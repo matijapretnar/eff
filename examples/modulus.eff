@@ -1,0 +1,37 @@
+(* We can implement modulus of continuity as usual with references *)
+
+let ref_mu f a =
+  let k = ref 0 in
+  let b i =
+    k := max !k i;
+    a i
+  in
+  f b;
+  !k
+
+(* An alternative is to define a special effect *)
+
+type 'a modulus =
+effect
+  operation call : integer -> 'a
+end
+
+(* A functional [f : (nat -> nat) -> nat] applied at argument [a : nat
+   -> nat] depends on at most [mu f a] terms of sequence [a]. *)
+let mu f a =
+  let m = new modulus in
+    handle
+      f m#call
+    with
+    | m#call n k -> (fun i -> let j = max i n in k (a n) j)
+    | val _ -> fun i -> i
+    | finally g -> g 0
+
+
+let f a = 0 * a 10 ;;
+let g a = a (a 5) ;;
+
+check_val (ref_mu f (fun i -> 30 + i * i)) ;;
+check (mu f (fun i -> 30 + i * i)) ;;
+check_val (ref_mu g (fun i -> 30 + i * i)) ;;
+check (mu g (fun i -> 30 + i * i)) ;;

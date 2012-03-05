@@ -1,0 +1,59 @@
+(* uniformly chooses an element of the list xs *)
+let rec uniform r = function
+  | [x] -> x
+  | x :: xs' as xs ->
+      let p = 1. /. (int_to_float (length xs)) in
+      if r#toss p then uniform r xs' else x
+
+let dice () = uniform rnd (range 1 6)
+
+(* merges two finite distributions according to ordering (<<) *)
+
+(* a handler that returns the distribution of answers *)
+let distribution r =
+  handler
+  | val x -> [(x, 1.)]
+  | r#toss p k ->
+      let rec weighted_sum p xs ys =
+        match (xs, ys) with
+        | (_, []) -> map (fun (x, q) -> (x, p *. q)) xs
+        | ([], _) -> map (fun (y, r) -> (y, (1. -. p) *. r)) ys
+        | ((x, q) :: xs', (y, r) :: ys') ->
+              if x = y then
+                  (x, p *. q +. (1. -. p) *. r) :: weighted_sum p xs' ys'
+              else if x < y then
+                  (x, p *. q) :: weighted_sum p xs' ys
+              else
+                  (y, (1. -. p) *. r) :: weighted_sum p xs ys'
+      in
+      weighted_sum p (k false) (k true)
+
+
+(* Example stolen from Jeremy Gibbons EWCE talk.
+   Monty-hall problem - parameter switch determines our strategy *)
+
+let monty_hall switch =
+  let doors = ["A"; "B"; "C"] in
+  (* the prize is hidden randomly behind one door *)
+  let prize = uniform rnd doors
+  (* contestant randomly chooses a door *)
+  and pick = uniform rnd doors in
+  (* host reveals with a door different from the two above *)
+  let revealed = uniform rnd (complement doors [prize; pick]) in
+  (* there is a remaining door *)
+  let remaining = head (complement doors [pick; revealed]) in
+  (* if we want to switch we take the remaining door, otherwise we stay with our pick *)
+  let final = if switch then remaining else pick in
+  (* did we get the prize? *)
+  prize = final ;;
+
+(* probability of getting the prize if we switch *)
+(* check (with distribution r handle monty_hall true) ;; *)
+
+(* probability of getting the prize if we don't switch *)
+(* check (with distribution r handle monty_hall false) ;; *)
+
+(* a different example: what is the distribution of a sum of two dice *)
+check (
+  with distribution rnd handle dice () + dice ()
+)

@@ -1,0 +1,1 @@
+Typing error (file "../tests/errors/polymorphism_id_id.eff", line 3, char 14): This expression has type string but it should have type int.

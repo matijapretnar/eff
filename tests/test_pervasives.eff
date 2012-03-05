@@ -1,0 +1,182 @@
+(* Check every thing in pervasives. *)
+
+check divByZero ;;
+
+check invalidArgument ;;
+
+check assertionFault ;;
+
+check failWith ;;
+
+check absurd ;;
+
+check raise ;;
+
+check assert ;;
+
+check (failwith "They say it's all about flirting.") ;;
+
+check (~-1) ;;
+
+check (~-. 3.14159) ;;
+
+check (~-. 1.0) ;;
+
+check (2 + 2) ;;
+
+check (2 * 2) ;;
+
+check (2 ** 3) ;;
+
+check (42 - 23) ;;
+
+check (42 - ~-23) ;;
+
+check (5 % 3) ;;
+
+check (0 % 1) ;;
+
+check (0 % 0) ;;
+
+check (1 % 0) ;;
+
+check (1 < 2) ;;
+
+check (true < false) ;;
+
+check ((1,true) < (0,false)) ;;
+
+check (1 = 1) ;;
+
+check ((fun x -> x) = (fun x -> x + 1)) ;;
+
+check (3.14 +. 2.7) ;;
+
+check (3.14 *. 2.7) ;;
+
+check (3.14 -. 2.7) ;;
+
+check (3.14 /. 2.7) ;;
+
+check (1.0 /. 0.0) ;;
+
+check (100 / 3) ;;
+
+check (1 / 0) ;;
+
+check (0 / 1) ;;
+
+check (0 / 0) ;;
+
+check ("cherry" ^ "pie") ;;
+
+check (to_string 13) ;;
+
+check (to_string [1,2,3]) ;;
+
+check (to_string (1,2,3)) ;;
+
+check (to_string (fun x -> x)) ;;
+
+check (float 42) ;;
+
+check None ;;
+
+check (Some 3) ;;
+
+check (ignore (2 + 3)) ;;
+
+check (not true) ;;
+
+check (3 > 2) ;;
+
+check ("foo" > "bar") ;;
+
+check (1 <= 1) ;;
+
+check (2 >= 1) ;;
+
+check (2 <> 3) ;;
+
+check (range 4 9) ;;
+
+check (map (fun x -> x * x) [1;2;3;4;5]) ;;
+
+check (take (fun k -> 3 * k + 2) 20) ;;
+
+check (fold_left (fun a y -> 2 * a + y) 1 [1;2;3;4;5]) ;;
+
+check (fold_right (fun y a -> 2 * a + y) [1;2;3;4;5] 1) ;;
+
+iter (fun k -> check ("iter " ^ to_string k)) [1;2;3;4;5] ;;
+
+check (forall (fun k -> k % 3 = 2) [1;2;3;4;5]) ;;
+
+check (exists (fun k -> k % 3 = 2) [1;2;3;4;5]) ;;
+
+check (mem "foo" ["bar"; "baz"]) ;;
+
+check (filter (fun k -> k > 3) [1;2;3;4;5]) ;;
+
+check (complement [1; 2; 3; 4; 5; 6] [2; 4; 8]) ;;
+
+check (intersection [1; 2; 3; 4; 5; 6] [2; 4; 8]) ;;
+
+check (zip [1;2;3] ["a"; "b"; "c"]) ;;
+
+check (zip [1;2;3;4;5;6] ["a"; "b"; "c"]) ;;
+
+check (reverse [1;2;3;4;5]) ;;
+
+check ([1;2;3] @ [4;5;6]) ;;
+
+check (length [1;2;3;4;5]) ;;
+
+check (head [1;2;3;4]) ;;
+
+check (head []) ;;
+
+check (tail [1;2;3;4]) ;;
+
+check (tail []) ;;
+
+check (abs 5, abs (~-5), abs(-5)) ;;
+
+check (min 1 2) ;;
+
+check (max 1 2) ;;
+
+check (gcd 12 8) ;;
+
+check (lcm 12 8) ;;
+
+check (odd 42) ;;
+
+check (even 42) ;;
+
+check (id 5) ;;
+
+check (id id) ;;
+
+check (compose (fun k -> k * k) (fun j -> j +4) 10) ;;
+
+check (fst ("foo", 4)) ;;
+
+check (snd ("foo", 4)) ;;
+
+check (std#write "Does this work?") ;;
+
+check (std#read ()) ;;
+
+check (err#raise "The cows are home.") ;;
+
+check (rnd#int 42) ;;
+
+check (rnd#float 42.0) ;;
+
+check (new ref) ;;
+
+let r = ref 5 ;;
+r := !r + 10 ;;
+let a = !r ;;
+check a ;;

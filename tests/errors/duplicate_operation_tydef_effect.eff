@@ -1,0 +1,7 @@
+(* Duplicate operations are not allowed in an effect type *)
+type cow =
+effect
+  operation chew : unit -> integer
+  operation chew : unit -> integer
+end
+

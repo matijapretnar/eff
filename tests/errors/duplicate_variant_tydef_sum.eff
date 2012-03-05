@@ -1,0 +1,3 @@
+(* Duplicate variants are not allowed in a sum type *)
+type cow = Horn of integer | Horn of unit
+

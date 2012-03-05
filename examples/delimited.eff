@@ -1,0 +1,22 @@
+(* Delimited continuations as in http://lamp.epfl.ch/~rompf/continuations-icfp09.pdf *)
+
+type ('a,'b) prompt =
+effect
+  operation shift : (('a -> 'b) -> 'b) -> 'a
+end
+
+let rec reset p =
+  handler
+  | p#shift f k -> with reset p handle (f k)
+
+let p = new prompt  ;;
+
+with reset p handle
+  p#shift (fun k -> k (k (k 7))) * 2 + 1 ;;
+
+let p = new prompt in
+let q = new prompt in
+  with reset p handle
+    1 + (with reset p handle
+           2 + (with reset q handle
+                  p#shift (fun k -> k (k 3))))

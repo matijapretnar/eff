@@ -1,0 +1,4 @@
+type foo = {a : bar; b : integer }
+
+type bar = integer -> integer
+

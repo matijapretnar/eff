@@ -1,0 +1,21 @@
+#!/bin/bash
+# Run compiled eff from the src subdirectory
+BASEDIR=`dirname $0`
+RLWRAP=`which rlwrap`
+if [ -x "$BASEDIR/src/eff.native" ]
+then
+  EFF="$BASEDIR/src/eff.native"
+elif [ -x "$BASEDIR/src/eff.byte" ]
+then
+  EFF="$BASEDIR/src/eff.byte"
+else
+  echo "Cannot find the eff executable. Run make in the src subdirectory to compile it."
+  exit 1
+fi
+if [ "$RLWRAP" = "" ]
+then
+  echo "Warning: could not find rlwrap, no line editing"
+  "$EFF" $@
+else
+  "$RLWRAP" "$EFF" $@
+fi

@@ -1,0 +1,5 @@
+(* A record must be linear *)
+type cow = {left : int; right : int}
+let c = {left=42; left=23; right=42}
+
+

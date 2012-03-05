@@ -1,0 +1,28 @@
+- : int
+- : bool
+- : string
+- : unit
+- : float
+- : int * int
+- : 'a list * string
+- : (string,  'a) cow
+- : ('a,  string) cow
+- : (int,  (string list)) cow -> ((string list),  int) cow
+- : (int,  string) bull
+- : (int,  'a) bull -> int
+- : ('a,  ('b list list)) bull -> 'b list list
+- : '_a dog
+- : int dog
+- : '_a list dog
+- : '_a -> string
+- : string
+- : string
+- : 'a -> 'a
+- : '_a -> '_a
+- : 'a -> 'a * 'a
+- : ('a -> 'a) * 'b list
+- : ('_a -> '_a) * ('_b -> '_b)
+- : 'a -> 'b -> 'a
+- : 'a list list list
+- : 'a -> 'b -> 'a
+- : 'a -> 'a

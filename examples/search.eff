@@ -1,0 +1,32 @@
+# Martin Escardo's search functional
+#
+# Let Cantor = Nat -> Bool. The search functional epsilon has type
+# (Cantor -> Bool) -> Cantor. It is characterized by the following
+# property. Given p : Cantor -> Bool, p (epsilon p) == True iff there
+# is a : Cantor such that p a == True.
+
+# We want to implement this in such a way that we can plug in different
+# search strategies later on.
+
+cons b s k = match k:
+                 case 0: b
+                 case n: s (n - 1)
+
+type Choice:
+    operation choose: () -> Bool
+
+dumb_strategy searcher = handler:
+    operation searcher.choose ():
+       b = yield True
+       if b: True
+       else: False
+
+def general_epsilon strategy searcher:
+    def epsilon p:
+       b = handle with strategy searcher:
+              b = searcher.choose ()
+              p' = compose p (cons b)
+              bs = epsilon p'
+              p (cons b bs)
+       cons b 
+    epsilon

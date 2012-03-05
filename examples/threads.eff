@@ -1,0 +1,78 @@
+type scheduler = effect
+  operation fork : (unit -> unit) -> unit
+  operation yield : unit -> unit
+end
+
+let round_robin s =
+  let queue = ref [] in
+  let enqueue p = queue := !queue @ [p] in
+  let dequeue () =
+    match !queue with
+    | [] -> ()
+    | p :: ps -> queue := ps; p ()
+  in
+  let rec manager () = handler
+    | s#fork p k -> enqueue (fun () -> with manager () handle p ()); k ()
+    | s#yield () k -> enqueue k; dequeue ()
+    | val () -> dequeue ()
+  in
+    manager () ;;
+
+let fifo s =
+  let rec manager () = handler
+    | s#fork p k -> k (); with manager () handle p ()
+    | s#yield () k -> k ()
+  in
+    manager () ;;
+
+let lifo s =
+  let rec manager () = handler
+    | s#fork p k -> with manager () handle p (); k ()
+    | s#yield () k -> k ()
+  in
+    manager () ;;
+
+(* example of forking a thread *)
+let sch = new scheduler in
+  with round_robin sch handle
+    sch#fork (fun () -> 
+      for i = 1 to 10 do
+        print_endline ("foo " ^ to_string i) ;
+        sch#yield () ;
+        sch#yield ()
+      done) ;
+    for j = 1 to 10 do
+      print_endline ("bar " ^ to_string j) ;
+      sch#yield ()
+    done ;;
+
+(* Enumerating all positive rational numbers. *)
+(* let sch = new scheduler in
+  (* Lists all fractions with a given numerator, yielding after each one *)
+  let rec fractions numerator =
+    (* Start enumerating fractions with a bigger numerator *)
+    sch#fork (fun () -> fractions (numerator + 1));
+    (* And list all the fractions with the current one *)
+    for denominator = 1 to numerator do
+      print_endline (to_string numerator ^ "/" ^ to_string denominator);
+      sch#yield ()
+    done
+in
+with round_robin sch handle
+  fractions 0 *)
+    
+
+(* example of two infinite loops yielding to each other *)
+(*
+let sch = new scheduler in
+  with round_robin sch handle
+    sch#fork (fun () ->
+      while true do
+        toplevel#print "Robin!" ;
+        sch#yield ()
+      done) ;
+    while true do
+      toplevel#print "Batman!" ;
+      sch#yield ()
+    done
+*)

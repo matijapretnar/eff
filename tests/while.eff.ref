@@ -1,0 +1,55 @@
+Check (file "../tests/while.eff", line 4, char 5): 0
+Check (file "../tests/while.eff", line 4, char 5): 1
+Check (file "../tests/while.eff", line 4, char 5): 2
+Check (file "../tests/while.eff", line 4, char 5): 3
+Check (file "../tests/while.eff", line 4, char 5): 4
+Check (file "../tests/while.eff", line 4, char 5): 5
+Check (file "../tests/while.eff", line 4, char 5): 6
+Check (file "../tests/while.eff", line 4, char 5): 7
+Check (file "../tests/while.eff", line 4, char 5): 8
+Check (file "../tests/while.eff", line 4, char 5): 9
+Check (file "../tests/while.eff", line 13, char 10): (1, 0)
+Check (file "../tests/while.eff", line 13, char 10): (2, 0)
+Check (file "../tests/while.eff", line 13, char 10): (2, 1)
+Check (file "../tests/while.eff", line 13, char 10): (3, 0)
+Check (file "../tests/while.eff", line 13, char 10): (3, 1)
+Check (file "../tests/while.eff", line 13, char 10): (3, 2)
+Check (file "../tests/while.eff", line 13, char 10): (4, 0)
+Check (file "../tests/while.eff", line 13, char 10): (4, 1)
+Check (file "../tests/while.eff", line 13, char 10): (4, 2)
+Check (file "../tests/while.eff", line 13, char 10): (4, 3)
+Check (file "../tests/while.eff", line 13, char 10): (5, 0)
+Check (file "../tests/while.eff", line 13, char 10): (5, 1)
+Check (file "../tests/while.eff", line 13, char 10): (5, 2)
+Check (file "../tests/while.eff", line 13, char 10): (5, 3)
+Check (file "../tests/while.eff", line 13, char 10): (5, 4)
+Check (file "../tests/while.eff", line 13, char 10): (6, 0)
+Check (file "../tests/while.eff", line 13, char 10): (6, 1)
+Check (file "../tests/while.eff", line 13, char 10): (6, 2)
+Check (file "../tests/while.eff", line 13, char 10): (6, 3)
+Check (file "../tests/while.eff", line 13, char 10): (6, 4)
+Check (file "../tests/while.eff", line 13, char 10): (6, 5)
+Check (file "../tests/while.eff", line 13, char 10): (7, 0)
+Check (file "../tests/while.eff", line 13, char 10): (7, 1)
+Check (file "../tests/while.eff", line 13, char 10): (7, 2)
+Check (file "../tests/while.eff", line 13, char 10): (7, 3)
+Check (file "../tests/while.eff", line 13, char 10): (7, 4)
+Check (file "../tests/while.eff", line 13, char 10): (7, 5)
+Check (file "../tests/while.eff", line 13, char 10): (7, 6)
+Check (file "../tests/while.eff", line 13, char 10): (8, 0)
+Check (file "../tests/while.eff", line 13, char 10): (8, 1)
+Check (file "../tests/while.eff", line 13, char 10): (8, 2)
+Check (file "../tests/while.eff", line 13, char 10): (8, 3)
+Check (file "../tests/while.eff", line 13, char 10): (8, 4)
+Check (file "../tests/while.eff", line 13, char 10): (8, 5)
+Check (file "../tests/while.eff", line 13, char 10): (8, 6)
+Check (file "../tests/while.eff", line 13, char 10): (8, 7)
+Check (file "../tests/while.eff", line 13, char 10): (9, 0)
+Check (file "../tests/while.eff", line 13, char 10): (9, 1)
+Check (file "../tests/while.eff", line 13, char 10): (9, 2)
+Check (file "../tests/while.eff", line 13, char 10): (9, 3)
+Check (file "../tests/while.eff", line 13, char 10): (9, 4)
+Check (file "../tests/while.eff", line 13, char 10): (9, 5)
+Check (file "../tests/while.eff", line 13, char 10): (9, 6)
+Check (file "../tests/while.eff", line 13, char 10): (9, 7)
+Check (file "../tests/while.eff", line 13, char 10): (9, 8)

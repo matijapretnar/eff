@@ -1,0 +1,13 @@
+check (false && (1 / 0 = 5)) ;;
+
+check (true || (1 / 0 = 5)) ;;
+
+check (false && false) ;;
+check (false && true) ;;
+check (true  && false) ;;
+check (true  && true) ;;
+
+check (false || false) ;;
+check (false || true) ;;
+check (true  || false) ;;
+check (true  || true) ;;

@@ -1,0 +1,2 @@
+(* A pattern must be linear. *)
+let (a,a) = (5,4)

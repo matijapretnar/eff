@@ -1,0 +1,4 @@
+let u x = x ;;
+let v = u u ;;
+check (v 42, v "foo") ;;
+

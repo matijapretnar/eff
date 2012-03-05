@@ -1,0 +1,49 @@
+(* Basic types *)
+#type 3 ;;
+#type true ;;
+#type "foo" ;;
+#type () ;;
+#type 4.2 ;;
+
+(* Tuples *)
+#type (3,4) ;;
+#type ([], "foo") ;;
+
+(* variants *)
+type ('a,'b) cow = Small of 'a | Large of 'b ;;
+#type Small "brown" ;;
+#type Large "white" ;;
+#type (fun cow -> match cow with Small k -> Large (k + 3) | Large s -> Small ("foo"::s)) ;;
+
+(* records *)
+type ('a,'b) bull = {small : 'a ; large : 'b} ;;
+#type {small = 5; large = "foo"} ;;
+#type (fun {small=k} -> k + 2) ;;
+#type (fun {large=l} -> [] :: l) ;;
+
+(* effects *)
+type 'a dog = effect
+                operation bark : 'a -> string
+                operation wag : unit -> 'a
+              end ;;
+
+#type (new dog) ;;
+#type (new dog @ 7 with operation bark x @ s -> ("yes", x) end) ;;
+#type (new dog @ [] with operation wag () @ s -> ([], []) end) ;;
+let fifi = new dog ;;
+#type fifi#bark ;;
+#type fifi#bark "tree" ;;
+#type fifi#wag () ;;
+
+(* Polymorphism *)
+#type (fun x -> x) ;;
+#type (fun x -> x) (fun y -> y) ;;
+#type (fun x -> (x, x)) ;;
+#type ((fun x -> x), []) ;;
+#type ((fun x -> x), (fun x -> x) (fun y -> y)) ;;
+#type (fun x y -> x) ;;
+#type [[[]]] ;;
+#type (fun x y -> (fun a -> a) x) ;;
+
+let rec h x = x ;;
+#type h ;;

@@ -1,0 +1,6 @@
+*~
+_build
+src/eff.{byte,native}
+src/version.ml
+src/parser.conflicts
+.DS_Store

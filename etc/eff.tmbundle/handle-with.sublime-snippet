@@ -1,0 +1,9 @@
+<snippet>
+    <content><![CDATA[handle
+	$0
+with
+| _ -> failwith "Unknown"]]></content>
+    <tabTrigger>handle</tabTrigger>
+    <scope>source.eff</scope>
+    <description>handle with</description>
+</snippet>

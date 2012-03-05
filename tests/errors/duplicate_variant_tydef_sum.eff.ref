@@ -1,0 +1,1 @@
+Typing error (file "../tests/errors/duplicate_variant_tydef_sum.eff", line 2, char 1): Alternatives in a sum type must be distinct

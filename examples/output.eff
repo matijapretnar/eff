@@ -1,0 +1,15 @@
+(* Output that collects prints into a list *)
+
+toplevel#print "Please enter your name:" ;
+let response = handle
+  toplevel#print "Hello ";
+  toplevel#print (toplevel#read ());
+  toplevel#print "!"
+with
+| toplevel#print x k -> fun c -> k () (c ^ x)
+| toplevel#read () k -> fun c -> k "Anonymous" c
+| val () -> fun c -> c
+| finally f -> f ""
+in
+toplevel#print "And here is your premade response:" ;
+toplevel#print response

@@ -1,0 +1,68 @@
+type choice = effect
+    operation amb : unit -> bool
+end
+
+let choose c x y = if c#amb () then x else y
+
+let rec pick c = function
+  | [] -> raise invalidArgument "pick"
+  | [x] -> x
+  | x :: xs -> choose c x (pick c xs)
+
+let choose_true c = handler
+  | c#amb () k -> k true
+
+let choose_false c = handler
+  | c#amb () k -> k false
+
+let choose_min c = handler
+  | c#amb () k -> min (k true) (k false)
+
+let choose_max c = handler
+  | c#amb () k -> max (k true) (k false)
+
+let choose_all c = handler
+  | val x -> [x]
+  | c#amb () k -> (k true) @ (k false)
+
+let avoid_exception c exc = handler
+  | c#amb () k ->
+      handle k true with
+      | exc#raise _ _ -> k false
+
+
+
+(* Searching for a pythagorean triple in a given set of numbers. *)
+let pythagoreans numbers =
+  let c = new choice
+  and fail = new exception in
+  with avoid_exception c fail handle
+    let x = pick c numbers
+    and y = pick c numbers
+    and z = pick c numbers
+    in
+      if x * x + y * y = z * z then
+        (x, y, z)
+      else
+        raise fail () ;;
+  
+(* check (pythagoreans (range 1 5));; *)
+(* check (pythagoreans (range 5 20));; *)
+
+(* Alice picks a number from a given set, and Bob afterwards picks a different
+   number. Alice wants to minimize the product of the chosen numbers while
+   Bob wants to maximize it. *)
+let min_max_game numbers =
+  let alice = new choice
+  and bob = new choice in
+  with choose_min alice handle
+    with choose_max bob handle
+      let a = pick alice numbers in
+      let b = pick bob (complement numbers [a]) in
+      a * b
+
+(* Alice will chose 1 and Bob will choose 5 *)
+(* check (min_max_game (range 1 5));; *)
+(* Alice will chose 0 and Bob's choice won't change anything. *)
+(* check (min_max_game (range -3 3));; *)
+

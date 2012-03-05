@@ -1,0 +1,8 @@
+<snippet>
+    <content><![CDATA[effect
+	$0
+end]]></content>
+    <tabTrigger>effect</tabTrigger>
+    <scope>source.eff</scope>
+    <description>effect</description>
+</snippet>

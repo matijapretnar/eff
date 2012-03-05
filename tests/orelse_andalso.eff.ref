@@ -1,0 +1,10 @@
+Check (file "../tests/orelse_andalso.eff", line 1, char 1): false
+Check (file "../tests/orelse_andalso.eff", line 3, char 1): true
+Check (file "../tests/orelse_andalso.eff", line 5, char 1): false
+Check (file "../tests/orelse_andalso.eff", line 6, char 1): false
+Check (file "../tests/orelse_andalso.eff", line 7, char 1): false
+Check (file "../tests/orelse_andalso.eff", line 8, char 1): true
+Check (file "../tests/orelse_andalso.eff", line 10, char 1): false
+Check (file "../tests/orelse_andalso.eff", line 11, char 1): true
+Check (file "../tests/orelse_andalso.eff", line 12, char 1): true
+Check (file "../tests/orelse_andalso.eff", line 13, char 1): true

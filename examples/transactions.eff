@@ -1,0 +1,38 @@
+let transaction r exc = handler
+  | r#lookup () k -> fun v -> k v v
+  | r#update v' k -> fun v -> k () v'
+  | exc#raise _ _ -> fun _ -> None
+  | val x -> fun v -> r := v; Some x
+  | finally f -> f (!r) ;;
+
+let exc = new exception in
+let x = ref 1 in
+let result = 
+  with transaction x exc handle
+    incr x;
+    exc#raise ();
+    3 * !x
+in
+check_val (!x, result) ;;
+
+let exc = new exception in
+let x = ref 1 in
+let result = 
+  with transaction x exc handle
+    incr x;
+    3 * !x
+in
+check_val (!x, result) ;;
+
+let exc = new exception in
+let x = ref 1 in
+let result =
+  handle
+    incr x;
+    exc#raise ();
+    3 * !x
+  with
+    | exc#raise _ _ -> None
+    | val x -> Some x
+in
+check_val (!x, result)

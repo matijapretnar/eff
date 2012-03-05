@@ -1,0 +1,14 @@
+let a = 5 in check a ;;
+let (a,b) = (1,2) in check (a,b) ;;
+let x :: y = [1;2;3;4] in check (x,y) ;;
+let _ :: y = [1;2;3;4] in check y ;;
+
+type 'a cow = Moo of 'a ;;
+let Moo x = Moo 10 in check x ;;
+
+let Moo x as y = Moo 10 in check (x,y) ;;
+let x as y as z = 42 in (x,y,z) ;;
+let x,y,z as a = (1,2,3) in (x,y,z,a) ;;
+
+(* This one should work also, but currently it does not:
+   let x as y, z = ("foo", "bar") in (x,y,z) ;; *)

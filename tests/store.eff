@@ -1,0 +1,18 @@
+type 'a store = effect
+  operation get: unit -> 'a
+  operation set: 'a -> unit
+end
+
+let x = ref 5 ;;
+let  y = ref 10 ;;
+let z = ref x ;;
+
+begin
+  y := 17 ;
+  z := y ;
+  let a = !x in
+  let b = !z in
+    x := a + !b ;
+    let c = !x + !y in
+    check (a, c)
+end

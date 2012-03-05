@@ -1,0 +1,2 @@
+(* Duplicate fields are not allowed in a record type. *)
+type cow = {a : unit; a : integer}

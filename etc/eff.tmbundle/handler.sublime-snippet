@@ -1,0 +1,10 @@
+<snippet>
+    <content><![CDATA[(handler
+| ${1:inst1#op1 x k} -> ${2:comp1}
+| ${3:inst2#op2 x k} -> ${4:comp2}${5:
+| ${6:val x} -> ${7:comp_val}}${8:
+| ${9:finally x} -> ${10:comp_fin}})]]></content>
+    <tabTrigger>hand</tabTrigger>
+    <scope>source.eff</scope>
+    <description>handler</description>
+</snippet>
