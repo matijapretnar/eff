@@ -1,1 +1,1 @@
-Typing error (file "../tests/errors/non_linear_pattern.eff", line 2, char 5): Fields in a pattern must be distinct.
+Typing error (file "./errors/non_linear_pattern.eff", line 2, char 5): Fields in a pattern must be distinct.

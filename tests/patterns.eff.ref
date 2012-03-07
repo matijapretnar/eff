@@ -1,6 +1,6 @@
-Check (file "../tests/patterns.eff", line 1, char 14): 5
-Check (file "../tests/patterns.eff", line 2, char 22): (1, 2)
-Check (file "../tests/patterns.eff", line 3, char 27): (1, [2; 3; 4])
-Check (file "../tests/patterns.eff", line 4, char 27): [2; 3; 4]
-Check (file "../tests/patterns.eff", line 7, char 23): 10
-Check (file "../tests/patterns.eff", line 9, char 28): (10, Moo 10)
+Check (file "./patterns.eff", line 1, char 14): 5
+Check (file "./patterns.eff", line 2, char 22): (1, 2)
+Check (file "./patterns.eff", line 3, char 27): (1, [2; 3; 4])
+Check (file "./patterns.eff", line 4, char 27): [2; 3; 4]
+Check (file "./patterns.eff", line 7, char 23): 10
+Check (file "./patterns.eff", line 9, char 28): (10, Moo 10)

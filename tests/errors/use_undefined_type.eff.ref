@@ -1,1 +1,1 @@
-Typing error (file "../tests/errors/use_undefined_type.eff", line 1, char 1): Unknown type constructors bar
+Typing error (file "./errors/use_undefined_type.eff", line 1, char 1): Unknown type constructors bar

@@ -1,6 +1,5 @@
-Check (file "../tests/tydef.eff", line 21, char 1): Tail
-Check (file "../tests/tydef.eff", line 23, char 1): {re = 1.2; im = 2.4}
-Check (file "../tests/tydef.eff", line 25, char 1): Node (10, Empty,
-                                                          Node (20, Empty,
-                                                                Empty))
-Check (file "../tests/tydef.eff", line 27, char 1): Horns <fun>
+Check (file "./tydef.eff", line 21, char 1): Tail
+Check (file "./tydef.eff", line 23, char 1): {re = 1.2; im = 2.4}
+Check (file "./tydef.eff", line 25, char 1): Node (10, Empty,
+                                                   Node (20, Empty, Empty))
+Check (file "./tydef.eff", line 27, char 1): Horns <fun>

@@ -1,8 +1,7 @@
-Check (file "../tests/polymorphism.eff", line 3, char 1): (5, "foo")
-Check (file "../tests/polymorphism.eff", line 7, char 1): (4, "foo")
-Check (file "../tests/polymorphism.eff", line 11, char 1): ([1], ["foo"])
-Check (file "../tests/polymorphism.eff", line 15, char 1): ([[]; []],
-                                                            [[2]; []])
+Check (file "./polymorphism.eff", line 3, char 1): (5, "foo")
+Check (file "./polymorphism.eff", line 7, char 1): (4, "foo")
+Check (file "./polymorphism.eff", line 11, char 1): ([1], ["foo"])
+Check (file "./polymorphism.eff", line 15, char 1): ([[]; []], [[2]; []])
 - : 'a -> 'a
 - : 'a -> 'a
 - : 'a -> 'b

@@ -1,21 +1,32 @@
 #!/bin/bash
-# Run compiled eff from the src subdirectory
-BASEDIR=`dirname $0`
-RLWRAP=`which rlwrap`
-if [ -x "$BASEDIR/src/eff.native" ]
+# WARNING: Do not change this file without making sure that sed in Makefile still works
+BASEDIR=.
+# Look for a line-editing wrapper rlwrap or ledit
+if [ -x /usr/bin/which ]
 then
-  EFF="$BASEDIR/src/eff.native"
-elif [ -x "$BASEDIR/src/eff.byte" ]
-then
-  EFF="$BASEDIR/src/eff.byte"
+    WRAPPER=`/usr/bin/which rlwrap`
+    if [ "$WRAPPER" = "" ]
+    then
+       WRAPPER=`/usr/bin/which ledit`
+    fi
 else
-  echo "Cannot find the eff executable. Run make in the src subdirectory to compile it."
+    WRAPPER=""
+fi
+# Determine whether we are going to run native or bytecode eff
+if [ -x "$BASEDIR/eff.native" ]
+then
+  EFF="$BASEDIR/eff.native"
+elif [ -x "$BASEDIR/eff.byte" ]
+then
+  EFF="$BASEDIR/eff.byte"
+else
+  echo "Cannot find the eff executable in $BASEDIR"
   exit 1
 fi
-if [ "$RLWRAP" = "" ]
+# Execute eff
+if [ "$WRAPPER" != "" ]
 then
-  echo "Warning: could not find rlwrap, no line editing"
-  "$EFF" $@
+  exec "$WRAPPER" "$EFF" --pervasives "$BASEDIR/pervasives.eff" $@
 else
-  "$RLWRAP" "$EFF" $@
+  exec "$EFF" --pervasives "$BASEDIR/pervasives.eff" $@
 fi

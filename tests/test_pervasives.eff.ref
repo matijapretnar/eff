@@ -1,109 +1,102 @@
-Check (file "../tests/test_pervasives.eff", line 3, char 1): <instance #3>
-Check (file "../tests/test_pervasives.eff", line 5, char 1): <instance #4>
-Check (file "../tests/test_pervasives.eff", line 7, char 1): <instance #5>
-Check (file "../tests/test_pervasives.eff", line 9, char 1): <instance #6>
-Check (file "../tests/test_pervasives.eff", line 11, char 1): <fun>
-Check (file "../tests/test_pervasives.eff", line 13, char 1): <fun>
-Check (file "../tests/test_pervasives.eff", line 15, char 1): <fun>
-Check (file "../tests/test_pervasives.eff", line 17, char 1): Operation <instance #6>.raise "They say it's all about flirting."
-Check (file "../tests/test_pervasives.eff", line 19, char 1): -1
-Check (file "../tests/test_pervasives.eff", line 21, char 1): -3.14159
-Check (file "../tests/test_pervasives.eff", line 23, char 1): -1.
-Check (file "../tests/test_pervasives.eff", line 25, char 1): 4
-Check (file "../tests/test_pervasives.eff", line 27, char 1): 4
-Check (file "../tests/test_pervasives.eff", line 29, char 1): 8
-Check (file "../tests/test_pervasives.eff", line 31, char 1): 19
-Check (file "../tests/test_pervasives.eff", line 33, char 1): 65
-Check (file "../tests/test_pervasives.eff", line 35, char 1): 2
-Check (file "../tests/test_pervasives.eff", line 37, char 1): 0
-Check (file "../tests/test_pervasives.eff", line 39, char 1): Operation <instance #3>.raise 
+Check (file "./test_pervasives.eff", line 3, char 1): <instance #3>
+Check (file "./test_pervasives.eff", line 5, char 1): <instance #4>
+Check (file "./test_pervasives.eff", line 7, char 1): <instance #5>
+Check (file "./test_pervasives.eff", line 9, char 1): <instance #6>
+Check (file "./test_pervasives.eff", line 11, char 1): <fun>
+Check (file "./test_pervasives.eff", line 13, char 1): <fun>
+Check (file "./test_pervasives.eff", line 15, char 1): <fun>
+Check (file "./test_pervasives.eff", line 17, char 1): Operation <instance #6>.raise "They say it's all about flirting."
+Check (file "./test_pervasives.eff", line 19, char 1): -1
+Check (file "./test_pervasives.eff", line 21, char 1): -3.14159
+Check (file "./test_pervasives.eff", line 23, char 1): -1.
+Check (file "./test_pervasives.eff", line 25, char 1): 4
+Check (file "./test_pervasives.eff", line 27, char 1): 4
+Check (file "./test_pervasives.eff", line 29, char 1): 8
+Check (file "./test_pervasives.eff", line 31, char 1): 19
+Check (file "./test_pervasives.eff", line 33, char 1): 65
+Check (file "./test_pervasives.eff", line 35, char 1): 2
+Check (file "./test_pervasives.eff", line 37, char 1): 0
+Check (file "./test_pervasives.eff", line 39, char 1): Operation <instance #3>.raise 
 ()
-Check (file "../tests/test_pervasives.eff", line 41, char 1): Operation <instance #3>.raise 
+Check (file "./test_pervasives.eff", line 41, char 1): Operation <instance #3>.raise 
 ()
-Check (file "../tests/test_pervasives.eff", line 43, char 1): true
-Check (file "../tests/test_pervasives.eff", line 45, char 1): false
-Check (file "../tests/test_pervasives.eff", line 47, char 1): false
-Check (file "../tests/test_pervasives.eff", line 49, char 1): true
-Check (file "../tests/test_pervasives.eff", line 51, char 1): false
-Check (file "../tests/test_pervasives.eff", line 53, char 1): 5.84
-Check (file "../tests/test_pervasives.eff", line 55, char 1): 8.478
-Check (file "../tests/test_pervasives.eff", line 57, char 1): 0.44
-Check (file "../tests/test_pervasives.eff", line 59, char 1): 1.16296296296
-Check (file "../tests/test_pervasives.eff", line 61, char 1): inf
-Check (file "../tests/test_pervasives.eff", line 63, char 1): 33
-Check (file "../tests/test_pervasives.eff", line 65, char 1): Operation <instance #3>.raise 
+Check (file "./test_pervasives.eff", line 43, char 1): true
+Check (file "./test_pervasives.eff", line 45, char 1): false
+Check (file "./test_pervasives.eff", line 47, char 1): false
+Check (file "./test_pervasives.eff", line 49, char 1): true
+Check (file "./test_pervasives.eff", line 51, char 1): false
+Check (file "./test_pervasives.eff", line 53, char 1): 5.84
+Check (file "./test_pervasives.eff", line 55, char 1): 8.478
+Check (file "./test_pervasives.eff", line 57, char 1): 0.44
+Check (file "./test_pervasives.eff", line 59, char 1): 1.16296296296
+Check (file "./test_pervasives.eff", line 61, char 1): inf
+Check (file "./test_pervasives.eff", line 63, char 1): 33
+Check (file "./test_pervasives.eff", line 65, char 1): Operation <instance #3>.raise 
 ()
-Check (file "../tests/test_pervasives.eff", line 67, char 1): 0
-Check (file "../tests/test_pervasives.eff", line 69, char 1): Operation <instance #3>.raise 
+Check (file "./test_pervasives.eff", line 67, char 1): 0
+Check (file "./test_pervasives.eff", line 69, char 1): Operation <instance #3>.raise 
 ()
-Check (file "../tests/test_pervasives.eff", line 71, char 1): "cherrypie"
-Check (file "../tests/test_pervasives.eff", line 73, char 1): "13"
-Check (file "../tests/test_pervasives.eff", line 75, char 1): "[(1, 2, 3)]"
-Check (file "../tests/test_pervasives.eff", line 77, char 1): "(1, 2, 3)"
-Check (file "../tests/test_pervasives.eff", line 79, char 1): "<fun>"
-Check (file "../tests/test_pervasives.eff", line 81, char 1): 42.
-Check (file "../tests/test_pervasives.eff", line 83, char 1): None
-Check (file "../tests/test_pervasives.eff", line 85, char 1): Some 3
-Check (file "../tests/test_pervasives.eff", line 87, char 1): ()
-Check (file "../tests/test_pervasives.eff", line 89, char 1): false
-Check (file "../tests/test_pervasives.eff", line 91, char 1): true
-Check (file "../tests/test_pervasives.eff", line 93, char 1): true
-Check (file "../tests/test_pervasives.eff", line 95, char 1): true
-Check (file "../tests/test_pervasives.eff", line 97, char 1): true
-Check (file "../tests/test_pervasives.eff", line 99, char 1): true
-Check (file "../tests/test_pervasives.eff", line 101, char 1): [4; 5; 6; 7;
-                                                                8; 9]
-Check (file "../tests/test_pervasives.eff", line 103, char 1): [1; 4; 9; 16;
-                                                                25]
-Check (file "../tests/test_pervasives.eff", line 105, char 1): [2; 5; 8; 11;
-                                                                14; 17; 20;
-                                                                23; 26; 29;
-                                                                32; 35; 38;
-                                                                41; 44; 47;
-                                                                50; 53; 56;
-                                                                59; 62]
-Check (file "../tests/test_pervasives.eff", line 107, char 1): 89
-Check (file "../tests/test_pervasives.eff", line 109, char 1): 161
-Check (file "../tests/test_pervasives.eff", line 111, char 16): "iter 1"
-Check (file "../tests/test_pervasives.eff", line 111, char 16): "iter 2"
-Check (file "../tests/test_pervasives.eff", line 111, char 16): "iter 3"
-Check (file "../tests/test_pervasives.eff", line 111, char 16): "iter 4"
-Check (file "../tests/test_pervasives.eff", line 111, char 16): "iter 5"
-Check (file "../tests/test_pervasives.eff", line 113, char 1): false
-Check (file "../tests/test_pervasives.eff", line 115, char 1): true
-Check (file "../tests/test_pervasives.eff", line 117, char 1): false
-Check (file "../tests/test_pervasives.eff", line 119, char 1): [4; 5]
-Check (file "../tests/test_pervasives.eff", line 121, char 1): [1; 3; 5; 6]
-Check (file "../tests/test_pervasives.eff", line 123, char 1): [2; 4]
-Check (file "../tests/test_pervasives.eff", line 125, char 1): [(1, "a");
-                                                                (2, "b");
-                                                                (3, "c")]
-Check (file "../tests/test_pervasives.eff", line 127, char 1): Operation <instance #4>.raise "zip: length mismatch"
-Check (file "../tests/test_pervasives.eff", line 129, char 1): [5; 4; 3; 2; 1]
-Check (file "../tests/test_pervasives.eff", line 131, char 1): [1; 2; 3; 4;
-                                                                5; 6]
-Check (file "../tests/test_pervasives.eff", line 133, char 1): 5
-Check (file "../tests/test_pervasives.eff", line 135, char 1): 1
-Check (file "../tests/test_pervasives.eff", line 137, char 1): Operation <instance #4>.raise "head: empty list"
-Check (file "../tests/test_pervasives.eff", line 139, char 1): [2; 3; 4]
-Check (file "../tests/test_pervasives.eff", line 141, char 1): Operation <instance #4>.raise "head: empty list"
-Check (file "../tests/test_pervasives.eff", line 143, char 1): (5, 5, 5)
-Check (file "../tests/test_pervasives.eff", line 145, char 1): 1
-Check (file "../tests/test_pervasives.eff", line 147, char 1): 2
-Check (file "../tests/test_pervasives.eff", line 149, char 1): 4
-Check (file "../tests/test_pervasives.eff", line 151, char 1): 24
-Check (file "../tests/test_pervasives.eff", line 153, char 1): false
-Check (file "../tests/test_pervasives.eff", line 155, char 1): true
-Check (file "../tests/test_pervasives.eff", line 157, char 1): 5
-Check (file "../tests/test_pervasives.eff", line 159, char 1): <fun>
-Check (file "../tests/test_pervasives.eff", line 161, char 1): 196
-Check (file "../tests/test_pervasives.eff", line 163, char 1): "foo"
-Check (file "../tests/test_pervasives.eff", line 165, char 1): 4
-Check (file "../tests/test_pervasives.eff", line 167, char 1): Operation <instance #2>.write "Does this work?"
-Check (file "../tests/test_pervasives.eff", line 169, char 1): Operation <instance #2>.read 
+Check (file "./test_pervasives.eff", line 71, char 1): "cherrypie"
+Check (file "./test_pervasives.eff", line 73, char 1): "13"
+Check (file "./test_pervasives.eff", line 75, char 1): "[(1, 2, 3)]"
+Check (file "./test_pervasives.eff", line 77, char 1): "(1, 2, 3)"
+Check (file "./test_pervasives.eff", line 79, char 1): "<fun>"
+Check (file "./test_pervasives.eff", line 81, char 1): 42.
+Check (file "./test_pervasives.eff", line 83, char 1): None
+Check (file "./test_pervasives.eff", line 85, char 1): Some 3
+Check (file "./test_pervasives.eff", line 87, char 1): ()
+Check (file "./test_pervasives.eff", line 89, char 1): false
+Check (file "./test_pervasives.eff", line 91, char 1): true
+Check (file "./test_pervasives.eff", line 93, char 1): true
+Check (file "./test_pervasives.eff", line 95, char 1): true
+Check (file "./test_pervasives.eff", line 97, char 1): true
+Check (file "./test_pervasives.eff", line 99, char 1): true
+Check (file "./test_pervasives.eff", line 101, char 1): [4; 5; 6; 7; 8; 9]
+Check (file "./test_pervasives.eff", line 103, char 1): [1; 4; 9; 16; 25]
+Check (file "./test_pervasives.eff", line 105, char 1): [2; 5; 8; 11; 14; 17;
+                                                         20; 23; 26; 29; 32;
+                                                         35; 38; 41; 44; 47;
+                                                         50; 53; 56; 59; 62]
+Check (file "./test_pervasives.eff", line 107, char 1): 89
+Check (file "./test_pervasives.eff", line 109, char 1): 161
+Check (file "./test_pervasives.eff", line 111, char 16): "iter 1"
+Check (file "./test_pervasives.eff", line 111, char 16): "iter 2"
+Check (file "./test_pervasives.eff", line 111, char 16): "iter 3"
+Check (file "./test_pervasives.eff", line 111, char 16): "iter 4"
+Check (file "./test_pervasives.eff", line 111, char 16): "iter 5"
+Check (file "./test_pervasives.eff", line 113, char 1): false
+Check (file "./test_pervasives.eff", line 115, char 1): true
+Check (file "./test_pervasives.eff", line 117, char 1): false
+Check (file "./test_pervasives.eff", line 119, char 1): [4; 5]
+Check (file "./test_pervasives.eff", line 121, char 1): [1; 3; 5; 6]
+Check (file "./test_pervasives.eff", line 123, char 1): [2; 4]
+Check (file "./test_pervasives.eff", line 125, char 1): [(1, "a"); (2, "b");
+                                                         (3, "c")]
+Check (file "./test_pervasives.eff", line 127, char 1): Operation <instance #4>.raise "zip: length mismatch"
+Check (file "./test_pervasives.eff", line 129, char 1): [5; 4; 3; 2; 1]
+Check (file "./test_pervasives.eff", line 131, char 1): [1; 2; 3; 4; 5; 6]
+Check (file "./test_pervasives.eff", line 133, char 1): 5
+Check (file "./test_pervasives.eff", line 135, char 1): 1
+Check (file "./test_pervasives.eff", line 137, char 1): Operation <instance #4>.raise "head: empty list"
+Check (file "./test_pervasives.eff", line 139, char 1): [2; 3; 4]
+Check (file "./test_pervasives.eff", line 141, char 1): Operation <instance #4>.raise "head: empty list"
+Check (file "./test_pervasives.eff", line 143, char 1): (5, 5, 5)
+Check (file "./test_pervasives.eff", line 145, char 1): 1
+Check (file "./test_pervasives.eff", line 147, char 1): 2
+Check (file "./test_pervasives.eff", line 149, char 1): 4
+Check (file "./test_pervasives.eff", line 151, char 1): 24
+Check (file "./test_pervasives.eff", line 153, char 1): false
+Check (file "./test_pervasives.eff", line 155, char 1): true
+Check (file "./test_pervasives.eff", line 157, char 1): 5
+Check (file "./test_pervasives.eff", line 159, char 1): <fun>
+Check (file "./test_pervasives.eff", line 161, char 1): 196
+Check (file "./test_pervasives.eff", line 163, char 1): "foo"
+Check (file "./test_pervasives.eff", line 165, char 1): 4
+Check (file "./test_pervasives.eff", line 167, char 1): Operation <instance #2>.write "Does this work?"
+Check (file "./test_pervasives.eff", line 169, char 1): Operation <instance #2>.read 
 ()
-Check (file "../tests/test_pervasives.eff", line 171, char 1): Operation <instance #1>.raise "The cows are home."
-Check (file "../tests/test_pervasives.eff", line 173, char 1): Operation <instance #0>.int 42
-Check (file "../tests/test_pervasives.eff", line 175, char 1): Operation <instance #0>.float 42.
-Check (file "../tests/test_pervasives.eff", line 177, char 1): <instance #7>
-Check (file "../tests/test_pervasives.eff", line 182, char 1): 15
+Check (file "./test_pervasives.eff", line 171, char 1): Operation <instance #1>.raise "The cows are home."
+Check (file "./test_pervasives.eff", line 173, char 1): Operation <instance #0>.int 42
+Check (file "./test_pervasives.eff", line 175, char 1): Operation <instance #0>.float 42.
+Check (file "./test_pervasives.eff", line 177, char 1): <instance #7>
+Check (file "./test_pervasives.eff", line 182, char 1): 15

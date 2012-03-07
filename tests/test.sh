@@ -1,26 +1,32 @@
 #!/bin/bash
 
-BASEDIR=`dirname $0`
-DIFF="diff"
+BASEDIR=`dirname "$0"`
+DIFF=`which diff`
 
-if [ -x "$BASEDIR/src/eff.native" ]
+if [ ! -x "$DIFF" ]
 then
-  EFF="$BASEDIR/src/eff.native"
-elif [ -x "$BASEDIR/src/eff.byte" ]
+    echo "Cannot find the diff command. Exiting."
+    exit 1
+fi
+
+if [ -x "$BASEDIR/../eff.native" ]
 then
-  EFF="$BASEDIR/src/eff.byte"
+  EFF="$BASEDIR/../eff.native"
+elif [ -x "$BASEDIR/../eff.byte" ]
+then
+  EFF="$BASEDIR/../eff.byte"
 else
-  echo "Cannot find the eff executable. Run make in the src subdirectory to compile it."
+  echo "Cannot find the eff executable. Compile eff first."
   exit 1
 fi
 
 VALIDATE=0
 if [ "$1" = "-v" ]
-    then
+then
     VALIDATE=1
 fi
 
-for FILE in $BASEDIR/tests/*.eff $BASEDIR/tests/*/*.eff
+for FILE in $BASEDIR/*.eff $BASEDIR/*/*.eff
   do
   $EFF $FILE &> $FILE.out
   if [ -f $FILE.ref ]

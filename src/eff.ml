@@ -1,11 +1,10 @@
 module S = Syntax
 module C = Common
 
-let version = "3.0"
-
 let usage = "Usage: eff [option] ... [file] ..."
 let interactive = ref true
 let pervasives = ref true
+let pervasives_file = ref (Filename.concat (Filename.dirname Sys.argv.(0)) "pervasives.eff")
 
 (* We set up a list of files to be loaded and run. *)
 let files = ref []
@@ -13,20 +12,20 @@ let add_file f = (files := f :: !files)
 
 (* Command-line options *)
 let options = Arg.align [
+  ("--pervasives",
+   Arg.String (fun str -> pervasives_file := str),
+   " Specify the pervasives.eff file");
   ("--no-pervasives",
     Arg.Clear pervasives,
     " Do not load pervasives.eff");
   ("--no-types",
     Arg.Set Infer.disable_typing,
     " Disable typechecking");
-  ("-version",
+  ("-v",
     Arg.Unit (fun () ->
-                print_endline ("eff " ^ version ^ ":\n" ^
-                                "  changeset: " ^ Version.changeset ^ "\n" ^
-                                "  system:    " ^ Version.os ^ "\n" ^
-                                "  date:      " ^ Version.date) ;
-                exit 0),
-    " Print full version information");
+      print_endline ("eff " ^ Version.version ^ "(" ^ Sys.os_type ^ ")") ;
+      exit 0),
+    " Print version information and exit");
   ("--warn-sequencing", Arg.Set Infer.warn_implicit_sequencing,
    " Print warning about implicit sequencing");
   ("-n",
@@ -143,7 +142,7 @@ let toplevel env =
     | "Win32" -> "Ctrl-Z"
     | _ -> "EOF"
   in
-  print_endline ("eff " ^ version);
+  print_endline ("eff " ^ Version.version);
   print_endline ("Press " ^ eof ^ " to exit.");
   try loop env
   with End_of_file -> ()
@@ -156,11 +155,7 @@ let main =
   (* Files were listed in the wrong order, so we reverse them *)
   files := List.rev !files;
   (* Load the pervasives. *)
-  if !pervasives then
-    begin
-      let eff_dir = Filename.dirname Sys.argv.(0) in
-      add_file (Filename.concat eff_dir "pervasives.eff")
-    end ;
+  if !pervasives then add_file !pervasives_file ;
   try
     (* Run and load all the specified files. *)
     let i = !interactive in

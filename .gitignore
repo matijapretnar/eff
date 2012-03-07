@@ -1,6 +1,6 @@
 *~
-_build
-src/eff.{byte,native}
-src/version.ml
-src/parser.conflicts
 .DS_Store
+_build
+eff.byte
+eff.native
+src/version.ml
