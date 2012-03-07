@@ -1,8 +1,14 @@
+(** Type inference contexts *)
 module C = Common
 module T = Type
 
+(** A context binds types to variables and type definitions to type names *)
 type context = {
+  (** each variable is assigned a type together with a list of polymorphic
+      type parameters (not restricted by value restriction) *)
   variables: (C.variable * (T.param list * T.ty)) list;
+  (** each type name is assigned a type definition according with a list of
+      type parameters *)
   types: (C.tyname * (T.param list * T.ty)) list;
 }
 
@@ -14,14 +20,18 @@ let extend_var x pt ctx =
 let extend_vars vars ctx =
   List.fold_right (fun (x, t) ctx -> extend_var x ([], t) ctx) vars ctx
 
+(** Initial context has no variables and only builtin types *)
 let initial = {
   variables = [];
   types = External.types;
 }
 
+(** [freeparams ctx] returns a list of all free type parameters in [ctx] *)
 let free_params {variables=lst} =
   C.uniq (List.flatten (List.map (fun (_,(ps,t)) -> C.diff (T.free_params t) ps) lst))
 
+(** [subst_ctx sbst ctx] applies a type substitution to all types occurring in
+    [ctx]. *)
 let subst_ctx sbst ctx =
   { ctx with variables =
       C.assoc_map
@@ -30,6 +40,8 @@ let subst_ctx sbst ctx =
           (ps, T.subst_ty sbst t))
         ctx.variables }
 
+(** [find_variant lbl tctx] returns the name of the variant type from [tcxt]
+    that defines the label [lbl] *)
 let find_variant lbl tctx =
   let rec find = function
     | [] -> None
@@ -42,6 +54,8 @@ let find_variant lbl tctx =
   in
     find tctx
 
+(** [find_field fld tctx] returns the name of the record type from [tcxt] that
+    defines the field [fld] *)
 let find_field fld tctx =
   let rec find = function
     | [] -> None
@@ -50,6 +64,8 @@ let find_field fld tctx =
   in
     find tctx
 
+(** [find_operation op tctx] returns the name of the effect type from [tcxt]
+    that defines the operation symbol [op] *)
 let find_operation op tctx =
   let rec find = function
     | [] -> None
@@ -64,6 +80,8 @@ let find_operation op tctx =
 
 let extend_tydef ty def ctx = {ctx with types = (ty, def) :: ctx.types}
 
+(** [infer_variant lbl tctx] finds a variant type from [tctx] that defines the
+    label [lbl] and returns it with refreshed type parameters. *)
 let infer_variant lbl tctx =
   let rec find = function
     | [] -> Error.typing "Unknown variant %s." lbl
@@ -80,6 +98,8 @@ let infer_variant lbl tctx =
   in
     find tctx
 
+(** [infer_field fld tctx] finds a record type from [tctx] that defines the
+    field [fld] and returns it with refreshed type parameters. *)
 let infer_field fld tctx =
   let rec find = function
     | [] -> Error.typing "Unknown field %s." fld
@@ -92,6 +112,8 @@ let infer_field fld tctx =
   in
     find tctx
 
+(** [infer_operation op tctx] finds an effect type from [tctx] that defines the
+    operation [op] and returns it with refreshed type parameters. *)
 let infer_operation op tctx =
   let rec find = function
     | [] -> Error.typing "Unknown operation %s" op
