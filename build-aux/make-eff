@@ -1,0 +1,17 @@
+#!/bin/bash
+# Create the eff script
+PERVASIVES="$1"
+EFFPROG="$2"
+WRAPPER="$3"
+if test "$WARPPER" = "no" ; then
+    cat eff <<EOF
+#!/bin/bash
+exec "$EFFPROG" --pervasives "$PERVASIVES" \$@
+EOF
+else
+    cat >eff <<EOF
+#!/bin/bash
+exec "$WRAPPER" "$EFFPROG" --pervasives "$PERVASIVES" \$@
+EOF
+fi
+chmod a+x eff

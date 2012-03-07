@@ -1,4 +1,4 @@
-(* Desugaring of syntax into the intermediate language. *)
+(** Desugaring of syntax into the intermediate language. *)
 
 module C = Common
 module S = Syntax
