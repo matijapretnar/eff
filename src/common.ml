@@ -1,20 +1,30 @@
-type variable = string
-type opname = string
-type effname = string
-type label = string
-type field = string
+(** Common definitions. *)
 
-type tyname = string
-type param = string
+(** Types shared by different modules *)
+type variable = string (** variable identifiers *)
+type opname = string (** operation symbols *)
+type label = string (** variant labels *)
+type field = string (** record fields *)
 
+type tyname = string (** type names *)
+type effname = string (** effect names *)
+type param = string (** type parameters *)
+
+(** Positions *)
 type position =
-  | Position of Lexing.position * Lexing.position
-  | Nowhere
+  | Position of Lexing.position * Lexing.position (** delimited position *)
+  | Nowhere (** unknown region *)
 
+(** A type enriched with a position *)
 type 'a pos = 'a * position
 
-type op = effname * opname
+(** A union of two positions *)
+let join_pos (_, pos1) (_, pos2) =
+  match pos1, pos2 with
+  | _, Nowhere | Nowhere, _ -> Nowhere
+  | Position (b1, _), Position (_, e2) -> Position (b1, e2)
 
+(** Primitive constants *)
 type const =
   | Integer of Big_int.big_int
   | String of string
@@ -37,11 +47,15 @@ let less_than_const c1 c2 =
     | Float f1, Float f2 -> f1 < f2
     | _, _ -> false
 
+(** Variants for the built-in list type *)
 let cons = "$1cons"
 let nil = "$0nil"
 
+(** Association lists *)
 type ('key, 'value) assoc = ('key * 'value) list
 
+(** Variants of association list operations that map into [option] type instead
+    of raising [Not_found] *)
 let lookup k env =
   try
     Some (List.assoc k env)
@@ -65,17 +79,15 @@ let injective f lst =
   in
     check [] lst
 
-let join_pos (_, pos1) (_, pos2) =
-  match pos1, pos2 with
-  | _, Nowhere | Nowhere, _ -> Nowhere
-  | Position (b1, _), Position (_, e2) -> Position (b1, e2)
-
+(* [find_duplicate xs ys] returns [Some x] if [x] is the first element of [xs]
+   that appears [ys]. It returns [None] if there is no such element. *)
 let rec find_duplicate xs ys =
   match xs with
     | [] -> None
     | x::xs -> if List.mem x ys then Some x else find_duplicate xs ys
 
-(** NB: We use our own [map] to be sure that the order of side-effects is well-defined. *)
+(** NB: We use our own [map] to be sure that the order of side-effects is
+    well-defined. *)
 let rec map f = function
   | [] -> []
   | x :: xs ->
@@ -83,14 +95,17 @@ let rec map f = function
       let ys = map f xs in
       y :: ys
 
+(** [option_map f] maps [None] to [None] and [Some x] to [Some (f x)]. *)
 let option_map f = function
   | None -> None
   | Some x -> Some (f x)
 
+(** [remove x lst] returns [lst] with all occurrences of [x] removed. *)
 let rec remove x = function
   | [] -> []
   | y::lst -> if x = y then remove x lst else y :: (remove x lst)
 
+(** [assoc_map f lst] transforms each [(k, v)] in [lst] into [(k, f v)]. *)
 let rec assoc_map f = function
   | [] -> []
   | (l, x) :: xs ->
@@ -98,6 +113,8 @@ let rec assoc_map f = function
       let ys = assoc_map f xs in
       (l, y) :: ys
 
+(** [fresh sort] creates a function that creates fresh instances with label
+    [sort] *)
 let fresh sort =
   let counter = ref 0 in
   fun () ->
@@ -106,14 +123,18 @@ let fresh sort =
     if !counter = 0 then failwith ("Too many instances of " ^ sort ^ ".");
     f
 
+(** [fresh_variable ()] creates a fresh variable ["$gen1"], ["$gen2"], ... on
+    each call *)
 let fresh_variable =
   let next_variable = fresh "variable" in
   fun () -> "$gen" ^ string_of_int (next_variable ())
 
+(** [uniq lst] returns [lst] with all duplicates removed *)
 let rec uniq = function
   | [] -> []
   | x::xs ->
     let ys = uniq xs in
       if List.mem x ys then ys else x::ys
 
+(** [diff lst1 lst2] returns [lst1] with all members of [lst2] removed *)
 let diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
