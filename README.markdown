@@ -31,10 +31,9 @@ statically typed language with parametric polymorphism and type inference.
 The types are similar to those of OCaml and other variants of ML in the
 sense that they do not express any information about computational effects.
 
-For further information contact Andrej Bauer <Andrej.Bauer@andrej.com> or
-Matija Pretnar <matija@pretnar.info>, and check the [eff
-posts](http://math.andrej.com/category/programming/eff/) on the Mathematics
-and Computation blog.
+For further information visit the [eff page](http://math.andrej.com/eff/)
+or contact the authors Andrej Bauer <Andrej.Bauer@andrej.com> and Matija
+Pretnar <matija@pretnar.info>,
 
 Obtaining eff
 -------------
