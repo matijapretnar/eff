@@ -10,7 +10,7 @@ let rev lst =
      done) ;
      !t ;;
 
-type 'a linked = Nil | Cons of 'a * 'a linked store ;;
+type 'a linked = Nil | Cons of 'a * 'a linked ref ;;
 
 let linked_rev r =
   let rec rev prev = function

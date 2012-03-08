@@ -1,0 +1,14 @@
+let rec pick lst =
+  if rnd#int (length lst) = 0 then hd lst else pick (tl lst)
+
+let monty_hall () =
+  let prize = pick ["A"; "B"; "C"] in
+  print_string ("The correct answer is " ^ prize ^ "\n");
+  print_string "Pick a door (A, B, C): " ;
+  let guess = std#read () in
+  let empty = pick (filter (fun k -> k <> guess && k <> prize) ["A"; "B"; "C"]) in
+  let other = hd (filter (fun k -> k <> guess && k <> empty) ["A"; "B"; "C"]) in
+  print_string ("Door " ^ empty ^ " is empty. Change to " ^ other ^ "? (y/n): ") ;
+  let final = (if std#read () = "y" then other else guess) in
+  print_string (if final = prize then "You won.\n" else "You lost.\n")
+

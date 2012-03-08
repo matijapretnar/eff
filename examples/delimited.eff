@@ -1,22 +1,28 @@
-(* Delimited continuations as in http://lamp.epfl.ch/~rompf/continuations-icfp09.pdf *)
+(* Section 6.11 Delimited control *)
 
-type ('a,'b) prompt =
+type ('a, 'b) delimited =
 effect
   operation shift : (('a -> 'b) -> 'b) -> 'a
 end
 
-let rec reset p =
-  handler
-  | p#shift f k -> with reset p handle (f k)
+let rec reset d = handler
+  | d#shift f k -> with reset d handle (f k) ;;
 
-let p = new prompt  ;;
+(* An example from http://lamp.epfl.ch/~rompf/continuations-icfp09.pdf *)
 
-with reset p handle
-  p#shift (fun k -> k (k (k 7))) * 2 + 1 ;;
+let d = new delimited in
+with reset d handle
+  d#shift (fun k -> k (k (k 7))) * 2 + 1 ;;
 
-let p = new prompt in
-let q = new prompt in
-  with reset p handle
-    1 + (with reset p handle
-           2 + (with reset q handle
-                  p#shift (fun k -> k (k 3))))
+(* The yin-yang puzzle, see
+   http://stackoverflow.com/questions/2694679/how-the-yin-yang-puzzle-works *)
+
+(* Due to too restrictive typing, this program does not type-check. Use the
+   --no-types option to run it without type checking. *)
+(*
+let y = new delimited in
+  with reset y handle
+    let yin = (fun k -> std#write "@" ; k) (y#shift (fun k -> k k)) in
+    let yang = (fun k -> std#write "*" ; k) (y#shift (fun k -> k k)) in
+      yin yang ;;
+*)

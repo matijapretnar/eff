@@ -13,7 +13,7 @@ let ref_mu f a =
 
 type 'a modulus =
 effect
-  operation call : integer -> 'a
+  operation call : int -> 'a
 end
 
 (* A functional [f : (nat -> nat) -> nat] applied at argument [a : nat

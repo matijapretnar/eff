@@ -1,32 +1,58 @@
-# Martin Escardo's search functional
-#
-# Let Cantor = Nat -> Bool. The search functional epsilon has type
-# (Cantor -> Bool) -> Cantor. It is characterized by the following
-# property. Given p : Cantor -> Bool, p (epsilon p) == True iff there
-# is a : Cantor such that p a == True.
+(* Martin Escardo's search functionals. *)
 
-# We want to implement this in such a way that we can plug in different
-# search strategies later on.
+type 'a result = Failure | Success of 'a
 
-cons b s k = match k:
-                 case 0: b
-                 case n: s (n - 1)
+type ('a, 'b) selection = effect
+  operation select: 'a * 'b list -> 'b
+end
 
-type Choice:
-    operation choose: () -> Bool
+let select s v = handler
+  | s#select (x,ys) k -> (fun cs ->
+    (match assoc x cs with
+     | Some y -> k y cs
+     | None ->
+         let rec try = function
+           | [] -> Failure
+           | y::ys ->
+               (match k y ((x,y)::cs) with
+                  | Success lst -> Success lst
+                  | Failure -> try ys)
+         in try ys))
+  | val u -> (fun cs ->
+      if u = v then Success cs else Failure)
+  | finally f -> f [] ;;
 
-dumb_strategy searcher = handler:
-    operation searcher.choose ():
-       b = yield True
-       if b: True
-       else: False
+check_val (
+  let s = new selection in
+  with select s true handle
+    let a = s#select ("a", [5;6;7;8]) in
+    let b = s#select ("b", [9;10;11;12]) in
+    let c = s#select ("c", [13;14;15;16]) in
+      a*a + b*b = c*c
+) ;;
 
-def general_epsilon strategy searcher:
-    def epsilon p:
-       b = handle with strategy searcher:
-              b = searcher.choose ()
-              p' = compose p (cons b)
-              bs = epsilon p'
-              p (cons b bs)
-       cons b 
-    epsilon
+(* Martin Escardo's epsilon. *)
+
+let epsilon p =
+  let s = new selection in
+  let r = (with select s true handle
+             p (fun n -> s#select (n, [false; true])))
+  in
+    match r with
+      | Failure -> (fun _ -> false)
+      | Success lst ->
+        (fun n -> match assoc n lst with
+                  | None -> false | Some b -> b)
+;;
+
+#type epsilon ;;
+
+check_val (
+  let b = epsilon (fun a -> a 0 <> a 1 && a 1 <> a 2 && a 2 <> a 3) in
+  take b 10
+) ;;
+
+check_val (
+  let b = epsilon (fun a -> a 0 && not (a 0)) in
+  take b 10
+)

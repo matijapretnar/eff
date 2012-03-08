@@ -1,68 +1,142 @@
+(* Choice is given by a single [arb] operation, which nondeterministically
+   chooses either [true] or [false]. *)
 type choice = effect
-    operation amb : unit -> bool
+  operation arb : unit -> bool
 end
 
-let choose c x y = if c#amb () then x else y
+(* [choose c x y] nondeterministically chooses between [x] and [y]. *)
+let choose c x y = if c#arb () then x else y
 
-let rec pick c = function
-  | [] -> raise invalidArgument "pick"
+(* [select c lst] nondeterministically selects an element in list [lst]. *)
+let rec select c = function
+  | [] -> raise invalidArgument "select"
   | [x] -> x
-  | x :: xs -> choose c x (pick c xs)
+  | x :: xs -> choose c x (select c xs)
 
+(* Handling with [choose_true] makes [c#arb] always result in [true]. *)
 let choose_true c = handler
-  | c#amb () k -> k true
+  | c#arb () k -> k true
 
+(* Handling with [choose_false] makes [c#arb] always result in [false]. *)
 let choose_false c = handler
-  | c#amb () k -> k false
+  | c#arb () k -> k false
 
+(* Handling with [choose_min] gives the smallest possible result. *)
 let choose_min c = handler
-  | c#amb () k -> min (k true) (k false)
+  | c#arb () k -> min (k true) (k false)
 
+(* Handling with [choose_max] gives the biggest possible result. *)
 let choose_max c = handler
-  | c#amb () k -> max (k true) (k false)
+  | c#arb () k -> max (k true) (k false)
 
+(* Handling with [choose_all] gives the list of all possible results. *)
 let choose_all c = handler
+  | c#arb () k -> k true @ k false
   | val x -> [x]
-  | c#amb () k -> (k true) @ (k false)
 
-let avoid_exception c exc = handler
-  | c#amb () k ->
-      handle k true with
-      | exc#raise _ _ -> k false
+(* Let us create a new choice instance *)
+let c = new choice ;;
 
+(* This example by itself causes a runtime error. *)
+(*  
+let x = (if c#arb () then 10 else 20) in
+let y = (if c#arb () then 0 else 5) in
+  x - y ;;
+ *)
 
+check_val (
+with choose_true c handle
+  let x = (if c#arb () then 10 else 20) in
+  let y = (if c#arb () then 0 else 5) in
+    x - y
+) ;;
 
-(* Searching for a pythagorean triple in a given set of numbers. *)
-let pythagoreans numbers =
-  let c = new choice
-  and fail = new exception in
-  with avoid_exception c fail handle
-    let x = pick c numbers
-    and y = pick c numbers
-    and z = pick c numbers
-    in
-      if x * x + y * y = z * z then
-        (x, y, z)
-      else
-        raise fail () ;;
-  
-(* check (pythagoreans (range 1 5));; *)
-(* check (pythagoreans (range 5 20));; *)
+(* This could also be written using an inline handler as *)
+check_val (
+handle
+  let x = (if c#arb () then 10 else 20) in
+  let y = (if c#arb () then 0 else 5) in
+    x - y
+with
+| c#arb () k -> k true
+) ;;
 
-(* Alice picks a number from a given set, and Bob afterwards picks a different
-   number. Alice wants to minimize the product of the chosen numbers while
-   Bob wants to maximize it. *)
-let min_max_game numbers =
-  let alice = new choice
-  and bob = new choice in
-  with choose_min alice handle
-    with choose_max bob handle
-      let a = pick alice numbers in
-      let b = pick bob (complement numbers [a]) in
-      a * b
+check_val (
+with choose_all c handle
+  let x = (if c#arb () then 10 else 20) in
+  let y = (if c#arb () then 0 else 5) in
+    x - y
+) ;;
 
-(* Alice will chose 1 and Bob will choose 5 *)
-(* check (min_max_game (range 1 5));; *)
-(* Alice will chose 0 and Bob's choice won't change anything. *)
-(* check (min_max_game (range -3 3));; *)
+check_val (
+let c1 = new choice in
+let c2 = new choice in
+  with choose_all c1 handle
+  with choose_all c2 handle
+    let x = (if c1#arb () then 10 else 20) in
+    let y = (if c2#arb () then 0 else 5) in
+      x - y
+) ;;
 
+check_val (
+let c1 = new choice in
+let c2 = new choice in
+  with choose_all c2 handle
+  with choose_all c1 handle
+    let y = (if c2#arb () then 0 else 5) in
+    let x = (if c1#arb () then 10 else 20) in
+      x - y
+) ;;
+
+check_val (
+let c1 = new choice in
+let c2 = new choice in
+  with choose_all c2 handle
+  with choose_all c1 handle
+    let x = (if c1#arb () then 10 else 20) in
+    let y = (if c2#arb () then 0 else 5) in
+      x - y
+) ;;
+
+(* An alternative approach is to take [select] as a primitive operation *)
+type 'a select = effect
+  operation select : 'a list -> 'a
+end ;;
+
+(* In this case, minimization is achieved with the following handler.
+   Additionally, the handler can return a sensible list of choices made. *)
+
+let select_min s = handler
+  | val x -> (x, [])
+  | s#select xs k ->
+      let rec minimize = function
+        | [x] -> let (y, zs) = k x in (y, x::zs)
+        | x::xs ->
+            let (y, zs)  = k x in
+            let (y', zs') = minimize xs in
+              if y < y' then (y, x::zs) else (y', zs')
+      in
+        minimize xs ;;
+
+(* Shortest path in a directed graph (no cycles are allowed). A graph is represented by a
+   an adjancency list with distances. *)
+
+let shortest_path g x y =
+  let s = new select in
+  let rec path l u =
+    if u = y
+    then l
+    else
+      match assoc u g with
+        | None -> failwith "No path"
+        | Some nbh -> let (v,d) = s#select nbh in path (l+d) v
+  in
+    with select_min s handle path 0 x ;;
+
+(* A sample graph. *)
+let g = [("A", [("B", 3); ("C", 1)]) ;
+         ("B", [("E", 5)]) ;
+         ("C", [("B", 2); ("D", 1)]) ;
+         ("D", [("E", 2)])] ;;
+
+check (shortest_path g "A" "E") ;;

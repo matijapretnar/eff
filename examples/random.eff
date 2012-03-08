@@ -1,59 +1,104 @@
-(* uniformly chooses an element of the list xs *)
-let rec uniform r = function
-  | [x] -> x
-  | x :: xs' as xs ->
-      let p = 1. /. (int_to_float (length xs)) in
-      if r#toss p then uniform r xs' else x
+type 'a random = effect
+  operation pick : ('a * float) list -> 'a
+end
 
-let dice () = uniform rnd (range 1 6)
+let uniform lst =
+  let n = length lst in
+    map (fun x -> (x, 1.0 /. float n)) lst ;;
 
-(* merges two finite distributions according to ordering (<<) *)
+let combine =
+  let scale p xs = map (fun (i, x) -> (i, p *. x)) xs in
+  let rec add (i,x) = function
+    | [] -> [(i,x)]
+    | (j,y)::lst ->
+      if i = j then (j, x +. y) :: lst else (j,y) :: add (i,x) lst
+  in
+    fold_left (fun e (d,p) -> fold_right add (scale p d) e) [] ;;
 
-(* a handler that returns the distribution of answers *)
-let distribution r =
-  handler
-  | val x -> [(x, 1.)]
-  | r#toss p k ->
-      let rec weighted_sum p xs ys =
-        match (xs, ys) with
-        | (_, []) -> map (fun (x, q) -> (x, p *. q)) xs
-        | ([], _) -> map (fun (y, r) -> (y, (1. -. p) *. r)) ys
-        | ((x, q) :: xs', (y, r) :: ys') ->
-              if x = y then
-                  (x, p *. q +. (1. -. p) *. r) :: weighted_sum p xs' ys'
-              else if x < y then
-                  (x, p *. q) :: weighted_sum p xs' ys
-              else
-                  (y, (1. -. p) *. r) :: weighted_sum p xs ys'
-      in
-      weighted_sum p (k false) (k true)
+let distribution r = handler
+  | val v -> [(v, 1.0)]
+  | r#pick lst k ->
+      combine (map (fun (x,p) -> (k x, p)) lst) ;;
 
+let expectation r = handler
+  | val v -> v
+  | r#pick lst k ->
+      fold_right (fun (x,p) e -> e +. p *. k x) lst 0.0 ;;
 
-(* Example stolen from Jeremy Gibbons EWCE talk.
-   Monty-hall problem - parameter switch determines our strategy *)
+check_val (
+  let r = new random in
+  with expectation r handle
+    let a = r#pick (uniform [1.0; 2.0; 4.0]) in
+      a
+) ;;
 
-let monty_hall switch =
-  let doors = ["A"; "B"; "C"] in
-  (* the prize is hidden randomly behind one door *)
-  let prize = uniform rnd doors
-  (* contestant randomly chooses a door *)
-  and pick = uniform rnd doors in
-  (* host reveals with a door different from the two above *)
-  let revealed = uniform rnd (complement doors [prize; pick]) in
-  (* there is a remaining door *)
-  let remaining = head (complement doors [pick; revealed]) in
-  (* if we want to switch we take the remaining door, otherwise we stay with our pick *)
-  let final = if switch then remaining else pick in
-  (* did we get the prize? *)
-  prize = final ;;
+check_val (
+let r = new random in
+with distribution r handle
+  let a = r#pick (uniform [1;2;3;4;5;6]) in
+  let b = r#pick (uniform [1;2;3;4;5;6]) in
+    a + b
+) ;;
 
-(* probability of getting the prize if we switch *)
-(* check (with distribution r handle monty_hall true) ;; *)
+check_val (
+let r = new random in
+with expectation r handle
+  let rec walk x n =
+    if n = 0 then x else
+      let d = r#pick [(-1, 0.2); (0, 0.3); (1, 0.5)] in
+        walk (x + d) (n - 1)
+  in
+    float (walk 0 5)
+) ;;
 
-(* probability of getting the prize if we don't switch *)
-(* check (with distribution r handle monty_hall false) ;; *)
+check_val (
+let r = new random in
+with distribution r handle
+  let rec walk x n =
+    if n = 0 then x else
+      let d = r#pick [(-1, 0.2); (0, 0.3); (1, 0.5)] in
+        walk (x + d) (n - 1)
+  in
+    walk 0 5
+) ;;
 
-(* a different example: what is the distribution of a sum of two dice *)
-check (
-  with distribution rnd handle dice () + dice ()
-)
+let state r x = handler
+  | val y -> (fun s -> y)
+  | r#lookup () k -> (fun s -> k s s)
+  | r#update s' k -> (fun s -> k () s')
+  | finally f -> f x ;;
+
+print_string "WHY DOES THIS ONE WORK?\n"; 
+check_val (
+let r = new random in
+with distribution r handle
+  let x = new ref in
+  with state x 0 handle
+    for i = 1 to 5 do
+      x := !x + r#pick [(-1, 0.2); (0, 0.3); (1, 0.5)]
+    done;
+    !x
+) ;;
+
+print_string "EXPECTED VALUE FOR 7 STEPS";
+check_val (
+let r = new random in
+with expectation r handle
+  let x = new ref in
+  with state x 0 handle
+    for i = 1 to 7 do
+      x := !x + r#pick [(-1, 0.2); (0, 0.3); (1, 0.5)]
+    done;
+    float (!x)
+) ;;
+
+check_val (
+let r = new random in
+with distribution r handle
+  let x = new ref in
+  with state x 0 handle
+    for i = 1 to 5 do
+      x := !x + r#pick [(-1, 0.2); (0, 0.3); (1, 0.5)]
+    done;
+    !x
+) ;;

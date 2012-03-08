@@ -32,9 +32,9 @@ let rec tictactoe player opponent (p,o) =
 let alice = new player ;;
 let bob = new player ;; 
 
-let game =
+(* let game =
   with optimal alice handle
    with optimal bob handle
-     tictactoe alice bob ([],[]) ;;
+     tictactoe alice bob ([],[]) ;; *)
 
-check game ;;
+(* check game ;; *)

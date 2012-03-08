@@ -1,0 +1,100 @@
+type 'a result = Failure | Success of 'a
+
+type 'a selection = effect
+  operation select : 'a list -> 'a
+end
+
+let amb s = handler
+  | s#select lst k ->
+    let rec try = function
+      | [] -> Failure
+      | x::xs -> (match k x with
+                    | Failure -> try xs
+                    | Success y -> Success y)
+    in
+      try lst  ;;
+
+let s = new selection ;;
+
+check_val (
+with amb s handle
+  let a = s#select [1;2;3;4;5] in
+  let b = s#select [1;2;3;4;5] in
+  let c = s#select [1;2;3;4;5] in
+    if a*a + b*b = c*c then Success (a,b,c) else Failure );;
+
+(* check_val (
+let s1 = new selection in
+let s2 = new selection in
+with amb s1 handle
+with amb s2 handle
+  let x = s1#select [2; 3; 5; 7; 11] in
+  let t = s2#select ["two"; "three"; "five"; "seven"; "eleven"] in
+    if x = string_length t then Success t else Failure
+) ;; *)
+
+(* The 8 queens problem. *)
+let no_attack (x,y) (x',y') =
+  x <> x' && y <> y' && abs (x - x') <> abs (y - y') ;;
+
+let available x qs =
+  filter (fun y -> forall (no_attack (x,y)) qs) [1;2;3;4;5;6;7;8] ;;
+
+check_val (
+let s = new selection in
+with amb s handle
+  let rec place x qs =
+    if x = 9 then Success qs else
+      let y = s#select (available x qs) in
+      place (x+1) ((x, y) :: qs)
+  in place 1 []
+);;
+
+(* Amb with state. *)
+let amb_with_state r u s = handler
+  | r#lookup () k -> (fun v -> k v v)
+  | r#update v' k -> (fun _ -> k () v')
+  | s#select lst k -> (fun v ->
+    let rec try = function
+      | [] -> Failure
+      | x::xs -> (match k x v with
+                    | Failure -> try xs
+                    | Success y -> Success y)
+    in
+      try lst)
+  | val x -> (fun _ -> x)
+  | finally f -> f u
+;;
+
+(* This is wrong because we use state. *)
+check_val (
+let s = new selection in
+with amb s handle
+  let qs = ref [] in
+  for x = 1 to 8 do
+    let y = s#select (available x !qs) in
+    qs := (x, y) :: !qs
+  done ;
+  Success !qs
+) ;;
+
+(* Watch this, it works! *)
+
+let state r x = handler
+  | val y -> (fun s -> y)
+  | r#lookup () k -> (fun s -> k s s)
+  | r#update s' k -> (fun s -> k () s')
+  | finally f -> f x ;;
+
+print_string "WHOA!\n" ;
+check_val (
+let s = new selection in
+with amb s handle
+  let qs = new ref in
+  with state qs [] handle
+    for x = 1 to 8 do
+      let y = s#select (available x !qs) in
+      qs := (x, y) :: !qs
+    done ;
+    Success !qs
+) ;;

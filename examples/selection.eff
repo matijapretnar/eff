@@ -42,15 +42,21 @@ let find_arg xs z =
 
 let bool = find_arg [false; true] true
 
-let otimes {x=x1;h=h1} {x=x2;h=h2} =
+let state r x = handler
+  | val y -> (fun s -> (y, s))
+  | r#lookup () k -> (fun s -> k s s)
+  | r#update s' k -> (fun s -> k () s')
+  | finally f -> f x ;;
+
+(* let otimes {x=x1;h=h1} {x=x2;h=h2} =
   { x = (x1,x2) ;
     h = (fun c ->
            handler
              | c#guess () k ->
-                 let a = new store in
-                 let b = new store in
-                   with ref a x1 handle
-                   with ref b x2 handle
+                 let a = new ref in
+                 let b = new ref in
+                   with state a x1 handle
+                   with state b x2 handle
                      let c1 = new choice in
                      let c2 = new choice in
                      let r = snd (with h1 c1 handle
@@ -63,7 +69,7 @@ let otimes {x=x1;h=h1} {x=x2;h=h2} =
                        ((a#lookup(), b#lookup()), r)
              | val v -> ((x1,x2), v))
   }
-
+ *)
 type ('a, 'b) memo = effect
                        operation put : ('a * 'b) -> unit
                        operation get : 'a -> ('b option)

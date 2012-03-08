@@ -1,78 +1,87 @@
-type scheduler = effect
-  operation fork : (unit -> unit) -> unit
+type coop = effect
   operation yield : unit -> unit
+  operation fork : (unit -> unit) -> unit
 end
 
-let round_robin s =
-  let queue = ref [] in
-  let enqueue p = queue := !queue @ [p] in
-  let dequeue () =
-    match !queue with
-    | [] -> ()
-    | p :: ps -> queue := ps; p ()
-  in
-  let rec manager () = handler
-    | s#fork p k -> enqueue (fun () -> with manager () handle p ()); k ()
-    | s#yield () k -> enqueue k; dequeue ()
-    | val () -> dequeue ()
-  in
-    manager () ;;
 
 let fifo s =
-  let rec manager () = handler
-    | s#fork p k -> k (); with manager () handle p ()
+  let rec scheduler () = handler
+    | s#fork p k -> k (); with scheduler () handle p ()
     | s#yield () k -> k ()
   in
-    manager () ;;
+    scheduler () ;;
 
 let lifo s =
-  let rec manager () = handler
-    | s#fork p k -> with manager () handle p (); k ()
+  let rec scheduler () = handler
+    | s#fork p k -> with scheduler () handle p (); k ()
     | s#yield () k -> k ()
   in
-    manager () ;;
+    scheduler () ;;
 
-(* example of forking a thread *)
-let sch = new scheduler in
-  with round_robin sch handle
-    sch#fork (fun () -> 
-      for i = 1 to 10 do
-        print_endline ("foo " ^ to_string i) ;
-        sch#yield () ;
-        sch#yield ()
-      done) ;
-    for j = 1 to 10 do
-      print_endline ("bar " ^ to_string j) ;
-      sch#yield ()
-    done ;;
+let round_robin c =
+  let threads = ref [] in
+  let enqueue t = threads := !threads @ [t] in
+  let dequeue () =
+    match !threads with
+    | [] -> ()
+    | t :: ts -> threads := ts ; t ()
+  in
+  let rec scheduler () = handler
+    | c#yield () k -> enqueue k ; dequeue ()
+    | c#fork t k -> enqueue k ; with scheduler () handle t ()
+    | val () -> dequeue ()
+  in
+    scheduler () ;;
+
+let c = new coop in
+with round_robin c handle
+  c#fork (fun _ ->
+    for i = 1 to 5 do
+      std#write "a" ;
+      c#yield ()
+    done) ;
+  let d = new coop in
+  with round_robin d handle
+    d#fork (fun _ ->
+      for j = 1 to 5 do
+         std#write "x" ;
+         d#yield ()
+    done) ;
+    for k = 1 to 5 do
+      std#write "y" ;
+      d#yield () ;
+      c#yield ()
+    done
+;;
 
 (* Enumerating all positive rational numbers. *)
-(* let sch = new scheduler in
+(* let c = new coop in
   (* Lists all fractions with a given numerator, yielding after each one *)
   let rec fractions numerator =
     (* Start enumerating fractions with a bigger numerator *)
-    sch#fork (fun () -> fractions (numerator + 1));
+    c#fork (fun _ -> c#yield (); fractions (numerator + 1));
     (* And list all the fractions with the current one *)
     for denominator = 1 to numerator do
       print_endline (to_string numerator ^ "/" ^ to_string denominator);
-      sch#yield ()
+      c#yield ()
     done
 in
-with round_robin sch handle
-  fractions 0 *)
+with round_robin c handle
+  fractions 0
+;; *)
     
 
-(* example of two infinite loops yielding to each other *)
-(*
-let sch = new scheduler in
-  with round_robin sch handle
-    sch#fork (fun () ->
+(* example of two infinite loops yielding to one another *)
+(* let c = new coop in
+  with round_robin c handle
+    c#fork (fun () ->
       while true do
-        toplevel#print "Robin!" ;
-        sch#yield ()
+        std#write "Robin!" ;
+        c#yield ()
       done) ;
     while true do
-      toplevel#print "Batman!" ;
-      sch#yield ()
+      std#write "Batman!" ;
+      c#yield ()
     done
-*)
+;; *)
+
