@@ -56,8 +56,8 @@ let symbols = [
             ])));
   ("err", V.fresh_instance "standard error" (Some (ref V.from_unit, [
              ("raise", coop (fun v s ->
-                               let str = V.to_str v in
-                                 Error.runtime "%s" str))])));
+                               let str = Print.to_string "%t" (Print.value v) in
+                                 Error.exc "%s" str))])));
 
   ("rnd", (Random.self_init () ;
            V.fresh_instance "random number generator" (Some (ref V.from_unit, [
