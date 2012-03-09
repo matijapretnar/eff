@@ -2,13 +2,13 @@ module S = Syntax
 module C = Common
 
 let usage = "Usage: eff [option] ... [file] ..."
-let interactive = ref true
+let interactive_shell = ref true
 let pervasives = ref true
 let pervasives_file = ref (Filename.concat (Filename.dirname Sys.argv.(0)) "pervasives.eff")
 
 (* We set up a list of files to be loaded and run. *)
 let files = ref []
-let add_file f = (files := f :: !files)
+let add_file interactive filename = (files := (filename, interactive) :: !files)
 
 (* Command-line options *)
 let options = Arg.align [
@@ -29,10 +29,10 @@ let options = Arg.align [
   ("--warn-sequencing", Arg.Set Infer.warn_implicit_sequencing,
    " Print warning about implicit sequencing");
   ("-n",
-    Arg.Clear interactive,
+    Arg.Clear interactive_shell,
     " Do not run the interactive toplevel");
   ("-l",
-    Arg.String (fun str -> add_file str),
+    Arg.String (fun str -> add_file false str),
     "<file> Load <file> into the initial environment");
   ("-V",
     Arg.Set_int Print.verbosity,
@@ -41,8 +41,8 @@ let options = Arg.align [
 
 (* Treat anonymous arguments as files to be run. *)
 let anonymous str =
-  add_file str;
-  interactive := false
+  add_file true str;
+  interactive_shell := false
 
 
 (* Parser wrapper *)
@@ -55,10 +55,10 @@ let parse parser lex =
   | Failure "lexing: empty token" ->
       Error.syntax ~pos:(Lexer.position_of_lex lex) "unrecognised symbol."
 
-let initial_environment =
+let initial_ctxenv =
   (Ctx.initial, Eval.initial)
 
-let exec_topdef (ctx, env) (d,pos) =
+let exec_topdef interactive (ctx, env) (d,pos) =
   match d with
   | S.TopLet defs ->
       let defs = C.assoc_map Desugar.computation defs in
@@ -68,7 +68,7 @@ let exec_topdef (ctx, env) (d,pos) =
           (fun (p,c) env -> let v = Eval.run env c in Eval.extend p v env)
           defs env
       in
-        if !interactive then begin
+        if interactive then begin
           List.iter (fun (x, (ps,t)) ->
                        match Eval.lookup x env with
                          | None -> assert false
@@ -80,7 +80,7 @@ let exec_topdef (ctx, env) (d,pos) =
       let defs = C.assoc_map Desugar.let_rec defs in
       let vars, ctx = Infer.infer_top_let_rec ctx pos defs in
       let env = Eval.extend_let_rec env defs in
-        if !interactive then begin
+        if interactive then begin
           List.iter (fun (x,(ps,t)) -> Format.printf "@[val %s : %t = <fun>@]@." x (Print.ty ps t)) vars
         end ;
         (ctx, env)
@@ -100,43 +100,33 @@ let exec_topdef (ctx, env) (d,pos) =
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
     and return the new environment. *)
-let rec exec_cmd (ctx, env) e =
+let rec exec_cmd interactive (ctx, env) e =
   match e with
   | S.Expr c ->
       let c = Desugar.computation c in
       let ctx, (ps, t) = Infer.infer_top_comp ctx c in
       let v = Eval.run env c in
-      if !interactive then Format.printf "@[- : %t = %t@]@." (Print.ty ps t) (Print.value v) ;
+      if interactive then Format.printf "@[- : %t = %t@]@." (Print.ty ps t) (Print.value v) ;
       (ctx, env)
   | S.TypeOf c ->
       let c = Desugar.computation c in
       let ctx, (ps, t) = Infer.infer_top_comp ctx c in
       Format.printf "@[- : %t@]@." (Print.ty ps t) ;
       (ctx, env)
-
   | S.Reset ->
-      print_endline ("Environment reset."); initial_environment
+      print_endline ("Environment reset."); initial_ctxenv
   | S.Help ->
       print_endline ("Read the source.") ; (ctx, env)
   | S.Quit -> exit 0
-  | S.Use fn -> use_file (ctx, env) fn
-  | S.Topdef def -> exec_topdef (ctx, env) def
+  | S.Use fn -> use_file (ctx, env) (fn, interactive)
+  | S.Topdef def -> exec_topdef interactive (ctx, env) def
 
-and use_file env fn =
-  let cmds = Lexer.read_file (parse Parser.file) fn in
-  List.fold_left exec_cmd env cmds
-
-let rec loop env =
-  try
-    let cmd = Lexer.read_toplevel (parse Parser.commandline) () in
-    let env = exec_cmd env cmd in
-    loop env
-  with
-    | Error.Error err -> Print.error err; loop env
-    | Sys.Break -> prerr_endline "Interrupted."; loop env
+and use_file env (filename, interactive) =
+  let cmds = Lexer.read_file (parse Parser.file) filename in
+  List.fold_left (exec_cmd interactive) env cmds
 
 (* Interactive toplevel *)
-let toplevel env =
+let toplevel ctxenv =
   let eof = match Sys.os_type with
     | "Unix" | "Cygwin" -> "Ctrl-D"
     | "Win32" -> "Ctrl-Z"
@@ -144,7 +134,16 @@ let toplevel env =
   in
   print_endline ("eff " ^ Version.version);
   print_endline ("Press " ^ eof ^ " to exit.");
-  try loop env
+  try
+    let ctxenv = ref ctxenv in
+    while true do
+      try
+        let cmd = Lexer.read_toplevel (parse Parser.commandline) () in
+        ctxenv := exec_cmd true !ctxenv cmd
+      with
+        | Error.Error err -> Print.error err
+        | Sys.Break -> prerr_endline "Interrupted."
+    done
   with End_of_file -> ()
 
 (* Main program *)
@@ -155,13 +154,10 @@ let main =
   (* Files were listed in the wrong order, so we reverse them *)
   files := List.rev !files;
   (* Load the pervasives. *)
-  if !pervasives then add_file !pervasives_file ;
+  if !pervasives then add_file false !pervasives_file ;
   try
     (* Run and load all the specified files. *)
-    let i = !interactive in
-      interactive := false ;
-      let env = List.fold_left use_file initial_environment !files in
-        interactive := i ;
-        if !interactive then toplevel env
+    let ctxenv = List.fold_left use_file initial_ctxenv !files in
+    if !interactive_shell then toplevel ctxenv
   with
     Error.Error err -> Print.error err; exit 1

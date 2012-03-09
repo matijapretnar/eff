@@ -196,7 +196,7 @@ let message ?(pos=Common.Nowhere) msg_type v =
   else
     Format.ifprintf Format.err_formatter
 
-let error (pos, err_type, msg) = message ~pos (err_type ^ " error") 1 "%s" msg
+let error (pos, err_type, msg) = message ~pos (err_type) 1 "%s" msg
 let check ?pos = message ?pos "Check" 2
 let warning ?pos = message ?pos "Warning" 3
 let debug ?pos = message ?pos "Debug" 4
