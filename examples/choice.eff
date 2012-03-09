@@ -1,68 +1,80 @@
+(* This example is described in Section 6.1 of "Programming with Algebraic Effects and
+   Handlers" by A. Bauer and M. Pretnar. *)
+
+(* An operation which makes a binary choice. *)
+
 type choice = effect
-    operation amb : unit -> bool
-end
+  operation decide : unit -> bool
+end ;;
 
-let choose c x y = if c#amb () then x else y
+(* We create an instance of choice to work with. *)
 
-let rec pick c = function
-  | [] -> raise invalidArgument "pick"
-  | [x] -> x
-  | x :: xs -> choose c x (pick c xs)
+let c = new choice ;;
 
-let choose_true c = handler
-  | c#amb () k -> k true
+(* The following piece of code chooses 10 or 20 for x and 0 or 5 for y,
+   but since it is not wrapped in a handler it just produces a runtime
+   error about an uncought operation:
 
-let choose_false c = handler
-  | c#amb () k -> k false
+   let x = (if c#decide () then 10 else 20) in
+   let y = (if c#decide () then 0 else 5) in
+     x - y ;;
+*)
 
-let choose_min c = handler
-  | c#amb () k -> min (k true) (k false)
+(* If we wrap it in a handler which handles c#decide by
+   passing true to the continuation, then x gets 10 and
+   y gets 0. *)
 
-let choose_max c = handler
-  | c#amb () k -> max (k true) (k false)
+handle
+  let x = (if c#decide () then 10 else 20) in
+  let y = (if c#decide () then 0 else 5) in
+    x - y
+with
+| c#decide () k -> k true ;;
 
-let choose_all c = handler
-  | val x -> [x]
-  | c#amb () k -> (k true) @ (k false)
+(* This handler collects all results that we can get by making different choices. *)
 
-let avoid_exception c exc = handler
-  | c#amb () k ->
-      handle k true with
-      | exc#raise _ _ -> k false
+let choose_all d = handler
+  | d#decide () k -> k true @ k false
+  | val x -> [x] ;;
 
+(* This returns a list of four possibilities [10; 5; 20; 15] *)
 
+with choose_all c handle
+  let x = (if c#decide () then 10 else 20) in
+  let y = (if c#decide () then 0 else 5) in
+    x - y ;;
 
-(* Searching for a pythagorean triple in a given set of numbers. *)
-let pythagoreans numbers =
-  let c = new choice
-  and fail = new exception in
-  with avoid_exception c fail handle
-    let x = pick c numbers
-    and y = pick c numbers
-    and z = pick c numbers
-    in
-      if x * x + y * y = z * z then
-        (x, y, z)
-      else
-        raise fail () ;;
-  
-(* check (pythagoreans (range 1 5));; *)
-(* check (pythagoreans (range 5 20));; *)
+(* We can create two instances and handle each one separately. The inner handler produces
+   two results in a list, and the outer handler then produces a list of two lists of two
+   results, so the answer is [[10; 5]; [20; 15]]. *)
 
-(* Alice picks a number from a given set, and Bob afterwards picks a different
-   number. Alice wants to minimize the product of the chosen numbers while
-   Bob wants to maximize it. *)
-let min_max_game numbers =
-  let alice = new choice
-  and bob = new choice in
-  with choose_min alice handle
-    with choose_max bob handle
-      let a = pick alice numbers in
-      let b = pick bob (complement numbers [a]) in
-      a * b
+let c1 = new choice in
+let c2 = new choice in
+  with choose_all c1 handle
+  with choose_all c2 handle
+    let x = (if c1#decide () then 10 else 20) in
+    let y = (if c2#decide () then 0 else 5) in
+      x - y ;;
 
-(* Alice will chose 1 and Bob will choose 5 *)
-(* check (min_max_game (range 1 5));; *)
-(* Alice will chose 0 and Bob's choice won't change anything. *)
-(* check (min_max_game (range -3 3));; *)
+(* If we switch the order of handlers and operations we also get a list of two lists of
+   two results, but in a different order: [[10; 20]; [5; 15]] *)
 
+let c1 = new choice in
+let c2 = new choice in
+  with choose_all c2 handle
+  with choose_all c1 handle
+    let y = (if c2#decide () then 0 else 5) in
+    let x = (if c1#decide () then 10 else 20) in
+      x - y ;;
+
+(* However, switching around only the handler but not the operations, produces a list of
+   _four_ lists of two elements each: [[10; 20]; [10; 15]; [5; 20]; [5; 15]]
+   Exercise: explain this. *)
+
+let c1 = new choice in
+let c2 = new choice in
+  with choose_all c2 handle
+  with choose_all c1 handle
+    let x = (if c1#decide () then 10 else 20) in
+    let y = (if c2#decide () then 0 else 5) in
+      x - y ;;
