@@ -114,5 +114,5 @@ Check (file "./test_pervasives.eff", line 180, char 1): Operation <instance #0>.
 - : unit = ()
 Check (file "./test_pervasives.eff", line 182, char 1): Operation <instance #0>.float 42.
 - : unit = ()
-- : '_a ref = <instance #3>
+val test_state : int = 42
 val test_ref : int = 15
