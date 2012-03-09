@@ -181,6 +181,10 @@ check (rnd#int 42) ;;
 
 check (rnd#float 42.0) ;;
 
-(new ref) ;;
+let test_state =
+  (let r = new ref in 
+   with state r 10 handle
+     r := !r + 32 ;
+     !r) ;; 
 
 let test_ref = (let r = ref 5 in r := !r + 10; !r) ;;

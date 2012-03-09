@@ -36,11 +36,11 @@ let divisionByZero = runtime_handle DivisionByZero ;;
 
 let invalidArgument msg = runtime_handle (InvalidArgument msg) ;;
 
+let failwith msg = runtime_error (FailWith msg) ;;
+
 let failWith msg = runtime_handle (FailWith msg) ;;
 
 let assert b = if b then () else runtime_error AssertionFault  ;;
-
-let failwith msg = runtime_error (FailWith msg) ;;
 
 external ( ~- ) : int -> int = "~-"
 
@@ -240,6 +240,12 @@ type 'a ref = effect
   operation lookup: unit -> 'a
   operation update: 'a -> unit
 end
+
+let state r x = handler
+  | val y -> (fun _ -> y)
+  | r#lookup () k -> (fun s -> k s s)
+  | r#update s' k -> (fun _ -> k () s')
+  | finally f -> f x ;;
 
 let ref x =
   new ref @ x with
