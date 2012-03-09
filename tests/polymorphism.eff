@@ -1,18 +1,18 @@
 let a = (let f x = x in (f 5, f "foo")) ;;
 
-check a ;;
+a ;;
 
 let g x y = (fun x y -> x) x y ;;
 
-check (g 4 "foo", g "foo" 4) ;;
+(g 4 "foo", g "foo" 4) ;;
 
 let u = [] ;;
 
-check (1 :: u, "foo" :: u) ;;
+(1 :: u, "foo" :: u) ;;
 
 let v = [[]] ;;
 
-check ([] :: v, [2] :: v) ;;
+([] :: v, [2] :: v) ;;
 
 #type (fun x -> let h t u = u in h x x) ;;
 

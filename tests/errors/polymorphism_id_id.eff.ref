@@ -1,1 +1,3 @@
-Typing error (file "./errors/polymorphism_id_id.eff", line 3, char 14): This expression has type string but it should have type int.
+val u : 'a -> 'a = <fun>
+val v : '_a -> '_a = <fun>
+Typing error (file "./errors/polymorphism_id_id.eff", line 3, char 8): This expression has type string but it should have type int.

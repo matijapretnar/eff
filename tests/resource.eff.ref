@@ -1,1 +1,5 @@
-Check (file "./resource.eff", line 19, char 1): (5, 17)
+val x : int store = <instance #3>
+val a : int = 5
+- : unit = ()
+val b : int = 17
+- : int * int = (5, 17)

@@ -14,6 +14,7 @@
 - : '_a dog
 - : int dog
 - : '_a list dog
+val fifi : '_a dog = <instance #3>
 - : '_a -> string
 - : string
 - : string
@@ -25,4 +26,5 @@
 - : 'a -> 'b -> 'a
 - : 'a list list list
 - : 'a -> 'b -> 'a
+val h : 'a -> 'a = <fun>
 - : 'a -> 'a

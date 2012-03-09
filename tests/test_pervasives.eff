@@ -1,182 +1,186 @@
 (* Check every thing in pervasives. *)
 
-check divByZero ;;
+let less1 = (1 < 2) ;;
 
-check invalidArgument ;;
+let less2 = (true < false) ;;
 
-check assertionFault ;;
+let less3 = ((1,true) < (0,false)) ;;
 
-check failWith ;;
+let test_equal_number = (1 = 1) ;;
 
-check absurd ;;
+let test_equal_fun = ((fun x -> x) = (fun x -> x + 1)) ;;
 
-check raise ;;
+let whatis_std = std ;;
 
-check assert ;;
+let whatis_raise = raise ;;
+
+let runtime_errors = [DivisionByZero; InvalidArgument "foo"; AssertionFault; FailWith "bar"] ;;
+
+let whatis_err = err ;;
+
+let whatis_runtime_error = runtime_error ;;
+
+let what_is_runtime_handle = runtime_handle ;;
+
+let test_divisionByZero = with divisionByZero "foo" handle let x = 1 / 0 in "bar" ;;
+
+let test_invalidArgument =
+    with invalidArgument "foo" "No he was not" handle "invalidArgument was here" ;;
 
 check (failwith "They say it's all about flirting.") ;;
 
-check (~-1) ;;
+let test_failWith = with failWith "bar" 42 handle failwith "bar" ;;
 
-check (~-. 3.14159) ;;
+assert ("a" = "a") ;;
 
-check (~-. 1.0) ;;
+let tilda_minus = (~-1) ;;
 
-check (2 + 2) ;;
+let tilda_minus_dot2 = (~-. 3.14159) ;;
 
-check (2 * 2) ;;
+let tilda_minus_dot2 = (~-. 1.0) ;;
 
-check (2 ** 3) ;;
+let test_plus = (2 + 2) ;;
 
-check (42 - 23) ;;
+let test_times = (2 * 2) ;;
 
-check (42 - ~-23) ;;
+let test_power = (2 ** 3) ;;
 
-check (5 % 3) ;;
+let test_minus = (42 - 23) ;;
 
-check (0 % 1) ;;
+let test_minus_tilda_minus = (42 - ~-23) ;;
+
+let test_mod1 = (5 % 3) ;;
+
+let test_mod2 = (0 % 1) ;;
 
 check (0 % 0) ;;
 
 check (1 % 0) ;;
 
-check (1 < 2) ;;
+let test_plus_dot = (3.14 +. 2.7) ;;
 
-check (true < false) ;;
+let test_times_dot = (3.14 *. 2.7) ;;
 
-check ((1,true) < (0,false)) ;;
+let test_minus_dot = (3.14 -. 2.7) ;;
 
-check (1 = 1) ;;
+let test_div_dot = (3.14 /. 2.7) ;;
 
-check ((fun x -> x) = (fun x -> x + 1)) ;;
+let test_div_dot_zero = (1.0 /. 0.0) ;;
 
-check (3.14 +. 2.7) ;;
-
-check (3.14 *. 2.7) ;;
-
-check (3.14 -. 2.7) ;;
-
-check (3.14 /. 2.7) ;;
-
-check (1.0 /. 0.0) ;;
-
-check (100 / 3) ;;
+let test_div = (100 / 3) ;;
 
 check (1 / 0) ;;
 
-check (0 / 1) ;;
+let test_zero_div = (0 / 1) ;;
 
 check (0 / 0) ;;
 
-check ("cherry" ^ "pie") ;;
+let test_carron = ("cherry" ^ "pie") ;;
 
-check (to_string 13) ;;
+let test_to_string1 = (to_string 13) ;;
 
-check (to_string [1,2,3]) ;;
+let test_to_string2 = (to_string [1,2,3]) ;;
 
-check (to_string (1,2,3)) ;;
+let test_to_string3 = (to_string (1,2,3)) ;;
 
-check (to_string (fun x -> x)) ;;
+let test_to_string4 = (to_string (fun x -> x)) ;;
 
-check (float 42) ;;
+let test_float = (float 42) ;;
 
-check None ;;
+let test_none = None ;;
 
-check (Some 3) ;;
+let test_some = (Some 3) ;;
 
-check (ignore (2 + 3)) ;;
+let test_ignore = (ignore (2 + 3)) ;;
 
-check (not true) ;;
+let test_not = (not true) ;;
 
-check (3 > 2) ;;
+let test_greater1 = (3 > 2) ;;
 
-check ("foo" > "bar") ;;
+let test_greater2 = ("foo" > "bar") ;;
 
-check (1 <= 1) ;;
+let test_leq = (1 <= 1) ;;
 
-check (2 >= 1) ;;
+let test_geq = (2 >= 1) ;;
 
-check (2 <> 3) ;;
+let test_neq = (2 <> 3) ;;
 
-check (range 4 9) ;;
+let test_range = (range 4 9) ;;
 
-check (map (fun x -> x * x) [1;2;3;4;5]) ;;
+let test_map = (map (fun x -> x * x) [1;2;3;4;5]) ;;
 
-check (take (fun k -> 3 * k + 2) 20) ;;
+let test_take = (take (fun k -> 3 * k + 2) 20) ;;
 
-check (fold_left (fun a y -> 2 * a + y) 1 [1;2;3;4;5]) ;;
+let test_fold_left = (fold_left (fun a y -> 2 * a + y) 1 [1;2;3;4;5]) ;;
 
-check (fold_right (fun y a -> 2 * a + y) [1;2;3;4;5] 1) ;;
+let test_fold_right = (fold_right (fun y a -> 2 * a + y) [1;2;3;4;5] 1) ;;
 
-iter (fun k -> check ("iter " ^ to_string k)) [1;2;3;4;5] ;;
+let test_iter = (fun k -> check ("iter " ^ to_string k)) [1;2;3;4;5] ;;
 
-check (forall (fun k -> k % 3 = 2) [1;2;3;4;5]) ;;
+let test_forall = (forall (fun k -> k % 3 = 2) [1;2;3;4;5]) ;;
 
-check (exists (fun k -> k % 3 = 2) [1;2;3;4;5]) ;;
+let test_exists = (exists (fun k -> k % 3 = 2) [1;2;3;4;5]) ;;
 
-check (mem "foo" ["bar"; "baz"]) ;;
+let test_mem = (mem "foo" ["bar"; "baz"]) ;;
 
-check (filter (fun k -> k > 3) [1;2;3;4;5]) ;;
+let test_filter = (filter (fun k -> k > 3) [1;2;3;4;5]) ;;
 
-check (complement [1; 2; 3; 4; 5; 6] [2; 4; 8]) ;;
+let test_complement = (complement [1; 2; 3; 4; 5; 6] [2; 4; 8]) ;;
 
-check (intersection [1; 2; 3; 4; 5; 6] [2; 4; 8]) ;;
+let test_intersection = (intersection [1; 2; 3; 4; 5; 6] [2; 4; 8]) ;;
 
-check (zip [1;2;3] ["a"; "b"; "c"]) ;;
+let test_zip1 = (zip [1;2;3] ["a"; "b"; "c"]) ;;
 
 check (zip [1;2;3;4;5;6] ["a"; "b"; "c"]) ;;
 
-check (reverse [1;2;3;4;5]) ;;
+let test_reverse = reverse [1;2;3;4;5] ;;
 
-check ([1;2;3] @ [4;5;6]) ;;
+let test_at = ([1;2;3] @ [4;5;6]) ;;
 
-check (length [1;2;3;4;5]) ;;
+let test_length = (length [1;2;3;4;5]) ;;
 
-check (head [1;2;3;4]) ;;
+let test_head = (head [1;2;3;4]) ;;
 
 check (head []) ;;
 
-check (tail [1;2;3;4]) ;;
+let test_tail = (tail [1;2;3;4]) ;;
 
 check (tail []) ;;
 
-check (abs 5, abs (~-5), abs(-5)) ;;
+let test_abs = (abs 5, abs (~-5), abs(-5)) ;;
 
-check (min 1 2) ;;
+let test_min = (min 1 2) ;;
 
-check (max 1 2) ;;
+let test_max = (max 1 2) ;;
 
-check (gcd 12 8) ;;
+let test_gcd = (gcd 12 8) ;;
 
-check (lcm 12 8) ;;
+let test_lcm = (lcm 12 8) ;;
 
-check (odd 42) ;;
+let test_odd = (odd 42) ;;
 
-check (even 42) ;;
+let test_even = (even 42) ;;
 
-check (id 5) ;;
+let test_id = (id 5) ;;
 
-check (id id) ;;
+let test_id_id = (id id) ;;
 
-check (compose (fun k -> k * k) (fun j -> j +4) 10) ;;
+let test_compose = (compose (fun k -> k * k) (fun j -> j +4) 10) ;;
 
-check (fst ("foo", 4)) ;;
+let test_fst = (fst ("foo", 4)) ;;
 
-check (snd ("foo", 4)) ;;
+let test_snd = (snd ("foo", 4)) ;;
 
-check (std#write "Does this work?") ;;
+(std#write "Does this work?") ;;
 
 check (std#read ()) ;;
 
-check (err#raise "The cows are home.") ;;
+check (err#raise (FailWith "The cows are home.")) ;;
 
 check (rnd#int 42) ;;
 
 check (rnd#float 42.0) ;;
 
-check (new ref) ;;
+(new ref) ;;
 
-let r = ref 5 ;;
-r := !r + 10 ;;
-let a = !r ;;
-check a ;;
+let test_ref = (let r = ref 5 in r := !r + 10; !r) ;;

@@ -18,11 +18,11 @@ and bull =
 (* Handler type. *)
 type 'a collector = 'a => 'a list ;;
 
-check Tail ;;
+Tail ;;
 
-check {re = 1.2; im = 2.4} ;;
+{re = 1.2; im = 2.4} ;;
 
-check (Node (10, Empty, Node (20, Empty, Empty))) ;;
+(Node (10, Empty, Node (20, Empty, Empty))) ;;
 
-check (Horns (fun _ -> 10))
+(Horns (fun _ -> 10))
 

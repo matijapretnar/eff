@@ -1,7 +1,12 @@
-Check (file "./polymorphism.eff", line 3, char 1): (5, "foo")
-Check (file "./polymorphism.eff", line 7, char 1): (4, "foo")
-Check (file "./polymorphism.eff", line 11, char 1): ([1], ["foo"])
-Check (file "./polymorphism.eff", line 15, char 1): ([[]; []], [[2]; []])
+val a : int * string = (5, "foo")
+- : int * string = (5, "foo")
+val g : 'a -> 'b -> 'a = <fun>
+- : int * string = (4, "foo")
+val u : 'a list = []
+- : int list * string list = ([1], ["foo"])
+val v : 'a list list = [[]]
+- : 'a list list * int list list = ([[]; []], [[2]; []])
 - : 'a -> 'a
 - : 'a -> 'a
+val u : 'a -> 'b = <fun>
 - : 'a -> 'b

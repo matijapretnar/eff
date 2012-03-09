@@ -1,22 +1,22 @@
 (* Tests for lexer. *)
 
-let _a = 10 in check _a ;;
-let a' = 20 in check a' ;;
-let a'b' = 30 in check a'b' ;;
-let a''' = 40 in check a''' ;;
+let _a = 10 in _a ;;
+let a' = 20 in a' ;;
+let a'b' = 30 in a'b' ;;
+let a''' = 40 in a''' ;;
 
-check 1_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000 ;;
-check 42 ;;
-check (-0b101010) ;;
-check 0b101010 ;;
-check 0B101010 ;;
-check 0xabcdef ;;
-check 0XAbCdEf ;;
-check 0o76510 ;;
-check 0O76510 ;;
+1_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000 ;;
+42 ;;
+(-0b101010) ;;
+0b101010 ;;
+0B101010 ;;
+0xabcdef ;;
+0XAbCdEf ;;
+0o76510 ;;
+0O76510 ;;
 
-check 3.141592 ;;
-check 4.141_592 ;;
-check -51592e-4 ;;
-check 61592E-4 ;;
-check -0.00314e+3___ ;;
+3.141592 ;;
+4.141_592 ;;
+-51592e-4 ;;
+61592E-4 ;;
+-0.00314e+3___ ;;

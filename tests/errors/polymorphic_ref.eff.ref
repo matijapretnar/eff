@@ -1,1 +1,5 @@
+val local_store : 'a ref -> 'a -> 'b => 'b = <fun>
+val put : '_a list -> unit = <fun>
+val get : unit -> '_a list = <fun>
+val s : '_a list ref = <instance #3>
 Typing error (file "./errors/polymorphic_ref.eff", line 16, char 10): This expression has type string but it should have type int.

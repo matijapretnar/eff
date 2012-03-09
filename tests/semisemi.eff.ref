@@ -1,0 +1,5 @@
+val a : int = 5
+val b : int = 6
+val c : int = 7
+- : int = 4
+- : int = 11

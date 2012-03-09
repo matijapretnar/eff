@@ -1,6 +1,8 @@
-Check (file "./patterns.eff", line 1, char 14): 5
-Check (file "./patterns.eff", line 2, char 22): (1, 2)
-Check (file "./patterns.eff", line 3, char 27): (1, [2; 3; 4])
-Check (file "./patterns.eff", line 4, char 27): [2; 3; 4]
-Check (file "./patterns.eff", line 7, char 23): 10
-Check (file "./patterns.eff", line 9, char 28): (10, Moo 10)
+- : int = 5
+- : int * int = (1, 2)
+- : int * int list = (1, [2; 3; 4])
+- : int list = [2; 3; 4]
+- : int = 10
+- : int * int cow = (10, Moo 10)
+- : int * int * int = (42, 42, 42)
+- : int * int * int * (int * int * int) = (1, 2, 3, (1, 2, 3))

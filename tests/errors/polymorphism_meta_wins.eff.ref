@@ -1,1 +1,3 @@
+val x : '_a ref = <instance #3>
+val h : unit => unit = <handler>
 - : '_a ref
