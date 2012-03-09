@@ -1,3 +1,10 @@
+(* This is the equivalent of Haskell prelude or Ocaml pervasives,
+   with some list handling functions thrown in. *)
+
+external ( = ) : 'a -> 'a -> bool = "="
+
+external ( < ) : 'a -> 'a -> bool = "<"
+
 type channel = effect
   operation write : string -> unit
   operation read : unit -> string
@@ -5,39 +12,35 @@ end ;;
 
 external std : channel = "std" ;;
 
-let absurd x = match x with ;;
-
 type 'a exception = effect
   operation raise : 'a -> empty
 end ;;
 
-external err : string exception = "err" ;;
+let raise e p = match (e#raise p) with ;;
 
-let raise e p = absurd (e#raise p) ;;
+type runtime_error =
+  | DivisionByZero
+  | InvalidArgument of string
+  | AssertionFault
+  | FailWith of string ;;
 
-let divByZero =
-   new exception @ () with
-     operation raise _ @ _ -> absurd (err#raise "Division by zero")
-   end ;;
+external err : runtime_error exception = "err" ;;
 
-let invalidArgument =
-  new exception @ () with
-    operation raise msg @ _ -> absurd (err#raise msg)
-  end ;;
+let runtime_error e = raise err e ;;
 
-let assertionFault =
-  new exception @ () with
-    operation raise _ @ _ -> absurd (err#raise "assertion failure")
-  end ;;
+let runtime_handle e v = handler
+  | err#raise e' _ ->
+    if e' = e then v else runtime_error e' ;;
 
-let assert b = if b then () else raise assertionFault () ;;
+let divisionByZero = runtime_handle DivisionByZero ;;
 
-let failWith =
-  new exception @ () with
-      operation raise msg @ _ -> absurd (err#raise msg)
-  end ;;
+let invalidArgument msg = runtime_handle (InvalidArgument msg) ;;
 
-let failwith msg = raise failWith msg ;;
+let failWith msg = runtime_handle (FailWith msg) ;;
+
+let assert b = if b then () else runtime_error AssertionFault  ;;
+
+let failwith msg = runtime_error (FailWith msg) ;;
 
 external ( ~- ) : int -> int = "~-"
 
@@ -51,12 +54,8 @@ external ( - ) : int -> int -> int = "-"
 
 external ( % ) : int -> int -> int = "%"
 let (%) m n = match n with
-  | 0 -> raise divByZero ()
+  | 0 -> runtime_error DivisionByZero
   | n -> (%) m n
-
-external ( < ) : 'a -> 'a -> bool = "<"
-
-external ( = ) : 'a -> 'a -> bool = "="
 
 external ( ~-. ) : float -> float = "~-."
 
@@ -69,7 +68,7 @@ external ( -. ) : float -> float -> float = "-."
 external ( /. ) : float -> float -> float = "/."
 external ( / ) : int -> int -> int = "/"
 let ( / ) m n = match n with
-  | 0 -> raise divByZero ()
+  | 0 -> runtime_error DivisionByZero
   | n -> (/) m n
 
 external float : int -> float = "float"
@@ -172,7 +171,7 @@ let rec zip xs ys =
   match (xs, ys) with
   | ([], []) -> []
   | (x :: xs, y :: ys) -> (x, y) :: (zip xs ys)
-  | (_, _) -> raise invalidArgument "zip: length mismatch"
+  | (_, _) -> runtime_error (InvalidArgument "zip: length mismatch")
 
 let reverse =
   let rec reverse_acc acc = function
@@ -191,11 +190,11 @@ let rec length = function
   | x :: xs -> length xs + 1
 
 let head = function
-  | [] -> raise invalidArgument "head: empty list"
+  | [] -> runtime_error (InvalidArgument "head: empty list")
   | x :: _ -> x
 
 let rec tail = function
-  | [] -> raise invalidArgument "head: empty list"
+  | [] -> runtime_error (InvalidArgument "tail: empty list")
   | x :: xs -> xs
 
 let abs x = if x < 0 then -x else x

@@ -7,7 +7,8 @@ let error ?(pos=Common.Nowhere) err_type =
   in
   Format.kfprintf k Format.str_formatter
 
-let fatal ?pos = error ?pos "Fatal"
-let typing ?pos = error ?pos "Typing"
-let runtime ?pos = error ?pos "Runtime"
-let syntax ?pos = error ?pos "Syntax"
+let fatal ?pos = error ?pos "Fatal error"
+let typing ?pos = error ?pos "Typing error"
+let runtime ?pos = error ?pos "Runtime error"
+let syntax ?pos = error ?pos "Syntax error"
+let exc ?pos = error ?pos "Exception"
