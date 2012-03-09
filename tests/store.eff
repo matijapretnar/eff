@@ -4,7 +4,7 @@ type 'a store = effect
 end
 
 let x = ref 5 ;;
-let  y = ref 10 ;;
+let y = ref 10 ;;
 let z = ref x ;;
 
 begin
@@ -14,5 +14,5 @@ begin
   let b = !z in
     x := a + !b ;
     let c = !x + !y in
-    check (a, c)
+    (a, c)
 end

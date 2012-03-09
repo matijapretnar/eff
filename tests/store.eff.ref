@@ -1,1 +1,4 @@
-Check (file "./store.eff", line 17, char 5): (5, 39)
+val x : int ref = <instance #3>
+val y : int ref = <instance #4>
+val z : int ref ref = <instance #5>
+- : int * int = (5, 39)

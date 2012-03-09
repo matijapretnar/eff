@@ -8,6 +8,7 @@ Check (file "./while.eff", line 4, char 5): 6
 Check (file "./while.eff", line 4, char 5): 7
 Check (file "./while.eff", line 4, char 5): 8
 Check (file "./while.eff", line 4, char 5): 9
+- : unit = ()
 Check (file "./while.eff", line 13, char 10): (1, 0)
 Check (file "./while.eff", line 13, char 10): (2, 0)
 Check (file "./while.eff", line 13, char 10): (2, 1)
@@ -53,3 +54,4 @@ Check (file "./while.eff", line 13, char 10): (9, 5)
 Check (file "./while.eff", line 13, char 10): (9, 6)
 Check (file "./while.eff", line 13, char 10): (9, 7)
 Check (file "./while.eff", line 13, char 10): (9, 8)
+- : unit = ()

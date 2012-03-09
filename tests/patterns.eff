@@ -1,12 +1,12 @@
-let a = 5 in check a ;;
-let (a,b) = (1,2) in check (a,b) ;;
-let x :: y = [1;2;3;4] in check (x,y) ;;
-let _ :: y = [1;2;3;4] in check y ;;
+let a = 5 in a ;;
+let (a,b) = (1,2) in (a,b) ;;
+let x :: y = [1;2;3;4] in (x,y) ;;
+let _ :: y = [1;2;3;4] in y ;;
 
 type 'a cow = Moo of 'a ;;
-let Moo x = Moo 10 in check x ;;
+let Moo x = Moo 10 in x ;;
 
-let Moo x as y = Moo 10 in check (x,y) ;;
+let Moo x as y = Moo 10 in (x,y) ;;
 let x as y as z = 42 in (x,y,z) ;;
 let x,y,z as a = (1,2,3) in (x,y,z,a) ;;
 

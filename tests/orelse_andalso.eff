@@ -1,13 +1,13 @@
-check (false && (1 / 0 = 5)) ;;
+(false && (1 / 0 = 5)) ;;
 
-check (true || (1 / 0 = 5)) ;;
+(true || (1 / 0 = 5)) ;;
 
-check (false && false) ;;
-check (false && true) ;;
-check (true  && false) ;;
-check (true  && true) ;;
+(false && false) ;;
+(false && true) ;;
+(true  && false) ;;
+(true  && true) ;;
 
-check (false || false) ;;
-check (false || true) ;;
-check (true  || false) ;;
-check (true  || true) ;;
+(false || false) ;;
+(false || true) ;;
+(true  || false) ;;
+(true  || true) ;;

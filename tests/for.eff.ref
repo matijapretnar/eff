@@ -8,6 +8,7 @@ Check (file "./for.eff", line 2, char 3): 7
 Check (file "./for.eff", line 2, char 3): 8
 Check (file "./for.eff", line 2, char 3): 9
 Check (file "./for.eff", line 2, char 3): 10
+- : unit = ()
 Check (file "./for.eff", line 6, char 3): 10
 Check (file "./for.eff", line 6, char 3): 9
 Check (file "./for.eff", line 6, char 3): 8
@@ -18,6 +19,7 @@ Check (file "./for.eff", line 6, char 3): 4
 Check (file "./for.eff", line 6, char 3): 3
 Check (file "./for.eff", line 6, char 3): 2
 Check (file "./for.eff", line 6, char 3): 1
+- : unit = ()
 Check (file "./for.eff", line 11, char 5): (1, 1)
 Check (file "./for.eff", line 11, char 5): (1, 2)
 Check (file "./for.eff", line 11, char 5): (1, 3)
@@ -118,6 +120,8 @@ Check (file "./for.eff", line 11, char 5): (10, 7)
 Check (file "./for.eff", line 11, char 5): (10, 8)
 Check (file "./for.eff", line 11, char 5): (10, 9)
 Check (file "./for.eff", line 11, char 5): (10, 10)
+- : unit = ()
+- : unit = ()
 Check (file "./for.eff", line 20, char 3): (1, 1)
 Check (file "./for.eff", line 22, char 5): (2, 1)
 Check (file "./for.eff", line 22, char 5): (2, 2)
@@ -136,3 +140,4 @@ Check (file "./for.eff", line 22, char 5): (2, 2)
 Check (file "./for.eff", line 22, char 5): (2, 3)
 Check (file "./for.eff", line 22, char 5): (2, 4)
 Check (file "./for.eff", line 22, char 5): (2, 5)
+- : unit = ()
