@@ -10,7 +10,8 @@ EFFTARGET=src/eff
 # How to compile
 EFFOCAMLBUILD=$(OCAMLBUILD) -use-menhir -lib nums
 
-.PHONY: install-datahook test test-validate test-clean
+.PHONY: install-datahook test test-validate test-clean \
+	eff.byte eff.native eff.d.byte eff.p.native
 
 eff-$(PACKAGE_VERSION): eff.$(BUILDBEST)
 	cd $(srcdir) && \
