@@ -4,6 +4,8 @@ AC_CONFIG_MACRO_DIR([build-aux])
 AM_MAINTAINER_MODE
 AM_INIT_AUTOMAKE([foreign no-dependencies])
 
+AC_PROG_CC
+
 AC_PROG_OCAML
 
 if test "$OCAMLBUILD" = "no"; then

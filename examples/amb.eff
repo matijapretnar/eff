@@ -1,3 +1,6 @@
+(* This example is described in Section 6.7 of "Programming with Algebraic Effects and
+   Handlers" by A. Bauer and M. Pretnar. *)
+
 type 'a result = Failure | Success of 'a
 
 type 'a selection = effect
@@ -14,60 +17,24 @@ let amb s = handler
     in
       try lst  ;;
 
-let s = new selection ;;
-
-check_val (
-with amb s handle
-  let a = s#select [1;2;3;4;5] in
-  let b = s#select [1;2;3;4;5] in
-  let c = s#select [1;2;3;4;5] in
-    if a*a + b*b = c*c then Success (a,b,c) else Failure );;
-
-(* check_val (
-let s1 = new selection in
-let s2 = new selection in
-with amb s1 handle
-with amb s2 handle
-  let x = s1#select [2; 3; 5; 7; 11] in
-  let t = s2#select ["two"; "three"; "five"; "seven"; "eleven"] in
-    if x = string_length t then Success t else Failure
-) ;; *)
-
 (* The 8 queens problem. *)
+
 let no_attack (x,y) (x',y') =
   x <> x' && y <> y' && abs (x - x') <> abs (y - y') ;;
 
 let available x qs =
   filter (fun y -> forall (no_attack (x,y)) qs) [1;2;3;4;5;6;7;8] ;;
 
-check_val (
+(* This one finds [(8, 4); (7, 2); (6, 7); (5, 3); (4, 6); (3, 8); (2, 5); (1, 1)]. *)
 let s = new selection in
 with amb s handle
   let rec place x qs =
     if x = 9 then Success qs else
       let y = s#select (available x qs) in
       place (x+1) ((x, y) :: qs)
-  in place 1 []
-);;
+  in place 1 [] ;;
 
-(* Amb with state. *)
-let amb_with_state r u s = handler
-  | r#lookup () k -> (fun v -> k v v)
-  | r#update v' k -> (fun _ -> k () v')
-  | s#select lst k -> (fun v ->
-    let rec try = function
-      | [] -> Failure
-      | x::xs -> (match k x v with
-                    | Failure -> try xs
-                    | Success y -> Success y)
-    in
-      try lst)
-  | val x -> (fun _ -> x)
-  | finally f -> f u
-;;
-
-(* This is wrong because we use state. *)
-check_val (
+(* This one does not work because state is handled outside amb. *)
 let s = new selection in
 with amb s handle
   let qs = ref [] in
@@ -75,19 +42,9 @@ with amb s handle
     let y = s#select (available x !qs) in
     qs := (x, y) :: !qs
   done ;
-  Success !qs
-) ;;
+  Success !qs ;;
 
-(* Watch this, it works! *)
-
-let state r x = handler
-  | val y -> (fun s -> y)
-  | r#lookup () k -> (fun s -> k s s)
-  | r#update s' k -> (fun s -> k () s')
-  | finally f -> f x ;;
-
-print_string "WHOA!\n" ;
-check_val (
+(* Watch this, it works and finds the same solution as the first one. *)
 let s = new selection in
 with amb s handle
   let qs = new ref in
@@ -96,5 +53,25 @@ with amb s handle
       let y = s#select (available x !qs) in
       qs := (x, y) :: !qs
     done ;
-    Success !qs
-) ;;
+    Success !qs ;;
+
+(* Breadth-first search. *)
+let bfs s =
+  let q = ref [] in
+  handler
+    | s#select lst k ->
+      (q := !q @ (map (fun x -> (k,x)) lst) ;
+       match !q with
+        | [] -> Failure
+        | (k,x) :: lst -> q := lst ; k x) ;;
+
+(* We repeat 8-queen example with breadth-first-search. It is much slower
+   than amb, which is not surprising. It still finds the same solution
+   (which is what we would expect in this case). *)
+let s = new selection in
+with bfs s handle
+  let rec place x qs =
+    if x = 9 then Success qs else
+      let y = s#select (available x qs) in
+      place (x+1) ((x, y) :: qs)
+  in place 1 [] ;;

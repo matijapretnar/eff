@@ -1,0 +1,24 @@
+(* This example is described in Section 6.11 of "Programming with Algebraic Effects and
+   Handlers" by A. Bauer and M. Pretnar. 
+
+   To run this example you have to turn off type checking with --no-types:
+
+        eff --no-types yinyang.eff
+*)
+
+type ('a, 'b) delimited =
+effect
+  operation shift : (('a -> 'b) -> 'b) -> 'a
+end
+
+let rec reset d = handler
+  | d#shift f k -> with reset d handle (f k) ;;
+
+(* The yin-yang puzzle, see
+   http://stackoverflow.com/questions/2694679/how-the-yin-yang-puzzle-works *)
+
+let y = new delimited in
+  with reset y handle
+    let yin = (fun k -> std#write "@" ; k) (y#shift (fun k -> k k)) in
+    let yang = (fun k -> std#write "*" ; k) (y#shift (fun k -> k k)) in
+      yin yang ;;

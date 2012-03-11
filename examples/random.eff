@@ -1,104 +1,92 @@
+(* This example is described in Section 6.9 of "Programming with Algebraic Effects and
+   Handlers" by A. Bauer and M. Pretnar. *)
+
+(* We represent finite distributions as lists of pairs (x,p) where
+   p is the probability of event x. *)
 type 'a random = effect
   operation pick : ('a * float) list -> 'a
 end
 
+(* The uniofrm distribution on a given list of events. *)
 let uniform lst =
   let n = length lst in
     map (fun x -> (x, 1.0 /. float n)) lst ;;
 
-let combine =
+(* Combine a probability distribution of probability distributions
+   into a single probability distribution. This is the multiplication
+   of the relevant monad. *)
+let combine lst =
   let scale p xs = map (fun (i, x) -> (i, p *. x)) xs in
   let rec add (i,x) = function
     | [] -> [(i,x)]
     | (j,y)::lst ->
       if i = j then (j, x +. y) :: lst else (j,y) :: add (i,x) lst
   in
-    fold_left (fun e (d,p) -> fold_right add (scale p d) e) [] ;;
+    fold_left (fun e (d,p) -> fold_right add (scale p d) e) [] lst ;;
 
+(* This handler computes the distribution of outcomes of a probabilisitic
+   computation. *)
 let distribution r = handler
   | val v -> [(v, 1.0)]
   | r#pick lst k ->
       combine (map (fun (x,p) -> (k x, p)) lst) ;;
 
+(* The handler computing the expected value of a probabilistic computation
+   of type float. *)
 let expectation r = handler
   | val v -> v
   | r#pick lst k ->
       fold_right (fun (x,p) e -> e +. p *. k x) lst 0.0 ;;
 
-check_val (
-  let r = new random in
+(* Examples. *)
+
+(* A random walk of n steps where the probability of going left is p and probability of
+   going right is q. *)
+let walk r n p q =
+  let s = 1.0 -. p -. q in
+  let x = new ref in
+    with state x 0.0 handle
+      for i = 1 to n do
+         x := !x +. r#pick [(-1.0, p); (0.0, s); (1.0, q)]
+      done ;
+      !x ;;
+
+(* Where do we expect to land after 5 steps in a symmetric walk? (Answer: 0.0) *)
+let r = new random in
   with expectation r handle
-    let a = r#pick (uniform [1.0; 2.0; 4.0]) in
-      a
-) ;;
+    walk r 5 (1.0 /. 3.0) (1.0 /. 3.0) ;;
 
-check_val (
+(* Instead of the expected value we can calculate the distribution. *)
 let r = new random in
-with distribution r handle
-  let a = r#pick (uniform [1;2;3;4;5;6]) in
-  let b = r#pick (uniform [1;2;3;4;5;6]) in
-    a + b
-) ;;
+  with distribution r handle
+    walk r 5 (1.0 /. 3.0) (1.0 /. 3.0) ;;
 
-check_val (
+(* Finally, let us solve the Monty Hall problem, see
+   http://en.wikipedia.org/wiki/Monty_Hall_problem *)
+
+(* We first define a function which runs the Monty Hall game. As input
+   it takes a flag indicating whether we change our mind. The function
+   return true if we get the prize, and false otherwise. *)
+
+let monty_hall r change =
+  let doors = ["A"; "B"; "C"] in
+  (* The prize goes behind one of the doors. *)
+  let prize = r#pick (uniform doors) in
+  (* We make random guess. *)
+  let guess = r#pick (uniform doors) in
+  (* The host shows what is behind a door which does not contain the prize. *)
+  let show = r#pick (uniform (complement doors [prize; guess])) in
+  (* What is our final answer? *)
+  let final = (if change then hd (complement doors [guess; show]) else guess) in
+  (* Did we get the prize? *)
+    final = prize ;;
+
+(* The distribution if we stay with our initial guess. *)
 let r = new random in
-with expectation r handle
-  let rec walk x n =
-    if n = 0 then x else
-      let d = r#pick [(-1, 0.2); (0, 0.3); (1, 0.5)] in
-        walk (x + d) (n - 1)
-  in
-    float (walk 0 5)
-) ;;
+  with distribution r handle
+    monty_hall r false ;;
 
-check_val (
+(* The distribution if we switch the door. *)
 let r = new random in
-with distribution r handle
-  let rec walk x n =
-    if n = 0 then x else
-      let d = r#pick [(-1, 0.2); (0, 0.3); (1, 0.5)] in
-        walk (x + d) (n - 1)
-  in
-    walk 0 5
-) ;;
-
-let state r x = handler
-  | val y -> (fun s -> y)
-  | r#lookup () k -> (fun s -> k s s)
-  | r#update s' k -> (fun s -> k () s')
-  | finally f -> f x ;;
-
-print_string "WHY DOES THIS ONE WORK?\n"; 
-check_val (
-let r = new random in
-with distribution r handle
-  let x = new ref in
-  with state x 0 handle
-    for i = 1 to 5 do
-      x := !x + r#pick [(-1, 0.2); (0, 0.3); (1, 0.5)]
-    done;
-    !x
-) ;;
-
-print_string "EXPECTED VALUE FOR 7 STEPS";
-check_val (
-let r = new random in
-with expectation r handle
-  let x = new ref in
-  with state x 0 handle
-    for i = 1 to 7 do
-      x := !x + r#pick [(-1, 0.2); (0, 0.3); (1, 0.5)]
-    done;
-    float (!x)
-) ;;
-
-check_val (
-let r = new random in
-with distribution r handle
-  let x = new ref in
-  with state x 0 handle
-    for i = 1 to 5 do
-      x := !x + r#pick [(-1, 0.2); (0, 0.3); (1, 0.5)]
-    done;
-    !x
-) ;;
+  with distribution r handle
+    monty_hall r true ;;
