@@ -1,38 +1,24 @@
+(* This example is described in Section 6.4 of "Programming with Algebraic Effects and
+   Handlers" by A. Bauer and M. Pretnar. *)
+
 let transaction r exc = handler
-  | r#lookup () k -> fun v -> k v v
-  | r#update v' k -> fun v -> k () v'
-  | exc#raise _ _ -> fun _ -> None
-  | val x -> fun v -> r := v; Some x
-  | finally f -> f (!r) ;;
+  | r#lookup () k -> (fun s -> k s s)
+  | r#update s' k -> (fun s -> k () s')
+  | val x -> (fun s -> r := s; x)
+  | finally f -> f !r ;;
 
-let exc = new exception in
-let x = ref 1 in
-let result = 
-  with transaction x exc handle
-    incr x;
-    exc#raise ();
-    3 * !x
-in
-check_val (!x, result) ;;
+let r = ref 42 ;;
 
-let exc = new exception in
-let x = ref 1 in
-let result = 
-  with transaction x exc handle
-    incr x;
-    3 * !x
-in
-check_val (!x, result) ;;
+let e = new exception ;;
 
-let exc = new exception in
-let x = ref 1 in
-let result =
-  handle
-    incr x;
-    exc#raise ();
-    3 * !x
-  with
-    | exc#raise _ _ -> None
-    | val x -> Some x
-in
-check_val (!x, result)
+(* This prints 69 but does not change !r. *)
+handle
+  with transaction r e handle
+    r := 23 ;
+    raise e (3 * !r) ; (* Raise e with argument 69. *)
+    r := 34 ;
+    print !r (* This won't print. *)
+with
+  e#raise v _ -> print v ;; (* Prints 69. *)
+
+(* The value of !r is still 42. *)

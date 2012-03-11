@@ -1,0 +1,37 @@
+(* This example is described in Section 6.5 of "Programming with Algebraic Effects and
+   Handlers" by A. Bauer and M. Pretnar. *)
+
+type 'a lazy = effect
+  operation force: unit -> 'a
+end 
+
+type 'a deferred = Thunk of (unit -> 'a) | Value of 'a
+
+let lazy t =
+  new lazy @ (Thunk t) with
+    operation force () @ v ->
+      (match v with
+        | Value v -> (v, Value v)
+        | Thunk t -> let v = t () in (v, Value v))
+  end
+
+let force x = x#force () ;;
+
+(* We define a function which is purposely slow so we can
+   notice the effect of deferred computations. *)
+
+let rec fib = function
+  | 0 -> 0
+  | 1 -> 1
+  | n -> fib (n-1) + fib (n-2)
+
+(* This evaluates immediately. *)
+let x = lazy (fun _ -> fib 30) ;;
+
+(* This one we have to wait for. *)
+let y = force x ;;
+
+(* This one is instantaneous. *)
+let z = force x ;;
+
+

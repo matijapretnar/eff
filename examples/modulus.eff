@@ -1,37 +1,42 @@
+(* In this example we pretend that int is the type of natural numbers. *)
+
+type nat = int
+
+(* A modulus-of-continuity functional is a function mu which accepts a
+   functional f : (nat -> nat) -> nat and a sequence a : nat -> nat
+   and returns a number m such that the value (f a) depends on at most
+   the first m terms of a. In other words, if a and b agree up to the
+   n-th term, then f a = f b. *)
+
 (* We can implement modulus of continuity as usual with references *)
 
 let ref_mu f a =
   let k = ref 0 in
-  let b i =
-    k := max !k i;
-    a i
-  in
-  f b;
-  !k
+  let b i = (k := max !k i; a i) in
+    ignore (f b) ; !k
 
-(* An alternative is to define a special effect *)
+(* Or we can define a custom operation and a handler which does essentially
+   the same thing. *)
 
 type 'a modulus =
 effect
   operation call : int -> 'a
 end
 
-(* A functional [f : (nat -> nat) -> nat] applied at argument [a : nat
-   -> nat] depends on at most [mu f a] terms of sequence [a]. *)
 let mu f a =
   let m = new modulus in
     handle
       f m#call
     with
-    | m#call n k -> (fun i -> let j = max i n in k (a n) j)
-    | val _ -> fun i -> i
-    | finally g -> g 0
+      | m#call n k -> (fun i -> let j = max i n in k (a n) j)
+      | val _ -> fun i -> i
+      | finally g -> g 0 ;;
 
-
+(* A couple of examples. *)
 let f a = 0 * a 10 ;;
 let g a = a (a 5) ;;
 
-check_val (ref_mu f (fun i -> 30 + i * i)) ;;
-check (mu f (fun i -> 30 + i * i)) ;;
-check_val (ref_mu g (fun i -> 30 + i * i)) ;;
-check (mu g (fun i -> 30 + i * i)) ;;
+ref_mu f (fun i -> 30 + i * i) ;;
+mu f (fun i -> 30 + i * i) ;;
+ref_mu g (fun i -> 30 + i * i) ;;
+mu g (fun i -> 30 + i * i) ;;
