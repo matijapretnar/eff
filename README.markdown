@@ -84,6 +84,7 @@ To install the command `eff`, run
 If you install rlwrap or ledit after you installed eff, you should rerun
 `./configure` and `make install` for eff to become aware of them.
 
+See the file `etc/README.txt` for editor support.
 
 Copyright and license
 ---------------------
