@@ -1,4 +1,5 @@
-(* Section 6.11 Delimited control *)
+(* This example is described in Section 6.11 of "Programming with Algebraic Effects and
+   Handlers" by A. Bauer and M. Pretnar. *)
 
 type ('a, 'b) delimited =
 effect
@@ -13,16 +14,3 @@ let rec reset d = handler
 let d = new delimited in
 with reset d handle
   d#shift (fun k -> k (k (k 7))) * 2 + 1 ;;
-
-(* The yin-yang puzzle, see
-   http://stackoverflow.com/questions/2694679/how-the-yin-yang-puzzle-works *)
-
-(* Due to too restrictive typing, this program does not type-check. Use the
-   --no-types option to run it without type checking. *)
-(*
-let y = new delimited in
-  with reset y handle
-    let yin = (fun k -> std#write "@" ; k) (y#shift (fun k -> k k)) in
-    let yang = (fun k -> std#write "*" ; k) (y#shift (fun k -> k k)) in
-      yin yang ;;
-*)

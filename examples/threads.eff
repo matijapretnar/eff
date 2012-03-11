@@ -1,22 +1,10 @@
+(* This example is described in Section 6.10 of "Programming with Algebraic Effects and
+   Handlers" by A. Bauer and M. Pretnar. *)
+
 type coop = effect
   operation yield : unit -> unit
   operation fork : (unit -> unit) -> unit
 end
-
-
-let fifo s =
-  let rec scheduler () = handler
-    | s#fork p k -> k (); with scheduler () handle p ()
-    | s#yield () k -> k ()
-  in
-    scheduler () ;;
-
-let lifo s =
-  let rec scheduler () = handler
-    | s#fork p k -> with scheduler () handle p (); k ()
-    | s#yield () k -> k ()
-  in
-    scheduler () ;;
 
 let round_robin c =
   let threads = ref [] in
@@ -33,55 +21,43 @@ let round_robin c =
   in
     scheduler () ;;
 
+(* An example of nested multithreading. We have a thread which prints
+   the letter a and another one which has two sub-threads printing x and y. *)
 let c = new coop in
 with round_robin c handle
   c#fork (fun _ ->
     for i = 1 to 5 do
-      std#write "a" ;
+      print_string "a" ;
       c#yield ()
     done) ;
   let d = new coop in
   with round_robin d handle
     d#fork (fun _ ->
       for j = 1 to 5 do
-         std#write "x" ;
+         print_string "x" ;
          d#yield ()
     done) ;
     for k = 1 to 5 do
-      std#write "y" ;
+      print_string "y" ;
       d#yield () ;
       c#yield ()
     done
 ;;
 
-(* Enumerating all positive rational numbers. *)
-(* let c = new coop in
-  (* Lists all fractions with a given numerator, yielding after each one *)
-  let rec fractions numerator =
-    (* Start enumerating fractions with a bigger numerator *)
-    c#fork (fun _ -> c#yield (); fractions (numerator + 1));
+(* We can run an unbounded amount of threads. The following example enumerates all
+   reduced positive fractions less than 1 by forking a thread for each denominator. *)
+let c = new coop in
+let rec fractions denominator =
+  (* For the next denominator *)
+    c#fork (fun _ -> c#yield (); fractions (denominator + 1)) ;
     (* And list all the fractions with the current one *)
-    for denominator = 1 to numerator do
-      print_endline (to_string numerator ^ "/" ^ to_string denominator);
+    for numerator = 1 to denominator - 1 do
+      (* Print if the fraction is reduced. *)
+      if gcd numerator denominator = 1 then
+        print_string (to_string numerator ^ "/" ^ to_string denominator ^ ", ")
+      else () ;
       c#yield ()
     done
 in
 with round_robin c handle
-  fractions 0
-;; *)
-    
-
-(* example of two infinite loops yielding to one another *)
-(* let c = new coop in
-  with round_robin c handle
-    c#fork (fun () ->
-      while true do
-        std#write "Robin!" ;
-        c#yield ()
-      done) ;
-    while true do
-      std#write "Batman!" ;
-      c#yield ()
-    done
-;; *)
-
+  fractions 1 ;;
