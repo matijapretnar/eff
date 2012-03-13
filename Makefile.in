@@ -33,6 +33,7 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
+bin_PROGRAMS = eff$(EXEEXT)
 subdir = .
 DIST_COMMON = $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(top_srcdir)/configure \
@@ -47,6 +48,20 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
 mkinstalldirs = $(install_sh) -d
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
+am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(effdir)"
+PROGRAMS = $(bin_PROGRAMS)
+am_eff_OBJECTS =
+eff_OBJECTS = $(am_eff_OBJECTS)
+eff_LDADD = $(LDADD)
+DEFAULT_INCLUDES = -I.@am__isrc@
+depcomp =
+am__depfiles_maybe =
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+CCLD = $(CC)
+LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+SOURCES = $(eff_SOURCES)
+DIST_SOURCES = $(eff_SOURCES)
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -74,12 +89,6 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(effdir)"
-SCRIPTS = $(bin_SCRIPTS)
-depcomp =
-am__depfiles_maybe =
-SOURCES =
-DIST_SOURCES =
 DATA = $(eff_DATA)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
@@ -103,28 +112,22 @@ AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 BUILDBEST = @BUILDBEST@
-CC = @CC@
-CFLAGS = @CFLAGS@
-CPPFLAGS = @CPPFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
-EXEEXT = @EXEEXT@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
-LDFLAGS = @LDFLAGS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LTLIBOBJS = @LTLIBOBJS@
 MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
-OBJEXT = @OBJEXT@
 OCAML = @OCAML@
 OCAMLBEST = @OCAMLBEST@
 OCAMLBUILD = @OCAMLBUILD@
@@ -156,7 +159,6 @@ abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
-ac_ct_CC = @ac_ct_CC@
 ac_ct_WRAPPER = @ac_ct_WRAPPER@
 am__leading_dot = @am__leading_dot@
 am__tar = @am__tar@
@@ -168,6 +170,7 @@ datadir = @datadir@
 datarootdir = @datarootdir@
 docdir = @docdir@
 dvidir = @dvidir@
+effdir = $(datarootdir)/eff
 exec_prefix = @exec_prefix@
 host_alias = @host_alias@
 htmldir = @htmldir@
@@ -194,16 +197,15 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I build-aux
-bin_SCRIPTS = eff
-eff_DATA = pervasives.eff eff-$(PACKAGE_VERSION)
-EXTRA_DIST = build-aux/make-eff pervasives.eff tests examples src etc LICENSE.txt INSTALL.txt README.txt
-effdir = $(datarootdir)/eff/$(PACKAGE_VERSION)
+eff_SOURCES = 
+eff_DATA = pervasives.eff
+EXTRA_DIST = pervasives.eff tests examples src etc LICENSE.txt INSTALL.txt README.txt
 
 # The main program (without the .ml extension)
 EFFTARGET = src/eff
 
 # How to compile
-EFFOCAMLBUILD = $(OCAMLBUILD) -use-menhir -lib nums
+EFFOCAMLBUILD = $(OCAMLBUILD) -use-menhir -lib nums -lib unix
 all: all-am
 
 .SUFFIXES:
@@ -241,38 +243,49 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	$(am__cd) $(srcdir) && $(ACLOCAL) $(ACLOCAL_AMFLAGS)
 $(am__aclocal_m4_deps):
-install-binSCRIPTS: $(bin_SCRIPTS)
+install-binPROGRAMS: $(bin_PROGRAMS)
 	@$(NORMAL_INSTALL)
 	test -z "$(bindir)" || $(MKDIR_P) "$(DESTDIR)$(bindir)"
-	@list='$(bin_SCRIPTS)'; test -n "$(bindir)" || list=; \
-	for p in $$list; do \
-	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  if test -f "$$d$$p"; then echo "$$d$$p"; echo "$$p"; else :; fi; \
+	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
+	for p in $$list; do echo "$$p $$p"; done | \
+	sed 's/$(EXEEXT)$$//' | \
+	while read p p1; do if test -f $$p; \
+	  then echo "$$p"; echo "$$p"; else :; fi; \
 	done | \
-	sed -e 'p;s,.*/,,;n' \
-	    -e 'h;s|.*|.|' \
-	    -e 'p;x;s,.*/,,;$(transform)' | sed 'N;N;N;s,\n, ,g' | \
-	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1; } \
+	sed -e 'p;s,.*/,,;n;h' -e 's|.*|.|' \
+	    -e 'p;x;s,.*/,,;s/$(EXEEXT)$$//;$(transform);s/$$/$(EXEEXT)/' | \
+	sed 'N;N;N;s,\n, ,g' | \
+	$(AWK) 'BEGIN { files["."] = ""; dirs["."] = 1 } \
 	  { d=$$3; if (dirs[d] != 1) { print "d", d; dirs[d] = 1 } \
-	    if ($$2 == $$4) { files[d] = files[d] " " $$1; \
-	      if (++n[d] == $(am__install_max)) { \
-		print "f", d, files[d]; n[d] = 0; files[d] = "" } } \
-	    else { print "f", d "/" $$4, $$1 } } \
+	    if ($$2 == $$4) files[d] = files[d] " " $$1; \
+	    else { print "f", $$3 "/" $$4, $$1; } } \
 	  END { for (d in files) print "f", d, files[d] }' | \
 	while read type dir files; do \
-	     if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
-	     test -z "$$files" || { \
-	       echo " $(INSTALL_SCRIPT) $$files '$(DESTDIR)$(bindir)$$dir'"; \
-	       $(INSTALL_SCRIPT) $$files "$(DESTDIR)$(bindir)$$dir" || exit $$?; \
-	     } \
+	    if test "$$dir" = .; then dir=; else dir=/$$dir; fi; \
+	    test -z "$$files" || { \
+	      echo " $(INSTALL_PROGRAM_ENV) $(INSTALL_PROGRAM) $$files '$(DESTDIR)$(bindir)$$dir'"; \
+	      $(INSTALL_PROGRAM_ENV) $(INSTALL_PROGRAM) $$files "$(DESTDIR)$(bindir)$$dir" || exit $$?; \
+	    } \
 	; done
 
-uninstall-binSCRIPTS:
+uninstall-binPROGRAMS:
 	@$(NORMAL_UNINSTALL)
-	@list='$(bin_SCRIPTS)'; test -n "$(bindir)" || exit 0; \
+	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
 	files=`for p in $$list; do echo "$$p"; done | \
-	       sed -e 's,.*/,,;$(transform)'`; \
-	dir='$(DESTDIR)$(bindir)'; $(am__uninstall_files_from_dir)
+	  sed -e 'h;s,^.*/,,;s/$(EXEEXT)$$//;$(transform)' \
+	      -e 's/$$/$(EXEEXT)/' `; \
+	test -n "$$list" || exit 0; \
+	echo " ( cd '$(DESTDIR)$(bindir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(bindir)" && rm -f $$files
+
+clean-binPROGRAMS:
+	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
+
+mostlyclean-compile:
+	-rm -f *.$(OBJEXT)
+
+distclean-compile:
+	-rm -f *.tab.c
 install-effDATA: $(eff_DATA)
 	@$(NORMAL_INSTALL)
 	test -z "$(effdir)" || $(MKDIR_P) "$(DESTDIR)$(effdir)"
@@ -462,7 +475,7 @@ distcleancheck: distclean
 	       exit 1; } >&2
 check-am: all-am
 check: check-am
-all-am: Makefile $(SCRIPTS) $(DATA)
+all-am: Makefile $(PROGRAMS) $(DATA)
 installdirs:
 	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(effdir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
@@ -497,12 +510,12 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-clean-am: clean-generic mostlyclean-am
+clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -f Makefile
-distclean-am: clean-am distclean-generic
+distclean-am: clean-am distclean-compile distclean-generic
 
 dvi: dvi-am
 
@@ -517,13 +530,12 @@ info: info-am
 info-am:
 
 install-data-am: install-effDATA
-	@$(NORMAL_INSTALL)
-	$(MAKE) $(AM_MAKEFLAGS) install-data-hook
+
 install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am: install-binSCRIPTS
+install-exec-am: install-binPROGRAMS
 
 install-html: install-html-am
 
@@ -553,7 +565,7 @@ maintainer-clean-am: distclean-am maintainer-clean-generic
 
 mostlyclean: mostlyclean-am
 
-mostlyclean-am: mostlyclean-generic
+mostlyclean-am: mostlyclean-compile mostlyclean-generic
 
 pdf: pdf-am
 
@@ -563,55 +575,49 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-binSCRIPTS uninstall-effDATA
+uninstall-am: uninstall-binPROGRAMS uninstall-effDATA
 
-.MAKE: install-am install-data-am install-strip
+.MAKE: install-am install-strip
 
-.PHONY: all all-am am--refresh check check-am clean clean-generic dist \
-	dist-all dist-bzip2 dist-gzip dist-lzip dist-lzma dist-shar \
-	dist-tarZ dist-xz dist-zip distcheck distclean \
-	distclean-generic distcleancheck distdir distuninstallcheck \
-	dvi dvi-am html html-am info info-am install install-am \
-	install-binSCRIPTS install-data install-data-am \
-	install-data-hook install-dvi install-dvi-am install-effDATA \
+.PHONY: all all-am am--refresh check check-am clean clean-binPROGRAMS \
+	clean-generic dist dist-all dist-bzip2 dist-gzip dist-lzip \
+	dist-lzma dist-shar dist-tarZ dist-xz dist-zip distcheck \
+	distclean distclean-compile distclean-generic distcleancheck \
+	distdir distuninstallcheck dvi dvi-am html html-am info \
+	info-am install install-am install-binPROGRAMS install-data \
+	install-data-am install-dvi install-dvi-am install-effDATA \
 	install-exec install-exec-am install-html install-html-am \
 	install-info install-info-am install-man install-pdf \
 	install-pdf-am install-ps install-ps-am install-strip \
 	installcheck installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic pdf \
-	pdf-am ps ps-am uninstall uninstall-am uninstall-binSCRIPTS \
-	uninstall-effDATA
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic pdf pdf-am ps ps-am uninstall uninstall-am \
+	uninstall-binPROGRAMS uninstall-effDATA
 
 
-.PHONY: install-datahook test test-validate test-clean \
+.PHONY: test test-validate test-clean \
 	eff.byte eff.native eff.d.byte eff.p.native
 
-eff-$(PACKAGE_VERSION): eff.$(BUILDBEST)
+eff: eff.$(BUILDBEST)
 	cd $(srcdir) && \
-	cp eff.$(BUILDBEST) eff-$(PACKAGE_VERSION)
+	cp eff.$(BUILDBEST) eff
 
-eff.byte:
+eff.byte: src/version.ml
 	cd $(srcdir) && \
 	$(EFFOCAMLBUILD) $(EFFTARGET).byte
 
-eff.native:
+eff.native: src/version.ml
 	cd $(srcdir) && \
 	$(EFFOCAMLBUILD) $(EFFTARGET).native
 
-eff.d.byte:
+eff.d.byte: src/version.ml
 	cd $(srcdir) && $(EFFOCAMLBUILD) $(EFFTARGET).d.byte
 
-eff.p.native:
+eff.p.native: src/version.ml
 	cd $(srcdir) && $(EFFOCAMLBUILD) $(EFFTARGET).p.native
 
-eff:
-	sh $(srcdir)/build-aux/make-eff \
-	   "$(effdir)/pervasives.eff" \
-	   "$(effdir)/eff-$(PACKAGE_VERSION)" \
-           "$(WRAPPER)"
-
-install-data-hook:
-	chmod a+x $(effdir)/eff-$(PACKAGE_VERSION)
+src/version.ml:
+	echo "let version=\"$(PACKAGE_VERSION)\";; let effdir=\"$(effdir)\";;" > src/version.ml
 
 # Explain parser conflicts in the file parser.conflicts
 conflicts:
@@ -637,7 +643,7 @@ test-clean:
 
 clean: test-clean
 	cd $(srcdir) && \
-	rm -f eff eff-$(PACKAGE_VERSION) && \
+	rm -f eff eff-$(PACKAGE_VERSION) src/version.ml && \
 	ocamlbuild -clean && rm -f parser.conflicts
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.

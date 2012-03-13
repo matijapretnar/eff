@@ -4,8 +4,6 @@ AC_CONFIG_MACRO_DIR([build-aux])
 AM_MAINTAINER_MODE
 AM_INIT_AUTOMAKE([foreign no-dependencies])
 
-AC_PROG_CC
-
 AC_PROG_OCAML
 
 if test "$OCAMLBUILD" = "no"; then
@@ -31,9 +29,10 @@ else
   BUILDBEST=byte
 fi
 
-echo "let version = \"$PACKAGE_VERSION\";;" > src/version.ml
-
 AC_SUBST([BUILDBEST])
+
+effdir="$datarootdir/eff/$PACKAGE_VERSION"
+AC_SUBST([effdir])
 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

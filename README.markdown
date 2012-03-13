@@ -67,9 +67,7 @@ for more information. Next, run
 
     make
 
-If all goes well, you should be able to run eff in-place by typing either
-`./eff.native` or `./eff.byte` if you do not have `ocamlopt` for some
-reason.
+If all goes well, you should be able to run eff in-place by typing `./eff`.
 
 You can also run a battery of tests with
 
@@ -80,9 +78,6 @@ You can also run a battery of tests with
 To install the command `eff`, run
 
     sudo make install
-
-If you install rlwrap or ledit after you installed eff, you should rerun
-`./configure` and `make install` for eff to become aware of them.
 
 See the file `etc/README.txt` for editor support.
 
