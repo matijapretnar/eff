@@ -125,7 +125,6 @@ let rec ceval env (c, pos) = match c with
         end
 
   | I.New (eff, r) ->
-      let description = Print.to_string "%s at %t" eff (Print.position pos) in
       let r = (match r with
                  | None -> None
                  | Some (e, lst) ->
@@ -133,7 +132,7 @@ let rec ceval env (c, pos) = match c with
                      let lst = List.map (fun (op, a) -> (op, eval_closure2 env a)) lst in
                        Some (ref v, lst))
       in
-      let e = V.fresh_instance description r in
+      let e = V.fresh_instance None r in
         V.Value e
 
   | I.Let (lst, c) ->
@@ -205,20 +204,20 @@ and eval_closure2 env (p1, p2, c) v1 v2 = ceval (extend p2 v2 (extend p1 v1 env)
 
 let rec top_handle = function
   | V.Value v -> v
-  | V.Operation (((_, d, Some (s_ref, resource)), opname) as op, v, k) ->
+  | V.Operation (((_, _, Some (s_ref, resource)) as inst, opname) as op, v, k) ->
       begin match C.lookup opname resource with
-        | None -> Error.runtime "uncaught operation %t %t (%s)." (Print.operation op) (Print.value v) d
+        | None -> Error.runtime "uncaught operation %t %t." (Print.operation op) (Print.value v)
         | Some f ->
             begin match f v !s_ref with
               | V.Value (V.Tuple [u; s]) ->
                   s_ref := s;
                   top_handle (k u)
-              | V.Value _ -> Error.runtime "pair expected in a resource handler for %s" d
-              | _ -> Error.runtime "pair expected ina resource handler for %s" d
+              | V.Value _ -> Error.runtime "pair expected in a resource handler for %t." (Print.instance inst)
+              | _ -> Error.runtime "pair expected ina resource handler for %t." (Print.instance inst)
             end
       end
-  | V.Operation (((_, d, None), _) as op, v, k) ->
-      Error.runtime "uncaught operation %t %t (%s)" (Print.operation op) (Print.value v) d
+  | V.Operation (((_, _, None), _) as op, v, k) ->
+      Error.runtime "uncaught operation %t %t." (Print.operation op) (Print.value v)
 
 let run env c =
   top_handle (ceval env c)

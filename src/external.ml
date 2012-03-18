@@ -45,7 +45,7 @@ let symbols = [
   ("string_length", V.from_fun (fun v -> V.value_int (Big_int.big_int_of_int (String.length (V.to_str v)))));
   ("to_string", V.from_fun (fun v -> let s = Print.to_string "%t" (Print.value v) in V.value_str s));
   ("float", V.from_fun (fun v -> V.value_float (Big_int.float_of_big_int (V.to_int v))));
-  ("std", V.fresh_instance "standard I/O" (Some (ref V.from_unit, [
+  ("std", V.fresh_instance (Some "standard I/O") (Some (ref V.from_unit, [
             ("write", coop (fun v s ->
                               let str = V.to_str v in
                                 print_string str; flush stdout ;
@@ -54,13 +54,13 @@ let symbols = [
                               let str = read_line () in
                                 (V.from_str str, s)));
             ])));
-  ("err", V.fresh_instance "standard error" (Some (ref V.from_unit, [
+  ("err", V.fresh_instance (Some "standard error") (Some (ref V.from_unit, [
              ("raise", coop (fun v s ->
                                let str = Print.to_string "%t" (Print.value v) in
                                  Error.exc "%s" str))])));
 
   ("rnd", (Random.self_init () ;
-           V.fresh_instance "random number generator" (Some (ref V.from_unit, [
+           V.fresh_instance (Some "random number generator") (Some (ref V.from_unit, [
              ("int", coop (fun k s -> (V.from_int (Big_int.big_int_of_int (Random.int (Big_int.int_of_big_int (V.to_int k))))), s));
              ("float", coop (fun x s -> (V.from_float (Random.float (V.to_float x))), s));
            ]))
