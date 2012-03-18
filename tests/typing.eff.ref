@@ -14,7 +14,7 @@
 - : '_a dog
 - : int dog
 - : '_a list dog
-val fifi : '_a dog = <instance #3>
+val fifi : '_a dog = <instance #6>
 - : '_a -> string
 - : string
 - : string

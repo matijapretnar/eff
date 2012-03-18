@@ -1,4 +1,4 @@
-val x : int store = <instance #3>
+val x : int store = <instance #6>
 val a : int = 5
 - : unit = ()
 val b : int = 17

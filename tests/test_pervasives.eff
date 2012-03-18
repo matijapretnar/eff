@@ -14,22 +14,22 @@ let whatis_std = std ;;
 
 let whatis_raise = raise ;;
 
-let runtime_errors = [DivisionByZero; InvalidArgument "foo"; AssertionFault; FailWith "bar"] ;;
+let whatis_exception = exception ;;
 
-let whatis_err = err ;;
+let whatis_divisionByZero = divisionByZero ;;
+let whatis_invalidArgument = invalidArgument ;;
+let whatis_assertionFault = assertionFault ;;
+let whatis_failure = failure ;;
 
-let whatis_runtime_error = runtime_error ;;
-
-let what_is_runtime_handle = runtime_handle ;;
-
-let test_divisionByZero = with divisionByZero "foo" handle let x = 1 / 0 in "bar" ;;
+let test_divisionByZero =
+  handle let x = 1 / 0 in "bar" with divisionByZero#raise _ _ -> "foo"
 
 let test_invalidArgument =
-    with invalidArgument "foo" "No he was not" handle "invalidArgument was here" ;;
+  handle "invalidArgument was here" with invalidArgument#raise "foo" _ -> "No he was not" ;;
 
 check (failwith "They say it's all about flirting.") ;;
 
-let test_failWith = with failWith "bar" 42 handle failwith "bar" ;;
+let test_failure = handle failwith "bar" with failure#raise "bar" _ -> 42 ;;
 
 assert ("a" = "a") ;;
 
@@ -175,7 +175,7 @@ let test_snd = (snd ("foo", 4)) ;;
 
 check (std#read ()) ;;
 
-check (err#raise (FailWith "The cows are home.")) ;;
+check (failwith "The cows are home.") ;;
 
 check (rnd#int 42) ;;
 

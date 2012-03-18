@@ -54,10 +54,12 @@ let symbols = [
                               let str = read_line () in
                                 (V.from_str str, s)));
             ])));
-  ("err", V.fresh_instance (Some "standard error") (Some (ref V.from_unit, [
-             ("raise", coop (fun v s ->
-                               let str = Print.to_string "%t" (Print.value v) in
-                                 Error.exc "%s" str))])));
+
+  ("exception", V.from_fun (fun v ->
+    let desc = V.to_str v in V.Value (V.fresh_instance (Some desc) (Some (ref V.from_unit, [
+                 ("raise", coop (fun v s ->
+                                   let str = Print.to_string "%s %t." desc (Print.value v) in
+                                     Error.exc "%s" str))])))));
 
   ("rnd", (Random.self_init () ;
            V.fresh_instance (Some "random number generator") (Some (ref V.from_unit, [
