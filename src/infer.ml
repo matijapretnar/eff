@@ -131,7 +131,7 @@ let unify tctx sbst pos t1 t2 =
    with the type of the pattern. *)
 let infer_pattern tctx sbst pp =
   if not (Pattern.linear_pattern pp) then
-    Error.typing ~pos:(snd pp) "Fields in a pattern must be distinct." ;
+    Error.typing ~pos:(snd pp) "Variables in a pattern must be distinct." ;
   let vars = ref [] in
   let rec infer (p, pos) =
     match p with
