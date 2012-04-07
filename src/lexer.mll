@@ -1,6 +1,5 @@
 {
   open Parser
-  open Lexing
 
   let reserved = [
     ("and", AND);
@@ -11,9 +10,9 @@
     ("do", DO);
     ("done", DONE);
     ("downto", DOWNTO);
+    ("effect", EFFECT);
     ("else", ELSE);
     ("end", END);
-    ("effect", EFFECT);
     ("external", EXTERNAL);
     ("false", BOOL false);
     ("finally", FINALLY);
@@ -24,25 +23,25 @@
     ("handler", HANDLER);
     ("if", IF);
     ("in", IN);
-    ("match", MATCH);
-    ("mod", MOD);
     ("land", LAND);
     ("let", LET);
     ("lor", LOR);
     ("lsl", LSL);
     ("lsr", LSR);
     ("lxor", LXOR);
+    ("match", MATCH);
+    ("mod", MOD);
     ("new", NEW);
     ("of", OF);
-    ("or", OR);
     ("operation", OPERATION);
+    ("or", OR);
     ("rec", REC);
-    ("val", VAL);
-    ("while", WHILE);
+    ("then", THEN);
     ("to", TO);
     ("true", BOOL true);
     ("type", TYPE);
-    ("then", THEN);
+    ("val", VAL);
+    ("while", WHILE);
     ("with", WITH)
   ]
 
@@ -102,21 +101,21 @@ let prefixop = ['~' '?' '!']             operatorchar*
 let infixop0 = ['=' '<' '>' '|' '&' '$'] operatorchar*
 let infixop1 = ['@' '^']                 operatorchar*
 let infixop2 = ['+' '-']                 operatorchar*
-let infixop4 = "**"                      operatorchar*
 let infixop3 = ['*' '/' '%']             operatorchar*
+let infixop4 = "**"                      operatorchar*
 
 rule token = parse
-  | '\n'                { new_line lexbuf; token lexbuf }
+  | '\n'                { Lexing.new_line lexbuf; token lexbuf }
   | [' ' '\r' '\t']     { token lexbuf }
   | "(*"                { comment 0 lexbuf }
-  | bigint              { INT (bigint_of_string (lexeme lexbuf)) }
+  | bigint              { INT (bigint_of_string (Lexing.lexeme lexbuf)) }
   | xxxint              { try
-                            INT (Big_int.big_int_of_int (int_of_string (lexeme lexbuf)))
+                            INT (Big_int.big_int_of_int (int_of_string (Lexing.lexeme lexbuf)))
                           with Failure _ -> Error.syntax ~pos:(position_of_lex lexbuf) "Invalid integer constant"
                         }
-  | float               { FLOAT (float_of_string(lexeme lexbuf)) }
+  | float               { FLOAT (float_of_string(Lexing.lexeme lexbuf)) }
   | '"'                 { STRING (string "" lexbuf) }
-  | lname               { let s = lexeme lexbuf in
+  | lname               { let s = Lexing.lexeme lexbuf in
                             match Common.lookup s reserved with
                               | Some t -> t
                               | None ->
@@ -125,8 +124,8 @@ rule token = parse
                                     | None -> LNAME s
                                   end
                         }
-  | uname               { UNAME (lexeme lexbuf) }
-  | '\'' lname          { let str = lexeme lexbuf in
+  | uname               { UNAME (Lexing.lexeme lexbuf) }
+  | '\'' lname          { let str = Lexing.lexeme lexbuf in
                           PARAM (String.sub str 1 (String.length str - 1)) }
   | '_'                 { UNDERSCORE }
   | '('                 { LPAREN }
@@ -158,8 +157,8 @@ rule token = parse
   | infixop0            { INFIXOP0(Lexing.lexeme lexbuf) }
   | infixop1            { INFIXOP1(Lexing.lexeme lexbuf) }
   | infixop2            { INFIXOP2(Lexing.lexeme lexbuf) }
-  | infixop4 (* Comes before infixop3 because ** matches the infixop3 pattern too *)
-                        { INFIXOP4(Lexing.lexeme lexbuf) }
+  (* infixop4 comes before infixop3 because ** would otherwise match infixop3 *)
+  | infixop4            { INFIXOP4(Lexing.lexeme lexbuf) }
   | infixop3            { INFIXOP3(Lexing.lexeme lexbuf) }
   | eof                 { EOF }
 
@@ -172,12 +171,12 @@ and comment n = parse
 and string acc = parse
   | '"'                 { acc }
   | '\\'                { let esc = escaped lexbuf in string (acc ^ esc) lexbuf }
-  | [^'"' '\\']*        { string (acc ^ (lexeme lexbuf)) lexbuf }
+  | [^'"' '\\']*        { string (acc ^ (Lexing.lexeme lexbuf)) lexbuf }
   | eof                 { Error.syntax ~pos:(position_of_lex lexbuf) "Unterminated string %s" acc}
 
 and escaped = parse
-  | _                   { let str = lexeme lexbuf in
-                          try List.assoc (lexeme lexbuf) escaped_characters
+  | _                   { let str = Lexing.lexeme lexbuf in
+                          try List.assoc str escaped_characters
                           with Not_found -> Error.syntax ~pos:(position_of_lex lexbuf) "Unknown escaped character %s" str
                         }
 
@@ -185,8 +184,8 @@ and escaped = parse
   let read_file parser fn =
   try
     let fh = open_in fn in
-    let lex = from_channel fh in
-    lex.lex_curr_p <- {lex.lex_curr_p with pos_fname = fn};
+    let lex = Lexing.from_channel fh in
+    lex.Lexing.lex_curr_p <- {lex.Lexing.lex_curr_p with Lexing.pos_fname = fn};
     try
       let terms = parser lex in
       close_in fh;

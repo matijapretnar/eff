@@ -181,14 +181,14 @@ and veval env (e, pos) = match e with
       V.Closure (fun v -> V.Operation ((n, op), v, V.value))
   | I.Handler h -> V.Handler (eval_handler env h)
 
-and eval_handler env {I.operations=ops; I.return=ret; I.finally=fin} =
-  let eval_op ((e, op), (kvar, a)) =
-    let f u k = eval_closure (extend kvar (V.Closure k) env) a u in
+and eval_handler env {I.operations=ops; I.value=value; I.finally=fin} =
+  let eval_op ((e, op), (p, kvar, c)) =
+    let f u k = eval_closure (extend kvar (V.Closure k) env) (p, c) u in
     ((V.to_instance (veval env e), op), f)
     in
   let ops = List.map eval_op ops in
   let rec h = function
-    | V.Value v -> eval_closure env ret v
+    | V.Value v -> eval_closure env value v
     | V.Operation (op, v, k) ->
         let k' u = h (k u) in
         begin match C.lookup op ops with
@@ -204,8 +204,8 @@ and eval_closure2 env (p1, p2, c) v1 v2 = ceval (extend p2 v2 (extend p1 v1 env)
 
 let rec top_handle = function
   | V.Value v -> v
-  | V.Operation (((_, _, Some (s_ref, resource)) as inst, opname) as op, v, k) ->
-      begin match C.lookup opname resource with
+  | V.Operation (((_, _, Some (s_ref, resource)) as inst, opsym) as op, v, k) ->
+      begin match C.lookup opsym resource with
         | None -> Error.runtime "uncaught operation %t %t." (Print.operation op) (Print.value v)
         | Some f ->
             begin match f v !s_ref with

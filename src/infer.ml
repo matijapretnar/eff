@@ -190,7 +190,7 @@ and infer_abstraction2 ctx sbst (p1, p2, c) =
   let t3 = infer_comp ctx sbst c in
     t1, t2, t3
 
-and infer_handler_case_abstraction ctx sbst k (p, e) =
+and infer_handler_case_abstraction ctx sbst (p, k, e) =
   let vs, t1, ctx = extend_with_pattern ctx sbst p in
   let _, tk, ctx = extend_with_pattern ~forbidden_vars:vs ctx sbst k in
   let t2 = infer_comp ctx sbst e in
@@ -300,24 +300,24 @@ and infer_expr ({Ctx.types=tctx} as ctx) sbst (e,pos) =
       unify tctx sbst pos u (T.Apply (t, ps)) ;
       T.Arrow (t1, t2)
 
-    | I.Handler {I.operations=ops; I.return=a_ret; I.finally=a_fin} -> 
+    | I.Handler {I.operations=ops; I.value=a_val; I.finally=a_fin} -> 
       let t_value = T.fresh_param () in
       let t_finally = T.fresh_param () in
       let t_yield = T.fresh_param () in
-      let unify_operation ((e, op), (k, a)) =
+      let unify_operation ((e, op), a2) =
         let (t, ps, t1, t2) = Ctx.infer_operation op tctx in
         let u = infer_expr ctx sbst e in
         unify tctx sbst pos u (T.Apply (t, ps));
-        let tk, u1, u2 = infer_handler_case_abstraction ctx sbst k a in
+        let tk, u1, u2 = infer_handler_case_abstraction ctx sbst a2 in
         unify tctx sbst pos t1 u1;
         unify tctx sbst pos tk (T.Arrow (t2, t_yield));
         unify tctx sbst pos t_yield u2
       in
       List.iter unify_operation ops;
-      let (rett1, rett2) = infer_abstraction ctx sbst a_ret in
+      let (valt1, valt2) = infer_abstraction ctx sbst a_val in
       let (fint1, fint2) = infer_abstraction ctx sbst a_fin in
-      unify tctx sbst pos rett1 t_value ;
-      unify tctx sbst pos rett2 t_yield ;
+      unify tctx sbst pos valt1 t_value ;
+      unify tctx sbst pos valt2 t_yield ;
       unify tctx sbst pos fint2 t_finally ;
       unify tctx sbst pos fint1 t_yield ;
       T.Handler { T.value = t_value; T.finally = t_finally }

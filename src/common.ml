@@ -2,13 +2,12 @@
 
 (** Types shared by different modules *)
 type variable = string (** variable identifiers *)
-type opname = string (** operation symbols *)
+type opsym = string (** operation symbols *)
 type label = string (** variant labels *)
 type field = string (** record fields *)
 
 type tyname = string (** type names *)
-type effname = string (** effect names *)
-type param = string (** type parameters *)
+type typaram = string (** type parameters *)
 
 (** Positions *)
 type position =
@@ -33,19 +32,19 @@ type const =
 
 let equal_const c1 c2 =
   match c1, c2 with
-    | Integer k1, Integer k2 -> Big_int.eq_big_int k1 k2
-    | String s1, String s2 -> s1 = s2
-    | Boolean b1, Boolean b2 -> b1 = b2
-    | Float f1, Float f2 -> f1 = f2
-    | _, _ -> false
+  | Integer k1, Integer k2 -> Big_int.eq_big_int k1 k2
+  | String s1, String s2 -> s1 = s2
+  | Boolean b1, Boolean b2 -> b1 = b2
+  | Float f1, Float f2 -> f1 = f2
+  | _, _ -> false
 
 let less_than_const c1 c2 =
   match c1, c2 with
-    | Integer k1, Integer k2 -> Big_int.lt_big_int k1 k2
-    | String s1, String s2 -> String.compare s1 s2 < 0
-    | Boolean b1, Boolean b2 -> not b1 && b2
-    | Float f1, Float f2 -> f1 < f2
-    | _, _ -> false
+  | Integer k1, Integer k2 -> Big_int.lt_big_int k1 k2
+  | String s1, String s2 -> String.compare s1 s2 < 0
+  | Boolean b1, Boolean b2 -> not b1 && b2
+  | Float f1, Float f2 -> f1 < f2
+  | _, _ -> false
 
 (** Variants for the built-in list type *)
 let cons = "$1cons"

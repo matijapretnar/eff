@@ -158,20 +158,20 @@ and record_expressions = function
     let ws, es = record_expressions ts in
     w @ ws, ((f, e) :: es)
 
-and handler pos {S.operations=ops; S.value=ret; S.finally=fin} =
+and handler pos {S.operations=ops; S.value=val_a; S.finally=fin_a} =
   let rec operation_cases = function
   | [] -> [], []
-  | ((t, op), (k, a)) :: cs ->
+  | ((t, op), a2) :: cs ->
     let w, e = expression t in
     let ws, cs' = operation_cases cs in
-    w @ ws, ((e, op), (k, abstraction a)) :: cs'
+    w @ ws, ((e, op), abstraction2 a2) :: cs'
   in
   let ws, ops = operation_cases ops in
   ws, { I.operations = ops;
-    I.return =
-      (match ret with None -> id_abstraction pos | Some a -> abstraction a);
+    I.value =
+      (match val_a with None -> id_abstraction pos | Some a -> abstraction a);
     I.finally =
-      (match fin with None -> id_abstraction pos | Some a -> abstraction a)}
+      (match fin_a with None -> id_abstraction pos | Some a -> abstraction a)}
 
 (** [tydef t ps d] desugars the definition of type [t] with parameters [ps]
     and definition [d]. *)

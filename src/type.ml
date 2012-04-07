@@ -20,7 +20,7 @@ and handler_ty = {
 
 and op_ty = ty * ty
 
-and effect_sig = (C.opname * op_ty) list
+and effect_sig = (C.opsym * op_ty) list
 
 type substitution = (param * ty) list
 
