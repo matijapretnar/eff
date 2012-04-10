@@ -3,20 +3,18 @@ val less2 : bool = false
 val less3 : bool = false
 val test_equal_number : bool = true
 val test_equal_fun : bool = false
-val whatis_std : channel = <instance #2>
+val whatis_std : channel = <standard I/O>
 val whatis_raise : 'a exception -> 'a -> 'b = <fun>
-val runtime_errors : runtime_error list = [DivisionByZero;
-                                           InvalidArgument "foo";
-                                           AssertionFault; FailWith "bar"]
-val whatis_err : runtime_error exception = <instance #1>
-val whatis_runtime_error : runtime_error -> 'a = <fun>
-val what_is_runtime_handle : runtime_error -> 'a -> 'a => 'a = <fun>
+val whatis_exception : string -> 'a exception = <fun>
+val whatis_divisionByZero : unit exception = <division by zero>
+val whatis_invalidArgument : string exception = <invalid argument>
+val whatis_assertionFault : unit exception = <assertion fault>
+val whatis_failure : '_a exception = <failure>
 val test_divisionByZero : string = "foo"
 val test_invalidArgument : string = "invalidArgument was here"
-Check (file "./test_pervasives.eff", line 30, char 1): Operation <instance #1>.raise 
-FailWith "They say it's all about flirting."
+Check (file "./test_pervasives.eff", line 30, char 1): Operation <failure>.raise "They say it's all about flirting."
 - : unit = ()
-val test_failWith : int = 42
+val test_failure : int = 42
 - : unit = ()
 val tilda_minus : int = -1
 val tilda_minus_dot2 : float = -3.14159
@@ -28,11 +26,11 @@ val test_minus : int = 19
 val test_minus_tilda_minus : int = 65
 val test_mod1 : int = 2
 val test_mod2 : int = 0
-Check (file "./test_pervasives.eff", line 56, char 1): Operation <instance #1>.raise 
-DivisionByZero
+Check (file "./test_pervasives.eff", line 56, char 1): Operation <division by zero>.raise 
+()
 - : unit = ()
-Check (file "./test_pervasives.eff", line 58, char 1): Operation <instance #1>.raise 
-DivisionByZero
+Check (file "./test_pervasives.eff", line 58, char 1): Operation <division by zero>.raise 
+()
 - : unit = ()
 val test_plus_dot : float = 5.84
 val test_times_dot : float = 8.478
@@ -40,12 +38,12 @@ val test_minus_dot : float = 0.44
 val test_div_dot : float = 1.16296296296
 val test_div_dot_zero : float = inf
 val test_div : int = 33
-Check (file "./test_pervasives.eff", line 72, char 1): Operation <instance #1>.raise 
-DivisionByZero
+Check (file "./test_pervasives.eff", line 72, char 1): Operation <division by zero>.raise 
+()
 - : unit = ()
 val test_zero_div : int = 0
-Check (file "./test_pervasives.eff", line 76, char 1): Operation <instance #1>.raise 
-DivisionByZero
+Check (file "./test_pervasives.eff", line 76, char 1): Operation <division by zero>.raise 
+()
 - : unit = ()
 val test_carron : string = "cherrypie"
 val test_to_string1 : string = "13"
@@ -77,19 +75,16 @@ val test_filter : int list = [4; 5]
 val test_complement : int list = [1; 3; 5; 6]
 val test_intersection : int list = [2; 4]
 val test_zip1 : (int * string) list = [(1, "a"); (2, "b"); (3, "c")]
-Check (file "./test_pervasives.eff", line 134, char 1): Operation <instance #1>.raise 
-InvalidArgument "zip: length mismatch"
+Check (file "./test_pervasives.eff", line 134, char 1): Operation <invalid argument>.raise "zip: length mismatch"
 - : unit = ()
 val test_reverse : int list = [5; 4; 3; 2; 1]
 val test_at : int list = [1; 2; 3; 4; 5; 6]
 val test_length : int = 5
 val test_head : int = 1
-Check (file "./test_pervasives.eff", line 144, char 1): Operation <instance #1>.raise 
-InvalidArgument "head: empty list"
+Check (file "./test_pervasives.eff", line 144, char 1): Operation <invalid argument>.raise "head: empty list"
 - : unit = ()
 val test_tail : int list = [2; 3; 4]
-Check (file "./test_pervasives.eff", line 148, char 1): Operation <instance #1>.raise 
-InvalidArgument "tail: empty list"
+Check (file "./test_pervasives.eff", line 148, char 1): Operation <invalid argument>.raise "tail: empty list"
 - : unit = ()
 val test_abs : int * int * int = (5, 5, 5)
 val test_min : int = 1
@@ -104,15 +99,14 @@ val test_compose : int = 196
 val test_fst : string = "foo"
 val test_snd : int = 4
 Does this work?- : unit = ()
-Check (file "./test_pervasives.eff", line 176, char 1): Operation <instance #2>.read 
+Check (file "./test_pervasives.eff", line 176, char 1): Operation <standard I/O>.read 
 ()
 - : unit = ()
-Check (file "./test_pervasives.eff", line 178, char 1): Operation <instance #1>.raise 
-FailWith "The cows are home."
+Check (file "./test_pervasives.eff", line 178, char 1): Operation <failure>.raise "The cows are home."
 - : unit = ()
-Check (file "./test_pervasives.eff", line 180, char 1): Operation <instance #0>.int 42
+Check (file "./test_pervasives.eff", line 180, char 1): Operation <random number generator>.int 42
 - : unit = ()
-Check (file "./test_pervasives.eff", line 182, char 1): Operation <instance #0>.float 42.
+Check (file "./test_pervasives.eff", line 182, char 1): Operation <random number generator>.float 42.
 - : unit = ()
 val test_state : int = 42
 val test_ref : int = 15

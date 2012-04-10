@@ -1,6 +1,6 @@
 module C = Common
 
-type instance = int * string (* description for user *) * resource option
+type instance = int * string option (* optional description *) * resource option
 and operation = instance * C.opname
 
 and value =

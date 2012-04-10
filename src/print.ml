@@ -147,8 +147,12 @@ and let_abstraction (p, c) ppf =
 and case a ppf =
   fprintf ppf "%t" (abstraction a)
 
-let operation ((i, _, _), op) ppf =
-  fprintf ppf "<instance #%d>.%s" i op
+let instance inst ppf =
+  match inst with
+  | (_, Some desc, _) -> fprintf ppf "<%s>" desc
+  | (i, None, _) -> fprintf ppf "<instance #%d>" i
+
+let operation (inst, op) ppf = fprintf ppf "%t.%s" (instance inst) op
 
 let rec value ?max_level v ppf =
   let print ?at_level = print ?max_level ?at_level ppf in
@@ -163,7 +167,7 @@ let rec value ?max_level v ppf =
   | Value.Variant (lbl, Some v) ->
       print ~at_level:1 "%s @[<hov>%t@]" lbl (value v)
   | Value.Closure _ -> print "<fun>"
-  | Value.Instance (i, _, _)  -> print "<instance #%d>" i
+  | Value.Instance inst  -> instance inst ppf
   | Value.Handler _  -> print "<handler>"
 
 and list ?(max_length=299) v ppf =
