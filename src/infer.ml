@@ -253,8 +253,8 @@ and infer_expr ({Ctx.types=tctx} as ctx) sbst (e,pos) =
   match e with
     | I.Var x ->
       begin match C.lookup x ctx.Ctx.variables with
-        | Some (ps, t) -> T.refresh ps (T.subst_ty !sbst t)
-        | None -> Error.typing ~pos:pos "Unknown name %s" x
+      | Some (ps, t) -> T.refresh ps (T.subst_ty !sbst t)
+      | None -> Error.typing ~pos:pos "Unknown name %s" x
       end
     | I.Const (C.Integer _) -> T.int_ty
     | I.Const (C.String _) -> T.string_ty

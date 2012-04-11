@@ -9,17 +9,30 @@ let id_abstraction pos =
   let x = C.fresh_variable () in
   ((Pattern.Var x, pos), (I.Value (I.Var x, pos), pos))
 
+
 (** [ty s k t] desugars type [t] where it applies the substitution [s] to parameters. *)
+let rec ty_fv = function
+  | S.TyApply (_, lst) -> List.flatten (List.map ty_fv lst)
+  | S.TyParam s -> [s]
+  | S.TyArrow (t1, t2) -> ty_fv t1 @ ty_fv t2
+  | S.TyTuple lst -> List.flatten (List.map ty_fv lst)
+  | S.TyHandler (t1, t2) -> ty_fv t1 @ ty_fv t2
+
 let rec ty s = function
   | S.TyApply (t, lst) -> T.Apply (t, List.map (ty s) lst)
   | S.TyParam str ->
     begin match C.lookup str s with
-      | None -> Error.syntax "Unbound type parameter '%s" str
-      | Some t -> t
+    | None -> Error.syntax "Unbound type parameter '%s" str
+    | Some t -> t
     end
   | S.TyArrow (t1, t2) -> T.Arrow (ty s t1, ty s t2)
   | S.TyTuple lst -> T.Tuple (List.map (ty s) lst)
   | S.TyHandler (t1, t2) -> T.Handler { T.value = ty s t1; T.finally = ty s t2 }
+
+let external_ty t =
+  let lst = List.fold_right (fun p lst -> (p, Type.next_param ()) :: lst) (ty_fv t) [] in
+  let s = C.assoc_map (fun p -> Type.Param p) lst in
+  (List.map snd lst, ty s t)
 
 
 (* Desugaring functions below return a list of bindings and the desugared form. *)

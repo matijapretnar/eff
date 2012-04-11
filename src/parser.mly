@@ -85,9 +85,9 @@ file:
   | lst = file_topdef
     { lst }
   | t = term EOF
-     { [S.Expr t] }
+     { [S.Term t] }
   | t = term SEMISEMI lst = file
-     { (S.Expr t) :: lst }
+     { (S.Term t) :: lst }
   | dir = topdirective EOF
      { [dir] }
   | dir = topdirective SEMISEMI lst = file
@@ -105,7 +105,7 @@ commandline:
   | def = topdef SEMISEMI
     { S.Topdef def }
   | t = term SEMISEMI
-    { S.Expr t }
+    { S.Term t }
   | dir = topdirective SEMISEMI
     { dir }
 

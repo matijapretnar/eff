@@ -84,24 +84,21 @@ type tydef =
 type topdef = plain_topdef Common.pos
 and plain_topdef =
   | Tydef of (Common.tyname * (Common.typaram list * tydef)) list
+  (* [type t = tydef] *)
   | TopLet of (Pattern.t * term) list
+  (* [let p1 = t1 and ... and pn = tn] *)
   | TopLetRec of (Common.variable * term) list
+  (* [let rec f1 p1 = t1 and ... and fn pn = tn] *)
   | External of Common.variable * ty * Common.variable
+  (* [external x : t = "ext_val_name"] *)
 
 (* Toplevel entries which need to be separated by ;; *)
 type toplevel =
   | Topdef of topdef
-  | Expr of term
+  | Term of term
   | Use of string
   | Reset
   | Help
   | Quit
   | TypeOf of term
 
-(** [ty_fv t] returns the list of free parameters occuring in type [t]. *)
-let rec ty_fv = function
-  | TyApply (_, lst) -> List.flatten (List.map ty_fv lst)
-  | TyParam s -> [s]
-  | TyArrow (t1, t2) -> ty_fv t1 @ ty_fv t2
-  | TyTuple lst -> List.flatten (List.map ty_fv lst)
-  | TyHandler (t1, t2) -> ty_fv t1 @ ty_fv t2

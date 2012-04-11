@@ -109,9 +109,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
         end ;
         (ctx, env)
   | S.External (x, t, f) ->
-    let lst = List.fold_right (fun p lst -> (p, Type.next_param ()) :: lst) (S.ty_fv t) [] in
-    let s = C.assoc_map (fun p -> Type.Param p) lst in
-    let ctx = Ctx.extend_var x (List.map snd lst, Desugar.ty s t) ctx in
+    let ctx = Ctx.extend_var x (Desugar.external_ty t) ctx in
       begin match C.lookup f External.symbols with
         | Some v -> (ctx, Eval.update x v env)
         | None -> Error.runtime ~pos:pos "unknown external symbol %s." f
@@ -126,7 +124,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
     and return the new environment. *)
 let rec exec_cmd interactive (ctx, env) e =
   match e with
-  | S.Expr c ->
+  | S.Term c ->
       let c = Desugar.computation c in
       let ctx, (ps, t) = Infer.infer_top_comp ctx c in
       let v = Eval.run env c in
