@@ -86,7 +86,7 @@ let unify tctx sbst pos t1 t2 =
               "This expression has a forbidden cylclic type %t = %t." (Print.ty ~sbst:sbst [] t1) (Print.ty ~sbst:sbst [] t2)
           end
           else
-            let s = [(p, t)] in sbst := T.concat_subst s (T.compose_subst !sbst s)
+            let s = [(p, t)] in sbst := T.compose_subst s !sbst
 
       | (T.Arrow (u1, v1), T.Arrow (u2, v2)) ->
           unify v1 v2;
@@ -416,20 +416,20 @@ and infer_comp ctx sbst cp =
   infer ctx cp
 
 let infer_top_comp ctx c =
-  let sbst = ref T.empty_subst in
+  let sbst = ref T.identity_subst in
   let ty = infer_comp ctx sbst c in
   let ps = (if nonexpansive (fst c) then generalize !sbst ctx ty else []) in
     Ctx.subst_ctx !sbst ctx, (ps, T.subst_ty !sbst ty)
 
 let infer_top_let ({Ctx.types=tctx} as ctx) pos defs =
-  let sbst = ref T.empty_subst in
+  let sbst = ref T.identity_subst in
   let vars, ctx = infer_let ctx sbst pos defs in
     let ctx = Ctx.subst_ctx !sbst ctx in
     let vars = C.assoc_map (fun (ps,t) -> (ps, T.subst_ty !sbst t)) vars in
       vars, ctx
 
 let infer_top_let_rec ctx pos defs =
-  let sbst = ref T.empty_subst in
+  let sbst = ref T.identity_subst in
   let vars, ctx = infer_let_rec ctx sbst pos defs in
   let ctx = Ctx.subst_ctx !sbst ctx in
   let vars = C.assoc_map (fun (ps,t) -> (ps, T.subst_ty !sbst t)) vars in

@@ -94,6 +94,8 @@ let rec map f = function
       let ys = map f xs in
       y :: ys
 
+let flatten_map f xs = List.flatten (List.map f xs)
+
 (** [option_map f] maps [None] to [None] and [Some x] to [Some (f x)]. *)
 let option_map f = function
   | None -> None
@@ -128,12 +130,13 @@ let fresh_variable =
   let next_variable = fresh "variable" in
   fun () -> "$gen" ^ string_of_int (next_variable ())
 
-(** [uniq lst] returns [lst] with all duplicates removed *)
-let rec uniq = function
-  | [] -> []
-  | x::xs ->
-    let ys = uniq xs in
-      if List.mem x ys then ys else x::ys
+(** [uniq lst] returns [lst] with all duplicates removed, keeping the first
+    occurence of each element. *)
+let uniq lst =
+  let rec uniq acc = function
+  | [] -> List.rev acc
+  | x :: xs -> if List.mem x acc then uniq acc xs else uniq (x :: acc) xs
+  in uniq [] lst
 
 (** [diff lst1 lst2] returns [lst1] with all members of [lst2] removed *)
 let diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
