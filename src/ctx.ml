@@ -54,6 +54,13 @@ let find_variant lbl tctx =
   in
     find tctx
 
+(** [find_variant_tags v tctx] returns the list of constructors for variant
+    type [v] from [tctx] *)
+let find_variant_tags v tctx =
+  match lookup_tydef v tctx with
+    | Some (_, (T.Sum tags)) -> Some tags
+    | _ -> None
+
 (** [find_field fld tctx] returns the name of the record type from [tcxt] that
     defines the field [fld] *)
 let find_field fld tctx =
