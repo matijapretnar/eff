@@ -4,19 +4,24 @@ module P = Pattern
 (* Pattern matching exhaustiveness checking as described by Maranget [0].
    [0] http://pauillac.inria.fr/~maranget/papers/warn/index.html *)
 
-(* describes pattern constructor type and number of sub-patterns *)
+(* describes pattern constructor type and its arity if non-zero *)
 type cons =
-  plain_cons * int
-and plain_cons =
-  As | Tuple | Record | Variant of string | Const of C.const | Wildcard
+  As | Tuple of int | Record of int | Variant of (C.label * bool) | Const of C.const | Wildcard
 
 let cons_of_pattern p = match fst p with
-  | P.As _ -> (As, 1)
-  | P.Tuple lst -> (Tuple, List.length lst)
-  | P.Record lst -> (Record, List.length lst)
-  | P.Variant (lbl, opt) -> (Variant lbl, if opt = None then 0 else 1)
-  | P.Const c -> (Const c, 0)
-  | P.Var _ | P.Nonbinding -> (Wildcard, 0)
+  | P.As _ -> As
+  | P.Tuple lst -> Tuple (List.length lst)
+  | P.Record lst -> Record (List.length lst)
+  | P.Variant (lbl, opt) -> Variant (lbl, opt != None)
+  | P.Const c -> Const c
+  | P.Var _ | P.Nonbinding -> Wildcard
+
+(* number of subpatterns required by a pattern constructor *)
+let arity = function
+  | Const _ | Wildcard -> 0
+  | As -> 1
+  | Tuple n | Record n -> n
+  | Variant (_, b) -> if b then 1 else 0
 
 (* returns a pair with the first value true iff the first column of pattern
    matrix [p] contains the complete type signature, and the list of distinct
@@ -25,7 +30,7 @@ let find_constructors p tctx =
   let rec filter column = match column with
     | [] -> []
     | pat :: pats -> begin match cons_of_pattern pat with
-        | (Wildcard, _) -> filter pats
+        | Wildcard -> filter pats
         | c -> c :: filter pats
       end
   in
@@ -33,15 +38,15 @@ let find_constructors p tctx =
     if List.length lst = 0 then
       (false, [])
     else
-      match fst (List.hd lst) with
+      match List.hd lst with
         (* tuple, record and as patterns have only one constructor *)
-        | Tuple | Record | As -> (true, lst)
+        | Tuple _ | Record _ | As -> (true, lst)
         (* floats, strings and integers have infinite constructors *)
         | Const (C.Float _ | C.String _ | C.Integer _) -> (false, lst)
         (* booleans have two distinct constructors *)
         | Const (C.Boolean _) -> (List.length lst = 2, lst)
         (* for variants, check if all labels are covered *)
-        | Variant lbl -> begin match Ctx.find_variant lbl tctx with
+        | Variant (lbl, _) -> begin match Ctx.find_variant lbl tctx with
             | None -> assert false
             | Some v -> begin match Ctx.find_variant_tags v tctx with
                 | None -> assert false
@@ -54,11 +59,11 @@ let find_constructors p tctx =
 let spec_row con p_row = match p_row with
   | [] -> assert false
   | p1 :: lst ->
-      begin match fst con, fst p1 with
+      begin match con, fst p1 with
         | As, P.As (p,_) -> Some (p :: lst)
-        | Tuple, P.Tuple l -> Some (l @ lst)
+        | Tuple _, P.Tuple l -> Some (l @ lst)
 	(* TODO record *)
-        | Variant lbl, P.Variant (lbl', opt) when lbl = lbl' ->
+        | Variant (lbl, _), P.Variant (lbl', opt) when lbl = lbl' ->
             begin match opt with
               | Some p -> Some (p :: lst)
               | None -> Some lst
@@ -71,7 +76,7 @@ let spec_row con p_row = match p_row with
               else
                 (P.Nonbinding, C.Nowhere) :: make_wildcard_list (n - 1)
             in
-            Some ((make_wildcard_list (snd con)) @ lst)
+            Some ((make_wildcard_list (arity con)) @ lst)
         | _ -> None
       end
 
@@ -103,13 +108,13 @@ let rec useful p q tctx =
         let c = cons_of_pattern q1 in
         begin match c with
           (* constructed pattern *)
-          | ((As | Tuple | Record | Variant _ | Const _), _) ->
+          | As | Tuple _ | Record _ | Variant _ | Const _ ->
               begin match spec_row c q with
                 | None -> assert false
                 | Some q' -> useful (specialize c p) q' tctx
               end
           (* wildcard pattern *)
-          | (Wildcard, _) ->
+          | Wildcard ->
               let (complete_sig, cons_lst) = find_constructors p tctx in
               if complete_sig then
                 List.exists (fun x -> match (spec_row x q) with
