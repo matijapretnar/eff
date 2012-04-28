@@ -12,7 +12,7 @@ let cons_of_pattern p = match fst p with
   | P.As _ -> As
   | P.Tuple lst -> Tuple (List.length lst)
   | P.Record lst -> Record (List.length lst)
-  | P.Variant (lbl, opt) -> Variant (lbl, opt != None)
+  | P.Variant (lbl, opt) -> Variant (lbl, opt <> None)
   | P.Const c -> Const c
   | P.Var _ | P.Nonbinding -> Wildcard
 
@@ -23,37 +23,38 @@ let arity = function
   | Tuple n | Record n -> n
   | Variant (_, b) -> if b then 1 else 0
 
-(* returns a pair with the first value true iff the first column of pattern
-   matrix [p] contains the complete type signature, and the list of distinct
-   root constructors as the second value *)
+(* Returns a pair with the list of distinct non-wildcard root pattern
+   constructors from the first column of matrix [p] as the first value, and
+   the second value true if that list represents a complete type signature.
+   Preconditions:
+     - [p] has at least one column,
+     - all patterns in the first column of [p] are of the same type. *)
 let find_constructors p tctx =
-  let rec filter column = match column with
-    | [] -> []
-    | pat :: pats -> begin match cons_of_pattern pat with
-        | Wildcard -> filter pats
-        | c -> c :: filter pats
-      end
+  let filter_column lst =
+    C.uniq (List.filter (fun c -> c <> Wildcard) (List.map cons_of_pattern lst))
   in
-  let lst = C.uniq (filter (List.map List.hd p)) in
-    if List.length lst = 0 then
-      (false, [])
-    else
-      match List.hd lst with
-        (* tuple, record and as patterns have only one constructor *)
-        | Tuple _ | Record _ | As -> (true, lst)
-        (* floats, strings and integers have infinite constructors *)
-        | Const (C.Float _ | C.String _ | C.Integer _) -> (false, lst)
-        (* booleans have two distinct constructors *)
-        | Const (C.Boolean _) -> (List.length lst = 2, lst)
-        (* for variants, check if all labels are covered *)
-        | Variant (lbl, _) -> begin match Ctx.find_variant lbl tctx with
+  let pats = filter_column (List.map List.hd p) in
+  let complete =
+    match pats with
+      (* Every type is assumed to have at least one constructor. *)
+      | [] -> false
+      (* Tuple, record and as patterns have exactly one constructor. *)
+      | [Tuple _ | Record _ | As] -> true
+      (* Booleans have exactly two distinct constructors. *)
+      | [Const (C.Boolean b1); Const (C.Boolean b2)] -> b1 <> b2
+      (* Floats, strings and integers have infinitely many constructors. *)
+      | Const (C.Float _ | C.String _ | C.Integer _) :: _ -> false
+      (* For variants, check if all labels are covered in [pats]. *)
+      | Variant (lbl, _) :: _ ->
+          begin match Ctx.find_variant_tags_from_label lbl tctx with
+            | Some tags ->
+                let pats' = (List.map (fun (lbl, opt) -> Variant (lbl, opt <> None)) tags) in
+                C.equal_set pats pats'
             | None -> assert false
-            | Some v -> begin match Ctx.find_variant_tags v tctx with
-                | None -> assert false
-                | Some tags -> (List.length lst = List.length tags, lst)
-              end
-          end
-        | _ -> (false, lst)
+	  end
+      | _ -> false
+  in
+    (pats, complete)
 
 (* returns a specialized row from [p_row] for pattern constructor [con] *)
 let spec_row con p_row = match p_row with
@@ -115,7 +116,7 @@ let rec useful p q tctx =
               end
           (* wildcard pattern *)
           | Wildcard ->
-              let (complete_sig, cons_lst) = find_constructors p tctx in
+              let (cons_lst, complete_sig) = find_constructors p tctx in
               if complete_sig then
                 List.exists (fun x -> match (spec_row x q) with
                                         | None -> false
@@ -127,12 +128,12 @@ let rec useful p q tctx =
 
 (* checks the list of patterns [pats] of same type for exhaustiveness and unused
    patterns *)
-let check_pats pats tctx =
+let check_pats ?(pos = C.Nowhere) pats tctx =
   let rec check p pats =
     match pats with
       | [] ->
           if useful p [(P.Nonbinding, C.Nowhere)] tctx then
-            Print.warning "This pattern-matching is not exhaustive."
+            Print.warning ~pos:pos "This pattern-matching is not exhaustive."
           else
             ()
       | (_, pos) as pat :: pats ->
@@ -145,3 +146,6 @@ let check_pats pats tctx =
             check ([pat] :: p) pats (* wrong order, but still correct result *)
   in
     check [] pats
+
+(* A pattern is irrefutable if it cannot fail during pattern matching. *)
+let is_irrefutable p tctx = check_pats ~pos:(snd p) [p] tctx

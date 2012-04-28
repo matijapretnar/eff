@@ -210,6 +210,7 @@ and infer_let ({Ctx.types=tctx} as ctx) sbst pos defs =
       let tc = infer_comp ctx sbst c in
       let ws, tp = infer_pattern ctx.Ctx.types sbst p in
       unify tctx sbst (snd c) tc tp ;
+      Check.is_irrefutable p tctx ;
       match C.find_duplicate (List.map fst ws) (List.map fst vs) with
         | Some x -> Error.typing ~pos:pos "Several definitions of %s." x
         | None -> 
@@ -353,7 +354,7 @@ and infer_comp ctx sbst cp =
               unify tctx sbst (snd e') t_out' t_out
           in
             List.iter infer_case lst ;
-            Check.check_pats (List.map fst lst) tctx ;
+            Check.check_pats ~pos:pos (List.map fst lst) tctx ;
             t_out
               
       | I.New (eff, r) ->
@@ -510,28 +511,3 @@ let check_tydef ctx pos defs =
     List.iter (fun (_, (_, d)) -> check_ty ctx.Ctx.types pos d) defs ;
     List.iter (fun (_, (_, d)) -> check_ty_noncyclic ctx.Ctx.types pos d) defs ;
     ctx
-
-(* A pattern is irrefutable if it cannot fail during pattern matching. This is
-   equal to: not (useful [p] _ tctx). *)
-let rec is_irrefutable p tctx =
-  match fst p with
-    | Pattern.Var _ -> true
-    | Pattern.As (p',_) -> is_irrefutable p' tctx
-    | Pattern.Tuple lst -> List.for_all (fun x -> is_irrefutable x tctx) lst
-    | Pattern.Record lst -> List.for_all (fun (_, p') -> is_irrefutable p' tctx) lst
-    | Pattern.Variant (lbl, op) ->
-        let single_tag =
-          match Ctx.find_variant lbl tctx with
-            | Some v ->
-                begin match Ctx.find_variant_tags v tctx with
-                  | Some tags -> (List.length tags) = 1
-                  | None -> assert false
-		end
-            | None -> assert false
-        in
-          single_tag && begin match op with
-            | None -> true
-            | Some p' -> is_irrefutable p' tctx
-	  end
-    | Pattern.Const _ -> false
-    | Pattern.Nonbinding -> true

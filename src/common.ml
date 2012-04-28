@@ -140,3 +140,9 @@ let uniq lst =
 
 (** [diff lst1 lst2] returns [lst1] with all members of [lst2] removed *)
 let diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
+
+(** [subset lst1 lst2] returns [true] if [lst1] is a subset of [lst2]. *)
+let subset lst1 lst2 = List.for_all (fun x -> List.mem x lst2) lst1
+
+(** [equal_set lst1 lst2] returns [true] if the lists are equal as sets. *)
+let equal_set lst1 lst2 = subset lst1 lst2 && subset lst2 lst1
