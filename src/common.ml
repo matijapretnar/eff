@@ -101,6 +101,11 @@ let option_map f = function
   | None -> None
   | Some x -> Some (f x)
 
+(** [repeat x n] creates a list with [x] repeated [n] times. *)
+let rec repeat x = function
+  | 0 -> []
+  | n -> x :: repeat x (n-1)
+
 (** [remove x lst] returns [lst] with all occurrences of [x] removed. *)
 let rec remove x = function
   | [] -> []

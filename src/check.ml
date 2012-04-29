@@ -1,10 +1,14 @@
 module C = Common
 module P = Pattern
 
-(* Pattern matching exhaustiveness checking as described by Maranget [0].
+(* Pattern matching exhaustiveness checking as described by Maranget [0]. These
+   functions assume that patterns are type correct, so they should be run only
+   after types are inferred. The functions find_constructors, specialize_vector,
+   specialize and default expect a pattern matrix (or vector) with at least one
+   column.
    [0] http://pauillac.inria.fr/~maranget/papers/warn/index.html *)
 
-(* describes pattern constructor type and its arity if non-zero *)
+(* Pattern constructors. *)
 type cons =
   As | Tuple of int | Record of int | Variant of (C.label * bool) | Const of C.const | Wildcard
 
@@ -16,7 +20,7 @@ let cons_of_pattern p = match fst p with
   | P.Const c -> Const c
   | P.Var _ | P.Nonbinding -> Wildcard
 
-(* number of subpatterns required by a pattern constructor *)
+(* Returns the number of subpatterns required by a pattern constructor. *)
 let arity = function
   | Const _ | Wildcard -> 0
   | As -> 1
@@ -25,10 +29,7 @@ let arity = function
 
 (* Returns a pair with the list of distinct non-wildcard root pattern
    constructors from the first column of matrix [p] as the first value, and
-   the second value true if that list represents a complete type signature.
-   Preconditions:
-     - [p] has at least one column,
-     - all patterns in the first column of [p] are of the same type. *)
+   the second value true if that list represents a complete type signature. *)
 let find_constructors p tctx =
   let filter_column lst =
     C.uniq (List.filter (fun c -> c <> Wildcard) (List.map cons_of_pattern lst))
@@ -51,47 +52,40 @@ let find_constructors p tctx =
                 let pats' = (List.map (fun (lbl, opt) -> Variant (lbl, opt <> None)) tags) in
                 C.equal_set pats pats'
             | None -> assert false
-	  end
+          end
       | _ -> false
   in
     (pats, complete)
 
-(* returns a specialized row from [p_row] for pattern constructor [con] *)
-let spec_row con p_row = match p_row with
+(* Specializes a pattern vector for the pattern constructor [con]. *)
+let specialize_vector con = function
   | [] -> assert false
-  | p1 :: lst ->
-      begin match con, fst p1 with
+  | (p1, _) :: lst ->
+      begin match con, p1 with
         | As, P.As (p,_) -> Some (p :: lst)
         | Tuple _, P.Tuple l -> Some (l @ lst)
-	(* TODO record *)
+        (* TODO record *)
         | Variant (lbl, _), P.Variant (lbl', opt) when lbl = lbl' ->
             begin match opt with
               | Some p -> Some (p :: lst)
               | None -> Some lst
             end
         | Const c, P.Const c' when C.equal_const c c' -> Some lst
-        | _, (P.Nonbinding | P.Var _) ->
-            let rec make_wildcard_list n =
-              if n = 0 then
-                []
-              else
-                (P.Nonbinding, C.Nowhere) :: make_wildcard_list (n - 1)
-            in
-            Some ((make_wildcard_list (arity con)) @ lst)
+        | _, (P.Nonbinding | P.Var _) -> Some ((C.repeat (P.Nonbinding, C.Nowhere) (arity con)) @ lst)
         | _ -> None
       end
 
-(* return rows where the first pattern constructor matches [con] or wildcard *)
-let rec specialize con p = match p with
+(* Specializes a pattern matrix for the pattern constructor [con]. *)
+let rec specialize con = function
   | [] -> []
   | row :: lst ->
-      begin match spec_row con row with
+      begin match specialize_vector con row with
         | Some row' -> row' :: (specialize con lst)
         | None -> (specialize con lst)
       end
 
-(* return rows where the first pattern constructor is a wildcard *)
-let rec default p = match p with
+(* Creates a default matrix for input pattern matrix. *)
+let rec default = function
   | [] -> []
   | row :: lst ->
       begin match row with
@@ -99,7 +93,7 @@ let rec default p = match p with
         | _ -> default lst
       end
 
-(* is pattern vector [q] useful w.r.t. pattern matrix [p]? *)
+(* Is the pattern vector [q] useful w.r.t. pattern matrix [p]? *)
 let rec useful p q tctx =
   match q with
     (* base case *)
@@ -110,7 +104,7 @@ let rec useful p q tctx =
         begin match c with
           (* constructed pattern *)
           | As | Tuple _ | Record _ | Variant _ | Const _ ->
-              begin match spec_row c q with
+              begin match specialize_vector c q with
                 | None -> assert false
                 | Some q' -> useful (specialize c p) q' tctx
               end
@@ -118,7 +112,7 @@ let rec useful p q tctx =
           | Wildcard ->
               let (cons_lst, complete_sig) = find_constructors p tctx in
               if complete_sig then
-                List.exists (fun x -> match (spec_row x q) with
+                List.exists (fun x -> match (specialize_vector x q) with
                                         | None -> false
                                         | Some q' -> useful (specialize x p) q' tctx)
                             cons_lst
@@ -126,9 +120,9 @@ let rec useful p q tctx =
                 useful (default p) qs tctx
         end
 
-(* checks the list of patterns [pats] of same type for exhaustiveness and unused
-   patterns *)
-let check_pats ?(pos = C.Nowhere) pats tctx =
+(* Checks the list of patterns [pats] of same type for exhaustiveness and unused
+   patterns. *)
+let check_patterns ?(pos = C.Nowhere) pats tctx =
   let rec check p pats =
     match pats with
       | [] ->
@@ -143,9 +137,9 @@ let check_pats ?(pos = C.Nowhere) pats tctx =
               check p pats
             end
           else
-            check ([pat] :: p) pats (* wrong order, but still correct result *)
+            check ([pat] :: p) pats (* reverse order, but still correct result *)
   in
     check [] pats
 
 (* A pattern is irrefutable if it cannot fail during pattern matching. *)
-let is_irrefutable p tctx = check_pats ~pos:(snd p) [p] tctx
+let is_irrefutable p tctx = check_patterns ~pos:(snd p) [p] tctx
