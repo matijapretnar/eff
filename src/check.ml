@@ -8,14 +8,31 @@ module P = Pattern
    column.
    [0] http://pauillac.inria.fr/~maranget/papers/warn/index.html *)
 
+(* Returns the list of subpatterns for record pattern [p], with fields not
+   specified in [p] set to the wildcard pattern. The returned list is in the
+   same order as the fields in record definition. *)
+let record_subpatterns tctx p =
+  (* Returns subpattern defined in [p] or wildcard for field labeled [lbl]. *)
+  let subpattern p_fields (lbl, _) = match C.lookup lbl p_fields with
+    | Some p' -> p'
+    | None -> (P.Nonbinding, C.Nowhere)
+  in
+  match p with
+    | P.Record (((lbl, _) :: _) as lst) ->
+        begin match Ctx.find_record_fields_from_label lbl tctx with
+          | Some flds -> List.map (subpattern lst) flds
+          | None -> assert false
+        end
+    | _ -> assert false
+
 (* Pattern constructors. *)
 type cons =
   As | Tuple of int | Record of int | Variant of (C.label * bool) | Const of C.const | Wildcard
 
-let cons_of_pattern p = match fst p with
+let cons_of_pattern tctx (p, _) = match p with
   | P.As _ -> As
   | P.Tuple lst -> Tuple (List.length lst)
-  | P.Record lst -> Record (List.length lst)
+  | P.Record _ -> Record (List.length (record_subpatterns tctx p))
   | P.Variant (lbl, opt) -> Variant (lbl, opt <> None)
   | P.Const c -> Const c
   | P.Var _ | P.Nonbinding -> Wildcard
@@ -32,7 +49,7 @@ let arity = function
    the second value true if that list represents a complete type signature. *)
 let find_constructors p tctx =
   let filter_column lst =
-    C.uniq (List.filter (fun c -> c <> Wildcard) (List.map cons_of_pattern lst))
+    C.uniq (List.filter (fun c -> c <> Wildcard) (List.map (cons_of_pattern tctx) lst))
   in
   let pats = filter_column (List.map List.hd p) in
   let complete =
@@ -58,13 +75,13 @@ let find_constructors p tctx =
     (pats, complete)
 
 (* Specializes a pattern vector for the pattern constructor [con]. *)
-let specialize_vector con = function
-  | [] -> assert false
-  | (p1, _) :: lst ->
+let specialize_vector tctx con = function
+  | [] -> None
+  | ((p1, _) :: lst) ->
       begin match con, p1 with
         | As, P.As (p,_) -> Some (p :: lst)
         | Tuple _, P.Tuple l -> Some (l @ lst)
-        (* TODO record *)
+        | Record _, P.Record _ -> Some ((record_subpatterns tctx p1) @ lst)
         | Variant (lbl, _), P.Variant (lbl', opt) when lbl = lbl' ->
             begin match opt with
               | Some p -> Some (p :: lst)
@@ -76,12 +93,12 @@ let specialize_vector con = function
       end
 
 (* Specializes a pattern matrix for the pattern constructor [con]. *)
-let rec specialize con = function
+let rec specialize tctx con = function
   | [] -> []
   | row :: lst ->
-      begin match specialize_vector con row with
-        | Some row' -> row' :: (specialize con lst)
-        | None -> (specialize con lst)
+      begin match specialize_vector tctx con row with
+        | Some row' -> row' :: (specialize tctx con lst)
+        | None -> (specialize tctx con lst)
       end
 
 (* Creates a default matrix for input pattern matrix. *)
@@ -94,30 +111,30 @@ let rec default = function
       end
 
 (* Is the pattern vector [q] useful w.r.t. pattern matrix [p]? *)
-let rec useful p q tctx =
+let rec useful tctx p q =
   match q with
     (* base case *)
     | [] -> List.length p = 0
     (* induction on the number of columns of p and q *)
     | q1 :: qs ->
-        let c = cons_of_pattern q1 in
+        let c = cons_of_pattern tctx q1 in
         begin match c with
           (* constructed pattern *)
           | As | Tuple _ | Record _ | Variant _ | Const _ ->
-              begin match specialize_vector c q with
+              begin match specialize_vector tctx c q with
                 | None -> assert false
-                | Some q' -> useful (specialize c p) q' tctx
+                | Some q' -> useful tctx (specialize tctx c p) q'
               end
           (* wildcard pattern *)
           | Wildcard ->
               let (cons_lst, complete_sig) = find_constructors p tctx in
               if complete_sig then
-                List.exists (fun x -> match (specialize_vector x q) with
+                List.exists (fun x -> match (specialize_vector tctx x q) with
                                         | None -> false
-                                        | Some q' -> useful (specialize x p) q' tctx)
+                                        | Some q' -> useful tctx (specialize tctx x p) q')
                             cons_lst
               else
-                useful (default p) qs tctx
+                useful tctx (default p) qs
         end
 
 (* Checks the list of patterns [pats] of same type for exhaustiveness and unused
@@ -126,12 +143,12 @@ let check_patterns ?(pos = C.Nowhere) pats tctx =
   let rec check p pats =
     match pats with
       | [] ->
-          if useful p [(P.Nonbinding, C.Nowhere)] tctx then
+          if useful tctx p [(P.Nonbinding, C.Nowhere)] then
             Print.warning ~pos:pos "This pattern-matching is not exhaustive."
           else
             ()
       | (_, pos) as pat :: pats ->
-          if not (useful p [pat] tctx) then
+          if not (useful tctx p [pat]) then
             begin
               Print.warning ~pos:pos "This match case is unused.";
               check p pats
