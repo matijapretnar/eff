@@ -9,18 +9,6 @@ and plain_t =
   | Const of Common.const
   | Nonbinding
 
-(* A pattern is irrefutable if it can be used in a S.Let *)
-let rec is_irrefutable (p, _) =
-  match p with
-    | Var _ -> true
-    | As (p,_) -> is_irrefutable p
-    | Tuple lst -> List.for_all is_irrefutable lst
-    | Record lst -> List.for_all (fun (_, p) -> is_irrefutable p) lst
-    | Variant (_, None) -> false
-    | Variant (_, Some p) -> is_irrefutable p
-    | Const _ -> false
-    | Nonbinding -> true
-
 (* [pattern_vars p] returns the list of variables appearing in pattern [p]. *)
 let rec pattern_vars (p, _) =
   match p with
@@ -50,3 +38,8 @@ let linear_pattern p =
 
 (* [linear_record r] verifies that a record or a record pattern has linear field names. *)
 let linear_record lst = Common.injective fst lst
+
+(* Removes any As pattern wrappers (e.g. [2 as x] -> [2]). *)
+let rec simplify p = match p with
+  | (As (p', _), _) -> simplify p'
+  | _ -> p

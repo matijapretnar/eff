@@ -210,6 +210,7 @@ and infer_let ({Ctx.types=tctx} as ctx) sbst pos defs =
       let tc = infer_comp ctx sbst c in
       let ws, tp = infer_pattern ctx.Ctx.types sbst p in
       unify tctx sbst (snd c) tc tp ;
+      Check.is_irrefutable p tctx ;
       match C.find_duplicate (List.map fst ws) (List.map fst vs) with
         | Some x -> Error.typing ~pos:pos "Several definitions of %s." x
         | None -> 
@@ -239,7 +240,8 @@ and infer_let_rec ({Ctx.types=tctx} as ctx) sbst pos defs =
       let _, tp, ctx' = extend_with_pattern ctx' sbst p in
       let tc = infer_comp ctx' sbst c in
       unify tctx sbst (snd p) u1 tp ;
-      unify tctx sbst (snd c) u2 tc)
+      unify tctx sbst (snd c) u2 tc ;
+      Check.is_irrefutable p tctx)
     lst ;
     let vars = generalize_vars !sbst ctx vars in
     let ctx =
@@ -353,6 +355,7 @@ and infer_comp ctx sbst cp =
               unify tctx sbst (snd e') t_out' t_out
           in
             List.iter infer_case lst ;
+            Check.check_patterns ~pos:pos (List.map fst lst) tctx ;
             t_out
               
       | I.New (eff, r) ->

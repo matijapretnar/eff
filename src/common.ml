@@ -101,6 +101,11 @@ let option_map f = function
   | None -> None
   | Some x -> Some (f x)
 
+(** [repeat x n] creates a list with [x] repeated [n] times. *)
+let rec repeat x = function
+  | 0 -> []
+  | n -> x :: repeat x (n-1)
+
 (** [remove x lst] returns [lst] with all occurrences of [x] removed. *)
 let rec remove x = function
   | [] -> []
@@ -138,5 +143,20 @@ let uniq lst =
   | x :: xs -> if List.mem x acc then uniq acc xs else uniq (x :: acc) xs
   in uniq [] lst
 
+(** [split n lst] splits [lst] into two parts containing (up to) the first [n]
+    elements and the rest. *)
+let split n lst =
+  let rec split_aux acc lst n = match lst, n with
+    | ([], _) | (_, 0) -> (List.rev acc, lst)
+    | x :: xs, n -> split_aux (x :: acc) xs (n-1)
+  in
+  split_aux [] lst n
+
 (** [diff lst1 lst2] returns [lst1] with all members of [lst2] removed *)
 let diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
+
+(** [subset lst1 lst2] returns [true] if [lst1] is a subset of [lst2]. *)
+let subset lst1 lst2 = List.for_all (fun x -> List.mem x lst2) lst1
+
+(** [equal_set lst1 lst2] returns [true] if the lists are equal as sets. *)
+let equal_set lst1 lst2 = subset lst1 lst2 && subset lst2 lst1

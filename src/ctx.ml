@@ -54,6 +54,17 @@ let find_variant lbl tctx =
   in
     find tctx
 
+(** [find_variant_tags_from_label lbl tctx] returns the list of all tags
+    defined by the variant from [tctx] which defines a constructor named [lbl]. *)
+let find_variant_tags_from_label lbl tctx =
+  match find_variant lbl tctx with
+    | Some v ->
+        begin match lookup_tydef v tctx with
+          | Some (_, (T.Sum tags)) -> Some tags
+          | _ -> None
+        end
+    | None -> None
+
 (** [find_field fld tctx] returns the name of the record type from [tcxt] that
     defines the field [fld] *)
 let find_field fld tctx =
@@ -63,6 +74,17 @@ let find_field fld tctx =
     | _ :: lst -> find lst
   in
     find tctx
+
+(** [find_record_fields_from_label lbl tctx] returns the list of all fields
+    defined by the record from [tctx] which defines the field named [lbl]. *)
+let find_record_fields_from_label lbl tctx =
+  match find_field lbl tctx with
+    | Some r ->
+        begin match lookup_tydef r tctx with
+          | Some (_, T.Record flds) -> Some flds
+          | _ -> None
+        end
+    | None -> None
 
 (** [find_operation op tctx] returns the name of the effect type from [tcxt]
     that defines the operation symbol [op] *)
