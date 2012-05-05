@@ -143,6 +143,15 @@ let uniq lst =
   | x :: xs -> if List.mem x acc then uniq acc xs else uniq (x :: acc) xs
   in uniq [] lst
 
+(** [split n lst] splits [lst] into two parts containing (up to) the first [n]
+    elements and the rest. *)
+let split n lst =
+  let rec split_aux acc lst n = match lst, n with
+    | ([], _) | (_, 0) -> (List.rev acc, lst)
+    | x :: xs, n -> split_aux (x :: acc) xs (n-1)
+  in
+  split_aux [] lst n
+
 (** [diff lst1 lst2] returns [lst1] with all members of [lst2] removed *)
 let diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
 
