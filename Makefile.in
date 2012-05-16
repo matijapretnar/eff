@@ -205,7 +205,7 @@ EXTRA_DIST = pervasives.eff tests examples src etc LICENSE.txt INSTALL.txt READM
 EFFTARGET = src/eff
 
 # How to compile
-EFFOCAMLBUILD = $(OCAMLBUILD) -use-menhir -lib nums -lib unix
+EFFOCAMLBUILD = $(OCAMLBUILD) -use-menhir -lib unix
 all: all-am
 
 .SUFFIXES:

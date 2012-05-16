@@ -9,7 +9,7 @@ effdir=$(datarootdir)/eff
 EFFTARGET=src/eff
 
 # How to compile
-EFFOCAMLBUILD=$(OCAMLBUILD) -use-menhir -lib nums -lib unix
+EFFOCAMLBUILD=$(OCAMLBUILD) -use-menhir -lib unix
 
 .PHONY: test test-validate test-clean \
 	eff.byte eff.native eff.d.byte eff.p.native

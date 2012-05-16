@@ -59,13 +59,13 @@ let find_constructors lst tctx =
           (* Try to find an unmatched value in a countable set of constants. *)
           | Const c ->
              let first = function
-               | C.Integer _ -> C.Integer Big_int.zero_big_int
+               | C.Integer _ -> C.Integer 0
                | C.String _ -> C.String ""
                | C.Boolean _ -> C.Boolean false
                | C.Float _ -> C.Float 0.0
              in
              let next = function
-               | C.Integer v -> C.Integer (Big_int.succ_big_int v)
+               | C.Integer v -> C.Integer (succ v)
                | C.String v -> C.String (v ^ "*")
                | C.Boolean v -> C.Boolean (not v)
                | C.Float v -> C.Float (v +. 1.0)
@@ -115,7 +115,7 @@ let specialize_vector tctx con = function
               | Some p -> Some (p :: lst)
               | None -> Some lst
             end
-        | Const c, P.Const c' when C.equal_const c c' -> Some lst
+        | Const c, P.Const c' when c = c' -> Some lst
         | _, (P.Nonbinding | P.Var _) -> Some ((C.repeat (P.Nonbinding, C.Nowhere) (arity con)) @ lst)
         | _ -> None
       end

@@ -27,24 +27,24 @@ let coop f v s =
   let (v, s) = f v s in V.Value (V.Tuple [v; s])
 
 let symbols = [
-  ("~-", V.from_fun (fun v -> V.value_int (Big_int.minus_big_int (V.to_int v))));
-  ("~-.", V.from_fun (fun v -> V.value_float (-.(V.to_float v))));
-  ("-", int_int_to_int Big_int.sub_big_int);
-  ("+", int_int_to_int Big_int.add_big_int);
-  ("*", int_int_to_int Big_int.mult_big_int);
-  ("/", int_int_to_int Big_int.div_big_int);
-  ("**", int_int_to_int Big_int.power_big_int_positive_big_int);
+  ("~-", V.from_fun (fun v -> V.value_int (~- (V.to_int v))));
+  ("~-.", V.from_fun (fun v -> V.value_float (~-. (V.to_float v))));
+  ("-", int_int_to_int (-));
+  ("+", int_int_to_int (+));
+  ("*", int_int_to_int ( * ));
+  ("/", int_int_to_int (/));
+  ("**", int_int_to_int (fun k1 k2 -> int_of_float (float_of_int k1 ** float_of_int k2)));
   ("-.", float_float_to_float (-.));
   ("+.", float_float_to_float (+.));
   ("*.", float_float_to_float ( *. ));
   ("/.", float_float_to_float (/.));
-  ("%", int_int_to_int Big_int.mod_big_int);
+  ("%", int_int_to_int (mod));
   ("=", val_val_to (fun v1 v2 -> V.value_bool (V.equal v1 v2)));
   ("<", val_val_to (fun v1 v2 -> V.value_bool (V.less_than v1 v2)));
   ("^", val_val_to (fun v1 v2 -> V.value_str (V.to_str v1 ^ V.to_str v2)));
-  ("string_length", V.from_fun (fun v -> V.value_int (Big_int.big_int_of_int (String.length (V.to_str v)))));
+  ("string_length", V.from_fun (fun v -> V.value_int (String.length (V.to_str v))));
   ("to_string", V.from_fun (fun v -> let s = Print.to_string "%t" (Print.value v) in V.value_str s));
-  ("float", V.from_fun (fun v -> V.value_float (Big_int.float_of_big_int (V.to_int v))));
+  ("float", V.from_fun (fun v -> V.value_float (float_of_int (V.to_int v))));
   ("std", V.fresh_instance (Some "standard I/O") (Some (ref V.from_unit, [
             ("write", coop (fun v s ->
                               let str = V.to_str v in
@@ -63,7 +63,7 @@ let symbols = [
 
   ("rnd", (Random.self_init () ;
            V.fresh_instance (Some "random number generator") (Some (ref V.from_unit, [
-             ("int", coop (fun k s -> (V.from_int (Big_int.big_int_of_int (Random.int (Big_int.int_of_big_int (V.to_int k))))), s));
+             ("int", coop (fun k s -> (V.from_int (Random.int (V.to_int k))), s));
              ("float", coop (fun x s -> (V.from_float (Random.float (V.to_float x))), s));
            ]))
    ));

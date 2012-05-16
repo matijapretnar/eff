@@ -46,7 +46,7 @@ let rec extend_value p v env =
   | Pattern.Variant (lbl, None), Value.Variant (lbl', None) when lbl = lbl' -> env
   | Pattern.Variant (lbl, Some p), Value.Variant (lbl', Some v) when lbl = lbl' ->
       extend_value p v env
-  | Pattern.Const c, Value.Const c' when Common.equal_const c c' -> env
+  | Pattern.Const c, Value.Const c' when c = c' -> env
   | _, _ -> raise (PatternMatch (snd p))
 
 let extend p v env =
@@ -99,9 +99,9 @@ let rec ceval env (c, pos) = match c with
         | V.Const (C.Integer k1) ->
             begin match veval env e2 with
               | V.Const (C.Integer k2) -> 
-                  let cmp = (if up then Big_int.le_big_int else Big_int.ge_big_int) k1 k2 in
+                  let cmp = (if up then (<=) else (>=)) k1 k2 in
                     if cmp then
-                      let k1' = (if up then Big_int.succ_big_int else Big_int.pred_big_int) k1 in
+                      let k1' = (if up then succ else pred) k1 in
                       let r = ceval (update i (V.Const (C.Integer k1)) env) c in
                         sequence
                           (fun _ -> ceval env (I.For (i,

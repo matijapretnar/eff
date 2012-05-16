@@ -66,13 +66,13 @@
 let position_of_lex lex =
   Common.Position (Lexing.lexeme_start_p lex, Lexing.lexeme_end_p lex)
 
-let bigint_of_string s =
+let int_of_string s =
   (* get rid of _ *)
   let j = ref 0 in
   for i = 0 to String.length s - 1 do
     if s.[i] <> '_' then (s.[!j] <- s.[i] ; incr j)
   done ;
-  Big_int.big_int_of_string (String.sub s 0 !j)
+  int_of_string (String.sub s 0 !j)
 
 }
 
@@ -83,7 +83,7 @@ let uname = ['A'-'Z'] ['_' 'a'-'z' 'A'-'Z' '0'-'9' '\'']*
 
 let hexdig = ['0'-'9' 'a'-'f' 'A'-'F']
 
-let bigint = ['0'-'9'] ['0'-'9' '_']*
+let int = ['0'-'9'] ['0'-'9' '_']*
 
 let xxxint =
     ( ("0x" | "0X") hexdig (hexdig | '_')*
@@ -108,9 +108,9 @@ rule token = parse
   | '\n'                { Lexing.new_line lexbuf; token lexbuf }
   | [' ' '\r' '\t']     { token lexbuf }
   | "(*"                { comment 0 lexbuf }
-  | bigint              { INT (bigint_of_string (Lexing.lexeme lexbuf)) }
+  | int                 { INT (int_of_string (Lexing.lexeme lexbuf)) }
   | xxxint              { try
-                            INT (Big_int.big_int_of_int (int_of_string (Lexing.lexeme lexbuf)))
+                            INT (int_of_string (Lexing.lexeme lexbuf))
                           with Failure _ -> Error.syntax ~pos:(position_of_lex lexbuf) "Invalid integer constant"
                         }
   | float               { FLOAT (float_of_string(Lexing.lexeme lexbuf)) }

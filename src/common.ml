@@ -25,26 +25,10 @@ let join_pos (_, pos1) (_, pos2) =
 
 (** Primitive constants *)
 type const =
-  | Integer of Big_int.big_int
+  | Integer of int
   | String of string
   | Boolean of bool
   | Float of float
-
-let equal_const c1 c2 =
-  match c1, c2 with
-  | Integer k1, Integer k2 -> Big_int.eq_big_int k1 k2
-  | String s1, String s2 -> s1 = s2
-  | Boolean b1, Boolean b2 -> b1 = b2
-  | Float f1, Float f2 -> f1 = f2
-  | _, _ -> false
-
-let less_than_const c1 c2 =
-  match c1, c2 with
-  | Integer k1, Integer k2 -> Big_int.lt_big_int k1 k2
-  | String s1, String s2 -> String.compare s1 s2 < 0
-  | Boolean b1, Boolean b2 -> not b1 && b2
-  | Float f1, Float f2 -> f1 < f2
-  | _, _ -> false
 
 (** Variants for the built-in list type *)
 let cons = "$1cons"

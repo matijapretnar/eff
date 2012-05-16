@@ -58,7 +58,7 @@ let value_float f = Value (from_float f)
 
 let rec equal v1 v2 =
   match v1, v2 with
-  | Const c1, Const c2 -> Common.equal_const c1 c2
+  | Const c1, Const c2 -> c1 = c2
   | Tuple vs1, Tuple vs2 -> equal_list vs1 vs2
   | Record r1, Record r2 -> equal_record r1 r2 && equal_record r2 r1
   | Variant (lbl1, None), Variant (lbl2, None) ->
@@ -85,7 +85,7 @@ and equal_operations op1 op2 =
 
 let rec less_than v1 v2 =
   match v1, v2 with
-  | Const c1, Const c2 -> Common.less_than_const c1 c2
+  | Const c1, Const c2 -> c1 < c2
   | Tuple vs1, Tuple vs2 -> less_than_list vs1 vs2
   | Record r1, Record r2 -> less_than_record r1 r2
   | Variant (lbl1, _), Variant (lbl2, _) when lbl1 < lbl2 -> true

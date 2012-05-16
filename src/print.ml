@@ -36,7 +36,7 @@ and field pp (f, v) ppf = fprintf ppf "%s = %t" f (pp v)
 
 let const c ppf =
   match c with
-  | Common.Integer k -> fprintf ppf "%s" (Big_int.string_of_big_int k)
+  | Common.Integer k -> fprintf ppf "%d" k
   | Common.String s -> fprintf ppf "%S" s
   | Common.Boolean b -> fprintf ppf "%B" b
   | Common.Float f -> fprintf ppf "%F" f
