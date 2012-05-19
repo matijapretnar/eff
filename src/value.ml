@@ -33,21 +33,29 @@ let from_fun f = Closure f
 
 let value v = Value v
 
-let to_int = function
+let to_bool ?pos = function
+  | Const (Common.Boolean b) -> b
+  | _ -> Error.runtime ?pos "A boolean value expected."
+
+let to_int ?pos = function
   | Const (Common.Integer n) -> n
-  | _ -> Error.runtime "An integer value expected."
+  | _ -> Error.runtime ?pos "An integer value expected."
 
-let to_float = function
+let to_float ?pos = function
   | Const (Common.Float f) -> f
-  | _ -> Error.runtime "A floating-point value expected."
+  | _ -> Error.runtime ?pos "A floating-point value expected."
 
-let to_str = function
+let to_str ?pos = function
   | Const (Common.String s) -> s
-  | _ -> Error.runtime "A string value expected."
+  | _ -> Error.runtime ?pos "A string value expected."
 
-let to_instance = function
+let to_instance ?pos = function
   | Instance i -> i
-  | _ -> Error.runtime "An effect instance expected."
+  | _ -> Error.runtime ?pos "An effect instance expected."
+
+let to_handler ?pos = function
+  | Handler h -> h
+  | _ -> Error.runtime ?pos "A handler expected."
 
 let value_unit = Value (from_unit)
 let value_bool b = Value (from_bool b)

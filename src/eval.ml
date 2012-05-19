@@ -81,48 +81,38 @@ let rec ceval env (c, pos) = match c with
       in
         eval_case cases
 
-  | I.While (c1, c2) as w ->
-      let r1 = ceval env c1 in
-        sequence
-          (function
-             | V.Const (C.Boolean b) ->
-                 if b then
-                   let r2 = ceval env c2 in
-                     sequence (fun _ -> ceval env (w,pos)) r2
-                 else
-                   V.Value V.from_unit
-             | _ -> Error.runtime ~pos:(snd c1) "Boolean expected in while loop.")
-          r1
+  | I.While (c1, c2) ->
+      let rec loop () =
+        let k v =
+          let b = V.to_bool v in
+          if b then
+            sequence (fun _ -> loop ()) (ceval env c2)
+          else
+            V.Value V.from_unit
+        in
+        sequence k (ceval env c1)
+      in
+      loop ()
           
   | I.For (i, e1, e2, c, up) ->
-      begin match veval env e1 with
-        | V.Const (C.Integer k1) ->
-            begin match veval env e2 with
-              | V.Const (C.Integer k2) -> 
-                  let cmp = (if up then (<=) else (>=)) k1 k2 in
-                    if cmp then
-                      let k1' = (if up then succ else pred) k1 in
-                      let r = ceval (update i (V.Const (C.Integer k1)) env) c in
-                        sequence
-                          (fun _ -> ceval env (I.For (i,
-                                                      (I.Const (C.Integer k1'), (snd e1)),
-                                                      (I.Const (C.Integer k2), (snd e2)),
-                                                      c, up), pos))
-                          r
-                    else
-                      V.Value V.from_unit
-              | _ -> Error.runtime ~pos:(snd e2) "Integer expected in for loop."
-            end
-        | _ -> Error.runtime ~pos:(snd e1) "Integer expected in for loop."
-      end
+      let n1 = V.to_int ~pos:(snd e1) (veval env e1) in
+      let n2 = V.to_int ~pos:(snd e2) (veval env e2) in
+      let test i = if up then i <= n2 else i >= n2 in
+      let next i = if up then succ i else pred i in
+      let rec loop n =
+        if test n then
+          let r = ceval (update i (V.Const (C.Integer n)) env) c in
+          sequence (fun _ -> loop (next n)) r
+        else
+          V.Value V.from_unit
+      in
+      loop n1
 
   | I.Handle (e, c) ->
       let v = veval env e in
       let r = ceval env c in
-        begin match v with
-          | V.Handler h -> h r
-          | _ -> Error.runtime ~pos:(snd e) "A handler expected in handle statement."
-        end
+      let h = V.to_handler ~pos:(snd e) v in
+      h r
 
   | I.New (eff, r) ->
       let r = (match r with
