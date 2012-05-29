@@ -12,10 +12,13 @@ type context = {
   types: (C.tyname * (T.param list * T.ty)) list;
 }
 
-let lookup_tydef ty tctx = C.lookup ty tctx
+let lookup_tydef ?pos tctx ty_name =
+  match Common.lookup ty_name tctx with
+  | None -> Error.typing ?pos "Unknown type %s" ty_name
+  | Some (params, ty) -> (params, ty)
 
-let fresh_tydef tctx ty_name =
-  let (params, ty) = List.assoc ty_name tctx in
+let fresh_tydef ?pos tctx ty_name =
+  let (params, ty) = lookup_tydef ?pos tctx ty_name in
   Type.refresh params ty
 
 let extend_var x pt ctx =
@@ -62,9 +65,9 @@ let find_variant lbl tctx =
     defined by the variant from [tctx] which defines a constructor named [lbl]. *)
 let find_variant_tags_from_label lbl tctx =
   match find_variant lbl tctx with
-    | Some v ->
-        begin match lookup_tydef v tctx with
-          | Some (_, (T.Sum tags)) -> Some tags
+    | Some ty_name ->
+        begin match lookup_tydef tctx ty_name with
+          | (_, (T.Sum tags)) -> Some tags
           | _ -> None
         end
     | None -> None
@@ -84,8 +87,8 @@ let find_field fld tctx =
 let find_record_fields_from_label lbl tctx =
   match find_field lbl tctx with
     | Some r ->
-        begin match lookup_tydef r tctx with
-          | Some (_, T.Record flds) -> Some flds
+        begin match lookup_tydef tctx r with
+          | (_, T.Record flds) -> Some flds
           | _ -> None
         end
     | None -> None
@@ -158,62 +161,54 @@ let infer_operation op tctx =
     find tctx
 
 
-let transparent ~pos:pos tctx t =
-  match lookup_tydef t tctx with
-    | None -> Error.typing ~pos:pos "Unknown type %s" t
-    | Some (_, t) ->
-        begin match t with
-          | (T.Sum (_::_) | T.Effect _ | T.Record _) -> false
-          | (T.Basic _ | T.Apply _ | T.Param _ | T.Sum [] |
-             T.Arrow _ | T.Tuple _ | T.Handler _ ) -> true
-        end
+let transparent ?pos tctx ty_name =
+  let (_, ty) = lookup_tydef ?pos tctx ty_name in
+  match ty with
+  | T.Sum (_::_) | T.Effect _ | T.Record _ -> false
+  | T.Basic _ | T.Apply _ | T.Param _ | T.Sum [] |
+    T.Arrow _ | T.Tuple _ | T.Handler _ -> true
 
 (* [ty_apply ctx pos t lst] applies the type constructor [t] to the given list of arguments. *)
-let ty_apply ctx pos t lst =
-  match lookup_tydef t ctx with
-    | None -> Error.typing ~pos:pos "Unknown type %s" t
-    | Some (ps, d) ->
-        try
-          let s = List.combine ps lst in
-            T.subst_ty s d
-        with
-            Invalid_argument "List.combine" ->
-              Error.typing ~pos:pos "Type constructors %s should be applied to %d arguments" t (List.length ps)
+let ty_apply ?pos tctx ty_name lst =
+  let (params, ty) = lookup_tydef ?pos tctx ty_name in
+  try
+    let s = List.combine params lst in
+      T.subst_ty s ty
+  with
+    Invalid_argument "List.combine" ->
+      Error.typing ?pos "Type constructors %s should be applied to %d arguments" ty_name (List.length params)
 
 (** [check_ty ctx pos t] checks that type [t] is well-formed in context [ctx]. *)
-let check_ty ctx pos =
+let check_ty ?pos ctx =
   let rec check = function
     | (T.Basic _ | T.Param _) -> ()
     | T.Apply (t, lst) ->
-        begin match lookup_tydef t ctx with
-          | None -> Error.typing ~pos:pos "Unknown type constructors %s" t
-          | Some (ps, _) ->
-              let n = List.length ps in
-                if List.length lst <> n then
-                  Error.typing ~pos:pos "Type constructors %s should be applied to %d arguments" t n
-        end
+        let (params, _) = lookup_tydef ?pos ctx t in
+        let n = List.length params in
+        if List.length lst <> n then
+          Error.typing ?pos "Type constructors %s should be applied to %d arguments" t n
     | T.Arrow (t1, t2) -> check t1; check t2
     | T.Tuple lst -> List.iter check lst
     | T.Record lst ->
-        if not (Pattern.linear_record lst) then Error.typing ~pos:pos "Fields in a record type must be distinct" ;
+        if not (Pattern.linear_record lst) then Error.typing ?pos "Fields in a record type must be distinct" ;
         List.iter (fun (_,t) -> check t) lst
     | T.Sum lst ->
-        if not (Pattern.linear_record lst) then Error.typing ~pos:pos "Alternatives in a sum type must be distinct" ;
+        if not (Pattern.linear_record lst) then Error.typing ?pos "Alternatives in a sum type must be distinct" ;
         List.iter (function (_,None) -> () | (_, Some t) -> check t) lst
     | T.Effect lst ->
-        if not (Pattern.linear_record lst) then Error.typing ~pos:pos "Operations in an effect type must be distinct" ;
+        if not (Pattern.linear_record lst) then Error.typing ?pos "Operations in an effect type must be distinct" ;
         List.iter (fun (_,(t1,t2)) -> check t1; check t2) lst
     | T.Handler {T.value=t1; T.finally=t2} -> check t1; check t2
   in
     check
 
-let check_ty_noncyclic ctx pos =
+let check_ty_noncyclic ?pos ctx =
   let rec check forbidden = function
     | (T.Basic _ | T.Sum _ | T.Param _) -> ()
     | T.Apply (t, lst) ->
         if List.mem t forbidden
-        then Error.typing ~pos:pos "Type definition %s is cyclic." t
-        else check (t :: forbidden) (ty_apply ctx pos t lst)
+        then Error.typing ?pos "Type definition %s is cyclic." t
+        else check (t :: forbidden) (ty_apply ?pos ctx t lst)
     | T.Arrow (t1, t2) -> check forbidden t1; check forbidden t2
     | T.Tuple lst -> List.iter (check forbidden) lst
     | T.Record lst -> List.iter (fun (_,t) -> check forbidden t) lst
@@ -225,25 +220,25 @@ let check_ty_noncyclic ctx pos =
 (** [check_tydef ctx defs] checks that the simulatenous type definitions [defs]
     is well-formed in context [ctx]. It returns the new context with the type
     definitions added to it. *)
-let check_tydef ctx pos defs =
+let check_tydef ?pos ctx defs =
   let check_names {types=tctx} = function
     | (T.Basic _ | T.Apply _ | T.Param _ | T.Arrow _ | T.Tuple _ | T.Handler _) -> ()
     | T.Record lst ->
         List.iter (fun (f,_) ->
                      match find_field f tctx with
-                       | Some u -> Error.typing ~pos:pos "Field %s is already used in type %s" f u
+                       | Some u -> Error.typing ?pos "Field %s is already used in type %s" f u
                        | None -> ()
                   ) lst
     | T.Sum lst ->
         List.iter (fun (lbl,_) ->
                      match find_variant lbl tctx with
-                       | Some u -> Error.typing ~pos:pos "Variant %s is already used in type %s" lbl u
+                       | Some u -> Error.typing ?pos "Variant %s is already used in type %s" lbl u
                        | None -> ()
                   ) lst
     | T.Effect lst ->
         List.iter (fun (op, _) ->
                      match find_operation op tctx with
-                       | Some u -> Error.typing ~pos:pos "Operation %s is already used in type %s" op u
+                       | Some u -> Error.typing ?pos "Operation %s is already used in type %s" op u
                        | None -> ()
                   ) lst
   in
@@ -251,6 +246,6 @@ let check_tydef ctx pos defs =
     List.fold_left
       (fun ctx (t, (ps,d)) -> check_names ctx d ; extend_tydef t (ps,d) ctx) ctx defs
   in
-    List.iter (fun (_, (_, d)) -> check_ty ctx.types pos d) defs ;
-    List.iter (fun (_, (_, d)) -> check_ty_noncyclic ctx.types pos d) defs ;
+    List.iter (fun (_, (_, d)) -> check_ty ?pos ctx.types d) defs ;
+    List.iter (fun (_, (_, d)) -> check_ty_noncyclic ?pos ctx.types d) defs ;
     ctx

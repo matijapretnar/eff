@@ -85,10 +85,10 @@ let unify tctx sbst pos t1 t2 =
                fails if both types are Apply, but only the second one is transparent. *)
 
       | (T.Apply (t1, lst1), t2) when Ctx.transparent ~pos:pos tctx t1 ->
-          unify t2 (Ctx.ty_apply tctx pos t1 lst1)
+          unify t2 (Ctx.ty_apply ~pos:pos tctx t1 lst1)
 
       | (t2, T.Apply (t1, lst1)) when Ctx.transparent ~pos:pos tctx t1 ->
-          unify t2 (Ctx.ty_apply tctx pos t1 lst1)
+          unify t2 (Ctx.ty_apply ~pos:pos tctx t1 lst1)
 
       | (T.Handler h1, T.Handler h2) ->
           unify h2.T.value h1.T.value;
@@ -331,7 +331,7 @@ and infer_comp ctx sbst cp =
             t_out
               
       | I.New (eff, r) ->
-          begin match Ctx.fresh_tydef tctx eff with
+          begin match Ctx.fresh_tydef ~pos:pos tctx eff with
           | (ps, T.Effect ops) ->
               begin match r with
               | None -> ()
