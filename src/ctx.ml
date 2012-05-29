@@ -83,8 +83,6 @@ let find_operation ?pos tctx op_name =
   in
   find tctx
 
-let extend_tydef ty def ctx = {ctx with types = (ty, def) :: ctx.types}
-
 (** [infer_variant lbl tctx] finds a variant type from [tctx] that defines the
     label [lbl] and returns it with refreshed type parameters. *)
 let infer_variant lbl tctx =
@@ -154,74 +152,72 @@ let ty_apply ?pos tctx ty_name lst =
     Invalid_argument "List.combine" ->
       Error.typing ?pos "Type constructors %s should be applied to %d arguments" ty_name (List.length params)
 
-(** [check_ty ctx pos t] checks that type [t] is well-formed in context [ctx]. *)
-let check_ty ?pos ctx =
+(** [check_well_formed ?pos tctx ty] checks that type [ty] is well-formed in
+    a type context [tctx]. *)
+let check_well_formed ?pos ctx =
   let rec check = function
-    | (T.Basic _ | T.Param _) -> ()
-    | T.Apply (t, lst) ->
-        let (params, _) = lookup_tydef ?pos ctx t in
-        let n = List.length params in
-        if List.length lst <> n then
-          Error.typing ?pos "Type constructors %s should be applied to %d arguments" t n
-    | T.Arrow (t1, t2) -> check t1; check t2
-    | T.Tuple lst -> List.iter check lst
-    | T.Record lst ->
-        if not (Pattern.linear_record lst) then Error.typing ?pos "Fields in a record type must be distinct" ;
-        List.iter (fun (_,t) -> check t) lst
-    | T.Sum lst ->
-        if not (Pattern.linear_record lst) then Error.typing ?pos "Alternatives in a sum type must be distinct" ;
-        List.iter (function (_,None) -> () | (_, Some t) -> check t) lst
-    | T.Effect lst ->
-        if not (Pattern.linear_record lst) then Error.typing ?pos "Operations in an effect type must be distinct" ;
-        List.iter (fun (_,(t1,t2)) -> check t1; check t2) lst
-    | T.Handler {T.value=t1; T.finally=t2} -> check t1; check t2
+  | T.Basic _ | T.Param _ -> ()
+  | T.Apply (ty_name, tys) ->
+      let (params, _) = lookup_tydef ?pos ctx ty_name in
+      let n = List.length params in
+      if List.length tys <> n then
+        Error.typing ?pos "The type constructor %s expects %d arguments" ty_name n
+  | T.Arrow (ty1, ty2) -> check ty1; check ty2
+  | T.Tuple tys -> List.iter check tys
+  | T.Record fields ->
+      if not (Common.injective fst fields) then
+        Error.typing ?pos "Field labels in a record type must be distinct";
+      List.iter (fun (_, ty) -> check ty) fields
+  | T.Sum constuctors ->
+      if not (Common.injective fst constuctors) then
+        Error.typing ?pos "Constructors of a sum type must be distinct";
+      List.iter (function (_, None) -> () | (_, Some ty) -> check ty) constuctors
+  | T.Effect signature ->
+      if not (Common.injective fst signature) then Error.typing ?pos
+        "Operations in an effect type must be distinct";
+      List.iter (fun (_, (ty1, ty2)) -> check ty1; check ty2) signature
+  | T.Handler {T.value = ty1; T.finally = ty2} -> check ty1; check ty2
   in
-    check
+  check
 
-let check_ty_noncyclic ?pos ctx =
+(** [check_well_formed ?pos tctx ty] checks that the definition of type [ty] is
+    non-cyclic in [tctx]. *)
+let check_noncyclic ?pos ctx =
   let rec check forbidden = function
-    | (T.Basic _ | T.Sum _ | T.Param _) -> ()
-    | T.Apply (t, lst) ->
-        if List.mem t forbidden
-        then Error.typing ?pos "Type definition %s is cyclic." t
-        else check (t :: forbidden) (ty_apply ?pos ctx t lst)
-    | T.Arrow (t1, t2) -> check forbidden t1; check forbidden t2
-    | T.Tuple lst -> List.iter (check forbidden) lst
-    | T.Record lst -> List.iter (fun (_,t) -> check forbidden t) lst
-    | T.Effect lst -> List.iter (fun (_,(t1,t2)) -> check forbidden t1; check forbidden t2) lst
-    | T.Handler {T.value=t1; T.finally=t2} -> check forbidden t1; check forbidden t2
+  | T.Basic _ | T.Sum _ | T.Param _ -> ()
+  | T.Apply (t, lst) ->
+      if List.mem t forbidden then
+        Error.typing ?pos "Type definition %s is cyclic." t
+      else
+        check (t :: forbidden) (ty_apply ?pos ctx t lst)
+  | T.Arrow (ty1, ty2) -> check forbidden ty1; check forbidden ty2
+  | T.Tuple tys -> List.iter (check forbidden) tys
+  | T.Record fields -> List.iter (fun (_,t) -> check forbidden t) fields
+  | T.Effect signature ->
+      List.iter (fun (_, (ty1, ty2)) -> check forbidden ty1; check forbidden ty2) signature
+  | T.Handler {T.value = ty1; T.finally = ty2} ->
+      check forbidden ty1; check forbidden ty2
   in
-    check []
+  check []
 
-(** [check_tydef ctx defs] checks that the simulatenous type definitions [defs]
-    is well-formed in context [ctx]. It returns the new context with the type
-    definitions added to it. *)
-let check_tydef ?pos ctx defs =
-  let check_names {types=tctx} = function
-  | T.Basic _ | T.Apply _ | T.Param _ | T.Arrow _ | T.Tuple _ | T.Handler _ -> ()
-  | T.Record lst -> () (* XXX *)
-(*         List.iter (fun (f,_) ->
-                   match find_field f tctx with
-                     | Some u -> Error.typing ?pos "Field %s is already used in type %s" f u
-                     | None -> ()
-                ) lst *)
-  | T.Sum lst -> () (* XXX *)
-(*         List.iter (fun (lbl,_) -> ())
-(*                      match find_variant lbl tctx with
-                     | Some u -> Error.typing ?pos "Variant %s is already used in type %s" lbl u
-                     | None -> ()
-                ) lst *) *)
-  | T.Effect lst -> () (* XXX *)
-(*         List.iter (fun (op, _) ->
-                   match find_operation op tctx with
-                     | Some u -> Error.typing ?pos "Operation %s is already used in type %s" op u
-                     | None -> ()
-                ) lst *)
-  in
-  let ctx =
-    List.fold_left
-      (fun ctx (t, (ps,d)) -> check_names ctx d ; extend_tydef t (ps,d) ctx) ctx defs
-  in
-    List.iter (fun (_, (_, d)) -> check_ty ?pos ctx.types d) defs ;
-    List.iter (fun (_, (_, d)) -> check_ty_noncyclic ?pos ctx.types d) defs ;
-    ctx
+(** [check_shadowing ?pos tctx ty] checks that the definition of type [ty] does
+    not shadow any field labels, constructors, or operations defined in [tctx]. *)
+(* XXX Not implemented yet *)
+let check_shadowing ?pos tctx ty = ()
+
+(** [extend_tydefs ?pos ctx tydefs] checks that the simulatenous type
+    definitions [tydefs] are well-formed in context [ctx] and returns the
+    extended context. *)
+
+let extend_tydef ty def ctx = {ctx with types = (ty, def) :: ctx.types}
+
+
+let extend_tydefs ?pos ctx tydefs =
+  let extend_tydef ctx ((_, (_, ty)) as tydef) =
+    check_shadowing ctx.types ty;
+    {ctx with types = tydef :: ctx.types}
+  in 
+  let ctx = List.fold_left extend_tydef ctx tydefs in
+  List.iter (fun (_, (_, ty)) -> check_well_formed ?pos ctx.types ty) tydefs;
+  List.iter (fun (_, (_, ty)) -> check_noncyclic ?pos ctx.types ty) tydefs;
+  ctx
