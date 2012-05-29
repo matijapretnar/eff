@@ -152,3 +152,91 @@ let infer_operation op tctx =
     | _ :: lst -> find lst
   in
     find tctx
+
+
+(* [ty_apply ctx pos t lst] applies the type constructor [t] to the given list of arguments. *)
+let ty_apply ctx pos t lst =
+  match lookup_tydef t ctx with
+    | None -> Error.typing ~pos:pos "Unknown type %s" t
+    | Some (ps, d) ->
+        try
+          let s = List.combine ps lst in
+            T.subst_ty s d
+        with
+            Invalid_argument "List.combine" ->
+              Error.typing ~pos:pos "Type constructors %s should be applied to %d arguments" t (List.length ps)
+
+(** [check_ty ctx pos t] checks that type [t] is well-formed in context [ctx]. *)
+let check_ty ctx pos =
+  let rec check = function
+    | (T.Basic _ | T.Param _) -> ()
+    | T.Apply (t, lst) ->
+        begin match lookup_tydef t ctx with
+          | None -> Error.typing ~pos:pos "Unknown type constructors %s" t
+          | Some (ps, _) ->
+              let n = List.length ps in
+                if List.length lst <> n then
+                  Error.typing ~pos:pos "Type constructors %s should be applied to %d arguments" t n
+        end
+    | T.Arrow (t1, t2) -> check t1; check t2
+    | T.Tuple lst -> List.iter check lst
+    | T.Record lst ->
+        if not (Pattern.linear_record lst) then Error.typing ~pos:pos "Fields in a record type must be distinct" ;
+        List.iter (fun (_,t) -> check t) lst
+    | T.Sum lst ->
+        if not (Pattern.linear_record lst) then Error.typing ~pos:pos "Alternatives in a sum type must be distinct" ;
+        List.iter (function (_,None) -> () | (_, Some t) -> check t) lst
+    | T.Effect lst ->
+        if not (Pattern.linear_record lst) then Error.typing ~pos:pos "Operations in an effect type must be distinct" ;
+        List.iter (fun (_,(t1,t2)) -> check t1; check t2) lst
+    | T.Handler {T.value=t1; T.finally=t2} -> check t1; check t2
+  in
+    check
+
+let check_ty_noncyclic ctx pos =
+  let rec check forbidden = function
+    | (T.Basic _ | T.Sum _ | T.Param _) -> ()
+    | T.Apply (t, lst) ->
+        if List.mem t forbidden
+        then Error.typing ~pos:pos "Type definition %s is cyclic." t
+        else check (t :: forbidden) (ty_apply ctx pos t lst)
+    | T.Arrow (t1, t2) -> check forbidden t1; check forbidden t2
+    | T.Tuple lst -> List.iter (check forbidden) lst
+    | T.Record lst -> List.iter (fun (_,t) -> check forbidden t) lst
+    | T.Effect lst -> List.iter (fun (_,(t1,t2)) -> check forbidden t1; check forbidden t2) lst
+    | T.Handler {T.value=t1; T.finally=t2} -> check forbidden t1; check forbidden t2
+  in
+    check []
+
+(** [check_tydef ctx defs] checks that the simulatenous type definitions [defs]
+    is well-formed in context [ctx]. It returns the new context with the type
+    definitions added to it. *)
+let check_tydef ctx pos defs =
+  let check_names {types=tctx} = function
+    | (T.Basic _ | T.Apply _ | T.Param _ | T.Arrow _ | T.Tuple _ | T.Handler _) -> ()
+    | T.Record lst ->
+        List.iter (fun (f,_) ->
+                     match find_field f tctx with
+                       | Some u -> Error.typing ~pos:pos "Field %s is already used in type %s" f u
+                       | None -> ()
+                  ) lst
+    | T.Sum lst ->
+        List.iter (fun (lbl,_) ->
+                     match find_variant lbl tctx with
+                       | Some u -> Error.typing ~pos:pos "Variant %s is already used in type %s" lbl u
+                       | None -> ()
+                  ) lst
+    | T.Effect lst ->
+        List.iter (fun (op, _) ->
+                     match find_operation op tctx with
+                       | Some u -> Error.typing ~pos:pos "Operation %s is already used in type %s" op u
+                       | None -> ()
+                  ) lst
+  in
+  let ctx =
+    List.fold_left
+      (fun ctx (t, (ps,d)) -> check_names ctx d ; extend_tydef t (ps,d) ctx) ctx defs
+  in
+    List.iter (fun (_, (_, d)) -> check_ty ctx.types pos d) defs ;
+    List.iter (fun (_, (_, d)) -> check_ty_noncyclic ctx.types pos d) defs ;
+    ctx

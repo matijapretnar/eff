@@ -116,7 +116,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
       end
   | S.Tydef defs ->
       let defs = List.map (fun (t, (ps, d)) -> (t, Desugar.tydef ps d)) defs in
-      let ctx = Infer.check_tydef ctx pos defs in
+      let ctx = Ctx.check_tydef ctx pos defs in
       (ctx, env)
 
 (* [exec_cmd env c] executes toplevel command [c] in global
