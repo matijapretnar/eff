@@ -49,63 +49,39 @@ let subst_ctx sbst ctx =
 
 (** [find_variant lbl tctx] returns the name of the variant type from [tcxt]
     that defines the label [lbl] *)
-let find_variant lbl tctx =
+let find_variant ?pos tctx cons =
   let rec find = function
-    | [] -> None
-    | (t, (ps, T.Sum vs)) :: lst ->
-        begin match C.lookup lbl vs with
-          | Some us -> Some t
-          | None -> find lst
-        end
-    | _ :: lst -> find lst
+  | [] -> Error.typing ?pos "Unbound constructor %s" cons
+  | (ty_name, (_, T.Sum vs) as ty) :: lst ->
+      begin match Common.lookup cons vs with
+      | Some us -> (ty_name, ty, vs, us)
+      | None -> find lst
+      end
+  | _ :: lst -> find lst
   in
-    find tctx
-
-(** [find_variant_tags_from_label lbl tctx] returns the list of all tags
-    defined by the variant from [tctx] which defines a constructor named [lbl]. *)
-let find_variant_tags_from_label lbl tctx =
-  match find_variant lbl tctx with
-    | Some ty_name ->
-        begin match lookup_tydef tctx ty_name with
-          | (_, (T.Sum tags)) -> Some tags
-          | _ -> None
-        end
-    | None -> None
+  find tctx
 
 (** [find_field fld tctx] returns the name of the record type from [tcxt] that
     defines the field [fld] *)
-let find_field fld tctx =
+let find_field ?pos tctx lbl =
   let rec find = function
-    | [] -> None
-    | (t, (ps, T.Record vs)) :: lst when List.mem_assoc fld vs -> Some t
-    | _ :: lst -> find lst
+  | [] -> Error.typing ?pos "Unbound record field label %s" lbl
+  | (ty_name, (_, T.Record flds) as ty) :: lst
+      when List.mem_assoc lbl flds -> (ty_name, ty, flds)
+  | _ :: lst -> find lst
   in
-    find tctx
-
-(** [find_record_fields_from_label lbl tctx] returns the list of all fields
-    defined by the record from [tctx] which defines the field named [lbl]. *)
-let find_record_fields_from_label lbl tctx =
-  match find_field lbl tctx with
-    | Some r ->
-        begin match lookup_tydef tctx r with
-          | (_, T.Record flds) -> Some flds
-          | _ -> None
-        end
-    | None -> None
+  find tctx
 
 (** [find_operation op tctx] returns the name of the effect type from [tcxt]
     that defines the operation symbol [op] *)
-let find_operation op tctx =
+let find_operation ?pos tctx op_name =
   let rec find = function
-    | [] -> None
-    | (t, (ps, T.Effect vs)) :: lst ->
-        begin match C.lookup op vs with
-          | Some (t1, t2) -> Some t
-          | None -> find lst
-        end
-    | _ :: lst -> find lst
+  | [] -> Error.typing ?pos "Unbound operation %s" op_name
+  | (ty_name, (_, T.Effect eff_sig) as ty) :: lst
+      when List.mem_assoc op_name eff_sig -> (ty_name, ty, eff_sig)
+  | _ :: lst -> find lst
   in
-    find tctx
+  find tctx
 
 let extend_tydef ty def ctx = {ctx with types = (ty, def) :: ctx.types}
 
@@ -222,25 +198,25 @@ let check_ty_noncyclic ?pos ctx =
     definitions added to it. *)
 let check_tydef ?pos ctx defs =
   let check_names {types=tctx} = function
-    | (T.Basic _ | T.Apply _ | T.Param _ | T.Arrow _ | T.Tuple _ | T.Handler _) -> ()
-    | T.Record lst ->
-        List.iter (fun (f,_) ->
-                     match find_field f tctx with
-                       | Some u -> Error.typing ?pos "Field %s is already used in type %s" f u
-                       | None -> ()
-                  ) lst
-    | T.Sum lst ->
-        List.iter (fun (lbl,_) ->
-                     match find_variant lbl tctx with
-                       | Some u -> Error.typing ?pos "Variant %s is already used in type %s" lbl u
-                       | None -> ()
-                  ) lst
-    | T.Effect lst ->
-        List.iter (fun (op, _) ->
-                     match find_operation op tctx with
-                       | Some u -> Error.typing ?pos "Operation %s is already used in type %s" op u
-                       | None -> ()
-                  ) lst
+  | T.Basic _ | T.Apply _ | T.Param _ | T.Arrow _ | T.Tuple _ | T.Handler _ -> ()
+  | T.Record lst -> () (* XXX *)
+(*         List.iter (fun (f,_) ->
+                   match find_field f tctx with
+                     | Some u -> Error.typing ?pos "Field %s is already used in type %s" f u
+                     | None -> ()
+                ) lst *)
+  | T.Sum lst -> () (* XXX *)
+(*         List.iter (fun (lbl,_) -> ())
+(*                      match find_variant lbl tctx with
+                     | Some u -> Error.typing ?pos "Variant %s is already used in type %s" lbl u
+                     | None -> ()
+                ) lst *) *)
+  | T.Effect lst -> () (* XXX *)
+(*         List.iter (fun (op, _) ->
+                   match find_operation op tctx with
+                     | Some u -> Error.typing ?pos "Operation %s is already used in type %s" op u
+                     | None -> ()
+                ) lst *)
   in
   let ctx =
     List.fold_left

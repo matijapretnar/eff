@@ -24,10 +24,8 @@ let rec cons_of_pattern tctx p =
     | P.Tuple lst -> Tuple (List.length lst)
     | P.Record [] -> assert false
     | P.Record ((lbl, _) :: _) ->
-        begin match Ctx.find_record_fields_from_label lbl tctx with
-          | None -> assert false
-          | Some flds -> Record (List.map fst flds)
-        end
+        let (_, _, flds) = Ctx.find_field tctx lbl in
+        Record (List.map fst flds)
     | P.Variant (lbl, opt) -> Variant (lbl, opt <> None)
     | P.Const c -> Const c
     | P.Var _ | P.Nonbinding -> Wildcard
@@ -84,12 +82,9 @@ let find_constructors lst tctx =
              find (first c)
           (* Check if all tags defined by this variant type are covered. *)
           | Variant (lbl, _) ->
-              begin match Ctx.find_variant_tags_from_label lbl tctx with
-                | Some tags ->
-                    let all = (List.map (fun (lbl, opt) -> Variant (lbl, opt <> None)) tags) in
-                    C.diff all present
-                | None -> assert false
-              end
+              let (_, _, tags, _) = Ctx.find_variant tctx lbl in
+              let all = (List.map (fun (lbl, opt) -> Variant (lbl, opt <> None)) tags) in
+              C.diff all present
           (* Only for completeness. *)
           | Wildcard -> []
         end
