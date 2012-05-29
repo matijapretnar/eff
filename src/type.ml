@@ -93,8 +93,9 @@ let fresh_param () = Param (next_param ())
 (** [refresh ps ty] replaces the polymorphic parameters [ps] in [ty] with new
     values. *)
 let refresh ps ty =
-  let sbst = List.map (fun p -> (p, fresh_param ())) ps in
-  subst_ty sbst ty
+  let ps' = List.map (fun p -> (p, next_param ())) ps in
+  let sbst = List.map (fun (p, p') -> (p, Param p')) ps' in
+  List.map snd ps', subst_ty sbst ty
 
 (** [beautify ty] returns a sequential replacement of all type parameters in
     [ty] that can be used for its pretty printing. *)

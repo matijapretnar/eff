@@ -230,7 +230,7 @@ and infer_expr ({Ctx.types=tctx} as ctx) sbst (e,pos) =
   match e with
     | I.Var x ->
       begin match C.lookup x ctx.Ctx.variables with
-      | Some (ps, t) -> T.refresh ps (T.subst_ty !sbst t)
+      | Some (ps, t) -> snd (T.refresh ps (T.subst_ty !sbst t))
       | None -> Error.typing ~pos:pos "Unknown name %s" x
       end
     | I.Const const -> T.ty_of_const const
@@ -331,29 +331,25 @@ and infer_comp ctx sbst cp =
             t_out
               
       | I.New (eff, r) ->
-          begin match Ctx.lookup_tydef eff tctx with
-            | None -> Error.typing ~pos:pos "Unknown type %s" eff
-            | Some (ps, T.Effect ops) ->
-                let subst_pq = C.map (fun p -> (p, T.fresh_param ())) ps in
-                let ops = C.assoc_map (fun (t1,t2) -> (T.subst_ty subst_pq t1, T.subst_ty subst_pq t2)) ops in
-                  begin match r with
-                    | None -> ()
-                    | Some (e, lst) ->
-                        let te = infer_expr ctx sbst e in
-                          List.iter
-                            (fun (op, (((_,pos1), (_,pos2), (_,posc)) as a)) ->
-                               match C.lookup op ops with
-                                 | None -> Error.typing ~pos:pos "Effect type %s does not have operation %s" eff op
-                                 | Some (u1, u2) ->
-                                     let t1, t2, t = infer_abstraction2 ctx sbst a in
-                                       unify tctx sbst pos1 t1 u1 ;
-                                       unify tctx sbst pos2 t2 te ;
-                                       unify tctx sbst posc t (T.Tuple [u2; te]))
-                            lst
-                  end ;
-                  let qs = List.map snd subst_pq in
-                    T.Apply (eff, qs)
-            | Some _ -> Error.typing ~pos:pos "Effect type expected but %s encountered" eff
+          begin match Ctx.fresh_tydef tctx eff with
+          | (ps, T.Effect ops) ->
+              begin match r with
+              | None -> ()
+              | Some (e, lst) ->
+                  let te = infer_expr ctx sbst e in
+                  List.iter
+                    (fun (op, (((_,pos1), (_,pos2), (_,posc)) as a)) ->
+                       match C.lookup op ops with
+                       | None -> Error.typing ~pos:pos "Effect type %s does not have operation %s" eff op
+                       | Some (u1, u2) ->
+                           let t1, t2, t = infer_abstraction2 ctx sbst a in
+                           unify tctx sbst pos1 t1 u1 ;
+                           unify tctx sbst pos2 t2 te ;
+                           unify tctx sbst posc t (T.Tuple [u2; te]))
+                    lst
+              end ;
+              T.Apply (eff, List.map (fun p -> Type.Param p) ps)
+          | _ -> Error.typing ~pos:pos "Effect type expected but %s encountered" eff
           end
 
       | I.While (c1, c2) ->

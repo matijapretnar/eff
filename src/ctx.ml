@@ -14,6 +14,10 @@ type context = {
 
 let lookup_tydef ty tctx = C.lookup ty tctx
 
+let fresh_tydef tctx ty_name =
+  let (params, ty) = List.assoc ty_name tctx in
+  Type.refresh params ty
+
 let extend_var x pt ctx =
   { ctx with variables = (x, pt) :: ctx.variables }
 
