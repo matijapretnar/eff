@@ -154,6 +154,16 @@ let infer_operation op tctx =
     find tctx
 
 
+let transparent ~pos:pos tctx t =
+  match lookup_tydef t tctx with
+    | None -> Error.typing ~pos:pos "Unknown type %s" t
+    | Some (_, t) ->
+        begin match t with
+          | (T.Sum (_::_) | T.Effect _ | T.Record _) -> false
+          | (T.Basic _ | T.Apply _ | T.Param _ | T.Sum [] |
+             T.Arrow _ | T.Tuple _ | T.Handler _ ) -> true
+        end
+
 (* [ty_apply ctx pos t lst] applies the type constructor [t] to the given list of arguments. *)
 let ty_apply ctx pos t lst =
   match lookup_tydef t ctx with

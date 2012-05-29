@@ -46,16 +46,6 @@ let generalize sbst ctx t =
 let unify tctx sbst pos t1 t2 =
   (* [transparent t] tells us whether the type constructor [t] is transparent, i.e.,
      do we unfold it during unificiation. *)
-  let transparent t =
-    match Ctx.lookup_tydef t tctx with
-      | None -> Error.typing ~pos:pos "Unknown type %s" t
-      | Some (_, t) ->
-          begin match t with
-            | (T.Sum (_::_) | T.Effect _ | T.Record _) -> false
-            | (T.Basic _ | T.Apply _ | T.Param _ | T.Sum [] |
-               T.Arrow _ | T.Tuple _ | T.Handler _ ) -> true
-          end
-  in
   let rec unify t1 t2 =
     let t1 = T.subst_ty !sbst t1 in
     let t2 = T.subst_ty !sbst t2 in
@@ -94,10 +84,10 @@ let unify tctx sbst pos t1 t2 =
             (* The following two cases cannot be merged into one, as the whole matching
                fails if both types are Apply, but only the second one is transparent. *)
 
-      | (T.Apply (t1, lst1), t2) when transparent t1 ->
+      | (T.Apply (t1, lst1), t2) when Ctx.transparent ~pos:pos tctx t1 ->
           unify t2 (Ctx.ty_apply tctx pos t1 lst1)
 
-      | (t2, T.Apply (t1, lst1)) when transparent t1 ->
+      | (t2, T.Apply (t1, lst1)) when Ctx.transparent ~pos:pos tctx t1 ->
           unify t2 (Ctx.ty_apply tctx pos t1 lst1)
 
       | (T.Handler h1, T.Handler h2) ->
