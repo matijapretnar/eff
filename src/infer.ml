@@ -144,10 +144,7 @@ let infer_pattern tctx sbst pp =
             vars := (x, t) :: !vars ;
             t
       | Pattern.Nonbinding -> T.fresh_param ()
-      | Pattern.Const (C.Integer _) -> T.int_ty
-      | Pattern.Const (C.String _) -> T.string_ty
-      | Pattern.Const (C.Boolean _) -> T.bool_ty
-      | Pattern.Const (C.Float _) -> T.float_ty
+      | Pattern.Const const -> T.ty_of_const const
       | Pattern.Tuple ps -> T.Tuple (C.map infer ps)
       | Pattern.Record [] -> assert false
       | Pattern.Record (((fld, _) :: _) as lst) ->
@@ -258,10 +255,7 @@ and infer_expr ({Ctx.types=tctx} as ctx) sbst (e,pos) =
       | Some (ps, t) -> T.refresh ps (T.subst_ty !sbst t)
       | None -> Error.typing ~pos:pos "Unknown name %s" x
       end
-    | I.Const (C.Integer _) -> T.int_ty
-    | I.Const (C.String _) -> T.string_ty
-    | I.Const (C.Boolean _) -> T.bool_ty
-    | I.Const (C.Float _) -> T.float_ty
+    | I.Const const -> T.ty_of_const const
     | I.Tuple es -> T.Tuple (C.map (infer_expr ctx sbst) es)
     | I.Record [] -> assert false
     | I.Record (((fld,_)::_) as lst) ->

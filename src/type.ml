@@ -22,11 +22,17 @@ and handler_ty = {
 let universal_ty = Basic "_"
 
 let int_ty = Basic "int"
-let bool_ty = Basic "bool"
 let string_ty = Basic "string"
+let bool_ty = Basic "bool"
 let float_ty = Basic "float"
 let unit_ty = Tuple []
 let empty_ty = Sum []
+
+let ty_of_const = function
+  | Common.Integer _ -> int_ty
+  | Common.String _ -> string_ty
+  | Common.Boolean _ -> bool_ty
+  | Common.Float _ -> float_ty
 
 type substitution = (param * ty) list
 
