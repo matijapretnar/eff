@@ -44,7 +44,7 @@ and plain_term =
   (** [check t] *)
 
 and handler = {
-  operations : (operation, abstraction2) Common.assoc ;
+  operations : (operation, abstraction2) Common.assoc;
   value : abstraction option;
   finally : abstraction option;
 }
@@ -80,7 +80,7 @@ type tydef =
   | TyInline of ty
   (** [ty] *)
 
-(* Toplevel definitions which need not be separated by ;; *)
+(* Toplevel definitions which need not be separated by;; *)
 type topdef = plain_topdef Common.pos
 and plain_topdef =
   | Tydef of (Common.tyname * (Common.typaram list * tydef)) list
@@ -92,7 +92,7 @@ and plain_topdef =
   | External of Common.variable * ty * Common.variable
   (* [external x : t = "ext_val_name"] *)
 
-(* Toplevel entries which need to be separated by ;; *)
+(* Toplevel entries which need to be separated by;; *)
 type toplevel =
   | Topdef of topdef
   | Term of term

@@ -7,10 +7,10 @@ effect
 end
 
 let rec reset d = handler
-  | d#shift f k -> with reset d handle (f k) ;;
+  | d#shift f k -> with reset d handle (f k);;
 
 (* An example from http://lamp.epfl.ch/~rompf/continuations-icfp09.pdf *)
 
 let d = new delimited in
 with reset d handle
-  d#shift (fun k -> k (k (k 7))) * 2 + 1 ;;
+  d#shift (fun k -> k (k (k 7))) * 2 + 1;;

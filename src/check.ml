@@ -202,14 +202,14 @@ let check_patterns ?(pos = C.Nowhere) pats tctx =
         begin match exhaustive tctx p 1 with
           | Some ps ->
               Print.warning ~pos:pos "This pattern-matching is not exhaustive.\n\
-                                      Here is an example of a value that is not matched:" ;
+                                      Here is an example of a value that is not matched:";
               prerr_endline (Print.to_string "%t" (Print.pattern (List.hd ps)))
           | None -> ()
         end
     | (_, pos) as pat :: pats ->
         if not (useful tctx p [pat]) then
           begin
-            Print.warning ~pos:pos "This match case is unused." ;
+            Print.warning ~pos:pos "This match case is unused.";
             check p pats
           end
         else

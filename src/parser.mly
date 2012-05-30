@@ -79,7 +79,7 @@
 
 (* Toplevel syntax *)
 
-(* If you're going to "optimize" this, please make sure we don't require ;; at the
+(* If you're going to "optimize" this, please make sure we don't require;; at the
    end of the file. *)
 file:
   | lst = file_topdef

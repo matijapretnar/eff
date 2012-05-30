@@ -57,7 +57,7 @@ let rec expression (t, pos) =
       let w, es = expressions ts in
       w, I.Tuple es
   | S.Record ts ->
-      if not (C.injective fst ts) then Error.syntax ~pos:pos "Fields in a record must be distinct" ;
+      if not (C.injective fst ts) then Error.syntax ~pos:pos "Fields in a record must be distinct";
       let w, es = record_expressions ts in
       w, I.Record es
   | S.Variant (lbl, None) ->

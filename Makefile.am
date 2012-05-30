@@ -37,8 +37,8 @@ src/version.ml:
 
 # Explain parser conflicts in the file parser.conflicts
 conflicts:
-	cd $(srcdir) ; \
-	$(EFFOCAMLBUILD) -yaccflags "--explain" src/parser.mli ; \
+	cd $(srcdir); \
+	$(EFFOCAMLBUILD) -yaccflags "--explain" src/parser.mli; \
 	if [ -f $(srcdir)/_build/src/parser.conflicts ]; \
 	then \
 		mv -f $(srcdir)/_build/src/parser.conflicts .; \

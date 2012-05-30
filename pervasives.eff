@@ -8,29 +8,29 @@ external ( < ) : 'a -> 'a -> bool = "<"
 type channel = effect
   operation write : string -> unit
   operation read : unit -> string
-end ;;
+end;;
 
-external std : channel = "std" ;;
+external std : channel = "std";;
 
 type 'a exception = effect
   operation raise : 'a -> empty
-end ;;
+end;;
 
-let raise e p = match (e#raise p) with ;;
+let raise e p = match (e#raise p) with;;
 
-external exception : string -> 'a exception = "exception" ;;
+external exception : string -> 'a exception = "exception";;
 
-let divisionByZero = exception "division by zero" ;;
+let divisionByZero = exception "division by zero";;
 
-let invalidArgument = exception "invalid argument" ;;
+let invalidArgument = exception "invalid argument";;
 
-let failure = exception "failure" ;;
+let failure = exception "failure";;
 
-let failwith msg = raise failure msg  ;;
+let failwith msg = raise failure msg ;;
 
-let assertionFault = exception "assertion fault" ;;
+let assertionFault = exception "assertion fault";;
 
-let assert b = if b then () else raise assertionFault ()  ;;
+let assert b = if b then () else raise assertionFault () ;;
 
 external ( ~- ) : int -> int = "~-"
 
@@ -110,7 +110,7 @@ let rec map f = function
   | x :: xs ->
     let y = f x in
     let ys = map f xs in
-      y :: ys ;;
+      y :: ys;;
 
 let ignore _ = ()
 
@@ -136,7 +136,7 @@ let rec fold_right f xs a =
 
 let rec iter f = function
   | [] -> ()
-  | x :: xs -> f x ; iter f xs
+  | x :: xs -> f x; iter f xs
 
 let rec forall p = function
   | [] -> true
@@ -223,7 +223,7 @@ let print_string str =
 
 let print_endline v =
   let s = to_string v in
-    std#write s ;
+    std#write s;
     std#write "\n"
 
 type 'a ref = effect
@@ -235,7 +235,7 @@ let state r x = handler
   | val y -> (fun _ -> y)
   | r#lookup () k -> (fun s -> k s s)
   | r#update s' k -> (fun _ -> k () s')
-  | finally f -> f x ;;
+  | finally f -> f x;;
 
 let ref x =
   new ref @ x with
@@ -254,7 +254,7 @@ effect
   operation float : float -> float
 end
 
-external rnd : random = "rnd" ;;
+external rnd : random = "rnd";;
 
 (* This forces the evaluation of x before calling the check, allowing us
    to write [check !l] and similar to get the result instead of an

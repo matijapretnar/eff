@@ -59,7 +59,7 @@ case $1 in
     run=:
     msg="probably too old"
   fi
-  ;;
+ ;;
 
   -h|--h|--he|--hel|--help)
     echo "\
@@ -91,18 +91,18 @@ Version suffixes to PROGRAM as well as the prefixes \`gnu-', \`gnu', and
 
 Send bug reports to <bug-automake@gnu.org>."
     exit $?
-    ;;
+   ;;
 
   -v|--v|--ve|--ver|--vers|--versi|--versio|--version)
     echo "missing $scriptversion (GNU Automake)"
     exit $?
-    ;;
+   ;;
 
   -*)
     echo 1>&2 "$0: Unknown \`$1' option"
     echo 1>&2 "Try \`$0 --help' for more information"
     exit 1
-    ;;
+   ;;
 
 esac
 
@@ -119,7 +119,7 @@ program=`echo "$1" | sed '
 case $1 in
   lex*|yacc*)
     # Not GNU programs, they don't have --version.
-    ;;
+   ;;
 
   *)
     if test -z "$run" && ($1 --version) > /dev/null 2>&1; then
@@ -131,7 +131,7 @@ case $1 in
        # $TOOL exists and not knowing $TOOL uses missing.
        exit 1
     fi
-    ;;
+   ;;
 esac
 
 # If it does not exist, or fails to run (possibly an outdated version),
@@ -144,7 +144,7 @@ WARNING: \`$1' is $msg.  You should only need it if
          to install the \`Automake' and \`Perl' packages.  Grab them from
          any GNU archive site."
     touch aclocal.m4
-    ;;
+   ;;
 
   autoconf*)
     echo 1>&2 "\
@@ -153,7 +153,7 @@ WARNING: \`$1' is $msg.  You should only need it if
          \`Autoconf' and \`GNU m4' packages.  Grab them from any GNU
          archive site."
     touch configure
-    ;;
+   ;;
 
   autoheader*)
     echo 1>&2 "\
@@ -172,7 +172,7 @@ WARNING: \`$1' is $msg.  You should only need it if
       esac
     done
     touch $touch_files
-    ;;
+   ;;
 
   automake*)
     echo 1>&2 "\
@@ -183,7 +183,7 @@ WARNING: \`$1' is $msg.  You should only need it if
     find . -type f -name Makefile.am -print |
 	   sed 's/\.am$/.in/' |
 	   while read f; do touch "$f"; done
-    ;;
+   ;;
 
   autom4te*)
     echo 1>&2 "\
@@ -206,7 +206,7 @@ WARNING: \`$1' is needed, but is $msg.
 	chmod +x $file
 	exit 1
     fi
-    ;;
+   ;;
 
   bison*|yacc*)
     echo 1>&2 "\
@@ -227,7 +227,7 @@ WARNING: \`$1' $msg.  You should only need it if
 	    if test -f "$SRCFILE"; then
 	         cp "$SRCFILE" y.tab.h
 	    fi
-	  ;;
+	 ;;
 	esac
     fi
     if test ! -f y.tab.h; then
@@ -236,7 +236,7 @@ WARNING: \`$1' $msg.  You should only need it if
     if test ! -f y.tab.c; then
 	echo 'main() { return 0; }' >y.tab.c
     fi
-    ;;
+   ;;
 
   lex*|flex*)
     echo 1>&2 "\
@@ -253,13 +253,13 @@ WARNING: \`$1' is $msg.  You should only need it if
 	    if test -f "$SRCFILE"; then
 	         cp "$SRCFILE" lex.yy.c
 	    fi
-	  ;;
+	 ;;
 	esac
     fi
     if test ! -f lex.yy.c; then
 	echo 'main() { return 0; }' >lex.yy.c
     fi
-    ;;
+   ;;
 
   help2man*)
     echo 1>&2 "\
@@ -277,7 +277,7 @@ WARNING: \`$1' is $msg.  You should only need it if
 	echo ".ab help2man is required to generate this page"
 	exit $?
     fi
-    ;;
+   ;;
 
   makeinfo*)
     echo 1>&2 "\
@@ -306,7 +306,7 @@ WARNING: \`$1' is $msg.  You should only need it if
     # let's fail without touching anything.
     test -f $file || exit 1
     touch $file
-    ;;
+   ;;
 
   *)
     echo 1>&2 "\
@@ -317,7 +317,7 @@ WARNING: \`$1' is needed, and is $msg.
          this package.  You may also peek at any GNU archive site, in case
          some other package would contain this missing \`$1' program."
     exit 1
-    ;;
+   ;;
 esac
 
 exit 0

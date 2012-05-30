@@ -12,7 +12,7 @@ let run y = handler
   | y#yield x k -> Susp (x, k)
   | val x -> Result x
 
-type 'a tree = Node of 'a tree * 'a tree | Leaf of 'a ;;
+type 'a tree = Node of 'a tree * 'a tree | Leaf of 'a;;
 
 let rec depthWalk y = function
   | Node (l, r) ->
@@ -21,14 +21,14 @@ let rec depthWalk y = function
       Node (l', r')
   | Leaf a ->
       let b = y#yield a in
-      Leaf b ;;
+      Leaf b;;
 
 let renum y = handler
-  | y#yield n k -> k (n + 1) ;;
+  | y#yield n k -> k (n + 1);;
 
 let y = new yield in
 with renum y handle
-  depthWalk y (Node (Leaf 10, Leaf 20)) ;;
+  depthWalk y (Node (Leaf 10, Leaf 20));;
 
 let shift y f = y#yield f
 
@@ -36,7 +36,7 @@ let rec reset y thunk =
   interp y (with run y handle thunk ())
 and interp y = function
   | Result r -> r
-  | Susp (f, k) -> reset y (fun () -> f (fun i -> interp y (k i))) ;;
+  | Susp (f, k) -> reset y (fun () -> f (fun i -> interp y (k i)));;
 
 (* To run this example, you have to turn off type checking with --no-types:
 
@@ -45,8 +45,8 @@ and interp y = function
 (*
 let y = new yield in
 reset y (fun () ->
-let yin = (fun k -> std#write "@" ; k) (shift y (fun k -> k k)) in
-let yang = (fun k -> std#write "*" ; k) (shift y (fun k -> k k)) in
-  yin yang) ;;
+let yin = (fun k -> std#write "@"; k) (shift y (fun k -> k k)) in
+let yang = (fun k -> std#write "*"; k) (shift y (fun k -> k k)) in
+  yin yang);;
 *)
 

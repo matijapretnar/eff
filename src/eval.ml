@@ -134,7 +134,7 @@ let rec ceval env (c, pos) = match c with
 
   | I.Check c ->
       let r = ceval env c in
-      Print.check ~pos:pos "%t" (Print.result r) ;
+      Print.check ~pos:pos "%t" (Print.result r);
       V.value_unit
 
 and eval_let env lst c =

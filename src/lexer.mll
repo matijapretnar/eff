@@ -70,8 +70,8 @@ let int_of_string s =
   (* get rid of _ *)
   let j = ref 0 in
   for i = 0 to String.length s - 1 do
-    if s.[i] <> '_' then (s.[!j] <- s.[i] ; incr j)
-  done ;
+    if s.[i] <> '_' then (s.[!j] <- s.[i]; incr j)
+  done;
   int_of_string (String.sub s 0 !j)
 
 }
@@ -213,9 +213,9 @@ and escaped = parse
             | '"', false, b, _ -> in_quote := not b; last_backslash := false; last_semi := false
             | ';', false, false, b -> semisemi := b; last_semi := true
             | _, _, _, _ -> last_backslash := false; last_semi := false
-        end ;
+        end;
         incr i
-      done ;
+      done;
       if !semisemi then
         Some (String.sub str 0 !i)
       else
@@ -226,7 +226,7 @@ and escaped = parse
       match has_semisemi acc with
       | Some acc -> acc
       | None ->
-          print_string prompt ;
+          print_string prompt;
           let str = read_line () in
           read_more "  " (acc ^ "\n" ^ str)
     in

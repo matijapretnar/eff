@@ -19,7 +19,7 @@ let free_params lst =
 let subst_ctx sbst ctx =
   C.assoc_map
         (fun (ps,t) -> 
-          assert (List.for_all (fun (p,_) -> not (List.mem p ps)) sbst) ;
+          assert (List.for_all (fun (p,_) -> not (List.mem p ps)) sbst);
           (ps, T.subst_ty sbst t))
         ctx
 

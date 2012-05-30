@@ -1,14 +1,14 @@
 type 'a cow = effect
  operation horn : 'a -> 'a
-end ;;
+end;;
 
-let c = new cow ;;
+let c = new cow;;
 
-#type c ;;
+#type c;;
 
 let milk = handler
  | c#horn x k -> let f y = k y in f x
 ;;
 
 (* c used to get the type 'a cow *)
-#type c ;;
+#type c;;

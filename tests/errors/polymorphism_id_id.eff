@@ -1,4 +1,4 @@
-let u x = x ;;
-let v = u u ;;
-(v 42, v "foo") ;;
+let u x = x;;
+let v = u u;;
+(v 42, v "foo");;
 

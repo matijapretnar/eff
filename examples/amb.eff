@@ -15,15 +15,15 @@ let amb s = handler
                     | Failure -> try xs
                     | Success y -> Success y)
     in
-      try lst  ;;
+      try lst ;;
 
 (* The 8 queens problem. *)
 
 let no_attack (x,y) (x',y') =
-  x <> x' && y <> y' && abs (x - x') <> abs (y - y') ;;
+  x <> x' && y <> y' && abs (x - x') <> abs (y - y');;
 
 let available x qs =
-  filter (fun y -> forall (no_attack (x,y)) qs) [1;2;3;4;5;6;7;8] ;;
+  filter (fun y -> forall (no_attack (x,y)) qs) [1;2;3;4;5;6;7;8];;
 
 (* This one finds [(8, 4); (7, 2); (6, 7); (5, 3); (4, 6); (3, 8); (2, 5); (1, 1)]. *)
 let s = new selection in
@@ -32,7 +32,7 @@ with amb s handle
     if x = 9 then Success qs else
       let y = s#select (available x qs) in
       place (x+1) ((x, y) :: qs)
-  in place 1 [] ;;
+  in place 1 [];;
 
 (* This one does not work because state is handled outside amb. *)
 let s = new selection in
@@ -41,8 +41,8 @@ with amb s handle
   for x = 1 to 8 do
     let y = s#select (available x !qs) in
     qs := (x, y) :: !qs
-  done ;
-  Success !qs ;;
+  done;
+  Success !qs;;
 
 (* Watch this, it works and finds the same solution as the first one. *)
 let s = new selection in
@@ -52,18 +52,18 @@ with amb s handle
     for x = 1 to 8 do
       let y = s#select (available x !qs) in
       qs := (x, y) :: !qs
-    done ;
-    Success !qs ;;
+    done;
+    Success !qs;;
 
 (* Breadth-first search. *)
 let bfs s =
   let q = ref [] in
   handler
     | s#select lst k ->
-      (q := !q @ (map (fun x -> (k,x)) lst) ;
+      (q := !q @ (map (fun x -> (k,x)) lst);
        match !q with
         | [] -> Failure
-        | (k,x) :: lst -> q := lst ; k x) ;;
+        | (k,x) :: lst -> q := lst; k x);;
 
 (* We repeat 8-queen example with breadth-first-search. It is much slower
    than amb, which is not surprising. It still finds the same solution
@@ -74,4 +74,4 @@ with bfs s handle
     if x = 9 then Success qs else
       let y = s#select (available x qs) in
       place (x+1) ((x, y) :: qs)
-  in place 1 [] ;;
+  in place 1 [];;

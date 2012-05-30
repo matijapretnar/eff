@@ -35,7 +35,7 @@ let symbols = [
   ("std", V.fresh_instance (Some "standard I/O") (Some (ref V.from_unit, [
             ("write", coop (fun v s ->
                               let str = V.to_str v in
-                                print_string str; flush stdout ;
+                                print_string str; flush stdout;
                                 (V.from_unit, s)));
              ("read", coop (fun v s ->
                               let str = read_line () in
@@ -48,7 +48,7 @@ let symbols = [
                                    let str = Print.to_string "%s %t." desc (Print.value v) in
                                      Error.exc "%s" str))])))));
 
-  ("rnd", (Random.self_init () ;
+  ("rnd", (Random.self_init ();
            V.fresh_instance (Some "random number generator") (Some (ref V.from_unit, [
              ("int", coop (fun k s -> (V.from_int (Random.int (V.to_int k))), s));
              ("float", coop (fun x s -> (V.from_float (Random.float (V.to_float x))), s));

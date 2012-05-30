@@ -15,7 +15,7 @@ let lazy t =
         | Thunk t -> let v = t () in (v, Value v))
   end
 
-let force x = x#force () ;;
+let force x = x#force ();;
 
 (* We define a function which is purposely slow so we can
    notice the effect of deferred computations. *)
@@ -26,12 +26,12 @@ let rec fib = function
   | n -> fib (n-1) + fib (n-2)
 
 (* This evaluates immediately. *)
-let x = lazy (fun _ -> fib 30) ;;
+let x = lazy (fun _ -> fib 30);;
 
 (* This one we have to wait for. *)
-let y = force x ;;
+let y = force x;;
 
 (* This one is instantaneous. *)
-let z = force x ;;
+let z = force x;;
 
 

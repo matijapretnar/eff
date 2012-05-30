@@ -9,9 +9,9 @@ let local_store r s0 = handler
 let (put, get,s) =
     let r = new ref in
        with local_store r [] handle
-          (r#update, r#lookup, r) ;;
+          (r#update, r#lookup, r);;
 
 with local_store s [] handle
-     put [5] ;
-     put ("foo":: get()) ;
-     get () ;;
+     put [5];
+     put ("foo":: get());
+     get ();;

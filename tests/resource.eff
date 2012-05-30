@@ -8,12 +8,12 @@ let x =
     with
       operation get () @ s -> (s, s)
       operation set s @ _ -> ((), s)
-    end ;;
+    end;;
 
-let a = x # get () ;;
+let a = x # get ();;
 
-x # set 17 ;;
+x # set 17;;
 
-let b = x # get () ;;
+let b = x # get ();;
 
 (a,b)

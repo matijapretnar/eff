@@ -11,7 +11,7 @@ let help_text = "Toplevel commands:
 #reset;;           forget all definitions (including pervasives)
 #help;;            print this help
 #quit;;            exit eff
-#use \"<file>\";;  load commands from file" ;;
+#use \"<file>\";;  load commands from file";;
 
 (* We look for pervasives.eff _first_ next to the executable and _then_ in the relevant
    install directory. This makes it easier to experiment with pervasives.eff because
@@ -47,7 +47,7 @@ let options = Arg.align [
     " Do not use a command-line wrapper");
   ("-v",
     Arg.Unit (fun () ->
-      print_endline ("eff " ^ Version.version ^ "(" ^ Sys.os_type ^ ")") ;
+      print_endline ("eff " ^ Version.version ^ "(" ^ Sys.os_type ^ ")");
       exit 0),
     " Print version information and exit");
   ("--warn-sequencing", Arg.Set Infer.warn_implicit_sequencing,
@@ -98,7 +98,7 @@ let exec_topdef interactive (ctx, tctx, env) (d,pos) =
                          | None -> assert false
                          | Some v -> Format.printf "@[val %s : %t = %t@]@." x (Print.ty ps t) (Print.value v))
             vars
-        end ;
+        end;
         (ctx, tctx, env)
   | S.TopLetRec defs ->
       let defs = C.assoc_map Desugar.let_rec defs in
@@ -106,7 +106,7 @@ let exec_topdef interactive (ctx, tctx, env) (d,pos) =
       let env = Eval.extend_let_rec env defs in
         if interactive then begin
           List.iter (fun (x,(ps,t)) -> Format.printf "@[val %s : %t = <fun>@]@." x (Print.ty ps t)) vars
-        end ;
+        end;
         (ctx, tctx, env)
   | S.External (x, t, f) ->
     let ctx = Ctx.extend_var x (Desugar.external_ty t) ctx in
@@ -138,17 +138,17 @@ let rec exec_cmd interactive (ctx, tctx, env) e =
       let c = Desugar.computation c in
       let ctx, (ps, t) = infer_top_comp tctx ctx c in
       let v = Eval.run env c in
-      if interactive then Format.printf "@[- : %t = %t@]@." (Print.ty ps t) (Print.value v) ;
+      if interactive then Format.printf "@[- : %t = %t@]@." (Print.ty ps t) (Print.value v);
       (ctx, tctx, env)
   | S.TypeOf c ->
       let c = Desugar.computation c in
       let ctx, (ps, t) = infer_top_comp tctx ctx c in
-      Format.printf "@[- : %t@]@." (Print.ty ps t) ;
+      Format.printf "@[- : %t@]@." (Print.ty ps t);
       (ctx, tctx, env)
   | S.Reset ->
       print_endline ("Environment reset."); initial_ctxenv
   | S.Help ->
-      print_endline help_text ; (ctx, tctx, env)
+      print_endline help_text; (ctx, tctx, env)
   | S.Quit -> exit 0
   | S.Use fn -> use_file (ctx, tctx, env) (fn, interactive)
   | S.Topdef def -> exec_topdef interactive (ctx, tctx, env) def
@@ -190,20 +190,20 @@ let main =
       | Some lst ->
           let n = Array.length Sys.argv + 2 in
           let args = Array.make n "" in
-            Array.blit Sys.argv 0 args 1 (n - 2) ;
-            args.(n - 1) <- "--no-wrapper" ;
+            Array.blit Sys.argv 0 args 1 (n - 2);
+            args.(n - 1) <- "--no-wrapper";
             List.iter
               (fun wrapper ->
                  try
-                   args.(0) <- wrapper ;
+                   args.(0) <- wrapper;
                    Unix.execvp wrapper args
                  with Unix.Unix_error _ -> ())
               lst
-    end ;
+    end;
   (* Files were listed in the wrong order, so we reverse them *)
   files := List.rev !files;
   (* Load the pervasives. *)
-  if !pervasives then add_file false !pervasives_file ;
+  if !pervasives then add_file false !pervasives_file;
   try
     (* Run and load all the specified files. *)
     let ctxenv = List.fold_left use_file initial_ctxenv !files in

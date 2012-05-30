@@ -16,13 +16,13 @@ and bull =
    | Horns of cow
 
 (* Handler type. *)
-type 'a collector = 'a => 'a list ;;
+type 'a collector = 'a => 'a list;;
 
-Tail ;;
+Tail;;
 
-{re = 1.2; im = 2.4} ;;
+{re = 1.2; im = 2.4};;
 
-(Node (10, Empty, Node (20, Empty, Empty))) ;;
+(Node (10, Empty, Node (20, Empty, Empty)));;
 
 (Horns (fun _ -> 10))
 

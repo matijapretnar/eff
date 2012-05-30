@@ -55,9 +55,9 @@ let solve tctx cstr =
 
     | (t1, t2) ->
         let sbst = Type.beautify2 t1 t2 in
-          Error.typing ~pos:pos
-            "This expression has type %t but it should have type %t."
-            (Print.ty ~sbst:sbst [] t1) (Print.ty ~sbst:sbst [] t2)
+        Error.typing ~pos:pos
+          "This expression has type %t but it should have type %t."
+          (Print.ty ~sbst:sbst [] t1) (Print.ty ~sbst:sbst [] t2)
   in
   List.iter (fun (t1, t2, pos) -> unify pos t1 t2) (List.rev cstr);
   !sbst
