@@ -6,17 +6,18 @@ let warn_implicit_sequencing = ref false ;;
 
 let disable_typing = ref false ;;
 
-(* We perform type inference int the style of Standard ML 97, i.e., Hindley-Milner polymorphism
-   with value restriction. Throughout we work with a reference to a type substitution, usually
-   called [sbst], in which we collect the results of unification. That is, we perform unification
-   as early as posssible (rather than collect all equations and then solve them), and store the
-   results in [sbst]. 
+(* We perform type inference int the style of Standard ML 97, i.e.,
+   Hindley-Milner polymorphism with value restriction. Throughout, we work with
+   a reference to a type substitution, usually called [sbst], in which we
+   collect the results of unification. That is, we perform unification as early
+   as posssible (rather than collect all equations and then solve them), and
+   store the results in [sbst]. 
 
-   The effect of carrying around the substitution is that we need to be careful about when
-   to apply it:
+   The effect of carrying around the substitution is that we need to be careful
+   about when to apply it:
    
-   1. we apply the substitution to types [t1] and [t2] before trying to solve the
-      equation [t1 = t2].
+   1. we apply the substitution to types [t1] and [t2] before trying to solve
+      the equation [t1 = t2].
 
    2. we apply the substitution to a type which we just looked up in the context.
 *)
@@ -279,15 +280,20 @@ and infer_comp tctx ctx sbst cp =
           end
 
       | I.While (c1, c2) ->
-          (let t1 = infer ctx c1 in unify tctx sbst pos t1 T.bool_ty) ;
-          (let t2 = infer ctx c2 in unify tctx sbst pos t2 T.unit_ty) ;
+          let t1 = infer ctx c1 in
+          unify tctx sbst pos t1 T.bool_ty;
+          let t2 = infer ctx c2 in
+          unify tctx sbst pos t2 T.unit_ty;
           T.unit_ty
 
       | I.For (i, e1, e2, c, _) ->
-          (let t1 = infer_expr tctx ctx sbst e1 in unify tctx sbst (snd e1) t1 T.int_ty) ;
-          (let t2 = infer_expr tctx ctx sbst e2 in unify tctx sbst (snd e2) t2 T.int_ty) ;
+          let t1 = infer_expr tctx ctx sbst e1 in
+          unify tctx sbst (snd e1) t1 T.int_ty;
+          let t2 = infer_expr tctx ctx sbst e2 in
+          unify tctx sbst (snd e2) t2 T.int_ty;
           let ctx = Ctx.extend_var i ([], T.int_ty) ctx in
-          (let t = infer ctx c in unify tctx sbst (snd c) t T.unit_ty) ;
+          let t = infer ctx c in
+          unify tctx sbst (snd c) t T.unit_ty;
           T.unit_ty
 
       | I.Handle (e1, e2) ->
@@ -299,12 +305,12 @@ and infer_comp tctx ctx sbst cp =
             t3
 
       | I.Let (defs, c) -> 
-        let _, ctx = infer_let tctx ctx sbst pos defs in
-        infer ctx c
+          let _, ctx = infer_let tctx ctx sbst pos defs in
+          infer ctx c
 
       | I.LetRec (defs, c) ->
-        let _, ctx = infer_let_rec tctx ctx sbst pos defs in
-        infer ctx c
+          let _, ctx = infer_let_rec tctx ctx sbst pos defs in
+          infer ctx c
 
       | I.Check c ->
           ignore (infer ctx c) ;
@@ -316,14 +322,14 @@ let infer_top_comp tctx ctx c =
   let sbst = ref T.identity_subst in
   let ty = infer_comp tctx ctx sbst c in
   let ps = (if nonexpansive (fst c) then Ctx.generalize !sbst ctx ty else []) in
-    Ctx.subst_ctx !sbst ctx, (ps, T.subst_ty !sbst ty)
+  Ctx.subst_ctx !sbst ctx, (ps, T.subst_ty !sbst ty)
 
 let infer_top_let tctx ctx pos defs =
   let sbst = ref T.identity_subst in
   let vars, ctx = infer_let tctx ctx sbst pos defs in
-    let ctx = Ctx.subst_ctx !sbst ctx in
-    let vars = C.assoc_map (fun (ps,t) -> (ps, T.subst_ty !sbst t)) vars in
-      vars, ctx
+  let ctx = Ctx.subst_ctx !sbst ctx in
+  let vars = C.assoc_map (fun (ps,t) -> (ps, T.subst_ty !sbst t)) vars in
+  vars, ctx
 
 let infer_top_let_rec tctx ctx pos defs =
   let sbst = ref T.identity_subst in

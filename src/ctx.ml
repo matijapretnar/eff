@@ -35,4 +35,3 @@ let generalize sbst ctx t =
   let ps = T.free_params (T.subst_ty sbst t) in
   let qs = free_params ctx in
     C.diff ps qs
-
