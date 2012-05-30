@@ -11,7 +11,18 @@ let fresh_tydef ?pos tctx ty_name =
   let (params, ty) = lookup_tydef ?pos tctx ty_name in
   Type.refresh params ty
 
-let initial = External.types
+let initial = [
+  ("bool", ([], T.bool_ty));
+  ("unit", ([], T.unit_ty));
+  ("int", ([], T.int_ty));
+  ("string", ([], T.string_ty));
+  ("float", ([], T.float_ty));
+  ("list", (let a = T.next_param () in
+              ([a],
+               T.Sum [(Common.nil, None);
+                      (Common.cons, Some (T.Tuple [T.Param a; T.Apply ("list", [T.Param a])]))])));
+  ("empty", ([], T.empty_ty));
+]
 
 (** [find_variant lbl tctx] returns the name of the variant type from [tcxt]
     that defines the label [lbl] *)

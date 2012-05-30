@@ -1,19 +1,6 @@
 module V = Value
 module T = Type
 
-let types = [
-  ("bool", ([], T.bool_ty));
-  ("unit", ([], T.unit_ty));
-  ("int", ([], T.int_ty));
-  ("string", ([], T.string_ty));
-  ("float", ([], T.float_ty));
-  ("list", (let a = T.next_param () in
-              ([a],
-               T.Sum [(Common.nil, None);
-                      (Common.cons, Some (T.Tuple [T.Param a; T.Apply ("list", [T.Param a])]))])));
-  ("empty", ([], T.empty_ty));
-]
-
 (* Transformations from functions on constants to functions on values *)
 let val_val_to f = V.from_fun (fun v1 -> V.value_fun (fun v2 -> f v1 v2))
 let int_int_to f = val_val_to (fun v1 v2 -> f (V.to_int v1) (V.to_int v2))
