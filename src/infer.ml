@@ -84,11 +84,11 @@ let unify tctx sbst pos t1 t2 =
             (* The following two cases cannot be merged into one, as the whole matching
                fails if both types are Apply, but only the second one is transparent. *)
 
-      | (T.Apply (t1, lst1), t2) when Ctx.transparent ~pos:pos tctx t1 ->
-          unify t2 (Ctx.ty_apply ~pos:pos tctx t1 lst1)
+      | (T.Apply (t1, lst1), t2) when Tctx.transparent ~pos:pos tctx t1 ->
+          unify t2 (Tctx.ty_apply ~pos:pos tctx t1 lst1)
 
-      | (t2, T.Apply (t1, lst1)) when Ctx.transparent ~pos:pos tctx t1 ->
-          unify t2 (Ctx.ty_apply ~pos:pos tctx t1 lst1)
+      | (t2, T.Apply (t1, lst1)) when Tctx.transparent ~pos:pos tctx t1 ->
+          unify t2 (Tctx.ty_apply ~pos:pos tctx t1 lst1)
 
       | (T.Handler h1, T.Handler h2) ->
           unify h2.T.value h1.T.value;
@@ -126,7 +126,7 @@ let infer_pattern tctx sbst pp =
       | Pattern.Tuple ps -> T.Tuple (C.map infer ps)
       | Pattern.Record [] -> assert false
       | Pattern.Record (((fld, _) :: _) as lst) ->
-          let (t, ps, us) = Ctx.infer_field fld tctx in
+          let (t, ps, us) = Tctx.infer_field fld tctx in
           let unify_record_pattern (fld, p) =
             begin match C.lookup fld us with
               | None -> Error.typing ~pos:pos "Unexpected field %s in a pattern of type %s." fld t
@@ -136,7 +136,7 @@ let infer_pattern tctx sbst pp =
             List.iter unify_record_pattern lst;
             T.Apply (t, ps)
       | Pattern.Variant (lbl, p) ->
-          let (t, ps, u) = Ctx.infer_variant lbl tctx in
+          let (t, ps, u) = Tctx.infer_variant lbl tctx in
             begin match p, u with
               | None, None -> ()
               | Some p, Some u -> unify tctx sbst pos (infer p) u
@@ -148,30 +148,30 @@ let infer_pattern tctx sbst pp =
   let t = infer pp in
     !vars, T.subst_ty !sbst t
 
-let extend_with_pattern ?(forbidden_vars=[]) ctx sbst p =
-  let vars, t = infer_pattern ctx.Ctx.types sbst p in
+let extend_with_pattern ?(forbidden_vars=[]) tctx ctx sbst p =
+  let vars, t = infer_pattern tctx sbst p in
   match C.find (fun (x,_) -> List.mem_assoc x vars) forbidden_vars with
     | Some (x,_) -> Error.typing ~pos:(snd p) "Several definitions of %s." x
     | None -> vars, t, Ctx.extend_vars vars ctx
 
-let rec infer_abstraction ctx sbst (p, c) =
-  let _, t1, ctx = extend_with_pattern ctx sbst p in
-  let t2 = infer_comp ctx sbst c in
+let rec infer_abstraction tctx ctx sbst (p, c) =
+  let _, t1, ctx = extend_with_pattern tctx ctx sbst p in
+  let t2 = infer_comp tctx ctx sbst c in
     t1, t2
 
-and infer_abstraction2 ctx sbst (p1, p2, c) =
-  let vs, t1, ctx = extend_with_pattern ctx sbst p1 in
-  let _, t2, ctx = extend_with_pattern ~forbidden_vars:vs ctx sbst p2 in
-  let t3 = infer_comp ctx sbst c in
+and infer_abstraction2 tctx ctx sbst (p1, p2, c) =
+  let vs, t1, ctx = extend_with_pattern tctx ctx sbst p1 in
+  let _, t2, ctx = extend_with_pattern ~forbidden_vars:vs tctx ctx sbst p2 in
+  let t3 = infer_comp tctx ctx sbst c in
     t1, t2, t3
 
-and infer_handler_case_abstraction ctx sbst (p, k, e) =
-  let vs, t1, ctx = extend_with_pattern ctx sbst p in
-  let _, tk, ctx = extend_with_pattern ~forbidden_vars:vs ctx sbst k in
-  let t2 = infer_comp ctx sbst e in
+and infer_handler_case_abstraction tctx ctx sbst (p, k, e) =
+  let vs, t1, ctx = extend_with_pattern tctx ctx sbst p in
+  let _, tk, ctx = extend_with_pattern ~forbidden_vars:vs tctx ctx sbst k in
+  let t2 = infer_comp tctx ctx sbst e in
     tk, t1, t2
 
-and infer_let ({Ctx.types=tctx} as ctx) sbst pos defs =
+and infer_let tctx ctx sbst pos defs =
   if !warn_implicit_sequencing then
     begin match defs with
       | [] | [_] -> ()
@@ -182,8 +182,8 @@ and infer_let ({Ctx.types=tctx} as ctx) sbst pos defs =
     end ;
   List.fold_left
     (fun (vs, ctx') (p,c) ->
-      let tc = infer_comp ctx sbst c in
-      let ws, tp = infer_pattern ctx.Ctx.types sbst p in
+      let tc = infer_comp tctx ctx sbst c in
+      let ws, tp = infer_pattern tctx sbst p in
       unify tctx sbst (snd c) tc tp ;
       Check.is_irrefutable p tctx ;
       match C.find_duplicate (List.map fst ws) (List.map fst vs) with
@@ -198,7 +198,7 @@ and infer_let ({Ctx.types=tctx} as ctx) sbst pos defs =
             (List.rev ws @ vs, ctx'))
     ([], ctx) defs
 
-and infer_let_rec ({Ctx.types=tctx} as ctx) sbst pos defs =
+and infer_let_rec tctx ctx sbst pos defs =
   if not (Common.injective fst defs) then
     Error.typing ~pos:pos "Multiply defined recursive value." ;
   let lst =
@@ -212,8 +212,8 @@ and infer_let_rec ({Ctx.types=tctx} as ctx) sbst pos defs =
   let ctx' = List.fold_right (fun (f,u1,u2,_,_) ctx -> Ctx.extend_var f ([], T.Arrow (u1, u2)) ctx) lst ctx in
   List.iter
     (fun (_,u1,u2,p,c) ->
-      let _, tp, ctx' = extend_with_pattern ctx' sbst p in
-      let tc = infer_comp ctx' sbst c in
+      let _, tp, ctx' = extend_with_pattern tctx ctx' sbst p in
+      let tc = infer_comp tctx ctx' sbst c in
       unify tctx sbst (snd p) u1 tp ;
       unify tctx sbst (snd c) u2 tc ;
       Check.is_irrefutable p tctx)
@@ -226,24 +226,24 @@ and infer_let_rec ({Ctx.types=tctx} as ctx) sbst pos defs =
 
 (* [infer_expr ctx sbst (e,pos)] infers the type of expression [e] in context
    [ctx]. It returns the inferred type of [e]. *)
-and infer_expr ({Ctx.types=tctx} as ctx) sbst (e,pos) =
+and infer_expr tctx ctx sbst (e,pos) =
   match e with
     | I.Var x ->
-      begin match C.lookup x ctx.Ctx.variables with
+      begin match C.lookup x ctx with
       | Some (ps, t) -> snd (T.refresh ps (T.subst_ty !sbst t))
       | None -> Error.typing ~pos:pos "Unknown name %s" x
       end
     | I.Const const -> T.ty_of_const const
-    | I.Tuple es -> T.Tuple (C.map (infer_expr ctx sbst) es)
+    | I.Tuple es -> T.Tuple (C.map (infer_expr tctx ctx sbst) es)
     | I.Record [] -> assert false
     | I.Record (((fld,_)::_) as lst) ->
       if not (Pattern.linear_record lst) then
         Error.typing ~pos:pos "Fields in a record must be distinct." ;
-      let (t_name, params, arg_types) = Ctx.infer_field fld tctx in
+      let (t_name, params, arg_types) = Tctx.infer_field fld tctx in
       if List.length lst <> List.length arg_types then
         Error.typing ~pos:pos "malformed record of type %s" t_name
       else
-        let arg_types' = C.assoc_map (infer_expr ctx sbst) lst in
+        let arg_types' = C.assoc_map (infer_expr tctx ctx sbst) lst in
         let unify_record_arg (fld, t) =
           begin match C.lookup fld arg_types with
             | None -> Error.typing ~pos:pos "Unexpected field %s in a pattern." fld
@@ -254,23 +254,23 @@ and infer_expr ({Ctx.types=tctx} as ctx) sbst (e,pos) =
         T.Apply (t_name, params)
           
     | I.Variant (lbl, u) ->
-      let (t_name, params, arg_type) = Ctx.infer_variant lbl tctx in
+      let (t_name, params, arg_type) = Tctx.infer_variant lbl tctx in
       begin match arg_type, u with
         | None, None -> ()
         | Some ty, Some u ->
-          let ty' = infer_expr ctx sbst u in
+          let ty' = infer_expr tctx ctx sbst u in
           unify tctx sbst pos ty ty'
         | _, _ -> Error.typing ~pos:pos "Wrong number of arguments for label %s." lbl
       end;
       T.Apply (t_name, params)
         
     | I.Lambda a ->
-      let t1, t2 = infer_abstraction ctx sbst a in
+      let t1, t2 = infer_abstraction tctx ctx sbst a in
       T.Arrow (t1, t2)
         
     | I.Operation (e, op) ->
-      let (t, ps, t1, t2) = Ctx.infer_operation op tctx in
-      let u = infer_expr ctx sbst e in
+      let (t, ps, t1, t2) = Tctx.infer_operation op tctx in
+      let u = infer_expr tctx ctx sbst e in
       unify tctx sbst pos u (T.Apply (t, ps)) ;
       T.Arrow (t1, t2)
 
@@ -279,17 +279,17 @@ and infer_expr ({Ctx.types=tctx} as ctx) sbst (e,pos) =
       let t_finally = T.fresh_param () in
       let t_yield = T.fresh_param () in
       let unify_operation ((e, op), a2) =
-        let (t, ps, t1, t2) = Ctx.infer_operation op tctx in
-        let u = infer_expr ctx sbst e in
+        let (t, ps, t1, t2) = Tctx.infer_operation op tctx in
+        let u = infer_expr tctx ctx sbst e in
         unify tctx sbst pos u (T.Apply (t, ps));
-        let tk, u1, u2 = infer_handler_case_abstraction ctx sbst a2 in
+        let tk, u1, u2 = infer_handler_case_abstraction tctx ctx sbst a2 in
         unify tctx sbst pos t1 u1;
         unify tctx sbst pos tk (T.Arrow (t2, t_yield));
         unify tctx sbst pos t_yield u2
       in
       List.iter unify_operation ops;
-      let (valt1, valt2) = infer_abstraction ctx sbst a_val in
-      let (fint1, fint2) = infer_abstraction ctx sbst a_fin in
+      let (valt1, valt2) = infer_abstraction tctx ctx sbst a_val in
+      let (fint1, fint2) = infer_abstraction tctx ctx sbst a_fin in
       unify tctx sbst pos valt1 t_value ;
       unify tctx sbst pos valt2 t_yield ;
       unify tctx sbst pos fint2 t_finally ;
@@ -298,31 +298,31 @@ and infer_expr ({Ctx.types=tctx} as ctx) sbst (e,pos) =
   
 (* [infer_comp ctx sbst (c,pos)] infers the type of computation [c] in context [ctx].
    It returns the list of newly introduced meta-variables and the inferred type. *)
-and infer_comp ctx sbst cp =
+and infer_comp tctx ctx sbst cp =
   if !disable_typing then T.universal_ty else
-  let rec infer ({Ctx.types=tctx} as ctx) (c, pos) =
+  let rec infer ctx (c, pos) =
     match c with
       | I.Apply (e1, e2) ->
-          let t1 = infer_expr ctx sbst e1 in
-          let t2 = infer_expr ctx sbst e2 in
+          let t1 = infer_expr tctx ctx sbst e1 in
+          let t2 = infer_expr tctx ctx sbst e2 in
           let t = T.fresh_param () in
             unify tctx sbst pos t1 (T.Arrow (t2, t));
             t
               
       | I.Value e ->
-          infer_expr ctx sbst e
+          infer_expr tctx ctx sbst e
             
       | I.Match (e, []) ->
-        let t_in = infer_expr ctx sbst e in
+        let t_in = infer_expr tctx ctx sbst e in
         let t_out = T.fresh_param () in
           unify tctx sbst pos t_in T.empty_ty ;
           t_out
 
       | I.Match (e, lst) ->
-          let t_in = infer_expr ctx sbst e in
+          let t_in = infer_expr tctx ctx sbst e in
           let t_out = T.fresh_param () in
           let infer_case ((p, e') as a) =
-            let t_in', t_out' = infer_abstraction ctx sbst a in
+            let t_in', t_out' = infer_abstraction tctx ctx sbst a in
               unify tctx sbst (snd e) t_in t_in' ;
               unify tctx sbst (snd e') t_out' t_out
           in
@@ -331,18 +331,18 @@ and infer_comp ctx sbst cp =
             t_out
               
       | I.New (eff, r) ->
-          begin match Ctx.fresh_tydef ~pos:pos tctx eff with
+          begin match Tctx.fresh_tydef ~pos:pos tctx eff with
           | (ps, T.Effect ops) ->
               begin match r with
               | None -> ()
               | Some (e, lst) ->
-                  let te = infer_expr ctx sbst e in
+                  let te = infer_expr tctx ctx sbst e in
                   List.iter
                     (fun (op, (((_,pos1), (_,pos2), (_,posc)) as a)) ->
                        match C.lookup op ops with
                        | None -> Error.typing ~pos:pos "Effect type %s does not have operation %s" eff op
                        | Some (u1, u2) ->
-                           let t1, t2, t = infer_abstraction2 ctx sbst a in
+                           let t1, t2, t = infer_abstraction2 tctx ctx sbst a in
                            unify tctx sbst pos1 t1 u1 ;
                            unify tctx sbst pos2 t2 te ;
                            unify tctx sbst posc t (T.Tuple [u2; te]))
@@ -358,14 +358,14 @@ and infer_comp ctx sbst cp =
           T.unit_ty
 
       | I.For (i, e1, e2, c, _) ->
-          (let t1 = infer_expr ctx sbst e1 in unify tctx sbst (snd e1) t1 T.int_ty) ;
-          (let t2 = infer_expr ctx sbst e2 in unify tctx sbst (snd e2) t2 T.int_ty) ;
+          (let t1 = infer_expr tctx ctx sbst e1 in unify tctx sbst (snd e1) t1 T.int_ty) ;
+          (let t2 = infer_expr tctx ctx sbst e2 in unify tctx sbst (snd e2) t2 T.int_ty) ;
           let ctx = Ctx.extend_var i ([], T.int_ty) ctx in
           (let t = infer ctx c in unify tctx sbst (snd c) t T.unit_ty) ;
           T.unit_ty
 
       | I.Handle (e1, e2) ->
-          let t1 = infer_expr ctx sbst e1 in
+          let t1 = infer_expr tctx ctx sbst e1 in
           let t2 = infer ctx e2 in
           let t3 = T.fresh_param () in
           let t1' = T.Handler {T.value = t2; T.finally = t3} in
@@ -373,11 +373,11 @@ and infer_comp ctx sbst cp =
             t3
 
       | I.Let (defs, c) -> 
-        let _, ctx = infer_let ctx sbst pos defs in
+        let _, ctx = infer_let tctx ctx sbst pos defs in
         infer ctx c
 
       | I.LetRec (defs, c) ->
-        let _, ctx = infer_let_rec ctx sbst pos defs in
+        let _, ctx = infer_let_rec tctx ctx sbst pos defs in
         infer ctx c
 
       | I.Check c ->
@@ -386,22 +386,22 @@ and infer_comp ctx sbst cp =
   in
   infer ctx cp
 
-let infer_top_comp ctx c =
+let infer_top_comp tctx ctx c =
   let sbst = ref T.identity_subst in
-  let ty = infer_comp ctx sbst c in
+  let ty = infer_comp tctx ctx sbst c in
   let ps = (if nonexpansive (fst c) then generalize !sbst ctx ty else []) in
     Ctx.subst_ctx !sbst ctx, (ps, T.subst_ty !sbst ty)
 
-let infer_top_let ({Ctx.types=tctx} as ctx) pos defs =
+let infer_top_let tctx ctx pos defs =
   let sbst = ref T.identity_subst in
-  let vars, ctx = infer_let ctx sbst pos defs in
+  let vars, ctx = infer_let tctx ctx sbst pos defs in
     let ctx = Ctx.subst_ctx !sbst ctx in
     let vars = C.assoc_map (fun (ps,t) -> (ps, T.subst_ty !sbst t)) vars in
       vars, ctx
 
-let infer_top_let_rec ctx pos defs =
+let infer_top_let_rec tctx ctx pos defs =
   let sbst = ref T.identity_subst in
-  let vars, ctx = infer_let_rec ctx sbst pos defs in
+  let vars, ctx = infer_let_rec tctx ctx sbst pos defs in
   let ctx = Ctx.subst_ctx !sbst ctx in
   let vars = C.assoc_map (fun (ps,t) -> (ps, T.subst_ty !sbst t)) vars in
   vars, ctx

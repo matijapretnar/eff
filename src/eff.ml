@@ -80,13 +80,13 @@ let parse parser lex =
       Error.syntax ~pos:(Lexer.position_of_lex lex) "unrecognised symbol."
 
 let initial_ctxenv =
-  (Ctx.initial, Eval.initial)
+  (Ctx.initial, Tctx.initial, Eval.initial)
 
-let exec_topdef interactive (ctx, env) (d,pos) =
+let exec_topdef interactive (ctx, tctx, env) (d,pos) =
   match d with
   | S.TopLet defs ->
       let defs = C.assoc_map Desugar.computation defs in
-      let vars, ctx = Infer.infer_top_let ctx pos defs in
+      let vars, ctx = Infer.infer_top_let tctx ctx pos defs in
       let env =
         List.fold_right
           (fun (p,c) env -> let v = Eval.run env c in Eval.extend p v env)
@@ -99,49 +99,49 @@ let exec_topdef interactive (ctx, env) (d,pos) =
                          | Some v -> Format.printf "@[val %s : %t = %t@]@." x (Print.ty ps t) (Print.value v))
             vars
         end ;
-        (ctx, env)
+        (ctx, tctx, env)
   | S.TopLetRec defs ->
       let defs = C.assoc_map Desugar.let_rec defs in
-      let vars, ctx = Infer.infer_top_let_rec ctx pos defs in
+      let vars, ctx = Infer.infer_top_let_rec tctx ctx pos defs in
       let env = Eval.extend_let_rec env defs in
         if interactive then begin
           List.iter (fun (x,(ps,t)) -> Format.printf "@[val %s : %t = <fun>@]@." x (Print.ty ps t)) vars
         end ;
-        (ctx, env)
+        (ctx, tctx, env)
   | S.External (x, t, f) ->
     let ctx = Ctx.extend_var x (Desugar.external_ty t) ctx in
       begin match C.lookup f External.symbols with
-        | Some v -> (ctx, Eval.update x v env)
+        | Some v -> (ctx, tctx, Eval.update x v env)
         | None -> Error.runtime ~pos:pos "unknown external symbol %s." f
       end
   | S.Tydef tydefs ->
       let tydefs = List.map (fun (t, (ps, d)) -> (t, Desugar.tydef ps d)) tydefs in
-      let ctx = Ctx.extend_tydefs ~pos:pos ctx tydefs in
-      (ctx, env)
+      let tctx = Tctx.extend_tydefs ~pos:pos tctx tydefs in
+      (ctx, tctx, env)
 
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
     and return the new environment. *)
-let rec exec_cmd interactive (ctx, env) e =
+let rec exec_cmd interactive (ctx, tctx, env) e =
   match e with
   | S.Term c ->
       let c = Desugar.computation c in
-      let ctx, (ps, t) = Infer.infer_top_comp ctx c in
+      let ctx, (ps, t) = Infer.infer_top_comp tctx ctx c in
       let v = Eval.run env c in
       if interactive then Format.printf "@[- : %t = %t@]@." (Print.ty ps t) (Print.value v) ;
-      (ctx, env)
+      (ctx, tctx, env)
   | S.TypeOf c ->
       let c = Desugar.computation c in
-      let ctx, (ps, t) = Infer.infer_top_comp ctx c in
+      let ctx, (ps, t) = Infer.infer_top_comp tctx ctx c in
       Format.printf "@[- : %t@]@." (Print.ty ps t) ;
-      (ctx, env)
+      (ctx, tctx, env)
   | S.Reset ->
       print_endline ("Environment reset."); initial_ctxenv
   | S.Help ->
-      print_endline help_text ; (ctx, env)
+      print_endline help_text ; (ctx, tctx, env)
   | S.Quit -> exit 0
-  | S.Use fn -> use_file (ctx, env) (fn, interactive)
-  | S.Topdef def -> exec_topdef interactive (ctx, env) def
+  | S.Use fn -> use_file (ctx, tctx, env) (fn, interactive)
+  | S.Topdef def -> exec_topdef interactive (ctx, tctx, env) def
 
 and use_file env (filename, interactive) =
   let cmds = Lexer.read_file (parse Parser.file) filename in
