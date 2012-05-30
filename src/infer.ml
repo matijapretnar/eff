@@ -28,19 +28,6 @@ let nonexpansive = function
   | (I.Apply _ | I.Match _ | I.While _ | I.For _ | I.New _ | I.Handle _
     | I.Let _ | I.LetRec _ | I.Check _) -> false
 
-(* [generalize_vars sbst ctx vars] generalizes the given variables. *)
-let generalize_vars sbst ctx vars =
-  let ctx = Ctx.subst_ctx sbst ctx in
-  let qs = Ctx.free_params ctx in
-    C.assoc_map (fun t -> C.diff (T.free_params (T.subst_ty sbst t)) qs, t) vars
-
-(* [generalize sbst ctx t] returns the variables over which we may generalize type [t]. *)
-let generalize sbst ctx t =
-  let ctx = Ctx.subst_ctx sbst ctx in
-  let ps = T.free_params (T.subst_ty sbst t) in
-  let qs = Ctx.free_params ctx in
-    C.diff ps qs
-
 let unify = Unify.unify
 
 (* [infer_pattern tctx sbst pp] infers the type of pattern [pp]. It returns the list of
@@ -130,7 +117,7 @@ and infer_let tctx ctx sbst pos defs =
         | None -> 
           let ws =
             (if nonexpansive (fst c)
-             then generalize_vars !sbst ctx ws
+             then Ctx.generalize_vars !sbst ctx ws
              else C.assoc_map (fun t -> ([],t)) ws)
           in
           let ctx' = List.fold_right (fun (x,pt) ctx -> Ctx.extend_var x pt ctx) ws ctx' in
@@ -157,7 +144,7 @@ and infer_let_rec tctx ctx sbst pos defs =
       unify tctx sbst (snd c) u2 tc ;
       Check.is_irrefutable p tctx)
     lst ;
-    let vars = generalize_vars !sbst ctx vars in
+    let vars = Ctx.generalize_vars !sbst ctx vars in
     let ctx =
       List.fold_right (fun (x,pt) ctx -> Ctx.extend_var x pt ctx) vars ctx
     in
@@ -328,7 +315,7 @@ and infer_comp tctx ctx sbst cp =
 let infer_top_comp tctx ctx c =
   let sbst = ref T.identity_subst in
   let ty = infer_comp tctx ctx sbst c in
-  let ps = (if nonexpansive (fst c) then generalize !sbst ctx ty else []) in
+  let ps = (if nonexpansive (fst c) then Ctx.generalize !sbst ctx ty else []) in
     Ctx.subst_ctx !sbst ctx, (ps, T.subst_ty !sbst ty)
 
 let infer_top_let tctx ctx pos defs =

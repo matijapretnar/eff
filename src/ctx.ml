@@ -22,3 +22,17 @@ let subst_ctx sbst ctx =
           assert (List.for_all (fun (p,_) -> not (List.mem p ps)) sbst) ;
           (ps, T.subst_ty sbst t))
         ctx
+
+(* [generalize_vars sbst ctx vars] generalizes the given variables. *)
+let generalize_vars sbst ctx vars =
+  let ctx = subst_ctx sbst ctx in
+  let qs = free_params ctx in
+    C.assoc_map (fun t -> C.diff (T.free_params (T.subst_ty sbst t)) qs, t) vars
+
+(* [generalize sbst ctx t] returns the variables over which we may generalize type [t]. *)
+let generalize sbst ctx t =
+  let ctx = subst_ctx sbst ctx in
+  let ps = T.free_params (T.subst_ty sbst t) in
+  let qs = free_params ctx in
+    C.diff ps qs
+
