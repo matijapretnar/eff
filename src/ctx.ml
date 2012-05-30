@@ -24,14 +24,10 @@ let subst_ctx sbst ctx =
         ctx
 
 (* [generalize_vars sbst ctx vars] generalizes the given variables. *)
-let generalize_vars sbst ctx vars =
-  let ctx = subst_ctx sbst ctx in
+let generalize_vars ctx vars =
   let qs = free_params ctx in
-    C.assoc_map (fun t -> C.diff (T.free_params (T.subst_ty sbst t)) qs, t) vars
+  C.assoc_map (fun t -> C.diff (T.free_params t) qs, t) vars
 
-(* [generalize sbst ctx t] returns the variables over which we may generalize type [t]. *)
-let generalize sbst ctx t =
-  let ctx = subst_ctx sbst ctx in
-  let ps = T.free_params (T.subst_ty sbst t) in
-  let qs = free_params ctx in
-    C.diff ps qs
+(* [generalize ctx t] returns the variables over which we may generalize type [t]. *)
+let generalize ctx t =
+  C.diff (T.free_params t) (free_params ctx)

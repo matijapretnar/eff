@@ -86,7 +86,7 @@ let exec_topdef interactive (ctx, tctx, env) (d,pos) =
   match d with
   | S.TopLet defs ->
       let defs = C.assoc_map Desugar.computation defs in
-      let vars, ctx = Infer.infer_top_let tctx ctx pos defs in
+      let vars, ctx = Infer.infer_let tctx ctx (ref Type.identity_subst) pos defs in
       let env =
         List.fold_right
           (fun (p,c) env -> let v = Eval.run env c in Eval.extend p v env)
@@ -102,7 +102,7 @@ let exec_topdef interactive (ctx, tctx, env) (d,pos) =
         (ctx, tctx, env)
   | S.TopLetRec defs ->
       let defs = C.assoc_map Desugar.let_rec defs in
-      let vars, ctx = Infer.infer_top_let_rec tctx ctx pos defs in
+      let vars, ctx = Infer.infer_let_rec tctx ctx (ref Type.identity_subst) pos defs in
       let env = Eval.extend_let_rec env defs in
         if interactive then begin
           List.iter (fun (x,(ps,t)) -> Format.printf "@[val %s : %t = <fun>@]@." x (Print.ty ps t)) vars
@@ -122,17 +122,27 @@ let exec_topdef interactive (ctx, tctx, env) (d,pos) =
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
     and return the new environment. *)
+
+
+let infer_top_comp tctx ctx c =
+  let sbst = ref Type.identity_subst in
+  let ty = Infer.infer_comp tctx ctx sbst c in
+  let ctx = Ctx.subst_ctx !sbst ctx in
+  let ty = Type.subst_ty !sbst ty in
+  let ps = (if Infer.nonexpansive (fst c) then Ctx.generalize ctx ty else []) in
+  ctx, (ps, ty)
+
 let rec exec_cmd interactive (ctx, tctx, env) e =
   match e with
   | S.Term c ->
       let c = Desugar.computation c in
-      let ctx, (ps, t) = Infer.infer_top_comp tctx ctx c in
+      let ctx, (ps, t) = infer_top_comp tctx ctx c in
       let v = Eval.run env c in
       if interactive then Format.printf "@[- : %t = %t@]@." (Print.ty ps t) (Print.value v) ;
       (ctx, tctx, env)
   | S.TypeOf c ->
       let c = Desugar.computation c in
-      let ctx, (ps, t) = Infer.infer_top_comp tctx ctx c in
+      let ctx, (ps, t) = infer_top_comp tctx ctx c in
       Format.printf "@[- : %t@]@." (Print.ty ps t) ;
       (ctx, tctx, env)
   | S.Reset ->

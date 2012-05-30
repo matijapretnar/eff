@@ -73,7 +73,7 @@ let infer_pattern tctx sbst pp =
             T.Apply (t, ps)
   in
   let t = infer pp in
-    !vars, T.subst_ty !sbst t
+    !vars, t
 
 let extend_with_pattern ?(forbidden_vars=[]) tctx ctx sbst p =
   let vars, t = infer_pattern tctx sbst p in
@@ -99,15 +99,11 @@ and infer_handler_case_abstraction tctx ctx sbst (p, k, e) =
     tk, t1, t2
 
 and infer_let tctx ctx sbst pos defs =
-  if !warn_implicit_sequencing then
-    begin match defs with
-      | [] | [_] -> ()
-      | ws ->        
-          let positions = List.map (fun (_, (_, pos)) -> pos) ws in
-            Print.warning ~pos:pos "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
-              (Print.sequence "," Print.position positions)
-    end ;
-  List.fold_left
+  (if !warn_implicit_sequencing && List.length defs >= 2 then
+      let positions = List.map (fun (_, (_, pos)) -> pos) defs in
+        Print.warning ~pos:pos "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
+          (Print.sequence "," Print.position positions));
+  let vars, ctx = List.fold_left
     (fun (vs, ctx') (p,c) ->
       let tc = infer_comp tctx ctx sbst c in
       let ws, tp = infer_pattern tctx sbst p in
@@ -116,14 +112,17 @@ and infer_let tctx ctx sbst pos defs =
       match C.find_duplicate (List.map fst ws) (List.map fst vs) with
         | Some x -> Error.typing ~pos:pos "Several definitions of %s." x
         | None -> 
-          let ws =
-            (if nonexpansive (fst c)
-             then Ctx.generalize_vars !sbst ctx ws
-             else C.assoc_map (fun t -> ([],t)) ws)
+            let ws = Common.assoc_map (T.subst_ty !sbst) ws in
+            let ctx = Ctx.subst_ctx !sbst ctx in            
+            let ws =
+              (if nonexpansive (fst c)
+               then Ctx.generalize_vars ctx ws
+               else C.assoc_map (fun t -> ([],t)) ws)
           in
-          let ctx' = List.fold_right (fun (x,pt) ctx -> Ctx.extend_var x pt ctx) ws ctx' in
+          let ctx' = List.fold_right (fun (x,(ps, t)) ctx -> Ctx.extend_var x (ps, t) ctx) ws ctx' in
             (List.rev ws @ vs, ctx'))
-    ([], ctx) defs
+    ([], ctx) defs in
+  vars, Ctx.subst_ctx !sbst ctx
 
 and infer_let_rec tctx ctx sbst pos defs =
   if not (Common.injective fst defs) then
@@ -145,11 +144,12 @@ and infer_let_rec tctx ctx sbst pos defs =
       unify tctx sbst (snd c) u2 tc ;
       Check.is_irrefutable p tctx)
     lst ;
-    let vars = Ctx.generalize_vars !sbst ctx vars in
-    let ctx =
-      List.fold_right (fun (x,pt) ctx -> Ctx.extend_var x pt ctx) vars ctx
-    in
-      vars, ctx
+  let vars = Common.assoc_map (T.subst_ty !sbst) vars in
+  let ctx = Ctx.subst_ctx !sbst ctx in
+  let vars = Ctx.generalize_vars ctx vars in
+  let ctx = List.fold_right (fun (x,(ps,t)) ctx -> Ctx.extend_var x (ps, t) ctx) vars ctx
+  in
+  vars, ctx
 
 (* [infer_expr ctx sbst (e,pos)] infers the type of expression [e] in context
    [ctx]. It returns the inferred type of [e]. *)
@@ -157,7 +157,7 @@ and infer_expr tctx ctx sbst (e,pos) =
   match e with
     | I.Var x ->
       begin match C.lookup x ctx with
-      | Some (ps, t) -> snd (T.refresh ps (T.subst_ty !sbst t))
+      | Some (ps, t) -> snd (T.refresh ps t)
       | None -> Error.typing ~pos:pos "Unknown name %s" x
       end
     | I.Const const -> T.ty_of_const const
@@ -317,23 +317,3 @@ and infer_comp tctx ctx sbst cp =
           T.unit_ty
   in
   infer ctx cp
-
-let infer_top_comp tctx ctx c =
-  let sbst = ref T.identity_subst in
-  let ty = infer_comp tctx ctx sbst c in
-  let ps = (if nonexpansive (fst c) then Ctx.generalize !sbst ctx ty else []) in
-  Ctx.subst_ctx !sbst ctx, (ps, T.subst_ty !sbst ty)
-
-let infer_top_let tctx ctx pos defs =
-  let sbst = ref T.identity_subst in
-  let vars, ctx = infer_let tctx ctx sbst pos defs in
-  let ctx = Ctx.subst_ctx !sbst ctx in
-  let vars = C.assoc_map (fun (ps,t) -> (ps, T.subst_ty !sbst t)) vars in
-  vars, ctx
-
-let infer_top_let_rec tctx ctx pos defs =
-  let sbst = ref T.identity_subst in
-  let vars, ctx = infer_let_rec tctx ctx sbst pos defs in
-  let ctx = Ctx.subst_ctx !sbst ctx in
-  let vars = C.assoc_map (fun (ps,t) -> (ps, T.subst_ty !sbst t)) vars in
-  vars, ctx
