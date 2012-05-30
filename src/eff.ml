@@ -123,12 +123,12 @@ let exec_topdef interactive (ctx, tctx, env) (d,pos) =
     environment [(ctx, env)]. It prints the result on standard output
     and return the new environment. *)
 
-
 let infer_top_comp tctx ctx c =
-  let sbst = ref Type.identity_subst in
-  let ty = Infer.infer_comp tctx ctx sbst c in
-  let ctx = Ctx.subst_ctx !sbst ctx in
-  let ty = Type.subst_ty !sbst ty in
+  let cstr = ref [] in
+  let ty = Infer.infer_comp tctx ctx cstr c in
+  let sbst = Unify.solve tctx !cstr in
+  let ctx = Ctx.subst_ctx sbst ctx in
+  let ty = Type.subst_ty sbst ty in
   let ps = (if Infer.nonexpansive (fst c) then Ctx.generalize ctx ty else []) in
   ctx, (ps, ty)
 

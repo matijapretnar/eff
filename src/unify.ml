@@ -1,7 +1,8 @@
 (** [unify tctx sbst pos t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)
-let unify tctx sbst pos t1 t2 =
-  let rec unify t1 t2 =
+let solve tctx cstr =
+  let sbst = ref Type.identity_subst in
+  let rec unify pos t1 t2 =
     let t1 = Type.subst_ty !sbst t1 in
     let t2 = Type.subst_ty !sbst t2 in
     match t1, t2 with
@@ -20,12 +21,12 @@ let unify tctx sbst pos t1 t2 =
           sbst := Type.compose_subst [(p, t)] !sbst
 
     | (Type.Arrow (u1, v1), Type.Arrow (u2, v2)) ->
-        unify v1 v2;
-        unify u2 u1
+        unify pos v1 v2;
+        unify pos u2 u1
 
     | (Type.Tuple lst1, Type.Tuple lst2)
         when List.length lst1 = List.length lst2 ->
-        List.iter2 unify lst1 lst2
+        List.iter2 (unify pos) lst1 lst2
 
     | (Type.Record lst1, Type.Record lst2) ->
         assert false
@@ -35,19 +36,19 @@ let unify tctx sbst pos t1 t2 =
 
     | (Type.Apply (t1, lst1), Type.Apply (t2, lst2))
         when t1 = t2 && List.length lst1 = List.length lst2  ->
-        List.iter2 unify lst1 lst2
+        List.iter2 (unify pos) lst1 lst2
 
     (* The following two cases cannot be merged into one, as the whole matching
        fails if both types are Apply, but only the second one is transparent. *)
     | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos:pos tctx t1 ->
-        unify t2 (Tctx.ty_apply ~pos:pos tctx t1 lst1)
+        unify pos t2 (Tctx.ty_apply ~pos:pos tctx t1 lst1)
 
     | (t1, (Type.Apply _ as t2)) ->
-        unify t2 t1
+        unify pos t2 t1
 
     | (Type.Handler h1, Type.Handler h2) ->
-        unify h2.Type.value h1.Type.value;
-        unify h1.Type.finally h2.Type.finally
+        unify pos h2.Type.value h1.Type.value;
+        unify pos h1.Type.finally h2.Type.finally
 
     | (Type.Effect lst1, Type.Effect lst2) ->
         assert false
@@ -58,4 +59,5 @@ let unify tctx sbst pos t1 t2 =
             "This expression has type %t but it should have type %t."
             (Print.ty ~sbst:sbst [] t1) (Print.ty ~sbst:sbst [] t2)
   in
-  unify t1 t2
+  List.iter (fun (t1, t2, pos) -> unify pos t1 t2) (List.rev cstr);
+  !sbst
