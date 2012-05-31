@@ -24,6 +24,10 @@ let initial = [
   ("empty", ([], T.empty_ty));
 ]
 
+let global = ref initial
+
+let reset () = global := initial
+
 (** [find_variant lbl tctx] returns the name of the variant type from [tcxt]
     that defines the label [lbl] *)
 let find_variant ?pos tctx cons =

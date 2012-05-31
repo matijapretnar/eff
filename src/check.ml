@@ -18,13 +18,13 @@ let arity = function
   | Variant (_, b) -> if b then 1 else 0
 
 (* Reads constructor description from a pattern, discarding any P.As layers. *)
-let rec cons_of_pattern tctx p =
+let rec cons_of_pattern p =
   match fst p with
-    | P.As _ -> cons_of_pattern tctx (P.simplify p)
+    | P.As _ -> cons_of_pattern (P.simplify p)
     | P.Tuple lst -> Tuple (List.length lst)
     | P.Record [] -> assert false
     | P.Record ((lbl, _) :: _) ->
-        let (_, _, flds) = Tctx.find_field tctx lbl in
+        let (_, _, flds) = Tctx.find_field !Tctx.global lbl in
         Record (List.map fst flds)
     | P.Variant (lbl, opt) -> Variant (lbl, opt <> None)
     | P.Const c -> Const c
@@ -44,9 +44,9 @@ let pattern_of_cons c lst =
 
 (* Finds all distinct non-wildcard root pattern constructors in [lst], and at
    least one constructor of their type not present in [lst] if it exists. *)
-let find_constructors lst tctx =
+let find_constructors lst =
   let present = List.filter (fun c -> c <> Wildcard)
-                            (List.map (cons_of_pattern tctx) (C.uniq lst))
+                            (List.map (cons_of_pattern) (C.uniq lst))
   in
   let missing = match present with
     | [] -> [Wildcard]
@@ -82,7 +82,7 @@ let find_constructors lst tctx =
              find (first c)
           (* Check if all tags defined by this variant type are covered. *)
           | Variant (lbl, _) ->
-              let (_, _, tags, _) = Tctx.find_variant tctx lbl in
+              let (_, _, tags, _) = Tctx.find_variant !Tctx.global lbl in
               let all = (List.map (fun (lbl, opt) -> Variant (lbl, opt <> None)) tags) in
               C.diff all present
           (* Only for completeness. *)
@@ -93,7 +93,7 @@ let find_constructors lst tctx =
 
 (* Specializes a pattern vector for the pattern constructor [con]. Returns None
    if the first pattern of input vector has an incompatible constructor. *)
-let specialize_vector tctx con = function
+let specialize_vector con = function
   | [] -> None
   | p1 :: lst ->
       let (p1, _) = P.simplify p1 in
@@ -116,12 +116,12 @@ let specialize_vector tctx con = function
       end
 
 (* Specializes a pattern matrix for the pattern constructor [con]. *)
-let rec specialize tctx con = function
+let rec specialize con = function
   | [] -> []
   | row :: lst ->
-      begin match specialize_vector tctx con row with
-        | Some row' -> row' :: (specialize tctx con lst)
-        | None -> (specialize tctx con lst)
+      begin match specialize_vector con row with
+        | Some row' -> row' :: (specialize con lst)
+        | None -> (specialize con lst)
       end
 
 (* Creates a default matrix from the input pattern matrix. *)
@@ -136,49 +136,49 @@ let rec default = function
       end
 
 (* Is the pattern vector [q] useful w.r.t. pattern matrix [p]? *)
-let rec useful tctx p q =
+let rec useful p q =
   match q with
     (* Base case. *)
     | [] -> p = []
     (* Induction on the number of columns of [p] and [q]. *)
     | q1 :: qs ->
-        let c = cons_of_pattern tctx q1 in
+        let c = cons_of_pattern q1 in
         begin match c with
           (* If the first pattern in [q] is constructed, check the matrix [p]
              specialized for that constructor. *)
           | Tuple _ | Record _ | Variant _ | Const _ ->
-              begin match specialize_vector tctx c q with
+              begin match specialize_vector c q with
                 | None -> assert false
-                | Some q' -> useful tctx (specialize tctx c p) q'
+                | Some q' -> useful (specialize c p) q'
               end
           (* Otherwise, check if pattern constructors in the first column of [p]
              form a complete type signature. If they do, check if [q] is useful
              for any specialization of [p] for that type; if not, only the
              default matrix of [p] must be checked. *)
           | Wildcard ->
-              let (present, missing) = find_constructors (List.map List.hd p) tctx in
+              let (present, missing) = find_constructors (List.map List.hd p) in
               if present <> [] && missing = [] then
-                List.exists (fun x -> match (specialize_vector tctx x q) with
+                List.exists (fun x -> match (specialize_vector x q) with
                                         | None -> false
-                                        | Some q' -> useful tctx (specialize tctx x p) q')
+                                        | Some q' -> useful (specialize x p) q')
                             present
               else
-                useful tctx (default p) qs
+                useful (default p) qs
         end
 
 (* Specialized version of [useful] that checks if a pattern matrix [p] with [n]
    columns is exhaustive (equivalent to calling [useful] on [p] with a vector
    of [n] wildcard patterns). Returns a list with at least one counterexample if
    [p] is not exhaustive. *)
-let rec exhaustive tctx p = function
+let rec exhaustive p = function
   | 0 -> if p = [] then Some [] else None
   | n ->
-      let (present, missing) = find_constructors (List.map List.hd p) tctx in
+      let (present, missing) = find_constructors (List.map List.hd p) in
       if present <> [] && missing = [] then
         let rec find = function
           | [] -> None
           | c :: cs ->
-              begin match exhaustive tctx (specialize tctx c p) ((arity c)+n-1) with
+              begin match exhaustive (specialize c p) ((arity c)+n-1) with
                 | None -> find cs
                 | Some lst ->
                     let (ps, rest) = C.split (arity c) lst in
@@ -187,7 +187,7 @@ let rec exhaustive tctx p = function
         in
         find present
       else
-        match exhaustive tctx (default p) (n-1) with
+        match exhaustive (default p) (n-1) with
           | None -> None
           | Some lst ->
               let c = List.hd missing in
@@ -195,11 +195,11 @@ let rec exhaustive tctx p = function
 
 (* Prints a warning if the list of patterns [pats] is not exhaustive or contains
    unused patterns. *)
-let check_patterns ?(pos = C.Nowhere) pats tctx =
+let check_patterns ?(pos = C.Nowhere) pats =
   (* [p] contains the patterns that have already been checked for usefulness. *)
   let rec check p pats = match pats with
     | [] ->
-        begin match exhaustive tctx p 1 with
+        begin match exhaustive p 1 with
           | Some ps ->
               Print.warning ~pos:pos "This pattern-matching is not exhaustive.\n\
                                       Here is an example of a value that is not matched:";
@@ -207,7 +207,7 @@ let check_patterns ?(pos = C.Nowhere) pats tctx =
           | None -> ()
         end
     | (_, pos) as pat :: pats ->
-        if not (useful tctx p [pat]) then
+        if not (useful p [pat]) then
           begin
             Print.warning ~pos:pos "This match case is unused.";
             check p pats
@@ -218,4 +218,4 @@ let check_patterns ?(pos = C.Nowhere) pats tctx =
   check [] pats
 
 (* A pattern is irrefutable if it cannot fail during pattern matching. *)
-let is_irrefutable p tctx = check_patterns ~pos:(snd p) [p] tctx
+let is_irrefutable p = check_patterns ~pos:(snd p) [p]

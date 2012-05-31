@@ -1,6 +1,6 @@
-(** [unify tctx sbst pos t1 t2] solves the equation [t1 = t2] and stores the
+(** [unify sbst pos t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)
-let solve tctx cstr =
+let solve cstr =
   let sbst = ref Type.identity_subst in
   let rec unify pos t1 t2 =
     let t1 = Type.subst_ty !sbst t1 in
@@ -40,8 +40,8 @@ let solve tctx cstr =
 
     (* The following two cases cannot be merged into one, as the whole matching
        fails if both types are Apply, but only the second one is transparent. *)
-    | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos:pos tctx t1 ->
-        unify pos t2 (Tctx.ty_apply ~pos:pos tctx t1 lst1)
+    | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos:pos !Tctx.global t1 ->
+        unify pos t2 (Tctx.ty_apply ~pos:pos !Tctx.global t1 lst1)
 
     | (t1, (Type.Apply _ as t2)) ->
         unify pos t2 t1

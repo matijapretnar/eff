@@ -31,10 +31,10 @@ let nonexpansive = function
 
 let add_constraint cstr pos t1 t2 = cstr := (t1, t2, pos) :: !cstr
 
-(* [infer_pattern tctx cstr pp] infers the type of pattern [pp]. It returns the list of
+(* [infer_pattern cstr pp] infers the type of pattern [pp]. It returns the list of
    pattern variables with their types, which are all guaranteed to be [Type.Meta]'s, together
    with the type of the pattern. *)
-let infer_pattern tctx cstr pp =
+let infer_pattern cstr pp =
   if not (Pattern.linear_pattern pp) then
     Error.typing ~pos:(snd pp) "Fields in a pattern must be distinct.";
   let vars = ref [] in
@@ -53,7 +53,7 @@ let infer_pattern tctx cstr pp =
       | Pattern.Tuple ps -> T.Tuple (C.map infer ps)
       | Pattern.Record [] -> assert false
       | Pattern.Record (((fld, _) :: _) as lst) ->
-          let (t, ps, us) = Tctx.infer_field fld tctx in
+          let (t, ps, us) = Tctx.infer_field fld !Tctx.global in
           let unify_record_pattern (fld, p) =
           begin match C.lookup fld us with
           | None -> Error.typing ~pos:pos "Unexpected field %s in a pattern of type %s." fld t
@@ -63,7 +63,7 @@ let infer_pattern tctx cstr pp =
             List.iter unify_record_pattern lst;
             T.Apply (t, ps)
       | Pattern.Variant (lbl, p) ->
-          let (t, ps, u) = Tctx.infer_variant lbl tctx in
+          let (t, ps, u) = Tctx.infer_variant lbl !Tctx.global in
           begin match p, u with
           | None, None -> ()
           | Some p, Some u -> add_constraint cstr pos (infer p) u
@@ -75,44 +75,44 @@ let infer_pattern tctx cstr pp =
   let t = infer pp in
     !vars, t
 
-let extend_with_pattern ?(forbidden_vars=[]) tctx ctx cstr p =
-  let vars, t = infer_pattern tctx cstr p in
+let extend_with_pattern ?(forbidden_vars=[]) ctx cstr p =
+  let vars, t = infer_pattern cstr p in
   match C.find (fun (x,_) -> List.mem_assoc x vars) forbidden_vars with
     | Some (x,_) -> Error.typing ~pos:(snd p) "Several definitions of %s." x
     | None -> vars, t, Ctx.extend_vars vars ctx
 
-let rec infer_abstraction tctx ctx cstr (p, c) =
-  let _, t1, ctx = extend_with_pattern tctx ctx cstr p in
-  let t2 = infer_comp tctx ctx cstr c in
+let rec infer_abstraction ctx cstr (p, c) =
+  let _, t1, ctx = extend_with_pattern ctx cstr p in
+  let t2 = infer_comp ctx cstr c in
     t1, t2
 
-and infer_abstraction2 tctx ctx cstr (p1, p2, c) =
-  let vs, t1, ctx = extend_with_pattern tctx ctx cstr p1 in
-  let _, t2, ctx = extend_with_pattern ~forbidden_vars:vs tctx ctx cstr p2 in
-  let t3 = infer_comp tctx ctx cstr c in
+and infer_abstraction2 ctx cstr (p1, p2, c) =
+  let vs, t1, ctx = extend_with_pattern ctx cstr p1 in
+  let _, t2, ctx = extend_with_pattern ~forbidden_vars:vs ctx cstr p2 in
+  let t3 = infer_comp ctx cstr c in
     t1, t2, t3
 
-and infer_handler_case_abstraction tctx ctx cstr (p, k, e) =
-  let vs, t1, ctx = extend_with_pattern tctx ctx cstr p in
-  let _, tk, ctx = extend_with_pattern ~forbidden_vars:vs tctx ctx cstr k in
-  let t2 = infer_comp tctx ctx cstr e in
+and infer_handler_case_abstraction ctx cstr (p, k, e) =
+  let vs, t1, ctx = extend_with_pattern ctx cstr p in
+  let _, tk, ctx = extend_with_pattern ~forbidden_vars:vs ctx cstr k in
+  let t2 = infer_comp ctx cstr e in
     tk, t1, t2
 
-and infer_let tctx ctx cstr pos defs =
+and infer_let ctx cstr pos defs =
   (if !warn_implicit_sequencing && List.length defs >= 2 then
       let positions = List.map (fun (_, (_, pos)) -> pos) defs in
         Print.warning ~pos:pos "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
           (Print.sequence "," Print.position positions));
   let vars, ctx = List.fold_left
     (fun (vs, ctx') (p,c) ->
-      let tc = infer_comp tctx ctx cstr c in
-      let ws, tp = infer_pattern tctx cstr p in
+      let tc = infer_comp ctx cstr c in
+      let ws, tp = infer_pattern cstr p in
       add_constraint cstr (snd c) tc tp;
-      Check.is_irrefutable p tctx;
+      Check.is_irrefutable p;
       match C.find_duplicate (List.map fst ws) (List.map fst vs) with
         | Some x -> Error.typing ~pos:pos "Several definitions of %s." x
         | None ->
-            let sbst = Unify.solve tctx !cstr in
+            let sbst = Unify.solve !cstr in
             let ws = Common.assoc_map (T.subst_ty sbst) ws in
             let ctx = Ctx.subst_ctx sbst ctx in            
             let ws =
@@ -123,9 +123,9 @@ and infer_let tctx ctx cstr pos defs =
           let ctx' = List.fold_right (fun (x,(ps, t)) ctx -> Ctx.extend_var x (ps, t) ctx) ws ctx' in
             (List.rev ws @ vs, ctx'))
     ([], ctx) defs in
-  vars, Ctx.subst_ctx (Unify.solve tctx !cstr) ctx
+  vars, Ctx.subst_ctx (Unify.solve !cstr) ctx
 
-and infer_let_rec tctx ctx cstr pos defs =
+and infer_let_rec ctx cstr pos defs =
   if not (Common.injective fst defs) then
     Error.typing ~pos:pos "Multiply defined recursive value.";
   let lst =
@@ -139,13 +139,13 @@ and infer_let_rec tctx ctx cstr pos defs =
   let ctx' = List.fold_right (fun (f,u1,u2,_,_) ctx -> Ctx.extend_var f ([], T.Arrow (u1, u2)) ctx) lst ctx in
   List.iter
     (fun (_,u1,u2,p,c) ->
-      let _, tp, ctx' = extend_with_pattern tctx ctx' cstr p in
-      let tc = infer_comp tctx ctx' cstr c in
+      let _, tp, ctx' = extend_with_pattern ctx' cstr p in
+      let tc = infer_comp ctx' cstr c in
       add_constraint cstr (snd p) u1 tp;
       add_constraint cstr (snd c) u2 tc;
-      Check.is_irrefutable p tctx)
+      Check.is_irrefutable p)
     lst;
-  let sbst = Unify.solve tctx !cstr in
+  let sbst = Unify.solve !cstr in
   let vars = Common.assoc_map (T.subst_ty sbst) vars in
   let ctx = Ctx.subst_ctx sbst ctx in
   let vars = Ctx.generalize_vars ctx vars in
@@ -155,7 +155,7 @@ and infer_let_rec tctx ctx cstr pos defs =
 
 (* [infer_expr ctx cstr (e,pos)] infers the type of expression [e] in context
    [ctx]. It returns the inferred type of [e]. *)
-and infer_expr tctx ctx cstr (e,pos) =
+and infer_expr ctx cstr (e,pos) =
   match e with
     | I.Var x ->
       begin match C.lookup x ctx with
@@ -163,16 +163,16 @@ and infer_expr tctx ctx cstr (e,pos) =
       | None -> Error.typing ~pos:pos "Unknown name %s" x
       end
     | I.Const const -> T.ty_of_const const
-    | I.Tuple es -> T.Tuple (C.map (infer_expr tctx ctx cstr) es)
+    | I.Tuple es -> T.Tuple (C.map (infer_expr ctx cstr) es)
     | I.Record [] -> assert false
     | I.Record (((fld,_)::_) as lst) ->
       if not (Pattern.linear_record lst) then
         Error.typing ~pos:pos "Fields in a record must be distinct.";
-      let (t_name, params, arg_types) = Tctx.infer_field fld tctx in
+      let (t_name, params, arg_types) = Tctx.infer_field fld !Tctx.global in
       if List.length lst <> List.length arg_types then
         Error.typing ~pos:pos "malformed record of type %s" t_name
       else
-        let arg_types' = C.assoc_map (infer_expr tctx ctx cstr) lst in
+        let arg_types' = C.assoc_map (infer_expr ctx cstr) lst in
         let unify_record_arg (fld, t) =
           begin match C.lookup fld arg_types with
             | None -> Error.typing ~pos:pos "Unexpected field %s in a pattern." fld
@@ -183,23 +183,23 @@ and infer_expr tctx ctx cstr (e,pos) =
         T.Apply (t_name, params)
           
     | I.Variant (lbl, u) ->
-      let (t_name, params, arg_type) = Tctx.infer_variant lbl tctx in
+      let (t_name, params, arg_type) = Tctx.infer_variant lbl !Tctx.global in
       begin match arg_type, u with
         | None, None -> ()
         | Some ty, Some u ->
-            let ty' = infer_expr tctx ctx cstr u in
+            let ty' = infer_expr ctx cstr u in
             add_constraint cstr pos ty ty'
         | _, _ -> Error.typing ~pos:pos "Wrong number of arguments for label %s." lbl
       end;
       T.Apply (t_name, params)
         
     | I.Lambda a ->
-        let t1, t2 = infer_abstraction tctx ctx cstr a in
+        let t1, t2 = infer_abstraction ctx cstr a in
         T.Arrow (t1, t2)
         
     | I.Operation (e, op) ->
-        let (t, ps, t1, t2) = Tctx.infer_operation op tctx in
-        let u = infer_expr tctx ctx cstr e in
+        let (t, ps, t1, t2) = Tctx.infer_operation op !Tctx.global in
+        let u = infer_expr ctx cstr e in
         add_constraint cstr pos u (T.Apply (t, ps));
         T.Arrow (t1, t2)
 
@@ -208,17 +208,17 @@ and infer_expr tctx ctx cstr (e,pos) =
         let t_finally = T.fresh_param () in
         let t_yield = T.fresh_param () in
         let unify_operation ((e, op), a2) =
-          let (t, ps, t1, t2) = Tctx.infer_operation op tctx in
-          let u = infer_expr tctx ctx cstr e in
+          let (t, ps, t1, t2) = Tctx.infer_operation op !Tctx.global in
+          let u = infer_expr ctx cstr e in
           add_constraint cstr pos u (T.Apply (t, ps));
-          let tk, u1, u2 = infer_handler_case_abstraction tctx ctx cstr a2 in
+          let tk, u1, u2 = infer_handler_case_abstraction ctx cstr a2 in
           add_constraint cstr pos t1 u1;
           add_constraint cstr pos tk (T.Arrow (t2, t_yield));
           add_constraint cstr pos t_yield u2
         in
         List.iter unify_operation ops;
-        let (valt1, valt2) = infer_abstraction tctx ctx cstr a_val in
-        let (fint1, fint2) = infer_abstraction tctx ctx cstr a_fin in
+        let (valt1, valt2) = infer_abstraction ctx cstr a_val in
+        let (fint1, fint2) = infer_abstraction ctx cstr a_fin in
         add_constraint cstr pos valt1 t_value;
         add_constraint cstr pos valt2 t_yield;
         add_constraint cstr pos fint2 t_finally;
@@ -227,51 +227,51 @@ and infer_expr tctx ctx cstr (e,pos) =
   
 (* [infer_comp ctx cstr (c,pos)] infers the type of computation [c] in context [ctx].
    It returns the list of newly introduced meta-variables and the inferred type. *)
-and infer_comp tctx ctx cstr cp =
+and infer_comp ctx cstr cp =
   if !disable_typing then T.universal_ty else
   let rec infer ctx (c, pos) =
     match c with
       | I.Apply (e1, e2) ->
-          let t1 = infer_expr tctx ctx cstr e1 in
-          let t2 = infer_expr tctx ctx cstr e2 in
+          let t1 = infer_expr ctx cstr e1 in
+          let t2 = infer_expr ctx cstr e2 in
           let t = T.fresh_param () in
           add_constraint cstr pos t1 (T.Arrow (t2, t));
           t
               
       | I.Value e ->
-          infer_expr tctx ctx cstr e
+          infer_expr ctx cstr e
             
       | I.Match (e, []) ->
-        let t_in = infer_expr tctx ctx cstr e in
+        let t_in = infer_expr ctx cstr e in
         let t_out = T.fresh_param () in
         add_constraint cstr pos t_in T.empty_ty;
         t_out
 
       | I.Match (e, lst) ->
-          let t_in = infer_expr tctx ctx cstr e in
+          let t_in = infer_expr ctx cstr e in
           let t_out = T.fresh_param () in
           let infer_case ((p, e') as a) =
-            let t_in', t_out' = infer_abstraction tctx ctx cstr a in
+            let t_in', t_out' = infer_abstraction ctx cstr a in
             add_constraint cstr (snd e) t_in t_in';
             add_constraint cstr (snd e') t_out' t_out
           in
           List.iter infer_case lst;
-          Check.check_patterns ~pos:pos (List.map fst lst) tctx;
+          Check.check_patterns ~pos:pos (List.map fst lst);
           t_out
               
       | I.New (eff, r) ->
-          begin match Tctx.fresh_tydef ~pos:pos tctx eff with
+          begin match Tctx.fresh_tydef ~pos:pos !Tctx.global eff with
           | (ps, T.Effect ops) ->
               begin match r with
               | None -> ()
               | Some (e, lst) ->
-                  let te = infer_expr tctx ctx cstr e in
+                  let te = infer_expr ctx cstr e in
                   List.iter
                     (fun (op, (((_,pos1), (_,pos2), (_,posc)) as a)) ->
                        match C.lookup op ops with
                        | None -> Error.typing ~pos:pos "Effect type %s does not have operation %s" eff op
                        | Some (u1, u2) ->
-                           let t1, t2, t = infer_abstraction2 tctx ctx cstr a in
+                           let t1, t2, t = infer_abstraction2 ctx cstr a in
                            add_constraint cstr pos1 t1 u1;
                            add_constraint cstr pos2 t2 te;
                            add_constraint cstr posc t (T.Tuple [u2; te]))
@@ -289,9 +289,9 @@ and infer_comp tctx ctx cstr cp =
           T.unit_ty
 
       | I.For (i, e1, e2, c, _) ->
-          let t1 = infer_expr tctx ctx cstr e1 in
+          let t1 = infer_expr ctx cstr e1 in
           add_constraint cstr (snd e1) t1 T.int_ty;
-          let t2 = infer_expr tctx ctx cstr e2 in
+          let t2 = infer_expr ctx cstr e2 in
           add_constraint cstr (snd e2) t2 T.int_ty;
           let ctx = Ctx.extend_var i ([], T.int_ty) ctx in
           let t = infer ctx c in
@@ -299,7 +299,7 @@ and infer_comp tctx ctx cstr cp =
           T.unit_ty
 
       | I.Handle (e1, e2) ->
-          let t1 = infer_expr tctx ctx cstr e1 in
+          let t1 = infer_expr ctx cstr e1 in
           let t2 = infer ctx e2 in
           let t3 = T.fresh_param () in
           let t1' = T.Handler {T.value = t2; T.finally = t3} in
@@ -307,11 +307,11 @@ and infer_comp tctx ctx cstr cp =
             t3
 
       | I.Let (defs, c) -> 
-          let _, ctx = infer_let tctx ctx cstr pos defs in
+          let _, ctx = infer_let ctx cstr pos defs in
           infer ctx c
 
       | I.LetRec (defs, c) ->
-          let _, ctx = infer_let_rec tctx ctx cstr pos defs in
+          let _, ctx = infer_let_rec ctx cstr pos defs in
           infer ctx c
 
       | I.Check c ->
