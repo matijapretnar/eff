@@ -1,33 +1,32 @@
-(** Type inference contexts *)
-module C = Common
-module T = Type
+type ty_scheme = Type.param list * Type.ty
+type context = (Common.variable, ty_scheme) Common.assoc
 
-let extend_var x pt ctx = (x, pt) :: ctx
+let empty = []
 
-let extend_vars vars ctx =
-  List.fold_right (fun (x, t) ctx -> extend_var x ([], t) ctx) vars ctx
+let lookup ?pos ctx x =
+  match Common.lookup x ctx with
+  | Some (ps, t) -> snd (Type.refresh ps t)
+  | None -> Error.typing ?pos "Unknown name %s" x
 
-(** Initial context has no variables and only builtin types *)
-let initial = []
+let extend x ty_scheme ctx = (x, ty_scheme) :: ctx
 
-(** [freeparams ctx] returns a list of all free type parameters in [ctx] *)
-let free_params lst =
-  C.uniq (List.flatten (List.map (fun (_,(ps,t)) -> C.diff (T.free_params t) ps) lst))
+let extend_ty x ty ctx = (x, ([], ty)) :: ctx
 
-(** [subst_ctx sbst ctx] applies a type substitution to all types occurring in
-    [ctx]. *)
 let subst_ctx sbst ctx =
-  C.assoc_map
-        (fun (ps,t) -> 
-          assert (List.for_all (fun (p,_) -> not (List.mem p ps)) sbst);
-          (ps, T.subst_ty sbst t))
-        ctx
+  let subst_ty_scheme (ps, ty) =
+    assert (List.for_all (fun (p, _) -> not (List.mem p ps)) sbst);
+    (ps, Type.subst_ty sbst ty)
+  in
+  Common.assoc_map subst_ty_scheme ctx
 
-(* [generalize_vars sbst ctx vars] generalizes the given variables. *)
-let generalize_vars ctx vars =
-  let qs = free_params ctx in
-  C.assoc_map (fun t -> C.diff (T.free_params t) qs, t) vars
+(** [free_params ctx] returns a list of all free type parameters in [ctx]. *)
+let free_params ctx =
+  let binding_params (_, (ps, ty)) = Common.diff (Type.free_params ty) ps in
+  Common.uniq (List.flatten (List.map binding_params ctx))
 
-(* [generalize ctx t] returns the variables over which we may generalize type [t]. *)
-let generalize ctx t =
-  C.diff (T.free_params t) (free_params ctx)
+let generalize ctx poly ty =
+  if poly then
+    let ps = Common.diff (Type.free_params ty) (free_params ctx) in
+    (ps, ty)
+  else
+    ([], ty)

@@ -79,7 +79,7 @@ let extend_with_pattern ?(forbidden_vars=[]) ctx cstr p =
   let vars, t = infer_pattern cstr p in
   match C.find (fun (x,_) -> List.mem_assoc x vars) forbidden_vars with
     | Some (x,_) -> Error.typing ~pos:(snd p) "Several definitions of %s." x
-    | None -> vars, t, Ctx.extend_vars vars ctx
+    | None -> vars, t, List.fold_right (fun (x, t) ctx -> Ctx.extend_ty x t ctx) vars ctx
 
 let rec infer_abstraction ctx cstr (p, c) =
   let _, t1, ctx = extend_with_pattern ctx cstr p in
@@ -115,12 +115,9 @@ and infer_let ctx cstr pos defs =
             let sbst = Unify.solve !cstr in
             let ws = Common.assoc_map (T.subst_ty sbst) ws in
             let ctx = Ctx.subst_ctx sbst ctx in            
-            let ws =
-              (if nonexpansive (fst c)
-               then Ctx.generalize_vars ctx ws
-               else C.assoc_map (fun t -> ([],t)) ws)
+            let ws = Common.assoc_map (Ctx.generalize ctx (nonexpansive (fst c))) ws
           in
-          let ctx' = List.fold_right (fun (x,(ps, t)) ctx -> Ctx.extend_var x (ps, t) ctx) ws ctx' in
+          let ctx' = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend x ty_scheme ctx) ws ctx' in
             (List.rev ws @ vs, ctx'))
     ([], ctx) defs in
   vars, Ctx.subst_ctx (Unify.solve !cstr) ctx
@@ -136,7 +133,7 @@ and infer_let_rec ctx cstr pos defs =
       defs
   in
   let vars = List.fold_right (fun (f,u1,u2,_,_) vars -> (f, (T.Arrow (u1, u2))) :: vars) lst [] in
-  let ctx' = List.fold_right (fun (f,u1,u2,_,_) ctx -> Ctx.extend_var f ([], T.Arrow (u1, u2)) ctx) lst ctx in
+  let ctx' = List.fold_right (fun (f,u1,u2,_,_) ctx -> Ctx.extend_ty f (T.Arrow (u1, u2)) ctx) lst ctx in
   List.iter
     (fun (_,u1,u2,p,c) ->
       let _, tp, ctx' = extend_with_pattern ctx' cstr p in
@@ -148,8 +145,8 @@ and infer_let_rec ctx cstr pos defs =
   let sbst = Unify.solve !cstr in
   let vars = Common.assoc_map (T.subst_ty sbst) vars in
   let ctx = Ctx.subst_ctx sbst ctx in
-  let vars = Ctx.generalize_vars ctx vars in
-  let ctx = List.fold_right (fun (x,(ps,t)) ctx -> Ctx.extend_var x (ps, t) ctx) vars ctx
+  let vars = Common.assoc_map (Ctx.generalize ctx true) vars in
+  let ctx = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend x ty_scheme ctx) vars ctx
   in
   vars, ctx
 
@@ -157,11 +154,7 @@ and infer_let_rec ctx cstr pos defs =
    [ctx]. It returns the inferred type of [e]. *)
 and infer_expr ctx cstr (e,pos) =
   match e with
-    | I.Var x ->
-      begin match C.lookup x ctx with
-      | Some (ps, t) -> snd (T.refresh ps t)
-      | None -> Error.typing ~pos:pos "Unknown name %s" x
-      end
+    | I.Var x -> Ctx.lookup ~pos:pos ctx x
     | I.Const const -> T.ty_of_const const
     | I.Tuple es -> T.Tuple (C.map (infer_expr ctx cstr) es)
     | I.Record [] -> assert false
@@ -293,7 +286,7 @@ and infer_comp ctx cstr cp =
           add_constraint cstr (snd e1) t1 T.int_ty;
           let t2 = infer_expr ctx cstr e2 in
           add_constraint cstr (snd e2) t2 T.int_ty;
-          let ctx = Ctx.extend_var i ([], T.int_ty) ctx in
+          let ctx = Ctx.extend_ty i T.int_ty ctx in
           let t = infer ctx c in
           add_constraint cstr (snd c) t T.unit_ty;
           T.unit_ty

@@ -80,7 +80,7 @@ let parse parser lex =
       Error.syntax ~pos:(Lexer.position_of_lex lex) "unrecognised symbol."
 
 let initial_ctxenv =
-  (Ctx.initial, Eval.initial)
+  (Ctx.empty, Eval.initial)
 
 let exec_topdef interactive (ctx, env) (d,pos) =
   match d with
@@ -109,7 +109,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
         end;
         (ctx, env)
   | S.External (x, t, f) ->
-    let ctx = Ctx.extend_var x (Desugar.external_ty t) ctx in
+    let ctx = Ctx.extend x (Desugar.external_ty t) ctx in
       begin match C.lookup f External.values with
         | Some v -> (ctx, Eval.update x v env)
         | None -> Error.runtime ~pos:pos "unknown external symbol %s." f
@@ -129,8 +129,7 @@ let infer_top_comp ctx c =
   let sbst = Unify.solve !cstr in
   let ctx = Ctx.subst_ctx sbst ctx in
   let ty = Type.subst_ty sbst ty in
-  let ps = (if Infer.nonexpansive (fst c) then Ctx.generalize ctx ty else []) in
-  ctx, (ps, ty)
+  ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty
 
 let rec exec_cmd interactive (ctx, env) e =
   match e with
