@@ -110,7 +110,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
         (ctx, env)
   | S.External (x, t, f) ->
     let ctx = Ctx.extend_var x (Desugar.external_ty t) ctx in
-      begin match C.lookup f External.symbols with
+      begin match C.lookup f External.values with
         | Some v -> (ctx, Eval.update x v env)
         | None -> Error.runtime ~pos:pos "unknown external symbol %s." f
       end

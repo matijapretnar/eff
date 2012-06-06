@@ -19,6 +19,6 @@ let rec reset d = handler
 
 let y = new delimited in
   with reset y handle
-    let yin = (fun k -> std#write "@"; k) (y#shift (fun k -> k k)) in
-    let yang = (fun k -> std#write "*"; k) (y#shift (fun k -> k k)) in
+    let yin = (fun k -> std#print "@"; k) (y#shift (fun k -> k k)) in
+    let yang = (fun k -> std#print "*"; k) (y#shift (fun k -> k k)) in
       yin yang;;

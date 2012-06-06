@@ -49,13 +49,13 @@ let test_minus = (42 - 23);;
 
 let test_minus_tilda_minus = (42 - ~-23);;
 
-let test_mod1 = (5 % 3);;
+let test_mod1 = (5 mod 3);;
 
-let test_mod2 = (0 % 1);;
+let test_mod2 = (0 mod 1);;
 
-check (0 % 0);;
+check (0 mod 0);;
 
-check (1 % 0);;
+check (1 mod 0);;
 
 let test_plus_dot = (3.14 +. 2.7);;
 
@@ -85,7 +85,7 @@ let test_to_string3 = (to_string (1,2,3));;
 
 let test_to_string4 = (to_string (fun x -> x));;
 
-let test_float = (float 42);;
+let test_float_of_int = (float_of_int 42);;
 
 let test_none = None;;
 
@@ -117,9 +117,9 @@ let test_fold_right = (fold_right (fun y a -> 2 * a + y) [1;2;3;4;5] 1);;
 
 let test_iter = (fun k -> check ("iter " ^ to_string k)) [1;2;3;4;5];;
 
-let test_forall = (forall (fun k -> k % 3 = 2) [1;2;3;4;5]);;
+let test_forall = (forall (fun k -> k mod 3 = 2) [1;2;3;4;5]);;
 
-let test_exists = (exists (fun k -> k % 3 = 2) [1;2;3;4;5]);;
+let test_exists = (exists (fun k -> k mod 3 = 2) [1;2;3;4;5]);;
 
 let test_mem = (mem "foo" ["bar"; "baz"]);;
 
@@ -171,7 +171,7 @@ let test_fst = (fst ("foo", 4));;
 
 let test_snd = (snd ("foo", 4));;
 
-(std#write "Does this work?");;
+(std#print "Does this work?");;
 
 check (std#read ());;
 

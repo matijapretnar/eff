@@ -45,8 +45,8 @@ and interp y = function
 (*
 let y = new yield in
 reset y (fun () ->
-let yin = (fun k -> std#write "@"; k) (shift y (fun k -> k k)) in
-let yang = (fun k -> std#write "*"; k) (shift y (fun k -> k k)) in
+let yin = (fun k -> std#print "@"; k) (shift y (fun k -> k k)) in
+let yang = (fun k -> std#print "*"; k) (shift y (fun k -> k k)) in
   yin yang);;
 *)
 

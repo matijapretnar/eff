@@ -10,7 +10,7 @@ end
 (* The uniofrm distribution on a given list of events. *)
 let uniform lst =
   let n = length lst in
-    map (fun x -> (x, 1.0 /. float n)) lst;;
+    map (fun x -> (x, 1.0 /. float_of_int n)) lst;;
 
 (* Combine a probability distribution of probability distributions
    into a single probability distribution. This is the multiplication
