@@ -1,11 +1,10 @@
 %{
-  module C = Common
-  module S = Syntax
+  open Syntax
 
   type handler_case =
-    | OperationCase of S.operation * S.abstraction2
-    | ReturnCase of S.abstraction
-    | FinallyCase of S.abstraction
+    | OperationCase of operation * abstraction2
+    | ReturnCase of abstraction
+    | FinallyCase of abstraction
 
   let collect_handler_cases (lst : handler_case list) =
     let (ops, ret, fin) =
@@ -25,9 +24,9 @@
         ([], None, None)
         lst
     in
-    { S.operations = List.rev ops;
-      S.value = ret;
-      S.finally = fin }
+    { operations = List.rev ops;
+      value = ret;
+      finally = fin }
 
 %}
 
@@ -85,9 +84,9 @@ file:
   | lst = file_topdef
     { lst }
   | t = term EOF
-     { [S.Term t] }
+     { [Term t] }
   | t = term SEMISEMI lst = file
-     { (S.Term t) :: lst }
+     { (Term t) :: lst }
   | dir = topdirective EOF
      { [dir] }
   | dir = topdirective SEMISEMI lst = file
@@ -97,15 +96,15 @@ file_topdef:
   | EOF
      { [] }
   | def = topdef SEMISEMI lst = file
-     { (S.Topdef def) :: lst }
+     { (Topdef def) :: lst }
   | def = topdef lst = file_topdef
-     { (S.Topdef def) :: lst }
+     { (Topdef def) :: lst }
 
 commandline:
   | def = topdef SEMISEMI
-    { S.Topdef def }
+    { Topdef def }
   | t = term SEMISEMI
-    { S.Term t }
+    { Term t }
   | dir = topdirective SEMISEMI
     { dir }
 
@@ -113,73 +112,73 @@ commandline:
 topdef: mark_position(plain_topdef) { $1 }
 plain_topdef:
   | TYPE defs = separated_nonempty_list(AND, ty_def)
-    { S.Tydef defs }
+    { Tydef defs }
   | LET defs = separated_nonempty_list(AND, let_def)
-    { S.TopLet defs }
+    { TopLet defs }
   | LET REC defs = separated_nonempty_list(AND, let_rec_def)
-    { S.TopLetRec defs }
+    { TopLetRec defs }
   | EXTERNAL x = ident COLON t = ty EQUAL n = STRING
-    { S.External (x, t, n) }
+    { External (x, t, n) }
 
-(* Toplevel directives. If you change these, make sure to update lname as well,
+(* Toplevel directive If you change these, make sure to update lname as well,
    or a directive might become a reserved word. *)
 topdirective:
   | HASH QUIT
-    { S.Quit }
+    { Quit }
   | HASH HELP
-    { S.Help }
+    { Help }
   | HASH RESET
-    { S.Reset }
+    { Reset }
   | HASH TYPE t = term
-    { S.TypeOf t }
+    { TypeOf t }
   | HASH USE fn = STRING
-    { S.Use fn }
+    { Use fn }
 
 (* Main syntax tree *)
 
 term: mark_position(plain_term) { $1 }
 plain_term:
   | MATCH t = term WITH cases = cases0(match_case) (* END *)
-    { S.Match (t, cases) }
+    { Match (t, cases) }
   | FUNCTION cases = cases(match_case) (* END *)
-    { S.Function cases }
+    { Function cases }
   | HANDLER h = handler (* END *)
     { fst h }
   | HANDLE t = term WITH h = handler (* END *)
-    { S.Handle (h, t) }
+    { Handle (h, t) }
   | FUN t = lambdas1(ARROW)
     { fst t }
   | LET defs = separated_nonempty_list(AND, let_def) IN t = term
-    { S.Let (defs, t) }
+    { Let (defs, t) }
   | LET REC defs = separated_nonempty_list(AND, let_rec_def) IN t = term
-    { S.LetRec (defs, t) }
+    { LetRec (defs, t) }
   | WITH h = term HANDLE t = term
-    { S.Handle (h, t) }
+    { Handle (h, t) }
   | t1 = term SEMI t2 = term
-    { S.Let ([(Pattern.Nonbinding, Common.Nowhere), t1], t2) }
+    { Let ([(Pattern.Nonbinding, Common.Nowhere), t1], t2) }
   | IF t_cond = comma_term THEN t_true = term ELSE t_false = term
-    { S.Conditional (t_cond, t_true, t_false) }
+    { Conditional (t_cond, t_true, t_false) }
   | WHILE t1 = comma_term DO t2 = term DONE
-    { S.While (t1, t2) }
+    { While (t1, t2) }
   | FOR i = lname EQUAL x = comma_term TO y = comma_term DO t = term DONE
-    { S.For (i, x, y, t, true) }
+    { For (i, x, y, t, true) }
   | FOR i = lname EQUAL x = comma_term DOWNTO y = comma_term DO t = term DONE
-    { S.For (i, x, y, t, false) }
+    { For (i, x, y, t, false) }
   | t = plain_comma_term
     { t }
 
 comma_term: mark_position(plain_comma_term) { $1 }
 plain_comma_term:
   | t = binop_term COMMA ts = separated_list(COMMA, binop_term)
-    { S.Tuple (t :: ts) }
+    { Tuple (t :: ts) }
   | t = plain_new_term
     { t }
 
 plain_new_term:
   | NEW ty = tyname AT t = simple_term WITH lst = resource_case* END
-    { S.New (ty, Some (t, lst)) }
+    { New (ty, Some (t, lst)) }
   | NEW ty = tyname
-    { S.New (ty, None) }
+    { New (ty, None) }
   | t = plain_binop_term
     { t }
 
@@ -188,12 +187,12 @@ plain_binop_term:
   | t1 = binop_term op = binop t2 = binop_term
     {
       let op_pos = Common.Position ($startpos(op), $endpos(op)) in
-      let partial = S.Apply ((S.Var op, op_pos), t1) in
+      let partial = Apply ((Var op, op_pos), t1) in
       let partial_pos = Common.Position ($startpos(t1), $endpos(op)) in
-      S.Apply ((partial, partial_pos), t2)
+      Apply ((partial, partial_pos), t2)
     }
   | t1 = binop_term CONS t2 = binop_term
-    { S.Variant (Common.cons, Some (S.Tuple [t1; t2], C.Nowhere)) }
+    { Variant (Common.cons, Some (Tuple [t1; t2], Common.Nowhere)) }
   | t = plain_uminus_term 
     { t }
 
@@ -201,23 +200,23 @@ uminus_term: mark_position(plain_uminus_term) { $1 }
 plain_uminus_term:
   | MINUS t = uminus_term
     { let op_pos = Common.Position ($startpos($1), $endpos($1)) in
-      S.Apply ((S.Var "~-", op_pos), t) }
+      Apply ((Var "~-", op_pos), t) }
   | MINUSDOT t = uminus_term
     { let op_pos = Common.Position ($startpos($1), $endpos($1)) in
-      S.Apply ((S.Var "~-.", op_pos), t) }
+      Apply ((Var "~-.", op_pos), t) }
   | t = plain_app_term
     { t }
 
 plain_app_term:
   | CHECK t = prefix_term
-    { S.Check t }
+    { Check t }
   | t = prefix_term ts = prefix_term+
     {
       match fst t, ts with
-      | S.Variant (lbl, None), [t] -> S.Variant (lbl, Some t)
-      | S.Variant (lbl, _), _ -> Error.syntax ~pos:(snd t) "Label %s applied to too many arguments." lbl
+      | Variant (lbl, None), [t] -> Variant (lbl, Some t)
+      | Variant (lbl, _), _ -> Error.syntax ~pos:(snd t) "Label %s applied to too many argument" lbl
       | _, _ ->
-        let apply t1 t2 = (S.Apply(t1, t2), Common.join_pos t1 t2) in
+        let apply t1 t2 = (Apply(t1, t2), Common.join_pos t1 t2) in
         fst (List.fold_left apply t ts)
     }
   | t = plain_prefix_term
@@ -228,7 +227,7 @@ plain_prefix_term:
   | op = prefixop t = simple_term
     {
       let op_pos = Common.Position ($startpos(op), $endpos(op)) in
-      S.Apply ((S.Var op, op_pos), t)
+      Apply ((Var op, op_pos), t)
     }
   | t = plain_simple_term
     { t }
@@ -236,23 +235,23 @@ plain_prefix_term:
 simple_term: mark_position(plain_simple_term) { $1 }
 plain_simple_term:
   | x = ident
-    { S.Var x }
+    { Var x }
   | lbl = UNAME
-    { S.Variant (lbl, None) }
+    { Variant (lbl, None) }
   | cst = const_term
-    { S.Const cst }
+    { Const cst }
   | t = simple_term HASH op = ident
-    { S.Operation (t, op) }
+    { Operation (t, op) }
   | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
-      let nil = (S.Variant (Common.nil, None), Common.Position ($endpos, $endpos)) in
-      let cons t ts = (S.Variant (Common.cons, Some (S.Tuple [t; ts], C.Nowhere)), Common.join_pos t ts) in
+      let nil = (Variant (Common.nil, None), Common.Position ($endpos, $endpos)) in
+      let cons t ts = (Variant (Common.cons, Some (Tuple [t; ts], Common.Nowhere)), Common.join_pos t ts) in
       fst (List.fold_right cons ts nil)
     }
   | LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, comma_term)) RBRACE
-    { S.Record flds }
+    { Record flds }
   | LPAREN RPAREN
-    { S.Tuple [] }
+    { Tuple [] }
   | LPAREN t = plain_term RPAREN
     { t }
   | BEGIN t = plain_term END
@@ -278,11 +277,11 @@ lambdas0(SEP):
   | SEP t = term
     { t }
   | p = simple_pattern t = lambdas0(SEP)
-    { (S.Lambda (p, t), Common.Position ($startpos, $endpos)) }
+    { (Lambda (p, t), Common.Position ($startpos, $endpos)) }
 
 lambdas1(SEP):
   | p = simple_pattern t = lambdas0(SEP)
-    { (S.Lambda (p, t), Common.Position ($startpos, $endpos)) }
+    { (Lambda (p, t), Common.Position ($startpos, $endpos)) }
 
 let_def:
   | p = pattern EQUAL t = term
@@ -356,7 +355,7 @@ plain_simple_pattern:
 handler: mark_position(plain_handler) { $1 }
 plain_handler:
   | cs = cases(handler_case)
-    { S.Handler (collect_handler_cases cs) }
+    { Handler (collect_handler_cases cs) }
 
 lname:
   | x = LNAME
@@ -462,19 +461,19 @@ ty_def:
 
 defined_ty:
   | LBRACE lst = separated_nonempty_list(SEMI, separated_pair(field, COLON, ty)) RBRACE
-    { S.TyRecord lst }
+    { TyRecord lst }
   | lst = cases(sum_case)
-    { S.TySum lst }
+    { TySum lst }
   | EFFECT lst = effect_case* END
-    { S.TyEffect lst }
+    { TyEffect lst }
   | t = ty
-    { S.TyInline t }
+    { TyInline t }
 
 ty:
   | t1 = ty_apply ARROW t2 = ty
-    { S.TyArrow (t1, t2) }
+    { TyArrow (t1, t2) }
   | t1 = ty_apply HARROW t2 = ty
-    { S.TyHandler (t1, t2) }
+    { TyHandler (t1, t2) }
   | t = prod_ty
     { t }
 
@@ -484,22 +483,22 @@ prod_ty:
       match ts with
       | [] -> assert false
       | [t] -> t
-      | _ -> S.TyTuple ts
+      | _ -> TyTuple ts
      }
 
 ty_apply:
   | LPAREN t = ty COMMA ts = separated_nonempty_list(COMMA, ty) RPAREN t2 = tyname
-    { S.TyApply (t2, (t :: ts)) }
+    { TyApply (t2, (t :: ts)) }
   | t = ty_apply t2 = tyname
-    { S.TyApply (t2, [t]) }
+    { TyApply (t2, [t]) }
   | t = simple_ty
     { t }
 
 simple_ty:
   | t = tyname
-    { S.TyApply (t, []) }
+    { TyApply (t, []) }
   | t = PARAM
-    { S.TyParam t }
+    { TyParam t }
   | LPAREN t = ty RPAREN
     { t }
 

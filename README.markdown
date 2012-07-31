@@ -33,7 +33,7 @@ sense that they do not express any information about computational effects.
 
 For further information visit the [eff page](http://math.andrej.com/eff/)
 or contact the authors Andrej Bauer <Andrej.Bauer@andrej.com> and Matija
-Pretnar <matija@pretnar.info>,
+Pretnar <matija@pretnar.info>.
 
 Obtaining eff
 -------------

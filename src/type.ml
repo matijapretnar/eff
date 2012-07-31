@@ -1,8 +1,18 @@
-type param = int
+module Param : sig
+  type ty
+  type 'a param
+  val fresh_ty : unit -> ty param
+  val int_of_param : 'a param -> int
+end = struct
+  type ty
+  type 'a param = int
+  let fresh_ty = Common.fresh "type parameter" 
+  let int_of_param p = p
+end
 
 type ty =
   | Apply of Common.tyname * ty list
-  | Param of param (* a type variable *)
+  | Param of Param.ty Param.param (* a type variable *)
   | Basic of string
   | Tuple of ty list
   | Record of (Common.field, ty) Common.assoc
@@ -28,13 +38,7 @@ let float_ty = Basic "float"
 let unit_ty = Tuple []
 let empty_ty = Sum []
 
-let ty_of_const = function
-  | Common.Integer _ -> int_ty
-  | Common.String _ -> string_ty
-  | Common.Boolean _ -> bool_ty
-  | Common.Float _ -> float_ty
-
-type substitution = (param * ty) list
+type substitution = (Param.ty Param.param * ty) list
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 let subst_ty sbst ty =
@@ -83,17 +87,14 @@ let free_params ty =
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
 let occurs_in_ty p ty = List.mem p (free_params ty)
 
-(** [next_param ()] gives a new type parameter on each call. *)
-let next_param = Common.fresh "type parameter" 
-
 (** [fresh_param ()] gives a type [Param p] where [p] is a new type parameter on
     each call. *)
-let fresh_param () = Param (next_param ())
+let fresh_param () = Param (Param.fresh_ty ())
 
 (** [refresh ps ty] replaces the polymorphic parameters [ps] in [ty] with new
     values. *)
 let refresh ps ty =
-  let ps' = List.map (fun p -> (p, next_param ())) ps in
+  let ps' = List.map (fun p -> (p, Param.fresh_ty ())) ps in
   let sbst = List.map (fun (p, p') -> (p, Param p')) ps' in
   List.map snd ps', subst_ty sbst ty
 

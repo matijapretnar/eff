@@ -1,4 +1,3 @@
-module S = Syntax
 module C = Common
 
 let usage = "Usage: eff [option] ... [file] ..."
@@ -84,7 +83,7 @@ let initial_ctxenv =
 
 let exec_topdef interactive (ctx, env) (d,pos) =
   match d with
-  | S.TopLet defs ->
+  | Syntax.TopLet defs ->
       let defs = C.assoc_map Desugar.computation defs in
       let vars, ctx = Infer.infer_let ctx (ref Type.identity_subst) pos defs in
       let env =
@@ -100,7 +99,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
             vars
         end;
         (ctx, env)
-  | S.TopLetRec defs ->
+  | Syntax.TopLetRec defs ->
       let defs = C.assoc_map Desugar.let_rec defs in
       let vars, ctx = Infer.infer_let_rec ctx (ref Type.identity_subst) pos defs in
       let env = Eval.extend_let_rec env defs in
@@ -108,13 +107,13 @@ let exec_topdef interactive (ctx, env) (d,pos) =
           List.iter (fun (x,(ps,t)) -> Format.printf "@[val %s : %t = <fun>@]@." x (Print.ty ps t)) vars
         end;
         (ctx, env)
-  | S.External (x, t, f) ->
-    let ctx = Ctx.extend x (Desugar.external_ty t) ctx in
+  | Syntax.External (x, t, f) ->
+    let ctx = Ctx.extend ctx x (Desugar.external_ty t) in
       begin match C.lookup f External.values with
         | Some v -> (ctx, Eval.update x v env)
         | None -> Error.runtime ~pos:pos "unknown external symbol %s." f
       end
-  | S.Tydef tydefs ->
+  | Syntax.Tydef tydefs ->
       let tydefs = List.map (fun (t, (ps, d)) -> (t, Desugar.tydef ps d)) tydefs in
       Tctx.global := Tctx.extend_tydefs ~pos:pos !Tctx.global tydefs;
       (ctx, env)
@@ -127,31 +126,31 @@ let infer_top_comp ctx c =
   let cstr = ref [] in
   let ty = Infer.infer_comp ctx cstr c in
   let sbst = Unify.solve !cstr in
-  let ctx = Ctx.subst_ctx sbst ctx in
+  let ctx = Ctx.subst_ctx ctx sbst in
   let ty = Type.subst_ty sbst ty in
   ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty
 
 let rec exec_cmd interactive (ctx, env) e =
   match e with
-  | S.Term c ->
+  | Syntax.Term c ->
       let c = Desugar.computation c in
       let ctx, (ps, t) = infer_top_comp ctx c in
       let v = Eval.run env c in
       if interactive then Format.printf "@[- : %t = %t@]@." (Print.ty ps t) (Print.value v);
       (ctx, env)
-  | S.TypeOf c ->
+  | Syntax.TypeOf c ->
       let c = Desugar.computation c in
       let ctx, (ps, t) = infer_top_comp ctx c in
       Format.printf "@[- : %t@]@." (Print.ty ps t);
       (ctx, env)
-  | S.Reset ->
+  | Syntax.Reset ->
       Tctx.reset ();
       print_endline ("Environment reset."); initial_ctxenv
-  | S.Help ->
+  | Syntax.Help ->
       print_endline help_text; (ctx, env)
-  | S.Quit -> exit 0
-  | S.Use fn -> use_file (ctx, env) (fn, interactive)
-  | S.Topdef def -> exec_topdef interactive (ctx, env) def
+  | Syntax.Quit -> exit 0
+  | Syntax.Use fn -> use_file (ctx, env) (fn, interactive)
+  | Syntax.Topdef def -> exec_topdef interactive (ctx, env) def
 
 and use_file env (filename, interactive) =
   let cmds = Lexer.read_file (parse Parser.file) filename in
