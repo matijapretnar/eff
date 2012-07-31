@@ -28,8 +28,8 @@ let rec ty s = function
   | Syntax.TyHandler (t1, t2) -> T.Handler { T.value = ty s t1; T.finally = ty s t2 }
 
 let external_ty t =
-  let lst = List.fold_right (fun p lst -> (p, Type.Param.fresh_ty ()) :: lst) (ty_fv t) [] in
-  let s = C.assoc_map (fun p -> Type.Param p) lst in
+  let lst = List.fold_right (fun p lst -> (p, Type.fresh_ty ()) :: lst) (ty_fv t) [] in
+  let s = C.assoc_map (fun p -> Type.TyParam p) lst in
   (List.map snd lst, ty s t)
 
 
@@ -189,8 +189,8 @@ and handler pos {Syntax.operations=ops; Syntax.value=val_a; Syntax.finally=fin_a
 let tydef ps d =
   let sbst, lst = 
     List.fold_right (fun p (sbst,lst) ->
-                       let u = Type.Param.fresh_ty () in
-                         (p, T.Param u)::sbst, u::lst) ps ([],[])
+                       let u = Type.fresh_ty () in
+                         (p, T.TyParam u)::sbst, u::lst) ps ([],[])
   in
     (lst,
      begin match d with

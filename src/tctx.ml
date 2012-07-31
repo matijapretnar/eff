@@ -17,10 +17,10 @@ let initial = [
   ("int", ([], T.int_ty));
   ("string", ([], T.string_ty));
   ("float", ([], T.float_ty));
-  ("list", (let a = Type.Param.fresh_ty () in
+  ("list", (let a = Type.fresh_ty () in
               ([a],
                T.Sum [(Common.nil, None);
-                      (Common.cons, Some (T.Tuple [T.Param a; T.Apply ("list", [T.Param a])]))])));
+                      (Common.cons, Some (T.Tuple [T.TyParam a; T.Apply ("list", [T.TyParam a])]))])));
   ("empty", ([], T.empty_ty));
 ]
 
@@ -120,7 +120,7 @@ let transparent ?pos tctx ty_name =
   let (_, ty) = lookup_tydef ?pos tctx ty_name in
   match ty with
   | T.Sum (_::_) | T.Effect _ | T.Record _ -> false
-  | T.Basic _ | T.Apply _ | T.Param _ | T.Sum [] |
+  | T.Basic _ | T.Apply _ | T.TyParam _ | T.Sum [] |
     T.Arrow _ | T.Tuple _ | T.Handler _ -> true
 
 (* [ty_apply ctx pos t lst] applies the type constructor [t] to the given list of arguments. *)
@@ -137,7 +137,7 @@ let ty_apply ?pos tctx ty_name lst =
     a type context [tctx]. *)
 let check_well_formed ?pos ctx =
   let rec check = function
-  | T.Basic _ | T.Param _ -> ()
+  | T.Basic _ | T.TyParam _ -> ()
   | T.Apply (ty_name, tys) ->
       let (params, _) = lookup_tydef ?pos ctx ty_name in
       let n = List.length params in
@@ -165,7 +165,7 @@ let check_well_formed ?pos ctx =
     non-cyclic in [tctx]. *)
 let check_noncyclic ?pos ctx =
   let rec check forbidden = function
-  | T.Basic _ | T.Sum _ | T.Param _ -> ()
+  | T.Basic _ | T.Sum _ | T.TyParam _ -> ()
   | T.Apply (t, lst) ->
       if List.mem t forbidden then
         Error.typing ?pos "Type definition %s is cyclic." t

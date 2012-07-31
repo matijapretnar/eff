@@ -275,7 +275,7 @@ and infer_comp ctx cstr cp =
                            add_constraint cstr posc t (T.Tuple [u2; te]))
                     lst
               end;
-              T.Apply (eff, List.map (fun p -> Type.Param p) ps)
+              T.Apply (eff, List.map (fun p -> Type.TyParam p) ps)
           | _ -> Error.typing ~pos:pos "Effect type expected but %s encountered" eff
           end
 

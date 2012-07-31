@@ -1,4 +1,4 @@
-type ty_scheme = Type.Param.ty Type.Param.param list * Type.ty
+type ty_scheme = Type.ty_param list * Type.ty
 type t = (Common.variable, ty_scheme) Common.assoc
 
 let empty = []

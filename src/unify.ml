@@ -9,7 +9,7 @@ let solve cstr =
 
     | (t1, t2) when t1 = t2 -> ()
 
-    | (Type.Param p, t) | (t, Type.Param p) ->
+    | (Type.TyParam p, t) | (t, Type.TyParam p) ->
         if Type.occurs_in_ty p t
         then
           let sbst = Type.beautify2 t1 t2 in

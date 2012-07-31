@@ -1,18 +1,16 @@
-module Param : sig
-  type ty
-  type 'a param
-  val fresh_ty : unit -> ty param
-  val int_of_param : 'a param -> int
-end = struct
-  type ty
-  type 'a param = int
-  let fresh_ty = Common.fresh "type parameter" 
-  let int_of_param p = p
-end
+type ty_param = Ty_Param of int
+type dirt_param = Dirt_Param of int
+type region_param = Region_Param of int
+type instance_param = Instance_Param of int
+
+let fresh_ty = (let f = Common.fresh "type parameter" in fun () -> Ty_Param (f ()))
+let fresh_dirt = (let f = Common.fresh "dirt parameter" in fun () -> Dirt_Param (f ()))
+let fresh_region = (let f = Common.fresh "region parameter" in fun () -> Region_Param (f ()))
+let fresh_instance = (let f = Common.fresh "instance parameter" in fun () -> Instance_Param (f ()))
 
 type ty =
   | Apply of Common.tyname * ty list
-  | Param of Param.ty Param.param (* a type variable *)
+  | TyParam of ty_param
   | Basic of string
   | Tuple of ty list
   | Record of (Common.field, ty) Common.assoc
@@ -21,10 +19,24 @@ type ty =
   | Effect of (Common.opsym, ty * ty) Common.assoc
   | Handler of handler_ty
 
+and dirty = ty * dirt
+
 and handler_ty = {
   value: ty; (* the type of the _argument_ of value *)
   finally: ty; (* the return type of finally *)
 }
+
+and dirt =
+  | DirtParam of dirt_param
+  | DirtUnion of dirt list
+  | DirtAtom of region * Common.opsym
+
+and region =
+  | RegionParam of region_param
+  | RegionInstances of instance_param
+  | RegionUnion of region list
+  | RegionTop
+
 
 (* This type is used when type checking is turned off. Its name
    is syntactically incorrect so that the programmer cannot accidentally
@@ -38,13 +50,13 @@ let float_ty = Basic "float"
 let unit_ty = Tuple []
 let empty_ty = Sum []
 
-type substitution = (Param.ty Param.param * ty) list
+type substitution = (ty_param * ty) list
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 let subst_ty sbst ty =
   let rec subst = function
   | Apply (ty_name, tys) -> Apply (ty_name, List.map subst tys)
-  | Param p as ty -> (try List.assoc p sbst with Not_found -> ty)
+  | TyParam p as ty -> (try List.assoc p sbst with Not_found -> ty)
   | Basic _ as ty -> ty
   | Tuple tys -> Tuple (List.map subst tys)
   | Record tys -> Record (Common.assoc_map subst tys)
@@ -71,7 +83,7 @@ let compose_subst sbst1 sbst2 =
 let free_params ty =
   let rec free = function
   | Apply (_, tys) -> Common.flatten_map free tys
-  | Param p -> [p]
+  | TyParam p -> [p]
   | Basic _ -> []
   | Tuple tys -> Common.flatten_map free tys
   | Record tys -> Common.flatten_map (fun (_, ty) -> free ty) tys
@@ -87,15 +99,15 @@ let free_params ty =
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
 let occurs_in_ty p ty = List.mem p (free_params ty)
 
-(** [fresh_param ()] gives a type [Param p] where [p] is a new type parameter on
+(** [fresh_param ()] gives a type [TyParam p] where [p] is a new type parameter on
     each call. *)
-let fresh_param () = Param (Param.fresh_ty ())
+let fresh_param () = TyParam (fresh_ty ())
 
 (** [refresh ps ty] replaces the polymorphic parameters [ps] in [ty] with new
     values. *)
 let refresh ps ty =
-  let ps' = List.map (fun p -> (p, Param.fresh_ty ())) ps in
-  let sbst = List.map (fun (p, p') -> (p, Param p')) ps' in
+  let ps' = List.map (fun p -> (p, fresh_ty ())) ps in
+  let sbst = List.map (fun (p, p') -> (p, TyParam p')) ps' in
   List.map snd ps', subst_ty sbst ty
 
 (** [beautify ty] returns a sequential replacement of all type parameters in

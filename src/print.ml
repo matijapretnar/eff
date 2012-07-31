@@ -72,7 +72,7 @@ let ty ?sbst poly t ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = print ?max_level ?at_level ppf in
     let print_param s p =
-      let k = (match Common.lookup p sbst with None -> ~-(Type.Param.int_of_param p) | Some k -> k) in
+      let k = (match Common.lookup p sbst with None -> (let Type.Ty_Param n = p in ~- n) | Some k -> k) in
       if 0 <= k && k <= 25
       then print "%s%c" s (char_of_int (k + int_of_char 'a'))
       else print "%sty%i" s (k - 25)
@@ -88,7 +88,7 @@ let ty ?sbst poly t ppf =
       | Type.Apply (t, ts) ->
           print ~at_level:1 "(%t) %s" (sequence ", " (ty ~max_level:0) ts) t
 
-      | Type.Param p ->
+      | Type.TyParam p ->
         let c = (if List.mem p poly then "'" else "'_") in
           print_param c p
 
