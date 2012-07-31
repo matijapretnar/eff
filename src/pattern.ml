@@ -38,3 +38,8 @@ let linear_pattern p =
 
 (* [linear_record r] verifies that a record or a record pattern has linear field names. *)
 let linear_record lst = Common.injective fst lst
+
+(* Removes any As pattern wrappers (e.g. [2 as x] -> [2]). *)
+let rec simplify p = match p with
+  | (As (p', _), _) -> simplify p'
+  | _ -> p

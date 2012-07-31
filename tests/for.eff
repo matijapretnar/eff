@@ -1,25 +1,25 @@
 for i = 1 to 10 do
   check i
-done ;;
+done;;
 
 for i = 10 downto 1 do
   check i
-done ;;
+done;;
 
 for i = 1 to 10 do
   for j = 1 to 10 do
     check (i,j)
   done
-done ;;
+done;;
 
 for i = 2 to 0 do
   check i
-done ;;
+done;;
 
 for i = 1 to 3 do
-  check (1,i) ;
+  check (1,i);
   for i = 1 to 5 do
     check (2,i)
   done
-done ;;
+done;;
   

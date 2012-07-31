@@ -36,7 +36,7 @@ and field pp (f, v) ppf = fprintf ppf "%s = %t" f (pp v)
 
 let const c ppf =
   match c with
-  | Common.Integer k -> fprintf ppf "%s" (Big_int.string_of_big_int k)
+  | Common.Integer k -> fprintf ppf "%d" k
   | Common.String s -> fprintf ppf "%S" s
   | Common.Boolean b -> fprintf ppf "%B" b
   | Common.Float f -> fprintf ppf "%F" f
@@ -48,7 +48,7 @@ let rec pattern ?max_level (p,_) ppf =
   | Pattern.As (p, x) -> print "%t as %s" (pattern p) x
   | Pattern.Const c -> const c ppf
   | Pattern.Tuple lst -> print "(@[<hov>%t@])" (sequence "," pattern lst)
-  | Pattern.Record lst -> print "(@[<hov>%t@])" (sequence ";" (field pattern) lst)
+  | Pattern.Record lst -> print "{@[<hov>%t@]}" (sequence ";" (field pattern) lst)
   | Pattern.Variant (lbl, None) when lbl = Common.nil -> print "[]"
   | Pattern.Variant (lbl, None) -> print "%s" lbl
   | Pattern.Variant (lbl, Some (Pattern.Tuple [v1; v2], _)) when lbl = Common.cons ->

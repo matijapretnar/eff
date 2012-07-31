@@ -3,7 +3,7 @@
   module S = Syntax
 
   type handler_case =
-    | OperationCase of S.operation * Pattern.t * S.abstraction
+    | OperationCase of S.operation * S.abstraction2
     | ReturnCase of S.abstraction
     | FinallyCase of S.abstraction
 
@@ -11,7 +11,7 @@
     let (ops, ret, fin) =
       List.fold_left
         (fun (ops, ret, fin) -> function
-          | OperationCase (op, k, a) ->  ((op, (k, a)) :: ops, ret, fin)
+          | OperationCase (op, a2) ->  ((op, a2) :: ops, ret, fin)
           | ReturnCase a ->
             begin match ret with
             | None -> (ops, Some a, fin)
@@ -36,12 +36,12 @@
 %token BEGIN END
 %token <Common.variable> LNAME
 %token UNDERSCORE AS
-%token <Big_int.big_int> INT
+%token <int> INT
 %token <string> STRING
 %token <bool> BOOL
 %token <float> FLOAT
 %token <Common.label> UNAME
-%token <Common.param> PARAM
+%token <Common.typaram> PARAM
 %token TYPE ARROW HARROW OF EFFECT
 %token EXTERNAL
 %token MATCH WITH FUNCTION HASH
@@ -79,15 +79,15 @@
 
 (* Toplevel syntax *)
 
-(* If you're going to "optimize" this, please make sure we don't require ;; at the
+(* If you're going to "optimize" this, please make sure we don't require;; at the
    end of the file. *)
 file:
   | lst = file_topdef
     { lst }
   | t = term EOF
-     { [S.Expr t] }
+     { [S.Term t] }
   | t = term SEMISEMI lst = file
-     { (S.Expr t) :: lst }
+     { (S.Term t) :: lst }
   | dir = topdirective EOF
      { [dir] }
   | dir = topdirective SEMISEMI lst = file
@@ -105,7 +105,7 @@ commandline:
   | def = topdef SEMISEMI
     { S.Topdef def }
   | t = term SEMISEMI
-    { S.Expr t }
+    { S.Term t }
   | dir = topdirective SEMISEMI
     { dir }
 
@@ -252,7 +252,7 @@ plain_simple_term:
   | LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, comma_term)) RBRACE
     { S.Record flds }
   | LPAREN RPAREN
-    { S.unit_term }
+    { S.Tuple [] }
   | LPAREN t = plain_term RPAREN
     { t }
   | BEGIN t = plain_term END
@@ -296,7 +296,7 @@ let_rec_def:
 
 handler_case:
   | t1 = simple_term HASH op = ident p = simple_pattern k = simple_pattern ARROW t2 = term
-    { OperationCase ((t1, op), k, (p, t2)) }
+    { OperationCase ((t1, op), (p, k, t2)) }
   | VAL c = match_case
     { ReturnCase c }
   | FINALLY c = match_case
@@ -510,11 +510,11 @@ sum_case:
     { (lbl, Some t) }
 
 effect_case:
-   | OPERATION opname = lname COLON t1 = prod_ty ARROW t2 = ty
-     { (opname, (t1, t2)) }
+   | OPERATION opsym = lname COLON t1 = prod_ty ARROW t2 = ty
+     { (opsym, (t1, t2)) }
 
 resource_case:
-   | OPERATION opname = lname p1 = simple_pattern AT p2 = simple_pattern ARROW t = term
-     { (opname, (p1, p2, t)) }
+   | OPERATION opsym = lname p1 = simple_pattern AT p2 = simple_pattern ARROW t = term
+     { (opsym, (p1, p2, t)) }
 
 %%

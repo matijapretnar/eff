@@ -1,16 +1,14 @@
-module C = Common
-
 type param = int
 
 type ty =
-  | Basic of string
+  | Apply of Common.tyname * ty list
   | Param of param (* a type variable *)
-  | Apply of C.tyname * ty list
-  | Arrow of ty * ty
+  | Basic of string
   | Tuple of ty list
-  | Record of (C.field * ty) list
-  | Sum of (C.label * ty option) list
-  | Effect of effect_sig
+  | Record of (Common.field, ty) Common.assoc
+  | Sum of (Common.label, ty option) Common.assoc
+  | Arrow of ty * ty
+  | Effect of (Common.opsym, ty * ty) Common.assoc
   | Handler of handler_ty
 
 and handler_ty = {
@@ -18,133 +16,93 @@ and handler_ty = {
   finally: ty; (* the return type of finally *)
 }
 
-and op_ty = ty * ty
-
-and effect_sig = (C.opname * op_ty) list
-
-type substitution = (param * ty) list
-
-let empty_subst = []
-
 (* This type is used when type checking is turned off. Its name
    is syntactically incorrect so that the programmer cannot accidentally
    define it. *)
 let universal_ty = Basic "_"
-   
+
 let int_ty = Basic "int"
-let bool_ty = Basic "bool"
 let string_ty = Basic "string"
+let bool_ty = Basic "bool"
 let float_ty = Basic "float"
 let unit_ty = Tuple []
 let empty_ty = Sum []
 
-let next_param = C.fresh "type parameter" 
+let ty_of_const = function
+  | Common.Integer _ -> int_ty
+  | Common.String _ -> string_ty
+  | Common.Boolean _ -> bool_ty
+  | Common.Float _ -> float_ty
 
+type substitution = (param * ty) list
+
+(** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
+let subst_ty sbst ty =
+  let rec subst = function
+  | Apply (ty_name, tys) -> Apply (ty_name, List.map subst tys)
+  | Param p as ty -> (try List.assoc p sbst with Not_found -> ty)
+  | Basic _ as ty -> ty
+  | Tuple tys -> Tuple (List.map subst tys)
+  | Record tys -> Record (Common.assoc_map subst tys)
+  | Sum tys -> Sum (Common.assoc_map (Common.option_map subst) tys)
+  | Arrow (ty1, ty2) -> Arrow (subst ty1, subst ty2)
+  | Effect op_sig ->
+      Effect (Common.assoc_map (fun (ty1, ty2) -> (subst ty1, subst ty2)) op_sig)
+  | Handler {value = ty1; finally = ty2} ->
+      Handler {value = subst ty1; finally = subst ty2}
+  in
+  subst ty
+
+(** [identity_subst] is a substitution that makes no changes. *)
+let identity_subst = []
+
+(** [compose_subst sbst1 sbst2] returns a substitution that first performs
+    [sbst2] and then [sbst1]. *)
+let compose_subst sbst1 sbst2 =
+  sbst1 @ Common.assoc_map (subst_ty sbst1) sbst2
+
+(** [free_params ty] returns a list of all type parameters that occur in [ty].
+    Each parameter is listed only once and in order in which it occurs when
+    [ty] is displayed. *)
+let free_params ty =
+  let rec free = function
+  | Apply (_, tys) -> Common.flatten_map free tys
+  | Param p -> [p]
+  | Basic _ -> []
+  | Tuple tys -> Common.flatten_map free tys
+  | Record tys -> Common.flatten_map (fun (_, ty) -> free ty) tys
+  | Sum tys ->
+      Common.flatten_map (function (_, None) -> [] | (_, Some ty) -> free ty) tys
+  | Arrow (ty1, ty2) -> free ty1 @ free ty2
+  | Effect op_sig ->
+      Common.flatten_map (function (_, (ty1, ty2)) -> free ty1 @ free ty2) op_sig
+  | Handler {value = ty1; finally = ty2} -> free ty1 @ free ty2
+  in
+  Common.uniq (free ty)
+
+(** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
+let occurs_in_ty p ty = List.mem p (free_params ty)
+
+(** [next_param ()] gives a new type parameter on each call. *)
+let next_param = Common.fresh "type parameter" 
+
+(** [fresh_param ()] gives a type [Param p] where [p] is a new type parameter on
+    each call. *)
 let fresh_param () = Param (next_param ())
 
-let subst_ty sbst =
-  let rec subst = function
-    | Basic _ as t -> t
-    | Param p as t ->
-        begin match C.lookup p sbst with
-          | Some u -> u
-          | None -> t
-        end
-    | Apply (t, lst) -> Apply (t, C.map subst lst)
-    | Arrow (t1, t2) -> Arrow (subst t1, subst t2)
-    | Tuple lst -> Tuple (C.map subst lst)
-    | Record lst -> Record (C.assoc_map subst lst)
-    | Sum lst -> Sum (C.assoc_map (C.option_map subst) lst)
-    | Effect lst -> Effect (C.assoc_map (fun (t1,t2) -> (subst t1, subst t2)) lst)
-    | Handler {value=t1; finally=t2} -> Handler {value=subst t1; finally=subst t2}
-  in
-  subst
-
-let compose_subst subst1 subst2 =
-  List.map (fun (k, t) -> (k, subst_ty subst2 t)) subst1
-
-let concat_subst subst1 subst2 = subst1 @ subst2
-
-let free_params t =
-  let rec free = function
-    | Basic _ -> []
-    | Apply (_, lst) -> List.flatten (List.map free lst)
-    | Param p -> [p]
-    | Arrow (t1, t2) -> free t1 @ free t2
-    | Tuple lst -> List.flatten (List.map free lst)
-    | Record lst -> List.flatten (List.map (fun (_,t) -> free t) lst)
-    | Sum lst -> List.flatten (List.map (function (_,None) -> [] | (_, Some t) -> free t) lst)
-    | Effect lst -> List.flatten (List.map (function (_,(t1,t2)) -> free t1 @ free t2) lst)
-    | Handler {value=t1; finally=t2} -> free t1 @ free t2
-  in
-    C.uniq (free t)
-
-exception Occurs
-
-let occurs_in_ty p t =
-  let rec check = function
-    | Basic _ -> ()
-    | Apply (_, lst) -> List.iter check lst
-    | Param q -> if p = q then raise Occurs
-    | Arrow (t1, t2) -> check t1; check t2
-    | Tuple lst -> List.iter check lst
-    | Record lst -> List.iter (fun (_,t) -> check t) lst
-    | Sum lst -> List.iter (function (_,None) -> () | (_,Some t) -> check t) lst
-    | Effect lst -> List.iter (fun (_,(t1,t2)) -> check t1; check t2) lst
-    | Handler {value=t1; finally=t2} -> check t1; check t2
-  in
-  try
-    check t ; false
-  with
-    Occurs -> true
-
-(** [reresh ps ty] renames the polymorphic parameters [ps] in [ty] to new parameters. *)
+(** [refresh ps ty] replaces the polymorphic parameters [ps] in [ty] with new
+    values. *)
 let refresh ps ty =
-  let sbst = List.map (fun p -> (p, fresh_param ())) ps in
-  let rec refresh = function
-    | Basic b -> Basic b
-    | Param p -> (try List.assoc p sbst with Not_found -> Param p)
-    | Apply (t, lst) -> Apply (t, C.map refresh lst)
-    | Arrow (t1, t2) -> Arrow (refresh t1, refresh t2)
-    | Tuple lst -> Tuple (C.map refresh lst)
-    | Record lst -> Record (C.assoc_map refresh lst)
-    | Sum lst -> Sum (C.assoc_map (C.option_map refresh) lst)
-    | Effect lst -> Effect (C.assoc_map (fun (t1,t2) ->
-                                                let u1 = refresh t1 in 
-                                                let u2 = refresh t2 in
-                                                  (u1, u2)) lst)
-    | Handler {value=t1; finally=t2} ->
-        let u1 = refresh t1 in
-        let u2 = refresh t2 in
-          Handler {value = u1; finally = u2}
-  in
-    refresh ty
+  let ps' = List.map (fun p -> (p, next_param ())) ps in
+  let sbst = List.map (fun (p, p') -> (p, Param p')) ps' in
+  List.map snd ps', subst_ty sbst ty
 
-(** [beautify ty] returns a substitution from type parameters to integers,
-    to be used for pretty printing. *)
+(** [beautify ty] returns a sequential replacement of all type parameters in
+    [ty] that can be used for its pretty printing. *)
 let beautify ty =
-  let next_param = C.fresh "beautify" in
-  let sbst = ref [] in
-  let rec scan = function
-    | Basic _ -> ()
-    | Param p ->
-        begin match C.lookup p !sbst with
-        | Some _ -> ()
-        | None ->
-            let m = next_param () in
-            sbst := (p, m) :: !sbst ;
-        end
-    | Apply (t, lst) -> List.iter scan lst
-    | Arrow (t1, t2) -> scan t1 ; scan t2
-    | Tuple lst -> List.iter scan lst
-    | Record lst -> List.iter (fun (_,t) -> scan t) lst
-    | Sum lst -> List.iter (function (_,None) -> () | (_, Some t) -> scan t) lst
-    | Effect lst -> List.iter (fun (_,(t1,t2)) -> scan t1 ; scan t2) lst
-    | Handler {value=t1; finally=t2} -> scan t1; scan t2
-  in
-    scan ty ;
-    !sbst
+  let next_param = Common.fresh "beautify" in
+  List.map (fun p -> (p, next_param ())) (free_params ty)
 
-(** [beautify2 t1 t2] returns a substitution for type parameters,
-    to be used for pretty printing of types [t1] and [t2]. *)
-let beautify2 t1 t2 = beautify (Arrow (t1, t2))
+(** [beautify2 ty1 ty2] returns a sequential replacement of type parameters in
+    [ty1] and [ty2] that can be used for their simultaneous pretty printing. *)
+let beautify2 ty1 ty2 = beautify (Tuple [ty1; ty2])

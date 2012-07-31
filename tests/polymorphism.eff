@@ -1,22 +1,22 @@
-let a = (let f x = x in (f 5, f "foo")) ;;
+let a = (let f x = x in (f 5, f "foo"));;
 
-a ;;
+a;;
 
-let g x y = (fun x y -> x) x y ;;
+let g x y = (fun x y -> x) x y;;
 
-(g 4 "foo", g "foo" 4) ;;
+(g 4 "foo", g "foo" 4);;
 
-let u = [] ;;
+let u = [];;
 
-(1 :: u, "foo" :: u) ;;
+(1 :: u, "foo" :: u);;
 
-let v = [[]] ;;
+let v = [[]];;
 
-([] :: v, [2] :: v) ;;
+([] :: v, [2] :: v);;
 
-#type (fun x -> let h t u = u in h x x) ;;
+#type (fun x -> let h t u = u in h x x);;
 
-#type (fun x -> let h t u = t in h x x) ;;
+#type (fun x -> let h t u = t in h x x);;
 
-let rec u x = u x ;;
-#type u ;;
+let rec u x = u x;;
+#type u;;

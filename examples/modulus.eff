@@ -13,7 +13,7 @@ type nat = int
 let ref_mu f a =
   let k = ref 0 in
   let b i = (k := max !k i; a i) in
-    ignore (f b) ; !k
+    ignore (f b); !k
 
 (* Or we can define a custom operation and a handler which does essentially
    the same thing. *)
@@ -30,13 +30,13 @@ let mu f a =
     with
       | m#call n k -> (fun i -> let j = max i n in k (a n) j)
       | val _ -> fun i -> i
-      | finally g -> g 0 ;;
+      | finally g -> g 0;;
 
 (* A couple of examples. *)
-let f a = 0 * a 10 ;;
-let g a = a (a 5) ;;
+let f a = 0 * a 10;;
+let g a = a (a 5);;
 
-ref_mu f (fun i -> 30 + i * i) ;;
-mu f (fun i -> 30 + i * i) ;;
-ref_mu g (fun i -> 30 + i * i) ;;
-mu g (fun i -> 30 + i * i) ;;
+ref_mu f (fun i -> 30 + i * i);;
+mu f (fun i -> 30 + i * i);;
+ref_mu g (fun i -> 30 + i * i);;
+mu g (fun i -> 30 + i * i);;

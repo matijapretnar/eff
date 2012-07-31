@@ -9,7 +9,7 @@ effdir=$(datarootdir)/eff
 EFFTARGET=src/eff
 
 # How to compile
-EFFOCAMLBUILD=$(OCAMLBUILD) -use-menhir -lib nums -lib unix
+EFFOCAMLBUILD=$(OCAMLBUILD) -use-menhir -lib unix
 
 .PHONY: test test-validate test-clean \
 	eff.byte eff.native eff.d.byte eff.p.native
@@ -37,8 +37,8 @@ src/version.ml:
 
 # Explain parser conflicts in the file parser.conflicts
 conflicts:
-	cd $(srcdir) ; \
-	$(EFFOCAMLBUILD) -yaccflags "--explain" src/parser.mli ; \
+	cd $(srcdir); \
+	$(EFFOCAMLBUILD) -yaccflags "--explain" src/parser.mli; \
 	if [ -f $(srcdir)/_build/src/parser.conflicts ]; \
 	then \
 		mv -f $(srcdir)/_build/src/parser.conflicts .; \

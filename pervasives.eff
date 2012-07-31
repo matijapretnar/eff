@@ -6,31 +6,31 @@ external ( = ) : 'a -> 'a -> bool = "="
 external ( < ) : 'a -> 'a -> bool = "<"
 
 type channel = effect
-  operation write : string -> unit
+  operation print : string -> unit
   operation read : unit -> string
-end ;;
+end;;
 
-external std : channel = "std" ;;
+external std : channel = "std";;
 
 type 'a exception = effect
   operation raise : 'a -> empty
-end ;;
+end;;
 
-let raise e p = match (e#raise p) with ;;
+let raise e p = match (e#raise p) with;;
 
-external exception : string -> 'a exception = "exception" ;;
+external exception : string -> 'a exception = "exception";;
 
-let divisionByZero = exception "division by zero" ;;
+let divisionByZero = exception "division by zero";;
 
-let invalidArgument = exception "invalid argument" ;;
+let invalidArgument = exception "invalid argument";;
 
-let failure = exception "failure" ;;
+let failure = exception "failure";;
 
-let failwith msg = raise failure msg  ;;
+let failwith msg = raise failure msg ;;
 
-let assertionFault = exception "assertion fault" ;;
+let assertionFault = exception "assertion fault";;
 
-let assert b = if b then () else raise assertionFault ()  ;;
+let assert b = if b then () else raise assertionFault () ;;
 
 external ( ~- ) : int -> int = "~-"
 
@@ -38,14 +38,12 @@ external ( + ) : int -> int -> int = "+"
 
 external ( * ) : int -> int -> int = "*"
 
-external ( ** ) : int -> int -> int = "**"
-
 external ( - ) : int -> int -> int = "-"
 
-external ( % ) : int -> int -> int = "%"
-let (%) m n = match n with
+external ( mod ) : int -> int -> int = "mod"
+let (mod) m n = match n with
   | 0 -> raise divisionByZero ()
-  | n -> (%) m n
+  | n -> m mod n
 
 external ( ~-. ) : float -> float = "~-."
 
@@ -57,11 +55,22 @@ external ( -. ) : float -> float -> float = "-."
 
 external ( /. ) : float -> float -> float = "/."
 external ( / ) : int -> int -> int = "/"
+
+let rec ( ** ) m n =
+  if n = 0 then
+    1
+  else
+    let p = m ** (n / 2) in
+    if n mod 2 = 0 then
+      p * p
+    else
+      p * p * m
+
 let ( / ) m n = match n with
   | 0 -> raise divisionByZero ()
   | n -> (/) m n
 
-external float : int -> float = "float"
+external float_of_int : int -> float = "float_of_int"
 
 external ( ^ ) : string -> string -> string = "^"
 
@@ -110,7 +119,7 @@ let rec map f = function
   | x :: xs ->
     let y = f x in
     let ys = map f xs in
-      y :: ys ;;
+      y :: ys;;
 
 let ignore _ = ()
 
@@ -136,7 +145,7 @@ let rec fold_right f xs a =
 
 let rec iter f = function
   | [] -> ()
-  | x :: xs -> f x ; iter f xs
+  | x :: xs -> f x; iter f xs
 
 let rec forall p = function
   | [] -> true
@@ -197,14 +206,14 @@ let rec gcd m n =
   match n with
   | 0 -> m
   | _ ->
-    let g = gcd n in g (m % n)
+    let g = gcd n in g (m mod n)
 
 let rec lcm m n =
   let d = gcd m n in (m * n) / d
 
-let odd x = (x % 2 = 1)
+let odd x = (x mod 2 = 1)
 
-let even x = (x % 2 = 0)
+let even x = (x mod 2 = 0)
 
 let id x = x
 
@@ -216,15 +225,15 @@ let snd (_, y) = y
 
 let print v =
   let s = to_string v in
-    std#write s
+    std#print s
 
 let print_string str =
-  std#write str
+  std#print str
 
 let print_endline v =
   let s = to_string v in
-    std#write s ;
-    std#write "\n"
+    std#print s;
+    std#print "\n"
 
 type 'a ref = effect
   operation lookup: unit -> 'a
@@ -235,7 +244,7 @@ let state r x = handler
   | val y -> (fun _ -> y)
   | r#lookup () k -> (fun s -> k s s)
   | r#update s' k -> (fun _ -> k () s')
-  | finally f -> f x ;;
+  | finally f -> f x;;
 
 let ref x =
   new ref @ x with
@@ -254,7 +263,7 @@ effect
   operation float : float -> float
 end
 
-external rnd : random = "rnd" ;;
+external rnd : random = "rnd";;
 
 (* This forces the evaluation of x before calling the check, allowing us
    to write [check !l] and similar to get the result instead of an

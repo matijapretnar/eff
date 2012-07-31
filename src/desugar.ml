@@ -9,17 +9,30 @@ let id_abstraction pos =
   let x = C.fresh_variable () in
   ((Pattern.Var x, pos), (I.Value (I.Var x, pos), pos))
 
+
 (** [ty s k t] desugars type [t] where it applies the substitution [s] to parameters. *)
+let rec ty_fv = function
+  | S.TyApply (_, lst) -> List.flatten (List.map ty_fv lst)
+  | S.TyParam s -> [s]
+  | S.TyArrow (t1, t2) -> ty_fv t1 @ ty_fv t2
+  | S.TyTuple lst -> List.flatten (List.map ty_fv lst)
+  | S.TyHandler (t1, t2) -> ty_fv t1 @ ty_fv t2
+
 let rec ty s = function
   | S.TyApply (t, lst) -> T.Apply (t, List.map (ty s) lst)
   | S.TyParam str ->
     begin match C.lookup str s with
-      | None -> Error.syntax "Unbound type parameter '%s" str
-      | Some t -> t
+    | None -> Error.syntax "Unbound type parameter '%s" str
+    | Some t -> t
     end
   | S.TyArrow (t1, t2) -> T.Arrow (ty s t1, ty s t2)
   | S.TyTuple lst -> T.Tuple (List.map (ty s) lst)
   | S.TyHandler (t1, t2) -> T.Handler { T.value = ty s t1; T.finally = ty s t2 }
+
+let external_ty t =
+  let lst = List.fold_right (fun p lst -> (p, Type.next_param ()) :: lst) (ty_fv t) [] in
+  let s = C.assoc_map (fun p -> Type.Param p) lst in
+  (List.map snd lst, ty s t)
 
 
 (* Desugaring functions below return a list of bindings and the desugared form. *)
@@ -44,7 +57,7 @@ let rec expression (t, pos) =
       let w, es = expressions ts in
       w, I.Tuple es
   | S.Record ts ->
-      if not (C.injective fst ts) then Error.syntax ~pos:pos "Fields in a record must be distinct" ;
+      if not (C.injective fst ts) then Error.syntax ~pos:pos "Fields in a record must be distinct";
       let w, es = record_expressions ts in
       w, I.Record es
   | S.Variant (lbl, None) ->
@@ -158,20 +171,20 @@ and record_expressions = function
     let ws, es = record_expressions ts in
     w @ ws, ((f, e) :: es)
 
-and handler pos {S.operations=ops; S.value=ret; S.finally=fin} =
+and handler pos {S.operations=ops; S.value=val_a; S.finally=fin_a} =
   let rec operation_cases = function
   | [] -> [], []
-  | ((t, op), (k, a)) :: cs ->
+  | ((t, op), a2) :: cs ->
     let w, e = expression t in
     let ws, cs' = operation_cases cs in
-    w @ ws, ((e, op), (k, abstraction a)) :: cs'
+    w @ ws, ((e, op), abstraction2 a2) :: cs'
   in
   let ws, ops = operation_cases ops in
   ws, { I.operations = ops;
-    I.return =
-      (match ret with None -> id_abstraction pos | Some a -> abstraction a);
+    I.value =
+      (match val_a with None -> id_abstraction pos | Some a -> abstraction a);
     I.finally =
-      (match fin with None -> id_abstraction pos | Some a -> abstraction a)}
+      (match fin_a with None -> id_abstraction pos | Some a -> abstraction a)}
 
 (** [tydef t ps d] desugars the definition of type [t] with parameters [ps]
     and definition [d]. *)

@@ -5,20 +5,20 @@ let transaction r exc = handler
   | r#lookup () k -> (fun s -> k s s)
   | r#update s' k -> (fun s -> k () s')
   | val x -> (fun s -> r := s; x)
-  | finally f -> f !r ;;
+  | finally f -> f !r;;
 
-let r = ref 42 ;;
+let r = ref 42;;
 
-let e = new exception ;;
+let e = new exception;;
 
 (* This prints 69 but does not change !r. *)
 handle
   with transaction r e handle
-    r := 23 ;
-    raise e (3 * !r) ; (* Raise e with argument 69. *)
-    r := 34 ;
+    r := 23;
+    raise e (3 * !r); (* Raise e with argument 69. *)
+    r := 34;
     print !r (* This won't print. *)
 with
-  e#raise v _ -> print v ;; (* Prints 69. *)
+  e#raise v _ -> print v;; (* Prints 69. *)
 
 (* The value of !r is still 42. *)

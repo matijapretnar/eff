@@ -10,7 +10,7 @@ end
 (* The uniofrm distribution on a given list of events. *)
 let uniform lst =
   let n = length lst in
-    map (fun x -> (x, 1.0 /. float n)) lst ;;
+    map (fun x -> (x, 1.0 /. float_of_int n)) lst;;
 
 (* Combine a probability distribution of probability distributions
    into a single probability distribution. This is the multiplication
@@ -22,21 +22,21 @@ let combine lst =
     | (j,y)::lst ->
       if i = j then (j, x +. y) :: lst else (j,y) :: add (i,x) lst
   in
-    fold_left (fun e (d,p) -> fold_right add (scale p d) e) [] lst ;;
+    fold_left (fun e (d,p) -> fold_right add (scale p d) e) [] lst;;
 
 (* This handler computes the distribution of outcomes of a probabilisitic
    computation. *)
 let distribution r = handler
   | val v -> [(v, 1.0)]
   | r#pick lst k ->
-      combine (map (fun (x,p) -> (k x, p)) lst) ;;
+      combine (map (fun (x,p) -> (k x, p)) lst);;
 
 (* The handler computing the expected value of a probabilistic computation
    of type float. *)
 let expectation r = handler
   | val v -> v
   | r#pick lst k ->
-      fold_right (fun (x,p) e -> e +. p *. k x) lst 0.0 ;;
+      fold_right (fun (x,p) e -> e +. p *. k x) lst 0.0;;
 
 (* Examples. *)
 
@@ -48,18 +48,18 @@ let walk r n p q =
     with state x 0.0 handle
       for i = 1 to n do
          x := !x +. r#pick [(-1.0, p); (0.0, s); (1.0, q)]
-      done ;
-      !x ;;
+      done;
+      !x;;
 
 (* Where do we expect to land after 5 steps in a symmetric walk? (Answer: 0.0) *)
 let r = new random in
   with expectation r handle
-    walk r 5 (1.0 /. 3.0) (1.0 /. 3.0) ;;
+    walk r 5 (1.0 /. 3.0) (1.0 /. 3.0);;
 
 (* Instead of the expected value we can calculate the distribution. *)
 let r = new random in
   with distribution r handle
-    walk r 5 (1.0 /. 3.0) (1.0 /. 3.0) ;;
+    walk r 5 (1.0 /. 3.0) (1.0 /. 3.0);;
 
 (* Finally, let us solve the Monty Hall problem, see
    http://en.wikipedia.org/wiki/Monty_Hall_problem *)
@@ -79,14 +79,14 @@ let monty_hall r change =
   (* What is our final answer? *)
   let final = (if change then hd (complement doors [guess; show]) else guess) in
   (* Did we get the prize? *)
-    final = prize ;;
+    final = prize;;
 
 (* The distribution if we stay with our initial guess. *)
 let r = new random in
   with distribution r handle
-    monty_hall r false ;;
+    monty_hall r false;;
 
 (* The distribution if we switch the door. *)
 let r = new random in
   with distribution r handle
-    monty_hall r true ;;
+    monty_hall r true;;

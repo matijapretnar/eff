@@ -5,11 +5,11 @@
 
 type choice = effect
   operation decide : unit -> bool
-end ;;
+end;;
 
 (* We create an instance of choice to work with. *)
 
-let c = new choice ;;
+let c = new choice;;
 
 (* The following piece of code chooses 10 or 20 for x and 0 or 5 for y,
    but since it is not wrapped in a handler it just produces a runtime
@@ -17,7 +17,7 @@ let c = new choice ;;
 
    let x = (if c#decide () then 10 else 20) in
    let y = (if c#decide () then 0 else 5) in
-     x - y ;;
+     x - y;;
 *)
 
 (* If we wrap it in a handler which handles c#decide by
@@ -29,20 +29,20 @@ handle
   let y = (if c#decide () then 0 else 5) in
     x - y
 with
-| c#decide () k -> k true ;;
+| c#decide () k -> k true;;
 
 (* This handler collects all results that we can get by making different choices. *)
 
 let choose_all d = handler
   | d#decide () k -> k true @ k false
-  | val x -> [x] ;;
+  | val x -> [x];;
 
 (* This returns a list of four possibilities [10; 5; 20; 15] *)
 
 with choose_all c handle
   let x = (if c#decide () then 10 else 20) in
   let y = (if c#decide () then 0 else 5) in
-    x - y ;;
+    x - y;;
 
 (* We can create two instances and handle each one separately. The inner handler produces
    two results in a list, and the outer handler then produces a list of two lists of two
@@ -54,7 +54,7 @@ let c2 = new choice in
   with choose_all c2 handle
     let x = (if c1#decide () then 10 else 20) in
     let y = (if c2#decide () then 0 else 5) in
-      x - y ;;
+      x - y;;
 
 (* If we switch the order of handlers and operations we also get a list of two lists of
    two results, but in a different order: [[10; 20]; [5; 15]] *)
@@ -65,7 +65,7 @@ let c2 = new choice in
   with choose_all c1 handle
     let y = (if c2#decide () then 0 else 5) in
     let x = (if c1#decide () then 10 else 20) in
-      x - y ;;
+      x - y;;
 
 (* However, switching around only the handler but not the operations, produces a list of
    _four_ lists of two elements each: [[10; 20]; [10; 15]; [5; 20]; [5; 15]]
@@ -77,4 +77,4 @@ let c2 = new choice in
   with choose_all c1 handle
     let x = (if c1#decide () then 10 else 20) in
     let y = (if c2#decide () then 0 else 5) in
-      x - y ;;
+      x - y;;

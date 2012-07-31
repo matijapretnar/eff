@@ -205,7 +205,7 @@ EXTRA_DIST = pervasives.eff tests examples src etc LICENSE.txt INSTALL.txt READM
 EFFTARGET = src/eff
 
 # How to compile
-EFFOCAMLBUILD = $(OCAMLBUILD) -use-menhir -lib nums -lib unix
+EFFOCAMLBUILD = $(OCAMLBUILD) -use-menhir -lib unix
 all: all-am
 
 .SUFFIXES:
@@ -323,7 +323,7 @@ distdir: $(DISTFILES)
 	case $$dist_files in \
 	  */*) $(MKDIR_P) `echo "$$dist_files" | \
 			   sed '/\//!d;s|^|$(distdir)/|;s,/[^/]*$$,,' | \
-			   sort -u` ;; \
+			   sort -u`;; \
 	esac; \
 	for file in $$dist_files; do \
 	  if test -f $$file || test -d $$file; then d=.; else d=$(srcdir); fi; \
@@ -393,21 +393,21 @@ dist dist-all: distdir
 distcheck: dist
 	case '$(DIST_ARCHIVES)' in \
 	*.tar.gz*) \
-	  GZIP=$(GZIP_ENV) gzip -dc $(distdir).tar.gz | $(am__untar) ;;\
+	  GZIP=$(GZIP_ENV) gzip -dc $(distdir).tar.gz | $(am__untar);;\
 	*.tar.bz2*) \
-	  bzip2 -dc $(distdir).tar.bz2 | $(am__untar) ;;\
+	  bzip2 -dc $(distdir).tar.bz2 | $(am__untar);;\
 	*.tar.lzma*) \
-	  lzma -dc $(distdir).tar.lzma | $(am__untar) ;;\
+	  lzma -dc $(distdir).tar.lzma | $(am__untar);;\
 	*.tar.lz*) \
-	  lzip -dc $(distdir).tar.lz | $(am__untar) ;;\
+	  lzip -dc $(distdir).tar.lz | $(am__untar);;\
 	*.tar.xz*) \
-	  xz -dc $(distdir).tar.xz | $(am__untar) ;;\
+	  xz -dc $(distdir).tar.xz | $(am__untar);;\
 	*.tar.Z*) \
-	  uncompress -c $(distdir).tar.Z | $(am__untar) ;;\
+	  uncompress -c $(distdir).tar.Z | $(am__untar);;\
 	*.shar.gz*) \
-	  GZIP=$(GZIP_ENV) gzip -dc $(distdir).shar.gz | unshar ;;\
+	  GZIP=$(GZIP_ENV) gzip -dc $(distdir).shar.gz | unshar;;\
 	*.zip*) \
-	  unzip $(distdir).zip ;;\
+	  unzip $(distdir).zip;;\
 	esac
 	chmod -R a-w $(distdir); chmod a+w $(distdir)
 	mkdir $(distdir)/_build
@@ -458,20 +458,20 @@ distuninstallcheck:
 	  exit 1; \
 	}; \
 	test `$(am__distuninstallcheck_listfiles) | wc -l` -eq 0 \
-	   || { echo "ERROR: files left after uninstall:" ; \
+	   || { echo "ERROR: files left after uninstall:"; \
 	        if test -n "$(DESTDIR)"; then \
 	          echo "  (check DESTDIR support)"; \
-	        fi ; \
-	        $(distuninstallcheck_listfiles) ; \
+	        fi; \
+	        $(distuninstallcheck_listfiles); \
 	        exit 1; } >&2
 distcleancheck: distclean
-	@if test '$(srcdir)' = . ; then \
-	  echo "ERROR: distcleancheck can only run from a VPATH build" ; \
-	  exit 1 ; \
+	@if test '$(srcdir)' = .; then \
+	  echo "ERROR: distcleancheck can only run from a VPATH build"; \
+	  exit 1; \
 	fi
 	@test `$(distcleancheck_listfiles) | wc -l` -eq 0 \
-	  || { echo "ERROR: files left in build directory after distclean:" ; \
-	       $(distcleancheck_listfiles) ; \
+	  || { echo "ERROR: files left in build directory after distclean:"; \
+	       $(distcleancheck_listfiles); \
 	       exit 1; } >&2
 check-am: all-am
 check: check-am
@@ -621,8 +621,8 @@ src/version.ml:
 
 # Explain parser conflicts in the file parser.conflicts
 conflicts:
-	cd $(srcdir) ; \
-	$(EFFOCAMLBUILD) -yaccflags "--explain" src/parser.mli ; \
+	cd $(srcdir); \
+	$(EFFOCAMLBUILD) -yaccflags "--explain" src/parser.mli; \
 	if [ -f $(srcdir)/_build/src/parser.conflicts ]; \
 	then \
 		mv -f $(srcdir)/_build/src/parser.conflicts .; \

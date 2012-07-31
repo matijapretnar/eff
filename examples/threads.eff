@@ -12,14 +12,14 @@ let round_robin c =
   let dequeue () =
     match !threads with
     | [] -> ()
-    | t :: ts -> threads := ts ; t ()
+    | t :: ts -> threads := ts; t ()
   in
   let rec scheduler () = handler
-    | c#yield () k -> enqueue k ; dequeue ()
-    | c#fork t k -> enqueue k ; with scheduler () handle t ()
+    | c#yield () k -> enqueue k; dequeue ()
+    | c#fork t k -> enqueue k; with scheduler () handle t ()
     | val () -> dequeue ()
   in
-    scheduler () ;;
+    scheduler ();;
 
 (* An example of nested multithreading. We have a thread which prints
    the letter a and another one which has two sub-threads printing x and y. *)
@@ -27,19 +27,19 @@ let c = new coop in
 with round_robin c handle
   c#fork (fun _ ->
     for i = 1 to 5 do
-      print_string "a" ;
+      print_string "a";
       c#yield ()
-    done) ;
+    done);
   let d = new coop in
   with round_robin d handle
     d#fork (fun _ ->
       for j = 1 to 5 do
-         print_string "x" ;
+         print_string "x";
          d#yield ()
-    done) ;
+    done);
     for k = 1 to 5 do
-      print_string "y" ;
-      d#yield () ;
+      print_string "y";
+      d#yield ();
       c#yield ()
     done
 ;;
@@ -49,15 +49,15 @@ with round_robin c handle
 let c = new coop in
 let rec fractions denominator =
   (* For the next denominator *)
-    c#fork (fun _ -> c#yield (); fractions (denominator + 1)) ;
+    c#fork (fun _ -> c#yield (); fractions (denominator + 1));
     (* And list all the fractions with the current one *)
     for numerator = 1 to denominator - 1 do
       (* Print if the fraction is reduced. *)
       if gcd numerator denominator = 1 then
         print_string (to_string numerator ^ "/" ^ to_string denominator ^ ", ")
-      else () ;
+      else ();
       c#yield ()
     done
 in
 with round_robin c handle
-  fractions 1 ;;
+  fractions 1;;

@@ -11,7 +11,7 @@ let help_text = "Toplevel commands:
 #reset;;           forget all definitions (including pervasives)
 #help;;            print this help
 #quit;;            exit eff
-#use \"<file>\";;  load commands from file" ;;
+#use \"<file>\";;  load commands from file";;
 
 (* We look for pervasives.eff _first_ next to the executable and _then_ in the relevant
    install directory. This makes it easier to experiment with pervasives.eff because
@@ -47,7 +47,7 @@ let options = Arg.align [
     " Do not use a command-line wrapper");
   ("-v",
     Arg.Unit (fun () ->
-      print_endline ("eff " ^ Version.version ^ "(" ^ Sys.os_type ^ ")") ;
+      print_endline ("eff " ^ Version.version ^ "(" ^ Sys.os_type ^ ")");
       exit 0),
     " Print version information and exit");
   ("--warn-sequencing", Arg.Set Infer.warn_implicit_sequencing,
@@ -80,13 +80,13 @@ let parse parser lex =
       Error.syntax ~pos:(Lexer.position_of_lex lex) "unrecognised symbol."
 
 let initial_ctxenv =
-  (Ctx.initial, Eval.initial)
+  (Ctx.empty, Eval.initial)
 
 let exec_topdef interactive (ctx, env) (d,pos) =
   match d with
   | S.TopLet defs ->
       let defs = C.assoc_map Desugar.computation defs in
-      let vars, ctx = Infer.infer_top_let ctx pos defs in
+      let vars, ctx = Infer.infer_let ctx (ref Type.identity_subst) pos defs in
       let env =
         List.fold_right
           (fun (p,c) env -> let v = Eval.run env c in Eval.extend p v env)
@@ -98,49 +98,57 @@ let exec_topdef interactive (ctx, env) (d,pos) =
                          | None -> assert false
                          | Some v -> Format.printf "@[val %s : %t = %t@]@." x (Print.ty ps t) (Print.value v))
             vars
-        end ;
+        end;
         (ctx, env)
   | S.TopLetRec defs ->
       let defs = C.assoc_map Desugar.let_rec defs in
-      let vars, ctx = Infer.infer_top_let_rec ctx pos defs in
+      let vars, ctx = Infer.infer_let_rec ctx (ref Type.identity_subst) pos defs in
       let env = Eval.extend_let_rec env defs in
         if interactive then begin
           List.iter (fun (x,(ps,t)) -> Format.printf "@[val %s : %t = <fun>@]@." x (Print.ty ps t)) vars
-        end ;
+        end;
         (ctx, env)
   | S.External (x, t, f) ->
-    let lst = List.fold_right (fun p lst -> (p, Type.next_param ()) :: lst) (S.ty_fv t) [] in
-    let s = C.assoc_map (fun p -> Type.Param p) lst in
-    let ctx = Ctx.extend_var x (List.map snd lst, Desugar.ty s t) ctx in
-      begin match C.lookup f External.symbols with
+    let ctx = Ctx.extend x (Desugar.external_ty t) ctx in
+      begin match C.lookup f External.values with
         | Some v -> (ctx, Eval.update x v env)
         | None -> Error.runtime ~pos:pos "unknown external symbol %s." f
       end
-  | S.Tydef defs ->
-      let defs = List.map (fun (t, (ps, d)) -> (t, Desugar.tydef ps d)) defs in
-      let ctx = Infer.check_tydef ctx pos defs in
+  | S.Tydef tydefs ->
+      let tydefs = List.map (fun (t, (ps, d)) -> (t, Desugar.tydef ps d)) tydefs in
+      Tctx.global := Tctx.extend_tydefs ~pos:pos !Tctx.global tydefs;
       (ctx, env)
 
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
     and return the new environment. *)
+
+let infer_top_comp ctx c =
+  let cstr = ref [] in
+  let ty = Infer.infer_comp ctx cstr c in
+  let sbst = Unify.solve !cstr in
+  let ctx = Ctx.subst_ctx sbst ctx in
+  let ty = Type.subst_ty sbst ty in
+  ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty
+
 let rec exec_cmd interactive (ctx, env) e =
   match e with
-  | S.Expr c ->
+  | S.Term c ->
       let c = Desugar.computation c in
-      let ctx, (ps, t) = Infer.infer_top_comp ctx c in
+      let ctx, (ps, t) = infer_top_comp ctx c in
       let v = Eval.run env c in
-      if interactive then Format.printf "@[- : %t = %t@]@." (Print.ty ps t) (Print.value v) ;
+      if interactive then Format.printf "@[- : %t = %t@]@." (Print.ty ps t) (Print.value v);
       (ctx, env)
   | S.TypeOf c ->
       let c = Desugar.computation c in
-      let ctx, (ps, t) = Infer.infer_top_comp ctx c in
-      Format.printf "@[- : %t@]@." (Print.ty ps t) ;
+      let ctx, (ps, t) = infer_top_comp ctx c in
+      Format.printf "@[- : %t@]@." (Print.ty ps t);
       (ctx, env)
   | S.Reset ->
+      Tctx.reset ();
       print_endline ("Environment reset."); initial_ctxenv
   | S.Help ->
-      print_endline help_text ; (ctx, env)
+      print_endline help_text; (ctx, env)
   | S.Quit -> exit 0
   | S.Use fn -> use_file (ctx, env) (fn, interactive)
   | S.Topdef def -> exec_topdef interactive (ctx, env) def
@@ -182,20 +190,20 @@ let main =
       | Some lst ->
           let n = Array.length Sys.argv + 2 in
           let args = Array.make n "" in
-            Array.blit Sys.argv 0 args 1 (n - 2) ;
-            args.(n - 1) <- "--no-wrapper" ;
+            Array.blit Sys.argv 0 args 1 (n - 2);
+            args.(n - 1) <- "--no-wrapper";
             List.iter
               (fun wrapper ->
                  try
-                   args.(0) <- wrapper ;
+                   args.(0) <- wrapper;
                    Unix.execvp wrapper args
                  with Unix.Unix_error _ -> ())
               lst
-    end ;
+    end;
   (* Files were listed in the wrong order, so we reverse them *)
   files := List.rev !files;
   (* Load the pervasives. *)
-  if !pervasives then add_file false !pervasives_file ;
+  if !pervasives then add_file false !pervasives_file;
   try
     (* Run and load all the specified files. *)
     let ctxenv = List.fold_left use_file initial_ctxenv !files in

@@ -34,7 +34,7 @@ AC_DEFUN([AC_PROG_OCAML],
 	AC_MSG_WARN([Cannot find ocamlopt; bytecode compilation only.])
      else
 	TMPVERSION=`$OCAMLOPT -v | sed -n -e 's|.*version* *\(.*\)$|\1|p' `
-	if test "$TMPVERSION" != "$OCAMLVERSION" ; then
+	if test "$TMPVERSION" != "$OCAMLVERSION"; then
 	    AC_MSG_RESULT([versions differs from ocamlc; ocamlopt discarded.])
 	    OCAMLOPT=no
 	else
@@ -48,7 +48,7 @@ AC_DEFUN([AC_PROG_OCAML],
      AC_CHECK_TOOL([OCAMLCDOTOPT],[ocamlc.opt],[no])
      if test "$OCAMLCDOTOPT" != "no"; then
 	TMPVERSION=`$OCAMLCDOTOPT -v | sed -n -e 's|.*version* *\(.*\)$|\1|p' `
-	if test "$TMPVERSION" != "$OCAMLVERSION" ; then
+	if test "$TMPVERSION" != "$OCAMLVERSION"; then
 	    AC_MSG_RESULT([versions differs from ocamlc; ocamlc.opt discarded.])
 	else
 	    OCAMLC=$OCAMLCDOTOPT
@@ -56,11 +56,11 @@ AC_DEFUN([AC_PROG_OCAML],
      fi
 
      # checking for ocamlopt.opt
-     if test "$OCAMLOPT" != "no" ; then
+     if test "$OCAMLOPT" != "no"; then
 	AC_CHECK_TOOL([OCAMLOPTDOTOPT],[ocamlopt.opt],[no])
 	if test "$OCAMLOPTDOTOPT" != "no"; then
 	   TMPVERSION=`$OCAMLOPTDOTOPT -v | sed -n -e 's|.*version* *\(.*\)$|\1|p' `
-	   if test "$TMPVERSION" != "$OCAMLVERSION" ; then
+	   if test "$TMPVERSION" != "$OCAMLVERSION"; then
 	      AC_MSG_RESULT([version differs from ocamlc; ocamlopt.opt discarded.])
 	   else
 	      OCAMLOPT=$OCAMLOPTDOTOPT
@@ -121,7 +121,7 @@ AC_DEFUN([AC_PROG_CAMLP4],
   AC_CHECK_TOOL([CAMLP4],[camlp4],[no])
   if test "$CAMLP4" != "no"; then
      TMPVERSION=`$CAMLP4 -v 2>&1| sed -n -e 's|.*version *\(.*\)$|\1|p'`
-     if test "$TMPVERSION" != "$OCAMLVERSION" ; then
+     if test "$TMPVERSION" != "$OCAMLVERSION"; then
 	AC_MSG_RESULT([versions differs from ocamlc])
         CAMLP4=no
      fi
@@ -170,7 +170,7 @@ AC_DEFUN([AC_CHECK_OCAML_PKG],
   unset found
   unset pkg
   found=no
-  for pkg in $1 $2 ; do
+  for pkg in $1 $2; do
     if $OCAMLFIND query $pkg >/dev/null 2>/dev/null; then
       AC_MSG_RESULT([found])
       AS_TR_SH([OCAML_PKG_$1])=$pkg
@@ -178,7 +178,7 @@ AC_DEFUN([AC_CHECK_OCAML_PKG],
       break
     fi
   done
-  if test "$found" = "no" ; then
+  if test "$found" = "no"; then
     AC_MSG_RESULT([not found])
     AS_TR_SH([OCAML_PKG_$1])=no
   fi
@@ -195,14 +195,14 @@ AC_DEFUN([AC_CHECK_OCAML_MODULE],
 open $3
 EOF
   unset found
-  for $1 in $$1 $4 ; do
-    if $OCAMLC -c -I "$$1" conftest.ml >&5 2>&5 ; then
+  for $1 in $$1 $4; do
+    if $OCAMLC -c -I "$$1" conftest.ml >&5 2>&5; then
       found=yes
       break
     fi
   done
 
-  if test "$found" ; then
+  if test "$found"; then
     AC_MSG_RESULT([$$1])
   else
     AC_MSG_RESULT([not found])

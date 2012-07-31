@@ -2,13 +2,12 @@
 
 (** Types shared by different modules *)
 type variable = string (** variable identifiers *)
-type opname = string (** operation symbols *)
+type opsym = string (** operation symbols *)
 type label = string (** variant labels *)
 type field = string (** record fields *)
 
 type tyname = string (** type names *)
-type effname = string (** effect names *)
-type param = string (** type parameters *)
+type typaram = string (** type parameters *)
 
 (** Positions *)
 type position =
@@ -26,26 +25,10 @@ let join_pos (_, pos1) (_, pos2) =
 
 (** Primitive constants *)
 type const =
-  | Integer of Big_int.big_int
+  | Integer of int
   | String of string
   | Boolean of bool
   | Float of float
-
-let equal_const c1 c2 =
-  match c1, c2 with
-    | Integer k1, Integer k2 -> Big_int.eq_big_int k1 k2
-    | String s1, String s2 -> s1 = s2
-    | Boolean b1, Boolean b2 -> b1 = b2
-    | Float f1, Float f2 -> f1 = f2
-    | _, _ -> false
-
-let less_than_const c1 c2 =
-  match c1, c2 with
-    | Integer k1, Integer k2 -> Big_int.lt_big_int k1 k2
-    | String s1, String s2 -> String.compare s1 s2 < 0
-    | Boolean b1, Boolean b2 -> not b1 && b2
-    | Float f1, Float f2 -> f1 < f2
-    | _, _ -> false
 
 (** Variants for the built-in list type *)
 let cons = "$1cons"
@@ -95,10 +78,17 @@ let rec map f = function
       let ys = map f xs in
       y :: ys
 
+let flatten_map f xs = List.flatten (List.map f xs)
+
 (** [option_map f] maps [None] to [None] and [Some x] to [Some (f x)]. *)
 let option_map f = function
   | None -> None
   | Some x -> Some (f x)
+
+(** [repeat x n] creates a list with [x] repeated [n] times. *)
+let rec repeat x = function
+  | 0 -> []
+  | n -> x :: repeat x (n-1)
 
 (** [remove x lst] returns [lst] with all occurrences of [x] removed. *)
 let rec remove x = function
@@ -129,12 +119,28 @@ let fresh_variable =
   let next_variable = fresh "variable" in
   fun () -> "$gen" ^ string_of_int (next_variable ())
 
-(** [uniq lst] returns [lst] with all duplicates removed *)
-let rec uniq = function
-  | [] -> []
-  | x::xs ->
-    let ys = uniq xs in
-      if List.mem x ys then ys else x::ys
+(** [uniq lst] returns [lst] with all duplicates removed, keeping the first
+    occurence of each element. *)
+let uniq lst =
+  let rec uniq acc = function
+  | [] -> List.rev acc
+  | x :: xs -> if List.mem x acc then uniq acc xs else uniq (x :: acc) xs
+  in uniq [] lst
+
+(** [split n lst] splits [lst] into two parts containing (up to) the first [n]
+    elements and the rest. *)
+let split n lst =
+  let rec split_aux acc lst n = match lst, n with
+    | ([], _) | (_, 0) -> (List.rev acc, lst)
+    | x :: xs, n -> split_aux (x :: acc) xs (n-1)
+  in
+  split_aux [] lst n
 
 (** [diff lst1 lst2] returns [lst1] with all members of [lst2] removed *)
 let diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
+
+(** [subset lst1 lst2] returns [true] if [lst1] is a subset of [lst2]. *)
+let subset lst1 lst2 = List.for_all (fun x -> List.mem x lst2) lst1
+
+(** [equal_set lst1 lst2] returns [true] if the lists are equal as sets. *)
+let equal_set lst1 lst2 = subset lst1 lst2 && subset lst2 lst1

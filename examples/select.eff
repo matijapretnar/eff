@@ -23,7 +23,7 @@ let select s v = handler
          in try ys))
   | val u -> (fun cs ->
       if u = v then Success cs else Failure)
-  | finally f -> f [] ;;
+  | finally f -> f [];;
 
 (* Search for a Pythagorean triple. It finds a=5, b=12, c=13. *)
 let s = new selection in
@@ -31,7 +31,7 @@ with select s true handle
   let a = s#select ("a", [5;6;7;8]) in
   let b = s#select ("b", [9;10;11;12]) in
   let c = s#select ("c", [13;14;15;16]) in
-    a*a + b*b = c*c ;;
+    a*a + b*b = c*c;;
 
 (* Martin Escardo's epsilon. *)
 
@@ -48,23 +48,23 @@ let epsilon p =
 ;;
 
 (* From epsilon we can define existential and universal quantifiers. *)
-let some p = p (epsilon p) ;;
-let every p = not (p (epsilon (fun x -> not (p x)))) ;;
+let some p = p (epsilon p);;
+let every p = not (p (epsilon (fun x -> not (p x))));;
 
 (* And equality on the Cantor space. *)
-let equal x y = every (fun k -> x k = y k) ;;
+let equal x y = every (fun k -> x k = y k);;
 
 (* A sample predicate. *)
-let p x = (if x (10 ** 1000) then x (2 ** 30000) else not (x (3 ** 40000))) ;;
+let p x = (if x (10 ** 1000) then x (2 ** 30000) else not (x (3 ** 40000)));;
 
-some p ;; (* true, answer found instantaneously *)
+some p;; (* true, answer found instantaneously *)
 
 (* xor n x takes the exclusive or of x 0, x 1, ..., x n. *)
 let rec xor n x =
-  if n = 0 then x 0 else x n <> xor (n-1) x ;;
+  if n = 0 then x 0 else x n <> xor (n-1) x;;
 
 (* It is not much more difficult to get a witness for xor. *)
-take (epsilon (xor 300)) 300 ;;
+take (epsilon (xor 300)) 300;;
 
 (* To get an example which takes some time we need a predicate
    whic is true only on a small portion of the entire space.*)
@@ -72,6 +72,6 @@ let rec is_alternating n b x =
   if n = 0 then x 0 = b else 
     let u = (x n = b) in
     let v = is_alternating (n-1) (not b) x in
-      u && v ;;
+      u && v;;
 
-take (epsilon (is_alternating 15 true)) 20 ;;
+take (epsilon (is_alternating 15 true)) 20;;

@@ -130,7 +130,7 @@ Environment variables override the default commands:
 
 while test $# -ne 0; do
   case $1 in
-    -c) ;;
+    -c);;
 
     -C) copy_on_change=true;;
 
@@ -343,7 +343,7 @@ do
 	  *[123567][0-7][0-7])
 	    # POSIX mkdir -p sets u+wx bits regardless of umask, which
 	    # is incompatible with FreeBSD 'install' when (umask & 300) != 0.
-	    ;;
+	   ;;
 	  *)
 	    tmpdir=${TMPDIR-/tmp}/ins$RANDOM-$$
 	    trap 'ret=$?; rmdir "$tmpdir/d" "$tmpdir" 2>/dev/null; exit $ret' 0

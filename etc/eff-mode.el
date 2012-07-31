@@ -59,9 +59,9 @@
 
 (defvar eff-font-lock-defaults
     `((
-       ;; stuff between "
+      ;; stuff between "
        ("\"\\.\\*\\?" . font-lock-string-face)
-       ;; prefix and infix operators, can be improved
+      ;; prefix and infix operators, can be improved
        ("+\\|,\\|;" . font-lock-keyword-face)
        ( ,(regexp-opt eff-keywords 'words) . font-lock-keyword-face)
        ( ,(regexp-opt eff-constants 'words) . font-lock-constant-face)
