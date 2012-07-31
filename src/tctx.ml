@@ -17,7 +17,7 @@ let initial = [
   ("int", ([], T.int_ty));
   ("string", ([], T.string_ty));
   ("float", ([], T.float_ty));
-  ("list", (let a = T.next_param () in
+  ("list", (let a = Type.Param.fresh_ty () in
               ([a],
                T.Sum [(Common.nil, None);
                       (Common.cons, Some (T.Tuple [T.Param a; T.Apply ("list", [T.Param a])]))])));

@@ -72,7 +72,7 @@ let ty ?sbst poly t ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = print ?max_level ?at_level ppf in
     let print_param s p =
-      let k = (match Common.lookup p sbst with None -> ~-p | Some k -> k) in
+      let k = (match Common.lookup p sbst with None -> ~-(Type.Param.int_of_param p) | Some k -> k) in
       if 0 <= k && k <= 25
       then print "%s%c" s (char_of_int (k + int_of_char 'a'))
       else print "%sty%i" s (k - 25)
@@ -111,32 +111,32 @@ let subst sbst ppf =
 let rec computation ?max_level c ppf =
   let print ?at_level = print ?max_level ?at_level ppf in
   match fst c with
-  | Inter.Apply (e1, e2) -> print ~at_level:1 "%t %t" (expression e1) (expression ~max_level:0 e2)
-  | Inter.Value e -> print ~at_level:1 "value %t" (expression ~max_level:0 e)
-  | Inter.Match (e, lst) -> print "match %t with (@[<hov>%t@])" (expression e) (sequence " | " case lst)
-  | Inter.While (c1, c2) -> print "while %t do %t done" (computation c1) (computation c2)
-  | Inter.For (i, e1, e2, c, d) -> print "for %s = ... " i
-  | Inter.New (eff, None) -> print "new %s" eff
-  | Inter.New (eff, Some (e, lst)) -> print "new %s @ %t with ... end" eff (expression e)
-  | Inter.Handle (e, c) -> print "handle %t with %t" (expression e) (computation c)
-  | Inter.Let (lst, c) -> print "let %d @[<hov>%t@] in %t" (List.length lst) (sequence " | " let_abstraction lst) (computation c)
-  | Inter.LetRec (lst, c) -> print "let rec ... in %t" (computation c)
-  | Inter.Check c -> print "check %t" (computation c)
+  | Core.Apply (e1, e2) -> print ~at_level:1 "%t %t" (expression e1) (expression ~max_level:0 e2)
+  | Core.Value e -> print ~at_level:1 "value %t" (expression ~max_level:0 e)
+  | Core.Match (e, lst) -> print "match %t with (@[<hov>%t@])" (expression e) (sequence " | " case lst)
+  | Core.While (c1, c2) -> print "while %t do %t done" (computation c1) (computation c2)
+  | Core.For (i, e1, e2, c, d) -> print "for %s = ... " i
+  | Core.New (eff, None) -> print "new %s" eff
+  | Core.New (eff, Some (e, lst)) -> print "new %s @ %t with ... end" eff (expression e)
+  | Core.Handle (e, c) -> print "handle %t with %t" (expression e) (computation c)
+  | Core.Let (lst, c) -> print "let %d @[<hov>%t@] in %t" (List.length lst) (sequence " | " let_abstraction lst) (computation c)
+  | Core.LetRec (lst, c) -> print "let rec ... in %t" (computation c)
+  | Core.Check c -> print "check %t" (computation c)
 
 
 and expression ?max_level e ppf =
   let print ?at_level = print ?max_level ?at_level ppf in
   match fst e with
-  | Inter.Var x -> print "%s" x
-  | Inter.Const c -> print "%t" (const c)
-  | Inter.Tuple lst -> print "(@[<hov>%t@])" (sequence "," expression lst)
-  | Inter.Record lst -> print "{@[<hov>%t@]}" (sequence ";" (field expression) lst)
-  | Inter.Variant (lbl, None) -> print "%s" lbl
-  | Inter.Variant (lbl, Some e) ->
+  | Core.Var x -> print "%s" x
+  | Core.Const c -> print "%t" (const c)
+  | Core.Tuple lst -> print "(@[<hov>%t@])" (sequence "," expression lst)
+  | Core.Record lst -> print "{@[<hov>%t@]}" (sequence ";" (field expression) lst)
+  | Core.Variant (lbl, None) -> print "%s" lbl
+  | Core.Variant (lbl, Some e) ->
     print ~at_level:1 "%s @[<hov>%t@]" lbl (expression e)
-  | Inter.Lambda a -> print "fun %t" (abstraction a)
-  | Inter.Handler _  -> print "<handler>"
-  | Inter.Operation (e, op) -> print "%t#%s" (expression e) op
+  | Core.Lambda a -> print "fun %t" (abstraction a)
+  | Core.Handler _  -> print "<handler>"
+  | Core.Operation (e, op) -> print "%t#%s" (expression e) op
 
 and abstraction (p, c) ppf =
   fprintf ppf "%t -> %t" (pattern p) (computation c)
