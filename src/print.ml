@@ -104,7 +104,8 @@ let ty sbst poly t ppf =
     in
     match t with
       | Type.Arrow (t1, (t2, drt)) ->
-          print ~at_level:5 "@[<h>%t ->@ %t ! %t@]" (ty ~max_level:4 t1) (ty t2) (dirt sbst poly drt)
+          (*print ~at_level:5 "@[<h>%t ->@ %t ! %t@]" (ty ~max_level:4 t1) (ty t2) (dirt sbst poly drt)*)
+          print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2)
       | Type.Basic b -> print "%s" b
       | Type.Apply (t, []) ->
           print "%s" t
