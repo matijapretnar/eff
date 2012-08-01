@@ -6,7 +6,8 @@
 *)
 
 (** The types of contexts and type schemes. *)
-type ty_scheme = Type.ty_param list * Type.ty
+type ty_scheme = (Type.ty_param list * Type.dirt_param list * Type.region_param list) * Type.ty
+
 type t
 
 (** [empty] is the empty context. *)
@@ -35,3 +36,4 @@ val subst_ctx : t -> Type.substitution -> t
     type scheme. If [poly] is [true], all free type parameters in [ty] that do
     not appear in [ctx] are universally quantified. *)
 val generalize : t -> bool -> Type.ty -> ty_scheme
+

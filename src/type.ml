@@ -1,12 +1,16 @@
+(* We need three sorts of parameters, for types, dirt, and regions.
+   In order not to confuse them, we define separate types for them.
+ *)
+
 type ty_param = Ty_Param of int
 type dirt_param = Dirt_Param of int
 type region_param = Region_Param of int
 type instance_param = Instance_Param of int
 
-let fresh_ty = (let f = Common.fresh "type parameter" in fun () -> Ty_Param (f ()))
-let fresh_dirt = (let f = Common.fresh "dirt parameter" in fun () -> Dirt_Param (f ()))
-let fresh_region = (let f = Common.fresh "region parameter" in fun () -> Region_Param (f ()))
-let fresh_instance = (let f = Common.fresh "instance parameter" in fun () -> Instance_Param (f ()))
+let fresh_ty_param = (let f = Common.fresh "type parameter" in fun () -> Ty_Param (f ()))
+let fresh_dirt_param = (let f = Common.fresh "dirt parameter" in fun () -> Dirt_Param (f ()))
+let fresh_region_param = (let f = Common.fresh "region parameter" in fun () -> Region_Param (f ()))
+let fresh_instance_param = (let f = Common.fresh "instance parameter" in fun () -> Instance_Param (f ()))
 
 type ty =
   | Apply of Common.tyname * ty list
@@ -15,7 +19,7 @@ type ty =
   | Tuple of ty list
   | Record of (Common.field, ty) Common.assoc
   | Sum of (Common.label, ty option) Common.assoc
-  | Arrow of ty * ty
+  | Arrow of ty * dirty
   | Effect of (Common.opsym, ty * ty) Common.assoc
   | Handler of handler_ty
 
@@ -28,15 +32,21 @@ and handler_ty = {
 
 and dirt =
   | DirtParam of dirt_param
-  | DirtUnion of dirt list
   | DirtAtom of region * Common.opsym
+  | DirtEmpty
+(* probably no need for this
+  | DirtUnion of dirt list
+*)
 
 and region =
   | RegionParam of region_param
-  | RegionInstances of instance_param
+  | RegionInstance of instance_param
+(* probably no need for this:
   | RegionUnion of region list
   | RegionTop
+*)
 
+let empty_dirt = DirtEmpty
 
 (* This type is used when type checking is turned off. Its name
    is syntactically incorrect so that the programmer cannot accidentally
@@ -50,18 +60,40 @@ let float_ty = Basic "float"
 let unit_ty = Tuple []
 let empty_ty = Sum []
 
-type substitution = (ty_param * ty) list
+type substitution = {
+  subst_ty : (ty_param * ty) list ;
+  subst_dirt : (dirt_param * dirt) list ;
+  subst_region : (region_param * region) list
+}
+
+let subst_region sbst = function
+  | RegionParam r ->
+    (match Common.lookup r sbst.subst_region with
+      | Some rgn -> rgn
+      | None -> RegionParam r)    
+  | (RegionInstance _) as rgn -> rgn
+
+let subst_dirt sbst = function
+  | DirtEmpty -> DirtEmpty
+  | DirtParam d ->
+    (match Common.lookup d sbst.subst_dirt with
+      | Some drt -> drt
+      | None -> DirtParam d)
+  | DirtAtom (r, op) -> DirtAtom (subst_region sbst r, op)
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
-let subst_ty sbst ty =
+let rec subst_ty sbst ty =
   let rec subst = function
   | Apply (ty_name, tys) -> Apply (ty_name, List.map subst tys)
-  | TyParam p as ty -> (try List.assoc p sbst with Not_found -> ty)
+  | TyParam p as ty ->
+    (match Common.lookup p sbst.subst_ty with
+      | Some ty -> ty
+      | None -> ty)
   | Basic _ as ty -> ty
   | Tuple tys -> Tuple (List.map subst tys)
   | Record tys -> Record (Common.assoc_map subst tys)
   | Sum tys -> Sum (Common.assoc_map (Common.option_map subst) tys)
-  | Arrow (ty1, ty2) -> Arrow (subst ty1, subst ty2)
+  | Arrow (ty1, ty2) -> Arrow (subst ty1, subst_dirty sbst ty2)
   | Effect op_sig ->
       Effect (Common.assoc_map (fun (ty1, ty2) -> (subst ty1, subst ty2)) op_sig)
   | Handler {value = ty1; finally = ty2} ->
@@ -69,52 +101,94 @@ let subst_ty sbst ty =
   in
   subst ty
 
+and subst_dirty sbst (ty, drt) =
+  (subst_ty sbst ty, subst_dirt sbst drt)
+
 (** [identity_subst] is a substitution that makes no changes. *)
-let identity_subst = []
+let identity_subst = { subst_ty = []; subst_dirt = []; subst_region = [] }
 
 (** [compose_subst sbst1 sbst2] returns a substitution that first performs
     [sbst2] and then [sbst1]. *)
-let compose_subst sbst1 sbst2 =
-  sbst1 @ Common.assoc_map (subst_ty sbst1) sbst2
+let compose_subst
+    ({subst_ty = a1 ; subst_dirt = b1 ; subst_region = c1} as sbst1)
+     {subst_ty = a2 ; subst_dirt = b2 ; subst_region = c2} =
+  { subst_ty = a1 @ Common.assoc_map (subst_ty sbst1) a2 ;
+    subst_dirt = b1 @ Common.assoc_map (subst_dirt sbst1) b2 ;
+    subst_region = c1 @ Common.assoc_map (subst_region sbst1) c2 }
 
-(** [free_params ty] returns a list of all type parameters that occur in [ty].
+(** [free_params ty] returns three lists of type parameters that occur in [ty].
     Each parameter is listed only once and in order in which it occurs when
     [ty] is displayed. *)
 let free_params ty =
-  let rec free = function
-  | Apply (_, tys) -> Common.flatten_map free tys
-  | TyParam p -> [p]
-  | Basic _ -> []
-  | Tuple tys -> Common.flatten_map free tys
-  | Record tys -> Common.flatten_map (fun (_, ty) -> free ty) tys
-  | Sum tys ->
-      Common.flatten_map (function (_, None) -> [] | (_, Some ty) -> free ty) tys
-  | Arrow (ty1, ty2) -> free ty1 @ free ty2
-  | Effect op_sig ->
-      Common.flatten_map (function (_, (ty1, ty2)) -> free ty1 @ free ty2) op_sig
-  | Handler {value = ty1; finally = ty2} -> free ty1 @ free ty2
+  let (@@@) (xs, ys, zs) (us, vs, ws) = (xs @ us, ys @ vs, zs @ ws) in
+  let flatten_map f lst = List.fold_left (@@@) ([], [], []) (List.map f lst) in
+  let rec free_ty = function
+    | Apply (_, tys) -> flatten_map free_ty tys
+    | TyParam p -> ([p], [], [])
+    | Basic _ -> ([], [], [])
+    | Tuple tys -> flatten_map free_ty tys
+    | Record lst -> flatten_map (fun (_, ty) -> free_ty ty) lst
+    | Sum lst ->
+      flatten_map (function (_, None) -> ([],[],[]) | (_, Some ty) -> free_ty ty) lst
+    | Arrow (ty1, dirty2) -> free_ty ty1 @@@ free_dirty dirty2
+    | Effect op_sig ->
+      flatten_map (function (_, (ty1, ty2)) -> free_ty ty1 @@@ free_ty ty2) op_sig
+    | Handler {value = ty1; finally = ty2} -> free_ty ty1 @@@ free_ty ty2
+  and free_dirty (ty, drt) =
+    let (xs, ys, zs) = free_ty ty in
+    let (vs, ws) = free_dirt drt in
+      (xs, ys @ vs, zs @ ws)
+  and free_dirt = function
+    | DirtEmpty -> ([], [])
+    | DirtParam p -> ([p], [])
+    | DirtAtom (rgn, _) -> ([], free_region rgn)
+  and free_region = function
+    | RegionParam r -> [r]
+    | RegionInstance _ -> []
   in
-  Common.uniq (free ty)
+  let (xs, ys, zs) = free_ty ty in    
+    (Common.uniq xs, Common.uniq ys, Common.uniq zs)
 
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
-let occurs_in_ty p ty = List.mem p (free_params ty)
+let occurs_in_ty p ty = List.mem p (let (xs, _, _) = free_params ty in xs)
 
-(** [fresh_param ()] gives a type [TyParam p] where [p] is a new type parameter on
+(** [fresh_ty ()] gives a type [TyParam p] where [p] is a new type parameter on
     each call. *)
-let fresh_param () = TyParam (fresh_ty ())
+let fresh_ty () = TyParam (fresh_ty_param ())
 
-(** [refresh ps ty] replaces the polymorphic parameters [ps] in [ty] with new
-    values. *)
-let refresh ps ty =
-  let ps' = List.map (fun p -> (p, fresh_ty ())) ps in
-  let sbst = List.map (fun (p, p') -> (p, TyParam p')) ps' in
-  List.map snd ps', subst_ty sbst ty
+let fresh_dirt () = DirtParam (fresh_dirt_param ())
+
+let fresh_region () = RegionParam (fresh_region_param ())
+
+let fresh_dirty () = (fresh_ty (), fresh_dirt ())
+
+let refreshing_subst (ps, qs, rs) =
+  let ps' = List.map (fun p -> (p, fresh_ty_param ())) ps in
+  let qs' = List.map (fun q -> (q, fresh_dirt_param ())) qs in
+  let rs' = List.map (fun r -> (r, fresh_region_param ())) rs in
+  let sbst = 
+    { subst_ty = Common.assoc_map (fun p' -> TyParam p') ps' ;
+      subst_dirt = Common.assoc_map (fun q' -> DirtParam q') qs' ;
+      subst_region = Common.assoc_map (fun r' -> RegionParam r') rs' }
+  in
+    (List.map snd ps', List.map snd qs', List.map snd rs'), sbst
+
+(** [refresh (ps,qs,rs) ty] replaces the polymorphic parameters [ps,qs,rs] in [ty] with fresh
+    parameters. It returns the  *)
+let refresh params ty =
+  let params', sbst = refreshing_subst params in
+    params', subst_ty sbst ty
 
 (** [beautify ty] returns a sequential replacement of all type parameters in
     [ty] that can be used for its pretty printing. *)
 let beautify ty =
-  let next_param = Common.fresh "beautify" in
-  List.map (fun p -> (p, next_param ())) (free_params ty)
+  let next_ty_param = Common.fresh "beautify_ty" in
+  let next_dirt_param = Common.fresh "beautify_dirt" in
+  let next_region_param = Common.fresh "beautify_region" in
+  let (xs, ys, zs) = free_params ty in
+    List.map (fun p -> (p, next_ty_param ())) xs,
+    List.map (fun q -> (q, next_dirt_param ())) ys,
+    List.map (fun r -> (r, next_region_param ())) zs
 
 (** [beautify2 ty1 ty2] returns a sequential replacement of type parameters in
     [ty1] and [ty2] that can be used for their simultaneous pretty printing. *)

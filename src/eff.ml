@@ -85,7 +85,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
   match d with
   | Syntax.TopLet defs ->
       let defs = C.assoc_map Desugar.computation defs in
-      let vars, ctx = Infer.infer_let ctx (ref Type.identity_subst) pos defs in
+      let vars, dirt, ctx = Infer.infer_let ctx (ref Infer.empty_constraint) pos defs in
       let env =
         List.fold_right
           (fun (p,c) env -> let v = Eval.run env c in Eval.extend p v env)
@@ -95,16 +95,16 @@ let exec_topdef interactive (ctx, env) (d,pos) =
           List.iter (fun (x, (ps,t)) ->
                        match Eval.lookup x env with
                          | None -> assert false
-                         | Some v -> Format.printf "@[val %s : %t = %t@]@." x (Print.ty ps t) (Print.value v))
+                         | Some v -> Format.printf "@[val %s : %t = %t@]@." x (Print.ty (Type.beautify t) ps t) (Print.value v))
             vars
         end;
         (ctx, env)
   | Syntax.TopLetRec defs ->
       let defs = C.assoc_map Desugar.let_rec defs in
-      let vars, ctx = Infer.infer_let_rec ctx (ref Type.identity_subst) pos defs in
+      let vars, ctx = Infer.infer_let_rec ctx (ref Infer.empty_constraint) pos defs in
       let env = Eval.extend_let_rec env defs in
         if interactive then begin
-          List.iter (fun (x,(ps,t)) -> Format.printf "@[val %s : %t = <fun>@]@." x (Print.ty ps t)) vars
+          List.iter (fun (x,(ps,t)) -> Format.printf "@[val %s : %t = <fun>@]@." x (Print.ty (Type.beautify t) ps t)) vars
         end;
         (ctx, env)
   | Syntax.External (x, t, f) ->
@@ -124,10 +124,10 @@ let exec_topdef interactive (ctx, env) (d,pos) =
 
 let infer_top_comp ctx c =
   let cstr = ref [] in
-  let ty = Infer.infer_comp ctx cstr c in
+  let dirty = Infer.infer_comp ctx cstr c in
   let sbst = Unify.solve !cstr in
   let ctx = Ctx.subst_ctx ctx sbst in
-  let ty = Type.subst_ty sbst ty in
+  let (ty, dirt) = Type.subst_dirty sbst dirty in
   ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty
 
 let rec exec_cmd interactive (ctx, env) e =
@@ -136,12 +136,12 @@ let rec exec_cmd interactive (ctx, env) e =
       let c = Desugar.computation c in
       let ctx, (ps, t) = infer_top_comp ctx c in
       let v = Eval.run env c in
-      if interactive then Format.printf "@[- : %t = %t@]@." (Print.ty ps t) (Print.value v);
+      if interactive then Format.printf "@[- : %t = %t@]@." (Print.ty (Type.beautify t) ps t) (Print.value v);
       (ctx, env)
   | Syntax.TypeOf c ->
       let c = Desugar.computation c in
       let ctx, (ps, t) = infer_top_comp ctx c in
-      Format.printf "@[- : %t@]@." (Print.ty ps t);
+      Format.printf "@[- : %t@]@." (Print.ty (Type.beautify t) ps t);
       (ctx, env)
   | Syntax.Reset ->
       Tctx.reset ();
