@@ -52,6 +52,7 @@ let empty_dirt = DirtEmpty
    is syntactically incorrect so that the programmer cannot accidentally
    define it. *)
 let universal_ty = Basic "_"
+let universal_dirty = (Basic "_", DirtEmpty)
 
 let int_ty = Basic "int"
 let string_ty = Basic "string"

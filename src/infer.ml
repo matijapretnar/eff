@@ -237,10 +237,9 @@ and infer_expr ctx cstr (e,pos) =
   
 (* [infer_comp ctx cstr (c,pos)] infers the type of computation [c] in context [ctx].
    It returns the list of newly introduced meta-variables and the inferred type. *)
-and infer_comp ctx cstr cp = T.fresh_dirty ()
-(*
+and infer_comp ctx cstr cp =
   (* XXX Why isn't it better to just not call type inference when type checking is disabled? *)
-  if !disable_typing then T.universal_ty else
+  if !disable_typing then T.universal_dirty else
   let rec infer ctx (c, pos) =
     match c with
       | Core.Apply (e1, e2) ->
@@ -249,10 +248,10 @@ and infer_comp ctx cstr cp = T.fresh_dirty ()
           let t = T.fresh_dirty () in
           add_ty_constraint cstr pos t1 (T.Arrow (t2, t));
           t
-              
+
       | Core.Value e ->
           infer_expr ctx cstr e, T.empty_dirt
-            
+
       | Core.Match (e, []) ->
         let t_in = infer_expr ctx cstr e in
         let t_out = T.fresh_ty () in
@@ -340,4 +339,4 @@ and infer_comp ctx cstr cp = T.fresh_dirty ()
           T.unit_ty, T.empty_dirt
   in
   infer ctx cp
-*)
+
