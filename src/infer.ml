@@ -120,7 +120,7 @@ and infer_let ctx cstr pos defs =
       let tc = infer_comp ctx cstr c in
       let ws, tp = infer_pattern cstr p in
       add_dirty_constraint cstr (snd c) tc (tp, delta);
-      Check.is_irrefutable p;
+      Exhaust.is_irrefutable p;
       match C.find_duplicate (List.map fst ws) (List.map fst vs) with
         | Some x -> Error.typing ~pos:pos "Several definitions of %s." x
         | None ->
@@ -152,7 +152,7 @@ and infer_let_rec ctx cstr pos defs =
       let tc = infer_comp ctx' cstr c in
       add_ty_constraint cstr (snd p) u1 tp;
       add_dirty_constraint cstr (snd c) u2 tc;
-      Check.is_irrefutable p)
+      Exhaust.is_irrefutable p)
     lst;
   let sbst = Unify.solve !cstr in
   let vars = Common.assoc_map (T.subst_ty sbst) vars in
@@ -267,7 +267,7 @@ and infer_comp ctx cstr cp =
             add_dirty_constraint cstr (snd e') t_out' t_out
           in
           List.iter infer_case lst;
-          Check.check_patterns ~pos:pos (List.map fst lst);
+          Exhaust.check_patterns ~pos:pos (List.map fst lst);
           t_out
               
       | Core.New (eff, r) ->

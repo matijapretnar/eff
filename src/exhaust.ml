@@ -1,14 +1,20 @@
 module C = Common
 module P = Pattern
 
-(* Pattern matching exhaustiveness checking as described by Maranget [0]. These
+(* Pattern matching exhaustiveness checking as described by Maranget [1]. These
    functions assume that patterns are type correct, so they should be run only
    after types are inferred.
-   [0] http://pauillac.inria.fr/~maranget/papers/warn/index.html *)
+
+   [1] http://pauillac.inria.fr/~maranget/papers/warn/index.html
+*)
 
 (* Pattern constructor description. *)
 type cons =
-  Tuple of int | Record of C.field list | Variant of C.label * bool | Const of C.const | Wildcard
+  | Tuple of int
+  | Record of C.field list
+  | Variant of C.label * bool
+  | Const of C.const
+  | Wildcard
 
 (* The number of subpatterns required by a pattern constructor. *)
 let arity = function
@@ -17,10 +23,15 @@ let arity = function
   | Record flds -> List.length flds
   | Variant (_, b) -> if b then 1 else 0
 
-(* Reads constructor description from a pattern, discarding any P.As layers. *)
+(* Removes the top-most [As] pattern wrappers, if present (e.g. [2 as x] -> [2]). *)
+let rec remove_as = function
+  | Pattern.As ((p', _), _) -> remove_as p'
+  | p -> p
+
+(* Reads constructor description from a pattern, discarding any [P.As] layers. *)
 let rec cons_of_pattern p =
   match fst p with
-    | P.As _ -> cons_of_pattern (P.simplify p)
+    | P.As (p, _) -> cons_of_pattern p
     | P.Tuple lst -> Tuple (List.length lst)
     | P.Record [] -> assert false
     | P.Record ((lbl, _) :: _) ->
@@ -95,9 +106,8 @@ let find_constructors lst =
    if the first pattern of input vector has an incompatible constructor. *)
 let specialize_vector con = function
   | [] -> None
-  | p1 :: lst ->
-      let (p1, _) = P.simplify p1 in
-      begin match con, p1 with
+  | (p1, _) :: lst ->
+      begin match con, remove_as p1 with
         | Tuple _, P.Tuple l -> Some (l @ lst)
         | Record all, P.Record def ->
             let get_pattern defs lbl = match C.lookup lbl defs with
@@ -112,7 +122,7 @@ let specialize_vector con = function
             end
         | Const c, P.Const c' when c = c' -> Some lst
         | _, (P.Nonbinding | P.Var _) -> Some ((C.repeat (P.Nonbinding, C.Nowhere) (arity con)) @ lst)
-        | _ -> None
+        | _, _ -> None
       end
 
 (* Specializes a pattern matrix for the pattern constructor [con]. *)
@@ -128,10 +138,9 @@ let rec specialize con = function
 let rec default = function
   | [] -> []
   | [] :: lst -> default lst (* Only for completeness. *)
-  | (p :: ps) :: lst ->
-      let p = P.simplify p in
-      begin match p with
-        | ((P.Nonbinding | P.Var _), _) -> ps :: (default lst)
+  | ((p,_) :: ps) :: lst ->
+      begin match remove_as p with
+        | (P.Nonbinding | P.Var _) -> ps :: (default lst)
         | _ -> default lst
       end
 
