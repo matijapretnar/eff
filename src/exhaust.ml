@@ -5,6 +5,16 @@ module P = Pattern
    functions assume that patterns are type correct, so they should be run only
    after types are inferred.
 
+   Another assumption made by the code is that all types are inhabited by some
+   values. An example where this matters is:
+
+   let f x = (match x with) ; let (y, 42) = (x, 23) in y ;;
+
+   Here we get a warning about non-exhaustive pattern match, but in fact
+   since x has the empty type, the code will never execute (there is nothing
+   we could pass to f). One solution would be to have the patterns explicitly
+   typed, then we could compute whether the type is non-inhabited.
+
    [1] http://pauillac.inria.fr/~maranget/papers/warn/index.html
 *)
 
