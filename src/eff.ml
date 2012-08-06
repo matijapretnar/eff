@@ -19,9 +19,10 @@ let help_text = "Toplevel commands:
    people. *)
 
 let pervasives_file =
-  ref (if Sys.file_exists "pervasives.eff"
-       then Filename.concat (Filename.dirname Sys.argv.(0)) "pervasives.eff"
-       else Filename.concat Version.effdir "pervasives.eff")
+  let pervasives_development = Filename.concat (Filename.dirname Sys.argv.(0)) "pervasives.eff" in
+  ref (if Sys.file_exists pervasives_development
+    then pervasives_development
+    else Filename.concat Version.effdir "pervasives.eff")
 
 (* A list of files to be loaded and run. *)
 let files = ref []
