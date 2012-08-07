@@ -1,0 +1,11 @@
+- : bool = true
+- : bool = false
+- : bool = true
+- : bool = false
+- : bool = false
+- : bool = true
+- : string * bool * bool * bool = ("no resource", true, false, true)
+- : string * bool * bool * bool = ("resource", true, false, true)
+val f : 'a -> 'a = <fun>
+val g : 'a -> 'a = <fun>
+- : string * bool * bool * bool = ("function", true, false, true)

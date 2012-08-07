@@ -64,13 +64,60 @@ let value_str s = Value (from_str s)
 let value_fun f = Value (from_fun f)
 let value_float f = Value (from_float f)
 
-let rec equal v1 v2 =
-  match v1, v2 with
-  | Record r1, Record r2 when List.length r1 = List.length r2 ->
-      List.for_all (fun (f1, v1) -> equal v1 (List.assoc f1 r2)) r1
-  | Closure f1, Closure f2 -> f1 == f2
-  | Handler h1, Handler h2 -> h1 == h2
-  | _, _ -> v1 = v2
+(* You math think the following code is ugly, but at least it works, and it
+   is not going to die when we extend the datatype of values because we
+   avoid using wild wildcards such as _, _. Also, the function is written
+   so that it works as expected when --no-types is used. *)
+let rec equal v = function
+  | Const c ->
+    (match v with
+      | Const c' -> Common.equal_const c c'
+      | _ -> false)
+  | Tuple lst ->
+    (match v with
+      | Tuple lst' -> equal_list lst lst'
+      | _ -> false)
+  | Record lst ->
+    (match v with
+      | Record lst' -> equal_record lst lst'
+      | _ -> false)
+  | Variant (lbl, u)->
+    (match v with
+      | Variant (lbl', u') ->
+        lbl = lbl' && equal_option u u'
+      | _ -> false)
+  | Closure c ->
+    (match v with
+      | Closure c' -> c == c'
+      | _ -> false)
+  | Instance (i, _, _) ->
+    (match v with
+      | Instance (i', _, _) -> i = i'
+      | _ -> false)
+  | Handler h ->
+    (match v with
+      | Handler h' -> h == h'
+      | _ -> false)
+
+and equal_list lst1 lst2 =
+  match lst1, lst2 with
+    | ([], []) -> true
+    | (u::lst1, v::lst2) -> equal u v && equal_list lst1 lst2
+    | ([], _ :: _) | (_ :: _, []) -> false
+
+and equal_record lst1 lst2 =
+  List.length lst1 = List.length lst2 &&
+  List.for_all (fun (fld, u) ->
+    match Common.lookup fld lst2 with
+      | Some v -> equal u v
+      | None -> false)
+  lst1
+
+and equal_option o1 o2 =
+  match o1, o2 with
+    | None, None -> true
+    | Some v1, Some v2 -> equal v1 v2
+    | Some _, None | None, Some _ -> false
 
 let rec less_than v1 v2 =
   match v1, v2 with

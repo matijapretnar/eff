@@ -1,0 +1,22 @@
+1 = 1 ;;
+1 = 2 ;;
+(1,2) = (1,2) ;;
+(2,1) = (1,2) ;;
+[1;2;3] = [] ;;
+[1;2;3] = [1;2;3] ;;
+
+(* Comparing instances without resources *)
+type cow = effect operation moo : unit -> unit end ;;
+let x = new cow in
+let y = new cow in
+ ("no resource", x = x, x = y, y = y) ;;
+
+(* Comparing instances with resources *)
+let x = (new cow @ () with operation moo () @ () -> ((), ()) end) in
+let y = (new cow @ () with operation moo () @ () -> ((), ()) end) in
+ ("resource", x = x, x = y, y = y) ;;
+
+(* Comparing functions. *)
+let f x = x ;;
+let g x = x ;;
+("function", f = f, g = f, g = g) ;;

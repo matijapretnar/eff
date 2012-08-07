@@ -30,6 +30,8 @@ type const =
   | Boolean of bool
   | Float of float
 
+let equal_const c1 c2 = (c1 = c2) (* XXX: Fix this when we put in big integers again. *)
+
 (** Variants for the built-in list type *)
 let cons = "$1cons"
 let nil = "$0nil"
