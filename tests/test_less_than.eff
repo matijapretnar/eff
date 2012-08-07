@@ -1,0 +1,24 @@
+1 < 1 ;;
+1 < 2 ;;
+2 < 1 ;;
+1.0 < 1.0 ;;
+1.0 < 2.0 ;;
+2.0 < 1.0 ;;
+(1.0 /. 0.0) < 1.0 ;;
+
+"composite values" ;;
+(* Composite values. *)
+(1, "foo", []) < (1, "foo", [[]]) ;; (* should be true *)
+(1, "foo", [[]]) < (1, "foo", []) ;; (* should be false *)
+
+
+(* records *)
+"records" ;;
+type ('a, 'b) cow = { horn : 'a ; tail : 'b } ;;
+
+({horn = 7; tail = "long"} < {horn = 7; tail = "short"}) ;; (* should be true *)
+({horn = 7; tail = "short"} < {horn = 7; tail = "long"}) ;; (* should be false *)
+({horn = 7; tail = "long"} < {tail = "short"; horn = 7}) ;; (* should be true *)
+({horn = 8; tail = "long"} < {tail = "short"; horn = 7}) ;; (* should be false *)
+({horn = [1;2]; tail = 0} < {tail = 0; horn = [3]}) ;; (* should be true *)
+({tail = 0; horn = [3]} > {horn = [3]; tail = 0}) ;; (* should be false *)

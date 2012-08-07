@@ -1,0 +1,17 @@
+- : bool = false
+- : bool = true
+- : bool = false
+- : bool = false
+- : bool = true
+- : bool = false
+- : bool = false
+- : string = "composite values"
+- : bool = true
+- : bool = false
+- : string = "records"
+- : bool = true
+- : bool = false
+- : bool = true
+- : bool = false
+- : bool = true
+- : bool = false
