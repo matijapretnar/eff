@@ -64,65 +64,94 @@ let value_str s = Value (from_str s)
 let value_fun f = Value (from_fun f)
 let value_float f = Value (from_float f)
 
-(* You math think the following code is ugly, but at least it works, and it
-   is not going to die when we extend the datatype of values because we
-   avoid using wild wildcards such as _, _. Also, the function is written
-   so that it works as expected when --no-types is used. *)
-let rec equal v = function
-  | Const c ->
-    (match v with
-      | Const c' -> Common.equal_const c c'
-      | _ -> false)
-  | Tuple lst ->
-    (match v with
-      | Tuple lst' -> equal_list lst lst'
-      | _ -> false)
-  | Record lst ->
-    (match v with
-      | Record lst' -> equal_record lst lst'
-      | _ -> false)
-  | Variant (lbl, u)->
-    (match v with
-      | Variant (lbl', u') ->
-        lbl = lbl' && equal_option u u'
-      | _ -> false)
-  | Closure c ->
-    (match v with
-      | Closure c' -> c == c'
-      | _ -> false)
-  | Instance (i, _, _) ->
-    (match v with
-      | Instance (i', _, _) -> i = i'
-      | _ -> false)
-  | Handler h ->
-    (match v with
-      | Handler h' -> h == h'
-      | _ -> false)
+(* Comparison of values is a trickier business than you might think. *)
+let rec compare v1 v2 =
+  match v1 with
+    | Const c ->
+      (match v2 with
+        | Const c' -> Common.compare_const c c'
+        | _ -> Common.Invalid)
+    | Tuple lst ->
+      (match v2 with
+        | Tuple lst' -> compare_list lst lst'
+        | _ -> Common.Invalid)
+    | Record lst ->
+      (match v2 with
+        | Record lst' -> compare_record lst lst'
+        | _ -> Common.Invalid)
+    | Variant (lbl, u)->
+      (match v2 with
+        | Variant (lbl', u') ->
+          let r = Pervasives.compare lbl lbl' in
+            if r < 0 then Common.Less
+            else if r > 0 then Common.Greater
+            else compare_option u u'
+        | _ -> Common.Invalid)
+    | Closure c ->
+      (match v2 with
+        | Closure c' -> if c == c' then Common.Equal else Common.Invalid
+        | _ -> Common.Invalid)
+    | Instance (i, _, _) ->
+      (match v2 with
+        | Instance (i', _, _) ->
+          let r = Pervasives.compare i i' in
+            if r < 0 then Common.Less
+            else if r > 0 then Common.Greater
+            else Common.Equal
+        | _ -> Common.Invalid)
+    | Handler h ->
+      (match v2 with
+        | Handler h' -> if h == h' then Common.Equal else Common.Invalid
+        | _ -> Common.Invalid)
 
-and equal_list lst1 lst2 =
+and compare_list lst1 lst2 =
   match lst1, lst2 with
-    | ([], []) -> true
-    | (u::lst1, v::lst2) -> equal u v && equal_list lst1 lst2
-    | ([], _ :: _) | (_ :: _, []) -> false
+    | ([], []) -> Common.Equal
+    | (u::lst1, v::lst2) ->
+      (match compare u v with
+        | Common.Less -> Common.Less
+        | Common.Equal -> compare_list lst1 lst2
+        | Common.Greater -> Common.Greater
+        | Common.Invalid -> Common.Invalid)
+    | ([], _ :: _) -> Common.Less
+    | (_ :: _, []) -> Common.Greater
 
-and equal_record lst1 lst2 =
-  List.length lst1 = List.length lst2 &&
-  List.for_all (fun (fld, u) ->
-    match Common.lookup fld lst2 with
-      | Some v -> equal u v
-      | None -> false)
-  lst1
+and compare_record lst1 lst2 =
+  (* Is is easiest to canonically sort the fields, then compare as lists. *)
+  let rec comp = function
+    | [], [] -> Common.Equal
+    | (fld1,v1)::lst1, (fld2,v2)::lst2 ->
+      let r = Pervasives.compare fld1 fld2 in
+        if r < 0 then Common.Less
+        else if r > 0 then Common.Greater 
+        else
+          (match compare v1 v2 with
+            | Common.Less -> Common.Less
+            | Common.Equal -> comp (lst1, lst2)
+            | Common.Greater -> Common.Greater
+            | Common.Invalid -> Common.Invalid)
+    | [], _ :: _ -> Common.Less
+    | _ :: _, [] -> Common.Greater
+  in
+    comp
+      ((List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst1),
+       (List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst2))
 
-and equal_option o1 o2 =
+and compare_option o1 o2 =
   match o1, o2 with
-    | None, None -> true
-    | Some v1, Some v2 -> equal v1 v2
-    | Some _, None | None, Some _ -> false
+    | None, None -> Common.Equal
+    | Some v1, Some v2 -> compare v1 v2
+    | None, Some _ -> Common.Less
+    | Some _, None -> Common.Greater
 
-let rec less_than v1 v2 =
-  match v1, v2 with
-  | Record r1, Record r2 when List.length r1 = List.length r2 ->
-      List.for_all (fun (f1, v1) -> less_than v1 (List.assoc f1 r2)) r1
-  | Closure f1, Closure f2 -> false
-  | Handler h1, Handler h2 -> false
-  | _, _ -> v1 < v2
+(* Now it is easy to get equality and less than, not to mention we
+   can now easily add a builtin "compare". *)
+let equal v1 v2 = (compare v1 v2 = Common.Equal)
+
+let less_than v1 v2 =
+  match compare v1 v2 with
+    | Common.Invalid -> Error.runtime "invalid comparison with <"
+    | Common.Less -> true
+    | Common.Greater | Common.Equal -> false
+
+

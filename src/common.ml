@@ -30,7 +30,16 @@ type const =
   | Boolean of bool
   | Float of float
 
-let equal_const c1 c2 = (c1 = c2) (* XXX: Fix this when we put in big integers again. *)
+type comparison = Less | Equal | Greater | Invalid
+
+(* XXX This won't work on Big_int. *)
+let compare_const c1 c2 =
+  let r = Pervasives.compare c1 c2 in
+    if r < 0 then Less
+    else if r > 0 then Greater
+    else Equal
+
+let equal_const c1 c2 = (compare_const c1 c2 = Equal)
 
 (** Variants for the built-in list type *)
 let cons = "$1cons"
