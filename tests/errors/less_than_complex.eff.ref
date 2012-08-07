@@ -1,0 +1,5 @@
+val h : 'a => 'a = <handler>
+val g : 'a => 'a = <handler>
+- : bool = false
+- : bool = false
+Runtime error (unknown position): invalid comparison with <
