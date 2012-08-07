@@ -20,7 +20,7 @@ let rec ty s = function
   | Syntax.TyApply (t, lst) -> T.Apply (t, List.map (ty s) lst)
   | Syntax.TyParam str ->
     begin match C.lookup str s with
-    | None -> Error.syntax "Unbound type parameter '%s" str
+    | None -> Error.syntax ~pos:C.Nowhere "Unbound type parameter '%s" str
     | Some t -> t
     end
   | Syntax.TyArrow (t1, t2) -> T.Arrow (ty s t1, (ty s t2, Type.fresh_dirt ()))

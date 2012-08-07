@@ -83,7 +83,7 @@ let rec ceval env (c, pos) = match c with
   | Core.While (c1, c2) ->
       let rec loop () =
         let k v =
-          let b = V.to_bool v in
+          let b = V.to_bool ~pos:(snd c1) v in
           if b then
             sequence (fun _ -> loop ()) (ceval env c2)
           else
@@ -166,14 +166,14 @@ and veval env (e, pos) = match e with
   | Core.Variant (lbl, Some e) -> V.Variant (lbl, Some (veval env e))
   | Core.Lambda a -> V.Closure (eval_closure env a)
   | Core.Operation (e, op) ->
-      let n = V.to_instance (veval env e) in
+      let n = V.to_instance ~pos:(snd e) (veval env e) in
       V.Closure (fun v -> V.Operation ((n, op), v, V.value))
   | Core.Handler h -> V.Handler (eval_handler env h)
 
 and eval_handler env {Core.operations=ops; Core.value=value; Core.finally=fin} =
   let eval_op ((e, op), (p, kvar, c)) =
     let f u k = eval_closure (extend kvar (V.Closure k) env) (p, c) u in
-    let (i, _, _) = V.to_instance (veval env e) in
+    let (i, _, _) = V.to_instance ~pos:(snd e) (veval env e) in
       ((i, op), f)
   in
   let ops = List.map eval_op ops in
@@ -196,18 +196,18 @@ let rec top_handle = function
   | V.Value v -> v
   | V.Operation (((_, _, Some (s_ref, resource)) as inst, opsym) as op, v, k) ->
       begin match C.lookup opsym resource with
-        | None -> Error.runtime "uncaught operation %t %t." (Print.operation op) (Print.value v)
+        | None -> Error.runtime ~pos:C.Nowhere "uncaught operation %t %t." (Print.operation op) (Print.value v)
         | Some f ->
             begin match f v !s_ref with
               | V.Value (V.Tuple [u; s]) ->
                   s_ref := s;
                   top_handle (k u)
-              | V.Value _ -> Error.runtime "pair expected in a resource handler for %t." (Print.instance inst)
-              | _ -> Error.runtime "pair expected ina resource handler for %t." (Print.instance inst)
+              | V.Value _ -> Error.runtime ~pos:C.Nowhere "pair expected in a resource handler for %t." (Print.instance inst)
+              | _ -> Error.runtime ~pos:C.Nowhere "pair expected in a resource handler for %t." (Print.instance inst)
             end
       end
   | V.Operation (((_, _, None), _) as op, v, k) ->
-      Error.runtime "uncaught operation %t %t." (Print.operation op) (Print.value v)
+      Error.runtime ~pos:C.Nowhere "uncaught operation %t %t." (Print.operation op) (Print.value v)
 
 let run env c =
   top_handle (ceval env c)

@@ -64,24 +64,28 @@ let infer_pattern cstr pp =
       | Pattern.Tuple ps -> T.Tuple (C.map infer ps)
       | Pattern.Record [] -> assert false
       | Pattern.Record (((fld, _) :: _) as lst) ->
-          let (t, (ps, _, _), us) = Tctx.infer_field fld !Tctx.global in
-          let unify_record_pattern (fld, p) =
-          begin match C.lookup fld us with
-          | None -> Error.typing ~pos:pos "Unexpected field %s in a pattern of type %s." fld t
-          | Some u -> add_ty_constraint cstr pos (infer p) u
-          end
-          in
-            List.iter unify_record_pattern lst;
-            T.Apply (t, List.map (fun p -> T.TyParam p) ps)
+          (match Tctx.infer_field fld !Tctx.global with
+            | None -> Error.typing ~pos:pos "Unbound record field label %s" fld
+            | Some (t, (ps, _, _), us) ->
+              let unify_record_pattern (fld, p) =
+                begin match C.lookup fld us with
+                  | None -> Error.typing ~pos:pos "Unexpected field %s in a pattern of type %s." fld t
+                  | Some u -> add_ty_constraint cstr pos (infer p) u
+                end
+              in
+                List.iter unify_record_pattern lst;
+                T.Apply (t, List.map (fun p -> T.TyParam p) ps))
       | Pattern.Variant (lbl, p) ->
-          let (t, (ps, _, _), u) = Tctx.infer_variant lbl !Tctx.global in
-          begin match p, u with
-          | None, None -> ()
-          | Some p, Some u -> add_ty_constraint cstr pos (infer p) u
-          | None, Some _ -> Error.typing ~pos:pos "Label %s should be applied to an argument." lbl
-          | Some _, None -> Error.typing ~pos:pos "Label %s cannot be applied to an argument." lbl
-          end;
-          T.Apply (t, List.map (fun p -> T.TyParam p) ps)
+          (match Tctx.infer_variant lbl !Tctx.global with
+            | None -> Error.typing ~pos:pos "Unbound constructor %s" lbl
+            | Some (t, (ps, _, _), u) ->
+              begin match p, u with
+                | None, None -> ()
+                | Some p, Some u -> add_ty_constraint cstr pos (infer p) u
+                | None, Some _ -> Error.typing ~pos:pos "Constructor %s should be applied to an argument." lbl
+                | Some _, None -> Error.typing ~pos:pos "Constructor %s cannot be applied to an argument." lbl
+              end;
+              T.Apply (t, List.map (fun p -> T.TyParam p) ps))
   in
   let t = infer pp in
     !vars, t
@@ -172,43 +176,49 @@ and infer_expr ctx cstr (e,pos) =
     | Core.Record [] -> assert false
     | Core.Record (((fld,_)::_) as lst) ->
       if not (Pattern.linear_record lst) then
-        Error.typing ~pos:pos "Fields in a record must be distinct.";
-      let (t_name, (params, _, _), arg_types) = Tctx.infer_field fld !Tctx.global in
-      if List.length lst <> List.length arg_types then
-        Error.typing ~pos:pos "malformed record of type %s" t_name
-      else
-        let arg_types' = C.assoc_map (infer_expr ctx cstr) lst in
-        let unify_record_arg (fld, t) =
-          begin match C.lookup fld arg_types with
-            | None -> Error.typing ~pos:pos "Unexpected field %s in a pattern." fld
-            | Some u -> add_ty_constraint cstr pos t u
-          end
-        in
-        List.iter unify_record_arg arg_types';
-        T.Apply (t_name, List.map (fun p -> T.TyParam p) params)
+        Error.typing ~pos:pos "Fields in a record must be distinct." ;
+      (match Tctx.infer_field fld !Tctx.global with
+        | None -> Error.typing ~pos:pos "Unbound record field label %s in a pattern" fld
+        | Some (t_name, (params, _, _), arg_types) ->
+          if List.length lst <> List.length arg_types then
+            Error.typing ~pos:pos "malformed record of type %s" t_name
+          else
+            let arg_types' = C.assoc_map (infer_expr ctx cstr) lst in
+            let unify_record_arg (fld, t) =
+              begin match C.lookup fld arg_types with
+                | None -> Error.typing ~pos:pos "Unexpected record field label %s in a pattern" fld
+                | Some u -> add_ty_constraint cstr pos t u
+              end
+            in
+              List.iter unify_record_arg arg_types';
+              T.Apply (t_name, List.map (fun p -> T.TyParam p) params))
           
     | Core.Variant (lbl, u) ->
-      let (t_name, (params, _, _), arg_type) = Tctx.infer_variant lbl !Tctx.global in
-      begin match arg_type, u with
-        | None, None -> ()
-        | Some ty, Some u ->
-            let ty' = infer_expr ctx cstr u in
-            add_ty_constraint cstr pos ty ty'
-        | _, _ -> Error.typing ~pos:pos "Wrong number of arguments for label %s." lbl
-      end;
-      T.Apply (t_name, List.map (fun p -> T.TyParam p) params)
+      (match Tctx.infer_variant lbl !Tctx.global with
+        | None -> Error.typing ~pos:pos "Unbound constructor %s in a pattern" lbl
+        | Some (t_name, (params, _, _), arg_type) ->
+          begin match arg_type, u with
+            | None, None -> ()
+            | Some ty, Some u ->
+              let ty' = infer_expr ctx cstr u in
+                add_ty_constraint cstr pos ty ty'
+            | _, _ -> Error.typing ~pos:pos "Wrong number of arguments for label %s." lbl
+          end;
+          T.Apply (t_name, List.map (fun p -> T.TyParam p) params))
         
     | Core.Lambda a ->
         let t1, t2 = infer_abstraction ctx cstr a in
         T.Arrow (t1, t2)
         
     | Core.Operation (e, op) ->
-        let (t, (ps, _, _), t1, t2) = Tctx.infer_operation op !Tctx.global in
-        let u = infer_expr ctx cstr e in
-        let dirt = T.DirtAtom (T.fresh_region (), op) in
-          (* XXX do something about regions *)
-          add_ty_constraint cstr pos u (T.Apply (t, List.map (fun p -> T.TyParam p) ps));
-          T.Arrow (t1, (t2, dirt))
+      (match Tctx.infer_operation op !Tctx.global with
+        | None -> Error.typing ~pos:pos "Unbound operation %s" op
+        | Some (t, (ps, _, _), t1, t2) ->
+          let u = infer_expr ctx cstr e in
+          let dirt = T.DirtAtom (T.fresh_region (), op) in
+            (* XXX do something about regions *)
+            add_ty_constraint cstr pos u (T.Apply (t, List.map (fun p -> T.TyParam p) ps));
+            T.Arrow (t1, (t2, dirt)))
 
     | Core.Handler {Core.operations=ops; Core.value=a_val; Core.finally=a_fin} -> 
         let t_value = T.fresh_ty () in
@@ -216,25 +226,27 @@ and infer_expr ctx cstr (e,pos) =
         let t_finally = T.fresh_ty () in
         let t_yield = T.fresh_ty () in
         let unify_operation ((e, op), a2) =
-          let (t, (ps, _, _), t1, t2) = Tctx.infer_operation op !Tctx.global in
-          let u = infer_expr ctx cstr e in
-          add_ty_constraint cstr pos u (T.Apply (t, List.map (fun p -> T.TyParam p) ps));
-          let tk, u1, u2 = infer_handler_case_abstraction ctx cstr a2 in
-          add_ty_constraint cstr pos t1 u1;
-          (* XXX maybe we need to change the direction of inequalities here,
-             or even require equalities. *)
-          add_ty_constraint cstr pos tk (T.Arrow (t2, (t_yield, dirt)));
-          add_dirty_constraint cstr pos (t_yield, dirt) u2
+          (match Tctx.infer_operation op !Tctx.global with
+            | None -> Error.typing ~pos:pos "Unbound operation %s in a handler" op
+            | Some (t, (ps, _, _), t1, t2) ->
+              let u = infer_expr ctx cstr e in
+                add_ty_constraint cstr pos u (T.Apply (t, List.map (fun p -> T.TyParam p) ps));
+                let tk, u1, u2 = infer_handler_case_abstraction ctx cstr a2 in
+                  add_ty_constraint cstr pos t1 u1;
+                  (* XXX maybe we need to change the direction of inequalities here,
+                     or even require equalities. *)
+                  add_ty_constraint cstr pos tk (T.Arrow (t2, (t_yield, dirt)));
+                  add_dirty_constraint cstr pos (t_yield, dirt) u2)
         in
-        List.iter unify_operation ops;
-        let (valt1, valt2) = infer_abstraction ctx cstr a_val in
-        let (fint1, fint2) = infer_abstraction ctx cstr a_fin in
-        add_ty_constraint cstr pos valt1 t_value;
-        add_dirty_constraint cstr pos valt2 (t_yield, dirt);
-        add_dirty_constraint cstr pos fint2 (t_finally, dirt);
-        add_ty_constraint cstr pos fint1 t_yield;
-        T.Handler { T.value = t_value; T.finally = t_finally }
-  
+          List.iter unify_operation ops;
+          let (valt1, valt2) = infer_abstraction ctx cstr a_val in
+          let (fint1, fint2) = infer_abstraction ctx cstr a_fin in
+            add_ty_constraint cstr pos valt1 t_value;
+            add_dirty_constraint cstr pos valt2 (t_yield, dirt);
+            add_dirty_constraint cstr pos fint2 (t_finally, dirt);
+            add_ty_constraint cstr pos fint1 t_yield;
+            T.Handler { T.value = t_value; T.finally = t_finally }
+              
 (* [infer_comp ctx cstr (c,pos)] infers the type of computation [c] in context [ctx].
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp ctx cstr cp =

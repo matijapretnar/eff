@@ -195,7 +195,7 @@ and escaped = parse
       Error.Error err -> close_in fh; raise (Error.Error err)
   with
     (* Any errors when opening or closing a file are fatal. *)
-    Sys_error msg -> Error.fatal "%s" msg
+    Sys_error msg -> Error.fatal ~pos:Common.Nowhere "%s" msg
 
 
   let read_toplevel parser () =

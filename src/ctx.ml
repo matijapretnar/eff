@@ -3,10 +3,10 @@ type t = (Common.variable, ty_scheme) Common.assoc
 
 let empty = []
 
-let lookup ?pos ctx x =
+let lookup ~pos ctx x =
   match Common.lookup x ctx with
   | Some (ps, t) -> snd (Type.refresh ps t)
-  | None -> Error.typing ?pos "Unknown name %s" x
+  | None -> Error.typing ~pos:pos "Unknown name %s" x
 
 let extend ctx x ty_scheme = (x, ty_scheme) :: ctx
 

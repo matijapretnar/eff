@@ -13,10 +13,10 @@ type t
 (** [empty] is the empty context. *)
 val empty : t
 
-(** [lookup ?pos ctx x] returns a fresh instance of the type scheme assigned
+(** [lookup ~pos ctx x] returns a fresh instance of the type scheme assigned
     to the variable [x] in the context [ctx]. The optional position is used in
     error reporting when the variable is not bound in the context. *)
-val lookup : ?pos:Common.position -> t -> Common.variable -> Type.ty
+val lookup : pos:Common.position -> t -> Common.variable -> Type.ty
 
 (** [extend x ty_scheme ctx] returns the context [ctx] extended with
     a variable [x] bound to the type scheme [ty_scheme]. *)

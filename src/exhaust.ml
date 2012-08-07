@@ -45,8 +45,9 @@ let rec cons_of_pattern p =
     | P.Tuple lst -> Tuple (List.length lst)
     | P.Record [] -> assert false
     | P.Record ((lbl, _) :: _) ->
-        let (_, _, flds) = Tctx.find_field !Tctx.global lbl in
-        Record (List.map fst flds)
+        (match Tctx.find_field !Tctx.global lbl with
+          | None -> Error.typing ~pos:(snd p) "Unbound record field label %s in a pattern" lbl
+          | Some (_, _, flds) -> Record (List.map fst flds))
     | P.Variant (lbl, opt) -> Variant (lbl, opt <> None)
     | P.Const c -> Const c
     | P.Var _ | P.Nonbinding -> Wildcard
@@ -103,9 +104,12 @@ let find_constructors lst =
              find (first c)
           (* Check if all tags defined by this variant type are covered. *)
           | Variant (lbl, _) ->
-              let (_, _, tags, _) = Tctx.find_variant !Tctx.global lbl in
-              let all = (List.map (fun (lbl, opt) -> Variant (lbl, opt <> None)) tags) in
-              C.diff all present
+              (match Tctx.find_variant !Tctx.global lbl with
+                | None -> Error.typing ~pos:C.Nowhere "Unbound constructor %s in a pattern" lbl
+                | Some (_, _, tags, _) ->
+                  let all = List.map (fun (lbl, opt) -> Variant (lbl, opt <> None)) tags
+                  in
+                    C.diff all present)
           (* Only for completeness. *)
           | Wildcard -> []
         end

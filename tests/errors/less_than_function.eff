@@ -1,0 +1,3 @@
+let f = fun x -> x in f < f ;; (* This is ok because we can tell that f equals itself. *)
+
+(fun x -> x) < (fun x -> 2 * x) ;; (* This breaks. *)

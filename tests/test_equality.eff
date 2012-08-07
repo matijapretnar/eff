@@ -16,14 +16,9 @@ let x = (new cow @ () with operation moo () @ () -> ((), ()) end) in
 let y = (new cow @ () with operation moo () @ () -> ((), ()) end) in
  ("resource", x = x, x = y, y = y) ;;
 
-(* Comparing functions. *)
-let f x = x ;;
-let g x = x ;;
-("function", f = f, g = f, g = g) ;;
-
 (* Nested structures *)
-type 'a rabbit = { eye : 'a; tail : unit -> unit } ;;
+type ('a,'b) rabbit = { eye : 'a; tail : 'b list } ;;
 
-let x = ([1,2], {eye = 7; tail = (fun () -> ())}) in
-let y = ([1,3], {eye = 7; tail = (fun () -> ())}) in
+let x = ([1,2], {eye = 7; tail = []}) in
+let y = ([1,3], {eye = 7; tail = []}) in
   ("nested", x = x, x = y, y = y) ;;

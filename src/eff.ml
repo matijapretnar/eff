@@ -155,7 +155,7 @@ let rec exec_cmd interactive (ctx, env) e =
 
 and use_file env (filename, interactive) =
   let cmds = Lexer.read_file (parse Parser.file) filename in
-  List.fold_left (exec_cmd interactive) env cmds
+    List.fold_left (exec_cmd interactive) env cmds
 
 (* Interactive toplevel *)
 let toplevel ctxenv =

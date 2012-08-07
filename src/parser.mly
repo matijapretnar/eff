@@ -6,20 +6,20 @@
     | ReturnCase of abstraction
     | FinallyCase of abstraction
 
-  let collect_handler_cases (lst : handler_case list) =
+  let collect_handler_cases (lst : (handler_case * Common.position) list) =
     let (ops, ret, fin) =
       List.fold_left
         (fun (ops, ret, fin) -> function
-          | OperationCase (op, a2) ->  ((op, a2) :: ops, ret, fin)
-          | ReturnCase a ->
+          | (OperationCase (op, a2), _) ->  ((op, a2) :: ops, ret, fin)
+          | (ReturnCase a, pos) ->
             begin match ret with
-            | None -> (ops, Some a, fin)
-            | Some _ -> Error.syntax "Multiple value cases in a handler."
+              | None -> (ops, Some a, fin)
+              | Some _ -> Error.syntax ~pos:pos "Multiple value cases in a handler."
             end
-          | FinallyCase a ->
+          | (FinallyCase a, pos) ->
             begin match fin with
             | None -> (ops, ret, Some a)
-            | Some _ -> Error.syntax "Multiple finally cases in a handler."
+            | Some _ -> Error.syntax ~pos:pos "Multiple finally cases in a handler."
             end)
         ([], None, None)
         lst
@@ -293,7 +293,8 @@ let_rec_def:
   | f = ident t = lambdas0(EQUAL)
     { (f, t) }
 
-handler_case:
+handler_case: mark_position(plain_handler_case) { $1 }
+plain_handler_case:
   | t1 = simple_term HASH op = ident p = simple_pattern k = simple_pattern ARROW t2 = term
     { OperationCase ((t1, op), (p, k, t2)) }
   | VAL c = match_case
