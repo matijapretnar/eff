@@ -36,7 +36,7 @@ and field pp (f, v) ppf = fprintf ppf "%s = %t" f (pp v)
 
 let const c ppf =
   match c with
-  | Common.Integer k -> fprintf ppf "%d" k
+  | Common.Integer k -> fprintf ppf "%s" (Big_int.string_of_big_int k)
   | Common.String s -> fprintf ppf "%S" s
   | Common.Boolean b -> fprintf ppf "%B" b
   | Common.Float f -> fprintf ppf "%F" f
@@ -67,18 +67,44 @@ and pattern_list ?(max_length=299) (p,_) ppf =
   else
     fprintf ppf ",@ ..."
 
-let ty ?sbst poly t ppf =
-  let sbst = (match sbst with Some sbst -> sbst | None -> Type.beautify t) in
+let region sbst poly reg ppf =
+  let _, _, poly_reg = poly in
+  let _, _, sbst_reg = sbst in
+  match reg with
+    | Type.RegionParam p ->
+        let k = (match Common.lookup p sbst_reg with None -> (let Type.Region_Param n = p in ~- n) | Some k -> k) in
+        let s = (if List.mem p poly_reg then "'" else "'_") in
+          print ppf "%srgn%i" s k
+    | Type.RegionInstance (Type.Instance_Param i) -> print ppf "%d" i
+
+let dirt sbst poly drt ppf =
+  let _, poly_dirt, _ = poly in
+  let _, sbst_dirt, _ = sbst in
+  match drt with
+    | Type.DirtEmpty -> print ppf "/" (* XXX display empty dirt reasonably *)
+    | Type.DirtParam p ->
+        let k = (match Common.lookup p sbst_dirt with None -> (let Type.Dirt_Param n = p in ~- n) | Some k -> k) in
+        let s = (if List.mem p poly_dirt then "'" else "'_") in
+          print ppf "%sdrt%i" s k
+    | Type.DirtAtom (rgn, op) -> print ppf "%t#%s" (region sbst poly rgn) op
+
+let ty sbst poly t ppf =
+  let poly_ty, _, _ = poly in
+  let sbst_ty, _, _ = sbst in
   let rec ty ?max_level t ppf =
     let print ?at_level = print ?max_level ?at_level ppf in
-    let print_param s p =
-      let k = (match Common.lookup p sbst with None -> ~-(Type.Param.int_of_param p) | Some k -> k) in
+    let print_ty_param s p =
+      (* Weirdness with negative numbers is probably there because of some debugging stuff. It would
+         seem better to just die if p cannot be found in sbst_ty. Someone should think about this
+         in the future and do the Right Thing. *)
+      let k = (match Common.lookup p sbst_ty with None -> (let Type.Ty_Param n = p in ~- n) | Some k -> k) in
       if 0 <= k && k <= 25
       then print "%s%c" s (char_of_int (k + int_of_char 'a'))
       else print "%sty%i" s (k - 25)
     in
     match t with
-      | Type.Arrow (t1, t2) ->
+      | Type.Arrow (t1, (t2, drt)) ->
+          (*print ~at_level:5 "@[<h>%t ->@ %t ! %t@]" (ty ~max_level:4 t1) (ty t2) (dirt sbst poly drt)*)
           print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2)
       | Type.Basic b -> print "%s" b
       | Type.Apply (t, []) ->
@@ -87,11 +113,9 @@ let ty ?sbst poly t ppf =
           print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
       | Type.Apply (t, ts) ->
           print ~at_level:1 "(%t) %s" (sequence ", " (ty ~max_level:0) ts) t
-
-      | Type.Param p ->
-        let c = (if List.mem p poly then "'" else "'_") in
-          print_param c p
-
+      | Type.TyParam p ->
+        let c = (if List.mem p poly_ty then "'" else "'_") in
+          print_ty_param c p
       | Type.Tuple [] -> print "unit"
       | Type.Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (sequence " *" (ty ~max_level:1) ts)
       | Type.Record ts -> print "{@[<hov>%t@]}" (sequence "; " (field ty) ts)

@@ -85,6 +85,7 @@ Copyright and license
 ---------------------
 
 Copyright (c) 2012, Andrej Bauer and Matija Pretnar
+Copyright (c) 2012, Timotej Lazar
 
 Eff is distributed under the abbreviated BSD License, see `LICENSE.txt` for
 licensing information.

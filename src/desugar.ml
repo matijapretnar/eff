@@ -20,17 +20,18 @@ let rec ty s = function
   | Syntax.TyApply (t, lst) -> T.Apply (t, List.map (ty s) lst)
   | Syntax.TyParam str ->
     begin match C.lookup str s with
-    | None -> Error.syntax "Unbound type parameter '%s" str
+    | None -> Error.syntax ~pos:C.Nowhere "Unbound type parameter '%s" str
     | Some t -> t
     end
-  | Syntax.TyArrow (t1, t2) -> T.Arrow (ty s t1, ty s t2)
+  | Syntax.TyArrow (t1, t2) -> T.Arrow (ty s t1, (ty s t2, Type.fresh_dirt ()))
   | Syntax.TyTuple lst -> T.Tuple (List.map (ty s) lst)
   | Syntax.TyHandler (t1, t2) -> T.Handler { T.value = ty s t1; T.finally = ty s t2 }
 
 let external_ty t =
-  let lst = List.fold_right (fun p lst -> (p, Type.Param.fresh_ty ()) :: lst) (ty_fv t) [] in
-  let s = C.assoc_map (fun p -> Type.Param p) lst in
-  (List.map snd lst, ty s t)
+  let lst = List.fold_right (fun p lst -> (p, Type.fresh_ty_param ()) :: lst) (ty_fv t) [] in
+  let s = C.assoc_map (fun p -> Type.TyParam p) lst in
+  (* XXX fix this, the dirt and region parameters are wrong *)
+  ((List.map snd lst, [], []), ty s t)
 
 
 (* Desugaring functions below return a list of bindings and the desugared form. *)
@@ -189,10 +190,10 @@ and handler pos {Syntax.operations=ops; Syntax.value=val_a; Syntax.finally=fin_a
 let tydef ps d =
   let sbst, lst = 
     List.fold_right (fun p (sbst,lst) ->
-                       let u = Type.Param.fresh_ty () in
-                         (p, T.Param u)::sbst, u::lst) ps ([],[])
+                       let u = Type.fresh_ty_param () in
+                         (p, T.TyParam u)::sbst, u::lst) ps ([],[])
   in
-    (lst,
+    ((lst, [], []),
      begin match d with
        | Syntax.TyRecord lst -> T.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
        | Syntax.TySum lst -> T.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)

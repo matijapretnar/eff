@@ -1,0 +1,7 @@
+type cow = effect operation horn : int -> int end
+
+type bull = 
+  effect
+    operation tail : int -> int
+    operation horn : int -> string
+  end

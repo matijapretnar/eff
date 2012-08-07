@@ -6,9 +6,13 @@ let less2 = (true < false);;
 
 let less3 = ((1,true) < (0,false));;
 
-let test_equal_number = (1 = 1);;
+(* More comprehensive checking of < can be found in test_less_than.eff *)
 
-let test_equal_fun = ((fun x -> x) = (fun x -> x + 1));;
+let test_equal_int = (1 = 1);;
+
+let test_equal_float = (1.0 = 1.0);;
+
+(* More comprehensive checking of = can be found in test_equality.eff *)
 
 let whatis_std = std;;
 

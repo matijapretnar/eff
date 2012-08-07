@@ -7,28 +7,29 @@ let binary_closure f = V.from_fun (fun v1 -> V.value_fun (fun v2 -> f v1 v2))
 (** [int_int_to_int f] takes a binary integer function f and transforms it into
     a closure that takes two values and evaluates to a value. *)
 let int_int_to_int f =
-  let int_f v1 v2 = V.value_int (f (V.to_int v1) (V.to_int v2)) in
+  let int_f v1 v2 = V.value_int (f (V.to_int ~pos:Common.Nowhere v1) (V.to_int ~pos:Common.Nowhere v2)) in
   binary_closure int_f
 
 (** [float_float_to_float f] takes a binary float function f and transforms it
     into a closure that takes two values and evaluates to a value. *)
 let float_float_to_float f =
-  let float_f v1 v2 = V.value_float (f (V.to_float v1) (V.to_float v2)) in
+  let float_f v1 v2 = V.value_float (f (V.to_float ~pos:Common.Nowhere v1) (V.to_float ~pos:Common.Nowhere v2)) in
   binary_closure float_f
 
 let comparison_functions = [
-  ("=", binary_closure (fun v1 v2 -> V.value_bool (V.equal v1 v2)));
-  ("<", binary_closure (fun v1 v2 -> V.value_bool (V.less_than v1 v2)));
+  ("=", binary_closure (fun v1 v2 -> V.value_bool (V.equal ~pos:Common.Nowhere v1 v2)));
+  ("<", binary_closure (fun v1 v2 -> V.value_bool (V.less_than ~pos:Common.Nowhere v1 v2)));
 ]
 
 let arithmetic_operations = [
-  ("~-", V.from_fun (fun v -> V.value_int (~- (V.to_int v))));
-  ("+", int_int_to_int (+));
-  ("-", int_int_to_int (-));
-  ("*", int_int_to_int ( * ));
-  ("/", int_int_to_int (/));
-  ("mod", int_int_to_int (mod));
-  ("~-.", V.from_fun (fun v -> V.value_float (~-. (V.to_float v))));
+  ("~-", V.from_fun (fun v -> V.value_int (Big_int.minus_big_int (V.to_int ~pos:Common.Nowhere v))));
+  ("+", int_int_to_int Big_int.add_big_int);
+  ("-", int_int_to_int Big_int.sub_big_int);
+  ("*", int_int_to_int Big_int.mult_big_int);
+  ("/", int_int_to_int Big_int.div_big_int);
+  ("mod", int_int_to_int Big_int.mod_big_int);
+  ("**", int_int_to_int Big_int.power_big_int_positive_big_int);
+  ("~-.", V.from_fun (fun v -> V.value_float (~-. (V.to_float ~pos:Common.Nowhere v))));
   ("+.", float_float_to_float (+.));
   ("-.", float_float_to_float (-.));
   ("*.", float_float_to_float ( *. ));
@@ -36,9 +37,9 @@ let arithmetic_operations = [
 ]
 
 let string_operations = [
-  ("^", binary_closure (fun v1 v2 -> V.value_str (V.to_str v1 ^ V.to_str v2)));
+  ("^", binary_closure (fun v1 v2 -> V.value_str (V.to_str ~pos:Common.Nowhere v1 ^ V.to_str ~pos:Common.Nowhere v2)));
   ("string_length",
-    V.from_fun (fun v -> V.value_int (String.length (V.to_str v))));
+    V.from_fun (fun v -> V.value_int (Big_int.big_int_of_int (String.length (V.to_str ~pos:Common.Nowhere v)))));
 ]
 
 let conversion_functions = [
@@ -49,7 +50,7 @@ let conversion_functions = [
     in
     V.from_fun to_string);
   ("float_of_int",
-    V.from_fun (fun v -> V.value_float (float_of_int (V.to_int v))));
+    V.from_fun (fun v -> V.value_float (Big_int.float_of_big_int (V.to_int ~pos:Common.Nowhere v))));
 ]
 
 (** [external_instance name ops] returns an instance with a given name and
@@ -60,28 +61,28 @@ let external_instance name ops =
   V.fresh_instance (Some name) (Some (ref V.from_unit, ops))
 
 let std_print v =
-  let str = V.to_str v in
-  print_string str;
-  flush stdout;
-  V.from_unit
+  let str = V.to_str ~pos:Common.Nowhere v in
+    print_string str;
+    flush stdout;
+    V.from_unit
 and std_read _ =
   let str = read_line () in
   V.from_str str
 
 let create_exception v = 
-  let exc_name = V.to_str v in
+  let exc_name = V.to_str ~pos:Common.Nowhere v in
   let exception_raise param =
     let message = Print.to_string "%s %t." exc_name (Print.value param) in
-    Error.exc "%s" message
+      Error.exc ~pos:Common.Nowhere "%s" message
   in
-  V.Value (external_instance exc_name [
-    ("raise", exception_raise);
-  ])
+    V.Value (external_instance exc_name [
+      ("raise", exception_raise);
+    ])
 
 let rnd_int v =
-  V.from_int (Random.int (V.to_int v))
+  V.from_int (Big_int.big_int_of_int (Random.int (Big_int.int_of_big_int (V.to_int ~pos:Common.Nowhere v))))
 and rnd_float v =
-  V.from_float (Random.float (V.to_float v))
+  V.from_float (Random.float (V.to_float ~pos:Common.Nowhere v))
 
 let effect_instances = [
   ("std", external_instance "standard I/O" [
