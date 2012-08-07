@@ -173,14 +173,15 @@ and veval env (e, pos) = match e with
 and eval_handler env {Core.operations=ops; Core.value=value; Core.finally=fin} =
   let eval_op ((e, op), (p, kvar, c)) =
     let f u k = eval_closure (extend kvar (V.Closure k) env) (p, c) u in
-    ((V.to_instance (veval env e), op), f)
-    in
+    let (i, _, _) = V.to_instance (veval env e) in
+      ((i, op), f)
+  in
   let ops = List.map eval_op ops in
   let rec h = function
     | V.Value v -> eval_closure env value v
-    | V.Operation (op, v, k) ->
+    | V.Operation (((i, _, _), opname) as op, v, k) ->
         let k' u = h (k u) in
-        begin match C.lookup op ops with
+        begin match C.lookup (i,opname) ops with
         | Some f -> f v k'
         | None -> V.Operation (op, v, k')
         end
