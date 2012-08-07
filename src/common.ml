@@ -39,17 +39,13 @@ type ('key, 'value) assoc = ('key * 'value) list
 
 (** Variants of association list operations that map into [option] type instead
     of raising [Not_found] *)
-let lookup k env =
-  try
-    Some (List.assoc k env)
-  with
-    | Not_found -> None
+let rec lookup x = function
+  | [] -> None
+  | (x', y) :: lst -> if x = x' then Some y else lookup x lst
 
-let find p lst =
-  try
-    Some (List.find p lst)
-  with
-    | Not_found -> None
+let rec find p = function
+  | [] -> None
+  | x :: lst -> if p x then Some x else find p lst
 
 let update k v env =
   (k, v) :: env
