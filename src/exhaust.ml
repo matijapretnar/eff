@@ -97,7 +97,7 @@ let find_constructors lst =
              let rec find c =
                let c' = Const c in
                if (is_last c) then [] else begin
-                 if List.mem c' present then find (next c) else [c']
+                 if List.exists (C.equal_const c') present then find (next c) else [c']
                end
              in
              find (first c)
@@ -130,7 +130,7 @@ let specialize_vector con = function
               | Some p -> Some (p :: lst)
               | None -> Some lst
             end
-        | Const c, P.Const c' when c = c' -> Some lst
+        | Const c, P.Const c' when Common.equal_const c c' -> Some lst
         | _, (P.Nonbinding | P.Var _) -> Some ((C.repeat (P.Nonbinding, C.Nowhere) (arity con)) @ lst)
         | _, _ -> None
       end
