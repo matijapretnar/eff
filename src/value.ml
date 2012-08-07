@@ -67,42 +67,43 @@ let value_float f = Value (from_float f)
 (* Comparison of values is a trickier business than you might think. *)
 let rec compare v1 v2 =
   match v1 with
+    | Closure _ | Handler _ -> Common.Invalid
     | Const c ->
       (match v2 with
+        | Closure _ | Handler _ -> Common.Invalid
         | Const c' -> Common.compare_const c c'
-        | _ -> Common.Invalid)
+        | Tuple _ | Record _ | Variant _ | Instance _ -> Common.Less)
     | Tuple lst ->
       (match v2 with
+        | Closure _ | Handler _ -> Common.Invalid
+        | Const _ -> Common.Greater
         | Tuple lst' -> compare_list lst lst'
-        | _ -> Common.Invalid)
+        | Record _ | Variant _ | Instance _ -> Common.Less)
     | Record lst ->
       (match v2 with
+        | Closure _ | Handler _ -> Common.Invalid
+        | Const _ | Tuple _ -> Common.Greater
         | Record lst' -> compare_record lst lst'
-        | _ -> Common.Invalid)
+        | Variant _ | Instance _ -> Common.Less)
     | Variant (lbl, u)->
       (match v2 with
+        | Closure _ | Handler _ -> Common.Invalid
+        | Const _ | Tuple _ | Record _ -> Common.Greater
         | Variant (lbl', u') ->
           let r = Pervasives.compare lbl lbl' in
             if r < 0 then Common.Less
             else if r > 0 then Common.Greater
             else compare_option u u'
-        | _ -> Common.Invalid)
-    | Closure c ->
-      (match v2 with
-        | Closure c' -> if c == c' then Common.Equal else Common.Invalid
-        | _ -> Common.Invalid)
+        | Instance _ -> Common.Less)
     | Instance (i, _, _) ->
       (match v2 with
+        | Closure _ | Handler _ -> Common.Invalid
+        | Const _ | Tuple _ | Record _ | Variant _ -> Common.Greater
         | Instance (i', _, _) ->
           let r = Pervasives.compare i i' in
             if r < 0 then Common.Less
             else if r > 0 then Common.Greater
-            else Common.Equal
-        | _ -> Common.Invalid)
-    | Handler h ->
-      (match v2 with
-        | Handler h' -> if h == h' then Common.Equal else Common.Invalid
-        | _ -> Common.Invalid)
+            else Common.Equal)
 
 and compare_list lst1 lst2 =
   match lst1, lst2 with
@@ -154,8 +155,8 @@ let equal ~pos v1 v2 =
 
 let less_than ~pos v1 v2 =
   match compare v1 v2 with
-    | Common.Invalid -> Error.runtime ~pos "invalid comparison with <"
     | Common.Less -> true
     | Common.Greater | Common.Equal -> false
+    | Common.Invalid -> Error.runtime ~pos "invalid comparison with <"
 
 

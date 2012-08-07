@@ -45,7 +45,7 @@ let rec extend_value p v env =
   | Pattern.Variant (lbl, None), Value.Variant (lbl', None) when lbl = lbl' -> env
   | Pattern.Variant (lbl, Some p), Value.Variant (lbl', Some v) when lbl = lbl' ->
       extend_value p v env
-  | Pattern.Const c, Value.Const c' when c = c' -> env
+  | Pattern.Const c, Value.Const c' when Common.equal_const c c' -> env
   | _, _ -> raise (PatternMatch (snd p))
 
 let extend p v env =
@@ -96,10 +96,10 @@ let rec ceval env (c, pos) = match c with
   | Core.For (i, e1, e2, c, up) ->
       let n1 = V.to_int ~pos:(snd e1) (veval env e1) in
       let n2 = V.to_int ~pos:(snd e2) (veval env e2) in
-      let test i = if up then i <= n2 else i >= n2 in
-      let next i = if up then succ i else pred i in
+      let le = if up then Big_int.le_big_int else Big_int.ge_big_int in
+      let next = if up then Big_int.succ_big_int else Big_int.pred_big_int in
       let rec loop n =
-        if test n then
+        if le n n2 then
           let r = ceval (update i (V.Const (C.Integer n)) env) c in
           sequence (fun _ -> loop (next n)) r
         else

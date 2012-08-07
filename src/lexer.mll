@@ -66,13 +66,13 @@
 let position_of_lex lex =
   Common.Position (Lexing.lexeme_start_p lex, Lexing.lexeme_end_p lex)
 
-let int_of_string s =
+let bigint_of_string s =
   (* get rid of _ *)
   let j = ref 0 in
   for i = 0 to String.length s - 1 do
     if s.[i] <> '_' then (s.[!j] <- s.[i]; incr j)
   done;
-  int_of_string (String.sub s 0 !j)
+  Big_int.big_int_of_string (String.sub s 0 !j)
 
 }
 
@@ -108,9 +108,9 @@ rule token = parse
   | '\n'                { Lexing.new_line lexbuf; token lexbuf }
   | [' ' '\r' '\t']     { token lexbuf }
   | "(*"                { comment 0 lexbuf }
-  | int                 { INT (int_of_string (Lexing.lexeme lexbuf)) }
+  | int                 { INT (bigint_of_string (Lexing.lexeme lexbuf)) }
   | xxxint              { try
-                            INT (int_of_string (Lexing.lexeme lexbuf))
+                            INT (Big_int.big_int_of_int (int_of_string (Lexing.lexeme lexbuf)))
                           with Failure _ -> Error.syntax ~pos:(position_of_lex lexbuf) "Invalid integer constant"
                         }
   | float               { FLOAT (float_of_string(Lexing.lexeme lexbuf)) }

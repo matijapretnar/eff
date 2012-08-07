@@ -22,12 +22,13 @@ let comparison_functions = [
 ]
 
 let arithmetic_operations = [
-  ("~-", V.from_fun (fun v -> V.value_int (~- (V.to_int ~pos:Common.Nowhere v))));
-  ("+", int_int_to_int (+));
-  ("-", int_int_to_int (-));
-  ("*", int_int_to_int ( * ));
-  ("/", int_int_to_int (/));
-  ("mod", int_int_to_int (mod));
+  ("~-", V.from_fun (fun v -> V.value_int (Big_int.minus_big_int (V.to_int ~pos:Common.Nowhere v))));
+  ("+", int_int_to_int Big_int.add_big_int);
+  ("-", int_int_to_int Big_int.sub_big_int);
+  ("*", int_int_to_int Big_int.mult_big_int);
+  ("/", int_int_to_int Big_int.div_big_int);
+  ("mod", int_int_to_int Big_int.mod_big_int);
+  ("**", int_int_to_int Big_int.power_big_int_positive_big_int);
   ("~-.", V.from_fun (fun v -> V.value_float (~-. (V.to_float ~pos:Common.Nowhere v))));
   ("+.", float_float_to_float (+.));
   ("-.", float_float_to_float (-.));
@@ -38,7 +39,7 @@ let arithmetic_operations = [
 let string_operations = [
   ("^", binary_closure (fun v1 v2 -> V.value_str (V.to_str ~pos:Common.Nowhere v1 ^ V.to_str ~pos:Common.Nowhere v2)));
   ("string_length",
-    V.from_fun (fun v -> V.value_int (String.length (V.to_str ~pos:Common.Nowhere v))));
+    V.from_fun (fun v -> V.value_int (Big_int.big_int_of_int (String.length (V.to_str ~pos:Common.Nowhere v)))));
 ]
 
 let conversion_functions = [
@@ -49,7 +50,7 @@ let conversion_functions = [
     in
     V.from_fun to_string);
   ("float_of_int",
-    V.from_fun (fun v -> V.value_float (float_of_int (V.to_int ~pos:Common.Nowhere v))));
+    V.from_fun (fun v -> V.value_float (Big_int.float_of_big_int (V.to_int ~pos:Common.Nowhere v))));
 ]
 
 (** [external_instance name ops] returns an instance with a given name and
@@ -79,7 +80,7 @@ let create_exception v =
     ])
 
 let rnd_int v =
-  V.from_int (Random.int (V.to_int ~pos:Common.Nowhere v))
+  V.from_int (Big_int.big_int_of_int (Random.int (Big_int.int_of_big_int (V.to_int ~pos:Common.Nowhere v))))
 and rnd_float v =
   V.from_float (Random.float (V.to_float ~pos:Common.Nowhere v))
 

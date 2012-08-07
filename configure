@@ -2442,7 +2442,7 @@ fi
 $as_echo "$as_me: WARNING: Cannot find ocamlopt; bytecode compilation only." >&2;}
      else
 	TMPVERSION=`$OCAMLOPT -v | sed -n -e 's|.*version* *\(.*\)$|\1|p' `
-	if test "$TMPVERSION" != "$OCAMLVERSION" ; then
+	if test "$TMPVERSION" != "$OCAMLVERSION"; then
 	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: versions differs from ocamlc; ocamlopt discarded." >&5
 $as_echo "versions differs from ocamlc; ocamlopt discarded." >&6; }
 	    OCAMLOPT=no
@@ -2548,7 +2548,7 @@ fi
 
      if test "$OCAMLCDOTOPT" != "no"; then
 	TMPVERSION=`$OCAMLCDOTOPT -v | sed -n -e 's|.*version* *\(.*\)$|\1|p' `
-	if test "$TMPVERSION" != "$OCAMLVERSION" ; then
+	if test "$TMPVERSION" != "$OCAMLVERSION"; then
 	    { $as_echo "$as_me:${as_lineno-$LINENO}: result: versions differs from ocamlc; ocamlc.opt discarded." >&5
 $as_echo "versions differs from ocamlc; ocamlc.opt discarded." >&6; }
 	else
@@ -2557,7 +2557,7 @@ $as_echo "versions differs from ocamlc; ocamlc.opt discarded." >&6; }
      fi
 
      # checking for ocamlopt.opt
-     if test "$OCAMLOPT" != "no" ; then
+     if test "$OCAMLOPT" != "no"; then
 	if test -n "$ac_tool_prefix"; then
   # Extract the first word of "${ac_tool_prefix}ocamlopt.opt", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ocamlopt.opt; ac_word=$2
@@ -2652,7 +2652,7 @@ fi
 
 	if test "$OCAMLOPTDOTOPT" != "no"; then
 	   TMPVERSION=`$OCAMLOPTDOTOPT -v | sed -n -e 's|.*version* *\(.*\)$|\1|p' `
-	   if test "$TMPVERSION" != "$OCAMLVERSION" ; then
+	   if test "$TMPVERSION" != "$OCAMLVERSION"; then
 	      { $as_echo "$as_me:${as_lineno-$LINENO}: result: version differs from ocamlc; ocamlopt.opt discarded." >&5
 $as_echo "version differs from ocamlc; ocamlopt.opt discarded." >&6; }
 	   else
