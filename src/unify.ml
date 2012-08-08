@@ -12,11 +12,11 @@ let solve cstr =
     | (Type.TyParam p, t) | (t, Type.TyParam p) ->
         if Type.occurs_in_ty p t
         then
-          let sbst = Type.beautify2 t1 t2 in
-          Error.typing ~pos:pos
+          let t1, t2 = Type.beautify2 t1 t2 in
+          Error.typing ~pos
             "This expression has a forbidden cylclic type %t = %t."
-            (Print.ty sbst ([], [], []) t1)
-            (Print.ty sbst ([], [], []) t2)
+            (Print.ty_scheme t1)
+            (Print.ty_scheme t2)
         else
           sbst := Type.compose_subst {Type.identity_subst with Type.subst_ty = [(p, t)]} !sbst
 
@@ -28,20 +28,17 @@ let solve cstr =
         when List.length lst1 = List.length lst2 ->
         List.iter2 (unify pos) lst1 lst2
 
-    | (Type.Record lst1, Type.Record lst2) ->
-        assert false
-
-    | (Type.Sum lst1, Type.Sum lst2) ->
-        assert false
-
     | (Type.Apply (t1, lst1), Type.Apply (t2, lst2))
         when t1 = t2 && List.length lst1 = List.length lst2  ->
         List.iter2 (unify pos) lst1 lst2
 
     (* The following two cases cannot be merged into one, as the whole matching
        fails if both types are Apply, but only the second one is transparent. *)
-    | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos:pos t1 ->
-        unify pos t2 (Tctx.ty_apply ~pos:pos t1 lst1)
+    | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos t1 ->
+        begin match Tctx.ty_apply ~pos t1 lst1 with
+        | Tctx.Inline t -> unify pos t2 t
+        | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
+        end
 
     | (t1, (Type.Apply _ as t2)) ->
         unify pos t2 t1
@@ -50,14 +47,11 @@ let solve cstr =
         unify pos h2.Type.value h1.Type.value;
         unify pos h1.Type.finally h2.Type.finally
 
-    | (Type.Effect lst1, Type.Effect lst2) ->
-        assert false
-
     | (t1, t2) ->
-        let sbst = Type.beautify2 t1 t2 in
-        Error.typing ~pos:pos
+        let t1, t2 = Type.beautify2 t1 t2 in
+        Error.typing ~pos
           "This expression has type %t but it should have type %t."
-          (Print.ty sbst ([],[],[]) t1) (Print.ty sbst ([],[],[]) t2)
+          (Print.ty_scheme t1) (Print.ty_scheme t2)
   in
   List.iter (fun (t1, t2, pos) -> unify pos t1 t2) (List.rev cstr);
   !sbst

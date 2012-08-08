@@ -3,8 +3,14 @@
 module C = Common
 module T = Type
 
+(** [fresh_variable ()] creates a fresh variable ["$gen1"], ["$gen2"], ... on
+    each call *)
+let fresh_variable =
+  let next_variable = Common.fresh "variable" in
+  fun () -> "$gen" ^ string_of_int (next_variable ())
+
 let id_abstraction pos =
-  let x = C.fresh_variable () in
+  let x = fresh_variable () in
   ((Pattern.Var x, pos), (Core.Value (Core.Var x, pos), pos))
 
 
@@ -46,7 +52,7 @@ let rec expression (t, pos) =
       let a = abstraction a in
       [], Core.Lambda a
   | Syntax.Function cs ->
-      let x = C.fresh_variable () in
+      let x = fresh_variable () in
       let cs = List.map abstraction cs in
       [], Core.Lambda ((Pattern.Var x, pos), (Core.Match ((Core.Var x, pos), cs), pos))
   | Syntax.Handler cs ->
@@ -56,7 +62,7 @@ let rec expression (t, pos) =
       let w, es = expressions ts in
       w, Core.Tuple es
   | Syntax.Record ts ->
-      if not (C.injective fst ts) then Error.syntax ~pos:pos "Fields in a record must be distinct";
+      if not (C.injective fst ts) then Error.syntax ~pos "Fields in a record must be distinct";
       let w, es = record_expressions ts in
       w, Core.Record es
   | Syntax.Variant (lbl, None) ->
@@ -71,7 +77,7 @@ let rec expression (t, pos) =
      order to catch any future constructs. *)
   | Syntax.Apply _ | Syntax.Match _ | Syntax.Let _ | Syntax.LetRec _
   | Syntax.Handle _ | Syntax.Conditional _ | Syntax.While _ | Syntax.For _ | Syntax.New _ | Syntax.Check _ ->
-      let x = C.fresh_variable () in
+      let x = fresh_variable () in
       let c = computation (t, pos) in
       let w = [(Pattern.Var x, pos), c] in
       w, Core.Var x
@@ -151,10 +157,10 @@ and abstraction2 (p1, p2, t) = (p1, p2, computation t)
 and let_rec = function
   | (Syntax.Lambda (p, t), _) -> (p, computation t)
   | (Syntax.Function cs, pos) ->
-    let x = C.fresh_variable () in
+    let x = fresh_variable () in
     let cs = List.map abstraction cs in
     ((Pattern.Var x, pos), (Core.Match ((Core.Var x, pos), cs), pos))
-  | (_, pos) -> Error.syntax ~pos:pos "This kind of expression is not allowed in a recursive definition"
+  | (_, pos) -> Error.syntax ~pos "This kind of expression is not allowed in a recursive definition"
 
 and expressions = function
   | [] -> [], []
@@ -195,8 +201,8 @@ let tydef ps d =
   in
     ((lst, [], []),
      begin match d with
-       | Syntax.TyRecord lst -> T.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
-       | Syntax.TySum lst -> T.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
-       | Syntax.TyEffect lst -> T.Effect (List.map (fun (op,(t1,t2)) -> (op, (ty sbst t1, ty sbst t2))) lst)
-       | Syntax.TyInline t -> ty sbst t
+       | Syntax.TyRecord lst -> Tctx.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
+       | Syntax.TySum lst -> Tctx.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
+       | Syntax.TyEffect lst -> Tctx.Effect (List.map (fun (op,(t1,t2)) -> (op, (ty sbst t1, ty sbst t2))) lst)
+       | Syntax.TyInline t -> Tctx.Inline (ty sbst t)
      end)

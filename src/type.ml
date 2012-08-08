@@ -17,10 +17,7 @@ type ty =
   | TyParam of ty_param
   | Basic of string
   | Tuple of ty list
-  | Record of (Common.field, ty) Common.assoc
-  | Sum of (Common.label, ty option) Common.assoc
   | Arrow of ty * dirty
-  | Effect of (Common.opsym, ty * ty) Common.assoc
   | Handler of handler_ty
 
 and dirty = ty * dirt
@@ -59,7 +56,7 @@ let string_ty = Basic "string"
 let bool_ty = Basic "bool"
 let float_ty = Basic "float"
 let unit_ty = Tuple []
-let empty_ty = Sum []
+let empty_ty = Apply ("empty", [])
 
 type substitution = {
   subst_ty : (ty_param * ty) list ;
@@ -92,11 +89,7 @@ let rec subst_ty sbst ty =
       | None -> ty)
   | Basic _ as ty -> ty
   | Tuple tys -> Tuple (List.map subst tys)
-  | Record tys -> Record (Common.assoc_map subst tys)
-  | Sum tys -> Sum (Common.assoc_map (Common.option_map subst) tys)
   | Arrow (ty1, ty2) -> Arrow (subst ty1, subst_dirty sbst ty2)
-  | Effect op_sig ->
-      Effect (Common.assoc_map (fun (ty1, ty2) -> (subst ty1, subst ty2)) op_sig)
   | Handler {value = ty1; finally = ty2} ->
       Handler {value = subst ty1; finally = subst ty2}
   in
@@ -128,12 +121,7 @@ let free_params ty =
     | TyParam p -> ([p], [], [])
     | Basic _ -> ([], [], [])
     | Tuple tys -> flatten_map free_ty tys
-    | Record lst -> flatten_map (fun (_, ty) -> free_ty ty) lst
-    | Sum lst ->
-      flatten_map (function (_, None) -> ([],[],[]) | (_, Some ty) -> free_ty ty) lst
     | Arrow (ty1, dirty2) -> free_ty ty1 @@@ free_dirty dirty2
-    | Effect op_sig ->
-      flatten_map (function (_, (ty1, ty2)) -> free_ty ty1 @@@ free_ty ty2) op_sig
     | Handler {value = ty1; finally = ty2} -> free_ty ty1 @@@ free_ty ty2
   and free_dirty (ty, drt) =
     let (xs, ys, zs) = free_ty ty in
@@ -182,15 +170,27 @@ let refresh params ty =
 
 (** [beautify ty] returns a sequential replacement of all type parameters in
     [ty] that can be used for its pretty printing. *)
-let beautify ty =
+let beautify ((ps, ds, rs), ty) =
   let next_ty_param = Common.fresh "beautify_ty" in
   let next_dirt_param = Common.fresh "beautify_dirt" in
   let next_region_param = Common.fresh "beautify_region" in
   let (xs, ys, zs) = free_params ty in
-    List.map (fun p -> (p, next_ty_param ())) xs,
-    List.map (fun q -> (q, next_dirt_param ())) ys,
-    List.map (fun r -> (r, next_region_param ())) zs
+  let xs_map = List.map (fun p -> (p, Ty_Param (next_ty_param ()))) xs
+  and ys_map = List.map (fun q -> (q, Dirt_Param (next_dirt_param ()))) ys
+  and zs_map = List.map (fun r -> (r, Region_Param (next_region_param ()))) zs in
+  let subst ps ps_map = List.map (fun p ->
+    match Common.lookup p ps_map with
+    | None -> p
+    | Some p' -> p') ps in
+  let sbst = 
+    { subst_ty = Common.assoc_map (fun p' -> TyParam p') xs_map ;
+      subst_dirt = Common.assoc_map (fun q' -> DirtParam q') ys_map ;
+      subst_region = Common.assoc_map (fun r' -> RegionParam r') zs_map }
+  in
+  (subst ps xs_map, subst ds ys_map, subst rs zs_map), subst_ty sbst ty
 
-(** [beautify2 ty1 ty2] returns a sequential replacement of type parameters in
-    [ty1] and [ty2] that can be used for their simultaneous pretty printing. *)
-let beautify2 ty1 ty2 = beautify (Tuple [ty1; ty2])
+let beautify2 ty1 ty2 =
+  match beautify (([], [], []), Tuple [ty1; ty2]) with
+  | (ps, Tuple [ty1; ty2]) -> (ps, ty1), (ps, ty2)
+  | _ -> assert false
+

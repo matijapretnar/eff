@@ -94,10 +94,11 @@ let exec_topdef interactive (ctx, env) (d,pos) =
           defs env
       in
         if interactive then begin
-          List.iter (fun (x, (ps,t)) ->
+          List.iter (fun (x, tysch) ->
                        match Eval.lookup x env with
                          | None -> assert false
-                         | Some v -> Format.printf "@[val %s : %t = %t@]@." x (Print.ty (Type.beautify t) ps t) (Print.value v))
+                         | Some v ->
+                         Format.printf "@[val %s : %t = %t@]@." x (Print.beautified_ty_scheme tysch) (Print.value v))
             vars
         end;
         (ctx, env)
@@ -107,14 +108,14 @@ let exec_topdef interactive (ctx, env) (d,pos) =
       List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env = Eval.extend_let_rec env defs in
         if interactive then begin
-          List.iter (fun (x,(ps,t)) -> Format.printf "@[val %s : %t = <fun>@]@." x (Print.ty (Type.beautify t) ps t)) vars
+          List.iter (fun (x, tysch) -> Format.printf "@[val %s : %t = <fun>@]@." x (Print.beautified_ty_scheme tysch)) vars
         end;
         (ctx, env)
   | Syntax.External (x, t, f) ->
     let ctx = Ctx.extend ctx x (Desugar.external_ty t) in
       begin match C.lookup f External.values with
         | Some v -> (ctx, Eval.update x v env)
-        | None -> Error.runtime ~pos:pos "unknown external symbol %s." f
+        | None -> Error.runtime ~pos "unknown external symbol %s." f
       end
   | Syntax.Tydef tydefs ->
       let tydefs = List.map (fun (t, (ps, d)) -> (t, Desugar.tydef ps d)) tydefs in
@@ -138,14 +139,14 @@ let rec exec_cmd interactive (ctx, env) e =
   match e with
   | Syntax.Term c ->
       let c = Desugar.computation c in
-      let ctx, (ps, t) = infer_top_comp ctx c in
+      let ctx, tysch = infer_top_comp ctx c in
       let v = Eval.run env c in
-      if interactive then Format.printf "@[- : %t = %t@]@." (Print.ty (Type.beautify t) ps t) (Print.value v);
+      if interactive then Format.printf "@[- : %t = %t@]@." (Print.beautified_ty_scheme tysch) (Print.value v);
       (ctx, env)
   | Syntax.TypeOf c ->
       let c = Desugar.computation c in
-      let ctx, (ps, t) = infer_top_comp ctx c in
-      Format.printf "@[- : %t@]@." (Print.ty (Type.beautify t) ps t);
+      let ctx, tysch = infer_top_comp ctx c in
+      Format.printf "@[- : %t@]@." (Print.beautified_ty_scheme tysch);
       (ctx, env)
   | Syntax.Reset ->
       Tctx.reset ();

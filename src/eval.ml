@@ -50,7 +50,7 @@ let rec extend_value p v env =
 
 let extend p v env =
   try extend_value p v env
-  with PatternMatch pos -> Error.runtime ~pos:pos "Pattern match failure."
+  with PatternMatch pos -> Error.runtime ~pos "Pattern match failure."
 
 let rec sequence k = function
   | V.Value v -> k v
@@ -73,7 +73,7 @@ let rec ceval env (c, pos) = match c with
   | Core.Match (e, cases) ->
       let v = veval env e in
       let rec eval_case = function
-        | [] -> Error.runtime ~pos:pos "No branches succeeded in a pattern match."
+        | [] -> Error.runtime ~pos "No branches succeeded in a pattern match."
         | (p, c) :: lst ->
             try ceval (extend_value p v env) c
             with PatternMatch _ -> eval_case lst
@@ -133,7 +133,7 @@ let rec ceval env (c, pos) = match c with
 
   | Core.Check c ->
       let r = ceval env c in
-      Print.check ~pos:pos "%t" (Print.result r);
+      Print.check ~pos "%t" (Print.result r);
       V.value_unit
 
 and eval_let env lst c =
@@ -157,7 +157,7 @@ and veval env (e, pos) = match e with
   | Core.Var x ->
       begin match lookup x env with
       | Some v -> v
-      | None -> Error.runtime ~pos:pos "Name %s is not defined." x
+      | None -> Error.runtime ~pos "Name %s is not defined." x
       end
   | Core.Const c -> V.Const c
   | Core.Tuple es -> V.Tuple (List.map (veval env) es)

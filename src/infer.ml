@@ -65,27 +65,27 @@ let infer_pattern cstr pp =
       | Pattern.Record [] -> assert false
       | Pattern.Record (((fld, _) :: _) as lst) ->
           (match Tctx.infer_field fld with
-            | None -> Error.typing ~pos:pos "Unbound record field label %s" fld
-            | Some (t, (ps, _, _), us) ->
+            | None -> Error.typing ~pos "Unbound record field label %s" fld
+            | Some (ty, (t, us)) ->
               let unify_record_pattern (fld, p) =
                 begin match C.lookup fld us with
-                  | None -> Error.typing ~pos:pos "Unexpected field %s in a pattern of type %s." fld t
+                  | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s." fld t
                   | Some u -> add_ty_constraint cstr pos (infer p) u
                 end
               in
                 List.iter unify_record_pattern lst;
-                T.Apply (t, List.map (fun p -> T.TyParam p) ps))
+                ty)
       | Pattern.Variant (lbl, p) ->
           (match Tctx.infer_variant lbl with
-            | None -> Error.typing ~pos:pos "Unbound constructor %s" lbl
-            | Some (t, (ps, _, _), u) ->
+            | None -> Error.typing ~pos "Unbound constructor %s" lbl
+            | Some (ty, u) ->
               begin match p, u with
                 | None, None -> ()
                 | Some p, Some u -> add_ty_constraint cstr pos (infer p) u
-                | None, Some _ -> Error.typing ~pos:pos "Constructor %s should be applied to an argument." lbl
-                | Some _, None -> Error.typing ~pos:pos "Constructor %s cannot be applied to an argument." lbl
+                | None, Some _ -> Error.typing ~pos "Constructor %s should be applied to an argument." lbl
+                | Some _, None -> Error.typing ~pos "Constructor %s cannot be applied to an argument." lbl
               end;
-              T.Apply (t, List.map (fun p -> T.TyParam p) ps))
+              ty)
   in
   let t = infer pp in
     !vars, t
@@ -116,7 +116,7 @@ and infer_handler_case_abstraction ctx cstr (p, k, e) =
 and infer_let ctx cstr pos defs =
   (if !warn_implicit_sequencing && List.length defs >= 2 then
       let positions = List.map (fun (_, (_, pos)) -> pos) defs in
-        Print.warning ~pos:pos "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
+        Print.warning ~pos "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
           (Print.sequence "," Print.position positions));
   let delta = T.fresh_dirt () in
   let vars, ctx = List.fold_left
@@ -125,7 +125,7 @@ and infer_let ctx cstr pos defs =
       let ws, tp = infer_pattern cstr p in
       add_dirty_constraint cstr (snd c) tc (tp, delta);
       match C.find_duplicate (List.map fst ws) (List.map fst vs) with
-        | Some x -> Error.typing ~pos:pos "Several definitions of %s." x
+        | Some x -> Error.typing ~pos "Several definitions of %s." x
         | None ->
             let sbst = Unify.solve !cstr in
             let ws = Common.assoc_map (T.subst_ty sbst) ws in
@@ -140,7 +140,7 @@ and infer_let ctx cstr pos defs =
 
 and infer_let_rec ctx cstr pos defs =
   if not (Common.injective fst defs) then
-    Error.typing ~pos:pos "Multiply defined recursive value.";
+    Error.typing ~pos "Multiply defined recursive value.";
   let lst =
     List.map (fun (f,(p,c)) ->
       let u1 = T.fresh_ty () in
@@ -169,41 +169,41 @@ and infer_let_rec ctx cstr pos defs =
    [ctx]. It returns the inferred type of [e]. *)
 and infer_expr ctx cstr (e,pos) =
   match e with
-    | Core.Var x -> Ctx.lookup ~pos:pos ctx x
+    | Core.Var x -> Ctx.lookup ~pos ctx x
     | Core.Const const -> ty_of_const const
     | Core.Tuple es -> T.Tuple (C.map (infer_expr ctx cstr) es)
     | Core.Record [] -> assert false
     | Core.Record (((fld,_)::_) as lst) ->
       if not (Pattern.linear_record lst) then
-        Error.typing ~pos:pos "Fields in a record must be distinct." ;
+        Error.typing ~pos "Fields in a record must be distinct." ;
       (match Tctx.infer_field fld with
-        | None -> Error.typing ~pos:pos "Unbound record field label %s in a pattern" fld
-        | Some (t_name, (params, _, _), arg_types) ->
+        | None -> Error.typing ~pos "Unbound record field label %s in a pattern" fld
+        | Some (ty, (t_name, arg_types)) ->
           if List.length lst <> List.length arg_types then
-            Error.typing ~pos:pos "malformed record of type %s" t_name
+            Error.typing ~pos "malformed record of type %s" t_name
           else
             let arg_types' = C.assoc_map (infer_expr ctx cstr) lst in
             let unify_record_arg (fld, t) =
               begin match C.lookup fld arg_types with
-                | None -> Error.typing ~pos:pos "Unexpected record field label %s in a pattern" fld
+                | None -> Error.typing ~pos "Unexpected record field label %s in a pattern" fld
                 | Some u -> add_ty_constraint cstr pos t u
               end
             in
               List.iter unify_record_arg arg_types';
-              T.Apply (t_name, List.map (fun p -> T.TyParam p) params))
+              ty)
           
     | Core.Variant (lbl, u) ->
       (match Tctx.infer_variant lbl with
-        | None -> Error.typing ~pos:pos "Unbound constructor %s in a pattern" lbl
-        | Some (t_name, (params, _, _), arg_type) ->
+        | None -> Error.typing ~pos "Unbound constructor %s in a pattern" lbl
+        | Some (ty, arg_type) ->
           begin match arg_type, u with
             | None, None -> ()
             | Some ty, Some u ->
               let ty' = infer_expr ctx cstr u in
                 add_ty_constraint cstr pos ty ty'
-            | _, _ -> Error.typing ~pos:pos "Wrong number of arguments for label %s." lbl
+            | _, _ -> Error.typing ~pos "Wrong number of arguments for label %s." lbl
           end;
-          T.Apply (t_name, List.map (fun p -> T.TyParam p) params))
+          ty)
         
     | Core.Lambda a ->
         let t1, t2 = infer_abstraction ctx cstr a in
@@ -211,12 +211,12 @@ and infer_expr ctx cstr (e,pos) =
         
     | Core.Operation (e, op) ->
       (match Tctx.infer_operation op with
-        | None -> Error.typing ~pos:pos "Unbound operation %s" op
-        | Some (t, (ps, _, _), t1, t2) ->
+        | None -> Error.typing ~pos "Unbound operation %s" op
+        | Some (ty, (t1, t2)) ->
           let u = infer_expr ctx cstr e in
           let dirt = T.DirtAtom (T.fresh_region (), op) in
             (* XXX do something about regions *)
-            add_ty_constraint cstr pos u (T.Apply (t, List.map (fun p -> T.TyParam p) ps));
+            add_ty_constraint cstr pos u ty;
             T.Arrow (t1, (t2, dirt)))
 
     | Core.Handler {Core.operations=ops; Core.value=a_val; Core.finally=a_fin} -> 
@@ -226,10 +226,10 @@ and infer_expr ctx cstr (e,pos) =
         let t_yield = T.fresh_ty () in
         let unify_operation ((e, op), a2) =
           (match Tctx.infer_operation op with
-            | None -> Error.typing ~pos:pos "Unbound operation %s in a handler" op
-            | Some (t, (ps, _, _), t1, t2) ->
+            | None -> Error.typing ~pos "Unbound operation %s in a handler" op
+            | Some (ty, (t1, t2)) ->
               let u = infer_expr ctx cstr e in
-                add_ty_constraint cstr pos u (T.Apply (t, List.map (fun p -> T.TyParam p) ps));
+                add_ty_constraint cstr pos u ty;
                 let tk, u1, u2 = infer_handler_case_abstraction ctx cstr a2 in
                   add_ty_constraint cstr pos t1 u1;
                   (* XXX maybe we need to change the direction of inequalities here,
@@ -282,7 +282,7 @@ and infer_comp ctx cstr cp =
               
       | Core.New (eff, r) ->
           begin match Tctx.fresh_tydef ~pos:pos eff with
-          | ((ps,_,_), T.Effect ops) ->
+          | ((ps,_,_), Tctx.Effect ops) ->
               begin match r with
               | None -> ()
               | Some (e, lst) ->
@@ -290,7 +290,7 @@ and infer_comp ctx cstr cp =
                   List.iter
                     (fun (op, (((_,pos1), (_,pos2), (_,posc)) as a)) ->
                        match C.lookup op ops with
-                       | None -> Error.typing ~pos:pos "Effect type %s does not have operation %s" eff op
+                       | None -> Error.typing ~pos "Effect type %s does not have operation %s" eff op
                        | Some (u1, u2) ->
                            let t1, t2, t = infer_abstraction2 ctx cstr a in
                            add_ty_constraint cstr pos1 t1 u1;
@@ -301,7 +301,7 @@ and infer_comp ctx cstr cp =
               (* XXX Here we need to change T.Apply to something that creates an
                  effect instance/region thingy. *)
               T.Apply (eff, List.map (fun p -> Type.TyParam p) ps), T.empty_dirt
-          | _ -> Error.typing ~pos:pos "Effect type expected but %s encountered" eff
+          | _ -> Error.typing ~pos "Effect type expected but %s encountered" eff
           end
 
       | Core.While (c1, c2) ->
