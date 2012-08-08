@@ -12,11 +12,11 @@ let solve cstr =
     | (Type.TyParam p, t) | (t, Type.TyParam p) ->
         if Type.occurs_in_ty p t
         then
-          let sbst = Type.beautify2 t1 t2 in
+          let t1, t2 = Type.beautify2 t1 t2 in
           Error.typing ~pos
             "This expression has a forbidden cylclic type %t = %t."
-            (Print.ty sbst ([], [], []) t1)
-            (Print.ty sbst ([], [], []) t2)
+            (Print.ty_scheme t1)
+            (Print.ty_scheme t2)
         else
           sbst := Type.compose_subst {Type.identity_subst with Type.subst_ty = [(p, t)]} !sbst
 
@@ -48,10 +48,10 @@ let solve cstr =
         unify pos h1.Type.finally h2.Type.finally
 
     | (t1, t2) ->
-        let sbst = Type.beautify2 t1 t2 in
+        let t1, t2 = Type.beautify2 t1 t2 in
         Error.typing ~pos
           "This expression has type %t but it should have type %t."
-          (Print.ty sbst ([],[],[]) t1) (Print.ty sbst ([],[],[]) t2)
+          (Print.ty_scheme t1) (Print.ty_scheme t2)
   in
   List.iter (fun (t1, t2, pos) -> unify pos t1 t2) (List.rev cstr);
   !sbst

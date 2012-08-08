@@ -170,15 +170,27 @@ let refresh params ty =
 
 (** [beautify ty] returns a sequential replacement of all type parameters in
     [ty] that can be used for its pretty printing. *)
-let beautify ty =
+let beautify ((ps, ds, rs), ty) =
   let next_ty_param = Common.fresh "beautify_ty" in
   let next_dirt_param = Common.fresh "beautify_dirt" in
   let next_region_param = Common.fresh "beautify_region" in
   let (xs, ys, zs) = free_params ty in
-    List.map (fun p -> (p, next_ty_param ())) xs,
-    List.map (fun q -> (q, next_dirt_param ())) ys,
-    List.map (fun r -> (r, next_region_param ())) zs
+  let xs_map = List.map (fun p -> (p, Ty_Param (next_ty_param ()))) xs
+  and ys_map = List.map (fun q -> (q, Dirt_Param (next_dirt_param ()))) ys
+  and zs_map = List.map (fun r -> (r, Region_Param (next_region_param ()))) zs in
+  let subst ps ps_map = List.map (fun p ->
+    match Common.lookup p ps_map with
+    | None -> p
+    | Some p' -> p') ps in
+  let sbst = 
+    { subst_ty = Common.assoc_map (fun p' -> TyParam p') xs_map ;
+      subst_dirt = Common.assoc_map (fun q' -> DirtParam q') ys_map ;
+      subst_region = Common.assoc_map (fun r' -> RegionParam r') zs_map }
+  in
+  (subst ps xs_map, subst ds ys_map, subst rs zs_map), subst_ty sbst ty
 
-(** [beautify2 ty1 ty2] returns a sequential replacement of type parameters in
-    [ty1] and [ty2] that can be used for their simultaneous pretty printing. *)
-let beautify2 ty1 ty2 = beautify (Tuple [ty1; ty2])
+let beautify2 ty1 ty2 =
+  match beautify (([], [], []), Tuple [ty1; ty2]) with
+  | (ps, Tuple [ty1; ty2]) -> (ps, ty1), (ps, ty2)
+  | _ -> assert false
+

@@ -67,44 +67,27 @@ and pattern_list ?(max_length=299) (p,_) ppf =
   else
     fprintf ppf ",@ ..."
 
-let region sbst poly reg ppf =
-  let _, _, poly_reg = poly in
-  let _, _, sbst_reg = sbst in
+let region (_, _, rs) reg ppf =
   match reg with
-    | Type.RegionParam p ->
-        let k = (match Common.lookup p sbst_reg with None -> (let Type.Region_Param n = p in ~- n) | Some k -> k) in
-        let s = (if List.mem p poly_reg then "'" else "'_") in
-          print ppf "%srgn%i" s k
+    | Type.RegionParam ((Type.Region_Param k) as p) ->
+        let c = (if List.mem p rs then "'" else "'_") in
+          print ppf "%srgn%i" c k
     | Type.RegionInstance (Type.Instance_Param i) -> print ppf "%d" i
 
-let dirt sbst poly drt ppf =
-  let _, poly_dirt, _ = poly in
-  let _, sbst_dirt, _ = sbst in
+let dirt ((_, ds, _) as poly) drt ppf =
   match drt with
     | Type.DirtEmpty -> print ppf "/" (* XXX display empty dirt reasonably *)
-    | Type.DirtParam p ->
-        let k = (match Common.lookup p sbst_dirt with None -> (let Type.Dirt_Param n = p in ~- n) | Some k -> k) in
-        let s = (if List.mem p poly_dirt then "'" else "'_") in
-          print ppf "%sdrt%i" s k
-    | Type.DirtAtom (rgn, op) -> print ppf "%t#%s" (region sbst poly rgn) op
+    | Type.DirtParam ((Type.Dirt_Param k) as p) ->
+        let c = (if List.mem p ds then "'" else "'_") in
+          print ppf "%sdrt%i" c k
+    | Type.DirtAtom (rgn, op) -> print ppf "%t#%s" (region poly rgn) op
 
-let ty sbst poly t ppf =
-  let poly_ty, _, _ = poly in
-  let sbst_ty, _, _ = sbst in
+let ty_scheme ((ps, _, _) as poly, t) ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = print ?max_level ?at_level ppf in
-    let print_ty_param s p =
-      (* Weirdness with negative numbers is probably there because of some debugging stuff. It would
-         seem better to just die if p cannot be found in sbst_ty. Someone should think about this
-         in the future and do the Right Thing. *)
-      let k = (match Common.lookup p sbst_ty with None -> (let Type.Ty_Param n = p in ~- n) | Some k -> k) in
-      if 0 <= k && k <= 25
-      then print "%s%c" s (char_of_int (k + int_of_char 'a'))
-      else print "%sty%i" s (k - 25)
-    in
     match t with
       | Type.Arrow (t1, (t2, drt)) ->
-          (*print ~at_level:5 "@[<h>%t ->@ %t ! %t@]" (ty ~max_level:4 t1) (ty t2) (dirt sbst poly drt)*)
+          (* print ~at_level:5 "@[<h>%t ->@ %t ! %t@]" (ty ~max_level:4 t1) (ty t2) (dirt poly drt) *)
           print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2)
       | Type.Basic b -> print "%s" b
       | Type.Apply (t, []) ->
@@ -113,15 +96,21 @@ let ty sbst poly t ppf =
           print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
       | Type.Apply (t, ts) ->
           print ~at_level:1 "(%t) %s" (sequence "," ty ts) t
-      | Type.TyParam p ->
-        let c = (if List.mem p poly_ty then "'" else "'_") in
-          print_ty_param c p
+      | Type.TyParam ((Type.Ty_Param k) as p) ->
+          let c = (if List.mem p ps then "'" else "'_") in
+          if 0 <= k && k <= 25
+          then print "%s%c" c (char_of_int (k + int_of_char 'a'))
+          else print "%sty%i" c (k - 25)
       | Type.Tuple [] -> print "unit"
       | Type.Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (sequence " *" (ty ~max_level:1) ts)
       | Type.Handler {Type.value=t1; Type.finally=t2} ->
           print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
   in
     ty t ppf
+
+let beautified_ty_scheme tysch =
+  let tysch = Type.beautify tysch in
+  ty_scheme tysch
 
 (*
 let subst sbst ppf =
