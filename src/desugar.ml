@@ -3,8 +3,14 @@
 module C = Common
 module T = Type
 
+(** [fresh_variable ()] creates a fresh variable ["$gen1"], ["$gen2"], ... on
+    each call *)
+let fresh_variable =
+  let next_variable = Common.fresh "variable" in
+  fun () -> "$gen" ^ string_of_int (next_variable ())
+
 let id_abstraction pos =
-  let x = C.fresh_variable () in
+  let x = fresh_variable () in
   ((Pattern.Var x, pos), (Core.Value (Core.Var x, pos), pos))
 
 
@@ -46,7 +52,7 @@ let rec expression (t, pos) =
       let a = abstraction a in
       [], Core.Lambda a
   | Syntax.Function cs ->
-      let x = C.fresh_variable () in
+      let x = fresh_variable () in
       let cs = List.map abstraction cs in
       [], Core.Lambda ((Pattern.Var x, pos), (Core.Match ((Core.Var x, pos), cs), pos))
   | Syntax.Handler cs ->
@@ -71,7 +77,7 @@ let rec expression (t, pos) =
      order to catch any future constructs. *)
   | Syntax.Apply _ | Syntax.Match _ | Syntax.Let _ | Syntax.LetRec _
   | Syntax.Handle _ | Syntax.Conditional _ | Syntax.While _ | Syntax.For _ | Syntax.New _ | Syntax.Check _ ->
-      let x = C.fresh_variable () in
+      let x = fresh_variable () in
       let c = computation (t, pos) in
       let w = [(Pattern.Var x, pos), c] in
       w, Core.Var x
@@ -151,7 +157,7 @@ and abstraction2 (p1, p2, t) = (p1, p2, computation t)
 and let_rec = function
   | (Syntax.Lambda (p, t), _) -> (p, computation t)
   | (Syntax.Function cs, pos) ->
-    let x = C.fresh_variable () in
+    let x = fresh_variable () in
     let cs = List.map abstraction cs in
     ((Pattern.Var x, pos), (Core.Match ((Core.Var x, pos), cs), pos))
   | (_, pos) -> Error.syntax ~pos "This kind of expression is not allowed in a recursive definition"

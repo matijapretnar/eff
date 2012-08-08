@@ -121,11 +121,6 @@ let rec repeat x = function
   | 0 -> []
   | n -> x :: repeat x (n-1)
 
-(** [remove x lst] returns [lst] with all occurrences of [x] removed. *)
-let rec remove x = function
-  | [] -> []
-  | y::lst -> if x = y then remove x lst else y :: (remove x lst)
-
 (** [assoc_map f lst] transforms each [(k, v)] in [lst] into [(k, f v)]. *)
 let rec assoc_map f = function
   | [] -> []
@@ -143,12 +138,6 @@ let fresh sort =
     incr counter;
     if !counter = 0 then failwith ("Too many instances of " ^ sort ^ ".");
     f
-
-(** [fresh_variable ()] creates a fresh variable ["$gen1"], ["$gen2"], ... on
-    each call *)
-let fresh_variable =
-  let next_variable = fresh "variable" in
-  fun () -> "$gen" ^ string_of_int (next_variable ())
 
 (** [uniq lst] returns [lst] with all duplicates removed, keeping the first
     occurence of each element. *)
@@ -169,9 +158,3 @@ let split n lst =
 
 (** [diff lst1 lst2] returns [lst1] with all members of [lst2] removed *)
 let diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
-
-(** [subset lst1 lst2] returns [true] if [lst1] is a subset of [lst2]. *)
-let subset lst1 lst2 = List.for_all (fun x -> List.mem x lst2) lst1
-
-(** [equal_set lst1 lst2] returns [true] if the lists are equal as sets. *)
-let equal_set lst1 lst2 = subset lst1 lst2 && subset lst2 lst1
