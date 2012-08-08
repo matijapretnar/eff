@@ -87,6 +87,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
   | Syntax.TopLet defs ->
       let defs = C.assoc_map Desugar.computation defs in
       let vars, dirt, ctx = Infer.infer_let ctx (ref Infer.empty_constraint) pos defs in
+      List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env =
         List.fold_right
           (fun (p,c) env -> let v = Eval.run env c in Eval.extend p v env)
@@ -104,6 +105,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
   | Syntax.TopLetRec defs ->
       let defs = C.assoc_map Desugar.let_rec defs in
       let vars, ctx = Infer.infer_let_rec ctx (ref Infer.empty_constraint) pos defs in
+      List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env = Eval.extend_let_rec env defs in
         if interactive then begin
           List.iter (fun (x, tysch) -> Format.printf "@[val %s : %t = <fun>@]@." x (Print.beautified_ty_scheme tysch)) vars
@@ -117,7 +119,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
       end
   | Syntax.Tydef tydefs ->
       let tydefs = List.map (fun (t, (ps, d)) -> (t, Desugar.tydef ps d)) tydefs in
-      Tctx.global := Tctx.extend_tydefs ~pos !Tctx.global tydefs;
+      Tctx.extend_tydefs ~pos:pos tydefs;
       (ctx, env)
 
 (* [exec_cmd env c] executes toplevel command [c] in global
@@ -128,6 +130,7 @@ let infer_top_comp ctx c =
   let cstr = ref [] in
   let dirty = Infer.infer_comp ctx cstr c in
   let sbst = Unify.solve !cstr in
+  Exhaust.check_comp c ;
   let ctx = Ctx.subst_ctx ctx sbst in
   let (ty, dirt) = Type.subst_dirty sbst dirty in
   ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty

@@ -18,7 +18,7 @@ module P = Pattern
    [1] http://pauillac.inria.fr/~maranget/papers/warn/index.html
 *)
 
-(* Pattern constructor description. *)
+(* Types of constructors. *)
 type cons =
   | Tuple of int
   | Record of C.field list
@@ -45,7 +45,7 @@ let rec cons_of_pattern p =
     | P.Tuple lst -> Tuple (List.length lst)
     | P.Record [] -> assert false
     | P.Record ((lbl, _) :: _) ->
-        (match Tctx.find_field !Tctx.global lbl with
+        (match Tctx.find_field lbl with
           | None -> Error.typing ~pos:(snd p) "Unbound record field label %s in a pattern" lbl
           | Some (_, _, flds) -> Record (List.map fst flds))
     | P.Variant (lbl, opt) -> Variant (lbl, opt <> None)
@@ -68,7 +68,7 @@ let pattern_of_cons c lst =
    least one constructor of their type not present in [lst] if it exists. *)
 let find_constructors lst =
   let present = List.filter (fun c -> c <> Wildcard)
-                            (List.map (cons_of_pattern) (C.uniq lst))
+                            (List.map cons_of_pattern (C.uniq lst))
   in
   let missing = match present with
     | [] -> [Wildcard]
@@ -104,7 +104,7 @@ let find_constructors lst =
              find (first c)
           (* Check if all tags defined by this variant type are covered. *)
           | Variant (lbl, _) ->
-              (match Tctx.find_variant !Tctx.global lbl with
+              (match Tctx.find_variant lbl with
                 | None -> Error.typing ~pos:C.Nowhere "Unbound constructor %s in a pattern" lbl
                 | Some (_, _, tags, _) ->
                   let all = List.map (fun (lbl, opt) -> Variant (lbl, opt <> None)) tags
@@ -242,3 +242,29 @@ let check_patterns ?(pos = C.Nowhere) pats =
 
 (* A pattern is irrefutable if it cannot fail during pattern matching. *)
 let is_irrefutable p = check_patterns ~pos:(snd p) [p]
+
+(* Check for refutable patterns in let statements and non-exhaustive match
+   statements. *)
+let check_comp c =
+  let rec check (c, pos) =
+    match c with
+      | Core.Value _ -> ()
+      | Core.Let (lst, c) ->
+        List.iter (fun (p, c) -> is_irrefutable p ; check c) lst ;
+        check c
+      | Core.LetRec (lst, c) ->
+        List.iter (fun (_, (p, c)) -> is_irrefutable p ; check c) lst ;
+      | Core.Match (_, []) -> () (* Skip empty match to avoid an unwanted warning. *)
+      | Core.Match (_, lst) -> 
+        check_patterns ~pos:pos (List.map fst lst) ;
+        List.iter (fun (_, c) -> check c) lst
+      | Core.While (c1, c2) -> check c1 ; check c2
+      | Core.For (_, _, _, c, _) -> check c
+      | Core.Apply _ -> ()
+      | Core.New (_, None) -> ()
+      | Core.New (_, Some (_, lst)) -> 
+        List.iter (fun (_, (p1, p2, c)) -> is_irrefutable p1 ; is_irrefutable p2 ; check c) lst
+      | Core.Handle (_, c) -> check c
+      | Core.Check c -> check c
+  in
+    check c

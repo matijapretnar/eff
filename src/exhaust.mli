@@ -5,9 +5,9 @@
    [1] http://pauillac.inria.fr/~maranget/papers/warn/index.html
 *)
 
-(** Check that a list of patterns is exhaustive, report a warning if it is not. *)
-val check_patterns : ?pos:Common.position -> Pattern.t list -> unit
-
-(** Check that a pattern is irrefutable, report a warning if it is refutable. *)
+(** Check that a pattern is irrefutable. *)
 val is_irrefutable : Pattern.t -> unit
+
+(** Check for refutable patterns in let statements and non-exhaustive match statements. *)
+val check_comp : Core.computation -> unit
 
