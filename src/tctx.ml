@@ -28,93 +28,85 @@ let global = ref initial
 
 let reset () = global := initial
 
-(** [find_variant lbl tctx] returns the name of the variant type from [tcxt]
-    that defines the label [lbl] *)
-let find_variant tctx cons =
+(** [find_variant tctx lbl] returns the information about the variant type
+    that defines the label [lbl] in [tctx]. *)
+let find_variant tctx lbl =
   let rec find = function
   | [] -> None
-  | (ty_name, (_, T.Sum vs) as ty) :: lst ->
-      begin match Common.lookup cons vs with
-      | Some us -> Some (ty_name, ty, vs, us)
+  | (ty_name, (ps, T.Sum vs)) :: lst ->
+      begin match Common.lookup lbl vs with
+      | Some us -> Some (ty_name, ps, vs, us)
       | None -> find lst
       end
   | _ :: lst -> find lst
   in
   find tctx
 
-(** [find_field fld tctx] returns the name of the record type from [tcxt] that
-    defines the field [fld] *)
-let find_field tctx lbl =
+(** [find_field tctx fld] returns the information about the record type
+    that defines the field [fld] in [tctx]. *)
+let find_field tctx fld =
   let rec find = function
     | [] -> None
-    | (ty_name, (_, T.Record flds) as ty) :: lst ->
-      if List.mem_assoc lbl flds
-      then Some (ty_name, ty, flds)
+    | (ty_name, (ps, T.Record flds)) :: lst ->
+      if List.mem_assoc fld flds
+      then Some (ty_name, ps, flds)
       else find lst
     | _ :: lst -> find lst
   in
     find tctx
 
-(** [find_operation op tctx] returns the name of the effect type from [tcxt]
-    that defines the operation symbol [op] *)
+(** [find_operation tctx op] returns the information about the effect type
+    that defines the operation symbol [op] in [tctx]. *)
 let find_operation tctx op_name =
   let rec find = function
     | [] -> None
-    | (ty_name, (_, T.Effect eff_sig) as ty) :: lst ->
-        if List.mem_assoc op_name eff_sig
-        then Some (ty_name, ty, eff_sig)
-        else find lst
-    | _ :: lst -> find lst
-  in
-    find tctx
-      
-(** [infer_variant lbl tctx] finds a variant type from [tctx] that defines the
-    label [lbl] and returns it with refreshed type parameters. *)
-let infer_variant lbl tctx =
-  let rec find = function
-    | [] -> None
-    | (t, (ps, T.Sum vs)) :: lst ->
-        begin match C.lookup lbl vs with
-          | Some u ->
-            let ps', fresh_subst = T.refreshing_subst ps in
-            let u = C.option_map (T.subst_ty fresh_subst) u in
-              Some (t, ps', u)
-          | None -> find lst
+    | (ty_name, (ps, T.Effect eff_sig)) :: lst ->
+        begin match Common.lookup op_name eff_sig with
+        | Some (t1, t2) -> Some (ty_name, ps, t1, t2)
+        | None -> find lst
         end
     | _ :: lst -> find lst
   in
     find tctx
 
-(** [infer_field fld tctx] finds a record type from [tctx] that defines the
-    field [fld] and returns it with refreshed type parameters. *)
-let infer_field fld tctx =
-  let rec find = function
-    | [] -> None
-    | (t, (ps, T.Record us)) :: _ when List.mem_assoc fld us ->
+let apply_to_params t (ps, _, _) =
+  Type.Apply (t, List.map (fun p -> Type.TyParam p) ps)
+
+(** [infer_variant tctx lbl] finds a variant type from [tctx] that defines the
+    label [lbl] and returns it with refreshed type parameters and additional
+    information needed for type inference. *)
+let infer_variant tctx lbl =
+  match find_variant tctx lbl with
+  | None -> None
+  | Some (ty_name, ps, _, u) ->
+      let ps', fresh_subst = T.refreshing_subst ps in
+      let u = C.option_map (T.subst_ty fresh_subst) u in
+      Some (apply_to_params ty_name ps', u)
+
+
+(** [infer_field tctx fld] finds a record type from [tctx] that defines the
+    field [fld] and returns it with refreshed type parameters and additional
+    information needed for type inference. *)
+let infer_field tctx fld =
+  match find_field tctx fld with
+  | None -> None
+  | Some (ty_name, ps, us) ->
       let ps', fresh_subst = T.refreshing_subst ps in
       let us' = C.assoc_map (T.subst_ty fresh_subst) us in
-        Some (t, ps', us')
-    | _ :: lst -> find lst
-  in
-    find tctx
+      Some (apply_to_params ty_name ps', (ty_name, us'))
 
-(** [infer_operation op tctx] finds an effect type from [tctx] that defines the
-    operation [op] and returns it with refreshed type parameters. *)
-let infer_operation op tctx =
-  let rec find = function
-    | [] -> None
-    | (t, (ps, T.Effect vs)) :: lst ->
-        begin match C.lookup op vs with
-          | Some (t1, t2) ->
-              let ps', fresh_subst = T.refreshing_subst ps in
-              let t1 = T.subst_ty fresh_subst t1 in
-              let t2 = T.subst_ty fresh_subst t2 in
-              Some (t, ps', t1, t2)
-          | None -> find lst
-        end
-    | _ :: lst -> find lst
-  in
-    find tctx
+
+(** [infer_operation tctx op] finds an effect type from [tctx] that defines the
+    operation [op] and returns it with refreshed type parameters and additional
+    information needed for type inference. *)
+let infer_operation tctx op =
+  match find_operation tctx op with
+  | None -> None
+  | Some (ty_name, ps, t1, t2) ->
+      let ps', fresh_subst = T.refreshing_subst ps in
+      let t1 = T.subst_ty fresh_subst t1 in
+      let t2 = T.subst_ty fresh_subst t2 in
+      Some (apply_to_params ty_name ps', (t1, t2))
 
 
 let transparent ~pos tctx ty_name =
@@ -205,7 +197,7 @@ let check_shadowing ~pos tctx = function
   | T.Effect lst ->
     List.iter (fun (op, _) ->
       match find_operation tctx op with
-        | Some (u, _, _) -> Error.typing ~pos "Operation %s is already used in type %s" op u
+        | Some (u, _, _, _) -> Error.typing ~pos "Operation %s is already used in type %s" op u
         | None -> ()
     ) lst
 

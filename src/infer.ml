@@ -64,9 +64,9 @@ let infer_pattern cstr pp =
       | Pattern.Tuple ps -> T.Tuple (C.map infer ps)
       | Pattern.Record [] -> assert false
       | Pattern.Record (((fld, _) :: _) as lst) ->
-          (match Tctx.infer_field fld !Tctx.global with
+          (match Tctx.infer_field !Tctx.global fld with
             | None -> Error.typing ~pos "Unbound record field label %s" fld
-            | Some (t, (ps, _, _), us) ->
+            | Some (ty, (t, us)) ->
               let unify_record_pattern (fld, p) =
                 begin match C.lookup fld us with
                   | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s." fld t
@@ -74,18 +74,18 @@ let infer_pattern cstr pp =
                 end
               in
                 List.iter unify_record_pattern lst;
-                T.Apply (t, List.map (fun p -> T.TyParam p) ps))
+                ty)
       | Pattern.Variant (lbl, p) ->
-          (match Tctx.infer_variant lbl !Tctx.global with
+          (match Tctx.infer_variant !Tctx.global lbl with
             | None -> Error.typing ~pos "Unbound constructor %s" lbl
-            | Some (t, (ps, _, _), u) ->
+            | Some (ty, u) ->
               begin match p, u with
                 | None, None -> ()
                 | Some p, Some u -> add_ty_constraint cstr pos (infer p) u
                 | None, Some _ -> Error.typing ~pos "Constructor %s should be applied to an argument." lbl
                 | Some _, None -> Error.typing ~pos "Constructor %s cannot be applied to an argument." lbl
               end;
-              T.Apply (t, List.map (fun p -> T.TyParam p) ps))
+              ty)
   in
   let t = infer pp in
     !vars, t
@@ -177,9 +177,9 @@ and infer_expr ctx cstr (e,pos) =
     | Core.Record (((fld,_)::_) as lst) ->
       if not (Pattern.linear_record lst) then
         Error.typing ~pos "Fields in a record must be distinct." ;
-      (match Tctx.infer_field fld !Tctx.global with
+      (match Tctx.infer_field !Tctx.global fld with
         | None -> Error.typing ~pos "Unbound record field label %s in a pattern" fld
-        | Some (t_name, (params, _, _), arg_types) ->
+        | Some (ty, (t_name, arg_types)) ->
           if List.length lst <> List.length arg_types then
             Error.typing ~pos "malformed record of type %s" t_name
           else
@@ -191,12 +191,12 @@ and infer_expr ctx cstr (e,pos) =
               end
             in
               List.iter unify_record_arg arg_types';
-              T.Apply (t_name, List.map (fun p -> T.TyParam p) params))
+              ty)
           
     | Core.Variant (lbl, u) ->
-      (match Tctx.infer_variant lbl !Tctx.global with
+      (match Tctx.infer_variant !Tctx.global lbl with
         | None -> Error.typing ~pos "Unbound constructor %s in a pattern" lbl
-        | Some (t_name, (params, _, _), arg_type) ->
+        | Some (ty, arg_type) ->
           begin match arg_type, u with
             | None, None -> ()
             | Some ty, Some u ->
@@ -204,20 +204,20 @@ and infer_expr ctx cstr (e,pos) =
                 add_ty_constraint cstr pos ty ty'
             | _, _ -> Error.typing ~pos "Wrong number of arguments for label %s." lbl
           end;
-          T.Apply (t_name, List.map (fun p -> T.TyParam p) params))
+          ty)
         
     | Core.Lambda a ->
         let t1, t2 = infer_abstraction ctx cstr a in
         T.Arrow (t1, t2)
         
     | Core.Operation (e, op) ->
-      (match Tctx.infer_operation op !Tctx.global with
+      (match Tctx.infer_operation !Tctx.global op with
         | None -> Error.typing ~pos "Unbound operation %s" op
-        | Some (t, (ps, _, _), t1, t2) ->
+        | Some (ty, (t1, t2)) ->
           let u = infer_expr ctx cstr e in
           let dirt = T.DirtAtom (T.fresh_region (), op) in
             (* XXX do something about regions *)
-            add_ty_constraint cstr pos u (T.Apply (t, List.map (fun p -> T.TyParam p) ps));
+            add_ty_constraint cstr pos u ty;
             T.Arrow (t1, (t2, dirt)))
 
     | Core.Handler {Core.operations=ops; Core.value=a_val; Core.finally=a_fin} -> 
@@ -226,11 +226,11 @@ and infer_expr ctx cstr (e,pos) =
         let t_finally = T.fresh_ty () in
         let t_yield = T.fresh_ty () in
         let unify_operation ((e, op), a2) =
-          (match Tctx.infer_operation op !Tctx.global with
+          (match Tctx.infer_operation !Tctx.global op with
             | None -> Error.typing ~pos "Unbound operation %s in a handler" op
-            | Some (t, (ps, _, _), t1, t2) ->
+            | Some (ty, (t1, t2)) ->
               let u = infer_expr ctx cstr e in
-                add_ty_constraint cstr pos u (T.Apply (t, List.map (fun p -> T.TyParam p) ps));
+                add_ty_constraint cstr pos u ty;
                 let tk, u1, u2 = infer_handler_case_abstraction ctx cstr a2 in
                   add_ty_constraint cstr pos t1 u1;
                   (* XXX maybe we need to change the direction of inequalities here,
