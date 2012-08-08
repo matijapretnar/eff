@@ -112,7 +112,7 @@ let ty sbst poly t ppf =
       | Type.Apply (t, [s]) ->
           print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
       | Type.Apply (t, ts) ->
-          print ~at_level:1 "(%t) %s" (sequence ", " (ty ~max_level:0) ts) t
+          print ~at_level:1 "(%t) %s" (sequence "," ty ts) t
       | Type.TyParam p ->
         let c = (if List.mem p poly_ty then "'" else "'_") in
           print_ty_param c p
