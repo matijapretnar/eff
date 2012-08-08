@@ -21,7 +21,7 @@ let initial : (string, Ctx.ty_scheme) C.assoc = [
               (([a], [], []),
                T.Sum [(Common.nil, None);
                       (Common.cons, Some (T.Tuple [T.TyParam a; T.Apply ("list", [T.TyParam a])]))])));
-  ("empty", (([], [], []), T.empty_ty));
+  ("empty", (([], [], []), T.Sum []));
 ]
 
 let global = ref initial
@@ -112,8 +112,8 @@ let infer_operation tctx op =
 let transparent ~pos tctx ty_name =
   let (_, ty) = lookup_tydef ~pos tctx ty_name in
   match ty with
-  | T.Sum (_::_) | T.Effect _ | T.Record _ -> false
-  | T.Basic _ | T.Apply _ | T.TyParam _ | T.Sum [] |
+  | T.Sum _ | T.Effect _ | T.Record _ -> false
+  | T.Basic _ | T.Apply _ | T.TyParam _ |
     T.Arrow _ | T.Tuple _ | T.Handler _ -> true
 
 (* [ty_apply ctx pos t lst] applies the type constructor [t] to the given list of arguments. *)

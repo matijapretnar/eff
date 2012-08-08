@@ -59,7 +59,7 @@ let string_ty = Basic "string"
 let bool_ty = Basic "bool"
 let float_ty = Basic "float"
 let unit_ty = Tuple []
-let empty_ty = Sum []
+let empty_ty = Apply ("empty", [])
 
 type substitution = {
   subst_ty : (ty_param * ty) list ;
