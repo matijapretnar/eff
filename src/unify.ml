@@ -28,12 +28,6 @@ let solve cstr =
         when List.length lst1 = List.length lst2 ->
         List.iter2 (unify pos) lst1 lst2
 
-    | (Type.Record lst1, Type.Record lst2) ->
-        assert false
-
-    | (Type.Sum lst1, Type.Sum lst2) ->
-        assert false
-
     | (Type.Apply (t1, lst1), Type.Apply (t2, lst2))
         when t1 = t2 && List.length lst1 = List.length lst2  ->
         List.iter2 (unify pos) lst1 lst2
@@ -41,7 +35,10 @@ let solve cstr =
     (* The following two cases cannot be merged into one, as the whole matching
        fails if both types are Apply, but only the second one is transparent. *)
     | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos !Tctx.global t1 ->
-        unify pos t2 (Tctx.ty_apply ~pos !Tctx.global t1 lst1)
+        begin match Tctx.ty_apply ~pos !Tctx.global t1 lst1 with
+        | Tctx.Inline t -> unify pos t2 t
+        | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
+        end
 
     | (t1, (Type.Apply _ as t2)) ->
         unify pos t2 t1
@@ -49,9 +46,6 @@ let solve cstr =
     | (Type.Handler h1, Type.Handler h2) ->
         unify pos h2.Type.value h1.Type.value;
         unify pos h1.Type.finally h2.Type.finally
-
-    | (Type.Effect lst1, Type.Effect lst2) ->
-        assert false
 
     | (t1, t2) ->
         let sbst = Type.beautify2 t1 t2 in

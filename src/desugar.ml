@@ -195,8 +195,8 @@ let tydef ps d =
   in
     ((lst, [], []),
      begin match d with
-       | Syntax.TyRecord lst -> T.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
-       | Syntax.TySum lst -> T.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
-       | Syntax.TyEffect lst -> T.Effect (List.map (fun (op,(t1,t2)) -> (op, (ty sbst t1, ty sbst t2))) lst)
-       | Syntax.TyInline t -> ty sbst t
+       | Syntax.TyRecord lst -> Tctx.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
+       | Syntax.TySum lst -> Tctx.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
+       | Syntax.TyEffect lst -> Tctx.Effect (List.map (fun (op,(t1,t2)) -> (op, (ty sbst t1, ty sbst t2))) lst)
+       | Syntax.TyInline t -> Tctx.Inline (ty sbst t)
      end)

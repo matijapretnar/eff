@@ -118,11 +118,8 @@ let ty sbst poly t ppf =
           print_ty_param c p
       | Type.Tuple [] -> print "unit"
       | Type.Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (sequence " *" (ty ~max_level:1) ts)
-      | Type.Record ts -> print "{@[<hov>%t@]}" (sequence "; " (field ty) ts)
-      | Type.Sum _ -> assert false
       | Type.Handler {Type.value=t1; Type.finally=t2} ->
           print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
-      | Type.Effect _ -> print "<effect>"
   in
     ty t ppf
 

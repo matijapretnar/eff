@@ -284,7 +284,7 @@ and infer_comp ctx cstr cp =
               
       | Core.New (eff, r) ->
           begin match Tctx.fresh_tydef ~pos !Tctx.global eff with
-          | ((ps,_,_), T.Effect ops) ->
+          | ((ps,_,_), Tctx.Effect ops) ->
               begin match r with
               | None -> ()
               | Some (e, lst) ->
