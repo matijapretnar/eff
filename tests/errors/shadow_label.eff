@@ -1,0 +1,2 @@
+type cow = Horn of int
+type bull = Tail of string | Horn of bull

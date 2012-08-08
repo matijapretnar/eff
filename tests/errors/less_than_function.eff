@@ -1,0 +1,1 @@
+(fun x -> x) < (fun x -> 2 * x) ;; (* This breaks. *)

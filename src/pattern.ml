@@ -8,6 +8,8 @@ and plain_t =
   | Variant of Common.label * t option
   | Const of Common.const
   | Nonbinding
+(* Changing the datatype [plain_t] will break [specialize_vector] in [exhaust.ml] because
+   of wildcard matches there. *)
 
 (* [pattern_vars p] returns the list of variables appearing in pattern [p]. *)
 let rec pattern_vars (p, _) =
@@ -38,8 +40,3 @@ let linear_pattern p =
 
 (* [linear_record r] verifies that a record or a record pattern has linear field names. *)
 let linear_record lst = Common.injective fst lst
-
-(* Removes any As pattern wrappers (e.g. [2 as x] -> [2]). *)
-let rec simplify p = match p with
-  | (As (p', _), _) -> simplify p'
-  | _ -> p

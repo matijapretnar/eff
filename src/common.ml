@@ -25,10 +25,45 @@ let join_pos (_, pos1) (_, pos2) =
 
 (** Primitive constants *)
 type const =
-  | Integer of int
+  | Integer of Big_int.big_int
   | String of string
   | Boolean of bool
   | Float of float
+
+type comparison = Less | Equal | Greater | Invalid
+
+let compare_const c1 c2 =
+  let cmp x y =
+    let r = Pervasives.compare x y in
+      if r < 0 then Less
+      else if r > 0 then Greater
+      else Equal
+  in
+    match c1 with
+      | Integer k ->
+        (match c2 with
+          | Integer k' -> 
+            let r = Big_int.compare_big_int k k' in
+              if r < 0 then Less
+              else if r > 0 then Greater
+              else Equal
+          | String _ | Boolean _ | Float _ -> Less)
+    | String s ->
+      (match c2 with
+        | Integer _ -> Greater
+        | String s' -> cmp s s'
+        | Boolean _ | Float _ -> Less)
+    | Boolean b ->
+      (match c2 with
+        | Integer _ | String _ -> Greater
+        | Boolean b' -> cmp b b'
+        | Float _ -> Less)
+    | Float x ->
+      (match c2 with
+        | Integer _ | String _ | Boolean _ -> Greater
+        | Float x' -> cmp x x')
+
+let equal_const c1 c2 = (compare_const c1 c2 = Equal)
 
 (** Variants for the built-in list type *)
 let cons = "$1cons"
@@ -39,17 +74,13 @@ type ('key, 'value) assoc = ('key * 'value) list
 
 (** Variants of association list operations that map into [option] type instead
     of raising [Not_found] *)
-let lookup k env =
-  try
-    Some (List.assoc k env)
-  with
-    | Not_found -> None
+let rec lookup x = function
+  | [] -> None
+  | (x', y) :: lst -> if x = x' then Some y else lookup x lst
 
-let find p lst =
-  try
-    Some (List.find p lst)
-  with
-    | Not_found -> None
+let rec find p = function
+  | [] -> None
+  | x :: lst -> if p x then Some x else find p lst
 
 let update k v env =
   (k, v) :: env
