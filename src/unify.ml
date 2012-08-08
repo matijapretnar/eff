@@ -13,7 +13,7 @@ let solve cstr =
         if Type.occurs_in_ty p t
         then
           let sbst = Type.beautify2 t1 t2 in
-          Error.typing ~pos:pos
+          Error.typing ~pos
             "This expression has a forbidden cylclic type %t = %t."
             (Print.ty sbst ([], [], []) t1)
             (Print.ty sbst ([], [], []) t2)
@@ -40,8 +40,8 @@ let solve cstr =
 
     (* The following two cases cannot be merged into one, as the whole matching
        fails if both types are Apply, but only the second one is transparent. *)
-    | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos:pos !Tctx.global t1 ->
-        unify pos t2 (Tctx.ty_apply ~pos:pos !Tctx.global t1 lst1)
+    | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos !Tctx.global t1 ->
+        unify pos t2 (Tctx.ty_apply ~pos !Tctx.global t1 lst1)
 
     | (t1, (Type.Apply _ as t2)) ->
         unify pos t2 t1
@@ -55,7 +55,7 @@ let solve cstr =
 
     | (t1, t2) ->
         let sbst = Type.beautify2 t1 t2 in
-        Error.typing ~pos:pos
+        Error.typing ~pos
           "This expression has type %t but it should have type %t."
           (Print.ty sbst ([],[],[]) t1) (Print.ty sbst ([],[],[]) t2)
   in

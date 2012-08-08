@@ -224,7 +224,7 @@ let check_patterns ?(pos = C.Nowhere) pats =
     | [] ->
         begin match exhaustive p 1 with
           | Some ps ->
-              Print.warning ~pos:pos "This pattern-matching is not exhaustive.\n\
+              Print.warning ~pos "This pattern-matching is not exhaustive.\n\
                                       Here is an example of a value that is not matched:";
 (*  *)              prerr_endline (Print.to_string "%t" (Print.pattern (List.hd ps)))
           | None -> ()
@@ -232,7 +232,7 @@ let check_patterns ?(pos = C.Nowhere) pats =
     | (_, pos) as pat :: pats ->
         if not (useful p [pat]) then
           begin
-            Print.warning ~pos:pos "This match case is unused.";
+            Print.warning ~pos "This match case is unused.";
             check p pats
           end
         else

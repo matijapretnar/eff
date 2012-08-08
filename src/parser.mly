@@ -14,12 +14,12 @@
           | (ReturnCase a, pos) ->
             begin match ret with
               | None -> (ops, Some a, fin)
-              | Some _ -> Error.syntax ~pos:pos "Multiple value cases in a handler."
+              | Some _ -> Error.syntax ~pos "Multiple value cases in a handler."
             end
           | (FinallyCase a, pos) ->
             begin match fin with
             | None -> (ops, ret, Some a)
-            | Some _ -> Error.syntax ~pos:pos "Multiple finally cases in a handler."
+            | Some _ -> Error.syntax ~pos "Multiple finally cases in a handler."
             end)
         ([], None, None)
         lst

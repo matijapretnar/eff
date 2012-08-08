@@ -193,19 +193,19 @@ let check_shadowing ~pos tctx = function
   | T.Record lst ->
     List.iter (fun (f,_) ->
       match find_field tctx f with
-        | Some (u, _, _) -> Error.typing ~pos:pos "Record field label %s is already used in type %s" f u
+        | Some (u, _, _) -> Error.typing ~pos "Record field label %s is already used in type %s" f u
         | None -> ()
     ) lst
   | T.Sum lst ->
     List.iter (fun (lbl,_) ->
       match find_variant tctx lbl with
-        | Some (u, _, _, _) -> Error.typing ~pos:pos "Constructor %s is already used in type %s" lbl u
+        | Some (u, _, _, _) -> Error.typing ~pos "Constructor %s is already used in type %s" lbl u
         | None -> ()
     ) lst
   | T.Effect lst ->
     List.iter (fun (op, _) ->
       match find_operation tctx op with
-        | Some (u, _, _) -> Error.typing ~pos:pos "Operation %s is already used in type %s" op u
+        | Some (u, _, _) -> Error.typing ~pos "Operation %s is already used in type %s" op u
         | None -> ()
     ) lst
 

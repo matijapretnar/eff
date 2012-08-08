@@ -56,7 +56,7 @@ let rec expression (t, pos) =
       let w, es = expressions ts in
       w, Core.Tuple es
   | Syntax.Record ts ->
-      if not (C.injective fst ts) then Error.syntax ~pos:pos "Fields in a record must be distinct";
+      if not (C.injective fst ts) then Error.syntax ~pos "Fields in a record must be distinct";
       let w, es = record_expressions ts in
       w, Core.Record es
   | Syntax.Variant (lbl, None) ->
@@ -154,7 +154,7 @@ and let_rec = function
     let x = C.fresh_variable () in
     let cs = List.map abstraction cs in
     ((Pattern.Var x, pos), (Core.Match ((Core.Var x, pos), cs), pos))
-  | (_, pos) -> Error.syntax ~pos:pos "This kind of expression is not allowed in a recursive definition"
+  | (_, pos) -> Error.syntax ~pos "This kind of expression is not allowed in a recursive definition"
 
 and expressions = function
   | [] -> [], []
