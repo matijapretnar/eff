@@ -40,8 +40,8 @@ let solve cstr =
 
     (* The following two cases cannot be merged into one, as the whole matching
        fails if both types are Apply, but only the second one is transparent. *)
-    | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos:pos !Tctx.global t1 ->
-        unify pos t2 (Tctx.ty_apply ~pos:pos !Tctx.global t1 lst1)
+    | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos:pos t1 ->
+        unify pos t2 (Tctx.ty_apply ~pos:pos t1 lst1)
 
     | (t1, (Type.Apply _ as t2)) ->
         unify pos t2 t1

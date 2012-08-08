@@ -64,7 +64,7 @@ let infer_pattern cstr pp =
       | Pattern.Tuple ps -> T.Tuple (C.map infer ps)
       | Pattern.Record [] -> assert false
       | Pattern.Record (((fld, _) :: _) as lst) ->
-          (match Tctx.infer_field fld !Tctx.global with
+          (match Tctx.infer_field fld with
             | None -> Error.typing ~pos:pos "Unbound record field label %s" fld
             | Some (t, (ps, _, _), us) ->
               let unify_record_pattern (fld, p) =
@@ -76,7 +76,7 @@ let infer_pattern cstr pp =
                 List.iter unify_record_pattern lst;
                 T.Apply (t, List.map (fun p -> T.TyParam p) ps))
       | Pattern.Variant (lbl, p) ->
-          (match Tctx.infer_variant lbl !Tctx.global with
+          (match Tctx.infer_variant lbl with
             | None -> Error.typing ~pos:pos "Unbound constructor %s" lbl
             | Some (t, (ps, _, _), u) ->
               begin match p, u with
@@ -124,7 +124,6 @@ and infer_let ctx cstr pos defs =
       let tc = infer_comp ctx cstr c in
       let ws, tp = infer_pattern cstr p in
       add_dirty_constraint cstr (snd c) tc (tp, delta);
-      Exhaust.is_irrefutable p;
       match C.find_duplicate (List.map fst ws) (List.map fst vs) with
         | Some x -> Error.typing ~pos:pos "Several definitions of %s." x
         | None ->
@@ -135,8 +134,9 @@ and infer_let ctx cstr pos defs =
           in
           let ctx' = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme) ws ctx' in
             (List.rev ws @ vs, ctx'))
-    ([], ctx) defs in
-  vars, delta, Ctx.subst_ctx ctx (Unify.solve !cstr)
+    ([], ctx) defs
+  in
+    vars, delta, Ctx.subst_ctx ctx (Unify.solve !cstr)
 
 and infer_let_rec ctx cstr pos defs =
   if not (Common.injective fst defs) then
@@ -155,8 +155,7 @@ and infer_let_rec ctx cstr pos defs =
       let _, tp, ctx' = extend_with_pattern ctx' cstr p in
       let tc = infer_comp ctx' cstr c in
       add_ty_constraint cstr (snd p) u1 tp;
-      add_dirty_constraint cstr (snd c) u2 tc;
-      Exhaust.is_irrefutable p)
+      add_dirty_constraint cstr (snd c) u2 tc)
     lst;
   let sbst = Unify.solve !cstr in
   let vars = Common.assoc_map (T.subst_ty sbst) vars in
@@ -164,7 +163,7 @@ and infer_let_rec ctx cstr pos defs =
   let vars = Common.assoc_map (Ctx.generalize ctx true) vars in
   let ctx = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme) vars ctx
   in
-  vars, ctx
+    vars, ctx
 
 (* [infer_expr ctx cstr (e,pos)] infers the type of expression [e] in context
    [ctx]. It returns the inferred type of [e]. *)
@@ -177,7 +176,7 @@ and infer_expr ctx cstr (e,pos) =
     | Core.Record (((fld,_)::_) as lst) ->
       if not (Pattern.linear_record lst) then
         Error.typing ~pos:pos "Fields in a record must be distinct." ;
-      (match Tctx.infer_field fld !Tctx.global with
+      (match Tctx.infer_field fld with
         | None -> Error.typing ~pos:pos "Unbound record field label %s in a pattern" fld
         | Some (t_name, (params, _, _), arg_types) ->
           if List.length lst <> List.length arg_types then
@@ -194,7 +193,7 @@ and infer_expr ctx cstr (e,pos) =
               T.Apply (t_name, List.map (fun p -> T.TyParam p) params))
           
     | Core.Variant (lbl, u) ->
-      (match Tctx.infer_variant lbl !Tctx.global with
+      (match Tctx.infer_variant lbl with
         | None -> Error.typing ~pos:pos "Unbound constructor %s in a pattern" lbl
         | Some (t_name, (params, _, _), arg_type) ->
           begin match arg_type, u with
@@ -211,7 +210,7 @@ and infer_expr ctx cstr (e,pos) =
         T.Arrow (t1, t2)
         
     | Core.Operation (e, op) ->
-      (match Tctx.infer_operation op !Tctx.global with
+      (match Tctx.infer_operation op with
         | None -> Error.typing ~pos:pos "Unbound operation %s" op
         | Some (t, (ps, _, _), t1, t2) ->
           let u = infer_expr ctx cstr e in
@@ -226,7 +225,7 @@ and infer_expr ctx cstr (e,pos) =
         let t_finally = T.fresh_ty () in
         let t_yield = T.fresh_ty () in
         let unify_operation ((e, op), a2) =
-          (match Tctx.infer_operation op !Tctx.global with
+          (match Tctx.infer_operation op with
             | None -> Error.typing ~pos:pos "Unbound operation %s in a handler" op
             | Some (t, (ps, _, _), t1, t2) ->
               let u = infer_expr ctx cstr e in
@@ -279,11 +278,10 @@ and infer_comp ctx cstr cp =
             add_dirty_constraint cstr (snd e') t_out' t_out
           in
           List.iter infer_case lst;
-          Exhaust.check_patterns ~pos:pos (List.map fst lst);
           t_out
               
       | Core.New (eff, r) ->
-          begin match Tctx.fresh_tydef ~pos:pos !Tctx.global eff with
+          begin match Tctx.fresh_tydef ~pos:pos eff with
           | ((ps,_,_), T.Effect ops) ->
               begin match r with
               | None -> ()
@@ -350,5 +348,6 @@ and infer_comp ctx cstr cp =
           ignore (infer ctx c);
           T.unit_ty, T.empty_dirt
   in
-  infer ctx cp
+  let ty = infer ctx cp in
+    ty
 
