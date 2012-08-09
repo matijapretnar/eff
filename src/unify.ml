@@ -34,8 +34,8 @@ let solve cstr =
 
     (* The following two cases cannot be merged into one, as the whole matching
        fails if both types are Apply, but only the second one is transparent. *)
-    | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos !Tctx.global t1 ->
-        begin match Tctx.ty_apply ~pos !Tctx.global t1 lst1 with
+    | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos t1 ->
+        begin match Tctx.ty_apply ~pos t1 lst1 with
         | Tctx.Inline t -> unify pos t2 t
         | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
         end
