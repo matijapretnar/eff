@@ -118,8 +118,8 @@ let exec_topdef interactive (ctx, env) (d,pos) =
         | None -> Error.runtime ~pos "unknown external symbol %s." f
       end
   | Syntax.Tydef tydefs ->
-      let tydefs = List.map (fun (t, (ps, d)) -> (t, Desugar.tydef ps d)) tydefs in
-      Tctx.extend_tydefs ~pos:pos tydefs;
+      let tydefs = Desugar.tydefs tydefs in
+      Tctx.extend_tydefs ~pos tydefs;
       (ctx, env)
 
 (* [exec_cmd env c] executes toplevel command [c] in global

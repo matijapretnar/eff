@@ -61,13 +61,18 @@ and operation = term * Common.opsym
 
 and resource = term * (Common.opsym, Pattern.t * Pattern.t * term) Common.assoc
 
+type dirt =
+  | DirtParam of Common.dirtparam
+
+type region =
+  | RegionParam of Common.regionparam
 
 type ty =
-  | TyApply of Common.tyname * ty list
+  | TyApply of Common.tyname * ty list * (dirt list * region list) option * region option
   (** [(ty1, ty2, ..., tyn) type_name] *)
   | TyParam of Common.typaram
   (** ['a] *)
-  | TyArrow of ty * ty
+  | TyArrow of ty * ty * dirt option
   (** [ty1 -> ty2] *)
   | TyTuple of ty list
   (** [ty1 * ty2 * ... * tyn] *)

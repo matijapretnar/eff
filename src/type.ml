@@ -12,8 +12,13 @@ let fresh_dirt_param = (let f = Common.fresh "dirt parameter" in fun () -> Dirt_
 let fresh_region_param = (let f = Common.fresh "region parameter" in fun () -> Region_Param (f ()))
 let fresh_instance_param = (let f = Common.fresh "instance parameter" in fun () -> Instance_Param (f ()))
 
-type ty =
-  | Apply of Common.tyname * ty list
+type params = ty_param list * dirt_param list * region_param list
+
+type args = ty list * dirt list * region list
+
+and ty =
+  | Apply of Common.tyname * args
+  | Effect of Common.tyname * args * region
   | TyParam of ty_param
   | Basic of string
   | Tuple of ty list
@@ -43,6 +48,7 @@ and region =
   | RegionTop
 *)
 
+
 let empty_dirt = DirtEmpty
 
 (* This type is used when type checking is turned off. Its name
@@ -56,7 +62,7 @@ let string_ty = Basic "string"
 let bool_ty = Basic "bool"
 let float_ty = Basic "float"
 let unit_ty = Tuple []
-let empty_ty = Apply ("empty", [])
+let empty_ty = Apply ("empty", ([], [], []))
 
 type substitution = {
   subst_ty : (ty_param * ty) list ;
@@ -79,10 +85,17 @@ let subst_dirt sbst = function
       | None -> DirtParam d)
   | DirtAtom (r, op) -> DirtAtom (subst_region sbst r, op)
 
+let rec subst_args subst (tys, drts, rgns) =
+  (List.map (subst_ty subst) tys,
+   List.map (subst_dirt subst) drts,
+   List.map (subst_region subst) rgns)
+
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
-let rec subst_ty sbst ty =
+and subst_ty sbst ty =
   let rec subst = function
-  | Apply (ty_name, tys) -> Apply (ty_name, List.map subst tys)
+  | Apply (ty_name, args) -> Apply (ty_name, subst_args sbst args)
+  | Effect (ty_name, args, rgn) ->
+      Effect (ty_name, subst_args sbst args, subst_region sbst rgn)
   | TyParam p as ty ->
     (match Common.lookup p sbst.subst_ty with
       | Some ty -> ty
@@ -117,23 +130,24 @@ let free_params ty =
   let (@@@) (xs, ys, zs) (us, vs, ws) = (xs @ us, ys @ vs, zs @ ws) in
   let flatten_map f lst = List.fold_left (@@@) ([], [], []) (List.map f lst) in
   let rec free_ty = function
-    | Apply (_, tys) -> flatten_map free_ty tys
+    | Apply (_, args) -> free_args args
+    | Effect (_, args, rgn) -> free_args args @@@ free_region rgn
     | TyParam p -> ([p], [], [])
     | Basic _ -> ([], [], [])
     | Tuple tys -> flatten_map free_ty tys
     | Arrow (ty1, dirty2) -> free_ty ty1 @@@ free_dirty dirty2
     | Handler {value = ty1; finally = ty2} -> free_ty ty1 @@@ free_ty ty2
   and free_dirty (ty, drt) =
-    let (xs, ys, zs) = free_ty ty in
-    let (vs, ws) = free_dirt drt in
-      (xs, ys @ vs, zs @ ws)
+    free_ty ty @@@ free_dirt drt
   and free_dirt = function
-    | DirtEmpty -> ([], [])
-    | DirtParam p -> ([p], [])
-    | DirtAtom (rgn, _) -> ([], free_region rgn)
+    | DirtEmpty -> ([], [], [])
+    | DirtParam p -> ([], [p], [])
+    | DirtAtom (rgn, _) -> free_region rgn
   and free_region = function
-    | RegionParam r -> [r]
-    | RegionInstance _ -> []
+    | RegionParam r -> ([], [], [r])
+    | RegionInstance _ -> ([], [], [])
+  and free_args (tys, drts, rgns) =
+    flatten_map free_ty tys @@@ flatten_map free_dirt drts @@@ flatten_map free_region rgns
   in
   let (xs, ys, zs) = free_ty ty in    
     (Common.uniq xs, Common.uniq ys, Common.uniq zs)

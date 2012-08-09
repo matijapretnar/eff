@@ -8,6 +8,8 @@ type field = string (** record fields *)
 
 type tyname = string (** type names *)
 type typaram = string (** type parameters *)
+type dirtparam = int (** dirt parameters *)
+type regionparam = int (** region parameters *)
 
 (** Positions *)
 type position =

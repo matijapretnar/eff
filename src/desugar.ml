@@ -3,6 +3,139 @@
 module C = Common
 module T = Type
 
+let fresh_dirt_param = (let f = Common.fresh "dirt parameter" in fun () -> Syntax.DirtParam (f ()))
+let fresh_region_param = (let f = Common.fresh "region parameter" in fun () -> Syntax.RegionParam (f ()))
+
+let fill_args tctx is_effect ty =
+  let ds = ref []
+  and rs = ref []
+  in
+  let fresh_dirt_param =
+    let f = Common.fresh "dirt parameter" in
+    fun _ ->
+      let d = f () in
+      ds := d :: !ds;
+      Syntax.DirtParam d
+  and fresh_region_param =
+    let f = Common.fresh "region parameter" in
+    fun _ ->
+      let r = f () in
+      rs := r :: !rs;
+      Syntax.RegionParam r
+  in
+  let rec fill = function
+  | Syntax.TyApply (t, tys, drts_rgns, rgn) ->
+      let tys = List.map fill tys
+      and drts_rgns = begin match drts_rgns with
+        | Some drts_rgns -> Some drts_rgns
+        | None -> begin match C.lookup t tctx with
+                  | None -> None
+                  | Some ((_, ds, rs), _) -> Some (
+                        List.map fresh_dirt_param ds,
+                        List.map fresh_region_param rs
+                    )
+                  end
+        end
+      and rgn = begin match rgn with
+        | Some rgn ->
+          if is_effect t then Some rgn else Error.typing ~pos:C.Nowhere "A non-effect type %s tagged with a region." t
+        | None ->
+          if is_effect t then Some (fresh_region_param ()) else None
+      end
+      in
+      Syntax.TyApply (t, tys, drts_rgns, rgn)
+  | Syntax.TyParam _ as ty -> ty
+  | Syntax.TyArrow (t1, t2, None) ->
+      Syntax.TyArrow (fill t1, fill t2, Some (fresh_dirt_param ()))
+  | Syntax.TyArrow (t1, t2, Some drt) ->
+      Syntax.TyArrow (fill t1, fill t2, Some drt)
+  | Syntax.TyTuple lst -> Syntax.TyTuple (List.map fill lst)
+  | Syntax.TyHandler (t1, t2) -> Syntax.TyHandler (fill t1, fill t2)
+  in
+  let ty = fill ty in
+  (!ds, !rs), ty
+
+let ty (ts, ds, rs) =
+  let rec ty = function
+  | Syntax.TyApply (t, tys, drts_rgns, rgn) ->
+      let tys = List.map ty tys
+      and (drts, rgns) = begin match drts_rgns with
+        | Some (drts, rgns) -> (List.map dirt drts, List.map region rgns)
+        | None -> (List.map (fun (_, d) -> T.DirtParam d) ds, List.map (fun (_, r) -> T.RegionParam r) rs)
+      end 
+      in begin match rgn with
+        | None -> T.Apply (t, (tys, drts, rgns))
+        | Some rgn -> T.Effect (t, (tys, drts, rgns), region rgn)
+      end
+  | Syntax.TyParam t ->
+    begin match C.lookup t ts with
+    | None -> Error.syntax ~pos:C.Nowhere "Unbound type parameter '%s" t
+    | Some p -> T.TyParam p
+    end
+  | Syntax.TyArrow (t1, t2, Some drt) -> T.Arrow (ty t1, (ty t2, dirt drt))
+  | Syntax.TyArrow (t1, t2, None) -> assert false
+  | Syntax.TyTuple lst -> T.Tuple (List.map ty lst)
+  | Syntax.TyHandler (t1, t2) -> T.Handler { T.value = ty t1; T.finally = ty t2 }
+  and dirt (Syntax.DirtParam d) =
+    match C.lookup d ds with
+    | None -> Error.syntax ~pos:C.Nowhere "Unbound dirt parameter 'drt%d" d
+    | Some d -> T.DirtParam d
+  and region (Syntax.RegionParam r) =
+    match C.lookup r rs with
+    | None -> Error.syntax ~pos:C.Nowhere "Unbound region parameter 'rgn%d" r
+    | Some r -> T.RegionParam r
+  in
+  ty
+
+(** [free_params t] returns a triple of all free type, dirt, and region params in [t]. *)
+let free_params t =
+  let (@@@) (xs, ys, zs) (us, vs, ws) = (xs @ us, ys @ vs, zs @ ws)
+  and optional f = function
+    | None -> ([], [], [])
+    | Some x -> f x
+  in
+  let flatten_map f lst = List.fold_left (@@@) ([], [], []) (List.map f lst) in
+  let rec ty = function
+  | Syntax.TyApply (_, tys, drts_rgns, rgn) ->
+      flatten_map ty tys @@@ (optional dirts_regions) drts_rgns @@@ (optional region) rgn
+  | Syntax.TyParam s -> ([s], [], [])
+  | Syntax.TyArrow (t1, t2, drt) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt
+  | Syntax.TyTuple lst -> flatten_map ty lst
+  | Syntax.TyHandler (t1, t2) -> ty t1 @@@ ty t2
+  and dirt (Syntax.DirtParam d) = ([], [d], [])
+  and region (Syntax.RegionParam r) = ([], [], [r])
+  and dirts_regions (drts, rgns) = flatten_map dirt drts @@@ flatten_map region rgns
+  in
+  let (xs, ys, zs) = ty t in
+    (Common.uniq xs, Common.uniq ys, Common.uniq zs)
+
+let syntax_to_core_params (ts, ds, rs) = (
+    List.map (fun p -> (p, Type.fresh_ty_param ())) ts,
+    List.map (fun d -> (d, Type.fresh_dirt_param ())) ds,
+    List.map (fun r -> (r, Type.fresh_region_param ())) rs
+  )
+
+let external_ty tctx is_effect t =
+  let _, t = fill_args tctx is_effect t in
+  let (ts, ds, rs) = syntax_to_core_params (free_params t) in
+  ((List.map snd ts, List.map snd ds, List.map snd rs), ty (ts, ds, rs) t)
+
+(** [tydef ps d] desugars the type definition with parameters [ps] and definition [d]. *)
+let tydef ps d =
+  let sbst, lst = 
+    List.fold_right (fun p (sbst,lst) ->
+                       let u = Type.fresh_ty_param () in
+                         (p, T.TyParam u)::sbst, u::lst) ps ([],[])
+  in
+    ((lst, [], []),
+     begin match d with
+       | Syntax.TyRecord lst -> Tctx.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
+       | Syntax.TySum lst -> Tctx.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
+       | Syntax.TyEffect lst -> Tctx.Effect (List.map (fun (op,(t1,t2)) -> (op, (ty sbst t1, ty sbst t2))) lst)
+       | Syntax.TyInline t -> Tctx.Inline (ty sbst t)
+     end)
+
+
 (** [fresh_variable ()] creates a fresh variable ["$gen1"], ["$gen2"], ... on
     each call *)
 let fresh_variable =
@@ -13,31 +146,6 @@ let id_abstraction pos =
   let x = fresh_variable () in
   ((Pattern.Var x, pos), (Core.Value (Core.Var x, pos), pos))
 
-
-(** [ty s k t] desugars type [t] where it applies the substitution [s] to parameters. *)
-let rec ty_fv = function
-  | Syntax.TyApply (_, lst) -> List.flatten (List.map ty_fv lst)
-  | Syntax.TyParam s -> [s]
-  | Syntax.TyArrow (t1, t2) -> ty_fv t1 @ ty_fv t2
-  | Syntax.TyTuple lst -> List.flatten (List.map ty_fv lst)
-  | Syntax.TyHandler (t1, t2) -> ty_fv t1 @ ty_fv t2
-
-let rec ty s = function
-  | Syntax.TyApply (t, lst) -> T.Apply (t, List.map (ty s) lst)
-  | Syntax.TyParam str ->
-    begin match C.lookup str s with
-    | None -> Error.syntax ~pos:C.Nowhere "Unbound type parameter '%s" str
-    | Some t -> t
-    end
-  | Syntax.TyArrow (t1, t2) -> T.Arrow (ty s t1, (ty s t2, Type.fresh_dirt ()))
-  | Syntax.TyTuple lst -> T.Tuple (List.map (ty s) lst)
-  | Syntax.TyHandler (t1, t2) -> T.Handler { T.value = ty s t1; T.finally = ty s t2 }
-
-let external_ty t =
-  let lst = List.fold_right (fun p lst -> (p, Type.fresh_ty_param ()) :: lst) (ty_fv t) [] in
-  let s = C.assoc_map (fun p -> Type.TyParam p) lst in
-  (* XXX fix this, the dirt and region parameters are wrong *)
-  ((List.map snd lst, [], []), ty s t)
 
 
 (* Desugaring functions below return a list of bindings and the desugared form. *)
@@ -191,18 +299,3 @@ and handler pos {Syntax.operations=ops; Syntax.value=val_a; Syntax.finally=fin_a
     Core.finally =
       (match fin_a with None -> id_abstraction pos | Some a -> abstraction a)}
 
-(** [tydef t ps d] desugars the definition of type [t] with parameters [ps]
-    and definition [d]. *)
-let tydef ps d =
-  let sbst, lst = 
-    List.fold_right (fun p (sbst,lst) ->
-                       let u = Type.fresh_ty_param () in
-                         (p, T.TyParam u)::sbst, u::lst) ps ([],[])
-  in
-    ((lst, [], []),
-     begin match d with
-       | Syntax.TyRecord lst -> Tctx.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
-       | Syntax.TySum lst -> Tctx.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
-       | Syntax.TyEffect lst -> Tctx.Effect (List.map (fun (op,(t1,t2)) -> (op, (ty sbst t1, ty sbst t2))) lst)
-       | Syntax.TyInline t -> Tctx.Inline (ty sbst t)
-     end)
