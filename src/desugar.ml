@@ -202,10 +202,7 @@ let tydefs defs =
       defs ([], [], [])
   in
     (* Now we traverse again and the rest of the work. *)
-    List.map
-      (fun (tyname, ((ts, ds', rs'), def)) -> 
-        let params = (ts, ds' @ ds, rs' @ rs) in (tyname, (params, tydef params def)))
-      defs
+    List.map (fun (tyname, (ts, def)) -> (tyname, tydef (ts, ds, rs) def)) defs
 
 
 (* ***** Desugaring of expressions and computations. ***** *)

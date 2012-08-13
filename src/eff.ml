@@ -112,14 +112,14 @@ let exec_topdef interactive (ctx, env) (d,pos) =
         end;
         (ctx, env)
   | Syntax.External (x, t, f) ->
-    let ctx = Ctx.extend ctx x (Desugar.external_ty t) in
+    let ctx = Ctx.extend ctx x (Desugar.external_ty (Tctx.is_effect ~pos:pos) t) in
       begin match C.lookup f External.values with
         | Some v -> (ctx, Eval.update x v env)
         | None -> Error.runtime ~pos "unknown external symbol %s." f
       end
   | Syntax.Tydef tydefs ->
       let tydefs = Desugar.tydefs tydefs in
-      Tctx.extend_tydefs ~pos tydefs;
+      Tctx.extend_tydefs ~pos tydefs ;
       (ctx, env)
 
 (* [exec_cmd env c] executes toplevel command [c] in global

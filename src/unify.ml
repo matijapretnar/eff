@@ -28,7 +28,8 @@ let solve cstr =
         when List.length lst1 = List.length lst2 ->
         List.iter2 (unify pos) lst1 lst2
 
-    | (Type.Apply (t1, lst1), Type.Apply (t2, lst2))
+    | ((Type.Apply (t1, (lst1, _, _)), Type.Apply (t2, (lst2, _, _))) |
+       (Type.Effect (t1, (lst1, _, _), _), Type.Effect (t2, (lst2, _, _), _)))
         when t1 = t2 && List.length lst1 = List.length lst2  ->
         List.iter2 (unify pos) lst1 lst2
 

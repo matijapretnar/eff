@@ -113,6 +113,13 @@ let apply_to_params t (ps, ds, rs) =
     List.map (fun r -> Type.RegionParam r) rs
   ))
 
+let effect_to_params t (ps, ds, rs) rgn =
+  Type.Effect (t, (
+    List.map (fun p -> Type.TyParam p) ps,
+    List.map (fun d -> Type.DirtParam d) ds,
+    List.map (fun r -> Type.RegionParam r) rs
+  ), rgn)
+
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
     with refreshed type parameters and additional information needed for type
     inference. *)

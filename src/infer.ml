@@ -281,26 +281,25 @@ and infer_comp ctx cstr cp =
           t_out
               
       | Core.New (eff, r) ->
-          begin match Tctx.fresh_tydef ~pos:pos eff with
-          | ((ps,_,_), Tctx.Effect ops) ->
-              begin match r with
+        begin match Tctx.fresh_tydef ~pos:pos eff with
+          | (params, Tctx.Effect ops) ->
+            begin match r with
               | None -> ()
               | Some (e, lst) ->
-                  let te = infer_expr ctx cstr e in
+                let te = infer_expr ctx cstr e in
                   List.iter
                     (fun (op, (((_,pos1), (_,pos2), (_,posc)) as a)) ->
-                       match C.lookup op ops with
-                       | None -> Error.typing ~pos "Effect type %s does not have operation %s" eff op
-                       | Some (u1, u2) ->
-                           let t1, t2, t = infer_abstraction2 ctx cstr a in
-                           add_ty_constraint cstr pos1 t1 u1;
-                           add_ty_constraint cstr pos2 t2 te;
-                           add_dirty_constraint cstr posc t (T.Tuple [u2; te], T.empty_dirt))
+                      match C.lookup op ops with
+                        | None -> Error.typing ~pos "Effect type %s does not have operation %s" eff op
+                        | Some (u1, u2) ->
+                          let t1, t2, t = infer_abstraction2 ctx cstr a in
+                            add_ty_constraint cstr pos1 t1 u1;
+                            add_ty_constraint cstr pos2 t2 te;
+                            add_dirty_constraint cstr posc t (T.Tuple [u2; te], T.empty_dirt))
                     lst
-              end;
-              (* XXX Here we need to change T.Apply to something that creates an
-                 effect instance/region thingy. *)
-              T.Apply (eff, List.map (fun p -> Type.TyParam p) ps), T.empty_dirt
+            end ;
+            let rgn = T.fresh_region () in
+              Tctx.effect_to_params eff params rgn, T.empty_dirt
           | _ -> Error.typing ~pos "Effect type expected but %s encountered" eff
           end
 

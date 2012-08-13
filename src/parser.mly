@@ -472,7 +472,7 @@ defined_ty:
 
 ty:
   | t1 = ty_apply ARROW t2 = ty
-    { TyArrow (t1, t2) }
+    { TyArrow (t1, t2, None) }
   | t1 = ty_apply HARROW t2 = ty
     { TyHandler (t1, t2) }
   | t = prod_ty
@@ -489,15 +489,15 @@ prod_ty:
 
 ty_apply:
   | LPAREN t = ty COMMA ts = separated_nonempty_list(COMMA, ty) RPAREN t2 = tyname
-    { TyApply (t2, (t :: ts)) }
+    { TyApply (t2, (t :: ts), None, None) }
   | t = ty_apply t2 = tyname
-    { TyApply (t2, [t]) }
+    { TyApply (t2, [t], None, None) }
   | t = simple_ty
     { t }
 
 simple_ty:
   | t = tyname
-    { TyApply (t, []) }
+    { TyApply (t, [], None, None) }
   | t = PARAM
     { TyParam t }
   | LPAREN t = ty RPAREN
