@@ -207,7 +207,7 @@ and infer_expr ctx cstr (e,pos) =
             | None, None -> ()
             | Some ty, Some u ->
               let ty' = infer_expr ctx cstr u in
-                add_ty_constraint cstr pos ty ty'
+                add_ty_constraint cstr pos ty' ty
             | _, _ -> Error.typing ~pos "Wrong number of arguments for label %s." lbl
           end;
           ty)
@@ -217,14 +217,13 @@ and infer_expr ctx cstr (e,pos) =
         T.Arrow (t1, t2)
         
     | Core.Operation (e, op) ->
-      (match Tctx.infer_operation op with
-        | None -> Error.typing ~pos "Unbound operation %s" op
-        | Some (ty, (t1, t2)) ->
-          let u = infer_expr ctx cstr e in
-          let dirt = T.DirtAtom (T.fresh_region (), op) in
-            (* XXX do something about regions *)
-            add_ty_constraint cstr pos u ty;
-            T.Arrow (t1, (t2, dirt)))
+        let rgn = T.fresh_region () in
+        (match Tctx.infer_operation op rgn with
+          | None -> Error.typing ~pos "Unbound operation %s" op
+          | Some (ty, (t1, t2)) ->
+            let u = infer_expr ctx cstr e in
+              add_ty_constraint cstr pos u ty;
+              T.Arrow (t1, (t2, T.DirtAtom (rgn, op))))
 
     | Core.Handler {Core.operations=ops; Core.value=a_val; Core.finally=a_fin} -> 
         let t_value = T.fresh_ty () in
@@ -232,7 +231,8 @@ and infer_expr ctx cstr (e,pos) =
         let t_finally = T.fresh_ty () in
         let t_yield = T.fresh_ty () in
         let constrain_operation ((e, op), a2) =
-          (match Tctx.infer_operation op with
+          (* XXX Correct when you know what to put instead of the fresh region .*)
+          (match Tctx.infer_operation op (T.fresh_region ()) with
             | None -> Error.typing ~pos "Unbound operation %s in a handler" op
             | Some (ty, (t1, t2)) ->
               let u = infer_expr ctx cstr e in
@@ -325,10 +325,9 @@ and infer_comp ctx cstr cp =
           let t2 = infer_expr ctx cstr e2 in
           add_ty_constraint cstr (snd e2) t2 T.int_ty;
           let ctx = Ctx.extend_ty ctx i T.int_ty in
-          let t = infer ctx c in
-          let dirt = T.fresh_dirt () in
-          add_dirty_constraint cstr (snd c) t (T.unit_ty, dirt);
-          (T.unit_ty, dirt)
+          let (ty, drt) = infer ctx c in
+          add_dirty_constraint cstr (snd c) ty T.unit_ty;
+          (T.unit_ty, drt)
 
       | Core.Handle (e1, c2) ->
           let t1 = infer_expr ctx cstr e1 in

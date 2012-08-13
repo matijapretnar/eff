@@ -204,6 +204,12 @@ let beautify ((ps, ds, rs), ty) =
   (subst ps xs_map, subst ds ys_map, subst rs zs_map), subst_ty sbst ty
 
 
+let beautify_dirty (params, ty) drt =
+  match beautify (params, Arrow (Tuple [], (ty, drt))) with
+  | (ps, Arrow (Tuple [], (ty, drt))) -> (ps, ty), drt
+  | _ -> assert false
+
+
 let beautify2 ty1 ty2 =
   match beautify (([], [], []), Tuple [ty1; ty2]) with
   | (ps, Tuple [ty1; ty2]) -> (ps, ty1), (ps, ty2)

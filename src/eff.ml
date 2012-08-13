@@ -86,7 +86,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
   match d with
   | Syntax.TopLet defs ->
       let defs = C.assoc_map Desugar.computation defs in
-      let vars, dirt, ctx = Infer.infer_let ctx (ref Infer.empty_constraint) pos defs in
+      let vars, drt, ctx = Infer.infer_let ctx (ref Infer.empty_constraint) pos defs in
       List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env =
         List.fold_right
@@ -98,7 +98,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
                        match Eval.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.printf "@[val %s : %t = %t@]@." x (Print.beautified_ty_scheme tysch) (Print.value v))
+                         Format.printf "@[val %s : %t = %t@]@." x (Print.beautified_dirty_scheme tysch drt) (Print.value v))
             vars
         end;
         (ctx, env)
@@ -132,21 +132,21 @@ let infer_top_comp ctx c =
   let sbst = Unify.solve !cstr in
   Exhaust.check_comp c ;
   let ctx = Ctx.subst_ctx ctx sbst in
-  let (ty, dirt) = Type.subst_dirty sbst dirty in
-  ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty
+  let (ty, drt) = Type.subst_dirty sbst dirty in
+  ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty, drt
 
 let rec exec_cmd interactive (ctx, env) e =
   match e with
   | Syntax.Term c ->
       let c = Desugar.computation c in
-      let ctx, tysch = infer_top_comp ctx c in
+      let ctx, tysch, drt = infer_top_comp ctx c in
       let v = Eval.run env c in
-      if interactive then Format.printf "@[- : %t = %t@]@." (Print.beautified_ty_scheme tysch) (Print.value v);
+      if interactive then Format.printf "@[- : %t = %t@]@." (Print.beautified_dirty_scheme tysch drt) (Print.value v);
       (ctx, env)
   | Syntax.TypeOf c ->
       let c = Desugar.computation c in
-      let ctx, tysch = infer_top_comp ctx c in
-      Format.printf "@[- : %t@]@." (Print.beautified_ty_scheme tysch);
+      let ctx, tysch, drt = infer_top_comp ctx c in
+      Format.printf "@[- : %t@]@." (Print.beautified_dirty_scheme tysch drt);
       (ctx, env)
   | Syntax.Reset ->
       Tctx.reset ();

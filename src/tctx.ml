@@ -146,14 +146,13 @@ let infer_field fld =
 (** [infer_operation op] finds an effect type that defines the operation [op] and returns
     it with refreshed type parameters and additional information needed for type
     inference. *)
-let infer_operation op =
+let infer_operation op rgn =
   match find_operation op with
     | None -> None
     | Some (ty_name, ps, t1, t2) ->
       let ps', fresh_subst = T.refreshing_subst ps in
       let t1 = T.subst_ty fresh_subst t1 in
       let t2 = T.subst_ty fresh_subst t2 in
-      let rgn = T.fresh_region () in
         Some (effect_to_params ty_name ps' rgn, (t1, t2))
 
 let transparent ~pos ty_name =
