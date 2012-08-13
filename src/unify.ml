@@ -22,7 +22,8 @@ let solve cstr =
 
     | (Type.Arrow (u1, (v1, _)), Type.Arrow (u2, (v2, _))) ->
         unify pos v1 v2;
-        unify pos u2 u1
+        unify pos u2 u1;
+        (* XXX Add constraints for dirt *)
 
     | (Type.Tuple lst1, Type.Tuple lst2)
         when List.length lst1 = List.length lst2 ->
@@ -32,6 +33,7 @@ let solve cstr =
        (Type.Effect (t1, (lst1, _, _), _), Type.Effect (t2, (lst2, _, _), _)))
         when t1 = t2 && List.length lst1 = List.length lst2  ->
         List.iter2 (unify pos) lst1 lst2
+        (* XXX Add constraints for other parameters, needs covariance information. *)
 
     (* The following two cases cannot be merged into one, as the whole matching
        fails if both types are Apply, but only the second one is transparent. *)
