@@ -165,6 +165,7 @@ rule token = parse
 and comment n = parse
   | "*)"                { if n = 0 then token lexbuf else comment (n - 1) lexbuf }
   | "(*"                { comment (n + 1) lexbuf }
+  | '\n'                { Lexing.new_line lexbuf; comment n lexbuf }
   | _                   { comment n lexbuf }
   | eof                 { Error.syntax ~pos:(position_of_lex lexbuf) "Unterminated comment" }
 
