@@ -24,7 +24,7 @@ let position pos ppf =
       if String.length filename != 0 then
         Format.fprintf ppf "file %S, line %d, char %d" filename begin_line begin_char
       else
-        Format.fprintf ppf "line %d, char %d" begin_line begin_char
+        Format.fprintf ppf "line %d, char %d" (begin_line - 1) begin_char
 
 let rec sequence sep pp vs ppf =
   match vs with
