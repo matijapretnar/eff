@@ -54,7 +54,7 @@ let is_effect ~pos =
       | (_, (Record _ | Sum _)) -> false
       | (_, Inline (T.Apply (ty_name', _))) ->
         if List.mem ty_name' forbidden
-        then Error.typing ~pos:C.Nowhere "Type definition %s is cyclic." ty_name' (* Compare to [Tctx.check_noncyclic]. *)
+        then Error.typing ~pos "Type definition %s is cyclic." ty_name' (* Compare to [Tctx.check_noncyclic]. *)
         else find (ty_name :: forbidden) ty_name'
       | (_, Inline _) -> false
   in
@@ -153,7 +153,8 @@ let infer_operation op =
       let ps', fresh_subst = T.refreshing_subst ps in
       let t1 = T.subst_ty fresh_subst t1 in
       let t2 = T.subst_ty fresh_subst t2 in
-        Some (apply_to_params ty_name ps', (t1, t2))
+      let rgn = T.fresh_region () in
+        Some (effect_to_params ty_name ps' rgn, (t1, t2))
 
 let transparent ~pos ty_name =
     match snd (lookup_tydef ~pos ty_name) with

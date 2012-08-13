@@ -90,12 +90,18 @@ let ty_scheme ((ps, _, _) as poly, t) ppf =
           (* print ~at_level:5 "@[<h>%t ->@ %t ! %t@]" (ty ~max_level:4 t1) (ty t2) (dirt poly drt) *)
           print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2)
       | Type.Basic b -> print "%s" b
-      | Type.Apply (t, ([], _, _)) | Type.Effect (t, ([], _, _), _) ->
-          print "%s" t
-      | Type.Apply (t, ([s], _, _)) | Type.Effect (t, ([s], _, _), _) ->
-          print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
-      | Type.Apply (t, (ts, _, _)) | Type.Effect (t, (ts, _, _), _) ->
-          print ~at_level:1 "(%t) %s" (sequence "," ty ts) t
+      | Type.Apply (t, (lst, _, _)) ->
+        begin match lst with
+          | [] -> print "%s" t
+          | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
+          | ts -> print ~at_level:1 "(%t) %s" (sequence "," ty ts) t
+        end
+      | Type.Effect (t, (lst, _, _), _) ->
+        begin match lst with
+          | [] -> print "%s" t
+          | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
+          | ts -> print ~at_level:1 "(%t) %s" (sequence "," ty ts) t
+        end
       | Type.TyParam ((Type.Ty_Param k) as p) ->
           let c = (if List.mem p ps then "'" else "'_") in
           if 0 <= k && k <= 25
