@@ -326,7 +326,7 @@ and infer_comp ctx cstr cp =
           add_ty_constraint cstr (snd e2) t2 T.int_ty;
           let ctx = Ctx.extend_ty ctx i T.int_ty in
           let (ty, drt) = infer ctx c in
-          add_dirty_constraint cstr (snd c) ty T.unit_ty;
+          add_ty_constraint cstr (snd c) ty T.unit_ty;
           (T.unit_ty, drt)
 
       | Core.Handle (e1, c2) ->
