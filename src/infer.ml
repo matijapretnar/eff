@@ -30,11 +30,16 @@ let nonexpansive = function
 
 let empty_constraint = []
 
-let add_ty_constraint cstr pos t1 t2 = cstr := (t1, t2, pos) :: !cstr
+let add_ty_constraint cstr pos t1 t2 =
+  cstr := (t1, t2, pos) :: !cstr
 
-let add_dirty_constraint cstr pos (t1, _) (t2, _) = cstr := (t1, t2, pos) :: !cstr
+let add_dirt_constraint cstr pos drt1 drt2 =
+  ()
 
-let add_dirt_constraint cstr pos _ _ = ()
+let add_dirty_constraint cstr pos (t1, drt1) (t2, drt2) =
+  add_ty_constraint cstr pos t1 t2;
+  add_dirt_constraint cstr pos drt1 drt2
+
 
 let ty_of_const = function
   | Common.Integer _ -> Type.int_ty
@@ -67,13 +72,13 @@ let infer_pattern cstr pp =
           (match Tctx.infer_field fld with
             | None -> Error.typing ~pos "Unbound record field label %s" fld
             | Some (ty, (t, us)) ->
-              let unify_record_pattern (fld, p) =
+              let constrain_record_pattern (fld, p) =
                 begin match C.lookup fld us with
                   | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s." fld t
                   | Some u -> add_ty_constraint cstr pos (infer p) u
                 end
               in
-                List.iter unify_record_pattern lst;
+                List.iter constrain_record_pattern lst;
                 ty)
       | Pattern.Variant (lbl, p) ->
           (match Tctx.infer_variant lbl with
@@ -119,24 +124,26 @@ and infer_let ctx cstr pos defs =
         Print.warning ~pos "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
           (Print.sequence "," Print.position positions));
   let delta = T.fresh_dirt () in
-  let vars, ctx = List.fold_left
-    (fun (vs, ctx') (p,c) ->
+  let vars = List.fold_left
+    (fun vs (p,c) ->
       let tc = infer_comp ctx cstr c in
       let ws, tp = infer_pattern cstr p in
       add_dirty_constraint cstr (snd c) tc (tp, delta);
       match C.find_duplicate (List.map fst ws) (List.map fst vs) with
         | Some x -> Error.typing ~pos "Several definitions of %s." x
         | None ->
-            let sbst = Unify.solve !cstr in
-            let ws = Common.assoc_map (T.subst_ty sbst) ws in
-            let ctx = Ctx.subst_ctx ctx sbst in            
-            let ws = Common.assoc_map (Ctx.generalize ctx (nonexpansive (fst c))) ws
+            let poly = nonexpansive (fst c) in
+            let ws = Common.assoc_map (fun ty -> (poly, ty)) ws
           in
-          let ctx' = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme) ws ctx' in
-            (List.rev ws @ vs, ctx'))
-    ([], ctx) defs
+          List.rev ws @ vs)
+    [] defs
   in
-    vars, delta, Ctx.subst_ctx ctx (Unify.solve !cstr)
+  let sbst = Unify.solve !cstr in
+  let ctx = Ctx.subst_ctx ctx sbst in
+  let vars = Common.assoc_map (fun (poly, ty) -> Ctx.generalize ctx poly (T.subst_ty sbst ty)) vars in
+  let ctx = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme) vars ctx
+  in
+    vars, delta, ctx
 
 and infer_let_rec ctx cstr pos defs =
   if not (Common.injective fst defs) then
@@ -183,13 +190,13 @@ and infer_expr ctx cstr (e,pos) =
             Error.typing ~pos "malformed record of type %s" t_name
           else
             let arg_types' = C.assoc_map (infer_expr ctx cstr) lst in
-            let unify_record_arg (fld, t) =
+            let constrain_record_arg (fld, t) =
               begin match C.lookup fld arg_types with
                 | None -> Error.typing ~pos "Unexpected record field label %s in a pattern" fld
                 | Some u -> add_ty_constraint cstr pos t u
               end
             in
-              List.iter unify_record_arg arg_types';
+              List.iter constrain_record_arg arg_types';
               ty)
           
     | Core.Variant (lbl, u) ->
@@ -224,7 +231,7 @@ and infer_expr ctx cstr (e,pos) =
         let dirt = T.fresh_dirt () in
         let t_finally = T.fresh_ty () in
         let t_yield = T.fresh_ty () in
-        let unify_operation ((e, op), a2) =
+        let constrain_operation ((e, op), a2) =
           (match Tctx.infer_operation op with
             | None -> Error.typing ~pos "Unbound operation %s in a handler" op
             | Some (ty, (t1, t2)) ->
@@ -237,7 +244,7 @@ and infer_expr ctx cstr (e,pos) =
                   add_ty_constraint cstr pos tk (T.Arrow (t2, (t_yield, dirt)));
                   add_dirty_constraint cstr pos (t_yield, dirt) u2)
         in
-          List.iter unify_operation ops;
+          List.iter constrain_operation ops;
           let (valt1, valt2) = infer_abstraction ctx cstr a_val in
           let (fint1, fint2) = infer_abstraction ctx cstr a_fin in
             add_ty_constraint cstr pos valt1 t_value;
