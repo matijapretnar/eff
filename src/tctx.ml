@@ -310,6 +310,7 @@ let extend_with_variances tydefs =
       | T.Apply (t, (tys, drts, rgns)) ->
           begin match Common.lookup t !tctx with
           | None ->
+              (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
               List.iter (ty true true) tys;
               List.iter (dirt true true) drts;
               List.iter (region true true) rgns
@@ -321,6 +322,7 @@ let extend_with_variances tydefs =
       | T.Effect (t, (tys, drts, rgns), rgn) ->
           begin match Common.lookup t !tctx with
           | None ->
+              (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
               List.iter (ty true true) tys;
               List.iter (dirt true true) drts;
               List.iter (region true true) rgns;
@@ -369,8 +371,6 @@ let extend_with_variances tydefs =
     (ty_name, ((unref ps, unref ds, unref rs), def))
   in
   List.map extend_with_variance prepared_tydefs
-
-  (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
 
 (** [extend_tydefs ~pos tydefs] checks that the simulatenous type definitions [tydefs] are
     well-formed and returns the extended context. *)

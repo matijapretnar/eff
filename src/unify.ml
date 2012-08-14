@@ -32,8 +32,18 @@ let solve cstr =
     | ((Type.Apply (t1, (lst1, _, _)), Type.Apply (t2, (lst2, _, _))) |
        (Type.Effect (t1, (lst1, _, _), _), Type.Effect (t2, (lst2, _, _), _)))
         when t1 = t2 && List.length lst1 = List.length lst2  ->
-        List.iter2 (unify pos) lst1 lst2
-        (* XXX Add constraints for other parameters, needs covariance information. *)
+        begin match Tctx.lookup_params t1 with
+        | None -> Error.typing ~pos "Undefined type %s" t1
+        (* XXX Add constraints for other parameters *)
+        | Some (ps, _, _) ->
+            List.iter2 (fun (_, (cov, contra)) (ty1, ty2) ->
+              begin if cov then
+                unify pos ty1 ty2
+              end;
+              begin if contra then
+                unify pos ty2 ty1
+              end) ps (List.combine lst1 lst2)
+        end
 
     (* The following two cases cannot be merged into one, as the whole matching
        fails if both types are Apply, but only the second one is transparent. *)
