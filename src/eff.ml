@@ -33,6 +33,9 @@ let options = Arg.align [
   ("--pervasives",
    Arg.String (fun str -> pervasives_file := str),
    " Specify the pervasives.eff file");
+  ("--no-beautify",
+    Arg.Set Type.disable_beautify,
+    " Do not beautify types");
   ("--no-pervasives",
     Arg.Clear pervasives,
     " Do not load pervasives.eff");
