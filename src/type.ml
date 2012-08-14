@@ -7,6 +7,8 @@ type dirt_param = Dirt_Param of int
 type region_param = Region_Param of int
 type instance_param = Instance_Param of int
 
+type params = ty_param list * dirt_param list * region_param list
+
 let fresh_ty_param = (let f = Common.fresh "type parameter" in fun () -> Ty_Param (f ()))
 let fresh_dirt_param = (let f = Common.fresh "dirt parameter" in fun () -> Dirt_Param (f ()))
 let fresh_region_param = (let f = Common.fresh "region parameter" in fun () -> Region_Param (f ()))
