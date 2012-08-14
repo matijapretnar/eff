@@ -176,7 +176,11 @@ and infer_let_rec ctx cstr pos defs =
    [ctx]. It returns the inferred type of [e]. *)
 and infer_expr ctx cstr (e,pos) =
   match e with
-    | Core.Var x -> Ctx.lookup ~pos ctx x
+    | Core.Var x ->
+        begin match Ctx.lookup ctx x with
+        | Some ty -> ty
+        | None -> Error.typing ~pos "Unknown variable %s" x
+        end
     | Core.Const const -> ty_of_const const
     | Core.Tuple es -> T.Tuple (C.map (infer_expr ctx cstr) es)
     | Core.Record [] -> assert false
