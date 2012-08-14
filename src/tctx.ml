@@ -8,7 +8,10 @@ type tydef =
   | Inline of Type.ty
   | Effect of (Common.opsym, Type.ty * Type.ty) Common.assoc
 
-type tyctx = (Common.tyname, Type.params * tydef) Common.assoc
+type variance = bool * bool
+type params = (Type.ty_param * variance) list * (Type.dirt_param * variance) list * (Type.region_param * variance) list
+
+type tyctx = (Common.tyname, params * tydef) Common.assoc
 
 let initial_tctx : tyctx = [
   ("bool", (([], [], []), Inline T.bool_ty));
@@ -17,7 +20,7 @@ let initial_tctx : tyctx = [
   ("string", (([], [], []), Inline T.string_ty));
   ("float", (([], [], []), Inline T.float_ty));
   ("list", (let a = Type.fresh_ty_param () in
-              (([a], [], []),
+              (([a, (true, false)], [], []),
                  Sum [(Common.nil, None);
                       (Common.cons, Some (T.Tuple [T.TyParam a; T.Apply ("list", ([T.TyParam a], [], []))]))])));
   ("empty", (([], [], []), Sum []))
@@ -42,10 +45,12 @@ let lookup_params ty_name =
     | None -> None
     | Some (params, _) -> Some params
 
+let remove_variances (ps, ds, rs) = (List.map fst ps, List.map fst ds, List.map fst rs)
+
 let lookup_tydef ~pos ty_name =
   match Common.lookup ty_name !tctx with
   | None -> Error.typing ~pos "Unknown type %s" ty_name
-  | Some (params, tydef) -> (params, tydef)
+  | Some (params, tydef) -> (remove_variances params, tydef)
 
 let is_effect ~pos =
   let rec find forbidden ty_name =
@@ -127,7 +132,7 @@ let infer_variant lbl =
   match find_variant lbl with
     | None -> None
     | Some (ty_name, ps, _, u) ->
-      let ps', fresh_subst = T.refreshing_subst ps in
+      let ps', fresh_subst = T.refreshing_subst (remove_variances ps) in
       let u = C.option_map (T.subst_ty fresh_subst) u in
         Some (apply_to_params ty_name ps', u)
 
@@ -138,7 +143,7 @@ let infer_field fld =
   match find_field fld with
     | None -> None
     | Some (ty_name, ps, us) ->
-      let ps', fresh_subst = T.refreshing_subst ps in
+      let ps', fresh_subst = T.refreshing_subst (remove_variances ps) in
       let us' = C.assoc_map (T.subst_ty fresh_subst) us in
         Some (apply_to_params ty_name ps', (ty_name, us'))
 
@@ -150,7 +155,7 @@ let infer_operation op rgn =
   match find_operation op with
     | None -> None
     | Some (ty_name, ps, t1, t2) ->
-      let ps', fresh_subst = T.refreshing_subst ps in
+      let ps', fresh_subst = T.refreshing_subst (remove_variances ps) in
       let t1 = T.subst_ty fresh_subst t1 in
       let t2 = T.subst_ty fresh_subst t2 in
         Some (effect_to_params ty_name ps' rgn, (t1, t2))
@@ -287,11 +292,92 @@ let check_shadowing ~pos = function
         | None -> ()
     ) lst
 
+let extend_with_variances tydefs =
+  let prepare_variance lst = List.map (fun p -> (p, (ref false, ref false))) lst in
+  let prepare_variances ((ps, ds, rs), def) =
+    ((prepare_variance ps, prepare_variance ds, prepare_variance rs), def) in
+  let prepared_tydefs = Common.assoc_map prepare_variances tydefs in
+  let set_variances (ty_name, ((ps, ds, rs), def)) =
+    let rec ty posi nega = function
+      | T.Basic _ -> ()
+      | T.TyParam p ->
+          begin match Common.lookup p ps with
+          | None -> assert false
+          | Some (posvar, negvar) ->
+              posvar := !posvar or posi;
+              negvar := !negvar or nega
+          end
+      | T.Apply (t, (tys, drts, rgns)) ->
+          begin match Common.lookup t !tctx with
+          | None ->
+              List.iter (ty true true) tys;
+              List.iter (dirt true true) drts;
+              List.iter (region true true) rgns
+          | Some ((ps, ds, rs), _) ->
+              List.iter2 (fun (_, (posi, nega)) -> ty posi nega) ps tys;
+              List.iter2 (fun (_, (posi, nega)) -> dirt posi nega) ds drts;
+              List.iter2 (fun (_, (posi, nega)) -> region posi nega) rs rgns
+          end
+      | T.Effect (t, (tys, drts, rgns), rgn) ->
+          begin match Common.lookup t !tctx with
+          | None ->
+              List.iter (ty true true) tys;
+              List.iter (dirt true true) drts;
+              List.iter (region true true) rgns;
+          | Some ((ps, ds, rs), _) ->
+              List.iter2 (fun (_, (posi, nega)) -> ty posi nega) ps tys;
+              List.iter2 (fun (_, (posi, nega)) -> dirt posi nega) ds drts;
+              List.iter2 (fun (_, (posi, nega)) -> region posi nega) rs rgns;
+          end;
+          region posi nega rgn
+      | T.Arrow (ty1, (ty2, drt)) ->
+          ty posi nega ty1;
+          ty nega posi ty2;
+          dirt nega posi drt
+      | T.Tuple tys -> List.iter (ty nega posi) tys
+      | T.Handler {T.value = ty1; T.finally = ty2} ->
+          ty posi nega ty1;
+          ty nega posi ty2
+    and dirt posi nega = function
+      | T.DirtParam d ->
+          begin match Common.lookup d ds with
+          | None -> assert false
+          | Some (posvar, negvar) ->
+              posvar := !posvar or posi;
+              negvar := !negvar or nega
+          end
+      | T.DirtAtom (rgn, _) -> region posi nega rgn
+      | T.DirtEmpty -> ()
+    and region posi nega = function
+      | T.RegionParam r ->
+          begin match Common.lookup r rs with
+          | None -> assert false
+          | Some (posvar, negvar) ->
+              posvar := !posvar or posi;
+              negvar := !negvar or nega
+          end
+      | T.RegionInstance _ -> ()
+    in match def with
+      | Record tys -> List.iter (fun (_, t) -> ty true false t) tys
+      | Sum tys -> List.iter (function (_, Some t) -> ty true false t | (_, None) -> ()) tys
+      | Inline t -> ty true false t
+      | Effect op_sig -> List.iter (fun (_, (ty1, ty2)) -> ty false true ty1; ty true false ty2) op_sig
+  in
+  List.iter set_variances prepared_tydefs;
+  let unref lst = Common.assoc_map (fun (ref1, ref2) -> (!ref1, !ref2)) lst in
+  let extend_with_variance (ty_name, ((ps, ds, rs), def)) =
+    (ty_name, ((unref ps, unref ds, unref rs), def))
+  in
+  List.map extend_with_variance prepared_tydefs
+
+  (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
+
 (** [extend_tydefs ~pos tydefs] checks that the simulatenous type definitions [tydefs] are
     well-formed and returns the extended context. *)
 let extend_tydefs ~pos tydefs =
   (* We wish we wrote this in eff, where we could have transactional memory. *)
   let tctx_orig = !tctx in
+  let tydefs = extend_with_variances tydefs in
   let extend_tydef ((tyname, (_, ty)) as tydef) =
     if List.mem_assoc tyname !tctx then Error.typing ~pos "Type %s is already defined" tyname ;
     check_shadowing ~pos ty ;
