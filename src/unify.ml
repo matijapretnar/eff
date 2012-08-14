@@ -1,7 +1,11 @@
 (** [unify sbst pos t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)
+
+let empty_constraint = []
+
 let solve cstr =
   let sbst = ref Type.identity_subst in
+  let remaining = ref empty_constraint in
   let rec unify pos t1 t2 =
     let t1 = Type.subst_ty !sbst t1 in
     let t2 = Type.subst_ty !sbst t2 in
@@ -12,7 +16,7 @@ let solve cstr =
     | (Type.TyParam p, t) | (t, Type.TyParam p) ->
         if Type.occurs_in_ty p t
         then
-          let t1, t2 = Type.beautify2 t1 t2 in
+          let t1, t2 = Type.beautify2 t1 t2 !remaining in
           Error.typing ~pos
             "This expression has a forbidden cylclic type %t = %t."
             (Print.ty_scheme t1)
@@ -20,9 +24,10 @@ let solve cstr =
         else
           sbst := Type.compose_subst {Type.identity_subst with Type.subst_ty = [(p, t)]} !sbst
 
-    | (Type.Arrow (u1, (v1, _)), Type.Arrow (u2, (v2, _))) ->
+    | (Type.Arrow (u1, (v1, drt1)), Type.Arrow (u2, (v2, drt2))) ->
         unify pos v1 v2;
         unify pos u2 u1;
+        unify_dirt pos drt1 drt2
         (* XXX Add constraints for dirt *)
 
     | (Type.Tuple lst1, Type.Tuple lst2)
@@ -61,10 +66,18 @@ let solve cstr =
         unify pos h1.Type.finally h2.Type.finally
 
     | (t1, t2) ->
-        let t1, t2 = Type.beautify2 t1 t2 in
+        let t1, t2 = Type.beautify2 t1 t2 !remaining in
         Error.typing ~pos
           "This expression has type %t but it should have type %t."
           (Print.ty_scheme t1) (Print.ty_scheme t2)
+  and unify_dirt pos drt1 drt2 =
+    remaining := Type.DirtConstraint (drt1, drt2, pos) :: !remaining
+  and unify_region pos rgn1 rgn2 =
+    remaining := Type.RegionConstraint (rgn1, rgn2, pos) :: !remaining
   in
-  List.iter (fun (t1, t2, pos) -> unify pos t1 t2) (List.rev cstr);
-  !sbst
+  List.iter (function
+    | Type.TypeConstraint (t1, t2, pos) -> unify pos t1 t2
+    | Type.DirtConstraint (drt1, drt2, pos) -> unify_dirt pos drt1 drt2;
+    | Type.RegionConstraint (rgn1, rgn2, pos) -> unify_region pos rgn1 rgn2)
+  (List.rev cstr);
+  !sbst, !remaining

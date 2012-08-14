@@ -51,6 +51,13 @@ and region =
 
 let empty_dirt = DirtEmpty
 
+type constraints =
+  | TypeConstraint of ty * ty * Common.position
+  | DirtConstraint of dirt * dirt * Common.position
+  | RegionConstraint of region * region * Common.position
+
+
+
 (* This type is used when type checking is turned off. Its name
    is syntactically incorrect so that the programmer cannot accidentally
    define it. *)
@@ -111,6 +118,13 @@ and subst_ty sbst ty =
 and subst_dirty sbst (ty, drt) =
   (subst_ty sbst ty, subst_dirt sbst drt)
 
+
+let subst_constraints sbst cstrs = List.map (function
+  | TypeConstraint (ty1, ty2, pos) -> TypeConstraint (subst_ty sbst ty1, subst_ty sbst ty2, pos)
+  | DirtConstraint (drt1, drt2, pos) -> DirtConstraint (subst_dirt sbst drt1, subst_dirt sbst drt2, pos)
+  | RegionConstraint (rgn1, rgn2, pos) -> RegionConstraint (subst_region sbst rgn1, subst_region sbst rgn2, pos)
+  ) cstrs
+
 (** [identity_subst] is a substitution that makes no changes. *)
 let identity_subst = { subst_ty = []; subst_dirt = []; subst_region = [] }
 
@@ -126,7 +140,7 @@ let compose_subst
 (** [free_params ty] returns three lists of type parameters that occur in [ty].
     Each parameter is listed only once and in order in which it occurs when
     [ty] is displayed. *)
-let free_params ty =
+let free_params ty cstrs =
   let (@@@) (xs, ys, zs) (us, vs, ws) = (xs @ us, ys @ vs, zs @ ws) in
   let flatten_map f lst = List.fold_left (@@@) ([], [], []) (List.map f lst) in
   let rec free_ty = function
@@ -148,12 +162,16 @@ let free_params ty =
     | RegionInstance _ -> ([], [], [])
   and free_args (tys, drts, rgns) =
     flatten_map free_ty tys @@@ flatten_map free_dirt drts @@@ flatten_map free_region rgns
+  and free_constraint = function
+    | TypeConstraint (ty1, ty2, pos) -> free_ty ty1 @@@ free_ty ty2
+    | DirtConstraint (drt1, drt2, pos) -> free_dirt drt1 @@@ free_dirt drt2
+    | RegionConstraint (rgn1, rgn2, pos) -> free_region rgn1 @@@ free_region rgn2
   in
-  let (xs, ys, zs) = free_ty ty in    
+  let (xs, ys, zs) = free_ty ty @@@ flatten_map free_constraint cstrs in    
     (Common.uniq xs, Common.uniq ys, Common.uniq zs)
 
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
-let occurs_in_ty p ty = List.mem p (let (xs, _, _) = free_params ty in xs)
+let occurs_in_ty p ty = List.mem p (let (xs, _, _) = free_params ty [] in xs)
 
 (** [fresh_ty ()] gives a type [TyParam p] where [p] is a new type parameter on
     each call. *)
@@ -178,22 +196,22 @@ let refreshing_subst (ps, qs, rs) =
 
 (** [refresh (ps,qs,rs) ty] replaces the polymorphic parameters [ps,qs,rs] in [ty] with fresh
     parameters. It returns the  *)
-let refresh params ty =
+let refresh params ty cstrs =
   let params', sbst = refreshing_subst params in
-    params', subst_ty sbst ty
+    params', subst_ty sbst ty, subst_constraints sbst cstrs
 
 let disable_beautify = ref false
 
 (** [beautify ty] returns a sequential replacement of all type parameters in
     [ty] that can be used for its pretty printing. *)
-let beautify ((ps, ds, rs), ty) =
+let beautify ((ps, ds, rs), ty, cstrs) =
   if !disable_beautify then
-    ((ps, ds, rs), ty)
+    ((ps, ds, rs), ty, cstrs)
   else
     let next_ty_param = Common.fresh "beautify_ty" in
     let next_dirt_param = Common.fresh "beautify_dirt" in
     let next_region_param = Common.fresh "beautify_region" in
-    let (xs, ys, zs) = free_params ty in
+    let (xs, ys, zs) = free_params ty cstrs in
     let xs_map = List.map (fun p -> (p, Ty_Param (next_ty_param ()))) xs
     and ys_map = List.map (fun q -> (q, Dirt_Param (next_dirt_param ()))) ys
     and zs_map = List.map (fun r -> (r, Region_Param (next_region_param ()))) zs in
@@ -206,17 +224,17 @@ let beautify ((ps, ds, rs), ty) =
         subst_dirt = Common.assoc_map (fun q' -> DirtParam q') ys_map ;
         subst_region = Common.assoc_map (fun r' -> RegionParam r') zs_map }
     in
-    (subst ps xs_map, subst ds ys_map, subst rs zs_map), subst_ty sbst ty
+    (subst ps xs_map, subst ds ys_map, subst rs zs_map), subst_ty sbst ty, subst_constraints sbst cstrs
 
 
-let beautify_dirty (params, ty) drt =
-  match beautify (params, Arrow (Tuple [], (ty, drt))) with
-  | (ps, Arrow (Tuple [], (ty, drt))) -> (ps, ty), drt
+let beautify_dirty (params, ty, cstrs) drt =
+  match beautify (params, Arrow (Tuple [], (ty, drt)), cstrs) with
+  | (ps, Arrow (Tuple [], (ty, drt)), cstrs) -> (ps, ty, cstrs), drt
   | _ -> assert false
 
 
-let beautify2 ty1 ty2 =
-  match beautify (([], [], []), Tuple [ty1; ty2]) with
-  | (ps, Tuple [ty1; ty2]) -> (ps, ty1), (ps, ty2)
+let beautify2 ty1 ty2 cstrs =
+  match beautify (([], [], []), Tuple [ty1; ty2], cstrs) with
+  | (ps, Tuple [ty1; ty2], cstrs) -> (ps, ty1, cstrs), (ps, ty2, cstrs)
   | _ -> assert false
 

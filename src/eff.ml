@@ -89,7 +89,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
   match d with
   | Syntax.TopLet defs ->
       let defs = C.assoc_map Desugar.computation defs in
-      let vars, drt, ctx = Infer.infer_let ctx (ref Infer.empty_constraint) pos defs in
+      let vars, drt, ctx = Infer.infer_let ctx (ref Unify.empty_constraint) pos defs in
       List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env =
         List.fold_right
@@ -107,7 +107,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
         (ctx, env)
   | Syntax.TopLetRec defs ->
       let defs = C.assoc_map Desugar.let_rec defs in
-      let vars, ctx = Infer.infer_let_rec ctx (ref Infer.empty_constraint) pos defs in
+      let vars, ctx = Infer.infer_let_rec ctx (ref Unify.empty_constraint) pos defs in
       List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env = Eval.extend_let_rec env defs in
         if interactive then begin
@@ -132,11 +132,12 @@ let exec_topdef interactive (ctx, env) (d,pos) =
 let infer_top_comp ctx c =
   let cstr = ref [] in
   let dirty = Infer.infer_comp ctx cstr c in
-  let sbst = Unify.solve !cstr in
+  let sbst, remaining = Unify.solve !cstr in
   Exhaust.check_comp c ;
   let ctx = Ctx.subst_ctx ctx sbst in
+  let remaining = Type.subst_constraints sbst remaining in
   let (ty, drt) = Type.subst_dirty sbst dirty in
-  ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty, drt
+  ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty remaining, drt
 
 let rec exec_cmd interactive (ctx, env) e =
   match e with

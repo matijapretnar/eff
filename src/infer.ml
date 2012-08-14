@@ -28,13 +28,11 @@ let nonexpansive = function
   | Core.Apply _ | Core.Match _ | Core.While _ | Core.For _ | Core.New _
   | Core.Handle _ | Core.Let _ | Core.LetRec _ | Core.Check _ -> false
 
-let empty_constraint = []
-
 let add_ty_constraint cstr pos t1 t2 =
-  cstr := (t1, t2, pos) :: !cstr
+  cstr := Type.TypeConstraint (t1, t2, pos) :: !cstr
 
 let add_dirt_constraint cstr pos drt1 drt2 =
-  ()
+  cstr := Type.DirtConstraint (drt1, drt2, pos) :: !cstr
 
 let add_dirty_constraint cstr pos (t1, drt1) (t2, drt2) =
   add_ty_constraint cstr pos t1 t2;
@@ -138,9 +136,10 @@ and infer_let ctx cstr pos defs =
           List.rev ws @ vs)
     [] defs
   in
-  let sbst = Unify.solve !cstr in
+  let sbst, remaining = Unify.solve !cstr in
+  let remaining = Type.subst_constraints sbst remaining in
   let ctx = Ctx.subst_ctx ctx sbst in
-  let vars = Common.assoc_map (fun (poly, ty) -> Ctx.generalize ctx poly (T.subst_ty sbst ty)) vars in
+  let vars = Common.assoc_map (fun (poly, ty) -> Ctx.generalize ctx poly (T.subst_ty sbst ty) remaining) vars in
   let ctx = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme) vars ctx
   in
     vars, delta, ctx
@@ -164,10 +163,11 @@ and infer_let_rec ctx cstr pos defs =
       add_ty_constraint cstr (snd p) u1 tp;
       add_dirty_constraint cstr (snd c) u2 tc)
     lst;
-  let sbst = Unify.solve !cstr in
+  let sbst, remaining = Unify.solve !cstr in
+  let remaining = Type.subst_constraints sbst remaining in
   let vars = Common.assoc_map (T.subst_ty sbst) vars in
   let ctx = Ctx.subst_ctx ctx sbst in
-  let vars = Common.assoc_map (Ctx.generalize ctx true) vars in
+  let vars = Common.assoc_map (fun t -> Ctx.generalize ctx true t remaining) vars in
   let ctx = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme) vars ctx
   in
     vars, ctx
@@ -178,7 +178,7 @@ and infer_expr ctx cstr (e,pos) =
   match e with
     | Core.Var x ->
         begin match Ctx.lookup ctx x with
-        | Some ty -> ty
+        | Some (_, ty, cstrs) -> cstr := cstrs @ !cstr; ty
         | None -> Error.typing ~pos "Unknown variable %s" x
         end
     | Core.Const const -> ty_of_const const

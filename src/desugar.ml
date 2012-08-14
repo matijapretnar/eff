@@ -161,7 +161,7 @@ let syntax_to_core_params (ts, ds, rs) = (
 let external_ty is_effect t =
   let _, t = fill_args is_effect t in
   let (ts, ds, rs) = syntax_to_core_params (free_params t) in
-  ((List.map snd ts, List.map snd ds, List.map snd rs), ty (ts, ds, rs) t)
+  ((List.map snd ts, List.map snd ds, List.map snd rs), ty (ts, ds, rs) t, [])
 
 (** [tydef params d] desugars the type definition with parameters [params] and definition [d]. *)
 let tydef params d =
