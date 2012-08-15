@@ -3,7 +3,10 @@ type t = (Common.variable, ty_scheme) Common.assoc
 
 let empty = []
 
-let lookup ctx x = Common.lookup x ctx
+let lookup ctx x =
+  match Common.lookup x ctx with
+  | None -> None
+  | Some (ps, ty, cstrs) -> Some (Type.refresh ps ty cstrs)
 
 let extend ctx x ty_scheme = (x, ty_scheme) :: ctx
 
