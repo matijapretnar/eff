@@ -121,20 +121,19 @@ and infer_let ctx cstr pos defs =
       let positions = List.map (fun (_, (_, pos)) -> pos) defs in
         Print.warning ~pos "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
           (Print.sequence "," Print.position positions));
-  let delta = T.fresh_dirt () in
-  let vars = List.fold_left
-    (fun vs (p,c) ->
-      let tc = infer_comp ctx cstr c in
+  let vars, drts = List.fold_left
+    (fun (vs, drts) (p,c) ->
+      let (tc, drt) = infer_comp ctx cstr c in
       let ws, tp = infer_pattern cstr p in
-      add_dirty_constraint cstr (snd c) tc (tp, delta);
+      add_ty_constraint cstr (snd c) tc tp;
       match C.find_duplicate (List.map fst ws) (List.map fst vs) with
         | Some x -> Error.typing ~pos "Several definitions of %s." x
         | None ->
             let poly = nonexpansive (fst c) in
             let ws = Common.assoc_map (fun ty -> (poly, ty)) ws
           in
-          List.rev ws @ vs)
-    [] defs
+          List.rev ws @ vs, drt :: drts)
+    ([], []) defs
   in
   let sbst, remaining = Unify.solve !cstr in
   let remaining = Type.subst_constraints sbst remaining in
@@ -142,7 +141,7 @@ and infer_let ctx cstr pos defs =
   let vars = Common.assoc_map (fun (poly, ty) -> Ctx.generalize ctx poly (T.subst_ty sbst ty) remaining) vars in
   let ctx = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme) vars ctx
   in
-    vars, delta, ctx
+    vars, drts, ctx
 
 and infer_let_rec ctx cstr pos defs =
   if not (Common.injective fst defs) then
@@ -342,12 +341,12 @@ and infer_comp ctx cstr cp =
             (t3, d2)
 
       | Core.Let (defs, c) -> 
-          let _, dlet, ctx = infer_let ctx cstr pos defs in
+          let _, let_drts, ctx = infer_let ctx cstr pos defs in
           let tc, dc = infer ctx c in
-          let dirt = T.fresh_dirt () in
-            add_dirt_constraint cstr pos dlet dirt ;
-            add_dirt_constraint cstr pos dc dirt ;
-            tc, dirt
+          let drt = T.fresh_dirt () in
+            List.iter (fun let_drt -> add_dirt_constraint cstr pos let_drt drt) let_drts;
+            add_dirt_constraint cstr pos dc drt ;
+            tc, drt
 
       | Core.LetRec (defs, c) ->
           let _, ctx = infer_let_rec ctx cstr pos defs in
