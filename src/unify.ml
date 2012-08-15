@@ -3,6 +3,15 @@
 
 let empty_constraint = []
 
+let for_parameters unify pos ps lst1 lst2 =
+  List.iter2 (fun (_, (cov, contra)) (ty1, ty2) ->
+    begin if cov then
+      unify pos ty1 ty2
+    end;
+    begin if contra then
+      unify pos ty2 ty1
+    end) ps (List.combine lst1 lst2)
+
 let solve cstr =
   let sbst = ref Type.identity_subst in
   let remaining = ref empty_constraint in
@@ -28,26 +37,30 @@ let solve cstr =
         unify pos v1 v2;
         unify pos u2 u1;
         unify_dirt pos drt1 drt2
-        (* XXX Add constraints for dirt *)
 
     | (Type.Tuple lst1, Type.Tuple lst2)
         when List.length lst1 = List.length lst2 ->
         List.iter2 (unify pos) lst1 lst2
 
-    | ((Type.Apply (t1, (lst1, _, _)), Type.Apply (t2, (lst2, _, _))) |
-       (Type.Effect (t1, (lst1, _, _), _), Type.Effect (t2, (lst2, _, _), _)))
-        when t1 = t2 && List.length lst1 = List.length lst2  ->
+    | (Type.Apply (t1, (ts1, drts1, rgns1)), Type.Apply (t2, (ts2, drts2, rgns2)))
+        when t1 = t2 && List.length ts1 = List.length ts2 && List.length drts1 = List.length drts2 && List.length rgns1 = List.length rgns2 ->
         begin match Tctx.lookup_params t1 with
         | None -> Error.typing ~pos "Undefined type %s" t1
-        (* XXX Add constraints for other parameters *)
-        | Some (ps, _, _) ->
-            List.iter2 (fun (_, (cov, contra)) (ty1, ty2) ->
-              begin if cov then
-                unify pos ty1 ty2
-              end;
-              begin if contra then
-                unify pos ty2 ty1
-              end) ps (List.combine lst1 lst2)
+        | Some (ps, ds, rs) ->
+            for_parameters unify pos ps ts1 ts2;
+            for_parameters unify_dirt pos ds drts1 drts2;
+            for_parameters unify_region pos rs rgns1 rgns2
+        end
+
+    | (Type.Effect (t1, (ts1, drts1, rgns1), rgn1), Type.Effect (t2, (ts2, drts2, rgns2), rgn2))
+        when t1 = t2 && List.length ts1 = List.length ts2 && List.length drts1 = List.length drts2 && List.length rgns1 = List.length rgns2 ->
+        begin match Tctx.lookup_params t1 with
+        | None -> Error.typing ~pos "Undefined type %s" t1
+        | Some (ps, ds, rs) ->
+            unify_region pos rgn1 rgn2;
+            for_parameters unify pos ps ts1 ts2;
+            for_parameters unify_dirt pos ds drts1 drts2;
+            for_parameters unify_region pos rs rgns1 rgns2
         end
 
     (* The following two cases cannot be merged into one, as the whole matching
