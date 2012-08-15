@@ -22,7 +22,10 @@ let solve cstr =
 
     | (t1, t2) when t1 = t2 -> ()
 
-    | (Type.TyParam p, t) | (t, Type.TyParam p) ->
+    | (Type.TyParam p, Type.TyParam q) ->
+        remaining := Type.TypeConstraint (t1, t2, pos) :: !remaining
+
+    | (Type.TyParam p, t) ->
         if Type.occurs_in_ty p t
         then
           let t1, t2 = Type.beautify2 t1 t2 !remaining in
@@ -31,7 +34,22 @@ let solve cstr =
             (Print.ty_scheme t1)
             (Print.ty_scheme t2)
         else
-          sbst := Type.compose_subst {Type.identity_subst with Type.subst_ty = [(p, t)]} !sbst
+          let (_, t', _) = Type.refresh (Type.free_params t []) t [] in
+          sbst := Type.compose_subst {Type.identity_subst with Type.subst_ty = [(p, t')]} !sbst;
+          unify pos t' t
+
+    | (t, Type.TyParam p) ->
+        if Type.occurs_in_ty p t
+        then
+          let t1, t2 = Type.beautify2 t1 t2 !remaining in
+          Error.typing ~pos
+            "This expression has a forbidden cylclic type %t = %t."
+            (Print.ty_scheme t1)
+            (Print.ty_scheme t2)
+        else
+          let (_, t', _) = Type.refresh (Type.free_params t []) t [] in
+          sbst := Type.compose_subst {Type.identity_subst with Type.subst_ty = [(p, t')]} !sbst;
+          unify pos t t'
 
     | (Type.Arrow (u1, (v1, drt1)), Type.Arrow (u2, (v2, drt2))) ->
         unify pos v1 v2;
