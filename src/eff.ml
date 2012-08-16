@@ -89,7 +89,8 @@ let exec_topdef interactive (ctx, env) (d,pos) =
   match d with
   | Syntax.TopLet defs ->
       let defs = C.assoc_map Desugar.computation defs in
-      let vars, drts, ctx = Infer.infer_let ctx (ref Unify.empty_constraint) pos defs in
+      (* XXX What to do about the dirts? *)
+      let vars, _, ctx = Infer.infer_let ctx (ref Unify.empty_constraint) pos defs in
       List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env =
         List.fold_right
@@ -97,7 +98,6 @@ let exec_topdef interactive (ctx, env) (d,pos) =
           defs env
       in
         if interactive then begin
-          (* XXX Print the corresponding dirts *)
           List.iter (fun (x, tysch) ->
                        match Eval.lookup x env with
                          | None -> assert false
