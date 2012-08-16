@@ -137,7 +137,7 @@ let compose_subst
     subst_dirt = b1 @ Common.assoc_map (subst_dirt sbst1) b2 ;
     subst_region = c1 @ Common.assoc_map (subst_region sbst1) c2 }
 
-(** [free_params ty] returns three lists of type parameters that occur in [ty].
+(** [free_params ty cstrs] returns three lists of type parameters that occur in [ty].
     Each parameter is listed only once and in order in which it occurs when
     [ty] is displayed. *)
 let free_params ty cstrs =
@@ -180,6 +180,8 @@ let fresh_ty () = TyParam (fresh_ty_param ())
 let fresh_dirt () = DirtParam (fresh_dirt_param ())
 
 let fresh_region () = RegionParam (fresh_region_param ())
+
+let fresh_instance () = RegionInstance (fresh_instance_param ())
 
 let fresh_dirty () = (fresh_ty (), fresh_dirt ())
 

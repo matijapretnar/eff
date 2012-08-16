@@ -34,6 +34,9 @@ let add_ty_constraint cstr pos t1 t2 =
 let add_dirt_constraint cstr pos drt1 drt2 =
   cstr := Type.DirtConstraint (drt1, drt2, pos) :: !cstr
 
+let add_region_constraint cstr pos rgn1 rgn2 =
+  cstr := Type.RegionConstraint (rgn1, rgn2, pos) :: !cstr
+
 let add_dirty_constraint cstr pos (t1, drt1) (t2, drt2) =
   add_ty_constraint cstr pos t1 t2;
   add_dirt_constraint cstr pos drt1 drt2
@@ -308,7 +311,9 @@ and infer_comp ctx cstr cp =
                             add_dirty_constraint cstr posc t (T.Tuple [u2; te], T.empty_dirt))
                     lst
             end ;
+            let instance = T.fresh_instance () in
             let rgn = T.fresh_region () in
+              add_region_constraint cstr pos instance rgn ;
               Tctx.effect_to_params eff params rgn, T.empty_dirt
           | _ -> Error.typing ~pos "Effect type expected but %s encountered" eff
           end
