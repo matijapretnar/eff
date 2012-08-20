@@ -131,6 +131,8 @@ and infer_let ctx cstr pos defs =
   let vars, drts, frshs = List.fold_left
     (fun (vs, drts, frshs) (p,c) ->
       let (frsh, tc, drt) = infer_comp ctx cstr c in
+      let isbst = T.instance_refreshing_subst frsh in
+      let (frsh, tc, drt) = Type.subst_inst_dirty isbst (frsh, tc, drt) in
       let ws, tp = infer_pattern cstr p in
       add_ty_constraint cstr (snd c) tc tp;
       match C.find_duplicate (List.map fst ws) (List.map fst vs) with

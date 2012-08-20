@@ -43,9 +43,9 @@ and dirt =
 and region =
   | RegionParam of region_param
   | RegionInstance of instance_param
+  | RegionTop
 (* probably no need for this:
   | RegionUnion of region list
-  | RegionTop
 *)
 
 
@@ -82,7 +82,7 @@ let subst_region sbst = function
     (match Common.lookup r sbst.subst_region with
       | Some rgn -> rgn
       | None -> RegionParam r)    
-  | (RegionInstance _) as rgn -> rgn
+  | (RegionInstance _ | RegionTop) as rgn -> rgn
 
 let subst_dirt sbst = function
   | DirtEmpty -> DirtEmpty
@@ -159,7 +159,7 @@ let free_params ty cstrs =
     | DirtAtom (rgn, _) -> free_region rgn
   and free_region = function
     | RegionParam r -> ([], [], [r])
-    | RegionInstance _ -> ([], [], [])
+    | RegionInstance _ | RegionTop -> ([], [], [])
   and free_args (tys, drts, rgns) =
     flatten_map free_ty tys @@@ flatten_map free_dirt drts @@@ flatten_map free_region rgns
   and free_constraint = function
@@ -169,6 +169,48 @@ let free_params ty cstrs =
   in
   let (xs, ys, zs) = free_ty ty @@@ flatten_map free_constraint cstrs in    
     (Common.uniq xs, Common.uniq ys, Common.uniq zs)
+
+let instance_refreshing_subst isbst = List.map (fun i -> i, Some (fresh_instance_param ())) isbst
+
+let subst_inst_region isbst = function
+  | (RegionParam _ | RegionTop) as rgn -> rgn
+  | RegionInstance i as rgn -> 
+      begin match Common.lookup i isbst with
+      | Some (Some j) -> RegionInstance j
+      | Some None -> RegionTop
+      | None -> rgn
+      end
+
+let subst_inst_dirt isbst = function
+  | (DirtEmpty | DirtParam _) as drt -> drt
+  | DirtAtom (r, op) -> DirtAtom (subst_inst_region isbst r, op)
+
+let rec subst_inst_args isbst (tys, drts, rgns) =
+  (List.map (subst_inst_ty isbst) tys,
+   List.map (subst_inst_dirt isbst) drts,
+   List.map (subst_inst_region isbst) rgns)
+
+(** [subst_inst_ty isbst ty] replaces type parameters in [ty] according to [isbst]. *)
+and subst_inst_ty isbst ty =
+  let rec subst_inst = function
+  | Apply (ty_name, args) -> Apply (ty_name, subst_inst_args isbst args)
+  | Effect (ty_name, args, rgn) ->
+      Effect (ty_name, subst_inst_args isbst args, subst_inst_region isbst rgn)
+  | TyParam p as ty -> ty
+  | Basic _ as ty -> ty
+  | Tuple tys -> Tuple (List.map subst_inst tys)
+  | Arrow (ty1, ty2) -> Arrow (subst_inst ty1, subst_inst_dirty isbst ty2)
+  | Handler {value = ty1; finally = ty2} ->
+      Handler {value = subst_inst ty1; finally = subst_inst ty2}
+  in
+  subst_inst ty
+
+and subst_inst_dirty isbst (frsh, ty, drt) =
+  let frsh = List.fold_right (fun i frsh ->
+    match Common.lookup i isbst with
+    | Some (Some j) -> j :: frsh
+    | _ -> frsh) frsh [] in
+  (frsh, subst_inst_ty isbst ty, subst_inst_dirt isbst drt)
 
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
 let occurs_in_ty p ty = List.mem p (let (xs, _, _) = free_params ty [] in xs)

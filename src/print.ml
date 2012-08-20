@@ -73,6 +73,7 @@ let region (_, _, rs) reg ppf =
         let c = (if List.mem p rs then "'" else "'_") in
           print ppf "<%srgn%i>" c k
     | Type.RegionInstance (Type.Instance_Param i) -> print ppf "<#%d>" i
+    | Type.RegionTop -> print ppf "<?>"
 
 let dirt ((_, ds, _) as poly) drt ppf =
   match drt with
