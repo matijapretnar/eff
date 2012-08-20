@@ -86,7 +86,8 @@ let rec ty ((ps, _, _) as poly) t ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = print ?max_level ?at_level ppf in
     match t with
-    | Type.Arrow (t1, (t2, drt)) ->
+    (* XXX Should we print which instances are fresh? *)
+    | Type.Arrow (t1, (_, t2, drt)) ->
         print ~at_level:5 "@[<h>%t ->@ %t[%t]@]" (ty ~max_level:4 t1) (ty ~max_level:4 t2) (dirt poly drt)
         (* print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2) *)
     | Type.Basic b -> print "%s" b

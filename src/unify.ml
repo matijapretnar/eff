@@ -85,7 +85,8 @@ let solve initial_cnstrs =
           add_substitution p t' ;
           unify pos t t'
 
-    | (Type.Arrow (u1, (v1, drt1)), Type.Arrow (u2, (v2, drt2))) ->
+    | (Type.Arrow (u1, (lst1, v1, drt1)), Type.Arrow (u2, (lst2, v2, drt2))) ->
+        (* XXX How do we unify fresh instances? *)
         unify pos v1 v2;
         unify pos u2 u1;
         unify_dirt pos drt1 drt2

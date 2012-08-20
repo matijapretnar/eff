@@ -90,7 +90,8 @@ let exec_topdef interactive (ctx, env) (d,pos) =
   | Syntax.TopLet defs ->
       let defs = C.assoc_map Desugar.computation defs in
       (* XXX What to do about the dirts? *)
-      let vars, _, ctx = Infer.infer_let ctx (ref Unify.empty_constraint) pos defs in
+      (* XXX What to do about the fresh instances? *)
+      let vars, _, _, ctx = Infer.infer_let ctx (ref Unify.empty_constraint) pos defs in
       List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env =
         List.fold_right
@@ -137,7 +138,8 @@ let infer_top_comp ctx c =
   Exhaust.check_comp c ;
   let ctx = Ctx.subst_ctx ctx sbst in
   let remaining = Type.subst_constraints sbst remaining in
-  let (ty, drt) = Type.subst_dirty sbst dirty in
+  let (frshs, ty, drt) = Type.subst_dirty sbst dirty in
+  (* XXX What to do about the fresh instances? *)
   ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty remaining, drt
 
 let rec exec_cmd interactive (ctx, env) e =

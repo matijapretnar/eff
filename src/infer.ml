@@ -31,13 +31,17 @@ let nonexpansive = function
 let add_ty_constraint cstr pos t1 t2 =
   cstr := Type.TypeConstraint (t1, t2, pos) :: !cstr
 
+let add_fresh_constraint cstr pos frsh1 frsh2 =
+  Print.debug "Unifying freshness constraints."
+
 let add_dirt_constraint cstr pos drt1 drt2 =
   cstr := Type.DirtConstraint (drt1, drt2, pos) :: !cstr
 
 let add_region_constraint cstr pos rgn1 rgn2 =
   cstr := Type.RegionConstraint (rgn1, rgn2, pos) :: !cstr
 
-let add_dirty_constraint cstr pos (t1, drt1) (t2, drt2) =
+let add_dirty_constraint cstr pos (lst1, t1, drt1) (lst2, t2, drt2) =
+  add_fresh_constraint cstr pos lst1 lst2;
   add_ty_constraint cstr pos t1 t2;
   add_dirt_constraint cstr pos drt1 drt2
 
@@ -124,9 +128,9 @@ and infer_let ctx cstr pos defs =
       let positions = List.map (fun (_, (_, pos)) -> pos) defs in
         Print.warning ~pos "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
           (Print.sequence "," Print.position positions));
-  let vars, drts = List.fold_left
-    (fun (vs, drts) (p,c) ->
-      let (tc, drt) = infer_comp ctx cstr c in
+  let vars, drts, frshs = List.fold_left
+    (fun (vs, drts, frshs) (p,c) ->
+      let (frsh, tc, drt) = infer_comp ctx cstr c in
       let ws, tp = infer_pattern cstr p in
       add_ty_constraint cstr (snd c) tc tp;
       match C.find_duplicate (List.map fst ws) (List.map fst vs) with
@@ -135,8 +139,8 @@ and infer_let ctx cstr pos defs =
             let poly = nonexpansive (fst c) in
             let ws = Common.assoc_map (fun ty -> (poly, ty)) ws
           in
-          List.rev ws @ vs, drt :: drts)
-    ([], []) defs
+          List.rev ws @ vs, drt :: drts, frsh @ frshs)
+    ([], [], []) defs
   in
   let sbst, remaining = Unify.solve !cstr in
   let remaining = Type.subst_constraints sbst remaining in
@@ -144,7 +148,7 @@ and infer_let ctx cstr pos defs =
   let vars = Common.assoc_map (fun (poly, ty) -> Ctx.generalize ctx poly (T.subst_ty sbst ty) remaining) vars in
   let ctx = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme) vars ctx
   in
-    vars, drts, ctx
+    vars, drts, frshs, ctx
 
 and infer_let_rec ctx cstr pos defs =
   if not (Common.injective fst defs) then
@@ -229,7 +233,8 @@ and infer_expr ctx cstr (e,pos) =
           | Some (ty, (t1, t2)) ->
             let u = infer_expr ctx cstr e in
               add_ty_constraint cstr pos u ty;
-              T.Arrow (t1, (t2, T.DirtAtom (rgn, op))))
+              (* An operation creates no new instances. *)
+              T.Arrow (t1, ([], t2, T.DirtAtom (rgn, op))))
 
     | Core.Handler {Core.operations=ops; Core.value=a_val; Core.finally=a_fin} -> 
         let t_value = T.fresh_ty () in
@@ -247,15 +252,16 @@ and infer_expr ctx cstr (e,pos) =
                   add_ty_constraint cstr pos t1 u1;
                   (* XXX maybe we need to change the direction of inequalities here,
                      or even require equalities. *)
-                  add_ty_constraint cstr pos tk (T.Arrow (t2, (t_yield, dirt)));
-                  add_dirty_constraint cstr pos (t_yield, dirt) u2)
+                  (* XXX Think also what to do about fresh instances. *)
+                  add_ty_constraint cstr pos tk (T.Arrow (t2, ([], t_yield, dirt)));
+                  add_dirty_constraint cstr pos ([], t_yield, dirt) u2)
         in
           List.iter constrain_operation ops;
           let (valt1, valt2) = infer_abstraction ctx cstr a_val in
           let (fint1, fint2) = infer_abstraction ctx cstr a_fin in
             add_ty_constraint cstr pos valt1 t_value;
-            add_dirty_constraint cstr pos valt2 (t_yield, dirt);
-            add_dirty_constraint cstr pos fint2 (t_finally, dirt);
+            add_dirty_constraint cstr pos valt2 ([], t_yield, dirt);
+            add_dirty_constraint cstr pos fint2 ([], t_finally, dirt);
             add_ty_constraint cstr pos fint1 t_yield;
             T.Handler { T.value = t_value; T.finally = t_finally }
               
@@ -274,13 +280,13 @@ and infer_comp ctx cstr cp =
           t
 
       | Core.Value e ->
-          infer_expr ctx cstr e, T.empty_dirt
+          [], infer_expr ctx cstr e, T.empty_dirt
 
       | Core.Match (e, []) ->
         let t_in = infer_expr ctx cstr e in
         let t_out = T.fresh_ty () in
         add_ty_constraint cstr pos t_in T.empty_ty;
-        t_out, T.empty_dirt
+        [], t_out, T.empty_dirt
 
       | Core.Match (e, lst) ->
           let t_in = infer_expr ctx cstr e in
@@ -308,24 +314,28 @@ and infer_comp ctx cstr cp =
                           let t1, t2, t = infer_abstraction2 ctx cstr a in
                             add_ty_constraint cstr pos1 t1 u1;
                             add_ty_constraint cstr pos2 t2 te;
-                            add_dirty_constraint cstr posc t (T.Tuple [u2; te], T.empty_dirt))
+                            (* Here, we should have that resources create no fresh instances. *)
+                            add_dirty_constraint cstr posc t ([], T.Tuple [u2; te], T.empty_dirt))
                     lst
             end ;
-            let instance = T.fresh_instance () in
+            let instance = T.fresh_instance_param () in
             let rgn = T.fresh_region () in
-              add_region_constraint cstr pos instance rgn ;
-              Tctx.effect_to_params eff params rgn, T.empty_dirt
+              add_region_constraint cstr pos (T.RegionInstance instance) rgn ;
+              [instance], Tctx.effect_to_params eff params rgn, T.empty_dirt
           | _ -> Error.typing ~pos "Effect type expected but %s encountered" eff
           end
 
       | Core.While (c1, c2) ->
         let dirt = T.fresh_dirt () in
-        let t1 = infer ctx c1 in
-          add_dirty_constraint cstr pos t1 (T.bool_ty, dirt);
-          let t2 = infer ctx c2 in
-          add_dirty_constraint cstr pos t2 (T.unit_ty, dirt);
+        let frsh1, t1, d1 = infer ctx c1 in
+          add_ty_constraint cstr pos t1 T.bool_ty;
+          add_dirt_constraint cstr pos d1 dirt;
+          let frsh2, t2, d2 = infer ctx c2 in
+          add_ty_constraint cstr pos t2 T.unit_ty;
+          add_dirt_constraint cstr pos d2 dirt;
+          (* XXX We need to make sure to erase all instances generated by frsh2 *)
           (* XXX could add "diverges" dirt *)
-          (T.unit_ty, dirt)
+          (frsh1, T.unit_ty, dirt)
 
       | Core.For (i, e1, e2, c, _) ->
           let t1 = infer_expr ctx cstr e1 in
@@ -333,25 +343,28 @@ and infer_comp ctx cstr cp =
           let t2 = infer_expr ctx cstr e2 in
           add_ty_constraint cstr (snd e2) t2 T.int_ty;
           let ctx = Ctx.extend_ty ctx i T.int_ty in
-          let (ty, drt) = infer ctx c in
+          let (frsh, ty, drt) = infer ctx c in
           add_ty_constraint cstr (snd c) ty T.unit_ty;
-          (T.unit_ty, drt)
+          (* XXX We need to make sure to erase all instances generated by frsh *)
+          ([], T.unit_ty, drt)
 
       | Core.Handle (e1, c2) ->
           let t1 = infer_expr ctx cstr e1 in
-          let t2, d2 = infer ctx c2 in
+          let frsh, t2, d2 = infer ctx c2 in
           let t3 = T.fresh_ty () in
           let t1' = T.Handler {T.value = t2; T.finally = t3} in
             add_ty_constraint cstr pos t1' t1;
-            (t3, d2)
+            (* XXX Are instances created by c2 just passed through?
+                What about ones that are created during handling? *)
+            (frsh, t3, d2)
 
       | Core.Let (defs, c) -> 
-          let _, let_drts, ctx = infer_let ctx cstr pos defs in
-          let tc, dc = infer ctx c in
+          let _, let_drts, let_frshs, ctx = infer_let ctx cstr pos defs in
+          let frsh, tc, dc = infer ctx c in
           let drt = T.fresh_dirt () in
             List.iter (fun let_drt -> add_dirt_constraint cstr pos let_drt drt) let_drts;
             add_dirt_constraint cstr pos dc drt ;
-            tc, drt
+            let_frshs @ frsh, tc, drt
 
       | Core.LetRec (defs, c) ->
           let _, ctx = infer_let_rec ctx cstr pos defs in
@@ -359,7 +372,7 @@ and infer_comp ctx cstr cp =
 
       | Core.Check c ->
           ignore (infer ctx c);
-          T.unit_ty, T.empty_dirt
+          [], T.unit_ty, T.empty_dirt
   in
   let ty = infer ctx cp in
     ty

@@ -25,7 +25,7 @@ and ty =
   | Arrow of ty * dirty
   | Handler of handler_ty
 
-and dirty = ty * dirt
+and dirty = instance_param list * ty * dirt
 
 and handler_ty = {
   value: ty; (* the type of the _argument_ of value *)
@@ -62,7 +62,7 @@ type constraints =
    is syntactically incorrect so that the programmer cannot accidentally
    define it. *)
 let universal_ty = Basic "_"
-let universal_dirty = (Basic "_", DirtEmpty)
+let universal_dirty = ([], Basic "_", DirtEmpty)
 
 let int_ty = Basic "int"
 let string_ty = Basic "string"
@@ -115,8 +115,8 @@ and subst_ty sbst ty =
   in
   subst ty
 
-and subst_dirty sbst (ty, drt) =
-  (subst_ty sbst ty, subst_dirt sbst drt)
+and subst_dirty sbst (frsh, ty, drt) =
+  (frsh, subst_ty sbst ty, subst_dirt sbst drt)
 
 
 let subst_constraints sbst cstrs = List.map (function
@@ -151,7 +151,7 @@ let free_params ty cstrs =
     | Tuple tys -> flatten_map free_ty tys
     | Arrow (ty1, dirty2) -> free_ty ty1 @@@ free_dirty dirty2
     | Handler {value = ty1; finally = ty2} -> free_ty ty1 @@@ free_ty ty2
-  and free_dirty (ty, drt) =
+  and free_dirty (_, ty, drt) =
     free_ty ty @@@ free_dirt drt
   and free_dirt = function
     | DirtEmpty -> ([], [], [])
@@ -183,7 +183,8 @@ let fresh_region () = RegionParam (fresh_region_param ())
 
 let fresh_instance () = RegionInstance (fresh_instance_param ())
 
-let fresh_dirty () = (fresh_ty (), fresh_dirt ())
+(* XXX Should a fresh dirty type have no fresh instances? *)
+let fresh_dirty () = ([], fresh_ty (), fresh_dirt ())
 
 let refreshing_subst (ps, qs, rs) =
   let ps' = List.map (fun p -> (p, fresh_ty_param ())) ps in
@@ -230,8 +231,8 @@ let beautify ((ps, ds, rs), ty, cstrs) =
 
 
 let beautify_dirty (params, ty, cstrs) drt =
-  match beautify (params, Arrow (Tuple [], (ty, drt)), cstrs) with
-  | (ps, Arrow (Tuple [], (ty, drt)), cstrs) -> (ps, ty, cstrs), drt
+  match beautify (params, Arrow (Tuple [], ([], ty, drt)), cstrs) with
+  | (ps, Arrow (Tuple [], ([], ty, drt)), cstrs) -> (ps, ty, cstrs), drt
   | _ -> assert false
 
 
