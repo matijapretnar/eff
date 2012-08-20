@@ -212,6 +212,12 @@ and subst_inst_dirty isbst (frsh, ty, drt) =
     | _ -> frsh) frsh [] in
   (frsh, subst_inst_ty isbst ty, subst_inst_dirt isbst drt)
 
+let subst_inst_constraints isbst cstrs = List.map (function
+  | TypeConstraint (ty1, ty2, pos) -> TypeConstraint (subst_inst_ty isbst ty1, subst_inst_ty isbst ty2, pos)
+  | DirtConstraint (drt1, drt2, pos) -> DirtConstraint (subst_inst_dirt isbst drt1, subst_inst_dirt isbst drt2, pos)
+  | RegionConstraint (rgn1, rgn2, pos) -> RegionConstraint (subst_inst_region isbst rgn1, subst_inst_region isbst rgn2, pos)
+  ) cstrs
+
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
 let occurs_in_ty p ty = List.mem p (let (xs, _, _) = free_params ty [] in xs)
 

@@ -130,9 +130,12 @@ and infer_let ctx cstr pos defs =
           (Print.sequence "," Print.position positions));
   let vars, drts, frshs = List.fold_left
     (fun (vs, drts, frshs) (p,c) ->
-      let (frsh, tc, drt) = infer_comp ctx cstr c in
+      let cstr_c = ref [] in
+      let (frsh, tc, drt) = infer_comp ctx cstr_c c in
       let isbst = T.instance_refreshing_subst frsh in
+      List.iter (function (T.Instance_Param i, None) -> Print.debug "%d -> /" i | (T.Instance_Param i, Some (T.Instance_Param j)) -> Print.debug "%d -> %d" i j) isbst;
       let (frsh, tc, drt) = Type.subst_inst_dirty isbst (frsh, tc, drt) in
+      cstr := Type.subst_inst_constraints isbst !cstr_c  @ !cstr;
       let ws, tp = infer_pattern cstr p in
       add_ty_constraint cstr (snd c) tc tp;
       match C.find_duplicate (List.map fst ws) (List.map fst vs) with
@@ -277,9 +280,16 @@ and infer_comp ctx cstr cp =
       | Core.Apply (e1, e2) ->
           let t1 = infer_expr ctx cstr e1 in
           let t2 = infer_expr ctx cstr e2 in
-          let t = T.fresh_dirty () in
-          add_ty_constraint cstr pos t1 (T.Arrow (t2, t));
-          t
+          begin match t1 with
+          | T.Arrow (s1, drty) ->
+              add_ty_constraint cstr pos t2 s1;
+              drty
+          | _ ->
+              Print.debug "%t is not a function type" (Print.ty_scheme (([], [],[]), t1, []));
+              let t = T.fresh_dirty () in
+              add_ty_constraint cstr pos t1 (T.Arrow (t2, t));
+              t
+          end
 
       | Core.Value e ->
           [], infer_expr ctx cstr e, T.empty_dirt
@@ -297,6 +307,7 @@ and infer_comp ctx cstr cp =
             let t_in', t_out' = infer_abstraction ctx cstr a in
             add_ty_constraint cstr (snd e) t_in t_in';
             add_dirty_constraint cstr (snd e') t_out' t_out
+            (* XXX Collect fresh instances from all branches. *)
           in
           List.iter infer_case lst;
           t_out
