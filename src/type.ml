@@ -119,11 +119,11 @@ and subst_dirty sbst (frsh, ty, drt) =
   (frsh, subst_ty sbst ty, subst_dirt sbst drt)
 
 
-let subst_constraints sbst cstrs = List.map (function
+let subst_constraints sbst cnstrs = List.map (function
   | TypeConstraint (ty1, ty2, pos) -> TypeConstraint (subst_ty sbst ty1, subst_ty sbst ty2, pos)
   | DirtConstraint (drt1, drt2, pos) -> DirtConstraint (subst_dirt sbst drt1, subst_dirt sbst drt2, pos)
   | RegionConstraint (rgn1, rgn2, pos) -> RegionConstraint (subst_region sbst rgn1, subst_region sbst rgn2, pos)
-  ) cstrs
+  ) cnstrs
 
 (** [identity_subst] is a substitution that makes no changes. *)
 let identity_subst = { subst_ty = []; subst_dirt = []; subst_region = [] }
@@ -137,10 +137,10 @@ let compose_subst
     subst_dirt = b1 @ Common.assoc_map (subst_dirt sbst1) b2 ;
     subst_region = c1 @ Common.assoc_map (subst_region sbst1) c2 }
 
-(** [free_params ty cstrs] returns three lists of type parameters that occur in [ty].
+(** [free_params ty cnstrs] returns three lists of type parameters that occur in [ty].
     Each parameter is listed only once and in order in which it occurs when
     [ty] is displayed. *)
-let free_params ty cstrs =
+let free_params ty cnstrs =
   let (@@@) (xs, ys, zs) (us, vs, ws) = (xs @ us, ys @ vs, zs @ ws) in
   let flatten_map f lst = List.fold_left (@@@) ([], [], []) (List.map f lst) in
   let rec free_ty = function
@@ -167,7 +167,7 @@ let free_params ty cstrs =
     | DirtConstraint (drt1, drt2, pos) -> free_dirt drt1 @@@ free_dirt drt2
     | RegionConstraint (rgn1, rgn2, pos) -> free_region rgn1 @@@ free_region rgn2
   in
-  let (xs, ys, zs) = free_ty ty @@@ flatten_map free_constraint cstrs in    
+  let (xs, ys, zs) = free_ty ty @@@ flatten_map free_constraint cnstrs in    
     (Common.uniq xs, Common.uniq ys, Common.uniq zs)
 
 let instance_refreshing_subst isbst = List.map (fun i -> i, Some (fresh_instance_param ())) isbst
@@ -213,11 +213,11 @@ and subst_inst_dirty isbst (frsh, ty, drt) =
     | None -> i :: frsh) frsh [] in
   (frsh, subst_inst_ty isbst ty, subst_inst_dirt isbst drt)
 
-let subst_inst_constraints isbst cstrs = List.map (function
+let subst_inst_constraints isbst cnstrs = List.map (function
   | TypeConstraint (ty1, ty2, pos) -> TypeConstraint (subst_inst_ty isbst ty1, subst_inst_ty isbst ty2, pos)
   | DirtConstraint (drt1, drt2, pos) -> DirtConstraint (subst_inst_dirt isbst drt1, subst_inst_dirt isbst drt2, pos)
   | RegionConstraint (rgn1, rgn2, pos) -> RegionConstraint (subst_inst_region isbst rgn1, subst_inst_region isbst rgn2, pos)
-  ) cstrs
+  ) cnstrs
 
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
 let occurs_in_ty p ty = List.mem p (let (xs, _, _) = free_params ty [] in xs)
@@ -248,22 +248,23 @@ let refreshing_subst (ps, qs, rs) =
 
 (** [refresh (ps,qs,rs) ty] replaces the polymorphic parameters [ps,qs,rs] in [ty] with fresh
     parameters. It returns the  *)
-let refresh params ty cstrs =
+let refresh params ty cnstrs =
   let params', sbst = refreshing_subst params in
-    params', subst_ty sbst ty, subst_constraints sbst cstrs
+    params', subst_ty sbst ty, subst_constraints sbst cnstrs
 
 let disable_beautify = ref false
 
 (** [beautify ty] returns a sequential replacement of all type parameters in
     [ty] that can be used for its pretty printing. *)
-let beautify ((ps, ds, rs), ty, cstrs) =
+let beautify ((ps, ds, rs), ty, cnstrs) =
   if !disable_beautify then
-    ((ps, ds, rs), ty, cstrs)
+    ((ps, ds, rs), ty, cnstrs)
   else
-    let next_ty_param = Common.fresh "beautify_ty" in
-    let next_dirt_param = Common.fresh "beautify_dirt" in
-    let next_region_param = Common.fresh "beautify_region" in
-    let (xs, ys, zs) = free_params ty cstrs in
+    let next_ty_param = Common.fresh "beautify_ty"
+    and next_dirt_param =  Common.fresh "beautify_dirt"
+    and next_region_param = Common.fresh "beautify_region"
+    in
+    let (xs, ys, zs) = free_params ty cnstrs in
     let xs_map = List.map (fun p -> (p, Ty_Param (next_ty_param ()))) xs
     and ys_map = List.map (fun q -> (q, Dirt_Param (next_dirt_param ()))) ys
     and zs_map = List.map (fun r -> (r, Region_Param (next_region_param ()))) zs in
@@ -276,17 +277,16 @@ let beautify ((ps, ds, rs), ty, cstrs) =
         subst_dirt = Common.assoc_map (fun q' -> DirtParam q') ys_map ;
         subst_region = Common.assoc_map (fun r' -> RegionParam r') zs_map }
     in
-    (subst ps xs_map, subst ds ys_map, subst rs zs_map), subst_ty sbst ty, subst_constraints sbst cstrs
+    (subst ps xs_map, subst ds ys_map, subst rs zs_map), subst_ty sbst ty, subst_constraints sbst cnstrs
 
-
-let beautify_dirty (params, ty, cstrs) drt =
-  match beautify (params, Arrow (Tuple [], ([], ty, drt)), cstrs) with
-  | (ps, Arrow (Tuple [], ([], ty, drt)), cstrs) -> (ps, ty, cstrs), drt
+let beautify_dirty (params, ty, cnstrs) drt =
+  match beautify (params, Arrow (Tuple [], ([], ty, drt)), cnstrs) with
+  | (ps, Arrow (Tuple [], ([], ty, drt)), cnstrs) -> (ps, ty, cnstrs), drt
   | _ -> assert false
 
 
-let beautify2 ty1 ty2 cstrs =
-  match beautify (([], [], []), Tuple [ty1; ty2], cstrs) with
-  | (ps, Tuple [ty1; ty2], cstrs) -> (ps, ty1, cstrs), (ps, ty2, cstrs)
+let beautify2 ty1 ty2 =
+  match beautify (([], [], []), Tuple [ty1; ty2], []) with
+  | (ps, Tuple [ty1; ty2], cnstrs) -> (ps, ty1), (ps, ty2)
   | _ -> assert false
 

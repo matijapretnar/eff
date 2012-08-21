@@ -1,8 +1,6 @@
 (** [unify sbst pos t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)
 
-let empty_constraint = []
-
 let for_parameters add pos ps lst1 lst2 =
   List.iter2 (fun (_, (cov, contra)) (ty1, ty2) ->
     begin if cov then
@@ -12,42 +10,43 @@ let for_parameters add pos ps lst1 lst2 =
       add pos ty2 ty1
     end) ps (List.combine lst1 lst2)
 
+
+let empty_constraint = []
+
+let constraints_of_graph g =
+  let lst = Constr.fold_ty (fun p1 p2 pos lst -> (Type.TypeConstraint (Type.TyParam p1, Type.TyParam p2, pos)) :: lst) g [] in
+  let lst = Constr.fold_dirt (fun d1 d2 pos lst -> (Type.DirtConstraint (d1, d2, pos)) :: lst) g lst in
+  Constr.fold_region (fun r1 r2 pos lst -> (Type.RegionConstraint (r1, r2, pos)) :: lst) g lst
+
 let solve initial_cnstrs =
   let sbst = ref Type.identity_subst in
   (* We keep a list of "final" constraints which are known not to
      generate new constraints, and a list of constraints which still
      need to be resolved. *)
-  let cnstr_final = ref empty_constraint in
-  let cnstr_queue = ref initial_cnstrs in
+  let graph = Constr.empty in
+  let queue = ref initial_cnstrs in
   let add_constraint = function
-    | Type.TypeConstraint (t1, t2, _) as cnstr ->
+    | Type.TypeConstraint (t1, t2, pos) as cnstr ->
       if t1 <> t2 then
         begin match t1, t2 with
-          | Type.TyParam _, Type.TyParam _ -> cnstr_final := cnstr :: !cnstr_final
-          | _, _ -> cnstr_queue := cnstr :: !cnstr_queue
+          | Type.TyParam p1, Type.TyParam p2 -> Constr.add_ty_edge graph p1 p2 pos
+          | _, _ -> queue := cnstr :: !queue
         end
-    | Type.DirtConstraint (d1, d2, _) as cnstr ->
-      if d1 <> d2 then cnstr_final := cnstr :: !cnstr_final
-    | Type.RegionConstraint (r1, r2, _) as cnstr ->
-      if r1 <> r2 then cnstr_final := cnstr :: !cnstr_final
+    | Type.DirtConstraint (d1, d2, pos) ->
+      if d1 <> d2 then Constr.add_dirt_edge graph d1 d2 pos
+    | Type.RegionConstraint (r1, r2, pos) ->
+      if r1 <> r2 then Constr.add_region_edge graph r1 r2 pos
   in
   let add_ty_constraint pos t1 t2 = add_constraint (Type.TypeConstraint (t1, t2, pos)) in
   let add_region_constraint pos r1 r2 = add_constraint (Type.RegionConstraint (r1, r2, pos)) in
   let add_dirt_constraint pos d1 d2 = add_constraint (Type.DirtConstraint (d1, d2, pos)) in
   let add_substitution p t =
-    let lst = !cnstr_final in
-      cnstr_final := [] ;
-      List.iter
-        (function
-          | (Type.DirtConstraint _ | Type.RegionConstraint _) as cnstr -> add_constraint cnstr
-          | Type.TypeConstraint (Type.TyParam q1, Type.TyParam q2, pos) as cnstr ->
-            if p <> q1 && p <> q2
-            then add_constraint cnstr
-            else cnstr_queue := cnstr :: !cnstr_queue (* Unify is going to perform the substitution. *)
-          | Type.TypeConstraint _ ->
-            assert false (* XXX Adapt Type.constraint so that only inequalities between type parameters are expressible. *)
-        )
-        lst ;
+    (* When parameter [p] gets substituted by type [t] the vertex
+       [p] must be removed from the graph, and each edge becomes
+       a constraint in the queue. *)
+    let (pred, succ) = Constr.remove_ty graph p in
+      List.iter (fun (q, pos) -> add_ty_constraint pos (Type.TyParam q) (Type.TyParam p)) pred ;
+      List.iter (fun (q, pos) -> add_ty_constraint pos (Type.TyParam p) (Type.TyParam q)) succ ;
       sbst := Type.compose_subst {Type.identity_subst with Type.subst_ty = [(p, t)]} !sbst
   in
   let unify pos t1 t2 =
@@ -62,12 +61,11 @@ let solve initial_cnstrs =
     | (Type.TyParam p, t) ->
         if Type.occurs_in_ty p t
         then
-          (* XXX Why do we we pass !cntr_final if it does not get printed? *)
-          let t1, t2 = Type.beautify2 t1 t2 !cnstr_final in
+          let (ps1, t1), (ps2, t2) = Type.beautify2 t1 t2 in
           Error.typing ~pos
             "This expression has a forbidden cylclic type %t = %t."
-            (Print.ty_scheme t1)
-            (Print.ty_scheme t2)
+            (Print.ty ps1 t1)
+            (Print.ty ps2 t2)
         else
           let (_, t', _) = Type.refresh (Type.free_params t []) t [] in
           add_substitution p t' ;
@@ -76,12 +74,11 @@ let solve initial_cnstrs =
     | (t, Type.TyParam p) ->
         if Type.occurs_in_ty p t
         then
-          (* XXX Why do we we pass !cntr_final if it does not get printed? *)
-          let t1, t2 = Type.beautify2 t1 t2 !cnstr_final in
+          let (ps1, t1), (ps2, t2) = Type.beautify2 t1 t2 in
           Error.typing ~pos
             "This expression has a forbidden cylclic type %t = %t."
-            (Print.ty_scheme t1)
-            (Print.ty_scheme t2)
+            (Print.ty ps1 t1)
+            (Print.ty ps2 t2)
         else
           let (_, t', _) = Type.refresh (Type.free_params t []) t [] in
           add_substitution p t' ;
@@ -137,11 +134,11 @@ let solve initial_cnstrs =
         add_ty_constraint pos h1.Type.finally h2.Type.finally
 
     | (t1, t2) ->
-        (* XXX Why do we pass !cnstr_final if it does not get printed? *)
-        let t1, t2 = Type.beautify2 t1 t2 !cnstr_final in
+      let (ps1, t1), (ps2, t2) = Type.beautify2 t1 t2 in
         Error.typing ~pos
           "This expression has type %t but it should have type %t."
-          (Print.ty_scheme t1) (Print.ty_scheme t2)
+          (Print.ty ps1 t1)
+          (Print.ty ps2 t2)
 
   and unify_dirt pos drt1 drt2 =
     add_dirt_constraint pos drt1 drt2
@@ -152,10 +149,10 @@ let solve initial_cnstrs =
   in
 
   let rec loop () =
-    match !cnstr_queue with
-      | [] -> !sbst, Common.uniq !cnstr_final
+    match !queue with
+      | [] -> !sbst, constraints_of_graph graph
       | cnstr :: cnstrs ->
-        cnstr_queue := cnstrs ;
+        queue := cnstrs ;
         begin match cnstr with
           | Type.TypeConstraint (t1, t2, pos) -> unify pos t1 t2
           | Type.DirtConstraint (drt1, drt2, pos) -> unify_dirt pos drt1 drt2;

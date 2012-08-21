@@ -84,7 +84,9 @@ let dirt ((_, ds, _) as poly) drt ppf =
     | Type.DirtAtom (rgn, op) -> print ppf "%t#%s" (region poly rgn) op
 
 let fresh_instances frsh ppf =
-  sequence "" (fun (Type.Instance_Param i) ppf -> print ppf "%d" i) frsh ppf
+  match frsh with
+    | [] -> print ppf ""
+    | frsh ->  print ppf "new %t." (sequence "" (fun (Type.Instance_Param i) ppf -> print ppf "%d" i) frsh)
 
 let rec ty ((ps, _, _) as poly) t ppf =
   let rec ty ?max_level t ppf =
@@ -92,7 +94,7 @@ let rec ty ((ps, _, _) as poly) t ppf =
     match t with
     (* XXX Should we print which instances are fresh? *)
     | Type.Arrow (t1, (frsh, t2, drt)) ->
-        print ~at_level:5 "@[<h>%t ->@ new %t. %t[%t]@]"
+        print ~at_level:5 "@[<h>%t ->@ %t %t[%t]@]"
         (ty ~max_level:4 t1)
         (fresh_instances frsh)
         (ty ~max_level:4 t2)
@@ -129,7 +131,6 @@ let constraints poly cstrs ppf =
   | Type.RegionConstraint (rgn1, rgn2, pos) -> print ppf "%t <= %t" (region poly rgn1) (region poly rgn2)
   in
   sequence ", " constr cstrs ppf
-
 
 let ty_scheme (poly, t, cstrs) ppf =
   print ppf "%t {%t}" (ty poly t) (constraints poly cstrs)

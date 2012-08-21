@@ -151,7 +151,7 @@ let rec exec_cmd interactive (ctx, env) e =
       let c = Desugar.computation c in
       let ctx, tysch, drt, frsh = infer_top_comp ctx c in
       let v = Eval.run env c in
-      if interactive then Format.printf "@[- : new %t. %t = %t@]@."
+      if interactive then Format.printf "@[- : %t %t = %t@]@."
         (Print.fresh_instances frsh)
         (Print.beautified_dirty_scheme tysch drt)
         (Print.value v);

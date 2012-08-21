@@ -14,7 +14,7 @@ let extend_ty ctx x ty = (x, (([],[],[]), ty, [])) :: ctx
 
 let subst_ctx ctx sbst =
   let subst_ty_scheme (ps, ty, cstrs) =
-    assert (List.for_all (fun (p, _) -> not (List.mem p (let ps,_,_= ps in ps))) sbst.Type.subst_ty);
+   assert (List.for_all (fun (p, _) -> not (List.mem p (let ps,_,_= ps in ps))) sbst.Type.subst_ty);
     (ps, Type.subst_ty sbst ty, Type.subst_constraints sbst cstrs)
   in
   Common.assoc_map subst_ty_scheme ctx
