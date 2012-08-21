@@ -133,7 +133,6 @@ and infer_let ctx cstr pos defs =
       let cstr_c = ref [] in
       let (frsh, tc, drt) = infer_comp ctx cstr_c c in
       let isbst = T.instance_refreshing_subst frsh in
-      List.iter (function (T.Instance_Param i, None) -> Print.debug "%d -> /" i | (T.Instance_Param i, Some (T.Instance_Param j)) -> Print.debug "%d -> %d" i j) isbst;
       let (frsh, tc, drt) = Type.subst_inst_dirty isbst (frsh, tc, drt) in
       cstr := Type.subst_inst_constraints isbst !cstr_c  @ !cstr;
       let ws, tp = infer_pattern cstr p in
@@ -281,11 +280,11 @@ and infer_comp ctx cstr cp =
           let t1 = infer_expr ctx cstr e1 in
           let t2 = infer_expr ctx cstr e2 in
           begin match t1 with
+          (* XXX Should we use this dirty hack? *)
           | T.Arrow (s1, drty) ->
               add_ty_constraint cstr pos t2 s1;
               drty
           | _ ->
-              Print.debug "%t is not a function type" (Print.ty_scheme (([], [],[]), t1, []));
               let t = T.fresh_dirty () in
               add_ty_constraint cstr pos t1 (T.Arrow (t2, t));
               t
@@ -302,15 +301,24 @@ and infer_comp ctx cstr cp =
 
       | Core.Match (e, lst) ->
           let t_in = infer_expr ctx cstr e in
-          let t_out = T.fresh_dirty () in
+          let t_out = T.fresh_ty () in
+          let drt_out = T.fresh_dirt () in
           let infer_case ((p, e') as a) =
-            let t_in', t_out' = infer_abstraction ctx cstr a in
+            let cstr_case = ref [] in
+            let t_in', (frsh_out, t_out', drt_out') = infer_abstraction ctx cstr_case a in
+            let isbst = Type.instance_refreshing_subst frsh_out in
+            let t_in' = Type.subst_inst_ty isbst t_in' in
+            let (frsh_out, t_out', drt_out') = Type.subst_inst_dirty isbst (frsh_out, t_out', drt_out') in
+            let cstr_case = Type.subst_inst_constraints isbst !cstr_case in
+            cstr := cstr_case @ !cstr;
             add_ty_constraint cstr (snd e) t_in t_in';
-            add_dirty_constraint cstr (snd e') t_out' t_out
+            add_ty_constraint cstr (snd e') t_out' t_out;
+            add_dirt_constraint cstr (snd e') drt_out' drt_out;
+            frsh_out
             (* XXX Collect fresh instances from all branches. *)
           in
-          List.iter infer_case lst;
-          t_out
+          let frshs = Common.flatten_map infer_case lst in
+          frshs, t_out, drt_out
               
       | Core.New (eff, r) ->
         begin match Tctx.fresh_tydef ~pos:pos eff with

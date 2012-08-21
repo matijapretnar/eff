@@ -86,6 +86,7 @@ let solve initial_cnstrs =
           unify pos t t'
 
     | (Type.Arrow (u1, (lst1, v1, drt1)), Type.Arrow (u2, (lst2, v2, drt2))) ->
+        Print.debug "Unifying %t and %t" (Print.fresh_instances lst1) (Print.fresh_instances lst2);
         (* XXX How do we unify fresh instances? *)
         unify pos v1 v2;
         unify pos u2 u1;

@@ -139,20 +139,26 @@ let infer_top_comp ctx c =
   let ctx = Ctx.subst_ctx ctx sbst in
   let remaining = Type.subst_constraints sbst remaining in
   let (frshs, ty, drt) = Type.subst_dirty sbst dirty in
+  let isbst = Type.instance_refreshing_subst frshs in
+  let (frshs, ty, drt) = Type.subst_inst_dirty isbst (frshs, ty, drt) in
+  let remaining = Type.subst_inst_constraints isbst remaining in
   (* XXX What to do about the fresh instances? *)
-  ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty remaining, drt
+  ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty remaining, drt, frshs
 
 let rec exec_cmd interactive (ctx, env) e =
   match e with
   | Syntax.Term c ->
       let c = Desugar.computation c in
-      let ctx, tysch, drt = infer_top_comp ctx c in
+      let ctx, tysch, drt, frsh = infer_top_comp ctx c in
       let v = Eval.run env c in
-      if interactive then Format.printf "@[- : %t = %t@]@." (Print.beautified_dirty_scheme tysch drt) (Print.value v);
+      if interactive then Format.printf "@[- : new %t. %t = %t@]@."
+        (Print.fresh_instances frsh)
+        (Print.beautified_dirty_scheme tysch drt)
+        (Print.value v);
       (ctx, env)
   | Syntax.TypeOf c ->
       let c = Desugar.computation c in
-      let ctx, tysch, drt = infer_top_comp ctx c in
+      let ctx, tysch, drt, frsh = infer_top_comp ctx c in
       Format.printf "@[- : %t@]@." (Print.beautified_dirty_scheme tysch drt);
       (ctx, env)
   | Syntax.Reset ->

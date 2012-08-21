@@ -209,7 +209,8 @@ and subst_inst_dirty isbst (frsh, ty, drt) =
   let frsh = List.fold_right (fun i frsh ->
     match Common.lookup i isbst with
     | Some (Some j) -> j :: frsh
-    | _ -> frsh) frsh [] in
+    | Some None -> frsh
+    | None -> i :: frsh) frsh [] in
   (frsh, subst_inst_ty isbst ty, subst_inst_dirt isbst drt)
 
 let subst_inst_constraints isbst cstrs = List.map (function

@@ -83,15 +83,18 @@ let dirt ((_, ds, _) as poly) drt ppf =
           print ppf "%sdrt%i" c k
     | Type.DirtAtom (rgn, op) -> print ppf "%t#%s" (region poly rgn) op
 
+let fresh_instances frsh ppf =
+  sequence "" (fun (Type.Instance_Param i) ppf -> print ppf "%d" i) frsh ppf
+
 let rec ty ((ps, _, _) as poly) t ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = print ?max_level ?at_level ppf in
     match t with
     (* XXX Should we print which instances are fresh? *)
     | Type.Arrow (t1, (frsh, t2, drt)) ->
-        print ~at_level:5 "@[<h>%t ->@ fresh %t. %t[%t]@]"
+        print ~at_level:5 "@[<h>%t ->@ new %t. %t[%t]@]"
         (ty ~max_level:4 t1)
-        (sequence "" (fun (Type.Instance_Param i) ppf -> print "%d" i) frsh)
+        (fresh_instances frsh)
         (ty ~max_level:4 t2)
         (dirt poly drt)
         (* print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2) *)
