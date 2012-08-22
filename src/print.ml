@@ -88,6 +88,13 @@ let fresh_instances frsh ppf =
     | [] -> print ppf ""
     | frsh ->  print ppf "new %t." (sequence "" (fun (Type.Instance_Param i) ppf -> print ppf "%d" i) frsh)
 
+let ty_param ps p ppf =
+  let (Type.Ty_Param k) = p in
+  let c = (if List.mem p ps then "'" else "'_") in
+    if 0 <= k && k <= 25
+    then print ppf "%s%c" c (char_of_int (k + int_of_char 'a'))
+    else print ppf "%sty%i" c (k - 25)
+
 let rec ty ((ps, _, _) as poly) t ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = print ?max_level ?at_level ppf in
@@ -113,11 +120,7 @@ let rec ty ((ps, _, _) as poly) t ppf =
         | [s] -> print ~at_level:1 "%t %s%t" (ty ~max_level:1 s) t (region poly rgn)
         | ts -> print ~at_level:1 "(%t) %s%t" (sequence "," ty ts) t (region poly rgn)
       end
-    | Type.TyParam ((Type.Ty_Param k) as p) ->
-        let c = (if List.mem p ps then "'" else "'_") in
-        if 0 <= k && k <= 25
-        then print "%s%c" c (char_of_int (k + int_of_char 'a'))
-        else print "%sty%i" c (k - 25)
+    | Type.TyParam p -> ty_param ps p ppf
     | Type.Tuple [] -> print "unit"
     | Type.Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (sequence " *" (ty ~max_level:1) ts)
     | Type.Handler {Type.value=t1; Type.finally=t2} ->

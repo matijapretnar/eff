@@ -150,7 +150,30 @@ let solve initial_cnstrs =
 
   let rec loop () =
     match !queue with
-      | [] -> !sbst, constraints_of_graph graph
+      | [] ->
+        Print.debug "COMPUTED GRAPH@.%t" (Constr.print graph) ;
+        let ty_lst = Constr.compress_ty graph in
+          Print.debug "SUBSTITUTION FOR ty VERTICES" ;
+          List.iter (fun (p,q) -> Print.debug "%t -> %t" (Print.ty_param [] p) (Print.ty_param [] q)) ty_lst ;
+        let region_lst = Constr.compress_region graph in
+        let dirt_lst = Constr.compress_dirt graph in
+        Print.debug "COMPRESSED GRAPH@.%t" (Constr.print graph) ;
+        let s =
+          { Type.subst_ty =
+              List.map (fun (p,q) -> (p, Type.TyParam q)) ty_lst;
+            Type.subst_region =
+              List.map (function
+                         | Type.RegionParam r, rgn -> (r, rgn)
+                         | _, _ -> assert false)
+                region_lst;
+            Type.subst_dirt =
+              List.map (function
+                         | Type.DirtParam d, drt -> (d, drt)
+                         | _, _ -> assert false)
+                dirt_lst
+          }
+        in
+          Type.compose_subst s !sbst, constraints_of_graph graph
       | cnstr :: cnstrs ->
         queue := cnstrs ;
         begin match cnstr with

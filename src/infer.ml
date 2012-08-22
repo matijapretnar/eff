@@ -147,7 +147,7 @@ and infer_let ctx cstr pos defs =
     ([], [], []) defs
   in
   let sbst, remaining = Unify.solve !cstr in
-  let remaining = Type.subst_constraints sbst remaining in
+  (* XXX is not needed? let remaining = Type.subst_constraints sbst remaining in*)
   let ctx = Ctx.subst_ctx ctx sbst in
   let vars = Common.assoc_map (fun (poly, ty) -> Ctx.generalize ctx poly (T.subst_ty sbst ty) remaining) vars in
   let ctx = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme) vars ctx
