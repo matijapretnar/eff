@@ -136,7 +136,7 @@ struct
         )
         grph G.empty
     in
-      grph, lst
+      grph, List.filter (fun (x, y) -> x <> y) lst
 end
 
 module Ty = Make(struct
