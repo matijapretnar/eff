@@ -36,6 +36,9 @@ sig
 
   (** Compress arcs of variables in a graph. Ok, we know this comment is cryptic. *)
   val compress : (elt -> bool) -> t -> t * (elt * elt) list
+
+  (** Create a transitive closure of a graph.  *)
+  val transitive_closure : t -> t
 end =
 struct
   type elt = Vertex.t
@@ -137,6 +140,20 @@ struct
         grph G.empty
     in
       grph, List.filter (fun (x, y) -> x <> y) lst
+
+  let transitive_closure grph =
+    let add_edge x y pos closure =
+      let (inx, _) = get x closure
+      and (_, outy) = get y closure
+      in
+      let closure =
+        S.fold (fun (x', _) grph -> add_edge x' y pos grph) inx closure in
+      let closure =
+        S.fold (fun (y', _) grph -> add_edge x y' pos grph) outy closure in
+      add_edge x y pos closure
+    in
+    fold_edges add_edge grph G.empty
+
 end
 
 module Ty = Make(struct
@@ -186,6 +203,12 @@ let remove_ty g x =
 let fold_ty f g acc = Ty.fold_edges f g.ty_graph acc
 let fold_region f g acc = Region.fold_edges f g.region_graph acc
 let fold_dirt f g acc = Dirt.fold_edges f g.dirt_graph acc
+
+let transitive_closure grph = {
+  ty_graph = Ty.transitive_closure grph.ty_graph;
+  dirt_graph = Dirt.transitive_closure grph.dirt_graph;
+  region_graph = Region.transitive_closure grph.region_graph
+}
 
 let compress_ty grph =
   let g, lst = Ty.compress (fun _ -> true) grph.ty_graph in
