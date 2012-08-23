@@ -23,15 +23,11 @@ let solve initial_cnstrs =
   (* We keep a list of "final" constraints which are known not to
      generate new constraints, and a list of constraints which still
      need to be resolved. *)
-  let graph = Constr.empty in
+  let graph = Constr.empty () in
   let queue = ref initial_cnstrs in
   let add_constraint = function
     | Type.TypeConstraint (t1, t2, pos) as cnstr ->
-      if t1 <> t2 then
-        begin match t1, t2 with
-          | Type.TyParam p1, Type.TyParam p2 -> Constr.add_ty_edge graph p1 p2 pos
-          | _, _ -> queue := cnstr :: !queue
-        end
+      if t1 <> t2 then queue := cnstr :: !queue
     | Type.DirtConstraint (d1, d2, pos) ->
       if d1 <> d2 then Constr.add_dirt_edge graph d1 d2 pos
     | Type.RegionConstraint (r1, r2, pos) ->
@@ -56,7 +52,8 @@ let solve initial_cnstrs =
 
     | (t1, t2) when t1 = t2 -> ()
 
-    | (Type.TyParam p, Type.TyParam q) -> add_ty_constraint pos t1 t2
+    | (Type.TyParam p, Type.TyParam q) ->
+        Constr.add_ty_edge graph p q pos
 
     | (Type.TyParam p, t) ->
         if Type.occurs_in_ty p t
