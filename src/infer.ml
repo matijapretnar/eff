@@ -5,7 +5,9 @@ let warn_implicit_sequencing = ref false;;
 
 let disable_typing = ref false;;
 
-(* We perform type inference int the style of Standard ML 97, i.e.,
+(* XXX: Obsolete comments, fix.
+
+   We perform type inference int the style of Standard ML 97, i.e.,
    Hindley-Milner polymorphism with value restriction. Throughout, we work with
    a reference to a type substitution, usually called [cstr], in which we
    collect the results of unification. That is, we perform unification as early
@@ -41,10 +43,9 @@ let add_region_constraint cstr pos rgn1 rgn2 =
   cstr := Type.RegionConstraint (rgn1, rgn2, pos) :: !cstr
 
 let add_dirty_constraint cstr pos (lst1, t1, drt1) (lst2, t2, drt2) =
-  add_fresh_constraint cstr pos lst1 lst2;
+  add_fresh_constraint cstr pos lst1 lst2; (* XXX very fishy *)
   add_ty_constraint cstr pos t1 t2;
   add_dirt_constraint cstr pos drt1 drt2
-
 
 let ty_of_const = function
   | Common.Integer _ -> Type.int_ty
@@ -52,9 +53,9 @@ let ty_of_const = function
   | Common.Boolean _ -> Type.bool_ty
   | Common.Float _ -> Type.float_ty
 
-(* [infer_pattern cstr pp] infers the type of pattern [pp]. It returns the list of
-   pattern variables with their types, which are all guaranteed to be [Type.Meta]'s, together
-   with the type of the pattern. *)
+(* [infer_pattern cstr pp] infers the type of pattern [pp]. It returns the list of pattern
+   variables with their types, which are all guaranteed to be fresh parameters, together
+   with the type of the whole pattern. *)
 let infer_pattern cstr pp =
   if not (Pattern.linear_pattern pp) then
     Error.typing ~pos:(snd pp) "Variables in a pattern must be distinct." ;
@@ -62,11 +63,14 @@ let infer_pattern cstr pp =
   let rec infer (p, pos) =
     match p with
       | Pattern.Var x ->
-          let t = (if !disable_typing then T.universal_ty else T.fresh_ty ()) in
+        (* XXX Why are we looking at disable_typing here? Probably not needed. If
+           it is needed, why don't we return [T.universal_ty] for types of constants?
+        *)
+        let t = (if !disable_typing then T.universal_ty else T.fresh_ty ()) in
           vars := (x, t) :: !vars;
           t
       | Pattern.As (p, x) ->
-          let t = infer p in
+        let t = infer p in
           vars := (x, t) :: !vars;
           t
       | Pattern.Nonbinding -> T.fresh_ty ()
@@ -74,37 +78,37 @@ let infer_pattern cstr pp =
       | Pattern.Tuple ps -> T.Tuple (C.map infer ps)
       | Pattern.Record [] -> assert false
       | Pattern.Record (((fld, _) :: _) as lst) ->
-          (match Tctx.infer_field fld with
-            | None -> Error.typing ~pos "Unbound record field label %s" fld
-            | Some (ty, (t, us)) ->
-              let constrain_record_pattern (fld, p) =
-                begin match C.lookup fld us with
-                  | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s." fld t
-                  | Some u -> add_ty_constraint cstr pos (infer p) u
-                end
-              in
-                List.iter constrain_record_pattern lst;
-                ty)
-      | Pattern.Variant (lbl, p) ->
-          (match Tctx.infer_variant lbl with
-            | None -> Error.typing ~pos "Unbound constructor %s" lbl
-            | Some (ty, u) ->
-              begin match p, u with
-                | None, None -> ()
-                | Some p, Some u -> add_ty_constraint cstr pos (infer p) u
-                | None, Some _ -> Error.typing ~pos "Constructor %s should be applied to an argument." lbl
-                | Some _, None -> Error.typing ~pos "Constructor %s cannot be applied to an argument." lbl
-              end;
+        (match Tctx.infer_field fld with
+          | None -> Error.typing ~pos "Unbound record field label %s" fld
+          | Some (ty, (t, us)) ->
+            let constrain_record_pattern (fld, p) =
+              begin match C.lookup fld us with
+                | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s." fld t
+                | Some u -> add_ty_constraint cstr pos (infer p) u
+              end
+            in
+              List.iter constrain_record_pattern lst;
               ty)
+      | Pattern.Variant (lbl, p) ->
+        (match Tctx.infer_variant lbl with
+          | None -> Error.typing ~pos "Unbound constructor %s" lbl
+          | Some (ty, u) ->
+            begin match p, u with
+              | None, None -> ()
+              | Some p, Some u -> add_ty_constraint cstr pos (infer p) u
+              | None, Some _ -> Error.typing ~pos "Constructor %s should be applied to an argument." lbl
+              | Some _, None -> Error.typing ~pos "Constructor %s cannot be applied to an argument." lbl
+            end;
+            ty)
   in
   let t = infer pp in
     !vars, t
 
 let extend_with_pattern ?(forbidden_vars=[]) ctx cstr p =
   let vars, t = infer_pattern cstr p in
-  match C.find (fun (x,_) -> List.mem_assoc x vars) forbidden_vars with
-    | Some (x,_) -> Error.typing ~pos:(snd p) "Several definitions of %s." x
-    | None -> vars, t, List.fold_right (fun (x, t) ctx -> Ctx.extend_ty ctx x t) vars ctx
+    match C.find (fun (x,_) -> List.mem_assoc x vars) forbidden_vars with
+      | Some (x,_) -> Error.typing ~pos:(snd p) "Several definitions of %s." x
+      | None -> vars, t, List.fold_right (fun (x, t) ctx -> Ctx.extend_ty ctx x t) vars ctx
 
 let rec infer_abstraction ctx cstr (p, c) =
   let _, t1, ctx = extend_with_pattern ctx cstr p in
@@ -134,16 +138,16 @@ and infer_let ctx cstr pos defs =
       let (frsh, tc, drt) = infer_comp ctx cstr_c c in
       let isbst = T.instance_refreshing_subst frsh in
       let (frsh, tc, drt) = Type.subst_inst_dirty isbst (frsh, tc, drt) in
-      cstr := Type.subst_inst_constraints isbst !cstr_c  @ !cstr;
-      let ws, tp = infer_pattern cstr p in
-      add_ty_constraint cstr (snd c) tc tp;
-      match C.find_duplicate (List.map fst ws) (List.map fst vs) with
-        | Some x -> Error.typing ~pos "Several definitions of %s." x
-        | None ->
-            let poly = nonexpansive (fst c) in
-            let ws = Common.assoc_map (fun ty -> (poly, ty)) ws
-          in
-          List.rev ws @ vs, drt :: drts, frsh @ frshs)
+        cstr := Type.subst_inst_constraints isbst !cstr_c  @ !cstr;
+        let ws, tp = infer_pattern cstr p in
+          add_ty_constraint cstr (snd c) tc tp;
+          match C.find_duplicate (List.map fst ws) (List.map fst vs) with
+            | Some x -> Error.typing ~pos "Several definitions of %s." x
+            | None ->
+              let poly = nonexpansive (fst c) in
+              let ws = Common.assoc_map (fun ty -> (poly, ty)) ws
+              in
+                List.rev ws @ vs, drt :: drts, frsh @ frshs)
     ([], [], []) defs
   in
   let sbst, remaining = Unify.solve !cstr in
