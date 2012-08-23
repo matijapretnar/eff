@@ -163,7 +163,7 @@ type t = {
   mutable dirt_graph : Dirt.t
 }
 
-let empty = {
+let empty () = {
   ty_graph = Ty.empty;
   region_graph = Region.empty;
   dirt_graph = Dirt.empty

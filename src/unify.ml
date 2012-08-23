@@ -23,7 +23,7 @@ let solve initial_cnstrs =
   (* We keep a list of "final" constraints which are known not to
      generate new constraints, and a list of constraints which still
      need to be resolved. *)
-  let graph = Constr.empty in
+  let graph = Constr.empty () in
   let queue = ref initial_cnstrs in
   let add_constraint = function
     | Type.TypeConstraint (t1, t2, pos) as cnstr ->
