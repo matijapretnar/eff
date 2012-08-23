@@ -150,9 +150,10 @@ and infer_let ctx cstr pos defs =
   (* XXX is not needed? let remaining = Type.subst_constraints sbst remaining in*)
   let ctx = Ctx.subst_ctx ctx sbst in
   let vars = Common.assoc_map (fun (poly, ty) ->
+                                 let ty = T.subst_ty sbst ty in
                                  let remaining = Unify.garbage_collect (Type.pos_neg_params ty) remaining in
                                  let cnstr = Unify.constraints_of_graph remaining in
-                                  Ctx.generalize ctx poly (T.subst_ty sbst ty) cnstr) vars in
+                                  Ctx.generalize ctx poly ty cnstr) vars in
   let ctx = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme) vars ctx
   in
     vars, drts, frshs, ctx
@@ -178,9 +179,10 @@ and infer_let_rec ctx cstr pos defs =
     lst;
   let sbst, remaining = Unify.solve !cstr in
   let vars = Common.assoc_map (fun ty ->
+                                 let ty = T.subst_ty sbst ty in
                                  let remaining = Unify.garbage_collect (Type.pos_neg_params ty) remaining in
                                  let cnstr = Unify.constraints_of_graph remaining in
-                                 Ctx.generalize ctx true (T.subst_ty sbst ty) cnstr) vars in
+                                 Ctx.generalize ctx true ty cnstr) vars in
   let ctx = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme) vars ctx
   in
     vars, ctx
