@@ -148,7 +148,7 @@ let solve initial_cnstrs =
   let rec loop () =
     match !queue with
       | [] ->
-        Print.debug "COMPUTED GRAPH@.%t" (Constr.print graph) ;
+(*         Print.debug "COMPUTED GRAPH@.%t" (Constr.print graph) ;
         let ty_lst = Constr.compress_ty graph in
           Print.debug "SUBSTITUTION FOR ty VERTICES" ;
           List.iter (fun (p,q) -> Print.debug "%t -> %t" (Print.ty_param [] p) (Print.ty_param [] q)) ty_lst ;
@@ -169,8 +169,8 @@ let solve initial_cnstrs =
                          | _, _ -> assert false)
                 dirt_lst
           }
-        in
-          Type.compose_subst s !sbst, constraints_of_graph graph
+        in *)
+          (* Type.compose_subst s  *)!sbst, graph
       | cnstr :: cnstrs ->
         queue := cnstrs ;
         begin match cnstr with
@@ -181,3 +181,18 @@ let solve initial_cnstrs =
         loop ()
   in
     loop ()
+
+let garbage_collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) grph =
+  let ty_p p q _ = List.mem p neg_ts && List.mem q pos_ts
+  and drt_p drt1 drt2 _ =
+    match drt1, drt2 with
+    | Type.DirtEmpty, _ -> false
+    | Type.DirtParam p, Type.DirtParam q -> List.mem p neg_ds && List.mem q pos_ds
+    | _, _ -> true
+  and rgn_p rgn1 rgn2 _ =
+    match rgn1, rgn2 with
+    | Type.RegionParam p, Type.RegionParam q -> List.mem p neg_rs && List.mem q pos_rs
+    | _, Type.RegionTop -> false
+    | _, _ -> true
+  in
+  Constr.garbage_collect ty_p drt_p rgn_p grph

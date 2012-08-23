@@ -39,6 +39,9 @@ sig
 
   (** Create a transitive closure of a graph.  *)
   val transitive_closure : t -> t
+
+  (** Filter edges of the graph. *)
+  val filter_edges : (elt -> elt -> Common.position -> bool) -> t -> t
 end =
 struct
   type elt = Vertex.t
@@ -84,6 +87,9 @@ struct
 
   let fold_vertices f grph acc =
     G.fold (fun x (inx, outx) acc -> f x (S.elements inx) (S.elements outx) acc) grph acc
+
+  let filter_edges p grph =
+    fold_edges (fun x y pos acc -> if p x y pos then add_edge x y pos acc else acc) grph G.empty
 
   let compress is_var grph =
     let get_arc x0 grph =
@@ -266,3 +272,11 @@ let print_dirt {dirt_graph = grph} ppf =
 let print grph ppf =
   Print.print ppf "TYPES:@.%t@.REGIONS:@.%t@.DIRT:@.%t@." 
   (print_ty grph) (print_region grph) (print_dirt grph)
+
+let garbage_collect ty_p drt_p rgn_p grph =
+  (* grph *)
+  {
+    ty_graph = Ty.filter_edges ty_p (Ty.transitive_closure grph.ty_graph);
+    dirt_graph = Dirt.filter_edges drt_p (Dirt.transitive_closure grph.dirt_graph);
+    region_graph = Region.filter_edges rgn_p (Region.transitive_closure grph.region_graph);
+  }

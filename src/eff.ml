@@ -137,13 +137,15 @@ let infer_top_comp ctx c =
   let sbst, remaining = Unify.solve !cstr in
   Exhaust.check_comp c ;
   let ctx = Ctx.subst_ctx ctx sbst in
-  let remaining = Type.subst_constraints sbst remaining in
   let (frshs, ty, drt) = Type.subst_dirty sbst dirty in
   let isbst = Type.instance_refreshing_subst frshs in
   let (frshs, ty, drt) = Type.subst_inst_dirty isbst (frshs, ty, drt) in
-  let remaining = Type.subst_inst_constraints isbst remaining in
+  let remaining = Unify.garbage_collect (Type.pos_neg_params ty) remaining in
+  let cnstr = Unify.constraints_of_graph remaining in
+  let cnstr = Type.subst_constraints sbst cnstr in
+  let cnstr = Type.subst_inst_constraints isbst cnstr in
   (* XXX What to do about the fresh instances? *)
-  ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty remaining, drt, frshs
+  ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty cnstr, drt, frshs
 
 let rec exec_cmd interactive (ctx, env) e =
   match e with
