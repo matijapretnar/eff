@@ -381,19 +381,19 @@ and infer_comp ctx cstr cp =
           ([], T.unit_ty, drt)
 
       | Core.Handle (e1, c2) ->
-          let d = T.fresh_dirt () in
+          let ty_val, drt_handled = T.fresh_ty (), T.fresh_dirt () in
+          let [], ty_fin, drt_fin = T.fresh_dirty () in
+          let drt = T.fresh_dirt () in
+          let ty_hand = T.Handler {T.value = (ty_val, drt_handled); T.finally = ([], ty_fin, drt_fin)} in
           let t1 = infer_expr ctx cstr e1 in
-          let d_handled = T.fresh_dirt () in
           let frsh, t2, d2 = infer ctx c2 in
-          let [], t3, d3 = T.fresh_dirty () in
-          let d2_clean = T.DirtDifference (d2, d_handled) in
-          let t1' = T.Handler {T.value = (t2, d_handled); T.finally = ([], t3, d3)} in
-            add_ty_constraint cstr pos t1 t1';
-            add_dirt_constraint cstr pos d3 d;
-            add_dirt_constraint cstr pos d2_clean d;
+          add_ty_constraint cstr pos t1 ty_hand;
+          add_ty_constraint cstr pos t2 ty_val;
+          add_dirt_constraint cstr pos (T.DirtDifference (d2, drt_handled)) drt;
+          add_dirt_constraint cstr pos drt_fin drt;
             (* XXX Are instances created by c2 just passed through?
                 What about ones that are created during handling? *)
-            (frsh, t3, d)
+            (frsh, ty_fin, drt)
 
       | Core.Let (defs, c) -> 
           let _, let_drts, let_frshs, ctx = infer_let ctx cstr pos defs in
