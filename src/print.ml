@@ -79,13 +79,14 @@ let region (_, _, rs) reg ppf =
           print ppf "<%srgn%i>" c k
     | Type.RegionAtom i -> print ppf "<%t>" (instance i)
 
-let dirt ((_, ds, _) as poly) drt ppf =
+let rec dirt ((_, ds, _) as poly) drt ppf =
   match drt with
     | Type.DirtEmpty -> print ppf ""
     | Type.DirtParam ((Type.Dirt_Param k) as p) ->
         let c = (if List.mem p ds then "'" else "'_") in
           print ppf "%sdrt%i" c k
     | Type.DirtAtom (rgn, op) -> print ppf "%t#%s" (region poly rgn) op
+    | Type.DirtDifference (drt1, drt2) -> print ppf "%t - %t" (dirt poly drt1) (dirt poly drt2)
 
 let fresh_instances frsh ppf =
   match frsh with
@@ -127,8 +128,8 @@ let rec ty ((ps, _, _) as poly) t ppf =
     | Type.TyParam p -> ty_param ps p ppf
     | Type.Tuple [] -> print "unit"
     | Type.Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (sequence " *" (ty ~max_level:1) ts)
-    | Type.Handler {Type.value=t1; Type.finally=t2} ->
-        print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
+    | Type.Handler {Type.value=(t1, d1); Type.finally=(frsh, t2, d2)} ->
+        print ~at_level:4 "%t[%t] =>@ %t %t[%t]" (ty ~max_level:2 t1) (dirt poly d1) (fresh_instances frsh) (ty t2) (dirt poly d2)
   in ty t ppf
 
 let constraints poly cstrs ppf =

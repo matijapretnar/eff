@@ -472,9 +472,9 @@ defined_ty:
 
 ty:
   | t1 = ty_apply ARROW t2 = ty
-    { TyArrow (t1, t2, None) }
+    { TyArrow (t1, (t2, None)) }
   | t1 = ty_apply HARROW t2 = ty
-    { TyHandler (t1, t2) }
+    { TyHandler ((t1, None), (t2, None)) }
   | t = prod_ty
     { t }
 

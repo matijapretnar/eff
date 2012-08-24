@@ -250,12 +250,14 @@ and infer_expr ctx cstr (e,pos) =
 
     | Core.Handler {Core.operations=ops; Core.value=a_val; Core.finally=a_fin} -> 
         let t_value = T.fresh_ty () in
+        let dirt_value = T.fresh_dirt () in
         let dirt = T.fresh_dirt () in
         let t_finally = T.fresh_ty () in
         let t_yield = T.fresh_ty () in
         let constrain_operation ((e, op), a2) =
           (* XXX Correct when you know what to put instead of the fresh region .*)
-          (match Tctx.infer_operation op (T.fresh_region ()) with
+          (let rgn = T.fresh_region () in
+            match Tctx.infer_operation op rgn with
             | None -> Error.typing ~pos "Unbound operation %s in a handler" op
             | Some (ty, (t1, t2)) ->
               let u = infer_expr ctx cstr e in
@@ -266,7 +268,8 @@ and infer_expr ctx cstr (e,pos) =
                      or even require equalities. *)
                   (* XXX Think also what to do about fresh instances. *)
                   add_ty_constraint cstr pos tk (T.Arrow (t2, ([], t_yield, dirt)));
-                  add_dirty_constraint cstr pos ([], t_yield, dirt) u2)
+                  add_dirty_constraint cstr pos ([], t_yield, dirt) u2;
+                  add_dirt_constraint cstr pos (T.DirtAtom (rgn, op)) dirt_value)
         in
           List.iter constrain_operation ops;
           let (valt1, valt2) = infer_abstraction ctx cstr a_val in
@@ -275,7 +278,7 @@ and infer_expr ctx cstr (e,pos) =
             add_dirty_constraint cstr pos valt2 ([], t_yield, dirt);
             add_dirty_constraint cstr pos fint2 ([], t_finally, dirt);
             add_ty_constraint cstr pos fint1 t_yield;
-            T.Handler { T.value = t_value; T.finally = t_finally }
+            T.Handler { T.value = (t_value, dirt_value); T.finally = fint2 }
               
 (* [infer_comp ctx cstr (c,pos)] infers the type of computation [c] in context [ctx].
    It returns the list of newly introduced meta-variables and the inferred type. *)
@@ -378,14 +381,19 @@ and infer_comp ctx cstr cp =
           ([], T.unit_ty, drt)
 
       | Core.Handle (e1, c2) ->
+          let d = T.fresh_dirt () in
           let t1 = infer_expr ctx cstr e1 in
+          let d_handled = T.fresh_dirt () in
           let frsh, t2, d2 = infer ctx c2 in
-          let t3 = T.fresh_ty () in
-          let t1' = T.Handler {T.value = t2; T.finally = t3} in
-            add_ty_constraint cstr pos t1' t1;
+          let [], t3, d3 = T.fresh_dirty () in
+          let d2_clean = T.DirtDifference (d2, d_handled) in
+          let t1' = T.Handler {T.value = (t2, d_handled); T.finally = ([], t3, d3)} in
+            add_ty_constraint cstr pos t1 t1';
+            add_dirt_constraint cstr pos d3 d;
+            add_dirt_constraint cstr pos d2_clean d;
             (* XXX Are instances created by c2 just passed through?
                 What about ones that are created during handling? *)
-            (frsh, t3, d2)
+            (frsh, t3, d)
 
       | Core.Let (defs, c) -> 
           let _, let_drts, let_frshs, ctx = infer_let ctx cstr pos defs in

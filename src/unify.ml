@@ -128,9 +128,14 @@ let solve initial_cnstrs =
     | (t1, (Type.Apply _ as t2)) ->
         add_ty_constraint pos t2 t1
 
-    | (Type.Handler h1, Type.Handler h2) ->
-        add_ty_constraint pos h2.Type.value h1.Type.value;
-        add_ty_constraint pos h1.Type.finally h2.Type.finally
+    | (Type.Handler {Type.value = (vt1, vd1); Type.finally = (frsh1, ft1, fd1)},
+       Type.Handler {Type.value = (vt2, vd2); Type.finally = (frsh2, ft2, fd2)}) ->
+        add_ty_constraint pos vt2 vt1;
+        add_dirt_constraint pos vd2 vd1;
+        add_ty_constraint pos ft1 ft2;
+        add_dirt_constraint pos fd1 fd2;
+        Print.debug "Unifying %t and %t" (Print.fresh_instances frsh1) (Print.fresh_instances frsh2);
+        (* XXX How do we unify fresh instances? *)
 
     | (t1, t2) ->
       let (ps1, t1), (ps2, t2) = Type.beautify2 t1 t2 in
