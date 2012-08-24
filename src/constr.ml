@@ -36,9 +36,6 @@ sig
   (** Fold over the vertices of the graph together with their in- and out-sets. *)
   val fold_vertices : (elt -> (elt * Common.position) list -> (elt * Common.position) list -> 'a -> 'a) -> t -> 'a -> 'a
 
-  (** Compress arcs of variables in a graph. Ok, we know this comment is cryptic. *)
-  val compress : (elt -> bool) -> t -> t * (elt * elt) list
-
   (** Create a transitive closure of a graph.  *)
   val transitive_closure : t -> t
 
@@ -92,62 +89,6 @@ struct
 
   let filter_edges p grph =
     fold_edges (fun x y pos acc -> if p x y pos then add_edge x y pos acc else acc) grph G.empty
-
-  let compress is_var grph =
-    let get_arc x0 grph =
-      (* Get the predecessor arc on which [x] lives, assuming [is_var x = true]. *)
-      let rec get_arc_prec x grph =
-        let inx = in_edges x grph in
-          if S.cardinal inx <> 1
-          then [x]
-          else
-            let (y, _) = S.choose inx in
-            let is_ok = y <> x0 && is_var y && (S.cardinal (out_edges y grph) = 1) in
-            x :: (if is_ok then get_arc_prec y grph else [])
-      in
-      (* Get the successor arc on which [x] lives, assuming [is_var x = true]. *)
-      let rec get_arc_succ x grph =
-        let outx = out_edges x grph in
-        (* Print.debug "get_arc_succ %t [%t]" (Vertex.print x) (Print.sequence "" Vertex.print (List.map fst (S.elements outx))) ; *)
-          if S.cardinal outx <> 1
-          then [x]
-          else
-            let (y, _) = S.choose outx in
-            let is_ok = y <> x0 && is_var y && (S.cardinal (in_edges y grph) = 1) in
-            x :: (if is_ok then get_arc_succ y grph else [])
-      in
-        if is_var x0 then
-          let prec = List.tl (get_arc_prec x0 grph) in
-          let succ = get_arc_succ x0 grph in
-          (* Print.debug "FOUND PRECARC FROM %t: (%t)" (Vertex.print x0) (Print.sequence "<-" Vertex.print prec) ; *)
-          (* Print.debug "FOUND SUCARC FROM %t: (%t)" (Vertex.print x0) (Print.sequence "->" Vertex.print succ) ; *)
-            List.rev_append prec succ
-        else
-          [x0]
-    in
-    (* List of points to be removed (and where to reconnect edges) *)
-    let lst =
-      G.fold
-        (fun x _ lst -> 
-          if List.mem_assoc x lst then lst
-          else
-            let arc = get_arc x grph in
-            let y = List.hd arc in
-              List.fold_left (fun lst x -> (x,y) :: lst) lst arc)
-        grph []
-    in
-    let grph =
-      G.fold
-        (fun x (inx, _) grph ->
-          let y = List.assoc x lst in
-            if x <> y
-            then grph
-            else
-              S.fold (fun (z, pos) grph -> add_edge (List.assoc z lst) y pos grph) inx (add_vertex y grph)
-        )
-        grph G.empty
-    in
-      grph, List.filter (fun (x, y) -> x <> y) lst
 
   let transitive_closure grph =
     (* XXX Get a student to implement this properly *)
@@ -234,29 +175,6 @@ let transitive_closure grph = {
   dirt_graph = Dirt.transitive_closure grph.dirt_graph;
   region_graph = Region.transitive_closure grph.region_graph
 }
-
-let compress_ty grph =
-  let g, lst = Ty.compress (fun _ -> true) grph.ty_graph in
-    grph.ty_graph <- g ;
-    lst
-
-let compress_region grph =
-  let g, lst =
-    Region.compress
-      (function Type.RegionParam _ -> true | Type.RegionInstance _ | Type.RegionTop -> false)
-      grph.region_graph
-  in
-    grph.region_graph <- g ;
-    lst
-
-let compress_dirt grph =
-  let g, lst =
-    Dirt.compress
-      (function Type.DirtParam _ -> true | Type.DirtAtom _ | Type.DirtEmpty -> false)
-      grph.dirt_graph
-  in
-    grph.dirt_graph <- g ;
-    lst
 
 let print_ty {ty_graph = grph} ppf =
   Ty.fold_vertices
