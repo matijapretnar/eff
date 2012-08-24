@@ -173,7 +173,7 @@ let garbage_collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) grph =
   and rgn_p rgn1 rgn2 _ =
     match rgn1, rgn2 with
     | Type.RegionParam p, Type.RegionParam q -> List.mem p neg_rs && List.mem q pos_rs
-    | _, Type.RegionTop -> false
+    | _, Type.RegionAtom (Type.InstanceTop) -> false
     | Type.RegionParam p, _ -> List.mem p neg_rs
     | _, Type.RegionParam q -> List.mem q pos_rs
     | _, _ -> true

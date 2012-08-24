@@ -339,7 +339,7 @@ and infer_comp ctx cstr cp =
             end ;
             let instance = T.fresh_instance_param () in
             let rgn = T.fresh_region () in
-              add_region_constraint cstr pos (T.RegionInstance instance) rgn ;
+              add_region_constraint cstr pos (T.RegionAtom (T.InstanceParam instance)) rgn ;
               [instance], Tctx.effect_to_params eff params rgn, T.empty_dirt
           | _ -> Error.typing ~pos "Effect type expected but %s encountered" eff
           end

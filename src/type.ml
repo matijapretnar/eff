@@ -36,18 +36,14 @@ and dirt =
   | DirtParam of dirt_param
   | DirtAtom of region * Common.opsym
   | DirtEmpty
-(* probably no need for this
-  | DirtUnion of dirt list
-*)
 
 and region =
   | RegionParam of region_param
-  | RegionInstance of instance_param
-  | RegionTop
-(* probably no need for this:
-  | RegionUnion of region list
-*)
+  | RegionAtom of instance
 
+and instance =
+  | InstanceParam of instance_param
+  | InstanceTop
 
 let empty_dirt = DirtEmpty
 
@@ -82,7 +78,7 @@ let subst_region sbst = function
     (match Common.lookup r sbst.subst_region with
       | Some rgn -> rgn
       | None -> RegionParam r)    
-  | (RegionInstance _ | RegionTop) as rgn -> rgn
+  | RegionAtom _ as rgn -> rgn
 
 let subst_dirt sbst = function
   | DirtEmpty -> DirtEmpty
@@ -159,7 +155,7 @@ let free_params ty cnstrs =
     | DirtAtom (rgn, _) -> free_region rgn
   and free_region = function
     | RegionParam r -> ([], [], [r])
-    | RegionInstance _ | RegionTop -> ([], [], [])
+    | RegionAtom _ -> ([], [], [])
   and free_args (tys, drts, rgns) =
     flatten_map free_ty tys @@@ flatten_map free_dirt drts @@@ flatten_map free_region rgns
   and free_constraint = function
@@ -191,7 +187,7 @@ let pos_neg_params ty =
       | DirtAtom (rgn, _) -> pos_region is_pos rgn
     and pos_region is_pos = function
       | RegionParam r -> ([], [], if is_pos then [r] else [])
-      | RegionInstance _ | RegionTop -> ([], [], [])
+      | RegionAtom _ -> ([], [], [])
     and pos_args is_pos (tys, drts, rgns) =
       flatten_map (pos_ty is_pos) tys @@@ flatten_map (pos_dirt is_pos) drts @@@ flatten_map (pos_region is_pos) rgns
     in
@@ -211,7 +207,7 @@ let fresh_dirt () = DirtParam (fresh_dirt_param ())
 
 let fresh_region () = RegionParam (fresh_region_param ())
 
-let fresh_instance () = RegionInstance (fresh_instance_param ())
+let fresh_instance () = RegionAtom (InstanceParam (fresh_instance_param ()))
 
 (* XXX Should a fresh dirty type have no fresh instances? *)
 let fresh_dirty () = ([], fresh_ty (), fresh_dirt ())

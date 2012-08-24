@@ -358,7 +358,7 @@ let extend_with_variances tydefs =
               posvar := !posvar or posi;
               negvar := !negvar or nega
           end
-      | T.RegionInstance _ | T.RegionTop -> ()
+      | T.RegionAtom _ -> ()
     in match def with
       | Record tys -> List.iter (fun (_, t) -> ty true false t) tys
       | Sum tys -> List.iter (function (_, Some t) -> ty true false t | (_, None) -> ()) tys

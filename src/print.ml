@@ -67,13 +67,17 @@ and pattern_list ?(max_length=299) (p,_) ppf =
   else
     fprintf ppf ",@ ..."
 
+let instance i ppf =
+  match i with
+  | Type.InstanceParam (Type.Instance_Param i) -> print ppf "#%d" i
+  | Type.InstanceTop -> print ppf "?"
+
 let region (_, _, rs) reg ppf =
   match reg with
     | Type.RegionParam ((Type.Region_Param k) as p) ->
         let c = (if List.mem p rs then "'" else "'_") in
           print ppf "<%srgn%i>" c k
-    | Type.RegionInstance (Type.Instance_Param i) -> print ppf "<#%d>" i
-    | Type.RegionTop -> print ppf "<?>"
+    | Type.RegionAtom i -> print ppf "<%t>" (instance i)
 
 let dirt ((_, ds, _) as poly) drt ppf =
   match drt with
