@@ -133,11 +133,14 @@ let exec_topdef interactive (ctx, env) (d,pos) =
 
 let infer_top_comp ctx c =
   let cstr = ref [] in
-  let dirty = Infer.infer_comp ctx cstr c in
+  let (frshs, ty, drt) = Infer.infer_comp ctx cstr c in
+  let isbst = Type.instance_refreshing_subst frshs in
+  cstr := Type.subst_constraints isbst !cstr;
   let sbst, remaining = Unify.solve !cstr in
   Exhaust.check_comp c ;
+  let sbst = Type.compose_subst isbst sbst in
   let ctx = Ctx.subst_ctx ctx sbst in
-  let (frshs, ty, drt) = Type.subst_dirty sbst dirty in
+  let (frshs, ty, drt) = Type.subst_dirty sbst (frshs, ty, drt) in
   let remaining = Unify.garbage_collect (Type.pos_neg_params ty) remaining in
   let cnstr = Unify.constraints_of_graph remaining in
   let cnstr = Type.subst_constraints sbst cnstr in

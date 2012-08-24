@@ -97,6 +97,10 @@ let subst_dirt sbst = function
       | None -> DirtParam d)
   | DirtAtom (r, op) -> DirtAtom (subst_region sbst r, op)
 
+let subst_fresh sbst frsh =
+  List.fold_right (fun i acc -> match subst_instance sbst (InstanceParam i) with
+    | InstanceParam j -> j :: acc | InstanceTop -> acc) frsh []
+
 let rec subst_args subst (tys, drts, rgns) =
   (List.map (subst_ty subst) tys,
    List.map (subst_dirt subst) drts,
@@ -121,7 +125,7 @@ and subst_ty sbst ty =
   subst ty
 
 and subst_dirty sbst (frsh, ty, drt) =
-  (frsh, subst_ty sbst ty, subst_dirt sbst drt)
+  (subst_fresh sbst frsh, subst_ty sbst ty, subst_dirt sbst drt)
 
 
 let subst_constraints sbst cnstrs = List.map (function
@@ -236,7 +240,7 @@ let rec variablize = function
 
 and variablize_dirty (frsh, ty, drt) =
   (* XXX What to do about fresh instances *)
-  ([], variablize ty, fresh_dirt ())
+  (frsh, variablize ty, fresh_dirt ())
 
 and variablize_args (tys, drts, rgns) =
   (List.map variablize tys, List.map (fun _ -> fresh_dirt ()) drts, List.map (fun _ -> fresh_region ()) rgns)
@@ -253,6 +257,10 @@ let refreshing_subst (ps, qs, rs) =
      }
   in
     (List.map snd ps', List.map snd qs', List.map snd rs'), sbst
+
+let instance_refreshing_subst is =
+    { identity_subst with subst_instance = List.map (fun i -> (i, InstanceParam (fresh_instance_param ()))) is;
+     }
 
 (** [refresh (ps,qs,rs) ty] replaces the polymorphic parameters [ps,qs,rs] in [ty] with fresh
     parameters. It returns the  *)
