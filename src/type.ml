@@ -70,15 +70,24 @@ let empty_ty = Apply ("empty", ([], [], []))
 type substitution = {
   subst_ty : (ty_param * ty) list ;
   subst_dirt : (dirt_param * dirt) list ;
-  subst_region : (region_param * region) list
+  subst_region : (region_param * region) list;
+  subst_instance : (instance_param * instance) list
 }
+
+let subst_instance sbst = function
+  | InstanceParam i as inst ->
+      begin match Common.lookup i sbst.subst_instance with
+      | Some inst' -> inst'
+      | None -> inst
+      end
+  | InstanceTop -> InstanceTop  
 
 let subst_region sbst = function
   | RegionParam r ->
     (match Common.lookup r sbst.subst_region with
       | Some rgn -> rgn
       | None -> RegionParam r)    
-  | RegionAtom _ as rgn -> rgn
+  | RegionAtom inst -> RegionAtom (subst_instance sbst inst)
 
 let subst_dirt sbst = function
   | DirtEmpty -> DirtEmpty
@@ -122,16 +131,18 @@ let subst_constraints sbst cnstrs = List.map (function
   ) cnstrs
 
 (** [identity_subst] is a substitution that makes no changes. *)
-let identity_subst = { subst_ty = []; subst_dirt = []; subst_region = [] }
+let identity_subst = { subst_ty = []; subst_dirt = []; subst_region = []; subst_instance = [] }
 
 (** [compose_subst sbst1 sbst2] returns a substitution that first performs
     [sbst2] and then [sbst1]. *)
 let compose_subst
-    ({subst_ty = a1 ; subst_dirt = b1 ; subst_region = c1} as sbst1)
-     {subst_ty = a2 ; subst_dirt = b2 ; subst_region = c2} =
+    ({subst_ty = a1 ; subst_dirt = b1 ; subst_region = c1; subst_instance = d1} as sbst1)
+     {subst_ty = a2 ; subst_dirt = b2 ; subst_region = c2; subst_instance = d2} =
   { subst_ty = a1 @ Common.assoc_map (subst_ty sbst1) a2 ;
     subst_dirt = b1 @ Common.assoc_map (subst_dirt sbst1) b2 ;
-    subst_region = c1 @ Common.assoc_map (subst_region sbst1) c2 }
+    subst_region = c1 @ Common.assoc_map (subst_region sbst1) c2 ;
+    subst_instance = d1 @ Common.assoc_map (subst_instance sbst1) d2 ;
+  }
 
 (** [free_params ty cnstrs] returns three lists of type parameters that occur in [ty].
     Each parameter is listed only once and in order in which it occurs when
@@ -237,7 +248,9 @@ let refreshing_subst (ps, qs, rs) =
   let sbst = 
     { subst_ty = Common.assoc_map (fun p' -> TyParam p') ps' ;
       subst_dirt = Common.assoc_map (fun q' -> DirtParam q') qs' ;
-      subst_region = Common.assoc_map (fun r' -> RegionParam r') rs' }
+      subst_region = Common.assoc_map (fun r' -> RegionParam r') rs';
+      subst_instance = [];
+     }
   in
     (List.map snd ps', List.map snd qs', List.map snd rs'), sbst
 
@@ -270,7 +283,8 @@ let beautify ((ps, ds, rs), ty, cnstrs) =
     let sbst = 
       { subst_ty = Common.assoc_map (fun p' -> TyParam p') xs_map ;
         subst_dirt = Common.assoc_map (fun q' -> DirtParam q') ys_map ;
-        subst_region = Common.assoc_map (fun r' -> RegionParam r') zs_map }
+        subst_region = Common.assoc_map (fun r' -> RegionParam r') zs_map ;
+        subst_instance = [] }
     in
     (subst ps xs_map, subst ds ys_map, subst rs zs_map), subst_ty sbst ty, subst_constraints sbst cnstrs
 

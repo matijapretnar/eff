@@ -182,6 +182,7 @@ let ty_apply ~pos ty_name (tys, drts, rgns) =
     T.subst_ty = ty_sbst;
     T.subst_dirt = dirt_sbst;
     T.subst_region = region_sbst;
+    T.subst_instance = []
   } ty
 
 (** [check_well_formed ~pos ty] checks that type [ty] is well-formed. *)
