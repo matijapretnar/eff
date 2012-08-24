@@ -188,11 +188,15 @@ let garbage_collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) grph =
     match drt1, drt2 with
     | Type.DirtEmpty, _ -> false
     | Type.DirtParam p, Type.DirtParam q -> List.mem p neg_ds && List.mem q pos_ds
+    | Type.DirtParam p, _ -> List.mem p neg_ds
+    | _, Type.DirtParam q -> List.mem q pos_ds
     | _, _ -> true
   and rgn_p rgn1 rgn2 _ =
     match rgn1, rgn2 with
     | Type.RegionParam p, Type.RegionParam q -> List.mem p neg_rs && List.mem q pos_rs
     | _, Type.RegionTop -> false
+    | Type.RegionParam p, _ -> List.mem p neg_rs
+    | _, Type.RegionParam q -> List.mem q pos_rs
     | _, _ -> true
   in
   Constr.garbage_collect ty_p drt_p rgn_p grph
