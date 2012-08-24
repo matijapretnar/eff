@@ -84,7 +84,7 @@ let infer_pattern cstr pp =
             let constrain_record_pattern (fld, p) =
               begin match C.lookup fld us with
                 | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s." fld t
-                | Some u -> add_ty_constraint cstr pos (infer p) u
+                | Some u -> add_ty_constraint cstr pos u (infer p)
               end
             in
               List.iter constrain_record_pattern lst;
@@ -95,7 +95,7 @@ let infer_pattern cstr pp =
           | Some (ty, u) ->
             begin match p, u with
               | None, None -> ()
-              | Some p, Some u -> add_ty_constraint cstr pos (infer p) u
+              | Some p, Some u -> add_ty_constraint cstr pos u (infer p)
               | None, Some _ -> Error.typing ~pos "Constructor %s should be applied to an argument." lbl
               | Some _, None -> Error.typing ~pos "Constructor %s cannot be applied to an argument." lbl
             end;
