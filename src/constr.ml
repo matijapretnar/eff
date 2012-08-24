@@ -41,6 +41,8 @@ sig
 
   (** Filter edges of the graph. *)
   val filter_edges : (elt -> elt -> Common.position -> bool) -> t -> t
+
+  val print : t -> Format.formatter -> unit
 end =
 struct
   type elt = Vertex.t
@@ -120,6 +122,15 @@ struct
     in
     loop grph
 
+    let print grph ppf =
+      fold_vertices
+        (fun x inx outx () ->
+          Print.print ppf "@[%t <= %t <= %t@];@."
+            (Print.sequence "," Vertex.print (List.map fst inx))
+            (Vertex.print x)
+            (Print.sequence "," Vertex.print (List.map fst outx))
+        )
+        grph ()
 end
 
 module Ty = Make(struct
@@ -176,42 +187,11 @@ let transitive_closure grph = {
   region_graph = Region.transitive_closure grph.region_graph
 }
 
-let print_ty {ty_graph = grph} ppf =
-  Ty.fold_vertices
-    (fun x inx outx () ->
-      Print.print ppf "@[%t <= %t <= %t@];@."
-        (Print.sequence "," (Print.ty_param []) (List.map fst inx))
-        (Print.ty_param [] x)
-        (Print.sequence "," (Print.ty_param []) (List.map fst outx))
-    )
-    grph ()
-
-let print_region {region_graph = grph} ppf =
-  Region.fold_vertices
-    (fun x inx outx () ->
-      Print.print ppf "@[%t <= %t <= %t@];@."
-        (Print.sequence "," (Print.region ([],[],[])) (List.map fst inx))
-        (Print.region ([],[],[]) x)
-        (Print.sequence "," (Print.region ([],[],[])) (List.map fst outx))
-    )
-    grph ()
-
-let print_dirt {dirt_graph = grph} ppf =
-  Dirt.fold_vertices
-    (fun x inx outx () ->
-      Print.print ppf "@[%t <= %t <= %t@];@. "
-        (Print.sequence "," (Print.dirt ([],[],[])) (List.map fst inx))
-        (Print.dirt ([],[],[]) x)
-        (Print.sequence "," (Print.dirt ([],[],[])) (List.map fst outx))
-    )
-    grph ()
-
 let print grph ppf =
   Print.print ppf "TYPES:@.%t@.REGIONS:@.%t@.DIRT:@.%t@." 
-  (print_ty grph) (print_region grph) (print_dirt grph)
+  (Ty.print grph.ty_graph) (Region.print grph.region_graph) (Dirt.print grph.dirt_graph)
 
 let garbage_collect ty_p drt_p rgn_p grph =
-  (* grph *)
   {
     ty_graph = Ty.filter_edges ty_p (Ty.transitive_closure grph.ty_graph);
     dirt_graph = Dirt.filter_edges drt_p (Dirt.transitive_closure grph.dirt_graph);
