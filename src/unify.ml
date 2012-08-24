@@ -69,6 +69,8 @@ let solve initial_cnstrs =
           add_ty_constraint pos t' t
 
     | (t, Type.TyParam p) ->
+        (* XXX One should do occurs check on constraints too.
+            Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)
         if Type.occurs_in_ty p t
         then
           let (ps1, t1), (ps2, t2) = Type.beautify2 t1 t2 in
