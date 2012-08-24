@@ -134,11 +134,7 @@ and infer_let ctx cstr pos defs =
           (Print.sequence "," Print.position positions));
   let vars, drts, frshs = List.fold_left
     (fun (vs, drts, frshs) (p,c) ->
-      let cstr_c = ref [] in
-      let (frsh, tc, drt) = infer_comp ctx cstr_c c in
-      let isbst = T.instance_refreshing_subst frsh in
-      let (frsh, tc, drt) = Type.subst_inst_dirty isbst (frsh, tc, drt) in
-        cstr := Type.subst_inst_constraints isbst !cstr_c  @ !cstr;
+      let (frsh, tc, drt) = infer_comp ctx cstr c in
         let ws, tp = infer_pattern cstr p in
           add_ty_constraint cstr (snd c) tc tp;
           match C.find_duplicate (List.map fst ws) (List.map fst vs) with
@@ -312,13 +308,7 @@ and infer_comp ctx cstr cp =
           let t_out = T.fresh_ty () in
           let drt_out = T.fresh_dirt () in
           let infer_case ((p, e') as a) =
-            let cstr_case = ref [] in
-            let t_in', (frsh_out, t_out', drt_out') = infer_abstraction ctx cstr_case a in
-            let isbst = Type.instance_refreshing_subst frsh_out in
-            let t_in' = Type.subst_inst_ty isbst t_in' in
-            let (frsh_out, t_out', drt_out') = Type.subst_inst_dirty isbst (frsh_out, t_out', drt_out') in
-            let cstr_case = Type.subst_inst_constraints isbst !cstr_case in
-            cstr := cstr_case @ !cstr;
+            let t_in', (frsh_out, t_out', drt_out') = infer_abstraction ctx cstr a in
             add_ty_constraint cstr (snd e) t_in t_in';
             add_ty_constraint cstr (snd e') t_out' t_out;
             add_dirt_constraint cstr (snd e') drt_out' drt_out;
