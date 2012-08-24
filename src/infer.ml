@@ -179,10 +179,7 @@ and infer_let_rec ctx cstr pos defs =
       let _, tp, ctx' = extend_with_pattern ctx' cstr p in
       let tc = infer_comp ctx' cstr c in
       add_ty_constraint cstr (snd p) u1 tp;
-      add_ty_constraint cstr (snd p) tp u1;
-      add_dirty_constraint cstr (snd c) tc u2;
-      add_dirty_constraint cstr (snd c) u2 tc;
-      ())
+      add_dirty_constraint cstr (snd c) tc u2)
     lst;
   let sbst, remaining = Unify.solve !cstr in
   let vars = Common.assoc_map (fun ty ->
