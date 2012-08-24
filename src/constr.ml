@@ -1,5 +1,7 @@
 (* Directed graphs of constraints. *)
 
+let compare_fst (x, _) (y, _) = Pervasives.compare x y
+
 module type VERTEX =
 sig
   type t
@@ -48,7 +50,7 @@ struct
 
   module S = Set.Make(struct
     type t = Vertex.t * Common.position
-    let compare = Pervasives.compare
+    let compare = compare_fst
   end)
 
   module G = Map.Make(Vertex)
@@ -148,17 +150,34 @@ struct
       grph, List.filter (fun (x, y) -> x <> y) lst
 
   let transitive_closure grph =
-    let add_edge x y pos closure =
-      let (inx, _) = get x closure
-      and (_, outy) = get y closure
+    (* XXX Get a student to implement this properly *)
+    let closure_step grph =
+      let added_new = ref false in
+      let add x y pos grph =
+        let (inx, outx) = get x grph in
+        if S.mem (y, Common.Nowhere) outx then
+          grph
+        else begin
+          added_new := true;
+          let (iny, outy) = get y grph in
+          G.add x (inx, S.add (y, pos) outx) (G.add y (S.add (x, pos) iny, outy) grph)
+        end
       in
-      let closure =
-        S.fold (fun (x', _) grph -> add_edge x' y pos grph) inx closure in
-      let closure =
-        S.fold (fun (y', _) grph -> add_edge x y' pos grph) outy closure in
-      add_edge x y pos closure
+      let add_closure_edges x y pos closure =
+        let (inx, _) = get x closure
+        and (_, outy) = get y closure
+        in
+        let closure =
+          S.fold (fun (x', _) grph -> add x' y pos grph) inx closure in
+        S.fold (fun (y', _) grph -> add x y' pos grph) outy closure
+      in
+      fold_edges add_closure_edges grph grph, !added_new
     in
-    fold_edges add_edge grph G.empty
+    let rec loop grph =
+      let grph, b = closure_step grph in
+      if b then loop grph else grph
+    in
+    loop grph
 
 end
 
