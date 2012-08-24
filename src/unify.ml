@@ -64,7 +64,7 @@ let solve initial_cnstrs =
             (Print.ty ps1 t1)
             (Print.ty ps2 t2)
         else
-          let (_, t', _) = Type.refresh (Type.free_params t []) t [] in
+          let t' = Type.variablize t in
           add_substitution p t' ;
           add_ty_constraint pos t' t
 
@@ -77,7 +77,7 @@ let solve initial_cnstrs =
             (Print.ty ps1 t1)
             (Print.ty ps2 t2)
         else
-          let (_, t', _) = Type.refresh (Type.free_params t []) t [] in
+          let t' = Type.variablize t in
           add_substitution p t' ;
           add_ty_constraint pos t t'
 

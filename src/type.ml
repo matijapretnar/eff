@@ -265,6 +265,24 @@ let fresh_instance () = RegionInstance (fresh_instance_param ())
 (* XXX Should a fresh dirty type have no fresh instances? *)
 let fresh_dirty () = ([], fresh_ty (), fresh_dirt ())
 
+let rec variablize = function
+  | Apply (ty_name, args) -> Apply (ty_name, variablize_args args)
+  | Effect (ty_name, args, rgn) ->
+      Effect (ty_name, variablize_args args, fresh_region ())
+  | TyParam _ -> fresh_ty ()
+  | Basic _ as ty -> ty
+  | Tuple tys -> Tuple (List.map variablize tys)
+  | Arrow (ty1, ty2) -> Arrow (variablize ty1, variablize_dirty ty2)
+  | Handler {value = ty1; finally = ty2} ->
+      Handler {value = variablize ty1; finally = variablize ty2}
+
+and variablize_dirty (frsh, ty, drt) =
+  (* XXX What to do about fresh instances *)
+  ([], variablize ty, fresh_dirt ())
+
+and variablize_args (tys, drts, rgns) =
+  (List.map variablize tys, List.map (fun _ -> fresh_dirt ()) drts, List.map (fun _ -> fresh_region ()) rgns)
+
 let refreshing_subst (ps, qs, rs) =
   let ps' = List.map (fun p -> (p, fresh_ty_param ())) ps in
   let qs' = List.map (fun q -> (q, fresh_dirt_param ())) qs in
