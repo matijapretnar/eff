@@ -44,12 +44,10 @@ let fill_args is_effect ty =
       in
       Syntax.TyApply (t, tys, drts_rgns, rgn)
   | Syntax.TyParam _ as ty -> ty
-  | Syntax.TyArrow (t1, drty2) -> Syntax.TyArrow (fill t1, fill_dirty drty2)
+  | Syntax.TyArrow (t1, t2, None) -> Syntax.TyArrow (fill t1, fill t2, Some (fresh_dirt_param ()))
+  | Syntax.TyArrow (t1, t2, Some drt) -> Syntax.TyArrow (fill t1, fill t2, Some drt)
   | Syntax.TyTuple lst -> Syntax.TyTuple (List.map fill lst)
-  | Syntax.TyHandler (drty1, drty2) -> Syntax.TyHandler (fill_dirty drty1, fill_dirty drty2)
-  and fill_dirty = function
-  | (t, None) -> (fill t, Some (fresh_dirt_param ()))
-  | (t, Some drt) -> (fill t, Some drt)
+  | Syntax.TyHandler (t1, t2) -> Syntax.TyHandler (fill t1, fill t2)
   in
   let ty = fill ty in
   (!ds, !rs), ty
@@ -118,11 +116,10 @@ let ty (ts, ds, rs) =
     | Some p -> T.TyParam p
     end
     (* XXX Here, we maybe want to parse fresh instances? *)
-  | Syntax.TyArrow (t1, (t2, Some drt)) -> T.Arrow (ty t1, ([], ty t2, dirt drt))
-  | Syntax.TyArrow (t1, (t2, None)) -> assert false
+  | Syntax.TyArrow (t1, t2, Some drt) -> T.Arrow (ty t1, ([], ty t2, dirt drt))
+  | Syntax.TyArrow (t1, t2, None) -> assert false
   | Syntax.TyTuple lst -> T.Tuple (List.map ty lst)
-  | Syntax.TyHandler ((t1, Some drt1), (t2, Some drt2)) -> T.Handler { T.value = (ty t1, dirt drt1); T.finally = ([], ty t2, dirt drt2) }
-  | Syntax.TyHandler _ -> assert false
+  | Syntax.TyHandler (t1, t2) -> T.Handler { T.value = ty t1; T.finally = ty t2 }
   and dirt (Syntax.DirtParam d) =
     match C.lookup d ds with
     | None -> Error.syntax ~pos:C.Nowhere "Unbound dirt parameter 'drt%d" d
@@ -146,12 +143,11 @@ let free_params t =
   | Syntax.TyApply (_, tys, drts_rgns, rgn) ->
       flatten_map ty tys @@@ (optional dirts_regions) drts_rgns @@@ (optional region) rgn
   | Syntax.TyParam s -> ([s], [], [])
-  | Syntax.TyArrow (t1, drty2) -> ty t1 @@@ dirty drty2
+  | Syntax.TyArrow (t1, t2, drt) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt
   | Syntax.TyTuple lst -> flatten_map ty lst
-  | Syntax.TyHandler (drty1, drty2) -> dirty drty1 @@@ dirty drty2
+  | Syntax.TyHandler (t1, t2) -> ty t1 @@@ ty t2
   and dirt (Syntax.DirtParam d) = ([], [d], [])
   and region (Syntax.RegionParam r) = ([], [], [r])
-  and dirty (t, d) = ty t @@@ (optional dirt) d
   and dirts_regions (drts, rgns) = flatten_map dirt drts @@@ flatten_map region rgns
   in
   let (xs, ys, zs) = ty t in

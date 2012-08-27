@@ -72,14 +72,12 @@ type ty =
   (** [(ty1, ty2, ..., tyn) type_name] *)
   | TyParam of Common.typaram
   (** ['a] *)
-  | TyArrow of ty * dirty
+  | TyArrow of ty * ty * dirt option
   (** [ty1 -> ty2] *)
   | TyTuple of ty list
   (** [ty1 * ty2 * ... * tyn] *)
-  | TyHandler of dirty * dirty
+  | TyHandler of ty * ty
   (** [ty1 => ty2] *)
-
-and dirty = ty * dirt option
 
 type tydef =
   | TyRecord of (Common.field, ty) Common.assoc

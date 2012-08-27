@@ -28,15 +28,14 @@ and ty =
 and dirty = instance_param list * ty * dirt
 
 and handler_ty = {
-  value: ty * dirt; (* the type of the _argument_ of value *)
-  finally: dirty; (* the return type of finally *)
+  value: ty; (* the type of the _argument_ of value *)
+  finally: ty; (* the return type of finally *)
 }
 
 and dirt =
   | DirtParam of dirt_param
   | DirtAtom of region * Common.opsym
   | DirtEmpty
-  | DirtDifference of dirt * dirt
 
 and region =
   | RegionParam of region_param
@@ -90,14 +89,13 @@ let subst_region sbst = function
       | None -> RegionParam r)    
   | RegionAtom inst -> RegionAtom (subst_instance sbst inst)
 
-let rec subst_dirt sbst = function
+let subst_dirt sbst = function
   | DirtEmpty -> DirtEmpty
   | DirtParam d ->
     (match Common.lookup d sbst.subst_dirt with
       | Some drt -> drt
       | None -> DirtParam d)
   | DirtAtom (r, op) -> DirtAtom (subst_region sbst r, op)
-  | DirtDifference (drt1, drt2) -> DirtDifference (subst_dirt sbst drt1, subst_dirt sbst drt2)
 
 let subst_fresh sbst frsh =
   List.fold_right (fun i acc -> match subst_instance sbst (InstanceParam i) with
@@ -121,8 +119,8 @@ and subst_ty sbst ty =
   | Basic _ as ty -> ty
   | Tuple tys -> Tuple (List.map subst tys)
   | Arrow (ty1, ty2) -> Arrow (subst ty1, subst_dirty sbst ty2)
-  | Handler {value = (ty1, drt1); finally = ty2} ->
-      Handler {value = (subst ty1, subst_dirt sbst drt1); finally = subst_dirty sbst ty2}
+  | Handler {value = ty1; finally = ty2} ->
+      Handler {value = subst ty1; finally = subst ty2}
   in
   subst ty
 
@@ -163,14 +161,13 @@ let free_params ty cnstrs =
     | Basic _ -> ([], [], [])
     | Tuple tys -> flatten_map free_ty tys
     | Arrow (ty1, dirty2) -> free_ty ty1 @@@ free_dirty dirty2
-    | Handler {value = (ty1, drt1); finally = ty2} -> free_ty ty1 @@@ free_dirt drt1 @@@ free_dirty ty2
+    | Handler {value = ty1; finally = ty2} -> free_ty ty1 @@@ free_ty ty2
   and free_dirty (_, ty, drt) =
     free_ty ty @@@ free_dirt drt
   and free_dirt = function
     | DirtEmpty -> ([], [], [])
     | DirtParam p -> ([], [p], [])
     | DirtAtom (rgn, _) -> free_region rgn
-    | DirtDifference (drt1, drt2) -> free_dirt drt1 @@@ free_dirt drt2
   and free_region = function
     | RegionParam r -> ([], [], [r])
     | RegionAtom _ -> ([], [], [])
@@ -196,14 +193,13 @@ let pos_neg_params ty =
       | Basic _ -> ([], [], [])
       | Tuple tys -> flatten_map (pos_ty is_pos) tys
       | Arrow (ty1, dirty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos dirty2
-      | Handler {value = (ty1, drt1); finally = ty2} -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos ty2
+      | Handler {value = ty1; finally = ty2} -> pos_ty (not is_pos) ty1 @@@ pos_ty is_pos ty2
     and pos_dirty is_pos (_, ty, drt) =
       pos_ty is_pos ty @@@ pos_dirt is_pos drt
     and pos_dirt is_pos = function
       | DirtEmpty -> ([], [], [])
       | DirtParam p -> ([], (if is_pos then [p] else []), [])
       | DirtAtom (rgn, _) -> pos_region is_pos rgn
-      | DirtDifference (drt1, drt2) -> pos_dirt is_pos drt1 @@@ pos_dirt is_pos drt2
     and pos_region is_pos = function
       | RegionParam r -> ([], [], if is_pos then [r] else [])
       | RegionAtom _ -> ([], [], [])
@@ -239,8 +235,8 @@ let rec variablize = function
   | Basic _ as ty -> ty
   | Tuple tys -> Tuple (List.map variablize tys)
   | Arrow (ty1, ty2) -> Arrow (variablize ty1, variablize_dirty ty2)
-  | Handler {value = (ty1, drt1); finally = ty2} ->
-      Handler {value = (variablize ty1, fresh_dirt ()); finally = variablize_dirty ty2}
+  | Handler {value = ty1; finally = ty2} ->
+      Handler {value = variablize ty1; finally = variablize ty2}
 
 and variablize_dirty (frsh, ty, drt) =
   (* XXX What to do about fresh instances *)

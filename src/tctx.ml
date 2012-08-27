@@ -221,7 +221,7 @@ let check_well_formed ~pos tydef =
     end
   | T.Arrow (ty1, dirty2) -> check ty1; check_dirty dirty2
   | T.Tuple tys -> List.iter check tys
-  | T.Handler {T.value = (ty1, _); T.finally = ty2} -> check ty1; check_dirty ty2
+  | T.Handler {T.value = ty1; T.finally = ty2} -> check ty1; check ty2
   and check_dirty (_, ty, _) = check ty
   in
   match tydef with
@@ -255,7 +255,7 @@ let check_noncyclic ~pos =
         check_tydef (t :: forbidden) (ty_apply ~pos t args)
   | T.Arrow (ty1, (_, ty2, _)) -> check forbidden ty1; check forbidden ty2
   | T.Tuple tys -> List.iter (check forbidden) tys
-  | T.Handler {T.value = (ty1, _); T.finally = (_, ty2, _)} ->
+  | T.Handler {T.value = ty1; T.finally = ty2} ->
       check forbidden ty1; check forbidden ty2
   and check_tydef forbidden = function
   | Sum _ -> ()
@@ -334,15 +334,13 @@ let extend_with_variances tydefs =
           end;
           region posi nega rgn
       | T.Arrow (ty1, (_, ty2, drt)) ->
-          ty nega posi ty1;
-          ty posi nega ty2;
-          dirt posi nega drt
-      | T.Tuple tys -> List.iter (ty posi nega) tys
-      | T.Handler {T.value = (ty1, drt1); T.finally = (_, ty2, drt2)} ->
-          ty nega posi ty1;
-          dirt nega posi drt1;
-          ty posi nega ty2;
-          dirt posi nega drt2
+          ty posi nega ty1;
+          ty nega posi ty2;
+          dirt nega posi drt
+      | T.Tuple tys -> List.iter (ty nega posi) tys
+      | T.Handler {T.value = ty1; T.finally = ty2} ->
+          ty posi nega ty1;
+          ty nega posi ty2
     and dirt posi nega = function
       | T.DirtParam d ->
           begin match Common.lookup d ds with
@@ -353,9 +351,6 @@ let extend_with_variances tydefs =
           end
       | T.DirtAtom (rgn, _) -> region posi nega rgn
       | T.DirtEmpty -> ()
-      | T.DirtDifference (drt1, drt2) ->
-          dirt posi nega drt1;
-          dirt posi nega drt2
     and region posi nega = function
       | T.RegionParam r ->
           begin match Common.lookup r rs with
