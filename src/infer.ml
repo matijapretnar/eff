@@ -45,7 +45,9 @@ let add_region_constraint cstr pos rgn1 rgn2 =
 let add_dirty_constraint cstr pos (lst1, t1, drt1) (lst2, t2, drt2) =
   add_fresh_constraint cstr pos lst1 lst2; (* XXX very fishy *)
   add_ty_constraint cstr pos t1 t2;
-  add_dirt_constraint cstr pos drt1 drt2
+  add_dirt_constraint cstr pos (Type.DirtParam drt1) (Type.DirtParam drt2)
+
+let lift_dirty (frsh, t, d) = (frsh, t, Type.DirtParam d)
 
 let ty_of_const = function
   | Common.Integer _ -> Type.int_ty
@@ -238,23 +240,25 @@ and infer_expr ctx cstr (e,pos) =
         T.Arrow (t1, t2)
         
     | Core.Operation (e, op) ->
-        let rgn = T.fresh_region () in
+        let rgn = T.fresh_region_param () in
         (match Tctx.infer_operation op rgn with
           | None -> Error.typing ~pos "Unbound operation %s" op
           | Some (ty, (t1, t2)) ->
             let u = infer_expr ctx cstr e in
+            let d = T.fresh_dirt_param () in
               add_ty_constraint cstr pos u ty;
+              add_dirt_constraint cstr pos (T.DirtAtom (rgn, op)) (T.DirtParam d);
               (* An operation creates no new instances. *)
-              T.Arrow (t1, ([], t2, T.DirtAtom (rgn, op))))
+              T.Arrow (t1, ([], t2, d)))
 
     | Core.Handler {Core.operations=ops; Core.value=a_val; Core.finally=a_fin} -> 
         let t_value = T.fresh_ty () in
-        let dirt = T.fresh_dirt () in
+        let dirt = T.fresh_dirt_param () in
         let t_finally = T.fresh_ty () in
         let t_yield = T.fresh_ty () in
         let constrain_operation ((e, op), a2) =
           (* XXX Correct when you know what to put instead of the fresh region .*)
-          (match Tctx.infer_operation op (T.fresh_region ()) with
+          (match Tctx.infer_operation op (T.fresh_region_param ()) with
             | None -> Error.typing ~pos "Unbound operation %s in a handler" op
             | Some (ty, (t1, t2)) ->
               let u = infer_expr ctx cstr e in
@@ -278,7 +282,7 @@ and infer_expr ctx cstr (e,pos) =
               
 (* [infer_comp ctx cstr (c,pos)] infers the type of computation [c] in context [ctx].
    It returns the list of newly introduced meta-variables and the inferred type. *)
-and infer_comp ctx cstr cp =
+and infer_comp ctx cstr (c, pos) =
   (* XXX Why isn't it better to just not call type inference when type checking is disabled? *)
   if !disable_typing then T.universal_dirty else
   let rec infer ctx (c, pos) =
@@ -288,13 +292,13 @@ and infer_comp ctx cstr cp =
           let t2 = infer_expr ctx cstr e2 in
           begin match t1 with
           (* XXX Should we use this dirty hack? *)
-          | T.Arrow (s1, drty) ->
+          | T.Arrow (s1, s2) ->
               add_ty_constraint cstr pos t2 s1;
-              drty
+              lift_dirty s2
           | _ ->
               let t = T.fresh_dirty () in
               add_ty_constraint cstr pos t1 (T.Arrow (t2, t));
-              t
+              lift_dirty t
           end
 
       | Core.Value e ->
@@ -309,7 +313,7 @@ and infer_comp ctx cstr cp =
       | Core.Match (e, lst) ->
           let t_in = infer_expr ctx cstr e in
           let t_out = T.fresh_ty () in
-          let drt_out = T.fresh_dirt () in
+          let drt_out = T.fresh_dirt_param () in
           let infer_case ((p, e') as a) =
             let cstr_case = ref [] in
             let t_in', (frsh_out, t_out', drt_out') = infer_abstraction ctx cstr_case a in
@@ -320,12 +324,12 @@ and infer_comp ctx cstr cp =
             cstr := cstr_case @ !cstr;
             add_ty_constraint cstr (snd e) t_in t_in';
             add_ty_constraint cstr (snd e') t_out' t_out;
-            add_dirt_constraint cstr (snd e') drt_out' drt_out;
+            add_dirt_constraint cstr (snd e') (T.DirtParam drt_out') (T.DirtParam drt_out);
             frsh_out
             (* XXX Collect fresh instances from all branches. *)
           in
           let frshs = Common.flatten_map infer_case lst in
-          frshs, t_out, drt_out
+          frshs, t_out, T.DirtParam drt_out
               
       | Core.New (eff, r) ->
         begin match Tctx.fresh_tydef ~pos:pos eff with
@@ -343,12 +347,14 @@ and infer_comp ctx cstr cp =
                             add_ty_constraint cstr pos1 t1 u1;
                             add_ty_constraint cstr pos2 t2 te;
                             (* Here, we should have that resources create no fresh instances. *)
-                            add_dirty_constraint cstr posc t ([], T.Tuple [u2; te], T.empty_dirt))
+                            let d_empty = T.fresh_dirt_param () in
+                            add_dirt_constraint cstr posc (T.DirtParam d_empty) (T.empty_dirt); 
+                            add_dirty_constraint cstr posc t ([], T.Tuple [u2; te], d_empty))
                     lst
             end ;
             let instance = T.fresh_instance_param () in
-            let rgn = T.fresh_region () in
-              add_region_constraint cstr pos (T.RegionAtom (T.InstanceParam instance)) rgn ;
+            let rgn = T.fresh_region_param () in
+              add_region_constraint cstr pos (T.RegionAtom (T.InstanceParam instance)) (T.RegionParam rgn) ;
               [instance], Tctx.effect_to_params eff params rgn, T.empty_dirt
           | _ -> Error.typing ~pos "Effect type expected but %s encountered" eff
           end
@@ -390,7 +396,7 @@ and infer_comp ctx cstr cp =
           let _, let_drts, let_frshs, ctx = infer_let ctx cstr pos defs in
           let frsh, tc, dc = infer ctx c in
           let drt = T.fresh_dirt () in
-            List.iter (fun let_drt -> add_dirt_constraint cstr pos let_drt drt) let_drts;
+            List.iter (fun let_drt -> add_dirt_constraint cstr pos (T.DirtParam let_drt) drt) let_drts;
             add_dirt_constraint cstr pos dc drt ;
             let_frshs @ frsh, tc, drt
 
@@ -402,6 +408,8 @@ and infer_comp ctx cstr cp =
           ignore (infer ctx c);
           [], T.unit_ty, T.empty_dirt
   in
-  let ty = infer ctx cp in
-    ty
+  let frsh, ty, drt = infer ctx (c, pos) in
+  let d = T.fresh_dirt_param () in
+  add_dirt_constraint cstr pos drt (Type.DirtParam d);
+  frsh, ty, d
 

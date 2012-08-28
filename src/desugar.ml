@@ -104,7 +104,7 @@ let ty (ts, ds, rs) =
       let tys = List.map ty tys
       and (drts, rgns) = begin match drts_rgns with
         | Some (drts, rgns) -> (List.map dirt drts, List.map region rgns)
-        | None -> (List.map (fun (_, d) -> T.DirtParam d) ds, List.map (fun (_, r) -> T.RegionParam r) rs)
+        | None -> (List.map (fun (_, d) -> d) ds, List.map (fun (_, r) -> r) rs)
       end 
       in begin match rgn with
         | None -> T.Apply (t, (tys, drts, rgns))
@@ -123,11 +123,11 @@ let ty (ts, ds, rs) =
   and dirt (Syntax.DirtParam d) =
     match C.lookup d ds with
     | None -> Error.syntax ~pos:C.Nowhere "Unbound dirt parameter 'drt%d" d
-    | Some d -> T.DirtParam d
+    | Some d -> d
   and region (Syntax.RegionParam r) =
     match C.lookup r rs with
     | None -> Error.syntax ~pos:C.Nowhere "Unbound region parameter 'rgn%d" r
-    | Some r -> T.RegionParam r
+    | Some r -> r
   in
   ty
 

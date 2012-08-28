@@ -72,20 +72,24 @@ let instance i ppf =
   | Type.InstanceParam (Type.Instance_Param i) -> print ppf "#%d" i
   | Type.InstanceTop -> print ppf "?"
 
-let region (_, _, rs) reg ppf =
+let region_param (_, _, rs) ((Type.Region_Param k) as p) ppf =
+  let c = (if List.mem p rs then "'" else "'_") in
+    print ppf "<%srgn%i>" c k
+
+let dirt_param (_, ds, _) ((Type.Dirt_Param k) as p) ppf =
+  let c = (if List.mem p ds then "'" else "'_") in
+    print ppf "<%sdrt%i>" c k
+
+let region poly reg ppf =
   match reg with
-    | Type.RegionParam ((Type.Region_Param k) as p) ->
-        let c = (if List.mem p rs then "'" else "'_") in
-          print ppf "<%srgn%i>" c k
+    | Type.RegionParam p -> print ppf "<%t>" (region_param poly p)
     | Type.RegionAtom i -> print ppf "<%t>" (instance i)
 
 let dirt ((_, ds, _) as poly) drt ppf =
   match drt with
     | Type.DirtEmpty -> print ppf ""
-    | Type.DirtParam ((Type.Dirt_Param k) as p) ->
-        let c = (if List.mem p ds then "'" else "'_") in
-          print ppf "%sdrt%i" c k
-    | Type.DirtAtom (rgn, op) -> print ppf "%t#%s" (region poly rgn) op
+    | Type.DirtParam p -> print ppf "%t" (dirt_param poly p)
+    | Type.DirtAtom (rgn, op) -> print ppf "%t#%s" (region_param poly rgn) op
 
 let fresh_instances frsh ppf =
   match frsh with
@@ -109,7 +113,7 @@ let rec ty ((ps, _, _) as poly) t ppf =
         (ty ~max_level:4 t1)
         (fresh_instances frsh)
         (ty ~max_level:4 t2)
-        (dirt poly drt)
+        (dirt_param poly drt)
         (* print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2) *)
     | Type.Basic b -> print "%s" b
     | Type.Apply (t, (lst, _, _)) ->
@@ -120,9 +124,9 @@ let rec ty ((ps, _, _) as poly) t ppf =
       end
     | Type.Effect (t, (lst, _, _), rgn) ->
       begin match lst with
-        | [] -> print "%s%t" t (region poly rgn)
-        | [s] -> print ~at_level:1 "%t %s%t" (ty ~max_level:1 s) t (region poly rgn)
-        | ts -> print ~at_level:1 "(%t) %s%t" (sequence "," ty ts) t (region poly rgn)
+        | [] -> print "%s%t" t (region_param poly rgn)
+        | [s] -> print ~at_level:1 "%t %s%t" (ty ~max_level:1 s) t (region_param poly rgn)
+        | ts -> print ~at_level:1 "(%t) %s%t" (sequence "," ty ts) t (region_param poly rgn)
       end
     | Type.TyParam p -> ty_param ps p ppf
     | Type.Tuple [] -> print "unit"
@@ -143,7 +147,7 @@ let ty_scheme (poly, t, cstrs) ppf =
   print ppf "%t {%t}" (ty poly t) (constraints poly cstrs)
 
 let dirty_scheme ((poly, _, _) as tysch) drt ppf =
-  print ppf "%t[%t]" (ty_scheme tysch) (dirt poly drt)
+  print ppf "%t[%t]" (ty_scheme tysch) (dirt_param poly drt)
 
 let beautified_ty_scheme tysch =
   let tysch = Type.beautify tysch in

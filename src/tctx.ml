@@ -113,16 +113,12 @@ let find_operation op_name =
 
 let apply_to_params t (ps, ds, rs) =
   Type.Apply (t, (
-    List.map (fun p -> Type.TyParam p) ps,
-    List.map (fun d -> Type.DirtParam d) ds,
-    List.map (fun r -> Type.RegionParam r) rs
+    List.map (fun p -> Type.TyParam p) ps, ds, rs
   ))
 
 let effect_to_params t (ps, ds, rs) rgn =
   Type.Effect (t, (
-    List.map (fun p -> Type.TyParam p) ps,
-    List.map (fun d -> Type.DirtParam d) ds,
-    List.map (fun r -> Type.RegionParam r) rs
+    List.map (fun p -> Type.TyParam p) ps, ds, rs
   ), rgn)
 
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
@@ -313,18 +309,18 @@ let extend_with_variances tydefs =
           | None ->
               (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
               List.iter (ty true true) tys;
-              List.iter (dirt true true) drts;
-              List.iter (region true true) rgns
+              List.iter (dirt_param true true) drts;
+              List.iter (region_param true true) rgns
           | Some ((ps, ds, rs), _) ->
               if posi then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty posi' nega') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> dirt posi' nega') ds drts;
-                List.iter2 (fun (_, (posi', nega')) -> region posi' nega') rs rgns
+                List.iter2 (fun (_, (posi', nega')) -> dirt_param posi' nega') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> region_param posi' nega') rs rgns
               end;
               if nega then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty nega' posi') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> dirt nega' posi') ds drts;
-                List.iter2 (fun (_, (posi', nega')) -> region nega' posi') rs rgns
+                List.iter2 (fun (_, (posi', nega')) -> dirt_param nega' posi') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> region_param nega' posi') rs rgns
               end
           end
       | T.Effect (t, (tys, drts, rgns), rgn) ->
@@ -332,48 +328,43 @@ let extend_with_variances tydefs =
           | None ->
               (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
               List.iter (ty true true) tys;
-              List.iter (dirt true true) drts;
-              List.iter (region true true) rgns;
+              List.iter (dirt_param true true) drts;
+              List.iter (region_param true true) rgns;
           | Some ((ps, ds, rs), _) ->
               if posi then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty posi' nega') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> dirt posi' nega') ds drts;
-                List.iter2 (fun (_, (posi', nega')) -> region posi' nega') rs rgns
+                List.iter2 (fun (_, (posi', nega')) -> dirt_param posi' nega') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> region_param posi' nega') rs rgns
               end;
               if nega then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty nega' posi') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> dirt nega' posi') ds drts;
-                List.iter2 (fun (_, (posi', nega')) -> region nega' posi') rs rgns
+                List.iter2 (fun (_, (posi', nega')) -> dirt_param nega' posi') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> region_param nega' posi') rs rgns
               end
           end;
-          region posi nega rgn
+          region_param posi nega rgn
       | T.Arrow (ty1, (_, ty2, drt)) ->
           ty nega posi ty1;
           ty posi nega ty2;
-          dirt posi nega drt
+          dirt_param posi nega drt
       | T.Tuple tys -> List.iter (ty posi nega) tys
       | T.Handler {T.value = ty1; T.finally = ty2} ->
           ty nega posi ty1;
           ty posi nega ty2
-    and dirt posi nega = function
-      | T.DirtParam d ->
-          begin match Common.lookup d ds with
-          | None -> assert false
-          | Some (posvar, negvar) ->
-              posvar := !posvar or posi;
-              negvar := !negvar or nega
-          end
-      | T.DirtAtom (rgn, _) -> region posi nega rgn
-      | T.DirtEmpty -> ()
-    and region posi nega = function
-      | T.RegionParam r ->
-          begin match Common.lookup r rs with
-          | None -> assert false
-          | Some (posvar, negvar) ->
-              posvar := !posvar or posi;
-              negvar := !negvar or nega
-          end
-      | T.RegionAtom _ -> ()
+    and dirt_param posi nega d =
+      begin match Common.lookup d ds with
+      | None -> assert false
+      | Some (posvar, negvar) ->
+          posvar := !posvar or posi;
+          negvar := !negvar or nega
+      end
+    and region_param posi nega r =
+      begin match Common.lookup r rs with
+      | None -> assert false
+      | Some (posvar, negvar) ->
+          posvar := !posvar or posi;
+          negvar := !negvar or nega
+      end
     in match def with
       | Record tys -> List.iter (fun (_, t) -> ty true false t) tys
       | Sum tys -> List.iter (function (_, Some t) -> ty true false t | (_, None) -> ()) tys

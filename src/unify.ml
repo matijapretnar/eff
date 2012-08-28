@@ -88,7 +88,7 @@ let solve initial_cnstrs =
         (* XXX How do we unify fresh instances? *)
         add_ty_constraint pos v1 v2;
         add_ty_constraint pos u2 u1;
-        add_dirt_constraint pos drt1 drt2
+        add_dirt_constraint pos (Type.DirtParam drt1) (Type.DirtParam drt2)
 
     | (Type.Tuple lst1, Type.Tuple lst2)
         when List.length lst1 = List.length lst2 ->
@@ -101,8 +101,8 @@ let solve initial_cnstrs =
         | None -> Error.typing ~pos "Undefined type %s" t1
         | Some (ps, ds, rs) ->
             for_parameters add_ty_constraint pos ps ts1 ts2;
-            for_parameters add_dirt_constraint pos ds drts1 drts2;
-            for_parameters add_region_constraint pos rs rgns1 rgns2
+            for_parameters add_dirt_constraint pos ds (List.map (fun d -> Type.DirtParam d) drts1) (List.map (fun d -> Type.DirtParam d) drts2);
+            for_parameters add_region_constraint pos rs (List.map (fun r -> Type.RegionParam r) rgns1) (List.map (fun r -> Type.RegionParam r) rgns2)
         end
 
     | (Type.Effect (t1, (ts1, drts1, rgns1), rgn1), Type.Effect (t2, (ts2, drts2, rgns2), rgn2)) when t1 = t2 ->
@@ -111,10 +111,10 @@ let solve initial_cnstrs =
         begin match Tctx.lookup_params t1 with
         | None -> Error.typing ~pos "Undefined type %s" t1
         | Some (ps, ds, rs) ->
-            add_region_constraint pos rgn1 rgn2;
+            add_region_constraint pos (Type.RegionParam rgn1) (Type.RegionParam rgn2);
             for_parameters add_ty_constraint pos ps ts1 ts2;
-            for_parameters add_dirt_constraint pos ds drts1 drts2;
-            for_parameters add_region_constraint pos rs rgns1 rgns2
+            for_parameters add_dirt_constraint pos ds (List.map (fun d -> Type.DirtParam d) drts1) (List.map (fun d -> Type.DirtParam d) drts2);
+            for_parameters add_region_constraint pos rs (List.map (fun r -> Type.RegionParam r) rgns1) (List.map (fun r -> Type.RegionParam r) rgns2)
         end
 
     (* The following two cases cannot be merged into one, as the whole matching
@@ -173,28 +173,23 @@ let pos_neg_params ty =
   let pos_params is_pos ty =
     let rec pos_ty is_pos = function
       | Type.Apply (ty_name, args) -> pos_args is_pos ty_name args
-      | Type.Effect (ty_name, args, rgn) -> pos_args is_pos ty_name args @@@ pos_region is_pos rgn
+      | Type.Effect (ty_name, args, rgn) -> pos_args is_pos ty_name args @@@ pos_region_param is_pos rgn
       | Type.TyParam p -> ((if is_pos then [p] else []), [], [])
       | Type.Basic _ -> ([], [], [])
       | Type.Tuple tys -> flatten_map (pos_ty is_pos) tys
       | Type.Arrow (ty1, dirty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos dirty2
       | Type.Handler {Type.value = ty1; Type.finally = ty2} -> pos_ty (not is_pos) ty1 @@@ pos_ty is_pos ty2
     and pos_dirty is_pos (_, ty, drt) =
-      pos_ty is_pos ty @@@ pos_dirt is_pos drt
-    and pos_dirt is_pos = function
-      | Type.DirtEmpty -> ([], [], [])
-      | Type.DirtParam p -> ([], (if is_pos then [p] else []), [])
-      | Type.DirtAtom (rgn, _) -> pos_region is_pos rgn
-    and pos_region is_pos = function
-      | Type.RegionParam r -> ([], [], if is_pos then [r] else [])
-      | Type.RegionAtom _ -> ([], [], [])
+      pos_ty is_pos ty @@@ pos_dirt_param is_pos drt
+    and pos_dirt_param is_pos p = ([], (if is_pos then [p] else []), [])
+    and pos_region_param is_pos r = ([], [], if is_pos then [r] else [])
     and pos_args is_pos ty_name (tys, drts, rgns) =
       begin match Tctx.lookup_params ty_name with
       | None -> Error.typing ~pos:Common.Nowhere "Undefined type %s" ty_name
       | Some (ps, ds, rs) ->
           for_parameters pos_ty is_pos ps tys @@@
-          for_parameters pos_dirt is_pos ds drts @@@
-          for_parameters pos_region is_pos rs rgns
+          for_parameters pos_dirt_param is_pos ds drts @@@
+          for_parameters pos_region_param is_pos rs rgns
       end
     in
     let (xs, ys, zs) = pos_ty is_pos ty in    
