@@ -316,9 +316,16 @@ let extend_with_variances tydefs =
               List.iter (dirt true true) drts;
               List.iter (region true true) rgns
           | Some ((ps, ds, rs), _) ->
-              List.iter2 (fun (_, (posi, nega)) -> ty posi nega) ps tys;
-              List.iter2 (fun (_, (posi, nega)) -> dirt posi nega) ds drts;
-              List.iter2 (fun (_, (posi, nega)) -> region posi nega) rs rgns
+              if posi then begin
+                List.iter2 (fun (_, (posi', nega')) -> ty posi' nega') ps tys;
+                List.iter2 (fun (_, (posi', nega')) -> dirt posi' nega') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> region posi' nega') rs rgns
+              end;
+              if nega then begin
+                List.iter2 (fun (_, (posi', nega')) -> ty nega' posi') ps tys;
+                List.iter2 (fun (_, (posi', nega')) -> dirt nega' posi') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> region nega' posi') rs rgns
+              end
           end
       | T.Effect (t, (tys, drts, rgns), rgn) ->
           begin match Common.lookup t !tctx with
@@ -328,19 +335,26 @@ let extend_with_variances tydefs =
               List.iter (dirt true true) drts;
               List.iter (region true true) rgns;
           | Some ((ps, ds, rs), _) ->
-              List.iter2 (fun (_, (posi, nega)) -> ty posi nega) ps tys;
-              List.iter2 (fun (_, (posi, nega)) -> dirt posi nega) ds drts;
-              List.iter2 (fun (_, (posi, nega)) -> region posi nega) rs rgns;
+              if posi then begin
+                List.iter2 (fun (_, (posi', nega')) -> ty posi' nega') ps tys;
+                List.iter2 (fun (_, (posi', nega')) -> dirt posi' nega') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> region posi' nega') rs rgns
+              end;
+              if nega then begin
+                List.iter2 (fun (_, (posi', nega')) -> ty nega' posi') ps tys;
+                List.iter2 (fun (_, (posi', nega')) -> dirt nega' posi') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> region nega' posi') rs rgns
+              end
           end;
           region posi nega rgn
       | T.Arrow (ty1, (_, ty2, drt)) ->
-          ty posi nega ty1;
-          ty nega posi ty2;
-          dirt nega posi drt
-      | T.Tuple tys -> List.iter (ty nega posi) tys
+          ty nega posi ty1;
+          ty posi nega ty2;
+          dirt posi nega drt
+      | T.Tuple tys -> List.iter (ty posi nega) tys
       | T.Handler {T.value = ty1; T.finally = ty2} ->
-          ty posi nega ty1;
-          ty nega posi ty2
+          ty nega posi ty1;
+          ty posi nega ty2
     and dirt posi nega = function
       | T.DirtParam d ->
           begin match Common.lookup d ds with
