@@ -161,6 +161,46 @@ let solve initial_cnstrs =
   in
     loop ()
 
+let (@@@) (xs, ys, zs) (us, vs, ws) = (xs @ us, ys @ vs, zs @ ws)
+let flatten_map f lst = List.fold_left (@@@) ([], [], []) (List.map f lst)
+
+let for_parameters get_params is_pos ps lst =
+  List.fold_right2 (fun (_, (cov, contra)) el params ->
+                      let params = if cov then get_params is_pos el @@@ params else params in
+                      if contra then get_params (not is_pos) el @@@ params else params) ps lst ([], [], [])
+
+let pos_neg_params ty =
+  let pos_params is_pos ty =
+    let rec pos_ty is_pos = function
+      | Type.Apply (ty_name, args) -> pos_args is_pos ty_name args
+      | Type.Effect (ty_name, args, rgn) -> pos_args is_pos ty_name args @@@ pos_region is_pos rgn
+      | Type.TyParam p -> ((if is_pos then [p] else []), [], [])
+      | Type.Basic _ -> ([], [], [])
+      | Type.Tuple tys -> flatten_map (pos_ty is_pos) tys
+      | Type.Arrow (ty1, dirty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos dirty2
+      | Type.Handler {Type.value = ty1; Type.finally = ty2} -> pos_ty (not is_pos) ty1 @@@ pos_ty is_pos ty2
+    and pos_dirty is_pos (_, ty, drt) =
+      pos_ty is_pos ty @@@ pos_dirt is_pos drt
+    and pos_dirt is_pos = function
+      | Type.DirtEmpty -> ([], [], [])
+      | Type.DirtParam p -> ([], (if is_pos then [p] else []), [])
+      | Type.DirtAtom (rgn, _) -> pos_region is_pos rgn
+    and pos_region is_pos = function
+      | Type.RegionParam r -> ([], [], if is_pos then [r] else [])
+      | Type.RegionAtom _ -> ([], [], [])
+    and pos_args is_pos ty_name (tys, drts, rgns) =
+      begin match Tctx.lookup_params ty_name with
+      | None -> Error.typing ~pos:Common.Nowhere "Undefined type %s" ty_name
+      | Some (ps, ds, rs) ->
+          for_parameters pos_ty is_pos ps tys @@@
+          for_parameters pos_dirt is_pos ds drts @@@
+          for_parameters pos_region is_pos rs rgns
+      end
+    in
+    let (xs, ys, zs) = pos_ty is_pos ty in    
+      (Common.uniq xs, Common.uniq ys, Common.uniq zs)
+  in
+  pos_params true ty, pos_params false ty
 let garbage_collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) grph =
   let ty_p p q _ = List.mem p neg_ts && List.mem q pos_ts
   and drt_p drt1 drt2 _ =

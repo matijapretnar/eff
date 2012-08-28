@@ -181,36 +181,6 @@ let free_params ty cnstrs =
   let (xs, ys, zs) = free_ty ty @@@ flatten_map free_constraint cnstrs in    
     (Common.uniq xs, Common.uniq ys, Common.uniq zs)
 
-
-let pos_neg_params ty =
-  let (@@@) (xs, ys, zs) (us, vs, ws) = (xs @ us, ys @ vs, zs @ ws) in
-  let flatten_map f lst = List.fold_left (@@@) ([], [], []) (List.map f lst) in
-  let pos_params is_pos ty =
-    let rec pos_ty is_pos = function
-      | Apply (_, args) -> pos_args is_pos args
-      | Effect (_, args, rgn) -> pos_args is_pos args @@@ pos_region is_pos rgn
-      | TyParam p -> ((if is_pos then [p] else []), [], [])
-      | Basic _ -> ([], [], [])
-      | Tuple tys -> flatten_map (pos_ty is_pos) tys
-      | Arrow (ty1, dirty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos dirty2
-      | Handler {value = ty1; finally = ty2} -> pos_ty (not is_pos) ty1 @@@ pos_ty is_pos ty2
-    and pos_dirty is_pos (_, ty, drt) =
-      pos_ty is_pos ty @@@ pos_dirt is_pos drt
-    and pos_dirt is_pos = function
-      | DirtEmpty -> ([], [], [])
-      | DirtParam p -> ([], (if is_pos then [p] else []), [])
-      | DirtAtom (rgn, _) -> pos_region is_pos rgn
-    and pos_region is_pos = function
-      | RegionParam r -> ([], [], if is_pos then [r] else [])
-      | RegionAtom _ -> ([], [], [])
-    and pos_args is_pos (tys, drts, rgns) =
-      flatten_map (pos_ty is_pos) tys @@@ flatten_map (pos_dirt is_pos) drts @@@ flatten_map (pos_region is_pos) rgns
-    in
-    let (xs, ys, zs) = pos_ty is_pos ty in    
-      (Common.uniq xs, Common.uniq ys, Common.uniq zs)
-  in
-  pos_params true ty, pos_params false ty
-
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
 let occurs_in_ty p ty = List.mem p (let (xs, _, _) = free_params ty [] in xs)
 

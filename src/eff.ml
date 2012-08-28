@@ -141,7 +141,7 @@ let infer_top_comp ctx c =
   let sbst = Type.compose_subst isbst sbst in
   let ctx = Ctx.subst_ctx ctx sbst in
   let (frshs, ty, drt) = Type.subst_dirty sbst (frshs, ty, drt) in
-  let remaining = Unify.garbage_collect (Type.pos_neg_params ty) remaining in
+  let remaining = Unify.garbage_collect (Unify.pos_neg_params ty) remaining in
   let cnstr = Unify.constraints_of_graph remaining in
   let cnstr = Type.subst_constraints sbst cnstr in
   (* XXX What to do about the fresh instances? *)
