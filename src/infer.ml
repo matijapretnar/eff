@@ -167,19 +167,18 @@ and infer_let_rec ctx cstr pos defs =
     Error.typing ~pos "Multiply defined recursive value.";
   let lst =
     Common.assoc_map (fun ((p,c)) ->
-      let u1 = T.fresh_ty () in
-      let u2 = T.fresh_dirty () in
-      (u1, u2, p, c))
+      let u = T.fresh_ty () in
+      (u, p, c))
       defs
   in
-  let ctx' = List.fold_right (fun (f, (u1,u2,_,_)) ctx -> Ctx.extend_ty ctx f (T.Arrow (u1, u2))) lst ctx in
+  let ctx' = List.fold_right (fun (f, (u, _, _)) ctx -> Ctx.extend_ty ctx f u) lst ctx in
   let vars = Common.assoc_map
-    (fun (u1,u2,p,c) ->
+    (fun (u, p, c) ->
       let _, tp, ctx' = extend_with_pattern ctx' cstr p in
       let tc = infer_comp ctx' cstr c in
-      add_ty_constraint cstr (snd p) u1 tp;
-      add_dirty_constraint cstr (snd c) tc u2;
-      T.Arrow (tp,tc)) lst in
+      let t = T.Arrow (tp, tc) in
+      add_ty_constraint cstr (Common.join_pos p c) t u;
+      t) lst in
   let sbst, remaining = Unify.solve !cstr in
   let vars = Common.assoc_map (fun ty ->
                                  let ty = T.subst_ty sbst ty in
