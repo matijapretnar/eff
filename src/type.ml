@@ -12,9 +12,9 @@ let fresh_dirt_param = (let f = Common.fresh "dirt parameter" in fun () -> Dirt_
 let fresh_region_param = (let f = Common.fresh "region parameter" in fun () -> Region_Param (f ()))
 let fresh_instance_param = (let f = Common.fresh "instance parameter" in fun () -> Instance_Param (f ()))
 
-type params = ty_param list * dirt_param list * region_param list
+type params = (ty_param, dirt_param, region_param) Trio.t
 
-type args = ty list * dirt_param list * region_param list
+type args = (ty, dirt_param, region_param) Trio.t
 
 and ty =
   | Apply of Common.tyname * args
@@ -65,7 +65,7 @@ let string_ty = Basic "string"
 let bool_ty = Basic "bool"
 let float_ty = Basic "float"
 let unit_ty = Tuple []
-let empty_ty = Apply ("empty", ([], [], []))
+let empty_ty = Apply ("empty", Trio.empty)
 
 type substitution = {
   subst_ty : (ty_param * ty) list ;
@@ -109,9 +109,7 @@ let subst_fresh sbst frsh =
     | InstanceParam j -> j :: acc | InstanceTop -> acc) frsh []
 
 let rec subst_args subst (tys, drts, rgns) =
-  (List.map (subst_ty subst) tys,
-   List.map (subst_dirt_param subst) drts,
-   List.map (subst_region_param subst) rgns)
+  (List.map (subst_ty subst) tys, List.map (subst_dirt_param subst) drts, List.map (subst_region_param subst) rgns)
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 and subst_ty sbst ty =
@@ -162,36 +160,34 @@ let compose_subst
     Each parameter is listed only once and in order in which it occurs when
     [ty] is displayed. *)
 let free_params ty cnstrs =
-  let (@@@) (xs, ys, zs) (us, vs, ws) = (xs @ us, ys @ vs, zs @ ws) in
-  let flatten_map f lst = List.fold_left (@@@) ([], [], []) (List.map f lst) in
+  let (@@@) = Trio.append in
   let rec free_ty = function
     | Apply (_, args) -> free_args args
     | Effect (_, args, rgn) -> free_args args @@@ free_region_param rgn
     | TyParam p -> ([p], [], [])
-    | Basic _ -> ([], [], [])
-    | Tuple tys -> flatten_map free_ty tys
+    | Basic _ -> Trio.empty
+    | Tuple tys -> Trio.flatten_map free_ty tys
     | Arrow (ty1, dirty2) -> free_ty ty1 @@@ free_dirty dirty2
     | Handler {value = ty1; finally = ty2} -> free_ty ty1 @@@ free_ty ty2
   and free_dirty (_, ty, drt) =
     free_ty ty @@@ free_dirt_param drt
   and free_dirt_param p = ([], [p], [])
   and free_dirt = function
-    | DirtEmpty -> ([], [], [])
+    | DirtEmpty -> Trio.empty
     | DirtParam p -> free_dirt_param p
     | DirtAtom (rgn, _) -> free_region_param rgn
   and free_region_param r = ([], [], [r])
   and free_region = function
     | RegionParam r -> free_region_param r
-    | RegionAtom _ -> ([], [], [])
+    | RegionAtom _ -> Trio.empty
   and free_args (tys, drts, rgns) =
-    flatten_map free_ty tys @@@ flatten_map free_dirt_param drts @@@ flatten_map free_region_param rgns
+    Trio.flatten_map free_ty tys @@@ Trio.flatten_map free_dirt_param drts @@@ Trio.flatten_map free_region_param rgns
   and free_constraint = function
     | TypeConstraint (ty1, ty2, pos) -> free_ty ty1 @@@ free_ty ty2
     | DirtConstraint (drt1, drt2, pos) -> free_dirt drt1 @@@ free_dirt drt2
     | RegionConstraint (rgn1, rgn2, pos) -> free_region rgn1 @@@ free_region rgn2
   in
-  let (xs, ys, zs) = free_ty ty @@@ flatten_map free_constraint cnstrs in    
-    (Common.uniq xs, Common.uniq ys, Common.uniq zs)
+  Trio.uniq (free_ty ty @@@ Trio.flatten_map free_constraint cnstrs)
 
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
 let occurs_in_ty p ty = List.mem p (let (xs, _, _) = free_params ty [] in xs)
@@ -221,7 +217,7 @@ let refreshing_subst (ps, qs, rs) =
       subst_instance = [];
      }
   in
-    (List.map snd ps', List.map snd qs', List.map snd rs'), sbst
+    Trio.snds (ps', qs', rs'), sbst
 
 let instance_refreshing_subst is =
     { identity_subst with subst_instance = List.map (fun i -> (i, InstanceParam (fresh_instance_param ()))) is;
@@ -273,7 +269,7 @@ let beautify_dirty (params, ty, cnstrs) drt =
 
 
 let beautify2 ty1 ty2 =
-  match beautify (([], [], []), Tuple [ty1; ty2], []) with
+  match beautify (Trio.empty, Tuple [ty1; ty2], []) with
   | (ps, Tuple [ty1; ty2], cnstrs) -> (ps, ty1), (ps, ty2)
   | _ -> assert false
 

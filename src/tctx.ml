@@ -14,16 +14,16 @@ type params = (Type.ty_param * variance) list * (Type.dirt_param * variance) lis
 type tyctx = (Common.tyname, params * tydef) Common.assoc
 
 let initial_tctx : tyctx = [
-  ("bool", (([], [], []), Inline T.bool_ty));
-  ("unit", (([], [], []), Inline T.unit_ty));
-  ("int", (([], [], []), Inline T.int_ty));
-  ("string", (([], [], []), Inline T.string_ty));
-  ("float", (([], [], []), Inline T.float_ty));
+  ("bool", (Trio.empty, Inline T.bool_ty));
+  ("unit", (Trio.empty, Inline T.unit_ty));
+  ("int", (Trio.empty, Inline T.int_ty));
+  ("string", (Trio.empty, Inline T.string_ty));
+  ("float", (Trio.empty, Inline T.float_ty));
   ("list", (let a = Type.fresh_ty_param () in
               (([a, (true, false)], [], []),
                  Sum [(Common.nil, None);
                       (Common.cons, Some (T.Tuple [T.TyParam a; T.Apply ("list", ([T.TyParam a], [], []))]))])));
-  ("empty", (([], [], []), Sum []))
+  ("empty", (Trio.empty, Sum []))
 ]
 
 let tctx = ref initial_tctx

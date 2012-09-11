@@ -150,7 +150,7 @@ and infer_let ctx cstr pos defs =
               let ws = Common.assoc_map (fun ty -> (poly, ty)) ws
               in
                 List.rev ws @ vs, drt :: drts, frsh @ frshs)
-    ([], [], []) defs
+    Trio.empty defs
   in
   let sbst, remaining = Unify.solve !cstr in
   (* XXX is not needed? let remaining = Type.subst_constraints sbst remaining in*)

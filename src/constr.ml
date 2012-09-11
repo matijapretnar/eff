@@ -126,13 +126,13 @@ end)
 module Region = Make(struct
   type t = Type.region
   let compare = Pervasives.compare
-  let print = Print.region ([],[],[])
+  let print = Print.region Trio.empty
 end)
 
 module Dirt = Make(struct
   type t = Type.dirt
   let compare = Pervasives.compare
-  let print = Print.dirt ([],[],[])
+  let print = Print.dirt Trio.empty
 end)
 
 type t = {

@@ -161,13 +161,12 @@ let solve initial_cnstrs =
   in
     loop ()
 
-let (@@@) (xs, ys, zs) (us, vs, ws) = (xs @ us, ys @ vs, zs @ ws)
-let flatten_map f lst = List.fold_left (@@@) ([], [], []) (List.map f lst)
+let (@@@) = Trio.append
 
 let for_parameters get_params is_pos ps lst =
   List.fold_right2 (fun (_, (cov, contra)) el params ->
                       let params = if cov then get_params is_pos el @@@ params else params in
-                      if contra then get_params (not is_pos) el @@@ params else params) ps lst ([], [], [])
+                      if contra then get_params (not is_pos) el @@@ params else params) ps lst Trio.empty
 
 let pos_neg_params ty =
   let pos_params is_pos ty =
@@ -175,8 +174,8 @@ let pos_neg_params ty =
       | Type.Apply (ty_name, args) -> pos_args is_pos ty_name args
       | Type.Effect (ty_name, args, rgn) -> pos_args is_pos ty_name args @@@ pos_region_param is_pos rgn
       | Type.TyParam p -> ((if is_pos then [p] else []), [], [])
-      | Type.Basic _ -> ([], [], [])
-      | Type.Tuple tys -> flatten_map (pos_ty is_pos) tys
+      | Type.Basic _ -> Trio.empty
+      | Type.Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
       | Type.Arrow (ty1, dirty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos dirty2
       | Type.Handler {Type.value = ty1; Type.finally = ty2} -> pos_ty (not is_pos) ty1 @@@ pos_ty is_pos ty2
     and pos_dirty is_pos (_, ty, drt) =
@@ -192,8 +191,7 @@ let pos_neg_params ty =
           for_parameters pos_region_param is_pos rs rgns
       end
     in
-    let (xs, ys, zs) = pos_ty is_pos ty in    
-      (Common.uniq xs, Common.uniq ys, Common.uniq zs)
+    Trio.uniq (pos_ty is_pos ty)
   in
   pos_params true ty, pos_params false ty
 let garbage_collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) grph =

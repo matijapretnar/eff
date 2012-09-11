@@ -60,7 +60,7 @@ let fill_args_tydef is_effect def =
           (fun (fld, ty) (ds, rs, lst) ->
             let (ds', rs'), ty = fill_args is_effect ty in
               (ds' @ ds, rs' @ rs, (fld, ty) :: lst))
-          lst ([], [], [])
+          lst Trio.empty
       in
         (ds, rs), Syntax.TyRecord lst
     | Syntax.TySum lst ->
@@ -72,7 +72,7 @@ let fill_args_tydef is_effect def =
               | Some ty ->
                 let (ds', rs'), ty = fill_args is_effect ty in
                   (ds' @ ds, rs' @ rs, (lbl, Some ty) :: lst))
-          lst ([], [], [])
+          lst Trio.empty
       in
         (ds, rs), Syntax.TySum lst
     | Syntax.TyEffect lst ->
@@ -82,7 +82,7 @@ let fill_args_tydef is_effect def =
             let (ds1, rs1), ty1 = fill_args is_effect ty1 in
             let (ds2, rs2), ty2 = fill_args is_effect ty2 in
               (ds1 @ ds2 @ ds, rs1 @ rs2 @ rs, (op, (ty1, ty2)) :: lst))
-          lst ([], [], [])
+          lst Trio.empty
       in
         (ds, rs), Syntax.TyEffect lst
 
@@ -133,25 +133,23 @@ let ty (ts, ds, rs) =
 
 (** [free_params t] returns a triple of all free type, dirt, and region params in [t]. *)
 let free_params t =
-  let (@@@) (xs, ys, zs) (us, vs, ws) = (xs @ us, ys @ vs, zs @ ws)
+  let (@@@) = Trio.append
   and optional f = function
-    | None -> ([], [], [])
+    | None -> Trio.empty
     | Some x -> f x
   in
-  let flatten_map f lst = List.fold_left (@@@) ([], [], []) (List.map f lst) in
   let rec ty = function
   | Syntax.TyApply (_, tys, drts_rgns, rgn) ->
-      flatten_map ty tys @@@ (optional dirts_regions) drts_rgns @@@ (optional region) rgn
+      Trio.flatten_map ty tys @@@ (optional dirts_regions) drts_rgns @@@ (optional region) rgn
   | Syntax.TyParam s -> ([s], [], [])
   | Syntax.TyArrow (t1, t2, drt) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt
-  | Syntax.TyTuple lst -> flatten_map ty lst
+  | Syntax.TyTuple lst -> Trio.flatten_map ty lst
   | Syntax.TyHandler (t1, t2) -> ty t1 @@@ ty t2
   and dirt (Syntax.DirtParam d) = ([], [d], [])
   and region (Syntax.RegionParam r) = ([], [], [r])
-  and dirts_regions (drts, rgns) = flatten_map dirt drts @@@ flatten_map region rgns
+  and dirts_regions (drts, rgns) = Trio.flatten_map dirt drts @@@ Trio.flatten_map region rgns
   in
-  let (xs, ys, zs) = ty t in
-    (Common.uniq xs, Common.uniq ys, Common.uniq zs)
+  Trio.uniq (ty t)
 
 let syntax_to_core_params (ts, ds, rs) = (
     List.map (fun p -> (p, Type.fresh_ty_param ())) ts,
@@ -162,12 +160,12 @@ let syntax_to_core_params (ts, ds, rs) = (
 let external_ty is_effect t =
   let _, t = fill_args is_effect t in
   let (ts, ds, rs) = syntax_to_core_params (free_params t) in
-  ((List.map snd ts, List.map snd ds, List.map snd rs), ty (ts, ds, rs) t, [])
+  (Trio.snds (ts, ds, rs), ty (ts, ds, rs) t, [])
 
 (** [tydef params d] desugars the type definition with parameters [params] and definition [d]. *)
 let tydef params d =
   let (ts, ds, rs) as sbst = syntax_to_core_params params in
-    ((List.map snd ts, List.map snd ds, List.map snd rs),
+    (Trio.snds (ts, ds, rs),
      begin match d with
        | Syntax.TyRecord lst -> Tctx.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
        | Syntax.TySum lst -> Tctx.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
@@ -200,7 +198,7 @@ let tydefs defs =
       (fun (tyname, (params, def)) (ds, rs, defs) ->
         let (d, r), def = fill_args_tydef is_effect def in
           (d @ ds, r @ rs, ((tyname, (params, def)) :: defs)))
-      defs ([], [], [])
+      defs Trio.empty
   in
     (* Now we traverse again and the rest of the work. *)
     List.map (fun (tyname, (ts, def)) -> (tyname, tydef (ts, ds, rs) def)) defs
