@@ -238,7 +238,7 @@ let disable_beautify = ref false
 
 (** [beautify ty] returns a sequential replacement of all type parameters in
     [ty] that can be used for its pretty printing. *)
-let beautify ((ps, ds, rs), ty, cnstrs) =
+let beautify ?beautifier ((ps, ds, rs), ty, cnstrs) =
   if !disable_beautify then
     ((ps, ds, rs), ty, cnstrs)
   else

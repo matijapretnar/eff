@@ -155,7 +155,7 @@ plain_term:
   | WITH h = term HANDLE t = term
     { Handle (h, t) }
   | t1 = term SEMI t2 = term
-    { Let ([(Pattern.Nonbinding, Common.Nowhere), t1], t2) }
+    { Let ([(Pattern.Nonbinding, snd t1), t1], t2) }
   | IF t_cond = comma_term THEN t_true = term ELSE t_false = term
     { Conditional (t_cond, t_true, t_false) }
   | WHILE t1 = comma_term DO t2 = term DONE
@@ -192,7 +192,7 @@ plain_binop_term:
       Apply ((partial, partial_pos), t2)
     }
   | t1 = binop_term CONS t2 = binop_term
-    { Variant (Common.cons, Some (Tuple [t1; t2], Common.Nowhere)) }
+    { Variant (Common.cons, Some (Tuple [t1; t2], Common.Position ($startpos, $endpos))) }
   | t = plain_uminus_term 
     { t }
 
@@ -216,7 +216,7 @@ plain_app_term:
       | Variant (lbl, None), [t] -> Variant (lbl, Some t)
       | Variant (lbl, _), _ -> Error.syntax ~pos:(snd t) "Label %s applied to too many argument" lbl
       | _, _ ->
-        let apply t1 t2 = (Apply(t1, t2), Common.join_pos t1 t2) in
+        let apply ((_, pos1) as t1) ((_, pos2) as t2) = (Apply(t1, t2), Common.join_pos pos1 pos2) in
         fst (List.fold_left apply t ts)
     }
   | t = plain_prefix_term
@@ -245,7 +245,9 @@ plain_simple_term:
   | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
       let nil = (Variant (Common.nil, None), Common.Position ($endpos, $endpos)) in
-      let cons t ts = (Variant (Common.cons, Some (Tuple [t; ts], Common.Nowhere)), Common.join_pos t ts) in
+      let cons ((_, post) as t) ((_, posts) as ts) =
+        let pos = Common.join_pos post posts in
+        (Variant (Common.cons, Some (Tuple [t; ts], pos)), pos) in
       fst (List.fold_right cons ts nil)
     }
   | LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, comma_term)) RBRACE
@@ -319,7 +321,7 @@ plain_cons_pattern:
   | p = variant_pattern
     { fst p }
   | p1 = variant_pattern CONS p2 = cons_pattern
-    { Pattern.Variant (Common.cons, Some (Pattern.Tuple [p1; p2], Common.Nowhere)) }
+    { Pattern.Variant (Common.cons, Some (Pattern.Tuple [p1; p2], Common.Position ($startpos, $endpos))) }
 
 variant_pattern: mark_position(plain_variant_pattern) { $1 }
 plain_variant_pattern:
@@ -342,9 +344,10 @@ plain_simple_pattern:
     { Pattern.Record flds }
   | LBRACK ts = separated_list(SEMI, pattern) RBRACK
     {
-      let nil = (Pattern.Variant (Common.nil, None), Common.Nowhere) in
-      let cons t ts =
-        (Pattern.Variant (Common.cons, Some (Pattern.Tuple [t; ts], Common.Nowhere)), Common.Nowhere)
+      let nil = (Pattern.Variant (Common.nil, None), Common.Position ($endpos, $endpos)) in
+      let cons ((_, post) as t) ((_, posts) as ts) =
+        let pos = Common.join_pos post posts in
+        (Pattern.Variant (Common.cons, Some (Pattern.Tuple [t; ts], pos)), pos)
       in
         fst (List.fold_right cons ts nil)
     }
@@ -470,38 +473,41 @@ defined_ty:
   | t = ty
     { TyInline t }
 
-ty:
+ty: mark_position(plain_ty) { $1 }
+plain_ty:
   | t1 = ty_apply ARROW t2 = ty
     { TyArrow (t1, t2, None) }
   | t1 = ty_apply HARROW t2 = ty
     { TyHandler (t1, t2) }
-  | t = prod_ty
+  | t = plain_prod_ty
     { t }
 
-prod_ty:
+prod_ty: mark_position(plain_prod_ty) { $1 }
+plain_prod_ty:
   | ts = separated_nonempty_list(STAR, ty_apply)
     {
       match ts with
       | [] -> assert false
-      | [t] -> t
+      | [t] -> fst t
       | _ -> TyTuple ts
      }
 
-ty_apply:
+ty_apply: mark_position(plain_ty_apply) { $1 }
+plain_ty_apply:
   | LPAREN t = ty COMMA ts = separated_nonempty_list(COMMA, ty) RPAREN t2 = tyname
     { TyApply (t2, (t :: ts), None, None) }
   | t = ty_apply t2 = tyname
     { TyApply (t2, [t], None, None) }
-  | t = simple_ty
+  | t = plain_simple_ty
     { t }
 
-simple_ty:
+plain_simple_ty:
   | t = tyname
     { TyApply (t, [], None, None) }
   | t = PARAM
     { TyParam t }
   | LPAREN t = ty RPAREN
-    { t }
+    { fst t }
 
 sum_case:
   | lbl = UNAME

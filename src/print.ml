@@ -14,8 +14,6 @@ let print ?(max_level=9999) ?(at_level=0) ppf =
 
 let position pos ppf =
   match pos with
-  | Common.Nowhere ->
-      Format.fprintf ppf "unknown position"
   | Common.Position (begin_pos, end_pos) ->
       let begin_char = begin_pos.Lexing.pos_cnum - begin_pos.Lexing.pos_bol + 1 in
       let begin_line = begin_pos.Lexing.pos_lnum in
@@ -245,16 +243,19 @@ let to_string m =
 
 
 let verbosity = ref 3
-let message ?(pos=Common.Nowhere) msg_type v =
+let message ?pos msg_type v =
   if v <= !verbosity then
     begin
-      Format.eprintf "@[%s (%t): " msg_type (position pos);
+      begin match pos with
+      | None -> Format.eprintf "@[%s: " msg_type
+      | Some pos -> Format.eprintf "@[%s (%t): " msg_type (position pos)
+      end;
       Format.kfprintf (fun ppf -> fprintf ppf "@]@.") Format.err_formatter
     end
   else
     Format.ifprintf Format.err_formatter
 
-let error (pos, err_type, msg) = message ~pos (err_type) 1 "%s" msg
-let check ?pos = message ?pos "Check" 2
-let warning ?pos = message ?pos "Warning" 3
+let error (pos, err_type, msg) = message ?pos err_type 1 "%s" msg
+let check ~pos = message ~pos "Check" 2
+let warning ~pos = message ~pos "Warning" 3
 let debug ?pos = message ?pos "Debug" 4

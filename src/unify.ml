@@ -184,7 +184,8 @@ let pos_neg_params ty =
     and pos_region_param is_pos r = ([], [], if is_pos then [r] else [])
     and pos_args is_pos ty_name (tys, drts, rgns) =
       begin match Tctx.lookup_params ty_name with
-      | None -> Error.typing ~pos:Common.Nowhere "Undefined type %s" ty_name
+      (* We assume that ty has been type-checked thus all type names are valid. *)
+      | None -> assert false
       | Some (ps, ds, rs) ->
           for_parameters pos_ty is_pos ps tys @@@
           for_parameters pos_dirt_param is_pos ds drts @@@

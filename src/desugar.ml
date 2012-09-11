@@ -23,7 +23,9 @@ let fill_args is_effect ty =
     let (Syntax.RegionParam x) as r = fresh_region_param () in
       rs := x :: !rs ; r
   in
-  let rec fill = function
+  let rec fill (ty, pos) =
+  let ty' =
+  match ty with
   | Syntax.TyApply (t, tys, drts_rgns, rgn) ->
       let tys = List.map fill tys
       and drts_rgns =
@@ -37,7 +39,7 @@ let fill_args is_effect ty =
         end
       and rgn = begin match rgn with
         | Some rgn ->
-          if is_effect t then Some rgn else Error.typing ~pos:C.Nowhere "A non-effect type %s tagged with a region." t
+          if is_effect t then Some rgn else Error.typing ~pos "A non-effect type %s tagged with a region." t
         | None ->
           if is_effect t then Some (fresh_region_param ()) else None
       end
@@ -48,6 +50,8 @@ let fill_args is_effect ty =
   | Syntax.TyArrow (t1, t2, Some drt) -> Syntax.TyArrow (fill t1, fill t2, Some drt)
   | Syntax.TyTuple lst -> Syntax.TyTuple (List.map fill lst)
   | Syntax.TyHandler (t1, t2) -> Syntax.TyHandler (fill t1, fill t2)
+  in
+  (ty', pos)
   in
   let ty = fill ty in
   (!ds, !rs), ty
@@ -99,34 +103,34 @@ let fill_args_tydef is_effect def =
    calling [ty].
 *)
 let ty (ts, ds, rs) =
-  let rec ty = function
+  let rec ty (t, pos) = match t with
   | Syntax.TyApply (t, tys, drts_rgns, rgn) ->
       let tys = List.map ty tys
       and (drts, rgns) = begin match drts_rgns with
-        | Some (drts, rgns) -> (List.map dirt drts, List.map region rgns)
+        | Some (drts, rgns) -> (List.map (dirt pos) drts, List.map (region pos) rgns)
         | None -> (List.map (fun (_, d) -> d) ds, List.map (fun (_, r) -> r) rs)
       end 
       in begin match rgn with
         | None -> T.Apply (t, (tys, drts, rgns))
-        | Some rgn -> T.Effect (t, (tys, drts, rgns), region rgn)
+        | Some rgn -> T.Effect (t, (tys, drts, rgns), (region pos) rgn)
       end
   | Syntax.TyParam t ->
     begin match C.lookup t ts with
-    | None -> Error.syntax ~pos:C.Nowhere "Unbound type parameter '%s" t
+    | None -> Error.syntax ~pos "Unbound type parameter '%s" t
     | Some p -> T.TyParam p
     end
     (* XXX Here, we maybe want to parse fresh instances? *)
-  | Syntax.TyArrow (t1, t2, Some drt) -> T.Arrow (ty t1, ([], ty t2, dirt drt))
+  | Syntax.TyArrow (t1, t2, Some drt) -> T.Arrow (ty t1, ([], ty t2, dirt pos drt))
   | Syntax.TyArrow (t1, t2, None) -> assert false
   | Syntax.TyTuple lst -> T.Tuple (List.map ty lst)
   | Syntax.TyHandler (t1, t2) -> T.Handler { T.value = ty t1; T.finally = ty t2 }
-  and dirt (Syntax.DirtParam d) =
+  and dirt pos (Syntax.DirtParam d) =
     match C.lookup d ds with
-    | None -> Error.syntax ~pos:C.Nowhere "Unbound dirt parameter 'drt%d" d
+    | None -> Error.syntax ~pos "Unbound dirt parameter 'drt%d" d
     | Some d -> d
-  and region (Syntax.RegionParam r) =
+  and region pos (Syntax.RegionParam r) =
     match C.lookup r rs with
-    | None -> Error.syntax ~pos:C.Nowhere "Unbound region parameter 'rgn%d" r
+    | None -> Error.syntax ~pos "Unbound region parameter 'rgn%d" r
     | Some r -> r
   in
   ty
@@ -138,7 +142,7 @@ let free_params t =
     | None -> Trio.empty
     | Some x -> f x
   in
-  let rec ty = function
+  let rec ty (t, pos) = match t with
   | Syntax.TyApply (_, tys, drts_rgns, rgn) ->
       Trio.flatten_map ty tys @@@ (optional dirts_regions) drts_rgns @@@ (optional region) rgn
   | Syntax.TyParam s -> ([s], [], [])
@@ -174,19 +178,19 @@ let tydef params d =
      end)
 
 (** [tydefs defs] desugars the simultaneous type definitions [defs]. *)
-let tydefs defs =
+let tydefs ~pos defs =
   (* First we build a predicate which tells whether a type name refers to an effect type. *)
   let is_effect =
     let rec find forbidden tyname =
       match C.lookup tyname defs with
         | Some (_, (Syntax.TyRecord _ | Syntax.TySum _)) -> false
-        | Some (_, (Syntax.TyInline (Syntax.TyApply (tyname', _, _, _)))) ->
+        | Some (_, (Syntax.TyInline (Syntax.TyApply (tyname', _, _, _), pos))) ->
           if List.mem tyname' forbidden
-          then Error.typing ~pos:C.Nowhere "Type definition %s is cyclic." tyname' (* Compare to [Tctx.check_noncyclic]. *)
+          then Error.typing ~pos "Type definition %s is cyclic." tyname' (* Compare to [Tctx.check_noncyclic]. *)
           else find (tyname :: forbidden) tyname'
         | Some (_, Syntax.TyInline _) -> false
         | Some (_, (Syntax.TyEffect _)) -> true
-        | None -> Tctx.is_effect ~pos:C.Nowhere tyname
+        | None -> Tctx.is_effect ~pos tyname
     in
       find []
   in
@@ -261,17 +265,21 @@ let rec expression (t, pos) =
   w, (e, pos)
 
 and computation (t, pos) =
+  let if_then_else e ((_, pos1) as c1) ((_, pos2) as c2) =
+    Core.Match (e, [
+      (Pattern.Const (C.Boolean true), pos1), c1;
+      (Pattern.Const (C.Boolean false), pos2), c2
+    ])
+  in
   let w, c = match t with
     | Syntax.Apply ((Syntax.Apply ((Syntax.Var "&&", pos1), t1), pos2), t2) ->
       let w1, e1 = expression t1 in
       let c2 = computation t2 in
-          w1, Core.Match (e1, [((Pattern.Const (C.Boolean false), pos1), (Core.Value (Core.Const (C.Boolean false), C.Nowhere), pos1));
-                            ((Pattern.Const (C.Boolean true), pos2), c2)])
+          w1, if_then_else e1 c2 ((Core.Value (Core.Const (C.Boolean false), pos2)), pos2)
     | Syntax.Apply ((Syntax.Apply ((Syntax.Var "||", pos1), t1), pos2), t2) ->
       let w1, e1 = expression t1 in
       let c2 = computation t2 in
-          w1, Core.Match (e1, [((Pattern.Const (C.Boolean true), pos1), (Core.Value (Core.Const (C.Boolean true), C.Nowhere), pos1));
-                            ((Pattern.Const (C.Boolean false), pos2), c2)])
+          w1, if_then_else e1 ((Core.Value (Core.Const (C.Boolean true), pos2)), pos2) c2
     | Syntax.Apply (t1, t2) ->
         let w1, e1 = expression t1 in
         let w2, e2 = expression t2 in
@@ -294,8 +302,7 @@ and computation (t, pos) =
         let w, e = expression t in
         let c1 = computation t1 in
         let c2 = computation t2 in
-          w, Core.Match (e, [((Pattern.Const (C.Boolean true), C.Nowhere), c1);
-                          ((Pattern.Const (C.Boolean false), C.Nowhere), c2)])
+          w, if_then_else e c1 c2
     | Syntax.While (t1, t2) ->
         let c1 = computation t1 in
         let c2 = computation t2 in

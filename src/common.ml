@@ -14,16 +14,12 @@ type regionparam = int (** region parameters *)
 (** Positions *)
 type position =
   | Position of Lexing.position * Lexing.position (** delimited position *)
-  | Nowhere (** unknown region *)
 
 (** A type enriched with a position *)
 type 'a pos = 'a * position
 
 (** A union of two positions *)
-let join_pos (_, pos1) (_, pos2) =
-  match pos1, pos2 with
-  | _, Nowhere | Nowhere, _ -> Nowhere
-  | Position (b1, _), Position (_, e2) -> Position (b1, e2)
+let join_pos (Position (b1, _)) (Position (_, e2)) = Position (b1, e2)
 
 (** Primitive constants *)
 type const =

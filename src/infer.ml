@@ -179,7 +179,7 @@ and infer_let_rec ctx cstr pos defs =
       let _, tp, ctx' = extend_with_pattern ctx' cstr p in
       let tc = infer_comp ctx' cstr c in
       let t = T.Arrow (tp, tc) in
-      add_ty_constraint cstr (Common.join_pos p c) t u;
+      add_ty_constraint cstr (Common.join_pos (snd p) (snd c)) t u;
       t) lst in
   let sbst, remaining = Unify.solve !cstr in
   let vars = Common.assoc_map (fun ty ->

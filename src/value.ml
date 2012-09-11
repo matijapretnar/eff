@@ -33,29 +33,29 @@ let from_fun f = Closure f
 
 let value v = Value v
 
-let to_bool ~pos = function
+let to_bool = function
   | Const (Common.Boolean b) -> b
-  | _ -> Error.runtime ~pos "A boolean value expected."
+  | _ -> Error.runtime "A boolean value expected."
 
-let to_int ~pos = function
+let to_int = function
   | Const (Common.Integer n) -> n
-  | _ -> Error.runtime ~pos "An integer value expected."
+  | _ -> Error.runtime "An integer value expected."
 
-let to_float ~pos = function
+let to_float = function
   | Const (Common.Float f) -> f
-  | _ -> Error.runtime ~pos "A floating-point value expected."
+  | _ -> Error.runtime "A floating-point value expected."
 
-let to_str ~pos = function
+let to_str = function
   | Const (Common.String s) -> s
-  | _ -> Error.runtime ~pos "A string value expected."
+  | _ -> Error.runtime "A string value expected."
 
-let to_instance ~pos = function
+let to_instance = function
   | Instance i -> i
-  | _ -> Error.runtime ~pos "An effect instance expected."
+  | _ -> Error.runtime "An effect instance expected."
 
-let to_handler ~pos = function
+let to_handler = function
   | Handler h -> h
-  | _ -> Error.runtime ~pos "A handler expected."
+  | _ -> Error.runtime "A handler expected."
 
 let value_unit = Value (from_unit)
 let value_bool b = Value (from_bool b)
@@ -147,16 +147,16 @@ and compare_option o1 o2 =
 
 (* Now it is easy to get equality and less than, not to mention we
    can now easily add a builtin "compare". *)
-let equal ~pos v1 v2 =
+let equal v1 v2 =
   match compare v1 v2 with
     | Common.Equal -> true
     | Common.Less | Common.Greater -> false
-    | Common.Invalid -> Error.runtime ~pos "invalid comparison with ="
+    | Common.Invalid -> Error.runtime "invalid comparison with ="
 
-let less_than ~pos v1 v2 =
+let less_than v1 v2 =
   match compare v1 v2 with
     | Common.Less -> true
     | Common.Greater | Common.Equal -> false
-    | Common.Invalid -> Error.runtime ~pos "invalid comparison with <"
+    | Common.Invalid -> Error.runtime "invalid comparison with <"
 
 

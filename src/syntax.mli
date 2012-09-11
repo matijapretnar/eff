@@ -67,7 +67,8 @@ type dirt =
 type region =
   | RegionParam of Common.regionparam
 
-type ty =
+type ty = plain_ty Common.pos
+and plain_ty =
   | TyApply of Common.tyname * ty list * (dirt list * region list) option * region option
   (** [(ty1, ty2, ..., tyn) type_name] *)
   | TyParam of Common.typaram
