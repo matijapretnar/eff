@@ -1,7 +1,5 @@
 (* Directed graphs of constraints. *)
 
-let compare_fst (x, _) (y, _) = Pervasives.compare x y
-
 module type VERTEX =
 sig
   type t
@@ -49,7 +47,7 @@ struct
 
   module S = Set.Make(struct
     type t = Vertex.t * Common.position
-    let compare = compare_fst
+    let compare (x, _) (y, _) = Vertex.compare x y
   end)
 
   module G = Map.Make(Vertex)
@@ -60,10 +58,6 @@ struct
 
   let get x (g : t) =
     try G.find x g with Not_found -> (S.empty, S.empty)
-
-  let in_edges x g = fst (G.find x g)
-
-  let out_edges x g = snd (G.find x g)
 
   let add_edge x y pos (g : t) =
     let (inx, outx) = get x g in
@@ -164,12 +158,6 @@ let remove_ty g x =
 let fold_ty f g acc = Ty.fold_edges f g.ty_graph acc
 let fold_region f g acc = Region.fold_edges f g.region_graph acc
 let fold_dirt f g acc = Dirt.fold_edges f g.dirt_graph acc
-
-let transitive_closure grph = {
-  ty_graph = Ty.transitive_closure grph.ty_graph;
-  dirt_graph = Dirt.transitive_closure grph.dirt_graph;
-  region_graph = Region.transitive_closure grph.region_graph
-}
 
 let print grph ppf =
   Print.print ppf "TYPES:@.%t@.REGIONS:@.%t@.DIRT:@.%t@." 
