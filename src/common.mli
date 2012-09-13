@@ -1,0 +1,36 @@
+type variable = string
+type opsym = string
+type label = string
+type field = string
+type tyname = string
+type typaram = string
+type dirtparam = int
+type regionparam = int
+type position = Position of Lexing.position * Lexing.position
+type 'a pos = 'a * position
+val join_pos : position -> position -> position
+type const =
+    Integer of Big_int.big_int
+  | String of string
+  | Boolean of bool
+  | Float of float
+type comparison = Less | Equal | Greater | Invalid
+val compare_const : const -> const -> comparison
+val equal_const : const -> const -> bool
+val cons : string
+val nil : string
+type ('a, 'b) assoc = ('a * 'b) list
+val lookup : 'a -> ('a * 'b) list -> 'b option
+val find : ('a -> bool) -> 'a list -> 'a option
+val update : 'a -> 'b -> ('a * 'b) list -> ('a * 'b) list
+val injective : ('a -> 'b) -> 'a list -> bool
+val find_duplicate : 'a list -> 'a list -> 'a option
+val map : ('a -> 'b) -> 'a list -> 'b list
+val flatten_map : ('a -> 'b list) -> 'a list -> 'b list
+val option_map : ('a -> 'b) -> 'a option -> 'b option
+val repeat : 'a -> int -> 'a list
+val assoc_map : ('a -> 'b) -> ('c * 'a) list -> ('c * 'b) list
+val fresh : string -> unit -> int
+val uniq : 'a list -> 'a list
+val split : int -> 'a list -> 'a list * 'a list
+val diff : 'a list -> 'a list -> 'a list

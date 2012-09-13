@@ -11,6 +11,8 @@ module EnvMap = Map.Make(
     let compare = String.compare
   end)
 
+type env = Value.value EnvMap.t
+
 let initial = EnvMap.empty
 
 let update = EnvMap.add 
