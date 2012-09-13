@@ -41,7 +41,7 @@ type substitution = {
   subst_ty : (ty_param * ty) list;
   subst_dirt : (dirt_param * dirt_param) list;
   subst_region : (region_param * region_param) list;
-  subst_instance : (instance_param * instance) list;
+  subst_instance : (instance_param * instance_param option) list;
 }
 val subst_instance : substitution -> instance -> instance
 val subst_region_param : substitution -> region_param -> region_param

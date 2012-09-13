@@ -71,16 +71,27 @@ type substitution = {
   subst_ty : (ty_param * ty) list ;
   subst_dirt : (dirt_param * dirt_param) list ;
   subst_region : (region_param * region_param) list;
-  subst_instance : (instance_param * instance) list
+  subst_instance : (instance_param * instance_param option) list
 }
 
 let subst_instance sbst = function
   | InstanceParam i as inst ->
       begin match Common.lookup i sbst.subst_instance with
-      | Some inst' -> inst'
+      | Some (Some inst') -> InstanceParam inst'
+      | Some None -> InstanceTop
       | None -> inst
       end
   | InstanceTop -> InstanceTop  
+
+let subst_instance_param sbst i =
+  match Common.lookup i sbst.subst_instance with
+  | Some (Some i') -> Some i'
+  | Some None -> None
+  | None -> Some i
+
+let subst_option_instance_param sbst = function
+  | None -> None
+  | Some i -> subst_instance_param sbst i
 
 let subst_region_param sbst r =
   match Common.lookup r sbst.subst_region with
@@ -153,7 +164,7 @@ let compose_subst
   { subst_ty = a1 @ Common.assoc_map (subst_ty sbst1) a2 ;
     subst_dirt = b1 @ Common.assoc_map (subst_dirt_param sbst1) b2 ;
     subst_region = c1 @ Common.assoc_map (subst_region_param sbst1) c2 ;
-    subst_instance = d1 @ Common.assoc_map (subst_instance sbst1) d2 ;
+    subst_instance = d1 @ Common.assoc_map (subst_option_instance_param sbst1) d2 ;
   }
 
 (** [free_params ty cnstrs] returns three lists of type parameters that occur in [ty].
@@ -220,7 +231,7 @@ let refreshing_subst (ps, qs, rs) =
     Trio.snds (ps', qs', rs'), sbst
 
 let instance_refreshing_subst is =
-    { identity_subst with subst_instance = List.map (fun i -> (i, InstanceParam (fresh_instance_param ()))) is;
+    { identity_subst with subst_instance = List.map (fun i -> (i, Some (fresh_instance_param ()))) is;
      }
 
 (** [refresh (ps,qs,rs) ty] replaces the polymorphic parameters [ps,qs,rs] in [ty] with fresh
