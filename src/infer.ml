@@ -128,12 +128,6 @@ and infer_abstraction2 ctx (p1, p2, c) =
   let t3, cstr3 = infer_comp ctx c in
     t1, t2, t3, cstr1 @ cstr2 @ cstr3
 
-and infer_handler_case_abstraction ctx (p, k, e) =
-  let vs, t1, ctx, cstrp = extend_with_pattern ctx p in
-  let _, tk, ctx, cstrc = extend_with_pattern ~forbidden_vars:vs ctx k in
-  let t2, cstr = infer_comp ctx e in
-    tk, t1, (t2 : T.dirty), cstrp @ cstrc @ cstr
-
 and infer_let ctx pos defs =
   (if !warn_implicit_sequencing && List.length defs >= 2 then
       let positions = List.map (fun (_, (_, pos)) -> pos) defs in
@@ -276,7 +270,7 @@ and infer_expr ctx (e,pos) =
               let u, cstr_e = infer_expr ctx e in
                 add_ty_constraint cstr pos u ty;
                 add_constraints cstr cstr_e;
-                let tk, u1, u2, cstr_a = infer_abstraction2 ctx a2 in
+                let u1, tk, u2, cstr_a = infer_abstraction2 ctx a2 in
                   add_constraints cstr cstr_a;
                   add_ty_constraint cstr pos t1 u1;
                   (* XXX maybe we need to change the direction of inequalities here,
