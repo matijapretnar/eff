@@ -58,7 +58,7 @@ type constraints =
    is syntactically incorrect so that the programmer cannot accidentally
    define it. *)
 let universal_ty = Basic "_"
-let universal_dirty = ([], Basic "_", fresh_dirt_param ())
+let universal_dirty = (([], Basic "_", fresh_dirt_param ()), [])
 
 let int_ty = Basic "int"
 let string_ty = Basic "string"

@@ -30,7 +30,7 @@ type constraints =
   | DirtConstraint of dirt * dirt * Common.position
   | RegionConstraint of region * region * Common.position
 val universal_ty : ty
-val universal_dirty : 'a list * ty * dirt_param
+val universal_dirty : ('a list * ty * dirt_param) * constraints list
 val int_ty : ty
 val string_ty : ty
 val bool_ty : ty

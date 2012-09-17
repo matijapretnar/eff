@@ -91,7 +91,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
       let defs = C.assoc_map Desugar.computation defs in
       (* XXX What to do about the dirts? *)
       (* XXX What to do about the fresh instances? *)
-      let vars, _, _, ctx = Infer.infer_let ctx (ref Unify.empty_constraint) pos defs in
+      let vars, _, _, ctx, cstr = Infer.infer_let ctx pos defs in
       List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env =
         List.fold_right
@@ -109,7 +109,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
         (ctx, env)
   | Syntax.TopLetRec defs ->
       let defs = C.assoc_map Desugar.let_rec defs in
-      let vars, ctx = Infer.infer_let_rec ctx (ref Unify.empty_constraint) pos defs in
+      let vars, ctx, cstr = Infer.infer_let_rec ctx pos defs in
       List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env = Eval.extend_let_rec env defs in
         if interactive then begin
@@ -132,11 +132,10 @@ let exec_topdef interactive (ctx, env) (d,pos) =
     and return the new environment. *)
 
 let infer_top_comp ctx c =
-  let cstr = ref [] in
-  let (frshs, ty, drt) = Infer.infer_comp ctx cstr c in
+  let (frshs, ty, drt), cstr = Infer.infer_comp ctx c in
   let isbst = Type.instance_refreshing_subst frshs in
-  cstr := Type.subst_constraints isbst !cstr;
-  let sbst, remaining = Unify.solve !cstr in
+  let cstr = Type.subst_constraints isbst cstr in
+  let sbst, remaining = Unify.solve cstr in
   Exhaust.check_comp c ;
   let sbst = Type.compose_subst isbst sbst in
   let ctx = Ctx.subst_ctx ctx sbst in
