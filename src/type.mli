@@ -44,20 +44,10 @@ type substitution = {
   subst_region : (region_param * region_param) list;
   subst_instance : (instance_param * instance_param option) list;
 }
-val subst_instance : substitution -> instance -> instance
-val subst_region_param : substitution -> region_param -> region_param
-val subst_dirt_param : substitution -> dirt_param -> dirt_param
-val subst_region : substitution -> region -> region
-val subst_dirt : substitution -> dirt -> dirt
-val subst_fresh : substitution -> instance_param list -> instance_param list
-val subst_args : substitution -> args -> args
-val subst_ty : substitution -> ty -> ty
-val subst_dirty : substitution -> dirty -> dirty
-val subst_dirt_ty :
-  substitution ->
-  instance_param list * ty * dirt -> instance_param list * ty * dirt
 val subst_ty_scheme : substitution -> ty_scheme -> ty_scheme
 val subst_constraints : substitution -> constraints list -> constraints list
+val subst_dirty : substitution -> dirty -> dirty
+val subst_ty : substitution -> ty -> ty
 val identity_subst : substitution
 val compose_subst : substitution -> substitution -> substitution
 val free_params :
@@ -65,10 +55,7 @@ val free_params :
 val occurs_in_ty : ty_param -> ty -> bool
 val fresh_ty : unit -> ty
 val fresh_dirt : unit -> dirt
-val fresh_region : unit -> region
-val fresh_instance : unit -> region
 val fresh_dirty : unit -> 'a list * ty * dirt_param
-val fresh_dirt_ty : unit -> 'a list * ty * dirt_param
 val refreshing_subst :
   ty_param list * dirt_param list * region_param list ->
   (ty_param, dirt_param, region_param) Trio.t * substitution
