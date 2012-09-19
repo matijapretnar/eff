@@ -3,7 +3,7 @@
 (** Pure expressions *)
 type expression = plain_expression Common.pos
 and plain_expression =
-  | Var of Common.variable
+  | Var of int
   | Const of Common.const
   | Tuple of expression list
   | Record of (Common.field, expression) Common.assoc
@@ -16,11 +16,11 @@ and plain_expression =
 and computation = plain_computation Common.pos
 and plain_computation =
   | Value of expression
-  | Let of (Common.variable Pattern.t * computation) list * computation
-  | LetRec of (Common.variable * abstraction) list * computation
+  | Let of (int Pattern.t * computation) list * computation
+  | LetRec of (int * abstraction) list * computation
   | Match of expression * abstraction list
   | While of computation * computation
-  | For of Common.variable * expression * expression * computation * bool
+  | For of int * expression * expression * computation * bool
   | Apply of expression * expression
   | New of Common.tyname * resource option
   | Handle of expression * computation
@@ -34,10 +34,10 @@ and handler = {
 }
 
 (** Abstractions that take one argument. *)
-and abstraction = Common.variable Pattern.t * computation
+and abstraction = int Pattern.t * computation
 
 (** Abstractions that take two arguments. *)
-and abstraction2 = Common.variable Pattern.t * Common.variable Pattern.t * computation
+and abstraction2 = int Pattern.t * int Pattern.t * computation
 
 (** An operation is an expression that represents an instance together with
     an operation symbol. *)

@@ -7,8 +7,8 @@ exception PatternMatch of C.position
 
 module EnvMap = Map.Make(
   struct
-    type t = string 
-    let compare = String.compare
+    type t = int 
+    let compare = Pervasives.compare
   end)
 
 type env = Value.value EnvMap.t
@@ -159,7 +159,7 @@ and veval env (e, pos) = match e with
   | Core.Var x ->
       begin match lookup x env with
       | Some v -> v
-      | None -> Error.runtime "Name %s is not defined." x
+      | None -> Error.runtime "Name %d is not defined." x
       end
   | Core.Const c -> V.Const c
   | Core.Tuple es -> V.Tuple (List.map (veval env) es)

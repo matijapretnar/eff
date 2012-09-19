@@ -161,11 +161,6 @@ let syntax_to_core_params (ts, ds, rs) = (
     List.map (fun r -> (r, Type.fresh_region_param ())) rs
   )
 
-let external_ty is_effect t =
-  let _, t = fill_args is_effect t in
-  let (ts, ds, rs) = syntax_to_core_params (free_params t) in
-  (Trio.snds (ts, ds, rs), ty (ts, ds, rs) t, [])
-
 (** [tydef params d] desugars the type definition with parameters [params] and definition [d]. *)
 let tydef params d =
   let (ts, ds, rs) as sbst = syntax_to_core_params params in
@@ -212,59 +207,83 @@ let tydefs ~pos defs =
 
 (** [fresh_variable ()] creates a fresh variable ["$gen1"], ["$gen2"], ... on
     each call *)
-let fresh_variable =
-  let next_variable = Common.fresh "variable" in
-  fun () -> "$gen" ^ string_of_int (next_variable ())
+let fresh_variable = Common.fresh "variable"
 
 let id_abstraction pos =
   let x = fresh_variable () in
   ((Pattern.Var x, pos), (Core.Value (Core.Var x, pos), pos))
 
+let pattern (p, pos) =
+  let vars = ref [] in
+  let rec pattern (p, pos) =
+    let p = match p with
+    | Pattern.Var x ->
+        let n = fresh_variable () in
+        vars := (x, n) :: !vars;
+        Pattern.Var n
+    | Pattern.As (p, x) ->
+        let n = fresh_variable () in
+        vars := (x, n) :: !vars;
+        let p' = pattern p in
+        Pattern.As (p', n)
+    | Pattern.Tuple ps -> Pattern.Tuple (List.map pattern ps)
+    | Pattern.Record flds -> Pattern.Record (Common.assoc_map pattern flds)
+    | Pattern.Variant (lbl, p) -> Pattern.Variant (lbl, Common.option_map pattern p)
+    | (Pattern.Const _ | Pattern.Nonbinding) as p -> p
+    in
+    (p, pos)
+  in
+  let p = pattern (p, pos) in
+  !vars, p
+
 (* Desugaring functions below return a list of bindings and the desugared form. *)
 
-let rec expression (t, pos) =
+let rec expression ctx (t, pos) =
   let w, e = match t with
   | Syntax.Var x ->
-      [], Core.Var x
+      begin match Common.lookup x ctx with
+      | Some n -> [], Core.Var n
+      | None -> Error.typing ~pos "Unknown variable %s" x
+      end
   | Syntax.Const k ->
       [], Core.Const k
   | Syntax.Lambda a ->
-      let a = abstraction a in
+      let a = abstraction ctx a in
       [], Core.Lambda a
   | Syntax.Function cs ->
       let x = fresh_variable () in
-      let cs = List.map abstraction cs in
+      let cs = List.map (abstraction ctx) cs in
       [], Core.Lambda ((Pattern.Var x, pos), (Core.Match ((Core.Var x, pos), cs), pos))
   | Syntax.Handler cs ->
-      let w, h = handler pos cs in
+      let w, h = handler pos ctx cs in
       w, Core.Handler h
   | Syntax.Tuple ts ->
-      let w, es = expressions ts in
+      let w, es = expressions ctx ts in
       w, Core.Tuple es
   | Syntax.Record ts ->
       if not (C.injective fst ts) then Error.syntax ~pos "Fields in a record must be distinct";
-      let w, es = record_expressions ts in
+      let w, es = record_expressions ctx ts in
       w, Core.Record es
   | Syntax.Variant (lbl, None) ->
       [], Core.Variant (lbl, None)
   | Syntax.Variant (lbl, Some t) ->
-      let w, e = expression t in
+      let w, e = expression ctx t in
       w, Core.Variant (lbl, Some e)
   | Syntax.Operation (t, op) ->
-      let w, e = expression t in
+      let w, e = expression ctx t in
       w, Core.Operation (e, op)
   (* Terms that are desugared into computations. We list them explicitly in
      order to catch any future constructs. *)
   | Syntax.Apply _ | Syntax.Match _ | Syntax.Let _ | Syntax.LetRec _
   | Syntax.Handle _ | Syntax.Conditional _ | Syntax.While _ | Syntax.For _ | Syntax.New _ | Syntax.Check _ ->
       let x = fresh_variable () in
-      let c = computation (t, pos) in
+      let c = computation ctx (t, pos) in
       let w = [(Pattern.Var x, pos), c] in
       w, Core.Var x
   in
   w, (e, pos)
 
-and computation (t, pos) =
+and computation ctx (t, pos) =
   let if_then_else e ((_, pos1) as c1) ((_, pos2) as c2) =
     Core.Match (e, [
       (Pattern.Const (C.Boolean true), pos1), c1;
@@ -273,104 +292,150 @@ and computation (t, pos) =
   in
   let w, c = match t with
     | Syntax.Apply ((Syntax.Apply ((Syntax.Var "&&", pos1), t1), pos2), t2) ->
-      let w1, e1 = expression t1 in
-      let c2 = computation t2 in
+      let w1, e1 = expression ctx t1 in
+      let c2 = computation ctx t2 in
           w1, if_then_else e1 c2 ((Core.Value (Core.Const (C.Boolean false), pos2)), pos2)
     | Syntax.Apply ((Syntax.Apply ((Syntax.Var "||", pos1), t1), pos2), t2) ->
-      let w1, e1 = expression t1 in
-      let c2 = computation t2 in
+      let w1, e1 = expression ctx t1 in
+      let c2 = computation ctx t2 in
           w1, if_then_else e1 ((Core.Value (Core.Const (C.Boolean true), pos2)), pos2) c2
     | Syntax.Apply (t1, t2) ->
-        let w1, e1 = expression t1 in
-        let w2, e2 = expression t2 in
+        let w1, e1 = expression ctx t1 in
+        let w2, e2 = expression ctx t2 in
           (w1 @ w2), Core.Apply (e1, e2)
     | Syntax.Match (t, cs) ->
-        let cs = List.map abstraction cs in
-        let w, e = expression t in
+        let cs = List.map (abstraction ctx) cs in
+        let w, e = expression ctx t in
           w, Core.Match (e, cs)
     | Syntax.New (eff, None) ->
         [], Core.New (eff, None)
     | Syntax.New (eff, Some (t, lst)) ->
-        let w, e = expression t in
-        let lst = List.map (fun (op, a) -> (op, abstraction2 a)) lst in
+        let w, e = expression ctx t in
+        let lst = List.map (fun (op, a) -> (op, abstraction2 ctx a)) lst in
           w, Core.New (eff, Some (e, lst))
     | Syntax.Handle (t1, t2) ->
-        let w1, e1 = expression t1 in
-        let c2 = computation t2 in
+        let w1, e1 = expression ctx t1 in
+        let c2 = computation ctx t2 in
           w1, Core.Handle (e1, c2)
     | Syntax.Conditional (t, t1, t2) ->
-        let w, e = expression t in
-        let c1 = computation t1 in
-        let c2 = computation t2 in
+        let w, e = expression ctx t in
+        let c1 = computation ctx t1 in
+        let c2 = computation ctx t2 in
           w, if_then_else e c1 c2
     | Syntax.While (t1, t2) ->
-        let c1 = computation t1 in
-        let c2 = computation t2 in
+        let c1 = computation ctx t1 in
+        let c2 = computation ctx t2 in
           [], Core.While (c1, c2)
 
     | Syntax.For (i, t1, t2, t, b) ->
-      let w1, e1 = expression t1 in
-      let w2, e2 = expression t2 in
-      let c = computation t in
-        w1 @ w2, Core.For (i, e1, e2, c, b)
+      let w1, e1 = expression ctx t1 in
+      let w2, e2 = expression ctx t2 in
+      let j = fresh_variable () in
+      let c = computation ((i, j) :: ctx) t in
+        w1 @ w2, Core.For (j, e1, e2, c, b)
     | Syntax.Check t ->
-        [], Core.Check (computation t)
+        [], Core.Check (computation ctx t)
     | Syntax.Let (defs, t) ->
-        let defs = C.assoc_map computation defs in
-        let c = computation t in
+        let ctx', defs =
+          List.fold_right (fun (p, c) (ctx', defs) ->
+                            let p_vars, p = pattern p in
+                            let c = computation ctx c in
+                            (p_vars @ ctx', (p, c) :: defs)) defs (ctx, []) in
+        let c = computation ctx' t in
           [], Core.Let (defs, c)
     | Syntax.LetRec (defs, t) ->
-        let defs = C.assoc_map let_rec defs in
-        let c = computation t in
+        let ctx', ns = List.fold_right (fun (x, _) (ctx', ns) ->
+                                          let n = fresh_variable () in
+                                          ((x, n) :: ctx', n :: ns)) defs (ctx, []) in
+        let defs =
+          List.fold_right (fun (p, (_, c)) defs ->
+                            let c = let_rec ctx' c in
+                            ((p, c) :: defs)) (List.combine ns defs) [] in
+        let c = computation ctx' t in
           [], Core.LetRec (defs, c)
     (* The remaining cases are expressions, which we list explicitly to catch any
        future changes. *)
     | (Syntax.Var _ | Syntax.Const _ | Syntax.Tuple _ | Syntax.Record _  | Syntax.Variant _ | Syntax.Lambda _ | Syntax.Function _ | Syntax.Handler _ | Syntax.Operation _) ->
-        let w, e = expression (t, pos) in
+        let w, e = expression ctx (t, pos) in
           w, Core.Value e
   in
     match w with
       | [] -> (c, pos)
       | _ :: _ -> Core.Let (w, (c, pos)), pos
 
-and abstraction (p, t) = (p, computation t)
+and abstraction ctx (p, t) =
+  let vars, p = pattern p in
+  (p, computation (vars @ ctx) t)
 
-and abstraction2 (p1, p2, t) = (p1, p2, computation t)
+and abstraction2 ctx (p1, p2, t) =
+  let vars1, p1 = pattern p1 in
+  let vars2, p2 = pattern p2 in
+  (p1, p2, computation (vars1 @ vars2 @ ctx) t)
 
-and let_rec = function
-  | (Syntax.Lambda (p, t), _) -> (p, computation t)
+and let_rec ctx = function
+  | (Syntax.Lambda a, _) -> abstraction ctx a
   | (Syntax.Function cs, pos) ->
     let x = fresh_variable () in
-    let cs = List.map abstraction cs in
+    let cs = List.map (abstraction ctx) cs in
     ((Pattern.Var x, pos), (Core.Match ((Core.Var x, pos), cs), pos))
   | (_, pos) -> Error.syntax ~pos "This kind of expression is not allowed in a recursive definition"
 
-and expressions = function
+and expressions ctx = function
   | [] -> [], []
   | t :: ts ->
-    let w, e = expression t in
-    let ws, es = expressions ts in
+    let w, e = expression ctx t in
+    let ws, es = expressions ctx ts in
     w @ ws, (e :: es)
 
-and record_expressions = function
+and record_expressions ctx = function
   | [] -> [], []
   | (f, t) :: ts ->
-    let w, e = expression t in
-    let ws, es = record_expressions ts in
+    let w, e = expression ctx t in
+    let ws, es = record_expressions ctx ts in
     w @ ws, ((f, e) :: es)
 
-and handler pos {Syntax.operations=ops; Syntax.value=val_a; Syntax.finally=fin_a} =
+and handler pos ctx {Syntax.operations=ops; Syntax.value=val_a; Syntax.finally=fin_a} =
   let rec operation_cases = function
   | [] -> [], []
   | ((t, op), a2) :: cs ->
-    let w, e = expression t in
+    let w, e = expression ctx t in
     let ws, cs' = operation_cases cs in
-    w @ ws, ((e, op), abstraction2 a2) :: cs'
+    w @ ws, ((e, op), abstraction2 ctx a2) :: cs'
   in
   let ws, ops = operation_cases ops in
   ws, { Core.operations = ops;
     Core.value =
-      (match val_a with None -> id_abstraction pos | Some a -> abstraction a);
+      (match val_a with None -> id_abstraction pos | Some a -> abstraction ctx a);
     Core.finally =
-      (match fin_a with None -> id_abstraction pos | Some a -> abstraction a)}
+      (match fin_a with None -> id_abstraction pos | Some a -> abstraction ctx a)}
 
+let top_ctx = ref []
+
+let top_let defs =
+  let ctx', defs =
+  List.fold_right (fun (p, c) (ctx', defs) ->
+                    let p_vars, p = pattern p in
+                    let c = computation !top_ctx c in
+                    (p_vars @ ctx', (p, c) :: defs)) defs (!top_ctx, []) in
+  top_ctx := ctx';
+  defs
+
+let top_let_rec defs =
+  let ctx', ns = List.fold_right (fun (x, _) (ctx', ns) ->
+                                    let n = fresh_variable () in
+                                    ((x, n) :: ctx', n :: ns)) defs (!top_ctx, []) in
+  let defs =
+    List.fold_right (fun (p, (_, c)) defs ->
+                      let c = let_rec ctx' c in
+                      ((p, c) :: defs)) (List.combine ns defs) [] in
+  top_ctx := ctx';
+  defs
+
+let external_ty is_effect x t =
+  let _, t = fill_args is_effect t in
+  let n = fresh_variable () in
+  top_ctx := (x, n) :: !top_ctx;
+  let (ts, ds, rs) = syntax_to_core_params (free_params t) in
+  n, (Trio.snds (ts, ds, rs), ty (ts, ds, rs) t, [])
+
+let top_computation c = computation !top_ctx c

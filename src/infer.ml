@@ -113,7 +113,7 @@ let infer_pattern pp =
 let extend_with_pattern ?(forbidden_vars=[]) ctx p =
   let vars, t, cstr = infer_pattern p in
     match C.find (fun (x,_) -> List.mem_assoc x vars) forbidden_vars with
-      | Some (x,_) -> Error.typing ~pos:(snd p) "Several definitions of %s." x
+      | Some (x,_) -> Error.typing ~pos:(snd p) "Several definitions of %d." x
       | None -> vars, t, List.fold_right (fun (x, t) ctx -> Ctx.extend_ty ctx x t) vars ctx, cstr
 
 
@@ -144,7 +144,7 @@ and infer_let ctx pos defs =
           add_constraints cstr cstr_p;
           add_ty_constraint cstr (snd c) tc tp;
           match C.find_duplicate (List.map fst ws) (List.map fst vs) with
-            | Some x -> Error.typing ~pos "Several definitions of %s." x
+            | Some x -> Error.typing ~pos "Several definitions of %d." x
             | None ->
               let poly = nonexpansive (fst c) in
               let ws = Common.assoc_map (fun ty -> (poly, ty)) ws
@@ -201,7 +201,7 @@ and infer_expr ctx (e,pos) =
     | Core.Var x ->
         begin match Ctx.lookup ctx x with
         | Some (_, ty, cstrs) -> add_constraints cstr cstrs; ty
-        | None -> Error.typing ~pos "Unknown variable %s" x
+        | None -> Error.typing ~pos "Unknown variable %d" x
         end
     | Core.Const const -> ty_of_const const
     | Core.Tuple es -> T.Tuple (C.map (fun e -> let t, cstr_e = infer_expr ctx e in add_constraints cstr cstr_e; t) es)

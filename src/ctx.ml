@@ -1,5 +1,5 @@
 type ty_scheme = Type.params * Type.ty * Type.constraints list
-type t = (Common.variable, ty_scheme) Common.assoc
+type t = (int, ty_scheme) Common.assoc
 
 let empty = []
 

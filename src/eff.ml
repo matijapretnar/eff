@@ -88,7 +88,7 @@ let initial_ctxenv =
 let exec_topdef interactive (ctx, env) (d,pos) =
   match d with
   | Syntax.TopLet defs ->
-      let defs = C.assoc_map Desugar.computation defs in
+      let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
       (* XXX What to do about the fresh instances? *)
       let vars, _, _, ctx, cstr = Infer.infer_let ctx pos defs in
@@ -103,21 +103,22 @@ let exec_topdef interactive (ctx, env) (d,pos) =
                        match Eval.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.printf "@[val %s : %t = %t@]@." x (Print.beautified_ty_scheme tysch) (Print.value v))
+                         Format.printf "@[val %d : %t = %t@]@." x (Print.beautified_ty_scheme tysch) (Print.value v))
             vars
         end;
         (ctx, env)
   | Syntax.TopLetRec defs ->
-      let defs = C.assoc_map Desugar.let_rec defs in
+      let defs = Desugar.top_let_rec defs in
       let vars, ctx, cstr = Infer.infer_let_rec ctx pos defs in
       List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env = Eval.extend_let_rec env defs in
         if interactive then begin
-          List.iter (fun (x, tysch) -> Format.printf "@[val %s : %t = <fun>@]@." x (Print.beautified_ty_scheme tysch)) vars
+          List.iter (fun (x, tysch) -> Format.printf "@[val %d : %t = <fun>@]@." x (Print.beautified_ty_scheme tysch)) vars
         end;
         (ctx, env)
   | Syntax.External (x, t, f) ->
-    let ctx = Ctx.extend ctx x (Desugar.external_ty (Tctx.is_effect ~pos:pos) t) in
+    let (x, t) = Desugar.external_ty (Tctx.is_effect ~pos:pos) x t in
+    let ctx = Ctx.extend ctx x t in
       begin match C.lookup f External.values with
         | Some v -> (ctx, Eval.update x v env)
         | None -> Error.runtime "unknown external symbol %s." f
@@ -149,7 +150,7 @@ let infer_top_comp ctx c =
 let rec exec_cmd interactive (ctx, env) e =
   match e with
   | Syntax.Term c ->
-      let c = Desugar.computation c in
+      let c = Desugar.top_computation c in
       let ctx, tysch, drt, frsh = infer_top_comp ctx c in
       let v = Eval.run env c in
       if interactive then Format.printf "@[- : %t %t = %t@]@."
@@ -158,7 +159,7 @@ let rec exec_cmd interactive (ctx, env) e =
         (Print.value v);
       (ctx, env)
   | Syntax.TypeOf c ->
-      let c = Desugar.computation c in
+      let c = Desugar.top_computation c in
       let ctx, tysch, drt, frsh = infer_top_comp ctx c in
       Format.printf "@[- : %t@]@." (Print.beautified_dirty_scheme tysch drt);
       (ctx, env)

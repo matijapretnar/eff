@@ -42,8 +42,8 @@ let const c ppf =
 let rec pattern ?max_level (p,_) ppf =
   let print ?at_level = print ?max_level ?at_level ppf in
   match p with
-  | Pattern.Var x -> print "%s" x
-  | Pattern.As (p, x) -> print "%t as %s" (pattern p) x
+  | Pattern.Var x -> print "%d" x
+  | Pattern.As (p, x) -> print "%t as %d" (pattern p) x
   | Pattern.Const c -> const c ppf
   | Pattern.Tuple lst -> print "(@[<hov>%t@])" (sequence "," pattern lst)
   | Pattern.Record lst -> print "{@[<hov>%t@]}" (sequence ";" (field pattern) lst)
@@ -167,7 +167,7 @@ let rec computation ?max_level c ppf =
   | Core.Value e -> print ~at_level:1 "value %t" (expression ~max_level:0 e)
   | Core.Match (e, lst) -> print "match %t with (@[<hov>%t@])" (expression e) (sequence " | " case lst)
   | Core.While (c1, c2) -> print "while %t do %t done" (computation c1) (computation c2)
-  | Core.For (i, e1, e2, c, d) -> print "for %s = ... " i
+  | Core.For (i, e1, e2, c, d) -> print "for %d = ... " i
   | Core.New (eff, None) -> print "new %s" eff
   | Core.New (eff, Some (e, lst)) -> print "new %s @ %t with ... end" eff (expression e)
   | Core.Handle (e, c) -> print "handle %t with %t" (expression e) (computation c)
@@ -179,7 +179,7 @@ let rec computation ?max_level c ppf =
 and expression ?max_level e ppf =
   let print ?at_level = print ?max_level ?at_level ppf in
   match fst e with
-  | Core.Var x -> print "%s" x
+  | Core.Var x -> print "%d" x
   | Core.Const c -> print "%t" (const c)
   | Core.Tuple lst -> print "(@[<hov>%t@])" (sequence "," expression lst)
   | Core.Record lst -> print "{@[<hov>%t@]}" (sequence ";" (field expression) lst)
