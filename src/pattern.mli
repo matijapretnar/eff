@@ -1,12 +1,13 @@
-type t = plain_t Common.pos
-and plain_t =
-    Var of Common.variable
-  | As of t * Common.variable
-  | Tuple of t list
-  | Record of (Common.field * t) list
-  | Variant of Common.label * t option
+type 'var t =
+    ('var plain_t) Common.pos
+and 'var plain_t =
+  | Var of 'var
+  | As of 'var t * 'var
+  | Tuple of ('var t) list
+  | Record of (Common.field * 'var t) list
+  | Variant of Common.label * ('var t) option
   | Const of Common.const
   | Nonbinding
-val pattern_vars : t -> Common.variable list
-val linear_pattern : t -> bool
+val pattern_vars : 'var t -> 'var list
+val linear_pattern : 'var t -> bool
 val linear_record : ('a * 'b) list -> bool

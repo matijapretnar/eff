@@ -22,7 +22,7 @@ and plain_term =
   | Handler of handler
   (** [handler clauses], where [clauses] are described below. *)
 
-  | Let of (Pattern.t * term) list * term
+  | Let of (Common.variable Pattern.t * term) list * term
   (** [let p1 = t1 and ... and pn = tn in t] *)
   | LetRec of (Common.variable * term) list * term
   (** [let rec f1 p1 = t1 and ... and fn pn = tn in t] *)
@@ -53,13 +53,13 @@ and handler = {
   (** [finally p -> t] *)
 }
 
-and abstraction = Pattern.t * term
+and abstraction = Common.variable Pattern.t * term
 
-and abstraction2 = Pattern.t * Pattern.t * term
+and abstraction2 = Common.variable Pattern.t * Common.variable Pattern.t * term
 
 and operation = term * Common.opsym
 
-and resource = term * (Common.opsym, Pattern.t * Pattern.t * term) Common.assoc
+and resource = term * (Common.opsym, Common.variable Pattern.t * Common.variable Pattern.t * term) Common.assoc
 
 type dirt =
   | DirtParam of Common.dirtparam
@@ -95,7 +95,7 @@ type topdef = plain_topdef Common.pos
 and plain_topdef =
   | Tydef of (Common.tyname, (Common.typaram list * tydef)) Common.assoc
   (** [type t = tydef] *)
-  | TopLet of (Pattern.t * term) list
+  | TopLet of (Common.variable Pattern.t * term) list
   (** [let p1 = t1 and ... and pn = tn] *)
   | TopLetRec of (Common.variable * term) list
   (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)

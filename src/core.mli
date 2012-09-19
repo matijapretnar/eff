@@ -16,7 +16,7 @@ and plain_expression =
 and computation = plain_computation Common.pos
 and plain_computation =
   | Value of expression
-  | Let of (Pattern.t * computation) list * computation
+  | Let of (Common.variable Pattern.t * computation) list * computation
   | LetRec of (Common.variable * abstraction) list * computation
   | Match of expression * abstraction list
   | While of computation * computation
@@ -34,10 +34,10 @@ and handler = {
 }
 
 (** Abstractions that take one argument. *)
-and abstraction = Pattern.t * computation
+and abstraction = Common.variable Pattern.t * computation
 
 (** Abstractions that take two arguments. *)
-and abstraction2 = Pattern.t * Pattern.t * computation
+and abstraction2 = Common.variable Pattern.t * Common.variable Pattern.t * computation
 
 (** An operation is an expression that represents an instance together with
     an operation symbol. *)

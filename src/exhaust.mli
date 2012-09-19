@@ -6,7 +6,7 @@
 *)
 
 (** Check that a pattern is irrefutable. *)
-val is_irrefutable : Pattern.t -> unit
+val is_irrefutable : Common.variable Pattern.t -> unit
 
 (** Check for refutable patterns in let statements and non-exhaustive match statements. *)
 val check_comp : Core.computation -> unit

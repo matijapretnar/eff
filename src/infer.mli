@@ -4,7 +4,7 @@ val nonexpansive : Core.plain_computation -> bool
 val infer_let :
   Ctx.t ->
   Common.position ->
-  (Pattern.t * Core.computation) list ->
+  (Common.variable Pattern.t * Core.computation) list ->
   (Common.variable * Ctx.ty_scheme) list * Type.dirt_param list *
   Type.instance_param list * Ctx.t * Type.constraints list
 val infer_let_rec :
