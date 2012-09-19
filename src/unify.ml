@@ -125,8 +125,11 @@ let solve initial_cnstrs =
         | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
         end
 
-    | (t1, (Type.Apply _ as t2)) ->
-        add_ty_constraint pos t2 t1
+    | (t2, Type.Apply (t1, lst1)) when Tctx.transparent ~pos t1 ->
+        begin match Tctx.ty_apply ~pos t1 lst1 with
+        | Tctx.Inline t -> add_ty_constraint pos t t2
+        | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
+        end
 
     | (Type.Handler h1, Type.Handler h2) ->
         add_ty_constraint pos h2.Type.value h1.Type.value;
