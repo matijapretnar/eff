@@ -29,6 +29,7 @@ type constraints =
     TypeConstraint of ty * ty * Common.position
   | DirtConstraint of dirt * dirt * Common.position
   | RegionConstraint of region * region * Common.position
+type ty_scheme = params * ty * constraints list
 val universal_ty : ty
 val universal_dirty : ('a list * ty * dirt_param) * constraints list
 val int_ty : ty

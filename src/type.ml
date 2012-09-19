@@ -52,7 +52,7 @@ type constraints =
   | DirtConstraint of dirt * dirt * Common.position
   | RegionConstraint of region * region * Common.position
 
-
+type ty_scheme = params * ty * constraints list
 
 (* This type is used when type checking is turned off. Its name
    is syntactically incorrect so that the programmer cannot accidentally
