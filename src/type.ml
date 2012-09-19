@@ -153,6 +153,10 @@ let subst_constraints sbst cnstrs = List.map (function
   | RegionConstraint (rgn1, rgn2, pos) -> RegionConstraint (subst_region sbst rgn1, subst_region sbst rgn2, pos)
   ) cnstrs
 
+let subst_ty_scheme sbst (ps, ty, cstrs) =
+ assert (List.for_all (fun (p, _) -> not (List.mem p (let ps,_,_= ps in ps))) sbst.subst_ty);
+  (ps, subst_ty sbst ty, subst_constraints sbst cstrs)
+
 (** [identity_subst] is a substitution that makes no changes. *)
 let identity_subst = { subst_ty = []; subst_dirt = []; subst_region = []; subst_instance = [] }
 

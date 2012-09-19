@@ -56,6 +56,7 @@ val subst_dirty : substitution -> dirty -> dirty
 val subst_dirt_ty :
   substitution ->
   instance_param list * ty * dirt -> instance_param list * ty * dirt
+val subst_ty_scheme : substitution -> ty_scheme -> ty_scheme
 val subst_constraints : substitution -> constraints list -> constraints list
 val identity_subst : substitution
 val compose_subst : substitution -> substitution -> substitution
