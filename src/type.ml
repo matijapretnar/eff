@@ -174,7 +174,7 @@ let compose_subst
 (** [free_params ty cnstrs] returns three lists of type parameters that occur in [ty].
     Each parameter is listed only once and in order in which it occurs when
     [ty] is displayed. *)
-let free_params ty cnstrs =
+let free_params (ps, ty, cnstrs) =
   let (@@@) = Trio.append in
   let rec free_ty = function
     | Apply (_, args) -> free_args args
@@ -202,10 +202,10 @@ let free_params ty cnstrs =
     | DirtConstraint (drt1, drt2, pos) -> free_dirt drt1 @@@ free_dirt drt2
     | RegionConstraint (rgn1, rgn2, pos) -> free_region rgn1 @@@ free_region rgn2
   in
-  Trio.uniq (free_ty ty @@@ Trio.flatten_map free_constraint cnstrs)
+  Trio.diff ps (Trio.uniq (free_ty ty @@@ Trio.flatten_map free_constraint cnstrs))
 
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
-let occurs_in_ty p ty = List.mem p (let (xs, _, _) = free_params ty [] in xs)
+let occurs_in_ty p ty = List.mem p (let (xs, _, _) = free_params (([], [], []), ty, []) in xs)
 
 (** [fresh_ty ()] gives a type [TyParam p] where [p] is a new type parameter on
     each call. *)
@@ -245,7 +245,7 @@ let refresh (params, ty, cnstrs) =
     params', subst_ty sbst ty, subst_constraints sbst cnstrs
 
 let rec variablize ty =
-  let params = free_params ty [] in
+  let params = free_params (Trio.empty, ty, []) in
   let _, ty, _ = refresh (params, ty, []) in
   ty
 
@@ -261,7 +261,7 @@ let beautify ?beautifier ((ps, ds, rs), ty, cnstrs) =
     and next_dirt_param =  Common.fresh "beautify_dirt"
     and next_region_param = Common.fresh "beautify_region"
     in
-    let (xs, ys, zs) = free_params ty cnstrs in
+    let (xs, ys, zs) = free_params (Trio.empty, ty, cnstrs) in
     let xs_map = List.map (fun p -> (p, Ty_Param (next_ty_param ()))) xs
     and ys_map = List.map (fun q -> (q, Dirt_Param (next_dirt_param ()))) ys
     and zs_map = List.map (fun r -> (r, Region_Param (next_region_param ()))) zs in

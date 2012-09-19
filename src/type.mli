@@ -50,8 +50,7 @@ val subst_dirty : substitution -> dirty -> dirty
 val subst_ty : substitution -> ty -> ty
 val identity_subst : substitution
 val compose_subst : substitution -> substitution -> substitution
-val free_params :
-  ty -> constraints list -> (ty_param, dirt_param, region_param) Trio.t
+val free_params : ty_scheme -> params
 val occurs_in_ty : ty_param -> ty -> bool
 val fresh_ty : unit -> ty
 val fresh_dirt : unit -> dirt
