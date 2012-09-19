@@ -5,7 +5,7 @@ let empty = []
 let lookup ctx x =
   match Common.lookup x ctx with
   | None -> None
-  | Some (ps, ty, cstrs) -> Some (Type.refresh ps ty cstrs)
+  | Some sch -> Some (Type.refresh sch)
 
 let extend ctx x ty_scheme = (x, ty_scheme) :: ctx
 

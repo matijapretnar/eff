@@ -240,13 +240,13 @@ let instance_refreshing_subst is =
 
 (** [refresh (ps,qs,rs) ty] replaces the polymorphic parameters [ps,qs,rs] in [ty] with fresh
     parameters. It returns the  *)
-let refresh params ty cnstrs =
+let refresh (params, ty, cnstrs) =
   let params', sbst = refreshing_subst params in
     params', subst_ty sbst ty, subst_constraints sbst cnstrs
 
 let rec variablize ty =
   let params = free_params ty [] in
-  let _, ty, _ = refresh params ty [] in
+  let _, ty, _ = refresh (params, ty, []) in
   ty
 
 let disable_beautify = ref false

@@ -60,11 +60,7 @@ val refreshing_subst :
   ty_param list * dirt_param list * region_param list ->
   (ty_param, dirt_param, region_param) Trio.t * substitution
 val instance_refreshing_subst : instance_param list -> substitution
-val refresh :
-  ty_param list * dirt_param list * region_param list ->
-  ty ->
-  constraints list ->
-  (ty_param, dirt_param, region_param) Trio.t * ty * constraints list
+val refresh : ty_scheme -> ty_scheme
 val variablize : ty -> ty
 val disable_beautify : bool ref
 val beautify :
