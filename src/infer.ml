@@ -114,7 +114,7 @@ let extend_with_pattern ?(forbidden_vars=[]) ctx p =
   let vars, t, cstr = infer_pattern p in
     match C.find (fun (x,_) -> List.mem_assoc x vars) forbidden_vars with
       | Some (x,_) -> Error.typing ~pos:(snd p) "Several definitions of %d." x
-      | None -> vars, t, List.fold_right (fun (x, t) ctx -> Ctx.extend_ty ctx x t) vars ctx, cstr
+      | None -> vars, t, List.fold_right (fun (x, t) ctx -> Ctx.extend_ty ctx x t []) vars ctx, cstr
 
 
 let rec infer_abstraction ctx (p, c) =
@@ -155,14 +155,17 @@ and infer_let ctx pos defs =
   let sbst, remaining = Unify.solve !cstr in
   (* XXX is not needed? let remaining = Type.subst_constraints sbst remaining in*)
   let ctx = Ctx.subst_ctx ctx sbst in
-  let vars = Common.assoc_map (fun (poly, ty) ->
+  let vars, ctx = List.fold_right (fun (x, (poly, ty)) (vars, ctx) ->
                                  let ty = T.subst_ty sbst ty in
                                  let remaining = Unify.garbage_collect (Unify.pos_neg_params ty) remaining in
                                  let cnstr = Unify.constraints_of_graph remaining in
-                                  Ctx.generalize ctx poly ty cnstr) vars in
-  let ctx = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme) vars ctx
+                                 if poly then
+                                   (Ctx.extend vars x ty cnstr, Ctx.extend ctx x ty cnstr)
+                                 else
+                                   (Ctx.extend_ty vars x ty cnstr, Ctx.extend_ty ctx x ty cnstr)
+                                ) vars (Ctx.empty, ctx)
   in
-    vars, drts, frshs, ctx, !cstr
+  Ctx.to_list vars, drts, frshs, ctx, !cstr
 
 and infer_let_rec ctx pos defs =
   if not (Common.injective fst defs) then
@@ -174,7 +177,7 @@ and infer_let_rec ctx pos defs =
       (u, p, c))
       defs
   in
-  let ctx' = List.fold_right (fun (f, (u, _, _)) ctx -> Ctx.extend_ty ctx f u) lst ctx in
+  let ctx' = List.fold_right (fun (f, (u, _, _)) ctx -> Ctx.extend_ty ctx f u []) lst ctx in
   let vars = Common.assoc_map
     (fun (u, p, c) ->
       let _, tp, ctx', cstr_p = extend_with_pattern ctx' p in
@@ -184,14 +187,14 @@ and infer_let_rec ctx pos defs =
       add_ty_constraint cstr (Common.join_pos (snd p) (snd c)) t u;
       t) lst in
   let sbst, remaining = Unify.solve !cstr in
-  let vars = Common.assoc_map (fun ty ->
+  let vars, ctx = List.fold_right (fun (x, ty) (vars, ctx) ->
                                  let ty = T.subst_ty sbst ty in
                                  let remaining = Unify.garbage_collect (Unify.pos_neg_params ty) remaining in
                                  let cnstr = Unify.constraints_of_graph remaining in
-                                 Ctx.generalize ctx true ty cnstr) vars in
-  let ctx = List.fold_right (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme) vars ctx
+                                 (Ctx.extend vars x ty cnstr, Ctx.extend ctx x ty cnstr))
+                                  vars (Ctx.empty, ctx)
   in
-    vars, ctx, !cstr
+  Ctx.to_list vars, ctx, !cstr
 
 (* [infer_expr ctx cstr (e,pos)] infers the type of expression [e] in context
    [ctx]. It returns the inferred type of [e]. *)
@@ -395,7 +398,7 @@ and infer_comp ctx (c, pos) =
           let t2, cstr2 = infer_expr ctx e2 in
           add_ty_constraint cstr (snd e2) t2 T.int_ty;
           add_constraints cstr (cstr1 @ cstr2);
-          let ctx = Ctx.extend_ty ctx i T.int_ty in
+          let ctx = Ctx.extend_ty ctx i T.int_ty [] in
           let (frsh, ty, drt, cstr_c) = infer ctx c in
           add_ty_constraint cstr (snd c) ty T.unit_ty;
           add_constraints cstr cstr_c;

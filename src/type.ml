@@ -54,6 +54,8 @@ type constraints =
 
 type ty_scheme = params * ty * constraints list
 
+let lift_ty ty = (Trio.empty, ty, [])
+
 (* This type is used when type checking is turned off. Its name
    is syntactically incorrect so that the programmer cannot accidentally
    define it. *)
@@ -202,7 +204,7 @@ let free_params (ps, ty, cnstrs) =
     | DirtConstraint (drt1, drt2, pos) -> free_dirt drt1 @@@ free_dirt drt2
     | RegionConstraint (rgn1, rgn2, pos) -> free_region rgn1 @@@ free_region rgn2
   in
-  Trio.diff ps (Trio.uniq (free_ty ty @@@ Trio.flatten_map free_constraint cnstrs))
+  Trio.diff (Trio.uniq (free_ty ty @@@ Trio.flatten_map free_constraint cnstrs)) ps
 
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
 let occurs_in_ty p ty = List.mem p (let (xs, _, _) = free_params (([], [], []), ty, []) in xs)

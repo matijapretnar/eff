@@ -118,7 +118,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
         (ctx, env)
   | Syntax.External (x, t, f) ->
     let (x, t) = Desugar.external_ty (Tctx.is_effect ~pos:pos) x t in
-    let ctx = Ctx.extend ctx x t in
+    let ctx = Ctx.extend ctx x t [] in
       begin match C.lookup f External.values with
         | Some v -> (ctx, Eval.update x v env)
         | None -> Error.runtime "unknown external symbol %s." f
@@ -145,7 +145,9 @@ let infer_top_comp ctx c =
   let cnstr = Unify.constraints_of_graph remaining in
   let cnstr = Type.subst_constraints sbst cnstr in
   (* XXX What to do about the fresh instances? *)
-  ctx, Ctx.generalize ctx (Infer.nonexpansive (fst c)) ty cnstr, drt, frshs
+  (* XXX Here, we need to show what type parameters are polymorphic or not. *)
+  (*     I am disabling it because we are going to try a new approach. *)
+  ctx, (Trio.empty, ty, cnstr), drt, frshs
 
 let rec exec_cmd interactive (ctx, env) e =
   match e with

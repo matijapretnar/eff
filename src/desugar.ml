@@ -436,6 +436,6 @@ let external_ty is_effect x t =
   let n = fresh_variable () in
   top_ctx := (x, n) :: !top_ctx;
   let (ts, ds, rs) = syntax_to_core_params (free_params t) in
-  n, (Trio.snds (ts, ds, rs), ty (ts, ds, rs) t, [])
+  n, ty (ts, ds, rs) t
 
 let top_computation c = computation !top_ctx c
