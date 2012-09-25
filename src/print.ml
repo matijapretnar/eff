@@ -67,8 +67,8 @@ and pattern_list ?(max_length=299) (p,_) ppf =
 
 let instance i ppf =
   match i with
-  | Type.InstanceParam (Type.Instance_Param i) -> print ppf "#%d" i
-  | Type.InstanceTop -> print ppf "?"
+  | Constr.InstanceParam (Type.Instance_Param i) -> print ppf "#%d" i
+  | Constr.InstanceTop -> print ppf "?"
 
 let region_param (_, _, rs) ((Type.Region_Param k) as p) ppf =
   let c = (if List.mem p rs then "'" else "'_") in
@@ -80,14 +80,14 @@ let dirt_param (_, ds, _) ((Type.Dirt_Param k) as p) ppf =
 
 let region poly reg ppf =
   match reg with
-    | Type.RegionParam p -> print ppf "<%t>" (region_param poly p)
-    | Type.RegionAtom i -> print ppf "<%t>" (instance i)
+    | Constr.RegionParam p -> print ppf "<%t>" (region_param poly p)
+    | Constr.RegionAtom i -> print ppf "<%t>" (instance i)
 
 let dirt ((_, ds, _) as poly) drt ppf =
   match drt with
-    | Type.DirtEmpty -> print ppf ""
-    | Type.DirtParam p -> print ppf "%t" (dirt_param poly p)
-    | Type.DirtAtom (rgn, op) -> print ppf "%t#%s" (region_param poly rgn) op
+    | Constr.DirtEmpty -> print ppf ""
+    | Constr.DirtParam p -> print ppf "%t" (dirt_param poly p)
+    | Constr.DirtAtom (rgn, op) -> print ppf "%t#%s" (region_param poly rgn) op
 
 let fresh_instances frsh ppf =
   match frsh with
@@ -135,9 +135,9 @@ let rec ty ((ps, _, _) as poly) t ppf =
 
 let constraints poly cstrs ppf =
   let constr cstr ppf = match cstr with
-  | Type.TypeConstraint (ty1, ty2, pos) -> print ppf "%t <= %t" (ty poly ty1) (ty poly ty2)
-  | Type.DirtConstraint (drt1, drt2, pos) -> print ppf "%t <= %t" (dirt poly drt1) (dirt poly drt2)
-  | Type.RegionConstraint (rgn1, rgn2, pos) -> print ppf "%t <= %t" (region poly rgn1) (region poly rgn2)
+  | Constr.TypeConstraint (ty1, ty2, pos) -> print ppf "%t <= %t" (ty poly ty1) (ty poly ty2)
+  | Constr.DirtConstraint (drt1, drt2, pos) -> print ppf "%t <= %t" (dirt poly drt1) (dirt poly drt2)
+  | Constr.RegionConstraint (rgn1, rgn2, pos) -> print ppf "%t <= %t" (region poly rgn1) (region poly rgn2)
   in
   sequence ", " constr cstrs ppf
 

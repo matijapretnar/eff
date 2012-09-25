@@ -5,7 +5,7 @@ sig
   val sup : bound -> bound -> bound
   val inf : bound -> bound -> bound
   val compare : t -> t -> int
-  val print : t -> Format.formatter -> unit
+  (* val print : t -> Format.formatter -> unit *)
 end
 
 module Make (V : Vertex) :
@@ -37,5 +37,5 @@ sig
   (** Filter edges of the graph. *)
   val filter_edges : (elt -> elt -> Common.position -> bool) -> t -> t
 
-  val print : t -> Format.formatter -> unit
+  (* val print : t -> Format.formatter -> unit *)
 end

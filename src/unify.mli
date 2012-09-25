@@ -1,6 +1,6 @@
 val empty_constraint : 'a list
-val constraints_of_graph : Constr.t -> Type.constraints list
-val solve : Type.constraints list -> Constr.t
+val constraints_of_graph : Constr.t -> Constr.constraints list
+val solve : Constr.constraints list -> Constr.t
 val pos_neg_params :
   Type.ty ->
   (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t *

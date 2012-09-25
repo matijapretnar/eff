@@ -5,7 +5,7 @@ sig
   val sup : bound -> bound -> bound
   val inf : bound -> bound -> bound
   val compare : t -> t -> int
-  val print : t -> Format.formatter -> unit
+  (* val print : t -> Format.formatter -> unit *)
 end
 
 module Make (V : Vertex) =
@@ -74,7 +74,7 @@ struct
   let filter_edges p grph =
     fold_edges (fun x y pos acc -> if p x y pos then add_edge x y pos acc else acc) grph G.empty
 
-    let print grph ppf =
+ (*    let print grph ppf =
       fold_vertices
         (fun x inx outx () ->
           Print.print ppf "@[%t <= %t <= %t@];@."
@@ -82,5 +82,5 @@ struct
             (V.print x)
             (Print.sequence "," V.print (List.map fst outx))
         )
-        grph ()
+        grph () *)
 end

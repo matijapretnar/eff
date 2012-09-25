@@ -42,29 +42,6 @@ and handler_ty = {
   finally: ty; (* the return type of finally *)
 }
 
-and dirt =
-  | DirtParam of dirt_param
-  | DirtAtom of region_param * Common.opsym
-  | DirtEmpty
-
-and region =
-  | RegionParam of region_param
-  | RegionAtom of instance
-
-and instance =
-  | InstanceParam of instance_param
-  | InstanceTop
-
-let empty_dirt = DirtEmpty
-
-type constraints =
-  | TypeConstraint of ty * ty * Common.position
-  | DirtConstraint of dirt * dirt * Common.position
-  | RegionConstraint of region * region * Common.position
-
-type ty_scheme = (int, ty) Common.assoc * ty * constraints list
-type dirty_scheme = (int, ty) Common.assoc * dirty * constraints list
-
 let lift_ty ty = (Trio.empty, ty, [])
 
 (* This type is used when type checking is turned off. Its name
@@ -87,14 +64,6 @@ type substitution = {
   subst_instance : (instance_param * instance_param option) list
 }
 
-let subst_instance sbst = function
-  | InstanceParam i as inst ->
-      begin match Common.lookup i sbst.subst_instance with
-      | Some (Some inst') -> InstanceParam inst'
-      | Some None -> InstanceTop
-      | None -> inst
-      end
-  | InstanceTop -> InstanceTop  
 
 let subst_instance_param sbst i =
   match Common.lookup i sbst.subst_instance with
@@ -116,21 +85,9 @@ let subst_dirt_param sbst d =
   | Some d' -> d'
   | None -> d
 
-let subst_region sbst = function
-  | RegionParam r -> RegionParam (subst_region_param sbst r)
-  | RegionAtom inst -> RegionAtom (subst_instance sbst inst)
-
-let subst_dirt sbst = function
-  | DirtEmpty -> DirtEmpty
-  | DirtParam d ->
-    (match Common.lookup d sbst.subst_dirt with
-      | Some drt -> DirtParam drt
-      | None -> DirtParam d)
-  | DirtAtom (r, op) -> DirtAtom (subst_region_param sbst r, op)
-
 let subst_fresh sbst frsh =
-  List.fold_right (fun i acc -> match subst_instance sbst (InstanceParam i) with
-    | InstanceParam j -> j :: acc | InstanceTop -> acc) frsh []
+  List.fold_right (fun i acc -> match subst_instance_param sbst i with
+    | Some j -> j :: acc | None -> acc) frsh []
 
 let rec subst_args subst (tys, drts, rgns) =
   (List.map (subst_ty subst) tys, List.map (subst_dirt_param subst) drts, List.map (subst_region_param subst) rgns)
@@ -156,9 +113,6 @@ and subst_ty sbst ty =
 and subst_dirty sbst (frsh, ty, drt) =
   (subst_fresh sbst frsh, subst_ty sbst ty, subst_dirt_param sbst drt)
 
-let subst_dirt_ty sbst (frsh, ty, drt) =
-  (subst_fresh sbst frsh, subst_ty sbst ty, subst_dirt sbst drt)
-
 (** [identity_subst] is a substitution that makes no changes. *)
 let identity_subst = { subst_ty = []; subst_dirt = []; subst_region = []; subst_instance = [] }
 
@@ -176,7 +130,7 @@ let compose_subst
 (** [free_params ty cnstrs] returns three lists of type parameters that occur in [ty].
     Each parameter is listed only once and in order in which it occurs when
     [ty] is displayed. *)
-let free_params (ps, ty, cnstrs) =
+let free_params ty =
   let (@@@) = Trio.append in
   let rec free_ty = function
     | Apply (_, args) -> free_args args
@@ -189,35 +143,19 @@ let free_params (ps, ty, cnstrs) =
   and free_dirty (_, ty, drt) =
     free_ty ty @@@ free_dirt_param drt
   and free_dirt_param p = ([], [p], [])
-  and free_dirt = function
-    | DirtEmpty -> Trio.empty
-    | DirtParam p -> free_dirt_param p
-    | DirtAtom (rgn, _) -> free_region_param rgn
   and free_region_param r = ([], [], [r])
-  and free_region = function
-    | RegionParam r -> free_region_param r
-    | RegionAtom _ -> Trio.empty
   and free_args (tys, drts, rgns) =
     Trio.flatten_map free_ty tys @@@ Trio.flatten_map free_dirt_param drts @@@ Trio.flatten_map free_region_param rgns
-  and free_constraint = function
-    | TypeConstraint (ty1, ty2, pos) -> free_ty ty1 @@@ free_ty ty2
-    | DirtConstraint (drt1, drt2, pos) -> free_dirt drt1 @@@ free_dirt drt2
-    | RegionConstraint (rgn1, rgn2, pos) -> free_region rgn1 @@@ free_region rgn2
   in
-  Trio.diff (Trio.uniq (free_ty ty @@@ Trio.flatten_map free_constraint cnstrs)) ps
+  Trio.uniq (free_ty ty)
 
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
-let occurs_in_ty p ty = List.mem p (let (xs, _, _) = free_params (([], [], []), ty, []) in xs)
+let occurs_in_ty p ty = let (xs, _, _) = free_params ty in List.mem p xs
 
 (** [fresh_ty ()] gives a type [TyParam p] where [p] is a new type parameter on
     each call. *)
 let fresh_ty () = TyParam (fresh_ty_param ())
 
-let fresh_dirt () = DirtParam (fresh_dirt_param ())
-
-let fresh_region () = RegionParam (fresh_region_param ())
-
-let fresh_instance () = RegionAtom (InstanceParam (fresh_instance_param ()))
 
 (* XXX Should a fresh dirty type have no fresh instances? *)
 let fresh_dirty () = ([], fresh_ty (), fresh_dirt_param ())
@@ -262,33 +200,9 @@ let refresh_ty (refresh_ty_param, refresh_dirt_param, refresh_region_param) ty =
   in
   refresh_ty ty
 
-let refresh_dirt (_, refresh_dirt_param, refresh_region_param) = function
-  | DirtEmpty as drt -> drt
-  | DirtParam d -> DirtParam (refresh_dirt_param d)
-  | DirtAtom (r, op) -> DirtAtom (refresh_region_param r, op)
-
-let refresh_region (_, _, refresh_region_param) = function
-  | RegionParam r -> RegionParam (refresh_region_param r)
-  | RegionAtom _ as rgn -> rgn
-
-let refresh_constraints param_refreshers = function
-  | TypeConstraint (ty1, ty2, pos) -> TypeConstraint (refresh_ty param_refreshers ty1, refresh_ty param_refreshers ty2, pos)
-  | DirtConstraint (drt1, drt2, pos) -> DirtConstraint (refresh_dirt param_refreshers drt1, refresh_dirt param_refreshers drt2, pos)
-  | RegionConstraint (rgn1, rgn2, pos) -> RegionConstraint (refresh_region param_refreshers rgn1, refresh_region param_refreshers rgn2, pos)
-
-let refresh_ctx param_refreshers ctx =
-  Common.assoc_map (refresh_ty param_refreshers) ctx
-
-
-(** [refresh (ps,qs,rs) ty] replaces the polymorphic parameters [ps,qs,rs] in [ty] with fresh
-    parameters. It returns the  *)
-let refresh (ctx, ty, cnstrs) =
-  let refreshers = global_param_refreshers () in
-  refresh_ctx refreshers ctx, refresh_ty refreshers ty, (List.map (refresh_constraints refreshers) cnstrs)
-
 let rec variablize ty =
-  let (_, ty, _) = refresh ([], ty, []) in
-  ty
+  let refreshers = global_param_refreshers () in
+  refresh_ty refreshers ty
 
 let disable_beautify = ref false
 

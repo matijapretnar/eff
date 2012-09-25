@@ -14,9 +14,9 @@ let for_parameters add pos ps lst1 lst2 =
 let empty_constraint = []
 
 let constraints_of_graph g =
-  let lst = Constr.fold_ty (fun p1 p2 pos lst -> (Type.TypeConstraint (Type.TyParam p1, Type.TyParam p2, pos)) :: lst) g [] in
-  let lst = Constr.fold_dirt (fun d1 d2 pos lst -> (Type.DirtConstraint (d1, d2, pos)) :: lst) g lst in
-  Constr.fold_region (fun r1 r2 pos lst -> (Type.RegionConstraint (r1, r2, pos)) :: lst) g lst
+  let lst = Constr.fold_ty (fun p1 p2 pos lst -> (Constr.TypeConstraint (Type.TyParam p1, Type.TyParam p2, pos)) :: lst) g [] in
+  let lst = Constr.fold_dirt (fun d1 d2 pos lst -> (Constr.DirtConstraint (d1, d2, pos)) :: lst) g lst in
+  Constr.fold_region (fun r1 r2 pos lst -> (Constr.RegionConstraint (r1, r2, pos)) :: lst) g lst
 
 let solve initial_cnstrs =
   let sbst = ref Type.identity_subst in
@@ -26,16 +26,16 @@ let solve initial_cnstrs =
   let graph = Constr.empty () in
   let queue = ref initial_cnstrs in
   let add_constraint = function
-    | Type.TypeConstraint (t1, t2, pos) as cnstr ->
+    | Constr.TypeConstraint (t1, t2, pos) as cnstr ->
       if t1 <> t2 then queue := cnstr :: !queue
-    | Type.DirtConstraint (d1, d2, pos) ->
+    | Constr.DirtConstraint (d1, d2, pos) ->
       if d1 <> d2 then Constr.add_dirt_edge graph d1 d2 pos
-    | Type.RegionConstraint (r1, r2, pos) ->
+    | Constr.RegionConstraint (r1, r2, pos) ->
       if r1 <> r2 then Constr.add_region_edge graph r1 r2 pos
   in
-  let add_ty_constraint pos t1 t2 = add_constraint (Type.TypeConstraint (t1, t2, pos)) in
-  let add_region_constraint pos r1 r2 = add_constraint (Type.RegionConstraint (r1, r2, pos)) in
-  let add_dirt_constraint pos d1 d2 = add_constraint (Type.DirtConstraint (d1, d2, pos)) in
+  let add_ty_constraint pos t1 t2 = add_constraint (Constr.TypeConstraint (t1, t2, pos)) in
+  let add_region_constraint pos r1 r2 = add_constraint (Constr.RegionConstraint (r1, r2, pos)) in
+  let add_dirt_constraint pos d1 d2 = add_constraint (Constr.DirtConstraint (d1, d2, pos)) in
   let add_substitution p t =
     (* When parameter [p] gets substituted by type [t] the vertex
        [p] must be removed from the graph, and each edge becomes
@@ -88,7 +88,7 @@ let solve initial_cnstrs =
         (* XXX How do we unify fresh instances? *)
         add_ty_constraint pos v1 v2;
         add_ty_constraint pos u2 u1;
-        add_dirt_constraint pos (Type.DirtParam drt1) (Type.DirtParam drt2)
+        add_dirt_constraint pos (Constr.DirtParam drt1) (Constr.DirtParam drt2)
 
     | (Type.Tuple lst1, Type.Tuple lst2)
         when List.length lst1 = List.length lst2 ->
@@ -101,8 +101,8 @@ let solve initial_cnstrs =
         | None -> Error.typing ~pos "Undefined type %s" t1
         | Some (ps, ds, rs) ->
             for_parameters add_ty_constraint pos ps ts1 ts2;
-            for_parameters add_dirt_constraint pos ds (List.map (fun d -> Type.DirtParam d) drts1) (List.map (fun d -> Type.DirtParam d) drts2);
-            for_parameters add_region_constraint pos rs (List.map (fun r -> Type.RegionParam r) rgns1) (List.map (fun r -> Type.RegionParam r) rgns2)
+            for_parameters add_dirt_constraint pos ds (List.map (fun d -> Constr.DirtParam d) drts1) (List.map (fun d -> Constr.DirtParam d) drts2);
+            for_parameters add_region_constraint pos rs (List.map (fun r -> Constr.RegionParam r) rgns1) (List.map (fun r -> Constr.RegionParam r) rgns2)
         end
 
     | (Type.Effect (t1, (ts1, drts1, rgns1), rgn1), Type.Effect (t2, (ts2, drts2, rgns2), rgn2)) when t1 = t2 ->
@@ -111,10 +111,10 @@ let solve initial_cnstrs =
         begin match Tctx.lookup_params t1 with
         | None -> Error.typing ~pos "Undefined type %s" t1
         | Some (ps, ds, rs) ->
-            add_region_constraint pos (Type.RegionParam rgn1) (Type.RegionParam rgn2);
+            add_region_constraint pos (Constr.RegionParam rgn1) (Constr.RegionParam rgn2);
             for_parameters add_ty_constraint pos ps ts1 ts2;
-            for_parameters add_dirt_constraint pos ds (List.map (fun d -> Type.DirtParam d) drts1) (List.map (fun d -> Type.DirtParam d) drts2);
-            for_parameters add_region_constraint pos rs (List.map (fun r -> Type.RegionParam r) rgns1) (List.map (fun r -> Type.RegionParam r) rgns2)
+            for_parameters add_dirt_constraint pos ds (List.map (fun d -> Constr.DirtParam d) drts1) (List.map (fun d -> Constr.DirtParam d) drts2);
+            for_parameters add_region_constraint pos rs (List.map (fun r -> Constr.RegionParam r) rgns1) (List.map (fun r -> Constr.RegionParam r) rgns2)
         end
 
     (* The following two cases cannot be merged into one, as the whole matching
@@ -156,9 +156,9 @@ let solve initial_cnstrs =
       | cnstr :: cnstrs ->
         queue := cnstrs ;
         begin match cnstr with
-          | Type.TypeConstraint (t1, t2, pos) -> unify pos t1 t2
-          | Type.DirtConstraint (drt1, drt2, pos) -> unify_dirt pos drt1 drt2;
-          | Type.RegionConstraint (rgn1, rgn2, pos) -> unify_region pos rgn1 rgn2
+          | Constr.TypeConstraint (t1, t2, pos) -> unify pos t1 t2
+          | Constr.DirtConstraint (drt1, drt2, pos) -> unify_dirt pos drt1 drt2;
+          | Constr.RegionConstraint (rgn1, rgn2, pos) -> unify_region pos rgn1 rgn2
         end ;
         loop ()
   in
@@ -202,17 +202,17 @@ let garbage_collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) grph =
   let ty_p p q _ = List.mem p neg_ts && List.mem q pos_ts
   and drt_p drt1 drt2 _ =
     match drt1, drt2 with
-    | Type.DirtEmpty, _ -> false
-    | Type.DirtParam p, Type.DirtParam q -> List.mem p neg_ds && List.mem q pos_ds
-    | Type.DirtParam p, _ -> List.mem p neg_ds
-    | _, Type.DirtParam q -> List.mem q pos_ds
+    | Constr.DirtEmpty, _ -> false
+    | Constr.DirtParam p, Constr.DirtParam q -> List.mem p neg_ds && List.mem q pos_ds
+    | Constr.DirtParam p, _ -> List.mem p neg_ds
+    | _, Constr.DirtParam q -> List.mem q pos_ds
     | _, _ -> true
   and rgn_p rgn1 rgn2 _ =
     match rgn1, rgn2 with
-    | Type.RegionParam p, Type.RegionParam q -> List.mem p neg_rs && List.mem q pos_rs
-    | _, Type.RegionAtom (Type.InstanceTop) -> false
-    | Type.RegionParam p, _ -> List.mem p neg_rs
-    | _, Type.RegionParam q -> List.mem q pos_rs
+    | Constr.RegionParam p, Constr.RegionParam q -> List.mem p neg_rs && List.mem q pos_rs
+    | _, Constr.RegionAtom (Constr.InstanceTop) -> false
+    | Constr.RegionParam p, _ -> List.mem p neg_rs
+    | _, Constr.RegionParam q -> List.mem q pos_rs
     | _, _ -> true
   in
   Constr.garbage_collect ty_p drt_p rgn_p grph
