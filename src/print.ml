@@ -141,18 +141,19 @@ let constraints poly cstrs ppf =
   in
   sequence ", " constr cstrs ppf
 
-let ty_scheme (poly, t, cstrs) ppf =
+let ty_scheme (ctx, t, cstrs) ppf =
+  let poly = Trio.empty in
   print ppf "%t {%t}" (ty poly t) (constraints poly cstrs)
 
 let dirty_scheme ((poly, _, _) as tysch) drt ppf =
   print ppf "%t[%t]" (ty_scheme tysch) (dirt_param poly drt)
 
-let beautified_ty_scheme tysch =
-  let tysch = Type.beautify tysch in
-  ty_scheme tysch
+let beautified_ty_scheme tysch = ty_scheme tysch
+  (* let tysch = Type.beautify tysch in *)
+  (* ty_scheme tysch *)
 
 let beautified_dirty_scheme tysch drt =
-  let tysch, drt = Type.beautify_dirty tysch drt in
+  (* let tysch, drt = Type.beautify_dirty tysch drt in *)
   dirty_scheme tysch drt
 
 (*

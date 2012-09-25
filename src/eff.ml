@@ -155,15 +155,15 @@ let rec exec_cmd interactive (ctx, env) e =
       let c = Desugar.top_computation c in
       let _, tysch, drt, frsh = infer_top_comp ctx c in
       let v = Eval.run env c in
-(*       if interactive then Format.printf "@[- : %t %t = %t@]@."
+      if interactive then Format.printf "@[- : %t %t = %t@]@."
         (Print.fresh_instances frsh)
         (Print.beautified_dirty_scheme tysch drt)
         (Print.value v);
- *)      (ctx, env)
+      (ctx, env)
   | Syntax.TypeOf c ->
       let c = Desugar.top_computation c in
       let _, tysch, drt, frsh = infer_top_comp ctx c in
-      (* Format.printf "@[- : %t@]@." (Print.beautified_dirty_scheme tysch drt); *)
+      Format.printf "@[- : %t@]@." (Print.beautified_dirty_scheme tysch drt);
       (ctx, env)
   | Syntax.Reset ->
       Tctx.reset ();
