@@ -39,9 +39,17 @@ struct
     try G.find x g with Not_found -> (S.empty, S.empty, None, None)
 
   let add_edge x y pos (g : t) =
-    let (inx, outx, infx, supx) = get x g in
-    let (iny, outy, infy, supy) = get y g in
-      G.add x (inx, S.add (y, pos) outx, infx, inf supx supy) (G.add y (S.add (x, pos) iny, outy, sup infx infy, supy) g)
+    let (inx, outx, infx, supx) = get x g
+    and (iny, outy, infy, supy) = get y g in
+    let left = S.add (x, pos) (S.diff inx iny)
+    and right = S.add (y, pos) (S.diff outy outx) in
+    let extend_left (l, pos) grph =
+      let (inl, outl, infl, supl) = get l grph in
+      G.add l (inl, S.union outl right, infl, inf supl supy) grph
+    and extend_right (r, pos) grph =
+      let (inr, outr, infr, supr) = get r grph in
+      G.add r (S.union inr left, outr, sup infx infr, supr) grph in
+    S.fold extend_left left (S.fold extend_right right g)
 
   let add_vertex x (g : t) =
     if G.mem x g then g else G.add x (S.empty, S.empty, None, None) g
@@ -65,20 +73,6 @@ struct
 
   let filter_edges p grph =
     fold_edges (fun x y pos acc -> if p x y pos then add_edge x y pos acc else acc) grph G.empty
-
-  let transitive_closure grph =
-    let add_closure_edges x y pos closure =
-      let (inx, outx, _, _) = get x closure
-      and (iny, outy, _, _) = get y closure in
-      let left = S.add (x, pos) (S.diff inx iny)
-      and right = S.add (y, pos) (S.diff outy outx) in
-        S.fold (fun (x', _) grph ->
-          S.fold (fun (y', _) grph ->
-            add_edge x' y' pos grph
-            ) right grph
-          ) left closure
-    in
-    fold_edges add_closure_edges grph G.empty
 
     let print grph ppf =
       fold_vertices

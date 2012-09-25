@@ -34,9 +34,6 @@ sig
   (** Fold over the vertices of the graph together with their in- and out-sets. *)
   val fold_vertices : (elt -> (elt * Common.position) list -> (elt * Common.position) list -> 'a -> 'a) -> t -> 'a -> 'a
 
-  (** Create a transitive closure of a graph.  *)
-  val transitive_closure : t -> t
-
   (** Filter edges of the graph. *)
   val filter_edges : (elt -> elt -> Common.position -> bool) -> t -> t
 

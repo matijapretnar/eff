@@ -65,7 +65,7 @@ let print grph ppf =
 
 let garbage_collect ty_p drt_p rgn_p grph =
   {
-    ty_graph = Ty.filter_edges ty_p (Ty.transitive_closure grph.ty_graph);
-    dirt_graph = Dirt.filter_edges drt_p (Dirt.transitive_closure grph.dirt_graph);
-    region_graph = Region.filter_edges rgn_p (Region.transitive_closure grph.region_graph);
+    ty_graph = Ty.filter_edges ty_p grph.ty_graph;
+    dirt_graph = Dirt.filter_edges drt_p grph.dirt_graph;
+    region_graph = Region.filter_edges rgn_p grph.region_graph;
   }
