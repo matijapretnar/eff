@@ -122,6 +122,7 @@ let extend_with_pattern ?(forbidden_vars=[]) p =
 
 let rec infer_abstraction env (p, c) =
   let ctxp, tp, cstrp = infer_pattern p in
+  let env = List.fold_right (fun (x, _) env -> Ctx.extend_ty env x) ctxp env in
   let ctxc, tc, cstrc = infer_comp env c in
   let ctx, cstr = unify_contexts [ctxp; ctxc] in
   ctx, tp, tc, cstrp @ cstrc @ cstr
@@ -129,6 +130,8 @@ let rec infer_abstraction env (p, c) =
 and infer_abstraction2 env (p1, p2, c) =
   let ctx1, t1, cstr1 = extend_with_pattern p1 in
   let ctx2, t2, cstr2 = extend_with_pattern ~forbidden_vars:ctx1 p2 in
+  let env = List.fold_right (fun (x, _) env -> Ctx.extend_ty env x) ctx1 env in
+  let env = List.fold_right (fun (x, _) env -> Ctx.extend_ty env x) ctx2 env in
   let ctx3, t3, cstr3 = infer_comp env c in
   let ctx, cstr = unify_contexts [ctx1; ctx2; ctx3] in
   ctx, t1, t2, t3, cstr1 @ cstr2 @ cstr3 @ cstr
@@ -150,6 +153,7 @@ and infer_let env pos defs =
         ctx, env
       else
         let ctx = List.fold_right (fun (x, t) ctx -> (x, t) :: ctx) ctx_p ctx in
+        let env = List.fold_right (fun (x, _) env -> Ctx.extend_ty env x) ctx_p env in
         ctx, env
     in
     (env, ctx :: ctxs, frsh @ frshs, drt :: drts, !cstr @ cstrs)
@@ -461,7 +465,6 @@ and infer_comp env (c, pos) : (int, Type.ty) Common.assoc * Type.dirty * Type.co
           add_ty_constraint cstr (snd e2) t2 T.int_ty;
           add_constraints cstr (cstr1 @ cstr2);
           let env = Ctx.extend_ty env i in
-          (* XXX DELETE i *)
           let ctx3, frsh, ty, drt, cstr_c = infer env c in
           add_ty_constraint cstr (snd c) ty T.unit_ty;
           add_constraints cstr cstr_c;
