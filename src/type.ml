@@ -1,6 +1,16 @@
 (* We need three sorts of parameters, for types, dirt, and regions.
    In order not to confuse them, we define separate types for them.
  *)
+let refresher fresh =
+  let substitution = ref [] in
+  fun p ->
+    match Common.lookup p !substitution with
+    | None ->
+        let p' = fresh () in
+        substitution := Common.update p p' !substitution;
+        p'
+    | Some p' -> p'
+
 
 type ty_param = Ty_Param of int
 type dirt_param = Dirt_Param of int
@@ -52,7 +62,8 @@ type constraints =
   | DirtConstraint of dirt * dirt * Common.position
   | RegionConstraint of region * region * Common.position
 
-type ty_scheme = params * ty * constraints list
+type ty_scheme = (int, ty) Common.assoc * ty * constraints list
+type dirty_scheme = (int, ty) Common.assoc * dirty * constraints list
 
 let lift_ty ty = (Trio.empty, ty, [])
 
@@ -60,7 +71,7 @@ let lift_ty ty = (Trio.empty, ty, [])
    is syntactically incorrect so that the programmer cannot accidentally
    define it. *)
 let universal_ty = Basic "_"
-let universal_dirty = (([], Basic "_", fresh_dirt_param ()), [])
+let universal_dirty = ([], ([], Basic "_", fresh_dirt_param ()), [])
 
 let int_ty = Basic "int"
 let string_ty = Basic "string"
@@ -155,10 +166,6 @@ let subst_constraints sbst cnstrs = List.map (function
   | RegionConstraint (rgn1, rgn2, pos) -> RegionConstraint (subst_region sbst rgn1, subst_region sbst rgn2, pos)
   ) cnstrs
 
-let subst_ty_scheme sbst (ps, ty, cstrs) =
- assert (List.for_all (fun (p, _) -> not (List.mem p (let ps,_,_= ps in ps))) sbst.subst_ty);
-  (ps, subst_ty sbst ty, subst_constraints sbst cstrs)
-
 (** [identity_subst] is a substitution that makes no changes. *)
 let identity_subst = { subst_ty = []; subst_dirt = []; subst_region = []; subst_instance = [] }
 
@@ -242,13 +249,52 @@ let instance_refreshing_subst is =
 
 (** [refresh (ps,qs,rs) ty] replaces the polymorphic parameters [ps,qs,rs] in [ty] with fresh
     parameters. It returns the  *)
-let refresh (params, ty, cnstrs) =
-  let params', sbst = refreshing_subst params in
-    params', subst_ty sbst ty, subst_constraints sbst cnstrs
+(** [refresh (ps,qs,rs) ty] replaces the polymorphic parameters [ps,qs,rs] in [ty] with fresh
+    parameters. It returns the  *)
+let global_param_refreshers () =
+  (refresher fresh_ty_param, refresher fresh_dirt_param, refresher fresh_region_param)
+
+let refresh_ty (refresh_ty_param, refresh_dirt_param, refresh_region_param) ty =
+  let rec refresh_ty = function
+  | Apply (ty_name, args) -> Apply (ty_name, refresh_args args)
+  | Effect (ty_name, args, r) -> Effect (ty_name, refresh_args args, refresh_region_param r)
+  | TyParam p -> TyParam (refresh_ty_param p)
+  | Basic _ as ty -> ty
+  | Tuple tys -> Tuple (List.map refresh_ty tys)
+  | Arrow (ty1, ty2) -> Arrow (refresh_ty ty1, refresh_dirty ty2)
+  | Handler {value = ty1; finally = ty2} -> Handler {value = refresh_ty ty1; finally = refresh_ty ty2}
+  and refresh_args (tys, ds, rs) =
+    (List.map refresh_ty tys, List.map refresh_dirt_param ds, List.map refresh_region_param rs)
+  and refresh_dirty (frsh, ty, d) = (frsh, refresh_ty ty, refresh_dirt_param d)
+  in
+  refresh_ty ty
+
+let refresh_dirt (_, refresh_dirt_param, refresh_region_param) = function
+  | DirtEmpty as drt -> drt
+  | DirtParam d -> DirtParam (refresh_dirt_param d)
+  | DirtAtom (r, op) -> DirtAtom (refresh_region_param r, op)
+
+let refresh_region (_, _, refresh_region_param) = function
+  | RegionParam r -> RegionParam (refresh_region_param r)
+  | RegionAtom _ as rgn -> rgn
+
+let refresh_constraints param_refreshers = function
+  | TypeConstraint (ty1, ty2, pos) -> TypeConstraint (refresh_ty param_refreshers ty1, refresh_ty param_refreshers ty2, pos)
+  | DirtConstraint (drt1, drt2, pos) -> DirtConstraint (refresh_dirt param_refreshers drt1, refresh_dirt param_refreshers drt2, pos)
+  | RegionConstraint (rgn1, rgn2, pos) -> RegionConstraint (refresh_region param_refreshers rgn1, refresh_region param_refreshers rgn2, pos)
+
+let refresh_ctx param_refreshers ctx =
+  Common.assoc_map (refresh_ty param_refreshers) ctx
+
+
+(** [refresh (ps,qs,rs) ty] replaces the polymorphic parameters [ps,qs,rs] in [ty] with fresh
+    parameters. It returns the  *)
+let refresh (ctx, ty, cnstrs) =
+  let refreshers = global_param_refreshers () in
+  refresh_ctx refreshers ctx, refresh_ty refreshers ty, (List.map (refresh_constraints refreshers) cnstrs)
 
 let rec variablize ty =
-  let params = free_params (Trio.empty, ty, []) in
-  let _, ty, _ = refresh (params, ty, []) in
+  let (_, ty, _) = refresh ([], ty, []) in
   ty
 
 let disable_beautify = ref false

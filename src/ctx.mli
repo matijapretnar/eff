@@ -13,18 +13,13 @@ val empty : t
 
 (** [lookup ctx x] returns a fresh instance of the type scheme assigned
     to the variable [x] in the context [ctx]. *)
-val lookup : t -> int -> Type.ty_scheme option
+val lookup : t -> int -> Type.ty_scheme option option
 
 (** [extend x ty_scheme ctx] returns the context [ctx] extended with
     a variable [x] bound to the type scheme [ty_scheme]. *)
-val extend : t -> int -> Type.ty -> Type.constraints list -> t
+val extend : t -> int -> Type.ty_scheme -> t
 
 (** [extend_ty x ty ctx] returns the context [ctx] extended with a variable [x]
     bound to the type [ty]. The type is promoted to a type scheme with no
     generalized type parameters. *)
-val extend_ty : t -> int -> Type.ty -> Type.constraints list -> t
-
-(** [subst_ctx sbst ctx] returns a substitution of [ctx] under [sbst]. *)
-val subst_ctx : t -> Type.substitution -> t
-
-val to_list : t -> (int, Type.ty_scheme) Common.assoc
+val extend_ty : t -> int -> t

@@ -29,9 +29,10 @@ type constraints =
     TypeConstraint of ty * ty * Common.position
   | DirtConstraint of dirt * dirt * Common.position
   | RegionConstraint of region * region * Common.position
-type ty_scheme = params * ty * constraints list
+type ty_scheme = (int, ty) Common.assoc * ty * constraints list
+type dirty_scheme = (int, ty) Common.assoc * dirty * constraints list
 val universal_ty : ty
-val universal_dirty : ('a list * ty * dirt_param) * constraints list
+val universal_dirty : 'b list * ('a list * ty * dirt_param) * constraints list
 val int_ty : ty
 val string_ty : ty
 val bool_ty : ty
@@ -44,13 +45,11 @@ type substitution = {
   subst_region : (region_param * region_param) list;
   subst_instance : (instance_param * instance_param option) list;
 }
-val subst_ty_scheme : substitution -> ty_scheme -> ty_scheme
 val subst_constraints : substitution -> constraints list -> constraints list
 val subst_dirty : substitution -> dirty -> dirty
 val subst_ty : substitution -> ty -> ty
 val identity_subst : substitution
 val compose_subst : substitution -> substitution -> substitution
-val free_params : ty_scheme -> params
 val occurs_in_ty : ty_param -> ty -> bool
 val fresh_ty : unit -> ty
 val fresh_dirt : unit -> dirt
