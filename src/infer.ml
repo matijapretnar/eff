@@ -164,75 +164,8 @@ and infer_let env pos defs =
     (env, ctx, frshs, drts, cstr_ctxs @ cstr)
 
 
-
-(* (*   (if !warn_implicit_sequencing && List.length defs >= 2 then
-      let positions = List.map (fun (_, (_, pos)) -> pos) defs in
-        Print.warning ~pos "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
-          (Print.sequence "," Print.position positions));
- *)  let cstr = ref [] in
-  let vars, drts, frshs, ctx = List.fold_left
-    (fun (vs, drts, frshs) (p,c) ->
-      let ctxc, (frsh, tc, drt), cstr_c = infer_comp env c in
-(*         let isbst = Type.instance_refreshing_subst frsh in
-        add_constraints cstr (Type.subst_constraints isbst cstr_c);
-        let (frsh, tc, drt) = Type.subst_dirty isbst (frsh, tc, drt) in
- *)    let ws, tp, cstr_p = infer_pattern p in
-          add_constraints cstr cstr_p;
-          add_ty_constraint cstr (snd c) tc tp;
-          match C.find_duplicate (List.map fst ws) (List.map fst vs) with
-            | Some x -> Error.typing ~pos "Several definitions of %d." x
-            | None ->
-              let poly = nonexpansive (fst c) in
-              let ctx, cstr_ct = trim_context ctx ws in
-              add_constraints cstr cstr_ct;
-              let ws = Common.assoc_map (fun ty -> (poly, ty)) ws
-              in
-                List.rev ws @ vs, drt :: drts, frsh @ frshs, ctx :: ctxs)
-    ([], [], [], []) defs
-  in
-  let sbst, remaining = Unify.solve !cstr in
-  (* XXX is not needed? let remaining = Type.subst_constraints sbst remaining in*)
-  let vars, env = List.fold_right (fun (x, (poly, ty)) (vars, env) ->
-                                 let ty = T.subst_ty sbst ty in
-                                 let remaining = Unify.garbage_collect (Unify.pos_neg_params ty) remaining in
-                                 let cnstr = Unify.constraints_of_graph remaining in
-                                 if poly then
-                                   (Ctx.extend vars x ty cnstr, Ctx.extend env x ty cnstr)
-                                 else
-                                   (Ctx.extend_ty vars x ty cnstr, Ctx.extend_ty env x ty cnstr)
-                                ) vars (Ctx.empty, env)
-  in
-  Ctx.to_list vars, drts, frshs, env, !cstr *)
-
 and infer_let_rec env pos defs =
   assert false
-(*   if not (Common.injective fst defs) then
-    Error.typing ~pos "Multiply defined recursive value.";
-  let cstr = ref [] in
-  let lst =
-    Common.assoc_map (fun ((p,c)) ->
-      let u = T.fresh_ty () in
-      (u, p, c))
-      defs
-  in
-  let env' = List.fold_right (fun (f, (u, _, _)) env -> Ctx.extend env f ([], u, [])) lst env in
-  let vars = Common.assoc_map
-    (fun (u, p, c) ->
-      let _, tp, env', cstr_p = extend_with_pattern env' p in
-      let tc, cstr_c = infer_comp env' c in
-      add_constraints cstr (cstr_p @ cstr_c);
-      let t = T.Arrow (tp, tc) in
-      add_ty_constraint cstr (Common.join_pos (snd p) (snd c)) t u;
-      t) lst in
-  let sbst, remaining = Unify.solve !cstr in
-  let vars, env = List.fold_right (fun (x, ty) (vars, env) ->
-                                 let ty = T.subst_ty sbst ty in
-                                 let remaining = Unify.garbage_collect (Unify.pos_neg_params ty) remaining in
-                                 let cnstr = Unify.constraints_of_graph remaining in
-                                 (Ctx.extend vars x ty cnstr, Ctx.extend env x ty cnstr))
-                                  vars (Ctx.empty, env)
-  in
-  Ctx.to_list vars, env, !cstr *)
 
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
    [env]. It returns the inferred type of [e]. *)
@@ -391,11 +324,8 @@ and infer_comp env (c, pos) : (int, Type.ty) Common.assoc * Type.dirty * Type.co
           let t_out = T.fresh_ty () in
           let drt_out = T.fresh_dirt_param () in
           let infer_case ((p, e') as a) =
+            (* XXX Refresh fresh instances *)
             let ctxa, t_in', (frsh_out, t_out', drt_out'), cstr_case = infer_abstraction env a in
-            let isbst = Type.instance_refreshing_subst frsh_out in
-            let t_in' = Type.subst_ty isbst t_in' in
-            let (frsh_out, t_out', drt_out') = Type.subst_dirty isbst (frsh_out, t_out', drt_out') in
-            let cstr_case = Type.subst_constraints isbst cstr_case in
             add_constraints cstr cstr_case;
             add_ty_constraint cstr (snd e) t_in t_in';
             add_ty_constraint cstr (snd e') t_out' t_out;

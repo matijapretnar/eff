@@ -159,13 +159,6 @@ and subst_dirty sbst (frsh, ty, drt) =
 let subst_dirt_ty sbst (frsh, ty, drt) =
   (subst_fresh sbst frsh, subst_ty sbst ty, subst_dirt sbst drt)
 
-
-let subst_constraints sbst cnstrs = List.map (function
-  | TypeConstraint (ty1, ty2, pos) -> TypeConstraint (subst_ty sbst ty1, subst_ty sbst ty2, pos)
-  | DirtConstraint (drt1, drt2, pos) -> DirtConstraint (subst_dirt sbst drt1, subst_dirt sbst drt2, pos)
-  | RegionConstraint (rgn1, rgn2, pos) -> RegionConstraint (subst_region sbst rgn1, subst_region sbst rgn2, pos)
-  ) cnstrs
-
 (** [identity_subst] is a substitution that makes no changes. *)
 let identity_subst = { subst_ty = []; subst_dirt = []; subst_region = []; subst_instance = [] }
 
@@ -303,9 +296,10 @@ let disable_beautify = ref false
     [ty] that can be used for its pretty printing. *)
 let beautify ?beautifier ((ps, ds, rs), ty, cnstrs) =
   if !disable_beautify then
-    ((ps, ds, rs), ty, cnstrs)
+     ((ps, ds, rs), ty, cnstrs)
   else
-    let next_ty_param = Common.fresh "beautify_ty"
+     ((ps, ds, rs), ty, cnstrs)
+ (*    let next_ty_param = Common.fresh "beautify_ty"
     and next_dirt_param =  Common.fresh "beautify_dirt"
     and next_region_param = Common.fresh "beautify_region"
     in
@@ -323,7 +317,7 @@ let beautify ?beautifier ((ps, ds, rs), ty, cnstrs) =
         subst_region = Common.assoc_map (fun r' -> r') zs_map ;
         subst_instance = [] }
     in
-    (subst ps xs_map, subst ds ys_map, subst rs zs_map), subst_ty sbst ty, subst_constraints sbst cnstrs
+    (subst ps xs_map, subst ds ys_map, subst rs zs_map), subst_ty sbst ty, subst_constraints sbst cnstrs *)
 
 let beautify_dirty (params, ty, cnstrs) drt =
   match beautify (params, Arrow (Tuple [], ([], ty, drt)), cnstrs) with

@@ -45,7 +45,6 @@ type substitution = {
   subst_region : (region_param * region_param) list;
   subst_instance : (instance_param * instance_param option) list;
 }
-val subst_constraints : substitution -> constraints list -> constraints list
 val subst_dirty : substitution -> dirty -> dirty
 val subst_ty : substitution -> ty -> ty
 val identity_subst : substitution

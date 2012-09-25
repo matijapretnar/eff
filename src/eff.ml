@@ -134,16 +134,10 @@ let exec_topdef interactive (ctx, env) (d,pos) =
 
 let infer_top_comp ctx c =
   let ctx, (frshs, ty, drt), cstr = Infer.infer_comp ctx c in
-  let isbst = Type.instance_refreshing_subst frshs in
-  let cstr = Type.subst_constraints isbst cstr in
-  let sbst, remaining = Unify.solve cstr in
+  let remaining = Unify.solve cstr in
   Exhaust.check_comp c ;
-  let sbst = Type.compose_subst isbst sbst in
-  (* let ctx = Ctx.subst_ctx ctx sbst in *)
-  let (frshs, ty, drt) = Type.subst_dirty sbst (frshs, ty, drt) in
   let remaining = Unify.garbage_collect (Unify.pos_neg_params ty) remaining in
   let cnstr = Unify.constraints_of_graph remaining in
-  let cnstr = Type.subst_constraints sbst cnstr in
   (* XXX What to do about the fresh instances? *)
   (* XXX Here, we need to show what type parameters are polymorphic or not. *)
   (*     I am disabling it because we are going to try a new approach. *)

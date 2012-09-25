@@ -152,7 +152,7 @@ let solve initial_cnstrs =
 
   let rec loop () =
     match !queue with
-      | [] -> !sbst, graph
+      | [] -> graph
       | cnstr :: cnstrs ->
         queue := cnstrs ;
         begin match cnstr with
