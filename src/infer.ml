@@ -185,7 +185,32 @@ and infer_let env pos defs =
 
 
 and infer_let_rec env pos defs =
-  assert false
+  if not (Common.injective fst defs) then
+    Error.typing ~pos "Multiply defined recursive value.";
+
+  let lst =
+    Common.assoc_map (fun a ->
+      let u = T.fresh_ty () in
+      (u, a))
+      defs
+
+  in
+  let cstr = ref [] in
+  let env' = List.fold_right (fun (f, (u, _)) env -> Ctx.extend_ty env f) lst env in
+  let vars = Common.assoc_map
+    (fun (u, ((p, c) as a)) ->
+      let ctx, tp, tc, cstr_c = infer_abstraction env' a in
+      let t = T.Arrow (tp, tc) in
+      add_ty_constraint cstr (snd c) t u;
+      add_constraints cstr cstr_c;
+      (ctx, t)) lst in
+  let ctxs, ctxp =
+    List.fold_right
+      (fun (x, (ctx, t)) (ctxs, ctxp) -> (ctx :: ctxs, (x, t) :: ctxp)) vars ([], []) in
+  let ctx, cstr_c = unify_contexts ~pos ctxs in
+  let cstr = cstr_c @ !cstr in
+  let env = List.fold_right (fun (x, (_, t)) env -> Ctx.extend env x (Unify.normalize (ctx, t, cstr))) vars env in
+    ctxp, env, ctx, cstr
 
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
    [env]. It returns the inferred type of [e]. *)
@@ -444,9 +469,11 @@ and infer_comp env (c, pos) : (int, Type.ty) Common.assoc * Type.dirty * Constr.
             ctx, (let_frshs @ frsh, tc, drt)
 
       | Core.LetRec (defs, c) ->
-          let env, ctx, cstrs = infer_let_rec env pos defs in
-          let ctx, frsh, tc, dc, cstr_c = infer env c in
-          add_constraints cstr (cstr_c @ cstrs);
+          let vars, env, ctx1, cstrs = infer_let_rec env pos defs in
+          let ctx2, frsh, tc, dc, cstr_c = infer env c in
+          let ctx, cstr_cs = unify_contexts ~pos [ctx1; ctx2] in
+          let ctx, cstr_diff = trim_context ~pos ctx vars in
+          add_constraints cstr (cstr_c @ cstrs @ cstr_cs @ cstr_diff);
           ctx, (frsh, tc, dc)
 
       | Core.Check c ->

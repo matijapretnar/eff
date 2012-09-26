@@ -8,10 +8,11 @@ val nonexpansive : Core.plain_computation -> bool
            Ctx.t * (int, Type.ty) Common.assoc * (int * Type.ty) list *
            Type.instance_param list * Type.dirt_param list *
            Constr.constraints list
-val infer_let_rec :
-   Ctx.t ->
-   Common.position ->
-   (int * Core.abstraction) list ->
-   Ctx.t * (int * Type.ty) list * Constr.constraints list
-val infer_comp :
+         val infer_let_rec :
+           Ctx.t ->
+           Common.position ->
+           (int * Core.abstraction) list ->
+           (int * Type.ty) list * Ctx.t * (int, Type.ty) Common.assoc *
+           Constr.constraints list
+           val infer_comp :
   Ctx.t -> Core.computation -> Ctx.dirty_scheme
