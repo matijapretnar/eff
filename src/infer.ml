@@ -61,14 +61,17 @@ let ty_of_const = function
 let unify_contexts ~pos ctxs =
   let unify_with_context ctx1 (ctx2, cstrs) =
     let unify (x, t) (ctx2, cstrs)=
-      let u = match Common.lookup x ctx2 with
-      | None -> Type.fresh_ty () | Some u -> u
-      in
-      ((x, u) :: ctx2, Constr.TypeConstraint (t, u, pos) :: cstrs)
+      match Common.lookup x ctx2 with
+      | None ->
+          let u = Type.fresh_ty () in
+          ((x, u) :: ctx2, Constr.TypeConstraint (u, t, pos) :: cstrs)
+      | Some u ->
+          (ctx2, Constr.TypeConstraint (u, t, pos) :: cstrs)
     in
     List.fold_right unify ctx1 (ctx2, cstrs)
   in
   List.fold_right unify_with_context ctxs ([], [])
+
 
 let trim_context ~pos ctx vars =
   let trim (x, t) (ctx, cstrs) =
