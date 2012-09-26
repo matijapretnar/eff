@@ -65,9 +65,21 @@ let is_effect ~pos =
   in
     find []
 
+let refreshing_subst (ps, ds, rs) =
+  let refresh_ty_param = Type.refresher Type.fresh_ty_param
+  and refresh_dirt_param = Type.refresher Type.fresh_dirt_param
+  and refresh_region_param = Type.refresher Type.fresh_region_param in
+  (List.map refresh_ty_param ps, List.map refresh_dirt_param ds, List.map refresh_region_param rs),
+  {
+    Type.identity_subst with
+    Type.ty_param = (fun p -> Type.TyParam (refresh_ty_param p));
+    Type.dirt_param = refresh_dirt_param;
+    Type.region_param = refresh_region_param;
+  }
+
 let fresh_tydef ~pos ty_name =
   let (params, tydef) = lookup_tydef ~pos ty_name in
-  let params', sbst = Type.refreshing_subst params in
+  let params', sbst = refreshing_subst params in
     params', subst_tydef sbst tydef
 
 (** [find_variant lbl] returns the information about the variant type that defines the
@@ -128,7 +140,7 @@ let infer_variant lbl =
   match find_variant lbl with
     | None -> None
     | Some (ty_name, ps, _, u) ->
-      let ps', fresh_subst = T.refreshing_subst (remove_variances ps) in
+      let ps', fresh_subst = refreshing_subst (remove_variances ps) in
       let u = C.option_map (T.subst_ty fresh_subst) u in
         Some (apply_to_params ty_name ps', u)
 
@@ -139,7 +151,7 @@ let infer_field fld =
   match find_field fld with
     | None -> None
     | Some (ty_name, ps, us) ->
-      let ps', fresh_subst = T.refreshing_subst (remove_variances ps) in
+      let ps', fresh_subst = refreshing_subst (remove_variances ps) in
       let us' = C.assoc_map (T.subst_ty fresh_subst) us in
         Some (apply_to_params ty_name ps', (ty_name, us'))
 
@@ -151,7 +163,7 @@ let infer_operation op rgn =
   match find_operation op with
     | None -> None
     | Some (ty_name, ps, t1, t2) ->
-      let ps', fresh_subst = T.refreshing_subst (remove_variances ps) in
+      let ps', fresh_subst = refreshing_subst (remove_variances ps) in
       let t1 = T.subst_ty fresh_subst t1 in
       let t2 = T.subst_ty fresh_subst t2 in
         Some (effect_to_params ty_name ps' rgn, (t1, t2))
@@ -175,10 +187,10 @@ let ty_apply ~pos ty_name (tys, drts, rgns) =
       Invalid_argument "List.combine" -> Error.typing ~pos "Type constructors %s should be applied to %d region arguments" ty_name (List.length rs)
   in
   subst_tydef {
-    T.subst_ty = ty_sbst;
-    T.subst_dirt = dirt_sbst;
-    T.subst_region = region_sbst;
-    T.subst_instance = []
+    T.identity_subst with
+    T.ty_param = (fun p -> Common.lookup_default p ty_sbst (Type.TyParam p));
+    T.dirt_param = (fun d -> Common.lookup_default d dirt_sbst d);
+    T.region_param = (fun r -> Common.lookup_default r region_sbst r);
   } ty
 
 (** [check_well_formed ~pos ty] checks that type [ty] is well-formed. *)

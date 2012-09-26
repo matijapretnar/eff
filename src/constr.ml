@@ -29,19 +29,19 @@ let fresh_region () = RegionParam (Type.fresh_region_param ())
 
 let fresh_instance () = RegionAtom (InstanceParam (Type.fresh_instance_param ()))
 
-let refresh_dirt (_, refresh_dirt_param, refresh_region_param) = function
-  | DirtEmpty as drt -> drt
-  | DirtParam d -> DirtParam (refresh_dirt_param d)
-  | DirtAtom (r, op) -> DirtAtom (refresh_region_param r, op)
+let subst_dirt sbst = function
+  | DirtEmpty -> DirtEmpty
+  | DirtParam d -> DirtParam (sbst.Type.dirt_param d)
+  | DirtAtom (r, op) -> DirtAtom (sbst.Type.region_param r, op)
 
-let refresh_region (_, _, refresh_region_param) = function
-  | RegionParam r -> RegionParam (refresh_region_param r)
+let subst_region sbst = function
+  | RegionParam r -> RegionParam (sbst.Type.region_param r)
   | RegionAtom _ as rgn -> rgn
 
-let refresh_constraints param_refreshers = function
-  | TypeConstraint (ty1, ty2, pos) -> TypeConstraint (Type.refresh_ty param_refreshers ty1, Type.refresh_ty param_refreshers ty2, pos)
-  | DirtConstraint (drt1, drt2, pos) -> DirtConstraint (refresh_dirt param_refreshers drt1, refresh_dirt param_refreshers drt2, pos)
-  | RegionConstraint (rgn1, rgn2, pos) -> RegionConstraint (refresh_region param_refreshers rgn1, refresh_region param_refreshers rgn2, pos)
+let subst_constraints sbst = function
+  | TypeConstraint (ty1, ty2, pos) -> TypeConstraint (Type.subst_ty sbst ty1, Type.subst_ty sbst ty2, pos)
+  | DirtConstraint (drt1, drt2, pos) -> DirtConstraint (subst_dirt sbst drt1, subst_dirt sbst drt2, pos)
+  | RegionConstraint (rgn1, rgn2, pos) -> RegionConstraint (subst_region sbst rgn1, subst_region sbst rgn2, pos)
 
 
 

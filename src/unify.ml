@@ -43,7 +43,10 @@ let solve initial_cnstrs =
     let (pred, succ) = Constr.remove_ty graph p in
       List.iter (fun (q, pos) -> add_ty_constraint pos (Type.TyParam q) (Type.TyParam p)) pred ;
       List.iter (fun (q, pos) -> add_ty_constraint pos (Type.TyParam p) (Type.TyParam q)) succ ;
-      sbst := Type.compose_subst {Type.identity_subst with Type.subst_ty = [(p, t)]} !sbst
+      sbst := Type.compose_subst {
+        Type.identity_subst with
+        Type.ty_param = (fun p' -> if p' = p then t else Type.TyParam p)
+      } !sbst
   in
   let unify pos t1 t2 =
     let t1 = Type.subst_ty !sbst t1 in
@@ -56,30 +59,34 @@ let solve initial_cnstrs =
         Constr.add_ty_edge graph p q pos
 
     | (Type.TyParam p, t) ->
-        if Type.occurs_in_ty p t
+        if false
+        (* XXX *)
+        (* if Type.occurs_in_ty p t *)
         then
-          let (ps1, t1), (ps2, t2) = Type.beautify2 t1 t2 in
+          let t1, t2 = Type.beautify2 t1 t2 in
           Error.typing ~pos
             "This expression has a forbidden cylclic type %t = %t."
-            (Print.ty ps1 t1)
-            (Print.ty ps2 t2)
+            (Print.ty Trio.empty t1)
+            (Print.ty Trio.empty t2)
         else
-          let t' = Type.variablize t in
+          let t' = Type.refresh t in
           add_substitution p t' ;
           add_ty_constraint pos t' t
 
     | (t, Type.TyParam p) ->
         (* XXX One should do occurs check on constraints too.
             Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)
-        if Type.occurs_in_ty p t
+        if false
+        (* XXX *)
+        (* if Type.occurs_in_ty p t *)
         then
-          let (ps1, t1), (ps2, t2) = Type.beautify2 t1 t2 in
+          let t1, t2 = Type.beautify2 t1 t2 in
           Error.typing ~pos
             "This expression has a forbidden cylclic type %t = %t."
-            (Print.ty ps1 t1)
-            (Print.ty ps2 t2)
+            (Print.ty Trio.empty t1)
+            (Print.ty Trio.empty t2)
         else
-          let t' = Type.variablize t in
+          let t' = Type.refresh t in
           add_substitution p t' ;
           add_ty_constraint pos t t'
 
@@ -136,11 +143,11 @@ let solve initial_cnstrs =
         add_ty_constraint pos tf1 tf2
 
     | (t1, t2) ->
-      let (ps1, t1), (ps2, t2) = Type.beautify2 t1 t2 in
-        Error.typing ~pos
-          "This expression has type %t but it should have type %t."
-          (Print.ty ps1 t1)
-          (Print.ty ps2 t2)
+          let t1, t2 = Type.beautify2 t1 t2 in
+          Error.typing ~pos
+            "This expression has type %t but it should have type %t."
+            (Print.ty Trio.empty t1)
+            (Print.ty Trio.empty t2)
 
   and unify_dirt pos drt1 drt2 =
     add_dirt_constraint pos drt1 drt2

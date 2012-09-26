@@ -9,6 +9,8 @@ type regionparam = int
 type position = Position of Lexing.position * Lexing.position
 type 'a pos = 'a * position
 val join_pos : position -> position -> position
+val id : 'a -> 'a
+val compose : ('b -> 'c) -> ('a -> 'b) -> ('a -> 'c)
 type const =
     Integer of Big_int.big_int
   | String of string
@@ -21,6 +23,7 @@ val cons : string
 val nil : string
 type ('a, 'b) assoc = ('a * 'b) list
 val lookup : 'a -> ('a * 'b) list -> 'b option
+val lookup_default : 'a -> ('a * 'b) list -> 'b -> 'b
 val find : ('a -> bool) -> 'a list -> 'a option
 val update : 'a -> 'b -> ('a * 'b) list -> ('a * 'b) list
 val injective : ('a -> 'b) -> 'a list -> bool

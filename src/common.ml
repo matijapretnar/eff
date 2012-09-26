@@ -11,6 +11,9 @@ type typaram = string (** type parameters *)
 type dirtparam = int (** dirt parameters *)
 type regionparam = int (** region parameters *)
 
+let id x = x
+let compose f g x = f (g x)
+
 (** Positions *)
 type position =
   | Position of Lexing.position * Lexing.position (** delimited position *)
@@ -75,6 +78,9 @@ type ('key, 'value) assoc = ('key * 'value) list
 let rec lookup x = function
   | [] -> None
   | (x', y) :: lst -> if x = x' then Some y else lookup x lst
+
+let lookup_default x =
+  List.fold_right (fun (x', y) rest -> if x = x' then y else rest)
 
 let rec find p = function
   | [] -> None

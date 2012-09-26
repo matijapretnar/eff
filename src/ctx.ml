@@ -6,15 +6,11 @@ type t = (int, ty_scheme option) Common.assoc
 
 let empty = []
 
-let refresh_ctx param_refreshers ctx =
-  Common.assoc_map (Type.refresh_ty param_refreshers) ctx
-
-
 (** [refresh (ps,qs,rs) ty] replaces the polymorphic parameters [ps,qs,rs] in [ty] with fresh
     parameters. It returns the  *)
 let refresh (ctx, ty, cnstrs) =
-  let refreshers = Type.global_param_refreshers () in
-  refresh_ctx refreshers ctx, Type.refresh_ty refreshers ty, (List.map (Constr.refresh_constraints refreshers) cnstrs)
+  let sbst = Type.refreshing_subst () in
+  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, List.map (Constr.subst_constraints sbst) cnstrs
 
 let lookup ctx x =
   match Common.lookup x ctx with
