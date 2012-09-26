@@ -39,6 +39,7 @@ sig
   val filter_edges : (elt -> elt -> Common.position -> bool) -> t -> t
 
   val join : t -> t -> t
+  val union : t -> t -> t
 
   val subst : Type.substitution -> t -> t
 

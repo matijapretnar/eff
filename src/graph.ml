@@ -72,6 +72,8 @@ struct
   let join grph1 grph2 =
     fold_edges add_edge grph1 grph2
 
+  let union = G.fold G.add
+
   let fold_vertices f grph acc =
     G.fold (fun x (inx, outx, _, _) acc -> f x (S.elements inx) (S.elements outx) acc) grph acc
 

@@ -109,6 +109,13 @@ let join_constraints cstr1 cstr2 =
     region_graph = Region.join cstr1.region_graph cstr2.region_graph;
   }
 
+let join_disjoint_constraints cstr1 cstr2 = 
+  {
+    ty_graph = Ty.union cstr1.ty_graph cstr2.ty_graph;
+    dirt_graph = Dirt.union cstr1.dirt_graph cstr2.dirt_graph;
+    region_graph = Region.union cstr1.region_graph cstr2.region_graph;
+  }
+
 (* let print grph ppf =
   Print.print ppf "TYPES:@.%t@.REGIONS:@.%t@.DIRT:@.%t@." 
   (Ty.print grph.ty_graph) (Region.print grph.region_graph) (Dirt.print grph.dirt_graph)
