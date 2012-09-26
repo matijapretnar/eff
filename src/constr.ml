@@ -38,11 +38,6 @@ let subst_region sbst = function
   | RegionParam r -> RegionParam (sbst.Type.region_param r)
   | RegionAtom _ as rgn -> rgn
 
-let subst_constraints sbst = function
-  | TypeConstraint (ty1, ty2, pos) -> TypeConstraint (Type.subst_ty sbst ty1, Type.subst_ty sbst ty2, pos)
-  | DirtConstraint (drt1, drt2, pos) -> DirtConstraint (subst_dirt sbst drt1, subst_dirt sbst drt2, pos)
-  | RegionConstraint (rgn1, rgn2, pos) -> RegionConstraint (subst_region sbst rgn1, subst_region sbst rgn2, pos)
-
 module Ty = Graph.Make(struct
   type t = Type.ty
   type bound = unit
@@ -74,30 +69,19 @@ module Dirt = Graph.Make(struct
 end)
 
 type t = {
-  mutable ty_graph : Ty.t;
-  mutable region_graph : Region.t;
-  mutable dirt_graph : Dirt.t
+  ty_graph : Ty.t;
+  region_graph : Region.t;
+  dirt_graph : Dirt.t
 }
 
-let empty () = {
+let empty = {
   ty_graph = Ty.empty;
   region_graph = Region.empty;
   dirt_graph = Dirt.empty
 }
 
-let add_ty_edge g p1 p2 pos =
-  g.ty_graph <- Ty.add_edge p1 p2 pos g.ty_graph
-
-let add_region_edge g p1 p2 pos =
-  g.region_graph <- Region.add_edge p1 p2 pos g.region_graph
-
-let add_dirt_edge g p1 p2 pos =
-  g.dirt_graph <- Dirt.add_edge p1 p2 pos g.dirt_graph
-
 let remove_ty g x =
-  let (inx, outx, g') = Ty.remove_vertex x g.ty_graph in
-    g.ty_graph <- g' ;
-    (inx, outx)
+  Ty.remove_vertex x g.ty_graph
 
 let subst_constraints sbst cnstr = {
   ty_graph = Ty.subst sbst cnstr.ty_graph;
@@ -108,29 +92,6 @@ let subst_constraints sbst cnstr = {
 let fold_ty f g acc = Ty.fold_edges f g.ty_graph acc
 let fold_region f g acc = Region.fold_edges f g.region_graph acc
 let fold_dirt f g acc = Dirt.fold_edges f g.dirt_graph acc
-
-(* let empty_constraints = []
-
-let add_ty_constraint ~pos ty1 ty2 cstr =
-  TypeConstraint (ty1, ty2, pos) :: !cstr
-let add_dirt_constraint ~pos drt1 drt2 cstr =
-  DirtConstraint (drt1, drt2, pos) :: !cstr
-let add_region_constraint ~pos rgn1 rgn2 cstr =
-  RegionConstraint (rgn1, rgn2, pos) :: !cstr
-let join_constraints cstr1 cstr2 = cstr1 @ cstr2 *)
-
-
-let empty_constraints = empty ()
-
-let add_ty_edge g p1 p2 pos =
-  g.ty_graph <- Ty.add_edge p1 p2 pos g.ty_graph
-
-let add_region_edge g p1 p2 pos =
-  g.region_graph <- Region.add_edge p1 p2 pos g.region_graph
-
-let add_dirt_edge g p1 p2 pos =
-  g.dirt_graph <- Dirt.add_edge p1 p2 pos g.dirt_graph
-
 
 let add_ty_constraint ~pos ty1 ty2 cstr =
   {cstr with ty_graph = Ty.add_edge ty1 ty2 pos cstr.ty_graph}

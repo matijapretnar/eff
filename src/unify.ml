@@ -18,20 +18,20 @@ let constraints_of_graph g =
   let lst = Constr.fold_dirt (fun d1 d2 pos lst -> (Constr.DirtConstraint (d1, d2, pos)) :: lst) g lst in
   Constr.fold_region (fun r1 r2 pos lst -> (Constr.RegionConstraint (r1, r2, pos)) :: lst) g lst
 
-let canonize (ctx, ty, grph) =
+let canonize (ctx, ty, initial_grph) =
   let sbst = ref Type.identity_subst in
   (* We keep a list of "final" constraints which are known not to
      generate new constraints, and a list of constraints which still
      need to be resolved. *)
-  let graph = Constr.empty () in
-  let queue = ref (constraints_of_graph grph) in
+  let grph = ref (Constr.empty) in
+  let queue = ref (constraints_of_graph initial_grph) in
   let add_constraint = function
     | Constr.TypeConstraint (t1, t2, pos) as cnstr ->
       if t1 <> t2 then queue := cnstr :: !queue
     | Constr.DirtConstraint (d1, d2, pos) ->
-      if d1 <> d2 then Constr.add_dirt_edge graph d1 d2 pos
+      if d1 <> d2 then grph := Constr.add_dirt_constraint ~pos d1 d2 !grph
     | Constr.RegionConstraint (r1, r2, pos) ->
-      if r1 <> r2 then Constr.add_region_edge graph r1 r2 pos
+      if r1 <> r2 then grph := Constr.add_region_constraint ~pos r1 r2 !grph
   in
   let add_ty_constraint pos t1 t2 = add_constraint (Constr.TypeConstraint (t1, t2, pos)) in
   let add_region_constraint pos r1 r2 = add_constraint (Constr.RegionConstraint (r1, r2, pos)) in
@@ -40,7 +40,8 @@ let canonize (ctx, ty, grph) =
     (* When parameter [p] gets substituted by type [t] the vertex
        [p] must be removed from the graph, and each edge becomes
        a constraint in the queue. *)
-    let (pred, succ) = Constr.remove_ty graph (Type.TyParam p) in
+    let (pred, succ, new_grph) = Constr.remove_ty !grph (Type.TyParam p) in
+    grph := {!grph with Constr.ty_graph = new_grph};
       List.iter (fun (q, pos) -> add_ty_constraint pos q (Type.TyParam p)) pred ;
       List.iter (fun (q, pos) -> add_ty_constraint pos (Type.TyParam p) q) succ ;
       sbst := Type.compose_subst {
@@ -56,7 +57,7 @@ let canonize (ctx, ty, grph) =
     | (t1, t2) when t1 = t2 -> ()
 
     | (Type.TyParam p, Type.TyParam q) ->
-        Constr.add_ty_edge graph (Type.TyParam p) (Type.TyParam q) pos
+        grph := Constr.add_ty_constraint ~pos (Type.TyParam p) (Type.TyParam q) !grph
 
     | (Type.TyParam p, t) ->
         if false
@@ -159,7 +160,7 @@ let canonize (ctx, ty, grph) =
 
   let rec loop () =
     match !queue with
-      | [] -> (Common.assoc_map (Type.subst_ty !sbst) ctx, Type.subst_ty !sbst ty, graph)
+      | [] -> (Common.assoc_map (Type.subst_ty !sbst) ctx, Type.subst_ty !sbst ty, !grph)
       | cnstr :: cnstrs ->
         queue := cnstrs ;
         begin match cnstr with

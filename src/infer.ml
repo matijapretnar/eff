@@ -70,7 +70,7 @@ let unify_contexts ~pos ctxs =
     in
     List.fold_right unify ctx1 (ctx2, cstrs)
   in
-  List.fold_right unify_with_context ctxs ([], Constr.empty_constraints)
+  List.fold_right unify_with_context ctxs ([], Constr.empty)
 
 
 let trim_context ~pos ctx vars =
@@ -79,13 +79,13 @@ let trim_context ~pos ctx vars =
     | None -> ((x, t) :: ctx, cstrs)
     | Some u -> (ctx, Constr.add_ty_constraint pos u t cstrs)
   in
-  List.fold_right trim ctx ([], Constr.empty_constraints)
+  List.fold_right trim ctx ([], Constr.empty)
 
 (* [infer_pattern cstr pp] infers the type of pattern [pp]. It returns the list of pattern
    variables with their types, which are all guaranteed to be fresh parameters, together
    with the type of the whole pattern. *)
 let infer_pattern pp =
-  let cstr = ref Constr.empty_constraints in
+  let cstr = ref Constr.empty in
   if not (Pattern.linear_pattern pp) then
     Error.typing ~pos:(snd pp) "Variables in a pattern must be distinct." ;
   let vars = ref [] in
@@ -163,7 +163,7 @@ and infer_let env pos defs =
   (* Refresh freshes *)
   (* Check for duplicate variables *)
   let add_binding (p, c) (env, ctxs, ctxp, frshs, drts, cstrs) =
-    let cstr = ref Constr.empty_constraints in
+    let cstr = ref Constr.empty in
     let ctx_p, t_p, cstr_p = infer_pattern p in
     let ctx_c, (frsh, t_c, drt), cstr_c = infer_comp env c in
     join_constraints cstr (cstr_p @@ cstr_c);
@@ -180,7 +180,7 @@ and infer_let env pos defs =
     (env, ctxs, ctxp, frsh @ frshs, drt :: drts, !cstr @@ cstrs)
   in  
   let env, ctxs, ctxp, frshs, drts, cstr =
-    List.fold_right add_binding defs (env, [], [], [], [], Constr.empty_constraints) in
+    List.fold_right add_binding defs (env, [], [], [], [], Constr.empty) in
   let ctx, cstr_ctxs = unify_contexts ~pos ctxs in
     (env, ctx, ctxp, frshs, drts, cstr_ctxs @@ cstr)
 
@@ -196,7 +196,7 @@ and infer_let_rec env pos defs =
       defs
 
   in
-  let cstr = ref Constr.empty_constraints in
+  let cstr = ref Constr.empty in
   let env' = List.fold_right (fun (f, (u, _)) env -> Ctx.extend_ty env f) lst env in
   let vars = Common.assoc_map
     (fun (u, ((p, c) as a)) ->
@@ -216,7 +216,7 @@ and infer_let_rec env pos defs =
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
    [env]. It returns the inferred type of [e]. *)
 and infer_expr env (e,pos) : Ctx.ty_scheme =
-  let cstr = ref Constr.empty_constraints in
+  let cstr = ref Constr.empty in
   let ctx, t = match e with
     | Core.Var x ->
         begin match Ctx.lookup env x with
@@ -335,9 +335,9 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
 and infer_comp env (c, pos) =
   (* XXX Why isn't it better to just not call type inference when type checking is disabled? *)
   (* Print.debug "Inferring type of %t" (Print.computation (c, pos)); *)
-  if !disable_typing then ([], ([], Type.Basic "_", Type.fresh_dirt_param ()), Constr.empty_constraints) else
+  if !disable_typing then ([], ([], Type.Basic "_", Type.fresh_dirt_param ()), Constr.empty) else
   let rec infer env (c, pos) =
-    let cstr = ref Constr.empty_constraints in
+    let cstr = ref Constr.empty in
     let ctx, (frsh, ty, drt) = match c with
       | Core.Apply (e1, e2) ->
           let ctx1, t1, cstr1 = infer_expr env e1 in
