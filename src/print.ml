@@ -145,15 +145,19 @@ let ty_scheme (ctx, t, cstrs) ppf =
   let poly = Trio.empty in
   print ppf "%t {%t}" (ty poly t) (constraints poly cstrs)
 
-let dirty_scheme ((poly, _, _) as tysch) drt ppf =
-  print ppf "%t[%t]" (ty_scheme tysch) (dirt_param poly drt)
+let dirty_scheme tysch drt ppf =
+  print ppf "%t[%t]" (ty_scheme tysch) (dirt_param Trio.empty drt)
 
-let beautified_ty_scheme tysch = ty_scheme tysch
-  (* let tysch = Type.beautify tysch in *)
-  (* ty_scheme tysch *)
+let beautified_ty_scheme (ctx, ty, cstrs) =
+  let sbst = Type.beautifying_subst () in
+  let ty = Type.subst_ty sbst ty in
+  ty_scheme (Common.assoc_map (Type.subst_ty sbst) ctx, ty, List.map (Constr.subst_constraints sbst) cstrs)
 
-let beautified_dirty_scheme tysch drt =
-  (* let tysch, drt = Type.beautify_dirty tysch drt in *)
+let beautified_dirty_scheme (ctx, ty, cstrs) drt =
+  let sbst = Type.beautifying_subst () in
+  let ty = Type.subst_ty sbst ty in
+  let tysch = (Common.assoc_map (Type.subst_ty sbst) ctx, ty, List.map (Constr.subst_constraints sbst) cstrs) in
+  let drt = sbst.Type.dirt_param drt in
   dirty_scheme tysch drt
 
 (*

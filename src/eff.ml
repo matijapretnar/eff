@@ -141,7 +141,7 @@ let infer_top_comp ctx c =
   (* XXX What to do about the fresh instances? *)
   (* XXX Here, we need to show what type parameters are polymorphic or not. *)
   (*     I am disabling it because we are going to try a new approach. *)
-  ctx, (Trio.empty, ty, cnstr), drt, frshs
+  ctx, ([], ty, cnstr), drt, frshs
 
 let rec exec_cmd interactive (ctx, env) e =
   match e with
@@ -151,7 +151,7 @@ let rec exec_cmd interactive (ctx, env) e =
       let v = Eval.run env c in
       if interactive then Format.printf "@[- : %t %t = %t@]@."
         (Print.fresh_instances frsh)
-        (Print.beautified_dirty_scheme tysch drt)
+        (Print.beautified_ty_scheme tysch)
         (Print.value v);
       (ctx, env)
   | Syntax.TypeOf c ->

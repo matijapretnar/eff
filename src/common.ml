@@ -136,10 +136,10 @@ let rec assoc_map f = function
 (** [fresh wrapper] creates a function that creates fresh instances and wraps
     them with the [wrapper] function *)
 let fresh wrapper =
-  let counter = ref 0 in
+  let counter = ref (-1) in
   fun () ->
     incr counter;
-    assert (!counter > 0);
+    assert (!counter >= 0);
     wrapper !counter
 
 (** [uniq lst] returns [lst] with all duplicates removed, keeping the first

@@ -56,12 +56,21 @@ type substitution = {
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 let rec subst_ty sbst = function
   | Apply (ty_name, args) -> Apply (ty_name, subst_args sbst args)
-  | Effect (ty_name, args, r) -> Effect (ty_name, subst_args sbst args, sbst.region_param r)
+  | Effect (ty_name, args, r) ->
+      let args = subst_args sbst args in
+      let r = sbst.region_param r in
+      Effect (ty_name, args, r)
   | TyParam p -> sbst.ty_param p
   | Basic _ as ty -> ty
-  | Tuple tys -> Tuple (List.map (subst_ty sbst) tys)
-  | Arrow (ty1, ty2) -> Arrow (subst_ty sbst ty1, subst_dirty sbst ty2)
-  | Handler (ty1, ty2) -> Handler (subst_ty sbst ty1, subst_ty sbst ty2)
+  | Tuple tys -> Tuple (Common.map (subst_ty sbst) tys)
+  | Arrow (ty1, drty2) ->
+      let ty1 = subst_ty sbst ty1 in
+      let drty2 = subst_dirty sbst drty2 in
+      Arrow (ty1, drty2)
+  | Handler (ty1, ty2) ->
+      let ty1 = subst_ty sbst ty1 in
+      let ty2 = subst_ty sbst ty2 in
+      Handler (ty1, ty2)
 
 and subst_dirty sbst (frsh, ty, d) =
   let subst_instance i frsh =
@@ -69,10 +78,16 @@ and subst_dirty sbst (frsh, ty, d) =
     | Some j -> j :: frsh
     | None -> frsh
   in
-  (List.fold_right subst_instance frsh [], subst_ty sbst ty, sbst.dirt_param d)
+  let frsh = List.fold_right subst_instance frsh [] in
+  let ty = subst_ty sbst ty in
+  let d = sbst.dirt_param d in
+  (frsh, ty, d)
 
 and subst_args sbst (tys, ds, rs) =
-  (List.map (subst_ty sbst) tys, List.map sbst.dirt_param ds, List.map sbst.region_param rs)
+  let tys = Common.map (subst_ty sbst) tys in
+  let ds = Common.map sbst.dirt_param ds in
+  let rs = Common.map sbst.region_param rs in
+  (tys, ds, rs)
 
 (** [identity_subst] is a substitution that makes no changes. *)
 let identity_subst = {

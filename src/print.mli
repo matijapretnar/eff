@@ -39,13 +39,8 @@ val dirty_scheme :
   (Type.ty_param list * Type.dirt_param list * Type.region_param list) *
   Type.ty * Constr.constraints list ->
   Type.dirt_param -> Format.formatter -> unit
-val beautified_ty_scheme :
-  (Type.ty_param list * Type.dirt_param list * Type.region_param list) *
-  Type.ty * Constr.constraints list -> Format.formatter -> unit
-val beautified_dirty_scheme :
-  (Type.ty_param list * Type.dirt_param list * Type.region_param list) *
-  Type.ty * Constr.constraints list ->
-  Type.dirt_param -> Format.formatter -> unit
+val beautified_ty_scheme : Ctx.ty_scheme -> Format.formatter -> unit
+val beautified_dirty_scheme : Ctx.ty_scheme -> Type.dirt_param -> Format.formatter -> unit
 val computation :
   ?max_level:int -> Core.computation -> Format.formatter -> unit
 val expression :
