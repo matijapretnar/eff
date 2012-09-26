@@ -207,7 +207,7 @@ let tydefs ~pos defs =
 
 (** [fresh_variable ()] creates a fresh variable ["$gen1"], ["$gen2"], ... on
     each call *)
-let fresh_variable = Common.fresh Common.id
+let fresh_variable = Common.fresh (fun n -> (n, "$gen" ^ string_of_int n))
 
 let id_abstraction pos =
   let x = fresh_variable () in
@@ -218,14 +218,14 @@ let pattern (p, pos) =
   let rec pattern (p, pos) =
     let p = match p with
     | Pattern.Var x ->
-        let n = fresh_variable () in
-        vars := (x, n) :: !vars;
-        Pattern.Var n
+        let (n, _) = fresh_variable () in
+        vars := (x, (n, x)) :: !vars;
+        Pattern.Var (n, x)
     | Pattern.As (p, x) ->
-        let n = fresh_variable () in
-        vars := (x, n) :: !vars;
+        let (n, _) = fresh_variable () in
+        vars := (x, (n, x)) :: !vars;
         let p' = pattern p in
-        Pattern.As (p', n)
+        Pattern.As (p', (n, x))
     | Pattern.Tuple ps -> Pattern.Tuple (List.map pattern ps)
     | Pattern.Record flds -> Pattern.Record (Common.assoc_map pattern flds)
     | Pattern.Variant (lbl, p) -> Pattern.Variant (lbl, Common.option_map pattern p)

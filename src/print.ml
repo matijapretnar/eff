@@ -12,6 +12,8 @@ let print ?(max_level=9999) ?(at_level=0) ppf =
       Format.kfprintf (fun ppf -> Format.fprintf ppf "@]") ppf
     end
 
+let variable (_, x) ppf = print ppf "%s" x
+
 let position pos ppf =
   match pos with
   | Common.Position (begin_pos, end_pos) ->
@@ -42,8 +44,8 @@ let const c ppf =
 let rec pattern ?max_level (p,_) ppf =
   let print ?at_level = print ?max_level ?at_level ppf in
   match p with
-  | Pattern.Var x -> print "%d" x
-  | Pattern.As (p, x) -> print "%t as %d" (pattern p) x
+  | Pattern.Var x -> print "%t" (variable x)
+  | Pattern.As (p, x) -> print "%t as %t" (pattern p) (variable x)
   | Pattern.Const c -> const c ppf
   | Pattern.Tuple lst -> print "(@[<hov>%t@])" (sequence "," pattern lst)
   | Pattern.Record lst -> print "{@[<hov>%t@]}" (sequence ";" (field pattern) lst)
@@ -55,13 +57,13 @@ let rec pattern ?max_level (p,_) ppf =
       print ~at_level:1 "%s @[<hov>%t@]" lbl (pattern p)
   | Pattern.Nonbinding -> print "_"
 
-and pattern_list ?(max_length=299) (p,_) ppf =
+and pattern_list ?(max_length=299) (p, pos) ppf =
   if max_length > 1 then
     match p with
     | Pattern.Variant (lbl, Some (Pattern.Tuple [v1; v2], _)) when lbl = Common.cons ->
         fprintf ppf ",@ %t%t" (pattern v1) (pattern_list ~max_length:(max_length - 1) v2)
     | Pattern.Variant (lbl, None) when lbl = Common.nil -> ()
-    | _ -> assert false
+    | p -> fprintf ppf "(??? %t ???)" (pattern (p, pos))
   else
     fprintf ppf ",@ ..."
 
@@ -142,7 +144,7 @@ let constraints poly cstrs ppf =
   sequence ", " constr cstrs ppf
 
 let context ctx =
-  sequence "," (fun (x, t) ppf -> print ppf "%d : %t" x (ty Trio.empty t)) ctx
+  sequence "," (fun (x, t) ppf -> print ppf "%t : %t" (variable x) (ty Trio.empty t)) ctx
 
 let ty_scheme (ctx, t, cstrs) ppf =
   let poly = Trio.empty in
@@ -175,11 +177,11 @@ let rec computation ?max_level c ppf =
   | Core.Value e -> print ~at_level:1 "value %t" (expression ~max_level:0 e)
   | Core.Match (e, lst) -> print "match %t with (@[<hov>%t@])" (expression e) (sequence " | " case lst)
   | Core.While (c1, c2) -> print "while %t do %t done" (computation c1) (computation c2)
-  | Core.For (i, e1, e2, c, d) -> print "for %d = ... " i
+  | Core.For (i, e1, e2, c, d) -> print "for %t = ... " (variable i)
   | Core.New (eff, None) -> print "new %s" eff
   | Core.New (eff, Some (e, lst)) -> print "new %s @ %t with ... end" eff (expression e)
   | Core.Handle (e, c) -> print "handle %t with %t" (expression e) (computation c)
-  | Core.Let (lst, c) -> print "let %d @[<hov>%t@] in %t" (List.length lst) (sequence " | " let_abstraction lst) (computation c)
+  | Core.Let (lst, c) -> print "let @[<hov>%t@] in %t" (sequence " | " let_abstraction lst) (computation c)
   | Core.LetRec (lst, c) -> print "let rec ... in %t" (computation c)
   | Core.Check c -> print "check %t" (computation c)
 
@@ -187,7 +189,7 @@ let rec computation ?max_level c ppf =
 and expression ?max_level e ppf =
   let print ?at_level = print ?max_level ?at_level ppf in
   match fst e with
-  | Core.Var x -> print "%d" x
+  | Core.Var x -> print "%t" (variable x)
   | Core.Const c -> print "%t" (const c)
   | Core.Tuple lst -> print "(@[<hov>%t@])" (sequence "," expression lst)
   | Core.Record lst -> print "{@[<hov>%t@]}" (sequence ";" (field expression) lst)

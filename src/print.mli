@@ -10,8 +10,8 @@ val sequence :
 val field :
   ('a -> Format.formatter -> unit) -> string * 'a -> Format.formatter -> unit
 val const : Common.const -> Format.formatter -> unit
-val pattern : ?max_level:int -> int Pattern.t -> Format.formatter -> unit
-val pattern_list : ?max_length:int -> int Pattern.t -> Format.formatter -> unit
+val pattern : ?max_level:int -> Core.pattern -> Format.formatter -> unit
+val pattern_list : ?max_length:int -> Core.pattern -> Format.formatter -> unit
 val region_param :
   'a * 'b * Type.region_param list ->
   Type.region_param -> Format.formatter -> unit
@@ -29,6 +29,7 @@ val ty_param :
 val ty :
   Type.ty_param list * Type.dirt_param list * Type.region_param list ->
   Type.ty -> Format.formatter -> unit
+val variable : Core.variable -> Format.formatter -> unit
 val constraints :
   Type.ty_param list * Type.dirt_param list * Type.region_param list ->
   Constr.constraints list -> Format.formatter -> unit
@@ -42,8 +43,8 @@ val expression :
   ?max_level:int -> Core.expression -> Format.formatter -> unit
 val abstraction : Core.abstraction -> Format.formatter -> unit
 val let_abstraction :
-  int Pattern.t * Core.computation -> Format.formatter -> unit
-val context : (int, Type.ty) Common.assoc -> Format.formatter -> unit
+  Core.pattern * Core.computation -> Format.formatter -> unit
+val context : (Core.variable, Type.ty) Common.assoc -> Format.formatter -> unit
 val case : Core.abstraction -> Format.formatter -> unit
 val instance : int * string option * 'a -> Format.formatter -> unit
 val operation :

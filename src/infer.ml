@@ -136,7 +136,7 @@ let infer_pattern pp =
 let extend_with_pattern ?(forbidden_vars=[]) p =
   let ctx, t, cstr = infer_pattern p in
     match C.find (fun (x,_) -> List.mem_assoc x ctx) forbidden_vars with
-      | Some (x,_) -> Error.typing ~pos:(snd p) "Several definitions of %d." x
+      | Some (x,_) -> Error.typing ~pos:(snd p) "Several definitions of %t." (Print.variable x)
       | None -> ctx, t, cstr
 
 
@@ -223,7 +223,7 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
         | Some None ->
             let t = T.fresh_ty () in
             [(x, t)], t
-        | None -> Error.typing ~pos "Unknown variable %d" x
+        | None -> Error.typing ~pos "Unknown variable %t" (Print.variable x)
         end
     | Core.Const const -> [], ty_of_const const
     | Core.Tuple es ->
@@ -331,7 +331,7 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
               
 (* [infer_comp env cstr (c,pos)] infers the type of computation [c] in context [env].
    It returns the list of newly introduced meta-variables and the inferred type. *)
-and infer_comp env (c, pos) : (int, Type.ty) Common.assoc * Type.dirty * Constr.constraints list =
+and infer_comp env (c, pos) : (Core.variable, Type.ty) Common.assoc * Type.dirty * Constr.constraints list =
   (* XXX Why isn't it better to just not call type inference when type checking is disabled? *)
   (* Print.debug "Inferring type of %t" (Print.computation (c, pos)); *)
   if !disable_typing then T.universal_dirty else

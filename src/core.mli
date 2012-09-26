@@ -1,9 +1,12 @@
 (** Syntax of the core language. *)
 
+type variable = int * Common.variable
+type pattern = variable Pattern.t
+
 (** Pure expressions *)
 type expression = plain_expression Common.pos
 and plain_expression =
-  | Var of int
+  | Var of variable
   | Const of Common.const
   | Tuple of expression list
   | Record of (Common.field, expression) Common.assoc
@@ -16,11 +19,11 @@ and plain_expression =
 and computation = plain_computation Common.pos
 and plain_computation =
   | Value of expression
-  | Let of (int Pattern.t * computation) list * computation
-  | LetRec of (int * abstraction) list * computation
+  | Let of (pattern * computation) list * computation
+  | LetRec of (variable * abstraction) list * computation
   | Match of expression * abstraction list
   | While of computation * computation
-  | For of int * expression * expression * computation * bool
+  | For of variable * expression * expression * computation * bool
   | Apply of expression * expression
   | New of Common.tyname * resource option
   | Handle of expression * computation
@@ -34,10 +37,10 @@ and handler = {
 }
 
 (** Abstractions that take one argument. *)
-and abstraction = int Pattern.t * computation
+and abstraction = pattern * computation
 
 (** Abstractions that take two arguments. *)
-and abstraction2 = int Pattern.t * int Pattern.t * computation
+and abstraction2 = pattern * pattern * computation
 
 (** An operation is an expression that represents an instance together with
     an operation symbol. *)

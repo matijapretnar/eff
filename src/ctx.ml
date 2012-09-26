@@ -1,7 +1,7 @@
-type ty_scheme = (int, Type.ty) Common.assoc * Type.ty * Constr.constraints list
-type dirty_scheme = (int, Type.ty) Common.assoc * Type.dirty * Constr.constraints list
+type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Constr.constraints list
+type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Constr.constraints list
 
-type t = (int, ty_scheme option) Common.assoc
+type t = (Core.variable, ty_scheme option) Common.assoc
 
 
 let empty = []

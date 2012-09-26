@@ -15,9 +15,9 @@ type env = Value.value EnvMap.t
 
 let initial = EnvMap.empty
 
-let update = EnvMap.add 
+let update (x, _) = EnvMap.add x
 
-let lookup x env =
+let lookup (x, _) env =
   try
     Some (EnvMap.find x env)
   with
@@ -25,7 +25,7 @@ let lookup x env =
 
 let rec extend_value p v env =
   match fst p, v with
-  | Pattern.Var x, _ -> update x v env
+  | Pattern.Var x, v -> update x v env
   | Pattern.As (p, x), v ->
       let env = extend_value p v env in
         update x v env
@@ -159,7 +159,7 @@ and veval env (e, pos) = match e with
   | Core.Var x ->
       begin match lookup x env with
       | Some v -> v
-      | None -> Error.runtime "Name %d is not defined." x
+      | None -> Error.runtime "Name %t is not defined." (Print.variable x)
       end
   | Core.Const c -> V.Const c
   | Core.Tuple es -> V.Tuple (List.map (veval env) es)
