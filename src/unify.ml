@@ -131,9 +131,9 @@ let solve initial_cnstrs =
         | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
         end
 
-    | (Type.Handler h1, Type.Handler h2) ->
-        add_ty_constraint pos h2.Type.value h1.Type.value;
-        add_ty_constraint pos h1.Type.finally h2.Type.finally
+    | (Type.Handler (tv1, tf1), Type.Handler (tv2, tf2)) ->
+        add_ty_constraint pos tv2 tv1;
+        add_ty_constraint pos tf1 tf2
 
     | (t1, t2) ->
       let (ps1, t1), (ps2, t2) = Type.beautify2 t1 t2 in
@@ -180,7 +180,7 @@ let pos_neg_params ty =
       | Type.Basic _ -> Trio.empty
       | Type.Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
       | Type.Arrow (ty1, dirty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos dirty2
-      | Type.Handler {Type.value = ty1; Type.finally = ty2} -> pos_ty (not is_pos) ty1 @@@ pos_ty is_pos ty2
+      | Type.Handler (ty1, ty2) -> pos_ty (not is_pos) ty1 @@@ pos_ty is_pos ty2
     and pos_dirty is_pos (_, ty, drt) =
       pos_ty is_pos ty @@@ pos_dirt_param is_pos drt
     and pos_dirt_param is_pos p = ([], (if is_pos then [p] else []), [])

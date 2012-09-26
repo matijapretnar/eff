@@ -297,7 +297,7 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
             add_constraints cstr (cstr_val @ cstr_fin);
             let ctx, cstrs = unify_contexts ~pos (ctx1 :: ctx2 :: ctxs) in
             add_constraints cstr cstrs;
-            ctx, T.Handler { T.value = t_value; T.finally = t_finally }
+            ctx, T.Handler (t_value, t_finally)
   in ctx, t, !cstr
               
 (* [infer_comp env cstr (c,pos)] infers the type of computation [c] in context [env].
@@ -426,7 +426,7 @@ and infer_comp env (c, pos) : (int, Type.ty) Common.assoc * Type.dirty * Constr.
           let ctx2, frsh, t2, d2, cstr2 = infer env c2 in
           add_constraints cstr (cstr1 @ cstr2);
           let t3 = T.fresh_ty () in
-          let t1' = T.Handler {T.value = t2; T.finally = t3} in
+          let t1' = T.Handler (t2, t3) in
             add_ty_constraint cstr pos t1' t1;
           let ctx, cstrs = unify_contexts ~pos [ctx1; ctx2] in
           add_constraints cstr (cstrs);

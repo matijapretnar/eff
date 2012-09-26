@@ -22,27 +22,19 @@ let fresh_dirt_param = (let f = Common.fresh "dirt parameter" in fun () -> Dirt_
 let fresh_region_param = (let f = Common.fresh "region parameter" in fun () -> Region_Param (f ()))
 let fresh_instance_param = (let f = Common.fresh "instance parameter" in fun () -> Instance_Param (f ()))
 
-type params = (ty_param, dirt_param, region_param) Trio.t
-
-type args = (ty, dirt_param, region_param) Trio.t
-
-and ty =
+type ty =
   | Apply of Common.tyname * args
   | Effect of Common.tyname * args * region_param
   | TyParam of ty_param
   | Basic of string
   | Tuple of ty list
   | Arrow of ty * dirty
-  | Handler of handler_ty
+  | Handler of ty * ty
 
 and dirty = instance_param list * ty * dirt_param
 
-and handler_ty = {
-  value: ty; (* the type of the _argument_ of value *)
-  finally: ty; (* the return type of finally *)
-}
+and args = (ty, dirt_param, region_param) Trio.t
 
-let lift_ty ty = (Trio.empty, ty, [])
 
 (* This type is used when type checking is turned off. Its name
    is syntactically incorrect so that the programmer cannot accidentally
@@ -105,8 +97,7 @@ and subst_ty sbst ty =
   | Basic _ as ty -> ty
   | Tuple tys -> Tuple (List.map subst tys)
   | Arrow (ty1, ty2) -> Arrow (subst ty1, subst_dirty sbst ty2)
-  | Handler {value = ty1; finally = ty2} ->
-      Handler {value = subst ty1; finally = subst ty2}
+  | Handler (ty1, ty2) -> Handler (subst ty1, subst ty2)
   in
   subst ty
 
@@ -134,18 +125,16 @@ let free_params ty =
   let (@@@) = Trio.append in
   let rec free_ty = function
     | Apply (_, args) -> free_args args
-    | Effect (_, args, rgn) -> free_args args @@@ free_region_param rgn
+    | Effect (_, args, r) -> ([], [], [r]) @@@ free_args args
     | TyParam p -> ([p], [], [])
     | Basic _ -> Trio.empty
     | Tuple tys -> Trio.flatten_map free_ty tys
     | Arrow (ty1, dirty2) -> free_ty ty1 @@@ free_dirty dirty2
-    | Handler {value = ty1; finally = ty2} -> free_ty ty1 @@@ free_ty ty2
-  and free_dirty (_, ty, drt) =
-    free_ty ty @@@ free_dirt_param drt
-  and free_dirt_param p = ([], [p], [])
-  and free_region_param r = ([], [], [r])
+    | Handler (ty1, ty2) -> free_ty ty1 @@@ free_ty ty2
+  and free_dirty (_, ty, d) =
+    ([], [d], []) @@@ free_ty ty
   and free_args (tys, drts, rgns) =
-    Trio.flatten_map free_ty tys @@@ Trio.flatten_map free_dirt_param drts @@@ Trio.flatten_map free_region_param rgns
+    ([], drts, rgns) @@@ Trio.flatten_map free_ty tys
   in
   Trio.uniq (free_ty ty)
 
@@ -159,7 +148,6 @@ let fresh_ty () = TyParam (fresh_ty_param ())
 
 (* XXX Should a fresh dirty type have no fresh instances? *)
 let fresh_dirty () = ([], fresh_ty (), fresh_dirt_param ())
-let fresh_dirt_ty () = ([], fresh_ty (), fresh_dirt_param ())
 
 let refreshing_subst (ps, qs, rs) =
   let ps' = List.map (fun p -> (p, fresh_ty_param ())) ps in
@@ -193,7 +181,7 @@ let refresh_ty (refresh_ty_param, refresh_dirt_param, refresh_region_param) ty =
   | Basic _ as ty -> ty
   | Tuple tys -> Tuple (List.map refresh_ty tys)
   | Arrow (ty1, ty2) -> Arrow (refresh_ty ty1, refresh_dirty ty2)
-  | Handler {value = ty1; finally = ty2} -> Handler {value = refresh_ty ty1; finally = refresh_ty ty2}
+  | Handler (ty1, ty2) -> Handler (refresh_ty ty1, refresh_ty ty2)
   and refresh_args (tys, ds, rs) =
     (List.map refresh_ty tys, List.map refresh_dirt_param ds, List.map refresh_region_param rs)
   and refresh_dirty (frsh, ty, d) = (frsh, refresh_ty ty, refresh_dirt_param d)
