@@ -33,7 +33,7 @@ val flatten_map : ('a -> 'b list) -> 'a list -> 'b list
 val option_map : ('a -> 'b) -> 'a option -> 'b option
 val repeat : 'a -> int -> 'a list
 val assoc_map : ('a -> 'b) -> ('c * 'a) list -> ('c * 'b) list
-val fresh : string -> unit -> int
+val fresh : (int -> 'a) -> unit -> 'a
 val uniq : 'a list -> 'a list
 val split : int -> 'a list -> 'a list * 'a list
 val diff : 'a list -> 'a list -> 'a list

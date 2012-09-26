@@ -21,7 +21,7 @@ and resource = value ref * (Common.opsym, value -> value -> result) Common.assoc
 
 
 let fresh_instance =
-  let fresh = Common.fresh "effect instance" in
+  let fresh = Common.fresh Common.id in
   fun description resource -> Instance (fresh (), description, resource)
 
 let from_unit = Tuple []

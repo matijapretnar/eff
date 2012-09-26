@@ -5,8 +5,8 @@ module T = Type
 
 (* ***** Desugaring of types. ***** *)
 
-let fresh_dirt_param = (let f = Common.fresh "dirt parameter" in fun () -> Syntax.DirtParam (f ()))
-let fresh_region_param = (let f = Common.fresh "region parameter" in fun () -> Syntax.RegionParam (f ()))
+let fresh_dirt_param = Common.fresh (fun n -> Syntax.DirtParam n)
+let fresh_region_param = Common.fresh (fun n -> Syntax.RegionParam n)
 
 (* Fill in missing dirt and region parameters in a type with fresh ones. Also resolves
    type applications so that applications of effect types are equipped with the extra region
@@ -207,7 +207,7 @@ let tydefs ~pos defs =
 
 (** [fresh_variable ()] creates a fresh variable ["$gen1"], ["$gen2"], ... on
     each call *)
-let fresh_variable = Common.fresh "variable"
+let fresh_variable = Common.fresh Common.id
 
 let id_abstraction pos =
   let x = fresh_variable () in

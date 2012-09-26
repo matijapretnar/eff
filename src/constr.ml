@@ -85,13 +85,13 @@ let empty () = {
 }
 
 let add_ty_edge g p1 p2 pos =
-  g.ty_graph <-  Ty.add_edge p1 p2 pos g.ty_graph
+  g.ty_graph <- Ty.add_edge p1 p2 pos g.ty_graph
 
 let add_region_edge g p1 p2 pos =
-  g.region_graph <-  Region.add_edge p1 p2 pos g.region_graph
+  g.region_graph <- Region.add_edge p1 p2 pos g.region_graph
 
 let add_dirt_edge g p1 p2 pos =
-  g.dirt_graph <-  Dirt.add_edge p1 p2 pos g.dirt_graph
+  g.dirt_graph <- Dirt.add_edge p1 p2 pos g.dirt_graph
 
 let remove_ty g x =
   let (inx, outx, g') = Ty.remove_vertex x g.ty_graph in

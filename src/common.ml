@@ -133,15 +133,14 @@ let rec assoc_map f = function
       let ys = assoc_map f xs in
       (l, y) :: ys
 
-(** [fresh sort] creates a function that creates fresh instances with label
-    [sort] *)
-let fresh sort =
+(** [fresh wrapper] creates a function that creates fresh instances and wraps
+    them with the [wrapper] function *)
+let fresh wrapper =
   let counter = ref 0 in
   fun () ->
-    let f = !counter in
     incr counter;
-    if !counter = 0 then failwith ("Too many instances of " ^ sort ^ ".");
-    f
+    assert (!counter > 0);
+    wrapper !counter
 
 (** [uniq lst] returns [lst] with all duplicates removed, keeping the first
     occurence of each element. *)

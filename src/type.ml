@@ -7,10 +7,10 @@ type dirt_param = Dirt_Param of int
 type region_param = Region_Param of int
 type instance_param = Instance_Param of int
 
-let fresh_ty_param = (let f = Common.fresh "type parameter" in fun () -> Ty_Param (f ()))
-let fresh_dirt_param = (let f = Common.fresh "dirt parameter" in fun () -> Dirt_Param (f ()))
-let fresh_region_param = (let f = Common.fresh "region parameter" in fun () -> Region_Param (f ()))
-let fresh_instance_param = (let f = Common.fresh "instance parameter" in fun () -> Instance_Param (f ()))
+let fresh_ty_param = Common.fresh (fun n -> Ty_Param n)
+let fresh_dirt_param = Common.fresh (fun n -> Dirt_Param n)
+let fresh_region_param = Common.fresh (fun n -> Region_Param n)
+let fresh_instance_param = Common.fresh (fun n -> Instance_Param n)
 
 type ty =
   | Apply of Common.tyname * args
@@ -117,9 +117,9 @@ let beautifying_subst () =
   if !disable_beautify then
     identity_subst
   else
-    let beautify_ty_param = (let f = Common.fresh "type parameter" in fun () -> Ty_Param (f ()))
-    and beautify_dirt_param = (let f = Common.fresh "dirt parameter" in fun () -> Dirt_Param (f ()))
-    and beautify_region_param = (let f = Common.fresh "region parameter" in fun () -> Region_Param (f ()))
+    let beautify_ty_param = Common.fresh (fun n -> Ty_Param n)
+    and beautify_dirt_param = Common.fresh (fun n -> Dirt_Param n)
+    and beautify_region_param = Common.fresh (fun n -> Region_Param n)
     in
     create_subst (beautify_ty_param, beautify_dirt_param, beautify_region_param)
 
