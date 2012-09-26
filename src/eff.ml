@@ -141,13 +141,13 @@ let infer_top_comp ctx c =
   (* XXX What to do about the fresh instances? *)
   (* XXX Here, we need to show what type parameters are polymorphic or not. *)
   (*     I am disabling it because we are going to try a new approach. *)
-  ctx, ([], ty, cnstr), drt, frshs
+  (ctx, ty, cnstr), drt, frshs
 
 let rec exec_cmd interactive (ctx, env) e =
   match e with
   | Syntax.Term c ->
       let c = Desugar.top_computation c in
-      let _, tysch, drt, frsh = infer_top_comp ctx c in
+      let tysch, drt, frsh = infer_top_comp ctx c in
       let v = Eval.run env c in
       if interactive then Format.printf "@[- : %t %t = %t@]@."
         (Print.fresh_instances frsh)
@@ -156,7 +156,7 @@ let rec exec_cmd interactive (ctx, env) e =
       (ctx, env)
   | Syntax.TypeOf c ->
       let c = Desugar.top_computation c in
-      let _, tysch, drt, frsh = infer_top_comp ctx c in
+      let tysch, drt, frsh = infer_top_comp ctx c in
       Format.printf "@[- : %t@]@." (Print.beautified_dirty_scheme tysch drt);
       (ctx, env)
   | Syntax.Reset ->

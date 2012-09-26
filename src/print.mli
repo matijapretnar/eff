@@ -32,13 +32,8 @@ val ty :
 val constraints :
   Type.ty_param list * Type.dirt_param list * Type.region_param list ->
   Constr.constraints list -> Format.formatter -> unit
-val ty_scheme :
-  (Type.ty_param list * Type.dirt_param list * Type.region_param list) *
-  Type.ty * Constr.constraints list -> Format.formatter -> unit
-val dirty_scheme :
-  (Type.ty_param list * Type.dirt_param list * Type.region_param list) *
-  Type.ty * Constr.constraints list ->
-  Type.dirt_param -> Format.formatter -> unit
+val ty_scheme : Ctx.ty_scheme -> Format.formatter -> unit
+val dirty_scheme : Ctx.ty_scheme -> Type.dirt_param -> Format.formatter -> unit
 val beautified_ty_scheme : Ctx.ty_scheme -> Format.formatter -> unit
 val beautified_dirty_scheme : Ctx.ty_scheme -> Type.dirt_param -> Format.formatter -> unit
 val computation :
@@ -48,6 +43,7 @@ val expression :
 val abstraction : Core.abstraction -> Format.formatter -> unit
 val let_abstraction :
   int Pattern.t * Core.computation -> Format.formatter -> unit
+val context : (int, Type.ty) Common.assoc -> Format.formatter -> unit
 val case : Core.abstraction -> Format.formatter -> unit
 val instance : int * string option * 'a -> Format.formatter -> unit
 val operation :
