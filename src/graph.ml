@@ -5,6 +5,7 @@ sig
   val sup : bound -> bound -> bound
   val inf : bound -> bound -> bound
   val compare : t -> t -> int
+  val subst : Type.substitution -> t -> t
   (* val print : t -> Format.formatter -> unit *)
 end
 
@@ -68,11 +69,17 @@ struct
   let fold_edges f grph acc =
     G.fold (fun x (_, outx, _, _) acc -> S.fold (fun (y, pos) acc -> f x y pos acc) outx acc) grph acc
 
+  let join grph1 grph2 =
+    fold_edges add_edge grph1 grph2
+
   let fold_vertices f grph acc =
     G.fold (fun x (inx, outx, _, _) acc -> f x (S.elements inx) (S.elements outx) acc) grph acc
 
   let filter_edges p grph =
     fold_edges (fun x y pos acc -> if p x y pos then add_edge x y pos acc else acc) grph G.empty
+
+  let subst sbst grph =
+    fold_edges (fun x y pos sbst_grph -> add_edge (V.subst sbst x) (V.subst sbst y) pos sbst_grph) grph G.empty
 
  (*    let print grph ppf =
       fold_vertices

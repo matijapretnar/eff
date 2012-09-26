@@ -14,17 +14,17 @@ let for_parameters add pos ps lst1 lst2 =
 let empty_constraint = []
 
 let constraints_of_graph g =
-  let lst = Constr.fold_ty (fun p1 p2 pos lst -> (Constr.TypeConstraint (Type.TyParam p1, Type.TyParam p2, pos)) :: lst) g [] in
+  let lst = Constr.fold_ty (fun p1 p2 pos lst -> (Constr.TypeConstraint (p1, p2, pos)) :: lst) g [] in
   let lst = Constr.fold_dirt (fun d1 d2 pos lst -> (Constr.DirtConstraint (d1, d2, pos)) :: lst) g lst in
   Constr.fold_region (fun r1 r2 pos lst -> (Constr.RegionConstraint (r1, r2, pos)) :: lst) g lst
 
-let canonize (ctx, ty, initial_cnstrs) =
+let canonize (ctx, ty, grph) =
   let sbst = ref Type.identity_subst in
   (* We keep a list of "final" constraints which are known not to
      generate new constraints, and a list of constraints which still
      need to be resolved. *)
   let graph = Constr.empty () in
-  let queue = ref initial_cnstrs in
+  let queue = ref (constraints_of_graph grph) in
   let add_constraint = function
     | Constr.TypeConstraint (t1, t2, pos) as cnstr ->
       if t1 <> t2 then queue := cnstr :: !queue
@@ -40,9 +40,9 @@ let canonize (ctx, ty, initial_cnstrs) =
     (* When parameter [p] gets substituted by type [t] the vertex
        [p] must be removed from the graph, and each edge becomes
        a constraint in the queue. *)
-    let (pred, succ) = Constr.remove_ty graph p in
-      List.iter (fun (q, pos) -> add_ty_constraint pos (Type.TyParam q) (Type.TyParam p)) pred ;
-      List.iter (fun (q, pos) -> add_ty_constraint pos (Type.TyParam p) (Type.TyParam q)) succ ;
+    let (pred, succ) = Constr.remove_ty graph (Type.TyParam p) in
+      List.iter (fun (q, pos) -> add_ty_constraint pos q (Type.TyParam p)) pred ;
+      List.iter (fun (q, pos) -> add_ty_constraint pos (Type.TyParam p) q) succ ;
       sbst := Type.compose_subst {
         Type.identity_subst with
         Type.ty_param = (fun p' -> if p' = p then t else Type.TyParam p')
@@ -56,7 +56,7 @@ let canonize (ctx, ty, initial_cnstrs) =
     | (t1, t2) when t1 = t2 -> ()
 
     | (Type.TyParam p, Type.TyParam q) ->
-        Constr.add_ty_edge graph p q pos
+        Constr.add_ty_edge graph (Type.TyParam p) (Type.TyParam q) pos
 
     | (Type.TyParam p, t) ->
         if false
@@ -159,7 +159,7 @@ let canonize (ctx, ty, initial_cnstrs) =
 
   let rec loop () =
     match !queue with
-      | [] -> (Common.assoc_map (Type.subst_ty !sbst) ctx, Type.subst_ty !sbst ty, constraints_of_graph graph)
+      | [] -> (Common.assoc_map (Type.subst_ty !sbst) ctx, Type.subst_ty !sbst ty, graph)
       | cnstr :: cnstrs ->
         queue := cnstrs ;
         begin match cnstr with
@@ -212,29 +212,22 @@ let garbage_collect (ctx, ty, cstr) =
       let pos_t, neg_t = pos_neg_params t in
       neg_t @@@ pos, pos_t @@@ neg) ctx (pos_neg_params ty) in
   let (pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs) = Trio.uniq pos, Trio.uniq neg in
-  let valuable = function
-    | Constr.TypeConstraint (p, q, _) ->
-        begin match p, q with
-        | Type.TyParam p, Type.TyParam q -> List.mem p neg_ts && List.mem q pos_ts
-        | _, _ -> assert false
-        end
-    | Constr.DirtConstraint (drt1, drt2, _) ->
-        begin match drt1, drt2 with
-        | Constr.DirtEmpty, _ -> false
-        | Constr.DirtParam p, Constr.DirtParam q -> List.mem p neg_ds && List.mem q pos_ds
-        | Constr.DirtParam p, _ -> List.mem p neg_ds
-        | _, Constr.DirtParam q -> List.mem q pos_ds
-        | _, _ -> true
-        end
-    | Constr.RegionConstraint (rgn1, rgn2, _) ->
-        begin match rgn1, rgn2 with
-        | Constr.RegionParam p, Constr.RegionParam q -> List.mem p neg_rs && List.mem q pos_rs
-        | _, Constr.RegionAtom (Constr.InstanceTop) -> false
-        | Constr.RegionParam p, _ -> List.mem p neg_rs
-        | _, Constr.RegionParam q -> List.mem q pos_rs
-        | _, _ -> true
-        end
+  let ty_p p q pos = match p, q with
+    | Type.TyParam p, Type.TyParam q -> List.mem p neg_ts && List.mem q pos_ts
+    | _, _ -> assert false
+  and drt_p drt1 drt2 pos = match drt1, drt2 with
+    | Constr.DirtEmpty, _ -> false
+    | Constr.DirtParam p, Constr.DirtParam q -> List.mem p neg_ds && List.mem q pos_ds
+    | Constr.DirtParam p, _ -> List.mem p neg_ds
+    | _, Constr.DirtParam q -> List.mem q pos_ds
+    | _, _ -> true
+  and rgn_p rgn1 rgn2 pos = match rgn1, rgn2 with
+    | Constr.RegionParam p, Constr.RegionParam q -> List.mem p neg_rs && List.mem q pos_rs
+    | _, Constr.RegionAtom (Constr.InstanceTop) -> false
+    | Constr.RegionParam p, _ -> List.mem p neg_rs
+    | _, Constr.RegionParam q -> List.mem q pos_rs
+    | _, _ -> true
   in
-  (ctx, ty, List.filter valuable cstr)
+  (ctx, ty, Constr.garbage_collect ty_p drt_p rgn_p cstr)
 
 let normalize tysch = garbage_collect (canonize tysch)

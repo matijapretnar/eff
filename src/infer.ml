@@ -31,24 +31,24 @@ let nonexpansive = function
   | Core.Handle _ | Core.Let _ | Core.LetRec _ | Core.Check _ -> false
 
 let add_ty_constraint cstr pos t1 t2 =
-  cstr := Constr.TypeConstraint (t1, t2, pos) :: !cstr
+  cstr := Constr.add_ty_constraint ~pos t1 t2 !cstr
 
 let add_fresh_constraint cstr pos frsh1 frsh2 =
   Print.debug "Unifying freshness constraints."
 
 let add_dirt_constraint cstr pos drt1 drt2 =
-  cstr := Constr.DirtConstraint (drt1, drt2, pos) :: !cstr
+  cstr := Constr.add_dirt_constraint ~pos drt1 drt2 !cstr
 
 let add_region_constraint cstr pos rgn1 rgn2 =
-  cstr := Constr.RegionConstraint (rgn1, rgn2, pos) :: !cstr
+  cstr := Constr.add_region_constraint ~pos rgn1 rgn2 !cstr
 
 let add_dirty_constraint cstr pos (lst1, t1, drt1) (lst2, t2, drt2) =
   add_fresh_constraint cstr pos lst1 lst2; (* XXX very fishy *)
   add_ty_constraint cstr pos t1 t2;
   add_dirt_constraint cstr pos (Constr.DirtParam drt1) (Constr.DirtParam drt2)
 
-let add_constraints cstr cstr' =
-  cstr := cstr' @ !cstr
+let join_constraints cstr cstr' =
+  cstr := Constr.join_constraints cstr' !cstr
 
 let lift_dirty (frsh, t, d) = (frsh, t, Constr.DirtParam d)
 
@@ -64,28 +64,28 @@ let unify_contexts ~pos ctxs =
       match Common.lookup x ctx2 with
       | None ->
           let u = Type.fresh_ty () in
-          ((x, u) :: ctx2, Constr.TypeConstraint (u, t, pos) :: cstrs)
+          ((x, u) :: ctx2, Constr.add_ty_constraint pos u t cstrs)
       | Some u ->
-          (ctx2, Constr.TypeConstraint (u, t, pos) :: cstrs)
+          (ctx2, Constr.add_ty_constraint pos u t cstrs)
     in
     List.fold_right unify ctx1 (ctx2, cstrs)
   in
-  List.fold_right unify_with_context ctxs ([], [])
+  List.fold_right unify_with_context ctxs ([], Constr.empty_constraints)
 
 
 let trim_context ~pos ctx vars =
   let trim (x, t) (ctx, cstrs) =
     match Common.lookup x vars with
     | None -> ((x, t) :: ctx, cstrs)
-    | Some u -> (ctx, Constr.TypeConstraint (u, t, pos) :: cstrs)
+    | Some u -> (ctx, Constr.add_ty_constraint pos u t cstrs)
   in
-  List.fold_right trim ctx ([], [])
+  List.fold_right trim ctx ([], Constr.empty_constraints)
 
 (* [infer_pattern cstr pp] infers the type of pattern [pp]. It returns the list of pattern
    variables with their types, which are all guaranteed to be fresh parameters, together
    with the type of the whole pattern. *)
 let infer_pattern pp =
-  let cstr = ref [] in
+  let cstr = ref Constr.empty_constraints in
   if not (Pattern.linear_pattern pp) then
     Error.typing ~pos:(snd pp) "Variables in a pattern must be distinct." ;
   let vars = ref [] in
@@ -139,13 +139,14 @@ let extend_with_pattern ?(forbidden_vars=[]) p =
       | Some (x,_) -> Error.typing ~pos:(snd p) "Several definitions of %t." (Print.variable x)
       | None -> ctx, t, cstr
 
+let (@@) = Constr.join_constraints
 
 let rec infer_abstraction env (p, c) =
   let ctxp, tp, cstrp = infer_pattern p in
   let env = List.fold_right (fun (x, _) env -> Ctx.extend_ty env x) ctxp env in
   let ctxc, tc, cstrc = infer_comp env c in
   let ctx, cstr = trim_context ~pos:(snd c) ctxc ctxp in
-  ctx, tp, tc, cstrp @ cstrc @ cstr
+  ctx, tp, tc, cstrp @@ cstrc @@ cstr
 
 and infer_abstraction2 env (p1, p2, c) =
   let ctx1, t1, cstr1 = extend_with_pattern p1 in
@@ -155,17 +156,17 @@ and infer_abstraction2 env (p1, p2, c) =
   let ctx, cstr_pts = unify_contexts ~pos:(snd p1) [ctx1; ctx2] in
   let ctx3, t3, cstr3 = infer_comp env c in
   let ctx, cstr = trim_context ~pos:(snd c) ctx3 ctx in
-  ctx, t1, t2, t3, cstr1 @ cstr2 @ cstr3 @ cstr_pts @ cstr
+  ctx, t1, t2, t3, cstr1 @@ cstr2 @@ cstr3 @@ cstr_pts @@ cstr
 
 and infer_let env pos defs =
   (* Check for implicit sequencing *)
   (* Refresh freshes *)
   (* Check for duplicate variables *)
   let add_binding (p, c) (env, ctxs, ctxp, frshs, drts, cstrs) =
-    let cstr = ref [] in
+    let cstr = ref Constr.empty_constraints in
     let ctx_p, t_p, cstr_p = infer_pattern p in
     let ctx_c, (frsh, t_c, drt), cstr_c = infer_comp env c in
-    add_constraints cstr (cstr_p @ cstr_c);
+    join_constraints cstr (cstr_p @@ cstr_c);
     add_ty_constraint cstr (snd c) t_c t_p;
     let ctxs, ctxp, env =
       if nonexpansive (fst c) then
@@ -176,12 +177,12 @@ and infer_let env pos defs =
         let env = List.fold_right (fun (x, _) env -> Ctx.extend_ty env x) ctx_p env in
         ctx_c :: ctxs, ctx_p @ ctxp, env
     in
-    (env, ctxs, ctxp, frsh @ frshs, drt :: drts, !cstr @ cstrs)
+    (env, ctxs, ctxp, frsh @ frshs, drt :: drts, !cstr @@ cstrs)
   in  
   let env, ctxs, ctxp, frshs, drts, cstr =
-    List.fold_right add_binding defs (env, [], [], [], [], []) in
+    List.fold_right add_binding defs (env, [], [], [], [], Constr.empty_constraints) in
   let ctx, cstr_ctxs = unify_contexts ~pos ctxs in
-    (env, ctx, ctxp, frshs, drts, cstr_ctxs @ cstr)
+    (env, ctx, ctxp, frshs, drts, cstr_ctxs @@ cstr)
 
 
 and infer_let_rec env pos defs =
@@ -195,31 +196,31 @@ and infer_let_rec env pos defs =
       defs
 
   in
-  let cstr = ref [] in
+  let cstr = ref Constr.empty_constraints in
   let env' = List.fold_right (fun (f, (u, _)) env -> Ctx.extend_ty env f) lst env in
   let vars = Common.assoc_map
     (fun (u, ((p, c) as a)) ->
       let ctx, tp, tc, cstr_c = infer_abstraction env' a in
       let t = T.Arrow (tp, tc) in
       add_ty_constraint cstr (snd c) t u;
-      add_constraints cstr cstr_c;
+      join_constraints cstr cstr_c;
       (ctx, t)) lst in
   let ctxs, ctxp =
     List.fold_right
       (fun (x, (ctx, t)) (ctxs, ctxp) -> (ctx :: ctxs, (x, t) :: ctxp)) vars ([], []) in
   let ctx, cstr_c = unify_contexts ~pos ctxs in
-  let cstr = cstr_c @ !cstr in
+  let cstr = cstr_c @@ !cstr in
   let env = List.fold_right (fun (x, (_, t)) env -> Ctx.extend env x (Unify.normalize (ctx, t, cstr))) vars env in
     ctxp, env, ctx, cstr
 
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
    [env]. It returns the inferred type of [e]. *)
 and infer_expr env (e,pos) : Ctx.ty_scheme =
-  let cstr = ref [] in
+  let cstr = ref Constr.empty_constraints in
   let ctx, t = match e with
     | Core.Var x ->
         begin match Ctx.lookup env x with
-        | Some (Some (ctx, ty, cstrs)) -> add_constraints cstr cstrs; ctx, ty
+        | Some (Some (ctx, ty, cstrs)) -> join_constraints cstr cstrs; ctx, ty
         | Some None ->
             let t = T.fresh_ty () in
             [(x, t)], t
@@ -227,9 +228,9 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
         end
     | Core.Const const -> [], ty_of_const const
     | Core.Tuple es ->
-        let ctxs, ts = List.split (C.map (fun e -> let ctx, t, cstr_e = infer_expr env e in add_constraints cstr cstr_e; (ctx, t)) es) in
+        let ctxs, ts = List.split (C.map (fun e -> let ctx, t, cstr_e = infer_expr env e in join_constraints cstr cstr_e; (ctx, t)) es) in
         let ctx, cstrs = unify_contexts ~pos ctxs in
-        add_constraints cstr cstrs;
+        join_constraints cstr cstrs;
         ctx, T.Tuple ts
     | Core.Record [] -> assert false
     | Core.Record (((fld,_)::_) as lst) ->
@@ -243,7 +244,7 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
           else
             let arg_types', ctxs = List.fold_right (fun (f, e) (flds, ctxs) ->
                                                 let ctx, t, cstr_e = infer_expr env e in
-                                                add_constraints cstr cstr_e;
+                                                join_constraints cstr cstr_e;
                                                 ((f, t) :: flds, ctxs)) lst ([], []) in
             let constrain_record_arg (fld, t) =
               begin match C.lookup fld arg_types with
@@ -253,7 +254,7 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
             in
               List.iter constrain_record_arg arg_types';
               let ctx, cstrs = unify_contexts ~pos ctxs in
-              add_constraints cstr cstrs;
+              join_constraints cstr cstrs;
               ctx, ty)
           
     | Core.Variant (lbl, u) ->
@@ -264,7 +265,7 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
             | None, None -> []
             | Some ty, Some u ->
               let ctx, ty', cstr_u = infer_expr env u in
-                add_constraints cstr cstr_u;
+                join_constraints cstr cstr_u;
                 add_ty_constraint cstr pos ty' ty;
                 ctx
             | _, _ -> Error.typing ~pos "Wrong number of arguments for label %s." lbl
@@ -273,7 +274,7 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
         
     | Core.Lambda a ->
         let ctx, t1, t2, cstr_abs = infer_abstraction env a in
-        add_constraints cstr cstr_abs;
+        join_constraints cstr cstr_abs;
         ctx, T.Arrow (t1, t2)
         
     | Core.Operation (e, op) ->
@@ -285,7 +286,7 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
             let d = T.fresh_dirt_param () in
               add_ty_constraint cstr pos u ty;
               add_dirt_constraint cstr pos (Constr.DirtAtom (rgn, op)) (Constr.DirtParam d);
-              add_constraints cstr cstr_u;
+              join_constraints cstr cstr_u;
               (* An operation creates no new instances. *)
               ctx, T.Arrow (t1, ([], t2, d)))
 
@@ -301,9 +302,9 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
             | Some (ty, (t1, t2)) ->
               let ctxe, u, cstr_e = infer_expr env e in
                 add_ty_constraint cstr pos u ty;
-                add_constraints cstr cstr_e;
+                join_constraints cstr cstr_e;
                 let ctxa, u1, tk, u2, cstr_a = infer_abstraction2 env a2 in
-                  add_constraints cstr cstr_a;
+                  join_constraints cstr cstr_a;
                   add_ty_constraint cstr pos t1 u1;
                   (* XXX maybe we need to change the direction of inequalities here,
                      or even require equalities. *)
@@ -311,7 +312,7 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
                   add_ty_constraint cstr pos tk (T.Arrow (t2, ([], t_yield, dirt)));
                   add_dirty_constraint cstr pos ([], t_yield, dirt) u2;
                   let ctx, cstrs = unify_contexts ~pos [ctxe; ctxa] in
-                  add_constraints cstr cstrs;
+                  join_constraints cstr cstrs;
                   ctx)
         in
           let ctxs = List.map constrain_operation ops in
@@ -321,9 +322,9 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
             add_dirty_constraint cstr pos valt2 ([], t_yield, dirt);
             add_dirty_constraint cstr pos fint2 ([], t_finally, dirt);
             add_ty_constraint cstr pos fint1 t_yield;
-            add_constraints cstr (cstr_val @ cstr_fin);
+            join_constraints cstr (cstr_val @@ cstr_fin);
             let ctx, cstrs = unify_contexts ~pos (ctx1 :: ctx2 :: ctxs) in
-            add_constraints cstr cstrs;
+            join_constraints cstr cstrs;
             ctx, T.Handler (t_value, t_finally)
   in
   Print.debug "Type of %t is (%t) %t | %t" (Print.expression (e, pos)) (Print.context ctx) (Print.ty Trio.empty t) (Print.constraints Trio.empty !cstr);
@@ -331,43 +332,43 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
               
 (* [infer_comp env cstr (c,pos)] infers the type of computation [c] in context [env].
    It returns the list of newly introduced meta-variables and the inferred type. *)
-and infer_comp env (c, pos) : (Core.variable, Type.ty) Common.assoc * Type.dirty * Constr.constraints list =
+and infer_comp env (c, pos) =
   (* XXX Why isn't it better to just not call type inference when type checking is disabled? *)
   (* Print.debug "Inferring type of %t" (Print.computation (c, pos)); *)
-  if !disable_typing then T.universal_dirty else
+  if !disable_typing then ([], ([], Type.Basic "_", Type.fresh_dirt_param ()), Constr.empty_constraints) else
   let rec infer env (c, pos) =
-    let cstr = ref [] in
+    let cstr = ref Constr.empty_constraints in
     let ctx, (frsh, ty, drt) = match c with
       | Core.Apply (e1, e2) ->
           let ctx1, t1, cstr1 = infer_expr env e1 in
           let ctx2, t2, cstr2 = infer_expr env e2 in
           let ctx, cstrs = unify_contexts ~pos [ctx1; ctx2] in
           let t = T.fresh_dirty () in
-          add_constraints cstr (cstr1 @ cstr2 @ cstrs);
+          join_constraints cstr (cstr1 @@ cstr2 @@ cstrs);
           add_ty_constraint cstr pos t1 (T.Arrow (t2, t));
           ctx, lift_dirty t
 
       | Core.Value e ->
           let ctx, t, cstr_e = infer_expr env e in
-          add_constraints cstr cstr_e;
+          join_constraints cstr cstr_e;
           ctx, ([], t, Constr.DirtEmpty)
 
       | Core.Match (e, []) ->
         let ctx, t_in, cstr_e = infer_expr env e in
         let t_out = T.fresh_ty () in
         add_ty_constraint cstr pos t_in T.empty_ty;
-        add_constraints cstr cstr_e;
+        join_constraints cstr cstr_e;
         ctx, ([], t_out, Constr.DirtEmpty)
 
       | Core.Match (e, lst) ->
           let ctxe, t_in, cstr_in = infer_expr env e in
-          add_constraints cstr cstr_in;
+          join_constraints cstr cstr_in;
           let t_out = T.fresh_ty () in
           let drt_out = T.fresh_dirt_param () in
           let infer_case ((p, e') as a) =
             (* XXX Refresh fresh instances *)
             let ctxa, t_in', (frsh_out, t_out', drt_out'), cstr_case = infer_abstraction env a in
-            add_constraints cstr cstr_case;
+            join_constraints cstr cstr_case;
             add_ty_constraint cstr (snd e) t_in t_in';
             add_ty_constraint cstr (snd e') t_out' t_out;
             add_dirt_constraint cstr (snd e') (Constr.DirtParam drt_out') (Constr.DirtParam drt_out);
@@ -376,7 +377,7 @@ and infer_comp env (c, pos) : (Core.variable, Type.ty) Common.assoc * Type.dirty
           in
           let ctxs, frshs = List.split (List.map infer_case lst) in
           let ctx, cstrs = unify_contexts ~pos (ctxe :: ctxs) in
-          add_constraints cstr cstrs;
+          join_constraints cstr cstrs;
           ctx, (List.flatten frshs, t_out, Constr.DirtParam drt_out)
               
       | Core.New (eff, r) ->
@@ -386,7 +387,7 @@ and infer_comp env (c, pos) : (Core.variable, Type.ty) Common.assoc * Type.dirty
               | None -> []
               | Some (e, lst) ->
                 let ctxe, te, cstr_e = infer_expr env e in
-                add_constraints cstr cstr_e;
+                join_constraints cstr cstr_e;
                 let ctxs =
                   List.map
                     (fun (op, (((_,pos1), (_,pos2), (_,posc)) as a)) ->
@@ -394,7 +395,7 @@ and infer_comp env (c, pos) : (Core.variable, Type.ty) Common.assoc * Type.dirty
                         | None -> Error.typing ~pos "Effect type %s does not have operation %s" eff op
                         | Some (u1, u2) ->
                           let ctx, t1, t2, t, cstr_a = infer_abstraction2 env a in
-                            add_constraints cstr cstr_a;
+                            join_constraints cstr cstr_a;
                             add_ty_constraint cstr pos1 t1 u1;
                             add_ty_constraint cstr pos2 t2 te;
                             (* Here, we should have that resources create no fresh instances. *)
@@ -404,7 +405,7 @@ and infer_comp env (c, pos) : (Core.variable, Type.ty) Common.assoc * Type.dirty
                             ctx)
                     lst in
                     let ctx, cstrs = unify_contexts ~pos ctxs in
-                    add_constraints cstr cstrs;
+                    join_constraints cstr cstrs;
                     ctx
             end
             in
@@ -424,7 +425,7 @@ and infer_comp env (c, pos) : (Core.variable, Type.ty) Common.assoc * Type.dirty
           add_ty_constraint cstr pos t2 T.unit_ty;
           add_dirt_constraint cstr pos d2 dirt;
           let ctx, cstrs = unify_contexts ~pos [ctx1; ctx2] in
-          add_constraints cstr (cstr1 @ cstr2 @ cstrs);
+          join_constraints cstr (cstr1 @@ cstr2 @@ cstrs);
           (* XXX We need to make sure to erase all instances generated by frsh2 *)
           (* XXX could add "diverges" dirt *)
           ctx, (frsh1, T.unit_ty, dirt)
@@ -434,25 +435,25 @@ and infer_comp env (c, pos) : (Core.variable, Type.ty) Common.assoc * Type.dirty
           add_ty_constraint cstr (snd e1) t1 T.int_ty;
           let ctx2, t2, cstr2 = infer_expr env e2 in
           add_ty_constraint cstr (snd e2) t2 T.int_ty;
-          add_constraints cstr (cstr1 @ cstr2);
+          join_constraints cstr (cstr1 @@ cstr2);
           let env = Ctx.extend_ty env i in
           let ctx3, frsh, ty, drt, cstr_c = infer env c in
           add_ty_constraint cstr (snd c) ty T.unit_ty;
-          add_constraints cstr cstr_c;
+          join_constraints cstr cstr_c;
           let ctx, cstrs = unify_contexts ~pos [ctx1; ctx2; ctx3] in
-          add_constraints cstr (cstrs);
+          join_constraints cstr (cstrs);
           (* XXX We need to make sure to erase all instances generated by frsh *)
           ctx, ([], T.unit_ty, drt)
 
       | Core.Handle (e1, c2) ->
           let ctx1, t1, cstr1 = infer_expr env e1 in
           let ctx2, frsh, t2, d2, cstr2 = infer env c2 in
-          add_constraints cstr (cstr1 @ cstr2);
+          join_constraints cstr (cstr1 @@ cstr2);
           let t3 = T.fresh_ty () in
           let t1' = T.Handler (t2, t3) in
             add_ty_constraint cstr pos t1' t1;
           let ctx, cstrs = unify_contexts ~pos [ctx1; ctx2] in
-          add_constraints cstr (cstrs);
+          join_constraints cstr (cstrs);
             (* XXX Are instances created by c2 just passed through?
                 What about ones that are created during handling? *)
             ctx, (frsh, t3, d2)
@@ -465,7 +466,7 @@ and infer_comp env (c, pos) : (Core.variable, Type.ty) Common.assoc * Type.dirty
           let drt = Constr.fresh_dirt () in
             List.iter (fun let_drt -> add_dirt_constraint cstr pos (Constr.DirtParam let_drt) drt) let_drts;
             add_dirt_constraint cstr pos dc drt ;
-            add_constraints cstr (cstr_c @ cstrs @ cstr_cs @ cstr_diff);
+            join_constraints cstr (cstr_c @@ cstrs @@ cstr_cs @@ cstr_diff);
             ctx, (let_frshs @ frsh, tc, drt)
 
       | Core.LetRec (defs, c) ->
@@ -473,7 +474,7 @@ and infer_comp env (c, pos) : (Core.variable, Type.ty) Common.assoc * Type.dirty
           let ctx2, frsh, tc, dc, cstr_c = infer env c in
           let ctx, cstr_cs = unify_contexts ~pos [ctx1; ctx2] in
           let ctx, cstr_diff = trim_context ~pos ctx vars in
-          add_constraints cstr (cstr_c @ cstrs @ cstr_cs @ cstr_diff);
+          join_constraints cstr (cstr_c @@ cstrs @@ cstr_cs @@ cstr_diff);
           ctx, (frsh, tc, dc)
 
       | Core.Check c ->
@@ -486,5 +487,5 @@ and infer_comp env (c, pos) : (Core.variable, Type.ty) Common.assoc * Type.dirty
   let ctx, frsh, ty, drt, cstr = infer env (c, pos) in
   let d = T.fresh_dirt_param () in
   Print.debug "Type of %t is (%t) %t | %t" (Print.computation (c, pos)) (Print.context ctx) (Print.ty Trio.empty ty) (Print.constraints Trio.empty cstr);
-  ctx, (frsh, ty, d), (Constr.DirtConstraint (drt, Constr.DirtParam d, pos) :: cstr)
+  ctx, (frsh, ty, d), (Constr.add_dirt_constraint pos drt (Constr.DirtParam d) cstr)
 

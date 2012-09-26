@@ -32,7 +32,7 @@ val ty :
 val variable : Core.variable -> Format.formatter -> unit
 val constraints :
   Type.ty_param list * Type.dirt_param list * Type.region_param list ->
-  Constr.constraints list -> Format.formatter -> unit
+  Constr.t -> Format.formatter -> unit
 val ty_scheme : Ctx.ty_scheme -> Format.formatter -> unit
 val dirty_scheme : Ctx.ty_scheme -> Type.dirt_param -> Format.formatter -> unit
 val beautified_ty_scheme : Ctx.ty_scheme -> Format.formatter -> unit

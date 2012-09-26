@@ -1,5 +1,5 @@
-type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Constr.constraints list
-type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Constr.constraints list
+type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Constr.t
+type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Constr.t
 
 type t = (Core.variable, ty_scheme option) Common.assoc
 
@@ -10,7 +10,7 @@ let empty = []
     parameters. It returns the  *)
 let refresh (ctx, ty, cnstrs) =
   let sbst = Type.refreshing_subst () in
-  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, List.map (Constr.subst_constraints sbst) cnstrs
+  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constr.subst_constraints sbst cnstrs
 
 let lookup ctx x =
   match Common.lookup x ctx with

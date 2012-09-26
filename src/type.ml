@@ -30,8 +30,6 @@ and args = (ty, dirt_param, region_param) Trio.t
    is syntactically incorrect so that the programmer cannot accidentally
    define it. *)
 let universal_ty = Basic "_"
-let universal_dirty = ([], ([], Basic "_", fresh_dirt_param ()), [])
-
 let int_ty = Basic "int"
 let string_ty = Basic "string"
 let bool_ty = Basic "bool"
@@ -90,12 +88,13 @@ and subst_args sbst (tys, ds, rs) =
   (tys, ds, rs)
 
 (** [identity_subst] is a substitution that makes no changes. *)
-let identity_subst = {
-  ty_param = (fun p -> TyParam p);
-  dirt_param = Common.id;
-  region_param = Common.id;
-  instance_param = (fun i -> Some i);
-}
+let identity_subst =
+  {
+    ty_param = (fun p -> TyParam p);
+    dirt_param = Common.id;
+    region_param = Common.id;
+    instance_param = (fun i -> Some i);
+  }
 
 (** [compose_subst sbst1 sbst2] returns a substitution that first performs
     [sbst2] and then [sbst1]. *)
@@ -117,41 +116,39 @@ let refresher fresh =
         p'
     | Some p' -> p'
 
-let create_subst (fresh_ty_param, fresh_dirt_param, fresh_region_param) =
-  let refresh = refresher fresh_ty_param in
-  {
-    identity_subst with
-    ty_param = (fun p -> TyParam (refresh p));
-    dirt_param = refresher fresh_dirt_param;
-    region_param = refresher fresh_region_param;
-  }
-
 let disable_beautify = ref false
 
 let beautifying_subst () =
   if !disable_beautify then
     identity_subst
   else
-    let beautify_ty_param = Common.fresh (fun n -> Ty_Param n)
-    and beautify_dirt_param = Common.fresh (fun n -> Dirt_Param n)
-    and beautify_region_param = Common.fresh (fun n -> Region_Param n)
-    in
-    create_subst (beautify_ty_param, beautify_dirt_param, beautify_region_param)
+    {
+      ty_param = refresher (Common.fresh (fun n -> TyParam (Ty_Param n)));
+      dirt_param = refresher (Common.fresh (fun n -> Dirt_Param n));
+      region_param = refresher (Common.fresh (fun n -> Region_Param n));
+      instance_param = refresher (Common.fresh (fun n -> Some (Instance_Param n)));
+    }
 
 let refreshing_subst () =
-  create_subst (fresh_ty_param, fresh_dirt_param, fresh_region_param)
+  {
+    identity_subst with
+    ty_param = (let refresh = refresher fresh_ty_param in fun p -> TyParam (refresh p));
+    dirt_param = refresher fresh_dirt_param;
+    region_param = refresher fresh_region_param;
+  }
+
+let instance_refreshing_subst () =
+  {
+    identity_subst with
+    instance_param = (let refresh = refresher fresh_instance_param in fun i -> Some (refresh i))
+  }
 
 let refresh ty =
   let sbst = refreshing_subst () in
   subst_ty sbst ty
 
-let instance_refreshing_subst is =
-  identity_subst
-(*   {
-    identity_subst with
-    instance_param = let refresh = fun i -> Some (fresh_instance_param ()))) is;
-  }
- *)
 let beautify2 ty1 ty2 =
   let sbst = beautifying_subst () in
-  (subst_ty sbst ty1, subst_ty sbst ty2)
+  let ty1 = subst_ty sbst ty1 in
+  let ty2 = subst_ty sbst ty2 in
+  (ty1, ty2)

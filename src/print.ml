@@ -135,13 +135,18 @@ let rec ty ((ps, _, _) as poly) t ppf =
         print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
   in ty t ppf
 
+let constraints_of_graph g =
+  let lst = Constr.fold_ty (fun p1 p2 pos lst -> (Constr.TypeConstraint (p1, p2, pos)) :: lst) g [] in
+  let lst = Constr.fold_dirt (fun d1 d2 pos lst -> (Constr.DirtConstraint (d1, d2, pos)) :: lst) g lst in
+  Constr.fold_region (fun r1 r2 pos lst -> (Constr.RegionConstraint (r1, r2, pos)) :: lst) g lst
+
 let constraints poly cstrs ppf =
   let constr cstr ppf = match cstr with
   | Constr.TypeConstraint (ty1, ty2, pos) -> print ppf "%t <= %t" (ty poly ty1) (ty poly ty2)
   | Constr.DirtConstraint (drt1, drt2, pos) -> print ppf "%t <= %t" (dirt poly drt1) (dirt poly drt2)
   | Constr.RegionConstraint (rgn1, rgn2, pos) -> print ppf "%t <= %t" (region poly rgn1) (region poly rgn2)
   in
-  sequence ", " constr cstrs ppf
+  sequence ", " constr (constraints_of_graph cstrs) ppf
 
 let context ctx =
   sequence "," (fun (x, t) ppf -> print ppf "%t : %t" (variable x) (ty Trio.empty t)) ctx
@@ -153,17 +158,17 @@ let ty_scheme (ctx, t, cstrs) ppf =
 let dirty_scheme tysch drt ppf =
   print ppf "%t [%t]" (ty_scheme tysch) (dirt_param Trio.empty drt)
 
-let beautified_ty_scheme (ctx, ty, cstrs) =
+let beautified_ty_scheme (ctx, ty, cstrs) ppf =
   let sbst = Type.beautifying_subst () in
   let ty = Type.subst_ty sbst ty in
-  ty_scheme (Common.assoc_map (Type.subst_ty sbst) ctx, ty, List.map (Constr.subst_constraints sbst) cstrs)
+  ty_scheme (Common.assoc_map (Type.subst_ty sbst) ctx, ty, Constr.subst_constraints sbst cstrs) ppf
 
-let beautified_dirty_scheme (ctx, ty, cstrs) drt =
+let beautified_dirty_scheme (ctx, ty, cstrs) drt ppf =
   let sbst = Type.beautifying_subst () in
   let ty = Type.subst_ty sbst ty in
-  let tysch = (Common.assoc_map (Type.subst_ty sbst) ctx, ty, List.map (Constr.subst_constraints sbst) cstrs) in
+  let tysch = (Common.assoc_map (Type.subst_ty sbst) ctx, ty, Constr.subst_constraints sbst cstrs) in
   let drt = sbst.Type.dirt_param drt in
-  dirty_scheme tysch drt
+  dirty_scheme tysch drt ppf
 
 (*
 let subst sbst ppf =

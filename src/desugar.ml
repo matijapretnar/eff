@@ -433,9 +433,10 @@ let top_let_rec defs =
 
 let external_ty is_effect x t =
   let _, t = fill_args is_effect t in
-  let n = fresh_variable () in
+  let (n, _) = fresh_variable () in
+  let n = (n, x) in
   top_ctx := (x, n) :: !top_ctx;
   let (ts, ds, rs) = syntax_to_core_params (free_params t) in
-  n, ([], ty (ts, ds, rs) t, [])
+  n, ([], ty (ts, ds, rs) t, Constr.empty_constraints)
 
 let top_computation c = computation !top_ctx c
