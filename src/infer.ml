@@ -161,28 +161,27 @@ and infer_let env pos defs =
   (* Check for implicit sequencing *)
   (* Refresh freshes *)
   (* Check for duplicate variables *)
-  let add_binding (p, c) (env, ctxs, frshs, drts, cstrs) =
+  let add_binding (p, c) (env, ctxs, ctxp, frshs, drts, cstrs) =
     let cstr = ref [] in
     let ctx_p, t_p, cstr_p = infer_pattern p in
     let ctx_c, (frsh, t_c, drt), cstr_c = infer_comp env c in
-    let ctx, cstr_diff = trim_context ~pos ctx_c ctx_p in
-    add_constraints cstr (cstr_diff @ cstr_p @ cstr_c);
+    add_constraints cstr (cstr_p @ cstr_c);
     add_ty_constraint cstr (snd c) t_c t_p;
-    let ctx, env =
+    let ctxs, ctxp, env =
       if nonexpansive (fst c) then
         let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (ctx_c, t_c, cstr_c)) ctx_p env in
-        ctx, env
+        ctxs, [], env
       else
-        let ctx = List.fold_right (fun (x, t) ctx -> (x, t) :: ctx) ctx_p ctx in
+        (* let ctx = List.fold_right (fun (x, t) ctx -> (x, t) :: ctx) ctx_p ctx in *)
         let env = List.fold_right (fun (x, _) env -> Ctx.extend_ty env x) ctx_p env in
-        ctx, env
+        ctx_c :: ctxs, ctx_p @ ctxp, env
     in
-    (env, ctx :: ctxs, frsh @ frshs, drt :: drts, !cstr @ cstrs)
+    (env, ctxs, ctxp, frsh @ frshs, drt :: drts, !cstr @ cstrs)
   in  
-  let env, ctxs, frshs, drts, cstr =
-    List.fold_right add_binding defs (env, [], [], [], []) in
+  let env, ctxs, ctxp, frshs, drts, cstr =
+    List.fold_right add_binding defs (env, [], [], [], [], []) in
   let ctx, cstr_ctxs = unify_contexts ~pos ctxs in
-    (env, ctx, frshs, drts, cstr_ctxs @ cstr)
+    (env, ctx, ctxp, frshs, drts, cstr_ctxs @ cstr)
 
 
 and infer_let_rec env pos defs =
@@ -434,13 +433,14 @@ and infer_comp env (c, pos) : (int, Type.ty) Common.assoc * Type.dirty * Constr.
             ctx, (frsh, t3, d2)
 
       | Core.Let (defs, c) -> 
-          let env, ctx1, let_frshs, let_drts, cstrs = infer_let env pos defs in
+          let env, ctx1, ctxp, let_frshs, let_drts, cstrs = infer_let env pos defs in
           let ctx2, frsh, tc, dc, cstr_c = infer env c in
           let ctx, cstr_cs = unify_contexts ~pos [ctx1; ctx2] in
+          let ctx, cstr_diff = trim_context ~pos ctx ctxp in
           let drt = Constr.fresh_dirt () in
             List.iter (fun let_drt -> add_dirt_constraint cstr pos (Constr.DirtParam let_drt) drt) let_drts;
             add_dirt_constraint cstr pos dc drt ;
-            add_constraints cstr (cstr_c @ cstrs @ cstr_cs);
+            add_constraints cstr (cstr_c @ cstrs @ cstr_cs @ cstr_diff);
             ctx, (let_frshs @ frsh, tc, drt)
 
       | Core.LetRec (defs, c) ->
