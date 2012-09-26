@@ -375,7 +375,7 @@ and infer_comp env (c, pos) : (Core.variable, Type.ty) Common.assoc * Type.dirty
             (* XXX Collect fresh instances from all branches. *)
           in
           let ctxs, frshs = List.split (List.map infer_case lst) in
-          let ctx, cstrs = unify_contexts ~pos ctxs in
+          let ctx, cstrs = unify_contexts ~pos (ctxe :: ctxs) in
           add_constraints cstr cstrs;
           ctx, (List.flatten frshs, t_out, Constr.DirtParam drt_out)
               
