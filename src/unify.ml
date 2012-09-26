@@ -45,7 +45,7 @@ let canonize (ctx, ty, initial_cnstrs) =
       List.iter (fun (q, pos) -> add_ty_constraint pos (Type.TyParam p) (Type.TyParam q)) succ ;
       sbst := Type.compose_subst {
         Type.identity_subst with
-        Type.ty_param = (fun p' -> if p' = p then t else Type.TyParam p)
+        Type.ty_param = (fun p' -> if p' = p then t else Type.TyParam p')
       } !sbst
   in
   let unify pos t1 t2 =

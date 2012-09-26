@@ -434,12 +434,13 @@ and infer_comp env (c, pos) : (int, Type.ty) Common.assoc * Type.dirty * Constr.
             ctx, (frsh, t3, d2)
 
       | Core.Let (defs, c) -> 
-          let env, ctx, let_frshs, let_drts, cstrs = infer_let env pos defs in
-          let ctx, frsh, tc, dc, cstr_c = infer env c in
+          let env, ctx1, let_frshs, let_drts, cstrs = infer_let env pos defs in
+          let ctx2, frsh, tc, dc, cstr_c = infer env c in
+          let ctx, cstr_cs = unify_contexts ~pos [ctx1; ctx2] in
           let drt = Constr.fresh_dirt () in
             List.iter (fun let_drt -> add_dirt_constraint cstr pos (Constr.DirtParam let_drt) drt) let_drts;
             add_dirt_constraint cstr pos dc drt ;
-            add_constraints cstr (cstr_c @ cstrs);
+            add_constraints cstr (cstr_c @ cstrs @ cstr_cs);
             ctx, (let_frshs @ frsh, tc, drt)
 
       | Core.LetRec (defs, c) ->
