@@ -301,12 +301,15 @@ and infer_expr env (e,pos) : Ctx.ty_scheme =
             let ctx, cstrs = unify_contexts ~pos (ctx1 :: ctx2 :: ctxs) in
             add_constraints cstr cstrs;
             ctx, T.Handler (t_value, t_finally)
-  in ctx, t, !cstr
+  in
+  Print.debug "Type of %t is (%t) %t | %t" (Print.expression (e, pos)) (Print.context ctx) (Print.ty Trio.empty t) (Print.constraints Trio.empty !cstr);
+  Unify.normalize (ctx, t, !cstr)
               
 (* [infer_comp env cstr (c,pos)] infers the type of computation [c] in context [env].
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp env (c, pos) : (int, Type.ty) Common.assoc * Type.dirty * Constr.constraints list =
   (* XXX Why isn't it better to just not call type inference when type checking is disabled? *)
+  (* Print.debug "Inferring type of %t" (Print.computation (c, pos)); *)
   if !disable_typing then T.universal_dirty else
   let rec infer env (c, pos) =
     let cstr = ref [] in
@@ -315,17 +318,10 @@ and infer_comp env (c, pos) : (int, Type.ty) Common.assoc * Type.dirty * Constr.
           let ctx1, t1, cstr1 = infer_expr env e1 in
           let ctx2, t2, cstr2 = infer_expr env e2 in
           let ctx, cstrs = unify_contexts ~pos [ctx1; ctx2] in
+          let t = T.fresh_dirty () in
           add_constraints cstr (cstr1 @ cstr2 @ cstrs);
-          begin match t1 with
-          (* XXX Should we use this dirty hack? *)
-          | T.Arrow (s1, s2) ->
-              add_ty_constraint cstr pos t2 s1;
-              ctx, lift_dirty s2
-          | _ ->
-              let t = T.fresh_dirty () in
-              add_ty_constraint cstr pos t1 (T.Arrow (t2, t));
-              ctx, lift_dirty t
-          end
+          add_ty_constraint cstr pos t1 (T.Arrow (t2, t));
+          ctx, lift_dirty t
 
       | Core.Value e ->
           let ctx, t, cstr_e = infer_expr env e in
@@ -456,9 +452,11 @@ and infer_comp env (c, pos) : (int, Type.ty) Common.assoc * Type.dirty * Constr.
           ignore (infer env c);
           [], ([], T.unit_ty, Constr.DirtEmpty)
     in
-    ctx, frsh, ty, drt, !cstr
+    let ctx, ty, cstr = Unify.normalize (ctx, ty, !cstr) in
+    ctx, frsh, ty, drt, cstr
   in
   let ctx, frsh, ty, drt, cstr = infer env (c, pos) in
   let d = T.fresh_dirt_param () in
+  Print.debug "Type of %t is (%t) %t | %t" (Print.computation (c, pos)) (Print.context ctx) (Print.ty Trio.empty ty) (Print.constraints Trio.empty cstr);
   ctx, (frsh, ty, d), (Constr.DirtConstraint (drt, Constr.DirtParam d, pos) :: cstr)
 

@@ -134,14 +134,13 @@ let exec_topdef interactive (ctx, env) (d,pos) =
 
 let infer_top_comp ctx c =
   let ctx, (frshs, ty, drt), cstr = Infer.infer_comp ctx c in
-  let remaining = Unify.solve cstr in
+  let tysch = Unify.normalize (ctx, ty, cstr) in
   Exhaust.check_comp c ;
-  let remaining = Unify.garbage_collect (Unify.pos_neg_params ty) remaining in
-  let cnstr = Unify.constraints_of_graph remaining in
+  (* let cnstr = Unify.constraints_of_graph remaining in *)
   (* XXX What to do about the fresh instances? *)
   (* XXX Here, we need to show what type parameters are polymorphic or not. *)
   (*     I am disabling it because we are going to try a new approach. *)
-  (ctx, ty, cnstr), drt, frshs
+  tysch, drt, frshs
 
 let rec exec_cmd interactive (ctx, env) e =
   match e with
