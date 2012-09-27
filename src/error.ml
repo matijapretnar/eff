@@ -1,8 +1,8 @@
 exception Error of (Common.position option * string * string)
 
-(** [error ~pos err_type msg] raises an error with a position [pos], an error
+(** [error ?pos err_type msg] raises an error with a position [pos], an error
     type [err_type], and a message [msg]. The [kfprintf] magic allows
-    one to write [msg] using a format string. *)
+    one to write the message using a format string. *)
 let error ?pos err_type =
   let k _ =
     let msg = Format.flush_str_formatter () in
@@ -14,4 +14,3 @@ let fatal msg = error "Fatal error" msg
 let syntax ~pos = error ~pos "Syntax error"
 let typing ~pos = error ~pos "Typing error"
 let runtime msg = error "Runtime error" msg
-let exc msg = error "Exception" msg

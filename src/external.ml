@@ -73,7 +73,7 @@ let create_exception v =
   let exc_name = V.to_str v in
   let exception_raise param =
     let message = Print.to_string "%s %t." exc_name (Print.value param) in
-      Error.exc "%s" message
+      Error.runtime "%s" message
   in
     V.Value (external_instance exc_name [
       ("raise", exception_raise);
