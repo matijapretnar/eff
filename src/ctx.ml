@@ -1,7 +1,4 @@
-type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Type.t
-type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Type.t
-
-type t = (Core.variable, ty_scheme option) Common.assoc
+type t = (Core.variable, Type.ty_scheme option) Common.assoc
 
 
 let empty = []

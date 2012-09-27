@@ -223,6 +223,9 @@ type t = {
   dirt_graph : Dirt.t
 }
 
+type ty_scheme = (Core.variable, ty) Common.assoc * ty * t
+type dirty_scheme = (Core.variable, ty) Common.assoc * dirty * t
+
 let empty = {
   ty_graph = Ty.empty;
   region_graph = Region.empty;

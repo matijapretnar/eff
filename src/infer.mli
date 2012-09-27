@@ -15,4 +15,4 @@ val nonexpansive : Core.plain_computation -> bool
            (Core.variable * Type.ty) list * Ctx.t * (Core.variable, Type.ty) Common.assoc *
            Type.t
            val infer_comp :
-  Ctx.t -> Core.computation -> Ctx.dirty_scheme
+  Ctx.t -> Core.computation -> Type.dirty_scheme

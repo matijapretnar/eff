@@ -7,19 +7,17 @@
 
 (** The types of contexts and type schemes. *)
 type t
-type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Type.t
-type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Type.t
 
 (** [empty] is the empty context. *)
 val empty : t
 
 (** [lookup ctx x] returns a fresh instance of the type scheme assigned
     to the variable [x] in the context [ctx]. *)
-val lookup : t -> Core.variable -> ty_scheme option option
+val lookup : t -> Core.variable -> Type.ty_scheme option option
 
 (** [extend x ty_scheme ctx] returns the context [ctx] extended with
     a variable [x] bound to the type scheme [ty_scheme]. *)
-val extend : t -> Core.variable -> ty_scheme -> t
+val extend : t -> Core.variable -> Type.ty_scheme -> t
 
 (** [extend_ty x ty ctx] returns the context [ctx] extended with a variable [x]
     bound to the type [ty]. The type is promoted to a type scheme with no

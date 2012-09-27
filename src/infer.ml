@@ -216,7 +216,7 @@ and infer_let_rec env pos defs =
 
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
    [env]. It returns the inferred type of [e]. *)
-and infer_expr env (e,pos) : Ctx.ty_scheme =
+and infer_expr env (e,pos) : Type.ty_scheme =
   let cstr = ref Type.empty in
   let ctx, t = match e with
     | Core.Var x ->

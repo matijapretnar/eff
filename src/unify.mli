@@ -1,1 +1,1 @@
-val normalize : Ctx.ty_scheme -> Ctx.ty_scheme
+val normalize : Type.ty_scheme -> Type.ty_scheme
