@@ -5,7 +5,6 @@ sig
   val sup : bound -> bound -> bound
   val inf : bound -> bound -> bound
   val compare : t -> t -> int
-  val subst : Type.substitution -> t -> t
   (* val print : t -> Format.formatter -> unit *)
 end
 
@@ -80,8 +79,8 @@ struct
   let filter_edges p grph =
     fold_edges (fun x y pos acc -> if p x y pos then add_edge x y pos acc else acc) grph G.empty
 
-  let subst sbst grph =
-    fold_edges (fun x y pos sbst_grph -> add_edge (V.subst sbst x) (V.subst sbst y) pos sbst_grph) grph G.empty
+  let map f grph =
+    fold_edges (fun x y pos sbst_grph -> add_edge (f x) (f y) pos sbst_grph) grph G.empty
 
  (*    let print grph ppf =
       fold_vertices

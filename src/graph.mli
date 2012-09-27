@@ -5,7 +5,6 @@ sig
   val sup : bound -> bound -> bound
   val inf : bound -> bound -> bound
   val compare : t -> t -> int
-  val subst : Type.substitution -> t -> t
   (* val print : t -> Format.formatter -> unit *)
 end
 
@@ -41,7 +40,7 @@ sig
   val join : t -> t -> t
   val union : t -> t -> t
 
-  val subst : Type.substitution -> t -> t
+  val map : (elt -> elt) -> t -> t
 
   (* val print : t -> Format.formatter -> unit *)
 end

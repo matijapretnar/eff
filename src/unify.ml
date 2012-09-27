@@ -14,34 +14,34 @@ let for_parameters add pos ps lst1 lst2 =
 let empty_constraint = []
 
 let constraints_of_graph g =
-  let lst = Constr.fold_ty (fun p1 p2 pos lst -> (Constr.TypeConstraint (p1, p2, pos)) :: lst) g [] in
-  let lst = Constr.fold_dirt (fun d1 d2 pos lst -> (Constr.DirtConstraint (d1, d2, pos)) :: lst) g lst in
-  Constr.fold_region (fun r1 r2 pos lst -> (Constr.RegionConstraint (r1, r2, pos)) :: lst) g lst
+  let lst = Type.fold_ty (fun p1 p2 pos lst -> (Type.TypeConstraint (p1, p2, pos)) :: lst) g [] in
+  let lst = Type.fold_dirt (fun d1 d2 pos lst -> (Type.DirtConstraint (d1, d2, pos)) :: lst) g lst in
+  Type.fold_region (fun r1 r2 pos lst -> (Type.RegionConstraint (r1, r2, pos)) :: lst) g lst
 
 let canonize (ctx, ty, initial_grph) =
   let sbst = ref Type.identity_subst in
   (* We keep a list of "final" constraints which are known not to
      generate new constraints, and a list of constraints which still
      need to be resolved. *)
-  let grph = ref (Constr.empty) in
+  let grph = ref (Type.empty) in
   let queue = ref (constraints_of_graph initial_grph) in
   let add_constraint = function
-    | Constr.TypeConstraint (t1, t2, pos) as cnstr ->
+    | Type.TypeConstraint (t1, t2, pos) as cnstr ->
       if t1 <> t2 then queue := cnstr :: !queue
-    | Constr.DirtConstraint (d1, d2, pos) ->
-      if d1 <> d2 then grph := Constr.add_dirt_constraint ~pos d1 d2 !grph
-    | Constr.RegionConstraint (r1, r2, pos) ->
-      if r1 <> r2 then grph := Constr.add_region_constraint ~pos r1 r2 !grph
+    | Type.DirtConstraint (d1, d2, pos) ->
+      if d1 <> d2 then grph := Type.add_dirt_constraint ~pos d1 d2 !grph
+    | Type.RegionConstraint (r1, r2, pos) ->
+      if r1 <> r2 then grph := Type.add_region_constraint ~pos r1 r2 !grph
   in
-  let add_ty_constraint pos t1 t2 = add_constraint (Constr.TypeConstraint (t1, t2, pos)) in
-  let add_region_constraint pos r1 r2 = add_constraint (Constr.RegionConstraint (r1, r2, pos)) in
-  let add_dirt_constraint pos d1 d2 = add_constraint (Constr.DirtConstraint (d1, d2, pos)) in
+  let add_ty_constraint pos t1 t2 = add_constraint (Type.TypeConstraint (t1, t2, pos)) in
+  let add_region_constraint pos r1 r2 = add_constraint (Type.RegionConstraint (r1, r2, pos)) in
+  let add_dirt_constraint pos d1 d2 = add_constraint (Type.DirtConstraint (d1, d2, pos)) in
   let add_substitution p t =
     (* When parameter [p] gets substituted by type [t] the vertex
        [p] must be removed from the graph, and each edge becomes
        a constraint in the queue. *)
-    let (pred, succ, new_grph) = Constr.remove_ty !grph (Type.TyParam p) in
-    grph := {!grph with Constr.ty_graph = new_grph};
+    let (pred, succ, new_grph) = Type.remove_ty !grph (Type.TyParam p) in
+    grph := {!grph with Type.ty_graph = new_grph};
       List.iter (fun (q, pos) -> add_ty_constraint pos q (Type.TyParam p)) pred ;
       List.iter (fun (q, pos) -> add_ty_constraint pos (Type.TyParam p) q) succ ;
       sbst := Type.compose_subst {
@@ -57,7 +57,7 @@ let canonize (ctx, ty, initial_grph) =
     | (t1, t2) when t1 = t2 -> ()
 
     | (Type.TyParam p, Type.TyParam q) ->
-        grph := Constr.add_ty_constraint ~pos (Type.TyParam p) (Type.TyParam q) !grph
+        grph := Type.add_ty_constraint ~pos (Type.TyParam p) (Type.TyParam q) !grph
 
     | (Type.TyParam p, t) ->
         if false
@@ -96,7 +96,7 @@ let canonize (ctx, ty, initial_grph) =
         (* XXX How do we unify fresh instances? *)
         add_ty_constraint pos v1 v2;
         add_ty_constraint pos u2 u1;
-        add_dirt_constraint pos (Constr.DirtParam drt1) (Constr.DirtParam drt2)
+        add_dirt_constraint pos (Type.DirtParam drt1) (Type.DirtParam drt2)
 
     | (Type.Tuple lst1, Type.Tuple lst2)
         when List.length lst1 = List.length lst2 ->
@@ -109,8 +109,8 @@ let canonize (ctx, ty, initial_grph) =
         | None -> Error.typing ~pos "Undefined type %s" t1
         | Some (ps, ds, rs) ->
             for_parameters add_ty_constraint pos ps ts1 ts2;
-            for_parameters add_dirt_constraint pos ds (List.map (fun d -> Constr.DirtParam d) drts1) (List.map (fun d -> Constr.DirtParam d) drts2);
-            for_parameters add_region_constraint pos rs (List.map (fun r -> Constr.RegionParam r) rgns1) (List.map (fun r -> Constr.RegionParam r) rgns2)
+            for_parameters add_dirt_constraint pos ds (List.map (fun d -> Type.DirtParam d) drts1) (List.map (fun d -> Type.DirtParam d) drts2);
+            for_parameters add_region_constraint pos rs (List.map (fun r -> Type.RegionParam r) rgns1) (List.map (fun r -> Type.RegionParam r) rgns2)
         end
 
     | (Type.Effect (t1, (ts1, drts1, rgns1), rgn1), Type.Effect (t2, (ts2, drts2, rgns2), rgn2)) when t1 = t2 ->
@@ -119,10 +119,10 @@ let canonize (ctx, ty, initial_grph) =
         begin match Tctx.lookup_params t1 with
         | None -> Error.typing ~pos "Undefined type %s" t1
         | Some (ps, ds, rs) ->
-            add_region_constraint pos (Constr.RegionParam rgn1) (Constr.RegionParam rgn2);
+            add_region_constraint pos (Type.RegionParam rgn1) (Type.RegionParam rgn2);
             for_parameters add_ty_constraint pos ps ts1 ts2;
-            for_parameters add_dirt_constraint pos ds (List.map (fun d -> Constr.DirtParam d) drts1) (List.map (fun d -> Constr.DirtParam d) drts2);
-            for_parameters add_region_constraint pos rs (List.map (fun r -> Constr.RegionParam r) rgns1) (List.map (fun r -> Constr.RegionParam r) rgns2)
+            for_parameters add_dirt_constraint pos ds (List.map (fun d -> Type.DirtParam d) drts1) (List.map (fun d -> Type.DirtParam d) drts2);
+            for_parameters add_region_constraint pos rs (List.map (fun r -> Type.RegionParam r) rgns1) (List.map (fun r -> Type.RegionParam r) rgns2)
         end
 
     (* The following two cases cannot be merged into one, as the whole matching
@@ -164,9 +164,9 @@ let canonize (ctx, ty, initial_grph) =
       | cnstr :: cnstrs ->
         queue := cnstrs ;
         begin match cnstr with
-          | Constr.TypeConstraint (t1, t2, pos) -> unify pos t1 t2
-          | Constr.DirtConstraint (drt1, drt2, pos) -> unify_dirt pos drt1 drt2;
-          | Constr.RegionConstraint (rgn1, rgn2, pos) -> unify_region pos rgn1 rgn2
+          | Type.TypeConstraint (t1, t2, pos) -> unify pos t1 t2
+          | Type.DirtConstraint (drt1, drt2, pos) -> unify_dirt pos drt1 drt2;
+          | Type.RegionConstraint (rgn1, rgn2, pos) -> unify_region pos rgn1 rgn2
         end ;
         loop ()
   in
@@ -217,18 +217,18 @@ let garbage_collect (ctx, ty, cstr) =
     | Type.TyParam p, Type.TyParam q -> List.mem p neg_ts && List.mem q pos_ts
     | _, _ -> assert false
   and drt_p drt1 drt2 pos = match drt1, drt2 with
-    | Constr.DirtEmpty, _ -> false
-    | Constr.DirtParam p, Constr.DirtParam q -> List.mem p neg_ds && List.mem q pos_ds
-    | Constr.DirtParam p, _ -> List.mem p neg_ds
-    | _, Constr.DirtParam q -> List.mem q pos_ds
+    | Type.DirtEmpty, _ -> false
+    | Type.DirtParam p, Type.DirtParam q -> List.mem p neg_ds && List.mem q pos_ds
+    | Type.DirtParam p, _ -> List.mem p neg_ds
+    | _, Type.DirtParam q -> List.mem q pos_ds
     | _, _ -> true
   and rgn_p rgn1 rgn2 pos = match rgn1, rgn2 with
-    | Constr.RegionParam p, Constr.RegionParam q -> List.mem p neg_rs && List.mem q pos_rs
-    | _, Constr.RegionAtom (Constr.InstanceTop) -> false
-    | Constr.RegionParam p, _ -> List.mem p neg_rs
-    | _, Constr.RegionParam q -> List.mem q pos_rs
+    | Type.RegionParam p, Type.RegionParam q -> List.mem p neg_rs && List.mem q pos_rs
+    | _, Type.RegionAtom (Type.InstanceTop) -> false
+    | Type.RegionParam p, _ -> List.mem p neg_rs
+    | _, Type.RegionParam q -> List.mem q pos_rs
     | _, _ -> true
   in
-  (ctx, ty, Constr.garbage_collect ty_p drt_p rgn_p cstr)
+  (ctx, ty, Type.garbage_collect ty_p drt_p rgn_p cstr)
 
 let normalize tysch = garbage_collect (canonize tysch)

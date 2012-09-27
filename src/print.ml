@@ -69,8 +69,8 @@ and pattern_list ?(max_length=299) (p, pos) ppf =
 
 let instance i ppf =
   match i with
-  | Constr.InstanceParam (Type.Instance_Param i) -> print ppf "#%d" i
-  | Constr.InstanceTop -> print ppf "?"
+  | Type.InstanceParam (Type.Instance_Param i) -> print ppf "#%d" i
+  | Type.InstanceTop -> print ppf "?"
 
 let region_param (_, _, rs) ((Type.Region_Param k) as p) ppf =
   let c = (if List.mem p rs then "'" else "'_") in
@@ -82,14 +82,14 @@ let dirt_param (_, ds, _) ((Type.Dirt_Param k) as p) ppf =
 
 let region poly reg ppf =
   match reg with
-    | Constr.RegionParam p -> print ppf "<%t>" (region_param poly p)
-    | Constr.RegionAtom i -> print ppf "<%t>" (instance i)
+    | Type.RegionParam p -> print ppf "<%t>" (region_param poly p)
+    | Type.RegionAtom i -> print ppf "<%t>" (instance i)
 
 let dirt ((_, ds, _) as poly) drt ppf =
   match drt with
-    | Constr.DirtEmpty -> print ppf ""
-    | Constr.DirtParam p -> print ppf "%t" (dirt_param poly p)
-    | Constr.DirtAtom (rgn, op) -> print ppf "%t#%s" (region_param poly rgn) op
+    | Type.DirtEmpty -> print ppf ""
+    | Type.DirtParam p -> print ppf "%t" (dirt_param poly p)
+    | Type.DirtAtom (rgn, op) -> print ppf "%t#%s" (region_param poly rgn) op
 
 let fresh_instances frsh ppf =
   match frsh with
@@ -136,15 +136,15 @@ let rec ty ((ps, _, _) as poly) t ppf =
   in ty t ppf
 
 let constraints_of_graph g =
-  let lst = Constr.fold_ty (fun p1 p2 pos lst -> (Constr.TypeConstraint (p1, p2, pos)) :: lst) g [] in
-  let lst = Constr.fold_dirt (fun d1 d2 pos lst -> (Constr.DirtConstraint (d1, d2, pos)) :: lst) g lst in
-  Constr.fold_region (fun r1 r2 pos lst -> (Constr.RegionConstraint (r1, r2, pos)) :: lst) g lst
+  let lst = Type.fold_ty (fun p1 p2 pos lst -> (Type.TypeConstraint (p1, p2, pos)) :: lst) g [] in
+  let lst = Type.fold_dirt (fun d1 d2 pos lst -> (Type.DirtConstraint (d1, d2, pos)) :: lst) g lst in
+  Type.fold_region (fun r1 r2 pos lst -> (Type.RegionConstraint (r1, r2, pos)) :: lst) g lst
 
 let constraints poly cstrs ppf =
   let constr cstr ppf = match cstr with
-  | Constr.TypeConstraint (ty1, ty2, pos) -> print ppf "%t <= %t" (ty poly ty1) (ty poly ty2)
-  | Constr.DirtConstraint (drt1, drt2, pos) -> print ppf "%t <= %t" (dirt poly drt1) (dirt poly drt2)
-  | Constr.RegionConstraint (rgn1, rgn2, pos) -> print ppf "%t <= %t" (region poly rgn1) (region poly rgn2)
+  | Type.TypeConstraint (ty1, ty2, pos) -> print ppf "%t <= %t" (ty poly ty1) (ty poly ty2)
+  | Type.DirtConstraint (drt1, drt2, pos) -> print ppf "%t <= %t" (dirt poly drt1) (dirt poly drt2)
+  | Type.RegionConstraint (rgn1, rgn2, pos) -> print ppf "%t <= %t" (region poly rgn1) (region poly rgn2)
   in
   sequence ", " constr (constraints_of_graph cstrs) ppf
 
@@ -161,12 +161,12 @@ let dirty_scheme tysch drt ppf =
 let beautified_ty_scheme (ctx, ty, cstrs) ppf =
   let sbst = Type.beautifying_subst () in
   let ty = Type.subst_ty sbst ty in
-  ty_scheme (Common.assoc_map (Type.subst_ty sbst) ctx, ty, Constr.subst_constraints sbst cstrs) ppf
+  ty_scheme (Common.assoc_map (Type.subst_ty sbst) ctx, ty, Type.subst_constraints sbst cstrs) ppf
 
 let beautified_dirty_scheme (ctx, ty, cstrs) drt ppf =
   let sbst = Type.beautifying_subst () in
   let ty = Type.subst_ty sbst ty in
-  let tysch = (Common.assoc_map (Type.subst_ty sbst) ctx, ty, Constr.subst_constraints sbst cstrs) in
+  let tysch = (Common.assoc_map (Type.subst_ty sbst) ctx, ty, Type.subst_constraints sbst cstrs) in
   let drt = sbst.Type.dirt_param drt in
   dirty_scheme tysch drt ppf
 

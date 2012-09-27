@@ -19,10 +19,10 @@ val dirt_param :
   'a * Type.dirt_param list * 'b ->
   Type.dirt_param -> Format.formatter -> unit
 val region :
-  'a * 'b * Type.region_param list -> Constr.region -> Format.formatter -> unit
+  'a * 'b * Type.region_param list -> Type.region -> Format.formatter -> unit
 val dirt :
   'a * Type.dirt_param list * Type.region_param list ->
-  Constr.dirt -> Format.formatter -> unit
+  Type.dirt -> Format.formatter -> unit
 val fresh_instances : Type.instance_param list -> Format.formatter -> unit
 val ty_param :
   Type.ty_param list -> Type.ty_param -> Format.formatter -> unit
@@ -32,7 +32,7 @@ val ty :
 val variable : Core.variable -> Format.formatter -> unit
 val constraints :
   Type.ty_param list * Type.dirt_param list * Type.region_param list ->
-  Constr.t -> Format.formatter -> unit
+  Type.t -> Format.formatter -> unit
 val ty_scheme : Ctx.ty_scheme -> Format.formatter -> unit
 val dirty_scheme : Ctx.ty_scheme -> Type.dirt_param -> Format.formatter -> unit
 val beautified_ty_scheme : Ctx.ty_scheme -> Format.formatter -> unit

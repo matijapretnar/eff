@@ -7,8 +7,8 @@
 
 (** The types of contexts and type schemes. *)
 type t
-type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Constr.t
-type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Constr.t
+type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Type.t
+type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Type.t
 
 (** [empty] is the empty context. *)
 val empty : t

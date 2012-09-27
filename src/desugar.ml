@@ -437,6 +437,6 @@ let external_ty is_effect x t =
   let n = (n, x) in
   top_ctx := (x, n) :: !top_ctx;
   let (ts, ds, rs) = syntax_to_core_params (free_params t) in
-  n, ([], ty (ts, ds, rs) t, Constr.empty)
+  n, ([], ty (ts, ds, rs) t, Type.empty)
 
 let top_computation c = computation !top_ctx c
