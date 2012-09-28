@@ -237,16 +237,18 @@ and infer_let_rec env pos defs =
 
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
    [env]. It returns the inferred type of [e]. *)
-and infer_expr env (e,pos) : Type.ty_scheme =
-  let ctx, ty, cstr = match e with
+and infer_expr env (e, pos) =
+  let ctx, ty, cstr =
+    match e with
     | Core.Var x ->
-        let cstr = ref Type.empty in
         begin match Ctx.lookup env x with
-        | Some (Some (ctx, ty, cstrs)) -> join_constraints cstr cstrs; ctx, ty, !cstr
+        | Some (Some (ctx, ty, cnstrs)) ->
+            (ctx, ty, cnstrs)
         | Some None ->
-            let t = T.fresh_ty () in
-            [(x, t)], t, !cstr
-        | None -> Error.typing ~pos "Unknown variable %t" (Print.variable x)
+            let ty = T.fresh_ty () in
+            [(x, ty)], ty, Type.empty
+        | None ->
+            Error.typing ~pos "Unknown variable %t" (Print.variable x)
         end
     | Core.Const const -> [], ty_of_const const, Type.empty
     | Core.Tuple es ->
@@ -302,18 +304,18 @@ and infer_expr env (e,pos) : Type.ty_scheme =
         ctx, T.Arrow (ty1, drty2), cnstrs
         
     | Core.Operation (e, op) ->
-        let cstr = ref Type.empty in
         let rgn = T.fresh_region_param () in
-        (match Tctx.infer_operation op rgn with
-          | None -> Error.typing ~pos "Unbound operation %s" op
-          | Some (ty, (t1, t2)) ->
+        begin match Tctx.infer_operation op rgn with
+        | None -> Error.typing ~pos "Unbound operation %s" op
+        | Some (ty, (t1, t2)) ->
             let ctx, u, cstr_u = infer_expr env e in
             let d = T.fresh_dirt_param () in
-              add_ty_constraint cstr pos u ty;
-              add_dirt_constraint cstr pos (Type.DirtAtom (rgn, op)) (Type.DirtParam d);
-              join_constraints cstr cstr_u;
-              (* An operation creates no new instances. *)
-              ctx, T.Arrow (t1, ([], t2, d)), !cstr)
+            ctx, T.Arrow (t1, ([], t2, d)), gather [
+              subtype ~pos u ty;
+              subdirt ~pos (Type.DirtAtom (rgn, op)) (Type.DirtParam d);
+              just cstr_u
+            ]
+        end
 
     | Core.Handler {Core.operations=ops; Core.value=a_val; Core.finally=a_fin} -> 
         let cstr = ref Type.empty in
@@ -381,33 +383,30 @@ and infer_comp env (c, pos) =
           ctx, ([], ty, Type.DirtEmpty), cnstrs
 
       | Core.Match (e, []) ->
-          let cstr = ref Type.empty in
-        let ctx, t_in, cstr_e = infer_expr env e in
-        let t_out = T.fresh_ty () in
-        add_ty_constraint cstr pos t_in T.empty_ty;
-        join_constraints cstr cstr_e;
-        ctx, ([], t_out, Type.DirtEmpty), !cstr
+          let ctx, ty_in, cnstrs = infer_expr env e in
+          let ty_out = Type.fresh_ty () in
+          ctx, ([], ty_out, Type.DirtEmpty), gather [
+            subtype ~pos ty_in Type.empty_ty;
+            just cnstrs
+          ]
 
-      | Core.Match (e, lst) ->
-          let cstr = ref Type.empty in
-          let ctxe, t_in, cstr_in = infer_expr env e in
-          join_constraints cstr cstr_in;
-          let t_out = T.fresh_ty () in
-          let drt_out = T.fresh_dirt_param () in
-          let infer_case ((p, e') as a) =
+      | Core.Match (e, cases) ->
+          let ctx_in, ty_in, cnstrs_in = infer_expr env e in
+          let ty_out = T.fresh_ty () in
+          let drt_out = T.fresh_dirt () in
+          let infer_case ((p, c) as a) (ctx, frshs, cnstrs) =
             (* XXX Refresh fresh instances *)
-            let ctxa, t_in', (frsh_out, t_out', drt_out'), cstr_case = infer_abstraction env a in
-            join_constraints cstr cstr_case;
-            add_ty_constraint cstr (snd e) t_in t_in';
-            add_ty_constraint cstr (snd e') t_out' t_out;
-            add_dirt_constraint cstr (snd e') (Type.DirtParam drt_out') (Type.DirtParam drt_out);
-            ctxa, frsh_out
-            (* XXX Collect fresh instances from all branches. *)
+            let ctx', ty_in', (frsh_out, ty_out', drt_out'), cnstrs' = infer_abstraction env a in
+            ctx' @ ctx, frsh_out @ frshs, gather [
+              subtype ~pos:(snd e) ty_in ty_in';
+              subtype ~pos:(snd c) ty_out' ty_out;
+              subdirt ~pos:(snd c) (Type.DirtParam drt_out') drt_out;
+              just cnstrs';
+              just cnstrs
+            ]
           in
-          let ctxs, frshs = List.split (List.map infer_case lst) in
-          let ctx, cstrs = unify_contexts ~pos (ctxe :: ctxs) in
-          join_constraints cstr cstrs;
-          ctx, (List.flatten frshs, t_out, Type.DirtParam drt_out), !cstr
+          let ctx, frshs, cnstrs = List.fold_right infer_case cases (ctx_in, [], cnstrs_in) in
+          ctx, (frshs, ty_out, drt_out), cnstrs
               
       | Core.New (eff, r) ->
           let cstr = ref Type.empty in
@@ -447,49 +446,42 @@ and infer_comp env (c, pos) =
           end
 
       | Core.While (c1, c2) ->
-          let cstr = ref Type.empty in
-        let dirt = Type.fresh_dirt () in
-        let ctx1, frsh1, t1, d1, cstr1 = infer env c1 in
-          add_ty_constraint cstr pos t1 T.bool_ty;
-          add_dirt_constraint cstr pos d1 dirt;
-          let ctx2, frsh2, t2, d2, cstr2 = infer env c2 in
-          add_ty_constraint cstr pos t2 T.unit_ty;
-          add_dirt_constraint cstr pos d2 dirt;
-          let ctx, cstrs = unify_contexts ~pos [ctx1; ctx2] in
-          join_constraints cstr ((cstr1 @!@ cstr2) @@ cstrs);
-          (* XXX We need to make sure to erase all instances generated by frsh2 *)
-          (* XXX could add "diverges" dirt *)
-          ctx, (frsh1, T.unit_ty, dirt), !cstr
+          let ctx1, frsh1, t1, drt1, cnstrs1 = infer env c1 in
+          let ctx2, frsh2, t2, drt2, cnstrs2 = infer env c2 in
+          let drt = Type.fresh_dirt () in
+          (* XXX We must erase all instances generated by c2 *)
+          ctx1 @ ctx2, (frsh1, T.unit_ty, drt), gather [
+            subtype ~pos t1 Type.bool_ty;
+            subtype ~pos t2 Type.unit_ty;
+            subdirt ~pos drt1 drt;
+            subdirt ~pos drt2 drt;
+            just cnstrs1;
+            just cnstrs2
+          ]
 
       | Core.For (i, e1, e2, c, _) ->
-          let cstr = ref Type.empty in
-          let ctx1, t1, cstr1 = infer_expr env e1 in
-          add_ty_constraint cstr (snd e1) t1 T.int_ty;
-          let ctx2, t2, cstr2 = infer_expr env e2 in
-          add_ty_constraint cstr (snd e2) t2 T.int_ty;
-          join_constraints cstr (cstr1 @!@ cstr2);
-          let env = Ctx.extend_ty env i in
-          let ctx3, frsh, ty, drt, cstr_c = infer env c in
-          add_ty_constraint cstr (snd c) ty T.unit_ty;
-          join_constraints cstr cstr_c;
-          let ctx, cstrs = unify_contexts ~pos [ctx1; ctx2; ctx3] in
-          join_constraints cstr (cstrs);
-          (* XXX We need to make sure to erase all instances generated by frsh *)
-          ctx, ([], T.unit_ty, drt), !cstr
+          let ctx1, ty1, cnstrs1 = infer_expr env e1 in
+          let ctx2, ty2, cnstrs2 = infer_expr env e2 in
+          let ctx3, frsh, ty, drt, cnstrs3 = infer (Ctx.extend_ty env i) c in
+          (* XXX We must erase all instances generated by c *)
+          ctx1 @ ctx2 @ ctx3, ([], T.unit_ty, drt), gather [
+            subtype ~pos:(snd e1) ty1 Type.int_ty;
+            subtype ~pos:(snd e2) ty2 Type.int_ty;
+            subtype ~pos:(snd c) ty Type.unit_ty;
+            just cnstrs1;
+            just cnstrs2;
+            just cnstrs3
+          ]
 
       | Core.Handle (e1, c2) ->
-          let cstr = ref Type.empty in
-          let ctx1, t1, cstr1 = infer_expr env e1 in
-          let ctx2, frsh, t2, d2, cstr2 = infer env c2 in
-          join_constraints cstr (cstr1 @!@ cstr2);
-          let t3 = T.fresh_ty () in
-          let t1' = T.Handler (t2, t3) in
-            add_ty_constraint cstr pos t1' t1;
-          let ctx, cstrs = unify_contexts ~pos [ctx1; ctx2] in
-          join_constraints cstr (cstrs);
-            (* XXX Are instances created by c2 just passed through?
-                What about ones that are created during handling? *)
-            ctx, (frsh, t3, d2), !cstr
+          let ctx1, ty1, cnstrs1 = infer_expr env e1 in
+          let ctx2, frsh, ty2, drt2, cnstrs2 = infer env c2 in
+          let ty3 = T.fresh_ty () in
+          ctx1 @ ctx2, (frsh, ty3, drt2), gather [
+            subtype ~pos ty1 (T.Handler (ty2, ty3));
+            just cnstrs1;
+            just cnstrs2
+          ]
 
       | Core.Let (defs, c) -> 
           let cstr = ref Type.empty in
