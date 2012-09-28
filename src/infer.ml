@@ -172,84 +172,10 @@ let rec infer_pattern (p, pos) =
 let (@@) = Type.join_constraints
 let (@!@) = Type.join_disjoint_constraints
 
-let rec infer_abstraction env (p, c) =
-  let ctx_p, ty_p, cnstrs_p = infer_pattern p in
-  let ctx_c, drty_c, cnstrs_c = infer_comp env c in
-  let ctx, cnstrs_ctx = trim_context ~pos:(snd c) ctx_c ctx_p in
-  ctx, ty_p, drty_c, gather [
-    merge cnstrs_ctx;
-    just cnstrs_p;
-    just cnstrs_c
-  ]
-
-and infer_abstraction2 env (p1, p2, c) =
-  let ctx_p1, ty_p1, cnstrs_p1 = infer_pattern p1 in
-  let ctx_p2, ty_p2, cnstrs_p2 = infer_pattern p2 in
-  let ctx_c, drty_c, cnstrs_c = infer_comp env c in
-  let ctx, cnstrs_ctx = trim_context ~pos:(snd c) ctx_c (ctx_p1 @ ctx_p2) in
-  ctx, ty_p1, ty_p2, drty_c, gather [
-    merge cnstrs_ctx;
-    just cnstrs_p1;
-    just cnstrs_p2;
-    just cnstrs_c
-  ]
-
-and infer_let ~pos env defs =
-  (* Check for implicit sequencing *)
-  (* Refresh freshes *)
-  (* Check for duplicate variables *)
-  let add_binding (p, c) (env, ctxs, ctxp, frshs, drts, cstrs) =
-    let cstr = ref Type.empty in
-    let ctx_p, t_p, cstr_p = infer_pattern p in
-    let ctx_c, (frsh, t_c, drt), cstr_c = infer_comp env c in
-    join_constraints cstr (cstr_p @!@ cstr_c);
-    add_ty_constraint cstr (snd c) t_c t_p;
-    let ctxs, ctxp, env =
-      if nonexpansive (fst c) then
-        let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (ctx_c, t_c, cstr_c)) ctx_p env in
-        ctxs, [], env
-      else
-        (* let ctx = List.fold_right (fun (x, t) ctx -> (x, t) :: ctx) ctx_p ctx in *)
-        ctx_c :: ctxs, ctx_p @ ctxp, env
-    in
-    (env, ctxs, ctxp, frsh @ frshs, drt :: drts, !cstr @@ cstrs)
-  in  
-  let env, ctxs, ctxp, frshs, drts, cstr =
-    List.fold_right add_binding defs (env, [], [], [], [], Type.empty) in
-  let ctx, cstr_ctxs = unify_contexts ~pos ctxs in
-    (env, ctx, ctxp, frshs, drts, cstr_ctxs @@ cstr)
-
-
-and infer_let_rec ~pos env defs =
-  if not (Common.injective fst defs) then
-    Error.typing ~pos "Multiply defined recursive value.";
-
-  let lst =
-    Common.assoc_map (fun a ->
-      let u = T.fresh_ty () in
-      (u, a))
-      defs
-
-  in
-  let cstr = ref Type.empty in
-  let vars = Common.assoc_map
-    (fun (u, ((p, c) as a)) ->
-      let ctx, tp, tc, cstr_c = infer_abstraction env a in
-      let t = T.Arrow (tp, tc) in
-      add_ty_constraint cstr (snd c) t u;
-      join_constraints cstr cstr_c;
-      (ctx, t)) lst in
-  let ctxs, ctxp =
-    List.fold_right
-      (fun (x, (ctx, t)) (ctxs, ctxp) -> (ctx :: ctxs, (x, t) :: ctxp)) vars ([], []) in
-  let ctx, cstr_c = unify_contexts ~pos ctxs in
-  let cstr = cstr_c @@ !cstr in
-  let env = List.fold_right (fun (x, (_, t)) env -> Ctx.extend env x (Unify.normalize (ctx, t, cstr))) vars env in
-    ctxp, env, ctx, cstr
-
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
    [env]. It returns the inferred type of [e]. *)
-and infer_expr env (e, pos) =
+let rec infer_expr env (e, pos) =
+  if !disable_typing then ([], Type.Basic "_", Type.empty) else
   let ty_scheme = match e with
 
   | Core.Var x ->
@@ -377,153 +303,226 @@ and infer_expr env (e, pos) =
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp env (c, pos) =
   let empty_dirt = Type.fresh_dirt_param in
-  (* XXX Why isn't it better to just not call type inference when type checking is disabled? *)
-  (* Print.debug "Inferring type of %t" (Print.computation (c, pos)); *)
   if !disable_typing then ([], ([], Type.Basic "_", Type.fresh_dirt_param ()), Type.empty) else
-  let rec infer env (c, pos) =
-    let ctx, (frsh, ty, drt), cstr = match c with
-      | Core.Apply (e1, e2) ->
-          let ctx1, ty1, cnstrs1 = infer_expr env e1 in
-          let ctx2, ty2, cnstrs2 = infer_expr env e2 in
-          let drty = T.fresh_dirty () in
-          ctx1 @ ctx2, drty, gather [
-            subtype ~pos ty1 (T.Arrow (ty2, drty));
-            just cnstrs1;
-            just cnstrs2
-          ]
+  let ctx, (frsh, ty, drt), cstr = match c with
 
-      | Core.Value e ->
-          let ctx, ty, cnstrs = infer_expr env e in
-          ctx, ([], ty, empty_dirt ()), cnstrs
+  | Core.Value e ->
+      let ctx, ty, cnstrs = infer_expr env e in
+      ctx, ([], ty, empty_dirt ()), cnstrs
 
-      | Core.Match (e, []) ->
-          let ctx, ty_in, cnstrs = infer_expr env e in
-          let ty_out = Type.fresh_ty () in
-          ctx, ([], ty_out, empty_dirt ()), gather [
-            subtype ~pos ty_in Type.empty_ty;
+  | Core.Let (defs, c) -> 
+      let cstr = ref Type.empty in
+      let env, ctx1, ctxp, let_frshs, let_drts, cstrs = infer_let ~pos env defs in
+      let ctx2, (frsh, tc, dc), cstr_c = infer_comp env c in
+      let ctx, cstr_cs = unify_contexts ~pos [ctx1; ctx2] in
+      let ctx, cstr_diff = trim_context ~pos ctx ctxp in
+      let drt = Type.fresh_dirt_param () in
+        List.iter (fun let_drt -> add_dirt_constraint cstr pos (Type.DirtParam let_drt) (Type.DirtParam drt)) let_drts;
+        add_dirt_constraint cstr pos (Type.DirtParam dc) (Type.DirtParam drt) ;
+        join_constraints cstr ((cstr_c @!@ cstrs) @@ cstr_cs @@ cstr_diff);
+        ctx, (let_frshs @ frsh, tc, drt), !cstr
+
+  | Core.LetRec (defs, c) ->
+      let cstr = ref Type.empty in
+      let vars, env, ctx1, cstrs = infer_let_rec ~pos env defs in
+      let ctx2, (frsh, tc, dc), cstr_c = infer_comp env c in
+      let ctx, cstr_cs = unify_contexts ~pos [ctx1; ctx2] in
+      let ctx, cstr_diff = trim_context ~pos ctx vars in
+      join_constraints cstr ((cstr_c @!@ cstrs) @@ cstr_cs @@ cstr_diff);
+      ctx, (frsh, tc, dc), !cstr
+
+  | Core.Match (e, []) ->
+      let ctx, ty_in, cnstrs = infer_expr env e in
+      let ty_out = Type.fresh_ty () in
+      ctx, ([], ty_out, empty_dirt ()), gather [
+        subtype ~pos ty_in Type.empty_ty;
+        just cnstrs
+      ]
+
+  | Core.Match (e, cases) ->
+      let ctx_in, ty_in, cnstrs_in = infer_expr env e in
+      let ty_out = T.fresh_ty () in
+      let drt_out = T.fresh_dirt_param () in
+      let infer_case ((p, c) as a) (ctx, frshs, cnstrs) =
+        (* XXX Refresh fresh instances *)
+        let ctx', ty_in', (frsh_out, ty_out', drt_out'), cnstrs' = infer_abstraction env a in
+        ctx' @ ctx, frsh_out @ frshs, gather [
+          subtype ~pos:(snd e) ty_in ty_in';
+          subtype ~pos:(snd c) ty_out' ty_out;
+          subdirt ~pos:(snd c) drt_out' drt_out;
+          just cnstrs';
+          just cnstrs
+        ]
+      in
+      let ctx, frshs, cnstrs = List.fold_right infer_case cases (ctx_in, [], cnstrs_in) in
+      ctx, (frshs, ty_out, drt_out), cnstrs
+          
+
+  | Core.While (c1, c2) ->
+      let ctx1, (frsh1, t1, drt1), cnstrs1 = infer_comp env c1 in
+      let ctx2, (frsh2, t2, drt2), cnstrs2 = infer_comp env c2 in
+      let drt = Type.fresh_dirt_param () in
+      (* XXX We must erase all instances generated by c2 *)
+      ctx1 @ ctx2, (frsh1, T.unit_ty, drt), gather [
+        subtype ~pos t1 Type.bool_ty;
+        subtype ~pos t2 Type.unit_ty;
+        subdirt ~pos drt1 drt;
+        subdirt ~pos drt2 drt;
+        just cnstrs1;
+        just cnstrs2
+      ]
+
+  | Core.For (i, e1, e2, c, _) ->
+      let ctx1, ty1, cnstrs1 = infer_expr env e1 in
+      let ctx2, ty2, cnstrs2 = infer_expr env e2 in
+      let ctx3, (frsh, ty, drt), cnstrs3 = infer_comp env c in
+      (* XXX We must erase all instances generated by c *)
+      ctx1 @ ctx2 @ ctx3, ([], T.unit_ty, drt), gather [
+        subtype ~pos:(snd e1) ty1 Type.int_ty;
+        subtype ~pos:(snd e2) ty2 Type.int_ty;
+        subtype ~pos:(snd c) ty Type.unit_ty;
+        just cnstrs1;
+        just cnstrs2;
+        just cnstrs3
+      ]
+
+  | Core.Apply (e1, e2) ->
+      let ctx1, ty1, cnstrs1 = infer_expr env e1 in
+      let ctx2, ty2, cnstrs2 = infer_expr env e2 in
+      let drty = T.fresh_dirty () in
+      ctx1 @ ctx2, drty, gather [
+        subtype ~pos ty1 (T.Arrow (ty2, drty));
+        just cnstrs1;
+        just cnstrs2
+      ]
+
+  | Core.New (eff, r) ->
+      begin match Tctx.fresh_tydef ~pos:pos eff with
+      | (params, Tctx.Effect ops) ->
+          let ctx, cnstrs = begin match r with
+          | None -> [], Type.empty
+          | Some (e, lst) ->
+              let ctxe, te, cstr_e = infer_expr env e in
+              let infer (op, a) (ctx, cstrs) =
+                match Common.lookup op ops with
+                | None -> Error.typing ~pos "Effect type %s does not have operation %s" eff op
+                | Some (u1, u2) ->
+                    let ctx', t1, t2, t, cstr_a = infer_abstraction2 env a in
+                    let d_empty = T.fresh_dirt_param () in
+                    ctx' @ ctx, gather [
+                      subtype ~pos(* p1 *) t1 u1;
+                      subtype ~pos(* p2 *) t2 te;
+                      (* XXX Warn that d_empty has to be empty *)
+                      (* subdirt ~pos(* c *) (Type.DirtParam d_empty) (Type.DirtEmpty); *)
+                      subdirty ~pos(* c *) t ([], T.Tuple [u2; te], d_empty);
+                      just cstr_a;
+                      just cstrs
+                    ]
+              in
+              List.fold_right infer lst (ctxe, cstr_e)
+          end
+          in
+          let instance = T.fresh_instance_param () in
+          let rgn = T.fresh_region_param () in
+          ctx, ([instance], Tctx.effect_to_params eff params rgn, empty_dirt ()), gather [
+            subregion ~pos (Type.RegionAtom (Type.InstanceParam instance)) (Type.RegionParam rgn);
             just cnstrs
           ]
+      | _ -> Error.typing ~pos "Effect type expected but %s encountered" eff
+      end
 
-      | Core.Match (e, cases) ->
-          let ctx_in, ty_in, cnstrs_in = infer_expr env e in
-          let ty_out = T.fresh_ty () in
-          let drt_out = T.fresh_dirt_param () in
-          let infer_case ((p, c) as a) (ctx, frshs, cnstrs) =
-            (* XXX Refresh fresh instances *)
-            let ctx', ty_in', (frsh_out, ty_out', drt_out'), cnstrs' = infer_abstraction env a in
-            ctx' @ ctx, frsh_out @ frshs, gather [
-              subtype ~pos:(snd e) ty_in ty_in';
-              subtype ~pos:(snd c) ty_out' ty_out;
-              subdirt ~pos:(snd c) drt_out' drt_out;
-              just cnstrs';
-              just cnstrs
-            ]
-          in
-          let ctx, frshs, cnstrs = List.fold_right infer_case cases (ctx_in, [], cnstrs_in) in
-          ctx, (frshs, ty_out, drt_out), cnstrs
-              
-      | Core.New (eff, r) ->
-          begin match Tctx.fresh_tydef ~pos:pos eff with
-          | (params, Tctx.Effect ops) ->
-              let ctx, cnstrs = begin match r with
-              | None -> [], Type.empty
-              | Some (e, lst) ->
-                  let ctxe, te, cstr_e = infer_expr env e in
-                  let infer (op, a) (ctx, cstrs) =
-                    match Common.lookup op ops with
-                    | None -> Error.typing ~pos "Effect type %s does not have operation %s" eff op
-                    | Some (u1, u2) ->
-                        let ctx', t1, t2, t, cstr_a = infer_abstraction2 env a in
-                        let d_empty = T.fresh_dirt_param () in
-                        ctx' @ ctx, gather [
-                          subtype ~pos(* p1 *) t1 u1;
-                          subtype ~pos(* p2 *) t2 te;
-                          (* XXX Warn that d_empty has to be empty *)
-                          (* subdirt ~pos(* c *) (Type.DirtParam d_empty) (Type.DirtEmpty); *)
-                          subdirty ~pos(* c *) t ([], T.Tuple [u2; te], d_empty);
-                          just cstr_a;
-                          just cstrs
-                        ]
-                  in
-                  List.fold_right infer lst (ctxe, cstr_e)
-              end
-              in
-              let instance = T.fresh_instance_param () in
-              let rgn = T.fresh_region_param () in
-              ctx, ([instance], Tctx.effect_to_params eff params rgn, empty_dirt ()), gather [
-                subregion ~pos (Type.RegionAtom (Type.InstanceParam instance)) (Type.RegionParam rgn);
-                just cnstrs
-              ]
-          | _ -> Error.typing ~pos "Effect type expected but %s encountered" eff
-          end
+  | Core.Handle (e1, c2) ->
+      let ctx1, ty1, cnstrs1 = infer_expr env e1 in
+      let ctx2, (frsh, ty2, drt2), cnstrs2 = infer_comp env c2 in
+      let ty3 = T.fresh_ty () in
+      ctx1 @ ctx2, (frsh, ty3, drt2), gather [
+        subtype ~pos ty1 (T.Handler (ty2, ty3));
+        just cnstrs1;
+        just cnstrs2
+      ]
 
-      | Core.While (c1, c2) ->
-          let ctx1, frsh1, t1, drt1, cnstrs1 = infer env c1 in
-          let ctx2, frsh2, t2, drt2, cnstrs2 = infer env c2 in
-          let drt = Type.fresh_dirt_param () in
-          (* XXX We must erase all instances generated by c2 *)
-          ctx1 @ ctx2, (frsh1, T.unit_ty, drt), gather [
-            subtype ~pos t1 Type.bool_ty;
-            subtype ~pos t2 Type.unit_ty;
-            subdirt ~pos drt1 drt;
-            subdirt ~pos drt2 drt;
-            just cnstrs1;
-            just cnstrs2
-          ]
+  | Core.Check c ->
+      ignore (infer_comp env c);
+      [], ([], T.unit_ty, empty_dirt ()), Type.empty
 
-      | Core.For (i, e1, e2, c, _) ->
-          let ctx1, ty1, cnstrs1 = infer_expr env e1 in
-          let ctx2, ty2, cnstrs2 = infer_expr env e2 in
-          let ctx3, frsh, ty, drt, cnstrs3 = infer env c in
-          (* XXX We must erase all instances generated by c *)
-          ctx1 @ ctx2 @ ctx3, ([], T.unit_ty, drt), gather [
-            subtype ~pos:(snd e1) ty1 Type.int_ty;
-            subtype ~pos:(snd e2) ty2 Type.int_ty;
-            subtype ~pos:(snd c) ty Type.unit_ty;
-            just cnstrs1;
-            just cnstrs2;
-            just cnstrs3
-          ]
-
-      | Core.Handle (e1, c2) ->
-          let ctx1, ty1, cnstrs1 = infer_expr env e1 in
-          let ctx2, frsh, ty2, drt2, cnstrs2 = infer env c2 in
-          let ty3 = T.fresh_ty () in
-          ctx1 @ ctx2, (frsh, ty3, drt2), gather [
-            subtype ~pos ty1 (T.Handler (ty2, ty3));
-            just cnstrs1;
-            just cnstrs2
-          ]
-
-      | Core.Let (defs, c) -> 
-          let cstr = ref Type.empty in
-          let env, ctx1, ctxp, let_frshs, let_drts, cstrs = infer_let ~pos env defs in
-          let ctx2, frsh, tc, dc, cstr_c = infer env c in
-          let ctx, cstr_cs = unify_contexts ~pos [ctx1; ctx2] in
-          let ctx, cstr_diff = trim_context ~pos ctx ctxp in
-          let drt = Type.fresh_dirt_param () in
-            List.iter (fun let_drt -> add_dirt_constraint cstr pos (Type.DirtParam let_drt) (Type.DirtParam drt)) let_drts;
-            add_dirt_constraint cstr pos (Type.DirtParam dc) (Type.DirtParam drt) ;
-            join_constraints cstr ((cstr_c @!@ cstrs) @@ cstr_cs @@ cstr_diff);
-            ctx, (let_frshs @ frsh, tc, drt), !cstr
-
-      | Core.LetRec (defs, c) ->
-          let cstr = ref Type.empty in
-          let vars, env, ctx1, cstrs = infer_let_rec ~pos env defs in
-          let ctx2, frsh, tc, dc, cstr_c = infer env c in
-          let ctx, cstr_cs = unify_contexts ~pos [ctx1; ctx2] in
-          let ctx, cstr_diff = trim_context ~pos ctx vars in
-          join_constraints cstr ((cstr_c @!@ cstrs) @@ cstr_cs @@ cstr_diff);
-          ctx, (frsh, tc, dc), !cstr
-
-      | Core.Check c ->
-          ignore (infer env c);
-          [], ([], T.unit_ty, empty_dirt ()), Type.empty
-    in
-    let ctx, ty, cstr = Unify.normalize (canonize_context ~pos (ctx, ty, cstr)) in
-    ctx, frsh, ty, drt, cstr
   in
-  let ctx, frsh, ty, drt, cstr = infer env (c, pos) in
+  let ctx, ty, cstr = Unify.normalize (canonize_context ~pos (ctx, ty, cstr)) in
   Print.debug "Type of %t is (%t) %t | %t" (Print.computation (c, pos)) (Print.context ctx) (Print.ty Trio.empty ty) (Print.constraints Trio.empty cstr);
   ctx, (frsh, ty, drt), cstr
+
+and infer_abstraction env (p, c) =
+  let ctx_p, ty_p, cnstrs_p = infer_pattern p in
+  let ctx_c, drty_c, cnstrs_c = infer_comp env c in
+  let ctx, cnstrs_ctx = trim_context ~pos:(snd c) ctx_c ctx_p in
+  ctx, ty_p, drty_c, gather [
+    merge cnstrs_ctx;
+    just cnstrs_p;
+    just cnstrs_c
+  ]
+
+and infer_abstraction2 env (p1, p2, c) =
+  let ctx_p1, ty_p1, cnstrs_p1 = infer_pattern p1 in
+  let ctx_p2, ty_p2, cnstrs_p2 = infer_pattern p2 in
+  let ctx_c, drty_c, cnstrs_c = infer_comp env c in
+  let ctx, cnstrs_ctx = trim_context ~pos:(snd c) ctx_c (ctx_p1 @ ctx_p2) in
+  ctx, ty_p1, ty_p2, drty_c, gather [
+    merge cnstrs_ctx;
+    just cnstrs_p1;
+    just cnstrs_p2;
+    just cnstrs_c
+  ]
+
+and infer_let ~pos env defs =
+  (* Check for implicit sequencing *)
+  (* Refresh freshes *)
+  (* Check for duplicate variables *)
+  let add_binding (p, c) (env, ctxs, ctxp, frshs, drts, cstrs) =
+    let cstr = ref Type.empty in
+    let ctx_p, t_p, cstr_p = infer_pattern p in
+    let ctx_c, (frsh, t_c, drt), cstr_c = infer_comp env c in
+    join_constraints cstr (cstr_p @!@ cstr_c);
+    add_ty_constraint cstr (snd c) t_c t_p;
+    let ctxs, ctxp, env =
+      if nonexpansive (fst c) then
+        let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (ctx_c, t_c, cstr_c)) ctx_p env in
+        ctxs, [], env
+      else
+        (* let ctx = List.fold_right (fun (x, t) ctx -> (x, t) :: ctx) ctx_p ctx in *)
+        ctx_c :: ctxs, ctx_p @ ctxp, env
+    in
+    (env, ctxs, ctxp, frsh @ frshs, drt :: drts, !cstr @@ cstrs)
+  in  
+  let env, ctxs, ctxp, frshs, drts, cstr =
+    List.fold_right add_binding defs (env, [], [], [], [], Type.empty) in
+  let ctx, cstr_ctxs = unify_contexts ~pos ctxs in
+    (env, ctx, ctxp, frshs, drts, cstr_ctxs @@ cstr)
+
+
+and infer_let_rec ~pos env defs =
+  if not (Common.injective fst defs) then
+    Error.typing ~pos "Multiply defined recursive value.";
+
+  let lst =
+    Common.assoc_map (fun a ->
+      let u = T.fresh_ty () in
+      (u, a))
+      defs
+
+  in
+  let cstr = ref Type.empty in
+  let vars = Common.assoc_map
+    (fun (u, ((p, c) as a)) ->
+      let ctx, tp, tc, cstr_c = infer_abstraction env a in
+      let t = T.Arrow (tp, tc) in
+      add_ty_constraint cstr (snd c) t u;
+      join_constraints cstr cstr_c;
+      (ctx, t)) lst in
+  let ctxs, ctxp =
+    List.fold_right
+      (fun (x, (ctx, t)) (ctxs, ctxp) -> (ctx :: ctxs, (x, t) :: ctxp)) vars ([], []) in
+  let ctx, cstr_c = unify_contexts ~pos ctxs in
+  let cstr = cstr_c @@ !cstr in
+  let env = List.fold_right (fun (x, (_, t)) env -> Ctx.extend env x (Unify.normalize (ctx, t, cstr))) vars env in
+    ctxp, env, ctx, cstr
+
 
