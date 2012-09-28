@@ -30,6 +30,7 @@ and args = (ty, dirt_param, region_param) Trio.t
    is syntactically incorrect so that the programmer cannot accidentally
    define it. *)
 let universal_ty = Basic "_"
+let universal_dirty = ([], Basic "_", fresh_dirt_param ())
 let int_ty = Basic "int"
 let string_ty = Basic "string"
 let bool_ty = Basic "bool"
@@ -171,12 +172,6 @@ type constraints =
   | DirtConstraint of dirt * dirt * Common.position
   | RegionConstraint of region * region * Common.position
 
-
-let fresh_dirt () = DirtParam (fresh_dirt_param ())
-
-let fresh_region () = RegionParam (fresh_region_param ())
-
-let fresh_instance () = RegionAtom (InstanceParam (fresh_instance_param ()))
 
 let subst_dirt sbst = function
   | DirtEmpty -> DirtEmpty

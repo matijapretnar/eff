@@ -30,6 +30,9 @@ let nonexpansive = function
   | Core.Apply _ | Core.Match _ | Core.While _ | Core.For _ | Core.New _
   | Core.Handle _ | Core.Let _ | Core.LetRec _ | Core.Check _ -> false
 
+let simple ty = ([], ty, Type.empty)
+let empty_dirt () = Type.fresh_dirt_param ()
+
 let gather add_news =
   List.fold_right (fun add_new cnstrs -> add_new cnstrs) add_news Type.empty
 
@@ -43,7 +46,6 @@ let subdirty ~pos (nws1, ty1, d1) (nws2, ty2, d2) cnstrs =
 
 let just cnstrs1 cnstrs2 = Type.join_disjoint_constraints cnstrs1 cnstrs2
 let merge cnstrs1 cnstrs2 = Type.join_constraints cnstrs1 cnstrs2
-
 
 let canonize_context ~pos (ctx, ty, cnstrs) =
   let add (x, ty) (ctx, cnstrs) =
@@ -60,24 +62,11 @@ let canonize_context ~pos (ctx, ty, cnstrs) =
 let add_ty_constraint cstr pos t1 t2 =
   cstr := Type.add_ty_constraint ~pos t1 t2 !cstr
 
-let add_fresh_constraint cstr pos frsh1 frsh2 =
-  Print.debug "Unifying freshness constraints."
-
 let add_dirt_constraint cstr pos drt1 drt2 =
   cstr := Type.add_dirt_constraint ~pos drt1 drt2 !cstr
 
-let add_region_constraint cstr pos rgn1 rgn2 =
-  cstr := Type.add_region_constraint ~pos rgn1 rgn2 !cstr
-
-let add_dirty_constraint cstr pos (lst1, t1, drt1) (lst2, t2, drt2) =
-  add_fresh_constraint cstr pos lst1 lst2; (* XXX very fishy *)
-  add_ty_constraint cstr pos t1 t2;
-  add_dirt_constraint cstr pos (Type.DirtParam drt1) (Type.DirtParam drt2)
-
 let join_constraints cstr cstr' =
   cstr := Type.join_constraints cstr' !cstr
-
-let lift_dirty (frsh, t, d) = (frsh, t, Type.DirtParam d)
 
 let ty_of_const = function
   | Common.Integer _ -> Type.int_ty
@@ -112,7 +101,7 @@ let trim_context ~pos ctx vars =
    with the type of the whole pattern. *)
 let rec infer_pattern (p, pos) =
   (* We do not check for overlaps as all identifiers are distinct - desugar needs to do those *)
-  if !disable_typing then [], Type.universal_ty, Type.empty else
+  if !disable_typing then simple Type.universal_ty else
   match p with
   | Pattern.Var x ->
       let ty = Type.fresh_ty () in
@@ -120,10 +109,8 @@ let rec infer_pattern (p, pos) =
   | Pattern.As (p, x) ->
       let ctx, ty, cnstrs = infer_pattern p in
       (x, ty) :: ctx, ty, cnstrs
-  | Pattern.Nonbinding ->
-      [], T.fresh_ty (), Type.empty
-  | Pattern.Const const ->
-      [], ty_of_const const, Type.empty
+  | Pattern.Nonbinding -> simple (Type.fresh_ty ())
+  | Pattern.Const const -> simple (ty_of_const const)
   | Pattern.Tuple ps ->
       let infer p (ctx, tys, cnstrs) =
         let ctx', ty', cnstrs' = infer_pattern p in
@@ -157,7 +144,7 @@ let rec infer_pattern (p, pos) =
       | None -> Error.typing ~pos "Unbound constructor %s" lbl
       | Some (ty, u) ->
         begin match p, u with
-          | None, None -> [], ty, Type.empty
+          | None, None -> simple ty
           | Some p, Some u ->
               let ctx', ty', cnstrs' = infer_pattern p in
               ctx', ty, gather [
@@ -175,7 +162,7 @@ let (@!@) = Type.join_disjoint_constraints
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
    [env]. It returns the inferred type of [e]. *)
 let rec infer_expr env (e, pos) =
-  if !disable_typing then ([], Type.Basic "_", Type.empty) else
+  if !disable_typing then simple Type.universal_ty else
   let ty_scheme = match e with
 
   | Core.Var x ->
@@ -187,7 +174,7 @@ let rec infer_expr env (e, pos) =
           [(x, ty)], ty, Type.empty
       end
 
-  | Core.Const const -> [], ty_of_const const, Type.empty
+  | Core.Const const -> simple (ty_of_const const)
 
   | Core.Tuple es ->
       let infer e (ctx, tys, cnstrs) =
@@ -228,7 +215,7 @@ let rec infer_expr env (e, pos) =
       | None -> Error.typing ~pos "Unbound constructor %s" lbl
       | Some (ty, arg_type) ->
         begin match e, arg_type with
-          | None, None -> [], ty, Type.empty
+          | None, None -> simple ty
           | Some e, Some u ->
               let ctx', ty', cnstrs' = infer_expr env e in
               ctx', ty, gather [
@@ -302,8 +289,7 @@ let rec infer_expr env (e, pos) =
 (* [infer_comp env cstr (c,pos)] infers the type of computation [c] in context [env].
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp env (c, pos) =
-  let empty_dirt = Type.fresh_dirt_param in
-  if !disable_typing then ([], ([], Type.Basic "_", Type.fresh_dirt_param ()), Type.empty) else
+  if !disable_typing then simple Type.universal_dirty else
   let ctx, (frsh, ty, drt), cstr = match c with
 
   | Core.Value e ->
@@ -443,7 +429,7 @@ and infer_comp env (c, pos) =
 
   | Core.Check c ->
       ignore (infer_comp env c);
-      [], ([], T.unit_ty, empty_dirt ()), Type.empty
+      simple ([], T.unit_ty, empty_dirt ())
 
   in
   let ctx, ty, cstr = Unify.normalize (canonize_context ~pos (ctx, ty, cstr)) in
