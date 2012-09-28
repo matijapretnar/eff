@@ -30,7 +30,7 @@ let nonexpansive = function
   | Core.Apply _ | Core.Match _ | Core.While _ | Core.For _ | Core.New _
   | Core.Handle _ | Core.Let _ | Core.LetRec _ | Core.Check _ -> false
 
-let constraints add_news =
+let gather add_news =
   List.fold_right (fun add_new cnstrs -> add_new cnstrs) add_news Type.empty
 
 let subnews ~pos nws1 nws2 cnstrs = Print.debug "Unifying freshness constraints."
@@ -88,6 +88,16 @@ let unify_contexts ~pos ctxs =
   in
   List.fold_right unify_with_context ctxs ([], Type.empty)
 
+let canonize_context ~pos ctx =
+  let add (x, ty) (ctx, cnstrs) =
+    match Common.lookup x ctx with
+    | None ->
+        let ty' = Type.fresh_ty () in
+        ((x, ty') :: ctx, subtype ~pos ty' ty cnstrs)
+    | Some ty' ->
+        (ctx, subtype ~pos ty' ty cnstrs)
+  in
+  List.fold_right add ctx ([], Type.empty)
 
 let trim_context ~pos ctx vars =
   let trim (x, t) (ctx, cstrs) =
@@ -159,7 +169,7 @@ let rec infer_abstraction env (p, c) =
   let env = List.fold_right (fun (x, _) env -> Ctx.extend_ty env x) ctx_p env in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
   let ctx, cnstrs_ctx = trim_context ~pos:(snd c) ctx_c ctx_p in
-  ctx, ty_p, drty_c, constraints [merge cnstrs_ctx; union cnstrs_p; just cnstrs_c]
+  ctx, ty_p, drty_c, gather [merge cnstrs_ctx; union cnstrs_p; just cnstrs_c]
 
 and infer_abstraction2 env (p1, p2, c) =
   let ctx_p1, ty_p1, cnstrs_p1 = infer_pattern p1 in
@@ -168,7 +178,7 @@ and infer_abstraction2 env (p1, p2, c) =
   let env = List.fold_right (fun (x, _) env -> Ctx.extend_ty env x) ctx_p env in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
   let ctx, cnstrs_ctx = trim_context ~pos:(snd c) ctx_c ctx_p in
-  ctx, ty_p1, ty_p2, drty_c, constraints [merge cnstrs_ctx; union cnstrs_p1; union cnstrs_p2; just cnstrs_c]
+  ctx, ty_p1, ty_p2, drty_c, gather [merge cnstrs_ctx; union cnstrs_p1; union cnstrs_p2; just cnstrs_c]
 
 and infer_let env pos defs =
   (* Check for implicit sequencing *)
@@ -228,7 +238,7 @@ and infer_let_rec env pos defs =
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
    [env]. It returns the inferred type of [e]. *)
 and infer_expr env (e,pos) : Type.ty_scheme =
-  let ctx, t, cstr = match e with
+  let ctx, ty, cstr = match e with
     | Core.Var x ->
         let cstr = ref Type.empty in
         begin match Ctx.lookup env x with
@@ -288,10 +298,8 @@ and infer_expr env (e,pos) : Type.ty_scheme =
           in ctx, ty, !cstr)
         
     | Core.Lambda a ->
-        let cstr = ref Type.empty in
-        let ctx, t1, t2, cstr_abs = infer_abstraction env a in
-        join_constraints cstr cstr_abs;
-        ctx, T.Arrow (t1, t2), !cstr
+        let ctx, ty1, drty2, cnstrs = infer_abstraction env a in
+        ctx, T.Arrow (ty1, drty2), cnstrs
         
     | Core.Operation (e, op) ->
         let cstr = ref Type.empty in
@@ -345,8 +353,10 @@ and infer_expr env (e,pos) : Type.ty_scheme =
             join_constraints cstr cstrs;
             ctx, T.Handler (t_value, t_finally), !cstr
   in
-  Print.debug "Type of %t is (%t) %t | %t" (Print.expression (e, pos)) (Print.context ctx) (Print.ty Trio.empty t) (Print.constraints Trio.empty cstr);
-  Unify.normalize (ctx, t, cstr)
+  let ctx, cnstr_ctx = canonize_context ~pos ctx in
+  let ctx, ty, cstr = Unify.normalize (ctx, ty, merge cnstr_ctx cstr) in
+  Print.debug "Type of %t is (%t) %t | %t" (Print.expression (e, pos)) (Print.context ctx) (Print.ty Trio.empty ty) (Print.constraints Trio.empty cstr);
+  (ctx, ty, cstr)
               
 (* [infer_comp env cstr (c,pos)] infers the type of computation [c] in context [env].
    It returns the list of newly introduced meta-variables and the inferred type. *)
@@ -357,20 +367,18 @@ and infer_comp env (c, pos) =
   let rec infer env (c, pos) =
     let ctx, (frsh, ty, drt), cstr = match c with
       | Core.Apply (e1, e2) ->
-          let cstr = ref Type.empty in
-          let ctx1, t1, cstr1 = infer_expr env e1 in
-          let ctx2, t2, cstr2 = infer_expr env e2 in
-          let ctx, cstrs = unify_contexts ~pos [ctx1; ctx2] in
-          let t = T.fresh_dirty () in
-          join_constraints cstr ((cstr1 @!@ cstr2) @@ cstrs);
-          add_ty_constraint cstr pos t1 (T.Arrow (t2, t));
-          ctx, lift_dirty t, !cstr
+          let ctx1, ty1, cnstrs1 = infer_expr env e1 in
+          let ctx2, ty2, cnstrs2 = infer_expr env e2 in
+          let drty = T.fresh_dirty () in
+          ctx1 @ ctx2, lift_dirty drty, gather [
+            subtype ~pos ty1 (T.Arrow (ty2, drty));
+            just cnstrs1;
+            just cnstrs2
+          ]
 
       | Core.Value e ->
-          let cstr = ref Type.empty in
-          let ctx, t, cstr_e = infer_expr env e in
-          join_constraints cstr cstr_e;
-          ctx, ([], t, Type.DirtEmpty), !cstr
+          let ctx, ty, cnstrs = infer_expr env e in
+          ctx, ([], ty, Type.DirtEmpty), cnstrs
 
       | Core.Match (e, []) ->
           let cstr = ref Type.empty in
@@ -505,11 +513,11 @@ and infer_comp env (c, pos) =
           ctx, (frsh, tc, dc), !cstr
 
       | Core.Check c ->
-          let cstr = ref Type.empty in
           ignore (infer env c);
-          [], ([], T.unit_ty, Type.DirtEmpty), !cstr
+          [], ([], T.unit_ty, Type.DirtEmpty), Type.empty
     in
-    let ctx, ty, cstr = Unify.normalize (ctx, ty, cstr) in
+    let ctx, cnstr_ctx = canonize_context ~pos ctx in
+    let ctx, ty, cstr = Unify.normalize (ctx, ty, merge cnstr_ctx cstr) in
     ctx, frsh, ty, drt, cstr
   in
   let ctx, frsh, ty, drt, cstr = infer env (c, pos) in
