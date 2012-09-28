@@ -91,7 +91,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
       (* XXX What to do about the fresh instances? *)
-      let ctx, vars, _, _, _, _ = Infer.infer_let ctx pos defs in
+      let ctx, vars, _, _, _, _ = Infer.infer_let ~pos ctx defs in
       List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env =
         List.fold_right
@@ -109,7 +109,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
  *)        (ctx, env)
   | Syntax.TopLetRec defs ->
       let defs = Desugar.top_let_rec defs in
-      let _, ctx, _, cstr = Infer.infer_let_rec ctx pos defs in
+      let _, ctx, _, cstr = Infer.infer_let_rec ~pos ctx defs in
       List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env = Eval.extend_let_rec env defs in
 (*         if interactive then begin

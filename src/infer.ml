@@ -193,7 +193,7 @@ and infer_abstraction2 env (p1, p2, c) =
     just cnstrs_c
   ]
 
-and infer_let env pos defs =
+and infer_let ~pos env defs =
   (* Check for implicit sequencing *)
   (* Refresh freshes *)
   (* Check for duplicate variables *)
@@ -219,7 +219,7 @@ and infer_let env pos defs =
     (env, ctx, ctxp, frshs, drts, cstr_ctxs @@ cstr)
 
 
-and infer_let_rec env pos defs =
+and infer_let_rec ~pos env defs =
   if not (Common.injective fst defs) then
     Error.typing ~pos "Multiply defined recursive value.";
 
@@ -494,7 +494,7 @@ and infer_comp env (c, pos) =
 
       | Core.Let (defs, c) -> 
           let cstr = ref Type.empty in
-          let env, ctx1, ctxp, let_frshs, let_drts, cstrs = infer_let env pos defs in
+          let env, ctx1, ctxp, let_frshs, let_drts, cstrs = infer_let ~pos env defs in
           let ctx2, frsh, tc, dc, cstr_c = infer env c in
           let ctx, cstr_cs = unify_contexts ~pos [ctx1; ctx2] in
           let ctx, cstr_diff = trim_context ~pos ctx ctxp in
@@ -506,7 +506,7 @@ and infer_comp env (c, pos) =
 
       | Core.LetRec (defs, c) ->
           let cstr = ref Type.empty in
-          let vars, env, ctx1, cstrs = infer_let_rec env pos defs in
+          let vars, env, ctx1, cstrs = infer_let_rec ~pos env defs in
           let ctx2, frsh, tc, dc, cstr_c = infer env c in
           let ctx, cstr_cs = unify_contexts ~pos [ctx1; ctx2] in
           let ctx, cstr_diff = trim_context ~pos ctx vars in
