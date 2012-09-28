@@ -7,7 +7,7 @@ val nonexpansive : Core.plain_computation -> bool
            (Core.variable Pattern.t * Core.computation) list ->
            Ctx.t * (Core.variable, Type.ty) Common.assoc *
            (Core.variable * Type.ty) list * Type.instance_param list *
-           Type.dirt_param list * Type.t
+           Type.dirt_param * Type.t
            val infer_let_rec :
           pos:Common.position ->
             Ctx.t ->

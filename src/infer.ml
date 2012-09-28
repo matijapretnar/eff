@@ -308,16 +308,17 @@ and infer_comp env (c, pos) =
       ctx, ([], ty, empty_dirt ()), cnstrs
 
   | Core.Let (defs, c) -> 
-      let cstr = ref Type.empty in
-      let env, ctx1, ctxp, let_frshs, let_drts, cstrs = infer_let ~pos env defs in
+      let env, ctx1, ctxp, let_frshs, let_drt, cstrs = infer_let ~pos env defs in
       let ctx2, (frsh, tc, dc), cstr_c = infer_comp env c in
-      let ctx, cstr_cs = unify_contexts ~pos [ctx1; ctx2] in
+      let ctx, cstr_cs = unify_context ~pos (ctx1 @ ctx2) in
       let ctx, cstr_diff = trim_context ~pos ctx ctxp in
-      let drt = Type.fresh_dirt_param () in
-        List.iter (fun let_drt -> add_dirt_constraint cstr pos (Type.DirtParam let_drt) (Type.DirtParam drt)) let_drts;
-        add_dirt_constraint cstr pos (Type.DirtParam dc) (Type.DirtParam drt) ;
-        join_constraints cstr ((cstr_c @!@ cstrs) @@ cstr_cs @@ cstr_diff);
-        ctx, (let_frshs @ frsh, tc, drt), !cstr
+      ctx, (let_frshs @ frsh, tc, let_drt), gather [
+        subdirt ~pos dc let_drt;
+        merge cstr_cs;
+        merge cstr_diff;
+        just cstr_c;
+        just cstrs
+      ]
 
   | Core.LetRec (defs, c) ->
       let env, ctx1, cstrs = infer_let_rec ~pos env defs in
@@ -472,27 +473,30 @@ and infer_let ~pos env defs =
   (* Check for implicit sequencing *)
   (* Refresh freshes *)
   (* Check for duplicate variables *)
-  let add_binding (p, c) (env, ctxs, ctxp, frshs, drts, cstrs) =
-    let cstr = ref Type.empty in
+  let drt = Type.fresh_dirt_param () in
+  let add_binding (p, c) (env, ctxs, ctxp, frshs, cstrs) =
     let ctx_p, t_p, cstr_p = infer_pattern p in
-    let ctx_c, (frsh, t_c, drt), cstr_c = infer_comp env c in
-    join_constraints cstr (cstr_p @!@ cstr_c);
-    add_ty_constraint cstr (snd c) t_c t_p;
-    let ctxs, ctxp, env =
+    let ctx_c, (frsh, t_c, drt'), cstr_c = infer_comp env c in
+    let env, ctxp =
       if nonexpansive (fst c) then
         let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (ctx_c, t_c, cstr_c)) ctx_p env in
-        ctxs, [], env
+        env, ctxp
       else
-        (* let ctx = List.fold_right (fun (x, t) ctx -> (x, t) :: ctx) ctx_p ctx in *)
-        ctx_c :: ctxs, ctx_p @ ctxp, env
+        env, ctx_p @ ctxp
     in
-    (env, ctxs, ctxp, frsh @ frshs, drt :: drts, !cstr @@ cstrs)
-  in  
-  let env, ctxs, ctxp, frshs, drts, cstr =
-    List.fold_right add_binding defs (env, [], [], [], [], Type.empty) in
-  let ctx, cstr_ctxs = unify_contexts ~pos ctxs in
-    (env, ctx, ctxp, frshs, drts, cstr_ctxs @@ cstr)
-
+    env, ctx_c @ ctxs, ctxp, frsh @ frshs, gather [
+      subtype ~pos:(snd c) t_c t_p;
+      subdirt ~pos:(snd c) drt' drt;
+      just cstr_p;
+      just cstr_c
+    ]
+  in
+  let env, ctxs, ctxp, frshs, cstrs = List.fold_right add_binding defs (env, [], [], [], Type.empty) in
+  let ctx, cstr_ctxs = unify_context ~pos ctxs in
+  env, ctx, ctxp, frshs, drt, gather [
+    merge cstr_ctxs;
+    just cstrs
+  ]
 
 and infer_let_rec ~pos env defs =
   if not (Common.injective fst defs) then Error.typing ~pos "Multiply defined recursive value.";
