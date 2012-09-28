@@ -346,8 +346,8 @@ and infer_expr env (e, pos) =
             ctxe @ ctxa @ ctx, gather [
               subtype ~pos u ty;
               subtype ~pos t1 u1;
-              subtype ~pos tk (T.Arrow (t2, ([], t_yield, dirt)));
-              subdirty ~pos ([], t_yield, dirt) u2;
+              subtype ~pos (T.Arrow (t2, ([], t_yield, dirt))) tk;
+              subdirty ~pos u2 ([], t_yield, dirt);
               just cstr_e;
               just cstr_a;
               just cnstrs
@@ -358,10 +358,10 @@ and infer_expr env (e, pos) =
         let ctx1, valt1, valt2, cstr_val = infer_abstraction env a_val in
         let ctx2, fint1, fint2, cstr_fin = infer_abstraction env a_fin in
         ctx1 @ ctx2 @ ctxs, Type.Handler(t_value, t_finally), gather [
-          subtype ~pos valt1 t_value;
+          subtype ~pos t_value valt1;
           subdirty ~pos valt2 ([], t_yield, dirt);
           subdirty ~pos fint2 ([], t_finally, dirt);
-          subtype ~pos fint1 t_yield;
+          subtype ~pos t_yield fint1;
           just cstr_val;
           just cstr_fin;
           just cnstrs
