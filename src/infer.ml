@@ -110,56 +110,64 @@ let trim_context ~pos ctx vars =
 (* [infer_pattern cstr pp] infers the type of pattern [pp]. It returns the list of pattern
    variables with their types, which are all guaranteed to be fresh parameters, together
    with the type of the whole pattern. *)
-let infer_pattern ?(forbidden_vars=[]) pp =
-  let cstr = ref T.empty in
-  if not (Pattern.linear_pattern pp) then
-    Error.typing ~pos:(snd pp) "Variables in a pattern must be distinct." ;
-  let vars = ref [] in
-  let rec infer (p, pos) =
-    match p with
-      | Pattern.Var x ->
-        (* XXX Why are we looking at disable_typing here? Probably not needed. If
-           it is needed, why don't we return [T.universal_ty] for types of constants?
-        *)
-        let t = (if !disable_typing then T.universal_ty else T.fresh_ty ()) in
-          vars := (x, t) :: !vars;
-          t
-      | Pattern.As (p, x) ->
-        let t = infer p in
-          vars := (x, t) :: !vars;
-          t
-      | Pattern.Nonbinding -> T.fresh_ty ()
-      | Pattern.Const const -> ty_of_const const
-      | Pattern.Tuple ps -> T.Tuple (C.map infer ps)
-      | Pattern.Record [] -> assert false
-      | Pattern.Record (((fld, _) :: _) as lst) ->
-        (match Tctx.infer_field fld with
-          | None -> Error.typing ~pos "Unbound record field label %s" fld
-          | Some (ty, (t, us)) ->
-            let constrain_record_pattern (fld, p) =
-              begin match C.lookup fld us with
-                | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s." fld t
-                | Some u -> add_ty_constraint cstr pos u (infer p)
-              end
-            in
-              List.iter constrain_record_pattern lst;
-              ty)
-      | Pattern.Variant (lbl, p) ->
-        (match Tctx.infer_variant lbl with
-          | None -> Error.typing ~pos "Unbound constructor %s" lbl
-          | Some (ty, u) ->
-            begin match p, u with
-              | None, None -> ()
-              | Some p, Some u -> add_ty_constraint cstr pos u (infer p)
-              | None, Some _ -> Error.typing ~pos "Constructor %s should be applied to an argument." lbl
-              | Some _, None -> Error.typing ~pos "Constructor %s cannot be applied to an argument." lbl
-            end;
-            ty)
-  in
-  let t = infer pp in
-  match C.find (fun (x,_) -> List.mem_assoc x !vars) forbidden_vars with
-    | Some (x,_) -> Error.typing ~pos:(snd pp) "Several definitions of %t." (Print.variable x)
-    | None -> !vars, t, !cstr
+let rec infer_pattern ?(forbidden_vars=[]) (p, pos) =
+  (* We do not check for overlaps as all identifiers are distinct - desugar needs to do those *)
+  if !disable_typing then [], Type.universal_ty, Type.empty else
+  match p with
+  | Pattern.Var x ->
+      let ty = Type.fresh_ty () in
+      [(x, ty)], ty, Type.empty
+  | Pattern.As (p, x) ->
+      let ctx, ty, cnstrs = infer_pattern p in
+      (x, ty) :: ctx, ty, cnstrs
+  | Pattern.Nonbinding ->
+      [], T.fresh_ty (), Type.empty
+  | Pattern.Const const ->
+      [], ty_of_const const, Type.empty
+  | Pattern.Tuple ps ->
+      let infer p (ctx, tys, cnstrs) =
+        let ctx', ty', cnstrs' = infer_pattern p in
+        ctx' @ ctx, ty' :: tys, union cnstrs' cnstrs
+      in
+      let ctx, tys, cnstrs = List.fold_right infer ps ([], [], Type.empty) in
+      ctx, Type.Tuple tys, cnstrs
+  | Pattern.Record [] ->
+      assert false
+  | Pattern.Record (((fld, _) :: _) as lst) ->
+      begin match Tctx.infer_field fld with
+      | None -> Error.typing ~pos "Unbound record field label %s" fld
+      | Some (ty, (ty_name, us)) ->
+          let infer (fld, p) (ctx, cnstrs) =
+            begin match C.lookup fld us with
+            | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s." fld ty_name
+            | Some ty ->
+                let ctx', ty', cnstrs' = infer_pattern p in
+                ctx' @ ctx, gather [
+                  subtype ~pos ty ty';
+                  just cnstrs;
+                  just cnstrs'
+                ]
+            end
+        in
+        let ctx, cnstrs = List.fold_right infer lst ([], Type.empty) in
+        ctx, ty, cnstrs
+      end
+  | Pattern.Variant (lbl, p) ->
+      begin match Tctx.infer_variant lbl with
+      | None -> Error.typing ~pos "Unbound constructor %s" lbl
+      | Some (ty, u) ->
+        begin match p, u with
+          | None, None -> [], ty, Type.empty
+          | Some p, Some u ->
+              let ctx', ty', cnstrs' = infer_pattern p in
+              ctx', ty, gather [
+                subtype ~pos u ty';
+                just cnstrs'
+              ]
+          | None, Some _ -> Error.typing ~pos "Constructor %s should be applied to an argument." lbl
+          | Some _, None -> Error.typing ~pos "Constructor %s cannot be applied to an argument." lbl
+        end
+      end
 
 let (@@) = Type.join_constraints
 let (@!@) = Type.join_disjoint_constraints
