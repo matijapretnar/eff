@@ -45,6 +45,17 @@ let merge cnstrs1 cnstrs2 = Type.join_constraints cnstrs1 cnstrs2
 let just cnstrs1 cnstrs2 = union cnstrs1 cnstrs2
 
 
+let canonize_context ~pos (ctx, ty, cnstrs) =
+  let add (x, ty) (ctx, cnstrs) =
+    match Common.lookup x ctx with
+    | None ->
+        let ty' = Type.fresh_ty () in
+        ((x, ty') :: ctx, subtype ~pos ty' ty cnstrs)
+    | Some ty' ->
+        (ctx, subtype ~pos ty' ty cnstrs)
+  in
+  let ctx, cnstrs = List.fold_right add ctx ([], cnstrs) in
+  ctx, ty, cnstrs
 
 let add_ty_constraint cstr pos t1 t2 =
   cstr := Type.add_ty_constraint ~pos t1 t2 !cstr
@@ -87,17 +98,6 @@ let unify_contexts ~pos ctxs =
     List.fold_right unify ctx1 (ctx2, cstrs)
   in
   List.fold_right unify_with_context ctxs ([], Type.empty)
-
-let canonize_context ~pos ctx =
-  let add (x, ty) (ctx, cnstrs) =
-    match Common.lookup x ctx with
-    | None ->
-        let ty' = Type.fresh_ty () in
-        ((x, ty') :: ctx, subtype ~pos ty' ty cnstrs)
-    | Some ty' ->
-        (ctx, subtype ~pos ty' ty cnstrs)
-  in
-  List.fold_right add ctx ([], Type.empty)
 
 let trim_context ~pos ctx vars =
   let trim (x, t) (ctx, cstrs) =
@@ -357,8 +357,7 @@ and infer_expr env (e, pos) =
             join_constraints cstr cstrs;
             ctx, T.Handler (t_value, t_finally), !cstr
   in
-  let ctx, cnstr_ctx = canonize_context ~pos ctx in
-  let ctx, ty, cstr = Unify.normalize (ctx, ty, merge cnstr_ctx cstr) in
+  let ctx, ty, cstr = Unify.normalize (canonize_context ~pos (ctx, ty, cstr)) in
   Print.debug "Type of %t is (%t) %t | %t" (Print.expression (e, pos)) (Print.context ctx) (Print.ty Trio.empty ty) (Print.constraints Trio.empty cstr);
   (ctx, ty, cstr)
               
@@ -510,8 +509,7 @@ and infer_comp env (c, pos) =
           ignore (infer env c);
           [], ([], T.unit_ty, Type.DirtEmpty), Type.empty
     in
-    let ctx, cnstr_ctx = canonize_context ~pos ctx in
-    let ctx, ty, cstr = Unify.normalize (ctx, ty, merge cnstr_ctx cstr) in
+    let ctx, ty, cstr = Unify.normalize (canonize_context ~pos (ctx, ty, cstr)) in
     ctx, frsh, ty, drt, cstr
   in
   let ctx, frsh, ty, drt, cstr = infer env (c, pos) in
