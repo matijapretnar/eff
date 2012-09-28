@@ -12,7 +12,7 @@ val nonexpansive : Core.plain_computation -> bool
           pos:Common.position ->
             Ctx.t ->
            (Core.variable * Core.abstraction) list ->
-           (Core.variable * Type.ty) list * Ctx.t * (Core.variable, Type.ty) Common.assoc *
+           Ctx.t * (Core.variable, Type.ty) Common.assoc *
            Type.t
            val infer_comp :
   Ctx.t -> Core.computation -> Type.dirty_scheme

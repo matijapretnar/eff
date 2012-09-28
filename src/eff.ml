@@ -109,7 +109,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
  *)        (ctx, env)
   | Syntax.TopLetRec defs ->
       let defs = Desugar.top_let_rec defs in
-      let _, ctx, _, cstr = Infer.infer_let_rec ~pos ctx defs in
+      let ctx, _, cstr = Infer.infer_let_rec ~pos ctx defs in
       List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env = Eval.extend_let_rec env defs in
 (*         if interactive then begin

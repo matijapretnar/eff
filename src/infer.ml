@@ -47,6 +47,17 @@ let subdirty ~pos (nws1, ty1, d1) (nws2, ty2, d2) cnstrs =
 let just cnstrs1 cnstrs2 = Type.join_disjoint_constraints cnstrs1 cnstrs2
 let merge cnstrs1 cnstrs2 = Type.join_constraints cnstrs1 cnstrs2
 
+let unify_context ~pos ctx =
+  let add (x, ty) (ctx, cnstrs) =
+    match Common.lookup x ctx with
+    | None ->
+        let ty' = Type.fresh_ty () in
+        ((x, ty') :: ctx, subtype ~pos ty' ty cnstrs)
+    | Some ty' ->
+        (ctx, subtype ~pos ty' ty cnstrs)
+  in
+  List.fold_right add ctx ([], Type.empty)
+
 let canonize_context ~pos (ctx, ty, cnstrs) =
   let add (x, ty) (ctx, cnstrs) =
     match Common.lookup x ctx with
@@ -88,9 +99,9 @@ let unify_contexts ~pos ctxs =
   in
   List.fold_right unify_with_context ctxs ([], Type.empty)
 
-let trim_context ~pos ctx vars =
+let trim_context ~pos ctx ctx_p =
   let trim (x, t) (ctx, cstrs) =
-    match Common.lookup x vars with
+    match Common.lookup x ctx_p with
     | None -> ((x, t) :: ctx, cstrs)
     | Some u -> (ctx, Type.add_ty_constraint pos u t cstrs)
   in
@@ -309,13 +320,12 @@ and infer_comp env (c, pos) =
         ctx, (let_frshs @ frsh, tc, drt), !cstr
 
   | Core.LetRec (defs, c) ->
-      let cstr = ref Type.empty in
-      let vars, env, ctx1, cstrs = infer_let_rec ~pos env defs in
+      let env, ctx1, cstrs = infer_let_rec ~pos env defs in
       let ctx2, (frsh, tc, dc), cstr_c = infer_comp env c in
-      let ctx, cstr_cs = unify_contexts ~pos [ctx1; ctx2] in
-      let ctx, cstr_diff = trim_context ~pos ctx vars in
-      join_constraints cstr ((cstr_c @!@ cstrs) @@ cstr_cs @@ cstr_diff);
-      ctx, (frsh, tc, dc), !cstr
+      ctx1 @ ctx2, (frsh, tc, dc), gather [
+        just cstrs;
+        just cstr_c
+      ]
 
   | Core.Match (e, []) ->
       let ctx, ty_in, cnstrs = infer_expr env e in
@@ -485,30 +495,21 @@ and infer_let ~pos env defs =
 
 
 and infer_let_rec ~pos env defs =
-  if not (Common.injective fst defs) then
-    Error.typing ~pos "Multiply defined recursive value.";
-
-  let lst =
-    Common.assoc_map (fun a ->
-      let u = T.fresh_ty () in
-      (u, a))
-      defs
-
+  if not (Common.injective fst defs) then Error.typing ~pos "Multiply defined recursive value.";
+  let infer (x, ((p, c) as a)) (vars, ctx, cnstrs) =
+    let ctx', tp, tc, cnstrs_a = infer_abstraction env a in
+    (x, Type.Arrow (tp, tc)) :: vars, ctx' @ ctx, gather [
+      just cnstrs_a;
+      just cnstrs
+    ]
   in
-  let cstr = ref Type.empty in
-  let vars = Common.assoc_map
-    (fun (u, ((p, c) as a)) ->
-      let ctx, tp, tc, cstr_c = infer_abstraction env a in
-      let t = T.Arrow (tp, tc) in
-      add_ty_constraint cstr (snd c) t u;
-      join_constraints cstr cstr_c;
-      (ctx, t)) lst in
-  let ctxs, ctxp =
-    List.fold_right
-      (fun (x, (ctx, t)) (ctxs, ctxp) -> (ctx :: ctxs, (x, t) :: ctxp)) vars ([], []) in
-  let ctx, cstr_c = unify_contexts ~pos ctxs in
-  let cstr = cstr_c @@ !cstr in
-  let env = List.fold_right (fun (x, (_, t)) env -> Ctx.extend env x (Unify.normalize (ctx, t, cstr))) vars env in
-    ctxp, env, ctx, cstr
-
-
+  let vars, ctx, cnstrs = List.fold_right infer defs ([], [], Type.empty) in
+  let ctx, cnstrs_ctx = unify_context ~pos ctx in
+  let ctx, cnstrs_diff = trim_context ~pos ctx vars in
+  let cnstrs = gather [
+    merge cnstrs_diff;
+    merge cnstrs_ctx;
+    just cnstrs
+  ] in
+  let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Unify.normalize (ctx, t, cnstrs))) vars env in
+  env, ctx, cnstrs
