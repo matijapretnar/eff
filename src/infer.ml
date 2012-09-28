@@ -59,45 +59,14 @@ let unify_context ~pos ctx =
   List.fold_right add ctx ([], Type.empty)
 
 let canonize_context ~pos (ctx, ty, cnstrs) =
-  let add (x, ty) (ctx, cnstrs) =
-    match Common.lookup x ctx with
-    | None ->
-        let ty' = Type.fresh_ty () in
-        ((x, ty') :: ctx, subtype ~pos ty' ty cnstrs)
-    | Some ty' ->
-        (ctx, subtype ~pos ty' ty cnstrs)
-  in
-  let ctx, cnstrs = List.fold_right add ctx ([], cnstrs) in
-  ctx, ty, cnstrs
-
-let add_ty_constraint cstr pos t1 t2 =
-  cstr := Type.add_ty_constraint ~pos t1 t2 !cstr
-
-let add_dirt_constraint cstr pos drt1 drt2 =
-  cstr := Type.add_dirt_constraint ~pos drt1 drt2 !cstr
-
-let join_constraints cstr cstr' =
-  cstr := Type.join_constraints cstr' !cstr
+  let ctx, cnstrs_ctx = unify_context ~pos ctx in
+  ctx, ty, merge cnstrs_ctx cnstrs
 
 let ty_of_const = function
   | Common.Integer _ -> Type.int_ty
   | Common.String _ -> Type.string_ty
   | Common.Boolean _ -> Type.bool_ty
   | Common.Float _ -> Type.float_ty
-
-let unify_contexts ~pos ctxs =
-  let unify_with_context ctx1 (ctx2, cstrs) =
-    let unify (x, t) (ctx2, cstrs)=
-      match Common.lookup x ctx2 with
-      | None ->
-          let u = Type.fresh_ty () in
-          ((x, u) :: ctx2, Type.add_ty_constraint pos u t cstrs)
-      | Some u ->
-          (ctx2, Type.add_ty_constraint pos u t cstrs)
-    in
-    List.fold_right unify ctx1 (ctx2, cstrs)
-  in
-  List.fold_right unify_with_context ctxs ([], Type.empty)
 
 let trim_context ~pos ctx ctx_p =
   let trim (x, t) (ctx, cstrs) =
@@ -166,9 +135,6 @@ let rec infer_pattern (p, pos) =
           | Some _, None -> Error.typing ~pos "Constructor %s cannot be applied to an argument." lbl
         end
       end
-
-let (@@) = Type.join_constraints
-let (@!@) = Type.join_disjoint_constraints
 
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
    [env]. It returns the inferred type of [e]. *)
