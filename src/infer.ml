@@ -35,10 +35,11 @@ let gather add_news =
 
 let subnews ~pos nws1 nws2 cnstrs = Print.debug "Unifying freshness constraints."; cnstrs
 let subtype ~pos ty1 ty2 cnstrs = Type.add_ty_constraint ~pos ty1 ty2 cnstrs
-let subdirt ~pos drt1 drt2 cnstrs = Type.add_dirt_constraint ~pos drt1 drt2 cnstrs
+let subdirt ~pos d1 d2 cnstrs = Type.add_dirt_constraint ~pos (Type.DirtParam d1) (Type.DirtParam d2) cnstrs
+let causes ~pos d r op cnstrs = Type.add_dirt_constraint ~pos (Type.DirtAtom (r, op)) (Type.DirtParam d) cnstrs
 let subregion ~pos rgn1 rgn2 cnstrs = Type.add_region_constraint ~pos rgn1 rgn2 cnstrs
 let subdirty ~pos (nws1, ty1, d1) (nws2, ty2, d2) cnstrs =
-  subnews ~pos nws1 nws2 (subtype ~pos ty1 ty2 (subdirt ~pos (Type.DirtParam d1) (Type.DirtParam d2) cnstrs))
+  subnews ~pos nws1 nws2 (subtype ~pos ty1 ty2 (subdirt ~pos d1 d2 cnstrs))
 
 let just cnstrs1 cnstrs2 = Type.join_disjoint_constraints cnstrs1 cnstrs2
 let merge cnstrs1 cnstrs2 = Type.join_constraints cnstrs1 cnstrs2
@@ -318,15 +319,15 @@ and infer_expr env (e, pos) =
       ctx, T.Arrow (ty1, drty2), cnstrs
       
   | Core.Operation (e, op) ->
-      let rgn = T.fresh_region_param () in
-      begin match Tctx.infer_operation op rgn with
+      let r = T.fresh_region_param () in
+      begin match Tctx.infer_operation op r with
       | None -> Error.typing ~pos "Unbound operation %s" op
       | Some (ty, (t1, t2)) ->
           let ctx, u, cstr_u = infer_expr env e in
           let d = T.fresh_dirt_param () in
           ctx, T.Arrow (t1, ([], t2, d)), gather [
             subtype ~pos u ty;
-            subdirt ~pos (Type.DirtAtom (rgn, op)) (Type.DirtParam d);
+            causes ~pos d r op;
             just cstr_u
           ]
       end
@@ -375,6 +376,7 @@ and infer_expr env (e, pos) =
 (* [infer_comp env cstr (c,pos)] infers the type of computation [c] in context [env].
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp env (c, pos) =
+  let empty_dirt = Type.fresh_dirt_param in
   (* XXX Why isn't it better to just not call type inference when type checking is disabled? *)
   (* Print.debug "Inferring type of %t" (Print.computation (c, pos)); *)
   if !disable_typing then ([], ([], Type.Basic "_", Type.fresh_dirt_param ()), Type.empty) else
@@ -384,7 +386,7 @@ and infer_comp env (c, pos) =
           let ctx1, ty1, cnstrs1 = infer_expr env e1 in
           let ctx2, ty2, cnstrs2 = infer_expr env e2 in
           let drty = T.fresh_dirty () in
-          ctx1 @ ctx2, lift_dirty drty, gather [
+          ctx1 @ ctx2, drty, gather [
             subtype ~pos ty1 (T.Arrow (ty2, drty));
             just cnstrs1;
             just cnstrs2
@@ -392,12 +394,12 @@ and infer_comp env (c, pos) =
 
       | Core.Value e ->
           let ctx, ty, cnstrs = infer_expr env e in
-          ctx, ([], ty, Type.DirtEmpty), cnstrs
+          ctx, ([], ty, empty_dirt ()), cnstrs
 
       | Core.Match (e, []) ->
           let ctx, ty_in, cnstrs = infer_expr env e in
           let ty_out = Type.fresh_ty () in
-          ctx, ([], ty_out, Type.DirtEmpty), gather [
+          ctx, ([], ty_out, empty_dirt ()), gather [
             subtype ~pos ty_in Type.empty_ty;
             just cnstrs
           ]
@@ -405,14 +407,14 @@ and infer_comp env (c, pos) =
       | Core.Match (e, cases) ->
           let ctx_in, ty_in, cnstrs_in = infer_expr env e in
           let ty_out = T.fresh_ty () in
-          let drt_out = T.fresh_dirt () in
+          let drt_out = T.fresh_dirt_param () in
           let infer_case ((p, c) as a) (ctx, frshs, cnstrs) =
             (* XXX Refresh fresh instances *)
             let ctx', ty_in', (frsh_out, ty_out', drt_out'), cnstrs' = infer_abstraction env a in
             ctx' @ ctx, frsh_out @ frshs, gather [
               subtype ~pos:(snd e) ty_in ty_in';
               subtype ~pos:(snd c) ty_out' ty_out;
-              subdirt ~pos:(snd c) (Type.DirtParam drt_out') drt_out;
+              subdirt ~pos:(snd c) drt_out' drt_out;
               just cnstrs';
               just cnstrs
             ]
@@ -436,7 +438,8 @@ and infer_comp env (c, pos) =
                         ctx' @ ctx, gather [
                           subtype ~pos(* p1 *) t1 u1;
                           subtype ~pos(* p2 *) t2 te;
-                          subdirt ~pos(* c *) (Type.DirtParam d_empty) (Type.DirtEmpty);
+                          (* XXX Warn that d_empty has to be empty *)
+                          (* subdirt ~pos(* c *) (Type.DirtParam d_empty) (Type.DirtEmpty); *)
                           subdirty ~pos(* c *) t ([], T.Tuple [u2; te], d_empty);
                           just cstr_a;
                           just cstrs
@@ -447,7 +450,7 @@ and infer_comp env (c, pos) =
               in
               let instance = T.fresh_instance_param () in
               let rgn = T.fresh_region_param () in
-              ctx, ([instance], Tctx.effect_to_params eff params rgn, Type.DirtEmpty), gather [
+              ctx, ([instance], Tctx.effect_to_params eff params rgn, empty_dirt ()), gather [
                 subregion ~pos (Type.RegionAtom (Type.InstanceParam instance)) (Type.RegionParam rgn);
                 just cnstrs
               ]
@@ -457,7 +460,7 @@ and infer_comp env (c, pos) =
       | Core.While (c1, c2) ->
           let ctx1, frsh1, t1, drt1, cnstrs1 = infer env c1 in
           let ctx2, frsh2, t2, drt2, cnstrs2 = infer env c2 in
-          let drt = Type.fresh_dirt () in
+          let drt = Type.fresh_dirt_param () in
           (* XXX We must erase all instances generated by c2 *)
           ctx1 @ ctx2, (frsh1, T.unit_ty, drt), gather [
             subtype ~pos t1 Type.bool_ty;
@@ -498,9 +501,9 @@ and infer_comp env (c, pos) =
           let ctx2, frsh, tc, dc, cstr_c = infer env c in
           let ctx, cstr_cs = unify_contexts ~pos [ctx1; ctx2] in
           let ctx, cstr_diff = trim_context ~pos ctx ctxp in
-          let drt = Type.fresh_dirt () in
-            List.iter (fun let_drt -> add_dirt_constraint cstr pos (Type.DirtParam let_drt) drt) let_drts;
-            add_dirt_constraint cstr pos dc drt ;
+          let drt = Type.fresh_dirt_param () in
+            List.iter (fun let_drt -> add_dirt_constraint cstr pos (Type.DirtParam let_drt) (Type.DirtParam drt)) let_drts;
+            add_dirt_constraint cstr pos (Type.DirtParam dc) (Type.DirtParam drt) ;
             join_constraints cstr ((cstr_c @!@ cstrs) @@ cstr_cs @@ cstr_diff);
             ctx, (let_frshs @ frsh, tc, drt), !cstr
 
@@ -515,13 +518,12 @@ and infer_comp env (c, pos) =
 
       | Core.Check c ->
           ignore (infer env c);
-          [], ([], T.unit_ty, Type.DirtEmpty), Type.empty
+          [], ([], T.unit_ty, empty_dirt ()), Type.empty
     in
     let ctx, ty, cstr = Unify.normalize (canonize_context ~pos (ctx, ty, cstr)) in
     ctx, frsh, ty, drt, cstr
   in
   let ctx, frsh, ty, drt, cstr = infer env (c, pos) in
-  let d = T.fresh_dirt_param () in
   Print.debug "Type of %t is (%t) %t | %t" (Print.computation (c, pos)) (Print.context ctx) (Print.ty Trio.empty ty) (Print.constraints Trio.empty cstr);
-  ctx, (frsh, ty, d), (Type.add_dirt_constraint pos drt (Type.DirtParam d) cstr)
+  ctx, (frsh, ty, drt), cstr
 
