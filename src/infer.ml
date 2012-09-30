@@ -36,13 +36,19 @@ let empty_dirt () = Type.fresh_dirt_param ()
 let gather add_news =
   List.fold_right (fun add_new cnstrs -> add_new cnstrs) add_news Type.empty
 
-let subnews ~pos nws1 nws2 cnstrs = Print.debug "Unifying freshness constraints."; cnstrs
-let subtype ~pos ty1 ty2 cnstrs = Type.add_ty_constraint ~pos ty1 ty2 cnstrs
-let subdirt ~pos d1 d2 cnstrs = Type.add_dirt_constraint ~pos (Type.DirtParam d1) (Type.DirtParam d2) cnstrs
-let causes ~pos d r op cnstrs = Type.add_dirt_constraint ~pos (Type.DirtAtom (r, op)) (Type.DirtParam d) cnstrs
-let subregion ~pos rgn1 rgn2 cnstrs = Type.add_region_constraint ~pos rgn1 rgn2 cnstrs
-let subdirty ~pos (nws1, ty1, d1) (nws2, ty2, d2) cnstrs =
-  subnews ~pos nws1 nws2 (subtype ~pos ty1 ty2 (subdirt ~pos d1 d2 cnstrs))
+let ty_less ~pos ty1 ty2 cnstrs =
+  Type.add_ty_constraint ~pos ty1 ty2 cnstrs
+let dirt_less ~pos d1 d2 cnstrs =
+  Type.add_dirt_constraint ~pos (Type.DirtParam d1) (Type.DirtParam d2) cnstrs
+let dirt_causes_op ~pos d r op cnstrs =
+  Type.add_dirt_constraint ~pos (Type.DirtAtom (r, op)) (Type.DirtParam d) cnstrs
+let dirt_pure ~pos d cnstrs =
+  Type.add_dirt_constraint ~pos (Type.DirtParam d) (Type.DirtEmpty) cnstrs
+let region_covers ~pos r i cnstrs =
+  Type.add_region_constraint ~pos (Type.RegionAtom (Type.InstanceParam i)) (Type.RegionParam r) cnstrs
+let dirty_less ~pos (nws1, ty1, d1) (nws2, ty2, d2) cnstrs =
+  Print.debug ~pos "Unifying freshness constraints %t <= %t." (Print.fresh_instances nws1) (Print.fresh_instances nws2);
+  ty_less ~pos ty1 ty2 (dirt_less ~pos d1 d2 cnstrs)
 
 let just cnstrs1 cnstrs2 = Type.join_disjoint_constraints cnstrs1 cnstrs2
 let merge cnstrs1 cnstrs2 = Type.join_constraints cnstrs1 cnstrs2
@@ -52,9 +58,9 @@ let unify_context ~pos ctx =
     match Common.lookup x ctx with
     | None ->
         let ty' = Type.fresh_ty () in
-        ((x, ty') :: ctx, subtype ~pos ty' ty cnstrs)
+        ((x, ty') :: ctx, ty_less ~pos ty' ty cnstrs)
     | Some ty' ->
-        (ctx, subtype ~pos ty' ty cnstrs)
+        (ctx, ty_less ~pos ty' ty cnstrs)
   in
   List.fold_right add ctx ([], Type.empty)
 
@@ -110,7 +116,7 @@ let rec infer_pattern (p, pos) =
             | Some ty ->
                 let ctx', ty', cnstrs' = infer_pattern p in
                 ctx' @ ctx, gather [
-                  subtype ~pos ty ty';
+                  ty_less ~pos ty ty';
                   just cnstrs;
                   just cnstrs'
                 ]
@@ -128,7 +134,7 @@ let rec infer_pattern (p, pos) =
           | Some p, Some u ->
               let ctx', ty', cnstrs' = infer_pattern p in
               ctx', ty, gather [
-                subtype ~pos u ty';
+                ty_less ~pos u ty';
                 just cnstrs'
               ]
           | None, Some _ -> Error.typing ~pos "Constructor %s should be applied to an argument." lbl
@@ -177,7 +183,7 @@ let rec infer_expr env (e, pos) =
             | Some ty ->
                 let ctx', ty', cnstrs' = infer_expr env e in
                 ctx' @ ctx, gather [
-                  subtype ~pos ty' ty;
+                  ty_less ~pos ty' ty;
                   just cnstrs;
                   just cnstrs'
                 ]
@@ -196,7 +202,7 @@ let rec infer_expr env (e, pos) =
           | Some e, Some u ->
               let ctx', ty', cnstrs' = infer_expr env e in
               ctx', ty, gather [
-                subtype ~pos ty' u;
+                ty_less ~pos ty' u;
                 just cnstrs'
               ]
           | None, Some _ -> Error.typing ~pos "Constructor %s should be applied to an argument." lbl
@@ -216,8 +222,8 @@ let rec infer_expr env (e, pos) =
           let ctx, u, cstr_u = infer_expr env e in
           let d = T.fresh_dirt_param () in
           ctx, T.Arrow (t1, ([], t2, d)), gather [
-            subtype ~pos u ty;
-            causes ~pos d r op;
+            ty_less ~pos u ty;
+            dirt_causes_op ~pos d r op;
             just cstr_u
           ]
       end
@@ -235,10 +241,10 @@ let rec infer_expr env (e, pos) =
             let ctxe, u, cstr_e = infer_expr env e in
             let ctxa, u1, tk, u2, cstr_a = infer_abstraction2 env a2 in
             ctxe @ ctxa @ ctx, gather [
-              subtype ~pos u ty;
-              subtype ~pos t1 u1;
-              subtype ~pos (T.Arrow (t2, ([], t_yield, dirt))) tk;
-              subdirty ~pos u2 ([], t_yield, dirt);
+              ty_less ~pos u ty;
+              ty_less ~pos t1 u1;
+              ty_less ~pos (T.Arrow (t2, ([], t_yield, dirt))) tk;
+              dirty_less ~pos u2 ([], t_yield, dirt);
               just cstr_e;
               just cstr_a;
               just cnstrs
@@ -249,10 +255,10 @@ let rec infer_expr env (e, pos) =
         let ctx1, valt1, valt2, cstr_val = infer_abstraction env a_val in
         let ctx2, fint1, fint2, cstr_fin = infer_abstraction env a_fin in
         ctx1 @ ctx2 @ ctxs, Type.Handler(t_value, t_finally), gather [
-          subtype ~pos t_value valt1;
-          subdirty ~pos valt2 ([], t_yield, dirt);
-          subdirty ~pos fint2 ([], t_finally, dirt);
-          subtype ~pos t_yield fint1;
+          ty_less ~pos t_value valt1;
+          dirty_less ~pos valt2 ([], t_yield, dirt);
+          dirty_less ~pos fint2 ([], t_finally, dirt);
+          ty_less ~pos t_yield fint1;
           just cstr_val;
           just cstr_fin;
           just cnstrs
@@ -260,7 +266,7 @@ let rec infer_expr env (e, pos) =
 
   in
   let ctx, ty, cstr = Unify.normalize (canonize_context ~pos ty_scheme) in
-  Print.debug "Type of %t is (%t) %t | %t" (Print.expression (e, pos)) (Print.context ctx) (Print.ty Trio.empty ty) (Print.constraints Trio.empty cstr);
+  Print.debug "Type of %t is %t" (Print.expression (e, pos)) (Print.ty_scheme (ctx, ty, cstr));
   (ctx, ty, cstr)
               
 (* [infer_comp env cstr (c,pos)] infers the type of computation [c] in context [env].
@@ -279,7 +285,7 @@ and infer_comp env (c, pos) =
       let ctx, cstr_cs = unify_context ~pos (ctx1 @ ctx2) in
       let ctx, cstr_diff = trim_context ~pos ctx ctxp in
       ctx, (let_frshs @ frsh, tc, let_drt), gather [
-        subdirt ~pos dc let_drt;
+        dirt_less ~pos dc let_drt;
         merge cstr_cs;
         merge cstr_diff;
         just cstr_c;
@@ -298,7 +304,7 @@ and infer_comp env (c, pos) =
       let ctx, ty_in, cnstrs = infer_expr env e in
       let ty_out = Type.fresh_ty () in
       ctx, ([], ty_out, empty_dirt ()), gather [
-        subtype ~pos ty_in Type.empty_ty;
+        ty_less ~pos ty_in Type.empty_ty;
         just cnstrs
       ]
 
@@ -310,9 +316,9 @@ and infer_comp env (c, pos) =
         (* XXX Refresh fresh instances *)
         let ctx', ty_in', (frsh_out, ty_out', drt_out'), cnstrs' = infer_abstraction env a in
         ctx' @ ctx, frsh_out @ frshs, gather [
-          subtype ~pos:(snd e) ty_in ty_in';
-          subtype ~pos:(snd c) ty_out' ty_out;
-          subdirt ~pos:(snd c) drt_out' drt_out;
+          ty_less ~pos:(snd e) ty_in ty_in';
+          ty_less ~pos:(snd c) ty_out' ty_out;
+          dirt_less ~pos:(snd c) drt_out' drt_out;
           just cnstrs';
           just cnstrs
         ]
@@ -327,10 +333,10 @@ and infer_comp env (c, pos) =
       let drt = Type.fresh_dirt_param () in
       (* XXX We must erase all instances generated by c2 *)
       ctx1 @ ctx2, (frsh1, T.unit_ty, drt), gather [
-        subtype ~pos t1 Type.bool_ty;
-        subtype ~pos t2 Type.unit_ty;
-        subdirt ~pos drt1 drt;
-        subdirt ~pos drt2 drt;
+        ty_less ~pos t1 Type.bool_ty;
+        ty_less ~pos t2 Type.unit_ty;
+        dirt_less ~pos drt1 drt;
+        dirt_less ~pos drt2 drt;
         just cnstrs1;
         just cnstrs2
       ]
@@ -341,9 +347,9 @@ and infer_comp env (c, pos) =
       let ctx3, (frsh, ty, drt), cnstrs3 = infer_comp env c in
       (* XXX We must erase all instances generated by c *)
       ctx1 @ ctx2 @ ctx3, ([], T.unit_ty, drt), gather [
-        subtype ~pos:(snd e1) ty1 Type.int_ty;
-        subtype ~pos:(snd e2) ty2 Type.int_ty;
-        subtype ~pos:(snd c) ty Type.unit_ty;
+        ty_less ~pos:(snd e1) ty1 Type.int_ty;
+        ty_less ~pos:(snd e2) ty2 Type.int_ty;
+        ty_less ~pos:(snd c) ty Type.unit_ty;
         just cnstrs1;
         just cnstrs2;
         just cnstrs3
@@ -354,7 +360,7 @@ and infer_comp env (c, pos) =
       let ctx2, ty2, cnstrs2 = infer_expr env e2 in
       let drty = T.fresh_dirty () in
       ctx1 @ ctx2, drty, gather [
-        subtype ~pos ty1 (T.Arrow (ty2, drty));
+        ty_less ~pos ty1 (T.Arrow (ty2, drty));
         just cnstrs1;
         just cnstrs2
       ]
@@ -373,11 +379,11 @@ and infer_comp env (c, pos) =
                     let ctx', t1, t2, t, cstr_a = infer_abstraction2 env a in
                     let d_empty = T.fresh_dirt_param () in
                     ctx' @ ctx, gather [
-                      subtype ~pos(* p1 *) t1 u1;
-                      subtype ~pos(* p2 *) t2 te;
+                      ty_less ~pos(* p1 *) t1 u1;
+                      ty_less ~pos(* p2 *) t2 te;
                       (* XXX Warn that d_empty has to be empty *)
-                      (* subdirt ~pos(* c *) (Type.DirtParam d_empty) (Type.DirtEmpty); *)
-                      subdirty ~pos(* c *) t ([], T.Tuple [u2; te], d_empty);
+                      dirt_pure ~pos(* c *) d_empty;
+                      dirty_less ~pos(* c *) t ([], T.Tuple [u2; te], d_empty);
                       just cstr_a;
                       just cstrs
                     ]
@@ -388,7 +394,7 @@ and infer_comp env (c, pos) =
           let instance = T.fresh_instance_param () in
           let rgn = T.fresh_region_param () in
           ctx, ([instance], Tctx.effect_to_params eff params rgn, empty_dirt ()), gather [
-            subregion ~pos (Type.RegionAtom (Type.InstanceParam instance)) (Type.RegionParam rgn);
+            region_covers ~pos rgn instance;
             just cnstrs
           ]
       | _ -> Error.typing ~pos "Effect type expected but %s encountered" eff
@@ -399,7 +405,7 @@ and infer_comp env (c, pos) =
       let ctx2, (frsh, ty2, drt2), cnstrs2 = infer_comp env c2 in
       let ty3 = T.fresh_ty () in
       ctx1 @ ctx2, (frsh, ty3, drt2), gather [
-        subtype ~pos ty1 (T.Handler (ty2, ty3));
+        ty_less ~pos ty1 (T.Handler (ty2, ty3));
         just cnstrs1;
         just cnstrs2
       ]
@@ -451,8 +457,8 @@ and infer_let ~pos env defs =
         env, ctx_p @ ctxp
     in
     env, ctx_c @ ctxs, ctxp, frsh @ frshs, gather [
-      subtype ~pos:(snd c) t_c t_p;
-      subdirt ~pos:(snd c) drt' drt;
+      ty_less ~pos:(snd c) t_c t_p;
+      dirt_less ~pos:(snd c) drt' drt;
       just cstr_p;
       just cstr_c
     ]
