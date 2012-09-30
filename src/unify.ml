@@ -67,8 +67,8 @@ let canonize (ctx, ty, initial_grph) =
           let t1, t2 = Type.beautify2 t1 t2 in
           Error.typing ~pos
             "This expression has a forbidden cylclic type %t = %t."
-            (Print.ty Trio.empty t1)
-            (Print.ty Trio.empty t2)
+            (Print.ty t1)
+            (Print.ty t2)
         else
           let t' = Type.refresh t in
           add_substitution p t' ;
@@ -84,8 +84,8 @@ let canonize (ctx, ty, initial_grph) =
           let t1, t2 = Type.beautify2 t1 t2 in
           Error.typing ~pos
             "This expression has a forbidden cylclic type %t = %t."
-            (Print.ty Trio.empty t1)
-            (Print.ty Trio.empty t2)
+            (Print.ty t1)
+            (Print.ty t2)
         else
           let t' = Type.refresh t in
           add_substitution p t' ;
@@ -147,8 +147,8 @@ let canonize (ctx, ty, initial_grph) =
           let t1, t2 = Type.beautify2 t1 t2 in
           Error.typing ~pos
             "This expression has type %t but it should have type %t."
-            (Print.ty Trio.empty t1)
-            (Print.ty Trio.empty t2)
+            (Print.ty t1)
+            (Print.ty t2)
 
   and unify_dirt pos drt1 drt2 =
     add_dirt_constraint pos drt1 drt2

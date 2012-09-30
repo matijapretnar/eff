@@ -416,7 +416,7 @@ and infer_comp env (c, pos) =
 
   in
   let ctx, ty, cstr = Unify.normalize (canonize_context ~pos (ctx, ty, cstr)) in
-  Print.debug "Type of %t is (%t) %t | %t" (Print.computation (c, pos)) (Print.context ctx) (Print.ty Trio.empty ty) (Print.constraints Trio.empty cstr);
+  Print.debug "Type of %t is %t" (Print.computation (c, pos)) (Print.dirty_scheme (ctx, (frsh, ty, drt), cstr));
   ctx, (frsh, ty, drt), cstr
 
 and infer_abstraction env (p, c) =

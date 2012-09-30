@@ -72,48 +72,51 @@ let instance i ppf =
   | Type.InstanceParam (Type.Instance_Param i) -> print ppf "#%d" i
   | Type.InstanceTop -> print ppf "?"
 
-let region_param (_, _, rs) ((Type.Region_Param k) as p) ppf =
-  let c = (if List.mem p rs then "'" else "'_") in
-    print ppf "<%srgn%i>" c k
+let region_param ?(non_poly=Trio.empty) ((Type.Region_Param k) as p) ppf =
+  let (_, _, rs) = non_poly in
+  let c = (if List.mem p rs then "_" else "") in
+    print ppf "%sr%i" c (k + 1)
 
-let dirt_param (_, ds, _) ((Type.Dirt_Param k) as p) ppf =
-  let c = (if List.mem p ds then "'" else "'_") in
-    print ppf "<%sdrt%i>" c k
+let dirt_param ?(non_poly=Trio.empty) ((Type.Dirt_Param k) as p) ppf =
+  let (_, ds, _) = non_poly in
+  let c = (if List.mem p ds then "_" else "") in
+    print ppf "%sd%i" c (k + 1)
 
-let region poly reg ppf =
+let region ?non_poly reg ppf =
   match reg with
-    | Type.RegionParam p -> print ppf "<%t>" (region_param poly p)
+    | Type.RegionParam p -> print ppf "<%t>" (region_param ?non_poly p)
     | Type.RegionAtom i -> print ppf "<%t>" (instance i)
 
-let dirt ((_, ds, _) as poly) drt ppf =
+let dirt ?non_poly drt ppf =
   match drt with
     | Type.DirtEmpty -> print ppf ""
-    | Type.DirtParam p -> print ppf "%t" (dirt_param poly p)
-    | Type.DirtAtom (rgn, op) -> print ppf "%t#%s" (region_param poly rgn) op
+    | Type.DirtParam p -> print ppf "%t" (dirt_param ?non_poly p)
+    | Type.DirtAtom (rgn, op) -> print ppf "%t#%s" (region_param ?non_poly rgn) op
 
 let fresh_instances frsh ppf =
   match frsh with
     | [] -> print ppf ""
     | frsh ->  print ppf "new %t." (sequence "" (fun (Type.Instance_Param i) ppf -> print ppf "%d" i) frsh)
 
-let ty_param ps p ppf =
+let ty_param ?(non_poly=Trio.empty) p ppf =
+  let (ps, _, _) = non_poly in
   let (Type.Ty_Param k) = p in
-  let c = (if List.mem p ps then "'" else "'_") in
-    if 0 <= k && k <= 25
-    then print ppf "%s%c" c (char_of_int (k + int_of_char 'a'))
-    else print ppf "%sty%i" c (k - 25)
+  let c = (if List.mem p ps then "'_" else "'") in
+    if 0 <= k && k <= 6
+    then print ppf "%s%c" c (char_of_int (k + int_of_char 't'))
+    else print ppf "%st%i" c (k - 6)
 
-let rec ty ((ps, _, _) as poly) t ppf =
+let rec ty ?(non_poly=Trio.empty) t ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = print ?max_level ?at_level ppf in
     match t with
     (* XXX Should we print which instances are fresh? *)
     | Type.Arrow (t1, (frsh, t2, drt)) ->
-        print ~at_level:5 "@[<h>%t ->@ %t %t[%t]@]"
+        print ~at_level:5 "@[<h>%t -%t->@ %t%t@]"
         (ty ~max_level:4 t1)
+        (dirt_param ~non_poly drt)
         (fresh_instances frsh)
-        (ty ~max_level:4 t2)
-        (dirt_param poly drt)
+        (ty ~max_level:5 t2)
         (* print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2) *)
     | Type.Basic b -> print "%s" b
     | Type.Apply (t, (lst, _, _)) ->
@@ -124,11 +127,11 @@ let rec ty ((ps, _, _) as poly) t ppf =
       end
     | Type.Effect (t, (lst, _, _), rgn) ->
       begin match lst with
-        | [] -> print "%s%t" t (region_param poly rgn)
-        | [s] -> print ~at_level:1 "%t %s%t" (ty ~max_level:1 s) t (region_param poly rgn)
-        | ts -> print ~at_level:1 "(%t) %s%t" (sequence "," ty ts) t (region_param poly rgn)
+        | [] -> print "%s[%t]" t (region_param ~non_poly rgn)
+        | [s] -> print ~at_level:1 "%t %s[%t]" (ty ~max_level:1 s) t (region_param ~non_poly rgn)
+        | ts -> print ~at_level:1 "(%t) %s[%t]" (sequence "," ty ts) t (region_param ~non_poly rgn)
       end
-    | Type.TyParam p -> ty_param ps p ppf
+    | Type.TyParam p -> ty_param ~non_poly p ppf
     | Type.Tuple [] -> print "unit"
     | Type.Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (sequence " *" (ty ~max_level:1) ts)
     | Type.Handler (t1, t2) ->
@@ -140,35 +143,38 @@ let constraints_of_graph g =
   let lst = Type.fold_dirt (fun d1 d2 pos lst -> (Type.DirtConstraint (d1, d2, pos)) :: lst) g lst in
   Type.fold_region (fun r1 r2 pos lst -> (Type.RegionConstraint (r1, r2, pos)) :: lst) g lst
 
-let constraints poly cstrs ppf =
+let constraints ?(non_poly=Trio.empty) cstrs ppf =
   let constr cstr ppf = match cstr with
-  | Type.TypeConstraint (ty1, ty2, pos) -> print ppf "%t <= %t" (ty poly ty1) (ty poly ty2)
-  | Type.DirtConstraint (drt1, drt2, pos) -> print ppf "%t <= %t" (dirt poly drt1) (dirt poly drt2)
-  | Type.RegionConstraint (rgn1, rgn2, pos) -> print ppf "%t <= %t" (region poly rgn1) (region poly rgn2)
+  | Type.TypeConstraint (ty1, ty2, pos) -> print ppf "%t <= %t" (ty ~non_poly ty1) (ty ~non_poly ty2)
+  | Type.DirtConstraint (drt1, drt2, pos) -> print ppf "%t <= %t" (dirt ~non_poly drt1) (dirt ~non_poly drt2)
+  | Type.RegionConstraint (rgn1, rgn2, pos) -> print ppf "%t <= %t" (region ~non_poly rgn1) (region ~non_poly rgn2)
   in
   sequence ", " constr (constraints_of_graph cstrs) ppf
 
-let context ctx =
-  sequence "," (fun (x, t) ppf -> print ppf "%t : %t" (variable x) (ty Trio.empty t)) ctx
+let context ctx ppf =
+  match ctx with
+  | [] -> ()
+  | _ -> print ppf "(@[%t@]).@ " (sequence "," (fun (x, t) ppf -> print ppf "%t : %t" (variable x) (ty t)) ctx)
 
 let ty_scheme (ctx, t, cstrs) ppf =
-  let poly = Trio.empty in
-  print ppf "(%t) %t | %t" (context ctx) (ty poly t) (constraints poly cstrs)
-
-let dirty_scheme tysch drt ppf =
-  print ppf "%t [%t]" (ty_scheme tysch) (dirt_param Trio.empty drt)
-
-let beautified_ty_scheme (ctx, ty, cstrs) ppf =
   let sbst = Type.beautifying_subst () in
-  let ty = Type.subst_ty sbst ty in
-  ty_scheme (Common.assoc_map (Type.subst_ty sbst) ctx, ty, Type.subst_constraints sbst cstrs) ppf
+  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  let t = Type.subst_ty sbst t in
+  let cstrs = Type.subst_constraints sbst cstrs in
+  print ppf "%t%t | %t" (context ctx) (ty t) (constraints cstrs)
 
-let beautified_dirty_scheme (ctx, ty, cstrs) drt ppf =
+let dirty_scheme (ctx, (frsh, t, drt), cstrs) ppf =
   let sbst = Type.beautifying_subst () in
-  let ty = Type.subst_ty sbst ty in
-  let tysch = (Common.assoc_map (Type.subst_ty sbst) ctx, ty, Type.subst_constraints sbst cstrs) in
+  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  let t = Type.subst_ty sbst t in
   let drt = sbst.Type.dirt_param drt in
-  dirty_scheme tysch drt ppf
+  let cstrs = Type.subst_constraints sbst cstrs in
+  print ppf "%t%t %t ! %t | %t"
+    (context ctx)
+    (fresh_instances frsh)
+    (ty t)
+    (dirt_param drt)
+    (constraints cstrs)
 
 (*
 let subst sbst ppf =
