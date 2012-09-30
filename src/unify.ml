@@ -207,12 +207,7 @@ let pos_neg_params ty =
   in
   pos_params true ty, pos_params false ty
 
-
-let garbage_collect (ctx, ty, cstr) =
-  let pos, neg = List.fold_right (fun (_, t) (pos, neg) ->
-      let pos_t, neg_t = pos_neg_params t in
-      neg_t @@@ pos, pos_t @@@ neg) ctx (pos_neg_params ty) in
-  let (pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs) = Trio.uniq pos, Trio.uniq neg in
+let collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) cstr =
   let ty_p p q pos = match p, q with
     | Type.TyParam p, Type.TyParam q -> List.mem p neg_ts && List.mem q pos_ts
     | _, _ -> assert false
@@ -229,6 +224,30 @@ let garbage_collect (ctx, ty, cstr) =
     | _, Type.RegionParam q -> List.mem q pos_rs
     | _, _ -> true
   in
-  (ctx, ty, Type.garbage_collect ty_p drt_p rgn_p cstr)
+  Type.garbage_collect ty_p drt_p rgn_p cstr
 
-let normalize tysch = garbage_collect (canonize tysch)
+let normalize_context ~pos (ctx, ty, cstr) =
+  let add (x, ty) (ctx, cnstrs) =
+    match Common.lookup x ctx with
+    | None ->
+        let ty' = Type.fresh_ty () in
+        ((x, ty') :: ctx, Type.add_ty_constraint ~pos ty' ty cnstrs)
+    | Some ty' ->
+        (ctx, Type.add_ty_constraint ~pos ty' ty cnstrs)
+  in
+  let ctx, cstr = List.fold_right add ctx ([], cstr) in
+  (ctx, ty, cstr)
+
+let normalize_ty_scheme ~pos ty_sch =
+  let ctx, ty, cstr = normalize_context ~pos ty_sch in
+  let ctx, ty, cstr = canonize (ctx, ty, cstr) in
+  let pos, neg = List.fold_right (fun (_, t) (pos, neg) ->
+      let pos_t, neg_t = pos_neg_params t in
+      neg_t @@@ pos, pos_t @@@ neg) ctx (pos_neg_params ty) in
+  let pos, neg = Trio.uniq pos, Trio.uniq neg in
+  (ctx, ty, collect pos neg cstr)
+
+let normalize_dirty_scheme ~pos (ctx, drty, cstr) =
+  match normalize_ty_scheme ~pos (ctx, Type.Arrow (Type.unit_ty, drty), cstr) with
+  | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
+  | _ -> assert false

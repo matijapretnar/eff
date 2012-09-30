@@ -133,29 +133,29 @@ let exec_topdef interactive (ctx, env) (d,pos) =
     and return the new environment. *)
 
 let infer_top_comp ctx c =
-  let ctx, (frshs, ty, drt), cstr = Infer.infer_comp ctx c in
-  let tysch = Unify.normalize (ctx, ty, cstr) in
+  let drty_sch = Infer.infer_comp ctx c in
+  let drty_sch = Unify.normalize_dirty_scheme ~pos:(snd c) drty_sch in
   Exhaust.check_comp c ;
   (* let cnstr = Unify.constraints_of_graph remaining in *)
   (* XXX What to do about the fresh instances? *)
   (* XXX Here, we need to show what type parameters are polymorphic or not. *)
   (*     I am disabling it because we are going to try a new approach. *)
-  tysch, drt, frshs
+  drty_sch
 
 let rec exec_cmd interactive (ctx, env) e =
   match e with
   | Syntax.Term c ->
       let c = Desugar.top_computation c in
-      let (ct, ty, cstrs), drt, frsh = infer_top_comp ctx c in
+      let drty_sch = infer_top_comp ctx c in
       let v = Eval.run env c in
       if interactive then Format.printf "@[- : %t = %t@]@."
-        (Print.dirty_scheme (ct, (frsh, ty, drt), cstrs))
+        (Print.dirty_scheme drty_sch)
         (Print.value v);
       (ctx, env)
   | Syntax.TypeOf c ->
       let c = Desugar.top_computation c in
-      let (ct, ty, cstrs), drt, frsh = infer_top_comp ctx c in
-      Format.printf "@[%t@]@." (Print.dirty_scheme (ct, (frsh, ty, drt), cstrs));
+      let drty_sch = infer_top_comp ctx c in
+      Format.printf "@[%t@]@." (Print.dirty_scheme drty_sch);
       (ctx, env)
   | Syntax.Reset ->
       Tctx.reset ();

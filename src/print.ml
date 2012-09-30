@@ -96,7 +96,7 @@ let dirt ?non_poly drt ppf =
 let fresh_instances frsh ppf =
   match frsh with
     | [] -> print ppf ""
-    | frsh ->  print ppf "new %t." (sequence "" (fun (Type.Instance_Param i) ppf -> print ppf "%d" i) frsh)
+    | frsh ->  print ppf "new %t.@ " (sequence "" (fun (Type.Instance_Param i) ppf -> print ppf "%d" i) frsh)
 
 let ty_param ?(non_poly=Trio.empty) p ppf =
   let (ps, _, _) = non_poly in
@@ -169,7 +169,7 @@ let dirty_scheme (ctx, (frsh, t, drt), cstrs) ppf =
   let t = Type.subst_ty sbst t in
   let drt = sbst.Type.dirt_param drt in
   let cstrs = Type.subst_constraints sbst cstrs in
-  print ppf "%t%t %t ! %t | %t"
+  print ppf "%t%t%t ! %t | %t"
     (context ctx)
     (fresh_instances frsh)
     (ty t)

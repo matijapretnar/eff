@@ -64,10 +64,6 @@ let unify_context ~pos ctx =
   in
   List.fold_right add ctx ([], Type.empty)
 
-let canonize_context ~pos (ctx, ty, cnstrs) =
-  let ctx, cnstrs_ctx = unify_context ~pos ctx in
-  ctx, ty, merge cnstrs_ctx cnstrs
-
 let ty_of_const = function
   | Common.Integer _ -> Type.int_ty
   | Common.String _ -> Type.string_ty
@@ -146,7 +142,7 @@ let rec infer_pattern (p, pos) =
    [env]. It returns the inferred type of [e]. *)
 let rec infer_expr env (e, pos) =
   if !disable_typing then simple Type.universal_ty else
-  let ty_scheme = match e with
+  let ty_sch = match e with
 
   | Core.Var x ->
       begin match Ctx.lookup env x with
@@ -265,15 +261,15 @@ let rec infer_expr env (e, pos) =
         ]
 
   in
-  let ctx, ty, cstr = Unify.normalize (canonize_context ~pos ty_scheme) in
-  Print.debug "Type of %t is %t" (Print.expression (e, pos)) (Print.ty_scheme (ctx, ty, cstr));
-  (ctx, ty, cstr)
+  let ty_sch = Unify.normalize_ty_scheme ~pos ty_sch in
+  Print.debug "Type of %t is %t" (Print.expression (e, pos)) (Print.ty_scheme ty_sch);
+  ty_sch
               
 (* [infer_comp env cstr (c,pos)] infers the type of computation [c] in context [env].
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp env (c, pos) =
   if !disable_typing then simple Type.universal_dirty else
-  let ctx, (frsh, ty, drt), cstr = match c with
+  let drty_sch = match c with
 
   | Core.Value e ->
       let ctx, ty, cnstrs = infer_expr env e in
@@ -415,9 +411,9 @@ and infer_comp env (c, pos) =
       simple ([], T.unit_ty, empty_dirt ())
 
   in
-  let ctx, ty, cstr = Unify.normalize (canonize_context ~pos (ctx, ty, cstr)) in
-  Print.debug "Type of %t is %t" (Print.computation (c, pos)) (Print.dirty_scheme (ctx, (frsh, ty, drt), cstr));
-  ctx, (frsh, ty, drt), cstr
+  let drty_sch = Unify.normalize_dirty_scheme ~pos drty_sch in
+  Print.debug "Type of %t is %t" (Print.computation (c, pos)) (Print.dirty_scheme drty_sch);
+  drty_sch
 
 and infer_abstraction env (p, c) =
   let ctx_p, ty_p, cnstrs_p = infer_pattern p in
@@ -487,5 +483,5 @@ and infer_let_rec ~pos env defs =
     merge cnstrs_ctx;
     just cnstrs
   ] in
-  let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Unify.normalize (ctx, t, cnstrs))) vars env in
+  let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Unify.normalize_ty_scheme ~pos (ctx, t, cnstrs))) vars env in
   env, ctx, cnstrs
