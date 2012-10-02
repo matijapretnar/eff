@@ -33,8 +33,7 @@ let nonexpansive = function
 let simple ty = ([], ty, Type.empty)
 let empty_dirt () = Type.fresh_dirt_param ()
 
-let gather add_news =
-  List.fold_right (fun add_new cnstrs -> add_new cnstrs) add_news Type.empty
+let gather changes = List.fold_right (fun change cnstrs -> change cnstrs) changes Type.empty
 
 let ty_less ~pos ty1 ty2 cnstrs =
   Type.add_ty_constraint ~pos ty1 ty2 cnstrs
@@ -64,12 +63,6 @@ let unify_context ~pos ctx =
   in
   List.fold_right add ctx ([], Type.empty)
 
-let ty_of_const = function
-  | Common.Integer _ -> Type.int_ty
-  | Common.String _ -> Type.string_ty
-  | Common.Boolean _ -> Type.bool_ty
-  | Common.Float _ -> Type.float_ty
-
 let trim_context ~pos ctx ctx_p =
   let trim (x, t) (ctx, cstrs) =
     match Common.lookup x ctx_p with
@@ -78,7 +71,13 @@ let trim_context ~pos ctx ctx_p =
   in
   List.fold_right trim ctx ([], Type.empty)
 
-(* [infer_pattern cstr pp] infers the type of pattern [pp]. It returns the list of pattern
+let ty_of_const = function
+  | Common.Integer _ -> Type.int_ty
+  | Common.String _ -> Type.string_ty
+  | Common.Boolean _ -> Type.bool_ty
+  | Common.Float _ -> Type.float_ty
+
+(* [infer_pattern p] infers the type of pattern [p]. It returns the list of pattern
    variables with their types, which are all guaranteed to be fresh parameters, together
    with the type of the whole pattern. *)
 let rec infer_pattern (p, pos) =
@@ -141,6 +140,10 @@ let rec infer_pattern (p, pos) =
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
    [env]. It returns the inferred type of [e]. *)
 let rec infer_expr env (e, pos) =
+  let unify ctx ty changes =
+    let cnstrs = gather changes in
+    Unify.normalize_ty_scheme ~pos (ctx, ty, cnstrs)
+  in
   if !disable_typing then simple Type.universal_ty else
   let ty_sch = match e with
 
@@ -178,15 +181,14 @@ let rec infer_expr env (e, pos) =
             | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s." fld ty_name
             | Some ty ->
                 let ctx', ty', cnstrs' = infer_expr env e in
-                ctx' @ ctx, gather [
+                ctx' @ ctx, [
                   ty_less ~pos ty' ty;
-                  just cnstrs;
                   just cnstrs'
-                ]
+                ] @ cnstrs
             end
         in
-        let ctx, cnstrs = List.fold_right infer lst ([], Type.empty) in
-        ctx, ty, cnstrs
+        let ctx, cnstrs = List.fold_right infer lst ([], []) in
+        unify ctx ty cnstrs
       end
 
   | Core.Variant (lbl, e) ->
@@ -197,7 +199,7 @@ let rec infer_expr env (e, pos) =
           | None, None -> simple ty
           | Some e, Some u ->
               let ctx', ty', cnstrs' = infer_expr env e in
-              ctx', ty, gather [
+              unify ctx' ty [
                 ty_less ~pos ty' u;
                 just cnstrs'
               ]
@@ -217,7 +219,7 @@ let rec infer_expr env (e, pos) =
       | Some (ty, (t1, t2)) ->
           let ctx, u, cstr_u = infer_expr env e in
           let d = T.fresh_dirt_param () in
-          ctx, T.Arrow (t1, ([], t2, d)), gather [
+          unify ctx (T.Arrow (t1, ([], t2, d))) [
             ty_less ~pos u ty;
             dirt_causes_op ~pos d r op;
             just cstr_u
@@ -236,32 +238,29 @@ let rec infer_expr env (e, pos) =
         | Some (ty, (t1, t2)) ->
             let ctxe, u, cstr_e = infer_expr env e in
             let ctxa, u1, tk, u2, cstr_a = infer_abstraction2 env a2 in
-            ctxe @ ctxa @ ctx, gather [
+            ctxe @ ctxa @ ctx, [
               ty_less ~pos u ty;
               ty_less ~pos t1 u1;
               ty_less ~pos (T.Arrow (t2, ([], t_yield, dirt))) tk;
               dirty_less ~pos u2 ([], t_yield, dirt);
               just cstr_e;
-              just cstr_a;
-              just cnstrs
-            ]
+              just cstr_a
+            ] @ cnstrs
         end
       in
-        let ctxs, cnstrs = List.fold_right constrain_operation ops ([], Type.empty) in
+        let ctxs, cnstrs = List.fold_right constrain_operation ops ([], []) in
         let ctx1, valt1, valt2, cstr_val = infer_abstraction env a_val in
         let ctx2, fint1, fint2, cstr_fin = infer_abstraction env a_fin in
-        ctx1 @ ctx2 @ ctxs, Type.Handler(t_value, t_finally), gather [
+        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler(t_value, t_finally)) ([
           ty_less ~pos t_value valt1;
           dirty_less ~pos valt2 ([], t_yield, dirt);
           dirty_less ~pos fint2 ([], t_finally, dirt);
           ty_less ~pos t_yield fint1;
           just cstr_val;
-          just cstr_fin;
-          just cnstrs
-        ]
+          just cstr_fin
+        ] @ cnstrs)
 
   in
-  let ty_sch = Unify.normalize_ty_scheme ~pos ty_sch in
   Print.debug "Type of %t is %t" (Print.expression (e, pos)) (Print.ty_scheme ty_sch);
   ty_sch
               
@@ -306,31 +305,29 @@ and infer_comp env (c, pos) =
 
   | Core.Match (e, cases) ->
       let ctx_in, ty_in, cnstrs_in = infer_expr env e in
-      let ty_out = T.fresh_ty () in
-      let drt_out = T.fresh_dirt_param () in
-      let infer_case ((p, c) as a) (ctx, frshs, cnstrs) =
+      let drty_out = T.fresh_dirty () in
+      let infer_case ((p, c) as a) (ctx, cnstrs) =
         (* XXX Refresh fresh instances *)
-        let ctx', ty_in', (frsh_out, ty_out', drt_out'), cnstrs' = infer_abstraction env a in
-        ctx' @ ctx, frsh_out @ frshs, gather [
+        let ctx', ty_in', drty_out', cnstrs' = infer_abstraction env a in
+        ctx' @ ctx, gather [
           ty_less ~pos:(snd e) ty_in ty_in';
-          ty_less ~pos:(snd c) ty_out' ty_out;
-          dirt_less ~pos:(snd c) drt_out' drt_out;
+          dirty_less ~pos:(snd c) drty_out' drty_out;
           just cnstrs';
           just cnstrs
         ]
       in
-      let ctx, frshs, cnstrs = List.fold_right infer_case cases (ctx_in, [], cnstrs_in) in
-      ctx, (frshs, ty_out, drt_out), cnstrs
+      let ctx, cnstrs = List.fold_right infer_case cases (ctx_in, cnstrs_in) in
+      ctx, drty_out, cnstrs
           
 
   | Core.While (c1, c2) ->
-      let ctx1, (frsh1, t1, drt1), cnstrs1 = infer_comp env c1 in
-      let ctx2, (frsh2, t2, drt2), cnstrs2 = infer_comp env c2 in
+      let ctx1, (frsh1, ty1, drt1), cnstrs1 = infer_comp env c1 in
+      let ctx2, (frsh2, ty2, drt2), cnstrs2 = infer_comp env c2 in
       let drt = Type.fresh_dirt_param () in
       (* XXX We must erase all instances generated by c2 *)
       ctx1 @ ctx2, (frsh1, T.unit_ty, drt), gather [
-        ty_less ~pos t1 Type.bool_ty;
-        ty_less ~pos t2 Type.unit_ty;
+        ty_less ~pos ty1 Type.bool_ty;
+        ty_less ~pos ty2 Type.unit_ty;
         dirt_less ~pos drt1 drt;
         dirt_less ~pos drt2 drt;
         just cnstrs1;
