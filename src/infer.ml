@@ -141,10 +141,7 @@ let rec infer_pattern (p, pos) =
    [env]. It returns the inferred type of [e]. *)
 let rec infer_expr env (e, pos) =
   if !disable_typing then simple Type.universal_ty else
-  let unify ctx ty changes =
-    let cnstrs = gather changes in
-    Unify.normalize_ty_scheme ~pos (ctx, ty, cnstrs)
-  in
+  let unify = Unify.unify_ty_scheme ~pos in
   match e with
 
   | Core.Var x ->
@@ -264,10 +261,7 @@ let rec infer_expr env (e, pos) =
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp env (c, pos) =
   if !disable_typing then simple Type.universal_dirty else
-  let unify ctx (frsh, ty, drt) changes =
-    let cnstrs = gather changes in
-    Unify.normalize_dirty_scheme ~pos (ctx, (frsh, ty, drt), cnstrs)
-  in
+  let unify = Unify.unify_dirty_scheme ~pos in
   match c with
 
   | Core.Value e ->
@@ -472,5 +466,5 @@ and infer_let_rec ~pos env defs =
     merge cnstrs_ctx;
     just cnstrs
   ] in
-  let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Unify.normalize_ty_scheme ~pos (ctx, t, cnstrs))) vars env in
+  let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Unify.unify_ty_scheme ~pos ctx t [just cnstrs])) vars env in
   env, ctx, cnstrs

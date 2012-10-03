@@ -18,6 +18,36 @@ let constraints_of_graph g =
   let lst = Type.fold_dirt (fun d1 d2 pos lst -> (Type.DirtConstraint (d1, d2, pos)) :: lst) g lst in
   Type.fold_region (fun r1 r2 pos lst -> (Type.RegionConstraint (r1, r2, pos)) :: lst) g lst
 
+let gather changes = List.fold_right (fun change cnstrs -> change cnstrs) changes Type.empty
+
+(* let rec add_substitution ~pos p t (ctx, ty, cnstrs) =
+  (* When parameter [p] gets substituted by type [t] the vertex
+     [p] must be removed from the graph, and each edge becomes
+     a constraint in the queue. *)
+  let (pred, succ, new_cnstrs) = Type.remove_ty cnstrs (Type.TyParam p) in
+  let sbst = {Type.identity_subst with Type.ty_param = (fun p' -> if p' = p then t else Type.TyParam p')} in
+  let cnstrs = List.fold_right (fun (q, pos) -> add_ty_constraint ~pos q (Type.TyParam p)) pred cnstrs in
+  let cnstrs = List.fold_right (fun (q, pos) -> add_ty_constraint ~pos (Type.TyParam p) q) succ cnstrs in
+  (Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty ty, cnstrs)
+
+and add_ty_constraint ~pos ty1 ty2 (ctx, ty, cnstrs) =
+  match ty1, ty2 with
+  | (t1, t2) when t1 = t2 -> (ctx, ty, cnstrs)
+
+  | (Type.TyParam p, Type.TyParam q) ->
+      (ctx, ty, Type.add_ty_constraint ~pos (Type.TyParam p) (Type.TyParam q) cnstrs)
+
+  | (Type.TyParam p, t) ->
+      let t' = Type.refresh t in
+      let ctx, ty, cnstrs = add_substitution ~pos p t' (ctx, ty, cnstrs) in
+      (ctx, ty, add_ty_constraint ~pos t' t cnstrs)
+
+  | (t, Type.TyParam p) ->
+      let t' = Type.refresh t in
+      let ctx, ty, cnstrs = add_substitution ~pos p t' (ctx, ty, cnstrs) in
+      (ctx, ty, add_ty_constraint ~pos t t' cnstrs)
+ *)
+
 let canonize (ctx, ty, initial_grph) =
   let sbst = ref Type.identity_subst in
   (* We keep a list of "final" constraints which are known not to
@@ -251,3 +281,12 @@ let normalize_dirty_scheme ~pos (ctx, drty, cstr) =
   match normalize_ty_scheme ~pos (ctx, Type.Arrow (Type.unit_ty, drty), cstr) with
   | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
   | _ -> assert false
+
+let unify_ty_scheme ~pos ctx ty changes =
+  let cnstrs = gather changes in
+  normalize_ty_scheme ~pos (ctx, ty, cnstrs)
+
+let unify_dirty_scheme ~pos ctx (frsh, ty, drt) changes =
+  let cnstrs = gather changes in
+  normalize_dirty_scheme ~pos (ctx, (frsh, ty, drt), cnstrs)
+
