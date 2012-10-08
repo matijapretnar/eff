@@ -291,7 +291,7 @@ let unify_dirty_scheme ~pos ctx (frsh, ty, drt) changes =
   normalize_dirty_scheme ~pos (ctx, (frsh, ty, drt), cnstrs)
 
 let ty_less ~pos ty1 ty2 (ctx, ty, cnstrs) =
-  (ctx, ty, Type.add_ty_constraint ~pos ty1 ty2 cnstrs)
+  canonize (ctx, ty, Type.add_ty_constraint ~pos ty1 ty2 cnstrs)
 let dirt_less ~pos d1 d2 (ctx, ty, cnstrs) =
   (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d1) (Type.DirtParam d2) cnstrs)
 let dirt_causes_op ~pos d r op (ctx, ty, cnstrs) =
@@ -306,3 +306,20 @@ let dirty_less ~pos (nws1, ty1, d1) (nws2, ty2, d2) (ctx, ty, cnstrs) =
 
 let just cnstrs1 (ctx, ty, cnstrs2) = (ctx, ty, Type.join_disjoint_constraints cnstrs1 cnstrs2)
 let merge cnstrs1 (ctx, ty, cnstrs2) = (ctx, ty, Type.join_constraints cnstrs1 cnstrs2)
+
+let trim_context ~pos ctx_p (ctx, ty, cnstrs) =
+  let trim (x, t) (ctx, ty, cnstrs) =
+    match Common.lookup x ctx_p with
+    | None -> ((x, t) :: ctx, ty, cnstrs)
+    | Some u -> (ctx, ty, Type.add_ty_constraint pos u t cnstrs)
+  in
+  List.fold_right trim ctx ([], ty, cnstrs)
+
+let gather_ty_scheme ~pos ctx ty changes =
+  normalize_ty_scheme ~pos (List.fold_right (fun change ty_sch -> change ty_sch) changes (ctx, ty, Type.empty))
+
+let gather_dirty_scheme ~pos ctx drty changes =
+  match gather_ty_scheme ~pos ctx (Type.Arrow (Type.unit_ty, drty)) changes with
+  | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
+  | _ -> assert false
+

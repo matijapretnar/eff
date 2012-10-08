@@ -52,25 +52,6 @@ let dirty_less ~pos (nws1, ty1, d1) (nws2, ty2, d2) cnstrs =
 let just cnstrs1 cnstrs2 = Type.join_disjoint_constraints cnstrs1 cnstrs2
 let merge cnstrs1 cnstrs2 = Type.join_constraints cnstrs1 cnstrs2
 
-let unify_context ~pos ctx =
-  let add (x, ty) (ctx, cnstrs) =
-    match Common.lookup x ctx with
-    | None ->
-        let ty' = Type.fresh_ty () in
-        ((x, ty') :: ctx, ty_less ~pos ty' ty cnstrs)
-    | Some ty' ->
-        (ctx, ty_less ~pos ty' ty cnstrs)
-  in
-  List.fold_right add ctx ([], Type.empty)
-
-let trim_context ~pos ctx ctx_p =
-  let trim (x, t) (ctx, cstrs) =
-    match Common.lookup x ctx_p with
-    | None -> ((x, t) :: ctx, cstrs)
-    | Some u -> (ctx, Type.add_ty_constraint pos u t cstrs)
-  in
-  List.fold_right trim ctx ([], Type.empty)
-
 let ty_of_const = function
   | Common.Integer _ -> Type.int_ty
   | Common.String _ -> Type.string_ty
@@ -388,24 +369,26 @@ and infer_comp env (c, pos) =
 and infer_abstraction env (p, c) =
   let ctx_p, ty_p, cnstrs_p = infer_pattern p in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
-  let ctx, cnstrs_ctx = trim_context ~pos:(snd c) ctx_c ctx_p in
-  ctx, ty_p, drty_c, gather [
-    merge cnstrs_ctx;
-    just cnstrs_p;
-    just cnstrs_c
-  ]
+  match Unify.gather_ty_scheme ~pos:(snd c) ctx_c (Type.Arrow (ty_p, drty_c)) [
+    Unify.trim_context ~pos:(snd c) ctx_p;
+    Unify.just cnstrs_p;
+    Unify.just cnstrs_c
+  ] with
+  | ctx, Type.Arrow (ty_p, drty_c), cnstrs -> ctx, ty_p, drty_c, cnstrs
+  | _ -> assert false
 
 and infer_abstraction2 env (p1, p2, c) =
   let ctx_p1, ty_p1, cnstrs_p1 = infer_pattern p1 in
   let ctx_p2, ty_p2, cnstrs_p2 = infer_pattern p2 in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
-  let ctx, cnstrs_ctx = trim_context ~pos:(snd c) ctx_c (ctx_p1 @ ctx_p2) in
-  ctx, ty_p1, ty_p2, drty_c, gather [
-    merge cnstrs_ctx;
-    just cnstrs_p1;
-    just cnstrs_p2;
-    just cnstrs_c
-  ]
+  match Unify.gather_ty_scheme ~pos:(snd c) ctx_c (Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c)) [
+  Unify.trim_context ~pos:(snd c) (ctx_p1 @ ctx_p2);
+    Unify.just cnstrs_p1;
+    Unify.just cnstrs_p2;
+    Unify.just cnstrs_c
+  ] with
+  | ctx, Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c), cnstrs -> ctx, ty_p1, ty_p2, drty_c, cnstrs
+  | _ -> assert false
 
 and infer_let ~pos env defs =
   (* Check for implicit sequencing *)
@@ -430,17 +413,12 @@ and infer_let ~pos env defs =
     ]
   in
   let env, ctxs, ctxp, frshs, cstrs = List.fold_right add_binding defs (env, [], [], [], Type.empty) in
-  let ctx1, cstr_ctxs = unify_context ~pos ctxs in
   env, fun (ctx2, (frsh, tc, dc), cstr_c) ->
-    let ctx, cstr_cs = unify_context ~pos (ctx1 @ ctx2) in
-    let ctx, cstr_diff = trim_context ~pos ctx ctxp in
-    Unify.unify_dirty_scheme ~pos ctx (frshs @ frsh, tc, drt) [
-      dirt_less ~pos dc drt;
-      merge cstr_cs;
-      merge cstr_diff;
-      just cstr_c;
-      merge cstr_ctxs;
-      just cstrs
+    Unify.gather_dirty_scheme ~pos (ctxs @ ctx2) (frshs @ frsh, tc, drt) [
+      Unify.dirt_less ~pos dc drt;
+      Unify.trim_context ~pos ctxp;
+      Unify.just cstr_c;
+      Unify.just cstrs
     ]
 
 and infer_let_rec ~pos env defs =
@@ -453,16 +431,10 @@ and infer_let_rec ~pos env defs =
     ]
   in
   let vars, ctx, cnstrs = List.fold_right infer defs ([], [], Type.empty) in
-  let ctx, cnstrs_ctx = unify_context ~pos ctx in
-  let ctx, cnstrs_diff = trim_context ~pos ctx vars in
-  let cnstrs = gather [
-    merge cnstrs_diff;
-    merge cnstrs_ctx;
-    just cnstrs
+  let cnstrs = [
+    Unify.trim_context ~pos vars;
+    Unify.just cnstrs
   ] in
-  let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Unify.unify_ty_scheme ~pos ctx t [just cnstrs])) vars env in
+  let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Unify.gather_ty_scheme ~pos ctx t cnstrs)) vars env in
   env, fun (ctx2, (frsh, tc, dc), cstr_c) ->
-  Unify.unify_dirty_scheme ~pos (ctx @ ctx2) (frsh, tc, dc) [
-    just cnstrs;
-    just cstr_c
-  ]
+  Unify.gather_dirty_scheme ~pos (ctx @ ctx2) (frsh, tc, dc) (Unify.just cstr_c :: cnstrs)
