@@ -290,3 +290,19 @@ let unify_dirty_scheme ~pos ctx (frsh, ty, drt) changes =
   let cnstrs = gather changes in
   normalize_dirty_scheme ~pos (ctx, (frsh, ty, drt), cnstrs)
 
+let ty_less ~pos ty1 ty2 (ctx, ty, cnstrs) =
+  (ctx, ty, Type.add_ty_constraint ~pos ty1 ty2 cnstrs)
+let dirt_less ~pos d1 d2 (ctx, ty, cnstrs) =
+  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d1) (Type.DirtParam d2) cnstrs)
+let dirt_causes_op ~pos d r op (ctx, ty, cnstrs) =
+  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtAtom (r, op)) (Type.DirtParam d) cnstrs)
+let dirt_pure ~pos d (ctx, ty, cnstrs) =
+  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d) (Type.DirtEmpty) cnstrs)
+let region_covers ~pos r i (ctx, ty, cnstrs) =
+  (ctx, ty, Type.add_region_constraint ~pos (Type.RegionAtom (Type.InstanceParam i)) (Type.RegionParam r) cnstrs)
+let dirty_less ~pos (nws1, ty1, d1) (nws2, ty2, d2) (ctx, ty, cnstrs) =
+  Print.debug ~pos "Unifying freshness constraints %t <= %t." (Print.fresh_instances nws1) (Print.fresh_instances nws2);
+  ty_less ~pos ty1 ty2 (dirt_less ~pos d1 d2 (ctx, ty, cnstrs))
+
+let just cnstrs1 (ctx, ty, cnstrs2) = (ctx, ty, Type.join_disjoint_constraints cnstrs1 cnstrs2)
+let merge cnstrs1 (ctx, ty, cnstrs2) = (ctx, ty, Type.join_constraints cnstrs1 cnstrs2)
