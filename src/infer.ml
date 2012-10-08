@@ -269,17 +269,8 @@ and infer_comp env (c, pos) =
       ctx, ([], ty, empty_dirt ()), cnstrs
 
   | Core.Let (defs, c) -> 
-      let env, ctx1, ctxp, let_frshs, let_drt, cstrs = infer_let ~pos env defs in
-      let ctx2, (frsh, tc, dc), cstr_c = infer_comp env c in
-      let ctx, cstr_cs = unify_context ~pos (ctx1 @ ctx2) in
-      let ctx, cstr_diff = trim_context ~pos ctx ctxp in
-      unify ctx (let_frshs @ frsh, tc, let_drt) [
-        dirt_less ~pos dc let_drt;
-        merge cstr_cs;
-        merge cstr_diff;
-        just cstr_c;
-        just cstrs
-      ]
+      let env, change = infer_let ~pos env defs in
+      change (infer_comp env c)
 
   | Core.LetRec (defs, c) ->
       let env, change = infer_let_rec ~pos env defs in
@@ -439,11 +430,18 @@ and infer_let ~pos env defs =
     ]
   in
   let env, ctxs, ctxp, frshs, cstrs = List.fold_right add_binding defs (env, [], [], [], Type.empty) in
-  let ctx, cstr_ctxs = unify_context ~pos ctxs in
-  env, ctx, ctxp, frshs, drt, gather [
-    merge cstr_ctxs;
-    just cstrs
-  ]
+  let ctx1, cstr_ctxs = unify_context ~pos ctxs in
+  env, fun (ctx2, (frsh, tc, dc), cstr_c) ->
+    let ctx, cstr_cs = unify_context ~pos (ctx1 @ ctx2) in
+    let ctx, cstr_diff = trim_context ~pos ctx ctxp in
+    Unify.unify_dirty_scheme ~pos ctx (frshs @ frsh, tc, drt) [
+      dirt_less ~pos dc drt;
+      merge cstr_cs;
+      merge cstr_diff;
+      just cstr_c;
+      merge cstr_ctxs;
+      just cstrs
+    ]
 
 and infer_let_rec ~pos env defs =
   if not (Common.injective fst defs) then Error.typing ~pos "Multiply defined recursive value.";
