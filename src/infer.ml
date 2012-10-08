@@ -409,7 +409,8 @@ and infer_let ~pos env defs =
       ty_less ~pos:(snd c) t_c t_p;
       dirt_less ~pos:(snd c) drt' drt;
       just cstr_p;
-      just cstr_c
+      just cstr_c;
+      just cstrs
     ]
   in
   let env, ctxs, ctxp, frshs, cstrs = List.fold_right add_binding defs (env, [], [], [], Type.empty) in
