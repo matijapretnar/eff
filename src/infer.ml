@@ -282,12 +282,8 @@ and infer_comp env (c, pos) =
       ]
 
   | Core.LetRec (defs, c) ->
-      let env, ctx1, cstrs = infer_let_rec ~pos env defs in
-      let ctx2, (frsh, tc, dc), cstr_c = infer_comp env c in
-      unify (ctx1 @ ctx2) (frsh, tc, dc) [
-        just cstrs;
-        just cstr_c
-      ]
+      let env, change = infer_let_rec ~pos env defs in
+      change (infer_comp env c)
 
   | Core.Match (e, []) ->
       let ctx, ty_in, cnstrs = infer_expr env e in
@@ -467,4 +463,8 @@ and infer_let_rec ~pos env defs =
     just cnstrs
   ] in
   let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Unify.unify_ty_scheme ~pos ctx t [just cnstrs])) vars env in
-  env, ctx, cnstrs
+  env, fun (ctx2, (frsh, tc, dc), cstr_c) ->
+  Unify.unify_dirty_scheme ~pos (ctx @ ctx2) (frsh, tc, dc) [
+    just cnstrs;
+    just cstr_c
+  ]
