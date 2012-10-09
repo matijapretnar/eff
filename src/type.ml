@@ -168,7 +168,7 @@ and instance =
   | InstanceTop
 
 type constraints =
-  | TypeConstraint of ty * ty * Common.position
+  | TypeConstraint of ty_param * ty_param * Common.position
   | DirtConstraint of dirt * dirt * Common.position
   | RegionConstraint of region * region * Common.position
 
@@ -183,7 +183,7 @@ let subst_region sbst = function
   | RegionAtom _ as rgn -> rgn
 
 module Ty = Graph.Make(struct
-  type t = ty
+  type t = ty_param
   type bound = unit
   let inf () () = ()
   let sup () () = ()
@@ -231,7 +231,7 @@ let remove_ty g x =
   Ty.remove_vertex x g.ty_graph
 
 let subst_constraints sbst cnstr = {
-  ty_graph = Ty.map (subst_ty sbst) cnstr.ty_graph;
+  ty_graph = Ty.map (fun p -> match sbst.ty_param p with TyParam q -> q | _ -> assert false) cnstr.ty_graph;
   dirt_graph = Dirt.map (subst_dirt sbst) cnstr.dirt_graph;
   region_graph = Region.map (subst_region sbst) cnstr.region_graph;
 }

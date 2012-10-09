@@ -145,7 +145,7 @@ let constraints_of_graph g =
 
 let constraints ?(non_poly=Trio.empty) cstrs ppf =
   let constr cstr ppf = match cstr with
-  | Type.TypeConstraint (ty1, ty2, pos) -> print ppf "%t <= %t" (ty ~non_poly ty1) (ty ~non_poly ty2)
+  | Type.TypeConstraint (ty1, ty2, pos) -> print ppf "%t <= %t" (ty_param ~non_poly ty1) (ty_param ~non_poly ty2)
   | Type.DirtConstraint (drt1, drt2, pos) -> print ppf "%t <= %t" (dirt ~non_poly drt1) (dirt ~non_poly drt2)
   | Type.RegionConstraint (rgn1, rgn2, pos) -> print ppf "%t <= %t" (region ~non_poly rgn1) (region ~non_poly rgn2)
   in

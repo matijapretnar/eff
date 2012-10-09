@@ -9,7 +9,7 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs) as ty_sch) =
   | (t1, t2) when t1 = t2 -> ty_sch
 
   | (Type.TyParam p, Type.TyParam q) ->
-      (ctx, ty, Type.add_ty_constraint ~pos (Type.TyParam p) (Type.TyParam q) cnstrs)
+      (ctx, ty, Type.add_ty_constraint ~pos p q cnstrs)
 
   | (Type.TyParam p, t) ->
       let t' = Type.refresh t in
@@ -70,19 +70,19 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs) as ty_sch) =
           (Print.ty t2)
 
 and add_substitution p t (ctx, ty, cnstrs) =
-  (* When parameter [p] gets substituted by type [t] the vertex
-     [p] must be removed from the graph, and each edge becomes
-     a constraint in the queue. *)
+(* When parameter [p] gets substituted by type [t] the vertex
+   [p] must be removed from the graph, and each edge becomes
+   a constraint in the queue. *)
   let sbst = {
     Type.identity_subst with 
     Type.ty_param = (fun p' -> if p' = p then t else Type.TyParam p')
   } in
-  let (pred, succ, new_grph) = Type.remove_ty cnstrs (Type.TyParam p) in
+  let (pred, succ, new_grph) = Type.remove_ty cnstrs p in
   let cnstrs = { cnstrs with Type.ty_graph = new_grph } in
   let ty_sch = (Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, cnstrs) in
   let ty_sch =
-    List.fold_right (fun (q, pos) ty_sch -> ty_less ~pos q (Type.TyParam p) ty_sch) pred ty_sch in
-    List.fold_right (fun (q, pos) ty_sch -> ty_less ~pos (Type.TyParam p) q ty_sch) succ ty_sch
+    List.fold_right (fun (q, pos) ty_sch -> ty_less ~pos (Type.TyParam q) (Type.TyParam p) ty_sch) pred ty_sch in
+    List.fold_right (fun (q, pos) ty_sch -> ty_less ~pos (Type.TyParam p) (Type.TyParam q) ty_sch) succ ty_sch
 
 and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
   let for_parameters add ps lst1 lst2 ty_sch =
@@ -154,9 +154,7 @@ let pos_neg_params ty =
   pos_params true ty, pos_params false ty
 
 let collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) cstr =
-  let ty_p p q pos = match p, q with
-    | Type.TyParam p, Type.TyParam q -> List.mem p neg_ts && List.mem q pos_ts
-    | _, _ -> assert false
+  let ty_p p q pos = List.mem p neg_ts && List.mem q pos_ts
   and drt_p drt1 drt2 pos = match drt1, drt2 with
     | Type.DirtEmpty, _ -> false
     | Type.DirtParam p, Type.DirtParam q -> List.mem p neg_ds && List.mem q pos_ds
