@@ -1,175 +1,7 @@
 (** [unify sbst pos t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)
 
-let for_parameters add pos ps lst1 lst2 =
-  List.iter2 (fun (_, (cov, contra)) (ty1, ty2) ->
-    begin if cov then
-      add pos ty1 ty2
-    end;
-    begin if contra then
-      add pos ty2 ty1
-    end) ps (List.combine lst1 lst2)
-
-let constraints_of_graph g =
-  let lst = Type.fold_ty (fun p1 p2 pos lst -> (Type.TypeConstraint (p1, p2, pos)) :: lst) g [] in
-  let lst = Type.fold_dirt (fun d1 d2 pos lst -> (Type.DirtConstraint (d1, d2, pos)) :: lst) g lst in
-  Type.fold_region (fun r1 r2 pos lst -> (Type.RegionConstraint (r1, r2, pos)) :: lst) g lst
-
-let canonize (ctx, ty, initial_grph) =
-  let sbst = ref Type.identity_subst in
-  (* We keep a list of "final" constraints which are known not to
-     generate new constraints, and a list of constraints which still
-     need to be resolved. *)
-  let grph = ref (Type.empty) in
-  let queue = ref (constraints_of_graph initial_grph) in
-  let add_constraint = function
-    | Type.TypeConstraint (t1, t2, pos) as cnstr ->
-      if t1 <> t2 then queue := cnstr :: !queue
-    | Type.DirtConstraint (d1, d2, pos) ->
-      if d1 <> d2 then grph := Type.add_dirt_constraint ~pos d1 d2 !grph
-    | Type.RegionConstraint (r1, r2, pos) ->
-      if r1 <> r2 then grph := Type.add_region_constraint ~pos r1 r2 !grph
-  in
-  let add_ty_constraint pos t1 t2 = add_constraint (Type.TypeConstraint (t1, t2, pos)) in
-  let add_region_constraint pos r1 r2 = add_constraint (Type.RegionConstraint (r1, r2, pos)) in
-  let add_dirt_constraint pos d1 d2 = add_constraint (Type.DirtConstraint (d1, d2, pos)) in
-  let add_substitution p t =
-    (* When parameter [p] gets substituted by type [t] the vertex
-       [p] must be removed from the graph, and each edge becomes
-       a constraint in the queue. *)
-    let (pred, succ, new_grph) = Type.remove_ty !grph (Type.TyParam p) in
-    grph := {!grph with Type.ty_graph = new_grph};
-      List.iter (fun (q, pos) -> add_ty_constraint pos q (Type.TyParam p)) pred ;
-      List.iter (fun (q, pos) -> add_ty_constraint pos (Type.TyParam p) q) succ ;
-      sbst := Type.compose_subst {
-        Type.identity_subst with
-        Type.ty_param = (fun p' -> if p' = p then t else Type.TyParam p')
-      } !sbst
-  in
-  let unify pos t1 t2 =
-    let t1 = Type.subst_ty !sbst t1 in
-    let t2 = Type.subst_ty !sbst t2 in
-    match t1, t2 with
-
-    | (t1, t2) when t1 = t2 -> ()
-
-    | (Type.TyParam p, Type.TyParam q) ->
-        grph := Type.add_ty_constraint ~pos (Type.TyParam p) (Type.TyParam q) !grph
-
-    | (Type.TyParam p, t) ->
-        if false
-        (* XXX *)
-        (* if Type.occurs_in_ty p t *)
-        then
-          let t1, t2 = Type.beautify2 t1 t2 in
-          Error.typing ~pos
-            "This expression has a forbidden cylclic type %t = %t."
-            (Print.ty t1)
-            (Print.ty t2)
-        else
-          let t' = Type.refresh t in
-          add_substitution p t' ;
-          add_ty_constraint pos t' t
-
-    | (t, Type.TyParam p) ->
-        (* XXX One should do occurs check on constraints too.
-            Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)
-        if false
-        (* XXX *)
-        (* if Type.occurs_in_ty p t *)
-        then
-          let t1, t2 = Type.beautify2 t1 t2 in
-          Error.typing ~pos
-            "This expression has a forbidden cylclic type %t = %t."
-            (Print.ty t1)
-            (Print.ty t2)
-        else
-          let t' = Type.refresh t in
-          add_substitution p t' ;
-          add_ty_constraint pos t t'
-
-    | (Type.Arrow (u1, (lst1, v1, drt1)), Type.Arrow (u2, (lst2, v2, drt2))) ->
-        Print.debug "Unifying %t and %t" (Print.fresh_instances lst1) (Print.fresh_instances lst2);
-        (* XXX How do we unify fresh instances? *)
-        add_ty_constraint pos v1 v2;
-        add_ty_constraint pos u2 u1;
-        add_dirt_constraint pos (Type.DirtParam drt1) (Type.DirtParam drt2)
-
-    | (Type.Tuple lst1, Type.Tuple lst2)
-        when List.length lst1 = List.length lst2 ->
-        List.iter2 (add_ty_constraint pos) lst1 lst2
-
-    | (Type.Apply (t1, (ts1, drts1, rgns1)), Type.Apply (t2, (ts2, drts2, rgns2))) when t1 = t2 ->
-      (* NB: it is assumed here that
-         List.length ts1 = List.length ts2 && List.length drts1 = List.length drts2 && List.length rgns1 = List.length rgns2 *)
-        begin match Tctx.lookup_params t1 with
-        | None -> Error.typing ~pos "Undefined type %s" t1
-        | Some (ps, ds, rs) ->
-            for_parameters add_ty_constraint pos ps ts1 ts2;
-            for_parameters add_dirt_constraint pos ds (List.map (fun d -> Type.DirtParam d) drts1) (List.map (fun d -> Type.DirtParam d) drts2);
-            for_parameters add_region_constraint pos rs (List.map (fun r -> Type.RegionParam r) rgns1) (List.map (fun r -> Type.RegionParam r) rgns2)
-        end
-
-    | (Type.Effect (t1, (ts1, drts1, rgns1), rgn1), Type.Effect (t2, (ts2, drts2, rgns2), rgn2)) when t1 = t2 ->
-        (* NB: it is assumed here that
-           && List.length ts1 = List.length ts2 && List.length drts1 = List.length drts2 && List.length rgns1 = List.length rgns2 *)
-        begin match Tctx.lookup_params t1 with
-        | None -> Error.typing ~pos "Undefined type %s" t1
-        | Some (ps, ds, rs) ->
-            add_region_constraint pos (Type.RegionParam rgn1) (Type.RegionParam rgn2);
-            for_parameters add_ty_constraint pos ps ts1 ts2;
-            for_parameters add_dirt_constraint pos ds (List.map (fun d -> Type.DirtParam d) drts1) (List.map (fun d -> Type.DirtParam d) drts2);
-            for_parameters add_region_constraint pos rs (List.map (fun r -> Type.RegionParam r) rgns1) (List.map (fun r -> Type.RegionParam r) rgns2)
-        end
-
-    (* The following two cases cannot be merged into one, as the whole matching
-       fails if both types are Apply, but only the second one is transparent. *)
-    | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos t1 ->
-        begin match Tctx.ty_apply ~pos t1 lst1 with
-        | Tctx.Inline t -> add_ty_constraint pos t2 t
-        | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
-        end
-
-    | (t2, Type.Apply (t1, lst1)) when Tctx.transparent ~pos t1 ->
-        begin match Tctx.ty_apply ~pos t1 lst1 with
-        | Tctx.Inline t -> add_ty_constraint pos t t2
-        | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
-        end
-
-    | (Type.Handler (tv1, tf1), Type.Handler (tv2, tf2)) ->
-        add_ty_constraint pos tv2 tv1;
-        add_ty_constraint pos tf1 tf2
-
-    | (t1, t2) ->
-          let t1, t2 = Type.beautify2 t1 t2 in
-          Error.typing ~pos
-            "This expression has type %t but it should have type %t."
-            (Print.ty t1)
-            (Print.ty t2)
-
-  and unify_dirt pos drt1 drt2 =
-    add_dirt_constraint pos drt1 drt2
-
-  and unify_region pos rgn1 rgn2 =
-    add_region_constraint pos rgn1 rgn2
-
-  in
-
-  let rec loop () =
-    match !queue with
-      | [] -> (Common.assoc_map (Type.subst_ty !sbst) ctx, Type.subst_ty !sbst ty, !grph)
-      | cnstr :: cnstrs ->
-        queue := cnstrs ;
-        begin match cnstr with
-          | Type.TypeConstraint (t1, t2, pos) -> unify pos t1 t2
-          | Type.DirtConstraint (drt1, drt2, pos) -> unify_dirt pos drt1 drt2;
-          | Type.RegionConstraint (rgn1, rgn2, pos) -> unify_region pos rgn1 rgn2
-        end ;
-        loop ()
-  in
-    loop ()
-
-let rec new_ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs) as ty_sch) =
+let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs) as ty_sch) =
   (* XXX Check cyclic types *)
   (* Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)
   match ty1, ty2 with
@@ -181,18 +13,18 @@ let rec new_ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs) as ty_sch) =
 
   | (Type.TyParam p, t) ->
       let t' = Type.refresh t in
-      new_ty_less ~pos t' t (add_substitution p t' ty_sch)
+      ty_less ~pos t' t (add_substitution p t' ty_sch)
 
   | (t, Type.TyParam p) ->
       let t' = Type.refresh t in
-      new_ty_less ~pos t t' (add_substitution p t' ty_sch)
+      ty_less ~pos t t' (add_substitution p t' ty_sch)
 
   | (Type.Arrow (ty1, drty1), Type.Arrow (ty2, drty2)) ->
-      new_ty_less ~pos ty2 ty1 (dirty_less ~pos drty1 drty2 ty_sch)
+      ty_less ~pos ty2 ty1 (dirty_less ~pos drty1 drty2 ty_sch)
 
   | (Type.Tuple lst1, Type.Tuple lst2)
       when List.length lst1 = List.length lst2 ->
-      List.fold_right2 (new_ty_less ~pos) lst1 lst2 ty_sch
+      List.fold_right2 (ty_less ~pos) lst1 lst2 ty_sch
 
   | (Type.Apply (t1, args1), Type.Apply (t2, args2)) when t1 = t2 ->
     (* NB: it is assumed here that
@@ -217,18 +49,18 @@ let rec new_ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs) as ty_sch) =
      fails if both types are Apply, but only the second one is transparent. *)
   | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos t1 ->
       begin match Tctx.ty_apply ~pos t1 lst1 with
-      | Tctx.Inline t -> new_ty_less ~pos t2 t ty_sch
+      | Tctx.Inline t -> ty_less ~pos t2 t ty_sch
       | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
       end
 
   | (t2, Type.Apply (t1, lst1)) when Tctx.transparent ~pos t1 ->
       begin match Tctx.ty_apply ~pos t1 lst1 with
-      | Tctx.Inline t -> new_ty_less ~pos t t2 ty_sch
+      | Tctx.Inline t -> ty_less ~pos t t2 ty_sch
       | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
       end
 
   | (Type.Handler (tv1, tf1), Type.Handler (tv2, tf2)) ->
-      new_ty_less ~pos tv2 tv1 (new_ty_less ~pos tf1 tf2 ty_sch)
+      ty_less ~pos tv2 tv1 (ty_less ~pos tf1 tf2 ty_sch)
 
   | (t1, t2) ->
         let t1, t2 = Type.beautify2 t1 t2 in
@@ -237,7 +69,20 @@ let rec new_ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs) as ty_sch) =
           (Print.ty t1)
           (Print.ty t2)
 
-and add_substitution p t (ctx, ty, cnstrs) = (ctx, ty, cnstrs)
+and add_substitution p t (ctx, ty, cnstrs) =
+  (* When parameter [p] gets substituted by type [t] the vertex
+     [p] must be removed from the graph, and each edge becomes
+     a constraint in the queue. *)
+  let sbst = {
+    Type.identity_subst with 
+    Type.ty_param = (fun p' -> if p' = p then t else Type.TyParam p')
+  } in
+  let (pred, succ, new_grph) = Type.remove_ty cnstrs (Type.TyParam p) in
+  let cnstrs = { cnstrs with Type.ty_graph = new_grph } in
+  let ty_sch = (Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, cnstrs) in
+  let ty_sch =
+    List.fold_right (fun (q, pos) ty_sch -> ty_less ~pos q (Type.TyParam p) ty_sch) pred ty_sch in
+    List.fold_right (fun (q, pos) ty_sch -> ty_less ~pos (Type.TyParam p) q ty_sch) succ ty_sch
 
 and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
   let for_parameters add ps lst1 lst2 ty_sch =
@@ -245,13 +90,10 @@ and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
                         let ty_sch = if cov then add ~pos ty1 ty2 ty_sch else ty_sch in
                         if contra then add ~pos ty2 ty1 ty_sch else ty_sch) ps (List.combine lst1 lst2) ty_sch
   in
-  let ty_sch = for_parameters new_ty_less ps ts1 ts2 ty_sch in
+  let ty_sch = for_parameters ty_less ps ts1 ts2 ty_sch in
   let ty_sch = for_parameters dirt_less ds ds1 ds2 ty_sch in
   for_parameters region_less rs rs1 rs2 ty_sch
 
-and ty_less ~pos ty1 ty2 (ctx, ty, cnstrs) =
-  (* new_ty_less ~pos ty1 ty2 (ctx, ty, cnstrs) *)
-  canonize (ctx, ty, Type.add_ty_constraint ~pos ty1 ty2 cnstrs)
 and dirt_less ~pos d1 d2 (ctx, ty, cnstrs) =
   (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d1) (Type.DirtParam d2) cnstrs)
 and dirt_causes_op ~pos d r op (ctx, ty, cnstrs) =
@@ -272,7 +114,7 @@ let trim_context ~pos ctx_p (ctx, ty, cnstrs) =
   let trim (x, t) (ctx, ty, cnstrs) =
     match Common.lookup x ctx_p with
     | None -> ((x, t) :: ctx, ty, cnstrs)
-    | Some u -> (ctx, ty, Type.add_ty_constraint pos u t cnstrs)
+    | Some u -> ty_less ~pos u t (ctx, ty, cnstrs)
   in
   List.fold_right trim ctx ([], ty, cnstrs)
 
@@ -332,20 +174,18 @@ let collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) cstr =
 
 let gather_ty_scheme ~pos ctx ty changes =
   let normalize_context ~pos (ctx, ty, cstr) =
-    let add (x, ty) (ctx, cnstrs) =
+    let add (x, ty) (ctx, typ, cnstrs) =
       match Common.lookup x ctx with
       | None ->
           let ty' = Type.fresh_ty () in
-          ((x, ty') :: ctx, Type.add_ty_constraint ~pos ty' ty cnstrs)
+          ty_less ~pos ty' ty ((x, ty') :: ctx, typ, cnstrs)
       | Some ty' ->
-          (ctx, Type.add_ty_constraint ~pos ty' ty cnstrs)
+          ty_less ~pos ty' ty (ctx, typ, cnstrs)
     in
-    let ctx, cstr = List.fold_right add ctx ([], cstr) in
-    (ctx, ty, cstr)
+    List.fold_right add ctx ([], ty, cstr)
   in
   let normalize_ty_scheme ~pos ty_sch =
     let ctx, ty, cstr = normalize_context ~pos ty_sch in
-    let ctx, ty, cstr = canonize (ctx, ty, cstr) in
     let pos, neg = List.fold_right (fun (_, t) (pos, neg) ->
         let pos_t, neg_t = pos_neg_params t in
         neg_t @@@ pos, pos_t @@@ neg) ctx (pos_neg_params ty) in
@@ -360,8 +200,7 @@ let gather_dirty_scheme ~pos ctx drty changes =
   | _ -> assert false
 
 let gather_pattern_scheme ~pos ctx ty changes =
-  let ty_sch = List.fold_right (fun change ty_sch -> change ty_sch) changes (ctx, ty, Type.empty) in
-  let ctx, ty, cstr = canonize ty_sch in
+  let ctx, ty, cstr = List.fold_right (fun change ty_sch -> change ty_sch) changes (ctx, ty, Type.empty) in
   let pos, neg = List.fold_right (fun (_, t) (pos, neg) ->
       let pos_t, neg_t = pos_neg_params t in
       neg_t @@@ pos, pos_t @@@ neg) ctx (pos_neg_params ty) in
