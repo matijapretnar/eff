@@ -10,43 +10,10 @@ let for_parameters add pos ps lst1 lst2 =
       add pos ty2 ty1
     end) ps (List.combine lst1 lst2)
 
-
-let empty_constraint = []
-
 let constraints_of_graph g =
   let lst = Type.fold_ty (fun p1 p2 pos lst -> (Type.TypeConstraint (p1, p2, pos)) :: lst) g [] in
   let lst = Type.fold_dirt (fun d1 d2 pos lst -> (Type.DirtConstraint (d1, d2, pos)) :: lst) g lst in
   Type.fold_region (fun r1 r2 pos lst -> (Type.RegionConstraint (r1, r2, pos)) :: lst) g lst
-
-let gather changes = List.fold_right (fun change cnstrs -> change cnstrs) changes Type.empty
-
-(* let rec add_substitution ~pos p t (ctx, ty, cnstrs) =
-  (* When parameter [p] gets substituted by type [t] the vertex
-     [p] must be removed from the graph, and each edge becomes
-     a constraint in the queue. *)
-  let (pred, succ, new_cnstrs) = Type.remove_ty cnstrs (Type.TyParam p) in
-  let sbst = {Type.identity_subst with Type.ty_param = (fun p' -> if p' = p then t else Type.TyParam p')} in
-  let cnstrs = List.fold_right (fun (q, pos) -> add_ty_constraint ~pos q (Type.TyParam p)) pred cnstrs in
-  let cnstrs = List.fold_right (fun (q, pos) -> add_ty_constraint ~pos (Type.TyParam p) q) succ cnstrs in
-  (Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty ty, cnstrs)
-
-and add_ty_constraint ~pos ty1 ty2 (ctx, ty, cnstrs) =
-  match ty1, ty2 with
-  | (t1, t2) when t1 = t2 -> (ctx, ty, cnstrs)
-
-  | (Type.TyParam p, Type.TyParam q) ->
-      (ctx, ty, Type.add_ty_constraint ~pos (Type.TyParam p) (Type.TyParam q) cnstrs)
-
-  | (Type.TyParam p, t) ->
-      let t' = Type.refresh t in
-      let ctx, ty, cnstrs = add_substitution ~pos p t' (ctx, ty, cnstrs) in
-      (ctx, ty, add_ty_constraint ~pos t' t cnstrs)
-
-  | (t, Type.TyParam p) ->
-      let t' = Type.refresh t in
-      let ctx, ty, cnstrs = add_substitution ~pos p t' (ctx, ty, cnstrs) in
-      (ctx, ty, add_ty_constraint ~pos t t' cnstrs)
- *)
 
 let canonize (ctx, ty, initial_grph) =
   let sbst = ref Type.identity_subst in
@@ -256,40 +223,6 @@ let collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) cstr =
   in
   Type.garbage_collect ty_p drt_p rgn_p cstr
 
-let normalize_context ~pos (ctx, ty, cstr) =
-  let add (x, ty) (ctx, cnstrs) =
-    match Common.lookup x ctx with
-    | None ->
-        let ty' = Type.fresh_ty () in
-        ((x, ty') :: ctx, Type.add_ty_constraint ~pos ty' ty cnstrs)
-    | Some ty' ->
-        (ctx, Type.add_ty_constraint ~pos ty' ty cnstrs)
-  in
-  let ctx, cstr = List.fold_right add ctx ([], cstr) in
-  (ctx, ty, cstr)
-
-let normalize_ty_scheme ~pos ty_sch =
-  let ctx, ty, cstr = normalize_context ~pos ty_sch in
-  let ctx, ty, cstr = canonize (ctx, ty, cstr) in
-  let pos, neg = List.fold_right (fun (_, t) (pos, neg) ->
-      let pos_t, neg_t = pos_neg_params t in
-      neg_t @@@ pos, pos_t @@@ neg) ctx (pos_neg_params ty) in
-  let pos, neg = Trio.uniq pos, Trio.uniq neg in
-  (ctx, ty, collect pos neg cstr)
-
-let normalize_dirty_scheme ~pos (ctx, drty, cstr) =
-  match normalize_ty_scheme ~pos (ctx, Type.Arrow (Type.unit_ty, drty), cstr) with
-  | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
-  | _ -> assert false
-
-let unify_ty_scheme ~pos ctx ty changes =
-  let cnstrs = gather changes in
-  normalize_ty_scheme ~pos (ctx, ty, cnstrs)
-
-let unify_dirty_scheme ~pos ctx (frsh, ty, drt) changes =
-  let cnstrs = gather changes in
-  normalize_dirty_scheme ~pos (ctx, (frsh, ty, drt), cnstrs)
-
 let ty_less ~pos ty1 ty2 (ctx, ty, cnstrs) =
   canonize (ctx, ty, Type.add_ty_constraint ~pos ty1 ty2 cnstrs)
 let dirt_less ~pos d1 d2 (ctx, ty, cnstrs) =
@@ -305,7 +238,6 @@ let dirty_less ~pos (nws1, ty1, d1) (nws2, ty2, d2) (ctx, ty, cnstrs) =
   ty_less ~pos ty1 ty2 (dirt_less ~pos d1 d2 (ctx, ty, cnstrs))
 
 let just cnstrs1 (ctx, ty, cnstrs2) = (ctx, ty, Type.join_disjoint_constraints cnstrs1 cnstrs2)
-let merge cnstrs1 (ctx, ty, cnstrs2) = (ctx, ty, Type.join_constraints cnstrs1 cnstrs2)
 
 let trim_context ~pos ctx_p (ctx, ty, cnstrs) =
   let trim (x, t) (ctx, ty, cnstrs) =
@@ -316,6 +248,27 @@ let trim_context ~pos ctx_p (ctx, ty, cnstrs) =
   List.fold_right trim ctx ([], ty, cnstrs)
 
 let gather_ty_scheme ~pos ctx ty changes =
+  let normalize_context ~pos (ctx, ty, cstr) =
+    let add (x, ty) (ctx, cnstrs) =
+      match Common.lookup x ctx with
+      | None ->
+          let ty' = Type.fresh_ty () in
+          ((x, ty') :: ctx, Type.add_ty_constraint ~pos ty' ty cnstrs)
+      | Some ty' ->
+          (ctx, Type.add_ty_constraint ~pos ty' ty cnstrs)
+    in
+    let ctx, cstr = List.fold_right add ctx ([], cstr) in
+    (ctx, ty, cstr)
+  in
+  let normalize_ty_scheme ~pos ty_sch =
+    let ctx, ty, cstr = normalize_context ~pos ty_sch in
+    let ctx, ty, cstr = canonize (ctx, ty, cstr) in
+    let pos, neg = List.fold_right (fun (_, t) (pos, neg) ->
+        let pos_t, neg_t = pos_neg_params t in
+        neg_t @@@ pos, pos_t @@@ neg) ctx (pos_neg_params ty) in
+    let pos, neg = Trio.uniq pos, Trio.uniq neg in
+    (ctx, ty, collect pos neg cstr)
+  in
   normalize_ty_scheme ~pos (List.fold_right (fun change ty_sch -> change ty_sch) changes (ctx, ty, Type.empty))
 
 let gather_dirty_scheme ~pos ctx drty changes =
@@ -323,9 +276,8 @@ let gather_dirty_scheme ~pos ctx drty changes =
   | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
   | _ -> assert false
 
-let unify_pattern ~pos ctx ty changes =
+let gather_pattern_scheme ~pos ctx ty changes =
   let ty_sch = List.fold_right (fun change ty_sch -> change ty_sch) changes (ctx, ty, Type.empty) in
-  (* let ty_sch = normalize_context ~pos ty_sch in *)
   let ctx, ty, cstr = canonize ty_sch in
   let pos, neg = List.fold_right (fun (_, t) (pos, neg) ->
       let pos_t, neg_t = pos_neg_params t in

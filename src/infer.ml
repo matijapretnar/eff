@@ -12,26 +12,7 @@ let dirt_pure = Unify.dirt_pure
 let region_covers = Unify.region_covers
 let dirty_less = Unify.dirty_less
 let just = Unify.just
-let merge = Unify.merge
 let trim_context = Unify.trim_context
-
-(* XXX: Obsolete comments, fix.
-
-   We perform type inference int the style of Standard ML 97, i.e.,
-   Hindley-Milner polymorphism with value restriction. Throughout, we work with
-   a reference to a type substitution, usually called [cstr], in which we
-   collect the results of unification. That is, we perform unification as early
-   as posssible (rather than collect all equations and then solve them), and
-   store the results in [cstr]. 
-
-   The effect of carrying around the substitution is that we need to be careful
-   about when to apply it:
-   
-   1. we apply the substitution to types [t1] and [t2] before trying to solve
-      the equation [t1 = t2].
-
-   2. we apply the substitution to a type which we just looked up in the context.
-*)
 
 (* Can a computation safely be generalized, i.e., is it non-expansive in the parlance of
    SML? In our case non-expansive simply means "is a value". *)
@@ -55,7 +36,7 @@ let ty_of_const = function
 let rec infer_pattern (p, pos) =
   (* We do not check for overlaps as all identifiers are distinct - desugar needs to do those *)
   if !disable_typing then simple Type.universal_ty else
-  let unify = Unify.unify_pattern ~pos in
+  let unify = Unify.gather_pattern_scheme ~pos in
   match p with
   | Pattern.Var x ->
       let ty = Type.fresh_ty () in
