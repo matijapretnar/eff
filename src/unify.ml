@@ -169,6 +169,113 @@ let canonize (ctx, ty, initial_grph) =
   in
     loop ()
 
+let rec new_ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs) as ty_sch) =
+  (* XXX Check cyclic types *)
+  (* Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)
+  match ty1, ty2 with
+
+  | (t1, t2) when t1 = t2 -> ty_sch
+
+  | (Type.TyParam p, Type.TyParam q) ->
+      (ctx, ty, Type.add_ty_constraint ~pos (Type.TyParam p) (Type.TyParam q) cnstrs)
+
+  | (Type.TyParam p, t) ->
+      let t' = Type.refresh t in
+      new_ty_less ~pos t' t (add_substitution p t' ty_sch)
+
+  | (t, Type.TyParam p) ->
+      let t' = Type.refresh t in
+      new_ty_less ~pos t t' (add_substitution p t' ty_sch)
+
+  | (Type.Arrow (ty1, drty1), Type.Arrow (ty2, drty2)) ->
+      new_ty_less ~pos ty2 ty1 (dirty_less ~pos drty1 drty2 ty_sch)
+
+  | (Type.Tuple lst1, Type.Tuple lst2)
+      when List.length lst1 = List.length lst2 ->
+      List.fold_right2 (new_ty_less ~pos) lst1 lst2 ty_sch
+
+  | (Type.Apply (t1, args1), Type.Apply (t2, args2)) when t1 = t2 ->
+    (* NB: it is assumed here that
+       List.length ts1 = List.length ts2 && List.length drts1 = List.length drts2 && List.length rgns1 = List.length rgns2 *)
+      begin match Tctx.lookup_params t1 with
+      | None -> Error.typing ~pos "Undefined type %s" t1
+      | Some ps -> args_less ~pos ps args1 args2 ty_sch
+      end
+
+  | (Type.Effect (t1, args1, rgn1), Type.Effect (t2, args2, rgn2)) when t1 = t2 ->
+      (* NB: it is assumed here that
+         && List.length ts1 = List.length ts2 && List.length drts1 = List.length drts2 && List.length rgns1 = List.length rgns2 *)
+      begin match Tctx.lookup_params t1 with
+      | None -> Error.typing ~pos "Undefined type %s" t1
+      | Some ps ->
+          region_less ~pos rgn1 rgn2 (
+            args_less ~pos ps args1 args2 ty_sch
+          )
+      end
+
+  (* The following two cases cannot be merged into one, as the whole matching
+     fails if both types are Apply, but only the second one is transparent. *)
+  | (Type.Apply (t1, lst1), t2) when Tctx.transparent ~pos t1 ->
+      begin match Tctx.ty_apply ~pos t1 lst1 with
+      | Tctx.Inline t -> new_ty_less ~pos t2 t ty_sch
+      | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
+      end
+
+  | (t2, Type.Apply (t1, lst1)) when Tctx.transparent ~pos t1 ->
+      begin match Tctx.ty_apply ~pos t1 lst1 with
+      | Tctx.Inline t -> new_ty_less ~pos t t2 ty_sch
+      | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
+      end
+
+  | (Type.Handler (tv1, tf1), Type.Handler (tv2, tf2)) ->
+      new_ty_less ~pos tv2 tv1 (new_ty_less ~pos tf1 tf2 ty_sch)
+
+  | (t1, t2) ->
+        let t1, t2 = Type.beautify2 t1 t2 in
+        Error.typing ~pos
+          "This expression has type %t but it should have type %t."
+          (Print.ty t1)
+          (Print.ty t2)
+
+and add_substitution p t (ctx, ty, cnstrs) = (ctx, ty, cnstrs)
+
+and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
+  let for_parameters add ps lst1 lst2 ty_sch =
+    List.fold_right2 (fun (_, (cov, contra)) (ty1, ty2) ty_sch ->
+                        let ty_sch = if cov then add ~pos ty1 ty2 ty_sch else ty_sch in
+                        if contra then add ~pos ty2 ty1 ty_sch else ty_sch) ps (List.combine lst1 lst2) ty_sch
+  in
+  let ty_sch = for_parameters new_ty_less ps ts1 ts2 ty_sch in
+  let ty_sch = for_parameters dirt_less ds ds1 ds2 ty_sch in
+  for_parameters region_less rs rs1 rs2 ty_sch
+
+and ty_less ~pos ty1 ty2 (ctx, ty, cnstrs) =
+  (* new_ty_less ~pos ty1 ty2 (ctx, ty, cnstrs) *)
+  canonize (ctx, ty, Type.add_ty_constraint ~pos ty1 ty2 cnstrs)
+and dirt_less ~pos d1 d2 (ctx, ty, cnstrs) =
+  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d1) (Type.DirtParam d2) cnstrs)
+and dirt_causes_op ~pos d r op (ctx, ty, cnstrs) =
+  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtAtom (r, op)) (Type.DirtParam d) cnstrs)
+and dirt_pure ~pos d (ctx, ty, cnstrs) =
+  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d) (Type.DirtEmpty) cnstrs)
+and region_less ~pos r1 r2 (ctx, ty, cnstrs) =
+  (ctx, ty, Type.add_region_constraint ~pos (Type.RegionParam r1) (Type.RegionParam r2) cnstrs)
+and region_covers ~pos r i (ctx, ty, cnstrs) =
+  (ctx, ty, Type.add_region_constraint ~pos (Type.RegionAtom (Type.InstanceParam i)) (Type.RegionParam r) cnstrs)
+and dirty_less ~pos (nws1, ty1, d1) (nws2, ty2, d2) (ctx, ty, cnstrs) =
+  Print.debug ~pos "Unifying freshness constraints %t <= %t." (Print.fresh_instances nws1) (Print.fresh_instances nws2);
+  ty_less ~pos ty1 ty2 (dirt_less ~pos d1 d2 (ctx, ty, cnstrs))
+
+let just cnstrs1 (ctx, ty, cnstrs2) = (ctx, ty, Type.join_disjoint_constraints cnstrs1 cnstrs2)
+
+let trim_context ~pos ctx_p (ctx, ty, cnstrs) =
+  let trim (x, t) (ctx, ty, cnstrs) =
+    match Common.lookup x ctx_p with
+    | None -> ((x, t) :: ctx, ty, cnstrs)
+    | Some u -> (ctx, ty, Type.add_ty_constraint pos u t cnstrs)
+  in
+  List.fold_right trim ctx ([], ty, cnstrs)
+
 let (@@@) = Trio.append
 
 let for_parameters get_params is_pos ps lst =
@@ -222,30 +329,6 @@ let collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) cstr =
     | _, _ -> true
   in
   Type.garbage_collect ty_p drt_p rgn_p cstr
-
-let ty_less ~pos ty1 ty2 (ctx, ty, cnstrs) =
-  canonize (ctx, ty, Type.add_ty_constraint ~pos ty1 ty2 cnstrs)
-let dirt_less ~pos d1 d2 (ctx, ty, cnstrs) =
-  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d1) (Type.DirtParam d2) cnstrs)
-let dirt_causes_op ~pos d r op (ctx, ty, cnstrs) =
-  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtAtom (r, op)) (Type.DirtParam d) cnstrs)
-let dirt_pure ~pos d (ctx, ty, cnstrs) =
-  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d) (Type.DirtEmpty) cnstrs)
-let region_covers ~pos r i (ctx, ty, cnstrs) =
-  (ctx, ty, Type.add_region_constraint ~pos (Type.RegionAtom (Type.InstanceParam i)) (Type.RegionParam r) cnstrs)
-let dirty_less ~pos (nws1, ty1, d1) (nws2, ty2, d2) (ctx, ty, cnstrs) =
-  Print.debug ~pos "Unifying freshness constraints %t <= %t." (Print.fresh_instances nws1) (Print.fresh_instances nws2);
-  ty_less ~pos ty1 ty2 (dirt_less ~pos d1 d2 (ctx, ty, cnstrs))
-
-let just cnstrs1 (ctx, ty, cnstrs2) = (ctx, ty, Type.join_disjoint_constraints cnstrs1 cnstrs2)
-
-let trim_context ~pos ctx_p (ctx, ty, cnstrs) =
-  let trim (x, t) (ctx, ty, cnstrs) =
-    match Common.lookup x ctx_p with
-    | None -> ((x, t) :: ctx, ty, cnstrs)
-    | Some u -> (ctx, ty, Type.add_ty_constraint pos u t cnstrs)
-  in
-  List.fold_right trim ctx ([], ty, cnstrs)
 
 let gather_ty_scheme ~pos ctx ty changes =
   let normalize_context ~pos (ctx, ty, cstr) =
