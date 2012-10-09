@@ -134,7 +134,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
 
 let infer_top_comp ctx c =
   let drty_sch = Infer.infer_comp ctx c in
-  let drty_sch = Unify.normalize_dirty_scheme ~pos:(snd c) drty_sch in
+  (* let drty_sch = Unify.normalize_dirty_scheme ~pos:(snd c) drty_sch in *)
   Exhaust.check_comp c ;
   (* let cnstr = Unify.constraints_of_graph remaining in *)
   (* XXX What to do about the fresh instances? *)

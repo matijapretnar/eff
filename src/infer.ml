@@ -5,6 +5,16 @@ let warn_implicit_sequencing = ref false;;
 
 let disable_typing = ref false;;
 
+let ty_less = Unify.ty_less
+let dirt_less = Unify.dirt_less
+let dirt_causes_op = Unify.dirt_causes_op
+let dirt_pure = Unify.dirt_pure
+let region_covers = Unify.region_covers
+let dirty_less = Unify.dirty_less
+let just = Unify.just
+let merge = Unify.merge
+let trim_context = Unify.trim_context
+
 (* XXX: Obsolete comments, fix.
 
    We perform type inference int the style of Standard ML 97, i.e.,
@@ -33,25 +43,6 @@ let nonexpansive = function
 let simple ty = ([], ty, Type.empty)
 let empty_dirt () = Type.fresh_dirt_param ()
 
-let gather changes = List.fold_right (fun change cnstrs -> change cnstrs) changes Type.empty
-
-let ty_less ~pos ty1 ty2 cnstrs =
-  Type.add_ty_constraint ~pos ty1 ty2 cnstrs
-let dirt_less ~pos d1 d2 cnstrs =
-  Type.add_dirt_constraint ~pos (Type.DirtParam d1) (Type.DirtParam d2) cnstrs
-let dirt_causes_op ~pos d r op cnstrs =
-  Type.add_dirt_constraint ~pos (Type.DirtAtom (r, op)) (Type.DirtParam d) cnstrs
-let dirt_pure ~pos d cnstrs =
-  Type.add_dirt_constraint ~pos (Type.DirtParam d) (Type.DirtEmpty) cnstrs
-let region_covers ~pos r i cnstrs =
-  Type.add_region_constraint ~pos (Type.RegionAtom (Type.InstanceParam i)) (Type.RegionParam r) cnstrs
-let dirty_less ~pos (nws1, ty1, d1) (nws2, ty2, d2) cnstrs =
-  Print.debug ~pos "Unifying freshness constraints %t <= %t." (Print.fresh_instances nws1) (Print.fresh_instances nws2);
-  ty_less ~pos ty1 ty2 (dirt_less ~pos d1 d2 cnstrs)
-
-let just cnstrs1 cnstrs2 = Type.join_disjoint_constraints cnstrs1 cnstrs2
-let merge cnstrs1 cnstrs2 = Type.join_constraints cnstrs1 cnstrs2
-
 let ty_of_const = function
   | Common.Integer _ -> Type.int_ty
   | Common.String _ -> Type.string_ty
@@ -64,6 +55,7 @@ let ty_of_const = function
 let rec infer_pattern (p, pos) =
   (* We do not check for overlaps as all identifiers are distinct - desugar needs to do those *)
   if !disable_typing then simple Type.universal_ty else
+  let unify = Unify.unify_pattern ~pos in
   match p with
   | Pattern.Var x ->
       let ty = Type.fresh_ty () in
@@ -76,10 +68,10 @@ let rec infer_pattern (p, pos) =
   | Pattern.Tuple ps ->
       let infer p (ctx, tys, cnstrs) =
         let ctx', ty', cnstrs' = infer_pattern p in
-        ctx' @ ctx, ty' :: tys, just cnstrs' cnstrs
+        ctx' @ ctx, ty' :: tys, just cnstrs' :: cnstrs
       in
-      let ctx, tys, cnstrs = List.fold_right infer ps ([], [], Type.empty) in
-      ctx, Type.Tuple tys, cnstrs
+      let ctx, tys, cnstrs = List.fold_right infer ps ([], [], []) in
+      unify ctx (Type.Tuple tys) cnstrs
   | Pattern.Record [] ->
       assert false
   | Pattern.Record (((fld, _) :: _) as lst) ->
@@ -91,15 +83,14 @@ let rec infer_pattern (p, pos) =
             | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s." fld ty_name
             | Some ty ->
                 let ctx', ty', cnstrs' = infer_pattern p in
-                ctx' @ ctx, gather [
+                ctx' @ ctx, [
                   ty_less ~pos ty ty';
-                  just cnstrs;
                   just cnstrs'
-                ]
+                ] @ cnstrs;
             end
         in
-        let ctx, cnstrs = List.fold_right infer lst ([], Type.empty) in
-        ctx, ty, cnstrs
+        let ctx, cnstrs = List.fold_right infer lst ([], []) in
+        unify ctx ty cnstrs
       end
   | Pattern.Variant (lbl, p) ->
       begin match Tctx.infer_variant lbl with
@@ -109,7 +100,7 @@ let rec infer_pattern (p, pos) =
           | None, None -> simple ty
           | Some p, Some u ->
               let ctx', ty', cnstrs' = infer_pattern p in
-              ctx', ty, gather [
+              unify ctx' ty [
                 ty_less ~pos u ty';
                 just cnstrs'
               ]
@@ -122,7 +113,7 @@ let rec infer_pattern (p, pos) =
    [env]. It returns the inferred type of [e]. *)
 let rec infer_expr env (e, pos) =
   if !disable_typing then simple Type.universal_ty else
-  let unify = Unify.unify_ty_scheme ~pos in
+  let unify = Unify.gather_ty_scheme ~pos in
   match e with
 
   | Core.Var x ->
@@ -139,10 +130,10 @@ let rec infer_expr env (e, pos) =
   | Core.Tuple es ->
       let infer e (ctx, tys, cnstrs) =
         let ctx', ty', cnstrs' = infer_expr env e in
-        ctx' @ ctx, ty' :: tys, just cnstrs' cnstrs
+        ctx' @ ctx, ty' :: tys, just cnstrs' :: cnstrs
       in
-      let ctx, tys, cnstrs = List.fold_right infer es ([], [], Type.empty) in
-      ctx, Type.Tuple tys, cnstrs
+      let ctx, tys, cnstrs = List.fold_right infer es ([], [], []) in
+      unify ctx (Type.Tuple tys) cnstrs
 
   | Core.Record [] -> assert false
 
@@ -188,7 +179,7 @@ let rec infer_expr env (e, pos) =
       
   | Core.Lambda a ->
       let ctx, ty1, drty2, cnstrs = infer_abstraction env a in
-      unify ctx (T.Arrow (ty1, drty2)) [just cnstrs]
+      ctx, T.Arrow (ty1, drty2), cnstrs
       
   | Core.Operation (e, op) ->
       let r = T.fresh_region_param () in
@@ -242,7 +233,7 @@ let rec infer_expr env (e, pos) =
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp env (c, pos) =
   if !disable_typing then simple Type.universal_dirty else
-  let unify = Unify.unify_dirty_scheme ~pos in
+  let unify = Unify.gather_dirty_scheme ~pos in
   match c with
 
   | Core.Value e ->
@@ -279,7 +270,6 @@ and infer_comp env (c, pos) =
       in
       let ctx, cnstrs = List.fold_right infer_case cases (ctx_in, [just cnstrs_in]) in
       unify ctx drty_out cnstrs
-          
 
   | Core.While (c1, c2) ->
       let ctx1, (frsh1, ty1, drt1), cnstrs1 = infer_comp env c1 in
@@ -370,9 +360,9 @@ and infer_abstraction env (p, c) =
   let ctx_p, ty_p, cnstrs_p = infer_pattern p in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
   match Unify.gather_ty_scheme ~pos:(snd c) ctx_c (Type.Arrow (ty_p, drty_c)) [
-    Unify.trim_context ~pos:(snd c) ctx_p;
-    Unify.just cnstrs_p;
-    Unify.just cnstrs_c
+    trim_context ~pos:(snd c) ctx_p;
+    just cnstrs_p;
+    just cnstrs_c
   ] with
   | ctx, Type.Arrow (ty_p, drty_c), cnstrs -> ctx, ty_p, drty_c, cnstrs
   | _ -> assert false
@@ -382,10 +372,10 @@ and infer_abstraction2 env (p1, p2, c) =
   let ctx_p2, ty_p2, cnstrs_p2 = infer_pattern p2 in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
   match Unify.gather_ty_scheme ~pos:(snd c) ctx_c (Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c)) [
-  Unify.trim_context ~pos:(snd c) (ctx_p1 @ ctx_p2);
-    Unify.just cnstrs_p1;
-    Unify.just cnstrs_p2;
-    Unify.just cnstrs_c
+  trim_context ~pos:(snd c) (ctx_p1 @ ctx_p2);
+    just cnstrs_p1;
+    just cnstrs_p2;
+    just cnstrs_c
   ] with
   | ctx, Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c), cnstrs -> ctx, ty_p1, ty_p2, drty_c, cnstrs
   | _ -> assert false
@@ -405,37 +395,34 @@ and infer_let ~pos env defs =
       else
         env, ctx_p @ ctxp
     in
-    env, ctx_c @ ctxs, ctxp, frsh @ frshs, gather [
+    env, ctx_c @ ctxs, ctxp, frsh @ frshs, [
       ty_less ~pos:(snd c) t_c t_p;
       dirt_less ~pos:(snd c) drt' drt;
       just cstr_p;
-      just cstr_c;
-      just cstrs
-    ]
+      just cstr_c
+    ] @ cstrs
   in
-  let env, ctxs, ctxp, frshs, cstrs = List.fold_right add_binding defs (env, [], [], [], Type.empty) in
+  let env, ctxs, ctxp, frshs, cstrs = List.fold_right add_binding defs (env, [], [], [], []) in
   env, fun (ctx2, (frsh, tc, dc), cstr_c) ->
-    Unify.gather_dirty_scheme ~pos (ctxs @ ctx2) (frshs @ frsh, tc, drt) [
-      Unify.dirt_less ~pos dc drt;
-      Unify.trim_context ~pos ctxp;
-      Unify.just cstr_c;
-      Unify.just cstrs
-    ]
+    Unify.gather_dirty_scheme ~pos (ctxs @ ctx2) (frshs @ frsh, tc, drt) ([
+          dirt_less ~pos dc drt;
+          trim_context ~pos ctxp;
+          just cstr_c;
+        ] @ cstrs)
 
 and infer_let_rec ~pos env defs =
   if not (Common.injective fst defs) then Error.typing ~pos "Multiply defined recursive value.";
   let infer (x, ((p, c) as a)) (vars, ctx, cnstrs) =
     let ctx', tp, tc, cnstrs_a = infer_abstraction env a in
-    (x, Type.Arrow (tp, tc)) :: vars, ctx' @ ctx, gather [
-      just cnstrs_a;
-      just cnstrs
-    ]
+    (x, Type.Arrow (tp, tc)) :: vars, ctx' @ ctx, [
+      just cnstrs_a
+    ] @ cnstrs
   in
-  let vars, ctx, cnstrs = List.fold_right infer defs ([], [], Type.empty) in
+  let vars, ctx, cnstrs = List.fold_right infer defs ([], [], []) in
   let cnstrs = [
-    Unify.trim_context ~pos vars;
-    Unify.just cnstrs
-  ] in
+    trim_context ~pos vars
+  ] @ cnstrs
+ in
   let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Unify.gather_ty_scheme ~pos ctx t cnstrs)) vars env in
   env, fun (ctx2, (frsh, tc, dc), cstr_c) ->
-  Unify.gather_dirty_scheme ~pos (ctx @ ctx2) (frsh, tc, dc) (Unify.just cstr_c :: cnstrs)
+  Unify.gather_dirty_scheme ~pos (ctx @ ctx2) (frsh, tc, dc) (just cstr_c :: cnstrs)

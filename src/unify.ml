@@ -323,3 +323,13 @@ let gather_dirty_scheme ~pos ctx drty changes =
   | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
   | _ -> assert false
 
+let unify_pattern ~pos ctx ty changes =
+  let ty_sch = List.fold_right (fun change ty_sch -> change ty_sch) changes (ctx, ty, Type.empty) in
+  (* let ty_sch = normalize_context ~pos ty_sch in *)
+  let ctx, ty, cstr = canonize ty_sch in
+  let pos, neg = List.fold_right (fun (_, t) (pos, neg) ->
+      let pos_t, neg_t = pos_neg_params t in
+      neg_t @@@ pos, pos_t @@@ neg) ctx (pos_neg_params ty) in
+  let pos, neg = Trio.uniq pos, Trio.uniq neg in
+  (ctx, ty, collect neg pos cstr)
+
