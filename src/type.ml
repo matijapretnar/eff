@@ -167,12 +167,6 @@ and instance =
   | InstanceParam of instance_param
   | InstanceTop
 
-type constraints =
-  | TypeConstraint of ty_param * ty_param * Common.position
-  | DirtConstraint of dirt * dirt * Common.position
-  | RegionConstraint of region * region * Common.position
-
-
 let subst_dirt sbst = function
   | DirtEmpty -> DirtEmpty
   | DirtParam d -> DirtParam (sbst.dirt_param d)

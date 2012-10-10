@@ -138,18 +138,18 @@ let rec ty ?(non_poly=Trio.empty) t ppf =
         print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
   in ty t ppf
 
-let constraints_of_graph g =
-  let lst = Type.fold_ty (fun p1 p2 pos lst -> (Type.TypeConstraint (p1, p2, pos)) :: lst) g [] in
-  let lst = Type.fold_dirt (fun d1 d2 pos lst -> (Type.DirtConstraint (d1, d2, pos)) :: lst) g lst in
-  Type.fold_region (fun r1 r2 pos lst -> (Type.RegionConstraint (r1, r2, pos)) :: lst) g lst
-
-let constraints ?(non_poly=Trio.empty) cstrs ppf =
-  let constr cstr ppf = match cstr with
-  | Type.TypeConstraint (ty1, ty2, pos) -> print ppf "%t <= %t" (ty_param ~non_poly ty1) (ty_param ~non_poly ty2)
-  | Type.DirtConstraint (drt1, drt2, pos) -> print ppf "%t <= %t" (dirt ~non_poly drt1) (dirt ~non_poly drt2)
-  | Type.RegionConstraint (rgn1, rgn2, pos) -> print ppf "%t <= %t" (region ~non_poly rgn1) (region ~non_poly rgn2)
+let constraints ?(non_poly=Trio.empty) g ppf =
+  let tys = Type.fold_ty (fun p1 p2 pos lst -> (p1, p2) :: lst) g []
+  and drts = Type.fold_dirt (fun d1 d2 pos lst -> (d1, d2) :: lst) g []
+  and rgns =Type.fold_region (fun r1 r2 pos lst -> (r1, r2) :: lst) g []
+  and sort lst = List.sort compare lst
   in
-  sequence ", " constr (constraints_of_graph cstrs) ppf
+  print ppf "%t%s%t%s%t"
+    (sequence "," (fun (p1, p2) ppf -> print ppf "%t <= %t" (ty_param ~non_poly p1) (ty_param ~non_poly p2)) (sort tys))
+    (match drts with [] -> "" | _ -> "; ")
+    (sequence "," (fun (drt1, drt2) ppf -> print ppf "%t <= %t" (dirt ~non_poly drt1) (dirt ~non_poly drt2)) (sort drts))
+    (match rgns with [] -> "" | _ -> "; ")
+    (sequence "," (fun (rgn1, rgn2) ppf -> print ppf "%t <= %t" (region ~non_poly rgn1) (region ~non_poly rgn2)) (sort rgns))
 
 let context ctx ppf =
   match ctx with
