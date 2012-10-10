@@ -125,34 +125,39 @@ let for_parameters get_params is_pos ps lst =
                       if contra then get_params (not is_pos) el @@@ params else params) ps lst Trio.empty
 
 let pos_neg_params ty =
-  let pos_params is_pos ty =
-    let rec pos_ty is_pos = function
-      | Type.Apply (ty_name, args) -> pos_args is_pos ty_name args
-      | Type.Effect (ty_name, args, rgn) -> pos_args is_pos ty_name args @@@ pos_region_param is_pos rgn
-      | Type.TyParam p -> ((if is_pos then [p] else []), [], [])
-      | Type.Basic _ -> Trio.empty
-      | Type.Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
-      | Type.Arrow (ty1, dirty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos dirty2
-      | Type.Handler (ty1, ty2) -> pos_ty (not is_pos) ty1 @@@ pos_ty is_pos ty2
-    and pos_dirty is_pos (_, ty, drt) =
-      pos_ty is_pos ty @@@ pos_dirt_param is_pos drt
-    and pos_dirt_param is_pos p = ([], (if is_pos then [p] else []), [])
-    and pos_region_param is_pos r = ([], [], if is_pos then [r] else [])
-    and pos_args is_pos ty_name (tys, drts, rgns) =
-      begin match Tctx.lookup_params ty_name with
-      (* We assume that ty has been type-checked thus all type names are valid. *)
-      | None -> assert false
-      | Some (ps, ds, rs) ->
-          for_parameters pos_ty is_pos ps tys @@@
-          for_parameters pos_dirt_param is_pos ds drts @@@
-          for_parameters pos_region_param is_pos rs rgns
-      end
-    in
-    Trio.uniq (pos_ty is_pos ty)
+  let rec pos_ty is_pos = function
+  | Type.Apply (ty_name, args) -> pos_args is_pos ty_name args
+  | Type.Effect (ty_name, args, rgn) -> pos_args is_pos ty_name args @@@ pos_region_param is_pos rgn
+  | Type.TyParam p -> ((if is_pos then [p] else []), [], [])
+  | Type.Basic _ -> Trio.empty
+  | Type.Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
+  | Type.Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
+  | Type.Handler (ty1, ty2) -> pos_ty (not is_pos) ty1 @@@ pos_ty is_pos ty2
+  and pos_dirty is_pos (_, ty, drt) =
+    pos_ty is_pos ty @@@ pos_dirt_param is_pos drt
+  and pos_dirt_param is_pos p =
+    ([], (if is_pos then [p] else []), [])
+  and pos_region_param is_pos r =
+    ([], [], if is_pos then [r] else [])
+  and pos_args is_pos ty_name (tys, drts, rgns) =
+    match Tctx.lookup_params ty_name with
+    | None -> assert false (* We type-checked before thus all type names are valid. *)
+    | Some (ps, ds, rs) ->
+        for_parameters pos_ty is_pos ps tys @@@
+        for_parameters pos_dirt_param is_pos ds drts @@@
+        for_parameters pos_region_param is_pos rs rgns
   in
-  pos_params true ty, pos_params false ty
+  Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)
 
-let collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) cstr =
+let pos_neg_ty_scheme (ctx, ty, _) =
+  let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
+    let pos_ctx_ty, neg_ctx_ty = pos_neg_params ctx_ty in
+    neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
+  in
+  let (pos, neg) = List.fold_right add_ctx_pos_neg ctx (pos_neg_params ty) in
+  (Trio.uniq pos, Trio.uniq neg)
+
+let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs) =
   let ty_p p q pos = List.mem p neg_ts && List.mem q pos_ts
   and drt_p drt1 drt2 pos = match drt1, drt2 with
     | Type.DirtEmpty, _ -> false
@@ -167,40 +172,32 @@ let collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) cstr =
     | _, Type.RegionParam q -> List.mem q pos_rs
     | _, _ -> true
   in
-  Type.garbage_collect ty_p drt_p rgn_p cstr
+  (ctx, ty, Type.garbage_collect ty_p drt_p rgn_p cnstrs)
 
-let gather_ty_scheme ~pos ctx ty changes =
-  let normalize_context ~pos (ctx, ty, cstr) =
-    let add (x, ty) (ctx, typ, cnstrs) =
-      match Common.lookup x ctx with
-      | None ->
-          let ty' = Type.fresh_ty () in
-          ty_less ~pos ty' ty ((x, ty') :: ctx, typ, cnstrs)
-      | Some ty' ->
-          ty_less ~pos ty' ty (ctx, typ, cnstrs)
-    in
-    List.fold_right add ctx ([], ty, cstr)
+let normalize_context ~pos (ctx, ty, cstr) =
+  let add (x, ty) (ctx, typ, cnstrs) =
+    match Common.lookup x ctx with
+    | None ->
+        let ty' = Type.fresh_ty () in
+        ty_less ~pos ty' ty ((x, ty') :: ctx, typ, cnstrs)
+    | Some ty' ->
+        ty_less ~pos ty' ty (ctx, typ, cnstrs)
   in
-  let normalize_ty_scheme ~pos ty_sch =
-    let ctx, ty, cstr = normalize_context ~pos ty_sch in
-    let pos, neg = List.fold_right (fun (_, t) (pos, neg) ->
-        let pos_t, neg_t = pos_neg_params t in
-        neg_t @@@ pos, pos_t @@@ neg) ctx (pos_neg_params ty) in
-    let pos, neg = Trio.uniq pos, Trio.uniq neg in
-    (ctx, ty, collect pos neg cstr)
-  in
-  normalize_ty_scheme ~pos (List.fold_right (fun change ty_sch -> change ty_sch) changes (ctx, ty, Type.empty))
+  List.fold_right add ctx ([], ty, cstr)
 
-let gather_dirty_scheme ~pos ctx drty changes =
-  match gather_ty_scheme ~pos ctx (Type.Arrow (Type.unit_ty, drty)) changes with
+let gather_ty_scheme ~pos ctx ty chngs =
+  let ty_sch = List.fold_right (fun chng -> chng) chngs (ctx, ty, Type.empty) in
+  let ty_sch = normalize_context ~pos ty_sch in
+  let pos_neg = pos_neg_ty_scheme ty_sch in
+  collect pos_neg ty_sch
+
+let gather_dirty_scheme ~pos ctx drty chngs =
+  match gather_ty_scheme ~pos ctx (Type.Arrow (Type.unit_ty, drty)) chngs with
   | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
   | _ -> assert false
 
-let gather_pattern_scheme ~pos ctx ty changes =
-  let ctx, ty, cstr = List.fold_right (fun change ty_sch -> change ty_sch) changes (ctx, ty, Type.empty) in
-  let pos, neg = List.fold_right (fun (_, t) (pos, neg) ->
-      let pos_t, neg_t = pos_neg_params t in
-      neg_t @@@ pos, pos_t @@@ neg) ctx (pos_neg_params ty) in
-  let pos, neg = Trio.uniq pos, Trio.uniq neg in
-  (ctx, ty, collect neg pos cstr)
-
+let gather_pattern_scheme ~pos ctx ty chngs =
+  let ty_sch = List.fold_right (fun chng -> chng) chngs (ctx, ty, Type.empty) in
+  (* Note that we change the polarities in pattern types *)
+  let (neg, pos) = pos_neg_ty_scheme ty_sch in
+  collect (pos, neg) ty_sch
