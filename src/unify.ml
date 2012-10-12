@@ -84,8 +84,8 @@ and add_substitution p ty' (ctx, ty, cnstrs) =
   let (pred, succ, new_ty_grph) = Type.remove_ty cnstrs p in
   let cnstrs = {cnstrs with Type.ty_graph = new_ty_grph} in
   let ty_sch = (Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, cnstrs) in
-  let ty_sch = List.fold_right (fun (q, pos) ty_sch -> ty_param_less ~pos q p ty_sch) pred ty_sch in
-  List.fold_right (fun (q, pos) ty_sch -> ty_param_less ~pos p q ty_sch) succ ty_sch
+  let ty_sch = List.fold_right (fun (q, pos) ty_sch -> ty_less ~pos (Type.TyParam q) ty' ty_sch) pred ty_sch in
+  List.fold_right (fun (q, pos) ty_sch -> ty_less ~pos ty' (Type.TyParam q) ty_sch) succ ty_sch
 
 and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
   (* NB: it is assumed here that
