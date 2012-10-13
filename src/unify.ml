@@ -1,25 +1,25 @@
 (** [unify sbst pos t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)
 
-let ty_param_less ~pos p q (ctx, ty, cnstrs) =
-  (ctx, ty, Type.add_ty_constraint ~pos p q cnstrs)
-and dirt_less ~pos d1 d2 (ctx, ty, cnstrs) =
-  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d1) (Type.DirtParam d2) cnstrs)
-and dirt_causes_op ~pos d r op (ctx, ty, cnstrs) =
-  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtAtom (r, op)) (Type.DirtParam d) cnstrs)
-and dirt_pure ~pos d (ctx, ty, cnstrs) =
-  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d) (Type.DirtEmpty) cnstrs)
-and region_less ~pos r1 r2 (ctx, ty, cnstrs) =
-  (ctx, ty, Type.add_region_constraint ~pos (Type.RegionParam r1) (Type.RegionParam r2) cnstrs)
-and region_covers ~pos r i (ctx, ty, cnstrs) =
-  (ctx, ty, Type.add_region_constraint ~pos (Type.RegionAtom (Type.InstanceParam i)) (Type.RegionParam r) cnstrs)
-and just new_cnstrs (ctx, ty, cnstrs) =
-  (ctx, ty, Type.join_disjoint_constraints new_cnstrs cnstrs)
+let ty_param_less ~pos p q (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Type.add_ty_constraint ~pos p q cnstrs, sbst)
+and dirt_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d1) (Type.DirtParam d2) cnstrs, sbst)
+and dirt_causes_op ~pos d r op (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtAtom (r, op)) (Type.DirtParam d) cnstrs, sbst)
+and dirt_pure ~pos d (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d) (Type.DirtEmpty) cnstrs, sbst)
+and region_less ~pos r1 r2 (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Type.add_region_constraint ~pos (Type.RegionParam r1) (Type.RegionParam r2) cnstrs, sbst)
+and region_covers ~pos r i (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Type.add_region_constraint ~pos (Type.RegionAtom (Type.InstanceParam i)) (Type.RegionParam r) cnstrs, sbst)
+and just new_cnstrs (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Type.join_disjoint_constraints new_cnstrs cnstrs, sbst)
 
-let rec ty_less ~pos ty1 ty2 ty_sch =
+let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   (* XXX Check cyclic types *)
   (* Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)
-  match ty1, ty2 with
+  match Type.subst_ty sbst ty1, Type.subst_ty sbst ty2 with
 
   | (ty1, ty2) when ty1 = ty2 -> ty_sch
 
@@ -76,14 +76,14 @@ let rec ty_less ~pos ty1 ty2 ty_sch =
       let ty1, ty2 = Type.beautify2 ty1 ty2 in
       Error.typing ~pos "This expression has type %t but it should have type %t." (Print.ty ty1) (Print.ty ty2)
 
-and add_substitution p ty' (ctx, ty, cnstrs) =
-  let sbst = {
+and add_substitution p ty' (ctx, ty, cnstrs, sbst) =
+  let sbst' = {
     Type.identity_subst with 
     Type.ty_param = (fun p' -> if p' = p then ty' else Type.TyParam p')
   } in
   let (pred, succ, new_ty_grph) = Type.remove_ty cnstrs p in
   let cnstrs = {cnstrs with Type.ty_graph = new_ty_grph} in
-  let ty_sch = (Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, cnstrs) in
+  let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
   let ty_sch = List.fold_right (fun (q, pos) ty_sch -> ty_less ~pos (Type.TyParam q) ty' ty_sch) pred ty_sch in
   List.fold_right (fun (q, pos) ty_sch -> ty_less ~pos ty' (Type.TyParam q) ty_sch) succ ty_sch
 
@@ -103,13 +103,13 @@ and dirty_less ~pos (nws1, ty1, d1) (nws2, ty2, d2) ty_sch =
   Print.debug ~pos "Unifying freshness constraints %t <= %t." (Print.fresh_instances nws1) (Print.fresh_instances nws2);
   ty_less ~pos ty1 ty2 (dirt_less ~pos d1 d2 ty_sch)
 
-let trim_context ~pos ctx_p (ctx, ty, cnstrs) =
-  let trim (x, t) (ctx, ty, cnstrs) =
+let trim_context ~pos ctx_p (ctx, ty, cnstrs, sbst) =
+  let trim (x, t) (ctx, ty, cnstrs, sbst) =
     match Common.lookup x ctx_p with
-    | None -> ((x, t) :: ctx, ty, cnstrs)
-    | Some u -> ty_less ~pos u t (ctx, ty, cnstrs)
+    | None -> ((x, t) :: ctx, ty, cnstrs, sbst)
+    | Some u -> ty_less ~pos u t (ctx, ty, cnstrs, sbst)
   in
-  List.fold_right trim ctx ([], ty, cnstrs)
+  List.fold_right trim ctx ([], ty, cnstrs, sbst)
 
 
 
@@ -149,7 +149,7 @@ let pos_neg_params ty =
   in
   Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)
 
-let pos_neg_ty_scheme (ctx, ty, _) =
+let pos_neg_ty_scheme (ctx, ty, _, _) =
   let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
     let pos_ctx_ty, neg_ctx_ty = pos_neg_params ctx_ty in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
@@ -157,7 +157,7 @@ let pos_neg_ty_scheme (ctx, ty, _) =
   let (pos, neg) = List.fold_right add_ctx_pos_neg ctx (pos_neg_params ty) in
   (Trio.uniq pos, Trio.uniq neg)
 
-let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs) =
+let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, sbst) =
   let ty_p p q pos = List.mem p neg_ts && List.mem q pos_ts
   and drt_p drt1 drt2 pos = match drt1, drt2 with
     | Type.DirtEmpty, _ -> false
@@ -174,19 +174,19 @@ let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstr
   in
   (ctx, ty, Type.garbage_collect ty_p drt_p rgn_p cnstrs)
 
-let normalize_context ~pos (ctx, ty, cstr) =
-  let add (x, ty) (ctx, typ, cnstrs) =
+let normalize_context ~pos (ctx, ty, cstr, sbst) =
+  let add (x, ty) (ctx, typ, cnstrs, sbst) =
     match Common.lookup x ctx with
     | None ->
         let ty' = Type.fresh_ty () in
-        ty_less ~pos ty' ty ((x, ty') :: ctx, typ, cnstrs)
+        ty_less ~pos ty' ty ((x, ty') :: ctx, typ, cnstrs, sbst)
     | Some ty' ->
-        ty_less ~pos ty' ty (ctx, typ, cnstrs)
+        ty_less ~pos ty' ty (ctx, typ, cnstrs, sbst)
   in
-  List.fold_right add ctx ([], ty, cstr)
+  List.fold_right add ctx ([], ty, cstr, sbst)
 
 let gather_ty_scheme ~pos ctx ty chngs =
-  let ty_sch = List.fold_right (fun chng -> chng) chngs (ctx, ty, Type.empty) in
+  let ty_sch = List.fold_right (fun chng -> chng) chngs (ctx, ty, Type.empty, Type.identity_subst) in
   let ty_sch = normalize_context ~pos ty_sch in
   let pos_neg = pos_neg_ty_scheme ty_sch in
   collect pos_neg ty_sch
@@ -197,7 +197,7 @@ let gather_dirty_scheme ~pos ctx drty chngs =
   | _ -> assert false
 
 let gather_pattern_scheme ~pos ctx ty chngs =
-  let ty_sch = List.fold_right (fun chng -> chng) chngs (ctx, ty, Type.empty) in
+  let ty_sch = List.fold_right (fun chng -> chng) chngs (ctx, ty, Type.empty, Type.identity_subst) in
   (* Note that we change the polarities in pattern types *)
   let (neg, pos) = pos_neg_ty_scheme ty_sch in
   collect (pos, neg) ty_sch
