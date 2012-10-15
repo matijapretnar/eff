@@ -13,6 +13,7 @@ module Make (V : Vertex) =
      Also add printers for vertices to [V] so that the module can export printing of a graph. *)
 struct
   type elt = V.t
+  type bound = V.bound
 
   module S = Set.Make(struct
     type t = V.t * Common.position
@@ -54,6 +55,24 @@ struct
   let add_vertex x (g : t) =
     if G.mem x g then g else G.add x (S.empty, S.empty, None, None) g
 
+  let add_upper_bound x new_up_b (g : t) =
+    let new_up_b = Some new_up_b in
+    let (inx, outx, infx, supx) = get x g in
+    let g = S.fold (fun (y, pos) g ->
+                      let (iny, outy, infy, supy) = get y g in
+                      G.add y (iny, outy, infy, inf supy new_up_b) g) inx g 
+    in
+    G.add x (inx, outx, infx, inf supx new_up_b) g 
+
+  let add_lower_bound x new_low_b (g : t) =
+    let new_low_b = Some new_low_b in
+    let (inx, outx, infx, supx) = get x g in
+    let g = S.fold (fun (y, pos) g ->
+                      let (iny, outy, infy, supy) = get y g in
+                      G.add y (iny, outy, sup infy new_low_b, supy) g) inx g 
+    in
+    G.add x (inx, outx, sup infx new_low_b, supx) g 
+
   let remove_vertex x (g : t) =
     (* We must remove [x] as a key from [g], as well as an element of any in- our out-set *)
     let remove_x = S.filter (fun (y, _) -> x <> y) in
@@ -73,14 +92,16 @@ struct
 
   let union = G.fold G.add
 
-  let fold_vertices f grph acc =
-    G.fold (fun x (inx, outx, _, _) acc -> f x (S.elements inx) (S.elements outx) acc) grph acc
+  let bounds grph =
+    G.fold (fun x (inx, outx, infx, supx) acc -> (x, infx, supx) :: acc) grph []
 
   let filter_edges p grph =
-    fold_edges (fun x y pos acc -> if p x y pos then add_edge x y pos acc else acc) grph G.empty
+    let g = G.fold (fun x (inx, outx, infx, supx) acc -> G.add x (S.empty, S.empty, infx, supx) acc) grph G.empty in
+    fold_edges (fun x y pos acc -> if p x y pos then add_edge x y pos acc else acc) grph g
 
   let map f grph =
-    fold_edges (fun x y pos sbst_grph -> add_edge (f x) (f y) pos sbst_grph) grph G.empty
+    let g = G.fold (fun x (inx, outx, infx, supx) acc -> G.add x (S.empty, S.empty, infx, supx) acc) grph G.empty in
+    fold_edges (fun x y pos sbst_grph -> add_edge (f x) (f y) pos sbst_grph) grph g
 
  (*    let print grph ppf =
       fold_vertices

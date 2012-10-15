@@ -95,7 +95,7 @@ let rec infer_pattern (p, pos) =
 let rec infer_expr env (e, pos) =
   if !disable_typing then simple Type.universal_ty else
   let unify = Unify.gather_ty_scheme ~pos in
-  match e with
+  let ty_sch = match e with
 
   | Core.Var x ->
       begin match Ctx.lookup env x with
@@ -209,13 +209,16 @@ let rec infer_expr env (e, pos) =
           just cstr_val;
           just cstr_fin
         ] @ cnstrs)
+  in
+  (* Print.debug "%t : %t" (Print.expression (e, pos)) (Print.ty_scheme ty_sch); *)
+  ty_sch
               
 (* [infer_comp env cstr (c,pos)] infers the type of computation [c] in context [env].
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp env (c, pos) =
   if !disable_typing then simple Type.universal_dirty else
   let unify = Unify.gather_dirty_scheme ~pos in
-  match c with
+  let drty_sch = match c with
 
   | Core.Value e ->
       let ctx, ty, cnstrs = infer_expr env e in
@@ -336,6 +339,10 @@ and infer_comp env (c, pos) =
   | Core.Check c ->
       ignore (infer_comp env c);
       simple ([], T.unit_ty, empty_dirt ())
+
+  in
+  (* Print.debug "%t : %t" (Print.computation (c, pos)) (Print.dirty_scheme drty_sch); *)
+  drty_sch
 
 and infer_abstraction env (p, c) =
   let ctx_p, ty_p, cnstrs_p = infer_pattern p in

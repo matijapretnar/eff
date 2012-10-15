@@ -4,11 +4,13 @@
 let ty_param_less ~pos p q (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.add_ty_constraint ~pos p q cnstrs, sbst)
 and dirt_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d1) (Type.DirtParam d2) cnstrs, sbst)
+  (ctx, ty, Type.add_dirt_constraint ~pos d1 d2 cnstrs, sbst)
 and dirt_causes_op ~pos d r op (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtAtom (r, op)) (Type.DirtParam d) cnstrs, sbst)
+  let cnstrs' = Type.add_dirt_low_bound ~pos (r, op) d cnstrs in
+  (ctx, ty, cnstrs', sbst)
 and dirt_pure ~pos d (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_dirt_constraint ~pos (Type.DirtParam d) (Type.DirtEmpty) cnstrs, sbst)
+  (* ??? *)
+  (ctx, ty, cnstrs, sbst)
 and region_less ~pos r1 r2 (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.add_region_constraint ~pos (Type.RegionParam r1) (Type.RegionParam r2) cnstrs, sbst)
 and region_covers ~pos r i (ctx, ty, cnstrs, sbst) =
@@ -149,22 +151,37 @@ let pos_neg_params ty =
   in
   Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)
 
-let pos_neg_ty_scheme (ctx, ty, _, _) =
+let pos_neg_constraints (_, pos_ds, _) (_, neg_ds, _) cnstrs =
+  let bounds = Type.Dirt.bounds cnstrs.Type.dirt_graph in
+  let regions = function
+    | None -> []
+    | Some r_ops -> List.map fst r_ops
+  in
+  let pos, neg = List.fold_right (fun (d, inf, sup) (pos, neg) ->
+                                    let neg = if List.mem d pos_ds then regions inf @ neg else neg
+                                    and pos = if List.mem d neg_ds then regions sup @ pos else pos
+                                    in
+                                    (pos, neg)
+  ) bounds ([], []) in
+  ([], [], Common.uniq pos), ([], [], Common.uniq neg)
+
+(*   let pos_vertex d =
+    if List.mem d pos_ds then
+    let (_, _, inf, _) = cnstrs.Type.dirt_graph.function
+ *)
+
+let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
   let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
     let pos_ctx_ty, neg_ctx_ty = pos_neg_params ctx_ty in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
   let (pos, neg) = List.fold_right add_ctx_pos_neg ctx (pos_neg_params ty) in
-  (Trio.uniq pos, Trio.uniq neg)
+  let (posc, negc) = pos_neg_constraints pos neg cnstrs in
+  (Trio.uniq (posc @@@ pos), Trio.uniq (negc @@@ neg))
 
 let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, sbst) =
   let ty_p p q pos = List.mem p neg_ts && List.mem q pos_ts
-  and drt_p drt1 drt2 pos = match drt1, drt2 with
-    | Type.DirtEmpty, _ -> false
-    | Type.DirtParam p, Type.DirtParam q -> List.mem p neg_ds && List.mem q pos_ds
-    | Type.DirtParam p, _ -> List.mem p neg_ds
-    | _, Type.DirtParam q -> List.mem q pos_ds
-    | _, _ -> true
+  and drt_p p q pos = List.mem p neg_ds && List.mem q pos_ds
   and rgn_p rgn1 rgn2 pos = match rgn1, rgn2 with
     | Type.RegionParam p, Type.RegionParam q -> List.mem p neg_rs && List.mem q pos_rs
     | _, Type.RegionAtom (Type.InstanceTop) -> false
@@ -172,7 +189,8 @@ let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstr
     | _, Type.RegionParam q -> List.mem q pos_rs
     | _, _ -> true
   in
-  (ctx, ty, Type.garbage_collect ty_p drt_p rgn_p cnstrs)
+  let cnstrs' = Type.garbage_collect ty_p drt_p rgn_p cnstrs in
+  (ctx, ty, cnstrs')
 
 let normalize_context ~pos (ctx, ty, cstr, sbst) =
   let add (x, ty) (ctx, typ, cnstrs, sbst) =

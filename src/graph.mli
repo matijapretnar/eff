@@ -13,6 +13,7 @@ module Make (V : Vertex) :
      Also add printers for vertices to [V] so that the module can export printing of a graph. *)
 sig
   type elt = V.t
+  type bound = V.bound
   type t
 
   (** The empty graph. *)
@@ -20,6 +21,8 @@ sig
 
   (** Add an edge to the graph. *)
   val add_edge : elt -> elt -> Common.position -> t -> t
+
+  val add_lower_bound : elt -> V.bound -> t -> t
 
   (** Add an edge to the graph. *)
   val add_vertex : elt -> t -> t
@@ -32,7 +35,9 @@ sig
   val fold_edges : (elt -> elt -> Common.position -> 'a -> 'a) -> t -> 'a -> 'a
 
   (** Fold over the vertices of the graph together with their in- and out-sets. *)
-  val fold_vertices : (elt -> (elt * Common.position) list -> (elt * Common.position) list -> 'a -> 'a) -> t -> 'a -> 'a
+  (* val fold_vertices : (elt -> (elt * Common.position) list -> (elt * Common.position) list -> bound -> bound -> 'a -> 'a) -> t -> 'a -> 'a *)
+
+  val bounds : t -> (elt * V.bound option * V.bound option) list
 
   (** Filter edges of the graph. *)
   val filter_edges : (elt -> elt -> Common.position -> bool) -> t -> t

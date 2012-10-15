@@ -98,6 +98,11 @@ let fresh_instances frsh ppf =
     | [] -> print ppf ""
     | frsh ->  print ppf "new %t.@ " (sequence "" (fun (Type.Instance_Param i) ppf -> print ppf "%d" i) frsh)
 
+let dirt_bound drt ppf =
+  match drt with
+  | None -> print ppf "/"
+  | Some r_ops -> sequence "," (fun (r, op) ppf -> print ppf "%t#%s" (region_param r) op) r_ops ppf
+
 let ty_param ?(non_poly=Trio.empty) p ppf =
   let (ps, _, _) = non_poly in
   let (Type.Ty_Param k) = p in
@@ -141,13 +146,15 @@ let rec ty ?(non_poly=Trio.empty) t ppf =
 let constraints ?(non_poly=Trio.empty) g ppf =
   let tys = Type.fold_ty (fun p1 p2 pos lst -> (p1, p2) :: lst) g []
   and drts = Type.fold_dirt (fun d1 d2 pos lst -> (d1, d2) :: lst) g []
-  and rgns =Type.fold_region (fun r1 r2 pos lst -> (r1, r2) :: lst) g []
+  and rgns = Type.fold_region (fun r1 r2 pos lst -> (r1, r2) :: lst) g []
+  and bounds = Type.Dirt.bounds g.Type.dirt_graph
   and sort lst = List.sort compare lst
   in
-  print ppf "%t%s%t%s%t"
+  print ppf "%t%s%t%t%s%t"
     (sequence "," (fun (p1, p2) ppf -> print ppf "%t <= %t" (ty_param ~non_poly p1) (ty_param ~non_poly p2)) (sort tys))
     (match drts with [] -> "" | _ -> "; ")
-    (sequence "," (fun (drt1, drt2) ppf -> print ppf "%t <= %t" (dirt ~non_poly drt1) (dirt ~non_poly drt2)) (sort drts))
+    (sequence "," (fun (drt1, drt2) ppf -> print ppf "%t <= %t" (dirt_param ~non_poly drt1) (dirt_param ~non_poly drt2)) (sort drts))
+    (sequence "," (fun (d, bound1, bound2) ppf -> print ppf "%t <= %t <= %t" (dirt_bound bound1) (dirt_param ~non_poly d) (dirt_bound bound2)) bounds)
     (match rgns with [] -> "" | _ -> "; ")
     (sequence "," (fun (rgn1, rgn2) ppf -> print ppf "%t <= %t" (region ~non_poly rgn1) (region ~non_poly rgn2)) (sort rgns))
 
