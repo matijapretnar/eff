@@ -225,9 +225,9 @@ let remove_ty g x =
   Ty.remove_vertex x g.ty_graph
 
 let subst_constraints sbst cnstr = {
-  ty_graph = Ty.map (fun p -> match sbst.ty_param p with TyParam q -> q | _ -> assert false) cnstr.ty_graph;
-  dirt_graph = Dirt.map sbst.dirt_param cnstr.dirt_graph;
-  region_graph = Region.map (subst_region sbst) cnstr.region_graph;
+  ty_graph = Ty.map (fun p -> match sbst.ty_param p with TyParam q -> q | _ -> assert false) (fun () -> ()) cnstr.ty_graph;
+  dirt_graph = Dirt.map sbst.dirt_param (fun r_ops -> List.map (fun (r, op) -> (sbst.region_param r, op)) r_ops) cnstr.dirt_graph;
+  region_graph = Region.map (subst_region sbst) (fun () -> ()) cnstr.region_graph;
 }
 
 let fold_ty f g acc = Ty.fold_edges f g.ty_graph acc
@@ -264,9 +264,9 @@ let join_disjoint_constraints cstr1 cstr2 =
   Print.print ppf "TYPES:@.%t@.REGIONS:@.%t@.DIRT:@.%t@." 
   (Ty.print grph.ty_graph) (Region.print grph.region_graph) (Dirt.print grph.dirt_graph)
  *)
-let garbage_collect ty_p drt_p rgn_p grph =
+let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) rgn_p grph =
   {
-    ty_graph = Ty.filter_edges ty_p grph.ty_graph;
-    dirt_graph = Dirt.filter_edges drt_p grph.dirt_graph;
+    ty_graph = Ty.collect pos_ts neg_ts grph.ty_graph;
+    dirt_graph = Dirt.collect pos_ds neg_ds grph.dirt_graph;
     region_graph = Region.filter_edges rgn_p grph.region_graph;
   }

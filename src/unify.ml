@@ -180,16 +180,14 @@ let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
   (Trio.uniq (posc @@@ pos), Trio.uniq (negc @@@ neg))
 
 let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, sbst) =
-  let ty_p p q = List.mem p neg_ts && List.mem q pos_ts
-  and drt_p p q = List.mem p neg_ds && List.mem q pos_ds
-  and rgn_p rgn1 rgn2 = match rgn1, rgn2 with
+  let rgn_p rgn1 rgn2 = match rgn1, rgn2 with
     | Type.RegionParam p, Type.RegionParam q -> List.mem p neg_rs && List.mem q pos_rs
     | _, Type.RegionAtom (Type.InstanceTop) -> false
     | Type.RegionParam p, _ -> List.mem p neg_rs
     | _, Type.RegionParam q -> List.mem q pos_rs
     | _, _ -> true
   in
-  let cnstrs' = Type.garbage_collect ty_p drt_p rgn_p cnstrs in
+  let cnstrs' = Type.garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) rgn_p cnstrs in
   (ctx, ty, cnstrs')
 
 let normalize_context ~pos (ctx, ty, cstr, sbst) =

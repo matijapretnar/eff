@@ -45,7 +45,9 @@ sig
   val join : t -> t -> t
   val union : t -> t -> t
 
-  val map : (elt -> elt) -> t -> t
+  val map : (elt -> elt) -> (bound -> bound) -> t -> t
+
+  val collect : elt list -> elt list -> t -> t
 
   (* val print : t -> Format.formatter -> unit *)
 end

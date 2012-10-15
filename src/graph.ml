@@ -99,9 +99,23 @@ struct
     let g = G.fold (fun x (inx, outx, infx, supx) acc -> G.add x (S.empty, S.empty, infx, supx) acc) grph G.empty in
     fold_edges (fun x y acc -> if p x y then add_edge x y acc else acc) grph g
 
-  let map f grph =
-    let g = G.fold (fun x (inx, outx, infx, supx) acc -> G.add x (S.empty, S.empty, infx, supx) acc) grph G.empty in
+  let map f fb grph =
+    let g = G.fold (fun x (inx, outx, infx, supx) acc -> G.add (f x) (S.empty, S.empty, Common.option_map fb infx, Common.option_map fb supx) acc) grph G.empty in
     fold_edges (fun x y sbst_grph -> add_edge (f x) (f y) sbst_grph) grph g
+
+  let collect pos neg grph =
+    let pos = List.fold_right S.add pos S.empty
+    and neg = List.fold_right S.add neg S.empty in
+    let collect x (inx, outx, infx, supx) acc =
+      let x_pos = S.mem x pos
+      and x_neg = S.mem x neg in
+      let inx, infx = if x_pos then (S.inter neg inx, infx) else (S.empty, None)
+      and outx, supx = if x_neg then (S.inter pos outx, supx) else (S.empty, None) in
+      match S.cardinal inx + S.cardinal outx, infx, supx with
+      | 0, None, None -> acc
+      | _, _, _ -> G.add x (inx, outx, infx, supx) acc
+    in
+    G.fold collect grph G.empty
 
  (*    let print grph ppf =
       fold_vertices
