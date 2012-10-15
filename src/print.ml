@@ -144,9 +144,9 @@ let rec ty ?(non_poly=Trio.empty) t ppf =
   in ty t ppf
 
 let constraints ?(non_poly=Trio.empty) g ppf =
-  let tys = Type.fold_ty (fun p1 p2 pos lst -> (p1, p2) :: lst) g []
-  and drts = Type.fold_dirt (fun d1 d2 pos lst -> (d1, d2) :: lst) g []
-  and rgns = Type.fold_region (fun r1 r2 pos lst -> (r1, r2) :: lst) g []
+  let tys = Type.fold_ty (fun p1 p2 lst -> (p1, p2) :: lst) g []
+  and drts = Type.fold_dirt (fun d1 d2 lst -> (d1, d2) :: lst) g []
+  and rgns = Type.fold_region (fun r1 r2 lst -> (r1, r2) :: lst) g []
   and bounds = Type.Dirt.bounds g.Type.dirt_graph
   and sort lst = List.sort compare lst
   in

@@ -1,20 +1,20 @@
 (** [unify sbst pos t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)
 
-let ty_param_less ~pos p q (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_ty_constraint ~pos p q cnstrs, sbst)
+let ty_param_less p q (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Type.add_ty_constraint p q cnstrs, sbst)
 and dirt_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_dirt_constraint ~pos d1 d2 cnstrs, sbst)
-and dirt_causes_op ~pos d r op (ctx, ty, cnstrs, sbst) =
-  let cnstrs' = Type.add_dirt_low_bound ~pos (r, op) d cnstrs in
+  (ctx, ty, Type.add_dirt_constraint d1 d2 cnstrs, sbst)
+and dirt_causes_op d r op (ctx, ty, cnstrs, sbst) =
+  let cnstrs' = Type.add_dirt_low_bound (r, op) d cnstrs in
   (ctx, ty, cnstrs', sbst)
-and dirt_pure ~pos d (ctx, ty, cnstrs, sbst) =
+and dirt_pure d (ctx, ty, cnstrs, sbst) =
   (* ??? *)
   (ctx, ty, cnstrs, sbst)
 and region_less ~pos r1 r2 (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_region_constraint ~pos (Type.RegionParam r1) (Type.RegionParam r2) cnstrs, sbst)
-and region_covers ~pos r i (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_region_constraint ~pos (Type.RegionAtom (Type.InstanceParam i)) (Type.RegionParam r) cnstrs, sbst)
+  (ctx, ty, Type.add_region_constraint (Type.RegionParam r1) (Type.RegionParam r2) cnstrs, sbst)
+and region_covers r i (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Type.add_region_constraint (Type.RegionAtom (Type.InstanceParam i)) (Type.RegionParam r) cnstrs, sbst)
 and just new_cnstrs (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.join_disjoint_constraints new_cnstrs cnstrs, sbst)
 
@@ -25,15 +25,15 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
 
   | (ty1, ty2) when ty1 = ty2 -> ty_sch
 
-  | (Type.TyParam p, Type.TyParam q) -> ty_param_less ~pos p q ty_sch
+  | (Type.TyParam p, Type.TyParam q) -> ty_param_less p q ty_sch
 
   | (Type.TyParam p, ty) ->
       let ty' = Type.refresh ty in
-      ty_less ~pos ty' ty (add_substitution p ty' ty_sch)
+      ty_less ~pos ty' ty (add_substitution ~pos p ty' ty_sch)
 
   | (ty, Type.TyParam p) ->
       let ty' = Type.refresh ty in
-      ty_less ~pos ty ty' (add_substitution p ty' ty_sch)
+      ty_less ~pos ty ty' (add_substitution ~pos p ty' ty_sch)
 
   | (Type.Arrow (ty1, drty1), Type.Arrow (ty2, drty2)) ->
       ty_less ~pos ty2 ty1 (dirty_less ~pos drty1 drty2 ty_sch)
@@ -78,7 +78,7 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       let ty1, ty2 = Type.beautify2 ty1 ty2 in
       Error.typing ~pos "This expression has type %t but it should have type %t." (Print.ty ty1) (Print.ty ty2)
 
-and add_substitution p ty' (ctx, ty, cnstrs, sbst) =
+and add_substitution ~pos p ty' (ctx, ty, cnstrs, sbst) =
   let sbst' = {
     Type.identity_subst with 
     Type.ty_param = (fun p' -> if p' = p then ty' else Type.TyParam p')
@@ -86,8 +86,8 @@ and add_substitution p ty' (ctx, ty, cnstrs, sbst) =
   let (pred, succ, new_ty_grph) = Type.remove_ty cnstrs p in
   let cnstrs = {cnstrs with Type.ty_graph = new_ty_grph} in
   let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
-  let ty_sch = List.fold_right (fun (q, pos) ty_sch -> ty_less ~pos (Type.TyParam q) ty' ty_sch) pred ty_sch in
-  List.fold_right (fun (q, pos) ty_sch -> ty_less ~pos ty' (Type.TyParam q) ty_sch) succ ty_sch
+  let ty_sch = List.fold_right (fun q ty_sch -> ty_less ~pos (Type.TyParam q) ty' ty_sch) pred ty_sch in
+  List.fold_right (fun q ty_sch -> ty_less ~pos ty' (Type.TyParam q) ty_sch) succ ty_sch
 
 and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
   (* NB: it is assumed here that
@@ -180,9 +180,9 @@ let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
   (Trio.uniq (posc @@@ pos), Trio.uniq (negc @@@ neg))
 
 let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, sbst) =
-  let ty_p p q pos = List.mem p neg_ts && List.mem q pos_ts
-  and drt_p p q pos = List.mem p neg_ds && List.mem q pos_ds
-  and rgn_p rgn1 rgn2 pos = match rgn1, rgn2 with
+  let ty_p p q = List.mem p neg_ts && List.mem q pos_ts
+  and drt_p p q = List.mem p neg_ds && List.mem q pos_ds
+  and rgn_p rgn1 rgn2 = match rgn1, rgn2 with
     | Type.RegionParam p, Type.RegionParam q -> List.mem p neg_rs && List.mem q pos_rs
     | _, Type.RegionAtom (Type.InstanceTop) -> false
     | Type.RegionParam p, _ -> List.mem p neg_rs

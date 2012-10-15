@@ -16,8 +16,8 @@ struct
   type bound = V.bound
 
   module S = Set.Make(struct
-    type t = V.t * Common.position
-    let compare (x, _) (y, _) = V.compare x y
+    type t = V.t
+    let compare = V.compare
   end)
 
   module G = Map.Make(V)
@@ -39,15 +39,15 @@ struct
   let get x (g : t) =
     try G.find x g with Not_found -> (S.empty, S.empty, None, None)
 
-  let add_edge x y pos (g : t) =
+  let add_edge x y (g : t) =
     let (inx, outx, infx, supx) = get x g
     and (iny, outy, infy, supy) = get y g in
-    let left = S.add (x, pos) (S.diff inx iny)
-    and right = S.add (y, pos) (S.diff outy outx) in
-    let extend_left (l, pos) grph =
+    let left = S.add x (S.diff inx iny)
+    and right = S.add y (S.diff outy outx) in
+    let extend_left l grph =
       let (inl, outl, infl, supl) = get l grph in
       G.add l (inl, S.union outl right, infl, inf supl supy) grph
-    and extend_right (r, pos) grph =
+    and extend_right r grph =
       let (inr, outr, infr, supr) = get r grph in
       G.add r (S.union inr left, outr, sup infx infr, supr) grph in
     S.fold extend_left left (S.fold extend_right right g)
@@ -58,7 +58,7 @@ struct
   let add_upper_bound x new_up_b (g : t) =
     let new_up_b = Some new_up_b in
     let (inx, outx, infx, supx) = get x g in
-    let g = S.fold (fun (y, pos) g ->
+    let g = S.fold (fun y g ->
                       let (iny, outy, infy, supy) = get y g in
                       G.add y (iny, outy, infy, inf supy new_up_b) g) inx g 
     in
@@ -67,7 +67,7 @@ struct
   let add_lower_bound x new_low_b (g : t) =
     let new_low_b = Some new_low_b in
     let (inx, outx, infx, supx) = get x g in
-    let g = S.fold (fun (y, pos) g ->
+    let g = S.fold (fun y g ->
                       let (iny, outy, infy, supy) = get y g in
                       G.add y (iny, outy, sup infy new_low_b, supy) g) inx g 
     in
@@ -75,7 +75,7 @@ struct
 
   let remove_vertex x (g : t) =
     (* We must remove [x] as a key from [g], as well as an element of any in- our out-set *)
-    let remove_x = S.filter (fun (y, _) -> x <> y) in
+    let remove_x = S.filter (fun y -> x <> y) in
     (* XXX What do we do about lower and upper bounds of the discarded vertex? *)
     let (inx, outx, _, _) = get x g in
       S.elements inx, S.elements outx,
@@ -85,7 +85,7 @@ struct
         G.empty
 
   let fold_edges f grph acc =
-    G.fold (fun x (_, outx, _, _) acc -> S.fold (fun (y, pos) acc -> f x y pos acc) outx acc) grph acc
+    G.fold (fun x (_, outx, _, _) acc -> S.fold (fun y acc -> f x y acc) outx acc) grph acc
 
   let join grph1 grph2 =
     fold_edges add_edge grph1 grph2
@@ -97,11 +97,11 @@ struct
 
   let filter_edges p grph =
     let g = G.fold (fun x (inx, outx, infx, supx) acc -> G.add x (S.empty, S.empty, infx, supx) acc) grph G.empty in
-    fold_edges (fun x y pos acc -> if p x y pos then add_edge x y pos acc else acc) grph g
+    fold_edges (fun x y acc -> if p x y then add_edge x y acc else acc) grph g
 
   let map f grph =
     let g = G.fold (fun x (inx, outx, infx, supx) acc -> G.add x (S.empty, S.empty, infx, supx) acc) grph G.empty in
-    fold_edges (fun x y pos sbst_grph -> add_edge (f x) (f y) pos sbst_grph) grph g
+    fold_edges (fun x y sbst_grph -> add_edge (f x) (f y) sbst_grph) grph g
 
  (*    let print grph ppf =
       fold_vertices

@@ -20,7 +20,7 @@ sig
   val empty : t
 
   (** Add an edge to the graph. *)
-  val add_edge : elt -> elt -> Common.position -> t -> t
+  val add_edge : elt -> elt -> t -> t
 
   val add_lower_bound : elt -> V.bound -> t -> t
 
@@ -29,10 +29,10 @@ sig
 
   (** Remove a vertex from the graph. Return a new graph together with the predecessors
       and successors of the removed vertex. *)
-  val remove_vertex : elt -> t -> (elt * Common.position) list * (elt * Common.position) list * t
+  val remove_vertex : elt -> t -> elt list * elt list * t
 
   (** Fold over the edges of the graph. *)
-  val fold_edges : (elt -> elt -> Common.position -> 'a -> 'a) -> t -> 'a -> 'a
+  val fold_edges : (elt -> elt -> 'a -> 'a) -> t -> 'a -> 'a
 
   (** Fold over the vertices of the graph together with their in- and out-sets. *)
   (* val fold_vertices : (elt -> (elt * Common.position) list -> (elt * Common.position) list -> bound -> bound -> 'a -> 'a) -> t -> 'a -> 'a *)
@@ -40,7 +40,7 @@ sig
   val bounds : t -> (elt * V.bound option * V.bound option) list
 
   (** Filter edges of the graph. *)
-  val filter_edges : (elt -> elt -> Common.position -> bool) -> t -> t
+  val filter_edges : (elt -> elt -> bool) -> t -> t
 
   val join : t -> t -> t
   val union : t -> t -> t

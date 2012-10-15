@@ -234,17 +234,17 @@ let fold_ty f g acc = Ty.fold_edges f g.ty_graph acc
 let fold_region f g acc = Region.fold_edges f g.region_graph acc
 let fold_dirt f g acc = Dirt.fold_edges f g.dirt_graph acc
 
-let add_dirt_low_bound ~pos r_op d cstr =
+let add_dirt_low_bound r_op d cstr =
   {cstr with dirt_graph = Dirt.add_lower_bound d [r_op] cstr.dirt_graph}
 
-let add_ty_constraint ~pos ty1 ty2 cstr =
-  {cstr with ty_graph = Ty.add_edge ty1 ty2 pos cstr.ty_graph}
+let add_ty_constraint ty1 ty2 cstr =
+  {cstr with ty_graph = Ty.add_edge ty1 ty2 cstr.ty_graph}
 
-let add_dirt_constraint ~pos drt1 drt2 cstr =
-  {cstr with dirt_graph = Dirt.add_edge drt1 drt2 pos cstr.dirt_graph}
+let add_dirt_constraint drt1 drt2 cstr =
+  {cstr with dirt_graph = Dirt.add_edge drt1 drt2 cstr.dirt_graph}
 
-let add_region_constraint ~pos rgn1 rgn2 cstr =
-  {cstr with region_graph = Region.add_edge rgn1 rgn2 pos cstr.region_graph}
+let add_region_constraint rgn1 rgn2 cstr =
+  {cstr with region_graph = Region.add_edge rgn1 rgn2 cstr.region_graph}
 
 let join_constraints cstr1 cstr2 = 
   {

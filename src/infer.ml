@@ -171,7 +171,7 @@ let rec infer_expr env (e, pos) =
           let d = T.fresh_dirt_param () in
           unify ctx (T.Arrow (t1, ([], t2, d))) [
             ty_less ~pos u ty;
-            dirt_causes_op ~pos d r op;
+            dirt_causes_op d r op;
             just cstr_u
           ]
       end
@@ -310,7 +310,7 @@ and infer_comp env (c, pos) =
                       ty_less ~pos(* p1 *) t1 u1;
                       ty_less ~pos(* p2 *) t2 te;
                       (* XXX Warn that d_empty has to be empty *)
-                      dirt_pure ~pos(* c *) d_empty;
+                      dirt_pure (* c *) d_empty;
                       dirty_less ~pos(* c *) t ([], T.Tuple [u2; te], d_empty);
                       just cstr_a
                     ] @ cstrs
@@ -321,7 +321,7 @@ and infer_comp env (c, pos) =
           let instance = T.fresh_instance_param () in
           let rgn = T.fresh_region_param () in
           unify ctx ([instance], Tctx.effect_to_params eff params rgn, empty_dirt ()) ([
-                      region_covers ~pos rgn instance;
+                      region_covers rgn instance;
                     ] @ cnstrs)
       | _ -> Error.typing ~pos "Effect type expected but %s encountered" eff
       end
