@@ -154,36 +154,12 @@ let beautify2 ty1 ty2 =
   let ty2 = subst_ty sbst ty2 in
   (ty1, ty2)
 
-type dirt =
-  | DirtParam of dirt_param
-  | DirtAtom of region_param * Common.opsym
-  | DirtEmpty
-
-and region =
-  | RegionParam of region_param
-  | RegionAtom of instance
-
-and instance =
-  | InstanceParam of instance_param
-  | InstanceTop
-
-let subst_dirt sbst = function
-  | DirtEmpty -> DirtEmpty
-  | DirtParam d -> DirtParam (sbst.dirt_param d)
-  | DirtAtom (r, op) -> DirtAtom (sbst.region_param r, op)
-
-let subst_region sbst = function
-  | RegionParam r -> RegionParam (sbst.region_param r)
-  | RegionAtom _ as rgn -> rgn
-
 module Ty = Graph.Make(struct
   type t = ty_param
   type bound = unit
   let inf () () = ()
   let sup () () = ()
   let compare = Pervasives.compare
-  let subst = subst_ty
-  (* let print = Print.ty_param [] *)
 end)
 
 module Region = Graph.Make(struct
@@ -200,8 +176,6 @@ module Region = Graph.Make(struct
     | Some insts, None | None, Some insts -> Some insts
     | None, None -> None
   let compare = Pervasives.compare
-  let subst = subst_region
-  (* let print = Print.region Trio.empty *)
 end)
 
 module Dirt = Graph.Make(struct
@@ -210,8 +184,6 @@ module Dirt = Graph.Make(struct
   let inf drt1 drt2 = List.filter (fun x -> List.mem x drt1) drt2
   let sup drt1 drt2 = Common.uniq (drt1 @ drt2)
   let compare = Pervasives.compare
-  let subst = subst_dirt
-  (* let print = Print.dirt Trio.empty *)
 end)
 
 type t = {

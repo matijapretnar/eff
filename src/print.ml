@@ -67,11 +67,6 @@ and pattern_list ?(max_length=299) (p, pos) ppf =
   else
     fprintf ppf ",@ ..."
 
-let instance i ppf =
-  match i with
-  | Type.InstanceParam (Type.Instance_Param i) -> print ppf "#%d" i
-  | Type.InstanceTop -> print ppf "?"
-
 let instance_param (Type.Instance_Param i) ppf =
   print ppf "#%d" i
 
@@ -84,17 +79,6 @@ let dirt_param ?(non_poly=Trio.empty) ((Type.Dirt_Param k) as p) ppf =
   let (_, ds, _) = non_poly in
   let c = (if List.mem p ds then "_" else "") in
     print ppf "%sd%i" c (k + 1)
-
-let region ?non_poly reg ppf =
-  match reg with
-    | Type.RegionParam p -> print ppf "<%t>" (region_param ?non_poly p)
-    | Type.RegionAtom i -> print ppf "<%t>" (instance i)
-
-let dirt ?non_poly drt ppf =
-  match drt with
-    | Type.DirtEmpty -> print ppf ""
-    | Type.DirtParam p -> print ppf "%t" (dirt_param ?non_poly p)
-    | Type.DirtAtom (rgn, op) -> print ppf "%t#%s" (region_param ?non_poly rgn) op
 
 let fresh_instances frsh ppf =
   match frsh with
