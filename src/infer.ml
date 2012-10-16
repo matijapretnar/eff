@@ -307,8 +307,8 @@ and infer_comp env (c, pos) =
                     let ctx', t1, t2, t, cstr_a = infer_abstraction2 env a in
                     let d_empty = T.fresh_dirt_param () in
                     ctx' @ ctx, [
-                      ty_less ~pos(* p1 *) t1 u1;
-                      ty_less ~pos(* p2 *) t2 te;
+                      ty_less ~pos(* p1 *) u1 t1;
+                      ty_less ~pos(* p2 *) te t2;
                       (* XXX Warn that d_empty has to be empty *)
                       dirt_pure (* c *) d_empty;
                       dirty_less ~pos(* c *) t ([], T.Tuple [u2; te], d_empty);
