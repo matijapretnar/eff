@@ -72,6 +72,9 @@ let instance i ppf =
   | Type.InstanceParam (Type.Instance_Param i) -> print ppf "#%d" i
   | Type.InstanceTop -> print ppf "?"
 
+let instance_param (Type.Instance_Param i) ppf =
+  print ppf "#%d" i
+
 let region_param ?(non_poly=Trio.empty) ((Type.Region_Param k) as p) ppf =
   let (_, _, rs) = non_poly in
   let c = (if List.mem p rs then "_" else "") in
@@ -102,6 +105,13 @@ let dirt_bound drt ppf =
   match drt with
   | None -> print ppf "/"
   | Some r_ops -> sequence "," (fun (r, op) ppf -> print ppf "%t#%s" (region_param r) op) r_ops ppf
+
+let region_bound drt ppf =
+  match drt with
+  | None -> print ppf "/"
+  | Some None -> print ppf "X"
+  | Some (Some insts) -> sequence "," instance_param insts ppf
+
 
 let ty_param ?(non_poly=Trio.empty) p ppf =
   let (ps, _, _) = non_poly in
@@ -147,16 +157,18 @@ let constraints ?(non_poly=Trio.empty) g ppf =
   let tys = Type.fold_ty (fun p1 p2 lst -> (p1, p2) :: lst) g []
   and drts = Type.fold_dirt (fun d1 d2 lst -> (d1, d2) :: lst) g []
   and rgns = Type.fold_region (fun r1 r2 lst -> (r1, r2) :: lst) g []
-  and bounds = Type.Dirt.bounds g.Type.dirt_graph
+  and dirt_bounds = Type.Dirt.bounds g.Type.dirt_graph
+  and region_bounds = Type.Region.bounds g.Type.region_graph
   and sort lst = List.sort compare lst
   in
-  print ppf "%t%s%t%t%s%t"
+  print ppf "%t%s%t%t%s%t%t"
     (sequence "," (fun (p1, p2) ppf -> print ppf "%t <= %t" (ty_param ~non_poly p1) (ty_param ~non_poly p2)) (sort tys))
     (match drts with [] -> "" | _ -> "; ")
     (sequence "," (fun (drt1, drt2) ppf -> print ppf "%t <= %t" (dirt_param ~non_poly drt1) (dirt_param ~non_poly drt2)) (sort drts))
-    (sequence "," (fun (d, bound1, bound2) ppf -> print ppf "%t <= %t <= %t" (dirt_bound bound1) (dirt_param ~non_poly d) (dirt_bound bound2)) bounds)
+    (sequence "," (fun (d, bound1, bound2) ppf -> print ppf "%t <= %t <= %t" (dirt_bound bound1) (dirt_param ~non_poly d) (dirt_bound bound2)) dirt_bounds)
     (match rgns with [] -> "" | _ -> "; ")
     (sequence "," (fun (rgn1, rgn2) ppf -> print ppf "%t <= %t" (region_param ~non_poly rgn1) (region_param ~non_poly rgn2)) (sort rgns))
+    (sequence "," (fun (r, bound1, bound2) ppf -> print ppf "%t <= %t <= %t" (region_bound bound1) (region_param ~non_poly r) (region_bound bound2)) region_bounds)
 
 let context ctx ppf =
   match ctx with

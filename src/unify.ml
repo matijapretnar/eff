@@ -158,8 +158,8 @@ let pos_neg_constraints (_, pos_ds, _) (_, neg_ds, _) cnstrs =
     | Some r_ops -> List.map fst r_ops
   in
   let pos, neg = List.fold_right (fun (d, inf, sup) (pos, neg) ->
-                                    let neg = if List.mem d pos_ds then regions inf @ neg else neg
-                                    and pos = if List.mem d neg_ds then regions sup @ pos else pos
+                                    let pos = if List.mem d pos_ds then regions inf @ pos else pos
+                                    and neg = if List.mem d neg_ds then regions sup @ neg else neg
                                     in
                                     (pos, neg)
   ) bounds ([], []) in
@@ -181,6 +181,7 @@ let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
 
 let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, sbst) =
   let cnstrs' = Type.garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
+  Print.debug "%t --> %t" (Print.constraints cnstrs) (Print.constraints cnstrs');
   (ctx, ty, cnstrs')
 
 let normalize_context ~pos (ctx, ty, cstr, sbst) =
