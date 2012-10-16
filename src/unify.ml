@@ -12,9 +12,9 @@ and dirt_pure d (ctx, ty, cnstrs, sbst) =
   (* ??? *)
   (ctx, ty, cnstrs, sbst)
 and region_less ~pos r1 r2 (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_region_constraint (Type.RegionParam r1) (Type.RegionParam r2) cnstrs, sbst)
+  (ctx, ty, Type.add_region_constraint r1 r2 cnstrs, sbst)
 and region_covers r i (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_region_constraint (Type.RegionAtom (Type.InstanceParam i)) (Type.RegionParam r) cnstrs, sbst)
+  (ctx, ty, Type.add_region_low_bound i r cnstrs, sbst)
 and just new_cnstrs (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.join_disjoint_constraints new_cnstrs cnstrs, sbst)
 
@@ -180,14 +180,7 @@ let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
   (Trio.uniq (posc @@@ pos), Trio.uniq (negc @@@ neg))
 
 let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, sbst) =
-  let rgn_p rgn1 rgn2 = match rgn1, rgn2 with
-    | Type.RegionParam p, Type.RegionParam q -> List.mem p neg_rs && List.mem q pos_rs
-    | _, Type.RegionAtom (Type.InstanceTop) -> false
-    | Type.RegionParam p, _ -> List.mem p neg_rs
-    | _, Type.RegionParam q -> List.mem q pos_rs
-    | _, _ -> true
-  in
-  let cnstrs' = Type.garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) rgn_p cnstrs in
+  let cnstrs' = Type.garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
   (ctx, ty, cnstrs')
 
 let normalize_context ~pos (ctx, ty, cstr, sbst) =

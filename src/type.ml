@@ -187,10 +187,18 @@ module Ty = Graph.Make(struct
 end)
 
 module Region = Graph.Make(struct
-  type t = region
-  type bound = unit
-  let inf () () = ()
-  let sup () () = ()
+  type t = region_param
+  type bound = (instance_param list) option
+  let inf rgn1 rgn2 =
+    match rgn1, rgn2 with
+    | Some insts1, Some insts2 -> Some (List.filter (fun x -> List.mem x insts1) insts2)
+    | Some insts, None | None, Some insts -> Some insts
+    | None, None -> None
+  let sup rgn1 rgn2 =
+    match rgn1, rgn2 with
+    | Some insts1, Some insts2 -> Some (Common.uniq (insts1 @ insts2))
+    | Some insts, None | None, Some insts -> Some insts
+    | None, None -> None
   let compare = Pervasives.compare
   let subst = subst_region
   (* let print = Print.region Trio.empty *)
@@ -227,7 +235,7 @@ let remove_ty g x =
 let subst_constraints sbst cnstr = {
   ty_graph = Ty.map (fun p -> match sbst.ty_param p with TyParam q -> q | _ -> assert false) (fun () -> ()) cnstr.ty_graph;
   dirt_graph = Dirt.map sbst.dirt_param (fun r_ops -> List.map (fun (r, op) -> (sbst.region_param r, op)) r_ops) cnstr.dirt_graph;
-  region_graph = Region.map (subst_region sbst) (fun () -> ()) cnstr.region_graph;
+  region_graph = Region.map sbst.region_param (fun insts -> Common.option_map (fun insts -> List.map (fun ins -> match sbst.instance_param ins with Some i -> i | None -> assert false) insts) insts) cnstr.region_graph;
 }
 
 let fold_ty f g acc = Ty.fold_edges f g.ty_graph acc
@@ -236,6 +244,9 @@ let fold_dirt f g acc = Dirt.fold_edges f g.dirt_graph acc
 
 let add_dirt_low_bound r_op d cstr =
   {cstr with dirt_graph = Dirt.add_lower_bound d [r_op] cstr.dirt_graph}
+
+let add_region_low_bound i r cstr =
+  {cstr with region_graph = Region.add_lower_bound r (Some [i]) cstr.region_graph}
 
 let add_ty_constraint ty1 ty2 cstr =
   {cstr with ty_graph = Ty.add_edge ty1 ty2 cstr.ty_graph}
@@ -264,9 +275,9 @@ let join_disjoint_constraints cstr1 cstr2 =
   Print.print ppf "TYPES:@.%t@.REGIONS:@.%t@.DIRT:@.%t@." 
   (Ty.print grph.ty_graph) (Region.print grph.region_graph) (Dirt.print grph.dirt_graph)
  *)
-let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) rgn_p grph =
+let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
   {
     ty_graph = Ty.collect pos_ts neg_ts grph.ty_graph;
     dirt_graph = Dirt.collect pos_ds neg_ds grph.dirt_graph;
-    region_graph = Region.filter_edges rgn_p grph.region_graph;
+    region_graph = Region.collect pos_rs neg_rs grph.region_graph;
   }

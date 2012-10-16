@@ -156,7 +156,7 @@ let constraints ?(non_poly=Trio.empty) g ppf =
     (sequence "," (fun (drt1, drt2) ppf -> print ppf "%t <= %t" (dirt_param ~non_poly drt1) (dirt_param ~non_poly drt2)) (sort drts))
     (sequence "," (fun (d, bound1, bound2) ppf -> print ppf "%t <= %t <= %t" (dirt_bound bound1) (dirt_param ~non_poly d) (dirt_bound bound2)) bounds)
     (match rgns with [] -> "" | _ -> "; ")
-    (sequence "," (fun (rgn1, rgn2) ppf -> print ppf "%t <= %t" (region ~non_poly rgn1) (region ~non_poly rgn2)) (sort rgns))
+    (sequence "," (fun (rgn1, rgn2) ppf -> print ppf "%t <= %t" (region_param ~non_poly rgn1) (region_param ~non_poly rgn2)) (sort rgns))
 
 let context ctx ppf =
   match ctx with
