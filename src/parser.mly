@@ -478,7 +478,7 @@ plain_ty:
   | t1 = ty_apply ARROW t2 = ty
     { TyArrow (t1, t2, None) }
   | t1 = ty_apply HARROW t2 = ty
-    { TyHandler (t1, t2, None) }
+    { TyHandler (t1, None, t2, None) }
   | t = plain_prod_ty
     { t }
 

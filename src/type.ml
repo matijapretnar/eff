@@ -19,7 +19,7 @@ type ty =
   | Basic of string
   | Tuple of ty list
   | Arrow of ty * dirty
-  | Handler of ty * dirty
+  | Handler of (ty * dirt_param) * dirty
 
 and dirty = instance_param list * ty * dirt_param
 
@@ -66,10 +66,10 @@ let rec subst_ty sbst = function
       let ty1 = subst_ty sbst ty1 in
       let drty2 = subst_dirty sbst drty2 in
       Arrow (ty1, drty2)
-  | Handler (ty1, drty2) ->
+  | Handler ((ty1, d), drty2) ->
       let ty1 = subst_ty sbst ty1 in
       let drty2 = subst_dirty sbst drty2 in
-      Handler (ty1, drty2)
+      Handler ((ty1, sbst.dirt_param d), drty2)
 
 and subst_dirty sbst (frsh, ty, d) =
   let subst_instance i frsh =
@@ -216,6 +216,9 @@ let fold_dirt f g acc = Dirt.fold_edges f g.dirt_graph acc
 
 let add_dirt_low_bound r_op d cstr =
   {cstr with dirt_graph = Dirt.add_lower_bound d [r_op] cstr.dirt_graph}
+
+let add_dirt_upper_bound r_op d cstr =
+  {cstr with dirt_graph = Dirt.add_upper_bound d [r_op] cstr.dirt_graph}
 
 let add_region_low_bound i r cstr =
   {cstr with region_graph = Region.add_lower_bound r (Some [i]) cstr.region_graph}

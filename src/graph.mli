@@ -23,6 +23,7 @@ sig
   val add_edge : elt -> elt -> t -> t
 
   val add_lower_bound : elt -> V.bound -> t -> t
+  val add_upper_bound : elt -> V.bound -> t -> t
 
   (** Add an edge to the graph. *)
   val add_vertex : elt -> t -> t

@@ -8,6 +8,7 @@ let disable_typing = ref false;;
 let ty_less = Unify.ty_less
 let dirt_less = Unify.dirt_less
 let dirt_causes_op = Unify.dirt_causes_op
+let dirt_handles_op = Unify.dirt_handles_op
 let dirt_pure = Unify.dirt_pure
 let region_covers = Unify.region_covers
 let dirty_less = Unify.dirty_less
@@ -181,14 +182,17 @@ let rec infer_expr env (e, pos) =
       let dirt = T.fresh_dirt_param () in
       let t_finally = T.fresh_ty () in
       let t_yield = T.fresh_ty () in
+      let drt_value = T.fresh_dirt_param () in
       let constrain_operation ((e, op), a2) (ctx, cnstrs) =
         (* XXX Correct when you know what to put instead of the fresh region .*)
-        begin match Tctx.infer_operation op (T.fresh_region_param ()) with
+        let r = T.fresh_region_param () in
+        begin match Tctx.infer_operation op r with
         | None -> Error.typing ~pos "Unbound operation %s in a handler" op
         | Some (ty, (t1, t2)) ->
             let ctxe, u, cstr_e = infer_expr env e in
             let ctxa, u1, tk, u2, cstr_a = infer_abstraction2 env a2 in
             ctxe @ ctxa @ ctx, [
+              dirt_handles_op drt_value r op;
               ty_less ~pos u ty;
               ty_less ~pos t1 u1;
               ty_less ~pos (T.Arrow (t2, ([], t_yield, dirt))) tk;
@@ -201,7 +205,7 @@ let rec infer_expr env (e, pos) =
         let ctxs, cnstrs = List.fold_right constrain_operation ops ([], []) in
         let ctx1, valt1, valt2, cstr_val = infer_abstraction env a_val in
         let ctx2, fint1, (frsh_fin, fint2, findrt), cstr_fin = infer_abstraction env a_fin in
-        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler(t_value, (frsh_fin, t_finally, dirt))) ([
+        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, drt_value), (frsh_fin, t_finally, dirt))) ([
           ty_less ~pos t_value valt1;
           dirty_less ~pos valt2 ([], t_yield, dirt);
           ty_less ~pos fint2 t_finally;
@@ -332,8 +336,10 @@ and infer_comp env (c, pos) =
       let ctx2, (frsh, ty2, drt2), cnstrs2 = infer_comp env c2 in
       let frsh3, ty3, drt3 = T.fresh_dirty () in
       let drt4 = T.fresh_dirt_param () in
+      let drt = T.fresh_dirt_param () in
+      (* XXX What do we do with drt is what is really important *)
       unify (ctx1 @ ctx2) (frsh @ frsh3, ty3, drt4) [
-        ty_less ~pos ty1 (T.Handler (ty2, (frsh3, ty3, drt3)));
+        ty_less ~pos ty1 (T.Handler ((ty2, drt), (frsh3, ty3, drt3)));
         dirt_less ~pos drt3 drt4;
         dirt_less ~pos drt2 drt4;
         just cnstrs1;

@@ -8,6 +8,9 @@ and dirt_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
 and dirt_causes_op d r op (ctx, ty, cnstrs, sbst) =
   let cnstrs' = Type.add_dirt_low_bound (r, op) d cnstrs in
   (ctx, ty, cnstrs', sbst)
+and dirt_handles_op d r op (ctx, ty, cnstrs, sbst) =
+  let cnstrs' = Type.add_dirt_upper_bound (r, op) d cnstrs in
+  (ctx, ty, cnstrs', sbst)
 and dirt_pure d (ctx, ty, cnstrs, sbst) =
   (* ??? *)
   (ctx, ty, cnstrs, sbst)
@@ -71,8 +74,8 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
       end
 
-  | (Type.Handler (tyv1, tyf1), Type.Handler (tyv2, tyf2)) ->
-      ty_less ~pos tyv2 tyv1 (dirty_less ~pos tyf1 tyf2 ty_sch)
+  | (Type.Handler ((tyv1, drt1), tyf1), Type.Handler ((tyv2, drt2), tyf2)) ->
+      dirt_less ~pos drt2 drt1 (ty_less ~pos tyv2 tyv1 (dirty_less ~pos tyf1 tyf2 ty_sch))
 
   | (ty1, ty2) ->
       let ty1, ty2 = Type.beautify2 ty1 ty2 in
@@ -134,7 +137,7 @@ let pos_neg_params ty =
   | Type.Basic _ -> Trio.empty
   | Type.Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
   | Type.Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
-  | Type.Handler (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
+  | Type.Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt_param (not is_pos) drt1 @@@ pos_dirty is_pos drty2
   and pos_dirty is_pos (_, ty, drt) =
     pos_ty is_pos ty @@@ pos_dirt_param is_pos drt
   and pos_dirt_param is_pos p =
@@ -158,8 +161,9 @@ let pos_neg_constraints (_, pos_ds, _) (_, neg_ds, _) cnstrs =
     | Some r_ops -> List.map fst r_ops
   in
   let pos, neg = List.fold_right (fun (d, inf, sup) (pos, neg) ->
-                                    let pos = if List.mem d pos_ds then regions inf @ pos else pos
-                                    and neg = if List.mem d neg_ds then regions sup @ neg else neg
+                                  (* XXX This might be a little weird - we never change the negative regions *)
+                                    let pos = if List.mem d pos_ds then regions inf @ pos else pos in
+                                    let pos = if List.mem d neg_ds then regions sup @ pos else pos
                                     in
                                     (pos, neg)
   ) bounds ([], []) in
@@ -177,7 +181,10 @@ let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
   in
   let (pos, neg) = List.fold_right add_ctx_pos_neg ctx (pos_neg_params ty) in
   let (posc, negc) = pos_neg_constraints pos neg cnstrs in
-  (Trio.uniq (posc @@@ pos), Trio.uniq (negc @@@ neg))
+  let ((_, _, pos_rs) as pos), ((_, _, neg_rs) as neg) = (Trio.uniq (posc @@@ pos), Trio.uniq (negc @@@ neg)) in
+  Print.debug "%t- < %t+" (Print.sequence "," Print.region_param neg_rs) (Print.sequence "," Print.region_param pos_rs);
+  pos, neg
+
 
 let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, sbst) =
   let cnstrs' = Type.garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in

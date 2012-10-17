@@ -135,8 +135,8 @@ let rec ty ?(non_poly=Trio.empty) t ppf =
     | Type.TyParam p -> ty_param ~non_poly p ppf
     | Type.Tuple [] -> print "unit"
     | Type.Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (sequence " *" (ty ~max_level:1) ts)
-    | Type.Handler (t1, (_, t2, drt)) ->
-        print ~at_level:4 "%t =>@ %t ! %t" (ty ~max_level:2 t1) (ty t2) (dirt_param ~non_poly drt)
+    | Type.Handler ((t1, drt1), (_, t2, drt2)) ->
+        print ~at_level:4 "%t ! %t =>@ %t ! %t" (ty ~max_level:2 t1) (dirt_param ~non_poly drt1) (ty t2) (dirt_param ~non_poly drt2)
   in ty t ppf
 
 let less pp p1 p2 ppf =
