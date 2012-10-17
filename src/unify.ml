@@ -72,7 +72,7 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       end
 
   | (Type.Handler (tyv1, tyf1), Type.Handler (tyv2, tyf2)) ->
-      ty_less ~pos tyv2 tyv1 (ty_less ~pos tyf1 tyf2 ty_sch)
+      ty_less ~pos tyv2 tyv1 (dirty_less ~pos tyf1 tyf2 ty_sch)
 
   | (ty1, ty2) ->
       let ty1, ty2 = Type.beautify2 ty1 ty2 in
@@ -134,7 +134,7 @@ let pos_neg_params ty =
   | Type.Basic _ -> Trio.empty
   | Type.Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
   | Type.Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
-  | Type.Handler (ty1, ty2) -> pos_ty (not is_pos) ty1 @@@ pos_ty is_pos ty2
+  | Type.Handler (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
   and pos_dirty is_pos (_, ty, drt) =
     pos_ty is_pos ty @@@ pos_dirt_param is_pos drt
   and pos_dirt_param is_pos p =

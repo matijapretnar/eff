@@ -227,9 +227,9 @@ let check_well_formed ~pos tydef =
       | _, (Sum _ | Record _ | Inline _) ->
         Error.typing ~pos "The non-effect type constructor %s cannot be applied to a region" ty_name
     end
-  | T.Arrow (ty1, dirty2) -> check ty1; check_dirty dirty2
+  | T.Arrow (ty1, drty2) -> check ty1; check_dirty drty2
   | T.Tuple tys -> List.iter check tys
-  | T.Handler (ty1, ty2) -> check ty1; check ty2
+  | T.Handler (ty1, drty2) -> check ty1; check_dirty drty2
   and check_dirty (_, ty, _) = check ty
   in
   match tydef with
@@ -263,7 +263,7 @@ let check_noncyclic ~pos =
         check_tydef (t :: forbidden) (ty_apply ~pos t args)
   | T.Arrow (ty1, (_, ty2, _)) -> check forbidden ty1; check forbidden ty2
   | T.Tuple tys -> List.iter (check forbidden) tys
-  | T.Handler (ty1, ty2) ->
+  | T.Handler (ty1, (_, ty2, _)) ->
       check forbidden ty1; check forbidden ty2
   and check_tydef forbidden = function
   | Sum _ -> ()
@@ -360,7 +360,7 @@ let extend_with_variances tydefs =
           ty posi nega ty2;
           dirt_param posi nega drt
       | T.Tuple tys -> List.iter (ty posi nega) tys
-      | T.Handler (ty1, ty2) ->
+      | T.Handler (ty1, (_, ty2, _)) ->
           ty nega posi ty1;
           ty posi nega ty2
     and dirt_param posi nega d =

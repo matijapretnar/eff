@@ -49,7 +49,8 @@ let fill_args is_effect ty =
   | Syntax.TyArrow (t1, t2, None) -> Syntax.TyArrow (fill t1, fill t2, Some (fresh_dirt_param ()))
   | Syntax.TyArrow (t1, t2, Some drt) -> Syntax.TyArrow (fill t1, fill t2, Some drt)
   | Syntax.TyTuple lst -> Syntax.TyTuple (List.map fill lst)
-  | Syntax.TyHandler (t1, t2) -> Syntax.TyHandler (fill t1, fill t2)
+  | Syntax.TyHandler (t1, t2, None) -> Syntax.TyHandler (fill t1, fill t2, Some (fresh_dirt_param ()))
+  | Syntax.TyHandler (t1, t2, Some drt) -> Syntax.TyHandler (fill t1, fill t2, Some drt)
   in
   (ty', pos)
   in
@@ -123,7 +124,8 @@ let ty (ts, ds, rs) =
   | Syntax.TyArrow (t1, t2, Some drt) -> T.Arrow (ty t1, ([], ty t2, dirt pos drt))
   | Syntax.TyArrow (t1, t2, None) -> assert false
   | Syntax.TyTuple lst -> T.Tuple (List.map ty lst)
-  | Syntax.TyHandler (t1, t2) -> T.Handler (ty t1, ty t2)
+  | Syntax.TyHandler (t1, t2, None) -> assert false
+  | Syntax.TyHandler (t1, t2, Some drt) -> T.Handler (ty t1, ([], ty t2, dirt pos drt))
   and dirt pos (Syntax.DirtParam d) =
     match C.lookup d ds with
     | None -> Error.syntax ~pos "Unbound dirt parameter 'drt%d" d
@@ -148,7 +150,7 @@ let free_params t =
   | Syntax.TyParam s -> ([s], [], [])
   | Syntax.TyArrow (t1, t2, drt) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt
   | Syntax.TyTuple lst -> Trio.flatten_map ty lst
-  | Syntax.TyHandler (t1, t2) -> ty t1 @@@ ty t2
+  | Syntax.TyHandler (t1, t2, drt) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt
   and dirt (Syntax.DirtParam d) = ([], [d], [])
   and region (Syntax.RegionParam r) = ([], [], [r])
   and dirts_regions (drts, rgns) = Trio.flatten_map dirt drts @@@ Trio.flatten_map region rgns

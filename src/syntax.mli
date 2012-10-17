@@ -77,7 +77,7 @@ and plain_ty =
   (** [ty1 -> ty2] *)
   | TyTuple of ty list
   (** [ty1 * ty2 * ... * tyn] *)
-  | TyHandler of ty * ty
+  | TyHandler of ty * ty * dirt option
   (** [ty1 => ty2] *)
 
 type tydef =

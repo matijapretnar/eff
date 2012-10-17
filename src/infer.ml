@@ -200,11 +200,12 @@ let rec infer_expr env (e, pos) =
       in
         let ctxs, cnstrs = List.fold_right constrain_operation ops ([], []) in
         let ctx1, valt1, valt2, cstr_val = infer_abstraction env a_val in
-        let ctx2, fint1, fint2, cstr_fin = infer_abstraction env a_fin in
-        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler(t_value, t_finally)) ([
+        let ctx2, fint1, (frsh_fin, fint2, findrt), cstr_fin = infer_abstraction env a_fin in
+        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler(t_value, (frsh_fin, t_finally, dirt))) ([
           ty_less ~pos t_value valt1;
           dirty_less ~pos valt2 ([], t_yield, dirt);
-          dirty_less ~pos fint2 ([], t_finally, dirt);
+          ty_less ~pos fint2 t_finally;
+          dirt_less ~pos findrt dirt;
           ty_less ~pos t_yield fint1;
           just cstr_val;
           just cstr_fin
@@ -329,9 +330,12 @@ and infer_comp env (c, pos) =
   | Core.Handle (e1, c2) ->
       let ctx1, ty1, cnstrs1 = infer_expr env e1 in
       let ctx2, (frsh, ty2, drt2), cnstrs2 = infer_comp env c2 in
-      let ty3 = T.fresh_ty () in
-      unify (ctx1 @ ctx2) (frsh, ty3, drt2) [
-        ty_less ~pos ty1 (T.Handler (ty2, ty3));
+      let frsh3, ty3, drt3 = T.fresh_dirty () in
+      let drt4 = T.fresh_dirt_param () in
+      unify (ctx1 @ ctx2) (frsh @ frsh3, ty3, drt4) [
+        ty_less ~pos ty1 (T.Handler (ty2, (frsh3, ty3, drt3)));
+        dirt_less ~pos drt3 drt4;
+        dirt_less ~pos drt2 drt4;
         just cnstrs1;
         just cnstrs2
       ]

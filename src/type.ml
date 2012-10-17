@@ -19,7 +19,7 @@ type ty =
   | Basic of string
   | Tuple of ty list
   | Arrow of ty * dirty
-  | Handler of ty * ty
+  | Handler of ty * dirty
 
 and dirty = instance_param list * ty * dirt_param
 
@@ -66,10 +66,10 @@ let rec subst_ty sbst = function
       let ty1 = subst_ty sbst ty1 in
       let drty2 = subst_dirty sbst drty2 in
       Arrow (ty1, drty2)
-  | Handler (ty1, ty2) ->
+  | Handler (ty1, drty2) ->
       let ty1 = subst_ty sbst ty1 in
-      let ty2 = subst_ty sbst ty2 in
-      Handler (ty1, ty2)
+      let drty2 = subst_dirty sbst drty2 in
+      Handler (ty1, drty2)
 
 and subst_dirty sbst (frsh, ty, d) =
   let subst_instance i frsh =
