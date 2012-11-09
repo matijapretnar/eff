@@ -8,7 +8,7 @@ let disable_typing = ref false;;
 let ty_less = Unify.ty_less
 let dirt_less = Unify.dirt_less
 let dirt_causes_op = Unify.dirt_causes_op
-let dirt_handles_op = Unify.dirt_handles_op
+let dirt_handles_ops = Unify.dirt_handles_ops
 let dirt_pure = Unify.dirt_pure
 let region_covers = Unify.region_covers
 let dirty_less = Unify.dirty_less
@@ -183,7 +183,7 @@ let rec infer_expr env (e, pos) =
       let t_finally = T.fresh_ty () in
       let t_yield = T.fresh_ty () in
       let drt_value = T.fresh_dirt_param () in
-      let constrain_operation ((e, op), a2) (ctx, cnstrs) =
+      let constrain_operation ((e, op), a2) (ctx, cnstrs, rops) =
         (* XXX Correct when you know what to put instead of the fresh region .*)
         let r = T.fresh_region_param () in
         begin match Tctx.infer_operation op r with
@@ -192,20 +192,20 @@ let rec infer_expr env (e, pos) =
             let ctxe, u, cstr_e = infer_expr env e in
             let ctxa, u1, tk, u2, cstr_a = infer_abstraction2 env a2 in
             ctxe @ ctxa @ ctx, [
-              dirt_handles_op drt_value r op;
               ty_less ~pos u ty;
               ty_less ~pos t1 u1;
               ty_less ~pos (T.Arrow (t2, ([], t_yield, dirt))) tk;
               dirty_less ~pos u2 ([], t_yield, dirt);
               just cstr_e;
               just cstr_a
-            ] @ cnstrs
+            ] @ cnstrs, (r, op) :: rops
         end
       in
-        let ctxs, cnstrs = List.fold_right constrain_operation ops ([], []) in
+        let ctxs, cnstrs, rops = List.fold_right constrain_operation ops ([], [], []) in
         let ctx1, valt1, valt2, cstr_val = infer_abstraction env a_val in
         let ctx2, fint1, (frsh_fin, fint2, findrt), cstr_fin = infer_abstraction env a_fin in
         unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, drt_value), (frsh_fin, t_finally, dirt))) ([
+          dirt_handles_ops drt_value rops;
           ty_less ~pos t_value valt1;
           dirty_less ~pos valt2 ([], t_yield, dirt);
           ty_less ~pos fint2 t_finally;

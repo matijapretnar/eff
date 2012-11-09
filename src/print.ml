@@ -91,8 +91,8 @@ let fresh_instances frsh ppf =
     | [] -> print ppf ""
     | frsh ->  print ppf "new %t.@ " (sequence "" (fun (Type.Instance_Param i) ppf -> print ppf "%d" i) frsh)
 
-let dirt_bound ~non_poly r_ops =
-  sequence "," (fun (r, op) ppf -> print ppf "%t#%s" (region_param ~non_poly r) op) r_ops
+let dirt_bound ?non_poly r_ops =
+  sequence "," (fun (r, op) ppf -> print ppf "%t#%s" (region_param ?non_poly r) op) r_ops
 
 let region_bound insts ppf =
   match insts with

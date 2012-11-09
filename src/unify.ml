@@ -8,8 +8,9 @@ and dirt_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
 and dirt_causes_op d r op (ctx, ty, cnstrs, sbst) =
   let cnstrs' = Type.add_dirt_low_bound (r, op) d cnstrs in
   (ctx, ty, cnstrs', sbst)
-and dirt_handles_op d r op (ctx, ty, cnstrs, sbst) =
-  let cnstrs' = Type.add_dirt_upper_bound (r, op) d cnstrs in
+and dirt_handles_ops d rops (ctx, ty, cnstrs, sbst) =
+  Print.debug "Dirt %t handles %t" (Print.dirt_param d) (Print.dirt_bound rops);
+  let cnstrs' = Type.add_dirt_upper_bound rops d cnstrs in
   (ctx, ty, cnstrs', sbst)
 and dirt_pure d (ctx, ty, cnstrs, sbst) =
   (* ??? *)

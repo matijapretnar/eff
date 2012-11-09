@@ -217,8 +217,8 @@ let fold_dirt f g acc = Dirt.fold_edges f g.dirt_graph acc
 let add_dirt_low_bound r_op d cstr =
   {cstr with dirt_graph = Dirt.add_lower_bound d [r_op] cstr.dirt_graph}
 
-let add_dirt_upper_bound r_op d cstr =
-  {cstr with dirt_graph = Dirt.add_upper_bound d [r_op] cstr.dirt_graph}
+let add_dirt_upper_bound r_ops d cstr =
+  {cstr with dirt_graph = Dirt.add_upper_bound d r_ops cstr.dirt_graph}
 
 let add_region_low_bound i r cstr =
   {cstr with region_graph = Region.add_lower_bound r (Some [i]) cstr.region_graph}
