@@ -198,7 +198,7 @@ let min x y = if x < y then x else y
 
 let max x y = if x < y then y else x
 
-let rec gcd m n =
+(* let rec gcd m n =
   match n with
   | 0 -> m
   | _ ->
@@ -206,7 +206,7 @@ let rec gcd m n =
 
 let rec lcm m n =
   let d = gcd m n in (m * n) / d
-
+ *)
 let odd x = (x mod 2 = 1)
 
 let even x = (x mod 2 = 0)
