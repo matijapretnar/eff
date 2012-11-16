@@ -1,7 +1,3 @@
-type eff = effect
-  operation op : unit -> unit
-end;;
-
 (* This is the equivalent of Haskell prelude or Ocaml pervasives,
    with some list handling functions thrown in. *)
 

@@ -329,16 +329,15 @@ and infer_comp env (c, pos) =
       end
 
   | Core.Handle (e1, c2) ->
-      let ctx1, ty1, cnstrs1 = infer_expr env e1 in
-      let ctx2, (frsh, ty2, drt2), cnstrs2 = infer_comp env c2 in
-      let frsh3, ty3, drt3 = T.fresh_dirty () in
-      let drt4 = T.fresh_dirt () in
-      let drt = T.fresh_dirt () in
-      (* XXX What do we do with drt is what is really important *)
-      unify (ctx1 @ ctx2) (frsh @ frsh3, ty3, drt4) [
-        ty_less ~pos ty1 (T.Handler ((ty2, drt), (frsh3, ty3, drt3)));
-        dirt_less ~pos drt3 drt4;
-        dirt_less ~pos drt2 drt4;
+      let ctx1, ty1, cnstrs1 = infer_expr env e1
+      and ctx2, (frsh, ty2, drt2), cnstrs2 = infer_comp env c2
+      and ty_in = T.fresh_ty ()
+      and drt_in = T.fresh_dirt ()
+      and frsh_out, ty_out, drt_out = T.fresh_dirty () in
+      unify (ctx1 @ ctx2) (frsh_out @ frsh, ty_out, drt_out) [
+        ty_less ~pos ty1 (T.Handler ((ty_in, drt_in), (frsh_out, ty_out, drt_out)));
+        ty_less ~pos ty2 ty_in;
+        dirt_less ~pos drt2 drt_in;
         just cnstrs1;
         just cnstrs2
       ]
