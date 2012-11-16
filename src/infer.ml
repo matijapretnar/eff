@@ -226,11 +226,11 @@ and infer_comp env (c, pos) =
       ctx, ([], ty, empty_dirt ()), cnstrs
 
   | Core.Let (defs, c) -> 
-      let env, change = infer_let ~pos env defs in
+      let env, _, change = infer_let ~pos env defs in
       change (infer_comp env c)
 
   | Core.LetRec (defs, c) ->
-      let env, change = infer_let_rec ~pos env defs in
+      let env, _, change = infer_let_rec ~pos env defs in
       change (infer_comp env c)
 
   | Core.Match (e, []) ->
@@ -379,9 +379,10 @@ and infer_let ~pos env defs =
   (* Refresh freshes *)
   (* Check for duplicate variables *)
   let drt = Type.fresh_dirt () in
-  let add_binding (p, c) (env, ctxs, ctxp, frshs, cstrs) =
+  let add_binding (p, c) (env, ctxs, ctxp, frshs, vars, cstrs) =
     let ctx_p, t_p, cstr_p = infer_pattern p in
     let ctx_c, (frsh, t_c, drt'), cstr_c = infer_comp env c in
+    let vars = (List.map fst ctx_p) @ vars in
     let env, ctxp =
       if nonexpansive (fst c) then
         let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (ctx_c, t_c, cstr_c)) ctx_p env in
@@ -389,15 +390,15 @@ and infer_let ~pos env defs =
       else
         env, ctx_p @ ctxp
     in
-    env, ctx_c @ ctxs, ctxp, frsh @ frshs, [
+    env, ctx_c @ ctxs, ctxp, frsh @ frshs, vars, [
       ty_less ~pos:(snd c) t_c t_p;
       dirt_less ~pos:(snd c) drt' drt;
       just cstr_p;
       just cstr_c
     ] @ cstrs
   in
-  let env, ctxs, ctxp, frshs, cstrs = List.fold_right add_binding defs (env, [], [], [], []) in
-  env, fun (ctx2, (frsh, tc, dc), cstr_c) ->
+  let env, ctxs, ctxp, frshs, vars, cstrs = List.fold_right add_binding defs (env, [], [], [], [], []) in
+  env, vars, fun (ctx2, (frsh, tc, dc), cstr_c) ->
     Unify.gather_dirty_scheme ~pos (ctxs @ ctx2) (frshs @ frsh, tc, drt) ([
           dirt_less ~pos dc drt;
           trim_context ~pos ctxp;
@@ -418,5 +419,5 @@ and infer_let_rec ~pos env defs =
   ] @ cnstrs
  in
   let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Unify.gather_ty_scheme ~pos ctx t cnstrs)) vars env in
-  env, fun (ctx2, (frsh, tc, dc), cstr_c) ->
+  env, vars, fun (ctx2, (frsh, tc, dc), cstr_c) ->
   Unify.gather_dirty_scheme ~pos (ctx @ ctx2) (frsh, tc, dc) (just cstr_c :: cnstrs)

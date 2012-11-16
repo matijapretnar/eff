@@ -91,31 +91,31 @@ let exec_topdef interactive (ctx, env) (d,pos) =
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
       (* XXX What to do about the fresh instances? *)
-      let ctx, _ = Infer.infer_let ~pos ctx defs in
+      let ctx, vars, _ = Infer.infer_let ~pos ctx defs in
       List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env =
         List.fold_right
           (fun (p,c) env -> let v = Eval.run env c in Eval.extend p v env)
           defs env
       in
-(*         if interactive then begin
-          List.iter (fun (x, tysch) ->
+        if interactive then begin
+          List.iter (fun x ->
                        match Eval.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.printf "@[val %d : %t = %t@]@." x (Print.beautified_ty_scheme tysch) (Print.value v))
+                         Format.printf "@[val %t = %t@]@." (Print.variable x) (* (Print.beautified_ty_scheme tysch)  *)(Print.value v))
             vars
         end;
- *)        (ctx, env)
+        (ctx, env)
   | Syntax.TopLetRec defs ->
       let defs = Desugar.top_let_rec defs in
-      let ctx, _ = Infer.infer_let_rec ~pos ctx defs in
+      let ctx, vars, _ = Infer.infer_let_rec ~pos ctx defs in
       List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env = Eval.extend_let_rec env defs in
-(*         if interactive then begin
-          List.iter (fun (x, tysch) -> Format.printf "@[val %d : %t = <fun>@]@." x (Print.beautified_ty_scheme tysch)) vars
+        if interactive then begin
+          List.iter (fun (x, _) -> Format.printf "@[val %t = <fun>@]@." (Print.variable x) (* (Print.beautified_ty_scheme tysch) *)) vars
         end;
- *)        (ctx, env)
+        (ctx, env)
   | Syntax.External (x, t, f) ->
     let (x, t) = Desugar.external_ty (Tctx.is_effect ~pos:pos) x t in
     let ctx = Ctx.extend ctx x t in
