@@ -79,7 +79,7 @@ let rec subst_ty sbst = function
 
 and subst_dirt sbst drt =
   let drt' = sbst.dirt_param drt.rest in
-  { ops = drt'.ops @ (Common.map (fun (r, op) -> (sbst.region_param r, op)) drt.ops); rest = drt'.rest }
+  { ops = Common.uniq (drt'.ops @ (Common.map (fun (r, op) -> (sbst.region_param r, op)) drt.ops)); rest = drt'.rest }
 
 and subst_dirty sbst (frsh, ty, drt) =
   let subst_instance i frsh =
@@ -190,9 +190,9 @@ end)
 
 module Dirt = Graph.Make(struct
   type t = dirt_param
-  type bound = (region_param * Common.opsym) list
-  let inf drt1 drt2 = List.filter (fun x -> List.mem x drt1) drt2
-  let sup drt1 drt2 = Common.uniq (drt1 @ drt2)
+  type bound = unit
+  let inf () () = ()
+  let sup () () = ()
   let compare = Pervasives.compare
 end)
 
@@ -213,22 +213,18 @@ let empty = {
 
 let remove_ty g x =
   Ty.remove_vertex x g.ty_graph
+let remove_dirt g x =
+  Dirt.remove_vertex x g.dirt_graph
 
 let subst_constraints sbst cnstr = {
   ty_graph = Ty.map (fun p -> match sbst.ty_param p with TyParam q -> q | _ -> assert false) (fun () -> ()) cnstr.ty_graph;
-  dirt_graph = Dirt.map (fun p -> (sbst.dirt_param p).rest) (fun r_ops -> List.map (fun (r, op) -> (sbst.region_param r, op)) r_ops) cnstr.dirt_graph;
+  dirt_graph = Dirt.map (fun p -> match sbst.dirt_param p with {rest = p; ops = []} -> p | _ -> assert false) (fun () -> ()) cnstr.dirt_graph;
   region_graph = Region.map sbst.region_param (fun insts -> Common.option_map (fun insts -> List.map (fun ins -> match sbst.instance_param ins with Some i -> i | None -> assert false) insts) insts) cnstr.region_graph;
 }
 
 let fold_ty f g acc = Ty.fold_edges f g.ty_graph acc
 let fold_region f g acc = Region.fold_edges f g.region_graph acc
 let fold_dirt f g acc = Dirt.fold_edges f g.dirt_graph acc
-
-let add_dirt_low_bound r_op d cstr =
-  {cstr with dirt_graph = Dirt.add_lower_bound d [r_op] cstr.dirt_graph}
-
-let add_dirt_upper_bound r_ops d cstr =
-  {cstr with dirt_graph = Dirt.add_upper_bound d r_ops cstr.dirt_graph}
 
 let add_region_low_bound i r cstr =
   {cstr with region_graph = Region.add_lower_bound r (Some [i]) cstr.region_graph}

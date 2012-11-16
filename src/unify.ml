@@ -5,16 +5,6 @@ let ty_param_less p q (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.add_ty_constraint p q cnstrs, sbst)
 and dirt_param_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.add_dirt_constraint d1 d2 cnstrs, sbst)
-and dirt_causes_op drt r op (ctx, ty, cnstrs, sbst) =
-  let cnstrs' = Type.add_dirt_low_bound (r, op) drt.Type.rest cnstrs in
-  (ctx, ty, cnstrs', sbst)
-and dirt_handles_ops drt rops (ctx, ty, cnstrs, sbst) =
-  Print.debug "Dirt %t handles %t" (Print.dirt_param drt.Type.rest) (Print.dirt_bound rops);
-  let cnstrs' = Type.add_dirt_upper_bound rops drt.Type.rest cnstrs in
-  (ctx, ty, cnstrs', sbst)
-and dirt_pure d (ctx, ty, cnstrs, sbst) =
-  (* ??? *)
-  (ctx, ty, cnstrs, sbst)
 and region_less ~pos r1 r2 (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.add_region_constraint r1 r2 cnstrs, sbst)
 and region_covers r i (ctx, ty, cnstrs, sbst) =
@@ -22,8 +12,40 @@ and region_covers r i (ctx, ty, cnstrs, sbst) =
 and just new_cnstrs (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.join_disjoint_constraints new_cnstrs cnstrs, sbst)
 
-let dirt_less ~pos drt1 drt2 ty_sch =
-  dirt_param_less ~pos drt1.Type.rest drt2.Type.rest ty_sch
+let rec add_dirt_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
+  let sbst' = {
+    Type.identity_subst with 
+    Type.dirt_param = (fun d' -> if d' = d then drt' else {Type.ops = []; Type.rest = d'})
+  } in
+  let (pred, succ, new_dirt_grph) = Type.remove_dirt cnstrs d in
+  let cnstrs = {cnstrs with Type.dirt_graph = new_dirt_grph} in
+  let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
+  let ty_sch = List.fold_right (fun q ty_sch -> dirt_less ~pos {Type.ops = []; Type.rest = q} drt' ty_sch) pred ty_sch in
+  List.fold_right (fun q ty_sch -> dirt_less ~pos drt' {Type.ops = []; Type.rest = q} ty_sch) succ ty_sch
+
+
+and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
+  let {Type.rest = d1; Type.ops = ops1} = Type.subst_dirt sbst drt1
+  and {Type.rest = d2; Type.ops = ops2} = Type.subst_dirt sbst drt2 in
+  let missing_ops1 = List.filter (fun rop -> not (List.mem rop ops1)) ops2
+  and missing_ops2 = List.filter (fun rop -> not (List.mem rop ops2)) ops1 in
+  let ty_sch, d1' =
+    match missing_ops1 with
+    | [] -> ty_sch, d1
+    | _ ->
+      let d1' = Type.fresh_dirt_param () in
+      let drt1' = { Type.ops = ops1 @ missing_ops1; Type.rest = d1' } in
+      add_dirt_substitution ~pos d1 drt1' ty_sch, d1'
+  in
+  let ty_sch, d2' =
+    match missing_ops2 with
+    | [] -> ty_sch, d2
+    | _ ->
+      let d2' = Type.fresh_dirt_param () in
+      let drt2' = { Type.ops = ops2 @ missing_ops2; Type.rest = d2' } in
+      add_dirt_substitution ~pos d2 drt2' ty_sch, d2'
+  in
+  dirt_param_less ~pos d1' d2' ty_sch
 
 let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   (* XXX Check cyclic types *)
@@ -145,7 +167,7 @@ let pos_neg_params ty =
   and pos_dirty is_pos (_, ty, drt) =
     pos_ty is_pos ty @@@ pos_dirt is_pos drt
   and pos_dirt is_pos drt =
-    pos_dirt_param is_pos drt.Type.rest
+    pos_dirt_param is_pos drt.Type.rest @@@ Trio.flatten_map (fun (r, _) -> pos_region_param is_pos r) drt.Type.ops
   and pos_dirt_param is_pos p =
     ([], (if is_pos then [p] else []), [])
   and pos_region_param is_pos r =
@@ -160,25 +182,6 @@ let pos_neg_params ty =
   in
   Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)
 
-let pos_neg_constraints (_, pos_ds, _) (_, neg_ds, _) cnstrs =
-  let bounds = Type.Dirt.bounds cnstrs.Type.dirt_graph in
-  let regions = function
-    | None -> []
-    | Some r_ops -> List.map fst r_ops
-  in
-  let pos, neg = List.fold_right (fun (d, inf, sup) (pos, neg) ->
-                                  (* XXX This might be a little weird - we never change the negative regions *)
-                                    let pos = if List.mem d pos_ds then regions inf @ pos else pos in
-                                    let pos = if List.mem d neg_ds then regions sup @ pos else pos
-                                    in
-                                    (pos, neg)
-  ) bounds ([], []) in
-  ([], [], Common.uniq pos), ([], [], Common.uniq neg)
-
-(*   let pos_vertex d =
-    if List.mem d pos_ds then
-    let (_, _, inf, _) = cnstrs.Type.dirt_graph.function
- *)
 
 let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
   let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
@@ -186,8 +189,7 @@ let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
   let (pos, neg) = List.fold_right add_ctx_pos_neg ctx (pos_neg_params ty) in
-  let (posc, negc) = pos_neg_constraints pos neg cnstrs in
-  let ((_, _, pos_rs) as pos), ((_, _, neg_rs) as neg) = (Trio.uniq (posc @@@ pos), Trio.uniq (negc @@@ neg)) in
+  let ((_, _, pos_rs) as pos), ((_, _, neg_rs) as neg) = (Trio.uniq pos, Trio.uniq neg) in
   Print.debug "%t- < %t+" (Print.sequence "," Print.region_param neg_rs) (Print.sequence "," Print.region_param pos_rs);
   pos, neg
 

@@ -7,9 +7,6 @@ let disable_typing = ref false;;
 
 let ty_less = Unify.ty_less
 let dirt_less = Unify.dirt_less
-let dirt_causes_op = Unify.dirt_causes_op
-let dirt_handles_ops = Unify.dirt_handles_ops
-let dirt_pure = Unify.dirt_pure
 let region_covers = Unify.region_covers
 let dirty_less = Unify.dirty_less
 let just = Unify.just
@@ -169,10 +166,9 @@ let rec infer_expr env (e, pos) =
       | None -> Error.typing ~pos "Unbound operation %s" op
       | Some (ty, (t1, t2)) ->
           let ctx, u, cstr_u = infer_expr env e in
-          let d = T.fresh_dirt () in
-          unify ctx (T.Arrow (t1, ([], t2, d))) [
+          let d = T.fresh_dirt_param () in
+          unify ctx (T.Arrow (t1, ([], t2, {T.ops = [(r, op)]; T.rest = d}))) [
             ty_less ~pos u ty;
-            dirt_causes_op d r op;
             just cstr_u
           ]
       end
@@ -205,7 +201,7 @@ let rec infer_expr env (e, pos) =
         let ctx1, valt1, valt2, cstr_val = infer_abstraction env a_val in
         let ctx2, fint1, (frsh_fin, fint2, findrt), cstr_fin = infer_abstraction env a_fin in
         unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, drt_value), (frsh_fin, t_finally, dirt))) ([
-          dirt_handles_ops drt_value rops;
+          (* dirt_handles_ops drt_value rops; *)
           ty_less ~pos t_value valt1;
           dirty_less ~pos valt2 ([], t_yield, dirt);
           ty_less ~pos fint2 t_finally;
@@ -315,7 +311,7 @@ and infer_comp env (c, pos) =
                       ty_less ~pos(* p1 *) u1 t1;
                       ty_less ~pos(* p2 *) te t2;
                       (* XXX Warn that d_empty has to be empty *)
-                      dirt_pure (* c *) d_empty;
+                      (* dirt_pure c d_empty; *)
                       dirty_less ~pos(* c *) t ([], T.Tuple [u2; te], d_empty);
                       just cstr_a
                     ] @ cstrs
