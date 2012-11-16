@@ -178,7 +178,6 @@ let rec infer_expr env (e, pos) =
       let dirt = T.fresh_dirt () in
       let t_finally = T.fresh_ty () in
       let t_yield = T.fresh_ty () in
-      let drt_value = T.fresh_dirt () in
       let constrain_operation ((e, op), a2) (ctx, cnstrs, rops) =
         (* XXX Correct when you know what to put instead of the fresh region .*)
         let r = T.fresh_region_param () in
@@ -200,8 +199,10 @@ let rec infer_expr env (e, pos) =
         let ctxs, cnstrs, rops = List.fold_right constrain_operation ops ([], [], []) in
         let ctx1, valt1, valt2, cstr_val = infer_abstraction env a_val in
         let ctx2, fint1, (frsh_fin, fint2, findrt), cstr_fin = infer_abstraction env a_fin in
-        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, drt_value), (frsh_fin, t_finally, dirt))) ([
+        let drt_rest = Type.fresh_dirt_param () in
+        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, {Type.ops = rops; Type.rest = drt_rest}), (frsh_fin, t_finally, dirt))) ([
           (* dirt_handles_ops drt_value rops; *)
+          dirt_less ~pos {Type.ops = []; Type.rest = drt_rest} dirt;
           ty_less ~pos t_value valt1;
           dirty_less ~pos valt2 ([], t_yield, dirt);
           ty_less ~pos fint2 t_finally;
