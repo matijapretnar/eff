@@ -200,13 +200,21 @@ let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstr
   (ctx, ty, cnstrs')
 
 let normalize_context ~pos (ctx, ty, cstr, sbst) =
-  let add (x, ty) (ctx, typ, cnstrs, sbst) =
+  let collect (x, ty) ctx =
     match Common.lookup x ctx with
-    | None ->
+    | None -> (x, ref [ty]) :: ctx
+    | Some tys -> tys := ty :: !tys; ctx
+  in
+  let ctx = List.fold_right collect ctx [] in
+
+  let add (x, tys) (ctx, typ, cnstrs, sbst) =
+    match !tys with
+    | [] -> assert false
+    | [ty] -> ((x, ty) :: ctx, typ, cnstrs, sbst)
+    | tys ->
         let ty' = Type.fresh_ty () in
-        ty_less ~pos ty' ty ((x, ty') :: ctx, typ, cnstrs, sbst)
-    | Some ty' ->
-        ty_less ~pos ty' ty (ctx, typ, cnstrs, sbst)
+        let ctx' = (x, ty') :: ctx in
+        List.fold_right (fun ty ty_sch -> ty_less ~pos ty' ty ty_sch) tys (ctx', typ, cnstrs, sbst)
   in
   List.fold_right add ctx ([], ty, cstr, sbst)
 
