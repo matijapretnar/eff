@@ -23,7 +23,10 @@ type ty =
 
 and dirty = instance_param list * ty * dirt
 
-and dirt = { rest: dirt_param }
+and dirt = {
+  ops: (region_param * Common.opsym) list;
+  rest: dirt_param
+}
 
 and args = (ty, dirt, region_param) Trio.t
 
@@ -41,7 +44,7 @@ let empty_ty = Apply ("empty", Trio.empty)
 (** [fresh_ty ()] gives a type [TyParam p] where [p] is a new type parameter on
     each call. *)
 let fresh_ty () = TyParam (fresh_ty_param ())
-let fresh_dirt () = { rest = fresh_dirt_param () }
+let fresh_dirt () = { ops = []; rest = fresh_dirt_param () }
 (* XXX Should a fresh dirty type have no fresh instances? *)
 let fresh_dirty () = ([], fresh_ty (), fresh_dirt ())
 let universal_ty = Basic "_"
@@ -75,7 +78,8 @@ let rec subst_ty sbst = function
       Handler ((ty1, subst_dirt sbst drt), drty2)
 
 and subst_dirt sbst drt =
-  sbst.dirt_param drt.rest
+  let drt' = sbst.dirt_param drt.rest in
+  { ops = drt'.ops @ (Common.map (fun (r, op) -> (sbst.region_param r, op)) drt.ops); rest = drt'.rest }
 
 and subst_dirty sbst (frsh, ty, drt) =
   let subst_instance i frsh =
@@ -98,7 +102,7 @@ and subst_args sbst (tys, drts, rs) =
 let identity_subst =
   {
     ty_param = (fun p -> TyParam p);
-    dirt_param = (fun d -> { rest = d });
+    dirt_param = (fun d -> { ops = []; rest = d });
     region_param = Common.id;
     instance_param = (fun i -> Some i);
   }
@@ -131,7 +135,7 @@ let beautifying_subst () =
   else
     {
       ty_param = refresher (Common.fresh (fun n -> TyParam (Ty_Param n)));
-      dirt_param = refresher (Common.fresh (fun n -> { rest = Dirt_Param n }));
+      dirt_param = refresher (Common.fresh (fun n -> { ops = []; rest = Dirt_Param n }));
       region_param = refresher (Common.fresh (fun n -> Region_Param n));
       instance_param = refresher (Common.fresh (fun n -> Some (Instance_Param n)));
     }
@@ -140,7 +144,7 @@ let refreshing_subst () =
   {
     identity_subst with
     ty_param = (let refresh = refresher fresh_ty_param in fun p -> TyParam (refresh p));
-    dirt_param = (let refresh = refresher fresh_dirt_param in fun d -> { rest = refresh d });
+    dirt_param = (let refresh = refresher fresh_dirt_param in fun d -> { ops = []; rest = refresh d });
     region_param = refresher fresh_region_param;
   }
 

@@ -86,16 +86,18 @@ let dirt_param ?(non_poly=Trio.empty) ((Type.Dirt_Param k) as p) ppf =
   let c = (if List.mem p ds then "_" else "") in
     print ppf "%sd%i" c (k + 1)
 
+let dirt_bound ?non_poly r_ops =
+  sequence "," (fun (r, op) ppf -> print ppf "%t#%s" (region_param ?non_poly r) op) r_ops
+
 let dirt ?(non_poly=Trio.empty) drt ppf =
-  dirt_param ~non_poly drt.Type.rest ppf
+  match drt.Type.ops with
+  | [] -> dirt_param ~non_poly drt.Type.rest ppf
+  | _ -> print ppf "%t; %t" (dirt_bound ~non_poly drt.Type.ops) (dirt_param ~non_poly drt.Type.rest)
 
 let fresh_instances frsh ppf =
   match frsh with
     | [] -> print ppf ""
     | frsh ->  print ppf "new %t.@ " (sequence "" (fun (Type.Instance_Param i) ppf -> print ppf "%d" i) frsh)
-
-let dirt_bound ?non_poly r_ops =
-  sequence "," (fun (r, op) ppf -> print ppf "%t#%s" (region_param ?non_poly r) op) r_ops
 
 let region_bound insts ppf =
   match insts with
