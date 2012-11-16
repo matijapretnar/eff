@@ -3,14 +3,14 @@
 
 let ty_param_less p q (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.add_ty_constraint p q cnstrs, sbst)
-and dirt_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
+and dirt_param_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.add_dirt_constraint d1 d2 cnstrs, sbst)
-and dirt_causes_op d r op (ctx, ty, cnstrs, sbst) =
-  let cnstrs' = Type.add_dirt_low_bound (r, op) d cnstrs in
+and dirt_causes_op drt r op (ctx, ty, cnstrs, sbst) =
+  let cnstrs' = Type.add_dirt_low_bound (r, op) drt.Type.rest cnstrs in
   (ctx, ty, cnstrs', sbst)
-and dirt_handles_ops d rops (ctx, ty, cnstrs, sbst) =
-  Print.debug "Dirt %t handles %t" (Print.dirt_param d) (Print.dirt_bound rops);
-  let cnstrs' = Type.add_dirt_upper_bound rops d cnstrs in
+and dirt_handles_ops drt rops (ctx, ty, cnstrs, sbst) =
+  Print.debug "Dirt %t handles %t" (Print.dirt_param drt.Type.rest) (Print.dirt_bound rops);
+  let cnstrs' = Type.add_dirt_upper_bound rops drt.Type.rest cnstrs in
   (ctx, ty, cnstrs', sbst)
 and dirt_pure d (ctx, ty, cnstrs, sbst) =
   (* ??? *)
@@ -21,6 +21,9 @@ and region_covers r i (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.add_region_low_bound i r cnstrs, sbst)
 and just new_cnstrs (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.join_disjoint_constraints new_cnstrs cnstrs, sbst)
+
+let dirt_less ~pos drt1 drt2 ty_sch =
+  dirt_param_less ~pos drt1.Type.rest drt2.Type.rest ty_sch
 
 let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   (* XXX Check cyclic types *)
@@ -138,9 +141,11 @@ let pos_neg_params ty =
   | Type.Basic _ -> Trio.empty
   | Type.Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
   | Type.Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
-  | Type.Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt_param (not is_pos) drt1 @@@ pos_dirty is_pos drty2
+  | Type.Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
   and pos_dirty is_pos (_, ty, drt) =
-    pos_ty is_pos ty @@@ pos_dirt_param is_pos drt
+    pos_ty is_pos ty @@@ pos_dirt is_pos drt
+  and pos_dirt is_pos drt =
+    pos_dirt_param is_pos drt.Type.rest
   and pos_dirt_param is_pos p =
     ([], (if is_pos then [p] else []), [])
   and pos_region_param is_pos r =
@@ -150,7 +155,7 @@ let pos_neg_params ty =
     | None -> assert false (* We type-checked before thus all type names are valid. *)
     | Some (ps, ds, rs) ->
         for_parameters pos_ty is_pos ps tys @@@
-        for_parameters pos_dirt_param is_pos ds drts @@@
+        for_parameters pos_dirt is_pos ds drts @@@
         for_parameters pos_region_param is_pos rs rgns
   in
   Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)

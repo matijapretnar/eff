@@ -86,6 +86,9 @@ let dirt_param ?(non_poly=Trio.empty) ((Type.Dirt_Param k) as p) ppf =
   let c = (if List.mem p ds then "_" else "") in
     print ppf "%sd%i" c (k + 1)
 
+let dirt ?(non_poly=Trio.empty) drt ppf =
+  dirt_param ~non_poly drt.Type.rest ppf
+
 let fresh_instances frsh ppf =
   match frsh with
     | [] -> print ppf ""
@@ -115,7 +118,7 @@ let rec ty ?(non_poly=Trio.empty) t ppf =
     | Type.Arrow (t1, (frsh, t2, drt)) ->
         print ~at_level:5 "@[<h>%t -%t->@ %t%t@]"
         (ty ~max_level:4 t1)
-        (dirt_param ~non_poly drt)
+        (dirt ~non_poly drt)
         (fresh_instances frsh)
         (ty ~max_level:5 t2)
         (* print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2) *)
@@ -136,7 +139,7 @@ let rec ty ?(non_poly=Trio.empty) t ppf =
     | Type.Tuple [] -> print "unit"
     | Type.Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (sequence " *" (ty ~max_level:1) ts)
     | Type.Handler ((t1, drt1), (_, t2, drt2)) ->
-        print ~at_level:4 "%t ! %t =>@ %t ! %t" (ty ~max_level:2 t1) (dirt_param ~non_poly drt1) (ty t2) (dirt_param ~non_poly drt2)
+        print ~at_level:4 "%t ! %t =>@ %t ! %t" (ty ~max_level:2 t1) (dirt ~non_poly drt1) (ty t2) (dirt ~non_poly drt2)
   in ty t ppf
 
 let less pp p1 p2 ppf =
@@ -175,13 +178,13 @@ let dirty_scheme (ctx, (frsh, t, drt), cstrs) ppf =
   let sbst = Type.beautifying_subst () in
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   let t = Type.subst_ty sbst t in
-  let drt = sbst.Type.dirt_param drt in
+  let drt = Type.subst_dirt sbst drt in
   let cstrs = Type.subst_constraints sbst cstrs in
   print ppf "%t%t%t ! %t | %t"
     (context ctx)
     (fresh_instances frsh)
     (ty t)
-    (dirt_param drt)
+    (dirt drt)
     (constraints cstrs)
 
 (*
