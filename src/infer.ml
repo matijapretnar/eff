@@ -101,7 +101,8 @@ let rec infer_expr env (e, pos) =
           (ctx, ty, cnstrs)
       | None ->
           let ty = T.fresh_ty () in
-          [(x, ty)], ty, Type.empty
+          let ty' = T.fresh_ty () in
+          unify [(x, ty)] ty' [ty_less ~pos ty ty']
       end
 
   | Core.Const const -> simple (ty_of_const const)
