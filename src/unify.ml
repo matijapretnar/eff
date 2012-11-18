@@ -57,11 +57,11 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   | (Type.TyParam p, Type.TyParam q) -> ty_param_less p q ty_sch
 
   | (Type.TyParam p, ty) ->
-      let ty' = Type.refresh ty in
+      let ty' = Type.replace ty in
       ty_less ~pos ty' ty (add_substitution ~pos p ty' ty_sch)
 
   | (ty, Type.TyParam p) ->
-      let ty' = Type.refresh ty in
+      let ty' = Type.replace ty in
       ty_less ~pos ty ty' (add_substitution ~pos p ty' ty_sch)
 
   | (Type.Arrow (ty1, drty1), Type.Arrow (ty2, drty2)) ->
