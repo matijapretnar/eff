@@ -14,6 +14,7 @@ and just new_cnstrs (ctx, ty, cnstrs, sbst) =
 
 let rec add_dirt_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
   Print.debug "Subst %t -> %t" (Print.dirt_param d) (Print.dirt drt');
+  let drt' = Type.subst_dirt sbst drt' in
   let sbst' = {
     Type.identity_subst with 
     Type.dirt_param = (fun d' -> if d' = d then drt' else Type.simple_dirt d')
@@ -85,13 +86,12 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
         let new_ops2, ty_sch = List.fold_right add_left ops1 ([], ty_sch) in
         let new_ops1, ((ctx, ty, cnstrs, sbst) as ty_sch) = List.fold_right add_right ops2 ([], ty_sch)
         in
-        let ((ctx, ty, cnstrs, sbst) as ty_sch), dt1 =
+        let ty_sch, dt1 =
           match new_ops1, dt1 with
           | _ :: _, Type.DirtParam d1 ->
               let d1' = Type.fresh_dirt_param () in
               let dt1' = Type.DirtParam d1' in
               let drt1' = { Type.ops = ops1 @ new_ops1; Type.rest = dt1' } in
-              let drt1' = Type.subst_dirt sbst drt1' in
               Print.debug "non-Dirt type subst";
               add_dirt_substitution ~pos d1 drt1' ty_sch, dt1'
           | _, _ -> ty_sch, dt1
@@ -102,7 +102,6 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
               let d2' = Type.fresh_dirt_param () in
               let dt2' = Type.DirtParam d2' in
               let drt2' = { Type.ops = ops2 @ new_ops2; Type.rest = dt2' } in
-              let drt2' = Type.subst_dirt sbst drt2' in
               Print.debug "non-Dirt type subst";
               add_dirt_substitution ~pos d2 drt2' ty_sch, dt2'
           | _ -> ty_sch, dt2
@@ -172,6 +171,7 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       Error.typing ~pos "This expression has type %t but it should have type %t." (Print.ty ty1) (Print.ty ty2)
 
 and add_substitution ~pos p ty' (ctx, ty, cnstrs, sbst) =
+  let ty' = Type.subst_ty sbst ty' in
   let sbst' = {
     Type.identity_subst with 
     Type.ty_param = (fun p' -> if p' = p then ty' else Type.TyParam p')
