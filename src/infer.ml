@@ -167,8 +167,7 @@ let rec infer_expr env (e, pos) =
       | None -> Error.typing ~pos "Unbound operation %s" op
       | Some (ty, (t1, t2)) ->
           let ctx, u, cstr_u = infer_expr env e in
-          let d = T.fresh_dirt_param () in
-          unify ctx (T.Arrow (t1, ([], t2, {T.ops = [(r, op)]; T.rest = d}))) [
+          unify ctx (T.Arrow (t1, ([], t2, {T.ops = [(r, op), Type.Present]; T.rest = Type.Absent}))) [
             ty_less ~pos u ty;
             just cstr_u
           ]
@@ -200,10 +199,12 @@ let rec infer_expr env (e, pos) =
         let ctxs, cnstrs, rops = List.fold_right constrain_operation ops ([], [], []) in
         let ctx1, valt1, valt2, cstr_val = infer_abstraction env a_val in
         let ctx2, fint1, (frsh_fin, fint2, findrt), cstr_fin = infer_abstraction env a_fin in
-        let drt_rest = Type.fresh_dirt_param () in
-        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, {Type.ops = rops; Type.rest = drt_rest}), (frsh_fin, t_finally, dirt))) ([
+        let drt_rest = Type.DirtParam (Type.fresh_dirt_param ()) in
+        let left_rops = List.map (fun rop -> (rop, Type.Present)) rops
+        and right_rops = List.map (fun rop -> (rop, Type.Absent)) rops in
+        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, {Type.ops = left_rops; Type.rest = drt_rest}), (frsh_fin, t_finally, dirt))) ([
           (* dirt_handles_ops drt_value rops; *)
-          dirt_less ~pos {Type.ops = []; Type.rest = drt_rest} dirt;
+          dirt_less ~pos {Type.ops = right_rops; Type.rest = drt_rest} dirt;
           ty_less ~pos t_value valt1;
           dirty_less ~pos valt2 ([], t_yield, dirt);
           ty_less ~pos fint2 t_finally;

@@ -73,7 +73,7 @@ let refreshing_subst (ps, ds, rs) =
   {
     Type.identity_subst with
     Type.ty_param = (fun p -> Type.TyParam (refresh_ty_param p));
-    Type.dirt_param = (fun p -> { ops = []; Type.rest = refresh_dirt_param p });
+    Type.dirt_param = (fun p -> Type.simple_dirt (refresh_dirt_param p));
     Type.region_param = refresh_region_param;
   }
 
@@ -125,12 +125,12 @@ let find_operation op_name =
 
 let apply_to_params t (ps, ds, rs) =
   Type.Apply (t, (
-    List.map (fun p -> Type.TyParam p) ps, List.map (fun d -> { ops = []; Type.rest = d }) ds, rs
+    List.map (fun p -> Type.TyParam p) ps, List.map Type.simple_dirt ds, rs
   ))
 
 let effect_to_params t (ps, ds, rs) rgn =
   Type.Effect (t, (
-    List.map (fun p -> Type.TyParam p) ps, List.map (fun d -> { ops = []; Type.rest = d }) ds, rs
+    List.map (fun p -> Type.TyParam p) ps, List.map Type.simple_dirt ds, rs
   ), rgn)
 
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
@@ -174,7 +174,7 @@ let transparent ~pos ty_name =
       | Inline _ -> true
 
 (* [ty_apply pos t lst] applies the type constructor [t] to the given list of arguments. *)
-let ty_apply ~pos ty_name (tys, drts, rgns) =
+let ty_apply ~pos ty_name (tys, drts, rgns) : tydef =
   let ((ts, ds, rs), ty) = lookup_tydef ~pos ty_name in
   let ty_sbst =
     try List.combine ts tys with
@@ -189,7 +189,7 @@ let ty_apply ~pos ty_name (tys, drts, rgns) =
   subst_tydef {
     T.identity_subst with
     T.ty_param = (fun p -> Common.lookup_default p ty_sbst (Type.TyParam p));
-    T.dirt_param = (fun d -> Common.lookup_default d dirt_sbst { Type.ops = []; Type.rest = d });
+    T.dirt_param = (fun d -> Common.lookup_default d dirt_sbst (Type.simple_dirt d));
     T.region_param = (fun r -> Common.lookup_default r region_sbst r);
   } ty
 
@@ -366,7 +366,10 @@ let extend_with_variances tydefs =
           dirt nega posi drt1;
           dirt posi nega drt2
     and dirt posi nega drt =
-      dirt_param posi nega drt.Type.rest
+      dirt_type posi nega drt.Type.rest
+    and dirt_type posi nega = function
+      | Type.Absent | Type.Present -> ()
+      | Type.DirtParam d -> dirt_param posi nega d
     and dirt_param posi nega d =
       begin match Common.lookup d ds with
       | None -> assert false

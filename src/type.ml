@@ -23,9 +23,14 @@ type ty =
 
 and dirty = instance_param list * ty * dirt
 
+and dirt_type =
+  | Absent
+  | Present
+  | DirtParam of dirt_param
+
 and dirt = {
-  ops: (region_param * Common.opsym) list;
-  rest: dirt_param
+  ops: (region_param * Common.opsym, dirt_type) Common.assoc;
+  rest: dirt_type
 }
 
 and args = (ty, dirt, region_param) Trio.t
@@ -44,7 +49,8 @@ let empty_ty = Apply ("empty", Trio.empty)
 (** [fresh_ty ()] gives a type [TyParam p] where [p] is a new type parameter on
     each call. *)
 let fresh_ty () = TyParam (fresh_ty_param ())
-let fresh_dirt () = { ops = []; rest = fresh_dirt_param () }
+let simple_dirt d = { ops = []; rest = DirtParam d }
+let fresh_dirt () = simple_dirt (fresh_dirt_param ())
 (* XXX Should a fresh dirty type have no fresh instances? *)
 let fresh_dirty () = ([], fresh_ty (), fresh_dirt ())
 let universal_ty = Basic "_"
@@ -77,9 +83,18 @@ let rec subst_ty sbst = function
       let drty2 = subst_dirty sbst drty2 in
       Handler ((ty1, subst_dirt sbst drt), drty2)
 
+and subst_dirt_type sbst = function
+  | Absent -> Absent
+  | Present -> Present
+  | DirtParam p -> 
+      begin match sbst.dirt_param p with
+      | { ops = []; rest = drt } -> drt
+      | _ -> assert false
+      end
+
 and subst_dirt sbst drt =
-  let drt' = sbst.dirt_param drt.rest in
-  { ops = Common.uniq (drt'.ops @ (Common.map (fun (r, op) -> (sbst.region_param r, op)) drt.ops)); rest = drt'.rest }
+  { ops = Common.uniq (Common.map (fun ((r, op), dt) -> ((sbst.region_param r, op), subst_dirt_type sbst dt)) drt.ops);
+    rest = subst_dirt_type sbst drt.rest }
 
 and subst_dirty sbst (frsh, ty, drt) =
   let subst_instance i frsh =
@@ -102,7 +117,7 @@ and subst_args sbst (tys, drts, rs) =
 let identity_subst =
   {
     ty_param = (fun p -> TyParam p);
-    dirt_param = (fun d -> { ops = []; rest = d });
+    dirt_param = simple_dirt;
     region_param = Common.id;
     instance_param = (fun i -> Some i);
   }
@@ -132,7 +147,7 @@ let replace ty =
     | Apply (ty_name, args) -> Apply (ty_name, replace_args args)
     | Effect (ty_name, args, r) ->
         let args = replace_args args in
-        Effect (ty_name, args, fresh_region_param "replace")
+        Effect (ty_name, args, fresh_region_param ())
     | TyParam p -> TyParam (fresh_ty_param ())
     | Basic _ as ty -> ty
     | Tuple tys -> Tuple (Common.map (replace_ty) tys)
@@ -145,7 +160,7 @@ let replace ty =
         let drty2 = replace_dirty drty2 in
         Handler ((ty1, replace_dirt drt), drty2)
 
-  and replace_dirt drt = { ops = []; rest = fresh_dirt_param () }
+  and replace_dirt drt = fresh_dirt ()
 
   and replace_dirty (frsh, ty, drt) =
     let ty = replace_ty ty in
@@ -155,7 +170,7 @@ let replace ty =
   and replace_args (tys, drts, rs) =
     let tys = Common.map (replace_ty) tys in
     let drts = Common.map (replace_dirt) drts in
-    let rs = Common.map (fun _ -> fresh_region_param "argn") rs in
+    let rs = Common.map (fun _ -> fresh_region_param ()) rs in
     (tys, drts, rs)
   in
   replace_ty ty
@@ -168,7 +183,7 @@ let beautifying_subst () =
   else
     {
       ty_param = refresher (Common.fresh (fun n -> TyParam (Ty_Param n)));
-      dirt_param = refresher (Common.fresh (fun n -> { ops = []; rest = Dirt_Param n }));
+      dirt_param = refresher (Common.fresh (fun n -> simple_dirt (Dirt_Param n)));
       region_param = refresher (Common.fresh (fun n -> Region_Param n));
       instance_param = refresher (Common.fresh (fun n -> Some (Instance_Param n)));
     }
@@ -177,7 +192,7 @@ let refreshing_subst () =
   {
     identity_subst with
     ty_param = (let refresh = refresher fresh_ty_param in fun p -> TyParam (refresh p));
-    dirt_param = (let refresh = refresher fresh_dirt_param in fun d -> { ops = []; rest = refresh d });
+    dirt_param = (let refresh = refresher fresh_dirt_param in fun d -> simple_dirt (refresh d));
     region_param = refresher fresh_region_param;
   }
 
@@ -251,7 +266,7 @@ let remove_dirt g x =
 
 let subst_constraints sbst cnstr = {
   ty_graph = Ty.map (fun p -> match sbst.ty_param p with TyParam q -> q | _ -> assert false) (fun () -> ()) cnstr.ty_graph;
-  dirt_graph = Dirt.map (fun p -> match sbst.dirt_param p with {rest = p; ops = []} -> p | _ -> assert false) (fun () -> ()) cnstr.dirt_graph;
+  dirt_graph = Dirt.map (fun p -> match sbst.dirt_param p with { ops = []; rest = DirtParam d } -> d | _ -> assert false) (fun () -> ()) cnstr.dirt_graph;
   region_graph = Region.map sbst.region_param (fun insts -> Common.option_map (fun insts -> List.map (fun ins -> match sbst.instance_param ins with Some i -> i | None -> assert false) insts) insts) cnstr.region_graph;
 }
 

@@ -15,37 +15,75 @@ and just new_cnstrs (ctx, ty, cnstrs, sbst) =
 let rec add_dirt_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
   let sbst' = {
     Type.identity_subst with 
-    Type.dirt_param = (fun d' -> if d' = d then drt' else {Type.ops = []; Type.rest = d'})
+    Type.dirt_param = (fun d' -> if d' = d then drt' else Type.simple_dirt d')
   } in
   let (pred, succ, new_dirt_grph) = Type.remove_dirt cnstrs d in
   let cnstrs = {cnstrs with Type.dirt_graph = new_dirt_grph} in
   let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
-  let ty_sch = List.fold_right (fun q ty_sch -> dirt_less ~pos {Type.ops = []; Type.rest = q} drt' ty_sch) pred ty_sch in
-  List.fold_right (fun q ty_sch -> dirt_less ~pos drt' {Type.ops = []; Type.rest = q} ty_sch) succ ty_sch
+  let ty_sch = List.fold_right (fun q ty_sch -> dirt_less ~pos (Type.simple_dirt q) drt' ty_sch) pred ty_sch in
+  List.fold_right (fun q ty_sch -> dirt_less ~pos drt' (Type.simple_dirt q) ty_sch) succ ty_sch
 
+and dirt_type_less ~pos dt1 dt2 ty_sch =
+  match dt1, dt2 with
+  | (Type.Absent, _ | _, Type.Present) -> ty_sch
+  | Type.DirtParam d, Type.Absent ->
+      add_dirt_substitution ~pos d { Type.ops = []; Type.rest = Type.Absent} ty_sch 
+  | Type.Present, Type.DirtParam d ->
+      add_dirt_substitution ~pos d { Type.ops = []; Type.rest = Type.Present} ty_sch 
+  | Type.DirtParam d1, Type.DirtParam d2 ->
+      dirt_param_less ~pos d1 d2 ty_sch 
+  | Type.Present, Type.Absent ->
+      Error.typing ~pos "Dirt is present but should be absent."
 
 and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
-  let {Type.rest = d1; Type.ops = ops1} = Type.subst_dirt sbst drt1
-  and {Type.rest = d2; Type.ops = ops2} = Type.subst_dirt sbst drt2 in
-  let missing_ops1 = List.filter (fun rop -> not (List.mem rop ops1)) ops2
-  and missing_ops2 = List.filter (fun rop -> not (List.mem rop ops2)) ops1 in
-  let ty_sch, d1' =
-    match missing_ops1 with
-    | [] -> ty_sch, d1
-    | _ ->
-      let d1' = Type.fresh_dirt_param () in
-      let drt1' = { Type.ops = ops1 @ missing_ops1; Type.rest = d1' } in
-      add_dirt_substitution ~pos d1 drt1' ty_sch, d1'
+  let {Type.rest = dt1; Type.ops = ops1} = Type.subst_dirt sbst drt1
+  and {Type.rest = dt2; Type.ops = ops2} = Type.subst_dirt sbst drt2 in
+  let add_left (rop, op_dt1) (new_ops2, ty_sch) =
+    let op_dt2, new_ops2 =
+      match Common.lookup rop ops2 with
+      | None ->
+        let op_dt2 =
+          begin match dt2 with
+          | Type.Present -> Type.Present
+          | Type.Absent -> Type.Absent
+          | Type.DirtParam _ -> Type.DirtParam (Type.fresh_dirt_param ())
+          end
+          in
+          op_dt2, (rop, op_dt2) :: new_ops2
+      | Some op_dt2 -> op_dt2, new_ops2
+    in
+    new_ops2, dirt_type_less ~pos op_dt1 op_dt2 ty_sch
+  and add_right (rop, op_dt2) (new_ops1, ty_sch) =
+    let op_dt1, new_ops1 =
+      match Common.lookup rop ops1 with
+      | None ->
+        let op_dt1 =
+          begin match dt1 with
+          | Type.Present -> Type.Present
+          | Type.Absent -> Type.Absent
+          | Type.DirtParam _ -> Type.DirtParam (Type.fresh_dirt_param ())
+          end
+          in
+          op_dt1, (rop, op_dt1) :: new_ops1
+      | Some op_dt1 -> op_dt1, new_ops1
+    in
+    new_ops1, dirt_type_less ~pos op_dt1 op_dt2 ty_sch
   in
-  let ty_sch, d2' =
-    match missing_ops2 with
-    | [] -> ty_sch, d2
-    | _ ->
-      let d2' = Type.fresh_dirt_param () in
-      let drt2' = { Type.ops = ops2 @ missing_ops2; Type.rest = d2' } in
-      add_dirt_substitution ~pos d2 drt2' ty_sch, d2'
+  let new_ops1, ty_sch = List.fold_right add_left ops1 ([], ty_sch) in
+  let new_ops2, ty_sch = List.fold_right add_right ops2 ([], ty_sch)
   in
-  dirt_param_less ~pos d1' d2' ty_sch
+  match dt1, dt2 with
+  | Type.DirtParam d1, Type.DirtParam d2 ->
+      let d1' = Type.fresh_dirt_param ()
+      and d2' = Type.fresh_dirt_param () in
+      let drt1' = { Type.ops = ops1 @ new_ops1; Type.rest = Type.DirtParam d1' }
+      and drt2' = { Type.ops = ops2 @ new_ops2; Type.rest = Type.DirtParam d2' } in
+      add_dirt_substitution ~pos d1 drt1' (
+        add_dirt_substitution ~pos d2 drt2' (
+          dirt_param_less ~pos d1' d2' ty_sch
+        )
+      )
+  | _, _ -> dirt_type_less ~pos dt1 dt2 ty_sch
 
 let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   (* XXX Check cyclic types *)
@@ -163,11 +201,14 @@ let pos_neg_params ty =
   | Type.Basic _ -> Trio.empty
   | Type.Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
   | Type.Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
-  | Type.Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt is_pos drt1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
+  | Type.Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
   and pos_dirty is_pos (_, ty, drt) =
     pos_ty is_pos ty @@@ pos_dirt is_pos drt
+  and pos_dirt_type is_pos = function
+  | Type.Present | Type.Absent -> Trio.empty
+  | Type.DirtParam d -> pos_dirt_param is_pos d
   and pos_dirt is_pos drt =
-    pos_dirt_param is_pos drt.Type.rest @@@ Trio.flatten_map (fun (r, _) -> pos_region_param is_pos r) drt.Type.ops
+    pos_dirt_type is_pos drt.Type.rest @@@ Trio.flatten_map (fun ((r, _), dt) -> pos_region_param is_pos r @@@ pos_dirt_type is_pos dt) drt.Type.ops
   and pos_dirt_param is_pos p =
     ([], (if is_pos then [p] else []), [])
   and pos_region_param is_pos r =
