@@ -93,8 +93,12 @@ and subst_dirt_type sbst = function
       end
 
 and subst_dirt sbst drt =
-  { ops = Common.uniq (Common.map (fun ((r, op), dt) -> ((sbst.region_param r, op), subst_dirt_type sbst dt)) drt.ops);
-    rest = subst_dirt_type sbst drt.rest }
+  let ops = Common.uniq (Common.map (fun ((r, op), dt) -> ((sbst.region_param r, op), subst_dirt_type sbst dt)) drt.ops) in
+  match drt.rest with
+  | (Absent | Present) as drt' -> { ops = ops; rest = drt' }
+  | DirtParam p ->
+      let { ops = ops'; rest = drt'} = sbst.dirt_param p in
+      { ops = Common.uniq (ops' @ ops); rest = drt' }
 
 and subst_dirty sbst (frsh, ty, drt) =
   let subst_instance i frsh =
