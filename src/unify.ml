@@ -13,6 +13,7 @@ and just new_cnstrs (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.join_disjoint_constraints new_cnstrs cnstrs, sbst)
 
 let rec add_dirt_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
+  Print.debug "Subst %t -> %t" (Print.dirt_param d) (Print.dirt drt');
   let sbst' = {
     Type.identity_subst with 
     Type.dirt_param = (fun d' -> if d' = d then drt' else Type.simple_dirt d')
@@ -43,10 +44,11 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   | [], [] -> dirt_type_less ~pos dt1 dt2 ty_sch
   | _, _ ->
       begin
-        let add_left (rop, op_dt1) (new_ops2, ty_sch) =
+        let add_left (((r, op) as rop), op_dt1) (new_ops2, ty_sch) =
           let op_dt2, new_ops2 =
             match Common.lookup rop ops2 with
             | None ->
+              Print.debug "%t#%s is missing in drt2" (Print.region_param r) (op);
               let op_dt2 =
                 begin match dt2 with
                 | Type.Present -> Type.Present
@@ -54,6 +56,7 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
                 | Type.DirtParam _ -> Type.DirtParam (Type.fresh_dirt_param ())
                 end
                 in
+                Print.debug "New type in drt2: %t" (Print.dirt_type op_dt2);
                 op_dt2, (rop, op_dt2) :: new_ops2
             | Some op_dt2 -> op_dt2, new_ops2
           in
@@ -74,21 +77,26 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
           in
           new_ops1, dirt_type_less ~pos op_dt1 op_dt2 ty_sch
         in
-        let new_ops1, ty_sch = List.fold_right add_left ops1 ([], ty_sch) in
-        let new_ops2, ty_sch = List.fold_right add_right ops2 ([], ty_sch)
+        let new_ops2, ty_sch = List.fold_right add_left ops1 ([], ty_sch) in
+        let new_ops1, ty_sch = List.fold_right add_right ops2 ([], ty_sch)
         in
-        match dt1, dt2 with
-        | Type.DirtParam d1, Type.DirtParam d2 ->
-            let d1' = Type.fresh_dirt_param ()
-            and d2' = Type.fresh_dirt_param () in
-            let drt1' = { Type.ops = ops1 @ new_ops1; Type.rest = Type.DirtParam d1' }
-            and drt2' = { Type.ops = ops2 @ new_ops2; Type.rest = Type.DirtParam d2' } in
-            add_dirt_substitution ~pos d1 drt1' (
-              add_dirt_substitution ~pos d2 drt2' (
-                dirt_param_less ~pos d1' d2' ty_sch
-              )
-            )
-        | _, _ -> dirt_type_less ~pos dt1 dt2 ty_sch
+        let ty_sch =
+          match dt1 with
+          | Type.DirtParam d1 ->
+              let d1' = Type.fresh_dirt_param () in
+              let drt1' = { Type.ops = ops1 @ new_ops1; Type.rest = Type.DirtParam d1' } in
+              add_dirt_substitution ~pos d1 drt1' ty_sch
+          | _ -> ty_sch
+        in
+        let ty_sch =
+          match dt2 with
+          | Type.DirtParam d2 ->
+              let d2' = Type.fresh_dirt_param () in
+              let drt2' = { Type.ops = ops2 @ new_ops2; Type.rest = Type.DirtParam d2' } in
+              add_dirt_substitution ~pos d2 drt2' ty_sch
+          | _ -> ty_sch
+        in
+        dirt_type_less ~pos dt1 dt2 ty_sch
     end
 
 let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =

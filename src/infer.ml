@@ -20,7 +20,7 @@ let nonexpansive = function
   | Core.Handle _ | Core.Let _ | Core.LetRec _ | Core.Check _ -> false
 
 let simple ty = ([], ty, Type.empty)
-let empty_dirt () = Type.fresh_dirt ()
+let empty_dirt () = { Type.ops = []; Type.rest = Type.Absent }
 
 let ty_of_const = function
   | Common.Integer _ -> Type.int_ty
