@@ -309,8 +309,19 @@ let join_disjoint_constraints cstr1 cstr2 =
   (Ty.print grph.ty_graph) (Region.print grph.region_graph) (Dirt.print grph.dirt_graph)
  *)
 let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
-  {
-    ty_graph = Ty.collect pos_ts neg_ts grph.ty_graph;
-    dirt_graph = Dirt.collect pos_ds neg_ds grph.dirt_graph;
-    region_graph = Region.collect pos_rs neg_rs grph.region_graph;
+  let ty_subst, ty_graph = Ty.collect pos_ts neg_ts grph.ty_graph
+  and dirt_subst, dirt_graph = Dirt.collect pos_ds neg_ds grph.dirt_graph
+  and region_subst, region_graph = Region.collect pos_rs neg_rs grph.region_graph
+  in
+  let sbst = {
+    identity_subst with
+    ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> TyParam q | None -> TyParam p);
+    dirt_param = (fun p -> match Common.lookup p dirt_subst with Some q -> simple_dirt q | None -> simple_dirt p);
+    region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
+  }
+  in
+  identity_subst, {
+    ty_graph = ty_graph;
+    dirt_graph = dirt_graph;
+    region_graph = region_graph;
   }

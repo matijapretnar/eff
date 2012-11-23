@@ -248,9 +248,9 @@ let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
   pos, neg
 
 
-let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, sbst) =
-  let cnstrs' = Type.garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
-  (ctx, ty, cnstrs')
+let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, _) =
+  let sbst, cnstrs' = Type.garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
+  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Type.subst_constraints sbst cnstrs'
 
 let normalize_context ~pos (ctx, ty, cstr, sbst) =
   let collect (x, ty) ctx =
