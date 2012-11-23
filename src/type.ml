@@ -89,7 +89,7 @@ and subst_dirt_type sbst = function
   | DirtParam p -> 
       begin match sbst.dirt_param p with
       | { ops = []; rest = drt } -> drt
-      | { ops = ops; rest = drt } -> List.iter print_endline (List.map snd (List.map fst ops)); assert false
+      | { ops = ops; rest = drt } -> assert false
       end
 
 and subst_dirt sbst drt =

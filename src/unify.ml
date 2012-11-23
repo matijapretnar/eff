@@ -13,7 +13,6 @@ and just new_cnstrs (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.join_disjoint_constraints new_cnstrs cnstrs, sbst)
 
 let rec add_dirt_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
-  Print.debug "Subst %t -> %t" (Print.dirt_param d) (Print.dirt drt');
   let drt' = Type.subst_dirt sbst drt' in
   let sbst' = {
     Type.identity_subst with 
@@ -26,14 +25,11 @@ let rec add_dirt_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
   List.fold_right (fun q ty_sch -> dirt_less ~pos drt' (Type.simple_dirt q) ty_sch) succ ty_sch
 
 and dirt_type_less ~pos dt1 dt2 ((ctx, ty, cnstrs, sbst) as ty_sch)  =
-  Print.debug "Dirt type less: %t <= %t" (Print.dirt_type dt1) (Print.dirt_type dt2);
   match Type.subst_dirt_type sbst dt1, Type.subst_dirt_type sbst dt2 with
   | (Type.Absent, _ | _, Type.Present) -> ty_sch
   | Type.DirtParam d, Type.Absent ->
-      Print.debug "Dirt type subst";
       add_dirt_substitution ~pos d { Type.ops = []; Type.rest = Type.Absent} ty_sch 
   | Type.Present, Type.DirtParam d ->
-      Print.debug "Dirt type subst";
       add_dirt_substitution ~pos d { Type.ops = []; Type.rest = Type.Present} ty_sch 
   | Type.DirtParam d1, Type.DirtParam d2 ->
       dirt_param_less ~pos d1 d2 ty_sch 
@@ -41,18 +37,16 @@ and dirt_type_less ~pos dt1 dt2 ((ctx, ty, cnstrs, sbst) as ty_sch)  =
       Error.typing ~pos "Dirt is present but should be absent."
 
 and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
-  Print.debug "Dirt less: %t <= %t" (Print.dirt drt1) (Print.dirt drt2);
   let {Type.rest = dt1; Type.ops = ops1} = Type.subst_dirt sbst drt1
   and {Type.rest = dt2; Type.ops = ops2} = Type.subst_dirt sbst drt2 in
   match ops1, ops2 with
-  | [], [] -> Print.debug "[][]"; dirt_type_less ~pos dt1 dt2 ty_sch
+  | [], [] -> dirt_type_less ~pos dt1 dt2 ty_sch
   | _, _ ->
       begin
         let add_left (((r, op) as rop), op_dt1) (new_ops2, ty_sch) =
           let op_dt2, new_ops2 =
             match Common.lookup rop ops2 with
             | None ->
-              Print.debug "%t#%s is missing in drt2" (Print.region_param r) (op);
               let op_dt2 =
                 begin match dt2 with
                 | Type.Present -> Type.Present
@@ -60,11 +54,9 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
                 | Type.DirtParam _ -> Type.DirtParam (Type.fresh_dirt_param ())
                 end
                 in
-                Print.debug "New type in drt2: %t" (Print.dirt_type op_dt2);
                 op_dt2, (rop, op_dt2) :: new_ops2
             | Some op_dt2 -> op_dt2, new_ops2
           in
-          Print.debug "newops2"; 
           new_ops2, dirt_type_less ~pos op_dt1 op_dt2 ty_sch
         and add_right (rop, op_dt2) (new_ops1, ty_sch) =
           let op_dt1, new_ops1 =
@@ -80,7 +72,6 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
                 op_dt1, (rop, op_dt1) :: new_ops1
             | Some op_dt1 -> op_dt1, new_ops1
           in
-          Print.debug "newops1"; 
           new_ops1, dirt_type_less ~pos op_dt1 op_dt2 ty_sch
         in
         let new_ops2, ty_sch = List.fold_right add_left ops1 ([], ty_sch) in
@@ -92,7 +83,6 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
               let d1' = Type.fresh_dirt_param () in
               let dt1' = Type.DirtParam d1' in
               let drt1' = { Type.ops = ops1 @ new_ops1; Type.rest = dt1' } in
-              Print.debug "non-Dirt type subst";
               add_dirt_substitution ~pos d1 drt1' ty_sch, dt1'
           | _, _ -> ty_sch, dt1
         in
@@ -102,11 +92,9 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
               let d2' = Type.fresh_dirt_param () in
               let dt2' = Type.DirtParam d2' in
               let drt2' = { Type.ops = ops2 @ new_ops2; Type.rest = dt2' } in
-              Print.debug "non-Dirt type subst";
               add_dirt_substitution ~pos d2 drt2' ty_sch, dt2'
           | _ -> ty_sch, dt2
         in
-        Print.debug "nakoncu"; 
         dirt_type_less ~pos dt1 dt2 ty_sch
     end
 
@@ -195,7 +183,7 @@ and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
   for_parameters region_less rs rs1 rs2 ty_sch
 
 and dirty_less ~pos (nws1, ty1, d1) (nws2, ty2, d2) ty_sch =
-  Print.debug ~pos "Unifying freshness constraints %t <= %t." (Print.fresh_instances nws1) (Print.fresh_instances nws2);
+  (* Print.debug ~pos "Unifying freshness constraints %t <= %t." (Print.fresh_instances nws1) (Print.fresh_instances nws2); *)
   ty_less ~pos ty1 ty2 (dirt_less ~pos d1 d2 ty_sch)
 
 let trim_context ~pos ctx_p (ctx, ty, cnstrs, sbst) =
@@ -257,13 +245,11 @@ let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
   in
   let (pos, neg) = List.fold_right add_ctx_pos_neg ctx (pos_neg_params ty) in
   let ((_, _, pos_rs) as pos), ((_, _, neg_rs) as neg) = (Trio.uniq pos, Trio.uniq neg) in
-  Print.debug "%t- < %t+" (Print.sequence "," Print.region_param neg_rs) (Print.sequence "," Print.region_param pos_rs);
   pos, neg
 
 
 let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, sbst) =
   let cnstrs' = Type.garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
-  Print.debug "%t --> %t" (Print.constraints cnstrs) (Print.constraints cnstrs');
   (ctx, ty, cnstrs')
 
 let normalize_context ~pos (ctx, ty, cstr, sbst) =
