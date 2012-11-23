@@ -320,8 +320,20 @@ let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
     region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
   }
   in
-  identity_subst, {
+  sbst, {
     ty_graph = ty_graph;
     dirt_graph = dirt_graph;
     region_graph = region_graph;
+  }
+
+let simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
+  let ty_subst = Ty.simplify pos_ts neg_ts grph.ty_graph
+  and dirt_subst = Dirt.simplify pos_ds neg_ds grph.dirt_graph
+  and region_subst = Region.simplify pos_rs neg_rs grph.region_graph
+  in
+  {
+    identity_subst with
+    ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> TyParam q | None -> TyParam p);
+    dirt_param = (fun p -> match Common.lookup p dirt_subst with Some q -> simple_dirt q | None -> simple_dirt p);
+    region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
   }

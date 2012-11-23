@@ -49,6 +49,7 @@ sig
   val map : (elt -> elt) -> (bound -> bound) -> t -> t
 
   val collect : elt list -> elt list -> t -> (elt * elt) list * t
+  val simplify : elt list -> elt list -> t -> (elt * elt) list
 
   (* val print : t -> Format.formatter -> unit *)
 end

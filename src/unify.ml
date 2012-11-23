@@ -238,7 +238,7 @@ let pos_neg_params ty =
   Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)
 
 
-let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
+let pos_neg_tyscheme (ctx, ty, cnstrs) =
   let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
     let pos_ctx_ty, neg_ctx_ty = pos_neg_params ctx_ty in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
@@ -247,10 +247,23 @@ let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
   let ((_, _, pos_rs) as pos), ((_, _, neg_rs) as neg) = (Trio.uniq pos, Trio.uniq neg) in
   pos, neg
 
+let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
+  pos_neg_tyscheme (ctx, ty, cnstrs)
+
 
 let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, _) =
   let sbst, cnstrs' = Type.garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
   Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Type.subst_constraints sbst cnstrs'
+
+let simplify (ctx, drty, cnstrs) =
+  let ty = (Type.Arrow (Type.unit_ty, drty)) in
+  let ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) = pos_neg_tyscheme (ctx, ty, cnstrs) in
+  let sbst = Type.simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
+  let ty_sch = Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Type.subst_constraints sbst cnstrs in
+  match ty_sch with
+  | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
+  | _ -> assert false
+
 
 let normalize_context ~pos (ctx, ty, cstr, sbst) =
   let collect (x, ty) ctx =

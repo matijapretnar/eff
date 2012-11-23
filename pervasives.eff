@@ -164,12 +164,12 @@ let rec zip xs ys =
   | (x :: xs, y :: ys) -> (x, y) :: (zip xs ys)
   | (_, _) -> raise invalidArgument "zip: length mismatch"
 
-let reverse =
+let reverse lst =
   let rec reverse_acc acc = function
     | [] -> acc
     | x :: xs -> reverse_acc (x :: acc) xs
   in
-    reverse_acc []
+    reverse_acc [] lst
 
 let rec (@) xs ys =
   match xs with

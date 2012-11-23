@@ -103,6 +103,22 @@ struct
     let g = G.fold (fun x (inx, outx, infx, supx) acc -> G.add (f x) (S.empty, S.empty, Common.option_map fb infx, Common.option_map fb supx) acc) grph G.empty in
     fold_edges (fun x y sbst_grph -> add_edge (f x) (f y) sbst_grph) grph g
 
+  let simplify pos neg grph =
+    let add x (inx, outx, _, _) sbst =
+      if List.mem x pos && S.cardinal inx = 1 then (x, S.choose inx) :: sbst
+      else if List.mem x neg && S.cardinal outx = 1 then (x, S.choose outx) :: sbst
+      else sbst
+    and collect_substitution (x, y) (used, sbst) =
+      if List.mem y used then
+        used, sbst
+      else
+        (x :: used), (x, y) :: sbst
+    in
+    let sbst = G.fold add grph [] in
+    let _, sbst = List.fold_right collect_substitution sbst ([], []) in
+    sbst
+
+
   let collect pos neg grph =
     let pos = List.fold_right S.add pos S.empty
     and neg = List.fold_right S.add neg S.empty in
