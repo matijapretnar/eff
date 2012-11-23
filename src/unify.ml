@@ -263,7 +263,7 @@ let normalize_context ~pos (ctx, ty, cstr, sbst) =
   let add (x, tys) (ctx, typ, cnstrs, sbst) =
     match !tys with
     | [] -> assert false
-    | [ty] -> ((x, ty) :: ctx, typ, cnstrs, sbst)
+    | [ty] -> ((x, Type.subst_ty sbst ty) :: ctx, typ, cnstrs, sbst)
     | tys ->
         let ty' = Type.fresh_ty () in
         let ctx' = (x, ty') :: ctx in
