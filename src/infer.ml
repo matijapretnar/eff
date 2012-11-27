@@ -385,19 +385,21 @@ and infer_let ~pos env defs =
     let ctx_p, t_p, cstr_p = infer_pattern p in
     let ctx_c, (frsh, t_c, drt'), cstr_c = infer_comp env c in
     let vars = (List.map fst ctx_p) @ vars in
-    let env, ctxp =
-      if nonexpansive (fst c) then
-        let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (ctx_c, t_c, cstr_c)) ctx_p env in
-        env, ctxp
-      else
-        env, ctx_p @ ctxp
-    in
-    env, ctx_c @ ctxs, ctxp, frsh @ frshs, vars, [
+    let changes = [
       ty_less ~pos:(snd c) t_c t_p;
       dirt_less ~pos:(snd c) drt' drt;
       just cstr_p;
       just cstr_c
-    ] @ cstrs
+    ]
+    in
+    let env, ctxp =
+      if nonexpansive (fst c) then
+        let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Unify.gather_ty_scheme ~pos ctx_c t changes)) ctx_p env in
+        env, ctxp
+      else
+        env, ctx_p @ ctxp
+    in
+    env, ctx_c @ ctxs, ctxp, frsh @ frshs, vars, changes @ cstrs
   in
   let env, ctxs, ctxp, frshs, vars, cstrs = List.fold_right add_binding defs (env, [], [], [], [], []) in
   env, vars, fun (ctx2, (frsh, tc, dc), cstr_c) ->
