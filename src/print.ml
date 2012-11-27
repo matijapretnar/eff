@@ -114,9 +114,12 @@ let ty_param ?(non_poly=Trio.empty) p ppf =
   let (ps, _, _) = non_poly in
   let (Type.Ty_Param k) = p in
   let c = (if List.mem p ps then "'_" else "'") in
-    if 0 <= k && k <= 6
+(*     if 0 <= k && k <= 6
     then print ppf "%s%c" c (char_of_int (k + int_of_char 't'))
     else print ppf "%st%i" c (k - 6)
+ *)    if 0 <= k && k <= 25
+    then print ppf "%s%c" c (char_of_int (k + int_of_char 'a'))
+    else print ppf "%st%i" c (k - 25)
 
 let rec ty ?(non_poly=Trio.empty) t ppf =
   let rec ty ?max_level t ppf =
@@ -124,12 +127,12 @@ let rec ty ?(non_poly=Trio.empty) t ppf =
     match t with
     (* XXX Should we print which instances are fresh? *)
     | Type.Arrow (t1, (frsh, t2, drt)) ->
-        print ~at_level:5 "@[<h>%t -%t->@ %t%t@]"
+(*         print ~at_level:5 "@[<h>%t -%t->@ %t%t@]"
         (ty ~max_level:4 t1)
         (dirt ~non_poly drt)
         (fresh_instances frsh)
-        (ty ~max_level:5 t2)
-        (* print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2) *)
+        (ty ~max_level:5 t2) *)
+        print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2)
     | Type.Basic b -> print "%s" b
     | Type.Apply (t, (lst, _, _)) ->
       begin match lst with
@@ -138,16 +141,22 @@ let rec ty ?(non_poly=Trio.empty) t ppf =
         | ts -> print ~at_level:1 "(%t) %s" (sequence "," ty ts) t
       end
     | Type.Effect (t, (lst, _, _), rgn) ->
-      begin match lst with
+(*       begin match lst with
         | [] -> print "%s[%t]" t (region_param ~non_poly rgn)
         | [s] -> print ~at_level:1 "%t %s[%t]" (ty ~max_level:1 s) t (region_param ~non_poly rgn)
         | ts -> print ~at_level:1 "(%t) %s[%t]" (sequence "," ty ts) t (region_param ~non_poly rgn)
+      end
+ *)      begin match lst with
+        | [] -> print "%s" t
+        | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
+        | ts -> print ~at_level:1 "(%t) %s" (sequence "," ty ts) t
       end
     | Type.TyParam p -> ty_param ~non_poly p ppf
     | Type.Tuple [] -> print "unit"
     | Type.Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (sequence " *" (ty ~max_level:1) ts)
     | Type.Handler ((t1, drt1), (_, t2, drt2)) ->
-        print ~at_level:4 "%t ! %t =>@ %t ! %t" (ty ~max_level:2 t1) (dirt ~non_poly drt1) (ty t2) (dirt ~non_poly drt2)
+        (* print ~at_level:4 "%t ! %t =>@ %t ! %t" (ty ~max_level:2 t1) (dirt ~non_poly drt1) (ty t2) (dirt ~non_poly drt2) *)
+        print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
   in ty t ppf
 
 let less pp p1 p2 ppf =
@@ -179,7 +188,9 @@ let ty_scheme (ctx, t, cstrs) ppf =
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   let t = Type.subst_ty sbst t in
   let cstrs = Type.subst_constraints sbst cstrs in
-  print ppf "%t%t | %t" (context ctx) (ty t) (constraints cstrs)
+  (* let non_poly =  *)
+  (* print ppf "%t%t | %t" (context ctx) (ty t) (constraints cstrs) *)
+  print ppf "%t" (ty t)
 
 let dirty_scheme (ctx, (frsh, t, drt), cstrs) ppf =
   let sbst = Type.beautifying_subst () in
@@ -187,12 +198,14 @@ let dirty_scheme (ctx, (frsh, t, drt), cstrs) ppf =
   let t = Type.subst_ty sbst t in
   let drt = Type.subst_dirt sbst drt in
   let cstrs = Type.subst_constraints sbst cstrs in
-  print ppf "%t%t%t ! %t | %t"
+(*   print ppf "%t%t%t ! %t | %t"
     (context ctx)
     (fresh_instances frsh)
     (ty t)
     (dirt drt)
     (constraints cstrs)
+ *)
+  print ppf "%t" (ty t)
 
 (*
 let subst sbst ppf =
