@@ -35,7 +35,7 @@ let rec infer_pattern (p, pos) =
   (* We do not check for overlaps as all identifiers are distinct - desugar needs to do those *)
   if !disable_typing then simple Type.universal_ty else
   let unify = Unify.gather_pattern_scheme ~pos in
-  match p with
+  let ty_sch = match p with
   | Pattern.Var x ->
       let ty = Type.fresh_ty () in
       [(x, ty)], ty, Type.empty
@@ -87,6 +87,9 @@ let rec infer_pattern (p, pos) =
           | Some _, None -> Error.typing ~pos "Constructor %s cannot be applied to an argument." lbl
         end
       end
+  in
+  Print.debug "%t : %t" (Print.pattern (p, pos)) (Print.ty_scheme ty_sch);
+  ty_sch
 
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
    [env]. It returns the inferred type of [e]. *)
