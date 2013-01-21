@@ -123,10 +123,10 @@ let ty (ts, ds, rs) =
     | Some p -> T.TyParam p
     end
     (* XXX Here, we maybe want to parse fresh instances? *)
-  | Syntax.TyArrow (t1, t2, Some drt) -> T.Arrow (ty t1, ([], ty t2, dirt pos drt))
+  | Syntax.TyArrow (t1, t2, Some drt) -> T.Arrow (ty t1, (ty t2, dirt pos drt))
   | Syntax.TyArrow (t1, t2, None) -> assert false
   | Syntax.TyTuple lst -> T.Tuple (List.map ty lst)
-  | Syntax.TyHandler (t1, Some drt1, t2, Some drt2) -> T.Handler ((ty t1, dirt pos drt1), ([], ty t2, dirt pos drt2))
+  | Syntax.TyHandler (t1, Some drt1, t2, Some drt2) -> T.Handler ((ty t1, dirt pos drt1), (ty t2, dirt pos drt2))
   | Syntax.TyHandler (t1, _, t2, _) -> assert false
   and dirt pos (Syntax.DirtParam d) =
     match C.lookup d ds with

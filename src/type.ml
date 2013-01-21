@@ -19,9 +19,9 @@ type ty =
   | Basic of string
   | Tuple of ty list
   | Arrow of ty * dirty
-  | Handler of (ty * dirt) * dirty
+  | Handler of dirty * dirty
 
-and dirty = instance_param list * ty * dirt
+and dirty = ty * dirt
 
 and dirt_type =
   | Absent
@@ -52,9 +52,9 @@ let fresh_ty () = TyParam (fresh_ty_param ())
 let simple_dirt d = { ops = []; rest = DirtParam d }
 let fresh_dirt () = simple_dirt (fresh_dirt_param ())
 (* XXX Should a fresh dirty type have no fresh instances? *)
-let fresh_dirty () = ([], fresh_ty (), fresh_dirt ())
+let fresh_dirty () = (fresh_ty (), fresh_dirt ())
 let universal_ty = Basic "_"
-let universal_dirty = ([], Basic "_", fresh_dirt ())
+let universal_dirty = (Basic "_", fresh_dirt ())
 
 
 type substitution = {
@@ -100,16 +100,10 @@ and subst_dirt sbst drt =
       let { ops = ops'; rest = drt'} = sbst.dirt_param p in
       { ops = Common.uniq (ops' @ ops); rest = drt' }
 
-and subst_dirty sbst (frsh, ty, drt) =
-  let subst_instance i frsh =
-    match sbst.instance_param i with
-    | Some j -> j :: frsh
-    | None -> frsh
-  in
-  let frsh = List.fold_right subst_instance frsh [] in
+and subst_dirty sbst (ty, drt) =
   let ty = subst_ty sbst ty in
   let drt = subst_dirt sbst drt in
-  (frsh, ty, drt)
+  (ty, drt)
 
 and subst_args sbst (tys, drts, rs) =
   let tys = Common.map (subst_ty sbst) tys in
@@ -166,10 +160,10 @@ let replace ty =
 
   and replace_dirt drt = fresh_dirt ()
 
-  and replace_dirty (frsh, ty, drt) =
+  and replace_dirty (ty, drt) =
     let ty = replace_ty ty in
     let drt = replace_dirt drt in
-    (frsh, ty, drt)
+    (ty, drt)
 
   and replace_args (tys, drts, rs) =
     let tys = Common.map (replace_ty) tys in

@@ -230,7 +230,7 @@ let check_well_formed ~pos tydef =
   | T.Arrow (ty1, drty2) -> check ty1; check_dirty drty2
   | T.Tuple tys -> List.iter check tys
   | T.Handler ((ty1, _), drty2) -> check ty1; check_dirty drty2
-  and check_dirty (_, ty, _) = check ty
+  and check_dirty (ty, _) = check ty
   in
   match tydef with
   | Record fields ->
@@ -261,9 +261,9 @@ let check_noncyclic ~pos =
         Error.typing ~pos "Type definition %s is cyclic." t
       else
         check_tydef (t :: forbidden) (ty_apply ~pos t args)
-  | T.Arrow (ty1, (_, ty2, _)) -> check forbidden ty1; check forbidden ty2
+  | T.Arrow (ty1, (ty2, _)) -> check forbidden ty1; check forbidden ty2
   | T.Tuple tys -> List.iter (check forbidden) tys
-  | T.Handler ((ty1, _), (_, ty2, _)) ->
+  | T.Handler ((ty1, _), (ty2, _)) ->
       check forbidden ty1; check forbidden ty2
   and check_tydef forbidden = function
   | Sum _ -> ()
@@ -355,12 +355,12 @@ let extend_with_variances tydefs =
               end
           end;
           region_param posi nega rgn
-      | T.Arrow (ty1, (_, ty2, drt)) ->
+      | T.Arrow (ty1, (ty2, drt)) ->
           ty nega posi ty1;
           ty posi nega ty2;
           dirt posi nega drt
       | T.Tuple tys -> List.iter (ty posi nega) tys
-      | T.Handler ((ty1, drt1), (_, ty2, drt2)) ->
+      | T.Handler ((ty1, drt1), (ty2, drt2)) ->
           ty nega posi ty1;
           ty posi nega ty2;
           dirt nega posi drt1;

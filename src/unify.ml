@@ -182,7 +182,7 @@ and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
   let ty_sch = for_parameters dirt_less ds ds1 ds2 ty_sch in
   for_parameters region_less rs rs1 rs2 ty_sch
 
-and dirty_less ~pos (nws1, ty1, d1) (nws2, ty2, d2) ty_sch =
+and dirty_less ~pos (ty1, d1) (ty2, d2) ty_sch =
   (* Print.debug ~pos "Unifying freshness constraints %t <= %t." (Print.fresh_instances nws1) (Print.fresh_instances nws2); *)
   ty_less ~pos ty1 ty2 (dirt_less ~pos d1 d2 ty_sch)
 
@@ -216,7 +216,7 @@ let pos_neg_params ty =
   | Type.Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
   | Type.Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
   | Type.Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
-  and pos_dirty is_pos (_, ty, drt) =
+  and pos_dirty is_pos (ty, drt) =
     pos_ty is_pos ty @@@ pos_dirt is_pos drt
   and pos_dirt_type is_pos = function
   | Type.Present | Type.Absent -> Trio.empty

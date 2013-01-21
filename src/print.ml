@@ -126,7 +126,7 @@ let rec ty ?(non_poly=Trio.empty) t ppf =
     let print ?at_level = print ?max_level ?at_level ppf in
     match t with
     (* XXX Should we print which instances are fresh? *)
-    | Type.Arrow (t1, (frsh, t2, drt)) ->
+    | Type.Arrow (t1, (t2, drt)) ->
 (*         print ~at_level:5 "@[<h>%t -%t->@ %t%t@]"
         (ty ~max_level:4 t1)
         (dirt ~non_poly drt)
@@ -154,9 +154,8 @@ let rec ty ?(non_poly=Trio.empty) t ppf =
     | Type.TyParam p -> ty_param ~non_poly p ppf
     | Type.Tuple [] -> print "unit"
     | Type.Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (sequence " *" (ty ~max_level:1) ts)
-    | Type.Handler ((t1, drt1), (_, t2, drt2)) ->
-        (* print ~at_level:4 "%t ! %t =>@ %t ! %t" (ty ~max_level:2 t1) (dirt ~non_poly drt1) (ty t2) (dirt ~non_poly drt2) *)
-        print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
+    | Type.Handler ((t1, drt1), (t2, drt2)) ->
+        print ~at_level:4 "%t ! %t =>@ %t ! %t" (ty ~max_level:2 t1) (dirt ~non_poly drt1) (ty t2) (dirt ~non_poly drt2)
   in ty t ppf
 
 let less pp p1 p2 ppf =
@@ -188,24 +187,19 @@ let ty_scheme (ctx, t, cstrs) ppf =
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   let t = Type.subst_ty sbst t in
   let cstrs = Type.subst_constraints sbst cstrs in
-  (* let non_poly =  *)
-  (* print ppf "%t%t | %t" (context ctx) (ty t) (constraints cstrs) *)
-  print ppf "%t" (ty t)
+  print ppf "%t%t | %t" (context ctx) (ty t) (constraints cstrs)
 
-let dirty_scheme (ctx, (frsh, t, drt), cstrs) ppf =
+let dirty_scheme (ctx, (t, drt), cstrs) ppf =
   let sbst = Type.beautifying_subst () in
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   let t = Type.subst_ty sbst t in
   let drt = Type.subst_dirt sbst drt in
   let cstrs = Type.subst_constraints sbst cstrs in
-(*   print ppf "%t%t%t ! %t | %t"
+  print ppf "%t%t ! %t | %t"
     (context ctx)
-    (fresh_instances frsh)
     (ty t)
     (dirt drt)
     (constraints cstrs)
- *)
-  print ppf "%t" (ty t)
 
 (*
 let subst sbst ppf =
