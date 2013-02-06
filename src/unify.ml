@@ -26,77 +26,15 @@ let rec add_dirt_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
 
 and presence_less ~pos dt1 dt2 ((ctx, ty, cnstrs, sbst) as ty_sch)  =
   match Type.subst_presence sbst dt1, Type.subst_presence sbst dt2 with
-  | (Type.Absent, _ | _, Type.Present) -> ty_sch
-  | Type.DirtParam d, Type.Absent ->
-      add_dirt_substitution ~pos d { Type.ops = []; Type.rest = Type.Absent} ty_sch 
-  | Type.Present, Type.DirtParam d ->
-      add_dirt_substitution ~pos d { Type.ops = []; Type.rest = Type.Present} ty_sch 
-  | Type.DirtParam d1, Type.DirtParam d2 ->
-      dirt_param_less ~pos d1 d2 ty_sch 
-  | Type.Present, Type.Absent ->
-      Error.typing ~pos "Dirt is present but should be absent."
+  | dt1, dt2 -> Print.debug "%t <= %t" (Print.presence dt1) (Print.presence dt2); ty_sch
 
 and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
-  let {Type.rest = dt1; Type.ops = ops1} = Type.subst_dirt sbst drt1
-  and {Type.rest = dt2; Type.ops = ops2} = Type.subst_dirt sbst drt2 in
-  match ops1, ops2 with
-  | [], [] -> presence_less ~pos dt1 dt2 ty_sch
-  | _, _ ->
-      begin
-        let add_left (((r, op) as rop), op_dt1) (new_ops2, ty_sch) =
-          let op_dt2, new_ops2 =
-            match Common.lookup rop ops2 with
-            | None ->
-              let op_dt2 =
-                begin match dt2 with
-                | Type.Present -> Type.Present
-                | Type.Absent -> Type.Absent
-                | Type.DirtParam _ -> Type.DirtParam (Type.fresh_dirt_param ())
-                end
-                in
-                op_dt2, (rop, op_dt2) :: new_ops2
-            | Some op_dt2 -> op_dt2, new_ops2
-          in
-          new_ops2, presence_less ~pos op_dt1 op_dt2 ty_sch
-        and add_right (rop, op_dt2) (new_ops1, ty_sch) =
-          let op_dt1, new_ops1 =
-            match Common.lookup rop ops1 with
-            | None ->
-              let op_dt1 =
-                begin match dt1 with
-                | Type.Present -> Type.Present
-                | Type.Absent -> Type.Absent
-                | Type.DirtParam _ -> Type.DirtParam (Type.fresh_dirt_param ())
-                end
-                in
-                op_dt1, (rop, op_dt1) :: new_ops1
-            | Some op_dt1 -> op_dt1, new_ops1
-          in
-          new_ops1, presence_less ~pos op_dt1 op_dt2 ty_sch
-        in
-        let new_ops2, ty_sch = List.fold_right add_left ops1 ([], ty_sch) in
-        let new_ops1, ((ctx, ty, cnstrs, sbst) as ty_sch) = List.fold_right add_right ops2 ([], ty_sch)
-        in
-        let ty_sch, dt1 =
-          match new_ops1, dt1 with
-          | _ :: _, Type.DirtParam d1 ->
-              let d1' = Type.fresh_dirt_param () in
-              let dt1' = Type.DirtParam d1' in
-              let drt1' = { Type.ops = ops1 @ new_ops1; Type.rest = dt1' } in
-              add_dirt_substitution ~pos d1 drt1' ty_sch, dt1'
-          | _, _ -> ty_sch, dt1
-        in
-        let ty_sch, dt2 =
-          match new_ops2, dt2 with
-          | _ :: _, Type.DirtParam d2 ->
-              let d2' = Type.fresh_dirt_param () in
-              let dt2' = Type.DirtParam d2' in
-              let drt2' = { Type.ops = ops2 @ new_ops2; Type.rest = dt2' } in
-              add_dirt_substitution ~pos d2 drt2' ty_sch, dt2'
-          | _ -> ty_sch, dt2
-        in
-        presence_less ~pos dt1 dt2 ty_sch
-    end
+  ignore ty_sch;
+  let drt1 = Type.subst_dirt sbst drt1
+  and drt2 = Type.subst_dirt sbst drt2 in
+  Print.debug "%t <= %t" (Print.dirt drt1) (Print.dirt drt2);
+  ty_sch
+
 
 let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   (* XXX Check cyclic types *)
