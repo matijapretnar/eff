@@ -24,8 +24,8 @@ let rec add_dirt_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
   let ty_sch = List.fold_right (fun q ty_sch -> dirt_less ~pos (Type.simple_dirt q) drt' ty_sch) pred ty_sch in
   List.fold_right (fun q ty_sch -> dirt_less ~pos drt' (Type.simple_dirt q) ty_sch) succ ty_sch
 
-and dirt_type_less ~pos dt1 dt2 ((ctx, ty, cnstrs, sbst) as ty_sch)  =
-  match Type.subst_dirt_type sbst dt1, Type.subst_dirt_type sbst dt2 with
+and presence_less ~pos dt1 dt2 ((ctx, ty, cnstrs, sbst) as ty_sch)  =
+  match Type.subst_presence sbst dt1, Type.subst_presence sbst dt2 with
   | (Type.Absent, _ | _, Type.Present) -> ty_sch
   | Type.DirtParam d, Type.Absent ->
       add_dirt_substitution ~pos d { Type.ops = []; Type.rest = Type.Absent} ty_sch 
@@ -40,7 +40,7 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   let {Type.rest = dt1; Type.ops = ops1} = Type.subst_dirt sbst drt1
   and {Type.rest = dt2; Type.ops = ops2} = Type.subst_dirt sbst drt2 in
   match ops1, ops2 with
-  | [], [] -> dirt_type_less ~pos dt1 dt2 ty_sch
+  | [], [] -> presence_less ~pos dt1 dt2 ty_sch
   | _, _ ->
       begin
         let add_left (((r, op) as rop), op_dt1) (new_ops2, ty_sch) =
@@ -57,7 +57,7 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
                 op_dt2, (rop, op_dt2) :: new_ops2
             | Some op_dt2 -> op_dt2, new_ops2
           in
-          new_ops2, dirt_type_less ~pos op_dt1 op_dt2 ty_sch
+          new_ops2, presence_less ~pos op_dt1 op_dt2 ty_sch
         and add_right (rop, op_dt2) (new_ops1, ty_sch) =
           let op_dt1, new_ops1 =
             match Common.lookup rop ops1 with
@@ -72,7 +72,7 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
                 op_dt1, (rop, op_dt1) :: new_ops1
             | Some op_dt1 -> op_dt1, new_ops1
           in
-          new_ops1, dirt_type_less ~pos op_dt1 op_dt2 ty_sch
+          new_ops1, presence_less ~pos op_dt1 op_dt2 ty_sch
         in
         let new_ops2, ty_sch = List.fold_right add_left ops1 ([], ty_sch) in
         let new_ops1, ((ctx, ty, cnstrs, sbst) as ty_sch) = List.fold_right add_right ops2 ([], ty_sch)
@@ -95,7 +95,7 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
               add_dirt_substitution ~pos d2 drt2' ty_sch, dt2'
           | _ -> ty_sch, dt2
         in
-        dirt_type_less ~pos dt1 dt2 ty_sch
+        presence_less ~pos dt1 dt2 ty_sch
     end
 
 let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
@@ -218,11 +218,11 @@ let pos_neg_params ty =
   | Type.Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
   and pos_dirty is_pos (ty, drt) =
     pos_ty is_pos ty @@@ pos_dirt is_pos drt
-  and pos_dirt_type is_pos = function
+  and pos_presence is_pos = function
   | Type.Present | Type.Absent -> Trio.empty
   | Type.DirtParam d -> pos_dirt_param is_pos d
   and pos_dirt is_pos drt =
-    pos_dirt_type is_pos drt.Type.rest @@@ Trio.flatten_map (fun ((r, _), dt) -> pos_region_param is_pos r @@@ pos_dirt_type is_pos dt) drt.Type.ops
+    pos_presence is_pos drt.Type.rest @@@ Trio.flatten_map (fun ((r, _), dt) -> pos_region_param is_pos r @@@ pos_presence is_pos dt) drt.Type.ops
   and pos_dirt_param is_pos p =
     ([], (if is_pos then [p] else []), [])
   and pos_region_param is_pos r =

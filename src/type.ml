@@ -23,14 +23,14 @@ type ty =
 
 and dirty = ty * dirt
 
-and dirt_type =
+and presence =
   | Absent
   | Present
   | DirtParam of dirt_param
 
 and dirt = {
-  ops: (region_param * Common.opsym, dirt_type) Common.assoc;
-  rest: dirt_type
+  ops: (region_param * Common.opsym, presence) Common.assoc;
+  rest: presence
 }
 
 and args = (ty, dirt, region_param) Trio.t
@@ -83,7 +83,7 @@ let rec subst_ty sbst = function
       let drty2 = subst_dirty sbst drty2 in
       Handler ((ty1, subst_dirt sbst drt), drty2)
 
-and subst_dirt_type sbst = function
+and subst_presence sbst = function
   | Absent -> Absent
   | Present -> Present
   | DirtParam p -> 
@@ -93,7 +93,7 @@ and subst_dirt_type sbst = function
       end
 
 and subst_dirt sbst drt =
-  let ops = Common.uniq (Common.map (fun ((r, op), dt) -> ((sbst.region_param r, op), subst_dirt_type sbst dt)) drt.ops) in
+  let ops = Common.uniq (Common.map (fun ((r, op), dt) -> ((sbst.region_param r, op), subst_presence sbst dt)) drt.ops) in
   match drt.rest with
   | (Absent | Present) as drt' -> { ops = ops; rest = drt' }
   | DirtParam p ->

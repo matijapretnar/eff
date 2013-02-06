@@ -366,8 +366,8 @@ let extend_with_variances tydefs =
           dirt nega posi drt1;
           dirt posi nega drt2
     and dirt posi nega drt =
-      dirt_type posi nega drt.Type.rest
-    and dirt_type posi nega = function
+      presence posi nega drt.Type.rest
+    and presence posi nega = function
       | Type.Absent | Type.Present -> ()
       | Type.DirtParam d -> dirt_param posi nega d
     and dirt_param posi nega d =
