@@ -93,7 +93,7 @@ let presence ?(non_poly=Trio.empty) drt ppf =
   | Type.DirtParam d -> dirt_param ~non_poly d ppf
 
 let dirt_bound ?non_poly r_ops =
-  sequence "," (fun ((r, op), dt) ppf -> print ppf "%t#%s:%t" (region_param ?non_poly r) op (presence dt)) r_ops
+  sequence "," (fun (op, dt) ppf -> print ppf "%s:%t" op (presence dt)) r_ops
 
 let dirt ?(non_poly=Trio.empty) drt ppf =
   match drt.Type.ops with

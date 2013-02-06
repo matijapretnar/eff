@@ -29,7 +29,7 @@ and presence =
   | DirtParam of dirt_param
 
 and dirt = {
-  ops: (region_param * Common.opsym, presence) Common.assoc;
+  ops: (Common.opsym, presence) Common.assoc;
   rest: presence
 }
 
@@ -93,7 +93,7 @@ and subst_presence sbst = function
       end
 
 and subst_dirt sbst drt =
-  let ops = Common.uniq (Common.map (fun ((r, op), dt) -> ((sbst.region_param r, op), subst_presence sbst dt)) drt.ops) in
+  let ops = Common.uniq (Common.assoc_map (subst_presence sbst) drt.ops) in
   match drt.rest with
   | (Absent | Present) as drt' -> { ops = ops; rest = drt' }
   | DirtParam p ->
@@ -304,19 +304,19 @@ let join_disjoint_constraints cstr1 cstr2 =
  *)
 let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
   let ty_subst, ty_graph = Ty.collect pos_ts neg_ts grph.ty_graph
-  and dirt_subst, dirt_graph = Dirt.collect pos_ds neg_ds grph.dirt_graph
+  (* and dirt_subst, dirt_graph = Dirt.collect pos_ds neg_ds grph.dirt_graph *)
   and region_subst, region_graph = Region.collect pos_rs neg_rs grph.region_graph
   in
   let sbst = {
     identity_subst with
     ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> TyParam q | None -> TyParam p);
-    dirt_param = (fun p -> match Common.lookup p dirt_subst with Some q -> simple_dirt q | None -> simple_dirt p);
+    (* dirt_param = (fun p -> match Common.lookup p dirt_subst with Some q -> simple_dirt q | None -> simple_dirt p); *)
     region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
   }
   in
   sbst, {
     ty_graph = ty_graph;
-    dirt_graph = dirt_graph;
+    dirt_graph = grph.dirt_graph;
     region_graph = region_graph;
   }
 

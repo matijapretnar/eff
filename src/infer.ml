@@ -170,7 +170,7 @@ let rec infer_expr env (e, pos) =
       | None -> Error.typing ~pos "Unbound operation %s" op
       | Some (ty, (t1, t2)) ->
           let ctx, u, cstr_u = infer_expr env e in
-          unify ctx (T.Arrow (t1, (t2, {T.ops = [(r, op), Type.Present]; T.rest = Type.Absent}))) [
+          unify ctx (T.Arrow (t1, (t2, {T.ops = [op, Type.Present]; T.rest = Type.Absent}))) [
             ty_less ~pos u ty;
             just cstr_u
           ]
@@ -196,7 +196,7 @@ let rec infer_expr env (e, pos) =
               dirty_less ~pos u2 (t_yield, dirt);
               just cstr_e;
               just cstr_a
-            ] @ cnstrs, (r, op) :: rops
+            ] @ cnstrs, op :: rops
         end
       in
         let ctxs, cnstrs, rops = List.fold_right constrain_operation ops ([], [], []) in

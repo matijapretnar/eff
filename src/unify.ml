@@ -160,7 +160,7 @@ let pos_neg_params ty =
   | Type.Present | Type.Absent -> Trio.empty
   | Type.DirtParam d -> pos_dirt_param is_pos d
   and pos_dirt is_pos drt =
-    pos_presence is_pos drt.Type.rest @@@ Trio.flatten_map (fun ((r, _), dt) -> pos_region_param is_pos r @@@ pos_presence is_pos dt) drt.Type.ops
+    pos_presence is_pos drt.Type.rest @@@ Trio.flatten_map (fun (_, dt) -> pos_presence is_pos dt) drt.Type.ops
   and pos_dirt_param is_pos p =
     ([], (if is_pos then [p] else []), [])
   and pos_region_param is_pos r =
