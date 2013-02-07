@@ -12,21 +12,27 @@ and region_covers r i (ctx, ty, cnstrs, sbst) =
 and just new_cnstrs (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.join_disjoint_constraints new_cnstrs cnstrs, sbst)
 
-let rec add_dirt_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
-  let drt' = Type.subst_dirt sbst drt' in
+let rec add_dirt_substitution ~pos d drt' ((ctx, ty, cnstrs, sbst) as ty_sch) =
+  Print.debug "%t -> %t" (Print.presence_param d) (Print.presence drt'); 
+  ty_sch
+(*   let drt' = Type.subst_dirt sbst drt' in
   let sbst' = {
     Type.identity_subst with 
-    Type.dirt_param = (fun d' -> if d' = d then drt' else Type.simple_dirt d')
+    Type.presence_param = (fun d' -> if d' = d then drt' else Type.simple_dirt d')
   } in
   let (pred, succ, new_dirt_grph) = Type.remove_dirt cnstrs d in
   let cnstrs = {cnstrs with Type.dirt_graph = new_dirt_grph} in
   let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
   let ty_sch = List.fold_right (fun q ty_sch -> dirt_less ~pos (Type.simple_dirt q) drt' ty_sch) pred ty_sch in
-  List.fold_right (fun q ty_sch -> dirt_less ~pos drt' (Type.simple_dirt q) ty_sch) succ ty_sch
+  List.fold_right (fun q ty_sch -> dirt_less ~pos drt' (Type.simple_dirt q) ty_sch) succ ty_sch *)
 
 and presence_less ~pos dt1 dt2 ((ctx, ty, cnstrs, sbst) as ty_sch)  =
   match Type.subst_presence sbst dt1, Type.subst_presence sbst dt2 with
   | dt1, dt2 -> Print.debug "%t <= %t" (Print.presence dt1) (Print.presence dt2); ty_sch
+
+and presence_param_less ~pos dt1 dt2 ((ctx, ty, cnstrs, sbst) as ty_sch)  =
+  match sbst.Type.presence_param dt1, sbst.Type.presence_param dt2 with
+  | dt1, dt2 -> Print.debug "%t <= %t" (Print.presence_param dt1) (Print.presence_param dt2); ty_sch
 
 and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   ignore ty_sch;
@@ -117,7 +123,7 @@ and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
                         if contra then add ~pos ty2 ty1 ty_sch else ty_sch) ps (List.combine lst1 lst2) ty_sch
   in
   let ty_sch = for_parameters ty_less ps ts1 ts2 ty_sch in
-  let ty_sch = for_parameters dirt_less ds ds1 ds2 ty_sch in
+  let ty_sch = for_parameters presence_param_less ds ds1 ds2 ty_sch in
   for_parameters region_less rs rs1 rs2 ty_sch
 
 and dirty_less ~pos (ty1, d1) (ty2, d2) ty_sch =
@@ -157,11 +163,12 @@ let pos_neg_params ty =
   and pos_dirty is_pos (ty, drt) =
     pos_ty is_pos ty @@@ pos_dirt is_pos drt
   and pos_presence is_pos = function
-  | Type.Present | Type.Absent -> Trio.empty
-  | Type.DirtParam d -> pos_dirt_param is_pos d
+  | Type.Region r -> pos_region_param is_pos r
+  | Type.PresenceParam p -> pos_presence_param is_pos p
+  | Type.Without (prs, rs) -> pos_presence is_pos prs @@@ Trio.flatten_map (pos_region_param (not is_pos)) rs
   and pos_dirt is_pos drt =
     pos_presence is_pos drt.Type.rest @@@ Trio.flatten_map (fun (_, dt) -> pos_presence is_pos dt) drt.Type.ops
-  and pos_dirt_param is_pos p =
+  and pos_presence_param is_pos p =
     ([], (if is_pos then [p] else []), [])
   and pos_region_param is_pos r =
     ([], [], if is_pos then [r] else [])
@@ -170,7 +177,7 @@ let pos_neg_params ty =
     | None -> assert false (* We type-checked before thus all type names are valid. *)
     | Some (ps, ds, rs) ->
         for_parameters pos_ty is_pos ps tys @@@
-        for_parameters pos_dirt is_pos ds drts @@@
+        for_parameters pos_presence_param is_pos ds drts @@@
         for_parameters pos_region_param is_pos rs rgns
   in
   Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)

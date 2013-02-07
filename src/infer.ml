@@ -20,7 +20,7 @@ let nonexpansive = function
   | Core.Handle _ | Core.Let _ | Core.LetRec _ | Core.Check _ -> false
 
 let simple ty = ([], ty, Type.empty)
-let empty_dirt () = { Type.ops = []; Type.rest = Type.Absent }
+let empty_dirt () = { Type.ops = []; Type.rest = Type.PresenceParam (Type.fresh_presence_param ()) }
 
 let ty_of_const = function
   | Common.Integer _ -> Type.int_ty
@@ -170,7 +170,7 @@ let rec infer_expr env (e, pos) =
       | None -> Error.typing ~pos "Unbound operation %s" op
       | Some (ty, (t1, t2)) ->
           let ctx, u, cstr_u = infer_expr env e in
-          unify ctx (T.Arrow (t1, (t2, {T.ops = [op, Type.Present]; T.rest = Type.Absent}))) [
+          unify ctx (T.Arrow (t1, (t2, {T.ops = [op, Type.Region r]; T.rest = Type.PresenceParam (Type.fresh_presence_param ())}))) [
             ty_less ~pos u ty;
             just cstr_u
           ]
@@ -181,7 +181,7 @@ let rec infer_expr env (e, pos) =
       let dirt = T.fresh_dirt () in
       let t_finally = T.fresh_ty () in
       let t_yield = T.fresh_ty () in
-      let constrain_operation ((e, op), a2) (ctx, cnstrs, rops) =
+      let constrain_operation ((e, op), a2) (ctx, cnstrs, ops) =
         (* XXX Correct when you know what to put instead of the fresh region .*)
         let r = T.fresh_region_param () in
         begin match Tctx.infer_operation op r with
@@ -189,6 +189,12 @@ let rec infer_expr env (e, pos) =
         | Some (ty, (t1, t2)) ->
             let ctxe, u, cstr_e = infer_expr env e in
             let ctxa, u1, tk, u2, cstr_a = infer_abstraction2 env a2 in
+            let ops =
+              begin match Common.lookup op ops with
+              | None -> (op, ref [r]) :: ops
+              | Some rs -> rs := r :: !rs; ops
+              end
+              in
             ctxe @ ctxa @ ctx, [
               ty_less ~pos u ty;
               ty_less ~pos t1 u1;
@@ -196,16 +202,23 @@ let rec infer_expr env (e, pos) =
               dirty_less ~pos u2 (t_yield, dirt);
               just cstr_e;
               just cstr_a
-            ] @ cnstrs, op :: rops
+            ] @ cnstrs, ops
         end
       in
-        let ctxs, cnstrs, rops = List.fold_right constrain_operation ops ([], [], []) in
+        let ctxs, cnstrs, ops = List.fold_right constrain_operation ops ([], [], []) in
         let ctx1, valt1, valt2, cstr_val = infer_abstraction env a_val in
         let ctx2, fint1, (fint2, findrt), cstr_fin = infer_abstraction env a_fin in
-        let drt_rest = Type.DirtParam (Type.fresh_dirt_param ()) in
-        let left_rops = List.map (fun rop -> (rop, Type.Present)) rops
+        let drt_rest = Type.PresenceParam (Type.fresh_presence_param ()) in
+        (* XXX *)
+        let make_presence (op, rs) (left_dirt, right_dirt) =
+          let pres = Type.PresenceParam (Type.fresh_presence_param ()) in
+          ((op, pres) :: left_dirt, (op, Type.Without (pres, !rs)) :: right_dirt)
+        in
+        let left_rops, right_rops =
+          List.fold_right make_presence ops ([], []) in
+(*         let left_rops = List.map (fun rop -> (rop, Type.Present)) rops
         and right_rops = List.map (fun rop -> (rop, Type.Absent)) rops in
-        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, {Type.ops = left_rops; Type.rest = drt_rest}), (t_finally, dirt))) ([
+ *)        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, {Type.ops = left_rops; Type.rest = drt_rest}), (t_finally, dirt))) ([
           (* dirt_handles_ops drt_value rops; *)
           dirt_less ~pos {Type.ops = right_rops; Type.rest = drt_rest} dirt;
           ty_less ~pos t_value valt1;

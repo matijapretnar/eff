@@ -81,16 +81,16 @@ let region_param ?(non_poly=Trio.empty) ((Type.Region_Param k) as p) ppf =
   let c = (if List.mem p rs then "_" else "") in
     print ppf "%sr%i" c (k + 1)
 
-let dirt_param ?(non_poly=Trio.empty) ((Type.Dirt_Param k) as p) ppf =
+let presence_param ?(non_poly=Trio.empty) ((Type.Presence_Param k) as p) ppf =
   let (_, ds, _) = non_poly in
   let c = (if List.mem p ds then "_" else "") in
     print ppf "%sd%i" c (k + 1)
 
-let presence ?(non_poly=Trio.empty) drt ppf =
+let rec presence ?(non_poly=Trio.empty) drt ppf =
   match drt with
-  | Type.Absent -> print ppf "-"
-  | Type.Present -> print ppf "+"
-  | Type.DirtParam d -> dirt_param ~non_poly d ppf
+  | Type.Region r -> region_param ~non_poly r ppf
+  | Type.PresenceParam p -> presence_param ~non_poly p ppf
+  | Type.Without (prs, rs) -> print ppf "%t - [%t]" (presence prs) (sequence "," (region_param) rs)
 
 let dirt_bound ?non_poly r_ops =
   sequence "," (fun (op, dt) ppf -> print ppf "%s:%t" op (presence dt)) r_ops
@@ -170,7 +170,7 @@ let bounds pp pp' p inf sup pps =
 
 let constraints ?(non_poly=Trio.empty) g ppf =
   let pps = Type.fold_ty (fun p1 p2 lst -> if p1 = p2 then lst else less (ty_param ~non_poly) p1 p2 :: lst) g [] in
-  let pps = Type.fold_dirt (fun d1 d2 lst -> if d1 = d2 then lst else less (dirt_param ~non_poly) d1 d2 :: lst) g pps in
+  let pps = Type.fold_dirt (fun d1 d2 lst -> if d1 = d2 then lst else less (presence_param ~non_poly) d1 d2 :: lst) g pps in
   let pps = Type.fold_region (fun r1 r2 lst -> if r1 = r2 then lst else less (region_param ~non_poly) r1 r2 :: lst) g pps in
   let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (region_param ~non_poly) region_bound r bound1 bound2 pps) (Type.Region.bounds g.Type.region_graph) pps
   in

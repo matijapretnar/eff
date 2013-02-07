@@ -3,12 +3,12 @@
  *)
 
 type ty_param = Ty_Param of int
-type dirt_param = Dirt_Param of int
+type presence_param = Presence_Param of int
 type region_param = Region_Param of int
 type instance_param = Instance_Param of int
 
 let fresh_ty_param = Common.fresh (fun n -> Ty_Param n)
-let fresh_dirt_param = Common.fresh (fun n -> Dirt_Param n)
+let fresh_presence_param = Common.fresh (fun n -> Presence_Param n)
 let fresh_region_param = Common.fresh (fun n -> Region_Param n)
 let fresh_instance_param = Common.fresh (fun n -> Instance_Param n)
 
@@ -24,16 +24,16 @@ type ty =
 and dirty = ty * dirt
 
 and presence =
-  | Absent
-  | Present
-  | DirtParam of dirt_param
+  | Region of region_param
+  | PresenceParam of presence_param
+  | Without of presence * region_param list
 
 and dirt = {
   ops: (Common.opsym, presence) Common.assoc;
   rest: presence
 }
 
-and args = (ty, dirt, region_param) Trio.t
+and args = (ty, presence_param, region_param) Trio.t
 
 
 (* This type is used when type checking is turned off. Its name
@@ -49,8 +49,8 @@ let empty_ty = Apply ("empty", Trio.empty)
 (** [fresh_ty ()] gives a type [TyParam p] where [p] is a new type parameter on
     each call. *)
 let fresh_ty () = TyParam (fresh_ty_param ())
-let simple_dirt d = { ops = []; rest = DirtParam d }
-let fresh_dirt () = simple_dirt (fresh_dirt_param ())
+let simple_dirt d = { ops = []; rest = PresenceParam d }
+let fresh_dirt () = simple_dirt (fresh_presence_param ())
 (* XXX Should a fresh dirty type have no fresh instances? *)
 let fresh_dirty () = (fresh_ty (), fresh_dirt ())
 let universal_ty = Basic "_"
@@ -59,7 +59,7 @@ let universal_dirty = (Basic "_", fresh_dirt ())
 
 type substitution = {
   ty_param : ty_param -> ty;
-  dirt_param : dirt_param -> dirt;
+  presence_param : presence_param -> presence_param;
   region_param : region_param -> region_param;
   instance_param : instance_param -> instance_param option;
 }
@@ -84,21 +84,14 @@ let rec subst_ty sbst = function
       Handler ((ty1, subst_dirt sbst drt), drty2)
 
 and subst_presence sbst = function
-  | Absent -> Absent
-  | Present -> Present
-  | DirtParam p -> 
-      begin match sbst.dirt_param p with
-      | { ops = []; rest = drt } -> drt
-      | { ops = ops; rest = drt } -> assert false
-      end
+  | Region r -> Region (sbst.region_param r)
+  | Without (p, rs) -> Without (subst_presence sbst p, List.map sbst.region_param rs)
+  | PresenceParam p -> PresenceParam (sbst.presence_param p)
 
 and subst_dirt sbst drt =
-  let ops = Common.uniq (Common.assoc_map (subst_presence sbst) drt.ops) in
-  match drt.rest with
-  | (Absent | Present) as drt' -> { ops = ops; rest = drt' }
-  | DirtParam p ->
-      let { ops = ops'; rest = drt'} = sbst.dirt_param p in
-      { ops = Common.uniq (ops' @ ops); rest = drt' }
+  let ops = Common.assoc_map (subst_presence sbst) drt.ops in
+  let rest = subst_presence sbst drt.rest in
+  { ops = ops; rest = rest }
 
 and subst_dirty sbst (ty, drt) =
   let ty = subst_ty sbst ty in
@@ -107,7 +100,7 @@ and subst_dirty sbst (ty, drt) =
 
 and subst_args sbst (tys, drts, rs) =
   let tys = Common.map (subst_ty sbst) tys in
-  let drts = Common.map (subst_dirt sbst) drts in
+  let drts = Common.map sbst.presence_param drts in
   let rs = Common.map sbst.region_param rs in
   (tys, drts, rs)
 
@@ -115,7 +108,7 @@ and subst_args sbst (tys, drts, rs) =
 let identity_subst =
   {
     ty_param = (fun p -> TyParam p);
-    dirt_param = simple_dirt;
+    presence_param = Common.id;
     region_param = Common.id;
     instance_param = (fun i -> Some i);
   }
@@ -125,7 +118,7 @@ let identity_subst =
 let compose_subst sbst1 sbst2 =
   {
     ty_param = Common.compose (subst_ty sbst1) sbst2.ty_param;
-    dirt_param = Common.compose (subst_dirt sbst1) sbst2.dirt_param;
+    presence_param = Common.compose sbst1.presence_param sbst2.presence_param;
     region_param = Common.compose sbst1.region_param sbst2.region_param;
     instance_param = (fun i -> match sbst2.instance_param i with None -> None | Some j -> sbst1.instance_param j);
   }
@@ -167,7 +160,7 @@ let replace ty =
 
   and replace_args (tys, drts, rs) =
     let tys = Common.map (replace_ty) tys in
-    let drts = Common.map (replace_dirt) drts in
+    let drts = Common.map (fun _ -> fresh_presence_param ()) drts in
     let rs = Common.map (fun _ -> fresh_region_param ()) rs in
     (tys, drts, rs)
   in
@@ -181,7 +174,7 @@ let beautifying_subst () =
   else
     {
       ty_param = refresher (Common.fresh (fun n -> TyParam (Ty_Param n)));
-      dirt_param = refresher (Common.fresh (fun n -> simple_dirt (Dirt_Param n)));
+      presence_param = refresher (Common.fresh (fun n -> Presence_Param n));
       region_param = refresher (Common.fresh (fun n -> Region_Param n));
       instance_param = refresher (Common.fresh (fun n -> Some (Instance_Param n)));
     }
@@ -190,7 +183,7 @@ let refreshing_subst () =
   {
     identity_subst with
     ty_param = (let refresh = refresher fresh_ty_param in fun p -> TyParam (refresh p));
-    dirt_param = (let refresh = refresher fresh_dirt_param in fun d -> simple_dirt (refresh d));
+    presence_param = refresher fresh_presence_param;
     region_param = refresher fresh_region_param;
   }
 
@@ -235,7 +228,7 @@ module Region = Graph.Make(struct
 end)
 
 module Dirt = Graph.Make(struct
-  type t = dirt_param
+  type t = presence_param
   type bound = unit
   let inf () () = ()
   let sup () () = ()
@@ -264,7 +257,7 @@ let remove_dirt g x =
 
 let subst_constraints sbst cnstr = {
   ty_graph = Ty.map (fun p -> match sbst.ty_param p with TyParam q -> q | _ -> assert false) (fun () -> ()) cnstr.ty_graph;
-  dirt_graph = Dirt.map (fun p -> match sbst.dirt_param p with { ops = []; rest = DirtParam d } -> d | _ -> assert false) (fun () -> ()) cnstr.dirt_graph;
+  dirt_graph = Dirt.map sbst.presence_param (fun () -> ()) cnstr.dirt_graph;
   region_graph = Region.map sbst.region_param (fun insts -> Common.option_map (fun insts -> List.map (fun ins -> match sbst.instance_param ins with Some i -> i | None -> assert false) insts) insts) cnstr.region_graph;
 }
 
@@ -310,7 +303,7 @@ let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
   let sbst = {
     identity_subst with
     ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> TyParam q | None -> TyParam p);
-    (* dirt_param = (fun p -> match Common.lookup p dirt_subst with Some q -> simple_dirt q | None -> simple_dirt p); *)
+    (* presence_param = (fun p -> match Common.lookup p dirt_subst with Some q -> simple_dirt q | None -> simple_dirt p); *)
     region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
   }
   in
@@ -328,6 +321,6 @@ let simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
   {
     identity_subst with
     ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> TyParam q | None -> TyParam p);
-    dirt_param = (fun p -> match Common.lookup p dirt_subst with Some q -> simple_dirt q | None -> simple_dirt p);
+    presence_param = (fun p -> match Common.lookup p dirt_subst with Some q -> q | None -> p);
     region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
   }

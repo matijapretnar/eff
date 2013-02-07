@@ -110,8 +110,8 @@ let ty (ts, ds, rs) =
   | Syntax.TyApply (t, tys, drts_rgns, rgn) ->
       let tys = List.map ty tys
       and (drts, rgns) = begin match drts_rgns with
-        | Some (drts, rgns) -> (List.map (dirt pos) drts, List.map (region pos) rgns)
-        | None -> (List.map (fun (_, d) -> {Type.ops = []; Type.rest = Type.DirtParam d}) ds, List.map (fun (_, r) -> r) rs)
+        | Some (drts, rgns) -> (List.map (presence pos) drts, List.map (region pos) rgns)
+        | None -> (List.map (fun (_, d) -> d) ds, List.map (fun (_, r) -> r) rs)
       end 
       in begin match rgn with
         | None -> T.Apply (t, (tys, drts, rgns))
@@ -131,7 +131,11 @@ let ty (ts, ds, rs) =
   and dirt pos (Syntax.DirtParam d) =
     match C.lookup d ds with
     | None -> Error.syntax ~pos "Unbound dirt parameter 'drt%d" d
-    | Some d -> {Type.ops = []; Type.rest = Type.DirtParam d}
+    | Some d -> Type.simple_dirt d
+  and presence pos (Syntax.DirtParam d) =
+    match C.lookup d ds with
+    | None -> Error.syntax ~pos "Unbound presence parameter 'drt%d" d
+    | Some d -> d
   and region pos (Syntax.RegionParam r) =
     match C.lookup r rs with
     | None -> Error.syntax ~pos "Unbound region parameter 'rgn%d" r
@@ -161,7 +165,7 @@ let free_params t =
 
 let syntax_to_core_params (ts, ds, rs) = (
     List.map (fun p -> (p, Type.fresh_ty_param ())) ts,
-    List.map (fun d -> (d, Type.fresh_dirt_param ())) ds,
+    List.map (fun d -> (d, Type.fresh_presence_param ())) ds,
     List.map (fun r -> (r, Type.fresh_region_param ())) rs
   )
 
