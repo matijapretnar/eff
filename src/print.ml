@@ -175,7 +175,7 @@ let constraints ?(non_poly=Trio.empty) g ppf =
   let pps = Type.fold_dirt (fun d1 d2 lst -> if d1 = d2 then lst else less (presence_param ~non_poly) d1 d2 :: lst) g pps in
   let pps = Type.fold_region (fun r1 r2 lst -> if r1 = r2 then lst else less (region_param ~non_poly) r1 r2 :: lst) g pps in
   let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (region_param ~non_poly) region_bound r bound1 bound2 pps) (Type.Region.bounds g.Type.region_graph) pps in
-  let pps = List.fold_right (fun (d, bnds) pps -> dirt_bounds d !bnds pps) (g.Type.dirt_bounds) pps
+  let pps = List.fold_right (fun (d, bnds) pps -> dirt_bounds d bnds pps) (g.Type.dirt_bounds) pps
   in
   print ppf "%t"
     (sequence2 "," pps)

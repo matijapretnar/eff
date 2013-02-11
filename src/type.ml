@@ -241,7 +241,7 @@ type t = {
   ty_graph : Ty.t;
   region_graph : Region.t;
   dirt_graph : Dirt.t;
-  dirt_bounds: (presence_param, (presence list) ref) Common.assoc;
+  dirt_bounds: (presence_param, presence list) Common.assoc;
 }
 
 type ty_scheme = (Core.variable, ty) Common.assoc * ty * t
@@ -263,7 +263,7 @@ let subst_constraints sbst cnstr = {
   ty_graph = Ty.map (fun p -> match sbst.ty_param p with TyParam q -> q | _ -> assert false) (fun () -> ()) cnstr.ty_graph;
   dirt_graph = Dirt.map sbst.presence_param (fun () -> ()) cnstr.dirt_graph;
   region_graph = Region.map sbst.region_param (fun insts -> Common.option_map (fun insts -> List.map (fun ins -> match sbst.instance_param ins with Some i -> i | None -> assert false) insts) insts) cnstr.region_graph;
-  dirt_bounds = (List.iter (fun (_, bnds) -> bnds := List.map (subst_presence sbst) !bnds) cnstr.dirt_bounds; cnstr.dirt_bounds);
+  dirt_bounds = Common.assoc_map (List.map (subst_presence sbst)) cnstr.dirt_bounds;
 }
 
 let fold_ty f g acc = Ty.fold_edges f g.ty_graph acc
@@ -278,19 +278,18 @@ let add_ty_constraint ty1 ty2 cstr =
 
 let add_bound d bnd bounds =
   match Common.lookup d bounds with
-  | None -> (d, ref [bnd]) :: bounds
+  | None -> (d, [bnd]) :: bounds
   | Some bnds ->
-      bnds := bnd :: !bnds;
-      bounds 
+      List.fold_right (fun (d', bnds) new_bounds ->
+                         if d = d' then (d', bnd :: bnds) :: new_bounds else (d', bnds) :: new_bounds) bounds []
 
 let add_dirt_constraint drt1 drt2 cstr =
   let new_dirt_graph = Dirt.add_edge drt1 drt2 cstr.dirt_graph in
-  let old_bounds = Common.assoc_map (fun bnds -> ref (!bnds)) cstr.dirt_bounds in
   let new_dirt_bounds =
     match Common.lookup drt1 cstr.dirt_bounds with
-    | None -> old_bounds
+    | None -> cstr.dirt_bounds
     | Some bnds1 ->
-       List.fold_right (fun bnd -> add_bound drt2 bnd) (!bnds1) old_bounds
+       List.fold_right (fun bnd -> add_bound drt2 bnd) bnds1 cstr.dirt_bounds
   in
   {cstr with dirt_graph = new_dirt_graph; dirt_bounds = new_dirt_bounds}
 
@@ -302,14 +301,7 @@ let add_presence_bound d bnd cstr =
   {cstr with dirt_bounds = add_bound d bnd cstr.dirt_bounds}
 
 let join_bounds bnds1 bnds2 =
-  let add_bound (d, bds1) new_bnds =
-    match Common.lookup d new_bnds with
-    | None -> (d, ref (!bds1)) :: new_bnds
-    | Some bds2 ->
-        bds2 := Common.uniq (!bds1 @ !bds2);
-        new_bnds
-  in
-  List.fold_right add_bound bnds1 (Common.assoc_map (fun bds2 -> ref (!bds2)) bnds2)
+  List.fold_right (fun (d, bds1) bnds2 -> List.fold_right (fun bd1 bnds2 -> add_bound d bd1 bnds2) bds1 bnds2) bnds1 bnds2
 
 let union_bounds bnds1 bnds2 =
   bnds1 @ bnds2
