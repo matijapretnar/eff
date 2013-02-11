@@ -173,12 +173,13 @@ let beautifying_subst () =
   if !disable_beautify then
     identity_subst
   else
+    let presence_param = refresher (Common.fresh (fun n -> Presence_Param n)) in
     {
       ty_param = refresher (Common.fresh (fun n -> TyParam (Ty_Param n)));
-      presence_param = refresher (Common.fresh (fun n -> Presence_Param n));
+      presence_param = presence_param;
       region_param = refresher (Common.fresh (fun n -> Region_Param n));
       instance_param = refresher (Common.fresh (fun n -> Some (Instance_Param n)));
-      presence_rest = refresher (Common.fresh (fun n -> { ops = []; rest = Presence_Param n }))
+      presence_rest = fun n -> { ops = []; rest = presence_param n }
     }
 
 let refreshing_subst () =
@@ -265,7 +266,7 @@ let subst_constraints sbst cnstr = {
   ty_graph = Ty.map (fun p -> match sbst.ty_param p with TyParam q -> q | _ -> assert false) (fun () -> ()) cnstr.ty_graph;
   dirt_graph = Dirt.map sbst.presence_param (fun () -> ()) cnstr.dirt_graph;
   region_graph = Region.map sbst.region_param (fun insts -> Common.option_map (fun insts -> List.map (fun ins -> match sbst.instance_param ins with Some i -> i | None -> assert false) insts) insts) cnstr.region_graph;
-  dirt_bounds = Common.assoc_map (List.map (subst_presence sbst)) cnstr.dirt_bounds;
+  dirt_bounds = List.map (fun (d, bnds) -> (sbst.presence_param d, List.map (subst_presence sbst) bnds)) cnstr.dirt_bounds;
 }
 
 let fold_ty f g acc = Ty.fold_edges f g.ty_graph acc
