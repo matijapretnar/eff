@@ -183,11 +183,13 @@ let beautifying_subst () =
     }
 
 let refreshing_subst () =
+  let refresh_presence_param = refresher fresh_presence_param in
   {
     identity_subst with
     ty_param = (let refresh = refresher fresh_ty_param in fun p -> TyParam (refresh p));
-    presence_param = refresher fresh_presence_param;
+    presence_param = refresh_presence_param;
     region_param = refresher fresh_region_param;
+    presence_rest = fun p -> { ops = []; rest = refresh_presence_param p }
   }
 
 let instance_refreshing_subst () =
