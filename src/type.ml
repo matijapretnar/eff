@@ -276,18 +276,26 @@ let add_region_low_bound i r cstr =
 let add_ty_constraint ty1 ty2 cstr =
   {cstr with ty_graph = Ty.add_edge ty1 ty2 cstr.ty_graph}
 
-let add_dirt_constraint drt1 drt2 cstr =
-  {cstr with dirt_graph = Dirt.add_edge drt1 drt2 cstr.dirt_graph}
-
-let add_region_constraint rgn1 rgn2 cstr =
-  {cstr with region_graph = Region.add_edge rgn1 rgn2 cstr.region_graph}
-
 let add_bound d bnd bounds =
   match Common.lookup d bounds with
   | None -> (d, ref [bnd]) :: bounds
   | Some bnds ->
       bnds := bnd :: !bnds;
       bounds 
+
+let add_dirt_constraint drt1 drt2 cstr =
+  let new_dirt_graph = Dirt.add_edge drt1 drt2 cstr.dirt_graph in
+  let old_bounds = Common.assoc_map (fun bnds -> ref (!bnds)) cstr.dirt_bounds in
+  let new_dirt_bounds =
+    match Common.lookup drt1 cstr.dirt_bounds with
+    | None -> old_bounds
+    | Some bnds1 ->
+       List.fold_right (fun bnd -> add_bound drt2 bnd) (!bnds1) old_bounds
+  in
+  {cstr with dirt_graph = new_dirt_graph; dirt_bounds = new_dirt_bounds}
+
+let add_region_constraint rgn1 rgn2 cstr =
+  {cstr with region_graph = Region.add_edge rgn1 rgn2 cstr.region_graph}
 
 
 let add_presence_bound d bnd cstr =
