@@ -368,14 +368,13 @@ let extend_with_variances tydefs =
     and dirt posi nega drt =
       List.iter (fun (_, prs) -> presence_param posi nega prs) drt.Type.ops;
       presence_param posi nega drt.Type.rest
-    and presence posi nega = function
+(*     and presence posi nega = function
       | Type.Region r -> region_param posi nega r
-      | Type.PresenceParam d -> presence_param posi nega d
       | Type.Without (prs, rs) ->
-          presence posi nega prs;
+          presence_param posi nega prs;
           (* XXX Maybe here, it is nega posi? *)
-          List.iter (region_param posi nega) rs
-    and presence_param posi nega d =
+          List.iter (region_param nega posi) rs
+ *)    and presence_param posi nega d =
       begin match Common.lookup d ds with
       | None -> assert false
       | Some (posvar, negvar) ->

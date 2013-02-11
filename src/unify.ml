@@ -11,11 +11,11 @@ and region_covers r i (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.add_region_low_bound i r cnstrs, sbst)
 and just new_cnstrs (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.join_disjoint_constraints new_cnstrs cnstrs, sbst)
+and add_presence_bound d bnd (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Type.add_presence_bound d bnd cnstrs, sbst)
 
 let rec add_rest_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
-(*   Print.debug "%t -> %t" (Print.presence_param d) (Print.presence drt'); 
-  ty_sch
- *)
+  Print.debug "%t -> %t" (Print.presence_param d) (Print.dirt drt'); 
   let drt' = Type.subst_dirt sbst drt' in
   let sbst' = {
     Type.identity_subst with 
@@ -42,8 +42,8 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
     in
     List.fold_right add_op ops1 []
   in
-  let new_ops1 = new_ops ops1 ops2
-  and new_ops2 = new_ops ops2 ops1 in
+  let new_ops1 = new_ops ops2 ops1
+  and new_ops2 = new_ops ops1 ops2 in
   match new_ops1, new_ops2 with
   | [], [] ->
       let op_less (op, dt1) ty_sch =
@@ -178,11 +178,10 @@ let pos_neg_params ty =
   | Type.Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
   and pos_dirty is_pos (ty, drt) =
     pos_ty is_pos ty @@@ pos_dirt is_pos drt
-  and pos_presence is_pos = function
+(*   and pos_presence is_pos = function
   | Type.Region r -> pos_region_param is_pos r
-  | Type.PresenceParam p -> pos_presence_param is_pos p
-  | Type.Without (prs, rs) -> pos_presence is_pos prs @@@ Trio.flatten_map (pos_region_param (not is_pos)) rs
-  and pos_dirt is_pos drt =
+  | Type.Without (prs, rs) -> pos_presence_param is_pos prs @@@ Trio.flatten_map (pos_region_param (not is_pos)) rs
+ *)  and pos_dirt is_pos drt =
     pos_presence_param is_pos drt.Type.rest @@@ Trio.flatten_map (fun (_, dt) -> pos_presence_param is_pos dt) drt.Type.ops
   and pos_presence_param is_pos p =
     ([], (if is_pos then [p] else []), [])

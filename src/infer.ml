@@ -171,9 +171,9 @@ let rec infer_expr env (e, pos) =
       | Some (ty, (t1, t2)) ->
           let ctx, u, cstr_u = infer_expr env e in
           let dt = Type.fresh_presence_param () in
-          Print.debug "%t contains region %t" (Print.presence_param dt) (Print.region_param r);
           unify ctx (T.Arrow (t1, (t2, {T.ops = [op, dt]; T.rest = Type.fresh_presence_param ()}))) [
             ty_less ~pos u ty;
+            Unify.add_presence_bound dt (Type.Region r);
             just cstr_u
           ]
       end
@@ -212,14 +212,14 @@ let rec infer_expr env (e, pos) =
         let ctx2, fint1, (fint2, findrt), cstr_fin = infer_abstraction env a_fin in
         let drt_rest = Type.fresh_presence_param () in
         (* XXX *)
-        let make_presence (op, rs) (left_dirt, right_dirt) =
+        let make_presence (op, rs) (left_dirt, right_dirt, cnstrs) =
           let pres = Type.fresh_presence_param () in
           let without = Type.fresh_presence_param () in
-          Print.debug "%t >= %t" (Print.presence_param without) (Print.presence (Type.Without (Type.PresenceParam pres, !rs)));
-          ((op, pres) :: left_dirt, (op, without) :: right_dirt)
+          (* Print.info "DIRT: %t >= %t" (Print.presence_param without) (Print.presence (Type.Without (pres, !rs))); *)
+          ((op, pres) :: left_dirt, (op, without) :: right_dirt, Unify.add_presence_bound without (Type.Without (pres, !rs)) :: cnstrs)
         in
-        let left_rops, right_rops =
-          List.fold_right make_presence ops ([], []) in
+        let left_rops, right_rops, cnstrs_ops =
+          List.fold_right make_presence ops ([], [], []) in
 (*         let left_rops = List.map (fun rop -> (rop, Type.Present)) rops
         and right_rops = List.map (fun rop -> (rop, Type.Absent)) rops in
  *)        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, {Type.ops = left_rops; Type.rest = drt_rest}), (t_finally, dirt))) ([
@@ -232,7 +232,7 @@ let rec infer_expr env (e, pos) =
           ty_less ~pos t_yield fint1;
           just cstr_val;
           just cstr_fin
-        ] @ cnstrs)
+        ] @ cnstrs_ops @ cnstrs)
   in
   Print.debug "%t : %t" (Print.expression (e, pos)) (Print.ty_scheme ty_sch);
   ty_sch

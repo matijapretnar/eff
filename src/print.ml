@@ -89,8 +89,7 @@ let presence_param ?(non_poly=Trio.empty) ((Type.Presence_Param k) as p) ppf =
 let rec presence ?(non_poly=Trio.empty) drt ppf =
   match drt with
   | Type.Region r -> region_param ~non_poly r ppf
-  | Type.PresenceParam p -> presence_param ~non_poly p ppf
-  | Type.Without (prs, rs) -> print ppf "%t - [%t]" (presence prs) (sequence "," (region_param) rs)
+  | Type.Without (prs, rs) -> print ppf "%t - [%t]" (presence_param prs) (sequence "," (region_param) rs)
 
 let dirt_bound ?non_poly r_ops =
   sequence "," (fun (op, dt) ppf -> print ppf "%s:%t" op (presence_param dt)) r_ops
@@ -168,11 +167,15 @@ let bounds pp pp' p inf sup pps =
   | None, Some sup -> (fun ppf -> print ppf "%t <= %t" (pp p) (pp' sup)) :: pps
   | Some inf, Some sup -> (fun ppf -> print ppf "%t <= %t <= %t" (pp' inf) (pp p) (pp' sup)) :: pps
 
+let dirt_bounds d bnds pps =
+  (fun ppf -> print ppf "%t <= %t" (sequence "," presence bnds) (presence_param d)) :: pps
+
 let constraints ?(non_poly=Trio.empty) g ppf =
   let pps = Type.fold_ty (fun p1 p2 lst -> if p1 = p2 then lst else less (ty_param ~non_poly) p1 p2 :: lst) g [] in
   let pps = Type.fold_dirt (fun d1 d2 lst -> if d1 = d2 then lst else less (presence_param ~non_poly) d1 d2 :: lst) g pps in
   let pps = Type.fold_region (fun r1 r2 lst -> if r1 = r2 then lst else less (region_param ~non_poly) r1 r2 :: lst) g pps in
-  let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (region_param ~non_poly) region_bound r bound1 bound2 pps) (Type.Region.bounds g.Type.region_graph) pps
+  let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (region_param ~non_poly) region_bound r bound1 bound2 pps) (Type.Region.bounds g.Type.region_graph) pps in
+  let pps = List.fold_right (fun (d, bnds) pps -> dirt_bounds d !bnds pps) (g.Type.dirt_bounds) pps
   in
   print ppf "%t"
     (sequence2 "," pps)
@@ -304,4 +307,5 @@ let message ?pos msg_type v =
 let error (pos, err_type, msg) = message ?pos err_type 1 "%s" msg
 let check ~pos = message ~pos "Check" 2
 let warning ~pos = message ~pos "Warning" 3
-let debug ?pos = message ?pos "Debug" 4
+let info ?pos = message ?pos "Info" 4
+let debug ?pos = message ?pos "Debug" 5
