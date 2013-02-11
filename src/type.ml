@@ -294,10 +294,16 @@ let add_presence_bound d bnd cstr =
   {cstr with dirt_bounds = add_bound d bnd cstr.dirt_bounds}
 
 let join_bounds bnds1 bnds2 =
-  bnds1 @ bnds2
+  let add_bound (d, bds1) new_bnds =
+    match Common.lookup d new_bnds with
+    | None -> (d, ref (!bds1)) :: new_bnds
+    | Some bds2 ->
+        bds2 := Common.uniq (!bds1 @ !bds2);
+        new_bnds
+  in
+  List.fold_right add_bound bnds1 (Common.assoc_map (fun bds2 -> ref (!bds2)) bnds2)
 
 let union_bounds bnds1 bnds2 =
-  (* List.fold_right (fun (d, bnds) -> List.fold_right (fun bnd -> add_bound d bnd) bnds new_bnds) *)
   bnds1 @ bnds2
 
 let join_constraints cstr1 cstr2 = 
