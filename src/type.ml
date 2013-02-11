@@ -331,21 +331,22 @@ let join_disjoint_constraints cstr1 cstr2 =
  *)
 let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
   let ty_subst, ty_graph = Ty.collect pos_ts neg_ts grph.ty_graph
-  (* and dirt_subst, dirt_graph = Dirt.collect pos_ds neg_ds grph.dirt_graph *)
+  and dirt_subst, dirt_graph = Dirt.collect pos_ds neg_ds grph.dirt_graph
   and region_subst, region_graph = Region.collect pos_rs neg_rs grph.region_graph
   in
   let sbst = {
     identity_subst with
     ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> TyParam q | None -> TyParam p);
-    (* presence_param = (fun p -> match Common.lookup p dirt_subst with Some q -> simple_dirt q | None -> simple_dirt p); *)
+    presence_param = (fun p -> match Common.lookup p dirt_subst with Some q -> q | None -> p);
     region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
-  }
+  } in
+  let dirt_bounds = List.filter (fun (d, bnds) -> List.mem d pos_ds) grph.dirt_bounds
   in
   sbst, {
     ty_graph = ty_graph;
-    dirt_graph = grph.dirt_graph;
+    dirt_graph = dirt_graph;
     region_graph = region_graph;
-    dirt_bounds = grph.dirt_bounds
+    dirt_bounds = dirt_bounds
   }
 
 let simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =

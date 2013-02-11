@@ -178,10 +178,7 @@ let pos_neg_params ty =
   | Type.Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
   and pos_dirty is_pos (ty, drt) =
     pos_ty is_pos ty @@@ pos_dirt is_pos drt
-(*   and pos_presence is_pos = function
-  | Type.Region r -> pos_region_param is_pos r
-  | Type.Without (prs, rs) -> pos_presence_param is_pos prs @@@ Trio.flatten_map (pos_region_param (not is_pos)) rs
- *)  and pos_dirt is_pos drt =
+  and pos_dirt is_pos drt =
     pos_presence_param is_pos drt.Type.rest @@@ Trio.flatten_map (fun (_, dt) -> pos_presence_param is_pos dt) drt.Type.ops
   and pos_presence_param is_pos p =
     ([], (if is_pos then [p] else []), [])
@@ -197,15 +194,20 @@ let pos_neg_params ty =
   in
   Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)
 
-
 let pos_neg_tyscheme (ctx, ty, cnstrs) =
   let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
     let pos_ctx_ty, neg_ctx_ty = pos_neg_params ctx_ty in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
   let (pos, neg) = List.fold_right add_ctx_pos_neg ctx (pos_neg_params ty) in
-  let ((_, _, pos_rs) as pos), ((_, _, neg_rs) as neg) = (Trio.uniq pos, Trio.uniq neg) in
-  pos, neg
+  let add_bound bnd (posi, nega) = match bnd with
+  | Type.Region r -> (([], [], [r]) @@@ posi, nega) 
+  | Type.Without (d, rs) -> (([], [d], []) @@@ posi, ([], [], rs) @@@ nega)
+  in
+  let (((_, pos_ds, _) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
+  let (posi, nega) = List.fold_right (fun (d, bnds) (posi, nega) ->
+                                      if List.mem d pos_ds then List.fold_right add_bound bnds (posi, nega) else (posi, nega)) cnstrs.Type.dirt_bounds (posi, nega) in
+  Trio.uniq posi, Trio.uniq nega
 
 let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
   pos_neg_tyscheme (ctx, ty, cnstrs)
