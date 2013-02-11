@@ -258,6 +258,8 @@ let remove_ty g x =
   Ty.remove_vertex x g.ty_graph
 let remove_dirt g x =
   Dirt.remove_vertex x g.dirt_graph
+let get_succ g x =
+  Dirt.get_succ x g.dirt_graph
 
 let subst_constraints sbst cnstr = {
   ty_graph = Ty.map (fun p -> match sbst.ty_param p with TyParam q -> q | _ -> assert false) (fun () -> ()) cnstr.ty_graph;
@@ -298,7 +300,8 @@ let add_region_constraint rgn1 rgn2 cstr =
 
 
 let add_presence_bound d bnd cstr =
-  {cstr with dirt_bounds = add_bound d bnd cstr.dirt_bounds}
+  let params = get_succ cstr d in
+  {cstr with dirt_bounds = List.fold_right (fun d' -> add_bound d' bnd) (d :: params) cstr.dirt_bounds}
 
 let join_bounds bnds1 bnds2 =
   List.fold_right (fun (d, bds1) bnds2 -> List.fold_right (fun bd1 bnds2 -> add_bound d bd1 bnds2) bds1 bnds2) bnds1 bnds2

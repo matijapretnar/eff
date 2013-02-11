@@ -39,6 +39,10 @@ struct
   let get x (g : t) =
     try G.find x g with Not_found -> (S.empty, S.empty, None, None)
 
+  let get_succ x g =
+    let (_, outx, _, _) = get x g in
+    S.elements outx
+
   let add_edge x y (g : t) =
     let (inx, outx, infx, supx) = get x g
     and (iny, outy, infy, supy) = get y g in
