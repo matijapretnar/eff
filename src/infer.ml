@@ -20,7 +20,7 @@ let nonexpansive = function
   | Core.Handle _ | Core.Let _ | Core.LetRec _ | Core.Check _ -> false
 
 let simple ty = ([], ty, Type.empty)
-let empty_dirt () = { Type.ops = []; Type.rest = Type.PresenceParam (Type.fresh_presence_param ()) }
+let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_presence_param () }
 
 let ty_of_const = function
   | Common.Integer _ -> Type.int_ty
@@ -170,7 +170,9 @@ let rec infer_expr env (e, pos) =
       | None -> Error.typing ~pos "Unbound operation %s" op
       | Some (ty, (t1, t2)) ->
           let ctx, u, cstr_u = infer_expr env e in
-          unify ctx (T.Arrow (t1, (t2, {T.ops = [op, Type.Region r]; T.rest = Type.PresenceParam (Type.fresh_presence_param ())}))) [
+          let dt = Type.fresh_presence_param () in
+          Print.debug "%t contains region %t" (Print.presence_param dt) (Print.region_param r);
+          unify ctx (T.Arrow (t1, (t2, {T.ops = [op, dt]; T.rest = Type.fresh_presence_param ()}))) [
             ty_less ~pos u ty;
             just cstr_u
           ]
@@ -208,11 +210,13 @@ let rec infer_expr env (e, pos) =
         let ctxs, cnstrs, ops = List.fold_right constrain_operation ops ([], [], []) in
         let ctx1, valt1, valt2, cstr_val = infer_abstraction env a_val in
         let ctx2, fint1, (fint2, findrt), cstr_fin = infer_abstraction env a_fin in
-        let drt_rest = Type.PresenceParam (Type.fresh_presence_param ()) in
+        let drt_rest = Type.fresh_presence_param () in
         (* XXX *)
         let make_presence (op, rs) (left_dirt, right_dirt) =
-          let pres = Type.PresenceParam (Type.fresh_presence_param ()) in
-          ((op, pres) :: left_dirt, (op, Type.Without (pres, !rs)) :: right_dirt)
+          let pres = Type.fresh_presence_param () in
+          let without = Type.fresh_presence_param () in
+          Print.debug "%t >= %t" (Print.presence_param without) (Print.presence (Type.Without (Type.PresenceParam pres, !rs)));
+          ((op, pres) :: left_dirt, (op, without) :: right_dirt)
         in
         let left_rops, right_rops =
           List.fold_right make_presence ops ([], []) in

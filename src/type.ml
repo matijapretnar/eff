@@ -29,8 +29,8 @@ and presence =
   | Without of presence * region_param list
 
 and dirt = {
-  ops: (Common.opsym, presence) Common.assoc;
-  rest: presence
+  ops: (Common.opsym, presence_param) Common.assoc;
+  rest: presence_param
 }
 
 and args = (ty, presence_param, region_param) Trio.t
@@ -49,7 +49,7 @@ let empty_ty = Apply ("empty", Trio.empty)
 (** [fresh_ty ()] gives a type [TyParam p] where [p] is a new type parameter on
     each call. *)
 let fresh_ty () = TyParam (fresh_ty_param ())
-let simple_dirt d = { ops = []; rest = PresenceParam d }
+let simple_dirt d = { ops = []; rest = d }
 let fresh_dirt () = simple_dirt (fresh_presence_param ())
 (* XXX Should a fresh dirty type have no fresh instances? *)
 let fresh_dirty () = (fresh_ty (), fresh_dirt ())
@@ -62,6 +62,7 @@ type substitution = {
   presence_param : presence_param -> presence_param;
   region_param : region_param -> region_param;
   instance_param : instance_param -> instance_param option;
+  presence_rest : presence_param -> dirt;
 }
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
@@ -89,9 +90,9 @@ and subst_presence sbst = function
   | PresenceParam p -> PresenceParam (sbst.presence_param p)
 
 and subst_dirt sbst drt =
-  let ops = Common.assoc_map (subst_presence sbst) drt.ops in
-  let rest = subst_presence sbst drt.rest in
-  { ops = ops; rest = rest }
+  let ops = Common.assoc_map sbst.presence_param drt.ops in
+  let { ops = new_ops; rest = new_rest } = sbst.presence_rest drt.rest in
+  { ops = new_ops @ ops; rest = new_rest }
 
 and subst_dirty sbst (ty, drt) =
   let ty = subst_ty sbst ty in
@@ -111,6 +112,7 @@ let identity_subst =
     presence_param = Common.id;
     region_param = Common.id;
     instance_param = (fun i -> Some i);
+    presence_rest = (fun d -> { ops = []; rest = d })
   }
 
 (** [compose_subst sbst1 sbst2] returns a substitution that first performs
@@ -121,6 +123,7 @@ let compose_subst sbst1 sbst2 =
     presence_param = Common.compose sbst1.presence_param sbst2.presence_param;
     region_param = Common.compose sbst1.region_param sbst2.region_param;
     instance_param = (fun i -> match sbst2.instance_param i with None -> None | Some j -> sbst1.instance_param j);
+    presence_rest = Common.compose (subst_dirt sbst1) sbst2.presence_rest;
   }
 
 let refresher fresh =
@@ -177,6 +180,7 @@ let beautifying_subst () =
       presence_param = refresher (Common.fresh (fun n -> Presence_Param n));
       region_param = refresher (Common.fresh (fun n -> Region_Param n));
       instance_param = refresher (Common.fresh (fun n -> Some (Instance_Param n)));
+      presence_rest = refresher (Common.fresh (fun n -> { ops = []; rest = Presence_Param n }))
     }
 
 let refreshing_subst () =

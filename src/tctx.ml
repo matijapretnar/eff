@@ -366,8 +366,8 @@ let extend_with_variances tydefs =
           dirt nega posi drt1;
           dirt posi nega drt2
     and dirt posi nega drt =
-      List.iter (fun (_, prs) -> presence posi nega prs) drt.Type.ops;
-      presence posi nega drt.Type.rest
+      List.iter (fun (_, prs) -> presence_param posi nega prs) drt.Type.ops;
+      presence_param posi nega drt.Type.rest
     and presence posi nega = function
       | Type.Region r -> region_param posi nega r
       | Type.PresenceParam d -> presence_param posi nega d

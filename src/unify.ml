@@ -30,10 +30,6 @@ and presence_less ~pos dt1 dt2 ((ctx, ty, cnstrs, sbst) as ty_sch)  =
   match Type.subst_presence sbst dt1, Type.subst_presence sbst dt2 with
   | dt1, dt2 -> Print.debug "%t <= %t" (Print.presence dt1) (Print.presence dt2); ty_sch
 
-and presence_param_less ~pos dt1 dt2 ((ctx, ty, cnstrs, sbst) as ty_sch)  =
-  match sbst.Type.presence_param dt1, sbst.Type.presence_param dt2 with
-  | dt1, dt2 -> Print.debug "%t <= %t" (Print.presence_param dt1) (Print.presence_param dt2); ty_sch
-
 and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   ignore ty_sch;
   let drt1 = Type.subst_dirt sbst drt1
@@ -123,7 +119,7 @@ and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
                         if contra then add ~pos ty2 ty1 ty_sch else ty_sch) ps (List.combine lst1 lst2) ty_sch
   in
   let ty_sch = for_parameters ty_less ps ts1 ts2 ty_sch in
-  let ty_sch = for_parameters presence_param_less ds ds1 ds2 ty_sch in
+  let ty_sch = for_parameters dirt_param_less ds ds1 ds2 ty_sch in
   for_parameters region_less rs rs1 rs2 ty_sch
 
 and dirty_less ~pos (ty1, d1) (ty2, d2) ty_sch =
@@ -167,7 +163,7 @@ let pos_neg_params ty =
   | Type.PresenceParam p -> pos_presence_param is_pos p
   | Type.Without (prs, rs) -> pos_presence is_pos prs @@@ Trio.flatten_map (pos_region_param (not is_pos)) rs
   and pos_dirt is_pos drt =
-    pos_presence is_pos drt.Type.rest @@@ Trio.flatten_map (fun (_, dt) -> pos_presence is_pos dt) drt.Type.ops
+    pos_presence_param is_pos drt.Type.rest @@@ Trio.flatten_map (fun (_, dt) -> pos_presence_param is_pos dt) drt.Type.ops
   and pos_presence_param is_pos p =
     ([], (if is_pos then [p] else []), [])
   and pos_region_param is_pos r =
@@ -201,13 +197,14 @@ let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstr
   Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Type.subst_constraints sbst cnstrs'
 
 let simplify (ctx, drty, cnstrs) =
-  let ty = (Type.Arrow (Type.unit_ty, drty)) in
+  (ctx, drty, cnstrs)
+(*   let ty = (Type.Arrow (Type.unit_ty, drty)) in
   let ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) = pos_neg_tyscheme (ctx, ty, cnstrs) in
   let sbst = Type.simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
   let ty_sch = Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Type.subst_constraints sbst cnstrs in
   match ty_sch with
   | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
-  | _ -> assert false
+  | _ -> assert false *)
 
 
 let normalize_context ~pos (ctx, ty, cstr, sbst) =
