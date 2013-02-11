@@ -199,14 +199,21 @@ let pos_neg_tyscheme (ctx, ty, cnstrs) =
     let pos_ctx_ty, neg_ctx_ty = pos_neg_params ctx_ty in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
-  let (pos, neg) = List.fold_right add_ctx_pos_neg ctx (pos_neg_params ty) in
-  let add_bound bnd (posi, nega) = match bnd with
+  let (((_, pos_ds, _) as pos), neg) = List.fold_right add_ctx_pos_neg ctx (pos_neg_params ty) in
+  let add_dirt_bound bnd posi = match bnd with
+  | Type.Region _ -> posi
+  | Type.Without (d, _) -> d :: posi
+  in
+  let posi_dirts = List.fold_right (fun (d, bnds) posi ->
+                                      if List.mem d pos_ds then List.fold_right add_dirt_bound bnds posi else posi) cnstrs.Type.dirt_bounds [] in
+  let pos = ([], posi_dirts, []) @@@ pos in
+  let add_region_bound bnd (posi, nega) = match bnd with
   | Type.Region r -> (([], [], [r]) @@@ posi, nega) 
-  | Type.Without (d, rs) -> (([], [d], []) @@@ posi, ([], [], rs) @@@ nega)
+  | Type.Without (d, rs) -> (([], [d], rs) @@@ posi, nega)
   in
   let (((_, pos_ds, _) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
   let (posi, nega) = List.fold_right (fun (d, bnds) (posi, nega) ->
-                                      if List.mem d pos_ds then List.fold_right add_bound bnds (posi, nega) else (posi, nega)) cnstrs.Type.dirt_bounds (posi, nega) in
+                                      if List.mem d pos_ds then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega)) cnstrs.Type.dirt_bounds (posi, nega) in
   Trio.uniq posi, Trio.uniq nega
 
 let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
