@@ -1,11 +1,11 @@
- (** Type contexts
+(** Type contexts
 
     Type contexts assign type schemes to variables, and are used for type
     inference. A type scheme consists of a type and a list of universally
     quantified type parameters.
 *)
 
-(** The types of contexts and type schemes. *)
+(** The type of contexts. *)
 type t
 
 (** [empty] is the empty context. *)
