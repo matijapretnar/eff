@@ -33,7 +33,8 @@ eff.p.native: src/version.ml
 	cd $(srcdir) && $(EFFOCAMLBUILD) $(EFFTARGET).p.native
 
 src/version.ml:
-	echo "let version=\"$(PACKAGE_VERSION)\";; let effdir=\"$(effdir)\";;" > src/version.ml
+	echo "let version = \"$(PACKAGE_VERSION)\"" > src/version.ml
+	echo "let effdir = \"$(effdir)\"" >> src/version.ml
 
 # Explain parser conflicts in the file parser.conflicts
 conflicts:
