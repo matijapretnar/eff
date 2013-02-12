@@ -342,6 +342,7 @@ let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
     ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> TyParam q | None -> TyParam p);
     presence_param = (fun p -> match Common.lookup p dirt_subst with Some q -> q | None -> p);
     region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
+    presence_rest = (fun p -> simple_dirt (match Common.lookup p dirt_subst with Some q -> q | None -> p));
   } in
   let dirt_bounds = List.filter (fun (d, bnds) -> List.mem d pos_ds) grph.dirt_bounds
   in
@@ -362,4 +363,5 @@ let simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
     ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> TyParam q | None -> TyParam p);
     presence_param = (fun p -> match Common.lookup p dirt_subst with Some q -> q | None -> p);
     region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
+    presence_rest = (fun p -> simple_dirt (match Common.lookup p dirt_subst with Some q -> q | None -> p));
   }
