@@ -210,7 +210,8 @@ let beautify2 ty1 ty2 =
 
 module Ty = Graph.Make(struct
   type t = ty_param
-  type bound = unit
+  type lower_bound = unit
+  type upper_bound = unit
   let inf () () = ()
   let sup () () = ()
   let compare = Pervasives.compare
@@ -218,23 +219,21 @@ end)
 
 module Region = Graph.Make(struct
   type t = region_param
-  type bound = (instance_param list) option
-  let inf rgn1 rgn2 =
-    match rgn1, rgn2 with
-    | Some insts1, Some insts2 -> Some (List.filter (fun x -> List.mem x insts1) insts2)
-    | Some insts, None | None, Some insts -> Some insts
-    | None, None -> None
+  type lower_bound = (instance_param list) option
+  type upper_bound = unit
   let sup rgn1 rgn2 =
     match rgn1, rgn2 with
     | Some insts1, Some insts2 -> Some (Common.uniq (insts1 @ insts2))
     | Some insts, None | None, Some insts -> Some insts
     | None, None -> None
+  let inf () () = ()
   let compare = Pervasives.compare
 end)
 
 module Dirt = Graph.Make(struct
   type t = presence_param
-  type bound = unit
+  type lower_bound = unit
+  type upper_bound = unit
   let inf () () = ()
   let sup () () = ()
   let compare = Pervasives.compare
@@ -265,9 +264,9 @@ let get_succ g x =
   Dirt.get_succ x g.dirt_graph
 
 let subst_constraints sbst cnstr = {
-  ty_graph = Ty.map (fun p -> match sbst.ty_param p with TyParam q -> q | _ -> assert false) (fun () -> ()) cnstr.ty_graph;
-  dirt_graph = Dirt.map sbst.presence_param (fun () -> ()) cnstr.dirt_graph;
-  region_graph = Region.map sbst.region_param (fun insts -> Common.option_map (fun insts -> List.map (fun ins -> match sbst.instance_param ins with Some i -> i | None -> assert false) insts) insts) cnstr.region_graph;
+  ty_graph = Ty.map (fun p -> match sbst.ty_param p with TyParam q -> q | _ -> assert false) (fun () -> ()) (fun () -> ()) cnstr.ty_graph;
+  dirt_graph = Dirt.map sbst.presence_param (fun () -> ()) (fun () -> ()) cnstr.dirt_graph;
+  region_graph = Region.map sbst.region_param (fun insts -> Common.option_map (fun insts -> List.map (fun ins -> match sbst.instance_param ins with Some i -> i | None -> assert false) insts) insts) (fun () -> ()) cnstr.region_graph;
   dirt_bounds = List.map (fun (d, bnds) -> (sbst.presence_param d, List.map (subst_presence sbst) bnds)) cnstr.dirt_bounds;
 }
 

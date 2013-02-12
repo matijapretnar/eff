@@ -1,11 +1,11 @@
 module type Vertex =
 sig
   type t
-  type bound
-  val sup : bound -> bound -> bound
-  val inf : bound -> bound -> bound
+  type lower_bound
+  type upper_bound
+  val sup : lower_bound -> lower_bound -> lower_bound
+  val inf : upper_bound -> upper_bound -> upper_bound
   val compare : t -> t -> int
-  (* val print : t -> Format.formatter -> unit *)
 end
 
 module Make (V : Vertex) =
@@ -13,7 +13,8 @@ module Make (V : Vertex) =
      Also add printers for vertices to [V] so that the module can export printing of a graph. *)
 struct
   type elt = V.t
-  type bound = V.bound
+  type lower_bound = V.lower_bound
+  type upper_bound = V.upper_bound
 
   module S = Set.Make(struct
     type t = V.t
@@ -22,7 +23,7 @@ struct
 
   module G = Map.Make(V)
 
-  type t = (S.t * S.t * V.bound option * V.bound option) G.t
+  type t = (S.t * S.t * V.lower_bound option * V.upper_bound option) G.t
 
   let empty = G.empty
 
@@ -103,8 +104,8 @@ struct
     let g = G.fold (fun x (inx, outx, infx, supx) acc -> G.add x (S.empty, S.empty, infx, supx) acc) grph G.empty in
     fold_edges (fun x y acc -> if p x y then add_edge x y acc else acc) grph g
 
-  let map f fb grph =
-    let g = G.fold (fun x (inx, outx, infx, supx) acc -> G.add (f x) (S.empty, S.empty, Common.option_map fb infx, Common.option_map fb supx) acc) grph G.empty in
+  let map f flow fup grph =
+    let g = G.fold (fun x (inx, outx, infx, supx) acc -> G.add (f x) (S.empty, S.empty, Common.option_map flow infx, Common.option_map fup supx) acc) grph G.empty in
     fold_edges (fun x y sbst_grph -> add_edge (f x) (f y) sbst_grph) grph g
 
   let simplify pos neg grph =
