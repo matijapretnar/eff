@@ -300,10 +300,6 @@ let join_disjoint_constraints cstr1 cstr2 =
     region_graph = Region.union cstr1.region_graph cstr2.region_graph;
   }
 
-(* let print grph ppf =
-  Print.print ppf "TYPES:@.%t@.REGIONS:@.%t@.DIRT:@.%t@." 
-  (Ty.print grph.ty_graph) (Region.print grph.region_graph) (Dirt.print grph.dirt_graph)
- *)
 let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
   let ty_subst, ty_graph = Ty.collect pos_ts neg_ts grph.ty_graph
   and dirt_subst, dirt_graph = Dirt.collect pos_ds neg_ds grph.dirt_graph
@@ -342,7 +338,7 @@ let for_parameters get_params is_pos ps lst =
                       let params = if cov then get_params is_pos el @@@ params else params in
                       if contra then get_params (not is_pos) el @@@ params else params) ps lst Trio.empty
 
-let pos_neg_params param_polarities ty =
+let pos_neg_params get_variances ty =
   let rec pos_ty is_pos = function
   | Apply (ty_name, args) -> pos_args is_pos ty_name args
   | Effect (ty_name, args, rgn) -> pos_args is_pos ty_name args @@@ pos_region_param is_pos rgn
@@ -360,7 +356,7 @@ let pos_neg_params param_polarities ty =
   and pos_region_param is_pos r =
     ([], [], if is_pos then [r] else [])
   and pos_args is_pos ty_name (tys, drts, rgns) =
-    let (ps, ds, rs) = param_polarities ty_name in
+    let (ps, ds, rs) = get_variances ty_name in
     for_parameters pos_ty is_pos ps tys @@@
     for_parameters pos_presence_param is_pos ds drts @@@
     for_parameters pos_region_param is_pos rs rgns
@@ -388,4 +384,15 @@ let pos_neg_tyscheme get_variances (ctx, ty, cnstrs) =
   let (posi, nega) = List.fold_right (fun (d, bnds, _) (posi, nega) ->
                                       match bnds with None -> (posi, nega) | Some bnds -> (if List.mem d pos_ds then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega))) (Dirt.bounds cnstrs.dirt_graph) (posi, nega) in
   Trio.uniq posi, Trio.uniq nega
+
+let simplify get_variances (ctx, drty, cnstrs) =
+  let ty = (Arrow (unit_ty, drty)) in
+  let ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) = pos_neg_tyscheme get_variances (ctx, ty, cnstrs) in
+  let sbst = simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
+  let ty_sch = Common.assoc_map (subst_ty sbst) ctx, subst_ty sbst ty, subst_constraints sbst cnstrs in
+  match ty_sch with
+  | ctx, Arrow (_, drty), cstr -> (ctx, drty, cstr)
+  | _ -> assert false
+
+
 

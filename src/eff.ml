@@ -135,7 +135,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
 let infer_top_comp ctx c =
   let drty_sch = Infer.infer_comp ctx c in
   Exhaust.check_comp c ;
-  let drty_sch = Unify.simplify drty_sch in
+  (* let drty_sch = Unify.simplify drty_sch in *)
   (* let cnstr = Unify.constraints_of_graph remaining in *)
   (* XXX What to do about the fresh instances? *)
   (* XXX Here, we need to show what type parameters are polymorphic or not. *)

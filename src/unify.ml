@@ -169,16 +169,6 @@ let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstr
   let sbst, cnstrs' = Type.garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
   Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Type.subst_constraints sbst cnstrs'
 
-let simplify (ctx, drty, cnstrs) =
-  let ty = (Type.Arrow (Type.unit_ty, drty)) in
-  let ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) = Type.pos_neg_tyscheme Tctx.get_variances (ctx, ty, cnstrs) in
-  let sbst = Type.simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
-  let ty_sch = Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Type.subst_constraints sbst cnstrs in
-  match ty_sch with
-  | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
-  | _ -> assert false
-
-
 let normalize_context ~pos (ctx, ty, cstr, sbst) =
   let collect (x, ty) ctx =
     match Common.lookup x ctx with
