@@ -18,7 +18,6 @@ and add_presence_bound d bnd (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.add_presence_bound d bnd cnstrs, sbst)
 
 let rec add_rest_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
-  Print.debug "%t -> %t" (Print.presence_param d) (Print.dirt drt'); 
   let drt' = Type.subst_dirt sbst drt' in
   let sbst' = {
     Type.identity_subst with 
@@ -29,10 +28,6 @@ let rec add_rest_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
   let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
   let ty_sch = List.fold_right (fun q ty_sch -> dirt_less ~pos (Type.simple_dirt q) drt' ty_sch) pred ty_sch in
   List.fold_right (fun q ty_sch -> dirt_less ~pos drt' (Type.simple_dirt q) ty_sch) succ ty_sch
-
-and presence_less ~pos dt1 dt2 ((ctx, ty, cnstrs, sbst) as ty_sch)  =
-  match Type.subst_presence sbst dt1, Type.subst_presence sbst dt2 with
-  | dt1, dt2 -> Print.debug "%t <= %t" (Print.presence dt1) (Print.presence dt2); ty_sch
 
 and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   ignore ty_sch;
@@ -119,7 +114,7 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
 
   | (ty1, ty2) ->
       let ty1, ty2 = Type.beautify2 ty1 ty2 in
-      Error.typing ~pos "This expression has type %t but it should have type %t." (Print.ty ty1) (Print.ty ty2)
+      Error.typing ~pos "This expression has type %t but it should have type %t." (Type.print ty1) (Type.print ty2)
 
 and add_substitution ~pos p ty' (ctx, ty, cnstrs, sbst) =
   let ty' = Type.subst_ty sbst ty' in
@@ -146,7 +141,6 @@ and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
   for_parameters region_less rs rs1 rs2 ty_sch
 
 and dirty_less ~pos (ty1, d1) (ty2, d2) ty_sch =
-  (* Print.debug ~pos "Unifying freshness constraints %t <= %t." (Print.fresh_instances nws1) (Print.fresh_instances nws2); *)
   ty_less ~pos ty1 ty2 (dirt_less ~pos d1 d2 ty_sch)
 
 let trim_context ~pos ctx_p (ctx, ty, cnstrs, sbst) =

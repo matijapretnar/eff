@@ -123,43 +123,6 @@ let ty_param ?(non_poly=Trio.empty) p ppf =
     then print ppf "%s%c" c (char_of_int (k + int_of_char 'a'))
     else print ppf "%st%i" c (k - 25)
 
-let rec ty ?(non_poly=Trio.empty) t ppf =
-  let rec ty ?max_level t ppf =
-    let print ?at_level = print ?max_level ?at_level ppf in
-    match t with
-    (* XXX Should we print which instances are fresh? *)
-    | Type.Arrow (t1, (t2, drt)) ->
-        print ~at_level:5 "@[<h>%t -%t->@ %t@]"
-        (ty ~max_level:4 t1)
-        (dirt ~non_poly drt)
-        (* (fresh_instances frsh) *)
-        (ty ~max_level:5 t2)
-        (* print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2) *)
-    | Type.Basic b -> print "%s" b
-    | Type.Apply (t, (lst, _, _)) ->
-      begin match lst with
-        | [] -> print "%s" t
-        | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
-        | ts -> print ~at_level:1 "(%t) %s" (sequence "," ty ts) t
-      end
-    | Type.Effect (t, (lst, _, _), rgn) ->
-      begin match lst with
-        | [] -> print "%s[%t]" t (region_param ~non_poly rgn)
-        | [s] -> print ~at_level:1 "%t %s[%t]" (ty ~max_level:1 s) t (region_param ~non_poly rgn)
-        | ts -> print ~at_level:1 "(%t) %s[%t]" (sequence "," ty ts) t (region_param ~non_poly rgn)
-      end
-(*       begin match lst with
-        | [] -> print "%s" t
-        | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
-        | ts -> print ~at_level:1 "(%t) %s" (sequence "," ty ts) t
-      end
- *)    | Type.TyParam p -> ty_param ~non_poly p ppf
-    | Type.Tuple [] -> print "unit"
-    | Type.Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (sequence " *" (ty ~max_level:1) ts)
-    | Type.Handler ((t1, drt1), (t2, drt2)) ->
-        print ~at_level:4 "%t ! %t =>@ %t ! %t" (ty ~max_level:2 t1) (dirt ~non_poly drt1) (ty t2) (dirt ~non_poly drt2)
-  in ty t ppf
-
 let less pp p1 p2 ppf =
   print ppf "%t <= %t" (pp p1) (pp p2)
 
@@ -185,14 +148,14 @@ let constraints ?(non_poly=Trio.empty) g ppf =
 let context ctx ppf =
   match ctx with
   | [] -> ()
-  | _ -> print ppf "(@[%t@]).@ " (sequence "," (fun (x, t) ppf -> print ppf "%t : %t" (variable x) (ty t)) ctx)
+  | _ -> print ppf "(@[%t@]).@ " (sequence "," (fun (x, t) ppf -> print ppf "%t : %t" (variable x) (Type.print t)) ctx)
 
 let ty_scheme (ctx, t, cstrs) ppf =
   let sbst = Type.beautifying_subst () in
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   let t = Type.subst_ty sbst t in
   let cstrs = Type.subst_constraints sbst cstrs in
-  print ppf "%t%t | %t" (context ctx) (ty t) (constraints cstrs)
+  print ppf "%t%t | %t" (context ctx) (Type.print t) (constraints cstrs)
 
 let dirty_scheme (ctx, (t, drt), cstrs) ppf =
   let sbst = Type.beautifying_subst () in
@@ -202,13 +165,13 @@ let dirty_scheme (ctx, (t, drt), cstrs) ppf =
   let cstrs = Type.subst_constraints sbst cstrs in
   print ppf "%t%t ! %t | %t"
     (context ctx)
-    (ty t)
+    (Type.print t)
     (dirt drt)
     (constraints cstrs)
 
 (*
 let subst sbst ppf =
-  fprintf ppf "[@[<hov>%t@]]" (sequence ", " (fun (p,t) ppf -> fprintf ppf "%d/%t" p (ty ~sbst:[] t)) sbst)
+  fprintf ppf "[@[<hov>%t@]]" (sequence ", " (fun (p,t) ppf -> fprintf ppf "%d/%t" p (Type.print ~sbst:[] t)) sbst)
 *)
 
 let rec computation ?max_level c ppf =
