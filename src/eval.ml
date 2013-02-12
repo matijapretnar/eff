@@ -89,7 +89,7 @@ let rec ceval env (c, pos) = match c with
           if b then
             sequence (fun _ -> loop ()) (ceval env c2)
           else
-            V.Value V.from_unit
+            V.unit_result
         in
         sequence k (ceval env c1)
       in
@@ -105,7 +105,7 @@ let rec ceval env (c, pos) = match c with
           let r = ceval (update i (V.Const (C.Integer n)) env) c in
           sequence (fun _ -> loop (next n)) r
         else
-          V.Value V.from_unit
+          V.unit_result
       in
       loop n1
 
@@ -136,7 +136,7 @@ let rec ceval env (c, pos) = match c with
   | Core.Check c ->
       let r = ceval env c in
       Print.check ~pos "%t" (Print.result r);
-      V.value_unit
+      V.unit_result
 
 and eval_let env lst c =
   match lst with
@@ -169,7 +169,7 @@ and veval env (e, pos) = match e with
   | Core.Lambda a -> V.Closure (eval_closure env a)
   | Core.Operation (e, op) ->
       let n = V.to_instance (veval env e) in
-      V.Closure (fun v -> V.Operation ((n, op), v, V.value))
+      V.Closure (fun v -> V.Operation ((n, op), v, fun r -> V.Value r))
   | Core.Handler h -> V.Handler (eval_handler env h)
 
 and eval_handler env {Core.operations=ops; Core.value=value; Core.finally=fin} =
