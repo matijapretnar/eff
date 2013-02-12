@@ -109,6 +109,9 @@ let region_bound insts ppf =
   | None -> print ppf "X"
   | Some insts -> sequence "," instance_param insts ppf
 
+let dirt_bound bnd ppf =
+  sequence "," presence bnd ppf
+
 let ty_param ?(non_poly=Trio.empty) p ppf =
   let (ps, _, _) = non_poly in
   let (Type.Ty_Param k) = p in
@@ -170,16 +173,12 @@ let bounds pp pp' p inf (* sup *) pps =
   | None, Some sup -> (fun ppf -> print ppf "%t <= %t" (pp p) (pp' sup)) :: pps
   | Some inf, Some sup -> (fun ppf -> print ppf "%t <= %t <= %t" (pp' inf) (pp p) (pp' sup)) :: pps
  *)
-let dirt_bounds d bnds pps =
-  (fun ppf -> print ppf "%t <= %t" (sequence "," presence bnds) (presence_param d)) :: pps
-
 let constraints ?(non_poly=Trio.empty) g ppf =
   let pps = Type.fold_ty (fun p1 p2 lst -> if p1 = p2 then lst else less (ty_param ~non_poly) p1 p2 :: lst) g [] in
   let pps = Type.fold_dirt (fun d1 d2 lst -> if d1 = d2 then lst else less (presence_param ~non_poly) d1 d2 :: lst) g pps in
   let pps = Type.fold_region (fun r1 r2 lst -> if r1 = r2 then lst else less (region_param ~non_poly) r1 r2 :: lst) g pps in
   let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (region_param ~non_poly) region_bound r bound1 (* bound2 *) pps) (Type.Region.bounds g.Type.region_graph) pps in
-  let pps = List.fold_right (fun (d, bnds) pps -> dirt_bounds d bnds pps) (g.Type.dirt_bounds) pps
-  in
+  let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (presence_param ~non_poly) dirt_bound r bound1 (* bound2 *) pps) (Type.Dirt.bounds g.Type.dirt_graph) pps in
   print ppf "%t"
     (sequence2 "," pps)
 

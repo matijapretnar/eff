@@ -232,10 +232,10 @@ end)
 
 module Dirt = Graph.Make(struct
   type t = presence_param
-  type lower_bound = unit
+  type lower_bound = presence list
   type upper_bound = unit
   let inf () () = ()
-  let sup () () = ()
+  let sup prs1 prs2 = prs1 @ prs2
   let compare = Pervasives.compare
 end)
 
@@ -243,7 +243,6 @@ type t = {
   ty_graph : Ty.t;
   region_graph : Region.t;
   dirt_graph : Dirt.t;
-  dirt_bounds: (presence_param, presence list) Common.assoc;
 }
 
 type ty_scheme = (Core.variable, ty) Common.assoc * ty * t
@@ -253,7 +252,6 @@ let empty = {
   ty_graph = Ty.empty;
   region_graph = Region.empty;
   dirt_graph = Dirt.empty;
-  dirt_bounds = [];
 }
 
 let remove_ty g x =
@@ -265,9 +263,8 @@ let get_succ g x =
 
 let subst_constraints sbst cnstr = {
   ty_graph = Ty.map (fun p -> match sbst.ty_param p with TyParam q -> q | _ -> assert false) (fun () -> ()) (fun () -> ()) cnstr.ty_graph;
-  dirt_graph = Dirt.map sbst.presence_param (fun () -> ()) (fun () -> ()) cnstr.dirt_graph;
+  dirt_graph = Dirt.map sbst.presence_param (List.map (subst_presence sbst)) (fun () -> ()) cnstr.dirt_graph;
   region_graph = Region.map sbst.region_param (fun insts -> Common.option_map (fun insts -> List.map (fun ins -> match sbst.instance_param ins with Some i -> i | None -> assert false) insts) insts) (fun () -> ()) cnstr.region_graph;
-  dirt_bounds = List.map (fun (d, bnds) -> (sbst.presence_param d, List.map (subst_presence sbst) bnds)) cnstr.dirt_bounds;
 }
 
 let fold_ty f g acc = Ty.fold_edges f g.ty_graph acc
@@ -280,43 +277,20 @@ let add_region_low_bound i r cstr =
 let add_ty_constraint ty1 ty2 cstr =
   {cstr with ty_graph = Ty.add_edge ty1 ty2 cstr.ty_graph}
 
-let add_bound d bnd bounds =
-  match Common.lookup d bounds with
-  | None -> (d, [bnd]) :: bounds
-  | Some bnds ->
-      List.fold_right (fun (d', bnds) new_bounds ->
-                         if d = d' then (d', bnd :: bnds) :: new_bounds else (d', bnds) :: new_bounds) bounds []
-
 let add_dirt_constraint drt1 drt2 cstr =
-  let new_dirt_graph = Dirt.add_edge drt1 drt2 cstr.dirt_graph in
-  let new_dirt_bounds =
-    match Common.lookup drt1 cstr.dirt_bounds with
-    | None -> cstr.dirt_bounds
-    | Some bnds1 ->
-       List.fold_right (fun bnd -> add_bound drt2 bnd) bnds1 cstr.dirt_bounds
-  in
-  {cstr with dirt_graph = new_dirt_graph; dirt_bounds = new_dirt_bounds}
+  {cstr with dirt_graph = Dirt.add_edge drt1 drt2 cstr.dirt_graph}
 
 let add_region_constraint rgn1 rgn2 cstr =
   {cstr with region_graph = Region.add_edge rgn1 rgn2 cstr.region_graph}
 
-
 let add_presence_bound d bnd cstr =
-  let params = get_succ cstr d in
-  {cstr with dirt_bounds = List.fold_right (fun d' -> add_bound d' bnd) (d :: params) cstr.dirt_bounds}
-
-let join_bounds bnds1 bnds2 =
-  List.fold_right (fun (d, bds1) bnds2 -> List.fold_right (fun bd1 bnds2 -> add_bound d bd1 bnds2) bds1 bnds2) bnds1 bnds2
-
-let union_bounds bnds1 bnds2 =
-  bnds1 @ bnds2
+  {cstr with dirt_graph = Dirt.add_lower_bound d bnd cstr.dirt_graph }
 
 let join_constraints cstr1 cstr2 = 
   {
     ty_graph = Ty.join cstr1.ty_graph cstr2.ty_graph;
     dirt_graph = Dirt.join cstr1.dirt_graph cstr2.dirt_graph;
     region_graph = Region.join cstr1.region_graph cstr2.region_graph;
-    dirt_bounds = join_bounds cstr1.dirt_bounds cstr2.dirt_bounds
   }
 
 let join_disjoint_constraints cstr1 cstr2 = 
@@ -324,7 +298,6 @@ let join_disjoint_constraints cstr1 cstr2 =
     ty_graph = Ty.union cstr1.ty_graph cstr2.ty_graph;
     dirt_graph = Dirt.union cstr1.dirt_graph cstr2.dirt_graph;
     region_graph = Region.union cstr1.region_graph cstr2.region_graph;
-    dirt_bounds = union_bounds cstr1.dirt_bounds cstr2.dirt_bounds
   }
 
 (* let print grph ppf =
@@ -343,13 +316,10 @@ let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
     region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
     presence_rest = (fun p -> simple_dirt (match Common.lookup p dirt_subst with Some q -> q | None -> p));
   } in
-  let dirt_bounds = List.filter (fun (d, bnds) -> List.mem d pos_ds) grph.dirt_bounds
-  in
   sbst, {
     ty_graph = ty_graph;
     dirt_graph = dirt_graph;
     region_graph = region_graph;
-    dirt_bounds = dirt_bounds
   }
 
 let simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
@@ -407,15 +377,15 @@ let pos_neg_tyscheme get_variances (ctx, ty, cnstrs) =
   | Region _ -> posi
   | Without (d, _) -> d :: posi
   in
-  let posi_dirts = List.fold_right (fun (d, bnds) posi ->
-                                      if List.mem d pos_ds then List.fold_right add_dirt_bound bnds posi else posi) cnstrs.dirt_bounds [] in
+  let posi_dirts = List.fold_right (fun (d, bnds, _) posi ->
+                                      match bnds with None -> posi | Some bnds -> if List.mem d pos_ds then List.fold_right add_dirt_bound bnds posi else posi) (Dirt.bounds cnstrs.dirt_graph) [] in
   let pos = ([], posi_dirts, []) @@@ pos in
   let add_region_bound bnd (posi, nega) = match bnd with
   | Region r -> (([], [], [r]) @@@ posi, nega) 
   | Without (d, rs) -> (([], [d], rs) @@@ posi, nega)
   in
   let (((_, pos_ds, _) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
-  let (posi, nega) = List.fold_right (fun (d, bnds) (posi, nega) ->
-                                      if List.mem d pos_ds then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega)) cnstrs.dirt_bounds (posi, nega) in
+  let (posi, nega) = List.fold_right (fun (d, bnds, _) (posi, nega) ->
+                                      match bnds with None -> (posi, nega) | Some bnds -> (if List.mem d pos_ds then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega))) (Dirt.bounds cnstrs.dirt_graph) (posi, nega) in
   Trio.uniq posi, Trio.uniq nega
 

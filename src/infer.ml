@@ -173,7 +173,7 @@ let rec infer_expr env (e, pos) =
           let dt = Type.fresh_presence_param () in
           unify ctx (T.Arrow (t1, (t2, {T.ops = [op, dt]; T.rest = Type.fresh_presence_param ()}))) [
             ty_less ~pos u ty;
-            Unify.add_presence_bound dt (Type.Region r);
+            Unify.add_presence_bound dt [Type.Region r];
             just cstr_u
           ]
       end
@@ -216,7 +216,7 @@ let rec infer_expr env (e, pos) =
           let pres = Type.fresh_presence_param () in
           let without = Type.fresh_presence_param () in
           (* Print.info "DIRT: %t >= %t" (Print.presence_param without) (Print.presence (Type.Without (pres, !rs))); *)
-          ((op, pres) :: left_dirt, (op, without) :: right_dirt, Unify.add_presence_bound without (Type.Without (pres, !rs)) :: cnstrs)
+          ((op, pres) :: left_dirt, (op, without) :: right_dirt, Unify.add_presence_bound without [Type.Without (pres, !rs)] :: cnstrs)
         in
         let left_rops, right_rops, cnstrs_ops =
           List.fold_right make_presence ops ([], [], []) in
