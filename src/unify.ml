@@ -1,24 +1,24 @@
 (** [unify sbst pos t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)
-type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Type.t
-type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Type.t
+type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Constraints.t
+type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Constraints.t
 
 type context = (Core.variable, Type.ty) Common.assoc
-type t = context * Type.ty * Type.t * Type.substitution
+type t = context * Type.ty * Constraints.t * Type.substitution
 type change = t -> t
 
 let ty_param_less p q (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_ty_constraint p q cnstrs, sbst)
+  (ctx, ty, Constraints.add_ty_constraint p q cnstrs, sbst)
 and presence_param_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_dirt_constraint d1 d2 cnstrs, sbst)
+  (ctx, ty, Constraints.add_dirt_constraint d1 d2 cnstrs, sbst)
 and region_less ~pos r1 r2 (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_region_constraint r1 r2 cnstrs, sbst)
+  (ctx, ty, Constraints.add_region_constraint r1 r2 cnstrs, sbst)
 and region_covers r i (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_region_low_bound i r cnstrs, sbst)
+  (ctx, ty, Constraints.add_region_low_bound i r cnstrs, sbst)
 and just new_cnstrs (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.join_disjoint_constraints new_cnstrs cnstrs, sbst)
+  (ctx, ty, Constraints.join_disjoint_constraints new_cnstrs cnstrs, sbst)
 and add_presence_bound d bnd (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Type.add_presence_bound d bnd cnstrs, sbst)
+  (ctx, ty, Constraints.add_presence_bound d bnd cnstrs, sbst)
 
 let rec add_rest_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
   let drt' = Type.subst_dirt sbst drt' in
@@ -26,8 +26,8 @@ let rec add_rest_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
     Type.identity_subst with 
     Type.presence_rest = (fun d' -> if d' = d then drt' else Type.simple_dirt d')
   } in
-  let (pred, succ, new_dirt_grph) = Type.remove_dirt cnstrs d in
-  let cnstrs = {cnstrs with Type.dirt_graph = new_dirt_grph} in
+  let (pred, succ, new_dirt_grph) = Constraints.remove_dirt cnstrs d in
+  let cnstrs = {cnstrs with Constraints.dirt_graph = new_dirt_grph} in
   let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
   let ty_sch = List.fold_right (fun q ty_sch -> dirt_less ~pos (Type.simple_dirt q) drt' ty_sch) pred ty_sch in
   List.fold_right (fun q ty_sch -> dirt_less ~pos drt' (Type.simple_dirt q) ty_sch) succ ty_sch
@@ -125,8 +125,8 @@ and add_substitution ~pos p ty' (ctx, ty, cnstrs, sbst) =
     Type.identity_subst with 
     Type.ty_param = (fun p' -> if p' = p then ty' else Type.TyParam p')
   } in
-  let (pred, succ, new_ty_grph) = Type.remove_ty cnstrs p in
-  let cnstrs = {cnstrs with Type.ty_graph = new_ty_grph} in
+  let (pred, succ, new_ty_grph) = Constraints.remove_ty cnstrs p in
+  let cnstrs = {cnstrs with Constraints.ty_graph = new_ty_grph} in
   let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
   let ty_sch = List.fold_right (fun q ty_sch -> ty_less ~pos (Type.TyParam q) ty' ty_sch) pred ty_sch in
   List.fold_right (fun q ty_sch -> ty_less ~pos ty' (Type.TyParam q) ty_sch) succ ty_sch
@@ -168,7 +168,7 @@ let pos_neg_tyscheme get_variances (ctx, ty, cnstrs) =
   | Type.Without (d, _) -> d :: posi
   in
   let posi_dirts = List.fold_right (fun (d, bnds, _) posi ->
-                                      match bnds with None -> posi | Some bnds -> if List.mem d pos_ds then List.fold_right add_dirt_bound bnds posi else posi) (Type.Dirt.bounds cnstrs.Type.dirt_graph) [] in
+                                      match bnds with None -> posi | Some bnds -> if List.mem d pos_ds then List.fold_right add_dirt_bound bnds posi else posi) (Constraints.Dirt.bounds cnstrs.Constraints.dirt_graph) [] in
   let pos = ([], posi_dirts, []) @@@ pos in
   let add_region_bound bnd (posi, nega) = match bnd with
   | Type.Region r -> (([], [], [r]) @@@ posi, nega) 
@@ -176,14 +176,14 @@ let pos_neg_tyscheme get_variances (ctx, ty, cnstrs) =
   in
   let (((_, pos_ds, _) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
   let (posi, nega) = List.fold_right (fun (d, bnds, _) (posi, nega) ->
-                                      match bnds with None -> (posi, nega) | Some bnds -> (if List.mem d pos_ds then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega))) (Type.Dirt.bounds cnstrs.Type.dirt_graph) (posi, nega) in
+                                      match bnds with None -> (posi, nega) | Some bnds -> (if List.mem d pos_ds then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega))) (Constraints.Dirt.bounds cnstrs.Constraints.dirt_graph) (posi, nega) in
   Trio.uniq posi, Trio.uniq nega
 
 let simplify get_variances (ctx, drty, cnstrs) =
   let ty = (Type.Arrow (Type.unit_ty, drty)) in
   let ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) = pos_neg_tyscheme get_variances (ctx, ty, cnstrs) in
-  let sbst = Type.simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
-  let ty_sch = Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Type.subst_constraints sbst cnstrs in
+  let sbst = Constraints.simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
+  let ty_sch = Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst_constraints sbst cnstrs in
   match ty_sch with
   | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
   | _ -> assert false
@@ -198,8 +198,8 @@ let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
 
 
 let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, _) =
-  let sbst, cnstrs' = Type.garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
-  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Type.subst_constraints sbst cnstrs'
+  let sbst, cnstrs' = Constraints.garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
+  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst_constraints sbst cnstrs'
 
 let normalize_context ~pos (ctx, ty, cstr, sbst) =
   let collect (x, ty) ctx =
@@ -221,7 +221,7 @@ let normalize_context ~pos (ctx, ty, cstr, sbst) =
   List.fold_right add ctx ([], ty, cstr, sbst)
 
 let gather_ty_scheme ~pos ctx ty chngs =
-  let ty_sch = List.fold_right (fun chng -> chng) chngs (ctx, ty, Type.empty, Type.identity_subst) in
+  let ty_sch = List.fold_right (fun chng -> chng) chngs (ctx, ty, Constraints.empty, Type.identity_subst) in
   let ty_sch = normalize_context ~pos ty_sch in
   let pos_neg = pos_neg_ty_scheme ty_sch in
   collect pos_neg ty_sch
@@ -232,7 +232,7 @@ let gather_dirty_scheme ~pos ctx drty chngs =
   | _ -> assert false
 
 let gather_pattern_scheme ~pos ctx ty chngs =
-  let ty_sch = List.fold_right (fun chng -> chng) chngs (ctx, ty, Type.empty, Type.identity_subst) in
+  let ty_sch = List.fold_right (fun chng -> chng) chngs (ctx, ty, Constraints.empty, Type.identity_subst) in
   (* Note that we change the polarities in pattern types *)
   let (neg, pos) = pos_neg_ty_scheme ty_sch in
   collect (pos, neg) ty_sch

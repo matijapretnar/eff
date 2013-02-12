@@ -19,7 +19,7 @@ let nonexpansive = function
   | Core.Apply _ | Core.Match _ | Core.While _ | Core.For _ | Core.New _
   | Core.Handle _ | Core.Let _ | Core.LetRec _ | Core.Check _ -> false
 
-let simple ty = ([], ty, Type.empty)
+let simple ty = ([], ty, Constraints.empty)
 let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_presence_param () }
 
 let ty_of_const = function
@@ -38,7 +38,7 @@ let rec infer_pattern (p, pos) =
   let ty_sch = match p with
   | Pattern.Var x ->
       let ty = Type.fresh_ty () in
-      [(x, ty)], ty, Type.empty
+      [(x, ty)], ty, Constraints.empty
   | Pattern.As (p, x) ->
       let ctx, ty, cnstrs = infer_pattern p in
       (x, ty) :: ctx, ty, cnstrs

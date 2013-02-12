@@ -137,11 +137,11 @@ let bounds pp pp' p inf (* sup *) pps =
   | Some inf, Some sup -> (fun ppf -> print ppf "%t <= %t <= %t" (pp' inf) (pp p) (pp' sup)) :: pps
  *)
 let constraints ?(non_poly=Trio.empty) g ppf =
-  let pps = Type.fold_ty (fun p1 p2 lst -> if p1 = p2 then lst else less (ty_param ~non_poly) p1 p2 :: lst) g [] in
-  let pps = Type.fold_dirt (fun d1 d2 lst -> if d1 = d2 then lst else less (presence_param ~non_poly) d1 d2 :: lst) g pps in
-  let pps = Type.fold_region (fun r1 r2 lst -> if r1 = r2 then lst else less (region_param ~non_poly) r1 r2 :: lst) g pps in
-  let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (region_param ~non_poly) region_bound r bound1 (* bound2 *) pps) (Type.Region.bounds g.Type.region_graph) pps in
-  let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (presence_param ~non_poly) dirt_bound r bound1 (* bound2 *) pps) (Type.Dirt.bounds g.Type.dirt_graph) pps in
+  let pps = Constraints.fold_ty (fun p1 p2 lst -> if p1 = p2 then lst else less (ty_param ~non_poly) p1 p2 :: lst) g [] in
+  let pps = Constraints.fold_dirt (fun d1 d2 lst -> if d1 = d2 then lst else less (presence_param ~non_poly) d1 d2 :: lst) g pps in
+  let pps = Constraints.fold_region (fun r1 r2 lst -> if r1 = r2 then lst else less (region_param ~non_poly) r1 r2 :: lst) g pps in
+  let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (region_param ~non_poly) region_bound r bound1 (* bound2 *) pps) (Constraints.Region.bounds g.Constraints.region_graph) pps in
+  let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (presence_param ~non_poly) dirt_bound r bound1 (* bound2 *) pps) (Constraints.Dirt.bounds g.Constraints.dirt_graph) pps in
   print ppf "%t"
     (sequence2 "," pps)
 
@@ -154,7 +154,7 @@ let ty_scheme (ctx, t, cstrs) ppf =
   let sbst = Type.beautifying_subst () in
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   let t = Type.subst_ty sbst t in
-  let cstrs = Type.subst_constraints sbst cstrs in
+  let cstrs = Constraints.subst_constraints sbst cstrs in
   print ppf "%t%t | %t" (context ctx) (Type.print t) (constraints cstrs)
 
 let dirty_scheme (ctx, (t, drt), cstrs) ppf =
@@ -162,7 +162,7 @@ let dirty_scheme (ctx, (t, drt), cstrs) ppf =
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   let t = Type.subst_ty sbst t in
   let drt = Type.subst_dirt sbst drt in
-  let cstrs = Type.subst_constraints sbst cstrs in
+  let cstrs = Constraints.subst_constraints sbst cstrs in
   print ppf "%t%t ! %t | %t"
     (context ctx)
     (Type.print t)

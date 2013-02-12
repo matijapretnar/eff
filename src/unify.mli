@@ -1,5 +1,5 @@
-type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Type.t
-type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Type.t
+type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Constraints.t
+type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Constraints.t
 type context = (Core.variable, Type.ty) Common.assoc
 type change
 
@@ -10,7 +10,7 @@ val region_less :
 val region_covers :
   Type.region_param ->
   Type.instance_param -> change
-val just : Type.t -> change
+val just : Constraints.t -> change
 val add_presence_bound :
   Type.presence_param ->
   Type.presence list -> change
@@ -38,14 +38,14 @@ val gather_ty_scheme :
   pos:Common.position ->
   context ->
   Type.ty ->
-  change list -> context * Type.ty * Type.t
+  change list -> context * Type.ty * Constraints.t
 val gather_dirty_scheme :
   pos:Common.position ->
   context ->
   Type.dirty ->
-  change list -> context * Type.dirty * Type.t
+  change list -> context * Type.dirty * Constraints.t
 val gather_pattern_scheme :
   pos:'a ->
   context ->
   Type.ty ->
-  change list -> context * Type.ty * Type.t
+  change list -> context * Type.ty * Constraints.t

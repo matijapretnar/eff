@@ -7,7 +7,7 @@ let empty = []
     parameters. It returns the  *)
 let refresh (ctx, ty, cnstrs) =
   let sbst = Type.refreshing_subst () in
-  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Type.subst_constraints sbst cnstrs
+  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst_constraints sbst cnstrs
 
 let lookup ctx x = Common.option_map refresh (Common.lookup x ctx)
 
