@@ -6,6 +6,10 @@ type dirty_scheme = context * Type.dirty * Constraints.t
 type t = context * Type.ty * Constraints.t * Type.substitution
 type change = t -> t
 
+let refresh (ctx, ty, cnstrs) =
+  let sbst = Type.refreshing_subst () in
+  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst_constraints sbst cnstrs
+
 let ty_param_less p q (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_ty_constraint p q cnstrs, sbst)
 and presence_param_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =

@@ -3,6 +3,8 @@ type ty_scheme = context * Type.ty * Constraints.t
 type dirty_scheme = context * Type.dirty * Constraints.t
 type change
 
+val refresh : ty_scheme -> ty_scheme
+
 val region_less :
   pos:'a ->
   Type.region_param ->
