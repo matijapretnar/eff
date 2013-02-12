@@ -1,3 +1,5 @@
+type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Type.t
+type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Type.t
 type context = (Core.variable, Type.ty) Common.assoc
 type change
 

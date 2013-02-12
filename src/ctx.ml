@@ -1,4 +1,4 @@
-type t = (Core.variable, Type.ty_scheme) Common.assoc
+type t = (Core.variable, Unify.ty_scheme) Common.assoc
 
 
 let empty = []

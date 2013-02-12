@@ -1,5 +1,8 @@
 (** [unify sbst pos t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)
+type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Type.t
+type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Type.t
+
 type context = (Core.variable, Type.ty) Common.assoc
 type t = context * Type.ty * Type.t * Type.substitution
 type change = t -> t
@@ -152,6 +155,38 @@ let trim_context ~pos ctx_p (ctx, ty, cnstrs, sbst) =
   List.fold_right trim ctx ([], ty, cnstrs, sbst)
 
 
+let (@@@) = Trio.append
+
+let pos_neg_tyscheme get_variances (ctx, ty, cnstrs) =
+  let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
+    let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params get_variances ctx_ty in
+    neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
+  in
+  let (((_, pos_ds, _) as pos), neg) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params get_variances ty) in
+  let add_dirt_bound bnd posi = match bnd with
+  | Type.Region _ -> posi
+  | Type.Without (d, _) -> d :: posi
+  in
+  let posi_dirts = List.fold_right (fun (d, bnds, _) posi ->
+                                      match bnds with None -> posi | Some bnds -> if List.mem d pos_ds then List.fold_right add_dirt_bound bnds posi else posi) (Type.Dirt.bounds cnstrs.Type.dirt_graph) [] in
+  let pos = ([], posi_dirts, []) @@@ pos in
+  let add_region_bound bnd (posi, nega) = match bnd with
+  | Type.Region r -> (([], [], [r]) @@@ posi, nega) 
+  | Type.Without (d, rs) -> (([], [d], rs) @@@ posi, nega)
+  in
+  let (((_, pos_ds, _) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
+  let (posi, nega) = List.fold_right (fun (d, bnds, _) (posi, nega) ->
+                                      match bnds with None -> (posi, nega) | Some bnds -> (if List.mem d pos_ds then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega))) (Type.Dirt.bounds cnstrs.Type.dirt_graph) (posi, nega) in
+  Trio.uniq posi, Trio.uniq nega
+
+let simplify get_variances (ctx, drty, cnstrs) =
+  let ty = (Type.Arrow (Type.unit_ty, drty)) in
+  let ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) = pos_neg_tyscheme get_variances (ctx, ty, cnstrs) in
+  let sbst = Type.simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
+  let ty_sch = Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Type.subst_constraints sbst cnstrs in
+  match ty_sch with
+  | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
+  | _ -> assert false
 
 
 
@@ -159,7 +194,7 @@ let trim_context ~pos ctx_p (ctx, ty, cnstrs, sbst) =
 
 
 let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
-  Type.pos_neg_tyscheme Tctx.get_variances (ctx, ty, cnstrs)
+  pos_neg_tyscheme Tctx.get_variances (ctx, ty, cnstrs)
 
 
 let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, _) =

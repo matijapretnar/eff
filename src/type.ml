@@ -245,9 +245,6 @@ type t = {
   dirt_graph : Dirt.t;
 }
 
-type ty_scheme = (Core.variable, ty) Common.assoc * ty * t
-type dirty_scheme = (Core.variable, ty) Common.assoc * dirty * t
-
 let empty = {
   ty_graph = Ty.empty;
   region_graph = Region.empty;
@@ -362,37 +359,6 @@ let pos_neg_params get_variances ty =
     for_parameters pos_region_param is_pos rs rgns
   in
   Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)
-
-let pos_neg_tyscheme get_variances (ctx, ty, cnstrs) =
-  let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
-    let pos_ctx_ty, neg_ctx_ty = pos_neg_params get_variances ctx_ty in
-    neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
-  in
-  let (((_, pos_ds, _) as pos), neg) = List.fold_right add_ctx_pos_neg ctx (pos_neg_params get_variances ty) in
-  let add_dirt_bound bnd posi = match bnd with
-  | Region _ -> posi
-  | Without (d, _) -> d :: posi
-  in
-  let posi_dirts = List.fold_right (fun (d, bnds, _) posi ->
-                                      match bnds with None -> posi | Some bnds -> if List.mem d pos_ds then List.fold_right add_dirt_bound bnds posi else posi) (Dirt.bounds cnstrs.dirt_graph) [] in
-  let pos = ([], posi_dirts, []) @@@ pos in
-  let add_region_bound bnd (posi, nega) = match bnd with
-  | Region r -> (([], [], [r]) @@@ posi, nega) 
-  | Without (d, rs) -> (([], [d], rs) @@@ posi, nega)
-  in
-  let (((_, pos_ds, _) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
-  let (posi, nega) = List.fold_right (fun (d, bnds, _) (posi, nega) ->
-                                      match bnds with None -> (posi, nega) | Some bnds -> (if List.mem d pos_ds then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega))) (Dirt.bounds cnstrs.dirt_graph) (posi, nega) in
-  Trio.uniq posi, Trio.uniq nega
-
-let simplify get_variances (ctx, drty, cnstrs) =
-  let ty = (Arrow (unit_ty, drty)) in
-  let ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) = pos_neg_tyscheme get_variances (ctx, ty, cnstrs) in
-  let sbst = simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
-  let ty_sch = Common.assoc_map (subst_ty sbst) ctx, subst_ty sbst ty, subst_constraints sbst cnstrs in
-  match ty_sch with
-  | ctx, Arrow (_, drty), cstr -> (ctx, drty, cstr)
-  | _ -> assert false
 
 let region_param ?(non_poly=Trio.empty) ((Region_Param k) as p) ppf =
   let (_, _, rs) = non_poly in
