@@ -1,5 +1,8 @@
 (** [unify sbst pos t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)
+type context = (Core.variable, Type.ty) Common.assoc
+type t = context * Type.ty * Type.t * Type.substitution
+type change = t -> t
 
 let ty_param_less p q (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Type.add_ty_constraint p q cnstrs, sbst)
