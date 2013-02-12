@@ -160,64 +160,9 @@ let trim_context ~pos ctx_p (ctx, ty, cnstrs, sbst) =
 
 
 
-let (@@@) = Trio.append
-
-let for_parameters get_params is_pos ps lst =
-  List.fold_right2 (fun (_, (cov, contra)) el params ->
-                      let params = if cov then get_params is_pos el @@@ params else params in
-                      if contra then get_params (not is_pos) el @@@ params else params) ps lst Trio.empty
-
-let pos_neg_params ty =
-  let rec pos_ty is_pos = function
-  | Type.Apply (ty_name, args) -> pos_args is_pos ty_name args
-  | Type.Effect (ty_name, args, rgn) -> pos_args is_pos ty_name args @@@ pos_region_param is_pos rgn
-  | Type.TyParam p -> ((if is_pos then [p] else []), [], [])
-  | Type.Basic _ -> Trio.empty
-  | Type.Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
-  | Type.Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
-  | Type.Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
-  and pos_dirty is_pos (ty, drt) =
-    pos_ty is_pos ty @@@ pos_dirt is_pos drt
-  and pos_dirt is_pos drt =
-    pos_presence_param is_pos drt.Type.rest @@@ Trio.flatten_map (fun (_, dt) -> pos_presence_param is_pos dt) drt.Type.ops
-  and pos_presence_param is_pos p =
-    ([], (if is_pos then [p] else []), [])
-  and pos_region_param is_pos r =
-    ([], [], if is_pos then [r] else [])
-  and pos_args is_pos ty_name (tys, drts, rgns) =
-    match Tctx.lookup_params ty_name with
-    | None -> assert false (* We type-checked before thus all type names are valid. *)
-    | Some (ps, ds, rs) ->
-        for_parameters pos_ty is_pos ps tys @@@
-        for_parameters pos_presence_param is_pos ds drts @@@
-        for_parameters pos_region_param is_pos rs rgns
-  in
-  Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)
-
-let pos_neg_tyscheme (ctx, ty, cnstrs) =
-  let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
-    let pos_ctx_ty, neg_ctx_ty = pos_neg_params ctx_ty in
-    neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
-  in
-  let (((_, pos_ds, _) as pos), neg) = List.fold_right add_ctx_pos_neg ctx (pos_neg_params ty) in
-  let add_dirt_bound bnd posi = match bnd with
-  | Type.Region _ -> posi
-  | Type.Without (d, _) -> d :: posi
-  in
-  let posi_dirts = List.fold_right (fun (d, bnds) posi ->
-                                      if List.mem d pos_ds then List.fold_right add_dirt_bound bnds posi else posi) cnstrs.Type.dirt_bounds [] in
-  let pos = ([], posi_dirts, []) @@@ pos in
-  let add_region_bound bnd (posi, nega) = match bnd with
-  | Type.Region r -> (([], [], [r]) @@@ posi, nega) 
-  | Type.Without (d, rs) -> (([], [d], rs) @@@ posi, nega)
-  in
-  let (((_, pos_ds, _) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
-  let (posi, nega) = List.fold_right (fun (d, bnds) (posi, nega) ->
-                                      if List.mem d pos_ds then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega)) cnstrs.Type.dirt_bounds (posi, nega) in
-  Trio.uniq posi, Trio.uniq nega
 
 let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
-  pos_neg_tyscheme (ctx, ty, cnstrs)
+  Type.pos_neg_tyscheme Tctx.get_variances (ctx, ty, cnstrs)
 
 
 let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, _) =
@@ -226,7 +171,7 @@ let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstr
 
 let simplify (ctx, drty, cnstrs) =
   let ty = (Type.Arrow (Type.unit_ty, drty)) in
-  let ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) = pos_neg_tyscheme (ctx, ty, cnstrs) in
+  let ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) = Type.pos_neg_tyscheme Tctx.get_variances (ctx, ty, cnstrs) in
   let sbst = Type.simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
   let ty_sch = Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Type.subst_constraints sbst cnstrs in
   match ty_sch with

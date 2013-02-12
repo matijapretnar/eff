@@ -365,3 +365,58 @@ let simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
     region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
     presence_rest = (fun p -> simple_dirt (match Common.lookup p dirt_subst with Some q -> q | None -> p));
   }
+
+let (@@@) = Trio.append
+
+let for_parameters get_params is_pos ps lst =
+  List.fold_right2 (fun (_, (cov, contra)) el params ->
+                      let params = if cov then get_params is_pos el @@@ params else params in
+                      if contra then get_params (not is_pos) el @@@ params else params) ps lst Trio.empty
+
+let pos_neg_params param_polarities ty =
+  let rec pos_ty is_pos = function
+  | Apply (ty_name, args) -> pos_args is_pos ty_name args
+  | Effect (ty_name, args, rgn) -> pos_args is_pos ty_name args @@@ pos_region_param is_pos rgn
+  | TyParam p -> ((if is_pos then [p] else []), [], [])
+  | Basic _ -> Trio.empty
+  | Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
+  | Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
+  | Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
+  and pos_dirty is_pos (ty, drt) =
+    pos_ty is_pos ty @@@ pos_dirt is_pos drt
+  and pos_dirt is_pos drt =
+    pos_presence_param is_pos drt.rest @@@ Trio.flatten_map (fun (_, dt) -> pos_presence_param is_pos dt) drt.ops
+  and pos_presence_param is_pos p =
+    ([], (if is_pos then [p] else []), [])
+  and pos_region_param is_pos r =
+    ([], [], if is_pos then [r] else [])
+  and pos_args is_pos ty_name (tys, drts, rgns) =
+    let (ps, ds, rs) = param_polarities ty_name in
+    for_parameters pos_ty is_pos ps tys @@@
+    for_parameters pos_presence_param is_pos ds drts @@@
+    for_parameters pos_region_param is_pos rs rgns
+  in
+  Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)
+
+let pos_neg_tyscheme get_variances (ctx, ty, cnstrs) =
+  let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
+    let pos_ctx_ty, neg_ctx_ty = pos_neg_params get_variances ctx_ty in
+    neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
+  in
+  let (((_, pos_ds, _) as pos), neg) = List.fold_right add_ctx_pos_neg ctx (pos_neg_params get_variances ty) in
+  let add_dirt_bound bnd posi = match bnd with
+  | Region _ -> posi
+  | Without (d, _) -> d :: posi
+  in
+  let posi_dirts = List.fold_right (fun (d, bnds) posi ->
+                                      if List.mem d pos_ds then List.fold_right add_dirt_bound bnds posi else posi) cnstrs.dirt_bounds [] in
+  let pos = ([], posi_dirts, []) @@@ pos in
+  let add_region_bound bnd (posi, nega) = match bnd with
+  | Region r -> (([], [], [r]) @@@ posi, nega) 
+  | Without (d, rs) -> (([], [d], rs) @@@ posi, nega)
+  in
+  let (((_, pos_ds, _) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
+  let (posi, nega) = List.fold_right (fun (d, bnds) (posi, nega) ->
+                                      if List.mem d pos_ds then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega)) cnstrs.dirt_bounds (posi, nega) in
+  Trio.uniq posi, Trio.uniq nega
+

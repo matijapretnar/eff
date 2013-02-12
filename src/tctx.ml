@@ -45,6 +45,11 @@ let lookup_params ty_name =
     | None -> None
     | Some (params, _) -> Some params
 
+let get_variances ty_name =
+  match lookup_params ty_name with
+  | None -> assert false (* this function should only be called after types have been checked. *)
+  | Some params -> params
+
 let remove_variances (ps, ds, rs) = (List.map fst ps, List.map fst ds, List.map fst rs)
 
 let lookup_tydef ~pos ty_name =
