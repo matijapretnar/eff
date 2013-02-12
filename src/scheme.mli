@@ -1,6 +1,6 @@
-type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Constraints.t
-type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Constraints.t
 type context = (Core.variable, Type.ty) Common.assoc
+type ty_scheme = context * Type.ty * Constraints.t
+type dirty_scheme = context * Type.dirty * Constraints.t
 type change
 
 val region_less :

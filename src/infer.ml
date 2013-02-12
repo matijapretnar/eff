@@ -5,12 +5,12 @@ let warn_implicit_sequencing = ref false;;
 
 let disable_typing = ref false;;
 
-let ty_less = Unify.ty_less
-let dirt_less = Unify.dirt_less
-let region_covers = Unify.region_covers
-let dirty_less = Unify.dirty_less
-let just = Unify.just
-let trim_context = Unify.trim_context
+let ty_less = Scheme.ty_less
+let dirt_less = Scheme.dirt_less
+let region_covers = Scheme.region_covers
+let dirty_less = Scheme.dirty_less
+let just = Scheme.just
+let trim_context = Scheme.trim_context
 
 (* Can a computation safely be generalized, i.e., is it non-expansive in the parlance of
    SML? In our case non-expansive simply means "is a value". *)
@@ -34,7 +34,7 @@ let ty_of_const = function
 let rec infer_pattern (p, pos) =
   (* We do not check for overlaps as all identifiers are distinct - desugar needs to do those *)
   if !disable_typing then simple Type.universal_ty else
-  let unify = Unify.gather_pattern_scheme ~pos in
+  let unify = Scheme.gather_pattern_scheme ~pos in
   let ty_sch = match p with
   | Pattern.Var x ->
       let ty = Type.fresh_ty () in
@@ -95,7 +95,7 @@ let rec infer_pattern (p, pos) =
    [env]. It returns the inferred type of [e]. *)
 let rec infer_expr env (e, pos) =
   if !disable_typing then simple Type.universal_ty else
-  let unify = Unify.gather_ty_scheme ~pos in
+  let unify = Scheme.gather_ty_scheme ~pos in
   let ty_sch = match e with
 
   | Core.Var x ->
@@ -173,7 +173,7 @@ let rec infer_expr env (e, pos) =
           let dt = Type.fresh_presence_param () in
           unify ctx (T.Arrow (t1, (t2, {T.ops = [op, dt]; T.rest = Type.fresh_presence_param ()}))) [
             ty_less ~pos u ty;
-            Unify.add_presence_bound dt [Type.Region r];
+            Scheme.add_presence_bound dt [Type.Region r];
             just cstr_u
           ]
       end
@@ -216,7 +216,7 @@ let rec infer_expr env (e, pos) =
           let pres = Type.fresh_presence_param () in
           let without = Type.fresh_presence_param () in
           (* Print.info "DIRT: %t >= %t" (Print.presence_param without) (Print.presence (Type.Without (pres, !rs))); *)
-          ((op, pres) :: left_dirt, (op, without) :: right_dirt, Unify.add_presence_bound without [Type.Without (pres, !rs)] :: cnstrs)
+          ((op, pres) :: left_dirt, (op, without) :: right_dirt, Scheme.add_presence_bound without [Type.Without (pres, !rs)] :: cnstrs)
         in
         let left_rops, right_rops, cnstrs_ops =
           List.fold_right make_presence ops ([], [], []) in
@@ -241,7 +241,7 @@ let rec infer_expr env (e, pos) =
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp env (c, pos) =
   if !disable_typing then simple Type.universal_dirty else
-  let unify = Unify.gather_dirty_scheme ~pos in
+  let unify = Scheme.gather_dirty_scheme ~pos in
   let drty_sch = match c with
 
   | Core.Value e ->
@@ -375,7 +375,7 @@ and infer_comp env (c, pos) =
 and infer_abstraction env (p, c) =
   let ctx_p, ty_p, cnstrs_p = infer_pattern p in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
-  match Unify.gather_ty_scheme ~pos:(snd c) ctx_c (Type.Arrow (ty_p, drty_c)) [
+  match Scheme.gather_ty_scheme ~pos:(snd c) ctx_c (Type.Arrow (ty_p, drty_c)) [
     trim_context ~pos:(snd c) ctx_p;
     just cnstrs_p;
     just cnstrs_c
@@ -387,7 +387,7 @@ and infer_abstraction2 env (p1, p2, c) =
   let ctx_p1, ty_p1, cnstrs_p1 = infer_pattern p1 in
   let ctx_p2, ty_p2, cnstrs_p2 = infer_pattern p2 in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
-  match Unify.gather_ty_scheme ~pos:(snd c) ctx_c (Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c)) [
+  match Scheme.gather_ty_scheme ~pos:(snd c) ctx_c (Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c)) [
   trim_context ~pos:(snd c) (ctx_p1 @ ctx_p2);
     just cnstrs_p1;
     just cnstrs_p2;
@@ -414,7 +414,7 @@ and infer_let ~pos env defs =
     in
     let env, ctxp =
       if nonexpansive (fst c) then
-        let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Unify.gather_ty_scheme ~pos ctx_c t changes)) ctx_p env in
+        let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.gather_ty_scheme ~pos ctx_c t changes)) ctx_p env in
         env, ctxp
       else
         env, ctx_p @ ctxp
@@ -423,7 +423,7 @@ and infer_let ~pos env defs =
   in
   let env, ctxs, ctxp, vars, cstrs = List.fold_right add_binding defs (env, [], [], [], []) in
   env, vars, fun (ctx2, (tc, dc), cstr_c) ->
-    Unify.gather_dirty_scheme ~pos (ctxs @ ctx2) (tc, drt) ([
+    Scheme.gather_dirty_scheme ~pos (ctxs @ ctx2) (tc, drt) ([
           dirt_less ~pos dc drt;
           trim_context ~pos ctxp;
           just cstr_c;
@@ -442,6 +442,6 @@ and infer_let_rec ~pos env defs =
     trim_context ~pos vars
   ] @ cnstrs
  in
-  let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Unify.gather_ty_scheme ~pos ctx t cnstrs)) vars env in
+  let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.gather_ty_scheme ~pos ctx t cnstrs)) vars env in
   env, vars, fun (ctx2, (tc, dc), cstr_c) ->
-  Unify.gather_dirty_scheme ~pos (ctx @ ctx2) (tc, dc) (just cstr_c :: cnstrs)
+  Scheme.gather_dirty_scheme ~pos (ctx @ ctx2) (tc, dc) (just cstr_c :: cnstrs)

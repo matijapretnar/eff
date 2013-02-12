@@ -1,9 +1,8 @@
 (** [unify sbst pos t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)
-type ty_scheme = (Core.variable, Type.ty) Common.assoc * Type.ty * Constraints.t
-type dirty_scheme = (Core.variable, Type.ty) Common.assoc * Type.dirty * Constraints.t
-
 type context = (Core.variable, Type.ty) Common.assoc
+type ty_scheme = context * Type.ty * Constraints.t
+type dirty_scheme = context * Type.dirty * Constraints.t
 type t = context * Type.ty * Constraints.t * Type.substitution
 type change = t -> t
 
