@@ -92,6 +92,25 @@ let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
     region_graph = Region.garbage_collect pos_rs neg_rs grph.region_graph;
   }
 
+let rec topological_sort = function
+  | [] -> []
+  | deps ->
+    let is_leaf (d, ds) = ds = [] in
+    let leaves, non_leaves = List.partition is_leaf deps in
+    let leaves = List.map fst leaves in
+    let new_deps = Common.assoc_map (fun ds -> List.filter (fun d -> not (List.mem d leaves)) ds) non_leaves in
+    leaves @ topological_sort new_deps
+
+let simplify grph =
+  let region_leaves = Region.leaves grph.region_graph in
+  let bound_dependency bnd = match bnd with None -> [] | Some bnd -> List.fold_right (fun bnd dep -> match bnd with
+  | Region _ -> dep
+  | Without (d, _) -> d :: dep) bnd [] in
+  let dependency = Dirt.fold_vertices (fun x inx _ infx _ dep -> (x, bound_dependency infx @ inx) :: dep) grph.dirt_graph [] in
+  let sort = topological_sort dependency in
+  region_leaves, dependency, sort
+
+
 let less pp p1 p2 ppf =
   Print.print ppf "%t <= %t" (pp p1) (pp p2)
 
