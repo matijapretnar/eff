@@ -50,3 +50,7 @@ and operation = expression * Common.opsym
     of operations, which take an argument and a state, and return a result and
     the new state. *)
 and resource = expression * (Common.opsym, abstraction2) Common.assoc
+
+val print_expression : ?max_level:int -> expression -> Format.formatter -> unit
+val print_computation : ?max_level:int -> computation -> Format.formatter -> unit
+val print_pattern : ?max_level:int -> pattern -> Format.formatter -> unit

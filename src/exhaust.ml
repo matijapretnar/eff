@@ -226,7 +226,7 @@ let check_patterns ~pos pats =
           | Some ps ->
               Print.warning ~pos "This pattern-matching is not exhaustive.\n\
                                       Here is an example of a value that is not matched:";
-(*  *)              prerr_endline (Print.to_string "%t" (Print.pattern (List.hd ps)))
+(*  *)              prerr_endline (Print.to_string "%t" (Core.print_pattern (List.hd ps)))
           | None -> ()
         end
     | (_, pos) as pat :: pats ->

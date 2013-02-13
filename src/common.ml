@@ -161,3 +161,24 @@ let split n lst =
 
 (** [diff lst1 lst2] returns [lst1] with all members of [lst2] removed *)
 let diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
+
+
+let print_const c ppf =
+  match c with
+  | Integer k -> Format.fprintf ppf "%s" (Big_int.string_of_big_int k)
+  | String s -> Format.fprintf ppf "%S" s
+  | Boolean b -> Format.fprintf ppf "%B" b
+  | Float f -> Format.fprintf ppf "%F" f
+
+
+let print_position pos ppf =
+  match pos with
+  | Position (begin_pos, end_pos) ->
+      let begin_char = begin_pos.Lexing.pos_cnum - begin_pos.Lexing.pos_bol + 1 in
+      let begin_line = begin_pos.Lexing.pos_lnum in
+      let filename = begin_pos.Lexing.pos_fname in
+
+      if String.length filename != 0 then
+        Format.fprintf ppf "file %S, line %d, char %d" filename begin_line begin_char
+      else
+        Format.fprintf ppf "line %d, char %d" (begin_line - 1) begin_char

@@ -135,7 +135,7 @@ let rec ceval env (c, pos) = match c with
 
   | Core.Check c ->
       let r = ceval env c in
-      Print.check ~pos "%t" (Print.result r);
+      Print.check ~pos "%t" (Value.print_result r);
       V.unit_result
 
 and eval_let env lst c =
@@ -159,7 +159,7 @@ and veval env (e, pos) = match e with
   | Core.Var x ->
       begin match lookup x env with
       | Some v -> v
-      | None -> Error.runtime "Name %t is not defined." (Newprint.variable x)
+      | None -> Error.runtime "Name %t is not defined." (Print.variable x)
       end
   | Core.Const c -> V.Const c
   | Core.Tuple es -> V.Tuple (List.map (veval env) es)
@@ -198,18 +198,18 @@ let rec top_handle = function
   | V.Value v -> v
   | V.Operation (((_, _, Some (s_ref, resource)) as inst, opsym) as op, v, k) ->
       begin match C.lookup opsym resource with
-        | None -> Error.runtime "uncaught operation %t %t." (Print.operation op) (Print.value v)
+        | None -> Error.runtime "uncaught operation %t %t." (Value.print_operation op) (Value.print_value v)
         | Some f ->
             begin match f v !s_ref with
               | V.Value (V.Tuple [u; s]) ->
                   s_ref := s;
                   top_handle (k u)
-              | V.Value _ -> Error.runtime "pair expected in a resource handler for %t." (Print.instance inst)
-              | _ -> Error.runtime "pair expected in a resource handler for %t." (Print.instance inst)
+              | V.Value _ -> Error.runtime "pair expected in a resource handler for %t." (Value.print_instance inst)
+              | _ -> Error.runtime "pair expected in a resource handler for %t." (Value.print_instance inst)
             end
       end
   | V.Operation (((_, _, None), _) as op, v, k) ->
-      Error.runtime "uncaught operation %t %t." (Print.operation op) (Print.value v)
+      Error.runtime "uncaught operation %t %t." (Value.print_operation op) (Value.print_value v)
 
 let run env c =
   top_handle (ceval env c)

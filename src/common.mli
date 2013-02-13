@@ -37,3 +37,5 @@ val fresh : (int -> 'a) -> unit -> 'a
 val uniq : 'a list -> 'a list
 val split : int -> 'a list -> 'a list * 'a list
 val diff : 'a list -> 'a list -> 'a list
+val print_const : const -> Format.formatter -> unit
+val print_position : position -> Format.formatter -> unit

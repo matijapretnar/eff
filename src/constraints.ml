@@ -121,26 +121,26 @@ let simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
   }
 
 let less pp p1 p2 ppf =
-  Newprint.print ppf "%t <= %t" (pp p1) (pp p2)
+  Print.print ppf "%t <= %t" (pp p1) (pp p2)
 
 let print_region_bound insts ppf =
   match insts with
-  | None -> Newprint.print ppf "X"
-  | Some insts -> Newprint.sequence "," Type.print_instance_param insts ppf
+  | None -> Print.print ppf "X"
+  | Some insts -> Print.sequence "," Type.print_instance_param insts ppf
 
 let rec print_presence ?(non_poly=Trio.empty) drt ppf =
   match drt with
   | Region r -> Type.print_region_param ~non_poly r ppf
-  | Without (prs, rs) -> Newprint.print ppf "%t - [%t]" (Type.print_presence_param prs) (Newprint.sequence "," (Type.print_region_param) rs)
+  | Without (prs, rs) -> Print.print ppf "%t - [%t]" (Type.print_presence_param prs) (Print.sequence "," (Type.print_region_param) rs)
 
 
 let print_dirt_bound bnd ppf =
-  Newprint.sequence "," print_presence bnd ppf
+  Print.sequence "," print_presence bnd ppf
 
 let bounds pp pp' p inf (* sup *) pps =
   match inf with
   | None -> pps
-  | Some inf -> (fun ppf -> Newprint.print ppf "%t <= %t" (pp' inf) (pp p)) :: pps
+  | Some inf -> (fun ppf -> Print.print ppf "%t <= %t" (pp' inf) (pp p)) :: pps
 
 let rec sequence2 sep pps ppf =
   match pps with
@@ -154,7 +154,7 @@ let print ?(non_poly=Trio.empty) g ppf =
   let pps = fold_region (fun r1 r2 lst -> if r1 = r2 then lst else less (Type.print_region_param ~non_poly) r1 r2 :: lst) g pps in
   let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (Type.print_region_param ~non_poly) print_region_bound r bound1 (* bound2 *) pps) (Region.bounds g.region_graph) pps in
   let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (Type.print_presence_param ~non_poly) print_dirt_bound r bound1 (* bound2 *) pps) (Dirt.bounds g.dirt_graph) pps in
-  Newprint.print ppf "%t"
+  Print.print ppf "%t"
     (sequence2 "," pps)
 
 

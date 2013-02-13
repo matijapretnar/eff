@@ -49,3 +49,42 @@ let to_instance = function
 let to_handler = function
   | Handler h -> h
   | _ -> Error.runtime "A handler expected."
+
+let print_instance inst ppf =
+  match inst with
+  | (_, Some desc, _) -> Format.fprintf ppf "<%s>" desc
+  | (i, None, _) -> Format.fprintf ppf "<instance #%d>" i
+
+let print_operation (inst, op) ppf = Format.fprintf ppf "%t.%s" (print_instance inst) op
+
+let rec print_value ?max_level v ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match v with
+  | Const c -> Common.print_const c ppf
+  | Tuple lst -> print "(@[<hov>%t@])" (Print.sequence "," print_value lst)
+  | Record lst -> print "{@[<hov>%t@]}" (Print.sequence ";" (Print.field print_value) lst)
+  | Variant (lbl, None) when lbl = Common.nil -> print "[]"
+  | Variant (lbl, None) -> print "%s" lbl
+  | Variant (lbl, Some (Tuple [v1; v2])) when lbl = Common.cons ->
+      print "[@[<hov>@[%t@]%t@]]" (print_value v1) (list v2)
+  | Variant (lbl, Some v) ->
+      print ~at_level:1 "%s @[<hov>%t@]" lbl (print_value v)
+  | Closure _ -> print "<fun>"
+  | Instance inst  -> print_instance inst ppf
+  | Handler _  -> print "<handler>"
+
+and list ?(max_length=299) v ppf =
+  if max_length > 1 then
+    match v with
+    | Variant (lbl, Some (Tuple [v1; v2])) when lbl = Common.cons ->
+        Format.fprintf ppf ";@ %t%t" (print_value v1) (list ~max_length:(max_length - 1) v2)
+    | Variant (lbl, None) when lbl = Common.nil -> ()
+    | _ -> assert false
+  else
+    Format.fprintf ppf ";@ ..."
+
+let print_result r ppf =
+  match r with
+  | Value v -> print_value v ppf
+  | Operation (op, v, _) ->
+      Format.fprintf ppf "Operation %t %t" (print_operation op) (print_value v)

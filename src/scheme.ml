@@ -244,14 +244,14 @@ let gather_pattern_scheme ~pos ctx ty chngs =
 let context ctx ppf =
   match ctx with
   | [] -> ()
-  | _ -> Newprint.print ppf "(@[%t@]).@ " (Newprint.sequence "," (fun (x, t) ppf -> Newprint.print ppf "%t : %t" (Newprint.variable x) (Type.print t)) ctx)
+  | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence "," (fun (x, t) ppf -> Print.print ppf "%t : %t" (Print.variable x) (Type.print t)) ctx)
 
 let print_ty_scheme (ctx, t, cstrs) ppf =
   let sbst = Type.beautifying_subst () in
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   let t = Type.subst_ty sbst t in
   let cstrs = Constraints.subst_constraints sbst cstrs in
-  Newprint.print ppf "%t%t | %t" (context ctx) (Type.print t) (Constraints.print cstrs)
+  Print.print ppf "%t%t | %t" (context ctx) (Type.print t) (Constraints.print cstrs)
 
 let print_dirty_scheme (ctx, (t, drt), cstrs) ppf =
   let sbst = Type.beautifying_subst () in
@@ -259,7 +259,7 @@ let print_dirty_scheme (ctx, (t, drt), cstrs) ppf =
   let t = Type.subst_ty sbst t in
   let drt = Type.subst_dirt sbst drt in
   let cstrs = Constraints.subst_constraints sbst cstrs in
-  Newprint.print ppf "%t%t ! %t | %t"
+  Print.print ppf "%t%t ! %t | %t"
     (context ctx)
     (Type.print t)
     (Type.print_dirt drt)

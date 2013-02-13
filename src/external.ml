@@ -153,7 +153,7 @@ let string_operations = [
 let conversion_functions = [
   ("to_string",
     let to_string v =
-      let s = Print.to_string "%t" (Print.value v) in
+      let s = Print.to_string "%t" (Value.print_value v) in
       value_str s
     in
     from_fun to_string);
@@ -180,7 +180,7 @@ and std_read _ =
 let create_exception v = 
   let exc_name = V.to_str v in
   let exception_raise param =
-    let message = Print.to_string "%s %t." exc_name (Print.value param) in
+    let message = Print.to_string "%s %t." exc_name (Value.print_value param) in
       Error.runtime "%s" message
   in
     V.Value (external_instance exc_name [

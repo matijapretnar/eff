@@ -30,3 +30,8 @@ val to_float : value -> float
 val to_str : value -> string
 val to_instance : value -> instance
 val to_handler : value -> result -> result
+
+val print_value : ?max_level:int -> value -> Format.formatter -> unit
+val print_instance : instance -> Format.formatter -> unit
+val print_operation : operation -> Format.formatter -> unit
+val print_result : result -> Format.formatter -> unit
