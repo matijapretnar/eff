@@ -182,18 +182,6 @@ let pos_neg_tyscheme get_variances (ctx, ty, cnstrs) =
                                       match bnds with None -> (posi, nega) | Some bnds -> (if List.mem d pos_ds then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega))) (Constraints.Dirt.bounds cnstrs.Constraints.dirt_graph) (posi, nega) in
   Trio.uniq posi, Trio.uniq nega
 
-let simplify get_variances (ctx, drty, cnstrs) =
-  let ty = (Type.Arrow (Type.unit_ty, drty)) in
-  let ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) = pos_neg_tyscheme get_variances (ctx, ty, cnstrs) in
-  let sbst = Constraints.simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
-  let ty_sch = Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst_constraints sbst cnstrs in
-  match ty_sch with
-  | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
-  | _ -> assert false
-
-
-
-
 
 
 let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =

@@ -96,19 +96,6 @@ let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
     region_graph = Region.garbage_collect pos_rs neg_rs grph.region_graph;
   }
 
-let simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
-  let ty_subst = Ty.simplify pos_ts neg_ts grph.ty_graph
-  (* and dirt_subst = Dirt.simplify pos_ds neg_ds grph.dirt_graph *)
-  and region_subst = Region.simplify pos_rs neg_rs grph.region_graph
-  in
-  {
-    Type.identity_subst with
-    Type.ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> Type.TyParam q | None -> Type.TyParam p);
-    (* presence_param = (fun p -> match Common.lookup p dirt_subst with Some q -> q | None -> p); *)
-    Type.region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
-    (* presence_rest = (fun p -> simple_dirt (match Common.lookup p dirt_subst with Some q -> q | None -> p)); *)
-  }
-
 let less pp p1 p2 ppf =
   Print.print ppf "%t <= %t" (pp p1) (pp p2)
 
