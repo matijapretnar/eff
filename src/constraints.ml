@@ -91,9 +91,9 @@ let join_disjoint_constraints cstr1 cstr2 =
 
 let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
   {
-    ty_graph = Ty.collect pos_ts neg_ts grph.ty_graph;
-    dirt_graph = Dirt.collect pos_ds neg_ds grph.dirt_graph;
-    region_graph = Region.collect pos_rs neg_rs grph.region_graph;
+    ty_graph = Ty.garbage_collect pos_ts neg_ts grph.ty_graph;
+    dirt_graph = Dirt.garbage_collect pos_ds neg_ds grph.dirt_graph;
+    region_graph = Region.garbage_collect pos_rs neg_rs grph.region_graph;
   }
 
 let simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =

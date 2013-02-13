@@ -124,7 +124,7 @@ struct
     sbst
 
 
-  let collect pos neg grph =
+  let garbage_collect pos neg grph =
     let pos = List.fold_right S.add pos S.empty
     and neg = List.fold_right S.add neg S.empty in
     let collect x (inx, outx, infx, supx) grph =
