@@ -105,8 +105,8 @@ struct
     fold_edges (fun x y acc -> if p x y then add_edge x y acc else acc) grph g
 
   let map f flow fup grph =
-    let g = G.fold (fun x (inx, outx, infx, supx) acc -> G.add (f x) (S.empty, S.empty, Common.option_map flow infx, Common.option_map fup supx) acc) grph G.empty in
-    fold_edges (fun x y sbst_grph -> add_edge (f x) (f y) sbst_grph) grph g
+    let f_set s = S.fold (fun x fs -> S.add (f x) fs) s S.empty in
+    G.fold (fun x (inx, outx, infx, supx) acc -> G.add (f x) (f_set inx, f_set outx, Common.option_map flow infx, Common.option_map fup supx) acc) grph G.empty
 
   let garbage_collect pos neg grph =
     let pos = List.fold_right S.add pos S.empty
