@@ -59,7 +59,7 @@ let subst_presence sbst = function
 
 let subst_constraints sbst cnstr = {
   ty_graph = Ty.map (fun p -> match sbst.Type.ty_param p with Type.TyParam q -> q | _ -> assert false) (fun () -> ()) (fun () -> ()) cnstr.ty_graph;
-  dirt_graph = Dirt.map sbst.Type.presence_param (List.map (subst_presence sbst)) (fun () -> ()) cnstr.dirt_graph;
+  dirt_graph = Dirt.map sbst.Type.presence_param (fun prs -> Common.uniq (List.map (subst_presence sbst) prs)) (fun () -> ()) cnstr.dirt_graph;
   region_graph = Region.map sbst.Type.region_param (fun insts -> Common.option_map (fun insts -> List.map (fun ins -> match sbst.Type.instance_param ins with Some i -> i | None -> assert false) insts) insts) (fun () -> ()) cnstr.region_graph;
 }
 
@@ -89,7 +89,7 @@ let join_disjoint_constraints cstr1 cstr2 =
     region_graph = Region.union cstr1.region_graph cstr2.region_graph;
   }
 
-let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
+let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
   {
     ty_graph = Ty.garbage_collect pos_ts neg_ts grph.ty_graph;
     dirt_graph = Dirt.garbage_collect pos_ds neg_ds grph.dirt_graph;

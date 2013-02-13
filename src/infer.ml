@@ -34,7 +34,7 @@ let ty_of_const = function
 let rec infer_pattern (p, pos) =
   (* We do not check for overlaps as all identifiers are distinct - desugar needs to do those *)
   if !disable_typing then simple Type.universal_ty else
-  let unify = Scheme.gather_pattern_scheme ~pos in
+  let unify = Scheme.finalize_pattern_scheme ~pos in
   let ty_sch = match p with
   | Pattern.Var x ->
       let ty = Type.fresh_ty () in
@@ -95,7 +95,7 @@ let rec infer_pattern (p, pos) =
    [env]. It returns the inferred type of [e]. *)
 let rec infer_expr env (e, pos) =
   if !disable_typing then simple Type.universal_ty else
-  let unify = Scheme.gather_ty_scheme ~pos in
+  let unify = Scheme.finalize_ty_scheme ~pos in
   let ty_sch = match e with
 
   | Core.Var x ->
@@ -241,7 +241,7 @@ let rec infer_expr env (e, pos) =
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp env (c, pos) =
   if !disable_typing then simple Type.universal_dirty else
-  let unify = Scheme.gather_dirty_scheme ~pos in
+  let unify = Scheme.finalize_dirty_scheme ~pos in
   let drty_sch = match c with
 
   | Core.Value e ->
@@ -375,7 +375,7 @@ and infer_comp env (c, pos) =
 and infer_abstraction env (p, c) =
   let ctx_p, ty_p, cnstrs_p = infer_pattern p in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
-  match Scheme.gather_ty_scheme ~pos:(snd c) ctx_c (Type.Arrow (ty_p, drty_c)) [
+  match Scheme.finalize_ty_scheme ~pos:(snd c) ctx_c (Type.Arrow (ty_p, drty_c)) [
     trim_context ~pos:(snd c) ctx_p;
     just cnstrs_p;
     just cnstrs_c
@@ -387,7 +387,7 @@ and infer_abstraction2 env (p1, p2, c) =
   let ctx_p1, ty_p1, cnstrs_p1 = infer_pattern p1 in
   let ctx_p2, ty_p2, cnstrs_p2 = infer_pattern p2 in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
-  match Scheme.gather_ty_scheme ~pos:(snd c) ctx_c (Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c)) [
+  match Scheme.finalize_ty_scheme ~pos:(snd c) ctx_c (Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c)) [
   trim_context ~pos:(snd c) (ctx_p1 @ ctx_p2);
     just cnstrs_p1;
     just cnstrs_p2;
@@ -414,7 +414,7 @@ and infer_let ~pos env defs =
     in
     let env, ctxp =
       if nonexpansive (fst c) then
-        let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.gather_ty_scheme ~pos ctx_c t changes)) ctx_p env in
+        let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctx_c t changes)) ctx_p env in
         env, ctxp
       else
         env, ctx_p @ ctxp
@@ -423,7 +423,7 @@ and infer_let ~pos env defs =
   in
   let env, ctxs, ctxp, vars, cstrs = List.fold_right add_binding defs (env, [], [], [], []) in
   env, vars, fun (ctx2, (tc, dc), cstr_c) ->
-    Scheme.gather_dirty_scheme ~pos (ctxs @ ctx2) (tc, drt) ([
+    Scheme.finalize_dirty_scheme ~pos (ctxs @ ctx2) (tc, drt) ([
           dirt_less ~pos dc drt;
           trim_context ~pos ctxp;
           just cstr_c;
@@ -442,6 +442,6 @@ and infer_let_rec ~pos env defs =
     trim_context ~pos vars
   ] @ cnstrs
  in
-  let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.gather_ty_scheme ~pos ctx t cnstrs)) vars env in
+  let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctx t cnstrs)) vars env in
   env, vars, fun (ctx2, (tc, dc), cstr_c) ->
-  Scheme.gather_dirty_scheme ~pos (ctx @ ctx2) (tc, dc) (just cstr_c :: cnstrs)
+  Scheme.finalize_dirty_scheme ~pos (ctx @ ctx2) (tc, dc) (just cstr_c :: cnstrs)

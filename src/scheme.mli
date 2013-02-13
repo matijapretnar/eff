@@ -36,17 +36,17 @@ val trim_context :
   context ->
   change
 
-val gather_ty_scheme :
+val finalize_ty_scheme :
   pos:Common.position ->
   context ->
   Type.ty ->
   change list -> context * Type.ty * Constraints.t
-val gather_dirty_scheme :
+val finalize_dirty_scheme :
   pos:Common.position ->
   context ->
   Type.dirty ->
   change list -> context * Type.dirty * Constraints.t
-val gather_pattern_scheme :
+val finalize_pattern_scheme :
   pos:'a ->
   context ->
   Type.ty ->

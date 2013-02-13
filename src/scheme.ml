@@ -183,14 +183,12 @@ let pos_neg_tyscheme get_variances (ctx, ty, cnstrs) =
   Trio.uniq posi, Trio.uniq nega
 
 
-
-let pos_neg_ty_scheme (ctx, ty, cnstrs, _) =
+let pos_neg_ty_scheme (ctx, ty, cnstrs) =
   pos_neg_tyscheme Tctx.get_variances (ctx, ty, cnstrs)
 
 
-let collect ((pos_ts, pos_ds, pos_rs), (neg_ts, neg_ds, neg_rs)) (ctx, ty, cnstrs, _) =
-  let cnstrs' = Constraints.garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) cnstrs in
-  ctx, ty, cnstrs'
+let garbage_collect pos neg (ctx, ty, cnstrs) =
+  ctx, ty, Constraints.garbage_collect pos neg cnstrs
 
 let normalize_context ~pos (ctx, ty, cstr, sbst) =
   let collect (x, ty) ctx =
@@ -211,22 +209,31 @@ let normalize_context ~pos (ctx, ty, cstr, sbst) =
   in
   List.fold_right add ctx ([], ty, cstr, sbst)
 
-let gather_ty_scheme ~pos ctx ty chngs =
-  let ty_sch = List.fold_right (fun chng -> chng) chngs (ctx, ty, Constraints.empty, Type.identity_subst) in
-  let ty_sch = normalize_context ~pos ty_sch in
-  let pos_neg = pos_neg_ty_scheme ty_sch in
-  collect pos_neg ty_sch
+let subst_ty_scheme sbst (ctx, ty, cnstrs) =
+  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst_constraints sbst cnstrs
 
-let gather_dirty_scheme ~pos ctx drty chngs =
-  match gather_ty_scheme ~pos ctx (Type.Arrow (Type.unit_ty, drty)) chngs with
+let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
+  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_dirty sbst drty, Constraints.subst_constraints sbst cnstrs
+
+let finalize ctx ty chngs =
+  let ctx, ty, cnstrs, sbst = List.fold_right Common.id chngs (ctx, ty, Constraints.empty, Type.identity_subst) in
+  subst_ty_scheme sbst (ctx, ty, cnstrs)
+
+let finalize_ty_scheme ~pos ctx ty chngs =
+  let ty_sch = finalize ctx ty (normalize_context ~pos :: chngs) in
+  let pos, neg = pos_neg_ty_scheme ty_sch in
+  garbage_collect pos neg ty_sch
+
+let finalize_dirty_scheme ~pos ctx drty chngs =
+  match finalize_ty_scheme ~pos ctx (Type.Arrow (Type.unit_ty, drty)) chngs with
   | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
   | _ -> assert false
 
-let gather_pattern_scheme ~pos ctx ty chngs =
-  let ty_sch = List.fold_right (fun chng -> chng) chngs (ctx, ty, Constraints.empty, Type.identity_subst) in
+let finalize_pattern_scheme ~pos ctx ty chngs =
+  let ty_sch = finalize ctx ty chngs in
   (* Note that we change the polarities in pattern types *)
-  let (neg, pos) = pos_neg_ty_scheme ty_sch in
-  collect (pos, neg) ty_sch
+  let neg, pos = pos_neg_ty_scheme ty_sch in
+  garbage_collect pos neg ty_sch
 
 
 let context ctx ppf =
@@ -234,22 +241,20 @@ let context ctx ppf =
   | [] -> ()
   | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence "," (fun (x, t) ppf -> Print.print ppf "%t : %t" (Print.variable x) (Type.print t)) ctx)
 
-let print_ty_scheme (ctx, t, cstrs) ppf =
+let print_ty_scheme ty_sch ppf =
   let sbst = Type.beautifying_subst () in
-  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
-  let t = Type.subst_ty sbst t in
-  let cstrs = Constraints.subst_constraints sbst cstrs in
-  Print.print ppf "%t%t | %t" (context ctx) (Type.print t) (Constraints.print cstrs)
+  let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in
+  Print.print ppf "%t%t | %t"
+    (context ctx)
+    (Type.print ty)
+    (Constraints.print cnstrs)
 
-let print_dirty_scheme (ctx, (t, drt), cstrs) ppf =
+let print_dirty_scheme drty_sch ppf =
   let sbst = Type.beautifying_subst () in
-  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
-  let t = Type.subst_ty sbst t in
-  let drt = Type.subst_dirt sbst drt in
-  let cstrs = Constraints.subst_constraints sbst cstrs in
+  let (ctx, (ty, drt), cnstrs) = subst_dirty_scheme sbst drty_sch in
   Print.print ppf "%t%t ! %t | %t"
     (context ctx)
-    (Type.print t)
+    (Type.print ty)
     (Type.print_dirt drt)
-    (Constraints.print cstrs)
+    (Constraints.print cnstrs)
 
