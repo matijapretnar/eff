@@ -159,7 +159,7 @@ and veval env (e, pos) = match e with
   | Core.Var x ->
       begin match lookup x env with
       | Some v -> v
-      | None -> Error.runtime "Name %t is not defined." (Print.variable x)
+      | None -> Error.runtime "Name %t is not defined." (Newprint.variable x)
       end
   | Core.Const c -> V.Const c
   | Core.Tuple es -> V.Tuple (List.map (veval env) es)

@@ -232,25 +232,25 @@ let pos_neg_params get_variances ty =
   in
   Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)
 
-let region_param ?(non_poly=Trio.empty) ((Region_Param k) as p) ppf =
+let print_region_param ?(non_poly=Trio.empty) ((Region_Param k) as p) ppf =
   let (_, _, rs) = non_poly in
   let c = (if List.mem p rs then "_" else "") in
     Newprint.print ppf "%sr%i" c (k + 1)
 
-let presence_param ?(non_poly=Trio.empty) ((Presence_Param k) as p) ppf =
+let print_presence_param ?(non_poly=Trio.empty) ((Presence_Param k) as p) ppf =
   let (_, ds, _) = non_poly in
   let c = (if List.mem p ds then "_" else "") in
     Newprint.print ppf "%sd%i" c (k + 1)
 
 let dirt_bound ?non_poly r_ops =
-  Newprint.sequence "," (fun (op, dt) ppf -> Newprint.print ppf "%s:%t" op (presence_param dt)) r_ops
+  Newprint.sequence "," (fun (op, dt) ppf -> Newprint.print ppf "%s:%t" op (print_presence_param dt)) r_ops
 
-let dirt ?(non_poly=Trio.empty) drt ppf =
+let print_dirt ?(non_poly=Trio.empty) drt ppf =
   match drt.ops with
-  | [] -> presence_param ~non_poly drt.rest ppf
-  | _ -> Newprint.print ppf "%t; %t" (dirt_bound ~non_poly drt.ops) (presence_param ~non_poly drt.rest)
+  | [] -> print_presence_param ~non_poly drt.rest ppf
+  | _ -> Newprint.print ppf "%t; %t" (dirt_bound ~non_poly drt.ops) (print_presence_param ~non_poly drt.rest)
 
-let ty_param ?(non_poly=Trio.empty) p ppf =
+let print_ty_param ?(non_poly=Trio.empty) p ppf =
   let (ps, _, _) = non_poly in
   let (Ty_Param k) = p in
   let c = (if List.mem p ps then "'_" else "'") in
@@ -261,6 +261,10 @@ let ty_param ?(non_poly=Trio.empty) p ppf =
     then Newprint.print ppf "%s%c" c (char_of_int (k + int_of_char 'a'))
     else Newprint.print ppf "%st%i" c (k - 25)
 
+let print_instance_param (Instance_Param i) ppf =
+  Newprint.print ppf "#%d" i
+
+
 let rec print ?(non_poly=Trio.empty) t ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = Newprint.print ?max_level ?at_level ppf in
@@ -269,7 +273,7 @@ let rec print ?(non_poly=Trio.empty) t ppf =
     | Arrow (t1, (t2, drt)) ->
         print ~at_level:5 "@[<h>%t -%t->@ %t@]"
         (ty ~max_level:4 t1)
-        (dirt ~non_poly drt)
+        (print_dirt ~non_poly drt)
         (* (fresh_instances frsh) *)
         (ty ~max_level:5 t2)
         (* print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2) *)
@@ -282,20 +286,20 @@ let rec print ?(non_poly=Trio.empty) t ppf =
       end
     | Effect (t, (lst, _, _), rgn) ->
       begin match lst with
-        | [] -> print "%s[%t]" t (region_param ~non_poly rgn)
-        | [s] -> print ~at_level:1 "%t %s[%t]" (ty ~max_level:1 s) t (region_param ~non_poly rgn)
-        | ts -> print ~at_level:1 "(%t) %s[%t]" (Newprint.sequence "," ty ts) t (region_param ~non_poly rgn)
+        | [] -> print "%s[%t]" t (print_region_param ~non_poly rgn)
+        | [s] -> print ~at_level:1 "%t %s[%t]" (ty ~max_level:1 s) t (print_region_param ~non_poly rgn)
+        | ts -> print ~at_level:1 "(%t) %s[%t]" (Newprint.sequence "," ty ts) t (print_region_param ~non_poly rgn)
       end
 (*       begin match lst with
         | [] -> print "%s" t
         | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
         | ts -> print ~at_level:1 "(%t) %s" (Newprint.sequence "," ty ts) t
       end
- *)    | TyParam p -> ty_param ~non_poly p ppf
+ *)    | TyParam p -> print_ty_param ~non_poly p ppf
     | Tuple [] -> print "unit"
     | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Newprint.sequence " *" (ty ~max_level:1) ts)
     | Handler ((t1, drt1), (t2, drt2)) ->
-        print ~at_level:4 "%t ! %t =>@ %t ! %t" (ty ~max_level:2 t1) (dirt ~non_poly drt1) (ty t2) (dirt ~non_poly drt2)
+        print ~at_level:4 "%t ! %t =>@ %t ! %t" (ty ~max_level:2 t1) (print_dirt ~non_poly drt1) (ty t2) (print_dirt ~non_poly drt2)
   in ty t ppf
 
 

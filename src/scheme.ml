@@ -239,3 +239,29 @@ let gather_pattern_scheme ~pos ctx ty chngs =
   (* Note that we change the polarities in pattern types *)
   let (neg, pos) = pos_neg_ty_scheme ty_sch in
   collect (pos, neg) ty_sch
+
+
+let context ctx ppf =
+  match ctx with
+  | [] -> ()
+  | _ -> Newprint.print ppf "(@[%t@]).@ " (Newprint.sequence "," (fun (x, t) ppf -> Newprint.print ppf "%t : %t" (Newprint.variable x) (Type.print t)) ctx)
+
+let print_ty_scheme (ctx, t, cstrs) ppf =
+  let sbst = Type.beautifying_subst () in
+  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  let t = Type.subst_ty sbst t in
+  let cstrs = Constraints.subst_constraints sbst cstrs in
+  Newprint.print ppf "%t%t | %t" (context ctx) (Type.print t) (Constraints.print cstrs)
+
+let print_dirty_scheme (ctx, (t, drt), cstrs) ppf =
+  let sbst = Type.beautifying_subst () in
+  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  let t = Type.subst_ty sbst t in
+  let drt = Type.subst_dirt sbst drt in
+  let cstrs = Constraints.subst_constraints sbst cstrs in
+  Newprint.print ppf "%t%t ! %t | %t"
+    (context ctx)
+    (Type.print t)
+    (Type.print_dirt drt)
+    (Constraints.print cstrs)
+

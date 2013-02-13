@@ -17,3 +17,6 @@ let rec sequence sep pp vs ppf =
   | [] -> ()
   | [v] -> pp v ppf
   | v :: vs -> Format.fprintf ppf "%t%s@ %t" (pp v) sep (sequence sep pp vs)
+
+
+let variable (_, x) ppf = print ppf "%s" x

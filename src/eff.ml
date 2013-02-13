@@ -103,7 +103,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
                        match Eval.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.printf "@[val %t = %t@]@." (Print.variable x) (* (Print.beautified_ty_scheme tysch)  *)(Print.value v))
+                         Format.printf "@[val %t = %t@]@." (Newprint.variable x) (* (Print.beautified_ty_scheme tysch)  *)(Print.value v))
             vars
         end;
         (ctx, env)
@@ -113,7 +113,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
       List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env = Eval.extend_let_rec env defs in
         if interactive then begin
-          List.iter (fun (x, _) -> Format.printf "@[val %t = <fun>@]@." (Print.variable x) (* (Print.beautified_ty_scheme tysch) *)) vars
+          List.iter (fun (x, _) -> Format.printf "@[val %t = <fun>@]@." (Newprint.variable x) (* (Print.beautified_ty_scheme tysch) *)) vars
         end;
         (ctx, env)
   | Syntax.External (x, t, f) ->
@@ -149,13 +149,13 @@ let rec exec_cmd interactive (ctx, env) e =
       let drty_sch = infer_top_comp ctx c in
       let v = Eval.run env c in
       if interactive then Format.printf "@[- : %t = %t@]@."
-        (Print.dirty_scheme drty_sch)
+        (Scheme.print_dirty_scheme drty_sch)
         (Print.value v);
       (ctx, env)
   | Syntax.TypeOf c ->
       let c = Desugar.top_computation c in
       let drty_sch = infer_top_comp ctx c in
-      Format.printf "@[%t@]@." (Print.dirty_scheme drty_sch);
+      Format.printf "@[%t@]@." (Scheme.print_dirty_scheme drty_sch);
       (ctx, env)
   | Syntax.Reset ->
       Tctx.reset ();

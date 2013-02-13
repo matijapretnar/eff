@@ -88,7 +88,7 @@ let rec infer_pattern (p, pos) =
         end
       end
   in
-  Print.debug "%t : %t" (Print.pattern (p, pos)) (Print.ty_scheme ty_sch);
+  Print.debug "%t : %t" (Print.pattern (p, pos)) (Scheme.print_ty_scheme ty_sch);
   ty_sch
 
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
@@ -234,7 +234,7 @@ let rec infer_expr env (e, pos) =
           just cstr_fin
         ] @ cnstrs_ops @ cnstrs)
   in
-  Print.debug "%t : %t" (Print.expression (e, pos)) (Print.ty_scheme ty_sch);
+  Print.debug "%t : %t" (Print.expression (e, pos)) (Scheme.print_ty_scheme ty_sch);
   ty_sch
               
 (* [infer_comp env cstr (c,pos)] infers the type of computation [c] in context [env].
@@ -369,7 +369,7 @@ and infer_comp env (c, pos) =
       simple (T.unit_ty, empty_dirt ())
 
   in
-  Print.debug "%t : %t" (Print.computation (c, pos)) (Print.dirty_scheme drty_sch);
+  Print.debug "%t : %t" (Print.computation (c, pos)) (Scheme.print_dirty_scheme drty_sch);
   drty_sch
 
 and infer_abstraction env (p, c) =

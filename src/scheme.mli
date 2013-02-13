@@ -51,3 +51,6 @@ val gather_pattern_scheme :
   context ->
   Type.ty ->
   change list -> context * Type.ty * Constraints.t
+
+val print_ty_scheme : ty_scheme -> Format.formatter -> unit
+val print_dirty_scheme : dirty_scheme -> Format.formatter -> unit
