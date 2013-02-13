@@ -45,16 +45,17 @@ struct
     S.elements outx
 
   let add_edge x y (g : t) =
+    if x = y then g else
     let (inx, outx, infx, supx) = get x g
     and (iny, outy, infy, supy) = get y g in
     let left = S.add x (S.diff inx iny)
     and right = S.add y (S.diff outy outx) in
     let extend_left l grph =
       let (inl, outl, infl, supl) = get l grph in
-      G.add l (inl, S.union outl right, infl, inf supl supy) grph
+      G.add l (inl, S.union outl (S.remove l right), infl, inf supl supy) grph
     and extend_right r grph =
       let (inr, outr, infr, supr) = get r grph in
-      G.add r (S.union inr left, outr, sup infx infr, supr) grph in
+      G.add r (S.union inr (S.remove r left), outr, sup infx infr, supr) grph in
     S.fold extend_left left (S.fold extend_right right g)
 
   let add_vertex x (g : t) =

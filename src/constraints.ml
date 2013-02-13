@@ -119,9 +119,9 @@ let rec sequence2 sep pps ppf =
   | pp :: pps -> Format.fprintf ppf "%t%s@ %t" pp sep (sequence2 sep pps)
 
 let print ?(non_poly=Trio.empty) g ppf =
-  let pps = fold_ty (fun p1 p2 lst -> if p1 = p2 then lst else less (Type.print_ty_param ~non_poly) p1 p2 :: lst) g [] in
-  let pps = fold_dirt (fun d1 d2 lst -> if d1 = d2 then lst else less (Type.print_presence_param ~non_poly) d1 d2 :: lst) g pps in
-  let pps = fold_region (fun r1 r2 lst -> if r1 = r2 then lst else less (Type.print_region_param ~non_poly) r1 r2 :: lst) g pps in
+  let pps = fold_ty (fun p1 p2 lst -> less (Type.print_ty_param ~non_poly) p1 p2 :: lst) g [] in
+  let pps = fold_dirt (fun d1 d2 lst -> less (Type.print_presence_param ~non_poly) d1 d2 :: lst) g pps in
+  let pps = fold_region (fun r1 r2 lst -> less (Type.print_region_param ~non_poly) r1 r2 :: lst) g pps in
   let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (Type.print_region_param ~non_poly) print_region_bound r bound1 (* bound2 *) pps) (Region.bounds g.region_graph) pps in
   let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (Type.print_presence_param ~non_poly) print_dirt_bound r bound1 (* bound2 *) pps) (Dirt.bounds g.dirt_graph) pps in
   Print.print ppf "%t"
