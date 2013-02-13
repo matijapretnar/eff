@@ -1,3 +1,7 @@
+type presence =
+  | Region of Type.region_param
+  | Without of Type.presence_param * Type.region_param list
+
 module Ty = Graph.Make(struct
   type t = Type.ty_param
   type lower_bound = unit
@@ -22,7 +26,7 @@ end)
 
 module Dirt = Graph.Make(struct
   type t = Type.presence_param
-  type lower_bound = Type.presence list
+  type lower_bound = presence list
   type upper_bound = unit
   let inf () () = ()
   let sup prs1 prs2 = prs1 @ prs2
@@ -48,9 +52,14 @@ let remove_dirt g x =
 let get_succ g x =
   Dirt.get_succ x g.dirt_graph
 
+let subst_presence sbst = function
+  | Region r -> Region (sbst.Type.region_param r)
+  | Without (p, rs) -> Without (sbst.Type.presence_param p, List.map sbst.Type.region_param rs)
+
+
 let subst_constraints sbst cnstr = {
   ty_graph = Ty.map (fun p -> match sbst.Type.ty_param p with Type.TyParam q -> q | _ -> assert false) (fun () -> ()) (fun () -> ()) cnstr.ty_graph;
-  dirt_graph = Dirt.map sbst.Type.presence_param (List.map (Type.subst_presence sbst)) (fun () -> ()) cnstr.dirt_graph;
+  dirt_graph = Dirt.map sbst.Type.presence_param (List.map (subst_presence sbst)) (fun () -> ()) cnstr.dirt_graph;
   region_graph = Region.map sbst.Type.region_param (fun insts -> Common.option_map (fun insts -> List.map (fun ins -> match sbst.Type.instance_param ins with Some i -> i | None -> assert false) insts) insts) (fun () -> ()) cnstr.region_graph;
 }
 
@@ -72,13 +81,6 @@ let add_region_constraint rgn1 rgn2 cstr =
 
 let add_presence_bound d bnd cstr =
   {cstr with dirt_graph = Dirt.add_lower_bound d bnd cstr.dirt_graph }
-
-let join_constraints cstr1 cstr2 = 
-  {
-    ty_graph = Ty.join cstr1.ty_graph cstr2.ty_graph;
-    dirt_graph = Dirt.join cstr1.dirt_graph cstr2.dirt_graph;
-    region_graph = Region.join cstr1.region_graph cstr2.region_graph;
-  }
 
 let join_disjoint_constraints cstr1 cstr2 = 
   {

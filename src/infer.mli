@@ -1,6 +1,5 @@
 val warn_implicit_sequencing : bool ref
 val disable_typing : bool ref
-val nonexpansive : Core.plain_computation -> bool
 val infer_let :
  pos:Common.position -> Ctx.t -> (Core.variable Pattern.t * Core.computation) list ->
    Ctx.t * Core.variable list * (Scheme.dirty_scheme -> Scheme.dirty_scheme)

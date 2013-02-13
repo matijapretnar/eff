@@ -88,8 +88,8 @@ let presence_param ?(non_poly=Trio.empty) ((Type.Presence_Param k) as p) ppf =
 
 let rec presence ?(non_poly=Trio.empty) drt ppf =
   match drt with
-  | Type.Region r -> region_param ~non_poly r ppf
-  | Type.Without (prs, rs) -> print ppf "%t - [%t]" (presence_param prs) (sequence "," (region_param) rs)
+  | Constraints.Region r -> region_param ~non_poly r ppf
+  | Constraints.Without (prs, rs) -> print ppf "%t - [%t]" (presence_param prs) (sequence "," (region_param) rs)
 
 let dirt_bound ?non_poly r_ops =
   sequence "," (fun (op, dt) ppf -> print ppf "%s:%t" op (presence_param dt)) r_ops

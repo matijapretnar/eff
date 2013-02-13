@@ -23,10 +23,6 @@ type ty =
 
 and dirty = ty * dirt
 
-and presence =
-  | Region of region_param
-  | Without of presence_param * region_param list
-
 and dirt = {
   ops: (Common.opsym, presence_param) Common.assoc;
   rest: presence_param
@@ -82,10 +78,6 @@ let rec subst_ty sbst = function
       let ty1 = subst_ty sbst ty1 in
       let drty2 = subst_dirty sbst drty2 in
       Handler ((ty1, subst_dirt sbst drt), drty2)
-
-and subst_presence sbst = function
-  | Region r -> Region (sbst.region_param r)
-  | Without (p, rs) -> Without (sbst.presence_param p, List.map sbst.region_param rs)
 
 and subst_dirt sbst drt =
   let ops = Common.assoc_map sbst.presence_param drt.ops in

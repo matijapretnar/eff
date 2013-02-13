@@ -167,15 +167,15 @@ let pos_neg_tyscheme get_variances (ctx, ty, cnstrs) =
   in
   let (((_, pos_ds, _) as pos), neg) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params get_variances ty) in
   let add_dirt_bound bnd posi = match bnd with
-  | Type.Region _ -> posi
-  | Type.Without (d, _) -> d :: posi
+  | Constraints.Region _ -> posi
+  | Constraints.Without (d, _) -> d :: posi
   in
   let posi_dirts = List.fold_right (fun (d, bnds, _) posi ->
                                       match bnds with None -> posi | Some bnds -> if List.mem d pos_ds then List.fold_right add_dirt_bound bnds posi else posi) (Constraints.Dirt.bounds cnstrs.Constraints.dirt_graph) [] in
   let pos = ([], posi_dirts, []) @@@ pos in
   let add_region_bound bnd (posi, nega) = match bnd with
-  | Type.Region r -> (([], [], [r]) @@@ posi, nega) 
-  | Type.Without (d, rs) -> (([], [d], rs) @@@ posi, nega)
+  | Constraints.Region r -> (([], [], [r]) @@@ posi, nega) 
+  | Constraints.Without (d, rs) -> (([], [d], rs) @@@ posi, nega)
   in
   let (((_, pos_ds, _) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
   let (posi, nega) = List.fold_right (fun (d, bnds, _) (posi, nega) ->
