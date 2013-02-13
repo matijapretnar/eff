@@ -46,7 +46,6 @@ sig
   (** Filter edges of the graph. *)
   val filter_edges : (elt -> elt -> bool) -> t -> t
 
-  val join : t -> t -> t
   val union : t -> t -> t
 
   val map : (elt -> elt) -> (lower_bound -> lower_bound) -> (upper_bound -> upper_bound) -> t -> t

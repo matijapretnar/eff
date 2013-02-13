@@ -93,9 +93,6 @@ struct
   let fold_edges f grph acc =
     G.fold (fun x (_, outx, _, _) acc -> S.fold (fun y acc -> f x y acc) outx acc) grph acc
 
-  let join grph1 grph2 =
-    fold_edges add_edge grph1 grph2
-
   let union = G.fold G.add
 
   let bounds grph =
