@@ -56,7 +56,7 @@ type substitution = {
   ty_param : ty_param -> ty;
   presence_param : presence_param -> presence_param;
   region_param : region_param -> region_param;
-  instance_param : instance_param -> instance_param option;
+  instance_param : instance_param -> instance_param;
   presence_rest : presence_param -> dirt;
 }
 
@@ -101,7 +101,7 @@ let identity_subst =
     ty_param = (fun p -> TyParam p);
     presence_param = Common.id;
     region_param = Common.id;
-    instance_param = (fun i -> Some i);
+    instance_param = Common.id;
     presence_rest = (fun d -> { ops = []; rest = d })
   }
 
@@ -112,7 +112,7 @@ let compose_subst sbst1 sbst2 =
     ty_param = Common.compose (subst_ty sbst1) sbst2.ty_param;
     presence_param = Common.compose sbst1.presence_param sbst2.presence_param;
     region_param = Common.compose sbst1.region_param sbst2.region_param;
-    instance_param = (fun i -> match sbst2.instance_param i with None -> None | Some j -> sbst1.instance_param j);
+    instance_param = Common.compose sbst2.instance_param sbst1.instance_param;
     presence_rest = Common.compose (subst_dirt sbst1) sbst2.presence_rest;
   }
 
@@ -170,7 +170,7 @@ let beautifying_subst () =
       ty_param = refresher (Common.fresh (fun n -> TyParam (Ty_Param n)));
       presence_param = presence_param;
       region_param = refresher (Common.fresh (fun n -> Region_Param n));
-      instance_param = refresher (Common.fresh (fun n -> Some (Instance_Param n)));
+      instance_param = refresher (Common.fresh (fun n -> Instance_Param n));
       presence_rest = fun n -> { ops = []; rest = presence_param n }
     }
 
@@ -182,12 +182,6 @@ let refreshing_subst () =
     presence_param = refresh_presence_param;
     region_param = refresher fresh_region_param;
     presence_rest = fun p -> { ops = []; rest = refresh_presence_param p }
-  }
-
-let instance_refreshing_subst () =
-  {
-    identity_subst with
-    instance_param = (let refresh = refresher fresh_instance_param in fun i -> Some (refresh i))
   }
 
 let refresh ty =

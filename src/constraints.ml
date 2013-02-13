@@ -13,13 +13,9 @@ end)
 
 module Region = Graph.Make(struct
   type t = Type.region_param
-  type lower_bound = (Type.instance_param list) option
+  type lower_bound = Type.instance_param list
   type upper_bound = unit
-  let sup rgn1 rgn2 =
-    match rgn1, rgn2 with
-    | Some insts1, Some insts2 -> Some (Common.uniq (insts1 @ insts2))
-    | Some insts, None | None, Some insts -> Some insts
-    | None, None -> None
+  let sup insts1 insts2 = Common.uniq (insts1 @ insts2)
   let inf () () = ()
   let compare = Pervasives.compare
 end)
@@ -60,7 +56,7 @@ let subst_presence sbst = function
 let subst_constraints sbst cnstr = {
   ty_graph = Ty.map (fun p -> match sbst.Type.ty_param p with Type.TyParam q -> q | _ -> assert false) (fun () -> ()) (fun () -> ()) cnstr.ty_graph;
   dirt_graph = Dirt.map sbst.Type.presence_param (fun prs -> Common.uniq (List.map (subst_presence sbst) prs)) (fun () -> ()) cnstr.dirt_graph;
-  region_graph = Region.map sbst.Type.region_param (fun insts -> Common.option_map (fun insts -> List.map (fun ins -> match sbst.Type.instance_param ins with Some i -> i | None -> assert false) insts) insts) (fun () -> ()) cnstr.region_graph;
+  region_graph = Region.map sbst.Type.region_param (List.map (sbst.Type.instance_param)) (fun () -> ()) cnstr.region_graph;
 }
 
 let fold_ty f g acc = Ty.fold_edges f g.ty_graph acc
@@ -68,7 +64,7 @@ let fold_region f g acc = Region.fold_edges f g.region_graph acc
 let fold_dirt f g acc = Dirt.fold_edges f g.dirt_graph acc
 
 let add_region_low_bound i r cstr =
-  {cstr with region_graph = Region.add_lower_bound r (Some [i]) cstr.region_graph}
+  {cstr with region_graph = Region.add_lower_bound r [i] cstr.region_graph}
 
 let add_ty_constraint ty1 ty2 cstr =
   {cstr with ty_graph = Ty.add_edge ty1 ty2 cstr.ty_graph}
@@ -100,9 +96,7 @@ let less pp p1 p2 ppf =
   Print.print ppf "%t <= %t" (pp p1) (pp p2)
 
 let print_region_bound insts ppf =
-  match insts with
-  | None -> Print.print ppf "X"
-  | Some insts -> Print.sequence "," Type.print_instance_param insts ppf
+  Print.sequence "," Type.print_instance_param insts ppf
 
 let rec print_presence ?(non_poly=Trio.empty) drt ppf =
   match drt with
