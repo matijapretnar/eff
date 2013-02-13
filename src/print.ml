@@ -23,6 +23,12 @@ let variable (_, x) ppf = print ppf "%s" x
 
 and field pp (f, v) ppf = fprintf ppf "%s = %t" f (pp v)
 
+let tuple pp lst ppf =
+  print ppf "(@[<hov>%t@])" (sequence "," pp lst)
+
+let record pp lst ppf =
+  print ppf "{@[<hov>%t@]}" (sequence ";" (field pp) lst)
+
 let to_string m =
   (Format.kfprintf (fun _ -> Format.flush_str_formatter ()) Format.str_formatter) m
 

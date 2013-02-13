@@ -58,8 +58,8 @@ let rec print_pattern ?max_level (p,_) ppf =
   | Pattern.Var x -> print "%t" (Print.variable x)
   | Pattern.As (p, x) -> print "%t as %t" (print_pattern p) (Print.variable x)
   | Pattern.Const c -> Common.print_const c ppf
-  | Pattern.Tuple lst -> print "(@[<hov>%t@])" (Print.sequence "," print_pattern lst)
-  | Pattern.Record lst -> print "{@[<hov>%t@]}" (Print.sequence ";" (Print.field print_pattern) lst)
+  | Pattern.Tuple lst -> Print.tuple print_pattern lst ppf
+  | Pattern.Record lst -> Print.record print_pattern lst ppf
   | Pattern.Variant (lbl, None) when lbl = Common.nil -> print "[]"
   | Pattern.Variant (lbl, None) -> print "%s" lbl
   | Pattern.Variant (lbl, Some (Pattern.Tuple [v1; v2], _)) when lbl = Common.cons ->
@@ -99,8 +99,8 @@ and print_expression ?max_level e ppf =
   match fst e with
   | Var x -> print "%t" (Print.variable x)
   | Const c -> print "%t" (Common.print_const c)
-  | Tuple lst -> print "(@[<hov>%t@])" (Print.sequence "," print_expression lst)
-  | Record lst -> print "{@[<hov>%t@]}" (Print.sequence ";" (Print.field print_expression) lst)
+  | Tuple lst -> Print.tuple print_expression lst ppf
+  | Record lst -> Print.record print_expression lst ppf
   | Variant (lbl, None) -> print "%s" lbl
   | Variant (lbl, Some e) ->
     print ~at_level:1 "%s @[<hov>%t@]" lbl (print_expression e)

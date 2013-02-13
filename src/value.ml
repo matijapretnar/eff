@@ -61,8 +61,8 @@ let rec print_value ?max_level v ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match v with
   | Const c -> Common.print_const c ppf
-  | Tuple lst -> print "(@[<hov>%t@])" (Print.sequence "," print_value lst)
-  | Record lst -> print "{@[<hov>%t@]}" (Print.sequence ";" (Print.field print_value) lst)
+  | Tuple lst -> Print.tuple print_value lst ppf
+  | Record lst -> Print.record print_value lst ppf
   | Variant (lbl, None) when lbl = Common.nil -> print "[]"
   | Variant (lbl, None) -> print "%s" lbl
   | Variant (lbl, Some (Tuple [v1; v2])) when lbl = Common.cons ->
