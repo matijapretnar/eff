@@ -101,6 +101,9 @@ struct
   let bounds grph =
     G.fold (fun x (inx, outx, infx, supx) acc -> (x, infx, supx) :: acc) grph []
 
+  let leaves grph =
+    G.fold (fun x (inx, outx, infx, supx) acc -> if S.is_empty inx then (x, infx, supx) :: acc else acc) grph []
+
   let filter_edges p grph =
     let g = G.fold (fun x (inx, outx, infx, supx) acc -> G.add x (S.empty, S.empty, infx, supx) acc) grph G.empty in
     fold_edges (fun x y acc -> if p x y then add_edge x y acc else acc) grph g

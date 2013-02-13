@@ -41,6 +41,7 @@ sig
   (* val fold_vertices : (elt -> (elt * Common.position) list -> (elt * Common.position) list -> bound -> bound -> 'a -> 'a) -> t -> 'a -> 'a *)
 
   val bounds : t -> (elt * V.lower_bound option * V.upper_bound option) list
+  val leaves : t -> (elt * V.lower_bound option * V.upper_bound option) list
 
   (** Filter edges of the graph. *)
   val filter_edges : (elt -> elt -> bool) -> t -> t
