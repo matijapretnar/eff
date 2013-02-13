@@ -127,50 +127,16 @@ struct
   let collect pos neg grph =
     let pos = List.fold_right S.add pos S.empty
     and neg = List.fold_right S.add neg S.empty in
-    let collect x (inx, outx, infx, supx) (pos_prop, neg_prop, grph) =
+    let collect x (inx, outx, infx, supx) grph =
       let x_pos = S.mem x pos
       and x_neg = S.mem x neg in
       let inx, infx = if x_pos then (S.inter neg inx, infx) else (S.empty, None)
       and outx, supx = if x_neg then (S.inter pos outx, supx) else (S.empty, None) in
       match S.cardinal inx + S.cardinal outx, infx, supx with
-      | 0, None, None -> pos_prop, neg_prop, grph
-      | _, _, _ ->
-          let grph = G.add x (inx, outx, infx, supx) grph in
-          begin match x_pos, x_neg with
-          | true, true -> pos_prop, neg_prop, grph
-          | false, true -> pos_prop, ((x, (outx, supx)) :: neg_prop), grph
-          | true, false -> ((x, (inx, infx)) :: pos_prop), neg_prop, grph
-          | false, false -> assert false
-          end
+      | 0, None, None -> grph
+      | _, _, _ -> G.add x (inx, outx, infx, supx) grph
     in
-    let pos_prop, neg_prop, grph = G.fold collect grph ([], [], G.empty) in
-    let pos_prop = List.sort (fun (_, prop) (_, prop') -> Pervasives.compare prop prop') pos_prop
-    and neg_prop = List.sort (fun (_, prop) (_, prop') -> Pervasives.compare prop prop') neg_prop in
-    let similar_subst lst =
-      let rec gather_aux acc current current_prop = function
-      | [] -> current :: acc
-      | (x, prop) :: rest ->
-          if prop = current_prop then
-            gather_aux acc (x :: current) current_prop rest
-          else
-            gather_aux (current :: acc) [x] prop rest
-      in
-      let rec add_subst group sbst =
-        match group with
-        | [] -> assert false
-        | x :: xs -> List.map (fun y -> (x, y)) xs @ sbst
-      in
-      match lst with
-      | [] -> []
-      | (x, prop) :: rest ->
-        let groups = gather_aux [] [x] prop rest in
-        List.fold_right add_subst groups []
-    in
-    let pos_subst = similar_subst pos_prop
-    and neg_subst = similar_subst neg_prop
-  in
-  pos_subst @ neg_subst, grph
-
+    G.fold collect grph G.empty
 
  (*    let print grph ppf =
       fold_vertices

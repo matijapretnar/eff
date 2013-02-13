@@ -90,21 +90,10 @@ let join_disjoint_constraints cstr1 cstr2 =
   }
 
 let garbage_collect (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
-  let ty_subst, ty_graph = Ty.collect pos_ts neg_ts grph.ty_graph
-  and dirt_subst, dirt_graph = Dirt.collect pos_ds neg_ds grph.dirt_graph
-  and region_subst, region_graph = Region.collect pos_rs neg_rs grph.region_graph
-  in
-  let sbst = {
-    Type.identity_subst with
-    Type.ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> Type.TyParam q | None -> Type.TyParam p);
-    Type.presence_param = (fun p -> match Common.lookup p dirt_subst with Some q -> q | None -> p);
-    Type.region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
-    Type.presence_rest = (fun p -> Type.simple_dirt (match Common.lookup p dirt_subst with Some q -> q | None -> p));
-  } in
-  sbst, {
-    ty_graph = ty_graph;
-    dirt_graph = dirt_graph;
-    region_graph = region_graph;
+  {
+    ty_graph = Ty.collect pos_ts neg_ts grph.ty_graph;
+    dirt_graph = Dirt.collect pos_ds neg_ds grph.dirt_graph;
+    region_graph = Region.collect pos_rs neg_rs grph.region_graph;
   }
 
 let simplify (pos_ts, neg_ts) (pos_ds, neg_ds) (pos_rs, neg_rs) grph =
