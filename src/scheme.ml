@@ -160,12 +160,12 @@ let trim_context ~pos ctx_p (ctx, ty, cnstrs, sbst) =
 
 let (@@@) = Trio.append
 
-let pos_neg_tyscheme get_variances (ctx, ty, cnstrs) =
+let pos_neg_tyscheme (ctx, ty, cnstrs) =
   let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
-    let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params get_variances ctx_ty in
+    let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
-  let (((_, pos_ds, _) as pos), neg) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params get_variances ty) in
+  let (((_, pos_ds, _) as pos), neg) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
   let add_dirt_bound bnd posi = match bnd with
   | Constraints.Region _ -> posi
   | Constraints.Without (d, _) -> d :: posi
@@ -181,11 +181,6 @@ let pos_neg_tyscheme get_variances (ctx, ty, cnstrs) =
   let (posi, nega) = List.fold_right (fun (d, bnds, _) (posi, nega) ->
                                       match bnds with None -> (posi, nega) | Some bnds -> (if List.mem d pos_ds then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega))) (Constraints.Dirt.bounds cnstrs.Constraints.dirt_graph) (posi, nega) in
   Trio.uniq posi, Trio.uniq nega
-
-
-let pos_neg_ty_scheme (ctx, ty, cnstrs) =
-  pos_neg_tyscheme Tctx.get_variances (ctx, ty, cnstrs)
-
 
 let garbage_collect pos neg (ctx, ty, cnstrs) =
   ctx, ty, Constraints.garbage_collect pos neg cnstrs
@@ -221,7 +216,7 @@ let finalize ctx ty chngs =
 
 let finalize_ty_scheme ~pos ctx ty chngs =
   let ty_sch = finalize ctx ty (normalize_context ~pos :: chngs) in
-  let pos, neg = pos_neg_ty_scheme ty_sch in
+  let pos, neg = pos_neg_tyscheme ty_sch in
   garbage_collect pos neg ty_sch
 
 let finalize_dirty_scheme ~pos ctx drty chngs =
@@ -232,7 +227,7 @@ let finalize_dirty_scheme ~pos ctx drty chngs =
 let finalize_pattern_scheme ~pos ctx ty chngs =
   let ty_sch = finalize ctx ty chngs in
   (* Note that we change the polarities in pattern types *)
-  let neg, pos = pos_neg_ty_scheme ty_sch in
+  let neg, pos = pos_neg_tyscheme ty_sch in
   garbage_collect pos neg ty_sch
 
 
