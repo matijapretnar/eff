@@ -1,10 +1,12 @@
-- : bool = false
-- : bool = true
-- : bool = false
-- : bool = false
-- : bool = false
-- : bool = true
-- : bool = false
-- : bool = true
-- : bool = true
-- : bool = true
+- : (divisionByZero : unit exception[r2]). bool ! raise:d1; d2 | r1 <= d1,
+                                                                 r2 <= r1 = false
+- : (divisionByZero : unit exception[r2]). bool ! raise:d1; d2 | r1 <= d1,
+                                                                 r2 <= r1 = true
+- : bool ! d1 |  = false
+- : bool ! d1 |  = false
+- : bool ! d1 |  = false
+- : bool ! d1 |  = true
+- : bool ! d1 |  = false
+- : bool ! d1 |  = true
+- : bool ! d1 |  = true
+- : bool ! d1 |  = true

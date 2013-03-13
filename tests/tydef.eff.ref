@@ -1,4 +1,4 @@
-- : bull = Tail
-- : complex = {re = 1.2; im = 2.4}
-- : int tree = Node (10, Empty, Node (20, Empty, Empty))
-- : bull = Horns <fun>
+- : bull ! d2 |  = Tail
+- : complex ! d1 |  = {re = 1.2; im = 2.4}
+- : int tree ! d1 |  = Node (10, Empty, Node (20, Empty, Empty))
+- : bull ! d2 |  = Horns <fun>
