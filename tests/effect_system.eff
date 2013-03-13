@@ -1,0 +1,26 @@
+type eff = effect
+  operation op : unit -> unit
+  operation op' : unit -> unit
+end;;
+
+fun h x -> with h handle x#op ();;
+
+fun f g x -> handle f () with x#op () _ -> g ();;
+
+fun x -> handle x#op () with x#op () k -> k ();;
+
+fun x y ->
+  let x = new eff and y = new eff in
+  let z = if true then x else y
+  and w = if true then x else y in
+  handle z#op () with w#op () _ -> ();;
+
+fun x y ->
+  let x = new eff and y = new eff in
+  let w = if true then x else y in
+  let z = if true then x else y in
+  handle (handle (z#op (); w#op ()) with x#op () _ -> ()) with val x -> x | x#op () _ -> ();;
+
+fun f h -> with h handle f ();;
+
+fun x f -> with (if true then handler x#op _ k -> k () else handler x#op' _ k -> k ()) handle f ();;
