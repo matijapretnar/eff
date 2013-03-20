@@ -221,19 +221,27 @@ let id_abstraction pos =
   let x = fresh_variable () in
   ((Pattern.Var x, pos), (Core.Value (Core.Var x, pos), pos))
 
-let pattern (p, pos) =
+let pattern ?(forbidden=[]) (p, pos) =
   let vars = ref [] in
+  let forbidden = ref forbidden in
+  let new_var x =
+    if List.mem x !forbidden then
+      Error.syntax ~pos "Variable %s occurs more than once in a pattern" x
+    else
+      let (n, _) = fresh_variable () in
+      vars := (x, (n, x)) :: !vars;
+      forbidden := x :: !forbidden;
+      (n, x)
+  in
   let rec pattern (p, pos) =
     let p = match p with
     | Pattern.Var x ->
-        let (n, _) = fresh_variable () in
-        vars := (x, (n, x)) :: !vars;
-        Pattern.Var (n, x)
+        let x = new_var x in
+        Pattern.Var x
     | Pattern.As (p, x) ->
-        let (n, _) = fresh_variable () in
-        vars := (x, (n, x)) :: !vars;
+        let x = new_var x in
         let p' = pattern p in
-        Pattern.As (p', (n, x))
+        Pattern.As (p', x)
     | Pattern.Tuple ps -> Pattern.Tuple (List.map pattern ps)
     | Pattern.Record flds -> Pattern.Record (Common.assoc_map pattern flds)
     | Pattern.Variant (lbl, p) -> Pattern.Variant (lbl, Common.option_map pattern p)
