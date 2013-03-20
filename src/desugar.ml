@@ -352,17 +352,24 @@ and computation ctx (t, pos) =
     | Syntax.Check t ->
         [], Core.Check (computation ctx t)
     | Syntax.Let (defs, t) ->
-        let ctx', defs =
-          List.fold_right (fun (p, c) (ctx', defs) ->
-                            let p_vars, p = pattern p in
-                            let c = computation ctx c in
-                            (p_vars @ ctx', (p, c) :: defs)) defs (ctx, []) in
+        let ctx', defs, _ =
+            List.fold_right (fun (p, c) (ctx', defs, forbidden) ->
+                    let check_forbidden (x, _) =
+                      if List.mem x forbidden then
+                        Error.syntax ~pos:(snd p) "Several definitions of %s" x
+                    in
+                    let p_vars, p = pattern p in
+                    List.iter check_forbidden p_vars;
+                    let c = computation ctx c in
+                    (p_vars @ ctx', (p, c) :: defs, (List.map fst p_vars) @ forbidden)) defs (ctx, [], []) in
         let c = computation ctx' t in
           [], Core.Let (defs, c)
     | Syntax.LetRec (defs, t) ->
-        let ctx', ns = List.fold_right (fun (x, _) (ctx', ns) ->
+        let ctx', ns, _ = List.fold_right (fun (x, t) (ctx', ns, forbidden) ->
+                                          if List.mem x forbidden then
+                                            Error.syntax ~pos:(snd t) "Several definitions of %s" x;
                                           let n = fresh_variable () in
-                                          ((x, n) :: ctx', n :: ns)) defs (ctx, []) in
+                                          ((x, n) :: ctx', n :: ns, x :: forbidden)) defs (ctx, [], []) in
         let defs =
           List.fold_right (fun (p, (_, c)) defs ->
                             let c = let_rec ctx' c in
@@ -428,18 +435,25 @@ and handler pos ctx {Syntax.operations=ops; Syntax.value=val_a; Syntax.finally=f
 let top_ctx = ref []
 
 let top_let defs =
-  let ctx', defs =
-  List.fold_right (fun (p, c) (ctx', defs) ->
+  let ctx', defs, _ =
+  List.fold_right (fun (p, c) (ctx', defs, forbidden) ->
+                    let check_forbidden (x, _) =
+                      if List.mem x forbidden then
+                        Error.syntax ~pos:(snd p) "Several definitions of %s" x
+                    in
                     let p_vars, p = pattern p in
+                    List.iter check_forbidden p_vars;
                     let c = computation !top_ctx c in
-                    (p_vars @ ctx', (p, c) :: defs)) defs (!top_ctx, []) in
+                    (p_vars @ ctx', (p, c) :: defs, (List.map fst p_vars) @ forbidden)) defs (!top_ctx, [], []) in
   top_ctx := ctx';
   defs
 
 let top_let_rec defs =
-  let ctx', ns = List.fold_right (fun (x, _) (ctx', ns) ->
+  let ctx', ns, _ = List.fold_right (fun (x, t) (ctx', ns, forbidden) ->
+                                    if List.mem x forbidden then
+                                      Error.syntax ~pos:(snd t) "Several definitions of %s" x;
                                     let n = fresh_variable () in
-                                    ((x, n) :: ctx', n :: ns)) defs (!top_ctx, []) in
+                                    ((x, n) :: ctx', n :: ns, x :: forbidden)) defs (!top_ctx, [], []) in
   let defs =
     List.fold_right (fun (p, (_, c)) defs ->
                       let c = let_rec ctx' c in
