@@ -99,11 +99,11 @@ let exec_topdef interactive (ctx, env) (d,pos) =
           defs env
       in
         if interactive then begin
-          List.iter (fun x ->
+          List.iter (fun (x, tysch) ->
                        match Eval.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.printf "@[val %t = %t@]@." (Print.variable x) (* (Print.beautified_ty_scheme tysch)  *)(Value.print_value v))
+                         Format.printf "@[val %t : %t = %t@]@." (Print.variable x) (Scheme.print_ty_scheme tysch) (Value.print_value v))
             vars
         end;
         (ctx, env)
@@ -113,7 +113,7 @@ let exec_topdef interactive (ctx, env) (d,pos) =
       List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env = Eval.extend_let_rec env defs in
         if interactive then begin
-          List.iter (fun (x, _) -> Format.printf "@[val %t = <fun>@]@." (Print.variable x) (* (Print.beautified_ty_scheme tysch) *)) vars
+          List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Print.variable x) (Scheme.print_ty_scheme tysch)) vars
         end;
         (ctx, env)
   | Syntax.External (x, t, f) ->

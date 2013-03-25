@@ -404,7 +404,7 @@ and infer_let ~pos env defs =
   let add_binding (p, c) (env, ctxs, ctxp, vars, cstrs) =
     let ctx_p, t_p, cstr_p = infer_pattern p in
     let ctx_c, (t_c, drt'), cstr_c = infer_comp env c in
-    let vars = (List.map fst ctx_p) @ vars in
+    let vars = ctx_p @ vars in
     let changes = [
       ty_less ~pos:(snd c) t_c t_p;
       dirt_less ~pos:(snd c) drt' drt;
@@ -422,6 +422,7 @@ and infer_let ~pos env defs =
     env, ctx_c @ ctxs, ctxp, vars, changes @ cstrs
   in
   let env, ctxs, ctxp, vars, cstrs = List.fold_right add_binding defs (env, [], [], [], []) in
+  let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos ctxp t cstrs) vars in
   env, vars, fun (ctx2, (tc, dc), cstr_c) ->
     Scheme.finalize_dirty_scheme ~pos (ctxs @ ctx2) (tc, drt) ([
           dirt_less ~pos dc drt;
@@ -443,5 +444,6 @@ and infer_let_rec ~pos env defs =
   ] @ cnstrs
  in
   let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctx t cnstrs)) vars env in
+  let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos ctx t cnstrs) vars in
   env, vars, fun (ctx2, (tc, dc), cstr_c) ->
   Scheme.finalize_dirty_scheme ~pos (ctx @ ctx2) (tc, dc) (just cstr_c :: cnstrs)
