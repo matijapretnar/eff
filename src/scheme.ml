@@ -12,7 +12,7 @@ let refresh (ctx, ty, cnstrs) =
 
 let ty_param_less p q (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_ty_constraint p q cnstrs, sbst)
-and presence_param_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
+and dirt_param_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_dirt_constraint d1 d2 cnstrs, sbst)
 and region_less ~pos r1 r2 (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_region_constraint r1 r2 cnstrs, sbst)
@@ -20,14 +20,14 @@ and region_covers r i (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_region_low_bound i r cnstrs, sbst)
 and just new_cnstrs (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.join_disjoint_constraints new_cnstrs cnstrs, sbst)
-and add_presence_bound d bnd (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_presence_bound d bnd cnstrs, sbst)
+and add_dirt_bound d bnd (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Constraints.add_dirt_bound d bnd cnstrs, sbst)
 
 let rec add_rest_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
   let drt' = Type.subst_dirt sbst drt' in
   let sbst' = {
     Type.identity_subst with 
-    Type.presence_rest = (fun d' -> if d' = d then drt' else Type.simple_dirt d')
+    Type.dirt_rest = (fun d' -> if d' = d then drt' else Type.simple_dirt d')
   } in
   let (pred, succ, new_dirt_grph) = Constraints.remove_dirt cnstrs d in
   let cnstrs = {cnstrs with Constraints.dirt_graph = new_dirt_grph} in
@@ -42,7 +42,7 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   let new_ops ops1 ops2 =
     let ops2 = List.map fst ops2 in
     let add_op (op, _) news =
-      if List.mem op ops2 then news else (op, Type.fresh_presence_param ()) :: news
+      if List.mem op ops2 then news else (op, Type.fresh_dirt_param ()) :: news
     in
     List.fold_right add_op ops1 []
   in
@@ -52,15 +52,15 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   | [], [] ->
       let op_less (op, dt1) ty_sch =
         begin match Common.lookup op ops2 with
-        | Some dt2 -> presence_param_less ~pos dt1 dt2 ty_sch
+        | Some dt2 -> dirt_param_less ~pos dt1 dt2 ty_sch
         | None -> assert false
       end
       in
-      List.fold_right op_less ops1 (presence_param_less ~pos rest1 rest2 ty_sch)
+      List.fold_right op_less ops1 (dirt_param_less ~pos rest1 rest2 ty_sch)
   | _, _ ->
       dirt_less ~pos drt1 drt2 (
-      add_rest_substitution ~pos rest1 {Type.ops = new_ops1; Type.rest = Type.fresh_presence_param ()}
-      (add_rest_substitution ~pos rest2 {Type.ops = new_ops2; Type.rest = Type.fresh_presence_param ()} ty_sch))
+      add_rest_substitution ~pos rest1 {Type.ops = new_ops1; Type.rest = Type.fresh_dirt_param ()}
+      (add_rest_substitution ~pos rest2 {Type.ops = new_ops2; Type.rest = Type.fresh_dirt_param ()} ty_sch))
 
 let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   (* XXX Check cyclic types *)
@@ -143,7 +143,7 @@ and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
                         if contra then add ~pos ty2 ty1 ty_sch else ty_sch) ps (List.combine lst1 lst2) ty_sch
   in
   let ty_sch = for_parameters ty_less ps ts1 ts2 ty_sch in
-  let ty_sch = for_parameters presence_param_less ds ds1 ds2 ty_sch in
+  let ty_sch = for_parameters dirt_param_less ds ds1 ds2 ty_sch in
   for_parameters region_less rs rs1 rs2 ty_sch
 
 and dirty_less ~pos (ty1, d1) (ty2, d2) ty_sch =

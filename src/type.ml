@@ -3,12 +3,12 @@
  *)
 
 type ty_param = Ty_Param of int
-type presence_param = Presence_Param of int
+type dirt_param = Dirt_Param of int
 type region_param = Region_Param of int
 type instance_param = Instance_Param of int
 
 let fresh_ty_param = Common.fresh (fun n -> Ty_Param n)
-let fresh_presence_param = Common.fresh (fun n -> Presence_Param n)
+let fresh_dirt_param = Common.fresh (fun n -> Dirt_Param n)
 let fresh_region_param = Common.fresh (fun n -> Region_Param n)
 let fresh_instance_param = Common.fresh (fun n -> Instance_Param n)
 
@@ -24,11 +24,11 @@ type ty =
 and dirty = ty * dirt
 
 and dirt = {
-  ops: (Common.opsym, presence_param) Common.assoc;
-  rest: presence_param
+  ops: (Common.opsym, dirt_param) Common.assoc;
+  rest: dirt_param
 }
 
-and args = (ty, presence_param, region_param) Trio.t
+and args = (ty, dirt_param, region_param) Trio.t
 
 
 (* This type is used when type checking is turned off. Its name
@@ -45,7 +45,7 @@ let empty_ty = Apply ("empty", Trio.empty)
     each call. *)
 let fresh_ty () = TyParam (fresh_ty_param ())
 let simple_dirt d = { ops = []; rest = d }
-let fresh_dirt () = simple_dirt (fresh_presence_param ())
+let fresh_dirt () = simple_dirt (fresh_dirt_param ())
 (* XXX Should a fresh dirty type have no fresh instances? *)
 let fresh_dirty () = (fresh_ty (), fresh_dirt ())
 let universal_ty = Basic "_"
@@ -54,10 +54,10 @@ let universal_dirty = (Basic "_", fresh_dirt ())
 
 type substitution = {
   ty_param : ty_param -> ty;
-  presence_param : presence_param -> presence_param;
+  dirt_param : dirt_param -> dirt_param;
   region_param : region_param -> region_param;
   instance_param : instance_param -> instance_param;
-  presence_rest : presence_param -> dirt;
+  dirt_rest : dirt_param -> dirt;
 }
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
@@ -80,8 +80,8 @@ let rec subst_ty sbst = function
       Handler ((ty1, subst_dirt sbst drt), drty2)
 
 and subst_dirt sbst drt =
-  let ops = Common.assoc_map sbst.presence_param drt.ops in
-  let { ops = new_ops; rest = new_rest } = sbst.presence_rest drt.rest in
+  let ops = Common.assoc_map sbst.dirt_param drt.ops in
+  let { ops = new_ops; rest = new_rest } = sbst.dirt_rest drt.rest in
   { ops = new_ops @ ops; rest = new_rest }
 
 and subst_dirty sbst (ty, drt) =
@@ -91,7 +91,7 @@ and subst_dirty sbst (ty, drt) =
 
 and subst_args sbst (tys, drts, rs) =
   let tys = Common.map (subst_ty sbst) tys in
-  let drts = Common.map sbst.presence_param drts in
+  let drts = Common.map sbst.dirt_param drts in
   let rs = Common.map sbst.region_param rs in
   (tys, drts, rs)
 
@@ -99,10 +99,10 @@ and subst_args sbst (tys, drts, rs) =
 let identity_subst =
   {
     ty_param = (fun p -> TyParam p);
-    presence_param = Common.id;
+    dirt_param = Common.id;
     region_param = Common.id;
     instance_param = Common.id;
-    presence_rest = (fun d -> { ops = []; rest = d })
+    dirt_rest = (fun d -> { ops = []; rest = d })
   }
 
 (** [compose_subst sbst1 sbst2] returns a substitution that first performs
@@ -110,10 +110,10 @@ let identity_subst =
 let compose_subst sbst1 sbst2 =
   {
     ty_param = Common.compose (subst_ty sbst1) sbst2.ty_param;
-    presence_param = Common.compose sbst1.presence_param sbst2.presence_param;
+    dirt_param = Common.compose sbst1.dirt_param sbst2.dirt_param;
     region_param = Common.compose sbst1.region_param sbst2.region_param;
     instance_param = Common.compose sbst2.instance_param sbst1.instance_param;
-    presence_rest = Common.compose (subst_dirt sbst1) sbst2.presence_rest;
+    dirt_rest = Common.compose (subst_dirt sbst1) sbst2.dirt_rest;
   }
 
 let refresher fresh =
@@ -153,7 +153,7 @@ let replace ty =
 
   and replace_args (tys, drts, rs) =
     let tys = Common.map (replace_ty) tys in
-    let drts = Common.map (fun _ -> fresh_presence_param ()) drts in
+    let drts = Common.map (fun _ -> fresh_dirt_param ()) drts in
     let rs = Common.map (fun _ -> fresh_region_param ()) rs in
     (tys, drts, rs)
   in
@@ -165,23 +165,23 @@ let beautifying_subst () =
   if !disable_beautify then
     identity_subst
   else
-    let presence_param = refresher (Common.fresh (fun n -> Presence_Param n)) in
+    let dirt_param = refresher (Common.fresh (fun n -> Dirt_Param n)) in
     {
       ty_param = refresher (Common.fresh (fun n -> TyParam (Ty_Param n)));
-      presence_param = presence_param;
+      dirt_param = dirt_param;
       region_param = refresher (Common.fresh (fun n -> Region_Param n));
       instance_param = refresher (Common.fresh (fun n -> Instance_Param n));
-      presence_rest = fun n -> { ops = []; rest = presence_param n }
+      dirt_rest = fun n -> { ops = []; rest = dirt_param n }
     }
 
 let refreshing_subst () =
-  let refresh_presence_param = refresher fresh_presence_param in
+  let refresh_dirt_param = refresher fresh_dirt_param in
   {
     identity_subst with
     ty_param = (let refresh = refresher fresh_ty_param in fun p -> TyParam (refresh p));
-    presence_param = refresh_presence_param;
+    dirt_param = refresh_dirt_param;
     region_param = refresher fresh_region_param;
-    presence_rest = fun p -> { ops = []; rest = refresh_presence_param p }
+    dirt_rest = fun p -> { ops = []; rest = refresh_dirt_param p }
   }
 
 let refresh ty =
@@ -213,15 +213,15 @@ let pos_neg_params get_variances ty =
   and pos_dirty is_pos (ty, drt) =
     pos_ty is_pos ty @@@ pos_dirt is_pos drt
   and pos_dirt is_pos drt =
-    pos_presence_param is_pos drt.rest @@@ Trio.flatten_map (fun (_, dt) -> pos_presence_param is_pos dt) drt.ops
-  and pos_presence_param is_pos p =
+    pos_dirt_param is_pos drt.rest @@@ Trio.flatten_map (fun (_, dt) -> pos_dirt_param is_pos dt) drt.ops
+  and pos_dirt_param is_pos p =
     ([], (if is_pos then [p] else []), [])
   and pos_region_param is_pos r =
     ([], [], if is_pos then [r] else [])
   and pos_args is_pos ty_name (tys, drts, rgns) =
     let (ps, ds, rs) = get_variances ty_name in
     for_parameters pos_ty is_pos ps tys @@@
-    for_parameters pos_presence_param is_pos ds drts @@@
+    for_parameters pos_dirt_param is_pos ds drts @@@
     for_parameters pos_region_param is_pos rs rgns
   in
   Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)
@@ -231,18 +231,18 @@ let print_region_param ?(non_poly=Trio.empty) ((Region_Param k) as p) ppf =
   let c = (if List.mem p rs then "_" else "") in
     Print.print ppf "%sr%i" c (k + 1)
 
-let print_presence_param ?(non_poly=Trio.empty) ((Presence_Param k) as p) ppf =
+let print_dirt_param ?(non_poly=Trio.empty) ((Dirt_Param k) as p) ppf =
   let (_, ds, _) = non_poly in
   let c = (if List.mem p ds then "_" else "") in
     Print.print ppf "%sd%i" c (k + 1)
 
 let dirt_bound ?non_poly r_ops =
-  Print.sequence "," (fun (op, dt) ppf -> Print.print ppf "%s:%t" op (print_presence_param dt)) r_ops
+  Print.sequence "," (fun (op, dt) ppf -> Print.print ppf "%s:%t" op (print_dirt_param dt)) r_ops
 
 let print_dirt ?(non_poly=Trio.empty) drt ppf =
   match drt.ops with
-  | [] -> print_presence_param ~non_poly drt.rest ppf
-  | _ -> Print.print ppf "%t; %t" (dirt_bound ~non_poly drt.ops) (print_presence_param ~non_poly drt.rest)
+  | [] -> print_dirt_param ~non_poly drt.rest ppf
+  | _ -> Print.print ppf "%t; %t" (dirt_bound ~non_poly drt.ops) (print_dirt_param ~non_poly drt.rest)
 
 let print_ty_param ?(non_poly=Trio.empty) p ppf =
   let (ps, _, _) = non_poly in

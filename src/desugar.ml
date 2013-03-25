@@ -165,7 +165,7 @@ let free_params t =
 
 let syntax_to_core_params (ts, ds, rs) = (
     List.map (fun p -> (p, Type.fresh_ty_param ())) ts,
-    List.map (fun d -> (d, Type.fresh_presence_param ())) ds,
+    List.map (fun d -> (d, Type.fresh_dirt_param ())) ds,
     List.map (fun r -> (r, Type.fresh_region_param ())) rs
   )
 

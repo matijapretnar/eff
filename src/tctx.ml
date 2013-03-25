@@ -9,7 +9,7 @@ type tydef =
   | Effect of (Common.opsym, Type.ty * Type.ty) Common.assoc
 
 type variance = bool * bool
-type params = (Type.ty_param * variance) list * (Type.presence_param * variance) list * (Type.region_param * variance) list
+type params = (Type.ty_param * variance) list * (Type.dirt_param * variance) list * (Type.region_param * variance) list
 
 type tyctx = (Common.tyname, params * tydef) Common.assoc
 
@@ -72,13 +72,13 @@ let is_effect ~pos =
 
 let refreshing_subst (ps, ds, rs) =
   let refresh_ty_param = Type.refresher Type.fresh_ty_param
-  and refresh_presence_param = Type.refresher Type.fresh_presence_param
+  and refresh_dirt_param = Type.refresher Type.fresh_dirt_param
   and refresh_region_param = Type.refresher Type.fresh_region_param in
-  (List.map refresh_ty_param ps, List.map refresh_presence_param ds, List.map refresh_region_param rs),
+  (List.map refresh_ty_param ps, List.map refresh_dirt_param ds, List.map refresh_region_param rs),
   {
     Type.identity_subst with
     Type.ty_param = (fun p -> Type.TyParam (refresh_ty_param p));
-    Type.presence_param = refresh_presence_param;
+    Type.dirt_param = refresh_dirt_param;
     Type.region_param = refresh_region_param;
   }
 
@@ -194,7 +194,7 @@ let ty_apply ~pos ty_name (tys, drts, rgns) : tydef =
   subst_tydef {
     T.identity_subst with
     T.ty_param = (fun p -> Common.lookup_default p ty_sbst (Type.TyParam p));
-    T.presence_param = (fun d -> Common.lookup_default d dirt_sbst d);
+    T.dirt_param = (fun d -> Common.lookup_default d dirt_sbst d);
     T.region_param = (fun r -> Common.lookup_default r region_sbst r);
   } ty
 
@@ -326,17 +326,17 @@ let extend_with_variances tydefs =
           | None ->
               (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
               List.iter (ty true true) tys;
-              List.iter (presence_param true true) drts;
+              List.iter (dirt_param true true) drts;
               List.iter (region_param true true) rgns
           | Some ((ps, ds, rs), _) ->
               if posi then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty posi' nega') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> presence_param posi' nega') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> dirt_param posi' nega') ds drts;
                 List.iter2 (fun (_, (posi', nega')) -> region_param posi' nega') rs rgns
               end;
               if nega then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty nega' posi') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> presence_param nega' posi') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> dirt_param nega' posi') ds drts;
                 List.iter2 (fun (_, (posi', nega')) -> region_param nega' posi') rs rgns
               end
           end
@@ -345,17 +345,17 @@ let extend_with_variances tydefs =
           | None ->
               (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
               List.iter (ty true true) tys;
-              List.iter (presence_param true true) drts;
+              List.iter (dirt_param true true) drts;
               List.iter (region_param true true) rgns;
           | Some ((ps, ds, rs), _) ->
               if posi then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty posi' nega') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> presence_param posi' nega') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> dirt_param posi' nega') ds drts;
                 List.iter2 (fun (_, (posi', nega')) -> region_param posi' nega') rs rgns
               end;
               if nega then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty nega' posi') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> presence_param nega' posi') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> dirt_param nega' posi') ds drts;
                 List.iter2 (fun (_, (posi', nega')) -> region_param nega' posi') rs rgns
               end
           end;
@@ -371,15 +371,15 @@ let extend_with_variances tydefs =
           dirt nega posi drt1;
           dirt posi nega drt2
     and dirt posi nega drt =
-      List.iter (fun (_, prs) -> presence_param posi nega prs) drt.Type.ops;
-      presence_param posi nega drt.Type.rest
-(*     and presence posi nega = function
+      List.iter (fun (_, prs) -> dirt_param posi nega prs) drt.Type.ops;
+      dirt_param posi nega drt.Type.rest
+(*     and dirt posi nega = function
       | Type.Region r -> region_param posi nega r
       | Type.Without (prs, rs) ->
-          presence_param posi nega prs;
+          dirt_param posi nega prs;
           (* XXX Maybe here, it is nega posi? *)
           List.iter (region_param nega posi) rs
- *)    and presence_param posi nega d =
+ *)    and dirt_param posi nega d =
       begin match Common.lookup d ds with
       | None -> assert false
       | Some (posvar, negvar) ->

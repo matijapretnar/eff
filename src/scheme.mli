@@ -13,9 +13,9 @@ val region_covers :
   Type.region_param ->
   Type.instance_param -> change
 val just : Constraints.t -> change
-val add_presence_bound :
-  Type.presence_param ->
-  Constraints.presence list -> change
+val add_dirt_bound :
+  Type.dirt_param ->
+  Constraints.dirt list -> change
 val dirt_less :
   pos:Common.position ->
   Type.dirt ->

@@ -1,6 +1,6 @@
-type presence =
+type dirt =
   | Region of Type.region_param
-  | Without of Type.presence_param * Type.region_param list
+  | Without of Type.dirt_param * Type.region_param list
 
 module Ty = Graph.Make(struct
   type t = Type.ty_param
@@ -21,8 +21,8 @@ module Region = Graph.Make(struct
 end)
 
 module Dirt = Graph.Make(struct
-  type t = Type.presence_param
-  type lower_bound = presence list
+  type t = Type.dirt_param
+  type lower_bound = dirt list
   type upper_bound = unit
   let inf () () = ()
   let sup prs1 prs2 = prs1 @ prs2
@@ -48,14 +48,14 @@ let remove_dirt g x =
 let get_succ g x =
   Dirt.get_succ x g.dirt_graph
 
-let subst_presence sbst = function
+let subst_dirt sbst = function
   | Region r -> Region (sbst.Type.region_param r)
-  | Without (p, rs) -> Without (sbst.Type.presence_param p, List.map sbst.Type.region_param rs)
+  | Without (p, rs) -> Without (sbst.Type.dirt_param p, List.map sbst.Type.region_param rs)
 
 
 let subst_constraints sbst cnstr = {
   ty_graph = Ty.map (fun p -> match sbst.Type.ty_param p with Type.TyParam q -> q | _ -> assert false) (fun () -> ()) (fun () -> ()) cnstr.ty_graph;
-  dirt_graph = Dirt.map sbst.Type.presence_param (fun prs -> Common.uniq (List.map (subst_presence sbst) prs)) (fun () -> ()) cnstr.dirt_graph;
+  dirt_graph = Dirt.map sbst.Type.dirt_param (fun prs -> Common.uniq (List.map (subst_dirt sbst) prs)) (fun () -> ()) cnstr.dirt_graph;
   region_graph = Region.map sbst.Type.region_param (List.map (sbst.Type.instance_param)) (fun () -> ()) cnstr.region_graph;
 }
 
@@ -75,7 +75,7 @@ let add_dirt_constraint drt1 drt2 cstr =
 let add_region_constraint rgn1 rgn2 cstr =
   {cstr with region_graph = Region.add_edge rgn1 rgn2 cstr.region_graph}
 
-let add_presence_bound d bnd cstr =
+let add_dirt_bound d bnd cstr =
   {cstr with dirt_graph = Dirt.add_lower_bound d bnd cstr.dirt_graph }
 
 let join_disjoint_constraints cstr1 cstr2 = 
@@ -117,14 +117,14 @@ let less pp p1 p2 ppf =
 let print_region_bound insts ppf =
   Print.sequence "," Type.print_instance_param insts ppf
 
-let rec print_presence ?(non_poly=Trio.empty) drt ppf =
+let rec print_dirt ?(non_poly=Trio.empty) drt ppf =
   match drt with
   | Region r -> Type.print_region_param ~non_poly r ppf
-  | Without (prs, rs) -> Print.print ppf "%t - [%t]" (Type.print_presence_param prs) (Print.sequence "," (Type.print_region_param) rs)
+  | Without (prs, rs) -> Print.print ppf "%t - [%t]" (Type.print_dirt_param prs) (Print.sequence "," (Type.print_region_param) rs)
 
 
 let print_dirt_bound bnd ppf =
-  Print.sequence "," print_presence bnd ppf
+  Print.sequence "," print_dirt bnd ppf
 
 let bounds pp pp' p inf (* sup *) pps =
   match inf with
@@ -139,10 +139,10 @@ let rec sequence2 sep pps ppf =
 
 let print ?(non_poly=Trio.empty) g ppf =
   let pps = fold_ty (fun p1 p2 lst -> less (Type.print_ty_param ~non_poly) p1 p2 :: lst) g [] in
-  let pps = fold_dirt (fun d1 d2 lst -> less (Type.print_presence_param ~non_poly) d1 d2 :: lst) g pps in
+  let pps = fold_dirt (fun d1 d2 lst -> less (Type.print_dirt_param ~non_poly) d1 d2 :: lst) g pps in
   let pps = fold_region (fun r1 r2 lst -> less (Type.print_region_param ~non_poly) r1 r2 :: lst) g pps in
   let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (Type.print_region_param ~non_poly) print_region_bound r bound1 (* bound2 *) pps) (Region.bounds g.region_graph) pps in
-  let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (Type.print_presence_param ~non_poly) print_dirt_bound r bound1 (* bound2 *) pps) (Dirt.bounds g.dirt_graph) pps in
+  let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (Type.print_dirt_param ~non_poly) print_dirt_bound r bound1 (* bound2 *) pps) (Dirt.bounds g.dirt_graph) pps in
   Print.print ppf "%t"
     (sequence2 "," pps)
 

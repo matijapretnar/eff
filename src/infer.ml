@@ -20,7 +20,7 @@ let nonexpansive = function
   | Core.Handle _ | Core.Let _ | Core.LetRec _ | Core.Check _ -> false
 
 let simple ty = ([], ty, Constraints.empty)
-let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_presence_param () }
+let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_dirt_param () }
 
 let ty_of_const = function
   | Common.Integer _ -> Type.int_ty
@@ -170,10 +170,10 @@ let rec infer_expr env (e, pos) =
       | None -> Error.typing ~pos "Unbound operation %s" op
       | Some (ty, (t1, t2)) ->
           let ctx, u, cstr_u = infer_expr env e in
-          let dt = Type.fresh_presence_param () in
-          unify ctx (T.Arrow (t1, (t2, {T.ops = [op, dt]; T.rest = Type.fresh_presence_param ()}))) [
+          let dt = Type.fresh_dirt_param () in
+          unify ctx (T.Arrow (t1, (t2, {T.ops = [op, dt]; T.rest = Type.fresh_dirt_param ()}))) [
             ty_less ~pos u ty;
-            Scheme.add_presence_bound dt [Constraints.Region r];
+            Scheme.add_dirt_bound dt [Constraints.Region r];
             just cstr_u
           ]
       end
@@ -210,16 +210,16 @@ let rec infer_expr env (e, pos) =
         let ctxs, cnstrs, ops = List.fold_right constrain_operation ops ([], [], []) in
         let ctx1, valt1, valt2, cstr_val = infer_abstraction env a_val in
         let ctx2, fint1, (fint2, findrt), cstr_fin = infer_abstraction env a_fin in
-        let drt_rest = Type.fresh_presence_param () in
+        let drt_rest = Type.fresh_dirt_param () in
         (* XXX *)
-        let make_presence (op, rs) (left_dirt, right_dirt, cnstrs) =
-          let pres = Type.fresh_presence_param () in
-          let without = Type.fresh_presence_param () in
-          (* Print.info "DIRT: %t >= %t" (Print.presence_param without) (Print.presence (Type.Without (pres, !rs))); *)
-          ((op, pres) :: left_dirt, (op, without) :: right_dirt, Scheme.add_presence_bound without [Constraints.Without (pres, !rs)] :: cnstrs)
+        let make_dirt (op, rs) (left_dirt, right_dirt, cnstrs) =
+          let pres = Type.fresh_dirt_param () in
+          let without = Type.fresh_dirt_param () in
+          (* Print.info "DIRT: %t >= %t" (Print.dirt_param without) (Print.dirt (Type.Without (pres, !rs))); *)
+          ((op, pres) :: left_dirt, (op, without) :: right_dirt, Scheme.add_dirt_bound without [Constraints.Without (pres, !rs)] :: cnstrs)
         in
         let left_rops, right_rops, cnstrs_ops =
-          List.fold_right make_presence ops ([], [], []) in
+          List.fold_right make_dirt ops ([], [], []) in
 (*         let left_rops = List.map (fun rop -> (rop, Type.Present)) rops
         and right_rops = List.map (fun rop -> (rop, Type.Absent)) rops in
  *)        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, {Type.ops = left_rops; Type.rest = drt_rest}), (t_finally, dirt))) ([
