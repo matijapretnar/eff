@@ -14,20 +14,22 @@ let ty_param_less p q (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_ty_constraint p q cnstrs, sbst)
 and dirt_param_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_dirt_constraint d1 d2 cnstrs, sbst)
+and region_param_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Constraints.add_region_constraint d1 d2 cnstrs, sbst)
 and region_less ~pos r1 r2 (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_region_constraint r1 r2 cnstrs, sbst)
 and region_covers r i (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_region_low_bound i r cnstrs, sbst)
+  (ctx, ty, Constraints.add_region_bound r [Constraints.Instance i] cnstrs, sbst)
 and just new_cnstrs (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.join_disjoint_constraints new_cnstrs cnstrs, sbst)
-and add_dirt_bound d bnd (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_dirt_bound d bnd cnstrs, sbst)
+and add_region_bound r bnd (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Constraints.add_region_bound r bnd cnstrs, sbst)
 
 let rec add_rest_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
   let drt' = Type.subst_dirt sbst drt' in
   let sbst' = {
     Type.identity_subst with 
-    Type.dirt_rest = (fun d' -> if d' = d then drt' else Type.simple_dirt d')
+    Type.dirt_param = (fun d' -> if d' = d then drt' else Type.simple_dirt d')
   } in
   let (pred, succ, new_dirt_grph) = Constraints.remove_dirt cnstrs d in
   let cnstrs = {cnstrs with Constraints.dirt_graph = new_dirt_grph} in
@@ -42,7 +44,7 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   let new_ops ops1 ops2 =
     let ops2 = List.map fst ops2 in
     let add_op (op, _) news =
-      if List.mem op ops2 then news else (op, Type.fresh_dirt_param ()) :: news
+      if List.mem op ops2 then news else (op, Type.fresh_region_param ()) :: news
     in
     List.fold_right add_op ops1 []
   in
@@ -52,7 +54,7 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   | [], [] ->
       let op_less (op, dt1) ty_sch =
         begin match Common.lookup op ops2 with
-        | Some dt2 -> dirt_param_less ~pos dt1 dt2 ty_sch
+        | Some dt2 -> region_param_less ~pos dt1 dt2 ty_sch
         | None -> assert false
       end
       in
@@ -143,7 +145,7 @@ and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
                         if contra then add ~pos ty2 ty1 ty_sch else ty_sch) ps (List.combine lst1 lst2) ty_sch
   in
   let ty_sch = for_parameters ty_less ps ts1 ts2 ty_sch in
-  let ty_sch = for_parameters dirt_param_less ds ds1 ds2 ty_sch in
+  let ty_sch = for_parameters dirt_less ds ds1 ds2 ty_sch in
   for_parameters region_less rs rs1 rs2 ty_sch
 
 and dirty_less ~pos (ty1, d1) (ty2, d2) ty_sch =
@@ -165,21 +167,23 @@ let pos_neg_tyscheme (ctx, ty, cnstrs) =
     let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
-  let (((_, pos_ds, _) as pos), neg) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
-  let add_dirt_bound bnd posi = match bnd with
+  let (((_, _, pos_rs) as pos), neg) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
+  let add_region_bound bnd posi = match bnd with
   | Constraints.Region _ -> posi
   | Constraints.Without (d, _) -> d :: posi
+  | Constraints.Instance _ -> posi
   in
-  let posi_dirts = List.fold_right (fun (d, bnds, _) posi ->
-                                      match bnds with None -> posi | Some bnds -> if List.mem d pos_ds then List.fold_right add_dirt_bound bnds posi else posi) (Constraints.Dirt.bounds cnstrs.Constraints.dirt_graph) [] in
-  let pos = ([], posi_dirts, []) @@@ pos in
+  let posi_regions = List.fold_right (fun (d, bnds, _) posi ->
+                                      match bnds with None -> posi | Some bnds -> if List.mem d pos_rs then List.fold_right add_region_bound bnds posi else posi) (Constraints.Region.bounds cnstrs.Constraints.region_graph) [] in
+  let pos = ([], [], posi_regions) @@@ pos in
   let add_region_bound bnd (posi, nega) = match bnd with
   | Constraints.Region r -> (([], [], [r]) @@@ posi, nega) 
-  | Constraints.Without (d, rs) -> (([], [d], rs) @@@ posi, nega)
+  | Constraints.Without (r, rs) -> (([], [], r :: rs) @@@ posi, nega)
+  | Constraints.Instance _ -> (posi, nega)
   in
-  let (((_, pos_ds, _) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
+  let (((_, _, pos_rs) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
   let (posi, nega) = List.fold_right (fun (d, bnds, _) (posi, nega) ->
-                                      match bnds with None -> (posi, nega) | Some bnds -> (if List.mem d pos_ds then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega))) (Constraints.Dirt.bounds cnstrs.Constraints.dirt_graph) (posi, nega) in
+                                      match bnds with None -> (posi, nega) | Some bnds -> (if List.mem d pos_rs then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega))) (Constraints.Region.bounds cnstrs.Constraints.region_graph) (posi, nega) in
   Trio.uniq posi, Trio.uniq nega
 
 let garbage_collect pos neg (ctx, ty, cnstrs) =

@@ -78,7 +78,7 @@ let refreshing_subst (ps, ds, rs) =
   {
     Type.identity_subst with
     Type.ty_param = (fun p -> Type.TyParam (refresh_ty_param p));
-    Type.dirt_param = refresh_dirt_param;
+    Type.dirt_param = (fun d -> Type.simple_dirt d);
     Type.region_param = refresh_region_param;
   }
 
@@ -130,12 +130,12 @@ let find_operation op_name =
 
 let apply_to_params t (ps, ds, rs) =
   Type.Apply (t, (
-    List.map (fun p -> Type.TyParam p) ps, ds, rs
+    List.map (fun p -> Type.TyParam p) ps, List.map Type.simple_dirt ds, rs
   ))
 
 let effect_to_params t (ps, ds, rs) rgn =
   Type.Effect (t, (
-    List.map (fun p -> Type.TyParam p) ps, ds, rs
+    List.map (fun p -> Type.TyParam p) ps, List.map Type.simple_dirt ds, rs
   ), rgn)
 
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
@@ -194,7 +194,7 @@ let ty_apply ~pos ty_name (tys, drts, rgns) : tydef =
   subst_tydef {
     T.identity_subst with
     T.ty_param = (fun p -> Common.lookup_default p ty_sbst (Type.TyParam p));
-    T.dirt_param = (fun d -> Common.lookup_default d dirt_sbst d);
+    T.dirt_param = (fun d -> Common.lookup_default d dirt_sbst (Type.simple_dirt d));
     T.region_param = (fun r -> Common.lookup_default r region_sbst r);
   } ty
 
@@ -326,17 +326,17 @@ let extend_with_variances tydefs =
           | None ->
               (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
               List.iter (ty true true) tys;
-              List.iter (dirt_param true true) drts;
+              List.iter (dirt true true) drts;
               List.iter (region_param true true) rgns
           | Some ((ps, ds, rs), _) ->
               if posi then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty posi' nega') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> dirt_param posi' nega') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> dirt posi' nega') ds drts;
                 List.iter2 (fun (_, (posi', nega')) -> region_param posi' nega') rs rgns
               end;
               if nega then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty nega' posi') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> dirt_param nega' posi') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> dirt nega' posi') ds drts;
                 List.iter2 (fun (_, (posi', nega')) -> region_param nega' posi') rs rgns
               end
           end
@@ -345,17 +345,17 @@ let extend_with_variances tydefs =
           | None ->
               (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
               List.iter (ty true true) tys;
-              List.iter (dirt_param true true) drts;
+              List.iter (dirt true true) drts;
               List.iter (region_param true true) rgns;
           | Some ((ps, ds, rs), _) ->
               if posi then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty posi' nega') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> dirt_param posi' nega') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> dirt posi' nega') ds drts;
                 List.iter2 (fun (_, (posi', nega')) -> region_param posi' nega') rs rgns
               end;
               if nega then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty nega' posi') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> dirt_param nega' posi') ds drts;
+                List.iter2 (fun (_, (posi', nega')) -> dirt nega' posi') ds drts;
                 List.iter2 (fun (_, (posi', nega')) -> region_param nega' posi') rs rgns
               end
           end;
@@ -371,7 +371,7 @@ let extend_with_variances tydefs =
           dirt nega posi drt1;
           dirt posi nega drt2
     and dirt posi nega drt =
-      List.iter (fun (_, prs) -> dirt_param posi nega prs) drt.Type.ops;
+      List.iter (fun (_, prs) -> region_param posi nega prs) drt.Type.ops;
       dirt_param posi nega drt.Type.rest
 (*     and dirt posi nega = function
       | Type.Region r -> region_param posi nega r

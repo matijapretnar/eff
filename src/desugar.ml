@@ -110,8 +110,8 @@ let ty (ts, ds, rs) =
   | Syntax.TyApply (t, tys, drts_rgns, rgn) ->
       let tys = List.map ty tys
       and (drts, rgns) = begin match drts_rgns with
-        | Some (drts, rgns) -> (List.map (presence pos) drts, List.map (region pos) rgns)
-        | None -> (List.map (fun (_, d) -> d) ds, List.map (fun (_, r) -> r) rs)
+        | Some (drts, rgns) -> (List.map (dirt pos) drts, List.map (region pos) rgns)
+        | None -> (List.map (fun (_, d) -> Type.simple_dirt d) ds, List.map (fun (_, r) -> r) rs)
       end 
       in begin match rgn with
         | None -> T.Apply (t, (tys, drts, rgns))
@@ -132,10 +132,6 @@ let ty (ts, ds, rs) =
     match C.lookup d ds with
     | None -> Error.syntax ~pos "Unbound dirt parameter 'drt%d" d
     | Some d -> Type.simple_dirt d
-  and presence pos (Syntax.DirtParam d) =
-    match C.lookup d ds with
-    | None -> Error.syntax ~pos "Unbound presence parameter 'drt%d" d
-    | Some d -> d
   and region pos (Syntax.RegionParam r) =
     match C.lookup r rs with
     | None -> Error.syntax ~pos "Unbound region parameter 'rgn%d" r

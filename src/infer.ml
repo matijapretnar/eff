@@ -170,10 +170,10 @@ let rec infer_expr env (e, pos) =
       | None -> Error.typing ~pos "Unbound operation %s" op
       | Some (ty, (t1, t2)) ->
           let ctx, u, cstr_u = infer_expr env e in
-          let dt = Type.fresh_dirt_param () in
-          unify ctx (T.Arrow (t1, (t2, {T.ops = [op, dt]; T.rest = Type.fresh_dirt_param ()}))) [
+          let rt = Type.fresh_region_param () in
+          unify ctx (T.Arrow (t1, (t2, {T.ops = [op, rt]; T.rest = Type.fresh_dirt_param ()}))) [
             ty_less ~pos u ty;
-            Scheme.add_dirt_bound dt [Constraints.Region r];
+            Scheme.add_region_bound rt [Constraints.Region r];
             just cstr_u
           ]
       end
@@ -213,10 +213,10 @@ let rec infer_expr env (e, pos) =
         let drt_rest = Type.fresh_dirt_param () in
         (* XXX *)
         let make_dirt (op, rs) (left_dirt, right_dirt, cnstrs) =
-          let pres = Type.fresh_dirt_param () in
-          let without = Type.fresh_dirt_param () in
+          let pres = Type.fresh_region_param () in
+          let without = Type.fresh_region_param () in
           (* Print.info "DIRT: %t >= %t" (Print.dirt_param without) (Print.dirt (Type.Without (pres, !rs))); *)
-          ((op, pres) :: left_dirt, (op, without) :: right_dirt, Scheme.add_dirt_bound without [Constraints.Without (pres, !rs)] :: cnstrs)
+          ((op, pres) :: left_dirt, (op, without) :: right_dirt, Scheme.add_region_bound without [Constraints.Without (pres, !rs)] :: cnstrs)
         in
         let left_rops, right_rops, cnstrs_ops =
           List.fold_right make_dirt ops ([], [], []) in
