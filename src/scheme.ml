@@ -169,7 +169,6 @@ let pos_neg_tyscheme (ctx, ty, cnstrs) =
   in
   let (((_, _, pos_rs) as pos), neg) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
   let add_region_bound bnd posi = match bnd with
-  | Constraints.Region _ -> posi
   | Constraints.Without (d, _) -> d :: posi
   | Constraints.Instance _ -> posi
   in
@@ -177,7 +176,6 @@ let pos_neg_tyscheme (ctx, ty, cnstrs) =
                                       match bnds with None -> posi | Some bnds -> if List.mem d pos_rs then List.fold_right add_region_bound bnds posi else posi) (Constraints.Region.bounds cnstrs.Constraints.region_graph) [] in
   let pos = ([], [], posi_regions) @@@ pos in
   let add_region_bound bnd (posi, nega) = match bnd with
-  | Constraints.Region r -> (([], [], [r]) @@@ posi, nega) 
   | Constraints.Without (r, rs) -> (([], [], r :: rs) @@@ posi, nega)
   | Constraints.Instance _ -> (posi, nega)
   in

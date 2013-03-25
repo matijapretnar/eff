@@ -173,7 +173,7 @@ let rec infer_expr env (e, pos) =
           let rt = Type.fresh_region_param () in
           unify ctx (T.Arrow (t1, (t2, {T.ops = [op, rt]; T.rest = Type.fresh_dirt_param ()}))) [
             ty_less ~pos u ty;
-            Scheme.add_region_bound rt [Constraints.Region r];
+            Scheme.region_less ~pos r rt;
             just cstr_u
           ]
       end

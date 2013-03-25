@@ -1,5 +1,4 @@
 type region_bound =
-  | Region of Type.region_param
   | Without of Type.region_param * Type.region_param list
   | Instance of Type.instance_param
 
@@ -50,7 +49,6 @@ let get_succ g x =
   Dirt.get_succ x g.dirt_graph
 
 let subst_region_bound sbst = function
-  | Region r -> Region (sbst.Type.region_param r)
   | Without (p, rs) -> Without (sbst.Type.region_param p, List.map sbst.Type.region_param rs)
   | Instance i -> Instance (sbst.Type.instance_param i)
 
@@ -103,7 +101,6 @@ let rec topological_sort = function
 let simplify grph =
   let region_leaves = Region.leaves grph.region_graph in
   let bound_dependency bnd = match bnd with None -> [] | Some bnd -> List.fold_right (fun bnd dep -> match bnd with
-  | Region _ -> dep
   | Without (d, _) -> d :: dep
   | Instance _ -> dep) bnd []
   in
@@ -118,7 +115,6 @@ let less pp p1 p2 ppf =
 let rec print_region_bound ?(non_poly=Trio.empty) bnd ppf =
   match bnd with
   | Instance i -> Type.print_instance_param i ppf
-  | Region r -> Type.print_region_param ~non_poly r ppf
   | Without (prs, rs) -> Print.print ppf "%t - [%t]" (Type.print_region_param prs) (Print.sequence "," (Type.print_region_param) rs)
 
 
