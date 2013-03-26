@@ -412,17 +412,17 @@ and infer_let ~pos env defs =
       just cstr_c
     ]
     in
-    let env, ctxp =
+    let env, ctxp, ctxs =
       if nonexpansive (fst c) then
         let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctx_c t changes)) ctx_p env in
-        env, ctxp
+        env, ctx_p @ ctxp, ctxs
       else
-        env, ctx_p @ ctxp
+        env, ctxp, ctx_p @ ctxs
     in
     env, ctx_c @ ctxs, ctxp, vars, changes @ cstrs
   in
   let env, ctxs, ctxp, vars, cstrs = List.fold_right add_binding defs (env, [], [], [], []) in
-  let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos ctxp t cstrs) vars in
+  let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos ctxs t cstrs) vars in
   env, vars, fun (ctx2, (tc, dc), cstr_c) ->
     Scheme.finalize_dirty_scheme ~pos (ctxs @ ctx2) (tc, drt) ([
           dirt_less ~pos dc drt;
