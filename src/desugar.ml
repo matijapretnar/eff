@@ -448,7 +448,8 @@ let top_let_rec defs =
   let ctx', ns, _ = List.fold_right (fun (x, t) (ctx', ns, forbidden) ->
                                     if List.mem x forbidden then
                                       Error.syntax ~pos:(snd t) "Several definitions of %s" x;
-                                    let n = fresh_variable () in
+                                    let (n, _) = fresh_variable () in
+                                    let n = (n, x) in
                                     ((x, n) :: ctx', n :: ns, x :: forbidden)) defs (!top_ctx, [], []) in
   let defs =
     List.fold_right (fun (p, (_, c)) defs ->
