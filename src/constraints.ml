@@ -30,19 +30,29 @@ module Dirt = Graph.Make(struct
 end)
 
 type t = {
-  ty_graph : Ty.t;
+  ty_graph : Ty.t list;
   region_graph : Region.t;
   dirt_graph : Dirt.t;
 }
 
 let empty = {
-  ty_graph = Ty.empty;
+  ty_graph = [];
   region_graph = Region.empty;
   dirt_graph = Dirt.empty;
 }
 
 let remove_ty g x =
-  Ty.remove_vertex x g.ty_graph
+  let rec remove unremoved = function
+  | [] -> ([], [], unremoved)
+  | g :: gs ->
+      if Ty.mem x g then
+        let (pred, succ, g') = Ty.remove_vertex x g in
+        (pred, succ, unremoved @ g' :: gs)
+      else
+        remove (g :: unremoved) gs
+  in
+  remove [] g.ty_graph
+
 let remove_dirt g x =
   Dirt.remove_vertex x g.dirt_graph
 let get_succ g x =
@@ -54,17 +64,27 @@ let subst_region_bound sbst = function
 
 
 let subst_constraints sbst cnstr = {
-  ty_graph = Ty.map (fun p -> match sbst.Type.ty_param p with Type.TyParam q -> q | _ -> assert false) (fun () -> ()) (fun () -> ()) cnstr.ty_graph;
+  ty_graph = List.map (Ty.map (fun p -> match sbst.Type.ty_param p with Type.TyParam q -> q | _ -> assert false) (fun () -> ()) (fun () -> ())) cnstr.ty_graph;
   dirt_graph = Dirt.map (fun d -> match sbst.Type.dirt_param d with { Type.ops = []; Type.rest = d' } -> d' | _ -> assert false) (fun () -> ()) (fun () -> ()) cnstr.dirt_graph;
   region_graph = Region.map sbst.Type.region_param (List.map (subst_region_bound sbst)) (fun () -> ()) cnstr.region_graph;
 }
 
-let fold_ty f g acc = Ty.fold_edges f g.ty_graph acc
+let fold_ty f g acc = List.fold_right (fun g acc -> Ty.fold_edges f g acc) g.ty_graph acc
 let fold_region f g acc = Region.fold_edges f g.region_graph acc
 let fold_dirt f g acc = Dirt.fold_edges f g.dirt_graph acc
 
 let add_ty_constraint ty1 ty2 cstr =
-  {cstr with ty_graph = Ty.add_edge ty1 ty2 cstr.ty_graph}
+  let within, without = List.partition (fun g -> Ty.mem ty1 g or Ty.mem ty2 g) cstr.ty_graph in
+  let new_graphs =
+    match within with
+    | [] -> (Ty.add_edge ty1 ty2 Ty.empty) :: without
+    | [g] -> (Ty.add_edge ty1 ty2 g) :: without
+    | [g1; g2] -> (Ty.add_edge ty1 ty2 (Ty.union g1 g2)) :: without
+    | _ -> assert false
+  (* Poglej, če sta že v skupnem constraintu *)
+  (* Sicer dodaj novega *)
+  in
+  {cstr with ty_graph = new_graphs}
 
 let add_dirt_constraint drt1 drt2 cstr =
   {cstr with dirt_graph = Dirt.add_edge drt1 drt2 cstr.dirt_graph}
@@ -77,14 +97,14 @@ let add_region_bound r bnd cstr =
 
 let join_disjoint_constraints cstr1 cstr2 = 
   {
-    ty_graph = Ty.union cstr1.ty_graph cstr2.ty_graph;
+    ty_graph = cstr1.ty_graph @ cstr2.ty_graph;
     dirt_graph = Dirt.union cstr1.dirt_graph cstr2.dirt_graph;
     region_graph = Region.union cstr1.region_graph cstr2.region_graph;
   }
 
 let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
   {
-    ty_graph = Ty.garbage_collect pos_ts neg_ts grph.ty_graph;
+    ty_graph = List.filter (fun g -> g <> Ty.empty) (List.map (Ty.garbage_collect pos_ts neg_ts) grph.ty_graph);
     dirt_graph = Dirt.garbage_collect pos_ds neg_ds grph.dirt_graph;
     region_graph = Region.garbage_collect pos_rs neg_rs grph.region_graph;
   }

@@ -28,6 +28,7 @@ sig
 
   (** Add an edge to the graph. *)
   val add_vertex : elt -> t -> t
+  val mem : elt -> t -> bool
 
   (** Remove a vertex from the graph. Return a new graph together with the predecessors
       and successors of the removed vertex. *)
