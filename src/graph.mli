@@ -30,6 +30,8 @@ sig
   val add_vertex : elt -> t -> t
   val mem : elt -> t -> bool
 
+  val keys : t -> elt list
+
   (** Remove a vertex from the graph. Return a new graph together with the predecessors
       and successors of the removed vertex. *)
   val remove_vertex : elt -> t -> elt list * elt list * t

@@ -40,6 +40,9 @@ struct
   let get x (g : t) =
     try G.find x g with Not_found -> (S.empty, S.empty, None, None)
 
+  let keys g =
+    List.map fst (G.bindings g)
+
   let mem x (g : t) =
     try ignore (G.find x g); true with Not_found -> false
 
