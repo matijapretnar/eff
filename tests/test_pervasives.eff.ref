@@ -1,114 +1,112 @@
-val less1 = true
-val less2 = false
-val less3 = false
-val test_equal_int = true
-val test_equal_float = true
-val whatis_std = <standard I/O>
-val whatis_raise = <fun>
-val whatis_exception = <fun>
-val whatis_divisionByZero = <division by zero>
-val whatis_invalidArgument = <invalid argument>
-val whatis_assertionFault = <assertion fault>
-val whatis_failure = <failure>
-val test_divisionByZero = "foo"
-val test_invalidArgument = "invalidArgument was here"
+val less1 : bool = true
+val less2 : bool = false
+val less3 : bool = false
+val test_equal_int : bool = true
+val test_equal_float : bool = true
+val whatis_std : channel = <standard I/O>
+val whatis_raise : 'a exception -> 'a -> 'b = <fun>
+val whatis_exception : string -> 'a exception = <fun>
+val whatis_divisionByZero : unit exception = <division by zero>
+val whatis_invalidArgument : string exception = <invalid argument>
+val whatis_assertionFault : unit exception = <assertion fault>
+val whatis_failure : '_a exception = <failure>
+val test_divisionByZero : string = "foo"
+val test_invalidArgument : string = "invalidArgument was here"
 Check (file "./test_pervasives.eff", line 34, char 1): Operation <failure>.raise "They say it's all about flirting."
-- : unit ! d1 |  = ()
-val test_failure = 42
-- : (assertionFault : unit exception[r2]). unit ! raise:d1; d2 | r1 <= d1,
-                                                                 r2 <= r1 = 
-()
-val tilda_minus = -1
-val tilda_minus_dot2 = -3.14159
-val tilda_minus_dot2 = -1.
-val test_plus = 4
-val test_times = 4
-val test_power = 8
-val test_minus = 19
-val test_minus_tilda_minus = 65
-val test_mod1 = 2
-val test_mod2 = 0
+- : unit = ()
+val test_failure : int = 42
+- : unit = ()
+val tilda_minus : int = -1
+val tilda_minus_dot2 : float = -3.14159
+val tilda_minus_dot2 : float = -1.
+val test_plus : int = 4
+val test_times : int = 4
+val test_power : int = 8
+val test_minus : int = 19
+val test_minus_tilda_minus : int = 65
+val test_mod1 : int = 2
+val test_mod2 : int = 0
 Check (file "./test_pervasives.eff", line 60, char 1): Operation <division by zero>.raise 
 ()
-- : unit ! d1 |  = ()
+- : unit = ()
 Check (file "./test_pervasives.eff", line 62, char 1): Operation <division by zero>.raise 
 ()
-- : unit ! d1 |  = ()
-val test_plus_dot = 5.84
-val test_times_dot = 8.478
-val test_minus_dot = 0.44
-val test_div_dot = 1.16296296296
-val test_div_dot_zero = inf
-val test_div = 33
+- : unit = ()
+val test_plus_dot : float = 5.84
+val test_times_dot : float = 8.478
+val test_minus_dot : float = 0.44
+val test_div_dot : float = 1.16296296296
+val test_div_dot_zero : float = inf
+val test_div : int = 33
 Check (file "./test_pervasives.eff", line 76, char 1): Operation <division by zero>.raise 
 ()
-- : unit ! d1 |  = ()
-val test_zero_div = 0
+- : unit = ()
+val test_zero_div : int = 0
 Check (file "./test_pervasives.eff", line 80, char 1): Operation <division by zero>.raise 
 ()
-- : unit ! d1 |  = ()
-val test_carron = "cherrypie"
-val test_to_string1 = "13"
-val test_to_string2 = "[(1, 2, 3)]"
-val test_to_string3 = "(1, 2, 3)"
-val test_to_string4 = "<fun>"
-val test_float_of_int = 42.
-val test_none = None
-val test_some = Some 3
-val test_ignore = ()
-val test_not = false
-val test_greater1 = true
-val test_greater2 = true
-val test_leq = true
-val test_geq = true
-val test_neq = true
-val test_range = [4; 5; 6; 7; 8; 9]
-val test_map = [1; 4; 9; 16; 25]
-val test_take = [2; 5; 8; 11; 14; 17; 20; 23; 26; 29; 32; 35; 38; 41; 44; 47;
-                 50; 53; 56; 59; 62]
-val test_fold_left = 89
-val test_fold_right = 161
+- : unit = ()
+val test_carron : string = "cherrypie"
+val test_to_string1 : string = "13"
+val test_to_string2 : string = "[(1, 2, 3)]"
+val test_to_string3 : string = "(1, 2, 3)"
+val test_to_string4 : string = "<fun>"
+val test_float_of_int : float = 42.
+val test_none : 'a option = None
+val test_some : int option = Some 3
+val test_ignore : unit = ()
+val test_not : bool = false
+val test_greater1 : bool = true
+val test_greater2 : bool = true
+val test_leq : bool = true
+val test_geq : bool = true
+val test_neq : bool = true
+val test_range : int list = [4; 5; 6; 7; 8; 9]
+val test_map : int list = [1; 4; 9; 16; 25]
+val test_take : int list = [2; 5; 8; 11; 14; 17; 20; 23; 26; 29; 32; 35; 38;
+                            41; 44; 47; 50; 53; 56; 59; 62]
+val test_fold_left : int = 89
+val test_fold_right : int = 161
 Check (file "./test_pervasives.eff", line 122, char 27): "iter [1; 2; 3; 4; 5]"
-val test_iter = ()
-val test_forall = false
-val test_exists = true
-val test_mem = false
-val test_filter = [4; 5]
-val test_complement = [1; 3; 5; 6]
-val test_intersection = [2; 4]
-val test_zip1 = [(1, "a"); (2, "b"); (3, "c")]
+val test_iter : unit = ()
+val test_forall : bool = false
+val test_exists : bool = true
+val test_mem : bool = false
+val test_filter : int list = [4; 5]
+val test_complement : int list = [1; 3; 5; 6]
+val test_intersection : int list = [2; 4]
+val test_zip1 : (int * string) list = [(1, "a"); (2, "b"); (3, "c")]
 Check (file "./test_pervasives.eff", line 138, char 1): Operation <invalid argument>.raise "zip: length mismatch"
-- : unit ! d1 |  = ()
-val test_reverse = [5; 4; 3; 2; 1]
-val test_at = [1; 2; 3; 4; 5; 6]
-val test_length = 5
-val test_head = 1
+- : unit = ()
+val test_reverse : int list = [5; 4; 3; 2; 1]
+val test_at : int list = [1; 2; 3; 4; 5; 6]
+val test_length : int = 5
+val test_head : int = 1
 Check (file "./test_pervasives.eff", line 148, char 1): Operation <invalid argument>.raise "head: empty list"
-- : unit ! d1 |  = ()
-val test_tail = [2; 3; 4]
+- : unit = ()
+val test_tail : int list = [2; 3; 4]
 Check (file "./test_pervasives.eff", line 152, char 1): Operation <invalid argument>.raise "tail: empty list"
-- : unit ! d1 |  = ()
-val test_abs = (5, 5, 5)
-val test_min = 1
-val test_max = 2
-val test_gcd = 4
-val test_lcm = 24
-val test_odd = false
-val test_even = true
-val test_id = 5
-val test_id_id = <fun>
-val test_compose = 196
-val test_fst = "foo"
-val test_snd = 4
-Does this work?- : unit ! print:d1; d2 | r1 <= d1 = ()
+- : unit = ()
+val test_abs : int * int * int = (5, 5, 5)
+val test_min : int = 1
+val test_max : int = 2
+val test_gcd : int = 4
+val test_lcm : int = 24
+val test_odd : bool = false
+val test_even : bool = true
+val test_id : int = 5
+val test_id_id : '_a -> '_a = <fun>
+val test_compose : int = 196
+val test_fst : string = "foo"
+val test_snd : int = 4
+Does this work?- : unit = ()
 Check (file "./test_pervasives.eff", line 180, char 1): Operation <standard I/O>.read 
 ()
-- : unit ! d1 |  = ()
+- : unit = ()
 Check (file "./test_pervasives.eff", line 182, char 1): Operation <failure>.raise "The cows are home."
-- : unit ! d1 |  = ()
+- : unit = ()
 Check (file "./test_pervasives.eff", line 184, char 1): Operation <random number generator>.int 42
-- : unit ! d1 |  = ()
+- : unit = ()
 Check (file "./test_pervasives.eff", line 186, char 1): Operation <random number generator>.float 42.
-- : unit ! d1 |  = ()
-val test_state = 42
-val test_ref = 15
+- : unit = ()
+val test_state : int = 42
+val test_ref : int = 15

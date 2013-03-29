@@ -1,5 +1,5 @@
-val a = 5
-val b = 6
-val c = 7
-- : int ! d1 |  = 4
-- : int ! d1 |  = 11
+val a : int = 5
+val b : int = 6
+val c : int = 7
+- : int = 4
+- : int = 11

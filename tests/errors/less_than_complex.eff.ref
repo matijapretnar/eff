@@ -1,3 +1,3 @@
-val h = <handler>
-val g = <handler>
-Runtime error: invalid comparison with <
+val h : 'a => 'a = <handler>
+val g : 'a => 'a = <handler>
+Runtime error (unknown position): invalid comparison with <
