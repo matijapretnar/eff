@@ -249,7 +249,7 @@ and infer_comp env (c, pos) =
       ctx, (ty, empty_dirt ()), cnstrs
 
   | Core.Let (defs, c) -> 
-      let env, _, change = infer_let ~pos env defs in
+      let env, _, _, _, change = infer_let ~pos env defs in
       change (infer_comp env c)
 
   | Core.LetRec (defs, c) ->
@@ -401,7 +401,7 @@ and infer_let ~pos env defs =
   (* Refresh freshes *)
   (* Check for duplicate variables *)
   let drt = Type.fresh_dirt () in
-  let add_binding (p, c) (env, ctxs, ctxp, vars, cstrs) =
+  let add_binding (p, c) (env, ctxs, ctxp, vars, cstrs, nonpoly) =
     let ctx_p, t_p, cstr_p = infer_pattern p in
     let ctx_c, (t_c, drt'), cstr_c = infer_comp env c in
     let vars = ctx_p @ vars in
@@ -412,17 +412,17 @@ and infer_let ~pos env defs =
       just cstr_c
     ]
     in
-    let env =
+    let env, nonpoly =
       if nonexpansive (fst c) then
-        List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctx_c t changes)) ctx_p env
+        List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctx_c t changes)) ctx_p env, nonpoly
       else
-        env
+        env, ctx_p @ nonpoly
     in
-    env, ctx_c @ ctxs, ctx_p @ ctxp, vars, changes @ cstrs
+    env, ctx_c @ ctxs, ctx_p @ ctxp, vars, changes @ cstrs, nonpoly
   in
-  let env, ctxs, ctxp, vars, cstrs = List.fold_right add_binding defs (env, [], [], [], []) in
+  let env, ctxs, ctxp, vars, cstrs, nonpoly = List.fold_right add_binding defs (env, [], [], [], [], []) in
   let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos ctxs t cstrs) vars in
-  env, vars, fun (ctx2, (tc, dc), cstr_c) ->
+  env, vars, nonpoly @ ctxs, cstrs, fun (ctx2, (tc, dc), cstr_c) ->
     Scheme.finalize_dirty_scheme ~pos (ctxs @ ctx2) (tc, drt) ([
           dirt_less ~pos dc drt;
           trim_context ~pos ctxp;
