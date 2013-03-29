@@ -93,7 +93,7 @@ let exec_topdef interactive ((ctx, top_ctx, top_cnstrs), env) (d,pos) =
       (* XXX What to do about the fresh instances? *)
       let ctx, vars, ctxs, cstrs, change = Infer.infer_let ~pos ctx defs in
       let top_ctx, _, top_cnstrs = 
-      Scheme.finalize_ty_scheme ~pos (ctxs @ top_ctx) Type.universal_ty ([
+      Scheme.finalize_ty_scheme ~pos (ctxs @ top_ctx) (Type.Tuple (List.map snd (ctxs @ top_ctx))) ([
           Scheme.just top_cnstrs
         ] @ cstrs) in
       List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
