@@ -238,6 +238,20 @@ let context ctx ppf =
   | [] -> ()
   | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence "," (fun (x, t) ppf -> Print.print ppf "%t : %t" (Print.variable x) (Type.print t)) ctx)
 
+let collapse ((_, _, cnstrs) as ty_sch) =
+  let collapse_graph g sbst =
+    let x = Type.fresh_ty_param () in
+    let keys = Constraints.Ty.keys g in
+    Type.compose_subst {
+      Type.identity_subst with
+      Type.ty_param = (
+        fun p -> Type.TyParam (if List.mem p keys then x else p)
+      )
+    } sbst
+  in
+  let sbst = List.fold_right collapse_graph cnstrs.Constraints.ty_graph Type.identity_subst in
+  subst_ty_scheme sbst ty_sch
+
 let print_ty_scheme ty_sch ppf =
   let sbst = Type.beautifying_subst () in
   let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in
