@@ -1,25 +1,7 @@
-- : unit ! op:d3; d4 => 'a ! d1 -d5-> eff[r2] -d2-> 'b ! d6 | r1 <= d3,
-                                                              r2 <= r1,
-                                                              d1 <= d2,
-                                                              'a <= 'b = 
-<fun>
-- : (unit -op:d1; d6-> 'b) -d9-> (unit -op:d3; d5-> 'a) -d8-> eff[r2] -op:d4; 
-                                                                    d7-> 'c ! 
-    d10 | d2 - [r1] <= d4, r2 <= r1, d6 <= d7, d5 <= d7, d3 <= d4, d1 <= d2,
-          'b <= 'c, 'a <= 'c = <fun>
-- : eff[r3] -op:d2; d3-> unit ! d4 | d1 - [r2] <= d2, r1 <= d1, r3 <= r2,
-                                     r3 <= r1 = <fun>
-- : 'a -d4-> 'b -op:d2; d3-> unit ! d5 | d1 - [r2] <= d2, r1 <= d1,
-                                         #0, #1 <= r2, #0, #1 <= r1 = 
-<fun>
-- : 'a -d5-> 'b -op:d3; d4-> unit ! d6 | d2 - [r4] <= d3, d1 - [r1] <= d2,
-                                         r2, r3 <= d1, #0 <= r4, #0 <= r1 = 
-<fun>
-- : (unit -d3-> 'c) -d5-> 'd ! d4 => 'a ! d1 -d2-> 'b ! d6 | d3 <= d4,
-                                                             d1 <= d2,
-                                                             'c <= 'd,
-                                                             'a <= 'b = 
-<fun>
-- : eff[r3] -d9-> (unit -op:d3, op':d1; d7-> 'a) -op:d6, op':d5; d8-> 'b ! 
-    d10 | d4 - [r2] <= d6, d2 - [r1] <= d5, r3 <= r2, r3 <= r1, d7 <= d8,
-          d3 <= d6, d3 <= d4, d1 <= d5, d1 <= d2, 'a <= 'b = <fun>
+- : unit => 'a -> eff -> 'a = <fun>
+- : (unit -> 'a) -> (unit -> 'a) -> eff -> 'a = <fun>
+- : eff -> unit = <fun>
+- : 'a -> 'b -> unit = <fun>
+- : 'a -> 'b -> unit = <fun>
+- : (unit -> 'a) -> 'a => 'b -> 'b = <fun>
+- : eff -> (unit -> 'a) -> 'a = <fun>
