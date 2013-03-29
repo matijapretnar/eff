@@ -91,9 +91,12 @@ let exec_topdef interactive ((ctx, top_ctx, top_cnstrs), env) (d,pos) =
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
       (* XXX What to do about the fresh instances? *)
-      let ctx, vars, ctxs, cstrs, change = Infer.infer_let ~pos ctx defs in
+      let poly, nonpoly, ctxs, cstrs, drt = Infer.infer_let ~pos ctx defs in
+      let ctx = List.fold_right (fun (x, t) env -> Ctx.extend ctx x (Scheme.finalize_ty_scheme ~pos ctxs t cstrs)) poly ctx in
+      let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos ctxs t cstrs) (poly @ nonpoly) in
+      let ctx' = nonpoly @ ctxs @ top_ctx in
       let top_ctx, _, top_cnstrs = 
-      Scheme.finalize_ty_scheme ~pos (ctxs @ top_ctx) (Type.Tuple (List.map snd (ctxs @ top_ctx))) ([
+      Scheme.finalize_ty_scheme ~pos ctx' (Type.Tuple (List.map snd ctx')) ([
           Scheme.just top_cnstrs
         ] @ cstrs) in
       List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;

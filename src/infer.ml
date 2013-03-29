@@ -248,9 +248,15 @@ and infer_comp env (c, pos) =
       let ctx, ty, cnstrs = infer_expr env e in
       ctx, (ty, empty_dirt ()), cnstrs
 
-  | Core.Let (defs, c) -> 
-      let env, _, _, _, change = infer_let ~pos env defs in
-      change (infer_comp env c)
+  | Core.Let (defs, c) ->
+      let poly, nonpoly, ctxs, cstrs, drt = infer_let ~pos env defs in
+      let env' = List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctxs t cstrs)) poly env in
+      let ctx2, (tc, dc), cstr_c = infer_comp env' c in
+      unify (ctxs @ ctx2) (tc, drt) ([
+          dirt_less ~pos dc drt;
+          trim_context ~pos (poly @ nonpoly);
+          just cstr_c;
+        ] @ cstrs)
 
   | Core.LetRec (defs, c) ->
       let env, _, change = infer_let_rec ~pos env defs in
@@ -399,35 +405,26 @@ and infer_abstraction2 env (p1, p2, c) =
 and infer_let ~pos env defs =
   (* Check for implicit sequencing *)
   (* Refresh freshes *)
-  (* Check for duplicate variables *)
   let drt = Type.fresh_dirt () in
-  let add_binding (p, c) (env, ctxs, ctxp, vars, cstrs, nonpoly) =
+  let add_binding (p, c) (poly, nonpoly, ctx, cnstrs) =
     let ctx_p, t_p, cstr_p = infer_pattern p in
-    let ctx_c, (t_c, drt'), cstr_c = infer_comp env c in
-    let vars = ctx_p @ vars in
+    let ctx_c, drty_c, cstr_c = infer_comp env c in
     let changes = [
-      ty_less ~pos:(snd c) t_c t_p;
-      dirt_less ~pos:(snd c) drt' drt;
+      dirty_less ~pos:(snd c) drty_c (t_p, drt);
       just cstr_p;
       just cstr_c
     ]
     in
-    let env, nonpoly =
+    let poly, nonpoly =
       if nonexpansive (fst c) then
-        List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctx_c t changes)) ctx_p env, nonpoly
+        ctx_p @ poly, nonpoly
       else
-        env, ctx_p @ nonpoly
+        poly, ctx_p @ nonpoly
     in
-    env, ctx_c @ ctxs, ctx_p @ ctxp, vars, changes @ cstrs, nonpoly
+    poly, nonpoly, ctx_c @ ctx, changes @ cnstrs
   in
-  let env, ctxs, ctxp, vars, cstrs, nonpoly = List.fold_right add_binding defs (env, [], [], [], [], []) in
-  let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos ctxs t cstrs) vars in
-  env, vars, nonpoly @ ctxs, cstrs, fun (ctx2, (tc, dc), cstr_c) ->
-    Scheme.finalize_dirty_scheme ~pos (ctxs @ ctx2) (tc, drt) ([
-          dirt_less ~pos dc drt;
-          trim_context ~pos ctxp;
-          just cstr_c;
-        ] @ cstrs)
+  let poly, nonpoly, ctx, cnstrs = List.fold_right add_binding defs ([], [], [], []) in
+  poly, nonpoly, ctx, cnstrs, drt
 
 and infer_let_rec ~pos env defs =
   if not (Common.injective fst defs) then Error.typing ~pos "Multiply defined recursive value.";
