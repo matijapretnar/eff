@@ -258,12 +258,12 @@ let rec print ?(non_poly=Trio.empty) t ppf =
     match t with
     (* XXX Should we print which instances are fresh? *)
     | Arrow (t1, (t2, drt)) ->
-        print ~at_level:5 "@[<h>%t -%t->@ %t@]"
+(*         print ~at_level:5 "@[<h>%t -%t->@ %t@]"
         (ty ~max_level:4 t1)
         (print_dirt ~non_poly drt)
         (* (fresh_instances frsh) *)
         (ty ~max_level:5 t2)
-        (* print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2) *)
+ *)        print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2)
     | Basic b -> print "%s" b
     | Apply (t, (lst, _, _)) ->
       begin match lst with
@@ -272,21 +272,22 @@ let rec print ?(non_poly=Trio.empty) t ppf =
         | ts -> print ~at_level:1 "(%t) %s" (Print.sequence "," ty ts) t
       end
     | Effect (t, (lst, _, _), rgn) ->
-      begin match lst with
+(*       begin match lst with
         | [] -> print "%s[%t]" t (print_region_param ~non_poly rgn)
         | [s] -> print ~at_level:1 "%t %s[%t]" (ty ~max_level:1 s) t (print_region_param ~non_poly rgn)
         | ts -> print ~at_level:1 "(%t) %s[%t]" (Print.sequence "," ty ts) t (print_region_param ~non_poly rgn)
-      end
-(*       begin match lst with
+      end *)
+      begin match lst with
         | [] -> print "%s" t
         | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
         | ts -> print ~at_level:1 "(%t) %s" (Print.sequence "," ty ts) t
       end
- *)    | TyParam p -> print_ty_param ~non_poly p ppf
+    | TyParam p -> print_ty_param ~non_poly p ppf
     | Tuple [] -> print "unit"
     | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence " *" (ty ~max_level:1) ts)
     | Handler ((t1, drt1), (t2, drt2)) ->
-        print ~at_level:4 "%t ! %t =>@ %t ! %t" (ty ~max_level:2 t1) (print_dirt ~non_poly drt1) (ty t2) (print_dirt ~non_poly drt2)
+        (* print ~at_level:4 "%t ! %t =>@ %t ! %t" (ty ~max_level:2 t1) (print_dirt ~non_poly drt1) (ty t2) (print_dirt ~non_poly drt2) *)
+        print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
   in ty t ppf
 
 

@@ -166,7 +166,7 @@ let rec exec_cmd interactive ((ctx', _, _) as ctx, env) e =
   | Syntax.TypeOf c ->
       let c = Desugar.top_computation c in
       let drty_sch, top_ctx, top_cnstrs = infer_top_comp ctx c in
-      Format.printf "@[%t@]@." (Scheme.print_dirty_scheme drty_sch);
+      Format.printf "@[- : %t@]@." (Scheme.print_dirty_scheme drty_sch);
       ((ctx', top_ctx, top_cnstrs), env)
   | Syntax.Reset ->
       Tctx.reset ();

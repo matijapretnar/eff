@@ -254,18 +254,22 @@ let collapse ((_, _, cnstrs) as ty_sch) =
 
 let print_ty_scheme ty_sch ppf =
   let sbst = Type.beautifying_subst () in
-  let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in
-  Print.print ppf "%t%t | %t"
+  let (_, ty, _) = collapse ty_sch in
+  let ty = Type.subst_ty sbst ty in
+  (* let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in *)
+(*   Print.print ppf "%t%t | %t"
     (context ctx)
-    (Type.print ty)
-    (Constraints.print cnstrs)
+ *)    (Type.print ty ppf)
+    (* (Constraints.print cnstrs) *)
 
 let print_dirty_scheme drty_sch ppf =
-  let sbst = Type.beautifying_subst () in
+  let (ctx, (ty, _), cnstrs) = drty_sch in
+  print_ty_scheme (ctx, ty, cnstrs) ppf
+(*   let sbst = Type.beautifying_subst () in
   let (ctx, (ty, drt), cnstrs) = subst_dirty_scheme sbst drty_sch in
   Print.print ppf "%t%t ! %t | %t"
     (context ctx)
     (Type.print ty)
     (Type.print_dirt drt)
-    (Constraints.print cnstrs)
+    (Constraints.print cnstrs) *)
 
