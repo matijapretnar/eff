@@ -109,8 +109,12 @@ let rec infer_pattern (p, pos) =
   (* Print.debug "%t : %t" (Core.print_pattern (p, pos)) (Scheme.print_ty_scheme ty_sch); *)
   ty_sch
 
-(* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
-   [env]. It returns the inferred type of [e]. *)
+(* [infer_expr env e] infers the type scheme of an expression [e] in a
+   typing environment [env] of generalised variables.
+   The scheme consists of:
+   - the context, which contains non-generalised variables and their types,
+   - the type of the expression, and
+   - constraints connecting all these types. *)
 let rec infer_expr env (e, pos) =
   if !disable_typing then simple Type.universal_ty else
   let unify = Scheme.finalize_ty_scheme ~pos in
@@ -122,38 +126,41 @@ let rec infer_expr env (e, pos) =
           (ctx, ty, cnstrs)
       | None ->
           let ty = T.fresh_ty () in
-          let ty' = T.fresh_ty () in
-          unify [(x, ty)] ty' [ty_less ~pos ty ty']
+          unify [(x, ty)] ty []
       end
 
-  | Core.Const const -> simple (ty_of_const const)
+  | Core.Const const ->
+      simple (ty_of_const const)
 
   | Core.Tuple es ->
       let infer e (ctx, tys, cnstrs) =
-        let ctx', ty', cnstrs' = infer_expr env e in
-        ctx' @ ctx, ty' :: tys, just cnstrs' :: cnstrs
+        let ctx_e, ty_e, cnstrs_e = infer_expr env e in
+        ctx_e @ ctx, ty_e :: tys, [
+          just cnstrs_e
+        ] @ cnstrs
       in
       let ctx, tys, cnstrs = List.fold_right infer es ([], [], []) in
       unify ctx (Type.Tuple tys) cnstrs
 
-  | Core.Record [] -> assert false
+  | Core.Record [] ->
+      assert false
 
   | Core.Record (((fld, _) :: _) as lst) ->
       if not (Pattern.linear_record lst) then
-        Error.typing ~pos "Fields in a record must be distinct." ;
+        Error.typing ~pos "Fields in a record must be distinct";
       begin match Tctx.infer_field fld with
       | None -> Error.typing ~pos "Unbound record field label %s" fld
-      | Some (ty, (ty_name, arg_types)) ->
-          if List.length lst <> List.length arg_types then
-            Error.typing ~pos "malformed record of type %s" ty_name;
+      | Some (ty, (ty_name, fld_tys)) ->
+          if List.length lst <> List.length fld_tys then
+            Error.typing ~pos "The record of type %s has an incorrect number of fields" ty_name;
           let infer (fld, e) (ctx, cnstrs) =
-            begin match C.lookup fld arg_types with
-            | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s." fld ty_name
-            | Some ty ->
-                let ctx', ty', cnstrs' = infer_expr env e in
-                ctx' @ ctx, [
-                  ty_less ~pos ty' ty;
-                  just cnstrs'
+            begin match C.lookup fld fld_tys with
+            | None -> Error.typing ~pos "Unexpected field %s in a record of type %s" fld ty_name
+            | Some fld_ty ->
+                let ctx_e, ty_e, cnstrs_e = infer_expr env e in
+                ctx_e @ ctx, [
+                  ty_less ~pos ty_e fld_ty;
+                  just cnstrs_e
                 ] @ cnstrs
             end
         in
@@ -164,18 +171,18 @@ let rec infer_expr env (e, pos) =
   | Core.Variant (lbl, e) ->
       begin match Tctx.infer_variant lbl with
       | None -> Error.typing ~pos "Unbound constructor %s" lbl
-      | Some (ty, arg_type) ->
-        begin match e, arg_type with
-          | None, None -> simple ty
-          | Some e, Some u ->
-              let ctx', ty', cnstrs' = infer_expr env e in
-              unify ctx' ty [
-                ty_less ~pos ty' u;
-                just cnstrs'
-              ]
-          | None, Some _ -> Error.typing ~pos "Constructor %s should be applied to an argument." lbl
-          | Some _, None -> Error.typing ~pos "Constructor %s cannot be applied to an argument." lbl
-        end
+      | Some (ty, arg_ty) ->
+          begin match e, arg_ty with
+            | None, None -> simple ty
+            | Some e, Some arg_ty ->
+                let ctx_e, ty_e, cnstrs_e = infer_expr env e in
+                unify ctx_e ty [
+                  ty_less ~pos ty_e arg_ty;
+                  just cnstrs_e
+                ]
+            | None, Some _ -> Error.typing ~pos "Constructor %s should be applied to an argument" lbl
+            | Some _, None -> Error.typing ~pos "Constructor %s cannot be applied to an argument" lbl
+          end
       end
       
   | Core.Lambda a ->
@@ -186,13 +193,11 @@ let rec infer_expr env (e, pos) =
       let r = T.fresh_region_param () in
       begin match Tctx.infer_operation op r with
       | None -> Error.typing ~pos "Unbound operation %s" op
-      | Some (ty, (t1, t2)) ->
-          let ctx, u, cstr_u = infer_expr env e in
-          let rt = Type.fresh_region_param () in
-          unify ctx (T.Arrow (t1, (t2, {T.ops = [op, rt]; T.rest = Type.fresh_dirt_param ()}))) [
-            ty_less ~pos u ty;
-            Scheme.region_less ~pos r rt;
-            just cstr_u
+      | Some (eff_ty, (par_ty, res_ty)) ->
+          let ctx_e, ty_e, cnstr_e = infer_expr env e in
+          unify ctx_e (T.Arrow (par_ty, (res_ty, {T.ops = [op, r]; T.rest = Type.fresh_dirt_param ()}))) [
+            ty_less ~pos ty_e eff_ty;
+            just cnstr_e
           ]
       end
 
@@ -202,57 +207,51 @@ let rec infer_expr env (e, pos) =
       let t_finally = T.fresh_ty () in
       let t_yield = T.fresh_ty () in
       let constrain_operation ((e, op), a2) (ctx, cnstrs, ops) =
-        (* XXX Correct when you know what to put instead of the fresh region .*)
         let r = T.fresh_region_param () in
         begin match Tctx.infer_operation op r with
         | None -> Error.typing ~pos "Unbound operation %s in a handler" op
-        | Some (ty, (t1, t2)) ->
-            let ctxe, u, cstr_e = infer_expr env e in
-            let ctxa, u1, tk, u2, cstr_a = infer_abstraction2 env a2 in
+        | Some (eff_ty, (par_ty, arg_ty)) ->
+            let ctx_e, ty_e, cnstr_e = infer_expr env e in
+            let ctx_a, u1, tk, u2, cnstr_a = infer_abstraction2 env a2 in
             let ops =
               begin match Common.lookup op ops with
               | None -> (op, ref [r]) :: ops
               | Some rs -> rs := r :: !rs; ops
               end
               in
-            ctxe @ ctxa @ ctx, [
-              ty_less ~pos u ty;
-              ty_less ~pos t1 u1;
-              ty_less ~pos (T.Arrow (t2, (t_yield, dirt))) tk;
+            ctx_e @ ctx_a @ ctx, [
+              ty_less ~pos ty_e eff_ty;
+              ty_less ~pos par_ty u1;
+              ty_less ~pos (T.Arrow (arg_ty, (t_yield, dirt))) tk;
               dirty_less ~pos u2 (t_yield, dirt);
-              just cstr_e;
-              just cstr_a
+              just cnstr_e;
+              just cnstr_a
             ] @ cnstrs, ops
         end
       in
         let ctxs, cnstrs, ops = List.fold_right constrain_operation ops ([], [], []) in
-        let ctx1, valt1, valt2, cstr_val = infer_abstraction env a_val in
-        let ctx2, fint1, (fint2, findrt), cstr_fin = infer_abstraction env a_fin in
+        let ctx1, valt1, valt2, cnstr_val = infer_abstraction env a_val in
+        let ctx2, fint1, (fint2, findrt), cnstr_fin = infer_abstraction env a_fin in
         let drt_rest = Type.fresh_dirt_param () in
-        (* XXX *)
         let make_dirt (op, rs) (left_dirt, right_dirt, cnstrs) =
           let pres = Type.fresh_region_param () in
           let without = Type.fresh_region_param () in
-          (* Print.info "DIRT: %t >= %t" (Print.dirt_param without) (Print.dirt (Type.Without (pres, !rs))); *)
           ((op, pres) :: left_dirt, (op, without) :: right_dirt, Scheme.add_region_bound without [Constraints.Without (pres, !rs)] :: cnstrs)
         in
-        let left_rops, right_rops, cnstrs_ops =
-          List.fold_right make_dirt ops ([], [], []) in
-(*         let left_rops = List.map (fun rop -> (rop, Type.Present)) rops
-        and right_rops = List.map (fun rop -> (rop, Type.Absent)) rops in
- *)        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, {Type.ops = left_rops; Type.rest = drt_rest}), (t_finally, dirt))) ([
-          (* dirt_handles_ops drt_value rops; *)
+        let left_rops, right_rops, cnstrs_ops = List.fold_right make_dirt ops ([], [], []) in
+        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, {Type.ops = left_rops; Type.rest = drt_rest}), (t_finally, dirt))) ([
           dirt_less ~pos {Type.ops = right_rops; Type.rest = drt_rest} dirt;
           ty_less ~pos t_value valt1;
           dirty_less ~pos valt2 (t_yield, dirt);
           ty_less ~pos fint2 t_finally;
           dirt_less ~pos findrt dirt;
           ty_less ~pos t_yield fint1;
-          just cstr_val;
-          just cstr_fin
+          just cnstr_val;
+          just cnstr_fin
         ] @ cnstrs_ops @ cnstrs)
+
   in
-  Print.debug "%t : %t" (Core.print_expression (e, pos)) (Scheme.print_ty_scheme ty_sch);
+  (* Print.debug "%t : %t" (Core.print_expression (e, pos)) (Scheme.print_ty_scheme ty_sch); *)
   ty_sch
               
 (* [infer_comp env cstr (c,pos)] infers the type of computation [c] in context [env].
