@@ -28,67 +28,85 @@ let ty_of_const = function
   | Common.Boolean _ -> Type.bool_ty
   | Common.Float _ -> Type.float_ty
 
-(* [infer_pattern p] infers the type of pattern [p]. It returns the list of pattern
-   variables with their types, which are all guaranteed to be fresh parameters, together
-   with the type of the whole pattern. *)
+(* [infer_pattern p] infers the type scheme of a pattern [p].
+   This consists of:
+   - the context, which contains bound variables and their types,
+   - the type of the whole pattern (what it matches against), and
+   - constraints connecting all these types.
+   Note that unlike in ordinary type schemes, context types are positive while
+   pattern type is negative. *)
 let rec infer_pattern (p, pos) =
-  (* We do not check for overlaps as all identifiers are distinct - desugar needs to do those *)
   if !disable_typing then simple Type.universal_ty else
   let unify = Scheme.finalize_pattern_scheme ~pos in
   let ty_sch = match p with
+
   | Pattern.Var x ->
       let ty = Type.fresh_ty () in
       [(x, ty)], ty, Constraints.empty
+
   | Pattern.As (p, x) ->
       let ctx, ty, cnstrs = infer_pattern p in
       (x, ty) :: ctx, ty, cnstrs
-  | Pattern.Nonbinding -> simple (Type.fresh_ty ())
-  | Pattern.Const const -> simple (ty_of_const const)
+
+  | Pattern.Nonbinding ->
+      simple (Type.fresh_ty ())
+
+  | Pattern.Const const ->
+      simple (ty_of_const const)
+
   | Pattern.Tuple ps ->
       let infer p (ctx, tys, cnstrs) =
-        let ctx', ty', cnstrs' = infer_pattern p in
-        ctx' @ ctx, ty' :: tys, just cnstrs' :: cnstrs
+        let ctx_p, ty_p, cnstrs_p = infer_pattern p in
+        ctx_p @ ctx, ty_p :: tys, [
+          just cnstrs_p
+        ] @ cnstrs
       in
       let ctx, tys, cnstrs = List.fold_right infer ps ([], [], []) in
       unify ctx (Type.Tuple tys) cnstrs
+
   | Pattern.Record [] ->
       assert false
+
   | Pattern.Record (((fld, _) :: _) as lst) ->
+      if not (Pattern.linear_record lst) then
+        Error.typing ~pos "Fields in a record must be distinct";
       begin match Tctx.infer_field fld with
       | None -> Error.typing ~pos "Unbound record field label %s" fld
-      | Some (ty, (ty_name, us)) ->
+      | Some (ty, (ty_name, fld_tys)) ->
           let infer (fld, p) (ctx, cnstrs) =
-            begin match C.lookup fld us with
-            | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s." fld ty_name
-            | Some ty ->
-                let ctx', ty', cnstrs' = infer_pattern p in
-                ctx' @ ctx, [
-                  ty_less ~pos ty ty';
-                  just cnstrs'
-                ] @ cnstrs;
+            begin match C.lookup fld fld_tys with
+            | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s" fld ty_name
+            | Some fld_ty ->
+                let ctx_p, ty_p, cnstrs_p = infer_pattern p in
+                ctx_p @ ctx, [
+                  ty_less ~pos fld_ty ty_p;
+                  just cnstrs_p
+                ] @ cnstrs
             end
         in
         let ctx, cnstrs = List.fold_right infer lst ([], []) in
         unify ctx ty cnstrs
       end
+
   | Pattern.Variant (lbl, p) ->
       begin match Tctx.infer_variant lbl with
       | None -> Error.typing ~pos "Unbound constructor %s" lbl
-      | Some (ty, u) ->
-        begin match p, u with
-          | None, None -> simple ty
-          | Some p, Some u ->
-              let ctx', ty', cnstrs' = infer_pattern p in
-              unify ctx' ty [
-                ty_less ~pos u ty';
-                just cnstrs'
-              ]
-          | None, Some _ -> Error.typing ~pos "Constructor %s should be applied to an argument." lbl
-          | Some _, None -> Error.typing ~pos "Constructor %s cannot be applied to an argument." lbl
-        end
+      | Some (ty, arg_ty) ->
+          begin match p, arg_ty with
+            | None, None -> simple ty
+            | Some p, Some arg_ty ->
+                let ctx_p, ty_p, cnstrs_p = infer_pattern p in
+                unify ctx_p ty [
+                  ty_less ~pos arg_ty ty_p;
+                  just cnstrs_p
+                ]
+            | None, Some _ -> Error.typing ~pos "Constructor %s should be applied to an argument" lbl
+            | Some _, None -> Error.typing ~pos "Constructor %s cannot be applied to an argument" lbl
+          end
       end
+
   in
-  Print.debug "%t : %t" (Core.print_pattern (p, pos)) (Scheme.print_ty_scheme ty_sch);
+  (* Print.debug "%t : %t" (Core.print_pattern (p, pos)) (Scheme.print_ty_scheme ty_sch); *)
   ty_sch
 
 (* [infer_expr env cstr (e,pos)] infers the type of expression [e] in context
