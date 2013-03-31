@@ -6,7 +6,6 @@ let disable_typing = ref false;;
 
 let ty_less = Scheme.ty_less
 let dirt_less = Scheme.dirt_less
-let region_covers = Scheme.region_covers
 let dirty_less = Scheme.dirty_less
 let just = Scheme.just
 let trim_context = Scheme.trim_context
@@ -117,7 +116,7 @@ let rec infer_expr env (e, pos) =
       | Some (ctx, ty, cnstrs) ->
           (ctx, ty, cnstrs)
       | None ->
-          let ty = T.fresh_ty () in
+          let ty = Type.fresh_ty () in
           unify [(x, ty)] ty []
       end
 
@@ -179,15 +178,16 @@ let rec infer_expr env (e, pos) =
       
   | Core.Lambda a ->
       let ctx, ty1, drty2, cnstrs = infer_abstraction env a in
-      ctx, T.Arrow (ty1, drty2), cnstrs
+      ctx, Type.Arrow (ty1, drty2), cnstrs
       
   | Core.Operation (e, op) ->
-      let r = T.fresh_region_param () in
+      let r = Type.fresh_region_param () in
       begin match Tctx.infer_operation op r with
       | None -> Error.typing ~pos "Unbound operation %s" op
-      | Some (eff_ty, (par_ty, res_ty)) ->
+      | Some (eff_ty, (ty_par, ty_res)) ->
           let ctx_e, ty_e, cnstrs_e = infer_expr env e in
-          unify ctx_e (T.Arrow (par_ty, (res_ty, {T.ops = [op, r]; T.rest = Type.fresh_dirt_param ()}))) [
+          let drt = {Type.ops = [op, r]; Type.rest = Type.fresh_dirt_param ()} in
+          unify ctx_e (Type.Arrow (ty_par, (ty_res, drt))) [
             ty_less ~pos ty_e eff_ty;
             just cnstrs_e
           ]
@@ -264,7 +264,11 @@ and infer_comp env (c, pos) =
 
   | Core.Let (defs, c) ->
       let poly, nonpoly, ctx, chngs, drt = infer_let ~pos env defs in
-      let env' = List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctx t chngs)) poly env in
+      let extend (x, ty) env =
+        let ty_sch = Scheme.finalize_ty_scheme ~pos ctx ty chngs in
+        Ctx.extend env x ty_sch
+      in
+      let env' = List.fold_right extend poly env in
       let ctx_c, (ty_c, drt_c), cnstrs_c = infer_comp env' c in
       unify (ctx @ ctx_c) (ty_c, drt) ([
         dirt_less ~pos drt_c drt;
@@ -274,7 +278,11 @@ and infer_comp env (c, pos) =
 
   | Core.LetRec (defs, c) ->
       let poly, ctx, chngs = infer_let_rec ~pos env defs in
-      let env' = List.fold_right (fun (x, ty) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctx ty chngs)) poly env in
+      let extend (x, ty) env =
+        let ty_sch = Scheme.finalize_ty_scheme ~pos ctx ty chngs in
+        Ctx.extend env x ty_sch
+      in
+      let env' = List.fold_right extend poly env in
       let ctx_c, drty_c, cnstrs_c = infer_comp env' c in
       unify (ctx @ ctx_c) drty_c ([
         just cnstrs_c;
@@ -289,7 +297,7 @@ and infer_comp env (c, pos) =
 
   | Core.Match (e, cases) ->
       let ctx_e, ty_e, cnstrs_e = infer_expr env e in
-      let drty = T.fresh_dirty () in
+      let drty = Type.fresh_dirty () in
       let infer_case ((p, c) as a) (ctx, chngs) =
         let ctx_a, ty_p, drty_c, cnstrs_a = infer_abstraction env a in
         ctx_a @ ctx, [
@@ -305,7 +313,7 @@ and infer_comp env (c, pos) =
       let ctx_c1, (ty_c1, drt_c1), cnstrs_c1 = infer_comp env c1 in
       let ctx_c2, (ty_c2, drt_c2), cnstrs_c2 = infer_comp env c2 in
       let drt = Type.fresh_dirt () in
-      unify (ctx_c1 @ ctx_c2) (T.unit_ty, drt) [
+      unify (ctx_c1 @ ctx_c2) (Type.unit_ty, drt) [
         ty_less ~pos ty_c1 Type.bool_ty;
         ty_less ~pos ty_c2 Type.unit_ty;
         dirt_less ~pos drt_c1 drt;
@@ -318,7 +326,7 @@ and infer_comp env (c, pos) =
       let ctx_e1, ty_e1, cnstrs_e1 = infer_expr env e1 in
       let ctx_e2, ty_e2, cnstrs_e2 = infer_expr env e2 in
       let ctx_c, (ty_c, drt_c), cnstrs_c = infer_comp env c in
-      unify (ctx_e1 @ ctx_e2 @ ctx_c) (T.unit_ty, drt_c) [
+      unify (ctx_e1 @ ctx_e2 @ ctx_c) (Type.unit_ty, drt_c) [
         ty_less ~pos:(snd e1) ty_e1 Type.int_ty;
         ty_less ~pos:(snd e2) ty_e2 Type.int_ty;
         ty_less ~pos:(snd c) ty_c Type.unit_ty;
@@ -330,9 +338,9 @@ and infer_comp env (c, pos) =
   | Core.Apply (e1, e2) ->
       let ctx_e1, ty_e1, cnstrs_e1 = infer_expr env e1 in
       let ctx_e2, ty_e2, cnstrs_e2 = infer_expr env e2 in
-      let drty = T.fresh_dirty () in
+      let drty = Type.fresh_dirty () in
       unify (ctx_e1 @ ctx_e2) drty [
-        ty_less ~pos ty_e1 (T.Arrow (ty_e2, drty));
+        ty_less ~pos ty_e1 (Type.Arrow (ty_e2, drty));
         just cnstrs_e1;
         just cnstrs_e2
       ]
@@ -350,19 +358,18 @@ and infer_comp env (c, pos) =
                   | None -> Error.typing ~pos "Effect type %s does not have operation %s" eff op
                   | Some (ty_par, ty_res) ->
                       let ctx_a, ty_p1, ty_p2, drty_c, cnstrs_a = infer_abstraction2 env a in
-                      let drt_empty = T.fresh_dirt () in
                       ctx_a @ ctx, [
                         ty_less ~pos ty_par ty_p1;
                         ty_less ~pos ty_e ty_p2;
-                        dirty_less ~pos drty_c (T.Tuple [ty_res; ty_e], drt_empty);
+                        dirty_less ~pos drty_c (Type.Tuple [ty_res; ty_e], empty_dirt ());
                         just cnstrs_a
                       ] @ chngs
                 in
                 List.fold_right infer op_defs (ctx_e, [just cnstrs_e])
             end
           in
-          let inst = T.fresh_instance_param () in
-          let r = T.fresh_region_param () in
+          let inst = Type.fresh_instance_param () in
+          let r = Type.fresh_region_param () in
           unify ctx (Tctx.effect_to_params eff params r, empty_dirt ()) ([
             Scheme.add_region_bound r [Constraints.Instance inst]
           ] @ chngs)
@@ -372,16 +379,16 @@ and infer_comp env (c, pos) =
   | Core.Handle (e, c) ->
       let ctx_e, ty_e, cnstrs_e = infer_expr env e
       and ctx_c, drty_c, cnstrs_c = infer_comp env c
-      and drty = T.fresh_dirty () in
+      and drty = Type.fresh_dirty () in
       unify (ctx_e @ ctx_c) drty [
-        ty_less ~pos ty_e (T.Handler (drty_c, drty));
+        ty_less ~pos ty_e (Type.Handler (drty_c, drty));
         just cnstrs_e;
         just cnstrs_c
       ]
 
   | Core.Check c ->
       ignore (infer_comp env c);
-      simple (T.unit_ty, empty_dirt ())
+      simple (Type.unit_ty, empty_dirt ())
 
   in
   (* Print.debug "%t : %t" (Core.print_computation (c, pos)) (Scheme.print_dirty_scheme drty_sch); *)
