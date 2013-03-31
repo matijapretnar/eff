@@ -432,19 +432,18 @@ and infer_let ~pos env defs =
   poly, nonpoly, ctx, chngs, drt
 
 and infer_let_rec ~pos env defs =
-  if not (Common.injective fst defs) then Error.typing ~pos "Multiply defined recursive value.";
-  let infer (x, ((p, c) as a)) (vars, ctx, cnstrs) =
-    let ctx', tp, tc, cnstrs_a = infer_abstraction env a in
-    (x, Type.Arrow (tp, tc)) :: vars, ctx' @ ctx, [
+  let infer (x, a) (poly, ctx, chngs) =
+    let ctx_a, ty_p, drty_c, cnstrs_a = infer_abstraction env a in
+    (x, Type.Arrow (ty_p, drty_c)) :: poly, ctx_a @ ctx, [
       just cnstrs_a
-    ] @ cnstrs
+    ] @ chngs
   in
-  let vars, ctx, cnstrs = List.fold_right infer defs ([], [], []) in
-  let cnstrs = [
-    trim_context ~pos vars
-  ] @ cnstrs
- in
-  let env = List.fold_right (fun (x, t) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctx t cnstrs)) vars env in
-  let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos ctx t cnstrs) vars in
-  env, vars, fun (ctx2, (tc, dc), cstr_c) ->
-  Scheme.finalize_dirty_scheme ~pos (ctx @ ctx2) (tc, dc) (just cstr_c :: cnstrs)
+  let poly, ctx, chngs = List.fold_right infer defs ([], [], []) in
+  let chngs = [
+    trim_context ~pos poly
+  ] @ chngs
+  in
+  let env = List.fold_right (fun (x, ty) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctx ty chngs)) poly env in
+  let poly = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~pos ctx ty chngs) poly in
+  env, poly, fun (ctx_c, drty_c, cnstr_c) ->
+  Scheme.finalize_dirty_scheme ~pos (ctx @ ctx_c) drty_c (just cnstr_c :: chngs)
