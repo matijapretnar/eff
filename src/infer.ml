@@ -2,7 +2,6 @@ module C = Common
 module T = Type
 
 let warn_implicit_sequencing = ref false;;
-
 let disable_typing = ref false;;
 
 let ty_less = Scheme.ty_less
@@ -11,13 +10,6 @@ let region_covers = Scheme.region_covers
 let dirty_less = Scheme.dirty_less
 let just = Scheme.just
 let trim_context = Scheme.trim_context
-
-(* Can a computation safely be generalized, i.e., is it non-expansive in the parlance of
-   SML? In our case non-expansive simply means "is a value". *)
-let nonexpansive = function
-  | Core.Value _ -> true
-  | Core.Apply _ | Core.Match _ | Core.While _ | Core.For _ | Core.New _
-  | Core.Handle _ | Core.Let _ | Core.LetRec _ | Core.Check _ -> false
 
 let simple ty = ([], ty, Constraints.empty)
 let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_dirt_param () }
@@ -419,25 +411,25 @@ and infer_let ~pos env defs =
   (* Check for implicit sequencing *)
   (* Refresh freshes *)
   let drt = Type.fresh_dirt () in
-  let add_binding (p, c) (poly, nonpoly, ctx, cnstrs) =
-    let ctx_p, t_p, cstr_p = infer_pattern p in
-    let ctx_c, drty_c, cstr_c = infer_comp env c in
-    let changes = [
-      dirty_less ~pos:(snd c) drty_c (t_p, drt);
-      just cstr_p;
-      just cstr_c
-    ]
-    in
+  let add_binding (p, c) (poly, nonpoly, ctx, chngs) =
+    let ctx_p, ty_p, cnstrs_p = infer_pattern p in
+    let ctx_c, drty_c, cnstrs_c = infer_comp env c in
     let poly, nonpoly =
-      if nonexpansive (fst c) then
-        ctx_p @ poly, nonpoly
-      else
-        poly, ctx_p @ nonpoly
+      match fst c with
+      | Core.Value _ ->
+          ctx_p @ poly, nonpoly
+      | Core.Apply _ | Core.Match _ | Core.While _ | Core.For _ | Core.New _
+      | Core.Handle _ | Core.Let _ | Core.LetRec _ | Core.Check _ ->
+          poly, ctx_p @ nonpoly
     in
-    poly, nonpoly, ctx_c @ ctx, changes @ cnstrs
+    poly, nonpoly, ctx_c @ ctx, [
+      dirty_less ~pos:(snd c) drty_c (ty_p, drt);
+      just cnstrs_p;
+      just cnstrs_c
+    ] @ chngs
   in
-  let poly, nonpoly, ctx, cnstrs = List.fold_right add_binding defs ([], [], [], []) in
-  poly, nonpoly, ctx, cnstrs, drt
+  let poly, nonpoly, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
+  poly, nonpoly, ctx, chngs, drt
 
 and infer_let_rec ~pos env defs =
   if not (Common.injective fst defs) then Error.typing ~pos "Multiply defined recursive value.";
