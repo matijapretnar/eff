@@ -273,8 +273,12 @@ and infer_comp env (c, pos) =
       ] @ chngs)
 
   | Core.LetRec (defs, c) ->
-      let env, _, change = infer_let_rec ~pos env defs in
-      change (infer_comp env c)
+      let poly, ctx, chngs = infer_let_rec ~pos env defs in
+      let env' = List.fold_right (fun (x, ty) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctx ty chngs)) poly env in
+      let ctx_c, drty_c, cnstrs_c = infer_comp env' c in
+      unify (ctx @ ctx_c) drty_c ([
+        just cnstrs_c;
+      ] @ chngs)
 
   | Core.Match (e, []) ->
       let ctx_e, ty_e, cnstrs_e = infer_expr env e in
@@ -439,11 +443,6 @@ and infer_let_rec ~pos env defs =
     ] @ chngs
   in
   let poly, ctx, chngs = List.fold_right infer defs ([], [], []) in
-  let chngs = [
+  poly, ctx, [
     trim_context ~pos poly
   ] @ chngs
-  in
-  let env = List.fold_right (fun (x, ty) env -> Ctx.extend env x (Scheme.finalize_ty_scheme ~pos ctx ty chngs)) poly env in
-  let poly = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~pos ctx ty chngs) poly in
-  env, poly, fun (ctx_c, drty_c, cnstr_c) ->
-  Scheme.finalize_dirty_scheme ~pos (ctx @ ctx_c) drty_c (just cnstr_c :: chngs)

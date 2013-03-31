@@ -116,8 +116,14 @@ let exec_topdef interactive ((ctx, top_ctx, top_cnstrs), env) (d,pos) =
         ((ctx, top_ctx, top_cnstrs), env)
   | Syntax.TopLetRec defs ->
       let defs = Desugar.top_let_rec defs in
-      let ctx, vars, change = Infer.infer_let_rec ~pos ctx defs in
-      let top_ctx, _, top_cnstrs = change (top_ctx, Type.universal_dirty, top_cnstrs) in
+      let poly, ctxs, cstrs = Infer.infer_let_rec ~pos ctx defs in
+      let ctx = List.fold_right (fun (x, t) env -> Ctx.extend ctx x (Scheme.finalize_ty_scheme ~pos ctxs t cstrs)) poly ctx in
+      let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos ctxs t cstrs) poly in
+      let ctx' = ctxs @ top_ctx in
+      let top_ctx, _, top_cnstrs = 
+      Scheme.finalize_ty_scheme ~pos ctx' (Type.Tuple (List.map snd ctx')) ([
+          Scheme.just top_cnstrs
+        ] @ cstrs) in
       List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env = Eval.extend_let_rec env defs in
         if interactive then begin
