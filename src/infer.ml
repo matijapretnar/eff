@@ -194,17 +194,16 @@ let rec infer_expr env (e, pos) =
       end
 
   | Core.Handler {Core.operations = ops; Core.value = a_val; Core.finally = a_fin} -> 
-      let t_value = T.fresh_ty () in
-      let dirt = T.fresh_dirt () in
-      let t_finally = T.fresh_ty () in
-      let t_yield = T.fresh_ty () in
-      let constrain_operation ((e, op), a2) (ctx, cnstrs, ops) =
-        let r = T.fresh_region_param () in
+      let drt_mid = Type.fresh_dirt () in
+      let ty_mid = Type.fresh_ty () in
+
+      let infer ((e, op), a2) (ctx, chngs, ops) =
+        let r = Type.fresh_region_param () in
         begin match Tctx.infer_operation op r with
         | None -> Error.typing ~pos "Unbound operation %s in a handler" op
-        | Some (eff_ty, (par_ty, arg_ty)) ->
-            let ctx_e, ty_e, cnstr_e = infer_expr env e in
-            let ctx_a, u1, tk, u2, cnstr_a = infer_abstraction2 env a2 in
+        | Some (eff_ty, (ty_par, ty_arg)) ->
+            let ctx_e, ty_e, cnstrs_e = infer_expr env e in
+            let ctx_a, ty_p, ty_k, drty_c, cnstrs_a = infer_abstraction2 env a2 in
             let ops =
               begin match Common.lookup op ops with
               | None -> (op, ref [r]) :: ops
@@ -213,34 +212,46 @@ let rec infer_expr env (e, pos) =
               in
             ctx_e @ ctx_a @ ctx, [
               ty_less ~pos ty_e eff_ty;
-              ty_less ~pos par_ty u1;
-              ty_less ~pos (T.Arrow (arg_ty, (t_yield, dirt))) tk;
-              dirty_less ~pos u2 (t_yield, dirt);
-              just cnstr_e;
-              just cnstr_a
-            ] @ cnstrs, ops
+              ty_less ~pos ty_par ty_p;
+              ty_less ~pos (Type.Arrow (ty_arg, (ty_mid, drt_mid))) ty_k;
+              dirty_less ~pos drty_c (ty_mid, drt_mid);
+              just cnstrs_e;
+              just cnstrs_a
+            ] @ chngs, ops
         end
       in
-        let ctxs, cnstrs, ops = List.fold_right constrain_operation ops ([], [], []) in
-        let ctx1, valt1, valt2, cnstr_val = infer_abstraction env a_val in
-        let ctx2, fint1, (fint2, findrt), cnstr_fin = infer_abstraction env a_fin in
-        let drt_rest = Type.fresh_dirt_param () in
-        let make_dirt (op, rs) (left_dirt, right_dirt, cnstrs) =
-          let pres = Type.fresh_region_param () in
-          let without = Type.fresh_region_param () in
-          ((op, pres) :: left_dirt, (op, without) :: right_dirt, Scheme.add_region_bound without [Constraints.Without (pres, !rs)] :: cnstrs)
+      let ctxs, chngs, ops = List.fold_right infer ops ([], [], []) in
+
+      let make_dirt (op, rs) (ops_in, ops_out, chngs) =
+        let r_in = Type.fresh_region_param () in
+        let r_out = Type.fresh_region_param () in
+        let chngs = [
+          Scheme.add_region_bound r_out [Constraints.Without (r_in, !rs)]
+        ] @ chngs
         in
-        let left_rops, right_rops, cnstrs_ops = List.fold_right make_dirt ops ([], [], []) in
-        unify (ctx1 @ ctx2 @ ctxs) (Type.Handler((t_value, {Type.ops = left_rops; Type.rest = drt_rest}), (t_finally, dirt))) ([
-          dirt_less ~pos {Type.ops = right_rops; Type.rest = drt_rest} dirt;
-          ty_less ~pos t_value valt1;
-          dirty_less ~pos valt2 (t_yield, dirt);
-          ty_less ~pos fint2 t_finally;
-          dirt_less ~pos findrt dirt;
-          ty_less ~pos t_yield fint1;
-          just cnstr_val;
-          just cnstr_fin
-        ] @ cnstrs_ops @ cnstrs)
+        (op, r_in) :: ops_in, (op, r_out) :: ops_out, chngs
+      in
+      let ops_in, ops_out, chngs_ops = List.fold_right make_dirt ops ([], [], []) in
+
+      let ctx_val, ty_val, drty_val, cnstrs_val = infer_abstraction env a_val in
+      let ctx_fin, ty_fin, drty_fin, cnstrs_fin = infer_abstraction env a_fin in
+
+      let ty_in = Type.fresh_ty () in
+      let drt_rest = Type.fresh_dirt_param () in
+      let drt_in = {Type.ops = ops_in; Type.rest = drt_rest} in
+      let drt_out = Type.fresh_dirt () in
+      let ty_out = Type.fresh_ty () in
+
+      unify (ctx_val @ ctx_fin @ ctxs) (Type.Handler((ty_in, drt_in), (ty_out, drt_out))) ([
+        dirt_less ~pos {Type.ops = ops_out; Type.rest = drt_rest} drt_out;
+        ty_less ~pos ty_in ty_val;
+        dirty_less ~pos drty_val (ty_mid, drt_mid);
+        ty_less ~pos ty_mid ty_fin;
+        dirt_less ~pos drt_mid drt_out;
+        dirty_less ~pos drty_fin (ty_out, drt_out);
+        just cnstrs_val;
+        just cnstrs_fin
+      ] @ chngs_ops @ chngs)
 
   in
   (* Print.debug "%t : %t" (Core.print_expression (e, pos)) (Scheme.print_ty_scheme ty_sch); *)
