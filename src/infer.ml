@@ -133,14 +133,14 @@ let rec infer_expr env (e, pos) =
       simple (ty_of_const const)
 
   | Core.Tuple es ->
-      let infer e (ctx, tys, cnstrs) =
+      let infer e (ctx, tys, chngs) =
         let ctx_e, ty_e, cnstrs_e = infer_expr env e in
         ctx_e @ ctx, ty_e :: tys, [
           just cnstrs_e
-        ] @ cnstrs
+        ] @ chngs
       in
-      let ctx, tys, cnstrs = List.fold_right infer es ([], [], []) in
-      unify ctx (Type.Tuple tys) cnstrs
+      let ctx, tys, chngs = List.fold_right infer es ([], [], []) in
+      unify ctx (Type.Tuple tys) chngs
 
   | Core.Record [] ->
       assert false
@@ -153,7 +153,7 @@ let rec infer_expr env (e, pos) =
       | Some (ty, (ty_name, fld_tys)) ->
           if List.length lst <> List.length fld_tys then
             Error.typing ~pos "The record of type %s has an incorrect number of fields" ty_name;
-          let infer (fld, e) (ctx, cnstrs) =
+          let infer (fld, e) (ctx, chngs) =
             begin match C.lookup fld fld_tys with
             | None -> Error.typing ~pos "Unexpected field %s in a record of type %s" fld ty_name
             | Some fld_ty ->
@@ -161,11 +161,11 @@ let rec infer_expr env (e, pos) =
                 ctx_e @ ctx, [
                   ty_less ~pos ty_e fld_ty;
                   just cnstrs_e
-                ] @ cnstrs
+                ] @ chngs
             end
         in
-        let ctx, cnstrs = List.fold_right infer lst ([], []) in
-        unify ctx ty cnstrs
+        let ctx, chngs = List.fold_right infer lst ([], []) in
+        unify ctx ty chngs
       end
 
   | Core.Variant (lbl, e) ->
@@ -194,10 +194,10 @@ let rec infer_expr env (e, pos) =
       begin match Tctx.infer_operation op r with
       | None -> Error.typing ~pos "Unbound operation %s" op
       | Some (eff_ty, (par_ty, res_ty)) ->
-          let ctx_e, ty_e, cnstr_e = infer_expr env e in
+          let ctx_e, ty_e, cnstrs_e = infer_expr env e in
           unify ctx_e (T.Arrow (par_ty, (res_ty, {T.ops = [op, r]; T.rest = Type.fresh_dirt_param ()}))) [
             ty_less ~pos ty_e eff_ty;
-            just cnstr_e
+            just cnstrs_e
           ]
       end
 
