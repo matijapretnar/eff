@@ -83,10 +83,10 @@
 file:
   | lst = file_topdef
     { lst }
-  | t = term EOF
-     { [Term t] }
-  | t = term SEMISEMI lst = file
-     { (Term t) :: lst }
+  | t = topterm EOF
+     { [t] }
+  | t = topterm SEMISEMI lst = file
+     { t :: lst }
   | dir = topdirective EOF
      { [dir] }
   | dir = topdirective SEMISEMI lst = file
@@ -96,17 +96,22 @@ file_topdef:
   | EOF
      { [] }
   | def = topdef SEMISEMI lst = file
-     { (Topdef def) :: lst }
+     { def :: lst }
   | def = topdef lst = file_topdef
-     { (Topdef def) :: lst }
+     { def :: lst }
 
 commandline:
   | def = topdef SEMISEMI
-    { Topdef def }
-  | t = term SEMISEMI
-    { Term t }
+    { def }
+  | t = topterm SEMISEMI
+    { t }
   | dir = topdirective SEMISEMI
     { dir }
+
+topterm: mark_position(plain_topterm) { $1 }
+plain_topterm:
+  | t = term
+    { Term t }
 
 (* Things that can be defined on toplevel. *)
 topdef: mark_position(plain_topdef) { $1 }
@@ -122,7 +127,8 @@ plain_topdef:
 
 (* Toplevel directive If you change these, make sure to update lname as well,
    or a directive might become a reserved word. *)
-topdirective:
+topdirective: mark_position(plain_topdirective) { $1 }
+plain_topdirective:
   | HASH QUIT
     { Quit }
   | HASH HELP

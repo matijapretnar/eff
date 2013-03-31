@@ -90,9 +90,9 @@ type tydef =
   | TyInline of ty
   (** [ty] *)
 
-(* Toplevel definitions which need not be separated by [;;] *)
-type topdef = plain_topdef Common.pos
-and plain_topdef =
+(* Toplevel entries which need to be separated by [;;] *)
+type toplevel = plain_toplevel Common.pos
+and plain_toplevel =
   | Tydef of (Common.tyname, (Common.typaram list * tydef)) Common.assoc
   (** [type t = tydef] *)
   | TopLet of (Common.variable Pattern.t * term) list
@@ -101,10 +101,6 @@ and plain_topdef =
   (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)
   | External of Common.variable * ty * Common.variable
   (** [external x : t = "ext_val_name"] *)
-
-(* Toplevel entries which need to be separated by [;;] *)
-type toplevel =
-  | Topdef of topdef
   | Term of term
   | Use of string
   (** [#use "filename.eff"] *)

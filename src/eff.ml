@@ -85,8 +85,47 @@ let parse parser lex =
 let initial_ctxenv =
   ((Ctx.empty, [], Constraints.empty), Eval.initial)
 
-let exec_topdef interactive ((ctx, top_ctx, top_cnstrs), env) (d,pos) =
+let infer_top_comp (ctx, top_ctx, top_cnstrs) c =
+  let ctx, drty, cnstrs = Infer.infer_comp ctx c in
+  let top_ctx, drty, top_cnstrs = 
+  Scheme.finalize_dirty_scheme ~pos:(snd c) (ctx @ top_ctx) drty ([
+      Scheme.just cnstrs;
+      Scheme.just top_cnstrs
+    ]) in
+
+  Exhaust.check_comp c ;
+  (* let drty_sch = Scheme.simplify drty_sch in *)
+  (* let cnstr = Scheme.constraints_of_graph remaining in *)
+  (* XXX What to do about the fresh instances? *)
+  (* XXX Here, we need to show what type parameters are polymorphic or not. *)
+  (*     I am disabling it because we are going to try a new approach. *)
+  (top_ctx, drty, top_cnstrs), top_ctx, top_cnstrs
+
+(* [exec_cmd env c] executes toplevel command [c] in global
+    environment [(ctx, env)]. It prints the result on standard output
+    and return the new environment. *)
+let rec exec_cmd interactive ((ctx, top_ctx, top_cnstrs) as wholectx, env) (d,pos) =
   match d with
+  | Syntax.Term c ->
+      let c = Desugar.top_computation c in
+      let drty_sch, top_ctx, top_cnstrs = infer_top_comp wholectx c in
+      let v = Eval.run env c in
+      if interactive then Format.printf "@[- : %t = %t@]@."
+        (Scheme.print_dirty_scheme drty_sch)
+        (Value.print_value v);
+      ((ctx, top_ctx, top_cnstrs), env)
+  | Syntax.TypeOf c ->
+      let c = Desugar.top_computation c in
+      let drty_sch, top_ctx, top_cnstrs = infer_top_comp wholectx c in
+      Format.printf "@[- : %t@]@." (Scheme.print_dirty_scheme drty_sch);
+      ((ctx, top_ctx, top_cnstrs), env)
+  | Syntax.Reset ->
+      Tctx.reset ();
+      print_endline ("Environment reset."); initial_ctxenv
+  | Syntax.Help ->
+      print_endline help_text; (wholectx, env)
+  | Syntax.Quit -> exit 0
+  | Syntax.Use fn -> use_file (wholectx, env) (fn, interactive)
   | Syntax.TopLet defs ->
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
@@ -114,77 +153,34 @@ let exec_topdef interactive ((ctx, top_ctx, top_cnstrs), env) (d,pos) =
             vars
         end;
         ((ctx, top_ctx, top_cnstrs), env)
-  | Syntax.TopLetRec defs ->
-      let defs = Desugar.top_let_rec defs in
-      let poly, ctxs, cstrs = Infer.infer_let_rec ~pos ctx defs in
-      let ctx = List.fold_right (fun (x, t) env -> Ctx.extend ctx x (Scheme.finalize_ty_scheme ~pos ctxs t cstrs)) poly ctx in
-      let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos ctxs t cstrs) poly in
-      let ctx' = ctxs @ top_ctx in
-      let top_ctx, _, top_cnstrs = 
-      Scheme.finalize_ty_scheme ~pos ctx' (Type.Tuple (List.map snd ctx')) ([
-          Scheme.just top_cnstrs
-        ] @ cstrs) in
-      List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
-      let env = Eval.extend_let_rec env defs in
-        if interactive then begin
-          List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Print.variable x) (Scheme.print_ty_scheme tysch)) vars
-        end;
+    | Syntax.TopLetRec defs ->
+        let defs = Desugar.top_let_rec defs in
+        let poly, ctxs, cstrs = Infer.infer_let_rec ~pos ctx defs in
+        let ctx = List.fold_right (fun (x, t) env -> Ctx.extend ctx x (Scheme.finalize_ty_scheme ~pos ctxs t cstrs)) poly ctx in
+        let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos ctxs t cstrs) poly in
+        let ctx' = ctxs @ top_ctx in
+        let top_ctx, _, top_cnstrs = 
+        Scheme.finalize_ty_scheme ~pos ctx' (Type.Tuple (List.map snd ctx')) ([
+            Scheme.just top_cnstrs
+          ] @ cstrs) in
+        List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
+        let env = Eval.extend_let_rec env defs in
+          if interactive then begin
+            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Print.variable x) (Scheme.print_ty_scheme tysch)) vars
+          end;
+          ((ctx, top_ctx, top_cnstrs), env)
+    | Syntax.External (x, t, f) ->
+      let (x, t) = Desugar.external_ty (Tctx.is_effect ~pos) x t in
+      let ctx = Ctx.extend ctx x t in
+        begin match C.lookup f External.values with
+          | Some v -> ((ctx, top_ctx, top_cnstrs), Eval.update x v env)
+          | None -> Error.runtime "unknown external symbol %s." f
+        end
+    | Syntax.Tydef tydefs ->
+        let tydefs = Desugar.tydefs ~pos tydefs in
+        Tctx.extend_tydefs ~pos tydefs ;
         ((ctx, top_ctx, top_cnstrs), env)
-  | Syntax.External (x, t, f) ->
-    let (x, t) = Desugar.external_ty (Tctx.is_effect ~pos:pos) x t in
-    let ctx = Ctx.extend ctx x t in
-      begin match C.lookup f External.values with
-        | Some v -> ((ctx, top_ctx, top_cnstrs), Eval.update x v env)
-        | None -> Error.runtime "unknown external symbol %s." f
-      end
-  | Syntax.Tydef tydefs ->
-      let tydefs = Desugar.tydefs ~pos tydefs in
-      Tctx.extend_tydefs ~pos tydefs ;
-      ((ctx, top_ctx, top_cnstrs), env)
 
-(* [exec_cmd env c] executes toplevel command [c] in global
-    environment [(ctx, env)]. It prints the result on standard output
-    and return the new environment. *)
-
-let infer_top_comp (ctx, top_ctx, top_cnstrs) c =
-  let ctx, drty, cnstrs = Infer.infer_comp ctx c in
-  let top_ctx, drty, top_cnstrs = 
-  Scheme.finalize_dirty_scheme ~pos:(snd c) (ctx @ top_ctx) drty ([
-      Scheme.just cnstrs;
-      Scheme.just top_cnstrs
-    ]) in
-
-  Exhaust.check_comp c ;
-  (* let drty_sch = Scheme.simplify drty_sch in *)
-  (* let cnstr = Scheme.constraints_of_graph remaining in *)
-  (* XXX What to do about the fresh instances? *)
-  (* XXX Here, we need to show what type parameters are polymorphic or not. *)
-  (*     I am disabling it because we are going to try a new approach. *)
-  (top_ctx, drty, top_cnstrs), top_ctx, top_cnstrs
-
-let rec exec_cmd interactive ((ctx', _, _) as ctx, env) e =
-  match e with
-  | Syntax.Term c ->
-      let c = Desugar.top_computation c in
-      let drty_sch, top_ctx, top_cnstrs = infer_top_comp ctx c in
-      let v = Eval.run env c in
-      if interactive then Format.printf "@[- : %t = %t@]@."
-        (Scheme.print_dirty_scheme drty_sch)
-        (Value.print_value v);
-      ((ctx', top_ctx, top_cnstrs), env)
-  | Syntax.TypeOf c ->
-      let c = Desugar.top_computation c in
-      let drty_sch, top_ctx, top_cnstrs = infer_top_comp ctx c in
-      Format.printf "@[- : %t@]@." (Scheme.print_dirty_scheme drty_sch);
-      ((ctx', top_ctx, top_cnstrs), env)
-  | Syntax.Reset ->
-      Tctx.reset ();
-      print_endline ("Environment reset."); initial_ctxenv
-  | Syntax.Help ->
-      print_endline help_text; (ctx, env)
-  | Syntax.Quit -> exit 0
-  | Syntax.Use fn -> use_file (ctx, env) (fn, interactive)
-  | Syntax.Topdef def -> exec_topdef interactive (ctx, env) def
 
 and use_file env (filename, interactive) =
   let cmds = Lexer.read_file (parse Parser.file) filename in
