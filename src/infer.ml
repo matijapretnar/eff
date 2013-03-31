@@ -55,14 +55,14 @@ let rec infer_pattern (p, pos) =
       simple (ty_of_const const)
 
   | Pattern.Tuple ps ->
-      let infer p (ctx, tys, cnstrs) =
+      let infer p (ctx, tys, chngs) =
         let ctx_p, ty_p, cnstrs_p = infer_pattern p in
         ctx_p @ ctx, ty_p :: tys, [
           just cnstrs_p
-        ] @ cnstrs
+        ] @ chngs
       in
-      let ctx, tys, cnstrs = List.fold_right infer ps ([], [], []) in
-      unify ctx (Type.Tuple tys) cnstrs
+      let ctx, tys, chngs = List.fold_right infer ps ([], [], []) in
+      unify ctx (Type.Tuple tys) chngs
 
   | Pattern.Record [] ->
       assert false
@@ -73,7 +73,7 @@ let rec infer_pattern (p, pos) =
       begin match Tctx.infer_field fld with
       | None -> Error.typing ~pos "Unbound record field label %s" fld
       | Some (ty, (ty_name, fld_tys)) ->
-          let infer (fld, p) (ctx, cnstrs) =
+          let infer (fld, p) (ctx, chngs) =
             begin match C.lookup fld fld_tys with
             | None -> Error.typing ~pos "Unexpected field %s in a pattern of type %s" fld ty_name
             | Some fld_ty ->
@@ -81,11 +81,11 @@ let rec infer_pattern (p, pos) =
                 ctx_p @ ctx, [
                   ty_less ~pos fld_ty ty_p;
                   just cnstrs_p
-                ] @ cnstrs
+                ] @ chngs
             end
         in
-        let ctx, cnstrs = List.fold_right infer lst ([], []) in
-        unify ctx ty cnstrs
+        let ctx, chngs = List.fold_right infer lst ([], []) in
+        unify ctx ty chngs
       end
 
   | Pattern.Variant (lbl, p) ->
