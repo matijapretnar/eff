@@ -254,13 +254,10 @@ let collapse ((_, _, cnstrs) as ty_sch) =
 
 let print_ty_scheme ty_sch ppf =
   let sbst = Type.beautifying_subst () in
-  let (_, ty, _) = collapse ty_sch in
-  let ty = Type.subst_ty sbst ty in
-  (* let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in *)
-(*   Print.print ppf "%t%t | %t"
-    (context ctx)
- *)    (Type.print ty ppf)
-    (* (Constraints.print cnstrs) *)
+  let ty_sch = collapse ty_sch in
+  let (ctx, ty, _) = subst_ty_scheme sbst ty_sch in
+  let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
+  Type.print ~non_poly ty ppf
 
 let print_dirty_scheme drty_sch ppf =
   let (ctx, (ty, _), cnstrs) = drty_sch in
