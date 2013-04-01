@@ -306,7 +306,7 @@ let check_shadowing ~pos = function
         | None -> ()
     ) lst
 
-let extend_with_variances tydefs =
+let extend_with_variances ~pos tydefs =
   let prepare_variance lst = List.map (fun p -> (p, (ref false, ref false))) lst in
   let prepare_variances ((ps, ds, rs), def) =
     ((prepare_variance ps, prepare_variance ds, prepare_variance rs), def) in
@@ -329,6 +329,12 @@ let extend_with_variances tydefs =
               List.iter (dirt true true) drts;
               List.iter (region_param true true) rgns
           | Some ((ps, ds, rs), _) ->
+              if List.length ps != List.length tys then
+                Error.typing ~pos "The type constructor %s expects %d type arguments" t (List.length ps);
+              if List.length ds != List.length drts then
+                Error.typing ~pos "The type constructor %s expects %d dirt arguments" t (List.length drts);
+              if List.length rs != List.length rgns then
+                Error.typing ~pos "The type constructor %s expects %d region arguments" t (List.length rgns);
               if posi then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty posi' nega') ps tys;
                 List.iter2 (fun (_, (posi', nega')) -> dirt posi' nega') ds drts;
@@ -348,6 +354,12 @@ let extend_with_variances tydefs =
               List.iter (dirt true true) drts;
               List.iter (region_param true true) rgns;
           | Some ((ps, ds, rs), _) ->
+              if List.length ps != List.length tys then
+                Error.typing ~pos "The type constructor %s expects %d type arguments" t (List.length ps);
+              if List.length ds != List.length drts then
+                Error.typing ~pos "The type constructor %s expects %d dirt arguments" t (List.length drts);
+              if List.length rs != List.length rgns then
+                Error.typing ~pos "The type constructor %s expects %d region arguments" t (List.length rgns);
               if posi then begin
                 List.iter2 (fun (_, (posi', nega')) -> ty posi' nega') ps tys;
                 List.iter2 (fun (_, (posi', nega')) -> dirt posi' nega') ds drts;
@@ -411,7 +423,7 @@ let extend_with_variances tydefs =
 let extend_tydefs ~pos tydefs =
   (* We wish we wrote this in eff, where we could have transactional memory. *)
   let tctx_orig = !tctx in
-  let tydefs = extend_with_variances tydefs in
+  let tydefs = extend_with_variances ~pos tydefs in
   let extend_tydef ((tyname, (_, ty)) as tydef) =
     if List.mem_assoc tyname !tctx then Error.typing ~pos "Type %s is already defined" tyname ;
     check_shadowing ~pos ty ;
