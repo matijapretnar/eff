@@ -86,10 +86,15 @@ let initial_ctxenv =
   ((Ctx.empty, [], Constraints.empty), Eval.initial)
 
 let infer_top_comp (ctx, top_ctx, top_cnstrs) c =
-  let ctx, drty, cnstrs = Infer.infer_comp ctx c in
-  let top_ctx, drty, top_cnstrs = 
-  Scheme.finalize_dirty_scheme ~pos:(snd c) (ctx @ top_ctx) drty ([
-      Scheme.just cnstrs;
+  let ctx', drty', cnstrs' = Infer.infer_comp ctx c in
+  let top_ctx, _, top_cnstrs = 
+  Scheme.finalize_ty_scheme ~pos:(snd c) (top_ctx @ ctx') (Type.Tuple (List.map snd (top_ctx @ ctx'))) ([
+      Scheme.just top_cnstrs;
+      Scheme.just cnstrs'
+    ]) in
+  let drty_sch = 
+  Scheme.finalize_dirty_scheme ~pos:(snd c) (ctx' @ top_ctx) drty' ([
+      Scheme.just cnstrs';
       Scheme.just top_cnstrs
     ]) in
 
@@ -99,7 +104,7 @@ let infer_top_comp (ctx, top_ctx, top_cnstrs) c =
   (* XXX What to do about the fresh instances? *)
   (* XXX Here, we need to show what type parameters are polymorphic or not. *)
   (*     I am disabling it because we are going to try a new approach. *)
-  (top_ctx, drty, top_cnstrs), top_ctx, top_cnstrs
+  drty_sch, top_ctx, top_cnstrs
 
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
@@ -131,8 +136,12 @@ let rec exec_cmd interactive ((ctx, top_ctx, top_cnstrs) as wholectx, env) (d,po
       (* XXX What to do about the dirts? *)
       (* XXX What to do about the fresh instances? *)
       let poly, nonpoly, ctxs, cstrs, drt = Infer.infer_let ~pos ctx defs in
-      let ctx = List.fold_right (fun (x, t) env -> Ctx.extend ctx x (Scheme.finalize_ty_scheme ~pos ctxs t cstrs)) poly ctx in
-      let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos ctxs t cstrs) (poly @ nonpoly) in
+      let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos (top_ctx @ ctxs) t ([
+                Scheme.just top_cnstrs
+              ] @ cstrs)) (poly @ nonpoly) in
+      let ctx = List.fold_right (fun (x, t) env -> Ctx.extend ctx x (Scheme.finalize_ty_scheme ~pos (top_ctx @ ctxs) t ([
+                Scheme.just top_cnstrs
+              ] @ cstrs))) poly ctx in
       let ctx' = nonpoly @ ctxs @ top_ctx in
       let top_ctx, _, top_cnstrs = 
       Scheme.finalize_ty_scheme ~pos ctx' (Type.Tuple (List.map snd ctx')) ([
@@ -156,8 +165,10 @@ let rec exec_cmd interactive ((ctx, top_ctx, top_cnstrs) as wholectx, env) (d,po
     | Syntax.TopLetRec defs ->
         let defs = Desugar.top_let_rec defs in
         let poly, ctxs, cstrs = Infer.infer_let_rec ~pos ctx defs in
-        let ctx = List.fold_right (fun (x, t) env -> Ctx.extend ctx x (Scheme.finalize_ty_scheme ~pos ctxs t cstrs)) poly ctx in
-        let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos ctxs t cstrs) poly in
+        let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos (top_ctx @ ctxs) t ([
+                  Scheme.just top_cnstrs
+                ] @ cstrs)) poly in
+        let ctx = List.fold_right (fun (x, ty_sch) env -> Ctx.extend ctx x ty_sch) vars ctx in
         let ctx' = ctxs @ top_ctx in
         let top_ctx, _, top_cnstrs = 
         Scheme.finalize_ty_scheme ~pos ctx' (Type.Tuple (List.map snd ctx')) ([
