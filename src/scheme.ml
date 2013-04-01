@@ -159,6 +159,14 @@ let trim_context ~pos ctx_p (ctx, ty, cnstrs, sbst) =
   in
   List.fold_right trim ctx ([], ty, cnstrs, sbst)
 
+let less_context ~pos ctx_p (ctx, ty, cnstrs, sbst) =
+  let trim (x, t) (ctx, ty, cnstrs, sbst) =
+    match Common.lookup x ctx_p with
+    | None -> ((x, t) :: ctx, ty, cnstrs, sbst)
+    | Some u -> ty_less ~pos u t ((x, u) :: ctx, ty, cnstrs, sbst)
+  in
+  List.fold_right trim ctx ([], ty, cnstrs, sbst)
+
 
 let (@@@) = Trio.append
 
@@ -211,6 +219,10 @@ let subst_ty_scheme sbst (ctx, ty, cnstrs) =
 
 let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
   Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_dirty sbst drty, Constraints.subst_constraints sbst cnstrs
+
+let add_to_top ~pos (top_ctx, top_cstrs, top_sbst) ctx cstrs =
+  let (top_ctx, _, top_cstrs, top_sbst) = List.fold_right Common.id (normalize_context ~pos :: cstrs) (ctx @ top_ctx, Type.universal_ty, top_cstrs, top_sbst) in
+  top_ctx, top_cstrs, top_sbst
 
 let finalize ctx ty chngs =
   let ctx, ty, cnstrs, sbst = List.fold_right Common.id chngs (ctx, ty, Constraints.empty, Type.identity_subst) in
