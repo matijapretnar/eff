@@ -83,18 +83,17 @@ let parse parser lex =
       Error.syntax ~pos:(Lexer.position_of_lex lex) "unrecognised symbol."
 
 let initial_ctxenv =
-  ((Ctx.empty, [], Constraints.empty), Eval.initial)
+  ((Ctx.empty, [], Constraints.empty, Type.identity_subst), Eval.initial)
 
-let infer_top_comp (ctx, top_ctx, top_cnstrs) c =
-  let ctx', drty', cnstrs' = Infer.infer_comp ctx c in
-  let top_ctx, _, top_cnstrs = 
-  Scheme.finalize_ty_scheme ~pos:(snd c) (top_ctx @ ctx') (Type.Tuple (List.map snd (top_ctx @ ctx'))) ([
-      Scheme.just top_cnstrs;
-      Scheme.just cnstrs'
-    ]) in
+let infer_top_comp (ctx, top_ctx, top_cnstrs, top_subst) c =
+  let ctx', (ty', drt'), cnstrs' = Infer.infer_comp ctx c in
+  let top_ctx, top_cnstrs, top_subst = Scheme.add_to_top ~pos:(snd c) (top_ctx, top_cnstrs, top_subst) ctx' [Scheme.just cnstrs'] in
+  let ctx = match fst c with
+  | Core.Value _ -> top_ctx
+  | _ -> (Desugar.fresh_variable (), ty') :: top_ctx
+  in
   let drty_sch = 
-  Scheme.finalize_dirty_scheme ~pos:(snd c) (ctx' @ top_ctx) drty' ([
-      Scheme.just cnstrs';
+  Scheme.finalize_dirty_scheme ~pos:(snd c) ctx (Type.subst_dirty top_subst (ty', drt')) ([
       Scheme.just top_cnstrs
     ]) in
 

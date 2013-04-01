@@ -10,7 +10,7 @@
 - : (int, string list) cow -> (string list, int) cow
 - : (int, string) bull
 - : (int, 'a) bull -> int
-- : ('a, 'b list list) bull -> 'b list list
+- : ('b, 'a list list) bull -> 'a list list
 - : '_a dog
 - : int dog
 - : '_a list dog
@@ -22,7 +22,7 @@ val fifi : '_a dog = <instance #6>
 - : '_a -> '_a
 - : 'a -> 'a * 'a
 - : ('a -> 'a) * 'b list
-- : ('_a -> '_a) * ('_b -> '_b)
+- : ('_b -> '_b) * ('_a -> '_a)
 - : 'a -> 'b -> 'a
 - : 'a list list list
 - : 'a -> 'b -> 'a
