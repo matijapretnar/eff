@@ -182,12 +182,6 @@ let refresh ty =
   let sbst = refreshing_subst () in
   subst_ty sbst ty
 
-let beautify2 ty1 ty2 =
-  let sbst = beautifying_subst () in
-  let ty1 = subst_ty sbst ty1 in
-  let ty2 = subst_ty sbst ty2 in
-  (ty1, ty2)
-
 let (@@@) = Trio.append
 
 let for_parameters get_params is_pos ps lst =
@@ -238,22 +232,29 @@ let print_dirt ?(non_poly=Trio.empty) drt ppf =
   | [] -> print_dirt_param ~non_poly drt.rest ppf
   | _ -> Print.print ppf "%t; %t" (dirt_bound ~non_poly drt.ops) (print_dirt_param ~non_poly drt.rest)
 
-let print_ty_param ?(non_poly=Trio.empty) p ppf =
+let print_ty_param ?(non_poly=Trio.empty) skeletons p ppf =
   let (ps, _, _) = non_poly in
-  let (Ty_Param k) = p in
+  let Ty_Param k = p in 
+  let rec get_skel_id skel id = function
+  | [] -> k - List.length (List.flatten skeletons) + List.length skeletons, -1
+  | [] :: skels -> get_skel_id (succ skel) 0 skels
+  | (Ty_Param l :: xs) :: _ when k == l ->
+      if id = 0 && List.length xs = 0 then skel, -1 else skel, id
+  | (_ :: xs) :: skels -> get_skel_id skel (succ id) (xs :: skels)
+  in
+  let skel, id = get_skel_id 0 0 skeletons in
   let c = (if List.mem p ps then "'_" else "'") in
-(*     if 0 <= k && k <= 6
-    then print ppf "%s%c" c (char_of_int (k + int_of_char 't'))
-    else print ppf "%st%i" c (k - 6)
- *)    if 0 <= k && k <= 25
-    then Print.print ppf "%s%c" c (char_of_int (k + int_of_char 'a'))
-    else Print.print ppf "%st%i" c (k - 25)
+  let index = if !effects && id != -1 then string_of_int (id + 1) else "" in
+  if skel <= 25 then
+    Print.print ppf "%s%c%s" c (char_of_int (skel + int_of_char 'a')) index
+  else
+    Print.print ppf "%st%i%s" c (skel - 25) index
 
 let print_instance_param (Instance_Param i) ppf =
   Print.print ppf "#%d" i
 
 
-let rec print ?(non_poly=Trio.empty) t ppf =
+let rec print ?(non_poly=Trio.empty) skeletons t ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = Print.print ?max_level ?at_level ppf in
     match t with
@@ -285,7 +286,7 @@ let rec print ?(non_poly=Trio.empty) t ppf =
             | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
             | ts -> print ~at_level:1 "(%t) %s" (Print.sequence "," ty ts) t
           end
-    | TyParam p -> print_ty_param ~non_poly p ppf
+    | TyParam p -> print_ty_param ~non_poly skeletons p ppf
     | Tuple [] -> print "unit"
     | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence " *" (ty ~max_level:1) ts)
     | Handler ((t1, drt1), (t2, drt2)) ->
@@ -298,5 +299,3 @@ let rec print ?(non_poly=Trio.empty) t ppf =
         else
           print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
   in ty t ppf
-
-

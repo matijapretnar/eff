@@ -6,6 +6,30 @@ type dirty_scheme = context * Type.dirty * Constraints.t
 type t = context * Type.ty * Constraints.t * Type.substitution
 type change = t -> t
 
+let skeletons cnstrs =
+  let skeletons = List.map Constraints.Ty.keys cnstrs.Constraints.ty_graph in
+  let rec missing misses expect = function
+  | [] -> misses
+  | x :: xs ->
+    let (Type.Ty_Param y) = x in
+    if y != expect then
+    missing (expect :: misses) (succ expect) (x :: xs)
+    else missing misses (succ expect) xs
+  in
+  let misses = missing [] 0 (List.sort Pervasives.compare (List.flatten skeletons)) in
+  let skeletons = List.map (fun x -> [Type.Ty_Param x]) misses @ skeletons in
+  let skeletons = List.sort Pervasives.compare (List.map (List.sort Pervasives.compare) skeletons) in
+  skeletons
+
+let beautify2 ty1 ty2 cnstrs =
+  let sbst = Type.beautifying_subst () in
+  let ty1 = Type.subst_ty sbst ty1 in
+  let ty2 = Type.subst_ty sbst ty2 in
+  let cnstrs = Constraints.subst_constraints sbst cnstrs in
+  let skeletons = skeletons cnstrs in
+  (ty1, ty2, skeletons)
+
+
 let refresh (ctx, ty, cnstrs) =
   let sbst = Type.refreshing_subst () in
   Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst_constraints sbst cnstrs
@@ -121,8 +145,8 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       dirt_less ~pos drt2 drt1 (ty_less ~pos tyv2 tyv1 (dirty_less ~pos tyf1 tyf2 ty_sch))
 
   | (ty1, ty2) ->
-      let ty1, ty2 = Type.beautify2 ty1 ty2 in
-      Error.typing ~pos "This expression has type %t but it should have type %t." (Type.print ty1) (Type.print ty2)
+      let ty1, ty2, skeletons = beautify2 ty1 ty2 cnstrs in
+      Error.typing ~pos "This expression has type %t but it should have type %t." (Type.print skeletons ty1) (Type.print skeletons ty2)
 
 and add_substitution ~pos p ty' (ctx, ty, cnstrs, sbst) =
   let ty' = Type.subst_ty sbst ty' in
@@ -251,46 +275,33 @@ let finalize_pattern_scheme ~pos ctx ty chngs =
   garbage_collect pos neg ty_sch
 
 
-let context ctx ppf =
+let context skeletons ctx ppf =
   match ctx with
   | [] -> ()
-  | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence "," (fun (x, t) ppf -> Print.print ppf "%t : %t" (Print.variable x) (Type.print t)) ctx)
+  | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence "," (fun (x, t) ppf -> Print.print ppf "%t : %t" (Print.variable x) (Type.print skeletons t)) ctx)
 
-let collapse ((_, _, cnstrs) as ty_sch) =
-  let collapse_graph g sbst =
-    let x = Type.fresh_ty_param () in
-    let keys = Constraints.Ty.keys g in
-    Type.compose_subst {
-      Type.identity_subst with
-      Type.ty_param = (
-        fun p -> Type.TyParam (if List.mem p keys then x else p)
-      )
-    } sbst
-  in
-  let sbst = List.fold_right collapse_graph cnstrs.Constraints.ty_graph Type.identity_subst in
-  subst_ty_scheme sbst ty_sch
 
 let print_ty_scheme ty_sch ppf =
   let sbst = Type.beautifying_subst () in
-  let ty_sch = if !Type.effects then ty_sch else collapse ty_sch in
   let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in
+  let skeletons = skeletons cnstrs in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   if !Type.effects then
     Print.print ppf "%t | %t"
-      (Type.print ~non_poly ty)
-      (Constraints.print ~non_poly cnstrs)
+      (Type.print skeletons ty)
+      (Constraints.print skeletons cnstrs)
   else
-    Type.print ~non_poly ty ppf
+    Type.print ~non_poly skeletons ty ppf
 
 let print_dirty_scheme drty_sch ppf =
   let sbst = Type.beautifying_subst () in
+  let (ctx, (ty, drt), cnstrs) = subst_dirty_scheme sbst drty_sch in
+  let skeletons = skeletons cnstrs in
+  let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   if !Type.effects then
-    let (ctx, (ty, drt), cnstrs) = subst_dirty_scheme sbst drty_sch in
-    let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
     Print.print ppf "%t ! %t | %t"
-      (Type.print ~non_poly ty)
+      (Type.print skeletons ty)
       (Type.print_dirt ~non_poly drt)
-      (Constraints.print ~non_poly cnstrs)
+      (Constraints.print skeletons cnstrs)
   else
-    let (ctx, (ty, _), cnstrs) = drty_sch in
-    print_ty_scheme (ctx, ty, cnstrs) ppf
+    Type.print ~non_poly skeletons ty ppf
