@@ -215,10 +215,16 @@ let normalize_context ~pos (ctx, ty, cstr, sbst) =
   List.fold_right add ctx ([], ty, cstr, sbst)
 
 let subst_ty_scheme sbst (ctx, ty, cnstrs) =
-  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst_constraints sbst cnstrs
+  let ty = Type.subst_ty sbst ty in
+  let cnstrs = Constraints.subst_constraints sbst cnstrs in
+  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  (ctx, ty, cnstrs)
 
 let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
-  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_dirty sbst drty, Constraints.subst_constraints sbst cnstrs
+  let drty = Type.subst_dirty sbst drty in
+  let cnstrs = Constraints.subst_constraints sbst cnstrs in
+  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  (ctx, drty, cnstrs)
 
 let add_to_top ~pos (top_ctx, top_cstrs, top_sbst) ctx cstrs =
   let (top_ctx, _, top_cstrs, top_sbst) = List.fold_right Common.id (normalize_context ~pos :: cstrs) (ctx @ top_ctx, Type.universal_ty, top_cstrs, top_sbst) in
