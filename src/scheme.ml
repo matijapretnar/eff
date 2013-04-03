@@ -272,19 +272,25 @@ let collapse ((_, _, cnstrs) as ty_sch) =
 
 let print_ty_scheme ty_sch ppf =
   let sbst = Type.beautifying_subst () in
-  let ty_sch = collapse ty_sch in
-  let (ctx, ty, _) = subst_ty_scheme sbst ty_sch in
+  let ty_sch = if !Type.effects then ty_sch else collapse ty_sch in
+  let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
-  Type.print ~non_poly ty ppf
+  if !Type.effects then
+    Print.print ppf "%t | %t"
+      (Type.print ~non_poly ty)
+      (Constraints.print ~non_poly cnstrs)
+  else
+    Type.print ~non_poly ty ppf
 
 let print_dirty_scheme drty_sch ppf =
-  let (ctx, (ty, _), cnstrs) = drty_sch in
-  print_ty_scheme (ctx, ty, cnstrs) ppf
-(*   let sbst = Type.beautifying_subst () in
-  let (ctx, (ty, drt), cnstrs) = subst_dirty_scheme sbst drty_sch in
-  Print.print ppf "%t%t ! %t | %t"
-    (context ctx)
-    (Type.print ty)
-    (Type.print_dirt drt)
-    (Constraints.print cnstrs) *)
-
+  let sbst = Type.beautifying_subst () in
+  if !Type.effects then
+    let (ctx, (ty, drt), cnstrs) = subst_dirty_scheme sbst drty_sch in
+    let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
+    Print.print ppf "%t ! %t | %t"
+      (Type.print ~non_poly ty)
+      (Type.print_dirt ~non_poly drt)
+      (Constraints.print ~non_poly cnstrs)
+  else
+    let (ctx, (ty, _), cnstrs) = drty_sch in
+    print_ty_scheme (ctx, ty, cnstrs) ppf
