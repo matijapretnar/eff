@@ -109,6 +109,18 @@ let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
     region_graph = Region.garbage_collect pos_rs neg_rs grph.region_graph;
   }
 
+let simplify (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
+  let ty_subst = List.fold_right (fun g sbst -> (Ty.simplify pos_ts neg_ts g) @ sbst) grph.ty_graph []
+  and dirt_subst = Dirt.simplify pos_ds neg_ds grph.dirt_graph
+  and region_subst = Region.simplify pos_rs neg_rs grph.region_graph
+  in
+  {
+    Type.identity_subst with
+    Type.ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> Type.TyParam q | None -> Type.TyParam p);
+    Type.dirt_param = (fun p -> match Common.lookup p dirt_subst with Some q -> Type.simple_dirt q | None -> Type.simple_dirt p);
+    Type.region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
+  }
+
 let rec topological_sort = function
   | [] -> []
   | deps ->
@@ -117,17 +129,6 @@ let rec topological_sort = function
     let leaves = List.map fst leaves in
     let new_deps = Common.assoc_map (fun ds -> List.filter (fun d -> not (List.mem d leaves)) ds) non_leaves in
     leaves @ topological_sort new_deps
-
-let simplify grph =
-  let region_leaves = Region.leaves grph.region_graph in
-  let bound_dependency bnd = match bnd with None -> [] | Some bnd -> List.fold_right (fun bnd dep -> match bnd with
-  | Without (d, _) -> d :: dep
-  | Instance _ -> dep) bnd []
-  in
-  let dependency = Region.fold_vertices (fun x inx _ infx _ dep -> (x, bound_dependency infx @ inx) :: dep) grph.region_graph [] in
-  let sort = topological_sort dependency in
-  region_leaves, dependency, sort
-
 
 let less pp p1 p2 ppf =
   Print.print ppf "%t <= %t" (pp p1) (pp p2)

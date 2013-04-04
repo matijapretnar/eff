@@ -131,6 +131,20 @@ struct
     in
     G.fold collect grph G.empty
 
+  let simplify pos neg grph =
+    let add x (inx, outx, _, _) sbst =
+      if List.mem x pos && S.cardinal inx = 1 then (x, S.choose inx) :: sbst
+      else if List.mem x neg && S.cardinal outx = 1 then (x, S.choose outx) :: sbst
+      else sbst
+    and collect_substitution (x, y) (used, sbst) =
+      if List.mem y used then
+        used, sbst
+      else
+        (x :: used), (x, y) :: sbst
+    in
+    let sbst = G.fold add grph [] in
+    let _, sbst = List.fold_right collect_substitution sbst ([], []) in
+    sbst
  (*    let print grph ppf =
       fold_vertices
         (fun x inx outx () ->

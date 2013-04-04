@@ -250,6 +250,16 @@ let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   (ctx, drty, cnstrs)
 
+let simplify (ctx, ty, cnstrs) =
+  let pos, neg = pos_neg_tyscheme (ctx, ty, cnstrs) in
+  let sbst = Constraints.simplify pos neg cnstrs in
+  subst_ty_scheme sbst (ctx, ty, cnstrs)
+
+let simplify_dirty (ctx, drty, cnstrs) =
+  match simplify (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs) with
+  | (ctx, Type.Arrow (_, drty), cnstrs) -> (ctx, drty, cnstrs)
+  | _ -> assert false
+
 let add_to_top ~pos (top_ctx, top_cstrs, top_sbst) ctx cstrs =
   let (top_ctx, _, top_cstrs, top_sbst) = List.fold_right Common.id (normalize_context ~pos :: cstrs) (ctx @ top_ctx, Type.universal_ty, top_cstrs, top_sbst) in
   top_ctx, top_cstrs, top_sbst
@@ -282,6 +292,7 @@ let context skeletons ctx ppf =
 
 
 let print_ty_scheme ty_sch ppf =
+  let ty_sch = simplify ty_sch in
   let sbst = Type.beautifying_subst () in
   let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in
   let skeletons = skeletons cnstrs in
@@ -294,6 +305,7 @@ let print_ty_scheme ty_sch ppf =
     Type.print ~non_poly skeletons ty ppf
 
 let print_dirty_scheme drty_sch ppf =
+  let drty_sch = simplify_dirty drty_sch in
   let sbst = Type.beautifying_subst () in
   let (ctx, (ty, drt), cnstrs) = subst_dirty_scheme sbst drty_sch in
   let skeletons = skeletons cnstrs in

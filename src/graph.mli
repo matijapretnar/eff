@@ -55,6 +55,7 @@ sig
   val map : (elt -> elt) -> (lower_bound -> lower_bound) -> (upper_bound -> upper_bound) -> t -> t
 
   val garbage_collect : elt list -> elt list -> t -> t
+  val simplify : elt list -> elt list -> t -> (elt, elt) Common.assoc
 
   (* val print : t -> Format.formatter -> unit *)
 end
