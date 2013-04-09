@@ -51,6 +51,9 @@ let options = Arg.align [
   ("--no-wrapper",
     Arg.Unit (fun () -> wrapper := None),
     " Do not use a command-line wrapper");
+  ("--ascii",
+    Arg.Set Symbols.ascii,
+    " Use ASCII output");
   ("-v",
     Arg.Unit (fun () ->
       print_endline ("eff " ^ Version.version ^ "(" ^ Sys.os_type ^ ")");

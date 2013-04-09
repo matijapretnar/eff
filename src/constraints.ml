@@ -131,7 +131,7 @@ let rec topological_sort = function
     leaves @ topological_sort new_deps
 
 let less pp p1 p2 ppf =
-  Print.print ppf "%t <= %t" (pp p1) (pp p2)
+  Print.print ppf "%t %s %t" (pp p1) (Symbols.less ()) (pp p2)
 
 let rec print_region_bound ?(non_poly=Trio.empty) bnd ppf =
   match bnd with
@@ -145,7 +145,7 @@ let print_region_bounds bnd ppf =
 let bounds pp pp' p inf (* sup *) pps =
   match inf with
   | None -> pps
-  | Some inf -> (fun ppf -> Print.print ppf "%t <= %t" (pp' inf) (pp p)) :: pps
+  | Some inf -> (fun ppf -> Print.print ppf "%t %s %t" (pp' inf) (Symbols.less ()) (pp p)) :: pps
 
 let rec sequence2 sep pps ppf =
   match pps with

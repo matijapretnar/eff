@@ -70,14 +70,15 @@ let rec subst_ty sbst = function
   | TyParam p -> sbst.ty_param p
   | Basic _ as ty -> ty
   | Tuple tys -> Tuple (Common.map (subst_ty sbst) tys)
-  | Arrow (ty1, drty2) ->
+  | Arrow (ty1, (ty2, drt)) ->
       let ty1 = subst_ty sbst ty1 in
+      let drt = subst_dirt sbst drt in
+      let ty2 = subst_ty sbst ty2 in
+      Arrow (ty1, (ty2, drt))
+  | Handler (drty1, drty2) ->
+      let drty1 = subst_dirty sbst drty1 in
       let drty2 = subst_dirty sbst drty2 in
-      Arrow (ty1, drty2)
-  | Handler ((ty1, drt), drty2) ->
-      let ty1 = subst_ty sbst ty1 in
-      let drty2 = subst_dirty sbst drty2 in
-      Handler ((ty1, subst_dirt sbst drt), drty2)
+      Handler (drty1, drty2)
 
 and subst_dirt sbst drt =
   let ops = Common.assoc_map sbst.region_param drt.ops in
@@ -216,13 +217,11 @@ let pos_neg_params get_variances ty =
 
 let print_region_param ?(non_poly=Trio.empty) ((Region_Param k) as p) ppf =
   let (_, _, rs) = non_poly in
-  let c = (if List.mem p rs then "_" else "") in
-    Print.print ppf "%sr%i" c (k + 1)
+  Symbols.region_param k (List.mem p rs) ppf
 
 let print_dirt_param ?(non_poly=Trio.empty) ((Dirt_Param k) as p) ppf =
   let (_, ds, _) = non_poly in
-  let c = (if List.mem p ds then "_" else "") in
-    Print.print ppf "%sd%i" c (k + 1)
+  Symbols.dirt_param k (List.mem p ds) ppf
 
 let dirt_bound ?non_poly r_ops =
   Print.sequence "," (fun (op, dt) ppf -> Print.print ppf "%s:%t" op (print_region_param dt)) r_ops
@@ -230,25 +229,21 @@ let dirt_bound ?non_poly r_ops =
 let print_dirt ?(non_poly=Trio.empty) drt ppf =
   match drt.ops with
   | [] -> print_dirt_param ~non_poly drt.rest ppf
-  | _ -> Print.print ppf "%t; %t" (dirt_bound ~non_poly drt.ops) (print_dirt_param ~non_poly drt.rest)
+  | _ -> Print.print ppf "{%t|%t}" (dirt_bound ~non_poly drt.ops) (print_dirt_param ~non_poly drt.rest)
 
 let print_ty_param ?(non_poly=Trio.empty) skeletons p ppf =
   let (ps, _, _) = non_poly in
   let Ty_Param k = p in 
   let rec get_skel_id skel id = function
-  | [] -> k - List.length (List.flatten skeletons) + List.length skeletons, -1
+  | [] -> k - List.length (List.flatten skeletons) + List.length skeletons, None
   | [] :: skels -> get_skel_id (succ skel) 0 skels
   | (Ty_Param l :: xs) :: _ when k == l ->
-      if id = 0 && List.length xs = 0 then skel, -1 else skel, id
+      if id = 0 && List.length xs = 0 then skel, None else skel, Some (id + 1)
   | (_ :: xs) :: skels -> get_skel_id skel (succ id) (xs :: skels)
   in
   let skel, id = get_skel_id 0 0 skeletons in
-  let c = (if List.mem p ps then "'_" else "'") in
-  let index = if !effects && id != -1 then string_of_int (id + 1) else "" in
-  if skel <= 25 then
-    Print.print ppf "%s%c%s" c (char_of_int (skel + int_of_char 'a')) index
-  else
-    Print.print ppf "%st%i%s" c (skel - 25) index
+  let id = if !effects then id else None in
+  Symbols.ty_param skel id (List.mem p ps) ppf
 
 let print_instance_param (Instance_Param i) ppf =
   Print.print ppf "#%d" i
@@ -260,12 +255,12 @@ let rec print ?(non_poly=Trio.empty) skeletons t ppf =
     match t with
     | Arrow (t1, (t2, drt)) ->
         if !effects then
-          print ~at_level:5 "@[<h>%t -%t->@ %t@]"
+          print ~at_level:5 "@[%t -%t->@ %t@]"
             (ty ~max_level:4 t1)
             (print_dirt ~non_poly drt)
             (ty ~max_level:5 t2)
         else
-          print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2)
+          print ~at_level:5 "@[%t@ ->@ %t@]" (ty ~max_level:4 t1) (ty ~max_level:5 t2)
     | Basic b -> print "%s" b
     | Apply (t, (lst, _, _)) ->
       begin match lst with
@@ -291,11 +286,12 @@ let rec print ?(non_poly=Trio.empty) skeletons t ppf =
     | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence " *" (ty ~max_level:1) ts)
     | Handler ((t1, drt1), (t2, drt2)) ->
         if !effects then
-          print ~at_level:4 "%t ! %t =>@ %t ! %t"
-            (ty ~max_level:2 t1)
+          print ~at_level:6 "%t ! %t %s@ %t ! %t"
+            (ty ~max_level:4 t1)
             (print_dirt ~non_poly drt1)
-            (ty t2)
+            (Symbols.handler_arrow ())
+            (ty ~max_level:4 t2)
             (print_dirt ~non_poly drt2)
         else
-          print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
+          print ~at_level:6 "%t %s@ %t" (ty ~max_level:4 t1) (Symbols.handler_arrow ()) (ty ~max_level:4 t2)
   in ty t ppf
