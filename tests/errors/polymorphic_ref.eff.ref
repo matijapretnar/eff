@@ -1,4 +1,4 @@
-val local_store : 'a ref -> 'a -> 'b => 'b = <fun>
+val local_store : 'a ref -> 'a -> ('b => 'b) = <fun>
 val put : '_a list -> unit = <fun>
 val get : unit -> '_a list = <fun>
 val s : '_a list ref = <instance #6>

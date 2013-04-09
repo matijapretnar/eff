@@ -33,7 +33,7 @@ fi
 
 for FILE in $BASEDIR/*.eff $BASEDIR/*/*.eff
   do
-  "$EFF" "$FILE" >"$FILE.out" 2>&1
+  "$EFF" "--ascii" "$FILE" >"$FILE.out" 2>&1
   if [ -f $FILE.ref ]
       then
       RESULT=`"$DIFF" "$FILE.out" "$FILE.ref"`

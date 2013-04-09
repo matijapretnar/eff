@@ -109,6 +109,18 @@ let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
     region_graph = Region.garbage_collect pos_rs neg_rs grph.region_graph;
   }
 
+let simplify (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
+  let ty_subst = List.fold_right (fun g sbst -> (Ty.simplify pos_ts neg_ts g) @ sbst) grph.ty_graph []
+  and dirt_subst = Dirt.simplify pos_ds neg_ds grph.dirt_graph
+  and region_subst = Region.simplify pos_rs neg_rs grph.region_graph
+  in
+  {
+    Type.identity_subst with
+    Type.ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> Type.TyParam q | None -> Type.TyParam p);
+    Type.dirt_param = (fun p -> match Common.lookup p dirt_subst with Some q -> Type.simple_dirt q | None -> Type.simple_dirt p);
+    Type.region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
+  }
+
 let rec topological_sort = function
   | [] -> []
   | deps ->
@@ -118,19 +130,8 @@ let rec topological_sort = function
     let new_deps = Common.assoc_map (fun ds -> List.filter (fun d -> not (List.mem d leaves)) ds) non_leaves in
     leaves @ topological_sort new_deps
 
-let simplify grph =
-  let region_leaves = Region.leaves grph.region_graph in
-  let bound_dependency bnd = match bnd with None -> [] | Some bnd -> List.fold_right (fun bnd dep -> match bnd with
-  | Without (d, _) -> d :: dep
-  | Instance _ -> dep) bnd []
-  in
-  let dependency = Region.fold_vertices (fun x inx _ infx _ dep -> (x, bound_dependency infx @ inx) :: dep) grph.region_graph [] in
-  let sort = topological_sort dependency in
-  region_leaves, dependency, sort
-
-
 let less pp p1 p2 ppf =
-  Print.print ppf "%t <= %t" (pp p1) (pp p2)
+  Print.print ppf "%t %s %t" (pp p1) (Symbols.less ()) (pp p2)
 
 let rec print_region_bound ?(non_poly=Trio.empty) bnd ppf =
   match bnd with
@@ -144,7 +145,7 @@ let print_region_bounds bnd ppf =
 let bounds pp pp' p inf (* sup *) pps =
   match inf with
   | None -> pps
-  | Some inf -> (fun ppf -> Print.print ppf "%t <= %t" (pp' inf) (pp p)) :: pps
+  | Some inf -> (fun ppf -> Print.print ppf "%t %s %t" (pp' inf) (Symbols.less ()) (pp p)) :: pps
 
 let rec sequence2 sep pps ppf =
   match pps with
@@ -152,11 +153,10 @@ let rec sequence2 sep pps ppf =
   | [pp] -> pp ppf
   | pp :: pps -> Format.fprintf ppf "%t%s@ %t" pp sep (sequence2 sep pps)
 
-let print ?(non_poly=Trio.empty) g ppf =
-  let pps = List.map (fun g -> (Print.sequence " ~" Type.print_ty_param (Ty.keys g))) g.ty_graph in
-  let pps = fold_ty (fun p1 p2 lst -> less (Type.print_ty_param ~non_poly) p1 p2 :: lst) g pps in
-  let pps = fold_dirt (fun d1 d2 lst -> less (Type.print_dirt_param ~non_poly) d1 d2 :: lst) g pps in
-  let pps = fold_region (fun r1 r2 lst -> less (Type.print_region_param ~non_poly) r1 r2 :: lst) g pps in
+let print ?(non_poly=Trio.empty) skeletons g ppf =
+  let pps = fold_ty (fun p1 p2 lst -> if p1 != p2 then less (Type.print_ty_param skeletons ~non_poly) p1 p2 :: lst else lst) g [] in
+  let pps = fold_dirt (fun d1 d2 lst -> if d1 != d2 then less (Type.print_dirt_param ~non_poly) d1 d2 :: lst else lst) g pps in
+  let pps = fold_region (fun r1 r2 lst -> if r1 != r2 then less (Type.print_region_param ~non_poly) r1 r2 :: lst else lst) g pps in
   let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (Type.print_region_param ~non_poly) print_region_bounds r bound1 (* bound2 *) pps) (Region.bounds g.region_graph) pps in
   Print.print ppf "%t"
     (sequence2 "," pps)

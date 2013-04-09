@@ -33,6 +33,9 @@ let options = Arg.align [
   ("--pervasives",
    Arg.String (fun str -> pervasives_file := str),
    " Specify the pervasives.eff file");
+  ("--effects",
+   Arg.Set Type.effects,
+   " Show the output of effect inference");
   ("--no-beautify",
     Arg.Set Type.disable_beautify,
     " Do not beautify types");
@@ -48,6 +51,9 @@ let options = Arg.align [
   ("--no-wrapper",
     Arg.Unit (fun () -> wrapper := None),
     " Do not use a command-line wrapper");
+  ("--ascii",
+    Arg.Set Symbols.ascii,
+    " Use ASCII output");
   ("-v",
     Arg.Unit (fun () ->
       print_endline ("eff " ^ Version.version ^ "(" ^ Sys.os_type ^ ")");
