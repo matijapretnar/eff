@@ -140,7 +140,7 @@ let rec exec_cmd interactive ((ctx, top_ctx, top_cnstrs, top_subst) as wholectx,
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
       (* XXX What to do about the fresh instances? *)
-      let poly, nonpoly, ctxs, cstrs, drt = Infer.infer_let ~pos ctx defs in
+      let _, poly, nonpoly, ctxs, cstrs, drt = Infer.infer_let ~pos ctx defs in
       let top_ctx, top_cnstrs, top_subst = Scheme.add_to_top ~pos (top_ctx, top_cnstrs, top_subst) (nonpoly @ ctxs) cstrs in
       let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos (top_ctx @ ctxs) t ([
                 Scheme.just top_cnstrs;
