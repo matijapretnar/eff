@@ -260,9 +260,8 @@ let simplify_dirty (ctx, drty, cnstrs) =
   | (ctx, Type.Arrow (_, drty), cnstrs) -> (ctx, drty, cnstrs)
   | _ -> assert false
 
-let add_to_top ~pos (top_ctx, top_cstrs, top_sbst) ctx cstrs =
-  let (top_ctx, _, top_cstrs, top_sbst) = List.fold_right Common.id (normalize_context ~pos :: cstrs) (ctx @ top_ctx, Type.universal_ty, top_cstrs, top_sbst) in
-  top_ctx, top_cstrs, top_sbst
+let add_to_top ~pos (top_ctx, top_cstrs) ctx cstrs =
+  (ctx @ top_ctx), Constraints.join_disjoint_constraints top_cstrs cstrs
 
 let finalize ctx ty chngs =
   let ctx, ty, cnstrs, sbst = List.fold_right Common.id chngs (ctx, ty, Constraints.empty, Type.identity_subst) in

@@ -274,7 +274,7 @@ and infer_comp env (c, pos) =
       ctx, (ty, empty_dirt ()), cnstrs
 
   | Core.Let (defs, c) ->
-      let vars, _, nonpoly, ctx, chngs, drt = infer_let ~pos env defs in
+      let vars, nonpoly, ctx, drt = infer_let ~pos env defs in
       let extend (x, ty_sch) env =
         Ctx.extend env x ty_sch
       in
@@ -463,7 +463,7 @@ and infer_let ~pos env defs =
   in
   let vars = List.fold_right extend_poly poly [] in
   let vars = List.fold_right extend_nonpoly nonpoly vars in
-  vars, poly, nonpoly, ctx, chngs, drt
+  vars, nonpoly, ctx, drt
 
 and infer_let_rec ~pos env defs =
   let infer (x, a) (poly, ctx, chngs) =

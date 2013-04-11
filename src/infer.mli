@@ -1,12 +1,11 @@
 val warn_implicit_sequencing : bool ref
 val disable_typing : bool ref
-val infer_let :
+         val infer_let :
            pos:Common.position ->
            Ctx.t ->
            (Core.variable Pattern.t * Core.computation) list ->
-           (Core.variable * Scheme.ty_scheme) list *
-           (Core.variable * Type.ty) list * (Core.variable * Type.ty) list *
-           (Core.variable * Type.ty) list * Scheme.change list * Type.dirt
+           (Core.variable * Scheme.ty_scheme) list * Scheme.context *
+           (Core.variable * Type.ty) list * Type.dirt
 val infer_let_rec :
     pos:Common.position ->
            Ctx.t ->
