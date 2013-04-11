@@ -283,7 +283,7 @@ and infer_comp env (c, pos) =
       let ctx_c, (ty_c, drt_c), cnstrs_c = infer_comp env' c in
       unify (ctx @ ctx_c) (ty_c, drt) ([
         dirt_less ~pos drt_c drt;
-        trim_context ~pos (poly @ nonpoly);
+        trim_context ~pos nonpoly;
         just cnstrs_c;
       ] @ chngs)
 
