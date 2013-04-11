@@ -284,7 +284,7 @@ and infer_comp env (c, pos) =
         dirt_less ~pos drt_c drt;
         trim_context ~pos nonpoly;
         just cnstrs_c;
-      ] @ chngs)
+      ])
 
   | Core.LetRec (defs, c) ->
       let poly, ctx, chngs = infer_let_rec ~pos env defs in
