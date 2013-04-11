@@ -274,7 +274,16 @@ and infer_comp env (c, pos) =
       ctx, (ty, empty_dirt ()), cnstrs
 
   | Core.Let (defs, c) ->
-      let vars, nonpoly, ctx, drt = infer_let ~pos env defs in
+      let vars, nonpoly, ctx, drt, chngs = infer_let ~pos env defs in
+      let extend_nonpoly (x, ty) env =
+        let ty' = Type.fresh_ty () in
+        let ctx' = (x, ty') :: ctx in
+        let ty_sch = Scheme.finalize_ty_scheme ~pos ctx' ty ([
+          ty_less ~pos ty' ty
+        ] @ chngs) in
+        (x, ty_sch) :: env
+      in
+      let vars = List.fold_right extend_nonpoly nonpoly vars in
       let extend (x, ty_sch) env =
         Ctx.extend env x ty_sch
       in
@@ -453,17 +462,9 @@ and infer_let ~pos env defs =
   let extend_poly (x, ty) env =
     let ty_sch = Scheme.finalize_ty_scheme ~pos ctx ty chngs in
     (x, ty_sch) :: env
-  and extend_nonpoly (x, ty) env =
-    let ty' = Type.fresh_ty () in
-    let ctx' = (x, ty') :: ctx in
-    let ty_sch = Scheme.finalize_ty_scheme ~pos ctx' ty ([
-      ty_less ~pos ty' ty
-    ] @ chngs) in
-    (x, ty_sch) :: env
   in
   let vars = List.fold_right extend_poly poly [] in
-  let vars = List.fold_right extend_nonpoly nonpoly vars in
-  vars, nonpoly, ctx, drt
+  vars, nonpoly, ctx, drt, chngs
 
 and infer_let_rec ~pos env defs =
   let infer (x, a) (poly, ctx, chngs) =

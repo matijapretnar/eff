@@ -5,7 +5,7 @@ val disable_typing : bool ref
            Ctx.t ->
            (Core.variable Pattern.t * Core.computation) list ->
            (Core.variable * Scheme.ty_scheme) list * Scheme.context *
-           (Core.variable * Type.ty) list * Type.dirt
+           (Core.variable * Type.ty) list * Type.dirt * Scheme.change list
 val infer_let_rec :
     pos:Common.position ->
            Ctx.t ->

@@ -140,7 +140,16 @@ let rec exec_cmd interactive ((ctx, top_ctx, top_cnstrs) as wholectx, env) (d,po
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
       (* XXX What to do about the fresh instances? *)
-      let vars, nonpoly, ctxs, drt = Infer.infer_let ~pos ctx defs in
+      let vars, nonpoly, ctxs, drt, chngs = Infer.infer_let ~pos ctx defs in
+      let extend_nonpoly (x, ty) env =
+            let ty' = Type.fresh_ty () in
+            let ctx' = (x, ty') :: ctxs in
+            let ty_sch = Scheme.finalize_ty_scheme ~pos ctx' ty ([
+              Scheme.ty_less ~pos ty' ty
+            ] @ chngs) in
+            (x, ty_sch) :: env
+      in
+      let vars = List.fold_right extend_nonpoly nonpoly vars in
       let add (x, ((c, ty, cnst) as ty_sch)) (ctx, top_ctx, top_cnstrs) =
         let ctx = Ctx.extend ctx x ty_sch in
         let top_ctx, top_cnstrs = Scheme.add_to_top ~pos (top_ctx, top_cnstrs) c cnst in
