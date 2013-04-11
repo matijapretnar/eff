@@ -12,9 +12,12 @@ let skeletons cnstrs =
   | [] -> misses
   | x :: xs ->
     let (Type.Ty_Param y) = x in
-    if y != expect then
-    missing (expect :: misses) (succ expect) (x :: xs)
-    else missing misses (succ expect) xs
+    if y < expect then
+      missing misses expect xs
+    else if y = expect then
+      missing misses (succ expect) xs
+    else (* y > expect *)
+      missing (expect :: misses) (succ expect) (x :: xs)
   in
   let misses = missing [] 0 (List.sort Pervasives.compare (List.flatten skeletons)) in
   let skeletons = List.map (fun x -> [Type.Ty_Param x]) misses @ skeletons in
