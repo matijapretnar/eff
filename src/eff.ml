@@ -138,7 +138,7 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,pos) =
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
       (* XXX What to do about the fresh instances? *)
-      let vars, nonpoly, _, _, _, change = Infer.infer_let ~pos ctx defs in
+      let vars, nonpoly, change = Infer.infer_let ~pos ctx defs in
       let ctx = List.fold_right (fun (x, ty_sch) env -> Ctx.extend env x ty_sch) vars ctx in
       let extend_nonpoly (x, ty) env =
         (x, ([(x, ty)], ty, Constraints.empty)) :: env
@@ -166,7 +166,7 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,pos) =
         ((ctx, top_change), env)
     | Syntax.TopLetRec defs ->
         let defs = Desugar.top_let_rec defs in
-        let vars, _, _, _, change = Infer.infer_let_rec ~pos ctx defs in
+        let vars, change = Infer.infer_let_rec ~pos ctx defs in
         let ctx = List.fold_right (fun (x, ty_sch) env -> Ctx.extend ctx x ty_sch) vars ctx in
         let top_change = Common.compose top_change change in
         let sch_change (ctx, ty, cnstrs) =

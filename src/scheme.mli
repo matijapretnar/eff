@@ -35,6 +35,10 @@ val trim_context :
   pos:Common.position ->
   context ->
   change
+val remove_context :
+  pos:Common.position ->
+  context ->
+  change
 val less_context :
   pos:Common.position ->
   context ->

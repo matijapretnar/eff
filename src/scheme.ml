@@ -186,6 +186,14 @@ let trim_context ~pos ctx_p (ctx, ty, cnstrs, sbst) =
   in
   List.fold_right trim ctx ([], ty, cnstrs, sbst)
 
+let remove_context ~pos ctx_p (ctx, ty, cnstrs, sbst) =
+  let trim (x, t) (ctx, ty, cnstrs, sbst) =
+    match Common.lookup x ctx_p with
+    | None -> ((x, t) :: ctx, ty, cnstrs, sbst)
+    | Some u -> (ctx, ty, cnstrs, sbst)
+  in
+  List.fold_right trim ctx ([], ty, cnstrs, sbst)
+
 let less_context ~pos ctx_p (ctx, ty, cnstrs, sbst) =
   let trim (x, t) (ctx, ty, cnstrs, sbst) =
     match Common.lookup x ctx_p with
