@@ -315,7 +315,7 @@ let extend_non_poly (ts, ds, rs) skeletons =
   (Common.uniq ts, ds, rs)
 
 let print_ty_scheme ty_sch ppf =
-  let ty_sch = simplify ty_sch in
+  (* let ty_sch = simplify ty_sch in *)
   let sbst = Type.beautifying_subst () in
   let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in
   let skeletons = skeletons cnstrs in
@@ -329,7 +329,7 @@ let print_ty_scheme ty_sch ppf =
     Type.print ~non_poly skeletons ty ppf
 
 let print_dirty_scheme drty_sch ppf =
-  let drty_sch = simplify_dirty drty_sch in
+  (* let drty_sch = simplify_dirty drty_sch in *)
   let sbst = Type.beautifying_subst () in
   let (ctx, (ty, drt), cnstrs) = subst_dirty_scheme sbst drty_sch in
   let skeletons = skeletons cnstrs in
