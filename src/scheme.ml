@@ -263,9 +263,6 @@ let simplify_dirty (ctx, drty, cnstrs) =
   | (ctx, Type.Arrow (_, drty), cnstrs) -> (ctx, drty, cnstrs)
   | _ -> assert false
 
-let add_to_top ~pos (top_ctx, top_cstrs) ctx cstrs =
-  (ctx @ top_ctx), Constraints.join_disjoint_constraints top_cstrs cstrs
-
 let finalize ctx ty chngs =
   let ctx, ty, cnstrs, sbst = List.fold_right Common.id chngs (ctx, ty, Constraints.empty, Type.identity_subst) in
   subst_ty_scheme sbst (ctx, ty, cnstrs)
@@ -279,6 +276,12 @@ let finalize_dirty_scheme ~pos ctx drty chngs =
   match finalize_ty_scheme ~pos ctx (Type.Arrow (Type.unit_ty, drty)) chngs with
   | ctx, Type.Arrow (_, drty), cstr -> (ctx, drty, cstr)
   | _ -> assert false
+
+let add_to_top ~pos ctx cstrs (ctx_c, drty_c, cnstrs_c) =
+  finalize_dirty_scheme ~pos (ctx @ ctx_c) drty_c ([
+    just cnstrs_c;
+    just cstrs
+  ])
 
 let finalize_pattern_scheme ~pos ctx ty chngs =
   let ty_sch = finalize ctx ty chngs in

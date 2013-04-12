@@ -56,9 +56,11 @@ val finalize_pattern_scheme :
   Type.ty ->
   change list -> context * Type.ty * Constraints.t
 val add_to_top :
- pos:'a ->
- 'b list * Constraints.t ->
- 'b list -> Constraints.t -> 'b list * Constraints.t
- val subst_dirty_scheme : Type.substitution -> dirty_scheme -> dirty_scheme
+           pos:Common.position ->
+           ('a * Type.ty) list ->
+           Constraints.t ->
+           ('a * Type.ty) list * Type.dirty * Constraints.t ->
+           ('a * Type.ty) list * Type.dirty * Constraints.t
+val subst_dirty_scheme : Type.substitution -> dirty_scheme -> dirty_scheme
 val print_ty_scheme : ty_scheme -> Format.formatter -> unit
 val print_dirty_scheme : dirty_scheme -> Format.formatter -> unit
