@@ -3,28 +3,28 @@
 - : string
 - : unit
 - : float
-- : int * int
-- : 'a list * string
-- : (string, 'a) cow
-- : ('a, string) cow
-- : (int, string list) cow -> (string list, int) cow
+- : int × int
+- : α list × string
+- : (string, α) cow
+- : (α, string) cow
+- : (int, string list) cow ⟶  (string list, int) cow
 - : (int, string) bull
-- : (int, 'a) bull -> int
-- : ('a, 'b list list) bull -> 'b list list
-- : '_a dog
+- : (int, α) bull ⟶  int
+- : (α, β list list) bull ⟶  β list list
+- : _α dog
 - : int dog
-- : '_a list dog
-val fifi : '_a dog = <instance #6>
-- : '_a -> string
+- : _α list dog
+val fifi : _α dog = <instance #6>
+- : _α ⟶  string
 - : string
 - : string
-- : 'a -> 'a
-- : '_a -> '_a
-- : 'a -> 'a * 'a
-- : ('a -> 'a) * 'b list
-- : ('_a -> '_a) * ('_b -> '_b)
-- : 'a -> 'b -> 'a
-- : 'a list list list
-- : 'a -> 'b -> 'a
-val h : 'a -> 'a = <fun>
-- : 'a -> 'a
+- : α ⟶  α
+- : _α ⟶  _α
+- : α ⟶  α × α
+- : (α ⟶  α) × β list
+- : (_α ⟶  _α) × (_β ⟶  _β)
+- : α ⟶  β ⟶  α
+- : α list list list
+- : α ⟶  β ⟶  α
+val h : α ⟶  α = <fun>
+- : α ⟶  α

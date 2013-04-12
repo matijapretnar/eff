@@ -2,4 +2,4 @@ val x : int store = <instance #6>
 val a : int = 5
 - : unit = ()
 val b : int = 17
-- : int * int = (5, 17)
+- : int × int = (5, 17)

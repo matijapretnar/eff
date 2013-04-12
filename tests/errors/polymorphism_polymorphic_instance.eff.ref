@@ -1,4 +1,4 @@
-val c : '_a cow = <instance #6>
-- : '_a cow
-val milk : 'a => 'a = <handler>
-- : '_a cow
+val c : _α cow = <instance #6>
+- : _α cow
+val milk : α ⟹  α = <handler>
+- : _α cow

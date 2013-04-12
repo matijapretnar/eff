@@ -1,7 +1,7 @@
-- : (unit => 'a) -> eff -> 'a = <fun>
-- : (unit -> 'a) -> (unit -> 'a) -> eff -> 'a = <fun>
-- : eff -> unit = <fun>
-- : 'a -> 'b -> unit = <fun>
-- : 'a -> 'b -> unit = <fun>
-- : (unit -> 'a) -> ('a => 'b) -> 'b = <fun>
-- : eff -> (unit -> 'a) -> 'a = <fun>
+- : (unit ⟹  α) ⟶  eff ⟶  α = <fun>
+- : (unit ⟶  α) ⟶  (unit ⟶  α) ⟶  eff ⟶  α = <fun>
+- : eff ⟶  unit = <fun>
+- : α ⟶  β ⟶  unit = <fun>
+- : α ⟶  β ⟶  unit = <fun>
+- : (unit ⟶  α) ⟶  (α ⟹  β) ⟶  β = <fun>
+- : eff ⟶  (unit ⟶  α) ⟶  α = <fun>

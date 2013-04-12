@@ -1,6 +1,6 @@
-val f : 'a -> 'a = <fun>
-val f1 : '_a -> '_a = <fun>
-val f2 : '_a -> '_a = <fun>
-val f3 : '_a -> '_a = <fun>
+val f : α ⟶  α = <fun>
+val f1 : _α ⟶  _α = <fun>
+val f2 : _α ⟶  _α = <fun>
+val f3 : _α ⟶  _α = <fun>
 - : bool = true
 Typing error (file "./errors/polymorphic_skeletons.eff", line 4, char 1): This expression has type int but it should have type bool.
