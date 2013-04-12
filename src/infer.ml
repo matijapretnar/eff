@@ -274,30 +274,20 @@ and infer_comp env (c, pos) =
       ctx, (ty, empty_dirt ()), cnstrs
 
   | Core.Let (defs, c) ->
-      let poly, nonpoly, ctx, chngs, drt = infer_let ~pos env defs in
-      let extend (x, ty) env =
-        let ty_sch = Scheme.finalize_ty_scheme ~pos ctx ty chngs in
-        Ctx.extend env x ty_sch
+      let vars, nonpoly, change = infer_let ~pos env defs in
+      let change2 (ctx_c, drty_c, cnstrs_c) =
+        Scheme.finalize_dirty_scheme ~pos (ctx_c) drty_c ([
+          Scheme.remove_context ~pos nonpoly;
+          just cnstrs_c
+        ])
       in
-      let env' = List.fold_right extend poly env in
-      let ctx_c, (ty_c, drt_c), cnstrs_c = infer_comp env' c in
-      unify (ctx @ ctx_c) (ty_c, drt) ([
-        dirt_less ~pos drt_c drt;
-        trim_context ~pos (poly @ nonpoly);
-        just cnstrs_c;
-      ] @ chngs)
+      let env' = List.fold_right (fun (x, ty_sch) env -> Ctx.extend env x ty_sch) vars env in
+      change2 (change (infer_comp env' c))
 
   | Core.LetRec (defs, c) ->
-      let poly, ctx, chngs = infer_let_rec ~pos env defs in
-      let extend (x, ty) env =
-        let ty_sch = Scheme.finalize_ty_scheme ~pos ctx ty chngs in
-        Ctx.extend env x ty_sch
-      in
-      let env' = List.fold_right extend poly env in
-      let ctx_c, drty_c, cnstrs_c = infer_comp env' c in
-      unify (ctx @ ctx_c) drty_c ([
-        just cnstrs_c;
-      ] @ chngs)
+      let vars, change = infer_let_rec ~pos env defs in
+      let env' = List.fold_right (fun (x, ty_sch) env -> Ctx.extend env x ty_sch) vars env in
+      change (infer_comp env' c)
 
   | Core.Match (e, []) ->
       let ctx_e, ty_e, cnstrs_e = infer_expr env e in
@@ -451,7 +441,19 @@ and infer_let ~pos env defs =
     ] @ chngs
   in
   let poly, nonpoly, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
-  poly, nonpoly, ctx, chngs, drt
+  let extend_poly (x, ty) env =
+    let ty_sch = Scheme.finalize_ty_scheme ~pos ctx ty chngs in
+    (x, ty_sch) :: env
+  in
+  let vars = List.fold_right extend_poly poly [] in
+  let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
+    Scheme.finalize_dirty_scheme ~pos (ctx @ ctx_c) (ty_c, drt) ([
+      dirt_less ~pos drt_c drt;
+      Scheme.less_context ~pos nonpoly;
+      just cnstrs_c;
+    ] @ chngs)
+  in
+  vars, nonpoly, change
 
 and infer_let_rec ~pos env defs =
   let infer (x, a) (poly, ctx, chngs) =
@@ -461,6 +463,15 @@ and infer_let_rec ~pos env defs =
     ] @ chngs
   in
   let poly, ctx, chngs = List.fold_right infer defs ([], [], []) in
-  poly, ctx, [
-    trim_context ~pos poly
-  ] @ chngs
+  let chngs = trim_context ~pos poly :: chngs in
+  let extend_poly (x, ty) env =
+    let ty_sch = Scheme.finalize_ty_scheme ~pos ctx ty chngs in
+    (x, ty_sch) :: env
+  in
+  let vars = List.fold_right extend_poly poly [] in
+  let change (ctx_c, drty_c, cnstrs_c) =
+    Scheme.finalize_dirty_scheme ~pos (ctx @ ctx_c) drty_c ([
+        just cnstrs_c;
+    ] @ chngs)
+  in
+  vars, change

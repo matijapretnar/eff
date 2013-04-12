@@ -97,7 +97,7 @@ let add_region_bound r bnd cstr =
 
 let join_disjoint_constraints cstr1 cstr2 = 
   {
-    ty_graph = cstr1.ty_graph @ cstr2.ty_graph;
+    ty_graph = Common.uniq (cstr1.ty_graph @ cstr2.ty_graph);
     dirt_graph = Dirt.union cstr1.dirt_graph cstr2.dirt_graph;
     region_graph = Region.union cstr1.region_graph cstr2.region_graph;
   }

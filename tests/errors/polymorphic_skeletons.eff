@@ -1,0 +1,6 @@
+let f x = x;;
+let f1 = f f;;
+let f2 = f f;;
+let f3 = if true then f1 else f2;;
+f1 true;;
+f2 5;;
