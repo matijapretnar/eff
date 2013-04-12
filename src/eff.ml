@@ -140,7 +140,7 @@ let rec exec_cmd interactive ((ctx, top_ctx, top_cnstrs) as wholectx, env) (d,po
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
       (* XXX What to do about the fresh instances? *)
-      let vars, nonpoly, ctxs, drt, chngs = Infer.infer_let ~pos ctx defs in
+      let vars, nonpoly, ctxs, drt, chngs, _ = Infer.infer_let ~pos ctx defs in
       let extend_nonpoly (x, ty) env =
             let ty' = Type.fresh_ty () in
             let ctx' = (x, ty') :: ctxs in
@@ -177,7 +177,7 @@ let rec exec_cmd interactive ((ctx, top_ctx, top_cnstrs) as wholectx, env) (d,po
         ((ctx, top_ctx, top_cnstrs), env)
     | Syntax.TopLetRec defs ->
         let defs = Desugar.top_let_rec defs in
-        let poly, ctxs, cstrs = Infer.infer_let_rec ~pos ctx defs in
+        let _, poly, ctxs, cstrs, _ = Infer.infer_let_rec ~pos ctx defs in
         let vars = Common.assoc_map (fun t -> Scheme.finalize_ty_scheme ~pos (top_ctx @ ctxs) t ([
                   Scheme.just top_cnstrs
                 ] @ cstrs)) poly in
