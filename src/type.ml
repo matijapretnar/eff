@@ -255,12 +255,13 @@ let rec print ?(non_poly=Trio.empty) skeletons t ppf =
     match t with
     | Arrow (t1, (t2, drt)) ->
         if !effects then
-          print ~at_level:5 "@[%t -%t->@ %t@]"
+          print ~at_level:5 "@[%t -%t%s@ %t@]"
             (ty ~max_level:4 t1)
             (print_dirt ~non_poly drt)
+            (Symbols.arrow ())
             (ty ~max_level:5 t2)
         else
-          print ~at_level:5 "@[%t@ ->@ %t@]" (ty ~max_level:4 t1) (ty ~max_level:5 t2)
+          print ~at_level:5 "@[%t@ %s@ %t@]" (ty ~max_level:4 t1) (Symbols.arrow ()) (ty ~max_level:5 t2)
     | Basic b -> print "%s" b
     | Apply (t, (lst, _, _)) ->
       begin match lst with
@@ -283,7 +284,7 @@ let rec print ?(non_poly=Trio.empty) skeletons t ppf =
           end
     | TyParam p -> print_ty_param ~non_poly skeletons p ppf
     | Tuple [] -> print "unit"
-    | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence " *" (ty ~max_level:1) ts)
+    | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence (Symbols.times ()) (ty ~max_level:1) ts)
     | Handler ((t1, drt1), (t2, drt2)) ->
         if !effects then
           print ~at_level:6 "%t ! %t %s@ %t ! %t"

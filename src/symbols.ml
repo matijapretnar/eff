@@ -2,6 +2,8 @@ let ascii = ref false
 
 let less () = if !ascii then "<=" else "≤"
 let handler_arrow () = if !ascii then "=>" else "⟹ "
+let arrow () = if !ascii then "->" else "⟶ "
+let times () = if !ascii then " *" else " ×"
 
 let subscript sub =
   match sub with
