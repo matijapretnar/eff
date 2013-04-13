@@ -36,6 +36,7 @@ sig
       and successors of the removed vertex. *)
   val remove_vertex : elt -> t -> elt list * elt list * t
   val get_succ : elt -> t -> elt list
+  val get_prec : elt -> t -> elt list
 
   (** Fold over the edges of the graph. *)
   val fold_edges : (elt -> elt -> 'a -> 'a) -> t -> 'a -> 'a

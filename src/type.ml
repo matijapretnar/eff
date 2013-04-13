@@ -226,7 +226,7 @@ let print_dirt_param ?(non_poly=Trio.empty) ((Dirt_Param k) as p) ppf =
 let dirt_bound ?non_poly r_ops =
   Print.sequence ", " (fun (op, dt) ppf -> Print.print ppf "%s:%t" op (print_region_param dt)) r_ops
 
-let print_dirt ?(non_poly=Trio.empty) drt ppf =
+let print_dirt ?(non_poly=Trio.empty) ~show_dirt_param drt ppf =
   match drt.ops with
   | [] -> print_dirt_param ~non_poly drt.rest ppf
   | _ -> Print.print ppf "{%t|%t}" (dirt_bound ~non_poly drt.ops) (print_dirt_param ~non_poly drt.rest)
@@ -248,17 +248,18 @@ let print_ty_param ?(non_poly=Trio.empty) skeletons p ppf =
 let print_instance_param (Instance_Param i) ppf =
   Print.print ppf "#%d" i
 
+let show_dirt show_dirt_param drt = drt.ops != [] || show_dirt_param drt.rest
 
-let rec print ?(non_poly=Trio.empty) skeletons t ppf =
+let rec print ?(non_poly=Trio.empty) ?(show_dirt_param=(fun d -> false)) skeletons t ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = Print.print ?max_level ?at_level ppf in
     match t with
     | Arrow (t1, (t2, drt)) ->
-        if !effects then
+        if !effects && show_dirt show_dirt_param drt then
           print ~at_level:5 "@[%t -%t%s@ %t@]"
             (ty ~max_level:4 t1)
-            (print_dirt ~non_poly drt)
-            (Symbols.arrow ())
+            (print_dirt ~non_poly ~show_dirt_param drt)
+            (Symbols.short_arrow ())
             (ty ~max_level:5 t2)
         else
           print ~at_level:5 "@[%t@ %s@ %t@]" (ty ~max_level:4 t1) (Symbols.arrow ()) (ty ~max_level:5 t2)
@@ -289,10 +290,10 @@ let rec print ?(non_poly=Trio.empty) skeletons t ppf =
         if !effects then
           print ~at_level:6 "%t ! %t %s@ %t ! %t"
             (ty ~max_level:4 t1)
-            (print_dirt ~non_poly drt1)
+            (print_dirt ~non_poly ~show_dirt_param drt1)
             (Symbols.handler_arrow ())
             (ty ~max_level:4 t2)
-            (print_dirt ~non_poly drt2)
+            (print_dirt ~non_poly ~show_dirt_param drt2)
         else
           print ~at_level:6 "%t %s@ %t" (ty ~max_level:4 t1) (Symbols.handler_arrow ()) (ty ~max_level:4 t2)
   in ty t ppf

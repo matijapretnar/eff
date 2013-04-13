@@ -314,6 +314,10 @@ let extend_non_poly (ts, ds, rs) skeletons =
   Print.info "New: %t" (Print.sequence "," (fun (Type.Ty_Param d) ppf -> Print.print ppf "%d" d) ts);
   (Common.uniq ts, ds, rs)
 
+let show_dirt_param (ctx, ty, cnstrs) =
+  let (_, pos, _), (_, neg, _) = pos_neg_tyscheme (ctx, ty, cnstrs) in
+  fun d -> (List.mem d neg) || (List.mem d pos && Constraints.Dirt.get_prec d cnstrs.Constraints.dirt_graph != [])
+
 let print_ty_scheme ty_sch ppf =
   (* let ty_sch = simplify ty_sch in *)
   let sbst = Type.beautifying_subst () in
@@ -321,9 +325,10 @@ let print_ty_scheme ty_sch ppf =
   let skeletons = skeletons cnstrs in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
+  let show_dirt_param = show_dirt_param (ctx, ty, cnstrs) in
   if !Type.effects then
     Print.print ppf "%t | %t"
-      (Type.print skeletons ty)
+      (Type.print ~show_dirt_param skeletons ty)
       (Constraints.print skeletons cnstrs)
   else
     Type.print ~non_poly skeletons ty ppf
@@ -335,10 +340,16 @@ let print_dirty_scheme drty_sch ppf =
   let skeletons = skeletons cnstrs in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
+  let show_dirt_param = show_dirt_param (ctx, (Type.Arrow (Type.unit_ty, (ty, drt))), cnstrs) in
   if !Type.effects then
-    Print.print ppf "%t ! %t | %t"
-      (Type.print skeletons ty)
-      (Type.print_dirt ~non_poly drt)
-      (Constraints.print skeletons cnstrs)
+    if Type.show_dirt show_dirt_param drt then
+      Print.print ppf "%t ! %t | %t"
+        (Type.print ~show_dirt_param skeletons ty)
+        (Type.print_dirt ~non_poly ~show_dirt_param drt)
+        (Constraints.print skeletons cnstrs)
+    else
+      Print.print ppf "%t | %t"
+        (Type.print ~show_dirt_param skeletons ty)
+        (Constraints.print skeletons cnstrs)
   else
     Type.print ~non_poly skeletons ty ppf
