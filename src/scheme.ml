@@ -320,7 +320,7 @@ let show_dirt_param ~non_poly:(_, ds, _) (ctx, ty, cnstrs) =
     if List.mem p neg then
       Some (fun ppf -> (Symbols.dirt_param k (List.mem p ds) ppf))
     else if (List.mem p pos && Constraints.Dirt.get_prec p cnstrs.Constraints.dirt_graph != []) then
-      Some (fun ppf -> (Symbols.dirt_param k (List.mem p ds) ppf))
+      Some (fun ppf -> Print.print ppf "%t" (Print.sequence (Symbols.union ()) (fun (Type.Dirt_Param k) ppf -> (Symbols.dirt_param k (List.mem p ds) ppf)) (Constraints.Dirt.get_prec p cnstrs.Constraints.dirt_graph)))
     else
       None
 
