@@ -304,14 +304,11 @@ let context skeletons ctx ppf =
   | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence ", " (fun (x, t) ppf -> Print.print ppf "%t : %t" (Print.variable x) (Type.print skeletons t)) ctx)
 
 let extend_non_poly (ts, ds, rs) skeletons =
-  Print.info "Old: %t" (Print.sequence "," (fun (Type.Ty_Param d) ppf -> Print.print ppf "%d" d) ts);
-  Print.info "Skeletons: %t" (Print.sequence ";" (fun skel ppf -> Print.print ppf "[%t]" (Print.sequence "," (fun (Type.Ty_Param d) ppf -> Print.print ppf "%d" d) skel)) skeletons);
   let add_skel skel new_ts =
     if List.exists (fun t -> List.mem t ts) skel then
     skel @ new_ts else new_ts
   in
   let ts = List.fold_right add_skel skeletons ts in
-  Print.info "New: %t" (Print.sequence "," (fun (Type.Ty_Param d) ppf -> Print.print ppf "%d" d) ts);
   (Common.uniq ts, ds, rs)
 
 let show_dirt_param ~non_poly:(_, ds, _) (ctx, ty, cnstrs) =

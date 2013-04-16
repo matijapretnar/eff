@@ -4,7 +4,7 @@ let less () = if !ascii then "<=" else "≤"
 let handler_arrow () = if !ascii then "=>" else "⟹ "
 let arrow () = if !ascii then "->" else "⟶ "
 let short_arrow () = if !ascii then "->" else "→"
-let times () = if !ascii then " *" else " ×"
+let times () = if !ascii then " * " else " × "
 let union () = if !ascii then "+" else "∪"
 
 let subscript sub =
