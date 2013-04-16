@@ -301,7 +301,7 @@ let finalize_pattern_scheme ~pos ctx ty chngs =
 let context skeletons ctx ppf =
   match ctx with
   | [] -> ()
-  | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence "," (fun (x, t) ppf -> Print.print ppf "%t : %t" (Print.variable x) (Type.print skeletons t)) ctx)
+  | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence ", " (fun (x, t) ppf -> Print.print ppf "%t : %t" (Print.variable x) (Type.print skeletons t)) ctx)
 
 
 let print_ty_scheme ty_sch ppf =

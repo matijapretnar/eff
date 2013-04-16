@@ -224,7 +224,7 @@ let print_dirt_param ?(non_poly=Trio.empty) ((Dirt_Param k) as p) ppf =
   Symbols.dirt_param k (List.mem p ds) ppf
 
 let dirt_bound ?non_poly r_ops =
-  Print.sequence "," (fun (op, dt) ppf -> Print.print ppf "%s:%t" op (print_region_param dt)) r_ops
+  Print.sequence ", " (fun (op, dt) ppf -> Print.print ppf "%s:%t" op (print_region_param dt)) r_ops
 
 let print_dirt ?(non_poly=Trio.empty) drt ppf =
   match drt.ops with
@@ -266,20 +266,20 @@ let rec print ?(non_poly=Trio.empty) skeletons t ppf =
       begin match lst with
         | [] -> print "%s" t
         | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
-        | ts -> print ~at_level:1 "(%t) %s" (Print.sequence "," ty ts) t
+        | ts -> print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
       end
     | Effect (t, (lst, _, _), rgn) ->
         if !effects then
           begin match lst with
             | [] -> print "%s[%t]" t (print_region_param ~non_poly rgn)
             | [s] -> print ~at_level:1 "%t %s[%t]" (ty ~max_level:1 s) t (print_region_param ~non_poly rgn)
-            | ts -> print ~at_level:1 "(%t) %s[%t]" (Print.sequence "," ty ts) t (print_region_param ~non_poly rgn)
+            | ts -> print ~at_level:1 "(%t) %s[%t]" (Print.sequence ", " ty ts) t (print_region_param ~non_poly rgn)
           end
         else
           begin match lst with
             | [] -> print "%s" t
             | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
-            | ts -> print ~at_level:1 "(%t) %s" (Print.sequence "," ty ts) t
+            | ts -> print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
           end
     | TyParam p -> print_ty_param ~non_poly skeletons p ppf
     | Tuple [] -> print "unit"

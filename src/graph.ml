@@ -149,9 +149,9 @@ struct
       fold_vertices
         (fun x inx outx () ->
           Print.print ppf "@[%t <= %t <= %t@];@."
-            (Print.sequence "," V.print (List.map fst inx))
+            (Print.sequence ", " V.print (List.map fst inx))
             (V.print x)
-            (Print.sequence "," V.print (List.map fst outx))
+            (Print.sequence ", " V.print (List.map fst outx))
         )
         grph () *)
 end

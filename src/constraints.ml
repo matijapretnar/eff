@@ -136,11 +136,11 @@ let less pp p1 p2 ppf =
 let rec print_region_bound ?(non_poly=Trio.empty) bnd ppf =
   match bnd with
   | Instance i -> Type.print_instance_param i ppf
-  | Without (prs, rs) -> Print.print ppf "%t - [%t]" (Type.print_region_param prs) (Print.sequence "," (Type.print_region_param) rs)
+  | Without (prs, rs) -> Print.print ppf "%t - [%t]" (Type.print_region_param prs) (Print.sequence ", " (Type.print_region_param) rs)
 
 
 let print_region_bounds bnd ppf =
-  Print.sequence "," print_region_bound bnd ppf
+  Print.sequence ", " print_region_bound bnd ppf
 
 let bounds pp pp' p inf (* sup *) pps =
   match inf with

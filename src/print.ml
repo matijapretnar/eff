@@ -16,7 +16,7 @@ let rec sequence sep pp vs ppf =
   match vs with
   | [] -> ()
   | [v] -> pp v ppf
-  | v :: vs -> Format.fprintf ppf "%t%s@ %t" (pp v) sep (sequence sep pp vs)
+  | v :: vs -> Format.fprintf ppf "%t%s@,%t" (pp v) sep (sequence sep pp vs)
 
 
 let variable (_, x) ppf = print ppf "%s" x
@@ -24,10 +24,10 @@ let variable (_, x) ppf = print ppf "%s" x
 and field pp (f, v) ppf = fprintf ppf "%s = %t" f (pp v)
 
 let tuple pp lst ppf =
-  print ppf "(@[<hov>%t@])" (sequence "," pp lst)
+  print ppf "(@[<hov>%t@])" (sequence ", " pp lst)
 
 let record pp lst ppf =
-  print ppf "{@[<hov>%t@]}" (sequence ";" (field pp) lst)
+  print ppf "{@[<hov>%t@]}" (sequence "; " (field pp) lst)
 
 let to_string m =
   (Format.kfprintf (fun _ -> Format.flush_str_formatter ()) Format.str_formatter) m
