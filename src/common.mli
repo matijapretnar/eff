@@ -39,3 +39,4 @@ val split : int -> 'a list -> 'a list * 'a list
 val diff : 'a list -> 'a list -> 'a list
 val print_const : const -> Format.formatter -> unit
 val print_position : position -> Format.formatter -> unit
+val assoc_flatten : ('a * 'b) list -> ('a * 'b list) list

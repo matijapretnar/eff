@@ -182,3 +182,13 @@ let print_position pos ppf =
         Format.fprintf ppf "file %S, line %d, char %d" filename begin_line begin_char
       else
         Format.fprintf ppf "line %d, char %d" (begin_line - 1) begin_char
+
+let assoc_flatten lst =
+  let add (k, v) lst =
+  begin match lookup k lst with
+  | None -> (k, ref [v]) :: lst
+  | Some vs -> vs := v :: !vs; lst
+  end
+  in
+  let lst = List.fold_right add lst [] in
+  assoc_map (!) lst
