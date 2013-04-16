@@ -50,6 +50,10 @@ struct
     let (_, outx, _, _) = get x g in
     S.elements outx
 
+  let get_prec x g =
+    let (inx, _, _, _) = get x g in
+    S.elements inx
+
   let add_edge x y (g : t) =
     if x = y then g else
     let (inx, outx, infx, supx) = get x g

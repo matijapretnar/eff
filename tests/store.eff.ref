@@ -1,4 +1,4 @@
 val x : int ref = <instance #6>
 val y : int ref = <instance #7>
 val z : int ref ref = <instance #8>
-- : int * int = (5, 39)
+- : int × int = (5, 39)

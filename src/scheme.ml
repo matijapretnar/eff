@@ -227,6 +227,9 @@ let pos_neg_tyscheme (ctx, ty, cnstrs) =
                                       match bnds with None -> (posi, nega) | Some bnds -> (if List.mem d pos_rs then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega))) (Constraints.Region.bounds cnstrs.Constraints.region_graph) (posi, nega) in
   Trio.uniq posi, Trio.uniq nega
 
+let pos_neg_dirtyscheme (ctx, drty, cnstrs) =
+  pos_neg_tyscheme (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs)
+
 let garbage_collect pos neg (ctx, ty, cnstrs) =
   ctx, ty, Constraints.garbage_collect pos neg cnstrs
 
@@ -303,30 +306,60 @@ let context skeletons ctx ppf =
   | [] -> ()
   | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence ", " (fun (x, t) ppf -> Print.print ppf "%t : %t" (Print.variable x) (Type.print skeletons t)) ctx)
 
+let extend_non_poly (ts, ds, rs) skeletons =
+  let add_skel skel new_ts =
+    if List.exists (fun t -> List.mem t ts) skel then
+    skel @ new_ts else new_ts
+  in
+  let ts = List.fold_right add_skel skeletons ts in
+  (Common.uniq ts, ds, rs)
+
+let show_dirt_param ~non_poly:(_, ds, _) (ctx, ty, cnstrs) =
+  let (_, pos, _), (_, neg, _) = pos_neg_tyscheme (ctx, ty, cnstrs) in
+  fun ((Type.Dirt_Param k) as p) ->
+    if List.mem p neg then
+      Some (fun ppf -> (Symbols.dirt_param k (List.mem p ds) ppf))
+    else if (List.mem p pos && Constraints.Dirt.get_prec p cnstrs.Constraints.dirt_graph != []) then
+      Some (fun ppf -> Print.print ppf "%t" (Print.sequence (Symbols.union ()) (fun (Type.Dirt_Param k) ppf -> (Symbols.dirt_param k (List.mem p ds) ppf)) (Constraints.Dirt.get_prec p cnstrs.Constraints.dirt_graph)))
+    else
+      None
 
 let print_ty_scheme ty_sch ppf =
-  let ty_sch = simplify ty_sch in
+  (* let ty_sch = simplify ty_sch in *)
   let sbst = Type.beautifying_subst () in
+  let _, (_, ds, _) = pos_neg_tyscheme ty_sch in
+  ignore (Common.map sbst.Type.dirt_param ds);
   let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in
   let skeletons = skeletons cnstrs in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
+  let non_poly = extend_non_poly non_poly skeletons in
+  let show_dirt_param = show_dirt_param (ctx, ty, cnstrs) ~non_poly in
   if !Type.effects then
-    Print.print ppf "%t | %t"
-      (Type.print skeletons ty)
+    Print.print ppf "%t%t"
+      (Type.print ~show_dirt_param skeletons ty)
       (Constraints.print skeletons cnstrs)
   else
     Type.print ~non_poly skeletons ty ppf
 
 let print_dirty_scheme drty_sch ppf =
-  let drty_sch = simplify_dirty drty_sch in
+  (* let drty_sch = simplify_dirty drty_sch in *)
   let sbst = Type.beautifying_subst () in
+  let _, (_, ds, _) = pos_neg_dirtyscheme drty_sch in
+  ignore (Common.map sbst.Type.dirt_param ds);
   let (ctx, (ty, drt), cnstrs) = subst_dirty_scheme sbst drty_sch in
   let skeletons = skeletons cnstrs in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
+  let non_poly = extend_non_poly non_poly skeletons in
+  let show_dirt_param = show_dirt_param (ctx, (Type.Arrow (Type.unit_ty, (ty, drt))), cnstrs) ~non_poly in
   if !Type.effects then
-    Print.print ppf "%t ! %t | %t"
-      (Type.print skeletons ty)
-      (Type.print_dirt ~non_poly drt)
-      (Constraints.print skeletons cnstrs)
+    if Type.show_dirt show_dirt_param drt then
+      Print.print ppf "%t ! %t%t"
+        (Type.print ~show_dirt_param skeletons ty)
+        (Type.print_dirt ~non_poly ~show_dirt_param drt)
+        (Constraints.print skeletons cnstrs)
+    else
+      Print.print ppf "%t%t"
+        (Type.print ~show_dirt_param skeletons ty)
+        (Constraints.print skeletons cnstrs)
   else
     Type.print ~non_poly skeletons ty ppf
