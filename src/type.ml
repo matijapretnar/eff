@@ -251,7 +251,8 @@ let print_ty_param ?(non_poly=Trio.empty) skeletons p ppf =
   | (_ :: xs) :: skels -> get_skel_id skel (succ id) (xs :: skels)
   in
   let skel, id = get_skel_id 0 0 skeletons in
-  let id = if !effects then id else None in
+  (* let id = if !effects then id else None in *)
+  let id = None in
   Symbols.ty_param skel id (List.mem p ps) ppf
 
 let print_instance_param (Instance_Param i) ppf =
