@@ -335,7 +335,7 @@ let print_ty_scheme ty_sch ppf =
   let non_poly = extend_non_poly non_poly skeletons in
   let show_dirt_param = show_dirt_param (ctx, ty, cnstrs) ~non_poly in
   if !Type.effects then
-    Print.print ppf "%t | %t"
+    Print.print ppf "%t%t"
       (Type.print ~show_dirt_param skeletons ty)
       (Constraints.print skeletons cnstrs)
   else
@@ -353,12 +353,12 @@ let print_dirty_scheme drty_sch ppf =
   let show_dirt_param = show_dirt_param (ctx, (Type.Arrow (Type.unit_ty, (ty, drt))), cnstrs) ~non_poly in
   if !Type.effects then
     if Type.show_dirt show_dirt_param drt then
-      Print.print ppf "%t ! %t | %t"
+      Print.print ppf "%t ! %t%t"
         (Type.print ~show_dirt_param skeletons ty)
         (Type.print_dirt ~non_poly ~show_dirt_param drt)
         (Constraints.print skeletons cnstrs)
     else
-      Print.print ppf "%t | %t"
+      Print.print ppf "%t%t"
         (Type.print ~show_dirt_param skeletons ty)
         (Constraints.print skeletons cnstrs)
   else

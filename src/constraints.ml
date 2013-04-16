@@ -158,7 +158,7 @@ let print ?(non_poly=Trio.empty) skeletons g ppf =
   let pps = fold_dirt (fun d1 d2 lst -> if d1 != d2 then less (Type.print_dirt_param ~non_poly) d1 d2 :: lst else lst) g pps in
   let pps = fold_region (fun r1 r2 lst -> if r1 != r2 then less (Type.print_region_param ~non_poly) r1 r2 :: lst else lst) g pps in
   let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (Type.print_region_param ~non_poly) print_region_bounds r bound1 (* bound2 *) pps) (Region.bounds g.region_graph) pps in
-  Print.print ppf "%t"
-    (sequence2 "," pps)
+  if pps != [] then
+    Print.print ppf " | %t" (sequence2 "," pps)
 
 
