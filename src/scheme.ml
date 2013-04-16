@@ -227,6 +227,9 @@ let pos_neg_tyscheme (ctx, ty, cnstrs) =
                                       match bnds with None -> (posi, nega) | Some bnds -> (if List.mem d pos_rs then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega))) (Constraints.Region.bounds cnstrs.Constraints.region_graph) (posi, nega) in
   Trio.uniq posi, Trio.uniq nega
 
+let pos_neg_dirtyscheme (ctx, drty, cnstrs) =
+  pos_neg_tyscheme (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs)
+
 let garbage_collect pos neg (ctx, ty, cnstrs) =
   ctx, ty, Constraints.garbage_collect pos neg cnstrs
 
@@ -324,6 +327,8 @@ let show_dirt_param ~non_poly:(_, ds, _) (ctx, ty, cnstrs) =
 let print_ty_scheme ty_sch ppf =
   (* let ty_sch = simplify ty_sch in *)
   let sbst = Type.beautifying_subst () in
+  let _, (_, ds, _) = pos_neg_tyscheme ty_sch in
+  ignore (Common.map sbst.Type.dirt_param ds);
   let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in
   let skeletons = skeletons cnstrs in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
@@ -339,6 +344,8 @@ let print_ty_scheme ty_sch ppf =
 let print_dirty_scheme drty_sch ppf =
   (* let drty_sch = simplify_dirty drty_sch in *)
   let sbst = Type.beautifying_subst () in
+  let _, (_, ds, _) = pos_neg_dirtyscheme drty_sch in
+  ignore (Common.map sbst.Type.dirt_param ds);
   let (ctx, (ty, drt), cnstrs) = subst_dirty_scheme sbst drty_sch in
   let skeletons = skeletons cnstrs in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
