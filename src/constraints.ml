@@ -33,12 +33,14 @@ type t = {
   ty_graph : Ty.t list;
   region_graph : Region.t;
   dirt_graph : Dirt.t;
+  region_bounds : (Type.region_param, region_bound list) Common.assoc
 }
 
 let empty = {
   ty_graph = [];
   region_graph = Region.empty;
   dirt_graph = Dirt.empty;
+  region_bounds = [];
 }
 
 let remove_ty g x =
@@ -67,6 +69,7 @@ let subst_constraints sbst cnstr = {
   ty_graph = List.map (Ty.map (fun p -> match sbst.Type.ty_param p with Type.TyParam q -> q | _ -> assert false) (fun () -> ()) (fun () -> ())) cnstr.ty_graph;
   dirt_graph = Dirt.map (fun d -> match sbst.Type.dirt_param d with { Type.ops = []; Type.rest = d' } -> d' | _ -> assert false) (fun () -> ()) (fun () -> ()) cnstr.dirt_graph;
   region_graph = Region.map sbst.Type.region_param (List.map (subst_region_bound sbst)) (fun () -> ()) cnstr.region_graph;
+  region_bounds = Common.assoc_map (List.map (subst_region_bound sbst)) cnstr.region_bounds
 }
 
 let fold_ty f g acc = List.fold_right (fun g acc -> Ty.fold_edges f g acc) g.ty_graph acc
@@ -100,6 +103,7 @@ let join_disjoint_constraints cstr1 cstr2 =
     ty_graph = Common.uniq (cstr1.ty_graph @ cstr2.ty_graph);
     dirt_graph = Dirt.union cstr1.dirt_graph cstr2.dirt_graph;
     region_graph = Region.union cstr1.region_graph cstr2.region_graph;
+    region_bounds = Common.assoc_map List.flatten (Common.assoc_flatten (cstr1.region_bounds @ cstr2.region_bounds))
   }
 
 let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
@@ -107,6 +111,7 @@ let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
     ty_graph = List.filter (fun g -> g <> Ty.empty) (List.map (Ty.garbage_collect pos_ts neg_ts) grph.ty_graph);
     dirt_graph = Dirt.garbage_collect pos_ds neg_ds grph.dirt_graph;
     region_graph = Region.garbage_collect pos_rs neg_rs grph.region_graph;
+    region_bounds = grph.region_bounds
   }
 
 let simplify (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
