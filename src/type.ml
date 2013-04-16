@@ -228,8 +228,17 @@ let dirt_bound ?non_poly r_ops =
 
 let print_dirt ?(non_poly=Trio.empty) ~show_dirt_param drt ppf =
   match drt.ops with
-  | [] -> print_dirt_param ~non_poly drt.rest ppf
-  | _ -> Print.print ppf "{%t|%t}" (dirt_bound ~non_poly drt.ops) (print_dirt_param ~non_poly drt.rest)
+  | [] ->
+    begin match show_dirt_param drt.rest with
+    | Some f -> f ppf
+    | None -> ()
+    end
+  | _ ->
+    begin match show_dirt_param drt.rest with
+    | Some f -> Print.print ppf "{%t|%t}" (dirt_bound ~non_poly drt.ops) f
+    | None -> Print.print ppf "{%t}" (dirt_bound ~non_poly drt.ops)
+    end
+
 
 let print_ty_param ?(non_poly=Trio.empty) skeletons p ppf =
   let (ps, _, _) = non_poly in
@@ -248,9 +257,9 @@ let print_ty_param ?(non_poly=Trio.empty) skeletons p ppf =
 let print_instance_param (Instance_Param i) ppf =
   Print.print ppf "#%d" i
 
-let show_dirt show_dirt_param drt = drt.ops != [] || show_dirt_param drt.rest
+let show_dirt show_dirt_param drt = drt.ops != [] || (show_dirt_param drt.rest != None)
 
-let rec print ?(non_poly=Trio.empty) ?(show_dirt_param=(fun d -> false)) skeletons t ppf =
+let rec print ?(non_poly=Trio.empty) ?(show_dirt_param=fun d -> Some (print_dirt_param ~non_poly d)) skeletons t ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = Print.print ?max_level ?at_level ppf in
     match t with
