@@ -76,10 +76,6 @@ struct
   let leaves grph =
     G.fold (fun x (inx, outx) acc -> if S.is_empty inx then x :: acc else acc) grph []
 
-  let filter_edges p grph =
-    let g = G.fold (fun x (inx, outx) acc -> G.add x (S.empty, S.empty) acc) grph G.empty in
-    fold_edges (fun x y acc -> if p x y then add_edge x y acc else acc) grph g
-
   let map f grph =
     let f_set s = S.fold (fun x fs -> S.add (f x) fs) s S.empty in
     G.fold (fun x (inx, outx) acc -> G.add (f x) (f_set inx, f_set outx) acc) grph G.empty

@@ -38,9 +38,6 @@ sig
 
   val leaves : t -> elt list
 
-  (** Filter edges of the graph. *)
-  val filter_edges : (elt -> elt -> bool) -> t -> t
-
   val union : t -> t -> t
 
   val map : (elt -> elt) -> t -> t
