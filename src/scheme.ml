@@ -338,7 +338,7 @@ let print_ty_scheme ty_sch ppf =
   if !Type.effects then
     Print.print ppf "%t%t"
       (Type.print ~show_dirt_param skeletons ty)
-      (Constraints.print skeletons cnstrs)
+      (Constraints.print ~non_poly skeletons cnstrs)
   else
     Type.print ~non_poly skeletons ty ppf
 
@@ -357,10 +357,10 @@ let print_dirty_scheme drty_sch ppf =
       Print.print ppf "%t ! %t%t"
         (Type.print ~show_dirt_param skeletons ty)
         (Type.print_dirt ~non_poly ~show_dirt_param drt)
-        (Constraints.print skeletons cnstrs)
+        (Constraints.print ~non_poly skeletons cnstrs)
     else
       Print.print ppf "%t%t"
         (Type.print ~show_dirt_param skeletons ty)
-        (Constraints.print skeletons cnstrs)
+        (Constraints.print ~non_poly skeletons cnstrs)
   else
     Type.print ~non_poly skeletons ty ppf
