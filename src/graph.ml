@@ -76,13 +76,15 @@ struct
     let pos = List.fold_right S.add pos S.empty
     and neg = List.fold_right S.add neg S.empty in
     let collect x (inx, outx) grph =
-      let x_pos = S.mem x pos
-      and x_neg = S.mem x neg in
-      let inx = if x_pos then S.inter neg inx else S.empty
-      and outx = if x_neg then S.inter pos outx else S.empty in
-      match S.cardinal inx + S.cardinal outx with
-      | 0 -> grph
-      | _ -> G.add x (inx, outx) grph
+      let inx =
+        if S.mem x pos then S.inter neg inx else S.empty
+      and outx =
+        if S.mem x neg then S.inter pos outx else S.empty
+      in
+      if S.cardinal inx + S.cardinal outx = 0 then
+       grph
+      else
+        G.add x (inx, outx) grph
     in
     G.fold collect grph G.empty
 
