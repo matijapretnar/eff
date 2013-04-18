@@ -1,10 +1,6 @@
 module type Vertex =
 sig
   type t
-  type lower_bound
-  type upper_bound
-  val sup : lower_bound -> lower_bound -> lower_bound
-  val inf : upper_bound -> upper_bound -> upper_bound
   val compare : t -> t -> int
 end
 
@@ -13,8 +9,6 @@ module Make (V : Vertex) :
      Also add printers for vertices to [V] so that the module can export printing of a graph. *)
 sig
   type elt = V.t
-  type lower_bound = V.lower_bound
-  type upper_bound = V.upper_bound
   type t
 
   (** The empty graph. *)
@@ -22,9 +16,6 @@ sig
 
   (** Add an edge to the graph. *)
   val add_edge : elt -> elt -> t -> t
-
-  val add_lower_bound : elt -> V.lower_bound -> t -> t
-  val add_upper_bound : elt -> V.upper_bound -> t -> t
 
   (** Add an edge to the graph. *)
   val add_vertex : elt -> t -> t
@@ -40,20 +31,19 @@ sig
 
   (** Fold over the edges of the graph. *)
   val fold_edges : (elt -> elt -> 'a -> 'a) -> t -> 'a -> 'a
-  val fold_vertices : (elt -> elt list -> elt list -> V.lower_bound option -> V.upper_bound option -> 'a -> 'a) -> t -> 'a -> 'a
+  val fold_vertices : (elt -> elt list -> elt list -> 'a -> 'a) -> t -> 'a -> 'a
 
   (** Fold over the vertices of the graph together with their in- and out-sets. *)
   (* val fold_vertices : (elt -> (elt * Common.position) list -> (elt * Common.position) list -> bound -> bound -> 'a -> 'a) -> t -> 'a -> 'a *)
 
-  val bounds : t -> (elt * V.lower_bound option * V.upper_bound option) list
-  val leaves : t -> (elt * V.lower_bound option * V.upper_bound option) list
+  val leaves : t -> elt list
 
   (** Filter edges of the graph. *)
   val filter_edges : (elt -> elt -> bool) -> t -> t
 
   val union : t -> t -> t
 
-  val map : (elt -> elt) -> (lower_bound -> lower_bound) -> (upper_bound -> upper_bound) -> t -> t
+  val map : (elt -> elt) -> t -> t
 
   val garbage_collect : elt list -> elt list -> t -> t
   val simplify : elt list -> elt list -> t -> (elt, elt) Common.assoc

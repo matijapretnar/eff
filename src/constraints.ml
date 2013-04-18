@@ -4,28 +4,16 @@ type region_bound =
 
 module Ty = Graph.Make(struct
   type t = Type.ty_param
-  type lower_bound = unit
-  type upper_bound = unit
-  let inf () () = ()
-  let sup () () = ()
   let compare = Pervasives.compare
 end)
 
 module Region = Graph.Make(struct
   type t = Type.region_param
-  type lower_bound = region_bound list
-  type upper_bound = unit
-  let sup insts1 insts2 = Common.uniq (insts1 @ insts2)
-  let inf () () = ()
   let compare = Pervasives.compare
 end)
 
 module Dirt = Graph.Make(struct
   type t = Type.dirt_param
-  type lower_bound = unit
-  type upper_bound = unit
-  let inf () () = ()
-  let sup () () = ()
   let compare = Pervasives.compare
 end)
 
@@ -66,9 +54,9 @@ let subst_region_bound sbst = function
 
 
 let subst_constraints sbst cnstr = {
-  ty_graph = List.map (Ty.map (fun p -> match sbst.Type.ty_param p with Type.TyParam q -> q | _ -> assert false) (fun () -> ()) (fun () -> ())) cnstr.ty_graph;
-  dirt_graph = Dirt.map (fun d -> match sbst.Type.dirt_param d with { Type.ops = []; Type.rest = d' } -> d' | _ -> assert false) (fun () -> ()) (fun () -> ()) cnstr.dirt_graph;
-  region_graph = Region.map sbst.Type.region_param (List.map (subst_region_bound sbst)) (fun () -> ()) cnstr.region_graph;
+  ty_graph = List.map (Ty.map (fun p -> match sbst.Type.ty_param p with Type.TyParam q -> q | _ -> assert false)) cnstr.ty_graph;
+  dirt_graph = Dirt.map (fun d -> match sbst.Type.dirt_param d with { Type.ops = []; Type.rest = d' } -> d' | _ -> assert false) cnstr.dirt_graph;
+  region_graph = Region.map sbst.Type.region_param cnstr.region_graph;
   region_bounds = List.map (fun (r, bnd) -> (sbst.Type.region_param r, List.map (subst_region_bound sbst) bnd)) cnstr.region_bounds
 }
 
