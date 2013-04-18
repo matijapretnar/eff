@@ -215,16 +215,17 @@ let pos_neg_tyscheme (ctx, ty, cnstrs) =
   | Constraints.Without (d, _) -> d :: posi
   | Constraints.Instance _ -> posi
   in
-  let posi_regions = List.fold_right (fun (d, bnds, _) posi ->
-                                      match bnds with None -> posi | Some bnds -> if List.mem d pos_rs then List.fold_right add_region_bound bnds posi else posi) (Constraints.Region.bounds cnstrs.Constraints.region_graph) [] in
+  let posi_regions = List.fold_right (fun (d, bnds) posi ->
+                                      if List.mem d pos_rs then List.fold_right add_region_bound bnds posi else posi) cnstrs.Constraints.region_bounds [] in
   let pos = ([], [], posi_regions) @@@ pos in
-  let add_region_bound bnd (posi, nega) = match bnd with
+
+   let add_region_bound bnd (posi, nega) = match bnd with
   | Constraints.Without (r, rs) -> (([], [], r :: rs) @@@ posi, nega)
   | Constraints.Instance _ -> (posi, nega)
   in
   let (((_, _, pos_rs) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
-  let (posi, nega) = List.fold_right (fun (d, bnds, _) (posi, nega) ->
-                                      match bnds with None -> (posi, nega) | Some bnds -> (if List.mem d pos_rs then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega))) (Constraints.Region.bounds cnstrs.Constraints.region_graph) (posi, nega) in
+  let (posi, nega) = List.fold_right (fun (d, bnds) (posi, nega) ->
+                                      if List.mem d pos_rs then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega)) cnstrs.Constraints.region_bounds (posi, nega) in
   Trio.uniq posi, Trio.uniq nega
 
 let pos_neg_dirtyscheme (ctx, drty, cnstrs) =
