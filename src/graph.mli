@@ -31,10 +31,6 @@ sig
 
   (** Fold over the edges of the graph. *)
   val fold_edges : (elt -> elt -> 'a -> 'a) -> t -> 'a -> 'a
-  val fold_vertices : (elt -> elt list -> elt list -> 'a -> 'a) -> t -> 'a -> 'a
-
-  (** Fold over the vertices of the graph together with their in- and out-sets. *)
-  (* val fold_vertices : (elt -> (elt * Common.position) list -> (elt * Common.position) list -> bound -> bound -> 'a -> 'a) -> t -> 'a -> 'a *)
 
   val union : t -> t -> t
 

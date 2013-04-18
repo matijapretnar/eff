@@ -68,8 +68,6 @@ struct
 
   let fold_edges f grph acc =
     G.fold (fun x (_, outx) acc -> S.fold (fun y acc -> f x y acc) outx acc) grph acc
-  let fold_vertices f grph acc =
-    G.fold (fun x (inx, outx) acc -> f x (S.elements inx) (S.elements outx) acc) grph acc
 
   let union = G.fold G.add
 
