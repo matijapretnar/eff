@@ -69,7 +69,7 @@ let subst_constraints sbst cnstr = {
   ty_graph = List.map (Ty.map (fun p -> match sbst.Type.ty_param p with Type.TyParam q -> q | _ -> assert false) (fun () -> ()) (fun () -> ())) cnstr.ty_graph;
   dirt_graph = Dirt.map (fun d -> match sbst.Type.dirt_param d with { Type.ops = []; Type.rest = d' } -> d' | _ -> assert false) (fun () -> ()) (fun () -> ()) cnstr.dirt_graph;
   region_graph = Region.map sbst.Type.region_param (List.map (subst_region_bound sbst)) (fun () -> ()) cnstr.region_graph;
-  region_bounds = Common.assoc_map (List.map (subst_region_bound sbst)) cnstr.region_bounds
+  region_bounds = List.map (fun (r, bnd) -> (sbst.Type.region_param r, List.map (subst_region_bound sbst) bnd)) cnstr.region_bounds
 }
 
 let fold_ty f g acc = List.fold_right (fun g acc -> Ty.fold_edges f g acc) g.ty_graph acc
@@ -92,26 +92,32 @@ let add_ty_constraint ty1 ty2 cstr =
 let add_dirt_constraint drt1 drt2 cstr =
   {cstr with dirt_graph = Dirt.add_edge drt1 drt2 cstr.dirt_graph}
 
-let add_region_constraint rgn1 rgn2 cstr =
-  {cstr with region_graph = Region.add_edge rgn1 rgn2 cstr.region_graph}
-
-let add_region_bound r bnd cstr =
-  {cstr with region_graph = Region.add_lower_bound r bnd cstr.region_graph }
-
 let join_disjoint_constraints cstr1 cstr2 = 
   {
     ty_graph = Common.uniq (cstr1.ty_graph @ cstr2.ty_graph);
     dirt_graph = Dirt.union cstr1.dirt_graph cstr2.dirt_graph;
     region_graph = Region.union cstr1.region_graph cstr2.region_graph;
-    region_bounds = Common.assoc_map List.flatten (Common.assoc_flatten (cstr1.region_bounds @ cstr2.region_bounds))
+    region_bounds = Common.assoc_map (Common.compose Common.uniq List.flatten) (Common.assoc_flatten (cstr1.region_bounds @ cstr2.region_bounds))
   }
+
+let add_region_bound r bnd cstr =
+  let succ = Region.get_succ r cstr.region_graph in
+  let new_bounds = List.map (fun r -> (r, bnd)) (r :: succ) in
+  { cstr with region_bounds =
+  Common.assoc_map (Common.compose Common.uniq List.flatten) (Common.assoc_flatten (new_bounds @ cstr.region_bounds)) }
+
+let add_region_constraint rgn1 rgn2 cstr =
+  let new_cstr = {cstr with region_graph = Region.add_edge rgn1 rgn2 cstr.region_graph} in
+  match Common.lookup rgn1 cstr.region_bounds with
+  | None -> new_cstr
+  | Some bnds -> add_region_bound rgn2 bnds new_cstr
 
 let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
   {
     ty_graph = List.filter (fun g -> g <> Ty.empty) (List.map (Ty.garbage_collect pos_ts neg_ts) grph.ty_graph);
     dirt_graph = Dirt.garbage_collect pos_ds neg_ds grph.dirt_graph;
     region_graph = Region.garbage_collect pos_rs neg_rs grph.region_graph;
-    region_bounds = grph.region_bounds
+    region_bounds = List.filter (fun (r, ds) -> List.mem r pos_rs && ds != []) grph.region_bounds
   }
 
 let simplify (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
@@ -149,8 +155,8 @@ let print_region_bounds bnd ppf =
 
 let bounds pp pp' p inf (* sup *) pps =
   match inf with
-  | None -> pps
-  | Some inf -> (fun ppf -> Print.print ppf "%t %s %t" (pp' inf) (Symbols.less ()) (pp p)) :: pps
+  | [] -> pps
+  | inf -> (fun ppf -> Print.print ppf "%t %s %t" (pp' inf) (Symbols.less ()) (pp p)) :: pps
 
 let rec sequence2 sep pps ppf =
   match pps with
@@ -163,7 +169,7 @@ let print ?(non_poly=Trio.empty) skeletons g ppf =
   (* let pps = fold_ty (fun p1 p2 lst -> if p1 != p2 then less (Type.print_ty_param skeletons ~non_poly) p1 p2 :: lst else lst) g [] in *)
   (* let pps = fold_dirt (fun d1 d2 lst -> if d1 != d2 then less (Type.print_dirt_param ~non_poly) d1 d2 :: lst else lst) g pps in *)
   let pps = fold_region (fun r1 r2 lst -> if r1 != r2 then less (Type.print_region_param ~non_poly) r1 r2 :: lst else lst) g pps in
-  let pps = List.fold_right (fun (r, bound1, bound2) pps -> bounds (Type.print_region_param ~non_poly) print_region_bounds r bound1 (* bound2 *) pps) (Region.bounds g.region_graph) pps in
+  let pps = List.fold_right (fun (r, bound1) pps -> bounds (Type.print_region_param ~non_poly) print_region_bounds r bound1 (* bound2 *) pps) g.region_bounds pps in
   if pps != [] then
     Print.print ppf " | %t" (sequence2 "," pps)
 
