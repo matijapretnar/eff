@@ -52,9 +52,6 @@ struct
       G.add r (S.union inr (S.remove r left), outr) grph in
     S.fold extend_left left (S.fold extend_right right g)
 
-  let add_vertex x (g : t) =
-    if G.mem x g then g else G.add x (S.empty, S.empty) g
-
   let remove_vertex x (g : t) =
     (* We must remove [x] as a key from [g], as well as an element of any in- our out-set *)
     let remove_x = S.filter (fun y -> x <> y) in

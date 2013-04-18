@@ -18,7 +18,6 @@ sig
   val add_edge : elt -> elt -> t -> t
 
   (** Add an edge to the graph. *)
-  val add_vertex : elt -> t -> t
   val mem : elt -> t -> bool
 
   val keys : t -> elt list
