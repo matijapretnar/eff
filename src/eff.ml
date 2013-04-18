@@ -102,7 +102,6 @@ let infer_top_comp (ctx, top_change) c =
   let drty_sch = top_change (ctx, (ty', drt'), cnstrs') in
 
   Exhaust.check_comp c ;
-  (* let drty_sch = Scheme.simplify drty_sch in *)
   (* let cnstr = Scheme.constraints_of_graph remaining in *)
   (* XXX What to do about the fresh instances? *)
   (* XXX Here, we need to show what type parameters are polymorphic or not. *)

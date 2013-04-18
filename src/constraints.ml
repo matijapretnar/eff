@@ -108,18 +108,6 @@ let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
     region_bounds = List.filter (fun (r, ds) -> List.mem r pos_rs && ds != []) grph.region_bounds
   }
 
-let simplify (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
-  let ty_subst = List.fold_right (fun g sbst -> (Ty.simplify pos_ts neg_ts g) @ sbst) grph.ty_graph []
-  and dirt_subst = Dirt.simplify pos_ds neg_ds grph.dirt_graph
-  and region_subst = Region.simplify pos_rs neg_rs grph.region_graph
-  in
-  {
-    Type.identity_subst with
-    Type.ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> Type.TyParam q | None -> Type.TyParam p);
-    Type.dirt_param = (fun p -> match Common.lookup p dirt_subst with Some q -> Type.simple_dirt q | None -> Type.simple_dirt p);
-    Type.region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
-  }
-
 let region_less ~non_poly r1 r2 ppf =
   Print.print ppf "%t %s %t" (Type.print_region_param ~non_poly r1) (Symbols.less ()) (Type.print_region_param ~non_poly r2)
 

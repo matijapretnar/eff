@@ -265,16 +265,6 @@ let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   (ctx, drty, cnstrs)
 
-let simplify (ctx, ty, cnstrs) =
-  let pos, neg = pos_neg_tyscheme (ctx, ty, cnstrs) in
-  let sbst = Constraints.simplify pos neg cnstrs in
-  subst_ty_scheme sbst (ctx, ty, cnstrs)
-
-let simplify_dirty (ctx, drty, cnstrs) =
-  match simplify (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs) with
-  | (ctx, Type.Arrow (_, drty), cnstrs) -> (ctx, drty, cnstrs)
-  | _ -> assert false
-
 let finalize ctx ty chngs =
   let ctx, ty, cnstrs, sbst = List.fold_right Common.id chngs (ctx, ty, Constraints.empty, Type.identity_subst) in
   subst_ty_scheme sbst (ctx, ty, cnstrs)
@@ -326,7 +316,6 @@ let show_dirt_param ~non_poly:(_, ds, _) (ctx, ty, cnstrs) =
       None
 
 let print_ty_scheme ty_sch ppf =
-  (* let ty_sch = simplify ty_sch in *)
   let sbst = Type.beautifying_subst () in
   let _, (_, ds, _) = pos_neg_tyscheme ty_sch in
   ignore (Common.map sbst.Type.dirt_param ds);
@@ -343,7 +332,6 @@ let print_ty_scheme ty_sch ppf =
     Type.print ~non_poly skeletons ty ppf
 
 let print_dirty_scheme drty_sch ppf =
-  (* let drty_sch = simplify_dirty drty_sch in *)
   let sbst = Type.beautifying_subst () in
   let _, (_, ds, _) = pos_neg_dirtyscheme drty_sch in
   ignore (Common.map sbst.Type.dirt_param ds);
