@@ -36,8 +36,6 @@ sig
   (** Fold over the vertices of the graph together with their in- and out-sets. *)
   (* val fold_vertices : (elt -> (elt * Common.position) list -> (elt * Common.position) list -> bound -> bound -> 'a -> 'a) -> t -> 'a -> 'a *)
 
-  val leaves : t -> elt list
-
   val union : t -> t -> t
 
   val map : (elt -> elt) -> t -> t

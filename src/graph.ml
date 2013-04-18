@@ -73,9 +73,6 @@ struct
 
   let union = G.fold G.add
 
-  let leaves grph =
-    G.fold (fun x (inx, outx) acc -> if S.is_empty inx then x :: acc else acc) grph []
-
   let map f grph =
     let f_set s = S.fold (fun x fs -> S.add (f x) fs) s S.empty in
     G.fold (fun x (inx, outx) acc -> G.add (f x) (f_set inx, f_set outx) acc) grph G.empty
