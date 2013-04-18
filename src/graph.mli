@@ -5,8 +5,6 @@ sig
 end
 
 module Make (V : Vertex) :
-  (* XXX Change the [V] signature so that [Common.position] is a parameter. 
-     Also add printers for vertices to [V] so that the module can export printing of a graph. *)
 sig
   type elt = V.t
   type t
@@ -17,7 +15,6 @@ sig
   (** Add an edge to the graph. *)
   val add_edge : elt -> elt -> t -> t
 
-  (** Add an edge to the graph. *)
   val mem : elt -> t -> bool
 
   val keys : t -> elt list
@@ -36,6 +33,4 @@ sig
   val map : (elt -> elt) -> t -> t
 
   val garbage_collect : elt list -> elt list -> t -> t
-
-  (* val print : t -> Format.formatter -> unit *)
 end

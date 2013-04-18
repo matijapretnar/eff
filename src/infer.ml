@@ -420,8 +420,7 @@ and infer_abstraction2 env (p1, p2, c) =
   | _ -> assert false
 
 and infer_let ~pos env defs =
-  (* Check for implicit sequencing *)
-  (* Refresh freshes *)
+  (* XXX Check for implicit sequencing *)
   let drt = Type.fresh_dirt () in
   let add_binding (p, c) (poly, nonpoly, ctx, chngs) =
     let ctx_p, ty_p, cnstrs_p = infer_pattern p in

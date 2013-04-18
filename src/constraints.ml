@@ -72,8 +72,6 @@ let add_ty_constraint ty1 ty2 cstr =
     | [g] -> (Ty.add_edge ty1 ty2 g) :: without
     | [g1; g2] -> (Ty.add_edge ty1 ty2 (Ty.union g1 g2)) :: without
     | _ -> assert false
-  (* Poglej, če sta že v skupnem constraintu *)
-  (* Sicer dodaj novega *)
   in
   {cstr with ty_graph = new_graphs}
 

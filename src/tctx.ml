@@ -385,13 +385,7 @@ let extend_with_variances ~pos tydefs =
     and dirt posi nega drt =
       List.iter (fun (_, prs) -> region_param posi nega prs) drt.Type.ops;
       dirt_param posi nega drt.Type.rest
-(*     and dirt posi nega = function
-      | Type.Region r -> region_param posi nega r
-      | Type.Without (prs, rs) ->
-          dirt_param posi nega prs;
-          (* XXX Maybe here, it is nega posi? *)
-          List.iter (region_param nega posi) rs
- *)    and dirt_param posi nega d =
+    and dirt_param posi nega d =
       begin match Common.lookup d ds with
       | None -> assert false
       | Some (posvar, negvar) ->

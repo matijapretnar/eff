@@ -5,8 +5,6 @@ sig
 end
 
 module Make (V : Vertex) =
-  (* XXX Change the [V] signature so that [Common.position] is a parameter. 
-     Also add printers for vertices to [V] so that the module can export printing of a graph. *)
 struct
   type elt = V.t
 
@@ -55,7 +53,6 @@ struct
   let remove_vertex x (g : t) =
     (* We must remove [x] as a key from [g], as well as an element of any in- our out-set *)
     let remove_x = S.filter (fun y -> x <> y) in
-    (* XXX What do we do about lower and upper bounds of the discarded vertex? *)
     let (inx, outx) = get x g in
       S.elements inx, S.elements outx,
       G.fold
@@ -88,13 +85,4 @@ struct
     in
     G.fold collect grph G.empty
 
- (*    let print grph ppf =
-      fold_vertices
-        (fun x inx outx () ->
-          Print.print ppf "@[%t <= %t <= %t@];@."
-            (Print.sequence ", " V.print (List.map fst inx))
-            (V.print x)
-            (Print.sequence ", " V.print (List.map fst outx))
-        )
-        grph () *)
 end

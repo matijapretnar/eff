@@ -1,5 +1,3 @@
-(** [unify sbst pos t1 t2] solves the equation [t1 = t2] and stores the
-    solution in the substitution [sbst]. *)
 type context = (Core.variable, Type.ty) Common.assoc
 type ty_scheme = context * Type.ty * Constraints.t
 type dirty_scheme = context * Type.dirty * Constraints.t
