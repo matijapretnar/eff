@@ -120,14 +120,6 @@ let simplify (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
     Type.region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
   }
 
-let rec topological_sort = function
-  | [] -> []
-  | deps ->
-    let is_leaf (d, ds) = ds = [] in
-    let leaves, non_leaves = List.partition is_leaf deps in
-    let leaves = List.map fst leaves in
-    let new_deps = Common.assoc_map (fun ds -> List.filter (fun d -> not (List.mem d leaves)) ds) non_leaves in
-    leaves @ topological_sort new_deps
 let region_less ~non_poly r1 r2 ppf =
   Print.print ppf "%t %s %t" (Type.print_region_param ~non_poly r1) (Symbols.less ()) (Type.print_region_param ~non_poly r2)
 
