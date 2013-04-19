@@ -5,8 +5,6 @@ sig
 end
 
 module Make (V : Vertex) :
-  (* XXX Change the [V] signature so that [Common.position] is a parameter. 
-     Also add printers for vertices to [V] so that the module can export printing of a graph. *)
 sig
   type elt = V.t
   type t
@@ -17,8 +15,6 @@ sig
   (** Add an edge to the graph. *)
   val add_edge : elt -> elt -> t -> t
 
-  (** Add an edge to the graph. *)
-  val add_vertex : elt -> t -> t
   val mem : elt -> t -> bool
 
   val keys : t -> elt list
@@ -31,22 +27,10 @@ sig
 
   (** Fold over the edges of the graph. *)
   val fold_edges : (elt -> elt -> 'a -> 'a) -> t -> 'a -> 'a
-  val fold_vertices : (elt -> elt list -> elt list -> 'a -> 'a) -> t -> 'a -> 'a
-
-  (** Fold over the vertices of the graph together with their in- and out-sets. *)
-  (* val fold_vertices : (elt -> (elt * Common.position) list -> (elt * Common.position) list -> bound -> bound -> 'a -> 'a) -> t -> 'a -> 'a *)
-
-  val leaves : t -> elt list
-
-  (** Filter edges of the graph. *)
-  val filter_edges : (elt -> elt -> bool) -> t -> t
 
   val union : t -> t -> t
 
   val map : (elt -> elt) -> t -> t
 
   val garbage_collect : elt list -> elt list -> t -> t
-  val simplify : elt list -> elt list -> t -> (elt, elt) Common.assoc
-
-  (* val print : t -> Format.formatter -> unit *)
 end

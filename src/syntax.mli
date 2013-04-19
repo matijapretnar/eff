@@ -90,7 +90,7 @@ type tydef =
   | TyInline of ty
   (** [ty] *)
 
-(* Toplevel entries which need to be separated by [;;] *)
+(* Toplevel commands (the first four do not need to be separated by [;;]) *)
 type toplevel = plain_toplevel Common.pos
 and plain_toplevel =
   | Tydef of (Common.tyname, (Common.typaram list * tydef)) Common.assoc

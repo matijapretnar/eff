@@ -101,12 +101,7 @@ let infer_top_comp (ctx, top_change) c =
   in
   let drty_sch = top_change (ctx, (ty', drt'), cnstrs') in
 
-  Exhaust.check_comp c ;
-  (* let drty_sch = Scheme.simplify drty_sch in *)
-  (* let cnstr = Scheme.constraints_of_graph remaining in *)
-  (* XXX What to do about the fresh instances? *)
-  (* XXX Here, we need to show what type parameters are polymorphic or not. *)
-  (*     I am disabling it because we are going to try a new approach. *)
+  Exhaust.check_comp c;
   drty_sch, top_change
 
 (* [exec_cmd env c] executes toplevel command [c] in global
@@ -137,7 +132,6 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,pos) =
   | Syntax.TopLet defs ->
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
-      (* XXX What to do about the fresh instances? *)
       let vars, nonpoly, change = Infer.infer_let ~pos ctx defs in
       let ctx = List.fold_right (fun (x, ty_sch) env -> Ctx.extend env x ty_sch) vars ctx in
       let extend_nonpoly (x, ty) env =

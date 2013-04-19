@@ -122,7 +122,6 @@ let ty (ts, ds, rs) =
     | None -> Error.syntax ~pos "Unbound type parameter '%s" t
     | Some p -> T.TyParam p
     end
-    (* XXX Here, we maybe want to parse fresh instances? *)
   | Syntax.TyArrow (t1, t2, Some drt) -> T.Arrow (ty t1, (ty t2, dirt pos drt))
   | Syntax.TyArrow (t1, t2, None) -> assert false
   | Syntax.TyTuple lst -> T.Tuple (List.map ty lst)

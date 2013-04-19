@@ -72,8 +72,6 @@ let add_ty_constraint ty1 ty2 cstr =
     | [g] -> (Ty.add_edge ty1 ty2 g) :: without
     | [g1; g2] -> (Ty.add_edge ty1 ty2 (Ty.union g1 g2)) :: without
     | _ -> assert false
-  (* Poglej, če sta že v skupnem constraintu *)
-  (* Sicer dodaj novega *)
   in
   {cstr with ty_graph = new_graphs}
 
@@ -108,57 +106,26 @@ let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
     region_bounds = List.filter (fun (r, ds) -> List.mem r pos_rs && ds != []) grph.region_bounds
   }
 
-let simplify (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
-  let ty_subst = List.fold_right (fun g sbst -> (Ty.simplify pos_ts neg_ts g) @ sbst) grph.ty_graph []
-  and dirt_subst = Dirt.simplify pos_ds neg_ds grph.dirt_graph
-  and region_subst = Region.simplify pos_rs neg_rs grph.region_graph
+let region_less ~non_poly r1 r2 ppf =
+  Print.print ppf "%t %s %t" (Type.print_region_param ~non_poly r1) (Symbols.less ()) (Type.print_region_param ~non_poly r2)
+
+let print_region_bounds ~non_poly bnds ppf =
+  let print bnd ppf =
+    match bnd with
+    | Instance i -> Type.print_instance_param i ppf
+    | Without (prs, rs) -> Print.print ppf "%t - [%t]" (Type.print_region_param ~non_poly prs) (Print.sequence ", " (Type.print_region_param ~non_poly) rs)
   in
-  {
-    Type.identity_subst with
-    Type.ty_param = (fun p -> match Common.lookup p ty_subst with Some q -> Type.TyParam q | None -> Type.TyParam p);
-    Type.dirt_param = (fun p -> match Common.lookup p dirt_subst with Some q -> Type.simple_dirt q | None -> Type.simple_dirt p);
-    Type.region_param = (fun p -> match Common.lookup p region_subst with Some q -> q | None -> p);
-  }
+  Print.sequence ", " print bnds ppf
 
-let rec topological_sort = function
-  | [] -> []
-  | deps ->
-    let is_leaf (d, ds) = ds = [] in
-    let leaves, non_leaves = List.partition is_leaf deps in
-    let leaves = List.map fst leaves in
-    let new_deps = Common.assoc_map (fun ds -> List.filter (fun d -> not (List.mem d leaves)) ds) non_leaves in
-    leaves @ topological_sort new_deps
-
-let less pp p1 p2 ppf =
-  Print.print ppf "%t %s %t" (pp p1) (Symbols.less ()) (pp p2)
-
-let rec print_region_bound ?(non_poly=Trio.empty) bnd ppf =
-  match bnd with
-  | Instance i -> Type.print_instance_param i ppf
-  | Without (prs, rs) -> Print.print ppf "%t - [%t]" (Type.print_region_param prs) (Print.sequence ", " (Type.print_region_param) rs)
-
-
-let print_region_bounds bnd ppf =
-  Print.sequence ", " print_region_bound bnd ppf
-
-let bounds pp pp' p inf (* sup *) pps =
-  match inf with
-  | [] -> pps
-  | inf -> (fun ppf -> Print.print ppf "%t %s %t" (pp' inf) (Symbols.less ()) (pp p)) :: pps
-
-let rec sequence2 sep pps ppf =
-  match pps with
+let bounds ~non_poly r bnds ppf =
+  match bnds with
   | [] -> ()
-  | [pp] -> pp ppf
-  | pp :: pps -> Format.fprintf ppf "%t%s@ %t" pp sep (sequence2 sep pps)
+  | bnds -> Print.print ppf "%t %s %t" (print_region_bounds ~non_poly bnds) (Symbols.less ()) (Type.print_region_param ~non_poly r)
 
-let print ?(non_poly=Trio.empty) skeletons g ppf =
-  let pps = [] in
-  (* let pps = fold_ty (fun p1 p2 lst -> if p1 != p2 then less (Type.print_ty_param skeletons ~non_poly) p1 p2 :: lst else lst) g [] in *)
-  (* let pps = fold_dirt (fun d1 d2 lst -> if d1 != d2 then less (Type.print_dirt_param ~non_poly) d1 d2 :: lst else lst) g pps in *)
-  let pps = fold_region (fun r1 r2 lst -> if r1 != r2 then less (Type.print_region_param ~non_poly) r1 r2 :: lst else lst) g pps in
-  let pps = List.fold_right (fun (r, bound1) pps -> bounds (Type.print_region_param ~non_poly) print_region_bounds r bound1 (* bound2 *) pps) g.region_bounds pps in
+let print ~non_poly skeletons g ppf =
+  let pps = fold_region (fun r1 r2 lst -> if r1 != r2 then region_less ~non_poly r1 r2 :: lst else lst) g [] in
+  let pps = List.fold_right (fun (r, bnds) lst -> if bnds != [] then bounds ~non_poly r bnds :: lst else lst) g.region_bounds pps in
   if pps != [] then
-    Print.print ppf " | %t" (sequence2 "," pps)
+    Print.print ppf " | %t" (Print.sequence "," Common.id pps)
 
 

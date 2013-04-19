@@ -1,5 +1,3 @@
-(** [unify sbst pos t1 t2] solves the equation [t1 = t2] and stores the
-    solution in the substitution [sbst]. *)
 type context = (Core.variable, Type.ty) Common.assoc
 type ty_scheme = context * Type.ty * Constraints.t
 type dirty_scheme = context * Type.dirty * Constraints.t
@@ -39,14 +37,10 @@ let refresh (ctx, ty, cnstrs) =
 
 let ty_param_less p q (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_ty_constraint p q cnstrs, sbst)
-and dirt_param_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
+and dirt_param_less d1 d2 (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_dirt_constraint d1 d2 cnstrs, sbst)
-and region_param_less ~pos d1 d2 (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_region_constraint d1 d2 cnstrs, sbst)
-and region_less ~pos r1 r2 (ctx, ty, cnstrs, sbst) =
+and region_param_less r1 r2 (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_region_constraint r1 r2 cnstrs, sbst)
-and region_covers r i (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_region_bound r [Constraints.Instance i] cnstrs, sbst)
 and just new_cnstrs (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.join_disjoint_constraints new_cnstrs cnstrs, sbst)
 and add_region_bound r bnd (ctx, ty, cnstrs, sbst) =
@@ -81,11 +75,11 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   | [], [] ->
       let op_less (op, dt1) ty_sch =
         begin match Common.lookup op ops2 with
-        | Some dt2 -> region_param_less ~pos dt1 dt2 ty_sch
+        | Some dt2 -> region_param_less dt1 dt2 ty_sch
         | None -> assert false
       end
       in
-      List.fold_right op_less ops1 (dirt_param_less ~pos rest1 rest2 ty_sch)
+      List.fold_right op_less ops1 (dirt_param_less rest1 rest2 ty_sch)
   | _, _ ->
       dirt_less ~pos drt1 drt2 (
       add_rest_substitution ~pos rest1 {Type.ops = new_ops1; Type.rest = Type.fresh_dirt_param ()}
@@ -125,7 +119,7 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       begin match Tctx.lookup_params ty_name1 with
       | None -> Error.typing ~pos "Undefined type %s" ty_name1
       | Some ps ->
-          region_less ~pos rgn1 rgn2 (
+          region_param_less rgn1 rgn2 (
             args_less ~pos ps args1 args2 ty_sch
           )
       end
@@ -168,12 +162,12 @@ and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
      List.length ts1 = List.length ts2 && List.length drts1 = List.length drts2 && List.length rgns1 = List.length rgns2 *)
   let for_parameters add ps lst1 lst2 ty_sch =
     List.fold_right2 (fun (_, (cov, contra)) (ty1, ty2) ty_sch ->
-                        let ty_sch = if cov then add ~pos ty1 ty2 ty_sch else ty_sch in
-                        if contra then add ~pos ty2 ty1 ty_sch else ty_sch) ps (List.combine lst1 lst2) ty_sch
+                        let ty_sch = if cov then add ty1 ty2 ty_sch else ty_sch in
+                        if contra then add ty2 ty1 ty_sch else ty_sch) ps (List.combine lst1 lst2) ty_sch
   in
-  let ty_sch = for_parameters ty_less ps ts1 ts2 ty_sch in
-  let ty_sch = for_parameters dirt_less ds ds1 ds2 ty_sch in
-  for_parameters region_less rs rs1 rs2 ty_sch
+  let ty_sch = for_parameters (ty_less ~pos) ps ts1 ts2 ty_sch in
+  let ty_sch = for_parameters (dirt_less ~pos) ds ds1 ds2 ty_sch in
+  for_parameters region_param_less rs rs1 rs2 ty_sch
 
 and dirty_less ~pos (ty1, d1) (ty2, d2) ty_sch =
   ty_less ~pos ty1 ty2 (dirt_less ~pos d1 d2 ty_sch)
@@ -265,16 +259,6 @@ let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   (ctx, drty, cnstrs)
 
-let simplify (ctx, ty, cnstrs) =
-  let pos, neg = pos_neg_tyscheme (ctx, ty, cnstrs) in
-  let sbst = Constraints.simplify pos neg cnstrs in
-  subst_ty_scheme sbst (ctx, ty, cnstrs)
-
-let simplify_dirty (ctx, drty, cnstrs) =
-  match simplify (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs) with
-  | (ctx, Type.Arrow (_, drty), cnstrs) -> (ctx, drty, cnstrs)
-  | _ -> assert false
-
 let finalize ctx ty chngs =
   let ctx, ty, cnstrs, sbst = List.fold_right Common.id chngs (ctx, ty, Constraints.empty, Type.identity_subst) in
   subst_ty_scheme sbst (ctx, ty, cnstrs)
@@ -295,7 +279,7 @@ let add_to_top ~pos ctx cstrs (ctx_c, drty_c, cnstrs_c) =
     just cstrs
   ])
 
-let finalize_pattern_scheme ~pos ctx ty chngs =
+let finalize_pattern_scheme ctx ty chngs =
   let ty_sch = finalize ctx ty chngs in
   (* Note that we change the polarities in pattern types *)
   let neg, pos = pos_neg_tyscheme ty_sch in
@@ -326,7 +310,6 @@ let show_dirt_param ~non_poly:(_, ds, _) (ctx, ty, cnstrs) =
       None
 
 let print_ty_scheme ty_sch ppf =
-  (* let ty_sch = simplify ty_sch in *)
   let sbst = Type.beautifying_subst () in
   let _, (_, ds, _) = pos_neg_tyscheme ty_sch in
   ignore (Common.map sbst.Type.dirt_param ds);
@@ -338,12 +321,11 @@ let print_ty_scheme ty_sch ppf =
   if !Type.effects then
     Print.print ppf "%t%t"
       (Type.print ~show_dirt_param skeletons ty)
-      (Constraints.print skeletons cnstrs)
+      (Constraints.print ~non_poly skeletons cnstrs)
   else
     Type.print ~non_poly skeletons ty ppf
 
 let print_dirty_scheme drty_sch ppf =
-  (* let drty_sch = simplify_dirty drty_sch in *)
   let sbst = Type.beautifying_subst () in
   let _, (_, ds, _) = pos_neg_dirtyscheme drty_sch in
   ignore (Common.map sbst.Type.dirt_param ds);
@@ -357,10 +339,10 @@ let print_dirty_scheme drty_sch ppf =
       Print.print ppf "%t ! %t%t"
         (Type.print ~show_dirt_param skeletons ty)
         (Type.print_dirt ~non_poly ~show_dirt_param drt)
-        (Constraints.print skeletons cnstrs)
+        (Constraints.print ~non_poly skeletons cnstrs)
     else
       Print.print ppf "%t%t"
         (Type.print ~show_dirt_param skeletons ty)
-        (Constraints.print skeletons cnstrs)
+        (Constraints.print ~non_poly skeletons cnstrs)
   else
     Type.print ~non_poly skeletons ty ppf

@@ -5,8 +5,6 @@ sig
 end
 
 module Make (V : Vertex) =
-  (* XXX Change the [V] signature so that [Common.position] is a parameter. 
-     Also add printers for vertices to [V] so that the module can export printing of a graph. *)
 struct
   type elt = V.t
 
@@ -52,13 +50,9 @@ struct
       G.add r (S.union inr (S.remove r left), outr) grph in
     S.fold extend_left left (S.fold extend_right right g)
 
-  let add_vertex x (g : t) =
-    if G.mem x g then g else G.add x (S.empty, S.empty) g
-
   let remove_vertex x (g : t) =
     (* We must remove [x] as a key from [g], as well as an element of any in- our out-set *)
     let remove_x = S.filter (fun y -> x <> y) in
-    (* XXX What do we do about lower and upper bounds of the discarded vertex? *)
     let (inx, outx) = get x g in
       S.elements inx, S.elements outx,
       G.fold
@@ -68,17 +62,8 @@ struct
 
   let fold_edges f grph acc =
     G.fold (fun x (_, outx) acc -> S.fold (fun y acc -> f x y acc) outx acc) grph acc
-  let fold_vertices f grph acc =
-    G.fold (fun x (inx, outx) acc -> f x (S.elements inx) (S.elements outx) acc) grph acc
 
   let union = G.fold G.add
-
-  let leaves grph =
-    G.fold (fun x (inx, outx) acc -> if S.is_empty inx then x :: acc else acc) grph []
-
-  let filter_edges p grph =
-    let g = G.fold (fun x (inx, outx) acc -> G.add x (S.empty, S.empty) acc) grph G.empty in
-    fold_edges (fun x y acc -> if p x y then add_edge x y acc else acc) grph g
 
   let map f grph =
     let f_set s = S.fold (fun x fs -> S.add (f x) fs) s S.empty in
@@ -88,37 +73,16 @@ struct
     let pos = List.fold_right S.add pos S.empty
     and neg = List.fold_right S.add neg S.empty in
     let collect x (inx, outx) grph =
-      let x_pos = S.mem x pos
-      and x_neg = S.mem x neg in
-      let inx = if x_pos then S.inter neg inx else S.empty
-      and outx = if x_neg then S.inter pos outx else S.empty in
-      match S.cardinal inx + S.cardinal outx with
-      | 0 -> grph
-      | _ -> G.add x (inx, outx) grph
+      let inx =
+        if S.mem x pos then S.inter neg inx else S.empty
+      and outx =
+        if S.mem x neg then S.inter pos outx else S.empty
+      in
+      if S.cardinal inx + S.cardinal outx = 0 then
+       grph
+      else
+        G.add x (inx, outx) grph
     in
     G.fold collect grph G.empty
 
-  let simplify pos neg grph =
-    let add x (inx, outx) sbst =
-      if List.mem x pos && S.cardinal inx = 1 then (x, S.choose inx) :: sbst
-      else if List.mem x neg && S.cardinal outx = 1 then (x, S.choose outx) :: sbst
-      else sbst
-    and collect_substitution (x, y) (used, sbst) =
-      if List.mem y used then
-        used, sbst
-      else
-        (x :: used), (x, y) :: sbst
-    in
-    let sbst = G.fold add grph [] in
-    let _, sbst = List.fold_right collect_substitution sbst ([], []) in
-    sbst
- (*    let print grph ppf =
-      fold_vertices
-        (fun x inx outx () ->
-          Print.print ppf "@[%t <= %t <= %t@];@."
-            (Print.sequence ", " V.print (List.map fst inx))
-            (V.print x)
-            (Print.sequence ", " V.print (List.map fst outx))
-        )
-        grph () *)
 end

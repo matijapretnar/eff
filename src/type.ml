@@ -32,9 +32,6 @@ and dirt = {
 and args = (ty, dirt, region_param) Trio.t
 
 
-(* This type is used when type checking is turned off. Its name
-   is syntactically incorrect so that the programmer cannot accidentally
-   define it. *)
 let int_ty = Basic "int"
 let string_ty = Basic "string"
 let bool_ty = Basic "bool"
@@ -47,8 +44,11 @@ let empty_ty = Apply ("empty", Trio.empty)
 let fresh_ty () = TyParam (fresh_ty_param ())
 let simple_dirt d = { ops = []; rest = d }
 let fresh_dirt () = simple_dirt (fresh_dirt_param ())
-(* XXX Should a fresh dirty type have no fresh instances? *)
 let fresh_dirty () = (fresh_ty (), fresh_dirt ())
+
+(* These types are used when type checking is turned off. Their names
+   are syntactically incorrect so that the programmer cannot accidentally
+   define it. *)
 let universal_ty = Basic "_"
 let universal_dirty = (Basic "_", fresh_dirt ())
 
