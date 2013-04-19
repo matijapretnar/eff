@@ -88,19 +88,17 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
 let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   (* XXX Check cyclic types *)
   (* Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)
-  match Type.subst_ty sbst ty1, Type.subst_ty sbst ty2 with
+  match Type.subst_ty sbst ty1,  Type.subst_ty sbst ty2 with
 
   | (ty1, ty2) when ty1 = ty2 -> ty_sch
 
   | (Type.TyParam p, Type.TyParam q) -> ty_param_less p q ty_sch
 
   | (Type.TyParam p, ty) ->
-      let ty' = Type.replace ty in
-      ty_less ~pos ty' ty (add_substitution ~pos p ty' ty_sch)
+      ty_less ~pos (Type.TyParam p) ty (explode_skeleton ~pos p ty ty_sch)
 
   | (ty, Type.TyParam p) ->
-      let ty' = Type.replace ty in
-      ty_less ~pos ty ty' (add_substitution ~pos p ty' ty_sch)
+      ty_less ~pos ty (Type.TyParam p) (explode_skeleton ~pos p ty ty_sch)
 
   | (Type.Arrow (ty1, drty1), Type.Arrow (ty2, drty2)) ->
       ty_less ~pos ty2 ty1 (dirty_less ~pos drty1 drty2 ty_sch)
@@ -145,17 +143,17 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       let ty1, ty2, skeletons = beautify2 ty1 ty2 cnstrs in
       Error.typing ~pos "This expression has type %t but it should have type %t." (Type.print skeletons ty1) (Type.print skeletons ty2)
 
-and add_substitution ~pos p ty' (ctx, ty, cnstrs, sbst) =
-  let ty' = Type.subst_ty sbst ty' in
+and explode_skeleton ~pos p ty_new (ctx, ty, cnstrs, sbst) =
+  let (skel, new_ty_grph) = Constraints.remove_skeleton cnstrs p in
+  let ps = Common.uniq (p :: Constraints.Ty.keys skel) in
+  let tys' = List.map (fun p -> (p, Type.replace ty_new)) ps in
   let sbst' = {
     Type.identity_subst with 
-    Type.ty_param = (fun p' -> if p' = p then ty' else Type.TyParam p')
+    Type.ty_param = (fun p' -> match Common.lookup p' tys' with Some ty' -> ty' | None -> Type.TyParam p')
   } in
-  let (pred, succ, new_ty_grph) = Constraints.remove_ty cnstrs p in
   let cnstrs = {cnstrs with Constraints.ty_graph = new_ty_grph} in
   let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
-  let ty_sch = List.fold_right (fun q ty_sch -> ty_less ~pos (Type.TyParam q) ty' ty_sch) pred ty_sch in
-  List.fold_right (fun q ty_sch -> ty_less ~pos ty' (Type.TyParam q) ty_sch) succ ty_sch
+  Constraints.Ty.fold_edges (fun p q ty_sch -> ty_less ~pos (Type.TyParam p) (Type.TyParam q) ty_sch) skel ty_sch
 
 and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
   (* NB: it is assumed here that

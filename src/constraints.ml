@@ -31,13 +31,12 @@ let empty = {
   region_bounds = [];
 }
 
-let remove_ty g x =
+let remove_skeleton g x =
   let rec remove unremoved = function
-  | [] -> ([], [], unremoved)
+  | [] -> (Ty.empty, unremoved)
   | g :: gs ->
       if Ty.mem x g then
-        let (pred, succ, g') = Ty.remove_vertex x g in
-        (pred, succ, unremoved @ g' :: gs)
+        (g, unremoved @ gs)
       else
         remove (g :: unremoved) gs
   in
