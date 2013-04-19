@@ -28,7 +28,7 @@ let ty_of_const = function
    pattern type is negative. *)
 let rec infer_pattern (p, pos) =
   if !disable_typing then simple Type.universal_ty else
-  let unify = Scheme.finalize_pattern_scheme ~pos in
+  let unify = Scheme.finalize_pattern_scheme in
   let ty_sch = match p with
 
   | Pattern.Var x ->
