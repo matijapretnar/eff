@@ -125,39 +125,6 @@ let refresher fresh =
         p'
     | Some p' -> p'
 
-let replace ty =
-  let rec replace_ty = function
-    | Apply (ty_name, args) -> Apply (ty_name, replace_args args)
-    | Effect (ty_name, args, r) ->
-        let args = replace_args args in
-        Effect (ty_name, args, fresh_region_param ())
-    | TyParam p -> TyParam (fresh_ty_param ())
-    | Basic _ as ty -> ty
-    | Tuple tys -> Tuple (Common.map (replace_ty) tys)
-    | Arrow (ty1, drty2) ->
-        let ty1 = replace_ty ty1 in
-        let drty2 = replace_dirty drty2 in
-        Arrow (ty1, drty2)
-    | Handler ((ty1, drt), drty2) ->
-        let ty1 = replace_ty ty1 in
-        let drty2 = replace_dirty drty2 in
-        Handler ((ty1, replace_dirt drt), drty2)
-
-  and replace_dirt drt = fresh_dirt ()
-
-  and replace_dirty (ty, drt) =
-    let ty = replace_ty ty in
-    let drt = replace_dirt drt in
-    (ty, drt)
-
-  and replace_args (tys, drts, rs) =
-    let tys = Common.map (replace_ty) tys in
-    let drts = Common.map (replace_dirt) drts in
-    let rs = Common.map (fun _ -> fresh_region_param ()) rs in
-    (tys, drts, rs)
-  in
-  replace_ty ty
-
 let disable_beautify = ref false
 
 let beautifying_subst () =

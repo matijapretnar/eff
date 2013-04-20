@@ -150,7 +150,7 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
 and explode_skeleton ~pos p ty_new (ctx, ty, cnstrs, sbst) =
   let (skel, new_ty_grph) = Constraints.remove_skeleton cnstrs p in
   let ps = Common.uniq (p :: Constraints.Ty.keys skel) in
-  let tys' = List.map (fun p -> (p, Type.replace ty_new)) ps in
+  let tys' = List.map (fun p -> (p, Type.refresh ty_new)) ps in
   let sbst' = {
     Type.identity_subst with 
     Type.ty_param = (fun p' -> match Common.lookup p' tys' with Some ty' -> ty' | None -> Type.TyParam p')
