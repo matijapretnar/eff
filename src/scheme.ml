@@ -49,12 +49,7 @@ and add_region_bound r bnd (ctx, ty, cnstrs, sbst) =
 let rec explode_dirt ~pos p drt_new (ctx, ty, cnstrs, sbst) =
   let (skel, new_drt_grph) = Constraints.remove_dirt cnstrs p in
   let ps = Common.uniq (p :: Constraints.Dirt.keys skel) in
-  let replace_drt () =
-    match Type.refresh (Type.Arrow (Type.unit_ty, (Type.unit_ty, drt_new))) with
-    | Type.Arrow (_, (_, drt')) -> drt'
-    | _ -> assert false
-  in
-  let drts' = List.map (fun p -> (p, replace_drt ())) ps in
+  let drts' = List.map (fun p -> (p, Type.subst_dirt (Type.refreshing_subst ()) drt_new)) ps in
   let sbst' = {
     Type.identity_subst with 
     Type.dirt_param = (fun d' -> match Common.lookup d' drts' with Some drt' -> drt' | None -> Type.simple_dirt d')
