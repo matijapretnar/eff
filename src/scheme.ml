@@ -46,20 +46,20 @@ and just new_cnstrs (ctx, ty, cnstrs, sbst) =
 and add_region_bound r bnd (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_region_bound r bnd cnstrs, sbst)
 
-let rec add_rest_substitution ~pos d drt' (ctx, ty, cnstrs, sbst) =
-  let drt' = Type.subst_dirt sbst drt' in
+let rec explode_dirt ~pos p ({Type.ops = ops} as drt_new) (ctx, ty, cnstrs, sbst) =
+  if ops = [] then (ctx, ty, cnstrs, sbst) else
+  let (skel, new_drt_grph) = Constraints.remove_dirt cnstrs p in
+  let ps = Common.uniq (p :: Constraints.Dirt.keys skel) in
+  let drts' = List.map (fun p -> (p, Type.subst_dirt (Type.refreshing_subst ()) drt_new)) ps in
   let sbst' = {
     Type.identity_subst with 
-    Type.dirt_param = (fun d' -> if d' = d then drt' else Type.simple_dirt d')
+    Type.dirt_param = (fun d' -> match Common.lookup d' drts' with Some drt' -> drt' | None -> Type.simple_dirt d')
   } in
-  let (pred, succ, new_dirt_grph) = Constraints.remove_dirt cnstrs d in
-  let cnstrs = {cnstrs with Constraints.dirt_graph = new_dirt_grph} in
+  let cnstrs = {cnstrs with Constraints.dirt_graph = new_drt_grph} in
   let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
-  let ty_sch = List.fold_right (fun q ty_sch -> dirt_less ~pos (Type.simple_dirt q) drt' ty_sch) pred ty_sch in
-  List.fold_right (fun q ty_sch -> dirt_less ~pos drt' (Type.simple_dirt q) ty_sch) succ ty_sch
+  Constraints.Dirt.fold_edges (fun p q ty_sch -> dirt_less ~pos (Type.simple_dirt p) (Type.simple_dirt q) ty_sch) skel ty_sch
 
 and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
-  ignore ty_sch;
   let {Type.ops = ops1; Type.rest = rest1} = Type.subst_dirt sbst drt1
   and {Type.ops = ops2; Type.rest = rest2} = Type.subst_dirt sbst drt2 in
   let new_ops ops1 ops2 =
@@ -82,25 +82,23 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       List.fold_right op_less ops1 (dirt_param_less rest1 rest2 ty_sch)
   | _, _ ->
       dirt_less ~pos drt1 drt2 (
-      add_rest_substitution ~pos rest1 {Type.ops = new_ops1; Type.rest = Type.fresh_dirt_param ()}
-      (add_rest_substitution ~pos rest2 {Type.ops = new_ops2; Type.rest = Type.fresh_dirt_param ()} ty_sch))
+      explode_dirt ~pos rest1 {Type.ops = new_ops1; Type.rest = Type.fresh_dirt_param ()}
+      (explode_dirt ~pos rest2 {Type.ops = new_ops2; Type.rest = Type.fresh_dirt_param ()} ty_sch))
 
 let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   (* XXX Check cyclic types *)
   (* Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)
-  match Type.subst_ty sbst ty1, Type.subst_ty sbst ty2 with
+  match Type.subst_ty sbst ty1,  Type.subst_ty sbst ty2 with
 
   | (ty1, ty2) when ty1 = ty2 -> ty_sch
 
   | (Type.TyParam p, Type.TyParam q) -> ty_param_less p q ty_sch
 
   | (Type.TyParam p, ty) ->
-      let ty' = Type.replace ty in
-      ty_less ~pos ty' ty (add_substitution ~pos p ty' ty_sch)
+      ty_less ~pos (Type.TyParam p) ty (explode_skeleton ~pos p ty ty_sch)
 
   | (ty, Type.TyParam p) ->
-      let ty' = Type.replace ty in
-      ty_less ~pos ty ty' (add_substitution ~pos p ty' ty_sch)
+      ty_less ~pos ty (Type.TyParam p) (explode_skeleton ~pos p ty ty_sch)
 
   | (Type.Arrow (ty1, drty1), Type.Arrow (ty2, drty2)) ->
       ty_less ~pos ty2 ty1 (dirty_less ~pos drty1 drty2 ty_sch)
@@ -145,17 +143,17 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       let ty1, ty2, skeletons = beautify2 ty1 ty2 cnstrs in
       Error.typing ~pos "This expression has type %t but it should have type %t." (Type.print skeletons ty1) (Type.print skeletons ty2)
 
-and add_substitution ~pos p ty' (ctx, ty, cnstrs, sbst) =
-  let ty' = Type.subst_ty sbst ty' in
+and explode_skeleton ~pos p ty_new (ctx, ty, cnstrs, sbst) =
+  let (skel, new_ty_grph) = Constraints.remove_skeleton cnstrs p in
+  let ps = Common.uniq (p :: Constraints.Ty.keys skel) in
+  let tys' = List.map (fun p -> (p, Type.refresh ty_new)) ps in
   let sbst' = {
     Type.identity_subst with 
-    Type.ty_param = (fun p' -> if p' = p then ty' else Type.TyParam p')
+    Type.ty_param = (fun p' -> match Common.lookup p' tys' with Some ty' -> ty' | None -> Type.TyParam p')
   } in
-  let (pred, succ, new_ty_grph) = Constraints.remove_ty cnstrs p in
   let cnstrs = {cnstrs with Constraints.ty_graph = new_ty_grph} in
   let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
-  let ty_sch = List.fold_right (fun q ty_sch -> ty_less ~pos (Type.TyParam q) ty' ty_sch) pred ty_sch in
-  List.fold_right (fun q ty_sch -> ty_less ~pos ty' (Type.TyParam q) ty_sch) succ ty_sch
+  Constraints.Ty.fold_edges (fun p q ty_sch -> ty_less ~pos (Type.TyParam p) (Type.TyParam q) ty_sch) skel ty_sch
 
 and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
   (* NB: it is assumed here that
@@ -304,8 +302,8 @@ let show_dirt_param ~non_poly:(_, ds, _) (ctx, ty, cnstrs) =
   fun ((Type.Dirt_Param k) as p) ->
     if List.mem p neg then
       Some (fun ppf -> (Symbols.dirt_param k (List.mem p ds) ppf))
-    else if (List.mem p pos && Constraints.Dirt.get_prec p cnstrs.Constraints.dirt_graph != []) then
-      Some (fun ppf -> Print.print ppf "%t" (Print.sequence (Symbols.union ()) (fun (Type.Dirt_Param k) ppf -> (Symbols.dirt_param k (List.mem p ds) ppf)) (Constraints.Dirt.get_prec p cnstrs.Constraints.dirt_graph)))
+    else if (List.mem p pos && Constraints.get_prec cnstrs p != []) then
+      Some (fun ppf -> Print.print ppf "%t" (Print.sequence (Symbols.union ()) (fun (Type.Dirt_Param k) ppf -> (Symbols.dirt_param k (List.mem p ds) ppf)) (Constraints.get_prec cnstrs p)))
     else
       None
 
