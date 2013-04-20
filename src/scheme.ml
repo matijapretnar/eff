@@ -46,7 +46,8 @@ and just new_cnstrs (ctx, ty, cnstrs, sbst) =
 and add_region_bound r bnd (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_region_bound r bnd cnstrs, sbst)
 
-let rec explode_dirt ~pos p drt_new (ctx, ty, cnstrs, sbst) =
+let rec explode_dirt ~pos p ({Type.ops = ops} as drt_new) (ctx, ty, cnstrs, sbst) =
+  if ops = [] then (ctx, ty, cnstrs, sbst) else
   let (skel, new_drt_grph) = Constraints.remove_dirt cnstrs p in
   let ps = Common.uniq (p :: Constraints.Dirt.keys skel) in
   let drts' = List.map (fun p -> (p, Type.subst_dirt (Type.refreshing_subst ()) drt_new)) ps in
