@@ -20,14 +20,14 @@ end)
 type t = {
   ty_graph : Ty.t list;
   region_graph : Region.t;
-  dirt_graph : Dirt.t;
+  dirt_graph : Dirt.t list;
   region_bounds : (Type.region_param, region_bound list) Common.assoc
 }
 
 let empty = {
   ty_graph = [];
   region_graph = Region.empty;
-  dirt_graph = Dirt.empty;
+  dirt_graph = [];
   region_bounds = [];
 }
 
@@ -43,9 +43,26 @@ let remove_skeleton g x =
   remove [] g.ty_graph
 
 let remove_dirt g x =
-  Dirt.remove_vertex x g.dirt_graph
-let get_succ g x =
-  Dirt.get_succ x g.dirt_graph
+  let rec remove unremoved = function
+  | [] -> (Dirt.empty, unremoved)
+  | g :: gs ->
+      if Dirt.mem x g then
+        (g, unremoved @ gs)
+      else
+        remove (g :: unremoved) gs
+  in
+  remove [] g.dirt_graph
+
+let get_prec g x =
+  let rec get = function
+  | [] -> []
+  | g :: gs ->
+      if Dirt.mem x g then
+        Dirt.get_prec x g
+      else
+        get gs
+  in
+  get g.dirt_graph
 
 let subst_region_bound sbst = function
   | Without (p, rs) -> Without (sbst.Type.region_param p, List.map sbst.Type.region_param rs)
@@ -54,14 +71,14 @@ let subst_region_bound sbst = function
 
 let subst_constraints sbst cnstr = {
   ty_graph = List.map (Ty.map (fun p -> match sbst.Type.ty_param p with Type.TyParam q -> q | _ -> assert false)) cnstr.ty_graph;
-  dirt_graph = Dirt.map (fun d -> match sbst.Type.dirt_param d with { Type.ops = []; Type.rest = d' } -> d' | _ -> assert false) cnstr.dirt_graph;
+  dirt_graph = List.map (Dirt.map (fun d -> match sbst.Type.dirt_param d with { Type.ops = []; Type.rest = d' } -> d' | _ -> assert false)) cnstr.dirt_graph;
   region_graph = Region.map sbst.Type.region_param cnstr.region_graph;
   region_bounds = List.map (fun (r, bnd) -> (sbst.Type.region_param r, List.map (subst_region_bound sbst) bnd)) cnstr.region_bounds
 }
 
 let fold_ty f g acc = List.fold_right (fun g acc -> Ty.fold_edges f g acc) g.ty_graph acc
 let fold_region f g acc = Region.fold_edges f g.region_graph acc
-let fold_dirt f g acc = Dirt.fold_edges f g.dirt_graph acc
+let fold_dirt f g acc = List.fold_right (fun g acc -> Dirt.fold_edges f g acc) g.dirt_graph acc
 
 let add_ty_constraint ty1 ty2 cstr =
   let within, without = List.partition (fun g -> Ty.mem ty1 g or Ty.mem ty2 g) cstr.ty_graph in
@@ -75,12 +92,20 @@ let add_ty_constraint ty1 ty2 cstr =
   {cstr with ty_graph = new_graphs}
 
 let add_dirt_constraint drt1 drt2 cstr =
-  {cstr with dirt_graph = Dirt.add_edge drt1 drt2 cstr.dirt_graph}
+  let within, without = List.partition (fun g -> Dirt.mem drt1 g or Dirt.mem drt2 g) cstr.dirt_graph in
+  let new_graphs =
+    match within with
+    | [] -> (Dirt.add_edge drt1 drt2 Dirt.empty) :: without
+    | [g] -> (Dirt.add_edge drt1 drt2 g) :: without
+    | [g1; g2] -> (Dirt.add_edge drt1 drt2 (Dirt.union g1 g2)) :: without
+    | _ -> assert false
+  in
+  {cstr with dirt_graph = new_graphs}
 
 let join_disjoint_constraints cstr1 cstr2 = 
   {
     ty_graph = Common.uniq (cstr1.ty_graph @ cstr2.ty_graph);
-    dirt_graph = Dirt.union cstr1.dirt_graph cstr2.dirt_graph;
+    dirt_graph = Common.uniq (cstr1.dirt_graph @ cstr2.dirt_graph);
     region_graph = Region.union cstr1.region_graph cstr2.region_graph;
     region_bounds = Common.assoc_map (Common.compose Common.uniq List.flatten) (Common.assoc_flatten (cstr1.region_bounds @ cstr2.region_bounds))
   }
@@ -100,7 +125,7 @@ let add_region_constraint rgn1 rgn2 cstr =
 let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
   {
     ty_graph = List.filter (fun g -> g <> Ty.empty) (List.map (Ty.garbage_collect pos_ts neg_ts) grph.ty_graph);
-    dirt_graph = Dirt.garbage_collect pos_ds neg_ds grph.dirt_graph;
+    dirt_graph = List.filter (fun g -> g <> Dirt.empty) (List.map (Dirt.garbage_collect pos_ds neg_ds) grph.dirt_graph);
     region_graph = Region.garbage_collect pos_rs neg_rs grph.region_graph;
     region_bounds = List.filter (fun (r, ds) -> List.mem r pos_rs && ds != []) grph.region_bounds
   }
