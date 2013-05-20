@@ -243,7 +243,7 @@ let rec infer_expr env (e, pos) =
       let ty_out = Type.fresh_ty () in
 
       unify (ctx_val @ ctx_fin @ ctxs) (Type.Handler((ty_in, drt_in), (ty_out, drt_out))) ([
-        dirt_less ~pos {Type.ops = ops_out; Type.rest = drt_rest} drt_out;
+        dirt_less ~pos {Type.ops = ops_out; Type.rest = drt_rest} drt_mid;
         ty_less ~pos ty_in ty_val;
         dirty_less ~pos drty_val (ty_mid, drt_mid);
         ty_less ~pos ty_mid ty_fin;
