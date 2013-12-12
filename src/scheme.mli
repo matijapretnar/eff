@@ -6,8 +6,9 @@ type change
 val refresh : ty_scheme -> ty_scheme
 
 val region_param_less : Type.region_param -> Type.region_param -> change
+val add_instance_constraint : Type.instance_param -> Type.region_param -> change
+val add_handled_constraint : Type.region_param -> Type.region_param -> Type.region_param list -> change
 val just : Constraints.t -> change
-val add_region_bound : Type.region_param -> Constraints.region_bound list -> change
 val dirt_less : pos:Common.position -> Type.dirt -> Type.dirt -> change
 val ty_less : pos:Common.position -> Type.ty -> Type.ty -> change
 val dirty_less : pos:Common.position -> Type.dirty -> Type.dirty -> change

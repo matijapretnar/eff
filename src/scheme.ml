@@ -5,7 +5,7 @@ type t = context * Type.ty * Constraints.t * Type.substitution
 type change = t -> t
 
 let skeletons cnstrs =
-  let skeletons = List.map Constraints.Ty.keys cnstrs.Constraints.ty_graph in
+  let skeletons = Constraints.Ty.skeletons cnstrs.Constraints.ty_graph in
   let rec missing misses expect = function
   | [] -> misses
   | x :: xs ->
@@ -26,30 +26,31 @@ let beautify2 ty1 ty2 cnstrs =
   let sbst = Type.beautifying_subst () in
   let ty1 = Type.subst_ty sbst ty1 in
   let ty2 = Type.subst_ty sbst ty2 in
-  let cnstrs = Constraints.subst_constraints sbst cnstrs in
+  let cnstrs = Constraints.subst sbst cnstrs in
   let skeletons = skeletons cnstrs in
   (ty1, ty2, skeletons)
 
 
 let refresh (ctx, ty, cnstrs) =
   let sbst = Type.refreshing_subst () in
-  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst_constraints sbst cnstrs
+  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst sbst cnstrs
 
 let ty_param_less p q (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_ty_constraint p q cnstrs, sbst)
 and dirt_param_less d1 d2 (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_dirt_constraint d1 d2 cnstrs, sbst)
-and region_param_less r1 r2 (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_region_constraint r1 r2 cnstrs, sbst)
 and just new_cnstrs (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.join_disjoint_constraints new_cnstrs cnstrs, sbst)
-and add_region_bound r bnd (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_region_bound r bnd cnstrs, sbst)
+  (ctx, ty, Constraints.union new_cnstrs cnstrs, sbst)
+and region_param_less r1 r2 (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Constraints.add_region_constraint r1 r2 [] cnstrs, sbst)
+and add_handled_constraint r1 r2 rs (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Constraints.add_region_constraint r1 r2 rs cnstrs, sbst)
+and add_instance_constraint iota r (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Constraints.add_instance_constraint iota r [] cnstrs, sbst)
 
 let rec explode_dirt ~pos p ({Type.ops = ops} as drt_new) (ctx, ty, cnstrs, sbst) =
   if ops = [] then (ctx, ty, cnstrs, sbst) else
-  let (skel, new_drt_grph) = Constraints.remove_dirt cnstrs p in
-  let ps = Common.uniq (p :: Constraints.Dirt.keys skel) in
+  let (new_drt_grph, ps, skel) = Constraints.Dirt.remove_skeleton p cnstrs.Constraints.dirt_graph in
   let drts' = List.map (fun p -> (p, Type.subst_dirt (Type.refreshing_subst ()) drt_new)) ps in
   let sbst' = {
     Type.identity_subst with 
@@ -57,7 +58,7 @@ let rec explode_dirt ~pos p ({Type.ops = ops} as drt_new) (ctx, ty, cnstrs, sbst
   } in
   let cnstrs = {cnstrs with Constraints.dirt_graph = new_drt_grph} in
   let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
-  Constraints.Dirt.fold_edges (fun p q ty_sch -> dirt_less ~pos (Type.simple_dirt p) (Type.simple_dirt q) ty_sch) skel ty_sch
+  List.fold_right (fun (p, q) ty_sch -> dirt_less ~pos (Type.simple_dirt p) (Type.simple_dirt q) ty_sch) skel ty_sch
 
 and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   let {Type.ops = ops1; Type.rest = rest1} = Type.subst_dirt sbst drt1
@@ -144,8 +145,7 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       Error.typing ~pos "This expression has type %t but it should have type %t." (Type.print skeletons ty1) (Type.print skeletons ty2)
 
 and explode_skeleton ~pos p ty_new (ctx, ty, cnstrs, sbst) =
-  let (skel, new_ty_grph) = Constraints.remove_skeleton cnstrs p in
-  let ps = Common.uniq (p :: Constraints.Ty.keys skel) in
+  let (new_ty_grph, ps, skel) = Constraints.Ty.remove_skeleton p cnstrs.Constraints.ty_graph in
   let tys' = List.map (fun p -> (p, Type.refresh ty_new)) ps in
   let sbst' = {
     Type.identity_subst with 
@@ -153,7 +153,7 @@ and explode_skeleton ~pos p ty_new (ctx, ty, cnstrs, sbst) =
   } in
   let cnstrs = {cnstrs with Constraints.ty_graph = new_ty_grph} in
   let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
-  Constraints.Ty.fold_edges (fun p q ty_sch -> ty_less ~pos (Type.TyParam p) (Type.TyParam q) ty_sch) skel ty_sch
+  List.fold_right (fun (p, q) ty_sch -> ty_less ~pos (Type.TyParam p) (Type.TyParam q) ty_sch) skel ty_sch
 
 and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
   (* NB: it is assumed here that
@@ -202,23 +202,9 @@ let pos_neg_tyscheme (ctx, ty, cnstrs) =
     let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
-  let (((_, _, pos_rs) as pos), neg) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
-  let add_region_bound bnd posi = match bnd with
-  | Constraints.Without (d, _) -> d :: posi
-  | Constraints.Instance _ -> posi
-  in
-  let posi_regions = List.fold_right (fun (d, bnds) posi ->
-                                      if List.mem d pos_rs then List.fold_right add_region_bound bnds posi else posi) cnstrs.Constraints.region_bounds [] in
-  let pos = ([], [], posi_regions) @@@ pos in
-
-   let add_region_bound bnd (posi, nega) = match bnd with
-  | Constraints.Without (r, rs) -> (([], [], r :: rs) @@@ posi, nega)
-  | Constraints.Instance _ -> (posi, nega)
-  in
-  let (((_, _, pos_rs) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
-  let (posi, nega) = List.fold_right (fun (d, bnds) (posi, nega) ->
-                                      if List.mem d pos_rs then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega)) cnstrs.Constraints.region_bounds (posi, nega) in
-  Trio.uniq posi, Trio.uniq nega
+  let (((_, _, pos_rs) as pos), ((_, _, neg_rs) as neg)) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
+  let pos = ([], [], Region.pos_handled pos_rs neg_rs cnstrs.Constraints.region_graph) @@@ pos in
+  Trio.uniq pos, Trio.uniq neg
 
 let pos_neg_dirtyscheme (ctx, drty, cnstrs) =
   pos_neg_tyscheme (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs)
@@ -247,13 +233,13 @@ let normalize_context ~pos (ctx, ty, cstr, sbst) =
 
 let subst_ty_scheme sbst (ctx, ty, cnstrs) =
   let ty = Type.subst_ty sbst ty in
-  let cnstrs = Constraints.subst_constraints sbst cnstrs in
+  let cnstrs = Constraints.subst sbst cnstrs in
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   (ctx, ty, cnstrs)
 
 let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
   let drty = Type.subst_dirty sbst drty in
-  let cnstrs = Constraints.subst_constraints sbst cnstrs in
+  let cnstrs = Constraints.subst sbst cnstrs in
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   (ctx, drty, cnstrs)
 
@@ -302,8 +288,8 @@ let show_dirt_param ~non_poly:(_, ds, _) (ctx, ty, cnstrs) =
   fun ((Type.Dirt_Param k) as p) ->
     if List.mem p neg then
       Some (fun ppf -> (Symbols.dirt_param k (List.mem p ds) ppf))
-    else if (List.mem p pos && Constraints.get_prec cnstrs p != []) then
-      Some (fun ppf -> Print.print ppf "%t" (Print.sequence (Symbols.union ()) (fun (Type.Dirt_Param k) ppf -> (Symbols.dirt_param k (List.mem p ds) ppf)) (Constraints.get_prec cnstrs p)))
+    else if (List.mem p pos && Constraints.Dirt.get_prec p cnstrs.Constraints.dirt_graph != []) then
+      Some (fun ppf -> Print.print ppf "%t" (Print.sequence (Symbols.union ()) (fun (Type.Dirt_Param k) ppf -> (Symbols.dirt_param k (List.mem p ds) ppf)) (Constraints.Dirt.get_prec p cnstrs.Constraints.dirt_graph)))
     else
       None
 
@@ -319,7 +305,7 @@ let print_ty_scheme ty_sch ppf =
   if !Type.effects then
     Print.print ppf "%t%t"
       (Type.print ~show_dirt_param skeletons ty)
-      (Constraints.print ~non_poly skeletons cnstrs)
+      (Region.print ~non_poly cnstrs.Constraints.region_graph)
   else
     Type.print ~non_poly skeletons ty ppf
 
@@ -337,10 +323,10 @@ let print_dirty_scheme drty_sch ppf =
       Print.print ppf "%t ! %t%t"
         (Type.print ~show_dirt_param skeletons ty)
         (Type.print_dirt ~non_poly ~show_dirt_param drt)
-        (Constraints.print ~non_poly skeletons cnstrs)
+        (Region.print ~non_poly cnstrs.Constraints.region_graph)
     else
       Print.print ppf "%t%t"
         (Type.print ~show_dirt_param skeletons ty)
-        (Constraints.print ~non_poly skeletons cnstrs)
+        (Region.print ~non_poly cnstrs.Constraints.region_graph)
   else
     Type.print ~non_poly skeletons ty ppf
