@@ -39,12 +39,14 @@ let ty_param_less p q (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_ty_constraint p q cnstrs, sbst)
 and dirt_param_less d1 d2 (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_dirt_constraint d1 d2 cnstrs, sbst)
-and region_param_less r1 r2 (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_region_constraint r1 r2 cnstrs, sbst)
 and just new_cnstrs (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.union new_cnstrs cnstrs, sbst)
-and add_region_bound r bnd (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_region_bound r bnd cnstrs, sbst)
+and region_param_less r1 r2 (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Constraints.add_region_constraint r1 r2 cnstrs, sbst)
+and add_handled_constraint r1 r2 rs (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Constraints.add_handled_constraint r1 r2 rs cnstrs, sbst)
+and add_instance_constraint iota r (ctx, ty, cnstrs, sbst) =
+  (ctx, ty, Constraints.add_instance_constraint iota r cnstrs, sbst)
 
 let rec explode_dirt ~pos p ({Type.ops = ops} as drt_new) (ctx, ty, cnstrs, sbst) =
   if ops = [] then (ctx, ty, cnstrs, sbst) else

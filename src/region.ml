@@ -57,6 +57,12 @@ let add_region_bound r bnd (grph, bnds) =
   let new_bounds = List.map (fun r -> (r, bnd)) (r :: succ) in
   (grph, Common.assoc_map (Common.compose Common.uniq List.flatten) (Common.assoc_flatten (new_bounds @ bnds)))
 
+let add_instance_constraint inst r =
+  add_region_bound r [Instance inst]
+
+let add_handled_constraint r1 r2 rs =
+  add_region_bound r2 [Without (r1, rs)]
+
 let add_region_constraint rgn1 rgn2 (grph, bnds) =
   let new_grph = add_edge rgn1 rgn2 grph in
   let new_cstr = (new_grph, bnds) in

@@ -226,7 +226,7 @@ let rec infer_expr env (e, pos) =
         let r_in = Type.fresh_region_param () in
         let r_out = Type.fresh_region_param () in
         let chngs = [
-          Scheme.add_region_bound r_out [Region.Without (r_in, !rs)]
+          Scheme.add_handled_constraint r_in r_out !rs
         ] @ chngs
         in
         (op, r_in) :: ops_in, (op, r_out) :: ops_out, chngs
@@ -372,7 +372,7 @@ and infer_comp env (c, pos) =
           let inst = Type.fresh_instance_param () in
           let r = Type.fresh_region_param () in
           unify ctx (Tctx.effect_to_params eff params r, empty_dirt ()) ([
-            Scheme.add_region_bound r [Region.Instance inst]
+            Scheme.add_instance_constraint inst r
           ] @ chngs)
       | _ -> Error.typing ~pos "Effect type expected but %s encountered" eff
       end
