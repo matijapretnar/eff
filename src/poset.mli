@@ -15,19 +15,15 @@ sig
   (** Add an edge to the graph. *)
   val add_edge : elt -> elt -> t -> t
 
-  val mem : elt -> t -> bool
+  val skeletons : t -> elt list list
 
-  val keys : t -> elt list
-
-  val get_succ : elt -> t -> elt list
   val get_prec : elt -> t -> elt list
-
-  (** Fold over the edges of the graph. *)
-  val fold_edges : (elt -> elt -> 'a -> 'a) -> t -> 'a -> 'a
-
-  val union : t -> t -> t
 
   val map : (elt -> elt) -> t -> t
 
   val garbage_collect : elt list -> elt list -> t -> t
+
+  val remove_skeleton : elt -> t -> t * elt list * (elt * elt) list
+
+  val union : t -> t -> t
 end

@@ -50,16 +50,6 @@ struct
       G.add r (S.union inr (S.remove r left), outr) grph in
     S.fold extend_left left (S.fold extend_right right g)
 
-  let remove_vertex x (g : t) =
-    (* We must remove [x] as a key from [g], as well as an element of any in- our out-set *)
-    let remove_x = S.filter (fun y -> x <> y) in
-    let (inx, outx) = get x g in
-      S.elements inx, S.elements outx,
-      G.fold
-        (fun y (iny, outy) g -> G.add y (remove_x iny, remove_x outy) g)
-        (G.remove x g)
-        G.empty
-
   let fold_edges f grph acc =
     G.fold (fun x (_, outx) acc -> S.fold (fun y acc -> f x y acc) outx acc) grph acc
 
