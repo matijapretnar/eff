@@ -1,128 +1,174 @@
-module V = struct
-  type t = Type.region_param
+type elt = Type.region_param
+
+module Instances = Map.Make(struct
+  type t = Type.instance_param * Type.region_param
   let compare = Pervasives.compare
-end
-
-type elt = V.t
-
-module S = Set.Make(struct
-  type t = V.t
-  let compare = V.compare
 end)
 
-module G = Map.Make(V)
+module Regions = Map.Make(struct
+  type t = Type.region_param * Type.region_param
+  let compare = Pervasives.compare
+end)
 
-type region_bound =
-  | Without of Type.region_param * Type.region_param list
-  | Instance of Type.instance_param
+module HandledRegions = Set.Make(struct
+  type t = Type.region_param
+  let compare = Pervasives.compare
+end)
 
-type t = (S.t * S.t) G.t * (Type.region_param, region_bound list) Common.assoc
+type t = {
+  instances: (HandledRegions.t list) Instances.t;
+  regions: (HandledRegions.t list) Regions.t
+}
 
-let empty = (G.empty, [])
+let empty = {
+  instances = Instances.empty;
+  regions = Regions.empty;
+}
 
-let get x (g) =
-  try G.find x g with Not_found -> (S.empty, S.empty)
+let union bnds1 bnds2 = {
+  instances = Instances.fold Instances.add bnds1.instances bnds2.instances;
+  regions = Regions.fold Regions.add bnds1.regions bnds2.regions;
+}
 
-let get_succ x g =
-  let (_, outx) = get x g in
-  S.elements outx
+let subst_handled_regions sbst =
+  let add r rs' = HandledRegions.add (sbst.Type.region_param r) rs' in
+  List.map (fun rs -> HandledRegions.fold add rs HandledRegions.empty)
 
-let add_edge x y (g) =
-  if x = y then g else
-  let (inx, outx) = get x g
-  and (iny, outy) = get y g in
-  let left = S.add x (S.diff inx iny)
-  and right = S.add y (S.diff outy outx) in
-  let extend_left l grph =
-    let (inl, outl) = get l grph in
-    G.add l (inl, S.union outl (S.remove l right)) grph
-  and extend_right r grph =
-    let (inr, outr) = get r grph in
-    G.add r (S.union inr (S.remove r left), outr) grph in
-  S.fold extend_left left (S.fold extend_right right g)
+let subst_instances sbst ibnds =
+  let add (i, r) rs ibnds' =
+    Instances.add (sbst.Type.instance_param i, sbst.Type.region_param r) (subst_handled_regions sbst rs) ibnds' in
+  Instances.fold add ibnds Instances.empty
 
-let fold_edges f grph acc =
-  G.fold (fun x (_, outx) acc -> S.fold (fun y acc -> f x y acc) outx acc) grph acc
+let subst_regions sbst rbnds =
+  let add (i, r) rs rbnds' =
+    Regions.add (sbst.Type.region_param i, sbst.Type.region_param r) (subst_handled_regions sbst rs) rbnds' in
+  Regions.fold add rbnds Regions.empty
 
-let union (grph1, bnds1) (grph2, bnds2) =
-  (G.fold G.add grph1 grph2,
-    Common.assoc_map (Common.compose Common.uniq List.flatten) (Common.assoc_flatten (bnds1 @ bnds2)))
+let subst sbst bnds = {
+  instances = subst_instances sbst bnds.instances;
+  regions = subst_regions sbst bnds.regions;
+}
 
-let subst_region_bound sbst = function
-  | Without (p, rs) -> Without (sbst.Type.region_param p, List.map sbst.Type.region_param rs)
-  | Instance i -> Instance (sbst.Type.instance_param i)
+let garbage_collect pos neg bnds =
+  {
+    instances =
+      Instances.filter
+      (fun (_, r) _ -> List.mem r pos)
+      bnds.instances;
+    regions =
+      Regions.filter
+      (fun (r1, r2) _ -> List.mem r1 neg && List.mem r2 pos)
+      bnds.regions;
+  }
 
-let add_region_bound r bnd (grph, bnds) =
-  let succ = get_succ r grph in
-  let new_bounds = List.map (fun r -> (r, bnd)) (r :: succ) in
-  (grph, Common.assoc_map (Common.compose Common.uniq List.flatten) (Common.assoc_flatten (new_bounds @ bnds)))
+let pos_handled pos neg bnds =
+  let add _ = List.fold_right HandledRegions.union in
+  let pos' = Instances.fold add bnds.instances (Regions.fold add bnds.regions HandledRegions.empty) in
+  HandledRegions.elements pos'
 
-let add_instance_constraint inst r =
-  add_region_bound r [Instance inst]
+let add_handled rs =
+  let rec add = function
+  | [] -> [rs]
+  | rs' :: rss ->
+    if HandledRegions.subset rs' rs then rss
+    else if HandledRegions.subset rs rs' then add rss
+    else rs' :: add rss
+  in
+  add
 
-let add_handled_constraint r1 r2 rs =
-  add_region_bound r2 [Without (r1, rs)]
+let double_fold f xs ys acc =
+  List.fold_right (fun x acc ->
+    List.fold_right (fun y acc ->
+      f x y acc
+    ) ys acc
+  ) xs acc
 
-let add_region_constraint rgn1 rgn2 (grph, bnds) =
-  let new_grph = add_edge rgn1 rgn2 grph in
-  let new_cstr = (new_grph, bnds) in
-  match Common.lookup rgn1 bnds with
-  | None -> new_cstr
-  | Some bnds -> add_region_bound rgn2 bnds new_cstr
-
-let subst sbst (grph, bnds) =
-  let f_set s = S.fold (fun x fs -> S.add (sbst.Type.region_param x) fs) s S.empty in
-  let grph = G.fold (fun x (inx, outx) acc -> G.add (sbst.Type.region_param x) (f_set inx, f_set outx) acc) grph G.empty in
-  let bnds = List.map (fun (r, bnd) -> (sbst.Type.region_param r, List.map (subst_region_bound sbst) bnd)) bnds in
-  (grph, bnds)
-
-let garbage_collect pos neg (grph, bnds) =
-  let pos = List.fold_right S.add pos S.empty
-  and neg = List.fold_right S.add neg S.empty in
-  let collect x (inx, outx) grph =
-    let inx =
-      if S.mem x pos then S.inter neg inx else S.empty
-    and outx =
-      if S.mem x neg then S.inter pos outx else S.empty
+let add_region_constraint r1 r2 rs bnds =
+  let rs = List.fold_right HandledRegions.add rs HandledRegions.empty in
+  let l_rbnds =
+    Regions.fold
+    (fun (r, r1') rss l_rbnds -> if r1' = r1 then (r, rss) :: l_rbnds else l_rbnds)
+    bnds.regions [(r1, [HandledRegions.empty])]
+  and r_rbnds =
+    Regions.fold
+    (fun (r2', r) rss r_rbnds -> if r2' = r2 then (r, rss) :: r_rbnds else r_rbnds)
+    bnds.regions [(r2, [HandledRegions.empty])]
+  and ibnds =
+    Instances.fold
+    (fun (i, r1') rss ibnds -> if r1' = r1 then (i, rss) :: ibnds else ibnds)
+    bnds.instances []
+  in
+  let add_ibnd (i, rss1') (r2', rss2') ibnds =
+    let rss =
+      try Instances.find (i, r2') bnds.instances
+      with Not_found -> []
     in
-    if S.cardinal inx + S.cardinal outx = 0 then
-     grph
-    else
-      G.add x (inx, outx) grph
+    let add rs1' rs2' ibnds =
+      let rs' = HandledRegions.union rs1' (HandledRegions.union rs rs2') in
+      Instances.add (i, r2') (add_handled rs' rss) ibnds
+    in
+    double_fold add rss1' rss2' ibnds
   in
-  let bnds = List.filter (fun (r, ds) -> S.mem r pos && ds != []) bnds in
-  (G.fold collect grph G.empty, bnds)
-
-let region_less ~non_poly r1 r2 ppf =
-  Print.print ppf "%t %s %t" (Type.print_region_param ~non_poly r1) (Symbols.less ()) (Type.print_region_param ~non_poly r2)
-
-let print_region_bounds ~non_poly bnds ppf =
-  let print bnd ppf =
-    match bnd with
-    | Instance i -> Type.print_instance_param i ppf
-    | Without (prs, rs) -> Print.print ppf "%t - [%t]" (Type.print_region_param ~non_poly prs) (Print.sequence ", " (Type.print_region_param ~non_poly) rs)
+  let add_rbnd (r1', rss1') (r2', rss2') rbnds =
+    let rss =
+      try Regions.find (r1', r2') bnds.regions
+      with Not_found -> []
+    in
+    let add rs1' rs2' rbnds =
+      let rs' = HandledRegions.union rs1' (HandledRegions.union rs rs2') in
+      Regions.add (r1', r2') (add_handled rs' rss) rbnds
+    in
+    double_fold add rss1' rss2' rbnds
   in
-  Print.sequence ", " print bnds ppf
+  {
+    instances = double_fold add_ibnd ibnds r_rbnds bnds.instances;
+    regions = double_fold add_rbnd l_rbnds r_rbnds bnds.regions
+  }
 
-let bounds ~non_poly r bnds ppf =
-  match bnds with
-  | [] -> ()
-  | bnds -> Print.print ppf "%t %s %t" (print_region_bounds ~non_poly bnds) (Symbols.less ()) (Type.print_region_param ~non_poly r)
-
-let print ~non_poly (g, bnds) ppf =
-  let pps = fold_edges (fun r1 r2 lst -> if r1 != r2 then region_less ~non_poly r1 r2 :: lst else lst) g [] in
-  let pps = List.fold_right (fun (r, bnds) lst -> if bnds != [] then bounds ~non_poly r bnds :: lst else lst) bnds pps in
-  if pps != [] then
-    Print.print ppf " | %t" (Print.sequence "," Common.id pps)
-
-let pos_handled pos neg (grph, bnds) =
-  []
-(* 
-   let add_region_bound bnd (posi, nega) = match bnd with
-  | Region.Without (r, rs) -> (([], [], r :: rs) @@@ posi, nega)
-  | Region.Instance _ -> (posi, nega)
+let add_instance_constraint i r2 rs bnds =
+  let rs = List.fold_right HandledRegions.add rs HandledRegions.empty in
+  let r_rbnds =
+    Regions.fold
+    (fun (r2', r) rss r_rbnds -> if r2' = r2 then (r, rss) :: r_rbnds else r_rbnds)
+    bnds.regions [(r2, [HandledRegions.empty])]
   in
-  let (((_, _, pos_rs) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
-  let (posi, nega) = List.fold_right (fun (d, bnds) (posi, nega) ->
-                                      if List.mem d pos_rs then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega)) cnstrs.Constraints.region_bounds (posi, nega) in
- *)
+  let add_ibnd (r2', rss2') ibnds =
+    let rss =
+      try Instances.find (i, r2') bnds.instances
+      with Not_found -> []
+    in
+    let add rs2' ibnds =
+      let rs' = HandledRegions.union rs rs2' in
+      Instances.add (i, r2') (add_handled rs' rss) ibnds
+    in
+    List.fold_right add rss2' ibnds
+  in
+  {
+    instances = List.fold_right add_ibnd r_rbnds bnds.instances;
+    regions = bnds.regions
+  }
+
+let print_removed_regions ~non_poly rs ppf =
+  if HandledRegions.is_empty rs then
+    Print.print ppf ""
+  else
+    let rs = HandledRegions.elements rs in
+    Print.print ppf "- %t" (Print.sequence " - " (Type.print_region_param ~non_poly) rs)
+
+let print_instance_bound ~non_poly i r rs ppf =
+  Print.print ppf "%t%t %s %t" (Type.print_instance_param i) (print_removed_regions ~non_poly rs) (Symbols.less ()) (Type.print_region_param ~non_poly r)
+
+let print_region_bound ~non_poly r1 r2 rs ppf =
+  Print.print ppf "%t%t %s %t" (Type.print_region_param r1) (print_removed_regions ~non_poly rs) (Symbols.less ()) (Type.print_region_param ~non_poly r2)
+
+let print ~non_poly bnds ppf =
+  let pps = Regions.fold (
+    fun (r1, r2) ->
+      List.fold_right (fun rs pps -> print_region_bound ~non_poly r1 r2 rs :: pps)
+  ) bnds.regions [] in
+  let pps = Instances.fold (
+    fun (i, r) ->
+      List.fold_right (fun rs pps -> print_instance_bound ~non_poly i r rs :: pps)
+  ) bnds.instances pps in
+  if pps = [] then () else
+  Print.print ppf " |@,@[%t@]" (Print.sequence "," Common.id pps)

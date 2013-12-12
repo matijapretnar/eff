@@ -23,14 +23,11 @@ let empty = {
 let add_ty_constraint ty1 ty2 cstr =
   { cstr with ty_graph = Ty.add_edge ty1 ty2 cstr.ty_graph }
 
-let add_region_constraint r1 r2 cstr =
-  { cstr with region_graph = Region.add_region_constraint r1 r2 cstr.region_graph }
+let add_region_constraint r1 r2 rs cstr =
+  { cstr with region_graph = Region.add_region_constraint r1 r2 rs cstr.region_graph }
 
-let add_handled_constraint r1 r2 rs cstr =
-  { cstr with region_graph = Region.add_handled_constraint r1 r2 rs cstr.region_graph }
-
-let add_instance_constraint inst r cstr =
-  { cstr with region_graph = Region.add_instance_constraint inst r cstr.region_graph }
+let add_instance_constraint inst r rs cstr =
+  { cstr with region_graph = Region.add_instance_constraint inst r rs cstr.region_graph }
 
 let add_dirt_constraint drt1 drt2 cstr =
   { cstr with dirt_graph = Dirt.add_edge drt1 drt2 cstr.dirt_graph }
