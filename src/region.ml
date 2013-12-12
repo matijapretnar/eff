@@ -70,7 +70,7 @@ let add_handled rs =
   let rec add = function
   | [] -> [rs]
   | rs' :: rss ->
-    if HandledRegions.subset rs' rs then rss
+    if HandledRegions.subset rs' rs then rs' :: rss
     else if HandledRegions.subset rs rs' then add rss
     else rs' :: add rss
   in
