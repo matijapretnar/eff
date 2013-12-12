@@ -7,11 +7,6 @@ module Ty = Poset.Make(struct
   let compare = Pervasives.compare
 end)
 
-module Region = Graph.Make(struct
-  type t = Type.region_param
-  let compare = Pervasives.compare
-end)
-
 module Dirt = Poset.Make(struct
   type t = Type.dirt_param
   let compare = Pervasives.compare
