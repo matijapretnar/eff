@@ -1,19 +1,24 @@
 type elt = Type.region_param
 type t
 
+type region_bound =
+  | Without of Type.region_param * Type.region_param list
+  | Instance of Type.instance_param
+
 (** The empty graph. *)
 val empty : t
 
-(** Add an edge to the graph. *)
-val add_edge : elt -> elt -> t -> t
-
-val get_succ : elt -> t -> elt list
-
-(** Fold over the edges of the graph. *)
-val fold_edges : (elt -> elt -> 'a -> 'a) -> t -> 'a -> 'a
-
 val union : t -> t -> t
 
-val map : (elt -> elt) -> t -> t
+val subst : Type.substitution -> t -> t
+
+val add_region_bound : elt -> region_bound list -> t -> t
+
+val add_region_constraint : elt -> elt -> t -> t
 
 val garbage_collect : elt list -> elt list -> t -> t
+
+val pos_handled : elt list -> elt list -> t -> elt list
+
+val print : non_poly:('a, 'b, Type.region_param) Trio.t -> t -> Format.formatter -> unit
+

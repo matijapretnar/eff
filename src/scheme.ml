@@ -200,23 +200,9 @@ let pos_neg_tyscheme (ctx, ty, cnstrs) =
     let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
-  let (((_, _, pos_rs) as pos), neg) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
-  let add_region_bound bnd posi = match bnd with
-  | Constraints.Without (d, _) -> d :: posi
-  | Constraints.Instance _ -> posi
-  in
-  let posi_regions = List.fold_right (fun (d, bnds) posi ->
-                                      if List.mem d pos_rs then List.fold_right add_region_bound bnds posi else posi) cnstrs.Constraints.region_bounds [] in
-  let pos = ([], [], posi_regions) @@@ pos in
-
-   let add_region_bound bnd (posi, nega) = match bnd with
-  | Constraints.Without (r, rs) -> (([], [], r :: rs) @@@ posi, nega)
-  | Constraints.Instance _ -> (posi, nega)
-  in
-  let (((_, _, pos_rs) as posi), nega) = (Trio.uniq pos, Trio.uniq neg) in
-  let (posi, nega) = List.fold_right (fun (d, bnds) (posi, nega) ->
-                                      if List.mem d pos_rs then List.fold_right add_region_bound bnds (posi, nega) else (posi, nega)) cnstrs.Constraints.region_bounds (posi, nega) in
-  Trio.uniq posi, Trio.uniq nega
+  let (((_, _, pos_rs) as pos), ((_, _, neg_rs) as neg)) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
+  let pos = ([], [], Region.pos_handled pos_rs neg_rs cnstrs.Constraints.region_graph) @@@ pos in
+  Trio.uniq pos, Trio.uniq neg
 
 let pos_neg_dirtyscheme (ctx, drty, cnstrs) =
   pos_neg_tyscheme (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs)
@@ -317,7 +303,7 @@ let print_ty_scheme ty_sch ppf =
   if !Type.effects then
     Print.print ppf "%t%t"
       (Type.print ~show_dirt_param skeletons ty)
-      (Constraints.print ~non_poly skeletons cnstrs)
+      (Region.print ~non_poly cnstrs.Constraints.region_graph)
   else
     Type.print ~non_poly skeletons ty ppf
 
@@ -335,10 +321,10 @@ let print_dirty_scheme drty_sch ppf =
       Print.print ppf "%t ! %t%t"
         (Type.print ~show_dirt_param skeletons ty)
         (Type.print_dirt ~non_poly ~show_dirt_param drt)
-        (Constraints.print ~non_poly skeletons cnstrs)
+        (Region.print ~non_poly cnstrs.Constraints.region_graph)
     else
       Print.print ppf "%t%t"
         (Type.print ~show_dirt_param skeletons ty)
-        (Constraints.print ~non_poly skeletons cnstrs)
+        (Region.print ~non_poly cnstrs.Constraints.region_graph)
   else
     Type.print ~non_poly skeletons ty ppf
