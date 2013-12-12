@@ -53,11 +53,11 @@ let garbage_collect pos neg bnds =
   {
     instances =
       Instances.filter
-      (fun (_, r) _ -> List.mem r pos)
+      (fun (_, r) bnds -> List.mem r pos && bnds != [])
       bnds.instances;
     regions =
       Regions.filter
-      (fun (r1, r2) _ -> List.mem r1 neg && List.mem r2 pos)
+      (fun (r1, r2) bnds -> r1 != r2 && List.mem r1 neg && List.mem r2 pos && bnds != [])
       bnds.regions;
   }
 
