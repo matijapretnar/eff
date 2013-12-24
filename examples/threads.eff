@@ -3,7 +3,7 @@
 
 type coop = effect
   operation yield : unit -> unit
-  operation fork : (unit -> unit) -> unit
+  operation spawn : (unit -> unit) -> unit
 end
 
 let round_robin c =
@@ -16,7 +16,7 @@ let round_robin c =
   in
   let rec scheduler () = handler
     | c#yield () k -> enqueue k; dequeue ()
-    | c#fork t k -> enqueue k; with scheduler () handle t ()
+    | c#spawn t k -> enqueue k; with scheduler () handle t ()
     | val () -> dequeue ()
   in
     scheduler ();;
@@ -25,14 +25,14 @@ let round_robin c =
    the letter a and another one which has two sub-threads printing x and y. *)
 let c = new coop in
 with round_robin c handle
-  c#fork (fun _ ->
+  c#spawn (fun _ ->
     for i = 1 to 5 do
       print_string "a";
       c#yield ()
     done);
   let d = new coop in
   with round_robin d handle
-    d#fork (fun _ ->
+    d#spawn (fun _ ->
       for j = 1 to 5 do
          print_string "x";
          d#yield ()
@@ -45,11 +45,11 @@ with round_robin c handle
 ;;
 
 (* We can run an unbounded amount of threads. The following example enumerates all
-   reduced positive fractions less than 1 by forking a thread for each denominator. *)
+   reduced positive fractions less than 1 by spawning a thread for each denominator. *)
 let c = new coop in
 let rec fractions denominator =
   (* For the next denominator *)
-    c#fork (fun _ -> c#yield (); fractions (denominator + 1));
+    c#spawn (fun _ -> c#yield (); fractions (denominator + 1));
     (* And list all the fractions with the current one *)
     for numerator = 1 to denominator - 1 do
       (* Print if the fraction is reduced. *)
