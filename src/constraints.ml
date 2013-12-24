@@ -74,7 +74,7 @@ let fold_region f g acc = Region.fold_edges f g.region_graph acc
 let fold_dirt f g acc = Dirt.fold_edges f g.dirt_graph acc
 
 let add_ty_constraint ty1 ty2 cstr =
-  let within, without = List.partition (fun g -> Ty.mem ty1 g or Ty.mem ty2 g) cstr.ty_graph in
+  let within, without = List.partition (fun g -> Ty.mem ty1 g || Ty.mem ty2 g) cstr.ty_graph in
   let new_graphs =
     match within with
     | [] -> (Ty.add_edge ty1 ty2 Ty.empty) :: without
