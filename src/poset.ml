@@ -52,7 +52,7 @@ struct
     S.fold extend_left left (S.fold extend_right right g)
 
   let add_edge ty1 ty2 g =
-    let within, without = List.partition (fun g -> mem ty1 g or mem ty2 g) g in
+    let within, without = List.partition (fun g -> mem ty1 g || mem ty2 g) g in
     match within with
     | [] -> (add_edge_aux ty1 ty2 G.empty) :: without
     | [g] -> (add_edge_aux ty1 ty2 g) :: without

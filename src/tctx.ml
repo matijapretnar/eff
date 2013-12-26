@@ -318,8 +318,8 @@ let extend_with_variances ~pos tydefs =
           begin match Common.lookup p ps with
           | None -> assert false
           | Some (posvar, negvar) ->
-              posvar := !posvar or posi;
-              negvar := !negvar or nega
+              posvar := !posvar || posi;
+              negvar := !negvar || nega
           end
       | T.Apply (t, (tys, drts, rgns)) ->
           begin match Common.lookup t !tctx with
@@ -389,15 +389,15 @@ let extend_with_variances ~pos tydefs =
       begin match Common.lookup d ds with
       | None -> assert false
       | Some (posvar, negvar) ->
-          posvar := !posvar or posi;
-          negvar := !negvar or nega
+          posvar := !posvar || posi;
+          negvar := !negvar || nega
       end
     and region_param posi nega r =
       begin match Common.lookup r rs with
       | None -> assert false
       | Some (posvar, negvar) ->
-          posvar := !posvar or posi;
-          negvar := !negvar or nega
+          posvar := !posvar || posi;
+          negvar := !negvar || nega
       end
     in match def with
       | Record tys -> List.iter (fun (_, t) -> ty true false t) tys

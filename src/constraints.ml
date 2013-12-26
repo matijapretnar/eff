@@ -30,7 +30,7 @@ let add_instance_constraint inst r rs cstr =
   { cstr with region_graph = Region.add_instance_constraint inst r rs cstr.region_graph }
 
 let add_dirt_constraint drt1 drt2 cstr =
-  { cstr with dirt_graph = Dirt.add_edge drt1 drt2 cstr.dirt_graph }
+  {cstr with dirt_graph = Dirt.add_edge drt1 drt2 cstr.dirt_graph}
 
 let union cstr1 cstr2 = 
   {
