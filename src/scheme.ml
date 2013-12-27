@@ -1,8 +1,47 @@
+type substitution = {
+  ty_param : Type.ty_param -> Type.ty;
+  dirt_param : Type.dirt_param -> Type.dirt;
+}
+
 type context = (Syntax.variable, Type.ty) Common.assoc
 type ty_scheme = context * Type.ty * Constraints.t
 type dirty_scheme = context * Type.dirty * Constraints.t
-type t = context * Type.ty * Constraints.t * Type.substitution
+type t = context * Type.ty * Constraints.t * substitution
 type change = t -> t
+
+(** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
+let rec subst_ty sbst = function
+  | Type.Apply (ty_name, args) -> Type.Apply (ty_name, subst_args sbst args)
+  | Type.Effect (ty_name, args, r) -> Type.Effect (ty_name, subst_args sbst args, r)
+  | Type.TyParam p -> sbst.ty_param p
+  | Type.Basic _ as ty -> ty
+  | Type.Tuple tys -> Type.Tuple (Common.map (subst_ty sbst) tys)
+  | Type.Arrow (ty1, (ty2, drt)) -> Type.Arrow (subst_ty sbst ty1, (subst_ty sbst ty2, subst_dirt sbst drt))
+  | Type.Handler (drty1, drty2) -> Type.Handler (subst_dirty sbst drty1, subst_dirty sbst drty2)
+
+and subst_dirt sbst drt =
+  let { Type.ops = new_ops; Type.rest = new_rest } = sbst.dirt_param drt.Type.rest in
+  { Type.ops = new_ops @ drt.Type.ops; Type.rest = new_rest }
+
+and subst_dirty sbst (ty, drt) = (subst_ty sbst ty, subst_dirt sbst drt)
+
+and subst_args sbst (tys, drts, rs) =
+  (Common.map (subst_ty sbst) tys, Common.map (subst_dirt sbst) drts, rs)
+
+(** [identity_subst] is a substitution that makes no changes. *)
+let identity_subst =
+  {
+    ty_param = (fun p -> Type.TyParam p);
+    dirt_param = (fun d -> { Type.ops = []; Type.rest = d })
+  }
+
+(** [compose_subst sbst1 sbst2] returns a substitution that first performs
+    [sbst2] and then [sbst1]. *)
+let compose_subst sbst1 sbst2 =
+  {
+    ty_param = Common.compose (subst_ty sbst1) sbst2.ty_param;
+    dirt_param = Common.compose (subst_dirt sbst1) sbst2.dirt_param;
+  }
 
 let beautify2 ty1 ty2 cnstrs =
   let sbst = Type.beautifying_subst () in
@@ -35,16 +74,16 @@ let rec explode_dirt ~pos p ({Type.ops = ops} as drt_new) (ctx, ty, cnstrs, sbst
   let (new_drt_grph, ps, skel) = ConstraintsDirt.remove_skeleton p cnstrs.Constraints.dirt in
   let drts' = List.map (fun p -> (p, Type.subst_dirt (Type.refreshing_subst ()) drt_new)) ps in
   let sbst' = {
-    Type.identity_subst with 
-    Type.dirt_param = (fun d' -> match Common.lookup d' drts' with Some drt' -> drt' | None -> Type.simple_dirt d')
+    identity_subst with 
+    dirt_param = (fun d' -> match Common.lookup d' drts' with Some drt' -> drt' | None -> Type.simple_dirt d')
   } in
   let cnstrs = {cnstrs with Constraints.dirt = new_drt_grph} in
-  let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
+  let ty_sch = (Common.assoc_map (subst_ty sbst') ctx, subst_ty sbst' ty, cnstrs, compose_subst sbst' sbst) in
   List.fold_right (fun (p, q) ty_sch -> dirt_less ~pos (Type.simple_dirt p) (Type.simple_dirt q) ty_sch) skel ty_sch
 
 and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
-  let {Type.ops = ops1; Type.rest = rest1} = Type.subst_dirt sbst drt1
-  and {Type.ops = ops2; Type.rest = rest2} = Type.subst_dirt sbst drt2 in
+  let {Type.ops = ops1; Type.rest = rest1} = subst_dirt sbst drt1
+  and {Type.ops = ops2; Type.rest = rest2} = subst_dirt sbst drt2 in
   let new_ops ops1 ops2 =
     let ops2 = List.map fst ops2 in
     let add_op (op, _) news =
@@ -71,7 +110,7 @@ and dirt_less ~pos drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
 let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   (* XXX Check cyclic types *)
   (* Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)
-  match Type.subst_ty sbst ty1,  Type.subst_ty sbst ty2 with
+  match subst_ty sbst ty1, subst_ty sbst ty2 with
 
   | (ty1, ty2) when ty1 = ty2 -> ty_sch
 
@@ -130,11 +169,11 @@ and explode_skeleton ~pos p ty_new (ctx, ty, cnstrs, sbst) =
   let (new_ty_grph, ps, skel) = ConstraintsTy.remove_skeleton p cnstrs.Constraints.ty in
   let tys' = List.map (fun p -> (p, Type.refresh ty_new)) ps in
   let sbst' = {
-    Type.identity_subst with 
-    Type.ty_param = (fun p' -> match Common.lookup p' tys' with Some ty' -> ty' | None -> Type.TyParam p')
+    identity_subst with 
+    ty_param = (fun p' -> match Common.lookup p' tys' with Some ty' -> ty' | None -> Type.TyParam p')
   } in
   let cnstrs = {cnstrs with Constraints.ty = new_ty_grph} in
-  let ty_sch = (Common.assoc_map (Type.subst_ty sbst') ctx, Type.subst_ty sbst' ty, cnstrs, Type.compose_subst sbst' sbst) in
+  let ty_sch = (Common.assoc_map (subst_ty sbst') ctx, subst_ty sbst' ty, cnstrs, compose_subst sbst' sbst) in
   List.fold_right (fun (p, q) ty_sch -> ty_less ~pos (Type.TyParam p) (Type.TyParam q) ty_sch) skel ty_sch
 
 and args_less ~pos (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
@@ -205,7 +244,7 @@ let normalize_context ~pos (ctx, ty, cnstrs, sbst) =
   let add (x, tys) (ctx, typ, cnstrs, sbst) =
     match !tys with
     | [] -> assert false
-    | [ty] -> ((x, Type.subst_ty sbst ty) :: ctx, typ, cnstrs, sbst)
+    | [ty] -> ((x, subst_ty sbst ty) :: ctx, typ, cnstrs, sbst)
     | tys ->
         let ty' = Type.fresh_ty () in
         let ctx' = (x, ty') :: ctx in
@@ -226,9 +265,9 @@ let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
   (ctx, drty, cnstrs)
 
 let finalize ctx ty chngs =
-  let ctx, ty, cnstrs, sbst = List.fold_right Common.id chngs (ctx, ty, Constraints.empty, Type.identity_subst) in
-  let ty = Type.subst_ty sbst ty in
-  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  let ctx, ty, cnstrs, sbst = List.fold_right Common.id chngs (ctx, ty, Constraints.empty, identity_subst) in
+  let ty = subst_ty sbst ty in
+  let ctx = Common.assoc_map (subst_ty sbst) ctx in
   (ctx, ty, cnstrs)
 
 let finalize_ty_scheme ~pos ctx ty chngs =
