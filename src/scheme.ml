@@ -227,7 +227,9 @@ let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
 
 let finalize ctx ty chngs =
   let ctx, ty, cnstrs, sbst = List.fold_right Common.id chngs (ctx, ty, Constraints.empty, Type.identity_subst) in
-  subst_ty_scheme sbst (ctx, ty, cnstrs)
+  let ty = Type.subst_ty sbst ty in
+  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  (ctx, ty, cnstrs)
 
 let finalize_ty_scheme ~pos ctx ty chngs =
   let ty_sch = finalize ctx ty (normalize_context ~pos :: chngs) in
