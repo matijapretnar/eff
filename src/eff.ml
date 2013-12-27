@@ -109,7 +109,7 @@ let infer_top_comp (ctx, top_change) c =
     and return the new environment. *)
 let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,pos) =
   match d with
-  | Syntax.Term c ->
+  | SyntaxSugared.Term c ->
       let c = SyntaxDesugar.top_computation c in
       let drty_sch, top_change = infer_top_comp wholectx c in
       let v = Eval.run env c in
@@ -117,19 +117,19 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,pos) =
         (Scheme.print_dirty_scheme drty_sch)
         (Value.print_value v);
       ((ctx, top_change), env)
-  | Syntax.TypeOf c ->
+  | SyntaxSugared.TypeOf c ->
       let c = SyntaxDesugar.top_computation c in
       let drty_sch, top_change = infer_top_comp wholectx c in
       Format.printf "@[- : %t@]@." (Scheme.print_dirty_scheme drty_sch);
       ((ctx, top_change), env)
-  | Syntax.Reset ->
+  | SyntaxSugared.Reset ->
       Tctx.reset ();
       print_endline ("Environment reset."); initial_ctxenv
-  | Syntax.Help ->
+  | SyntaxSugared.Help ->
       print_endline help_text; (wholectx, env)
-  | Syntax.Quit -> exit 0
-  | Syntax.Use fn -> use_file (wholectx, env) (fn, interactive)
-  | Syntax.TopLet defs ->
+  | SyntaxSugared.Quit -> exit 0
+  | SyntaxSugared.Use fn -> use_file (wholectx, env) (fn, interactive)
+  | SyntaxSugared.TopLet defs ->
       let defs = SyntaxDesugar.top_let defs in
       (* XXX What to do about the dirts? *)
       let vars, nonpoly, change = Infer.infer_let ~pos ctx defs in
@@ -158,7 +158,7 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,pos) =
             vars
         end;
         ((ctx, top_change), env)
-    | Syntax.TopLetRec defs ->
+    | SyntaxSugared.TopLetRec defs ->
         let defs = SyntaxDesugar.top_let_rec defs in
         let vars, change = Infer.infer_let_rec ~pos ctx defs in
         let ctx = List.fold_right (fun (x, ty_sch) env -> Ctx.extend ctx x ty_sch) vars ctx in
@@ -173,14 +173,14 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,pos) =
             List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Print.variable x) (Scheme.print_ty_scheme (sch_change tysch))) vars
           end;
           ((ctx, top_change), env)
-    | Syntax.External (x, t, f) ->
+    | SyntaxSugared.External (x, t, f) ->
       let (x, t) = SyntaxDesugar.external_ty (Tctx.is_effect ~pos) x t in
       let ctx = Ctx.extend ctx x t in
         begin match C.lookup f External.values with
           | Some v -> ((ctx, top_change), Eval.update x v env)
           | None -> Error.runtime "unknown external symbol %s." f
         end
-    | Syntax.Tydef tydefs ->
+    | SyntaxSugared.Tydef tydefs ->
         let tydefs = SyntaxDesugar.tydefs ~pos tydefs in
         Tctx.extend_tydefs ~pos tydefs ;
         ((ctx, top_change), env)
