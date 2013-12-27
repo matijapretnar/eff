@@ -4,30 +4,12 @@ type dirty_scheme = context * Type.dirty * Constraints.t
 type t = context * Type.ty * Constraints.t * Type.substitution
 type change = t -> t
 
-let skeletons cnstrs =
-  let skeletons = ConstraintsTy.skeletons cnstrs.Constraints.ty in
-  let rec missing misses expect = function
-  | [] -> misses
-  | x :: xs ->
-    let (Type.Ty_Param y) = x in
-    if y < expect then
-      missing misses expect xs
-    else if y = expect then
-      missing misses (succ expect) xs
-    else (* y > expect *)
-      missing (expect :: misses) (succ expect) (x :: xs)
-  in
-  let misses = missing [] 0 (List.sort Pervasives.compare (List.flatten skeletons)) in
-  let skeletons = List.map (fun x -> [Type.Ty_Param x]) misses @ skeletons in
-  let skeletons = List.sort Pervasives.compare (List.map (List.sort Pervasives.compare) skeletons) in
-  skeletons
-
 let beautify2 ty1 ty2 cnstrs =
   let sbst = Type.beautifying_subst () in
   let ty1 = Type.subst_ty sbst ty1 in
   let ty2 = Type.subst_ty sbst ty2 in
   let cnstrs = Constraints.subst sbst cnstrs in
-  let skeletons = skeletons cnstrs in
+  let skeletons = ConstraintsTy.skeletons cnstrs.Constraints.ty in
   (ty1, ty2, skeletons)
 
 
@@ -298,7 +280,7 @@ let print_ty_scheme ty_sch ppf =
   let _, (_, ds, _) = pos_neg_tyscheme ty_sch in
   ignore (Common.map sbst.Type.dirt_param ds);
   let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in
-  let skeletons = skeletons cnstrs in
+  let skeletons = ConstraintsTy.skeletons cnstrs.Constraints.ty in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
   let show_dirt_param = show_dirt_param (ctx, ty, cnstrs) ~non_poly in
@@ -314,7 +296,7 @@ let print_dirty_scheme drty_sch ppf =
   let _, (_, ds, _) = pos_neg_dirtyscheme drty_sch in
   ignore (Common.map sbst.Type.dirt_param ds);
   let (ctx, (ty, drt), cnstrs) = subst_dirty_scheme sbst drty_sch in
-  let skeletons = skeletons cnstrs in
+  let skeletons = ConstraintsTy.skeletons cnstrs.Constraints.ty in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
   let show_dirt_param = show_dirt_param (ctx, (Type.Arrow (Type.unit_ty, (ty, drt))), cnstrs) ~non_poly in
