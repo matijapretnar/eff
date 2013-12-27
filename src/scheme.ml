@@ -1,6 +1,6 @@
 type substitution = {
-  ty_param : Type.ty_param -> Type.ty;
-  dirt_param : Type.dirt_param -> Type.dirt;
+  ty_param : (Type.ty_param, Type.ty) Common.assoc;
+  dirt_param : (Type.dirt_param, Type.dirt) Common.assoc;
 }
 
 type context = (Syntax.variable, Type.ty) Common.assoc
@@ -13,15 +13,20 @@ type change = t -> t
 let rec subst_ty sbst = function
   | Type.Apply (ty_name, args) -> Type.Apply (ty_name, subst_args sbst args)
   | Type.Effect (ty_name, args, r) -> Type.Effect (ty_name, subst_args sbst args, r)
-  | Type.TyParam p -> sbst.ty_param p
+  | Type.TyParam p ->
+      begin match Common.lookup p sbst.ty_param with
+      | Some t -> t
+      | None -> Type.TyParam p
+      end
   | Type.Basic _ as ty -> ty
   | Type.Tuple tys -> Type.Tuple (Common.map (subst_ty sbst) tys)
   | Type.Arrow (ty1, (ty2, drt)) -> Type.Arrow (subst_ty sbst ty1, (subst_ty sbst ty2, subst_dirt sbst drt))
   | Type.Handler (drty1, drty2) -> Type.Handler (subst_dirty sbst drty1, subst_dirty sbst drty2)
 
 and subst_dirt sbst drt =
-  let { Type.ops = new_ops; Type.rest = new_rest } = sbst.dirt_param drt.Type.rest in
-  { Type.ops = new_ops @ drt.Type.ops; Type.rest = new_rest }
+  match Common.lookup drt.Type.rest sbst.dirt_param with
+  | Some { Type.ops = new_ops; Type.rest = new_rest } -> { Type.ops = new_ops @ drt.Type.ops; Type.rest = new_rest }
+  | None -> drt
 
 and subst_dirty sbst (ty, drt) = (subst_ty sbst ty, subst_dirt sbst drt)
 
@@ -31,16 +36,16 @@ and subst_args sbst (tys, drts, rs) =
 (** [identity_subst] is a substitution that makes no changes. *)
 let identity_subst =
   {
-    ty_param = (fun p -> Type.TyParam p);
-    dirt_param = (fun d -> { Type.ops = []; Type.rest = d })
+    ty_param = [];
+    dirt_param = []
   }
 
 (** [compose_subst sbst1 sbst2] returns a substitution that first performs
     [sbst2] and then [sbst1]. *)
 let compose_subst sbst1 sbst2 =
   {
-    ty_param = Common.compose (subst_ty sbst1) sbst2.ty_param;
-    dirt_param = Common.compose (subst_dirt sbst1) sbst2.dirt_param;
+    ty_param = sbst1.ty_param @ (Common.assoc_map (subst_ty sbst1) sbst2.ty_param);
+    dirt_param = sbst1.dirt_param @ (Common.assoc_map (subst_dirt sbst1) sbst2.dirt_param);
   }
 
 let beautify2 ty1 ty2 cnstrs =
@@ -75,7 +80,7 @@ let rec explode_dirt ~pos p ({Type.ops = ops} as drt_new) (ctx, ty, cnstrs, sbst
   let drts' = List.map (fun p -> (p, Type.subst_dirt (Type.refreshing_subst ()) drt_new)) ps in
   let sbst' = {
     identity_subst with 
-    dirt_param = (fun d' -> match Common.lookup d' drts' with Some drt' -> drt' | None -> Type.simple_dirt d')
+    dirt_param = drts'
   } in
   let cnstrs = {cnstrs with Constraints.dirt = new_drt_grph} in
   let ty_sch = (Common.assoc_map (subst_ty sbst') ctx, subst_ty sbst' ty, cnstrs, compose_subst sbst' sbst) in
@@ -170,7 +175,7 @@ and explode_skeleton ~pos p ty_new (ctx, ty, cnstrs, sbst) =
   let tys' = List.map (fun p -> (p, Type.refresh ty_new)) ps in
   let sbst' = {
     identity_subst with 
-    ty_param = (fun p' -> match Common.lookup p' tys' with Some ty' -> ty' | None -> Type.TyParam p')
+    ty_param = tys'
   } in
   let cnstrs = {cnstrs with Constraints.ty = new_ty_grph} in
   let ty_sch = (Common.assoc_map (subst_ty sbst') ctx, subst_ty sbst' ty, cnstrs, compose_subst sbst' sbst) in
@@ -266,9 +271,12 @@ let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
 
 let finalize ctx ty chngs =
   let ctx, ty, cnstrs, sbst = List.fold_right Common.id chngs (ctx, ty, Constraints.empty, identity_subst) in
-  let ty = subst_ty sbst ty in
-  let ctx = Common.assoc_map (subst_ty sbst) ctx in
-  (ctx, ty, cnstrs)
+  if sbst = identity_subst then
+    (ctx, ty, cnstrs)
+  else
+    let ty = subst_ty sbst ty in
+    let ctx = Common.assoc_map (subst_ty sbst) ctx in
+    (ctx, ty, cnstrs)
 
 let finalize_ty_scheme ~pos ctx ty chngs =
   let ty_sch = finalize ctx ty (normalize_context ~pos :: chngs) in
