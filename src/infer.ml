@@ -97,7 +97,7 @@ let rec infer_pattern (p, pos) =
       end
 
   in
-  (* Print.debug "%t : %t" (Core.print_pattern (p, pos)) (Scheme.print_ty_scheme ty_sch); *)
+  (* Print.debug "%t : %t" (Syntax.print_pattern (p, pos)) (Scheme.print_ty_scheme ty_sch); *)
   ty_sch
 
 (* [infer_expr env e] infers the type scheme of an expression [e] in a
@@ -111,7 +111,7 @@ let rec infer_expr env (e, pos) =
   let unify = Scheme.finalize_ty_scheme ~pos in
   let ty_sch = match e with
 
-  | Core.Var x ->
+  | Syntax.Var x ->
       begin match Ctx.lookup env x with
       | Some (ctx, ty, cnstrs) ->
           (ctx, ty, cnstrs)
@@ -120,10 +120,10 @@ let rec infer_expr env (e, pos) =
           unify [(x, ty)] ty []
       end
 
-  | Core.Const const ->
+  | Syntax.Const const ->
       simple (ty_of_const const)
 
-  | Core.Tuple es ->
+  | Syntax.Tuple es ->
       let infer e (ctx, tys, chngs) =
         let ctx_e, ty_e, cnstrs_e = infer_expr env e in
         ctx_e @ ctx, ty_e :: tys, [
@@ -133,10 +133,10 @@ let rec infer_expr env (e, pos) =
       let ctx, tys, chngs = List.fold_right infer es ([], [], []) in
       unify ctx (Type.Tuple tys) chngs
 
-  | Core.Record [] ->
+  | Syntax.Record [] ->
       assert false
 
-  | Core.Record (((fld, _) :: _) as lst) ->
+  | Syntax.Record (((fld, _) :: _) as lst) ->
       if not (Pattern.linear_record lst) then
         Error.typing ~pos "Fields in a record must be distinct";
       begin match Tctx.infer_field fld with
@@ -159,7 +159,7 @@ let rec infer_expr env (e, pos) =
         unify ctx ty chngs
       end
 
-  | Core.Variant (lbl, e) ->
+  | Syntax.Variant (lbl, e) ->
       begin match Tctx.infer_variant lbl with
       | None -> Error.typing ~pos "Unbound constructor %s" lbl
       | Some (ty, arg_ty) ->
@@ -176,11 +176,11 @@ let rec infer_expr env (e, pos) =
           end
       end
       
-  | Core.Lambda a ->
+  | Syntax.Lambda a ->
       let ctx, ty1, drty2, cnstrs = infer_abstraction env a in
       ctx, Type.Arrow (ty1, drty2), cnstrs
       
-  | Core.Operation (e, op) ->
+  | Syntax.Operation (e, op) ->
       let r = Type.fresh_region_param () in
       begin match Tctx.infer_operation op r with
       | None -> Error.typing ~pos "Unbound operation %s" op
@@ -193,7 +193,7 @@ let rec infer_expr env (e, pos) =
           ]
       end
 
-  | Core.Handler {Core.operations = ops; Core.value = a_val; Core.finally = a_fin} -> 
+  | Syntax.Handler {Syntax.operations = ops; Syntax.value = a_val; Syntax.finally = a_fin} -> 
       let drt_mid = Type.fresh_dirt () in
       let ty_mid = Type.fresh_ty () in
 
@@ -254,7 +254,7 @@ let rec infer_expr env (e, pos) =
       ] @ chngs_ops @ chngs)
 
   in
-  (* Print.debug "%t : %t" (Core.print_expression (e, pos)) (Scheme.print_ty_scheme ty_sch); *)
+  (* Print.debug "%t : %t" (Syntax.print_expression (e, pos)) (Scheme.print_ty_scheme ty_sch); *)
   ty_sch
               
 (* [infer_comp env c] infers the dirty type scheme of a computation [c] in a
@@ -269,11 +269,11 @@ and infer_comp env (c, pos) =
   let unify = Scheme.finalize_dirty_scheme ~pos in
   let drty_sch = match c with
 
-  | Core.Value e ->
+  | Syntax.Value e ->
       let ctx, ty, cnstrs = infer_expr env e in
       ctx, (ty, empty_dirt ()), cnstrs
 
-  | Core.Let (defs, c) ->
+  | Syntax.Let (defs, c) ->
       let vars, nonpoly, change = infer_let ~pos env defs in
       let change2 (ctx_c, drty_c, cnstrs_c) =
         Scheme.finalize_dirty_scheme ~pos (ctx_c) drty_c ([
@@ -284,19 +284,19 @@ and infer_comp env (c, pos) =
       let env' = List.fold_right (fun (x, ty_sch) env -> Ctx.extend env x ty_sch) vars env in
       change2 (change (infer_comp env' c))
 
-  | Core.LetRec (defs, c) ->
+  | Syntax.LetRec (defs, c) ->
       let vars, change = infer_let_rec ~pos env defs in
       let env' = List.fold_right (fun (x, ty_sch) env -> Ctx.extend env x ty_sch) vars env in
       change (infer_comp env' c)
 
-  | Core.Match (e, []) ->
+  | Syntax.Match (e, []) ->
       let ctx_e, ty_e, cnstrs_e = infer_expr env e in
       unify ctx_e (Type.fresh_ty (), empty_dirt ()) [
         ty_less ~pos ty_e Type.empty_ty;
         just cnstrs_e
       ]
 
-  | Core.Match (e, cases) ->
+  | Syntax.Match (e, cases) ->
       let ctx_e, ty_e, cnstrs_e = infer_expr env e in
       let drty = Type.fresh_dirty () in
       let infer_case ((p, c) as a) (ctx, chngs) =
@@ -310,7 +310,7 @@ and infer_comp env (c, pos) =
       let ctx, chngs = List.fold_right infer_case cases (ctx_e, [just cnstrs_e]) in
       unify ctx drty chngs
 
-  | Core.While (c1, c2) ->
+  | Syntax.While (c1, c2) ->
       let ctx_c1, (ty_c1, drt_c1), cnstrs_c1 = infer_comp env c1 in
       let ctx_c2, (ty_c2, drt_c2), cnstrs_c2 = infer_comp env c2 in
       let drt = Type.fresh_dirt () in
@@ -323,7 +323,7 @@ and infer_comp env (c, pos) =
         just cnstrs_c2
       ]
 
-  | Core.For (i, e1, e2, c, _) ->
+  | Syntax.For (i, e1, e2, c, _) ->
       let ctx_e1, ty_e1, cnstrs_e1 = infer_expr env e1 in
       let ctx_e2, ty_e2, cnstrs_e2 = infer_expr env e2 in
       let ctx_c, (ty_c, drt_c), cnstrs_c = infer_comp env c in
@@ -336,7 +336,7 @@ and infer_comp env (c, pos) =
         just cnstrs_c
       ]
 
-  | Core.Apply (e1, e2) ->
+  | Syntax.Apply (e1, e2) ->
       let ctx_e1, ty_e1, cnstrs_e1 = infer_expr env e1 in
       let ctx_e2, ty_e2, cnstrs_e2 = infer_expr env e2 in
       let drty = Type.fresh_dirty () in
@@ -346,7 +346,7 @@ and infer_comp env (c, pos) =
         just cnstrs_e2
       ]
 
-  | Core.New (eff, rsrc) ->
+  | Syntax.New (eff, rsrc) ->
       begin match Tctx.fresh_tydef ~pos eff with
       | (params, Tctx.Effect ops) ->
           let ctx, chngs =
@@ -377,7 +377,7 @@ and infer_comp env (c, pos) =
       | _ -> Error.typing ~pos "Effect type expected but %s encountered" eff
       end
 
-  | Core.Handle (e, c) ->
+  | Syntax.Handle (e, c) ->
       let ctx_e, ty_e, cnstrs_e = infer_expr env e
       and ctx_c, drty_c, cnstrs_c = infer_comp env c
       and drty = Type.fresh_dirty () in
@@ -387,12 +387,12 @@ and infer_comp env (c, pos) =
         just cnstrs_c
       ]
 
-  | Core.Check c ->
+  | Syntax.Check c ->
       ignore (infer_comp env c);
       simple (Type.unit_ty, empty_dirt ())
 
   in
-  (* Print.debug "%t : %t" (Core.print_computation (c, pos)) (Scheme.print_dirty_scheme drty_sch); *)
+  (* Print.debug "%t : %t" (Syntax.print_computation (c, pos)) (Scheme.print_dirty_scheme drty_sch); *)
   drty_sch
 
 and infer_abstraction env (p, c) =
@@ -427,10 +427,10 @@ and infer_let ~pos env defs =
     let ctx_c, drty_c, cnstrs_c = infer_comp env c in
     let poly, nonpoly =
       match fst c with
-      | Core.Value _ ->
+      | Syntax.Value _ ->
           ctx_p @ poly, nonpoly
-      | Core.Apply _ | Core.Match _ | Core.While _ | Core.For _ | Core.New _
-      | Core.Handle _ | Core.Let _ | Core.LetRec _ | Core.Check _ ->
+      | Syntax.Apply _ | Syntax.Match _ | Syntax.While _ | Syntax.For _ | Syntax.New _
+      | Syntax.Handle _ | Syntax.Let _ | Syntax.LetRec _ | Syntax.Check _ ->
           poly, ctx_p @ nonpoly
     in
     poly, nonpoly, ctx_c @ ctx, [

@@ -215,7 +215,7 @@ let fresh_variable = Common.fresh (fun n -> (n, "$gen" ^ string_of_int n))
 
 let id_abstraction pos =
   let x = fresh_variable () in
-  ((Pattern.Var x, pos), (Core.Value (Core.Var x, pos), pos))
+  ((Pattern.Var x, pos), (Syntax.Value (Syntax.Var x, pos), pos))
 
 let pattern ?(forbidden=[]) (p, pos) =
   let vars = ref [] in
@@ -254,36 +254,36 @@ let rec expression ctx (t, pos) =
   let w, e = match t with
   | Sugared.Var x ->
       begin match Common.lookup x ctx with
-      | Some n -> [], Core.Var n
+      | Some n -> [], Syntax.Var n
       | None -> Error.typing ~pos "Unknown variable %s" x
       end
   | Sugared.Const k ->
-      [], Core.Const k
+      [], Syntax.Const k
   | Sugared.Lambda a ->
       let a = abstraction ctx a in
-      [], Core.Lambda a
+      [], Syntax.Lambda a
   | Sugared.Function cs ->
       let x = fresh_variable () in
       let cs = List.map (abstraction ctx) cs in
-      [], Core.Lambda ((Pattern.Var x, pos), (Core.Match ((Core.Var x, pos), cs), pos))
+      [], Syntax.Lambda ((Pattern.Var x, pos), (Syntax.Match ((Syntax.Var x, pos), cs), pos))
   | Sugared.Handler cs ->
       let w, h = handler pos ctx cs in
-      w, Core.Handler h
+      w, Syntax.Handler h
   | Sugared.Tuple ts ->
       let w, es = expressions ctx ts in
-      w, Core.Tuple es
+      w, Syntax.Tuple es
   | Sugared.Record ts ->
       if not (C.injective fst ts) then Error.syntax ~pos "Fields in a record must be distinct";
       let w, es = record_expressions ctx ts in
-      w, Core.Record es
+      w, Syntax.Record es
   | Sugared.Variant (lbl, None) ->
-      [], Core.Variant (lbl, None)
+      [], Syntax.Variant (lbl, None)
   | Sugared.Variant (lbl, Some t) ->
       let w, e = expression ctx t in
-      w, Core.Variant (lbl, Some e)
+      w, Syntax.Variant (lbl, Some e)
   | Sugared.Operation (t, op) ->
       let w, e = expression ctx t in
-      w, Core.Operation (e, op)
+      w, Syntax.Operation (e, op)
   (* Terms that are desugared into computations. We list them explicitly in
      order to catch any future constructs. *)
   | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
@@ -291,13 +291,13 @@ let rec expression ctx (t, pos) =
       let x = fresh_variable () in
       let c = computation ctx (t, pos) in
       let w = [(Pattern.Var x, pos), c] in
-      w, Core.Var x
+      w, Syntax.Var x
   in
   w, (e, pos)
 
 and computation ctx (t, pos) =
   let if_then_else e ((_, pos1) as c1) ((_, pos2) as c2) =
-    Core.Match (e, [
+    Syntax.Match (e, [
       (Pattern.Const (C.Boolean true), pos1), c1;
       (Pattern.Const (C.Boolean false), pos2), c2
     ])
@@ -306,29 +306,29 @@ and computation ctx (t, pos) =
     | Sugared.Apply ((Sugared.Apply ((Sugared.Var "&&", pos1), t1), pos2), t2) ->
       let w1, e1 = expression ctx t1 in
       let c2 = computation ctx t2 in
-          w1, if_then_else e1 c2 ((Core.Value (Core.Const (C.Boolean false), pos2)), pos2)
+          w1, if_then_else e1 c2 ((Syntax.Value (Syntax.Const (C.Boolean false), pos2)), pos2)
     | Sugared.Apply ((Sugared.Apply ((Sugared.Var "||", pos1), t1), pos2), t2) ->
       let w1, e1 = expression ctx t1 in
       let c2 = computation ctx t2 in
-          w1, if_then_else e1 ((Core.Value (Core.Const (C.Boolean true), pos2)), pos2) c2
+          w1, if_then_else e1 ((Syntax.Value (Syntax.Const (C.Boolean true), pos2)), pos2) c2
     | Sugared.Apply (t1, t2) ->
         let w1, e1 = expression ctx t1 in
         let w2, e2 = expression ctx t2 in
-          (w1 @ w2), Core.Apply (e1, e2)
+          (w1 @ w2), Syntax.Apply (e1, e2)
     | Sugared.Match (t, cs) ->
         let cs = List.map (abstraction ctx) cs in
         let w, e = expression ctx t in
-          w, Core.Match (e, cs)
+          w, Syntax.Match (e, cs)
     | Sugared.New (eff, None) ->
-        [], Core.New (eff, None)
+        [], Syntax.New (eff, None)
     | Sugared.New (eff, Some (t, lst)) ->
         let w, e = expression ctx t in
         let lst = List.map (fun (op, a) -> (op, abstraction2 ctx a)) lst in
-          w, Core.New (eff, Some (e, lst))
+          w, Syntax.New (eff, Some (e, lst))
     | Sugared.Handle (t1, t2) ->
         let w1, e1 = expression ctx t1 in
         let c2 = computation ctx t2 in
-          w1, Core.Handle (e1, c2)
+          w1, Syntax.Handle (e1, c2)
     | Sugared.Conditional (t, t1, t2) ->
         let w, e = expression ctx t in
         let c1 = computation ctx t1 in
@@ -337,16 +337,16 @@ and computation ctx (t, pos) =
     | Sugared.While (t1, t2) ->
         let c1 = computation ctx t1 in
         let c2 = computation ctx t2 in
-          [], Core.While (c1, c2)
+          [], Syntax.While (c1, c2)
 
     | Sugared.For (i, t1, t2, t, b) ->
       let w1, e1 = expression ctx t1 in
       let w2, e2 = expression ctx t2 in
       let j = fresh_variable () in
       let c = computation ((i, j) :: ctx) t in
-        w1 @ w2, Core.For (j, e1, e2, c, b)
+        w1 @ w2, Syntax.For (j, e1, e2, c, b)
     | Sugared.Check t ->
-        [], Core.Check (computation ctx t)
+        [], Syntax.Check (computation ctx t)
     | Sugared.Let (defs, t) ->
         let ctx', defs, _ =
             List.fold_right (fun (p, c) (ctx', defs, forbidden) ->
@@ -359,7 +359,7 @@ and computation ctx (t, pos) =
                     let c = computation ctx c in
                     (p_vars @ ctx', (p, c) :: defs, (List.map fst p_vars) @ forbidden)) defs (ctx, [], []) in
         let c = computation ctx' t in
-          [], Core.Let (defs, c)
+          [], Syntax.Let (defs, c)
     | Sugared.LetRec (defs, t) ->
         let ctx', ns, _ = List.fold_right (fun (x, t) (ctx', ns, forbidden) ->
                                           if List.mem x forbidden then
@@ -371,16 +371,16 @@ and computation ctx (t, pos) =
                             let c = let_rec ctx' c in
                             ((p, c) :: defs)) (List.combine ns defs) [] in
         let c = computation ctx' t in
-          [], Core.LetRec (defs, c)
+          [], Syntax.LetRec (defs, c)
     (* The remaining cases are expressions, which we list explicitly to catch any
        future changes. *)
     | (Sugared.Var _ | Sugared.Const _ | Sugared.Tuple _ | Sugared.Record _  | Sugared.Variant _ | Sugared.Lambda _ | Sugared.Function _ | Sugared.Handler _ | Sugared.Operation _) ->
         let w, e = expression ctx (t, pos) in
-          w, Core.Value e
+          w, Syntax.Value e
   in
     match w with
       | [] -> (c, pos)
-      | _ :: _ -> Core.Let (w, (c, pos)), pos
+      | _ :: _ -> Syntax.Let (w, (c, pos)), pos
 
 and abstraction ctx (p, t) =
   let vars, p = pattern p in
@@ -396,7 +396,7 @@ and let_rec ctx = function
   | (Sugared.Function cs, pos) ->
     let x = fresh_variable () in
     let cs = List.map (abstraction ctx) cs in
-    ((Pattern.Var x, pos), (Core.Match ((Core.Var x, pos), cs), pos))
+    ((Pattern.Var x, pos), (Syntax.Match ((Syntax.Var x, pos), cs), pos))
   | (_, pos) -> Error.syntax ~pos "This kind of expression is not allowed in a recursive definition"
 
 and expressions ctx = function
@@ -422,10 +422,10 @@ and handler pos ctx {Sugared.operations=ops; Sugared.value=val_a; Sugared.finall
     w @ ws, ((e, op), abstraction2 ctx a2) :: cs'
   in
   let ws, ops = operation_cases ops in
-  ws, { Core.operations = ops;
-    Core.value =
+  ws, { Syntax.operations = ops;
+    Syntax.value =
       (match val_a with None -> id_abstraction pos | Some a -> abstraction ctx a);
-    Core.finally =
+    Syntax.finally =
       (match fin_a with None -> id_abstraction pos | Some a -> abstraction ctx a)}
 
 let top_ctx = ref []

@@ -13,8 +13,8 @@ val empty : t
 
 (** [lookup ctx x] returns a fresh instance of the type scheme assigned
     to the variable [x] in the context [ctx]. *)
-val lookup : t -> Core.variable -> Scheme.ty_scheme option
+val lookup : t -> Syntax.variable -> Scheme.ty_scheme option
 
 (** [extend x ty_scheme ctx] returns the context [ctx] extended with
     a variable [x] bound to the type scheme [ty_scheme]. *)
-val extend : t -> Core.variable -> Scheme.ty_scheme -> t
+val extend : t -> Syntax.variable -> Scheme.ty_scheme -> t

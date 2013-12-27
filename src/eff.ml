@@ -96,7 +96,7 @@ let infer_top_comp (ctx, top_change) c =
   let change = Scheme.add_to_top ~pos:(snd c) ctx' cnstrs' in
   let top_change = Common.compose top_change change in
   let ctx = match fst c with
-  | Core.Value _ -> ctx'
+  | Syntax.Value _ -> ctx'
   | _ -> (SyntaxDesugar.fresh_variable (), ty') :: ctx'
   in
   let drty_sch = top_change (ctx, (ty', drt'), cnstrs') in

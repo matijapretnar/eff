@@ -1,4 +1,4 @@
-type context = (Core.variable, Type.ty) Common.assoc
+type context = (Syntax.variable, Type.ty) Common.assoc
 type ty_scheme = context * Type.ty * Constraints.t
 type dirty_scheme = context * Type.dirty * Constraints.t
 type change
