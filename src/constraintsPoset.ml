@@ -90,8 +90,8 @@ struct
     in
     let (skel, new_grph) = remove [] grph in
     let ps = Common.uniq (p :: keys skel) in
-    let cstrs = fold_edges (fun p q acc -> (p, q) :: acc) skel [] in
-    (new_grph, ps, cstrs)
+    let rest = fold_edges (fun p q acc -> (p, q) :: acc) skel [] in
+    (new_grph, ps, rest)
 
   let garbage_collect pos neg grph =
     let pos = List.fold_right S.add pos S.empty
