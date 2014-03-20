@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+
+    <title>Eff by matijapretnar</title>
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <h1>Eff</h1>
+        <h2>A functional programming language based on algebraic effects and their handlers.</h2>
+
+        <section id="downloads">
+          <a href="https://github.com/matijapretnar/eff/zipball/master" class="btn">Download as .zip</a>
+          <a href="https://github.com/matijapretnar/eff/tarball/master" class="btn">Download as .tar.gz</a>
+          <a href="https://github.com/matijapretnar/eff" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+        </section>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="main_content">
+        <h1>
+<a name="eff" class="anchor" href="#eff"><span class="octicon octicon-link"></span></a>Eff</h1>
+
+<p>Eff is a functional programming language based on algebraic effects and
+their handlers.</p>
+
+<p>Algebraic effects are a way of adding computational effects to a pure
+functional setting. In a technical sense they are subsumed by the monadic
+approach to computational effects, but they offer new ways of programming
+that are not easily achieved with monads. In particular, algebraic effects
+are combined seamlessly, whereas monad transformers are needed in the
+monadic style.</p>
+
+<p>The main idea of eff is that computational effects are accessed through a
+set of operations, for example <code>lookup</code> and <code>update</code> for state, <code>read</code> and
+<code>write</code> for I/O, <code>raise</code> for exceptions, etc. The behavior of operations is
+determined by handlers. Just like an exception handler determines what
+happens when an exception is raised, a general handler describes the
+actions taken when an operation is triggered. Examples of handlers include
+state, transactions, non-determinism, stream redirection, backtracking,
+delimited continuations, and many others.</p>
+
+<p>Because eff supports first-class effects and handlers, programmers may
+define new computational effects, combine existing ones, and handle effects
+in novel ways. For instance, ML-style references are a defined concept in
+eff.</p>
+
+<p>Eff code looks and feels like that of Ocaml because eff uses Ocaml syntax
+extended with constructs for effects and handlers. Furthermore, eff is a
+statically typed language with parametric polymorphism and type inference.
+The types are similar to those of OCaml and other variants of ML in the
+sense that they do not express any information about computational effects.</p>
+
+<p>For further information visit the <a href="http://math.andrej.com/eff/">eff page</a>
+or contact the authors Andrej Bauer <a href="mailto:Andrej.Bauer@andrej.com">Andrej.Bauer@andrej.com</a> and Matija
+Pretnar <a href="mailto:matija@pretnar.info">matija@pretnar.info</a>.</p>
+
+<h2>
+<a name="obtaining-eff" class="anchor" href="#obtaining-eff"><span class="octicon octicon-link"></span></a>Obtaining eff</h2>
+
+<h3>
+<a name="prerequisites" class="anchor" href="#prerequisites"><span class="octicon octicon-link"></span></a>Prerequisites</h3>
+
+<p>We have tested eff on Mac OS X and Linux, and it should work in other
+Unix-like environments. In principle, nothing prevents eff from running
+on Windows, we just have not tested it yet.</p>
+
+<p>To install eff, you need a standard Unix-style build environment as well as</p>
+
+<ol>
+<li>
+<a href="http://caml.inria.fr/ocaml/">OCaml</a>, version 3.12 or newer, and</li>
+<li>
+<a href="http://cristal.inria.fr/%7Efpottier/menhir/">Menhir</a> parser generator</li>
+</ol><p>We do not require, but recommend a command-line editing wrapper such as
+<a href="http://utopia.knoware.nl/%7Ehlub/rlwrap/#rlwrap">rlwrap</a> or
+<a href="http://cristal.inria.fr/%7Eddr/ledit/">ledit</a>. Eff uses these automatically.</p>
+
+<h3>
+<a name="compilation" class="anchor" href="#compilation"><span class="octicon octicon-link"></span></a>Compilation</h3>
+
+<p>To compile eff, first run</p>
+
+<pre><code>./configure
+</code></pre>
+
+<p>If it complains you will have to install missing prerequisites. The
+configuration script takes standard GNU Autoconf arguments, such as
+<code>--prefix</code> which determines where to install eff. Type <code>./configure --help</code>
+for more information. Next, run</p>
+
+<pre><code>make
+</code></pre>
+
+<p>If all goes well, you should be able to run eff in-place by typing <code>./eff</code>.</p>
+
+<p>You can also run a battery of tests with</p>
+
+<pre><code>make test
+</code></pre>
+
+<h3>
+<a name="installation" class="anchor" href="#installation"><span class="octicon octicon-link"></span></a>Installation</h3>
+
+<p>To install the command <code>eff</code>, run</p>
+
+<pre><code>sudo make install
+</code></pre>
+
+<p>See the file <code>etc/README.txt</code> for editor support.</p>
+
+<h2>
+<a name="copyright-and-license" class="anchor" href="#copyright-and-license"><span class="octicon octicon-link"></span></a>Copyright and license</h2>
+
+<p>Copyright (c) 2012, Andrej Bauer and Matija Pretnar
+Copyright (c) 2012, Timotej Lazar</p>
+
+<p>Eff is distributed under the abbreviated BSD License, see <code>LICENSE.txt</code> for
+licensing information.</p>
+      </section>
+    </div>
+
+    
+  </body>
+</html>
