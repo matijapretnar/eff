@@ -1,72 +1,95 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <title>Eff by matijapretnar</title>
-    <link rel="stylesheet" href="stylesheets/styles.css">
-    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
-    <script src="javascripts/respond.js"></script>
-    <!--[if lt IE 9]>
-      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
-    <!--[if lt IE 8]>
-    <link rel="stylesheet" href="stylesheets/ie.css">
-    <![endif]-->
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
 
-  </head>
-  <body>
-      <div id="header">
-        <nav>
-          <li class="fork"><a href="https://github.com/matijapretnar/eff">View On GitHub</a></li>
-          <li class="downloads"><a href="https://github.com/matijapretnar/eff/zipball/master">ZIP</a></li>
-          <li class="downloads"><a href="https://github.com/matijapretnar/eff/tarball/master">TAR</a></li>
-          <li class="title">DOWNLOADS</li>
-        </nav>
-      </div><!-- end header -->
+    <title>Eff — a functional language with effect handlers</title>
 
-    <div class="wrapper">
+    <link rel="stylesheet" href="css/inuit.css">
+    <link rel="stylesheet" href="css/grid.inuit.css">
+    <link rel="stylesheet" href="css/style.css">
 
-      <section>
-        <div id="title">
-          <h1>Eff</h1>
-          <p>A functional programming language based on algebraic effects and their handlers.</p>
-          <hr>
-          <span class="credits left">Project maintained by <a href="https://github.com/matijapretnar">matijapretnar</a></span>
-          <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="https://twitter.com/michigangraham">mattgraham</a></span>
-        </div>
+    <link rel="shortcut icon" href="img/favicon.ico">
+    <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+</head>
 
-        <h1>
-<a name="about-eff" class="anchor" href="#about-eff"><span class="octicon octicon-link"></span></a>About Eff</h1>
+<body class="wrapper">
 
-<p>Eff is a functional programming language based on algebraic effects and their handlers.</p>
-
-<p>Algebraic effects are a way of adding computational effects to a pure functional setting. In a technical sense they are subsumed by the monadic approach to computational effects, but they offer new ways of programming that are not easily achieved with monads. In particular, algebraic effects are combined seamlessly, whereas monad transformers are needed in the monadic style.</p>
-
-<p>The main idea of Eff is that computational effects are accessed through a set of operations, for example <code>lookup</code> and <code>update</code> for state, <code>read</code> and <code>write</code> for I/O, <code>raise</code> for exceptions, etc. The behavior of operations is determined by handlers. Just like an exception handler determines what happens when an exception is raised, a general handler describes the actions taken when an operation is triggered. Examples of handlers include state, transactions, non-determinism, stream redirection, backtracking, delimited continuations, and many others.</p>
-
-<p>Because Eff supports first-class effects and handlers, programmers may define new computational effects, combine existing ones, and handle effects in novel ways. For instance, ML-style references are a defined concept in Eff.</p>
-
-<p>Eff code looks and feels like that of Ocaml because Eff uses Ocaml syntax extended with constructs for effects and handlers. Furthermore, Eff is a statically typed language with parametric polymorphism and type inference. The types are similar to those of OCaml and other variants of ML in the sense that they do not express any information about computational effects.</p>
-
-<p>Eff was developed by <a href="http://andrej.com/">Andrej Bauer</a> and <a href="http://matija.pretnar.info/">Matija Pretnar</a>.</p>
-
-<h1>
-<a name="eff-resources" class="anchor" href="#eff-resources"><span class="octicon octicon-link"></span></a>Eff resources</h1>
-
-<ul>
-<li>the source code is freely available on <a href="https://github.com/matijapretnar/eff">Github</a>
-</li>
-<li>the Eff paper on arXiv “<a href="http://arxiv.org/abs/1203.1539"></a><a href="http://arxiv.org/abs/1203.1539">Programming with algebraic effects and handlers</a>
-</li>
-<li>the Mathematics and Computation <a href="http://math.andrej.com/category/programming/Eff/">posts about Eff</a> (beware that some of them are fairly old and talk about an outdated version of Eff)</li>
-</ul>
-      </section>
-
+    <div class="header">
+        <h1><em>Eff</em></h1>
+        <h3>
+            <em>Eff</em> is a functional language with handlers of not only exceptions,
+            but also of other computational effects such as state or I/O.
+            With handlers, you can simply implement transactions, redirections, backtracking, multi-threading,
+            and much more…
+        </h3>
     </div>
-    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
-    
-  </body>
+
+    <hr />
+
+    <div class="header">
+        <h2>Reasons to like <em>Eff</em></h2>
+    </div>
+
+    <div class="grids">
+        <div class="grid-4">
+            <h3>Effects are first-class citizens</h3>
+            <p>
+                <em>Eff</em> is built around a powerful uniform representation of effects,
+                which allows you to
+                seamlessly combine effects (no monad transformers),
+                override existing effects
+                and define your own effects.
+            </p>
+        </div><!-- /grid-4 -->
+
+        <div class="grid-4">
+            <h3>Precise control over effects</h3>
+            <p>
+                <em>Eff</em> infers not only the type of the result, but also the set of all effects that may happen when computing it.
+                To boot, handlers allow you to change an effectful computation into one bound to be pure.
+            </p>
+        </div><!-- /grid-4 -->
+
+        <div class="grid-4">
+            <h3>Strong theoretical foundations</h3>
+            <p>
+                <em>Eff</em> was built to test the mathematical ideas of algebraic effects in practice.
+                Thus, every new feature of <em>Eff</em> is backed by peer-reviewed research.
+            </p>
+        </div><!-- /grid-4 -->
+    </div>
+
+    <hr />
+
+    <div class="header">
+        <h2>Interested?</h2>
+    </div>
+
+    <p>
+        The source code is freely available on <a href="https://github.com/matijapretnar/eff">Github</a>.
+        If you want to know more about <em>Eff</em>, take a look at:
+        <ul>
+            <li>the paper <a href="http://arxiv.org/abs/1203.1539">Programming with Algebraic Effects and Handlers</a>,
+                which introduces <em>Eff</em>
+            <li>the paper <a href="http://arxiv.org/abs/1306.6316">An Effect System for Algebraic Effects and Handlers</a>,
+                which describes the effect system of <em>Eff</em>
+            <li>the paper <a href="http://arxiv.org/abs/1312.2334">Inferring Algebraic Effects</a>,
+                which describes the algorithm that <em>Eff</em> uses to infer effects
+            <li>the paper <a href="http://arxiv.org/abs/1312.1399">Handling Algebraic Effects</a>,
+                which describes the mathematical background of handlers
+            <li>old Mathematics and Computation <a href="http://math.andrej.com/category/programming/Eff/">posts about Eff</a>
+                (beware that some of them are fairly old and talk about an outdated version of Eff)
+        </ul>
+    </p>
+
+
+    <div class="footer">
+        <p>
+            &copy; Andrej Bauer and Matija Pretnar
+            (made with <a href="http://csswizardry.com/inuitcss/">inuit.css</a>)
+        </p>
+    </div>
+
+</body>
 </html>
