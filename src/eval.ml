@@ -61,7 +61,7 @@ let rec sequence k = function
       V.Operation (op, v, k'')
 
 let rec ceval env (c, pos) = match c with
-  | Core.Apply (e1, e2) ->
+  | Syntax.Apply (e1, e2) ->
       let v1 = veval env e1
       and v2 = veval env e2 in
       begin match v1 with
@@ -69,10 +69,10 @@ let rec ceval env (c, pos) = match c with
       | _ -> Error.runtime "Only functions can be applied."
       end
 
-  | Core.Value e ->
+  | Syntax.Value e ->
       V.Value (veval env e)
 
-  | Core.Match (e, cases) ->
+  | Syntax.Match (e, cases) ->
       let v = veval env e in
       let rec eval_case = function
         | [] -> Error.runtime "No branches succeeded in a pattern match."
@@ -82,7 +82,7 @@ let rec ceval env (c, pos) = match c with
       in
         eval_case cases
 
-  | Core.While (c1, c2) ->
+  | Syntax.While (c1, c2) ->
       let rec loop () =
         let k v =
           let b = V.to_bool v in
@@ -95,7 +95,7 @@ let rec ceval env (c, pos) = match c with
       in
       loop ()
           
-  | Core.For (i, e1, e2, c, up) ->
+  | Syntax.For (i, e1, e2, c, up) ->
       let n1 = V.to_int (veval env e1) in
       let n2 = V.to_int (veval env e2) in
       let le = if up then Big_int.le_big_int else Big_int.ge_big_int in
@@ -109,13 +109,13 @@ let rec ceval env (c, pos) = match c with
       in
       loop n1
 
-  | Core.Handle (e, c) ->
+  | Syntax.Handle (e, c) ->
       let v = veval env e in
       let r = ceval env c in
       let h = V.to_handler v in
       h r
 
-  | Core.New (eff, r) ->
+  | Syntax.New (eff, r) ->
       let r = (match r with
                  | None -> None
                  | Some (e, lst) ->
@@ -126,14 +126,14 @@ let rec ceval env (c, pos) = match c with
       let e = V.fresh_instance None r in
         V.Value e
 
-  | Core.Let (lst, c) ->
+  | Syntax.Let (lst, c) ->
       eval_let env lst c
 
-  | Core.LetRec (defs, c) ->
+  | Syntax.LetRec (defs, c) ->
       let env = extend_let_rec env defs in
       ceval env c
 
-  | Core.Check c ->
+  | Syntax.Check c ->
       let r = ceval env c in
       Print.check ~pos "%t" (Value.print_result r);
       V.unit_result
@@ -156,23 +156,23 @@ and extend_let_rec env defs =
   env
 
 and veval env (e, pos) = match e with
-  | Core.Var x ->
+  | Syntax.Var x ->
       begin match lookup x env with
       | Some v -> v
       | None -> Error.runtime "Name %t is not defined." (Print.variable x)
       end
-  | Core.Const c -> V.Const c
-  | Core.Tuple es -> V.Tuple (List.map (veval env) es)
-  | Core.Record es -> V.Record (List.map (fun (f, e) -> (f, veval env e)) es)
-  | Core.Variant (lbl, None) -> V.Variant (lbl, None)
-  | Core.Variant (lbl, Some e) -> V.Variant (lbl, Some (veval env e))
-  | Core.Lambda a -> V.Closure (eval_closure env a)
-  | Core.Operation (e, op) ->
+  | Syntax.Const c -> V.Const c
+  | Syntax.Tuple es -> V.Tuple (List.map (veval env) es)
+  | Syntax.Record es -> V.Record (List.map (fun (f, e) -> (f, veval env e)) es)
+  | Syntax.Variant (lbl, None) -> V.Variant (lbl, None)
+  | Syntax.Variant (lbl, Some e) -> V.Variant (lbl, Some (veval env e))
+  | Syntax.Lambda a -> V.Closure (eval_closure env a)
+  | Syntax.Operation (e, op) ->
       let n = V.to_instance (veval env e) in
       V.Closure (fun v -> V.Operation ((n, op), v, fun r -> V.Value r))
-  | Core.Handler h -> V.Handler (eval_handler env h)
+  | Syntax.Handler h -> V.Handler (eval_handler env h)
 
-and eval_handler env {Core.operations=ops; Core.value=value; Core.finally=fin} =
+and eval_handler env {Syntax.operations=ops; Syntax.value=value; Syntax.finally=fin} =
   let eval_op ((e, op), (p, kvar, c)) =
     let f u k = eval_closure (extend kvar (V.Closure k) env) (p, c) u in
     let (i, _, _) = V.to_instance (veval env e) in

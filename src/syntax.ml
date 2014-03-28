@@ -51,7 +51,6 @@ and operation = expression * Common.opsym
     the new state. *)
 and resource = expression * (Common.opsym, abstraction2) Common.assoc
 
-
 let rec print_pattern ?max_level (p,_) ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p with

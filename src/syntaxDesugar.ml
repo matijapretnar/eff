@@ -2,11 +2,12 @@
 
 module C = Common
 module T = Type
+module Sugared = SyntaxSugared
 
 (* ***** Desugaring of types. ***** *)
 
-let fresh_dirt_param = Common.fresh (fun n -> Syntax.DirtParam n)
-let fresh_region_param = Common.fresh (fun n -> Syntax.RegionParam n)
+let fresh_dirt_param = Common.fresh (fun n -> Sugared.DirtParam n)
+let fresh_region_param = Common.fresh (fun n -> Sugared.RegionParam n)
 
 (* Fill in missing dirt and region parameters in a type with fresh ones. Also resolves
    type applications so that applications of effect types are equipped with the extra region
@@ -17,16 +18,16 @@ let fill_args is_effect ty =
   and rs = ref []
   in
   let fresh_dirt_param _ =
-    let (Syntax.DirtParam x) as d = fresh_dirt_param () in
+    let (Sugared.DirtParam x) as d = fresh_dirt_param () in
       ds := x :: !ds ; d
   and fresh_region_param _ =
-    let (Syntax.RegionParam x) as r = fresh_region_param () in
+    let (Sugared.RegionParam x) as r = fresh_region_param () in
       rs := x :: !rs ; r
   in
   let rec fill (ty, pos) =
   let ty' =
   match ty with
-  | Syntax.TyApply (t, tys, drts_rgns, rgn) ->
+  | Sugared.TyApply (t, tys, drts_rgns, rgn) ->
       let tys = List.map fill tys
       and drts_rgns =
         begin match drts_rgns with
@@ -44,15 +45,15 @@ let fill_args is_effect ty =
           if is_effect t then Some (fresh_region_param ()) else None
       end
       in
-      Syntax.TyApply (t, tys, drts_rgns, rgn)
-  | Syntax.TyParam _ as ty -> ty
-  | Syntax.TyArrow (t1, t2, None) -> Syntax.TyArrow (fill t1, fill t2, Some (fresh_dirt_param ()))
-  | Syntax.TyArrow (t1, t2, Some drt) -> Syntax.TyArrow (fill t1, fill t2, Some drt)
-  | Syntax.TyTuple lst -> Syntax.TyTuple (List.map fill lst)
-  | Syntax.TyHandler (t1, None, t2, None) -> Syntax.TyHandler (fill t1, Some (fresh_dirt_param ()), fill t2, Some (fresh_dirt_param ()))
-  | Syntax.TyHandler (t1, Some drt, t2, None) -> Syntax.TyHandler (fill t1, Some drt, fill t2, Some (fresh_dirt_param ()))
-  | Syntax.TyHandler (t1, None, t2, Some drt) -> Syntax.TyHandler (fill t1, Some (fresh_dirt_param ()), fill t2, Some drt)
-  | Syntax.TyHandler (t1, Some drt1, t2, Some drt2) -> Syntax.TyHandler (fill t1, Some drt1, fill t2, Some drt2)
+      Sugared.TyApply (t, tys, drts_rgns, rgn)
+  | Sugared.TyParam _ as ty -> ty
+  | Sugared.TyArrow (t1, t2, None) -> Sugared.TyArrow (fill t1, fill t2, Some (fresh_dirt_param ()))
+  | Sugared.TyArrow (t1, t2, Some drt) -> Sugared.TyArrow (fill t1, fill t2, Some drt)
+  | Sugared.TyTuple lst -> Sugared.TyTuple (List.map fill lst)
+  | Sugared.TyHandler (t1, None, t2, None) -> Sugared.TyHandler (fill t1, Some (fresh_dirt_param ()), fill t2, Some (fresh_dirt_param ()))
+  | Sugared.TyHandler (t1, Some drt, t2, None) -> Sugared.TyHandler (fill t1, Some drt, fill t2, Some (fresh_dirt_param ()))
+  | Sugared.TyHandler (t1, None, t2, Some drt) -> Sugared.TyHandler (fill t1, Some (fresh_dirt_param ()), fill t2, Some drt)
+  | Sugared.TyHandler (t1, Some drt1, t2, Some drt2) -> Sugared.TyHandler (fill t1, Some drt1, fill t2, Some drt2)
   in
   (ty', pos)
   in
@@ -61,7 +62,7 @@ let fill_args is_effect ty =
 
 let fill_args_tydef is_effect def =
   match def with
-    | Syntax.TyRecord lst ->
+    | Sugared.TyRecord lst ->
       let (ds, rs, lst) =
         List.fold_right
           (fun (fld, ty) (ds, rs, lst) ->
@@ -69,8 +70,8 @@ let fill_args_tydef is_effect def =
               (ds' @ ds, rs' @ rs, (fld, ty) :: lst))
           lst Trio.empty
       in
-        (ds, rs), Syntax.TyRecord lst
-    | Syntax.TySum lst ->
+        (ds, rs), Sugared.TyRecord lst
+    | Sugared.TySum lst ->
       let (ds, rs, lst) =
         List.fold_right
           (fun (lbl, ty_op) (ds, rs, lst) ->
@@ -81,8 +82,8 @@ let fill_args_tydef is_effect def =
                   (ds' @ ds, rs' @ rs, (lbl, Some ty) :: lst))
           lst Trio.empty
       in
-        (ds, rs), Syntax.TySum lst
-    | Syntax.TyEffect lst ->
+        (ds, rs), Sugared.TySum lst
+    | Sugared.TyEffect lst ->
       let (ds, rs, lst) =
         List.fold_right
           (fun (op, (ty1, ty2)) (ds, rs, lst) ->
@@ -91,11 +92,11 @@ let fill_args_tydef is_effect def =
               (ds1 @ ds2 @ ds, rs1 @ rs2 @ rs, (op, (ty1, ty2)) :: lst))
           lst Trio.empty
       in
-        (ds, rs), Syntax.TyEffect lst
+        (ds, rs), Sugared.TyEffect lst
 
-    | Syntax.TyInline ty ->
+    | Sugared.TyInline ty ->
       let params, ty = fill_args is_effect ty in
-        params, Syntax.TyInline ty
+        params, Sugared.TyInline ty
 
 (* Desugar a type, where only the given type, dirt and region parameters may appear. 
    If a type application with missing dirt and region parameters is encountered,
@@ -107,7 +108,7 @@ let fill_args_tydef is_effect def =
 *)
 let ty (ts, ds, rs) =
   let rec ty (t, pos) = match t with
-  | Syntax.TyApply (t, tys, drts_rgns, rgn) ->
+  | Sugared.TyApply (t, tys, drts_rgns, rgn) ->
       let tys = List.map ty tys
       and (drts, rgns) = begin match drts_rgns with
         | Some (drts, rgns) -> (List.map (dirt pos) drts, List.map (region pos) rgns)
@@ -117,21 +118,21 @@ let ty (ts, ds, rs) =
         | None -> T.Apply (t, (tys, drts, rgns))
         | Some rgn -> T.Effect (t, (tys, drts, rgns), (region pos) rgn)
       end
-  | Syntax.TyParam t ->
+  | Sugared.TyParam t ->
     begin match C.lookup t ts with
     | None -> Error.syntax ~pos "Unbound type parameter '%s" t
     | Some p -> T.TyParam p
     end
-  | Syntax.TyArrow (t1, t2, Some drt) -> T.Arrow (ty t1, (ty t2, dirt pos drt))
-  | Syntax.TyArrow (t1, t2, None) -> assert false
-  | Syntax.TyTuple lst -> T.Tuple (List.map ty lst)
-  | Syntax.TyHandler (t1, Some drt1, t2, Some drt2) -> T.Handler ((ty t1, dirt pos drt1), (ty t2, dirt pos drt2))
-  | Syntax.TyHandler (t1, _, t2, _) -> assert false
-  and dirt pos (Syntax.DirtParam d) =
+  | Sugared.TyArrow (t1, t2, Some drt) -> T.Arrow (ty t1, (ty t2, dirt pos drt))
+  | Sugared.TyArrow (t1, t2, None) -> assert false
+  | Sugared.TyTuple lst -> T.Tuple (List.map ty lst)
+  | Sugared.TyHandler (t1, Some drt1, t2, Some drt2) -> T.Handler ((ty t1, dirt pos drt1), (ty t2, dirt pos drt2))
+  | Sugared.TyHandler (t1, _, t2, _) -> assert false
+  and dirt pos (Sugared.DirtParam d) =
     match C.lookup d ds with
     | None -> Error.syntax ~pos "Unbound dirt parameter 'drt%d" d
     | Some d -> Type.simple_dirt d
-  and region pos (Syntax.RegionParam r) =
+  and region pos (Sugared.RegionParam r) =
     match C.lookup r rs with
     | None -> Error.syntax ~pos "Unbound region parameter 'rgn%d" r
     | Some r -> r
@@ -146,14 +147,14 @@ let free_params t =
     | Some x -> f x
   in
   let rec ty (t, pos) = match t with
-  | Syntax.TyApply (_, tys, drts_rgns, rgn) ->
+  | Sugared.TyApply (_, tys, drts_rgns, rgn) ->
       Trio.flatten_map ty tys @@@ (optional dirts_regions) drts_rgns @@@ (optional region) rgn
-  | Syntax.TyParam s -> ([s], [], [])
-  | Syntax.TyArrow (t1, t2, drt) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt
-  | Syntax.TyTuple lst -> Trio.flatten_map ty lst
-  | Syntax.TyHandler (t1, drt1, t2, drt2) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt1 @@@ (optional dirt) drt2
-  and dirt (Syntax.DirtParam d) = ([], [d], [])
-  and region (Syntax.RegionParam r) = ([], [], [r])
+  | Sugared.TyParam s -> ([s], [], [])
+  | Sugared.TyArrow (t1, t2, drt) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt
+  | Sugared.TyTuple lst -> Trio.flatten_map ty lst
+  | Sugared.TyHandler (t1, drt1, t2, drt2) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt1 @@@ (optional dirt) drt2
+  and dirt (Sugared.DirtParam d) = ([], [d], [])
+  and region (Sugared.RegionParam r) = ([], [], [r])
   and dirts_regions (drts, rgns) = Trio.flatten_map dirt drts @@@ Trio.flatten_map region rgns
   in
   Trio.uniq (ty t)
@@ -169,10 +170,10 @@ let tydef params d =
   let (ts, ds, rs) as sbst = syntax_to_core_params params in
     (Trio.snds (ts, ds, rs),
      begin match d with
-       | Syntax.TyRecord lst -> Tctx.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
-       | Syntax.TySum lst -> Tctx.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
-       | Syntax.TyEffect lst -> Tctx.Effect (List.map (fun (op,(t1,t2)) -> (op, (ty sbst t1, ty sbst t2))) lst)
-       | Syntax.TyInline t -> Tctx.Inline (ty sbst t)
+       | Sugared.TyRecord lst -> Tctx.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
+       | Sugared.TySum lst -> Tctx.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
+       | Sugared.TyEffect lst -> Tctx.Effect (List.map (fun (op,(t1,t2)) -> (op, (ty sbst t1, ty sbst t2))) lst)
+       | Sugared.TyInline t -> Tctx.Inline (ty sbst t)
      end)
 
 (** [tydefs defs] desugars the simultaneous type definitions [defs]. *)
@@ -181,13 +182,13 @@ let tydefs ~pos defs =
   let is_effect =
     let rec find forbidden tyname =
       match C.lookup tyname defs with
-        | Some (_, (Syntax.TyRecord _ | Syntax.TySum _)) -> false
-        | Some (_, (Syntax.TyInline (Syntax.TyApply (tyname', _, _, _), pos))) ->
+        | Some (_, (Sugared.TyRecord _ | Sugared.TySum _)) -> false
+        | Some (_, (Sugared.TyInline (Sugared.TyApply (tyname', _, _, _), pos))) ->
           if List.mem tyname' forbidden
           then Error.typing ~pos "Type definition %s is cyclic." tyname' (* Compare to [Tctx.check_noncyclic]. *)
           else find (tyname :: forbidden) tyname'
-        | Some (_, Syntax.TyInline _) -> false
-        | Some (_, (Syntax.TyEffect _)) -> true
+        | Some (_, Sugared.TyInline _) -> false
+        | Some (_, (Sugared.TyEffect _)) -> true
         | None -> Tctx.is_effect ~pos tyname
     in
       find []
@@ -214,7 +215,7 @@ let fresh_variable = Common.fresh (fun n -> (n, "$gen" ^ string_of_int n))
 
 let id_abstraction pos =
   let x = fresh_variable () in
-  ((Pattern.Var x, pos), (Core.Value (Core.Var x, pos), pos))
+  ((Pattern.Var x, pos), (Syntax.Value (Syntax.Var x, pos), pos))
 
 let pattern ?(forbidden=[]) (p, pos) =
   let vars = ref [] in
@@ -251,102 +252,102 @@ let pattern ?(forbidden=[]) (p, pos) =
 
 let rec expression ctx (t, pos) =
   let w, e = match t with
-  | Syntax.Var x ->
+  | Sugared.Var x ->
       begin match Common.lookup x ctx with
-      | Some n -> [], Core.Var n
+      | Some n -> [], Syntax.Var n
       | None -> Error.typing ~pos "Unknown variable %s" x
       end
-  | Syntax.Const k ->
-      [], Core.Const k
-  | Syntax.Lambda a ->
+  | Sugared.Const k ->
+      [], Syntax.Const k
+  | Sugared.Lambda a ->
       let a = abstraction ctx a in
-      [], Core.Lambda a
-  | Syntax.Function cs ->
+      [], Syntax.Lambda a
+  | Sugared.Function cs ->
       let x = fresh_variable () in
       let cs = List.map (abstraction ctx) cs in
-      [], Core.Lambda ((Pattern.Var x, pos), (Core.Match ((Core.Var x, pos), cs), pos))
-  | Syntax.Handler cs ->
+      [], Syntax.Lambda ((Pattern.Var x, pos), (Syntax.Match ((Syntax.Var x, pos), cs), pos))
+  | Sugared.Handler cs ->
       let w, h = handler pos ctx cs in
-      w, Core.Handler h
-  | Syntax.Tuple ts ->
+      w, Syntax.Handler h
+  | Sugared.Tuple ts ->
       let w, es = expressions ctx ts in
-      w, Core.Tuple es
-  | Syntax.Record ts ->
+      w, Syntax.Tuple es
+  | Sugared.Record ts ->
       if not (C.injective fst ts) then Error.syntax ~pos "Fields in a record must be distinct";
       let w, es = record_expressions ctx ts in
-      w, Core.Record es
-  | Syntax.Variant (lbl, None) ->
-      [], Core.Variant (lbl, None)
-  | Syntax.Variant (lbl, Some t) ->
+      w, Syntax.Record es
+  | Sugared.Variant (lbl, None) ->
+      [], Syntax.Variant (lbl, None)
+  | Sugared.Variant (lbl, Some t) ->
       let w, e = expression ctx t in
-      w, Core.Variant (lbl, Some e)
-  | Syntax.Operation (t, op) ->
+      w, Syntax.Variant (lbl, Some e)
+  | Sugared.Operation (t, op) ->
       let w, e = expression ctx t in
-      w, Core.Operation (e, op)
+      w, Syntax.Operation (e, op)
   (* Terms that are desugared into computations. We list them explicitly in
      order to catch any future constructs. *)
-  | Syntax.Apply _ | Syntax.Match _ | Syntax.Let _ | Syntax.LetRec _
-  | Syntax.Handle _ | Syntax.Conditional _ | Syntax.While _ | Syntax.For _ | Syntax.New _ | Syntax.Check _ ->
+  | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
+  | Sugared.Handle _ | Sugared.Conditional _ | Sugared.While _ | Sugared.For _ | Sugared.New _ | Sugared.Check _ ->
       let x = fresh_variable () in
       let c = computation ctx (t, pos) in
       let w = [(Pattern.Var x, pos), c] in
-      w, Core.Var x
+      w, Syntax.Var x
   in
   w, (e, pos)
 
 and computation ctx (t, pos) =
   let if_then_else e ((_, pos1) as c1) ((_, pos2) as c2) =
-    Core.Match (e, [
+    Syntax.Match (e, [
       (Pattern.Const (C.Boolean true), pos1), c1;
       (Pattern.Const (C.Boolean false), pos2), c2
     ])
   in
   let w, c = match t with
-    | Syntax.Apply ((Syntax.Apply ((Syntax.Var "&&", pos1), t1), pos2), t2) ->
+    | Sugared.Apply ((Sugared.Apply ((Sugared.Var "&&", pos1), t1), pos2), t2) ->
       let w1, e1 = expression ctx t1 in
       let c2 = computation ctx t2 in
-          w1, if_then_else e1 c2 ((Core.Value (Core.Const (C.Boolean false), pos2)), pos2)
-    | Syntax.Apply ((Syntax.Apply ((Syntax.Var "||", pos1), t1), pos2), t2) ->
+          w1, if_then_else e1 c2 ((Syntax.Value (Syntax.Const (C.Boolean false), pos2)), pos2)
+    | Sugared.Apply ((Sugared.Apply ((Sugared.Var "||", pos1), t1), pos2), t2) ->
       let w1, e1 = expression ctx t1 in
       let c2 = computation ctx t2 in
-          w1, if_then_else e1 ((Core.Value (Core.Const (C.Boolean true), pos2)), pos2) c2
-    | Syntax.Apply (t1, t2) ->
+          w1, if_then_else e1 ((Syntax.Value (Syntax.Const (C.Boolean true), pos2)), pos2) c2
+    | Sugared.Apply (t1, t2) ->
         let w1, e1 = expression ctx t1 in
         let w2, e2 = expression ctx t2 in
-          (w1 @ w2), Core.Apply (e1, e2)
-    | Syntax.Match (t, cs) ->
+          (w1 @ w2), Syntax.Apply (e1, e2)
+    | Sugared.Match (t, cs) ->
         let cs = List.map (abstraction ctx) cs in
         let w, e = expression ctx t in
-          w, Core.Match (e, cs)
-    | Syntax.New (eff, None) ->
-        [], Core.New (eff, None)
-    | Syntax.New (eff, Some (t, lst)) ->
+          w, Syntax.Match (e, cs)
+    | Sugared.New (eff, None) ->
+        [], Syntax.New (eff, None)
+    | Sugared.New (eff, Some (t, lst)) ->
         let w, e = expression ctx t in
         let lst = List.map (fun (op, a) -> (op, abstraction2 ctx a)) lst in
-          w, Core.New (eff, Some (e, lst))
-    | Syntax.Handle (t1, t2) ->
+          w, Syntax.New (eff, Some (e, lst))
+    | Sugared.Handle (t1, t2) ->
         let w1, e1 = expression ctx t1 in
         let c2 = computation ctx t2 in
-          w1, Core.Handle (e1, c2)
-    | Syntax.Conditional (t, t1, t2) ->
+          w1, Syntax.Handle (e1, c2)
+    | Sugared.Conditional (t, t1, t2) ->
         let w, e = expression ctx t in
         let c1 = computation ctx t1 in
         let c2 = computation ctx t2 in
           w, if_then_else e c1 c2
-    | Syntax.While (t1, t2) ->
+    | Sugared.While (t1, t2) ->
         let c1 = computation ctx t1 in
         let c2 = computation ctx t2 in
-          [], Core.While (c1, c2)
+          [], Syntax.While (c1, c2)
 
-    | Syntax.For (i, t1, t2, t, b) ->
+    | Sugared.For (i, t1, t2, t, b) ->
       let w1, e1 = expression ctx t1 in
       let w2, e2 = expression ctx t2 in
       let j = fresh_variable () in
       let c = computation ((i, j) :: ctx) t in
-        w1 @ w2, Core.For (j, e1, e2, c, b)
-    | Syntax.Check t ->
-        [], Core.Check (computation ctx t)
-    | Syntax.Let (defs, t) ->
+        w1 @ w2, Syntax.For (j, e1, e2, c, b)
+    | Sugared.Check t ->
+        [], Syntax.Check (computation ctx t)
+    | Sugared.Let (defs, t) ->
         let ctx', defs, _ =
             List.fold_right (fun (p, c) (ctx', defs, forbidden) ->
                     let check_forbidden (x, _) =
@@ -358,8 +359,8 @@ and computation ctx (t, pos) =
                     let c = computation ctx c in
                     (p_vars @ ctx', (p, c) :: defs, (List.map fst p_vars) @ forbidden)) defs (ctx, [], []) in
         let c = computation ctx' t in
-          [], Core.Let (defs, c)
-    | Syntax.LetRec (defs, t) ->
+          [], Syntax.Let (defs, c)
+    | Sugared.LetRec (defs, t) ->
         let ctx', ns, _ = List.fold_right (fun (x, t) (ctx', ns, forbidden) ->
                                           if List.mem x forbidden then
                                             Error.syntax ~pos:(snd t) "Several definitions of %s" x;
@@ -370,16 +371,16 @@ and computation ctx (t, pos) =
                             let c = let_rec ctx' c in
                             ((p, c) :: defs)) (List.combine ns defs) [] in
         let c = computation ctx' t in
-          [], Core.LetRec (defs, c)
+          [], Syntax.LetRec (defs, c)
     (* The remaining cases are expressions, which we list explicitly to catch any
        future changes. *)
-    | (Syntax.Var _ | Syntax.Const _ | Syntax.Tuple _ | Syntax.Record _  | Syntax.Variant _ | Syntax.Lambda _ | Syntax.Function _ | Syntax.Handler _ | Syntax.Operation _) ->
+    | (Sugared.Var _ | Sugared.Const _ | Sugared.Tuple _ | Sugared.Record _  | Sugared.Variant _ | Sugared.Lambda _ | Sugared.Function _ | Sugared.Handler _ | Sugared.Operation _) ->
         let w, e = expression ctx (t, pos) in
-          w, Core.Value e
+          w, Syntax.Value e
   in
     match w with
       | [] -> (c, pos)
-      | _ :: _ -> Core.Let (w, (c, pos)), pos
+      | _ :: _ -> Syntax.Let (w, (c, pos)), pos
 
 and abstraction ctx (p, t) =
   let vars, p = pattern p in
@@ -391,11 +392,11 @@ and abstraction2 ctx (p1, p2, t) =
   (p1, p2, computation (vars1 @ vars2 @ ctx) t)
 
 and let_rec ctx = function
-  | (Syntax.Lambda a, _) -> abstraction ctx a
-  | (Syntax.Function cs, pos) ->
+  | (Sugared.Lambda a, _) -> abstraction ctx a
+  | (Sugared.Function cs, pos) ->
     let x = fresh_variable () in
     let cs = List.map (abstraction ctx) cs in
-    ((Pattern.Var x, pos), (Core.Match ((Core.Var x, pos), cs), pos))
+    ((Pattern.Var x, pos), (Syntax.Match ((Syntax.Var x, pos), cs), pos))
   | (_, pos) -> Error.syntax ~pos "This kind of expression is not allowed in a recursive definition"
 
 and expressions ctx = function
@@ -412,7 +413,7 @@ and record_expressions ctx = function
     let ws, es = record_expressions ctx ts in
     w @ ws, ((f, e) :: es)
 
-and handler pos ctx {Syntax.operations=ops; Syntax.value=val_a; Syntax.finally=fin_a} =
+and handler pos ctx {Sugared.operations=ops; Sugared.value=val_a; Sugared.finally=fin_a} =
   let rec operation_cases = function
   | [] -> [], []
   | ((t, op), a2) :: cs ->
@@ -421,10 +422,10 @@ and handler pos ctx {Syntax.operations=ops; Syntax.value=val_a; Syntax.finally=f
     w @ ws, ((e, op), abstraction2 ctx a2) :: cs'
   in
   let ws, ops = operation_cases ops in
-  ws, { Core.operations = ops;
-    Core.value =
+  ws, { Syntax.operations = ops;
+    Syntax.value =
       (match val_a with None -> id_abstraction pos | Some a -> abstraction ctx a);
-    Core.finally =
+    Syntax.finally =
       (match fin_a with None -> id_abstraction pos | Some a -> abstraction ctx a)}
 
 let top_ctx = ref []

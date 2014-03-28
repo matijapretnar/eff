@@ -226,7 +226,7 @@ let check_patterns ~pos pats =
           | Some ps ->
               Print.warning ~pos "This pattern-matching is not exhaustive.\n\
                                       Here is an example of a value that is not matched:";
-(*  *)              prerr_endline (Print.to_string "%t" (Core.print_pattern (List.hd ps)))
+(*  *)              prerr_endline (Print.to_string "%t" (Syntax.print_pattern (List.hd ps)))
           | None -> ()
         end
     | (_, pos) as pat :: pats ->
@@ -248,23 +248,23 @@ let is_irrefutable p = check_patterns ~pos:(snd p) [p]
 let check_comp c =
   let rec check (c, pos) =
     match c with
-      | Core.Value _ -> ()
-      | Core.Let (lst, c) ->
+      | Syntax.Value _ -> ()
+      | Syntax.Let (lst, c) ->
         List.iter (fun (p, c) -> is_irrefutable p ; check c) lst ;
         check c
-      | Core.LetRec (lst, c) ->
+      | Syntax.LetRec (lst, c) ->
         List.iter (fun (_, (p, c)) -> is_irrefutable p ; check c) lst ;
-      | Core.Match (_, []) -> () (* Skip empty match to avoid an unwanted warning. *)
-      | Core.Match (_, lst) -> 
+      | Syntax.Match (_, []) -> () (* Skip empty match to avoid an unwanted warning. *)
+      | Syntax.Match (_, lst) -> 
         check_patterns ~pos:pos (List.map fst lst) ;
         List.iter (fun (_, c) -> check c) lst
-      | Core.While (c1, c2) -> check c1 ; check c2
-      | Core.For (_, _, _, c, _) -> check c
-      | Core.Apply _ -> ()
-      | Core.New (_, None) -> ()
-      | Core.New (_, Some (_, lst)) -> 
+      | Syntax.While (c1, c2) -> check c1 ; check c2
+      | Syntax.For (_, _, _, c, _) -> check c
+      | Syntax.Apply _ -> ()
+      | Syntax.New (_, None) -> ()
+      | Syntax.New (_, Some (_, lst)) -> 
         List.iter (fun (_, (p1, p2, c)) -> is_irrefutable p1 ; is_irrefutable p2 ; check c) lst
-      | Core.Handle (_, c) -> check c
-      | Core.Check c -> check c
+      | Syntax.Handle (_, c) -> check c
+      | Syntax.Check c -> check c
   in
     check c
