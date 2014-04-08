@@ -1,0 +1,32 @@
+OASISFormat: 0.4
+Name:        eff
+Version:     3.1
+Synopsis:    A functional language with effect handlers
+Authors:     Andrej Bauer and Matija Pretnar
+License:     BSD-3-clause
+Homepage:    http://www.eff-lang.org/
+Plugins:     DevFiles (0.4)
+XDevFilesMakefileNoTargets: test
+
+PostConfCommand:
+    hash rlwrap >/dev/null 2>&1 || \
+    hash ledit >/dev/null 2>&1 || \
+    echo "No line-editing wrapper found"
+PreBuildCommand:
+    echo "let version = \"$pkg_version\"" > src/version.ml
+    echo "let effdir = \"$datarootdir/$pkg_name\"" >> src/version.ml
+PostBuildCommand:
+    if [ -f "eff.native" ]; then
+        ln -fs "eff.native" "eff"
+    else
+        ln -fs "eff.byte" "eff"
+    fi
+PostCleanCommand:
+    rm -f eff src/version.ml tests/*.out tests/*/*.out
+
+Executable eff
+  Path:           src
+  BuildTools:     ocamlbuild,menhir
+  MainIs:         eff.ml
+  DataFiles:      ../pervasives.eff
+  CompiledObject: best

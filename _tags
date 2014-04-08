@@ -1,0 +1,21 @@
+true: use_menhir
+true: use_unix
+true: use_nums
+
+# OASIS_START
+# DO NOT EDIT (digest: 2f188e014dbf7f5da1b1c24f10d2b03b)
+# Ignore VCS directories, you can use the same kind of rule outside
+# OASIS_START/STOP if you want to exclude directories that contains
+# useless stuff for the build process
+<**/.svn>: -traverse
+<**/.svn>: not_hygienic
+".bzr": -traverse
+".bzr": not_hygienic
+".hg": -traverse
+".hg": not_hygienic
+".git": -traverse
+".git": not_hygienic
+"_darcs": -traverse
+"_darcs": not_hygienic
+# Executable eff
+# OASIS_STOP
