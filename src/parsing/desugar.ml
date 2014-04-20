@@ -2,7 +2,7 @@
 
 module C = Common
 module T = Type
-module Sugared = SyntaxSugared
+module Sugared = SugaredSyntax
 
 (* ***** Desugaring of types. ***** *)
 
@@ -16,6 +16,7 @@ let fresh_region_param = Common.fresh (fun n -> Sugared.RegionParam n)
 let fill_args is_effect ty =
   let ds = ref []
   and rs = ref []
+  
   in
   let fresh_dirt_param _ =
     let (Sugared.DirtParam x) as d = fresh_dirt_param () in

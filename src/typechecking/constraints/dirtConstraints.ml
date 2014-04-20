@@ -1,4 +1,4 @@
-module DirtPoset = ConstraintsPoset.Make(struct
+module DirtPoset = Poset.Make(struct
   type t = Type.dirt_param
   let compare = Pervasives.compare
 end)

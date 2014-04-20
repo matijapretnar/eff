@@ -53,7 +53,7 @@ let beautify2 ty1 ty2 cnstrs =
   let ty1 = Type.subst_ty sbst ty1 in
   let ty2 = Type.subst_ty sbst ty2 in
   let cnstrs = Constraints.subst sbst cnstrs in
-  let skeletons = ConstraintsTy.skeletons cnstrs.Constraints.ty in
+  let skeletons = TyConstraints.skeletons cnstrs.Constraints.ty in
   (ty1, ty2, skeletons)
 
 
@@ -76,7 +76,7 @@ and add_instance_constraint iota r (ctx, ty, cnstrs, sbst) =
 
 let rec explode_dirt ~pos p ({Type.ops = ops} as drt_new) (ctx, ty, cnstrs, sbst) =
   if ops = [] then (ctx, ty, cnstrs, sbst) else
-  let (new_drt_grph, ps, skel) = ConstraintsDirt.remove_skeleton p cnstrs.Constraints.dirt in
+  let (new_drt_grph, ps, skel) = DirtConstraints.remove_skeleton p cnstrs.Constraints.dirt in
   let drts' = List.map (fun p -> (p, Type.subst_dirt (Type.refreshing_subst ()) drt_new)) ps in
   let sbst' = {
     identity_subst with 
@@ -171,7 +171,7 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       Error.typing ~pos "This expression has type %t but it should have type %t." (Type.print skeletons ty1) (Type.print skeletons ty2)
 
 and explode_skeleton ~pos p ty_new (ctx, ty, cnstrs, sbst) =
-  let (new_ty_grph, ps, skel) = ConstraintsTy.remove_skeleton p cnstrs.Constraints.ty in
+  let (new_ty_grph, ps, skel) = TyConstraints.remove_skeleton p cnstrs.Constraints.ty in
   let tys' = List.map (fun p -> (p, Type.refresh ty_new)) ps in
   let sbst' = {
     identity_subst with 
@@ -229,7 +229,7 @@ let pos_neg_tyscheme (ctx, ty, cnstrs) =
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
   let (((_, _, pos_rs) as pos), ((_, _, neg_rs) as neg)) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
-  let pos = ([], [], ConstraintsRegion.pos_handled pos_rs neg_rs cnstrs.Constraints.region) @@@ pos in
+  let pos = ([], [], RegionConstraints.pos_handled pos_rs neg_rs cnstrs.Constraints.region) @@@ pos in
   Trio.uniq pos, Trio.uniq neg
 
 let pos_neg_dirtyscheme (ctx, drty, cnstrs) =
@@ -319,8 +319,8 @@ let show_dirt_param ~non_poly:(_, ds, _) (ctx, ty, cnstrs) =
   fun ((Type.Dirt_Param k) as p) ->
     if List.mem p neg then
       Some (fun ppf -> (Symbols.dirt_param k (List.mem p ds) ppf))
-    else if (List.mem p pos && ConstraintsDirt.get_prec p cnstrs.Constraints.dirt != []) then
-      Some (fun ppf -> Print.print ppf "%t" (Print.sequence (Symbols.union ()) (fun (Type.Dirt_Param k) ppf -> (Symbols.dirt_param k (List.mem p ds) ppf)) (ConstraintsDirt.get_prec p cnstrs.Constraints.dirt)))
+    else if (List.mem p pos && DirtConstraints.get_prec p cnstrs.Constraints.dirt != []) then
+      Some (fun ppf -> Print.print ppf "%t" (Print.sequence (Symbols.union ()) (fun (Type.Dirt_Param k) ppf -> (Symbols.dirt_param k (List.mem p ds) ppf)) (DirtConstraints.get_prec p cnstrs.Constraints.dirt)))
     else
       None
 
@@ -329,14 +329,14 @@ let print_ty_scheme ty_sch ppf =
   let _, (_, ds, _) = pos_neg_tyscheme ty_sch in
   ignore (Common.map sbst.Type.dirt_param ds);
   let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in
-  let skeletons = ConstraintsTy.skeletons cnstrs.Constraints.ty in
+  let skeletons = TyConstraints.skeletons cnstrs.Constraints.ty in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
   let show_dirt_param = show_dirt_param (ctx, ty, cnstrs) ~non_poly in
   if !Type.effects then
     Print.print ppf "%t%t"
       (Type.print ~show_dirt_param skeletons ty)
-      (ConstraintsRegion.print ~non_poly cnstrs.Constraints.region)
+      (RegionConstraints.print ~non_poly cnstrs.Constraints.region)
   else
     Type.print ~non_poly skeletons ty ppf
 
@@ -345,7 +345,7 @@ let print_dirty_scheme drty_sch ppf =
   let _, (_, ds, _) = pos_neg_dirtyscheme drty_sch in
   ignore (Common.map sbst.Type.dirt_param ds);
   let (ctx, (ty, drt), cnstrs) = subst_dirty_scheme sbst drty_sch in
-  let skeletons = ConstraintsTy.skeletons cnstrs.Constraints.ty in
+  let skeletons = TyConstraints.skeletons cnstrs.Constraints.ty in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
   let show_dirt_param = show_dirt_param (ctx, (Type.Arrow (Type.unit_ty, (ty, drt))), cnstrs) ~non_poly in
@@ -354,10 +354,10 @@ let print_dirty_scheme drty_sch ppf =
       Print.print ppf "%t ! %t%t"
         (Type.print ~show_dirt_param skeletons ty)
         (Type.print_dirt ~non_poly ~show_dirt_param drt)
-        (ConstraintsRegion.print ~non_poly cnstrs.Constraints.region)
+        (RegionConstraints.print ~non_poly cnstrs.Constraints.region)
     else
       Print.print ppf "%t%t"
         (Type.print ~show_dirt_param skeletons ty)
-        (ConstraintsRegion.print ~non_poly cnstrs.Constraints.region)
+        (RegionConstraints.print ~non_poly cnstrs.Constraints.region)
   else
     Type.print ~non_poly skeletons ty ppf

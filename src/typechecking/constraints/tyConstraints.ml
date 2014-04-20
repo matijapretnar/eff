@@ -1,4 +1,4 @@
-module TyParam = ConstraintsPoset.Make(struct
+module TyParam = Poset.Make(struct
   type t = Type.ty_param
   let compare = Pervasives.compare
 end)

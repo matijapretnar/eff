@@ -1,6 +1,5 @@
-true: use_menhir
-true: use_unix
-true: use_nums
+true: use_menhir, use_nums, use_unix
+<src/**>: include
 
 # OASIS_START
 # DO NOT EDIT (digest: 2f188e014dbf7f5da1b1c24f10d2b03b)

@@ -1,5 +1,5 @@
 %{
-  open SyntaxSugared
+  open SugaredSyntax
 
   type handler_case =
     | OperationCase of operation * abstraction2
@@ -71,8 +71,8 @@
 %left  INFIXOP3 STAR MOD LAND LOR LXOR
 %right INFIXOP4 LSL LSR ASR
 
-%start <SyntaxSugared.toplevel list> file
-%start <SyntaxSugared.toplevel> commandline
+%start <SugaredSyntax.toplevel list> file
+%start <SugaredSyntax.toplevel> commandline
 
 %%
 
