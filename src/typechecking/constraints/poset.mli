@@ -26,4 +26,6 @@ sig
   val remove_skeleton : elt -> t -> t * elt list * (elt * elt) list
 
   val union : t -> t -> t
+
+  val shares_skeleton : t -> elt -> elt list -> bool
 end

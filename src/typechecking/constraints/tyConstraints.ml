@@ -38,3 +38,4 @@ let skeletons cnstrs =
   let skeletons = List.sort Pervasives.compare (List.map (List.sort Pervasives.compare) skeletons) in
   skeletons
 
+let shares_skeleton = TyParam.shares_skeleton

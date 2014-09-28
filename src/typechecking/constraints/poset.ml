@@ -93,6 +93,17 @@ struct
     let rest = fold_edges (fun p q acc -> (p, q) :: acc) skel [] in
     (new_grph, ps, rest)
 
+  let shares_skeleton grph p ps =
+    let rec find = function
+      | [] -> false
+      | g :: gs ->
+        let g = (List.fold_right S.add g S.empty) in
+        if S.mem p g then
+          not (S.is_empty (S.inter g (List.fold_right S.add ps S.empty)))
+        else
+          find gs
+    in find (skeletons grph)
+
   let garbage_collect pos neg grph =
     let pos = List.fold_right S.add pos S.empty
     and neg = List.fold_right S.add neg S.empty in

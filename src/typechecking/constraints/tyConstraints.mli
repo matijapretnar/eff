@@ -17,3 +17,5 @@ val garbage_collect : Type.ty_param list -> Type.ty_param list -> t -> t
 val remove_skeleton : Type.ty_param -> t -> t * Type.ty_param list * (Type.ty_param * Type.ty_param) list
 
 val union : t -> t -> t
+
+val shares_skeleton : t -> Type.ty_param -> Type.ty_param list -> bool

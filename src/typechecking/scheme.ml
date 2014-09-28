@@ -171,6 +171,12 @@ let rec ty_less ~pos ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       Error.typing ~pos "This expression has type %t but it should have type %t." (Type.print skeletons ty1) (Type.print skeletons ty2)
 
 and explode_skeleton ~pos p ty_new (ctx, ty, cnstrs, sbst) =
+  let (ps, _, _), (ng, _, _) = Type.pos_neg_params Tctx.get_variances ty_new in
+  begin
+  if TyConstraints.shares_skeleton cnstrs.Constraints.ty p (ps @ ng) then
+    let ty1, ty2, skeletons = beautify2 (Type.TyParam p) ty_new cnstrs in
+    Error.typing ~pos "This expression has a forbidden cylclic type %t = %t." (Type.print skeletons ty1) (Type.print skeletons ty2)
+  end;
   let (new_ty_grph, ps, skel) = TyConstraints.remove_skeleton p cnstrs.Constraints.ty in
   let tys' = List.map (fun p -> (p, Type.refresh ty_new)) ps in
   let sbst' = {
