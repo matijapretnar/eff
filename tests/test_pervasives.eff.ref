@@ -35,7 +35,7 @@ Check (file "./test_pervasives.eff", line 62, char 1): Operation <division by ze
 val test_plus_dot : float = 5.84
 val test_times_dot : float = 8.478
 val test_minus_dot : float = 0.44
-val test_div_dot : float = 1.16296296296
+val test_div_dot : float = 1.16296
 val test_div_dot_zero : float = infinity
 val test_div : int = 33
 Check (file "./test_pervasives.eff", line 76, char 1): Operation <division by zero>.raise 
