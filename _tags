@@ -2,10 +2,11 @@ true: use_menhir, use_nums, use_unix
 <src/**>: include
 
 # OASIS_START
-# DO NOT EDIT (digest: 2f188e014dbf7f5da1b1c24f10d2b03b)
+# DO NOT EDIT (digest: a32af09f383767cfdd7bb0ed657fc250)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
+true: annot, bin_annot
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic
 ".bzr": -traverse
