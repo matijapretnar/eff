@@ -7,9 +7,7 @@ type value =
   | Instance of instance
   | Handler of (result -> result)
 
-and result =
-  | Value of value
-  | Operation of operation * value * closure
+and result = Result of (closure -> (int * Common.opsym, value -> closure -> result) Common.assoc -> result)
 
 and closure = value -> result
 
@@ -19,8 +17,9 @@ and instance = int * string option * resource option
 
 and resource = value ref * (Common.opsym, value -> value -> result) Common.assoc
 
+let value v = Result (fun val_case _ -> val_case v)
 let unit_value = Tuple []
-let unit_result = Value unit_value
+let unit_result = value unit_value
 
 let fresh_instance =
   let fresh = Common.fresh Common.id in
@@ -82,9 +81,3 @@ and list ?(max_length=299) v ppf =
     | _ -> assert false
   else
     Format.fprintf ppf ";@ ..."
-
-let print_result r ppf =
-  match r with
-  | Value v -> print_value v ppf
-  | Operation (op, v, _) ->
-      Format.fprintf ppf "Operation %t %t" (print_operation op) (print_value v)

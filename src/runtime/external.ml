@@ -6,11 +6,11 @@ let from_str s = V.Const (Common.String s)
 let from_float f = V.Const (Common.Float f)
 let from_fun f = V.Closure f
 
-let value_bool b = V.Value (from_bool b)
-let value_int n = V.Value (from_int n)
-let value_str s = V.Value (from_str s)
-let value_float f = V.Value (from_float f)
-let value_fun f = V.Value (from_fun f)
+let value_bool b = V.value (from_bool b)
+let value_int n = V.value (from_int n)
+let value_str s = V.value (from_str s)
+let value_float f = V.value (from_float f)
+let value_fun f = V.value (from_fun f)
 
 
 (** [binary_closure f] converts a function [f] that takes two values into two
@@ -164,7 +164,7 @@ let conversion_functions = [
 (** [external_instance name ops] returns an instance with a given name and
     a resource with unit state and operations defined as [ops]. *)
 let external_instance name ops =
-  let resource_op op v s = V.Value (V.Tuple [op v; s]) in
+  let resource_op op v s = V.value (V.Tuple [op v; s]) in
   let ops = Common.assoc_map resource_op ops in
   V.fresh_instance (Some name) (Some (ref V.unit_value, ops))
 
@@ -183,7 +183,7 @@ let create_exception v =
     let message = Print.to_string "%s %t." exc_name (Value.print_value param) in
       Error.runtime "%s" message
   in
-    V.Value (external_instance exc_name [
+    V.value (external_instance exc_name [
       ("raise", exception_raise);
     ])
 

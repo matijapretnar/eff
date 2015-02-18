@@ -54,11 +54,35 @@ let extend p v env =
   try extend_value p v env
   with PatternMatch pos -> Error.runtime "Pattern match failure."
 
-let rec sequence k = function
-  | V.Value v -> k v
-  | V.Operation (op, v, k') ->
-      let k'' u = sequence k (k' u) in
-      V.Operation (op, v, k'')
+let rec sequence (k : Value.closure) : Value.result -> Value.result =
+  fun (Value.Result r) ->
+    Value.Result (
+      fun val_case op_cases ->
+        r (fun v -> let Value.Result r = k v in r val_case op_cases)
+        (Common.assoc_map (fun op_case -> fun par k' -> op_case par (fun u -> sequence k (k' u))) op_cases)
+    )
+
+let value v = Value.Result (fun val_case _ -> val_case v)
+
+let operation (((n, desc, res) as inst, o) as op) v = fun val_case op_cases ->
+  match C.lookup (n, o) op_cases with
+  | Some f -> f v val_case
+  | None -> Error.runtime "uncaught operation %t %t." (Value.print_operation op) (Value.print_value v)
+  (* XXX Do resources *)
+(*       begin match res with
+      | Some (s_ref, resource) ->
+        begin match C.lookup o resource with
+        | Some f ->
+            begin match f v !s_ref with
+            | V.Value (V.Tuple [u; s]) ->
+                s_ref := s;
+                val_case u
+            | _ -> Error.runtime "pair expected in a resource handler for %t." (Value.print_instance inst)
+            end
+        | None -> Error.runtime "the resource for %t is missing an operation case for %t" (Value.print_instance inst) (Value.print_operation op)
+        end
+      | None -> Error.runtime "uncaught operation %t %t." (Value.print_operation op) (Value.print_value v)
+      end *)
 
 let rec ceval env (c, pos) = match c with
   | Syntax.Apply (e1, e2) ->
@@ -70,7 +94,7 @@ let rec ceval env (c, pos) = match c with
       end
 
   | Syntax.Value e ->
-      V.Value (veval env e)
+      value (veval env e)
 
   | Syntax.Match (e, cases) ->
       let v = veval env e in
@@ -124,7 +148,7 @@ let rec ceval env (c, pos) = match c with
                        Some (ref v, lst))
       in
       let e = V.fresh_instance None r in
-        V.Value e
+        value e
 
   | Syntax.Let (lst, c) ->
       eval_let env lst c
@@ -134,9 +158,13 @@ let rec ceval env (c, pos) = match c with
       ceval env c
 
   | Syntax.Check c ->
-      let r = ceval env c in
-      Print.check ~pos "%t" (Value.print_result r);
-      V.unit_result
+      let Value.Result r = ceval env c in
+      let val_case v =
+        Print.check ~pos "%t" (Value.print_value v);
+        V.unit_result
+      in
+      r val_case []
+
 
 and eval_let env lst c =
   match lst with
@@ -169,47 +197,51 @@ and veval env (e, pos) = match e with
   | Syntax.Lambda a -> V.Closure (eval_closure env a)
   | Syntax.Operation (e, op) ->
       let n = V.to_instance (veval env e) in
-      V.Closure (fun v -> V.Operation ((n, op), v, fun r -> V.Value r))
+      V.Closure (fun v -> Value.Result (operation (n, op) v))
   | Syntax.Handler h -> V.Handler (eval_handler env h)
 
+and eval_closure env (p, c) v : Value.result = ceval (extend p v env) c
+
+and eval_closure2 env (p1, p2, c) v1 v2 : Value.result = ceval (extend p2 v2 (extend p1 v1 env)) c
+
 and eval_handler env {Syntax.operations=ops; Syntax.value=value; Syntax.finally=fin} =
-  let eval_op ((e, op), (p, kvar, c)) =
-    let f u k = eval_closure (extend kvar (V.Closure k) env) (p, c) u in
+  let fin = eval_closure env fin in
+
+  let rec change_cases val_case op_cases =
+    (
+      (fun v -> let Value.Result r = eval_closure env value v in r val_case op_cases),
+      List.map eval_op ops @ op_cases
+    )
+
+  and change_closure k =
+    fun v ->
+      let (Value.Result r) = k v in
+      Value.Result (fun val_case op_cases ->
+        let (val_case', op_cases') = change_cases val_case op_cases in
+        r val_case' op_cases')
+
+  and eval_op ((e, op), (p, kvar, c)) =
     let (i, _, _) = V.to_instance (veval env e) in
+    let f u k =
+      eval_closure (extend kvar (V.Closure (change_closure k)) env) (p, c) u in
       ((i, op), f)
+
   in
-  let ops = List.map eval_op ops in
-  let rec h = function
-    | V.Value v -> eval_closure env value v
-    | V.Operation (((i, _, _), opname) as op, v, k) ->
-        let k' u = h (k u) in
-        begin match C.lookup (i,opname) ops with
-        | Some f -> f v k'
-        | None -> V.Operation (op, v, k')
-        end
-  in
-  fun r -> sequence (eval_closure env fin) (h r)
 
-and eval_closure env (p, c) v = ceval (extend p v env) c
+  fun (Value.Result r) ->
+  sequence fin
+  (Value.Result (fun val_case op_cases ->
+    let (val_case', op_cases') = change_cases val_case op_cases in
+    r val_case' op_cases'))
 
-and eval_closure2 env (p1, p2, c) v1 v2 = ceval (extend p2 v2 (extend p1 v1 env)) c
+exception ReturnValue of Value.value
 
-let rec top_handle = function
-  | V.Value v -> v
-  | V.Operation (((_, _, Some (s_ref, resource)) as inst, opsym) as op, v, k) ->
-      begin match C.lookup opsym resource with
-        | None -> Error.runtime "uncaught operation %t %t." (Value.print_operation op) (Value.print_value v)
-        | Some f ->
-            begin match f v !s_ref with
-              | V.Value (V.Tuple [u; s]) ->
-                  s_ref := s;
-                  top_handle (k u)
-              | V.Value _ -> Error.runtime "pair expected in a resource handler for %t." (Value.print_instance inst)
-              | _ -> Error.runtime "pair expected in a resource handler for %t." (Value.print_instance inst)
-            end
-      end
-  | V.Operation (((_, _, None), _) as op, v, k) ->
-      Error.runtime "uncaught operation %t %t." (Value.print_operation op) (Value.print_value v)
+let rec extract_value (Value.Result r) = 
+  match 
+    r (fun v -> raise (ReturnValue v)) []
+  with
+  | exception (ReturnValue v) -> v
+  | r -> extract_value r
 
-let run env c =
-  top_handle (ceval env c)
+    
+let run env c = extract_value (ceval env c)

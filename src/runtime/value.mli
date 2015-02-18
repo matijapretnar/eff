@@ -7,9 +7,7 @@ type value =
   | Instance of instance
   | Handler of (result -> result)
 
-and result =
-  | Value of value
-  | Operation of operation * value * closure
+and result = Result of (closure -> (int * Common.opsym, value -> closure -> result) Common.assoc -> result)
 
 and closure = value -> result
 
@@ -19,6 +17,7 @@ and instance = int * string option * resource option
 
 and resource = value ref * (Common.opsym, value -> value -> result) Common.assoc
 
+val value : value -> result
 val unit_value : value
 val unit_result : result
 
@@ -34,4 +33,3 @@ val to_handler : value -> result -> result
 val print_value : ?max_level:int -> value -> Format.formatter -> unit
 val print_instance : instance -> Format.formatter -> unit
 val print_operation : operation -> Format.formatter -> unit
-val print_result : result -> Format.formatter -> unit
