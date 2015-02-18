@@ -64,17 +64,17 @@ let rec sequence (k : Value.closure) : Value.result -> Value.result =
 
 let value v = Value.Result (fun val_case _ -> val_case v)
 
-let operation (((n, desc, res) as inst, o) as op) v = fun val_case op_cases ->
-  match C.lookup (n, o) op_cases with
-  | Some f -> f v val_case
-  | None -> Error.runtime "uncaught operation %t %t." (Value.print_operation op) (Value.print_value v)
-  (* XXX Do resources *)
-(*       begin match res with
+let operation ((((i, _, res) as inst), opsym) as op) v : Value.result = Value.Result (fun val_case op_cases ->
+  match C.lookup ~compare:(fun ((i1, _, _), o1) ((i2, _, _), o2) -> (i1, o1) = (i2, o2)) op op_cases with
+  | Some f -> f v value
+  | None ->
+      begin match res with
       | Some (s_ref, resource) ->
-        begin match C.lookup o resource with
+        begin match C.lookup opsym resource with
         | Some f ->
-            begin match f v !s_ref with
-            | V.Value (V.Tuple [u; s]) ->
+            let (Value.Result r) = f v !s_ref in
+            begin match r (fun v -> v) [] with
+            | V.Tuple [u; s] ->
                 s_ref := s;
                 val_case u
             | _ -> Error.runtime "pair expected in a resource handler for %t." (Value.print_instance inst)
@@ -82,7 +82,8 @@ let operation (((n, desc, res) as inst, o) as op) v = fun val_case op_cases ->
         | None -> Error.runtime "the resource for %t is missing an operation case for %t" (Value.print_instance inst) (Value.print_operation op)
         end
       | None -> Error.runtime "uncaught operation %t %t." (Value.print_operation op) (Value.print_value v)
-      end *)
+      end
+)
 
 let rec ceval env (c, pos) = match c with
   | Syntax.Apply (e1, e2) ->
@@ -161,9 +162,9 @@ let rec ceval env (c, pos) = match c with
       let Value.Result r = ceval env c in
       let val_case v =
         Print.check ~pos "%t" (Value.print_value v);
-        V.unit_result
+        V.unit_value
       in
-      r val_case []
+      Value.value (r val_case [])
 
 
 and eval_let env lst c =
@@ -197,7 +198,7 @@ and veval env (e, pos) = match e with
   | Syntax.Lambda a -> V.Closure (eval_closure env a)
   | Syntax.Operation (e, op) ->
       let n = V.to_instance (veval env e) in
-      V.Closure (fun v -> Value.Result (operation (n, op) v))
+      V.Closure (operation (n, op))
   | Syntax.Handler h -> V.Handler (eval_handler env h)
 
 and eval_closure env (p, c) v : Value.result = ceval (extend p v env) c
@@ -208,23 +209,26 @@ and eval_handler env {Syntax.operations=ops; Syntax.value=value; Syntax.finally=
   let fin = eval_closure env fin in
 
   let rec change_cases val_case op_cases =
+    let eval_op ((e, op), (arg_pat, k_pat, c)) =
+      let i = V.to_instance (veval env e) in
+      let f arg k =
+        let k' = change_closure k in
+        let Value.Result r = eval_closure (extend k_pat (V.Closure k') env) (arg_pat, c) arg in
+        r val_case op_cases
+      in
+        ((i, op), f)
+    in
     (
       (fun v -> let Value.Result r = eval_closure env value v in r val_case op_cases),
-      List.map eval_op ops @ op_cases
+      List.map eval_op ops @ (Common.assoc_map (fun op_case -> fun arg k -> op_case arg (change_closure k)) op_cases)
     )
 
   and change_closure k =
-    fun v ->
-      let (Value.Result r) = k v in
+    fun y ->
+      let (Value.Result r) = k y in
       Value.Result (fun val_case op_cases ->
         let (val_case', op_cases') = change_cases val_case op_cases in
         r val_case' op_cases')
-
-  and eval_op ((e, op), (p, kvar, c)) =
-    let (i, _, _) = V.to_instance (veval env e) in
-    let f u k =
-      eval_closure (extend kvar (V.Closure (change_closure k)) env) (p, c) u in
-      ((i, op), f)
 
   in
 
@@ -234,14 +238,6 @@ and eval_handler env {Syntax.operations=ops; Syntax.value=value; Syntax.finally=
     let (val_case', op_cases') = change_cases val_case op_cases in
     r val_case' op_cases'))
 
-exception ReturnValue of Value.value
-
-let rec extract_value (Value.Result r) = 
-  match 
-    r (fun v -> raise (ReturnValue v)) []
-  with
-  | exception (ReturnValue v) -> v
-  | r -> extract_value r
-
-    
-let run env c = extract_value (ceval env c)
+let run env c =
+  let (Value.Result r) = ceval env c in
+  r Common.id []

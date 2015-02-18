@@ -75,9 +75,9 @@ type ('key, 'value) assoc = ('key * 'value) list
 
 (** Variants of association list operations that map into [option] type instead
     of raising [Not_found] *)
-let rec lookup x = function
+let rec lookup ?(compare=(=)) x = function
   | [] -> None
-  | (x', y) :: lst -> if x = x' then Some y else lookup x lst
+  | (x', y) :: lst -> if compare x x' then Some y else lookup x lst
 
 let lookup_default x =
   List.fold_right (fun (x', y) rest -> if x = x' then y else rest)

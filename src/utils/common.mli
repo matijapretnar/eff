@@ -22,7 +22,7 @@ val equal_const : const -> const -> bool
 val cons : string
 val nil : string
 type ('a, 'b) assoc = ('a * 'b) list
-val lookup : 'a -> ('a * 'b) list -> 'b option
+val lookup : ?compare:('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
 val lookup_default : 'a -> ('a * 'b) list -> 'b -> 'b
 val find : ('a -> bool) -> 'a list -> 'a option
 val update : 'a -> 'b -> ('a * 'b) list -> ('a * 'b) list

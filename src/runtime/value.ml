@@ -7,7 +7,7 @@ type value =
   | Instance of instance
   | Handler of (result -> result)
 
-and result = Result of (closure -> (int * Common.opsym, value -> closure -> result) Common.assoc -> result)
+and result = Result of ((value -> value) -> (operation, value -> closure -> value) Common.assoc -> value)
 
 and closure = value -> result
 
