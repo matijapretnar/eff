@@ -32,6 +32,37 @@ and handler = {
 
 let _ = Header.run
 
+
+let rec optimize ((t, pos) : term) : term =
+  let t' = match t with
+  | Apply (e1, e2) -> Apply (optimize e1, optimize e2)
+  | Value e -> Value (optimize e)
+  | Match (e, lst) -> Match (optimize e, List.map optimize_abstraction lst)
+  | New -> New
+  | Handle (e, c) -> Handle (optimize e, optimize c)
+  | Let (p, c1, c2) -> Let (p, optimize c1, optimize c2)
+  | Bind (p, c1, c2) -> Bind (p, optimize c1, optimize c2)
+  | LetRec (lst, c) -> LetRec (optimize_let_rec lst, optimize c)
+  | Check c -> Check (optimize c)
+  | Var x -> Var x
+  | Const c -> Const c
+  | Tuple lst -> Tuple (List.map optimize lst)
+  | Record lst -> Record (Common.assoc_map optimize lst)
+  | Variant (lbl, e) -> Variant (lbl, Common.option_map optimize e)
+  | Lambda a -> Lambda (optimize_abstraction a)
+  | Handler h -> Handler (optimize_handler h)
+  | Operation op -> Operation op
+  in
+  (t', pos)
+and optimize_abstraction (p, c) = (p, optimize c)
+and optimize_abstraction2 (p1, p2, c) = (p1, p2, optimize c)
+and optimize_let_rec lst = Common.assoc_map optimize_abstraction lst
+and optimize_handler h = {
+  value = optimize_abstraction h.value;
+  finally = optimize_abstraction h.finally;
+  operations = Common.assoc_map optimize_abstraction2 h.operations;
+}
+
 let rec compile_expression (e, pos) =
   let e' = match e with
   | Syntax.Var x ->
@@ -128,8 +159,7 @@ let rec print_term ?max_level c ppf =
   | Tuple lst -> Print.tuple print_term lst ppf
   | Record lst -> Print.record print_term lst ppf
   | Variant (lbl, None) -> print "%s" lbl
-  | Variant (lbl, Some e) ->
-    print ~at_level:1 "%s @[<hov>%t@]" lbl (print_term e)
+  | Variant (lbl, Some e) -> print ~at_level:1 "%s @[<hov>%t@]" lbl (print_term e)
   | Lambda a -> print ~at_level:3 "fun %t" (abstraction a)
   | Handler h -> print "%t" (handler h)
   | Operation op -> print "apply_operation %t" (operation op)
