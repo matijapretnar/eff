@@ -102,6 +102,7 @@ and plain_toplevel =
   | External of Common.variable * ty * Common.variable
   (** [external x : t = "ext_val_name"] *)
   | Term of term
+  | Compile of term
   | Use of string
   (** [#use "filename.eff"] *)
   | Reset

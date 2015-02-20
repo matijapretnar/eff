@@ -109,6 +109,10 @@ let infer_top_comp (ctx, top_change) c =
     and return the new environment. *)
 let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,pos) =
   match d with
+  | SugaredSyntax.Compile c ->
+      let c = Desugar.top_computation c in
+      Format.printf "%s@." (DynamicFree.compile c);
+      ((ctx, top_change), env)
   | SugaredSyntax.Term c ->
       let c = Desugar.top_computation c in
       let drty_sch, top_change = infer_top_comp wholectx c in

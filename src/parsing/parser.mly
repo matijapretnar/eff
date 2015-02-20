@@ -41,7 +41,7 @@
 %token <float> FLOAT
 %token <Common.label> UNAME
 %token <Common.typaram> PARAM
-%token TYPE ARROW HARROW OF EFFECT
+%token COMPILE TYPE ARROW HARROW OF EFFECT
 %token EXTERNAL
 %token MATCH WITH FUNCTION HASH
 %token LET REC AND IN
@@ -137,6 +137,8 @@ plain_topdirective:
     { Reset }
   | HASH TYPE t = term
     { TypeOf t }
+  | HASH COMPILE t = term
+    { Compile t }
   | HASH USE fn = STRING
     { Use fn }
 
@@ -374,6 +376,8 @@ lname:
     { "quit" }
   | HELP
     { "help" }
+  | COMPILE
+    { "compile" }
   | USE
     { "use" }
   | RESET

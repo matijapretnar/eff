@@ -40,6 +40,7 @@
     ("to", TO);
     ("true", BOOL true);
     ("type", TYPE);
+    ("compile", COMPILE);
     ("val", VAL);
     ("while", WHILE);
     ("with", WITH)
