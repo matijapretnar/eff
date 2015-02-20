@@ -1,4 +1,95 @@
+type variable = string
+type term = plain_term Common.pos
+and plain_term =
+  | Apply of term * term
+  | Value of term
+  | Match of term * abstraction list
+  | New
+  | Handle of term * term
+  | Let of (variable Pattern.t * term) list * term
+  | LetRec of (variable * abstraction) list * term
+  | Var of variable
+  | Const of Common.const
+  | Tuple of term list
+  | Record of (Common.field, term) Common.assoc
+  | Variant of Common.label * term option
+  | Lambda of abstraction
+  | Operation of operation
+  | Handler of handler
+  | Check of term
+and abstraction =
+  variable Pattern.t * term
+and abstraction2 =
+  variable Pattern.t * variable Pattern.t * term
+and operation =
+  term * Common.opsym
+and handler = {
+  operations : (operation, abstraction2) Common.assoc;
+  value : abstraction;
+  finally : abstraction;
+}
+
 let _ = Header.run
+
+let rec compile_expression (e, pos) =
+  let e' = match e with
+  | Syntax.Var x ->
+      Var (compile_variable x)
+  | Syntax.Const c ->
+      Const c
+  | Syntax.Tuple lst ->
+      Tuple (List.map compile_expression lst)
+  | Syntax.Record lst ->
+      Record (Common.assoc_map compile_expression lst)
+  | Syntax.Variant (lbl, e) ->
+      Variant (lbl, Common.option_map compile_expression e)
+  | Syntax.Lambda a ->
+      Lambda (compile_abstraction a)
+  | Syntax.Handler h  ->
+      Handler (compile_handler h)
+  | Syntax.Operation op ->
+      Operation (compile_operation op)
+  in (e', pos)
+and compile_computation (c, pos) =
+  let c' = match c with
+  | Syntax.Apply (e1, e2) ->
+      Apply (compile_expression e1, compile_expression e2)
+  | Syntax.Value e ->
+      Value (compile_expression e)
+  | Syntax.Match (e, lst) ->
+      Match (compile_expression e, List.map compile_abstraction lst)
+  | Syntax.While _ ->
+      Error.runtime "Compiling of while loops not implemented" 
+  | Syntax.For _ ->
+      Error.runtime "Compiling of for loops not implemented"
+  | Syntax.New _ ->
+      New
+  | Syntax.Handle (e, c) ->
+      Handle (compile_expression e, compile_computation c)
+  | Syntax.Let (lst, c) ->
+      Let (compile_let lst, compile_computation c)
+  | Syntax.LetRec (lst, c) ->
+      LetRec (compile_letrec lst, compile_computation c)
+  | Syntax.Check c ->
+      Check (compile_computation c)
+  in (c', pos)
+and compile_variable (n, x) = (x ^ string_of_int n)
+and compile_pattern p = Pattern.map compile_variable p
+and compile_abstraction (p, c) = (compile_pattern p, compile_computation c)
+and compile_abstraction2 (p1, p2, c) =
+  (compile_pattern p1, compile_pattern p2, compile_computation c)
+and compile_operation (e, op) = (compile_expression e, op)
+and compile_handler h = {
+  operations =
+    List.map (fun (op, a2) -> (compile_operation op, compile_abstraction2 a2)) h.operations;
+  value = compile_abstraction h.value;
+  finally = compile_abstraction h.finally;
+}
+and compile_let lst =
+  List.map (fun (p, c) -> (compile_pattern p, compile_computation c)) lst
+and compile_letrec lst =
+  List.map (fun (x, a) -> (compile_variable x, compile_abstraction a)) lst
+
 
 let rec print_pattern ?max_level (p,_) ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
