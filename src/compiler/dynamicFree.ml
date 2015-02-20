@@ -41,7 +41,11 @@ let rec optimize ((t, pos) : term) : term =
   | New -> New
   | Handle (e, c) -> Handle (optimize e, optimize c)
   | Let (p, c1, c2) -> Let (p, optimize c1, optimize c2)
-  | Bind (p, c1, c2) -> Bind (p, optimize c1, optimize c2)
+  | Bind (p, c1, c2) -> 
+      begin match optimize c1 with
+      | (Value e, _) -> Let (p, e, optimize c2)
+      | c -> Bind (p, c, optimize c2)
+      end
   | LetRec (lst, c) -> LetRec (optimize_let_rec lst, optimize c)
   | Check c -> Check (optimize c)
   | Var x -> Var x
@@ -95,7 +99,7 @@ and compile_computation (c, pos) =
   | Syntax.For _ ->
       Error.runtime "Compiling of for loops not implemented"
   | Syntax.New _ ->
-      New
+      Value (New, pos)
   | Syntax.Handle (e, c) ->
       Handle (compile_expression e, compile_computation c)
   | Syntax.Let (lst, c) ->
@@ -148,9 +152,9 @@ let rec print_term ?max_level c ppf =
   | Apply (e1, e2) -> print ~at_level:1 "%t %t" (print_term e1) (print_term ~max_level:0 e2)
   | Value e -> print ~at_level:1 "value %t" (print_term ~max_level:0 e)
   | Match (e, lst) -> print "match %t with @[<hov>%t@]" (print_term e) (Print.sequence "\n" case lst)
-  | New -> print "value (new_instance ())"
+  | New -> print "new_instance ()"
   | Handle (e, c) -> print ~at_level:1 "handle (%t) (%t)" (print_term e) (print_term ~max_level:0 c)
-  | Let (p, c1, c2) -> print "let %t = %t in (%t)" (print_term c1) (print_pattern p) (print_term c2)
+  | Let (p, c1, c2) -> print "let %t = %t in (%t)" (print_pattern p) (print_term c1) (print_term c2)
   | Bind (p, c1, c2) -> print "(%t) >> (fun %t -> %t)" (print_term c1) (print_pattern p) (print_term c2)
   | LetRec (lst, c) -> print "let rec @[<hov>%t@] in %t" (Print.sequence " and " let_rec_abstraction lst) (print_term c)
   | Check c -> print "()"
@@ -199,6 +203,7 @@ and operation_cases cases ppf =
 
 let compile c =
   let c' = compile_computation c in
+  let c' = optimize c' in
   print_term c' Format.str_formatter;
   Format.flush_str_formatter ()
 
