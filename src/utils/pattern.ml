@@ -38,5 +38,17 @@ let linear_pattern p =
   in
     Common.injective (fun x -> x) (pattern_vars p) && linear_records p
 
+let rec map f (p, pos) =
+  let p' = match p with
+    | Var x -> Var (f x)
+    | As (p, x) -> As (map f p, f x)
+    | Tuple lst -> Tuple (List.map (map f) lst)
+    | Record lst -> Record (Common.assoc_map (map f) lst)
+    | Variant (lbl, e) -> Variant (lbl, Common.option_map (map f) e)
+    | Const c -> Const c
+    | Nonbinding -> Nonbinding
+  in
+  (p', pos)
+
 (* [linear_record r] verifies that a record or a record pattern has linear field names. *)
 let linear_record lst = Common.injective fst lst

@@ -11,3 +11,4 @@ and 'var plain_t =
 val pattern_vars : 'var t -> 'var list
 val linear_pattern : 'var t -> bool
 val linear_record : ('a * 'b) list -> bool
+val map : ('a -> 'b) -> 'a t -> 'b t
