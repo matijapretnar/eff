@@ -73,6 +73,7 @@
 
 %start <SugaredSyntax.toplevel list> file
 %start <SugaredSyntax.toplevel> commandline
+%start <SugaredSyntax.term> term_file
 
 %%
 
@@ -107,6 +108,10 @@ commandline:
     { t }
   | dir = topdirective SEMISEMI
     { dir }
+
+term_file:
+  | t = term EOF
+    { t }
 
 topterm: mark_position(plain_topterm) { $1 }
 plain_topterm:

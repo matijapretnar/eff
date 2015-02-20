@@ -28,6 +28,25 @@ let pervasives_file =
 let files = ref []
 let add_file interactive filename = (files := (filename, interactive) :: !files)
 
+(* Parser wrapper *)
+let parse parser lex =
+  try
+    parser Lexer.token lex
+  with
+  | Parser.Error ->
+      Error.syntax ~pos:(Lexer.position_of_lex lex) ""
+  | Failure "lexing: empty token" ->
+      Error.syntax ~pos:(Lexer.position_of_lex lex) "unrecognised symbol."
+
+let compile_file filename =
+  interactive_shell := false;
+  let t = Lexer.read_file (parse Parser.term_file) filename in
+  let c = Desugar.computation [] t in
+  let compiled = DynamicFree.compile_with_header c in
+  let channel = open_out (filename ^ ".ml") in
+  output_string channel compiled;
+  close_out channel
+
 (* Command-line options *)
 let options = Arg.align [
   ("--pervasives",
@@ -67,6 +86,9 @@ let options = Arg.align [
   ("-l",
     Arg.String (fun str -> add_file false str),
     "<file> Load <file> into the initial environment");
+  ("-c",
+    Arg.String compile_file,
+    "<file> Compiles <file> into an OCaml source");
   ("-V",
     Arg.Set_int Print.verbosity,
     "<n> Set printing verbosity to <n>");
@@ -77,16 +99,6 @@ let anonymous str =
   add_file true str;
   interactive_shell := false
 
-
-(* Parser wrapper *)
-let parse parser lex =
-  try
-    parser Lexer.token lex
-  with
-  | Parser.Error ->
-      Error.syntax ~pos:(Lexer.position_of_lex lex) ""
-  | Failure "lexing: empty token" ->
-      Error.syntax ~pos:(Lexer.position_of_lex lex) "unrecognised symbol."
 
 let initial_ctxenv =
   ((Ctx.empty, Common.id), Eval.initial)

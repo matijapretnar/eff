@@ -1,3 +1,5 @@
+let _ = Header.run
+
 let rec print_pattern ?max_level (p,_) ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p with
@@ -32,7 +34,7 @@ let rec print_computation ?max_level c ppf =
   | Syntax.Match (e, lst) -> print "match %t with (@[<hov>%t@])" (print_expression e) (Print.sequence " | " case lst)
   | Syntax.While (c1, c2) -> Error.runtime "Compiling of while loops not implemented"
   | Syntax.For (i, e1, e2, c, d) -> Error.runtime "Compiling of for loops not implemented"
-  | Syntax.New (eff, _) -> print "new_op %s" eff
+  | Syntax.New (eff, _) -> print "new_instance %s" eff
   (* XXX Do compilation of resources *)
   | Syntax.Handle (e, c) -> print ~at_level:1 "handle (%t) (%t)" (print_expression e) (print_computation ~max_level:0 c)
   | Syntax.Let (lst, c) -> print "%t" (compile_let c lst)
@@ -57,11 +59,10 @@ and print_expression ?max_level e ppf =
     print ~at_level:1 "%s @[<hov>%t@]" lbl (print_expression e)
   | Syntax.Lambda a -> print "fun %t" (abstraction a)
   | Syntax.Handler h  -> print "%t" (handler h)
-  | Syntax.Operation op -> print "%t" (operation op)
+  | Syntax.Operation op -> print "apply_operation %t" (operation op)
 
 and operation (e, op) ppf =
-  (* XXX Add instances! *)
-  Print.print ppf "%s" op
+  Print.print ppf "(%s, %t)" op (print_expression e)
 
 and abstraction (p, c) ppf =
   Format.fprintf ppf "%t -> %t" (print_pattern p) (print_computation c)
@@ -90,3 +91,11 @@ and operation_cases cases ppf =
 let compile c =
   print_computation c Format.str_formatter;
   Format.flush_str_formatter ()
+
+let compile_with_header c =
+  let ic = open_in "src/compiler/header.ml" in
+  let n = in_channel_length ic in
+  let header = Bytes.create n in
+  really_input ic header 0 n;
+  close_in ic;
+  header ^ "\n\n\nlet _ = (" ^ compile c ^ ")"
