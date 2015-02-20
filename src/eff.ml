@@ -41,7 +41,7 @@ let parse parser lex =
 let compile_file filename =
   interactive_shell := false;
   let t = Lexer.read_file (parse Parser.term_file) filename in
-  let c = Desugar.computation [] t in
+  let c = Desugar.computation DynamicFree.builtin t in
   let compiled = DynamicFree.compile_with_header c in
   let channel = open_out (filename ^ ".ml") in
   output_string channel compiled;

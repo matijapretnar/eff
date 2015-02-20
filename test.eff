@@ -1,12 +1,29 @@
-let raise = "TODO"
-and c = "TODO"
-and fail = "TODO"
-and (+) = "TODO"
-and available = "TODO"
-and (=) = "TODO"
-
+let c = new ref (* Because choice is not builtin *)
 in
 
+let fail = new ref (* Because choice is not builtin *)
+in
+
+let rec filter p = function
+  | [] -> []
+  | x :: xs ->
+    if p x then (x :: filter p xs) else filter p xs
+in
+
+let rec forall p = function
+  | [] -> true
+  | x :: xs -> if p x then forall p xs else false
+in
+
+let no_attack (x, y) (x', y') =
+  x <> x' && y <> y' && abs (x - x') <> abs (y - y')
+in
+
+let available x qs =
+  filter (fun y -> forall (no_attack (x, y)) qs) [1; 2; 3; 4; 5; 6; 7; 8]
+in
+
+ 
 let rec choose xs =
   match xs with
   | [] -> raise fail ()

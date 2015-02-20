@@ -11,20 +11,10 @@ let rec print_pattern ?max_level (p,_) ppf =
   | Pattern.Variant (lbl, None) when lbl = Common.nil -> print "[]"
   | Pattern.Variant (lbl, None) -> print "%s" lbl
   | Pattern.Variant (lbl, Some (Pattern.Tuple [v1; v2], _)) when lbl = Common.cons ->
-      print "[@[<hov>@[%t@]%t@]]" (print_pattern v1) (pattern_list v2)
+      print "(%t) :: (%t)" (print_pattern v1) (print_pattern v2)
   | Pattern.Variant (lbl, Some p) ->
       print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
   | Pattern.Nonbinding -> print "_"
-
-and pattern_list ?(max_length=299) (p, pos) ppf =
-  if max_length > 1 then
-    match p with
-    | Pattern.Variant (lbl, Some (Pattern.Tuple [v1; v2], _)) when lbl = Common.cons ->
-        Format.fprintf ppf ",@ %t%t" (print_pattern v1) (pattern_list ~max_length:(max_length - 1) v2)
-    | Pattern.Variant (lbl, None) when lbl = Common.nil -> ()
-    | p -> Format.fprintf ppf ",@ %t" (print_pattern (p, pos))
-  else
-    Format.fprintf ppf ",@ ..."
 
 let rec print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -34,7 +24,7 @@ let rec print_computation ?max_level c ppf =
   | Syntax.Match (e, lst) -> print "match %t with @[<hov>%t@]" (print_expression e) (Print.sequence "\n" case lst)
   | Syntax.While (c1, c2) -> Error.runtime "Compiling of while loops not implemented"
   | Syntax.For (i, e1, e2, c, d) -> Error.runtime "Compiling of for loops not implemented"
-  | Syntax.New (eff, _) -> print "new_instance %s" eff
+  | Syntax.New (eff, _) -> print "value (new_instance ())"
   (* XXX Do compilation of resources *)
   | Syntax.Handle (e, c) -> print ~at_level:1 "handle (%t) (%t)" (print_expression e) (print_computation ~max_level:0 c)
   | Syntax.Let (lst, c) -> print "%t" (compile_let c lst)
@@ -62,7 +52,7 @@ and print_expression ?max_level e ppf =
   | Syntax.Operation op -> print "apply_operation %t" (operation op)
 
 and operation (e, op) ppf =
-  Print.print ppf "(%s, %t)" op (print_expression e)
+  Print.print ppf "(\"%s\", %t)" op (print_expression e)
 
 and abstraction (p, c) ppf =
   Format.fprintf ppf "%t -> %t" (print_pattern p) (print_computation c)
@@ -99,3 +89,13 @@ let compile_with_header c =
   really_input ic header 0 n;
   close_in ic;
   header ^ "\n\n\nlet _ = (" ^ compile c ^ ")"
+
+let builtin = [
+  ("=", (-1, "="));
+  ("+", (-2, "+"));
+  ("&&", (-3, "&&"));
+  ("<>", (-4, "<>"));
+  ("-", (-5, "-"));
+  ("abs", (-6, "abs"));
+  ("raise", (-7, "raise"));
+]
