@@ -6,7 +6,8 @@ and plain_term =
   | Match of term * abstraction list
   | New
   | Handle of term * term
-  | Let of (variable Pattern.t * term) list * term
+  | Let of variable Pattern.t * term * term
+  | Bind of variable Pattern.t * term * term
   | LetRec of (variable * abstraction) list * term
   | Var of variable
   | Const of Common.const
@@ -67,7 +68,7 @@ and compile_computation (c, pos) =
   | Syntax.Handle (e, c) ->
       Handle (compile_expression e, compile_computation c)
   | Syntax.Let (lst, c) ->
-      Let (compile_let lst, compile_computation c)
+      compile_let c lst
   | Syntax.LetRec (lst, c) ->
       LetRec (compile_letrec lst, compile_computation c)
   | Syntax.Check c ->
@@ -85,8 +86,10 @@ and compile_handler h = {
   value = compile_abstraction h.Syntax.value;
   finally = compile_abstraction h.Syntax.finally;
 }
-and compile_let lst =
-  List.map (fun (p, c) -> (compile_pattern p, compile_computation c)) lst
+and compile_let c = function
+  | [] -> fst (compile_computation c)
+  | (p, c') :: lst ->
+      Bind (compile_pattern p, compile_computation c', (compile_let c lst, snd c))
 and compile_letrec lst =
   List.map (fun (x, a) -> (compile_variable x, compile_abstraction a)) lst
 
@@ -116,7 +119,8 @@ let rec print_term ?max_level c ppf =
   | Match (e, lst) -> print "match %t with @[<hov>%t@]" (print_term e) (Print.sequence "\n" case lst)
   | New -> print "value (new_instance ())"
   | Handle (e, c) -> print ~at_level:1 "handle (%t) (%t)" (print_term e) (print_term ~max_level:0 c)
-  | Let (lst, c) -> print "%t" (print_let c lst)
+  | Let (p, c1, c2) -> print "let %t = %t in (%t)" (print_term c1) (print_pattern p) (print_term c2)
+  | Bind (p, c1, c2) -> print "(%t) >> (fun %t -> %t)" (print_term c1) (print_pattern p) (print_term c2)
   | LetRec (lst, c) -> print "let rec @[<hov>%t@] in %t" (Print.sequence " and " let_rec_abstraction lst) (print_term c)
   | Check c -> print "()"
   | Var x -> print "(%s)" x
