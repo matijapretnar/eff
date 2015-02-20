@@ -67,8 +67,8 @@ let compare_const c1 c2 =
 let equal_const c1 c2 = (compare_const c1 c2 = Equal)
 
 (** Variants for the built-in list type *)
-let cons = "$1cons"
-let nil = "$0nil"
+let cons = "(::)"
+let nil = "([])"
 
 (** Association lists *)
 type ('key, 'value) assoc = ('key * 'value) list

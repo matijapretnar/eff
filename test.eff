@@ -1,0 +1,29 @@
+let raise = "TODO"
+and c = "TODO"
+and fail = "TODO"
+and (+) = "TODO"
+and available = "TODO"
+and (=) = "TODO"
+
+in
+
+let rec choose xs =
+  match xs with
+  | [] -> raise fail ()
+  | x :: xs -> if c#decide () then x else choose xs
+in
+
+let rec place x qs =
+  if x = 9 then qs else
+  let y = choose (available x qs) in
+  place (x + 1) ((x, y) :: qs)
+in
+
+let dont_fail = handler
+| c#decide () k ->
+    handle k true with
+    | fail#raise () _ -> k false
+in
+
+with dont_fail handle
+  place 1 []

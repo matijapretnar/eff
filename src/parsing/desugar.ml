@@ -212,7 +212,7 @@ let tydefs ~pos defs =
 
 (** [fresh_variable ()] creates a fresh variable ["$gen1"], ["$gen2"], ... on
     each call *)
-let fresh_variable = Common.fresh (fun n -> (n, "$gen" ^ string_of_int n))
+let fresh_variable = Common.fresh (fun n -> (n, "__gen" ^ string_of_int n))
 
 let id_abstraction pos =
   let x = fresh_variable () in

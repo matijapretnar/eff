@@ -22,7 +22,7 @@ and pattern_list ?(max_length=299) (p, pos) ppf =
     | Pattern.Variant (lbl, Some (Pattern.Tuple [v1; v2], _)) when lbl = Common.cons ->
         Format.fprintf ppf ",@ %t%t" (print_pattern v1) (pattern_list ~max_length:(max_length - 1) v2)
     | Pattern.Variant (lbl, None) when lbl = Common.nil -> ()
-    | p -> Format.fprintf ppf "(??? %t ???)" (print_pattern (p, pos))
+    | p -> Format.fprintf ppf ",@ %t" (print_pattern (p, pos))
   else
     Format.fprintf ppf ",@ ..."
 
@@ -31,7 +31,7 @@ let rec print_computation ?max_level c ppf =
   match fst c with
   | Syntax.Apply (e1, e2) -> print ~at_level:1 "%t %t" (print_expression e1) (print_expression ~max_level:0 e2)
   | Syntax.Value e -> print ~at_level:1 "value %t" (print_expression ~max_level:0 e)
-  | Syntax.Match (e, lst) -> print "match %t with (@[<hov>%t@])" (print_expression e) (Print.sequence " | " case lst)
+  | Syntax.Match (e, lst) -> print "match %t with @[<hov>%t@]" (print_expression e) (Print.sequence "\n" case lst)
   | Syntax.While (c1, c2) -> Error.runtime "Compiling of while loops not implemented"
   | Syntax.For (i, e1, e2, c, d) -> Error.runtime "Compiling of for loops not implemented"
   | Syntax.New (eff, _) -> print "new_instance %s" eff
@@ -50,14 +50,14 @@ and compile_let c2 lst ppf =
 and print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match fst e with
-  | Syntax.Var x -> print "%t" (Print.variable x)
+  | Syntax.Var x -> print "(%t)" (Print.variable x)
   | Syntax.Const c -> print "%t" (Common.print_const c)
   | Syntax.Tuple lst -> Print.tuple print_expression lst ppf
   | Syntax.Record lst -> Print.record print_expression lst ppf
   | Syntax.Variant (lbl, None) -> print "%s" lbl
   | Syntax.Variant (lbl, Some e) ->
     print ~at_level:1 "%s @[<hov>%t@]" lbl (print_expression e)
-  | Syntax.Lambda a -> print "fun %t" (abstraction a)
+  | Syntax.Lambda a -> print ~at_level:3 "fun %t" (abstraction a)
   | Syntax.Handler h  -> print "%t" (handler h)
   | Syntax.Operation op -> print "apply_operation %t" (operation op)
 
@@ -74,10 +74,10 @@ and let_rec_abstraction (x, a) ppf =
   Format.fprintf ppf "%t = fun %t" (Print.variable x) (abstraction a)
 
 and case a ppf =
-  Format.fprintf ppf "%t" (abstraction a)
+  Format.fprintf ppf "| %t" (abstraction a)
 
 and handler h ppf =
-  Format.fprintf ppf "{ value = (%t); finally = (%t); operation_cases = (%t)}"
+  Format.fprintf ppf "{ value = (fun %t); finally = (fun %t); operation_cases = (%t)}"
   (abstraction h.Syntax.value) (abstraction h.Syntax.finally) (operation_cases h.Syntax.operations)
 
 and operation_cases cases ppf =
