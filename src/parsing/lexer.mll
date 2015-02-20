@@ -70,10 +70,10 @@ let position_of_lex lex =
 let bigint_of_string s =
   (* get rid of _ *)
   let j = ref 0 in
-  for i = 0 to String.length s - 1 do
-    if s.[i] <> '_' then (s.[!j] <- s.[i]; incr j)
+  for i = 0 to Bytes.length s - 1 do
+    if Bytes.get s i <> '_' then (Bytes.set s !j (Bytes.get s i); incr j)
   done;
-  Big_int.big_int_of_string (String.sub s 0 !j)
+  Big_int.big_int_of_string (Bytes.sub s 0 !j)
 
 }
 
@@ -194,7 +194,7 @@ and escaped = parse
       terms
     with
       (* Close the file in case of any parsing errors. *)
-      Error.Error err -> close_in fh; raise (Error.Error err)
+      Error.Error ((_, e, msg) as err) -> close_in fh; print_endline (e ^ msg); raise (Error.Error err)
   with
     (* Any errors when opening or closing a file are fatal. *)
     Sys_error msg -> Error.fatal "%s" msg
