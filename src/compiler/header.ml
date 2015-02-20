@@ -54,10 +54,11 @@ let run = function
   | Value x -> x
   | Op ((op, _), _, _) -> failwith ("Uncaught operation " ^ op)
 
+let abs = fun x -> value (if x < 0 then -x else x)
+let (<) = fun x -> value (fun y -> value (x < y))
 let (=) = fun x -> value (fun y -> value (x = y))
 let (+) = fun x -> value (fun y -> value (x + y))
 let (&&) = fun x -> value (fun y -> value (x && y))
 let (<>) = fun x -> value (fun y -> value (x <> y))
 let (-) = fun x -> value (fun y -> value (x - y))
-let abs = fun x -> value (if x < 0 then -x else x)
 let raise exc = value (fun x -> Op (("raise", exc), x, fun _ -> assert false))

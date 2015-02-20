@@ -4,6 +4,9 @@ in
 let fail = new ref (* Because choice is not builtin *)
 in
 
+let number_of_queens = 20
+in
+
 let rec filter p = function
   | [] -> []
   | x :: xs ->
@@ -20,9 +23,12 @@ let no_attack (x, y) (x', y') =
 in
 
 let available x qs =
-  filter (fun y -> forall (no_attack (x, y)) qs) [1; 2; 3; 4; 5; 6; 7; 8]
+  let rec loop possible y =
+    if y < 1 then possible else
+    if forall (no_attack (x, y)) qs then loop (y :: possible) (y - 1) else loop possible (y - 1)
+  in
+  loop [] number_of_queens
 in
-
  
 let rec choose xs =
   match xs with
@@ -31,7 +37,7 @@ let rec choose xs =
 in
 
 let rec place x qs =
-  if x = 9 then qs else
+  if number_of_queens < x then qs else
   let y = choose (available x qs) in
   place (x + 1) ((x, y) :: qs)
 in
