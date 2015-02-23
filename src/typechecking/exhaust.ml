@@ -46,7 +46,7 @@ let rec cons_of_pattern p =
     | P.Record [] -> assert false
     | P.Record ((lbl, _) :: _) ->
         (match Tctx.find_field lbl with
-          | None -> Error.typing ~pos:(snd p) "Unbound record field label %s in a pattern" lbl
+          | None -> Error.typing ~loc:(snd p) "Unbound record field label %s in a pattern" lbl
           | Some (_, _, flds) -> Record (List.map fst flds))
     | P.Variant (lbl, opt) -> Variant (lbl, opt <> None)
     | P.Const c -> Const c
@@ -54,7 +54,7 @@ let rec cons_of_pattern p =
 
 (* Constructs a pattern from a constructor and a list of subpatterns, which must
    contain [arity c] elements. *)
-let pattern_of_cons ~pos c lst =
+let pattern_of_cons ~loc c lst =
   let plain = match c with
     | Tuple n -> P.Tuple lst
     | Record flds -> P.Record (List.combine flds lst)
@@ -62,7 +62,7 @@ let pattern_of_cons ~pos c lst =
     | Variant (lbl, opt) -> P.Variant (lbl, if opt then Some (List.hd lst) else None)
     | Wildcard -> P.Nonbinding
   in
-  (plain, pos)
+  (plain, loc)
 
 (* Finds all distinct non-wildcard root pattern constructors in [lst], and at
    least one constructor of their type not present in [lst] if it exists. *)
@@ -118,7 +118,7 @@ let find_constructors lst =
 
 (* Specializes a pattern vector for the pattern constructor [con]. Returns None
    if the first pattern of input vector has an incompatible constructor. *)
-let specialize_vector ~pos con = function
+let specialize_vector ~loc con = function
   | [] -> None
   | (p1, _) :: lst ->
       begin match con, remove_as p1 with
@@ -126,7 +126,7 @@ let specialize_vector ~pos con = function
         | Record all, P.Record def ->
             let get_pattern defs lbl = match C.lookup lbl defs with
               | Some p' -> p'
-              | None -> (P.Nonbinding, pos)
+              | None -> (P.Nonbinding, loc)
             in
             Some ((List.map (get_pattern def) all) @ lst)
         | Variant (lbl, _), P.Variant (lbl', opt) when lbl = lbl' ->
@@ -135,17 +135,17 @@ let specialize_vector ~pos con = function
               | None -> Some lst
             end
         | Const c, P.Const c' when Common.equal_const c c' -> Some lst
-        | _, (P.Nonbinding | P.Var _) -> Some ((C.repeat (P.Nonbinding, pos) (arity con)) @ lst)
+        | _, (P.Nonbinding | P.Var _) -> Some ((C.repeat (P.Nonbinding, loc) (arity con)) @ lst)
         | _, _ -> None
       end
 
 (* Specializes a pattern matrix for the pattern constructor [con]. *)
-let rec specialize ~pos con = function
+let rec specialize ~loc con = function
   | [] -> []
   | row :: lst ->
-      begin match specialize_vector ~pos con row with
-        | Some row' -> row' :: (specialize ~pos con lst)
-        | None -> (specialize ~pos con lst)
+      begin match specialize_vector ~loc con row with
+        | Some row' -> row' :: (specialize ~loc con lst)
+        | None -> (specialize ~loc con lst)
       end
 
 (* Creates a default matrix from the input pattern matrix. *)
@@ -159,7 +159,7 @@ let rec default = function
       end
 
 (* Is the pattern vector [q] useful w.r.t. pattern matrix [p]? *)
-let rec useful ~pos p q =
+let rec useful ~loc p q =
   match q with
     (* Base case. *)
     | [] -> p = []
@@ -170,9 +170,9 @@ let rec useful ~pos p q =
           (* If the first pattern in [q] is constructed, check the matrix [p]
              specialized for that constructor. *)
           | Tuple _ | Record _ | Variant _ | Const _ ->
-              begin match specialize_vector ~pos c q with
+              begin match specialize_vector ~loc c q with
                 | None -> assert false
-                | Some q' -> useful ~pos (specialize ~pos c p) q'
+                | Some q' -> useful ~loc (specialize ~loc c p) q'
               end
           (* Otherwise, check if pattern constructors in the first column of [p]
              form a complete type signature. If they do, check if [q] is useful
@@ -181,19 +181,19 @@ let rec useful ~pos p q =
           | Wildcard ->
               let (present, missing) = find_constructors (List.map List.hd p) in
               if present <> [] && missing = [] then
-                List.exists (fun x -> match (specialize_vector ~pos x q) with
+                List.exists (fun x -> match (specialize_vector ~loc x q) with
                                         | None -> false
-                                        | Some q' -> useful ~pos (specialize ~pos x p) q')
+                                        | Some q' -> useful ~loc (specialize ~loc x p) q')
                             present
               else
-                useful ~pos (default p) qs
+                useful ~loc (default p) qs
         end
 
 (* Specialized version of [useful] that checks if a pattern matrix [p] with [n]
    columns is exhaustive (equivalent to calling [useful] on [p] with a vector
    of [n] wildcard patterns). Returns a list with at least one counterexample if
    [p] is not exhaustive. *)
-let rec exhaustive ~pos p = function
+let rec exhaustive ~loc p = function
   | 0 -> if p = [] then Some [] else None
   | n ->
       let (present, missing) = find_constructors (List.map List.hd p) in
@@ -201,38 +201,38 @@ let rec exhaustive ~pos p = function
         let rec find = function
           | [] -> None
           | c :: cs ->
-              begin match exhaustive ~pos (specialize ~pos c p) ((arity c)+n-1) with
+              begin match exhaustive ~loc (specialize ~loc c p) ((arity c)+n-1) with
                 | None -> find cs
                 | Some lst ->
                     let (ps, rest) = C.split (arity c) lst in
-                    Some ((pattern_of_cons ~pos c ps) :: rest)
+                    Some ((pattern_of_cons ~loc c ps) :: rest)
               end
         in
         find present
       else
-        match exhaustive ~pos (default p) (n-1) with
+        match exhaustive ~loc (default p) (n-1) with
           | None -> None
           | Some lst ->
               let c = List.hd missing in
-              Some ((pattern_of_cons ~pos c (C.repeat (P.Nonbinding, pos) (arity c))) :: lst)
+              Some ((pattern_of_cons ~loc c (C.repeat (P.Nonbinding, loc) (arity c))) :: lst)
 
 (* Prints a warning if the list of patterns [pats] is not exhaustive or contains
    unused patterns. *)
-let check_patterns ~pos pats =
+let check_patterns ~loc pats =
   (* [p] contains the patterns that have already been checked for usefulness. *)
   let rec check p pats = match pats with
     | [] ->
-        begin match exhaustive ~pos p 1 with
+        begin match exhaustive ~loc p 1 with
           | Some ps ->
-              Print.warning ~pos "This pattern-matching is not exhaustive.\n\
+              Print.warning ~loc "This pattern-matching is not exhaustive.\n\
                                       Here is an example of a value that is not matched:";
 (*  *)              prerr_endline (Print.to_string "%t" (Syntax.print_pattern (List.hd ps)))
           | None -> ()
         end
-    | (_, pos) as pat :: pats ->
-        if not (useful ~pos p [pat]) then
+    | (_, loc) as pat :: pats ->
+        if not (useful ~loc p [pat]) then
           begin
-            Print.warning ~pos "This match case is unused.";
+            Print.warning ~loc "This match case is unused.";
             check p pats
           end
         else
@@ -241,12 +241,12 @@ let check_patterns ~pos pats =
   check [] pats
 
 (* A pattern is irrefutable if it cannot fail during pattern matching. *)
-let is_irrefutable p = check_patterns ~pos:(snd p) [p]
+let is_irrefutable p = check_patterns ~loc:(snd p) [p]
 
 (* Check for refutable patterns in let statements and non-exhaustive match
    statements. *)
 let check_comp c =
-  let rec check (c, pos) =
+  let rec check (c, loc) =
     match c with
       | Syntax.Value _ -> ()
       | Syntax.Let (lst, c) ->
@@ -256,7 +256,7 @@ let check_comp c =
         List.iter (fun (_, (p, c)) -> is_irrefutable p ; check c) lst ;
       | Syntax.Match (_, []) -> () (* Skip empty match to avoid an unwanted warning. *)
       | Syntax.Match (_, lst) -> 
-        check_patterns ~pos:pos (List.map fst lst) ;
+        check_patterns ~loc (List.map fst lst) ;
         List.iter (fun (_, c) -> check c) lst
       | Syntax.While (c1, c2) -> check c1 ; check c2
       | Syntax.For (_, _, _, c, _) -> check c

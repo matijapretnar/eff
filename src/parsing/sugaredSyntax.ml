@@ -1,7 +1,7 @@
 (** Abstract syntax of eff terms, types, and toplevel commands. *)
 
 (** Terms *)
-type term = plain_term Common.pos
+type term = plain_term * Location.t
 and plain_term =
   | Var of Common.variable
   (** variables *)
@@ -67,7 +67,7 @@ type dirt =
 type region =
   | RegionParam of Common.regionparam
 
-type ty = plain_ty Common.pos
+type ty = plain_ty * Location.t
 and plain_ty =
   | TyApply of Common.tyname * ty list * (dirt list * region list) option * region option
   (** [(ty1, ty2, ..., tyn) type_name] *)
@@ -91,7 +91,7 @@ type tydef =
   (** [ty] *)
 
 (* Toplevel commands (the first four do not need to be separated by [;;]) *)
-type toplevel = plain_toplevel Common.pos
+type toplevel = plain_toplevel * Location.t
 and plain_toplevel =
   | Tydef of (Common.tyname, (Common.typaram list * tydef)) Common.assoc
   (** [type t = tydef] *)

@@ -6,9 +6,6 @@ type tyname = string
 type typaram = string
 type dirtparam = int
 type regionparam = int
-type position = Position of Lexing.position * Lexing.position
-type 'a pos = 'a * position
-val join_pos : position -> position -> position
 val id : 'a -> 'a
 val compose : ('b -> 'c) -> ('a -> 'b) -> ('a -> 'c)
 type const =
@@ -38,5 +35,4 @@ val uniq : 'a list -> 'a list
 val split : int -> 'a list -> 'a list * 'a list
 val diff : 'a list -> 'a list -> 'a list
 val print_const : const -> Format.formatter -> unit
-val print_position : position -> Format.formatter -> unit
 val assoc_flatten : ('a * 'b) list -> ('a * 'b list) list

@@ -3,7 +3,7 @@
 module C = Common
 module V = Value
 
-exception PatternMatch of C.position
+exception PatternMatch of Location.t
 
 module EnvMap = Map.Make(
   struct
@@ -52,7 +52,7 @@ let rec extend_value p v env =
 
 let extend p v env =
   try extend_value p v env
-  with PatternMatch pos -> Error.runtime "Pattern match failure."
+  with PatternMatch loc -> Error.runtime "Pattern match failure."
 
 let rec sequence k = function
   | V.Value v -> k v
@@ -60,7 +60,7 @@ let rec sequence k = function
       let k'' u = sequence k (k' u) in
       V.Operation (op, v, k'')
 
-let rec ceval env (c, pos) = match c with
+let rec ceval env (c, loc) = match c with
   | Syntax.Apply (e1, e2) ->
       let v1 = veval env e1
       and v2 = veval env e2 in
@@ -135,7 +135,7 @@ let rec ceval env (c, pos) = match c with
 
   | Syntax.Check c ->
       let r = ceval env c in
-      Print.check ~pos "%t" (Value.print_result r);
+      Print.check ~loc "%t" (Value.print_result r);
       V.unit_result
 
 and eval_let env lst c =
@@ -155,7 +155,7 @@ and extend_let_rec env defs =
   env' := env;
   env
 
-and veval env (e, pos) = match e with
+and veval env (e, loc) = match e with
   | Syntax.Var x ->
       begin match lookup x env with
       | Some v -> v

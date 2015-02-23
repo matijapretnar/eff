@@ -63,9 +63,6 @@
     (" ", " ");
   ]
 
-let position_of_lex lex =
-  Common.Position (Lexing.lexeme_start_p lex, Lexing.lexeme_end_p lex)
-
 let bigint_of_string s =
   (* get rid of _ *)
   let j = ref 0 in
@@ -111,7 +108,7 @@ rule token = parse
   | int                 { INT (bigint_of_string (Lexing.lexeme lexbuf)) }
   | xxxint              { try
                             INT (Big_int.big_int_of_int (int_of_string (Lexing.lexeme lexbuf)))
-                          with Failure _ -> Error.syntax ~pos:(position_of_lex lexbuf) "Invalid integer constant"
+                          with Failure _ -> Error.syntax ~loc:(Location.of_lexeme lexbuf) "Invalid integer constant"
                         }
   | float               { FLOAT (float_of_string(Lexing.lexeme lexbuf)) }
   | '"'                 { STRING (string "" lexbuf) }
@@ -167,18 +164,18 @@ and comment n = parse
   | "(*"                { comment (n + 1) lexbuf }
   | '\n'                { Lexing.new_line lexbuf; comment n lexbuf }
   | _                   { comment n lexbuf }
-  | eof                 { Error.syntax ~pos:(position_of_lex lexbuf) "Unterminated comment" }
+  | eof                 { Error.syntax ~loc:(Location.of_lexeme lexbuf) "Unterminated comment" }
 
 and string acc = parse
   | '"'                 { acc }
   | '\\'                { let esc = escaped lexbuf in string (acc ^ esc) lexbuf }
   | [^'"' '\\']*        { string (acc ^ (Lexing.lexeme lexbuf)) lexbuf }
-  | eof                 { Error.syntax ~pos:(position_of_lex lexbuf) "Unterminated string %s" acc}
+  | eof                 { Error.syntax ~loc:(Location.of_lexeme lexbuf) "Unterminated string %s" acc}
 
 and escaped = parse
   | _                   { let str = Lexing.lexeme lexbuf in
                           try List.assoc str escaped_characters
-                          with Not_found -> Error.syntax ~pos:(position_of_lex lexbuf) "Unknown escaped character %s" str
+                          with Not_found -> Error.syntax ~loc:(Location.of_lexeme lexbuf) "Unknown escaped character %s" str
                         }
 
 {

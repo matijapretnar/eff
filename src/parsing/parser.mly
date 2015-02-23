@@ -6,20 +6,20 @@
     | ReturnCase of abstraction
     | FinallyCase of abstraction
 
-  let collect_handler_cases (lst : (handler_case * Common.position) list) =
+  let collect_handler_cases (lst : (handler_case * Location.t) list) =
     let (ops, ret, fin) =
       List.fold_left
         (fun (ops, ret, fin) -> function
           | (OperationCase (op, a2), _) ->  ((op, a2) :: ops, ret, fin)
-          | (ReturnCase a, pos) ->
+          | (ReturnCase a, loc) ->
             begin match ret with
               | None -> (ops, Some a, fin)
-              | Some _ -> Error.syntax ~pos "Multiple value cases in a handler."
+              | Some _ -> Error.syntax ~loc "Multiple value cases in a handler."
             end
-          | (FinallyCase a, pos) ->
+          | (FinallyCase a, loc) ->
             begin match fin with
             | None -> (ops, ret, Some a)
-            | Some _ -> Error.syntax ~pos "Multiple finally cases in a handler."
+            | Some _ -> Error.syntax ~loc "Multiple finally cases in a handler."
             end)
         ([], None, None)
         lst
@@ -192,24 +192,24 @@ binop_term: mark_position(plain_binop_term) { $1 }
 plain_binop_term:
   | t1 = binop_term op = binop t2 = binop_term
     {
-      let op_pos = Common.Position ($startpos(op), $endpos(op)) in
-      let partial = Apply ((Var op, op_pos), t1) in
-      let partial_pos = Common.Position ($startpos(t1), $endpos(op)) in
+      let op_loc = Location.make $startpos(op) $endpos(op) in
+      let partial = Apply ((Var op, op_loc), t1) in
+      let partial_pos = Location.make $startpos(t1) $endpos(op) in
       Apply ((partial, partial_pos), t2)
     }
   | t1 = binop_term CONS t2 = binop_term
-    { Variant (Common.cons, Some (Tuple [t1; t2], Common.Position ($startpos, $endpos))) }
+    { Variant (Common.cons, Some (Tuple [t1; t2], Location.make $startpos $endpos)) }
   | t = plain_uminus_term 
     { t }
 
 uminus_term: mark_position(plain_uminus_term) { $1 }
 plain_uminus_term:
   | MINUS t = uminus_term
-    { let op_pos = Common.Position ($startpos($1), $endpos($1)) in
-      Apply ((Var "~-", op_pos), t) }
+    { let op_loc = Location.make $startpos($1) $endpos($1) in
+      Apply ((Var "~-", op_loc), t) }
   | MINUSDOT t = uminus_term
-    { let op_pos = Common.Position ($startpos($1), $endpos($1)) in
-      Apply ((Var "~-.", op_pos), t) }
+    { let op_loc = Location.make $startpos($1) $endpos($1) in
+      Apply ((Var "~-.", op_loc), t) }
   | t = plain_app_term
     { t }
 
@@ -220,9 +220,9 @@ plain_app_term:
     {
       match fst t, ts with
       | Variant (lbl, None), [t] -> Variant (lbl, Some t)
-      | Variant (lbl, _), _ -> Error.syntax ~pos:(snd t) "Label %s applied to too many argument" lbl
+      | Variant (lbl, _), _ -> Error.syntax ~loc:(snd t) "Label %s applied to too many argument" lbl
       | _, _ ->
-        let apply ((_, pos1) as t1) ((_, pos2) as t2) = (Apply(t1, t2), Common.join_pos pos1 pos2) in
+        let apply ((_, loc1) as t1) ((_, loc2) as t2) = (Apply(t1, t2), Location.join loc1 loc2) in
         fst (List.fold_left apply t ts)
     }
   | t = plain_prefix_term
@@ -232,8 +232,8 @@ prefix_term: mark_position(plain_prefix_term) { $1 }
 plain_prefix_term:
   | op = prefixop t = simple_term
     {
-      let op_pos = Common.Position ($startpos(op), $endpos(op)) in
-      Apply ((Var op, op_pos), t)
+      let op_loc = Location.make $startpos(op) $endpos(op) in
+      Apply ((Var op, op_loc), t)
     }
   | t = plain_simple_term
     { t }
@@ -250,10 +250,10 @@ plain_simple_term:
     { Operation (t, op) }
   | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
-      let nil = (Variant (Common.nil, None), Common.Position ($endpos, $endpos)) in
-      let cons ((_, post) as t) ((_, posts) as ts) =
-        let pos = Common.join_pos post posts in
-        (Variant (Common.cons, Some (Tuple [t; ts], pos)), pos) in
+      let nil = (Variant (Common.nil, None), Location.make $endpos $endpos) in
+      let cons ((_, loc_t) as t) ((_, loc_ts) as ts) =
+        let loc = Location.join loc_t loc_ts in
+        (Variant (Common.cons, Some (Tuple [t; ts], loc)), loc) in
       fst (List.fold_right cons ts nil)
     }
   | LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, comma_term)) RBRACE
@@ -285,11 +285,11 @@ lambdas0(SEP):
   | SEP t = term
     { t }
   | p = simple_pattern t = lambdas0(SEP)
-    { (Lambda (p, t), Common.Position ($startpos, $endpos)) }
+    { (Lambda (p, t), Location.make $startpos $endpos) }
 
 lambdas1(SEP):
   | p = simple_pattern t = lambdas0(SEP)
-    { (Lambda (p, t), Common.Position ($startpos, $endpos)) }
+    { (Lambda (p, t), Location.make $startpos $endpos) }
 
 let_def:
   | p = pattern EQUAL t = term
@@ -327,7 +327,7 @@ plain_cons_pattern:
   | p = variant_pattern
     { fst p }
   | p1 = variant_pattern CONS p2 = cons_pattern
-    { Pattern.Variant (Common.cons, Some (Pattern.Tuple [p1; p2], Common.Position ($startpos, $endpos))) }
+    { Pattern.Variant (Common.cons, Some (Pattern.Tuple [p1; p2], Location.make $startpos $endpos)) }
 
 variant_pattern: mark_position(plain_variant_pattern) { $1 }
 plain_variant_pattern:
@@ -350,10 +350,10 @@ plain_simple_pattern:
     { Pattern.Record flds }
   | LBRACK ts = separated_list(SEMI, pattern) RBRACK
     {
-      let nil = (Pattern.Variant (Common.nil, None), Common.Position ($endpos, $endpos)) in
-      let cons ((_, post) as t) ((_, posts) as ts) =
-        let pos = Common.join_pos post posts in
-        (Pattern.Variant (Common.cons, Some (Pattern.Tuple [t; ts], pos)), pos)
+      let nil = (Pattern.Variant (Common.nil, None), Location.make $endpos $endpos) in
+      let cons ((_, loc_t) as t) ((_, loc_ts) as ts) =
+        let loc = Location.join loc_t loc_ts in
+        (Pattern.Variant (Common.cons, Some (Pattern.Tuple [t; ts], loc)), loc)
       in
         fst (List.fold_right cons ts nil)
     }
@@ -455,7 +455,7 @@ cases(case):
 
 mark_position(X):
   x = X
-  { x, Common.Position ($startpos, $endpos)}
+  { x, Location.make $startpos $endpos}
 
 params:
   |

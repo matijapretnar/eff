@@ -4,7 +4,7 @@ type variable = int * Common.variable
 type pattern = variable Pattern.t
 
 (** Pure expressions *)
-type expression = plain_expression Common.pos
+type expression = plain_expression * Location.t
 and plain_expression =
   | Var of variable
   | Const of Common.const
@@ -16,7 +16,7 @@ and plain_expression =
   | Handler of handler
 
 (** Impure computations *)
-and computation = plain_computation Common.pos
+and computation = plain_computation * Location.t
 and plain_computation =
   | Value of expression
   | Let of (pattern * computation) list * computation
@@ -67,13 +67,13 @@ let rec print_pattern ?max_level (p,_) ppf =
       print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
   | Pattern.Nonbinding -> print "_"
 
-and pattern_list ?(max_length=299) (p, pos) ppf =
+and pattern_list ?(max_length=299) (p, loc) ppf =
   if max_length > 1 then
     match p with
     | Pattern.Variant (lbl, Some (Pattern.Tuple [v1; v2], _)) when lbl = Common.cons ->
         Format.fprintf ppf ",@ %t%t" (print_pattern v1) (pattern_list ~max_length:(max_length - 1) v2)
     | Pattern.Variant (lbl, None) when lbl = Common.nil -> ()
-    | p -> Format.fprintf ppf "(??? %t ???)" (print_pattern (p, pos))
+    | p -> Format.fprintf ppf "(??? %t ???)" (print_pattern (p, loc))
   else
     Format.fprintf ppf ",@ ..."
 

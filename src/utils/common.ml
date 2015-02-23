@@ -14,16 +14,6 @@ type regionparam = int (** region parameters *)
 let id x = x
 let compose f g x = f (g x)
 
-(** Positions *)
-type position =
-  | Position of Lexing.position * Lexing.position (** delimited position *)
-
-(** A type enriched with a position *)
-type 'a pos = 'a * position
-
-(** A union of two positions *)
-let join_pos (Position (b1, _)) (Position (_, e2)) = Position (b1, e2)
-
 (** Primitive constants *)
 type const =
   | Integer of Big_int.big_int
@@ -169,19 +159,6 @@ let print_const c ppf =
   | String s -> Format.fprintf ppf "%S" s
   | Boolean b -> Format.fprintf ppf "%B" b
   | Float f -> Format.fprintf ppf "%F" f
-
-
-let print_position pos ppf =
-  match pos with
-  | Position (begin_pos, end_pos) ->
-      let begin_char = begin_pos.Lexing.pos_cnum - begin_pos.Lexing.pos_bol + 1 in
-      let begin_line = begin_pos.Lexing.pos_lnum in
-      let filename = begin_pos.Lexing.pos_fname in
-
-      if String.length filename != 0 then
-        Format.fprintf ppf "file %S, line %d, char %d" filename begin_line begin_char
-      else
-        Format.fprintf ppf "line %d, char %d" (begin_line - 1) begin_char
 
 let assoc_flatten lst =
   let add (k, v) lst =

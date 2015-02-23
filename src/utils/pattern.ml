@@ -1,5 +1,4 @@
-type 'var t =
-    ('var plain_t) Common.pos
+type 'var t = 'var plain_t * Location.t
 and 'var plain_t =
   | Var of 'var
   | As of 'var t * 'var

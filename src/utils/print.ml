@@ -34,20 +34,20 @@ let to_string m =
 
 
 let verbosity = ref 3
-let message ?pos msg_type v =
+let message ?loc msg_type v =
   if v <= !verbosity then
     begin
-      begin match pos with
+      begin match loc with
       | None -> Format.eprintf "@[%s: " msg_type
-      | Some pos -> Format.eprintf "@[%s (%t): " msg_type (Common.print_position pos)
+      | Some loc -> Format.eprintf "@[%s (%t): " msg_type (Location.print loc)
       end;
       Format.kfprintf (fun ppf -> fprintf ppf "@]@.") Format.err_formatter
     end
   else
     Format.ifprintf Format.err_formatter
 
-let error (pos, err_type, msg) = message ?pos err_type 1 "%s" msg
-let check ~pos = message ~pos "Check" 2
-let warning ~pos = message ~pos "Warning" 3
-let info ?pos = message ?pos "Info" 4
-let debug ?pos = message ?pos "Debug" 5
+let error (loc, err_type, msg) = message ?loc err_type 1 "%s" msg
+let check ~loc = message ~loc "Check" 2
+let warning ~loc = message ~loc "Warning" 3
+let info ?loc = message ?loc "Info" 4
+let debug ?loc = message ?loc "Debug" 5

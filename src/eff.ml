@@ -84,16 +84,16 @@ let parse parser lex =
     parser Lexer.token lex
   with
   | Parser.Error ->
-      Error.syntax ~pos:(Lexer.position_of_lex lex) ""
+      Error.syntax ~loc:(Location.of_lexeme lex) ""
   | Failure "lexing: empty token" ->
-      Error.syntax ~pos:(Lexer.position_of_lex lex) "unrecognised symbol."
+      Error.syntax ~loc:(Location.of_lexeme lex) "unrecognised symbol."
 
 let initial_ctxenv =
   ((Ctx.empty, Common.id), Eval.initial)
 
 let infer_top_comp (ctx, top_change) c =
   let ctx', (ty', drt'), cnstrs' = Infer.infer_comp ctx c in
-  let change = Scheme.add_to_top ~pos:(snd c) ctx' cnstrs' in
+  let change = Scheme.add_to_top ~loc:(snd c) ctx' cnstrs' in
   let top_change = Common.compose top_change change in
   let ctx = match fst c with
   | Syntax.Value _ -> ctx'
@@ -107,7 +107,7 @@ let infer_top_comp (ctx, top_change) c =
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
     and return the new environment. *)
-let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,pos) =
+let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,loc) =
   match d with
   | SugaredSyntax.Term c ->
       let c = Desugar.top_computation c in
@@ -132,7 +132,7 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,pos) =
   | SugaredSyntax.TopLet defs ->
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
-      let vars, nonpoly, change = Infer.infer_let ~pos ctx defs in
+      let vars, nonpoly, change = Infer.infer_let ~loc ctx defs in
       let ctx = List.fold_right (fun (x, ty_sch) env -> Ctx.extend env x ty_sch) vars ctx in
       let extend_nonpoly (x, ty) env =
         (x, ([(x, ty)], ty, Constraints.empty)) :: env
@@ -160,7 +160,7 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,pos) =
         ((ctx, top_change), env)
     | SugaredSyntax.TopLetRec defs ->
         let defs = Desugar.top_let_rec defs in
-        let vars, change = Infer.infer_let_rec ~pos ctx defs in
+        let vars, change = Infer.infer_let_rec ~loc ctx defs in
         let ctx = List.fold_right (fun (x, ty_sch) env -> Ctx.extend ctx x ty_sch) vars ctx in
         let top_change = Common.compose top_change change in
         let sch_change (ctx, ty, cnstrs) =
@@ -174,15 +174,15 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,pos) =
           end;
           ((ctx, top_change), env)
     | SugaredSyntax.External (x, t, f) ->
-      let (x, t) = Desugar.external_ty (Tctx.is_effect ~pos) x t in
+      let (x, t) = Desugar.external_ty (Tctx.is_effect ~loc) x t in
       let ctx = Ctx.extend ctx x t in
         begin match C.lookup f External.values with
           | Some v -> ((ctx, top_change), Eval.update x v env)
           | None -> Error.runtime "unknown external symbol %s." f
         end
     | SugaredSyntax.Tydef tydefs ->
-        let tydefs = Desugar.tydefs ~pos tydefs in
-        Tctx.extend_tydefs ~pos tydefs ;
+        let tydefs = Desugar.tydefs ~loc tydefs in
+        Tctx.extend_tydefs ~loc tydefs ;
         ((ctx, top_change), env)
 
 
