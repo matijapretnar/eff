@@ -44,6 +44,8 @@ let rec optimize ((t, pos) : term) : term =
   | Bind (p, c1, c2) -> 
       begin match optimize c1 with
       | (Value e, _) -> Let (p, e, optimize c2)
+      | (Match(e, lst), pos1) ->  Match(e, List.map (optimize_bind_list pos1 p c2) lst)
+      | (Bind (pi,c1i,c2i), pos1) -> Bind (pi,c1i, optimize(Bind (p, c2i, c2),pos1) ) 
       | c -> Bind (p, c, optimize c2)
       end
   | LetRec (lst, c) -> LetRec (optimize_let_rec lst, optimize c)
@@ -66,6 +68,7 @@ and optimize_handler h = {
   finally = optimize_abstraction h.finally;
   operations = Common.assoc_map optimize_abstraction2 h.operations;
 }
+and optimize_bind_list pos1 p c2 (pattern,expr) = (pattern,optimize (Bind (p, expr, c2), pos1))
 
 let rec compile_expression (e, pos) =
   let e' = match e with
@@ -153,10 +156,10 @@ let rec print_term ?max_level c ppf =
   | Value e -> print ~at_level:1 "value %t" (print_term ~max_level:0 e)
   | Match (e, lst) -> print "match %t with @[<hov>%t@]" (print_term e) (Print.sequence "\n" case lst)
   | New -> print "new_instance ()"
-  | Handle (e, c) -> print ~at_level:1 "handle (%t) (%t)" (print_term e) (print_term ~max_level:0 c)
-  | Let (p, c1, c2) -> print "let %t = %t in (%t)" (print_pattern p) (print_term c1) (print_term c2)
+  | Handle (e, c) -> print ~at_level:1 "handle (%t)  (%t)" (print_term e) (print_term ~max_level:0 c)
+  | Let (p, c1, c2) -> print "let %t =  %t \n in  (%t)" (print_pattern p) (print_term c1) (print_term c2)
   | Bind (p, c1, c2) -> print "(%t) >> (fun %t -> %t)" (print_term c1) (print_pattern p) (print_term c2)
-  | LetRec (lst, c) -> print "let rec @[<hov>%t@] in %t" (Print.sequence " and " let_rec_abstraction lst) (print_term c)
+  | LetRec (lst, c) -> print "let rec @[<hov>%t@] \n in %t" (Print.sequence " and " let_rec_abstraction lst) (print_term c)
   | Check c -> print "()"
   | Var x -> print "(%s)" x
   | Const c -> print "%t" (Common.print_const c)
@@ -172,7 +175,7 @@ and print_let c2 lst ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match lst with
   | [] -> print "%t" (print_term c2)
-  | (p, c1) :: lst -> print "((%t) >> (fun %t -> %t))" (print_term c1) (print_pattern p) (print_let c2 lst)
+  | (p, c1) :: lst -> print "((%t) >> \n (fun %t -> %t))" (print_term c1) (print_pattern p) (print_let c2 lst)
 
 and operation (e, op) ppf =
   Print.print ppf "(\"%s\", %t)" op (print_term e)
@@ -190,7 +193,7 @@ and case a ppf =
   Format.fprintf ppf "| %t" (abstraction a)
 
 and handler h ppf =
-  Format.fprintf ppf "{ value = (fun %t); finally = (fun %t); operation_cases = (%t)}"
+  Format.fprintf ppf "{ value = (fun %t); \n finally = (fun %t); \n operation_cases = (%t)}"
   (abstraction h.value) (abstraction h.finally) (operation_cases h.operations)
 
 and operation_cases cases ppf =
