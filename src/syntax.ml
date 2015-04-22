@@ -51,11 +51,13 @@ and operation = expression * Common.opsym
     the new state. *)
 and resource = expression * (Common.opsym, abstraction2) Common.assoc
 
+let print_variable (_, x) ppf = Print.print ppf "%s" x
+
 let rec print_pattern ?max_level (p,_) ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p with
-  | Pattern.Var x -> print "%t" (Print.variable x)
-  | Pattern.As (p, x) -> print "%t as %t" (print_pattern p) (Print.variable x)
+  | Pattern.Var x -> print "%t" (print_variable x)
+  | Pattern.As (p, x) -> print "%t as %t" (print_pattern p) (print_variable x)
   | Pattern.Const c -> Common.print_const c ppf
   | Pattern.Tuple lst -> Print.tuple print_pattern lst ppf
   | Pattern.Record lst -> Print.record print_pattern lst ppf
@@ -84,7 +86,7 @@ let rec print_computation ?max_level c ppf =
   | Value e -> print ~at_level:1 "value %t" (print_expression ~max_level:0 e)
   | Match (e, lst) -> print "match %t with (@[<hov>%t@])" (print_expression e) (Print.sequence " | " case lst)
   | While (c1, c2) -> print "while %t do %t done" (print_computation c1) (print_computation c2)
-  | For (i, e1, e2, c, d) -> print "for %t = ... " (Print.variable i)
+  | For (i, e1, e2, c, d) -> print "for %t = ... " (print_variable i)
   | New (eff, None) -> print "new %s" eff
   | New (eff, Some (e, lst)) -> print "new %s @ %t with ... end" eff (print_expression e)
   | Handle (e, c) -> print "handle %t with %t" (print_expression e) (print_computation c)
@@ -96,7 +98,7 @@ let rec print_computation ?max_level c ppf =
 and print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match fst e with
-  | Var x -> print "%t" (Print.variable x)
+  | Var x -> print "%t" (print_variable x)
   | Const c -> print "%t" (Common.print_const c)
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record lst -> Print.record print_expression lst ppf

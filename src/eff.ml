@@ -138,7 +138,7 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,loc) =
                        match Eval.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.printf "@[val %t : %t = %t@]@." (Print.variable x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
+                         Format.printf "@[val %t : %t = %t@]@." (Syntax.print_variable x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
             vars
         end;
         ((ctx, top_change), env)
@@ -154,7 +154,7 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,loc) =
         List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
         let env = Eval.extend_let_rec env defs in
           if interactive then begin
-            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Print.variable x) (Scheme.print_ty_scheme (sch_change tysch))) vars
+            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Syntax.print_variable x) (Scheme.print_ty_scheme (sch_change tysch))) vars
           end;
           ((ctx, top_change), env)
     | SugaredSyntax.External (x, t, f) ->
@@ -190,7 +190,7 @@ let toplevel ctxenv =
         let cmd = Lexer.read_toplevel (parse Parser.commandline) () in
         ctxenv := exec_cmd true !ctxenv cmd
       with
-        | Error.Error err -> Print.error err
+        | Error.Error err -> Error.print err
         | Sys.Break -> prerr_endline "Interrupted."
     done
   with End_of_file -> ()
@@ -238,4 +238,4 @@ let main =
     let ctxenv = List.fold_left use_file initial_ctxenv !files in
     if !Config.interactive_shell then toplevel ctxenv
   with
-    Error.Error err -> Print.error err; exit 1
+    Error.Error err -> Error.print err; exit 1

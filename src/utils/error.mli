@@ -1,12 +1,21 @@
-(** Errors raised by Eff. *)
+(** Error reporting
 
-(** Each error has a locatio, a type (typing, runtime, ...), and a message. *)
-exception Error of (Location.t option * string * string)
+    All internal errors are represented uniformly with a single exception that
+    carries additional details such as error kind (syntax, typing, ...), message
+    or location.
 
-(** Shortcut functions for raising errors. In addition to an error location,
-    the functions accept a message, which is a format string.
-    This allows one, for example, to raise a typing error as
-    [Error.typing "Unknown name %s." x]. *)
+    Errors are raised through helper functions that take an optional location
+    and a message in form of a format string. For example, a typing error can be
+    raised by [Error.typing ~loc "Type %t is not a product." (print_ty t)]. *)
+
+(** Type of error details. *)
+type details
+
+(** Print error details. *)
+val print : details -> unit
+
+(** Exception representing all possible Andromeda errors. *)
+exception Error of details
 
 (** Fatal errors are errors over which Eff has no control, for example when
     a file cannot be opened. *)

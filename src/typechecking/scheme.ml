@@ -310,7 +310,7 @@ let finalize_pattern_scheme ctx ty chngs =
 let context skeletons ctx ppf =
   match ctx with
   | [] -> ()
-  | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence ", " (fun (x, t) ppf -> Print.print ppf "%t : %t" (Print.variable x) (Type.print skeletons t)) ctx)
+  | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence ", " (fun (x, t) ppf -> Print.print ppf "%t : %t" (Syntax.print_variable x) (Type.print skeletons t)) ctx)
 
 let extend_non_poly (ts, ds, rs) skeletons =
   let add_skel skel new_ts =

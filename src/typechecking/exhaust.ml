@@ -225,8 +225,8 @@ let check_patterns ~loc pats =
         begin match exhaustive ~loc p 1 with
           | Some ps ->
               Print.warning ~loc "This pattern-matching is not exhaustive.\n\
-                                      Here is an example of a value that is not matched:";
-(*  *)              prerr_endline (Print.to_string "%t" (Syntax.print_pattern (List.hd ps)))
+                                      Here is an example of a value that is not matched:@. %t"
+              (Syntax.print_pattern (List.hd ps));
           | None -> ()
         end
     | (_, loc) as pat :: pats ->
