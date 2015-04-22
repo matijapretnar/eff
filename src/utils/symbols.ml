@@ -1,17 +1,15 @@
-let ascii = ref false
-
-let less () = if !ascii then "<=" else "≤"
-let handler_arrow () = if !ascii then "=>" else "⟹ "
-let arrow () = if !ascii then "->" else "⟶ "
-let short_arrow () = if !ascii then "->" else "→"
-let times () = if !ascii then " * " else " × "
-let union () = if !ascii then "+" else "∪"
+let less () = if !Config.ascii then "<=" else "≤"
+let handler_arrow () = if !Config.ascii then "=>" else "⟹ "
+let arrow () = if !Config.ascii then "->" else "⟶ "
+let short_arrow () = if !Config.ascii then "->" else "→"
+let times () = if !Config.ascii then " * " else " × "
+let union () = if !Config.ascii then "+" else "∪"
 
 let subscript sub =
   match sub with
   | None -> ""
   | Some i ->
-      if !ascii then
+      if !Config.ascii then
         string_of_int i
       else
         let rec sub i =
@@ -21,7 +19,7 @@ let subscript sub =
         sub i
 
 let ty_param skel index poly ppf =
-  if !ascii then
+  if !Config.ascii then
     let c = if poly then "'_" else "'" in
     if skel <= 25 then
       Print.print ppf "%s%c%s" c (char_of_int (skel + int_of_char 'a')) (subscript index)
@@ -38,7 +36,7 @@ let ty_param skel index poly ppf =
       Print.print ppf "%sτ%d%s" c (skel - List.length letters) (subscript index)
 
 let dirt_param index poly ppf =
-  if !ascii then
+  if !Config.ascii then
     let c = if poly then "_drt" else "drt" in
     Print.print ppf "%s%s" c (subscript (Some (index + 1)))
   else
@@ -46,7 +44,7 @@ let dirt_param index poly ppf =
     Print.print ppf "%s%s" c (subscript (Some (index + 1)))
 
 let region_param index poly ppf =
-  if !ascii then
+  if !Config.ascii then
     let c = if poly then "_rgn" else "rgn" in
     Print.print ppf "%s%s" c (subscript (Some (index + 1)))
   else

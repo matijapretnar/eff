@@ -1,9 +1,6 @@
 module C = Common
 module T = Type
 
-let warn_implicit_sequencing = ref false;;
-let disable_typing = ref false;;
-
 let ty_less = Scheme.ty_less
 let dirt_less = Scheme.dirt_less
 let dirty_less = Scheme.dirty_less
@@ -27,7 +24,7 @@ let ty_of_const = function
    Note that unlike in ordinary type schemes, context types are positive while
    pattern type is negative. *)
 let rec infer_pattern (p, loc) =
-  if !disable_typing then simple Type.universal_ty else
+  if !Config.disable_typing then simple Type.universal_ty else
   let unify = Scheme.finalize_pattern_scheme in
   let ty_sch = match p with
 
@@ -107,7 +104,7 @@ let rec infer_pattern (p, loc) =
    - the type of the expression, and
    - constraints connecting all these types. *)
 let rec infer_expr env (e, loc) =
-  if !disable_typing then simple Type.universal_ty else
+  if !Config.disable_typing then simple Type.universal_ty else
   let unify = Scheme.finalize_ty_scheme ~loc in
   let ty_sch = match e with
 
@@ -265,7 +262,7 @@ let rec infer_expr env (e, loc) =
    - the dirt of the computation, and
    - constraints connecting all these types. *)
 and infer_comp env (c, loc) =
-  if !disable_typing then simple Type.universal_dirty else
+  if !Config.disable_typing then simple Type.universal_dirty else
   let unify = Scheme.finalize_dirty_scheme ~loc in
   let drty_sch = match c with
 

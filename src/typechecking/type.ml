@@ -1,8 +1,6 @@
 (* We need three sorts of parameters, for types, dirt, and regions.
    In order not to confuse them, we define separate types for them.
  *)
-let effects = ref false
-
 type ty_param = Ty_Param of int
 type dirt_param = Dirt_Param of int
 type region_param = Region_Param of int
@@ -125,10 +123,8 @@ let refresher fresh =
         p'
     | Some p' -> p'
 
-let disable_beautify = ref false
-
 let beautifying_subst () =
-  if !disable_beautify then
+  if !Config.disable_beautify then
     identity_subst
   else
     {
@@ -232,7 +228,7 @@ let rec print ?(non_poly=Trio.empty) ?(show_dirt_param=fun d -> Some (print_dirt
     let print ?at_level = Print.print ?max_level ?at_level ppf in
     match t with
     | Arrow (t1, (t2, drt)) ->
-        if !effects && show_dirt show_dirt_param drt then
+        if !Config.effect_annotations && show_dirt show_dirt_param drt then
           print ~at_level:5 "@[%t -%t%s@ %t@]"
             (ty ~max_level:4 t1)
             (print_dirt ~non_poly ~show_dirt_param drt)
@@ -248,7 +244,7 @@ let rec print ?(non_poly=Trio.empty) ?(show_dirt_param=fun d -> Some (print_dirt
         | ts -> print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
       end
     | Effect (t, (lst, _, _), rgn) ->
-        if !effects then
+        if !Config.effect_annotations then
           begin match lst with
             | [] -> print "%s[%t]" t (print_region_param ~non_poly rgn)
             | [s] -> print ~at_level:1 "%t %s[%t]" (ty ~max_level:1 s) t (print_region_param ~non_poly rgn)
@@ -264,7 +260,7 @@ let rec print ?(non_poly=Trio.empty) ?(show_dirt_param=fun d -> Some (print_dirt
     | Tuple [] -> print "unit"
     | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence (Symbols.times ()) (ty ~max_level:1) ts)
     | Handler ((t1, drt1), (t2, drt2)) ->
-        if !effects then
+        if !Config.effect_annotations then
           print ~at_level:6 "%t ! %t %s@ %t ! %t"
             (ty ~max_level:4 t1)
             (print_dirt ~non_poly ~show_dirt_param drt1)

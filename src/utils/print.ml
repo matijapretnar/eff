@@ -33,9 +33,8 @@ let to_string m =
   (Format.kfprintf (fun _ -> Format.flush_str_formatter ()) Format.str_formatter) m
 
 
-let verbosity = ref 3
 let message ?loc msg_type v =
-  if v <= !verbosity then
+  if v <= !Config.verbosity then
     begin
       begin match loc with
       | None -> Format.eprintf "@[%s: " msg_type

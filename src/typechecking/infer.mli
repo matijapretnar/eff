@@ -1,5 +1,3 @@
-val warn_implicit_sequencing : bool ref
-val disable_typing : bool ref
          val infer_let :
            loc:Location.t ->
            Ctx.t ->
