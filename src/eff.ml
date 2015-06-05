@@ -190,7 +190,7 @@ let rec exec_cmd interactive st (d,loc) =
           environment = env;
         }
     | SugaredSyntax.External (x, t, f) ->
-      let (x, t) = Desugar.external_ty (Tctx.is_effect ~loc) x t in
+      let (x, t) = Desugar.external_ty x t in
       let ctx = Ctx.extend st.context x t in
         begin match C.lookup f External.values with
           | Some v -> {

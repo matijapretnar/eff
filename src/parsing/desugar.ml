@@ -13,7 +13,7 @@ let fresh_region_param = Common.fresh (fun n -> Sugared.RegionParam n)
    type applications so that applications of effect types are equipped with the extra region
    parameter and other type applications are not. It returns the list of newly introduced
    dirt parameters, the list of newly introduced region parameters, and the type. *)
-let fill_args is_effect ty =
+let fill_args ty =
   let ds = ref []
   and rs = ref []
   
@@ -28,7 +28,7 @@ let fill_args is_effect ty =
   let rec fill (ty, loc) =
   let ty' =
   match ty with
-  | Sugared.TyApply (t, tys, drts_rgns, rgn) ->
+  | Sugared.TyApply (t, tys, drts_rgns) ->
       let tys = List.map fill tys
       and drts_rgns =
         begin match drts_rgns with
@@ -39,14 +39,8 @@ let fill_args is_effect ty =
               | Some (_, ds, rs) -> Some (List.map fresh_dirt_param ds, List.map fresh_region_param rs)
             end
         end
-      and rgn = begin match rgn with
-        | Some rgn ->
-          if is_effect t then Some rgn else Error.typing ~loc "A non-effect type %s tagged with a region." t
-        | None ->
-          if is_effect t then Some (fresh_region_param ()) else None
-      end
       in
-      Sugared.TyApply (t, tys, drts_rgns, rgn)
+      Sugared.TyApply (t, tys, drts_rgns)
   | Sugared.TyParam _ as ty -> ty
   | Sugared.TyArrow (t1, t2, None) -> Sugared.TyArrow (fill t1, fill t2, Some (fresh_dirt_param ()))
   | Sugared.TyArrow (t1, t2, Some drt) -> Sugared.TyArrow (fill t1, fill t2, Some drt)
@@ -61,13 +55,13 @@ let fill_args is_effect ty =
   let ty = fill ty in
   (!ds, !rs), ty
 
-let fill_args_tydef is_effect def =
+let fill_args_tydef def =
   match def with
     | Sugared.TyRecord lst ->
       let (ds, rs, lst) =
         List.fold_right
           (fun (fld, ty) (ds, rs, lst) ->
-            let (ds', rs'), ty = fill_args is_effect ty in
+            let (ds', rs'), ty = fill_args ty in
               (ds' @ ds, rs' @ rs, (fld, ty) :: lst))
           lst Trio.empty
       in
@@ -79,24 +73,13 @@ let fill_args_tydef is_effect def =
             match ty_op with
               | None -> (ds, rs, (lbl, None) :: lst)
               | Some ty ->
-                let (ds', rs'), ty = fill_args is_effect ty in
+                let (ds', rs'), ty = fill_args ty in
                   (ds' @ ds, rs' @ rs, (lbl, Some ty) :: lst))
           lst Trio.empty
       in
         (ds, rs), Sugared.TySum lst
-    | Sugared.TyEffect lst ->
-      let (ds, rs, lst) =
-        List.fold_right
-          (fun (op, (ty1, ty2)) (ds, rs, lst) ->
-            let (ds1, rs1), ty1 = fill_args is_effect ty1 in
-            let (ds2, rs2), ty2 = fill_args is_effect ty2 in
-              (ds1 @ ds2 @ ds, rs1 @ rs2 @ rs, (op, (ty1, ty2)) :: lst))
-          lst Trio.empty
-      in
-        (ds, rs), Sugared.TyEffect lst
-
     | Sugared.TyInline ty ->
-      let params, ty = fill_args is_effect ty in
+      let params, ty = fill_args ty in
         params, Sugared.TyInline ty
 
 (* Desugar a type, where only the given type, dirt and region parameters may appear. 
@@ -109,16 +92,14 @@ let fill_args_tydef is_effect def =
 *)
 let ty (ts, ds, rs) =
   let rec ty (t, loc) = match t with
-  | Sugared.TyApply (t, tys, drts_rgns, rgn) ->
+  | Sugared.TyApply (t, tys, drts_rgns) ->
       let tys = List.map ty tys
       and (drts, rgns) = begin match drts_rgns with
         | Some (drts, rgns) -> (List.map (dirt loc) drts, List.map (region loc) rgns)
         | None -> (List.map (fun (_, d) -> Type.simple_dirt d) ds, List.map (fun (_, r) -> r) rs)
       end 
-      in begin match rgn with
-        | None -> T.Apply (t, (tys, drts, rgns))
-        | Some rgn -> T.Effect (t, (tys, drts, rgns), (region loc) rgn)
-      end
+      in
+      T.Apply (t, (tys, drts, rgns))
   | Sugared.TyParam t ->
     begin match C.lookup t ts with
     | None -> Error.syntax ~loc "Unbound type parameter '%s" t
@@ -148,8 +129,8 @@ let free_params t =
     | Some x -> f x
   in
   let rec ty (t, loc) = match t with
-  | Sugared.TyApply (_, tys, drts_rgns, rgn) ->
-      Trio.flatten_map ty tys @@@ (optional dirts_regions) drts_rgns @@@ (optional region) rgn
+  | Sugared.TyApply (_, tys, drts_rgns) ->
+      Trio.flatten_map ty tys @@@ (optional dirts_regions) drts_rgns
   | Sugared.TyParam s -> ([s], [], [])
   | Sugared.TyArrow (t1, t2, drt) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt
   | Sugared.TyTuple lst -> Trio.flatten_map ty lst
@@ -173,34 +154,18 @@ let tydef params d =
      begin match d with
        | Sugared.TyRecord lst -> Tctx.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
        | Sugared.TySum lst -> Tctx.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
-       | Sugared.TyEffect lst -> Tctx.Effect (List.map (fun (op,(t1,t2)) -> (op, (ty sbst t1, ty sbst t2))) lst)
        | Sugared.TyInline t -> Tctx.Inline (ty sbst t)
      end)
 
 (** [tydefs defs] desugars the simultaneous type definitions [defs]. *)
 let tydefs ~loc defs =
-  (* First we build a predicate which tells whether a type name refers to an effect type. *)
-  let is_effect =
-    let rec find forbidden tyname =
-      match C.lookup tyname defs with
-        | Some (_, (Sugared.TyRecord _ | Sugared.TySum _)) -> false
-        | Some (_, (Sugared.TyInline (Sugared.TyApply (tyname', _, _, _), loc))) ->
-          if List.mem tyname' forbidden
-          then Error.typing ~loc "Type definition %s is cyclic." tyname' (* Compare to [Tctx.check_noncyclic]. *)
-          else find (tyname :: forbidden) tyname'
-        | Some (_, Sugared.TyInline _) -> false
-        | Some (_, (Sugared.TyEffect _)) -> true
-        | None -> Tctx.is_effect ~loc tyname
-    in
-      find []
-  in
   (* The first thing to do is to fill the missing dirt and region parameters. 
      At the end [ds] and [rs] hold the newly introduces dirt and region parameters.
      These become parameters to type definitions in the second stage. *)
   let ds, rs, defs =
     List.fold_right
       (fun (tyname, (params, def)) (ds, rs, defs) ->
-        let (d, r), def = fill_args_tydef is_effect def in
+        let (d, r), def = fill_args_tydef def in
           (d @ ds, r @ rs, ((tyname, (params, def)) :: defs)))
       defs Trio.empty
   in
@@ -451,8 +416,8 @@ let top_let_rec defs =
   top_ctx := ctx';
   defs
 
-let external_ty is_effect x t =
-  let _, t = fill_args is_effect t in
+let external_ty x t =
+  let _, t = fill_args t in
   let (n, _) = fresh_variable () in
   let n = (n, x) in
   top_ctx := (x, n) :: !top_ctx;

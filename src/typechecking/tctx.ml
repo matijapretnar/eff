@@ -6,7 +6,6 @@ type tydef =
   | Record of (Common.field, Type.ty) Common.assoc
   | Sum of (Common.label, Type.ty option) Common.assoc
   | Inline of Type.ty
-  | Effect of (Common.opsym, Type.ty * Type.ty) Common.assoc
 
 type variance = bool * bool
 type params = (Type.ty_param * variance) list * (Type.dirt_param * variance) list * (Type.region_param * variance) list
@@ -37,7 +36,6 @@ let subst_tydef sbst =
   | Record tys -> Record (Common.assoc_map subst tys)
   | Sum tys -> Sum (Common.assoc_map (Common.option_map subst) tys)
   | Inline ty -> Inline (subst ty)
-  | Effect op_sig -> Effect (Common.assoc_map (fun (ty1, ty2) -> (subst ty1, subst ty2)) op_sig)
 
 (* Lookup type parameters for a given type. *)
 let lookup_params ty_name =
@@ -56,19 +54,6 @@ let lookup_tydef ~loc ty_name =
   match Common.lookup ty_name !tctx with
   | None -> Error.typing ~loc "Unknown type %s" ty_name
   | Some (params, tydef) -> (remove_variances params, tydef)
-
-let is_effect ~loc =
-  let rec find forbidden ty_name =
-    match lookup_tydef ~loc ty_name with
-      | (_, Effect _) -> true
-      | (_, (Record _ | Sum _)) -> false
-      | (_, Inline (T.Apply (ty_name', _))) ->
-        if List.mem ty_name' forbidden
-        then Error.typing ~loc "Type definition %s is cyclic." ty_name' (* Compare to [Tctx.check_noncyclic]. *)
-        else find (ty_name :: forbidden) ty_name'
-      | (_, Inline _) -> false
-  in
-    find []
 
 let refreshing_subst (ps, ds, rs) =
   let refresh_ty_param = Type.refresher Type.fresh_ty_param
@@ -114,29 +99,11 @@ let find_field fld =
   in
     find !tctx
 
-(** [find_operation op] returns the information about the effect type
-    that defines the operation symbol [op]. *)
-let find_operation op_name =
-  let rec find = function
-    | [] -> None
-    | (ty_name, (ps, Effect eff_sig)) :: lst ->
-        begin match Common.lookup op_name eff_sig with
-        | Some (t1, t2) -> Some (ty_name, ps, t1, t2)
-        | None -> find lst
-        end
-    | _ :: lst -> find lst
-  in
-    find !tctx
 
 let apply_to_params t (ps, ds, rs) =
   Type.Apply (t, (
     List.map (fun p -> Type.TyParam p) ps, List.map Type.simple_dirt ds, rs
   ))
-
-let effect_to_params t (ps, ds, rs) rgn =
-  Type.Effect (t, (
-    List.map (fun p -> Type.TyParam p) ps, List.map Type.simple_dirt ds, rs
-  ), rgn)
 
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
     with refreshed type parameters and additional information needed for type
@@ -161,21 +128,9 @@ let infer_field fld =
         Some (apply_to_params ty_name ps', (ty_name, us'))
 
 
-(** [infer_operation op] finds an effect type that defines the operation [op] and returns
-    it with refreshed type parameters and additional information needed for type
-    inference. *)
-let infer_operation op rgn =
-  match find_operation op with
-    | None -> None
-    | Some (ty_name, ps, t1, t2) ->
-      let ps', fresh_subst = refreshing_subst (remove_variances ps) in
-      let t1 = T.subst_ty fresh_subst t1 in
-      let t2 = T.subst_ty fresh_subst t2 in
-        Some (effect_to_params ty_name ps' rgn, (t1, t2))
-
 let transparent ~loc ty_name =
     match snd (lookup_tydef ~loc ty_name) with
-      | Sum _ | Record _ | Effect _ -> false
+      | Sum _ | Record _ -> false
       | Inline _ -> true
 
 (* [ty_apply ~loc t lst] applies the type constructor [t] to the given list of arguments. *)
@@ -214,23 +169,6 @@ let check_well_formed ~loc tydef =
             let n = List.length rs in
               if List.length rgns <> n then
                 Error.typing ~loc "The type constructor %s expects %d region arguments" ty_name n
-      | _, Effect _ ->
-        Error.typing ~loc "The effect type constructor %s should be applied to a region" ty_name
-    end
-  | T.Effect (ty_name, (tys, drts, rgns), _) ->
-    begin match lookup_tydef ~loc ty_name with
-      | (ts, ds, rs), Effect _ ->
-        let n = List.length ts in
-          if List.length tys <> n then
-            Error.typing ~loc "The type constructor %s expects %d type arguments" ty_name n;
-          let n = List.length ds in
-            if List.length drts <> n then
-              Error.typing ~loc "The type constructor %s expects %d dirt arguments" ty_name n;
-            let n = List.length rs in
-              if List.length rgns <> n then
-                Error.typing ~loc "The type constructor %s expects %d region arguments" ty_name n
-      | _, (Sum _ | Record _ | Inline _) ->
-        Error.typing ~loc "The non-effect type constructor %s cannot be applied to a region" ty_name
     end
   | T.Arrow (ty1, drty2) -> check ty1; check_dirty drty2
   | T.Tuple tys -> List.iter check tys
@@ -247,21 +185,12 @@ let check_well_formed ~loc tydef =
         Error.typing ~loc "Constructors of a sum type must be distinct";
       List.iter (function (_, None) -> () | (_, Some ty) -> check ty) constuctors
   | Inline ty -> check ty
-  | Effect signature ->
-      if not (Common.injective fst signature) then Error.typing ~loc
-        "Operations in an effect type must be distinct";
-      List.iter (fun (_, (ty1, ty2)) -> check ty1; check ty2) signature
 
 (** [check_noncyclic ~loc ty] checks that the definition of type [ty] is non-cyclic. *)
 let check_noncyclic ~loc =
   let rec check forbidden = function
   | T.Basic _ | T.TyParam _ -> ()
   | T.Apply (t, args) ->
-      if List.mem t forbidden then
-        Error.typing ~loc "Type definition %s is cyclic." t
-      else
-        check_tydef (t :: forbidden) (ty_apply ~loc t args)
-  | T.Effect (t, args, _) ->
       if List.mem t forbidden then
         Error.typing ~loc "Type definition %s is cyclic." t
       else
@@ -274,8 +203,6 @@ let check_noncyclic ~loc =
   | Sum _ -> ()
   | Record fields -> List.iter (fun (_,t) -> check forbidden t) fields
   | Inline ty -> check forbidden ty
-  | Effect signature ->
-      List.iter (fun (_, (ty1, ty2)) -> check forbidden ty1; check forbidden ty2) signature
   in 
   check_tydef []
 
@@ -299,12 +226,6 @@ let check_shadowing ~loc = function
         | None -> ()
     ) lst
   | Inline _ -> ()
-  | Effect lst ->
-    List.iter (fun (op, _) ->
-      match find_operation op with
-        | Some (u, _, _, _) -> Error.typing ~loc "Operation %s is already used in type %s" op u
-        | None -> ()
-    ) lst
 
 let extend_with_variances ~loc tydefs =
   let prepare_variance lst = List.map (fun p -> (p, (ref false, ref false))) lst in
@@ -346,32 +267,6 @@ let extend_with_variances ~loc tydefs =
                 List.iter2 (fun (_, (posi', nega')) -> region_param nega' posi') rs rgns
               end
           end
-      | T.Effect (t, (tys, drts, rgns), rgn) ->
-          begin match Common.lookup t !tctx with
-          | None ->
-              (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
-              List.iter (ty true true) tys;
-              List.iter (dirt true true) drts;
-              List.iter (region_param true true) rgns;
-          | Some ((ps, ds, rs), _) ->
-              if List.length ps != List.length tys then
-                Error.typing ~loc "The type constructor %s expects %d type arguments" t (List.length ps);
-              if List.length ds != List.length drts then
-                Error.typing ~loc "The type constructor %s expects %d dirt arguments" t (List.length drts);
-              if List.length rs != List.length rgns then
-                Error.typing ~loc "The type constructor %s expects %d region arguments" t (List.length rgns);
-              if posi then begin
-                List.iter2 (fun (_, (posi', nega')) -> ty posi' nega') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> dirt posi' nega') ds drts;
-                List.iter2 (fun (_, (posi', nega')) -> region_param posi' nega') rs rgns
-              end;
-              if nega then begin
-                List.iter2 (fun (_, (posi', nega')) -> ty nega' posi') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> dirt nega' posi') ds drts;
-                List.iter2 (fun (_, (posi', nega')) -> region_param nega' posi') rs rgns
-              end
-          end;
-          region_param posi nega rgn
       | T.Arrow (ty1, (ty2, drt)) ->
           ty nega posi ty1;
           ty posi nega ty2;
@@ -403,7 +298,6 @@ let extend_with_variances ~loc tydefs =
       | Record tys -> List.iter (fun (_, t) -> ty true false t) tys
       | Sum tys -> List.iter (function (_, Some t) -> ty true false t | (_, None) -> ()) tys
       | Inline t -> ty true false t
-      | Effect op_sig -> List.iter (fun (_, (ty1, ty2)) -> ty false true ty1; ty true false ty2) op_sig
   in
   List.iter set_variances prepared_tydefs;
   let unref lst = Common.assoc_map (fun (ref1, ref2) -> (!ref1, !ref2)) lst in

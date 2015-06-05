@@ -64,7 +64,7 @@ type region =
 
 type ty = plain_ty * Location.t
 and plain_ty =
-  | TyApply of Common.tyname * ty list * (dirt list * region list) option * region option
+  | TyApply of Common.tyname * ty list * (dirt list * region list) option
   (** [(ty1, ty2, ..., tyn) type_name] *)
   | TyParam of Common.typaram
   (** ['a] *)
@@ -80,8 +80,6 @@ type tydef =
   (** [{ field1 : ty1; field2 : ty2; ...; fieldn : tyn }] *)
   | TySum of (Common.label, ty option) Common.assoc
   (** [Label1 of ty1 | Label2 of ty2 | ... | Labeln of tyn | Label' | Label''] *)
-  | TyEffect of (Common.opsym, ty * ty) Common.assoc
-  (** [effect operation1 : ty1 -> ty1' ... operationn : tyn -> tyn' end] *)
   | TyInline of ty
   (** [ty] *)
 

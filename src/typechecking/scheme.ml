@@ -12,7 +12,6 @@ type change = t -> t
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 let rec subst_ty sbst = function
   | Type.Apply (ty_name, args) -> Type.Apply (ty_name, subst_args sbst args)
-  | Type.Effect (ty_name, args, r) -> Type.Effect (ty_name, subst_args sbst args, r)
   | Type.TyParam p ->
       begin match Common.lookup p sbst.ty_param with
       | Some t -> t
@@ -138,27 +137,18 @@ let rec ty_less ~loc ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       | Some ps -> args_less ~loc ps args1 args2 ty_sch
       end
 
-  | (Type.Effect (ty_name1, args1, rgn1), Type.Effect (ty_name2, args2, rgn2)) when ty_name1 = ty_name2 ->
-      begin match Tctx.lookup_params ty_name1 with
-      | None -> Error.typing ~loc "Undefined type %s" ty_name1
-      | Some ps ->
-          region_param_less rgn1 rgn2 (
-            args_less ~loc ps args1 args2 ty_sch
-          )
-      end
-
   (* The following two cases cannot be merged into one, as the whole matching
      fails if both types are Apply, but only the second one is transparent. *)
   | (Type.Apply (ty_name, args), ty) when Tctx.transparent ~loc ty_name ->
       begin match Tctx.ty_apply ~loc ty_name args with
       | Tctx.Inline ty' -> ty_less ~loc ty' ty ty_sch
-      | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
+      | Tctx.Sum _ | Tctx.Record _ -> assert false (* None of these are transparent *)
       end
 
   | (ty, Type.Apply (ty_name, args)) when Tctx.transparent ~loc ty_name ->
       begin match Tctx.ty_apply ~loc ty_name args with
       | Tctx.Inline ty' -> ty_less ~loc ty ty' ty_sch
-      | Tctx.Sum _ | Tctx.Record _ | Tctx.Effect _ -> assert false (* None of these are transparent *)
+      | Tctx.Sum _ | Tctx.Record _ -> assert false (* None of these are transparent *)
       end
 
   | (Type.Handler ((tyv1, drt1), tyf1), Type.Handler ((tyv2, drt2), tyf2)) ->

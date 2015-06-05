@@ -32,7 +32,6 @@
     ("match", MATCH);
     ("mod", MOD);
     ("of", OF);
-    ("operation", OPERATION);
     ("or", OR);
     ("rec", REC);
     ("then", THEN);

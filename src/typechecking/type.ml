@@ -13,7 +13,6 @@ let fresh_instance_param = Common.fresh (fun n -> Instance_Param n)
 
 type ty =
   | Apply of Common.tyname * args
-  | Effect of Common.tyname * args * region_param
   | TyParam of ty_param
   | Basic of string
   | Tuple of ty list
@@ -61,10 +60,6 @@ type substitution = {
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 let rec subst_ty sbst = function
   | Apply (ty_name, args) -> Apply (ty_name, subst_args sbst args)
-  | Effect (ty_name, args, r) ->
-      let args = subst_args sbst args in
-      let r = sbst.region_param r in
-      Effect (ty_name, args, r)
   | TyParam p -> sbst.ty_param p
   | Basic _ as ty -> ty
   | Tuple tys -> Tuple (Common.map (subst_ty sbst) tys)
@@ -156,7 +151,6 @@ let for_parameters get_params is_pos ps lst =
 let pos_neg_params get_variances ty =
   let rec pos_ty is_pos = function
   | Apply (ty_name, args) -> pos_args is_pos ty_name args
-  | Effect (ty_name, args, rgn) -> pos_args is_pos ty_name args @@@ pos_region_param is_pos rgn
   | TyParam p -> ((if is_pos then [p] else []), [], [])
   | Basic _ -> Trio.empty
   | Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
@@ -243,19 +237,6 @@ let rec print ?(non_poly=Trio.empty) ?(show_dirt_param=fun d -> Some (print_dirt
         | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
         | ts -> print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
       end
-    | Effect (t, (lst, _, _), rgn) ->
-        if !Config.effect_annotations then
-          begin match lst with
-            | [] -> print "%s[%t]" t (print_region_param ~non_poly rgn)
-            | [s] -> print ~at_level:1 "%t %s[%t]" (ty ~max_level:1 s) t (print_region_param ~non_poly rgn)
-            | ts -> print ~at_level:1 "(%t) %s[%t]" (Print.sequence ", " ty ts) t (print_region_param ~non_poly rgn)
-          end
-        else
-          begin match lst with
-            | [] -> print "%s" t
-            | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
-            | ts -> print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
-          end
     | TyParam p -> print_ty_param ~non_poly skeletons p ppf
     | Tuple [] -> print "unit"
     | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence (Symbols.times ()) (ty ~max_level:1) ts)

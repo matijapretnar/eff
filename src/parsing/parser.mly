@@ -48,7 +48,7 @@
 %token FUN BAR BARBAR
 %token IF THEN ELSE
 %token WHILE DO DONE FOR TO DOWNTO
-%token HANDLER AT OPERATION VAL FINALLY HANDLE
+%token HANDLER AT VAL FINALLY HANDLE
 %token PLUS STAR MINUS MINUSDOT
 %token LSL LSR ASR
 %token MOD OR
@@ -468,8 +468,6 @@ defined_ty:
     { TyRecord lst }
   | lst = cases(sum_case)
     { TySum lst }
-  | EFFECT lst = effect_case* END
-    { TyEffect lst }
   | t = ty
     { TyInline t }
 
@@ -495,15 +493,15 @@ plain_prod_ty:
 ty_apply: mark_position(plain_ty_apply) { $1 }
 plain_ty_apply:
   | LPAREN t = ty COMMA ts = separated_nonempty_list(COMMA, ty) RPAREN t2 = tyname
-    { TyApply (t2, (t :: ts), None, None) }
+    { TyApply (t2, (t :: ts), None) }
   | t = ty_apply t2 = tyname
-    { TyApply (t2, [t], None, None) }
+    { TyApply (t2, [t], None) }
   | t = plain_simple_ty
     { t }
 
 plain_simple_ty:
   | t = tyname
-    { TyApply (t, [], None, None) }
+    { TyApply (t, [], None) }
   | t = PARAM
     { TyParam t }
   | LPAREN t = ty RPAREN
@@ -518,9 +516,5 @@ sum_case:
 effect:
   | eff = UNAME
     { eff }
-
-effect_case:
-   | OPERATION opsym = lname COLON t1 = prod_ty ARROW t2 = ty
-     { (opsym, (t1, t2)) }
 
 %%
