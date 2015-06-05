@@ -3,6 +3,7 @@
 (** Types shared by different modules *)
 type variable = string (** variable identifiers *)
 type opsym = string (** operation symbols *)
+type effect = string (** effect symbols *)
 type label = string (** variant labels *)
 type field = string (** record fields *)
 

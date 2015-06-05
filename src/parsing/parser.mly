@@ -124,6 +124,8 @@ plain_topdef:
     { TopLetRec defs }
   | EXTERNAL x = ident COLON t = ty EQUAL n = STRING
     { External (x, t, n) }
+  | EFFECT eff = effect COLON t1 = prod_ty ARROW t2 = ty
+    { Effect (eff, (t1, t2))}
 
 (* Toplevel directive If you change these, make sure to update lname as well,
    or a directive might become a reserved word. *)
@@ -520,6 +522,10 @@ sum_case:
     { (lbl, None) }
   | lbl = UNAME OF t = ty
     { (lbl, Some t) }
+
+effect:
+  | eff = UNAME
+    { eff }
 
 effect_case:
    | OPERATION opsym = lname COLON t1 = prod_ty ARROW t2 = ty

@@ -73,16 +73,20 @@ let parse parser lex =
       Error.syntax ~loc:(Location.of_lexeme lex) "unrecognised symbol."
 
 
+module EffectMap = Map.Make(String)
+
 type state = {
   environment : Eval.env;
   context : Ctx.t;
   change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
+  effects : (Type.ty * Type.ty) EffectMap.t
 }
 
 let initial_ctxenv = {
   environment = Eval.initial;
   context = Ctx.empty;
   change = Common.id;
+  effects = EffectMap.empty;
 }
 
 let infer_top_comp ctx top_change c =
@@ -122,6 +126,10 @@ let rec exec_cmd interactive st (d,loc) =
   | SugaredSyntax.Help ->
       print_endline help_text;
       st
+  | SugaredSyntax.Effect (eff, (ty1, ty2)) ->
+      let ty1 = Desugar.ty Trio.empty ty1
+      and ty2 = Desugar.ty Trio.empty ty2 in
+      {st with effects = EffectMap.add eff (ty1, ty2) st.effects}
   | SugaredSyntax.Quit -> exit 0
   | SugaredSyntax.Use fn -> use_file st (fn, interactive)
   | SugaredSyntax.TopLet defs ->
@@ -153,6 +161,7 @@ let rec exec_cmd interactive st (d,loc) =
             vars
         end;
         {
+          st with
           context = ctx;
           change = top_change;
           environment = env;
@@ -172,6 +181,7 @@ let rec exec_cmd interactive st (d,loc) =
             List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Syntax.print_variable x) (Scheme.print_ty_scheme (sch_change tysch))) vars
           end;
         {
+          st with
           context = ctx;
           change = top_change;
           environment = env;
@@ -181,6 +191,7 @@ let rec exec_cmd interactive st (d,loc) =
       let ctx = Ctx.extend st.context x t in
         begin match C.lookup f External.values with
           | Some v -> {
+              st with
               context = ctx;
               change = st.change;
               environment = Eval.update x v st.environment;

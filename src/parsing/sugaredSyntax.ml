@@ -101,6 +101,8 @@ and plain_toplevel =
   (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)
   | External of Common.variable * ty * Common.variable
   (** [external x : t = "ext_val_name"] *)
+  | Effect of Common.effect * (ty * ty)
+  (** [effect Eff : ty1 -> t2] *)
   | Term of term
   | Use of string
   (** [#use "filename.eff"] *)
