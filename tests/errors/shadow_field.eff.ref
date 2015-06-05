@@ -1,1 +1,1 @@
-Typing error (./errors/shadow_field.eff:2:1-40): Record field label horn is already used in type cow
+Typing error (file "./errors/shadow_field.eff", line 2, char 1): Record field label horn is already used in type cow

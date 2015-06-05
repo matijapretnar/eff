@@ -1,1 +1,1 @@
-Typing error (./errors/polymorphic_list_ref.eff:3:3-5:14): This expression has type int but it should have type string.
+Typing error (file "./errors/polymorphic_list_ref.eff", line 3, char 3): This expression has type int but it should have type string.

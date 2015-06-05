@@ -1,1 +1,1 @@
-Typing error (./errors/duplicate_variant_tydef_sum.eff:2:1-38): Constructors of a sum type must be distinct
+Typing error (file "./errors/duplicate_variant_tydef_sum.eff", line 2, char 1): Constructors of a sum type must be distinct

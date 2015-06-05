@@ -1,1 +1,1 @@
-Syntax error (./errors/duplicate_let_toplevel.eff:1:5-6): Several definitions of x
+Syntax error (file "./errors/duplicate_let_toplevel.eff", line 1, char 5): Several definitions of x

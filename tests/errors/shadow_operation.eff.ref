@@ -1,1 +1,1 @@
-Typing error (./errors/shadow_operation.eff:3:1-7:6): Operation horn is already used in type cow
+Typing error (file "./errors/shadow_operation.eff", line 3, char 1): Operation horn is already used in type cow

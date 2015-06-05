@@ -1,12 +1,12 @@
 - : int = 5
 - : int × int = (1, 2)
-Warning (./patterns.eff:3:5-11): This pattern-matching is not exhaustive.
+Warning (file "./patterns.eff", line 3, char 5): This pattern-matching is not exhaustive.
 Here is an example of a value that is not matched:
-[]
+ []
 - : int × int list = (1, [2; 3; 4])
-Warning (./patterns.eff:4:5-11): This pattern-matching is not exhaustive.
+Warning (file "./patterns.eff", line 4, char 5): This pattern-matching is not exhaustive.
 Here is an example of a value that is not matched:
-[]
+ []
 - : int list = [2; 3; 4]
 - : int = 10
 - : int × int cow = (10, Moo 10)

@@ -3,8 +3,8 @@
 let message ~verbosity ?loc ~header fmt =
   if verbosity <= !Config.verbosity then
     match loc with
-    | None -> Format.eprintf ("%s: " ^^ fmt ^^ "@.") header
-    | Some loc -> Format.eprintf ("%s (%t): " ^^ fmt ^^ "@.") header (Location.print loc)
+    | None -> Format.eprintf ("%s:@," ^^ fmt ^^ "@.") header
+    | Some loc -> Format.eprintf ("%s (%t):@," ^^ fmt ^^ "@.") header (Location.print loc)
   else
     Format.ifprintf Format.err_formatter fmt
 
@@ -20,7 +20,7 @@ let print ?(at_level=min_int) ?(max_level=max_int) ppf =
   if at_level <= max_level then
     Format.fprintf ppf
   else
-    fun fmt -> Format.fprintf ppf ("(@[" ^^ fmt ^^ "@])")
+    fun fmt -> Format.fprintf ppf ("(" ^^ fmt ^^ ")")
 
 let rec sequence sep pp vs ppf =
   match vs with
