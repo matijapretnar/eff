@@ -181,7 +181,7 @@ let fresh_variable = Common.fresh (fun n -> (n, "$gen" ^ string_of_int n))
 
 let id_abstraction loc =
   let x = fresh_variable () in
-  ((Pattern.Var x, loc), (Syntax.Value (Syntax.Var x, loc), loc))
+  ((Pattern.Var x, loc), (Syntax.add_loc (Syntax.Value (Syntax.add_loc (Syntax.Var x) loc)) loc))
 
 let pattern ?(forbidden=[]) (p, loc) =
   let vars = ref [] in
@@ -231,7 +231,7 @@ let rec expression ctx (t, loc) =
   | Sugared.Function cs ->
       let x = fresh_variable () in
       let cs = List.map (abstraction ctx) cs in
-      [], Syntax.Lambda ((Pattern.Var x, loc), (Syntax.Match ((Syntax.Var x, loc), cs), loc))
+      [], Syntax.Lambda ((Pattern.Var x, loc), Syntax.add_loc (Syntax.Match (Syntax.add_loc (Syntax.Var x) loc, cs)) loc)
   | Sugared.Handler cs ->
       let w, h = handler loc ctx cs in
       w, Syntax.Handler h
@@ -258,24 +258,24 @@ let rec expression ctx (t, loc) =
       let w = [(Pattern.Var x, loc), c] in
       w, Syntax.Var x
   in
-  w, (e, loc)
+  w, Syntax.add_loc e loc
 
 and computation ctx (t, loc) =
-  let if_then_else e ((_, loc1) as c1) ((_, loc2) as c2) =
+  let if_then_else e c1 c2 =
     Syntax.Match (e, [
-      (Pattern.Const (C.Boolean true), loc1), c1;
-      (Pattern.Const (C.Boolean false), loc2), c2
+      (Pattern.Const (C.Boolean true), c1.Syntax.location), c1;
+      (Pattern.Const (C.Boolean false), c2.Syntax.location), c2
     ])
   in
   let w, c = match t with
     | Sugared.Apply ((Sugared.Apply ((Sugared.Var "&&", loc1), t1), loc2), t2) ->
       let w1, e1 = expression ctx t1 in
       let c2 = computation ctx t2 in
-          w1, if_then_else e1 c2 ((Syntax.Value (Syntax.Const (C.Boolean false), loc2)), loc2)
+          w1, if_then_else e1 c2 (Syntax.add_loc (Syntax.Value (Syntax.add_loc (Syntax.Const (C.Boolean false)) loc2)) loc2)
     | Sugared.Apply ((Sugared.Apply ((Sugared.Var "||", loc1), t1), loc2), t2) ->
       let w1, e1 = expression ctx t1 in
       let c2 = computation ctx t2 in
-          w1, if_then_else e1 ((Syntax.Value (Syntax.Const (C.Boolean true), loc2)), loc2) c2
+          w1, if_then_else e1 (Syntax.add_loc (Syntax.Value (Syntax.add_loc (Syntax.Const (C.Boolean true)) loc2)) loc2) c2
     | Sugared.Apply (t1, t2) ->
         let w1, e1 = expression ctx t1 in
         let w2, e2 = expression ctx t2 in
@@ -338,8 +338,8 @@ and computation ctx (t, loc) =
           w, Syntax.Value e
   in
     match w with
-      | [] -> (c, loc)
-      | _ :: _ -> Syntax.Let (w, (c, loc)), loc
+      | [] -> Syntax.add_loc c loc
+      | _ :: _ -> Syntax.add_loc (Syntax.Let (w, Syntax.add_loc c loc)) loc
 
 and abstraction ctx (p, t) =
   let vars, p = pattern p in
@@ -350,13 +350,14 @@ and abstraction2 ctx (p1, p2, t) =
   let vars2, p2 = pattern p2 in
   (p1, p2, computation (vars1 @ vars2 @ ctx) t)
 
-and let_rec ctx = function
-  | (Sugared.Lambda a, _) -> abstraction ctx a
-  | (Sugared.Function cs, loc) ->
+and let_rec ctx (e, loc) =
+  match e with
+  | Sugared.Lambda a -> abstraction ctx a
+  | Sugared.Function cs ->
     let x = fresh_variable () in
     let cs = List.map (abstraction ctx) cs in
-    ((Pattern.Var x, loc), (Syntax.Match ((Syntax.Var x, loc), cs), loc))
-  | (_, loc) -> Error.syntax ~loc "This kind of expression is not allowed in a recursive definition"
+    (Pattern.Var x, loc), Syntax.add_loc (Syntax.Match (Syntax.add_loc (Syntax.Var x) loc, cs)) loc
+  | _ -> Error.syntax ~loc "This kind of expression is not allowed in a recursive definition"
 
 and expressions ctx = function
   | [] -> [], []

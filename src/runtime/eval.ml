@@ -60,7 +60,9 @@ let rec sequence k = function
       let k'' u = sequence k (k' u) in
       V.Call (op, v, k'')
 
-let rec ceval env (c, loc) = match c with
+let rec ceval env c =
+  let loc = c.Syntax.location in
+  match c.Syntax.term with
   | Syntax.Apply (e1, e2) ->
       let v1 = veval env e1
       and v2 = veval env e2 in
@@ -144,7 +146,8 @@ and extend_let_rec env defs =
   env' := env;
   env
 
-and veval env (e, loc) = match e with
+and veval env e =
+  match e.Syntax.term with
   | Syntax.Var x ->
       begin match lookup x env with
       | Some v -> v

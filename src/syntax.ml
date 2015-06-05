@@ -5,8 +5,18 @@ module EffectMap = Map.Make(String)
 type variable = int * Common.variable
 type pattern = variable Pattern.t
 
+type 'term annotation = {
+  term: 'term;
+  location: Location.t;
+}
+
+let add_loc t loc = {
+  term = t;
+  location = loc;
+}
+
 (** Pure expressions *)
-type expression = plain_expression * Location.t
+type expression = plain_expression annotation
 and plain_expression =
   | Var of variable
   | Const of Common.const
@@ -18,7 +28,7 @@ and plain_expression =
   | Handler of handler
 
 (** Impure computations *)
-and computation = plain_computation * Location.t
+and computation = plain_computation annotation
 and plain_computation =
   | Value of expression
   | Let of (pattern * computation) list * computation
@@ -75,7 +85,7 @@ and pattern_list ?(max_length=299) (p, loc) ppf =
 
 let rec print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match fst c with
+  match c.term with
   | Apply (e1, e2) -> print ~at_level:1 "%t %t" (print_expression e1) (print_expression ~max_level:0 e2)
   | Value e -> print ~at_level:1 "value %t" (print_expression ~max_level:0 e)
   | Match (e, lst) -> print "match %t with (@[<hov>%t@])" (print_expression e) (Print.sequence " | " case lst)
@@ -89,7 +99,7 @@ let rec print_computation ?max_level c ppf =
 
 and print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match fst e with
+  match e.term with
   | Var x -> print "%t" (print_variable x)
   | Const c -> print "%t" (Common.print_const c)
   | Tuple lst -> Print.tuple print_expression lst ppf

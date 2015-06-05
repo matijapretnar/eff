@@ -246,8 +246,8 @@ let is_irrefutable p = check_patterns ~loc:(snd p) [p]
 (* Check for refutable patterns in let statements and non-exhaustive match
    statements. *)
 let check_comp c =
-  let rec check (c, loc) =
-    match c with
+  let rec check c =
+    match c.Syntax.term with
       | Syntax.Value _ -> ()
       | Syntax.Let (lst, c) ->
         List.iter (fun (p, c) -> is_irrefutable p ; check c) lst ;
@@ -256,7 +256,7 @@ let check_comp c =
         List.iter (fun (_, (p, c)) -> is_irrefutable p ; check c) lst ;
       | Syntax.Match (_, []) -> () (* Skip empty match to avoid an unwanted warning. *)
       | Syntax.Match (_, lst) -> 
-        check_patterns ~loc (List.map fst lst) ;
+        check_patterns ~loc:c.Syntax.location (List.map fst lst) ;
         List.iter (fun (_, c) -> check c) lst
       | Syntax.While (c1, c2) -> check c1 ; check c2
       | Syntax.For (_, _, _, c, _) -> check c

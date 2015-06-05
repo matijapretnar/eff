@@ -119,10 +119,11 @@ let rec infer_pattern (p, loc) =
    - the context, which contains non-generalised variables and their types,
    - the type of the expression, and
    - constraints connecting all these types. *)
-let rec infer_expr env (e, loc) =
+let rec infer_expr env e =
   if !Config.disable_typing then simple Type.universal_ty else
+  let loc = e.Syntax.location in
   let unify = Scheme.finalize_ty_scheme ~loc in
-  let ty_sch = match e with
+  let ty_sch = match e.Syntax.term with
 
   | Syntax.Var x ->
       begin match Ctx.lookup env.context x with
@@ -260,10 +261,11 @@ let rec infer_expr env (e, loc) =
    - the type of the expression,
    - the dirt of the computation, and
    - constraints connecting all these types. *)
-and infer_comp env (c, loc) =
+and infer_comp env c =
   if !Config.disable_typing then simple Type.universal_dirty else
+  let loc = c.Syntax.location in
   let unify = Scheme.finalize_dirty_scheme ~loc in
-  let drty_sch = match c with
+  let drty_sch = match c.Syntax.term with
 
   | Syntax.Value e ->
       let ctx, ty, cnstrs = infer_expr env e in
@@ -298,8 +300,8 @@ and infer_comp env (c, loc) =
       let infer_case ((p, c) as a) (ctx, chngs) =
         let ctx_a, ty_p, drty_c, cnstrs_a = infer_abstraction env a in
         ctx_a @ ctx, [
-          ty_less ~loc:(snd e) ty_e ty_p;
-          dirty_less ~loc:(snd c) drty_c drty;
+          ty_less ~loc:e.Syntax.location ty_e ty_p;
+          dirty_less ~loc:c.Syntax.location drty_c drty;
           just cnstrs_a
         ] @ chngs
       in
@@ -324,9 +326,9 @@ and infer_comp env (c, loc) =
       let ctx_e2, ty_e2, cnstrs_e2 = infer_expr env e2 in
       let ctx_c, (ty_c, drt_c), cnstrs_c = infer_comp env c in
       unify (ctx_e1 @ ctx_e2 @ ctx_c) (Type.unit_ty, drt_c) [
-        ty_less ~loc:(snd e1) ty_e1 Type.int_ty;
-        ty_less ~loc:(snd e2) ty_e2 Type.int_ty;
-        ty_less ~loc:(snd c) ty_c Type.unit_ty;
+        ty_less ~loc:e1.Syntax.location ty_e1 Type.int_ty;
+        ty_less ~loc:e2.Syntax.location ty_e2 Type.int_ty;
+        ty_less ~loc:c.Syntax.location ty_c Type.unit_ty;
         just cnstrs_e1;
         just cnstrs_e2;
         just cnstrs_c
@@ -363,8 +365,8 @@ and infer_comp env (c, loc) =
 and infer_abstraction env (p, c) =
   let ctx_p, ty_p, cnstrs_p = infer_pattern p in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
-  match Scheme.finalize_ty_scheme ~loc:(snd c) ctx_c (Type.Arrow (ty_p, drty_c)) [
-    trim_context ~loc:(snd c) ctx_p;
+  match Scheme.finalize_ty_scheme ~loc:c.Syntax.location ctx_c (Type.Arrow (ty_p, drty_c)) [
+    trim_context ~loc:c.Syntax.location ctx_p;
     just cnstrs_p;
     just cnstrs_c
   ] with
@@ -375,8 +377,8 @@ and infer_abstraction2 env (p1, p2, c) =
   let ctx_p1, ty_p1, cnstrs_p1 = infer_pattern p1 in
   let ctx_p2, ty_p2, cnstrs_p2 = infer_pattern p2 in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
-  match Scheme.finalize_ty_scheme ~loc:(snd c) ctx_c (Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c)) [
-    trim_context ~loc:(snd c) (ctx_p1 @ ctx_p2);
+  match Scheme.finalize_ty_scheme ~loc:c.Syntax.location ctx_c (Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c)) [
+    trim_context ~loc:c.Syntax.location (ctx_p1 @ ctx_p2);
     just cnstrs_p1;
     just cnstrs_p2;
     just cnstrs_c
@@ -391,7 +393,7 @@ and infer_let ~loc env defs =
     let ctx_p, ty_p, cnstrs_p = infer_pattern p in
     let ctx_c, drty_c, cnstrs_c = infer_comp env c in
     let poly, nonpoly =
-      match fst c with
+      match c.Syntax.term with
       | Syntax.Value _ ->
           ctx_p @ poly, nonpoly
       | Syntax.Apply _ | Syntax.Match _ | Syntax.While _ | Syntax.For _
@@ -399,7 +401,7 @@ and infer_let ~loc env defs =
           poly, ctx_p @ nonpoly
     in
     poly, nonpoly, ctx_c @ ctx, [
-      dirty_less ~loc:(snd c) drty_c (ty_p, drt);
+      dirty_less ~loc:c.Syntax.location drty_c (ty_p, drt);
       just cnstrs_p;
       just cnstrs_c
     ] @ chngs

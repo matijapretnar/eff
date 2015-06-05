@@ -94,9 +94,9 @@ let create_infer_state st = {
 
 let infer_top_comp st c =
   let ctx', (ty', drt'), cnstrs' = Infer.infer_comp (create_infer_state st) c in
-  let change = Scheme.add_to_top ~loc:(snd c) ctx' cnstrs' in
+  let change = Scheme.add_to_top ~loc:c.Syntax.location ctx' cnstrs' in
   let top_change = Common.compose st.change change in
-  let ctx = match fst c with
+  let ctx = match c.Syntax.term with
   | Syntax.Value _ -> ctx'
   | _ -> (Desugar.fresh_variable (), ty') :: ctx'
   in
