@@ -69,8 +69,6 @@ and just new_cnstrs (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.union new_cnstrs cnstrs, sbst)
 and region_param_less r1 r2 (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_region_constraint r1 r2 [] cnstrs, sbst)
-and add_handled_constraint r1 r2 rs (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_region_constraint r1 r2 rs cnstrs, sbst)
 and add_instance_constraint iota r (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_instance_constraint iota r [] cnstrs, sbst)
 

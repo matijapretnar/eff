@@ -282,13 +282,12 @@ let rec expression ctx (t, loc) =
   | Sugared.Variant (lbl, Some t) ->
       let w, e = expression ctx t in
       w, Syntax.Variant (lbl, Some e)
-  | Sugared.Operation (t, op) ->
-      let w, e = expression ctx t in
-      w, Syntax.Operation (e, op)
+  | Sugared.Effect eff ->
+      [], Syntax.Effect eff
   (* Terms that are desugared into computations. We list them explicitly in
      order to catch any future constructs. *)
   | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
-  | Sugared.Handle _ | Sugared.Conditional _ | Sugared.While _ | Sugared.For _ | Sugared.New _ | Sugared.Check _ ->
+  | Sugared.Handle _ | Sugared.Conditional _ | Sugared.While _ | Sugared.For _ | Sugared.Check _ ->
       let x = fresh_variable () in
       let c = computation ctx (t, loc) in
       let w = [(Pattern.Var x, loc), c] in
@@ -320,12 +319,6 @@ and computation ctx (t, loc) =
         let cs = List.map (abstraction ctx) cs in
         let w, e = expression ctx t in
           w, Syntax.Match (e, cs)
-    | Sugared.New (eff, None) ->
-        [], Syntax.New (eff, None)
-    | Sugared.New (eff, Some (t, lst)) ->
-        let w, e = expression ctx t in
-        let lst = List.map (fun (op, a) -> (op, abstraction2 ctx a)) lst in
-          w, Syntax.New (eff, Some (e, lst))
     | Sugared.Handle (t1, t2) ->
         let w1, e1 = expression ctx t1 in
         let c2 = computation ctx t2 in
@@ -375,7 +368,7 @@ and computation ctx (t, loc) =
           [], Syntax.LetRec (defs, c)
     (* The remaining cases are expressions, which we list explicitly to catch any
        future changes. *)
-    | (Sugared.Var _ | Sugared.Const _ | Sugared.Tuple _ | Sugared.Record _  | Sugared.Variant _ | Sugared.Lambda _ | Sugared.Function _ | Sugared.Handler _ | Sugared.Operation _) ->
+    | (Sugared.Var _ | Sugared.Const _ | Sugared.Tuple _ | Sugared.Record _  | Sugared.Variant _ | Sugared.Lambda _ | Sugared.Function _ | Sugared.Handler _ | Sugared.Effect _) ->
         let w, e = expression ctx (t, loc) in
           w, Syntax.Value e
   in
@@ -416,14 +409,13 @@ and record_expressions ctx = function
 
 and handler loc ctx {Sugared.operations=ops; Sugared.value=val_a; Sugared.finally=fin_a} =
   let rec operation_cases = function
-  | [] -> [], []
-  | ((t, op), a2) :: cs ->
-    let w, e = expression ctx t in
-    let ws, cs' = operation_cases cs in
-    w @ ws, ((e, op), abstraction2 ctx a2) :: cs'
+  | [] -> []
+  | (op, a2) :: cs ->
+    let cs' = operation_cases cs in
+    (op, abstraction2 ctx a2) :: cs'
   in
-  let ws, ops = operation_cases ops in
-  ws, { Syntax.operations = ops;
+  let ops = operation_cases ops in
+  [], { Syntax.operations = ops;
     Syntax.value =
       (match val_a with None -> id_abstraction loc | Some a -> abstraction ctx a);
     Syntax.finally =

@@ -4,27 +4,16 @@ type value =
   | Record of (Common.field, value) Common.assoc
   | Variant of Common.label * value option
   | Closure of closure
-  | Instance of instance
   | Handler of (result -> result)
 
 and result =
   | Value of value
-  | Operation of operation * value * closure
+  | Call of Common.effect * value * closure
 
 and closure = value -> result
 
-and operation = instance * Common.opsym
-
-and instance = int * string option * resource option
-
-and resource = value ref * (Common.opsym, value -> value -> result) Common.assoc
-
 let unit_value = Tuple []
 let unit_result = Value unit_value
-
-let fresh_instance =
-  let fresh = Common.fresh Common.id in
-  fun description resource -> Instance (fresh (), description, resource)
 
 let to_bool = function
   | Const (Common.Boolean b) -> b
@@ -42,20 +31,11 @@ let to_str = function
   | Const (Common.String s) -> s
   | _ -> Error.runtime "A string value expected."
 
-let to_instance = function
-  | Instance i -> i
-  | _ -> Error.runtime "An effect instance expected."
-
 let to_handler = function
   | Handler h -> h
   | _ -> Error.runtime "A handler expected."
 
-let print_instance inst ppf =
-  match inst with
-  | (_, Some desc, _) -> Format.fprintf ppf "<%s>" desc
-  | (i, None, _) -> Format.fprintf ppf "<instance #%d>" i
-
-let print_operation (inst, op) ppf = Format.fprintf ppf "%t.%s" (print_instance inst) op
+let print_effect eff ppf = Format.fprintf ppf "%s" eff
 
 let rec print_value ?max_level v ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -70,7 +50,6 @@ let rec print_value ?max_level v ppf =
   | Variant (lbl, Some v) ->
       print ~at_level:1 "%s @[<hov>%t@]" lbl (print_value v)
   | Closure _ -> print "<fun>"
-  | Instance inst  -> print_instance inst ppf
   | Handler _  -> print "<handler>"
 
 and list ?(max_length=299) v ppf =
@@ -86,5 +65,5 @@ and list ?(max_length=299) v ppf =
 let print_result r ppf =
   match r with
   | Value v -> print_value v ppf
-  | Operation (op, v, _) ->
-      Format.fprintf ppf "Operation %t %t" (print_operation op) (print_value v)
+  | Call (eff, v, _) ->
+      Format.fprintf ppf "Call %s %t" eff (print_value v)

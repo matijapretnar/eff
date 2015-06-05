@@ -56,9 +56,9 @@ let extend p v env =
 
 let rec sequence k = function
   | V.Value v -> k v
-  | V.Operation (op, v, k') ->
+  | V.Call (op, v, k') ->
       let k'' u = sequence k (k' u) in
-      V.Operation (op, v, k'')
+      V.Call (op, v, k'')
 
 let rec ceval env (c, loc) = match c with
   | Syntax.Apply (e1, e2) ->
@@ -115,17 +115,6 @@ let rec ceval env (c, loc) = match c with
       let h = V.to_handler v in
       h r
 
-  | Syntax.New (eff, r) ->
-      let r = (match r with
-                 | None -> None
-                 | Some (e, lst) ->
-                     let v = veval env e in
-                     let lst = List.map (fun (op, a) -> (op, eval_closure2 env a)) lst in
-                       Some (ref v, lst))
-      in
-      let e = V.fresh_instance None r in
-        V.Value e
-
   | Syntax.Let (lst, c) ->
       eval_let env lst c
 
@@ -167,25 +156,23 @@ and veval env (e, loc) = match e with
   | Syntax.Variant (lbl, None) -> V.Variant (lbl, None)
   | Syntax.Variant (lbl, Some e) -> V.Variant (lbl, Some (veval env e))
   | Syntax.Lambda a -> V.Closure (eval_closure env a)
-  | Syntax.Operation (e, op) ->
-      let n = V.to_instance (veval env e) in
-      V.Closure (fun v -> V.Operation ((n, op), v, fun r -> V.Value r))
+  | Syntax.Effect eff ->
+      V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | Syntax.Handler h -> V.Handler (eval_handler env h)
 
 and eval_handler env {Syntax.operations=ops; Syntax.value=value; Syntax.finally=fin} =
-  let eval_op ((e, op), (p, kvar, c)) =
+  let eval_op (op, (p, kvar, c)) =
     let f u k = eval_closure (extend kvar (V.Closure k) env) (p, c) u in
-    let (i, _, _) = V.to_instance (veval env e) in
-      ((i, op), f)
+      (op, f)
   in
   let ops = List.map eval_op ops in
   let rec h = function
     | V.Value v -> eval_closure env value v
-    | V.Operation (((i, _, _), opname) as op, v, k) ->
+    | V.Call (eff, v, k) ->
         let k' u = h (k u) in
-        begin match C.lookup (i,opname) ops with
+        begin match C.lookup eff ops with
         | Some f -> f v k'
-        | None -> V.Operation (op, v, k')
+        | None -> V.Call (eff, v, k')
         end
   in
   fun r -> sequence (eval_closure env fin) (h r)
@@ -196,20 +183,8 @@ and eval_closure2 env (p1, p2, c) v1 v2 = ceval (extend p2 v2 (extend p1 v1 env)
 
 let rec top_handle = function
   | V.Value v -> v
-  | V.Operation (((_, _, Some (s_ref, resource)) as inst, opsym) as op, v, k) ->
-      begin match C.lookup opsym resource with
-        | None -> Error.runtime "uncaught operation %t %t." (Value.print_operation op) (Value.print_value v)
-        | Some f ->
-            begin match f v !s_ref with
-              | V.Value (V.Tuple [u; s]) ->
-                  s_ref := s;
-                  top_handle (k u)
-              | V.Value _ -> Error.runtime "pair expected in a resource handler for %t." (Value.print_instance inst)
-              | _ -> Error.runtime "pair expected in a resource handler for %t." (Value.print_instance inst)
-            end
-      end
-  | V.Operation (((_, _, None), _) as op, v, k) ->
-      Error.runtime "uncaught operation %t %t." (Value.print_operation op) (Value.print_value v)
+  | V.Call (eff, v, k) ->
+      Error.runtime "uncaught effect %t %t." (Value.print_effect eff) (Value.print_value v)
 
 let run env c =
   top_handle (ceval env c)

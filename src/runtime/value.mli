@@ -4,34 +4,23 @@ type value =
   | Record of (Common.field, value) Common.assoc
   | Variant of Common.label * value option
   | Closure of closure
-  | Instance of instance
   | Handler of (result -> result)
 
 and result =
   | Value of value
-  | Operation of operation * value * closure
+  | Call of Common.effect * value * closure
 
 and closure = value -> result
 
-and operation = instance * Common.opsym
-
-and instance = int * string option * resource option
-
-and resource = value ref * (Common.opsym, value -> value -> result) Common.assoc
-
 val unit_value : value
 val unit_result : result
-
-val fresh_instance : string option -> resource option -> value
 
 val to_bool : value -> bool
 val to_int : value -> Big_int.big_int
 val to_float : value -> float
 val to_str : value -> string
-val to_instance : value -> instance
 val to_handler : value -> result -> result
 
 val print_value : ?max_level:int -> value -> Format.formatter -> unit
-val print_instance : instance -> Format.formatter -> unit
-val print_operation : operation -> Format.formatter -> unit
+val print_effect : Common.effect -> Format.formatter -> unit
 val print_result : result -> Format.formatter -> unit

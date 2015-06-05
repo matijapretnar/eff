@@ -31,7 +31,6 @@
     ("lxor", LXOR);
     ("match", MATCH);
     ("mod", MOD);
-    ("new", NEW);
     ("of", OF);
     ("operation", OPERATION);
     ("or", OR);

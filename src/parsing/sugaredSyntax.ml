@@ -17,8 +17,8 @@ and plain_term =
   (** [fun p1 p2 ... pn -> t] *)
   | Function of abstraction list
   (** [function p1 -> t1 | ... | pn -> tn] *)
-  | Operation of operation
-  (** [t#op], where [op] is an operation symbol. *)
+  | Effect of Common.effect
+  (** [eff], where [eff] is an effect symbol. *)
   | Handler of handler
   (** [handler clauses], where [clauses] are described below. *)
 
@@ -36,16 +36,13 @@ and plain_term =
   (** [for x = t1 to t2 do t done] or [for x = t1 downto t2 do t done] *)
   | Apply of term * term
   (** [t1 t2] *)
-  | New of Common.tyname * resource option
-  (** [new effect] or
-      [new effect @ t with operation op1 x1 @ s1 -> t1 ... end] *)
   | Handle of term * term
   (** [with t1 handle t2] *)
   | Check of term
   (** [check t] *)
 
 and handler = {
-  operations : (operation, abstraction2) Common.assoc;
+  operations : (Common.effect, abstraction2) Common.assoc;
   (** [t1#op1 p1 k1 -> t1' | ... | tn#opn pn kn -> tn'] *)
   value : abstraction option;
   (** [val p -> t] *)
@@ -57,9 +54,7 @@ and abstraction = Common.variable Pattern.t * term
 
 and abstraction2 = Common.variable Pattern.t * Common.variable Pattern.t * term
 
-and operation = term * Common.opsym
-
-and resource = term * (Common.opsym, Common.variable Pattern.t * Common.variable Pattern.t * term) Common.assoc
+and operation = Common.opsym
 
 type dirt =
   | DirtParam of Common.dirtparam
@@ -101,7 +96,7 @@ and plain_toplevel =
   (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)
   | External of Common.variable * ty * Common.variable
   (** [external x : t = "ext_val_name"] *)
-  | Effect of Common.effect * (ty * ty)
+  | DefEffect of Common.effect * (ty * ty)
   (** [effect Eff : ty1 -> t2] *)
   | Term of term
   | Use of string

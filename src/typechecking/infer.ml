@@ -7,6 +7,16 @@ let dirty_less = Scheme.dirty_less
 let just = Scheme.just
 let trim_context = Scheme.trim_context
 
+type state = {
+  context : Ctx.t;
+  effects : (Type.ty * Type.ty) Syntax.EffectMap.t
+}
+
+let initial = {
+  context = Ctx.empty;
+  effects = Syntax.EffectMap.empty;
+}
+
 let simple ty = ([], ty, Constraints.empty)
 let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_dirt_param () }
 
@@ -15,6 +25,12 @@ let ty_of_const = function
   | Common.String _ -> Type.string_ty
   | Common.Boolean _ -> Type.bool_ty
   | Common.Float _ -> Type.float_ty
+
+let infer_effect env eff =
+  try
+    Some (Syntax.EffectMap.find eff env.effects)
+  with
+    | Not_found -> None
 
 (* [infer_pattern p] infers the type scheme of a pattern [p].
    This consists of:
@@ -109,7 +125,7 @@ let rec infer_expr env (e, loc) =
   let ty_sch = match e with
 
   | Syntax.Var x ->
-      begin match Ctx.lookup env x with
+      begin match Ctx.lookup env.context x with
       | Some (ctx, ty, cnstrs) ->
           (ctx, ty, cnstrs)
       | None ->
@@ -177,58 +193,45 @@ let rec infer_expr env (e, loc) =
       let ctx, ty1, drty2, cnstrs = infer_abstraction env a in
       ctx, Type.Arrow (ty1, drty2), cnstrs
       
-  | Syntax.Operation (e, op) ->
+  | Syntax.Effect eff ->
       let r = Type.fresh_region_param () in
-      begin match Tctx.infer_operation op r with
-      | None -> Error.typing ~loc "Unbound operation %s" op
-      | Some (eff_ty, (ty_par, ty_res)) ->
-          let ctx_e, ty_e, cnstrs_e = infer_expr env e in
-          let drt = {Type.ops = [op, r]; Type.rest = Type.fresh_dirt_param ()} in
-          unify ctx_e (Type.Arrow (ty_par, (ty_res, drt))) [
-            ty_less ~loc ty_e eff_ty;
-            just cnstrs_e
-          ]
+      begin match infer_effect env eff with
+      | None -> Error.typing ~loc "Unbound effect %s" eff
+      | Some (ty_par, ty_res) ->
+          let drt = {Type.ops = [eff, r]; Type.rest = Type.fresh_dirt_param ()} in
+          [], Type.Arrow (ty_par, (ty_res, drt)), Constraints.empty
+            (* XXX r is not empty *)
       end
 
   | Syntax.Handler {Syntax.operations = ops; Syntax.value = a_val; Syntax.finally = a_fin} -> 
       let drt_mid = Type.fresh_dirt () in
       let ty_mid = Type.fresh_ty () in
 
-      let infer ((e, op), a2) (ctx, chngs, ops) =
-        let r = Type.fresh_region_param () in
-        begin match Tctx.infer_operation op r with
-        | None -> Error.typing ~loc "Unbound operation %s in a handler" op
-        | Some (eff_ty, (ty_par, ty_arg)) ->
-            let ctx_e, ty_e, cnstrs_e = infer_expr env e in
+      let infer (eff, a2) (ctx, chngs) =
+        begin match infer_effect env eff with
+        | None -> Error.typing ~loc "Unbound effect %s in a handler" eff
+        | Some (ty_par, ty_arg) ->
             let ctx_a, ty_p, ty_k, drty_c, cnstrs_a = infer_abstraction2 env a2 in
-            let ops =
-              begin match Common.lookup op ops with
-              | None -> (op, ref [r]) :: ops
-              | Some rs -> rs := r :: !rs; ops
-              end
-              in
-            ctx_e @ ctx_a @ ctx, [
-              ty_less ~loc ty_e eff_ty;
+            ctx_a @ ctx, [
               ty_less ~loc ty_par ty_p;
               ty_less ~loc (Type.Arrow (ty_arg, (ty_mid, drt_mid))) ty_k;
               dirty_less ~loc drty_c (ty_mid, drt_mid);
-              just cnstrs_e;
               just cnstrs_a
-            ] @ chngs, ops
+            ] @ chngs
         end
       in
-      let ctxs, chngs, ops = List.fold_right infer ops ([], [], []) in
+      let ctxs, chngs = List.fold_right infer ops ([], []) in
 
-      let make_dirt (op, rs) (ops_in, ops_out, chngs) =
+      let make_dirt op (ops_in, ops_out, chngs) =
         let r_in = Type.fresh_region_param () in
         let r_out = Type.fresh_region_param () in
         let chngs = [
-          Scheme.add_handled_constraint r_in r_out !rs
+          Scheme.region_param_less r_in r_out
         ] @ chngs
         in
         (op, r_in) :: ops_in, (op, r_out) :: ops_out, chngs
       in
-      let ops_in, ops_out, chngs_ops = List.fold_right make_dirt ops ([], [], []) in
+      let ops_in, ops_out, chngs_ops = List.fold_right make_dirt (Common.uniq (List.map fst ops)) ([], [], []) in
 
       let ctx_val, ty_val, drty_val, cnstrs_val = infer_abstraction env a_val in
       let ctx_fin, ty_fin, drty_fin, cnstrs_fin = infer_abstraction env a_fin in
@@ -278,12 +281,12 @@ and infer_comp env (c, loc) =
           just cnstrs_c
         ])
       in
-      let env' = List.fold_right (fun (x, ty_sch) env -> Ctx.extend env x ty_sch) vars env in
+      let env' = List.fold_right (fun (x, ty_sch) env -> {env with context = Ctx.extend env.context x ty_sch}) vars env in
       change2 (change (infer_comp env' c))
 
   | Syntax.LetRec (defs, c) ->
       let vars, change = infer_let_rec ~loc env defs in
-      let env' = List.fold_right (fun (x, ty_sch) env -> Ctx.extend env x ty_sch) vars env in
+      let env' = List.fold_right (fun (x, ty_sch) env -> {env with context = Ctx.extend env.context x ty_sch}) vars env in
       change (infer_comp env' c)
 
   | Syntax.Match (e, []) ->
@@ -343,37 +346,6 @@ and infer_comp env (c, loc) =
         just cnstrs_e2
       ]
 
-  | Syntax.New (eff, rsrc) ->
-      begin match Tctx.fresh_tydef ~loc eff with
-      | (params, Tctx.Effect ops) ->
-          let ctx, chngs =
-            begin match rsrc with
-            | None -> [], []
-            | Some (e, op_defs) ->
-                let ctx_e, ty_e, cnstrs_e = infer_expr env e in
-                let infer (op, a) (ctx, chngs) =
-                  match Common.lookup op ops with
-                  | None -> Error.typing ~loc "Effect type %s does not have operation %s" eff op
-                  | Some (ty_par, ty_res) ->
-                      let ctx_a, ty_p1, ty_p2, drty_c, cnstrs_a = infer_abstraction2 env a in
-                      ctx_a @ ctx, [
-                        ty_less ~loc ty_par ty_p1;
-                        ty_less ~loc ty_e ty_p2;
-                        dirty_less ~loc drty_c (Type.Tuple [ty_res; ty_e], empty_dirt ());
-                        just cnstrs_a
-                      ] @ chngs
-                in
-                List.fold_right infer op_defs (ctx_e, [just cnstrs_e])
-            end
-          in
-          let inst = Type.fresh_instance_param () in
-          let r = Type.fresh_region_param () in
-          unify ctx (Tctx.effect_to_params eff params r, empty_dirt ()) ([
-            Scheme.add_instance_constraint inst r
-          ] @ chngs)
-      | _ -> Error.typing ~loc "Effect type expected but %s encountered" eff
-      end
-
   | Syntax.Handle (e, c) ->
       let ctx_e, ty_e, cnstrs_e = infer_expr env e
       and ctx_c, drty_c, cnstrs_c = infer_comp env c
@@ -426,7 +398,7 @@ and infer_let ~loc env defs =
       match fst c with
       | Syntax.Value _ ->
           ctx_p @ poly, nonpoly
-      | Syntax.Apply _ | Syntax.Match _ | Syntax.While _ | Syntax.For _ | Syntax.New _
+      | Syntax.Apply _ | Syntax.Match _ | Syntax.While _ | Syntax.For _
       | Syntax.Handle _ | Syntax.Let _ | Syntax.LetRec _ | Syntax.Check _ ->
           poly, ctx_p @ nonpoly
     in

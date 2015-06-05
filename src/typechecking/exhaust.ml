@@ -261,9 +261,6 @@ let check_comp c =
       | Syntax.While (c1, c2) -> check c1 ; check c2
       | Syntax.For (_, _, _, c, _) -> check c
       | Syntax.Apply _ -> ()
-      | Syntax.New (_, None) -> ()
-      | Syntax.New (_, Some (_, lst)) -> 
-        List.iter (fun (_, (p1, p2, c)) -> is_irrefutable p1 ; is_irrefutable p2 ; check c) lst
       | Syntax.Handle (_, c) -> check c
       | Syntax.Check c -> check c
   in

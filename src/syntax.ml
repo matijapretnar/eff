@@ -1,5 +1,7 @@
 (** Syntax of the core language. *)
 
+module EffectMap = Map.Make(String)
+
 type variable = int * Common.variable
 type pattern = variable Pattern.t
 
@@ -12,7 +14,7 @@ and plain_expression =
   | Record of (Common.field, expression) Common.assoc
   | Variant of Common.label * expression option
   | Lambda of abstraction
-  | Operation of operation
+  | Effect of Common.effect
   | Handler of handler
 
 (** Impure computations *)
@@ -25,7 +27,6 @@ and plain_computation =
   | While of computation * computation
   | For of variable * expression * expression * computation * bool
   | Apply of expression * expression
-  | New of Common.tyname * resource option
   | Handle of expression * computation
   | Check of computation
 
@@ -42,14 +43,7 @@ and abstraction = pattern * computation
 (** Abstractions that take two arguments. *)
 and abstraction2 = pattern * pattern * computation
 
-(** An operation is an expression that represents an instance together with
-    an operation symbol. *)
-and operation = expression * Common.opsym
-
-(** A resource consists of an expression for initial state and of a definition
-    of operations, which take an argument and a state, and return a result and
-    the new state. *)
-and resource = expression * (Common.opsym, abstraction2) Common.assoc
+and operation = Common.opsym
 
 let print_variable (_, x) ppf = Print.print ppf "%s" x
 
@@ -87,8 +81,6 @@ let rec print_computation ?max_level c ppf =
   | Match (e, lst) -> print "match %t with (@[<hov>%t@])" (print_expression e) (Print.sequence " | " case lst)
   | While (c1, c2) -> print "while %t do %t done" (print_computation c1) (print_computation c2)
   | For (i, e1, e2, c, d) -> print "for %t = ... " (print_variable i)
-  | New (eff, None) -> print "new %s" eff
-  | New (eff, Some (e, lst)) -> print "new %s @ %t with ... end" eff (print_expression e)
   | Handle (e, c) -> print "handle %t with %t" (print_expression e) (print_computation c)
   | Let (lst, c) -> print "let @[<hov>%t@] in %t" (Print.sequence " | " let_abstraction lst) (print_computation c)
   | LetRec (lst, c) -> print "let rec ... in %t" (print_computation c)
@@ -107,7 +99,7 @@ and print_expression ?max_level e ppf =
     print ~at_level:1 "%s @[<hov>%t@]" lbl (print_expression e)
   | Lambda a -> print "fun %t" (abstraction a)
   | Handler _  -> print "<handler>"
-  | Operation (e, op) -> print "%t#%s" (print_expression e) op
+  | Effect eff -> print "%s" eff
 
 and abstraction (p, c) ppf =
   Format.fprintf ppf "%t -> %t" (print_pattern p) (print_computation c)

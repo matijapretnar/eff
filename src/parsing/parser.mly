@@ -2,7 +2,7 @@
   open SugaredSyntax
 
   type handler_case =
-    | OperationCase of operation * abstraction2
+    | EffectCase of Common.effect * abstraction2
     | ReturnCase of abstraction
     | FinallyCase of abstraction
 
@@ -10,7 +10,7 @@
     let (ops, ret, fin) =
       List.fold_left
         (fun (ops, ret, fin) -> function
-          | (OperationCase (op, a2), _) ->  ((op, a2) :: ops, ret, fin)
+          | (EffectCase (eff, a2), _) ->  ((eff, a2) :: ops, ret, fin)
           | (ReturnCase a, loc) ->
             begin match ret with
               | None -> (ops, Some a, fin)
@@ -48,7 +48,7 @@
 %token FUN BAR BARBAR
 %token IF THEN ELSE
 %token WHILE DO DONE FOR TO DOWNTO
-%token HANDLER NEW AT OPERATION VAL FINALLY HANDLE
+%token HANDLER AT OPERATION VAL FINALLY HANDLE
 %token PLUS STAR MINUS MINUSDOT
 %token LSL LSR ASR
 %token MOD OR
@@ -125,7 +125,7 @@ plain_topdef:
   | EXTERNAL x = ident COLON t = ty EQUAL n = STRING
     { External (x, t, n) }
   | EFFECT eff = effect COLON t1 = prod_ty ARROW t2 = ty
-    { Effect (eff, (t1, t2))}
+    { DefEffect (eff, (t1, t2))}
 
 (* Toplevel directive If you change these, make sure to update lname as well,
    or a directive might become a reserved word. *)
@@ -179,14 +179,6 @@ comma_term: mark_position(plain_comma_term) { $1 }
 plain_comma_term:
   | t = binop_term COMMA ts = separated_list(COMMA, binop_term)
     { Tuple (t :: ts) }
-  | t = plain_new_term
-    { t }
-
-plain_new_term:
-  | NEW ty = tyname AT t = simple_term WITH lst = resource_case* END
-    { New (ty, Some (t, lst)) }
-  | NEW ty = tyname
-    { New (ty, None) }
   | t = plain_binop_term
     { t }
 
@@ -248,8 +240,8 @@ plain_simple_term:
     { Variant (lbl, None) }
   | cst = const_term
     { Const cst }
-  | t = simple_term HASH op = ident
-    { Operation (t, op) }
+  | HASH eff = effect
+    { Effect eff }
   | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
       let nil = (Variant (Common.nil, None), Location.make $endpos $endpos) in
@@ -305,8 +297,8 @@ let_rec_def:
 
 handler_case: mark_position(plain_handler_case) { $1 }
 plain_handler_case:
-  | t1 = simple_term HASH op = ident p = simple_pattern k = simple_pattern ARROW t2 = term
-    { OperationCase ((t1, op), (p, k, t2)) }
+  | HASH eff = effect p = simple_pattern k = simple_pattern ARROW t2 = term
+    { EffectCase (eff, (p, k, t2)) }
   | VAL c = match_case
     { ReturnCase c }
   | FINALLY c = match_case
@@ -530,9 +522,5 @@ effect:
 effect_case:
    | OPERATION opsym = lname COLON t1 = prod_ty ARROW t2 = ty
      { (opsym, (t1, t2)) }
-
-resource_case:
-   | OPERATION opsym = lname p1 = simple_pattern AT p2 = simple_pattern ARROW t = term
-     { (opsym, (p1, p2, t)) }
 
 %%

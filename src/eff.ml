@@ -73,26 +73,29 @@ let parse parser lex =
       Error.syntax ~loc:(Location.of_lexeme lex) "unrecognised symbol."
 
 
-module EffectMap = Map.Make(String)
-
 type state = {
   environment : Eval.env;
   context : Ctx.t;
   change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
-  effects : (Type.ty * Type.ty) EffectMap.t
+  effects : (Type.ty * Type.ty) Syntax.EffectMap.t
 }
 
 let initial_ctxenv = {
   environment = Eval.initial;
   context = Ctx.empty;
   change = Common.id;
-  effects = EffectMap.empty;
+  effects = Syntax.EffectMap.empty;
 }
 
-let infer_top_comp ctx top_change c =
-  let ctx', (ty', drt'), cnstrs' = Infer.infer_comp ctx c in
+let create_infer_state st = {
+  Infer.context = st.context;
+  Infer.effects = st.effects;
+}
+
+let infer_top_comp st c =
+  let ctx', (ty', drt'), cnstrs' = Infer.infer_comp (create_infer_state st) c in
   let change = Scheme.add_to_top ~loc:(snd c) ctx' cnstrs' in
-  let top_change = Common.compose top_change change in
+  let top_change = Common.compose st.change change in
   let ctx = match fst c with
   | Syntax.Value _ -> ctx'
   | _ -> (Desugar.fresh_variable (), ty') :: ctx'
@@ -109,7 +112,7 @@ let rec exec_cmd interactive st (d,loc) =
   match d with
   | SugaredSyntax.Term c ->
       let c = Desugar.top_computation c in
-      let drty_sch, new_change = infer_top_comp st.context st.change c in
+      let drty_sch, new_change = infer_top_comp st c in
       let v = Eval.run st.environment c in
       if interactive then Format.printf "@[- : %t = %t@]@."
         (Scheme.print_dirty_scheme drty_sch)
@@ -117,7 +120,7 @@ let rec exec_cmd interactive st (d,loc) =
       {st with change = new_change}
   | SugaredSyntax.TypeOf c ->
       let c = Desugar.top_computation c in
-      let drty_sch, new_change = infer_top_comp st.context st.change c in
+      let drty_sch, new_change = infer_top_comp st c in
       Format.printf "@[- : %t@]@." (Scheme.print_dirty_scheme drty_sch);
       {st with change = new_change}
   | SugaredSyntax.Reset ->
@@ -126,16 +129,16 @@ let rec exec_cmd interactive st (d,loc) =
   | SugaredSyntax.Help ->
       print_endline help_text;
       st
-  | SugaredSyntax.Effect (eff, (ty1, ty2)) ->
+  | SugaredSyntax.DefEffect (eff, (ty1, ty2)) ->
       let ty1 = Desugar.ty Trio.empty ty1
       and ty2 = Desugar.ty Trio.empty ty2 in
-      {st with effects = EffectMap.add eff (ty1, ty2) st.effects}
+      {st with effects = Syntax.EffectMap.add eff (ty1, ty2) st.effects}
   | SugaredSyntax.Quit -> exit 0
   | SugaredSyntax.Use fn -> use_file st (fn, interactive)
   | SugaredSyntax.TopLet defs ->
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
-      let vars, nonpoly, change = Infer.infer_let ~loc st.context defs in
+      let vars, nonpoly, change = Infer.infer_let ~loc (create_infer_state st) defs in
       let ctx = List.fold_right (fun (x, ty_sch) env -> Ctx.extend env x ty_sch) vars st.context in
       let extend_nonpoly (x, ty) env =
         (x, ([(x, ty)], ty, Constraints.empty)) :: env
@@ -168,7 +171,7 @@ let rec exec_cmd interactive st (d,loc) =
         }
     | SugaredSyntax.TopLetRec defs ->
         let defs = Desugar.top_let_rec defs in
-        let vars, change = Infer.infer_let_rec ~loc st.context defs in
+        let vars, change = Infer.infer_let_rec ~loc (create_infer_state st) defs in
         let ctx = List.fold_right (fun (x, ty_sch) ctx -> Ctx.extend ctx x ty_sch) vars st.context in
         let top_change = Common.compose st.change change in
         let sch_change (ctx, ty, cnstrs) =
