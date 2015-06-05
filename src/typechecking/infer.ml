@@ -222,16 +222,12 @@ let rec infer_expr env (e, loc) =
       in
       let ctxs, chngs = List.fold_right infer ops ([], []) in
 
-      let make_dirt op (ops_in, ops_out, chngs) =
+      let make_dirt op (ops_in, ops_out) =
         let r_in = Type.fresh_region_param () in
         let r_out = Type.fresh_region_param () in
-        let chngs = [
-          Scheme.region_param_less r_in r_out
-        ] @ chngs
-        in
-        (op, r_in) :: ops_in, (op, r_out) :: ops_out, chngs
+        (op, r_in) :: ops_in, (op, r_out) :: ops_out
       in
-      let ops_in, ops_out, chngs_ops = List.fold_right make_dirt (Common.uniq (List.map fst ops)) ([], [], []) in
+      let ops_in, ops_out = List.fold_right make_dirt (Common.uniq (List.map fst ops)) ([], []) in
 
       let ctx_val, ty_val, drty_val, cnstrs_val = infer_abstraction env a_val in
       let ctx_fin, ty_fin, drty_fin, cnstrs_fin = infer_abstraction env a_fin in
@@ -251,7 +247,7 @@ let rec infer_expr env (e, loc) =
         dirty_less ~loc drty_fin (ty_out, drt_out);
         just cnstrs_val;
         just cnstrs_fin
-      ] @ chngs_ops @ chngs)
+      ] @ chngs)
 
   in
   (* Print.debug "%t : %t" (Syntax.print_expression (e, loc)) (Scheme.print_ty_scheme ty_sch); *)
