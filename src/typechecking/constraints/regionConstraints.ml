@@ -1,4 +1,4 @@
-module RegionPoset = Poset.Make(struct
+module RegionPoset = SkelPoset.Make(struct
   type t = Type.region_param
   let compare = Pervasives.compare
 end)

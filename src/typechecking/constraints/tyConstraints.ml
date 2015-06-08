@@ -1,4 +1,4 @@
-module TyParam = Poset.Make(struct
+module TyParam = SkelPoset.Make(struct
   type t = Type.ty_param
   let compare = Pervasives.compare
 end)

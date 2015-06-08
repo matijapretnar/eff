@@ -1,4 +1,4 @@
-module DirtPoset = Poset.Make(struct
+module DirtPoset = SkelPoset.Make(struct
   type t = Type.dirt_param
   let compare = Pervasives.compare
 end)
