@@ -35,6 +35,10 @@ struct
     let (inx, _) = get_aux x g in
     S.elements inx
 
+  let get_succ_aux x g =
+    let (_, outx) = get_aux x g in
+    S.elements outx
+
   let union = G.fold G.add
 
   let add_edge_aux x y g =
@@ -65,6 +69,17 @@ struct
     | g :: gs ->
         if mem x g then
           get_prec_aux x g
+        else
+          get gs
+    in
+    get g
+
+  let get_succ x g =
+    let rec get = function
+    | [] -> []
+    | g :: gs ->
+        if mem x g then
+          get_succ_aux x g
         else
           get gs
     in
@@ -124,5 +139,16 @@ struct
     List.filter (fun g -> g <> G.empty) (List.map collect_aux grph)
 
   let union grph1 grph2 = Common.uniq (grph1 @ grph2)
+
+
+
+  let print pp grph ppf =
+    let print_bound x1 x2 =
+      Print.print ppf "%t %s %t" (pp x1) (Symbols.less ()) (pp x2)
+    in
+    let print_skeleton grph =
+      fold_edges (fun p q _ -> print_bound p q) grph ()
+    in
+    List.iter print_skeleton grph
 
 end

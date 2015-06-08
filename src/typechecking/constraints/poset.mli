@@ -19,6 +19,8 @@ sig
 
   val get_prec : elt -> t -> elt list
 
+  val get_succ : elt -> t -> elt list
+
   val map : (elt -> elt) -> t -> t
 
   val garbage_collect : elt list -> elt list -> t -> t
@@ -28,4 +30,6 @@ sig
   val union : t -> t -> t
 
   val shares_skeleton : t -> elt -> elt list -> bool
+
+  val print : (elt -> Format.formatter -> unit) -> t -> Format.formatter -> unit
 end

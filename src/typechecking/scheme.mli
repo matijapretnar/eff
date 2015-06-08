@@ -6,7 +6,7 @@ type change
 val refresh : ty_scheme -> ty_scheme
 
 val region_param_less : Type.region_param -> Type.region_param -> change
-val add_instance_constraint : Type.instance_param -> Type.region_param -> change
+val add_full_region : Type.region_param -> change
 val just : Constraints.t -> change
 val dirt_less : loc:Location.t -> Type.dirt -> Type.dirt -> change
 val ty_less : loc:Location.t -> Type.ty -> Type.ty -> change

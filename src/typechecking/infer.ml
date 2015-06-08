@@ -200,8 +200,9 @@ let rec infer_expr env e =
       | None -> Error.typing ~loc "Unbound effect %s" eff
       | Some (ty_par, ty_res) ->
           let drt = {Type.ops = [eff, r]; Type.rest = Type.fresh_dirt_param ()} in
-          [], Type.Arrow (ty_par, (ty_res, drt)), Constraints.empty
-            (* XXX r is not empty *)
+          unify [] (Type.Arrow (ty_par, (ty_res, drt))) [
+            Scheme.add_full_region r
+          ]
       end
 
   | Syntax.Handler {Syntax.operations = ops; Syntax.value = a_val; Syntax.finally = a_fin} -> 

@@ -13,11 +13,11 @@ let empty = {
 let add_ty_constraint ty1 ty2 cnstrs =
   { cnstrs with ty = TyConstraints.add_edge ty1 ty2 cnstrs.ty }
 
-let add_region_constraint r1 r2 rs cnstrs =
-  { cnstrs with region = RegionConstraints.add_region_constraint r1 r2 rs cnstrs.region }
+let add_region_constraint r1 r2 cnstrs =
+  { cnstrs with region = RegionConstraints.add_region_constraint r1 r2 cnstrs.region }
 
-let add_instance_constraint inst r rs cnstrs =
-  { cnstrs with region = RegionConstraints.add_instance_constraint inst r rs cnstrs.region }
+let add_full_region r cnstrs =
+  { cnstrs with region = RegionConstraints.add_full_region r cnstrs.region }
 
 let add_dirt_constraint d1 d2 cnstrs =
   { cnstrs with dirt = DirtConstraints.add_edge d1 d2 cnstrs.dirt }
