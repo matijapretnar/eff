@@ -1,3 +1,4 @@
 val h : α ⟹  α = <handler>
 val g : α ⟹  α = <handler>
-Runtime error (unknown location): invalid comparison with <
+Runtime error (unknown location):
+invalid comparison with <

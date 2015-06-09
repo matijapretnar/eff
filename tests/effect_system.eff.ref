@@ -1,7 +1,7 @@
-- : (unit ⟹  α) ⟶  eff ⟶  α = <fun>
-- : (unit ⟶  α) ⟶  (unit ⟶  α) ⟶  eff ⟶  α = <fun>
-- : eff ⟶  unit = <fun>
-- : α ⟶  β ⟶  unit = <fun>
-- : α ⟶  β ⟶  unit = <fun>
+- : (unit ⟹  α) ⟶  α = <fun>
+- : (unit ⟶  α) ⟶  (unit ⟶  α) ⟶  α = <fun>
+- : unit ⟶  unit = <fun>
+- : unit ⟶  unit = <fun>
+- : unit ⟶  unit = <fun>
 - : (unit ⟶  α) ⟶  (α ⟹  β) ⟶  β = <fun>
-- : eff ⟶  (unit ⟶  α) ⟶  α = <fun>
+- : (unit ⟶  α) ⟶  α = <fun>

@@ -1,4 +1,0 @@
-(* This used to force x to be polymorphic. *)
-let x = new ref;;
-let h = handler x#lookup _ _ -> ();;
-#type x;;

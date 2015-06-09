@@ -1,3 +1,0 @@
-val x : _α ref = <instance #6>
-val h : unit ⟹  unit = <handler>
-- : _α ref

@@ -3,18 +3,6 @@ val less2 : bool = false
 val less3 : bool = false
 val test_equal_int : bool = true
 val test_equal_float : bool = true
-val whatis_std : channel = <standard I/O>
-val whatis_raise : α exception ⟶  α ⟶  β = <fun>
-val whatis_exception : string ⟶  α exception = <fun>
-val whatis_divisionByZero : unit exception = <division by zero>
-val whatis_invalidArgument : string exception = <invalid argument>
-val whatis_assertionFault : unit exception = <assertion fault>
-val whatis_failure : _α exception = <failure>
-val test_divisionByZero : string = "foo"
-val test_invalidArgument : string = "invalidArgument was here"
-Check (file "./test_pervasives.eff", line 34, char 1): Operation <failure>.raise "They say it's all about flirting."
-- : unit = ()
-val test_failure : int = 42
 - : unit = ()
 val tilda_minus : int = -1
 val tilda_minus_dot2 : float = -3.14159
@@ -26,9 +14,11 @@ val test_minus : int = 19
 val test_minus_tilda_minus : int = 65
 val test_mod1 : int = 2
 val test_mod2 : int = 0
-Check (file "./test_pervasives.eff", line 60, char 1): Operation <division by zero>.raise ()
+Check (file "./test_pervasives.eff", line 39, char 1):
+Call DivisionByZero ()
 - : unit = ()
-Check (file "./test_pervasives.eff", line 62, char 1): Operation <division by zero>.raise ()
+Check (file "./test_pervasives.eff", line 41, char 1):
+Call DivisionByZero ()
 - : unit = ()
 val test_plus_dot : float = 5.84
 val test_times_dot : float = 8.478
@@ -36,10 +26,12 @@ val test_minus_dot : float = 0.44
 val test_div_dot : float = 1.16296
 val test_div_dot_zero : float = infinity
 val test_div : int = 33
-Check (file "./test_pervasives.eff", line 76, char 1): Operation <division by zero>.raise ()
+Check (file "./test_pervasives.eff", line 55, char 1):
+Call DivisionByZero ()
 - : unit = ()
 val test_zero_div : int = 0
-Check (file "./test_pervasives.eff", line 80, char 1): Operation <division by zero>.raise ()
+Check (file "./test_pervasives.eff", line 59, char 1):
+Call DivisionByZero ()
 - : unit = ()
 val test_carron : string = "cherrypie"
 val test_to_string1 : string = "13"
@@ -62,7 +54,8 @@ val test_take : int list = [2; 5; 8; 11; 14; 17; 20; 23; 26; 29; 32; 35; 38;
                             41; 44; 47; 50; 53; 56; 59; 62]
 val test_fold_left : int = 89
 val test_fold_right : int = 161
-Check (file "./test_pervasives.eff", line 122, char 27): "iter [1; 2; 3; 4; 5]"
+Check (file "./test_pervasives.eff", line 101, char 27):
+"iter [1; 2; 3; 4; 5]"
 val test_iter : unit = ()
 val test_forall : bool = false
 val test_exists : bool = true
@@ -71,16 +64,19 @@ val test_filter : int list = [4; 5]
 val test_complement : int list = [1; 3; 5; 6]
 val test_intersection : int list = [2; 4]
 val test_zip1 : (int × string) list = [(1, "a"); (2, "b"); (3, "c")]
-Check (file "./test_pervasives.eff", line 138, char 1): Operation <invalid argument>.raise "zip: length mismatch"
+Check (file "./test_pervasives.eff", line 117, char 1):
+Call InvalidArgument "zip: length mismatch"
 - : unit = ()
 val test_reverse : int list = [5; 4; 3; 2; 1]
 val test_at : int list = [1; 2; 3; 4; 5; 6]
 val test_length : int = 5
 val test_head : int = 1
-Check (file "./test_pervasives.eff", line 148, char 1): Operation <invalid argument>.raise "head: empty list"
+Check (file "./test_pervasives.eff", line 127, char 1):
+Call InvalidArgument "head: empty list"
 - : unit = ()
 val test_tail : int list = [2; 3; 4]
-Check (file "./test_pervasives.eff", line 152, char 1): Operation <invalid argument>.raise "tail: empty list"
+Check (file "./test_pervasives.eff", line 131, char 1):
+Call InvalidArgument "tail: empty list"
 - : unit = ()
 val test_abs : int × int × int = (5, 5, 5)
 val test_min : int = 1
@@ -94,14 +90,9 @@ val test_id_id : _α ⟶  _α = <fun>
 val test_compose : int = 196
 val test_fst : string = "foo"
 val test_snd : int = 4
-Does this work?- : unit = ()
-Check (file "./test_pervasives.eff", line 180, char 1): Operation <standard I/O>.read ()
+Check (file "./test_pervasives.eff", line 157, char 1):
+Call Print "Does this work?"
 - : unit = ()
-Check (file "./test_pervasives.eff", line 182, char 1): Operation <failure>.raise "The cows are home."
+Check (file "./test_pervasives.eff", line 159, char 1):
+Call Read ()
 - : unit = ()
-Check (file "./test_pervasives.eff", line 184, char 1): Operation <random number generator>.int 42
-- : unit = ()
-Check (file "./test_pervasives.eff", line 186, char 1): Operation <random number generator>.float 42.
-- : unit = ()
-val test_state : int = 42
-val test_ref : int = 15

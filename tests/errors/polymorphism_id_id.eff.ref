@@ -1,3 +1,4 @@
 val u : α ⟶  α = <fun>
 val v : _α ⟶  _α = <fun>
-Typing error (file "./errors/polymorphism_id_id.eff", line 3, char 1): This expression has type int but it should have type string.
+Typing error (file "./errors/polymorphism_id_id.eff", line 3, char 1):
+This expression has type int but it should have type string.

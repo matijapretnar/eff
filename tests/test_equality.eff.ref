@@ -4,6 +4,4 @@
 - : bool = false
 - : bool = false
 - : bool = true
-- : string × bool × bool × bool = ("no resource", true, false, true)
-- : string × bool × bool × bool = ("resource", true, false, true)
 - : string × bool × bool × bool = ("nested", true, false, true)
