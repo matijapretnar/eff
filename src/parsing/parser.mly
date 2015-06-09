@@ -216,7 +216,7 @@ plain_app_term:
       | Variant (lbl, None), [t] -> Variant (lbl, Some t)
       | Variant (lbl, _), _ -> Error.syntax ~loc:(snd t) "Label %s applied to too many argument" lbl
       | _, _ ->
-        let apply ((_, loc1) as t1) ((_, loc2) as t2) = (Apply(t1, t2), Location.join loc1 loc2) in
+        let apply ((_, loc1) as t1) ((_, loc2) as t2) = (Apply(t1, t2), Location.merge loc1 loc2) in
         fst (List.fold_left apply t ts)
     }
   | t = plain_prefix_term
@@ -246,7 +246,7 @@ plain_simple_term:
     {
       let nil = (Variant (Common.nil, None), Location.make $endpos $endpos) in
       let cons ((_, loc_t) as t) ((_, loc_ts) as ts) =
-        let loc = Location.join loc_t loc_ts in
+        let loc = Location.merge loc_t loc_ts in
         (Variant (Common.cons, Some (Tuple [t; ts], loc)), loc) in
       fst (List.fold_right cons ts nil)
     }
@@ -346,7 +346,7 @@ plain_simple_pattern:
     {
       let nil = (Pattern.Variant (Common.nil, None), Location.make $endpos $endpos) in
       let cons ((_, loc_t) as t) ((_, loc_ts) as ts) =
-        let loc = Location.join loc_t loc_ts in
+        let loc = Location.merge loc_t loc_ts in
         (Pattern.Variant (Common.cons, Some (Pattern.Tuple [t; ts], loc)), loc)
       in
         fst (List.fold_right cons ts nil)

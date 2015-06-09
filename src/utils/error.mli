@@ -5,21 +5,21 @@
     or location.
 
     Errors are raised through helper functions that take an optional location
-    and a message in form of a format string. For example, a typing error can be
-    raised by [Error.typing ~loc "Type %t is not a product." (print_ty t)]. *)
+    and a message in form of a format string, for example:
+    [Error.runtime ~loc "Unhandled effect %t" (Effect.print eff)]. *)
 
-(** Type of error details. *)
-type details
+(** Type of errors. *)
+type t
 
-(** Print error details. *)
-val print : details -> unit
+(** Print an error. *)
+val print : t -> unit
 
-(** Exception representing all possible Andromeda errors. *)
-exception Error of details
+(** Exception representing all possible Eff errors. *)
+exception Error of t
 
 (** Fatal errors are errors over which Eff has no control, for example when
     a file cannot be opened. *)
-val fatal : ('a, Format. formatter, unit, 'b) format4 -> 'a
+val fatal : ?loc:Location.t -> ('a, Format. formatter, unit, 'b) format4 -> 'a
 
 (** Syntax errors occur during lexing, parsing, or desugaring into Eff's core
     language. *)
@@ -29,6 +29,6 @@ val syntax : loc:Location.t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 val typing : loc:Location.t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 
 (** Runtime errors are usually prevented by type-checking. Otherwise, they occur
-    when pattern match is not exhaustive, or when an externaly defined function
+    when pattern match is not exhaustive, or when an externally defined function
     has an incorrectly assigned type. *)
-val runtime : ('a, Format.formatter, unit, 'b) format4 -> 'a
+val runtime : ?loc:Location.t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
