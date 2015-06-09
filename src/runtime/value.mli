@@ -1,5 +1,5 @@
 type value =
-  | Const of Common.const
+  | Const of Const.t
   | Tuple of value list
   | Record of (Common.field, value) Common.assoc
   | Variant of Common.label * value option

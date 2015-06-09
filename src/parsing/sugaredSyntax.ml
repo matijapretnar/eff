@@ -7,7 +7,7 @@ type term = plain_term * Location.t
 and plain_term =
   | Var of variable
   (** variables *)
-  | Const of Common.const
+  | Const of Const.t
   (** integers, strings, booleans, and floats *)
   | Tuple of term list
   (** [(t1, t2, ..., tn)] *)

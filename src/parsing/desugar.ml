@@ -265,19 +265,19 @@ let rec expression ctx (t, loc) =
 and computation ctx (t, loc) =
   let if_then_else e c1 c2 =
     Syntax.Match (e, [
-      (Pattern.Const (C.Boolean true), c1.Syntax.location), c1;
-      (Pattern.Const (C.Boolean false), c2.Syntax.location), c2
+      (Pattern.Const (Const.of_true), c1.Syntax.location), c1;
+      (Pattern.Const (Const.of_false), c2.Syntax.location), c2
     ])
   in
   let w, c = match t with
     | Sugared.Apply ((Sugared.Apply ((Sugared.Var "&&", loc1), t1), loc2), t2) ->
       let w1, e1 = expression ctx t1 in
       let c2 = computation ctx t2 in
-          w1, if_then_else e1 c2 (Syntax.add_loc (Syntax.Value (Syntax.add_loc (Syntax.Const (C.Boolean false)) loc2)) loc2)
+          w1, if_then_else e1 c2 (Syntax.add_loc (Syntax.Value (Syntax.add_loc (Syntax.Const Const.of_false) loc2)) loc2)
     | Sugared.Apply ((Sugared.Apply ((Sugared.Var "||", loc1), t1), loc2), t2) ->
       let w1, e1 = expression ctx t1 in
       let c2 = computation ctx t2 in
-          w1, if_then_else e1 (Syntax.add_loc (Syntax.Value (Syntax.add_loc (Syntax.Const (C.Boolean true)) loc2)) loc2) c2
+          w1, if_then_else e1 (Syntax.add_loc (Syntax.Value (Syntax.add_loc (Syntax.Const Const.of_true) loc2)) loc2) c2
     | Sugared.Apply (t1, t2) ->
         let w1, e1 = expression ctx t1 in
         let w2, e2 = expression ctx t2 in

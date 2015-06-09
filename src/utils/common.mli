@@ -8,14 +8,7 @@ type dirtparam = int
 type regionparam = int
 val id : 'a -> 'a
 val compose : ('b -> 'c) -> ('a -> 'b) -> ('a -> 'c)
-type const =
-    Integer of Big_int.big_int
-  | String of string
-  | Boolean of bool
-  | Float of float
 type comparison = Less | Equal | Greater | Invalid
-val compare_const : const -> const -> comparison
-val equal_const : const -> const -> bool
 val cons : string
 val nil : string
 type ('a, 'b) assoc = ('a * 'b) list
@@ -34,5 +27,4 @@ val fresh : (int -> 'a) -> unit -> 'a
 val uniq : 'a list -> 'a list
 val split : int -> 'a list -> 'a list * 'a list
 val diff : 'a list -> 'a list -> 'a list
-val print_const : const -> Format.formatter -> unit
 val assoc_flatten : ('a * 'b) list -> ('a * 'b list) list

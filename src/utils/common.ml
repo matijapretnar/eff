@@ -14,47 +14,7 @@ type regionparam = int (** region parameters *)
 let id x = x
 let compose f g x = f (g x)
 
-(** Primitive constants *)
-type const =
-  | Integer of Big_int.big_int
-  | String of string
-  | Boolean of bool
-  | Float of float
-
 type comparison = Less | Equal | Greater | Invalid
-
-let compare_const c1 c2 =
-  let cmp x y =
-    let r = Pervasives.compare x y in
-      if r < 0 then Less
-      else if r > 0 then Greater
-      else Equal
-  in
-    match c1 with
-      | Integer k ->
-        (match c2 with
-          | Integer k' -> 
-            let r = Big_int.compare_big_int k k' in
-              if r < 0 then Less
-              else if r > 0 then Greater
-              else Equal
-          | String _ | Boolean _ | Float _ -> Less)
-    | String s ->
-      (match c2 with
-        | Integer _ -> Greater
-        | String s' -> cmp s s'
-        | Boolean _ | Float _ -> Less)
-    | Boolean b ->
-      (match c2 with
-        | Integer _ | String _ -> Greater
-        | Boolean b' -> cmp b b'
-        | Float _ -> Less)
-    | Float x ->
-      (match c2 with
-        | Integer _ | String _ | Boolean _ -> Greater
-        | Float x' -> cmp x x')
-
-let equal_const c1 c2 = (compare_const c1 c2 = Equal)
 
 (** Variants for the built-in list type *)
 let cons = "$1cons"
@@ -151,14 +111,6 @@ let split n lst =
 
 (** [diff lst1 lst2] returns [lst1] with all members of [lst2] removed *)
 let diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
-
-
-let print_const c ppf =
-  match c with
-  | Integer k -> Format.fprintf ppf "%s" (Big_int.string_of_big_int k)
-  | String s -> Format.fprintf ppf "%S" s
-  | Boolean b -> Format.fprintf ppf "%B" b
-  | Float f -> Format.fprintf ppf "%F" f
 
 let assoc_flatten lst =
   let add (k, v) lst =

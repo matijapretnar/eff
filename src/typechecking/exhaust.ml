@@ -23,7 +23,7 @@ type cons =
   | Tuple of int
   | Record of C.field list
   | Variant of C.label * bool
-  | Const of C.const
+  | Const of Const.t
   | Wildcard
 
 (* The number of subpatterns required by a pattern constructor. *)
@@ -79,25 +79,25 @@ let find_constructors lst =
           (* Try to find an unmatched value in a countable set of constants. *)
           | Const c ->
              let first = function
-               | C.Integer _ -> C.Integer Big_int.zero_big_int
-               | C.String _ -> C.String ""
-               | C.Boolean _ -> C.Boolean false
-               | C.Float _ -> C.Float 0.0
+               | Const.Integer _ -> Const.of_integer Big_int.zero_big_int
+               | Const.String _ -> Const.of_string ""
+               | Const.Boolean _ -> Const.of_false
+               | Const.Float _ -> Const.of_float 0.0
              in
              let next = function
-               | C.Integer v -> C.Integer (Big_int.succ_big_int v)
-               | C.String v -> C.String (v ^ "*")
-               | C.Boolean v -> C.Boolean (not v)
-               | C.Float v -> C.Float (v +. 1.0)
+               | Const.Integer v -> Const.of_integer (Big_int.succ_big_int v)
+               | Const.String v -> Const.of_string (v ^ "*")
+               | Const.Boolean v -> Const.of_boolean (not v)
+               | Const.Float v -> Const.of_float (v +. 1.0)
              in
              (* Only booleans are considered finite. *)
              let is_last = function
-               | C.Boolean b -> b
+               | Const.Boolean b -> b
                | _ -> false
              in
              let rec find c =
                if (is_last c) then [] else begin
-                 if List.exists (function Const c' -> C.equal_const c c' | _ -> false) present
+                 if List.exists (function Const c' -> Const.equal c c' | _ -> false) present
                  then find (next c) else [Const c]
                end
              in
@@ -134,7 +134,7 @@ let specialize_vector ~loc con = function
               | Some p -> Some (p :: lst)
               | None -> Some lst
             end
-        | Const c, P.Const c' when Common.equal_const c c' -> Some lst
+        | Const c, P.Const c' when Const.equal c c' -> Some lst
         | _, (P.Nonbinding | P.Var _) -> Some ((C.repeat (P.Nonbinding, loc) (arity con)) @ lst)
         | _, _ -> None
       end

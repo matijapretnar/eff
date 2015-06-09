@@ -1,5 +1,5 @@
 type value =
-  | Const of Common.const
+  | Const of Const.t
   | Tuple of value list
   | Record of (Common.field, value) Common.assoc
   | Variant of Common.label * value option
@@ -16,19 +16,19 @@ let unit_value = Tuple []
 let unit_result = Value unit_value
 
 let to_bool = function
-  | Const (Common.Boolean b) -> b
+  | Const (Const.Boolean b) -> b
   | _ -> Error.runtime "A boolean value expected."
 
 let to_int = function
-  | Const (Common.Integer n) -> n
+  | Const (Const.Integer n) -> n
   | _ -> Error.runtime "An integer value expected."
 
 let to_float = function
-  | Const (Common.Float f) -> f
+  | Const (Const.Float f) -> f
   | _ -> Error.runtime "A floating-point value expected."
 
 let to_str = function
-  | Const (Common.String s) -> s
+  | Const (Const.String s) -> s
   | _ -> Error.runtime "A string value expected."
 
 let to_handler = function
@@ -40,7 +40,7 @@ let print_effect eff ppf = Format.fprintf ppf "%s" eff
 let rec print_value ?max_level v ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match v with
-  | Const c -> Common.print_const c ppf
+  | Const c -> Const.print c ppf
   | Tuple lst -> Print.tuple print_value lst ppf
   | Record lst -> Print.record print_value lst ppf
   | Variant (lbl, None) when lbl = Common.nil -> print "[]"

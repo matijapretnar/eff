@@ -1,9 +1,9 @@
 module V = Value
 
-let from_bool b = V.Const (Common.Boolean b)
-let from_int n = V.Const (Common.Integer n)
-let from_str s = V.Const (Common.String s)
-let from_float f = V.Const (Common.Float f)
+let from_bool b = V.Const (Const.of_boolean b)
+let from_int n = V.Const (Const.of_integer n)
+let from_str s = V.Const (Const.of_string s)
+let from_float f = V.Const (Const.of_float f)
 let from_fun f = V.Closure f
 
 let value_bool b = V.Value (from_bool b)
@@ -36,7 +36,7 @@ let rec compare v1 v2 =
     | V.Const c ->
       (match v2 with
         | V.Closure _ | V.Handler _ -> Common.Invalid
-        | V.Const c' -> Common.compare_const c c'
+        | V.Const c' -> Const.compare c c'
         | V.Tuple _ | V.Record _ | V.Variant _ -> Common.Less)
     | V.Tuple lst ->
       (match v2 with

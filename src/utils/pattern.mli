@@ -5,7 +5,7 @@ and 'var plain_t =
   | Tuple of ('var t) list
   | Record of (Common.field * 'var t) list
   | Variant of Common.label * ('var t) option
-  | Const of Common.const
+  | Const of Const.t
   | Nonbinding
 val pattern_vars : 'var t -> 'var list
 val linear_pattern : 'var t -> bool

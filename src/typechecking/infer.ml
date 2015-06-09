@@ -21,10 +21,10 @@ let simple ty = ([], ty, Constraints.empty)
 let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_dirt_param () }
 
 let ty_of_const = function
-  | Common.Integer _ -> Type.int_ty
-  | Common.String _ -> Type.string_ty
-  | Common.Boolean _ -> Type.bool_ty
-  | Common.Float _ -> Type.float_ty
+  | Const.Integer _ -> Type.int_ty
+  | Const.String _ -> Type.string_ty
+  | Const.Boolean _ -> Type.bool_ty
+  | Const.Float _ -> Type.float_ty
 
 let infer_effect env eff =
   try

@@ -20,7 +20,7 @@ let add_loc t loc = {
 type expression = plain_expression annotation
 and plain_expression =
   | Var of variable
-  | Const of Common.const
+  | Const of Const.t
   | Tuple of expression list
   | Record of (Common.field, expression) Common.assoc
   | Variant of Common.label * expression option
@@ -61,7 +61,7 @@ let rec print_pattern ?max_level (p,_) ppf =
   match p with
   | Pattern.Var x -> print "%t" (Variable.print x)
   | Pattern.As (p, x) -> print "%t as %t" (print_pattern p) (Variable.print x)
-  | Pattern.Const c -> Common.print_const c ppf
+  | Pattern.Const c -> Const.print c ppf
   | Pattern.Tuple lst -> Print.tuple print_pattern lst ppf
   | Pattern.Record lst -> Print.record print_pattern lst ppf
   | Pattern.Variant (lbl, None) when lbl = Common.nil -> print "[]"
@@ -100,7 +100,7 @@ and print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match e.term with
   | Var x -> print "%t" (Variable.print x)
-  | Const c -> print "%t" (Common.print_const c)
+  | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record lst -> Print.record print_expression lst ppf
   | Variant (lbl, None) -> print "%s" lbl

@@ -263,13 +263,13 @@ plain_simple_term:
 
 const_term:
   | n = INT
-    { Common.Integer n }
+    { Const.of_integer n }
   | str = STRING
-    { Common.String str }
+    { Const.of_string str }
   | b = BOOL
-    { Common.Boolean b }
+    { Const.of_boolean b }
   | f = FLOAT
-    { Common.Float f }
+    { Const.of_float f }
 
 match_case:
   | p = pattern ARROW t = term

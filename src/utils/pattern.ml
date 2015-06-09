@@ -5,7 +5,7 @@ and 'var plain_t =
   | Tuple of ('var t) list
   | Record of (Common.field * 'var t) list
   | Variant of Common.label * ('var t) option
-  | Const of Common.const
+  | Const of Const.t
   | Nonbinding
 (* Changing the datatype [plain_t] will break [specialize_vector] in [exhaust.ml] because
    of wildcard matches there. *)
