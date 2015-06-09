@@ -1,0 +1,14 @@
+- : int = 10
+val choose_all : α ⟹  α list = <handler>
+- : int list = [10; 5; 20; 15]
+val choose_all2 : α ⟹  α list = <handler>
+- : int list list = [[10; 5]; [20; 15]]
+- : int list list = [[10; 20]; [5; 15]]
+- : int list list = [[10; 20]; [10; 15]; [5; 20]; [5; 15]]
+val choose_int : int ⟶  α ⟶  int = <fun>
+val sqrt : α ⟶  int option = <fun>
+val pythagorean : int ⟶  int ⟶  int × int × int = <fun>
+val backtrack : α ⟹  α = <handler>
+val choose_all : α ⟹  α list = <handler>
+- : (int × int × int) list = [(5, 12, 13); (6, 8, 10); (8, 15, 17);
+                                (9, 12, 15)]

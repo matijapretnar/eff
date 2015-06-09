@@ -1,0 +1,9 @@
+val better_state : int ⟶  (α ⟹  α) = <fun>
+val transaction : α ⟹  α = <handler>
+Check (file "./state.eff", line 20, char 24):
+20
+Check (file "./state.eff", line 23, char 26):
+30
+Check (file "./state.eff", line 29, char 37):
+20
+- : int = 0
