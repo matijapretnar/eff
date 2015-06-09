@@ -1,4 +1,3 @@
-type variable = string
 type opsym = string
 type effect = string
 type label = string

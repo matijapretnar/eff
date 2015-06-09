@@ -1,9 +1,11 @@
 (** Abstract syntax of eff terms, types, and toplevel commands. *)
 
 (** Terms *)
+type variable = string
+
 type term = plain_term * Location.t
 and plain_term =
-  | Var of Common.variable
+  | Var of variable
   (** variables *)
   | Const of Common.const
   (** integers, strings, booleans, and floats *)
@@ -22,9 +24,9 @@ and plain_term =
   | Handler of handler
   (** [handler clauses], where [clauses] are described below. *)
 
-  | Let of (Common.variable Pattern.t * term) list * term
+  | Let of (variable Pattern.t * term) list * term
   (** [let p1 = t1 and ... and pn = tn in t] *)
-  | LetRec of (Common.variable * term) list * term
+  | LetRec of (variable * term) list * term
   (** [let rec f1 p1 = t1 and ... and fn pn = tn in t] *)
   | Match of term * abstraction list
   (** [match t with p1 -> t1 | ... | pn -> tn] *)
@@ -32,7 +34,7 @@ and plain_term =
   (** [if t then t1 else t2] *)
   | While of term * term
   (** [while t1 do t2 done] *)
-  | For of Common.variable * term * term * term * bool
+  | For of variable * term * term * term * bool
   (** [for x = t1 to t2 do t done] or [for x = t1 downto t2 do t done] *)
   | Apply of term * term
   (** [t1 t2] *)
@@ -50,9 +52,9 @@ and handler = {
   (** [finally p -> t] *)
 }
 
-and abstraction = Common.variable Pattern.t * term
+and abstraction = variable Pattern.t * term
 
-and abstraction2 = Common.variable Pattern.t * Common.variable Pattern.t * term
+and abstraction2 = variable Pattern.t * variable Pattern.t * term
 
 and operation = Common.opsym
 
@@ -88,11 +90,11 @@ type toplevel = plain_toplevel * Location.t
 and plain_toplevel =
   | Tydef of (Common.tyname, (Common.typaram list * tydef)) Common.assoc
   (** [type t = tydef] *)
-  | TopLet of (Common.variable Pattern.t * term) list
+  | TopLet of (variable Pattern.t * term) list
   (** [let p1 = t1 and ... and pn = tn] *)
-  | TopLetRec of (Common.variable * term) list
+  | TopLetRec of (variable * term) list
   (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)
-  | External of Common.variable * ty * Common.variable
+  | External of variable * ty * variable
   (** [external x : t = "ext_val_name"] *)
   | DefEffect of Common.effect * (ty * ty)
   (** [effect Eff : ty1 -> t2] *)

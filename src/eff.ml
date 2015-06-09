@@ -98,7 +98,7 @@ let infer_top_comp st c =
   let top_change = Common.compose st.change change in
   let ctx = match c.Syntax.term with
   | Syntax.Value _ -> ctx'
-  | _ -> (Desugar.fresh_variable (), ty') :: ctx'
+  | _ -> (Desugar.fresh_variable (Some "$top_comp"), ty') :: ctx'
   in
   let drty_sch = top_change (ctx, (ty', drt'), cnstrs') in
 
@@ -160,7 +160,7 @@ let rec exec_cmd interactive st (d,loc) =
                        match Eval.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.printf "@[val %t : %t = %t@]@." (Syntax.print_variable x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
+                         Format.printf "@[val %t : %t = %t@]@." (Syntax.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
             vars
         end;
         {
@@ -181,7 +181,7 @@ let rec exec_cmd interactive st (d,loc) =
         List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
         let env = Eval.extend_let_rec st.environment defs in
           if interactive then begin
-            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Syntax.print_variable x) (Scheme.print_ty_scheme (sch_change tysch))) vars
+            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Syntax.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch))) vars
           end;
         {
           st with

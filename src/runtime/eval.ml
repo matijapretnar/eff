@@ -5,19 +5,15 @@ module V = Value
 
 exception PatternMatch of Location.t
 
-module EnvMap = Map.Make(
-  struct
-    type t = int 
-    let compare = Pervasives.compare
-  end)
+module EnvMap = Map.Make(Syntax.Variable)
 
 type env = Value.value EnvMap.t
 
 let initial = EnvMap.empty
 
-let update (x, _) = EnvMap.add x
+let update x = EnvMap.add x
 
-let lookup (x, _) env =
+let lookup x env =
   try
     Some (EnvMap.find x env)
   with
@@ -151,7 +147,7 @@ and veval env e =
   | Syntax.Var x ->
       begin match lookup x env with
       | Some v -> v
-      | None -> Error.runtime "Name %t is not defined." (Syntax.print_variable x)
+      | None -> Error.runtime "Name %t is not defined." (Syntax.Variable.print x)
       end
   | Syntax.Const c -> V.Const c
   | Syntax.Tuple es -> V.Tuple (List.map (veval env) es)

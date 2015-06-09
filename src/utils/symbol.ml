@@ -31,5 +31,5 @@ struct
     incr count;
     (!count, ann)
 
-  let print (n, _) ppf = Format.pp_print_int n
+  let print (n, _) ppf = Format.pp_print_int ppf n
 end

@@ -33,7 +33,7 @@
 %token LPAREN RPAREN LBRACK RBRACK LBRACE RBRACE
 %token COLON COMMA SEMI SEMISEMI EQUAL CONS
 %token BEGIN END
-%token <Common.variable> LNAME
+%token <string> LNAME
 %token UNDERSCORE AS
 %token <Big_int.big_int> INT
 %token <string> STRING

@@ -177,10 +177,12 @@ let tydefs ~loc defs =
 
 (** [fresh_variable ()] creates a fresh variable ["$gen1"], ["$gen2"], ... on
     each call *)
-let fresh_variable = Common.fresh (fun n -> (n, "$gen" ^ string_of_int n))
+let fresh_variable = function
+  | None -> Syntax.Variable.fresh "anon"
+  | Some x -> Syntax.Variable.fresh x
 
 let id_abstraction loc =
-  let x = fresh_variable () in
+  let x = fresh_variable (Some "$id_par") in
   ((Pattern.Var x, loc), (Syntax.add_loc (Syntax.Value (Syntax.add_loc (Syntax.Var x) loc)) loc))
 
 let pattern ?(forbidden=[]) (p, loc) =
@@ -190,10 +192,10 @@ let pattern ?(forbidden=[]) (p, loc) =
     if List.mem x !forbidden then
       Error.syntax ~loc "Variable %s occurs more than once in a pattern" x
     else
-      let (n, _) = fresh_variable () in
-      vars := (x, (n, x)) :: !vars;
+      let var = fresh_variable (Some x) in
+      vars := (x, var) :: !vars;
       forbidden := x :: !forbidden;
-      (n, x)
+      var
   in
   let rec pattern (p, loc) =
     let p = match p with
@@ -229,7 +231,7 @@ let rec expression ctx (t, loc) =
       let a = abstraction ctx a in
       [], Syntax.Lambda a
   | Sugared.Function cs ->
-      let x = fresh_variable () in
+      let x = fresh_variable (Some "$function") in
       let cs = List.map (abstraction ctx) cs in
       [], Syntax.Lambda ((Pattern.Var x, loc), Syntax.add_loc (Syntax.Match (Syntax.add_loc (Syntax.Var x) loc, cs)) loc)
   | Sugared.Handler cs ->
@@ -253,7 +255,7 @@ let rec expression ctx (t, loc) =
      order to catch any future constructs. *)
   | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
   | Sugared.Handle _ | Sugared.Conditional _ | Sugared.While _ | Sugared.For _ | Sugared.Check _ ->
-      let x = fresh_variable () in
+      let x = fresh_variable (Some "$bind") in
       let c = computation ctx (t, loc) in
       let w = [(Pattern.Var x, loc), c] in
       w, Syntax.Var x
@@ -301,7 +303,7 @@ and computation ctx (t, loc) =
     | Sugared.For (i, t1, t2, t, b) ->
       let w1, e1 = expression ctx t1 in
       let w2, e2 = expression ctx t2 in
-      let j = fresh_variable () in
+      let j = fresh_variable (Some "$for") in
       let c = computation ((i, j) :: ctx) t in
         w1 @ w2, Syntax.For (j, e1, e2, c, b)
     | Sugared.Check t ->
@@ -323,7 +325,7 @@ and computation ctx (t, loc) =
         let ctx', ns, _ = List.fold_right (fun (x, t) (ctx', ns, forbidden) ->
                                           if List.mem x forbidden then
                                             Error.syntax ~loc:(snd t) "Several definitions of %s" x;
-                                          let n = fresh_variable () in
+                                          let n = fresh_variable (Some x) in
                                           ((x, n) :: ctx', n :: ns, x :: forbidden)) defs (ctx, [], []) in
         let defs =
           List.fold_right (fun (p, (_, c)) defs ->
@@ -354,7 +356,7 @@ and let_rec ctx (e, loc) =
   match e with
   | Sugared.Lambda a -> abstraction ctx a
   | Sugared.Function cs ->
-    let x = fresh_variable () in
+    let x = fresh_variable (Some "$let_rec_function") in
     let cs = List.map (abstraction ctx) cs in
     (Pattern.Var x, loc), Syntax.add_loc (Syntax.Match (Syntax.add_loc (Syntax.Var x) loc, cs)) loc
   | _ -> Error.syntax ~loc "This kind of expression is not allowed in a recursive definition"
@@ -407,8 +409,7 @@ let top_let_rec defs =
   let ctx', ns, _ = List.fold_right (fun (x, t) (ctx', ns, forbidden) ->
                                     if List.mem x forbidden then
                                       Error.syntax ~loc:(snd t) "Several definitions of %s" x;
-                                    let (n, _) = fresh_variable () in
-                                    let n = (n, x) in
+                                    let n = fresh_variable (Some x) in
                                     ((x, n) :: ctx', n :: ns, x :: forbidden)) defs (!top_ctx, [], []) in
   let defs =
     List.fold_right (fun (p, (_, c)) defs ->
@@ -419,8 +420,7 @@ let top_let_rec defs =
 
 let external_ty x t =
   let _, t = fill_args t in
-  let (n, _) = fresh_variable () in
-  let n = (n, x) in
+  let n = fresh_variable (Some x) in
   top_ctx := (x, n) :: !top_ctx;
   let (ts, ds, rs) = syntax_to_core_params (free_params t) in
   n, ([], ty (ts, ds, rs) t, Constraints.empty)
