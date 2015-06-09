@@ -5,3 +5,6 @@
 - : unit ⟶  unit = <fun>
 - : (unit ⟶  α) ⟶  (α ⟹  β) ⟶  β = <fun>
 - : (unit ⟶  α) ⟶  α = <fun>
+- : (unit ⟶  α) ⟶ 
+    (unit ⟶  β) ⟶ 
+    (unit ⟶  β) × (unit ⟶  string) × (unit ⟶  string) = <fun>

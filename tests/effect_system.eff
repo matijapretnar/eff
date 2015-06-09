@@ -16,3 +16,5 @@ fun () ->
 fun f h -> with h handle f ();;
 
 fun f -> with (if true then handler #Op _ k -> k () else handler #Op' _ k -> k ()) handle f ();;
+
+fun f g -> ((fun () -> f (); g ()), (fun () -> f (); #Read ()), (fun () -> g (); #Read ()));;
