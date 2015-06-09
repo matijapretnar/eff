@@ -50,9 +50,47 @@ let universal_ty = Basic "_"
 let universal_dirty = (Basic "_", fresh_dirt ())
 
 
+type replacement = {
+  ty_param_repl : ty_param -> ty;
+  dirt_param_repl : dirt_param -> dirt;
+  region_param_repl : region_param -> region_param;
+}
+
+(** [replace_ty rpls ty] replaces type parameters in [ty] according to [rpls]. *)
+let rec replace_ty rpls = function
+  | Apply (ty_name, args) -> Apply (ty_name, replace_args rpls args)
+  | TyParam p -> rpls.ty_param_repl p
+  | Basic _ as ty -> ty
+  | Tuple tys -> Tuple (Common.map (replace_ty rpls) tys)
+  | Arrow (ty1, (ty2, drt)) ->
+      let ty1 = replace_ty rpls ty1 in
+      let drt = replace_dirt rpls drt in
+      let ty2 = replace_ty rpls ty2 in
+      Arrow (ty1, (ty2, drt))
+  | Handler (drty1, drty2) ->
+      let drty1 = replace_dirty rpls drty1 in
+      let drty2 = replace_dirty rpls drty2 in
+      Handler (drty1, drty2)
+
+and replace_dirt rpls drt =
+  let ops = Common.assoc_map rpls.region_param_repl drt.ops in
+  let { ops = new_ops; rest = new_rest } = rpls.dirt_param_repl drt.rest in
+  { ops = new_ops @ ops; rest = new_rest }
+
+and replace_dirty rpls (ty, drt) =
+  let ty = replace_ty rpls ty in
+  let drt = replace_dirt rpls drt in
+  (ty, drt)
+
+and replace_args rpls (tys, drts, rs) =
+  let tys = Common.map (replace_ty rpls) tys in
+  let drts = Common.map (replace_dirt rpls) drts in
+  let rs = Common.map rpls.region_param_repl rs in
+  (tys, drts, rs)
+
 type substitution = {
-  ty_param : ty_param -> ty;
-  dirt_param : dirt_param -> dirt;
+  ty_param : ty_param -> ty_param;
+  dirt_param : dirt_param -> dirt_param;
   region_param : region_param -> region_param;
   instance_param : instance_param -> instance_param;
 }
@@ -60,7 +98,7 @@ type substitution = {
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 let rec subst_ty sbst = function
   | Apply (ty_name, args) -> Apply (ty_name, subst_args sbst args)
-  | TyParam p -> sbst.ty_param p
+  | TyParam p -> TyParam (sbst.ty_param p)
   | Basic _ as ty -> ty
   | Tuple tys -> Tuple (Common.map (subst_ty sbst) tys)
   | Arrow (ty1, (ty2, drt)) ->
@@ -73,10 +111,8 @@ let rec subst_ty sbst = function
       let drty2 = subst_dirty sbst drty2 in
       Handler (drty1, drty2)
 
-and subst_dirt sbst drt =
-  let ops = Common.assoc_map sbst.region_param drt.ops in
-  let { ops = new_ops; rest = new_rest } = sbst.dirt_param drt.rest in
-  { ops = new_ops @ ops; rest = new_rest }
+and subst_dirt sbst {ops; rest} =
+  { ops = Common.assoc_map sbst.region_param ops; rest = sbst.dirt_param rest }
 
 and subst_dirty sbst (ty, drt) =
   let ty = subst_ty sbst ty in
@@ -92,8 +128,8 @@ and subst_args sbst (tys, drts, rs) =
 (** [identity_subst] is a substitution that makes no changes. *)
 let identity_subst =
   {
-    ty_param = (fun p -> TyParam p);
-    dirt_param = (fun d -> { ops = []; rest = d });
+    ty_param = Common.id;
+    dirt_param = Common.id;
     region_param = Common.id;
     instance_param = Common.id;
   }
@@ -102,10 +138,10 @@ let identity_subst =
     [sbst2] and then [sbst1]. *)
 let compose_subst sbst1 sbst2 =
   {
-    ty_param = Common.compose (subst_ty sbst1) sbst2.ty_param;
-    dirt_param = Common.compose (subst_dirt sbst1) sbst2.dirt_param;
+    ty_param = Common.compose sbst1.ty_param sbst2.ty_param;
+    dirt_param = Common.compose sbst1.dirt_param sbst2.dirt_param;
     region_param = Common.compose sbst1.region_param sbst2.region_param;
-    instance_param = Common.compose sbst2.instance_param sbst1.instance_param;
+    instance_param = Common.compose sbst1.instance_param sbst2.instance_param;
   }
 
 let refresher fresh =
@@ -123,8 +159,8 @@ let beautifying_subst () =
     identity_subst
   else
     {
-      ty_param = refresher (Common.fresh (fun n -> TyParam (Ty_Param n)));
-      dirt_param = refresher (Common.fresh (fun n -> { ops = []; rest = Dirt_Param n }));
+      ty_param = refresher (Common.fresh (fun n -> Ty_Param n));
+      dirt_param = refresher (Common.fresh (fun n -> Dirt_Param n));
       region_param = refresher (Common.fresh (fun n -> Region_Param n));
       instance_param = refresher (Common.fresh (fun n -> Instance_Param n));
     }
@@ -132,8 +168,8 @@ let beautifying_subst () =
 let refreshing_subst () =
   {
     identity_subst with
-    ty_param = (let refresh = refresher fresh_ty_param in fun p -> TyParam (refresh p));
-    dirt_param = (let refresh = refresher fresh_dirt_param in fun p -> { ops = []; rest = refresh p});
+    ty_param = refresher fresh_ty_param;
+    dirt_param = refresher fresh_dirt_param;
     region_param = refresher fresh_region_param;
   }
 

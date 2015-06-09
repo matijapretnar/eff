@@ -37,6 +37,13 @@ let subst_tydef sbst =
   | Sum tys -> Sum (Common.assoc_map (Common.option_map subst) tys)
   | Inline ty -> Inline (subst ty)
 
+let replace_tydef rpls =
+  let replace = Type.replace_ty rpls in
+  function
+  | Record tys -> Record (Common.assoc_map replace tys)
+  | Sum tys -> Sum (Common.assoc_map (Common.option_map replace) tys)
+  | Inline ty -> Inline (replace ty)
+
 (* Lookup type parameters for a given type. *)
 let lookup_params ty_name =
   match Common.lookup ty_name !tctx with
@@ -62,8 +69,8 @@ let refreshing_subst (ps, ds, rs) =
   (List.map refresh_ty_param ps, List.map refresh_dirt_param ds, List.map refresh_region_param rs),
   {
     Type.identity_subst with
-    Type.ty_param = (fun p -> Type.TyParam (refresh_ty_param p));
-    Type.dirt_param = (fun d -> Type.simple_dirt d);
+    Type.ty_param = (fun p -> refresh_ty_param p);
+    Type.dirt_param = Common.id;
     Type.region_param = refresh_region_param;
   }
 
@@ -146,11 +153,10 @@ let ty_apply ~loc ty_name (tys, drts, rgns) : tydef =
     try List.combine rs rgns with
       Invalid_argument "List.combine" -> Error.typing ~loc "Type constructors %s should be applied to %d region arguments" ty_name (List.length rs)
   in
-  subst_tydef {
-    T.identity_subst with
-    T.ty_param = (fun p -> Common.lookup_default p ty_sbst (Type.TyParam p));
-    T.dirt_param = (fun d -> Common.lookup_default d dirt_sbst (Type.simple_dirt d));
-    T.region_param = (fun r -> Common.lookup_default r region_sbst r);
+  replace_tydef {
+    T.ty_param_repl = (fun p -> Common.lookup_default p ty_sbst (Type.TyParam p));
+    T.dirt_param_repl = (fun d -> Common.lookup_default d dirt_sbst (Type.simple_dirt d));
+    T.region_param_repl = (fun r -> Common.lookup_default r region_sbst r);
   } ty
 
 (** [check_well_formed ~loc ty] checks that type [ty] is well-formed. *)

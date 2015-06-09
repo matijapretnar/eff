@@ -31,9 +31,9 @@ let union cnstrs1 cnstrs2 =
 
 let subst sbst cnstr =
   {
-    ty = TyConstraints.map (fun p -> match sbst.Type.ty_param p with Type.TyParam q -> q | _ -> assert false) cnstr.ty;
+    ty = TyConstraints.map sbst.Type.ty_param cnstr.ty;
     region = RegionConstraints.subst sbst cnstr.region;
-    dirt = DirtConstraints.map (fun d -> match sbst.Type.dirt_param d with { Type.ops = []; Type.rest = d' } -> d' | _ -> assert false) cnstr.dirt;
+    dirt = DirtConstraints.map sbst.Type.dirt_param cnstr.dirt;
   }
 
 let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) grph =
