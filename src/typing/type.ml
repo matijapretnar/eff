@@ -226,20 +226,9 @@ let print_dirt ?(non_poly=Trio.empty) ~show_dirt_param drt ppf =
     end
 
 
-let print_ty_param ?(non_poly=Trio.empty) skeletons p ppf =
+let print_ty_param ?(non_poly=Trio.empty) ((Ty_Param k) as p) ppf =
   let (ps, _, _) = non_poly in
-  let Ty_Param k = p in 
-  let rec get_skel_id skel id = function
-  | [] -> k - List.length (List.flatten skeletons) + List.length skeletons, None
-  | [] :: skels -> get_skel_id (succ skel) 0 skels
-  | (Ty_Param l :: xs) :: _ when k == l ->
-      if id = 0 && List.length xs = 0 then skel, None else skel, Some (id + 1)
-  | (_ :: xs) :: skels -> get_skel_id skel (succ id) (xs :: skels)
-  in
-  let skel, id = get_skel_id 0 0 skeletons in
-  (* let id = if !effects then id else None in *)
-  let id = None in
-  Symbols.ty_param skel id (List.mem p ps) ppf
+  Symbols.ty_param k (List.mem p ps) ppf
 
 let show_dirt show_dirt_param drt = drt.ops != [] || (show_dirt_param drt.rest != None)
 
@@ -263,7 +252,7 @@ let rec print ?(non_poly=Trio.empty) ?(show_dirt_param=fun d -> Some (print_dirt
         | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
         | ts -> print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
       end
-    | TyParam p -> print_ty_param ~non_poly skeletons p ppf
+    | TyParam p -> print_ty_param ~non_poly p ppf
     | Tuple [] -> print "unit"
     | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence (Symbols.times ()) (ty ~max_level:1) ts)
     | Handler ((t1, drt1), (t2, drt2)) ->
