@@ -29,11 +29,10 @@ let subst sbst bnds = {
   regions = RegionPoset.map sbst.Type.region_param bnds.regions;
 }
 
-let garbage_collect pos neg bnds =
-  {
-    full_regions = FullRegions.filter (fun r -> List.mem r pos) bnds.full_regions;
-    regions = RegionPoset.filter (fun x y -> List.mem x neg && List.mem y pos && not (FullRegions.mem y bnds.full_regions)) bnds.regions;
-  }
+let garbage_collect pos neg bnds = {
+  full_regions = FullRegions.filter (fun r -> List.mem r pos) bnds.full_regions;
+  regions = RegionPoset.filter (fun x y -> List.mem x neg && List.mem y pos && not (FullRegions.mem y bnds.full_regions)) bnds.regions;
+}
 
 let add_full_region r bnds =
   let new_full_regions = r :: RegionPoset.get_succ r bnds.regions in

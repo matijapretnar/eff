@@ -4,12 +4,10 @@
 type ty_param = Ty_Param of int
 type dirt_param = Dirt_Param of int
 type region_param = Region_Param of int
-type instance_param = Instance_Param of int
 
 let fresh_ty_param = Common.fresh (fun n -> Ty_Param n)
 let fresh_dirt_param = Common.fresh (fun n -> Dirt_Param n)
 let fresh_region_param = Common.fresh (fun n -> Region_Param n)
-let fresh_instance_param = Common.fresh (fun n -> Instance_Param n)
 
 type ty =
   | Apply of Common.tyname * args
@@ -92,7 +90,6 @@ type substitution = {
   ty_param : ty_param -> ty_param;
   dirt_param : dirt_param -> dirt_param;
   region_param : region_param -> region_param;
-  instance_param : instance_param -> instance_param;
 }
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
@@ -131,7 +128,6 @@ let identity_subst =
     ty_param = Common.id;
     dirt_param = Common.id;
     region_param = Common.id;
-    instance_param = Common.id;
   }
 
 (** [compose_subst sbst1 sbst2] returns a substitution that first performs
@@ -141,7 +137,6 @@ let compose_subst sbst1 sbst2 =
     ty_param = Common.compose sbst1.ty_param sbst2.ty_param;
     dirt_param = Common.compose sbst1.dirt_param sbst2.dirt_param;
     region_param = Common.compose sbst1.region_param sbst2.region_param;
-    instance_param = Common.compose sbst1.instance_param sbst2.instance_param;
   }
 
 let refresher fresh =
@@ -162,12 +157,10 @@ let beautifying_subst () =
       ty_param = refresher (Common.fresh (fun n -> Ty_Param n));
       dirt_param = refresher (Common.fresh (fun n -> Dirt_Param n));
       region_param = refresher (Common.fresh (fun n -> Region_Param n));
-      instance_param = refresher (Common.fresh (fun n -> Instance_Param n));
     }
 
 let refreshing_subst () =
   {
-    identity_subst with
     ty_param = refresher fresh_ty_param;
     dirt_param = refresher fresh_dirt_param;
     region_param = refresher fresh_region_param;
@@ -247,9 +240,6 @@ let print_ty_param ?(non_poly=Trio.empty) skeletons p ppf =
   (* let id = if !effects then id else None in *)
   let id = None in
   Symbols.ty_param skel id (List.mem p ps) ppf
-
-let print_instance_param (Instance_Param i) ppf =
-  Print.print ppf "#%d" i
 
 let show_dirt show_dirt_param drt = drt.ops != [] || (show_dirt_param drt.rest != None)
 
