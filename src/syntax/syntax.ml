@@ -1,6 +1,6 @@
 (** Syntax of the core language. *)
 
-module Variable = Symbol.Make(String)
+module Variable = Symbol.Make(Symbol.String)
 module EffectMap = Map.Make(String)
 
 type variable = Variable.t

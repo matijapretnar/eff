@@ -1,11 +1,22 @@
 module type Annotation =
 sig
   type t
+
+  val print : t -> int -> Format.formatter -> unit
 end
 
 module Anonymous : Annotation with type t = unit =
 struct
   type t = unit
+
+  let print _ n ppf = Format.pp_print_int ppf n
+end
+
+module String : Annotation with type t = string =
+struct
+  type t = string
+
+  let print s _ ppf = Format.pp_print_string ppf s
 end
 
 module type S =
@@ -31,5 +42,5 @@ struct
     incr count;
     (!count, ann)
 
-  let print (n, _) ppf = Format.pp_print_int ppf n
+  let print (n, ann) = Annot.print ann n
 end
