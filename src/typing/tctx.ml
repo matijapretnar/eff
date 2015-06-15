@@ -68,7 +68,6 @@ let refreshing_subst (ps, ds, rs) =
   and refresh_region_param = Type.refresher Type.fresh_region_param in
   (List.map refresh_ty_param ps, List.map refresh_dirt_param ds, List.map refresh_region_param rs),
   {
-    Type.identity_subst with
     Type.ty_param = (fun p -> refresh_ty_param p);
     Type.dirt_param = Common.id;
     Type.region_param = refresh_region_param;

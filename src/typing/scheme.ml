@@ -329,7 +329,7 @@ let print_ty_scheme ty_sch ppf =
   if !Config.effect_annotations then
     Print.print ppf "%t%t"
       (Type.print ~show_dirt_param skeletons ty)
-      (RegionConstraints.print ~non_poly cnstrs.Constraints.region)
+      (NewConstraints.print ~non_poly cnstrs.Constraints.new_constraints)
   else
     Type.print ~non_poly skeletons ty ppf
 
@@ -347,10 +347,10 @@ let print_dirty_scheme drty_sch ppf =
       Print.print ppf "%t ! %t%t"
         (Type.print ~show_dirt_param skeletons ty)
         (Type.print_dirt ~non_poly ~show_dirt_param drt)
-        (RegionConstraints.print ~non_poly cnstrs.Constraints.region)
+        (NewConstraints.print ~non_poly cnstrs.Constraints.new_constraints)
     else
       Print.print ppf "%t%t"
         (Type.print ~show_dirt_param skeletons ty)
-        (RegionConstraints.print ~non_poly cnstrs.Constraints.region)
+        (NewConstraints.print ~non_poly cnstrs.Constraints.new_constraints)
   else
     Type.print ~non_poly skeletons ty ppf
