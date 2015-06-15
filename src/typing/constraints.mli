@@ -16,6 +16,8 @@ val add_ty_constraint : Type.ty_param -> Type.ty_param -> t -> t
 
 val remove_ty : Type.ty_param -> t -> Type.ty_param list * Type.ty_param list * t
 
+val skeletons : t -> Type.ty_param list list
+
 val add_dirt_constraint : Type.dirt_param -> Type.dirt_param -> t -> t
 
 val remove_dirt : Type.dirt_param -> t -> Type.dirt_param list * Type.dirt_param list * t
