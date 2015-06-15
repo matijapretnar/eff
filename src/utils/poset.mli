@@ -14,6 +14,7 @@ sig
 
   val empty : t
   val add : elt -> elt -> t -> t
+  val remove : elt -> t -> elt list * elt list * t
   val merge : t -> t -> t
   val fold : (elt -> elt -> 'a -> 'a) -> t -> 'a -> 'a
   val filter : (elt -> elt -> bool) -> t -> t

@@ -14,6 +14,7 @@ sig
 
   val empty : t
   val add : elt -> elt -> t -> t
+  val remove : elt -> t -> elt list * elt list * t
   val merge : t -> t -> t
   val fold : (elt -> elt -> 'a -> 'a) -> t -> 'a -> 'a
   val filter : (elt -> elt -> bool) -> t -> t
@@ -69,6 +70,15 @@ struct
         else
           related_to_z
       ) poset
+
+  let remove x poset =
+    let related_to_x = get_related x poset in
+    let poset = EltMap.remove x poset in
+    let poset = EltMap.map (fun {smaller; greater} -> {
+      smaller = EltSet.remove x smaller;
+      greater = EltSet.remove x greater;
+    }) poset in
+    EltSet.elements related_to_x.smaller, EltSet.elements related_to_x.greater, poset
 
   let fold f poset =
     EltMap.fold (fun x {greater} acc ->

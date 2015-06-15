@@ -71,17 +71,15 @@ and region_param_less r1 r2 (ctx, ty, cnstrs, sbst) =
 and add_full_region r (ctx, ty, cnstrs, sbst) =
   (ctx, ty, Constraints.add_full_region r cnstrs, sbst)
 
-let rec explode_dirt ~loc p ({Type.ops = ops} as drt_new) (ctx, ty, cnstrs, sbst) =
-  if ops = [] then (ctx, ty, cnstrs, sbst) else
-  let (new_drt_grph, ps, skel) = DirtConstraints.remove_skeleton p cnstrs.Constraints.dirt in
-  let drts' = List.map (fun p -> (p, Type.subst_dirt (Type.refreshing_subst ()) drt_new)) ps in
+let rec explode_dirt ~loc p drt (ctx, ty, cnstrs, sbst) =
+  let (smaller, greater, cnstrs) = Constraints.remove_dirt p cnstrs in
   let sbst' = {
     identity_subst with 
-    dirt_param = drts'
+    dirt_param = [(p, drt)]
   } in
-  let cnstrs = {cnstrs with Constraints.dirt = new_drt_grph} in
   let ty_sch = (Common.assoc_map (subst_ty sbst') ctx, subst_ty sbst' ty, cnstrs, compose_subst sbst' sbst) in
-  List.fold_right (fun (p, q) ty_sch -> dirt_less ~loc (Type.simple_dirt p) (Type.simple_dirt q) ty_sch) skel ty_sch
+  let ty_sch = List.fold_right (fun q ty_sch -> dirt_less ~loc (Type.simple_dirt q) drt ty_sch) smaller ty_sch in
+  List.fold_right (fun q ty_sch -> dirt_less ~loc drt (Type.simple_dirt q) ty_sch) greater ty_sch
 
 and dirt_less ~loc drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   let {Type.ops = ops1; Type.rest = rest1} = subst_dirt sbst drt1
@@ -95,19 +93,25 @@ and dirt_less ~loc drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   in
   let new_ops1 = new_ops ops2 ops1
   and new_ops2 = new_ops ops1 ops2 in
-  match new_ops1, new_ops2 with
-  | [], [] ->
-      let op_less (op, dt1) ty_sch =
-        begin match Common.lookup op ops2 with
-        | Some dt2 -> region_param_less dt1 dt2 ty_sch
-        | None -> assert false
-      end
-      in
-      List.fold_right op_less ops1 (dirt_param_less rest1 rest2 ty_sch)
-  | _, _ ->
-      dirt_less ~loc drt1 drt2 (
-      explode_dirt ~loc rest1 {Type.ops = new_ops1; Type.rest = Type.fresh_dirt_param ()}
-      (explode_dirt ~loc rest2 {Type.ops = new_ops2; Type.rest = Type.fresh_dirt_param ()} ty_sch))
+  let ty_sch, rest1 = match new_ops1 with
+    | [] -> ty_sch, rest1
+    | _ :: _ ->
+      let r = Type.fresh_dirt_param () in
+      (explode_dirt ~loc rest1 {Type.ops = new_ops1; Type.rest = r} ty_sch), r in
+  let ty_sch, rest2 = match new_ops2 with
+    | [] -> ty_sch, rest2
+    | _ :: _ ->
+      let r = Type.fresh_dirt_param () in
+      (explode_dirt ~loc rest2 {Type.ops = new_ops2; Type.rest = r} ty_sch), r in
+  let ops1 = new_ops1 @ ops1
+  and ops2 = new_ops2 @ ops2 in
+  let op_less (op, dt1) ty_sch =
+    begin match Common.lookup op ops2 with
+    | Some dt2 -> region_param_less dt1 dt2 ty_sch
+    | None -> assert false
+  end
+  in
+  List.fold_right op_less ops1 (dirt_param_less rest1 rest2 ty_sch)
 
 let rec ty_less ~loc ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   (* XXX Check cyclic types *)
