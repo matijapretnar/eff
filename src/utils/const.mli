@@ -1,4 +1,4 @@
-type t =
+type t = private
   | Integer of Big_int.big_int
   | String of string
   | Boolean of bool
