@@ -52,7 +52,7 @@ let beautify2 ty1 ty2 cnstrs =
   let ty1 = Type.subst_ty sbst ty1 in
   let ty2 = Type.subst_ty sbst ty2 in
   let cnstrs = Constraints.subst sbst cnstrs in
-  let skeletons = TyConstraints.skeletons cnstrs.Constraints.ty in
+  let skeletons = Constraints.skeletons cnstrs in
   (ty1, ty2, skeletons)
 
 
@@ -123,10 +123,10 @@ let rec ty_less ~loc ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
   | (Type.TyParam p, Type.TyParam q) -> ty_param_less p q ty_sch
 
   | (Type.TyParam p, ty) ->
-      ty_less ~loc (Type.TyParam p) ty (explode_skeleton ~loc p ty ty_sch)
+      ty_less ~loc (Type.TyParam p) ty (explode_ty ~loc p ty ty_sch)
 
   | (ty, Type.TyParam p) ->
-      ty_less ~loc ty (Type.TyParam p) (explode_skeleton ~loc p ty ty_sch)
+      ty_less ~loc ty (Type.TyParam p) (explode_ty ~loc p ty ty_sch)
 
   | (Type.Arrow (ty1, drty1), Type.Arrow (ty2, drty2)) ->
       ty_less ~loc ty2 ty1 (dirty_less ~loc drty1 drty2 ty_sch)
@@ -162,22 +162,16 @@ let rec ty_less ~loc ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
       let ty1, ty2, skeletons = beautify2 ty1 ty2 cnstrs in
       Error.typing ~loc "This expression has type %t but it should have type %t." (Type.print skeletons ty1) (Type.print skeletons ty2)
 
-and explode_skeleton ~loc p ty_new (ctx, ty, cnstrs, sbst) =
-  let (ps, _, _), (ng, _, _) = Type.pos_neg_params Tctx.get_variances ty_new in
-  begin
-  if TyConstraints.shares_skeleton cnstrs.Constraints.ty p (ps @ ng) then
-    let ty1, ty2, skeletons = beautify2 (Type.TyParam p) ty_new cnstrs in
-    Error.typing ~loc "This expression has a forbidden cylclic type %t = %t." (Type.print skeletons ty1) (Type.print skeletons ty2)
-  end;
-  let (new_ty_grph, ps, skel) = TyConstraints.remove_skeleton p cnstrs.Constraints.ty in
-  let tys' = List.map (fun p -> (p, Type.refresh ty_new)) ps in
+and explode_ty ~loc t ty' (ctx, ty, cnstrs, sbst) =
+  (* XXX OCCUR-CHECK *)
+  let (smaller, greater, cnstrs) = Constraints.remove_ty t cnstrs in
   let sbst' = {
     identity_subst with 
-    ty_param = tys'
+    ty_param = [(t, ty')]
   } in
-  let cnstrs = {cnstrs with Constraints.ty = new_ty_grph} in
   let ty_sch = (Common.assoc_map (subst_ty sbst') ctx, subst_ty sbst' ty, cnstrs, compose_subst sbst' sbst) in
-  List.fold_right (fun (p, q) ty_sch -> ty_less ~loc (Type.TyParam p) (Type.TyParam q) ty_sch) skel ty_sch
+  let ty_sch = List.fold_right (fun q ty_sch -> ty_less ~loc (Type.TyParam q) ty' ty_sch) smaller ty_sch in
+  List.fold_right (fun q ty_sch -> ty_less ~loc ty' (Type.TyParam q) ty_sch) greater ty_sch
 
 and args_less ~loc (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
   (* NB: it is assumed here that
@@ -319,7 +313,7 @@ let print_ty_scheme ty_sch ppf =
   let _, (_, ds, _) = pos_neg_tyscheme ty_sch in
   ignore (Common.map sbst.Type.dirt_param ds);
   let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in
-  let skeletons = TyConstraints.skeletons cnstrs.Constraints.ty in
+  let skeletons = Constraints.skeletons cnstrs in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
   let show_dirt_param = show_dirt_param (ctx, ty, cnstrs) ~non_poly in
@@ -335,7 +329,7 @@ let print_dirty_scheme drty_sch ppf =
   let _, (_, ds, _) = pos_neg_dirtyscheme drty_sch in
   ignore (Common.map sbst.Type.dirt_param ds);
   let (ctx, (ty, drt), cnstrs) = subst_dirty_scheme sbst drty_sch in
-  let skeletons = TyConstraints.skeletons cnstrs.Constraints.ty in
+  let skeletons = Constraints.skeletons cnstrs in
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
   let show_dirt_param = show_dirt_param (ctx, (Type.Arrow (Type.unit_ty, (ty, drt))), cnstrs) ~non_poly in
