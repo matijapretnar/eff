@@ -308,14 +308,7 @@ let extend_non_poly (ts, ds, rs) skeletons =
   (Common.uniq ts, ds, rs)
 
 let show_dirt_param ~non_poly:(_, ds, _) (ctx, ty, cnstrs) =
-  let (_, pos, _), (_, neg, _) = pos_neg_tyscheme (ctx, ty, cnstrs) in
-  fun ((Type.Dirt_Param k) as p) ->
-    if List.mem p neg then
-      Some (fun ppf -> (Symbols.dirt_param k (List.mem p ds) ppf))
-    else if (List.mem p pos && DirtConstraints.get_prec p cnstrs.Constraints.dirt != []) then
-      Some (fun ppf -> Print.print ppf "%t" (Print.sequence (Symbols.union ()) (fun (Type.Dirt_Param k) ppf -> (Symbols.dirt_param k (List.mem p ds) ppf)) (DirtConstraints.get_prec p cnstrs.Constraints.dirt)))
-    else
-      None
+  fun ((Type.Dirt_Param k) as p) -> Some (fun ppf -> (Symbols.dirt_param k (List.mem p ds) ppf))
 
 let print_ty_scheme ty_sch ppf =
   let sbst = Type.beautifying_subst () in
