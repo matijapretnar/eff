@@ -1,4 +1,4 @@
-val h : α ⟹  α = <handler>
-val g : α ⟹  α = <handler>
+val h : τ27₀ ⟹  τ27₁ = <handler>
+val g : τ27₀ ⟹  τ27₁ = <handler>
 Runtime error (unknown location):
 invalid comparison with <

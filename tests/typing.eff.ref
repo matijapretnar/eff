@@ -4,23 +4,23 @@
 - : unit
 - : float
 - : int × int
-- : α list × string
-- : (string, α) cow
-- : (α, string) cow
+- : τ27₀ list × string
+- : (string, τ27₀) cow
+- : (τ27₀, string) cow
 - : (int, string list) cow ⟶  (string list, int) cow
 - : (int, string) bull
-- : (int, α) bull ⟶  int
-- : (α, β list list) bull ⟶  β list list
+- : (int, τ27₀) bull ⟶  int
+- : (τ27₀, τ27₁ list list) bull ⟶  τ27₁ list list
 - : string ⟶  string
 - : string
 - : int
-- : α ⟶  α
-- : _α ⟶  _α
-- : α ⟶  α × α
-- : (α ⟶  α) × β list
-- : (_α ⟶  _α) × (_β ⟶  _β)
-- : α ⟶  β ⟶  α
-- : α list list list
-- : α ⟶  β ⟶  α
-val h : α ⟶  α = <fun>
-- : α ⟶  α
+- : τ27₀ ⟶  τ27₁
+- : _τ27₀ ⟶  _τ27₁
+- : τ27₀ ⟶  τ27₁ × τ27₂
+- : (τ27₀ ⟶  τ27₁) × τ27₂ list
+- : (_τ27₀ ⟶  _τ27₁) × (_τ27₂ ⟶  _τ27₃)
+- : τ27₀ ⟶  τ27₁ ⟶  τ27₂
+- : τ27₀ list list list
+- : τ27₀ ⟶  τ27₁ ⟶  τ27₂
+val h : τ27₀ ⟶  τ27₁ = <fun>
+- : τ27₀ ⟶  τ27₁

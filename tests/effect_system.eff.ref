@@ -1,10 +1,10 @@
-- : (unit ⟹  α) ⟶  α = <fun>
-- : (unit ⟶  α) ⟶  (unit ⟶  α) ⟶  α = <fun>
+- : (unit ⟹  τ27₀) ⟶  τ27₀ = <fun>
+- : (unit ⟶  τ27₀) ⟶  (unit ⟶  τ27₁) ⟶  τ27₂ = <fun>
 - : unit ⟶  unit = <fun>
 - : unit ⟶  unit = <fun>
 - : unit ⟶  unit = <fun>
-- : (unit ⟶  α) ⟶  (α ⟹  β) ⟶  β = <fun>
-- : (unit ⟶  α) ⟶  α = <fun>
-- : (unit ⟶  α) ⟶ 
-    (unit ⟶  β) ⟶ 
-    (unit ⟶  β) × (unit ⟶  string) × (unit ⟶  string) = <fun>
+- : (unit ⟶  τ27₀) ⟶  (τ27₀ ⟹  τ27₁) ⟶  τ27₁ = <fun>
+- : (unit ⟶  τ27₀) ⟶  τ27₁ = <fun>
+- : (unit ⟶  τ27₀) ⟶ 
+    (unit ⟶  τ27₁) ⟶ 
+    (unit ⟶  τ27₂) × (unit ⟶  string) × (unit ⟶  string) = <fun>

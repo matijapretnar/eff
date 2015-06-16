@@ -1,12 +1,12 @@
 val a : int × string = (5, "foo")
 - : int × string = (5, "foo")
-val g : α ⟶  β ⟶  α = <fun>
+val g : τ27₀ ⟶  τ27₁ ⟶  τ27₂ = <fun>
 - : int × string = (4, "foo")
-val u : α list = []
+val u : τ27₀ list = []
 - : int list × string list = ([1], ["foo"])
-val v : α list list = [[]]
-- : α list list × int list list = ([[]; []], [[2]; []])
-- : α ⟶  α
-- : α ⟶  α
-val u : α ⟶  β = <fun>
-- : α ⟶  β
+val v : τ27₀ list list = [[]]
+- : τ27₀ list list × int list list = ([[]; []], [[2]; []])
+- : τ27₀ ⟶  τ27₁
+- : τ27₀ ⟶  τ27₁
+val u : τ27₀ ⟶  τ27₁ = <fun>
+- : τ27₀ ⟶  τ27₁

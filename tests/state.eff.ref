@@ -1,5 +1,5 @@
-val better_state : int ⟶  (α ⟹  α) = <fun>
-val transaction : α ⟹  α = <handler>
+val better_state : int ⟶  (τ27₀ ⟹  τ27₁) = <fun>
+val transaction : τ27₀ ⟹  τ27₁ = <handler>
 Check (file "./state.eff", line 20, char 24):
 20
 Check (file "./state.eff", line 23, char 26):
