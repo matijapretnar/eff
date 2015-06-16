@@ -217,8 +217,8 @@ let empty = {
   dirt_expansion = DirtMap.empty;
 }
 
-let union ~loc constraints1 constraints2 =
-  let constraints = TyMap.fold (add_ty_expansion ~loc) constraints1.ty_expansion constraints2 in
+let union constraints1 constraints2 =
+  let constraints = TyMap.fold (add_ty_expansion ~loc:Location.unknown) constraints1.ty_expansion constraints2 in
   let constraints = DirtMap.fold add_dirt_expansion constraints1.dirt_expansion constraints in
   {
     constraints with
@@ -237,12 +237,15 @@ let subst sbst constraints = {
   dirt_expansion = DirtMap.map (Type.subst_dirt sbst) constraints.dirt_expansion;
 }
 
+let expand_ty constraints = expand_ty constraints.ty_expansion constraints.dirt_expansion
+
 let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) constraints = {
-  constraints with
   ty_poset = TyPoset.filter (fun x y -> List.mem x neg_ts && List.mem y pos_ts) constraints.ty_poset;
   dirt_poset = DirtPoset.filter (fun x y -> List.mem x neg_ds && List.mem y pos_ds) constraints.dirt_poset;
   region_poset = RegionPoset.filter (fun x y -> List.mem x neg_rs && List.mem y pos_rs && not (FullRegions.mem y constraints.full_regions)) constraints.region_poset;
   full_regions = FullRegions.filter (fun r -> List.mem r pos_rs) constraints.full_regions;
+  ty_expansion = TyMap.empty;
+  dirt_expansion = DirtMap.empty;
 }
 
 let print ~non_poly constraints ppf =

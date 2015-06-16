@@ -241,11 +241,11 @@ let rec infer_expr env e =
       let ty_out = Type.fresh_ty () in
 
       unify (ctx_val @ ctx_fin @ ctxs) (Type.Handler((ty_in, drt_in), (ty_out, drt_out))) ([
-        dirt_less ~loc {Type.ops = ops_out; Type.rest = drt_rest} drt_mid;
+        dirt_less {Type.ops = ops_out; Type.rest = drt_rest} drt_mid;
         ty_less ~loc ty_in ty_val;
         dirty_less ~loc drty_val (ty_mid, drt_mid);
         ty_less ~loc ty_mid ty_fin;
-        dirt_less ~loc drt_mid drt_out;
+        dirt_less drt_mid drt_out;
         dirty_less ~loc drty_fin (ty_out, drt_out);
         just cnstrs_val;
         just cnstrs_fin
@@ -316,8 +316,8 @@ and infer_comp env c =
       unify (ctx_c1 @ ctx_c2) (Type.unit_ty, drt) [
         ty_less ~loc ty_c1 Type.bool_ty;
         ty_less ~loc ty_c2 Type.unit_ty;
-        dirt_less ~loc drt_c1 drt;
-        dirt_less ~loc drt_c2 drt;
+        dirt_less drt_c1 drt;
+        dirt_less drt_c2 drt;
         just cnstrs_c1;
         just cnstrs_c2
       ]
@@ -415,7 +415,7 @@ and infer_let ~loc env defs =
   let vars = List.fold_right extend_poly poly [] in
   let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
-      dirt_less ~loc drt_c drt;
+      dirt_less drt_c drt;
       Scheme.less_context ~loc nonpoly;
       just cnstrs_c;
     ] @ chngs)

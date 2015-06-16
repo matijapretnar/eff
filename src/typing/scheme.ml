@@ -1,51 +1,7 @@
-type substitution = {
-  ty_param : (Type.ty_param, Type.ty) Common.assoc;
-  dirt_param : (Type.dirt_param, Type.dirt) Common.assoc;
-}
-
 type context = (Syntax.variable, Type.ty) Common.assoc
 type ty_scheme = context * Type.ty * Constraints.t
 type dirty_scheme = context * Type.dirty * Constraints.t
-type t = context * Type.ty * Constraints.t * substitution
-type change = t -> t
-
-(** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
-let rec subst_ty sbst = function
-  | Type.Apply (ty_name, args) -> Type.Apply (ty_name, subst_args sbst args)
-  | Type.TyParam p ->
-      begin match Common.lookup p sbst.ty_param with
-      | Some t -> t
-      | None -> Type.TyParam p
-      end
-  | Type.Basic _ as ty -> ty
-  | Type.Tuple tys -> Type.Tuple (Common.map (subst_ty sbst) tys)
-  | Type.Arrow (ty1, (ty2, drt)) -> Type.Arrow (subst_ty sbst ty1, (subst_ty sbst ty2, subst_dirt sbst drt))
-  | Type.Handler (drty1, drty2) -> Type.Handler (subst_dirty sbst drty1, subst_dirty sbst drty2)
-
-and subst_dirt sbst drt =
-  match Common.lookup drt.Type.rest sbst.dirt_param with
-  | Some { Type.ops = new_ops; Type.rest = new_rest } -> { Type.ops = new_ops @ drt.Type.ops; Type.rest = new_rest }
-  | None -> drt
-
-and subst_dirty sbst (ty, drt) = (subst_ty sbst ty, subst_dirt sbst drt)
-
-and subst_args sbst (tys, drts, rs) =
-  (Common.map (subst_ty sbst) tys, Common.map (subst_dirt sbst) drts, rs)
-
-(** [identity_subst] is a substitution that makes no changes. *)
-let identity_subst =
-  {
-    ty_param = [];
-    dirt_param = []
-  }
-
-(** [compose_subst sbst1 sbst2] returns a substitution that first performs
-    [sbst2] and then [sbst1]. *)
-let compose_subst sbst1 sbst2 =
-  {
-    ty_param = sbst1.ty_param @ (Common.assoc_map (subst_ty sbst1) sbst2.ty_param);
-    dirt_param = sbst1.dirt_param @ (Common.assoc_map (subst_dirt sbst1) sbst2.dirt_param);
-  }
+type change = ty_scheme -> ty_scheme
 
 let beautify2 ty1 ty2 cnstrs =
   let sbst = Type.beautifying_subst () in
@@ -55,162 +11,50 @@ let beautify2 ty1 ty2 cnstrs =
   let skeletons = Constraints.skeletons cnstrs in
   (ty1, ty2, skeletons)
 
-
 let refresh (ctx, ty, cnstrs) =
   let sbst = Type.refreshing_subst () in
   Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst sbst cnstrs
 
-let ty_param_less p q (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_ty_constraint p q cnstrs, sbst)
-and dirt_param_less d1 d2 (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_dirt_constraint d1 d2 cnstrs, sbst)
-and just new_cnstrs (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.union new_cnstrs cnstrs, sbst)
-and region_param_less r1 r2 (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_region_constraint r1 r2 cnstrs, sbst)
-and add_full_region r (ctx, ty, cnstrs, sbst) =
-  (ctx, ty, Constraints.add_full_region r cnstrs, sbst)
+let ty_param_less p q (ctx, ty, cnstrs) =
+  (ctx, ty, Constraints.add_ty_constraint p q cnstrs)
+and dirt_param_less d1 d2 (ctx, ty, cnstrs) =
+  (ctx, ty, Constraints.add_dirt_constraint d1 d2 cnstrs)
+and just new_cnstrs (ctx, ty, cnstrs) =
+  (ctx, ty, Constraints.union new_cnstrs cnstrs)
+and region_param_less r1 r2 (ctx, ty, cnstrs) =
+  (ctx, ty, Constraints.add_region_param_constraint r1 r2 cnstrs)
+and add_full_region r (ctx, ty, cnstrs) =
+  (ctx, ty, Constraints.add_full_region r cnstrs)
+and dirt_less drt1 drt2 (ctx, ty, cnstrs) =
+  (ctx, ty, Constraints.add_dirt_constraint drt1 drt2 cnstrs)
+and ty_less ~loc ty1 ty2 (ctx, ty, cnstrs) =
+  (ctx, ty, Constraints.add_ty_constraint ~loc ty1 ty2 cnstrs)
+and dirty_less ~loc drty1 drty2 (ctx, ty, cnstrs) =
+  (ctx, ty, Constraints.add_dirty_constraint ~loc drty1 drty2 cnstrs)
 
-let rec explode_dirt ~loc p drt (ctx, ty, cnstrs, sbst) =
-  let (smaller, greater, cnstrs) = Constraints.remove_dirt p cnstrs in
-  let sbst' = {
-    identity_subst with 
-    dirt_param = [(p, drt)]
-  } in
-  let ty_sch = (Common.assoc_map (subst_ty sbst') ctx, subst_ty sbst' ty, cnstrs, compose_subst sbst' sbst) in
-  let ty_sch = List.fold_right (fun q ty_sch -> dirt_less ~loc (Type.simple_dirt q) drt ty_sch) smaller ty_sch in
-  List.fold_right (fun q ty_sch -> dirt_less ~loc drt (Type.simple_dirt q) ty_sch) greater ty_sch
-
-and dirt_less ~loc drt1 drt2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
-  let {Type.ops = ops1; Type.rest = rest1} = subst_dirt sbst drt1
-  and {Type.ops = ops2; Type.rest = rest2} = subst_dirt sbst drt2 in
-  let new_ops ops1 ops2 =
-    let ops2 = List.map fst ops2 in
-    let add_op (op, _) news =
-      if List.mem op ops2 then news else (op, Type.fresh_region_param ()) :: news
-    in
-    List.fold_right add_op ops1 []
-  in
-  let new_ops1 = new_ops ops2 ops1
-  and new_ops2 = new_ops ops1 ops2 in
-  let ty_sch, rest1 = match new_ops1 with
-    | [] -> ty_sch, rest1
-    | _ :: _ ->
-      let r = Type.fresh_dirt_param () in
-      (explode_dirt ~loc rest1 {Type.ops = new_ops1; Type.rest = r} ty_sch), r in
-  let ty_sch, rest2 = match new_ops2 with
-    | [] -> ty_sch, rest2
-    | _ :: _ ->
-      let r = Type.fresh_dirt_param () in
-      (explode_dirt ~loc rest2 {Type.ops = new_ops2; Type.rest = r} ty_sch), r in
-  let ops1 = new_ops1 @ ops1
-  and ops2 = new_ops2 @ ops2 in
-  let op_less (op, dt1) ty_sch =
-    begin match Common.lookup op ops2 with
-    | Some dt2 -> region_param_less dt1 dt2 ty_sch
-    | None -> assert false
-  end
-  in
-  List.fold_right op_less ops1 (dirt_param_less rest1 rest2 ty_sch)
-
-let rec ty_less ~loc ty1 ty2 ((ctx, ty, cnstrs, sbst) as ty_sch) =
-  (* XXX Check cyclic types *)
-  (* Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)
-  match subst_ty sbst ty1, subst_ty sbst ty2 with
-
-  | (ty1, ty2) when ty1 = ty2 -> ty_sch
-
-  | (Type.TyParam p, Type.TyParam q) -> ty_param_less p q ty_sch
-
-  | (Type.TyParam p, ty) ->
-      ty_less ~loc (Type.TyParam p) ty (explode_ty ~loc p ty ty_sch)
-
-  | (ty, Type.TyParam p) ->
-      ty_less ~loc ty (Type.TyParam p) (explode_ty ~loc p ty ty_sch)
-
-  | (Type.Arrow (ty1, drty1), Type.Arrow (ty2, drty2)) ->
-      ty_less ~loc ty2 ty1 (dirty_less ~loc drty1 drty2 ty_sch)
-
-  | (Type.Tuple tys1, Type.Tuple tys2)
-      when List.length tys1 = List.length tys2 ->
-      List.fold_right2 (ty_less ~loc) tys1 tys2 ty_sch
-
-  | (Type.Apply (ty_name1, args1), Type.Apply (ty_name2, args2)) when ty_name1 = ty_name2 ->
-      begin match Tctx.lookup_params ty_name1 with
-      | None -> Error.typing ~loc "Undefined type %s" ty_name1
-      | Some ps -> args_less ~loc ps args1 args2 ty_sch
-      end
-
-  (* The following two cases cannot be merged into one, as the whole matching
-     fails if both types are Apply, but only the second one is transparent. *)
-  | (Type.Apply (ty_name, args), ty) when Tctx.transparent ~loc ty_name ->
-      begin match Tctx.ty_apply ~loc ty_name args with
-      | Tctx.Inline ty' -> ty_less ~loc ty' ty ty_sch
-      | Tctx.Sum _ | Tctx.Record _ -> assert false (* None of these are transparent *)
-      end
-
-  | (ty, Type.Apply (ty_name, args)) when Tctx.transparent ~loc ty_name ->
-      begin match Tctx.ty_apply ~loc ty_name args with
-      | Tctx.Inline ty' -> ty_less ~loc ty ty' ty_sch
-      | Tctx.Sum _ | Tctx.Record _ -> assert false (* None of these are transparent *)
-      end
-
-  | (Type.Handler ((tyv1, drt1), tyf1), Type.Handler ((tyv2, drt2), tyf2)) ->
-      dirt_less ~loc drt2 drt1 (ty_less ~loc tyv2 tyv1 (dirty_less ~loc tyf1 tyf2 ty_sch))
-
-  | (ty1, ty2) ->
-      let ty1, ty2, skeletons = beautify2 ty1 ty2 cnstrs in
-      Error.typing ~loc "This expression has type %t but it should have type %t." (Type.print skeletons ty1) (Type.print skeletons ty2)
-
-and explode_ty ~loc t ty' (ctx, ty, cnstrs, sbst) =
-  (* XXX OCCUR-CHECK *)
-  let (smaller, greater, cnstrs) = Constraints.remove_ty t cnstrs in
-  let sbst' = {
-    identity_subst with 
-    ty_param = [(t, ty')]
-  } in
-  let ty_sch = (Common.assoc_map (subst_ty sbst') ctx, subst_ty sbst' ty, cnstrs, compose_subst sbst' sbst) in
-  let ty_sch = List.fold_right (fun q ty_sch -> ty_less ~loc (Type.TyParam q) ty' ty_sch) smaller ty_sch in
-  List.fold_right (fun q ty_sch -> ty_less ~loc ty' (Type.TyParam q) ty_sch) greater ty_sch
-
-and args_less ~loc (ps, ds, rs) (ts1, ds1, rs1) (ts2, ds2, rs2) ty_sch =
-  (* NB: it is assumed here that
-     List.length ts1 = List.length ts2 && List.length drts1 = List.length drts2 && List.length rgns1 = List.length rgns2 *)
-  let for_parameters add ps lst1 lst2 ty_sch =
-    List.fold_right2 (fun (_, (cov, contra)) (ty1, ty2) ty_sch ->
-                        let ty_sch = if cov then add ty1 ty2 ty_sch else ty_sch in
-                        if contra then add ty2 ty1 ty_sch else ty_sch) ps (List.combine lst1 lst2) ty_sch
-  in
-  let ty_sch = for_parameters (ty_less ~loc) ps ts1 ts2 ty_sch in
-  let ty_sch = for_parameters (dirt_less ~loc) ds ds1 ds2 ty_sch in
-  for_parameters region_param_less rs rs1 rs2 ty_sch
-
-and dirty_less ~loc (ty1, d1) (ty2, d2) ty_sch =
-  ty_less ~loc ty1 ty2 (dirt_less ~loc d1 d2 ty_sch)
-
-let trim_context ~loc ctx_p (ctx, ty, cnstrs, sbst) =
-  let trim (x, t) (ctx, ty, cnstrs, sbst) =
+let trim_context ~loc ctx_p (ctx, ty, cnstrs) =
+  let trim (x, t) (ctx, ty, cnstrs) =
     match Common.lookup x ctx_p with
-    | None -> ((x, t) :: ctx, ty, cnstrs, sbst)
-    | Some u -> ty_less ~loc u t (ctx, ty, cnstrs, sbst)
+    | None -> ((x, t) :: ctx, ty, cnstrs)
+    | Some u -> ty_less ~loc u t (ctx, ty, cnstrs)
   in
-  List.fold_right trim ctx ([], ty, cnstrs, sbst)
+  List.fold_right trim ctx ([], ty, cnstrs)
 
-let remove_context ~loc ctx_p (ctx, ty, cnstrs, sbst) =
-  let trim (x, t) (ctx, ty, cnstrs, sbst) =
+let remove_context ~loc ctx_p (ctx, ty, cnstrs) =
+  let trim (x, t) (ctx, ty, cnstrs) =
     match Common.lookup x ctx_p with
-    | None -> ((x, t) :: ctx, ty, cnstrs, sbst)
-    | Some u -> (ctx, ty, cnstrs, sbst)
+    | None -> ((x, t) :: ctx, ty, cnstrs)
+    | Some u -> (ctx, ty, cnstrs)
   in
-  List.fold_right trim ctx ([], ty, cnstrs, sbst)
+  List.fold_right trim ctx ([], ty, cnstrs)
 
-let less_context ~loc ctx_p (ctx, ty, cnstrs, sbst) =
-  let trim (x, t) (ctx, ty, cnstrs, sbst) =
+let less_context ~loc ctx_p (ctx, ty, cnstrs) =
+  let trim (x, t) (ctx, ty, cnstrs) =
     match Common.lookup x ctx_p with
-    | None -> ((x, t) :: ctx, ty, cnstrs, sbst)
-    | Some u -> ty_less ~loc u t ((x, u) :: ctx, ty, cnstrs, sbst)
+    | None -> ((x, t) :: ctx, ty, cnstrs)
+    | Some u -> ty_less ~loc u t ((x, u) :: ctx, ty, cnstrs)
   in
-  List.fold_right trim ctx ([], ty, cnstrs, sbst)
+  List.fold_right trim ctx ([], ty, cnstrs)
 
 
 let (@@@) = Trio.append
@@ -229,7 +73,7 @@ let pos_neg_dirtyscheme (ctx, drty, cnstrs) =
 let garbage_collect pos neg (ctx, ty, cnstrs) =
   ctx, ty, Constraints.garbage_collect pos neg cnstrs
 
-let normalize_context ~loc (ctx, ty, cnstrs, sbst) =
+let normalize_context ~loc (ctx, ty, cnstrs) =
   let collect (x, ty) ctx =
     match Common.lookup x ctx with
     | None -> (x, ref [ty]) :: ctx
@@ -237,16 +81,16 @@ let normalize_context ~loc (ctx, ty, cnstrs, sbst) =
   in
   let ctx = List.fold_right collect ctx [] in
 
-  let add (x, tys) (ctx, typ, cnstrs, sbst) =
+  let add (x, tys) (ctx, typ, cnstrs) =
     match !tys with
     | [] -> assert false
-    | [ty] -> ((x, ty) :: ctx, typ, cnstrs, sbst)
+    | [ty] -> ((x, ty) :: ctx, typ, cnstrs)
     | tys ->
         let ty' = Type.fresh_ty () in
         let ctx' = (x, ty') :: ctx in
-        List.fold_right (fun ty ty_sch -> ty_less ~loc ty' ty ty_sch) tys (ctx', typ, cnstrs, sbst)
+        List.fold_right (fun ty ty_sch -> ty_less ~loc ty' ty ty_sch) tys (ctx', typ, cnstrs)
   in
-  List.fold_right add ctx ([], ty, cnstrs, sbst)
+  List.fold_right add ctx ([], ty, cnstrs)
 
 let subst_ty_scheme sbst (ctx, ty, cnstrs) =
   let ty = Type.subst_ty sbst ty in
@@ -261,13 +105,8 @@ let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
   (ctx, drty, cnstrs)
 
 let finalize ctx ty chngs =
-  let ctx, ty, cnstrs, sbst = List.fold_right Common.id chngs (ctx, ty, Constraints.empty, identity_subst) in
-  if sbst = identity_subst then
-    (ctx, ty, cnstrs)
-  else
-    let ty = subst_ty sbst ty in
-    let ctx = Common.assoc_map (subst_ty sbst) ctx in
-    (ctx, ty, cnstrs)
+  let ctx, ty, cnstrs = List.fold_right Common.id chngs (ctx, ty, Constraints.empty) in
+  (Common.assoc_map (Constraints.expand_ty cnstrs) ctx, Constraints.expand_ty cnstrs ty, cnstrs)
 
 let finalize_ty_scheme ~loc ctx ty chngs =
   let ty_sch = finalize ctx ty (normalize_context ~loc :: chngs) in
