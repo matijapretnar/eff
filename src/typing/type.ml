@@ -11,7 +11,7 @@ let fresh_region_param = Common.fresh (fun n -> Region_Param n)
 
 type ty =
   | Apply of Common.tyname * args
-  | TyParam of ty_param
+  | Param of ty_param
   | Basic of string
   | Tuple of ty list
   | Arrow of ty * dirty
@@ -34,9 +34,9 @@ let float_ty = Basic "float"
 let unit_ty = Tuple []
 let empty_ty = Apply ("empty", Trio.empty)
 
-(** [fresh_ty ()] gives a type [TyParam p] where [p] is a new type parameter on
+(** [fresh_ty ()] gives a type [Param p] where [p] is a new type parameter on
     each call. *)
-let fresh_ty () = TyParam (fresh_ty_param ())
+let fresh_ty () = Param (fresh_ty_param ())
 let simple_dirt d = { ops = []; rest = d }
 let fresh_dirt () = simple_dirt (fresh_dirt_param ())
 let fresh_dirty () = (fresh_ty (), fresh_dirt ())
@@ -57,7 +57,7 @@ type replacement = {
 (** [replace_ty rpls ty] replaces type parameters in [ty] according to [rpls]. *)
 let rec replace_ty rpls = function
   | Apply (ty_name, args) -> Apply (ty_name, replace_args rpls args)
-  | TyParam p -> rpls.ty_param_repl p
+  | Param p -> rpls.ty_param_repl p
   | Basic _ as ty -> ty
   | Tuple tys -> Tuple (Common.map (replace_ty rpls) tys)
   | Arrow (ty1, (ty2, drt)) ->
@@ -95,7 +95,7 @@ type substitution = {
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 let rec subst_ty sbst = function
   | Apply (ty_name, args) -> Apply (ty_name, subst_args sbst args)
-  | TyParam p -> TyParam (sbst.ty_param p)
+  | Param p -> Param (sbst.ty_param p)
   | Basic _ as ty -> ty
   | Tuple tys -> Tuple (Common.map (subst_ty sbst) tys)
   | Arrow (ty1, (ty2, drt)) ->
@@ -180,7 +180,7 @@ let for_parameters get_params is_pos ps lst =
 let pos_neg_params get_variances ty =
   let rec pos_ty is_pos = function
   | Apply (ty_name, args) -> pos_args is_pos ty_name args
-  | TyParam p -> ((if is_pos then [p] else []), [], [])
+  | Param p -> ((if is_pos then [p] else []), [], [])
   | Basic _ -> Trio.empty
   | Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
   | Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
@@ -252,7 +252,7 @@ let rec print ?(non_poly=Trio.empty) ?(show_dirt_param=fun d -> Some (print_dirt
         | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
         | ts -> print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
       end
-    | TyParam p -> print_ty_param ~non_poly p ppf
+    | Param p -> print_ty_param ~non_poly p ppf
     | Tuple [] -> print "unit"
     | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence (Symbols.times ()) (ty ~max_level:1) ts)
     | Handler ((t1, drt1), (t2, drt2)) ->

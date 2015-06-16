@@ -42,7 +42,7 @@ type t = {
 
 let rec expand_ty ty_expansion dirt_expansion = function
   | Type.Apply (ty_name, args) -> Type.Apply (ty_name, expand_args ty_expansion dirt_expansion args)
-  | Type.TyParam t as ty ->
+  | Type.Param t as ty ->
     begin try
       TyMap.find t ty_expansion
     with
@@ -103,13 +103,13 @@ let rec add_ty_constraint ~loc ty1 ty2 constraints =
 
   | (ty1, ty2) when ty1 = ty2 -> constraints
 
-  | (Type.TyParam t1, Type.TyParam t2) -> add_ty_param_constraint t1 t2 constraints
+  | (Type.Param t1, Type.Param t2) -> add_ty_param_constraint t1 t2 constraints
 
-  | (Type.TyParam t, ty) ->
-      add_ty_constraint ~loc (Type.TyParam t) ty (add_ty_expansion ~loc t ty constraints)
+  | (Type.Param t, ty) ->
+      add_ty_constraint ~loc (Type.Param t) ty (add_ty_expansion ~loc t ty constraints)
 
-  | (ty, Type.TyParam t) ->
-      add_ty_constraint ~loc ty (Type.TyParam t) (add_ty_expansion ~loc t ty constraints)
+  | (ty, Type.Param t) ->
+      add_ty_constraint ~loc ty (Type.Param t) (add_ty_expansion ~loc t ty constraints)
 
   | (Type.Arrow (ty1, drty1), Type.Arrow (ty2, drty2)) ->
       add_ty_constraint ~loc ty2 ty1 (add_dirty_constraint ~loc drty1 drty2 constraints)
@@ -165,8 +165,8 @@ and add_ty_expansion ~loc t ty constraints =
   let ty_expansion = TyMap.map (expand_ty (TyMap.singleton t ty) DirtMap.empty) constraints.ty_expansion
   and smaller, greater, constraints = remove_ty_param t constraints in
   let constraints = {constraints with ty_expansion = TyMap.add t ty ty_expansion} in
-  let constraints = List.fold_right (fun t' -> add_ty_constraint ~loc (Type.TyParam t') ty) smaller constraints in
-  List.fold_right (fun t' -> add_ty_constraint ~loc ty (Type.TyParam t')) greater constraints
+  let constraints = List.fold_right (fun t' -> add_ty_constraint ~loc (Type.Param t') ty) smaller constraints in
+  List.fold_right (fun t' -> add_ty_constraint ~loc ty (Type.Param t')) greater constraints
 
 and add_dirt_constraint drt1 drt2 constraints =
   let {Type.ops = ops1; Type.rest = rest1} = expand_dirt constraints.dirt_expansion drt1

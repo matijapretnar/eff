@@ -103,7 +103,7 @@ let ty (ts, ds, rs) =
   | Sugared.TyParam t ->
     begin match C.lookup t ts with
     | None -> Error.syntax ~loc "Unbound type parameter '%s" t
-    | Some p -> T.TyParam p
+    | Some p -> T.Param p
     end
   | Sugared.TyArrow (t1, t2, Some drt) -> T.Arrow (ty t1, (ty t2, dirt loc drt))
   | Sugared.TyArrow (t1, t2, None) -> assert false

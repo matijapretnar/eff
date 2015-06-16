@@ -21,7 +21,7 @@ let initial_tctx : tyctx = [
   ("list", (let a = Type.fresh_ty_param () in
               (([a, (true, false)], [], []),
                  Sum [(Common.nil, None);
-                      (Common.cons, Some (T.Tuple [T.TyParam a; T.Apply ("list", ([T.TyParam a], [], []))]))])));
+                      (Common.cons, Some (T.Tuple [T.Param a; T.Apply ("list", ([T.Param a], [], []))]))])));
   ("empty", (Trio.empty, Sum []))
 ]
 
@@ -108,7 +108,7 @@ let find_field fld =
 
 let apply_to_params t (ps, ds, rs) =
   Type.Apply (t, (
-    List.map (fun p -> Type.TyParam p) ps, List.map Type.simple_dirt ds, rs
+    List.map (fun p -> Type.Param p) ps, List.map Type.simple_dirt ds, rs
   ))
 
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
@@ -153,7 +153,7 @@ let ty_apply ~loc ty_name (tys, drts, rgns) : tydef =
       Invalid_argument "List.combine" -> Error.typing ~loc "Type constructors %s should be applied to %d region arguments" ty_name (List.length rs)
   in
   replace_tydef {
-    T.ty_param_repl = (fun p -> Common.lookup_default p ty_sbst (Type.TyParam p));
+    T.ty_param_repl = (fun p -> Common.lookup_default p ty_sbst (Type.Param p));
     T.dirt_param_repl = (fun d -> Common.lookup_default d dirt_sbst (Type.simple_dirt d));
     T.region_param_repl = (fun r -> Common.lookup_default r region_sbst r);
   } ty
@@ -161,7 +161,7 @@ let ty_apply ~loc ty_name (tys, drts, rgns) : tydef =
 (** [check_well_formed ~loc ty] checks that type [ty] is well-formed. *)
 let check_well_formed ~loc tydef =
   let rec check = function
-  | T.Basic _ | T.TyParam _ -> ()
+  | T.Basic _ | T.Param _ -> ()
   | T.Apply (ty_name, (tys, drts, rgns)) ->
     begin match lookup_tydef ~loc ty_name with
       | (ts, ds, rs), (Sum _  | Record _ | Inline _) ->
@@ -194,7 +194,7 @@ let check_well_formed ~loc tydef =
 (** [check_noncyclic ~loc ty] checks that the definition of type [ty] is non-cyclic. *)
 let check_noncyclic ~loc =
   let rec check forbidden = function
-  | T.Basic _ | T.TyParam _ -> ()
+  | T.Basic _ | T.Param _ -> ()
   | T.Apply (t, args) ->
       if List.mem t forbidden then
         Error.typing ~loc "Type definition %s is cyclic." t
@@ -240,7 +240,7 @@ let extend_with_variances ~loc tydefs =
   let set_variances (ty_name, ((ps, ds, rs), def)) =
     let rec ty posi nega = function
       | T.Basic _ -> ()
-      | T.TyParam p ->
+      | T.Param p ->
           begin match Common.lookup p ps with
           | None -> assert false
           | Some (posvar, negvar) ->
