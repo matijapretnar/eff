@@ -1,4 +1,4 @@
-type t = (Syntax.variable, Scheme.ty_scheme) Common.assoc
+type t = (Untyped.variable, Scheme.ty_scheme) Common.assoc
 
 let empty = []
 

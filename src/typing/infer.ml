@@ -9,12 +9,12 @@ let trim_context = Scheme.trim_context
 
 type state = {
   context : Ctx.t;
-  effects : (Type.ty * Type.ty) Syntax.EffectMap.t
+  effects : (Type.ty * Type.ty) Untyped.EffectMap.t
 }
 
 let initial = {
   context = Ctx.empty;
-  effects = Syntax.EffectMap.empty;
+  effects = Untyped.EffectMap.empty;
 }
 
 let simple ty = ([], ty, Constraints.empty)
@@ -28,7 +28,7 @@ let ty_of_const = function
 
 let infer_effect env eff =
   try
-    Some (Syntax.EffectMap.find eff env.effects)
+    Some (Untyped.EffectMap.find eff env.effects)
   with
     | Not_found -> None
 
@@ -110,7 +110,7 @@ let rec infer_pattern (p, loc) =
       end
 
   in
-  (* Print.debug "%t : %t" (Syntax.print_pattern (p, loc)) (Scheme.print_ty_scheme ty_sch); *)
+  (* Print.debug "%t : %t" (Untyped.print_pattern (p, loc)) (Scheme.print_ty_scheme ty_sch); *)
   ty_sch
 
 (* [infer_expr env e] infers the type scheme of an expression [e] in a
@@ -121,11 +121,11 @@ let rec infer_pattern (p, loc) =
    - constraints connecting all these types. *)
 let rec infer_expr env e =
   if !Config.disable_typing then simple Type.universal_ty else
-  let loc = e.Syntax.location in
+  let loc = e.Untyped.location in
   let unify = Scheme.finalize_ty_scheme ~loc in
-  let ty_sch = match e.Syntax.term with
+  let ty_sch = match e.Untyped.term with
 
-  | Syntax.Var x ->
+  | Untyped.Var x ->
       begin match Ctx.lookup env.context x with
       | Some (ctx, ty, cnstrs) ->
           (ctx, ty, cnstrs)
@@ -134,10 +134,10 @@ let rec infer_expr env e =
           unify [(x, ty)] ty []
       end
 
-  | Syntax.Const const ->
+  | Untyped.Const const ->
       simple (ty_of_const const)
 
-  | Syntax.Tuple es ->
+  | Untyped.Tuple es ->
       let infer e (ctx, tys, chngs) =
         let ctx_e, ty_e, cnstrs_e = infer_expr env e in
         ctx_e @ ctx, ty_e :: tys, [
@@ -147,10 +147,10 @@ let rec infer_expr env e =
       let ctx, tys, chngs = List.fold_right infer es ([], [], []) in
       unify ctx (Type.Tuple tys) chngs
 
-  | Syntax.Record [] ->
+  | Untyped.Record [] ->
       assert false
 
-  | Syntax.Record (((fld, _) :: _) as lst) ->
+  | Untyped.Record (((fld, _) :: _) as lst) ->
       if not (Pattern.linear_record lst) then
         Error.typing ~loc "Fields in a record must be distinct";
       begin match Tctx.infer_field fld with
@@ -173,7 +173,7 @@ let rec infer_expr env e =
         unify ctx ty chngs
       end
 
-  | Syntax.Variant (lbl, e) ->
+  | Untyped.Variant (lbl, e) ->
       begin match Tctx.infer_variant lbl with
       | None -> Error.typing ~loc "Unbound constructor %s" lbl
       | Some (ty, arg_ty) ->
@@ -190,11 +190,11 @@ let rec infer_expr env e =
           end
       end
       
-  | Syntax.Lambda a ->
+  | Untyped.Lambda a ->
       let ctx, ty1, drty2, cnstrs = infer_abstraction env a in
       ctx, Type.Arrow (ty1, drty2), cnstrs
       
-  | Syntax.Effect eff ->
+  | Untyped.Effect eff ->
       let r = Type.fresh_region_param () in
       begin match infer_effect env eff with
       | None -> Error.typing ~loc "Unbound effect %s" eff
@@ -205,7 +205,7 @@ let rec infer_expr env e =
           ]
       end
 
-  | Syntax.Handler {Syntax.operations = ops; Syntax.value = a_val; Syntax.finally = a_fin} -> 
+  | Untyped.Handler {Untyped.operations = ops; Untyped.value = a_val; Untyped.finally = a_fin} -> 
       let drt_mid = Type.fresh_dirt () in
       let ty_mid = Type.fresh_ty () in
 
@@ -252,7 +252,7 @@ let rec infer_expr env e =
       ] @ chngs)
 
   in
-  (* Print.debug "%t : %t" (Syntax.print_expression (e, loc)) (Scheme.print_ty_scheme ty_sch); *)
+  (* Print.debug "%t : %t" (Untyped.print_expression (e, loc)) (Scheme.print_ty_scheme ty_sch); *)
   ty_sch
               
 (* [infer_comp env c] infers the dirty type scheme of a computation [c] in a
@@ -264,15 +264,15 @@ let rec infer_expr env e =
    - constraints connecting all these types. *)
 and infer_comp env c =
   if !Config.disable_typing then simple Type.universal_dirty else
-  let loc = c.Syntax.location in
+  let loc = c.Untyped.location in
   let unify = Scheme.finalize_dirty_scheme ~loc in
-  let drty_sch = match c.Syntax.term with
+  let drty_sch = match c.Untyped.term with
 
-  | Syntax.Value e ->
+  | Untyped.Value e ->
       let ctx, ty, cnstrs = infer_expr env e in
       ctx, (ty, empty_dirt ()), cnstrs
 
-  | Syntax.Let (defs, c) ->
+  | Untyped.Let (defs, c) ->
       let vars, nonpoly, change = infer_let ~loc env defs in
       let change2 (ctx_c, drty_c, cnstrs_c) =
         Scheme.finalize_dirty_scheme ~loc (ctx_c) drty_c ([
@@ -283,33 +283,33 @@ and infer_comp env c =
       let env' = List.fold_right (fun (x, ty_sch) env -> {env with context = Ctx.extend env.context x ty_sch}) vars env in
       change2 (change (infer_comp env' c))
 
-  | Syntax.LetRec (defs, c) ->
+  | Untyped.LetRec (defs, c) ->
       let vars, change = infer_let_rec ~loc env defs in
       let env' = List.fold_right (fun (x, ty_sch) env -> {env with context = Ctx.extend env.context x ty_sch}) vars env in
       change (infer_comp env' c)
 
-  | Syntax.Match (e, []) ->
+  | Untyped.Match (e, []) ->
       let ctx_e, ty_e, cnstrs_e = infer_expr env e in
       unify ctx_e (Type.fresh_ty (), empty_dirt ()) [
         ty_less ~loc ty_e Type.empty_ty;
         just cnstrs_e
       ]
 
-  | Syntax.Match (e, cases) ->
+  | Untyped.Match (e, cases) ->
       let ctx_e, ty_e, cnstrs_e = infer_expr env e in
       let drty = Type.fresh_dirty () in
       let infer_case ((p, c) as a) (ctx, chngs) =
         let ctx_a, ty_p, drty_c, cnstrs_a = infer_abstraction env a in
         ctx_a @ ctx, [
-          ty_less ~loc:e.Syntax.location ty_e ty_p;
-          dirty_less ~loc:c.Syntax.location drty_c drty;
+          ty_less ~loc:e.Untyped.location ty_e ty_p;
+          dirty_less ~loc:c.Untyped.location drty_c drty;
           just cnstrs_a
         ] @ chngs
       in
       let ctx, chngs = List.fold_right infer_case cases (ctx_e, [just cnstrs_e]) in
       unify ctx drty chngs
 
-  | Syntax.While (c1, c2) ->
+  | Untyped.While (c1, c2) ->
       let ctx_c1, (ty_c1, drt_c1), cnstrs_c1 = infer_comp env c1 in
       let ctx_c2, (ty_c2, drt_c2), cnstrs_c2 = infer_comp env c2 in
       let drt = Type.fresh_dirt () in
@@ -322,20 +322,20 @@ and infer_comp env c =
         just cnstrs_c2
       ]
 
-  | Syntax.For (i, e1, e2, c, _) ->
+  | Untyped.For (i, e1, e2, c, _) ->
       let ctx_e1, ty_e1, cnstrs_e1 = infer_expr env e1 in
       let ctx_e2, ty_e2, cnstrs_e2 = infer_expr env e2 in
       let ctx_c, (ty_c, drt_c), cnstrs_c = infer_comp env c in
       unify (ctx_e1 @ ctx_e2 @ ctx_c) (Type.unit_ty, drt_c) [
-        ty_less ~loc:e1.Syntax.location ty_e1 Type.int_ty;
-        ty_less ~loc:e2.Syntax.location ty_e2 Type.int_ty;
-        ty_less ~loc:c.Syntax.location ty_c Type.unit_ty;
+        ty_less ~loc:e1.Untyped.location ty_e1 Type.int_ty;
+        ty_less ~loc:e2.Untyped.location ty_e2 Type.int_ty;
+        ty_less ~loc:c.Untyped.location ty_c Type.unit_ty;
         just cnstrs_e1;
         just cnstrs_e2;
         just cnstrs_c
       ]
 
-  | Syntax.Apply (e1, e2) ->
+  | Untyped.Apply (e1, e2) ->
       let ctx_e1, ty_e1, cnstrs_e1 = infer_expr env e1 in
       let ctx_e2, ty_e2, cnstrs_e2 = infer_expr env e2 in
       let drty = Type.fresh_dirty () in
@@ -345,7 +345,7 @@ and infer_comp env c =
         just cnstrs_e2
       ]
 
-  | Syntax.Handle (e, c) ->
+  | Untyped.Handle (e, c) ->
       let ctx_e, ty_e, cnstrs_e = infer_expr env e
       and ctx_c, drty_c, cnstrs_c = infer_comp env c
       and drty = Type.fresh_dirty () in
@@ -355,19 +355,19 @@ and infer_comp env c =
         just cnstrs_c
       ]
 
-  | Syntax.Check c ->
+  | Untyped.Check c ->
       ignore (infer_comp env c);
       simple (Type.unit_ty, empty_dirt ())
 
   in
-  (* Print.debug "%t : %t" (Syntax.print_computation (c, loc)) (Scheme.print_dirty_scheme drty_sch); *)
+  (* Print.debug "%t : %t" (Untyped.print_computation (c, loc)) (Scheme.print_dirty_scheme drty_sch); *)
   drty_sch
 
 and infer_abstraction env (p, c) =
   let ctx_p, ty_p, cnstrs_p = infer_pattern p in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
-  match Scheme.finalize_ty_scheme ~loc:c.Syntax.location ctx_c (Type.Arrow (ty_p, drty_c)) [
-    trim_context ~loc:c.Syntax.location ctx_p;
+  match Scheme.finalize_ty_scheme ~loc:c.Untyped.location ctx_c (Type.Arrow (ty_p, drty_c)) [
+    trim_context ~loc:c.Untyped.location ctx_p;
     just cnstrs_p;
     just cnstrs_c
   ] with
@@ -378,8 +378,8 @@ and infer_abstraction2 env (p1, p2, c) =
   let ctx_p1, ty_p1, cnstrs_p1 = infer_pattern p1 in
   let ctx_p2, ty_p2, cnstrs_p2 = infer_pattern p2 in
   let ctx_c, drty_c, cnstrs_c = infer_comp env c in
-  match Scheme.finalize_ty_scheme ~loc:c.Syntax.location ctx_c (Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c)) [
-    trim_context ~loc:c.Syntax.location (ctx_p1 @ ctx_p2);
+  match Scheme.finalize_ty_scheme ~loc:c.Untyped.location ctx_c (Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c)) [
+    trim_context ~loc:c.Untyped.location (ctx_p1 @ ctx_p2);
     just cnstrs_p1;
     just cnstrs_p2;
     just cnstrs_c
@@ -394,15 +394,15 @@ and infer_let ~loc env defs =
     let ctx_p, ty_p, cnstrs_p = infer_pattern p in
     let ctx_c, drty_c, cnstrs_c = infer_comp env c in
     let poly, nonpoly =
-      match c.Syntax.term with
-      | Syntax.Value _ ->
+      match c.Untyped.term with
+      | Untyped.Value _ ->
           ctx_p @ poly, nonpoly
-      | Syntax.Apply _ | Syntax.Match _ | Syntax.While _ | Syntax.For _
-      | Syntax.Handle _ | Syntax.Let _ | Syntax.LetRec _ | Syntax.Check _ ->
+      | Untyped.Apply _ | Untyped.Match _ | Untyped.While _ | Untyped.For _
+      | Untyped.Handle _ | Untyped.Let _ | Untyped.LetRec _ | Untyped.Check _ ->
           poly, ctx_p @ nonpoly
     in
     poly, nonpoly, ctx_c @ ctx, [
-      dirty_less ~loc:c.Syntax.location drty_c (ty_p, drt);
+      dirty_less ~loc:c.Untyped.location drty_c (ty_p, drt);
       just cnstrs_p;
       just cnstrs_c
     ] @ chngs

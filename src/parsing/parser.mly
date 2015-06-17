@@ -1,5 +1,5 @@
 %{
-  open SugaredSyntax
+  open Sugared
 
   type handler_case =
     | EffectCase of Common.effect * abstraction2
@@ -71,8 +71,8 @@
 %left  INFIXOP3 STAR MOD LAND LOR LXOR
 %right INFIXOP4 LSL LSR ASR
 
-%start <SugaredSyntax.toplevel list> file
-%start <SugaredSyntax.toplevel> commandline
+%start <Sugared.toplevel list> file
+%start <Sugared.toplevel> commandline
 
 %%
 

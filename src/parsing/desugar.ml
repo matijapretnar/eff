@@ -2,7 +2,6 @@
 
 module C = Common
 module T = Type
-module Sugared = SugaredSyntax
 
 (* ***** Desugaring of types. ***** *)
 
@@ -178,12 +177,12 @@ let tydefs ~loc defs =
 (** [fresh_variable ()] creates a fresh variable ["$gen1"], ["$gen2"], ... on
     each call *)
 let fresh_variable = function
-  | None -> Syntax.Variable.fresh "anon"
-  | Some x -> Syntax.Variable.fresh x
+  | None -> Untyped.Variable.fresh "anon"
+  | Some x -> Untyped.Variable.fresh x
 
 let id_abstraction loc =
   let x = fresh_variable (Some "$id_par") in
-  ((Pattern.Var x, loc), (Syntax.add_loc (Syntax.Value (Syntax.add_loc (Syntax.Var x) loc)) loc))
+  ((Pattern.Var x, loc), (Untyped.add_loc (Untyped.Value (Untyped.add_loc (Untyped.Var x) loc)) loc))
 
 let pattern ?(forbidden=[]) (p, loc) =
   let vars = ref [] in
@@ -222,35 +221,35 @@ let rec expression ctx (t, loc) =
   let w, e = match t with
   | Sugared.Var x ->
       begin match Common.lookup x ctx with
-      | Some n -> [], Syntax.Var n
+      | Some n -> [], Untyped.Var n
       | None -> Error.typing ~loc "Unknown variable %s" x
       end
   | Sugared.Const k ->
-      [], Syntax.Const k
+      [], Untyped.Const k
   | Sugared.Lambda a ->
       let a = abstraction ctx a in
-      [], Syntax.Lambda a
+      [], Untyped.Lambda a
   | Sugared.Function cs ->
       let x = fresh_variable (Some "$function") in
       let cs = List.map (abstraction ctx) cs in
-      [], Syntax.Lambda ((Pattern.Var x, loc), Syntax.add_loc (Syntax.Match (Syntax.add_loc (Syntax.Var x) loc, cs)) loc)
+      [], Untyped.Lambda ((Pattern.Var x, loc), Untyped.add_loc (Untyped.Match (Untyped.add_loc (Untyped.Var x) loc, cs)) loc)
   | Sugared.Handler cs ->
       let w, h = handler loc ctx cs in
-      w, Syntax.Handler h
+      w, Untyped.Handler h
   | Sugared.Tuple ts ->
       let w, es = expressions ctx ts in
-      w, Syntax.Tuple es
+      w, Untyped.Tuple es
   | Sugared.Record ts ->
       if not (C.injective fst ts) then Error.syntax ~loc "Fields in a record must be distinct";
       let w, es = record_expressions ctx ts in
-      w, Syntax.Record es
+      w, Untyped.Record es
   | Sugared.Variant (lbl, None) ->
-      [], Syntax.Variant (lbl, None)
+      [], Untyped.Variant (lbl, None)
   | Sugared.Variant (lbl, Some t) ->
       let w, e = expression ctx t in
-      w, Syntax.Variant (lbl, Some e)
+      w, Untyped.Variant (lbl, Some e)
   | Sugared.Effect eff ->
-      [], Syntax.Effect eff
+      [], Untyped.Effect eff
   (* Terms that are desugared into computations. We list them explicitly in
      order to catch any future constructs. *)
   | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
@@ -258,38 +257,38 @@ let rec expression ctx (t, loc) =
       let x = fresh_variable (Some "$bind") in
       let c = computation ctx (t, loc) in
       let w = [(Pattern.Var x, loc), c] in
-      w, Syntax.Var x
+      w, Untyped.Var x
   in
-  w, Syntax.add_loc e loc
+  w, Untyped.add_loc e loc
 
 and computation ctx (t, loc) =
   let if_then_else e c1 c2 =
-    Syntax.Match (e, [
-      (Pattern.Const (Const.of_true), c1.Syntax.location), c1;
-      (Pattern.Const (Const.of_false), c2.Syntax.location), c2
+    Untyped.Match (e, [
+      (Pattern.Const (Const.of_true), c1.Untyped.location), c1;
+      (Pattern.Const (Const.of_false), c2.Untyped.location), c2
     ])
   in
   let w, c = match t with
     | Sugared.Apply ((Sugared.Apply ((Sugared.Var "&&", loc1), t1), loc2), t2) ->
       let w1, e1 = expression ctx t1 in
       let c2 = computation ctx t2 in
-          w1, if_then_else e1 c2 (Syntax.add_loc (Syntax.Value (Syntax.add_loc (Syntax.Const Const.of_false) loc2)) loc2)
+          w1, if_then_else e1 c2 (Untyped.add_loc (Untyped.Value (Untyped.add_loc (Untyped.Const Const.of_false) loc2)) loc2)
     | Sugared.Apply ((Sugared.Apply ((Sugared.Var "||", loc1), t1), loc2), t2) ->
       let w1, e1 = expression ctx t1 in
       let c2 = computation ctx t2 in
-          w1, if_then_else e1 (Syntax.add_loc (Syntax.Value (Syntax.add_loc (Syntax.Const Const.of_true) loc2)) loc2) c2
+          w1, if_then_else e1 (Untyped.add_loc (Untyped.Value (Untyped.add_loc (Untyped.Const Const.of_true) loc2)) loc2) c2
     | Sugared.Apply (t1, t2) ->
         let w1, e1 = expression ctx t1 in
         let w2, e2 = expression ctx t2 in
-          (w1 @ w2), Syntax.Apply (e1, e2)
+          (w1 @ w2), Untyped.Apply (e1, e2)
     | Sugared.Match (t, cs) ->
         let cs = List.map (abstraction ctx) cs in
         let w, e = expression ctx t in
-          w, Syntax.Match (e, cs)
+          w, Untyped.Match (e, cs)
     | Sugared.Handle (t1, t2) ->
         let w1, e1 = expression ctx t1 in
         let c2 = computation ctx t2 in
-          w1, Syntax.Handle (e1, c2)
+          w1, Untyped.Handle (e1, c2)
     | Sugared.Conditional (t, t1, t2) ->
         let w, e = expression ctx t in
         let c1 = computation ctx t1 in
@@ -298,16 +297,16 @@ and computation ctx (t, loc) =
     | Sugared.While (t1, t2) ->
         let c1 = computation ctx t1 in
         let c2 = computation ctx t2 in
-          [], Syntax.While (c1, c2)
+          [], Untyped.While (c1, c2)
 
     | Sugared.For (i, t1, t2, t, b) ->
       let w1, e1 = expression ctx t1 in
       let w2, e2 = expression ctx t2 in
       let j = fresh_variable (Some "$for") in
       let c = computation ((i, j) :: ctx) t in
-        w1 @ w2, Syntax.For (j, e1, e2, c, b)
+        w1 @ w2, Untyped.For (j, e1, e2, c, b)
     | Sugared.Check t ->
-        [], Syntax.Check (computation ctx t)
+        [], Untyped.Check (computation ctx t)
     | Sugared.Let (defs, t) ->
         let ctx', defs, _ =
             List.fold_right (fun (p, c) (ctx', defs, forbidden) ->
@@ -320,7 +319,7 @@ and computation ctx (t, loc) =
                     let c = computation ctx c in
                     (p_vars @ ctx', (p, c) :: defs, (List.map fst p_vars) @ forbidden)) defs (ctx, [], []) in
         let c = computation ctx' t in
-          [], Syntax.Let (defs, c)
+          [], Untyped.Let (defs, c)
     | Sugared.LetRec (defs, t) ->
         let ctx', ns, _ = List.fold_right (fun (x, t) (ctx', ns, forbidden) ->
                                           if List.mem x forbidden then
@@ -332,16 +331,16 @@ and computation ctx (t, loc) =
                             let c = let_rec ctx' c in
                             ((p, c) :: defs)) (List.combine ns defs) [] in
         let c = computation ctx' t in
-          [], Syntax.LetRec (defs, c)
+          [], Untyped.LetRec (defs, c)
     (* The remaining cases are expressions, which we list explicitly to catch any
        future changes. *)
     | (Sugared.Var _ | Sugared.Const _ | Sugared.Tuple _ | Sugared.Record _  | Sugared.Variant _ | Sugared.Lambda _ | Sugared.Function _ | Sugared.Handler _ | Sugared.Effect _) ->
         let w, e = expression ctx (t, loc) in
-          w, Syntax.Value e
+          w, Untyped.Value e
   in
     match w with
-      | [] -> Syntax.add_loc c loc
-      | _ :: _ -> Syntax.add_loc (Syntax.Let (w, Syntax.add_loc c loc)) loc
+      | [] -> Untyped.add_loc c loc
+      | _ :: _ -> Untyped.add_loc (Untyped.Let (w, Untyped.add_loc c loc)) loc
 
 and abstraction ctx (p, t) =
   let vars, p = pattern p in
@@ -358,7 +357,7 @@ and let_rec ctx (e, loc) =
   | Sugared.Function cs ->
     let x = fresh_variable (Some "$let_rec_function") in
     let cs = List.map (abstraction ctx) cs in
-    (Pattern.Var x, loc), Syntax.add_loc (Syntax.Match (Syntax.add_loc (Syntax.Var x) loc, cs)) loc
+    (Pattern.Var x, loc), Untyped.add_loc (Untyped.Match (Untyped.add_loc (Untyped.Var x) loc, cs)) loc
   | _ -> Error.syntax ~loc "This kind of expression is not allowed in a recursive definition"
 
 and expressions ctx = function
@@ -383,10 +382,10 @@ and handler loc ctx {Sugared.operations=ops; Sugared.value=val_a; Sugared.finall
     (op, abstraction2 ctx a2) :: cs'
   in
   let ops = operation_cases ops in
-  [], { Syntax.operations = ops;
-    Syntax.value =
+  [], { Untyped.operations = ops;
+    Untyped.value =
       (match val_a with None -> id_abstraction loc | Some a -> abstraction ctx a);
-    Syntax.finally =
+    Untyped.finally =
       (match fin_a with None -> id_abstraction loc | Some a -> abstraction ctx a)}
 
 let top_ctx = ref []

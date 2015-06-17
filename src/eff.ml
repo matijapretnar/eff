@@ -77,14 +77,14 @@ type state = {
   environment : Eval.env;
   context : Ctx.t;
   change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
-  effects : (Type.ty * Type.ty) Syntax.EffectMap.t
+  effects : (Type.ty * Type.ty) Untyped.EffectMap.t
 }
 
 let initial_ctxenv = {
   environment = Eval.initial;
   context = Ctx.empty;
   change = Common.id;
-  effects = Syntax.EffectMap.empty;
+  effects = Untyped.EffectMap.empty;
 }
 
 let create_infer_state st = {
@@ -94,10 +94,10 @@ let create_infer_state st = {
 
 let infer_top_comp st c =
   let ctx', (ty', drt'), cnstrs' = Infer.infer_comp (create_infer_state st) c in
-  let change = Scheme.add_to_top ~loc:c.Syntax.location ctx' cnstrs' in
+  let change = Scheme.add_to_top ~loc:c.Untyped.location ctx' cnstrs' in
   let top_change = Common.compose st.change change in
-  let ctx = match c.Syntax.term with
-  | Syntax.Value _ -> ctx'
+  let ctx = match c.Untyped.term with
+  | Untyped.Value _ -> ctx'
   | _ -> (Desugar.fresh_variable (Some "$top_comp"), ty') :: ctx'
   in
   let drty_sch = top_change (ctx, (ty', drt'), cnstrs') in
@@ -110,7 +110,7 @@ let infer_top_comp st c =
     and return the new environment. *)
 let rec exec_cmd interactive st (d,loc) =
   match d with
-  | SugaredSyntax.Term c ->
+  | Sugared.Term c ->
       let c = Desugar.top_computation c in
       let drty_sch, new_change = infer_top_comp st c in
       let v = Eval.run st.environment c in
@@ -118,24 +118,24 @@ let rec exec_cmd interactive st (d,loc) =
         (Scheme.print_dirty_scheme drty_sch)
         (Value.print_value v);
       {st with change = new_change}
-  | SugaredSyntax.TypeOf c ->
+  | Sugared.TypeOf c ->
       let c = Desugar.top_computation c in
       let drty_sch, new_change = infer_top_comp st c in
       Format.printf "@[- : %t@]@." (Scheme.print_dirty_scheme drty_sch);
       {st with change = new_change}
-  | SugaredSyntax.Reset ->
+  | Sugared.Reset ->
       Tctx.reset ();
       print_endline ("Environment reset."); initial_ctxenv
-  | SugaredSyntax.Help ->
+  | Sugared.Help ->
       print_endline help_text;
       st
-  | SugaredSyntax.DefEffect (eff, (ty1, ty2)) ->
+  | Sugared.DefEffect (eff, (ty1, ty2)) ->
       let ty1 = Desugar.ty Trio.empty ty1
       and ty2 = Desugar.ty Trio.empty ty2 in
-      {st with effects = Syntax.EffectMap.add eff (ty1, ty2) st.effects}
-  | SugaredSyntax.Quit -> exit 0
-  | SugaredSyntax.Use fn -> use_file st (fn, interactive)
-  | SugaredSyntax.TopLet defs ->
+      {st with effects = Untyped.EffectMap.add eff (ty1, ty2) st.effects}
+  | Sugared.Quit -> exit 0
+  | Sugared.Use fn -> use_file st (fn, interactive)
+  | Sugared.TopLet defs ->
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
       let vars, nonpoly, change = Infer.infer_let ~loc (create_infer_state st) defs in
@@ -160,7 +160,7 @@ let rec exec_cmd interactive st (d,loc) =
                        match Eval.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.printf "@[val %t : %t = %t@]@." (Syntax.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
+                         Format.printf "@[val %t : %t = %t@]@." (Untyped.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
             vars
         end;
         {
@@ -169,7 +169,7 @@ let rec exec_cmd interactive st (d,loc) =
           change = top_change;
           environment = env;
         }
-    | SugaredSyntax.TopLetRec defs ->
+    | Sugared.TopLetRec defs ->
         let defs = Desugar.top_let_rec defs in
         let vars, change = Infer.infer_let_rec ~loc (create_infer_state st) defs in
         let ctx = List.fold_right (fun (x, ty_sch) ctx -> Ctx.extend ctx x ty_sch) vars st.context in
@@ -181,7 +181,7 @@ let rec exec_cmd interactive st (d,loc) =
         List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
         let env = Eval.extend_let_rec st.environment defs in
           if interactive then begin
-            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Syntax.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch))) vars
+            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Untyped.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch))) vars
           end;
         {
           st with
@@ -189,7 +189,7 @@ let rec exec_cmd interactive st (d,loc) =
           change = top_change;
           environment = env;
         }
-    | SugaredSyntax.External (x, t, f) ->
+    | Sugared.External (x, t, f) ->
       let (x, t) = Desugar.external_ty x t in
       let ctx = Ctx.extend st.context x t in
         begin match C.lookup f External.values with
@@ -201,7 +201,7 @@ let rec exec_cmd interactive st (d,loc) =
             }
           | None -> Error.runtime "unknown external symbol %s." f
         end
-    | SugaredSyntax.Tydef tydefs ->
+    | Sugared.Tydef tydefs ->
         let tydefs = Desugar.tydefs ~loc tydefs in
         Tctx.extend_tydefs ~loc tydefs ;
         st

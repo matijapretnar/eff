@@ -226,7 +226,7 @@ let check_patterns ~loc pats =
           | Some ps ->
               Print.warning ~loc "@[This pattern-matching is not exhaustive.@.
                                     Here is an example of a value that is not matched:@.  @[%t@]"
-              (Syntax.print_pattern (List.hd ps));
+              (Untyped.print_pattern (List.hd ps));
           | None -> ()
         end
     | (_, loc) as pat :: pats ->
@@ -247,21 +247,21 @@ let is_irrefutable p = check_patterns ~loc:(snd p) [p]
    statements. *)
 let check_comp c =
   let rec check c =
-    match c.Syntax.term with
-      | Syntax.Value _ -> ()
-      | Syntax.Let (lst, c) ->
+    match c.Untyped.term with
+      | Untyped.Value _ -> ()
+      | Untyped.Let (lst, c) ->
         List.iter (fun (p, c) -> is_irrefutable p ; check c) lst ;
         check c
-      | Syntax.LetRec (lst, c) ->
+      | Untyped.LetRec (lst, c) ->
         List.iter (fun (_, (p, c)) -> is_irrefutable p ; check c) lst ;
-      | Syntax.Match (_, []) -> () (* Skip empty match to avoid an unwanted warning. *)
-      | Syntax.Match (_, lst) -> 
-        check_patterns ~loc:c.Syntax.location (List.map fst lst) ;
+      | Untyped.Match (_, []) -> () (* Skip empty match to avoid an unwanted warning. *)
+      | Untyped.Match (_, lst) -> 
+        check_patterns ~loc:c.Untyped.location (List.map fst lst) ;
         List.iter (fun (_, c) -> check c) lst
-      | Syntax.While (c1, c2) -> check c1 ; check c2
-      | Syntax.For (_, _, _, c, _) -> check c
-      | Syntax.Apply _ -> ()
-      | Syntax.Handle (_, c) -> check c
-      | Syntax.Check c -> check c
+      | Untyped.While (c1, c2) -> check c1 ; check c2
+      | Untyped.For (_, _, _, c, _) -> check c
+      | Untyped.Apply _ -> ()
+      | Untyped.Handle (_, c) -> check c
+      | Untyped.Check c -> check c
   in
     check c

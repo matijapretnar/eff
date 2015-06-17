@@ -1,4 +1,4 @@
-type context = (Syntax.variable, Type.ty) Common.assoc
+type context = (Untyped.variable, Type.ty) Common.assoc
 type ty_scheme = context * Type.ty * Constraints.t
 type dirty_scheme = context * Type.dirty * Constraints.t
 type change = ty_scheme -> ty_scheme
@@ -134,7 +134,7 @@ let finalize_pattern_scheme ctx ty chngs =
 let context skeletons ctx ppf =
   match ctx with
   | [] -> ()
-  | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence ", " (fun (x, t) ppf -> Print.print ppf "%t : %t" (Syntax.Variable.print x) (Type.print skeletons t)) ctx)
+  | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence ", " (fun (x, t) ppf -> Print.print ppf "%t : %t" (Untyped.Variable.print x) (Type.print skeletons t)) ctx)
 
 let extend_non_poly (ts, ds, rs) skeletons =
   let add_skel skel new_ts =

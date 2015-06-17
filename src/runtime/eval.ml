@@ -5,7 +5,7 @@ module V = Value
 
 exception PatternMatch of Location.t
 
-module EnvMap = Map.Make(Syntax.Variable)
+module EnvMap = Map.Make(Untyped.Variable)
 
 type env = Value.value EnvMap.t
 
@@ -57,9 +57,9 @@ let rec sequence k = function
       V.Call (op, v, k'')
 
 let rec ceval env c =
-  let loc = c.Syntax.location in
-  match c.Syntax.term with
-  | Syntax.Apply (e1, e2) ->
+  let loc = c.Untyped.location in
+  match c.Untyped.term with
+  | Untyped.Apply (e1, e2) ->
       let v1 = veval env e1
       and v2 = veval env e2 in
       begin match v1 with
@@ -67,10 +67,10 @@ let rec ceval env c =
       | _ -> Error.runtime "Only functions can be applied."
       end
 
-  | Syntax.Value e ->
+  | Untyped.Value e ->
       V.Value (veval env e)
 
-  | Syntax.Match (e, cases) ->
+  | Untyped.Match (e, cases) ->
       let v = veval env e in
       let rec eval_case = function
         | [] -> Error.runtime "No branches succeeded in a pattern match."
@@ -80,7 +80,7 @@ let rec ceval env c =
       in
         eval_case cases
 
-  | Syntax.While (c1, c2) ->
+  | Untyped.While (c1, c2) ->
       let rec loop () =
         let k v =
           let b = V.to_bool v in
@@ -93,7 +93,7 @@ let rec ceval env c =
       in
       loop ()
           
-  | Syntax.For (i, e1, e2, c, up) ->
+  | Untyped.For (i, e1, e2, c, up) ->
       let n1 = V.to_int (veval env e1) in
       let n2 = V.to_int (veval env e2) in
       let le = if up then Big_int.le_big_int else Big_int.ge_big_int in
@@ -107,20 +107,20 @@ let rec ceval env c =
       in
       loop n1
 
-  | Syntax.Handle (e, c) ->
+  | Untyped.Handle (e, c) ->
       let v = veval env e in
       let r = ceval env c in
       let h = V.to_handler v in
       h r
 
-  | Syntax.Let (lst, c) ->
+  | Untyped.Let (lst, c) ->
       eval_let env lst c
 
-  | Syntax.LetRec (defs, c) ->
+  | Untyped.LetRec (defs, c) ->
       let env = extend_let_rec env defs in
       ceval env c
 
-  | Syntax.Check c ->
+  | Untyped.Check c ->
       let r = ceval env c in
       Print.check ~loc "%t" (Value.print_result r);
       V.unit_result
@@ -143,23 +143,23 @@ and extend_let_rec env defs =
   env
 
 and veval env e =
-  match e.Syntax.term with
-  | Syntax.Var x ->
+  match e.Untyped.term with
+  | Untyped.Var x ->
       begin match lookup x env with
       | Some v -> v
-      | None -> Error.runtime "Name %t is not defined." (Syntax.Variable.print x)
+      | None -> Error.runtime "Name %t is not defined." (Untyped.Variable.print x)
       end
-  | Syntax.Const c -> V.Const c
-  | Syntax.Tuple es -> V.Tuple (List.map (veval env) es)
-  | Syntax.Record es -> V.Record (List.map (fun (f, e) -> (f, veval env e)) es)
-  | Syntax.Variant (lbl, None) -> V.Variant (lbl, None)
-  | Syntax.Variant (lbl, Some e) -> V.Variant (lbl, Some (veval env e))
-  | Syntax.Lambda a -> V.Closure (eval_closure env a)
-  | Syntax.Effect eff ->
+  | Untyped.Const c -> V.Const c
+  | Untyped.Tuple es -> V.Tuple (List.map (veval env) es)
+  | Untyped.Record es -> V.Record (List.map (fun (f, e) -> (f, veval env e)) es)
+  | Untyped.Variant (lbl, None) -> V.Variant (lbl, None)
+  | Untyped.Variant (lbl, Some e) -> V.Variant (lbl, Some (veval env e))
+  | Untyped.Lambda a -> V.Closure (eval_closure env a)
+  | Untyped.Effect eff ->
       V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
-  | Syntax.Handler h -> V.Handler (eval_handler env h)
+  | Untyped.Handler h -> V.Handler (eval_handler env h)
 
-and eval_handler env {Syntax.operations=ops; Syntax.value=value; Syntax.finally=fin} =
+and eval_handler env {Untyped.operations=ops; Untyped.value=value; Untyped.finally=fin} =
   let eval_op (op, (p, kvar, c)) =
     let f u k = eval_closure (extend kvar (V.Closure k) env) (p, c) u in
       (op, f)

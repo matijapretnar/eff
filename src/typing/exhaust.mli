@@ -6,8 +6,8 @@
 *)
 
 (** Check that a pattern is irrefutable. *)
-val is_irrefutable : Syntax.pattern -> unit
+val is_irrefutable : Untyped.pattern -> unit
 
 (** Check for refutable patterns in let statements and non-exhaustive match statements. *)
-val check_comp : Syntax.computation -> unit
+val check_comp : Untyped.computation -> unit
 
