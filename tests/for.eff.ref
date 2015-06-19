@@ -18,7 +18,7 @@ Check (file "./for.eff", line 2, char 3):
 9
 Check (file "./for.eff", line 2, char 3):
 10
-- : unit = ()
+- : unit ! δ₁ |  = ()
 Check (file "./for.eff", line 6, char 3):
 10
 Check (file "./for.eff", line 6, char 3):
@@ -39,7 +39,7 @@ Check (file "./for.eff", line 6, char 3):
 2
 Check (file "./for.eff", line 6, char 3):
 1
-- : unit = ()
+- : unit ! δ₁ |  = ()
 Check (file "./for.eff", line 11, char 5):
 (1, 1)
 Check (file "./for.eff", line 11, char 5):
@@ -240,8 +240,8 @@ Check (file "./for.eff", line 11, char 5):
 (10, 9)
 Check (file "./for.eff", line 11, char 5):
 (10, 10)
-- : unit = ()
-- : unit = ()
+- : unit ! δ₁ |  = ()
+- : unit ! δ₁ |  = ()
 Check (file "./for.eff", line 20, char 3):
 (1, 1)
 Check (file "./for.eff", line 22, char 5):
@@ -278,4 +278,4 @@ Check (file "./for.eff", line 22, char 5):
 (2, 4)
 Check (file "./for.eff", line 22, char 5):
 (2, 5)
-- : unit = ()
+- : unit ! δ₁ |  = ()

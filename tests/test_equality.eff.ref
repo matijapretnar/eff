@@ -1,7 +1,7 @@
-- : bool = true
-- : bool = false
-- : bool = true
-- : bool = false
-- : bool = false
-- : bool = true
-- : string × bool × bool × bool = ("nested", true, false, true)
+- : bool ! δ₁ |  = true
+- : bool ! δ₁ |  = false
+- : bool ! δ₁ |  = true
+- : bool ! δ₁ |  = false
+- : bool ! δ₁ |  = false
+- : bool ! δ₁ |  = true
+- : string × bool × bool × bool ! δ₁ |  = ("nested", true, false, true)

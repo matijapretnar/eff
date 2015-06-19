@@ -2,6 +2,11 @@ effect Get: unit -> int
 effect Set: int -> unit
 effect Fail : unit -> empty ;;
 
+let state x = handler
+  | val y -> (fun _ -> y)
+  | #Get () k -> (fun s -> k s s)
+  | #Set s' k -> (fun _ -> k () s')
+
 let better_state x = handler
   | val y -> (fun _ -> y)
   | #Get () k -> (fun s -> k s s)
