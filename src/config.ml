@@ -7,7 +7,7 @@ type pervasives =
 
 let pervasives_file = ref PervasivesDefault
 
-let effect_annotations = ref false
+let effect_annotations = ref true
 
 let disable_beautify = ref false
 

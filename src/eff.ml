@@ -19,9 +19,9 @@ let options = Arg.align [
   ("--pervasives",
    Arg.String (fun str -> Config.pervasives_file := Config.PervasivesFile str),
    " Specify the pervasives.eff file");
-  ("--effects",
-   Arg.Set Config.effect_annotations,
-   " Show the output of effect inference");
+  ("--no-effects",
+   Arg.Clear Config.effect_annotations,
+   " Hide the output of effect inference");
   ("--no-beautify",
     Arg.Set Config.disable_beautify,
     " Do not beautify types");
