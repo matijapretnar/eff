@@ -6673,7 +6673,7 @@ let setup_t =
           alpha_features = [];
           beta_features = [];
           name = "eff";
-          version = "3.1";
+          version = "4.0";
           license =
             OASISLicense.DEP5License
               (OASISLicense.DEP5Unit
