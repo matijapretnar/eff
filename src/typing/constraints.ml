@@ -249,8 +249,10 @@ let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) constraint
 }
 
 let print ~non_poly constraints ppf =
-  Print.print ppf "ty_poset: %t\ndirt_poset: %t\nregion_poset: %t\n; FULL: %t"
-    (TyPoset.print constraints.ty_poset)
-    (DirtPoset.print constraints.dirt_poset)
-    (RegionPoset.print constraints.region_poset)
-    (Print.sequence "," (Type.print_region_param ~non_poly) (FullRegions.elements constraints.full_regions))
+  TyPoset.print constraints.ty_poset ppf;
+  if not (TyPoset.is_empty constraints.ty_poset) then Format.pp_print_string ppf "; ";
+  DirtPoset.print constraints.dirt_poset ppf;
+  if not (DirtPoset.is_empty constraints.dirt_poset) then Format.pp_print_string ppf "; ";
+  RegionPoset.print constraints.region_poset ppf;
+  if not (RegionPoset.is_empty constraints.region_poset) then Format.pp_print_string ppf "; ";
+  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Type.print_region_param ~non_poly x) (Symbols.top ())) (FullRegions.elements constraints.full_regions) ppf

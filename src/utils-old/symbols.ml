@@ -4,6 +4,7 @@ let arrow () = if !Config.ascii then "->" else "⟶ "
 let short_arrow () = if !Config.ascii then "->" else "→"
 let times () = if !Config.ascii then " * " else " × "
 let union () = if !Config.ascii then "+" else "∪"
+let top () = if !Config.ascii then "T" else "⊤"
 
 let subscript sub =
   match sub with

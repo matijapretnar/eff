@@ -13,6 +13,7 @@ sig
   type t
 
   val empty : t
+  val is_empty : t -> bool
   val add : elt -> elt -> t -> t
   val remove : elt -> t -> elt list * elt list * t
   val merge : t -> t -> t

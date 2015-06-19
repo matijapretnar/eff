@@ -13,6 +13,7 @@ sig
   type t
 
   val empty : t
+  val is_empty : t -> bool
   val add : elt -> elt -> t -> t
   val remove : elt -> t -> elt list * elt list * t
   val merge : t -> t -> t
@@ -40,6 +41,8 @@ struct
   type t = related EltMap.t
 
   let empty = EltMap.empty
+
+  let is_empty = EltMap.is_empty
 
   let empty_related = {
     smaller = EltSet.empty;
@@ -98,5 +101,6 @@ struct
   let map f poset = fold (fun x y -> add (f x) (f y)) poset empty
 
   let print poset ppf =
-    fold (fun x y _ -> Format.fprintf ppf "%t < %t" (Elt.print x) (Elt.print y)) poset ()
-end
+    let pairs = fold (fun x y lst -> (x, y) :: lst) poset [] in
+    Print.sequence "," (fun (x, y) ppf -> Format.fprintf ppf "%t < %t" (Elt.print x) (Elt.print y)) pairs ppf
+  end
