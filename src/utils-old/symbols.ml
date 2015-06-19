@@ -19,22 +19,12 @@ let subscript sub =
         sub i
 
 let ty_param index poly ppf =
-  let skel = 30 in
   if !Config.ascii then
-    let c = if poly then "'_" else "'" in
-    if skel <= 25 then
-      Print.print ppf "%s%c%s" c (char_of_int (skel + int_of_char 'a')) (subscript (Some index))
-    else
-      Print.print ppf "%st%i%s" c (skel - 25) (subscript (Some index))
+    let c = if poly then "_ty" else "ty" in
+    Print.print ppf "%s%s" c (subscript (Some (index + 1)))
   else
-    let c = if poly then "_" else "" in
-    let letters =
-      ["α"; "β"; "γ"]
-    in
-    if skel < List.length letters then
-      Print.print ppf "%s%s%s" c (List.nth letters skel) (subscript (Some index))
-    else
-      Print.print ppf "%sτ%d%s" c (skel - List.length letters) (subscript (Some index))
+    let c = if poly then "_τ" else "τ" in
+    Print.print ppf "%s%s" c (subscript (Some (index + 1)))
 
 let dirt_param index poly ppf =
   if !Config.ascii then
