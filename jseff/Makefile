@@ -1,4 +1,4 @@
-	include ./Makefile.conf
+include ./Makefile.conf
 -include ./Makefile.local
 
 all: toplevel.js eval.js
@@ -22,25 +22,14 @@ SYNTAXES= lwt.syntax \
 	js_of_ocaml.deriving.syntax deriving.syntax.std
 endif
 
-JSFILES= +weak.js +toplevel.js +graphics.js +nat.js
+JSFILES= +weak.js +toplevel.js +nat.js
 
 PACKAGES= \
-	graphics lwt bigarray tyxml.functor \
-	react reactiveData \
+	lwt tyxml.functor \
 	js_of_ocaml \
 	js_of_ocaml.deriving \
 	js_of_ocaml.tyxml \
-	js_of_ocaml.graphics \
 	js_of_ocaml.toplevel
-
-ifeq ($(METAOCAML),1)
-BER_EXPORT=trx runcode print_code
-BER=metalib.cma bertop.cmo \
-	${addprefix -export-unit , ${BER_EXPORT}}
-#METAOCAML DOES NOT WORK WITH CAMLP4
-SYNTAXES=
-OPTCOMP_OPT+= -let metaocaml=true
-endif
 
 #-jsopt "--pretty --disable shortvar"
 MKTOP=jsoo_mktop -verbose $(SAFESTRING) \
@@ -70,9 +59,6 @@ $(EVAL_NAME).js: $(EVAL_OBJS)
 
 %.cmis.js:
 	jsoo_mkcmis $*
-
-server.%: server.ml
-	ocamlbuild -use-ocamlfind -package findlib,cohttp.lwt server.$*
 
 %.cmo:%.ml
 	ocamlfind ocamlc -c -syntax camlp4o $(SAFESTRING) \

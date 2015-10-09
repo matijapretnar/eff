@@ -18,8 +18,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *)
 
-open Lwt
-module Html = Dom_html
+let ( >>= ) = Lwt.( >>= )
 
 (****** Eff interface ******)
 
@@ -31,23 +30,25 @@ struct
     (** Initialize Eff state. *)
     ()
       
-  let use ppf file =
-    (** Evaluate file *)
-    Format.fprintf ppf "This is a test.\n" ;
+  let use ppf expr =
+    (** Evaluate expr *)
+    Format.fprintf ppf "Would evaluate %s\n" expr ;
     true
       
   (** [execute print fmt content] Execute [content].
     [print] says whether the values and types of the results should be printed.
     [pp_code] formatter can be use to output ocaml source during lexing. *)
   let execute print ?pp_code fmt content =
-    Format.fprintf fmt "YYY %s YYY.\n" content ;
-    match pp_code with
+    begin match pp_code with
       | None -> ()
-      | Some fmt -> Format.fprintf fmt "XXX %s XXX.\n" content
+      | Some fmt -> Format.fprintf fmt "%s@?" content
+    end ;
+    Format.fprintf fmt "YYY %s YYY@?" content
 end
 
 (***************************)
 
+(** Manage shell history. *)
 module H = struct
   type 'a t = {
     data : 'a array;
@@ -73,6 +74,7 @@ module H = struct
     if t.size < len'
     then t.size <- t.size + 1
     else t.start <- m (t.start + 1) len'
+
   let get t i =
     if i >= t.size || i < 0 then raise Not_found;
     t.data.(m (t.start + i) (Array.length t.data))
@@ -90,7 +92,7 @@ module H = struct
 
 
   let get_storage () =
-    match Js.Optdef.to_option Html.window##localStorage with
+    match Js.Optdef.to_option Dom_html.window##localStorage with
         None -> raise Not_found
       | Some t -> t
 
@@ -168,8 +170,6 @@ let initialize () =
   EffTop.initialize ();
   Sys.interactive := false;
   exec'("let _print_error fmt e = Format.pp_print_string fmt (Js.string_of_error e)");
-  Topdirs.dir_install_printer Format.std_formatter
-    (Longident.(Lident "_print_error"));
   Hashtbl.add Toploop.directive_table "display" (Toploop.Directive_ident (fun lid ->
       let s =
         match lid with
@@ -211,15 +211,14 @@ let initialize () =
   Sys.interactive := true;
   ()
 
+(** Trim initial and final whitespace on a string. *)
 let trim s =
   let ws c = c = ' ' || c = '\t' || c = '\n' in
   let len = String.length s in
   let start = ref 0 in
   let stop = ref (len - 1) in
-  while !start < len && (ws s.[!start])
-  do incr start done;
-  while !stop > !start && (ws s.[!stop])
-  do decr stop done;
+  while !start < len && (ws s.[!start]) do incr start done;
+  while !stop > !start && (ws s.[!stop]) do decr stop done;
   String.sub s !start (!stop - !start + 1)
 
 let by_id s = Dom_html.getElementById s
@@ -342,7 +341,7 @@ let parse_hash () =
 let run _ =
   let container = by_id "toplevel-container" in
   let output = by_id "output" in
-  let textbox : 'a Js.t = by_id_coerce "userinput" Html.CoerceTo.textarea in
+  let textbox : 'a Js.t = by_id_coerce "userinput" Dom_html.CoerceTo.textarea in
   let example_container = by_id "toplevel-examples" in
   let sharp_chan = open_out "/dev/null0" in
   let sharp_ppf = Format.formatter_of_out_channel sharp_chan in
@@ -360,8 +359,11 @@ let run _ =
 
 
   let hist : string H.t = H.load_or_create 100 in
+
   let hist_idx = ref (H.size hist) in
+
   let cur = ref (Js.string "") in
+
   let execute () =
     let content' = Js.to_string textbox##value in
     let content = trim content' in
@@ -379,21 +381,22 @@ let run _ =
     hist_idx:=H.size hist;
     EffTop.execute true ~pp_code:sharp_ppf caml_ppf content;
     textbox##value <- Js.string "";
-    resize () >>= fun () ->
-    container##scrollTop <- container##scrollHeight;
-    textbox##focus();
-    Lwt.return_unit in
+    resize () >>= (fun () ->
+                   container##scrollTop <- container##scrollHeight;
+                   textbox##focus();
+                   Lwt.return_unit)
+  in
 
   List.iter (fun (name,content) ->
       let a = Tyxml_js.Html5.(a ~a:[
           a_class ["list-group-item"];
           a_onclick (fun _ ->
               textbox##value <- Js.string content;
-              Lwt.async(fun () ->
-                  resize () >>= fun () ->
-                  container##scrollTop <- container##scrollHeight;
-                  textbox##focus();
-                  Lwt.return_unit);
+              Lwt.async (fun () ->
+                  resize () >>= (fun () ->
+                                 container##scrollTop <- container##scrollHeight;
+                                 textbox##focus();
+                                 Lwt.return_unit));
               true
             )] [pcdata name]) in
       Dom.appendChild example_container (Tyxml_js.To_dom.of_a a)
@@ -401,16 +404,16 @@ let run _ =
 
   begin (* setup handlers *)
     do_by_id "btn-execute"
-      (fun e -> e##onclick <- Html.handler (fun _ -> Lwt.async execute; Js._false));
+      (fun e -> e##onclick <- Dom_html.handler (fun _ -> Lwt.async execute; Js._false));
     do_by_id "btn-clear"
-      (fun e -> e##onclick <- Html.handler (fun _ -> output##innerHTML <- Js.string ""; Js._false));
+      (fun e -> e##onclick <- Dom_html.handler (fun _ -> output##innerHTML <- Js.string ""; Js._false));
     do_by_id "btn-reset"
-      (fun e -> e##onclick <- Html.handler (fun _ -> output##innerHTML <- Js.string "";
+      (fun e -> e##onclick <- Dom_html.handler (fun _ -> output##innerHTML <- Js.string "";
                                              initialize (); Js._false));
     do_by_id "btn-share"
       (fun e ->
          e##style##display <- Js.string "block";
-         e##onclick <- Html.handler (fun _ ->
+         e##onclick <- Dom_html.handler (fun _ ->
 
            (* get all ocaml code *)
            let childs = Dom.list_of_nodeList output##childNodes in
@@ -458,7 +461,7 @@ let run _ =
                     Lwt.return_unit));
            Js._false));
 
-    textbox##onkeydown <- Html.handler (fun e ->
+    textbox##onkeydown <- Dom_html.handler (fun e ->
         match e##keyCode with
         | 13 when not (Js.to_bool e##ctrlKey  ||
                        Js.to_bool e##shiftKey ||
@@ -530,9 +533,9 @@ let run _ =
 
         | _ -> Js._true
       );
-    textbox##onkeyup <- Html.handler (fun e ->
+    textbox##onkeyup <- Dom_html.handler (fun e ->
         Lwt.async resize;Js._true);
-    textbox##onchange <- Html.handler (fun _ -> Lwt.async resize; Js._true)
+    textbox##onchange <- Dom_html.handler (fun _ -> Lwt.async resize; Js._true)
   end;
 
   let append_string cl s =
@@ -596,4 +599,4 @@ let append_ocaml = append_string in
   | exc ->
     Firebug.console##log_3(Js.string "exception", Js.string (Printexc.to_string exc), exc)
 
-let _ = Html.window##onload <- Html.handler (fun _ -> run (); Js._false)
+let _ = Dom_html.window##onload <- Dom_html.handler (fun _ -> run (); Js._false)
