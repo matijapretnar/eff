@@ -5,6 +5,6 @@ val initial_state : eff_state
 val parse :
   ((Lexing.lexbuf -> Parser.token) -> Lexing.lexbuf -> 'a) -> Lexing.lexbuf -> 'a
 
-val exec_cmd : bool -> eff_state -> SugaredSyntax.toplevel -> eff_state
+val exec_cmd : Format.formatter -> bool -> eff_state -> SugaredSyntax.toplevel -> eff_state
 
-val use_file : eff_state -> string * bool -> eff_state
+val use_file : Format.formatter -> eff_state -> string * bool -> eff_state

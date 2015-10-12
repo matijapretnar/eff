@@ -84,7 +84,7 @@ let toplevel ctxenv =
     while true do
       try
         let cmd = Lexer.read_toplevel (Shell.parse Parser.commandline) () in
-        ctxenv := Shell.exec_cmd true !ctxenv cmd
+        ctxenv := Shell.exec_cmd Format.std_formatter true !ctxenv cmd
       with
         | Error.Error err -> Print.error err
         | Sys.Break -> prerr_endline "Interrupted."
@@ -119,7 +119,7 @@ let main =
   if !pervasives then add_file false !pervasives_file;
   try
     (* Run and load all the specified files. *)
-    let ctxenv = List.fold_left Shell.use_file Shell.initial_state !files in
+    let ctxenv = List.fold_left (Shell.use_file Format.std_formatter) Shell.initial_state !files in
     if !interactive_shell then toplevel ctxenv
   with
     Error.Error err -> Print.error err; exit 1

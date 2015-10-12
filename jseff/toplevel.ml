@@ -24,28 +24,30 @@ let ( >>= ) = Lwt.( >>= )
 
 module EffTop =
 struct
-  let version = "Eff GET VERSION FROM Version.ml"
+  let version = "eff " ^ EffApi.Version.version
 
-  let state = ref EffApi.Shell.initial_state                  
+  let ctxenv = ref EffApi.Shell.initial_state                  
 
   let initialize () =
-    ()
+    print_endline version;
+    ctxenv := EffApi.Shell.initial_state;
+    ctxenv := EffApi.Shell.use_file Format.std_formatter !ctxenv ("/static/pervasives.eff", false)
       
-  let use ppf expr =
-    (** Evaluate expr *)
-    Format.fprintf ppf "Would evaluate %s\n" expr ;
-    true
-      
-  (** [execute print fmt content] Execute [content].
+  (** [execute print ppf content] Execute [content].
     [print] says whether the values and types of the results should be printed.
     [pp_code] formatter can be use to output ocaml source during lexing. *)
-  let execute print ?pp_code fmt content =
+  let execute print ?pp_code ppf content =
     (* Pretty-print the output. *)
     begin match pp_code with
       | None -> ()
-      | Some fmt -> Format.fprintf fmt "%s@?" content
+      | Some ppf -> Format.fprintf ppf "%s@?" content
     end ;
-    Format.fprintf fmt "YYY %s YYY@?" content
+    try
+      let cmd = EffApi.Lexer.read_string (EffApi.Shell.parse EffApi.Parser.commandline) content in
+      ctxenv := EffApi.Shell.exec_cmd ppf true !ctxenv cmd
+    with
+      EffApi.Error.Error err -> EffApi.Print.error err
+
 end
 
 (***************************)
@@ -158,20 +160,14 @@ let load_resource scheme (_,suffix) =
   let url = Printf.sprintf "%s://%s" scheme suffix in
   load_resource_aux url
 
-let exec' s =
-  let res : bool = EffTop.use Format.std_formatter s in
-  if not res then Format.eprintf "error while evaluating %s@." s;
-  ()
-
 let initialize () =
   Sys_js.register_autoload "/dev/" (fun s -> Some "");
-  Sys_js.register_autoload "/" (fun (_,s) -> load_resource_aux ("filesys/" ^ s));
+  Sys_js.register_autoload "/file/" (fun (_,s) -> load_resource_aux ("filesys/" ^ s));
   Sys_js.register_autoload "/http/" (fun s -> load_resource "http" s);
   Sys_js.register_autoload "/https/" (fun s -> load_resource "https" s);
   Sys_js.register_autoload "/ftp/" (fun s -> load_resource "ftp" s);
   EffTop.initialize ();
   Sys.interactive := false;
-  exec'("let _print_error fmt e = Format.pp_print_string fmt (Js.string_of_error e)");
   Hashtbl.add Toploop.directive_table "display" (Toploop.Directive_ident (fun lid ->
       let s =
         match lid with
@@ -188,30 +184,7 @@ let initialize () =
         let s = Json.output v in
         print_endline (Js.to_string s)
     ));
-  exec' ("module Lwt_main = struct
-             let run t = match Lwt.state t with
-               | Lwt.Return x -> x
-               | Lwt.Fail e -> raise e
-               | Lwt.Sleep -> failwith \"Lwt_main.run: thread didn't return\"
-            end");
-  exec' ("let jsoo_logo =
-            let open Tyxml_js.Html5 in
-            a ~a:[a_href \"http://ocsigen.org/js_of_ocaml\"] [
-              img
-                ~src:\"http://ocsigen.org/resources/logos/text_js_of_ocaml_with_shadow.png\"
-                ~alt:\"Ocsigen\"  ()
-            ]");
-  exec' ("#display jsoo_logo");
-  let header1 =
-      Printf.sprintf "%s" EffTop.version in
-  let header2 = Printf.sprintf
-      "     Compiled with Js_of_ocaml version %s" Sys_js.js_of_ocaml_version in
-  exec' (Printf.sprintf "Format.printf \"%s@.\" Sys.ocaml_version;;" header1);
-  exec' (Printf.sprintf "Format.printf \"%s@.\";;" header2);
-  exec' ("#enable \"pretty\";;");
-  exec' ("#enable \"shortvar\";;");
-  Sys.interactive := true;
-  ()
+  Sys.interactive := true
 
 (** Trim initial and final whitespace on a string. *)
 let trim s =

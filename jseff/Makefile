@@ -48,6 +48,7 @@ $(TOPLEVEL_NAME).js: $(TOPLEVEL_OBJS)
 	$(TOPLEVEL_OBJS) \
 	${addprefix -jsopt , ${JSFILES}} \
 	${addprefix -jsopt , -I ./ --file examples.ml} \
+	${addprefix -jsopt , -I ./ --file pervasives.eff} \
 	-package base64 \
 	-o $(TOPLEVEL_NAME).byte \
 

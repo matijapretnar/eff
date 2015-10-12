@@ -36,20 +36,20 @@ let infer_top_comp (ctx, top_change) c =
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
     and return the new environment. *)
-let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,loc) =
+let rec exec_cmd ppf interactive ((ctx, top_change) as wholectx, env) (d,loc) =
   match d with
   | SugaredSyntax.Term c ->
       let c = Desugar.top_computation c in
       let drty_sch, top_change = infer_top_comp wholectx c in
       let v = Eval.run env c in
-      if interactive then Format.printf "@[- : %t = %t@]@."
+      if interactive then Format.fprintf ppf "@[- : %t = %t@]@."
         (Scheme.print_dirty_scheme drty_sch)
         (Value.print_value v);
       ((ctx, top_change), env)
   | SugaredSyntax.TypeOf c ->
       let c = Desugar.top_computation c in
       let drty_sch, top_change = infer_top_comp wholectx c in
-      Format.printf "@[- : %t@]@." (Scheme.print_dirty_scheme drty_sch);
+      Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme drty_sch);
       ((ctx, top_change), env)
   | SugaredSyntax.Reset ->
       Tctx.reset ();
@@ -57,7 +57,7 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,loc) =
   | SugaredSyntax.Help ->
       print_endline help_text; (wholectx, env)
   | SugaredSyntax.Quit -> exit 0
-  | SugaredSyntax.Use fn -> use_file (wholectx, env) (fn, interactive)
+  | SugaredSyntax.Use fn -> use_file ppf (wholectx, env) (fn, interactive)
   | SugaredSyntax.TopLet defs ->
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
@@ -83,7 +83,7 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,loc) =
                        match Eval.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.printf "@[val %t : %t = %t@]@." (Print.variable x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
+                         Format.fprintf ppf "@[val %t : %t = %t@]@." (Print.variable x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
             vars
         end;
         ((ctx, top_change), env)
@@ -99,7 +99,7 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,loc) =
         List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
         let env = Eval.extend_let_rec env defs in
           if interactive then begin
-            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Print.variable x) (Scheme.print_ty_scheme (sch_change tysch))) vars
+            List.iter (fun (x, tysch) -> Format.fprintf ppf "@[val %t : %t = <fun>@]@." (Print.variable x) (Scheme.print_ty_scheme (sch_change tysch))) vars
           end;
           ((ctx, top_change), env)
     | SugaredSyntax.External (x, t, f) ->
@@ -115,6 +115,6 @@ let rec exec_cmd interactive ((ctx, top_change) as wholectx, env) (d,loc) =
         ((ctx, top_change), env)
 
 
-and use_file env (filename, interactive) =
+and use_file ppf env (filename, interactive) =
   let cmds = Lexer.read_file (parse Parser.file) filename in
-    List.fold_left (exec_cmd interactive) env cmds
+    List.fold_left (exec_cmd ppf interactive) env cmds

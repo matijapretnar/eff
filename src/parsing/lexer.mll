@@ -179,6 +179,11 @@ and escaped = parse
                         }
 
 {
+  let read_string parser str =
+    let lex = Lexing.from_string (str ^ "\n") in
+    let cmd = parser lex in
+    cmd
+    
   let read_file parser fn =
   try
     let fh = open_in fn in
