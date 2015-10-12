@@ -9,7 +9,7 @@ type regionparam = int
 val id : 'a -> 'a
 val compose : ('b -> 'c) -> ('a -> 'b) -> ('a -> 'c)
 type const =
-    Integer of Big_int.big_int
+    Integer of int
   | String of string
   | Boolean of bool
   | Float of float

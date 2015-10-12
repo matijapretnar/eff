@@ -98,8 +98,8 @@ let rec ceval env (c, loc) = match c with
   | Syntax.For (i, e1, e2, c, up) ->
       let n1 = V.to_int (veval env e1) in
       let n2 = V.to_int (veval env e2) in
-      let le = if up then Big_int.le_big_int else Big_int.ge_big_int in
-      let next = if up then Big_int.succ_big_int else Big_int.pred_big_int in
+      let le = if up then ( <= ) else ( >= ) in
+      let next = if up then succ else pred in
       let rec loop n =
         if le n n2 then
           let r = ceval (update i (V.Const (C.Integer n)) env) c in

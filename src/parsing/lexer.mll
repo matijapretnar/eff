@@ -69,7 +69,7 @@ let bigint_of_string s =
   for i = 0 to String.length s - 1 do
     if s.[i] <> '_' then (s.[!j] <- s.[i]; incr j)
   done;
-  Big_int.big_int_of_string (String.sub s 0 !j)
+  int_of_string (String.sub s 0 !j)
 
 }
 
@@ -107,7 +107,7 @@ rule token = parse
   | "(*"                { comment 0 lexbuf }
   | int                 { INT (bigint_of_string (Lexing.lexeme lexbuf)) }
   | xxxint              { try
-                            INT (Big_int.big_int_of_int (int_of_string (Lexing.lexeme lexbuf)))
+                            INT (int_of_string (Lexing.lexeme lexbuf))
                           with Failure _ -> Error.syntax ~loc:(Location.of_lexeme lexbuf) "Invalid integer constant"
                         }
   | float               { FLOAT (float_of_string(Lexing.lexeme lexbuf)) }

@@ -35,7 +35,7 @@
 %token BEGIN END
 %token <Common.variable> LNAME
 %token UNDERSCORE AS
-%token <Big_int.big_int> INT
+%token <int> INT
 %token <string> STRING
 %token <bool> BOOL
 %token <float> FLOAT

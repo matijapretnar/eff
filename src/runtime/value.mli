@@ -25,7 +25,7 @@ val unit_result : result
 val fresh_instance : string option -> resource option -> value
 
 val to_bool : value -> bool
-val to_int : value -> Big_int.big_int
+val to_int : value -> int
 val to_float : value -> float
 val to_str : value -> string
 val to_instance : value -> instance

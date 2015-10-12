@@ -79,13 +79,13 @@ let find_constructors lst =
           (* Try to find an unmatched value in a countable set of constants. *)
           | Const c ->
              let first = function
-               | C.Integer _ -> C.Integer Big_int.zero_big_int
+               | C.Integer _ -> C.Integer 0
                | C.String _ -> C.String ""
                | C.Boolean _ -> C.Boolean false
                | C.Float _ -> C.Float 0.0
              in
              let next = function
-               | C.Integer v -> C.Integer (Big_int.succ_big_int v)
+               | C.Integer v -> C.Integer (succ v)
                | C.String v -> C.String (v ^ "*")
                | C.Boolean v -> C.Boolean (not v)
                | C.Float v -> C.Float (v +. 1.0)

@@ -129,14 +129,21 @@ let comparison_functions = [
   ("<", binary_closure (fun v1 v2 -> value_bool (less_than v1 v2)));
 ]
 
+let rec pow a = function
+  | 0 -> 1
+  | 1 -> a
+  | n -> 
+     let b = pow a (n / 2) in
+     if n mod 2 = 0 then b * b else b * b * a
+
 let arithmetic_operations = [
-  ("~-", from_fun (fun v -> value_int (Big_int.minus_big_int (V.to_int v))));
-  ("+", int_int_to_int Big_int.add_big_int);
-  ("-", int_int_to_int Big_int.sub_big_int);
-  ("*", int_int_to_int Big_int.mult_big_int);
-  ("/", int_int_to_int Big_int.div_big_int);
-  ("mod", int_int_to_int Big_int.mod_big_int);
-  ("**", int_int_to_int Big_int.power_big_int_positive_big_int);
+  ("~-", from_fun (fun v -> value_int (~- (V.to_int v))));
+  ("+", int_int_to_int ( + ));
+  ("-", int_int_to_int ( - ));
+  ("*", int_int_to_int ( * ));
+  ("/", int_int_to_int ( / ));
+  ("mod", int_int_to_int ( mod ));
+  ("**", int_int_to_int pow);
   ("~-.", from_fun (fun v -> value_float (~-. (V.to_float v))));
   ("+.", float_float_to_float (+.));
   ("-.", float_float_to_float (-.));
@@ -147,7 +154,7 @@ let arithmetic_operations = [
 let string_operations = [
   ("^", binary_closure (fun v1 v2 -> value_str (V.to_str v1 ^ V.to_str v2)));
   ("string_length",
-    from_fun (fun v -> value_int (Big_int.big_int_of_int (String.length (V.to_str v)))));
+    from_fun (fun v -> value_int (String.length (V.to_str v))));
 ]
 
 let conversion_functions = [
@@ -158,7 +165,7 @@ let conversion_functions = [
     in
     from_fun to_string);
   ("float_of_int",
-    from_fun (fun v -> value_float (Big_int.float_of_big_int (V.to_int v))));
+    from_fun (fun v -> value_float (float_of_int (V.to_int v))));
 ]
 
 (** [external_instance name ops] returns an instance with a given name and
@@ -188,7 +195,7 @@ let create_exception v =
     ])
 
 let rnd_int v =
-  from_int (Big_int.big_int_of_int (Random.int (Big_int.int_of_big_int (V.to_int v))))
+  from_int (Random.int (V.to_int v))
 and rnd_float v =
   from_float (Random.float (V.to_float v))
 

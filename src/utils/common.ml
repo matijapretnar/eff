@@ -16,7 +16,7 @@ let compose f g x = f (g x)
 
 (** Primitive constants *)
 type const =
-  | Integer of Big_int.big_int
+  | Integer of int
   | String of string
   | Boolean of bool
   | Float of float
@@ -34,7 +34,7 @@ let compare_const c1 c2 =
       | Integer k ->
         (match c2 with
           | Integer k' -> 
-            let r = Big_int.compare_big_int k k' in
+            let r = compare k k' in
               if r < 0 then Less
               else if r > 0 then Greater
               else Equal
@@ -155,7 +155,7 @@ let diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
 
 let print_const c ppf =
   match c with
-  | Integer k -> Format.fprintf ppf "%s" (Big_int.string_of_big_int k)
+  | Integer k -> Format.fprintf ppf "%d" k
   | String s -> Format.fprintf ppf "%S" s
   | Boolean b -> Format.fprintf ppf "%B" b
   | Float f -> Format.fprintf ppf "%F" f
