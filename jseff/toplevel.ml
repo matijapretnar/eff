@@ -26,8 +26,9 @@ module EffTop =
 struct
   let version = "Eff GET VERSION FROM Version.ml"
 
+  let state = ref EffApi.Shell.initial_state                  
+
   let initialize () =
-    (** Initialize Eff state. *)
     ()
       
   let use ppf expr =
@@ -39,6 +40,7 @@ struct
     [print] says whether the values and types of the results should be printed.
     [pp_code] formatter can be use to output ocaml source during lexing. *)
   let execute print ?pp_code fmt content =
+    (* Pretty-print the output. *)
     begin match pp_code with
       | None -> ()
       | Some fmt -> Format.fprintf fmt "%s@?" content
