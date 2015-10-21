@@ -12,3 +12,39 @@ and odd n =
   match n with
   | 0 -> false
   | x -> even (x-1)
+
+(** Eight queens problem *)
+type choice = effect
+  operation fail : unit -> empty
+  operation decide : unit -> bool
+end
+
+let c = new choice
+let fail () = match c#fail () with
+
+
+let rec choose xs =
+  match xs with
+  | [] -> fail ()
+  | x :: xs -> if c#decide () then x else choose xs
+
+let no_attack (x, y) (x', y') =
+  x <> x' && y <> y' && abs (x - x') <> abs (y - y');;
+
+let available x qs =
+  filter (fun y -> forall (no_attack (x, y)) qs) [1; 2; 3; 4; 5; 6; 7; 8];;
+
+let rec place x qs =
+  if x = 9 then qs else
+  let y = choose (available x qs) in
+  place (x + 1) ((x, y) :: qs)
+
+let backtrack = handler
+| c#decide () k ->
+    handle k true with
+    | c#fail () _ -> k false
+
+;;
+
+with backtrack handle
+  place 1 []
