@@ -33,18 +33,21 @@ struct
     ctxenv := EffApi.Shell.initial_state;
     ctxenv := EffApi.Shell.use_file Format.std_formatter !ctxenv ("/static/pervasives.eff", false)
       
-  (** [execute print ppf content] Execute [content].
-    [print] says whether the values and types of the results should be printed.
+  (** [execute is_file ppf content] Execute [content].
     [pp_code] formatter can be use to output ocaml source during lexing. *)
-  let execute print ?pp_code ppf content =
+  let execute is_file ?pp_code ppf content =
     (* Pretty-print the output. *)
     begin match pp_code with
       | None -> ()
       | Some ppf -> Format.fprintf ppf "%s@?" content
     end ;
     try
-      let cmd = EffApi.Lexer.read_string (EffApi.Shell.parse EffApi.Parser.commandline) content in
-      ctxenv := EffApi.Shell.exec_cmd ppf true !ctxenv cmd
+      if is_file then
+        let cmds = EffApi.Lexer.read_string (EffApi.Shell.parse EffApi.Parser.file) content in
+        ctxenv := List.fold_left (EffApi.Shell.exec_cmd ppf true) !ctxenv cmds
+      else
+        let cmd = EffApi.Lexer.read_string (EffApi.Shell.parse EffApi.Parser.commandline) content in
+        ctxenv := EffApi.Shell.exec_cmd ppf true !ctxenv cmd
     with
       EffApi.Error.Error err -> EffApi.Print.error err
 
@@ -209,7 +212,7 @@ let examples =
   let content = ref [] in
   try
     begin
-      let ic = open_in "/static/examples.ml" in
+      let ic = open_in "/static/examples.eff" in
       try
         while true do
           let line = input_line ic in
@@ -317,6 +320,7 @@ let run _ =
   let container = by_id "toplevel-container" in
   let output = by_id "output" in
   let textbox : 'a Js.t = by_id_coerce "userinput" Dom_html.CoerceTo.textarea in
+  let my_source : 'a Js.t = by_id_coerce "source" Dom_html.CoerceTo.textarea in
   let example_container = by_id "toplevel-examples" in
   let sharp_chan = open_out "/dev/null0" in
   let sharp_ppf = Format.formatter_of_out_channel sharp_chan in
@@ -354,7 +358,7 @@ let run _ =
     H.save hist;
     cur:=Js.string "";
     hist_idx:=H.size hist;
-    EffTop.execute true ~pp_code:sharp_ppf caml_ppf content;
+    EffTop.execute false ~pp_code:sharp_ppf caml_ppf content;
     textbox##value <- Js.string "";
     resize () >>= (fun () ->
                    container##scrollTop <- container##scrollHeight;
@@ -366,11 +370,11 @@ let run _ =
       let a = Tyxml_js.Html5.(a ~a:[
           a_class ["list-group-item"];
           a_onclick (fun _ ->
-              textbox##value <- Js.string content;
+              my_source##value <- Js.string content;
               Lwt.async (fun () ->
                   resize () >>= (fun () ->
                                  container##scrollTop <- container##scrollHeight;
-                                 textbox##focus();
+                                 my_source##focus();
                                  Lwt.return_unit));
               true
             )] [pcdata name]) in
@@ -385,6 +389,10 @@ let run _ =
     do_by_id "btn-reset"
       (fun e -> e##onclick <- Dom_html.handler (fun _ -> output##innerHTML <- Js.string "";
                                              initialize (); Js._false));
+    do_by_id "btn-transfer"
+      (fun e -> e##onclick <- Dom_html.handler (fun _ ->
+        EffTop.execute true caml_ppf (Js.to_string my_source##value);
+        Js._false));
     do_by_id "btn-share"
       (fun e ->
          e##style##display <- Js.string "block";

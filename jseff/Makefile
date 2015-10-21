@@ -3,7 +3,6 @@ include ./Makefile.conf
 
 all: toplevel.js
 
-
 OCPINDENT=$(shell ocamlfind query ocp-indent -format "-package %p.lib" 2> /dev/null)
 HIGLO=$(shell ocamlfind query higlo.ocaml -format "-package %p -rectypes" 2> /dev/null)
 
@@ -47,7 +46,7 @@ $(TOPLEVEL_NAME).js: $(TOPLEVEL_OBJS)
 	effApi.cmo \
 	$(TOPLEVEL_OBJS) \
 	${addprefix -jsopt , ${JSFILES}} \
-	${addprefix -jsopt , -I ./ --file examples.ml} \
+	${addprefix -jsopt , -I ./ --file examples.eff} \
 	${addprefix -jsopt , -I ./ --file pervasives.eff} \
 	-package base64 \
 	-o $(TOPLEVEL_NAME).byte \

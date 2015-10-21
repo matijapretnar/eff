@@ -16,13 +16,31 @@
       background-color:#eee;
       }
 
+      #left-side {
+        height: 100%;
+        width: 60%;
+        float:left;
+      }
+
+      #source-container {
+      width: 100%;
+      background-color: gray;
+      color: #ccc;
+      overflow: auto;
+      overflow-x: hidden;
+      height: 50%;
+      float:left;
+      padding:10px;
+      padding-top: 20px;
+      }
+
       #toplevel-container {
-      width: 50%;
+      width: 100%;
       background-color: black;
       color: #ccc;
       overflow: auto;
       overflow-x: hidden;
-      height: 100%;
+      height: 50%;
       float:left;
       padding:10px;
       padding-top: 20px;
@@ -56,6 +74,27 @@
       margin: 0px;
       padding:0px;
       }
+      #source-container textarea {
+      width:100%;
+      height:100%;
+      line-height:18px;
+      font-size: 12px;
+      background-color: transparent;
+      color: #fff;
+      border: 0;
+      resize: none;
+      outline: none;
+      font-family: Menlo,Monaco,Consolas,monospace;
+      font-weight: bold;
+      float:left;
+      margin: 0px;
+      padding:0px;
+      }
+      #button-container {
+        text-align:center;
+        width: 100%;
+        font-size: 1.2em;
+      }
       #toplevel-container #sharp {
       float: left;
       line-height:18px;
@@ -74,7 +113,7 @@
       }
       #toplevel-side{
       position:relative;
-      width:45%;
+      width:35%;
       height: 100%;
       overflow: auto;
       text-align:justify;
@@ -109,7 +148,7 @@
       }
       #toplevel-examples {
       width: 270px;
-      float: left;
+      /*float: left;*/
       }
       #toplevel-examples .list-group-item{
       padding: 5px 15px;
@@ -140,8 +179,68 @@
       .sharp .symbol1 { color: #993300 ; font-weight: bold ; }
       .sharp .constant { color: rgb(0, 152, 255); }
     </style>
-    <script type="text/javascript">
 
+  </head>
+  <body>
+  <div id="left-side">
+    <div id="source-container">
+      <textarea id="source"></textarea>
+    </div>
+    <div id="button-container">
+    <button id="btn-transfer">↓↓↓ Execute the above source in the toplevel ↓↓↓</button>
+    <button type="button" class="btn btn-default"
+            id="btn-reset">Reset</button>
+    </div>
+    <div id="toplevel-container">
+      <pre id="output"></pre>
+      <div>
+        <div id="sharp" class="sharp"></div>
+        <textarea id="userinput"></textarea>
+        <!-- <button type="button" class="btn btn-default" -->
+        <!--         id="btn-execute">Execute</button> -->
+        <!-- <button type="button" class="btn btn-default" -->
+        <!--         id="btn-clear">Clear</button> -->
+        <!-- <button type="button" class="btn btn-default" -->
+        <!--         id="btn-share">Share</button> -->
+      </div>
+    </div>
+  </div>
+    <div id="toplevel-side">
+      <h3>Try <em>Eff</em> online!</h3>
+      <p>On the left-hand side, you see two text areas. The top one contains your source code, and the bottom one is the interactive toplevel. You execute the source code in the toplevel using the button between them. This web-based <em>Eff</em> toplevel is compiled using Js_of_ocaml and is very much based on the toplevel example included with Js_of_ocaml.</p>
+      <h4>Load examples</h4>
+      <div id="toplevel-examples" class="list-group"></div>
+      <h4>Toplevel commands</h4>
+      <table class="table table-striped table-condensed">
+        <tbody class>
+          <tr>
+            <td>Enter/Return</td>
+            <td>Submit code</td>
+          </tr>
+          <tr>
+            <td>Ctrl + Enter</td>
+            <td>Newline</td>
+          </tr>
+          <tr>
+            <td>Up / Down</td>
+            <td>Browse history</td>
+          </tr>
+          <tr>
+            <td>Ctrl + l</td>
+            <td>Clear display</td>
+          </tr>
+          <tr>
+            <td>Tab</td>
+            <td>Indent code</td>
+          </tr>
+        </tbody>
+      </table>
+      <!-- <canvas width=200 height=200 id="test-canvas"></canvas> -->
+      <!-- <h4 class="clear">See the generated javascript code</h4> -->
+      <pre id="last-js" style="display: none"></pre>
+      </div>
+
+    <script type="text/javascript">
       window.onhashchange = function() { window.location.reload() }
       var hash = window.location.hash.replace(/^#/,"");
       var fields = hash.split(/&/);
@@ -165,73 +264,9 @@
       load_script("js_of_ocaml.toplevel.cmis.js");
       load_script("js_of_ocaml.deriving.cmis.js");
       load_script("js_of_ocaml.tyxml.cmis.js");
-      load_script("js_of_ocaml.graphics.cmis.js");
       load_script("lwt.cmis.js");
-      load_script("react.cmis.js");
-      load_script("reactiveData.cmis.js");
       load_script("toplevel.js");
     </script>
-  </head>
-  <body>
-    <div id="toplevel-container">
-      <pre id="output"></pre>
-      <div>
-        <div id="sharp" class="sharp"></div>
-        <textarea id="userinput"></textarea>
-        <!-- <button type="button" class="btn btn-default" -->
-        <!--         id="btn-execute">Execute</button> -->
-        <!-- <button type="button" class="btn btn-default" -->
-        <!--         id="btn-clear">Clear</button> -->
-        <!-- <button type="button" class="btn btn-default" -->
-        <!--         id="btn-reset">Reset</button> -->
-        <!-- <button type="button" class="btn btn-default" -->
-        <!--         id="btn-share">Share</button> -->
-      </div>
-    </div>
-    <div id="toplevel-side">
-      <h3>Js_of_ocaml</h3>
-      <h4>A compiler from OCaml bytecode to Javascript.</h4>
-      <p>It makes OCaml programs that run on Web browsers. It is
-        easy to install as it works with an existing installation of OCaml,
-        with no need to recompile any library. It comes with bindings for a
-        large part of the browser APIs.</p>
-      <p>This web-based OCaml toplevel is compiled using Js_of_ocaml.</p>
-      <h4>Command</h4>
-      <table class="table table-striped table-condensed">
-        <tbody class>
-          <tr>
-            <td>Enter/Return</td>
-            <td>Submit code</td>
-          </tr>
-          <tr>
-            <td>Ctrl + Enter</td>
-            <td>Newline</td>
-          </tr>
-          <tr>
-            <td>Up / Down</td>
-            <td>Browse history</td>
-          </tr>
-          <tr>
-            <td>Ctrl + l</td>
-            <td>Clear display</td>
-          </tr>
-          <tr>
-            <td>Ctrl + k</td>
-            <td>Reset toplevel</td>
-          </tr>
-          <tr>
-            <td>Tab</td>
-            <td>Indent code</td>
-          </tr>
 
-        </tbody>
-      </table>
-      <h4>Try to execute samples</h4>
-      <div id="toplevel-examples" class="list-group"></div>
-      <canvas width=200 height=200 id="test-canvas"></canvas>
-      <h4 class="clear">See the generated javascript code</h4>
-      <pre id="last-js">
-      </pre>
-    </div>
-  </body>
+</body>
 </html>
