@@ -432,14 +432,14 @@ with round_robin c handle
 
 ;;
 
-let rec fractions denominator =
+let rec fractions d e =
   (* Spawn a thread for the next denominator *)
-    c#spawn (fun _ -> c#yield (); fractions (denominator + 1));
+    if d <= e then c#spawn (fun _ -> c#yield (); fractions (d + 1) e) else () ;
     (* List all the fractions with the current denominator *)
-    for numerator = 1 to denominator - 1 do
+    for numerator = 1 to d - 1 do
       (* If the fraction is reduced, print it and yield *)
-      if gcd numerator denominator = 1 then
-        print_string (to_string numerator ^ "/" ^ to_string denominator ^ ", ");
+      if gcd numerator d = 1 then
+        print_string (to_string numerator ^ "/" ^ to_string d ^ ", ");
         c#yield ()
       else ()
     done
@@ -449,5 +449,5 @@ let rec fractions denominator =
 (* You can try this, but it may not stop. *)
 (*
 with round_robin c handle
-  fractions 1
+  fractions 1 4
 *)
