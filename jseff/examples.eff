@@ -1,9 +1,25 @@
-(** Overview *)
-let x = 10+10
-let y = x * 3
-let rec fact n = if n = 0 then 1 else n * fact (n - 1)
+(** Overview of syntax *)
 
-(** Mutually recursive function *)
+(*
+  Before we take a look at effects, let us see the rest of Eff.
+  If you have ever programmed in OCaml, Eff should be very familiar as it
+  closely follows OCaml in everything except in the approach to effects.
+  If you are not familiar with OCaml, you should try it out at
+    http://try.ocamlpro.com
+*)
+
+(* You can define variables *)
+let x = 10 + 10
+let y = x * 3
+
+(* You can define functions *)
+let double x = 2 * x
+
+(* Functions can be recursive *)
+let rec fact n =
+  if n = 0 then 1 else n * fact (n - 1)
+
+(* Or even mutually recursive *)
 let rec even n =
   match n with
   | 0 -> true
@@ -13,7 +29,136 @@ and odd n =
   | 0 -> false
   | x -> even (x-1)
 
-(** Eight queens problem *)
+(* You can declare your own types *)
+type shape =
+  | Circle of float
+  | Rectangle of float * float
+
+(* And you can use pattern matching to define functions on such types *)
+let area shape =
+  match shape with
+  | Circle r -> 3.14159 *. r *. r
+  | Rectangle (w, h) -> w *. h
+
+(* You can write the above using the "function" shortcut *)
+let perimeter = function
+  | Circle r -> 2.0 *. 3.14159 *. r
+  | Rectangle (w, h) -> 2.0 *. (w +. h)
+
+(* like in OCaml, a double semicolon separates commands in a file *)
+;;
+
+(** Printing to the standard output *)
+
+(*
+  The main premise of algebraic effects, which is what Eff is based on,
+  is that each effect (manipulating memory, exceptions, ...) arises from
+  a set of basic operations, for example lookup & update or raise.
+  Operations in Eff are actually composed of two parts: an instance and an
+  operation symbol. For example, we print out messages by calling the operation
+  "std#print". Here, "print" is the operation symbol that signifies the action,
+  and "std" stands for the standard channel. You can imagine that there are
+  other instances that could support "print", for example files (though Eff
+  does not support them in practice).
+*)
+
+(* To recap: you print out messages by calling "std#print". For example: *)
+
+std#print "Hello, world!\n" ;;
+
+(*
+  Where Eff really differs from OCaml is that you can handle such calls.
+  For example, the program inside the handler would print "A", "B", "C" and "D",
+  but the handler overrides it just as an exception handler would override an
+  exception. Thus, the program should output just:
+
+    "I see you tried to print A. Not so fast!"
+*)
+
+handle
+    std#print "A";
+    std#print "B";
+    std#print "C";
+    std#print "D"
+with
+| std#print msg k ->
+    std#print ("I see you tried to print " ^ msg ^ ". Not so fast!\n")
+
+;;
+
+(*
+  You may be wondering what the second parameter "k" in the handling clause
+  for std#print is. It stands for the continuation, i.e. the part of the program
+  that is waiting for the result of print. The difference between exception
+  handlers and general effect handlers is that we may call this continuation.
+  For example, instead of stopping after the first print like above, we may
+  handle it and then resume the continuation by passing it "()", the unit
+  result expected from the call of "std#print".
+*)
+
+
+handle
+    std#print "A";
+    std#print "B";
+    std#print "C";
+    std#print "D"
+with
+| std#print msg k ->
+    std#print ("I see you tried to print " ^ msg ^ ". Okay, you may.\n");
+    k ()
+
+;;
+
+(*
+  The handlers may be even more complex. For example, we may create a reference
+  to count the number of std#print calls, and print out only the first three.
+  Note that references are again accessed in the standard form instance#operation.
+*)
+
+
+let count = ref 0
+
+;;
+
+handle
+    std#print "A";
+    std#print "B";
+    std#print "C";
+    std#print "D"
+with
+| std#print msg k ->
+    match count#lookup () with
+    | 0 ->
+        std#print ("I see you tried to print " ^ msg ^ ". Sure!\n");
+        count#update 1;
+        k ()
+    | 1 ->
+        std#print ("I see you tried to print " ^ msg ^ ". Slow down!\n");
+        count#update 2;
+        k ()
+    | _ ->
+        std#print ("I see you tried to print " ^ msg ^ ". That's it!\n")
+
+;;
+
+let collect = handler
+    | val x -> (x, "")
+    | std#print msg k ->
+        let (res, msgs) = k () in
+        (res, msg ^ msgs)
+
+;;
+
+with collect handle
+    std#print "A";
+    std#print "B";
+    std#print "C";
+    std#print "D"
+
+;;
+
+(** Non-determinism *)
+
 type choice = effect
   operation fail : unit -> empty
   operation decide : unit -> bool
@@ -22,6 +167,86 @@ end
 let c = new choice
 let fail () = match c#fail () with
 
+let choose_left =
+    handler
+    | c#decide () k -> k true
+
+let choose_max =
+    handler
+    | c#decide () k -> max (k true) (k false)
+
+let choose_all =
+    handler
+    | val x -> [x]
+    | c#fail () _ -> []
+    | c#decide () k -> (k true) @ (k false)
+
+;;
+
+(* Try also "choose_max" and "choose_all" *)
+with choose_left handle
+  let x = (if c#decide () then 10 else 20) in
+  let y = (if c#decide () then 0 else 5) in
+  x - y
+
+;;
+
+let rec choose_int m n =
+  if m > n then
+    fail ()
+  else if c#decide () then
+    m
+  else
+    choose_int (m + 1) n
+
+let sqrt m =
+  let rec try n =
+    let n2 = n ** 2 in
+    if n2 > m then
+      None
+    else if n2 = m then
+      Some n
+    else
+      try (n + 1)
+  in
+  try 0
+
+let pythagorean m n =
+  let a = choose_int m (n - 1) in
+  let b = choose_int a n in
+  match sqrt (a ** 2 + b ** 2) with
+  | None -> fail ()
+  | Some c -> (a, b, c)
+
+let backtrack = handler
+| c#decide () k ->
+    handle k false with
+    | c#fail () _ -> k true
+
+;;
+
+with choose_all handle
+  pythagorean 5 7
+
+;;
+
+with backtrack handle
+  pythagorean 5 15
+
+;;
+
+with choose_all handle
+  pythagorean 3 4
+
+;;
+
+with choose_all handle
+  pythagorean 5 15
+
+;;
+
+
+(* Eight queens problem *)
 
 let rec choose xs =
   match xs with
@@ -48,3 +273,181 @@ let backtrack = handler
 
 with backtrack handle
   place 1 []
+
+
+;;
+
+(** Probability *)
+
+type random_choice = effect
+  operation toss : float -> bool
+end
+
+let c = new random_choice
+
+let rec uniform = function
+  | [x] -> x
+  | x :: xs ->
+      let n = length xs + 1 in
+      let p = 1.0 /. float_of_int n in
+      if c#toss p then x else uniform xs
+
+let expectation f = handler
+  | val v -> f v
+  | c#toss p k -> p *. k true +. (1.0 -. p) *. k false
+
+;;
+
+with expectation (fun x -> float_of_int (x + 3)) handle
+  let x = uniform [1; 2; 3; 4; 5; 6] in
+  let y = uniform [1; 2; 3; 4; 5; 6] in
+  x + y
+
+;;
+
+let combine p dist1 dist2 =
+  let scale p dist = map (fun (x, q) -> (x, p *. q)) dist in
+  let rec add (x, p) = function
+    | [] -> [(x, p)]
+    | (y, q) :: dist ->
+      if x = y then (x, p +. q) :: dist else (y, q) :: add (x, p) dist
+  in
+  let dist1 = scale p dist1 in
+  let dist2 = scale (1.0 -. p) dist2 in
+  fold_right add dist1 dist2
+
+(* This handler computes the distribution of outcomes of a probabilisitic
+   computation. *)
+let distribution = handler
+  | val v -> [(v, 1.0)]
+  | c#toss p k -> combine p (k true) (k false)
+
+;;
+
+with distribution handle
+  let x = uniform [1; 2; 3; 4; 5; 6] in
+  let y = uniform [1; 2; 3; 4; 5; 6] in
+  x + y
+
+;;
+
+(** State *)
+
+type 'a state = effect
+  operation get: unit -> 'a
+  operation set: 'a -> unit
+end
+
+let r = new state
+
+let monad_state r = handler
+  | val y -> (fun _ -> y)
+  | r#get () k -> (fun s -> k s s)
+  | r#set s' k -> (fun _ -> k () s')
+
+;;
+
+let f = with monad_state r handle
+    let x = r#get () in
+    r#set (2 * x);
+    r#get ()
+in
+f 30
+
+;;
+
+let better_state r x = handler
+  | val y -> (fun s -> (y, s))
+  | r#get () k -> (fun s -> k s s)
+  | r#set s' k -> (fun _ -> k () s')
+  | finally f -> f x
+
+let r' = new state
+;;
+
+with better_state r 20 handle
+    with better_state r' 30 handle
+        let x = r#get () in
+        let y = r'#get () in
+        r'#set (x * y);
+        r'#get () + 1
+
+;;
+
+let transaction r = handler
+  | r#get () k -> (fun s -> k s s)
+  | r#set s' k -> (fun s -> k () s')
+  | val x -> (fun s -> r#set s; x)
+  | finally f -> f (r#get ())
+
+let e = new exception
+
+;;
+
+with better_state r 10 handle
+  handle
+    r#set 20;
+    (with transaction r handle
+      r#set 30;
+      r#set 50);
+    print (r#get ())
+  with
+  e#raise x _ -> print (x, r#get ())
+
+;;
+
+(** Multi-threading *)
+
+type coop = effect
+  operation yield : unit -> unit
+  operation spawn : (unit -> unit) -> unit
+end
+
+let round_robin c =
+  let threads = ref [] in
+  let enqueue t = threads := !threads @ [t] in
+  let dequeue () =
+    match !threads with
+    | [] -> ()
+    | t :: ts -> threads := ts; t ()
+  in
+  let rec scheduler () = handler
+    | c#yield () k -> enqueue k; dequeue ()
+    | c#spawn t k -> enqueue k; with scheduler () handle t ()
+    | val () -> dequeue ()
+  in
+  scheduler ()
+
+let c = new coop
+
+;;
+
+with round_robin c handle
+  c#spawn (fun _ ->
+    iter (fun x -> std#print x; c#yield ()) ["a"; "b"; "c"; "d"; "e"]
+  );
+  c#spawn (fun _ ->
+    iter (fun x -> std#print x; c#yield ()) ["A"; "B"; "C"; "D"; "E"]
+  )
+
+;;
+
+let rec fractions denominator =
+  (* Spawn a thread for the next denominator *)
+    c#spawn (fun _ -> c#yield (); fractions (denominator + 1));
+    (* List all the fractions with the current denominator *)
+    for numerator = 1 to denominator - 1 do
+      (* If the fraction is reduced, print it and yield *)
+      if gcd numerator denominator = 1 then
+        print_string (to_string numerator ^ "/" ^ to_string denominator ^ ", ");
+        c#yield ()
+      else ()
+    done
+
+;;
+
+(* You can try this, but it may not stop. *)
+(*
+with round_robin c handle
+  fractions 1
+*)
