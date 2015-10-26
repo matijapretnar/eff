@@ -207,7 +207,7 @@ let do_by_id s f =
   try f (Dom_html.getElementById s) with Not_found -> ()
 
 let examples =
-  let r = Regexp.regexp "^\\(\\*+(.*)\\*+\\)$" in
+  let r = Regexp.regexp "^\\(\\*\\*+(.*)\\*+\\)$" in
   let l = ref [] and name = ref "" in
   let content = ref [] in
   try
