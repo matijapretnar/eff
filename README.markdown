@@ -25,7 +25,7 @@ define new computational effects, combine existing ones, and handle effects
 in novel ways. For instance, ML-style references are a defined concept in
 Eff.
 
-Eff code looks and feels like that of Ocaml because Eff uses Ocaml syntax
+Eff code looks and feels like that of OCaml because Eff uses OCaml syntax
 extended with constructs for effects and handlers. Furthermore, Eff is a
 statically typed language with parametric polymorphism and type inference.
 The types are similar to those of OCaml and other variants of ML in the
@@ -35,13 +35,14 @@ For further information visit the [Eff page](http://www.eff-lang.org/)
 or contact the authors Andrej Bauer <Andrej.Bauer@andrej.com> and Matija
 Pretnar <matija@pretnar.info>.
 
-Obtaining Eff
--------------
+
+Installation & Usage
+--------------------
 
 ### Prerequisites
 
-We have tested Eff on Mac OS X and Linux, and it should work in other
-Unix-like environments. In principle, nothing prevents Eff from running
+We have tested Eff on Mac OS X and Linux, and it should work on other
+Unix-like systems. In principle, nothing prevents Eff from running
 on Windows, we just have not tested it yet.
 
 To install Eff, you need a standard Unix-style build environment as well as
@@ -53,18 +54,29 @@ We do not require, but recommend a command-line editing wrapper such as
 [rlwrap](http://freecode.com/projects/rlwrap) or
 [ledit](http://cristal.inria.fr/~ddr/ledit/). Eff uses these automatically.
 
-### Installing using OPAM
+### Installing with OPAM
 
-This is the easiest way to install Eff. First, you need to switch to a
-suitable OCaml compiler (e.g. `opam switch 4.02.3`) and then run
+This is the easiest way to install Eff. Follow these steps:
 
-    opam pin add eff git@github.com:matijapretnar/eff.git
+1. Install the [OPAM package manager](http://opam.ocamlpro.com) if you do not have it yet.
 
-to download the dependencies and build and install Eff.
+2. Make sure you have the correct OCaml compiler activated. Since Eff compiles with all recent version of OCaml you probably need not worry about this step.
+
+3. Run
+
+        opam pin add eff git@github.com:matijapretnar/eff.git
+
+   OPAM will download and build the necessary dependencies first, then download
+   and build Eff itself.
 
 ### Manual installation
 
-To compile Eff manually, first run
+To compile Eff manually, first clone the GitHub repository
+
+    git clone git@github.com:matijapretnar/eff.git
+    cd eff
+
+and run
 
     ./configure
 
@@ -86,6 +98,11 @@ Finally, to install the command `eff`, run
     sudo make install
 
 See the file `etc/README.txt` for editor support.
+
+### Using Eff
+
+There are examples of Eff in `examples` subdirectory that should get you started. The Eff
+syntax is very close to that of OCaml. You can find further material about Eff on the [Eff page](http://www.eff-lang.org/).
 
 Copyright and license
 ---------------------
