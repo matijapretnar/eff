@@ -35,8 +35,9 @@ For further information visit the [Eff page](http://www.eff-lang.org/)
 or contact the authors Andrej Bauer <Andrej.Bauer@andrej.com> and Matija
 Pretnar <matija@pretnar.info>.
 
-Obtaining Eff
--------------
+
+Installation & Usage
+--------------------
 
 ### Prerequisites
 
@@ -97,6 +98,11 @@ Finally, to install the command `eff`, run
     sudo make install
 
 See the file `etc/README.txt` for editor support.
+
+### Using Eff
+
+There are examples of Eff in `examples` subdirectory that should get you started. The Eff
+syntax is very close to that of OCaml. You can find further material about Eff on the [Eff page](http://www.eff-lang.org/).
 
 Copyright and license
 ---------------------
