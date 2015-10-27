@@ -63,7 +63,7 @@ This is the easiest way to install Eff. Follow these steps:
 
 3. Run
 
-       opam pin add eff git@github.com:matijapretnar/eff.git
+        opam pin add eff git@github.com:matijapretnar/eff.git
 
    OPAM will download and build the necessary dependencies first, then download
    and build Eff itself.
