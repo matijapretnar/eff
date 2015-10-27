@@ -46,17 +46,25 @@ on Windows, we just have not tested it yet.
 
 To install Eff, you need a standard Unix-style build environment as well as
 
-1. [OCaml](https://ocaml.org/), version 4.02 or newer, and
+1. [OCaml](https://ocaml.org/), version 3.12.1 or newer, and
 2. [Menhir](http://gallium.inria.fr/~fpottier/menhir/) parser generator
 
 We do not require, but recommend a command-line editing wrapper such as
 [rlwrap](http://freecode.com/projects/rlwrap) or
 [ledit](http://cristal.inria.fr/~ddr/ledit/). Eff uses these automatically.
-   
 
-### Compilation
+### Installing using OPAM
 
-To compile Eff, first run
+This is the easiest way to install Eff. First, you need to switch to a
+suitable OCaml compiler (e.g. `opam switch 4.02.3`) and then run
+
+    opam pin add eff git@github.com:matijapretnar/eff.git
+
+to download the dependencies and build and install Eff.
+
+### Manual installation
+
+To compile Eff manually, first run
 
     ./configure
 
@@ -73,9 +81,7 @@ You can also run a battery of tests with
 
     make test
 
-### Installation
-
-To install the command `eff`, run
+Finally, to install the command `eff`, run
 
     sudo make install
 
