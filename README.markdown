@@ -40,8 +40,8 @@ Obtaining Eff
 
 ### Prerequisites
 
-We have tested Eff on Mac OS X and Linux, and it should work in other
-Unix-like environments. In principle, nothing prevents Eff from running
+We have tested Eff on Mac OS X and Linux, and it should work on other
+Unix-like systems. In principle, nothing prevents Eff from running
 on Windows, we just have not tested it yet.
 
 To install Eff, you need a standard Unix-style build environment as well as
@@ -55,16 +55,27 @@ We do not require, but recommend a command-line editing wrapper such as
 
 ### Installing using OPAM
 
-This is the easiest way to install Eff. First, you need to switch to a
-suitable OCaml compiler (e.g. `opam switch 4.02.3`) and then run
+This is the easiest way to install Eff. Follow these steps:
 
-    opam pin add eff git@github.com:matijapretnar/eff.git
+1. Install the [OPAM package mangager](http://opam.ocamlpro.com) if you do not have it yet.
 
-to download the dependencies and build and install Eff.
+2. Make sure you have teh correct OCaml compiler activated. Since Eff compiles with all recent version of OCaml you probably need not worry about this step.
+
+3. Run
+
+       opam pin add eff git@github.com:matijapretnar/eff.git
+
+   OPAM will download and build the necessary dependencies first, then download
+   and build Eff itself.
 
 ### Manual installation
 
-To compile Eff manually, first run
+To compile Eff manually, first clone the GitHub repository
+
+    git clone git@github.com:matijapretnar/eff.git
+    cd eff
+
+and run
 
     ./configure
 
