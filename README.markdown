@@ -25,7 +25,7 @@ define new computational effects, combine existing ones, and handle effects
 in novel ways. For instance, ML-style references are a defined concept in
 Eff.
 
-Eff code looks and feels like that of Ocaml because Eff uses Ocaml syntax
+Eff code looks and feels like that of OCaml because Eff uses OCaml syntax
 extended with constructs for effects and handlers. Furthermore, Eff is a
 statically typed language with parametric polymorphism and type inference.
 The types are similar to those of OCaml and other variants of ML in the
@@ -57,9 +57,9 @@ We do not require, but recommend a command-line editing wrapper such as
 
 This is the easiest way to install Eff. Follow these steps:
 
-1. Install the [OPAM package mangager](http://opam.ocamlpro.com) if you do not have it yet.
+1. Install the [OPAM package manager](http://opam.ocamlpro.com) if you do not have it yet.
 
-2. Make sure you have teh correct OCaml compiler activated. Since Eff compiles with all recent version of OCaml you probably need not worry about this step.
+2. Make sure you have the correct OCaml compiler activated. Since Eff compiles with all recent version of OCaml you probably need not worry about this step.
 
 3. Run
 
