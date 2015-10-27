@@ -54,7 +54,7 @@ We do not require, but recommend a command-line editing wrapper such as
 [rlwrap](http://freecode.com/projects/rlwrap) or
 [ledit](http://cristal.inria.fr/~ddr/ledit/). Eff uses these automatically.
 
-### Installing using OPAM
+### Installing with OPAM
 
 This is the easiest way to install Eff. Follow these steps:
 
