@@ -113,6 +113,17 @@ let rec infer_pattern (p, loc) =
   (* Print.debug "%t : %t" (Untyped.print_pattern (p, loc)) (Scheme.print_ty_scheme ty_sch); *)
   ty_sch
 
+let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
+  match expr with
+  | Untyped.Const const -> Typed.const ~loc const
+  | Untyped.Tuple es ->
+      let es = List.map (type_expr env) es in
+      Typed.tuple ~loc es
+and type_comp env {Untyped.term=comp; Untyped.location=loc} =
+  match comp with
+  | Untyped.Value e -> Typed.value ~loc (type_expr env e)
+
+
 (* [infer_expr env e] infers the type scheme of an expression [e] in a
    typing environment [env] of generalised variables.
    The scheme consists of:
