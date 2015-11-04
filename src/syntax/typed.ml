@@ -60,6 +60,13 @@ and operation = Common.opsym
 
 let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_dirt_param () }
 
+let var ~loc x ty_sch =
+  {
+    term = Var x;
+    scheme = ty_sch;
+    location = loc;
+  }
+
 let const ~loc c =
   let ty = match c with
   | Const.Integer _ -> Type.int_ty
@@ -82,9 +89,96 @@ let tuple ~loc es =
   in
   {
     term = Tuple es;
-    scheme = Scheme.normalize_context ~loc (ctx, Type.Tuple tys, constraints);
+    scheme = Scheme.clean_ty_scheme ~loc (ctx, Type.Tuple tys, constraints);
     location = loc;
   }
+
+let record ~loc = function
+  | [] -> assert false
+  | ((fld, _) :: _) as lst ->
+    if not (Pattern.linear_record lst) then
+      Error.typing ~loc "Fields in a record must be distinct";
+    begin match Tctx.infer_field fld with
+    | None -> Error.typing ~loc "Unbound record field label %s" fld
+    | Some (ty, (ty_name, fld_tys)) ->
+        if List.length lst <> List.length fld_tys then
+          Error.typing ~loc "The record of type %s has an incorrect number of fields" ty_name;
+        let infer (fld, e) (ctx, constraints) =
+          begin match Common.lookup fld fld_tys with
+          | None -> Error.typing ~loc "Unexpected field %s in a record of type %s" fld ty_name
+          | Some fld_ty ->
+              let e_ctx, e_ty, e_constraints = e.scheme in
+              e_ctx @ ctx, Constraints.add_ty_constraint ~loc e_ty fld_ty constraints
+          end
+      in
+      let ctx, constraints = List.fold_right infer lst ([], Constraints.empty) in
+      {
+        term = Record lst;
+        scheme = Scheme.clean_ty_scheme ~loc (ctx, ty, constraints);
+        location = loc;
+      }
+    end
+
+let variant ~loc (lbl, e) =
+    begin match Tctx.infer_variant lbl with
+    | None -> Error.typing ~loc "Unbound constructor %s" lbl
+    | Some (ty, arg_ty) ->
+        let ty_sch = begin match e, arg_ty with
+          | None, None -> ([], ty, Constraints.empty)
+          | Some e, Some arg_ty ->
+              let e_ctx, e_ty, e_constraints = e.scheme in
+              let constraints = Constraints.add_ty_constraint ~loc e_ty arg_ty e_constraints in
+              e_ctx, ty, constraints
+          | None, Some _ -> Error.typing ~loc "Constructor %s should be applied to an argument" lbl
+          | Some _, None -> Error.typing ~loc "Constructor %s cannot be applied to an argument" lbl
+        end
+        in
+        {
+          term = Variant (lbl, e);
+          scheme = ty_sch;
+          location = loc
+        }
+    end
+
+let effect ~loc eff signature =
+    match signature eff with
+    | None -> Error.typing ~loc "Unbound effect %s" eff
+    | Some (ty_par, ty_res) ->
+      let r = Type.fresh_region_param () in
+      let drt = {Type.ops = [eff, r]; Type.rest = Type.fresh_dirt_param ()} in
+      let ty = Type.Arrow (ty_par, (ty_res, drt)) in
+      let constraints = Constraints.add_full_region r Constraints.empty in
+      {
+        term = Effect eff;
+        scheme = Scheme.clean_ty_scheme ~loc ([], ty, constraints);
+        location = loc;
+      }
+(* 
+let match_cases ~loc e cases =
+  let ctx_e, ty_e, cnstrs_e = e.scheme in
+  let drty = Type.fresh_dirty (), empty_dirt () in
+  let drty_sch = match cases with
+  | [] ->
+      let constraints = Constraints.add_ty_constraint ~loc ty_e Type.empty_ty cnstrs_e in
+      (ctx_e, drty, constraints)
+  | _::_ ->
+      let infer_case ((p, ty_p) (c_drty_c as a) (ctx, constraints) =
+        let ctx_a, ty_p, drty_c, cnstrs_a = a in
+        ctx_a @ ctx,
+          Constraints.add_ty_constraint ~loc:e.Untyped.location ty_e ty_p (
+          Constraints.add_dirty_constraint ~loc:c.Untyped.location drty_c drty (
+          Constraints.unon cnstrs_a constraints))
+      in
+      let ctx, constraints = List.fold_right infer_case cases (ctx_e, cnstrs_e) in
+      (ctx, drty, constraints)
+  in
+  {
+    term = Match (e, cases);
+    scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
+    location = loc
+  } *)
+  
+
 
 let value ~loc e =
   let ctx, ty, constraints = e.scheme in
@@ -92,4 +186,23 @@ let value ~loc e =
     term = Value e;
     scheme = (ctx, (ty, empty_dirt ()), constraints);
     location = loc
+  }
+
+let while' ~loc c1 c2 =
+  let ctx_c1, (ty_c1, drt_c1), cnstrs_c1 = c1.scheme in
+  let ctx_c2, (ty_c2, drt_c2), cnstrs_c2 = c2.scheme in
+  let drt = Type.fresh_dirt () in
+  let drty_sch =
+    (ctx_c1 @ ctx_c2, (Type.unit_ty, drt),
+        Constraints.add_ty_constraint ~loc ty_c1 Type.bool_ty (
+        Constraints.add_ty_constraint ~loc ty_c2 Type.unit_ty (
+        Constraints.add_dirt_constraint drt_c1 drt (
+        Constraints.add_dirt_constraint drt_c2 drt (
+        Constraints.union cnstrs_c1 (
+        cnstrs_c2
+    )))))) in
+  {
+    term = While (c1, c2);
+    scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
+    location = loc;
   }

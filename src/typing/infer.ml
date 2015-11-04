@@ -41,7 +41,7 @@ let infer_effect env eff =
    pattern type is negative. *)
 let rec infer_pattern (p, loc) =
   if !Config.disable_typing then simple Type.universal_ty else
-  let unify = Scheme.finalize_pattern_scheme in
+  let unify = Scheme.finalize_pattern_scheme ~loc in
   let ty_sch = match p with
 
   | Pattern.Var x ->
@@ -115,13 +115,30 @@ let rec infer_pattern (p, loc) =
 
 let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
   match expr with
+  | Untyped.Var x ->
+      let ty_sch = begin match Ctx.lookup env.context x with
+      | Some ty_sch -> ty_sch
+      | None ->
+          let ty = Type.fresh_ty () in
+          ([(x, ty)], ty, Constraints.empty)
+      end
+      in
+      Typed.var ~loc x ty_sch
   | Untyped.Const const -> Typed.const ~loc const
   | Untyped.Tuple es ->
       let es = List.map (type_expr env) es in
       Typed.tuple ~loc es
+  | Untyped.Record lst ->
+      let lst = Common.assoc_map (type_expr env) lst in
+      Typed.record ~loc lst
+  | Untyped.Variant (lbl, e) ->
+      Typed.variant ~loc (lbl, Common.option_map (type_expr env) e)
+  | Untyped.Effect eff ->
+      Typed.effect ~loc eff (infer_effect env)
 and type_comp env {Untyped.term=comp; Untyped.location=loc} =
   match comp with
   | Untyped.Value e -> Typed.value ~loc (type_expr env e)
+  | Untyped.While (c1, c2) -> Typed.while' ~loc (type_comp env c1) (type_comp env c2)
 
 
 (* [infer_expr env e] infers the type scheme of an expression [e] in a
