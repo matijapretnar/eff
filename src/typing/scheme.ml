@@ -59,7 +59,7 @@ let less_context ~loc ctx_p (ctx, ty, cnstrs) =
 
 let (@@@) = Trio.append
 
-let pos_neg_tyscheme (ctx, ty, cnstrs) =
+let pos_neg_ty_scheme (ctx, ty, cnstrs) =
   let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
     let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
@@ -68,7 +68,7 @@ let pos_neg_tyscheme (ctx, ty, cnstrs) =
   Trio.uniq pos, Trio.uniq neg
 
 let pos_neg_dirtyscheme (ctx, drty, cnstrs) =
-  pos_neg_tyscheme (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs)
+  pos_neg_ty_scheme (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs)
 
 let garbage_collect pos neg (ctx, ty, cnstrs) =
   ctx, ty, Constraints.garbage_collect pos neg cnstrs
@@ -108,28 +108,45 @@ let finalize ctx ty chngs =
   let ctx, ty, cnstrs = List.fold_right Common.id chngs (ctx, ty, Constraints.empty) in
   (Common.assoc_map (Constraints.expand_ty cnstrs) ctx, Constraints.expand_ty cnstrs ty, cnstrs)
 
-let finalize_ty_scheme ~loc ctx ty chngs =
-  let ty_sch = finalize ctx ty (normalize_context ~loc :: chngs) in
-  let pos, neg = pos_neg_tyscheme ty_sch in
+let expand_ty_scheme (ctx, ty, constraints) =
+  (Common.assoc_map (Constraints.expand_ty constraints) ctx, Constraints.expand_ty constraints ty, constraints)
+
+let clean_ty_scheme ~loc ty_sch =
+  let ty_sch = normalize_context ~loc ty_sch in
+  let ty_sch = expand_ty_scheme ty_sch in
+  let pos, neg = pos_neg_ty_scheme ty_sch in
   garbage_collect pos neg ty_sch
 
-let finalize_dirty_scheme ~loc ctx drty chngs =
-  match finalize_ty_scheme ~loc ctx (Type.Arrow (Type.unit_ty, drty)) chngs with
+let clean_dirty_scheme ~loc (ctx, drty, constraints) =
+  match clean_ty_scheme ~loc (ctx, (Type.Arrow (Type.unit_ty, drty)), constraints) with
   | ctx, Type.Arrow (_, drty), cnstrs -> (ctx, drty, cnstrs)
   | _ -> assert false
+
+let create_ty_scheme ctx ty changes =
+  List.fold_right Common.id changes (ctx, ty, Constraints.empty)
+
+let finalize_ty_scheme ~loc ctx ty changes =
+  let ty_sch = create_ty_scheme ctx ty changes in
+  clean_ty_scheme ~loc ty_sch
+
+let finalize_dirty_scheme ~loc ctx drty changes =
+  match finalize_ty_scheme ~loc ctx (Type.Arrow (Type.unit_ty, drty)) changes with
+  | ctx, Type.Arrow (_, drty), cnstrs -> (ctx, drty, cnstrs)
+  | _ -> assert false
+
+let finalize_pattern_scheme ~loc ctx ty chngs =
+  (* We do not expand the context *)
+  let ty_sch = create_ty_scheme ctx ty chngs in
+  let ty_sch = expand_ty_scheme ty_sch in
+  (* Note that we change the polarities in pattern types *)
+  let neg, pos = pos_neg_ty_scheme ty_sch in
+  garbage_collect pos neg ty_sch
 
 let add_to_top ~loc ctx cnstrs (ctx_c, drty_c, cnstrs_c) =
   finalize_dirty_scheme ~loc (ctx @ ctx_c) drty_c ([
     just cnstrs_c;
     just cnstrs
   ])
-
-let finalize_pattern_scheme ctx ty chngs =
-  let ty_sch = finalize ctx ty chngs in
-  (* Note that we change the polarities in pattern types *)
-  let neg, pos = pos_neg_tyscheme ty_sch in
-  garbage_collect pos neg ty_sch
-
 
 let context skeletons ctx ppf =
   match ctx with
@@ -149,7 +166,7 @@ let show_dirt_param ~non_poly:(_, ds, _) (ctx, ty, cnstrs) =
 
 let print_ty_scheme ty_sch ppf =
   let sbst = Type.beautifying_subst () in
-  let _, (_, ds, _) = pos_neg_tyscheme ty_sch in
+  let _, (_, ds, _) = pos_neg_ty_scheme ty_sch in
   ignore (Common.map sbst.Type.dirt_param ds);
   let (ctx, ty, cnstrs) = subst_ty_scheme sbst ty_sch in
   let skeletons = Constraints.skeletons cnstrs in

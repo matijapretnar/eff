@@ -16,7 +16,9 @@ val remove_context : loc:Location.t -> context -> change
 val less_context : loc:Location.t -> context -> change
 val finalize_ty_scheme : loc:Location.t -> context -> Type.ty -> change list -> ty_scheme
 val finalize_dirty_scheme : loc:Location.t -> context -> Type.dirty -> change list -> dirty_scheme
-val finalize_pattern_scheme : context -> Type.ty -> change list -> ty_scheme
+val clean_ty_scheme : loc:Location.t -> ty_scheme -> ty_scheme
+val clean_dirty_scheme : loc:Location.t -> dirty_scheme -> dirty_scheme
+val finalize_pattern_scheme : loc:Location.t -> context -> Type.ty -> change list -> ty_scheme
 val add_to_top : loc:Location.t -> context -> Constraints.t -> (dirty_scheme -> dirty_scheme)
 val print_ty_scheme : ty_scheme -> Format.formatter -> unit
 val print_dirty_scheme : dirty_scheme -> Format.formatter -> unit
