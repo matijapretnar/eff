@@ -206,3 +206,57 @@ let while' ~loc c1 c2 =
     scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
     location = loc;
   }
+
+let for' ~loc i e1 e2 c up =
+  let ctx_e1, ty_e1, cnstrs_e1 = e1.scheme in
+  let ctx_e2, ty_e2, cnstrs_e2 = e2.scheme in
+  let ctx_c, (ty_c, drt_c), cnstrs_c = c.scheme in
+  let drty_sch =
+    (ctx_e1 @ ctx_e2 @ ctx_c, (Type.unit_ty, drt_c),
+        Constraints.add_ty_constraint ~loc:e1.location ty_e1 Type.int_ty (
+        Constraints.add_ty_constraint ~loc:e2.location ty_e2 Type.int_ty (
+        Constraints.add_ty_constraint ~loc:c.location ty_c Type.unit_ty (
+        Constraints.union cnstrs_e1 (
+        Constraints.union cnstrs_e2 (
+        cnstrs_c
+    )))))) in
+  {
+    term = For (i, e1, e2, c, up);
+    scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
+    location = loc;
+  }
+
+let apply ~loc e1 e2 =
+  let ctx_e1, ty_e1, cnstrs_e1 = e1.scheme in
+  let ctx_e2, ty_e2, cnstrs_e2 = e2.scheme in
+  let drty = Type.fresh_dirty () in
+  let constraints =
+    Constraints.add_ty_constraint ~loc ty_e1 (Type.Arrow (ty_e2, drty)) (
+    Constraints.union cnstrs_e1 cnstrs_e2) in
+  let drty_sch = (ctx_e1 @ ctx_e2, drty, constraints) in
+  {
+    term = Apply (e1, e2);
+    scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
+    location = loc;
+  }
+
+let handle ~loc e c =
+  let ctx_e, ty_e, cnstrs_e = e.scheme in
+  let ctx_c, drty_c, cnstrs_c = c.scheme in
+  let drty = Type.fresh_dirty () in
+  let constraints =
+    Constraints.add_ty_constraint ~loc ty_e (Type.Handler (drty_c, drty)) (
+    Constraints.union cnstrs_e cnstrs_c) in
+  let drty_sch = (ctx_e @ ctx_c, drty, constraints) in
+  {
+    term = Handle (e, c);
+    scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
+    location = loc;
+  }
+
+let check ~loc c =
+  {
+    term = Check c;
+    scheme = ([], (Type.unit_ty, empty_dirt ()), Constraints.empty);
+    location = loc;
+  }

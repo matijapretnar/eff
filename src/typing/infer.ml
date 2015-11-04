@@ -137,9 +137,18 @@ let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
       Typed.effect ~loc eff (infer_effect env)
 and type_comp env {Untyped.term=comp; Untyped.location=loc} =
   match comp with
-  | Untyped.Value e -> Typed.value ~loc (type_expr env e)
-  | Untyped.While (c1, c2) -> Typed.while' ~loc (type_comp env c1) (type_comp env c2)
-
+  | Untyped.Value e ->
+      Typed.value ~loc (type_expr env e)
+  | Untyped.While (c1, c2) ->
+      Typed.while' ~loc (type_comp env c1) (type_comp env c2)
+  | Untyped.For (i, e1, e2, c, up) ->
+      Typed.for' ~loc i (type_expr env e1) (type_expr env e2) (type_comp env c) up
+  | Untyped.Apply (e1, e2) ->
+      Typed.apply ~loc (type_expr env e1) (type_expr env e2)
+  | Untyped.Handle (e, c) ->
+      Typed.handle ~loc (type_expr env e) (type_comp env c)
+  | Untyped.Check c ->
+      Typed.check ~loc (type_comp env c)
 
 (* [infer_expr env e] infers the type scheme of an expression [e] in a
    typing environment [env] of generalised variables.
