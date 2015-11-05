@@ -4,13 +4,14 @@ module Variable = Symbol.Make(Symbol.String)
 module EffectMap = Map.Make(String)
 
 type variable = Variable.t
-type pattern = variable Pattern.t
 
 type ('term, 'scheme) annotation = {
   term: 'term;
   scheme: 'scheme;
   location: Location.t;
 }
+
+type pattern = (variable Pattern.t, Scheme.ty_scheme) annotation
 
 let annotate t sch loc = {
   term = t;
@@ -51,14 +52,28 @@ and handler = {
 }
 
 (** Abstractions that take one argument. *)
-and abstraction = pattern * computation
+and abstraction = (pattern * computation, Scheme.abstraction_scheme) annotation
 
 (** Abstractions that take two arguments. *)
-and abstraction2 = pattern * pattern * computation
+and abstraction2 = (pattern * pattern * computation, Scheme.abstraction2_scheme) annotation
 
 and operation = Common.opsym
 
 let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_dirt_param () }
+
+let abstraction ~loc p c : abstraction =
+  {
+    term = (p, c);
+    scheme = Scheme.abstract ~loc p.scheme c.scheme;
+    location = loc;
+  }
+
+let abstraction2 ~loc p1 p2 c =
+  {
+    term = (p1, p2, c);
+    scheme = Scheme.abstract2 ~loc p1.scheme p2.scheme c.scheme;
+    location = c.location;
+  }
 
 let var ~loc x ty_sch =
   {
@@ -140,6 +155,14 @@ let variant ~loc (lbl, e) =
         }
     end
 
+let lambda ~loc a =
+  let ctx, (ty, drty), constraints = a.scheme in
+  {
+    term = Lambda a;
+    scheme = Scheme.clean_ty_scheme ~loc (ctx, Type.Arrow (ty, drty), constraints);
+    location = loc
+  }
+
 let effect ~loc eff signature =
     match signature eff with
     | None -> Error.typing ~loc "Unbound effect %s" eff
@@ -153,31 +176,61 @@ let effect ~loc eff signature =
         scheme = Scheme.clean_ty_scheme ~loc ([], ty, constraints);
         location = loc;
       }
-(* 
-let match_cases ~loc e cases =
-  let ctx_e, ty_e, cnstrs_e = e.scheme in
-  let drty = Type.fresh_dirty (), empty_dirt () in
-  let drty_sch = match cases with
-  | [] ->
-      let constraints = Constraints.add_ty_constraint ~loc ty_e Type.empty_ty cnstrs_e in
-      (ctx_e, drty, constraints)
-  | _::_ ->
-      let infer_case ((p, ty_p) (c_drty_c as a) (ctx, constraints) =
-        let ctx_a, ty_p, drty_c, cnstrs_a = a in
-        ctx_a @ ctx,
-          Constraints.add_ty_constraint ~loc:e.Untyped.location ty_e ty_p (
-          Constraints.add_dirty_constraint ~loc:c.Untyped.location drty_c drty (
-          Constraints.unon cnstrs_a constraints))
-      in
-      let ctx, constraints = List.fold_right infer_case cases (ctx_e, cnstrs_e) in
-      (ctx, drty, constraints)
-  in
-  {
-    term = Match (e, cases);
-    scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
-    location = loc
-  } *)
-  
+
+let handler ~loc h signature =
+    let drt_mid = Type.fresh_dirt () in
+    let ty_mid = Type.fresh_ty () in
+
+    let fold (eff, a2) (ctx, constraints) =
+      begin match signature eff with
+      | None -> Error.typing ~loc "Unbound effect %s in a handler" eff
+      | Some (ty_par, ty_arg) ->
+          let ctx_a, (ty_p, ty_k, drty_c), cnstrs_a = a2.scheme in
+          ctx_a @ ctx,
+          constraints
+          |> Constraints.union cnstrs_a
+          |> Constraints.add_ty_constraint ~loc ty_par ty_p
+          |> Constraints.add_ty_constraint ~loc (Type.Arrow (ty_arg, (ty_mid, drt_mid))) ty_k
+          |> Constraints.add_dirty_constraint ~loc drty_c (ty_mid, drt_mid)
+      end
+    in
+    let ctxs, constraints = List.fold_right fold h.operations ([], Constraints.empty) in
+
+    let make_dirt op (ops_in, ops_out) =
+      let r_in = Type.fresh_region_param () in
+      let r_out = Type.fresh_region_param () in
+      (op, r_in) :: ops_in, (op, r_out) :: ops_out
+    in
+    let ops_in, ops_out = List.fold_right make_dirt (Common.uniq (List.map fst h.operations)) ([], []) in
+
+    let ctx_val, (ty_val, drty_val), cnstrs_val = h.value.scheme in
+    let ctx_fin, (ty_fin, drty_fin), cnstrs_fin = h.finally.scheme in
+
+    let ty_in = Type.fresh_ty () in
+    let drt_rest = Type.fresh_dirt_param () in
+    let drt_in = {Type.ops = ops_in; Type.rest = drt_rest} in
+    let drt_out = Type.fresh_dirt () in
+    let ty_out = Type.fresh_ty () in
+
+    let constraints =
+      constraints
+      |> Constraints.add_dirt_constraint {Type.ops = ops_out; Type.rest = drt_rest} drt_mid
+      |> Constraints.add_ty_constraint ~loc ty_in ty_val
+      |> Constraints.add_dirty_constraint ~loc drty_val (ty_mid, drt_mid)
+      |> Constraints.add_ty_constraint ~loc ty_mid ty_fin
+      |> Constraints.add_dirt_constraint drt_mid drt_out
+      |> Constraints.add_dirty_constraint ~loc drty_fin (ty_out, drt_out)
+      |> Constraints.union cnstrs_val
+      |> Constraints.union cnstrs_fin
+
+    in
+
+    let ty_sch = (ctx_val @ ctx_fin @ ctxs, Type.Handler((ty_in, drt_in), (ty_out, drt_out)), constraints) in
+    {
+      term = Handler h;
+      scheme = Scheme.clean_ty_scheme ~loc ty_sch;
+      location = loc;
+    }
 
 
 let value ~loc e =
@@ -185,6 +238,30 @@ let value ~loc e =
   {
     term = Value e;
     scheme = (ctx, (ty, empty_dirt ()), constraints);
+    location = loc
+  }
+
+let match' ~loc e cases =
+  let ctx_e, ty_e, cnstrs_e = e.scheme in
+  let drty = Type.fresh_dirty () in
+  let drty_sch = match cases with
+  | [] ->
+      let constraints = Constraints.add_ty_constraint ~loc ty_e Type.empty_ty cnstrs_e in
+      (ctx_e, drty, constraints)
+  | _::_ ->
+      let fold a (ctx, constraints) =
+        let ctx_a, (ty_p, drty_c), cnstrs_a = a.scheme in
+        ctx_a @ ctx,
+          Constraints.add_ty_constraint ~loc:e.location ty_e ty_p (
+          Constraints.add_dirty_constraint ~loc:a.location drty_c drty (
+          Constraints.union cnstrs_a constraints))
+      in
+      let ctx, constraints = List.fold_right fold cases (ctx_e, cnstrs_e) in
+      (ctx, drty, constraints)
+  in
+  {
+    term = Match (e, cases);
+    scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
     location = loc
   }
 

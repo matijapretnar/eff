@@ -1,6 +1,9 @@
 type context = (Untyped.variable, Type.ty) Common.assoc
-type ty_scheme = context * Type.ty * Constraints.t
-type dirty_scheme = context * Type.dirty * Constraints.t
+type 'a t = context * 'a * Constraints.t
+type ty_scheme = Type.ty t
+type dirty_scheme = Type.dirty t
+type abstraction_scheme = (Type.ty * Type.dirty) t
+type abstraction2_scheme = (Type.ty * Type.ty * Type.dirty) t
 type change = ty_scheme -> ty_scheme
 
 let beautify2 ty1 ty2 cnstrs =
@@ -147,6 +150,25 @@ let add_to_top ~loc ctx cnstrs (ctx_c, drty_c, cnstrs_c) =
     just cnstrs_c;
     just cnstrs
   ])
+
+let abstract ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
+  match finalize_ty_scheme ~loc ctx_c (Type.Arrow (ty_p, drty_c)) [
+    trim_context ~loc ctx_p;
+    just cnstrs_p;
+    just cnstrs_c
+  ] with
+  | ctx, Type.Arrow (ty_p, drty_c), cnstrs -> ctx, (ty_p, drty_c), cnstrs
+  | _ -> assert false
+
+and abstract2 ~loc (ctx_p1, ty_p1, cnstrs_p1) (ctx_p2, ty_p2, cnstrs_p2) (ctx_c, drty_c, cnstrs_c) =
+  match finalize_ty_scheme ~loc ctx_c (Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c)) [
+    trim_context ~loc (ctx_p1 @ ctx_p2);
+    just cnstrs_p1;
+    just cnstrs_p2;
+    just cnstrs_c
+  ] with
+  | ctx, Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c), cnstrs -> ctx, (ty_p1, ty_p2, drty_c), cnstrs
+  | _ -> assert false
 
 let context skeletons ctx ppf =
   match ctx with

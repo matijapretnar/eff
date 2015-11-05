@@ -113,6 +113,13 @@ let rec infer_pattern (p, loc) =
   (* Print.debug "%t : %t" (Untyped.print_pattern (p, loc)) (Scheme.print_ty_scheme ty_sch); *)
   ty_sch
 
+let type_pattern p =
+  let ty_sch = infer_pattern p in
+  {
+    Typed.term = p;
+    Typed.scheme = ty_sch;
+    Typed.location = snd p
+  }
 let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
   match expr with
   | Untyped.Var x ->
@@ -133,12 +140,18 @@ let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
       Typed.record ~loc lst
   | Untyped.Variant (lbl, e) ->
       Typed.variant ~loc (lbl, Common.option_map (type_expr env) e)
+  | Untyped.Lambda a ->
+      Typed.lambda ~loc (type_abstraction env a)
   | Untyped.Effect eff ->
       Typed.effect ~loc eff (infer_effect env)
+  | Untyped.Handler h ->
+      Typed.handler ~loc (type_handler env h) (infer_effect env)
 and type_comp env {Untyped.term=comp; Untyped.location=loc} =
   match comp with
   | Untyped.Value e ->
       Typed.value ~loc (type_expr env e)
+  | Untyped.Match (e, cases) ->
+      Typed.match' ~loc (type_expr env e) (List.map (type_abstraction env) cases)
   | Untyped.While (c1, c2) ->
       Typed.while' ~loc (type_comp env c1) (type_comp env c2)
   | Untyped.For (i, e1, e2, c, up) ->
@@ -149,6 +162,16 @@ and type_comp env {Untyped.term=comp; Untyped.location=loc} =
       Typed.handle ~loc (type_expr env e) (type_comp env c)
   | Untyped.Check c ->
       Typed.check ~loc (type_comp env c)
+and type_abstraction env (p, c) =
+  Typed.abstraction ~loc:(c.Untyped.location) (type_pattern p) (type_comp env c)
+and type_abstraction2 env ((p1, p2, c) : Untyped.abstraction2) : Typed.abstraction2=
+  Typed.abstraction2 ~loc:(c.Untyped.location) (type_pattern p1) (type_pattern p2) (type_comp env c)
+and type_handler env h =
+  {
+    Typed.operations = Common.assoc_map (type_abstraction2 env) h.Untyped.operations;
+    Typed.value = type_abstraction env h.Untyped.value;
+    Typed.finally = type_abstraction env h.Untyped.finally;
+  }
 
 (* [infer_expr env e] infers the type scheme of an expression [e] in a
    typing environment [env] of generalised variables.
