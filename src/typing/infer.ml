@@ -162,6 +162,10 @@ and type_comp env {Untyped.term=comp; Untyped.location=loc} =
       Typed.handle ~loc (type_expr env e) (type_comp env c)
   | Untyped.Check c ->
       Typed.check ~loc (type_comp env c)
+  | Untyped.Let _ ->
+      Error.typing ~loc "Typing of let binding not yet implemented."
+  | Untyped.LetRec _ ->
+      Error.typing ~loc "Typing of let rec binding not yet implemented."
 and type_abstraction env (p, c) =
   Typed.abstraction ~loc:(c.Untyped.location) (type_pattern p) (type_comp env c)
 and type_abstraction2 env ((p1, p2, c) : Untyped.abstraction2) : Typed.abstraction2=
