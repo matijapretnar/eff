@@ -26,6 +26,12 @@ let ty_of_const = function
   | Const.Boolean _ -> Type.bool_ty
   | Const.Float _ -> Type.float_ty
 
+let add_effect env eff (ty1, ty2) =
+  {env with effects = Untyped.EffectMap.add eff (ty1, ty2) env.effects}
+
+let add_def env x ty_sch =
+  {env with context = TypingEnv.update env.context x ty_sch}
+
 let infer_effect env eff =
   try
     Some (Untyped.EffectMap.find eff env.effects)

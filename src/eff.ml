@@ -75,25 +75,18 @@ let parse parser lex =
 
 type state = {
   environment : RuntimeEnv.t;
-  context : TypingEnv.t;
   change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
-  effects : (Type.ty * Type.ty) Untyped.EffectMap.t
+  typing : Infer.state;
 }
 
 let initial_ctxenv = {
   environment = RuntimeEnv.empty;
-  context = TypingEnv.empty;
   change = Common.id;
-  effects = Untyped.EffectMap.empty;
-}
-
-let create_infer_state st = {
-  Infer.context = st.context;
-  Infer.effects = st.effects;
+  typing = Infer.initial;
 }
 
 let infer_top_comp st c =
-  let ctx', (ty', drt'), cnstrs' = Infer.infer_comp (create_infer_state st) c in
+  let ctx', (ty', drt'), cnstrs' = Infer.infer_comp st.typing c in
   let change = Scheme.add_to_top ~loc:c.Untyped.location ctx' cnstrs' in
   let top_change = Common.compose st.change change in
   let ctx = match c.Untyped.term with
@@ -132,14 +125,14 @@ let rec exec_cmd interactive st (d,loc) =
   | Sugared.DefEffect (eff, (ty1, ty2)) ->
       let ty1 = Desugar.ty Trio.empty ty1
       and ty2 = Desugar.ty Trio.empty ty2 in
-      {st with effects = Untyped.EffectMap.add eff (ty1, ty2) st.effects}
+      {st with typing = Infer.add_effect st.typing eff (ty1, ty2)}
   | Sugared.Quit -> exit 0
   | Sugared.Use fn -> use_file st (fn, interactive)
   | Sugared.TopLet defs ->
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
-      let vars, nonpoly, change = Infer.infer_let ~loc (create_infer_state st) defs in
-      let ctx = List.fold_right (fun (x, ty_sch) env -> TypingEnv.update env x ty_sch) vars st.context in
+      let vars, nonpoly, change = Infer.infer_let ~loc st.typing defs in
+      let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
       let extend_nonpoly (x, ty) env =
         (x, ([(x, ty)], ty, Constraints.empty)) :: env
       in
@@ -164,15 +157,14 @@ let rec exec_cmd interactive st (d,loc) =
             vars
         end;
         {
-          st with
-          context = ctx;
+          typing = typing_env;
           change = top_change;
           environment = env;
         }
     | Sugared.TopLetRec defs ->
         let defs = Desugar.top_let_rec defs in
-        let vars, _, change = Infer.infer_let_rec ~loc (create_infer_state st) defs in
-        let ctx = List.fold_right (fun (x, ty_sch) ctx -> TypingEnv.update ctx x ty_sch) vars st.context in
+        let vars, _, change = Infer.infer_let_rec ~loc st.typing defs in
+        let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
         let top_change = Common.compose st.change change in
         let sch_change (ctx, ty, cnstrs) =
           let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
@@ -184,18 +176,16 @@ let rec exec_cmd interactive st (d,loc) =
             List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Untyped.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch))) vars
           end;
         {
-          st with
-          context = ctx;
+          typing = typing_env;
           change = top_change;
           environment = env;
         }
     | Sugared.External (x, t, f) ->
-      let (x, t) = Desugar.external_ty x t in
-      let ctx = TypingEnv.update st.context x t in
+      let x, ty_sch = Desugar.external_ty x t in
+      let typing_env = Infer.add_def st.typing x ty_sch in
         begin match C.lookup f External.values with
           | Some v -> {
-              st with
-              context = ctx;
+              typing = typing_env;
               change = st.change;
               environment = RuntimeEnv.update x v st.environment;
             }
