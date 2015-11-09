@@ -177,6 +177,11 @@ and type_handler env h =
     Typed.finally = type_abstraction env h.Untyped.finally;
   }
 
+
+let extend_env vars env =
+  List.fold_right (fun (x, ty_sch) env -> {env with context = Ctx.extend env.context x ty_sch}) vars env
+
+
 (* [infer_expr env e] infers the type scheme of an expression [e] in a
    typing environment [env] of generalised variables.
    The scheme consists of:
@@ -337,20 +342,26 @@ and infer_comp env c =
       ctx, (ty, empty_dirt ()), cnstrs
 
   | Untyped.Let (defs, c) ->
-      let vars, nonpoly, change = infer_let ~loc env defs in
+      let poly_tyschs, nonpoly_tys, change = infer_let ~loc env defs in
+      let env' = extend_env poly_tyschs env in
       let change2 (ctx_c, drty_c, cnstrs_c) =
         Scheme.finalize_dirty_scheme ~loc (ctx_c) drty_c ([
-          Scheme.remove_context ~loc nonpoly;
+          Scheme.remove_context ~loc nonpoly_tys;
           just cnstrs_c
         ])
       in
-      let env' = List.fold_right (fun (x, ty_sch) env -> {env with context = Ctx.extend env.context x ty_sch}) vars env in
       change2 (change (infer_comp env' c))
 
   | Untyped.LetRec (defs, c) ->
-      let vars, change = infer_let_rec ~loc env defs in
-      let env' = List.fold_right (fun (x, ty_sch) env -> {env with context = Ctx.extend env.context x ty_sch}) vars env in
-      change (infer_comp env' c)
+      let poly_tyschs, nonpoly_tys, change = infer_let_rec ~loc env defs in
+      let env' = extend_env poly_tyschs env in
+      let change2 (ctx_c, drty_c, cnstrs_c) =
+        Scheme.finalize_dirty_scheme ~loc (ctx_c) drty_c ([
+          Scheme.remove_context ~loc nonpoly_tys;
+          just cnstrs_c
+        ])
+      in
+      change2 (change (infer_comp env' c))
 
   | Untyped.Match (e, []) ->
       let ctx_e, ty_e, cnstrs_e = infer_expr env e in
@@ -454,55 +465,50 @@ and infer_abstraction2 env (p1, p2, c) =
 and infer_let ~loc env defs =
   (* XXX Check for implicit sequencing *)
   let drt = Type.fresh_dirt () in
-  let add_binding (p, c) (poly, nonpoly, ctx, chngs) =
+  let add_binding (p, c) (poly_tys, nonpoly_tys, ctx, chngs) =
     let ctx_p, ty_p, cnstrs_p = infer_pattern p in
     let ctx_c, drty_c, cnstrs_c = infer_comp env c in
-    let poly, nonpoly =
+    let poly_tys, nonpoly_tys =
       match c.Untyped.term with
       | Untyped.Value _ ->
-          ctx_p @ poly, nonpoly
+          ctx_p @ poly_tys, nonpoly_tys
       | Untyped.Apply _ | Untyped.Match _ | Untyped.While _ | Untyped.For _
       | Untyped.Handle _ | Untyped.Let _ | Untyped.LetRec _ | Untyped.Check _ ->
-          poly, ctx_p @ nonpoly
+          poly_tys, ctx_p @ nonpoly_tys
     in
-    poly, nonpoly, ctx_c @ ctx, [
+    poly_tys, nonpoly_tys, ctx_c @ ctx, [
       dirty_less ~loc:c.Untyped.location drty_c (ty_p, drt);
       just cnstrs_p;
       just cnstrs_c
     ] @ chngs
   in
-  let poly, nonpoly, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
-  let extend_poly (x, ty) env =
-    let ty_sch = Scheme.finalize_ty_scheme ~loc ctx ty chngs in
-    (x, ty_sch) :: env
-  in
-  let vars = List.fold_right extend_poly poly [] in
+  let poly_tys, nonpoly_tys, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
+  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
   let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
+      Scheme.less_context ~loc nonpoly_tys;
       dirt_less drt_c drt;
-      Scheme.less_context ~loc nonpoly;
       just cnstrs_c;
     ] @ chngs)
   in
-  vars, nonpoly, change
+  poly_tyschs, nonpoly_tys, change
 
 and infer_let_rec ~loc env defs =
-  let infer (x, a) (poly, ctx, chngs) =
+  let drt = Type.fresh_dirt () in
+  let add_binding (x, a) (poly_tys, nonpoly_tys, ctx, chngs) =
     let ctx_a, ty_p, drty_c, cnstrs_a = infer_abstraction env a in
-    (x, Type.Arrow (ty_p, drty_c)) :: poly, ctx_a @ ctx, [
+    let poly_tys, nonpoly_tys = (x, Type.Arrow (ty_p, drty_c)) :: poly_tys, nonpoly_tys in
+    poly_tys, nonpoly_tys, ctx_a @ ctx, [
       just cnstrs_a
     ] @ chngs
   in
-  let poly, ctx, chngs = List.fold_right infer defs ([], [], []) in
-  let chngs = trim_context ~loc poly :: chngs in
-  let extend_poly (x, ty) env =
-    let ty_sch = Scheme.finalize_ty_scheme ~loc ctx ty chngs in
-    (x, ty_sch) :: env
-  in
-  let vars = List.fold_right extend_poly poly [] in
-  let change (ctx_c, drty_c, cnstrs_c) =
-    Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) drty_c ([
-        just cnstrs_c;
+  let poly_tys, nonpoly_tys, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
+  let chngs = trim_context ~loc poly_tys :: chngs in
+  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
+    Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
+      dirt_less drt_c drt;
+      just cnstrs_c;
     ] @ chngs)
   in
-  vars, change
+  poly_tyschs, nonpoly_tys, change

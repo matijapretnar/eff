@@ -171,7 +171,7 @@ let rec exec_cmd interactive st (d,loc) =
         }
     | Sugared.TopLetRec defs ->
         let defs = Desugar.top_let_rec defs in
-        let vars, change = Infer.infer_let_rec ~loc (create_infer_state st) defs in
+        let vars, _, change = Infer.infer_let_rec ~loc (create_infer_state st) defs in
         let ctx = List.fold_right (fun (x, ty_sch) ctx -> Ctx.extend ctx x ty_sch) vars st.context in
         let top_change = Common.compose st.change change in
         let sch_change (ctx, ty, cnstrs) =
