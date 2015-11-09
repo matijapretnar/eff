@@ -44,6 +44,9 @@ and plain_computation =
   | Handle of expression * computation
   | Check of computation
 
+  | Bind of computation * abstraction
+  | LetIn of expression * abstraction
+
 (** Handler definitions *)
 and handler = {
   operations : (operation, abstraction2) Common.assoc;
@@ -349,7 +352,8 @@ let let' ~loc defs c =
       | Value _ ->
           ctx_p @ poly_tys, nonpoly_tys
       | Apply _ | Match _ | While _ | For _
-      | Handle _ | Let _ | LetRec _ | Check _ ->
+      | Handle _ | Let _ | LetRec _ | Check _
+      | Bind _ | LetIn _ ->
           poly_tys, ctx_p @ nonpoly_tys
     in
     poly_tys, nonpoly_tys, ctx_c @ ctx, [
@@ -359,7 +363,6 @@ let let' ~loc defs c =
     ] @ chngs
   in
   let poly_tys, nonpoly_tys, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
-  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
   let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
       Scheme.less_context ~loc nonpoly_tys;
@@ -390,7 +393,6 @@ let let_rec' ~loc defs c =
   in
   let poly_tys, nonpoly_tys, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
   let chngs = Scheme.trim_context ~loc poly_tys :: chngs in
-  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
   let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
       Scheme.dirt_less drt_c drt;
@@ -406,5 +408,34 @@ let let_rec' ~loc defs c =
   {
     term = LetRec (defs, c);
     scheme = change2 (change c.scheme);
+    location = loc;
+  }
+
+let bind ~loc c1 c2 =
+  let ctx_c1, (ty_c1, drt_c1), constraints_c1 = c1.scheme
+  and ctx_c2, (ty_p, (ty_c2, drt_c2)), constraints_c2 = c2.scheme in
+  let drt = Type.fresh_dirt () in
+  let constraints =
+    Constraints.union constraints_c1 constraints_c2 |>
+    Constraints.add_dirt_constraint drt_c1 drt |>
+    Constraints.add_dirt_constraint drt_c2 drt |>
+    Constraints.add_ty_constraint ~loc ty_c1 ty_p
+  in
+  {
+    term = Bind (c1, c2);
+    scheme = Scheme.clean_dirty_scheme ~loc (ctx_c1 @ ctx_c2, (ty_c2, drt), constraints);
+    location = loc;
+  }
+
+let let_in ~loc e1 c2 =
+  let ctx_e1, ty_e1, constraints_e1 = e1.scheme
+  and ctx_c2, (ty_p, drty_c2), constraints_c2 = c2.scheme in
+  let constraints =
+    Constraints.union constraints_e1 constraints_c2 |>
+    Constraints.add_ty_constraint ~loc ty_e1 ty_p
+  in
+  {
+    term = LetIn (e1, c2);
+    scheme = Scheme.clean_dirty_scheme ~loc (ctx_e1 @ ctx_c2, drty_c2, constraints);
     location = loc;
   }
