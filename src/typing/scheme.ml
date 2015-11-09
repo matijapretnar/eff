@@ -35,14 +35,6 @@ and ty_less ~loc ty1 ty2 (ctx, ty, cnstrs) =
 and dirty_less ~loc drty1 drty2 (ctx, ty, cnstrs) =
   (ctx, ty, Constraints.add_dirty_constraint ~loc drty1 drty2 cnstrs)
 
-let trim_context ~loc ctx_p (ctx, ty, cnstrs) =
-  let trim (x, t) (ctx, ty, cnstrs) =
-    match Common.lookup x ctx_p with
-    | None -> ((x, t) :: ctx, ty, cnstrs)
-    | Some u -> ty_less ~loc u t (ctx, ty, cnstrs)
-  in
-  List.fold_right trim ctx ([], ty, cnstrs)
-
 let remove_context ~loc ctx_p (ctx, ty, cnstrs) =
   let trim (x, t) (ctx, ty, cnstrs) =
     match Common.lookup x ctx_p with
@@ -59,6 +51,10 @@ let less_context ~loc ctx_p (ctx, ty, cnstrs) =
   in
   List.fold_right trim ctx ([], ty, cnstrs)
 
+let trim_context ~loc ctx_p ty_sch =
+  let ty_sch = less_context ~loc ctx_p ty_sch in
+  let ty_sch = remove_context ~loc ctx_p ty_sch in
+  ty_sch
 
 let (@@@) = Trio.append
 
