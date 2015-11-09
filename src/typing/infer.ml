@@ -119,6 +119,9 @@ let rec infer_pattern (p, loc) =
   (* Print.debug "%t : %t" (Untyped.print_pattern (p, loc)) (Scheme.print_ty_scheme ty_sch); *)
   ty_sch
 
+let extend_env vars env =
+  List.fold_right (fun (x, ty_sch) env -> {env with context = TypingEnv.update env.context x ty_sch}) vars env
+
 let type_pattern p =
   let ty_sch = infer_pattern p in
   {
@@ -168,13 +171,17 @@ and type_comp env {Untyped.term=comp; Untyped.location=loc} =
       Typed.handle ~loc (type_expr env e) (type_comp env c)
   | Untyped.Check c ->
       Typed.check ~loc (type_comp env c)
-  | Untyped.Let _ ->
-      Error.typing ~loc "Typing of let binding not yet implemented."
-  | Untyped.LetRec _ ->
-      Error.typing ~loc "Typing of let rec binding not yet implemented."
+  | Untyped.Let (defs, c) ->
+      let defs, poly_tyschs = type_let_defs ~loc env defs in
+      let env' = extend_env poly_tyschs env in
+      Typed.let' ~loc defs (type_comp env' c)
+  | Untyped.LetRec (defs, c) ->
+      let defs, poly_tyschs = type_let_rec_defs ~loc env defs in
+      let env' = extend_env poly_tyschs env in
+      Typed.let_rec' ~loc defs (type_comp env' c)
 and type_abstraction env (p, c) =
   Typed.abstraction ~loc:(c.Untyped.location) (type_pattern p) (type_comp env c)
-and type_abstraction2 env ((p1, p2, c) : Untyped.abstraction2) : Typed.abstraction2=
+and type_abstraction2 env (p1, p2, c) =
   Typed.abstraction2 ~loc:(c.Untyped.location) (type_pattern p1) (type_pattern p2) (type_comp env c)
 and type_handler env h =
   {
@@ -182,11 +189,44 @@ and type_handler env h =
     Typed.value = type_abstraction env h.Untyped.value;
     Typed.finally = type_abstraction env h.Untyped.finally;
   }
-
-
-let extend_env vars env =
-  List.fold_right (fun (x, ty_sch) env -> {env with context = TypingEnv.update env.context x ty_sch}) vars env
-
+and type_let_defs ~loc env defs =
+  let drt = Type.fresh_dirt () in
+  let add_binding (p, c) (poly_tys, nonpoly_tys, ctx, chngs, defs) =
+    let p = type_pattern p
+    and c = type_comp env c in
+    let ctx_p, ty_p, cnstrs_p = p.Typed.scheme in
+    let ctx_c, drty_c, cnstrs_c = c.Typed.scheme in
+    let poly_tys, nonpoly_tys =
+      match c.Typed.term with
+      | Typed.Value _ ->
+          ctx_p @ poly_tys, nonpoly_tys
+      | Typed.Apply _ | Typed.Match _ | Typed.While _ | Typed.For _
+      | Typed.Handle _ | Typed.Let _ | Typed.LetRec _ | Typed.Check _ ->
+          poly_tys, ctx_p @ nonpoly_tys
+    in
+    poly_tys, nonpoly_tys, ctx_c @ ctx, [
+      Scheme.dirty_less ~loc:c.Typed.location drty_c (ty_p, drt);
+      Scheme.just cnstrs_p;
+      Scheme.just cnstrs_c
+    ] @ chngs, (p, c) :: defs
+  in
+  let poly_tys, nonpoly_tys, ctx, chngs, defs = List.fold_right add_binding defs ([], [], [], [], []) in
+  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  defs, poly_tyschs
+and type_let_rec_defs ~loc env defs =
+  let drt = Type.fresh_dirt () in
+  let add_binding (x, a) (poly_tys, nonpoly_tys, ctx, chngs, defs) =
+    let a = type_abstraction env a in
+    let ctx_a, (ty_p, drty_c), cnstrs_a = a.Typed.scheme in
+    let poly_tys, nonpoly_tys = (x, Type.Arrow (ty_p, drty_c)) :: poly_tys, nonpoly_tys in
+    poly_tys, nonpoly_tys, ctx_a @ ctx, [
+      Scheme.just cnstrs_a
+    ] @ chngs, (x, a) :: defs
+  in
+  let poly_tys, nonpoly_tys, ctx, chngs, defs = List.fold_right add_binding defs ([], [], [], [], []) in
+  let chngs = Scheme.trim_context ~loc poly_tys :: chngs in
+  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  defs, poly_tyschs
 
 (* [infer_expr env e] infers the type scheme of an expression [e] in a
    typing environment [env] of generalised variables.
