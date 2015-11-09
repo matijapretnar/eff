@@ -107,6 +107,7 @@ let rec exec_cmd interactive st (d,loc) =
   | Sugared.Term c ->
       let c = Desugar.top_computation c in
       let drty_sch, c', new_change = infer_top_comp st c in
+      let c' = Optimize.optimize_comp c' in
       let v = Eval.run st.environment c' in
       if interactive then Format.printf "@[- : %t = %t@]@."
         (Scheme.print_dirty_scheme drty_sch)
