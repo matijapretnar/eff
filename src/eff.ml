@@ -74,15 +74,15 @@ let parse parser lex =
 
 
 type state = {
-  environment : Eval.env;
-  context : Ctx.t;
+  environment : RuntimeEnv.t;
+  context : TypingEnv.t;
   change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
   effects : (Type.ty * Type.ty) Untyped.EffectMap.t
 }
 
 let initial_ctxenv = {
-  environment = Eval.initial;
-  context = Ctx.empty;
+  environment = RuntimeEnv.initial;
+  context = TypingEnv.empty;
   change = Common.id;
   effects = Untyped.EffectMap.empty;
 }
@@ -139,7 +139,7 @@ let rec exec_cmd interactive st (d,loc) =
       let defs = Desugar.top_let defs in
       (* XXX What to do about the dirts? *)
       let vars, nonpoly, change = Infer.infer_let ~loc (create_infer_state st) defs in
-      let ctx = List.fold_right (fun (x, ty_sch) env -> Ctx.extend env x ty_sch) vars st.context in
+      let ctx = List.fold_right (fun (x, ty_sch) env -> TypingEnv.extend env x ty_sch) vars st.context in
       let extend_nonpoly (x, ty) env =
         (x, ([(x, ty)], ty, Constraints.empty)) :: env
       in
@@ -157,7 +157,7 @@ let rec exec_cmd interactive st (d,loc) =
       in
         if interactive then begin
           List.iter (fun (x, tysch) ->
-                       match Eval.lookup x env with
+                       match RuntimeEnv.lookup x env with
                          | None -> assert false
                          | Some v ->
                          Format.printf "@[val %t : %t = %t@]@." (Untyped.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
@@ -172,7 +172,7 @@ let rec exec_cmd interactive st (d,loc) =
     | Sugared.TopLetRec defs ->
         let defs = Desugar.top_let_rec defs in
         let vars, _, change = Infer.infer_let_rec ~loc (create_infer_state st) defs in
-        let ctx = List.fold_right (fun (x, ty_sch) ctx -> Ctx.extend ctx x ty_sch) vars st.context in
+        let ctx = List.fold_right (fun (x, ty_sch) ctx -> TypingEnv.extend ctx x ty_sch) vars st.context in
         let top_change = Common.compose st.change change in
         let sch_change (ctx, ty, cnstrs) =
           let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
@@ -191,13 +191,13 @@ let rec exec_cmd interactive st (d,loc) =
         }
     | Sugared.External (x, t, f) ->
       let (x, t) = Desugar.external_ty x t in
-      let ctx = Ctx.extend st.context x t in
+      let ctx = TypingEnv.extend st.context x t in
         begin match C.lookup f External.values with
           | Some v -> {
               st with
               context = ctx;
               change = st.change;
-              environment = Eval.update x v st.environment;
+              environment = RuntimeEnv.update x v st.environment;
             }
           | None -> Error.runtime "unknown external symbol %s." f
         end

@@ -5,26 +5,12 @@ module V = Value
 
 exception PatternMatch of Location.t
 
-module EnvMap = Map.Make(Untyped.Variable)
-
-type env = Value.value EnvMap.t
-
-let initial = EnvMap.empty
-
-let update x = EnvMap.add x
-
-let lookup x env =
-  try
-    Some (EnvMap.find x env)
-  with
-    | Not_found -> None      
-
 let rec extend_value p v env =
   match fst p, v with
-  | Pattern.Var x, v -> update x v env
+  | Pattern.Var x, v -> RuntimeEnv.update x v env
   | Pattern.As (p, x), v ->
       let env = extend_value p v env in
-        update x v env
+        RuntimeEnv.update x v env
   | Pattern.Nonbinding, _ -> env
   | Pattern.Tuple ps, Value.Tuple vs -> List.fold_right2 extend_value ps vs env
   | Pattern.Record ps, Value.Record vs ->
@@ -100,7 +86,7 @@ let rec ceval env c =
       let next = if up then Big_int.succ_big_int else Big_int.pred_big_int in
       let rec loop n =
         if le n n2 then
-          let r = ceval (update i (V.Const (Const.of_integer n)) env) c in
+          let r = ceval (RuntimeEnv.update i (V.Const (Const.of_integer n)) env) c in
           sequence (fun _ -> loop (next n)) r
         else
           V.unit_result
@@ -137,7 +123,7 @@ and extend_let_rec env defs =
   let env = List.fold_right
     (fun (f, (p, c)) env ->
        let g = V.Closure (fun v -> ceval (extend p v !env') c) in
-       update f g env)
+       RuntimeEnv.update f g env)
     defs env in
   env' := env;
   env
@@ -145,7 +131,7 @@ and extend_let_rec env defs =
 and veval env e =
   match e.Untyped.term with
   | Untyped.Var x ->
-      begin match lookup x env with
+      begin match RuntimeEnv.lookup x env with
       | Some v -> v
       | None -> Error.runtime "Name %t is not defined." (Untyped.Variable.print x)
       end

@@ -8,12 +8,12 @@ let just = Scheme.just
 let trim_context = Scheme.trim_context
 
 type state = {
-  context : Ctx.t;
+  context : TypingEnv.t;
   effects : (Type.ty * Type.ty) Untyped.EffectMap.t
 }
 
 let initial = {
-  context = Ctx.empty;
+  context = TypingEnv.empty;
   effects = Untyped.EffectMap.empty;
 }
 
@@ -123,7 +123,7 @@ let type_pattern p =
 let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
   match expr with
   | Untyped.Var x ->
-      let ty_sch = begin match Ctx.lookup env.context x with
+      let ty_sch = begin match TypingEnv.lookup env.context x with
       | Some ty_sch -> ty_sch
       | None ->
           let ty = Type.fresh_ty () in
@@ -179,7 +179,7 @@ and type_handler env h =
 
 
 let extend_env vars env =
-  List.fold_right (fun (x, ty_sch) env -> {env with context = Ctx.extend env.context x ty_sch}) vars env
+  List.fold_right (fun (x, ty_sch) env -> {env with context = TypingEnv.extend env.context x ty_sch}) vars env
 
 
 (* [infer_expr env e] infers the type scheme of an expression [e] in a
@@ -195,7 +195,7 @@ let rec infer_expr env e =
   let ty_sch = match e.Untyped.term with
 
   | Untyped.Var x ->
-      begin match Ctx.lookup env.context x with
+      begin match TypingEnv.lookup env.context x with
       | Some (ctx, ty, cnstrs) ->
           (ctx, ty, cnstrs)
       | None ->
