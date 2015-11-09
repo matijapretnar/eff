@@ -214,7 +214,6 @@ and type_let_defs ~loc env defs =
   let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
   defs, poly_tyschs
 and type_let_rec_defs ~loc env defs =
-  let drt = Type.fresh_dirt () in
   let add_binding (x, a) (poly_tys, nonpoly_tys, ctx, chngs, defs) =
     let a = type_abstraction env a in
     let ctx_a, (ty_p, drty_c), cnstrs_a = a.Typed.scheme in
