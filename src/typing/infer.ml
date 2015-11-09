@@ -179,7 +179,7 @@ and type_handler env h =
 
 
 let extend_env vars env =
-  List.fold_right (fun (x, ty_sch) env -> {env with context = TypingEnv.extend env.context x ty_sch}) vars env
+  List.fold_right (fun (x, ty_sch) env -> {env with context = TypingEnv.update env.context x ty_sch}) vars env
 
 
 (* [infer_expr env e] infers the type scheme of an expression [e] in a

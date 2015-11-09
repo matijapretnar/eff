@@ -17,4 +17,4 @@ val lookup : t -> Untyped.variable -> Scheme.ty_scheme option
 
 (** [extend x ty_scheme ctx] returns the context [ctx] extended with
     a variable [x] bound to the type scheme [ty_scheme]. *)
-val extend : t -> Untyped.variable -> Scheme.ty_scheme -> t
+val update : t -> Untyped.variable -> Scheme.ty_scheme -> t

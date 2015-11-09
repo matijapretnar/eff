@@ -2,7 +2,7 @@ module EnvMap = Map.Make(Untyped.Variable)
 
 type t = Value.value EnvMap.t
 
-let initial = EnvMap.empty
+let empty = EnvMap.empty
 
 let update x = EnvMap.add x
 
