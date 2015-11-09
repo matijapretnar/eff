@@ -214,14 +214,14 @@ let handler ~loc h signature =
 
     let constraints =
       constraints
+      |> Constraints.union cnstrs_val
+      |> Constraints.union cnstrs_fin
       |> Constraints.add_dirt_constraint {Type.ops = ops_out; Type.rest = drt_rest} drt_mid
       |> Constraints.add_ty_constraint ~loc ty_in ty_val
       |> Constraints.add_dirty_constraint ~loc drty_val (ty_mid, drt_mid)
       |> Constraints.add_ty_constraint ~loc ty_mid ty_fin
       |> Constraints.add_dirt_constraint drt_mid drt_out
       |> Constraints.add_dirty_constraint ~loc drty_fin (ty_out, drt_out)
-      |> Constraints.union cnstrs_val
-      |> Constraints.union cnstrs_fin
 
     in
 

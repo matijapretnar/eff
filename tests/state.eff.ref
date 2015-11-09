@@ -5,8 +5,8 @@ val state : τ₁ -δ₂→ (τ₂ ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹
 val better_state : int -δ₂→ (τ₁ ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹ 
                    τ₂ ! {Get:ρ₃, Set:ρ₄|δ₃}) | τ₁ < τ₂; δ₁ < δ₃;  = <fun>
 val transaction : τ₁ ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹ 
-τ₂ ! {Set:ρ₃, 
-Get:ρ₄|δ₂} | τ₁ < τ₂; δ₁ < δ₂; ρ₃ = ⊤,
+τ₂ ! {Get:ρ₃, 
+Set:ρ₄|δ₂} | τ₁ < τ₂; δ₁ < δ₂; ρ₃ = ⊤,
 ρ₄ = ⊤ = <handler>
 Check (file "./state.eff", line 25, char 24):
 20
