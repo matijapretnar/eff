@@ -447,37 +447,27 @@ let (^+^) x y = x ^^ space ^^ y
 let rec prettyE e =
   prettyE' e.term
 and prettyE' e = match e with
-(*   | PureLetIn(v,e1,e2) 
-  -> group (string "let" ^+^ pretty_var v ^+^ string "=" ^+^ prettyE e1 ^^ break 1 ^^ 
-            string "in" ^+^ prettyE e2)
- *)  | Var x 
+  | Var x 
   -> pretty_var x
-(*   | PureConditional(e1,e2,e3) 
-  -> group (string "if" ^+^ parens (prettyE e1) ^^ break 1 ^^
-              nest 2 (string "then" ^+^ parens (prettyE e2) ^^ break 1 ^^
-                      string "else" ^+^ parens (prettyE e3)))
- *)  | Const c 
+  | Const c 
   -> pretty_const c
   | Lambda a 
   -> parens (string "fun" ^+^ pretty_abstraction a)
-(*
-  | PureLambda a 
-  -> parens (string "fun" ^+^ pretty_pure_abstraction a)
-  | PureApply (e1,e2) 
-  -> parens (prettyE e1 ^+^ prettyE e2)
-*)  
   | Effect eff 
   -> parens (string "fun x -> apply_effect" ^+^ pretty_effect eff ^+^ string "x" ^+^ string "(fun y -> value y)")
   | Handler h 
   -> pretty_handler h
-  (* | PureLetRecIn _ -> failwith "Not implemented" *)
 and prettyC c = 
    prettyC' c.term
 and prettyC' c = match c with
-(*   | LetIn (v,e,c) -> group (string "let*" ^+^ pretty_var v ^+^ string "=" ^+^ prettyE e ^^ break 1 ^^ 
-                           string "in" ^+^ prettyC c) *)
-     | Value e -> string "value" ^+^ parens (prettyE e)
-  (* | Bind (v,c1,c2) -> parens (prettyC c1) ^+^ string ">>" ^+^ parens (string "fun" ^+^ pretty_var v ^+^ string "->" ^+^ prettyC c2) *)
+   | Value e -> string "value" ^+^ parens (prettyE e)
+   | LetIn (e,a) ->
+      let (p, c2) = a.term in
+      group (string "let*" ^+^ pretty_pattern p.term ^+^ string "=" ^+^ prettyE e ^^ break 1 ^^ 
+                         string "in" ^+^ prettyC c2)
+   | Bind (c1,a) ->
+      let (p, c2) = a.term in
+      parens (prettyC c1) ^+^ string ">>" ^+^ parens (string "fun" ^+^ pretty_pattern p.term ^+^ string "->" ^+^ prettyC c2)
 (*   | Conditional (e,c1,c2) 
                    -> group (string "if" ^+^ parens (prettyE e) ^^ break 1 ^^
                                nest 2 (string "then" ^+^ parens (prettyC c1) ^^ break 1 ^^
@@ -503,6 +493,8 @@ and pretty_pure_abstraction (v, e) =
 
 and pretty_pattern p = match fst p with
   | Pattern.Var x -> pretty_var x
+  (* Catch all case *)
+  | _ -> string (Common.to_string Untyped.print_pattern p)
 
 and pretty_h_effs cases  =  pretty_h_effs_aux cases
 and pretty_h_effs_aux cases =
