@@ -73,6 +73,7 @@
 
 %start <Sugared.toplevel list> file
 %start <Sugared.toplevel> commandline
+%start <Sugared.term> computation_file 
 
 %%
 
@@ -91,6 +92,10 @@ file:
      { [dir] }
   | dir = topdirective SEMISEMI lst = file
      { dir :: lst }
+
+computation_file:
+  | t = term EOF
+    { t }
 
 file_topdef:
   | EOF

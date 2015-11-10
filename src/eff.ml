@@ -12,7 +12,9 @@ let help_text = "Toplevel commands:
 
 (* A list of files to be loaded and run. *)
 let files = ref []
+let to_be_optimized = ref []
 let add_file interactive filename = (files := (filename, interactive) :: !files)
+let optimize_file filename = (to_be_optimized := filename :: !to_be_optimized)
 
 (* Command-line options *)
 let options = Arg.align [
@@ -51,6 +53,9 @@ let options = Arg.align [
   ("-l",
     Arg.String (fun str -> add_file false str),
     "<file> Load <file> into the initial environment");
+  ("--opt",
+    Arg.String (fun str -> optimize_file str),
+    "<file> Optimize <file>");
   ("-V",
     Arg.Set_int Config.verbosity,
     "<n> Set printing verbosity to <n>");
@@ -107,7 +112,6 @@ let rec exec_cmd interactive st (d,loc) =
   | Sugared.Term c ->
       let c = Desugar.top_computation c in
       let drty_sch, c', new_change = infer_top_comp st c in
-      let c' = Optimize.optimize_comp c' in
       let v = Eval.run st.environment c' in
       if interactive then Format.printf "@[- : %t = %t@]@."
         (Scheme.print_dirty_scheme drty_sch)
@@ -205,6 +209,23 @@ and use_file env (filename, interactive) =
   let cmds = Lexer.read_file (parse Parser.file) filename in
     List.fold_left (exec_cmd interactive) env cmds
 
+and optimize_file st filename =
+  let t = Lexer.read_file (parse Parser.computation_file) filename in
+  let c = Desugar.top_computation t in
+  let drty_sch, c', new_change = infer_top_comp st c in
+  print_endline "UNOPTIMIZED CODE:";
+  Typed.printC c' stdout;
+  print_endline "OPTIMIZED CODE:";
+  Typed.printC c' stdout;
+  (* Format.printf "OPTIMIZED CODE:@.@[val %t : %t = <fun>@]@." (Typed.print_computation c'); *)
+(*   let r = Eval.run st.environment c' in
+  begin match r with
+  | Runtime.Value v -> print_endline (Runtime.string_of_value v)
+  | Runtime.Call (eff, v, _) -> print_endline ("Uncaught effect " ^ (Syntax.Effect.string_of eff) ^ " " ^ Runtime.string_of_value v)
+  end
+ *)
+  ()
+
 (* Interactive toplevel *)
 let toplevel ctxenv =
   let eof = match Sys.os_type with
@@ -267,6 +288,7 @@ let main =
   try
     (* Run and load all the specified files. *)
     let ctxenv = List.fold_left use_file initial_ctxenv !files in
+    List.iter (optimize_file ctxenv) !to_be_optimized;
     if !Config.interactive_shell then toplevel ctxenv
   with
     Error.Error err -> Error.print err; exit 1
