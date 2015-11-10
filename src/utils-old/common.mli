@@ -28,3 +28,4 @@ val uniq : 'a list -> 'a list
 val split : int -> 'a list -> 'a list * 'a list
 val diff : 'a list -> 'a list -> 'a list
 val assoc_flatten : ('a * 'b) list -> ('a * 'b list) list
+val to_string : ('a -> Format.formatter -> unit) -> 'a -> string

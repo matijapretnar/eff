@@ -121,3 +121,7 @@ let assoc_flatten lst =
   in
   let lst = List.fold_right add lst [] in
   assoc_map (!) lst
+
+let to_string print x =
+  print x Format.str_formatter;
+  Format.flush_str_formatter ()

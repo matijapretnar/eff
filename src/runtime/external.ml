@@ -143,8 +143,7 @@ let string_operations = [
 let conversion_functions = [
   ("to_string",
     let to_string v =
-      Value.print_value v Format.str_formatter;
-      let s = Format.flush_str_formatter () in
+      let s = Common.to_string Value.print_value v in
       value_str s
     in
     from_fun to_string);
