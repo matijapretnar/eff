@@ -15,6 +15,7 @@ type ty =
   | Basic of string
   | Tuple of ty list
   | Arrow of ty * dirty
+  | PureArrow of ty * ty
   | Handler of dirty * dirty
 
 and dirty = ty * dirt

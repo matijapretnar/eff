@@ -3,12 +3,14 @@ type 'a t = context * 'a * Constraints.t
 type ty_scheme = Type.ty t
 type dirty_scheme = Type.dirty t
 type abstraction_scheme = (Type.ty * Type.dirty) t
+type pure_abstraction_scheme = (Type.ty * Type.ty) t
 type abstraction2_scheme = (Type.ty * Type.ty * Type.dirty) t
 type change
 
 val refresh : ty_scheme -> ty_scheme
 
 val abstract : loc:Location.t -> ty_scheme -> dirty_scheme -> abstraction_scheme
+val pure_abstract : loc:Location.t -> ty_scheme -> ty_scheme -> pure_abstraction_scheme
 val abstract2 : loc:Location.t -> ty_scheme -> ty_scheme -> dirty_scheme -> abstraction2_scheme
 val region_param_less : Type.region_param -> Type.region_param -> change
 val add_full_region : Type.region_param -> change

@@ -17,6 +17,8 @@ let ascii = ref false
 
 let interactive_shell = ref true
 
-let wrapper = ref (Some ["rlwrap"; "ledit"])
+(*let wrapper = ref (Some ["rlwrap"; "ledit"])*)
+
+let wrapper = ref None
 
 let verbosity = ref 3

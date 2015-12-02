@@ -3,6 +3,7 @@ type 'a t = context * 'a * Constraints.t
 type ty_scheme = Type.ty t
 type dirty_scheme = Type.dirty t
 type abstraction_scheme = (Type.ty * Type.dirty) t
+type pure_abstraction_scheme = (Type.ty * Type.ty) t
 type abstraction2_scheme = (Type.ty * Type.ty * Type.dirty) t
 type change = ty_scheme -> ty_scheme
 
@@ -154,6 +155,15 @@ let abstract ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
     just cnstrs_c
   ] with
   | ctx, Type.Arrow (ty_p, drty_c), cnstrs -> ctx, (ty_p, drty_c), cnstrs
+  | _ -> assert false
+
+let pure_abstract ~loc (ctx_p, ty_p, cnstrs_p) (ctx_e, ty_e, cnstrs_e) =
+  match finalize_ty_scheme ~loc ctx_e (Type.PureArrow (ty_p, ty_e)) [
+    trim_context ~loc ctx_p;
+    just cnstrs_p;
+    just cnstrs_e
+  ] with
+  | ctx, Type.PureArrow (ty_p, ty_e), cnstrs -> ctx, (ty_p, ty_e), cnstrs
   | _ -> assert false
 
 and abstract2 ~loc (ctx_p1, ty_p1, cnstrs_p1) (ctx_p2, ty_p2, cnstrs_p2) (ctx_c, drty_c, cnstrs_c) =

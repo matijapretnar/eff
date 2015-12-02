@@ -31,6 +31,7 @@ and plain_expression =
   | Lambda of abstraction
   | Effect of Common.effect
   | Handler of handler
+  | PureLambda of pure_abstraction
 
 (** Impure computations *)
 and computation = (plain_computation, Scheme.dirty_scheme) annotation
@@ -50,7 +51,7 @@ and plain_computation =
 
 (** Handler definitions *)
 and handler = {
-  operations : (operation, abstraction2) Common.assoc;
+  operations : (Common.effect, abstraction2) Common.assoc;
   value : abstraction;
   finally : abstraction;
 }
@@ -58,10 +59,11 @@ and handler = {
 (** Abstractions that take one argument. *)
 and abstraction = (pattern * computation, Scheme.abstraction_scheme) annotation
 
+(** Pure abstractions that take a pattern and an expression instead of a computation. *)
+and pure_abstraction = (pattern * expression, Scheme.pure_abstraction_scheme) annotation
+
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * computation, Scheme.abstraction2_scheme) annotation
-
-and operation = Common.opsym
 
 let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_dirt_param () }
 
@@ -72,12 +74,23 @@ let abstraction ~loc p c : abstraction =
     location = loc;
   }
 
+
+let pure_abstraction ~loc p e : pure_abstraction =
+  {
+    term = (p, e);
+    scheme = Scheme.pure_abstract ~loc p.scheme e.scheme;
+    location = loc;
+  }
+
 let abstraction2 ~loc p1 p2 c =
   {
     term = (p1, p2, c);
     scheme = Scheme.abstract2 ~loc p1.scheme p2.scheme c.scheme;
     location = c.location;
   }
+
+
+  (*pure abstract*)
 
 let var ~loc x ty_sch =
   {
@@ -166,6 +179,17 @@ let lambda ~loc a =
     scheme = Scheme.clean_ty_scheme ~loc (ctx, Type.Arrow (ty, drty), constraints);
     location = loc
   }
+
+let pure_lambda ~loc a =
+    let ctx, (ty1, ty2), constraints = a.scheme in
+  {
+    term = PureLambda a;
+    scheme = Scheme.clean_ty_scheme ~loc (ctx, Type.PureArrow (ty2, ty2), constraints);
+    location = loc
+  }
+
+
+
 
 let effect ~loc eff signature =
     match signature eff with
