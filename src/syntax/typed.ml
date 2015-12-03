@@ -32,6 +32,7 @@ and plain_expression =
   | Effect of Common.effect
   | Handler of handler
   | PureLambda of pure_abstraction
+  | PureApply of expression * expression
 
 (** Impure computations *)
 and computation = (plain_computation, Scheme.dirty_scheme) annotation
@@ -45,7 +46,8 @@ and plain_computation =
   | Apply of expression * expression
   | Handle of expression * computation
   | Check of computation
-
+  
+  | Call of Common.effect * expression * abstraction
   | Bind of computation * abstraction
   | LetIn of expression * abstraction
 
@@ -189,8 +191,6 @@ let pure_lambda ~loc a =
   }
 
 
-
-
 let effect ~loc eff signature =
     match signature eff with
     | None -> Error.typing ~loc "Unbound effect %s" eff
@@ -330,6 +330,18 @@ let for' ~loc i e1 e2 c up =
     scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
     location = loc;
   }
+
+
+let pure_apply ~loc e1 e2 =
+  let ctx_e1, ty_e1, cnstrs_e1 = e1.scheme in
+  let ctx_e2, ty_e2, cnstrs_e2 = e2.scheme in
+  let constraints = (Constraints.union cnstrs_e1 cnstrs_e2) in
+  {
+    term = PureApply (e1, e2);
+    scheme = Scheme.clean_ty_scheme ~loc (ctx_e1 @ ctx_e2, Type.PureArrow (ty_e2, ty_e1), constraints);
+    location = loc;
+  }
+
 
 let apply ~loc e1 e2 =
   let ctx_e1, ty_e1, cnstrs_e1 = e1.scheme in
