@@ -46,7 +46,7 @@ and plain_computation =
   | Apply of expression * expression
   | Handle of expression * computation
   | Check of computation
-  
+
   | Call of Common.effect * expression * abstraction
   | Bind of computation * abstraction
   | LetIn of expression * abstraction
@@ -489,6 +489,8 @@ and prettyE' e = match e with
   -> pretty_const c
   | Lambda a 
   -> parens (string "fun" ^+^ pretty_abstraction a)
+  | PureLambda a 
+  -> parens (string "fun" ^+^ pretty_pure_abstraction a)
   | Effect eff 
   -> parens (string "fun x -> apply_effect" ^+^ pretty_effect eff ^+^ string "x" ^+^ string "(fun y -> value y)")
   | Handler h 
@@ -524,8 +526,9 @@ and pretty_abstraction a =
   let (p, c) = a.term in
   pretty_pattern p.term ^+^ string "->" ^+^ prettyC c
 
-and pretty_pure_abstraction (v, e) =
-  pretty_var v ^+^ string "->*" ^+^ prettyE e
+and pretty_pure_abstraction a =
+  let (p, e) = a.term in
+  pretty_pattern p.term ^+^ string "->*" ^+^ prettyE e
 
 and pretty_pattern p = match fst p with
   | Pattern.Var x -> pretty_var x
