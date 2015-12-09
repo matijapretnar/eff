@@ -185,6 +185,7 @@ let pos_neg_params get_variances ty =
   | Basic _ -> Trio.empty
   | Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
   | Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
+  | PureArrow (ty1,ty2) -> pos_ty (not is_pos) ty1 @@@ pos_ty (is_pos) ty2
   | Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
   and pos_dirty is_pos (ty, drt) =
     pos_ty is_pos ty @@@ pos_dirt is_pos drt

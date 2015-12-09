@@ -186,7 +186,7 @@ let pure_lambda ~loc a =
     let ctx, (ty1, ty2), constraints = a.scheme in
   {
     term = PureLambda a;
-    scheme = Scheme.clean_ty_scheme ~loc (ctx, Type.PureArrow (ty2, ty2), constraints);
+    scheme = Scheme.clean_ty_scheme ~loc (ctx, Type.PureArrow (ty1, ty2), constraints);
     location = loc
   }
 
@@ -338,7 +338,7 @@ let pure_apply ~loc e1 e2 =
   let constraints = (Constraints.union cnstrs_e1 cnstrs_e2) in
   {
     term = PureApply (e1, e2);
-    scheme = Scheme.clean_ty_scheme ~loc (ctx_e1 @ ctx_e2, Type.PureArrow (ty_e2, ty_e1), constraints);
+    scheme = Scheme.clean_ty_scheme ~loc (ctx_e1 @ ctx_e2, Type.PureArrow (ty_e1, ty_e2), constraints);
     location = loc;
   }
 
@@ -495,6 +495,8 @@ and prettyE' e = match e with
   -> parens (string "fun x -> apply_effect" ^+^ pretty_effect eff ^+^ string "x" ^+^ string "(fun y -> value y)")
   | Handler h 
   -> pretty_handler h
+  | PureApply (e1,e2)
+  -> parens (prettyE e1 ^+^ prettyE e2)
 and prettyC c = 
    prettyC' c.term
 and prettyC' c = match c with
