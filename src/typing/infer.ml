@@ -1,4 +1,3 @@
-module C = Common
 module T = Type
 
 let ty_less = Scheme.ty_less
@@ -84,7 +83,7 @@ let rec infer_pattern (p, loc) =
       | None -> Error.typing ~loc "Unbound record field label %s" fld
       | Some (ty, (ty_name, fld_tys)) ->
           let infer (fld, p) (ctx, chngs) =
-            begin match C.lookup fld fld_tys with
+            begin match Common.lookup fld fld_tys with
             | None -> Error.typing ~loc "Unexpected field %s in a pattern of type %s" fld ty_name
             | Some fld_ty ->
                 let ctx_p, ty_p, cnstrs_p = infer_pattern p in

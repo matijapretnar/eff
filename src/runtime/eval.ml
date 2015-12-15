@@ -1,6 +1,5 @@
 (* Evaluation of the intermediate language, big step. *)
 
-module C = Common
 module V = Value
 
 exception PatternMatch of Location.t
@@ -158,7 +157,7 @@ and eval_handler env {Typed.effect_clauses=ops; Typed.value_clause=value; Typed.
     | V.Value v -> eval_closure env value v
     | V.Call (eff, v, k) ->
         let k' u = h (k u) in
-        begin match C.lookup eff ops with
+        begin match Common.lookup eff ops with
         | Some f -> f v k'
         | None -> V.Call (eff, v, k')
         end
