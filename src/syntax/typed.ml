@@ -46,9 +46,9 @@ and plain_computation =
 
 (** Handler definitions *)
 and handler = {
-  operations : (operation, abstraction2) Common.assoc;
-  value : abstraction;
-  finally : abstraction;
+  effect_clauses : (Common.effect, abstraction2) Common.assoc;
+  value_clause : abstraction;
+  finally_clause : abstraction;
 }
 
 (** Abstractions that take one argument. *)
@@ -194,17 +194,17 @@ let handler ~loc h signature =
           |> Constraints.add_dirty_constraint ~loc drty_c (ty_mid, drt_mid)
       end
     in
-    let ctxs, constraints = List.fold_right fold h.operations ([], Constraints.empty) in
+    let ctxs, constraints = List.fold_right fold h.effect_clauses ([], Constraints.empty) in
 
     let make_dirt op (ops_in, ops_out) =
       let r_in = Type.fresh_region_param () in
       let r_out = Type.fresh_region_param () in
       (op, r_in) :: ops_in, (op, r_out) :: ops_out
     in
-    let ops_in, ops_out = List.fold_right make_dirt (Common.uniq (List.map fst h.operations)) ([], []) in
+    let ops_in, ops_out = List.fold_right make_dirt (Common.uniq (List.map fst h.effect_clauses)) ([], []) in
 
-    let ctx_val, (ty_val, drty_val), cnstrs_val = h.value.scheme in
-    let ctx_fin, (ty_fin, drty_fin), cnstrs_fin = h.finally.scheme in
+    let ctx_val, (ty_val, drty_val), cnstrs_val = h.value_clause.scheme in
+    let ctx_fin, (ty_fin, drty_fin), cnstrs_fin = h.finally_clause.scheme in
 
     let ty_in = Type.fresh_ty () in
     let drt_rest = Type.fresh_dirt_param () in

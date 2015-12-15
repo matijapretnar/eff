@@ -24,9 +24,9 @@
         ([], None, None)
         lst
     in
-    { operations = List.rev ops;
-      value = ret;
-      finally = fin }
+    { effect_clauses = List.rev ops;
+      value_clause = ret;
+      finally_clause = fin }
 
 %}
 

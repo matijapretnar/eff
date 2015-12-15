@@ -43,9 +43,9 @@ and plain_computation =
 
 (** Handler definitions *)
 and handler = {
-  operations : (operation, abstraction2) Common.assoc;
-  value : abstraction;
-  finally : abstraction;
+  effect_clauses : (operation, abstraction2) Common.assoc;
+  value_clause : abstraction;
+  finally_clause : abstraction;
 }
 
 (** Abstractions that take one argument. *)

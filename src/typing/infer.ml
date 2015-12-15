@@ -185,9 +185,9 @@ and type_abstraction2 env (p1, p2, c) =
   Typed.abstraction2 ~loc:(c.Untyped.location) (type_pattern p1) (type_pattern p2) (type_comp env c)
 and type_handler env h =
   {
-    Typed.operations = Common.assoc_map (type_abstraction2 env) h.Untyped.operations;
-    Typed.value = type_abstraction env h.Untyped.value;
-    Typed.finally = type_abstraction env h.Untyped.finally;
+    Typed.effect_clauses = Common.assoc_map (type_abstraction2 env) h.Untyped.effect_clauses;
+    Typed.value_clause = type_abstraction env h.Untyped.value_clause;
+    Typed.finally_clause = type_abstraction env h.Untyped.finally_clause;
   }
 and type_let_defs ~loc env defs =
   let drt = Type.fresh_dirt () in

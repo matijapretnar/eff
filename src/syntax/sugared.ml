@@ -44,11 +44,11 @@ and plain_term =
   (** [check t] *)
 
 and handler = {
-  operations : (Common.effect, abstraction2) Common.assoc;
+  effect_clauses : (Common.effect, abstraction2) Common.assoc;
   (** [t1#op1 p1 k1 -> t1' | ... | tn#opn pn kn -> tn'] *)
-  value : abstraction option;
+  value_clause : abstraction option;
   (** [val p -> t] *)
-  finally : abstraction option;
+  finally_clause : abstraction option;
   (** [finally p -> t] *)
 }
 

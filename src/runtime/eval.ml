@@ -147,7 +147,7 @@ and veval env e =
       V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | Typed.Handler h -> V.Handler (eval_handler env h)
 
-and eval_handler env {Typed.operations=ops; Typed.value=value; Typed.finally=fin} =
+and eval_handler env {Typed.effect_clauses=ops; Typed.value_clause=value; Typed.finally_clause=fin} =
   let eval_op (op, a2) =
     let (p, kvar, c) = a2.Typed.term in
     let f u k = eval_closure (extend kvar (V.Closure k) env) (Typed.abstraction ~loc:a2.Typed.location p c) u in
