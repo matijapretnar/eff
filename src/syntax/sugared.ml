@@ -2,6 +2,7 @@
 
 (** Terms *)
 type variable = string
+type effect = Common.effect
 
 type term = plain_term * Location.t
 and plain_term =
@@ -19,7 +20,7 @@ and plain_term =
   (** [fun p1 p2 ... pn -> t] *)
   | Function of abstraction list
   (** [function p1 -> t1 | ... | pn -> tn] *)
-  | Effect of Common.effect
+  | Effect of effect
   (** [eff], where [eff] is an effect symbol. *)
   | Handler of handler
   (** [handler clauses], where [clauses] are described below. *)
@@ -44,7 +45,7 @@ and plain_term =
   (** [check t] *)
 
 and handler = {
-  effect_clauses : (Common.effect, abstraction2) Common.assoc;
+  effect_clauses : (effect, abstraction2) Common.assoc;
   (** [t1#op1 p1 k1 -> t1' | ... | tn#opn pn kn -> tn'] *)
   value_clause : abstraction option;
   (** [val p -> t] *)
@@ -55,8 +56,6 @@ and handler = {
 and abstraction = variable Pattern.t * term
 
 and abstraction2 = variable Pattern.t * variable Pattern.t * term
-
-and operation = Common.opsym
 
 type dirt =
   | DirtParam of Common.dirtparam
@@ -96,7 +95,7 @@ and plain_toplevel =
   (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)
   | External of variable * ty * variable
   (** [external x : t = "ext_val_name"] *)
-  | DefEffect of Common.effect * (ty * ty)
+  | DefEffect of effect * (ty * ty)
   (** [effect Eff : ty1 -> t2] *)
   | Term of term
   | Use of string

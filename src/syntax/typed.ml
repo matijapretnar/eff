@@ -4,6 +4,7 @@ module Variable = Symbol.Make(Symbol.String)
 module EffectMap = Map.Make(String)
 
 type variable = Variable.t
+type effect = Common.effect
 
 type ('term, 'scheme) annotation = {
   term: 'term;
@@ -28,7 +29,7 @@ and plain_expression =
   | Record of (Common.field, expression) Common.assoc
   | Variant of Common.label * expression option
   | Lambda of abstraction
-  | Effect of Common.effect
+  | Effect of effect
   | Handler of handler
 
 (** Impure computations *)
@@ -46,7 +47,7 @@ and plain_computation =
 
 (** Handler definitions *)
 and handler = {
-  effect_clauses : (Common.effect, abstraction2) Common.assoc;
+  effect_clauses : (effect, abstraction2) Common.assoc;
   value_clause : abstraction;
   finally_clause : abstraction;
 }
@@ -56,8 +57,6 @@ and abstraction = (pattern * computation, Scheme.abstraction_scheme) annotation
 
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * computation, Scheme.abstraction2_scheme) annotation
-
-and operation = Common.opsym
 
 let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_dirt_param () }
 
