@@ -5,6 +5,7 @@ module Variable = Symbol.Make(Symbol.String)
 module EffectMap = Map.Make(String)
 
 type variable = Variable.t
+type effect = Common.effect
 
 type ('term, 'scheme) annotation = {
   term: 'term;
@@ -29,7 +30,7 @@ and plain_expression =
   | Record of (Common.field, expression) Common.assoc
   | Variant of Common.label * expression option
   | Lambda of abstraction
-  | Effect of Common.effect
+  | Effect of effect
   | Handler of handler
   | PureLambda of pure_abstraction
   | PureApply of expression * expression
@@ -54,9 +55,9 @@ and plain_computation =
 
 (** Handler definitions *)
 and handler = {
-  operations : (Common.effect, abstraction2) Common.assoc;
-  value : abstraction;
-  finally : abstraction;
+  effect_clauses : (effect, abstraction2) Common.assoc;
+  value_clause : abstraction;
+  finally_clause : abstraction;
 }
 
 (** Abstractions that take one argument. *)
@@ -119,7 +120,7 @@ let tuple ~loc es =
   let ctx, tys, constraints =
     List.fold_right (fun e (ctx, tys, constraints) ->
       let e_ctx, e_ty, e_constraints = e.scheme in
-      e_ctx @ ctx, e_ty :: tys, Constraints.union e_constraints constraints
+      e_ctx @ ctx, e_ty :: tys, Constraints.list_union [e_constraints; constraints]
     ) es ([], [], Constraints.empty)
   in
   {
@@ -216,24 +217,23 @@ let handler ~loc h signature =
       | Some (ty_par, ty_arg) ->
           let ctx_a, (ty_p, ty_k, drty_c), cnstrs_a = a2.scheme in
           ctx_a @ ctx,
-          constraints
-          |> Constraints.union cnstrs_a
+          Constraints.list_union [constraints; cnstrs_a]
           |> Constraints.add_ty_constraint ~loc ty_par ty_p
           |> Constraints.add_ty_constraint ~loc (Type.Arrow (ty_arg, (ty_mid, drt_mid))) ty_k
           |> Constraints.add_dirty_constraint ~loc drty_c (ty_mid, drt_mid)
       end
     in
-    let ctxs, constraints = List.fold_right fold h.operations ([], Constraints.empty) in
+    let ctxs, constraints = List.fold_right fold h.effect_clauses ([], Constraints.empty) in
 
     let make_dirt op (ops_in, ops_out) =
       let r_in = Type.fresh_region_param () in
       let r_out = Type.fresh_region_param () in
       (op, r_in) :: ops_in, (op, r_out) :: ops_out
     in
-    let ops_in, ops_out = List.fold_right make_dirt (Common.uniq (List.map fst h.operations)) ([], []) in
+    let ops_in, ops_out = List.fold_right make_dirt (Common.uniq (List.map fst h.effect_clauses)) ([], []) in
 
-    let ctx_val, (ty_val, drty_val), cnstrs_val = h.value.scheme in
-    let ctx_fin, (ty_fin, drty_fin), cnstrs_fin = h.finally.scheme in
+    let ctx_val, (ty_val, drty_val), cnstrs_val = h.value_clause.scheme in
+    let ctx_fin, (ty_fin, drty_fin), cnstrs_fin = h.finally_clause.scheme in
 
     let ty_in = Type.fresh_ty () in
     let drt_rest = Type.fresh_dirt_param () in
@@ -242,9 +242,7 @@ let handler ~loc h signature =
     let ty_out = Type.fresh_ty () in
 
     let constraints =
-      constraints
-      |> Constraints.union cnstrs_val
-      |> Constraints.union cnstrs_fin
+      Constraints.list_union [constraints; cnstrs_val; cnstrs_fin]
       |> Constraints.add_dirt_constraint {Type.ops = ops_out; Type.rest = drt_rest} drt_mid
       |> Constraints.add_ty_constraint ~loc ty_in ty_val
       |> Constraints.add_dirty_constraint ~loc drty_val (ty_mid, drt_mid)
@@ -281,9 +279,9 @@ let match' ~loc e cases =
       let fold a (ctx, constraints) =
         let ctx_a, (ty_p, drty_c), cnstrs_a = a.scheme in
         ctx_a @ ctx,
-          Constraints.add_ty_constraint ~loc:e.location ty_e ty_p (
-          Constraints.add_dirty_constraint ~loc:a.location drty_c drty (
-          Constraints.union cnstrs_a constraints))
+          Constraints.list_union [cnstrs_a; constraints]
+          |> Constraints.add_ty_constraint ~loc:e.location ty_e ty_p
+          |> Constraints.add_dirty_constraint ~loc:a.location drty_c drty
       in
       let ctx, constraints = List.fold_right fold cases (ctx_e, cnstrs_e) in
       (ctx, drty, constraints)
@@ -300,13 +298,12 @@ let while' ~loc c1 c2 =
   let drt = Type.fresh_dirt () in
   let drty_sch =
     (ctx_c1 @ ctx_c2, (Type.unit_ty, drt),
-        Constraints.add_ty_constraint ~loc ty_c1 Type.bool_ty (
-        Constraints.add_ty_constraint ~loc ty_c2 Type.unit_ty (
-        Constraints.add_dirt_constraint drt_c1 drt (
-        Constraints.add_dirt_constraint drt_c2 drt (
-        Constraints.union cnstrs_c1 (
-        cnstrs_c2
-    )))))) in
+        Constraints.list_union [cnstrs_c1; cnstrs_c2]
+        |> Constraints.add_ty_constraint ~loc ty_c1 Type.bool_ty
+        |> Constraints.add_ty_constraint ~loc ty_c2 Type.unit_ty
+        |> Constraints.add_dirt_constraint drt_c1 drt
+        |> Constraints.add_dirt_constraint drt_c2 drt
+    ) in
   {
     term = While (c1, c2);
     scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
@@ -319,13 +316,11 @@ let for' ~loc i e1 e2 c up =
   let ctx_c, (ty_c, drt_c), cnstrs_c = c.scheme in
   let drty_sch =
     (ctx_e1 @ ctx_e2 @ ctx_c, (Type.unit_ty, drt_c),
-        Constraints.add_ty_constraint ~loc:e1.location ty_e1 Type.int_ty (
-        Constraints.add_ty_constraint ~loc:e2.location ty_e2 Type.int_ty (
-        Constraints.add_ty_constraint ~loc:c.location ty_c Type.unit_ty (
-        Constraints.union cnstrs_e1 (
-        Constraints.union cnstrs_e2 (
-        cnstrs_c
-    )))))) in
+      Constraints.list_union [cnstrs_e1; cnstrs_e2; cnstrs_c]
+      |> Constraints.add_ty_constraint ~loc:e1.location ty_e1 Type.int_ty
+      |> Constraints.add_ty_constraint ~loc:e2.location ty_e2 Type.int_ty
+      |> Constraints.add_ty_constraint ~loc:c.location ty_c Type.unit_ty
+    ) in
   {
     term = For (i, e1, e2, c, up);
     scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
@@ -349,8 +344,8 @@ let apply ~loc e1 e2 =
   let ctx_e2, ty_e2, cnstrs_e2 = e2.scheme in
   let drty = Type.fresh_dirty () in
   let constraints =
-    Constraints.add_ty_constraint ~loc ty_e1 (Type.Arrow (ty_e2, drty)) (
-    Constraints.union cnstrs_e1 cnstrs_e2) in
+    Constraints.list_union [cnstrs_e1; cnstrs_e2]
+    |> Constraints.add_ty_constraint ~loc ty_e1 (Type.Arrow (ty_e2, drty)) in
   let drty_sch = (ctx_e1 @ ctx_e2, drty, constraints) in
   {
     term = Apply (e1, e2);
@@ -363,8 +358,8 @@ let handle ~loc e c =
   let ctx_c, drty_c, cnstrs_c = c.scheme in
   let drty = Type.fresh_dirty () in
   let constraints =
-    Constraints.add_ty_constraint ~loc ty_e (Type.Handler (drty_c, drty)) (
-    Constraints.union cnstrs_e cnstrs_c) in
+    Constraints.list_union [cnstrs_e; cnstrs_c]
+    |> Constraints.add_ty_constraint ~loc ty_e (Type.Handler (drty_c, drty)) in
   let drty_sch = (ctx_e @ ctx_c, drty, constraints) in
   {
     term = Handle (e, c);
@@ -567,8 +562,8 @@ and pretty_h_effs_aux cases =
 and pretty_effect eff = dquotes (string eff)
 
 and pretty_handler h =
- braces (space ^^ prefix 3 1 (string "value = " ^^ parens (string "fun" ^+^ pretty_abstraction h.value) ^^ semi) 
-                             (string "effect_cases = " ^^ pretty_h_effs h.operations))      
+ braces (space ^^ prefix 3 1 (string "value = " ^^ parens (string "fun" ^+^ pretty_abstraction h.value_clause) ^^ semi) 
+                             (string "effect_cases = " ^^ pretty_h_effs h.effect_clauses))      
 
 let printE et chan =
    let document = prettyE et ^^ hardline in

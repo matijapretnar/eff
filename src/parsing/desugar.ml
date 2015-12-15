@@ -374,7 +374,7 @@ and record_expressions ctx = function
     let ws, es = record_expressions ctx ts in
     w @ ws, ((f, e) :: es)
 
-and handler loc ctx {Sugared.operations=ops; Sugared.value=val_a; Sugared.finally=fin_a} =
+and handler loc ctx {Sugared.effect_clauses=ops; Sugared.value_clause=val_a; Sugared.finally_clause=fin_a} =
   let rec operation_cases = function
   | [] -> []
   | (op, a2) :: cs ->
@@ -382,10 +382,10 @@ and handler loc ctx {Sugared.operations=ops; Sugared.value=val_a; Sugared.finall
     (op, abstraction2 ctx a2) :: cs'
   in
   let ops = operation_cases ops in
-  [], { Untyped.operations = ops;
-    Untyped.value =
+  [], { Untyped.effect_clauses = ops;
+    Untyped.value_clause =
       (match val_a with None -> id_abstraction loc | Some a -> abstraction ctx a);
-    Untyped.finally =
+    Untyped.finally_clause =
       (match fin_a with None -> id_abstraction loc | Some a -> abstraction ctx a)}
 
 let top_ctx = ref []

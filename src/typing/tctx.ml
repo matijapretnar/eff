@@ -1,5 +1,4 @@
 (** Type inference contexts *)
-module C = Common
 module T = Type
 
 type tydef =
@@ -119,7 +118,7 @@ let infer_variant lbl =
     | None -> None
     | Some (ty_name, ps, _, u) ->
       let ps', fresh_subst = refreshing_subst (remove_variances ps) in
-      let u = C.option_map (T.subst_ty fresh_subst) u in
+      let u = Common.option_map (T.subst_ty fresh_subst) u in
         Some (apply_to_params ty_name ps', u)
 
 
@@ -130,7 +129,7 @@ let infer_field fld =
     | None -> None
     | Some (ty_name, ps, us) ->
       let ps', fresh_subst = refreshing_subst (remove_variances ps) in
-      let us' = C.assoc_map (T.subst_ty fresh_subst) us in
+      let us' = Common.assoc_map (T.subst_ty fresh_subst) us in
         Some (apply_to_params ty_name ps', (ty_name, us'))
 
 

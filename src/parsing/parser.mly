@@ -1,32 +1,32 @@
 %{
   open Sugared
 
-  type handler_case =
-    | EffectCase of Common.effect * abstraction2
-    | ReturnCase of abstraction
-    | FinallyCase of abstraction
+  type handler_clause =
+    | EffectClause of Common.effect * abstraction2
+    | ReturnClause of abstraction
+    | FinallyClause of abstraction
 
-  let collect_handler_cases (lst : (handler_case * Location.t) list) =
-    let (ops, ret, fin) =
+  let collect_handler_clauses clauses =
+    let (eff_cs, val_c, fin_c) =
       List.fold_left
-        (fun (ops, ret, fin) -> function
-          | (EffectCase (eff, a2), _) ->  ((eff, a2) :: ops, ret, fin)
-          | (ReturnCase a, loc) ->
-            begin match ret with
-              | None -> (ops, Some a, fin)
-              | Some _ -> Error.syntax ~loc "Multiple value cases in a handler."
+        (fun (eff_cs, val_c, fin_c) -> function
+          | (EffectClause (eff, a2), _) ->  ((eff, a2) :: eff_cs, val_c, fin_c)
+          | (ReturnClause a, loc) ->
+            begin match val_c with
+              | None -> (eff_cs, Some a, fin_c)
+              | Some _ -> Error.syntax ~loc "Multiple value clauses in a handler."
             end
-          | (FinallyCase a, loc) ->
-            begin match fin with
-            | None -> (ops, ret, Some a)
-            | Some _ -> Error.syntax ~loc "Multiple finally cases in a handler."
+          | (FinallyClause a, loc) ->
+            begin match fin_c with
+            | None -> (eff_cs, val_c, Some a)
+            | Some _ -> Error.syntax ~loc "Multiple finally clauses in a handler."
             end)
         ([], None, None)
-        lst
+        clauses
     in
-    { operations = List.rev ops;
-      value = ret;
-      finally = fin }
+    { effect_clauses = List.rev eff_cs;
+      value_clause = val_c;
+      finally_clause = fin_c }
 
 %}
 
@@ -300,14 +300,14 @@ let_rec_def:
   | f = ident t = lambdas0(EQUAL)
     { (f, t) }
 
-handler_case: mark_position(plain_handler_case) { $1 }
-plain_handler_case:
+handler_clause: mark_position(plain_handler_clause) { $1 }
+plain_handler_clause:
   | HASH eff = effect p = simple_pattern k = simple_pattern ARROW t2 = term
-    { EffectCase (eff, (p, k, t2)) }
+    { EffectClause (eff, (p, k, t2)) }
   | VAL c = match_case
-    { ReturnCase c }
+    { ReturnClause c }
   | FINALLY c = match_case
-    { FinallyCase c }
+    { FinallyClause c }
 
 pattern: mark_position(plain_pattern) { $1 }
 plain_pattern:
@@ -363,8 +363,8 @@ plain_simple_pattern:
 
 handler: mark_position(plain_handler) { $1 }
 plain_handler:
-  | cs = cases(handler_case)
-    { Handler (collect_handler_cases cs) }
+  | cs = cases(handler_clause)
+    { Handler (collect_handler_clauses cs) }
 
 lname:
   | x = LNAME

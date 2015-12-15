@@ -1,4 +1,3 @@
-module C = Common
 module T = Type
 
 let ty_less = Scheme.ty_less
@@ -84,7 +83,7 @@ let rec infer_pattern (p, loc) =
       | None -> Error.typing ~loc "Unbound record field label %s" fld
       | Some (ty, (ty_name, fld_tys)) ->
           let infer (fld, p) (ctx, chngs) =
-            begin match C.lookup fld fld_tys with
+            begin match Common.lookup fld fld_tys with
             | None -> Error.typing ~loc "Unexpected field %s in a pattern of type %s" fld ty_name
             | Some fld_ty ->
                 let ctx_p, ty_p, cnstrs_p = infer_pattern p in
@@ -185,9 +184,9 @@ and type_abstraction2 env (p1, p2, c) =
   Typed.abstraction2 ~loc:(c.Untyped.location) (type_pattern p1) (type_pattern p2) (type_comp env c)
 and type_handler env h =
   {
-    Typed.operations = Common.assoc_map (type_abstraction2 env) h.Untyped.operations;
-    Typed.value = type_abstraction env h.Untyped.value;
-    Typed.finally = type_abstraction env h.Untyped.finally;
+    Typed.effect_clauses = Common.assoc_map (type_abstraction2 env) h.Untyped.effect_clauses;
+    Typed.value_clause = type_abstraction env h.Untyped.value_clause;
+    Typed.finally_clause = type_abstraction env h.Untyped.finally_clause;
   }
 and type_let_defs ~loc env defs =
   let drt = Type.fresh_dirt () in
