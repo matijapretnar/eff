@@ -228,6 +228,11 @@ let union constraints1 constraints2 =
     full_regions = FullRegions.union constraints1.full_regions constraints2.full_regions;
   }
 
+let list_union = function
+  | [] -> empty
+  | [constraints] -> constraints
+  | constraints :: constraints_lst -> List.fold_right union constraints_lst constraints
+
 let subst sbst constraints = {
   ty_poset = TyPoset.map sbst.Type.ty_param constraints.ty_poset;
   dirt_poset = DirtPoset.map sbst.Type.dirt_param constraints.dirt_poset;
