@@ -21,7 +21,7 @@ type ty =
 and dirty = ty * dirt
 
 and dirt = {
-  ops: (Common.opsym, region_param) Common.assoc;
+  ops: (Common.effect, region_param) Common.assoc;
   rest: dirt_param
 }
 

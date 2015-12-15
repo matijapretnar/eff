@@ -1,5 +1,3 @@
-module C = Common
-
 let usage = "Usage: eff [option] ... [file] ..."
 let wrapper = ref (Some ["rlwrap"; "ledit"])
 
@@ -191,7 +189,7 @@ let rec exec_cmd interactive st (d,loc) =
     | Sugared.External (x, t, f) ->
       let x, ty_sch = Desugar.external_ty x t in
       let typing_env = Infer.add_def st.typing x ty_sch in
-        begin match C.lookup f External.values with
+        begin match Common.lookup f External.values with
           | Some v -> {
               typing = typing_env;
               change = st.change;

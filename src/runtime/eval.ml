@@ -1,6 +1,5 @@
 (* Evaluation of the intermediate language, big step. *)
 
-module C = Common
 module V = Value
 
 exception PatternMatch of Location.t
@@ -147,7 +146,7 @@ and veval env e =
       V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | Typed.Handler h -> V.Handler (eval_handler env h)
 
-and eval_handler env {Typed.operations=ops; Typed.value=value; Typed.finally=fin} =
+and eval_handler env {Typed.effect_clauses=ops; Typed.value_clause=value; Typed.finally_clause=fin} =
   let eval_op (op, a2) =
     let (p, kvar, c) = a2.Typed.term in
     let f u k = eval_closure (extend kvar (V.Closure k) env) (Typed.abstraction ~loc:a2.Typed.location p c) u in
@@ -158,7 +157,7 @@ and eval_handler env {Typed.operations=ops; Typed.value=value; Typed.finally=fin
     | V.Value v -> eval_closure env value v
     | V.Call (eff, v, k) ->
         let k' u = h (k u) in
-        begin match C.lookup eff ops with
+        begin match Common.lookup eff ops with
         | Some f -> f v k'
         | None -> V.Call (eff, v, k')
         end

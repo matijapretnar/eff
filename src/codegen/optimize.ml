@@ -21,7 +21,7 @@ let rec optimize_comp c =
     | Value v -> begin match e1.term with
     
                  (*Handle (Handler vc ocs) (Value v) -> Apply (Lambda vc) v *)
-                 | Handler h -> apply ~loc:c.location (lambda ~loc:c.location h.value) v
+                 | Handler h -> apply ~loc:c.location (lambda ~loc:c.location h.value_clause) v
                  | _-> c
                  end
     | _ -> c

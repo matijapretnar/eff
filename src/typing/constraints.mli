@@ -5,6 +5,8 @@ val empty : t
 
 val union : t -> t -> t
 
+val list_union : t list -> t
+
 val subst : Type.substitution -> t -> t
 
 val expand_ty : t -> Type.ty -> Type.ty

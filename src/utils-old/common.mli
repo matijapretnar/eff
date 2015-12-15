@@ -1,4 +1,3 @@
-type opsym = string
 type effect = string
 type label = string
 type field = string

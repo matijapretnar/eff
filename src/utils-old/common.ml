@@ -1,7 +1,6 @@
 (** Common definitions. *)
 
 (** Types shared by different modules *)
-type opsym = string (** operation symbols *)
 type effect = string (** effect symbols *)
 type label = string (** variant labels *)
 type field = string (** record fields *)
