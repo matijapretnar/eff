@@ -33,6 +33,7 @@ and plain_expression =
   | Handler of handler
   | PureLambda of pure_abstraction
   | PureApply of expression * expression
+  | PureLetIn of expression * pure_abstraction
 
 (** Impure computations *)
 and computation = (plain_computation, Scheme.dirty_scheme) annotation
@@ -478,6 +479,19 @@ let let_in ~loc e1 c2 =
   }
 
 
+let pure_let_in ~loc e1 c2 =
+  let ctx_e1, ty_e1, constraints_e1 = e1.scheme
+  and ctx_c2, (ty_p, drty_c2), constraints_c2 = c2.scheme in
+  let constraints =
+    Constraints.union constraints_e1 constraints_c2 |>
+    Constraints.add_ty_constraint ~loc ty_e1 ty_p
+  in
+  {
+    term = PureLetIn (e1, c2);
+    scheme = Scheme.clean_ty_scheme ~loc (ctx_e1 @ ctx_c2, drty_c2, constraints);
+    location = loc;
+  }
+
 let (^+^) x y = x ^^ space ^^ y
 
 let rec prettyE e =
@@ -497,6 +511,10 @@ and prettyE' e = match e with
   -> pretty_handler h
   | PureApply (e1,e2)
   -> parens (prettyE e1 ^+^ prettyE e2)
+  | PureLetIn (e,pa) ->
+      let (p, e2) = pa.term in
+      group (string "let**" ^+^ pretty_pattern p.term ^+^ string "=" ^+^ prettyE e ^^ break 1 ^^ 
+                         string "in" ^+^ prettyE e2)
 and prettyC c = 
    prettyC' c.term
 and prettyC' c = match c with

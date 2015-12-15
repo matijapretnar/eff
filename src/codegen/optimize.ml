@@ -6,9 +6,11 @@ let rec optimize_comp c =
     begin match (optimize_comp c1).term with
     (*Bind x (Value e) c -> LetC x e c*)
     | Value e -> let_in ~loc:c.location e (optimize_abstraction c2)
-    (*Bind x (Bind y c1 c2) c3 -> Bind y c1 (Bind x c2 c3)*)
-(*    | Bind (c3,(p1,c4)) -> bind ~loc:c.location (bind ~loc:c.location  (optimize_comp c2) (optimize_comp (p,c3)) )
-                                (optimize_comp (p1,c4)) *)
+    | Bind (c3,c4) -> let (p1,cp1) = c2.term in 
+                      let (p2,cp2) = c4.term in 
+                      bind ~loc:c.location c1 (abstraction ~loc:c.location p2 
+                                              (bind ~loc:c.location cp2 (abstraction ~loc:c.location p1 cp1)))
+
     | _ -> c
     end
   | Handle (e1,c1) ->
@@ -36,6 +38,14 @@ let rec optimize_comp c =
                                              (optimize_expr e2) ) 
      | _ -> apply ~loc:c.location (optimize_expr e1) (optimize_expr e2)
      end
+  
+  | LetIn (e,a) ->
+      let (p,cp) = a.term in
+      begin match (optimize_comp cp).term with
+      | Value e2 -> value ~loc:c.location (pure_let_in ~loc:c.location e (pure_abstraction ~loc:c.location p e2))
+      | _ -> let_in ~loc:c.location (optimize_expr e) (optimize_abstraction a)
+      end
+
   | _ -> c
 
 and optimize_abstraction abs = let (p,c) = abs.term in abstraction ~loc:abs.location p (optimize_comp c) 
