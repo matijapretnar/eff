@@ -487,6 +487,30 @@ let pure_let_in ~loc e1 c2 =
     location = loc;
   }
 
+let call ~loc signature eff e a =
+    match signature eff with
+    | None -> Error.typing ~loc "Unbound effect %s" eff
+    | Some (ty_par, ty_res) ->
+      let ctx_e, ty_e, constraints_e = e.scheme
+      and ctx_a, (ty_a, drty_a), constraints_a = a.scheme in
+      let r = Type.fresh_region_param () in
+      let drt_eff = {Type.ops = [eff, r]; Type.rest = Type.fresh_dirt_param ()} in
+      let ((ty_out, drt_out) as drty_out) = Type.fresh_dirty () in
+      let constraints =
+        Constraints.union constraints_e constraints_a
+        |> Constraints.add_full_region r
+        |> Constraints.add_ty_constraint ~loc:e.location ty_e ty_par
+        |> Constraints.add_ty_constraint ~loc:a.location ty_res ty_a
+        |> Constraints.add_dirt_constraint drt_eff drt_out
+        |> Constraints.add_dirty_constraint ~loc drty_a drty_out
+      in
+      {
+        term = Call (eff, e, a);
+        scheme = Scheme.clean_dirty_scheme ~loc (ctx_e @ ctx_a, drty_out, constraints);
+        location = loc;
+      }
+
+
 let (^+^) x y = x ^^ space ^^ y
 
 let rec prettyE e =
