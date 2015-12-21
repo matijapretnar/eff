@@ -518,6 +518,9 @@ and prettyC' c = match c with
       let (p, c2) = a.term in
       group (string "let*" ^+^ pretty_pattern p.term ^+^ string "=" ^+^ prettyE e ^^ break 1 ^^ 
                          string "in" ^+^ prettyC c2)
+   | Let (pclist,c2)-> let [(p1,c1)] = pclist
+                      in group (string "let" ^+^ pretty_pattern p1.term ^+^ string "=" ^+^ prettyC c1 ^^ break 1 ^^ 
+                         string "in" ^+^ prettyC c2)
    | Bind (c1,a) ->
       let (p, c2) = a.term in
       parens (prettyC c1) ^+^ string ">>" ^+^ parens (string "fun" ^+^ pretty_pattern p.term ^+^ string "->" ^+^ prettyC c2)
