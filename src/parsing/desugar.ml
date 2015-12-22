@@ -157,7 +157,7 @@ let tydef params d =
      end)
 
 (** [tydefs defs] desugars the simultaneous type definitions [defs]. *)
-let tydefs ~loc defs =
+let tydefs defs =
   (* The first thing to do is to fill the missing dirt and region parameters. 
      At the end [ds] and [rs] hold the newly introduces dirt and region parameters.
      These become parameters to type definitions in the second stage. *)
@@ -422,6 +422,40 @@ let external_ty x t =
   let n = fresh_variable (Some x) in
   top_ctx := (x, n) :: !top_ctx;
   let (ts, ds, rs) = syntax_to_core_params (free_params t) in
-  n, ([], ty (ts, ds, rs) t, Constraints.empty)
+  n, ty (ts, ds, rs) t
 
 let top_computation c = computation !top_ctx c
+
+let rec toplevel (cmd, loc) =
+  (plain_toplevel cmd, loc)
+and plain_toplevel = function
+  | Sugared.Tydef defs ->
+      Untyped.Tydef (tydefs defs)
+  | Sugared.TopLet defs ->
+      let defs = top_let defs in
+      Untyped.TopLet defs
+  | Sugared.TopLetRec defs ->
+      let defs = top_let_rec defs in
+      Untyped.TopLetRec defs
+  | Sugared.External (x, ty, y) ->
+      let x, ty = external_ty x ty in
+      Untyped.External (x, ty, y)
+  | Sugared.DefEffect (eff, (ty1, ty2)) ->
+      let ty1 = ty Trio.empty ty1
+      and ty2 = ty Trio.empty ty2 in
+      Untyped.DefEffect (eff, (ty1, ty2))
+  | Sugared.Term t ->
+      let c = top_computation t in
+      Untyped.Computation c
+  | Sugared.Use filename ->
+      Untyped.Use filename
+  | Sugared.Reset ->
+      Untyped.Reset
+  | Sugared.Help ->
+      Untyped.Help
+  | Sugared.Quit ->
+      Untyped.Quit
+  | Sugared.TypeOf t ->
+      let c = top_computation t in
+      Untyped.TypeOf c
+
