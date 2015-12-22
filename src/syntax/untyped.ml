@@ -55,6 +55,33 @@ and abstraction = pattern * computation
 (** Abstractions that take two arguments. *)
 and abstraction2 = pattern * pattern * computation
 
+
+(* Toplevel commands (the first four do not need to be separated by [;;]) *)
+type toplevel = plain_toplevel * Location.t
+and plain_toplevel =
+  | Tydef of (Common.tyname, (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t * Tctx.tydef) Common.assoc
+  (** [type t = tydef] *)
+  | TopLet of (variable Pattern.t * computation) list
+  (** [let p1 = t1 and ... and pn = tn] *)
+  | TopLetRec of (variable * abstraction) list
+  (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)
+  | External of variable * Type.ty * string
+  (** [external x : t = "ext_val_name"] *)
+  | DefEffect of effect * (Type.ty * Type.ty)
+  (** [effect Eff : ty1 -> t2] *)
+  | Computation of computation
+  | Use of string
+  (** [#use "filename.eff"] *)
+  | Reset
+  (** [#reset] *)
+  | Help
+  (** [#help] *)
+  | Quit
+  (** [#quit] *)
+  | TypeOf of computation
+  (** [#type t] *)
+
+
 let rec print_pattern ?max_level (p,_) ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p with

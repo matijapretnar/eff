@@ -107,33 +107,28 @@ let infer_top_comp st c =
     and return the new environment. *)
 let rec exec_cmd interactive st (d,loc) =
   match d with
-  | Sugared.Term c ->
-      let c = Desugar.top_computation c in
+  | Untyped.Computation c ->
       let drty_sch, c', new_change = infer_top_comp st c in
       let v = Eval.run st.environment c' in
       if interactive then Format.printf "@[- : %t = %t@]@."
         (Scheme.print_dirty_scheme drty_sch)
         (Value.print_value v);
       {st with change = new_change}
-  | Sugared.TypeOf c ->
-      let c = Desugar.top_computation c in
+  | Untyped.TypeOf c ->
       let drty_sch, c', new_change = infer_top_comp st c in
       Format.printf "@[- : %t@]@." (Scheme.print_dirty_scheme drty_sch);
       {st with change = new_change}
-  | Sugared.Reset ->
+  | Untyped.Reset ->
       Tctx.reset ();
       print_endline ("Environment reset."); initial_ctxenv
-  | Sugared.Help ->
+  | Untyped.Help ->
       print_endline help_text;
       st
-  | Sugared.DefEffect (eff, (ty1, ty2)) ->
-      let ty1 = Desugar.ty Trio.empty ty1
-      and ty2 = Desugar.ty Trio.empty ty2 in
+  | Untyped.DefEffect (eff, (ty1, ty2)) ->
       {st with typing = Infer.add_effect st.typing eff (ty1, ty2)}
-  | Sugared.Quit -> exit 0
-  | Sugared.Use fn -> use_file st (fn, interactive)
-  | Sugared.TopLet defs ->
-      let defs = Desugar.top_let defs in
+  | Untyped.Quit -> exit 0
+  | Untyped.Use fn -> use_file st (fn, interactive)
+  | Untyped.TopLet defs ->
       (* XXX What to do about the dirts? *)
       let vars, nonpoly, change = Infer.infer_let ~loc st.typing defs in
       let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
@@ -166,8 +161,7 @@ let rec exec_cmd interactive st (d,loc) =
           change = top_change;
           environment = env;
         }
-    | Sugared.TopLetRec defs ->
-        let defs = Desugar.top_let_rec defs in
+    | Untyped.TopLetRec defs ->
         let vars, _, change = Infer.infer_let_rec ~loc st.typing defs in
         let defs', poly_tyschs = Infer.type_let_rec_defs ~loc st.typing defs in
         let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
@@ -186,9 +180,8 @@ let rec exec_cmd interactive st (d,loc) =
           change = top_change;
           environment = env;
         }
-    | Sugared.External (x, t, f) ->
-      let x, ty_sch = Desugar.external_ty x t in
-      let typing_env = Infer.add_def st.typing x ty_sch in
+    | Untyped.External (x, ty, f) ->
+      let typing_env = Infer.add_def st.typing x ([], ty, Constraints.empty) in
         begin match Common.lookup f External.values with
           | Some v -> {
               typing = typing_env;
@@ -197,14 +190,14 @@ let rec exec_cmd interactive st (d,loc) =
             }
           | None -> Error.runtime "unknown external symbol %s." f
         end
-    | Sugared.Tydef tydefs ->
-        let tydefs = Desugar.tydefs ~loc tydefs in
+    | Untyped.Tydef tydefs ->
         Tctx.extend_tydefs ~loc tydefs ;
         st
 
 
 and use_file env (filename, interactive) =
   let cmds = Lexer.read_file (parse Parser.file) filename in
+  let cmds = List.map Desugar.toplevel cmds in
     List.fold_left (exec_cmd interactive) env cmds
 
 and optimize_file st filename =
@@ -239,6 +232,7 @@ let toplevel ctxenv =
     while true do
       try
         let cmd = Lexer.read_toplevel (parse Parser.commandline) () in
+        let cmd = Desugar.toplevel cmd in
         ctxenv := exec_cmd true !ctxenv cmd
       with
         | Error.Error err -> Error.print err
