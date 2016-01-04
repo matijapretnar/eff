@@ -11,8 +11,10 @@ let help_text = "Toplevel commands:
 (* A list of files to be loaded and run. *)
 let files = ref []
 let to_be_optimized = ref []
+let to_be_compiled = ref []
 let add_file interactive filename = (files := (filename, interactive) :: !files)
-let optimize_file filename = (to_be_optimized := filename :: !to_be_optimized)
+let optimize_file filename = (to_be_optimized := filename :: !to_be_optimized; Config.interactive_shell := false)
+let compile_file filename = (to_be_compiled := filename :: !to_be_compiled; Config.interactive_shell := false)
 
 (* Command-line options *)
 let options = Arg.align [
@@ -54,6 +56,9 @@ let options = Arg.align [
   ("--opt",
     Arg.String (fun str -> optimize_file str),
     "<file> Optimize <file>");
+  ("--compile",
+    Arg.String (fun str -> compile_file str),
+    "<file> Compile <file>");
   ("-V",
     Arg.Set_int Config.verbosity,
     "<n> Set printing verbosity to <n>");
@@ -200,21 +205,31 @@ and use_file env (filename, interactive) =
   let cmds = List.map Desugar.toplevel cmds in
     List.fold_left (exec_cmd interactive) env cmds
 
-and optimize_file st filename =
+let optimize_file st filename =
   let t = Lexer.read_file (parse Parser.computation_file) filename in
   let c = Desugar.top_computation t in
   let drty_sch, c', new_change = infer_top_comp st c in
-  Format.printf "UNOPTIMIZED CODE: %t" (CamlPrint.print_computation c');
+  Format.printf "UNOPTIMIZED CODE:@.%t@." (CamlPrint.print_computation c');
   let c' = Optimize.optimize_comp c' in
-  Format.printf "OPTIMIZED CODE: %t" (CamlPrint.print_computation c');
-  (* Format.printf "OPTIMIZED CODE:@.@[val %t : %t = <fun>@]@." (Typed.print_computation c'); *)
-(*   let r = Eval.run st.environment c' in
-  begin match r with
-  | Runtime.Value v -> print_endline (Runtime.string_of_value v)
-  | Runtime.Call (eff, v, _) -> print_endline ("Uncaught effect " ^ (Syntax.Effect.string_of eff) ^ " " ^ Runtime.string_of_value v)
-  end
- *)
-  ()
+  Format.printf "OPTIMIZED CODE:@.%t@." (CamlPrint.print_computation c')
+
+let compile_file st filename =
+  let t = Lexer.read_file (parse Parser.computation_file) filename in
+  let c = Desugar.top_computation t in
+  let drty_sch, c', new_change = infer_top_comp st c in
+  let c' = Optimize.optimize_comp c' in
+  (* look for header.ml next to the executable  *)
+  let header_file = Filename.concat (Filename.dirname Sys.argv.(0)) "header.ml" in
+  let header_channel = open_in header_file in
+  let n = in_channel_length header_channel in
+  let header = String.create n in
+  really_input header_channel header 0 n;
+  close_in header_channel;
+  let compiled_file = filename ^ ".ml" in
+  let out_channel = open_out compiled_file in
+  Format.fprintf (Format.formatter_of_out_channel out_channel) "%s\n%t@." header (CamlPrint.print_computation c');
+  flush out_channel;
+  close_out out_channel
 
 (* Interactive toplevel *)
 let toplevel ctxenv =
@@ -280,6 +295,7 @@ let main =
     (* Run and load all the specified files. *)
     let ctxenv = List.fold_left use_file initial_ctxenv !files in
     List.iter (optimize_file ctxenv) !to_be_optimized;
+    List.iter (compile_file ctxenv) !to_be_compiled;
     if !Config.interactive_shell then toplevel ctxenv
   with
     Error.Error err -> Error.print err; exit 1
