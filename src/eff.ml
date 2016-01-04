@@ -204,11 +204,10 @@ and optimize_file st filename =
   let t = Lexer.read_file (parse Parser.computation_file) filename in
   let c = Desugar.top_computation t in
   let drty_sch, c', new_change = infer_top_comp st c in
-  Typed.printC c' stdout;
   print_endline "UNOPTIMIZED CODE:";
-  Typed.printC c' stdout;
+  CamlPrint.printC c' stdout;
   print_endline "OPTIMIZED CODE:";
-  Typed.printC (Optimize.optimize_comp c') stdout;
+  CamlPrint.printC (Optimize.optimize_comp c') stdout;
   (* Format.printf "OPTIMIZED CODE:@.@[val %t : %t = <fun>@]@." (Typed.print_computation c'); *)
 (*   let r = Eval.run st.environment c' in
   begin match r with
