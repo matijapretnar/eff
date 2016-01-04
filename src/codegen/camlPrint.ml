@@ -30,7 +30,7 @@ let rec print_expression ?max_level e ppf =
   | Typed.PureLambda pa ->
       print ~at_level:2 "(* pure *) fun %t" (print_pure_abstraction pa)
   | Typed.PureApply (e1, e2) ->
-      print ~at_level:1 "(* pure *) %t %t" (print_expression e1) (print_expression ~max_level:0 e2)
+      print ~at_level:1 "(* pure *) %t %t" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
   | Typed.PureLetIn (e1, pa) ->
       let (p, e2) = pa.Typed.term in
       print ~at_level:2 "(* pure *) let %t = %t in@ %t" (print_pattern p) (print_expression e1) (print_expression e2)
@@ -39,31 +39,32 @@ and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.Typed.term with
   | Typed.Apply (e1, e2) ->
-      print ~at_level:1 "%t %t" (print_expression e1) (print_expression ~max_level:0 e2)
+      print ~at_level:1 "%t %t" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
   | Typed.Value e ->
       print ~at_level:1 "value %t" (print_expression ~max_level:0 e)
   | Typed.Match (e, lst) ->
-      print "match %t with (@[<hov>%t@])" (print_expression e) (Print.sequence " | " print_abstraction lst)
+      print ~at_level:2 "match %t with (@[<hov>%t@])" (print_expression e) (Print.sequence " | " print_abstraction lst)
   | Typed.While (c1, c2) ->
-      print "while %t do %t done" (print_computation c1) (print_computation c2)
+      print ~at_level:2 "while %t do %t done" (print_computation c1) (print_computation c2)
   | Typed.For (i, e1, e2, c, up) ->
       let direction = if up then "to" else "downto" in
-      print "for %t = %t %s %t do %t done"
+      print ~at_level:2 "for %t = %t %s %t do %t done"
       (print_variable i) (print_expression e1) direction (print_expression e2) (print_computation c)
   | Typed.Handle (e, c) ->
-      print "handle %t %t" (print_expression e) (print_computation c)
+      print ~at_level:1 "handle %t %t" (print_expression ~max_level:0 e) (print_computation ~max_level:0 c)
   | Typed.Let (lst, c) ->
-      print "let @[<hov>%t@] in %t"
-      (Print.sequence " | " print_let_abstraction lst) (print_computation c)
+      print ~at_level:2 "let @[<hov>%t@] in %t"
+      (Print.sequence " and " print_let_abstraction lst) (print_computation c)
   | Typed.LetRec (lst, c) ->
-      print "let rec ... in %t" (print_computation c)
-  | Typed.Check c ->
-      print "check %t" (print_computation c)
+      print ~at_level:2 "let rec @[<hov>%t@] in %t"
+      (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
+  | Typed.Check c' ->
+      print ~at_level:1 "check %S %t" (Common.to_string Location.print c.Typed.location) (print_computation ~max_level:0 c')
   | Typed.Call (eff, e, a) ->
-      print "apply_effect %t %t (fun %t)"
+      print ~at_level:1 "apply_effect %t %t (fun %t)"
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
   | Typed.Bind (c1, a) ->
-      print ~at_level:2 "%t >> fun %t" (print_computation c1) (print_abstraction a)
+      print ~at_level:2 "%t >> fun %t" (print_computation ~max_level:0 c1) (print_abstraction a)
   | Typed.LetIn (e, {Typed.term = (p, c)}) ->
       print ~at_level:2 "let %t = %t in@ %t" (print_pattern p) (print_expression e) (print_computation c)
 
@@ -84,3 +85,6 @@ and print_pure_abstraction {Typed.term = (p, e)} ppf =
 
 and print_let_abstraction (p, c) ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)
+
+and print_let_rec_abstraction (x, a) ppf =
+  Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction a)
