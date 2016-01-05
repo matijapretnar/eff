@@ -88,3 +88,27 @@ and print_let_abstraction (p, c) ppf =
 
 and print_let_rec_abstraction (x, a) ppf =
   Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction a)
+
+let rec print_type ?max_level ty ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match ty with
+  | Type.Apply (ty_name, args) ->
+      print ~at_level:1 "%s %t" ty_name (print_args args)
+  | Type.Param (Type.Ty_Param n) ->
+      print "'t%d" n
+  | Type.Basic t ->
+      print "%s" t
+  | Type.Tuple tys ->
+      print "%t" (Print.tuple print_type tys)
+  | Type.Arrow (ty, drty) ->
+      print ~at_level:2 "%t -> %t" (print_type ~max_level:1 ty) (print_dirty_type drty)
+  | Type.PureArrow(ty1,ty2) ->
+      print ~at_level:2 "%t -> %t" (print_type ~max_level:1 ty1) (print_type ty2)
+  | Type.Handler ((ty1, _), (ty2, _)) ->
+      print ~at_level:2 "(%t, %t) handler" (print_type ty1) (print_type ty2)
+
+and print_dirty_type (ty, _) ppf =
+  print_type ty ppf
+
+and print_args (tys, _, _) ppf =
+  Print.sequence " " print_type tys ppf
