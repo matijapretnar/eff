@@ -16,8 +16,6 @@ let initial = {
   effects = Untyped.EffectMap.empty;
 }
 
-let simple ty = ([], ty, Constraints.empty)
-
 let ty_of_const = function
   | Const.Integer _ -> Type.int_ty
   | Const.String _ -> Type.string_ty
@@ -44,7 +42,7 @@ let infer_effect env eff =
    Note that unlike in ordinary type schemes, context types are positive while
    pattern type is negative. *)
 let rec infer_pattern (p, loc) =
-  if !Config.disable_typing then simple Type.universal_ty else
+  if !Config.disable_typing then Scheme.simple Type.universal_ty else
   let unify = Scheme.finalize_pattern_scheme ~loc in
   let ty_sch = match p with
 
@@ -57,10 +55,10 @@ let rec infer_pattern (p, loc) =
       (x, ty) :: ctx, ty, cnstrs
 
   | Pattern.Nonbinding ->
-      simple (Type.fresh_ty ())
+      Scheme.simple (Type.fresh_ty ())
 
   | Pattern.Const const ->
-      simple (ty_of_const const)
+      Scheme.simple (ty_of_const const)
 
   | Pattern.Tuple ps ->
       let infer p (ctx, tys, chngs) =
@@ -101,7 +99,7 @@ let rec infer_pattern (p, loc) =
       | None -> Error.typing ~loc "Unbound constructor %s" lbl
       | Some (ty, arg_ty) ->
           begin match p, arg_ty with
-            | None, None -> simple ty
+            | None, None -> Scheme.simple ty
             | Some p, Some arg_ty ->
                 let ctx_p, ty_p, cnstrs_p = infer_pattern p in
                 unify ctx_p ty [
@@ -232,7 +230,7 @@ and type_let_rec_defs ~loc env defs =
    - the type of the expression, and
    - constraints connecting all these types. *)
 let infer_expr env e =
-  if !Config.disable_typing then simple Type.universal_ty else (type_expr env e).Typed.scheme
+  if !Config.disable_typing then Scheme.simple Type.universal_ty else (type_expr env e).Typed.scheme
            
 (* [infer_comp env c] infers the dirty type scheme of a computation [c] in a
    typing environment [env] of generalised variables.
@@ -242,7 +240,7 @@ let infer_expr env e =
    - the dirt of the computation, and
    - constraints connecting all these types. *)
 let infer_comp env c =
-  if !Config.disable_typing then simple Type.universal_dirty else (type_comp env c).Typed.scheme
+  if !Config.disable_typing then Scheme.simple Type.universal_dirty else (type_comp env c).Typed.scheme
 
 let infer_abstraction env a =
   (type_abstraction env a).Typed.scheme

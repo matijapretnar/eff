@@ -6,6 +6,8 @@ type abstraction_scheme = (Type.ty * Type.dirty) t
 type abstraction2_scheme = (Type.ty * Type.ty * Type.dirty) t
 type change = ty_scheme -> ty_scheme
 
+let simple ty = ([], ty, Constraints.empty)
+
 let beautify2 ty1 ty2 cnstrs =
   let sbst = Type.beautifying_subst () in
   let ty1 = Type.subst_ty sbst ty1 in
