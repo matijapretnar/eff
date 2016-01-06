@@ -47,7 +47,7 @@ on Windows, we just have not tested it yet.
 
 To install Eff, you need a standard Unix-style build environment as well as
 
-1. [OCaml](https://ocaml.org/), version 3.12.1 or newer, and
+1. [OCaml](https://ocaml.org/), version 4.01 or newer, and
 2. [Menhir](http://gallium.inria.fr/~fpottier/menhir/) parser generator
 
 We do not require, but recommend a command-line editing wrapper such as
