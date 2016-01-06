@@ -17,7 +17,6 @@ let initial = {
 }
 
 let simple ty = ([], ty, Constraints.empty)
-let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_dirt_param () }
 
 let ty_of_const = function
   | Const.Integer _ -> Type.int_ty
