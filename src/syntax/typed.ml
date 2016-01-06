@@ -68,8 +68,6 @@ and pure_abstraction = (pattern * expression, Scheme.pure_abstraction_scheme) an
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * computation, Scheme.abstraction2_scheme) annotation
 
-let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_dirt_param () }
-
 let abstraction ~loc p c : abstraction =
   {
     term = (p, c);
@@ -263,7 +261,7 @@ let value ~loc e =
   let ctx, ty, constraints = e.scheme in
   {
     term = Value e;
-    scheme = (ctx, (ty, empty_dirt ()), constraints);
+    scheme = (ctx, (ty, Type.fresh_dirt ()), constraints);
     location = loc
   }
 
@@ -369,7 +367,7 @@ let handle ~loc e c =
 let check ~loc c =
   {
     term = Check c;
-    scheme = ([], (Type.unit_ty, empty_dirt ()), Constraints.empty);
+    scheme = ([], (Type.unit_ty, Type.fresh_dirt ()), Constraints.empty);
     location = loc;
   }
 
