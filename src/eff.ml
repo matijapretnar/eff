@@ -99,6 +99,12 @@ let type_cmd st (cmd, loc) =
   let st = {st with change = ty_st.Infer.change; typing = ty_st.Infer.typing} in
   (cmd, loc), st
 
+let type_cmds st cmds =
+  List.fold_left (fun (cmds, st) cmd ->
+    let cmd, st = type_cmd st cmd in
+    (cmd :: cmds, st)
+  ) ([], st) (List.rev cmds)
+
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
     and return the new environment. *)
@@ -204,10 +210,11 @@ let optimize_file st filename =
   Format.printf "OPTIMIZED CODE:@.%t@." (CamlPrint.print_computation c')
 
 let compile_file st filename =
-  let t = Lexer.read_file (parse Parser.computation_file) filename in
-  let c = Desugar.top_computation t in
-  let c', _ = Infer.infer_top_comp {Infer.change = st.change; Infer.typing = st.typing} c in
-  let c' = Optimize.optimize_comp c' in
+  let cmds = Lexer.read_file (parse Parser.file) filename in
+  let cmds = List.map Desugar.toplevel cmds in
+  let cmds, _ = type_cmds st cmds in
+  (* let cmds = Optimize.optimize_cmds cmds in *)
+
   (* look for header.ml next to the executable  *)
   let header_file = Filename.concat (Filename.dirname Sys.argv.(0)) "header.ml" in
   let header_channel = open_in header_file in
@@ -215,9 +222,10 @@ let compile_file st filename =
   let header = String.create n in
   really_input header_channel header 0 n;
   close_in header_channel;
+
   let compiled_file = filename ^ ".ml" in
   let out_channel = open_out compiled_file in
-  Format.fprintf (Format.formatter_of_out_channel out_channel) "%s\n%t@." header (CamlPrint.print_computation c');
+  Format.fprintf (Format.formatter_of_out_channel out_channel) "%s\n;;\n%t@." header (CamlPrint.print_commands cmds);
   flush out_channel;
   close_out out_channel
 

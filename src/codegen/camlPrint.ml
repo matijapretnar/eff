@@ -1,6 +1,6 @@
 let print_variable = Typed.Variable.print
 
-let print_effect eff ppf = Print.print ppf "%s" eff
+let print_effect eff ppf = Print.print ppf "effect_%s" eff
 
 let print_pattern p ppf = Untyped.print_pattern (p.Typed.term) ppf
 
@@ -8,7 +8,9 @@ let rec print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match e.Typed.term with
   | Typed.Var x ->
-      print "%t" (print_variable x)
+      (* We add extra parentheses in case the variable is a symbol *)
+      (* We add extra spaces in case the symbol is * *)
+      print "( %t )" (print_variable x)
   | Typed.Const c ->
       print "%t" (Const.print c)
   | Typed.Tuple lst ->
@@ -26,7 +28,7 @@ let rec print_expression ?max_level e ppf =
       (print_abstraction h.Typed.value_clause) (print_abstraction h.Typed.finally_clause)
       (print_effect_clauses h.Typed.effect_clauses)
   | Typed.Effect eff ->
-      print ~at_level:2 "fun param -> apply_effect %t param (fun result -> value result)" (print_effect eff)
+      print ~at_level:2 "fun param -> call %t param (fun result -> value result)" (print_effect eff)
   | Typed.PureLambda pa ->
       print ~at_level:2 "(* pure *) fun %t" (print_pure_abstraction pa)
   | Typed.PureApply (e1, e2) ->
@@ -61,7 +63,7 @@ and print_computation ?max_level c ppf =
   | Typed.Check c' ->
       print ~at_level:1 "check %S %t" (Common.to_string Location.print c.Typed.location) (print_computation ~max_level:0 c')
   | Typed.Call (eff, e, a) ->
-      print ~at_level:1 "apply_effect %t %t (fun %t)"
+      print ~at_level:1 "call %t %t (fun %t)"
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
   | Typed.Bind (c1, a) ->
       print ~at_level:2 "%t >> fun %t" (print_computation ~max_level:0 c1) (print_abstraction a)
@@ -112,3 +114,13 @@ and print_dirty_type (ty, _) ppf =
 
 and print_args (tys, _, _) ppf =
   Print.sequence " " print_type tys ppf
+
+let print_command (cmd, _) ppf =
+  match cmd with
+  | Typed.DefEffect (eff, (ty1, ty2)) ->
+      Print.print ppf "let %t : (%t, %t) effect = \"%t\"" (print_effect eff) (print_type ty1) (print_type ty2) (print_effect eff)
+  | Typed.Computation c ->
+      print_computation c ppf
+
+let print_commands cmds ppf =
+  Print.sequence ";;" print_command cmds ppf

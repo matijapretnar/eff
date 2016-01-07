@@ -174,14 +174,14 @@ let tydefs defs =
 
 (* ***** Desugaring of expressions and computations. ***** *)
 
-(** [fresh_variable ()] creates a fresh variable ["$gen1"], ["$gen2"], ... on
+(** [fresh_variable ()] creates a fresh variable ["gen_gen1"], ["gen_gen2"], ... on
     each call *)
 let fresh_variable = function
   | None -> Untyped.Variable.fresh "anon"
   | Some x -> Untyped.Variable.fresh x
 
 let id_abstraction loc =
-  let x = fresh_variable (Some "$id_par") in
+  let x = fresh_variable (Some "gen_id_par") in
   ((Pattern.Var x, loc), (Untyped.add_loc (Untyped.Value (Untyped.add_loc (Untyped.Var x) loc)) loc))
 
 let pattern ?(forbidden=[]) (p, loc) =
@@ -230,7 +230,7 @@ let rec expression ctx (t, loc) =
       let a = abstraction ctx a in
       [], Untyped.Lambda a
   | Sugared.Function cs ->
-      let x = fresh_variable (Some "$function") in
+      let x = fresh_variable (Some "gen_function") in
       let cs = List.map (abstraction ctx) cs in
       [], Untyped.Lambda ((Pattern.Var x, loc), Untyped.add_loc (Untyped.Match (Untyped.add_loc (Untyped.Var x) loc, cs)) loc)
   | Sugared.Handler cs ->
@@ -254,7 +254,7 @@ let rec expression ctx (t, loc) =
      order to catch any future constructs. *)
   | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
   | Sugared.Handle _ | Sugared.Conditional _ | Sugared.While _ | Sugared.For _ | Sugared.Check _ ->
-      let x = fresh_variable (Some "$bind") in
+      let x = fresh_variable (Some "gen_bind") in
       let c = computation ctx (t, loc) in
       let w = [(Pattern.Var x, loc), c] in
       w, Untyped.Var x
@@ -302,7 +302,7 @@ and computation ctx (t, loc) =
     | Sugared.For (i, t1, t2, t, b) ->
       let w1, e1 = expression ctx t1 in
       let w2, e2 = expression ctx t2 in
-      let j = fresh_variable (Some "$for") in
+      let j = fresh_variable (Some "gen_for") in
       let c = computation ((i, j) :: ctx) t in
         w1 @ w2, Untyped.For (j, e1, e2, c, b)
     | Sugared.Check t ->
@@ -355,7 +355,7 @@ and let_rec ctx (e, loc) =
   match e with
   | Sugared.Lambda a -> abstraction ctx a
   | Sugared.Function cs ->
-    let x = fresh_variable (Some "$let_rec_function") in
+    let x = fresh_variable (Some "gen_let_rec_function") in
     let cs = List.map (abstraction ctx) cs in
     (Pattern.Var x, loc), Untyped.add_loc (Untyped.Match (Untyped.add_loc (Untyped.Var x) loc, cs)) loc
   | _ -> Error.syntax ~loc "This kind of expression is not allowed in a recursive definition"
