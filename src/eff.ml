@@ -93,47 +93,40 @@ let initial_ctxenv = {
   typing = Infer.initial;
 }
 
-let infer_top_comp st c =
-  let c' = Infer.type_comp st.typing c in
-  let ctx', (ty', drt'), cnstrs' = c'.Typed.scheme in
-  let change = Scheme.add_to_top ~loc:c'.Typed.location ctx' cnstrs' in
-  let top_change = Common.compose st.change change in
-  let ctx = match c'.Typed.term with
-  | Typed.Value _ -> ctx'
-  | _ -> (Desugar.fresh_variable (Some "$top_comp"), ty') :: ctx'
-  in
-  let drty_sch = top_change (ctx, (ty', drt'), cnstrs') in
-  Exhaust.check_comp c;
-
-  drty_sch, c', top_change
+let type_cmd st (cmd, loc) =
+  let ty_st = {Infer.change = st.change; Infer.typing = st.typing} in
+  let cmd, ty_st = Infer.infer_toplevel ~loc ty_st cmd in
+  let st = {st with change = ty_st.Infer.change; typing = ty_st.Infer.typing} in
+  (cmd, loc), st
 
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
     and return the new environment. *)
-let rec exec_cmd interactive st (d,loc) =
-  match d with
-  | Untyped.Computation c ->
-      let drty_sch, c', new_change = infer_top_comp st c in
-      let v = Eval.run st.environment c' in
+let rec exec_cmd interactive st (cmd, loc) =
+  let (cmd, loc), st = type_cmd st (cmd, loc) in
+  match cmd with
+  | Typed.Computation c ->
+      let v = Eval.run st.environment c in
       if interactive then Format.printf "@[- : %t = %t@]@."
-        (Scheme.print_dirty_scheme drty_sch)
+        (Scheme.print_dirty_scheme c.Typed.scheme)
         (Value.print_value v);
-      {st with change = new_change}
-  | Untyped.TypeOf c ->
-      let drty_sch, c', new_change = infer_top_comp st c in
-      Format.printf "@[- : %t@]@." (Scheme.print_dirty_scheme drty_sch);
-      {st with change = new_change}
-  | Untyped.Reset ->
+      st
+  | Typed.TypeOf c ->
+      Format.printf "@[- : %t@]@." (Scheme.print_dirty_scheme c.Typed.scheme);
+      st
+  | Typed.Reset ->
       Tctx.reset ();
       print_endline ("Environment reset."); initial_ctxenv
-  | Untyped.Help ->
+  | Typed.Help ->
       print_endline help_text;
       st
-  | Untyped.DefEffect (eff, (ty1, ty2)) ->
-      {st with typing = Infer.add_effect st.typing eff (ty1, ty2)}
-  | Untyped.Quit -> exit 0
-  | Untyped.Use fn -> use_file st (fn, interactive)
-  | Untyped.TopLet defs ->
+  | Typed.DefEffect (eff, (ty1, ty2)) ->
+      st
+  | Typed.Quit ->
+      exit 0
+  | Typed.Use fn ->
+      use_file st (fn, interactive)
+  | Typed.TopLet defs ->
       (* XXX What to do about the dirts? *)
       let vars, nonpoly, change = Infer.infer_let ~loc st.typing defs in
       let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
@@ -158,7 +151,7 @@ let rec exec_cmd interactive st (d,loc) =
                        match RuntimeEnv.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.printf "@[val %t : %t = %t@]@." (Untyped.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
+                         Format.printf "@[val %t : %t = %t@]@." (Typed.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
             vars
         end;
         {
@@ -166,7 +159,7 @@ let rec exec_cmd interactive st (d,loc) =
           change = top_change;
           environment = env;
         }
-    | Untyped.TopLetRec defs ->
+    | Typed.TopLetRec defs ->
         let vars, _, change = Infer.infer_let_rec ~loc st.typing defs in
         let defs', poly_tyschs = Infer.type_let_rec_defs ~loc st.typing defs in
         let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
@@ -178,25 +171,22 @@ let rec exec_cmd interactive st (d,loc) =
         List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
         let env = Eval.extend_let_rec st.environment defs' in
           if interactive then begin
-            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Untyped.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch))) vars
+            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Typed.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch))) vars
           end;
         {
           typing = typing_env;
           change = top_change;
           environment = env;
         }
-    | Untyped.External (x, ty, f) ->
-      let typing_env = Infer.add_def st.typing x ([], ty, Constraints.empty) in
+    | Typed.External (x, ty, f) ->
         begin match Common.lookup f External.values with
           | Some v -> {
-              typing = typing_env;
-              change = st.change;
+              st with
               environment = RuntimeEnv.update x v st.environment;
             }
           | None -> Error.runtime "unknown external symbol %s." f
         end
-    | Untyped.Tydef tydefs ->
-        Tctx.extend_tydefs ~loc tydefs ;
+    | Typed.Tydef tydefs ->
         st
 
 
@@ -208,7 +198,7 @@ and use_file env (filename, interactive) =
 let optimize_file st filename =
   let t = Lexer.read_file (parse Parser.computation_file) filename in
   let c = Desugar.top_computation t in
-  let drty_sch, c', new_change = infer_top_comp st c in
+  let c', _ = Infer.infer_top_comp {Infer.change = st.change; Infer.typing = st.typing} c in
   Format.printf "UNOPTIMIZED CODE:@.%t@." (CamlPrint.print_computation c');
   let c' = Optimize.optimize_comp c' in
   Format.printf "OPTIMIZED CODE:@.%t@." (CamlPrint.print_computation c')
@@ -216,7 +206,7 @@ let optimize_file st filename =
 let compile_file st filename =
   let t = Lexer.read_file (parse Parser.computation_file) filename in
   let c = Desugar.top_computation t in
-  let drty_sch, c', new_change = infer_top_comp st c in
+  let c', _ = Infer.infer_top_comp {Infer.change = st.change; Infer.typing = st.typing} c in
   let c' = Optimize.optimize_comp c' in
   (* look for header.ml next to the executable  *)
   let header_file = Filename.concat (Filename.dirname Sys.argv.(0)) "header.ml" in
@@ -247,7 +237,7 @@ let toplevel ctxenv =
         let cmd = Lexer.read_toplevel (parse Parser.commandline) () in
         let cmd = Desugar.toplevel cmd in
         ctxenv := exec_cmd true !ctxenv cmd
-      with
+        with
         | Error.Error err -> Error.print err
         | Sys.Break -> prerr_endline "Interrupted."
     done

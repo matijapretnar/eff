@@ -68,6 +68,20 @@ and pure_abstraction = (pattern * expression, Scheme.pure_abstraction_scheme) an
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * computation, Scheme.abstraction2_scheme) annotation
 
+type toplevel = plain_toplevel * Location.t
+and plain_toplevel =
+  | Tydef of (Common.tyname, (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t * Tctx.tydef) Common.assoc
+  | TopLet of (variable Pattern.t * Untyped.computation) list
+  | TopLetRec of (variable * Untyped.abstraction) list
+  | External of variable * Type.ty * string
+  | DefEffect of effect * (Type.ty * Type.ty)
+  | Computation of computation
+  | Use of string
+  | Reset
+  | Help
+  | Quit
+  | TypeOf of computation
+
 let abstraction ~loc p c : abstraction =
   {
     term = (p, c);

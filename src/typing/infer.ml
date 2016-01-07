@@ -296,3 +296,56 @@ let infer_let_rec ~loc env defs =
     ] @ chngs)
   in
   poly_tyschs, nonpoly_tys, change
+
+type toplevel_state = {
+  change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
+  typing : state;
+}
+
+let initial_ctxenv = {
+  change = Common.id;
+  typing = initial;
+}
+
+let infer_top_comp st c =
+  let c' = type_comp st.typing c in
+  let ctx', (ty', drt'), cnstrs' = c'.Typed.scheme in
+  let change = Scheme.add_to_top ~loc:c'.Typed.location ctx' cnstrs' in
+  let top_change = Common.compose st.change change in
+  let ctx = match c'.Typed.term with
+  | Typed.Value _ -> ctx'
+  | _ -> (Desugar.fresh_variable (Some "$top_comp"), ty') :: ctx'
+  in
+  let drty_sch = top_change (ctx, (ty', drt'), cnstrs') in
+  Exhaust.check_comp c;
+
+  {c' with Typed.scheme = drty_sch}, {st with change = top_change}
+
+let infer_toplevel ~loc st = function
+  | Untyped.Tydef defs ->
+      Tctx.extend_tydefs ~loc defs;
+      Typed.Tydef defs, st
+  | Untyped.TopLet defs ->
+      Typed.TopLet defs, st
+  | Untyped.TopLetRec defs ->
+      Typed.TopLetRec defs, st
+  | Untyped.External (x, ty, f) ->
+      let st = {st with typing = add_def st.typing x ([], ty, Constraints.empty)} in
+      Typed.External (x, ty, f), st
+  | Untyped.DefEffect (eff, (ty1, ty2)) ->
+      let st = {st with typing = add_effect st.typing eff (ty1, ty2)} in
+      Typed.DefEffect (eff, (ty1, ty2)), st
+  | Untyped.Computation c ->
+      let c, st = infer_top_comp st c in
+      Typed.Computation c, st
+  | Untyped.Use fn ->
+      Typed.Use fn, st
+  | Untyped.Reset ->
+      Typed.Reset, st
+  | Untyped.Help ->
+      Typed.Help, st
+  | Untyped.Quit ->
+      Typed.Quit, st
+  | Untyped.TypeOf c ->
+      let c, st = infer_top_comp st c in
+      Typed.TypeOf c, st
