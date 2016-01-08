@@ -94,6 +94,9 @@ and print_multiple_bind (lst, c') ppf =
 and print_let_abstraction (p, c) ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)
 
+and print_top_let_abstraction (p, c) ppf =
+  Format.fprintf ppf "%t = run %t" (print_pattern p) (print_computation ~max_level:0 c)
+
 and print_let_rec_abstraction (x, a) ppf =
   Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction a)
 
@@ -127,10 +130,10 @@ let print_command (cmd, _) ppf =
       Print.print ppf "let %t : (%t, %t) effect = \"%t\"" (print_effect eff) (print_type ty1) (print_type ty2) (print_effect eff)
   | Typed.Computation c ->
       print_computation c ppf
-  | Typed.TopLet (_, _) ->
-      Print.print ppf "(* top let definition not yet implemented *)"
-  | Typed.TopLetRec (_, _) ->
-      Print.print ppf "(* top let definition not yet implemented *)"
+  | Typed.TopLet (defs, _) ->
+      Print.print ppf "let %t" (Print.sequence "\nand\n" print_top_let_abstraction defs)
+  | Typed.TopLetRec (defs, _) ->
+      Print.print ppf "let rec %t" (Print.sequence "\nand\n" print_let_rec_abstraction defs)
   | Typed.Use _ ->
       Print.print ppf "(* #use directive not yet implemented *)"
   | Typed.External _ ->
