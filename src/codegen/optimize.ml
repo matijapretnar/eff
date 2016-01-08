@@ -63,12 +63,19 @@ and  optimize_expr e =
 
 let optimize_command = function
   | Typed.Computation c ->
-      Typed.Computation (optimize_comp c)
-  | Typed.TopLet defs as cmd -> cmd
-  | Typed.TopLetRec defs as cmd -> cmd
+      Some (Typed.Computation (optimize_comp c))
+  | Typed.TopLet defs as cmd -> Some cmd
+  | Typed.TopLetRec defs as cmd -> Some cmd
   | (Typed.DefEffect _ | Typed.Reset | Typed.Quit | Typed.Use _ |
-     Typed.External _ | Typed.Tydef _ | Typed.TypeOf _ | Typed.Help) as cmd ->
-      cmd
+     Typed.External _ | Typed.Tydef _) as cmd ->
+      Some cmd
+  | (Typed.TypeOf _ | Typed.Help) -> None
 
-let optimize_commands cmds =
-  List.map (fun (cmd, loc) -> (optimize_command cmd, loc)) cmds
+let rec optimize_commands = function
+  | [] -> []
+  | (cmd, loc) :: cmds ->
+      let cmds = optimize_commands cmds in
+      begin match optimize_command cmd with
+      | Some cmd -> (cmd, loc) :: cmds
+      | None -> cmds
+      end
