@@ -60,3 +60,15 @@ and  optimize_expr e =
     | _ -> e
     end
   | _ -> e
+
+let optimize_command = function
+  | Typed.Computation c ->
+      Typed.Computation (optimize_comp c)
+  | Typed.TopLet defs as cmd -> cmd
+  | Typed.TopLetRec defs as cmd -> cmd
+  | (Typed.DefEffect _ | Typed.Reset | Typed.Quit | Typed.Use _ |
+     Typed.External _ | Typed.Tydef _ | Typed.TypeOf _ | Typed.Help) as cmd ->
+      cmd
+
+let optimize_commands cmds =
+  List.map (fun (cmd, loc) -> (optimize_command cmd, loc)) cmds

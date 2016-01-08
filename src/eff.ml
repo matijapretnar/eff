@@ -213,7 +213,9 @@ let compile_file st filename =
   let cmds = Lexer.read_file (parse Parser.file) filename in
   let cmds = List.map Desugar.toplevel cmds in
   let cmds, _ = type_cmds st cmds in
-  (* let cmds = Optimize.optimize_cmds cmds in *)
+  Print.debug "UNOPTIMIZED CODE:@.%t@." (CamlPrint.print_commands cmds);
+  let cmds = Optimize.optimize_commands cmds in
+  Print.debug "OPTIMIZED CODE:@.%t@." (CamlPrint.print_commands cmds);
 
   (* look for header.ml next to the executable  *)
   let header_file = Filename.concat (Filename.dirname Sys.argv.(0)) "header.ml" in
