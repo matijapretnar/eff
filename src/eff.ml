@@ -10,10 +10,8 @@ let help_text = "Toplevel commands:
 
 (* A list of files to be loaded and run. *)
 let files = ref []
-let to_be_optimized = ref []
 let to_be_compiled = ref []
 let add_file interactive filename = (files := (filename, interactive) :: !files)
-let optimize_file filename = (to_be_optimized := filename :: !to_be_optimized; Config.interactive_shell := false)
 let compile_file filename = (to_be_compiled := filename :: !to_be_compiled; Config.interactive_shell := false)
 
 (* Command-line options *)
@@ -53,9 +51,6 @@ let options = Arg.align [
   ("-l",
     Arg.String (fun str -> add_file false str),
     "<file> Load <file> into the initial environment");
-  ("--opt",
-    Arg.String (fun str -> optimize_file str),
-    "<file> Optimize <file>");
   ("--compile",
     Arg.String (fun str -> compile_file str),
     "<file> Compile <file>");
@@ -201,14 +196,6 @@ and use_file env (filename, interactive) =
   let cmds = List.map Desugar.toplevel cmds in
     List.fold_left (exec_cmd interactive) env cmds
 
-let optimize_file st filename =
-  let t = Lexer.read_file (parse Parser.computation_file) filename in
-  let c = Desugar.top_computation t in
-  let c', _ = Infer.infer_top_comp {Infer.change = st.change; Infer.typing = st.typing} c in
-  Format.printf "UNOPTIMIZED CODE:@.%t@." (CamlPrint.print_computation c');
-  let c' = Optimize.optimize_comp c' in
-  Format.printf "OPTIMIZED CODE:@.%t@." (CamlPrint.print_computation c')
-
 let compile_file st filename =
   let cmds = Lexer.read_file (parse Parser.file) filename in
   let cmds = List.map Desugar.toplevel cmds in
@@ -294,7 +281,6 @@ let main =
   try
     (* Run and load all the specified files. *)
     let ctxenv = List.fold_left use_file initial_ctxenv !files in
-    List.iter (optimize_file ctxenv) !to_be_optimized;
     List.iter (compile_file ctxenv) !to_be_compiled;
     if !Config.interactive_shell then toplevel ctxenv
   with
