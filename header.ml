@@ -48,3 +48,24 @@ let effect eff = fun arg -> call eff arg value
 let run = function
   | Value x -> x
   | Call (eff, _, _) -> failwith ("Uncaught effect " ^ eff)
+
+let (+) = fun x -> value (fun y -> value (Pervasives.(+) x y))
+let (-) = fun x -> value (fun y -> value (Pervasives.(-) x y))
+let ( * ) = fun x -> value (fun y -> value (Pervasives.( * ) x y))
+let (/) = fun x -> value (fun y -> value (Pervasives.(/) x y))
+
+let (+.) = fun x -> value (fun y -> value (Pervasives.(+.) x y))
+let (-.) = fun x -> value (fun y -> value (Pervasives.(-.) x y))
+let ( *. ) = fun x -> value (fun y -> value (Pervasives.( *. ) x y))
+let (/.) = fun x -> value (fun y -> value (Pervasives.(/.) x y))
+
+let (=) = fun x -> value (fun y -> value (Pervasives.(=) x y))
+let (!=) = fun x -> value (fun y -> value (Pervasives.(!=) x y))
+let (<>) = fun x -> value (fun y -> value (Pervasives.(<>) x y))
+let (<) = fun x -> value (fun y -> value (Pervasives.(<) x y))
+let (>) = fun x -> value (fun y -> value (Pervasives.(>) x y))
+let (<=) = fun x -> value (fun y -> value (Pervasives.(<=) x y))
+let (>=) = fun x -> value (fun y -> value (Pervasives.(>=) x y))
+
+let (&&) = fun x -> value (fun y -> value (Pervasives.(&&) x y))
+let (||) = fun x -> value (fun y -> value (Pervasives.(||) x y))
