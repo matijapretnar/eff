@@ -64,8 +64,8 @@ and  optimize_expr e =
 let optimize_command = function
   | Typed.Computation c ->
       Some (Typed.Computation (optimize_comp c))
-  | Typed.TopLet defs as cmd -> Some cmd
-  | Typed.TopLetRec defs as cmd -> Some cmd
+  | Typed.TopLet (_, _) as cmd -> Some cmd
+  | Typed.TopLetRec (_, _) as cmd -> Some cmd
   | (Typed.DefEffect _ | Typed.Reset | Typed.Quit | Typed.Use _ |
      Typed.External _ | Typed.Tydef _) as cmd ->
       Some cmd

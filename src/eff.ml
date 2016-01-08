@@ -127,56 +127,32 @@ let rec exec_cmd interactive st (cmd, loc) =
       exit 0
   | Typed.Use fn ->
       use_file st (fn, interactive)
-  | Typed.TopLet defs ->
-      (* XXX What to do about the dirts? *)
-      let vars, nonpoly, change = Infer.infer_let ~loc st.typing defs in
-      let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
-      let extend_nonpoly (x, ty) env =
-        (x, ([(x, ty)], ty, Constraints.empty)) :: env
-      in
-      let vars = List.fold_right extend_nonpoly nonpoly vars in
-      let top_change = Common.compose st.change change in
-      let sch_change (ctx, ty, cnstrs) =
-        let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
-        (ctx, ty, cnstrs)
-      in
-      let defs', poly_tyschs = Infer.type_let_defs ~loc st.typing defs in
-      List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
+  | Typed.TopLet (defs, vars) ->
       let env =
         List.fold_right
           (fun (p,c) env -> let v = Eval.run env c in Eval.extend p v env)
-          defs' st.environment
+          defs st.environment
       in
         if interactive then begin
           List.iter (fun (x, tysch) ->
                        match RuntimeEnv.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.printf "@[val %t : %t = %t@]@." (Typed.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
+                         Format.printf "@[val %t : %t = %t@]@." (Typed.Variable.print x) (Scheme.print_ty_scheme tysch) (Value.print_value v))
             vars
         end;
         {
-          typing = typing_env;
-          change = top_change;
+          st with
           environment = env;
         }
-    | Typed.TopLetRec defs ->
-        let vars, _, change = Infer.infer_let_rec ~loc st.typing defs in
-        let defs', poly_tyschs = Infer.type_let_rec_defs ~loc st.typing defs in
-        let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
-        let top_change = Common.compose st.change change in
-        let sch_change (ctx, ty, cnstrs) =
-          let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
-          (ctx, ty, cnstrs)
-        in
-        List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
-        let env = Eval.extend_let_rec st.environment defs' in
+    | Typed.TopLetRec (defs, vars) ->
+
+        let env = Eval.extend_let_rec st.environment defs in
           if interactive then begin
-            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Typed.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch))) vars
+            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Typed.Variable.print x) (Scheme.print_ty_scheme tysch)) vars
           end;
         {
-          typing = typing_env;
-          change = top_change;
+          st with
           environment = env;
         }
     | Typed.External (x, ty, f) ->

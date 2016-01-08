@@ -127,9 +127,9 @@ let print_command (cmd, _) ppf =
       Print.print ppf "let %t : (%t, %t) effect = \"%t\"" (print_effect eff) (print_type ty1) (print_type ty2) (print_effect eff)
   | Typed.Computation c ->
       print_computation c ppf
-  | Typed.TopLet defs ->
+  | Typed.TopLet (_, _) ->
       Print.print ppf "(* top let definition not yet implemented *)"
-  | Typed.TopLetRec defs ->
+  | Typed.TopLetRec (_, _) ->
       Print.print ppf "(* top let definition not yet implemented *)"
   | Typed.Use _ ->
       Print.print ppf "(* #use directive not yet implemented *)"
