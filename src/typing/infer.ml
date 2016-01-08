@@ -16,9 +16,6 @@ let initial = {
   effects = Untyped.EffectMap.empty;
 }
 
-let simple ty = ([], ty, Constraints.empty)
-let empty_dirt () = { Type.ops = []; Type.rest = Type.fresh_dirt_param () }
-
 let ty_of_const = function
   | Const.Integer _ -> Type.int_ty
   | Const.String _ -> Type.string_ty
@@ -45,7 +42,7 @@ let infer_effect env eff =
    Note that unlike in ordinary type schemes, context types are positive while
    pattern type is negative. *)
 let rec infer_pattern (p, loc) =
-  if !Config.disable_typing then simple Type.universal_ty else
+  if !Config.disable_typing then Scheme.simple Type.universal_ty else
   let unify = Scheme.finalize_pattern_scheme ~loc in
   let ty_sch = match p with
 
@@ -58,10 +55,10 @@ let rec infer_pattern (p, loc) =
       (x, ty) :: ctx, ty, cnstrs
 
   | Pattern.Nonbinding ->
-      simple (Type.fresh_ty ())
+      Scheme.simple (Type.fresh_ty ())
 
   | Pattern.Const const ->
-      simple (ty_of_const const)
+      Scheme.simple (ty_of_const const)
 
   | Pattern.Tuple ps ->
       let infer p (ctx, tys, chngs) =
@@ -102,7 +99,7 @@ let rec infer_pattern (p, loc) =
       | None -> Error.typing ~loc "Unbound constructor %s" lbl
       | Some (ty, arg_ty) ->
           begin match p, arg_ty with
-            | None, None -> simple ty
+            | None, None -> Scheme.simple ty
             | Some p, Some arg_ty ->
                 let ctx_p, ty_p, cnstrs_p = infer_pattern p in
                 unify ctx_p ty [
@@ -234,7 +231,7 @@ and type_let_rec_defs ~loc env defs =
    - the type of the expression, and
    - constraints connecting all these types. *)
 let infer_expr env e =
-  if !Config.disable_typing then simple Type.universal_ty else (type_expr env e).Typed.scheme
+  if !Config.disable_typing then Scheme.simple Type.universal_ty else (type_expr env e).Typed.scheme
            
 (* [infer_comp env c] infers the dirty type scheme of a computation [c] in a
    typing environment [env] of generalised variables.
@@ -244,7 +241,7 @@ let infer_expr env e =
    - the dirt of the computation, and
    - constraints connecting all these types. *)
 let infer_comp env c =
-  if !Config.disable_typing then simple Type.universal_dirty else (type_comp env c).Typed.scheme
+  if !Config.disable_typing then Scheme.simple Type.universal_dirty else (type_comp env c).Typed.scheme
 
 let infer_abstraction env a =
   (type_abstraction env a).Typed.scheme
@@ -299,3 +296,56 @@ let infer_let_rec ~loc env defs =
     ] @ chngs)
   in
   poly_tyschs, nonpoly_tys, change
+
+type toplevel_state = {
+  change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
+  typing : state;
+}
+
+let initial_ctxenv = {
+  change = Common.id;
+  typing = initial;
+}
+
+let infer_top_comp st c =
+  let c' = type_comp st.typing c in
+  let ctx', (ty', drt'), cnstrs' = c'.Typed.scheme in
+  let change = Scheme.add_to_top ~loc:c'.Typed.location ctx' cnstrs' in
+  let top_change = Common.compose st.change change in
+  let ctx = match c'.Typed.term with
+  | Typed.Value _ -> ctx'
+  | _ -> (Desugar.fresh_variable (Some "$top_comp"), ty') :: ctx'
+  in
+  let drty_sch = top_change (ctx, (ty', drt'), cnstrs') in
+  Exhaust.check_comp c;
+
+  {c' with Typed.scheme = drty_sch}, {st with change = top_change}
+
+let infer_toplevel ~loc st = function
+  | Untyped.Tydef defs ->
+      Tctx.extend_tydefs ~loc defs;
+      Typed.Tydef defs, st
+  | Untyped.TopLet defs ->
+      Typed.TopLet defs, st
+  | Untyped.TopLetRec defs ->
+      Typed.TopLetRec defs, st
+  | Untyped.External (x, ty, f) ->
+      let st = {st with typing = add_def st.typing x ([], ty, Constraints.empty)} in
+      Typed.External (x, ty, f), st
+  | Untyped.DefEffect (eff, (ty1, ty2)) ->
+      let st = {st with typing = add_effect st.typing eff (ty1, ty2)} in
+      Typed.DefEffect (eff, (ty1, ty2)), st
+  | Untyped.Computation c ->
+      let c, st = infer_top_comp st c in
+      Typed.Computation c, st
+  | Untyped.Use fn ->
+      Typed.Use fn, st
+  | Untyped.Reset ->
+      Typed.Reset, st
+  | Untyped.Help ->
+      Typed.Help, st
+  | Untyped.Quit ->
+      Typed.Quit, st
+  | Untyped.TypeOf c ->
+      let c, st = infer_top_comp st c in
+      Typed.TypeOf c, st

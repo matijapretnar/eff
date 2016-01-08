@@ -1,5 +1,3 @@
-BUILDFLAGS = -use-ocamlfind
-
 # OASIS_START
 # DO NOT EDIT (digest: 4d265c1dbe34db850ba8f3cfa7396db0)
 
@@ -43,13 +41,12 @@ eff: setup.data
 	$(SETUP) -build $(BUILDFLAGS)
 
 # "make test" to see if anything broke
-test:
-	ocamlbuild $(BUILDFLAGS) eff.native
-	cd tests && sh ./test.sh
+test: eff
+	cd examples/tests && sh ./test.sh
 
 # "make test-validate" to see if anything broke
 # and ask for validation of possibly broken things.
 test-validate: eff
-	cd tests && sh ./test.sh -v
+	cd examples/tests && sh ./test.sh -v
 
 .PHONY: test test-validate

@@ -11,15 +11,15 @@ then
     exit 1
 fi
 
-if [ -x "$BASEDIR/../eff" ]
+if [ -x "$BASEDIR/../../eff" ]
 then
-  EFF="$BASEDIR/../eff"
-elif [ -x "$BASEDIR/../eff.native" ]
+  EFF="$BASEDIR/../../eff"
+elif [ -x "$BASEDIR/../../eff.native" ]
 then
-  EFF="$BASEDIR/../eff.byte"
-elif [ -x "$BASEDIR/../eff.byte" ]
+  EFF="$BASEDIR/../../eff.byte"
+elif [ -x "$BASEDIR/../../eff.byte" ]
 then
-  EFF="$BASEDIR/../eff.byte"
+  EFF="$BASEDIR/../../eff.byte"
 else
   echo "Cannot find the eff executable. Compile eff first."
   exit 1
