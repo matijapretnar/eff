@@ -127,6 +127,24 @@ let print_command (cmd, _) ppf =
       Print.print ppf "let %t : (%t, %t) effect = \"%t\"" (print_effect eff) (print_type ty1) (print_type ty2) (print_effect eff)
   | Typed.Computation c ->
       print_computation c ppf
+  | Typed.TopLet defs ->
+      Print.print ppf "(* top let definition not yet implemented *)"
+  | Typed.TopLetRec defs ->
+      Print.print ppf "(* top let definition not yet implemented *)"
+  | Typed.Use _ ->
+      Print.print ppf "(* #use directive not yet implemented *)"
+  | Typed.External _ ->
+      Print.print ppf "(* external definition not yet implemented *)"
+  | Typed.Tydef _ ->
+      Print.print ppf "(* type definition not yet implemented *)"
+  | Typed.Reset ->
+      Print.print ppf "(* #reset directive not supported by OCaml *)"
+  | Typed.Quit ->
+      Print.print ppf "(* #quit directive not supported by OCaml *)"
+  | Typed.TypeOf _ ->
+      Print.print ppf "(* #type directive not supported by OCaml *)"
+  | Typed.Help ->
+      Print.print ppf "(* #help directive not supported by OCaml *)"
 
 let print_commands cmds ppf =
   Print.sequence ";;" print_command cmds ppf
