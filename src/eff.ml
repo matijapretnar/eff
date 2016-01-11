@@ -95,10 +95,13 @@ let type_cmd st (cmd, loc) =
   (cmd, loc), st
 
 let type_cmds st cmds =
-  List.fold_left (fun (cmds, st) cmd ->
-    let cmd, st = type_cmd st cmd in
-    (cmd :: cmds, st)
-  ) ([], st) (List.rev cmds)
+  let cmds, st =
+    List.fold_left (fun (cmds, st) cmd ->
+      let cmd, st = type_cmd st cmd in
+      (cmd :: cmds, st)
+    ) ([], st) cmds
+  in
+  List.rev cmds, st
 
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
