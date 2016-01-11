@@ -100,17 +100,20 @@ and print_top_let_abstraction (p, c) ppf =
 and print_let_rec_abstraction (x, a) ppf =
   Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction a)
 
+let print_type_param (Type.Ty_Param n) ppf =
+   Format.fprintf ppf "'t%d" n
+
 let rec print_type ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
   | Type.Apply (ty_name, args) ->
-      print ~at_level:1 "%s %t" ty_name (print_args args)
-  | Type.Param (Type.Ty_Param n) ->
-      print "'t%d" n
+      print ~at_level:1 "%t %s" (print_args args) ty_name
+  | Type.Param p ->
+      print "%t" (print_type_param p)
   | Type.Basic t ->
       print "%s" t
   | Type.Tuple tys ->
-      print "%t" (Print.tuple print_type tys)
+      print ~at_level:1 "%t" (Print.sequence "*" print_type tys)
   | Type.Arrow (ty, drty) ->
       print ~at_level:2 "%t -> %t" (print_type ~max_level:1 ty) (print_dirty_type drty)
   | Type.PureArrow(ty1,ty2) ->
@@ -119,12 +122,39 @@ let rec print_type ?max_level ty ppf =
       print ~at_level:2 "(%t, %t) handler" (print_type ty1) (print_type ty2)
 
 and print_dirty_type (ty, _) ppf =
-  print_type ty ppf
+  Format.fprintf ppf "%t computation" (print_type ~max_level:0 ty)
 
 and print_args (tys, _, _) ppf =
-  Print.sequence " " print_type tys ppf
+  match tys with
+  | [] -> ()
+  | _ -> Format.fprintf ppf "(%t)" (Print.sequence "," print_type tys)
+
+and print_params (tys, _, _) ppf =
+  match tys with
+  | [] -> ()
+  | _ -> Format.fprintf ppf "(%t)" (Print.sequence "," print_type_param tys)
 
 let compiled_filename fn = fn ^ ".ml"
+
+let print_tydef_body ty_def ppf =
+  match ty_def with
+  | Tctx.Record flds ->
+      let field (fld, ty) ppf = Format.fprintf ppf "%s: %t" fld (print_type ty) in
+      Format.fprintf ppf "{@[<hov>%t@]}" (Print.sequence "; " field flds)
+  | Tctx.Sum variants ->
+      let variant (lbl, ty) ppf =
+        match ty with
+        | None -> Format.fprintf ppf "%s" lbl
+        | Some ty -> Format.fprintf ppf "%s of %t" lbl (print_type ~max_level:0 ty)
+      in
+      Format.fprintf ppf "@[<hov>%t@]" (Print.sequence "|" variant variants)
+  | Tctx.Inline ty -> print_type ty ppf
+
+let print_tydef (name, (params, body)) ppf =
+  Format.fprintf ppf "%t %s = %t" (print_params params) name (print_tydef_body body)
+
+let print_tydefs tydefs ppf =
+  Format.fprintf ppf "type %t" (Print.sequence "\nand\n" print_tydef tydefs)
 
 let print_command (cmd, _) ppf =
   match cmd with
@@ -140,8 +170,8 @@ let print_command (cmd, _) ppf =
       Print.print ppf "#use %S" (compiled_filename fn)
   | Typed.External _ ->
       Print.print ppf "(* external definition not yet implemented *)"
-  | Typed.Tydef _ ->
-      Print.print ppf "(* type definition not yet implemented *)"
+  | Typed.Tydef tydefs ->
+      print_tydefs tydefs ppf
   | Typed.Reset ->
       Print.print ppf "(* #reset directive not supported by OCaml *)"
   | Typed.Quit ->
