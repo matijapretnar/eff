@@ -191,7 +191,7 @@ let compile_file st filename =
   really_input header_channel header 0 n;
   close_in header_channel;
 
-  let compiled_file = filename ^ ".ml" in
+  let compiled_file = CamlPrint.compiled_filename filename in
   let out_channel = open_out compiled_file in
   Format.fprintf (Format.formatter_of_out_channel out_channel) "%s\n;;\n%t@." header (CamlPrint.print_commands cmds);
   flush out_channel;

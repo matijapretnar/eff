@@ -124,6 +124,8 @@ and print_dirty_type (ty, _) ppf =
 and print_args (tys, _, _) ppf =
   Print.sequence " " print_type tys ppf
 
+let compiled_filename fn = fn ^ ".ml"
+
 let print_command (cmd, _) ppf =
   match cmd with
   | Typed.DefEffect (eff, (ty1, ty2)) ->
@@ -134,8 +136,8 @@ let print_command (cmd, _) ppf =
       Print.print ppf "let %t" (Print.sequence "\nand\n" print_top_let_abstraction defs)
   | Typed.TopLetRec (defs, _) ->
       Print.print ppf "let rec %t" (Print.sequence "\nand\n" print_let_rec_abstraction defs)
-  | Typed.Use _ ->
-      Print.print ppf "(* #use directive not yet implemented *)"
+  | Typed.Use fn ->
+      Print.print ppf "#use %S" (compiled_filename fn)
   | Typed.External _ ->
       Print.print ppf "(* external definition not yet implemented *)"
   | Typed.Tydef _ ->
