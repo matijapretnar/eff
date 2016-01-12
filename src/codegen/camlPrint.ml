@@ -168,8 +168,8 @@ let print_command (cmd, _) ppf =
       Print.print ppf "let rec %t" (Print.sequence "\nand\n" print_let_rec_abstraction defs)
   | Typed.Use fn ->
       Print.print ppf "#use %S" (compiled_filename fn)
-  | Typed.External _ ->
-      Print.print ppf "(* external definition not yet implemented *)"
+  | Typed.External (x, ty, f) ->
+      Print.print ppf "let %t : %t = ( %s )" (print_variable x) (print_type ty) f
   | Typed.Tydef tydefs ->
       print_tydefs tydefs ppf
   | Typed.Reset ->
