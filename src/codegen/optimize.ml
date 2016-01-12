@@ -1,5 +1,40 @@
 open Typed
 
+let unary_inlinable f ty1 ty2 =
+  let x = Typed.Variable.fresh "x"
+  and f = Typed.Variable.fresh f
+  and loc = Location.unknown in
+  let p = {
+    term = (Pattern.Var x, loc);
+    location = loc;
+    scheme = Scheme.simple ty1
+  } in
+  pure_lambda ~loc @@
+    pure_abstraction ~loc p @@
+      pure_apply ~loc
+        (var ~loc f (Scheme.simple (Type.PureArrow (ty1, ty2))))
+        (var ~loc x (Scheme.simple ty1))
+
+let inlinable_definitions = [("(+)", unary_inlinable "+" Type.int_ty Type.int_ty)]
+
+let inlinable = ref []
+
+(* let binary_inlinable f ty1 ty2 ty =
+  let x = Typed.Variable.fresh ()
+  and y = Typed.Variable.fresh ()
+  and loc = Location.unknown in
+  pure_lambda ~loc @@
+    abstraction ~loc (Pattern.Var x) @@
+      pure_lambda ~loc @@
+        abstraction ~loc (Pattern.Var y) @@
+          pure_apply ~loc f @@
+            pure
+
+ *)
+(* let inlinable = [
+  ("+", PureLambda ()
+]
+ *)
 let rec optimize_comp c =
   match c.term with
   | Bind (c1, c2) ->
@@ -50,7 +85,7 @@ let rec optimize_comp c =
 
 and optimize_abstraction abs = let (p,c) = abs.term in abstraction ~loc:abs.location p (optimize_comp c) 
 
-and  optimize_expr e =
+and optimize_expr e =
   match e.term with
   | Lambda a -> 
     let (p,c) = a.term in
@@ -59,6 +94,11 @@ and  optimize_expr e =
     | Value v -> pure_lambda ~loc:e.location (pure_abstraction ~loc:e.location p v)
     | _ -> e
     end
+  | Var x ->
+      begin match Common.lookup x !inlinable with
+      | Some e -> print_endline "found."; optimize_expr e
+      | _ -> print_endline "not found."; e
+      end
   | _ -> e
 
 let optimize_command = function
@@ -68,9 +108,13 @@ let optimize_command = function
       Some (Typed.TopLet (Common.assoc_map optimize_comp defs, vars))
   | Typed.TopLetRec (defs, vars) ->
       Some (Typed.TopLetRec (Common.assoc_map optimize_abstraction defs, vars))
-  | (Typed.DefEffect _ | Typed.Reset | Typed.Quit | Typed.Use _ |
-     Typed.External _ | Typed.Tydef _) as cmd ->
+  | (Typed.DefEffect _ | Typed.Reset | Typed.Quit | Typed.Use _ | Typed.Tydef _) as cmd ->
       Some cmd
+  | Typed.External (x, _, f) as cmd ->
+      begin match Common.lookup f inlinable_definitions with
+      | None -> Some cmd
+      | Some e -> inlinable := Common.update x e !inlinable; None
+      end
   | (Typed.TypeOf _ | Typed.Help) -> None
 
 let rec optimize_commands = function
