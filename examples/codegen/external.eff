@@ -1,4 +1,4 @@
-external f : int -> int -> int = "(+)"
+external f : int -> int -> int = "+"
 
 ;;
 

@@ -17,7 +17,36 @@ let unary_inlinable f ty1 ty2 =
         (var ~loc f (Scheme.simple (Type.Arrow (ty1, (ty2, drt)))))
         (var ~loc x (Scheme.simple ty1))
 
-let inlinable_definitions = [("+", unary_inlinable "Pervasives.(+)" Type.int_ty Type.int_ty)]
+let binary_inlinable f ty1 ty2 ty =
+  let x1 = Typed.Variable.fresh "x1"
+  and x2 = Typed.Variable.fresh "x2"
+  and f = Typed.Variable.fresh f
+  and loc = Location.unknown
+  and drt = Type.fresh_dirt () in
+  let p1 = {
+    term = (Pattern.Var x1, loc);
+    location = loc;
+    scheme = Scheme.simple ty1
+  }
+  and p2 = {
+    term = (Pattern.Var x2, loc);
+    location = loc;
+    scheme = Scheme.simple ty2
+  } in
+  lambda ~loc @@
+    abstraction ~loc p1 @@
+      value ~loc @@
+        lambda ~loc @@
+          abstraction ~loc p2 @@
+            value ~loc @@
+              pure_apply ~loc (
+                pure_apply ~loc
+                  (var ~loc f (Scheme.simple (Type.Arrow (ty1, (Type.Arrow (ty2, (ty, drt)), drt)))))
+                  (var ~loc x1 (Scheme.simple ty1))
+              ) (var ~loc x2 (Scheme.simple ty2))
+
+let inlinable_definitions =
+  [("+", binary_inlinable "Pervasives.(+)" Type.int_ty Type.int_ty Type.int_ty)]
 
 let inlinable = ref []
 
@@ -127,7 +156,6 @@ and optimize_inner_expr e =
   | PureApply (e1, e2)-> pure_apply ~loc:e.location (optimize_expr e1) (optimize_expr e2)
   | PureLetIn (e1, pa) -> pure_let_in ~loc:e.location (optimize_expr e1) (optimize_pure_abstraction pa)
   | Var x ->
-      print_endline "optimizing_var";
       begin match Common.lookup x !inlinable with
       | Some e -> print_endline "found."; optimize_expr e
       | _ -> print_endline "not found."; e
@@ -146,15 +174,17 @@ let optimize_command = function
   | Typed.External (x, _, f) as cmd ->
       begin match Common.lookup f inlinable_definitions with
       | None -> Some cmd
-      | Some e -> print_endline ("found inlinable " ^ f); inlinable := Common.update x e !inlinable; None
+      | Some e ->
+          inlinable := Common.update x e !inlinable; None
       end
   | (Typed.TypeOf _ | Typed.Help) -> None
 
 let rec optimize_commands = function
   | [] -> []
   | (cmd, loc) :: cmds ->
+      let cmd = optimize_command cmd in
       let cmds = optimize_commands cmds in
-      begin match optimize_command cmd with
+      begin match cmd with
       | Some cmd -> (cmd, loc) :: cmds
       | None -> cmds
       end
