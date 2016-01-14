@@ -32,7 +32,7 @@ let rec print_expression ?max_level e ppf =
   | Typed.PureLambda pa ->
       print ~at_level:2 "(* pure *) fun %t" (print_pure_abstraction pa)
   | Typed.PureApply (e1, e2) ->
-      print ~at_level:1 "(* pure *) %t %t" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
+      print ~at_level:1 "%t (* pure apply *) %t" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
   | Typed.PureLetIn (e1, pa) ->
       let (p, e2) = pa.Typed.term in
       print ~at_level:2 "(* pure *) let %t = %t in@ %t" (print_pattern p) (print_expression e1) (print_expression e2)
@@ -65,7 +65,7 @@ and print_computation ?max_level c ppf =
       print ~at_level:1 "call %t %t (fun %t)"
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
   | Typed.Bind (c1, a) ->
-      print ~at_level:2 "%t >> fun %t" (print_computation ~max_level:0 c1) (print_abstraction a)
+      print ~at_level:2 "%t >>(* bind *) fun %t" (print_computation ~max_level:0 c1) (print_abstraction a)
   | Typed.LetIn (e, {Typed.term = (p, c)}) ->
       print ~at_level:2 "let %t = %t in@ %t" (print_pattern p) (print_expression e) (print_computation c)
 
@@ -82,7 +82,7 @@ and print_abstraction {Typed.term = (p, c)} ppf =
   Format.fprintf ppf "%t -> %t" (print_pattern p) (print_computation c)
 
 and print_pure_abstraction {Typed.term = (p, e)} ppf =
-  Format.fprintf ppf "%t -> (* pure *) %t" (print_pattern p) (print_expression e)
+  Format.fprintf ppf "%t -> %t" (print_pattern p) (print_expression e)
 
 and print_multiple_bind (lst, c') ppf =
   match lst with
