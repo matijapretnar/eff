@@ -116,8 +116,6 @@ let rec print_type ?max_level ty ppf =
       print ~at_level:1 "%t" (Print.sequence "*" print_type tys)
   | Type.Arrow (ty, drty) ->
       print ~at_level:2 "%t -> %t" (print_type ~max_level:1 ty) (print_dirty_type drty)
-  | Type.PureArrow(ty1,ty2) ->
-      print ~at_level:2 "%t -> %t" (print_type ~max_level:1 ty1) (print_type ty2)
   | Type.Handler ((ty1, _), (ty2, _)) ->
       print ~at_level:2 "(%t, %t) handler" (print_type ty1) (print_type ty2)
 

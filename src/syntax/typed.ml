@@ -197,9 +197,10 @@ let lambda ~loc a =
 
 let pure_lambda ~loc a =
     let ctx, (ty1, ty2), constraints = a.scheme in
+    let drt = Type.fresh_dirt () in
   {
     term = PureLambda a;
-    scheme = Scheme.clean_ty_scheme ~loc (ctx, Type.PureArrow (ty1, ty2), constraints);
+    scheme = Scheme.clean_ty_scheme ~loc (ctx, Type.Arrow (ty1, (ty2, drt)), constraints);
     location = loc
   }
 
@@ -343,9 +344,11 @@ let pure_apply ~loc e1 e2 =
   let ctx_e1, ty_e1, cnstrs_e1 = e1.scheme in
   let ctx_e2, ty_e2, cnstrs_e2 = e2.scheme in
   let constraints = (Constraints.union cnstrs_e1 cnstrs_e2) in
+  let drt = Type.fresh_dirt () in
+  (* XXX: We must ensure that drt is empty! *)
   {
     term = PureApply (e1, e2);
-    scheme = Scheme.clean_ty_scheme ~loc (ctx_e1 @ ctx_e2, Type.PureArrow (ty_e1, ty_e2), constraints);
+    scheme = Scheme.clean_ty_scheme ~loc (ctx_e1 @ ctx_e2, Type.Arrow (ty_e1, (ty_e2, drt)), constraints);
     location = loc;
   }
 

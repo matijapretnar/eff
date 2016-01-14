@@ -5,6 +5,7 @@ let unary_inlinable f ty1 ty2 =
   let x = Typed.Variable.fresh "x"
   and f = Typed.Variable.fresh f
   and loc = Location.unknown in
+  let drt = Type.fresh_dirt () in
   let p = {
     term = (Pattern.Var x, loc);
     location = loc;
@@ -13,7 +14,7 @@ let unary_inlinable f ty1 ty2 =
   pure_lambda ~loc @@
     pure_abstraction ~loc p @@
       pure_apply ~loc
-        (var ~loc f (Scheme.simple (Type.PureArrow (ty1, ty2))))
+        (var ~loc f (Scheme.simple (Type.Arrow (ty1, (ty2, drt)))))
         (var ~loc x (Scheme.simple ty1))
 
 let inlinable_definitions = [("+", unary_inlinable "Pervasives.(+)" Type.int_ty Type.int_ty)]

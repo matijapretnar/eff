@@ -51,7 +51,6 @@ let rec expand_ty ty_expansion dirt_expansion = function
   | Type.Basic _ as ty -> ty
   | Type.Tuple tys -> Type.Tuple (Common.map (expand_ty ty_expansion dirt_expansion) tys)
   | Type.Arrow (ty, drty) -> Type.Arrow (expand_ty ty_expansion dirt_expansion ty, expand_dirty ty_expansion dirt_expansion drty)
-  | Type.PureArrow(ty1,ty2) -> Type.PureArrow (expand_ty ty_expansion dirt_expansion ty1, expand_ty ty_expansion dirt_expansion ty2)
   | Type.Handler (drty1, drty2) -> Type.Handler (expand_dirty ty_expansion dirt_expansion drty1, expand_dirty ty_expansion dirt_expansion drty2)
 
 and expand_dirty ty_expansion dirt_expansion (ty, drt) = (expand_ty ty_expansion dirt_expansion ty, expand_dirt dirt_expansion drt)

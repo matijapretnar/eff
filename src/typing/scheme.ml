@@ -160,12 +160,13 @@ let abstract ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
   | _ -> assert false
 
 let pure_abstract ~loc (ctx_p, ty_p, cnstrs_p) (ctx_e, ty_e, cnstrs_e) =
-  match finalize_ty_scheme ~loc ctx_e (Type.PureArrow (ty_p, ty_e)) [
+  let drt = Type.fresh_dirt () in
+  match finalize_ty_scheme ~loc ctx_e (Type.Arrow (ty_p, (ty_e, drt))) [
     trim_context ~loc ctx_p;
     just cnstrs_p;
     just cnstrs_e
   ] with
-  | ctx, Type.PureArrow (ty_p, ty_e), cnstrs -> ctx, (ty_p, ty_e), cnstrs
+  | ctx, Type.Arrow (ty_p, (ty_e, _)), cnstrs -> ctx, (ty_p, ty_e), cnstrs
   | _ -> assert false
 
 and abstract2 ~loc (ctx_p1, ty_p1, cnstrs_p1) (ctx_p2, ty_p2, cnstrs_p2) (ctx_c, drty_c, cnstrs_c) =

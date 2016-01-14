@@ -175,7 +175,6 @@ let check_well_formed ~loc tydef =
                 Error.typing ~loc "The type constructor %s expects %d region arguments" ty_name n
     end
   | T.Arrow (ty1, drty2) -> check ty1; check_dirty drty2
-  | T.PureArrow (ty1, ty2) -> check ty1; check ty2
   | T.Tuple tys -> List.iter check tys
   | T.Handler ((ty1, _), drty2) -> check ty1; check_dirty drty2
   and check_dirty (ty, _) = check ty
@@ -201,7 +200,6 @@ let check_noncyclic ~loc =
       else
         check_tydef (t :: forbidden) (ty_apply ~loc t args)
   | T.Arrow (ty1, (ty2, _)) -> check forbidden ty1; check forbidden ty2
-  | T.PureArrow (ty1, ty2) -> check forbidden ty1; check forbidden ty2
   | T.Tuple tys -> List.iter (check forbidden) tys
   | T.Handler ((ty1, _), (ty2, _)) ->
       check forbidden ty1; check forbidden ty2
@@ -277,9 +275,6 @@ let extend_with_variances ~loc tydefs =
           ty nega posi ty1;
           ty posi nega ty2;
           dirt posi nega drt
-      | T.PureArrow (ty1, ty2) ->
-          ty nega posi ty1;
-          ty posi nega ty2
       | T.Tuple tys -> List.iter (ty posi nega) tys
       | T.Handler ((ty1, drt1), (ty2, drt2)) ->
           ty nega posi ty1;
