@@ -95,6 +95,13 @@ let rec optimize_comp c =
   | Apply (e1,e2) ->
      begin match e1.term with
      (*Apply (PureLambda a) e -> Value (PureApply (PureLambda a) e)*)
+     | Lambda a ->
+          let (p,c') = a.term in
+          begin match c'.term with 
+          | Value v -> value ~loc:c.location @@ optimize_expr (
+              pure_apply ~loc:c.location (pure_lambda ~loc:e1.location (pure_abstraction ~loc:a.location p v)) e2)
+          | _ -> optimize_inner_comp c
+          end
      | PureLambda pure_abs -> let (p,e) = pure_abs.term in 
                                  optimize_comp 
                                  (value ~loc:c.location 
@@ -127,7 +134,7 @@ and  optimize_expr e =
     let (p,c) = a.term in
     begin match c.term with 
     (*Lambda (x, Value e) -> PureLambda (x, e)*)
-    | Value v -> optimize_expr (pure_lambda ~loc:e.location (pure_abstraction ~loc:e.location p v))
+    (* | Value v -> optimize_expr (pure_lambda ~loc:e.location (pure_abstraction ~loc:e.location p v)) *)
     | _ -> optimize_inner_expr e
     end
   | _ -> optimize_inner_expr e
