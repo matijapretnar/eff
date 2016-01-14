@@ -198,7 +198,7 @@ and type_let_defs ~loc env defs =
           ctx_p @ poly_tys, nonpoly_tys
       | Typed.Apply _ | Typed.Match _ | Typed.While _ | Typed.For _
       | Typed.Handle _ | Typed.Let _ | Typed.LetRec _ | Typed.Check _
-      | Typed.Bind _ | Typed.LetIn _ ->
+      | Typed.Bind _ | Typed.LetIn _ | Typed.Call _ ->
           poly_tys, ctx_p @ nonpoly_tys
     in
     poly_tys, nonpoly_tys, ctx_c @ ctx, [

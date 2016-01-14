@@ -16,26 +16,10 @@ let unary_inlinable f ty1 ty2 =
         (var ~loc f (Scheme.simple (Type.PureArrow (ty1, ty2))))
         (var ~loc x (Scheme.simple ty1))
 
-let inlinable_definitions = [("(+)", unary_inlinable "+" Type.int_ty Type.int_ty)]
+let inlinable_definitions = [("+", unary_inlinable "Pervasives.(+)" Type.int_ty Type.int_ty)]
 
 let inlinable = ref []
 
-(* let binary_inlinable f ty1 ty2 ty =
-  let x = Typed.Variable.fresh ()
-  and y = Typed.Variable.fresh ()
-  and loc = Location.unknown in
-  pure_lambda ~loc @@
-    abstraction ~loc (Pattern.Var x) @@
-      pure_lambda ~loc @@
-        abstraction ~loc (Pattern.Var y) @@
-          pure_apply ~loc f @@
-            pure
-
- *)
-(* let inlinable = [
-  ("+", PureLambda ()
-]
- *)
 
 let rec optimize_comp c =
   match c.term with
@@ -142,6 +126,7 @@ and optimize_inner_expr e =
   | PureApply (e1, e2)-> pure_apply ~loc:e.location (optimize_expr e1) (optimize_expr e2)
   | PureLetIn (e1, pa) -> pure_let_in ~loc:e.location (optimize_expr e1) (optimize_pure_abstraction pa)
   | Var x ->
+      print_endline "optimizing_var";
       begin match Common.lookup x !inlinable with
       | Some e -> print_endline "found."; optimize_expr e
       | _ -> print_endline "not found."; e
@@ -160,7 +145,7 @@ let optimize_command = function
   | Typed.External (x, _, f) as cmd ->
       begin match Common.lookup f inlinable_definitions with
       | None -> Some cmd
-      | Some e -> inlinable := Common.update x e !inlinable; None
+      | Some e -> print_endline ("found inlinable " ^ f); inlinable := Common.update x e !inlinable; None
       end
   | (Typed.TypeOf _ | Typed.Help) -> None
 

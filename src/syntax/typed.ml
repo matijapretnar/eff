@@ -397,7 +397,7 @@ let let' ~loc defs c =
           ctx_p @ poly_tys, nonpoly_tys
       | Apply _ | Match _ | While _ | For _
       | Handle _ | Let _ | LetRec _ | Check _
-      | Bind _ | LetIn _ ->
+      | Bind _ | LetIn _ | Call _ ->
           poly_tys, ctx_p @ nonpoly_tys
     in
     poly_tys, nonpoly_tys, ctx_c @ ctx, [
