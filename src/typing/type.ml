@@ -66,6 +66,10 @@ let rec replace_ty rpls = function
       let drt = replace_dirt rpls drt in
       let ty2 = replace_ty rpls ty2 in
       Arrow (ty1, (ty2, drt))
+  | PureArrow (ty1,ty2) ->
+      let ty1 = replace_ty rpls ty1 in
+      let ty2 = replace_ty rpls ty2 in
+      PureArrow (ty1,ty2)
   | Handler (drty1, drty2) ->
       let drty1 = replace_dirty rpls drty1 in
       let drty2 = replace_dirty rpls drty2 in
@@ -104,6 +108,10 @@ let rec subst_ty sbst = function
       let drt = subst_dirt sbst drt in
       let ty2 = subst_ty sbst ty2 in
       Arrow (ty1, (ty2, drt))
+  | PureArrow (ty1, ty2) ->
+      let ty1 = subst_ty sbst ty1 in
+      let ty2 = subst_ty sbst ty2 in
+      PureArrow (ty1, ty2)
   | Handler (drty1, drty2) ->
       let drty1 = subst_dirty sbst drty1 in
       let drty2 = subst_dirty sbst drty2 in
@@ -246,6 +254,8 @@ let rec print ?(non_poly=Trio.empty) ?(show_dirt_param=fun d -> Some (print_dirt
             (Symbols.short_arrow ())
             (ty ~max_level:5 t2)
         else
+          print ~at_level:5 "@[%t@ %s@ %t@]" (ty ~max_level:4 t1) (Symbols.arrow ()) (ty ~max_level:5 t2)
+    | PureArrow (t1, t2) ->
           print ~at_level:5 "@[%t@ %s@ %t@]" (ty ~max_level:4 t1) (Symbols.arrow ()) (ty ~max_level:5 t2)
     | Basic b -> print "%s" b
     | Apply (t, (lst, _, _)) ->

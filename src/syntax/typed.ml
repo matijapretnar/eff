@@ -71,8 +71,8 @@ and abstraction2 = (pattern * pattern * computation, Scheme.abstraction2_scheme)
 type toplevel = plain_toplevel * Location.t
 and plain_toplevel =
   | Tydef of (Common.tyname, (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t * Tctx.tydef) Common.assoc
-  | TopLet of (variable Pattern.t * Untyped.computation) list
-  | TopLetRec of (variable * Untyped.abstraction) list
+  | TopLet of (pattern * computation) list * (variable * Scheme.ty_scheme) list
+  | TopLetRec of (variable * abstraction) list * (variable * Scheme.ty_scheme) list
   | External of variable * Type.ty * string
   | DefEffect of effect * (Type.ty * Type.ty)
   | Computation of computation

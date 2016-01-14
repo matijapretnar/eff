@@ -4,10 +4,26 @@ effect Read : unit -> string
 ;;
 
 let f x y = x + y in
-f 3 5
+(f 3 5, #Print "bla")
+
 
 ;;
 
-(fun x -> x + 5) 3
+let rec f x = g (x - 3)
+and g x = x
+
+;;
+
+#help
+
+;;
+
+
+(fun x -> x) 3
+
+;;
+
+let z = f 5
+and w = g 0
 
 ;;

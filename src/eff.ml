@@ -10,10 +10,8 @@ let help_text = "Toplevel commands:
 
 (* A list of files to be loaded and run. *)
 let files = ref []
-let to_be_optimized = ref []
 let to_be_compiled = ref []
 let add_file interactive filename = (files := (filename, interactive) :: !files)
-let optimize_file filename = (to_be_optimized := filename :: !to_be_optimized; Config.interactive_shell := false)
 let compile_file filename = (to_be_compiled := filename :: !to_be_compiled; Config.interactive_shell := false)
 
 (* Command-line options *)
@@ -53,9 +51,6 @@ let options = Arg.align [
   ("-l",
     Arg.String (fun str -> add_file false str),
     "<file> Load <file> into the initial environment");
-  ("--opt",
-    Arg.String (fun str -> optimize_file str),
-    "<file> Optimize <file>");
   ("--compile",
     Arg.String (fun str -> compile_file str),
     "<file> Compile <file>");
@@ -100,10 +95,13 @@ let type_cmd st (cmd, loc) =
   (cmd, loc), st
 
 let type_cmds st cmds =
-  List.fold_left (fun (cmds, st) cmd ->
-    let cmd, st = type_cmd st cmd in
-    (cmd :: cmds, st)
-  ) ([], st) (List.rev cmds)
+  let cmds, st =
+    List.fold_left (fun (cmds, st) cmd ->
+      let cmd, st = type_cmd st cmd in
+      (cmd :: cmds, st)
+    ) ([], st) cmds
+  in
+  List.rev cmds, st
 
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
@@ -132,56 +130,32 @@ let rec exec_cmd interactive st (cmd, loc) =
       exit 0
   | Typed.Use fn ->
       use_file st (fn, interactive)
-  | Typed.TopLet defs ->
-      (* XXX What to do about the dirts? *)
-      let vars, nonpoly, change = Infer.infer_let ~loc st.typing defs in
-      let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
-      let extend_nonpoly (x, ty) env =
-        (x, ([(x, ty)], ty, Constraints.empty)) :: env
-      in
-      let vars = List.fold_right extend_nonpoly nonpoly vars in
-      let top_change = Common.compose st.change change in
-      let sch_change (ctx, ty, cnstrs) =
-        let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
-        (ctx, ty, cnstrs)
-      in
-      let defs', poly_tyschs = Infer.type_let_defs ~loc st.typing defs in
-      List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
+  | Typed.TopLet (defs, vars) ->
       let env =
         List.fold_right
           (fun (p,c) env -> let v = Eval.run env c in Eval.extend p v env)
-          defs' st.environment
+          defs st.environment
       in
         if interactive then begin
           List.iter (fun (x, tysch) ->
                        match RuntimeEnv.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.printf "@[val %t : %t = %t@]@." (Typed.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
+                         Format.printf "@[val %t : %t = %t@]@." (Typed.Variable.print x) (Scheme.print_ty_scheme tysch) (Value.print_value v))
             vars
         end;
         {
-          typing = typing_env;
-          change = top_change;
+          st with
           environment = env;
         }
-    | Typed.TopLetRec defs ->
-        let vars, _, change = Infer.infer_let_rec ~loc st.typing defs in
-        let defs', poly_tyschs = Infer.type_let_rec_defs ~loc st.typing defs in
-        let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
-        let top_change = Common.compose st.change change in
-        let sch_change (ctx, ty, cnstrs) =
-          let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
-          (ctx, ty, cnstrs)
-        in
-        List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
-        let env = Eval.extend_let_rec st.environment defs' in
+    | Typed.TopLetRec (defs, vars) ->
+
+        let env = Eval.extend_let_rec st.environment defs in
           if interactive then begin
-            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Typed.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch))) vars
+            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Typed.Variable.print x) (Scheme.print_ty_scheme tysch)) vars
           end;
         {
-          typing = typing_env;
-          change = top_change;
+          st with
           environment = env;
         }
     | Typed.External (x, ty, f) ->
@@ -201,19 +175,13 @@ and use_file env (filename, interactive) =
   let cmds = List.map Desugar.toplevel cmds in
     List.fold_left (exec_cmd interactive) env cmds
 
-let optimize_file st filename =
-  let t = Lexer.read_file (parse Parser.computation_file) filename in
-  let c = Desugar.top_computation t in
-  let c', _ = Infer.infer_top_comp {Infer.change = st.change; Infer.typing = st.typing} c in
-  Format.printf "UNOPTIMIZED CODE:@.%t@." (CamlPrint.print_computation c');
-  let c' = Optimize.optimize_comp c' in
-  Format.printf "OPTIMIZED CODE:@.%t@." (CamlPrint.print_computation c')
-
 let compile_file st filename =
   let cmds = Lexer.read_file (parse Parser.file) filename in
   let cmds = List.map Desugar.toplevel cmds in
   let cmds, _ = type_cmds st cmds in
-  (* let cmds = Optimize.optimize_cmds cmds in *)
+  Print.debug "UNOPTIMIZED CODE:@.%t@." (CamlPrint.print_commands cmds);
+  let cmds = Optimize.optimize_commands cmds in
+  Print.debug "OPTIMIZED CODE:@.%t@." (CamlPrint.print_commands cmds);
 
   (* look for header.ml next to the executable  *)
   let header_file = Filename.concat (Filename.dirname Sys.argv.(0)) "header.ml" in
@@ -223,7 +191,7 @@ let compile_file st filename =
   really_input header_channel header 0 n;
   close_in header_channel;
 
-  let compiled_file = filename ^ ".ml" in
+  let compiled_file = CamlPrint.compiled_filename filename in
   let out_channel = open_out compiled_file in
   Format.fprintf (Format.formatter_of_out_channel out_channel) "%s\n;;\n%t@." header (CamlPrint.print_commands cmds);
   flush out_channel;
@@ -292,7 +260,6 @@ let main =
   try
     (* Run and load all the specified files. *)
     let ctxenv = List.fold_left use_file initial_ctxenv !files in
-    List.iter (optimize_file ctxenv) !to_be_optimized;
     List.iter (compile_file ctxenv) !to_be_compiled;
     if !Config.interactive_shell then toplevel ctxenv
   with
