@@ -54,10 +54,10 @@ let inlinable = ref []
 let rec optimize_comp c =
   match c.term with
 
-  | Let (pclist,c2) -> let [(p1,c1)] = pclist in
-                        optimize_comp (bind ~loc:c.location c1 (abstraction ~loc:c.location p1 c2))
+ (* | Let (pclist,c2) -> let [(p1,c1)] = pclist in
+                        optimize_comp (bind ~loc:c.location c1 (abstraction ~loc:c.location p1 c2)) *)
 
-(*  | Let (pclist,c2) -> folder pclist c2 *)
+  | Let (pclist,c2) -> optimize_comp (folder pclist c2)
   | Bind (c1, c2) ->
     begin match c1.term with
     (*Bind x (Value e) c -> LetC x e c*)
@@ -71,9 +71,32 @@ let rec optimize_comp c =
                    let newbind = bind ~loc:c.location ca c2 in 
                    let let_abs = abstraction ~loc:c.location pa newbind in
                    optimize_inner_comp (let_in ~loc:c.location e let_abs)
-    
+
+    | Apply(e1,e2) -> let (p,c) = c2.term in
+                      begin match e1.term with
+                     | Effect ef -> begin match c.term with 
+                                   | Apply(e3,e4) -> 
+                                          begin match e4.term with 
+                                          | Var x -> begin match e3.term with
+                                                     | Lambda k -> begin match (fst p.term)  with
+                                                                   | Pattern.Var pv when (pv = x) ->
+                                                                       let (_,efty,_) = e1.scheme in
+                                                                       let Type.Arrow (ty1, (ty2, _ )) = efty in
+                                                                       let func = (fun eff -> if ef = eff then Some (ty1, ty2) else None) in
+                                                                       optimize_comp (call ~loc:c.location func ef e2 k)
+                                                                   | _-> optimize_inner_comp c
+                                                                 end
+                                                     | _->optimize_inner_comp c
+                                                     end
+                                          |  _ -> optimize_inner_comp c  
+                                          end
+                                   | _ -> optimize_inner_comp c
+                                   end
+                     | _ -> optimize_inner_comp c
+                     end                                   
     | _ -> optimize_inner_comp c
     end
+
   | Handle (e1,c1) ->
     begin match c1.term with
 
@@ -122,10 +145,11 @@ and optimize_abstraction abs = let (p,c) = abs.term in abstraction ~loc:abs.loca
 
 
 and optimize_pure_abstraction abs = let (p,e) = abs.term in pure_abstraction ~loc:abs.location p (optimize_expr e)
-(*and folder pclist cn = 
-    let func = \a -> \b ->  (bind ~loc:b.location (abstraction ~loc:b.location (fst a) (snd a)) b)
-    in  list.fold_right(func , pclist, cn)
-*)
+
+and folder pclist cn = 
+    let func = fun a ->  fun b ->  (bind ~loc:b.location (snd a) (abstraction ~loc:b.location (fst a) b ) )
+    in  List.fold_right func pclist cn
+
 and  optimize_expr e =
 
 
@@ -133,8 +157,8 @@ and  optimize_expr e =
   | Lambda a -> 
     let (p,c) = a.term in
     begin match c.term with 
-    (*Lambda (x, Value e) -> PureLambda (x, e)*)
-    (* | Value v -> optimize_expr (pure_lambda ~loc:e.location (pure_abstraction ~loc:e.location p v)) *)
+    (*Lambda (x, Value e) -> PureLambda (x, e)
+     | Value v -> optimize_expr (pure_lambda ~loc:e.location (pure_abstraction ~loc:e.location p v)) *)
     | _ -> optimize_inner_expr e
     end
   | _ -> optimize_inner_expr e
