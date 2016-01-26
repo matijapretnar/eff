@@ -16,7 +16,7 @@ module String : Annotation with type t = string =
 struct
   type t = string
 
-  let print s _ ppf = Format.pp_print_string ppf s
+  let print _ n ppf = Format.fprintf ppf "_var_%d" n
 end
 
 module type S =
