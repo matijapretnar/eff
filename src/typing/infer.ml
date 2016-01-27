@@ -28,11 +28,11 @@ let add_effect env eff (ty1, ty2) =
 let add_def env x ty_sch =
   {env with context = TypingEnv.update env.context x ty_sch}
 
-let infer_effect env eff =
+let infer_effect ~loc env eff =
   try
-    Some (Untyped.EffectMap.find eff env.effects)
+    eff, (Untyped.EffectMap.find eff env.effects)
   with
-    | Not_found -> None
+    | Not_found -> Error.typing ~loc "Unbound effect %s" eff
 
 (* [infer_pattern p] infers the type scheme of a pattern [p].
    This consists of:
@@ -148,9 +148,10 @@ let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
   | Untyped.Lambda a ->
       Typed.lambda ~loc (type_abstraction env a)
   | Untyped.Effect eff ->
-      Typed.effect ~loc eff (infer_effect env)
+      let eff = infer_effect ~loc env eff in
+      Typed.effect ~loc eff
   | Untyped.Handler h ->
-      Typed.handler ~loc (type_handler env h) (infer_effect env)
+      Typed.handler ~loc (type_handler env h)
 and type_comp env {Untyped.term=comp; Untyped.location=loc} =
   match comp with
   | Untyped.Value e ->
@@ -180,8 +181,11 @@ and type_abstraction env (p, c) =
 and type_abstraction2 env (p1, p2, c) =
   Typed.abstraction2 ~loc:(c.Untyped.location) (type_pattern p1) (type_pattern p2) (type_comp env c)
 and type_handler env h =
+  let type_handler_clause (eff, (p1, p2, c)) =
+    let eff = infer_effect ~loc:(c.Untyped.location) env eff in
+    (eff, type_abstraction2 env (p1, p2, c)) in
   {
-    Typed.effect_clauses = Common.assoc_map (type_abstraction2 env) h.Untyped.effect_clauses;
+    Typed.effect_clauses = Common.map type_handler_clause h.Untyped.effect_clauses;
     Typed.value_clause = type_abstraction env h.Untyped.value_clause;
     Typed.finally_clause = type_abstraction env h.Untyped.finally_clause;
   }
@@ -361,7 +365,7 @@ let infer_toplevel ~loc st = function
       Typed.External (x, ty, f), st
   | Untyped.DefEffect (eff, (ty1, ty2)) ->
       let st = {st with typing = add_effect st.typing eff (ty1, ty2)} in
-      Typed.DefEffect (eff, (ty1, ty2)), st
+      Typed.DefEffect ((eff, (ty1, ty2)), (ty1, ty2)), st
   | Untyped.Computation c ->
       let c, st = infer_top_comp st c in
       Typed.Computation c, st

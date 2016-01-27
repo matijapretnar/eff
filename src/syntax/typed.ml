@@ -4,7 +4,7 @@ module Variable = Symbol.Make(Symbol.String)
 module EffectMap = Map.Make(String)
 
 type variable = Variable.t
-type effect = Common.effect
+type effect = Common.effect * (Type.ty * Type.ty)
 
 type ('term, 'scheme) annotation = {
   term: 'term;
@@ -48,7 +48,7 @@ and plain_computation =
   | Handle of expression * computation
   | Check of computation
 
-  | Call of Common.effect * expression * abstraction
+  | Call of effect * expression * abstraction
   | Bind of computation * abstraction
   | LetIn of expression * abstraction
 
@@ -205,57 +205,50 @@ let pure_lambda ~loc a =
   }
 
 
-let effect ~loc eff signature =
-    match signature eff with
-    | None -> Error.typing ~loc "Unbound effect %s" eff
-    | Some (ty_par, ty_res) ->
-      let r = Type.fresh_region_param () in
-      let drt = {Type.ops = [eff, r]; Type.rest = Type.fresh_dirt_param ()} in
-      let ty = Type.Arrow (ty_par, (ty_res, drt)) in
-      let constraints = Constraints.add_full_region r Constraints.empty in
-      {
-        term = Effect eff;
-        scheme = Scheme.clean_ty_scheme ~loc ([], ty, constraints);
-        location = loc;
-      }
+let effect ~loc ((eff_name, (ty_par, ty_res)) as eff) =
+    let r = Type.fresh_region_param () in
+    let drt = {Type.ops = [eff_name, r]; Type.rest = Type.fresh_dirt_param ()} in
+    let ty = Type.Arrow (ty_par, (ty_res, drt)) in
+    let constraints = Constraints.add_full_region r Constraints.empty in
+    {
+      term = Effect eff;
+      scheme = Scheme.clean_ty_scheme ~loc ([], ty, constraints);
+      location = loc;
+    }
 
-let handler ~loc h signature =
+let handler ~loc h =
     let drt_mid = Type.fresh_dirt () in
     let ty_mid = Type.fresh_ty () in
 
-    let fold (eff, a2) (ctx, constraints) =
-      begin match signature eff with
-      | None -> Error.typing ~loc "Unbound effect %s in a handler" eff
-      | Some (ty_par, ty_arg) ->
-          let ctx_a, (ty_p, ty_k, drty_c), cnstrs_a = a2.scheme in
-          ctx_a @ ctx,
-          Constraints.list_union [constraints; cnstrs_a]
-          |> Constraints.add_ty_constraint ~loc ty_par ty_p
-          |> Constraints.add_ty_constraint ~loc (Type.Arrow (ty_arg, (ty_mid, drt_mid))) ty_k
-          |> Constraints.add_dirty_constraint ~loc drty_c (ty_mid, drt_mid)
-      end
+    let fold ((_, (ty_par, ty_arg)), a2) (ctx, constraints) =
+      let ctx_a, (ty_p, ty_k, drty_c), cnstrs_a = a2.scheme in
+      ctx_a @ ctx,
+      Constraints.list_union [constraints; cnstrs_a]
+      |> Constraints.add_ty_constraint ~loc ty_par ty_p
+      |> Constraints.add_ty_constraint ~loc (Type.Arrow (ty_arg, (ty_mid, drt_mid))) ty_k
+      |> Constraints.add_dirty_constraint ~loc drty_c (ty_mid, drt_mid)
     in
     let ctxs, constraints = List.fold_right fold h.effect_clauses ([], Constraints.empty) in
 
-    let make_dirt op (ops_in, ops_out) =
+    let make_dirt (eff, _) (effs_in, effs_out) =
       let r_in = Type.fresh_region_param () in
       let r_out = Type.fresh_region_param () in
-      (op, r_in) :: ops_in, (op, r_out) :: ops_out
+      (eff, r_in) :: effs_in, (eff, r_out) :: effs_out
     in
-    let ops_in, ops_out = List.fold_right make_dirt (Common.uniq (List.map fst h.effect_clauses)) ([], []) in
+    let effs_in, effs_out = List.fold_right make_dirt (Common.uniq (List.map fst h.effect_clauses)) ([], []) in
 
     let ctx_val, (ty_val, drty_val), cnstrs_val = h.value_clause.scheme in
     let ctx_fin, (ty_fin, drty_fin), cnstrs_fin = h.finally_clause.scheme in
 
     let ty_in = Type.fresh_ty () in
     let drt_rest = Type.fresh_dirt_param () in
-    let drt_in = {Type.ops = ops_in; Type.rest = drt_rest} in
+    let drt_in = {Type.ops = effs_in; Type.rest = drt_rest} in
     let drt_out = Type.fresh_dirt () in
     let ty_out = Type.fresh_ty () in
 
     let constraints =
       Constraints.list_union [constraints; cnstrs_val; cnstrs_fin]
-      |> Constraints.add_dirt_constraint {Type.ops = ops_out; Type.rest = drt_rest} drt_mid
+      |> Constraints.add_dirt_constraint {Type.ops = effs_out; Type.rest = drt_rest} drt_mid
       |> Constraints.add_ty_constraint ~loc ty_in ty_val
       |> Constraints.add_dirty_constraint ~loc drty_val (ty_mid, drt_mid)
       |> Constraints.add_ty_constraint ~loc ty_mid ty_fin
@@ -501,25 +494,22 @@ let pure_let_in ~loc e1 c2 =
     location = loc;
   }
 
-let call ~loc signature eff e a =
-    match signature eff with
-    | None -> Error.typing ~loc "Unbound effect %s" eff
-    | Some (ty_par, ty_res) ->
-      let ctx_e, ty_e, constraints_e = e.scheme
-      and ctx_a, (ty_a, drty_a), constraints_a = a.scheme in
-      let r = Type.fresh_region_param () in
-      let drt_eff = {Type.ops = [eff, r]; Type.rest = Type.fresh_dirt_param ()} in
-      let ((ty_out, drt_out) as drty_out) = Type.fresh_dirty () in
-      let constraints =
-        Constraints.union constraints_e constraints_a
-        |> Constraints.add_full_region r
-        |> Constraints.add_ty_constraint ~loc:e.location ty_e ty_par
-        |> Constraints.add_ty_constraint ~loc:a.location ty_res ty_a
-        |> Constraints.add_dirt_constraint drt_eff drt_out
-        |> Constraints.add_dirty_constraint ~loc drty_a drty_out
-      in
-      {
-        term = Call (eff, e, a);
-        scheme = Scheme.clean_dirty_scheme ~loc (ctx_e @ ctx_a, drty_out, constraints);
-        location = loc;
-      }
+let call ~loc  ((eff_name, (ty_par, ty_res)) as eff) e a =
+    let ctx_e, ty_e, constraints_e = e.scheme
+    and ctx_a, (ty_a, drty_a), constraints_a = a.scheme in
+    let r = Type.fresh_region_param () in
+    let drt_eff = {Type.ops = [eff_name, r]; Type.rest = Type.fresh_dirt_param ()} in
+    let ((ty_out, drt_out) as drty_out) = Type.fresh_dirty () in
+    let constraints =
+      Constraints.union constraints_e constraints_a
+      |> Constraints.add_full_region r
+      |> Constraints.add_ty_constraint ~loc:e.location ty_e ty_par
+      |> Constraints.add_ty_constraint ~loc:a.location ty_res ty_a
+      |> Constraints.add_dirt_constraint drt_eff drt_out
+      |> Constraints.add_dirty_constraint ~loc drty_a drty_out
+    in
+    {
+      term = Call (eff, e, a);
+      scheme = Scheme.clean_dirty_scheme ~loc (ctx_e @ ctx_a, drty_out, constraints);
+      location = loc;
+    }
