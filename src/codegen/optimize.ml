@@ -57,11 +57,11 @@ let rec optimize_comp c =
  (* | Let (pclist,c2) -> let [(p1,c1)] = pclist in
                         optimize_comp (bind ~loc:c.location c1 (abstraction ~loc:c.location p1 c2)) *)
 
-  | Let (pclist,c2) -> optimize_comp (folder pclist c2)
+  | Let (pclist,c2) -> print_string "In the folder \n" ;optimize_comp (folder pclist c2)
   | Bind (c1, c2) ->
     begin match c1.term with
     (*Bind x (Value e) c -> LetC x e c*)
-    | Value e -> optimize_comp (let_in ~loc:c.location e c2)
+    | Value e ->  print_string "Hello world!\n"; optimize_comp (let_in ~loc:c.location e c2)
     | Bind (c3,c4) -> let (p1,cp1) = c2.term in 
                       let (p2,cp2) = c4.term in 
                       optimize_inner_comp (bind ~loc:c.location c1 (abstraction ~loc:c.location p2 
@@ -72,9 +72,9 @@ let rec optimize_comp c =
                    let let_abs = abstraction ~loc:c.location pa newbind in
                    optimize_inner_comp (let_in ~loc:c.location e let_abs)
 
-    | Apply(e1,e2) -> let (p,c) = c2.term in
+    | Apply(e1,e2) -> let (p,ca) = c2.term in
                       begin match e1.term with
-                     | Effect ef -> begin match c.term with 
+                     | Effect ef -> begin match ca.term with 
                                    | Apply(e3,e4) -> 
                                           begin match e4.term with 
                                           | Var x -> begin match e3.term with
@@ -94,6 +94,18 @@ let rec optimize_comp c =
                                    end
                      | _ -> optimize_inner_comp c
                      end                                   
+    
+
+    | Call(eff,e,k) ->  let (pa,ca) = c2.term in
+                        let loc = Location.unknown in
+                        let z = Typed.Variable.fresh "z" in 
+                        let( _ , (input_k_ty , _) , _ ) = k.scheme in
+                        let pz = {
+                                  term = (Pattern.Var z, loc);
+                                  location = loc;
+                                  scheme = Scheme.simple input_k_ty
+                                } in
+                        optimize_inner_comp c 
     | _ -> optimize_inner_comp c
     end
 
@@ -113,6 +125,39 @@ let rec optimize_comp c =
                                 apply ~loc:c.location (lambda ~loc:c.location h.value_clause) v)
                  | _-> c
                  end
+
+    | Call (eff,exp,k) -> begin match e1.term with
+                          | Handler h -> 
+                                let loc = Location.unknown in
+                                let z = Typed.Variable.fresh "z" in 
+                                let( _ , (input_k_ty , _) , _ ) = k.scheme in
+                                let pz = {
+                                          term = (Pattern.Var z, loc);
+                                          location = loc;
+                                          scheme = Scheme.simple input_k_ty
+                                        } in
+                                let vz = var ~loc:loc z (Scheme.simple input_k_ty) in
+                                let (p_k,c_k) = k.term in 
+                                let k_lambda = lambda ~loc:loc (abstraction ~loc:loc p_k c_k) in
+                                let e2_apply = apply ~loc:loc k_lambda vz in
+                                let e2_handle = handle ~loc:loc e1 e2_apply in
+                                let e2_lambda = lambda ~loc:loc (abstraction ~loc:loc pz e2_handle) in
+                                begin match Common.lookup eff h.effect_clauses with
+                                        | Some result -> 
+                                          let (p1,p2,cresult) = result.term in
+                                          let e1_lamda =  lambda ~loc:loc (abstraction ~loc:loc p2 cresult) in
+                                          let e1_purelambda = pure_lambda ~loc:loc (pure_abstraction ~loc:loc p1 e1_lamda) in
+                                          let e1_pureapply = pure_apply ~loc:loc e1_purelambda exp in
+                                          optimize_comp (apply ~loc:loc e1_pureapply e2_lambda)
+
+                                        | None ->
+                                         let (_,(c1_ty1, _),_) = c1.scheme in
+                                         let func = (fun efy -> if efy = eff then Some (c1_ty1, c1_ty1) else None) in
+                                         let call_abst = abstraction ~loc:loc pz e2_handle in
+                                         optimize_comp (call ~loc:loc func eff exp call_abst )
+                                        end
+                          | _-> optimize_inner_comp c
+                          end
     | _ -> optimize_inner_comp c
     end
   | Apply (e1,e2) ->
