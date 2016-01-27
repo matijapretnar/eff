@@ -8,7 +8,7 @@ type value =
 
 and result =
   | Value of value
-  | Call of Common.effect * value * closure
+  | Call of Typed.effect * value * closure
 
 and closure = value -> result
 
@@ -22,5 +22,5 @@ val to_str : value -> string
 val to_handler : value -> result -> result
 
 val print_value : ?max_level:int -> value -> Format.formatter -> unit
-val print_effect : Common.effect -> Format.formatter -> unit
+val print_effect : Typed.effect -> Format.formatter -> unit
 val print_result : result -> Format.formatter -> unit

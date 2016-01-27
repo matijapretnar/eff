@@ -8,7 +8,7 @@ type value =
 
 and result =
   | Value of value
-  | Call of Common.effect * value * closure
+  | Call of Typed.effect * value * closure
 
 and closure = value -> result
 
@@ -35,7 +35,7 @@ let to_handler = function
   | Handler h -> h
   | _ -> Error.runtime "A handler expected."
 
-let print_effect eff ppf = Format.fprintf ppf "%s" eff
+let print_effect (eff, _) ppf = Format.fprintf ppf "%s" eff
 
 let rec print_value ?max_level v ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -66,4 +66,4 @@ let print_result r ppf =
   match r with
   | Value v -> print_value v ppf
   | Call (eff, v, _) ->
-      Format.fprintf ppf "Call %s %t" eff (print_value v)
+      Format.fprintf ppf "Call %t %t" (print_effect eff) (print_value v)

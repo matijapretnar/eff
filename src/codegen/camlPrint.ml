@@ -1,6 +1,6 @@
 let print_variable = Typed.Variable.print
 
-let print_effect eff ppf = Print.print ppf "effect_%s" eff
+let print_effect (eff, _) ppf = Print.print ppf "effect_%s" eff
 
 let print_pattern p ppf = Untyped.print_pattern (p.Typed.term) ppf
 
