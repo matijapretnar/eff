@@ -66,8 +66,7 @@ let rec optimize_comp c =
                       let (p2,cp2) = c4.term in 
                       optimize_inner_comp (bind ~loc:c.location c1 (abstraction ~loc:c.location p2 
                                               (bind ~loc:c.location cp2 (abstraction ~loc:c.location p1 cp1))))
-    | LetIn(e,a) -> let (p1,cp1) = c2.term in
-                   let (pa,ca) = a.term in
+    | LetIn(e,a) ->let (pa,ca) = a.term in
                    let newbind = bind ~loc:c.location ca c2 in 
                    let let_abs = abstraction ~loc:c.location pa newbind in
                    optimize_inner_comp (let_in ~loc:c.location e let_abs)
@@ -80,10 +79,7 @@ let rec optimize_comp c =
                                           | Var x -> begin match e3.term with
                                                      | Lambda k -> begin match (fst p.term)  with
                                                                    | Pattern.Var pv when (pv = x) ->
-                                                                       let (_,efty,_) = e1.scheme in
-                                                                       let Type.Arrow (ty1, (ty2, _ )) = efty in
-                                                                       let func = (fun eff -> if ef = eff then Some (ty1, ty2) else None) in
-                                                                       optimize_comp (call ~loc:c.location func ef e2 k)
+                                                                       optimize_comp (call ~loc:c.location ef e2 k)
                                                                    | _-> optimize_inner_comp c
                                                                  end
                                                      | _->optimize_inner_comp c
@@ -105,7 +101,12 @@ let rec optimize_comp c =
                                   location = loc;
                                   scheme = Scheme.simple input_k_ty
                                 } in
-                        optimize_inner_comp c 
+                        let vz = var ~loc:loc z (Scheme.simple input_k_ty) in
+                        let (p_k,c_k) = k.term in 
+                        let k_lambda = lambda ~loc:loc (abstraction ~loc:loc p_k c_k) in
+                        let inner_apply = apply ~loc:loc k_lambda vz in
+                        let inner_bind = bind ~loc:loc inner_apply (abstraction ~loc:loc pa ca) in
+                        optimize_comp (call ~loc:loc eff e (abstraction ~loc:loc pz inner_bind))
     | _ -> optimize_inner_comp c
     end
 
@@ -151,10 +152,8 @@ let rec optimize_comp c =
                                           optimize_comp (apply ~loc:loc e1_pureapply e2_lambda)
 
                                         | None ->
-                                         let (_,(c1_ty1, _),_) = c1.scheme in
-                                         let func = (fun efy -> if efy = eff then Some (c1_ty1, c1_ty1) else None) in
-                                         let call_abst = abstraction ~loc:loc pz e2_handle in
-                                         optimize_comp (call ~loc:loc func eff exp call_abst )
+                                          let call_abst = abstraction ~loc:loc pz e2_handle in
+                                          optimize_comp (call ~loc:loc eff exp call_abst )
                                         end
                           | _-> optimize_inner_comp c
                           end
@@ -170,8 +169,7 @@ let rec optimize_comp c =
               pure_apply ~loc:c.location (pure_lambda ~loc:e1.location (pure_abstraction ~loc:a.location p v)) e2)
           | _ -> optimize_inner_comp c
           end
-     | PureLambda pure_abs -> let (p,e) = pure_abs.term in 
-                                 optimize_comp 
+     | PureLambda pure_abs ->    optimize_comp 
                                  (value ~loc:c.location 
                                  (pure_apply ~loc:c.location (pure_lambda ~loc:c.location pure_abs) e2 )) 
      | _ -> optimize_inner_comp c
