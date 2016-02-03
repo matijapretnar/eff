@@ -51,25 +51,28 @@ let inlinable_definitions =
 let inlinable = ref []
 
 
-let rec optimize_comp c =
+let rec optimize_comp c = shallow_opt ( opt_sub_comp c)
+
+and shallow_opt c = 
   match c.term with
 
- (* | Let (pclist,c2) -> let [(p1,c1)] = pclist in
+ (*| Let (pclist,c2) -> let [(p1,c1)] = pclist in
                         optimize_comp (bind ~loc:c.location c1 (abstraction ~loc:c.location p1 c2)) *)
 
-  | Let (pclist,c2) -> print_string "In the folder \n" ;optimize_comp (folder pclist c2)
+  | Let (pclist,c2) -> (folder pclist c2)
+  
   | Bind (c1, c2) ->
     begin match c1.term with
     (*Bind x (Value e) c -> LetC x e c*)
-    | Value e ->  print_string "Hello world!\n"; optimize_comp (let_in ~loc:c.location e c2)
+    | Value e ->  shallow_opt(let_in ~loc:c.location e c2)
     | Bind (c3,c4) -> let (p1,cp1) = c2.term in 
                       let (p2,cp2) = c4.term in 
-                      optimize_inner_comp (bind ~loc:c.location c1 (abstraction ~loc:c.location p2 
+                      shallow_opt (bind ~loc:c.location c1 (abstraction ~loc:c.location p2 
                                               (bind ~loc:c.location cp2 (abstraction ~loc:c.location p1 cp1))))
     | LetIn(e,a) ->let (pa,ca) = a.term in
-                   let newbind = bind ~loc:c.location ca c2 in 
+                   let newbind = shallow_opt (bind ~loc:c.location ca c2) in 
                    let let_abs = abstraction ~loc:c.location pa newbind in
-                   optimize_inner_comp (let_in ~loc:c.location e let_abs)
+                   shallow_opt (let_in ~loc:c.location e let_abs)
 
     | Apply(e1,e2) -> let (p,ca) = c2.term in
                       begin match e1.term with
@@ -79,16 +82,16 @@ let rec optimize_comp c =
                                           | Var x -> begin match e3.term with
                                                      | Lambda k -> begin match (fst p.term)  with
                                                                    | Pattern.Var pv when (pv = x) ->
-                                                                       optimize_comp (call ~loc:c.location ef e2 k)
-                                                                   | _-> optimize_inner_comp c
+                                                                       shallow_opt (call ~loc:c.location ef e2 k)
+                                                                   | _-> c
                                                                  end
-                                                     | _->optimize_inner_comp c
+                                                     | _-> c
                                                      end
-                                          |  _ -> optimize_inner_comp c  
+                                          |  _ ->  c  
                                           end
-                                   | _ -> optimize_inner_comp c
+                                   | _ -> c
                                    end
-                     | _ -> optimize_inner_comp c
+                     | _ -> c
                      end                                   
     
 
@@ -104,10 +107,10 @@ let rec optimize_comp c =
                         let vz = var ~loc:loc z (Scheme.simple input_k_ty) in
                         let (p_k,c_k) = k.term in 
                         let k_lambda = lambda ~loc:loc (abstraction ~loc:loc p_k c_k) in
-                        let inner_apply = apply ~loc:loc k_lambda vz in
-                        let inner_bind = bind ~loc:loc inner_apply (abstraction ~loc:loc pa ca) in
-                        optimize_comp (call ~loc:loc eff e (abstraction ~loc:loc pz inner_bind))
-    | _ -> optimize_inner_comp c
+                        let inner_apply = shallow_opt (apply ~loc:loc k_lambda vz) in
+                        let inner_bind = shallow_opt (bind ~loc:loc inner_apply (abstraction ~loc:loc pa ca)) in
+                        shallow_opt (call ~loc:loc eff e (abstraction ~loc:loc pz inner_bind))
+    | _ -> c
     end
 
   | Handle (e1,c1) ->
@@ -115,14 +118,14 @@ let rec optimize_comp c =
 
     (*Handle h (LetC x e c) -> LetC (x e) (Handle c h)*)
     | LetIn (e2,a) -> let (p,c2) = a.term in 
-                    optimize_comp(
-                      let_in ~loc:c.location e2 (abstraction ~loc:c.location p (handle ~loc:c.location e1 c2))
+                     shallow_opt(
+                      let_in ~loc:c.location e2 (abstraction ~loc:c.location p (shallow_opt (handle ~loc:c.location e1 c2)))
                     )
     
     | Value v -> begin match e1.term with
     
                  (*Handle (Handler vc ocs) (Value v) -> Apply (Lambda vc) v *)
-                 | Handler h -> optimize_comp(
+                 | Handler h -> shallow_opt(
                                 apply ~loc:c.location (lambda ~loc:c.location h.value_clause) v)
                  | _-> c
                  end
@@ -140,8 +143,8 @@ let rec optimize_comp c =
                                 let vz = var ~loc:loc z (Scheme.simple input_k_ty) in
                                 let (p_k,c_k) = k.term in 
                                 let k_lambda = lambda ~loc:loc (abstraction ~loc:loc p_k c_k) in
-                                let e2_apply = apply ~loc:loc k_lambda vz in
-                                let e2_handle = handle ~loc:loc e1 e2_apply in
+                                let e2_apply = shallow_opt (apply ~loc:loc k_lambda vz) in
+                                let e2_handle = shallow_opt (handle ~loc:loc e1 e2_apply) in
                                 let e2_lambda = lambda ~loc:loc (abstraction ~loc:loc pz e2_handle) in
                                 begin match Common.lookup eff h.effect_clauses with
                                         | Some result -> 
@@ -149,15 +152,15 @@ let rec optimize_comp c =
                                           let e1_lamda =  lambda ~loc:loc (abstraction ~loc:loc p2 cresult) in
                                           let e1_purelambda = pure_lambda ~loc:loc (pure_abstraction ~loc:loc p1 e1_lamda) in
                                           let e1_pureapply = pure_apply ~loc:loc e1_purelambda exp in
-                                          optimize_comp (apply ~loc:loc e1_pureapply e2_lambda)
+                                          shallow_opt (apply ~loc:loc e1_pureapply e2_lambda)
 
                                         | None ->
                                           let call_abst = abstraction ~loc:loc pz e2_handle in
-                                          optimize_comp (call ~loc:loc eff exp call_abst )
+                                          shallow_opt (call ~loc:loc eff exp call_abst )
                                         end
-                          | _-> optimize_inner_comp c
+                          | _-> c
                           end
-    | _ -> optimize_inner_comp c
+    | _ -> c
     end
   | Apply (e1,e2) ->
      begin match e1.term with
@@ -165,24 +168,23 @@ let rec optimize_comp c =
      | Lambda a ->
           let (p,c') = a.term in
           begin match c'.term with 
-          | Value v -> value ~loc:c.location @@ optimize_expr (
+          | Value v -> shallow_opt (value ~loc:c.location @@ 
               pure_apply ~loc:c.location (pure_lambda ~loc:e1.location (pure_abstraction ~loc:a.location p v)) e2)
-          | _ -> optimize_inner_comp c
+          | _ -> c
           end
-     | PureLambda pure_abs ->    optimize_comp 
-                                 (value ~loc:c.location 
-                                 (pure_apply ~loc:c.location (pure_lambda ~loc:c.location pure_abs) e2 )) 
-     | _ -> optimize_inner_comp c
+     | PureLambda pure_abs ->    shallow_opt (value ~loc:c.location 
+                                 (pure_apply ~loc:c.location (pure_lambda ~loc:c.location pure_abs) e2 ))
+     | _ -> c
      end
   
   | LetIn (e,a) ->
       let (p,cp) = a.term in
       begin match cp.term with
-      | Value e2 -> optimize_comp (value ~loc:c.location (pure_let_in ~loc:c.location e (pure_abstraction ~loc:c.location p e2)))
-      | _ -> optimize_inner_comp c
+      | Value e2 -> shallow_opt (value ~loc:c.location (pure_let_in ~loc:c.location e (pure_abstraction ~loc:c.location p e2)))
+      | _ -> c
       end
 
-  | _ -> optimize_inner_comp c
+  | _ -> c
 
 and optimize_abstraction abs = let (p,c) = abs.term in abstraction ~loc:abs.location p (optimize_comp c) 
 
@@ -190,11 +192,10 @@ and optimize_abstraction abs = let (p,c) = abs.term in abstraction ~loc:abs.loca
 and optimize_pure_abstraction abs = let (p,e) = abs.term in pure_abstraction ~loc:abs.location p (optimize_expr e)
 
 and folder pclist cn = 
-    let func = fun a ->  fun b ->  (bind ~loc:b.location (snd a) (abstraction ~loc:b.location (fst a) b ) )
+    let func = fun a ->  fun b ->  shallow_opt ((bind ~loc:b.location (snd a) (abstraction ~loc:b.location (fst a) b ) ))
     in  List.fold_right func pclist cn
 
 and  optimize_expr e =
-
 
   match e.term with
   | Lambda a -> 
@@ -202,26 +203,26 @@ and  optimize_expr e =
     begin match c.term with 
     (*Lambda (x, Value e) -> PureLambda (x, e)
      | Value v -> optimize_expr (pure_lambda ~loc:e.location (pure_abstraction ~loc:e.location p v)) *)
-    | _ -> optimize_inner_expr e
+    | _ -> e
     end
-  | _ -> optimize_inner_expr e
+  | _ -> e
 
-and optimize_inner_comp c =
+and opt_sub_comp c =
   match c.term with
   | Value e -> value ~loc:c.location (optimize_expr e)
-(*  | LetRec li c1 -> let_rec' ~loc:c.location li (optimize_comp c1)
-  | Match e li -> match' ~loc:c.location (optimize_expr e) li
-  | While c1 c2 -> while' ~loc:c.location (optimize_comp c1) (optimize_comp c2)
-  | For v e1 e2 c1 b -> for' ~loc:c.location v (optimize_expr e1) (optimize_expr e2) (optimize_comp c1) b
-*)  | Apply (e1, e2) -> apply ~loc:c.location (optimize_expr e1) (optimize_expr e2)
+  | LetRec (li, c1) -> let_rec' ~loc:c.location li (optimize_comp c1)
+  | Match (e, li) -> match' ~loc:c.location (optimize_expr e) li
+  | While (c1, c2) -> while' ~loc:c.location (optimize_comp c1) (optimize_comp c2)
+  | For (v, e1, e2, c1, b) -> for' ~loc:c.location v (optimize_expr e1) (optimize_expr e2) (optimize_comp c1) b
+  | Apply (e1, e2) -> apply ~loc:c.location (optimize_expr e1) (optimize_expr e2)
   | Handle (e, c1) -> handle ~loc:c.location (optimize_expr e) (optimize_comp c1)
   | Check c1 -> check ~loc:c.location (optimize_comp c1)
- (* | Call (eff, e1, a1) -> call ~loc:c.location eff (optimize_expr e1) (optimize_abstraction a1) *)
+  | Call (eff, e1, a1) -> call ~loc:c.location eff (optimize_expr e1) (optimize_abstraction a1) 
   | Bind (c1, a1) -> bind ~loc:c.location (optimize_comp c1) (optimize_abstraction a1)
   | LetIn (e, a) -> let_in ~loc: c.location(optimize_expr e) (optimize_abstraction a)
   | _ -> c
 
-and optimize_inner_expr e =
+and opt_sub_expr e =
   match e.term with
   | Const c -> const ~loc:e.location c
   | Tuple lst -> tuple ~loc:e.location lst
