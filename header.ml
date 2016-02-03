@@ -13,8 +13,9 @@ type 'a effect_clauses =
   | Nil : 'a effect_clauses
   | Cons : ('eff_arg, 'eff_res) effect * ('eff_arg -> ('eff_res -> 'a computation) -> 'a computation) * 'a effect_clauses -> 'a effect_clauses
 
-type ('a, 'b) handler = {
-  value: ('a, 'b) value_clause;
+type ('a, 'b, 'c) handler = {
+  value_clause: ('a, 'b) value_clause;
+  finally_clause: ('b, 'c) finally_clause;
   effect_clauses: 'b effect_clauses;
 }
 
@@ -31,12 +32,14 @@ let rec (>>) (c : 'a computation) (f : 'a -> 'b computation) =
   | Value x -> f x
   | Call (eff, arg, k) -> Call (eff, arg, fun y -> k y >> f)
 
-let rec handle (h : ('a, 'b) handler) (c : 'a computation) : 'b computation =
-  match c with
-  | Value x -> h.value x
+let rec handle (h : ('a, 'b, 'c) handler) (c : 'a computation) : 'c computation =
+  let rec handler = function
+  | Value x -> h.value_clause x
   | Call (eff, arg, k) ->
     let f = find_case eff h.effect_clauses in
-    f arg (fun y -> handle h (k y))
+    f arg (fun y -> handler (k y))
+  in
+  handler c >> h.finally_clause
 
 let value (x : 'a) : 'a computation = Value x
 

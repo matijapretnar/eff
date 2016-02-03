@@ -24,7 +24,7 @@ let rec print_expression ?max_level e ppf =
   | Typed.Lambda a ->
       print ~at_level:2 "fun %t" (print_abstraction a)
   | Typed.Handler h ->
-      print "{ value_clause = fun %t; finally_clause = fun %t; effect_clauses = %t }"
+      print "{ value_clause = (fun %t); finally_clause = (fun %t); effect_clauses = %t }"
       (print_abstraction h.Typed.value_clause) (print_abstraction h.Typed.finally_clause)
       (print_effect_clauses h.Typed.effect_clauses)
   | Typed.Effect eff ->
@@ -75,8 +75,8 @@ and print_effect_clauses eff_clauses ppf =
   | [] ->
       print "Nil"
   | (eff, {Typed.term = (p1, p2, c)}) :: cases ->
-      print ~at_level:1 "Cons %t %t %t %t"
-      (print_effect eff) (print_pattern p1) (print_pattern p2) (print_computation c)
+      print ~at_level:1 "Cons ((%t), (fun %t %t -> %t), (%t))"
+      (print_effect eff) (print_pattern p1) (print_pattern p2) (print_computation c) (print_effect_clauses cases)
 
 and print_abstraction {Typed.term = (p, c)} ppf =
   Format.fprintf ppf "%t -> %t" (print_pattern p) (print_computation c)
