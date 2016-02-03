@@ -250,7 +250,7 @@ let optimize_command = function
       begin match Common.lookup f inlinable_definitions with
       | None -> Some cmd
       | Some e ->
-          inlinable := Common.update x e !inlinable; None
+          inlinable := Common.update x e !inlinable; Some cmd
       end
   | (Typed.TypeOf _ | Typed.Help) -> None
 
