@@ -216,7 +216,7 @@ and  optimize_expr e =
 
 and opt_sub_comp c =
   match c.term with
-  | Value e -> value ~loc:c.location (optimize_expr e)
+  | Value e -> value ~loc:c.location (opt_sub_expr e)
   | LetRec (li, c1) -> let_rec' ~loc:c.location li (optimize_comp c1)
   | Match (e, li) -> match' ~loc:c.location (opt_sub_expr e) li
   | While (c1, c2) -> while' ~loc:c.location (optimize_comp c1) (optimize_comp c2)
