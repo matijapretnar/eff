@@ -1,7 +1,7 @@
 open Typed
 
 
-let unary_inlinable f ty1 ty2 =
+let unary_inlinable f ty1 ty2 = 
   let x = Typed.Variable.fresh "x"
   and f = Typed.Variable.fresh f
   and loc = Location.unknown in
@@ -59,7 +59,7 @@ and shallow_opt c =
  (*| Let (pclist,c2) -> let [(p1,c1)] = pclist in
                         optimize_comp (bind ~loc:c.location c1 (abstraction ~loc:c.location p1 c2)) *)
 
-  | Let (pclist,c2) -> (folder pclist c2)
+  | Let (pclist,c2) ->  optimize_comp (folder pclist c2)
   
   | Bind (c1, c2) ->
     begin match c1.term with
@@ -167,6 +167,13 @@ and shallow_opt c =
      (*Apply (PureLambda a) e -> Value (PureApply (PureLambda a) e)*)
      | Lambda a ->
           let (p,c') = a.term in
+          if is_atomic e2 
+            then  
+                let Pattern.Var vp = (fst p.term) in
+                let tempvar = var ~loc:c.location  vp p.scheme in
+                let Var v = tempvar.term in
+                optimize_comp (substitute_var_comp c' v e2)
+          else 
           begin match c'.term with 
           | Value v -> shallow_opt (value ~loc:c.location @@ 
               pure_apply ~loc:c.location (pure_lambda ~loc:e1.location (pure_abstraction ~loc:a.location p v)) e2)
@@ -192,7 +199,7 @@ and optimize_abstraction abs = let (p,c) = abs.term in abstraction ~loc:abs.loca
 and optimize_pure_abstraction abs = let (p,e) = abs.term in pure_abstraction ~loc:abs.location p (optimize_expr e)
 
 and folder pclist cn = 
-    let func = fun a ->  fun b ->  shallow_opt ((bind ~loc:b.location (snd a) (abstraction ~loc:b.location (fst a) b ) ))
+    let func = fun a ->  fun b ->  (bind ~loc:b.location (snd a) (abstraction ~loc:b.location (fst a) b ) )
     in  List.fold_right func pclist cn
 
 and  optimize_expr e =
@@ -211,15 +218,15 @@ and opt_sub_comp c =
   match c.term with
   | Value e -> value ~loc:c.location (optimize_expr e)
   | LetRec (li, c1) -> let_rec' ~loc:c.location li (optimize_comp c1)
-  | Match (e, li) -> match' ~loc:c.location (optimize_expr e) li
+  | Match (e, li) -> match' ~loc:c.location (opt_sub_expr e) li
   | While (c1, c2) -> while' ~loc:c.location (optimize_comp c1) (optimize_comp c2)
-  | For (v, e1, e2, c1, b) -> for' ~loc:c.location v (optimize_expr e1) (optimize_expr e2) (optimize_comp c1) b
-  | Apply (e1, e2) -> apply ~loc:c.location (optimize_expr e1) (optimize_expr e2)
-  | Handle (e, c1) -> handle ~loc:c.location (optimize_expr e) (optimize_comp c1)
+  | For (v, e1, e2, c1, b) -> for' ~loc:c.location v (opt_sub_expr e1) (opt_sub_expr e2) (optimize_comp c1) b
+  | Apply (e1, e2) -> apply ~loc:c.location (opt_sub_expr e1) (opt_sub_expr e2)
+  | Handle (e, c1) -> handle ~loc:c.location (opt_sub_expr e) (optimize_comp c1)
   | Check c1 -> check ~loc:c.location (optimize_comp c1)
-  | Call (eff, e1, a1) -> call ~loc:c.location eff (optimize_expr e1) (optimize_abstraction a1) 
+  | Call (eff, e1, a1) -> call ~loc:c.location eff (opt_sub_expr e1) (optimize_abstraction a1) 
   | Bind (c1, a1) -> bind ~loc:c.location (optimize_comp c1) (optimize_abstraction a1)
-  | LetIn (e, a) -> let_in ~loc: c.location(optimize_expr e) (optimize_abstraction a)
+  | LetIn (e, a) -> let_in ~loc: c.location(opt_sub_expr e) (optimize_abstraction a)
   | _ -> c
 
 and opt_sub_expr e =
@@ -230,12 +237,66 @@ and opt_sub_expr e =
   | PureLambda pa -> pure_lambda ~loc:e.location (optimize_pure_abstraction pa)
   | PureApply (e1, e2)-> pure_apply ~loc:e.location (optimize_expr e1) (optimize_expr e2)
   | PureLetIn (e1, pa) -> pure_let_in ~loc:e.location (optimize_expr e1) (optimize_pure_abstraction pa)
-  | Var x ->
+  | Var x -> 
       begin match Common.lookup x !inlinable with
       | Some e -> print_endline "found."; optimize_expr e
       | _ -> print_endline "not found."; e
       end
   | _ -> e
+
+
+and is_atomic e = begin match e.term with 
+                    | Var _ -> true
+                    | Const _ -> true
+                    | _ -> false
+                  end
+
+
+and substitute_var_comp comp var exp =
+        let loc = Location.unknown in
+        begin match comp.term with
+          | Value e -> value ~loc:loc (substitute_var_exp e var exp)
+          | Let (list,cf) ->  let' ~loc:loc list cf
+          | LetRec (li, c1) -> let_rec' ~loc:loc li c1
+          | Match (e, li) -> match' ~loc:loc e li
+          | While (c1, c2) -> while' ~loc:loc (substitute_var_comp c1 var exp) (substitute_var_comp c2 var exp)
+          | For (v, e1, e2, c1, b) -> for' ~loc:loc v (substitute_var_exp e1 var exp) (substitute_var_exp e2 var exp) (substitute_var_comp c1 var exp) b
+          | Apply (e1, e2) -> apply ~loc:loc (substitute_var_exp e1 var exp) (substitute_var_exp e2 var exp)
+          | Handle (e, c1) -> handle ~loc:loc (substitute_var_exp e var exp) (substitute_var_comp c1 var exp)
+          | Check c1 -> check ~loc:loc (substitute_var_comp c1 var exp)
+          | Call (eff, e1, a1) -> call ~loc:loc eff (substitute_var_exp e1 var exp )  a1
+          | Bind (c1, a1) -> let (p1,cp1) = a1.term in 
+                             begin match (fst p1.term)  with
+                             | Pattern.Var pv when ( var !=  pv ) -> bind ~loc:loc (substitute_var_comp c1 var exp) (abstraction ~loc:loc p1 (substitute_var_comp cp1 var exp))
+                             | _->bind ~loc:loc (substitute_var_comp c1 var exp) a1
+                             end
+          | LetIn (e, a) -> let (p1,cp1) = a.term in 
+                             begin match (fst p1.term) with
+                             | Pattern.Var pv when (pv != var) -> let_in ~loc:loc (substitute_var_exp e var exp) (abstraction ~loc:loc p1 (substitute_var_comp cp1 var exp))
+                             | _->let_in ~loc:loc e a
+                             end
+          | _ -> comp
+        end
+and substitute_var_exp e var exp = 
+    let loc = Location.unknown in
+    begin match e.term with 
+      | Var v when (v = var) -> print_endline "did a sub" ; exp
+      (*| Tuple lst -> tuple ~loc:loc (substitute_var_exp_list lst var exp) *)
+      | Lambda a -> let (p,c) = a.term in
+                    begin match (fst p.term) with
+                    | Pattern.Var pv when (pv != var) -> lambda ~loc:loc (abstraction ~loc:loc p (substitute_var_comp c var exp))
+                    | _ -> lambda ~loc:loc (abstraction ~loc:loc p c )
+                  end
+   (*   | Handler of handler *)
+      | PureLambda pa -> let (p,ea) = pa.term in
+                      begin match (fst p.term) with
+                    | Pattern.Var pv when (pv != var) -> pure_lambda ~loc:loc (pure_abstraction ~loc:loc p (substitute_var_exp ea var exp))
+                    | _ -> pure_lambda ~loc:loc (pure_abstraction ~loc:loc p ea )
+                  end
+      | PureApply (e1,e2) -> pure_apply ~loc:loc (substitute_var_exp e var e1) (substitute_var_exp e var e2)
+   (*   | PureLetIn (e,pa) -> pure_let_in ~loc:loc expression * pure_abstraction *)
+      | _ -> e
+    end
 
 let optimize_command = function
   | Typed.Computation c ->
@@ -263,3 +324,7 @@ let rec optimize_commands = function
       | Some cmd -> (cmd, loc) :: cmds
       | None -> cmds
       end
+
+
+
+
