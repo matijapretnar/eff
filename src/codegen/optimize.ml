@@ -54,6 +54,7 @@ let inlinable = ref []
 let rec optimize_comp c = shallow_opt ( opt_sub_comp c)
 
 and shallow_opt c = 
+  (* Print.debug "Shallow optimizing %t" (CamlPrint.print_computation c); *)
   match c.term with
 
  (*| Let (pclist,c2) -> let [(p1,c1)] = pclist in
@@ -215,6 +216,7 @@ and  optimize_expr e =
   | _ -> e
 
 and opt_sub_comp c =
+  (* Print.debug "Optimizing %t" (CamlPrint.print_computation c); *)
   match c.term with
   | Value e -> value ~loc:c.location (opt_sub_expr e)
   | LetRec (li, c1) -> let_rec' ~loc:c.location li (optimize_comp c1)
@@ -230,6 +232,7 @@ and opt_sub_comp c =
   | _ -> c
 
 and opt_sub_expr e =
+  (* Print.debug "Optimizing %t" (CamlPrint.print_expression e); *)
   match e.term with
   | Const c -> const ~loc:e.location c
   | Tuple lst -> tuple ~loc:e.location lst
@@ -239,8 +242,8 @@ and opt_sub_expr e =
   | PureLetIn (e1, pa) -> pure_let_in ~loc:e.location (optimize_expr e1) (optimize_pure_abstraction pa)
   | Var x -> 
       begin match Common.lookup x !inlinable with
-      | Some e -> print_endline "found."; optimize_expr e
-      | _ -> print_endline "not found."; e
+      | Some e -> opt_sub_expr e
+      | _ -> e
       end
   | _ -> e
 
@@ -253,6 +256,7 @@ and is_atomic e = begin match e.term with
 
 
 and substitute_var_comp comp var exp =
+  (* Print.debug "Substituting %t" (CamlPrint.print_computation comp); *)
         let loc = Location.unknown in
         begin match comp.term with
           | Value e -> value ~loc:loc (substitute_var_exp e var exp)
@@ -278,6 +282,7 @@ and substitute_var_comp comp var exp =
           | _ -> comp
         end
 and substitute_var_exp e var exp = 
+  (* Print.debug "Substituting %t" (CamlPrint.print_expression e); *)
     let loc = Location.unknown in
     begin match e.term with 
       | Var v when (v = var) -> print_endline "did a sub" ; exp
@@ -293,7 +298,7 @@ and substitute_var_exp e var exp =
                     | Pattern.Var pv when (pv != var) -> pure_lambda ~loc:loc (pure_abstraction ~loc:loc p (substitute_var_exp ea var exp))
                     | _ -> pure_lambda ~loc:loc (pure_abstraction ~loc:loc p ea )
                   end
-      | PureApply (e1,e2) -> pure_apply ~loc:loc (substitute_var_exp e var e1) (substitute_var_exp e var e2)
+      | PureApply (e1,e2) -> pure_apply ~loc:loc (substitute_var_exp e1 var exp) (substitute_var_exp e2 var exp)
    (*   | PureLetIn (e,pa) -> pure_let_in ~loc:loc expression * pure_abstraction *)
       | _ -> e
     end
