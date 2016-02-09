@@ -160,34 +160,75 @@ let is_atomic e = begin match e.term with
                   end
 
 
-let rec substitute_var_comp comp var exp =
+let rec substitute_var_comp comp vr exp =
 (*   Print.debug "Substituting %t" (CamlPrint.print_computation comp); *)
         let loc = Location.unknown in
         begin match comp.term with
-          | Value e -> value ~loc:loc (substitute_var_exp e var exp)
-          | Let (list,cf) ->  let' ~loc:loc list cf
+          | Value e -> value ~loc:loc (substitute_var_exp e vr exp)
+          | Let (li,cf) ->  let' ~loc:loc li cf
           | LetRec (li, c1) -> failwith "substitute_var_comp for let_rec not implemented"
           | Match (e, li) -> failwith "substitute_var_comp for match not implemented"
-          | While (c1, c2) -> while' ~loc:loc (substitute_var_comp c1 var exp) (substitute_var_comp c2 var exp)
-          | For (v, e1, e2, c1, b) -> for' ~loc:loc v (substitute_var_exp e1 var exp) (substitute_var_exp e2 var exp) (substitute_var_comp c1 var exp) b
-          | Apply (e1, e2) -> apply ~loc:loc (substitute_var_exp e1 var exp) (substitute_var_exp e2 var exp)
-          | Handle (e, c1) -> handle ~loc:loc (substitute_var_exp e var exp) (substitute_var_comp c1 var exp)
-          | Check c1 -> check ~loc:loc (substitute_var_comp c1 var exp)
-          | Call (eff, e1, a1) -> call ~loc:loc eff (substitute_var_exp e1 var exp )  a1
-          | Bind (c1, a1) -> failwith "variable renaming needed"
-          | LetIn (e, a) -> failwith "variable renaming needed"
-          | _ -> comp
-        end
+          | While (c1, c2) -> while' ~loc:loc (substitute_var_comp c1 vr exp) (substitute_var_comp c2 vr exp)
+          | For (v, e1, e2, c1, b) -> for' ~loc:loc v (substitute_var_exp e1 vr exp) (substitute_var_exp e2 vr exp) (substitute_var_comp c1 vr exp) b
+          | Apply (e1, e2) -> apply ~loc:loc (substitute_var_exp e1 vr exp) (substitute_var_exp e2 vr exp)
+          | Handle (e, c1) -> handle ~loc:loc (substitute_var_exp e vr exp) (substitute_var_comp c1 vr exp)
+          | Check c1 -> check ~loc:loc (substitute_var_comp c1 vr exp)
+          | Call (eff, e1, a1) -> call ~loc:loc eff (substitute_var_exp e1 vr exp )  a1
+          
+          | Bind (c1, a1) -> print_endline "matched with bind in sub var";
+                             let (p,c) = a1.term in
+                             let (Var v) = (make_var_from_pattern p).term in
+                             if (v == vr) then  begin print_endline "pattern = variable" ; 
+                                                      bind ~loc:loc (substitute_var_comp c1 vr exp) a1
+                                                end
+                                 else if not( VariableSet.mem v (free_vars_e exp) )
+                                      then 
+                                            begin 
+                                            print_endline " apply sub (not in free vars)";
+                                            bind ~loc:loc (substitute_var_comp c1 vr exp) (abstraction ~loc:loc p (substitute_var_comp c vr exp))
+                                            end
+                                      else begin 
+                                          print_endline  "we do renaming with ";
+                                           let fresh_var = make_var_from_counter p.scheme in
+                                           let fresh_pattern = make_pattern_from_var fresh_var in
+                                           
+                                           bind ~loc:loc (substitute_var_comp c1 vr exp)
+                                           (abstraction ~loc:loc fresh_pattern ( substitute_var_comp (substitute_var_comp c v fresh_var) vr exp))
+                                         end
+
+
+          | LetIn (e, a) -> print_endline "matched with letin in sub var";
+                            let (p,c) = a.term in
+                            let (Var v) = (make_var_from_pattern p).term in
+                            if (v == vr) then  begin print_endline "pattern = variable" ; 
+                                                      let_in ~loc:loc (substitute_var_exp e vr exp) a
+                                                end
+                            else if not( VariableSet.mem v (free_vars_e exp) )
+                                 then 
+                                      begin 
+                                      print_endline " apply sub (not in free vars)";
+                                      let_in ~loc:loc (substitute_var_exp e vr exp) (abstraction ~loc:loc p (substitute_var_comp c vr exp))
+                                      end
+                                 else begin 
+                                      print_endline  "we do renaming with ";
+                                      let fresh_var = make_var_from_counter p.scheme in
+                                      let fresh_pattern = make_pattern_from_var fresh_var in
+                                      let_in ~loc:loc (substitute_var_exp e vr exp)
+                                       (abstraction ~loc:loc fresh_pattern ( substitute_var_comp (substitute_var_comp c v fresh_var) vr exp))
+                                  end
+
+          end
 and substitute_var_exp e vr exp = 
   (* Print.debug "Substituting %t" (CamlPrint.print_expression e); *)
     let loc = Location.unknown in
     begin match e.term with 
       | Var v -> if (v == vr) then (print_endline "did a sub" ; exp) else var ~loc:loc v e.scheme
-      (*| Tuple lst -> tuple ~loc:loc (substitute_var_exp_list lst var exp) *)
+      | Tuple lst -> let func = fun a -> substitute_var_exp a vr exp in
+                     tuple ~loc:loc (List.map func lst) 
       | Lambda a -> print_endline "matched with lambda in sub var";
                     let (p,c) = a.term in
                     let (Var v) = (make_var_from_pattern p).term in
-                    if (v == vr) then  begin print_endline "pattern = variable" ;lambda ~loc:loc a end
+                    if (v == vr) then  begin print_endline "pattern = variable" ; e end
                                  else if not( VariableSet.mem v (free_vars_e exp) )
                                       then 
                                             begin 
@@ -208,7 +249,7 @@ and substitute_var_exp e vr exp =
                     let (p,e) = pa.term in
                     let (Var v) = (make_var_from_pattern p).term in
                     print_free_vars (value ~loc:Location.unknown exp) ;
-                    if (v == vr) then  begin print_endline "pattern = variable" ;pure_lambda ~loc:loc pa end
+                    if (v == vr) then  begin print_endline "pattern = variable" ; e end
                                  else if not( VariableSet.mem v (free_vars_e exp) )
                                       then 
                                             begin 
@@ -225,13 +266,33 @@ and substitute_var_exp e vr exp =
                                                            ( substitute_var_exp (substitute_var_exp e v fresh_var) vr exp))
                                          end
       | PureApply (e1,e2) -> pure_apply ~loc:loc (substitute_var_exp e1 vr exp) (substitute_var_exp e2 vr exp)
-   (*   | PureLetIn (e,pa) -> pure_let_in ~loc:loc expression * pure_abstraction *)
+      
+      | PureLetIn (e,pa) ->  print_endline "matched with letin in sub var";
+                            let (p,e') = pa.term in
+                            let (Var v) = (make_var_from_pattern p).term in
+                            if (v == vr) then  begin print_endline "pattern = variable" ; 
+                                                      pure_let_in ~loc:loc (substitute_var_exp e vr exp) pa
+                                                end
+                            else if not( VariableSet.mem v (free_vars_e exp) )
+                                 then 
+                                      begin 
+                                      print_endline " apply sub (not in free vars)";
+                                      pure_let_in ~loc:loc (substitute_var_exp e vr exp) (pure_abstraction ~loc:loc p (substitute_var_exp e' vr exp))
+                                      end
+                                 else begin 
+                                      print_endline  "we do renaming with ";
+                                      let fresh_var = make_var_from_counter p.scheme in
+                                      let fresh_pattern = make_pattern_from_var fresh_var in
+                                      pure_let_in ~loc:loc (substitute_var_exp e vr exp)
+                                       (pure_abstraction ~loc:loc fresh_pattern ( substitute_var_exp (substitute_var_exp e' v fresh_var) vr exp))
+                                  end
+      
       | _ -> e
     end
 
 
 
-let rec optimize_comp c =  print_free_vars c ; shallow_opt ( opt_sub_comp c)
+let rec optimize_comp c = shallow_opt ( opt_sub_comp c)
 
 and shallow_opt c = 
    (*Print.debug "Shallow optimizing %t" (CamlPrint.print_computation c);*)
@@ -240,25 +301,26 @@ and shallow_opt c =
   | Let (pclist,c2) ->  optimize_comp (folder pclist c2)
   
   | Bind (c1, c2) ->
+    let (pa,ca) = c2.term in
     begin match c1.term with
     (*Bind x (Value e) c -> LetC x e c*)
     | Value e ->  shallow_opt(let_in ~loc:c.location e c2)
-    | Bind (c3,c4) -> let (p1,cp1) = c2.term in 
+    | Bind (c3,c4) -> let (pa,ca) = c2.term in 
                       let (p2,cp2) = c4.term in 
                       shallow_opt (bind ~loc:c.location c1 (abstraction ~loc:c.location p2 
-                                              (shallow_opt (bind ~loc:c.location cp2 (abstraction ~loc:c.location p1 cp1)))))
-    | LetIn(e,a) ->let (pa,ca) = a.term in
-                   let newbind = shallow_opt (bind ~loc:c.location ca c2) in 
-                   let let_abs = abstraction ~loc:c.location pa newbind in
+                                              (shallow_opt (bind ~loc:c.location cp2 (abstraction ~loc:c.location pa ca)))))
+    | LetIn(e,a) ->let (pal,cal) = a.term in
+                   let newbind = shallow_opt (bind ~loc:c.location cal c2) in 
+                   let let_abs = abstraction ~loc:c.location pal newbind in
                    shallow_opt (let_in ~loc:c.location e let_abs)
 
-    | Apply(e1,e2) -> let (p,ca) = c2.term in
+    | Apply(e1,e2) -> let (pa,ca) = c2.term in
                       begin match e1.term with
                      | Effect ef -> begin match ca.term with 
                                    | Apply(e3,e4) -> 
                                           begin match e4.term with 
                                           | Var x -> begin match e3.term with
-                                                     | Lambda k -> begin match (fst p.term)  with
+                                                     | Lambda k -> begin match (fst pa.term)  with
                                                                    | Pattern.Var pv when (pv = x) ->
                                                                        shallow_opt (call ~loc:c.location ef e2 k)
                                                                    | _-> c
@@ -388,6 +450,26 @@ and  optimize_expr e = shallow_opt_e (opt_sub_expr e)
 
 and shallow_opt_e e = 
       begin match e.term with 
+      | PureLetIn (ex,pa) -> let (p,ep) = pa.term in
+                             if is_atomic ex then 
+                                let (Var vp) = (make_var_from_pattern p).term in
+                                substitute_var_exp ep vp ex
+                             else
+                               e 
+      | PureApply (e1,e2) -> 
+            begin match e1.term with 
+            | PureLambda pa -> 
+                let (p,e') = pa.term in
+                if is_atomic e2 
+                then  
+                    let Pattern.Var vp = (fst p.term) in
+                    let tempvar = var ~loc:e.location  vp p.scheme in
+                    let Var v = tempvar.term in
+                    optimize_expr (substitute_var_exp e' v e2) 
+                else
+                  e
+            | _ -> e
+            end
       | _ -> e
       end
 
