@@ -24,6 +24,7 @@ let annotate t sch loc = {
 type expression = (plain_expression, Scheme.ty_scheme) annotation
 and plain_expression =
   | Var of variable
+  | BuiltIn of string
   | Const of Const.t
   | Tuple of expression list
   | Record of (Common.field, expression) Common.assoc
@@ -110,6 +111,13 @@ let abstraction2 ~loc p1 p2 c =
 let var ~loc x ty_sch =
   {
     term = Var x;
+    scheme = ty_sch;
+    location = loc;
+  }
+
+let built_in ~loc x ty_sch =
+  {
+    term = BuiltIn x;
     scheme = ty_sch;
     location = loc;
   }

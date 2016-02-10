@@ -11,6 +11,8 @@ let rec print_expression ?max_level e ppf =
       (* We add extra parentheses in case the variable is a symbol *)
       (* We add extra spaces in case the symbol is * *)
       print "( %t )" (print_variable x)
+  | Typed.BuiltIn s ->
+      print "%s" s
   | Typed.Const c ->
       print "%t" (Const.print c)
   | Typed.Tuple lst ->

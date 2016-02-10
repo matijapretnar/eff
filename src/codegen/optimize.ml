@@ -3,7 +3,6 @@ open Typed
 
 let unary_inlinable f ty1 ty2 = 
   let x = Typed.Variable.fresh "x"
-  and f = Typed.Variable.fresh f
   and loc = Location.unknown in
   let drt = Type.fresh_dirt () in
   let p = {
@@ -14,13 +13,12 @@ let unary_inlinable f ty1 ty2 =
   pure_lambda ~loc @@
     pure_abstraction ~loc p @@
       pure_apply ~loc
-        (var ~loc f (Scheme.simple (Type.Arrow (ty1, (ty2, drt)))))
+        (built_in ~loc f (Scheme.simple (Type.Arrow (ty1, (ty2, drt)))))
         (var ~loc x (Scheme.simple ty1))
 
 let binary_inlinable f ty1 ty2 ty =
   let x1 = Typed.Variable.fresh "x1"
   and x2 = Typed.Variable.fresh "x2"
-  and f = Typed.Variable.fresh f
   and loc = Location.unknown
   and drt = Type.fresh_dirt () in
   let p1 = {
@@ -41,7 +39,7 @@ let binary_inlinable f ty1 ty2 ty =
             value ~loc @@
               pure_apply ~loc (
                 pure_apply ~loc
-                  (var ~loc f (Scheme.simple (Type.Arrow (ty1, (Type.Arrow (ty2, (ty, drt)), drt)))))
+                  (built_in ~loc f (Scheme.simple (Type.Arrow (ty1, (Type.Arrow (ty2, (ty, drt)), drt)))))
                   (var ~loc x1 (Scheme.simple ty1))
               ) (var ~loc x2 (Scheme.simple ty2))
 
@@ -126,6 +124,7 @@ and free_vars_e e : VariableSet.t =
   | PureLetIn (e,pa) -> let (p1,ep1) = pa.term in
                            let (Var vp1) = (make_var_from_pattern p1).term in
                             VariableSet.union (free_vars_e e) (VariableSet.remove vp1 (free_vars_e ep1))
+  | BuiltIn _ -> VariableSet.empty
   | _ -> failwith "free vars matched a record or a variant, not handled yet ";
     end
 
@@ -494,6 +493,7 @@ and opt_sub_expr e =
   (* Print.debug "Optimizing %t" (CamlPrint.print_expression e); *)
   match e.term with
   | Const c -> const ~loc:e.location c
+  | BuiltIn f -> built_in ~loc:e.location f e.scheme
   | Tuple lst -> tuple ~loc:e.location (List.map optimize_expr lst)
   | Lambda a -> lambda ~loc:e.location (optimize_abstraction a)
   | PureLambda pa -> pure_lambda ~loc:e.location (optimize_pure_abstraction pa)
