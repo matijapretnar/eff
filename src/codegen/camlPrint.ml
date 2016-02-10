@@ -11,6 +11,8 @@ let rec print_expression ?max_level e ppf =
       (* We add extra parentheses in case the variable is a symbol *)
       (* We add extra spaces in case the symbol is * *)
       print "( %t )" (print_variable x)
+  | Typed.BuiltIn s ->
+      print "%s" s
   | Typed.Const c ->
       print "%t" (Const.print c)
   | Typed.Tuple lst ->
@@ -45,7 +47,7 @@ and print_computation ?max_level c ppf =
   | Typed.Value e ->
       print ~at_level:1 "value %t" (print_expression ~max_level:0 e)
   | Typed.Match (e, lst) ->
-      print ~at_level:2 "match %t with (@[<hov>%t@])" (print_expression e) (Print.sequence " | " print_abstraction lst)
+      print ~at_level:2 "match %t with @[<hov>%t@]" (print_expression e) (Print.sequence " | " print_abstraction lst)
   | Typed.While (c1, c2) ->
       print ~at_level:2 "while %t do %t done" (print_computation c1) (print_computation c2)
   | Typed.For (i, e1, e2, c, up) ->
