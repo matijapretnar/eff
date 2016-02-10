@@ -91,7 +91,12 @@ let rec free_vars_c c : VariableSet.t =
   | LetRec (li, c1) -> free_vars_let_rec li c1 (* still not fully implmented*)
   
 
-  | Match (e, li) -> failwith "found a match in free vars, not handled yet"
+  | Match (e, li) -> let func = fun a ->  fun b ->  
+                                let (pt,ct) = a.term in 
+                                let (Var vp1) = (make_var_from_pattern pt).term in
+                                VariableSet.union (VariableSet.remove vp1 (free_vars_c ct)) b
+                     in VariableSet.union (free_vars_e e) (List.fold_right func li VariableSet.empty)
+                     
   | While (c1, c2) -> VariableSet.union (free_vars_c c1) (free_vars_c c2)
   | For (v, e1, e2, c1, b) -> VariableSet.remove v (free_vars_c c1)
   | Apply (e1, e2) -> VariableSet.union (free_vars_e e1) (free_vars_e e2)
