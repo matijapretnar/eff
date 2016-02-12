@@ -607,7 +607,7 @@ and shallow_opt c =
       else 
       begin match cp.term with
       | Value e2 -> shallow_opt (value ~loc:c.location (pure_let_in ~loc:c.location e (pure_abstraction ~loc:c.location p e2)))
-      | Apply (a_e1,a_e2) ->  Print.debug "in apply of let in for %t" (CamlPrint.print_computation cp);
+      | _ ->  Print.debug "in apply of let in for %t" (CamlPrint.print_computation cp);
                     let (Var vp) = (make_var_from_pattern p).term in
                     let (occ_b,occ_f) = occurances vp cp in
                     if( occ_b == 0 && occ_f == 1)
@@ -615,7 +615,7 @@ and shallow_opt c =
                       optimize_comp (substitute_var_comp cp vp e)
                     else
                       c
-      | _ -> c
+     
       end
 
   | _ -> c
