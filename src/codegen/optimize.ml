@@ -1,3 +1,26 @@
+(*
+ To Do list for optimization :
+
+  ==> optimize sub_computation (LetRec)
+  ==> Optimize sub_expression (Record/Variant)
+  ==> Freevarse (Records/ Variants)
+  ==> fix all pattern matching warnings and not halt when pattern is not var
+  ==> Substitution for LetRec/patterns/variants
+  ==> Make regression tests
+  ==> Handler beta reduction ?
+  ==> Beta reduction with variables occur only once & not in a binder
+      (let-in apply) (pure_let-in pure_apply) (bind)
+
+  ==> effect clauses in handlers substitution
+  ==> handler /letrec/record/variant occurrances
+
+the idea is if it appeared "Free" under a pattern
+
+*)
+
+
+
+
 open Typed
 
 
@@ -150,6 +173,122 @@ and free_vars_handler h : VariableSet.t = let (pv,cv) = (h.value_clause).term in
                                                                 (VariableSet.remove pf1 (free_vars_c cf) ))
                                                             (List.fold_right func eff_list VariableSet.empty)  
 
+let rec occurances v c =
+
+    begin match c.term with
+  | Value e -> let (ep,ef) =  occurances_e v e in (ep,ef)
+  | Let (li,cf) -> failwith "occ found a let, all should turn to binds" (*let func = fun a ->
+                                let(p1,c1) = a.term  in
+                                let (Var vp1) = (make_var_from_pattern (fst a)).term in
+                                let occ_c1 = occurances v c1 in
+                                if (v == vp1) then (true , occ_c1) else (false, occ_c1)
+                   in
+                   let (pcf,fcf) = occurances v cf in
+                   let new_list = List.map func li in
+                   let func2 = fun (isequal, (pe,fe)) -> fun (start,(startpe,startfe)) -> 
+                                    if (isequal) then ((true || start), (pe+startpe,fe+startfe))
+                                    else (start,(pe+startpe,fe+startfe))
+                   in let (isequal ,(peall,feall)) = List.fold_right func2 new_list (false,(0,0))
+                   in if isequal then (peall,feall) else (peall+pcf , fcf+feall)*)
+                                  
+  | LetRec (li, c1) -> let (binder,free) = occurances_letrec v li c1 
+                        in (binder,free) (* still not fully implmented*)
+  
+
+  | Match (e, li) -> let func = fun a ->  
+                                let (pt,ct) = a.term in 
+                                let (Var vp1) = (make_var_from_pattern pt).term in
+                                let (ctb,ctf) = occurances v ct in 
+                                if(vp1 == v) then (0,0)
+                                else (ctb+ctf,0)
+                  in let new_list = List.map func li in
+                     let func2 = fun (b,f) -> fun (sb,sf) -> (b+sb,f+sf) in
+                     let (resb,resf) = List.fold_right func2 new_list (0,0) in
+                     let (be,fe) = occurances_e v e in
+                     (resb+be, resf+fe)
+                     
+  | While (c1, c2) -> let (c1b,c1f) = occurances v c1 in
+                      let (c2b,c2f) = occurances v c2 in
+                      (c1b+c2b , c1f+c2f)
+
+  | For (vr, e1, e2, c1, b) -> let (e1b,e1f) = occurances v c1 in
+                               if (v == vr) then (0, 0)
+                               else (e1b+e1f,0)
+
+  | Apply (e1, e2) -> let (e1b,e1f) = occurances_e v e1 in
+                      let (e2b,e2f) = occurances_e v e2 in
+                      (e1b+e2b , e1f+e2f)
+  
+  | Handle (e, c1) -> let (e1b,e1f) = occurances_e v e in
+                      let (c2b,c2f) = occurances v c1 in
+                      (e1b+c2b , e1f+c2f)
+  | Check c1 -> occurances v c1
+  | Call (eff, e1, a1) -> let (p1,cp1) = a1.term in
+                           let (Var vp1) = (make_var_from_pattern p1).term in
+                           let (pe1,fe1) = occurances_e v e1 in
+                           let (pcp1,fcp1) = occurances v cp1 in
+                           if (vp1 == v) then (pe1, fe1 )
+                         else
+                              (pe1+pcp1+fcp1, fe1)
+
+  | Bind (c1, a1) -> let (p1,cp1) = a1.term in
+                           let (Var vp1) = (make_var_from_pattern p1).term in
+                           let (pc1,fc1) = occurances v c1 in
+                           let (pcp1,fcp1) = occurances v cp1 in
+                           if (vp1 == v) then (pc1, fc1 )
+                         else
+                              (pc1+pcp1+fcp1, fc1)
+  | LetIn (e, a) -> let (p1,cp1) = a.term in
+                           let (Var vp1) = (make_var_from_pattern p1).term in
+                           let (pe1,fe1) = occurances_e v e in
+                           let (pcp1,fcp1) = occurances v cp1 in
+                           if (vp1 == v) then (pe1, fe1 )
+                         else
+                              (pe1+pcp1+fcp1, fe1)
+                            
+  end
+
+and occurances_e v e = 
+  begin match e.term with 
+  | Var vr  -> if (v == vr) then (0,1) else (0,0)
+  | Const _ -> (0,0)
+  | Tuple lst -> 
+                let func = fun a -> fun (sb,sf) -> let (pa,fa) = a in (pa+sb,fa+sf) in 
+                List.fold_right func (List.map (occurances_e v) lst ) (0,0)
+  | Lambda a -> let (p1,cp1) = a.term in
+                           let (Var vp1) = (make_var_from_pattern p1).term in
+                           let (pcp1,fcp1) = occurances v cp1 in
+                           if (vp1 == v) then (0, 0)
+                         else
+                              (pcp1+fcp1,0)
+  | Handler h -> occurances_handler v h
+  (*  | Record of (Common.field, expression) Common.assoc
+  | Variant of Common.label * expression option *)
+  | PureLambda pa -> let (p1,ep1) = pa.term in
+                           let (Var vp1) = (make_var_from_pattern p1).term in
+                           let (pep1,fep1) = occurances_e v ep1 in
+                           if (vp1 == v) then (0, 0 )
+                         else
+                              (pep1+fep1,0)
+
+  | PureApply (e1,e2) -> let (e1b,e1f) = occurances_e v e1 in
+                         let (e2b,e2f) = occurances_e v e2 in
+                         (e1b+e2b , e1f+e2f)
+  | PureLetIn (e,pa) -> let (p1,ep1) = pa.term in
+                           let (Var vp1) = (make_var_from_pattern p1).term in
+                           let (pe1,fe1) = occurances_e v e in
+                           let (pep1,fep1) = occurances_e v ep1 in
+                           if (vp1 == v) then (pe1,fe1 )
+                         else
+                              (pe1+pep1+fep1, fe1)
+  | BuiltIn _ -> (0,0)
+  | _ -> failwith "occ matched a record or a variant, not handled yet ";
+end
+
+and occurances_handler v h = (0,0) (*not implmented yet*)
+
+and occurances_letrec v li c =(0,0) (*not implmented yet*)
+
 
 
 let print_free_vars c = print_endline "in free vars print ";
@@ -162,6 +301,11 @@ let is_atomic e = begin match e.term with
                     | Const _ -> true
                     | _ -> false
                   end
+
+let is_var e = begin match e.term with
+               | Var _ -> true
+               | _ -> false
+             end
 
 
 let rec substitute_var_comp comp vr exp =
@@ -248,7 +392,9 @@ and substitute_var_exp e vr exp =
                                                            ( substitute_var_comp (substitute_var_comp c v fresh_var) vr exp))
                                          end
 
-   (*   | Handler of handler *)
+      | Handler h -> handler ~loc:loc (substitute_var_handler h vr exp)
+
+
       | PureLambda pa -> print_endline "matched with pure_lambda in sub var";
                     let (p,e) = pa.term in
                     let (Var v) = (make_var_from_pattern p).term in
@@ -294,7 +440,35 @@ and substitute_var_exp e vr exp =
       | _ -> e
     end
 
+and substitute_var_handler h vr exp = let loc = Location.unknown in
+                                      let (pv,cv) = (h.value_clause).term in 
+                                      let (pf,cf) = (h.finally_clause).term in
+                                      let eff_list = h.effect_clauses in
+                                      let new_value_lambda = 
+                                          (substitute_var_exp (lambda ~loc:loc (abstraction ~loc:loc pv cv) ) vr exp) in
+                                      let new_final_lambda = 
+                                          (substitute_var_exp (lambda ~loc:loc (abstraction ~loc:loc pf cf ) ) vr exp) in
 
+                                      let func = fun a -> let (e,ab2) = a in
+                                                 let (p1,p2,ck) = ab2.term in
+                                                 a in
+
+                                      begin match new_value_lambda.term with
+                                      | Lambda new_value_abstraction -> 
+                                                begin match new_final_lambda.term with
+                                                | Lambda new_final_abstraction -> 
+                                                     {
+                                                       effect_clauses =  List.map func eff_list;
+                                                       value_clause = new_value_abstraction;
+                                                       finally_clause = new_final_abstraction
+                                                     }
+                                                | _ -> failwith "substitute_var_handler error."
+                                                  
+                                                end
+                                      | _ -> failwith "substitute_var_handler error."
+                                    end
+                                      
+                          
 
 let rec optimize_comp c = shallow_opt ( opt_sub_comp c)
 
@@ -309,8 +483,7 @@ and shallow_opt c =
     begin match c1.term with
     (*Bind x (Value e) c -> LetC x e c*)
     | Value e ->  shallow_opt(let_in ~loc:c.location e c2)
-    | Bind (c3,c4) -> let (pa,ca) = c2.term in 
-                      let (p2,cp2) = c4.term in 
+    | Bind (c3,c4) -> let (p2,cp2) = c4.term in 
                       shallow_opt (bind ~loc:c.location c1 (abstraction ~loc:c.location p2 
                                               (shallow_opt (bind ~loc:c.location cp2 (abstraction ~loc:c.location pa ca)))))
     | LetIn(e,a) ->let (pal,cal) = a.term in
@@ -318,8 +491,7 @@ and shallow_opt c =
                    let let_abs = abstraction ~loc:c.location pal newbind in
                    shallow_opt (let_in ~loc:c.location e let_abs)
 
-    | Apply(e1,e2) -> let (pa,ca) = c2.term in
-                      begin match e1.term with
+    | Apply(e1,e2) -> begin match e1.term with
                      | Effect ef -> begin match ca.term with 
                                    | Apply(e3,e4) -> 
                                           begin match e4.term with 
@@ -339,8 +511,7 @@ and shallow_opt c =
                      end                                   
     
 
-    | Call(eff,e,k) ->  let (pa,ca) = c2.term in
-                        let loc = Location.unknown in
+    | Call(eff,e,k) ->  let loc = Location.unknown in
                         let z = Typed.Variable.fresh "z" in 
                         let( _ , (input_k_ty , _) , _ ) = k.scheme in
                         let pz = {
@@ -432,10 +603,18 @@ and shallow_opt c =
      let (p,cp) = a.term in
       if is_atomic e then 
           let (Var vp) = (make_var_from_pattern p).term in
-          substitute_var_comp cp vp e
+          optimize_comp (substitute_var_comp cp vp e)
       else 
       begin match cp.term with
       | Value e2 -> shallow_opt (value ~loc:c.location (pure_let_in ~loc:c.location e (pure_abstraction ~loc:c.location p e2)))
+      | Apply (a_e1,a_e2) ->  Print.debug "in apply of let in for %t" (CamlPrint.print_computation cp);
+                    let (Var vp) = (make_var_from_pattern p).term in
+                    let (occ_b,occ_f) = occurances vp cp in
+                    if( occ_b == 0 && occ_f == 1)
+                    then 
+                      optimize_comp (substitute_var_comp cp vp e)
+                    else
+                      c
       | _ -> c
       end
 
