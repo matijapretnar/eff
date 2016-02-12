@@ -10,6 +10,7 @@
   ==> Handler beta reduction ?
   ==> Beta reduction with variables occur only once & not in a binder
       (let-in apply) (pure_let-in pure_apply) (bind)
+  ==> (let x = e in e1) e2 -> let x = e in e1 e2
 
   ==> effect clauses in handlers substitution
   ==> handler /letrec/record/variant occurrances

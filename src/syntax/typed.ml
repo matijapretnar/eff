@@ -344,12 +344,15 @@ let for' ~loc i e1 e2 c up =
 let pure_apply ~loc e1 e2 =
   let ctx_e1, ty_e1, cnstrs_e1 = e1.scheme in
   let ctx_e2, ty_e2, cnstrs_e2 = e2.scheme in
-  let constraints = (Constraints.union cnstrs_e1 cnstrs_e2) in
-  let drt = Type.fresh_dirt () in
+  let ((ty, drt) as drty) = Type.fresh_dirty () in
+  let constraints =
+    Constraints.list_union [cnstrs_e1; cnstrs_e2]
+    |> Constraints.add_ty_constraint ~loc ty_e1 (Type.Arrow (ty_e2, drty)) in
+  let ty_sch = (ctx_e1 @ ctx_e2, ty, constraints) in
   (* XXX: We must ensure that drt is empty! *)
   {
     term = PureApply (e1, e2);
-    scheme = Scheme.clean_ty_scheme ~loc (ctx_e1 @ ctx_e2, Type.Arrow (ty_e1, (ty_e2, drt)), constraints);
+    scheme = Scheme.clean_ty_scheme ~loc ty_sch;
     location = loc;
   }
 
@@ -489,16 +492,16 @@ let let_in ~loc e1 c2 =
   }
 
 
-let pure_let_in ~loc e1 c2 =
+let pure_let_in ~loc e1 e2 =
   let ctx_e1, ty_e1, constraints_e1 = e1.scheme
-  and ctx_c2, (ty_p, drty_c2), constraints_c2 = c2.scheme in
+  and ctx_e2, (ty_p, ty_e2), constraints_e2 = e2.scheme in
   let constraints =
-    Constraints.union constraints_e1 constraints_c2 |>
+    Constraints.union constraints_e1 constraints_e2 |>
     Constraints.add_ty_constraint ~loc ty_e1 ty_p
   in
   {
-    term = PureLetIn (e1, c2);
-    scheme = Scheme.clean_ty_scheme ~loc (ctx_e1 @ ctx_c2, drty_c2, constraints);
+    term = PureLetIn (e1, e2);
+    scheme = Scheme.clean_ty_scheme ~loc (ctx_e1 @ ctx_e2, ty_e2, constraints);
     location = loc;
   }
 
