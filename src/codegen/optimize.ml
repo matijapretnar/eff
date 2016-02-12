@@ -485,7 +485,7 @@ and shallow_opt c =
     (*Bind x (Value e) c -> LetC x e c*)
     | Value e ->  shallow_opt(let_in ~loc:c.location e c2)
     | Bind (c3,c4) -> let (p2,cp2) = c4.term in 
-                      shallow_opt (bind ~loc:c.location c1 (abstraction ~loc:c.location p2 
+                      shallow_opt (bind ~loc:c.location c3 (abstraction ~loc:c.location p2 
                                               (shallow_opt (bind ~loc:c.location cp2 (abstraction ~loc:c.location pa ca)))))
     | LetIn(e,a) ->let (pal,cal) = a.term in
                    let newbind = shallow_opt (bind ~loc:c.location cal c2) in 
