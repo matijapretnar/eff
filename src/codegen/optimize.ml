@@ -173,17 +173,17 @@ and free_vars_handler h : VariableSet.t = let (pv,cv) = (h.value_clause).term in
                                                                 (VariableSet.remove pf1 (free_vars_c cf) ))
                                                             (List.fold_right func eff_list VariableSet.empty)  
 
-let rec occurances v c =
+let rec occurrences v c =
 
     begin match c.term with
-  | Value e -> let (ep,ef) =  occurances_e v e in (ep,ef)
+  | Value e -> let (ep,ef) =  occurrences_e v e in (ep,ef)
   | Let (li,cf) -> failwith "occ found a let, all should turn to binds" (*let func = fun a ->
                                 let(p1,c1) = a.term  in
                                 let (Var vp1) = (make_var_from_pattern (fst a)).term in
-                                let occ_c1 = occurances v c1 in
+                                let occ_c1 = occurrences v c1 in
                                 if (v == vp1) then (true , occ_c1) else (false, occ_c1)
                    in
-                   let (pcf,fcf) = occurances v cf in
+                   let (pcf,fcf) = occurrences v cf in
                    let new_list = List.map func li in
                    let func2 = fun (isequal, (pe,fe)) -> fun (start,(startpe,startfe)) -> 
                                     if (isequal) then ((true || start), (pe+startpe,fe+startfe))
@@ -191,93 +191,93 @@ let rec occurances v c =
                    in let (isequal ,(peall,feall)) = List.fold_right func2 new_list (false,(0,0))
                    in if isequal then (peall,feall) else (peall+pcf , fcf+feall)*)
                                   
-  | LetRec (li, c1) -> let (binder,free) = occurances_letrec v li c1 
+  | LetRec (li, c1) -> let (binder,free) = occurrences_letrec v li c1 
                         in (binder,free) (* still not fully implmented*)
   
 
   | Match (e, li) -> let func = fun a ->  
                                 let (pt,ct) = a.term in 
                                 let (Var vp1) = (make_var_from_pattern pt).term in
-                                let (ctb,ctf) = occurances v ct in 
+                                let (ctb,ctf) = occurrences v ct in 
                                 if(vp1 == v) then (0,0)
                                 else (ctb+ctf,0)
                   in let new_list = List.map func li in
                      let func2 = fun (b,f) -> fun (sb,sf) -> (b+sb,f+sf) in
                      let (resb,resf) = List.fold_right func2 new_list (0,0) in
-                     let (be,fe) = occurances_e v e in
+                     let (be,fe) = occurrences_e v e in
                      (resb+be, resf+fe)
                      
-  | While (c1, c2) -> let (c1b,c1f) = occurances v c1 in
-                      let (c2b,c2f) = occurances v c2 in
+  | While (c1, c2) -> let (c1b,c1f) = occurrences v c1 in
+                      let (c2b,c2f) = occurrences v c2 in
                       (c1b+c2b , c1f+c2f)
 
-  | For (vr, e1, e2, c1, b) -> let (e1b,e1f) = occurances v c1 in
+  | For (vr, e1, e2, c1, b) -> let (e1b,e1f) = occurrences v c1 in
                                if (v == vr) then (0, 0)
                                else (e1b+e1f,0)
 
-  | Apply (e1, e2) -> let (e1b,e1f) = occurances_e v e1 in
-                      let (e2b,e2f) = occurances_e v e2 in
+  | Apply (e1, e2) -> let (e1b,e1f) = occurrences_e v e1 in
+                      let (e2b,e2f) = occurrences_e v e2 in
                       (e1b+e2b , e1f+e2f)
   
-  | Handle (e, c1) -> let (e1b,e1f) = occurances_e v e in
-                      let (c2b,c2f) = occurances v c1 in
+  | Handle (e, c1) -> let (e1b,e1f) = occurrences_e v e in
+                      let (c2b,c2f) = occurrences v c1 in
                       (e1b+c2b , e1f+c2f)
-  | Check c1 -> occurances v c1
+  | Check c1 -> occurrences v c1
   | Call (eff, e1, a1) -> let (p1,cp1) = a1.term in
                            let (Var vp1) = (make_var_from_pattern p1).term in
-                           let (pe1,fe1) = occurances_e v e1 in
-                           let (pcp1,fcp1) = occurances v cp1 in
+                           let (pe1,fe1) = occurrences_e v e1 in
+                           let (pcp1,fcp1) = occurrences v cp1 in
                            if (vp1 == v) then (pe1, fe1 )
                          else
                               (pe1+pcp1+fcp1, fe1)
 
   | Bind (c1, a1) -> let (p1,cp1) = a1.term in
                            let (Var vp1) = (make_var_from_pattern p1).term in
-                           let (pc1,fc1) = occurances v c1 in
-                           let (pcp1,fcp1) = occurances v cp1 in
+                           let (pc1,fc1) = occurrences v c1 in
+                           let (pcp1,fcp1) = occurrences v cp1 in
                            if (vp1 == v) then (pc1, fc1 )
                          else
                               (pc1+pcp1+fcp1, fc1)
   | LetIn (e, a) -> let (p1,cp1) = a.term in
                            let (Var vp1) = (make_var_from_pattern p1).term in
-                           let (pe1,fe1) = occurances_e v e in
-                           let (pcp1,fcp1) = occurances v cp1 in
+                           let (pe1,fe1) = occurrences_e v e in
+                           let (pcp1,fcp1) = occurrences v cp1 in
                            if (vp1 == v) then (pe1, fe1 )
                          else
                               (pe1+pcp1+fcp1, fe1)
                             
   end
 
-and occurances_e v e = 
+and occurrences_e v e = 
   begin match e.term with 
   | Var vr  -> if (v == vr) then (0,1) else (0,0)
   | Const _ -> (0,0)
   | Tuple lst -> 
                 let func = fun a -> fun (sb,sf) -> let (pa,fa) = a in (pa+sb,fa+sf) in 
-                List.fold_right func (List.map (occurances_e v) lst ) (0,0)
+                List.fold_right func (List.map (occurrences_e v) lst ) (0,0)
   | Lambda a -> let (p1,cp1) = a.term in
                            let (Var vp1) = (make_var_from_pattern p1).term in
-                           let (pcp1,fcp1) = occurances v cp1 in
+                           let (pcp1,fcp1) = occurrences v cp1 in
                            if (vp1 == v) then (0, 0)
                          else
                               (pcp1+fcp1,0)
-  | Handler h -> occurances_handler v h
+  | Handler h -> occurrences_handler v h
   (*  | Record of (Common.field, expression) Common.assoc
   | Variant of Common.label * expression option *)
   | PureLambda pa -> let (p1,ep1) = pa.term in
                            let (Var vp1) = (make_var_from_pattern p1).term in
-                           let (pep1,fep1) = occurances_e v ep1 in
+                           let (pep1,fep1) = occurrences_e v ep1 in
                            if (vp1 == v) then (0, 0 )
                          else
                               (pep1+fep1,0)
 
-  | PureApply (e1,e2) -> let (e1b,e1f) = occurances_e v e1 in
-                         let (e2b,e2f) = occurances_e v e2 in
+  | PureApply (e1,e2) -> let (e1b,e1f) = occurrences_e v e1 in
+                         let (e2b,e2f) = occurrences_e v e2 in
                          (e1b+e2b , e1f+e2f)
   | PureLetIn (e,pa) -> let (p1,ep1) = pa.term in
                            let (Var vp1) = (make_var_from_pattern p1).term in
-                           let (pe1,fe1) = occurances_e v e in
-                           let (pep1,fep1) = occurances_e v ep1 in
+                           let (pe1,fe1) = occurrences_e v e in
+                           let (pep1,fep1) = occurrences_e v ep1 in
                            if (vp1 == v) then (pe1,fe1 )
                          else
                               (pe1+pep1+fep1, fe1)
@@ -285,9 +285,9 @@ and occurances_e v e =
   | _ -> failwith "occ matched a record or a variant, not handled yet ";
 end
 
-and occurances_handler v h = (0,0) (*not implmented yet*)
+and occurrences_handler v h = (0,0) (*not implmented yet*)
 
-and occurances_letrec v li c =(0,0) (*not implmented yet*)
+and occurrences_letrec v li c =(0,0) (*not implmented yet*)
 
 
 
@@ -609,7 +609,7 @@ and shallow_opt c =
       | Value e2 -> shallow_opt (value ~loc:c.location (pure_let_in ~loc:c.location e (pure_abstraction ~loc:c.location p e2)))
       | _ ->  Print.debug "in apply of let in for %t" (CamlPrint.print_computation cp);
                     let (Var vp) = (make_var_from_pattern p).term in
-                    let (occ_b,occ_f) = occurances vp cp in
+                    let (occ_b,occ_f) = occurrences vp cp in
                     if( occ_b == 0 && occ_f == 1)
                     then 
                       optimize_comp (substitute_var_comp cp vp e)
