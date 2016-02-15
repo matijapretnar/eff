@@ -1,11 +1,13 @@
 (*
  To Do list for optimization :
 
-  ==> optimize sub_computation (LetRec)
-  ==> Optimize sub_expression (Record/Variant)
-  ==> Freevarse (Records/ Variants)
+  ==> (done) optimize sub_computation (LetRec)
+  ==> (done) Optimize sub_expression (Record/Variant) 
+  ==> (done) Freevarse (Records/ Variants)
+  ==> free_vars letrec
+  ==> (done) occurances (patterns/variants)
   ==> fix all pattern matching warnings and not halt when pattern is not var
-  ==> Substitution for LetRec/patterns/variants
+  ==> Substitution for LetRec
   ==> Make regression tests
   ==> Handler beta reduction ?
   ==> Beta reduction with variables occur only once & not in a binder
@@ -144,8 +146,11 @@ and free_vars_e e : VariableSet.t =
                            let (Var vp1) = (make_var_from_pattern p1).term in
                             VariableSet.remove vp1 (free_vars_c cp1)
   | Handler h -> free_vars_handler h
-  (*  | Record of (Common.field, expression) Common.assoc
-  | Variant of Common.label * expression option *)
+  | Record lst -> List.fold_right ( fun (_, set) -> fun b -> VariableSet.union set b ) (Common.assoc_map free_vars_e lst) VariableSet.empty
+  | Variant (label,exp) -> begin match (Common.option_map free_vars_e exp) with 
+                           | Some set -> set
+                           | None -> VariableSet.empty
+                           end 
   | PureLambda pa -> let (p1,ep1) = pa.term in
                            let (Var vp1) = (make_var_from_pattern p1).term in
                             VariableSet.remove vp1 (free_vars_e ep1)
@@ -154,7 +159,7 @@ and free_vars_e e : VariableSet.t =
                            let (Var vp1) = (make_var_from_pattern p1).term in
                             VariableSet.union (free_vars_e e) (VariableSet.remove vp1 (free_vars_e ep1))
   | BuiltIn _ -> VariableSet.empty
-  | _ -> failwith "free vars matched a record or a variant, not handled yet ";
+  | Effect _->  VariableSet.empty
     end
 
 and free_vars_let_rec li c1 : VariableSet.t = VariableSet.empty
@@ -263,8 +268,11 @@ and occurrences_e v e =
                          else
                               (pcp1+fcp1,0)
   | Handler h -> occurrences_handler v h
-  (*  | Record of (Common.field, expression) Common.assoc
-  | Variant of Common.label * expression option *)
+  | Record lst -> List.fold_right ( fun (_, (boc,foc)) -> fun (sb,sf) -> (sb+boc,foc+sf) ) (Common.assoc_map (occurrences_e v) lst) (0,0)
+  | Variant (label,exp) -> begin match (Common.option_map (occurrences_e v) exp) with 
+                           | Some set -> set
+                           | None -> (0,0)
+                           end 
   | PureLambda pa -> let (p1,ep1) = pa.term in
                            let (Var vp1) = (make_var_from_pattern p1).term in
                            let (pep1,fep1) = occurrences_e v ep1 in
@@ -374,6 +382,10 @@ and substitute_var_exp e vr exp =
       | Var v -> if (v == vr) then (print_endline "did a sub" ; exp) else var ~loc:loc v e.scheme
       | Tuple lst -> let func = fun a -> substitute_var_exp a vr exp in
                      tuple ~loc:loc (List.map func lst) 
+      | Record lst -> record ~loc:loc (Common.assoc_map (fun a -> substitute_var_exp a vr exp)  lst)
+      | Variant (label,ex) ->  let func = (fun a -> substitute_var_exp a vr exp) in
+                                variant ~loc:loc (label, (Common.option_map func ex)) 
+                           
       | Lambda a -> print_endline "matched with lambda in sub var";
                     let (p,c) = a.term in
                     let (Var v) = (make_var_from_pattern p).term in
@@ -452,7 +464,17 @@ and substitute_var_handler h vr exp = let loc = Location.unknown in
 
                                       let func = fun a -> let (e,ab2) = a in
                                                  let (p1,p2,ck) = ab2.term in
-                                                 a in
+                                                 let new_exp = (substitute_var_exp (pure_lambda ~loc:loc 
+                                                                  (pure_abstraction ~loc:loc p1 
+                                                                  (lambda ~loc:loc (abstraction ~loc:loc p2 ck)))) vr exp) in
+                                                 let PureLambda panew = new_exp.term  in
+                                                 let (p1new,temp_exp1)  = panew.term in
+                                                 let Lambda anew = temp_exp1.term in
+                                                 let (p2new,cknew) = anew.term in
+                                                 (e, (abstraction2 ~loc:loc p1new p2new cknew)) in
+
+
+
 
                                       begin match new_value_lambda.term with
                                       | Lambda new_value_abstraction -> 
@@ -663,7 +685,9 @@ and opt_sub_comp c =
   | Value e -> value ~loc:c.location (optimize_expr e)
   | Let (li,c1) -> let func = fun (pa,co) -> (pa, optimize_comp co) in
                     let' ~loc:c.location (List.map func li) (optimize_comp c1)
-  | LetRec (li, c1) -> let_rec' ~loc:c.location li (optimize_comp c1)
+  | LetRec (li, c1) -> let_rec' ~loc:c.location (List.map (fun (v,abs)-> let (p,comp) = abs.term in
+                                                                         (v, abstraction ~loc:c.location p (optimize_comp comp)))
+                                                                         li)  (optimize_comp c1)
   | Match (e, li) -> match' ~loc:c.location (optimize_expr e) li
   | While (c1, c2) -> while' ~loc:c.location (optimize_comp c1) (optimize_comp c2)
   | For (v, e1, e2, c1, b) -> for' ~loc:c.location v (optimize_expr e1) (optimize_expr e2) (optimize_comp c1) b
@@ -678,20 +702,21 @@ and opt_sub_expr e =
   (* Print.debug "Optimizing %t" (CamlPrint.print_expression e); *)
   match e.term with
   | Const c -> const ~loc:e.location c
-  | BuiltIn f -> built_in ~loc:e.location f e.scheme
+  | BuiltIn f -> e
+  | Record lst -> record ~loc:e.location (Common.assoc_map optimize_expr lst)
+  | Variant (label,exp) -> variant ~loc:e.location ( label , Common.option_map optimize_expr exp)
   | Tuple lst -> tuple ~loc:e.location (List.map optimize_expr lst)
   | Lambda a -> lambda ~loc:e.location (optimize_abstraction a)
   | PureLambda pa -> pure_lambda ~loc:e.location (optimize_pure_abstraction pa)
   | PureApply (e1, e2)-> pure_apply ~loc:e.location (optimize_expr e1) (optimize_expr e2)
   | PureLetIn (e1, pa) -> pure_let_in ~loc:e.location (optimize_expr e1) (optimize_pure_abstraction pa)
   | Handler h -> optimize_handler h
-  | Effect eff -> effect ~loc:e.location eff
+  | Effect eff -> e
   | Var x -> 
       begin match Common.lookup x !inlinable with
       | Some e -> opt_sub_expr e
       | _ -> e
       end
-  | _ -> failwith "matched record or variant in optimize sub expression. Not handled yet, or just an effect"
 
 
 
