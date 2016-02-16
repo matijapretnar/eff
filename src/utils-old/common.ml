@@ -16,8 +16,8 @@ let compose f g x = f (g x)
 type comparison = Less | Equal | Greater | Invalid
 
 (** Variants for the built-in list type *)
-let cons = "$1cons"
-let nil = "$0nil"
+let cons = "(::)"
+let nil = "[]"
 
 (** Association lists *)
 type ('key, 'value) assoc = ('key * 'value) list
