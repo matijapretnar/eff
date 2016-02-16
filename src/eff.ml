@@ -12,7 +12,8 @@ let help_text = "Toplevel commands:
 let files = ref []
 let to_be_compiled = ref []
 let add_file interactive filename = (files := (filename, interactive) :: !files)
-let compile_file filename = (to_be_compiled := filename :: !to_be_compiled; Config.interactive_shell := false)
+let load_pervasives = ref true
+let compile_file filename = (load_pervasives := false; to_be_compiled := filename :: !to_be_compiled; Config.interactive_shell := false)
 
 (* Command-line options *)
 let options = Arg.align [
@@ -176,8 +177,21 @@ and use_file env (filename, interactive) =
     List.fold_left (exec_cmd interactive) env cmds
 
 let compile_file st filename =
+  let pervasives_cmds =
+    match !Config.pervasives_file with
+    | Config.PervasivesNone -> []
+    | Config.PervasivesFile f -> Lexer.read_file (parse Parser.file) f
+    | Config.PervasivesDefault ->
+      (* look for pervasives next to the executable and in the installation
+      directory if they are not there *)
+      let pervasives_development = Filename.concat (Filename.dirname Sys.argv.(0)) "pervasives.eff" in
+      let f = (if Sys.file_exists pervasives_development
+        then pervasives_development
+        else Filename.concat Version.effdir "pervasives.eff") in
+      Lexer.read_file (parse Parser.file) f
+  in
   let cmds = Lexer.read_file (parse Parser.file) filename in
-  let cmds = List.map Desugar.toplevel cmds in
+  let cmds = List.map Desugar.toplevel (pervasives_cmds @ cmds) in
   let cmds, _ = type_cmds st cmds in
   Print.debug "UNOPTIMIZED CODE:@.%t@." (CamlPrint.print_commands cmds);
   let cmds = Optimize.optimize_commands cmds in
@@ -247,7 +261,7 @@ let main =
   begin
     match !Config.pervasives_file with
     | Config.PervasivesNone -> ()
-    | Config.PervasivesFile f -> add_file false f
+    | Config.PervasivesFile f -> if !load_pervasives then add_file false f
     | Config.PervasivesDefault ->
       (* look for pervasives next to the executable and in the installation
       directory if they are not there *)
@@ -255,7 +269,7 @@ let main =
       let f = (if Sys.file_exists pervasives_development
         then pervasives_development
         else Filename.concat Version.effdir "pervasives.eff") in
-      add_file false f
+      if !load_pervasives then add_file false f
   end;
   try
     (* Run and load all the specified files. *)
