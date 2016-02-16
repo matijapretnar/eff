@@ -47,7 +47,7 @@ and print_computation ?max_level c ppf =
   | Typed.Value e ->
       print ~at_level:1 "value %t" (print_expression ~max_level:0 e)
   | Typed.Match (e, lst) ->
-      print ~at_level:2 "(match %t with @[<hov>%t@])" (print_expression e) (Print.sequence " | " print_abstraction lst)
+      print ~at_level:2 "(match %t with @[<hov>%t@] | _ -> assert false)" (print_expression e) (Print.sequence " | " print_abstraction lst)
   | Typed.While (c1, c2) ->
       print ~at_level:2 "while %t do %t done" (print_computation c1) (print_computation c2)
   | Typed.For (i, e1, e2, c, up) ->
@@ -108,6 +108,8 @@ let print_type_param (Type.Ty_Param n) ppf =
 let rec print_type ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
+  | Type.Apply ("empty", _) ->
+      print "'empty"
   | Type.Apply (ty_name, args) ->
       print ~at_level:1 "%t %s" (print_args args) ty_name
   | Type.Param p ->
