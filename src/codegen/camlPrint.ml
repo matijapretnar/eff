@@ -47,7 +47,7 @@ and print_computation ?max_level c ppf =
   | Typed.Match (e, []) ->
       print ~at_level:2 "(match %t with _ -> assert false)" (print_expression e)
   | Typed.Match (e, lst) ->
-      print ~at_level:2 "(match %t with @[<hov>%t@])" (print_expression e) (Print.sequence " | " print_abstraction lst)
+      print ~at_level:2 "(match %t with @[<v>|%t@])" (print_expression e) (Print.sequence "|" print_abstraction lst)
   | Typed.While (c1, c2) ->
       print ~at_level:2 "while %t do %t done" (print_computation c1) (print_computation c2)
   | Typed.For (i, e1, e2, c, up) ->
@@ -64,10 +64,10 @@ and print_computation ?max_level c ppf =
   | Typed.Check c' ->
       print ~at_level:1 "check %S %t" (Common.to_string Location.print c.Typed.location) (print_computation ~max_level:0 c')
   | Typed.Call (eff, e, a) ->
-      print ~at_level:1 "call %t %t (fun %t)"
+      print ~at_level:1 "call %t %t (@[fun %t@])"
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
   | Typed.Bind (c1, a) ->
-      print ~at_level:2 "@[<hov>%t@ >>(* bind *) fun@ %t@]" (print_computation ~max_level:0 c1) (print_abstraction a)
+      print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
   | Typed.LetIn (e, {Typed.term = (p, c)}) ->
       print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression e) (print_computation c)
 
@@ -81,10 +81,10 @@ and print_effect_clauses eff_clauses ppf =
       (print_effect eff) (print_pattern p1) (print_pattern p2) (print_computation c) (print_effect_clauses cases)
 
 and print_abstraction {Typed.term = (p, c)} ppf =
-  Format.fprintf ppf "%t ->@ %t" (print_pattern p) (print_computation c)
+  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
 
 and print_pure_abstraction {Typed.term = (p, e)} ppf =
-  Format.fprintf ppf "%t ->@ %t" (print_pattern p) (print_expression e)
+  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_expression e)
 
 and print_multiple_bind (lst, c') ppf =
   match lst with

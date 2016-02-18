@@ -1,5 +1,1 @@
-external f : int -> int -> int = "+"
-
-;;
-
-f 3 5
+float_of_int ((3 + 5) * (2 - 5)) *. (3.0 -. (2.0 /. 1.0))
