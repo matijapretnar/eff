@@ -5,19 +5,20 @@
   ==> (done) Optimize sub_expression (Record/Variant) 
   ==> (done) Freevarse (Records/ Variants)
   ==> free_vars letrec
-  ==> (done) occurances (patterns/variants)
-  ==> fix all pattern matching warnings and not halt when pattern is not var
+  ==> (done) occurrences (patterns/variants)
+  ==> fix all pattern matching warnings and not halt when pattern is not var (PRIORITY)
   ==> Substitution for LetRec
   ==> Make regression tests
-  ==> Handler beta reduction ?
+  ==> Handler beta reduction (done only when handle call... with handler..)
   ==> Beta reduction with variables occur only once & not in a binder
       (let-in apply) (pure_let-in pure_apply) (bind)
   ==> (let x = e in e1) e2 -> let x = e in e1 e2
 
   ==> effect clauses in handlers substitution
-  ==> handler /letrec/record/variant occurrances
+  ==> handler /letrec/record/variant occurrences
 
-the idea is if it appeared "Free" under a pattern
+  ==> effect eff ===> fun param -> call eff param (fun result -> value result)
+  ==> match beta reduction
 
 *)
 
@@ -75,8 +76,10 @@ let inlinable_definitions =
 let inlinable = ref []
 
 
-and make_var_from_pattern p =   let (Pattern.Var z) = fst (p.term) in
-                                var ~loc:p.location z p.scheme
+and make_var_from_pattern p =   match fst (p.term) with 
+                                | Pattern.Var z ->  var ~loc:p.location z p.scheme
+                                | Pattern.Const z -> const ~loc:p.location z
+                                | Pattern.Tuple z -> failwith "MATCHED A TUPLE PATTERN" 
 
 
 let make_var_counter =
@@ -103,6 +106,55 @@ module VariableSet = Set.Make(
     let compare = Pervasives.compare
   end
   )
+
+
+let rec is_pure_comp c = 
+  begin match c.term with
+  | Value e -> true
+  | Let (li,cf) -> is_pure_comp cf
+  
+  | LetRec (li, c1) -> is_pure_comp c1
+  
+
+  | Match (e, li) -> let func = fun a ->  fun b ->  
+                                let (pt,ct) = a.term in 
+                                (is_pure_comp ct) && b
+                     in (List.fold_right  func li true)
+                     
+  | While (c1, c2) -> (is_pure_comp c1) && (is_pure_comp c2)
+  | For (v, e1, e2, c1, b) -> is_pure_comp c1
+  | Apply (e1, e2) -> (is_pure_exp e1) && (is_pure_exp e2)
+  | Handle (e, c1) -> (is_pure_exp e) && (is_pure_comp c1)
+  | Check c1 -> is_pure_comp c1
+  | Call _ -> false
+  | Bind (c1, a1) -> let (p1,cp1) = a1.term in
+                           (is_pure_comp c1) && (is_pure_comp cp1)
+  | LetIn (e, a) -> let (p1,cp1) = a.term in
+                           (is_pure_exp e) && (is_pure_comp cp1)
+  end 
+
+and is_pure_exp e =
+  begin match e.term with 
+  | Var v  -> true
+  | Const _ -> true
+  | Tuple lst -> List.fold_right (&&) (List.map is_pure_exp lst) true
+  | Lambda a -> let (p1,cp1) = a.term in
+                           is_pure_comp cp1
+  | Handler h -> true
+  | Record lst -> true
+  | Variant (label,exp) -> begin match (Common.option_map is_pure_exp exp) with 
+                           | Some set -> set
+                           | None -> true
+                           end 
+  | PureLambda pa -> let (p1,ep1) = pa.term in
+                           is_pure_exp ep1
+  | PureApply (e1,e2) -> (is_pure_exp e1) && (is_pure_exp e2)
+  | PureLetIn (e,pa) -> let (p1,ep1) = pa.term in
+                           (is_pure_exp e) && (is_pure_exp ep1)
+  | BuiltIn _ -> true
+  | Effect _->  true
+    end
+
 
 let rec free_vars_c c : VariableSet.t = 
   begin match c.term with 
@@ -308,6 +360,7 @@ let print_free_vars c = print_endline "in free vars print ";
 let is_atomic e = begin match e.term with 
                     | Var _ -> true
                     | Const _ -> true
+                    | Tuple []-> true
                     | _ -> false
                   end
 
@@ -324,13 +377,24 @@ let rec substitute_var_comp comp vr exp =
           | Value e -> value ~loc:loc (substitute_var_exp e vr exp)
           | Let (li,cf) ->  let' ~loc:loc li cf
           | LetRec (li, c1) -> failwith "substitute_var_comp for let_rec not implemented"
-          | Match (e, li) -> failwith "substitute_var_comp for match not implemented"
+          | Match (e, li) -> let func = (fun a -> let (p,c) = a.term in 
+                                         match fst (p.term) with 
+                                         | Pattern.Const _-> a
+                                         | _ -> 
+                                         let temp_lambda = lambda ~loc:loc (abstraction ~loc:loc p c) in 
+                                         let new_temp_lambda = substitute_var_exp temp_lambda vr exp in
+                                         let (Lambda newa) = new_temp_lambda.term in
+                                         newa) in
+                            match' ~loc:loc (substitute_var_exp e vr exp) (List.map func li)
           | While (c1, c2) -> while' ~loc:loc (substitute_var_comp c1 vr exp) (substitute_var_comp c2 vr exp)
           | For (v, e1, e2, c1, b) -> for' ~loc:loc v (substitute_var_exp e1 vr exp) (substitute_var_exp e2 vr exp) (substitute_var_comp c1 vr exp) b
           | Apply (e1, e2) -> apply ~loc:loc (substitute_var_exp e1 vr exp) (substitute_var_exp e2 vr exp)
           | Handle (e, c1) -> handle ~loc:loc (substitute_var_exp e vr exp) (substitute_var_comp c1 vr exp)
           | Check c1 -> check ~loc:loc (substitute_var_comp c1 vr exp)
-          | Call (eff, e1, a1) -> call ~loc:loc eff (substitute_var_exp e1 vr exp )  a1
+          | Call (eff, e1, a1) -> let (p,c1) = a1.term in 
+                                  let new_lambda = (substitute_var_exp (lambda ~loc:loc (abstraction ~loc:loc p c1)) vr exp) in 
+                                  let (Lambda new_a) = new_lambda.term in
+                                  call ~loc:loc eff (substitute_var_exp e1 vr exp )  new_a
           
           | Bind (c1, a1) -> print_endline "matched with bind in sub var";
                              let (p,c) = a1.term in
@@ -379,7 +443,7 @@ and substitute_var_exp e vr exp =
   (* Print.debug "Substituting %t" (CamlPrint.print_expression e); *)
     let loc = Location.unknown in
     begin match e.term with 
-      | Var v -> if (v == vr) then (print_endline "did a sub" ; exp) else var ~loc:loc v e.scheme
+      | Var v -> if (v == vr) then (Print.debug "Substituting %t to %t" (CamlPrint.print_expression e) (CamlPrint.print_expression exp) ; exp) else var ~loc:loc v e.scheme
       | Tuple lst -> let func = fun a -> substitute_var_exp a vr exp in
                      tuple ~loc:loc (List.map func lst) 
       | Record lst -> record ~loc:loc (Common.assoc_map (fun a -> substitute_var_exp a vr exp)  lst)
@@ -387,8 +451,9 @@ and substitute_var_exp e vr exp =
                                 variant ~loc:loc (label, (Common.option_map func ex)) 
                            
       | Lambda a -> print_endline "matched with lambda in sub var";
-                    let (p,c) = a.term in
-                    let (Var v) = (make_var_from_pattern p).term in
+                    Print.debug "searching for  %t in %t to be sub. to %t" (CamlPrint.print_variable vr) (CamlPrint.print_abstraction a) (CamlPrint.print_expression exp) ; 
+                    let (p,c) = a.term in 
+                    let (Var v) = (make_var_from_pattern p).term in Print.debug "Substituting %t" (CamlPrint.print_abstraction a); 
                     if (v == vr) then  begin print_endline "pattern = variable" ; e end
                                  else if not( VariableSet.mem v (free_vars_e exp) )
                                       then 
@@ -405,7 +470,7 @@ and substitute_var_exp e vr exp =
                                                            ( substitute_var_comp (substitute_var_comp c v fresh_var) vr exp))
                                          end
 
-      | Handler h -> handler ~loc:loc (substitute_var_handler h vr exp)
+      | Handler h -> handler ~loc:loc h (* (substitute_var_handler h vr exp) *)
 
 
       | PureLambda pa -> print_endline "matched with pure_lambda in sub var";
@@ -496,11 +561,23 @@ and substitute_var_handler h vr exp = let loc = Location.unknown in
 let rec optimize_comp c = shallow_opt ( opt_sub_comp c)
 
 and shallow_opt c = 
-   (*Print.debug "Shallow optimizing %t" (CamlPrint.print_computation c);*)
+  (*Print.debug "Shallow optimizing %t" (CamlPrint.print_computation c);*)
   match c.term with
 
   | Let (pclist,c2) ->  optimize_comp (folder pclist c2)
-  
+  | Match (e,lst) -> begin match e.term with
+                    | Const cc -> let func = (fun a -> let (p,clst) = a.term in 
+                                              begin match (fst p.term) with
+                                              | Pattern.Const cp when (cc = cp) -> true
+                                              | _ -> false
+                                              end) in
+                                  begin match (List.find func lst) with
+                                  | abs -> let (_,c')= abs.term in Print.debug "the constant value is %t" (CamlPrint.print_computation c')
+                                            ;(c')
+                                  | _ -> c
+                                  end
+                    | _ -> c
+                    end
   | Bind (c1, c2) ->
     let (pa,ca) = c2.term in
     begin match c1.term with
@@ -533,7 +610,19 @@ and shallow_opt c =
                      | _ -> c
                      end                                   
     
-
+    | Handle(h,ch)-> begin match h.term with
+                     | Handler h -> begin match ch.term with
+                                    | Value ve ->
+                                      if (is_pure_comp ch) then
+                                        begin 
+                                        let newlambda = lambda ~loc:c.location h.value_clause in
+                                        optimize_comp (apply ~loc:c.location newlambda ve)
+                                        end
+                                      else c
+                                    | _ ->c
+                                   end
+                     | _ -> c
+                   end
     | Call(eff,e,k) ->  let loc = Location.unknown in
                         let z = Typed.Variable.fresh "z" in 
                         let( _ , (input_k_ty , _) , _ ) = k.scheme in
@@ -544,7 +633,7 @@ and shallow_opt c =
                                 } in
                         let vz = var ~loc:loc z (Scheme.simple input_k_ty) in
                         let (p_k,c_k) = k.term in 
-                        let k_lambda = lambda ~loc:loc (abstraction ~loc:loc p_k c_k) in
+                        let k_lambda = shallow_opt_e (lambda ~loc:loc (abstraction ~loc:loc p_k c_k)) in
                         let inner_apply = shallow_opt (apply ~loc:loc k_lambda vz) in
                         let inner_bind = shallow_opt (bind ~loc:loc inner_apply (abstraction ~loc:loc pa ca)) in
                         shallow_opt (call ~loc:loc eff e (abstraction ~loc:loc pz inner_bind))
@@ -552,6 +641,7 @@ and shallow_opt c =
     end
 
   | Handle (e1,c1) ->
+    (*Print.debug "handler computation : %t" (CamlPrint.print_computation c1);*)
     begin match c1.term with
 
     (*Handle h (LetC x e c) -> LetC (x e) (Handle c h)*)
@@ -564,11 +654,12 @@ and shallow_opt c =
     
                  (*Handle (Handler vc ocs) (Value v) -> Apply (Lambda vc) v *)
                  | Handler h -> shallow_opt(
-                                apply ~loc:c.location (lambda ~loc:c.location h.value_clause) v)
+                                apply ~loc:c.location ( shallow_opt_e (lambda ~loc:c.location h.value_clause)) v)
                  | _-> c
                  end
 
-    | Call (eff,exp,k) -> begin match e1.term with
+    | Call (eff,exp,k) -> 
+                          begin match e1.term with
                           | Handler h -> 
                                 let loc = Location.unknown in
                                 let z = Typed.Variable.fresh "z" in 
@@ -580,16 +671,16 @@ and shallow_opt c =
                                         } in
                                 let vz = var ~loc:loc z (Scheme.simple input_k_ty) in
                                 let (p_k,c_k) = k.term in 
-                                let k_lambda = lambda ~loc:loc (abstraction ~loc:loc p_k c_k) in
+                                let k_lambda = shallow_opt_e (lambda ~loc:loc (abstraction ~loc:loc p_k c_k)) in
                                 let e2_apply = shallow_opt (apply ~loc:loc k_lambda vz) in
                                 let e2_handle = shallow_opt (handle ~loc:loc e1 e2_apply) in
-                                let e2_lambda = lambda ~loc:loc (abstraction ~loc:loc pz e2_handle) in
+                                let e2_lambda = shallow_opt_e (lambda ~loc:loc (abstraction ~loc:loc pz e2_handle)) in
                                 begin match Common.lookup eff h.effect_clauses with
                                         | Some result -> 
                                           let (p1,p2,cresult) = result.term in
-                                          let e1_lamda =  lambda ~loc:loc (abstraction ~loc:loc p2 cresult) in
-                                          let e1_purelambda = pure_lambda ~loc:loc (pure_abstraction ~loc:loc p1 e1_lamda) in
-                                          let e1_pureapply = pure_apply ~loc:loc e1_purelambda exp in
+                                          let e1_lamda =  shallow_opt_e (lambda ~loc:loc (abstraction ~loc:loc p2 cresult)) in
+                                          let e1_purelambda = shallow_opt_e (pure_lambda ~loc:loc (pure_abstraction ~loc:loc p1 e1_lamda)) in
+                                          let e1_pureapply = shallow_opt_e (pure_apply ~loc:loc e1_purelambda exp) in
                                           shallow_opt (apply ~loc:loc e1_pureapply e2_lambda)
 
                                         | None ->
@@ -605,20 +696,28 @@ and shallow_opt c =
      (*Apply (PureLambda a) e -> Value (PureApply (PureLambda a) e)*)
      | Lambda a ->
           let (p,c') = a.term in
-          if is_atomic e2 
+          (*WARNING : Adhoc to remove the unit pattern and sub. with a var pattern to make it work *)
+          if true 
             then  
-                let Pattern.Var vp = (fst p.term) in
-                let tempvar = var ~loc:c.location  vp p.scheme in
-                let Var v = tempvar.term in
-                optimize_comp (substitute_var_comp c' v e2)
+              begin match (fst p.term) with
+              |  Pattern.Tuple s ->  begin match e2.term with
+                                     | Tuple [] -> print_endline "wesel hena" ;shallow_opt c'
+                                     | _-> c
+                                     end 
+              | _ -> 
+                   let Pattern.Var vp = (fst p.term) in
+                   let tempvar = var ~loc:c.location  vp p.scheme in
+                   let Var v = tempvar.term in
+                   optimize_comp (substitute_var_comp c' v e2)
+              end
           else 
           begin match c'.term with 
           | Value v -> shallow_opt (value ~loc:c.location @@ 
-              pure_apply ~loc:c.location (pure_lambda ~loc:e1.location (pure_abstraction ~loc:a.location p v)) e2)
+              shallow_opt_e (pure_apply ~loc:c.location (shallow_opt_e (pure_lambda ~loc:e1.location (pure_abstraction ~loc:a.location p v))) e2))
           | _ -> c
           end
      | PureLambda pure_abs ->    shallow_opt (value ~loc:c.location 
-                                 (pure_apply ~loc:c.location (pure_lambda ~loc:c.location pure_abs) e2 ))
+                                 (shallow_opt_e (pure_apply ~loc:c.location (shallow_opt_e (pure_lambda ~loc:c.location pure_abs)) e2 )))
      | _ -> c
      end
   
@@ -626,7 +725,10 @@ and shallow_opt c =
      let (p,cp) = a.term in
       if is_atomic e then 
           let (Var vp) = (make_var_from_pattern p).term in
-          optimize_comp (substitute_var_comp cp vp e)
+          Print.debug "from let in : sub %t \n to \n %t \n in \n %t "(CamlPrint.print_variable vp) (CamlPrint.print_expression e) (CamlPrint.print_computation cp);
+          let cres = (substitute_var_comp cp vp e) in 
+           Print.debug "To get\n %t" (CamlPrint.print_computation cres);
+           optimize_comp cres
       else 
       begin match cp.term with
       | Value e2 -> shallow_opt (value ~loc:c.location (pure_let_in ~loc:c.location e (pure_abstraction ~loc:c.location p e2)))
@@ -662,20 +764,39 @@ and shallow_opt_e e =
                                 substitute_var_exp ep vp ex
                              else
                                e 
-      | PureApply (e1,e2) -> 
+    | PureApply (e1,e2) -> 
+            Print.debug "what's in the pure apply :\n %t" (CamlPrint.print_expression e);
             begin match e1.term with 
             | PureLambda pa -> 
                 let (p,e') = pa.term in
                 if is_atomic e2 
-                then  
+                then 
+                begin match (fst p.term) with
+                | Pattern.Tuple [] -> 
+                              begin match e2.term with
+                              | Tuple [] -> (optimize_expr e') 
+                              |_ -> e
+                            end
+
+                |_->     
                     let Pattern.Var vp = (fst p.term) in
                     let tempvar = var ~loc:e.location  vp p.scheme in
                     let Var v = tempvar.term in
-                    optimize_expr (substitute_var_exp e' v e2) 
-                else
-                  e
+                    optimize_expr (substitute_var_exp e' v e2)
+                end 
+                
+                else e
+                
             | _ -> e
             end
+      | Effect eff ->  let (eff_name, (ty_par, ty_res)) = eff in 
+                   let param = make_var_from_counter (Scheme.simple ty_par) in
+                   let result = make_var_from_counter (Scheme.simple ty_res) in
+                   let res_pat = make_pattern_from_var result in
+                   let param_pat = make_pattern_from_var param in
+                   let kincall = abstraction ~loc:e.location res_pat (value ~loc:e.location result) in
+                   let call_cons = call ~loc:e.location eff param kincall in
+                   optimize_expr (lambda ~loc:e.location (abstraction ~loc:e.location param_pat call_cons))
       | _ -> e
       end
 
@@ -688,7 +809,7 @@ and opt_sub_comp c =
   | LetRec (li, c1) -> let_rec' ~loc:c.location (List.map (fun (v,abs)-> let (p,comp) = abs.term in
                                                                          (v, abstraction ~loc:c.location p (optimize_comp comp)))
                                                                          li)  (optimize_comp c1)
-  | Match (e, li) -> match' ~loc:c.location (optimize_expr e) li
+  | Match (e, li) -> match' ~loc:c.location (optimize_expr e) (List.map optimize_abstraction li)
   | While (c1, c2) -> while' ~loc:c.location (optimize_comp c1) (optimize_comp c2)
   | For (v, e1, e2, c1, b) -> for' ~loc:c.location v (optimize_expr e1) (optimize_expr e2) (optimize_comp c1) b
   | Apply (e1, e2) -> apply ~loc:c.location (optimize_expr e1) (optimize_expr e2)
@@ -711,7 +832,7 @@ and opt_sub_expr e =
   | PureApply (e1, e2)-> pure_apply ~loc:e.location (optimize_expr e1) (optimize_expr e2)
   | PureLetIn (e1, pa) -> pure_let_in ~loc:e.location (optimize_expr e1) (optimize_pure_abstraction pa)
   | Handler h -> optimize_handler h
-  | Effect eff -> e
+  | Effect eff ->  e
   | Var x -> 
       begin match Common.lookup x !inlinable with
       | Some e -> opt_sub_expr e
