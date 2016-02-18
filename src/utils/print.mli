@@ -69,6 +69,7 @@ val print :
 (** [sequence sep pp lst ppf] uses pretty-printer [pp] to print elements of
     [lst] separated by [sep] to the formatter [ppf]. *)
 val sequence : string -> ('a -> Format.formatter -> unit) -> 'a list -> Format.formatter -> unit
+val cases : ('a -> Format.formatter -> unit) -> 'a list -> Format.formatter -> unit
 
 (** [tuple pp lst ppf] prints a tuple given by a list of elements [lst] using
     a pretty-printer [pp] to the formatter [ppf]. *)
