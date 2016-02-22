@@ -8,9 +8,7 @@
       (let-in apply) (pure_let-in pure_apply) (bind)
   ==> free_vars letrec
   ==> (done) occurrences (patterns/variants)
-  ==> fix all pattern matching warnings and not halt when pattern is not var (PRIORITY)
-      --> done with freevars/sub/occurrences
-      --> Missing the call to these function in the new way
+  ==> (donefix all pattern matching warnings and not halt when pattern is not var (PRIORITY)
   ==> Substitution for LetRec
   ==> Make regression tests
 
@@ -134,7 +132,9 @@ let rec is_pure_comp c =
   | Value e -> true
   | Let (li,cf) -> is_pure_comp cf
   
-  | LetRec (li, c1) -> is_pure_comp c1
+  | LetRec (li, c1) -> let func = (fun (_,abs)-> let (_,c') = abs.term in 
+                                    is_pure_comp c') in 
+                        List.fold_right (&&) (List.map func li) (is_pure_comp c1)
   
 
   | Match (e, li) -> let func = fun a ->  fun b ->  
@@ -248,7 +248,17 @@ and free_vars_e e : VariableSet.t =
   | Effect _->  VariableSet.empty
     end
 
-and free_vars_let_rec li c1 : VariableSet.t = VariableSet.empty
+and free_vars_let_rec li c1 : VariableSet.t = 
+                                    let var_binders_set = VariableSet.of_list (List.map (fun (v,_) -> v) li) in
+                                    let func = (fun a ->  fun b ->  
+                                                let(_,abs) = a in 
+                                                let (ap,ac) = abs.term in
+                                                let pattern_vars = Pattern.pattern_vars (ap.term) in
+                                                let vars_set = VariableSet.of_list pattern_vars in
+                                                VariableSet.union (VariableSet.diff (free_vars_c ac) vars_set) b )in
+                                    let free_vars = List.fold_right func li (free_vars_c c1) in
+                                    VariableSet.diff free_vars var_binders_set
+
 
 and free_vars_handler h : VariableSet.t = let (pv,cv) = (h.value_clause).term in 
                                           let (pf,cf) = (h.finally_clause).term in
@@ -417,7 +427,7 @@ let rec substitute_var_comp comp vr exp =
         begin match comp.term with
           | Value e -> value ~loc:loc (substitute_var_exp e vr exp)
           | Let (li,cf) ->  let' ~loc:loc li cf
-          | LetRec (li, c1) -> failwith "substitute_var_comp for let_rec not implemented"
+          | LetRec (li, c1) -> comp
           | Match (e, li) -> let func = (fun a -> let (p,c) = a.term in 
                                          match fst (p.term) with 
                                          | Pattern.Const _-> a
@@ -613,6 +623,7 @@ let rec substitute_pattern_comp c p exp maincomp =
                                                     | Tuple elst -> optimize_comp(List.fold_right2 (fun pat -> fun exp -> fun co -> substitute_pattern_comp  co pat exp maincomp) lst elst c)
                                                     | _ -> maincomp
                                                     end
+                              | Pattern.Record _ ->maincomp
                               | Pattern.Variant _ -> maincomp
                               | Pattern.Const _ -> maincomp
                               | Pattern.Nonbinding -> maincomp
@@ -628,10 +639,12 @@ and substitute_pattern_exp e p exp mainexp =
                                                     else
                                                       mainexp
                               | Pattern.Tuple [] when (exp.term = Tuple [])-> e
-                              (*| Pattern.Tuple lst -> List.fold_right (fun a -> fun b -> substitute_pattern_comp  b a exp) lst c
-                              | Pattern.Record lst -> List.fold_right (fun a -> fun b -> substitute_pattern_comp b a c exp) lst c*)
-                              | Pattern.Variant (_, None) -> mainexp
-                              (*| Pattern.Variant (_, Some px) -> substitute_pattern_comp c (px, snd (p.term)) exp *)
+                              | Pattern.Tuple lst -> begin match exp.term with
+                                                    | Tuple elst -> optimize_expr(List.fold_right2 (fun pat -> fun exp -> fun co -> substitute_pattern_exp  co pat exp mainexp) lst elst e)
+                                                    | _ -> mainexp
+                                                    end
+                              | Pattern.Record _ -> mainexp
+                              | Pattern.Variant _ -> mainexp
                               | Pattern.Const _ -> mainexp
                               | Pattern.Nonbinding -> mainexp
                             end
