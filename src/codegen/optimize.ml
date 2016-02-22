@@ -599,34 +599,46 @@ and substitute_var_handler h vr exp = let loc = Location.unknown in
                                     end
                                       
                           
-and substitute_pattern_comp c p exp =
-                          begin match fst (p.term) with
-                              | Pattern.Var x -> substitute_var_comp c x exp
-                              | Pattern.As (p,x) -> substitute_var_comp c x exp
-                              (*| Pattern.Tuple lst -> List.fold_right (fun a -> fun b -> substitute_pattern_comp  b a exp) lst c
-                              | Pattern.Record lst -> List.fold_right (fun a -> fun b -> substitute_pattern_comp b a c exp) lst c*)
-                              | Pattern.Variant (_, None) -> c
-                              (*| Pattern.Variant (_, Some px) -> substitute_pattern_comp c (px, snd (p.term)) exp *)
-                              | Pattern.Const _ -> c
-                              | Pattern.Nonbinding -> c
+let rec substitute_pattern_comp c p exp maincomp =
+                          begin match fst p with
+                              | Pattern.Var x -> optimize_comp (substitute_var_comp c x exp)
+                              | Pattern.As (_,x) -> 
+                                                    let (xbo,xfo) = occurrences x c in
+                                                    if(xbo == 0 && xfo == 1) then
+                                                    optimize_comp (substitute_var_comp c x exp)
+                                                    else
+                                                      maincomp
+                              | Pattern.Tuple [] when (exp.term = Tuple [])-> c
+                              | Pattern.Tuple lst -> begin match exp.term with
+                                                    | Tuple elst -> optimize_comp(List.fold_right2 (fun pat -> fun exp -> fun co -> substitute_pattern_comp  co pat exp maincomp) lst elst c)
+                                                    | _ -> maincomp
+                                                    end
+                              | Pattern.Variant _ -> maincomp
+                              | Pattern.Const _ -> maincomp
+                              | Pattern.Nonbinding -> maincomp
                             end
 
 
-and substitute_pattern_exp e p exp =
-                          begin match fst (p.term) with
-                              | Pattern.Var x -> substitute_var_exp e x exp
-                              | Pattern.As (p,x) -> substitute_var_exp e x exp
+and substitute_pattern_exp e p exp mainexp =
+                          begin match fst p with
+                              | Pattern.Var x -> optimize_expr (substitute_var_exp e x exp)
+                              | Pattern.As (p,x) -> let (xbo,xfo) = occurrences_e x e in
+                                                    if(xbo == 0 && xfo == 1) then
+                                                     optimize_expr (substitute_var_exp e x exp)
+                                                    else
+                                                      mainexp
+                              | Pattern.Tuple [] when (exp.term = Tuple [])-> e
                               (*| Pattern.Tuple lst -> List.fold_right (fun a -> fun b -> substitute_pattern_comp  b a exp) lst c
                               | Pattern.Record lst -> List.fold_right (fun a -> fun b -> substitute_pattern_comp b a c exp) lst c*)
-                              | Pattern.Variant (_, None) -> e
+                              | Pattern.Variant (_, None) -> mainexp
                               (*| Pattern.Variant (_, Some px) -> substitute_pattern_comp c (px, snd (p.term)) exp *)
-                              | Pattern.Const _ -> e
-                              | Pattern.Nonbinding -> e
+                              | Pattern.Const _ -> mainexp
+                              | Pattern.Nonbinding -> mainexp
                             end
 
 
 
-let rec optimize_comp c = shallow_opt ( opt_sub_comp c)
+and  optimize_comp c = shallow_opt ( opt_sub_comp c)
 
 and shallow_opt c = 
   (*Print.debug "Shallow optimizing %t" (CamlPrint.print_computation c);*)
@@ -768,20 +780,14 @@ and shallow_opt c =
           (*WARNING : Adhoc to remove the unit pattern and sub. with a var pattern to make it work *)
           if is_atomic e2
             then  
-              begin match (fst p.term) with
-              |  Pattern.Tuple s ->  begin match e2.term with
-                                     | Tuple [] -> shallow_opt c'
-                                     | _-> c
-                                     end 
-              | _ -> optimize_comp (substitute_pattern_comp c' p e2)
-              end
+              substitute_pattern_comp c' (p.term) e2 c
           else 
           let (pbo,pfo) = (pattern_occurrences p c') in
           if (pbo == 0 && pfo < 2) then
           begin
               if (pfo == 0) then c' 
             else 
-                optimize_comp (substitute_pattern_comp c' p e2)
+                substitute_pattern_comp c' (p.term) e2 c
               end
           else 
           begin match c'.term with 
@@ -798,17 +804,17 @@ and shallow_opt c =
      let (p,cp) = a.term in
       if is_atomic e then 
           (*Print.debug "from let in : sub %t \n to \n %t \n in \n %t "(CamlPrint.print_variable vp) (CamlPrint.print_expression e) (CamlPrint.print_computation cp);*)
-          let cres = (substitute_pattern_comp cp p e) in 
+          let cres = (substitute_pattern_comp cp (p.term) e c) in 
            (*Print.debug "To get\n %t" (CamlPrint.print_computation cres);*)
-           optimize_comp cres
+           cres
       else
       begin match cp.term with
-      | Value e2 -> shallow_opt (value ~loc:c.location (pure_let_in ~loc:c.location e (pure_abstraction ~loc:c.location p e2)))
+      | Value e2 -> shallow_opt (value ~loc:c.location ( shallow_opt_e (pure_let_in ~loc:c.location e (pure_abstraction ~loc:c.location p e2))))
       | _ ->  Print.debug "in apply of let in for %t" (CamlPrint.print_computation cp);
                     let (occ_b,occ_f) = pattern_occurrences p cp in
                     if( occ_b == 0 && occ_f < 2)
                     then 
-                      optimize_comp (substitute_pattern_comp cp p e)
+                      substitute_pattern_comp cp (p.term) e c
                     else
                       c
      
@@ -831,9 +837,14 @@ and shallow_opt_e e =
       begin match e.term with 
       | PureLetIn (ex,pa) -> let (p,ep) = pa.term in
                              if is_atomic ex then 
-                                substitute_pattern_exp ep p ex
+                                substitute_pattern_exp ep (p.term) ex e
                              else
-                               e 
+                              let (occ_b,occ_f) = pattern_occurrences_e p ep in
+                              if( occ_b == 0 && occ_f < 2)
+                              then 
+                                substitute_pattern_exp ep (p.term) ex e
+                              else
+                                e 
     | PureApply (e1,e2) -> 
             Print.debug "what's in the pure apply :\n %t" (CamlPrint.print_expression e);
             begin match e1.term with 
@@ -841,20 +852,15 @@ and shallow_opt_e e =
                 let (p,e') = pa.term in
                 if is_atomic e2 
                 then 
-                begin match (fst p.term) with
-                | Pattern.Tuple [] -> 
-                              begin match e2.term with
-                              | Tuple [] -> (optimize_expr e') 
-                              |_ -> e
-                            end
-
-                |_->     
-                    let Pattern.Var vp = (fst p.term) in
-                    let tempvar = var ~loc:e.location  vp p.scheme in
-                    let Var v = tempvar.term in
-                    optimize_expr (substitute_var_exp e' v e2)
-                end 
-                
+                  substitute_pattern_exp e' (p.term) e2 e
+                else
+                  let (pbo,pfo) = (pattern_occurrences_e p e') in
+                  if (pbo == 0 && pfo < 2) then
+                  begin
+                      if (pfo == 0) then e' 
+                    else 
+                        substitute_pattern_exp e' (p.term) e2 e
+                      end
                 else e
                 
             | _ -> e
