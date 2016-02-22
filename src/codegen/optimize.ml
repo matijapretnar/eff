@@ -388,7 +388,22 @@ end
 
 and occurrences_handler v h = (0,0) (*not implmented yet*)
 
-and occurrences_letrec v li c =(0,0) (*not implmented yet*)
+and occurrences_letrec v li c =     let var_binders_set = (List.map (fun (vr,_) -> vr) li) in
+                                    if(List.mem v var_binders_set ) then (0,0)
+                                  else 
+                                    let func = (fun a ->  fun (b0,f0) ->  
+                                                let(_,abs) = a in 
+                                                let (ap,ac) = abs.term in
+                                                let pattern_vars = Pattern.pattern_vars (ap.term) in
+                                                let (bo,fo) = occurrences v ac in
+                                                if (List.mem v pattern_vars) 
+                                                  then (b0,f0) 
+                                                  else (bo+fo+b0,f0))
+                                              in
+                                    let (vr_bo,vr_fo) = List.fold_right func li (0,0) in
+                                    let (vr_boc,vr_foc) = occurrences v c in
+                                    (vr_bo+vr_boc,vr_fo+vr_foc)
+ (*not implmented yet*)
 
 and pattern_occurrences p c = let pvars = Pattern.pattern_vars (p.term) in 
                               let func = (fun a -> fun (sb,sf) -> 
