@@ -73,30 +73,27 @@ let binary_inlinable f ty1 ty2 ty =
               ) (var ~loc x2 (Scheme.simple ty2))
 
 let inlinable_definitions = [
-  ("=", fun () -> let t = Type.fresh_ty () in binary_inlinable "Pervasives.(=)" t t Type.bool_ty);
-  ("<", fun () -> let t = Type.fresh_ty () in binary_inlinable "Pervasives.(<)" t t Type.bool_ty);
-  ("~-", fun () -> unary_inlinable "Pervasives.(~-)" Type.int_ty Type.int_ty);
-  ("+", fun () -> binary_inlinable "Pervasives.(+)" Type.int_ty Type.int_ty Type.int_ty);
-  ("*", fun () -> binary_inlinable "Pervasives.( * )" Type.int_ty Type.int_ty Type.int_ty);
-  ("-", fun () -> binary_inlinable "Pervasives.(-)" Type.int_ty Type.int_ty Type.int_ty);
-  ("mod", fun () -> binary_inlinable "Pervasives.(mod)" Type.int_ty Type.int_ty Type.int_ty);
-  ("~-.", fun () -> unary_inlinable "Pervasives.(~-.)" Type.float_ty Type.float_ty);
-  ("+.", fun () -> binary_inlinable "Pervasives.(+.)" Type.float_ty Type.float_ty Type.float_ty);
-  ("*.", fun () -> binary_inlinable "Pervasives.( *. )" Type.float_ty Type.float_ty Type.float_ty);
-  ("-.", fun () -> binary_inlinable "Pervasives.(-.)" Type.float_ty Type.float_ty Type.float_ty);
-  ("/.", fun () -> binary_inlinable "Pervasives.(/.)" Type.float_ty Type.float_ty Type.float_ty);
-  ("/", fun () -> binary_inlinable "Pervasives.(/)" Type.int_ty Type.int_ty Type.int_ty);
-  ("float_of_int", fun () -> unary_inlinable "Pervasives.(float_of_int)" Type.int_ty Type.float_ty);
-  ("^", fun () -> binary_inlinable "Pervasives.(^)" Type.string_ty Type.string_ty Type.string_ty);
-  ("string_length", fun () -> unary_inlinable "Pervasives.(string_length)" Type.string_ty Type.int_ty)
+  (* Do not inline them because they are polymorphic *)
+  (* ("=", binary_inlinable "Pervasives.(=)" ? ? Type.bool_ty); *)
+  (* ("<", binary_inlinable "Pervasives.(<)" ? ? Type.bool_ty); *)
+  ("~-", unary_inlinable "Pervasives.(~-)" Type.int_ty Type.int_ty);
+  ("+", binary_inlinable "Pervasives.(+)" Type.int_ty Type.int_ty Type.int_ty);
+  ("*", binary_inlinable "Pervasives.( * )" Type.int_ty Type.int_ty Type.int_ty);
+  ("-", binary_inlinable "Pervasives.(-)" Type.int_ty Type.int_ty Type.int_ty);
+  ("mod", binary_inlinable "Pervasives.(mod)" Type.int_ty Type.int_ty Type.int_ty);
+  ("~-.", unary_inlinable "Pervasives.(~-.)" Type.float_ty Type.float_ty);
+  ("+.", binary_inlinable "Pervasives.(+.)" Type.float_ty Type.float_ty Type.float_ty);
+  ("*.", binary_inlinable "Pervasives.( *. )" Type.float_ty Type.float_ty Type.float_ty);
+  ("-.", binary_inlinable "Pervasives.(-.)" Type.float_ty Type.float_ty Type.float_ty);
+  ("/.", binary_inlinable "Pervasives.(/.)" Type.float_ty Type.float_ty Type.float_ty);
+  ("/", binary_inlinable "Pervasives.(/)" Type.int_ty Type.int_ty Type.int_ty);
+  ("float_of_int", unary_inlinable "Pervasives.(float_of_int)" Type.int_ty Type.float_ty);
+  ("^", binary_inlinable "Pervasives.(^)" Type.string_ty Type.string_ty Type.string_ty);
+  ("string_length", unary_inlinable "Pervasives.(string_length)" Type.string_ty Type.int_ty)
   ]
 
 let inlinable = ref []
 
-let find_inlinable x =
-  match Common.lookup x !inlinable with
-  | Some e -> Some (e ())
-  | None -> None
 
 let make_var_from_pattern p =  begin match fst (p.term) with 
                                 | Pattern.Var z ->  var ~loc:p.location z p.scheme
@@ -502,7 +499,11 @@ let rec substitute_var_comp comp vr exp =
           | Handle (e, c1) -> handle ~loc:loc (substitute_var_exp e vr exp) (substitute_var_comp c1 vr exp)
           | Check c1 -> check ~loc:loc (substitute_var_comp c1 vr exp)
           | Call (eff, e1, a1) -> print_endline "matched with call in sub var";
-                                  let new_lambda = (substitute_var_exp (lambda ~loc:loc a1) vr exp) in 
+                                  let (p,c1) = a1.term in
+                                  let fp = refresh_pattern p in 
+                                  let fpe = make_expression_from_pattern fp in 
+                                  let new_abs = abstraction ~loc:loc fp (substitute_pattern_comp c1 (p.term) fpe c1 false )  in
+                                  let new_lambda = (substitute_var_exp (lambda ~loc:loc new_abs) vr exp) in 
                                   let (Lambda new_a) = new_lambda.term in
                                   call ~loc:loc eff (substitute_var_exp e1 vr exp )  new_a
           
@@ -526,6 +527,7 @@ let rec substitute_var_comp comp vr exp =
                                            let new_p= refresh_pattern p in 
                                            let new_pe = make_expression_from_pattern new_p in 
                                            let fresh_c = substitute_pattern_comp c (p.term) new_pe c false in 
+                                          (*Print.debug "renaming %t to %t in %t" (CamlPrint.print_variable vr) (CamlPrint.print_variable fvar) (CamlPrint.print_computation c); *)
                                            bind ~loc:loc (substitute_var_comp c1 vr exp)
                                            (abstraction ~loc:loc new_p ( substitute_var_comp fresh_c vr exp))
                                          end
@@ -724,7 +726,7 @@ and refresh_comp c = match c.term with
                                       let new_ca = substitute_pattern_comp ca (pa.term) newpa_e temp false in 
                                       Print.debug "oldp : %t \n newp : %t \n old ca : %t \n New Ca : %t "(CamlPrint.print_variable pav) (CamlPrint.print_variable pavn) (CamlPrint.print_computation ca) (CamlPrint.print_computation new_ca);
                                       bind ~loc:c.location (refresh_comp c1) (abstraction ~loc:c.location newpa ( refresh_comp new_ca))
-                    | _ -> c
+                    | _ -> Print.debug "el a7a : %t" (CamlPrint.print_computation c) ; c
 
 and refresh_exp e = begin match e.term with 
                     | PureLambda a -> let (pa,ea) = a.term in 
@@ -775,7 +777,7 @@ and refresh_handler e =
                         let (Lambda aa) = lterm.term in 
                         let (p2new,cknew) = aa.term in 
                       
-                         (e, (abstraction2 ~loc:loc p1new p2new cknew )) in
+                         (e, (abstraction2 ~loc:loc p1new p2new ( cknew ))) in
 
               let h' = {
                          effect_clauses = List.map func eff_list;
@@ -877,7 +879,10 @@ and shallow_opt c b =
                         let( _ , (input_k_ty , _) , _ ) = k.scheme in
                         let vz = (make_var_from_counter (Scheme.simple input_k_ty)) in
                         let pz = make_pattern_from_var vz in
-                        let (fpk,fck) = k.term in 
+                        let (p_k,c_k) = k.term in 
+                        let fpk = refresh_pattern p_k in 
+                        let efpk = make_expression_from_pattern fpk in 
+                        let fck = substitute_pattern_comp c_k (p_k.term) efpk c_k false in 
                         let k_lambda = shallow_opt_e (lambda ~loc:loc (abstraction ~loc:loc fpk fck)) in
                         let inner_apply = shallow_opt (apply ~loc:loc k_lambda vz) false  in
                         let inner_bind = shallow_opt (bind ~loc:loc inner_apply (abstraction ~loc:loc pa ca)) false  in
@@ -919,7 +924,10 @@ and shallow_opt c b =
                                           scheme = Scheme.simple input_k_ty
                                         } in
                                 let vz = var ~loc:loc z (Scheme.simple input_k_ty) in
-                                let (fpk,fck) = k.term in 
+                                let (p_k,c_k) = k.term in 
+                                let fpk = refresh_pattern p_k in 
+                                let efpk = make_expression_from_pattern fpk in 
+                                let fck = substitute_pattern_comp c_k (p_k.term) efpk c_k false in 
                                 let k_lambda = shallow_opt_e (lambda ~loc:loc (abstraction ~loc:loc fpk fck)) in
                                 let e2_apply = shallow_opt (apply ~loc:loc k_lambda vz) false in
                                 let fresh_handler = refresh_handler e1 in 
@@ -933,7 +941,12 @@ and shallow_opt c b =
                                           let e1_pureapply = shallow_opt_e (pure_apply ~loc:loc e1_purelambda exp) in
                                           shallow_opt (apply ~loc:loc e1_pureapply e2_lambda)
                                         *)
-                                          let (fp1,fp2,fcresult) = result.term in
+                                          let (p1,p2,cresult) = result.term in
+                                          let fp1 = refresh_pattern p1 in 
+                                          let fp2 = refresh_pattern p2 in 
+                                          let efp1 = make_expression_from_pattern fp1 in 
+                                          let efp2 = make_expression_from_pattern fp2 in 
+                                          let fcresult = substitute_pattern_comp (substitute_pattern_comp cresult (p2.term) efp2 cresult false ) (p1.term) efp1 cresult false in 
                                           let e1_lamda =  shallow_opt_e (lambda ~loc:loc (abstraction ~loc:loc fp2 fcresult)) in
                                           let e1_lambda_sub = substitute_pattern_comp fcresult (fp2.term) e2_lambda (value ~loc:c.location vz) false in
                                           let e1_lambda = shallow_opt_e (lambda ~loc:loc (abstraction ~loc:loc fp1 e1_lambda_sub)) in
@@ -1095,7 +1108,7 @@ and opt_sub_expr e =
   | Handler h -> optimize_handler h
   | Effect eff ->  e
   | Var x -> 
-      begin match find_inlinable x with
+      begin match Common.lookup x !inlinable with
       | Some e -> opt_sub_expr e
       | _ -> e
       end
