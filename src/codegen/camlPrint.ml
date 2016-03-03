@@ -97,7 +97,11 @@ and print_let_abstraction (p, c) ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)
 
 and print_top_let_abstraction (p, c) ppf =
-  Format.fprintf ppf "%t = run %t" (print_pattern p) (print_computation ~max_level:0 c)
+  match c.Typed.term with
+  | Typed.Value e -> 
+    Format.fprintf ppf "%t = %t" (print_pattern p) (print_expression ~max_level:0 e)
+  | _ -> 
+    Format.fprintf ppf "%t = run %t" (print_pattern p) (print_computation ~max_level:0 c)
 
 and print_let_rec_abstraction (x, a) ppf =
   Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction a)
