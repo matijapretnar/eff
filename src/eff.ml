@@ -197,6 +197,13 @@ let compile_file st filename =
   let cmds = Optimize.optimize_commands cmds in
   Print.debug "OPTIMIZED CODE:@.%t@." (CamlPrint.print_commands cmds);
 
+  (* Read the compiled file  *)
+  let source_channel = open_in filename in
+  let n = in_channel_length source_channel in
+  let source = String.create n in
+  really_input source_channel source 0 n;
+  close_in source_channel;
+
   (* look for header.ml next to the executable  *)
   let header_file = Filename.concat (Filename.dirname Sys.argv.(0)) "header.ml" in
   let header_channel = open_in header_file in
@@ -207,7 +214,9 @@ let compile_file st filename =
 
   let compiled_file = CamlPrint.compiled_filename filename in
   let out_channel = open_out compiled_file in
-  Format.fprintf (Format.formatter_of_out_channel out_channel) "%s\n;;\n%t@." header (CamlPrint.print_commands cmds);
+  Format.fprintf (Format.formatter_of_out_channel out_channel)
+    "(*\n=== GENERATED FROM %s ===\n=== BEGIN SOURCE ===\n\n%s\n\n=== END SOURCE ===\n*)\n\n%s\n;;\n%t@."
+    filename source header (CamlPrint.print_commands cmds);
   flush out_channel;
   close_out out_channel
 
