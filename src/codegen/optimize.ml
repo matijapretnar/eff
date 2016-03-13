@@ -717,12 +717,31 @@ and substitute_pattern_exp e p exp mainexp =
 
 
 and refresh_comp c = match c.term with
-                   | Bind (c1,c2) ->  let (pa,ca) = c2.term in 
-                                      let newpa = refresh_pattern pa in 
-                                      let newpa_e = make_expression_from_pattern newpa in  
-                                      let new_ca = substitute_pattern_comp ca (pa.term) newpa_e c in 
-                                      bind ~loc:c.location (refresh_comp c1) (abstraction ~loc:c.location newpa ( refresh_comp new_ca))
-                    | _ -> c
+           | Bind (c1,c2) ->  let (pa,ca) = c2.term in 
+                              let newpa = refresh_pattern pa in 
+                              let newpa_e = make_expression_from_pattern newpa in  
+                              let new_ca = substitute_pattern_comp ca (pa.term) newpa_e c in 
+                              bind ~loc:c.location (refresh_comp c1) (abstraction ~loc:c.location newpa ( refresh_comp new_ca))
+            
+            | LetIn (e,a) -> let (pa,ca)= a.term in
+                             let newpa = refresh_pattern pa in 
+                             let newpa_e = make_expression_from_pattern newpa in  
+                             let new_ca = substitute_pattern_comp ca (pa.term) newpa_e c in 
+                             let_in ~loc:c.location (refresh_exp e) (abstraction ~loc:c.location newpa (refresh_comp new_ca))
+
+            | Let (li,c1) -> let func = fun (pa,co) -> (pa, refresh_comp co ) in
+                               let' ~loc:c.location (List.map func li) (refresh_comp c1 )
+            | LetRec (li, c1) -> let_rec' ~loc:c.location (List.map (fun (v,abs)-> let (p,comp) = abs.term in
+                                                                                   (v, abstraction ~loc:c.location p (optimize_comp comp )))
+                                                                                   li)  (refresh_comp c1 )
+            | Match (e, li) -> match' ~loc:c.location (refresh_exp e) li
+            | While (c1, c2) -> while' ~loc:c.location (refresh_comp c1 ) (optimize_comp c2 )
+            | For (v, e1, e2, c1, b) -> for' ~loc:c.location v (refresh_exp e1) (refresh_exp e2) (refresh_comp c1 ) b
+            | Apply (e1, e2) -> apply ~loc:c.location (refresh_exp e1) (refresh_exp e2)
+            | Handle (e, c1) -> handle ~loc:c.location (refresh_exp e) (optimize_comp c1 )
+            | Check c1 -> check ~loc:c.location (refresh_comp c1 )
+            | Call (eff, e1, a1) -> call ~loc:c.location eff (refresh_exp e1)  a1 
+            | Value e -> value ~loc:c.location (refresh_exp e)
 
 and refresh_exp e = begin match e.term with 
                     | PureLambda a -> let (pa,ea) = a.term in 
@@ -739,8 +758,21 @@ and refresh_exp e = begin match e.term with
                                               abstraction ~loc:e.location
                                                   panew 
                                                   (refresh_comp ( substitute_pattern_comp ca (pa.term) panew_e ca )))
-                    | _ -> e
-                  end
+                    | PureLetIn (e1,pa) ->
+                                let (ppa,ea) = pa.term in 
+                                let newppa = refresh_pattern ppa in 
+                             let newppa_e = make_expression_from_pattern newppa in  
+                             let new_ea = substitute_pattern_exp ea (ppa.term) newppa_e e in 
+                             pure_let_in ~loc:e.location (refresh_exp e1) (pure_abstraction ~loc:e.location newppa (refresh_exp new_ea))
+                    | Handler h -> refresh_handler e 
+                    | BuiltIn f -> e
+                    | Record lst -> record ~loc:e.location (Common.assoc_map refresh_exp lst)
+                    | Variant (label,exp) -> variant ~loc:e.location ( label , Common.option_map refresh_exp exp)
+                    | Tuple lst -> tuple ~loc:e.location (List.map refresh_exp lst)
+                    | PureApply (e1, e2)-> pure_apply ~loc:e.location (refresh_exp e1) (refresh_exp e2)
+                    | PureLetIn (e1, pa) -> pure_let_in ~loc:e.location (optimize_expr e1) (optimize_pure_abstraction pa)
+                    |_ -> e
+                    end
 
 and refresh_handler e = 
           begin match e.term with 
@@ -1087,7 +1119,7 @@ and opt_sub_expr e =
   | Effect eff ->  e
   | Var x -> 
       begin match Common.lookup x !inlinable with
-      | Some e -> opt_sub_expr e
+      | Some d -> refresh_exp d
       | _ -> e
       end
 
@@ -1109,8 +1141,24 @@ and optimize_handler h = let (pv,cv) = (h.value_clause).term in
 let optimize_command = function
   | Typed.Computation c ->
       Some (Typed.Computation (optimize_comp c))
-  | Typed.TopLet (defs, vars) ->
-      Some (Typed.TopLet (Common.assoc_map optimize_comp defs, vars))
+  | Typed.TopLet (defs, vars) -> 
+      let defs' = Common.assoc_map optimize_comp defs in
+      begin match defs' with
+      | [(p, c)] ->
+         begin match fst (p.term) with
+            |  Pattern.Var x -> 
+            begin match c.term with 
+                 | Value e -> begin match (e.term) with 
+                              | Handler _ -> inlinable := Common.update x e !inlinable ;
+                              | _ -> ()
+                            end
+                | _-> ()
+                 end
+            | _ -> ()
+            end
+      | _ -> ()
+      end;
+      Some (Typed.TopLet (defs', vars))
   | Typed.TopLetRec (defs, vars) ->
       Some (Typed.TopLetRec (Common.assoc_map optimize_abstraction defs, vars))
   | (Typed.DefEffect _ | Typed.Reset | Typed.Quit | Typed.Use _ | Typed.Tydef _) as cmd ->
