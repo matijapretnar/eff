@@ -1118,9 +1118,10 @@ and opt_sub_expr e =
   | Effect eff ->  e
   | Var x -> 
       begin match Common.lookup x !inlinable with
-      | Some d -> match d.term with 
+      | Some d -> begin match d.term with 
                   | Handler _ -> refresh_exp d
                   | _-> d
+                end
       | _ -> e
       end
 
