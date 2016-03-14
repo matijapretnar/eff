@@ -126,23 +126,28 @@ let make_pattern_from_var v =
     location = Location.unknown;
     scheme = v.scheme}
 
-
 let refresh_pattern p =
-      begin match fst (p.term) with
+  let rec refresh_pattern' p = 
+    let refreshed_p =
+      begin match fst p with
       | Pattern.Var x -> let counter_string = string_of_int (make_var_counter ()) in
                          let y = Typed.Variable.fresh ("fresh_pattern_" ^ counter_string) in 
-                         {term = (Pattern.Var y, Location.unknown);
-                          location = Location.unknown;
-                          scheme = p.scheme}
-      
+                         Pattern.Var y
       | Pattern.As (c,x) -> failwith "Pattern can not be refreshed for now"
-      | Pattern.Tuple [] -> p
-      | Pattern.Tuple lst -> failwith "Pattern can not be refreshed for now"
-      | Pattern.Record _ -> failwith "Pattern can not be refreshed for now"
-      | Pattern.Variant _ -> failwith "Pattern can not be refreshed for now"
-      | Pattern.Const _ -> failwith "Pattern can not be refreshed for now"
-      | Pattern.Nonbinding -> failwith "Pattern can not be refreshed for now"
+      | Pattern.Tuple [] -> Pattern.Tuple []
+      | Pattern.Tuple lst -> Pattern.Tuple (List.map refresh_pattern' lst)
+      | Pattern.Record flds -> Pattern.Record (Common.assoc_map refresh_pattern' flds)
+      | Pattern.Variant (lbl, p) -> Pattern.Variant (lbl, Common.option_map refresh_pattern' p)
+      | (Pattern.Const _ | Pattern.Nonbinding) as p -> p
     end
+  in
+  (refreshed_p, snd p)
+  in
+  {
+    term = refresh_pattern' p.term;
+    location = p.location;
+    scheme = p.scheme
+  }
 
 
 module VariableSet = Set.Make(
