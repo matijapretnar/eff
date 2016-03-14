@@ -732,13 +732,13 @@ and refresh_comp c = match c.term with
             | Let (li,c1) -> let func = fun (pa,co) -> (pa, refresh_comp co ) in
                                let' ~loc:c.location (List.map func li) (refresh_comp c1 )
             | LetRec (li, c1) -> let_rec' ~loc:c.location (List.map (fun (v,abs)-> let (p,comp) = abs.term in
-                                                                                   (v, abstraction ~loc:c.location p (optimize_comp comp )))
+                                                                                   (v, abstraction ~loc:c.location p (refresh_comp comp )))
                                                                                    li)  (refresh_comp c1 )
             | Match (e, li) -> match' ~loc:c.location (refresh_exp e) li
-            | While (c1, c2) -> while' ~loc:c.location (refresh_comp c1 ) (optimize_comp c2 )
+            | While (c1, c2) -> while' ~loc:c.location (refresh_comp c1 ) (refresh_comp c2 )
             | For (v, e1, e2, c1, b) -> for' ~loc:c.location v (refresh_exp e1) (refresh_exp e2) (refresh_comp c1 ) b
             | Apply (e1, e2) -> apply ~loc:c.location (refresh_exp e1) (refresh_exp e2)
-            | Handle (e, c1) -> handle ~loc:c.location (refresh_exp e) (optimize_comp c1 )
+            | Handle (e, c1) -> handle ~loc:c.location (refresh_exp e) (refresh_comp c1 )
             | Check c1 -> check ~loc:c.location (refresh_comp c1 )
             | Call (eff, e1, a1) -> call ~loc:c.location eff (refresh_exp e1)  a1 
             | Value e -> value ~loc:c.location (refresh_exp e)
@@ -770,7 +770,6 @@ and refresh_exp e = begin match e.term with
                     | Variant (label,exp) -> variant ~loc:e.location ( label , Common.option_map refresh_exp exp)
                     | Tuple lst -> tuple ~loc:e.location (List.map refresh_exp lst)
                     | PureApply (e1, e2)-> pure_apply ~loc:e.location (refresh_exp e1) (refresh_exp e2)
-                    | PureLetIn (e1, pa) -> pure_let_in ~loc:e.location (optimize_expr e1) (optimize_pure_abstraction pa)
                     |_ -> e
                     end
 
@@ -1119,7 +1118,9 @@ and opt_sub_expr e =
   | Effect eff ->  e
   | Var x -> 
       begin match Common.lookup x !inlinable with
-      | Some d -> refresh_exp d
+      | Some d -> match d.term with 
+                  | Handler _ -> refresh_exp d
+                  | _-> d
       | _ -> e
       end
 
