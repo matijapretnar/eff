@@ -55,6 +55,9 @@ let options = Arg.align [
   ("--compile",
     Arg.String (fun str -> compile_file str),
     "<file> Compile <file>");
+  ("--no-opt",
+    Arg.Set Config.disable_optimization,
+    " Disable optimization of compiled files");
   ("-V",
     Arg.Set_int Config.verbosity,
     "<n> Set printing verbosity to <n>");
@@ -194,7 +197,7 @@ let compile_file st filename =
   let cmds = List.map Desugar.toplevel (pervasives_cmds @ cmds) in
   let cmds, _ = type_cmds st cmds in
   Print.debug "UNOPTIMIZED CODE:@.%t@." (CamlPrint.print_commands cmds);
-  let cmds = Optimize.optimize_commands cmds in
+  let cmds = if !Config.disable_optimization then cmds else Optimize.optimize_commands cmds in
   Print.debug "OPTIMIZED CODE:@.%t@." (CamlPrint.print_commands cmds);
 
   (* Read the compiled file  *)

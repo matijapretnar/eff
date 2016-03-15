@@ -25,6 +25,9 @@ val disable_beautify : bool ref
 (** Should type-checking be disabled? *)
 val disable_typing : bool ref
 
+(** Should compiled computations be optimized? *)
+val disable_optimization : bool ref
+
 (** Should we use ASCII instead of Unicode for printing out types? *)
 val ascii : bool ref
 

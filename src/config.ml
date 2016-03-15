@@ -13,6 +13,8 @@ let disable_beautify = ref false
 
 let disable_typing = ref false
 
+let disable_optimization = ref false
+
 let ascii = ref false
 
 let interactive_shell = ref true
