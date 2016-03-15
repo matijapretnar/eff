@@ -32,6 +32,7 @@ and plain_expression =
   | Lambda of abstraction
   | Effect of effect
   | Handler of handler
+
   | PureLambda of pure_abstraction
   | PureApply of expression * expression
   | PureLetIn of expression * pure_abstraction
