@@ -102,12 +102,24 @@ let make_var_from_pattern p =  begin match fst (p.term) with
                               end
 
 
-let make_expression_from_pattern p = 
-                            begin match fst (p.term) with
-                            | Pattern.Var z -> var ~loc:p.location z p.scheme
-                            | Pattern.Tuple [] -> tuple ~loc:p.location []
-                            | _ -> failwith "matched a non var or unit pattern"
-                          end
+let  make_expression_from_pattern p = 
+      let rec make_expr pa =
+      let e_p=
+                begin match fst pa with
+                | Pattern.Var z -> var ~loc:Location.unknown z p.scheme
+                | Pattern.Tuple [] -> tuple ~loc:Location.unknown []
+                | Pattern.As (c,x) ->  var ~loc:Location.unknown x p.scheme
+                | Pattern.Tuple lst -> tuple ~loc:Location.unknown (List.map make_expr lst)
+                | Pattern.Record flds -> record ~loc:Location.unknown (Common.assoc_map make_expr flds)
+                | Pattern.Variant (lbl, p) -> variant ~loc:Location.unknown (lbl, Common.option_map make_expr p)
+                | Pattern.Const c -> const ~loc:Location.unknown c 
+                | Pattern.Nonbinding as p -> tuple ~loc:Location.unknown []
+              end
+                in
+              e_p
+              in
+                make_expr (p.term)
+
 
 let make_var_counter =
   let count = ref (0) in
@@ -133,7 +145,7 @@ let refresh_pattern p =
       | Pattern.Var x -> let counter_string = string_of_int (make_var_counter ()) in
                          let y = Typed.Variable.fresh ("fresh_pattern_" ^ counter_string) in 
                          Pattern.Var y
-      | Pattern.As (c,x) -> failwith "Pattern can not be refreshed for now"
+      | Pattern.As (c,x) as p->  p
       | Pattern.Tuple [] -> Pattern.Tuple []
       | Pattern.Tuple lst -> Pattern.Tuple (List.map refresh_pattern' lst)
       | Pattern.Record flds -> Pattern.Record (Common.assoc_map refresh_pattern' flds)
