@@ -16,7 +16,13 @@ module String : Annotation with type t = string =
 struct
   type t = string
 
-  let print _ n ppf = Format.fprintf ppf "_var_%d" n
+  let print desc n ppf =
+    match desc.[0] with
+    | ('a'..'z' | '_') ->
+      print_endline desc;
+      Format.fprintf ppf "_%s_%d" desc n
+    | _ -> Format.fprintf ppf "_var_%d (* %s *)" n desc
+
 end
 
 module type S =
