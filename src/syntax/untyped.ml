@@ -92,6 +92,8 @@ let rec print_pattern ?max_level (p,_) ppf =
   | Pattern.Record lst -> Print.record print_pattern lst ppf
   | Pattern.Variant (lbl, None) when lbl = Common.nil -> print "[]"
   | Pattern.Variant (lbl, None) -> print "%s" lbl
+  | Pattern.Variant ("(::)", Some (Pattern.Tuple [p1; p2], _)) ->
+      print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
   | Pattern.Variant (lbl, Some p) ->
       print ~at_level:1 "(%s @[<hov>%t@])" lbl (print_pattern p)
   | Pattern.Nonbinding -> print "_"
