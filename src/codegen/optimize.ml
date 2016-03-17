@@ -127,15 +127,8 @@ let  make_expression_from_pattern p =
                 make_expr (p.term)
 
 
-let make_var_counter =
-  let count = ref (0) in
-  fun () ->
-    incr count;
-    !count
-
-let make_var_from_counter scheme = 
-      let counter_string = string_of_int (make_var_counter ()) in
-      let x = Typed.Variable.fresh ("fresh_pattern_" ^ counter_string) in
+let make_var_from_counter ann scheme = 
+      let x = Typed.Variable.fresh ann in
       var ~loc:Location.unknown x scheme
 
 let make_pattern_from_var v = 
@@ -148,9 +141,7 @@ let refresh_pattern p =
   let rec refresh_pattern' p = 
     let refreshed_p =
       begin match fst p with
-      | Pattern.Var x -> let counter_string = string_of_int (make_var_counter ()) in
-                         let y = Typed.Variable.fresh ("fresh_pattern_" ^ counter_string) in 
-                         Pattern.Var y
+      | Pattern.Var x -> Pattern.Var (Variable.refresh x)
       | Pattern.As (c,x) as p->  p
       | Pattern.Tuple [] -> Pattern.Tuple []
       | Pattern.Tuple lst -> Pattern.Tuple (List.map refresh_pattern' lst)
@@ -916,7 +907,7 @@ and shallow_opt c =
                    end
     | Call(eff,e,k) ->  let loc = Location.unknown in
                         let( _ , (input_k_ty , _) , _ ) = k.scheme in
-                        let vz = (make_var_from_counter (Scheme.simple input_k_ty)) in
+                        let vz = (make_var_from_counter "_call_result" (Scheme.simple input_k_ty)) in
                         let pz = make_pattern_from_var vz in
                         let (p_k,c_k) = k.term in 
                         let fpk = refresh_pattern p_k in 
@@ -1096,8 +1087,8 @@ and shallow_opt_e e =
             | _ -> e
             end
       | Effect eff ->  let (eff_name, (ty_par, ty_res)) = eff in 
-                   let param = make_var_from_counter (Scheme.simple ty_par) in
-                   let result = make_var_from_counter (Scheme.simple ty_res) in
+                   let param = make_var_from_counter "param" (Scheme.simple ty_par) in
+                   let result = make_var_from_counter "result" (Scheme.simple ty_res) in
                    let res_pat = make_pattern_from_var result in
                    let param_pat = make_pattern_from_var param in
                    let kincall = abstraction ~loc:e.location res_pat (value ~loc:e.location result) in

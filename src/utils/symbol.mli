@@ -16,6 +16,7 @@ sig
 
   val compare : t -> t -> int
   val fresh : annot -> t
+  val refresh : t -> t
   val print : t -> Format.formatter -> unit
 end
 

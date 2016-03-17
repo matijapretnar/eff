@@ -19,7 +19,6 @@ struct
   let print desc n ppf =
     match desc.[0] with
     | ('a'..'z' | '_') ->
-      print_endline desc;
       Format.fprintf ppf "_%s_%d" desc n
     | _ -> Format.fprintf ppf "_var_%d (* %s *)" n desc
 
@@ -32,6 +31,7 @@ sig
 
   val compare : t -> t -> int
   val fresh : annot -> t
+  val refresh : t -> t
   val print : t -> Format.formatter -> unit
 end
 
@@ -45,6 +45,10 @@ struct
   let count = ref 0
 
   let fresh ann =
+    incr count;
+    (!count, ann)
+
+  let refresh (_, ann) =
     incr count;
     (!count, ann)
 
