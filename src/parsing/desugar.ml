@@ -441,8 +441,10 @@ and plain_toplevel = function
       let x, ty = external_ty x ty in
       Untyped.External (x, ty, y)
   | Sugared.DefEffect (eff, (ty1, ty2)) ->
-      let ty1 = ty Trio.empty ty1
-      and ty2 = ty Trio.empty ty2 in
+      let (ds1, rs1), ty1 = fill_args ty1
+      and (ds2, rs2), ty2 = fill_args ty2 in
+      let ty1 = ty (syntax_to_core_params ([], ds1, rs1)) ty1
+      and ty2 = ty (syntax_to_core_params ([], ds2, rs2)) ty2 in
       Untyped.DefEffect (eff, (ty1, ty2))
   | Sugared.Term t ->
       let c = top_computation t in
