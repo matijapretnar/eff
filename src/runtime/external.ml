@@ -117,6 +117,8 @@ let less_than v1 v2 =
 let comparison_functions = [
   ("=", binary_closure (fun v1 v2 -> value_bool (equal v1 v2)));
   ("<", binary_closure (fun v1 v2 -> value_bool (less_than v1 v2)));
+  (">", binary_closure (fun v1 v2 -> value_bool (less_than v2 v1)));
+  ("<>", binary_closure (fun v1 v2 -> value_bool (not (equal v1 v2))));
 ]
 
 let arithmetic_operations = [

@@ -54,6 +54,8 @@ let run = function
 
 let (=) = fun x -> value (fun y -> value (Pervasives.(=) x y))
 let (<) = fun x -> value (fun y -> value (Pervasives.(<) x y))
+let (<>) = fun x -> value (fun y -> value (Pervasives.(<>) x y))
+let (>) = fun x -> value (fun y -> value (Pervasives.(>) x y))
 
 let (~-) = fun x -> value (Pervasives.(~-) x)
 let (+) = fun x -> value (fun y -> value (Pervasives.(+) x y))

@@ -75,6 +75,8 @@ let binary_inlinable f ty1 ty2 ty =
 let inlinable_definitions = [
   ("=", fun () -> let t = Type.fresh_ty () in binary_inlinable "Pervasives.(=)" t t Type.bool_ty);
   ("<", fun () -> let t = Type.fresh_ty () in binary_inlinable "Pervasives.(<)" t t Type.bool_ty);
+  ("<>", fun () -> let t = Type.fresh_ty () in binary_inlinable "Pervasives.(<>)" t t Type.bool_ty);
+  (">", fun () -> let t = Type.fresh_ty () in binary_inlinable "Pervasives.(>)" t t Type.bool_ty);
   ("~-", fun () -> unary_inlinable "Pervasives.(~-)" Type.int_ty Type.int_ty);
   ("+", fun () -> binary_inlinable "Pervasives.(+)" Type.int_ty Type.int_ty Type.int_ty);
   ("*", fun () -> binary_inlinable "Pervasives.( * )" Type.int_ty Type.int_ty Type.int_ty);

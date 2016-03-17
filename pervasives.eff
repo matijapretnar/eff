@@ -5,6 +5,10 @@ external ( = ) : 'a -> 'a -> bool = "="
 
 external ( < ) : 'a -> 'a -> bool = "<"
 
+external ( > ) : 'a -> 'a -> bool = ">"
+
+external ( <> ) : 'a -> 'a -> bool = "<>"
+
 effect Print : string -> unit
 effect Read : unit -> string
 effect Raise : unit -> empty
