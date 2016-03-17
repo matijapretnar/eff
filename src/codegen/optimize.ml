@@ -73,26 +73,30 @@ let binary_inlinable f ty1 ty2 ty =
               ) (var ~loc x2 (Scheme.simple ty2))
 
 let inlinable_definitions = [
-  (* Do not inline them because they are polymorphic *)
-  (* ("=", binary_inlinable "Pervasives.(=)" ? ? Type.bool_ty); *)
-  (* ("<", binary_inlinable "Pervasives.(<)" ? ? Type.bool_ty); *)
-  ("~-", unary_inlinable "Pervasives.(~-)" Type.int_ty Type.int_ty);
-  ("+", binary_inlinable "Pervasives.(+)" Type.int_ty Type.int_ty Type.int_ty);
-  ("*", binary_inlinable "Pervasives.( * )" Type.int_ty Type.int_ty Type.int_ty);
-  ("-", binary_inlinable "Pervasives.(-)" Type.int_ty Type.int_ty Type.int_ty);
-  ("mod", binary_inlinable "Pervasives.(mod)" Type.int_ty Type.int_ty Type.int_ty);
-  ("~-.", unary_inlinable "Pervasives.(~-.)" Type.float_ty Type.float_ty);
-  ("+.", binary_inlinable "Pervasives.(+.)" Type.float_ty Type.float_ty Type.float_ty);
-  ("*.", binary_inlinable "Pervasives.( *. )" Type.float_ty Type.float_ty Type.float_ty);
-  ("-.", binary_inlinable "Pervasives.(-.)" Type.float_ty Type.float_ty Type.float_ty);
-  ("/.", binary_inlinable "Pervasives.(/.)" Type.float_ty Type.float_ty Type.float_ty);
-  ("/", binary_inlinable "Pervasives.(/)" Type.int_ty Type.int_ty Type.int_ty);
-  ("float_of_int", unary_inlinable "Pervasives.(float_of_int)" Type.int_ty Type.float_ty);
-  ("^", binary_inlinable "Pervasives.(^)" Type.string_ty Type.string_ty Type.string_ty);
-  ("string_length", unary_inlinable "Pervasives.(string_length)" Type.string_ty Type.int_ty)
-  ]
+  ("=", fun () -> let t = Type.fresh_ty () in binary_inlinable "Pervasives.(=)" t t Type.bool_ty);
+  ("<", fun () -> let t = Type.fresh_ty () in binary_inlinable "Pervasives.(<)" t t Type.bool_ty);
+  ("~-", fun () -> unary_inlinable "Pervasives.(~-)" Type.int_ty Type.int_ty);
+  ("+", fun () -> binary_inlinable "Pervasives.(+)" Type.int_ty Type.int_ty Type.int_ty);
+  ("*", fun () -> binary_inlinable "Pervasives.( * )" Type.int_ty Type.int_ty Type.int_ty);
+  ("-", fun () -> binary_inlinable "Pervasives.(-)" Type.int_ty Type.int_ty Type.int_ty);
+  ("mod", fun () -> binary_inlinable "Pervasives.(mod)" Type.int_ty Type.int_ty Type.int_ty);
+  ("~-.", fun () -> unary_inlinable "Pervasives.(~-.)" Type.float_ty Type.float_ty);
+  ("+.", fun () -> binary_inlinable "Pervasives.(+.)" Type.float_ty Type.float_ty Type.float_ty);
+  ("*.", fun () -> binary_inlinable "Pervasives.( *. )" Type.float_ty Type.float_ty Type.float_ty);
+  ("-.", fun () -> binary_inlinable "Pervasives.(-.)" Type.float_ty Type.float_ty Type.float_ty);
+  ("/.", fun () -> binary_inlinable "Pervasives.(/.)" Type.float_ty Type.float_ty Type.float_ty);
+  ("/", fun () -> binary_inlinable "Pervasives.(/)" Type.int_ty Type.int_ty Type.int_ty);
+  ("float_of_int", fun () -> unary_inlinable "Pervasives.(float_of_int)" Type.int_ty Type.float_ty);
+  ("^", fun () -> binary_inlinable "Pervasives.(^)" Type.string_ty Type.string_ty Type.string_ty);
+  ("string_length", fun () -> unary_inlinable "Pervasives.(string_length)" Type.string_ty Type.int_ty)
+]
 
 let inlinable = ref []
+
+let find_inlinable x =
+  match Common.lookup x !inlinable with
+  | Some e -> Some (e ())
+  | None -> None
 
 
 let make_var_from_pattern p =  begin match fst (p.term) with 
@@ -1134,8 +1138,8 @@ and opt_sub_expr e =
   | Handler h -> optimize_handler h
   | Effect eff ->  e
   | Var x -> 
-      begin match Common.lookup x !inlinable with
-      | Some d -> begin match d.term with 
+      begin match find_inlinable x with
+      | Some d ->  begin match d.term with 
                   | Handler _ -> refresh_exp d
                   | _-> d
                 end
@@ -1168,7 +1172,7 @@ let optimize_command = function
             |  Pattern.Var x -> 
             begin match c.term with 
                  | Value e -> begin match (e.term) with 
-                              | Handler _ -> inlinable := Common.update x e !inlinable ;
+                              | Handler _ -> inlinable := Common.update x (fun () -> e) !inlinable ;
                               | _ -> ()
                             end
                 | _-> ()
