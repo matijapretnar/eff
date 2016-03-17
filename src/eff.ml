@@ -196,11 +196,9 @@ let compile_file st filename =
   let cmds = Lexer.read_file (parse Parser.file) filename in
   let cmds = List.map Desugar.toplevel (pervasives_cmds @ cmds) in
   let cmds, _ = type_cmds st cmds in
-  Print.debug "UNOPTIMIZED CODE:@.%t@." (CamlPrint.print_commands cmds);
   let cmds = if !Config.disable_optimization then cmds else Optimize.optimize_commands cmds in
-  Print.debug "OPTIMIZED CODE:@.%t@." (CamlPrint.print_commands cmds);
 
-  (* Read the compiled file  *)
+  (* read the source file *)
   let source_channel = open_in filename in
   let n = in_channel_length source_channel in
   let source = String.create n in
@@ -215,13 +213,26 @@ let compile_file st filename =
   really_input header_channel header 0 n;
   close_in header_channel;
 
-  let compiled_file = CamlPrint.compiled_filename filename in
-  let out_channel = open_out compiled_file in
+  (* write a temporary compiled file *)
+  ignore (Sys.command ("mkdir _tmp"));
+  let temporary_file = "_tmp/" ^ CamlPrint.compiled_filename filename in
+  let out_channel = open_out temporary_file in
   Format.fprintf (Format.formatter_of_out_channel out_channel)
-    "(*\n=== GENERATED FROM %s ===\n=== BEGIN SOURCE ===\n\n%s\n\n=== END SOURCE ===\n*)\n\n%s\n;;\n%t@."
-    filename source header (CamlPrint.print_commands cmds);
+    "%s\n;;\n%t@."
+    header (CamlPrint.print_commands cmds);
   flush out_channel;
-  close_out out_channel
+  close_out out_channel;
+
+  let compiled_file = CamlPrint.compiled_filename filename in
+  ignore (Sys.command ("echo '(*\n=== GENERATED FROM " ^ filename ^ " ===' > " ^ compiled_file));
+  ignore (Sys.command ("echo '=== BEGIN SOURCE ==='" ^ " >> " ^ compiled_file));
+  ignore (Sys.command ("echo ''" ^ " >> " ^ compiled_file));
+  ignore (Sys.command ("cat " ^ filename ^ " >> " ^ compiled_file));
+  ignore (Sys.command ("echo ''" ^ " >> " ^ compiled_file));
+  ignore (Sys.command ("echo '=== END SOURCE ===\n*)'" ^ " >> " ^ compiled_file));
+  ignore (Sys.command ("echo ''" ^ " >> " ^ compiled_file));
+  ignore (Sys.command ("ocamlc " ^ temporary_file));
+  ignore (Sys.command ("ocamlc -dsource -w -A " ^ temporary_file ^ " >>" ^ compiled_file ^ " 2>&1"))
 
 (* Interactive toplevel *)
 let toplevel ctxenv =
