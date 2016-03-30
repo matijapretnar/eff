@@ -31,9 +31,7 @@
     ("lxor", LXOR);
     ("match", MATCH);
     ("mod", MOD);
-    ("new", NEW);
     ("of", OF);
-    ("operation", OPERATION);
     ("or", OR);
     ("rec", REC);
     ("then", THEN);
@@ -67,7 +65,7 @@ let bigint_of_string s =
   (* get rid of _ *)
   let j = ref 0 in
   for i = 0 to String.length s - 1 do
-    if s.[i] <> '_' then (s.[!j] <- s.[i]; incr j)
+    if s.[i] <> '_' then (Bytes.set s (!j) s.[i]; incr j)
   done;
   int_of_string (String.sub s 0 !j)
 

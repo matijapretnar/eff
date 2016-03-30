@@ -1,39 +1,39 @@
 %{
-  open SugaredSyntax
+  open Sugared
 
-  type handler_case =
-    | OperationCase of operation * abstraction2
-    | ReturnCase of abstraction
-    | FinallyCase of abstraction
+  type handler_clause =
+    | EffectClause of Common.effect * abstraction2
+    | ReturnClause of abstraction
+    | FinallyClause of abstraction
 
-  let collect_handler_cases (lst : (handler_case * Location.t) list) =
-    let (ops, ret, fin) =
+  let collect_handler_clauses clauses =
+    let (eff_cs, val_c, fin_c) =
       List.fold_left
-        (fun (ops, ret, fin) -> function
-          | (OperationCase (op, a2), _) ->  ((op, a2) :: ops, ret, fin)
-          | (ReturnCase a, loc) ->
-            begin match ret with
-              | None -> (ops, Some a, fin)
-              | Some _ -> Error.syntax ~loc "Multiple value cases in a handler."
+        (fun (eff_cs, val_c, fin_c) -> function
+          | (EffectClause (eff, a2), _) ->  ((eff, a2) :: eff_cs, val_c, fin_c)
+          | (ReturnClause a, loc) ->
+            begin match val_c with
+              | None -> (eff_cs, Some a, fin_c)
+              | Some _ -> Error.syntax ~loc "Multiple value clauses in a handler."
             end
-          | (FinallyCase a, loc) ->
-            begin match fin with
-            | None -> (ops, ret, Some a)
-            | Some _ -> Error.syntax ~loc "Multiple finally cases in a handler."
+          | (FinallyClause a, loc) ->
+            begin match fin_c with
+            | None -> (eff_cs, val_c, Some a)
+            | Some _ -> Error.syntax ~loc "Multiple finally clauses in a handler."
             end)
         ([], None, None)
-        lst
+        clauses
     in
-    { operations = List.rev ops;
-      value = ret;
-      finally = fin }
+    { effect_clauses = List.rev eff_cs;
+      value_clause = val_c;
+      finally_clause = fin_c }
 
 %}
 
 %token LPAREN RPAREN LBRACK RBRACK LBRACE RBRACE
 %token COLON COMMA SEMI SEMISEMI EQUAL CONS
 %token BEGIN END
-%token <Common.variable> LNAME
+%token <string> LNAME
 %token UNDERSCORE AS
 %token <int> INT
 %token <string> STRING
@@ -48,7 +48,7 @@
 %token FUN BAR BARBAR
 %token IF THEN ELSE
 %token WHILE DO DONE FOR TO DOWNTO
-%token HANDLER NEW AT OPERATION VAL FINALLY HANDLE
+%token HANDLER AT VAL FINALLY HANDLE
 %token PLUS STAR MINUS MINUSDOT
 %token LSL LSR ASR
 %token MOD OR
@@ -71,8 +71,8 @@
 %left  INFIXOP3 STAR MOD LAND LOR LXOR
 %right INFIXOP4 LSL LSR ASR
 
-%start <SugaredSyntax.toplevel list> file
-%start <SugaredSyntax.toplevel> commandline
+%start <Sugared.toplevel list> file
+%start <Sugared.toplevel> commandline
 
 %%
 
@@ -124,6 +124,8 @@ plain_topdef:
     { TopLetRec defs }
   | EXTERNAL x = ident COLON t = ty EQUAL n = STRING
     { External (x, t, n) }
+  | EFFECT eff = effect COLON t1 = prod_ty ARROW t2 = ty
+    { DefEffect (eff, (t1, t2))}
 
 (* Toplevel directive If you change these, make sure to update lname as well,
    or a directive might become a reserved word. *)
@@ -177,14 +179,6 @@ comma_term: mark_position(plain_comma_term) { $1 }
 plain_comma_term:
   | t = binop_term COMMA ts = separated_list(COMMA, binop_term)
     { Tuple (t :: ts) }
-  | t = plain_new_term
-    { t }
-
-plain_new_term:
-  | NEW ty = tyname AT t = simple_term WITH lst = resource_case* END
-    { New (ty, Some (t, lst)) }
-  | NEW ty = tyname
-    { New (ty, None) }
   | t = plain_binop_term
     { t }
 
@@ -222,7 +216,7 @@ plain_app_term:
       | Variant (lbl, None), [t] -> Variant (lbl, Some t)
       | Variant (lbl, _), _ -> Error.syntax ~loc:(snd t) "Label %s applied to too many argument" lbl
       | _, _ ->
-        let apply ((_, loc1) as t1) ((_, loc2) as t2) = (Apply(t1, t2), Location.join loc1 loc2) in
+        let apply ((_, loc1) as t1) ((_, loc2) as t2) = (Apply(t1, t2), Location.merge loc1 loc2) in
         fst (List.fold_left apply t ts)
     }
   | t = plain_prefix_term
@@ -246,13 +240,13 @@ plain_simple_term:
     { Variant (lbl, None) }
   | cst = const_term
     { Const cst }
-  | t = simple_term HASH op = ident
-    { Operation (t, op) }
+  | HASH eff = effect
+    { Effect eff }
   | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
       let nil = (Variant (Common.nil, None), Location.make $endpos $endpos) in
       let cons ((_, loc_t) as t) ((_, loc_ts) as ts) =
-        let loc = Location.join loc_t loc_ts in
+        let loc = Location.merge loc_t loc_ts in
         (Variant (Common.cons, Some (Tuple [t; ts], loc)), loc) in
       fst (List.fold_right cons ts nil)
     }
@@ -269,13 +263,13 @@ plain_simple_term:
 
 const_term:
   | n = INT
-    { Common.Integer n }
+    { Const.of_integer n }
   | str = STRING
-    { Common.String str }
+    { Const.of_string str }
   | b = BOOL
-    { Common.Boolean b }
+    { Const.of_boolean b }
   | f = FLOAT
-    { Common.Float f }
+    { Const.of_float f }
 
 match_case:
   | p = pattern ARROW t = term
@@ -301,14 +295,14 @@ let_rec_def:
   | f = ident t = lambdas0(EQUAL)
     { (f, t) }
 
-handler_case: mark_position(plain_handler_case) { $1 }
-plain_handler_case:
-  | t1 = simple_term HASH op = ident p = simple_pattern k = simple_pattern ARROW t2 = term
-    { OperationCase ((t1, op), (p, k, t2)) }
+handler_clause: mark_position(plain_handler_clause) { $1 }
+plain_handler_clause:
+  | HASH eff = effect p = simple_pattern k = simple_pattern ARROW t2 = term
+    { EffectClause (eff, (p, k, t2)) }
   | VAL c = match_case
-    { ReturnCase c }
+    { ReturnClause c }
   | FINALLY c = match_case
-    { FinallyCase c }
+    { FinallyClause c }
 
 pattern: mark_position(plain_pattern) { $1 }
 plain_pattern:
@@ -352,7 +346,7 @@ plain_simple_pattern:
     {
       let nil = (Pattern.Variant (Common.nil, None), Location.make $endpos $endpos) in
       let cons ((_, loc_t) as t) ((_, loc_ts) as ts) =
-        let loc = Location.join loc_t loc_ts in
+        let loc = Location.merge loc_t loc_ts in
         (Pattern.Variant (Common.cons, Some (Pattern.Tuple [t; ts], loc)), loc)
       in
         fst (List.fold_right cons ts nil)
@@ -364,8 +358,8 @@ plain_simple_pattern:
 
 handler: mark_position(plain_handler) { $1 }
 plain_handler:
-  | cs = cases(handler_case)
-    { Handler (collect_handler_cases cs) }
+  | cs = cases(handler_clause)
+    { Handler (collect_handler_clauses cs) }
 
 lname:
   | x = LNAME
@@ -474,8 +468,6 @@ defined_ty:
     { TyRecord lst }
   | lst = cases(sum_case)
     { TySum lst }
-  | EFFECT lst = effect_case* END
-    { TyEffect lst }
   | t = ty
     { TyInline t }
 
@@ -501,15 +493,15 @@ plain_prod_ty:
 ty_apply: mark_position(plain_ty_apply) { $1 }
 plain_ty_apply:
   | LPAREN t = ty COMMA ts = separated_nonempty_list(COMMA, ty) RPAREN t2 = tyname
-    { TyApply (t2, (t :: ts), None, None) }
+    { TyApply (t2, (t :: ts), None) }
   | t = ty_apply t2 = tyname
-    { TyApply (t2, [t], None, None) }
+    { TyApply (t2, [t], None) }
   | t = plain_simple_ty
     { t }
 
 plain_simple_ty:
   | t = tyname
-    { TyApply (t, [], None, None) }
+    { TyApply (t, [], None) }
   | t = PARAM
     { TyParam t }
   | LPAREN t = ty RPAREN
@@ -521,12 +513,8 @@ sum_case:
   | lbl = UNAME OF t = ty
     { (lbl, Some t) }
 
-effect_case:
-   | OPERATION opsym = lname COLON t1 = prod_ty ARROW t2 = ty
-     { (opsym, (t1, t2)) }
-
-resource_case:
-   | OPERATION opsym = lname p1 = simple_pattern AT p2 = simple_pattern ARROW t = term
-     { (opsym, (p1, p2, t)) }
+effect:
+  | eff = UNAME
+    { eff }
 
 %%

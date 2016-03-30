@@ -1,9 +1,9 @@
 module V = Value
 
-let from_bool b = V.Const (Common.Boolean b)
-let from_int n = V.Const (Common.Integer n)
-let from_str s = V.Const (Common.String s)
-let from_float f = V.Const (Common.Float f)
+let from_bool b = V.Const (Const.of_boolean b)
+let from_int n = V.Const (Const.of_integer n)
+let from_str s = V.Const (Const.of_string s)
+let from_float f = V.Const (Const.of_float f)
 let from_fun f = V.Closure f
 
 let value_bool b = V.Value (from_bool b)
@@ -36,20 +36,20 @@ let rec compare v1 v2 =
     | V.Const c ->
       (match v2 with
         | V.Closure _ | V.Handler _ -> Common.Invalid
-        | V.Const c' -> Common.compare_const c c'
-        | V.Tuple _ | V.Record _ | V.Variant _ | V.Instance _ -> Common.Less)
+        | V.Const c' -> Const.compare c c'
+        | V.Tuple _ | V.Record _ | V.Variant _ -> Common.Less)
     | V.Tuple lst ->
       (match v2 with
         | V.Closure _ | V.Handler _ -> Common.Invalid
         | V.Const _ -> Common.Greater
         | V.Tuple lst' -> compare_list lst lst'
-        | V.Record _ | V.Variant _ | V.Instance _ -> Common.Less)
+        | V.Record _ | V.Variant _ -> Common.Less)
     | V.Record lst ->
       (match v2 with
         | V.Closure _ | V.Handler _ -> Common.Invalid
         | V.Const _ | V.Tuple _ -> Common.Greater
         | V.Record lst' -> compare_record lst lst'
-        | V.Variant _ | V.Instance _ -> Common.Less)
+        | V.Variant _ -> Common.Less)
     | V.Variant (lbl, u)->
       (match v2 with
         | V.Closure _ | V.Handler _ -> Common.Invalid
@@ -58,17 +58,7 @@ let rec compare v1 v2 =
           let r = Pervasives.compare lbl lbl' in
             if r < 0 then Common.Less
             else if r > 0 then Common.Greater
-            else compare_option u u'
-        | V.Instance _ -> Common.Less)
-    | V.Instance (i, _, _) ->
-      (match v2 with
-        | V.Closure _ | V.Handler _ -> Common.Invalid
-        | V.Const _ | V.Tuple _ | V.Record _ | V.Variant _ -> Common.Greater
-        | V.Instance (i', _, _) ->
-          let r = Pervasives.compare i i' in
-            if r < 0 then Common.Less
-            else if r > 0 then Common.Greater
-            else Common.Equal)
+            else compare_option u u')
 
 and compare_list lst1 lst2 =
   match lst1, lst2 with
@@ -160,20 +150,14 @@ let string_operations = [
 let conversion_functions = [
   ("to_string",
     let to_string v =
-      let s = Print.to_string "%t" (Value.print_value v) in
+      Value.print_value v Format.str_formatter;
+      let s = Format.flush_str_formatter () in
       value_str s
     in
     from_fun to_string);
   ("float_of_int",
     from_fun (fun v -> value_float (float_of_int (V.to_int v))));
 ]
-
-(** [external_instance name ops] returns an instance with a given name and
-    a resource with unit state and operations defined as [ops]. *)
-let external_instance name ops =
-  let resource_op op v s = V.Value (V.Tuple [op v; s]) in
-  let ops = Common.assoc_map resource_op ops in
-  V.fresh_instance (Some name) (Some (ref V.unit_value, ops))
 
 let std_print v =
   let str = V.to_str v in
@@ -184,11 +168,10 @@ and std_read _ =
   let str = read_line () in
   from_str str
 
-let create_exception v = 
+(* let create_exception v = 
   let exc_name = V.to_str v in
   let exception_raise param =
-    let message = Print.to_string "%s %t." exc_name (Value.print_value param) in
-      Error.runtime "%s" message
+    Error.runtime "%s %t." exc_name (Value.print_value param)
   in
     V.Value (external_instance exc_name [
       ("raise", exception_raise);
@@ -197,10 +180,10 @@ let create_exception v =
 let rnd_int v =
   from_int (Random.int (V.to_int v))
 and rnd_float v =
-  from_float (Random.float (V.to_float v))
+  from_float (Random.float (V.to_float v)) *)
 
 let effect_instances = [
-  ("std", external_instance "standard I/O" [
+(*   ("std", external_instance "standard I/O" [
     ("print", std_print);
     ("read", std_read);
   ]);
@@ -210,7 +193,7 @@ let effect_instances = [
   ("rnd", external_instance "random number generator" [
     ("int", rnd_int);
     ("float", rnd_float);
-  ]);
+  ]); *)
 ]
 
 (** [values] is an association list of external names and values, consisting of

@@ -1,10 +1,10 @@
-- : bool = false
-- : bool = true
-- : bool = false
-- : bool = false
-- : bool = false
-- : bool = true
-- : bool = false
-- : bool = true
-- : bool = true
-- : bool = true
+- : bool ! {DivisionByZero:ρ₁|δ₁} | ρ₁ = ⊤ = false
+- : bool ! {DivisionByZero:ρ₁|δ₁} | ρ₁ = ⊤ = true
+- : bool ! δ₁ |  = false
+- : bool ! δ₁ |  = false
+- : bool ! δ₁ |  = false
+- : bool ! δ₁ |  = true
+- : bool ! δ₁ |  = false
+- : bool ! δ₁ |  = true
+- : bool ! δ₁ |  = true
+- : bool ! δ₁ |  = true

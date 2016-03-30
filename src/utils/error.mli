@@ -1,16 +1,25 @@
-(** Errors raised by Eff. *)
+(** Error reporting
 
-(** Each error has a locatio, a type (typing, runtime, ...), and a message. *)
-exception Error of (Location.t option * string * string)
+    All internal errors are represented uniformly with a single exception that
+    carries additional details such as error kind (syntax, typing, ...), message
+    or location.
 
-(** Shortcut functions for raising errors. In addition to an error location,
-    the functions accept a message, which is a format string.
-    This allows one, for example, to raise a typing error as
-    [Error.typing "Unknown name %s." x]. *)
+    Errors are raised through helper functions that take an optional location
+    and a message in form of a format string, for example:
+    [Error.runtime ~loc "Unhandled effect %t" (Effect.print eff)]. *)
+
+(** Type of errors. *)
+type t
+
+(** Print an error. *)
+val print : t -> unit
+
+(** Exception representing all possible Eff errors. *)
+exception Error of t
 
 (** Fatal errors are errors over which Eff has no control, for example when
     a file cannot be opened. *)
-val fatal : ('a, Format. formatter, unit, 'b) format4 -> 'a
+val fatal : ?loc:Location.t -> ('a, Format. formatter, unit, 'b) format4 -> 'a
 
 (** Syntax errors occur during lexing, parsing, or desugaring into Eff's core
     language. *)
@@ -20,6 +29,6 @@ val syntax : loc:Location.t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 val typing : loc:Location.t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 
 (** Runtime errors are usually prevented by type-checking. Otherwise, they occur
-    when pattern match is not exhaustive, or when an externaly defined function
+    when pattern match is not exhaustive, or when an externally defined function
     has an incorrectly assigned type. *)
-val runtime : ('a, Format.formatter, unit, 'b) format4 -> 'a
+val runtime : ?loc:Location.t -> ('a, Format.formatter, unit, 'b) format4 -> 'a

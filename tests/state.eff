@@ -1,0 +1,35 @@
+effect Get: unit -> int
+effect Set: int -> unit
+effect Fail : unit -> empty ;;
+
+let state x = handler
+  | val y -> (fun _ -> y)
+  | #Get () k -> (fun s -> k s s)
+  | #Set s' k -> (fun _ -> k () s')
+
+let better_state x = handler
+  | val y -> (fun _ -> y)
+  | #Get () k -> (fun s -> k s s)
+  | #Set s' k -> (fun _ -> k () s')
+  | finally f -> f x
+
+let transaction = handler
+  | #Get () k -> (fun s -> k s s)
+  | #Set s' k -> (fun s -> k () s')
+  | val x -> (fun s -> #Set s; x)
+  | finally f -> f (#Get ());;
+
+with better_state 10 handle
+  handle
+    #Set 20;
+    let x = #Get () in check x;
+    (with transaction handle
+      #Set 30;
+      let x = #Get () in check x;
+      absurd (#Fail ());
+      #Set 50);
+    let x = #Get () in check x;
+    1
+  with
+  | #Fail _ _ -> let x = #Get () in check x; 0
+

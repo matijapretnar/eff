@@ -1,0 +1,20 @@
+opam-version: "1.2"
+name: "eff"
+version: "dev"
+maintainer: "matija@pretnar.info"
+authors: ["Andrej Bauer <Andrej.Bauer@andrej.com>"
+          "Matija Pretnar <matija@pretnar.info>"]
+homepage: "http://www.eff-lang.org/"
+bug-reports: "https://github.com/matijapretnar/eff/issues"
+license: "BSD2"
+dev-repo: "git@github.com:matijapretnar/eff.git"
+build: [
+  ["./configure" "--prefix=%{prefix}%"]
+  [make]
+]
+install: [make "install"]
+remove: [make "uninstall"]
+depends: [
+  "ocamlfind"
+  "menhir" 
+]

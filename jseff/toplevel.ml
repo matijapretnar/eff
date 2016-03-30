@@ -44,12 +44,14 @@ struct
     try
       if is_file then
         let cmds = EffApi.Lexer.read_string (EffApi.Shell.parse EffApi.Parser.file) content in
+        let cmds = List.map EffApi.Desugar.toplevel cmds in
         ctxenv := List.fold_left (EffApi.Shell.exec_cmd ppf true) !ctxenv cmds
       else
         let cmd = EffApi.Lexer.read_string (EffApi.Shell.parse EffApi.Parser.commandline) content in
+        let cmd = EffApi.Desugar.toplevel cmd in
         ctxenv := EffApi.Shell.exec_cmd ppf true !ctxenv cmd
     with
-      EffApi.Error.Error err -> EffApi.Print.error err
+      EffApi.Error.Error err -> EffApi.Error.print err
 
 end
 

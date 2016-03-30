@@ -1,3 +1,4 @@
-val u : α ⟶  α = <fun>
-val v : _α ⟶  _α = <fun>
-Typing error (./errors/polymorphism_id_id.eff:3:1-16): This expression has type int but it should have type string.
+val u : τ₁ -δ₁→ τ₂ | τ₁ < τ₂;  = <fun>
+val v : τ₁ -_δ₁→ τ₂ | τ₁ < τ₂;  = <fun>
+Typing error (file "./errors/polymorphism_id_id.eff", line 3, char 1):
+This expression has type int but it should have type string.

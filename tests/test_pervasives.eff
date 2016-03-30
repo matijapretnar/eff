@@ -14,27 +14,6 @@ let test_equal_float = (1.0 = 1.0);;
 
 (* More comprehensive checking of = can be found in test_equality.eff *)
 
-let whatis_std = std;;
-
-let whatis_raise = raise;;
-
-let whatis_exception = exception;;
-
-let whatis_divisionByZero = divisionByZero;;
-let whatis_invalidArgument = invalidArgument;;
-let whatis_assertionFault = assertionFault;;
-let whatis_failure = failure;;
-
-let test_divisionByZero =
-  handle let x = 1 / 0 in "bar" with divisionByZero#raise _ _ -> "foo"
-
-let test_invalidArgument =
-  handle "invalidArgument was here" with invalidArgument#raise "foo" _ -> "No he was not";;
-
-check (failwith "They say it's all about flirting.");;
-
-let test_failure = handle failwith "bar" with failure#raise "bar" _ -> 42;;
-
 assert ("a" = "a");;
 
 let tilda_minus = (~-1);;
@@ -175,11 +154,11 @@ let test_fst = (fst ("foo", 4));;
 
 let test_snd = (snd ("foo", 4));;
 
-(std#print "Does this work?");;
+check (#Print "Does this work?");;
 
-check (std#read ());;
+check (#Read ());;
 
-check (failwith "The cows are home.");;
+(* check (failwith "The cows are home.");;
 
 check (rnd#int 42);;
 
@@ -192,3 +171,4 @@ let test_state =
      !r);; 
 
 let test_ref = (let r = ref 5 in r := !r + 10; !r);;
+ *)

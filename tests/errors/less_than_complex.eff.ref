@@ -1,3 +1,6 @@
-val h : α ⟹  α = <handler>
-val g : α ⟹  α = <handler>
-Runtime error: invalid comparison with <
+val h : τ₁ ! δ₁ ⟹ 
+τ₂ ! δ₂ | τ₁ < τ₂; δ₁ < δ₂;  = <handler>
+val g : τ₁ ! δ₁ ⟹ 
+τ₂ ! δ₂ | τ₁ < τ₂; δ₁ < δ₂;  = <handler>
+Runtime error (unknown location):
+invalid comparison with <

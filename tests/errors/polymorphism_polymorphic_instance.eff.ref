@@ -1,4 +1,0 @@
-val c : _α cow = <instance #6>
-- : _α cow
-val milk : α ⟹  α = <handler>
-- : _α cow
