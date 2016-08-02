@@ -852,7 +852,7 @@ and refresh_exp e =
       lambda ~loc:e.location (refresh_abs a)
   | PureLetIn (e1, pa) ->
       pure_let_in ~loc:e.location (refresh_exp e1) (refresh_pure_abs pa)
-  | Handler h -> refresh_handler e
+  | Handler h -> refresh_handler ~loc:e.location h
   | BuiltIn f -> e
   | Record lst -> record ~loc: e.location (Common.assoc_map refresh_exp lst)
   | Variant (label, exp) ->
@@ -861,39 +861,35 @@ and refresh_exp e =
   | PureApply (e1, e2) ->
       pure_apply ~loc: e.location (refresh_exp e1) (refresh_exp e2)
   | _ -> e
-and refresh_handler e =
-  match e.term with
-  | Handler h ->
-      let loc = Location.unknown in
-      let eff_list = h.effect_clauses in
-      let func a =
-        let (e, ab2) = a in
-        let (p1, p2, ck) = ab2.term in
-        (*  let p1new = refresh_pattern p1 in
-                         let p1new_e = make_expression_from_pattern p1new in 
-                         let p2new = refresh_pattern p2 in 
-                         let p2new_e = make_expression_from_pattern p2new in 
-                         let cknew = substitute_pattern_comp ( substitute_pattern_comp ck (p2.term) p2new_e ck false) (p1.term) p1new_e ck false in
-                         let lst = List.append (Typed.pattern_vars (p1new)) (Typed.pattern_vars (p2new)) in 
-                         *)
-        let temp_lambda =
-          refresh_exp
-            (pure_lambda ~loc
-               (pure_abstraction ~loc p1
-                  (lambda ~loc (abstraction ~loc p2 ck)))) in
-        let (PureLambda pura) = temp_lambda.term in
-        let (p1new, lterm) = pura.term in
-        let (Lambda aa) = lterm.term in
-        let (p2new, cknew) = aa.term
-        in (e, (abstraction2 ~loc p1new p2new cknew)) in
-      let h' =
-        {
-          effect_clauses = List.map func eff_list;
-          value_clause = refresh_abs h.value_clause;
-          finally_clause = refresh_abs h.finally_clause;
-        }
-      in handler ~loc:Location.unknown h'
-  | _ -> e
+and refresh_handler ~loc h =
+    let eff_list = h.effect_clauses in
+    let func a =
+      let (e, ab2) = a in
+      let (p1, p2, ck) = ab2.term in
+      (*  let p1new = refresh_pattern p1 in
+                       let p1new_e = make_expression_from_pattern p1new in 
+                       let p2new = refresh_pattern p2 in 
+                       let p2new_e = make_expression_from_pattern p2new in 
+                       let cknew = substitute_pattern_comp ( substitute_pattern_comp ck (p2.term) p2new_e ck false) (p1.term) p1new_e ck false in
+                       let lst = List.append (Typed.pattern_vars (p1new)) (Typed.pattern_vars (p2new)) in 
+                       *)
+      let temp_lambda =
+        refresh_exp
+          (pure_lambda ~loc
+             (pure_abstraction ~loc p1
+                (lambda ~loc (abstraction ~loc p2 ck)))) in
+      let (PureLambda pura) = temp_lambda.term in
+      let (p1new, lterm) = pura.term in
+      let (Lambda aa) = lterm.term in
+      let (p2new, cknew) = aa.term
+      in (e, (abstraction2 ~loc p1new p2new cknew)) in
+    let h' =
+      {
+        effect_clauses = List.map func eff_list;
+        value_clause = refresh_abs h.value_clause;
+        finally_clause = refresh_abs h.finally_clause;
+      }
+    in handler ~loc h'
 and optimize_comp c = shallow_opt (opt_sub_comp c)
 and shallow_opt c =
   (*Print.debug "Shallow optimizing %t" (CamlPrint.print_computation c);*)
@@ -950,92 +946,80 @@ and shallow_opt c =
      let res =
        call eff e (abstraction pz inner_bind)
      in shallow_opt res
-  | Handle (e1, c1) ->
-      (*Print.debug "handler computation : %t" (CamlPrint.print_computation c1);*)
-      (match c1.term with
-       | (*Handle h (LetC x e c) -> LetC (x e) (Handle c h)*) LetIn (e2, a)
-           ->
-           let (p, c2) = a.term in
-           let res =
-             let_in ~loc: c.location e2
-               (abstraction ~loc: c.location p
-                  (shallow_opt (handle ~loc: c.location e1 c2)))
+  | Handle (e1, {term = LetIn (e2, a)}) ->
+       let (p, c2) = a.term in
+       let res =
+         let_in ~loc: c.location e2
+           (abstraction ~loc: c.location p
+              (shallow_opt (handle ~loc: c.location e1 c2)))
+       in shallow_opt res
+  | Handle ({term = Handler h}, {term = Value v}) ->
+      let res =
+        apply ~loc: c.location
+          (shallow_opt_e (lambda ~loc: c.location h.value_clause))
+          v
+      in shallow_opt res
+  | Handle ({term = Handler h}, {term = Call (eff, exp, k)}) ->
+    let loc = Location.unknown in
+    let z = Typed.Variable.fresh "z" in
+    let (_, (input_k_ty, _), _) = k.scheme in
+    let pz =
+      {
+        term = Typed.PVar z;
+        location = loc;
+        scheme = Scheme.simple input_k_ty;
+      } in
+    let vz = var ~loc z (Scheme.simple input_k_ty) in
+    let (p_k, c_k) = k.term in
+    let fpk = refresh_pattern p_k in
+    let efpk = make_expression_from_pattern fpk in
+    let fck = substitute_pattern_comp c_k p_k efpk c_k in
+    let k_lambda =
+      shallow_opt_e
+        (lambda ~loc (abstraction ~loc fpk fck)) in
+    let e2_apply = shallow_opt (apply ~loc k_lambda vz) in
+    let fresh_handler = refresh_handler ~loc h in
+    let e2_handle =
+      shallow_opt (handle ~loc fresh_handler e2_apply) in
+    let e2_lambda =
+      shallow_opt_e
+        (lambda ~loc (abstraction ~loc pz e2_handle))
+    in
+      (match Common.lookup eff h.effect_clauses with
+       | Some result ->
+           (*let (p1,p2,cresult) = result.term in
+                              let e1_lamda =  shallow_opt_e (lambda ~loc:loc (abstraction ~loc:loc p2 cresult)) in
+                              let e1_purelambda = shallow_opt_e (pure_lambda ~loc:loc (pure_abstraction ~loc:loc p1 e1_lamda)) in
+                              let e1_pureapply = shallow_opt_e (pure_apply ~loc:loc e1_purelambda exp) in
+                              shallow_opt (apply ~loc:loc e1_pureapply e2_lambda)
+                            *)
+           let (p1, p2, cresult) = result.term in
+           let fp1 = refresh_pattern p1 in
+           let fp2 = refresh_pattern p2 in
+           let efp1 = make_expression_from_pattern fp1 in
+           let efp2 = make_expression_from_pattern fp2 in
+           let fcresult =
+             substitute_pattern_comp
+               (substitute_pattern_comp cresult p2 efp2
+                  cresult)
+               p1 efp1 cresult in
+           let e1_lamda =
+             shallow_opt_e
+               (lambda ~loc
+                  (abstraction ~loc fp2 fcresult)) in
+           let e1_lambda_sub =
+             substitute_pattern_comp fcresult fp2 e2_lambda
+               (value ~loc: c.location vz) in
+           let e1_lambda =
+             shallow_opt_e
+               (lambda ~loc
+                  (abstraction ~loc fp1 e1_lambda_sub)) in
+           let res = apply ~loc e1_lambda exp
            in shallow_opt res
-       | Value v ->
-           (match e1.term with
-            | (*Handle (Handler vc ocs) (Value v) -> Apply (Lambda vc) v *)
-                Handler h ->
-                let res =
-                  apply ~loc: c.location
-                    (shallow_opt_e (lambda ~loc: c.location h.value_clause))
-                    v
-                in shallow_opt res
-            | _ -> c)
-       | Call (eff, exp, k) ->
-           (match e1.term with
-            | Handler h ->
-                let loc = Location.unknown in
-                let z = Typed.Variable.fresh "z" in
-                let (_, (input_k_ty, _), _) = k.scheme in
-                let pz =
-                  {
-                    term = Typed.PVar z;
-                    location = loc;
-                    scheme = Scheme.simple input_k_ty;
-                  } in
-                let vz = var ~loc z (Scheme.simple input_k_ty) in
-                let (p_k, c_k) = k.term in
-                let fpk = refresh_pattern p_k in
-                let efpk = make_expression_from_pattern fpk in
-                let fck = substitute_pattern_comp c_k p_k efpk c_k in
-                let k_lambda =
-                  shallow_opt_e
-                    (lambda ~loc (abstraction ~loc fpk fck)) in
-                let e2_apply = shallow_opt (apply ~loc k_lambda vz) in
-                let fresh_handler = refresh_handler e1 in
-                let e2_handle =
-                  shallow_opt (handle ~loc fresh_handler e2_apply) in
-                let e2_lambda =
-                  shallow_opt_e
-                    (lambda ~loc (abstraction ~loc pz e2_handle))
-                in
-                  (match Common.lookup eff h.effect_clauses with
-                   | Some result ->
-                       (*let (p1,p2,cresult) = result.term in
-                                          let e1_lamda =  shallow_opt_e (lambda ~loc:loc (abstraction ~loc:loc p2 cresult)) in
-                                          let e1_purelambda = shallow_opt_e (pure_lambda ~loc:loc (pure_abstraction ~loc:loc p1 e1_lamda)) in
-                                          let e1_pureapply = shallow_opt_e (pure_apply ~loc:loc e1_purelambda exp) in
-                                          shallow_opt (apply ~loc:loc e1_pureapply e2_lambda)
-                                        *)
-                       let (p1, p2, cresult) = result.term in
-                       let fp1 = refresh_pattern p1 in
-                       let fp2 = refresh_pattern p2 in
-                       let efp1 = make_expression_from_pattern fp1 in
-                       let efp2 = make_expression_from_pattern fp2 in
-                       let fcresult =
-                         substitute_pattern_comp
-                           (substitute_pattern_comp cresult p2 efp2
-                              cresult)
-                           p1 efp1 cresult in
-                       let e1_lamda =
-                         shallow_opt_e
-                           (lambda ~loc
-                              (abstraction ~loc fp2 fcresult)) in
-                       let e1_lambda_sub =
-                         substitute_pattern_comp fcresult fp2 e2_lambda
-                           (value ~loc: c.location vz) in
-                       let e1_lambda =
-                         shallow_opt_e
-                           (lambda ~loc
-                              (abstraction ~loc fp1 e1_lambda_sub)) in
-                       let res = apply ~loc e1_lambda exp
-                       in shallow_opt res
-                   | None ->
-                       let call_abst = abstraction ~loc pz e2_handle in
-                       let res = call ~loc eff exp call_abst
-                       in shallow_opt res)
-            | _ -> c)
-       | _ -> c)
+       | None ->
+           let call_abst = abstraction ~loc pz e2_handle in
+           let res = call ~loc eff exp call_abst
+           in shallow_opt res)
   | Apply ({term = Lambda {term = (p, c')}}, e) when is_atomic e ->
       substitute_pattern_comp c' p e c
   | Apply ({term = Lambda {term = (p, c')}}, e) ->
