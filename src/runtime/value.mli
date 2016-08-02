@@ -16,7 +16,7 @@ val unit_value : value
 val unit_result : result
 
 val to_bool : value -> bool
-val to_int : value -> Big_int.big_int
+val to_int : value -> int
 val to_float : value -> float
 val to_str : value -> string
 val to_handler : value -> result -> result

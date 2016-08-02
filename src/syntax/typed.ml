@@ -12,7 +12,26 @@ type ('term, 'scheme) annotation = {
   location: Location.t;
 }
 
-type pattern = (variable Pattern.t, Scheme.ty_scheme) annotation
+type pattern = (plain_pattern, Scheme.ty_scheme) annotation
+and plain_pattern =
+  | PVar of variable
+  | PAs of pattern * variable
+  | PTuple of pattern list
+  | PRecord of (Common.field, pattern) Common.assoc
+  | PVariant of Common.label * pattern option
+  | PConst of Const.t
+  | PNonbinding
+
+let rec pattern_vars p =
+  match p.term with
+    | PVar x -> [x]
+    | PAs (p,x) -> x :: pattern_vars p
+    | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
+    | PRecord lst -> List.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
+    | PVariant (_, None) -> []
+    | PVariant (_, Some p) -> pattern_vars p
+    | PConst _ -> []
+    | PNonbinding -> []
 
 let annotate t sch loc = {
   term = t;

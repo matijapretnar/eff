@@ -1,12 +1,6 @@
 let usage = "Usage: eff [option] ... [file] ..."
 let wrapper = ref (Some ["rlwrap"; "ledit"])
 
-let help_text = "Toplevel commands:
-#type <expr>;;     print the type of <expr> without evaluating it
-#reset;;           forget all definitions (including pervasives)
-#help;;            print this help
-#quit;;            exit eff
-#use \"<file>\";;  load commands from file";;
 
 (* A list of files to be loaded and run. *)
 let files = ref []
@@ -79,106 +73,6 @@ let parse parser lex =
   | Failure "lexing: empty token" ->
       Error.syntax ~loc:(Location.of_lexeme lex) "unrecognised symbol."
 
-
-type state = {
-  environment : RuntimeEnv.t;
-  change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
-  typing : Infer.state;
-}
-
-let initial_ctxenv = {
-  environment = RuntimeEnv.empty;
-  change = Common.id;
-  typing = Infer.initial;
-}
-
-let type_cmd st (cmd, loc) =
-  let ty_st = {Infer.change = st.change; Infer.typing = st.typing} in
-  let cmd, ty_st = Infer.infer_toplevel ~loc ty_st cmd in
-  let st = {st with change = ty_st.Infer.change; typing = ty_st.Infer.typing} in
-  (cmd, loc), st
-
-let type_cmds st cmds =
-  let cmds, st =
-    List.fold_left (fun (cmds, st) cmd ->
-      let cmd, st = type_cmd st cmd in
-      (cmd :: cmds, st)
-    ) ([], st) cmds
-  in
-  List.rev cmds, st
-
-(* [exec_cmd env c] executes toplevel command [c] in global
-    environment [(ctx, env)]. It prints the result on standard output
-    and return the new environment. *)
-let rec exec_cmd interactive st (cmd, loc) =
-  let (cmd, loc), st = type_cmd st (cmd, loc) in
-  match cmd with
-  | Typed.Computation c ->
-      let v = Eval.run st.environment c in
-      if interactive then Format.printf "@[- : %t = %t@]@."
-        (Scheme.print_dirty_scheme c.Typed.scheme)
-        (Value.print_value v);
-      st
-  | Typed.TypeOf c ->
-      Format.printf "@[- : %t@]@." (Scheme.print_dirty_scheme c.Typed.scheme);
-      st
-  | Typed.Reset ->
-      Tctx.reset ();
-      print_endline ("Environment reset."); initial_ctxenv
-  | Typed.Help ->
-      print_endline help_text;
-      st
-  | Typed.DefEffect (eff, (ty1, ty2)) ->
-      st
-  | Typed.Quit ->
-      exit 0
-  | Typed.Use fn ->
-      use_file st (fn, interactive)
-  | Typed.TopLet (defs, vars) ->
-      let env =
-        List.fold_right
-          (fun (p,c) env -> let v = Eval.run env c in Eval.extend p v env)
-          defs st.environment
-      in
-        if interactive then begin
-          List.iter (fun (x, tysch) ->
-                       match RuntimeEnv.lookup x env with
-                         | None -> assert false
-                         | Some v ->
-                         Format.printf "@[val %t : %t = %t@]@." (Typed.Variable.print x) (Scheme.print_ty_scheme tysch) (Value.print_value v))
-            vars
-        end;
-        {
-          st with
-          environment = env;
-        }
-    | Typed.TopLetRec (defs, vars) ->
-
-        let env = Eval.extend_let_rec st.environment defs in
-          if interactive then begin
-            List.iter (fun (x, tysch) -> Format.printf "@[val %t : %t = <fun>@]@." (Typed.Variable.print x) (Scheme.print_ty_scheme tysch)) vars
-          end;
-        {
-          st with
-          environment = env;
-        }
-    | Typed.External (x, ty, f) ->
-        begin match Common.lookup f External.values with
-          | Some v -> {
-              st with
-              environment = RuntimeEnv.update x v st.environment;
-            }
-          | None -> Error.runtime "unknown external symbol %s." f
-        end
-    | Typed.Tydef tydefs ->
-        st
-
-
-and use_file env (filename, interactive) =
-  let cmds = Lexer.read_file (parse Parser.file) filename in
-  let cmds = List.map Desugar.toplevel cmds in
-    List.fold_left (exec_cmd interactive) env cmds
-
 let compile_file st filename =
   let pervasives_cmds =
     match !Config.pervasives_file with
@@ -195,7 +89,7 @@ let compile_file st filename =
   in
   let cmds = Lexer.read_file (parse Parser.file) filename in
   let cmds = List.map Desugar.toplevel (pervasives_cmds @ cmds) in
-  let cmds, _ = type_cmds st cmds in
+  let cmds, _ = Infer.type_cmds {Infer.typing = st.Shell.typing; Infer.change = st.Shell.change} cmds in
   let cmds = if !Config.disable_optimization then cmds else Optimize.optimize_commands cmds in
 
   (* read the source file *)
@@ -247,10 +141,10 @@ let toplevel ctxenv =
     let ctxenv = ref ctxenv in
     while true do
       try
-        let cmd = Lexer.read_toplevel (parse Parser.commandline) () in
+        let cmd = Lexer.read_toplevel (Shell.parse Parser.commandline) () in
         let cmd = Desugar.toplevel cmd in
-        ctxenv := exec_cmd true !ctxenv cmd
-        with
+        ctxenv := Shell.exec_cmd Format.std_formatter true !ctxenv cmd
+      with
         | Error.Error err -> Error.print err
         | Sys.Break -> prerr_endline "Interrupted."
     done
@@ -296,7 +190,7 @@ let main =
   end;
   try
     (* Run and load all the specified files. *)
-    let ctxenv = List.fold_left use_file initial_ctxenv !files in
+    let ctxenv = List.fold_left (Shell.use_file Format.std_formatter) Shell.initial_state !files in
     List.iter (compile_file ctxenv) !to_be_compiled;
     if !Config.interactive_shell then toplevel ctxenv
   with

@@ -41,41 +41,44 @@ let infer_effect ~loc env eff =
    - constraints connecting all these types.
    Note that unlike in ordinary type schemes, context types are positive while
    pattern type is negative. *)
-let rec infer_pattern (p, loc) =
-  if !Config.disable_typing then Scheme.simple Type.universal_ty else
+let rec type_pattern p =
+  let loc = p.Untyped.location in
   let unify = Scheme.finalize_pattern_scheme ~loc in
-  let ty_sch = match p with
+  let ty_sch, pat = match p.Untyped.term with
 
-  | Pattern.Var x ->
+  | Untyped.PVar x ->
       let ty = Type.fresh_ty () in
-      [(x, ty)], ty, Constraints.empty
+      ([(x, ty)], ty, Constraints.empty), Typed.PVar x
 
-  | Pattern.As (p, x) ->
-      let ctx, ty, cnstrs = infer_pattern p in
-      (x, ty) :: ctx, ty, cnstrs
+  | Untyped.PAs (p, x) ->
+      let p = type_pattern p in
+      let ctx, ty, cnstrs = p.Typed.scheme in
+      ((x, ty) :: ctx, ty, cnstrs), Typed.PAs (p, x)
 
-  | Pattern.Nonbinding ->
-      Scheme.simple (Type.fresh_ty ())
+  | Untyped.PNonbinding ->
+      Scheme.simple (Type.fresh_ty ()), Typed.PNonbinding
 
-  | Pattern.Const const ->
-      Scheme.simple (ty_of_const const)
+  | Untyped.PConst const ->
+      Scheme.simple (ty_of_const const), Typed.PConst const
 
-  | Pattern.Tuple ps ->
+  | Untyped.PTuple ps ->
+      let ps = List.map type_pattern ps in
       let infer p (ctx, tys, chngs) =
-        let ctx_p, ty_p, cnstrs_p = infer_pattern p in
+        let ctx_p, ty_p, cnstrs_p = p.Typed.scheme in
         ctx_p @ ctx, ty_p :: tys, [
           just cnstrs_p
         ] @ chngs
       in
       let ctx, tys, chngs = List.fold_right infer ps ([], [], []) in
-      unify ctx (Type.Tuple tys) chngs
+      unify ctx (Type.Tuple tys) chngs, Typed.PTuple ps
 
-  | Pattern.Record [] ->
+  | Untyped.PRecord [] ->
       assert false
 
-  | Pattern.Record (((fld, _) :: _) as lst) ->
+  | Untyped.PRecord (((fld, _) :: _) as lst) ->
       if not (Pattern.linear_record lst) then
         Error.typing ~loc "Fields in a record must be distinct";
+      let lst = Common.assoc_map type_pattern lst in
       begin match Tctx.infer_field fld with
       | None -> Error.typing ~loc "Unbound record field label %s" fld
       | Some (ty, (ty_name, fld_tys)) ->
@@ -83,7 +86,7 @@ let rec infer_pattern (p, loc) =
             begin match Common.lookup fld fld_tys with
             | None -> Error.typing ~loc "Unexpected field %s in a pattern of type %s" fld ty_name
             | Some fld_ty ->
-                let ctx_p, ty_p, cnstrs_p = infer_pattern p in
+                let ctx_p, ty_p, cnstrs_p = p.Typed.scheme in
                 ctx_p @ ctx, [
                   ty_less ~loc fld_ty ty_p;
                   just cnstrs_p
@@ -91,21 +94,22 @@ let rec infer_pattern (p, loc) =
             end
         in
         let ctx, chngs = List.fold_right infer lst ([], []) in
-        unify ctx ty chngs
+        unify ctx ty chngs, Typed.PRecord lst
       end
 
-  | Pattern.Variant (lbl, p) ->
+  | Untyped.PVariant (lbl, p) ->
       begin match Tctx.infer_variant lbl with
       | None -> Error.typing ~loc "Unbound constructor %s" lbl
       | Some (ty, arg_ty) ->
           begin match p, arg_ty with
-            | None, None -> Scheme.simple ty
+            | None, None -> Scheme.simple ty, Typed.PVariant (lbl, None)
             | Some p, Some arg_ty ->
-                let ctx_p, ty_p, cnstrs_p = infer_pattern p in
+                let p = type_pattern p in
+                let ctx_p, ty_p, cnstrs_p = p.Typed.scheme in
                 unify ctx_p ty [
                   ty_less ~loc arg_ty ty_p;
                   just cnstrs_p
-                ]
+                ], Typed.PVariant (lbl, Some p)
             | None, Some _ -> Error.typing ~loc "Constructor %s should be applied to an argument" lbl
             | Some _, None -> Error.typing ~loc "Constructor %s cannot be applied to an argument" lbl
           end
@@ -113,18 +117,15 @@ let rec infer_pattern (p, loc) =
 
   in
   (* Print.debug "%t : %t" (Untyped.print_pattern (p, loc)) (Scheme.print_ty_scheme ty_sch); *)
-  ty_sch
+  {
+    Typed.term = pat;
+    Typed.scheme = ty_sch;
+    Typed.location = loc
+  }
 
 let extend_env vars env =
   List.fold_right (fun (x, ty_sch) env -> {env with context = TypingEnv.update env.context x ty_sch}) vars env
 
-let type_pattern p =
-  let ty_sch = infer_pattern p in
-  {
-    Typed.term = p;
-    Typed.scheme = ty_sch;
-    Typed.location = snd p
-  }
 let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
   match expr with
   | Untyped.Var x ->
@@ -228,15 +229,6 @@ and type_let_rec_defs ~loc env defs =
   let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
   defs, poly_tyschs
 
-(* [infer_expr env e] infers the type scheme of an expression [e] in a
-   typing environment [env] of generalised variables.
-   The scheme consists of:
-   - the context, which contains non-generalised variables and their types,
-   - the type of the expression, and
-   - constraints connecting all these types. *)
-let infer_expr env e =
-  if !Config.disable_typing then Scheme.simple Type.universal_ty else (type_expr env e).Typed.scheme
-           
 (* [infer_comp env c] infers the dirty type scheme of a computation [c] in a
    typing environment [env] of generalised variables.
    The scheme consists of:
@@ -244,6 +236,9 @@ let infer_expr env e =
    - the type of the expression,
    - the dirt of the computation, and
    - constraints connecting all these types. *)
+let infer_pattern p =
+  if !Config.disable_typing then Scheme.simple Type.universal_ty else (type_pattern p).Typed.scheme
+
 let infer_comp env c =
   if !Config.disable_typing then Scheme.simple Type.universal_dirty else (type_comp env c).Typed.scheme
 
@@ -380,3 +375,20 @@ let infer_toplevel ~loc st = function
   | Untyped.TypeOf c ->
       let c, st = infer_top_comp st c in
       Typed.TypeOf c, st
+
+
+let type_cmd st cmd =
+  let loc = cmd.Untyped.location in
+  let ty_st = {change = st.change; typing = st.typing} in
+  let cmd, ty_st = infer_toplevel ~loc ty_st cmd.Untyped.term in
+  let st = {change = ty_st.change; typing = ty_st.typing} in
+  (cmd, loc), st
+
+let type_cmds st cmds =
+  let cmds, st =
+    List.fold_left (fun (cmds, st) cmd ->
+      let cmd, st = type_cmd st cmd in
+      (cmd :: cmds, st)
+    ) ([], st) cmds
+  in
+  List.rev cmds, st

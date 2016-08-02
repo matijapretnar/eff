@@ -1,5 +1,5 @@
 type t =
-  | Integer of Big_int.big_int
+  | Integer of int
   | String of string
   | Boolean of bool
   | Float of float
@@ -13,7 +13,7 @@ let of_false = of_boolean false
 
 let print c ppf =
   match c with
-  | Integer k -> Format.fprintf ppf "%s" (Big_int.string_of_big_int k)
+  | Integer k -> Format.fprintf ppf "%d" k
   | String s -> Format.fprintf ppf "%S" s
   | Boolean b -> Format.fprintf ppf "%B" b
   | Float f -> Format.fprintf ppf "%F" f
@@ -29,7 +29,7 @@ let compare c1 c2 =
       | Integer k ->
         (match c2 with
           | Integer k' -> 
-            let r = Big_int.compare_big_int k k' in
+            let r = Pervasives.compare k k' in
               if r < 0 then Common.Less
               else if r > 0 then Common.Greater
               else Common.Equal

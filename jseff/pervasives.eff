@@ -1,0 +1,263 @@
+(* This is the equivalent of Haskell prelude or Ocaml pervasives,
+   with some list handling functions thrown in. *)
+
+external ( = ) : 'a -> 'a -> bool = "="
+
+external ( < ) : 'a -> 'a -> bool = "<"
+
+type channel = effect
+  operation print : string -> unit
+  operation read : unit -> string
+end;;
+
+external std : channel = "std";;
+
+type 'a exception = effect
+  operation raise : 'a -> empty
+end;;
+
+let raise e p = match (e#raise p) with;;
+
+external exception : string -> 'a exception = "exception";;
+
+let divisionByZero = exception "division by zero";;
+
+let invalidArgument = exception "invalid argument";;
+
+let failure = exception "failure";;
+
+let failwith msg = raise failure msg ;;
+
+let assertionFault = exception "assertion fault";;
+
+let assert b = if b then () else raise assertionFault () ;;
+
+external ( ~- ) : int -> int = "~-"
+
+external ( + ) : int -> int -> int = "+"
+
+external ( * ) : int -> int -> int = "*"
+
+external ( - ) : int -> int -> int = "-"
+
+external ( mod ) : int -> int -> int = "mod"
+let (mod) m n = match n with
+  | 0 -> raise divisionByZero ()
+  | n -> m mod n
+
+external ( ~-. ) : float -> float = "~-."
+
+external ( +. ) : float -> float -> float = "+."
+
+external ( *. ) : float -> float -> float = "*."
+
+external ( -. ) : float -> float -> float = "-."
+
+external ( /. ) : float -> float -> float = "/."
+external ( / ) : int -> int -> int = "/"
+
+external ( ** ) : int -> int -> int = "**"
+
+let ( / ) m n = match n with
+  | 0 -> raise divisionByZero ()
+  | n -> (/) m n
+
+external float_of_int : int -> float = "float_of_int"
+
+external ( ^ ) : string -> string -> string = "^"
+
+external string_length : string -> int = "string_length"
+
+external to_string : 'a -> string  = "to_string"
+
+type 'a option = None | Some of 'a
+
+let rec assoc x = function
+  | [] -> None
+  | (y,z)::lst -> if x = y then Some z else assoc x lst
+
+let option_catch exc = handler
+  | exc#raise _ _ -> None
+  | val x -> Some x
+
+let default_catch exc default = handler
+  | exc#raise _ _ -> default
+
+let not x = if x then false else true
+
+let (>) x y = y < x
+
+let (<=) x y =
+  let lt = x < y in
+  let eq = x = y in
+  lt || eq
+
+let (>=) x y = (y <= x)
+
+let (<>) x y = not (x = y)
+
+let (!=) x y = not (x = y)
+
+
+let rec range m n =
+  if m > n
+  then []
+  else
+    let r = range in
+    m :: r (m + 1) n
+
+let rec map f = function
+  | [] -> []
+  | x :: xs ->
+    let y = f x in
+    let ys = map f xs in
+      y :: ys;;
+
+let ignore _ = ()
+
+let hd (x :: _) = x
+
+let tl (_ :: lst) = lst
+
+let take f k =
+  let r = range 0 k in map f r
+
+let rec fold_left f a = function
+  | [] -> a
+  | y :: ys ->
+    let a = f a y in
+    fold_left f a ys
+
+let rec fold_right f xs a =
+  match xs with
+    | [] -> a
+    | x :: xs ->
+      let a = fold_right f xs a in
+      f x a
+
+let rec iter f = function
+  | [] -> ()
+  | x :: xs -> f x; iter f xs
+
+let rec forall p = function
+  | [] -> true
+  | x :: xs -> if p x then forall p xs else false
+
+let rec exists p = function
+  | [] -> false
+  | x :: xs -> if p x then true else exists p xs
+
+let mem x = exists (fun x' -> x = x')
+
+let rec filter p = function
+  | [] -> []
+  | x :: xs ->
+    if p x then (x :: filter p xs) else filter p xs
+
+let complement xs ys = filter (fun x -> not (mem x ys)) xs
+
+let intersection xs ys = filter (fun x -> mem x ys) xs
+
+let rec zip xs ys =
+  match (xs, ys) with
+  | ([], []) -> []
+  | (x :: xs, y :: ys) -> (x, y) :: (zip xs ys)
+  | (_, _) -> raise invalidArgument "zip: length mismatch"
+
+let reverse lst =
+  let rec reverse_acc acc = function
+    | [] -> acc
+    | x :: xs -> reverse_acc (x :: acc) xs
+  in
+    reverse_acc [] lst
+
+let rec (@) xs ys =
+  match xs with
+  | [] -> ys
+  | x :: xs -> x :: (xs @ ys)
+
+let rec length = function
+  | [] -> 0
+  | x :: xs -> length xs + 1
+
+let head = function
+  | [] ->  raise invalidArgument "head: empty list"
+  | x :: _ -> x
+
+let rec tail = function
+  | [] ->  raise invalidArgument "tail: empty list"
+  | x :: xs -> xs
+
+let abs x = if x < 0 then -x else x
+
+let min x y = if x < y then x else y
+
+let max x y = if x < y then y else x
+
+let rec gcd m n =
+  match n with
+  | 0 -> m
+  | _ ->
+    let g = gcd n in g (m mod n)
+
+let rec lcm m n =
+  let d = gcd m n in (m * n) / d
+
+let odd x = (x mod 2 = 1)
+
+let even x = (x mod 2 = 0)
+
+let id x = x
+
+let compose f g x = f (g x)
+
+let fst (x, _) = x
+
+let snd (_, y) = y
+
+let print v =
+  let s = to_string v in
+    std#print s
+
+let print_string str =
+  std#print str
+
+let print_endline v =
+  let s = to_string v in
+    std#print s;
+    std#print "\n"
+
+type 'a ref = effect
+  operation lookup: unit -> 'a
+  operation update: 'a -> unit
+end
+
+let state r x = handler
+  | val y -> (fun _ -> y)
+  | r#lookup () k -> (fun s -> k s s)
+  | r#update s' k -> (fun _ -> k () s')
+  | finally f -> f x;;
+
+let ref x =
+  new ref @ x with
+    operation lookup _ @ x -> (x, x)
+    operation update y @ _ -> ((), y)
+  end
+
+let (!) r = r#lookup ()
+let (:=) r v = r#update v
+let incr r = r#update (r#lookup () + 1)
+let decr r = r#update (r#lookup () - 1)
+
+type random =
+effect
+  operation int : int -> int
+  operation float : float -> float
+end
+
+external rnd : random = "rnd";;
+
+(* This forces the evaluation of x before calling the check, allowing us
+   to write [check !l] and similar to get the result instead of an
+   operation *)
+let check_val x = check x

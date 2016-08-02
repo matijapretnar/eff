@@ -5,14 +5,14 @@ module V = Value
 exception PatternMatch of Location.t
 
 let rec extend_value p v env =
-  match fst p, v with
-  | Pattern.Var x, v -> RuntimeEnv.update x v env
-  | Pattern.As (p, x), v ->
+  match p.Typed.term, v with
+  | Typed.PVar x, v -> RuntimeEnv.update x v env
+  | Typed.PAs (p, x), v ->
       let env = extend_value p v env in
         RuntimeEnv.update x v env
-  | Pattern.Nonbinding, _ -> env
-  | Pattern.Tuple ps, Value.Tuple vs -> List.fold_right2 extend_value ps vs env
-  | Pattern.Record ps, Value.Record vs ->
+  | Typed.PNonbinding, _ -> env
+  | Typed.PTuple ps, Value.Tuple vs -> List.fold_right2 extend_value ps vs env
+  | Typed.PRecord ps, Value.Record vs ->
       begin
         let rec extend_record ps vs env =
           match ps with
@@ -23,16 +23,16 @@ let rec extend_value p v env =
         in
           try
             extend_record ps vs env
-          with Not_found -> raise (PatternMatch (snd p))
+          with Not_found -> raise (PatternMatch p.Typed.location)
       end
-  | Pattern.Variant (lbl, None), Value.Variant (lbl', None) when lbl = lbl' -> env
-  | Pattern.Variant (lbl, Some p), Value.Variant (lbl', Some v) when lbl = lbl' ->
+  | Typed.PVariant (lbl, None), Value.Variant (lbl', None) when lbl = lbl' -> env
+  | Typed.PVariant (lbl, Some p), Value.Variant (lbl', Some v) when lbl = lbl' ->
       extend_value p v env
-  | Pattern.Const c, Value.Const c' when Const.equal c c' -> env
-  | _, _ -> raise (PatternMatch (snd p))
+  | Typed.PConst c, Value.Const c' when Const.equal c c' -> env
+  | _, _ -> raise (PatternMatch p.Typed.location)
 
 let extend p v env =
-  try extend_value p.Typed.term v env
+  try extend_value p v env
   with PatternMatch loc -> Error.runtime "Pattern match failure."
 
 let rec sequence k = function
@@ -61,7 +61,7 @@ let rec ceval env c =
         | [] -> Error.runtime "No branches succeeded in a pattern match."
         | a :: lst ->
             let (p, c) = a.Typed.term in
-            try ceval (extend_value p.Typed.term v env) c
+            try ceval (extend_value p v env) c
             with PatternMatch _ -> eval_case lst
       in
         eval_case cases
@@ -82,8 +82,8 @@ let rec ceval env c =
   | Typed.For (i, e1, e2, c, up) ->
       let n1 = V.to_int (veval env e1) in
       let n2 = V.to_int (veval env e2) in
-      let le = if up then Big_int.le_big_int else Big_int.ge_big_int in
-      let next = if up then Big_int.succ_big_int else Big_int.pred_big_int in
+      let le = if up then ( <= ) else ( >= ) in
+      let next = if up then succ else pred in
       let rec loop n =
         if le n n2 then
           let r = ceval (RuntimeEnv.update i (V.Const (Const.of_integer n)) env) c in

@@ -2,7 +2,21 @@ let print_variable = Typed.Variable.print
 
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
 
-let print_pattern p ppf = Untyped.print_pattern (p.Typed.term) ppf
+let rec print_pattern ?max_level p ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match p.Typed.term with
+  | Typed.PVar x -> print "%t" (print_variable x)
+  | Typed.PAs (p, x) -> print "%t as %t" (print_pattern p) (print_variable x)
+  | Typed.PConst c -> Const.print c ppf
+  | Typed.PTuple lst -> Print.tuple print_pattern lst ppf
+  | Typed.PRecord lst -> Print.record print_pattern lst ppf
+  | Typed.PVariant (lbl, None) when lbl = Common.nil -> print "[]"
+  | Typed.PVariant (lbl, None) -> print "%s" lbl
+  | Typed.PVariant ("(::)", Some ({ Typed.term = Typed.PTuple [p1; p2] })) ->
+      print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
+  | Typed.PVariant (lbl, Some p) ->
+      print ~at_level:1 "(%s @[<hov>%t@])" lbl (print_pattern p)
+  | Typed.PNonbinding -> print "_"
 
 let print_type_param (Type.Ty_Param n) ppf =
    Format.fprintf ppf "'t%d" n

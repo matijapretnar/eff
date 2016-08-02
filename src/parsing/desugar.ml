@@ -182,7 +182,7 @@ let fresh_variable = function
 
 let id_abstraction loc =
   let x = fresh_variable (Some "gen_id_par") in
-  ((Pattern.Var x, loc), (Untyped.add_loc (Untyped.Value (Untyped.add_loc (Untyped.Var x) loc)) loc))
+  (Untyped.add_loc (Untyped.PVar x) loc, (Untyped.add_loc (Untyped.Value (Untyped.add_loc (Untyped.Var x) loc)) loc))
 
 let pattern ?(forbidden=[]) (p, loc) =
   let vars = ref [] in
@@ -200,17 +200,18 @@ let pattern ?(forbidden=[]) (p, loc) =
     let p = match p with
     | Pattern.Var x ->
         let x = new_var x in
-        Pattern.Var x
+        Untyped.PVar x
     | Pattern.As (p, x) ->
         let x = new_var x in
         let p' = pattern p in
-        Pattern.As (p', x)
-    | Pattern.Tuple ps -> Pattern.Tuple (List.map pattern ps)
-    | Pattern.Record flds -> Pattern.Record (Common.assoc_map pattern flds)
-    | Pattern.Variant (lbl, p) -> Pattern.Variant (lbl, Common.option_map pattern p)
-    | (Pattern.Const _ | Pattern.Nonbinding) as p -> p
+        Untyped.PAs (p', x)
+    | Pattern.Tuple ps -> Untyped.PTuple (List.map pattern ps)
+    | Pattern.Record flds -> Untyped.PRecord (Common.assoc_map pattern flds)
+    | Pattern.Variant (lbl, p) -> Untyped.PVariant (lbl, Common.option_map pattern p)
+    | Pattern.Const c -> Untyped.PConst c
+    | Pattern.Nonbinding -> Untyped.PNonbinding
     in
-    (p, loc)
+    { Untyped.term = p; Untyped.location = loc }
   in
   let p = pattern (p, loc) in
   !vars, p
@@ -232,7 +233,7 @@ let rec expression ctx (t, loc) =
   | Sugared.Function cs ->
       let x = fresh_variable (Some "gen_function") in
       let cs = List.map (abstraction ctx) cs in
-      [], Untyped.Lambda ((Pattern.Var x, loc), Untyped.add_loc (Untyped.Match (Untyped.add_loc (Untyped.Var x) loc, cs)) loc)
+      [], Untyped.Lambda ((Untyped.add_loc (Untyped.PVar x) loc), Untyped.add_loc (Untyped.Match (Untyped.add_loc (Untyped.Var x) loc, cs)) loc)
   | Sugared.Handler cs ->
       let w, h = handler loc ctx cs in
       w, Untyped.Handler h
@@ -256,7 +257,7 @@ let rec expression ctx (t, loc) =
   | Sugared.Handle _ | Sugared.Conditional _ | Sugared.While _ | Sugared.For _ | Sugared.Check _ ->
       let x = fresh_variable (Some "gen_bind") in
       let c = computation ctx (t, loc) in
-      let w = [(Pattern.Var x, loc), c] in
+      let w = [Untyped.add_loc (Untyped.PVar x) loc, c] in
       w, Untyped.Var x
   in
   w, Untyped.add_loc e loc
@@ -264,8 +265,8 @@ let rec expression ctx (t, loc) =
 and computation ctx (t, loc) =
   let if_then_else e c1 c2 =
     Untyped.Match (e, [
-      (Pattern.Const (Const.of_true), c1.Untyped.location), c1;
-      (Pattern.Const (Const.of_false), c2.Untyped.location), c2
+      ((Untyped.add_loc (Untyped.PConst (Const.of_true)) c1.Untyped.location), c1);
+      ((Untyped.add_loc (Untyped.PConst (Const.of_false)) c2.Untyped.location), c2)
     ])
   in
   let w, c = match t with
@@ -357,7 +358,7 @@ and let_rec ctx (e, loc) =
   | Sugared.Function cs ->
     let x = fresh_variable (Some "gen_let_rec_function") in
     let cs = List.map (abstraction ctx) cs in
-    (Pattern.Var x, loc), Untyped.add_loc (Untyped.Match (Untyped.add_loc (Untyped.Var x) loc, cs)) loc
+    (Untyped.add_loc (Untyped.PVar x) loc), Untyped.add_loc (Untyped.Match (Untyped.add_loc (Untyped.Var x) loc, cs)) loc
   | _ -> Error.syntax ~loc "This kind of expression is not allowed in a recursive definition"
 
 and expressions ctx = function
@@ -427,7 +428,10 @@ let external_ty x t =
 let top_computation c = computation !top_ctx c
 
 let rec toplevel (cmd, loc) =
-  (plain_toplevel cmd, loc)
+  {
+    Untyped.term = plain_toplevel cmd;
+    Untyped.location = loc
+  }
 and plain_toplevel = function
   | Sugared.Tydef defs ->
       Untyped.Tydef (tydefs defs)

@@ -5,7 +5,6 @@ module EffectMap = Map.Make(String)
 
 type variable = Variable.t
 type effect = Common.effect
-type pattern = variable Pattern.t
 
 type 'term annotation = {
   term: 'term;
@@ -16,6 +15,16 @@ let add_loc t loc = {
   term = t;
   location = loc;
 }
+
+type pattern = plain_pattern annotation
+and plain_pattern =
+  | PVar of variable
+  | PAs of pattern * variable
+  | PTuple of pattern list
+  | PRecord of (Common.field, pattern) Common.assoc
+  | PVariant of Common.label * pattern option
+  | PConst of Const.t
+  | PNonbinding
 
 (** Pure expressions *)
 type expression = plain_expression annotation
@@ -57,11 +66,11 @@ and abstraction2 = pattern * pattern * computation
 
 
 (* Toplevel commands (the first four do not need to be separated by [;;]) *)
-type toplevel = plain_toplevel * Location.t
+type toplevel = plain_toplevel annotation
 and plain_toplevel =
   | Tydef of (Common.tyname, (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t * Tctx.tydef) Common.assoc
   (** [type t = tydef] *)
-  | TopLet of (variable Pattern.t * computation) list
+  | TopLet of (pattern * computation) list
   (** [let p1 = t1 and ... and pn = tn] *)
   | TopLetRec of (variable * abstraction) list
   (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)
@@ -82,29 +91,29 @@ and plain_toplevel =
   (** [#type t] *)
 
 
-let rec print_pattern ?max_level (p,_) ppf =
+let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match p with
-  | Pattern.Var x -> print "%t" (Variable.print x)
-  | Pattern.As (p, x) -> print "%t as %t" (print_pattern p) (Variable.print x)
-  | Pattern.Const c -> Const.print c ppf
-  | Pattern.Tuple lst -> Print.tuple print_pattern lst ppf
-  | Pattern.Record lst -> Print.record print_pattern lst ppf
-  | Pattern.Variant (lbl, None) when lbl = Common.nil -> print "[]"
-  | Pattern.Variant (lbl, None) -> print "%s" lbl
-  | Pattern.Variant ("(::)", Some (Pattern.Tuple [p1; p2], _)) ->
-      print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
-  | Pattern.Variant (lbl, Some p) ->
-      print ~at_level:1 "(%s @[<hov>%t@])" lbl (print_pattern p)
-  | Pattern.Nonbinding -> print "_"
+  match p.term with
+  | PVar x -> print "%t" (Variable.print x)
+  | PAs (p, x) -> print "%t as %t" (print_pattern p) (Variable.print x)
+  | PConst c -> Const.print c ppf
+  | PTuple lst -> Print.tuple print_pattern lst ppf
+  | PRecord lst -> Print.record print_pattern lst ppf
+  | PVariant (lbl, None) when lbl = Common.nil -> print "[]"
+  | PVariant (lbl, None) -> print "%s" lbl
+  | PVariant (lbl, Some ({ term = PTuple [p1; p2] })) when lbl = Common.cons ->
+      print ~at_level:1 "[@[<hov>@[%t@]%t@]]" (print_pattern p1) (pattern_list p2)
+  | PVariant (lbl, Some p) ->
+      print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
+  | PNonbinding -> print "_"
 
-and pattern_list ?(max_length=299) (p, loc) ppf =
+and pattern_list ?(max_length=299) p ppf =
   if max_length > 1 then
-    match p with
-    | Pattern.Variant (lbl, Some (Pattern.Tuple [v1; v2], _)) when lbl = Common.cons ->
+    match p.term with
+    | PVariant (lbl, Some ({ term = PTuple [v1; v2] })) when lbl = Common.cons ->
         Format.fprintf ppf ",@ %t%t" (print_pattern v1) (pattern_list ~max_length:(max_length - 1) v2)
-    | Pattern.Variant (lbl, None) when lbl = Common.nil -> ()
-    | p -> Format.fprintf ppf "(??? %t ???)" (print_pattern (p, loc))
+    | PVariant (lbl, None) when lbl = Common.nil -> ()
+    | _ -> Format.fprintf ppf "(??? %t ???)" (print_pattern p)
   else
     Format.fprintf ppf ",@ ..."
 
