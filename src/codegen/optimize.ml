@@ -934,20 +934,6 @@ and shallow_opt c =
       let (pa, ca) = c2.term
       in
         (match c1.term with
-         | Handle (h, ch) ->
-             (match h.term with
-              | Handler h ->
-                  (match ch.term with
-                   | Value ve ->
-                       if is_pure_comp ch
-                       then
-                         (let newlambda =
-                            lambda ~loc: c.location h.value_clause in
-                          let res = apply ~loc: c.location newlambda ve
-                          in optimize_comp res)
-                       else c
-                   | _ -> c)
-              | _ -> c)
          | Call (eff, e, k) ->
              let loc = Location.unknown in
              let (_, (input_k_ty, _), _) = k.scheme in
