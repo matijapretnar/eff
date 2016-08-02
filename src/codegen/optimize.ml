@@ -924,28 +924,16 @@ and shallow_opt c =
      let let_abs = abstraction p1 newbind in
      let res = let_in ~loc: c.location e let_abs in
      shallow_opt res
+  | Bind (
+      {term = Apply({term = Effect eff}, e_param)},
+      {term = {term = Typed.PVar y}, {term = Apply ({term = Lambda k}, {term = Var x})}}
+    ) when y = x ->
+      let res = call ~loc: c.location eff e_param k in
+      shallow_opt res
   | Bind (c1, c2) ->
       let (pa, ca) = c2.term
       in
         (match c1.term with
-         | Apply (e1, e2) ->
-             (match e1.term with
-              | Effect ef ->
-                  (match ca.term with
-                   | Apply (e3, e4) ->
-                       (match e4.term with
-                        | Var x ->
-                            (match e3.term with
-                             | Lambda k ->
-                                 (match pa.term with
-                                  | Typed.PVar pv when pv = x ->
-                                      let res = call ~loc: c.location ef e2 k
-                                      in shallow_opt res
-                                  | _ -> c)
-                             | _ -> c)
-                        | _ -> c)
-                   | _ -> c)
-              | _ -> c)
          | Handle (h, ch) ->
              (match h.term with
               | Handler h ->
