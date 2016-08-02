@@ -808,7 +808,7 @@ and refresh_comp c =
       let (pa, ca) = c2.term in
       let newpa = refresh_pattern pa in
       let newpa_e = make_expression_from_pattern newpa in
-      let new_ca = substitute_pattern_comp ca pa newpa_e c
+      let new_ca = substitute_pattern_comp ca pa newpa_e ca
       in
         bind ~loc: c.location (refresh_comp c1)
           (abstraction ~loc: c.location newpa (refresh_comp new_ca))
@@ -816,7 +816,7 @@ and refresh_comp c =
       let (pa, ca) = a.term in
       let newpa = refresh_pattern pa in
       let newpa_e = make_expression_from_pattern newpa in
-      let new_ca = substitute_pattern_comp ca pa newpa_e c
+      let new_ca = substitute_pattern_comp ca pa newpa_e ca
       in
         let_in ~loc: c.location (refresh_exp e)
           (abstraction ~loc: c.location newpa (refresh_comp new_ca))
