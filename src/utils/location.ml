@@ -39,8 +39,18 @@ let make start_lexing_position end_lexing_position =
 let merge loc1 loc2 =
   match loc1, loc2 with
   | Known loc1, Known loc2 ->
-      Known {loc1 with end_line = loc2.end_line; end_column = loc2.end_column}
-  | _, _ -> Unknown
+      if loc1.filename <> loc2.filename then
+        failwith "Location.union: locations do not belong to the same file"
+      else
+        let (start_line, start_column) =
+          min (loc1.start_line, loc1.start_column) (loc2.start_line, loc2.start_column)
+        and (end_line, end_column) =
+          max (loc1.end_line, loc1.end_column) (loc2.end_line, loc2.end_column)
+        in
+        Known {loc1 with start_line; start_column; end_line; end_column}
+  | (loc, Unknown) | (Unknown, loc) -> loc
+
+let union locs = List.fold_right merge locs Unknown
 
 let of_lexeme lex =
   make (Lexing.lexeme_start_p lex) (Lexing.lexeme_end_p lex)
