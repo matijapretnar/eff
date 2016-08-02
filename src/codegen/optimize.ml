@@ -35,11 +35,11 @@ let unary_inlinable f ty1 ty2 =
       scheme = Scheme.simple ty1;
     }
   in
-    (pure_lambda ~loc) @@
-      ((pure_abstraction ~loc p) @@
-         (pure_apply ~loc
-            (built_in ~loc f (Scheme.simple (Type.Arrow (ty1, (ty2, drt)))))
-            (var ~loc x (Scheme.simple ty1))))
+    pure_lambda @@
+    pure_abstraction p @@
+      pure_apply
+        (built_in f (Scheme.simple (Type.Arrow (ty1, (ty2, drt)))))
+        (var x (Scheme.simple ty1))
   
 let binary_inlinable f ty1 ty2 ty =
   let x1 = Typed.Variable.fresh "x1" and x2 = Typed.Variable.fresh "x2"
@@ -57,20 +57,17 @@ let binary_inlinable f ty1 ty2 ty =
       scheme = Scheme.simple ty2;
     }
   in
-    (lambda ~loc) @@
-      ((abstraction ~loc p1) @@
-         ((value ~loc) @@
-            ((lambda ~loc) @@
-               ((abstraction ~loc p2) @@
-                  ((value ~loc) @@
-                     (pure_apply ~loc
-                        (pure_apply ~loc
-                           (built_in ~loc f
-                              (Scheme.simple
-                                 (Type.Arrow (ty1,
-                                    ((Type.Arrow (ty2, (ty, drt))), drt)))))
-                           (var ~loc x1 (Scheme.simple ty1)))
-                        (var ~loc x2 (Scheme.simple ty2))))))))
+    lambda @@
+    abstraction p1 @@
+      value @@
+      lambda @@
+      abstraction p2 @@
+        value @@
+          pure_apply
+            (pure_apply
+              (built_in f (Scheme.simple (Type.Arrow (ty1, ((Type.Arrow (ty2, (ty, drt))), drt)))))
+              (var x1 (Scheme.simple ty1)))
+            (var x2 (Scheme.simple ty2))
   
 let inlinable_definitions =
   [ ("=",
@@ -145,12 +142,6 @@ let find_inlinable x =
   match Common.lookup x !inlinable with
   | Some e -> Some (e ())
   | None -> None
-  
-let make_var_from_pattern p =
-  match fst p.term with
-  | Typed.PVar z -> var ~loc: p.location z p.scheme
-  | Typed.PAs (_, x) -> var ~loc: p.location x p.scheme
-  | _ -> failwith "MATCHED A non var PATTERN"
   
 let rec make_expression_from_pattern p =
     let loc = p.location in

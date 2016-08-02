@@ -143,7 +143,8 @@ let var ?loc x ty_sch =
     location = loc;
   }
 
-let built_in ~loc x ty_sch =
+let built_in ?loc x ty_sch =
+  let loc = backup_location loc [] in
   {
     term = BuiltIn x;
     scheme = ty_sch;
