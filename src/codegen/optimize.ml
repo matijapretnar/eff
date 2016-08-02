@@ -900,20 +900,17 @@ and shallow_opt c =
   match c.term with
   | Let (pclist, c2) ->
       let bind_comps = folder pclist c2 in optimize_comp bind_comps
-  | Match (e, lst) ->
-      (match e.term with
-       | Const cc ->
-           let func a =
-             let (p, clst) = a.term
-             in
-               (match p.term with
-                | Typed.PConst cp when cc = cp -> true
-                | _ -> false)
-           in
-             (match List.find func lst with
-              | abs -> let (_, c') = abs.term in c'
-              | _ -> c)
-       | _ -> c)
+  | Match ({term = Const cc}, lst) ->
+     let func a =
+       let (p, clst) = a.term
+       in
+         (match p.term with
+          | Typed.PConst cp when cc = cp -> true
+          | _ -> false)
+     in
+       (match List.find func lst with
+        | abs -> let (_, c') = abs.term in c'
+        | _ -> c)
   | Bind (c1, c2) ->
       let (pa, ca) = c2.term
       in
