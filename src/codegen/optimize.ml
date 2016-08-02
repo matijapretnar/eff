@@ -919,15 +919,15 @@ and shallow_opt c =
        bind ~loc:c.location c1 (abstraction p2 (shallow_opt (bind c2 c3)))
      in
      shallow_opt res
+  | Bind ({term = LetIn (e, {term = (p1, c1)})}, c2) ->
+     let newbind = shallow_opt (bind c1 c2) in
+     let let_abs = abstraction p1 newbind in
+     let res = let_in ~loc: c.location e let_abs in
+     shallow_opt res
   | Bind (c1, c2) ->
       let (pa, ca) = c2.term
       in
         (match c1.term with
-         | LetIn (e, a) ->
-             let (pal, cal) = a.term in
-             let newbind = shallow_opt (bind ~loc: c.location cal c2) in
-             let let_abs = abstraction ~loc: c.location pal newbind in
-             let res = let_in ~loc: c.location e let_abs in shallow_opt res
          | Apply (e1, e2) ->
              (match e1.term with
               | Effect ef ->
