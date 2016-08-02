@@ -911,12 +911,12 @@ and shallow_opt c =
        (match List.find func lst with
         | abs -> let (_, c') = abs.term in c'
         | _ -> c)
+  | Bind ({term = Value e}, c2) ->
+     let res = let_in ~loc: c.location e c2 in shallow_opt res
   | Bind (c1, c2) ->
       let (pa, ca) = c2.term
       in
         (match c1.term with
-         | (*Bind x (Value e) c -> LetC x e c*) Value e ->
-             let res = let_in ~loc: c.location e c2 in shallow_opt res
          | Bind (c3, c4) ->
              let (p2, cp2) = c4.term in
              let res =
