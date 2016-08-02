@@ -532,12 +532,7 @@ let rec substitute_var_comp comp vr exp =
           in
             (match p.term with
              | Typed.PConst _ -> a
-             | _ ->
-                 let temp_lambda =
-                   lambda ~loc (abstraction ~loc p c) in
-                 let new_temp_lambda =
-                   substitute_var_exp temp_lambda vr exp in
-                 let (Lambda newa) = new_temp_lambda.term in newa)
+             | _ -> substitute_var_abs a vr exp)
         in match' ~loc (substitute_var_exp e vr exp) (List.map func li)
     | While (c1, c2) ->
         while' ~loc (substitute_var_comp c1 vr exp)
@@ -560,9 +555,7 @@ let rec substitute_var_comp comp vr exp =
          let new_abs =
            abstraction ~loc fp
              (substitute_pattern_comp c1 p fpe c1) in
-         let new_lambda =
-           substitute_var_exp (lambda ~loc new_abs) vr exp in
-         let (Lambda new_a) = new_lambda.term
+         let new_a = substitute_var_abs new_abs vr exp
          in call ~loc eff (substitute_var_exp e1 vr exp) new_a)
     | Bind (c1, a1) ->
         (print_endline "matched with bind in sub var";
@@ -619,6 +612,10 @@ let rec substitute_var_comp comp vr exp =
                    let_in ~loc (substitute_var_exp e vr exp)
                      (abstraction ~loc new_p
                         (substitute_var_comp fresh_c vr exp)))))
+let substitute_var_abs a vr exp =
+    match substitute_var_exp (lambda a) vr exp with
+    | Lambda new_a -> new_a
+    | _ -> assert false
 and substitute_var_exp e vr exp =
   (* Print.debug "Substituting %t" (CamlPrint.print_expression e); *)
   let loc = Location.unknown
