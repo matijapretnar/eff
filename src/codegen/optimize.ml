@@ -1302,43 +1302,28 @@ and optimize_handler h =
   
 let optimize_command =
   function
-  | Typed.Computation c -> Some (Typed.Computation (optimize_comp c))
+  | Typed.Computation c ->
+      Typed.Computation (optimize_comp c)
   | Typed.TopLet (defs, vars) ->
-      let defs' = Common.assoc_map optimize_comp defs
-      in
-        ((match defs' with
-          | [ (p, c) ] ->
-              (match p.term with
-               | Typed.PVar x ->
-                   (match c.term with
-                    | Value e ->
-                        (match e.term with
-                         | Handler _ ->
-                             inlinable :=
-                               Common.update x (fun () -> e) !inlinable
-                         | _ -> ())
-                    | _ -> ())
-               | _ -> ())
-          | _ -> ());
-         Some (Typed.TopLet (defs', vars)))
+      let defs' = Common.assoc_map optimize_comp defs in
+      begin match defs' with
+      (* If we define a single simple handler, we inline it *)
+      | [({ term = Typed.PVar x}, { term = Value ({ term = Handler _ } as e)})] ->
+        inlinable := Common.update x (fun () -> e) !inlinable
+      | _ -> ()
+      end;
+      Typed.TopLet (defs', vars)
   | Typed.TopLetRec (defs, vars) ->
-      Some
-        (Typed.TopLetRec ((Common.assoc_map optimize_abstraction defs), vars))
-  | (Typed.DefEffect _ | Typed.Reset | Typed.Quit | Typed.Use _ |
-       Typed.Tydef _
-     as cmd) -> Some cmd
-  | (Typed.External (x, _, f) as cmd) ->
-      (match Common.lookup f inlinable_definitions with
-       | None -> Some cmd
-       | Some e -> (inlinable := Common.update x e !inlinable; Some cmd))
-  | Typed.TypeOf _ | Typed.Help -> None
+      Typed.TopLetRec (Common.assoc_map optimize_abstraction defs, vars)
+  | Typed.External (x, _, f) as cmd ->
+      begin match Common.lookup f inlinable_definitions with
+      (* If the external function is one of the predefined inlinables, we inline it *)
+      | Some e -> inlinable := Common.update x e !inlinable
+      | None -> ()
+      end;
+      cmd
+  | Typed.DefEffect _ | Typed.Reset | Typed.Quit | Typed.Use _
+  | Typed.Tydef _ | Typed.TypeOf _ | Typed.Help as cmd -> cmd
   
-let rec optimize_commands =
-  function
-  | [] -> []
-  | (cmd, loc) :: cmds ->
-      let cmd = optimize_command cmd in
-      let cmds = optimize_commands cmds
-      in (match cmd with | Some cmd -> (cmd, loc) :: cmds | None -> cmds)
-  
-
+let optimize_commands cmds =
+  List.map (fun (cmd, loc) -> (optimize_command cmd, loc)) cmds
