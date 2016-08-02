@@ -612,9 +612,9 @@ let rec substitute_var_comp comp vr exp =
                    let_in ~loc (substitute_var_exp e vr exp)
                      (abstraction ~loc new_p
                         (substitute_var_comp fresh_c vr exp)))))
-let substitute_var_abs a vr exp =
+and substitute_var_abs a vr exp =
     match substitute_var_exp (lambda a) vr exp with
-    | Lambda new_a -> new_a
+    | {term = Lambda new_a} -> new_a
     | _ -> assert false
 and substitute_var_exp e vr exp =
   (* Print.debug "Substituting %t" (CamlPrint.print_expression e); *)
