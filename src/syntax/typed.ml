@@ -77,28 +77,37 @@ and abstraction = (pattern * computation, Scheme.abstraction_scheme) annotation
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * computation, Scheme.abstraction2_scheme) annotation
 
-let abstraction ~loc p c : abstraction =
+let backup_location loc locs =
+  match loc with
+  | None -> Location.union locs
+  | Some loc -> loc
+
+let abstraction ?loc p c : abstraction =
+  let loc = backup_location loc [p.location; c.location] in
   {
     term = (p, c);
     scheme = Scheme.abstract ~loc p.scheme c.scheme;
     location = loc;
   }
 
-let abstraction2 ~loc p1 p2 c =
+let abstraction2 ?loc p1 p2 c =
+  let loc = backup_location loc [p1.location; p2.location; c.location] in
   {
     term = (p1, p2, c);
     scheme = Scheme.abstract2 ~loc p1.scheme p2.scheme c.scheme;
     location = c.location;
   }
 
-let var ~loc x ty_sch =
+let var ?loc x ty_sch =
+  let loc = backup_location loc [] in
   {
     term = Var x;
     scheme = ty_sch;
     location = loc;
   }
 
-let const ~loc c =
+let const ?loc c =
+  let loc = backup_location loc [] in
   let ty = match c with
   | Const.Integer _ -> Type.int_ty
   | Const.String _ -> Type.string_ty
@@ -111,7 +120,8 @@ let const ~loc c =
     location = loc;
   }
 
-let tuple ~loc es =
+let tuple ?loc es =
+  let loc = backup_location loc (List.map (fun e -> e.location) es) in
   let ctx, tys, constraints =
     List.fold_right (fun e (ctx, tys, constraints) ->
       let e_ctx, e_ty, e_constraints = e.scheme in
@@ -124,7 +134,9 @@ let tuple ~loc es =
     location = loc;
   }
 
-let record ~loc = function
+let record ?loc lst =
+  let loc = backup_location loc (List.map (fun (_, e) -> e.location) lst) in
+  match lst with
   | [] -> assert false
   | ((fld, _) :: _) as lst ->
     if not (Pattern.linear_record lst) then
@@ -150,7 +162,8 @@ let record ~loc = function
       }
     end
 
-let variant ~loc (lbl, e) =
+let variant ?loc (lbl, e) =
+    let loc = backup_location loc (match e with None -> [] | Some e -> [e.location]) in
     begin match Tctx.infer_variant lbl with
     | None -> Error.typing ~loc "Unbound constructor %s" lbl
     | Some (ty, arg_ty) ->
@@ -171,7 +184,8 @@ let variant ~loc (lbl, e) =
         }
     end
 
-let lambda ~loc a =
+let lambda ?loc a =
+  let loc = backup_location loc [a.location] in
   let ctx, (ty, drty), constraints = a.scheme in
   {
     term = Lambda a;
@@ -179,7 +193,8 @@ let lambda ~loc a =
     location = loc
   }
 
-let effect ~loc eff signature =
+let effect ?loc eff signature =
+  let loc = backup_location loc [] in
     match signature eff with
     | None -> Error.typing ~loc "Unbound effect %s" eff
     | Some (ty_par, ty_res) ->
@@ -193,7 +208,11 @@ let effect ~loc eff signature =
         location = loc;
       }
 
-let handler ~loc h signature =
+let handler ?loc h signature =
+    let loc = backup_location loc (
+      [h.value_clause.location; h.finally_clause.location] @
+      List.map (fun (_, a2) -> a2.location) h.effect_clauses
+    ) in
     let drt_mid = Type.fresh_dirt () in
     let ty_mid = Type.fresh_ty () in
 
@@ -246,7 +265,8 @@ let handler ~loc h signature =
     }
 
 
-let value ~loc e =
+let value ?loc e =
+  let loc = backup_location loc [e.location] in
   let ctx, ty, constraints = e.scheme in
   {
     term = Value e;
@@ -254,7 +274,10 @@ let value ~loc e =
     location = loc
   }
 
-let match' ~loc e cases =
+let match' ?loc e cases =
+  let loc = backup_location loc (
+    e.location :: List.map (fun a -> a.location) cases
+  ) in
   let ctx_e, ty_e, cnstrs_e = e.scheme in
   let drty = Type.fresh_dirty () in
   let drty_sch = match cases with
@@ -278,7 +301,8 @@ let match' ~loc e cases =
     location = loc
   }
 
-let while' ~loc c1 c2 =
+let while' ?loc c1 c2 =
+  let loc = backup_location loc [c1.location; c2.location] in
   let ctx_c1, (ty_c1, drt_c1), cnstrs_c1 = c1.scheme in
   let ctx_c2, (ty_c2, drt_c2), cnstrs_c2 = c2.scheme in
   let drt = Type.fresh_dirt () in
@@ -296,7 +320,8 @@ let while' ~loc c1 c2 =
     location = loc;
   }
 
-let for' ~loc i e1 e2 c up =
+let for' ?loc i e1 e2 c up =
+  let loc = backup_location loc [e1.location; e2.location; c.location] in
   let ctx_e1, ty_e1, cnstrs_e1 = e1.scheme in
   let ctx_e2, ty_e2, cnstrs_e2 = e2.scheme in
   let ctx_c, (ty_c, drt_c), cnstrs_c = c.scheme in
@@ -313,7 +338,8 @@ let for' ~loc i e1 e2 c up =
     location = loc;
   }
 
-let apply ~loc e1 e2 =
+let apply ?loc e1 e2 =
+  let loc = backup_location loc [e1.location; e2.location] in
   let ctx_e1, ty_e1, cnstrs_e1 = e1.scheme in
   let ctx_e2, ty_e2, cnstrs_e2 = e2.scheme in
   let drty = Type.fresh_dirty () in
@@ -327,7 +353,8 @@ let apply ~loc e1 e2 =
     location = loc;
   }
 
-let handle ~loc e c =
+let handle ?loc e c =
+  let loc = backup_location loc [e.location; c.location] in
   let ctx_e, ty_e, cnstrs_e = e.scheme in
   let ctx_c, drty_c, cnstrs_c = c.scheme in
   let drty = Type.fresh_dirty () in
@@ -341,14 +368,18 @@ let handle ~loc e c =
     location = loc;
   }
 
-let check ~loc c =
+let check ?loc c =
+  let loc = backup_location loc [c.location] in
   {
     term = Check c;
     scheme = ([], (Type.unit_ty, Type.fresh_dirt ()), Constraints.empty);
     location = loc;
   }
 
-let let' ~loc defs c =
+let let' ?loc defs c =
+  let loc = backup_location loc (
+    List.fold_right (fun (p, c) locs -> p.location :: c.location :: locs) defs [c.location]
+  ) in
   (* XXX Check for implicit sequencing *)
   let drt = Type.fresh_dirt () in
   let add_binding (p, c) (poly_tys, nonpoly_tys, ctx, chngs) =
@@ -389,7 +420,10 @@ let let' ~loc defs c =
     location = loc;
   }
 
-let let_rec' ~loc defs c =
+let let_rec' ?loc defs c =
+  let loc = backup_location loc (
+    c.location :: List.map (fun (_, a) -> a.location) defs
+  ) in
   let drt = Type.fresh_dirt () in
   let add_binding (x, a) (poly_tys, nonpoly_tys, ctx, chngs) =
     let ctx_a, (ty_p, drty_c), cnstrs_a = a.scheme in
