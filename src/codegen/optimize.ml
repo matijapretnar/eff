@@ -802,24 +802,24 @@ and substitute_pattern_exp e p exp mainexp =
   | Typed.PVariant _ -> mainexp
   | Typed.PConst _ -> mainexp
   | Typed.PNonbinding -> mainexp
+and refresh_abs a = 
+  let (p, c) = a.term in
+  let new_p = refresh_pattern p in
+  let new_p_e = make_expression_from_pattern new_p in
+  let new_c = substitute_pattern_comp c p new_p_e c in
+  abstraction ~loc:a.location new_p (refresh_comp new_c)
+and refresh_pure_abs a = 
+  let (p, e) = a.term in
+  let new_p = refresh_pattern p in
+  let new_p_e = make_expression_from_pattern new_p in
+  let new_e = substitute_pattern_exp e p new_p_e e in
+  pure_abstraction ~loc:a.location new_p (refresh_exp new_e)
 and refresh_comp c =
   match c.term with
   | Bind (c1, c2) ->
-      let (pa, ca) = c2.term in
-      let newpa = refresh_pattern pa in
-      let newpa_e = make_expression_from_pattern newpa in
-      let new_ca = substitute_pattern_comp ca pa newpa_e ca
-      in
-        bind ~loc: c.location (refresh_comp c1)
-          (abstraction ~loc: c.location newpa (refresh_comp new_ca))
+      bind ~loc: c.location (refresh_comp c1) (refresh_abs c2)
   | LetIn (e, a) ->
-      let (pa, ca) = a.term in
-      let newpa = refresh_pattern pa in
-      let newpa_e = make_expression_from_pattern newpa in
-      let new_ca = substitute_pattern_comp ca pa newpa_e ca
-      in
-        let_in ~loc: c.location (refresh_exp e)
-          (abstraction ~loc: c.location newpa (refresh_comp new_ca))
+      let_in ~loc: c.location (refresh_exp e) (refresh_abs a)
   | Let (li, c1) ->
       let func (pa, co) = (pa, (refresh_comp co))
       in let' ~loc: c.location (List.map func li) (refresh_comp c1)
@@ -847,29 +847,11 @@ and refresh_comp c =
 and refresh_exp e =
   match e.term with
   | PureLambda a ->
-      let (pa, ea) = a.term in
-      let panew = refresh_pattern pa in
-      let panew_e = make_expression_from_pattern panew
-      in
-        pure_lambda ~loc: e.location
-          (pure_abstraction ~loc: e.location panew
-             (refresh_exp (substitute_pattern_exp ea pa panew_e ea)))
+      pure_lambda ~loc:e.location (refresh_pure_abs a)
   | Lambda a ->
-      let (pa, ca) = a.term in
-      let panew = refresh_pattern pa in
-      let panew_e = make_expression_from_pattern panew
-      in
-        lambda ~loc: e.location
-          (abstraction ~loc: e.location panew
-             (refresh_comp (substitute_pattern_comp ca pa panew_e ca)))
+      lambda ~loc:e.location (refresh_abs a)
   | PureLetIn (e1, pa) ->
-      let (ppa, ea) = pa.term in
-      let newppa = refresh_pattern ppa in
-      let newppa_e = make_expression_from_pattern newppa in
-      let new_ea = substitute_pattern_exp ea ppa newppa_e e
-      in
-        pure_let_in ~loc: e.location (refresh_exp e1)
-          (pure_abstraction ~loc: e.location newppa (refresh_exp new_ea))
+      pure_let_in ~loc:e.location (refresh_exp e1) (refresh_pure_abs pa)
   | Handler h -> refresh_handler e
   | BuiltIn f -> e
   | Record lst -> record ~loc: e.location (Common.assoc_map refresh_exp lst)
@@ -883,17 +865,7 @@ and refresh_handler e =
   match e.term with
   | Handler h ->
       let loc = Location.unknown in
-      let (pv, cv) = h.value_clause.term in
-      let (pf, cf) = h.finally_clause.term in
       let eff_list = h.effect_clauses in
-      let new_value_pattern = refresh_pattern pv in
-      let new_value_pattern_e =
-        make_expression_from_pattern new_value_pattern in
-      let new_cv =
-        substitute_pattern_comp cv pv new_value_pattern_e cv in
-      let new_f_pattern = refresh_pattern pf in
-      let new_f_pattern_e = make_expression_from_pattern new_f_pattern in
-      let new_cf = substitute_pattern_comp cf pf new_f_pattern_e cf in
       let func a =
         let (e, ab2) = a in
         let (p1, p2, ck) = ab2.term in
@@ -917,9 +889,8 @@ and refresh_handler e =
       let h' =
         {
           effect_clauses = List.map func eff_list;
-          value_clause =
-            abstraction ~loc: cv.location new_value_pattern new_cv;
-          finally_clause = abstraction ~loc: cf.location new_f_pattern new_cf;
+          value_clause = refresh_abs h.value_clause;
+          finally_clause = refresh_abs h.finally_clause;
         }
       in handler ~loc:Location.unknown h'
   | _ -> e
