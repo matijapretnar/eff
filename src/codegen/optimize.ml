@@ -1125,23 +1125,18 @@ and shallow_opt_e e =
              if (occ_b == 0) && (occ_f < 2)
              then substitute_pattern_exp ep p ex e
              else e)
-  | PureApply (e1, e2) ->
-      (match e1.term with
-       | PureLambda pa ->
-           let (p, e') = pa.term
-           in
-             if is_atomic e2
-             then substitute_pattern_exp e' p e2 e
-             else
-               (let (pbo, pfo) = pattern_occurrences_e p e'
-                in
-                  if (pbo == 0) && (pfo < 2)
-                  then
-                    if pfo == 0
-                    then e'
-                    else substitute_pattern_exp e' p e2 e
-                  else e)
-       | _ -> e)
+  | PureApply ({term = PureLambda {term = (p, e')}}, e2) ->
+     if is_atomic e2
+     then substitute_pattern_exp e' p e2 e
+     else
+       (let (pbo, pfo) = pattern_occurrences_e p e'
+        in
+          if (pbo == 0) && (pfo < 2)
+          then
+            if pfo == 0
+            then e'
+            else substitute_pattern_exp e' p e2 e
+          else e)
   | Effect eff ->
       let (eff_name, (ty_par, ty_res)) = eff in
       let param = make_var_from_counter "param" (Scheme.simple ty_par) in
