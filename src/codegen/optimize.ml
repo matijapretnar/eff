@@ -1036,71 +1036,51 @@ and shallow_opt c =
                        in shallow_opt res)
             | _ -> c)
        | _ -> c)
-  | Apply (e1, e2) ->
-      (match e1.term with
-       | (*Apply (PureLambda a) e -> Value (PureApply (PureLambda a) e)*)
-           Lambda a ->
-           let (p, c') = a.term
-           in
-             (*WARNING : Adhoc to remove the unit pattern and sub. with a var pattern to make it work *)
-             if is_atomic e2
-             then substitute_pattern_comp c' p e2 c
-             else
-               (let (pbo, pfo) = pattern_occurrences p c'
-                in
-                  if (pbo == 0) && (pfo < 2)
-                  then
-                    if pfo == 0
-                    then c'
-                    else substitute_pattern_comp c' p e2 c
-                  else
-                    (match c'.term with
-                     | Value v ->
-                         let res =
-                           (value ~loc: c.location) @@
-                             (shallow_opt_e
-                                (pure_apply ~loc: c.location
-                                   (shallow_opt_e
-                                      (pure_lambda ~loc: e1.location
-                                         (pure_abstraction ~loc: a.location p
-                                            v)))
-                                   e2))
-                         in shallow_opt res
-                     | _ -> c))
-       | PureLambda pure_abs ->
-           let res =
-             value ~loc: c.location
-               (shallow_opt_e
-                  (pure_apply ~loc: c.location
-                     (shallow_opt_e (pure_lambda ~loc: c.location pure_abs))
-                     e2))
-           in shallow_opt res
-       | _ -> c)
-  | LetIn (e, a) ->
-      let (p, cp) = a.term
+  | Apply ({term = Lambda {term = (p, c')}}, e) when is_atomic e ->
+      substitute_pattern_comp c' p e c
+  | Apply ({term = Lambda {term = (p, c')}}, e) ->
+     (let (pbo, pfo) = pattern_occurrences p c'
       in
-        if is_atomic e
+        if (pbo == 0) && (pfo < 2)
         then
-          (*Print.debug "from let in : sub %t \n to \n %t \n in \n %t "(CamlPrint.print_variable vp) (CamlPrint.print_expression e) (CamlPrint.print_computation cp);*)
-          (let cres = substitute_pattern_comp cp p e c
-           in
-             (*Print.debug "To get\n %t" (CamlPrint.print_computation cres);*)
-             cres)
+          if pfo == 0
+          then c'
+          else substitute_pattern_comp c' p e c
         else
-          (match cp.term with
-           | Value e2 ->
+          (match c'.term with
+           | Value v ->
                let res =
-                 value ~loc: c.location
+                 (value ~loc: c.location) @@
                    (shallow_opt_e
-                      (pure_let_in ~loc: c.location e
-                         (pure_abstraction ~loc: c.location p e2)))
+                      (pure_apply ~loc: c.location
+                         (shallow_opt_e
+                            (pure_lambda
+                               (pure_abstraction p
+                                  v)))
+                         e))
                in shallow_opt res
-           | _ ->
-               let (occ_b, occ_f) = pattern_occurrences p cp
-               in
-                 if (occ_b == 0) && (occ_f < 2)
-                 then substitute_pattern_comp cp p e c
-                 else c)
+           | _ -> c))
+  | Apply ({term = PureLambda pure_abs}, e2) ->
+       let res =
+         value ~loc:c.location
+           (shallow_opt_e
+              (pure_apply ~loc: c.location
+                 (shallow_opt_e (pure_lambda ~loc: c.location pure_abs))
+                 e2))
+       in shallow_opt res
+  | LetIn (e, {term = (p, cp)}) when is_atomic e ->
+      substitute_pattern_comp cp p e c
+  | LetIn (e1, {term = (p, {term = Value e2})}) ->
+     let res =
+       value ~loc:c.location
+         (shallow_opt_e (pure_let_in e1 (pure_abstraction p e2)))
+     in shallow_opt res
+  | LetIn (e, {term = (p, cp)}) ->
+     let (occ_b, occ_f) = pattern_occurrences p cp
+     in
+       if (occ_b == 0) && (occ_f < 2)
+       then substitute_pattern_comp cp p e c
+       else c
   | _ -> c
 and optimize_abstraction abs =
   let (p, c) = abs.term in abstraction ~loc: abs.location p (optimize_comp c)
