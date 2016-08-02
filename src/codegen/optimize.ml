@@ -912,20 +912,17 @@ and shallow_opt c =
         | abs -> let (_, c') = abs.term in c'
         | _ -> c)
   | Bind ({term = Value e}, c2) ->
-     let res = let_in ~loc: c.location e c2 in shallow_opt res
+     let res = let_in ~loc:c.location e c2 in
+     shallow_opt res
+  | Bind ({term = Bind (c1, {term = (p2, c2)})}, c3) ->
+     let res =
+       bind ~loc:c.location c1 (abstraction p2 (shallow_opt (bind c2 c3)))
+     in
+     shallow_opt res
   | Bind (c1, c2) ->
       let (pa, ca) = c2.term
       in
         (match c1.term with
-         | Bind (c3, c4) ->
-             let (p2, cp2) = c4.term in
-             let res =
-               bind ~loc: c.location c3
-                 (abstraction ~loc: c.location p2
-                    (shallow_opt
-                       (bind ~loc: c.location cp2
-                          (abstraction ~loc: c.location pa ca))))
-             in shallow_opt res
          | LetIn (e, a) ->
              let (pal, cal) = a.term in
              let newbind = shallow_opt (bind ~loc: c.location cal c2) in

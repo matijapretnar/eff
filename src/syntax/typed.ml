@@ -518,7 +518,8 @@ let let_rec' ?loc defs c =
     location = loc;
   }
 
-let bind ~loc c1 c2 =
+let bind ?loc c1 c2 =
+  let loc = backup_location loc [c1.location; c2.location] in
   let ctx_c1, (ty_c1, drt_c1), constraints_c1 = c1.scheme
   and ctx_c2, (ty_p, (ty_c2, drt_c2)), constraints_c2 = c2.scheme in
   let drt = Type.fresh_dirt () in
