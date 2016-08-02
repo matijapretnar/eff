@@ -216,6 +216,36 @@ let rec exhaustive ~loc p = function
               let c = List.hd missing in
               Some ((pattern_of_cons ~loc c (C.repeat (P.Nonbinding, loc) (arity c))) :: lst)
 
+
+let rec old_of_new_pattern p =
+  let old_p =
+    match p.Untyped.term with
+    | Untyped.PAs (p, x) -> P.As (old_of_new_pattern p, x)
+    | Untyped.PTuple lst -> P.Tuple (List.map old_of_new_pattern lst)
+    | Untyped.PRecord lst -> P.Record (Common.assoc_map old_of_new_pattern lst)
+    | Untyped.PVariant (lbl, opt) -> P.Variant (lbl, Common.option_map old_of_new_pattern opt)
+    | Untyped.PConst c -> P.Const c
+    | Untyped.PVar x -> P.Var x
+    | Untyped.PNonbinding -> P.Nonbinding
+  in
+  (old_p, p.Untyped.location)
+
+let rec new_of_old_pattern p =
+  let new_p =
+    match fst p with
+    | P.As (p, x) -> Untyped.PAs (new_of_old_pattern p, x)
+    | P.Tuple lst -> Untyped.PTuple (List.map new_of_old_pattern lst)
+    | P.Record lst -> Untyped.PRecord (Common.assoc_map new_of_old_pattern lst)
+    | P.Variant (lbl, opt) -> Untyped.PVariant (lbl, Common.option_map new_of_old_pattern opt)
+    | P.Const c -> Untyped.PConst c
+    | P.Var x -> Untyped.PVar x
+    | P.Nonbinding -> Untyped.PNonbinding
+  in
+  {
+    Untyped.term = new_p;
+    Untyped.location = snd p
+  }
+
 (* Prints a warning if the list of patterns [pats] is not exhaustive or contains
    unused patterns. *)
 let check_patterns ~loc pats =
@@ -226,7 +256,7 @@ let check_patterns ~loc pats =
           | Some ps ->
               Print.warning ~loc "@[This pattern-matching is not exhaustive.@.
                                     Here is an example of a value that is not matched:@.  @[%t@]"
-              (Untyped.print_pattern (List.hd ps));
+              (Untyped.print_pattern (new_of_old_pattern (List.hd ps)));
           | None -> ()
         end
     | (_, loc) as pat :: pats ->
@@ -241,7 +271,9 @@ let check_patterns ~loc pats =
   check [] pats
 
 (* A pattern is irrefutable if it cannot fail during pattern matching. *)
-let is_irrefutable p = check_patterns ~loc:(snd p) [p]
+let is_irrefutable p =
+  let p = old_of_new_pattern p in
+  check_patterns ~loc:(snd p) [p]
 
 (* Check for refutable patterns in let statements and non-exhaustive match
    statements. *)
@@ -256,7 +288,7 @@ let check_comp c =
         List.iter (fun (_, (p, c)) -> is_irrefutable p ; check c) lst ;
       | Untyped.Match (_, []) -> () (* Skip empty match to avoid an unwanted warning. *)
       | Untyped.Match (_, lst) -> 
-        check_patterns ~loc:c.Untyped.location (List.map fst lst) ;
+        check_patterns ~loc:c.Untyped.location (List.map (Common.compose old_of_new_pattern fst) lst) ;
         List.iter (fun (_, c) -> check c) lst
       | Untyped.While (c1, c2) -> check c1 ; check c2
       | Untyped.For (_, _, _, c, _) -> check c

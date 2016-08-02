@@ -46,8 +46,9 @@ let infer_top_comp st c =
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
     and return the new environment. *)
-let rec exec_cmd ppf interactive st (d,loc) =
-  match d with
+let rec exec_cmd ppf interactive st d =
+  let loc = d.Untyped.location in
+  match d.Untyped.term with
   | Untyped.Computation c ->
       let drty_sch, c', new_change = infer_top_comp st c in
       let v = Eval.run st.environment c' in
