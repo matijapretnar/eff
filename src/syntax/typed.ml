@@ -535,7 +535,8 @@ let bind ?loc c1 c2 =
     location = loc;
   }
 
-let let_in ~loc e1 c2 =
+let let_in ?loc e1 c2 =
+  let loc = backup_location loc [e1.location; c2.location] in
   let ctx_e1, ty_e1, constraints_e1 = e1.scheme
   and ctx_c2, (ty_p, drty_c2), constraints_c2 = c2.scheme in
   let constraints =
@@ -549,7 +550,8 @@ let let_in ~loc e1 c2 =
   }
 
 
-let pure_let_in ~loc e1 e2 =
+let pure_let_in ?loc e1 e2 =
+  let loc = backup_location loc [e1.location; e2.location] in
   let ctx_e1, ty_e1, constraints_e1 = e1.scheme
   and ctx_e2, (ty_p, ty_e2), constraints_e2 = e2.scheme in
   let constraints =
@@ -562,7 +564,8 @@ let pure_let_in ~loc e1 e2 =
     location = loc;
   }
 
-let call ~loc  ((eff_name, (ty_par, ty_res)) as eff) e a =
+let call ?loc ((eff_name, (ty_par, ty_res)) as eff) e a =
+    let loc = backup_location loc [e.location; a.location] in
     let ctx_e, ty_e, constraints_e = e.scheme
     and ctx_a, (ty_a, drty_a), constraints_a = a.scheme in
     let r = Type.fresh_region_param () in
