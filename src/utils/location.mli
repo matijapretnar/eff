@@ -17,8 +17,8 @@ val unknown : t
 (** Make a location from two lexing positions. *)
 val make : Lexing.position -> Lexing.position -> t
 
-(** Merge two locations into one. *)
-val merge : t -> t -> t
+(** Computes the smallest location containing all known locations in the list. *)
+val union : t list -> t
 
 (** Get the location of the current lexeme in a lexing buffer. *)
 val of_lexeme : Lexing.lexbuf -> t
