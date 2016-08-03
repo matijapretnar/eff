@@ -521,13 +521,12 @@ let rec substitute_var_comp comp vr exp =
           (substitute_var_comp c1 vr exp)
     | Check c1 -> check ~loc (substitute_var_comp c1 vr exp)
     | Call (eff, e1, a1) ->
-        print_endline "matched with call in sub var";
-        call ~loc eff (substitute_var_exp e1 vr exp) (substitute_var_abs a1 vr exp)
+        call ~loc eff
+          (substitute_var_exp e1 vr exp)
+          (substitute_var_abs a1 vr exp)
     | Bind (c1, a1) ->
-        print_endline "matched with bind in sub var";
         bind ~loc (substitute_var_comp c1 vr exp) (substitute_var_abs a1 vr exp)
     | LetIn (e, a) ->
-        print_endline "matched with letin in sub var";
         let_in ~loc (substitute_var_exp e vr exp) (substitute_var_abs a vr exp)
 and substitute_var_abs a vr exp =
    let (p, c) = a.term in
@@ -583,35 +582,24 @@ and substitute_var_exp e vr exp =
   in
     match e.term with
     | Var v ->
-        (print_endline "matched with var in sub var";
-         if v == vr
-         then exp
-         else
-           (*Print.debug "Substituting %t to %t " (CamlPrint.print_variable vr) (CamlPrint.print_expression exp); *)
-           e)
+       if v == vr then exp else e
     | Tuple lst ->
-        let func a = substitute_var_exp a vr exp
-        in tuple ~loc (List.map func lst)
+       tuple ~loc (List.map (fun a -> substitute_var_exp a vr exp) lst)
     | Record lst ->
         record ~loc
           (Common.assoc_map (fun a -> substitute_var_exp a vr exp) lst)
     | Variant (label, ex) ->
-        let func a = substitute_var_exp a vr exp
-        in variant ~loc (label, (Common.option_map func ex))
+        variant ~loc (label, (Common.option_map (fun a -> substitute_var_exp a vr exp) ex))
     | Lambda a ->
-        print_endline "matched with lambda in sub var";
         lambda ~loc (substitute_var_abs a vr exp)
     | Handler h ->
-        (print_endline "matched with handler in sub var";
-         substitute_var_handler h vr exp)
+        substitute_var_handler h vr exp
     | PureLambda pa ->
-        print_endline "matched with pure_lambda in sub var";
         pure_lambda ~loc (substitute_var_pure_abs pa vr exp)
     | PureApply (e1, e2) ->
         pure_apply ~loc (substitute_var_exp e1 vr exp)
           (substitute_var_exp e2 vr exp)
     | PureLetIn (e, pa) ->
-        print_endline "matched with letin in sub var";
         pure_let_in ~loc (substitute_var_exp e vr exp) (substitute_var_pure_abs pa vr exp)
     | (BuiltIn _ | Const _ | Effect _) -> e
 and substitute_var_handler h vr exp =
@@ -747,13 +735,6 @@ and refresh_handler ~loc h =
     let func a =
       let (e, ab2) = a in
       let (p1, p2, ck) = ab2.term in
-      (*  let p1new = refresh_pattern p1 in
-                       let p1new_e = make_expression_from_pattern p1new in 
-                       let p2new = refresh_pattern p2 in 
-                       let p2new_e = make_expression_from_pattern p2new in 
-                       let cknew = substitute_pattern_comp ( substitute_pattern_comp ck (p2.term) p2new_e ck false) (p1.term) p1new_e ck false in
-                       let lst = List.append (Typed.pattern_vars (p1new)) (Typed.pattern_vars (p2new)) in 
-                       *)
       let temp_lambda =
         refresh_exp
           (pure_lambda ~loc
