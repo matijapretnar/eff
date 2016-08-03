@@ -496,36 +496,13 @@ let rec substitute_var_comp comp vr exp =
     | Let (li, cf) ->
         failwith "Substituting in let, should all be changed to binds"
     | LetRec (li, c1) ->
-        let bound_vars = List.map (fun (v, _) -> v) li in
-        let func (v, a) =
-          let (p, c) = a.term in
-          let p_vars = Typed.pattern_vars p in
-          let p_vars_set = VariableSet.of_list p_vars
-          in
-            if (List.mem vr p_vars) || (List.mem vr bound_vars)
-            then (v, a)
-            else
-              if
-                VariableSet.equal
-                  (VariableSet.inter p_vars_set (free_vars_e exp))
-                  VariableSet.empty
-              then
-                (v, (abstraction ~loc p (substitute_var_comp c vr exp)))
-              else
-                (print_endline "we do renaming (should never happen) with ";
-                 (let new_p = refresh_pattern p in
-                  let new_pe = make_expression_from_pattern new_p in
-                  let fresh_c = substitute_pattern_comp c p new_pe c
-                  in
-                    (v,
-                     (abstraction ~loc new_p
-                        (substitute_var_comp fresh_c vr exp)))))
-        in
-          if List.mem vr bound_vars
-          then let_rec' ~loc (List.map func li) c1
-          else
-            let_rec' ~loc (List.map func li)
-              (substitute_var_comp c1 vr exp)
+        if List.mem vr (List.map (fun (v, _) -> v) li)
+        then
+          let_rec' ~loc li c1
+        else
+          let_rec' ~loc
+            (Common.assoc_map (fun a -> substitute_var_abs a vr exp) li)
+            (substitute_var_comp c1 vr exp)
     | Match (e, cases) ->
         match' ~loc
           (substitute_var_exp e vr exp)
