@@ -794,13 +794,9 @@ and shallow_opt c =
        make_var_from_counter "_call_result"
          (Scheme.simple input_k_ty) in
      let pz = make_pattern_from_var vz in
-     let (p_k, c_k) = k.term in
-     let fpk = refresh_pattern p_k in
-     let efpk = make_expression_from_pattern fpk in
-     let fck = substitute_pattern_comp c_k p_k efpk c_k in
      let k_lambda =
        shallow_opt_e
-         (lambda (abstraction fpk fck)) in
+         (lambda (refresh_abs k)) in
      let inner_apply = shallow_opt (apply k_lambda vz) in
      let inner_bind =
        shallow_opt
@@ -832,13 +828,9 @@ and shallow_opt c =
         scheme = Scheme.simple input_k_ty;
       } in
     let vz = var ~loc z (Scheme.simple input_k_ty) in
-    let (p_k, c_k) = k.term in
-    let fpk = refresh_pattern p_k in
-    let efpk = make_expression_from_pattern fpk in
-    let fck = substitute_pattern_comp c_k p_k efpk c_k in
     let k_lambda =
       shallow_opt_e
-        (lambda ~loc (abstraction ~loc fpk fck)) in
+        (lambda ~loc (refresh_abs k)) in
     let e2_apply = shallow_opt (apply ~loc k_lambda vz) in
     let fresh_handler = refresh_handler ~loc h in
     let e2_handle =
