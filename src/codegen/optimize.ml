@@ -548,74 +548,62 @@ let rec substitute_var_comp comp vr exp =
           (substitute_var_comp c1 vr exp)
     | Check c1 -> check ~loc (substitute_var_comp c1 vr exp)
     | Call (eff, e1, a1) ->
-        (print_endline "matched with call in sub var";
-         let (p, c1) = a1.term in
-         let fp = refresh_pattern p in
-         let fpe = make_expression_from_pattern fp in
-         let new_abs =
-           abstraction ~loc fp
-             (substitute_pattern_comp c1 p fpe c1) in
-         let new_a = substitute_var_abs new_abs vr exp
-         in call ~loc eff (substitute_var_exp e1 vr exp) new_a)
+        print_endline "matched with call in sub var";
+        call ~loc eff (substitute_var_exp e1 vr exp) (substitute_var_abs a1 vr exp)
     | Bind (c1, a1) ->
-        (print_endline "matched with bind in sub var";
-         let (p, c) = a1.term in
-         let p_vars = Typed.pattern_vars p in
-         let p_vars_set = VariableSet.of_list p_vars
-         in
-           if List.mem vr p_vars
-           then
-             (print_endline "matched vr is member in p of bind)";
-              bind ~loc (substitute_var_comp c1 vr exp) a1)
-           else
-             if
-               VariableSet.equal
-                 (VariableSet.inter p_vars_set (free_vars_e exp))
-                 VariableSet.empty
-             then
-               bind ~loc (substitute_var_comp c1 vr exp)
-                 (abstraction ~loc p (substitute_var_comp c vr exp))
-             else
-               (print_endline
-                  "we do renaming in bind(should never happen) with ";
-                (let new_p = refresh_pattern p in
-                 let new_pe = make_expression_from_pattern new_p in
-                 let fresh_c = substitute_pattern_comp c p new_pe c
-                 in
-                   (*Print.debug "renaming %t to %t in %t" (CamlPrint.print_variable vr) (CamlPrint.print_variable fvar) (CamlPrint.print_computation c); *)
-                   bind ~loc (substitute_var_comp c1 vr exp)
-                     (abstraction ~loc new_p
-                        (substitute_var_comp fresh_c vr exp)))))
+        print_endline "matched with bind in sub var";
+        bind ~loc (substitute_var_comp c1 vr exp) (substitute_var_abs a1 vr exp)
     | LetIn (e, a) ->
-        (print_endline "matched with letin in sub var";
-         let (p, c) = a.term in
-         let p_vars = Typed.pattern_vars p in
-         let p_vars_set = VariableSet.of_list p_vars
-         in
-           if List.mem vr p_vars
-           then let_in ~loc (substitute_var_exp e vr exp) a
-           else
-             if
-               VariableSet.equal
-                 (VariableSet.inter p_vars_set (free_vars_e exp))
-                 VariableSet.empty
-             then
-               (print_endline "matched vr is member in p of let in)";
-                let_in ~loc (substitute_var_exp e vr exp)
-                  (abstraction ~loc p (substitute_var_comp c vr exp)))
-             else
-               (print_endline "we do renaming from let_in with ";
-                (let new_p = refresh_pattern p in
-                 let new_pe = make_expression_from_pattern new_p in
-                 let fresh_c = substitute_pattern_comp c p new_pe c
-                 in
-                   let_in ~loc (substitute_var_exp e vr exp)
-                     (abstraction ~loc new_p
-                        (substitute_var_comp fresh_c vr exp)))))
+        print_endline "matched with letin in sub var";
+        let_in ~loc (substitute_var_exp e vr exp) (substitute_var_abs a vr exp)
 and substitute_var_abs a vr exp =
-    match substitute_var_exp (lambda a) vr exp with
-    | {term = Lambda new_a} -> new_a
-    | _ -> assert false
+   let (p, c) = a.term in
+   let p_vars = Typed.pattern_vars p in
+   let p_vars_set = VariableSet.of_list p_vars
+   in
+     if List.mem vr p_vars then
+       (Print.debug "matched vr is member in p of abstraction)";
+              a)
+     else
+     begin if
+         VariableSet.equal
+           (VariableSet.inter p_vars_set (free_vars_e exp))
+           VariableSet.empty
+     then
+       abstraction ~loc:a.location p (substitute_var_comp c vr exp)
+     else
+       begin Print.debug "we do renaming in bind(should never happen) with ";
+       let new_p = refresh_pattern p in
+       let new_pe = make_expression_from_pattern new_p in
+       let fresh_c = substitute_pattern_comp c p new_pe c
+       in
+       abstraction ~loc:a.location new_p (substitute_var_comp fresh_c vr exp)
+     end
+    end
+and substitute_var_pure_abs a vr exp =
+   let (p, e) = a.term in
+   let p_vars = Typed.pattern_vars p in
+   let p_vars_set = VariableSet.of_list p_vars
+   in
+     if List.mem vr p_vars then
+       (Print.debug "matched vr is member in p of abstraction)";
+              a)
+     else
+     begin if
+         VariableSet.equal
+           (VariableSet.inter p_vars_set (free_vars_e exp))
+           VariableSet.empty
+     then
+       pure_abstraction ~loc:a.location p (substitute_var_exp e vr exp)
+     else
+       begin Print.debug "we do renaming (should never happen) with ";
+       let new_p = refresh_pattern p in
+       let new_pe = make_expression_from_pattern new_p in
+       let fresh_e = substitute_pattern_exp e p new_pe e
+       in
+       pure_abstraction ~loc:a.location new_p (substitute_var_exp fresh_e vr exp)
+     end
+    end
 and substitute_var_exp e vr exp =
   (* Print.debug "Substituting %t" (CamlPrint.print_expression e); *)
   let loc = Location.unknown
@@ -638,98 +626,24 @@ and substitute_var_exp e vr exp =
         let func a = substitute_var_exp a vr exp
         in variant ~loc (label, (Common.option_map func ex))
     | Lambda a ->
-        (print_endline "matched with lambda in sub var";
-         (*Print.debug "searching for  %t in %t to be sub. to %t" (CamlPrint.print_variable vr) (CamlPrint.print_abstraction a) (CamlPrint.print_expression exp) ;*)
-         let (p, c) = a.term in
-         let p_vars = Typed.pattern_vars p in
-         let p_vars_set = VariableSet.of_list p_vars
-         in
-           if List.mem vr p_vars
-           then (print_endline "matched vr is member in p of lambda)"; e)
-           else
-             if
-               VariableSet.equal
-                 (VariableSet.inter p_vars_set (free_vars_e exp))
-                 VariableSet.empty
-             then
-               lambda ~loc
-                 (abstraction ~loc p (substitute_var_comp c vr exp))
-             else
-               (print_endline "we do renaming in lambda with ";
-                (let new_p = refresh_pattern p in
-                 let new_pe = make_expression_from_pattern new_p in
-                 let fresh_c = substitute_pattern_comp c p new_pe c
-                 in
-                   lambda ~loc
-                     (abstraction ~loc new_p
-                        (substitute_var_comp fresh_c vr exp)))))
+        print_endline "matched with lambda in sub var";
+        lambda ~loc (substitute_var_abs a vr exp)
     | Handler h ->
         (print_endline "matched with handler in sub var";
          substitute_var_handler h vr exp)
     | PureLambda pa ->
-        (print_endline "matched with pure_lambda in sub var";
-         let (p, e) = pa.term in
-         let p_vars = Typed.pattern_vars p in
-         let p_vars_set = VariableSet.of_list p_vars
-         in
-           if List.mem vr p_vars
-           then (print_endline "matched vr is member in p of purelambda)"; e)
-           else
-             if
-               VariableSet.equal
-                 (VariableSet.inter p_vars_set (free_vars_e exp))
-                 VariableSet.empty
-             then
-               pure_lambda ~loc
-                 (pure_abstraction ~loc p (substitute_var_exp e vr exp))
-             else
-               (let new_p = refresh_pattern p in
-                let new_pe = make_expression_from_pattern new_p in
-                let fresh_e = substitute_pattern_exp e p new_pe e
-                in
-                  pure_lambda ~loc
-                    (pure_abstraction ~loc new_p
-                       (substitute_var_exp fresh_e vr exp))))
+        print_endline "matched with pure_lambda in sub var";
+        pure_lambda ~loc (substitute_var_pure_abs pa vr exp)
     | PureApply (e1, e2) ->
         pure_apply ~loc (substitute_var_exp e1 vr exp)
           (substitute_var_exp e2 vr exp)
     | PureLetIn (e, pa) ->
-        (print_endline "matched with letin in sub var";
-         let (p, e') = pa.term in
-         let p_vars = Typed.pattern_vars p in
-         let p_vars_set = VariableSet.of_list p_vars
-         in
-           if List.mem vr p_vars
-           then pure_let_in ~loc (substitute_var_exp e vr exp) pa
-           else
-             if
-               VariableSet.equal
-                 (VariableSet.inter p_vars_set (free_vars_e exp))
-                 VariableSet.empty
-             then
-               pure_let_in ~loc (substitute_var_exp e vr exp)
-                 (pure_abstraction ~loc p (substitute_var_exp e' vr exp))
-             else
-               (print_endline "we do renaming with ";
-                (let new_p = refresh_pattern p in
-                 let new_pe = make_expression_from_pattern new_p in
-                 let fresh_e = substitute_pattern_exp e p new_pe e
-                 in
-                   pure_let_in ~loc (substitute_var_exp e vr exp)
-                     (pure_abstraction ~loc new_p
-                        (substitute_var_exp fresh_e vr exp)))))
-    | _ -> e
+        print_endline "matched with letin in sub var";
+        pure_let_in ~loc (substitute_var_exp e vr exp) (substitute_var_pure_abs pa vr exp)
+    | (BuiltIn _ | Const _ | Effect _) -> e
 and substitute_var_handler h vr exp =
   let loc = Location.unknown in
-  let (pv, cv) = h.value_clause.term in
-  let (pf, cf) = h.finally_clause.term in
   let eff_list = h.effect_clauses in
-  let new_value_lambda =
-    substitute_var_exp (lambda ~loc (abstraction ~loc pv cv)) vr
-      exp in
-  let new_final_lambda =
-    substitute_var_exp (lambda ~loc (abstraction ~loc pf cf)) vr
-      exp in
   let func a =
     let (e, ab2) = a in
     let (p1, p2, ck) = ab2.term in
@@ -745,18 +659,12 @@ and substitute_var_handler h vr exp =
     let (p2new, cknew) = anew.term
     in (e, (abstraction2 ~loc p1new p2new cknew))
   in
-    match new_value_lambda.term with
-    | Lambda new_value_abstraction ->
-        (match new_final_lambda.term with
-         | Lambda new_final_abstraction ->
-             handler ~loc
-               {
-                 effect_clauses = List.map func eff_list;
-                 value_clause = new_value_abstraction;
-                 finally_clause = new_final_abstraction;
-               }
-         | _ -> failwith "substitute_var_handler error.")
-    | _ -> failwith "substitute_var_handler error."
+  handler ~loc
+    {
+      effect_clauses = List.map func eff_list;
+      value_clause = substitute_var_abs h.value_clause vr exp;
+      finally_clause = substitute_var_abs h.finally_clause vr exp;
+    }
 and substitute_pattern_comp c p exp maincomp =
   match p.term with
   | Typed.PVar x -> optimize_comp (substitute_var_comp c x exp)
