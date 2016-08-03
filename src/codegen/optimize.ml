@@ -24,7 +24,32 @@
 
 *)
 open Typed
-  
+
+let a22a a2 =
+  let (p1, p2, c) = a2.term in
+  let ctx1, ty1, cnstrs1 = p1.scheme
+  and ctx2, ty2, cnstrs2 = p2.scheme in
+  let p = {
+    term = PTuple [p1; p2];
+    scheme = (
+      ctx1 @ ctx2,
+      Type.Tuple [ty1; ty2],
+      Constraints.union cnstrs1 cnstrs2
+    );
+    location = a2.location;
+  } in
+  abstraction ~loc:a2.location p c
+let pa2a pa =
+  let (p, e) = pa.term in
+  abstraction ~loc:pa.location p (value ~loc:e.location e)
+let a2a2 a =
+  match a.term with
+  | ({term = PTuple [p1; p2]}, c) -> abstraction2 ~loc:a.location p1 p2 c
+  | _ -> assert false
+let a2pa a =
+  match a.term with
+  | (p, {term = Value e}) -> pure_abstraction ~loc:p.location p e
+
 let unary_inlinable f ty1 ty2 =
   let x = Typed.Variable.fresh "x" and loc = Location.unknown in
   let drt = Type.fresh_dirt () in
@@ -553,32 +578,12 @@ and substitute_var_abs a vr exp =
      end
     end
 and substitute_var_pure_abs a vr exp =
-   let (p, e) = a.term in
-   let p_vars = Typed.pattern_vars p in
-   let p_vars_set = VariableSet.of_list p_vars
-   in
-     if List.mem vr p_vars then
-       (Print.debug "matched vr is member in p of abstraction)";
-              a)
-     else
-     begin if
-         VariableSet.equal
-           (VariableSet.inter p_vars_set (free_vars_e exp))
-           VariableSet.empty
-     then
-       pure_abstraction ~loc:a.location p (substitute_var_exp e vr exp)
-     else
-       begin Print.debug "we do renaming (should never happen) with ";
-       let new_p = refresh_pattern p in
-       let new_pe = make_expression_from_pattern new_p in
-       let fresh_e = substitute_pattern_exp e p new_pe e
-       in
-       pure_abstraction ~loc:a.location new_p (substitute_var_exp fresh_e vr exp)
-     end
-    end
+  a2pa @@ substitute_var_abs (pa2a a) vr exp
+and substitute_var_abs2 a2 vr exp =
+  a2a2 @@ substitute_var_abs (a22a a2) vr exp
 and substitute_var_exp e vr exp =
   (* Print.debug "Substituting %t" (CamlPrint.print_expression e); *)
-  let loc = Location.unknown
+  let loc = e.Typed.location
   in
     match e.term with
     | Var v ->
@@ -593,7 +598,7 @@ and substitute_var_exp e vr exp =
     | Lambda a ->
         lambda ~loc (substitute_var_abs a vr exp)
     | Handler h ->
-        substitute_var_handler h vr exp
+        substitute_var_handler ~loc h vr exp
     | PureLambda pa ->
         pure_lambda ~loc (substitute_var_pure_abs pa vr exp)
     | PureApply (e1, e2) ->
@@ -602,27 +607,10 @@ and substitute_var_exp e vr exp =
     | PureLetIn (e, pa) ->
         pure_let_in ~loc (substitute_var_exp e vr exp) (substitute_var_pure_abs pa vr exp)
     | (BuiltIn _ | Const _ | Effect _) -> e
-and substitute_var_handler h vr exp =
-  let loc = Location.unknown in
-  let eff_list = h.effect_clauses in
-  let func a =
-    let (e, ab2) = a in
-    let (p1, p2, ck) = ab2.term in
-    let new_exp =
-      substitute_var_exp
-        (pure_lambda ~loc
-           (pure_abstraction ~loc p1
-              (lambda ~loc (abstraction ~loc p2 ck))))
-        vr exp in
-    let (PureLambda panew) = new_exp.term in
-    let (p1new, temp_exp1) = panew.term in
-    let (Lambda anew) = temp_exp1.term in
-    let (p2new, cknew) = anew.term
-    in (e, (abstraction2 ~loc p1new p2new cknew))
-  in
+and substitute_var_handler ~loc h vr exp =
   handler ~loc
     {
-      effect_clauses = List.map func eff_list;
+      effect_clauses = Common.assoc_map (fun a2 -> substitute_var_abs2 a2 vr exp) h.effect_clauses;
       value_clause = substitute_var_abs h.value_clause vr exp;
       finally_clause = substitute_var_abs h.finally_clause vr exp;
     }
@@ -677,12 +665,10 @@ and refresh_abs a =
   let new_p_e = make_expression_from_pattern new_p in
   let new_c = substitute_pattern_comp c p new_p_e c in
   abstraction ~loc:a.location new_p (refresh_comp new_c)
-and refresh_pure_abs a = 
-  let (p, e) = a.term in
-  let new_p = refresh_pattern p in
-  let new_p_e = make_expression_from_pattern new_p in
-  let new_e = substitute_pattern_exp e p new_p_e e in
-  pure_abstraction ~loc:a.location new_p (refresh_exp new_e)
+and refresh_pure_abs pa =
+  a2pa @@ refresh_abs @@ pa2a @@ pa
+and refresh_abs2 a2 =
+  a2a2 @@ refresh_abs @@ a22a @@ a2
 and refresh_comp c =
   match c.term with
   | Bind (c1, c2) ->
@@ -731,27 +717,12 @@ and refresh_exp e =
       pure_apply ~loc: e.location (refresh_exp e1) (refresh_exp e2)
   | _ -> e
 and refresh_handler ~loc h =
-    let eff_list = h.effect_clauses in
-    let func a =
-      let (e, ab2) = a in
-      let (p1, p2, ck) = ab2.term in
-      let temp_lambda =
-        refresh_exp
-          (pure_lambda ~loc
-             (pure_abstraction ~loc p1
-                (lambda ~loc (abstraction ~loc p2 ck)))) in
-      let (PureLambda pura) = temp_lambda.term in
-      let (p1new, lterm) = pura.term in
-      let (Lambda aa) = lterm.term in
-      let (p2new, cknew) = aa.term
-      in (e, (abstraction2 ~loc p1new p2new cknew)) in
-    let h' =
-      {
-        effect_clauses = List.map func eff_list;
+    handler ~loc {
+        effect_clauses = Common.assoc_map refresh_abs2 h.effect_clauses;
         value_clause = refresh_abs h.value_clause;
         finally_clause = refresh_abs h.finally_clause;
       }
-    in handler ~loc h'
+
 and optimize_comp c = shallow_opt (opt_sub_comp c)
 and shallow_opt c =
   (*Print.debug "Shallow optimizing %t" (CamlPrint.print_computation c);*)
