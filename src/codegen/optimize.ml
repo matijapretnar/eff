@@ -526,14 +526,10 @@ let rec substitute_var_comp comp vr exp =
           else
             let_rec' ~loc (List.map func li)
               (substitute_var_comp c1 vr exp)
-    | Match (e, li) ->
-        let func a =
-          let (p, c) = a.term
-          in
-            (match p.term with
-             | Typed.PConst _ -> a
-             | _ -> substitute_var_abs a vr exp)
-        in match' ~loc (substitute_var_exp e vr exp) (List.map func li)
+    | Match (e, cases) ->
+        match' ~loc
+          (substitute_var_exp e vr exp)
+          (List.map (fun a -> substitute_var_abs a vr exp) cases)
     | While (c1, c2) ->
         while' ~loc (substitute_var_comp c1 vr exp)
           (substitute_var_comp c2 vr exp)
