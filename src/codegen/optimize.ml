@@ -162,9 +162,16 @@ let inlinable_definitions =
           int_ty)) ]
   
 let inlinable = ref []
+
+let stack = ref []
   
 let find_inlinable x =
   match Common.lookup x !inlinable with
+  | Some e -> Some (e ())
+  | None -> None
+
+let find_in_stack x =
+  match Common.lookup x !stack with
   | Some e -> Some (e ())
   | None -> None
   
@@ -782,6 +789,25 @@ and shallow_opt c =
            (abstraction ~loc: c.location p
               (shallow_opt (handle ~loc: c.location e1 c2)))
        in shallow_opt res
+  | Handle (e1, {term = Apply (ae1, ae2)}) ->
+      begin match ae1.term with
+      | Var v ->
+            let new_var = make_var_from_counter "newvar" ae1.scheme in
+            begin match find_in_stack v with
+              | Some d -> 
+                begin match d.term with
+                | Lambda ({term = (dp,dc)}) ->
+                    let new_computation = apply ~loc:c.location (new_var) (ae2) in
+                    let new_handle = handle ~loc:c.location e1 (substitute_var_comp dc v (refresh_exp d)) in
+                    let new_lambda = lambda ~loc:c.location (abstraction ~loc:c.location dp new_handle) in 
+                    optimize_comp (let_in ~loc:c.location new_lambda 
+                          (abstraction ~loc:c.location (make_pattern_from_var new_var) (new_computation)))
+                | _ -> c
+                end
+              |_ -> c
+            end
+      | _ -> c
+      end
   | Handle ({term = Handler h}, {term = Value v}) ->
       let res =
         apply ~loc: c.location
@@ -884,12 +910,22 @@ and shallow_opt c =
        value ~loc:c.location
          (shallow_opt_e (pure_let_in e1 (pure_abstraction p e2)))
      in shallow_opt res
+
   | LetIn (e, {term = (p, cp)}) ->
      let (occ_b, occ_f) = pattern_occurrences p cp
      in
        if (occ_b == 0) && (occ_f < 2)
        then substitute_pattern_comp cp p e c
-       else c
+       else 
+        begin 
+          (match p.term with
+          | Typed.PVar xx -> 
+              stack:= Common.update xx (fun () -> e) !stack     
+          | _ -> ()
+          );
+        let_in ~loc:c.location e (abstraction ~loc:e.location p (optimize_comp cp))
+        end
+
   | _ -> c
 and optimize_abstraction abs =
   let (p, c) = abs.term in abstraction ~loc: abs.location p (optimize_comp c)
@@ -995,9 +1031,10 @@ and opt_sub_expr e =
   | Handler h -> optimize_handler h
   | Effect eff -> e
   | Var x ->
-      (match find_inlinable x with
+      (begin match find_inlinable x with
        | Some d -> (match d.term with | Handler _ -> refresh_exp d | _ -> d)
-       | _ -> e)
+       | _ -> e
+     end )
 and optimize_handler h =
   let (pv, cv) = h.value_clause.term in
   let (pf, cf) = h.finally_clause.term in
