@@ -164,7 +164,9 @@ let inlinable_definitions =
 let inlinable = ref []
 
 let stack = ref []
-  
+
+let impure_wrappers = ref []
+
 let find_inlinable x =
   match Common.lookup x !inlinable with
   | Some e -> Some (e ())
@@ -174,7 +176,8 @@ let find_in_stack x =
   match Common.lookup x !stack with
   | Some e -> Some (e ())
   | None -> None
-  
+ 
+
 let rec make_expression_from_pattern p =
     let loc = p.location in
     match p.term with
@@ -226,7 +229,8 @@ module VariableSet =
   Set.Make(struct type t = variable
                    let compare = Pervasives.compare
                       end)
-  
+
+
 let rec is_pure_comp c =
   match c.term with
   | Value e -> true
@@ -504,6 +508,12 @@ and pattern_occurrences_e p e =
   let func a (sb, sf) =
     let (ba, fa) = occurrences_e a e in ((ba + sb), (fa + sf))
   in List.fold_right func pvars (0, 0)
+
+
+let only_inlinable_occurrences p cp = 
+ let (occ_b, occ_f) = pattern_occurrences p cp
+     in  (occ_b == 0) && (occ_f < 2) 
+  
   
 let print_free_vars c =
   (print_endline "in free vars print ";
@@ -792,11 +802,11 @@ and shallow_opt c =
   | Handle (e1, {term = Apply (ae1, ae2)}) ->
       begin match ae1.term with
       | Var v ->
-            let new_var = make_var_from_counter "newvar" ae1.scheme in
             begin match find_in_stack v with
               | Some d -> 
                 begin match d.term with
                 | Lambda ({term = (dp,dc)}) ->
+                    let new_var = make_var_from_counter "newvar" ae1.scheme in
                     let new_computation = apply ~loc:c.location (new_var) (ae2) in
                     let new_handle = handle ~loc:c.location e1 (substitute_var_comp dc v (refresh_exp d)) in
                     let new_lambda = lambda ~loc:c.location (abstraction ~loc:c.location dp new_handle) in 
@@ -808,6 +818,24 @@ and shallow_opt c =
             end
       | _ -> c
       end
+
+  | Handle(h, {term = Bind( {term = Apply(ae1,ae2)}, {term = (bp,bc)} )}) ->
+      
+      begin match ae1.term with
+      | Var v ->
+            begin match find_in_stack v with
+              | Some d -> 
+                begin match d.term with
+                | Lambda ({term = (dp, {term = Value de} ) }) ->
+                  let new_var = make_var_from_counter "newvar" ae1.scheme in
+                  c                  
+                | _ -> c
+                end
+              |_ -> c
+            end
+      | _ -> c
+      end
+
   | Handle ({term = Handler h}, {term = Value v}) ->
       let res =
         apply ~loc: c.location
@@ -903,6 +931,16 @@ and shallow_opt c =
                  (shallow_opt_e (pure_lambda ~loc: c.location pure_abs))
                  e2))
        in shallow_opt res
+  
+  | Apply( {term = (Var v)} as e1, e2) ->
+    begin match (List.find_all (fun a -> (fst a).term = e1.term) !impure_wrappers) with
+    | [(fo,fn)]-> 
+          let pure_app = shallow_opt_e (pure_apply ~loc:c.location fn e2) in 
+          let main_value = shallow_opt (value ~loc:c.location pure_app) in
+          main_value
+    | [] -> c
+    end
+
   | LetIn (e, {term = (p, cp)}) when is_atomic e ->
       substitute_pattern_comp cp p e c
   | LetIn (e1, {term = (p, {term = Value e2})}) ->
@@ -911,12 +949,24 @@ and shallow_opt c =
          (shallow_opt_e (pure_let_in e1 (pure_abstraction p e2)))
      in shallow_opt res
 
-  | LetIn (e, {term = (p, cp)}) ->
-     let (occ_b, occ_f) = pattern_occurrences p cp
-     in
-       if (occ_b == 0) && (occ_f < 2)
-       then substitute_pattern_comp cp p e c
-       else 
+  | LetIn (e, {term = (p, cp)}) when only_inlinable_occurrences p cp ->
+       substitute_pattern_comp cp p e c
+  
+  (*Matching let f = \x.\y. c *)    
+  | LetIn({term = Lambda ({term = (pe1, {term = Value ({term = Lambda ({term = (pe2,ce2)}) } as in_lambda)} )})} as e, {term = ({term = PVar fo} as p,cp)} )->
+        let new_var = make_var_from_counter "newvar" p.scheme in
+        let new_var2 = make_var_from_counter "newvar2" pe1.scheme in 
+        let new_pattern = make_pattern_from_var new_var2 in
+        let pure_application = pure_apply ~loc:c.location new_var new_var2 in
+        let second_let_value = value ~loc:c.location pure_application in 
+        let second_let_lambda = lambda ~loc:c.location (abstraction ~loc:c.location new_pattern second_let_value) in
+        let second_let = let_in ~loc:c.location second_let_lambda (abstraction ~loc:c.location p cp) in
+        let outer_lambda = pure_lambda ~loc:c.location (pure_abstraction pe1 in_lambda) in
+        let first_let_abstraction = abstraction ~loc:c.location (make_pattern_from_var new_var) second_let in
+        let first_let = let_in ~loc:c.location (outer_lambda) first_let_abstraction in
+        impure_wrappers:= ((make_expression_from_pattern p),new_var) :: !impure_wrappers;
+        optimize_comp first_let
+  | LetIn(e, {term = (p,cp)} )->
         begin 
           (match p.term with
           | Typed.PVar xx -> 
@@ -927,6 +977,8 @@ and shallow_opt c =
         end
 
   | _ -> c
+
+
 and optimize_abstraction abs =
   let (p, c) = abs.term in abstraction ~loc: abs.location p (optimize_comp c)
 and optimize_pure_abstraction abs =
