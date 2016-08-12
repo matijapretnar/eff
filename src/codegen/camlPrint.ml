@@ -79,13 +79,8 @@ let rec print_expression ?max_level e ppf =
       (print_effect_clauses h.Typed.effect_clauses)
   | Typed.Effect eff ->
       print ~at_level:2 "effect %t" (print_effect eff)
-  | Typed.PureLambda pa ->
-      print ~at_level:2 "(*pure*)fun %t" (print_pure_abstraction pa)
-  | Typed.PureApply (e1, e2) ->
-      print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
-  | Typed.PureLetIn (e1, pa) ->
-      let (p, e2) = pa.Typed.term in
-      print ~at_level:2 "(* pure *) let %t = %t in@ %t" (print_pattern p) (print_expression e1) (print_expression e2)
+  | Typed.Pure c ->
+      print ~at_level:1 "run %t" (print_computation ~max_level:0 c)
 
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -132,9 +127,6 @@ and print_effect_clauses eff_clauses ppf =
 
 and print_abstraction {Typed.term = (p, c)} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
-
-and print_pure_abstraction {Typed.term = (p, e)} ppf =
-  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_expression e)
 
 and print_multiple_bind (lst, c') ppf =
   match lst with

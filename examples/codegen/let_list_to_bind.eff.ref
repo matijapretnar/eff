@@ -1,1 +1,1 @@
-;;value (Pervasives.(+) 2 1)
+;;(binary_builtin Pervasives.(+)) (2, 1)

@@ -52,9 +52,7 @@ and plain_expression =
   | Effect of effect
   | Handler of handler
 
-  | PureLambda of pure_abstraction
-  | PureApply of expression * expression
-  | PureLetIn of expression * pure_abstraction
+  | Pure of computation
 
 (** Impure computations *)
 and computation = (plain_computation, Scheme.dirty_scheme) annotation
@@ -82,9 +80,6 @@ and handler = {
 
 (** Abstractions that take one argument. *)
 and abstraction = (pattern * computation, Scheme.abstraction_scheme) annotation
-
-(** Pure abstractions that take a pattern and an expression instead of a computation. *)
-and pure_abstraction = (pattern * expression, Scheme.pure_abstraction_scheme) annotation
 
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * computation, Scheme.abstraction2_scheme) annotation
@@ -114,14 +109,6 @@ let abstraction ?loc p c : abstraction =
   {
     term = (p, c);
     scheme = Scheme.abstract ~loc p.scheme c.scheme;
-    location = loc;
-  }
-
-let pure_abstraction ?loc p e : pure_abstraction =
-  let loc = backup_location loc [p.location; e.location] in
-  {
-    term = (p, e);
-    scheme = Scheme.pure_abstract ~loc p.scheme e.scheme;
     location = loc;
   }
 
@@ -158,16 +145,9 @@ let a22a a2 =
     location = a2.location;
   } in
   abstraction ~loc:a2.location p c
-let pa2a pa =
-  let (p, e) = pa.term in
-  abstraction ~loc:pa.location p (value ~loc:e.location e)
 let a2a2 a =
   match a.term with
   | ({term = PTuple [p1; p2]}, c) -> abstraction2 ~loc:a.location p1 p2 c
-  | _ -> assert false
-let a2pa a =
-  match a.term with
-  | (p, {term = Value e}) -> pure_abstraction ~loc:p.location p e
   | _ -> assert false
 
 let rec refresh_pattern sbst p =
@@ -210,12 +190,10 @@ and refresh_expr' sbst = function
       | Some x' -> Var x'
       | None -> e
       end
-  | PureLambda pa ->
-      PureLambda (refresh_pure_abs sbst pa)
+  | Pure c ->
+      Pure (refresh_comp sbst c)
   | Lambda a ->
       Lambda (refresh_abs sbst a)
-  | PureLetIn (e1, pa) ->
-      PureLetIn (refresh_expr sbst e1, refresh_pure_abs sbst pa)
   | Handler h ->
       Handler (refresh_handler sbst h)
   | Tuple es ->
@@ -224,8 +202,6 @@ and refresh_expr' sbst = function
       Record (Common.assoc_map (refresh_expr sbst) flds)
   | Variant (lbl, e) ->
       Variant (lbl, Common.option_map (refresh_expr sbst) e)
-  | PureApply (e1, e2) ->
-      PureApply (refresh_expr sbst e1, refresh_expr sbst e2)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
 and refresh_comp sbst c =
   {c with term = refresh_comp' sbst c.term}
@@ -277,8 +253,6 @@ and refresh_abs sbst a =
   let (p, c) = a.term in
   let sbst, p' = refresh_pattern sbst p in
   {a with term = (p', refresh_comp sbst c)}
-and refresh_pure_abs sbst pa =
-  a2pa @@ refresh_abs sbst @@ pa2a @@ pa
 and refresh_abs2 sbst a2 =
   a2a2 @@ refresh_abs sbst @@ a22a @@ a2
 
@@ -290,12 +264,10 @@ and subst_expr' sbst = function
       | Some e' -> e'
       | None -> e
       end
-  | PureLambda pa ->
-      PureLambda (subst_pure_abs sbst pa)
+  | Pure c ->
+      Pure (subst_comp sbst c)
   | Lambda a ->
       Lambda (subst_abs sbst a)
-  | PureLetIn (e1, pa) ->
-      PureLetIn (subst_expr sbst e1, subst_pure_abs sbst pa)
   | Handler h ->
       Handler (subst_handler sbst h)
   | Tuple es ->
@@ -304,8 +276,6 @@ and subst_expr' sbst = function
       Record (Common.assoc_map (subst_expr sbst) flds)
   | Variant (lbl, e) ->
       Variant (lbl, Common.option_map (subst_expr sbst) e)
-  | PureApply (e1, e2) ->
-      PureApply (subst_expr sbst e1, subst_expr sbst e2)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
 and subst_comp sbst c =
   {c with term = subst_comp' sbst c.term}
@@ -354,8 +324,6 @@ and subst_abs sbst a =
   let (p, c) = a.term in
   (* XXX Should we check that p & sbst have disjoint variables? *)
   {a with term = (p, subst_comp sbst c)}
-and subst_pure_abs sbst pa =
-  a2pa @@ subst_abs sbst @@ pa2a @@ pa
 and subst_abs2 sbst a2 =
   a2a2 @@ subst_abs sbst @@ a22a @@ a2
 
@@ -464,17 +432,6 @@ let lambda ?loc a =
     location = loc
   }
 
-let pure_lambda ?loc a =
-  let loc = backup_location loc [a.location] in
-  let ctx, (ty1, ty2), constraints = a.scheme in
-  let drt = Type.fresh_dirt () in
-  {
-    term = PureLambda a;
-    scheme = Scheme.clean_ty_scheme ~loc (ctx, Type.Arrow (ty1, (ty2, drt)), constraints);
-    location = loc
-  }
-
-
 let effect ?loc ((eff_name, (ty_par, ty_res)) as eff) =
   let loc = backup_location loc [] in
     let r = Type.fresh_region_param () in
@@ -539,6 +496,18 @@ let handler ?loc h =
       location = loc;
     }
 
+let pure ?loc c =
+  (* XXX We are just throwing away the dirt, but we should check that it is empty
+     and maybe recompute the constraints, though that likely won't be necessary
+     in case the dirt is pure *)
+  let loc = backup_location loc [c.location] in
+  let ctx, (ty, _), constraints = c.scheme in
+  {
+    term = Pure c;
+    scheme = (ctx, ty, constraints);
+    location = loc
+  }
+
 let match' ?loc e cases =
   let loc = backup_location loc (
     e.location :: List.map (fun a -> a.location) cases
@@ -602,23 +571,6 @@ let for' ?loc i e1 e2 c up =
     scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
     location = loc;
   }
-
-let pure_apply ?loc e1 e2 =
-  let loc = backup_location loc [e1.location; e2.location] in
-  let ctx_e1, ty_e1, cnstrs_e1 = e1.scheme in
-  let ctx_e2, ty_e2, cnstrs_e2 = e2.scheme in
-  let ((ty, drt) as drty) = Type.fresh_dirty () in
-  let constraints =
-    Constraints.list_union [cnstrs_e1; cnstrs_e2]
-    |> Constraints.add_ty_constraint ~loc ty_e1 (Type.Arrow (ty_e2, drty)) in
-  let ty_sch = (ctx_e1 @ ctx_e2, ty, constraints) in
-  (* XXX: We must ensure that drt is empty! *)
-  {
-    term = PureApply (e1, e2);
-    scheme = Scheme.clean_ty_scheme ~loc ty_sch;
-    location = loc;
-  }
-
 
 let apply ?loc e1 e2 =
   let loc = backup_location loc [e1.location; e2.location] in
@@ -766,20 +718,6 @@ let let_in ?loc e1 c2 =
   }
 
 
-let pure_let_in ?loc e1 e2 =
-  let loc = backup_location loc [e1.location; e2.location] in
-  let ctx_e1, ty_e1, constraints_e1 = e1.scheme
-  and ctx_e2, (ty_p, ty_e2), constraints_e2 = e2.scheme in
-  let constraints =
-    Constraints.union constraints_e1 constraints_e2 |>
-    Constraints.add_ty_constraint ~loc ty_e1 ty_p
-  in
-  {
-    term = PureLetIn (e1, e2);
-    scheme = Scheme.clean_ty_scheme ~loc (ctx_e1 @ ctx_e2, ty_e2, constraints);
-    location = loc;
-  }
-
 let call ?loc ((eff_name, (ty_par, ty_res)) as eff) e a =
     let loc = backup_location loc [e.location; a.location] in
     let ctx_e, ty_e, constraints_e = e.scheme
@@ -871,15 +809,13 @@ let rec free_vars_comp c =
 and free_vars_expr e =
   match e.term with
   | Var v -> ([], [v])
+  | Pure c -> free_vars_comp c
   | Tuple es -> concat_vars (List.map free_vars_expr es)
   | Lambda a -> free_vars_abs a
   | Handler h -> free_vars_handler h
   | Record flds -> concat_vars (List.map (fun (_, e) -> free_vars_expr e) flds)
   | Variant (_, None) -> ([], [])
   | Variant (_, Some e) -> free_vars_expr e
-  | PureLambda pa -> free_vars_pure_abs pa
-  | PureApply (e1, e2) -> free_vars_expr e1 @@@ free_vars_expr e2
-  | PureLetIn (e, pa) -> free_vars_expr e @@@ free_vars_pure_abs pa
   | (BuiltIn _ | Effect _ | Const _) -> ([], [])
 and free_vars_handler h =
   free_vars_abs h.value_clause @@@
@@ -889,7 +825,6 @@ and free_vars_abs a =
   let (p, c) = a.term in
   let (inside, outside) = free_vars_comp c --- pattern_vars p in
   (inside @ outside, [])
-and free_vars_pure_abs pa = free_vars_abs @@ pa2a @@ pa
 and free_vars_abs2 a2 = free_vars_abs @@ a22a @@ a2
 
 let occurrences x (inside, outside) =

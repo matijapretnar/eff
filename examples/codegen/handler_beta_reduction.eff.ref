@@ -1,3 +1,6 @@
 type (_,_) effect +=
   | Effect_Eff: (int,int) effect 
-;;value (Pervasives.(+) (Pervasives.(+) (Pervasives.(+) 1 2) 3) 4)
+;;(binary_builtin Pervasives.(+))
+    ((run
+        ((binary_builtin Pervasives.(+))
+           ((run ((binary_builtin Pervasives.(+)) (1, 2))), 3))), 4)

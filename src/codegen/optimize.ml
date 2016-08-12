@@ -7,9 +7,7 @@
 open Typed
 
 let a22a a2 = Typed.a22a a2
-let pa2a pa = Typed.pa2a pa
 let a2a2 a = Typed.a2a2 a
-let a2pa a = Typed.a2pa a
 
 let unary_inlinable f ty1 ty2 =
   let x = Typed.Variable.fresh "x" and loc = Location.unknown in
@@ -21,14 +19,15 @@ let unary_inlinable f ty1 ty2 =
       scheme = Scheme.simple ty1;
     }
   in
-  pure_lambda @@
-  pure_abstraction p @@
-  pure_apply
-    (built_in f (Scheme.simple (Type.Arrow (ty1, (ty2, drt)))))
-    (var x (Scheme.simple ty1))
-
+    lambda @@
+    abstraction p @@
+      apply
+        (built_in ("(unary_builtin " ^ f ^ ")") (Scheme.simple (Type.Arrow (ty1, (ty2, drt)))))
+        (var x (Scheme.simple ty1))
+  
 let binary_inlinable f ty1 ty2 ty =
-  let x1 = Typed.Variable.fresh "x1" and x2 = Typed.Variable.fresh "x2"
+  let x1 = Typed.Variable.fresh "x1"
+  and x2 = Typed.Variable.fresh "x2"
   and loc = Location.unknown and drt = Type.fresh_dirt () in
   let p1 =
     {
@@ -43,17 +42,14 @@ let binary_inlinable f ty1 ty2 ty =
       scheme = Scheme.simple ty2;
     }
   in
-  lambda @@
-  abstraction p1 @@
-  value @@
-  lambda @@
-  abstraction p2 @@
-  value @@
-  pure_apply
-    (pure_apply
-       (built_in f (Scheme.simple (Type.Arrow (ty1, ((Type.Arrow (ty2, (ty, drt))), drt)))))
-       (var x1 (Scheme.simple ty1)))
-    (var x2 (Scheme.simple ty2))
+    lambda @@
+    abstraction p1 @@
+      value @@
+      lambda @@
+      abstraction p2 @@
+        apply
+          (built_in ("(binary_builtin " ^ f ^ ")") (Scheme.simple (Type.Arrow (Type.Tuple [ty1; ty2], (ty, drt)))))
+          (tuple [var x1 (Scheme.simple ty1); var x2 (Scheme.simple ty2)])
 
 let inlinable_definitions =
   [ ("=",
@@ -126,7 +122,7 @@ let inlinable = ref []
 
 let stack = ref []
 
-let impure_wrappers = ref []
+(* let impure_wrappers = ref [] *)
 
 let find_inlinable x =
   match Common.lookup x !inlinable with
@@ -203,25 +199,6 @@ and beta_reduce ({term = (p, c)} as a) e =
     in
     let_in e a
 
-and pure_beta_reduce ({term = (p, exp)} as pa) e =
-  match applicable_pattern p (Typed.free_vars_expr exp) with
-  | NotInlinable when is_atomic e -> substitute_pattern_expr exp p e
-  | Inlinable -> substitute_pattern_expr exp p e
-  | NotPresent -> exp
-  | _ ->
-    let pa = 
-      begin match p with
-        | {term = Typed.PVar x} ->
-          Print.debug "Added to stack ==== %t" (CamlPrint.print_variable x);
-          stack := Common.update x (fun () -> e) !stack;
-          pure_abstraction p (optimize_expr e)
-        | _ ->
-          Print.debug "We are now in the let in 5 novar for %t" (Typed.print_pattern p);
-          pa
-      end
-    in
-    pure_let_in e pa
-
 and optimize_expr e = reduce_expr (optimize_sub_expr e)
 and optimize_comp c = reduce_comp (optimize_sub_comp c)
 
@@ -237,12 +214,8 @@ and optimize_sub_expr e =
     tuple ~loc (List.map optimize_expr lst)
   | Lambda a ->
     lambda ~loc (optimize_abs a)
-  | PureLambda pa ->
-    pure_lambda ~loc (optimize_pure_abs pa)
-  | PureApply (e1, e2) ->
-    pure_apply ~loc (optimize_expr e1) (optimize_expr e2)
-  | PureLetIn (e1, pa) ->
-    pure_let_in ~loc (optimize_expr e1) (optimize_pure_abs pa)
+  | Pure c ->
+    pure ~loc (optimize_comp c)
   | Handler h ->
     handler ~loc {
       effect_clauses = Common.assoc_map optimize_abs2 h.effect_clauses;
@@ -280,7 +253,6 @@ and optimize_sub_comp c =
     let_in ~loc (optimize_expr e) (optimize_abs a)
 and optimize_abs {term = (p, c); location = loc} =
   abstraction ~loc p (optimize_comp c)
-and optimize_pure_abs pa = a2pa @@ optimize_abs @@ pa2a @@ pa
 and optimize_abs2 a2 = a2a2 @@ optimize_abs @@ a22a @@ a2
 
 and reduce_expr e =
@@ -293,12 +265,6 @@ and reduce_expr e =
       | _ -> e
     end
 
-  | PureLetIn (ex, pa) ->
-    pure_beta_reduce pa ex
-
-  | PureApply ({term = PureLambda pa}, e2) ->
-    pure_beta_reduce pa e2
-
   | Effect eff ->
     let (eff_name, (ty_par, ty_res)) = eff in
     let param_var, param_pat = make_var "param" (Scheme.simple ty_par) in
@@ -310,6 +276,9 @@ and reduce_expr e =
     in
     (* Body is already reduced and it's a lambda *)
     res
+
+  | Pure {term = Value e} ->
+    e
 
   | _ -> e
 
@@ -332,8 +301,8 @@ and reduce_comp c =
     in
     find_const_case cases
 
-  | Bind ({term = Value e}, c) ->
-    beta_reduce c e
+  | Bind (c1, c2) when Scheme.is_pure c1.scheme ->
+    beta_reduce c2 (reduce_expr (pure c1))
 
   | Bind ({term = Bind (c1, {term = (p1, c2)})}, c3) ->
     let bind_c2_c3 = reduce_comp (bind c2 c3) in
@@ -364,8 +333,8 @@ and reduce_comp c =
     in
     reduce_comp res
 
-  | Handle ({term = Handler h}, {term = Value v}) ->
-    beta_reduce h.value_clause v
+  | Handle ({term = Handler h}, c) when Scheme.is_pure c.scheme ->
+    beta_reduce h.value_clause (reduce_expr (pure c))
 
   | Handle ({term = Handler h} as handler, {term = Call (eff, param, k)}) ->
     let {term = (k_pat, k_body)} = refresh_abs k in
@@ -388,10 +357,7 @@ and reduce_comp c =
   | Apply ({term = Lambda a}, e) ->
     beta_reduce a e
 
-  | Apply ({term = PureLambda pa}, e2) ->
-    value (pure_beta_reduce pa e2)
-
-  | Apply ({term = Var v}, e2) ->
+(*   | Apply ({term = Var v}, e2) ->
     begin match Common.lookup v !impure_wrappers with
       | Some f -> 
         let res =
@@ -399,16 +365,16 @@ and reduce_comp c =
         in
         reduce_comp res
       | None -> c
-    end
+    end *)
 
-  | LetIn (e1, {term = (p, {term = Value e2})}) ->
+(*   | LetIn (e1, {term = (p, {term = Value e2})}) ->
     Print.debug "We are now in the let in 2 for %t" (Typed.print_pattern p);
     let res =
       value (pure_let_in e1 (pure_abstraction p e2))
     in
-    reduce_comp res
+    reduce_comp res *)
 
-  | Handle (e1, {term = Apply (ae1, ae2)}) ->
+(*   | Handle (e1, {term = Apply (ae1, ae2)}) ->
     begin match ae1.term with
       | Var v ->
         begin match find_in_stack v with
@@ -448,7 +414,7 @@ and reduce_comp c =
           | _ -> c
         end
       | _ -> c
-    end
+    end *)
 
 
 
@@ -459,7 +425,7 @@ and reduce_comp c =
       let f = \new_p. val (f1 new_p) in
       c
     *)
-  | LetIn ({term = Lambda ({term = (p, {term = Value ({term = Lambda _ } as in_lambda)} )})}, ({term = ({term = PVar f} as f_pat,_)} as a) )->
+(*   | LetIn ({term = Lambda ({term = (p, {term = Value ({term = Lambda _ } as in_lambda)} )})}, ({term = ({term = PVar f} as f_pat,_)} as a) )->
     Print.debug "We are now in the let in 4 for %t" (Typed.print_pattern f_pat);
     let f1_var, f1_pat = make_var "f1" f_pat.scheme in
     let new_p_var, new_p_pat = make_var "new_p" p.scheme in 
@@ -479,7 +445,7 @@ and reduce_comp c =
       let_in second_fun @@
       a
     in
-    optimize_comp res
+    optimize_comp res *)
 
   | LetIn (e, ({term = (p, cp)} as a)) ->
     Print.debug "We are now in the let in 1, 3 or 5 for %t" (Typed.print_pattern p);

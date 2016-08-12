@@ -10,13 +10,8 @@ let _choose_all_279 =
          | Effect_Decide  ->
              (fun (() : unit)  ->
                 fun (_k_280 : bool -> _ computation)  ->
-                  (_k_280 true) >>
-                    (fun _gen_bind_282  ->
-                       (_var_187 _gen_bind_282) >>
-                         (fun _gen_bind_281  ->
-                            (_k_280 false) >>
-                              (fun _gen_bind_283  ->
-                                 _gen_bind_281 _gen_bind_283))))
+                  let _gen_bind_281 = run (_var_187 (run (_k_280 true)))  in
+                  _gen_bind_281 (run (_k_280 false)))
          | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                    (b ->
                                                                     _
@@ -25,4 +20,4 @@ let _choose_all_279 =
                                                                     _
                                                                     computation)
   } 
-;;(_var_187 [10]) >> (fun _gen_bind_84  -> _gen_bind_84 [20])
+;;run (_var_187 [10]) [20]
