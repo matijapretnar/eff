@@ -38,6 +38,9 @@ and ty_less ~loc ty1 ty2 (ctx, ty, cnstrs) =
 and dirty_less ~loc drty1 drty2 (ctx, ty, cnstrs) =
   (ctx, ty, Constraints.add_dirty_constraint ~loc drty1 drty2 cnstrs)
 
+let is_pure (_, (_, drt), cnstrs) =
+  Constraints.is_pure cnstrs drt
+
 let remove_context ~loc ctx_p (ctx, ty, cnstrs) =
   let trim (x, t) (ctx, ty, cnstrs) =
     match Common.lookup x ctx_p with

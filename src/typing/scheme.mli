@@ -30,3 +30,4 @@ val add_to_top : loc:Location.t -> context -> Constraints.t -> (dirty_scheme -> 
 val print_ty_scheme : ty_scheme -> Format.formatter -> unit
 val print_dirty_scheme : dirty_scheme -> Format.formatter -> unit
 val normalize_context : loc:Location.t -> ty_scheme -> ty_scheme
+val is_pure : dirty_scheme -> bool
