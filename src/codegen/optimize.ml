@@ -816,22 +816,24 @@ and shallow_opt c =
                 end
               |_ -> c
             end
-      | _ -> c
-      end
-
-  | Handle(h, {term = Bind( {term = Apply(ae1,ae2)}, {term = (bp,bc)} )}) ->
-      
-      begin match ae1.term with
-      | Var v ->
-            begin match find_in_stack v with
+      | PureApply ({term = Var fname} as pae1,pae2)->
+            begin match find_in_stack fname with
               | Some d -> 
                 begin match d.term with
-                | Lambda ({term = (dp, {term = Value de} ) }) ->
-                  let new_var = make_var_from_counter "newvar" ae1.scheme in
-                  c                  
+                | PureLambda ({term = (dp1,{term = Lambda ({term = (dp2,dc)})})} as da) ->
+                   let newfname = make_var_from_counter "newvar" ae1.scheme in
+                   let pure_application = pure_apply ~loc:c.location newfname pae2 in
+                   let application = apply ~loc:c.location pure_application ae2 in
+                   let handler_call = handle ~loc:c.location e1 dc in 
+                   let newfinnerlambda = lambda ~loc:c.location (abstraction ~loc:c.location dp2 handler_call) in 
+                   let newfbody = pure_lambda ~loc:c.location (pure_abstraction dp1 newfinnerlambda) in 
+                   let res = 
+                     let_in ~loc:c.location (newfbody) (abstraction ~loc:c.location (make_pattern_from_var newfname) application) in
+                   optimize_comp res
+                   
                 | _ -> c
-                end
-              |_ -> c
+              end
+              | _ -> c
             end
       | _ -> c
       end
@@ -938,22 +940,26 @@ and shallow_opt c =
           let pure_app = shallow_opt_e (pure_apply ~loc:c.location fn e2) in 
           let main_value = shallow_opt (value ~loc:c.location pure_app) in
           main_value
-    | [] -> c
+    | _ -> c
     end
 
   | LetIn (e, {term = (p, cp)}) when is_atomic e ->
+      Print.debug "We are now in the let in 1 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
       substitute_pattern_comp cp p e c
   | LetIn (e1, {term = (p, {term = Value e2})}) ->
+    Print.debug "We are now in the let in 2 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
      let res =
        value ~loc:c.location
          (shallow_opt_e (pure_let_in e1 (pure_abstraction p e2)))
      in shallow_opt res
 
   | LetIn (e, {term = (p, cp)}) when only_inlinable_occurrences p cp ->
+  Print.debug "We are now in the let in 3 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
        substitute_pattern_comp cp p e c
   
   (*Matching let f = \x.\y. c *)    
   | LetIn({term = Lambda ({term = (pe1, {term = Value ({term = Lambda ({term = (pe2,ce2)}) } as in_lambda)} )})} as e, {term = ({term = PVar fo} as p,cp)} )->
+        Print.debug "We are now in the let in 4 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
         let new_var = make_var_from_counter "newvar" p.scheme in
         let new_var2 = make_var_from_counter "newvar2" pe1.scheme in 
         let new_pattern = make_pattern_from_var new_var2 in
@@ -967,15 +973,17 @@ and shallow_opt c =
         impure_wrappers:= ((make_expression_from_pattern p),new_var) :: !impure_wrappers;
         optimize_comp first_let
   | LetIn(e, {term = (p,cp)} )->
+      Print.debug "We are now in the let in 5 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
         begin 
           (match p.term with
           | Typed.PVar xx -> 
+              Print.debug "Added to stack ==== %t" (CamlPrint.print_variable xx);
               stack:= Common.update xx (fun () -> e) !stack     
-          | _ -> ()
+          | _ -> Print.debug "We are now in the let in 5 novar for %t" (CamlPrint.print_expression (make_expression_from_pattern p));()
           );
         let_in ~loc:c.location e (abstraction ~loc:e.location p (optimize_comp cp))
         end
-
+  | LetRec(l,co) -> Print.debug "the letrec comp%t" (CamlPrint.print_computation co); c
   | _ -> c
 
 
@@ -1113,6 +1121,8 @@ let optimize_command =
       (* If we define a single simple handler, we inline it *)
       | [({ term = Typed.PVar x}, { term = Value ({ term = Handler _ } as e)})] ->
         inlinable := Common.update x (fun () -> e) !inlinable
+      | [({ term = Typed.PVar x}, ({ term = Value ({term = Lambda ({term = (pc,cc)}) } as e )} ))] ->
+        stack := Common.update x (fun () -> e) !stack
       | _ -> ()
       end;
       Typed.TopLet (defs', vars)
