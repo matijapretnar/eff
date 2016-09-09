@@ -1,0 +1,11 @@
+effect Decide : unit -> bool
+
+let choose_sum = handler
+  | #Decide () k -> k true + k false
+  | val x -> x
+
+;;
+
+let decide_func1 x  =
+    (if #Decide () then x else 20) in
+with choose_sum handle (decide_func1 10 )

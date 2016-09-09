@@ -1,0 +1,35 @@
+type (_,_) effect +=
+  | Effect_Decide: (unit,bool) effect 
+let _choose_all_279 =
+  {
+    value_clause = (fun _x_285  -> value [_x_285]);
+    finally_clause = (fun _gen_id_par_284  -> value _gen_id_par_284);
+    effect_clauses = fun (type a) -> fun (type b) ->
+      fun (x : (a,b) effect)  ->
+        (match x with
+         | Effect_Decide  ->
+             (fun (() : unit)  ->
+                fun (_k_280 : bool -> _ computation)  ->
+                  (_k_280 true) >>
+                    (fun _gen_bind_282  ->
+                       (_var_187 _gen_bind_282) >>
+                         (fun _gen_bind_281  ->
+                            (_k_280 false) >>
+                              (fun _gen_bind_283  ->
+                                 _gen_bind_281 _gen_bind_283))))
+         | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
+                                                                   (b ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                    _
+                                                                    computation)
+  } 
+;;let _newvar_84 _x_287 _y_288 =
+    call Effect_Decide ()
+      (fun __call_result_82  ->
+         match __call_result_82 with
+         | true  -> value _x_287
+         | false  -> value _y_288)
+     in
+  (_var_187 [10]) >> (fun _gen_bind_78  -> _gen_bind_78 [20])

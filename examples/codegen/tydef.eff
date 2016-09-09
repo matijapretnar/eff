@@ -1,5 +1,0 @@
-type 'a foo = ('a * 'a) bar
-and 'b bar = int -> unit
-and complex = { re: int; im: unit }
-
-type 'a my_option = MyNone | MySome of 'a

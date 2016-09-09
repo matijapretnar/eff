@@ -1,0 +1,34 @@
+type (_,_) effect +=
+  | Effect_Decide: (unit,bool) effect 
+let _choose_sum_279 =
+  {
+    value_clause = (fun _x_285  -> value _x_285);
+    finally_clause = (fun _gen_id_par_284  -> value _gen_id_par_284);
+    effect_clauses = fun (type a) -> fun (type b) ->
+      fun (x : (a,b) effect)  ->
+        (match x with
+         | Effect_Decide  ->
+             (fun (() : unit)  ->
+                fun (_k_280 : bool -> _ computation)  ->
+                  (_k_280 true) >>
+                    (fun _gen_bind_282  ->
+                       let _gen_bind_281 _x2_75 =
+                         value (Pervasives.(+) _gen_bind_282 _x2_75)  in
+                       (_k_280 false) >>
+                         (fun _gen_bind_283  -> _gen_bind_281 _gen_bind_283)))
+         | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
+                                                                   (b ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                    _
+                                                                    computation)
+  } 
+;;let _decide_func1_286 _x_287 =
+    call Effect_Decide ()
+      (fun __call_result_85  ->
+         match __call_result_85 with
+         | true  -> value _x_287
+         | false  -> value 20)
+     in
+  value (Pervasives.(+) 10 20)

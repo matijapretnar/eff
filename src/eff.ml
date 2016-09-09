@@ -88,7 +88,9 @@ let compile_file st filename =
       Lexer.read_file (parse Parser.file) f
   in
   let cmds = Lexer.read_file (parse Parser.file) filename in
-  let cmds = List.map Desugar.toplevel (pervasives_cmds @ cmds) in
+  (* Here, we insert a simple command to be later on able to separate the source from pervasives *)
+  let separator = (Sugared.Term (Sugared.Const (Const.of_string "End of pervasives"), Location.unknown), Location.unknown) in
+  let cmds = List.map Desugar.toplevel (pervasives_cmds @ separator :: cmds) in
   let cmds, _ = Infer.type_cmds {Infer.typing = st.Shell.typing; Infer.change = st.Shell.change} cmds in
   let cmds = if !Config.disable_optimization then cmds else Optimize.optimize_commands cmds in
 
@@ -108,7 +110,7 @@ let compile_file st filename =
   close_in header_channel;
 
   (* write a temporary compiled file *)
-  ignore (Sys.command ("mkdir _tmp"));
+  ignore (Sys.command ("mkdir -p _tmp"));
   let temporary_file = "_tmp/" ^ CamlPrint.compiled_filename filename in
   let out_channel = open_out temporary_file in
   Format.fprintf (Format.formatter_of_out_channel out_channel)

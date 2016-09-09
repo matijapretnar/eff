@@ -110,10 +110,6 @@ let rec map f = function
 
 let ignore _ = ()
 
-let hd (x :: _) = x
-
-let tl (_ :: lst) = lst
-
 let take f k =
   let r = range 0 k in map f r
 
@@ -179,9 +175,13 @@ let head = function
   | [] ->  absurd (#InvalidArgument "head: empty list")
   | x :: _ -> x
 
-let rec tail = function
+let tail = function
   | [] ->  absurd (#InvalidArgument "tail: empty list")
   | x :: xs -> xs
+
+let hd = head
+
+let tl = tail
 
 let abs x = if x < 0 then -x else x
 
