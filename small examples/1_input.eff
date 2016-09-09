@@ -1,0 +1,46 @@
+effect Decide : unit -> bool
+
+let choose_sum = handler
+  | #Decide () k -> k true + k false
+  | val x -> x
+
+;;
+
+let decide_func1 x  =
+    (if #Decide () then x else 20) in
+with choose_sum handle (decide_func1 10 )
+
+
+
+(*
+type (_, _) effect += Effect_Decide : ( unit,  bool) effect
+
+;;
+
+
+let _choose_sum_281 = { value_clause = (fun _x_287 ->  value _x_287);
+                       finally_clause = (fun _gen_id_par_286 ->
+                                            value _gen_id_par_286);
+                       effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
+             ((match x with | Effect_Decide -> (fun (() :  unit) (_k_282 :  bool -> _ computation) -> 
+                       (_k_282 true) >>
+                       fun _gen_bind_284 ->
+                          let _gen_bind_283 = fun _x2_75 ->
+                                 value (Pervasives.(+) _gen_bind_284 _x2_75)
+                              in
+                       (_k_282 false) >>
+                       fun _gen_bind_285 ->  _gen_bind_283 _gen_bind_285) | eff' -> fun arg k -> Call (eff', arg, k)) : a -> (b -> _ computation) -> _ computation)) }
+
+;;
+
+
+let _decide_func1_288 = fun _x_289 ->
+       call Effect_Decide () (fun __call_result_85 ->
+                                 (match __call_result_85 with | true ->
+                                                                 value _x_289
+                                                              | false ->
+                                                                 value 20))
+    in value (Pervasives.(+) 10
+20)
+
+*)

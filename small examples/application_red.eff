@@ -1,0 +1,8 @@
+let x = (fun y -> y*2) in
+  x 3
+;;
+
+(*
+value (Pervasives.( * ) 3
+2)
+*)

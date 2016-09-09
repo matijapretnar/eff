@@ -1,0 +1,10 @@
+
+let x = true in 
+match x with 
+ | true -> 1
+ | _ -> 2
+
+
+(*
+value 1
+*)
