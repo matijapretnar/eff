@@ -8,7 +8,7 @@
       (let-in apply) (pure_let-in pure_apply) (bind)
   ==> (done) free_vars letrec
   ==> (done) occurrences (patterns/variants)
-  ==> (donefix all pattern matching warnings and not halt when pattern is not var (PRIORITY)
+  ==> (done) fix all pattern matching warnings and not halt when pattern is not var (PRIORITY)
   ==> (done)Substitution for LetRec
   ==> Make regression tests
 
@@ -230,45 +230,6 @@ module VariableSet =
                    let compare = Pervasives.compare
                       end)
 
-
-let rec is_pure_comp c =
-  match c.term with
-  | Value e -> true
-  | Let (li, cf) -> is_pure_comp cf
-  | LetRec (li, c1) ->
-      let func (_, abs) = let (_, c') = abs.term in is_pure_comp c'
-      in List.fold_right ( && ) (List.map func li) (is_pure_comp c1)
-  | Match (e, li) ->
-      let func a b = let (pt, ct) = a.term in (is_pure_comp ct) && b
-      in List.fold_right func li true
-  | While (c1, c2) -> (is_pure_comp c1) && (is_pure_comp c2)
-  | For (v, e1, e2, c1, b) -> is_pure_comp c1
-  | Apply (e1, e2) -> (is_pure_exp e1) && (is_pure_exp e2)
-  | Handle (e, c1) -> (is_pure_exp e) && (is_pure_comp c1)
-  | Check c1 -> is_pure_comp c1
-  | Call _ -> false
-  | Bind (c1, a1) ->
-      let (p1, cp1) = a1.term in (is_pure_comp c1) && (is_pure_comp cp1)
-  | LetIn (e, a) ->
-      let (p1, cp1) = a.term in (is_pure_exp e) && (is_pure_comp cp1)
-and is_pure_exp e =
-  match e.term with
-  | Var v -> true
-  | Const _ -> true
-  | Tuple lst -> List.fold_right ( && ) (List.map is_pure_exp lst) true
-  | Lambda a -> let (p1, cp1) = a.term in is_pure_comp cp1
-  | Handler h -> true
-  | Record lst -> true
-  | Variant (label, exp) ->
-      (match Common.option_map is_pure_exp exp with
-       | Some set -> set
-       | None -> true)
-  | PureLambda pa -> let (p1, ep1) = pa.term in is_pure_exp ep1
-  | PureApply (e1, e2) -> (is_pure_exp e1) && (is_pure_exp e2)
-  | PureLetIn (e, pa) ->
-      let (p1, ep1) = pa.term in (is_pure_exp e) && (is_pure_exp ep1)
-  | BuiltIn _ -> true
-  | Effect _ -> true
   
 let rec free_vars_c c : VariableSet.t =
   match c.term with
@@ -526,8 +487,6 @@ let print_free_vars c =
   
 let is_atomic e =
   match e.term with | Var _ -> true | Const _ -> true | _ -> false
-  
-let is_var e = match e.term with | Var _ -> true | _ -> false
   
 let rec substitute_var_comp comp vr exp =
   (*   Print.debug "Substituting %t" (CamlPrint.print_computation comp); *)
