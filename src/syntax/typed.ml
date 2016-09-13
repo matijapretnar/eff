@@ -104,40 +104,6 @@ and plain_toplevel =
   | TypeOf of computation
 
 
-let refresh_pattern p =
-  let rec refresh sbst p =
-    let p', sbst' = refresh' sbst p.term in
-    {p with term = p'}, sbst'
-  and refresh' sbst = function
-    | PVar x ->
-        let x' = Variable.refresh x in
-        PVar x', Common.update x x' sbst
-    | PAs (p, x) ->
-        let x' = Variable.refresh x in
-        let p', sbst = refresh (Common.update x x' sbst) p in
-        PAs (p', x'), sbst
-    | PTuple ps ->
-      let ps', sbst =
-        List.fold_right (fun p (ps', sbst) ->
-          let p', sbst = refresh sbst p in
-          p' :: ps', sbst
-        ) ps ([], sbst) in
-      PTuple ps', sbst
-    | PRecord flds ->
-      let flds', sbst =
-        List.fold_right (fun (lbl, p) (flds', sbst) ->
-          let p', sbst = refresh sbst p in
-          (lbl, p') :: flds', sbst
-        ) flds ([], sbst) in
-      PRecord flds', sbst
-    | PVariant (lbl, None) -> PVariant (lbl, None), sbst
-    | PVariant (lbl, Some p) ->
-        let p', sbst = refresh sbst p in 
-        PVariant (lbl, Some p'), sbst
-    | (PConst _ | PNonbinding) as p -> p, sbst
-  in
-  fst (refresh [] p)
-
 let backup_location loc locs =
   match loc with
   | None -> Location.union locs
@@ -167,8 +133,156 @@ let abstraction2 ?loc p1 p2 c =
     location = c.location;
   }
 
+let value ?loc e =
+  let loc = backup_location loc [e.location] in
+  let ctx, ty, constraints = e.scheme in
+  {
+    term = Value e;
+    scheme = (ctx, (ty, Type.fresh_dirt ()), constraints);
+    location = loc
+  }
 
-  (*pure abstract*)
+
+
+let a22a a2 =
+  let (p1, p2, c) = a2.term in
+  let ctx1, ty1, cnstrs1 = p1.scheme
+  and ctx2, ty2, cnstrs2 = p2.scheme in
+  let p = {
+    term = PTuple [p1; p2];
+    scheme = (
+      ctx1 @ ctx2,
+      Type.Tuple [ty1; ty2],
+      Constraints.union cnstrs1 cnstrs2
+    );
+    location = a2.location;
+  } in
+  abstraction ~loc:a2.location p c
+let pa2a pa =
+  let (p, e) = pa.term in
+  abstraction ~loc:pa.location p (value ~loc:e.location e)
+let a2a2 a =
+  match a.term with
+  | ({term = PTuple [p1; p2]}, c) -> abstraction2 ~loc:a.location p1 p2 c
+  | _ -> assert false
+let a2pa a =
+  match a.term with
+  | (p, {term = Value e}) -> pure_abstraction ~loc:p.location p e
+  | _ -> assert false
+
+let rec refresh_pat sbst p =
+  let sbst', p' = refresh_pat' sbst p.term in
+  sbst', {p with term = p'}
+and refresh_pat' sbst = function
+  | PVar x ->
+      let x' = Variable.refresh x in
+      Common.update x x' sbst, PVar x'
+  | PAs (p, x) ->
+      let x' = Variable.refresh x in
+      let sbst, p' = refresh_pat (Common.update x x' sbst) p in
+      sbst, PAs (p', x')
+  | PTuple ps ->
+    let sbst, ps' =
+      List.fold_right (fun p (sbst, ps') ->
+        let sbst, p' = refresh_pat sbst p in
+        sbst, p' :: ps'
+      ) ps (sbst, []) in
+    sbst, PTuple ps'
+  | PRecord flds ->
+    let sbst, flds' =
+      List.fold_right (fun (lbl, p) (sbst, flds') ->
+        let sbst, p' = refresh_pat sbst p in
+        sbst, (lbl, p') :: flds'
+      ) flds (sbst, []) in
+    sbst, PRecord flds'
+  | PVariant (lbl, None) ->
+      sbst, PVariant (lbl, None)
+  | PVariant (lbl, Some p) ->
+      let sbst, p' = refresh_pat sbst p in 
+      sbst, PVariant (lbl, Some p')
+  | (PConst _ | PNonbinding) as p -> sbst, p
+
+let rec refresh_exp sbst e =
+  {e with term = refresh_exp' sbst e.term}
+and refresh_exp' sbst = function
+  | (Var x) as e ->
+      begin match Common.lookup x sbst with
+      | Some x' -> Var x'
+      | None -> e
+      end
+  | PureLambda pa ->
+      PureLambda (refresh_pure_abs sbst pa)
+  | Lambda a ->
+      Lambda (refresh_abs sbst a)
+  | PureLetIn (e1, pa) ->
+      PureLetIn (refresh_exp sbst e1, refresh_pure_abs sbst pa)
+  | Handler h ->
+      Handler (refresh_handler sbst h)
+  | Tuple es ->
+      Tuple (List.map (refresh_exp sbst) es)
+  | Record flds ->
+      Record (Common.assoc_map (refresh_exp sbst) flds)
+  | Variant (lbl, e) ->
+      Variant (lbl, Common.option_map (refresh_exp sbst) e)
+  | PureApply (e1, e2) ->
+      PureApply (refresh_exp sbst e1, refresh_exp sbst e2)
+  | (BuiltIn _ | Const _ | Effect _) as e -> e
+and refresh_comp sbst c =
+  {c with term = refresh_comp' sbst c.term}
+and refresh_comp' sbst = function
+  | Bind (c1, c2) ->
+      Bind (refresh_comp sbst c1, refresh_abs sbst c2)
+  | LetIn (e, a) ->
+      LetIn (refresh_exp sbst e, refresh_abs sbst a)
+  | Let (li, c1) ->
+      let sbst', li' = List.fold_right (fun (p, c) (sbst', li') ->
+        (* sbst' is what will be used for c1, but for definitons c, we use sbst *)
+        let sbst', p' = refresh_pat sbst' p in
+        sbst', (p', refresh_comp sbst c) :: li'
+      ) li (sbst, []) in
+      Let (li', refresh_comp sbst' c1)
+  | LetRec (li, c1) ->
+      let new_xs, sbst' = List.fold_right (fun (x, _) (new_xs, sbst') ->
+        let x' = Variable.refresh x in
+        x' :: new_xs, Common.update x x' sbst'
+      ) li ([], sbst) in
+      let li' =
+        List.combine new_xs (List.map (fun (_, a) -> refresh_abs sbst' a) li)
+      in
+      LetRec (li', refresh_comp sbst' c1)
+  | Match (e, li) ->
+      Match (refresh_exp sbst e, List.map (refresh_abs sbst) li)
+  | While (c1, c2) ->
+      While (refresh_comp sbst c1, refresh_comp sbst c2)
+  | For (x, e1, e2, c, b) ->
+      let x' = Variable.refresh x in
+      let sbst' = Common.update x x' sbst in
+      For (x', refresh_exp sbst e1, refresh_exp sbst e2, refresh_comp sbst' c, b)
+  | Apply (e1, e2) ->
+      Apply (refresh_exp sbst e1, refresh_exp sbst e2)
+  | Handle (e, c) ->
+      Handle (refresh_exp sbst e, refresh_comp sbst c)
+  | Check c ->
+      Check (refresh_comp sbst c)
+  | Call (eff, e, a) ->
+      Call (eff, refresh_exp sbst e, refresh_abs sbst a)
+  | Value e ->
+      Value (refresh_exp sbst e)
+and refresh_handler sbst h = {
+    effect_clauses = Common.assoc_map (refresh_abs2 sbst) h.effect_clauses;
+    value_clause = refresh_abs sbst h.value_clause;
+    finally_clause = refresh_abs sbst h.finally_clause;
+  }
+and refresh_abs sbst a = 
+  let (p, c) = a.term in
+  let sbst, p' = refresh_pat sbst p in
+  {a with term = (p', refresh_comp sbst c)}
+and refresh_pure_abs sbst pa =
+  a2pa @@ refresh_abs sbst @@ pa2a @@ pa
+and refresh_abs2 sbst a2 =
+  a2a2 @@ refresh_abs sbst @@ a22a @@ a2
+
+(*pure abstract*)
 
 let var ?loc x ty_sch =
   let loc = backup_location loc [] in
@@ -347,16 +461,6 @@ let handler ?loc h =
       scheme = Scheme.clean_ty_scheme ~loc ty_sch;
       location = loc;
     }
-
-
-let value ?loc e =
-  let loc = backup_location loc [e.location] in
-  let ctx, ty, constraints = e.scheme in
-  {
-    term = Value e;
-    scheme = (ctx, (ty, Type.fresh_dirt ()), constraints);
-    location = loc
-  }
 
 let match' ?loc e cases =
   let loc = backup_location loc (
