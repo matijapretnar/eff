@@ -538,20 +538,15 @@ and substitute_var_abs a vr exp =
        (Print.debug "matched vr is member in p of abstraction)";
               a)
      else
-     begin if
-         VariableSet.equal
-           (VariableSet.inter p_vars_set (free_vars_e exp))
-           VariableSet.empty
-     then
+     begin
+      (* We must avoid capturing of any free variables in exp when substituting
+         inside the body of abstraction. However, all our variables are distinct,
+         so that cannot happen. To be sure, we insert an assertion. *)
+       assert
+         (VariableSet.equal
+                    (VariableSet.inter p_vars_set (free_vars_e exp))
+                    VariableSet.empty);
        abstraction ~loc:a.location p (substitute_var_comp c vr exp)
-     else
-       begin Print.debug "we do renaming in bind(should never happen) with ";
-       let new_p = refresh_pattern p in
-       let new_pe = make_expression_from_pattern new_p in
-       let fresh_c = substitute_pattern_comp c p new_pe c
-       in
-       abstraction ~loc:a.location new_p (substitute_var_comp fresh_c vr exp)
-     end
     end
 and substitute_var_pure_abs a vr exp =
   a2pa @@ substitute_var_abs (pa2a a) vr exp
@@ -590,7 +585,7 @@ and substitute_var_handler ~loc h vr exp =
       value_clause = substitute_var_abs h.value_clause vr exp;
       finally_clause = substitute_var_abs h.finally_clause vr exp;
     }
-and substitute_pattern_comp c p exp maincomp =
+let rec substitute_pattern_comp c p exp maincomp =
   match p.term with
   | Typed.PVar x -> optimize_comp (substitute_var_comp c x exp)
   | Typed.PAs (_, x) ->
