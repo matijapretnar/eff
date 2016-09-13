@@ -282,6 +282,83 @@ and refresh_pure_abs sbst pa =
 and refresh_abs2 sbst a2 =
   a2a2 @@ refresh_abs sbst @@ a22a @@ a2
 
+let rec subst_exp sbst e =
+  {e with term = subst_exp' sbst e.term}
+and subst_exp' sbst = function
+  | (Var x) as e ->
+      begin match Common.lookup x sbst with
+      | Some e' -> e'
+      | None -> e
+      end
+  | PureLambda pa ->
+      PureLambda (subst_pure_abs sbst pa)
+  | Lambda a ->
+      Lambda (subst_abs sbst a)
+  | PureLetIn (e1, pa) ->
+      PureLetIn (subst_exp sbst e1, subst_pure_abs sbst pa)
+  | Handler h ->
+      Handler (subst_handler sbst h)
+  | Tuple es ->
+      Tuple (List.map (subst_exp sbst) es)
+  | Record flds ->
+      Record (Common.assoc_map (subst_exp sbst) flds)
+  | Variant (lbl, e) ->
+      Variant (lbl, Common.option_map (subst_exp sbst) e)
+  | PureApply (e1, e2) ->
+      PureApply (subst_exp sbst e1, subst_exp sbst e2)
+  | (BuiltIn _ | Const _ | Effect _) as e -> e
+and subst_comp sbst c =
+  {c with term = subst_comp' sbst c.term}
+and subst_comp' sbst = function
+  | Bind (c1, c2) ->
+      Bind (subst_comp sbst c1, subst_abs sbst c2)
+  | LetIn (e, a) ->
+      LetIn (subst_exp sbst e, subst_abs sbst a)
+  | Let (li, c1) ->
+      let li' = List.map (fun (p, c) ->
+        (* XXX Should we check that p & sbst have disjoint variables? *)
+        (p, subst_comp sbst c)
+      ) li
+      in
+      Let (li', subst_comp sbst c1)
+  | LetRec (li, c1) ->
+      let li' = List.map (fun (x, a) ->
+        (* XXX Should we check that x does not appear in sbst? *)
+        (x, subst_abs sbst a)
+      ) li
+      in
+      LetRec (li', subst_comp sbst c1)
+  | Match (e, li) ->
+      Match (subst_exp sbst e, List.map (subst_abs sbst) li)
+  | While (c1, c2) ->
+      While (subst_comp sbst c1, subst_comp sbst c2)
+  | For (x, e1, e2, c, b) ->
+      (* XXX Should we check that x does not appear in sbst? *)
+      For (x, subst_exp sbst e1, subst_exp sbst e2, subst_comp sbst c, b)
+  | Apply (e1, e2) ->
+      Apply (subst_exp sbst e1, subst_exp sbst e2)
+  | Handle (e, c) ->
+      Handle (subst_exp sbst e, subst_comp sbst c)
+  | Check c ->
+      Check (subst_comp sbst c)
+  | Call (eff, e, a) ->
+      Call (eff, subst_exp sbst e, subst_abs sbst a)
+  | Value e ->
+      Value (subst_exp sbst e)
+and subst_handler sbst h = {
+    effect_clauses = Common.assoc_map (subst_abs2 sbst) h.effect_clauses;
+    value_clause = subst_abs sbst h.value_clause;
+    finally_clause = subst_abs sbst h.finally_clause;
+  }
+and subst_abs sbst a = 
+  let (p, c) = a.term in
+  (* XXX Should we check that p & sbst have disjoint variables? *)
+  {a with term = (p, subst_comp sbst c)}
+and subst_pure_abs sbst pa =
+  a2pa @@ subst_abs sbst @@ pa2a @@ pa
+and subst_abs2 sbst a2 =
+  a2a2 @@ subst_abs sbst @@ a22a @@ a2
+
 (*pure abstract*)
 
 let var ?loc x ty_sch =
