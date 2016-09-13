@@ -206,25 +206,8 @@ let make_pattern_from_var v =
       scheme = v.scheme;
     }
   
-let rec refresh_pattern p =
-  let refreshed_term =
-    match p.term with
-    | Typed.PVar x -> Typed.PVar (Variable.refresh x)
-    | (Typed.PAs (c, x) as p) -> p
-    | Typed.PTuple [] -> Typed.PTuple []
-    | Typed.PTuple lst -> Typed.PTuple (List.map refresh_pattern lst)
-    | Typed.PRecord flds ->
-        Typed.PRecord (Common.assoc_map refresh_pattern flds)
-    | Typed.PVariant (lbl, p) ->
-        Typed.PVariant (lbl, (Common.option_map refresh_pattern p))
-    | (Typed.PConst _ | Typed.PNonbinding as p) -> p
-  in
-  {
-    term = refreshed_term;
-    location = p.location;
-    scheme = p.scheme;
-  }
-  
+let refresh_pattern p = Typed.refresh_pattern p
+
 module VariableSet =
   Set.Make(struct type t = variable
                    let compare = Pervasives.compare

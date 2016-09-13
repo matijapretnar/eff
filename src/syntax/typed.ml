@@ -103,6 +103,41 @@ and plain_toplevel =
   | Quit
   | TypeOf of computation
 
+
+let refresh_pattern p =
+  let rec refresh sbst p =
+    let p', sbst' = refresh' sbst p.term in
+    {p with term = p'}, sbst'
+  and refresh' sbst = function
+    | PVar x ->
+        let x' = Variable.refresh x in
+        PVar x', Common.update x x' sbst
+    | PAs (p, x) ->
+        let x' = Variable.refresh x in
+        let p', sbst = refresh (Common.update x x' sbst) p in
+        PAs (p', x'), sbst
+    | PTuple ps ->
+      let ps', sbst =
+        List.fold_right (fun p (ps', sbst) ->
+          let p', sbst = refresh sbst p in
+          p' :: ps', sbst
+        ) ps ([], sbst) in
+      PTuple ps', sbst
+    | PRecord flds ->
+      let flds', sbst =
+        List.fold_right (fun (lbl, p) (flds', sbst) ->
+          let p', sbst = refresh sbst p in
+          (lbl, p') :: flds', sbst
+        ) flds ([], sbst) in
+      PRecord flds', sbst
+    | PVariant (lbl, None) -> PVariant (lbl, None), sbst
+    | PVariant (lbl, Some p) ->
+        let p', sbst = refresh sbst p in 
+        PVariant (lbl, Some p'), sbst
+    | (PConst _ | PNonbinding) as p -> p, sbst
+  in
+  fst (refresh [] p)
+
 let backup_location loc locs =
   match loc with
   | None -> Location.union locs
