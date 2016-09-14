@@ -24,11 +24,4 @@ let _choose_sum_279 =
                                                                     _
                                                                     computation)
   } 
-;;let _decide_func1_286 _x_287 =
-    call Effect_Decide ()
-      (fun __call_result_85  ->
-         match __call_result_85 with
-         | true  -> value _x_287
-         | false  -> value 20)
-     in
-  value (Pervasives.(+) 10 20)
+;;value (Pervasives.(+) 10 20)

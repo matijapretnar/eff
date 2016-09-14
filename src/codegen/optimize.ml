@@ -193,260 +193,88 @@ module VariableSet =
                    let compare = Pervasives.compare
                       end)
 
-  
-let rec free_vars_c c : VariableSet.t =
+let (@@@) (inside1, outside1) (inside2, outside2) =
+  (inside1 @ inside2, outside1 @ outside2)
+let (---) (inside, outside) bound =
+  let remove_bound xs = List.filter (fun x -> not (List.mem x bound)) xs in
+  (remove_bound inside, remove_bound outside)
+let concat_vars vars = List.fold_right (@@@) vars ([], [])
+
+let rec free_vars_comp c =
   match c.term with
-  | Value e -> free_vars_e e
+  | Value e -> free_vars_exp e
   | Let (li, cf) ->
-      let func a b =
-        let (ap, ac) = a in
-        let pattern_vars = Typed.pattern_vars ap in
-        let vars_set = VariableSet.of_list pattern_vars
-        in VariableSet.union (VariableSet.diff (free_vars_c ac) vars_set) b
-      in
-        VariableSet.union (free_vars_c cf)
-          (List.fold_right func li VariableSet.empty)
-  | LetRec (li, c1) -> free_vars_let_rec li c1
-  | Match (e, li) ->
-      let func a b =
-        let (ap, ac) = a.term in
-        let pattern_vars = Typed.pattern_vars ap in
-        let vars_set = VariableSet.of_list pattern_vars
-        in VariableSet.union (VariableSet.diff (free_vars_c ac) vars_set) b
-      in
-        VariableSet.union (free_vars_e e)
-          (List.fold_right func li VariableSet.empty)
-  | While (c1, c2) -> VariableSet.union (free_vars_c c1) (free_vars_c c2)
-  | For (v, e1, e2, c1, b) -> VariableSet.remove v (free_vars_c c1)
-  | Apply (e1, e2) -> VariableSet.union (free_vars_e e1) (free_vars_e e2)
-  | Handle (e, c1) -> VariableSet.union (free_vars_e e) (free_vars_c c1)
-  | Check c1 -> free_vars_c c1
-  | Call (eff, e1, a1) ->
-      let (p1, cp1) = a1.term in
-      let pattern_vars = Typed.pattern_vars p1 in
-      let vars_set = VariableSet.of_list pattern_vars
-      in
-        VariableSet.union (free_vars_e e1)
-          (VariableSet.diff (free_vars_c cp1) vars_set)
-  | Bind (c1, a1) ->
-      let (p1, cp1) = a1.term in
-      let pattern_vars = Typed.pattern_vars p1 in
-      let vars_set = VariableSet.of_list pattern_vars
-      in
-        VariableSet.union (free_vars_c c1)
-          (VariableSet.diff (free_vars_c cp1) vars_set)
-  | LetIn (e, a) ->
-      let (p1, cp1) = a.term in
-      let pattern_vars = Typed.pattern_vars p1 in
-      let vars_set = VariableSet.of_list pattern_vars
-      in
-        VariableSet.union (free_vars_e e)
-          (VariableSet.diff (free_vars_c cp1) vars_set)
-and free_vars_e e : VariableSet.t =
-  match e.term with
-  | Var v -> VariableSet.singleton v
-  | Const _ -> VariableSet.empty
-  | Tuple lst ->
-      List.fold_right VariableSet.union (List.map free_vars_e lst)
-        VariableSet.empty
-  | Lambda a ->
-      let (p1, cp1) = a.term in
-      let pattern_vars = Typed.pattern_vars p1 in
-      let vars_set = VariableSet.of_list pattern_vars
-      in VariableSet.diff (free_vars_c cp1) vars_set
-  | Handler h -> free_vars_handler h
-  | Record lst ->
-      List.fold_right (fun (_, set) b -> VariableSet.union set b)
-        (Common.assoc_map free_vars_e lst) VariableSet.empty
-  | Variant (label, exp) ->
-      (match Common.option_map free_vars_e exp with
-       | Some set -> set
-       | None -> VariableSet.empty)
-  | PureLambda pa ->
-      let (p1, ep1) = pa.term in
-      let pattern_vars = Typed.pattern_vars p1 in
-      let vars_set = VariableSet.of_list pattern_vars
-      in VariableSet.diff (free_vars_e ep1) vars_set
-  | PureApply (e1, e2) -> VariableSet.union (free_vars_e e1) (free_vars_e e2)
-  | PureLetIn (e, pa) ->
-      let (p1, ep1) = pa.term in
-      let pattern_vars = Typed.pattern_vars p1 in
-      let vars_set = VariableSet.of_list pattern_vars
-      in
-        VariableSet.union (free_vars_e e)
-          (VariableSet.diff (free_vars_e ep1) vars_set)
-  | BuiltIn _ -> VariableSet.empty
-  | Effect _ -> VariableSet.empty
-and free_vars_let_rec li c1 : VariableSet.t =
-  let var_binders_set =
-    VariableSet.of_list (List.map (fun (v, _) -> v) li) in
-  let func a b =
-    let (_, abs) = a in
-    let (ap, ac) = abs.term in
-    let pattern_vars = Typed.pattern_vars ap in
-    let vars_set = VariableSet.of_list pattern_vars
-    in VariableSet.union (VariableSet.diff (free_vars_c ac) vars_set) b in
-  let free_vars = List.fold_right func li (free_vars_c c1)
-  in VariableSet.diff free_vars var_binders_set
-and free_vars_handler h : VariableSet.t =
-  let (pv, cv) = h.value_clause.term in
-  let (pf, cf) = h.finally_clause.term in
-  let eff_list = h.effect_clauses in
-  let pv_vars = VariableSet.of_list (Typed.pattern_vars pv) in
-  let pf_vars = VariableSet.of_list (Typed.pattern_vars pf) in
-  let func a b =
-    let (p1, p2, c) = (snd a).term in
-    let p1_vars = Typed.pattern_vars p1 in
-    let p2_vars = Typed.pattern_vars p2 in
-    let p_all_vars = VariableSet.of_list (p1_vars @ p2_vars)
-    in VariableSet.union (VariableSet.diff (free_vars_c c) p_all_vars) b
-  in
-    VariableSet.union
-      (VariableSet.union (VariableSet.diff (free_vars_c cv) pv_vars)
-         (VariableSet.diff (free_vars_c cf) pf_vars))
-      (List.fold_right func eff_list VariableSet.empty)
-  
-let rec occurrences v c =
-  match c.term with
-  | Value e -> let (ep, ef) = occurrences_e v e in (ep, ef)
-  | Let (li, cf) -> failwith "occ found a let, all should turn to binds"
+      let xs, vars = List.fold_right (fun (p, c) (xs, vars) ->
+        Typed.pattern_vars p, free_vars_comp c @@@ vars
+      ) li ([], ([], [])) in
+      vars @@@ (free_vars_comp cf --- xs)
   | LetRec (li, c1) ->
-      let (binder, free) = occurrences_letrec v li c1 in (binder, free)
-  | Match (e, li) ->
-      let func a =
-        let (pt, ct) = a.term in
-        let (ctb, ctf) = occurrences v ct
-        in
-          if List.mem v (Typed.pattern_vars pt)
-          then (0, 0)
-          else ((ctb + ctf), 0) in
-      let new_list = List.map func li in
-      let func2 (b, f) (sb, sf) = ((b + sb), (f + sf)) in
-      let (resb, resf) = List.fold_right func2 new_list (0, 0) in
-      let (be, fe) = occurrences_e v e in ((resb + be), (resf + fe))
-  | While (c1, c2) ->
-      let (c1b, c1f) = occurrences v c1 in
-      let (c2b, c2f) = occurrences v c2 in ((c1b + c2b), (c1f + c2f))
-  | For (vr, e1, e2, c1, b) ->
-      let (e1b, e1f) = occurrences v c1
-      in if v == vr then (0, 0) else ((e1b + e1f), 0)
-  | Apply (e1, e2) ->
-      let (e1b, e1f) = occurrences_e v e1 in
-      let (e2b, e2f) = occurrences_e v e2 in ((e1b + e2b), (e1f + e2f))
-  | Handle (e, c1) ->
-      let (e1b, e1f) = occurrences_e v e in
-      let (c2b, c2f) = occurrences v c1 in ((e1b + c2b), (e1f + c2f))
-  | Check c1 -> occurrences v c1
-  | Call (eff, e1, a1) ->
-      let (p1, cp1) = a1.term in
-      let (pe1, fe1) = occurrences_e v e1 in
-      let (pcp1, fcp1) = occurrences v cp1
-      in
-        if List.mem v (Typed.pattern_vars p1)
-        then (pe1, fe1)
-        else (((pe1 + pcp1) + fcp1), fe1)
-  | Bind (c1, a1) ->
-      let (p1, cp1) = a1.term in
-      let (pc1, fc1) = occurrences v c1 in
-      let (pcp1, fcp1) = occurrences v cp1
-      in
-        if List.mem v (Typed.pattern_vars p1)
-        then (pc1, fc1)
-        else (((pc1 + pcp1) + fcp1), fc1)
-  | LetIn (e, a) ->
-      let (p1, cp1) = a.term in
-      let (pe1, fe1) = occurrences_e v e in
-      let (pcp1, fcp1) = occurrences v cp1
-      in
-        if List.mem v (Typed.pattern_vars p1)
-        then (pe1, fe1)
-        else (((pe1 + pcp1) + fcp1), fe1)
-and occurrences_e v e =
+      let xs, vars = List.fold_right (fun (x, a) (xs, vars) ->
+        x :: xs, free_vars_abs a @@@ vars
+      ) li ([], free_vars_comp c1) in
+      vars --- xs
+  | Match (e, li) -> free_vars_exp e @@@ concat_vars (List.map free_vars_abs li)
+  | While (c1, c2) -> free_vars_comp c1 @@@ free_vars_comp c2
+  | For (v, e1, e2, c1, b) ->
+      (free_vars_exp e1 @@@ free_vars_exp e2 @@@ free_vars_comp c1) --- [v]
+  | Apply (e1, e2) -> free_vars_exp e1 @@@ free_vars_exp e2
+  | Handle (e, c1) -> free_vars_exp e @@@ free_vars_comp c1
+  | Check c1 -> free_vars_comp c1
+  | Call (_, e1, a1) -> free_vars_exp e1 @@@ free_vars_abs a1
+  | Bind (c1, a1) -> free_vars_comp c1 @@@ free_vars_abs a1
+  | LetIn (e, a) -> free_vars_exp e @@@ free_vars_abs a
+and free_vars_exp e =
   match e.term with
-  | Var vr -> if v == vr then (0, 1) else (0, 0)
-  | Const _ -> (0, 0)
-  | Tuple lst ->
-      let func a (sb, sf) = let (pa, fa) = a in ((pa + sb), (fa + sf))
-      in List.fold_right func (List.map (occurrences_e v) lst) (0, 0)
-  | Lambda a ->
-      let (p1, cp1) = a.term in
-      let (pcp1, fcp1) = occurrences v cp1
-      in
-        if List.mem v (Typed.pattern_vars p1)
-        then (0, 0)
-        else ((pcp1 + fcp1), 0)
-  | Handler h -> occurrences_handler v h
-  | Record lst ->
-      List.fold_right
-        (fun (_, (boc, foc)) (sb, sf) -> ((sb + boc), (foc + sf)))
-        (Common.assoc_map (occurrences_e v) lst) (0, 0)
-  | Variant (label, exp) ->
-      (match Common.option_map (occurrences_e v) exp with
-       | Some set -> set
-       | None -> (0, 0))
-  | PureLambda pa ->
-      let (p1, ep1) = pa.term in
-      let (pep1, fep1) = occurrences_e v ep1
-      in
-        if List.mem v (Typed.pattern_vars p1)
-        then (0, 0)
-        else ((pep1 + fep1), 0)
-  | PureApply (e1, e2) ->
-      let (e1b, e1f) = occurrences_e v e1 in
-      let (e2b, e2f) = occurrences_e v e2 in ((e1b + e2b), (e1f + e2f))
-  | PureLetIn (e, pa) ->
-      let (p1, ep1) = pa.term in
-      let (pe1, fe1) = occurrences_e v e in
-      let (pep1, fep1) = occurrences_e v ep1
-      in
-        if List.mem v (Typed.pattern_vars p1)
-        then (pe1, fe1)
-        else (((pe1 + pep1) + fep1), fe1)
-  | BuiltIn _ -> (0, 0)
-and occurrences_handler v h = (10, 10)
-and (*not implmented yet*) occurrences_letrec v li c =
-  let var_binders_set = List.map (fun (vr, _) -> vr) li
-  in
-    if List.mem v var_binders_set
-    then (0, 0)
-    else
-      (let func a (b0, f0) =
-         let (_, abs) = a in
-         let (ap, ac) = abs.term in
-         let pattern_vars = Typed.pattern_vars ap in
-         let (bo, fo) = occurrences v ac
-         in
-           if List.mem v pattern_vars
-           then (b0, f0)
-           else (((bo + fo) + b0), f0) in
-       let (vr_bo, vr_fo) = List.fold_right func li (0, 0) in
-       let (vr_boc, vr_foc) = occurrences v c
-       in ((vr_bo + vr_boc), (vr_fo + vr_foc)))
-and pattern_occurrences p c =
-  let pvars = Typed.pattern_vars p in
-  let func a (sb, sf) =
-    let (ba, fa) = occurrences a c in ((ba + sb), (fa + sf))
-  in List.fold_right func pvars (0, 0)
-and pattern_occurrences_e p e =
-  let pvars = Typed.pattern_vars p in
-  let func a (sb, sf) =
-    let (ba, fa) = occurrences_e a e in ((ba + sb), (fa + sf))
-  in List.fold_right func pvars (0, 0)
+  | Var v -> ([], [v])
+  | Tuple es -> concat_vars (List.map free_vars_exp es)
+  | Lambda a -> free_vars_abs a
+  | Handler h -> free_vars_handler h
+  | Record flds -> concat_vars (List.map (fun (_, e) -> free_vars_exp e) flds)
+  | Variant (_, None) -> ([], [])
+  | Variant (_, Some e) -> free_vars_exp e
+  | PureLambda pa -> free_vars_pure_abs pa
+  | PureApply (e1, e2) -> free_vars_exp e1 @@@ free_vars_exp e2
+  | PureLetIn (e, pa) -> free_vars_exp e @@@ free_vars_pure_abs pa
+  | (BuiltIn _ | Effect _ | Const _) -> ([], [])
+and free_vars_handler h =
+  free_vars_abs h.value_clause @@@
+  free_vars_abs h.finally_clause @@@
+  concat_vars (List.map (fun (_, a2) -> free_vars_abs2 a2) h.effect_clauses)
+and free_vars_abs a =
+  let (p, c) = a.term in
+  let (inside, outside) = free_vars_comp c --- Typed.pattern_vars p in
+  (inside @ outside, [])
+and free_vars_pure_abs pa = free_vars_abs @@ pa2a @@ pa
+and free_vars_abs2 a2 = free_vars_abs @@ a22a @@ a2
 
+let occurrences x (inside, outside) =
+  let count ys = List.length (List.filter (fun y -> x = y) ys) in
+  (count inside, count outside)
 
-let only_inlinable_occurrences p cp = 
- let (occ_b, occ_f) = pattern_occurrences p cp
-     in  (occ_b == 0) && (occ_f < 2) 
+(* XXX Most likely, this function should never be used *)
+let pattern_occurrences p vars =
+  List.fold_right (fun x (inside_occ, outside_occ) ->
+    let (inside_occ_x, outside_occ_x) = occurrences x vars in
+    (inside_occ + inside_occ_x, outside_occ + outside_occ_x)
+  ) (Typed.pattern_vars p) (0, 0)
+
+let replaceable x vars =
+  let (inside_occ, outside_occ) = occurrences x vars in
+  outside_occ <= 1 && inside_occ = 0
+
+let only_inlinable_occurrences p c =
+  let vars = free_vars_comp c in
+  List.for_all (fun x -> replaceable x vars) (Typed.pattern_vars p)
   
   
 let print_free_vars c =
   (print_endline "in free vars print ";
-   let fvc = free_vars_c c
+   let fvc = free_vars_comp c
    in
      (Print.debug "free vars of  %t  is" (CamlPrint.print_computation c);
       VariableSet.iter
         (fun v -> Print.debug "free var :  %t" (CamlPrint.print_variable v))
-        fvc))
+        (VariableSet.of_list (fst fvc @ snd fvc))))
   
 let is_atomic e =
   match e.term with | Var _ -> true | Const _ -> true | _ -> false
@@ -463,7 +291,7 @@ let rec substitute_pattern_comp c p exp maincomp =
   match p.term with
   | Typed.PVar x -> optimize_comp (substitute_var_comp c x exp)
   | Typed.PAs (_, x) ->
-      let (xbo, xfo) = occurrences x c
+      let (xbo, xfo) = occurrences x (free_vars_comp c)
       in
         if (xbo == 0) && (xfo == 1)
         then optimize_comp (substitute_var_comp c x exp)
@@ -486,7 +314,7 @@ and substitute_pattern_exp e p exp mainexp =
   match p.term with
   | Typed.PVar x -> optimize_expr (substitute_var_exp e x exp)
   | Typed.PAs (p, x) ->
-      let (xbo, xfo) = occurrences_e x e
+      let (xbo, xfo) = occurrences x (free_vars_exp e)
       in
         if (xbo == 0) && (xfo == 1)
         then optimize_expr (substitute_var_exp e x exp)
@@ -669,7 +497,7 @@ and shallow_opt c =
   | Apply ({term = Lambda {term = (p, c')}}, e) when is_atomic e ->
       substitute_pattern_comp c' p e c
   | Apply ({term = Lambda {term = (p, c')}}, e) ->
-     (let (pbo, pfo) = pattern_occurrences p c'
+     (let (pbo, pfo) = pattern_occurrences p (free_vars_comp c')
       in
         if (pbo == 0) && (pfo < 2)
         then
@@ -770,7 +598,7 @@ and shallow_opt_e e =
         if is_atomic ex
         then substitute_pattern_exp ep p ex e
         else
-          (let (occ_b, occ_f) = pattern_occurrences_e p ep
+          (let (occ_b, occ_f) = pattern_occurrences p (free_vars_exp ep)
            in
              if (occ_b == 0) && (occ_f < 2)
              then substitute_pattern_exp ep p ex e
@@ -779,7 +607,7 @@ and shallow_opt_e e =
      if is_atomic e2
      then substitute_pattern_exp e' p e2 e
      else
-       (let (pbo, pfo) = pattern_occurrences_e p e'
+       (let (pbo, pfo) = pattern_occurrences p (free_vars_exp e')
         in
           if (pbo == 0) && (pfo < 2)
           then

@@ -25,11 +25,4 @@ let _choose_all_279 =
                                                                     _
                                                                     computation)
   } 
-;;let _newvar_84 _x_287 _y_288 =
-    call Effect_Decide ()
-      (fun __call_result_82  ->
-         match __call_result_82 with
-         | true  -> value _x_287
-         | false  -> value _y_288)
-     in
-  (_var_187 [10]) >> (fun _gen_bind_78  -> _gen_bind_78 [20])
+;;(_var_187 [10]) >> (fun _gen_bind_78  -> _gen_bind_78 [20])
