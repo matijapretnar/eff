@@ -292,7 +292,87 @@ let rec substitute_pattern_comp c p exp =
 and substitute_pattern_exp e p exp =
   optimize_expr (Typed.subst_exp (Typed.match_values p exp []) e)
 and optimize_comp c = shallow_opt (opt_sub_comp c)
-and shallow_opt c =
+and optimize_abstraction abs =
+  let (p, c) = abs.term in abstraction ~loc: abs.location p (optimize_comp c)
+and optimize_pure_abstraction abs =
+  let (p, e) = abs.term
+  in pure_abstraction ~loc: abs.location p (optimize_expr e)
+and optimize_expr e = shallow_opt_e (opt_sub_expr e)
+and opt_sub_comp c =
+  (* Print.debug "Optimizing %t" (CamlPrint.print_computation c); *)
+  match c.term with
+  | Value e -> value ~loc: c.location (optimize_expr e)
+  | Let (li, c1) ->
+      let func (pa, co) = (pa, (optimize_comp co))
+      in let' ~loc: c.location (List.map func li) (optimize_comp c1)
+  | LetRec (li, c1) ->
+      let_rec' ~loc: c.location
+        (List.map
+           (fun (v, abs) ->
+              let (p, comp) = abs.term
+              in (v, (abstraction ~loc: c.location p (optimize_comp comp))))
+           li)
+        (optimize_comp c1)
+  | Match (e, li) ->
+      match' ~loc: c.location (optimize_expr e)
+        (List.map optimize_abstraction li)
+  | While (c1, c2) ->
+      while' ~loc: c.location (optimize_comp c1) (optimize_comp c2)
+  | For (v, e1, e2, c1, b) ->
+      for' ~loc: c.location v (optimize_expr e1) (optimize_expr e2)
+        (optimize_comp c1) b
+  | Apply (e1, e2) ->
+      apply ~loc: c.location (optimize_expr e1) (optimize_expr e2)
+  | Handle (e, c1) ->
+      handle ~loc: c.location (optimize_expr e) (optimize_comp c1)
+  | Check c1 -> check ~loc: c.location (optimize_comp c1)
+  | Call (eff, e1, a1) ->
+      call ~loc: c.location eff (optimize_expr e1) (optimize_abstraction a1)
+  | Bind (c1, a1) ->
+      bind ~loc: c.location (optimize_comp c1) (optimize_abstraction a1)
+  | LetIn (e, a) ->
+      let_in ~loc: c.location (optimize_expr e) (optimize_abstraction a)
+and opt_sub_expr e =
+  (* Print.debug "Optimizing %t" (CamlPrint.print_expression e); *)
+  match e.term with
+  | Const c -> const ~loc: e.location c
+  | BuiltIn f -> e
+  | Record lst ->
+      record ~loc: e.location (Common.assoc_map optimize_expr lst)
+  | Variant (label, exp) ->
+      variant ~loc: e.location (label, (Common.option_map optimize_expr exp))
+  | Tuple lst -> tuple ~loc: e.location (List.map optimize_expr lst)
+  | Lambda a -> lambda ~loc: e.location (optimize_abstraction a)
+  | PureLambda pa ->
+      pure_lambda ~loc: e.location (optimize_pure_abstraction pa)
+  | PureApply (e1, e2) ->
+      pure_apply ~loc: e.location (optimize_expr e1) (optimize_expr e2)
+  | PureLetIn (e1, pa) ->
+      pure_let_in ~loc: e.location (optimize_expr e1)
+        (optimize_pure_abstraction pa)
+  | Handler h -> optimize_handler h
+  | Effect eff -> e
+  | Var x ->
+      (begin match find_inlinable x with
+       | Some d -> (match d.term with | Handler _ -> refresh_exp d | _ -> d)
+       | _ -> e
+     end )
+and optimize_handler h =
+  let (pv, cv) = h.value_clause.term in
+  let (pf, cf) = h.finally_clause.term in
+  let eff_list = h.effect_clauses in
+  let func a =
+    let (e, ab2) = a in
+    let (p1, p2, ca) = ab2.term
+    in (e, (abstraction2 ~loc: ca.location p1 p2 (optimize_comp ca))) in
+  let h' =
+    {
+      effect_clauses = List.map func eff_list;
+      value_clause = abstraction ~loc: cv.location pv (optimize_comp cv);
+      finally_clause = abstraction ~loc: cf.location pf (optimize_comp cf);
+    }
+  in handler ~loc:Location.unknown h'
+ and shallow_opt c =
   (*Print.debug "Shallow optimizing %t" (CamlPrint.print_computation c);*)
   match c.term with
   | Let (pclist, c2) ->
@@ -536,16 +616,10 @@ and shallow_opt c =
   | _ -> c
 
 
-and optimize_abstraction abs =
-  let (p, c) = abs.term in abstraction ~loc: abs.location p (optimize_comp c)
-and optimize_pure_abstraction abs =
-  let (p, e) = abs.term
-  in pure_abstraction ~loc: abs.location p (optimize_expr e)
 and folder pclist cn =
   let func a b =
     bind ~loc: b.location (snd a) (abstraction ~loc: b.location (fst a) b)
   in List.fold_right func pclist cn
-and optimize_expr e = shallow_opt_e (opt_sub_expr e)
 and shallow_opt_e e =
   match e.term with
   | PureLetIn (ex, pa) ->
@@ -585,81 +659,7 @@ and shallow_opt_e e =
           (lambda ~loc: e.location
              (abstraction ~loc: e.location param_pat call_cons))
   | _ -> e
-and opt_sub_comp c =
-  (* Print.debug "Optimizing %t" (CamlPrint.print_computation c); *)
-  match c.term with
-  | Value e -> value ~loc: c.location (optimize_expr e)
-  | Let (li, c1) ->
-      let func (pa, co) = (pa, (optimize_comp co))
-      in let' ~loc: c.location (List.map func li) (optimize_comp c1)
-  | LetRec (li, c1) ->
-      let_rec' ~loc: c.location
-        (List.map
-           (fun (v, abs) ->
-              let (p, comp) = abs.term
-              in (v, (abstraction ~loc: c.location p (optimize_comp comp))))
-           li)
-        (optimize_comp c1)
-  | Match (e, li) ->
-      match' ~loc: c.location (optimize_expr e)
-        (List.map optimize_abstraction li)
-  | While (c1, c2) ->
-      while' ~loc: c.location (optimize_comp c1) (optimize_comp c2)
-  | For (v, e1, e2, c1, b) ->
-      for' ~loc: c.location v (optimize_expr e1) (optimize_expr e2)
-        (optimize_comp c1) b
-  | Apply (e1, e2) ->
-      apply ~loc: c.location (optimize_expr e1) (optimize_expr e2)
-  | Handle (e, c1) ->
-      handle ~loc: c.location (optimize_expr e) (optimize_comp c1)
-  | Check c1 -> check ~loc: c.location (optimize_comp c1)
-  | Call (eff, e1, a1) ->
-      call ~loc: c.location eff (optimize_expr e1) (optimize_abstraction a1)
-  | Bind (c1, a1) ->
-      bind ~loc: c.location (optimize_comp c1) (optimize_abstraction a1)
-  | LetIn (e, a) ->
-      let_in ~loc: c.location (optimize_expr e) (optimize_abstraction a)
-and opt_sub_expr e =
-  (* Print.debug "Optimizing %t" (CamlPrint.print_expression e); *)
-  match e.term with
-  | Const c -> const ~loc: e.location c
-  | BuiltIn f -> e
-  | Record lst ->
-      record ~loc: e.location (Common.assoc_map optimize_expr lst)
-  | Variant (label, exp) ->
-      variant ~loc: e.location (label, (Common.option_map optimize_expr exp))
-  | Tuple lst -> tuple ~loc: e.location (List.map optimize_expr lst)
-  | Lambda a -> lambda ~loc: e.location (optimize_abstraction a)
-  | PureLambda pa ->
-      pure_lambda ~loc: e.location (optimize_pure_abstraction pa)
-  | PureApply (e1, e2) ->
-      pure_apply ~loc: e.location (optimize_expr e1) (optimize_expr e2)
-  | PureLetIn (e1, pa) ->
-      pure_let_in ~loc: e.location (optimize_expr e1)
-        (optimize_pure_abstraction pa)
-  | Handler h -> optimize_handler h
-  | Effect eff -> e
-  | Var x ->
-      (begin match find_inlinable x with
-       | Some d -> (match d.term with | Handler _ -> refresh_exp d | _ -> d)
-       | _ -> e
-     end )
-and optimize_handler h =
-  let (pv, cv) = h.value_clause.term in
-  let (pf, cf) = h.finally_clause.term in
-  let eff_list = h.effect_clauses in
-  let func a =
-    let (e, ab2) = a in
-    let (p1, p2, ca) = ab2.term
-    in (e, (abstraction2 ~loc: ca.location p1 p2 (optimize_comp ca))) in
-  let h' =
-    {
-      effect_clauses = List.map func eff_list;
-      value_clause = abstraction ~loc: cv.location pv (optimize_comp cv);
-      finally_clause = abstraction ~loc: cf.location pf (optimize_comp cf);
-    }
-  in handler ~loc:Location.unknown h'
-  
+ 
 let optimize_command =
   function
   | Typed.Computation c ->
