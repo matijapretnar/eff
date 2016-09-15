@@ -337,28 +337,15 @@ and optimize_abs2 a2 = a2a2 @@ optimize_abs @@ a22a @@ a2
 and reduce_expr e =
   match e.term with
   | PureLetIn (ex, pa) ->
-      let (p, ep) = pa.term
-      in
-        if is_atomic ex
-        then substitute_pattern_expr ep p ex
-        else
-          (let (occ_b, occ_f) = pattern_occurrences p (free_vars_expr ep)
-           in
-             if (occ_b == 0) && (occ_f < 2)
-             then substitute_pattern_expr ep p ex
-             else e)
-  | PureApply ({term = PureLambda {term = (p, e')}}, e2) ->
-     if is_atomic e2
-     then substitute_pattern_expr e' p e2
-     else
-       (let (pbo, pfo) = pattern_occurrences p (free_vars_expr e')
-        in
-          if (pbo == 0) && (pfo < 2)
-          then
-            if pfo == 0
-            then e'
-            else substitute_pattern_expr e' p e2
-          else e)
+      begin match pure_beta_reduce pa ex with
+      | Some e' -> e'
+      | None -> e
+      end
+  | PureApply ({term = PureLambda pa}, e2) ->
+      begin match pure_beta_reduce pa e2 with
+      | Some e' -> e'
+      | None -> e
+      end
   | Effect eff ->
       let (eff_name, (ty_par, ty_res)) = eff in
       let param = make_var_from_counter "param" (Scheme.simple ty_par) in
