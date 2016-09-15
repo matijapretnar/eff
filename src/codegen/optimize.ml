@@ -301,11 +301,59 @@ and optimize_abs {term = (p, c); location = loc} =
 and optimize_pure_abs pa = a2pa @@ optimize_abs @@ pa2a @@ pa
 and optimize_abs2 a2 = a2a2 @@ optimize_abs @@ a22a @@ a2
 
+and reduce_expr e =
+  match e.term with
+  | PureLetIn (ex, pa) ->
+      let (p, ep) = pa.term
+      in
+        if is_atomic ex
+        then substitute_pattern_expr ep p ex
+        else
+          (let (occ_b, occ_f) = pattern_occurrences p (free_vars_expr ep)
+           in
+             if (occ_b == 0) && (occ_f < 2)
+             then substitute_pattern_expr ep p ex
+             else e)
+  | PureApply ({term = PureLambda {term = (p, e')}}, e2) ->
+     if is_atomic e2
+     then substitute_pattern_expr e' p e2
+     else
+       (let (pbo, pfo) = pattern_occurrences p (free_vars_expr e')
+        in
+          if (pbo == 0) && (pfo < 2)
+          then
+            if pfo == 0
+            then e'
+            else substitute_pattern_expr e' p e2
+          else e)
+  | Effect eff ->
+      let (eff_name, (ty_par, ty_res)) = eff in
+      let param = make_var_from_counter "param" (Scheme.simple ty_par) in
+      let result = make_var_from_counter "result" (Scheme.simple ty_res) in
+      let res_pat = make_pattern_from_var result in
+      let param_pat = make_pattern_from_var param in
+      let kincall =
+        abstraction ~loc: e.location res_pat (value ~loc: e.location result) in
+      let call_cons = reduce_comp (call ~loc: e.location eff param kincall)
+      in
+        optimize_expr
+          (lambda ~loc: e.location
+             (abstraction ~loc: e.location param_pat call_cons))
+  | _ -> e
+
 and reduce_comp c =
   (*Print.debug "Shallow optimizing %t" (CamlPrint.print_computation c);*)
   match c.term with
   | Let (pclist, c2) ->
-      let bind_comps = folder pclist c2 in optimize_comp bind_comps
+      let folder pclist cn =
+        let func a b =
+          bind ~loc: b.location (snd a) (abstraction ~loc: b.location (fst a) b)
+        in
+      List.fold_right func pclist cn
+      in
+
+      let bind_comps = folder pclist c2 in
+      optimize_comp bind_comps
   | Match ({term = Const cc}, lst) ->
      let func a =
        let (p, clst) = a.term
@@ -543,51 +591,6 @@ and reduce_comp c =
         end
   | LetRec(l,co) -> Print.debug "the letrec comp%t" (CamlPrint.print_computation co); c
   | _ -> c
-
-
-and folder pclist cn =
-  let func a b =
-    bind ~loc: b.location (snd a) (abstraction ~loc: b.location (fst a) b)
-  in List.fold_right func pclist cn
-and reduce_expr e =
-  match e.term with
-  | PureLetIn (ex, pa) ->
-      let (p, ep) = pa.term
-      in
-        if is_atomic ex
-        then substitute_pattern_expr ep p ex
-        else
-          (let (occ_b, occ_f) = pattern_occurrences p (free_vars_expr ep)
-           in
-             if (occ_b == 0) && (occ_f < 2)
-             then substitute_pattern_expr ep p ex
-             else e)
-  | PureApply ({term = PureLambda {term = (p, e')}}, e2) ->
-     if is_atomic e2
-     then substitute_pattern_expr e' p e2
-     else
-       (let (pbo, pfo) = pattern_occurrences p (free_vars_expr e')
-        in
-          if (pbo == 0) && (pfo < 2)
-          then
-            if pfo == 0
-            then e'
-            else substitute_pattern_expr e' p e2
-          else e)
-  | Effect eff ->
-      let (eff_name, (ty_par, ty_res)) = eff in
-      let param = make_var_from_counter "param" (Scheme.simple ty_par) in
-      let result = make_var_from_counter "result" (Scheme.simple ty_res) in
-      let res_pat = make_pattern_from_var result in
-      let param_pat = make_pattern_from_var param in
-      let kincall =
-        abstraction ~loc: e.location res_pat (value ~loc: e.location result) in
-      let call_cons = reduce_comp (call ~loc: e.location eff param kincall)
-      in
-        optimize_expr
-          (lambda ~loc: e.location
-             (abstraction ~loc: e.location param_pat call_cons))
-  | _ -> e
  
 let optimize_command = function
   | Typed.Computation c ->
