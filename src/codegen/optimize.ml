@@ -564,9 +564,6 @@ and reduce_comp c =
     | _ -> c
     end
 
-  | LetIn (e, {term = (p, cp)}) when is_atomic e ->
-      Print.debug "We are now in the let in 1 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
-      substitute_pattern_comp cp p e
   | LetIn (e1, {term = (p, {term = Value e2})}) ->
     Print.debug "We are now in the let in 2 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
      let res =
@@ -574,10 +571,6 @@ and reduce_comp c =
          (reduce_expr (pure_let_in e1 (pure_abstraction p e2)))
      in reduce_comp res
 
-  | LetIn (e, {term = (p, cp)}) when only_inlinable_occurrences p cp ->
-  Print.debug "We are now in the let in 3 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
-       substitute_pattern_comp cp p e
-  
   (*Matching let f = \x.\y. c *)    
   | LetIn({term = Lambda ({term = (pe1, {term = Value ({term = Lambda ({term = (pe2,ce2)}) } as in_lambda)} )})} as e, {term = ({term = PVar fo} as p,cp)} )->
         Print.debug "We are now in the let in 4 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
@@ -593,6 +586,13 @@ and reduce_comp c =
         let first_let = let_in ~loc:c.location (outer_lambda) first_let_abstraction in
         impure_wrappers:= ((make_expression_from_pattern p),new_var) :: !impure_wrappers;
         optimize_comp first_let
+  | LetIn (e, {term = (p, cp)}) when is_atomic e ->
+      Print.debug "We are now in the let in 1 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
+      substitute_pattern_comp cp p e
+  | LetIn (e, {term = (p, cp)}) when only_inlinable_occurrences p cp ->
+  Print.debug "We are now in the let in 3 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
+       substitute_pattern_comp cp p e
+  
   | LetIn(e, {term = (p,cp)} )->
       Print.debug "We are now in the let in 5 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
         begin 
