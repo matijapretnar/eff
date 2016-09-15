@@ -586,24 +586,21 @@ and reduce_comp c =
         let first_let = let_in ~loc:c.location (outer_lambda) first_let_abstraction in
         impure_wrappers:= ((make_expression_from_pattern p),new_var) :: !impure_wrappers;
         optimize_comp first_let
-  | LetIn (e, {term = (p, cp)}) when is_atomic e ->
-      Print.debug "We are now in the let in 1 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
-      substitute_pattern_comp cp p e
-  | LetIn (e, {term = (p, cp)}) when only_inlinable_occurrences p cp ->
-  Print.debug "We are now in the let in 3 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
-       substitute_pattern_comp cp p e
-  
-  | LetIn(e, {term = (p,cp)} )->
-      Print.debug "We are now in the let in 5 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
-        begin 
-          (match p.term with
-          | Typed.PVar xx -> 
-              Print.debug "Added to stack ==== %t" (CamlPrint.print_variable xx);
-              stack:= Common.update xx (fun () -> e) !stack     
-          | _ -> Print.debug "We are now in the let in 5 novar for %t" (CamlPrint.print_expression (make_expression_from_pattern p));()
-          );
+  | LetIn (e, ({term = (p, cp)} as a)) ->
+      Print.debug "We are now in the let in 1, 3 or 5 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
+      begin match beta_reduce a e with
+      | Some c -> c
+      | None ->
+        begin match p with
+        | {term = Typed.PVar xx} ->
+            Print.debug "Added to stack ==== %t" (CamlPrint.print_variable xx);
+            stack:= Common.update xx (fun () -> e) !stack     
+        | _ ->
+            Print.debug "We are now in the let in 5 novar for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
+        end;
+        (* XXX Is this necessary? Isn't cp already optimized, so we should just return c? *)
         let_in ~loc:c.location e (abstraction ~loc:e.location p (optimize_comp cp))
-        end
+      end
   | LetRec(l,co) -> Print.debug "the letrec comp%t" (CamlPrint.print_computation co); c
   | _ -> c
  
