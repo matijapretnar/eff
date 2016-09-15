@@ -170,41 +170,41 @@ let a2pa a =
   | (p, {term = Value e}) -> pure_abstraction ~loc:p.location p e
   | _ -> assert false
 
-let rec refresh_pat sbst p =
-  let sbst', p' = refresh_pat' sbst p.term in
+let rec refresh_pattern sbst p =
+  let sbst', p' = refresh_pattern' sbst p.term in
   sbst', {p with term = p'}
-and refresh_pat' sbst = function
+and refresh_pattern' sbst = function
   | PVar x ->
       let x' = Variable.refresh x in
       Common.update x x' sbst, PVar x'
   | PAs (p, x) ->
       let x' = Variable.refresh x in
-      let sbst, p' = refresh_pat (Common.update x x' sbst) p in
+      let sbst, p' = refresh_pattern (Common.update x x' sbst) p in
       sbst, PAs (p', x')
   | PTuple ps ->
     let sbst, ps' =
       List.fold_right (fun p (sbst, ps') ->
-        let sbst, p' = refresh_pat sbst p in
+        let sbst, p' = refresh_pattern sbst p in
         sbst, p' :: ps'
       ) ps (sbst, []) in
     sbst, PTuple ps'
   | PRecord flds ->
     let sbst, flds' =
       List.fold_right (fun (lbl, p) (sbst, flds') ->
-        let sbst, p' = refresh_pat sbst p in
+        let sbst, p' = refresh_pattern sbst p in
         sbst, (lbl, p') :: flds'
       ) flds (sbst, []) in
     sbst, PRecord flds'
   | PVariant (lbl, None) ->
       sbst, PVariant (lbl, None)
   | PVariant (lbl, Some p) ->
-      let sbst, p' = refresh_pat sbst p in 
+      let sbst, p' = refresh_pattern sbst p in 
       sbst, PVariant (lbl, Some p')
   | (PConst _ | PNonbinding) as p -> sbst, p
 
-let rec refresh_exp sbst e =
-  {e with term = refresh_exp' sbst e.term}
-and refresh_exp' sbst = function
+let rec refresh_expr sbst e =
+  {e with term = refresh_expr' sbst e.term}
+and refresh_expr' sbst = function
   | (Var x) as e ->
       begin match Common.lookup x sbst with
       | Some x' -> Var x'
@@ -215,17 +215,17 @@ and refresh_exp' sbst = function
   | Lambda a ->
       Lambda (refresh_abs sbst a)
   | PureLetIn (e1, pa) ->
-      PureLetIn (refresh_exp sbst e1, refresh_pure_abs sbst pa)
+      PureLetIn (refresh_expr sbst e1, refresh_pure_abs sbst pa)
   | Handler h ->
       Handler (refresh_handler sbst h)
   | Tuple es ->
-      Tuple (List.map (refresh_exp sbst) es)
+      Tuple (List.map (refresh_expr sbst) es)
   | Record flds ->
-      Record (Common.assoc_map (refresh_exp sbst) flds)
+      Record (Common.assoc_map (refresh_expr sbst) flds)
   | Variant (lbl, e) ->
-      Variant (lbl, Common.option_map (refresh_exp sbst) e)
+      Variant (lbl, Common.option_map (refresh_expr sbst) e)
   | PureApply (e1, e2) ->
-      PureApply (refresh_exp sbst e1, refresh_exp sbst e2)
+      PureApply (refresh_expr sbst e1, refresh_expr sbst e2)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
 and refresh_comp sbst c =
   {c with term = refresh_comp' sbst c.term}
@@ -233,11 +233,11 @@ and refresh_comp' sbst = function
   | Bind (c1, c2) ->
       Bind (refresh_comp sbst c1, refresh_abs sbst c2)
   | LetIn (e, a) ->
-      LetIn (refresh_exp sbst e, refresh_abs sbst a)
+      LetIn (refresh_expr sbst e, refresh_abs sbst a)
   | Let (li, c1) ->
       let sbst', li' = List.fold_right (fun (p, c) (sbst', li') ->
         (* sbst' is what will be used for c1, but for definitons c, we use sbst *)
-        let sbst', p' = refresh_pat sbst' p in
+        let sbst', p' = refresh_pattern sbst' p in
         sbst', (p', refresh_comp sbst c) :: li'
       ) li (sbst, []) in
       Let (li', refresh_comp sbst' c1)
@@ -251,23 +251,23 @@ and refresh_comp' sbst = function
       in
       LetRec (li', refresh_comp sbst' c1)
   | Match (e, li) ->
-      Match (refresh_exp sbst e, List.map (refresh_abs sbst) li)
+      Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
   | While (c1, c2) ->
       While (refresh_comp sbst c1, refresh_comp sbst c2)
   | For (x, e1, e2, c, b) ->
       let x' = Variable.refresh x in
       let sbst' = Common.update x x' sbst in
-      For (x', refresh_exp sbst e1, refresh_exp sbst e2, refresh_comp sbst' c, b)
+      For (x', refresh_expr sbst e1, refresh_expr sbst e2, refresh_comp sbst' c, b)
   | Apply (e1, e2) ->
-      Apply (refresh_exp sbst e1, refresh_exp sbst e2)
+      Apply (refresh_expr sbst e1, refresh_expr sbst e2)
   | Handle (e, c) ->
-      Handle (refresh_exp sbst e, refresh_comp sbst c)
+      Handle (refresh_expr sbst e, refresh_comp sbst c)
   | Check c ->
       Check (refresh_comp sbst c)
   | Call (eff, e, a) ->
-      Call (eff, refresh_exp sbst e, refresh_abs sbst a)
+      Call (eff, refresh_expr sbst e, refresh_abs sbst a)
   | Value e ->
-      Value (refresh_exp sbst e)
+      Value (refresh_expr sbst e)
 and refresh_handler sbst h = {
     effect_clauses = Common.assoc_map (refresh_abs2 sbst) h.effect_clauses;
     value_clause = refresh_abs sbst h.value_clause;
@@ -275,16 +275,16 @@ and refresh_handler sbst h = {
   }
 and refresh_abs sbst a = 
   let (p, c) = a.term in
-  let sbst, p' = refresh_pat sbst p in
+  let sbst, p' = refresh_pattern sbst p in
   {a with term = (p', refresh_comp sbst c)}
 and refresh_pure_abs sbst pa =
   a2pa @@ refresh_abs sbst @@ pa2a @@ pa
 and refresh_abs2 sbst a2 =
   a2a2 @@ refresh_abs sbst @@ a22a @@ a2
 
-let rec subst_exp sbst e =
-  {e with term = subst_exp' sbst e.term}
-and subst_exp' sbst = function
+let rec subst_expr sbst e =
+  {e with term = subst_expr' sbst e.term}
+and subst_expr' sbst = function
   | (Var x) as e ->
       begin match Common.lookup x sbst with
       | Some e' -> e'
@@ -295,17 +295,17 @@ and subst_exp' sbst = function
   | Lambda a ->
       Lambda (subst_abs sbst a)
   | PureLetIn (e1, pa) ->
-      PureLetIn (subst_exp sbst e1, subst_pure_abs sbst pa)
+      PureLetIn (subst_expr sbst e1, subst_pure_abs sbst pa)
   | Handler h ->
       Handler (subst_handler sbst h)
   | Tuple es ->
-      Tuple (List.map (subst_exp sbst) es)
+      Tuple (List.map (subst_expr sbst) es)
   | Record flds ->
-      Record (Common.assoc_map (subst_exp sbst) flds)
+      Record (Common.assoc_map (subst_expr sbst) flds)
   | Variant (lbl, e) ->
-      Variant (lbl, Common.option_map (subst_exp sbst) e)
+      Variant (lbl, Common.option_map (subst_expr sbst) e)
   | PureApply (e1, e2) ->
-      PureApply (subst_exp sbst e1, subst_exp sbst e2)
+      PureApply (subst_expr sbst e1, subst_expr sbst e2)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
 and subst_comp sbst c =
   {c with term = subst_comp' sbst c.term}
@@ -313,7 +313,7 @@ and subst_comp' sbst = function
   | Bind (c1, c2) ->
       Bind (subst_comp sbst c1, subst_abs sbst c2)
   | LetIn (e, a) ->
-      LetIn (subst_exp sbst e, subst_abs sbst a)
+      LetIn (subst_expr sbst e, subst_abs sbst a)
   | Let (li, c1) ->
       let li' = List.map (fun (p, c) ->
         (* XXX Should we check that p & sbst have disjoint variables? *)
@@ -329,22 +329,22 @@ and subst_comp' sbst = function
       in
       LetRec (li', subst_comp sbst c1)
   | Match (e, li) ->
-      Match (subst_exp sbst e, List.map (subst_abs sbst) li)
+      Match (subst_expr sbst e, List.map (subst_abs sbst) li)
   | While (c1, c2) ->
       While (subst_comp sbst c1, subst_comp sbst c2)
   | For (x, e1, e2, c, b) ->
       (* XXX Should we check that x does not appear in sbst? *)
-      For (x, subst_exp sbst e1, subst_exp sbst e2, subst_comp sbst c, b)
+      For (x, subst_expr sbst e1, subst_expr sbst e2, subst_comp sbst c, b)
   | Apply (e1, e2) ->
-      Apply (subst_exp sbst e1, subst_exp sbst e2)
+      Apply (subst_expr sbst e1, subst_expr sbst e2)
   | Handle (e, c) ->
-      Handle (subst_exp sbst e, subst_comp sbst c)
+      Handle (subst_expr sbst e, subst_comp sbst c)
   | Check c ->
       Check (subst_comp sbst c)
   | Call (eff, e, a) ->
-      Call (eff, subst_exp sbst e, subst_abs sbst a)
+      Call (eff, subst_expr sbst e, subst_abs sbst a)
   | Value e ->
-      Value (subst_exp sbst e)
+      Value (subst_expr sbst e)
 and subst_handler sbst h = {
     effect_clauses = Common.assoc_map (subst_abs2 sbst) h.effect_clauses;
     value_clause = subst_abs sbst h.value_clause;
@@ -801,14 +801,14 @@ let call ?loc ((eff_name, (ty_par, ty_res)) as eff) e a =
       location = loc;
     }
 
-let rec match_values p e sbst =
+let rec pattern_match p e sbst =
   match p.term, e.term with
   | PVar x, e -> Common.update x e sbst
   | PAs (p, x), e' ->
-      let sbst = match_values p e sbst in
+      let sbst = pattern_match p e sbst in
         Common.update x e' sbst
   | PNonbinding, _ -> sbst
-  | PTuple ps, Tuple es -> List.fold_right2 match_values ps es sbst
+  | PTuple ps, Tuple es -> List.fold_right2 pattern_match ps es sbst
   | PRecord ps, Record es ->
       begin
         let rec extend_record ps es sbst =
@@ -816,7 +816,7 @@ let rec match_values p e sbst =
             | [] -> sbst
             | (f, p) :: ps ->
                 let e = List.assoc f es in
-                  extend_record ps es (match_values p e sbst)
+                  extend_record ps es (pattern_match p e sbst)
         in
           try
             extend_record ps es sbst
@@ -824,7 +824,7 @@ let rec match_values p e sbst =
       end
   | PVariant (lbl, None), Variant (lbl', None) when lbl = lbl' -> sbst
   | PVariant (lbl, Some p), Variant (lbl', Some e) when lbl = lbl' ->
-      match_values p e sbst
+      pattern_match p e sbst
   | PConst c, Const c' when Const.equal c c' -> sbst
   | _, _ -> Error.runtime ~loc:e.location "Cannot substitute an expression in a pattern."
 
