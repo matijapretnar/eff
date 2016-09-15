@@ -234,8 +234,8 @@ let rec substitute_pattern_comp c p exp =
 and substitute_pattern_expr e p exp =
   optimize_expr (Typed.subst_expr (Typed.pattern_match p exp []) e)
 
-and optimize_expr e = shallow_optimize_expr (optimize_sub_expr e)
-and optimize_comp c = shallow_optimize_comp (optimize_sub_comp c)
+and optimize_expr e = reduce_expr (optimize_sub_expr e)
+and optimize_comp c = reduce_comp (optimize_sub_comp c)
 
 and optimize_sub_expr e =
   (* Print.debug "Optimizing %t" (CamlPrint.print_expression e); *)
@@ -301,7 +301,7 @@ and optimize_abs {term = (p, c); location = loc} =
 and optimize_pure_abs pa = a2pa @@ optimize_abs @@ pa2a @@ pa
 and optimize_abs2 a2 = a2a2 @@ optimize_abs @@ a22a @@ a2
 
-and shallow_optimize_comp c =
+and reduce_comp c =
   (*Print.debug "Shallow optimizing %t" (CamlPrint.print_computation c);*)
   match c.term with
   | Let (pclist, c2) ->
@@ -319,23 +319,23 @@ and shallow_optimize_comp c =
         | _ -> c)
   | Bind ({term = Value e}, c2) ->
      let res = let_in ~loc:c.location e c2 in
-     shallow_optimize_comp res
+     reduce_comp res
   | Bind ({term = Bind (c1, {term = (p2, c2)})}, c3) ->
      let res =
-       bind ~loc:c.location c1 (abstraction p2 (shallow_optimize_comp (bind c2 c3)))
+       bind ~loc:c.location c1 (abstraction p2 (reduce_comp (bind c2 c3)))
      in
-     shallow_optimize_comp res
+     reduce_comp res
   | Bind ({term = LetIn (e, {term = (p1, c1)})}, c2) ->
-     let newbind = shallow_optimize_comp (bind c1 c2) in
+     let newbind = reduce_comp (bind c1 c2) in
      let let_abs = abstraction p1 newbind in
      let res = let_in ~loc: c.location e let_abs in
-     shallow_optimize_comp res
+     reduce_comp res
   | Bind (
       {term = Apply({term = Effect eff}, e_param)},
       {term = {term = Typed.PVar y}, {term = Apply ({term = Lambda k}, {term = Var x})}}
     ) when y = x ->
       let res = call ~loc: c.location eff e_param k in
-      shallow_optimize_comp res
+      reduce_comp res
   | Bind ({term = Call (eff, e, k)}, {term = (pa, ca)}) ->
      let (_, (input_k_ty, _), _) = k.scheme in
      let vz =
@@ -343,22 +343,22 @@ and shallow_optimize_comp c =
          (Scheme.simple input_k_ty) in
      let pz = make_pattern_from_var vz in
      let k_lambda =
-       shallow_optimize_expr
+       reduce_expr
          (lambda (refresh_abs k)) in
-     let inner_apply = shallow_optimize_comp (apply k_lambda vz) in
+     let inner_apply = reduce_comp (apply k_lambda vz) in
      let inner_bind =
-       shallow_optimize_comp
+       reduce_comp
          (bind inner_apply (abstraction pa ca)) in
      let res =
        call eff e (abstraction pz inner_bind)
-     in shallow_optimize_comp res
+     in reduce_comp res
   | Handle (e1, {term = LetIn (e2, a)}) ->
        let (p, c2) = a.term in
        let res =
          let_in ~loc: c.location e2
            (abstraction ~loc: c.location p
-              (shallow_optimize_comp (handle ~loc: c.location e1 c2)))
-       in shallow_optimize_comp res
+              (reduce_comp (handle ~loc: c.location e1 c2)))
+       in reduce_comp res
   | Handle (e1, {term = Apply (ae1, ae2)}) ->
       begin match ae1.term with
       | Var v ->
@@ -401,9 +401,9 @@ and shallow_optimize_comp c =
   | Handle ({term = Handler h}, {term = Value v}) ->
       let res =
         apply ~loc: c.location
-          (shallow_optimize_expr (lambda ~loc: c.location h.value_clause))
+          (reduce_expr (lambda ~loc: c.location h.value_clause))
           v
-      in shallow_optimize_comp res
+      in reduce_comp res
   | Handle ({term = Handler h}, {term = Call (eff, exp, k)}) ->
     let loc = Location.unknown in
     let z = Typed.Variable.fresh "z" in
@@ -416,23 +416,23 @@ and shallow_optimize_comp c =
       } in
     let vz = var ~loc z (Scheme.simple input_k_ty) in
     let k_lambda =
-      shallow_optimize_expr
+      reduce_expr
         (lambda ~loc (refresh_abs k)) in
-    let e2_apply = shallow_optimize_comp (apply ~loc k_lambda vz) in
+    let e2_apply = reduce_comp (apply ~loc k_lambda vz) in
     let fresh_handler = refresh_handler h in
     let e2_handle =
-      shallow_optimize_comp (handle ~loc (handler fresh_handler) e2_apply) in
+      reduce_comp (handle ~loc (handler fresh_handler) e2_apply) in
     let e2_lambda =
-      shallow_optimize_expr
+      reduce_expr
         (lambda ~loc (abstraction ~loc pz e2_handle))
     in
       (match Common.lookup eff h.effect_clauses with
        | Some result ->
            (*let (p1,p2,cresult) = result.term in
-                              let e1_lamda =  shallow_optimize_expr (lambda ~loc:loc (abstraction ~loc:loc p2 cresult)) in
-                              let e1_purelambda = shallow_optimize_expr (pure_lambda ~loc:loc (pure_abstraction ~loc:loc p1 e1_lamda)) in
-                              let e1_pureapply = shallow_optimize_expr (pure_apply ~loc:loc e1_purelambda exp) in
-                              shallow_optimize_comp (apply ~loc:loc e1_pureapply e2_lambda)
+                              let e1_lamda =  reduce_expr (lambda ~loc:loc (abstraction ~loc:loc p2 cresult)) in
+                              let e1_purelambda = reduce_expr (pure_lambda ~loc:loc (pure_abstraction ~loc:loc p1 e1_lamda)) in
+                              let e1_pureapply = reduce_expr (pure_apply ~loc:loc e1_purelambda exp) in
+                              reduce_comp (apply ~loc:loc e1_pureapply e2_lambda)
                             *)
            let (p1, p2, cresult) = result.term in
            let fp1 = refresh_pattern p1 in
@@ -444,21 +444,21 @@ and shallow_optimize_comp c =
                (substitute_pattern_comp cresult p2 efp2)
                p1 efp1 in
            let e1_lamda =
-             shallow_optimize_expr
+             reduce_expr
                (lambda ~loc
                   (abstraction ~loc fp2 fcresult)) in
            let e1_lambda_sub =
              substitute_pattern_comp fcresult fp2 e2_lambda in
            let e1_lambda =
-             shallow_optimize_expr
+             reduce_expr
                (lambda ~loc
                   (abstraction ~loc fp1 e1_lambda_sub)) in
            let res = apply ~loc e1_lambda exp
-           in shallow_optimize_comp res
+           in reduce_comp res
        | None ->
            let call_abst = abstraction ~loc pz e2_handle in
            let res = call ~loc eff exp call_abst
-           in shallow_optimize_comp res)
+           in reduce_comp res)
   | Apply ({term = Lambda {term = (p, c')}}, e) when is_atomic e ->
       substitute_pattern_comp c' p e
   | Apply ({term = Lambda {term = (p, c')}}, e) ->
@@ -474,29 +474,29 @@ and shallow_optimize_comp c =
            | Value v ->
                let res =
                  (value ~loc: c.location) @@
-                   (shallow_optimize_expr
+                   (reduce_expr
                       (pure_apply ~loc: c.location
-                         (shallow_optimize_expr
+                         (reduce_expr
                             (pure_lambda
                                (pure_abstraction p
                                   v)))
                          e))
-               in shallow_optimize_comp res
+               in reduce_comp res
            | _ -> c))
   | Apply ({term = PureLambda pure_abs}, e2) ->
        let res =
          value ~loc:c.location
-           (shallow_optimize_expr
+           (reduce_expr
               (pure_apply ~loc: c.location
-                 (shallow_optimize_expr (pure_lambda ~loc: c.location pure_abs))
+                 (reduce_expr (pure_lambda ~loc: c.location pure_abs))
                  e2))
-       in shallow_optimize_comp res
+       in reduce_comp res
   
   | Apply( {term = (Var v)} as e1, e2) ->
     begin match (List.find_all (fun a -> (fst a).term = e1.term) !impure_wrappers) with
     | [(fo,fn)]-> 
-          let pure_app = shallow_optimize_expr (pure_apply ~loc:c.location fn e2) in 
-          let main_value = shallow_optimize_comp (value ~loc:c.location pure_app) in
+          let pure_app = reduce_expr (pure_apply ~loc:c.location fn e2) in 
+          let main_value = reduce_comp (value ~loc:c.location pure_app) in
           main_value
     | _ -> c
     end
@@ -508,8 +508,8 @@ and shallow_optimize_comp c =
     Print.debug "We are now in the let in 2 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
      let res =
        value ~loc:c.location
-         (shallow_optimize_expr (pure_let_in e1 (pure_abstraction p e2)))
-     in shallow_optimize_comp res
+         (reduce_expr (pure_let_in e1 (pure_abstraction p e2)))
+     in reduce_comp res
 
   | LetIn (e, {term = (p, cp)}) when only_inlinable_occurrences p cp ->
   Print.debug "We are now in the let in 3 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
@@ -549,7 +549,7 @@ and folder pclist cn =
   let func a b =
     bind ~loc: b.location (snd a) (abstraction ~loc: b.location (fst a) b)
   in List.fold_right func pclist cn
-and shallow_optimize_expr e =
+and reduce_expr e =
   match e.term with
   | PureLetIn (ex, pa) ->
       let (p, ep) = pa.term
@@ -582,7 +582,7 @@ and shallow_optimize_expr e =
       let param_pat = make_pattern_from_var param in
       let kincall =
         abstraction ~loc: e.location res_pat (value ~loc: e.location result) in
-      let call_cons = shallow_optimize_comp (call ~loc: e.location eff param kincall)
+      let call_cons = reduce_comp (call ~loc: e.location eff param kincall)
       in
         optimize_expr
           (lambda ~loc: e.location
