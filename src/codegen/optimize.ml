@@ -354,8 +354,10 @@ and reduce_expr e =
       let param_pat = make_pattern_from_var param in
       let kincall =
         abstraction ~loc: e.location res_pat (value ~loc: e.location result) in
+      (* XXX Is reduce_comp necessary here? *)
       let call_cons = reduce_comp (call ~loc: e.location eff param kincall)
       in
+        (* XXX Is optimize_expr necessary here? *)
         optimize_expr
           (lambda ~loc: e.location
              (abstraction ~loc: e.location param_pat call_cons))
@@ -373,6 +375,7 @@ and reduce_comp c =
       in
 
       let bind_comps = folder pclist c2 in
+      (* XXX Is reduce_comp good enough here? All cases already went through optimize_sub_comp *)
       optimize_comp bind_comps
   | Match ({term = Const cc}, lst) ->
      let func a =
