@@ -287,52 +287,10 @@ let refresh_handler h = Typed.refresh_handler [] h
 let substitute_var_comp comp vr exp = Typed.subst_comp [(vr, exp.term)] comp
 let substitute_var_exp e vr exp = Typed.subst_exp [(vr, exp.term)] e
 
-let rec substitute_pattern_comp c p exp maincomp =
-  match p.term with
-  | Typed.PVar x -> optimize_comp (substitute_var_comp c x exp)
-  | Typed.PAs (_, x) ->
-      let (xbo, xfo) = occurrences x (free_vars_comp c)
-      in
-        if (xbo == 0) && (xfo == 1)
-        then optimize_comp (substitute_var_comp c x exp)
-        else maincomp
-  | Typed.PTuple [] when exp.term = (Tuple []) -> c
-  | Typed.PTuple lst ->
-      (match exp.term with
-       | Tuple elst ->
-           optimize_comp
-             (List.fold_right2
-                (fun pat exp co ->
-                   substitute_pattern_comp co pat exp maincomp)
-                lst elst c)
-       | _ -> maincomp)
-  | Typed.PRecord _ -> maincomp
-  | Typed.PVariant _ -> maincomp
-  | Typed.PConst _ -> maincomp
-  | Typed.PNonbinding -> maincomp
-and substitute_pattern_exp e p exp mainexp =
-  match p.term with
-  | Typed.PVar x -> optimize_expr (substitute_var_exp e x exp)
-  | Typed.PAs (p, x) ->
-      let (xbo, xfo) = occurrences x (free_vars_exp e)
-      in
-        if (xbo == 0) && (xfo == 1)
-        then optimize_expr (substitute_var_exp e x exp)
-        else mainexp
-  | Typed.PTuple [] when exp.term = (Tuple []) -> e
-  | Typed.PTuple lst ->
-      (match exp.term with
-       | Tuple elst ->
-           optimize_expr
-             (List.fold_right2
-                (fun pat exp co -> substitute_pattern_exp co pat exp mainexp)
-                lst elst e)
-       | _ -> mainexp)
-  | Typed.PRecord _ -> mainexp
-  | Typed.PVariant _ -> mainexp
-  | Typed.PConst _ -> mainexp
-  | Typed.PNonbinding -> mainexp
-
+let rec substitute_pattern_comp c p exp =
+  optimize_comp (Typed.subst_comp (Typed.match_values p exp []) c)
+and substitute_pattern_exp e p exp =
+  optimize_expr (Typed.subst_exp (Typed.match_values p exp []) e)
 and optimize_comp c = shallow_opt (opt_sub_comp c)
 and shallow_opt c =
   (*Print.debug "Shallow optimizing %t" (CamlPrint.print_computation c);*)
@@ -474,16 +432,14 @@ and shallow_opt c =
            let efp2 = make_expression_from_pattern fp2 in
            let fcresult =
              substitute_pattern_comp
-               (substitute_pattern_comp cresult p2 efp2
-                  cresult)
-               p1 efp1 cresult in
+               (substitute_pattern_comp cresult p2 efp2)
+               p1 efp1 in
            let e1_lamda =
              shallow_opt_e
                (lambda ~loc
                   (abstraction ~loc fp2 fcresult)) in
            let e1_lambda_sub =
-             substitute_pattern_comp fcresult fp2 e2_lambda
-               (value ~loc: c.location vz) in
+             substitute_pattern_comp fcresult fp2 e2_lambda in
            let e1_lambda =
              shallow_opt_e
                (lambda ~loc
@@ -495,7 +451,7 @@ and shallow_opt c =
            let res = call ~loc eff exp call_abst
            in shallow_opt res)
   | Apply ({term = Lambda {term = (p, c')}}, e) when is_atomic e ->
-      substitute_pattern_comp c' p e c
+      substitute_pattern_comp c' p e
   | Apply ({term = Lambda {term = (p, c')}}, e) ->
      (let (pbo, pfo) = pattern_occurrences p (free_vars_comp c')
       in
@@ -503,7 +459,7 @@ and shallow_opt c =
         then
           if pfo == 0
           then c'
-          else substitute_pattern_comp c' p e c
+          else substitute_pattern_comp c' p e
         else
           (match c'.term with
            | Value v ->
@@ -538,7 +494,7 @@ and shallow_opt c =
 
   | LetIn (e, {term = (p, cp)}) when is_atomic e ->
       Print.debug "We are now in the let in 1 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
-      substitute_pattern_comp cp p e c
+      substitute_pattern_comp cp p e
   | LetIn (e1, {term = (p, {term = Value e2})}) ->
     Print.debug "We are now in the let in 2 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
      let res =
@@ -548,7 +504,7 @@ and shallow_opt c =
 
   | LetIn (e, {term = (p, cp)}) when only_inlinable_occurrences p cp ->
   Print.debug "We are now in the let in 3 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
-       substitute_pattern_comp cp p e c
+       substitute_pattern_comp cp p e
   
   (*Matching let f = \x.\y. c *)    
   | LetIn({term = Lambda ({term = (pe1, {term = Value ({term = Lambda ({term = (pe2,ce2)}) } as in_lambda)} )})} as e, {term = ({term = PVar fo} as p,cp)} )->
@@ -596,16 +552,16 @@ and shallow_opt_e e =
       let (p, ep) = pa.term
       in
         if is_atomic ex
-        then substitute_pattern_exp ep p ex e
+        then substitute_pattern_exp ep p ex
         else
           (let (occ_b, occ_f) = pattern_occurrences p (free_vars_exp ep)
            in
              if (occ_b == 0) && (occ_f < 2)
-             then substitute_pattern_exp ep p ex e
+             then substitute_pattern_exp ep p ex
              else e)
   | PureApply ({term = PureLambda {term = (p, e')}}, e2) ->
      if is_atomic e2
-     then substitute_pattern_exp e' p e2 e
+     then substitute_pattern_exp e' p e2
      else
        (let (pbo, pfo) = pattern_occurrences p (free_vars_exp e')
         in
@@ -613,7 +569,7 @@ and shallow_opt_e e =
           then
             if pfo == 0
             then e'
-            else substitute_pattern_exp e' p e2 e
+            else substitute_pattern_exp e' p e2
           else e)
   | Effect eff ->
       let (eff_name, (ty_par, ty_res)) = eff in

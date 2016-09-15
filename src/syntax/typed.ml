@@ -800,3 +800,31 @@ let call ?loc ((eff_name, (ty_par, ty_res)) as eff) e a =
       scheme = Scheme.clean_dirty_scheme ~loc (ctx_e @ ctx_a, drty_out, constraints);
       location = loc;
     }
+
+let rec match_values p e sbst =
+  match p.term, e.term with
+  | PVar x, e -> Common.update x e sbst
+  | PAs (p, x), e' ->
+      let sbst = match_values p e sbst in
+        Common.update x e' sbst
+  | PNonbinding, _ -> sbst
+  | PTuple ps, Tuple es -> List.fold_right2 match_values ps es sbst
+  | PRecord ps, Record es ->
+      begin
+        let rec extend_record ps es sbst =
+          match ps with
+            | [] -> sbst
+            | (f, p) :: ps ->
+                let e = List.assoc f es in
+                  extend_record ps es (match_values p e sbst)
+        in
+          try
+            extend_record ps es sbst
+          with Not_found -> Error.runtime ~loc:e.location "Incompatible records in substitution."
+      end
+  | PVariant (lbl, None), Variant (lbl', None) when lbl = lbl' -> sbst
+  | PVariant (lbl, Some p), Variant (lbl', Some e) when lbl = lbl' ->
+      match_values p e sbst
+  | PConst c, Const c' when Const.equal c c' -> sbst
+  | _, _ -> Error.runtime ~loc:e.location "Cannot substitute an expression in a pattern."
+
