@@ -828,3 +828,60 @@ let rec pattern_match p e sbst =
   | PConst c, Const c' when Const.equal c c' -> sbst
   | _, _ -> Error.runtime ~loc:e.location "Cannot substitute an expression in a pattern."
 
+let (@@@) (inside1, outside1) (inside2, outside2) =
+  (inside1 @ inside2, outside1 @ outside2)
+let (---) (inside, outside) bound =
+  let remove_bound xs = List.filter (fun x -> not (List.mem x bound)) xs in
+  (remove_bound inside, remove_bound outside)
+let concat_vars vars = List.fold_right (@@@) vars ([], [])
+
+let rec free_vars_comp c =
+  match c.term with
+  | Value e -> free_vars_expr e
+  | Let (li, cf) ->
+      let xs, vars = List.fold_right (fun (p, c) (xs, vars) ->
+        pattern_vars p, free_vars_comp c @@@ vars
+      ) li ([], ([], [])) in
+      vars @@@ (free_vars_comp cf --- xs)
+  | LetRec (li, c1) ->
+      let xs, vars = List.fold_right (fun (x, a) (xs, vars) ->
+        x :: xs, free_vars_abs a @@@ vars
+      ) li ([], free_vars_comp c1) in
+      vars --- xs
+  | Match (e, li) -> free_vars_expr e @@@ concat_vars (List.map free_vars_abs li)
+  | While (c1, c2) -> free_vars_comp c1 @@@ free_vars_comp c2
+  | For (v, e1, e2, c1, b) ->
+      (free_vars_expr e1 @@@ free_vars_expr e2 @@@ free_vars_comp c1) --- [v]
+  | Apply (e1, e2) -> free_vars_expr e1 @@@ free_vars_expr e2
+  | Handle (e, c1) -> free_vars_expr e @@@ free_vars_comp c1
+  | Check c1 -> free_vars_comp c1
+  | Call (_, e1, a1) -> free_vars_expr e1 @@@ free_vars_abs a1
+  | Bind (c1, a1) -> free_vars_comp c1 @@@ free_vars_abs a1
+  | LetIn (e, a) -> free_vars_expr e @@@ free_vars_abs a
+and free_vars_expr e =
+  match e.term with
+  | Var v -> ([], [v])
+  | Tuple es -> concat_vars (List.map free_vars_expr es)
+  | Lambda a -> free_vars_abs a
+  | Handler h -> free_vars_handler h
+  | Record flds -> concat_vars (List.map (fun (_, e) -> free_vars_expr e) flds)
+  | Variant (_, None) -> ([], [])
+  | Variant (_, Some e) -> free_vars_expr e
+  | PureLambda pa -> free_vars_pure_abs pa
+  | PureApply (e1, e2) -> free_vars_expr e1 @@@ free_vars_expr e2
+  | PureLetIn (e, pa) -> free_vars_expr e @@@ free_vars_pure_abs pa
+  | (BuiltIn _ | Effect _ | Const _) -> ([], [])
+and free_vars_handler h =
+  free_vars_abs h.value_clause @@@
+  free_vars_abs h.finally_clause @@@
+  concat_vars (List.map (fun (_, a2) -> free_vars_abs2 a2) h.effect_clauses)
+and free_vars_abs a =
+  let (p, c) = a.term in
+  let (inside, outside) = free_vars_comp c --- pattern_vars p in
+  (inside @ outside, [])
+and free_vars_pure_abs pa = free_vars_abs @@ pa2a @@ pa
+and free_vars_abs2 a2 = free_vars_abs @@ a22a @@ a2
+
+let occurrences x (inside, outside) =
+  let count ys = List.length (List.filter (fun y -> x = y) ys) in
+  (count inside, count outside)
