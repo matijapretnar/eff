@@ -207,8 +207,27 @@ let replaceable x vars =
 let only_inlinable_occurrences p c =
   let vars = free_vars_comp c in
   List.for_all (fun x -> replaceable x vars) (Typed.pattern_vars p)
-  
-  
+
+type inlinability =
+  | NotInlinable (* Pattern variables occur more than once or inside a binder *)
+  | NotPresent (* Pattern variables are not present in the body *)
+  | Inlinable (* Pattern variables occur each at most once outside a binder *)
+
+let applicable_pattern p vars =
+  let rec check_variables = function
+  | [] -> NotPresent
+  | x :: xs ->
+      let inside_occ, outside_occ = Typed.occurrences x vars in
+      if inside_occ > 0 || outside_occ > 1 then
+        NotInlinable
+      else
+        begin match check_variables xs with
+        | NotPresent -> if outside_occ = 0 then NotPresent else Inlinable
+        | inlinability -> inlinability
+        end
+  in
+  check_variables (Typed.pattern_vars p)
+
 let print_free_vars c =
   (print_endline "in free vars print ";
    let fvc = free_vars_comp c
@@ -233,6 +252,20 @@ let rec substitute_pattern_comp c p exp =
   optimize_comp (Typed.subst_comp (Typed.pattern_match p exp) c)
 and substitute_pattern_expr e p exp =
   optimize_expr (Typed.subst_expr (Typed.pattern_match p exp) e)
+
+and beta_reduce {term = (p, c)} e =
+  match applicable_pattern p (Typed.free_vars_comp c) with
+  | NotInlinable when is_atomic e -> Some (substitute_pattern_comp c p e)
+  | Inlinable -> Some (substitute_pattern_comp c p e)
+  | NotPresent -> Some c
+  | _ -> None
+
+and pure_beta_reduce {term = (p, exp)} e =
+  match applicable_pattern p (Typed.free_vars_expr exp) with
+  | NotInlinable when is_atomic e  -> Some (substitute_pattern_expr exp p e)
+  | Inlinable -> Some (substitute_pattern_expr exp p e)
+  | NotPresent -> Some exp
+  | _ -> None
 
 and optimize_expr e = reduce_expr (optimize_sub_expr e)
 and optimize_comp c = reduce_comp (optimize_sub_comp c)
