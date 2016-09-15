@@ -527,30 +527,25 @@ and reduce_comp c =
            let call_abst = abstraction ~loc pz e2_handle in
            let res = call ~loc eff exp call_abst
            in reduce_comp res)
-  | Apply ({term = Lambda {term = (p, c')}}, e) when is_atomic e ->
-      substitute_pattern_comp c' p e
-  | Apply ({term = Lambda {term = (p, c')}}, e) ->
-     (let (pbo, pfo) = pattern_occurrences p (free_vars_comp c')
-      in
-        if (pbo == 0) && (pfo < 2)
-        then
-          if pfo == 0
-          then c'
-          else substitute_pattern_comp c' p e
-        else
-          (match c'.term with
-           | Value v ->
-               let res =
-                 (value ~loc: c.location) @@
-                   (reduce_expr
-                      (pure_apply ~loc: c.location
-                         (reduce_expr
-                            (pure_lambda
-                               (pure_abstraction p
-                                  v)))
-                         e))
-               in reduce_comp res
-           | _ -> c))
+  | Apply ({term = Lambda a}, e) ->
+      begin match beta_reduce a e with
+      | Some c' -> c'
+      | None ->
+        begin match a with
+        | {term = (p, {term = Value v})} ->
+             let res =
+               (value ~loc: c.location) @@
+                 (reduce_expr
+                    (pure_apply ~loc: c.location
+                       (reduce_expr
+                          (pure_lambda
+                             (pure_abstraction p
+                                v)))
+                       e))
+             in reduce_comp res
+        | _ -> c
+        end
+      end
   | Apply ({term = PureLambda pure_abs}, e2) ->
        let res =
          value ~loc:c.location
