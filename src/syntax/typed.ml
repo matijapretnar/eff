@@ -801,32 +801,42 @@ let call ?loc ((eff_name, (ty_par, ty_res)) as eff) e a =
       location = loc;
     }
 
-let rec pattern_match p e sbst =
-  match p.term, e.term with
-  | PVar x, e -> Common.update x e sbst
-  | PAs (p, x), e' ->
-      let sbst = pattern_match p e sbst in
-        Common.update x e' sbst
-  | PNonbinding, _ -> sbst
-  | PTuple ps, Tuple es -> List.fold_right2 pattern_match ps es sbst
-  | PRecord ps, Record es ->
-      begin
-        let rec extend_record ps es sbst =
-          match ps with
-            | [] -> sbst
-            | (f, p) :: ps ->
-                let e = List.assoc f es in
-                  extend_record ps es (pattern_match p e sbst)
-        in
-          try
-            extend_record ps es sbst
-          with Not_found -> Error.runtime ~loc:e.location "Incompatible records in substitution."
-      end
-  | PVariant (lbl, None), Variant (lbl', None) when lbl = lbl' -> sbst
-  | PVariant (lbl, Some p), Variant (lbl', Some e) when lbl = lbl' ->
-      pattern_match p e sbst
-  | PConst c, Const c' when Const.equal c c' -> sbst
-  | _, _ -> Error.runtime ~loc:e.location "Cannot substitute an expression in a pattern."
+let pattern_match p e =
+  let _, ty_e, constraints_e = e.scheme
+  and _, ty_p, constraints_p = p.scheme in
+  let constraints =
+    Constraints.union constraints_e constraints_p |>
+    Constraints.add_ty_constraint ~loc:e.location ty_e ty_p
+  in
+  ignore constraints;
+  let rec extend_subst p e sbst =
+    match p.term, e.term with
+    | PVar x, e -> Common.update x e sbst
+    | PAs (p, x), e' ->
+        let sbst = extend_subst p e sbst in
+          Common.update x e' sbst
+    | PNonbinding, _ -> sbst
+    | PTuple ps, Tuple es -> List.fold_right2 extend_subst ps es sbst
+    | PRecord ps, Record es ->
+        begin
+          let rec extend_record ps es sbst =
+            match ps with
+              | [] -> sbst
+              | (f, p) :: ps ->
+                  let e = List.assoc f es in
+                    extend_record ps es (extend_subst p e sbst)
+          in
+            try
+              extend_record ps es sbst
+            with Not_found -> Error.runtime ~loc:e.location "Incompatible records in substitution."
+        end
+    | PVariant (lbl, None), Variant (lbl', None) when lbl = lbl' -> sbst
+    | PVariant (lbl, Some p), Variant (lbl', Some e) when lbl = lbl' ->
+        extend_subst p e sbst
+    | PConst c, Const c' when Const.equal c c' -> sbst
+    | _, _ -> Error.runtime ~loc:e.location "Cannot substitute an expression in a pattern."
+  in
+  extend_subst p e []
 
 let (@@@) (inside1, outside1) (inside2, outside2) =
   (inside1 @ inside2, outside1 @ outside2)

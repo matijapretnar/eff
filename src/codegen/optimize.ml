@@ -230,9 +230,9 @@ let substitute_var_expr e vr exp = Typed.subst_expr [(vr, exp.term)] e
 let substitute_var_comp comp vr exp = Typed.subst_comp [(vr, exp.term)] comp
 
 let rec substitute_pattern_comp c p exp =
-  optimize_comp (Typed.subst_comp (Typed.pattern_match p exp []) c)
+  optimize_comp (Typed.subst_comp (Typed.pattern_match p exp) c)
 and substitute_pattern_expr e p exp =
-  optimize_expr (Typed.subst_expr (Typed.pattern_match p exp []) e)
+  optimize_expr (Typed.subst_expr (Typed.pattern_match p exp) e)
 
 and optimize_expr e = reduce_expr (optimize_sub_expr e)
 and optimize_comp c = reduce_comp (optimize_sub_comp c)
