@@ -578,14 +578,15 @@ and reduce_comp c =
       in
       reduce_comp res
   
-   (* XXX simplify *)
   | Apply( {term = (Var v)} as e1, e2) ->
-    begin match (List.find_all (fun a -> (fst a).term = e1.term) !impure_wrappers) with
-    | [(fo,fn)]-> 
-          let pure_app = reduce_expr (pure_apply ~loc:c.location fn e2) in 
-          let main_value = reduce_comp (value ~loc:c.location pure_app) in
-          main_value
-    | _ -> c
+    begin match Common.lookup v !impure_wrappers with
+    | Some fn -> 
+          let pure_apply_fn_e2 = reduce_expr (pure_apply fn e2) in 
+          let res =
+            value pure_apply_fn_e2
+          in
+          reduce_comp res
+    | None -> c
     end
 
   | LetIn (e1, {term = (p, {term = Value e2})}) ->
@@ -610,7 +611,7 @@ and reduce_comp c =
         let outer_lambda = pure_lambda ~loc:c.location (pure_abstraction pe1 in_lambda) in
         let first_let_abstraction = abstraction ~loc:c.location (var_pattern new_var) second_let in
         let first_let = let_in ~loc:c.location (outer_lambda) first_let_abstraction in
-        impure_wrappers:= ((make_expression_from_pattern p),new_var) :: !impure_wrappers;
+        impure_wrappers:= (fo,new_var) :: !impure_wrappers;
         optimize_comp first_let
 
    (* XXX simplify *)
