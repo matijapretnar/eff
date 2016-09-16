@@ -175,9 +175,10 @@ let rec make_expression_from_pattern p =
     | (Typed.PNonbinding as p) -> tuple ~loc []
   
 let make_var_from_counter ann scheme =
-  let x = Typed.Variable.fresh ann in var ~loc:Location.unknown x scheme
+  let x = Typed.Variable.fresh ann in
+  var x scheme
   
-let make_pattern_from_var v =
+let var_pattern v =
   let (Var va) = v.term
   in
     {
@@ -185,7 +186,17 @@ let make_pattern_from_var v =
       location = Location.unknown;
       scheme = v.scheme;
     }
-  
+
+let make_var ?(loc=Location.unknown) ann scheme =
+  let x = Typed.Variable.fresh ann in
+  let x_var = var ~loc x scheme
+  and x_pat = {
+    term = Typed.PVar x;
+    location = loc;
+    scheme = scheme
+  } in
+  x_var, x_pat
+
 let refresh_pattern p = snd (Typed.refresh_pattern [] p)
 
 module VariableSet =
@@ -336,36 +347,37 @@ and optimize_abs2 a2 = a2a2 @@ optimize_abs @@ a22a @@ a2
 
 and reduce_expr e =
   match e.term with
+
   | PureLetIn (ex, pa) ->
       begin match pure_beta_reduce pa ex with
       | Some e' -> e'
       | None -> e
       end
+
   | PureApply ({term = PureLambda pa}, e2) ->
       begin match pure_beta_reduce pa e2 with
       | Some e' -> e'
       | None -> e
       end
+
   | Effect eff ->
       let (eff_name, (ty_par, ty_res)) = eff in
-      let param = make_var_from_counter "param" (Scheme.simple ty_par) in
-      let result = make_var_from_counter "result" (Scheme.simple ty_res) in
-      let res_pat = make_pattern_from_var result in
-      let param_pat = make_pattern_from_var param in
-      let kincall =
-        abstraction ~loc: e.location res_pat (value ~loc: e.location result) in
-      (* XXX Is reduce_comp necessary here? *)
-      let call_cons = reduce_comp (call ~loc: e.location eff param kincall)
+      let param_var, param_pat = make_var "param" (Scheme.simple ty_par) in
+      let result_var, result_pat = make_var "result" (Scheme.simple ty_res) in
+      let k = abstraction result_pat (value result_var) in
+      let call_eff_param_var_k = reduce_comp (call eff param_var k) in
+      let res =
+        lambda (abstraction param_pat call_eff_param_var_k)
       in
-        (* XXX Is optimize_expr necessary here? *)
-        optimize_expr
-          (lambda ~loc: e.location
-             (abstraction ~loc: e.location param_pat call_cons))
+      optimize_expr res
+
   | _ -> e
 
 and reduce_comp c =
   (*Print.debug "Shallow optimizing %t" (CamlPrint.print_computation c);*)
   match c.term with
+
+  (* XXX simplify *)
   | Let (pclist, c2) ->
       let folder pclist cn =
         let func a b =
@@ -377,6 +389,8 @@ and reduce_comp c =
       let bind_comps = folder pclist c2 in
       (* XXX Is reduce_comp good enough here? All cases already went through optimize_sub_comp *)
       optimize_comp bind_comps
+
+  (* XXX simplify *)
   | Match ({term = Const cc}, lst) ->
      let func a =
        let (p, clst) = a.term
@@ -388,48 +402,55 @@ and reduce_comp c =
        (match List.find func lst with
         | abs -> let (_, c') = abs.term in c'
         | _ -> c)
+
   | Bind ({term = Value e}, c2) ->
-     let res = let_in ~loc:c.location e c2 in
-     reduce_comp res
+      let res =
+        let_in e c2
+      in
+      reduce_comp res
+
   | Bind ({term = Bind (c1, {term = (p2, c2)})}, c3) ->
-     let res =
-       bind ~loc:c.location c1 (abstraction p2 (reduce_comp (bind c2 c3)))
-     in
-     reduce_comp res
+      let bind_c2_c3 = reduce_comp (bind c2 c3) in
+      let res =
+        bind c1 (abstraction p2 bind_c2_c3)
+      in
+      reduce_comp res
+
   | Bind ({term = LetIn (e, {term = (p1, c1)})}, c2) ->
-     let newbind = reduce_comp (bind c1 c2) in
-     let let_abs = abstraction p1 newbind in
-     let res = let_in ~loc: c.location e let_abs in
-     reduce_comp res
+      let bind_c1_c2 = reduce_comp (bind c1 c2) in
+      let res =
+        let_in e (abstraction p1 (bind_c1_c2))
+      in
+      optimize_comp res
+
+  (* XXX most likely remove *)
   | Bind (
       {term = Apply({term = Effect eff}, e_param)},
       {term = {term = Typed.PVar y}, {term = Apply ({term = Lambda k}, {term = Var x})}}
     ) when y = x ->
+
       let res = call ~loc: c.location eff e_param k in
       reduce_comp res
-  | Bind ({term = Call (eff, e, k)}, {term = (pa, ca)}) ->
-     let (_, (input_k_ty, _), _) = k.scheme in
-     let vz =
-       make_var_from_counter "_call_result"
-         (Scheme.simple input_k_ty) in
-     let pz = make_pattern_from_var vz in
-     let k_lambda =
-       reduce_expr
-         (lambda (refresh_abs k)) in
-     let inner_apply = reduce_comp (apply k_lambda vz) in
-     let inner_bind =
-       reduce_comp
-         (bind inner_apply (abstraction pa ca)) in
+  
+   | Bind ({term = Call (eff, e, k)}, c2) ->
+     let (_, (result_ty, _), _) = k.scheme in
+     let result_var, result_pat = make_var "result" (Scheme.simple result_ty) in
+     let lambda_k = reduce_expr (lambda (refresh_abs k)) in
+     let apply_lambda_k_result_var = reduce_comp (apply lambda_k result_var) in
+     let bind_apply_lambda_k_result_var_c2 = reduce_comp (bind apply_lambda_k_result_var c2) in
      let res =
-       call eff e (abstraction pz inner_bind)
-     in reduce_comp res
-  | Handle (e1, {term = LetIn (e2, a)}) ->
-       let (p, c2) = a.term in
-       let res =
-         let_in ~loc: c.location e2
-           (abstraction ~loc: c.location p
-              (reduce_comp (handle ~loc: c.location e1 c2)))
-       in reduce_comp res
+       call eff e (abstraction result_pat bind_apply_lambda_k_result_var_c2)
+     in
+     reduce_comp res
+
+  | Handle (e1, {term = LetIn (e2, {term = (p, c2)})}) ->
+      let handle_e1_c2 = reduce_comp (handle e1 c2) in
+      let res =
+        let_in e2 (abstraction p (handle_e1_c2))
+      in
+      reduce_comp res
+
+   (* XXX simplify *)
   | Handle (e1, {term = Apply (ae1, ae2)}) ->
       begin match ae1.term with
       | Var v ->
@@ -442,7 +463,7 @@ and reduce_comp c =
                     let new_handle = handle ~loc:c.location e1 (substitute_var_comp dc v (refresh_expr d)) in
                     let new_lambda = lambda ~loc:c.location (abstraction ~loc:c.location dp new_handle) in 
                     optimize_comp (let_in ~loc:c.location new_lambda 
-                          (abstraction ~loc:c.location (make_pattern_from_var new_var) (new_computation)))
+                          (abstraction ~loc:c.location (var_pattern new_var) (new_computation)))
                 | _ -> c
                 end
               |_ -> c
@@ -459,7 +480,7 @@ and reduce_comp c =
                    let newfinnerlambda = lambda ~loc:c.location (abstraction ~loc:c.location dp2 handler_call) in 
                    let newfbody = pure_lambda ~loc:c.location (pure_abstraction dp1 newfinnerlambda) in 
                    let res = 
-                     let_in ~loc:c.location (newfbody) (abstraction ~loc:c.location (make_pattern_from_var newfname) application) in
+                     let_in ~loc:c.location (newfbody) (abstraction ~loc:c.location (var_pattern newfname) application) in
                    optimize_comp res
                    
                 | _ -> c
@@ -470,11 +491,13 @@ and reduce_comp c =
       end
 
   | Handle ({term = Handler h}, {term = Value v}) ->
+      let lambda_h_value_clause = reduce_expr (lambda h.value_clause) in
       let res =
-        apply ~loc: c.location
-          (reduce_expr (lambda ~loc: c.location h.value_clause))
-          v
-      in reduce_comp res
+        apply lambda_h_value_clause v
+      in
+      reduce_comp res
+
+   (* XXX simplify *)
   | Handle ({term = Handler h}, {term = Call (eff, exp, k)}) ->
     let loc = Location.unknown in
     let z = Typed.Variable.fresh "z" in
@@ -530,34 +553,32 @@ and reduce_comp c =
            let call_abst = abstraction ~loc pz e2_handle in
            let res = call ~loc eff exp call_abst
            in reduce_comp res)
+
   | Apply ({term = Lambda a}, e) ->
       begin match beta_reduce a e with
       | Some c' -> c'
       | None ->
         begin match a with
         | {term = (p, {term = Value v})} ->
-             let res =
-               (value ~loc: c.location) @@
-                 (reduce_expr
-                    (pure_apply ~loc: c.location
-                       (reduce_expr
-                          (pure_lambda
-                             (pure_abstraction p
-                                v)))
-                       e))
-             in reduce_comp res
+            let pure_lambda_p_v = reduce_expr (pure_lambda (pure_abstraction p v)) in
+            let pure_apply_pure_lambda_p_v_e = reduce_expr (pure_apply pure_lambda_p_v e) in
+            let res =
+              value pure_apply_pure_lambda_p_v_e
+            in
+            reduce_comp res
         | _ -> c
         end
       end
-  | Apply ({term = PureLambda pure_abs}, e2) ->
-       let res =
-         value ~loc:c.location
-           (reduce_expr
-              (pure_apply ~loc: c.location
-                 (reduce_expr (pure_lambda ~loc: c.location pure_abs))
-                 e2))
-       in reduce_comp res
+
+  | Apply ({term = PureLambda pa}, e2) ->
+      let pure_lambda_pa = reduce_expr (pure_lambda pa) in
+      let pure_apply_pure_lambda_pa_e2 = reduce_expr (pure_apply pure_lambda_pa e2) in
+      let res =
+        value pure_apply_pure_lambda_pa_e2
+      in
+      reduce_comp res
   
+   (* XXX simplify *)
   | Apply( {term = (Var v)} as e1, e2) ->
     begin match (List.find_all (fun a -> (fst a).term = e1.term) !impure_wrappers) with
     | [(fo,fn)]-> 
@@ -568,27 +589,31 @@ and reduce_comp c =
     end
 
   | LetIn (e1, {term = (p, {term = Value e2})}) ->
-    Print.debug "We are now in the let in 2 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
-     let res =
-       value ~loc:c.location
-         (reduce_expr (pure_let_in e1 (pure_abstraction p e2)))
-     in reduce_comp res
+      Print.debug "We are now in the let in 2 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
+      let pure_let_in_e1_p_e2 = reduce_expr (pure_let_in e1 (pure_abstraction p e2)) in
+      let res =
+        value pure_let_in_e1_p_e2
+      in
+      reduce_comp res
 
+   (* XXX simplify *)
   (*Matching let f = \x.\y. c *)    
   | LetIn({term = Lambda ({term = (pe1, {term = Value ({term = Lambda ({term = (pe2,ce2)}) } as in_lambda)} )})} as e, {term = ({term = PVar fo} as p,cp)} )->
         Print.debug "We are now in the let in 4 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
         let new_var = make_var_from_counter "newvar" p.scheme in
         let new_var2 = make_var_from_counter "newvar2" pe1.scheme in 
-        let new_pattern = make_pattern_from_var new_var2 in
+        let new_pattern = var_pattern new_var2 in
         let pure_application = pure_apply ~loc:c.location new_var new_var2 in
         let second_let_value = value ~loc:c.location pure_application in 
         let second_let_lambda = lambda ~loc:c.location (abstraction ~loc:c.location new_pattern second_let_value) in
         let second_let = let_in ~loc:c.location second_let_lambda (abstraction ~loc:c.location p cp) in
         let outer_lambda = pure_lambda ~loc:c.location (pure_abstraction pe1 in_lambda) in
-        let first_let_abstraction = abstraction ~loc:c.location (make_pattern_from_var new_var) second_let in
+        let first_let_abstraction = abstraction ~loc:c.location (var_pattern new_var) second_let in
         let first_let = let_in ~loc:c.location (outer_lambda) first_let_abstraction in
         impure_wrappers:= ((make_expression_from_pattern p),new_var) :: !impure_wrappers;
         optimize_comp first_let
+
+   (* XXX simplify *)
   | LetIn (e, ({term = (p, cp)} as a)) ->
       Print.debug "We are now in the let in 1, 3 or 5 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
       begin match beta_reduce a e with
@@ -604,7 +629,10 @@ and reduce_comp c =
         (* XXX Is this necessary? Isn't cp already optimized, so we should just return c? *)
         let_in ~loc:c.location e (abstraction ~loc:e.location p (optimize_comp cp))
       end
+
+   (* XXX simplify *)
   | LetRec(l,co) -> Print.debug "the letrec comp%t" (CamlPrint.print_computation co); c
+
   | _ -> c
  
 let optimize_command = function
