@@ -204,20 +204,6 @@ module VariableSet =
                    let compare = Pervasives.compare
                       end)
 
-(* XXX Most likely, this function should never be used *)
-let pattern_occurrences p vars =
-  List.fold_right (fun x (inside_occ, outside_occ) ->
-    let (inside_occ_x, outside_occ_x) = Typed.occurrences x vars in
-    (inside_occ + inside_occ_x, outside_occ + outside_occ_x)
-  ) (Typed.pattern_vars p) (0, 0)
-
-let replaceable x vars =
-  let (inside_occ, outside_occ) = Typed.occurrences x vars in
-  outside_occ <= 1 && inside_occ = 0
-
-let only_inlinable_occurrences p c =
-  let vars = free_vars_comp c in
-  List.for_all (fun x -> replaceable x vars) (Typed.pattern_vars p)
 
 type inlinability =
   | NotInlinable (* Pattern variables occur more than once or inside a binder *)
@@ -285,12 +271,6 @@ and optimize_sub_expr e =
   (* Print.debug "Optimizing %t" (CamlPrint.print_expression e); *)
   let loc = e.location in
   match e.term with
-  | Var x ->
-    begin match find_inlinable x with
-    | Some ({term = Handler _} as d) -> refresh_expr d
-    | Some d -> d
-    | _ -> e
-    end
   | Record lst ->
       record ~loc (Common.assoc_map optimize_expr lst)
   | Variant (lbl, e) ->
@@ -311,7 +291,7 @@ and optimize_sub_expr e =
         value_clause = optimize_abs h.value_clause;
         finally_clause = optimize_abs h.finally_clause;
       }
-  | (Const _ | BuiltIn _ | Effect _) -> e
+  | (Var _ | Const _ | BuiltIn _ | Effect _) -> e
 and optimize_sub_comp c =
   (* Print.debug "Optimizing %t" (CamlPrint.print_computation c); *)
   let loc = c.location in
@@ -348,6 +328,13 @@ and optimize_abs2 a2 = a2a2 @@ optimize_abs @@ a22a @@ a2
 and reduce_expr e =
   match e.term with
 
+  | Var x ->
+      begin match find_inlinable x with
+      | Some d -> reduce_expr d
+      | Some ({term = Handler _} as d) -> reduce_expr (refresh_expr d)
+      | _ -> e
+      end
+
   | PureLetIn (ex, pa) ->
       begin match pure_beta_reduce pa ex with
       | Some e' -> e'
@@ -369,7 +356,8 @@ and reduce_expr e =
       let res =
         lambda (abstraction param_pat call_eff_param_var_k)
       in
-      optimize_expr res
+      (* Body is already reduced and it's a lambda *)
+      res
 
   | _ -> e
 
@@ -421,15 +409,6 @@ and reduce_comp c =
       let res =
         let_in e (abstraction p1 (bind_c1_c2))
       in
-      optimize_comp res
-
-  (* XXX most likely remove *)
-  | Bind (
-      {term = Apply({term = Effect eff}, e_param)},
-      {term = {term = Typed.PVar y}, {term = Apply ({term = Lambda k}, {term = Var x})}}
-    ) when y = x ->
-
-      let res = call ~loc: c.location eff e_param k in
       reduce_comp res
   
    | Bind ({term = Call (eff, e, k)}, c2) ->
