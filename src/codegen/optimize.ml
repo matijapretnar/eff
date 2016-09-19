@@ -250,19 +250,43 @@ let rec substitute_pattern_comp c p exp =
 and substitute_pattern_expr e p exp =
   optimize_expr (Typed.subst_expr (Typed.pattern_match p exp) e)
 
-and beta_reduce {term = (p, c)} e =
+and beta_reduce ({term = (p, c)} as a) e =
   match applicable_pattern p (Typed.free_vars_comp c) with
-  | NotInlinable when is_atomic e -> Some (substitute_pattern_comp c p e)
-  | Inlinable -> Some (substitute_pattern_comp c p e)
-  | NotPresent -> Some c
-  | _ -> None
+  | NotInlinable when is_atomic e -> substitute_pattern_comp c p e
+  | Inlinable -> substitute_pattern_comp c p e
+  | NotPresent -> c
+  | _ ->
+      let a = 
+        begin match p with
+        | {term = Typed.PVar x} ->
+            Print.debug "Added to stack ==== %t" (CamlPrint.print_variable x);
+            stack := Common.update x (fun () -> e) !stack;
+            abstraction p (optimize_comp c)
+        | _ ->
+            Print.debug "We are now in the let in 5 novar for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
+            a
+        end
+      in
+      let_in e a
 
-and pure_beta_reduce {term = (p, exp)} e =
+and pure_beta_reduce ({term = (p, exp)} as pa) e =
   match applicable_pattern p (Typed.free_vars_expr exp) with
-  | NotInlinable when is_atomic e  -> Some (substitute_pattern_expr exp p e)
-  | Inlinable -> Some (substitute_pattern_expr exp p e)
-  | NotPresent -> Some exp
-  | _ -> None
+  | NotInlinable when is_atomic e -> substitute_pattern_expr exp p e
+  | Inlinable -> substitute_pattern_expr exp p e
+  | NotPresent -> exp
+  | _ ->
+      let pa = 
+        begin match p with
+        | {term = Typed.PVar x} ->
+            Print.debug "Added to stack ==== %t" (CamlPrint.print_variable x);
+            stack := Common.update x (fun () -> e) !stack;
+            pure_abstraction p (optimize_expr e)
+        | _ ->
+            Print.debug "We are now in the let in 5 novar for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
+            pa
+        end
+      in
+      pure_let_in e pa
 
 and optimize_expr e = reduce_expr (optimize_sub_expr e)
 and optimize_comp c = reduce_comp (optimize_sub_comp c)
@@ -336,16 +360,10 @@ and reduce_expr e =
       end
 
   | PureLetIn (ex, pa) ->
-      begin match pure_beta_reduce pa ex with
-      | Some e' -> e'
-      | None -> e
-      end
+      pure_beta_reduce pa ex
 
   | PureApply ({term = PureLambda pa}, e2) ->
-      begin match pure_beta_reduce pa e2 with
-      | Some e' -> e'
-      | None -> e
-      end
+      pure_beta_reduce pa e2
 
   | Effect eff ->
       let (eff_name, (ty_par, ty_res)) = eff in
@@ -392,10 +410,7 @@ and reduce_comp c =
         | _ -> c)
 
   | Bind ({term = Value e}, c2) ->
-      let res =
-        let_in e c2
-      in
-      reduce_comp res
+      beta_reduce c2 e
 
   | Bind ({term = Bind (c1, {term = (p2, c2)})}, c3) ->
       let bind_c2_c3 = reduce_comp (bind c2 c3) in
@@ -470,11 +485,7 @@ and reduce_comp c =
       end
 
   | Handle ({term = Handler h}, {term = Value v}) ->
-      let lambda_h_value_clause = reduce_expr (lambda h.value_clause) in
-      let res =
-        apply lambda_h_value_clause v
-      in
-      reduce_comp res
+      beta_reduce h.value_clause v
 
    (* XXX simplify *)
   | Handle ({term = Handler h}, {term = Call (eff, exp, k)}) ->
@@ -534,28 +545,10 @@ and reduce_comp c =
            in reduce_comp res)
 
   | Apply ({term = Lambda a}, e) ->
-      begin match beta_reduce a e with
-      | Some c' -> c'
-      | None ->
-        begin match a with
-        | {term = (p, {term = Value v})} ->
-            let pure_lambda_p_v = reduce_expr (pure_lambda (pure_abstraction p v)) in
-            let pure_apply_pure_lambda_p_v_e = reduce_expr (pure_apply pure_lambda_p_v e) in
-            let res =
-              value pure_apply_pure_lambda_p_v_e
-            in
-            reduce_comp res
-        | _ -> c
-        end
-      end
+      beta_reduce a e
 
   | Apply ({term = PureLambda pa}, e2) ->
-      let pure_lambda_pa = reduce_expr (pure_lambda pa) in
-      let pure_apply_pure_lambda_pa_e2 = reduce_expr (pure_apply pure_lambda_pa e2) in
-      let res =
-        value pure_apply_pure_lambda_pa_e2
-      in
-      reduce_comp res
+      value (pure_beta_reduce pa e2)
   
   | Apply( {term = (Var v)} as e1, e2) ->
     begin match Common.lookup v !impure_wrappers with
@@ -596,19 +589,7 @@ and reduce_comp c =
    (* XXX simplify *)
   | LetIn (e, ({term = (p, cp)} as a)) ->
       Print.debug "We are now in the let in 1, 3 or 5 for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
-      begin match beta_reduce a e with
-      | Some c -> c
-      | None ->
-        begin match p with
-        | {term = Typed.PVar xx} ->
-            Print.debug "Added to stack ==== %t" (CamlPrint.print_variable xx);
-            stack:= Common.update xx (fun () -> e) !stack     
-        | _ ->
-            Print.debug "We are now in the let in 5 novar for %t" (CamlPrint.print_expression (make_expression_from_pattern p));
-        end;
-        (* XXX Is this necessary? Isn't cp already optimized, so we should just return c? *)
-        let_in ~loc:c.location e (abstraction ~loc:e.location p (optimize_comp cp))
-      end
+      beta_reduce a e
 
    (* XXX simplify *)
   | LetRec(l,co) -> Print.debug "the letrec comp%t" (CamlPrint.print_computation co); c
