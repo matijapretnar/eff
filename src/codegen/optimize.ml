@@ -350,13 +350,10 @@ and reduce_comp c =
     reduce_comp res
 
   | Bind ({term = Call (eff, e, k)}, c2) ->
-    let (_, (result_ty, _), _) = k.scheme in
-    let result_var, result_pat = make_var "result" (Scheme.simple result_ty) in
-    let lambda_k = reduce_expr (lambda (refresh_abs k)) in
-    let apply_lambda_k_result_var = reduce_comp (apply lambda_k result_var) in
-    let bind_apply_lambda_k_result_var_c2 = reduce_comp (bind apply_lambda_k_result_var c2) in
+    let {term = (k_pat, k_body)} = refresh_abs k in
+    let bind_k_c2 = reduce_comp (bind k_body c2) in
     let res =
-      call eff e (abstraction result_pat bind_apply_lambda_k_result_var_c2)
+      call eff e (abstraction k_pat bind_k_c2)
     in
     reduce_comp res
 
@@ -367,41 +364,43 @@ and reduce_comp c =
     in
     reduce_comp res
 
-  (* XXX simplify *)
   | Handle (e1, {term = Apply (ae1, ae2)}) ->
     begin match ae1.term with
       | Var v ->
         begin match find_in_stack v with
-          | Some d -> 
-            begin match d.term with
-              | Lambda ({term = (dp,dc)}) ->
-                let new_var, new_pat = make_var "newvar" ae1.scheme in
-                let new_computation = apply ~loc:c.location (new_var) (ae2) in
-                let new_handle = handle ~loc:c.location e1 (substitute_var_comp dc v (refresh_expr d)) in
-                let new_lambda = lambda ~loc:c.location (abstraction ~loc:c.location dp new_handle) in 
-                optimize_comp (let_in ~loc:c.location new_lambda 
-                                 (abstraction ~loc:c.location new_pat (new_computation)))
-              | _ -> c
-            end
-          |_ -> c
+          | Some ({term = Lambda {term = (dp, dc)}} as d) -> 
+            let f_var, f_pat = make_var "newvar" ae1.scheme in
+            let f_def =
+              lambda @@
+              abstraction dp @@
+              handle e1 (substitute_var_comp dc v (refresh_expr d))
+            in 
+            let res =
+              let_in f_def @@
+              abstraction f_pat @@
+              apply f_var ae2
+            in
+            optimize_comp res
+          | _ -> c
         end
-      | PureApply ({term = Var fname},pae2)->
+      | PureApply ({term = Var fname}, pae2)->
         begin match find_in_stack fname with
-          | Some d -> 
-            begin match d.term with
-              | PureLambda {term = (dp1,{term = Lambda ({term = (dp2,dc)})})} ->
-                let newfname, new_pat = make_var "newvar" ae1.scheme in
-                let pure_application = pure_apply ~loc:c.location newfname pae2 in
-                let application = apply ~loc:c.location pure_application ae2 in
-                let handler_call = handle ~loc:c.location e1 dc in 
-                let newfinnerlambda = lambda ~loc:c.location (abstraction ~loc:c.location dp2 handler_call) in 
-                let newfbody = pure_lambda ~loc:c.location (pure_abstraction dp1 newfinnerlambda) in 
-                let res = 
-                  let_in ~loc:c.location (newfbody) (abstraction ~loc:c.location new_pat application) in
-                optimize_comp res
-
-              | _ -> c
-            end
+          | Some {term = PureLambda {term = (dp1, {term = Lambda ({term = (dp2,dc)})})}} -> 
+            let f_var, f_pat = make_var "newvar" ae1.scheme in
+            let f_def =
+              pure_lambda @@
+              pure_abstraction dp1 @@
+              lambda @@
+              abstraction dp2 @@
+              (* Why don't we refresh dc here? *)
+              handle e1 dc
+            in 
+            let res = 
+              let_in f_def @@
+              abstraction f_pat @@
+              apply (pure_apply f_var pae2) ae2
+            in
+            optimize_comp res
           | _ -> c
         end
       | _ -> c
@@ -455,19 +454,27 @@ and reduce_comp c =
 
   (* XXX simplify *)
   (*Matching let f = \x.\y. c *)    
-  | LetIn({term = Lambda ({term = (pe1, {term = Value ({term = Lambda ({term = (pe2,ce2)}) } as in_lambda)} )})}, {term = ({term = PVar fo} as p,cp)} )->
+  | LetIn ({term = Lambda ({term = (pe1, {term = Value ({term = Lambda ({term = (pe2,ce2)}) } as in_lambda)} )})}, ({term = ({term = PVar f} as p,_)} as a) )->
     Print.debug "We are now in the let in 4 for %t" (Typed.print_pattern p);
     let new_var, new_pat = make_var "newvar" p.scheme in
     let new_var2, new_pat2 = make_var "newvar2" pe1.scheme in 
-    let pure_application = pure_apply ~loc:c.location new_var new_var2 in
-    let second_let_value = value ~loc:c.location pure_application in 
-    let second_let_lambda = lambda ~loc:c.location (abstraction ~loc:c.location new_pat2 second_let_value) in
-    let second_let = let_in ~loc:c.location second_let_lambda (abstraction ~loc:c.location p cp) in
-    let outer_lambda = pure_lambda ~loc:c.location (pure_abstraction pe1 in_lambda) in
-    let first_let_abstraction = abstraction ~loc:c.location new_pat second_let in
-    let first_let = let_in ~loc:c.location (outer_lambda) first_let_abstraction in
-    impure_wrappers:= (fo,new_var) :: !impure_wrappers;
-    optimize_comp first_let
+    let first_fun =
+      pure_lambda @@
+      pure_abstraction pe1 @@
+      in_lambda
+    and second_fun =
+      lambda @@
+      abstraction new_pat2 @@
+      value (pure_apply new_var new_var2)
+    in
+    impure_wrappers := (f, new_var) :: !impure_wrappers;
+    let res =
+      let_in first_fun @@
+      abstraction new_pat @@
+      let_in second_fun @@
+      a
+    in
+    optimize_comp res
 
   | LetIn (e, ({term = (p, cp)} as a)) ->
     Print.debug "We are now in the let in 1, 3 or 5 for %t" (Typed.print_pattern p);

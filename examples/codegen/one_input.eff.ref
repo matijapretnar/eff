@@ -12,8 +12,8 @@ let _choose_sum_279 =
                 fun (_k_280 : bool -> _ computation)  ->
                   (_k_280 true) >>
                     (fun _gen_bind_282  ->
-                       let _gen_bind_281 _x2_75 =
-                         value (Pervasives.(+) _gen_bind_282 _x2_75)  in
+                       let _gen_bind_281 _x2_67 =
+                         value (Pervasives.(+) _gen_bind_282 _x2_67)  in
                        (_k_280 false) >>
                          (fun _gen_bind_283  -> _gen_bind_281 _gen_bind_283)))
          | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
