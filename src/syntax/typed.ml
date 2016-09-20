@@ -895,3 +895,16 @@ and free_vars_abs2 a2 = free_vars_abs @@ a22a @@ a2
 let occurrences x (inside, outside) =
   let count ys = List.length (List.filter (fun y -> x = y) ys) in
   (count inside, count outside)
+
+let rec print_pattern ?max_level p ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match p.term with
+  | PVar x -> print "%t" (Variable.print x)
+  | PAs (p, x) -> print "%t as %t" (print_pattern p) (Variable.print x)
+  | PConst c -> Const.print c ppf
+  | PTuple lst -> Print.tuple print_pattern lst ppf
+  | PRecord lst -> Print.record print_pattern lst ppf
+  | PVariant (lbl, None) -> print "%s" lbl
+  | PVariant (lbl, Some p) ->
+      print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
+  | PNonbinding -> print "_"
