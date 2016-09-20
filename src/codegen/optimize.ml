@@ -319,8 +319,8 @@ and reduce_comp c =
 
   (* Convert simultaneous let into a sequence of binds *)
   | Let (defs, c) ->
-    let binds = List.fold_right (fun (p, c) binds ->
-        bind c (abstraction p binds)
+    let binds = List.fold_right (fun (p_def, c_def) binds ->
+        bind c_def (abstraction p_def binds)
       ) defs c in
     reduce_comp binds
 
@@ -332,35 +332,79 @@ and reduce_comp c =
     in
     find_const_case cases
 
-  | Bind ({term = Value e}, c2) ->
-    beta_reduce c2 e
+  | Bind ({term = Value e}, c) ->
+    beta_reduce c e
 
-  | Bind ({term = Bind (c1, {term = (p2, c2)})}, c3) ->
+  | Bind ({term = Bind (c1, {term = (p1, c2)})}, c3) ->
     let bind_c2_c3 = reduce_comp (bind c2 c3) in
     let res =
-      bind c1 (abstraction p2 bind_c2_c3)
+      bind c1 (abstraction p1 bind_c2_c3)
     in
     reduce_comp res
 
-  | Bind ({term = LetIn (e, {term = (p1, c1)})}, c2) ->
-    let bind_c1_c2 = reduce_comp (bind c1 c2) in
+  | Bind ({term = LetIn (e1, {term = (p1, c2)})}, c3) ->
+    let bind_c2_c3 = reduce_comp (bind c2 c3) in
     let res =
-      let_in e (abstraction p1 (bind_c1_c2))
+      let_in e1 (abstraction p1 (bind_c2_c3))
     in
     reduce_comp res
 
-  | Bind ({term = Call (eff, e, k)}, c2) ->
+  | Bind ({term = Call (eff, param, k)}, c) ->
     let {term = (k_pat, k_body)} = refresh_abs k in
-    let bind_k_c2 = reduce_comp (bind k_body c2) in
+    let bind_k_c = reduce_comp (bind k_body c) in
     let res =
-      call eff e (abstraction k_pat bind_k_c2)
+      call eff param (abstraction k_pat bind_k_c)
     in
     reduce_comp res
 
-  | Handle (e1, {term = LetIn (e2, {term = (p, c2)})}) ->
-    let handle_e1_c2 = reduce_comp (handle e1 c2) in
+  | Handle (h, {term = LetIn (e, {term = (p, c)})}) ->
+    let handle_h_c = reduce_comp (handle h c) in
     let res =
-      let_in e2 (abstraction p (handle_e1_c2))
+      let_in e (abstraction p (handle_h_c))
+    in
+    reduce_comp res
+
+  | Handle ({term = Handler h}, {term = Value v}) ->
+    beta_reduce h.value_clause v
+
+  | Handle ({term = Handler h} as handler, {term = Call (eff, param, k)}) ->
+    let {term = (k_pat, k_body)} = refresh_abs k in
+    let handled_k =
+      abstraction k_pat
+        (reduce_comp (handle (refresh_expr handler) k_body))
+    in
+    begin match Common.lookup eff h.effect_clauses with
+      | Some eff_clause ->
+        let {term = (p1, p2, c)} = refresh_abs2 eff_clause in
+        (* Shouldn't we check for inlinability of p1 and p2 here? *)
+        substitute_pattern_comp (substitute_pattern_comp c p1 param) p2 (lambda handled_k)
+      | None ->
+        let res =
+          call eff param handled_k
+        in
+        reduce_comp res
+    end
+
+  | Apply ({term = Lambda a}, e) ->
+    beta_reduce a e
+
+  | Apply ({term = PureLambda pa}, e2) ->
+    value (pure_beta_reduce pa e2)
+
+  | Apply ({term = Var v}, e2) ->
+    begin match Common.lookup v !impure_wrappers with
+      | Some f -> 
+        let res =
+          value (pure_apply f e2)
+        in
+        reduce_comp res
+      | None -> c
+    end
+
+  | LetIn (e1, {term = (p, {term = Value e2})}) ->
+    Print.debug "We are now in the let in 2 for %t" (Typed.print_pattern p);
+    let res =
+      value (pure_let_in e1 (pure_abstraction p e2))
     in
     reduce_comp res
 
@@ -406,54 +450,7 @@ and reduce_comp c =
       | _ -> c
     end
 
-  | Handle ({term = Handler h}, {term = Value v}) ->
-    beta_reduce h.value_clause v
-
-  | Handle ({term = Handler h} as handler, {term = Call (eff, param, k)}) ->
-    let {term = (k_pat, k_body)} = refresh_abs k in
-    let handled_k =
-      abstraction k_pat
-        (reduce_comp (handle (refresh_expr handler) k_body))
-    in
-    begin match Common.lookup eff h.effect_clauses with
-      | Some eff_clause ->
-        let {term = (p1, p2, c)} = refresh_abs2 eff_clause in
-        (* Shouldn't we check for inlinability of p1 and p2 here? *)
-        substitute_pattern_comp (substitute_pattern_comp c p1 param) p2 (lambda handled_k)
-      | None ->
-        let res =
-          call eff param handled_k
-        in
-        reduce_comp res
-    end
-
-  | Apply ({term = Lambda a}, e) ->
-    beta_reduce a e
-
-  | Apply ({term = PureLambda pa}, e2) ->
-    value (pure_beta_reduce pa e2)
-
-  | Apply( {term = Var v}, e2) ->
-    begin match Common.lookup v !impure_wrappers with
-      | Some fn -> 
-        let pure_apply_fn_e2 = reduce_expr (pure_apply fn e2) in 
-        let res =
-          value pure_apply_fn_e2
-        in
-        reduce_comp res
-      | None -> c
-    end
-
-  | LetIn (e1, {term = (p, {term = Value e2})}) ->
-    Print.debug "We are now in the let in 2 for %t" (Typed.print_pattern p);
-    let pure_let_in_e1_p_e2 = reduce_expr (pure_let_in e1 (pure_abstraction p e2)) in
-    let res =
-      value pure_let_in_e1_p_e2
-    in
-    reduce_comp res
-
-  (* XXX simplify *)
-  (*Matching let f = \x.\y. c *)    
+  (* Matching let f = \x.\y. c *)    
   | LetIn ({term = Lambda ({term = (pe1, {term = Value ({term = Lambda ({term = (pe2,ce2)}) } as in_lambda)} )})}, ({term = ({term = PVar f} as p,_)} as a) )->
     Print.debug "We are now in the let in 4 for %t" (Typed.print_pattern p);
     let new_var, new_pat = make_var "newvar" p.scheme in
