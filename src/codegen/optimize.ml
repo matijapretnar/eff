@@ -450,24 +450,32 @@ and reduce_comp c =
       | _ -> c
     end
 
-  (* Matching let f = \x.\y. c *)    
-  | LetIn ({term = Lambda ({term = (pe1, {term = Value ({term = Lambda ({term = (pe2,ce2)}) } as in_lambda)} )})}, ({term = ({term = PVar f} as p,_)} as a) )->
-    Print.debug "We are now in the let in 4 for %t" (Typed.print_pattern p);
-    let new_var, new_pat = make_var "newvar" p.scheme in
-    let new_var2, new_pat2 = make_var "newvar2" pe1.scheme in 
+
+
+    (*
+      let f = \p. val lambda in c
+       ~~> (append f := f1 to impure_wrappers)
+      let f1 = \*p. lambda
+      let f = \new_p. val (f1 new_p) in
+      c
+    *)
+  | LetIn ({term = Lambda ({term = (p, {term = Value ({term = Lambda _ } as in_lambda)} )})}, ({term = ({term = PVar f} as f_pat,_)} as a) )->
+    Print.debug "We are now in the let in 4 for %t" (Typed.print_pattern f_pat);
+    let f1_var, f1_pat = make_var "f1" f_pat.scheme in
+    let new_p_var, new_p_pat = make_var "new_p" p.scheme in 
     let first_fun =
       pure_lambda @@
-      pure_abstraction pe1 @@
+      pure_abstraction p @@
       in_lambda
     and second_fun =
       lambda @@
-      abstraction new_pat2 @@
-      value (pure_apply new_var new_var2)
+      abstraction new_p_pat @@
+      value (pure_apply f1_var new_p_var)
     in
-    impure_wrappers := (f, new_var) :: !impure_wrappers;
+    impure_wrappers := (f, f1_var) :: !impure_wrappers;
     let res =
       let_in first_fun @@
-      abstraction new_pat @@
+      abstraction f1_pat @@
       let_in second_fun @@
       a
     in
