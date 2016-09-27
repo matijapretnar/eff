@@ -10,15 +10,14 @@ let _choose_sum_279 =
          | Effect_Decide  ->
              (fun (() : unit)  ->
                 fun (_k_280 : bool -> _ computation)  ->
-                  let _gen_bind_281 =
-                    run
-                      (let _gen_bind_282 = run (_k_280 true)  in
-                       value
-                         (fun _x2_67  ->
-                            (binary_builtin Pervasives.(+))
-                              (_gen_bind_282, _x2_67)))
-                     in
-                  _gen_bind_281 (run (_k_280 false)))
+                  (_k_280 true) >>
+                    (fun _gen_bind_282  ->
+                       let _gen_bind_281 _x2_67 =
+                         (binary_builtin Pervasives.(+))
+                           (_gen_bind_282, _x2_67)
+                          in
+                       (_k_280 false) >>
+                         (fun _gen_bind_283  -> _gen_bind_281 _gen_bind_283)))
          | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                    (b ->
                                                                     _
