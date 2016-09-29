@@ -126,6 +126,8 @@ let inlinable = ref []
 
 let stack = ref []
 
+let letrec_memory = ref []
+
 let impure_wrappers = ref []
 
 let find_inlinable x =
@@ -137,6 +139,14 @@ let find_in_stack x =
   match Common.lookup x !stack with
   | Some e -> Some (e ())
   | None -> None
+
+
+let find_in_let_rec_mem v = 
+  let findres = List.filter ( fun (var,a) ->  if(var == v) then true else false) !letrec_memory in
+  begin match findres with
+  | [] -> None
+  | [(vr,ab)] -> Some ab
+  end
 
 let make_var ?(loc=Location.unknown) ann scheme =
   let x = Typed.Variable.fresh ann in
@@ -408,6 +418,14 @@ and reduce_comp c =
     in
     reduce_comp res
 
+  | Handle (e1, {term = Match (e, abs_list)}) ->
+    
+    let push_handler = fun abs -> let (p,c1) = abs.term in  
+          let temp = abstraction p ( reduce_comp (handle (refresh_expr e1) c1)) in
+          temp in
+    let res = match' e (List.map push_handler abs_list) in
+    res
+
   | Handle (e1, {term = Apply (ae1, ae2)}) ->
     begin match ae1.term with
       | Var v ->
@@ -425,7 +443,25 @@ and reduce_comp c =
               apply f_var ae2
             in
             optimize_comp res
-          | _ -> c
+          | _ -> begin match (find_in_let_rec_mem v) with 
+                 | Some abs ->
+                              let (let_rec_p,let_rec_c) = abs.term in 
+                              let new_f_var, new_f_pat = make_var "newvar" ae1.scheme in
+                              let new_handler_call = handle e1 let_rec_c in
+                              let v_pat = {
+                                        term = Typed.PVar v;
+                                        location = c.location;
+                                        scheme = ae1.scheme
+                                      } in
+                              let Var newfvar = new_f_var.term in
+                              let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in 
+                              let res =
+                                let_rec' defs @@
+                                apply new_f_var ae2
+                              in
+                              optimize_comp res
+                 | None -> c
+               end
         end
       | PureApply ({term = Var fname}, pae2)->
         begin match find_in_stack fname with
@@ -479,10 +515,14 @@ and reduce_comp c =
 
   (* XXX simplify *)
   | LetRec (defs, co) ->
-    Print.debug "the letrec comp%t" (CamlPrint.print_computation co);
-    c
+    Print.debug "the letrec comp  %t" (CamlPrint.print_computation co);
+    List.map (fun (var,abs)-> 
+            Print.debug "ADDING %t and %t to letrec" (CamlPrint.print_variable var) (CamlPrint.print_abstraction abs);
+            letrec_memory := (var,abs) :: !letrec_memory) defs;
+    let_rec' defs (reduce_comp co)
 
   | _ -> c
+
 
 let optimize_command = function
   | Typed.Computation c ->
