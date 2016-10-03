@@ -359,6 +359,124 @@ and subst_pure_abs sbst pa =
 and subst_abs2 sbst a2 =
   a2a2 @@ subst_abs sbst @@ a22a @@ a2
 
+let assoc_equal eq flds flds' : bool =
+  let rec equal_fields flds =
+    match flds with
+      | [] -> true
+      | (f, x) :: flds ->
+          begin match Common.lookup f flds' with
+          | Some x' when eq x x' -> equal_fields flds
+          | _ -> false
+          end
+  in
+  List.length flds = List.length flds' &&
+  equal_fields flds
+
+let rec make_equal_pattern eqvars p p' =
+  make_equal_pattern' eqvars p.term p'.term
+and make_equal_pattern' eqvars p p' =
+  match p, p' with
+  | PVar x, PVar x' -> Some ((x, x') :: (x', x) :: eqvars)
+  | PAs (p, x), PAs (p', x') ->
+      Common.option_map (fun eqvars ->
+        (x, x') :: (x', x) :: eqvars
+      ) (make_equal_pattern eqvars p p')
+  | PTuple ps, PTuple ps' ->
+      List.fold_right2 (fun p p' -> function
+        | Some eqvars' -> make_equal_pattern eqvars' p p'
+        | None -> None
+      ) ps ps' (Some eqvars)
+  | PConst cst, PConst cst' when Const.equal cst cst' -> Some eqvars
+  | PNonbinding, PNonbinding -> Some eqvars
+  | _, _ -> None
+
+let rec alphaeq_expr eqvars e e' =
+  alphaeq_expr' eqvars e.term e'.term
+and alphaeq_expr' eqvars e e' =
+  match e, e' with
+  | Var x, Var y ->
+     List.mem (x, y) eqvars ||  Variable.compare x y = 0
+  | PureLambda pa, PureLambda pa' ->
+      alphaeq_pure_abs eqvars pa pa'
+  | Lambda a, Lambda a' ->
+      alphaeq_abs eqvars a a'
+  | PureLetIn (e1, pa), PureLetIn (e1', pa') ->
+      alphaeq_expr eqvars e1 e1' && alphaeq_pure_abs eqvars pa pa'
+  | Handler h, Handler h' ->
+      alphaeq_handler eqvars h h'
+  | Tuple es, Tuple es' ->
+      List.for_all2 (alphaeq_expr eqvars) es es'
+  | Record flds, Record flds' ->
+      assoc_equal (alphaeq_expr eqvars) flds flds'
+  | Variant (lbl, None), Variant (lbl', None) ->
+      lbl = lbl'
+  | Variant (lbl, Some e), Variant (lbl', Some e') ->
+      lbl = lbl' && alphaeq_expr eqvars e e'
+  | PureApply (e1, e2), PureApply (e1', e2') ->
+      alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2'
+  | BuiltIn f, BuiltIn f' ->
+      f = f'
+  | Const cst, Const cst' ->
+      Const.equal cst cst'
+  | Effect eff, Effect eff' ->
+      eff = eff'
+  | _, _ -> false
+and alphaeq_comp eqvars c c' =
+  alphaeq_comp' eqvars c.term c'.term
+and alphaeq_comp' eqvars c c' =
+  match c, c' with
+  | Bind (c1, c2), Bind (c1', c2') ->
+      alphaeq_comp eqvars c1 c1' && alphaeq_abs eqvars c2 c2'
+  | LetIn (e, a), LetIn (e', a') ->
+      alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a'
+  | Let (li, c1), Let (li', c1') ->
+      let eqvars' = List.fold_right2 (fun (p, c) (p', c') -> function
+        | None -> None
+        | Some eqvars' ->
+          begin match make_equal_pattern eqvars' p p' with
+          | Some eqvars' when alphaeq_comp eqvars c c' -> Some eqvars'
+          | _ -> None
+          end
+      ) li li' (Some eqvars) in
+      begin match eqvars' with
+      | None -> false
+      | Some eqvars' -> alphaeq_comp eqvars' c1 c1'
+      end
+  | LetRec (li, c1), LetRec (li', c1') ->
+      (* XXX Not yet implemented *)
+      false
+  | Match (e, li), Match (e', li') ->
+      alphaeq_expr eqvars e e' && List.for_all2 (alphaeq_abs eqvars) li li'
+  | While (c1, c2), While (c1', c2') ->
+      alphaeq_comp eqvars c1 c1' && alphaeq_comp eqvars c2 c2'
+  | For (x, e1, e2, c, b), For (x', e1', e2', c', b') ->
+      Variable.compare x x' = 0 &&
+      alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2' &&
+      alphaeq_comp eqvars c c' && b = b'
+  | Apply (e1, e2), Apply (e1', e2') ->
+      alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2'
+  | Handle (e, c), Handle (e', c') ->
+      alphaeq_expr eqvars e e' && alphaeq_comp eqvars c c'
+  | Check c, Check c' ->
+      alphaeq_comp eqvars c c'
+  | Call (eff, e, a), Call (eff', e', a') ->
+      eff = eff' && alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a'
+  | Value e, Value e' ->
+      alphaeq_expr eqvars e e'
+  | _, _ -> false
+and alphaeq_handler eqvars h h' =
+  assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
+  alphaeq_abs eqvars h.value_clause h'.value_clause &&
+  alphaeq_abs eqvars h.finally_clause h'.finally_clause
+and alphaeq_abs eqvars {term = (p, c)} {term = (p', c')} =
+  match make_equal_pattern eqvars p p' with
+  | Some eqvars' -> alphaeq_comp eqvars' c c'
+  | None -> false
+and alphaeq_pure_abs eqvars pa pa' =
+  alphaeq_abs eqvars (pa2a pa) (pa2a pa')
+and alphaeq_abs2 eqvars a2 a2' =
+  alphaeq_abs eqvars (a22a a2) (a22a a2')
+
 (*pure abstract*)
 
 let var ?loc x ty_sch =
