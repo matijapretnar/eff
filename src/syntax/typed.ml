@@ -376,10 +376,10 @@ let rec make_equal_pattern eqvars p p' =
   make_equal_pattern' eqvars p.term p'.term
 and make_equal_pattern' eqvars p p' =
   match p, p' with
-  | PVar x, PVar x' -> Some ((x, x') :: (x', x) :: eqvars)
+  | PVar x, PVar x' -> Some ((x, x') :: eqvars)
   | PAs (p, x), PAs (p', x') ->
       Common.option_map (fun eqvars ->
-        (x, x') :: (x', x) :: eqvars
+        (x, x') :: eqvars
       ) (make_equal_pattern eqvars p p')
   | PTuple ps, PTuple ps' ->
       List.fold_right2 (fun p p' -> function

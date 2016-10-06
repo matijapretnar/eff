@@ -128,6 +128,8 @@ let stack = ref []
 
 let letrec_memory = ref []
 
+let handlers_functions_mem = ref []
+
 let impure_wrappers = ref []
 
 let find_inlinable x =
@@ -146,6 +148,14 @@ let find_in_let_rec_mem v =
   begin match findres with
   | [] -> None
   | [(vr,ab)] -> Some ab
+  end
+
+let find_in_handlers_func_mem f_name h_exp =
+  let findres = List.filter 
+                  (fun (h,old_f,new_f) -> (f_name == old_f) && alphaeq_expr [] h h_exp) !handlers_functions_mem in
+  begin match findres with 
+  | [] -> None
+  | [(_,_,newf)] -> Some newf
   end
 
 let make_var ?(loc=Location.unknown) ann scheme =
@@ -443,24 +453,31 @@ and reduce_comp c =
               apply f_var ae2
             in
             optimize_comp res
-          | _ -> begin match (find_in_let_rec_mem v) with 
-                 | Some abs ->
-                              let (let_rec_p,let_rec_c) = abs.term in 
-                              let new_f_var, new_f_pat = make_var "newvar" ae1.scheme in
-                              let new_handler_call = handle e1 let_rec_c in
-                              let v_pat = {
-                                        term = Typed.PVar v;
-                                        location = c.location;
-                                        scheme = ae1.scheme
-                                      } in
-                              let Var newfvar = new_f_var.term in
-                              let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in 
-                              let res =
-                                let_rec' defs @@
-                                apply new_f_var ae2
-                              in
-                              optimize_comp res
-                 | None -> c
+          | _ -> begin match (find_in_handlers_func_mem v e1) with 
+                 | Some new_f_exp -> 
+                                    let res = apply new_f_exp ae2
+                                    in reduce_comp res 
+                 | _ -> 
+                       begin match (find_in_let_rec_mem v) with 
+                       | Some abs ->
+                                    let (let_rec_p,let_rec_c) = abs.term in 
+                                    let new_f_var, new_f_pat = make_var "newvar" ae1.scheme in
+                                    let new_handler_call = handle e1 let_rec_c in
+                                    let v_pat = {
+                                              term = Typed.PVar v;
+                                              location = c.location;
+                                              scheme = ae1.scheme
+                                            } in
+                                    let Var newfvar = new_f_var.term in
+                                    let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in 
+                                    handlers_functions_mem:= (e1,v,new_f_var) :: !handlers_functions_mem ;
+                                    let res =
+                                      let_rec' defs @@
+                                      apply new_f_var ae2
+                                    in
+                                    optimize_comp res
+                       | None -> c
+                       end
                end
         end
       | PureApply ({term = Var fname}, pae2)->
