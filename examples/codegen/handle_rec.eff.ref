@@ -1,0 +1,26 @@
+type (_,_) effect +=
+  | Effect_Eff: (unit,unit) effect 
+;;let rec _f_279 _x_280 =
+    match Pervasives.(=) _x_280 0 with
+    | true  -> value 1
+    | false  ->
+        call Effect_Eff ()
+          (fun _result_72  -> _f_279 (Pervasives.(-) _x_280 1))
+     in
+  let rec _newvar_75 _x_280 =
+    match Pervasives.(=) _x_280 0 with
+    | true  -> value 1
+    | false  ->
+        (_newvar_75 (Pervasives.(-) _x_280 1)) >>
+          ((fun _gen_bind_90  -> value (Pervasives.( * ) _gen_bind_90 2)))
+     in
+  _newvar_75 5
+;;let rec _g_290 _x_291 =
+    match Pervasives.(=) _x_291 0 with
+    | true  -> value 1
+    | false  -> _g_290 (Pervasives.(-) _x_291 1)  in
+  let rec _newvar_97 _x_291 =
+    match Pervasives.(=) _x_291 0 with
+    | true  -> value 1
+    | false  -> _newvar_97 (Pervasives.(-) _x_291 1)  in
+  _newvar_97 5
