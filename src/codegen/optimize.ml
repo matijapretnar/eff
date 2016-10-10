@@ -428,12 +428,13 @@ and reduce_comp c =
     in
     reduce_comp res
 
-  | Handle (e1, {term = Match (e, abs_list)}) ->
-    
-    let push_handler = fun abs -> let (p,c1) = abs.term in  
-          let temp = abstraction p ( reduce_comp (handle (refresh_expr e1) c1)) in
-          temp in
-    let res = match' e (List.map push_handler abs_list) in
+  | Handle (e1, {term = Match (e2, cases)}) ->    
+    let push_handler = fun {term = (p, c)} ->  
+      abstraction p (reduce_comp (handle (refresh_expr e1) c))
+    in
+    let res =
+      match' e2 (List.map push_handler cases)
+    in
     res
 
   | Handle (e1, {term = Apply (ae1, ae2)}) ->

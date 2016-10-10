@@ -1,0 +1,5 @@
+;;match [4; 5; 6] with
+  | [] -> value (Pervasives.(+) 1 10)
+  | _x_282::[] -> value (Pervasives.(+) _x_282 10)
+  | _::_y_283::[] -> value (Pervasives.(+) _y_283 10)
+  | _x_284::_ -> value (Pervasives.(+) _x_284 10)
