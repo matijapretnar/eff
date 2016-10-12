@@ -22,7 +22,7 @@ let unary_inlinable f ty1 ty2 =
     lambda @@
     abstraction p @@
       apply
-        (built_in ("(unary_builtin " ^ f ^ ")") (Scheme.simple (Type.Arrow (ty1, (ty2, drt)))))
+        (built_in ("(inlined_unary " ^ f ^ ")") (Scheme.simple (Type.Arrow (ty1, (ty2, drt)))))
         (var x (Scheme.simple ty1))
   
 let binary_inlinable f ty1 ty2 ty =
@@ -48,7 +48,7 @@ let binary_inlinable f ty1 ty2 ty =
       lambda @@
       abstraction p2 @@
         apply
-          (built_in ("(binary_builtin " ^ f ^ ")") (Scheme.simple (Type.Arrow (Type.Tuple [ty1; ty2], (ty, drt)))))
+          (built_in ("(inlined_binary " ^ f ^ ")") (Scheme.simple (Type.Arrow (Type.Tuple [ty1; ty2], (ty, drt)))))
           (tuple [var x1 (Scheme.simple ty1); var x2 (Scheme.simple ty2)])
 
 let inlinable_definitions =
@@ -463,6 +463,9 @@ let optimize_command = function
     Typed.Computation (optimize_comp c)
   | Typed.TopLet (defs, vars) ->
     let defs' = Common.assoc_map optimize_comp defs in
+    let defs' = Common.assoc_map (fun c ->
+      if Scheme.is_pure c.scheme then value (reduce_expr (pure c)) else c
+    ) defs' in
     begin match defs' with
       (* If we define a single simple handler, we inline it *)
       | [({ term = Typed.PVar x}, { term = Value ({ term = Handler _ } as e)})] ->

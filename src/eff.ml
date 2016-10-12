@@ -127,8 +127,8 @@ let compile_file st filename =
   ignore (Sys.command ("echo ''" ^ " >> " ^ compiled_file));
   ignore (Sys.command ("echo '=== END SOURCE ===\n*)'" ^ " >> " ^ compiled_file));
   ignore (Sys.command ("echo ''" ^ " >> " ^ compiled_file));
-  ignore (Sys.command ("ocamlc " ^ temporary_file));
-  ignore (Sys.command ("ocamlc -dsource -w -A " ^ temporary_file ^ " >>" ^ compiled_file ^ " 2>&1"))
+  (* ignore (Sys.command ("ocamlc " ^ temporary_file)); *)
+  ignore (Sys.command ("cat " ^ temporary_file ^ " >>" ^ compiled_file))
 
 (* Interactive toplevel *)
 let toplevel ctxenv =
