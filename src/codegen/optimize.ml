@@ -143,7 +143,7 @@ let find_in_stack x =
   | None -> None
 
 
-let find_in_let_rec_mem v = 
+let find_in_let_rec_mem v =
   let findres = List.filter ( fun (var,a) ->  if(var == v) then true else false) !letrec_memory in
   begin match findres with
   | [] -> None
@@ -151,9 +151,9 @@ let find_in_let_rec_mem v =
   end
 
 let find_in_handlers_func_mem f_name h_exp =
-  let findres = List.filter 
+  let findres = List.filter
                   (fun (h,old_f,new_f) -> (f_name == old_f) && alphaeq_expr [] h h_exp) !handlers_functions_mem in
-  begin match findres with 
+  begin match findres with
   | [] -> None
   | [(_,_,newf)] -> Some newf
   end
@@ -204,13 +204,28 @@ let rec substitute_pattern_comp c p exp =
 and substitute_pattern_expr e p exp =
   optimize_expr (Typed.subst_expr (Typed.pattern_match p exp) e)
 
+
+and hasEffectsInCommon c h =
+    (* Print.debug "%t" (CamlPrint.print_computation_effects c1); *)
+    let rec hasCommonEffects l1 l2 =
+        match l1 with
+            | [] -> false
+            | (h1,_)::t1 -> (
+                match l2 with
+                    | [] -> false
+                    | ((h2,(_,_)),_)::t2 when h1 = h2 -> true
+                    | ((h2,(_,_)),_)::t2 -> (hasCommonEffects t1 l2) || (hasCommonEffects l1 t2)
+            ) in
+    let get_dirt (_,(_,dirt),_) = dirt in
+    hasCommonEffects (get_dirt (c.Typed.scheme)).Type.ops h.effect_clauses
+
 and beta_reduce ({term = (p, c)} as a) e =
   match applicable_pattern p (Typed.free_vars_comp c) with
   | NotInlinable when is_atomic e -> substitute_pattern_comp c p e
   | Inlinable -> substitute_pattern_comp c p e
   | NotPresent -> c
   | _ ->
-    let a = 
+    let a =
       begin match p with
         | {term = Typed.PVar x} ->
           Print.debug "Added to stack ==== %t" (CamlPrint.print_variable x);
@@ -229,7 +244,7 @@ and pure_beta_reduce ({term = (p, exp)} as pa) e =
   | Inlinable -> substitute_pattern_expr exp p e
   | NotPresent -> exp
   | _ ->
-    let pa = 
+    let pa =
       begin match p with
         | {term = Typed.PVar x} ->
           Print.debug "Added to stack ==== %t" (CamlPrint.print_variable x);
@@ -384,6 +399,14 @@ and reduce_comp c =
     in
     reduce_comp res
 
+  | Handle ({term = Handler h}, c1) when (not (hasEffectsInCommon c1 h)) ->
+    Print.debug "Remove handler, keep handler since no effects in common with computation";
+    reduce_comp (bind c1 h.value_clause)
+
+  | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})}) when  (not (hasEffectsInCommon c1 h)) ->
+    Print.debug "Remove handler of outer Bind, keep handler since no effects in common with computation";
+    reduce_comp (bind (reduce_comp c1) (abstraction p1 (reduce_comp (handle (refresh_expr handler) c2))))
+
   | Handle ({term = Handler h}, {term = Value v}) ->
     beta_reduce h.value_clause v
 
@@ -413,7 +436,7 @@ and reduce_comp c =
 
   | Apply ({term = Var v}, e2) ->
     begin match Common.lookup v !impure_wrappers with
-      | Some f -> 
+      | Some f ->
         let res =
           value (pure_apply f e2)
         in
@@ -428,8 +451,8 @@ and reduce_comp c =
     in
     reduce_comp res
 
-  | Handle (e1, {term = Match (e2, cases)}) ->    
-    let push_handler = fun {term = (p, c)} ->  
+  | Handle (e1, {term = Match (e2, cases)}) ->
+    let push_handler = fun {term = (p, c)} ->
       abstraction p (reduce_comp (handle (refresh_expr e1) c))
     in
     let res =
@@ -441,27 +464,28 @@ and reduce_comp c =
     begin match ae1.term with
       | Var v ->
         begin match find_in_stack v with
-          | Some ({term = Lambda {term = (dp, dc)}} as d) -> 
-            let f_var, f_pat = make_var "newvar" ae1.scheme in
+          | Some ({term = Lambda {term = (dp, dc)}} as d) ->
+            (* let f_var, f_pat = make_var "newvar" ae1.scheme in
             let f_def =
               lambda @@
               abstraction dp @@
               handle e1 (substitute_var_comp dc v (refresh_expr d))
-            in 
+            in
             let res =
               let_in f_def @@
               abstraction f_pat @@
               apply f_var ae2
             in
-            optimize_comp res
-          | _ -> begin match (find_in_handlers_func_mem v e1) with 
-                 | Some new_f_exp -> 
+            optimize_comp res *)
+            c
+          | _ -> begin match (find_in_handlers_func_mem v e1) with
+                 | Some new_f_exp ->
                                     let res = apply new_f_exp ae2
-                                    in reduce_comp res 
-                 | _ -> 
-                       begin match (find_in_let_rec_mem v) with 
+                                    in reduce_comp res
+                 | _ ->
+                       begin match (find_in_let_rec_mem v) with
                        | Some abs ->
-                                    let (let_rec_p,let_rec_c) = abs.term in 
+                                    let (let_rec_p,let_rec_c) = abs.term in
                                     let new_f_var, new_f_pat = make_var "newvar" ae1.scheme in
                                     let new_handler_call = handle e1 let_rec_c in
                                     let v_pat = {
@@ -470,7 +494,7 @@ and reduce_comp c =
                                               scheme = ae1.scheme
                                             } in
                                     let Var newfvar = new_f_var.term in
-                                    let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in 
+                                    let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
                                     handlers_functions_mem:= (e1,v,new_f_var) :: !handlers_functions_mem ;
                                     let res =
                                       let_rec' defs @@
@@ -483,7 +507,7 @@ and reduce_comp c =
         end
       | PureApply ({term = Var fname}, pae2)->
         begin match find_in_stack fname with
-          | Some {term = PureLambda {term = (dp1, {term = Lambda ({term = (dp2,dc)})})}} -> 
+          | Some {term = PureLambda {term = (dp1, {term = Lambda ({term = (dp2,dc)})})}} ->
             let f_var, f_pat = make_var "newvar" ae1.scheme in
             let f_def =
               pure_lambda @@
@@ -492,8 +516,8 @@ and reduce_comp c =
               abstraction dp2 @@
               (* Why don't we refresh dc here? *)
               handle e1 dc
-            in 
-            let res = 
+            in
+            let res =
               let_in f_def @@
               abstraction f_pat @@
               apply (pure_apply f_var pae2) ae2
@@ -516,7 +540,7 @@ and reduce_comp c =
   | LetIn ({term = Lambda ({term = (p, {term = Value ({term = Lambda _ } as in_lambda)} )})}, ({term = ({term = PVar f} as f_pat,_)} as a) )->
     Print.debug "We are now in the let in 4 for %t" (Typed.print_pattern f_pat);
     let f1_var, f1_pat = make_var "f1" f_pat.scheme in
-    let new_p_var, new_p_pat = make_var "new_p" p.scheme in 
+    let new_p_var, new_p_pat = make_var "new_p" p.scheme in
     let first_fun =
       pure_lambda @@
       pure_abstraction p @@
@@ -542,10 +566,11 @@ and reduce_comp c =
   (* XXX simplify *)
   | LetRec (defs, co) ->
     Print.debug "the letrec comp  %t" (CamlPrint.print_computation co);
-    List.map (fun (var,abs)-> 
+    List.map (fun (var,abs)->
             Print.debug "ADDING %t and %t to letrec" (CamlPrint.print_variable var) (CamlPrint.print_abstraction abs);
             letrec_memory := (var,abs) :: !letrec_memory) defs;
     let_rec' defs (reduce_comp co)
+
 
   | _ -> c
 
