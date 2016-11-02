@@ -8,7 +8,7 @@ open Typed
 
 type state = {
   inlinable : (Typed.variable, unit -> Typed.expression) Common.assoc;
-  stack : (Typed.variable, unit -> Typed.expression) Common.assoc;
+  stack : (Typed.variable, Typed.expression) Common.assoc;
   letrec_memory : (Typed.variable, Typed.abstraction) Common.assoc;
   handlers_functions_mem : (Typed.expression * Typed.variable * Typed.expression) list;
   impure_wrappers : (Typed.variable, Typed.expression) Common.assoc
@@ -27,11 +27,7 @@ let find_inlinable st x =
   | Some e -> Some (e ())
   | None -> None
 
-let find_in_stack st x =
-  match Common.lookup x st.stack with
-  | Some e -> Some (e ())
-  | None -> None
-
+let find_in_stack st x = Common.lookup x st.stack
 
 let find_in_let_rec_mem st v =
   let findres = List.filter ( fun (var,a) ->  if(var == v) then true else false) st.letrec_memory in
@@ -235,7 +231,7 @@ and beta_reduce st ({term = (p, c)} as a) e =
       begin match p with
         | {term = Typed.PVar x} ->
           Print.debug "Added to stack ==== %t" (CamlPrint.print_variable x);
-          let st = {st with stack = Common.update x (fun () -> e) st.stack} in
+          let st = {st with stack = Common.update x e st.stack} in
           abstraction p (optimize_comp st c)
         | _ ->
           Print.debug "We are now in the let in 5 novar for %t" (Typed.print_pattern p);
@@ -254,7 +250,7 @@ and pure_beta_reduce st ({term = (p, exp)} as pa) e =
       begin match p with
         | {term = Typed.PVar x} ->
           Print.debug "Added to stack ==== %t" (CamlPrint.print_variable x);
-          let st = {st with stack = Common.update x (fun () -> e) st.stack} in
+          let st = {st with stack = Common.update x e st.stack} in
           pure_abstraction p (optimize_expr st e)
         | _ ->
           Print.debug "We are now in the let in 5 novar for %t" (Typed.print_pattern p);
@@ -592,7 +588,7 @@ let optimize_command st = function
       | [({ term = Typed.PVar x}, { term = Value ({ term = Handler _ } as e)})] ->
         {st with inlinable = Common.update x (fun () -> e) st.inlinable}
       | [({ term = Typed.PVar x}, ({ term = Value ({term = Lambda _ } as e )} ))] ->
-        {st with stack = Common.update x (fun () -> e) st.stack}
+        {st with stack = Common.update x e st.stack}
       | _ -> st
     end
     in
