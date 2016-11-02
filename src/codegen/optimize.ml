@@ -88,72 +88,30 @@ let binary_inlinable f ty1 ty2 ty =
        (var x1 (Scheme.simple ty1)))
     (var x2 (Scheme.simple ty2))
 
+
 let inlinable_definitions =
-  [ ("=",
-     (fun () ->
-        let t = Type.fresh_ty ()
-        in binary_inlinable "Pervasives.(=)" t t Type.bool_ty));
-    ("<",
-     (fun () ->
-        let t = Type.fresh_ty ()
-        in binary_inlinable "Pervasives.(<)" t t Type.bool_ty));
-    ("<>",
-     (fun () ->
-        let t = Type.fresh_ty ()
-        in binary_inlinable "Pervasives.(<>)" t t Type.bool_ty));
-    (">",
-     (fun () ->
-        let t = Type.fresh_ty ()
-        in binary_inlinable "Pervasives.(>)" t t Type.bool_ty));
-    ("~-",
-     (fun () -> unary_inlinable "Pervasives.(~-)" Type.int_ty Type.int_ty));
-    ("+",
-     (fun () ->
-        binary_inlinable "Pervasives.(+)" Type.int_ty Type.int_ty Type.int_ty));
-    ("*",
-     (fun () ->
-        binary_inlinable "Pervasives.( * )" Type.int_ty Type.int_ty Type.
-                                                                      int_ty));
-    ("-",
-     (fun () ->
-        binary_inlinable "Pervasives.(-)" Type.int_ty Type.int_ty Type.int_ty));
-    ("mod",
-     (fun () ->
-        binary_inlinable "Pervasives.(mod)" Type.int_ty Type.int_ty Type.
-                                                                      int_ty));
-    ("~-.",
-     (fun () ->
-        unary_inlinable "Pervasives.(~-.)" Type.float_ty Type.float_ty));
-    ("+.",
-     (fun () ->
-        binary_inlinable "Pervasives.(+.)" Type.float_ty Type.float_ty Type.
-                                                                         float_ty));
-    ("*.",
-     (fun () ->
-        binary_inlinable "Pervasives.( *. )" Type.float_ty Type.float_ty
-          Type.float_ty));
-    ("-.",
-     (fun () ->
-        binary_inlinable "Pervasives.(-.)" Type.float_ty Type.float_ty Type.
-                                                                         float_ty));
-    ("/.",
-     (fun () ->
-        binary_inlinable "Pervasives.(/.)" Type.float_ty Type.float_ty Type.
-                                                                         float_ty));
-    ("/",
-     (fun () ->
-        binary_inlinable "Pervasives.(/)" Type.int_ty Type.int_ty Type.int_ty));
-    ("float_of_int",
-     (fun () ->
-        unary_inlinable "Pervasives.(float_of_int)" Type.int_ty Type.float_ty));
-    ("^",
-     (fun () ->
-        binary_inlinable "Pervasives.(^)" Type.string_ty Type.string_ty Type.
-                                                                          string_ty));
-    ("string_length",
-     (fun () ->
-        unary_inlinable "Pervasives.(string_length)" Type.string_ty Type.
-                                                                      int_ty)) ]
+  let polymorphic expr_of_ty = fun () -> expr_of_ty (Type.fresh_ty ())
+  and monomorphic expr = fun () -> expr in
+  [
+    ("=", polymorphic @@ fun t -> binary_inlinable "Pervasives.(=)" t t Type.bool_ty);
+    ("<", polymorphic @@ fun t -> binary_inlinable "Pervasives.(<)" t t Type.bool_ty);
+    ("<>", polymorphic @@ fun t -> binary_inlinable "Pervasives.(<>)" t t Type.bool_ty);
+    (">", polymorphic @@ fun t -> binary_inlinable "Pervasives.(>)" t t Type.bool_ty);
+    ("~-", monomorphic @@ unary_inlinable "Pervasives.(~-)" Type.int_ty Type.int_ty);
+    ("+", monomorphic @@ binary_inlinable "Pervasives.(+)" Type.int_ty Type.int_ty Type.int_ty);
+    ("*", monomorphic @@ binary_inlinable "Pervasives.( * )" Type.int_ty Type.int_ty Type. int_ty);
+    ("-", monomorphic @@ binary_inlinable "Pervasives.(-)" Type.int_ty Type.int_ty Type.int_ty);
+    ("mod", monomorphic @@ binary_inlinable "Pervasives.(mod)" Type.int_ty Type.int_ty Type.int_ty);
+    ("~-.", monomorphic @@ unary_inlinable "Pervasives.(~-.)" Type.float_ty Type.float_ty);
+    ("+.", monomorphic @@ binary_inlinable "Pervasives.(+.)" Type.float_ty Type.float_ty Type.float_ty);
+    ("*.", monomorphic @@ binary_inlinable "Pervasives.( *. )" Type.float_ty Type.float_ty Type.float_ty);
+    ("-.", monomorphic @@ binary_inlinable "Pervasives.(-.)" Type.float_ty Type.float_ty Type.float_ty);
+    ("/.", monomorphic @@ binary_inlinable "Pervasives.(/.)" Type.float_ty Type.float_ty Type.float_ty);
+    ("/", monomorphic @@ binary_inlinable "Pervasives.(/)" Type.int_ty Type.int_ty Type.int_ty);
+    ("float_of_int", monomorphic @@ unary_inlinable "Pervasives.(float_of_int)" Type.int_ty Type.float_ty);
+    ("^", monomorphic @@ binary_inlinable "Pervasives.(^)" Type.string_ty Type.string_ty Type.string_ty);
+    ("string_length", monomorphic @@ unary_inlinable "Pervasives.(string_length)" Type.string_ty Type.int_ty)
+  ]
 
 let make_var ?(loc=Location.unknown) ann scheme =
   let x = Typed.Variable.fresh ann in
