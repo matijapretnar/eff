@@ -29,12 +29,7 @@ let find_inlinable st x =
 
 let find_in_stack st x = Common.lookup x st.stack
 
-let find_in_let_rec_mem st v =
-  let findres = List.filter ( fun (var,a) ->  if(var == v) then true else false) st.letrec_memory in
-  begin match findres with
-  | [] -> None
-  | [(vr,ab)] -> Some ab
-  end
+let find_in_let_rec_mem st v = Common.lookup v st.letrec_memory
 
 let find_in_handlers_func_mem st f_name h_exp =
   let findres = List.filter
