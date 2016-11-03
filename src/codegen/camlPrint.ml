@@ -1,6 +1,10 @@
 let print_variable = Typed.Variable.print
 
+let format_region (Type.Region_Param i) = i
+
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
+
+let print_effect_region (eff, (region)) ppf = Print.print ppf "Effect_%s -> %d" eff (format_region region)
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -148,9 +152,9 @@ and print_let_abstraction (p, c) ppf =
 
 and print_top_let_abstraction (p, c) ppf =
   match c.Typed.term with
-  | Typed.Value e -> 
+  | Typed.Value e ->
     Format.fprintf ppf "%t = %t" (print_pattern p) (print_expression ~max_level:0 e)
-  | _ -> 
+  | _ ->
     Format.fprintf ppf "%t = run %t" (print_pattern p) (print_computation ~max_level:0 c)
 
 and print_let_rec_abstraction (x, a) ppf =
@@ -181,11 +185,18 @@ let print_tydefs tydefs ppf =
 let print_computation_effects ?max_level c ppf =
     let print ?at_level = Print.print ?max_level ?at_level ppf in
     let get_dirt (_,(_,dirt),_) = dirt in
+    let get_type (_,(ty,dirt),_) = ty in
+    let rest = (get_dirt(c.Typed.scheme)).Type.rest in
+    let rest_int (Type.Dirt_Param i) = i in
     (* Here we have access to the effects *)
-    (Format.fprintf ppf "Effects of a computation: \n";
+    (
+    Format.fprintf ppf "Effects of a computation: \n";
     let f elem =
-        Format.fprintf ppf "\t%t" (print_effect elem) in
-        List.iter f (get_dirt(c.Typed.scheme)).Type.ops;)
+        Format.fprintf ppf "\t%t\n" (print_effect_region elem) in
+        List.iter f (get_dirt(c.Typed.scheme)).Type.ops;
+    Format.fprintf ppf "\nRest: %d\n" (rest_int rest);
+    Format.fprintf ppf "Type: %t\n" (print_type (get_type(c.Typed.scheme)));
+    )
 
 let print_command (cmd, _) ppf =
   match cmd with

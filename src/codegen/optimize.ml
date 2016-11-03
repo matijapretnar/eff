@@ -165,7 +165,7 @@ and hasEffectsInCommon c h =
     let rec hasCommonEffects l1 l2 =
         match l1 with
             | [] -> false
-            | (h1,_)::t1 -> (
+            | (h1,region)::t1 when region >= (Type.Region_Param 0) -> (
                 match l2 with
                     | [] -> false
                     | ((h2,(_,_)),_)::t2 when h1 = h2 -> true
@@ -355,7 +355,10 @@ and reduce_comp st c =
     reduce_comp st res
 
   | Handle ({term = Handler h}, c1) when (not (hasEffectsInCommon c1 h)) ->
-    Print.debug "Remove handler, keep handler since no effects in common with computation";
+    Print.debug "Remove handler, since no effects in common with computation";
+    Print.debug "%t" (CamlPrint.print_computation c);
+    Print.debug "%t" (CamlPrint.print_computation_effects c1);
+    Print.debug "%t" (CamlPrint.print_computation c1);
     reduce_comp st (bind c1 h.value_clause)
 
   | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})}) when  (not (hasEffectsInCommon c1 h)) ->
