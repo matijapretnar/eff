@@ -25,4 +25,7 @@ let _choose_all_279 =
                                                                     _
                                                                     computation)
   } 
-;;(_var_187 [10]) >> (fun _gen_bind_84  -> _gen_bind_84 [20])
+;;call Effect_Decide ()
+    (fun _result_81  ->
+       (match _result_81 with | true  -> value 10 | false  -> value 20) >>
+         (fun _x_73  -> value [_x_73]))
