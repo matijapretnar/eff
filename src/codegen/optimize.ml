@@ -441,13 +441,14 @@ and reduce_comp c =
     begin match ae1.term with
       | Var v ->
         begin match find_in_stack v with
-          | Some ({term = Lambda {term = (dp, dc)}} as d) -> 
-            let f_var, f_pat = make_var "newvar" ae1.scheme in
+          | Some ({term = Lambda k}) ->
+            let {term = (newdp, newdc)} = refresh_abs k in
+            let (_,Type.Handler((ty_in, drt_in), (ty_out, drt_out)),_) = e1.scheme in 
+            let f_var, f_pat = make_var "newvar" (Scheme.simple (Type.Arrow(ty_in,(ty_out,drt_out)))) in
             let f_def =
               lambda @@
-              abstraction dp @@
-              handle e1 (substitute_var_comp dc v (refresh_expr d))
-            in 
+              abstraction newdp @@
+              handle e1 newdc in
             let res =
               let_in f_def @@
               abstraction f_pat @@
@@ -462,13 +463,9 @@ and reduce_comp c =
                        begin match (find_in_let_rec_mem v) with 
                        | Some abs ->
                                     let (let_rec_p,let_rec_c) = abs.term in 
-                                    let new_f_var, new_f_pat = make_var "newvar" ae1.scheme in
+                                    let (_,Type.Handler((ty_in, drt_in), (ty_out, drt_out)),_) = e1.scheme in
+                                    let new_f_var, new_f_pat = make_var "newvar" (Scheme.simple (Type.Arrow(ty_in,(ty_out,drt_out)))) in
                                     let new_handler_call = handle e1 let_rec_c in
-                                    let v_pat = {
-                                              term = Typed.PVar v;
-                                              location = c.location;
-                                              scheme = ae1.scheme
-                                            } in
                                     let Var newfvar = new_f_var.term in
                                     let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in 
                                     handlers_functions_mem:= (e1,v,new_f_var) :: !handlers_functions_mem ;
@@ -560,6 +557,7 @@ let optimize_command = function
       | [({ term = Typed.PVar x}, { term = Value ({ term = Handler _ } as e)})] ->
         inlinable := Common.update x (fun () -> e) !inlinable
       | [({ term = Typed.PVar x}, ({ term = Value ({term = Lambda _ } as e )} ))] ->
+      Print.debug "Added to stack ==> %t" (CamlPrint.print_variable x);
         stack := Common.update x (fun () -> e) !stack
       | _ -> ()
     end;
