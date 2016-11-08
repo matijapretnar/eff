@@ -170,6 +170,15 @@ let print_tydef (name, (params, body)) ppf =
 let print_tydefs tydefs ppf =
   Format.fprintf ppf "type %t" (Print.sequence "\nand\n" print_tydef tydefs)
 
+let print_computation_effects ?max_level c ppf =
+    let print ?at_level = Print.print ?max_level ?at_level ppf in
+    let get_dirt (_,(_,dirt),_) = dirt in
+    (* Here we have access to the effects *)
+    (Format.fprintf ppf "Effects of a computation: \n";
+    let f elem =
+        Format.fprintf ppf "\t%t" (print_effect elem) in
+        List.iter f (get_dirt(c.Typed.scheme)).Type.ops;)
+
 let print_command (cmd, _) ppf =
   match cmd with
   | Typed.DefEffect (eff, (ty1, ty2)) ->
