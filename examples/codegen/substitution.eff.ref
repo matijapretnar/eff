@@ -1,2 +1,2 @@
 let _decide_func_279 _bl_280 =
-  match _bl_280 with | true  -> value 10 | false  -> value 20 
+  match _bl_280 with | true  -> value 10 | false  -> value 20
