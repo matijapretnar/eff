@@ -43,8 +43,8 @@ let rec print_type ?max_level ty ppf =
   | Type.Handler ((ty1, _), (ty2, _)) ->
       print ~at_level:2 "(%t, %t) handler" (print_type ty1) (print_type ty2)
 
-and print_dirty_type (ty, _) ppf =
-  Format.fprintf ppf "%t computation" (print_type ~max_level:0 ty)
+and print_dirty_type (ty, drt) ppf =
+  Format.fprintf ppf "_"
 
 and print_args (tys, _, _) ppf =
   match tys with

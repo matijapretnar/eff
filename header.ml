@@ -44,30 +44,11 @@ let call (eff : ('a, 'b) effect) (arg : 'a) (cont : 'b -> 'c computation) :
   
 let effect eff arg = call eff arg value
 
-let unary_builtin f = fun x -> (f x)
-let binary_builtin f = fun (x, y) -> (f x y)
-
 let run =
   function
   | Value x -> x
   | Call (eff, _, _) -> failwith ("Uncaught effect")
 
-let (=) = fun x -> value (fun y -> value (Pervasives.(=) x y))
-let (<) = fun x -> value (fun y -> value (Pervasives.(<) x y))
-let (<>) = fun x -> value (fun y -> value (Pervasives.(<>) x y))
-let (>) = fun x -> value (fun y -> value (Pervasives.(>) x y))
-
-let (~-) = fun x -> value (Pervasives.(~-) x)
-let (+) = fun x -> value (fun y -> value (Pervasives.(+) x y))
-let ( * ) = fun x -> value (fun y -> value (Pervasives.( * ) x y))
-let (-) = fun x -> value (fun y -> value (Pervasives.(-) x y))
-let (mod) = fun x -> value (fun y -> value (Pervasives.(mod) x y))
-let (~-.) = fun x -> value (Pervasives.(~-.) x)
-let (+.) = fun x -> value (fun y -> value (Pervasives.(+.) x y))
-let ( *. ) = fun x -> value (fun y -> value (Pervasives.( *. ) x y))
-let (-.) = fun x -> value (fun y -> value (Pervasives.(-.) x y))
-let (/.) = fun x -> value (fun y -> value (Pervasives.(/.) x y))
-let (/) = fun x -> value (fun y -> value (Pervasives.(/) x y))
 let ( ** ) =
   let rec pow a = Pervasives.(function
   | 0 -> 1
@@ -75,9 +56,4 @@ let ( ** ) =
   | n -> 
     let b = pow a (n / 2) in
     b * b * (if n mod 2 = 0 then 1 else a)) in
-  fun x -> value (fun y -> value (pow x y))
-
-let float_of_int = fun x -> value (Pervasives.float_of_int x)
-let (^) = fun x -> value (fun y -> value (Pervasives.(^) x y))
-let string_length = fun x -> value (String.length x)
-let to_string = fun _ -> failwith "Not implemented"
+  pow

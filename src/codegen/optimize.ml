@@ -43,46 +43,13 @@ let a22a a2 = Typed.a22a a2
 let a2a2 a = Typed.a2a2 a
 
 let unary_inlinable f ty1 ty2 =
-  let x = Typed.Variable.fresh "x" and loc = Location.unknown in
   let drt = Type.fresh_dirt () in
-  let p =
-    {
-      term = Typed.PVar x;
-      location = loc;
-      scheme = Scheme.simple ty1;
-    }
-  in
-    lambda @@
-    abstraction p @@
-      apply
-        (built_in ("(unary_builtin " ^ f ^ ")") (Scheme.simple (Type.Arrow (ty1, (ty2, drt)))))
-        (var x (Scheme.simple ty1))
+  built_in f (Scheme.simple (Type.Arrow (ty1, (ty2, drt))))
   
 let binary_inlinable f ty1 ty2 ty =
-  let x1 = Typed.Variable.fresh "x1"
-  and x2 = Typed.Variable.fresh "x2"
-  and loc = Location.unknown and drt = Type.fresh_dirt () in
-  let p1 =
-    {
-      term = Typed.PVar x1;
-      location = loc;
-      scheme = Scheme.simple ty1;
-    }
-  and p2 =
-    {
-      term = Typed.PVar x2;
-      location = loc;
-      scheme = Scheme.simple ty2;
-    }
-  in
-    lambda @@
-    abstraction p1 @@
-      value @@
-      lambda @@
-      abstraction p2 @@
-        apply
-          (built_in ("(binary_builtin " ^ f ^ ")") (Scheme.simple (Type.Arrow (Type.Tuple [ty1; ty2], (ty, drt)))))
-          (tuple [var x1 (Scheme.simple ty1); var x2 (Scheme.simple ty2)])
+  let drt = Type.fresh_dirt ()
+  and drt2 = Type.fresh_dirt () in
+  built_in f (Scheme.simple (Type.Arrow (ty1, (Type.Arrow (ty2, (ty, drt)), drt2))))
 
 let inlinable_definitions =
   let polymorphic expr_of_ty = fun () -> expr_of_ty (Type.fresh_ty ())
