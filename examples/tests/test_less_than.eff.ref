@@ -6,8 +6,8 @@
 - : bool ! δ₁ |  = false
 - : bool ! δ₁ |  = false
 - : string ! δ₁ |  = "composite values"
-- : bool ! δ₁ |  = true
 - : bool ! δ₁ |  = false
+- : bool ! δ₁ |  = true
 - : string ! δ₁ |  = "records"
 - : bool ! δ₁ |  = true
 - : bool ! δ₁ |  = false
