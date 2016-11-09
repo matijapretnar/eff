@@ -29,3 +29,5 @@ val add_region_param_constraint : Type.region_param -> Type.region_param -> t ->
 val add_full_region : Type.region_param -> t -> t
 
 val print : non_poly:(Type.ty_param, Type.dirt_param, Type.region_param) Trio.t -> t -> Format.formatter -> unit
+
+val is_pure_for_handler : t -> Type.dirt -> ((Common.effect * ('a * 'b)) * 'c) list -> bool

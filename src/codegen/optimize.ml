@@ -159,21 +159,6 @@ let rec substitute_pattern_comp st c p exp =
 and substitute_pattern_expr st e p exp =
   optimize_expr st (Typed.subst_expr (Typed.pattern_match p exp) e)
 
-
-and hasEffectsInCommon c h =
-    (* Print.debug "%t" (CamlPrint.print_computation_effects c1); *)
-    let rec hasCommonEffects l1 l2 =
-        match l1 with
-            | [] -> false
-            | (h1,region)::t1 when region >= (Type.Region_Param 0) -> (
-                match l2 with
-                    | [] -> false
-                    | ((h2,(_,_)),_)::t2 when h1 = h2 -> true
-                    | ((h2,(_,_)),_)::t2 -> (hasCommonEffects t1 l2) || (hasCommonEffects l1 t2)
-            ) in
-    let get_dirt (_,(_,dirt),_) = dirt in
-    hasCommonEffects (get_dirt (c.Typed.scheme)).Type.ops h.effect_clauses
-
 and beta_reduce st ({term = (p, c)} as a) e =
   match applicable_pattern p (Typed.free_vars_comp c) with
   | NotInlinable when is_atomic e -> substitute_pattern_comp st c p e
@@ -354,15 +339,14 @@ and reduce_comp st c =
     in
     reduce_comp st res
 
-  | Handle ({term = Handler h}, c1) when (not (hasEffectsInCommon c1 h)) ->
+  | Handle ({term = Handler h}, c1)
+        when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
     Print.debug "Remove handler, since no effects in common with computation";
-    Print.debug "%t" (CamlPrint.print_computation c);
-    Print.debug "%t" (CamlPrint.print_computation_effects c1);
-    Print.debug "%t" (CamlPrint.print_computation c1);
     reduce_comp st (bind c1 h.value_clause)
 
-  | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})}) when  (not (hasEffectsInCommon c1 h)) ->
-    Print.debug "Remove handler of outer Bind, keep handler since no effects in common with computation";
+  | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})})
+        when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
+    Print.debug "Remove handler of outer Bind, since no effects in common with computation";
     reduce_comp st (bind (reduce_comp st c1) (abstraction p1 (reduce_comp st (handle (refresh_expr handler) c2))))
 
   | Handle ({term = Handler h}, {term = Value v}) ->

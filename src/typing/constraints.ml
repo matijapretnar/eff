@@ -40,6 +40,29 @@ type t = {
   dirt_expansion : Type.dirt DirtMap.t;
 }
 
+
+let is_pure_for_handler { dirt_poset; region_poset; full_regions } { Type.ops; Type.rest } eff_clause =
+  (* full_regions = unhandled effects in the computation *)
+  let check_region eff r =
+    (* check if 'eff' is present in the eff_clause, otherwise we don't care *)
+    let rec hasCommonEffects eff_list =
+        match eff_list with
+            | [] -> false
+            | ((eff_name,(_,_)),_)::tail when eff_name = eff -> true
+            | ((eff_name,(_,_)),_)::tail -> hasCommonEffects tail
+        in
+    if (not (hasCommonEffects eff_clause)) then true
+    else
+        (* check whether the region is a constraint *)
+        RegionPoset.get_prec r region_poset = [] &&
+        not (FullRegions.mem r full_regions)
+    in
+  (* for all 'ops' check the region *)
+  List.for_all (fun (eff, r) -> check_region eff r) ops &&
+  (* check the rest *)
+  DirtPoset.get_prec rest dirt_poset = []
+
+
 let rec expand_ty ty_expansion dirt_expansion = function
   | Type.Apply (ty_name, args) -> Type.Apply (ty_name, expand_args ty_expansion dirt_expansion args)
   | Type.Param t as ty ->
