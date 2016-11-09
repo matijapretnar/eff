@@ -74,7 +74,10 @@ let rec print_expression ?max_level st e ppf =
   | Typed.Variant (lbl, Some e) ->
       print ~at_level:1 "%s %t" lbl (print_expression st e)
   | Typed.Lambda a ->
-      print ~at_level:2 "fun %t" (print_abstraction st a)
+      if Scheme.is_pure_function e.Typed.scheme then
+        print ~at_level:2 "fun %t" (print_pure_abstraction st a)
+      else
+        print ~at_level:2 "fun %t" (print_abstraction st a)
   | Typed.Handler h ->
       print "{@[<hov> value_clause = (@[fun %t@]);@ finally_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
              ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
@@ -83,13 +86,16 @@ let rec print_expression ?max_level st e ppf =
   | Typed.Effect eff ->
       print ~at_level:2 "effect %t" (print_effect eff)
   | Typed.Pure c ->
-      print ~at_level:1 "run %t" (print_computation ~max_level:0 st c)
+      print ~at_level:1 "%t" (print_pure_computation ~max_level:0 st c)
 
 and print_computation ?max_level st c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.Typed.term with
   | Typed.Apply (e1, e2) ->
-      print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 st e1) (print_expression ~max_level:0 st e2)
+      if Scheme.is_pure_function ~loc:e1.Typed.location e1.Typed.scheme then
+        print ~at_level:1 "value (%t@ %t)" (print_expression ~max_level:1 st e1) (print_expression ~max_level:0 st e2)
+      else
+        print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 st e1) (print_expression ~max_level:0 st e2)
   | Typed.Value e ->
       print ~at_level:1 "value %t" (print_expression ~max_level:0 st e)
   | Typed.Match (e, []) ->
@@ -119,6 +125,35 @@ and print_computation ?max_level st c ppf =
   | Typed.LetIn (e, {Typed.term = (p, c)}) ->
       print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression st e) (print_computation st c)
 
+and print_pure_computation ?max_level st c ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match c.Typed.term with
+  | Typed.Apply ({term = Typed.Lambda a}, e2) ->
+      print ~at_level:1 "(fun %t)@ %t" (print_pure_abstraction st a) (print_expression ~max_level:0 st e2)
+  | Typed.Apply (e1, e2) ->
+      print ~at_level:1 "(%t)@ %t" (print_expression ~max_level:1 st e1) (print_expression ~max_level:0 st e2)
+  | Typed.Value e ->
+      print ~at_level:1 "%t" (print_expression ~max_level:0 st e)
+  | Typed.Match (e, []) ->
+      print ~at_level:2 "(match %t with _ -> assert false)" (print_expression st e)
+  | Typed.Match (e, lst) ->
+      print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression st e) (Print.cases (print_pure_abstraction st) lst)
+  | Typed.Handle (e, c) ->
+      print ~at_level:1 "pure_handle %t %t" (print_expression ~max_level:0 st e) (print_computation ~max_level:0 st c)
+  | Typed.Let (lst, c) ->
+      assert false
+  | Typed.LetRec (lst, c) ->
+      print ~at_level:2 "let rec @[<hov>%t@] in %t"
+      (Print.sequence " and " (print_let_rec_abstraction st) lst) (print_pure_computation st c)
+  | Typed.Check c' ->
+      print ~at_level:1 "(* check %S %t *)" (Common.to_string Location.print c.Typed.location) (print_computation ~max_level:0 st c')
+  | Typed.Call (eff, e, a) ->
+      assert false
+  | Typed.Bind (c1, {Typed.term = (p, c2)}) ->
+      print ~at_level:2 "let @[<hov>%t =@ %t@ in @]@ %t" (print_pattern p) (print_pure_computation st c1) (print_pure_computation st c2)
+  | Typed.LetIn (e, {Typed.term = (p, c)}) ->
+      print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression st e) (print_pure_computation st c)
+
 and print_effect_clauses st eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match eff_clauses with
@@ -130,6 +165,9 @@ and print_effect_clauses st eff_clauses ppf =
 
 and print_abstraction st {Typed.term = (p, c)} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation st c)
+
+and print_pure_abstraction st {Typed.term = (p, c)} ppf =
+  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_pure_computation st c)
 
 and print_multiple_bind st (lst, c') ppf =
   match lst with

@@ -44,8 +44,8 @@ let call (eff : ('a, 'b) effect) (arg : 'a) (cont : 'b -> 'c computation) :
   
 let effect eff arg = call eff arg value
 
-let unary_builtin f = fun x -> value (f x)
-let binary_builtin f = fun (x, y) -> value (f x y)
+let unary_builtin f = fun x -> (f x)
+let binary_builtin f = fun (x, y) -> (f x y)
 
 let run =
   function

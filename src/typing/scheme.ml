@@ -37,17 +37,6 @@ and ty_less ~loc ty1 ty2 (ctx, ty, cnstrs) =
 and dirty_less ~loc drty1 drty2 (ctx, ty, cnstrs) =
   (ctx, ty, Constraints.add_dirty_constraint ~loc drty1 drty2 cnstrs)
 
-let is_pure (ctx, (_, drt), cnstrs) =
-  let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
-    let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty
-    and (@@@) = Trio.append in
-    neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
-  in
-  let (_, pos_ds, _), (_, neg_ds, _) = List.fold_right add_ctx_pos_neg ctx (Trio.empty, Trio.empty) in
-  Constraints.is_pure cnstrs drt &&
-  not (List.mem drt.Type.rest (pos_ds @ neg_ds))
-
-
 let remove_context ~loc ctx_p (ctx, ty, cnstrs) =
   let trim (x, t) (ctx, ty, cnstrs) =
     match Common.lookup x ctx_p with
@@ -232,3 +221,19 @@ let print_dirty_scheme drty_sch ppf =
         (Constraints.print ~non_poly cnstrs)
   else
     Type.print ~non_poly skeletons ty ppf
+
+let is_pure ?(loc=Location.unknown) (ctx, (_, drt), cnstrs) =
+  let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
+    let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty
+    and (@@@) = Trio.append in
+    neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
+  in
+  let (_, pos_ds, _), (_, neg_ds, _) = List.fold_right add_ctx_pos_neg ctx (Trio.empty, Trio.empty) in
+  Constraints.is_pure cnstrs drt &&
+  not (List.mem drt.Type.rest (pos_ds @ neg_ds))
+
+let is_pure_function ?loc (ctx, ty, cnstrs) =
+  match ty with
+  | Type.Arrow (_, drty) -> is_pure ?loc (ctx, drty, cnstrs)
+  | _ -> (Print.warning ?loc "%t" (print_ty_scheme (ctx, ty, cnstrs)); assert false)
+
