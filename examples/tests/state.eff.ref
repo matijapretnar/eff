@@ -1,10 +1,11 @@
-val state : τ₁ -δ₂→ (τ₂ ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹ 
-            (int -{Get:ρ₃, Set:ρ₄|δ₃}→ τ₃) ! {Get:ρ₅, 
-            Set:ρ₆|δ₄}) | τ₂ < τ₃; δ₁ < δ₄,
+val _state_279 : τ₁ -δ₂→ (τ₂ ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹ 
+                 (int -{Get:ρ₃, Set:ρ₄|δ₃}→ τ₃) ! {Get:ρ₅, 
+                 Set:ρ₆|δ₄}) | τ₂ < τ₃; δ₁ < δ₄,
 δ₁ < δ₃;  = <fun>
-val better_state : int -δ₂→ (τ₁ ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹ 
-                   τ₂ ! {Get:ρ₃, Set:ρ₄|δ₃}) | τ₁ < τ₂; δ₁ < δ₃;  = <fun>
-val transaction : τ₁ ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹ 
+val _better_state_289 : int -δ₂→ (τ₁ ! {Get:ρ₁, 
+                        Set:ρ₂|δ₁} ⟹  τ₂ ! {Get:ρ₃, 
+                        Set:ρ₄|δ₃}) | τ₁ < τ₂; δ₁ < δ₃;  = <fun>
+val _transaction_299 : τ₁ ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹ 
 τ₂ ! {Get:ρ₃, 
 Set:ρ₄|δ₂} | τ₁ < τ₂; δ₁ < δ₂; ρ₃ = ⊤,
 ρ₄ = ⊤ = <handler>

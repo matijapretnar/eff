@@ -1,5 +1,5 @@
 type (_,_) effect +=
-  | Effect_Decide: (unit,bool) effect 
+  | Effect_Decide: (unit,bool) effect
 let _choose_sum_279 =
   {
     value_clause = (fun _x_285  -> value _x_285);
@@ -12,8 +12,8 @@ let _choose_sum_279 =
                 fun (_k_280 : bool -> _ computation)  ->
                   (_k_280 true) >>
                     (fun _gen_bind_282  ->
-                       let _gen_bind_281 _x2_67 =
-                         value (Pervasives.(+) _gen_bind_282 _x2_67)  in
+                       let _gen_bind_281 _x2_23 =
+                         value (Pervasives.(+) _gen_bind_282 _x2_23) in
                        (_k_280 false) >>
                          (fun _gen_bind_283  -> _gen_bind_281 _gen_bind_283)))
          | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
@@ -23,5 +23,5 @@ let _choose_sum_279 =
                                                                     ->
                                                                     _
                                                                     computation)
-  } 
-;;value (Pervasives.(+) 10 20)
+  }
+let _ = value (Pervasives.(+) 10 20)

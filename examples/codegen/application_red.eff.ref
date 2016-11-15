@@ -1,1 +1,1 @@
-;;value (Pervasives.( * ) 3 2)
+let _ = value (Pervasives.( * ) 3 2)

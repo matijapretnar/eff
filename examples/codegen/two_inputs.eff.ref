@@ -1,5 +1,5 @@
 type (_,_) effect +=
-  | Effect_Decide: (unit,bool) effect 
+  | Effect_Decide: (unit,bool) effect
 let _choose_all_279 =
   {
     value_clause = (fun _x_285  -> value [_x_285]);
@@ -24,8 +24,5 @@ let _choose_all_279 =
                                                                     ->
                                                                     _
                                                                     computation)
-  } 
-;;call Effect_Decide ()
-    (fun _result_81  ->
-       (match _result_81 with | true  -> value 10 | false  -> value 20) >>
-         (fun _x_73  -> value [_x_73]))
+  }
+let _ = (_var_187 [10]) >> (fun _gen_bind_103  -> _gen_bind_103 [20])

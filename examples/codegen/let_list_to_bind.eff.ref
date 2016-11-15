@@ -1,1 +1,1 @@
-;;value (Pervasives.(+) 2 1)
+let _ = value (Pervasives.(+) 2 1)

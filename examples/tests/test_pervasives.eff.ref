@@ -1,101 +1,101 @@
-val less1 : bool |  = true
-val less2 : bool |  = false
-val less3 : bool |  = false
-val test_equal_int : bool |  = true
-val test_equal_float : bool |  = true
+val _less1_279 : bool |  = true
+val _less2_281 : bool |  = false
+val _less3_283 : bool |  = false
+val _test_equal_int_285 : bool |  = true
+val _test_equal_float_287 : bool |  = true
 - : unit ! {AssertionFault:ρ₁|δ₁} | ρ₁ = ⊤ = ()
-val tilda_minus : int |  = -1
-val tilda_minus_dot2 : float |  = -3.14159
-val tilda_minus_dot2 : float |  = -1.
-val test_plus : int |  = 4
-val test_times : int |  = 4
-val test_power : int |  = 8
-val test_minus : int |  = 19
-val test_minus_tilda_minus : int |  = 65
-val test_mod1 : int | ρ₁ = ⊤ = 2
-val test_mod2 : int | ρ₁ = ⊤ = 0
+val _tilda_minus_291 : int |  = -1
+val _tilda_minus_dot2_292 : float |  = -3.14159
+val _tilda_minus_dot2_293 : float |  = -1.
+val _test_plus_294 : int |  = 4
+val _test_times_296 : int |  = 4
+val _test_power_298 : int |  = 8
+val _test_minus_300 : int |  = 19
+val _test_minus_tilda_minus_302 : int |  = 65
+val _test_mod1_305 : int | ρ₁ = ⊤ = 2
+val _test_mod2_307 : int | ρ₁ = ⊤ = 0
 Check (file "./test_pervasives.eff", line 39, char 1):
 Call DivisionByZero ()
 - : unit ! {DivisionByZero:ρ₁|δ₁} | ρ₁ = ⊤ = ()
 Check (file "./test_pervasives.eff", line 41, char 1):
 Call DivisionByZero ()
 - : unit ! {DivisionByZero:ρ₁|δ₁} | ρ₁ = ⊤ = ()
-val test_plus_dot : float | ρ₁ = ⊤ = 5.84
-val test_times_dot : float | ρ₁ = ⊤ = 8.478
-val test_minus_dot : float | ρ₁ = ⊤ = 0.44
-val test_div_dot : float | ρ₁ = ⊤ = 1.16296
-val test_div_dot_zero : float | ρ₁ = ⊤ = infinity
-val test_div : int | ρ₁ = ⊤ = 33
+val _test_plus_dot_311 : float | ρ₁ = ⊤ = 5.84
+val _test_times_dot_313 : float | ρ₁ = ⊤ = 8.478
+val _test_minus_dot_315 : float | ρ₁ = ⊤ = 0.44
+val _test_div_dot_317 : float | ρ₁ = ⊤ = 1.16296
+val _test_div_dot_zero_319 : float | ρ₁ = ⊤ = infinity
+val _test_div_321 : int | ρ₁ = ⊤ = 33
 Check (file "./test_pervasives.eff", line 55, char 1):
 Call DivisionByZero ()
 - : unit ! {DivisionByZero:ρ₁|δ₁} | ρ₁ = ⊤ = ()
-val test_zero_div : int | ρ₁ = ⊤ = 0
+val _test_zero_div_324 : int | ρ₁ = ⊤ = 0
 Check (file "./test_pervasives.eff", line 59, char 1):
 Call DivisionByZero ()
 - : unit ! {DivisionByZero:ρ₁|δ₁} | ρ₁ = ⊤ = ()
-val test_carron : string | ρ₁ = ⊤ = "cherrypie"
-val test_to_string1 : string | ρ₁ = ⊤ = "13"
-val test_to_string2 : string | ρ₁ = ⊤ = "[(1, 2, 3)]"
-val test_to_string3 : string | ρ₁ = ⊤ = "(1, 2, 3)"
-val test_to_string4 : string | ρ₁ = ⊤ = "<fun>"
-val test_float_of_int : float | ρ₁ = ⊤ = 42.
-val test_none : τ₁ option | ρ₁ = ⊤ = None
-val test_some : int option | ρ₁ = ⊤ = Some 3
-val test_ignore : unit | ρ₁ = ⊤ = ()
-val test_not : bool | ρ₁ = ⊤ = false
-val test_greater1 : bool | ρ₁ = ⊤ = true
-val test_greater2 : bool | ρ₁ = ⊤ = true
-val test_leq : bool | ρ₁ = ⊤ = true
-val test_geq : bool | ρ₁ = ⊤ = true
-val test_neq : bool | ρ₁ = ⊤ = true
-val test_range : int list | ρ₁ = ⊤ = [4; 5; 6; 7; 8; 9]
-val test_map : int list | ρ₁ = ⊤ = [1; 4; 9; 16; 25]
-val test_take : int list | ρ₁ = ⊤ = [2; 5; 8; 11; 14; 17; 20; 23; 26;
-                                          29; 32; 35; 38; 41; 44; 47; 50; 53;
-                                          56; 59; 62]
-val test_fold_left : int | ρ₁ = ⊤ = 89
-val test_fold_right : int | ρ₁ = ⊤ = 161
+val _test_carron_327 : string | ρ₁ = ⊤ = "cherrypie"
+val _test_to_string1_329 : string | ρ₁ = ⊤ = "13"
+val _test_to_string2_330 : string | ρ₁ = ⊤ = "[(1, 2, 3)]"
+val _test_to_string3_331 : string | ρ₁ = ⊤ = "(1, 2, 3)"
+val _test_to_string4_332 : string | ρ₁ = ⊤ = "<fun>"
+val _test_float_of_int_334 : float | ρ₁ = ⊤ = 42.
+val _test_none_335 : τ₁ option | ρ₁ = ⊤ = None
+val _test_some_336 : int option | ρ₁ = ⊤ = Some 3
+val _test_ignore_337 : unit | ρ₁ = ⊤ = ()
+val _test_not_340 : bool | ρ₁ = ⊤ = false
+val _test_greater1_341 : bool | ρ₁ = ⊤ = true
+val _test_greater2_343 : bool | ρ₁ = ⊤ = true
+val _test_leq_345 : bool | ρ₁ = ⊤ = true
+val _test_geq_347 : bool | ρ₁ = ⊤ = true
+val _test_neq_349 : bool | ρ₁ = ⊤ = true
+val _test_range_351 : int list | ρ₁ = ⊤ = [4; 5; 6; 7; 8; 9]
+val _test_map_353 : int list | ρ₁ = ⊤ = [1; 4; 9; 16; 25]
+val _test_take_357 : int list | ρ₁ = ⊤ = [2; 5; 8; 11; 14; 17; 20; 23;
+                                               26; 29; 32; 35; 38; 41; 44;
+                                               47; 50; 53; 56; 59; 62]
+val _test_fold_left_363 : int | ρ₁ = ⊤ = 89
+val _test_fold_right_371 : int | ρ₁ = ⊤ = 161
 Check (file "./test_pervasives.eff", line 101, char 27):
 "iter [1; 2; 3; 4; 5]"
-val test_iter : unit | ρ₁ = ⊤ = ()
-val test_forall : bool | ρ₁ = ⊤ = false
-val test_exists : bool | ρ₁ = ⊤ = true
-val test_mem : bool | ρ₁ = ⊤ = false
-val test_filter : int list | ρ₁ = ⊤ = [4; 5]
-val test_complement : int list | ρ₁ = ⊤ = [1; 3; 5; 6]
-val test_intersection : int list | ρ₁ = ⊤ = [2; 4]
-val test_zip1 : (int × string) list | ρ₁ = ⊤,
+val _test_iter_379 : unit | ρ₁ = ⊤ = ()
+val _test_forall_383 : bool | ρ₁ = ⊤ = false
+val _test_exists_389 : bool | ρ₁ = ⊤ = true
+val _test_mem_395 : bool | ρ₁ = ⊤ = false
+val _test_filter_397 : int list | ρ₁ = ⊤ = [4; 5]
+val _test_complement_401 : int list | ρ₁ = ⊤ = [1; 3; 5; 6]
+val _test_intersection_403 : int list | ρ₁ = ⊤ = [2; 4]
+val _test_zip1_405 : (int × string) list | ρ₁ = ⊤,
 ρ₂ = ⊤ = [(1, "a"); (2, "b"); (3, "c")]
 Check (file "./test_pervasives.eff", line 117, char 1):
 Call InvalidArgument "zip: length mismatch"
 - : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂|δ₁} | ρ₁ = ⊤,
 ρ₂ = ⊤ = ()
-val test_reverse : int list | ρ₁ = ⊤,ρ₂ = ⊤ = [5; 4; 3; 2; 1]
-val test_at : int list | ρ₁ = ⊤,ρ₂ = ⊤ = [1; 2; 3; 4; 5; 6]
-val test_length : int | ρ₁ = ⊤,ρ₂ = ⊤ = 5
-val test_head : int | ρ₁ = ⊤,ρ₂ = ⊤ = 1
+val _test_reverse_408 : int list | ρ₁ = ⊤,ρ₂ = ⊤ = [5; 4; 3; 2; 1]
+val _test_at_409 : int list | ρ₁ = ⊤,ρ₂ = ⊤ = [1; 2; 3; 4; 5; 6]
+val _test_length_411 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 5
+val _test_head_412 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 1
 Check (file "./test_pervasives.eff", line 127, char 1):
 Call InvalidArgument "head: empty list"
 - : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂|δ₁} | ρ₁ = ⊤,
 ρ₂ = ⊤ = ()
-val test_tail : int list | ρ₁ = ⊤,ρ₂ = ⊤ = [2; 3; 4]
+val _test_tail_413 : int list | ρ₁ = ⊤,ρ₂ = ⊤ = [2; 3; 4]
 Check (file "./test_pervasives.eff", line 131, char 1):
 Call InvalidArgument "tail: empty list"
 - : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂|δ₁} | ρ₁ = ⊤,
 ρ₂ = ⊤ = ()
-val test_abs : int × int × int | ρ₁ = ⊤,ρ₂ = ⊤ = (5, 5, 5)
-val test_min : int | ρ₁ = ⊤,ρ₂ = ⊤ = 1
-val test_max : int | ρ₁ = ⊤,ρ₂ = ⊤ = 2
-val test_gcd : int | ρ₁ = ⊤,ρ₂ = ⊤ = 4
-val test_lcm : int | ρ₁ = ⊤,ρ₂ = ⊤ = 24
-val test_odd : bool | ρ₁ = ⊤,ρ₂ = ⊤ = false
-val test_even : bool | ρ₁ = ⊤,ρ₂ = ⊤ = true
-val test_id : int | ρ₁ = ⊤,ρ₂ = ⊤ = 5
-val test_id_id : τ₁ -_δ₁→ τ₂ | τ₁ < τ₂; ρ₁ = ⊤,
+val _test_abs_414 : int × int × int | ρ₁ = ⊤,ρ₂ = ⊤ = (5, 5, 5)
+val _test_min_420 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 1
+val _test_max_422 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 2
+val _test_gcd_424 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 4
+val _test_lcm_426 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 24
+val _test_odd_428 : bool | ρ₁ = ⊤,ρ₂ = ⊤ = false
+val _test_even_429 : bool | ρ₁ = ⊤,ρ₂ = ⊤ = true
+val _test_id_430 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 5
+val _test_id_id_431 : τ₁ -_δ₁→ τ₂ | τ₁ < τ₂; ρ₁ = ⊤,
 ρ₂ = ⊤ = <fun>
-val test_compose : int | ρ₁ = ⊤,ρ₂ = ⊤ = 196
-val test_fst : string | ρ₁ = ⊤,ρ₂ = ⊤ = "foo"
-val test_snd : int | ρ₁ = ⊤,ρ₂ = ⊤ = 4
+val _test_compose_432 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 196
+val _test_fst_439 : string | ρ₁ = ⊤,ρ₂ = ⊤ = "foo"
+val _test_snd_440 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 4
 Check (file "./test_pervasives.eff", line 157, char 1):
 Call Print "Does this work?"
 - : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂|δ₁} | ρ₁ = ⊤,

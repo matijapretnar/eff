@@ -1,22 +1,22 @@
 type (_,_) effect +=
-  | Effect_Eff: (unit,unit) effect 
-;;let rec _f_279 _x_280 =
+  | Effect_Eff: (unit,unit) effect
+let _ =
+  let rec _f_279 _x_280 =
     match Pervasives.(=) _x_280 0 with
     | true  -> value 1
     | false  ->
         call Effect_Eff ()
-          (fun _result_72  -> _f_279 (Pervasives.(-) _x_280 1))
-     in
-  let rec _newvar_75 _x_280 =
+          (fun _result_81  -> _f_279 (Pervasives.(-) _x_280 1)) in
+  let rec _newvar_84 _x_280 =
     match Pervasives.(=) _x_280 0 with
     | true  -> value 1
     | false  ->
-        (_f_279 (Pervasives.(-) _x_280 1)) >>
-          ((fun _gen_id_par_86  -> value (Pervasives.( * ) _gen_id_par_86 2)))
-     in
-  _newvar_75 5
-;;let rec _g_290 _x_291 =
+        (_newvar_84 (Pervasives.(-) _x_280 1)) >>
+          ((fun _gen_bind_99  -> value (Pervasives.( * ) _gen_bind_99 2))) in
+  _newvar_84 5
+let _ =
+  let rec _g_290 _x_291 =
     match Pervasives.(=) _x_291 0 with
     | true  -> value 1
-    | false  -> _g_290 (Pervasives.(-) _x_291 1)  in
+    | false  -> _g_290 (Pervasives.(-) _x_291 1) in
   (_g_290 5) >> (fun _gen_id_par_300  -> value _gen_id_par_300)

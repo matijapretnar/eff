@@ -195,6 +195,26 @@ let extend_non_poly (ts, ds, rs) skeletons =
 let show_dirt_param ~non_poly:(_, ds, _) (ctx, ty, cnstrs) =
   fun ((Type.Dirt_Param k) as p) -> Some (fun ppf -> (Symbols.dirt_param k (List.mem p ds) ppf))
 
+(*
+    check whether the dirty_scheme is pure in terms of the handler
+    ie.
+        check if any operations from the handler can occur in the computation
+        if so => the dirty_scheme is dirty
+        otherwise the dirty_scheme is pure
+*)
+let is_pure_for_handler (ctx, (_, drt), cnstrs) eff_clause =
+  let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
+    let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty
+    and (@@@) = Trio.append in
+    neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
+  in
+  let (_, pos_ds, _), (_, neg_ds, _) = List.fold_right add_ctx_pos_neg ctx (Trio.empty, Trio.empty) in
+  (* Check if the constraints from the operations in the dirt are pure in terms of the handler *)
+  Constraints.is_pure_for_handler cnstrs drt eff_clause &&
+  (* Check if the rest occurs in the pos_ds or neg_ds *)
+  not (List.mem drt.Type.rest (pos_ds @ neg_ds))
+
+
 let print_ty_scheme ty_sch ppf =
   let sbst = Type.beautifying_subst () in
   let _, (_, ds, _) = pos_neg_ty_scheme ty_sch in
