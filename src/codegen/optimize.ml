@@ -424,8 +424,13 @@ and reduce_comp st c =
         begin match find_in_stack st v with
           | Some ({term = Lambda k}) ->
             let {term = (newdp, newdc)} = refresh_abs k in
-            let (_,Type.Handler((ty_in, drt_in), (ty_out, drt_out)),_) = e1.scheme in 
-            let f_var, f_pat = make_var "newvar" (Scheme.simple (Type.Arrow(ty_in,(ty_out,drt_out)))) in
+            let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
+            let (f_ctx,Type.Arrow(f_ty_in, f_ty_out ),f_const) = ae1.scheme in 
+            let constraints = Constraints.list_union [h_const; f_const]
+                              |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
+            let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
+            let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
+            let f_var, f_pat = make_var "newvar"  function_scheme in
             let f_def =
               lambda @@
               abstraction newdp @@
@@ -444,8 +449,13 @@ and reduce_comp st c =
                        begin match (find_in_let_rec_mem st v) with
                        | Some abs ->
                                     let (let_rec_p,let_rec_c) = abs.term in
-                                    let (_,Type.Handler((ty_in, drt_in), (ty_out, drt_out)),_) = e1.scheme in
-                                    let new_f_var, new_f_pat = make_var "newvar" (Scheme.simple (Type.Arrow(ty_in,(ty_out,drt_out)))) in
+                                    let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
+                                    let (f_ctx,Type.Arrow(f_ty_in, f_ty_out ),f_const) = ae1.scheme in 
+                                    let constraints = Constraints.list_union [h_const; f_const]
+                                          |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
+                                    let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
+                                    let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
+                                    let new_f_var, new_f_pat = make_var "newvar"  function_scheme in
                                     let new_handler_call = handle e1 let_rec_c in
                                     let Var newfvar = new_f_var.term in
                                     let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
