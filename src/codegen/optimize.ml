@@ -339,7 +339,7 @@ and reduce_comp st c =
     in
     reduce_comp st res
 
-  | Handle ({term = Handler h}, c1)
+(*  | Handle ({term = Handler h}, c1)
         when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
     Print.debug "Remove handler, since no effects in common with computation";
     reduce_comp st (bind c1 h.value_clause)
@@ -348,7 +348,7 @@ and reduce_comp st c =
         when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
     Print.debug "Remove handler of outer Bind, since no effects in common with computation";
     reduce_comp st (bind (reduce_comp st c1) (abstraction p1 (reduce_comp st (handle (refresh_expr handler) c2))))
-
+*)
   | Handle ({term = Handler h}, {term = Value v}) ->
     beta_reduce st h.value_clause v
 
