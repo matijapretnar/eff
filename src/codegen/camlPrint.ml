@@ -38,13 +38,13 @@ let rec print_type ?max_level ty ppf =
       print "%s" t
   | Type.Tuple tys ->
       print ~at_level:1 "%t" (Print.sequence "*" print_type tys)
-  | Type.Arrow (ty, drty) ->
-      print ~at_level:2 "%t -> %t" (print_type ~max_level:1 ty) (print_dirty_type drty)
+  | Type.Arrow (ty1, (ty2, _)) ->
+      print ~at_level:2 "(%t, %t) abstraction" (print_type ty1) (print_type ty2)
   | Type.Handler ((ty1, _), (ty2, _)) ->
       print ~at_level:2 "(%t, %t) handler" (print_type ty1) (print_type ty2)
 
-and print_dirty_type (ty, drt) ppf =
-  Format.fprintf ppf "_"
+and print_dirty_type (ty, _) ppf =
+  Format.fprintf ppf "%t computation" (print_type ~max_level:0 ty)
 
 and print_args (tys, _, _) ppf =
   match tys with
@@ -74,14 +74,28 @@ let rec print_expression ?max_level st e ppf =
   | Typed.Variant (lbl, Some e) ->
       print ~at_level:1 "%s %t" lbl (print_expression st e)
   | Typed.Lambda a ->
-      if Scheme.is_pure_function e.Typed.scheme then
-        print ~at_level:2 "fun %t" (print_pure_abstraction st a)
-      else
-        print ~at_level:2 "fun %t" (print_abstraction st a)
+      print ~at_level:2 "%t" (print_both_abstractions st a)
   | Typed.Handler h ->
-      print "{@[<hov> value_clause = (@[fun %t@]);@ finally_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
-      (print_abstraction st h.Typed.value_clause) (print_abstraction st h.Typed.finally_clause)
+      print "{@[<hov>
+        value_clause = %t;
+        finally_clause = %t;
+        pure_effect_clauses = ((
+                  fun (type a) (type b) (x : (a, b) effect) -> (
+                    (match x with %t)
+                    :
+                    a -> (b, _) abstraction -> _
+                  )
+                ));
+        impure_effect_clauses = ((
+                  fun (type a) (type b) (x : (a, b) effect) -> (
+                    (match x with %t)
+                    :
+                    a -> (b, _) abstraction -> _ computation
+                  )
+                )) @]}"
+      (print_both_abstractions st h.Typed.value_clause)
+      (print_both_abstractions st h.Typed.finally_clause)
+      (print_pure_effect_clauses st h.Typed.effect_clauses)
       (print_effect_clauses st h.Typed.effect_clauses)
   | Typed.Effect eff ->
       print ~at_level:2 "effect %t" (print_effect eff)
@@ -91,11 +105,13 @@ let rec print_expression ?max_level st e ppf =
 and print_computation ?max_level st c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.Typed.term with
+  | Typed.Apply ({Typed.term = Typed.Lambda a}, e2) ->
+      print ~at_level:1 "(fun %t)@ %t" (print_abstraction st a) (print_expression ~max_level:0 st e2)
   | Typed.Apply (e1, e2) ->
       if Scheme.is_pure_function ~loc:e1.Typed.location e1.Typed.scheme then
         print ~at_level:1 "value (%t@ %t)" (print_expression ~max_level:1 st e1) (print_expression ~max_level:0 st e2)
       else
-        print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 st e1) (print_expression ~max_level:0 st e2)
+        print ~at_level:1 "(%t).impure@ %t" (print_expression ~max_level:1 st e1) (print_expression ~max_level:0 st e2)
   | Typed.Value e ->
       print ~at_level:1 "value %t" (print_expression ~max_level:0 st e)
   | Typed.Match (e, []) ->
@@ -128,7 +144,7 @@ and print_computation ?max_level st c ppf =
 and print_pure_computation ?max_level st c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.Typed.term with
-  | Typed.Apply ({term = Typed.Lambda a}, e2) ->
+  | Typed.Apply ({Typed.term = Typed.Lambda a}, e2) ->
       print ~at_level:1 "(fun %t)@ %t" (print_pure_abstraction st a) (print_expression ~max_level:0 st e2)
   | Typed.Apply (e1, e2) ->
       print ~at_level:1 "(%t)@ %t" (print_expression ~max_level:1 st e1) (print_expression ~max_level:0 st e2)
@@ -158,10 +174,19 @@ and print_effect_clauses st eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match eff_clauses with
   | [] ->
+      print "| eff' -> fun arg k -> Call (eff', arg, k.impure)"
+  | (((_, (t1, t2)) as eff), {Typed.term = (p1, p2, c)}) :: cases ->
+      print ~at_level:1 "| %t -> (fun (%t : %t) (%t : (%t, _) abstraction) -> %t) %t"
+      (print_effect eff) (print_pattern p1) (print_type t1) (print_pattern p2) (print_type t2) (print_computation st c) (print_effect_clauses st cases)
+
+and print_pure_effect_clauses st eff_clauses ppf =
+  let print ?at_level = Print.print ?at_level ppf in
+  match eff_clauses with
+  | [] ->
       print "| eff' -> fun arg k -> Call (eff', arg, k)"
   | (((_, (t1, t2)) as eff), {Typed.term = (p1, p2, c)}) :: cases ->
-      print ~at_level:1 "| %t -> (fun (%t : %t) (%t : %t -> _ computation) -> %t) %t"
-      (print_effect eff) (print_pattern p1) (print_type t1) (print_pattern p2) (print_type t2) (print_computation st c) (print_effect_clauses st cases)
+      print ~at_level:1 "| %t -> (fun (%t : %t) (%t : (%t, _) abstraction) -> %t) %t"
+      (print_effect eff) (print_pattern p1) (print_type t1) (print_pattern p2) (print_type t2) (print_pure_computation st c) (print_pure_effect_clauses st cases)
 
 and print_abstraction st {Typed.term = (p, c)} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation st c)
@@ -178,6 +203,12 @@ and print_multiple_bind st (lst, c') ppf =
 
 and print_let_abstraction st (p, c) ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation st c)
+and print_pure_multiple_bind st (lst, c') ppf =
+  match lst with
+  | [] -> Format.fprintf ppf "%t" (print_pure_computation st c')
+  | (p, c) :: lst ->
+      Format.fprintf ppf "let %t = %t in %t"
+      (print_pattern p) (print_pure_computation st c) (print_pure_multiple_bind st (lst, c'))
 
 and print_top_let_abstraction st (p, c) ppf =
   match c.Typed.term with
@@ -188,6 +219,9 @@ and print_top_let_abstraction st (p, c) ppf =
 
 and print_let_rec_abstraction st (x, a) ppf =
   Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction st a)
+and print_both_abstractions st a ppf =
+  Format.fprintf ppf "{ pure = (fun %t); impure = (fun %t) }"
+    (print_pure_abstraction st a) (print_abstraction st a)
 
 let compiled_filename fn = fn ^ ".ml"
 

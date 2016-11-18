@@ -456,6 +456,9 @@ let optimize_command st = function
     st, Typed.Computation (optimize_comp st c)
   | Typed.TopLet (defs, vars) ->
     let defs' = Common.assoc_map (optimize_comp st) defs in
+    let defs' = Common.assoc_map (fun c ->
+      if Scheme.is_pure c.scheme then value (reduce_expr st (pure c)) else c
+    ) defs' in
     let st' = begin match defs' with
       (* If we define a single simple handler, we inline it *)
       | [({ term = Typed.PVar x}, { term = Value ({ term = Handler _ } as e)})] ->
