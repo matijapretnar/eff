@@ -1,0 +1,4 @@
+let decide_func bl =
+	let x = 10 in
+	let y = 20 in 
+    (if bl then x else y)
