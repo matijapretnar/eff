@@ -189,7 +189,7 @@ and pure_beta_reduce st ({term = (p, exp)} as pa) e =
         | {term = Typed.PVar x} ->
           Print.debug "Added to stack ==== %t" (CamlPrint.print_variable x);
           let st = {st with stack = Common.update x e st.stack} in
-          pure_abstraction p (optimize_expr st e)
+          pure_abstraction p (optimize_expr st exp)
         | _ ->
           Print.debug "We are now in the let in 5 novar for %t" (Typed.print_pattern p);
           pa
