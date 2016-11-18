@@ -360,6 +360,16 @@ and reduce_comp st c =
     } in
     reduce_comp st (handle (refresh_expr hdlr) c1)
 
+  | Handle ({term = Handler h} as h2, {term = Bind (c1, {term = (p, c2)})}) ->
+    Print.debug "Move (dirty) inner bind into the value case";
+    let new_value_clause = abstraction p (handle (refresh_expr h2) (refresh_comp (reduce_comp st c2) )) in
+    let hdlr = handler {
+      effect_clauses = h.effect_clauses;
+      value_clause = refresh_abs new_value_clause;
+      finally_clause = h.finally_clause;
+    } in
+    reduce_comp st (handle (refresh_expr hdlr) (refresh_comp c1))
+
   | Handle ({term = Handler h}, {term = Value v}) ->
     beta_reduce st h.value_clause v
 
