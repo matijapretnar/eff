@@ -2,7 +2,7 @@
 
 BASEDIR=`dirname "$0"`
 DIFF=`which diff`
-EFF_DIR="$BASEDIR/../.."
+EFF_DIR="$BASEDIR/../../.."
 
 MAIN="main.ml"
 

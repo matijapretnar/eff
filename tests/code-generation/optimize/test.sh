@@ -2,7 +2,7 @@
 
 BASEDIR=`dirname "$0"`
 DIFF=`which diff`
-EFF_DIR="$BASEDIR/../.."
+EFF_DIR="$BASEDIR/../../.."
 
 NO_OPT_DIR="_tmp_no_opt"
 OPT_DIR="_tmp"
