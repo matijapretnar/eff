@@ -443,7 +443,7 @@ and reduce_comp st c =
     Print.debug "the letrec comp  %t" (CamlPrint.print_computation CamlPrint.initial co);
     let st = 
     List.fold_right (fun (var,abs) st ->
-            Print.debug "ADDING %t and %t to letrec" (CamlPrint.print_variable var) (CamlPrint.print_abstraction CamlPrint.initial abs);
+            Print.debug "ADDING %t and %t to letrec" (CamlPrint.print_variable var) (CamlPrint.print_abstraction ~pure:false CamlPrint.initial abs);
             {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
     let_rec' defs (reduce_comp st co)
 
