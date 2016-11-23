@@ -1,3 +1,5 @@
+(** PRINTER STATE *)
+
 type state = {
   pure_computation : bool;
 }
@@ -6,25 +8,8 @@ let initial = {
   pure_computation = true;
 }
 
-let print_variable = Typed.Variable.print
 
-let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
-
-let rec print_pattern ?max_level p ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match p.Typed.term with
-  | Typed.PVar x -> print "%t" (print_variable x)
-  | Typed.PAs (p, x) -> print "%t as %t" (print_pattern p) (print_variable x)
-  | Typed.PConst c -> Const.print c ppf
-  | Typed.PTuple lst -> Print.tuple print_pattern lst ppf
-  | Typed.PRecord lst -> Print.record print_pattern lst ppf
-  | Typed.PVariant (lbl, None) when lbl = Common.nil -> print "[]"
-  | Typed.PVariant (lbl, None) -> print "%s" lbl
-  | Typed.PVariant ("(::)", Some ({ Typed.term = Typed.PTuple [p1; p2] })) ->
-      print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
-  | Typed.PVariant (lbl, Some p) ->
-      print ~at_level:1 "(%s @[<hov>%t@])" lbl (print_pattern p)
-  | Typed.PNonbinding -> print "_"
+(** TYPES *)
 
 let print_type_param (Type.Ty_Param n) ppf =
    Format.fprintf ppf "'t%d" n
@@ -45,7 +30,7 @@ let rec print_type ?max_level ty ppf =
   | Type.Arrow (ty, drty) ->
       print ~at_level:2 "%t -> %t" (print_type ~max_level:1 ty) (print_dirty_type drty)
   | Type.Handler ((ty1, _), (ty2, _)) ->
-      print ~at_level:2 "(%t, %t) handler" (print_type ty1) (print_type ty2)
+      print ~at_level:2 "(%t, ???, %t) handler" (print_type ty1) (print_type ty2)
 
 and print_dirty_type (ty, drt) ppf =
   Format.fprintf ppf "_"
@@ -55,10 +40,64 @@ and print_args (tys, _, _) ppf =
   | [] -> ()
   | _ -> Format.fprintf ppf "(%t)" (Print.sequence "," print_type tys)
 
-and print_params (tys, _, _) ppf =
+
+(** TYPE DEFINITIONS *)
+
+let rec print_params (tys, _, _) ppf =
   match tys with
   | [] -> ()
   | _ -> Format.fprintf ppf "(%t)" (Print.sequence "," print_type_param tys)
+
+let print_tydef_body ty_def ppf =
+  match ty_def with
+  | Tctx.Record flds ->
+      let print_field (fld, ty) ppf = Format.fprintf ppf "%s: %t" fld (print_type ty) in
+      Format.fprintf ppf "{@[<hov>%t@]}" (Print.sequence "; " print_field flds)
+  | Tctx.Sum variants ->
+      let print_variant (lbl, ty) ppf =
+        match ty with
+        | None -> Format.fprintf ppf "%s" lbl
+        | Some ty -> Format.fprintf ppf "%s of %t" lbl (print_type ~max_level:0 ty)
+      in
+      Format.fprintf ppf "@[<hov>%t@]" (Print.sequence "|" print_variant variants)
+  | Tctx.Inline ty -> print_type ty ppf
+
+let print_tydef (name, (params, body)) ppf =
+  Format.fprintf ppf "%t %s = %t" (print_params params) name (print_tydef_body body)
+
+let print_tydefs tydefs ppf =
+  Format.fprintf ppf "type %t" (Print.sequence "\nand\n" print_tydef tydefs)
+
+
+(** SYNTAX *)
+
+let print_variable = Typed.Variable.print
+
+let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
+
+let rec print_pattern ?max_level p ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match p.Typed.term with
+  | Typed.PVar x ->
+      print "%t" (print_variable x)
+  | Typed.PAs (p, x) ->
+      print "%t as %t" (print_pattern p) (print_variable x)
+  | Typed.PConst c ->
+      Const.print c ppf
+  | Typed.PTuple lst ->
+      Print.tuple print_pattern lst ppf
+  | Typed.PRecord lst ->
+      Print.record print_pattern lst ppf
+  | Typed.PVariant (lbl, None) when lbl = Common.nil ->
+      print "[]"
+  | Typed.PVariant (lbl, None) ->
+      print "%s" lbl
+  | Typed.PVariant ("(::)", Some ({ Typed.term = Typed.PTuple [p1; p2] })) ->
+      print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
+  | Typed.PVariant (lbl, Some p) ->
+      print ~at_level:1 "(%s @[<hov>%t@])" lbl (print_pattern p)
+  | Typed.PNonbinding ->
+      print "_"
 
 let rec print_expression ?max_level st e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -80,10 +119,7 @@ let rec print_expression ?max_level st e ppf =
   | Typed.Lambda a ->
       print ~at_level:2 "fun %t" (print_abstraction ~pure:(Scheme.is_pure_function e.Typed.scheme) st a)
   | Typed.Handler h ->
-      print "{@[<hov> value_clause = (@[fun %t@]);@ finally_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
-      (print_abstraction ~pure:false st h.Typed.value_clause) (print_abstraction ~pure:false st h.Typed.finally_clause)
-      (print_effect_clauses st h.Typed.effect_clauses)
+      print "%t" (print_handler ~pure:false st h)
   | Typed.Effect eff ->
       print ~at_level:2 "effect %t" (print_effect eff)
   | Typed.Pure c ->
@@ -136,14 +172,31 @@ and print_computation ?max_level st c ppf =
   | Typed.LetIn (e, {Typed.term = (p, c)}) ->
       print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression st e) (print_computation st c)
 
-and print_effect_clauses st eff_clauses ppf =
+and print_handler ~pure st h ppf =
+  Print.print ppf
+    "{@[<hov>
+      value_clause = (@[fun %t@]);@ 
+      finally_clause = (@[fun %t@]);@ 
+      effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
+        ((match x with %t) : a -> (b -> _ computation) -> _ computation))
+    @]}"
+    (print_abstraction ~pure st h.Typed.value_clause)
+    (print_abstraction ~pure st h.Typed.finally_clause)
+    (print_effect_clauses ~pure st h.Typed.effect_clauses)
+
+and print_effect_clauses ~pure st eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match eff_clauses with
   | [] ->
       print "| eff' -> fun arg k -> Call (eff', arg, k)"
   | (((_, (t1, t2)) as eff), {Typed.term = (p1, p2, c)}) :: cases ->
-      print ~at_level:1 "| %t -> (fun (%t : %t) (%t : %t -> _ computation) -> %t) %t"
-      (print_effect eff) (print_pattern p1) (print_type t1) (print_pattern p2) (print_type t2) (print_computation st c) (print_effect_clauses st cases)
+      print ~at_level:1
+        "| %t -> (fun (%t : %t) (%t : %t -> _ computation) -> %t) %t"
+        (print_effect eff)
+        (print_pattern p1) (print_type t1)
+        (print_pattern p2) (print_type t2)
+        (print_computation {st with pure_computation = pure} c)
+        (print_effect_clauses ~pure st cases)
 
 and print_abstraction ~pure st {Typed.term = (p, c)} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation {st with pure_computation = pure} c)
@@ -168,36 +221,10 @@ and print_top_let_abstraction st (p, c) ppf =
 and print_let_rec_abstraction ~pure st (x, a) ppf =
   Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction ~pure st a)
 
+
+(** COMMANDS *)
+
 let compiled_filename fn = fn ^ ".ml"
-
-let print_tydef_body ty_def ppf =
-  match ty_def with
-  | Tctx.Record flds ->
-      let field (fld, ty) ppf = Format.fprintf ppf "%s: %t" fld (print_type ty) in
-      Format.fprintf ppf "{@[<hov>%t@]}" (Print.sequence "; " field flds)
-  | Tctx.Sum variants ->
-      let variant (lbl, ty) ppf =
-        match ty with
-        | None -> Format.fprintf ppf "%s" lbl
-        | Some ty -> Format.fprintf ppf "%s of %t" lbl (print_type ~max_level:0 ty)
-      in
-      Format.fprintf ppf "@[<hov>%t@]" (Print.sequence "|" variant variants)
-  | Tctx.Inline ty -> print_type ty ppf
-
-let print_tydef (name, (params, body)) ppf =
-  Format.fprintf ppf "%t %s = %t" (print_params params) name (print_tydef_body body)
-
-let print_tydefs tydefs ppf =
-  Format.fprintf ppf "type %t" (Print.sequence "\nand\n" print_tydef tydefs)
-
-let print_computation_effects ?max_level c ppf =
-    let print ?at_level = Print.print ?max_level ?at_level ppf in
-    let get_dirt (_,(_,dirt),_) = dirt in
-    (* Here we have access to the effects *)
-    (Format.fprintf ppf "Effects of a computation: \n";
-    let f elem =
-        Format.fprintf ppf "\t%t" (print_effect elem) in
-        List.iter f (get_dirt(c.Typed.scheme)).Type.ops;)
 
 let print_command st (cmd, _) ppf =
   match cmd with
@@ -227,3 +254,15 @@ let print_command st (cmd, _) ppf =
 let print_commands cmds ppf =
   let st = initial in
   Print.sequence "\n\n;;\n\n" (print_command st) cmds ppf
+
+
+(** THE REST *)
+
+let print_computation_effects ?max_level c ppf =
+    let print ?at_level = Print.print ?max_level ?at_level ppf in
+    let get_dirt (_,(_,dirt),_) = dirt in
+    (* Here we have access to the effects *)
+    (Format.fprintf ppf "Effects of a computation: \n";
+    let f elem =
+        Format.fprintf ppf "\t%t" (print_effect elem) in
+        List.iter f (get_dirt(c.Typed.scheme)).Type.ops;)
