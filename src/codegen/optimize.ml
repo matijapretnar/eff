@@ -339,6 +339,13 @@ and reduce_comp st c =
     in
     reduce_comp st res
 
+  | Handle (h, {term = LetRec (defs, co)}) ->
+    let handle_h_c = reduce_comp st (handle h co) in
+    let res =
+      let_rec' defs handle_h_c
+    in
+    reduce_comp st res
+
   | Handle ({term = Handler h}, c1)
         when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
     Print.debug "Remove handler, since no effects in common with computation";
