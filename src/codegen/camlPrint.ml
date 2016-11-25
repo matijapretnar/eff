@@ -99,7 +99,12 @@ let rec print_pattern ?max_level p ppf =
   | Typed.PNonbinding ->
       print "_"
 
-let rec print_expression ?max_level st e ppf =
+let rec is_pure_function e =
+  let res = Scheme.is_pure_function_type ~loc:e.Typed.location e.Typed.scheme in
+  Print.debug ~loc:e.Typed.location "%t %b" (Scheme.print_ty_scheme e.Typed.scheme) res;
+  res
+
+and print_expression ?max_level st e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match e.Typed.term with
   | Typed.Var x ->
@@ -117,7 +122,7 @@ let rec print_expression ?max_level st e ppf =
   | Typed.Variant (lbl, Some e) ->
       print ~at_level:1 "%s %t" lbl (print_expression st e)
   | Typed.Lambda a ->
-      print ~at_level:2 "fun %t" (print_abstraction ~pure:(Scheme.is_pure_function e.Typed.scheme) st a)
+      print ~at_level:2 "fun %t" (print_abstraction ~pure:(is_pure_function e) st a)
   | Typed.Handler h ->
       print "%t" (print_handler ~pure:false st h)
   | Typed.Effect eff ->
@@ -125,18 +130,20 @@ let rec print_expression ?max_level st e ppf =
   | Typed.Pure c ->
       print ~at_level:1 "%t" (print_computation ~max_level:0 {st with pure_computation = true} c)
 
+and print_possibly_pure_function_argument ?max_level st e ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  if is_pure_function e then
+    print "(fun x -> value (%t x))" (print_expression ~max_level:1 st e)
+  else
+    print_expression ~max_level:0 st e ppf
+
 and print_computation ?max_level st c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.Typed.term with
-  | Typed.Apply ({Typed.term = Typed.Lambda a}, e2) when st.pure_computation ->
-      print ~at_level:1 "(fun %t)@ %t" (print_abstraction ~pure:true st a) (print_expression ~max_level:0 st e2)
-  | Typed.Apply (e1, e2) when st.pure_computation ->
-      print ~at_level:1 "(%t)@ %t" (print_expression ~max_level:1 st e1) (print_expression ~max_level:0 st e2)
+  | Typed.Apply (e1, e2) when (not st.pure_computation) && is_pure_function e1 ->
+      print ~at_level:1 "value (%t@ %t)" (print_expression ~max_level:1 st e1) (print_possibly_pure_function_argument ~max_level:0 st e2)
   | Typed.Apply (e1, e2) ->
-      if Scheme.is_pure_function ~loc:e1.Typed.location e1.Typed.scheme then
-        print ~at_level:1 "value (%t@ %t)" (print_expression ~max_level:1 st e1) (print_expression ~max_level:0 st e2)
-      else
-        print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 st e1) (print_expression ~max_level:0 st e2)
+      print ~at_level:1 "(%t@ %t)" (print_expression ~max_level:1 st e1) (print_possibly_pure_function_argument ~max_level:0 st e2)
   | Typed.Value e when st.pure_computation ->
         print ~at_level:1 "%t" (print_expression ~max_level:0 st e)
   | Typed.Value e ->
@@ -157,7 +164,7 @@ and print_computation ?max_level st c ppf =
       print ~at_level:2 "%t" (print_multiple_bind st (lst, c))
   | Typed.LetRec (lst, c) ->
       print ~at_level:2 "let rec @[<hov>%t@] in %t"
-      (Print.sequence " and " (print_let_rec_abstraction ~pure:false st) lst) (print_computation st c)
+      (Print.sequence " and " (print_let_rec_abstraction st) lst) (print_computation st c)
   | Typed.Check c' ->
       print ~at_level:1 "check %S %t" (Common.to_string Location.print c.Typed.location) (print_computation ~max_level:0 st c')
   | Typed.Call (eff, e, a) when st.pure_computation ->
@@ -218,8 +225,8 @@ and print_top_let_abstraction st (p, c) ppf =
   | _ -> 
     Format.fprintf ppf "%t = run %t" (print_pattern p) (print_computation ~max_level:0 st c)
 
-and print_let_rec_abstraction ~pure st (x, a) ppf =
-  Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction ~pure st a)
+and print_let_rec_abstraction st (x, ({Typed.term = (_, c)} as a)) ppf =
+  Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction ~pure:(Scheme.is_pure c.Typed.scheme) st a)
 
 
 (** COMMANDS *)
@@ -235,7 +242,7 @@ let print_command st (cmd, _) ppf =
   | Typed.TopLet (defs, _) ->
       Print.print ppf "let %t" (Print.sequence "\nand\n" (print_top_let_abstraction st) defs)
   | Typed.TopLetRec (defs, _) ->
-      Print.print ppf "let rec %t" (Print.sequence "\nand\n" (print_let_rec_abstraction ~pure:false st) defs)
+      Print.print ppf "let rec %t" (Print.sequence "\nand\n" (print_let_rec_abstraction st) defs)
   | Typed.Use fn ->
       Print.print ppf "#use %S" (compiled_filename fn)
   | Typed.External (x, ty, f) ->
