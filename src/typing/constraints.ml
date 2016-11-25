@@ -36,10 +36,7 @@ type t = {
   dirt_poset: DirtPoset.t;
   region_poset: RegionPoset.t;
   full_regions: FullRegions.t;
-  ty_expansion : Type.ty TyMap.t;
-  dirt_expansion : Type.dirt DirtMap.t;
 }
-
 
 type global_subst = {
   mutable ty_subst : Type.ty TyMap.t;
@@ -96,32 +93,6 @@ and global_expand_dirt ({Type.ops=ops; Type.rest=rest} as drt) =
 and global_expand_args (tys, drts, rs) =
   (Common.map global_expand_ty tys, Common.map global_expand_dirt drts, rs)
 
-let rec expand_ty ty_expansion dirt_expansion = function
-  | Type.Apply (ty_name, args) -> Type.Apply (ty_name, expand_args ty_expansion dirt_expansion args)
-  | Type.Param t as ty ->
-    begin try
-      TyMap.find t ty_expansion
-    with
-      Not_found -> ty
-    end
-  | Type.Basic _ as ty -> ty
-  | Type.Tuple tys -> Type.Tuple (Common.map (expand_ty ty_expansion dirt_expansion) tys)
-  | Type.Arrow (ty, drty) -> Type.Arrow (expand_ty ty_expansion dirt_expansion ty, expand_dirty ty_expansion dirt_expansion drty)
-  | Type.Handler (drty1, drty2) -> Type.Handler (expand_dirty ty_expansion dirt_expansion drty1, expand_dirty ty_expansion dirt_expansion drty2)
-
-and expand_dirty ty_expansion dirt_expansion (ty, drt) = (expand_ty ty_expansion dirt_expansion ty, expand_dirt dirt_expansion drt)
-
-and expand_dirt dirt_expansion ({Type.ops=ops; Type.rest=rest} as drt) =
-  begin try
-    let {Type.ops=new_ops; Type.rest=new_rest} = DirtMap.find rest dirt_expansion in
-    {Type.ops = new_ops @ ops; Type.rest = new_rest }
-  with
-    Not_found -> drt
-  end
-
-and expand_args ty_expansion dirt_expansion (tys, drts, rs) =
-  (Common.map (expand_ty ty_expansion dirt_expansion) tys, Common.map (expand_dirt dirt_expansion) drts, rs)
-
 let add_ty_param_constraint t1 t2 constraints =
   {constraints with ty_poset = TyPoset.add t1 t2 constraints.ty_poset}
 
@@ -153,8 +124,8 @@ let skeletons constraints =
 let rec add_ty_constraint ~loc ty1 ty2 constraints =
   (* XXX Check cyclic types *)
   (* Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)
-  let ty1 = expand_ty constraints.ty_expansion constraints.dirt_expansion ty1
-  and ty2 = expand_ty constraints.ty_expansion constraints.dirt_expansion ty2 in
+  let ty1 = global_expand_ty ty1
+  and ty2 = global_expand_ty ty2 in
   match ty1, ty2 with
 
   | (ty1, ty2) when ty1 = ty2 -> constraints
@@ -219,15 +190,13 @@ and add_dirty_constraint ~loc (ty1, drt1) (ty2, drt2) constraints =
 and add_ty_expansion ~loc t ty constraints =
   global_add_ty t ty;
   (* XXX OCCUR-CHECK *)
-  let ty_expansion = TyMap.map (expand_ty (TyMap.singleton t ty) DirtMap.empty) constraints.ty_expansion
-  and smaller, greater, constraints = remove_ty_param t constraints in
-  let constraints = {constraints with ty_expansion = TyMap.add t ty ty_expansion} in
+  let smaller, greater, constraints = remove_ty_param t constraints in
   let constraints = List.fold_right (fun t' -> add_ty_constraint ~loc (Type.Param t') ty) smaller constraints in
   List.fold_right (fun t' -> add_ty_constraint ~loc ty (Type.Param t')) greater constraints
 
 and add_dirt_constraint drt1 drt2 constraints =
-  let {Type.ops = ops1; Type.rest = rest1} = expand_dirt constraints.dirt_expansion drt1
-  and {Type.ops = ops2; Type.rest = rest2} = expand_dirt constraints.dirt_expansion drt2 in
+  let {Type.ops = ops1; Type.rest = rest1} = global_expand_dirt drt1
+  and {Type.ops = ops2; Type.rest = rest2} = global_expand_dirt drt2 in
   let new_ops ops1 ops2 =
     let ops2 = List.map fst ops2 in
     let add_op (op, _) news =
@@ -259,10 +228,7 @@ and add_dirt_constraint drt1 drt2 constraints =
 
 and add_dirt_expansion d drt constraints =
   global_add_dirt d drt;
-  let ty_expansion = TyMap.map (expand_ty TyMap.empty (DirtMap.singleton d drt)) constraints.ty_expansion
-  and dirt_expansion = DirtMap.map (expand_dirt (DirtMap.singleton d drt)) constraints.dirt_expansion
-  and smaller, greater, constraints = remove_dirt_param d constraints in
-  let constraints = {constraints with ty_expansion; dirt_expansion = DirtMap.add d drt dirt_expansion} in
+  let smaller, greater, constraints = remove_dirt_param d constraints in
   let constraints = List.fold_right (fun d' -> add_dirt_constraint (Type.simple_dirt d') drt) smaller constraints in
   List.fold_right (fun d' -> add_dirt_constraint drt (Type.simple_dirt d')) greater constraints
 
@@ -271,15 +237,10 @@ let empty = {
   dirt_poset = DirtPoset.empty;
   region_poset = RegionPoset.empty;
   full_regions = FullRegions.empty;
-  ty_expansion = TyMap.empty;
-  dirt_expansion = DirtMap.empty;
-}
+ }
 
 let union constraints1 constraints2 =
-  let constraints = TyMap.fold (add_ty_expansion ~loc:Location.unknown) constraints1.ty_expansion constraints2 in
-  let constraints = DirtMap.fold add_dirt_expansion constraints1.dirt_expansion constraints in
   {
-    constraints with
     ty_poset = TyPoset.merge constraints1.ty_poset constraints2.ty_poset;
     dirt_poset = DirtPoset.merge constraints1.dirt_poset constraints2.dirt_poset;
     region_poset = RegionPoset.merge constraints1.region_poset constraints2.region_poset;
@@ -296,20 +257,14 @@ let subst sbst constraints = {
   dirt_poset = DirtPoset.map sbst.Type.dirt_param constraints.dirt_poset;
   region_poset = RegionPoset.map sbst.Type.region_param constraints.region_poset;
   full_regions = FullRegions.fold (fun r s -> FullRegions.add (sbst.Type.region_param r) s) constraints.full_regions FullRegions.empty;
-  ty_expansion = TyMap.map (Type.subst_ty sbst) constraints.ty_expansion;
-  dirt_expansion = DirtMap.map (Type.subst_dirt sbst) constraints.dirt_expansion;
-}
-
-let expand_ty constraints = expand_ty constraints.ty_expansion constraints.dirt_expansion
+ }
 
 let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) constraints = {
   ty_poset = TyPoset.filter (fun x y -> List.mem x neg_ts && List.mem y pos_ts) constraints.ty_poset;
   dirt_poset = DirtPoset.filter (fun x y -> List.mem x neg_ds && List.mem y pos_ds) constraints.dirt_poset;
   region_poset = RegionPoset.filter (fun x y -> List.mem x neg_rs && List.mem y pos_rs && not (FullRegions.mem y constraints.full_regions)) constraints.region_poset;
   full_regions = FullRegions.filter (fun r -> List.mem r pos_rs) constraints.full_regions;
-  ty_expansion = TyMap.empty;
-  dirt_expansion = DirtMap.empty;
-}
+ }
 
 let print ~non_poly constraints ppf =
   TyPoset.print constraints.ty_poset ppf;

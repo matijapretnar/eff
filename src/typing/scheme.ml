@@ -107,10 +107,10 @@ let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
 
 let finalize ctx ty chngs =
   let ctx, ty, cnstrs = List.fold_right Common.id chngs (ctx, ty, Constraints.empty) in
-  (Common.assoc_map (Constraints.expand_ty cnstrs) ctx, Constraints.expand_ty cnstrs ty, cnstrs)
+  (Common.assoc_map Constraints.global_expand_ty ctx, Constraints.global_expand_ty ty, cnstrs)
 
 let expand_ty_scheme (ctx, ty, constraints) =
-  (Common.assoc_map (Constraints.expand_ty constraints) ctx, Constraints.expand_ty constraints ty, constraints)
+  (Common.assoc_map Constraints.global_expand_ty ctx, Constraints.global_expand_ty ty, constraints)
 
 let clean_ty_scheme ~loc ty_sch =
   let ty_sch = normalize_context ~loc ty_sch in
