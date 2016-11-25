@@ -106,12 +106,11 @@ let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   (ctx, drty, cnstrs)
 
-let finalize ctx ty chngs =
-  let ctx, ty, cnstrs = List.fold_right Common.id chngs (ctx, ty, Constraints.empty) in
-  (Common.assoc_map (Constraints.expand_ty cnstrs) ctx, Constraints.expand_ty cnstrs ty, cnstrs)
-
 let expand_ty_scheme (ctx, ty, constraints) =
-  (Common.assoc_map (Constraints.expand_ty constraints) ctx, Constraints.expand_ty constraints ty, constraints)
+  (Common.assoc_map Constraints.expand_ty ctx, Constraints.expand_ty ty, constraints)
+
+let create_ty_scheme ctx ty changes =
+  List.fold_right Common.id changes (ctx, ty, Constraints.empty)
 
 let clean_ty_scheme ~loc ty_sch =
   let ty_sch = normalize_context ~loc ty_sch in
@@ -123,9 +122,6 @@ let clean_dirty_scheme ~loc (ctx, drty, constraints) =
   match clean_ty_scheme ~loc (ctx, (Type.Arrow (Type.unit_ty, drty)), constraints) with
   | ctx, Type.Arrow (_, drty), cnstrs -> (ctx, drty, cnstrs)
   | _ -> assert false
-
-let create_ty_scheme ctx ty changes =
-  List.fold_right Common.id changes (ctx, ty, Constraints.empty)
 
 let finalize_ty_scheme ~loc ctx ty changes =
   let ty_sch = create_ty_scheme ctx ty changes in
@@ -224,6 +220,7 @@ let print_ty_scheme ty_sch ppf =
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
   let show_dirt_param = show_dirt_param (ctx, ty, cnstrs) ~non_poly in
+  let ty = Constraints.expand_ty ty in
   if !Config.effect_annotations then
     Print.print ppf "%t | %t"
       (Type.print ~show_dirt_param skeletons ty)
@@ -240,6 +237,7 @@ let print_dirty_scheme drty_sch ppf =
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
   let show_dirt_param = show_dirt_param (ctx, (Type.Arrow (Type.unit_ty, (ty, drt))), cnstrs) ~non_poly in
+  let ty = Constraints.expand_ty ty in
   if !Config.effect_annotations then
     if Type.show_dirt show_dirt_param drt then
       Print.print ppf "%t ! %t | %t"

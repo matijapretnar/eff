@@ -9,8 +9,6 @@ val list_union : t list -> t
 
 val subst : Type.substitution -> t -> t
 
-val expand_ty : t -> Type.ty -> Type.ty
-
 val garbage_collect :
     (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t ->
     (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t ->
@@ -31,3 +29,5 @@ val add_full_region : Type.region_param -> t -> t
 val print : non_poly:(Type.ty_param, Type.dirt_param, Type.region_param) Trio.t -> t -> Format.formatter -> unit
 
 val is_pure_for_handler : t -> Type.dirt -> ((Common.effect * ('a * 'b)) * 'c) list -> bool
+
+val expand_ty : Type.ty -> Type.ty
