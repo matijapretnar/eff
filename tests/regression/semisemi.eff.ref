@@ -1,5 +1,5 @@
-val _a_279 : int |  = 5
-val _b_280 : int |  = 6
-val _c_281 : int |  = 7
+val _a_257 : int |  = 5
+val _b_258 : int |  = 6
+val _c_259 : int |  = 7
 - : int ! δ₁ |  = 4
 - : int ! δ₁ |  = 11

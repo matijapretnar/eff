@@ -1,12 +1,12 @@
-val _a_279 : int × string |  = (5, "foo")
+val _a_257 : int × string |  = (5, "foo")
 - : int × string ! δ₁ |  = (5, "foo")
-val _g_284 : τ₁ -δ₁→ τ₂ -δ₂→ τ₃ | τ₁ < τ₃;  = <fun>
+val _g_262 : τ₁ -δ₁→ int -δ₂→ string -δ₆→ string | τ₁ < τ₃;  = <fun>
 - : int × string ! δ₁ |  = (4, "foo")
-val _u_294 : τ₁ list |  = []
+val _u_272 : τ₁ list |  = []
 - : int list × string list ! δ₁ |  = ([1], ["foo"])
-val _v_295 : τ₁ list list |  = [[]]
+val _v_273 : τ₁ list list |  = [[]]
 - : τ₁ list list × int list list ! δ₁ |  = ([[]; []], [[2]; []])
-- : τ₁ -δ₁→ τ₂ ! δ₂ | τ₁ < τ₂; 
-- : τ₁ -δ₁→ τ₂ ! δ₂ | τ₁ < τ₂; 
-val _u_306 : τ₁ -δ₁→ τ₂ |  = <fun>
-- : τ₁ -δ₁→ τ₂ ! δ₂ | 
+- : τ₁ -δ₁→ int ! δ₂ | τ₁ < τ₂; 
+- : τ₁ -δ₁→ int ! δ₂ | τ₁ < τ₂; 
+val _u_284 : τ₁ -δ₁→ int |  = <fun>
+- : τ₁ -δ₁→ int ! δ₂ | 
