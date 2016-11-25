@@ -193,6 +193,7 @@ let print_ty_scheme ty_sch ppf =
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
   let show_dirt_param = show_dirt_param (ctx, ty, cnstrs) ~non_poly in
+  let ty = Constraints.global_expand_ty ty in
   if !Config.effect_annotations then
     Print.print ppf "%t | %t"
       (Type.print ~show_dirt_param skeletons ty)
@@ -209,6 +210,7 @@ let print_dirty_scheme drty_sch ppf =
   let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
   let show_dirt_param = show_dirt_param (ctx, (Type.Arrow (Type.unit_ty, (ty, drt))), cnstrs) ~non_poly in
+  let ty = Constraints.global_expand_ty ty in
   if !Config.effect_annotations then
     if Type.show_dirt show_dirt_param drt then
       Print.print ppf "%t ! %t | %t"

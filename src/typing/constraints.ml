@@ -40,6 +40,62 @@ type t = {
   dirt_expansion : Type.dirt DirtMap.t;
 }
 
+
+type global_subst = {
+  mutable ty_subst : Type.ty TyMap.t;
+  mutable dirt_subst : Type.dirt DirtMap.t;
+}
+
+let global_subst = {
+  ty_subst = TyMap.empty;
+  dirt_subst = DirtMap.empty;
+}
+
+let global_add_ty p ty = 
+    global_subst.ty_subst <- TyMap.add p ty global_subst.ty_subst
+
+let global_add_dirt d drt =
+    global_subst.dirt_subst <- DirtMap.add d drt global_subst.dirt_subst
+
+let rec lookup_ty_param p =
+  try
+    let ty = global_expand_ty (TyMap.find p global_subst.ty_subst) in
+    global_add_ty p ty;
+    Some ty
+  with
+    Not_found -> None
+
+and lookup_dirt_param d =
+ try
+    let drt = global_expand_dirt (DirtMap.find d global_subst.dirt_subst) in
+    global_add_dirt d drt;
+    Some drt
+  with
+    Not_found -> None
+
+and global_expand_ty ty = match ty with
+  | Type.Apply (ty_name, args) -> Type.Apply (ty_name, global_expand_args args)
+  | Type.Param t ->
+    begin match lookup_ty_param t with
+    | Some ty' -> ty'
+    | None -> ty
+    end
+  | Type.Basic _ -> ty
+  | Type.Tuple tys -> Type.Tuple (Common.map global_expand_ty tys)
+  | Type.Arrow (ty, drty) -> Type.Arrow (global_expand_ty ty, global_expand_dirty drty)
+  | Type.Handler (drty1, drty2) -> Type.Handler (global_expand_dirty drty1, global_expand_dirty drty2)
+
+and global_expand_dirty (ty, drt) = (global_expand_ty ty, global_expand_dirt drt)
+
+and global_expand_dirt ({Type.ops=ops; Type.rest=rest} as drt) =
+  match lookup_dirt_param rest with
+  | Some {Type.ops=new_ops; Type.rest=new_rest} ->
+      {Type.ops = new_ops @ ops; Type.rest = new_rest }
+  | None -> drt
+
+and global_expand_args (tys, drts, rs) =
+  (Common.map global_expand_ty tys, Common.map global_expand_dirt drts, rs)
+
 let rec expand_ty ty_expansion dirt_expansion = function
   | Type.Apply (ty_name, args) -> Type.Apply (ty_name, expand_args ty_expansion dirt_expansion args)
   | Type.Param t as ty ->
@@ -161,6 +217,7 @@ and add_dirty_constraint ~loc (ty1, drt1) (ty2, drt2) constraints =
   add_ty_constraint ~loc ty1 ty2 (add_dirt_constraint drt1 drt2 constraints)
 
 and add_ty_expansion ~loc t ty constraints =
+  global_add_ty t ty;
   (* XXX OCCUR-CHECK *)
   let ty_expansion = TyMap.map (expand_ty (TyMap.singleton t ty) DirtMap.empty) constraints.ty_expansion
   and smaller, greater, constraints = remove_ty_param t constraints in
@@ -201,6 +258,7 @@ and add_dirt_constraint drt1 drt2 constraints =
   List.fold_right op_less ops1 (add_dirt_param_constraint rest1 rest2 constraints)
 
 and add_dirt_expansion d drt constraints =
+  global_add_dirt d drt;
   let ty_expansion = TyMap.map (expand_ty TyMap.empty (DirtMap.singleton d drt)) constraints.ty_expansion
   and dirt_expansion = DirtMap.map (expand_dirt (DirtMap.singleton d drt)) constraints.dirt_expansion
   and smaller, greater, constraints = remove_dirt_param d constraints in
