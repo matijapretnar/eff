@@ -28,4 +28,4 @@ val add_full_region : Type.region_param -> t -> t
 
 val print : non_poly:(Type.ty_param, Type.dirt_param, Type.region_param) Trio.t -> t -> Format.formatter -> unit
 
-val global_expand_ty : Type.ty -> Type.ty
+val expand_ty : Type.ty -> Type.ty

@@ -38,25 +38,25 @@ type t = {
   full_regions: FullRegions.t;
 }
 
-type global_subst = {
-  mutable ty_subst : Type.ty TyMap.t;
-  mutable dirt_subst : Type.dirt DirtMap.t;
+type param_expansion = {
+  mutable ty_expansion : Type.ty TyMap.t;
+  mutable dirt_expansion : Type.dirt DirtMap.t;
 }
 
-let global_subst = {
-  ty_subst = TyMap.empty;
-  dirt_subst = DirtMap.empty;
+let param_expansion = {
+  ty_expansion = TyMap.empty;
+  dirt_expansion = DirtMap.empty;
 }
 
 let global_add_ty p ty = 
-    global_subst.ty_subst <- TyMap.add p ty global_subst.ty_subst
+    param_expansion.ty_expansion <- TyMap.add p ty param_expansion.ty_expansion
 
 let global_add_dirt d drt =
-    global_subst.dirt_subst <- DirtMap.add d drt global_subst.dirt_subst
+    param_expansion.dirt_expansion <- DirtMap.add d drt param_expansion.dirt_expansion
 
 let rec lookup_ty_param p =
   try
-    let ty = global_expand_ty (TyMap.find p global_subst.ty_subst) in
+    let ty = expand_ty (TyMap.find p param_expansion.ty_expansion) in
     global_add_ty p ty;
     Some ty
   with
@@ -64,34 +64,34 @@ let rec lookup_ty_param p =
 
 and lookup_dirt_param d =
  try
-    let drt = global_expand_dirt (DirtMap.find d global_subst.dirt_subst) in
+    let drt = expand_dirt (DirtMap.find d param_expansion.dirt_expansion) in
     global_add_dirt d drt;
     Some drt
   with
     Not_found -> None
 
-and global_expand_ty ty = match ty with
-  | Type.Apply (ty_name, args) -> Type.Apply (ty_name, global_expand_args args)
+and expand_ty ty = match ty with
+  | Type.Apply (ty_name, args) -> Type.Apply (ty_name, expand_args args)
   | Type.Param t ->
     begin match lookup_ty_param t with
     | Some ty' -> ty'
     | None -> ty
     end
   | Type.Basic _ -> ty
-  | Type.Tuple tys -> Type.Tuple (Common.map global_expand_ty tys)
-  | Type.Arrow (ty, drty) -> Type.Arrow (global_expand_ty ty, global_expand_dirty drty)
-  | Type.Handler (drty1, drty2) -> Type.Handler (global_expand_dirty drty1, global_expand_dirty drty2)
+  | Type.Tuple tys -> Type.Tuple (Common.map expand_ty tys)
+  | Type.Arrow (ty, drty) -> Type.Arrow (expand_ty ty, expand_dirty drty)
+  | Type.Handler (drty1, drty2) -> Type.Handler (expand_dirty drty1, expand_dirty drty2)
 
-and global_expand_dirty (ty, drt) = (global_expand_ty ty, global_expand_dirt drt)
+and expand_dirty (ty, drt) = (expand_ty ty, expand_dirt drt)
 
-and global_expand_dirt ({Type.ops=ops; Type.rest=rest} as drt) =
+and expand_dirt ({Type.ops=ops; Type.rest=rest} as drt) =
   match lookup_dirt_param rest with
   | Some {Type.ops=new_ops; Type.rest=new_rest} ->
       {Type.ops = new_ops @ ops; Type.rest = new_rest }
   | None -> drt
 
-and global_expand_args (tys, drts, rs) =
-  (Common.map global_expand_ty tys, Common.map global_expand_dirt drts, rs)
+and expand_args (tys, drts, rs) =
+  (Common.map expand_ty tys, Common.map expand_dirt drts, rs)
 
 let add_ty_param_constraint t1 t2 constraints =
   {constraints with ty_poset = TyPoset.add t1 t2 constraints.ty_poset}
@@ -124,8 +124,8 @@ let skeletons constraints =
 let rec add_ty_constraint ~loc ty1 ty2 constraints =
   (* XXX Check cyclic types *)
   (* Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)
-  let ty1 = global_expand_ty ty1
-  and ty2 = global_expand_ty ty2 in
+  let ty1 = expand_ty ty1
+  and ty2 = expand_ty ty2 in
   match ty1, ty2 with
 
   | (ty1, ty2) when ty1 = ty2 -> constraints
@@ -195,8 +195,8 @@ and add_ty_expansion ~loc t ty constraints =
   List.fold_right (fun t' -> add_ty_constraint ~loc ty (Type.Param t')) greater constraints
 
 and add_dirt_constraint drt1 drt2 constraints =
-  let {Type.ops = ops1; Type.rest = rest1} = global_expand_dirt drt1
-  and {Type.ops = ops2; Type.rest = rest2} = global_expand_dirt drt2 in
+  let {Type.ops = ops1; Type.rest = rest1} = expand_dirt drt1
+  and {Type.ops = ops2; Type.rest = rest2} = expand_dirt drt2 in
   let new_ops ops1 ops2 =
     let ops2 = List.map fst ops2 in
     let add_op (op, _) news =
