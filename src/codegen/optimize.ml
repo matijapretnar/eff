@@ -97,6 +97,9 @@ let inlinable_definitions =
     ("<", polymorphic @@ fun t -> binary_inlinable "Pervasives.(<)" t t Type.bool_ty);
     ("<>", polymorphic @@ fun t -> binary_inlinable "Pervasives.(<>)" t t Type.bool_ty);
     (">", polymorphic @@ fun t -> binary_inlinable "Pervasives.(>)" t t Type.bool_ty);
+    (">=", polymorphic @@ fun t -> binary_inlinable "Pervasives.(>=)" t t Type.bool_ty);
+    ("<=", polymorphic @@ fun t -> binary_inlinable "Pervasives.(<=)" t t Type.bool_ty);
+    ("!=", polymorphic @@ fun t -> binary_inlinable "Pervasives.(!=)" t t Type.bool_ty);
     ("~-", monomorphic @@ unary_inlinable "Pervasives.(~-)" Type.int_ty Type.int_ty);
     ("+", monomorphic @@ binary_inlinable "Pervasives.(+)" Type.int_ty Type.int_ty Type.int_ty);
     ("*", monomorphic @@ binary_inlinable "Pervasives.( * )" Type.int_ty Type.int_ty Type. int_ty);
