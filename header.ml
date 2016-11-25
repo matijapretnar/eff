@@ -57,3 +57,6 @@ let ( ** ) =
     let b = pow a (n / 2) in
     b * b * (if n mod 2 = 0 then 1 else a)) in
   pow
+
+let string_length _ = assert false
+let to_string _ = assert false

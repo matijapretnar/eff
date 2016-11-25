@@ -246,7 +246,7 @@ let print_command st (cmd, _) ppf =
   | Typed.Use fn ->
       Print.print ppf "#use %S" (compiled_filename fn)
   | Typed.External (x, ty, f) ->
-      Print.print ppf "let %t : %t = ( %s )" (print_variable x) (print_type ty) f
+      Print.print ppf "let %t = ( %s )" (print_variable x) f
   | Typed.Tydef tydefs ->
       print_tydefs tydefs ppf
   | Typed.Reset ->
