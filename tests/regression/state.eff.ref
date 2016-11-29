@@ -1,0 +1,19 @@
+val _state_257 : τ₁ -δ₂→ (int ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹ 
+                 (int -{Get:ρ₃, Set:ρ₄|δ₃}→
+                  string -δ₆→ string) ! {Get:ρ₅, 
+                 Set:ρ₆|δ₄}) | τ₂ < τ₃; δ₁ < δ₄,
+δ₁ < δ₃;  = <fun>
+val _better_state_267 : int -δ₂→ (τ₁ ! {Get:ρ₁, 
+                        Set:ρ₂|δ₁} ⟹  int ! {Get:ρ₃, 
+                        Set:ρ₄|δ₃}) | τ₁ < τ₂; δ₁ < δ₃;  = <fun>
+val _transaction_277 : τ₁ ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹ 
+int ! {Get:ρ₃, 
+Set:ρ₄|δ₂} | τ₁ < τ₂; δ₁ < δ₂; ρ₃ = ⊤,
+ρ₄ = ⊤ = <handler>
+Check (file "./state.eff", line 25, char 24):
+20
+Check (file "./state.eff", line 28, char 26):
+30
+Check (file "./state.eff", line 34, char 37):
+20
+- : int ! {Fail:ρ₁, Get:ρ₂, Set:ρ₃|δ₁} |  = 0

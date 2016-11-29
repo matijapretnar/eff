@@ -1,0 +1,110 @@
+val _less1_257 : bool |  = true
+val _less2_259 : bool |  = false
+val _less3_261 : bool |  = false
+val _test_equal_int_263 : bool |  = true
+val _test_equal_float_265 : bool |  = true
+- : unit ! {AssertionFault:ρ₁|δ₁} | ρ₁ = ⊤ = ()
+val _tilda_minus_269 : int |  = -1
+val _tilda_minus_dot2_270 : float |  = -3.14159
+val _tilda_minus_dot2_271 : float |  = -1.
+val _test_plus_272 : int |  = 4
+val _test_times_274 : int |  = 4
+val _test_power_276 : int |  = 8
+val _test_minus_278 : int |  = 19
+val _test_minus_tilda_minus_280 : int |  = 65
+val _test_mod1_283 : int | ρ₁ = ⊤ = 2
+val _test_mod2_285 : int | ρ₁ = ⊤ = 0
+Check (file "./test_pervasives.eff", line 39, char 1):
+Call DivisionByZero ()
+- : unit ! {DivisionByZero:ρ₁, 
+AssertionFault:ρ₂|δ₁} | ρ₁ = ⊤ = ()
+Check (file "./test_pervasives.eff", line 41, char 1):
+Call DivisionByZero ()
+- : unit ! {DivisionByZero:ρ₁, 
+AssertionFault:ρ₂|δ₁} | ρ₁ = ⊤ = ()
+val _test_plus_dot_289 : float | ρ₁ = ⊤ = 5.84
+val _test_times_dot_291 : float | ρ₁ = ⊤ = 8.478
+val _test_minus_dot_293 : float | ρ₁ = ⊤ = 0.44
+val _test_div_dot_295 : float | ρ₁ = ⊤ = 1.16296296296
+val _test_div_dot_zero_297 : float | ρ₁ = ⊤ = infinity
+val _test_div_299 : int | ρ₁ = ⊤ = 33
+Check (file "./test_pervasives.eff", line 55, char 1):
+Call DivisionByZero ()
+- : unit ! {DivisionByZero:ρ₁, 
+AssertionFault:ρ₂|δ₁} | ρ₁ = ⊤ = ()
+val _test_zero_div_302 : int | ρ₁ = ⊤ = 0
+Check (file "./test_pervasives.eff", line 59, char 1):
+Call DivisionByZero ()
+- : unit ! {DivisionByZero:ρ₁, 
+AssertionFault:ρ₂|δ₁} | ρ₁ = ⊤ = ()
+val _test_carron_305 : string | ρ₁ = ⊤ = "cherrypie"
+val _test_to_string1_307 : string | ρ₁ = ⊤ = "13"
+val _test_to_string2_308 : string | ρ₁ = ⊤ = "[(1, 2, 3)]"
+val _test_to_string3_309 : string | ρ₁ = ⊤ = "(1, 2, 3)"
+val _test_to_string4_310 : string | ρ₁ = ⊤ = "<fun>"
+val _test_float_of_int_312 : float | ρ₁ = ⊤ = 42.
+val _test_none_313 : τ₁ option | ρ₁ = ⊤ = None
+val _test_some_314 : int option | ρ₁ = ⊤ = Some 3
+val _test_ignore_315 : unit | ρ₁ = ⊤ = ()
+val _test_not_318 : bool | ρ₁ = ⊤ = false
+val _test_greater1_319 : bool | ρ₁ = ⊤ = true
+val _test_greater2_321 : bool | ρ₁ = ⊤ = true
+val _test_leq_323 : bool | ρ₁ = ⊤ = true
+val _test_geq_325 : bool | ρ₁ = ⊤ = true
+val _test_neq_327 : bool | ρ₁ = ⊤ = true
+val _test_range_329 : int list | ρ₁ = ⊤ = [4; 5; 6; 7; 8; 9]
+val _test_map_331 : int list | ρ₁ = ⊤ = [1; 4; 9; 16; 25]
+val _test_take_335 : int list | ρ₁ = ⊤ = [2; 5; 8; 11; 14; 17; 20; 23;
+                                               26; 29; 32; 35; 38; 41; 44;
+                                               47; 50; 53; 56; 59; 62]
+val _test_fold_left_341 : int | ρ₁ = ⊤ = 89
+val _test_fold_right_349 : int | ρ₁ = ⊤ = 161
+Check (file "./test_pervasives.eff", line 101, char 27):
+"iter [1; 2; 3; 4; 5]"
+val _test_iter_357 : unit | ρ₁ = ⊤ = ()
+val _test_forall_361 : bool | ρ₁ = ⊤ = false
+val _test_exists_367 : bool | ρ₁ = ⊤ = true
+val _test_mem_373 : bool | ρ₁ = ⊤ = false
+val _test_filter_375 : int list | ρ₁ = ⊤ = [4; 5]
+val _test_complement_379 : int list | ρ₁ = ⊤ = [1; 3; 5; 6]
+val _test_intersection_381 : int list | ρ₁ = ⊤ = [2; 4]
+val _test_zip1_383 : (int × string) list | ρ₁ = ⊤,
+ρ₂ = ⊤ = [(1, "a"); (2, "b"); (3, "c")]
+Check (file "./test_pervasives.eff", line 117, char 1):
+Call InvalidArgument "zip: length mismatch"
+- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂, 
+AssertionFault:ρ₃|δ₁} | ρ₁ = ⊤,ρ₂ = ⊤ = ()
+val _test_reverse_386 : int list | ρ₁ = ⊤,ρ₂ = ⊤ = [5; 4; 3; 2; 1]
+val _test_at_387 : int list | ρ₁ = ⊤,ρ₂ = ⊤ = [1; 2; 3; 4; 5; 6]
+val _test_length_389 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 5
+val _test_head_390 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 1
+Check (file "./test_pervasives.eff", line 127, char 1):
+Call InvalidArgument "head: empty list"
+- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂, 
+AssertionFault:ρ₃|δ₁} | ρ₁ = ⊤,ρ₂ = ⊤ = ()
+val _test_tail_391 : int list | ρ₁ = ⊤,ρ₂ = ⊤ = [2; 3; 4]
+Check (file "./test_pervasives.eff", line 131, char 1):
+Call InvalidArgument "tail: empty list"
+- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂, 
+AssertionFault:ρ₃|δ₁} | ρ₁ = ⊤,ρ₂ = ⊤ = ()
+val _test_abs_392 : int × int × int | ρ₁ = ⊤,ρ₂ = ⊤ = (5, 5, 5)
+val _test_min_398 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 1
+val _test_max_400 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 2
+val _test_gcd_402 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 4
+val _test_lcm_404 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 24
+val _test_odd_406 : bool | ρ₁ = ⊤,ρ₂ = ⊤ = false
+val _test_even_407 : bool | ρ₁ = ⊤,ρ₂ = ⊤ = true
+val _test_id_408 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 5
+val _test_id_id_409 : τ₁ -_δ₁→ int | τ₁ < τ₂; ρ₁ = ⊤,
+ρ₂ = ⊤ = <fun>
+val _test_compose_410 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 196
+val _test_fst_417 : string | ρ₁ = ⊤,ρ₂ = ⊤ = "foo"
+val _test_snd_418 : int | ρ₁ = ⊤,ρ₂ = ⊤ = 4
+Check (file "./test_pervasives.eff", line 157, char 1):
+Call Print "Does this work?"
+- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂, 
+AssertionFault:ρ₃|δ₁} | ρ₁ = ⊤,ρ₂ = ⊤ = ()
+Check (file "./test_pervasives.eff", line 159, char 1):
+Call Read ()
+- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂, 
+AssertionFault:ρ₃|δ₁} | ρ₁ = ⊤,ρ₂ = ⊤ = ()

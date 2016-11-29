@@ -1,0 +1,10 @@
+effect Eff : int -> int
+
+;;
+
+
+handle
+  #Eff 1 + 3
+with
+| #Eff x k -> k (x + 2)
+| val y -> y + 4

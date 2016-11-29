@@ -164,7 +164,7 @@ and abstract2 ~loc (ctx_p1, ty_p1, cnstrs_p1) (ctx_p2, ty_p2, cnstrs_p2) (ctx_c,
   | ctx, Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c), cnstrs -> ctx, (ty_p1, ty_p2, drty_c), cnstrs
   | _ -> assert false
 
-let context skeletons ctx ppf =
+let print_context skeletons ctx ppf =
   match ctx with
   | [] -> ()
   | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence ", " (fun (x, t) ppf -> Print.print ppf "%t : %t" (Untyped.Variable.print x) (Type.print skeletons t)) ctx)
@@ -180,6 +180,26 @@ let extend_non_poly (ts, ds, rs) skeletons =
 let show_dirt_param ~non_poly:(_, ds, _) (ctx, ty, cnstrs) =
   fun ((Type.Dirt_Param k) as p) -> Some (fun ppf -> (Symbols.dirt_param k (List.mem p ds) ppf))
 
+(*
+    check whether the dirty_scheme is pure in terms of the handler
+    ie.
+        check if any operations from the handler can occur in the computation
+        if so => the dirty_scheme is dirty
+        otherwise the dirty_scheme is pure
+*)
+let is_pure_for_handler (ctx, (_, drt), cnstrs) eff_clause =
+  let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
+    let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty
+    and (@@@) = Trio.append in
+    neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
+  in
+  let (_, pos_ds, _), (_, neg_ds, _) = List.fold_right add_ctx_pos_neg ctx (Trio.empty, Trio.empty) in
+  (* Check if the constraints from the operations in the dirt are pure in terms of the handler *)
+  Constraints.is_pure_for_handler cnstrs drt eff_clause &&
+  (* Check if the rest occurs in the pos_ds or neg_ds *)
+  not (List.mem drt.Type.rest (pos_ds @ neg_ds))
+
+
 let print_ty_scheme ty_sch ppf =
   let sbst = Type.beautifying_subst () in
   let _, (_, ds, _) = pos_neg_ty_scheme ty_sch in
@@ -191,7 +211,8 @@ let print_ty_scheme ty_sch ppf =
   let show_dirt_param = show_dirt_param (ctx, ty, cnstrs) ~non_poly in
   let ty = Constraints.expand_ty ty in
   if !Config.effect_annotations then
-    Print.print ppf "%t | %t"
+    Print.print ppf "%t |- %t | %t"
+      (print_context skeletons ctx)
       (Type.print ~show_dirt_param skeletons ty)
       (Constraints.print ~non_poly cnstrs)
   else
@@ -209,7 +230,8 @@ let print_dirty_scheme drty_sch ppf =
   let ty = Constraints.expand_ty ty in
   if !Config.effect_annotations then
     if Type.show_dirt show_dirt_param drt then
-      Print.print ppf "%t ! %t | %t"
+      Print.print ppf "%t |- %t ! %t | %t"
+        (print_context skeletons ctx)
         (Type.print ~show_dirt_param skeletons ty)
         (Type.print_dirt ~non_poly ~show_dirt_param drt)
         (Constraints.print ~non_poly cnstrs)

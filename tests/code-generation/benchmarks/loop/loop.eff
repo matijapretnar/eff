@@ -1,0 +1,19 @@
+effect Fail : unit -> empty
+
+(******************************************************************************)
+
+let rec loop n =
+  if n < 0 then
+    absurd (#Fail ())
+  else if n = 0 then
+    0
+  else
+    loop (n - 1) + 1
+
+let rec loop_acc n acc =
+  if n < 0 then
+    absurd (#Fail ())
+  else if n = 0 then
+    acc
+  else
+    loop_acc (n - 1) (acc + 1)

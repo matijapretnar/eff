@@ -58,6 +58,9 @@ let inlinable_definitions =
     ("<", polymorphic @@ fun t -> binary_builtin "(<)" t t Type.bool_ty);
     ("<>", polymorphic @@ fun t -> binary_builtin "(<>)" t t Type.bool_ty);
     (">", polymorphic @@ fun t -> binary_builtin "(>)" t t Type.bool_ty);
+    (">=", polymorphic @@ fun t -> binary_builtin "(>=)" t t Type.bool_ty);
+    ("<=", polymorphic @@ fun t -> binary_builtin "(<=)" t t Type.bool_ty);
+    ("!=", polymorphic @@ fun t -> binary_builtin "(!=)" t t Type.bool_ty);
     ("~-", monomorphic @@ unary_builtin "(~-)" Type.int_ty Type.int_ty);
     ("+", monomorphic @@ binary_builtin "(+)" Type.int_ty Type.int_ty Type.int_ty);
     ("*", monomorphic @@ binary_builtin "( * )" Type.int_ty Type.int_ty Type. int_ty);
@@ -119,21 +122,6 @@ let rec substitute_pattern_comp st c p exp =
   optimize_comp st (Typed.subst_comp (Typed.pattern_match p exp) c)
 and substitute_pattern_expr st e p exp =
   optimize_expr st (Typed.subst_expr (Typed.pattern_match p exp) e)
-
-
-and hasEffectsInCommon c h =
-    (* Print.debug "%t" (CamlPrint.print_computation_effects c1); *)
-    let rec hasCommonEffects l1 l2 =
-        match l1 with
-            | [] -> false
-            | (h1,_)::t1 -> (
-                match l2 with
-                    | [] -> false
-                    | ((h2,(_,_)),_)::t2 when h1 = h2 -> true
-                    | ((h2,(_,_)),_)::t2 -> (hasCommonEffects t1 l2) || (hasCommonEffects l1 t2)
-            ) in
-    let get_dirt (_,(_,dirt),_) = dirt in
-    hasCommonEffects (get_dirt (c.Typed.scheme)).Type.ops h.effect_clauses
 
 and beta_reduce st ({term = (p, c)} as a) e =
   match applicable_pattern p (Typed.free_vars_comp c) with
@@ -288,16 +276,46 @@ and reduce_comp st c =
     in
     reduce_comp st res
 
-  | Handle ({term = Handler h}, c1) when (not (hasEffectsInCommon c1 h)) ->
-    Print.debug "Remove handler, keep handler since no effects in common with computation";
+  | Handle (h, {term = LetRec (defs, co)}) ->
+    let handle_h_c = reduce_comp st (handle h co) in
+    let res =
+      let_rec' defs handle_h_c
+    in
+    reduce_comp st res
+
+  | Handle ({term = Handler h}, c1)
+        when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
+    Print.debug "Remove handler, since no effects in common with computation";
     reduce_comp st (bind c1 h.value_clause)
 
-  | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})}) when  (not (hasEffectsInCommon c1 h)) ->
-    Print.debug "Remove handler of outer Bind, keep handler since no effects in common with computation";
+  | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})})
+        when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
+    Print.debug "Remove handler of outer Bind, since no effects in common with computation";
     reduce_comp st (bind (reduce_comp st c1) (abstraction p1 (reduce_comp st (handle (refresh_expr handler) c2))))
 
   | Handle ({term = Handler h}, c) when Scheme.is_pure c.scheme ->
     beta_reduce st h.value_clause (reduce_expr st (pure c))
+
+  | Handle ({term = Handler h}, {term = Bind (c1, {term = (p1, c2)})})
+        when (Scheme.is_pure_for_handler c2.Typed.scheme h.effect_clauses) ->
+    Print.debug "Move inner bind into the value case";
+    let new_value_clause = abstraction p1 (bind (reduce_comp st c2) (refresh_abs h.value_clause)) in
+    let hdlr = handler {
+      effect_clauses = h.effect_clauses;
+      value_clause = refresh_abs new_value_clause;
+      finally_clause = h.finally_clause;
+    } in
+    reduce_comp st (handle (refresh_expr hdlr) c1)
+
+  | Handle ({term = Handler h} as h2, {term = Bind (c1, {term = (p, c2)})}) ->
+    Print.debug "Move (dirty) inner bind into the value case";
+    let new_value_clause = abstraction p (handle (refresh_expr h2) (refresh_comp (reduce_comp st c2) )) in
+    let hdlr = handler {
+      effect_clauses = h.effect_clauses;
+      value_clause = refresh_abs new_value_clause;
+      finally_clause = h.finally_clause;
+    } in
+    reduce_comp st (handle (refresh_expr hdlr) (refresh_comp c1))
 
   | Handle ({term = Handler h} as handler, {term = Call (eff, param, k)}) ->
     let {term = (k_pat, k_body)} = refresh_abs k in
@@ -345,8 +363,13 @@ and reduce_comp st c =
         begin match find_in_stack st v with
           | Some ({term = Lambda k}) ->
             let {term = (newdp, newdc)} = refresh_abs k in
-            let (_,Type.Handler((ty_in, drt_in), (ty_out, drt_out)),_) = e1.scheme in 
-            let f_var, f_pat = make_var "newvar" (Scheme.simple (Type.Arrow(ty_in,(ty_out,drt_out)))) in
+            let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
+            let (f_ctx,Type.Arrow(f_ty_in, f_ty_out ),f_const) = ae1.scheme in 
+            let constraints = Constraints.list_union [h_const; f_const]
+                              |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
+            let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
+            let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
+            let f_var, f_pat = make_var "newvar"  function_scheme in
             let f_def =
               lambda @@
               abstraction newdp @@
@@ -365,8 +388,13 @@ and reduce_comp st c =
                        begin match (find_in_let_rec_mem st v) with
                        | Some abs ->
                                     let (let_rec_p,let_rec_c) = abs.term in
-                                    let (_,Type.Handler((ty_in, drt_in), (ty_out, drt_out)),_) = e1.scheme in
-                                    let new_f_var, new_f_pat = make_var "newvar" (Scheme.simple (Type.Arrow(ty_in,(ty_out,drt_out)))) in
+                                    let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
+                                    let (f_ctx,Type.Arrow(f_ty_in, f_ty_out ),f_const) = ae1.scheme in 
+                                    let constraints = Constraints.list_union [h_const; f_const]
+                                          |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
+                                    let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
+                                    let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
+                                    let new_f_var, new_f_pat = make_var "newvar"  function_scheme in
                                     let new_handler_call = handle e1 let_rec_c in
                                     let Var newfvar = new_f_var.term in
                                     let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in

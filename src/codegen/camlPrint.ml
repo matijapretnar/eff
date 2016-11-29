@@ -73,7 +73,11 @@ let print_tydefs tydefs ppf =
 
 let print_variable = Typed.Variable.print
 
+let format_region (Type.Region_Param i) = i
+
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
+
+let print_effect_region (eff, (region)) ppf = Print.print ppf "Effect_%s -> %d" eff (format_region region)
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -232,6 +236,25 @@ and print_let_rec_abstraction st (x, ({Typed.term = (_, c)} as a)) ppf =
 (** COMMANDS *)
 
 let compiled_filename fn = fn ^ ".ml"
+
+let print_tydefs tydefs ppf =
+  Format.fprintf ppf "type %t" (Print.sequence "\nand\n" print_tydef tydefs)
+
+let print_computation_effects ?max_level c ppf =
+    let print ?at_level = Print.print ?max_level ?at_level ppf in
+    let get_dirt (_,(_,dirt),_) = dirt in
+    let get_type (_,(ty,dirt),_) = ty in
+    let rest = (get_dirt(c.Typed.scheme)).Type.rest in
+    let rest_int (Type.Dirt_Param i) = i in
+    (* Here we have access to the effects *)
+    (
+    Format.fprintf ppf "Effects of a computation: \n";
+    let f elem =
+        Format.fprintf ppf "\t%t\n" (print_effect_region elem) in
+        List.iter f (get_dirt(c.Typed.scheme)).Type.ops;
+    Format.fprintf ppf "\nRest: %d\n" (rest_int rest);
+    Format.fprintf ppf "Type: %t\n" (print_type (get_type(c.Typed.scheme)));
+    )
 
 let print_command st (cmd, _) ppf =
   match cmd with

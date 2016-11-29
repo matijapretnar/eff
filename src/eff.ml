@@ -92,6 +92,7 @@ let compile_file st filename =
   let separator = (Sugared.Term (Sugared.Const (Const.of_string "End of pervasives"), Location.unknown), Location.unknown) in
   let cmds = List.map Desugar.toplevel (pervasives_cmds @ separator :: cmds) in
   let cmds, _ = Infer.type_cmds {Infer.typing = st.Shell.typing; Infer.change = st.Shell.change} cmds in
+  let cmds_no_opt = cmds in
   let cmds = if !Config.disable_optimization then cmds else Optimize.optimize_commands cmds in
 
   (* read the source file *)
@@ -110,6 +111,15 @@ let compile_file st filename =
   close_in header_channel;
 
   (* write a temporary compiled file *)
+  ignore (Sys.command ("mkdir -p _tmp_no_opt"));
+  let temporary_file = "_tmp_no_opt/" ^ CamlPrint.compiled_filename filename in
+  let out_channel = open_out temporary_file in
+  Format.fprintf (Format.formatter_of_out_channel out_channel)
+    "%s\n;;\n%t@."
+    header (CamlPrint.print_commands cmds_no_opt);
+  flush out_channel;
+  close_out out_channel;
+
   ignore (Sys.command ("mkdir -p _tmp"));
   let temporary_file = "_tmp/" ^ CamlPrint.compiled_filename filename in
   let out_channel = open_out temporary_file in

@@ -1,0 +1,47 @@
+effect Decide : unit -> bool
+
+let choose_all = handler
+  | #Decide () k -> k true @ k false
+  | val x -> [x]
+
+;;
+
+let decide_func1 x y =
+    (if #Decide () then x else y) in
+with choose_all handle (decide_func1 10 20 )
+
+
+
+(*
+	type (_, _) effect += Effect_Decide : ( unit,  bool) effect
+
+;;
+
+
+let _choose_all_281 = { value_clause = (fun _x_287 ->
+                                           value ((::) (_x_287, [])));
+                       finally_clause = (fun _gen_id_par_286 ->
+                                            value _gen_id_par_286);
+                       effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
+             ((match x with | Effect_Decide -> (fun (() :  unit) (_k_282 :  bool -> _ computation) -> 
+                       (_k_282 true) >>
+                       fun _gen_bind_284 ->
+                          (_var_191 (* @ *) _gen_bind_284) >>
+                          fun _gen_bind_283 ->
+                             (_k_282 false) >>
+                             fun _gen_bind_285 ->  _gen_bind_283
+                             _gen_bind_285) | eff' -> fun arg k -> Call (eff', arg, k)) : a -> (b -> _ computation) -> _ computation)) }
+
+;;
+
+
+let _newvar_84 = (*pure*)fun _x_289 ->  fun _y_290 ->
+       call Effect_Decide () (fun __call_result_82 ->
+                                 (match __call_result_82 with | true ->
+                                                                 value _x_289
+                                                              | false ->
+                                                                 value _y_290))
+    in
+(_var_191 (* @ *) ((::) (10, []))) >>
+fun _gen_bind_78 ->  _gen_bind_78 ((::) (20, []))
+*)

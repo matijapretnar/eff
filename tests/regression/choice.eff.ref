@@ -1,0 +1,28 @@
+- : int ! {Decide:ρ₁|δ₁} |  = 10
+val _choose_all_265 : τ₁ ! {Decide:ρ₁|δ₁} ⟹ 
+int list ! {Decide:ρ₂|δ₂} | τ₁ < τ₂; δ₁ < δ₂;  = <handler>
+- : int list ! {Decide:ρ₁|δ₁} |  = [10; 5; 20; 15]
+val _choose_all2_277 : τ₁ ! {Decide2:ρ₁|δ₁} ⟹ 
+int list ! {Decide2:ρ₂|δ₂} | τ₁ < τ₂; δ₁ < δ₂;  = <handler>
+- : int list list ! {Decide2:ρ₁, 
+Decide:ρ₂|δ₁} |  = [[10; 5]; [20; 15]]
+- : int list list ! {Decide2:ρ₁, 
+Decide:ρ₂|δ₁} |  = [[10; 20]; [5; 15]]
+- : int list list ! {Decide2:ρ₁, 
+Decide:ρ₂|δ₁} |  = [[10; 20]; [10; 15]; [5; 20]; [5; 15]]
+val _choose_int_299 : int -{Fail:ρ₁, Decide:ρ₂|δ₁}→
+                      τ₁ -{Fail:ρ₃, Decide:ρ₄|δ₂}→ int | ρ₃ = ⊤,
+ρ₄ = ⊤ = <fun>
+val _sqrt_309 : τ₁ -δ₁→ int option |  = <fun>
+val _pythagorean_323 : int -δ₁→
+                       int -{Fail:ρ₁, Decide:ρ₂|δ₂}→
+                       int × int × int | ρ₁ = ⊤,
+ρ₂ = ⊤ = <fun>
+val _backtrack_347 : τ₁ ! {Fail:ρ₁, Decide:ρ₂|δ₁} ⟹ 
+int ! {Decide:ρ₃, 
+Fail:ρ₄|δ₂} | τ₁ < τ₂; δ₁ < δ₂; ρ₁ < ρ₄;  = <handler>
+val _choose_all_353 : τ₁ ! {Decide:ρ₁, Fail:ρ₂|δ₁} ⟹ 
+int list ! {Decide:ρ₃, 
+Fail:ρ₄|δ₂} | τ₁ < τ₂; δ₁ < δ₂;  = <handler>
+- : (int × int × int) list ! {Fail:ρ₁, Decide2:ρ₂, 
+Decide:ρ₃|δ₁} |  = [(5, 12, 13); (6, 8, 10); (8, 15, 17); (9, 12, 15)]

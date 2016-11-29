@@ -9,6 +9,12 @@ external ( > ) : 'a -> 'a -> bool = ">"
 
 external ( <> ) : 'a -> 'a -> bool = "<>"
 
+external ( <= ) : 'a -> 'a -> bool = "<="
+
+external ( >= ) : 'a -> 'a -> bool = ">="
+
+external ( != ) : 'a -> 'a -> bool = "!="
+
 effect Print : string -> unit
 effect Read : unit -> string
 effect Raise : unit -> empty
@@ -80,7 +86,7 @@ let default_catch exc default = handler
  *)
 let not x = if x then false else true
 
-let (>) x y = y < x
+(* let (>) x y = y < x
 
 let (<=) x y =
   let lt = x < y in
@@ -91,7 +97,7 @@ let (>=) x y = (y <= x)
 
 let (<>) x y = not (x = y)
 
-let (!=) x y = not (x = y)
+let (!=) x y = not (x = y) *)
 
 
 let rec range m n =
