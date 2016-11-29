@@ -17,9 +17,11 @@ let print loc ppf =
   | Unknown -> Format.fprintf ppf "unknown location"
   | Known {filename; start_line; start_column; end_line; end_column} ->
     if String.length filename != 0 then
-      Format.fprintf ppf "file %S, line %d, char %d" filename start_line start_column
+      Format.fprintf ppf "file %S, line %d, char %d - line %d, char %d"
+        filename start_line start_column end_line end_column
     else
-      Format.fprintf ppf "line %d, char %d" (start_line - 1) start_column
+      Format.fprintf ppf "line %d, char %d - line %d, char %d"
+        (start_line - 1) start_column end_line end_column
 
 let unknown = Unknown
 

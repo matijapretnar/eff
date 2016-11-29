@@ -175,7 +175,7 @@ and abstract2 ~loc (ctx_p1, ty_p1, cnstrs_p1) (ctx_p2, ty_p2, cnstrs_p2) (ctx_c,
   | ctx, Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c), cnstrs -> ctx, (ty_p1, ty_p2, drty_c), cnstrs
   | _ -> assert false
 
-let context skeletons ctx ppf =
+let print_context skeletons ctx ppf =
   match ctx with
   | [] -> ()
   | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence ", " (fun (x, t) ppf -> Print.print ppf "%t : %t" (Untyped.Variable.print x) (Type.print skeletons t)) ctx)
@@ -222,7 +222,8 @@ let print_ty_scheme ty_sch ppf =
   let show_dirt_param = show_dirt_param (ctx, ty, cnstrs) ~non_poly in
   let ty = Constraints.expand_ty ty in
   if !Config.effect_annotations then
-    Print.print ppf "%t | %t"
+    Print.print ppf "%t |- %t | %t"
+      (print_context skeletons ctx)
       (Type.print ~show_dirt_param skeletons ty)
       (Constraints.print ~non_poly cnstrs)
   else
@@ -240,7 +241,8 @@ let print_dirty_scheme drty_sch ppf =
   let ty = Constraints.expand_ty ty in
   if !Config.effect_annotations then
     if Type.show_dirt show_dirt_param drt then
-      Print.print ppf "%t ! %t | %t"
+      Print.print ppf "%t |- %t ! %t | %t"
+        (print_context skeletons ctx)
         (Type.print ~show_dirt_param skeletons ty)
         (Type.print_dirt ~non_poly ~show_dirt_param drt)
         (Constraints.print ~non_poly cnstrs)

@@ -127,7 +127,7 @@ let extend_env vars env =
   List.fold_right (fun (x, ty_sch) env -> {env with context = TypingEnv.update env.context x ty_sch}) vars env
 
 let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
-  match expr with
+  let typed_expr = match expr with
   | Untyped.Var x ->
       let ty_sch = begin match TypingEnv.lookup env.context x with
       | Some ty_sch -> ty_sch
@@ -153,8 +153,11 @@ let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
       Typed.effect ~loc eff
   | Untyped.Handler h ->
       Typed.handler ~loc (type_handler env h)
+  in
+  Print.debug ~loc:typed_expr.Typed.location "%t" (Scheme.print_ty_scheme typed_expr.Typed.scheme);
+  typed_expr
 and type_comp env {Untyped.term=comp; Untyped.location=loc} =
-  match comp with
+  let typed_comp = match comp with
   | Untyped.Value e ->
       Typed.value ~loc (type_expr env e)
   | Untyped.Match (e, cases) ->
@@ -177,6 +180,9 @@ and type_comp env {Untyped.term=comp; Untyped.location=loc} =
       let defs, poly_tyschs = type_let_rec_defs ~loc env defs in
       let env' = extend_env poly_tyschs env in
       Typed.let_rec' ~loc defs (type_comp env' c)
+  in
+  Print.debug ~loc:typed_comp.Typed.location "%t" (Scheme.print_dirty_scheme typed_comp.Typed.scheme);
+  typed_comp
 and type_abstraction env (p, c) =
   Typed.abstraction ~loc:(c.Untyped.location) (type_pattern p) (type_comp env c)
 and type_abstraction2 env (p1, p2, c) =
