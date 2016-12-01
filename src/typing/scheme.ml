@@ -204,10 +204,11 @@ let is_pure_for_handler (ctx, (_, drt), cnstrs) eff_clause =
     and (@@@) = Trio.append in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
-  let (_, pos_ds, _), (_, neg_ds, _) = List.fold_right add_ctx_pos_neg ctx (Trio.empty, Trio.empty) in
+  let (_, pos_ds, pos_rs), (_, neg_ds, neg_rs) = List.fold_right add_ctx_pos_neg ctx (Trio.empty, Trio.empty) in
   (* Check if the constraints from the operations in the dirt are pure in terms of the handler *)
   Constraints.is_pure_for_handler cnstrs drt eff_clause &&
   (* Check if the rest occurs in the pos_ds or neg_ds *)
+  not (List.exists (fun (_, r) -> List.mem r (pos_rs @ neg_rs)) drt.Type.ops) &&
   not (List.mem drt.Type.rest (pos_ds @ neg_ds))
 
 
