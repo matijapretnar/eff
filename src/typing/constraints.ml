@@ -266,8 +266,10 @@ let union constraints1 constraints2 =
     ty_poset = TyPoset.merge constraints1.ty_poset constraints2.ty_poset;
     dirt_poset = DirtPoset.merge constraints1.dirt_poset constraints2.dirt_poset;
     region_poset = RegionPoset.merge constraints1.region_poset constraints2.region_poset;
-    full_regions = FullRegions.union constraints1.full_regions constraints2.full_regions;
+    full_regions = constraints1.full_regions;
   }
+  |> FullRegions.fold add_full_region constraints1.full_regions
+  |> FullRegions.fold add_full_region constraints2.full_regions
 
 let list_union = function
   | [] -> empty
