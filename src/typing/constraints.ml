@@ -100,24 +100,21 @@ and expand_dirt ({Type.ops=ops; Type.rest=rest} as drt) =
 and expand_args (tys, drts, rs) =
   (Common.map expand_ty tys, Common.map expand_dirt drts, rs)
 
-let is_pure_for_handler { dirt_poset; region_poset; full_regions } { Type.ops; Type.rest } eff_clause =
+let is_pure_for_handler { dirt_poset; region_poset; full_regions } { Type.ops; Type.rest } effect_clauses =
   (* full_regions = unhandled effects in the computation *)
-  let check_region eff r =
+  let check_effect eff r =
     (* check if 'eff' is present in the eff_clause, otherwise we don't care *)
-    let rec hasCommonEffects eff_list =
-        match eff_list with
-            | [] -> false
-            | ((eff_name,(_,_)),_)::tail when eff_name = eff -> true
-            | ((eff_name,(_,_)),_)::tail -> hasCommonEffects tail
-        in
-    if (not (hasCommonEffects eff_clause)) then true
-    else
-        (* check whether the region is a constraint *)
+    let rec effect_is_ignored = function
+    | [] -> true
+    | ((eff_name,(_,_)),_)::tail when eff_name = eff ->
         RegionPoset.get_prec r region_poset = [] &&
         not (FullRegions.mem r full_regions)
+    | _ :: tail -> effect_is_ignored tail
     in
+    effect_is_ignored effect_clauses
+  in
   (* for all 'ops' check the region *)
-  List.for_all (fun (eff, r) -> check_region eff r) ops &&
+  List.for_all (fun (eff, r) -> check_effect eff r) ops &&
   (* check the rest *)
   DirtPoset.get_prec rest dirt_poset = []
 
@@ -272,8 +269,10 @@ let union constraints1 constraints2 =
     ty_poset = TyPoset.merge constraints1.ty_poset constraints2.ty_poset;
     dirt_poset = DirtPoset.merge constraints1.dirt_poset constraints2.dirt_poset;
     region_poset = RegionPoset.merge constraints1.region_poset constraints2.region_poset;
-    full_regions = FullRegions.union constraints1.full_regions constraints2.full_regions;
+    full_regions = constraints1.full_regions;
   }
+  |> FullRegions.fold add_full_region constraints1.full_regions
+  |> FullRegions.fold add_full_region constraints2.full_regions
 
 let list_union = function
   | [] -> empty

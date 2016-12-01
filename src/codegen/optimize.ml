@@ -146,7 +146,6 @@ and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
 and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
 
 and optimize_sub_expr st e =
-  (* Print.debug "Optimizing %t" (CamlPrint.print_expression e); *)
   let loc = e.location in
   match e.term with
   | Record lst ->
@@ -167,7 +166,6 @@ and optimize_sub_expr st e =
     }
   | (Var _ | Const _ | BuiltIn _ | Effect _) -> e
 and optimize_sub_comp st c =
-  (* Print.debug "Optimizing %t" (CamlPrint.print_computation c); *)
   let loc = c.location in
   match c.term with
   | Value e ->
@@ -199,7 +197,7 @@ and optimize_abs st {term = (p, c); location = loc} =
 and optimize_abs2 st a2 = a2a2 @@ optimize_abs st @@ a22a @@ a2
 
 and reduce_expr st e =
-  match e.term with
+  let e' = match e.term with
 
   | Var x ->
     begin match find_inlinable st x with
@@ -224,10 +222,16 @@ and reduce_expr st e =
     e
 
   | _ -> e
+  in
+  if e <> e' then
+  Print.debug ~loc:e.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
+    (CamlPrint.print_expression CamlPrint.initial e) (Scheme.print_ty_scheme e.Typed.scheme)
+    (CamlPrint.print_expression CamlPrint.initial e') (Scheme.print_ty_scheme e'.Typed.scheme);
+  e'
+
 
 and reduce_comp st c =
-  (*Print.debug "Shallow optimizing %t" (CamlPrint.print_computation c);*)
-  match c.term with
+  let c' = match c.term with
 
   (* Convert simultaneous let into a sequence of binds *)
   | Let (defs, c) ->
@@ -477,6 +481,13 @@ and reduce_comp st c =
 
 
   | _ -> c
+
+  in 
+  if c <> c' then
+  Print.debug ~loc:c.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
+    (CamlPrint.print_computation CamlPrint.initial c) (Scheme.print_dirty_scheme c.Typed.scheme)
+    (CamlPrint.print_computation CamlPrint.initial c') (Scheme.print_dirty_scheme c'.Typed.scheme);
+  c'
 
 
 let optimize_command st = function
