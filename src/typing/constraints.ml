@@ -1,19 +1,19 @@
 module TyPoset = Poset.Make(struct
   type t = Type.ty_param
   let compare = Pervasives.compare
-  let print = SmartPrint.print_ty_param ~non_poly:Trio.empty
+  let print = Type.print_ty_param
 end)
 
 module DirtPoset = Poset.Make(struct
   type t = Type.dirt_param
   let compare = Pervasives.compare
-  let print = SmartPrint.print_dirt_param ~non_poly:Trio.empty
+  let print = Type.print_dirt_param
 end)
 
 module RegionPoset = Poset.Make(struct
   type t = Type.region_param
   let compare = Pervasives.compare
-  let print = SmartPrint.print_region_param ~non_poly:Trio.empty
+  let print = Type.print_region_param
 end)
 
 module FullRegions = Set.Make(struct
@@ -143,7 +143,7 @@ let rec add_ty_constraint ~loc ty1 ty2 constraints =
 
   | (ty1, ty2) ->
       let skeletons = skeletons constraints in
-      Error.typing ~loc "This expression has type %t but it should have type %t." (SmartPrint.print skeletons ty1) (SmartPrint.print skeletons ty2)
+      Error.typing ~loc "This expression has type %t but it should have type %t." (Type.print_ty ty1) (Type.print_ty ty2)
 
 and add_args_constraint ~loc (ts, ds, rs) (tys1, drts1, rs1) (tys2, drts2, rs2) constraints =
   (* NB: it is assumed here that
@@ -262,4 +262,4 @@ let print ~non_poly constraints ppf =
   if not (DirtPoset.is_empty constraints.dirt_poset) then Format.pp_print_string ppf "; ";
   RegionPoset.print constraints.region_poset ppf;
   if not (RegionPoset.is_empty constraints.region_poset) then Format.pp_print_string ppf "; ";
-  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (SmartPrint.print_region_param ~non_poly x) (Symbols.top ())) (FullRegions.elements constraints.full_regions) ppf
+  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Type.print_region_param x) (Symbols.top ())) (FullRegions.elements constraints.full_regions) ppf
