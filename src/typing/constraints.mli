@@ -30,4 +30,6 @@ val add_full_region : Type.region_param -> t -> t
 
 val non_empty_dirts : t -> Type.dirt_param list
 
+val non_empty_regions : t -> Type.region_param list
+
 val print : t -> Format.formatter -> unit

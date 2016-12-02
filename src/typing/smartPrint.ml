@@ -1,6 +1,7 @@
 open Scheme
 open Type
 
+
 let print_ty_param ~non_poly:(ps, _, _) ((Ty_Param k) as p) ppf =
   Symbols.ty_param k (List.mem p ps) ppf
 
@@ -10,38 +11,26 @@ let print_dirt_param ~non_poly:(_, ds, _) ((Dirt_Param k) as p) ppf =
 let print_region_param ~non_poly:(_, _, rs) ((Region_Param k) as p) ppf =
   Symbols.region_param k (List.mem p rs) ppf
 
-let show_dirt_param ~non_poly ~non_empty_dirts d =
-  if List.mem d non_empty_dirts then
-    Some (print_dirt_param ~non_poly d)
-  else
-    None
 
-let show_region_param ~non_poly ~non_empty_regions r =
-  if List.mem r non_empty_regions then
-    Some (print_region_param ~non_poly r)
-  else
-    None
+let show_dirt ~non_empty_dirts drt =
+  drt.ops != [] || List.mem drt.rest non_empty_dirts
 
-let dirt_bound ~non_poly r_ops =
+
+let print_operation ~non_poly r_ops =
   Print.sequence ", " (fun (op, r) ppf -> Print.print ppf "%s:%t" op (print_region_param ~non_poly r)) r_ops
 
 let print_dirt ~non_poly ~non_empty_dirts drt ppf =
   match drt.ops with
   | [] ->
-    begin match show_dirt_param ~non_poly ~non_empty_dirts drt.rest with
-    | Some f -> f ppf
-    | None -> ()
-    end
+      if List.mem drt.rest non_empty_dirts then
+        Print.print ppf "%t" (print_dirt_param ~non_poly drt.rest)
   | _ ->
-    begin match show_dirt_param ~non_poly ~non_empty_dirts drt.rest with
-    | Some f -> Print.print ppf "{%t|%t}" (dirt_bound ~non_poly drt.ops) f
-    | None -> Print.print ppf "{%t}" (dirt_bound ~non_poly drt.ops)
-    end
+      if List.mem drt.rest non_empty_dirts then
+        Print.print ppf "{%t|%t}" (print_operation ~non_poly drt.ops) (print_dirt_param ~non_poly drt.rest)
+      else
+        Print.print ppf "{%t}" (print_operation ~non_poly drt.ops)
 
-let show_dirt ~non_empty_dirts drt =
-  drt.ops != [] || List.mem drt.rest non_empty_dirts
-
-let rec print ~non_poly ~non_empty_dirts skeletons t ppf =
+let print_ty ~non_poly ~non_empty_dirts ~skeletons t ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = Print.print ?max_level ?at_level ppf in
     match t with
@@ -76,6 +65,7 @@ let rec print ~non_poly ~non_empty_dirts skeletons t ppf =
           print ~at_level:6 "%t %s@ %t" (ty ~max_level:4 t1) (Symbols.handler_arrow ()) (ty ~max_level:4 t2)
   in ty t ppf
 
+
 let print_ty_scheme ty_sch ppf =
   let ty_sch = Scheme.beautify_ty_scheme ty_sch in
   let skeletons, non_poly = Scheme.skeletons_non_poly_scheme ty_sch in
@@ -83,10 +73,10 @@ let print_ty_scheme ty_sch ppf =
   let non_empty_dirts = Constraints.non_empty_dirts cnstrs in
   if !Config.effect_annotations then
     Print.print ppf "%t | %t"
-      (print ~non_poly ~non_empty_dirts skeletons ty)
+      (print_ty ~non_poly ~non_empty_dirts ~skeletons ty)
       (Constraints.print cnstrs)
   else
-    print ~non_poly ~non_empty_dirts skeletons ty ppf
+    print_ty ~non_poly ~non_empty_dirts ~skeletons ty ppf
 
 let print_dirty_scheme drty_sch ppf =
   let drty_sch = Scheme.beautify_dirty_scheme drty_sch in
@@ -96,13 +86,12 @@ let print_dirty_scheme drty_sch ppf =
   if !Config.effect_annotations then
     if show_dirt ~non_empty_dirts drt then
       Print.print ppf "%t ! %t | %t"
-        (print ~non_poly ~non_empty_dirts skeletons ty)
+        (print_ty ~non_poly ~non_empty_dirts ~skeletons ty)
         (print_dirt ~non_poly ~non_empty_dirts drt)
         (Constraints.print cnstrs)
     else
       Print.print ppf "%t | %t"
-        (print ~non_poly ~non_empty_dirts skeletons ty)
+        (print_ty ~non_poly ~non_empty_dirts ~skeletons ty)
         (Constraints.print cnstrs)
   else
-    print ~non_poly ~non_empty_dirts skeletons ty ppf
-
+    print_ty ~non_poly ~non_empty_dirts ~skeletons ty ppf
