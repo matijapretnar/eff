@@ -255,7 +255,7 @@ let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) constraint
   dirt_expansion = DirtMap.empty;
 }
 
-let print ~non_poly constraints ppf =
+let print constraints ppf =
   TyPoset.print constraints.ty_poset ppf;
   if not (TyPoset.is_empty constraints.ty_poset) then Format.pp_print_string ppf "; ";
   DirtPoset.print constraints.dirt_poset ppf;

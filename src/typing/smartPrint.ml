@@ -95,7 +95,7 @@ let print_ty_scheme ty_sch ppf =
   if !Config.effect_annotations then
     Print.print ppf "%t | %t"
       (print ~show_dirt_param skeletons ty)
-      (Constraints.print ~non_poly cnstrs)
+      (Constraints.print cnstrs)
   else
     print ~non_poly skeletons ty ppf
 
@@ -113,11 +113,11 @@ let print_dirty_scheme drty_sch ppf =
       Print.print ppf "%t ! %t | %t"
         (print ~show_dirt_param skeletons ty)
         (print_dirt ~non_poly ~show_dirt_param drt)
-        (Constraints.print ~non_poly cnstrs)
+        (Constraints.print cnstrs)
     else
       Print.print ppf "%t | %t"
         (print ~show_dirt_param skeletons ty)
-        (Constraints.print ~non_poly cnstrs)
+        (Constraints.print cnstrs)
   else
     print ~non_poly skeletons ty ppf
 
