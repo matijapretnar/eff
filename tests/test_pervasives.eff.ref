@@ -3,7 +3,7 @@ val less2 : bool |  = false
 val less3 : bool |  = false
 val test_equal_int : bool |  = true
 val test_equal_float : bool |  = true
-- : unit ! {AssertionFault:ρ₁|δ₁} | ρ₁ = ⊤ = ()
+- : unit ! {AssertionFault:ρ₁} | ρ₁ = ⊤ = ()
 val tilda_minus : int |  = -1
 val tilda_minus_dot2 : float |  = -3.14159
 val tilda_minus_dot2 : float |  = -1.
@@ -16,23 +16,23 @@ val test_mod1 : int | ρ₁ = ⊤ = 2
 val test_mod2 : int | ρ₁ = ⊤ = 0
 Check (file "./test_pervasives.eff", line 39, char 1):
 Call DivisionByZero ()
-- : unit ! {DivisionByZero:ρ₁|δ₁} | ρ₁ = ⊤ = ()
+- : unit ! {DivisionByZero:ρ₁} | ρ₁ = ⊤ = ()
 Check (file "./test_pervasives.eff", line 41, char 1):
 Call DivisionByZero ()
-- : unit ! {DivisionByZero:ρ₁|δ₁} | ρ₁ = ⊤ = ()
+- : unit ! {DivisionByZero:ρ₁} | ρ₁ = ⊤ = ()
 val test_plus_dot : float | ρ₁ = ⊤ = 5.84
 val test_times_dot : float | ρ₁ = ⊤ = 8.478
 val test_minus_dot : float | ρ₁ = ⊤ = 0.44
-val test_div_dot : float | ρ₁ = ⊤ = 1.16296
+val test_div_dot : float | ρ₁ = ⊤ = 1.16296296296
 val test_div_dot_zero : float | ρ₁ = ⊤ = infinity
 val test_div : int | ρ₁ = ⊤ = 33
 Check (file "./test_pervasives.eff", line 55, char 1):
 Call DivisionByZero ()
-- : unit ! {DivisionByZero:ρ₁|δ₁} | ρ₁ = ⊤ = ()
+- : unit ! {DivisionByZero:ρ₁} | ρ₁ = ⊤ = ()
 val test_zero_div : int | ρ₁ = ⊤ = 0
 Check (file "./test_pervasives.eff", line 59, char 1):
 Call DivisionByZero ()
-- : unit ! {DivisionByZero:ρ₁|δ₁} | ρ₁ = ⊤ = ()
+- : unit ! {DivisionByZero:ρ₁} | ρ₁ = ⊤ = ()
 val test_carron : string | ρ₁ = ⊤ = "cherrypie"
 val test_to_string1 : string | ρ₁ = ⊤ = "13"
 val test_to_string2 : string | ρ₁ = ⊤ = "[(1, 2, 3)]"
@@ -68,7 +68,7 @@ val test_zip1 : (int × string) list | ρ₁ = ⊤,
 ρ₂ = ⊤ = [(1, "a"); (2, "b"); (3, "c")]
 Check (file "./test_pervasives.eff", line 117, char 1):
 Call InvalidArgument "zip: length mismatch"
-- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂|δ₁} | ρ₁ = ⊤,
+- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂} | ρ₁ = ⊤,
 ρ₂ = ⊤ = ()
 val test_reverse : int list | ρ₁ = ⊤,ρ₂ = ⊤ = [5; 4; 3; 2; 1]
 val test_at : int list | ρ₁ = ⊤,ρ₂ = ⊤ = [1; 2; 3; 4; 5; 6]
@@ -76,12 +76,12 @@ val test_length : int | ρ₁ = ⊤,ρ₂ = ⊤ = 5
 val test_head : int | ρ₁ = ⊤,ρ₂ = ⊤ = 1
 Check (file "./test_pervasives.eff", line 127, char 1):
 Call InvalidArgument "head: empty list"
-- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂|δ₁} | ρ₁ = ⊤,
+- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂} | ρ₁ = ⊤,
 ρ₂ = ⊤ = ()
 val test_tail : int list | ρ₁ = ⊤,ρ₂ = ⊤ = [2; 3; 4]
 Check (file "./test_pervasives.eff", line 131, char 1):
 Call InvalidArgument "tail: empty list"
-- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂|δ₁} | ρ₁ = ⊤,
+- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂} | ρ₁ = ⊤,
 ρ₂ = ⊤ = ()
 val test_abs : int × int × int | ρ₁ = ⊤,ρ₂ = ⊤ = (5, 5, 5)
 val test_min : int | ρ₁ = ⊤,ρ₂ = ⊤ = 1
@@ -91,16 +91,16 @@ val test_lcm : int | ρ₁ = ⊤,ρ₂ = ⊤ = 24
 val test_odd : bool | ρ₁ = ⊤,ρ₂ = ⊤ = false
 val test_even : bool | ρ₁ = ⊤,ρ₂ = ⊤ = true
 val test_id : int | ρ₁ = ⊤,ρ₂ = ⊤ = 5
-val test_id_id : τ₁ -_δ₁→ τ₂ | τ₁ < τ₂; ρ₁ = ⊤,
+val test_id_id : _τ₁ ⟶  _τ₂ | τ₁ < τ₂; ρ₁ = ⊤,
 ρ₂ = ⊤ = <fun>
 val test_compose : int | ρ₁ = ⊤,ρ₂ = ⊤ = 196
 val test_fst : string | ρ₁ = ⊤,ρ₂ = ⊤ = "foo"
 val test_snd : int | ρ₁ = ⊤,ρ₂ = ⊤ = 4
 Check (file "./test_pervasives.eff", line 157, char 1):
 Call Print "Does this work?"
-- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂|δ₁} | ρ₁ = ⊤,
+- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂} | ρ₁ = ⊤,
 ρ₂ = ⊤ = ()
 Check (file "./test_pervasives.eff", line 159, char 1):
 Call Read ()
-- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂|δ₁} | ρ₁ = ⊤,
+- : unit ! {InvalidArgument:ρ₁, DivisionByZero:ρ₂} | ρ₁ = ⊤,
 ρ₂ = ⊤ = ()

@@ -23,6 +23,9 @@ let options = Arg.align [
   ("--no-types",
     Arg.Set Config.disable_typing,
     " Disable typechecking");
+  ("--no-smart-print",
+    Arg.Clear Config.smart_print,
+    " Disable smart printing of type schemes");
   ("--wrapper",
     Arg.String (fun str -> wrapper := Some [str]),
     "<program> Specify a command-line wrapper to be used (such as rlwrap or ledit)");
