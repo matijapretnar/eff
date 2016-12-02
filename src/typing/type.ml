@@ -200,3 +200,53 @@ let pos_neg_params get_variances ty =
     for_parameters pos_region_param is_pos rs rgns
   in
   Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)
+
+let print_ty_param (Ty_Param k) ppf =
+  Symbols.ty_param k false ppf
+
+let print_dirt_param (Dirt_Param k) ppf =
+  Symbols.dirt_param k false ppf
+
+let print_region_param (Region_Param k) ppf =
+  Symbols.region_param k false ppf
+
+let print_dirt drt ppf =
+  match drt.ops with
+  | [] ->
+      Print.print ppf "%t" (print_dirt_param drt.rest)
+  | _ ->
+      let print_operation (op, r) ppf =
+        Print.print ppf "%s:%t" op (print_region_param r)
+      in
+      Print.print ppf "{%t|%t}"
+        (Print.sequence ", " print_operation drt.ops)
+        (print_dirt_param drt.rest)
+
+let rec print_ty ?max_level ty ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match ty with
+  | Apply (ty_name, ([], _, _)) ->
+      print "%s" ty_name
+  | Apply (ty_name, ([ty], _, _)) ->
+      print ~at_level:1 "%t %s" (print_ty ~max_level:1 ty) ty_name
+  | Apply (ty_name, (tys, _, _)) ->
+      print ~at_level:1 "(%t) %s" (Print.sequence ", " print_ty tys) ty_name
+  | Param p -> print_ty_param p ppf
+  | Basic b -> print "%s" b
+  | Tuple [] -> print "unit"
+  | Tuple tys ->
+      print ~at_level:2 "@[<hov>%t@]"
+      (Print.sequence (Symbols.times ()) (print_ty ~max_level:1) tys)
+  | Arrow (t1, (t2, drt)) ->
+      print ~at_level:5 "@[%t -%t%s@ %t@]"
+        (print_ty ~max_level:4 t1)
+        (print_dirt drt)
+        (Symbols.short_arrow ())
+        (print_ty ~max_level:5 t2)
+  | Handler ((t1, drt1), (t2, drt2)) ->
+      print ~at_level:6 "%t ! %t %s@ %t ! %t"
+        (print_ty ~max_level:4 t1)
+        (print_dirt drt1)
+        (Symbols.handler_arrow ())
+        (print_ty ~max_level:4 t2)
+        (print_dirt drt2)
