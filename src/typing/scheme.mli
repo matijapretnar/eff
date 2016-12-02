@@ -26,9 +26,8 @@ val clean_dirty_scheme : loc:Location.t -> dirty_scheme -> dirty_scheme
 val finalize_pattern_scheme : loc:Location.t -> context -> Type.ty -> change list -> ty_scheme
 val add_to_top : loc:Location.t -> context -> Constraints.t -> (dirty_scheme -> dirty_scheme)
 val normalize_context : loc:Location.t -> ty_scheme -> ty_scheme
-val subst_ty_scheme : Type.substitution -> ty_scheme -> ty_scheme
-val subst_dirty_scheme : Type.substitution -> dirty_scheme -> dirty_scheme
-val pos_neg_ty_scheme : ty_scheme -> (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t * (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t
-val pos_neg_dirtyscheme : dirty_scheme -> (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t * (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t
+val beautify_ty_scheme : ty_scheme -> ty_scheme
+val beautify_dirty_scheme : dirty_scheme -> dirty_scheme
+val skeletons_non_poly_scheme : 'a t -> Type.ty_param list list * (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t
 val print_ty_scheme : ty_scheme -> Format.formatter -> unit
 val print_dirty_scheme : dirty_scheme -> Format.formatter -> unit
