@@ -53,12 +53,12 @@ let rec exec_cmd ppf interactive st d =
       let drty_sch, c', new_change = infer_top_comp st c in
       let v = Eval.run st.environment c' in
       if interactive then Format.fprintf ppf "@[- : %t = %t@]@."
-        (Scheme.print_dirty_scheme drty_sch)
+        (SmartPrint.print_dirty_scheme drty_sch)
         (Value.print_value v);
       {st with change = new_change}
   | Untyped.TypeOf c ->
       let drty_sch, c', new_change = infer_top_comp st c in
-      Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme drty_sch);
+      Format.fprintf ppf "@[- : %t@]@." (SmartPrint.print_dirty_scheme drty_sch);
       {st with change = new_change}
   | Untyped.Reset ->
       Tctx.reset ();
@@ -95,7 +95,7 @@ let rec exec_cmd ppf interactive st d =
                        match RuntimeEnv.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.fprintf ppf "@[val %t : %t = %t@]@." (Untyped.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
+                         Format.fprintf ppf "@[val %t : %t = %t@]@." (Untyped.Variable.print x) (SmartPrint.print_ty_scheme (sch_change tysch)) (Value.print_value v))
             vars
         end;
         {
@@ -115,7 +115,7 @@ let rec exec_cmd ppf interactive st d =
         List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
         let env = Eval.extend_let_rec st.environment defs' in
           if interactive then begin
-            List.iter (fun (x, tysch) -> Format.fprintf ppf "@[val %t : %t = <fun>@]@." (Untyped.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch))) vars
+            List.iter (fun (x, tysch) -> Format.fprintf ppf "@[val %t : %t = <fun>@]@." (Untyped.Variable.print x) (SmartPrint.print_ty_scheme (sch_change tysch))) vars
           end;
         {
           typing = typing_env;
