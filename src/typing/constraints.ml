@@ -94,6 +94,9 @@ let skeletons constraints =
   (* XXX Not yet implemented *)
   []
 
+let non_empty_dirts constraints =
+  DirtPoset.fold (fun _ d non_empty -> d :: non_empty) constraints.dirt_poset []
+
 let rec add_ty_constraint ~loc ty1 ty2 constraints =
   (* XXX Check cyclic types *)
   (* Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)

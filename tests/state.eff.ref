@@ -1,11 +1,10 @@
-val state : τ₁ -δ₂→ (τ₂ ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹ 
+val state : τ₁ ⟶  (τ₂ ! {Get:ρ₁, Set:ρ₂} ⟹ 
             (int -{Get:ρ₃, Set:ρ₄|δ₃}→ τ₃) ! {Get:ρ₅, 
-            Set:ρ₆|δ₄}) | τ₂ < τ₃; δ₁ < δ₄,
-δ₁ < δ₃;  = <fun>
-val better_state : int -δ₂→ (τ₁ ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹ 
-                   τ₂ ! {Get:ρ₃, Set:ρ₄|δ₃}) | τ₁ < τ₂; δ₁ < δ₃;  = <fun>
-val transaction : τ₁ ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹ 
-τ₂ ! {Get:ρ₃, 
+            Set:ρ₆|δ₄}) | τ₂ < τ₃; δ₂ < δ₄,
+δ₂ < δ₃;  = <fun>
+val better_state : int ⟶  (τ₁ ! {Get:ρ₁, Set:ρ₂} ⟹ 
+                   τ₂ ! {Get:ρ₃, Set:ρ₄|δ₃}) | τ₁ < τ₂; δ₂ < δ₃;  = <fun>
+val transaction : τ₁ ! {Get:ρ₁, Set:ρ₂} ⟹  τ₂ ! {Get:ρ₃, 
 Set:ρ₄|δ₂} | τ₁ < τ₂; δ₁ < δ₂; ρ₃ = ⊤,
 ρ₄ = ⊤ = <handler>
 Check (file "./state.eff", line 25, char 24):
@@ -14,4 +13,4 @@ Check (file "./state.eff", line 28, char 26):
 30
 Check (file "./state.eff", line 34, char 37):
 20
-- : int ! {Fail:ρ₁, Get:ρ₂, Set:ρ₃|δ₁} |  = 0
+- : int ! {Fail:ρ₁, Get:ρ₂, Set:ρ₃} |  = 0

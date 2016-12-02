@@ -1,4 +1,4 @@
-- : bull ! δ₂ |  = Tail
-- : complex ! δ₁ |  = {re = 1.2; im = 2.4}
-- : int tree ! δ₁ |  = Node (10, Empty, Node (20, Empty, Empty))
-- : bull ! δ₂ |  = Horns <fun>
+- : bull |  = Tail
+- : complex |  = {re = 1.2; im = 2.4}
+- : int tree |  = Node (10, Empty, Node (20, Empty, Empty))
+- : bull |  = Horns <fun>

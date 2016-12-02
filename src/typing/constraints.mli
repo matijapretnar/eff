@@ -28,4 +28,6 @@ val add_region_param_constraint : Type.region_param -> Type.region_param -> t ->
 
 val add_full_region : Type.region_param -> t -> t
 
+val non_empty_dirts : t -> Type.dirt_param list
+
 val print : t -> Format.formatter -> unit

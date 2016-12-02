@@ -1,27 +1,27 @@
-- : int ! δ₁ | 
-- : bool ! δ₁ | 
-- : string ! δ₁ | 
-- : unit ! δ₁ | 
-- : float ! δ₁ | 
-- : int × int ! δ₁ | 
-- : τ₁ list × string ! δ₁ | 
-- : (string, τ₁) cow ! δ₁ | 
-- : (τ₁, string) cow ! δ₁ | 
-- : (int, string list) cow -δ₁→ (string list, int) cow ! δ₂ | 
-- : (int, string) bull ! δ₁ | 
-- : (int, τ₁) bull -δ₁→ int ! δ₂ | 
-- : (τ₁, τ₂ list list) bull -δ₁→ τ₂ list list ! δ₂ | 
-- : string -{Bark:ρ₁|δ₁}→ string ! δ₂ | ρ₁ = ⊤
-- : string ! {Bark:ρ₁|δ₁} | ρ₁ = ⊤
-- : int ! {Wag:ρ₁|δ₁} | ρ₁ = ⊤
-- : τ₁ -δ₁→ τ₂ ! δ₂ | τ₁ < τ₂; 
-- : τ₁ -_δ₁→ τ₂ ! δ₂ | τ₁ < τ₂; 
-- : τ₁ -δ₁→ τ₂ × τ₃ ! δ₂ | τ₁ < τ₃,τ₁ < τ₂; 
-- : (τ₁ -δ₁→ τ₂) × τ₃ list ! δ₂ | τ₁ < τ₂; 
-- : (τ₁ -_δ₁→ τ₂) × (τ₃ -_δ₂→ τ₄) ! δ₃ | τ₃ < τ₄,
+- : int | 
+- : bool | 
+- : string | 
+- : unit | 
+- : float | 
+- : int × int | 
+- : τ₁ list × string | 
+- : (string, τ₁) cow | 
+- : (τ₁, string) cow | 
+- : (int, string list) cow ⟶  (string list, int) cow | 
+- : (int, string) bull | 
+- : (int, τ₁) bull ⟶  int | 
+- : (τ₁, τ₂ list list) bull ⟶  τ₂ list list | 
+- : string -{Bark:ρ₁}→ string | ρ₁ = ⊤
+- : string ! {Bark:ρ₁} | ρ₁ = ⊤
+- : int ! {Wag:ρ₁} | ρ₁ = ⊤
+- : τ₁ ⟶  τ₂ | τ₁ < τ₂; 
+- : _τ₁ ⟶  _τ₂ | τ₁ < τ₂; 
+- : τ₁ ⟶  τ₂ × τ₃ | τ₁ < τ₃,τ₁ < τ₂; 
+- : (τ₁ ⟶  τ₂) × τ₃ list | τ₁ < τ₂; 
+- : (_τ₁ ⟶  _τ₂) × (_τ₃ ⟶  _τ₄) | τ₃ < τ₄,
 τ₁ < τ₂; 
-- : τ₁ -δ₁→ τ₂ -δ₂→ τ₃ ! δ₃ | τ₁ < τ₃; 
-- : τ₁ list list list ! δ₁ | 
-- : τ₁ -δ₁→ τ₂ -δ₂→ τ₃ ! δ₃ | τ₁ < τ₃; 
-val h : τ₁ -δ₁→ τ₂ | τ₁ < τ₂;  = <fun>
-- : τ₁ -δ₁→ τ₂ ! δ₂ | τ₁ < τ₂; 
+- : τ₁ ⟶  τ₂ ⟶  τ₃ | τ₁ < τ₃; 
+- : τ₁ list list list | 
+- : τ₁ ⟶  τ₂ ⟶  τ₃ | τ₁ < τ₃; 
+val h : τ₁ ⟶  τ₂ | τ₁ < τ₂;  = <fun>
+- : τ₁ ⟶  τ₂ | τ₁ < τ₂; 
