@@ -45,8 +45,6 @@ and plain_computation =
   | Let of (pattern * computation) list * computation
   | LetRec of (variable * abstraction) list * computation
   | Match of expression * abstraction list
-  | While of computation * computation
-  | For of variable * expression * expression * computation * bool
   | Apply of expression * expression
   | Handle of expression * computation
   | Check of computation
@@ -123,8 +121,6 @@ let rec print_computation ?max_level c ppf =
   | Apply (e1, e2) -> print ~at_level:1 "%t %t" (print_expression e1) (print_expression ~max_level:0 e2)
   | Value e -> print ~at_level:1 "value %t" (print_expression ~max_level:0 e)
   | Match (e, lst) -> print "match %t with (@[<hov>%t@])" (print_expression e) (Print.sequence " | " case lst)
-  | While (c1, c2) -> print "while %t do %t done" (print_computation c1) (print_computation c2)
-  | For (i, e1, e2, c, d) -> print "for %t = ... " (Variable.print i)
   | Handle (e, c) -> print "handle %t with %t" (print_expression e) (print_computation c)
   | Let (lst, c) -> print "let @[<hov>%t@] in %t" (Print.sequence " | " let_abstraction lst) (print_computation c)
   | LetRec (lst, c) -> print "let rec ... in %t" (print_computation c)

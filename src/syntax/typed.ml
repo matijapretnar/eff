@@ -58,8 +58,6 @@ and plain_computation =
   | Let of (pattern * computation) list * computation
   | LetRec of (variable * abstraction) list * computation
   | Match of expression * abstraction list
-  | While of computation * computation
-  | For of variable * expression * expression * computation * bool
   | Apply of expression * expression
   | Handle of expression * computation
   | Check of computation
@@ -301,43 +299,6 @@ let match' ?loc e cases =
     location = loc
   }
 
-let while' ?loc c1 c2 =
-  let loc = backup_location loc [c1.location; c2.location] in
-  let ctx_c1, (ty_c1, drt_c1), cnstrs_c1 = c1.scheme in
-  let ctx_c2, (ty_c2, drt_c2), cnstrs_c2 = c2.scheme in
-  let drt = Type.fresh_dirt () in
-  let drty_sch =
-    (ctx_c1 @ ctx_c2, (Type.unit_ty, drt),
-        Constraints.list_union [cnstrs_c1; cnstrs_c2]
-        |> Constraints.add_ty_constraint ~loc ty_c1 Type.bool_ty
-        |> Constraints.add_ty_constraint ~loc ty_c2 Type.unit_ty
-        |> Constraints.add_dirt_constraint drt_c1 drt
-        |> Constraints.add_dirt_constraint drt_c2 drt
-    ) in
-  {
-    term = While (c1, c2);
-    scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
-    location = loc;
-  }
-
-let for' ?loc i e1 e2 c up =
-  let loc = backup_location loc [e1.location; e2.location; c.location] in
-  let ctx_e1, ty_e1, cnstrs_e1 = e1.scheme in
-  let ctx_e2, ty_e2, cnstrs_e2 = e2.scheme in
-  let ctx_c, (ty_c, drt_c), cnstrs_c = c.scheme in
-  let drty_sch =
-    (ctx_e1 @ ctx_e2 @ ctx_c, (Type.unit_ty, drt_c),
-      Constraints.list_union [cnstrs_e1; cnstrs_e2; cnstrs_c]
-      |> Constraints.add_ty_constraint ~loc:e1.location ty_e1 Type.int_ty
-      |> Constraints.add_ty_constraint ~loc:e2.location ty_e2 Type.int_ty
-      |> Constraints.add_ty_constraint ~loc:c.location ty_c Type.unit_ty
-    ) in
-  {
-    term = For (i, e1, e2, c, up);
-    scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
-    location = loc;
-  }
-
 let apply ?loc e1 e2 =
   let loc = backup_location loc [e1.location; e2.location] in
   let ctx_e1, ty_e1, cnstrs_e1 = e1.scheme in
@@ -389,8 +350,7 @@ let let' ?loc defs c =
       match c.term with
       | Value _ ->
           ctx_p @ poly_tys, nonpoly_tys
-      | Apply _ | Match _ | While _ | For _
-      | Handle _ | Let _ | LetRec _ | Check _ ->
+      | Apply _ | Match _ | Handle _ | Let _ | LetRec _ | Check _ ->
           poly_tys, ctx_p @ nonpoly_tys
     in
     poly_tys, nonpoly_tys, ctx_c @ ctx, [
