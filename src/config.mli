@@ -41,3 +41,6 @@ val wrapper : string list option ref
     - 3 errors, check, and warnings
     - 4 errors, check, warnings, and debug messages *)
 val verbosity : int ref
+
+(** Should we use smart printing for type schemes? *)
+val smart_print : bool ref
