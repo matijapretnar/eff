@@ -171,7 +171,7 @@ and abstract2 ~loc (ctx_p1, ty_p1, cnstrs_p1) (ctx_p2, ty_p2, cnstrs_p2) (ctx_c,
 let context skeletons ctx ppf =
   match ctx with
   | [] -> ()
-  | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence ", " (fun (x, t) ppf -> Print.print ppf "%t : %t" (Untyped.Variable.print x) (Type.print skeletons t)) ctx)
+  | _ -> Print.print ppf "(@[%t@]).@ " (Print.sequence ", " (fun (x, t) ppf -> Print.print ppf "%t : %t" (Untyped.Variable.print x) (SmartPrint.print skeletons t)) ctx)
 
 let extend_non_poly (ts, ds, rs) skeletons =
   let add_skel skel new_ts =
@@ -195,10 +195,10 @@ let print_ty_scheme ty_sch ppf =
   let show_dirt_param = show_dirt_param (ctx, ty, cnstrs) ~non_poly in
   if !Config.effect_annotations then
     Print.print ppf "%t | %t"
-      (Type.print ~show_dirt_param skeletons ty)
+      (SmartPrint.print ~show_dirt_param skeletons ty)
       (Constraints.print ~non_poly cnstrs)
   else
-    Type.print ~non_poly skeletons ty ppf
+    SmartPrint.print ~non_poly skeletons ty ppf
 
 let print_dirty_scheme drty_sch ppf =
   let sbst = Type.beautifying_subst () in
@@ -210,14 +210,14 @@ let print_dirty_scheme drty_sch ppf =
   let non_poly = extend_non_poly non_poly skeletons in
   let show_dirt_param = show_dirt_param (ctx, (Type.Arrow (Type.unit_ty, (ty, drt))), cnstrs) ~non_poly in
   if !Config.effect_annotations then
-    if Type.show_dirt show_dirt_param drt then
+    if SmartPrint.show_dirt show_dirt_param drt then
       Print.print ppf "%t ! %t | %t"
-        (Type.print ~show_dirt_param skeletons ty)
-        (Type.print_dirt ~non_poly ~show_dirt_param drt)
+        (SmartPrint.print ~show_dirt_param skeletons ty)
+        (SmartPrint.print_dirt ~non_poly ~show_dirt_param drt)
         (Constraints.print ~non_poly cnstrs)
     else
       Print.print ppf "%t | %t"
-        (Type.print ~show_dirt_param skeletons ty)
+        (SmartPrint.print ~show_dirt_param skeletons ty)
         (Constraints.print ~non_poly cnstrs)
   else
-    Type.print ~non_poly skeletons ty ppf
+    SmartPrint.print ~non_poly skeletons ty ppf
