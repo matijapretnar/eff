@@ -30,3 +30,5 @@ val subst_ty_scheme : Type.substitution -> ty_scheme -> ty_scheme
 val subst_dirty_scheme : Type.substitution -> dirty_scheme -> dirty_scheme
 val pos_neg_ty_scheme : ty_scheme -> (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t * (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t
 val pos_neg_dirtyscheme : dirty_scheme -> (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t * (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t
+val print_ty_scheme : ty_scheme -> Format.formatter -> unit
+val print_dirty_scheme : dirty_scheme -> Format.formatter -> unit
