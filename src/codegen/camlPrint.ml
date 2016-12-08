@@ -73,7 +73,7 @@ let rec print_expression ?max_level e ppf =
   | Typed.Variant (lbl, None) ->
       print "%s" lbl
   | Typed.Variant (lbl, Some e) ->
-      print ~at_level:1 "%s %t" lbl (print_expression e)
+      print ~at_level:1 "(%s %t)" lbl (print_expression e)
   | Typed.Lambda a ->
       print ~at_level:2 "fun %t" (print_abstraction a)
   | Typed.Handler h ->
