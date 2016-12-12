@@ -71,6 +71,11 @@ let pos_neg_ty_scheme (ctx, ty, cnstrs) =
 let pos_neg_dirtyscheme (ctx, drty, cnstrs) =
   pos_neg_ty_scheme (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs)
 
+let present_in_abstraction (ctx, (ty, drty), cnstrs) =
+  let _, neg_ty = Type.pos_neg_params Tctx.get_variances ty
+  and pos_drty, _ = Type.pos_neg_params Tctx.get_variances (Type.Arrow (Type.unit_ty, drty)) in
+  neg_ty @@@ pos_drty
+
 let garbage_collect pos neg (ctx, ty, cnstrs) =
   ctx, ty, Constraints.garbage_collect pos neg cnstrs
 
@@ -107,6 +112,12 @@ let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
 
 let expand_ty_scheme (ctx, ty, constraints) =
   (Common.assoc_map Constraints.expand_ty ctx, Constraints.expand_ty ty, constraints)
+
+let expand_dirty_scheme (ctx, (ty, drt), constraints) = (
+  Common.assoc_map Constraints.expand_ty ctx,
+  (Constraints.expand_ty ty, Constraints.expand_dirt drt),
+  constraints
+)
 
 let create_ty_scheme ctx ty changes =
   List.fold_right Common.id changes (ctx, ty, Constraints.empty)
@@ -166,13 +177,13 @@ and abstract2 ~loc (ctx_p1, ty_p1, cnstrs_p1) (ctx_p2, ty_p2, cnstrs_p2) (ctx_c,
 
 let beautify_ty_scheme ty_sch = 
   let sbst = Type.beautifying_subst () in
-  subst_ty_scheme sbst ty_sch
+  subst_ty_scheme sbst (expand_ty_scheme ty_sch)
 
 let beautify_dirty_scheme drty_sch = 
   let sbst = Type.beautifying_subst () in
   let _, (_, ds, _) = pos_neg_dirtyscheme drty_sch in
   ignore (Common.map sbst.Type.dirt_param ds);
-  subst_dirty_scheme sbst drty_sch
+  subst_dirty_scheme sbst (expand_dirty_scheme drty_sch)
 
 let extend_non_poly (ts, ds, rs) skeletons =
   let add_skel skel new_ts =
@@ -229,17 +240,25 @@ let print_dirty_scheme ty_sch ppf =
     (Type.print_dirt drt)
     (Constraints.print cnstrs)
 
-let is_pure ?(loc=Location.unknown) (ctx, (_, drt), cnstrs) =
+let is_pure ?(loc=Location.unknown) (_, ignored_ds, ignored_rs) (ctx, (_, drt), cnstrs) =
   let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
     let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances (Constraints.expand_ty ctx_ty)
     and (@@@) = Trio.append in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
-  let (_, pos_ds, _), (_, neg_ds, _) = List.fold_right add_ctx_pos_neg ctx (Trio.empty, Trio.empty) in
-  Constraints.is_pure cnstrs drt &&
-  not (List.mem drt.Type.rest (pos_ds @ neg_ds))
+  let (_, pos_ds, pos_rs), (_, neg_ds, neg_rs) = List.fold_right add_ctx_pos_neg ctx (Trio.empty, Trio.empty) in
+  let wrong_ds = List.filter (fun d -> not (List.mem d ignored_ds)) (pos_ds @ neg_ds)
+  and wrong_rs = List.filter (fun r -> not (List.mem r ignored_rs)) (pos_rs @ neg_rs) in
+  match Constraints.must_be_empty cnstrs (Constraints.expand_dirt drt) with
+  | None -> false
+  | Some (ds, rs) ->
+      let ds_t = List.for_all (fun d -> not (List.mem d wrong_ds)) ds
+      and rs_t = List.for_all (fun r -> not (List.mem r wrong_rs)) rs
+      in
+      (* Print.debug "%b /// %b" ds_t rs_t; *)
+      ds_t && rs_t
 
-let is_pure_function_type ?loc (ctx, ty, cnstrs) =
+let is_pure_function_type ?loc ignored (ctx, ty, cnstrs) =
   match Constraints.expand_ty ty with
-  | Type.Arrow (_, drty) -> is_pure ?loc (ctx, drty, cnstrs)
+  | Type.Arrow (_, drty) -> is_pure ?loc ignored (ctx, drty, cnstrs)
   | _ -> false

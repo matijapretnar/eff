@@ -30,6 +30,7 @@ val beautify_dirty_scheme : dirty_scheme -> dirty_scheme
 val skeletons_non_poly_scheme : 'a t -> Type.ty_param list list * (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t
 val print_ty_scheme : ty_scheme -> Format.formatter -> unit
 val print_dirty_scheme : dirty_scheme -> Format.formatter -> unit
-val is_pure : ?loc:Location.t -> dirty_scheme -> bool
-val is_pure_function_type : ?loc:Location.t -> ty_scheme -> bool
+val is_pure : ?loc:Location.t -> (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t -> dirty_scheme -> bool
+val is_pure_function_type : ?loc:Location.t -> (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t -> ty_scheme -> bool
 val is_pure_for_handler : dirty_scheme -> ((Common.effect * ('a * 'b)) * 'c) list -> bool
+val present_in_abstraction : abstraction_scheme -> (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t

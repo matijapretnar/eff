@@ -154,7 +154,7 @@ let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
   | Untyped.Handler h ->
       Typed.handler ~loc (type_handler env h)
   in
-  Print.debug ~loc:typed_expr.Typed.location "%t" (Scheme.print_ty_scheme typed_expr.Typed.scheme);
+  (* Print.debug ~loc:typed_expr.Typed.location "%t" (Scheme.print_ty_scheme typed_expr.Typed.scheme); *)
   typed_expr
 and type_comp env {Untyped.term=comp; Untyped.location=loc} =
   let typed_comp = match comp with
@@ -177,7 +177,7 @@ and type_comp env {Untyped.term=comp; Untyped.location=loc} =
       let env' = extend_env poly_tyschs env in
       Typed.let_rec' ~loc defs (type_comp env' c)
   in
-  Print.debug ~loc:typed_comp.Typed.location "%t" (Scheme.print_dirty_scheme typed_comp.Typed.scheme);
+  (* Print.debug ~loc:typed_comp.Typed.location "%t" (Scheme.print_dirty_scheme typed_comp.Typed.scheme); *)
   typed_comp
 and type_abstraction env (p, c) =
   Typed.abstraction ~loc:(c.Untyped.location) (type_pattern p) (type_comp env c)
@@ -226,8 +226,12 @@ and type_let_rec_defs ~loc env defs =
     ] @ chngs, (x, a) :: defs
   in
   let poly_tys, nonpoly_tys, ctx, chngs, defs = List.fold_right add_binding defs ([], [], [], [], []) in
+  Print.debug "REMOVING: %t" (Print.sequence "," (fun (x, ty) ppf -> Print.print ppf "%t: %t" (Typed.print_variable x) (Type.print_ty (Constraints.expand_ty ty))) poly_tys);
+  Print.debug "FROM: %t" (Print.sequence "," (fun (x, ty) ppf -> Print.print ppf "%t: %t" (Typed.print_variable x) (Type.print_ty (Constraints.expand_ty ty))) ctx);
   let chngs = Scheme.trim_context ~loc poly_tys :: chngs in
   let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  let [(_, sch)] = poly_tyschs in
+  Print.debug "%t" (Scheme.print_ty_scheme sch);
   defs, poly_tyschs
 
 (* [infer_comp env c] infers the dirty type scheme of a computation [c] in a

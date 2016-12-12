@@ -2,10 +2,12 @@
 
 type state = {
   debug: bool;
+  ignored: (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t;
 }
 
 let initial = {
   debug = true;
+  ignored = Trio.empty;
 }
 
 
@@ -103,13 +105,21 @@ let rec print_pattern ?max_level p ppf =
   | Typed.PNonbinding ->
       print "_"
 
-let is_pure_function e =
-  Scheme.is_pure_function_type ~loc:e.Typed.location e.Typed.scheme
+let compute_ignored st (ctx, _, cstrs) =
+  let (_, ds, rs) = st.ignored in
+  (* Print.debug "ignored dirt param: %t" (Print.sequence "," Type.print_dirt_param ds); *)
+  (* Print.debug "ignored region param: %t" (Print.sequence "," Type.print_region_param rs); *)
+  st.ignored
 
-let is_pure_abstraction {Typed.term = (_, c)} =
-  Scheme.is_pure c.Typed.scheme
+let is_pure_function st e =
+  let ignored = compute_ignored st e.Typed.scheme in
+  Scheme.is_pure_function_type ~loc:e.Typed.location ignored e.Typed.scheme
 
-let is_pure_handler e =
+let is_pure_abstraction st {Typed.term = (_, c)} =
+  let ignored = compute_ignored st c.Typed.scheme in
+  Scheme.is_pure ignored c.Typed.scheme
+
+let is_pure_handler st e =
   false
 
 let rec print_expression ?max_level st e ppf =
@@ -130,10 +140,10 @@ let rec print_expression ?max_level st e ppf =
   | Typed.Variant (lbl, Some e) ->
       print ~at_level:1 "%s %t" lbl (print_expression st e)
   | Typed.Lambda a ->
-      let pure = is_pure_function e in
+      let pure = is_pure_function st e in
       print ~at_level:2 "fun %t" (print_abstraction ~pure st a)
   | Typed.Handler h ->
-      let pure = is_pure_handler e in
+      let pure = is_pure_handler st e in
       print "%t" (print_handler ~pure st h)
   | Typed.Effect eff ->
       print ~at_level:2 "effect %t" (print_effect eff)
@@ -142,14 +152,24 @@ let rec print_expression ?max_level st e ppf =
 
 and print_function_argument ?max_level st e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  if is_pure_function e then
+  if is_pure_function st e then
     print "(fun x -> value (%t x))" (print_expression ~max_level:1 st e)
   else
     print_expression ~max_level:0 st e ppf
 
 and print_computation ?max_level ~pure st c ppf =
-  let is_pure_computation = Scheme.is_pure ~loc:c.Typed.location c.Typed.scheme in
+  let ignored = compute_ignored st c.Typed.scheme in
+  let is_pure_computation = Scheme.is_pure ~loc:c.Typed.location ignored c.Typed.scheme in
   let expect_pure_computation = pure in
+(*   let ignored = 
+    if pure then
+      let params = Scheme.present_in_abstraction a.Typed.scheme in
+      Trio.append params st.ignored
+    else
+      st.ignored
+  in
+ (* *)  let (_, _, cstrs) = a.Typed.scheme in *)
+  (* let st = {st with ignored = Constraints.add_prec cstrs ignored} in *)
   if st.debug then
     Print.debug ~loc:c.Typed.location "%t@.expect: %b, is: %b@.BEGIN@.%t@.END"
       (Scheme.print_dirty_scheme c.Typed.scheme)
@@ -160,7 +180,7 @@ and print_computation ?max_level ~pure st c ppf =
   | true, true ->
       print_computation' ?max_level ~pure:true st c ppf
   | true, false ->
-      assert false
+      Print.print ?max_level ppf "run %t" (print_computation' ~max_level:0 ~pure:false st c)
   | false, true ->
       Print.print ?max_level ppf "value %t" (print_computation' ~max_level:0 ~pure:true st c)
   | false, false ->
@@ -261,7 +281,7 @@ and print_top_let_abstraction st (p, c) ppf =
     Format.fprintf ppf "%t = run %t" (print_pattern p) (print_computation ~max_level:0 ~pure:false st c)
 
 and print_let_rec_abstraction st (x, a) ppf =
-  let pure = is_pure_abstraction a in
+  let pure = is_pure_abstraction st a in
   Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction ~pure st a)
 
 
@@ -296,9 +316,9 @@ let print_command st (cmd, _) ppf =
       print_computation ~pure:false st c ppf
   | Typed.TopLet (defs, _) ->
       Print.print ppf "let %t" (Print.sequence "\nand\n" (print_top_let_abstraction st) defs)
-(*   | Typed.TopLetRec (defs, _) ->
+  | Typed.TopLetRec (defs, _) ->
       Print.print ppf "let rec %t" (Print.sequence "\nand\n" (print_let_rec_abstraction st) defs)
- *)  | Typed.Use fn ->
+  | Typed.Use fn ->
       Print.print ppf "#use %S" (compiled_filename fn)
   | Typed.External (x, ty, f) ->
       Print.print ppf "let %t = ( %s )" (print_variable x) f

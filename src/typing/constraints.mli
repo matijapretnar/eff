@@ -31,9 +31,14 @@ val is_pure : t -> Type.dirt -> bool
 val is_pure_for_handler : t -> Type.dirt -> ((Common.effect * ('a * 'b)) * 'c) list -> bool
 
 val expand_ty : Type.ty -> Type.ty
+val expand_dirt : Type.dirt -> Type.dirt
 
 val non_empty_dirts : t -> Type.dirt_param list
 
 val non_empty_regions : t -> Type.region_param list
 
 val print : t -> Format.formatter -> unit
+
+val must_be_empty : t -> Type.dirt -> (Type.dirt_param list * Type.region_param list) option
+
+val add_prec : t -> (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t -> (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t

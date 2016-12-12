@@ -132,11 +132,11 @@ and beta_reduce st ({term = (p, c)} as a) e =
     let a =
       begin match p with
         | {term = Typed.PVar x} ->
-          Print.debug "Added to stack ==== %t" (Typed.print_variable x);
+          (* Print.debug "Added to stack ==== %t" (Typed.print_variable x); *)
           let st = {st with stack = Common.update x e st.stack} in
           abstraction p (optimize_comp st c)
         | _ ->
-          Print.debug "We are now in the let in 5 novar for %t" (Typed.print_pattern p);
+          (* Print.debug "We are now in the let in 5 novar for %t" (Typed.print_pattern p); *)
           a
       end
     in
@@ -220,10 +220,10 @@ and reduce_expr st e =
 
   | _ -> e
   in
-  if e <> e' then
+(*   if e <> e' then
   Print.debug ~loc:e.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
     (Typed.print_expression e) (Scheme.print_ty_scheme e.Typed.scheme)
-    (Typed.print_expression e') (Scheme.print_ty_scheme e'.Typed.scheme);
+    (Typed.print_expression e') (Scheme.print_ty_scheme e'.Typed.scheme); *)
   e'
 
 
@@ -245,7 +245,7 @@ and reduce_comp st c =
     in
     find_const_case cases
 
-  | Bind (c1, c2) when Scheme.is_pure c1.scheme ->
+  | Bind (c1, c2) when Scheme.is_pure Trio.empty c1.scheme ->
     beta_reduce st c2 (reduce_expr st (pure c1))
 
   | Bind ({term = Bind (c1, {term = (p1, c2)})}, c3) ->
@@ -286,20 +286,20 @@ and reduce_comp st c =
 
   | Handle ({term = Handler h}, c1)
         when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
-    Print.debug "Remove handler, since no effects in common with computation";
+    (* Print.debug "Remove handler, since no effects in common with computation"; *)
     reduce_comp st (bind c1 h.value_clause)
 
   | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})})
         when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
-    Print.debug "Remove handler of outer Bind, since no effects in common with computation";
+    (* Print.debug "Remove handler of outer Bind, since no effects in common with computation"; *)
     reduce_comp st (bind (reduce_comp st c1) (abstraction p1 (reduce_comp st (handle (refresh_expr handler) c2))))
 
-  | Handle ({term = Handler h}, c) when Scheme.is_pure c.scheme ->
+  | Handle ({term = Handler h}, c) when Scheme.is_pure Trio.empty c.scheme ->
     beta_reduce st h.value_clause (reduce_expr st (pure c))
 
   | Handle ({term = Handler h}, {term = Bind (c1, {term = (p1, c2)})})
         when (Scheme.is_pure_for_handler c2.Typed.scheme h.effect_clauses) ->
-    Print.debug "Move inner bind into the value case";
+    (* Print.debug "Move inner bind into the value case"; *)
     let new_value_clause = abstraction p1 (bind (reduce_comp st c2) (refresh_abs h.value_clause)) in
     let hdlr = handler {
       effect_clauses = h.effect_clauses;
@@ -309,7 +309,7 @@ and reduce_comp st c =
     reduce_comp st (handle (refresh_expr hdlr) c1)
 
   | Handle ({term = Handler h} as h2, {term = Bind (c1, {term = (p, c2)})}) ->
-    Print.debug "Move (dirty) inner bind into the value case";
+    (* Print.debug "Move (dirty) inner bind into the value case"; *)
     let new_value_clause = abstraction p (handle (refresh_expr h2) (refresh_comp (reduce_comp st c2) )) in
     let hdlr = handler {
       effect_clauses = h.effect_clauses;
@@ -464,25 +464,25 @@ and reduce_comp st c =
     optimize_comp st res *)
 
   | LetIn (e, ({term = (p, cp)} as a)) ->
-    Print.debug "We are now in the let in 1, 3 or 5 for %t" (Typed.print_pattern p);
+    (* Print.debug "We are now in the let in 1, 3 or 5 for %t" (Typed.print_pattern p); *)
     beta_reduce st a e
 
   (* XXX simplify *)
   | LetRec (defs, co) ->
-    Print.debug "the letrec comp  %t" (Typed.print_computation co);
+    (* Print.debug "the letrec comp  %t" (Typed.print_computation co); *)
     let st = 
     List.fold_right (fun (var,abs) st ->
-            Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs);
+            (* Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs); *)
             {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
     let_rec' defs (reduce_comp st co)
 
   | _ -> c
 
   in 
-  if c <> c' then
+(*   if c <> c' then
   Print.debug ~loc:c.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
     (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme)
-    (Typed.print_computation c') (Scheme.print_dirty_scheme c'.Typed.scheme);
+    (Typed.print_computation c') (Scheme.print_dirty_scheme c'.Typed.scheme); *)
   c'
 
 
@@ -492,7 +492,7 @@ let optimize_command st = function
   | Typed.TopLet (defs, vars) ->
     let defs' = Common.assoc_map (optimize_comp st) defs in
     let defs' = Common.assoc_map (fun c ->
-      if Scheme.is_pure c.scheme then value (reduce_expr st (pure c)) else c
+      if Scheme.is_pure Trio.empty c.scheme then value (reduce_expr st (pure c)) else c
     ) defs' in
     let st' = begin match defs' with
       (* If we define a single simple handler, we inline it *)
