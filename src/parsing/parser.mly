@@ -47,7 +47,6 @@
 %token LET REC AND IN
 %token FUN BAR BARBAR
 %token IF THEN ELSE
-%token WHILE DO DONE FOR TO DOWNTO
 %token HANDLER AT VAL FINALLY HANDLE
 %token PLUS STAR MINUS MINUSDOT
 %token LSL LSR ASR
@@ -166,12 +165,6 @@ plain_term:
     { Let ([(Pattern.Nonbinding, snd t1), t1], t2) }
   | IF t_cond = comma_term THEN t_true = term ELSE t_false = term
     { Conditional (t_cond, t_true, t_false) }
-  | WHILE t1 = comma_term DO t2 = term DONE
-    { While (t1, t2) }
-  | FOR i = lname EQUAL x = comma_term TO y = comma_term DO t = term DONE
-    { For (i, x, y, t, true) }
-  | FOR i = lname EQUAL x = comma_term DOWNTO y = comma_term DO t = term DONE
-    { For (i, x, y, t, false) }
   | t = plain_comma_term
     { t }
 

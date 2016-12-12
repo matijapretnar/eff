@@ -162,10 +162,6 @@ and type_comp env {Untyped.term=comp; Untyped.location=loc} =
       Typed.value ~loc (type_expr env e)
   | Untyped.Match (e, cases) ->
       Typed.match' ~loc (type_expr env e) (List.map (type_abstraction env) cases)
-  | Untyped.While (c1, c2) ->
-      Typed.while' ~loc (type_comp env c1) (type_comp env c2)
-  | Untyped.For (i, e1, e2, c, up) ->
-      Typed.for' ~loc i (type_expr env e1) (type_expr env e2) (type_comp env c) up
   | Untyped.Apply (e1, e2) ->
       Typed.apply ~loc (type_expr env e1) (type_expr env e2)
   | Untyped.Handle (e, c) ->
@@ -207,9 +203,8 @@ and type_let_defs ~loc env defs =
       match c.Typed.term with
       | Typed.Value _ ->
           ctx_p @ poly_tys, nonpoly_tys
-      | Typed.Apply _ | Typed.Match _ | Typed.While _ | Typed.For _
-      | Typed.Handle _ | Typed.Let _ | Typed.LetRec _ | Typed.Check _
-      | Typed.Bind _ | Typed.LetIn _ | Typed.Call _ ->
+      | Typed.Apply _ | Typed.Match _ | Typed.Handle _ | Typed.Let _ | Typed.LetRec _
+      | Typed.Check _ | Typed.Bind _ | Typed.LetIn _ | Typed.Call _ ->
           poly_tys, ctx_p @ nonpoly_tys
     in
     poly_tys, nonpoly_tys, ctx_c @ ctx, [
@@ -261,8 +256,8 @@ let infer_let ~loc env defs =
       match c.Untyped.term with
       | Untyped.Value _ ->
           ctx_p @ poly_tys, nonpoly_tys
-      | Untyped.Apply _ | Untyped.Match _ | Untyped.While _ | Untyped.For _
-      | Untyped.Handle _ | Untyped.Let _ | Untyped.LetRec _ | Untyped.Check _ ->
+      | Untyped.Apply _ | Untyped.Match _ | Untyped.Handle _
+      | Untyped.Let _ | Untyped.LetRec _ | Untyped.Check _ ->
           poly_tys, ctx_p @ nonpoly_tys
     in
     poly_tys, nonpoly_tys, ctx_c @ ctx, [

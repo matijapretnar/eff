@@ -102,12 +102,6 @@ and print_computation ?max_level c ppf =
       print ~at_level:2 "(match %t with _ -> assert false)" (print_expression e)
   | Typed.Match (e, lst) ->
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e) (Print.cases print_abstraction lst)
-  | Typed.While (c1, c2) ->
-      print ~at_level:2 "while %t do %t done" (print_computation c1) (print_computation c2)
-  | Typed.For (i, e1, e2, c, up) ->
-      let direction = if up then "to" else "downto" in
-      print ~at_level:2 "for %t = %t %s %t do %t done"
-      (print_variable i) (print_expression e1) direction (print_expression e2) (print_computation c)
   | Typed.Handle (e, c) ->
       print ~at_level:1 "handle %t %t" (print_expression ~max_level:0 e) (print_computation ~max_level:0 c)
   | Typed.Let (lst, c) ->

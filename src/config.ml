@@ -24,3 +24,5 @@ let interactive_shell = ref true
 let wrapper = ref None
 
 let verbosity = ref 3
+
+let smart_print = ref true

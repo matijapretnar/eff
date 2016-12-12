@@ -63,8 +63,6 @@ and plain_computation =
   | Let of (pattern * computation) list * computation
   | LetRec of (variable * abstraction) list * computation
   | Match of expression * abstraction list
-  | While of computation * computation
-  | For of variable * expression * expression * computation * bool
   | Apply of expression * expression
   | Handle of expression * computation
   | Check of computation
@@ -252,12 +250,6 @@ and refresh_comp' sbst = function
       LetRec (li', refresh_comp sbst' c1)
   | Match (e, li) ->
       Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
-  | While (c1, c2) ->
-      While (refresh_comp sbst c1, refresh_comp sbst c2)
-  | For (x, e1, e2, c, b) ->
-      let x' = Variable.refresh x in
-      let sbst' = Common.update x x' sbst in
-      For (x', refresh_expr sbst e1, refresh_expr sbst e2, refresh_comp sbst' c, b)
   | Apply (e1, e2) ->
       Apply (refresh_expr sbst e1, refresh_expr sbst e2)
   | Handle (e, c) ->
@@ -330,11 +322,6 @@ and subst_comp' sbst = function
       LetRec (li', subst_comp sbst c1)
   | Match (e, li) ->
       Match (subst_expr sbst e, List.map (subst_abs sbst) li)
-  | While (c1, c2) ->
-      While (subst_comp sbst c1, subst_comp sbst c2)
-  | For (x, e1, e2, c, b) ->
-      (* XXX Should we check that x does not appear in sbst? *)
-      For (x, subst_expr sbst e1, subst_expr sbst e2, subst_comp sbst c, b)
   | Apply (e1, e2) ->
       Apply (subst_expr sbst e1, subst_expr sbst e2)
   | Handle (e, c) ->
@@ -447,12 +434,6 @@ and alphaeq_comp' eqvars c c' =
       false
   | Match (e, li), Match (e', li') ->
       alphaeq_expr eqvars e e' && List.for_all2 (alphaeq_abs eqvars) li li'
-  | While (c1, c2), While (c1', c2') ->
-      alphaeq_comp eqvars c1 c1' && alphaeq_comp eqvars c2 c2'
-  | For (x, e1, e2, c, b), For (x', e1', e2', c', b') ->
-      Variable.compare x x' = 0 &&
-      alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2' &&
-      alphaeq_comp eqvars c c' && b = b'
   | Apply (e1, e2), Apply (e1', e2') ->
       alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2'
   | Handle (e, c), Handle (e', c') ->
@@ -684,42 +665,6 @@ let match' ?loc e cases =
     location = loc
   }
 
-let while' ?loc c1 c2 =
-  let loc = backup_location loc [c1.location; c2.location] in
-  let ctx_c1, (ty_c1, drt_c1), cnstrs_c1 = c1.scheme in
-  let ctx_c2, (ty_c2, drt_c2), cnstrs_c2 = c2.scheme in
-  let drt = Type.fresh_dirt () in
-  let drty_sch =
-    (ctx_c1 @ ctx_c2, (Type.unit_ty, drt),
-        Constraints.list_union [cnstrs_c1; cnstrs_c2]
-        |> Constraints.add_ty_constraint ~loc ty_c1 Type.bool_ty
-        |> Constraints.add_ty_constraint ~loc ty_c2 Type.unit_ty
-        |> Constraints.add_dirt_constraint drt_c1 drt
-        |> Constraints.add_dirt_constraint drt_c2 drt
-    ) in
-  {
-    term = While (c1, c2);
-    scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
-    location = loc;
-  }
-
-let for' ?loc i e1 e2 c up =
-  let loc = backup_location loc [e1.location; e2.location; c.location] in
-  let ctx_e1, ty_e1, cnstrs_e1 = e1.scheme in
-  let ctx_e2, ty_e2, cnstrs_e2 = e2.scheme in
-  let ctx_c, (ty_c, drt_c), cnstrs_c = c.scheme in
-  let drty_sch =
-    (ctx_e1 @ ctx_e2 @ ctx_c, (Type.unit_ty, drt_c),
-      Constraints.list_union [cnstrs_e1; cnstrs_e2; cnstrs_c]
-      |> Constraints.add_ty_constraint ~loc:e1.location ty_e1 Type.int_ty
-      |> Constraints.add_ty_constraint ~loc:e2.location ty_e2 Type.int_ty
-      |> Constraints.add_ty_constraint ~loc:c.location ty_c Type.unit_ty
-    ) in
-  {
-    term = For (i, e1, e2, c, up);
-    scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
-    location = loc;
-  }
 
 let pure_apply ?loc e1 e2 =
   let loc = backup_location loc [e1.location; e2.location] in
@@ -789,9 +734,8 @@ let let' ?loc defs c =
       match c.term with
       | Value _ ->
           ctx_p @ poly_tys, nonpoly_tys
-      | Apply _ | Match _ | While _ | For _
-      | Handle _ | Let _ | LetRec _ | Check _
-      | Bind _ | LetIn _ | Call _ ->
+      | Apply _ | Match _ | Handle _ | Let _ | LetRec _
+      | Check _ | Bind _ | LetIn _ | Call _ ->
           poly_tys, ctx_p @ nonpoly_tys
     in
     poly_tys, nonpoly_tys, ctx_c @ ctx, [
@@ -977,9 +921,6 @@ let rec free_vars_comp c =
       ) li ([], free_vars_comp c1) in
       vars --- xs
   | Match (e, li) -> free_vars_expr e @@@ concat_vars (List.map free_vars_abs li)
-  | While (c1, c2) -> free_vars_comp c1 @@@ free_vars_comp c2
-  | For (v, e1, e2, c1, b) ->
-      (free_vars_expr e1 @@@ free_vars_expr e2 @@@ free_vars_comp c1) --- [v]
   | Apply (e1, e2) -> free_vars_expr e1 @@@ free_vars_expr e2
   | Handle (e, c1) -> free_vars_expr e @@@ free_vars_comp c1
   | Check c1 -> free_vars_comp c1

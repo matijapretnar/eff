@@ -238,10 +238,6 @@ and optimize_sub_comp st c =
     let_rec' ~loc (Common.assoc_map (optimize_abs st) li) (optimize_comp st c1)
   | Match (e, li) ->
     match' ~loc (optimize_expr st e) (List.map (optimize_abs st) li)
-  | While (c1, c2) ->
-    while' ~loc (optimize_comp st c1) (optimize_comp st c2)
-  | For (v, e1, e2, c1, b) ->
-    for' ~loc v (optimize_expr st e1) (optimize_expr st e2) (optimize_comp st c1) b
   | Apply (e1, e2) ->
     apply ~loc (optimize_expr st e1) (optimize_expr st e2)
   | Handle (e, c1) ->

@@ -43,6 +43,18 @@ let infer_top_comp st c =
 
   drty_sch, c', top_change
 
+let print_ty_scheme =
+  if !Config.smart_print then
+    SmartPrint.print_ty_scheme
+  else
+    Scheme.print_ty_scheme
+
+let print_dirty_scheme =
+  if !Config.smart_print then
+    SmartPrint.print_dirty_scheme
+  else
+    Scheme.print_dirty_scheme
+
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
     and return the new environment. *)
@@ -53,12 +65,12 @@ let rec exec_cmd ppf interactive st d =
       let drty_sch, c', new_change = infer_top_comp st c in
       let v = Eval.run st.environment c' in
       if interactive then Format.fprintf ppf "@[- : %t = %t@]@."
-        (Scheme.print_dirty_scheme drty_sch)
+        (print_dirty_scheme drty_sch)
         (Value.print_value v);
       {st with change = new_change}
   | Untyped.TypeOf c ->
       let drty_sch, c', new_change = infer_top_comp st c in
-      Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme drty_sch);
+      Format.fprintf ppf "@[- : %t@]@." (print_dirty_scheme drty_sch);
       {st with change = new_change}
   | Untyped.Reset ->
       Tctx.reset ();
@@ -95,7 +107,7 @@ let rec exec_cmd ppf interactive st d =
                        match RuntimeEnv.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.fprintf ppf "@[val %t : %t = %t@]@." (Untyped.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch)) (Value.print_value v))
+                         Format.fprintf ppf "@[val %t : %t = %t@]@." (Untyped.Variable.print x) (print_ty_scheme (sch_change tysch)) (Value.print_value v))
             vars
         end;
         {
@@ -115,7 +127,7 @@ let rec exec_cmd ppf interactive st d =
         List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
         let env = Eval.extend_let_rec st.environment defs' in
           if interactive then begin
-            List.iter (fun (x, tysch) -> Format.fprintf ppf "@[val %t : %t = <fun>@]@." (Untyped.Variable.print x) (Scheme.print_ty_scheme (sch_change tysch))) vars
+            List.iter (fun (x, tysch) -> Format.fprintf ppf "@[val %t : %t = <fun>@]@." (Untyped.Variable.print x) (print_ty_scheme (sch_change tysch))) vars
           end;
         {
           typing = typing_env;
