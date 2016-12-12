@@ -471,23 +471,23 @@ and reduce_comp st c =
     beta_reduce st a e
 
   (* XXX simplify *)
-  | LetRec (defs, co) ->
+(*   | LetRec (defs, co) ->
     Print.debug "the letrec comp  %t" (CamlPrint.print_computation CamlPrint.initial co);
     let st = 
     List.fold_right (fun (var,abs) st ->
-            Print.debug "ADDING %t and %t to letrec" (CamlPrint.print_variable var) (CamlPrint.print_abstraction ~pure:false CamlPrint.initial abs);
+            Print.debug "ADDING %t and %t to letrec" (CamlPrint.print_variable var) (CamlPrint.print_abstraction CamlPrint.initial abs);
             {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
     let_rec' defs (reduce_comp st co)
-
+ *)
 
   | _ -> c
 
   in 
-  if c <> c' then
+(*   if c <> c' then
   Print.debug ~loc:c.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
     (CamlPrint.print_computation CamlPrint.initial c) (Scheme.print_dirty_scheme c.Typed.scheme)
     (CamlPrint.print_computation CamlPrint.initial c') (Scheme.print_dirty_scheme c'.Typed.scheme);
-  c'
+ *)  c'
 
 
 let optimize_command st = function
