@@ -171,7 +171,7 @@ and beta_reduce st ({term = (p, c)} as a) e =
     let a =
       begin match p with
         | {term = Typed.PVar x} ->
-          Print.debug "Added to stack ==== %t" (CamlPrint.print_variable x);
+          Print.debug "Added to stack ==== %t" (Typed.print_variable x);
           let st = {st with stack = Common.update x e st.stack} in
           abstraction p (optimize_comp st c)
         | _ ->
@@ -190,7 +190,7 @@ and pure_beta_reduce st ({term = (p, exp)} as pa) e =
     let pa =
       begin match p with
         | {term = Typed.PVar x} ->
-          Print.debug "Added to stack ==== %t" (CamlPrint.print_variable x);
+          Print.debug "Added to stack ==== %t" (Typed.print_variable x);
           let st = {st with stack = Common.update x e st.stack} in
           pure_abstraction p (optimize_expr st exp)
         | _ ->
@@ -287,8 +287,8 @@ and reduce_expr st e =
   in
   if e <> e' then
   Print.debug ~loc:e.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
-    (CamlPrint.print_expression e) (Scheme.print_ty_scheme e.Typed.scheme)
-    (CamlPrint.print_expression e') (Scheme.print_ty_scheme e'.Typed.scheme);
+    (Typed.print_expression e) (Scheme.print_ty_scheme e.Typed.scheme)
+    (Typed.print_expression e') (Scheme.print_ty_scheme e'.Typed.scheme);
   e'
 
 
@@ -544,10 +544,10 @@ and reduce_comp st c =
 
   (* XXX simplify *)
   | LetRec (defs, co) ->
-    Print.debug "the letrec comp  %t" (CamlPrint.print_computation co);
+    Print.debug "the letrec comp  %t" (Typed.print_computation co);
     let st = 
     List.fold_right (fun (var,abs) st ->
-            Print.debug "ADDING %t and %t to letrec" (CamlPrint.print_variable var) (CamlPrint.print_abstraction abs);
+            Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs);
             {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
     let_rec' defs (reduce_comp st co)
 
@@ -557,8 +557,8 @@ and reduce_comp st c =
   in 
   if c <> c' then
   Print.debug ~loc:c.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
-    (CamlPrint.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme)
-    (CamlPrint.print_computation c') (Scheme.print_dirty_scheme c'.Typed.scheme);
+    (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme)
+    (Typed.print_computation c') (Scheme.print_dirty_scheme c'.Typed.scheme);
   c'
 
 
