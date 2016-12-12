@@ -66,33 +66,6 @@ let rec ceval env c =
       in
         eval_case cases
 
-  | Typed.While (c1, c2) ->
-      let rec loop () =
-        let k v =
-          let b = V.to_bool v in
-          if b then
-            sequence (fun _ -> loop ()) (ceval env c2)
-          else
-            V.unit_result
-        in
-        sequence k (ceval env c1)
-      in
-      loop ()
-          
-  | Typed.For (i, e1, e2, c, up) ->
-      let n1 = V.to_int (veval env e1) in
-      let n2 = V.to_int (veval env e2) in
-      let le = if up then ( <= ) else ( >= ) in
-      let next = if up then succ else pred in
-      let rec loop n =
-        if le n n2 then
-          let r = ceval (RuntimeEnv.update i (V.Const (Const.of_integer n)) env) c in
-          sequence (fun _ -> loop (next n)) r
-        else
-          V.unit_result
-      in
-      loop n1
-
   | Typed.Handle (e, c) ->
       let v = veval env e in
       let r = ceval env c in

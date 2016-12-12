@@ -290,8 +290,6 @@ let check_comp c =
       | Untyped.Match (_, lst) -> 
         check_patterns ~loc:c.Untyped.location (List.map (Common.compose old_of_new_pattern fst) lst) ;
         List.iter (fun (_, c) -> check c) lst
-      | Untyped.While (c1, c2) -> check c1 ; check c2
-      | Untyped.For (_, _, _, c, _) -> check c
       | Untyped.Apply _ -> ()
       | Untyped.Handle (_, c) -> check c
       | Untyped.Check c -> check c

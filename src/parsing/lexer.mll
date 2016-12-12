@@ -7,16 +7,12 @@
     ("asr", ASR);
     ("begin", BEGIN);
     ("check", CHECK);
-    ("do", DO);
-    ("done", DONE);
-    ("downto", DOWNTO);
     ("effect", EFFECT);
     ("else", ELSE);
     ("end", END);
     ("external", EXTERNAL);
     ("false", BOOL false);
     ("finally", FINALLY);
-    ("for", FOR);
     ("fun", FUN);
     ("function", FUNCTION);
     ("handle", HANDLE);
@@ -35,11 +31,9 @@
     ("or", OR);
     ("rec", REC);
     ("then", THEN);
-    ("to", TO);
     ("true", BOOL true);
     ("type", TYPE);
     ("val", VAL);
-    ("while", WHILE);
     ("with", WITH)
   ]
 

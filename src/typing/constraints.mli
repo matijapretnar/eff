@@ -28,8 +28,12 @@ val add_full_region : Type.region_param -> t -> t
 
 val is_pure : t -> Type.dirt -> bool
 
-val print : non_poly:(Type.ty_param, Type.dirt_param, Type.region_param) Trio.t -> t -> Format.formatter -> unit
-
 val is_pure_for_handler : t -> Type.dirt -> ((Common.effect * ('a * 'b)) * 'c) list -> bool
 
 val expand_ty : Type.ty -> Type.ty
+
+val non_empty_dirts : t -> Type.dirt_param list
+
+val non_empty_regions : t -> Type.region_param list
+
+val print : t -> Format.formatter -> unit

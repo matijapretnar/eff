@@ -155,7 +155,7 @@ and print_computation ?max_level ~pure st c ppf =
       (Scheme.print_dirty_scheme c.Typed.scheme)
       expect_pure_computation
       is_pure_computation
-      (print_computation' ~pure {initial with debug=false} c);
+      (Typed.print_computation c);
   match expect_pure_computation, is_pure_computation with
   | true, true ->
       print_computation' ?max_level ~pure:true st c ppf

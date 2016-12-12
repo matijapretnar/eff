@@ -1,19 +1,19 @@
 module TyPoset = Poset.Make(struct
   type t = Type.ty_param
   let compare = Pervasives.compare
-  let print = Type.print_ty_param ~non_poly:Trio.empty
+  let print = Type.print_ty_param
 end)
 
 module DirtPoset = Poset.Make(struct
   type t = Type.dirt_param
   let compare = Pervasives.compare
-  let print = Type.print_dirt_param ~non_poly:Trio.empty
+  let print = Type.print_dirt_param
 end)
 
 module RegionPoset = Poset.Make(struct
   type t = Type.region_param
   let compare = Pervasives.compare
-  let print = Type.print_region_param ~non_poly:Trio.empty
+  let print = Type.print_region_param
 end)
 
 module FullRegions = Set.Make(struct
@@ -146,6 +146,14 @@ let skeletons constraints =
   (* XXX Not yet implemented *)
   []
 
+let non_empty_dirts constraints =
+  [] |>
+  DirtPoset.fold (fun _ d non_empty -> d :: non_empty) constraints.dirt_poset
+
+let non_empty_regions constraints =
+  FullRegions.elements constraints.full_regions |>
+  RegionPoset.fold (fun _ r non_empty -> r :: non_empty) constraints.region_poset
+
 let rec add_ty_constraint ~loc ty1 ty2 constraints =
   (* XXX Check cyclic types *)
   (* Consider: [let rec f x = f (x, x)] or [let rec f x = (x, f x)] *)
@@ -195,7 +203,7 @@ let rec add_ty_constraint ~loc ty1 ty2 constraints =
 
   | (ty1, ty2) ->
       let skeletons = skeletons constraints in
-      Error.typing ~loc "This expression has type %t but it should have type %t." (Type.print skeletons ty1) (Type.print skeletons ty2)
+      Error.typing ~loc "This expression has type %t but it should have type %t." (Type.print_ty ty1) (Type.print_ty ty2)
 
 and add_args_constraint ~loc (ts, ds, rs) (tys1, drts1, rs1) (tys2, drts2, rs2) constraints =
   (* NB: it is assumed here that
@@ -293,11 +301,11 @@ let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) constraint
   full_regions = FullRegions.filter (fun r -> List.mem r pos_rs) constraints.full_regions;
  }
 
-let print ~non_poly constraints ppf =
+let print constraints ppf =
   TyPoset.print constraints.ty_poset ppf;
   if not (TyPoset.is_empty constraints.ty_poset) then Format.pp_print_string ppf "; ";
   DirtPoset.print constraints.dirt_poset ppf;
   if not (DirtPoset.is_empty constraints.dirt_poset) then Format.pp_print_string ppf "; ";
   RegionPoset.print constraints.region_poset ppf;
   if not (RegionPoset.is_empty constraints.region_poset) then Format.pp_print_string ppf "; ";
-  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Type.print_region_param ~non_poly x) (Symbols.top ())) (FullRegions.elements constraints.full_regions) ppf
+  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Type.print_region_param x) (Symbols.top ())) (FullRegions.elements constraints.full_regions) ppf

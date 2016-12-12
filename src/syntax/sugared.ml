@@ -33,10 +33,6 @@ and plain_term =
   (** [match t with p1 -> t1 | ... | pn -> tn] *)
   | Conditional of term * term * term
   (** [if t then t1 else t2] *)
-  | While of term * term
-  (** [while t1 do t2 done] *)
-  | For of variable * term * term * term * bool
-  (** [for x = t1 to t2 do t done] or [for x = t1 downto t2 do t done] *)
   | Apply of term * term
   (** [t1 t2] *)
   | Handle of term * term

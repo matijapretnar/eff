@@ -61,8 +61,6 @@ and plain_computation =
   | Let of (pattern * computation) list * computation
   | LetRec of (variable * abstraction) list * computation
   | Match of expression * abstraction list
-  | While of computation * computation
-  | For of variable * expression * expression * computation * bool
   | Apply of expression * expression
   | Handle of expression * computation
   | Check of computation
@@ -228,12 +226,6 @@ and refresh_comp' sbst = function
       LetRec (li', refresh_comp sbst' c1)
   | Match (e, li) ->
       Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
-  | While (c1, c2) ->
-      While (refresh_comp sbst c1, refresh_comp sbst c2)
-  | For (x, e1, e2, c, b) ->
-      let x' = Variable.refresh x in
-      let sbst' = Common.update x x' sbst in
-      For (x', refresh_expr sbst e1, refresh_expr sbst e2, refresh_comp sbst' c, b)
   | Apply (e1, e2) ->
       Apply (refresh_expr sbst e1, refresh_expr sbst e2)
   | Handle (e, c) ->
@@ -300,11 +292,6 @@ and subst_comp' sbst = function
       LetRec (li', subst_comp sbst c1)
   | Match (e, li) ->
       Match (subst_expr sbst e, List.map (subst_abs sbst) li)
-  | While (c1, c2) ->
-      While (subst_comp sbst c1, subst_comp sbst c2)
-  | For (x, e1, e2, c, b) ->
-      (* XXX Should we check that x does not appear in sbst? *)
-      For (x, subst_expr sbst e1, subst_expr sbst e2, subst_comp sbst c, b)
   | Apply (e1, e2) ->
       Apply (subst_expr sbst e1, subst_expr sbst e2)
   | Handle (e, c) ->
@@ -411,12 +398,6 @@ and alphaeq_comp' eqvars c c' =
       false
   | Match (e, li), Match (e', li') ->
       alphaeq_expr eqvars e e' && List.for_all2 (alphaeq_abs eqvars) li li'
-  | While (c1, c2), While (c1', c2') ->
-      alphaeq_comp eqvars c1 c1' && alphaeq_comp eqvars c2 c2'
-  | For (x, e1, e2, c, b), For (x', e1', e2', c', b') ->
-      Variable.compare x x' = 0 &&
-      alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2' &&
-      alphaeq_comp eqvars c c' && b = b'
   | Apply (e1, e2), Apply (e1', e2') ->
       alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2'
   | Handle (e, c), Handle (e', c') ->
@@ -647,42 +628,6 @@ let match' ?loc e cases =
     location = loc
   }
 
-let while' ?loc c1 c2 =
-  let loc = backup_location loc [c1.location; c2.location] in
-  let ctx_c1, (ty_c1, drt_c1), cnstrs_c1 = c1.scheme in
-  let ctx_c2, (ty_c2, drt_c2), cnstrs_c2 = c2.scheme in
-  let drt = Type.fresh_dirt () in
-  let drty_sch =
-    (ctx_c1 @ ctx_c2, (Type.unit_ty, drt),
-        Constraints.list_union [cnstrs_c1; cnstrs_c2]
-        |> Constraints.add_ty_constraint ~loc ty_c1 Type.bool_ty
-        |> Constraints.add_ty_constraint ~loc ty_c2 Type.unit_ty
-        |> Constraints.add_dirt_constraint drt_c1 drt
-        |> Constraints.add_dirt_constraint drt_c2 drt
-    ) in
-  {
-    term = While (c1, c2);
-    scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
-    location = loc;
-  }
-
-let for' ?loc i e1 e2 c up =
-  let loc = backup_location loc [e1.location; e2.location; c.location] in
-  let ctx_e1, ty_e1, cnstrs_e1 = e1.scheme in
-  let ctx_e2, ty_e2, cnstrs_e2 = e2.scheme in
-  let ctx_c, (ty_c, drt_c), cnstrs_c = c.scheme in
-  let drty_sch =
-    (ctx_e1 @ ctx_e2 @ ctx_c, (Type.unit_ty, drt_c),
-      Constraints.list_union [cnstrs_e1; cnstrs_e2; cnstrs_c]
-      |> Constraints.add_ty_constraint ~loc:e1.location ty_e1 Type.int_ty
-      |> Constraints.add_ty_constraint ~loc:e2.location ty_e2 Type.int_ty
-      |> Constraints.add_ty_constraint ~loc:c.location ty_c Type.unit_ty
-    ) in
-  {
-    term = For (i, e1, e2, c, up);
-    scheme = Scheme.clean_dirty_scheme ~loc drty_sch;
-    location = loc;
-  }
 
 let apply ?loc e1 e2 =
   let loc = backup_location loc [e1.location; e2.location] in
@@ -735,9 +680,8 @@ let let' ?loc defs c =
       match c.term with
       | Value _ ->
           ctx_p @ poly_tys, nonpoly_tys
-      | Apply _ | Match _ | While _ | For _
-      | Handle _ | Let _ | LetRec _ | Check _
-      | Bind _ | LetIn _ | Call _ ->
+      | Apply _ | Match _ | Handle _ | Let _ | LetRec _
+      | Check _ | Bind _ | LetIn _ | Call _ ->
           poly_tys, ctx_p @ nonpoly_tys
     in
     poly_tys, nonpoly_tys, ctx_c @ ctx, [
@@ -909,9 +853,6 @@ let rec free_vars_comp c =
       ) li ([], free_vars_comp c1) in
       vars --- xs
   | Match (e, li) -> free_vars_expr e @@@ concat_vars (List.map free_vars_abs li)
-  | While (c1, c2) -> free_vars_comp c1 @@@ free_vars_comp c2
-  | For (v, e1, e2, c1, b) ->
-      (free_vars_expr e1 @@@ free_vars_expr e2 @@@ free_vars_comp c1) --- [v]
   | Apply (e1, e2) -> free_vars_expr e1 @@@ free_vars_expr e2
   | Handle (e, c1) -> free_vars_expr e @@@ free_vars_comp c1
   | Check c1 -> free_vars_comp c1
@@ -943,15 +884,114 @@ let occurrences x (inside, outside) =
   let count ys = List.length (List.filter (fun y -> x = y) ys) in
   (count inside, count outside)
 
+let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
+
+let print_variable = Variable.print
+
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p.term with
-  | PVar x -> print "%t" (Variable.print x)
-  | PAs (p, x) -> print "%t as %t" (print_pattern p) (Variable.print x)
+  | PVar x -> print "%t" (print_variable x)
+  | PAs (p, x) -> print "%t as %t" (print_pattern p) (print_variable x)
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
   | PRecord lst -> Print.record print_pattern lst ppf
+  | PVariant (lbl, None) when lbl = Common.nil -> print "[]"
   | PVariant (lbl, None) -> print "%s" lbl
+  | PVariant ("(::)", Some ({ term = PTuple [p1; p2] })) ->
+      print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
   | PVariant (lbl, Some p) ->
-      print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
+      print ~at_level:1 "(%s @[<hov>%t@])" lbl (print_pattern p)
   | PNonbinding -> print "_"
+
+let rec print_expression ?max_level e ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match e.term with
+  | Var x ->
+      print "%t" (print_variable x)
+  | BuiltIn s ->
+      print "%s" s
+  | Const c ->
+      print "%t" (Const.print c)
+  | Tuple lst ->
+      Print.tuple print_expression lst ppf
+  | Record lst ->
+      Print.record print_expression lst ppf
+  | Variant (lbl, None) ->
+      print "%s" lbl
+  | Variant (lbl, Some e) ->
+      print ~at_level:1 "%s %t" lbl (print_expression e)
+  | Lambda a ->
+      print ~at_level:2 "fun %t" (print_abstraction a)
+  | Handler h ->
+      print "{@[<hov> value_clause = (@[fun %t@]);@ finally_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
+             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
+      (print_abstraction h.value_clause) (print_abstraction h.finally_clause)
+      (print_effect_clauses h.effect_clauses)
+  | Effect eff ->
+      print ~at_level:2 "effect %t" (print_effect eff)
+  | Pure c ->
+      print ~at_level:1 "pure %t" (print_computation ~max_level:0 c)
+
+and print_computation ?max_level c ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match c.term with
+  | Apply (e1, e2) ->
+      print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
+  | Value e ->
+      print ~at_level:1 "value %t" (print_expression ~max_level:0 e)
+  | Match (e, []) ->
+      print ~at_level:2 "(match %t with _ -> assert false)" (print_expression e)
+  | Match (e, lst) ->
+      print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e) (Print.cases print_abstraction lst)
+  | Handle (e, c) ->
+      print ~at_level:1 "handle %t %t" (print_expression ~max_level:0 e) (print_computation ~max_level:0 c)
+  | Let (lst, c) ->
+      print ~at_level:2 "%t" (print_multiple_bind (lst, c))
+  | LetRec (lst, c) ->
+      print ~at_level:2 "let rec @[<hov>%t@] in %t"
+      (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
+  | Check c' ->
+      print ~at_level:1 "check %S %t" (Common.to_string Location.print c.location) (print_computation ~max_level:0 c')
+  | Call (eff, e, a) ->
+      print ~at_level:1 "call %t %t (@[fun %t@])"
+      (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
+  | Bind (c1, a) ->
+      print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
+  | LetIn (e, {term = (p, c)}) ->
+      print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression e) (print_computation c)
+
+and print_effect_clauses eff_clauses ppf =
+  let print ?at_level = Print.print ?at_level ppf in
+  match eff_clauses with
+  | [] ->
+      print "| eff' -> fun arg k -> Call (eff', arg, k)"
+  | (((_, (t1, t2)) as eff), {term = (p1, p2, c)}) :: cases ->
+      print ~at_level:1 "| %t -> (fun %t %t -> %t) %t"
+      (print_effect eff) (print_pattern p1) (print_pattern p2) (print_computation c) (print_effect_clauses cases)
+
+and print_abstraction {term = (p, c)} ppf =
+  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
+
+and print_pure_abstraction {term = (p, e)} ppf =
+  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_expression e)
+
+and print_multiple_bind (lst, c') ppf =
+  match lst with
+  | [] -> Format.fprintf ppf "%t" (print_computation c')
+  | (p, c) :: lst ->
+      Format.fprintf ppf "%t >> fun %t -> %t"
+      (print_computation c) (print_pattern p) (print_multiple_bind (lst, c'))
+
+and print_let_abstraction (p, c) ppf =
+  Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)
+
+and print_top_let_abstraction (p, c) ppf =
+  match c.term with
+  | Value e ->
+    Format.fprintf ppf "%t = %t" (print_pattern p) (print_expression ~max_level:0 e)
+  | _ ->
+    Format.fprintf ppf "%t = run %t" (print_pattern p) (print_computation ~max_level:0 c)
+
+and print_let_rec_abstraction (x, a) ppf =
+  Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction a)

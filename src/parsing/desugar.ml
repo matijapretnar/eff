@@ -254,7 +254,7 @@ let rec expression ctx (t, loc) =
   (* Terms that are desugared into computations. We list them explicitly in
      order to catch any future constructs. *)
   | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
-  | Sugared.Handle _ | Sugared.Conditional _ | Sugared.While _ | Sugared.For _ | Sugared.Check _ ->
+  | Sugared.Handle _ | Sugared.Conditional _ | Sugared.Check _ ->
       let x = fresh_variable (Some "gen_bind") in
       let c = computation ctx (t, loc) in
       let w = [Untyped.add_loc (Untyped.PVar x) loc, c] in
@@ -295,17 +295,6 @@ and computation ctx (t, loc) =
         let c1 = computation ctx t1 in
         let c2 = computation ctx t2 in
           w, if_then_else e c1 c2
-    | Sugared.While (t1, t2) ->
-        let c1 = computation ctx t1 in
-        let c2 = computation ctx t2 in
-          [], Untyped.While (c1, c2)
-
-    | Sugared.For (i, t1, t2, t, b) ->
-      let w1, e1 = expression ctx t1 in
-      let w2, e2 = expression ctx t2 in
-      let j = fresh_variable (Some "gen_for") in
-      let c = computation ((i, j) :: ctx) t in
-        w1 @ w2, Untyped.For (j, e1, e2, c, b)
     | Sugared.Check t ->
         [], Untyped.Check (computation ctx t)
     | Sugared.Let (defs, t) ->
