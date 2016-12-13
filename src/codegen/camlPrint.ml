@@ -35,11 +35,11 @@ let rec print_type ?max_level ty ppf =
   | Type.Param p ->
       print "%t" (print_type_param p)
   | Type.Basic t ->
-      print "%s" t
+      print "(%s)" t
   | Type.Tuple tys ->
-      print ~at_level:1 "%t" (Print.sequence "*" print_type tys)
+      print ~at_level:1 "(%t)" (Print.sequence "*" print_type tys)
   | Type.Arrow (ty, drty) ->
-      print ~at_level:2 "%t -> %t" (print_type ~max_level:1 ty) (print_dirty_type drty)
+      print ~at_level:2 "(%t -> %t)" (print_type ~max_level:1 ty) (print_dirty_type drty)
   | Type.Handler ((ty1, _), (ty2, _)) ->
       print ~at_level:2 "(%t, %t) handler" (print_type ty1) (print_type ty2)
 
