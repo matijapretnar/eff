@@ -1,2 +1,2 @@
-Syntax error (file "./errors/duplicate_let.eff", line 1, char 5):
+Syntax error (file "./errors/duplicate_let.eff", line 1, char 5 - line 1, char 6):
 Several definitions of x

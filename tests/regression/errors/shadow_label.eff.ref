@@ -1,2 +1,2 @@
-Typing error (file "./errors/shadow_label.eff", line 2, char 1):
+Typing error (file "./errors/shadow_label.eff", line 2, char 1 - line 2, char 42):
 Constructor Horn is already used in type cow

@@ -1,22 +1,22 @@
 type (_,_) effect +=
   | Effect_Decide: (unit,bool) effect
-let _choose_all_279 =
+let _choose_all_257 =
   {
-    value_clause = (fun _x_285  -> value [_x_285]);
-    finally_clause = (fun _gen_id_par_284  -> value _gen_id_par_284);
+    value_clause = (fun _x_263  -> value [_x_263]);
+    finally_clause = (fun _gen_id_par_262  -> value _gen_id_par_262);
     effect_clauses = fun (type a) -> fun (type b) ->
       fun (x : (a,b) effect)  ->
         (match x with
          | Effect_Decide  ->
              (fun (() : unit)  ->
-                fun (_k_280 : bool -> _ computation)  ->
-                  (_k_280 true) >>
-                    (fun _gen_bind_282  ->
-                       (_var_187 _gen_bind_282) >>
-                         (fun _gen_bind_281  ->
-                            (_k_280 false) >>
-                              (fun _gen_bind_283  ->
-                                 _gen_bind_281 _gen_bind_283))))
+                fun (_k_258 : bool -> _ computation)  ->
+                  (_k_258 true) >>
+                    (fun _gen_bind_260  ->
+                       (_var_165 _gen_bind_260) >>
+                         (fun _gen_bind_259  ->
+                            (_k_258 false) >>
+                              (fun _gen_bind_261  ->
+                                 _gen_bind_259 _gen_bind_261))))
          | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                    (b ->
                                                                     _
@@ -25,4 +25,4 @@ let _choose_all_279 =
                                                                     _
                                                                     computation)
   }
-let _ = (_var_187 [10]) >> (fun _gen_bind_103  -> _gen_bind_103 [20])
+let _ = (_var_165 [10]) >> (fun _gen_bind_95  -> _gen_bind_95 [20])

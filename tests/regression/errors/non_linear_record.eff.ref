@@ -1,2 +1,2 @@
-Syntax error (file "./errors/non_linear_record.eff", line 3, char 9):
+Syntax error (file "./errors/non_linear_record.eff", line 3, char 9 - line 3, char 37):
 Fields in a record must be distinct
