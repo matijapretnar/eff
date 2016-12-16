@@ -1,8 +1,8 @@
-val _f_257 : τ₁ -δ₁→ int | τ₁ < τ₂;  = <fun>
-val _f1_259 : τ₁ -_δ₁→ int | τ₁ < τ₂;  = <fun>
-val _f2_260 : τ₁ -_δ₁→ int | τ₁ < τ₂;  = <fun>
-val _f3_261 : τ₁ -_δ₂→ int | τ₃ < τ₂,τ₁ < τ₄,
-τ₁ < τ₂; δ₁ < δ₂;  = <fun>
+val _f_257 : τ₁ ⟶  τ₂ | τ₁ < τ₂;  = <fun>
+val _f1_259 : _τ₁ ⟶  _τ₂ | τ₁ < τ₂;  = <fun>
+val _f2_260 : _τ₁ ⟶  _τ₂ | τ₁ < τ₂;  = <fun>
+val _f3_261 : _τ₁ -_δ₁→ _τ₂ | τ₃ < τ₂,τ₁ < τ₄,
+τ₁ < τ₂; δ₂ < δ₁;  = <fun>
 - : bool ! δ₃ | δ₂ < δ₃;  = true
-Typing error (file "./errors/polymorphic_skeletons.eff", line 4, char 1):
+Typing error (file "./errors/polymorphic_skeletons.eff", line 4, char 1 - line 4, char 33):
 This expression has type bool but it should have type int.
