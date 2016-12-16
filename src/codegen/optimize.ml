@@ -424,14 +424,7 @@ and reduce_comp st c =
     in
     reduce_comp st res
 
-  | Handle (e1, {term = Match (e2, cases)}) ->
-    let push_handler = fun {term = (p, c)} ->
-      abstraction p (reduce_comp st (handle (refresh_expr e1) c))
-    in
-    let res =
-      match' e2 (List.map push_handler cases)
-    in
-    res
+  
 
   | Handle (e1, {term = Apply (ae1, ae2)}) ->
     begin match ae1.term with
@@ -480,7 +473,9 @@ and reduce_comp st c =
                                       apply new_f_var ae2
                                     in
                                     optimize_comp st res
-                       | None -> c
+                       | None -> 
+                        Print.debug "Its a none";
+                                    Print.debug "The handle exp : %t" (Typed.print_expression ae1);c
                        end
                end
         end
@@ -507,7 +502,14 @@ and reduce_comp st c =
       | _ -> c
     end
 
-
+| Handle (e1, {term = Match (e2, cases)}) ->
+    let push_handler = fun {term = (p, c)} ->
+      abstraction p (reduce_comp st (handle (refresh_expr e1) c))
+    in
+    let res =
+      match' e2 (List.map push_handler cases)
+    in
+    res
 
     (*
       let f = \p. val lambda in c
@@ -556,7 +558,7 @@ and reduce_comp st c =
 
   in 
   if c <> c' then
-  Print.debug ~loc:c.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
+   Print.debug ~loc:c.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
     (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme)
     (Typed.print_computation c') (Scheme.print_dirty_scheme c'.Typed.scheme);
   c'
@@ -578,7 +580,13 @@ let optimize_command st = function
     in
     st', Typed.TopLet (defs', vars)
   | Typed.TopLetRec (defs, vars) ->
-    st, Typed.TopLetRec (Common.assoc_map (optimize_abs st) defs, vars)
+    let defs' = Common.assoc_map (optimize_abs st) defs in
+    let st' = 
+    List.fold_right (fun (var,abs) st ->
+            Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs);
+            {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
+    st', Typed.TopLetRec (defs', vars)
+
   | Typed.External (x, _, f) as cmd ->
     let st' =
       begin match Common.lookup f inlinable_definitions with
