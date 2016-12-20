@@ -84,7 +84,7 @@ and abstraction2 = (pattern * pattern * computation, Scheme.abstraction2_scheme)
 
 type toplevel = plain_toplevel * Location.t
 and plain_toplevel =
-  | Tydef of (Common.tyname, (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t * Tctx.tydef) Common.assoc
+  | Tydef of (Common.tyname, Params.t * Tctx.tydef) Common.assoc
   | TopLet of (pattern * computation) list * (variable * Scheme.ty_scheme) list
   | TopLetRec of (variable * abstraction) list * (variable * Scheme.ty_scheme) list
   | External of variable * Type.ty * string
@@ -527,8 +527,8 @@ let lambda ?loc a =
 
 let effect ?loc ((eff_name, (ty_par, ty_res)) as eff) =
   let loc = backup_location loc [] in
-    let r = Type.fresh_region_param () in
-    let drt = {Type.ops = [eff_name, r]; Type.rest = Type.fresh_dirt_param ()} in
+    let r = Params.fresh_region_param () in
+    let drt = {Type.ops = [eff_name, r]; Type.rest = Params.fresh_dirt_param ()} in
     let ty = Type.Arrow (ty_par, (ty_res, drt)) in
     let constraints = Constraints.add_full_region r Constraints.empty in
     {
@@ -556,8 +556,8 @@ let handler ?loc h =
     let ctxs, constraints = List.fold_right fold h.effect_clauses ([], Constraints.empty) in
 
     let make_dirt (eff, _) (effs_in, effs_out) =
-      let r_in = Type.fresh_region_param () in
-      let r_out = Type.fresh_region_param () in
+      let r_in = Params.fresh_region_param () in
+      let r_out = Params.fresh_region_param () in
       (eff, r_in) :: effs_in, (eff, r_out) :: effs_out
     in
     let effs_in, effs_out = List.fold_right make_dirt (Common.uniq (List.map fst h.effect_clauses)) ([], []) in
@@ -566,7 +566,7 @@ let handler ?loc h =
     let ctx_fin, (ty_fin, drty_fin), cnstrs_fin = h.finally_clause.scheme in
 
     let ty_in = Type.fresh_ty () in
-    let drt_rest = Type.fresh_dirt_param () in
+    let drt_rest = Params.fresh_dirt_param () in
     let drt_in = {Type.ops = effs_in; Type.rest = drt_rest} in
     let drt_out = Type.fresh_dirt () in
     let ty_out = Type.fresh_ty () in
@@ -778,8 +778,8 @@ let call ?loc ((eff_name, (ty_par, ty_res)) as eff) e a =
     let loc = backup_location loc [e.location; a.location] in
     let ctx_e, ty_e, constraints_e = e.scheme
     and ctx_a, (ty_a, drty_a), constraints_a = a.scheme in
-    let r = Type.fresh_region_param () in
-    let drt_eff = {Type.ops = [eff_name, r]; Type.rest = Type.fresh_dirt_param ()} in
+    let r = Params.fresh_region_param () in
+    let drt_eff = {Type.ops = [eff_name, r]; Type.rest = Params.fresh_dirt_param ()} in
     let ((ty_out, drt_out) as drty_out) = Type.fresh_dirty () in
     let constraints =
       Constraints.union constraints_e constraints_a

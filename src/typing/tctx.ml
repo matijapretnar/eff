@@ -7,21 +7,21 @@ type tydef =
   | Inline of Type.ty
 
 type variance = bool * bool
-type params = (Type.ty_param * variance) list * (Type.dirt_param * variance) list * (Type.region_param * variance) list
+type params = (Params.ty_param * variance) list * (Params.dirt_param * variance) list * (Params.region_param * variance) list
 
 type tyctx = (Common.tyname, params * tydef) Common.assoc
 
 let initial_tctx : tyctx = [
-  ("bool", (Trio.empty, Inline T.bool_ty));
-  ("unit", (Trio.empty, Inline T.unit_ty));
-  ("int", (Trio.empty, Inline T.int_ty));
-  ("string", (Trio.empty, Inline T.string_ty));
-  ("float", (Trio.empty, Inline T.float_ty));
-  ("list", (let a = Type.fresh_ty_param () in
+  ("bool", (([], [], []), Inline T.bool_ty));
+  ("unit", (([], [], []), Inline T.unit_ty));
+  ("int", (([], [], []), Inline T.int_ty));
+  ("string", (([], [], []), Inline T.string_ty));
+  ("float", (([], [], []), Inline T.float_ty));
+  ("list", (let a = Params.fresh_ty_param () in
               (([a, (true, false)], [], []),
                  Sum [(Common.nil, None);
                       (Common.cons, Some (T.Tuple [T.Param a; T.Apply ("list", ([T.Param a], [], []))]))])));
-  ("empty", (Trio.empty, Sum []))
+  ("empty", (([], [], []), Sum []))
 ]
 
 let tctx = ref initial_tctx
@@ -62,20 +62,16 @@ let lookup_tydef ~loc ty_name =
   | Some (params, tydef) -> (remove_variances params, tydef)
 
 let refreshing_subst (ps, ds, rs) =
-  let refresh_ty_param = Type.refresher Type.fresh_ty_param
-  and refresh_dirt_param = Type.refresher Type.fresh_dirt_param
-  and refresh_region_param = Type.refresher Type.fresh_region_param in
-  (List.map refresh_ty_param ps, List.map refresh_dirt_param ds, List.map refresh_region_param rs),
+  let sbst = Params.refreshing_subst () in
+  let refresh_ty_param = sbst.Params.ty_param
+  and refresh_dirt_param = sbst.Params.dirt_param
+  and refresh_region_param = sbst.Params.region_param in
+  Params.make (List.map refresh_ty_param ps, List.map refresh_dirt_param ds, List.map refresh_region_param rs),
   {
-    Type.ty_param = (fun p -> refresh_ty_param p);
-    Type.dirt_param = Common.id;
-    Type.region_param = refresh_region_param;
+    Params.ty_param = (fun p -> refresh_ty_param p);
+    Params.dirt_param = Common.id;
+    Params.region_param = refresh_region_param;
   }
-
-let fresh_tydef ~loc ty_name =
-  let (params, tydef) = lookup_tydef ~loc ty_name in
-  let params', sbst = refreshing_subst params in
-    params', subst_tydef sbst tydef
 
 (** [find_variant lbl] returns the information about the variant type that defines the
     label [lbl]. *)
@@ -105,7 +101,8 @@ let find_field fld =
     find !tctx
 
 
-let apply_to_params t (ps, ds, rs) =
+let apply_to_params t params =
+  let (ps, ds, rs) = Params.unmake params in
   Type.Apply (t, (
     List.map (fun p -> Type.Param p) ps, List.map Type.simple_dirt ds, rs
   ))
@@ -233,7 +230,8 @@ let check_shadowing ~loc = function
 
 let extend_with_variances ~loc tydefs =
   let prepare_variance lst = List.map (fun p -> (p, (ref false, ref false))) lst in
-  let prepare_variances ((ps, ds, rs), def) =
+  let prepare_variances (params, def) =
+    let (ps, ds, rs) = Params.unmake params in
     ((prepare_variance ps, prepare_variance ds, prepare_variance rs), def) in
   let prepared_tydefs = Common.assoc_map prepare_variances tydefs in
   let set_variances (ty_name, ((ps, ds, rs), def)) =

@@ -62,7 +62,7 @@ let fill_args_tydef def =
           (fun (fld, ty) (ds, rs, lst) ->
             let (ds', rs'), ty = fill_args ty in
               (ds' @ ds, rs' @ rs, (fld, ty) :: lst))
-          lst Trio.empty
+          lst ([], [], [])
       in
         (ds, rs), Sugared.TyRecord lst
     | Sugared.TySum lst ->
@@ -74,7 +74,7 @@ let fill_args_tydef def =
               | Some ty ->
                 let (ds', rs'), ty = fill_args ty in
                   (ds' @ ds, rs' @ rs, (lbl, Some ty) :: lst))
-          lst Trio.empty
+          lst ([], [], [])
       in
         (ds, rs), Sugared.TySum lst
     | Sugared.TyInline ty ->
@@ -120,36 +120,42 @@ let ty (ts, ds, rs) =
   in
   ty
 
+let trio_empty = ([], [], [])
+let trio_append (ts1, ds1, rs1) (ts2, ds2, rs2) = (ts1 @ ts2, ds1 @ ds2, rs1 @ rs2)
+let trio_flatten_map f lst = List.fold_left trio_append trio_empty (List.map f lst)
+let trio_diff (ts1, ds1, rs1) (ts2, ds2, rs2) = (Common.diff ts1 ts2, Common.diff ds1 ds2, Common.diff rs1 rs2)
+let trio_uniq (ts1, ds1, rs1) = (Common.uniq ts1, Common.uniq ds1, Common.uniq rs1)
+
 (** [free_params t] returns a triple of all free type, dirt, and region params in [t]. *)
 let free_params t =
-  let (@@@) = Trio.append
+  let (@@@) = trio_append
   and optional f = function
-    | None -> Trio.empty
+    | None -> trio_empty
     | Some x -> f x
   in
   let rec ty (t, loc) = match t with
   | Sugared.TyApply (_, tys, drts_rgns) ->
-      Trio.flatten_map ty tys @@@ (optional dirts_regions) drts_rgns
+      trio_flatten_map ty tys @@@ (optional dirts_regions) drts_rgns
   | Sugared.TyParam s -> ([s], [], [])
   | Sugared.TyArrow (t1, t2, drt) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt
-  | Sugared.TyTuple lst -> Trio.flatten_map ty lst
+  | Sugared.TyTuple lst -> trio_flatten_map ty lst
   | Sugared.TyHandler (t1, drt1, t2, drt2) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt1 @@@ (optional dirt) drt2
   and dirt (Sugared.DirtParam d) = ([], [d], [])
   and region (Sugared.RegionParam r) = ([], [], [r])
-  and dirts_regions (drts, rgns) = Trio.flatten_map dirt drts @@@ Trio.flatten_map region rgns
+  and dirts_regions (drts, rgns) = trio_flatten_map dirt drts @@@ trio_flatten_map region rgns
   in
-  Trio.uniq (ty t)
+  trio_uniq (ty t)
 
 let syntax_to_core_params (ts, ds, rs) = (
-    List.map (fun p -> (p, Type.fresh_ty_param ())) ts,
-    List.map (fun d -> (d, Type.fresh_dirt_param ())) ds,
-    List.map (fun r -> (r, Type.fresh_region_param ())) rs
+    List.map (fun p -> (p, Params.fresh_ty_param ())) ts,
+    List.map (fun d -> (d, Params.fresh_dirt_param ())) ds,
+    List.map (fun r -> (r, Params.fresh_region_param ())) rs
   )
 
 (** [tydef params d] desugars the type definition with parameters [params] and definition [d]. *)
 let tydef params d =
   let (ts, ds, rs) as sbst = syntax_to_core_params params in
-    (Trio.snds (ts, ds, rs),
+    (Params.make (List.map snd ts, List.map snd ds, List.map snd rs),
      begin match d with
        | Sugared.TyRecord lst -> Tctx.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
        | Sugared.TySum lst -> Tctx.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
@@ -166,7 +172,7 @@ let tydefs defs =
       (fun (tyname, (params, def)) (ds, rs, defs) ->
         let (d, r), def = fill_args_tydef def in
           (d @ ds, r @ rs, ((tyname, (params, def)) :: defs)))
-      defs Trio.empty
+      defs trio_empty
   in
     (* Now we traverse again and the rest of the work. *)
     List.map (fun (tyname, (ts, def)) -> (tyname, tydef (ts, ds, rs) def)) defs
@@ -411,8 +417,8 @@ let external_ty x t =
   let _, t = fill_args t in
   let n = fresh_variable (Some x) in
   top_ctx := (x, n) :: !top_ctx;
-  let (ts, ds, rs) = syntax_to_core_params (free_params t) in
-  n, ty (ts, ds, rs) t
+  let params = syntax_to_core_params (free_params t) in
+  n, ty params t
 
 let top_computation c = computation !top_ctx c
 

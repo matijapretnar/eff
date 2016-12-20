@@ -66,7 +66,7 @@ and abstraction2 = pattern * pattern * computation
 (* Toplevel commands (the first four do not need to be separated by [;;]) *)
 type toplevel = plain_toplevel annotation
 and plain_toplevel =
-  | Tydef of (Common.tyname, (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t * Tctx.tydef) Common.assoc
+  | Tydef of (Common.tyname, Params.t * Tctx.tydef) Common.assoc
   (** [type t = tydef] *)
   | TopLet of (pattern * computation) list
   (** [let p1 = t1 and ... and pn = tn] *)

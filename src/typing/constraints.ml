@@ -1,33 +1,33 @@
 module TyPoset = Poset.Make(struct
-  type t = Type.ty_param
+  type t = Params.ty_param
   let compare = Pervasives.compare
-  let print = Type.print_ty_param
+  let print = Params.print_ty_param ~non_poly:Params.empty
 end)
 
 module DirtPoset = Poset.Make(struct
-  type t = Type.dirt_param
+  type t = Params.dirt_param
   let compare = Pervasives.compare
-  let print = Type.print_dirt_param
+  let print = Params.print_dirt_param ~non_poly:Params.empty
 end)
 
 module RegionPoset = Poset.Make(struct
-  type t = Type.region_param
+  type t = Params.region_param
   let compare = Pervasives.compare
-  let print = Type.print_region_param
+  let print = Params.print_region_param ~non_poly:Params.empty
 end)
 
 module FullRegions = Set.Make(struct
-  type t = Type.region_param
+  type t = Params.region_param
   let compare = Pervasives.compare
 end)
 
 module TyMap = Map.Make(struct
-  type t = Type.ty_param
+  type t = Params.ty_param
   let compare = Pervasives.compare
 end)
 
 module DirtMap = Map.Make(struct
-  type t = Type.dirt_param
+  type t = Params.dirt_param
   let compare = Pervasives.compare
 end)
 
@@ -45,7 +45,7 @@ let is_pure { dirt_poset; region_poset; full_regions } { Type.ops; Type.rest } =
   List.for_all (fun (_, r) -> check_region r) ops &&
   DirtPoset.get_prec rest dirt_poset = []
 
-let add_prec constraints (pos_ts, pos_ds, pos_rs) =
+(* let add_prec constraints (pos_ts, pos_ds, pos_rs) =
   let pos_ds = 
       pos_ds
       |> List.map (fun d -> d :: DirtPoset.get_prec d constraints.dirt_poset)
@@ -57,7 +57,7 @@ let add_prec constraints (pos_ts, pos_ds, pos_rs) =
       |> List.concat
       |> List.sort_uniq Pervasives.compare
   in
-  (pos_ts, pos_ds, pos_rs)
+  (pos_ts, pos_ds, pos_rs) *)
 
 let must_be_empty {dirt_poset; region_poset; full_regions} {Type.ops; Type.rest} =
   if List.exists (fun (_, r) -> FullRegions.mem r full_regions) ops then
@@ -260,7 +260,7 @@ and add_dirt_constraint drt1 drt2 constraints =
   let new_ops ops1 ops2 =
     let ops2 = List.map fst ops2 in
     let add_op (op, _) news =
-      if List.mem op ops2 then news else (op, Type.fresh_region_param ()) :: news
+      if List.mem op ops2 then news else (op, Params.fresh_region_param ()) :: news
     in
     List.fold_right add_op ops1 []
   in
@@ -269,12 +269,12 @@ and add_dirt_constraint drt1 drt2 constraints =
   let constraints, rest1 = match new_ops1 with
     | [] -> constraints, rest1
     | _ :: _ ->
-      let r = Type.fresh_dirt_param () in
+      let r = Params.fresh_dirt_param () in
       (add_dirt_expansion rest1 {Type.ops = new_ops1; Type.rest = r} constraints), r in
   let constraints, rest2 = match new_ops2 with
     | [] -> constraints, rest2
     | _ :: _ ->
-      let r = Type.fresh_dirt_param () in
+      let r = Params.fresh_dirt_param () in
       (add_dirt_expansion rest2 {Type.ops = new_ops2; Type.rest = r} constraints), r in
   let ops1 = new_ops1 @ ops1
   and ops2 = new_ops2 @ ops2 in
@@ -315,17 +315,17 @@ let list_union = function
   | constraints :: constraints_lst -> List.fold_right union constraints_lst constraints
 
 let subst sbst constraints = {
-  ty_poset = TyPoset.map sbst.Type.ty_param constraints.ty_poset;
-  dirt_poset = DirtPoset.map sbst.Type.dirt_param constraints.dirt_poset;
-  region_poset = RegionPoset.map sbst.Type.region_param constraints.region_poset;
-  full_regions = FullRegions.fold (fun r s -> FullRegions.add (sbst.Type.region_param r) s) constraints.full_regions FullRegions.empty;
+  ty_poset = TyPoset.map sbst.Params.ty_param constraints.ty_poset;
+  dirt_poset = DirtPoset.map sbst.Params.dirt_param constraints.dirt_poset;
+  region_poset = RegionPoset.map sbst.Params.region_param constraints.region_poset;
+  full_regions = FullRegions.fold (fun r s -> FullRegions.add (sbst.Params.region_param r) s) constraints.full_regions FullRegions.empty;
  }
 
-let garbage_collect (pos_ts, pos_ds, pos_rs) (neg_ts, neg_ds, neg_rs) constraints = {
-  ty_poset = TyPoset.filter (fun x y -> List.mem x neg_ts && List.mem y pos_ts) constraints.ty_poset;
-  dirt_poset = DirtPoset.filter (fun x y -> List.mem x neg_ds && List.mem y pos_ds) constraints.dirt_poset;
-  region_poset = RegionPoset.filter (fun x y -> List.mem x neg_rs && List.mem y pos_rs && not (FullRegions.mem y constraints.full_regions)) constraints.region_poset;
-  full_regions = FullRegions.filter (fun r -> List.mem r pos_rs) constraints.full_regions;
+let garbage_collect pos neg constraints = {
+  ty_poset = TyPoset.filter (fun x y -> Params.ty_param_mem x neg && Params.ty_param_mem y pos) constraints.ty_poset;
+  dirt_poset = DirtPoset.filter (fun x y -> Params.dirt_param_mem x neg && Params.dirt_param_mem y pos) constraints.dirt_poset;
+  region_poset = RegionPoset.filter (fun x y -> Params.region_param_mem x neg && Params.region_param_mem y pos && not (FullRegions.mem y constraints.full_regions)) constraints.region_poset;
+  full_regions = FullRegions.filter (fun r -> Params.region_param_mem r pos) constraints.full_regions;
  }
 
 let print constraints ppf =
@@ -335,4 +335,4 @@ let print constraints ppf =
   if not (DirtPoset.is_empty constraints.dirt_poset) then Format.pp_print_string ppf "; ";
   RegionPoset.print constraints.region_poset ppf;
   if not (RegionPoset.is_empty constraints.region_poset) then Format.pp_print_string ppf "; ";
-  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Type.print_region_param x) (Symbols.top ())) (FullRegions.elements constraints.full_regions) ppf
+  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Params.print_region_param x) (Symbols.top ())) (FullRegions.elements constraints.full_regions) ppf

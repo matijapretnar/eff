@@ -10,8 +10,8 @@ val refresh : ty_scheme -> ty_scheme
 val simple : 'a -> 'a t
 val abstract : loc:Location.t -> ty_scheme -> dirty_scheme -> abstraction_scheme
 val abstract2 : loc:Location.t -> ty_scheme -> ty_scheme -> dirty_scheme -> abstraction2_scheme
-val region_param_less : Type.region_param -> Type.region_param -> change
-val add_full_region : Type.region_param -> change
+val region_param_less : Params.region_param -> Params.region_param -> change
+val add_full_region : Params.region_param -> change
 val just : Constraints.t -> change
 val dirt_less : Type.dirt -> Type.dirt -> change
 val ty_less : loc:Location.t -> Type.ty -> Type.ty -> change
@@ -27,10 +27,10 @@ val finalize_pattern_scheme : loc:Location.t -> context -> Type.ty -> change lis
 val add_to_top : loc:Location.t -> context -> Constraints.t -> (dirty_scheme -> dirty_scheme)
 val beautify_ty_scheme : ty_scheme -> ty_scheme
 val beautify_dirty_scheme : dirty_scheme -> dirty_scheme
-val skeletons_non_poly_scheme : 'a t -> Type.ty_param list list * (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t
+val skeletons_non_poly_scheme : 'a t -> Params.ty_param list list * Params.t
 val print_ty_scheme : ty_scheme -> Format.formatter -> unit
 val print_dirty_scheme : dirty_scheme -> Format.formatter -> unit
-val is_pure : ?loc:Location.t -> (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t -> dirty_scheme -> bool
-val is_pure_function_type : ?loc:Location.t -> (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t -> ty_scheme -> bool
+val is_pure : ?loc:Location.t -> Params.t -> dirty_scheme -> bool
+val is_pure_function_type : ?loc:Location.t -> Params.t -> ty_scheme -> bool
 val is_pure_for_handler : dirty_scheme -> ((Common.effect * ('a * 'b)) * 'c) list -> bool
-val present_in_abstraction : abstraction_scheme -> (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t
+val present_in_abstraction : abstraction_scheme -> Params.t

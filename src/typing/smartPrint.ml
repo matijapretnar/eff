@@ -2,31 +2,21 @@ open Scheme
 open Type
 
 
-let print_ty_param ~non_poly:(ps, _, _) ((Ty_Param k) as p) ppf =
-  Symbols.ty_param k (List.mem p ps) ppf
-
-let print_dirt_param ~non_poly:(_, ds, _) ((Dirt_Param k) as p) ppf =
-  Symbols.dirt_param k (List.mem p ds) ppf
-
-let print_region_param ~non_poly:(_, _, rs) ((Region_Param k) as p) ppf =
-  Symbols.region_param k (List.mem p rs) ppf
-
-
 let show_dirt ~non_empty_dirts drt =
   drt.ops != [] || List.mem drt.rest non_empty_dirts
 
 
 let print_operation ~non_poly r_ops =
-  Print.sequence ", " (fun (op, r) ppf -> Print.print ppf "%s:%t" op (print_region_param ~non_poly r)) r_ops
+  Print.sequence ", " (fun (op, r) ppf -> Print.print ppf "%s:%t" op (Params.print_region_param ~non_poly r)) r_ops
 
 let print_dirt ~non_poly ~non_empty_dirts drt ppf =
   match drt.ops with
   | [] ->
       if List.mem drt.rest non_empty_dirts then
-        Print.print ppf "%t" (print_dirt_param ~non_poly drt.rest)
+        Print.print ppf "%t" (Params.print_dirt_param ~non_poly drt.rest)
   | _ ->
       if List.mem drt.rest non_empty_dirts then
-        Print.print ppf "{%t|%t}" (print_operation ~non_poly drt.ops) (print_dirt_param ~non_poly drt.rest)
+        Print.print ppf "{%t|%t}" (print_operation ~non_poly drt.ops) (Params.print_dirt_param ~non_poly drt.rest)
       else
         Print.print ppf "{%t}" (print_operation ~non_poly drt.ops)
 
@@ -50,7 +40,7 @@ let print_ty ~non_poly ~non_empty_dirts ~skeletons t ppf =
         | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
         | ts -> print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
       end
-    | Param p -> print_ty_param ~non_poly p ppf
+    | Param p -> Params.print_ty_param ~non_poly p ppf
     | Tuple [] -> print "unit"
     | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence (Symbols.times ()) (ty ~max_level:1) ts)
     | Handler ((t1, drt1), (t2, drt2)) ->

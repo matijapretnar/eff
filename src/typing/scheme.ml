@@ -9,7 +9,7 @@ type change = ty_scheme -> ty_scheme
 let simple ty = ([], ty, Constraints.empty)
 
 let beautify2 ty1 ty2 cnstrs =
-  let sbst = Type.beautifying_subst () in
+  let sbst = Params.beautifying_subst () in
   let ty1 = Type.subst_ty sbst ty1 in
   let ty2 = Type.subst_ty sbst ty2 in
   let cnstrs = Constraints.subst sbst cnstrs in
@@ -17,7 +17,7 @@ let beautify2 ty1 ty2 cnstrs =
   (ty1, ty2, skeletons)
 
 let refresh (ctx, ty, cnstrs) =
-  let sbst = Type.refreshing_subst () in
+  let sbst = Params.refreshing_subst () in
   Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst sbst cnstrs
 
 let ty_param_less p q (ctx, ty, cnstrs) =
@@ -58,15 +58,15 @@ let trim_context ~loc ctx_p ty_sch =
   let ty_sch = remove_context ~loc ctx_p ty_sch in
   ty_sch
 
-let (@@@) = Trio.append
+let (@@@) = Params.append
 
 let pos_neg_ty_scheme (ctx, ty, cnstrs) =
   let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
     let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
-  let (((_, _, pos_rs) as pos), ((_, _, neg_rs) as neg)) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
-  Trio.uniq pos, Trio.uniq neg
+  let pos, neg = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
+  Params.uniq pos, Params.uniq neg
 
 let pos_neg_dirtyscheme (ctx, drty, cnstrs) =
   pos_neg_ty_scheme (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs)
@@ -176,22 +176,20 @@ and abstract2 ~loc (ctx_p1, ty_p1, cnstrs_p1) (ctx_p2, ty_p2, cnstrs_p2) (ctx_c,
   | _ -> assert false
 
 let beautify_ty_scheme ty_sch = 
-  let sbst = Type.beautifying_subst () in
+  let sbst = Params.beautifying_subst () in
   subst_ty_scheme sbst (expand_ty_scheme ty_sch)
 
 let beautify_dirty_scheme drty_sch = 
-  let sbst = Type.beautifying_subst () in
-  let _, (_, ds, _) = pos_neg_dirtyscheme drty_sch in
-  ignore (Common.map sbst.Type.dirt_param ds);
+  let sbst = Params.beautifying_subst () in
   subst_dirty_scheme sbst (expand_dirty_scheme drty_sch)
 
-let extend_non_poly (ts, ds, rs) skeletons =
-  let add_skel skel new_ts =
-    if List.exists (fun t -> List.mem t ts) skel then
-    skel @ new_ts else new_ts
+let extend_non_poly params skeletons =
+  let add_skel skel new_params =
+    if List.exists (fun t -> Params.ty_param_mem t params) skel then
+    List.fold_right Params.add_ty_param skel new_params else new_params
   in
-  let ts = List.fold_right add_skel skeletons ts in
-  (Common.uniq ts, ds, rs)
+  let new_params = List.fold_right add_skel skeletons params in
+  Params.uniq new_params
 
 (*
     check whether the dirty_scheme is pure in terms of the handler
@@ -203,19 +201,20 @@ let extend_non_poly (ts, ds, rs) skeletons =
 let is_pure_for_handler (ctx, (_, drt), cnstrs) eff_clause =
   let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
     let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty
-    and (@@@) = Trio.append in
+    and (@@@) = Params.append in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
-  let (_, pos_ds, pos_rs), (_, neg_ds, neg_rs) = List.fold_right add_ctx_pos_neg ctx (Trio.empty, Trio.empty) in
+  let pos, neg = List.fold_right add_ctx_pos_neg ctx (Params.empty, Params.empty) in
+  let params = Params.append pos neg in
   (* Check if the constraints from the operations in the dirt are pure in terms of the handler *)
   Constraints.is_pure_for_handler cnstrs drt eff_clause &&
-  (* Check if the rest occurs in the pos_ds or neg_ds *)
-  not (List.exists (fun (_, r) -> List.mem r (pos_rs @ neg_rs)) drt.Type.ops) &&
-  not (List.mem drt.Type.rest (pos_ds @ neg_ds))
+  (* Check if the rest occurs in the free parameters *)
+  not (List.exists (fun (_, r) -> Params.region_param_mem r params) drt.Type.ops) &&
+  not (Params.dirt_param_mem drt.Type.rest params)
 
 let skeletons_non_poly_scheme (ctx, _, cnstrs) =
   let skeletons = Constraints.skeletons cnstrs in
-  let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
+  let non_poly = Params.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
   skeletons, non_poly
 
@@ -240,20 +239,20 @@ let print_dirty_scheme ty_sch ppf =
     (Type.print_dirt drt)
     (Constraints.print cnstrs)
 
-let is_pure ?(loc=Location.unknown) (_, ignored_ds, ignored_rs) (ctx, (_, drt), cnstrs) =
+let is_pure ?(loc=Location.unknown) ignored_params (ctx, (_, drt), cnstrs) =
   let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
     let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances (Constraints.expand_ty ctx_ty)
-    and (@@@) = Trio.append in
+    and (@@@) = Params.append in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
-  let (_, pos_ds, pos_rs), (_, neg_ds, neg_rs) = List.fold_right add_ctx_pos_neg ctx (Trio.empty, Trio.empty) in
-  let wrong_ds = List.filter (fun d -> not (List.mem d ignored_ds)) (pos_ds @ neg_ds)
-  and wrong_rs = List.filter (fun r -> not (List.mem r ignored_rs)) (pos_rs @ neg_rs) in
+  let pos, neg = List.fold_right add_ctx_pos_neg ctx (Params.empty, Params.empty) in
+  let params = Params.append pos neg in
+  let params = Params.diff params ignored_params in
   match Constraints.must_be_empty cnstrs (Constraints.expand_dirt drt) with
   | None -> false
   | Some (ds, rs) ->
-      let ds_t = List.for_all (fun d -> not (List.mem d wrong_ds)) ds
-      and rs_t = List.for_all (fun r -> not (List.mem r wrong_rs)) rs
+      let ds_t = List.for_all (fun d -> not (Params.dirt_param_mem d params)) ds
+      and rs_t = List.for_all (fun r -> not (Params.region_param_mem r params)) rs
       in
       (* Print.debug "%b /// %b" ds_t rs_t; *)
       ds_t && rs_t

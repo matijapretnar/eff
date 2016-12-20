@@ -2,19 +2,17 @@
 
 type state = {
   debug: bool;
-  ignored: (Type.ty_param, Type.dirt_param, Type.region_param) Trio.t;
+  ignored: Params.t;
 }
 
 let initial = {
   debug = true;
-  ignored = Trio.empty;
+  ignored = Params.empty;
 }
 
 
 (** TYPES *)
 
-let print_type_param (Type.Ty_Param n) ppf =
-   Format.fprintf ppf "'t%d" n
 
 let rec print_type ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -24,7 +22,7 @@ let rec print_type ?max_level ty ppf =
   | Type.Apply (ty_name, args) ->
       print ~at_level:1 "%t %s" (print_args args) ty_name
   | Type.Param p ->
-      print "%t" (print_type_param p)
+      print "%t" (Params.print_type_param p)
   | Type.Basic t ->
       print "%s" t
   | Type.Tuple tys ->
@@ -45,10 +43,10 @@ and print_args (tys, _, _) ppf =
 
 (** TYPE DEFINITIONS *)
 
-let rec print_params (tys, _, _) ppf =
-  match tys with
+let rec print_params params ppf =
+  match Params.project_ty_params params with
   | [] -> ()
-  | _ -> Format.fprintf ppf "(%t)" (Print.sequence "," print_type_param tys)
+  | tys -> Format.fprintf ppf "(%t)" (Print.sequence "," Params.print_type_param tys)
 
 let print_tydef_body ty_def ppf =
   match ty_def with
@@ -75,11 +73,10 @@ let print_tydefs tydefs ppf =
 
 let print_variable = Typed.Variable.print
 
-let format_region (Type.Region_Param i) = i
 
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
 
-let print_effect_region (eff, (region)) ppf = Print.print ppf "Effect_%s -> %d" eff (format_region region)
+let print_effect_region (eff, (region)) ppf = Print.print ppf "Effect_%s -> %t" eff (Params.print_region_param region)
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -106,7 +103,7 @@ let rec print_pattern ?max_level p ppf =
       print "_"
 
 let compute_ignored st (ctx, _, cstrs) =
-  let (_, ds, rs) = st.ignored in
+  (* let (_, ds, rs) = st.ignored in *)
   (* Print.debug "ignored dirt param: %t" (Print.sequence "," Type.print_dirt_param ds); *)
   (* Print.debug "ignored region param: %t" (Print.sequence "," Type.print_region_param rs); *)
   st.ignored
@@ -164,7 +161,7 @@ and print_computation ?max_level ~pure st c ppf =
 (*   let ignored = 
     if pure then
       let params = Scheme.present_in_abstraction a.Typed.scheme in
-      Trio.append params st.ignored
+      Params.append params st.ignored
     else
       st.ignored
   in
@@ -297,14 +294,13 @@ let print_computation_effects ?max_level c ppf =
     let get_dirt (_,(_,dirt),_) = dirt in
     let get_type (_,(ty,dirt),_) = ty in
     let rest = (get_dirt(c.Typed.scheme)).Type.rest in
-    let rest_int (Type.Dirt_Param i) = i in
     (* Here we have access to the effects *)
     (
     Format.fprintf ppf "Effects of a computation: \n";
     let f elem =
         Format.fprintf ppf "\t%t\n" (print_effect_region elem) in
         List.iter f (get_dirt(c.Typed.scheme)).Type.ops;
-    Format.fprintf ppf "\nRest: %d\n" (rest_int rest);
+    Format.fprintf ppf "\nRest: %t\n" (Params.print_dirt_param rest);
     Format.fprintf ppf "Type: %t\n" (print_type (get_type(c.Typed.scheme)));
     )
 

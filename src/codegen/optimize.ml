@@ -245,7 +245,7 @@ and reduce_comp st c =
     in
     find_const_case cases
 
-  | Bind (c1, c2) when Scheme.is_pure Trio.empty c1.scheme ->
+  | Bind (c1, c2) when Scheme.is_pure Params.empty c1.scheme ->
     beta_reduce st c2 (reduce_expr st (pure c1))
 
   | Bind ({term = Bind (c1, {term = (p1, c2)})}, c3) ->
@@ -294,7 +294,7 @@ and reduce_comp st c =
     (* Print.debug "Remove handler of outer Bind, since no effects in common with computation"; *)
     reduce_comp st (bind (reduce_comp st c1) (abstraction p1 (reduce_comp st (handle (refresh_expr handler) c2))))
 
-  | Handle ({term = Handler h}, c) when Scheme.is_pure Trio.empty c.scheme ->
+  | Handle ({term = Handler h}, c) when Scheme.is_pure Params.empty c.scheme ->
     beta_reduce st h.value_clause (reduce_expr st (pure c))
 
   | Handle ({term = Handler h}, {term = Bind (c1, {term = (p1, c2)})})
@@ -492,7 +492,7 @@ let optimize_command st = function
   | Typed.TopLet (defs, vars) ->
     let defs' = Common.assoc_map (optimize_comp st) defs in
     let defs' = Common.assoc_map (fun c ->
-      if Scheme.is_pure Trio.empty c.scheme then value (reduce_expr st (pure c)) else c
+      if Scheme.is_pure Params.empty c.scheme then value (reduce_expr st (pure c)) else c
     ) defs' in
     let st' = begin match defs' with
       (* If we define a single simple handler, we inline it *)
