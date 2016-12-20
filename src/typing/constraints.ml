@@ -336,3 +336,10 @@ let print constraints ppf =
   RegionPoset.print constraints.region_poset ppf;
   if not (RegionPoset.is_empty constraints.region_poset) then Format.pp_print_string ppf "; ";
   Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Params.print_region_param x) (Symbols.top ())) (FullRegions.elements constraints.full_regions) ppf
+
+let pure_ty_param t {ty_poset} =
+  TyPoset.get_prec t ty_poset = []
+let pure_dirt_param d {dirt_poset} =
+  DirtPoset.get_prec d dirt_poset = []
+let pure_region_param r {region_poset; full_regions} =
+  RegionPoset.get_prec r region_poset = [] && not (FullRegions.mem r full_regions)
