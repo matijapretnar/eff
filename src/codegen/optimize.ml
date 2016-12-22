@@ -458,7 +458,8 @@ and reduce_comp st c =
                        | Some abs ->
                                     let (let_rec_p,let_rec_c) = abs.term in
                                     let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
-                                    let (f_ctx,Type.Arrow(f_ty_in, f_ty_out ),f_const) = ae1.scheme in 
+                                    let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
+                                    let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
                                     let constraints = Constraints.list_union [h_const; f_const]
                                           |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
                                     let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
@@ -468,6 +469,7 @@ and reduce_comp st c =
                                     let Var newfvar = new_f_var.term in
                                     let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
                                     let st = {st with handlers_functions_mem = (e1,v,new_f_var) :: st.handlers_functions_mem} in
+                                    Print.debug " the ae2 is %t" (Typed.print_expression ae2);
                                     let res =
                                       let_rec' defs @@
                                       apply new_f_var ae2
