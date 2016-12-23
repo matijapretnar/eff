@@ -19,6 +19,7 @@ val dirty_less : loc:Location.t -> Type.dirty -> Type.dirty -> change
 val trim_context : loc:Location.t -> context -> change
 val remove_context : loc:Location.t -> context -> change
 val less_context : loc:Location.t -> context -> change
+val collect_constraints : change list -> Constraints.t
 val finalize_ty_scheme : loc:Location.t -> context -> Type.ty -> change list -> ty_scheme
 val finalize_dirty_scheme : loc:Location.t -> context -> Type.dirty -> change list -> dirty_scheme
 val clean_ty_scheme : loc:Location.t -> ty_scheme -> ty_scheme

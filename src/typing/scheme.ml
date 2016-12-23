@@ -122,6 +122,10 @@ let expand_dirty_scheme (ctx, (ty, drt), constraints) = (
 let create_ty_scheme ctx ty changes =
   List.fold_right Common.id changes (ctx, ty, Constraints.empty)
 
+let collect_constraints changes =
+  let _, _, constraints = create_ty_scheme [] Type.unit_ty changes in
+  constraints
+
 let clean_ty_scheme ~loc ty_sch =
   let ty_sch = normalize_context ~loc ty_sch in
   let ty_sch = expand_ty_scheme ty_sch in

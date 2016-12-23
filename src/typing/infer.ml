@@ -230,9 +230,10 @@ and type_let_rec_defs ~loc env defs =
   Print.debug "FROM: %t" (Print.sequence "," (fun (x, ty) ppf -> Print.print ppf "%t: %t" (Typed.print_variable x) (Type.print_ty (Constraints.expand_ty ty))) ctx);
   let chngs = Scheme.trim_context ~loc poly_tys :: chngs in
   let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  let constraints = Scheme.collect_constraints chngs in
   let [(_, sch)] = poly_tyschs in
   Print.debug "%t" (Scheme.print_ty_scheme sch);
-  defs, poly_tyschs
+  Common.assoc_map (Typed.remove_rec_abs (poly_tys, constraints)) defs, poly_tyschs
 
 (* [infer_comp env c] infers the dirty type scheme of a computation [c] in a
    typing environment [env] of generalised variables.
