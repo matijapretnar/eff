@@ -36,6 +36,7 @@ let () =
   if run_queens_one then begin
   Printf.printf "FIRST SOLUTION OF n-QUEENS (%d queens):\n" number_of_queens_one;
   Command.run (Bench.make_command [
+      Bench.Test.create ~name:"Handlers - hand-tweaked 02e9f8c" (fun () -> Queens02e9f8c.effy_queens_one_83 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - 7cc7606" (fun () -> Queens7cc7606._queens_one_350 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - ce4263d" (fun () -> Queensce4263d._queens_one_348 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - hand-written" (fun () -> QueensHandlers.queens_one number_of_queens_one);
@@ -47,6 +48,7 @@ let () =
   if run_queens_all then begin
   Printf.printf "ALL SOLUTIONS OF n-QUEENS (%d queens):\n" number_of_queens_all;
   Command.run (Bench.make_command [
+      Bench.Test.create ~name:"Handlers - hand-tweaked 02e9f8c" (fun () -> QueensNew.effy_queens_all_90 number_of_queens_all);
       Bench.Test.create ~name:"Handlers - 7cc7606" (fun () -> Queens7cc7606._queens_all_352 number_of_queens_all);
       Bench.Test.create ~name:"Handlers - hand-written" (fun () -> QueensHandlers.queens_all number_of_queens_all);
       Bench.Test.create ~name:"Native - lists" (fun () -> QueensNative.queens_all number_of_queens_all);

@@ -36,5 +36,6 @@ We compare:
 
 The compared commits:
 
+* `02e9f8c`: 2016-12-23 (first time we use generated recursive functions)
 * `ce4263d`: 2016-10-10 (when we started with systematic benchmarks)
 * `7cc7606`: 2016-03-18 (from Dagstuhl the first generated code that uses the new library)
