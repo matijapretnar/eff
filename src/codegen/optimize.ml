@@ -33,7 +33,7 @@ let find_in_let_rec_mem st v = Common.lookup v st.letrec_memory
 
 let find_in_handlers_func_mem st f_name h_exp =
   let findres = List.filter
-                  (fun (h,old_f,new_f) -> (f_name == old_f) && alphaeq_expr [] h h_exp) st.handlers_functions_mem in
+                  (fun (h,old_f,new_f) -> (f_name == old_f) (*&& alphaeq_expr [] h h_exp*)) st.handlers_functions_mem in
   begin match findres with
   | [] -> None
   | [(_,_,newf)] -> Some newf
@@ -469,7 +469,7 @@ and reduce_comp st c =
                                     let Var newfvar = new_f_var.term in
                                     let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
                                     let st = {st with handlers_functions_mem = (e1,v,new_f_var) :: st.handlers_functions_mem} in
-                                    Print.debug " the ae2 is %t" (Typed.print_expression ae2);
+                                    Print.debug " the ccc is %t" (Typed.print_computation c);
                                     let res =
                                       let_rec' defs @@
                                       apply new_f_var ae2
@@ -559,10 +559,11 @@ and reduce_comp st c =
   | _ -> c
 
   in 
+  (*
   if c <> c' then
    Print.debug ~loc:c.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
     (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme)
-    (Typed.print_computation c') (Scheme.print_dirty_scheme c'.Typed.scheme);
+    (Typed.print_computation c') (Scheme.print_dirty_scheme c'.Typed.scheme);*)
   c'
 
 
