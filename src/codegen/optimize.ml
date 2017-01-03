@@ -362,7 +362,7 @@ and reduce_comp st c =
   | Handle ({term = Handler h}, {term = Bind (c1, {term = (p1, c2)})})
         when (Scheme.is_pure_for_handler c2.Typed.scheme h.effect_clauses) ->
     Print.debug "Move inner bind into the value case";
-    let new_value_clause = abstraction p1 (bind (reduce_comp st c2) (refresh_abs h.value_clause)) in
+    let new_value_clause = optimize_abs st (abstraction p1 (bind (reduce_comp st c2) (refresh_abs h.value_clause))) in
     let hdlr = handler {
       effect_clauses = h.effect_clauses;
       value_clause = refresh_abs new_value_clause;
@@ -372,7 +372,7 @@ and reduce_comp st c =
 
   | Handle ({term = Handler h} as h2, {term = Bind (c1, {term = (p, c2)})}) ->
     Print.debug "Move (dirty) inner bind into the value case";
-    let new_value_clause = abstraction p (handle (refresh_expr h2) (refresh_comp (reduce_comp st c2) )) in
+    let new_value_clause = optimize_abs st (abstraction p (handle (refresh_expr h2) (refresh_comp (reduce_comp st c2) ))) in
     let hdlr = handler {
       effect_clauses = h.effect_clauses;
       value_clause = refresh_abs new_value_clause;
