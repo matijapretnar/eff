@@ -1,23 +1,21 @@
 type (_,_) effect +=
-  | Effect_Decide: (unit,bool) effect 
-let _choose_sum_279 =
+  | Effect_Decide: (unit,bool) effect
+let _choose_sum_257 =
   {
-    value_clause = (fun _x_285  -> value _x_285);
-    finally_clause = (fun _gen_id_par_284  -> value _gen_id_par_284);
+    value_clause = (fun _x_263  -> value _x_263);
+    finally_clause = (fun _gen_id_par_262  -> value _gen_id_par_262);
     effect_clauses = fun (type a) -> fun (type b) ->
       fun (x : (a,b) effect)  ->
         (match x with
          | Effect_Decide  ->
              (fun (() : unit)  ->
-                fun (_k_280 : bool -> _ computation)  ->
-                  (_k_280 true) >>
-                    (fun _gen_bind_282  ->
-                       let _gen_bind_281 _x2_23 =
-                         (binary_builtin Pervasives.(+))
-                           (_gen_bind_282, _x2_23)
-                          in
-                       (_k_280 false) >>
-                         (fun _gen_bind_283  -> _gen_bind_281 _gen_bind_283)))
+                fun (_k_258 : bool -> _ computation)  ->
+                  (_k_258 true) >>
+                    (fun _gen_bind_260  ->
+                       let _gen_bind_259 _x2_23 =
+                         value (Pervasives.(+) _gen_bind_260 _x2_23) in
+                       (_k_258 false) >>
+                         (fun _gen_bind_261  -> _gen_bind_259 _gen_bind_261)))
          | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                    (b ->
                                                                     _

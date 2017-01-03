@@ -1,7 +1,7 @@
-;;(binary_builtin Pervasives.(+))
-    ((run
-        (match [4; 5; 6] with
-         | [] -> value 1
-         | _x_282::[] -> value _x_282
-         | _::_y_283::[] -> value _y_283
-         | _x_284::_ -> value _x_284)), 10)
+let _ =
+  (match [4; 5; 6] with
+   | [] -> value 1
+   | _x_260::[] -> value _x_260
+   | _::_y_261::[] -> value _y_261
+   | _x_262::_ -> value _x_262) >>
+    (fun _x_258  -> value (Pervasives.(+) _x_258 10))

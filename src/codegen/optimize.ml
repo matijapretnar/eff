@@ -33,7 +33,7 @@ let find_in_let_rec_mem st v = Common.lookup v st.letrec_memory
 
 let find_in_handlers_func_mem st f_name h_exp =
   let findres = List.filter
-                  (fun (h,old_f,new_f) -> (f_name == old_f) && alphaeq_expr [] h h_exp) st.handlers_functions_mem in
+                  (fun (h,old_f,new_f) -> (f_name == old_f) (*&& alphaeq_expr [] h h_exp*)) st.handlers_functions_mem in
   begin match findres with
   | [] -> None
   | [(_,_,newf)] -> Some newf
@@ -358,7 +358,7 @@ and reduce_comp st c =
     in
     res
 
-(*   | Handle (e1, {term = Apply (ae1, ae2)}) ->
+  | Handle (e1, {term = Apply (ae1, ae2)}) ->
     begin match ae1.term with
       | Var v ->
         begin match find_in_stack st v with
@@ -390,7 +390,8 @@ and reduce_comp st c =
                        | Some abs ->
                                     let (let_rec_p,let_rec_c) = abs.term in
                                     let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
-                                    let (f_ctx,Type.Arrow(f_ty_in, f_ty_out ),f_const) = ae1.scheme in 
+                                    let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
+                                    let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
                                     let constraints = Constraints.list_union [h_const; f_const]
                                           |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
                                     let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
@@ -400,16 +401,20 @@ and reduce_comp st c =
                                     let Var newfvar = new_f_var.term in
                                     let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
                                     let st = {st with handlers_functions_mem = (e1,v,new_f_var) :: st.handlers_functions_mem} in
+                                    Print.debug " the ccc is %t" (Typed.print_computation c);
                                     let res =
                                       let_rec' defs @@
                                       apply new_f_var ae2
                                     in
                                     optimize_comp st res
-                       | None -> c
+                       | None -> 
+                        Print.debug "Its a none";
+                                    Print.debug "The handle exp : %t" (Typed.print_expression ae1);c
                        end
                end
         end
-      | PureApply ({term = Var fname}, pae2)->
+  (* XXX What to do with this optimization? *)
+(*       | PureApply ({term = Var fname}, pae2)->
         begin match find_in_stack st fname with
           | Some {term = PureLambda {term = (dp1, {term = Lambda ({term = (dp2,dc)})})}} ->
             let f_var, f_pat = make_var "newvar" ae1.scheme in
@@ -428,12 +433,20 @@ and reduce_comp st c =
             in
             optimize_comp st res
           | _ -> c
-        end
+        end *)
       | _ -> c
-    end *)
+    end
 
+| Handle (e1, {term = Match (e2, cases)}) ->
+    let push_handler = fun {term = (p, c)} ->
+      abstraction p (reduce_comp st (handle (refresh_expr e1) c))
+    in
+    let res =
+      match' e2 (List.map push_handler cases)
+    in
+    res
 
-
+  (* XXX What to do with this optimization? *)
     (*
       let f = \p. val lambda in c
        ~~> (append f := f1 to impure_wrappers)
@@ -479,10 +492,11 @@ and reduce_comp st c =
   | _ -> c
 
   in 
-(*   if c <> c' then
-  Print.debug ~loc:c.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
+  (*
+  if c <> c' then
+   Print.debug ~loc:c.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
     (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme)
-    (Typed.print_computation c') (Scheme.print_dirty_scheme c'.Typed.scheme); *)
+    (Typed.print_computation c') (Scheme.print_dirty_scheme c'.Typed.scheme);*)
   c'
 
 
@@ -505,7 +519,13 @@ let optimize_command st = function
     in
     st', Typed.TopLet (defs', vars)
   | Typed.TopLetRec (defs, vars) ->
-    st, Typed.TopLetRec (Common.assoc_map (optimize_abs st) defs, vars)
+    let defs' = Common.assoc_map (optimize_abs st) defs in
+    let st' = 
+    List.fold_right (fun (var,abs) st ->
+            Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs);
+            {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
+    st', Typed.TopLetRec (defs', vars)
+
   | Typed.External (x, _, f) as cmd ->
     let st' =
       begin match Common.lookup f inlinable_definitions with

@@ -124,11 +124,11 @@ let rec print_type ?max_level ty ppf =
   | Type.Param p ->
       print "%t" (Params.print_type_param p)
   | Type.Basic t ->
-      print "%s" t
+      print "(%s)" t
   | Type.Tuple tys ->
-      print ~at_level:1 "%t" (Print.sequence "*" print_type tys)
+      print ~at_level:1 "(%t)" (Print.sequence "*" print_type tys)
   | Type.Arrow (ty, drty) ->
-      print ~at_level:2 "%t -> %t" (print_type ~max_level:1 ty) (print_dirty_type drty)
+      print ~at_level:2 "(%t -> %t)" (print_type ~max_level:1 ty) (print_dirty_type drty)
   | Type.Handler ((ty1, _), (ty2, _)) ->
       print ~at_level:2 "(%t, ???, %t) handler" (print_type ty1) (print_type ty2)
 
@@ -235,7 +235,7 @@ let rec print_expression ?max_level st e ppf =
   | Typed.Variant (lbl, None) ->
       print "%s" lbl
   | Typed.Variant (lbl, Some e) ->
-      print ~at_level:1 "%s %t" lbl (print_expression st e)
+      print ~at_level:1 "(%s %t)" lbl (print_expression st e)
   | Typed.Lambda a ->
       let pure = is_pure_function st e in
       print ~at_level:2 "fun %t" (print_abstraction ~pure st a)
