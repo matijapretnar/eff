@@ -38,6 +38,7 @@ let () =
   if run_queens_one then begin
   Printf.printf "FIRST SOLUTION OF n-QUEENS (%d queens):\n" number_of_queens_one;
   Command.run (Bench.make_command [
+      Bench.Test.create ~name:"Handlers - not optimized" (fun () -> Queensunopt._queens_one_326 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - 7cc7606 (18-03-2016)" (fun () -> Queens7cc7606._queens_one_350 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - ce4263d (10-10-2016)" (fun () -> Queensce4263d._queens_one_348 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - 4bf5385 (01-12-2016)" (fun () -> Queens4bf5385._queens_one_322 number_of_queens_one);
@@ -52,6 +53,7 @@ let () =
   if run_queens_all then begin
   Printf.printf "ALL SOLUTIONS OF n-QUEENS (%d queens):\n" number_of_queens_all;
   Command.run (Bench.make_command [
+      Bench.Test.create ~name:"Handlers - not optimized" (fun () -> Queensunopt._queens_all_328 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - 7cc7606 (18-03-2016)" (fun () -> Queens7cc7606._queens_all_352 number_of_queens_all);
       Bench.Test.create ~name:"Handlers - 29c8f51e (22-12-2016)" (fun () -> Queens29c8f51e._queens_all_324 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - faebf456 (02-01-2017)" (fun () -> Queensfaebf456._queens_all_321 number_of_queens_one);
@@ -63,6 +65,7 @@ let () =
   if run_interp then begin
   Printf.printf "INTERPRETER BENCHMARK:\n";
   Command.run (Bench.make_command [
+      Bench.Test.create ~name:"Handlers - not optimized" (fun () -> Interpunopt._bigTest_424 ());
       Bench.Test.create ~name:"Handlers - 4f3a6da1 (04-01-2017)" (fun () -> Interp4f3a6da1._bigTest_424 ());
     ]);
   Printf.printf "\n\n"
@@ -70,6 +73,7 @@ let () =
   if run_parser_short then begin
   Printf.printf "PARSER BENCHMARK:\n";
   Command.run (Bench.make_command [
+      Bench.Test.create ~name:"Handlers - not optimized" (fun () -> Parserunopt._parseTest_348 ());
       Bench.Test.create ~name:"Handlers - faebf456 (03-01-2017)" (fun () -> Parserfaebf456._parseTest_348 ());
       Bench.Test.create ~name:"Handlers - 4f3a6da1 (04-01-2017)" (fun () -> Parser4f3a6da1._parseTest_348 ());
     ]);
