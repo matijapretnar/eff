@@ -3,11 +3,6 @@
 ******* The Building Blocks ********
 ***********************************)
 
-(*
-LambdaN + LambdaL + CallCC + Write + Merge + Err
-Combine term and termF
-*)
-
 (********************************
 * Types
 ********************************)
@@ -301,7 +296,7 @@ let rec createCase n =
     | _ -> App( lambdaCase, (createCase (n-1)))
     end;;
 
-let finalCase = createCase 3000;;
+let finalCase = createCase 200;;
 
 let bigTest () =
     (with storeHandler handle (
