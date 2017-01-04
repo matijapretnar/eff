@@ -1,0 +1,138 @@
+(***********************************
+*********** The Parser *************
+***********************************)
+
+(********************************
+* Effects
+********************************)
+
+effect Symbol : string -> unit -> string;;
+effect Fail : unit -> empty;;
+effect Decide : unit -> bool
+
+(********************************
+* Handlers
+********************************)
+
+let parse = handler
+    | val y -> (fun s ->
+        begin match s with
+        | [] -> y
+        | _ -> absurd (#Fail ())
+        end
+    )
+    | #Symbol c k ->
+        fun s ->
+        (begin match s with
+            | [] -> k (fun () -> (absurd (#Fail ()))) []
+            | (x :: xs) -> if (c = x) then k (fun () -> x) xs else k (fun () -> (absurd (#Fail ()))) s
+        end
+        )
+;;
+
+let allsols = handler
+  | val x -> [x]
+  | #Decide _ k -> k true @ k false
+  | #Fail _ _ -> []
+;;
+
+let backtrack = handler
+    | #Decide _ k ->
+        handle k true with
+            | #Fail _ _ -> k false
+;;
+(********************************
+* Parser :: string list to int
+********************************)
+
+let createNumber (prev, num) = prev * 10 + num;;
+
+let rec parseNum (l, v) =
+    begin match l with
+    | [] -> v
+    | (x :: xs) ->
+        begin match x with
+        | "0" -> parseNum (xs, (createNumber (v, 0)))
+        | "1" -> parseNum (xs, (createNumber (v, 1)))
+        | "2" -> parseNum (xs, (createNumber (v, 2)))
+        | "3" -> parseNum (xs, (createNumber (v, 3)))
+        | "4" -> parseNum (xs, (createNumber (v, 4)))
+        | "5" -> parseNum (xs, (createNumber (v, 5)))
+        | "6" -> parseNum (xs, (createNumber (v, 6)))
+        | "7" -> parseNum (xs, (createNumber (v, 7)))
+        | "8" -> parseNum (xs, (createNumber (v, 8)))
+        | "9" -> parseNum (xs, (createNumber (v, 9)))
+        end
+    end
+;;
+
+let rec toNum l = parseNum (l, 0);;
+
+(********************************
+* Parser :: main
+********************************)
+
+let digit () =
+    with backtrack handle (
+        let nums = ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"] in
+        let rec checkNums n =
+            begin match n with
+            | [] -> (absurd (#Fail ()))
+            | (x :: xs) ->
+                if (#Decide ()) then (#Symbol x ()) else (checkNums xs)
+            end in
+        checkNums nums
+    )
+;;
+
+let rec many m = if (#Decide ()) then (m ()) else ([]);;
+
+let rec many1 () =
+    let x = digit () in
+    let xs = many many1 in
+    [x] @ xs
+;;
+
+let rec expr () =
+    let rec term () =
+        let rec factor () =
+            if (#Decide ()) then (
+                let i = many1 () in
+                (toNum i)
+            ) else (
+                let p = #Symbol "(" () in
+                let j = expr () in
+                let p = #Symbol ")" () in
+                j
+            )
+        in
+        if (#Decide ()) then (
+            let i = factor () in
+            let p = #Symbol "*" () in
+            let j = term () in
+            i * j
+        ) else (
+            factor ()
+        )
+    in
+    if (#Decide ()) then (
+        let i = term () in
+        let p = #Symbol "+" () in
+        let j = expr () in
+        i + j
+    ) else (
+        term ()
+    )
+;;
+
+(********************************
+* Example
+********************************)
+
+let parseTest () =
+    with allsols handle (
+        (with parse handle (
+            expr ()
+        )) ["4"; "3"; "*"; "("; "3"; "+"; "3"; ")"]
+    )
+;;

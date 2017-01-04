@@ -9,6 +9,8 @@ let run_loop = true
 and run_loop_acc = true
 and run_queens_one = true
 and run_queens_all = true
+and run_interp = true
+and run_parser_short = true
 
 let () =
   if run_loop then begin
@@ -40,6 +42,7 @@ let () =
       Bench.Test.create ~name:"Handlers - ce4263d (10-10-2016)" (fun () -> Queensce4263d._queens_one_348 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - 4bf5385 (01-12-2016)" (fun () -> Queens4bf5385._queens_one_322 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - 29c8f51e (22-12-2016)" (fun () -> Queens29c8f51e._queens_one_322 number_of_queens_one);
+      Bench.Test.create ~name:"Handlers - faebf456 (02-01-2017)" (fun () -> Queensfaebf456._queens_one_319 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - hand-written" (fun () -> QueensHandlers.queens_one number_of_queens_one);
       Bench.Test.create ~name:"Native - option" (fun () -> QueensNative.queens_one_option number_of_queens_one);
       Bench.Test.create ~name:"Native - fail" (fun () -> QueensNative.queens_one_fail number_of_queens_one);
@@ -51,8 +54,24 @@ let () =
   Command.run (Bench.make_command [
       Bench.Test.create ~name:"Handlers - 7cc7606 (18-03-2016)" (fun () -> Queens7cc7606._queens_all_352 number_of_queens_all);
       Bench.Test.create ~name:"Handlers - 29c8f51e (22-12-2016)" (fun () -> Queens29c8f51e._queens_all_324 number_of_queens_one);
+      Bench.Test.create ~name:"Handlers - faebf456 (02-01-2017)" (fun () -> Queensfaebf456._queens_all_321 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - hand-written" (fun () -> QueensHandlers.queens_all number_of_queens_all);
       Bench.Test.create ~name:"Native - lists" (fun () -> QueensNative.queens_all number_of_queens_all);
+    ]);
+  Printf.printf "\n\n"
+  end;
+  if run_interp then begin
+  Printf.printf "INTERPRETER BENCHMARK:\n";
+  Command.run (Bench.make_command [
+      Bench.Test.create ~name:"Handlers - 4f3a6da1 (04-01-2017)" (fun () -> Interp4f3a6da1._bigTest_424 ());
+    ]);
+  Printf.printf "\n\n"
+  end;
+  if run_parser_short then begin
+  Printf.printf "PARSER BENCHMARK:\n";
+  Command.run (Bench.make_command [
+      Bench.Test.create ~name:"Handlers - faebf456 (03-01-2017)" (fun () -> Parserfaebf456._parseTest_348 ());
+      Bench.Test.create ~name:"Handlers - 4f3a6da1 (04-01-2017)" (fun () -> Parser4f3a6da1._parseTest_348 ());
     ]);
   Printf.printf "\n\n"
   end
