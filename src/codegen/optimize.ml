@@ -33,10 +33,15 @@ let find_in_let_rec_mem st v = Common.lookup v st.letrec_memory
 
 let find_in_handlers_func_mem st f_name h_exp =
   let findres = List.filter
-                  (fun (h,old_f,new_f) -> (f_name == old_f) (*&& alphaeq_expr [] h h_exp*)) st.handlers_functions_mem in
+                  (fun (h,old_f,new_f) -> (f_name == old_f) && alphaeq_expr [] h h_exp) st.handlers_functions_mem in
   begin match findres with
-  | [] -> None
-  | [(_,_,newf)] -> Some newf
+  | [] -> let findres2 = List.filter
+                  (fun (h,old_f,new_f) -> (f_name == old_f) ) st.handlers_functions_mem in
+                  begin match findres2 with 
+                  | [] -> (false,None)
+                  | _ -> (true,None)
+                end
+  | [(_,_,newf)] -> (true,Some newf)
   end
 
 let a22a a2 = Typed.a22a a2
@@ -429,31 +434,35 @@ and reduce_comp st c =
   | Handle (e1, {term = Apply (ae1, ae2)}) ->
     begin match ae1.term with
       | Var v ->
-        begin match find_in_stack st v with
-          | Some ({term = Lambda k}) ->
-            let {term = (newdp, newdc)} = refresh_abs k in
-            let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
-            let (f_ctx,Type.Arrow(f_ty_in, f_ty_out ),f_const) = ae1.scheme in 
-            let constraints = Constraints.list_union [h_const; f_const]
-                              |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
-            let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
-            let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
-            let f_var, f_pat = make_var "newvar"  function_scheme in
-            let f_def =
-              lambda @@
-              abstraction newdp @@
-              handle e1 newdc in
-            let res =
-              let_in f_def @@
-              abstraction f_pat @@
-              apply f_var ae2
-            in
-            optimize_comp st res
-          | _ -> begin match (find_in_handlers_func_mem st v e1) with
-                 | Some new_f_exp ->
-                                    let res = apply new_f_exp ae2
-                                    in reduce_comp st res
-                 | _ ->
+            begin match (find_in_handlers_func_mem st v e1) with
+             | (true,Some new_f_exp) ->
+                                let res = apply new_f_exp ae2
+                                in reduce_comp st res
+             | (true, None) ->
+                  c
+             |_ -> 
+               begin match find_in_stack st v with
+               | Some ({term = Lambda k}) ->
+                  let {term = (newdp, newdc)} = refresh_abs k in
+                  let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
+                  let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
+                  let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
+                  let constraints = Constraints.list_union [h_const; f_const]
+                                    |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
+                  let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
+                  let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
+                  let f_var, f_pat = make_var "newvar"  function_scheme in
+                  let f_def =
+                    lambda @@
+                    abstraction newdp @@
+                    handle e1 newdc in
+                  let res =
+                    let_in f_def @@
+                    abstraction f_pat @@
+                    apply f_var ae2
+                  in
+                  optimize_comp st res
+                | _ -> 
                        begin match (find_in_let_rec_mem st v) with
                        | Some abs ->
                                     let (let_rec_p,let_rec_c) = abs.term in
