@@ -175,11 +175,11 @@ let skeletons constraints =
 
 let non_empty_dirts constraints =
   [] |>
-  DirtPoset.fold (fun _ d non_empty -> d :: non_empty) constraints.dirt_poset
+  DirtPoset.fold (fun d1 d2 non_empty -> d1 :: d2 :: non_empty) constraints.dirt_poset
 
 let non_empty_regions constraints =
   FullRegions.elements constraints.full_regions |>
-  RegionPoset.fold (fun _ r non_empty -> r :: non_empty) constraints.region_poset
+  RegionPoset.fold (fun r1 r2 non_empty -> r1 :: r2 :: non_empty) constraints.region_poset
 
 let rec add_ty_constraint ~loc ty1 ty2 constraints =
   (* XXX Check cyclic types *)
