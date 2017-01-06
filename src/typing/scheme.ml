@@ -265,3 +265,9 @@ let is_pure_function_type ?loc ignored (ctx, ty, cnstrs) =
   match Constraints.expand_ty ty with
   | Type.Arrow (_, drty) -> is_pure ?loc ignored (ctx, drty, cnstrs)
   | _ -> false
+
+let polymorphic_dirt (ctx, ty, cnstrs) =
+  true
+
+let pos_dirt_params tysch =
+  Params.project_dirt_params (fst (pos_neg_ty_scheme tysch))

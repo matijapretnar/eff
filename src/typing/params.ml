@@ -90,3 +90,4 @@ let print_type_param t ppf =
   Format.fprintf ppf "'t%d" t
 
 let project_ty_params (ts, _, _) = ts
+let project_dirt_params (_, ds, _) = ds

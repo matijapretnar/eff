@@ -48,3 +48,4 @@ val print_region_param : ?non_poly:t -> region_param -> Format.formatter -> unit
 val print_type_param : ty_param -> Format.formatter -> unit
 
 val project_ty_params : t -> ty_param list
+val project_dirt_params : t -> dirt_param list
