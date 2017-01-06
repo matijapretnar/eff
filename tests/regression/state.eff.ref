@@ -1,10 +1,10 @@
-val _state_257 : τ₁ ⟶  (τ₂ ! {Get:ρ₁, Set:ρ₂} ⟹ 
+val _state_257 : τ₁ ⟶  (τ₂ ! {Get:ρ₁, Set:ρ₂|δ₂} ⟹ 
                  (int -{Get:ρ₃, Set:ρ₄|δ₃}→ τ₃) ! {Get:ρ₅, 
                  Set:ρ₆|δ₄}) | τ₂ < τ₃; δ₂ < δ₄,
 δ₂ < δ₃;  = <fun>
-val _better_state_267 : int ⟶  (τ₁ ! {Get:ρ₁, Set:ρ₂} ⟹ 
+val _better_state_267 : int ⟶  (τ₁ ! {Get:ρ₁, Set:ρ₂|δ₂} ⟹ 
                         τ₂ ! {Get:ρ₃, Set:ρ₄|δ₃}) | τ₁ < τ₂; δ₂ < δ₃;  = <fun>
-val _transaction_277 : τ₁ ! {Get:ρ₁, Set:ρ₂} ⟹ 
+val _transaction_277 : τ₁ ! {Get:ρ₁, Set:ρ₂|δ₁} ⟹ 
 τ₂ ! {Get:ρ₃, 
 Set:ρ₄|δ₂} | τ₁ < τ₂; δ₁ < δ₂; ρ₃ = ⊤,
 ρ₄ = ⊤ = <handler>

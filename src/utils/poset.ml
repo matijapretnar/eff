@@ -66,33 +66,33 @@ struct
       let poset = if EltMap.mem x poset then poset else EltMap.add x empty_related poset in
       let poset = if EltMap.mem y poset then poset else EltMap.add y empty_related poset in
       EltMap.mapi (fun z related_to_z ->
-        if EltSet.mem z new_smaller then
-          {related_to_z with greater = EltSet.remove z (EltSet.union related_to_z.greater new_greater)}
-        else if EltSet.mem z new_greater then
-          {related_to_z with smaller = EltSet.remove z (EltSet.union related_to_z.smaller new_smaller)}
-        else
-          related_to_z
-      ) poset
+          if EltSet.mem z new_smaller then
+            {related_to_z with greater = EltSet.remove z (EltSet.union related_to_z.greater new_greater)}
+          else if EltSet.mem z new_greater then
+            {related_to_z with smaller = EltSet.remove z (EltSet.union related_to_z.smaller new_smaller)}
+          else
+            related_to_z
+        ) poset
 
   let remove x poset =
     let related_to_x = get_related x poset in
     let poset = EltMap.remove x poset in
     let poset = EltMap.map (fun {smaller; greater} -> {
-      smaller = EltSet.remove x smaller;
-      greater = EltSet.remove x greater;
-    }) poset in
+          smaller = EltSet.remove x smaller;
+          greater = EltSet.remove x greater;
+        }) poset in
     EltSet.elements related_to_x.smaller, EltSet.elements related_to_x.greater, poset
 
   let fold f poset =
     EltMap.fold (fun x {greater} acc ->
-      EltSet.fold (fun y acc -> f x y acc) greater acc
-    ) poset
+        EltSet.fold (fun y acc -> f x y acc) greater acc
+      ) poset
 
   let merge poset1 poset2 = fold add poset1 poset2
 
   let filter p poset = fold (fun x y poset ->
-    if p x y then add x y poset else poset
-  ) poset empty
+      if p x y then add x y poset else poset
+    ) poset empty
 
   let get_prec x poset = EltSet.elements (get_related x poset).smaller
 
@@ -103,4 +103,4 @@ struct
   let print poset ppf =
     let pairs = fold (fun x y lst -> (x, y) :: lst) poset [] in
     Print.sequence "," (fun (x, y) ppf -> Format.fprintf ppf "%t < %t" (Elt.print x) (Elt.print y)) pairs ppf
-  end
+end

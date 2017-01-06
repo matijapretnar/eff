@@ -52,9 +52,9 @@ let refresher fresh =
   fun p ->
     match Common.lookup p !substitution with
     | None ->
-        let p' = fresh () in
-        substitution := Common.update p p' !substitution;
-        p'
+      let p' = fresh () in
+      substitution := Common.update p p' !substitution;
+      p'
     | Some p' -> p'
 
 let beautifying_subst () =
@@ -87,6 +87,6 @@ let print_region_param ?(non_poly=empty) r ppf =
   Symbols.region_param r (List.mem r rs) ppf
 
 let print_type_param t ppf =
-   Format.fprintf ppf "'t%d" t
+  Format.fprintf ppf "'t%d" t
 
 let project_ty_params (ts, _, _) = ts

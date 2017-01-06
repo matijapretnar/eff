@@ -12,27 +12,27 @@ let print_operation ~non_poly r_ops =
 let print_dirt ~non_poly ~non_empty_dirts drt ppf =
   match drt.ops with
   | [] ->
-      if List.mem drt.rest non_empty_dirts then
-        Print.print ppf "%t" (Params.print_dirt_param ~non_poly drt.rest)
+    if List.mem drt.rest non_empty_dirts then
+      Print.print ppf "%t" (Params.print_dirt_param ~non_poly drt.rest)
   | _ ->
-      if List.mem drt.rest non_empty_dirts then
-        Print.print ppf "{%t|%t}" (print_operation ~non_poly drt.ops) (Params.print_dirt_param ~non_poly drt.rest)
-      else
-        Print.print ppf "{%t}" (print_operation ~non_poly drt.ops)
+    if List.mem drt.rest non_empty_dirts then
+      Print.print ppf "{%t|%t}" (print_operation ~non_poly drt.ops) (Params.print_dirt_param ~non_poly drt.rest)
+    else
+      Print.print ppf "{%t}" (print_operation ~non_poly drt.ops)
 
 let print_ty ~non_poly ~non_empty_dirts ~skeletons t ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = Print.print ?max_level ?at_level ppf in
     match t with
     | Arrow (t1, (t2, drt)) ->
-        if !Config.effect_annotations && show_dirt ~non_empty_dirts drt then
-          print ~at_level:5 "@[%t -%t%s@ %t@]"
-            (ty ~max_level:4 t1)
-            (print_dirt ~non_poly ~non_empty_dirts drt)
-            (Symbols.short_arrow ())
-            (ty ~max_level:5 t2)
-        else
-          print ~at_level:5 "@[%t@ %s@ %t@]" (ty ~max_level:4 t1) (Symbols.arrow ()) (ty ~max_level:5 t2)
+      if !Config.effect_annotations && show_dirt ~non_empty_dirts drt then
+        print ~at_level:5 "@[%t -%t%s@ %t@]"
+          (ty ~max_level:4 t1)
+          (print_dirt ~non_poly ~non_empty_dirts drt)
+          (Symbols.short_arrow ())
+          (ty ~max_level:5 t2)
+      else
+        print ~at_level:5 "@[%t@ %s@ %t@]" (ty ~max_level:4 t1) (Symbols.arrow ()) (ty ~max_level:5 t2)
     | Basic b -> print "%s" b
     | Apply (t, (lst, _, _)) ->
       begin match lst with
@@ -44,15 +44,15 @@ let print_ty ~non_poly ~non_empty_dirts ~skeletons t ppf =
     | Tuple [] -> print "unit"
     | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence (Symbols.times ()) (ty ~max_level:1) ts)
     | Handler ((t1, drt1), (t2, drt2)) ->
-        if !Config.effect_annotations then
-          print ~at_level:6 "%t ! %t %s@ %t ! %t"
-            (ty ~max_level:4 t1)
-            (print_dirt ~non_poly ~non_empty_dirts drt1)
-            (Symbols.handler_arrow ())
-            (ty ~max_level:4 t2)
-            (print_dirt ~non_poly ~non_empty_dirts drt2)
-        else
-          print ~at_level:6 "%t %s@ %t" (ty ~max_level:4 t1) (Symbols.handler_arrow ()) (ty ~max_level:4 t2)
+      if !Config.effect_annotations then
+        print ~at_level:6 "%t ! %t %s@ %t ! %t"
+          (ty ~max_level:4 t1)
+          (print_dirt ~non_poly ~non_empty_dirts drt1)
+          (Symbols.handler_arrow ())
+          (ty ~max_level:4 t2)
+          (print_dirt ~non_poly ~non_empty_dirts drt2)
+      else
+        print ~at_level:6 "%t %s@ %t" (ty ~max_level:4 t1) (Symbols.handler_arrow ()) (ty ~max_level:4 t2)
   in ty t ppf
 
 

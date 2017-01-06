@@ -10,14 +10,14 @@ let subscript sub =
   match sub with
   | None -> ""
   | Some i ->
-      if !Config.ascii then
-        string_of_int i
-      else
-        let rec sub i =
-          let last = List.nth ["₀"; "₁"; "₂"; "₃"; "₄"; "₅"; "₆"; "₇"; "₈"; "₉"] (i mod 10) in
-          if i < 10 then last else sub (i / 10) ^ last
-        in
-        sub i
+    if !Config.ascii then
+      string_of_int i
+    else
+      let rec sub i =
+        let last = List.nth ["₀"; "₁"; "₂"; "₃"; "₄"; "₅"; "₆"; "₇"; "₈"; "₉"] (i mod 10) in
+        if i < 10 then last else sub (i / 10) ^ last
+      in
+      sub i
 
 let ty_param index poly ppf =
   if !Config.ascii then

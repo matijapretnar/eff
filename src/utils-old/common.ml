@@ -44,23 +44,23 @@ let injective f lst =
     | [] -> true
     | x :: xs -> let y = f x in not (List.mem y ys) && check (y::ys) xs
   in
-    check [] lst
+  check [] lst
 
 (* [find_duplicate xs ys] returns [Some x] if [x] is the first element of [xs]
    that appears [ys]. It returns [None] if there is no such element. *)
 let rec find_duplicate xs ys =
   match xs with
-    | [] -> None
-    | x::xs -> if List.mem x ys then Some x else find_duplicate xs ys
+  | [] -> None
+  | x::xs -> if List.mem x ys then Some x else find_duplicate xs ys
 
 (** NB: We use our own [map] to be sure that the order of side-effects is
     well-defined. *)
 let rec map f = function
   | [] -> []
   | x :: xs ->
-      let y = f x in
-      let ys = map f xs in
-      y :: ys
+    let y = f x in
+    let ys = map f xs in
+    y :: ys
 
 let flatten_map f xs = List.flatten (List.map f xs)
 
@@ -78,9 +78,9 @@ let rec repeat x = function
 let rec assoc_map f = function
   | [] -> []
   | (l, x) :: xs ->
-      let y = f x in
-      let ys = assoc_map f xs in
-      (l, y) :: ys
+    let y = f x in
+    let ys = assoc_map f xs in
+    (l, y) :: ys
 
 (** [fresh wrapper] creates a function that creates fresh instances and wraps
     them with the [wrapper] function *)
@@ -95,8 +95,8 @@ let fresh wrapper =
     occurence of each element. *)
 let uniq lst =
   let rec uniq acc = function
-  | [] -> List.rev acc
-  | x :: xs -> if List.mem x acc then uniq acc xs else uniq (x :: acc) xs
+    | [] -> List.rev acc
+    | x :: xs -> if List.mem x acc then uniq acc xs else uniq (x :: acc) xs
   in uniq [] lst
 
 (** [split n lst] splits [lst] into two parts containing (up to) the first [n]
@@ -113,10 +113,10 @@ let diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
 
 let assoc_flatten lst =
   let add (k, v) lst =
-  begin match lookup k lst with
-  | None -> (k, ref [v]) :: lst
-  | Some vs -> vs := v :: !vs; lst
-  end
+    begin match lookup k lst with
+      | None -> (k, ref [v]) :: lst
+      | Some vs -> vs := v :: !vs; lst
+    end
   in
   let lst = List.fold_right add lst [] in
   assoc_map (!) lst

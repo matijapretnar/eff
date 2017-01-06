@@ -23,7 +23,7 @@ Call DivisionByZero ()
 val _test_plus_dot_289 : float | ρ₁ = ⊤ = 5.84
 val _test_times_dot_291 : float | ρ₁ = ⊤ = 8.478
 val _test_minus_dot_293 : float | ρ₁ = ⊤ = 0.44
-val _test_div_dot_295 : float | ρ₁ = ⊤ = 1.16296
+val _test_div_dot_295 : float | ρ₁ = ⊤ = 1.16296296296
 val _test_div_dot_zero_297 : float | ρ₁ = ⊤ = infinity
 val _test_div_299 : int | ρ₁ = ⊤ = 33
 Check (file "./test_pervasives.eff", line 55, char 1 - line 55, char 14):

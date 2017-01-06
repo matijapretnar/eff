@@ -42,9 +42,9 @@ let refresher fresh =
   fun p ->
     match Common.lookup p !substitution with
     | None ->
-        let p' = fresh () in
-        substitution := Common.update p p' !substitution;
-        p'
+      let p' = fresh () in
+      substitution := Common.update p p' !substitution;
+      p'
     | Some p' -> p'
 
 let beautifying_subst () =
@@ -81,4 +81,4 @@ let format_region (Region_Param i) = i
 let rest_int (Dirt_Param i) = i
 
 let print_type_param (Ty_Param n) ppf =
-   Format.fprintf ppf "'t%d" n
+  Format.fprintf ppf "'t%d" n

@@ -24,14 +24,14 @@ and plain_pattern =
 
 let rec pattern_vars p =
   match p.term with
-    | PVar x -> [x]
-    | PAs (p,x) -> x :: pattern_vars p
-    | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
-    | PRecord lst -> List.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
-    | PVariant (_, None) -> []
-    | PVariant (_, Some p) -> pattern_vars p
-    | PConst _ -> []
-    | PNonbinding -> []
+  | PVar x -> [x]
+  | PAs (p,x) -> x :: pattern_vars p
+  | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
+  | PRecord lst -> List.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
+  | PVariant (_, None) -> []
+  | PVariant (_, Some p) -> pattern_vars p
+  | PConst _ -> []
+  | PNonbinding -> []
 
 let annotate t sch loc = {
   term = t;
@@ -153,94 +153,94 @@ let rec refresh_pattern sbst p =
   sbst', {p with term = p'}
 and refresh_pattern' sbst = function
   | PVar x ->
-      let x' = Variable.refresh x in
-      Common.update x x' sbst, PVar x'
+    let x' = Variable.refresh x in
+    Common.update x x' sbst, PVar x'
   | PAs (p, x) ->
-      let x' = Variable.refresh x in
-      let sbst, p' = refresh_pattern (Common.update x x' sbst) p in
-      sbst, PAs (p', x')
+    let x' = Variable.refresh x in
+    let sbst, p' = refresh_pattern (Common.update x x' sbst) p in
+    sbst, PAs (p', x')
   | PTuple ps ->
     let sbst, ps' =
       List.fold_right (fun p (sbst, ps') ->
-        let sbst, p' = refresh_pattern sbst p in
-        sbst, p' :: ps'
-      ) ps (sbst, []) in
+          let sbst, p' = refresh_pattern sbst p in
+          sbst, p' :: ps'
+        ) ps (sbst, []) in
     sbst, PTuple ps'
   | PRecord flds ->
     let sbst, flds' =
       List.fold_right (fun (lbl, p) (sbst, flds') ->
-        let sbst, p' = refresh_pattern sbst p in
-        sbst, (lbl, p') :: flds'
-      ) flds (sbst, []) in
+          let sbst, p' = refresh_pattern sbst p in
+          sbst, (lbl, p') :: flds'
+        ) flds (sbst, []) in
     sbst, PRecord flds'
   | PVariant (lbl, None) ->
-      sbst, PVariant (lbl, None)
+    sbst, PVariant (lbl, None)
   | PVariant (lbl, Some p) ->
-      let sbst, p' = refresh_pattern sbst p in 
-      sbst, PVariant (lbl, Some p')
+    let sbst, p' = refresh_pattern sbst p in 
+    sbst, PVariant (lbl, Some p')
   | (PConst _ | PNonbinding) as p -> sbst, p
 
 let rec refresh_expr sbst e =
   {e with term = refresh_expr' sbst e.term}
 and refresh_expr' sbst = function
   | (Var x) as e ->
-      begin match Common.lookup x sbst with
+    begin match Common.lookup x sbst with
       | Some x' -> Var x'
       | None -> e
-      end
+    end
   | Pure c ->
-      Pure (refresh_comp sbst c)
+    Pure (refresh_comp sbst c)
   | Lambda a ->
-      Lambda (refresh_abs sbst a)
+    Lambda (refresh_abs sbst a)
   | Handler h ->
-      Handler (refresh_handler sbst h)
+    Handler (refresh_handler sbst h)
   | Tuple es ->
-      Tuple (List.map (refresh_expr sbst) es)
+    Tuple (List.map (refresh_expr sbst) es)
   | Record flds ->
-      Record (Common.assoc_map (refresh_expr sbst) flds)
+    Record (Common.assoc_map (refresh_expr sbst) flds)
   | Variant (lbl, e) ->
-      Variant (lbl, Common.option_map (refresh_expr sbst) e)
+    Variant (lbl, Common.option_map (refresh_expr sbst) e)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
 and refresh_comp sbst c =
   {c with term = refresh_comp' sbst c.term}
 and refresh_comp' sbst = function
   | Bind (c1, c2) ->
-      Bind (refresh_comp sbst c1, refresh_abs sbst c2)
+    Bind (refresh_comp sbst c1, refresh_abs sbst c2)
   | LetIn (e, a) ->
-      LetIn (refresh_expr sbst e, refresh_abs sbst a)
+    LetIn (refresh_expr sbst e, refresh_abs sbst a)
   | Let (li, c1) ->
-      let sbst', li' = List.fold_right (fun (p, c) (sbst', li') ->
+    let sbst', li' = List.fold_right (fun (p, c) (sbst', li') ->
         (* sbst' is what will be used for c1, but for definitons c, we use sbst *)
         let sbst', p' = refresh_pattern sbst' p in
         sbst', (p', refresh_comp sbst c) :: li'
       ) li (sbst, []) in
-      Let (li', refresh_comp sbst' c1)
+    Let (li', refresh_comp sbst' c1)
   | LetRec (li, c1) ->
-      let new_xs, sbst' = List.fold_right (fun (x, _) (new_xs, sbst') ->
+    let new_xs, sbst' = List.fold_right (fun (x, _) (new_xs, sbst') ->
         let x' = Variable.refresh x in
         x' :: new_xs, Common.update x x' sbst'
       ) li ([], sbst) in
-      let li' =
-        List.combine new_xs (List.map (fun (_, a) -> refresh_abs sbst' a) li)
-      in
-      LetRec (li', refresh_comp sbst' c1)
+    let li' =
+      List.combine new_xs (List.map (fun (_, a) -> refresh_abs sbst' a) li)
+    in
+    LetRec (li', refresh_comp sbst' c1)
   | Match (e, li) ->
-      Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
+    Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
   | Apply (e1, e2) ->
-      Apply (refresh_expr sbst e1, refresh_expr sbst e2)
+    Apply (refresh_expr sbst e1, refresh_expr sbst e2)
   | Handle (e, c) ->
-      Handle (refresh_expr sbst e, refresh_comp sbst c)
+    Handle (refresh_expr sbst e, refresh_comp sbst c)
   | Check c ->
-      Check (refresh_comp sbst c)
+    Check (refresh_comp sbst c)
   | Call (eff, e, a) ->
-      Call (eff, refresh_expr sbst e, refresh_abs sbst a)
+    Call (eff, refresh_expr sbst e, refresh_abs sbst a)
   | Value e ->
-      Value (refresh_expr sbst e)
+    Value (refresh_expr sbst e)
 and refresh_handler sbst h = {
-    effect_clauses = Common.assoc_map (refresh_abs2 sbst) h.effect_clauses;
-    value_clause = refresh_abs sbst h.value_clause;
-    finally_clause = refresh_abs sbst h.finally_clause;
-  }
+  effect_clauses = Common.assoc_map (refresh_abs2 sbst) h.effect_clauses;
+  value_clause = refresh_abs sbst h.value_clause;
+  finally_clause = refresh_abs sbst h.finally_clause;
+}
 and refresh_abs sbst a = 
   let (p, c) = a.term in
   let sbst, p' = refresh_pattern sbst p in
@@ -252,61 +252,61 @@ let rec subst_expr sbst e =
   {e with term = subst_expr' sbst e.term}
 and subst_expr' sbst = function
   | (Var x) as e ->
-      begin match Common.lookup x sbst with
+    begin match Common.lookup x sbst with
       | Some e' -> e'
       | None -> e
-      end
+    end
   | Pure c ->
-      Pure (subst_comp sbst c)
+    Pure (subst_comp sbst c)
   | Lambda a ->
-      Lambda (subst_abs sbst a)
+    Lambda (subst_abs sbst a)
   | Handler h ->
-      Handler (subst_handler sbst h)
+    Handler (subst_handler sbst h)
   | Tuple es ->
-      Tuple (List.map (subst_expr sbst) es)
+    Tuple (List.map (subst_expr sbst) es)
   | Record flds ->
-      Record (Common.assoc_map (subst_expr sbst) flds)
+    Record (Common.assoc_map (subst_expr sbst) flds)
   | Variant (lbl, e) ->
-      Variant (lbl, Common.option_map (subst_expr sbst) e)
+    Variant (lbl, Common.option_map (subst_expr sbst) e)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
 and subst_comp sbst c =
   {c with term = subst_comp' sbst c.term}
 and subst_comp' sbst = function
   | Bind (c1, c2) ->
-      Bind (subst_comp sbst c1, subst_abs sbst c2)
+    Bind (subst_comp sbst c1, subst_abs sbst c2)
   | LetIn (e, a) ->
-      LetIn (subst_expr sbst e, subst_abs sbst a)
+    LetIn (subst_expr sbst e, subst_abs sbst a)
   | Let (li, c1) ->
-      let li' = List.map (fun (p, c) ->
+    let li' = List.map (fun (p, c) ->
         (* XXX Should we check that p & sbst have disjoint variables? *)
         (p, subst_comp sbst c)
       ) li
-      in
-      Let (li', subst_comp sbst c1)
+    in
+    Let (li', subst_comp sbst c1)
   | LetRec (li, c1) ->
-      let li' = List.map (fun (x, a) ->
+    let li' = List.map (fun (x, a) ->
         (* XXX Should we check that x does not appear in sbst? *)
         (x, subst_abs sbst a)
       ) li
-      in
-      LetRec (li', subst_comp sbst c1)
+    in
+    LetRec (li', subst_comp sbst c1)
   | Match (e, li) ->
-      Match (subst_expr sbst e, List.map (subst_abs sbst) li)
+    Match (subst_expr sbst e, List.map (subst_abs sbst) li)
   | Apply (e1, e2) ->
-      Apply (subst_expr sbst e1, subst_expr sbst e2)
+    Apply (subst_expr sbst e1, subst_expr sbst e2)
   | Handle (e, c) ->
-      Handle (subst_expr sbst e, subst_comp sbst c)
+    Handle (subst_expr sbst e, subst_comp sbst c)
   | Check c ->
-      Check (subst_comp sbst c)
+    Check (subst_comp sbst c)
   | Call (eff, e, a) ->
-      Call (eff, subst_expr sbst e, subst_abs sbst a)
+    Call (eff, subst_expr sbst e, subst_abs sbst a)
   | Value e ->
-      Value (subst_expr sbst e)
+    Value (subst_expr sbst e)
 and subst_handler sbst h = {
-    effect_clauses = Common.assoc_map (subst_abs2 sbst) h.effect_clauses;
-    value_clause = subst_abs sbst h.value_clause;
-    finally_clause = subst_abs sbst h.finally_clause;
-  }
+  effect_clauses = Common.assoc_map (subst_abs2 sbst) h.effect_clauses;
+  value_clause = subst_abs sbst h.value_clause;
+  finally_clause = subst_abs sbst h.finally_clause;
+}
 and subst_abs sbst a = 
   let (p, c) = a.term in
   (* XXX Should we check that p & sbst have disjoint variables? *)
@@ -318,77 +318,77 @@ let rec remove_rec_expr (poly_tys, constraints) e =
   let ctx, ty, cnstrs = e.scheme in
   let joint_cnstrs = Constraints.union cnstrs constraints in
   let scheme =
-  Scheme.finalize_ty_scheme ~loc:e.location ctx ty [
-    Scheme.just joint_cnstrs;
-    Scheme.trim_context ~loc:e.location poly_tys
-  ]
+    Scheme.finalize_ty_scheme ~loc:e.location ctx ty [
+      Scheme.just joint_cnstrs;
+      Scheme.trim_context ~loc:e.location poly_tys
+    ]
   in
   {
     e with term = remove_rec_expr' (poly_tys, joint_cnstrs) e.term;
-    scheme
+           scheme
   }
 and remove_rec_expr' st = function
   | Pure c ->
-      Pure (remove_rec_comp st c)
+    Pure (remove_rec_comp st c)
   | Lambda a ->
-      Lambda (remove_rec_abs st a)
+    Lambda (remove_rec_abs st a)
   | Handler h ->
-      Handler (remove_rec_handler st h)
+    Handler (remove_rec_handler st h)
   | Tuple es ->
-      Tuple (List.map (remove_rec_expr st) es)
+    Tuple (List.map (remove_rec_expr st) es)
   | Record flds ->
-      Record (Common.assoc_map (remove_rec_expr st) flds)
+    Record (Common.assoc_map (remove_rec_expr st) flds)
   | Variant (lbl, e) ->
-      Variant (lbl, Common.option_map (remove_rec_expr st) e)
+    Variant (lbl, Common.option_map (remove_rec_expr st) e)
   | (Var _ | BuiltIn _ | Const _ | Effect _) as e -> e
 and remove_rec_comp (poly_tys, constraints) c =
   let ctx, ty, cnstrs = c.scheme in
   let joint_cnstrs = Constraints.union cnstrs constraints in
   let scheme =
-  Scheme.finalize_dirty_scheme ~loc:c.location ctx ty [
-    Scheme.just joint_cnstrs;
-    Scheme.trim_context ~loc:c.location poly_tys
-  ]
+    Scheme.finalize_dirty_scheme ~loc:c.location ctx ty [
+      Scheme.just joint_cnstrs;
+      Scheme.trim_context ~loc:c.location poly_tys
+    ]
   in
   {
     c with term = remove_rec_comp' (poly_tys, joint_cnstrs) c.term;
-    scheme
+           scheme
   }and remove_rec_comp' st = function
-  | Bind (c1, c2) ->
+    | Bind (c1, c2) ->
       Bind (remove_rec_comp st c1, remove_rec_abs st c2)
-  | LetIn (e, a) ->
+    | LetIn (e, a) ->
       LetIn (remove_rec_expr st e, remove_rec_abs st a)
-  | Let (li, c1) ->
+    | Let (li, c1) ->
       let li' = List.map (fun (p, c) ->
-        (* XXX Should we check that p & st have disjoint variables? *)
-        (p, remove_rec_comp st c)
-      ) li
+          (* XXX Should we check that p & st have disjoint variables? *)
+          (p, remove_rec_comp st c)
+        ) li
       in
       Let (li', remove_rec_comp st c1)
-  | LetRec (li, c1) ->
+    | LetRec (li, c1) ->
       let li' = List.map (fun (x, a) ->
-        (* XXX Should we check that x does not appear in st? *)
-        (x, remove_rec_abs st a)
-      ) li
+          (* XXX Should we check that x does not appear in st? *)
+          (x, remove_rec_abs st a)
+        ) li
       in
       LetRec (li', remove_rec_comp st c1)
-  | Match (e, li) ->
+    | Match (e, li) ->
       Match (remove_rec_expr st e, List.map (remove_rec_abs st) li)
-  | Apply (e1, e2) ->
+    | Apply (e1, e2) ->
       Apply (remove_rec_expr st e1, remove_rec_expr st e2)
-  | Handle (e, c) ->
+    | Handle (e, c) ->
       Handle (remove_rec_expr st e, remove_rec_comp st c)
-  | Check c ->
+    | Check c ->
       Check (remove_rec_comp st c)
-  | Call (eff, e, a) ->
+    | Call (eff, e, a) ->
       Call (eff, remove_rec_expr st e, remove_rec_abs st a)
-  | Value e ->
+    | Value e ->
       Value (remove_rec_expr st e)
 and remove_rec_handler st h = {
-    effect_clauses = Common.assoc_map (remove_rec_abs2 st) h.effect_clauses;
-    value_clause = remove_rec_abs st h.value_clause;
-    finally_clause = remove_rec_abs st h.finally_clause;
-  }
+  effect_clauses = Common.assoc_map (remove_rec_abs2 st) h.effect_clauses;
+  value_clause = remove_rec_abs st h.value_clause;
+  finally_clause = remove_rec_abs st h.finally_clause;
+}
 and remove_rec_abs st a = 
   let (p, c) = a.term in
   (* XXX Should we check that p & st have disjoint variables? *)
@@ -400,12 +400,12 @@ and remove_rec_abs2 st a2 =
 let assoc_equal eq flds flds' : bool =
   let rec equal_fields flds =
     match flds with
-      | [] -> true
-      | (f, x) :: flds ->
-          begin match Common.lookup f flds' with
-          | Some x' when eq x x' -> equal_fields flds
-          | _ -> false
-          end
+    | [] -> true
+    | (f, x) :: flds ->
+      begin match Common.lookup f flds' with
+        | Some x' when eq x x' -> equal_fields flds
+        | _ -> false
+      end
   in
   List.length flds = List.length flds' &&
   equal_fields flds
@@ -416,11 +416,11 @@ and make_equal_pattern' eqvars p p' =
   match p, p' with
   | PVar x, PVar x' -> Some ((x, x') :: eqvars)
   | PAs (p, x), PAs (p', x') ->
-      Common.option_map (fun eqvars ->
+    Common.option_map (fun eqvars ->
         (x, x') :: eqvars
       ) (make_equal_pattern eqvars p p')
   | PTuple ps, PTuple ps' ->
-      List.fold_right2 (fun p p' -> function
+    List.fold_right2 (fun p p' -> function
         | Some eqvars' -> make_equal_pattern eqvars' p p'
         | None -> None
       ) ps ps' (Some eqvars)
@@ -433,64 +433,64 @@ let rec alphaeq_expr eqvars e e' =
 and alphaeq_expr' eqvars e e' =
   match e, e' with
   | Var x, Var y ->
-     List.mem (x, y) eqvars ||  Variable.compare x y = 0
+    List.mem (x, y) eqvars ||  Variable.compare x y = 0
   | Lambda a, Lambda a' ->
-      alphaeq_abs eqvars a a'
+    alphaeq_abs eqvars a a'
   | Handler h, Handler h' ->
-      alphaeq_handler eqvars h h'
+    alphaeq_handler eqvars h h'
   | Tuple es, Tuple es' ->
-      List.for_all2 (alphaeq_expr eqvars) es es'
+    List.for_all2 (alphaeq_expr eqvars) es es'
   | Record flds, Record flds' ->
-      assoc_equal (alphaeq_expr eqvars) flds flds'
+    assoc_equal (alphaeq_expr eqvars) flds flds'
   | Variant (lbl, None), Variant (lbl', None) ->
-      lbl = lbl'
+    lbl = lbl'
   | Variant (lbl, Some e), Variant (lbl', Some e') ->
-      lbl = lbl' && alphaeq_expr eqvars e e'
+    lbl = lbl' && alphaeq_expr eqvars e e'
   | BuiltIn f, BuiltIn f' ->
-      f = f'
+    f = f'
   | Const cst, Const cst' ->
-      Const.equal cst cst'
+    Const.equal cst cst'
   | Effect eff, Effect eff' ->
-      eff = eff'
+    eff = eff'
   | Pure c, Pure c' ->
-      alphaeq_comp eqvars c c'
+    alphaeq_comp eqvars c c'
   | _, _ -> false
 and alphaeq_comp eqvars c c' =
   alphaeq_comp' eqvars c.term c'.term
 and alphaeq_comp' eqvars c c' =
   match c, c' with
   | Bind (c1, c2), Bind (c1', c2') ->
-      alphaeq_comp eqvars c1 c1' && alphaeq_abs eqvars c2 c2'
+    alphaeq_comp eqvars c1 c1' && alphaeq_abs eqvars c2 c2'
   | LetIn (e, a), LetIn (e', a') ->
-      alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a'
+    alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a'
   | Let (li, c1), Let (li', c1') ->
-      let eqvars' = List.fold_right2 (fun (p, c) (p', c') -> function
+    let eqvars' = List.fold_right2 (fun (p, c) (p', c') -> function
         | None -> None
         | Some eqvars' ->
           begin match make_equal_pattern eqvars' p p' with
-          | Some eqvars' when alphaeq_comp eqvars c c' -> Some eqvars'
-          | _ -> None
+            | Some eqvars' when alphaeq_comp eqvars c c' -> Some eqvars'
+            | _ -> None
           end
       ) li li' (Some eqvars) in
-      begin match eqvars' with
+    begin match eqvars' with
       | None -> false
       | Some eqvars' -> alphaeq_comp eqvars' c1 c1'
-      end
+    end
   | LetRec (li, c1), LetRec (li', c1') ->
-      (* XXX Not yet implemented *)
-      false
+    (* XXX Not yet implemented *)
+    false
   | Match (e, li), Match (e', li') ->
-      alphaeq_expr eqvars e e' && List.for_all2 (alphaeq_abs eqvars) li li'
+    alphaeq_expr eqvars e e' && List.for_all2 (alphaeq_abs eqvars) li li'
   | Apply (e1, e2), Apply (e1', e2') ->
-      alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2'
+    alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2'
   | Handle (e, c), Handle (e', c') ->
-      alphaeq_expr eqvars e e' && alphaeq_comp eqvars c c'
+    alphaeq_expr eqvars e e' && alphaeq_comp eqvars c c'
   | Check c, Check c' ->
-      alphaeq_comp eqvars c c'
+    alphaeq_comp eqvars c c'
   | Call (eff, e, a), Call (eff', e', a') ->
-      eff = eff' && alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a'
+    eff = eff' && alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a'
   | Value e, Value e' ->
-      alphaeq_expr eqvars e e'
+    alphaeq_expr eqvars e e'
   | _, _ -> false
 and alphaeq_handler eqvars h h' =
   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
@@ -524,10 +524,10 @@ let built_in ?loc x ty_sch =
 let const ?loc c =
   let loc = backup_location loc [] in
   let ty = match c with
-  | Const.Integer _ -> Type.int_ty
-  | Const.String _ -> Type.string_ty
-  | Const.Boolean _ -> Type.bool_ty
-  | Const.Float _ -> Type.float_ty
+    | Const.Integer _ -> Type.int_ty
+    | Const.String _ -> Type.string_ty
+    | Const.Boolean _ -> Type.bool_ty
+    | Const.Float _ -> Type.float_ty
   in
   {
     term = Const c;
@@ -539,9 +539,9 @@ let tuple ?loc es =
   let loc = backup_location loc (List.map (fun e -> e.location) es) in
   let ctx, tys, constraints =
     List.fold_right (fun e (ctx, tys, constraints) ->
-      let e_ctx, e_ty, e_constraints = e.scheme in
-      e_ctx @ ctx, e_ty :: tys, Constraints.list_union [e_constraints; constraints]
-    ) es ([], [], Constraints.empty)
+        let e_ctx, e_ty, e_constraints = e.scheme in
+        e_ctx @ ctx, e_ty :: tys, Constraints.list_union [e_constraints; constraints]
+      ) es ([], [], Constraints.empty)
   in
   {
     term = Tuple es;
@@ -557,47 +557,47 @@ let record ?loc lst =
     if not (Pattern.linear_record lst) then
       Error.typing ~loc "Fields in a record must be distinct";
     begin match Tctx.infer_field fld with
-    | None -> Error.typing ~loc "Unbound record field label %s" fld
-    | Some (ty, (ty_name, fld_tys)) ->
+      | None -> Error.typing ~loc "Unbound record field label %s" fld
+      | Some (ty, (ty_name, fld_tys)) ->
         if List.length lst <> List.length fld_tys then
           Error.typing ~loc "The record of type %s has an incorrect number of fields" ty_name;
         let infer (fld, e) (ctx, constraints) =
           begin match Common.lookup fld fld_tys with
-          | None -> Error.typing ~loc "Unexpected field %s in a record of type %s" fld ty_name
-          | Some fld_ty ->
+            | None -> Error.typing ~loc "Unexpected field %s in a record of type %s" fld ty_name
+            | Some fld_ty ->
               let e_ctx, e_ty, e_constraints = e.scheme in
               e_ctx @ ctx, Constraints.add_ty_constraint ~loc e_ty fld_ty constraints
           end
-      in
-      let ctx, constraints = List.fold_right infer lst ([], Constraints.empty) in
-      {
-        term = Record lst;
-        scheme = Scheme.clean_ty_scheme ~loc (ctx, ty, constraints);
-        location = loc;
-      }
+        in
+        let ctx, constraints = List.fold_right infer lst ([], Constraints.empty) in
+        {
+          term = Record lst;
+          scheme = Scheme.clean_ty_scheme ~loc (ctx, ty, constraints);
+          location = loc;
+        }
     end
 
 let variant ?loc (lbl, e) =
-    let loc = backup_location loc (match e with None -> [] | Some e -> [e.location]) in
-    begin match Tctx.infer_variant lbl with
+  let loc = backup_location loc (match e with None -> [] | Some e -> [e.location]) in
+  begin match Tctx.infer_variant lbl with
     | None -> Error.typing ~loc "Unbound constructor %s" lbl
     | Some (ty, arg_ty) ->
-        let ty_sch = begin match e, arg_ty with
-          | None, None -> ([], ty, Constraints.empty)
-          | Some e, Some arg_ty ->
-              let e_ctx, e_ty, e_constraints = e.scheme in
-              let constraints = Constraints.add_ty_constraint ~loc e_ty arg_ty e_constraints in
-              e_ctx, ty, constraints
-          | None, Some _ -> Error.typing ~loc "Constructor %s should be applied to an argument" lbl
-          | Some _, None -> Error.typing ~loc "Constructor %s cannot be applied to an argument" lbl
-        end
-        in
-        {
-          term = Variant (lbl, e);
-          scheme = ty_sch;
-          location = loc
-        }
-    end
+      let ty_sch = begin match e, arg_ty with
+        | None, None -> ([], ty, Constraints.empty)
+        | Some e, Some arg_ty ->
+          let e_ctx, e_ty, e_constraints = e.scheme in
+          let constraints = Constraints.add_ty_constraint ~loc e_ty arg_ty e_constraints in
+          e_ctx, ty, constraints
+        | None, Some _ -> Error.typing ~loc "Constructor %s should be applied to an argument" lbl
+        | Some _, None -> Error.typing ~loc "Constructor %s cannot be applied to an argument" lbl
+      end
+      in
+      {
+        term = Variant (lbl, e);
+        scheme = ty_sch;
+        location = loc
+      }
+  end
 
 let lambda ?loc a =
   let loc = backup_location loc [a.location] in
@@ -610,67 +610,67 @@ let lambda ?loc a =
 
 let effect ?loc ((eff_name, (ty_par, ty_res)) as eff) =
   let loc = backup_location loc [] in
-    let r = Params.fresh_region_param () in
-    let drt = {Type.ops = [eff_name, r]; Type.rest = Params.fresh_dirt_param ()} in
-    let ty = Type.Arrow (ty_par, (ty_res, drt)) in
-    let constraints = Constraints.add_full_region r Constraints.empty in
-    {
-      term = Effect eff;
-      scheme = Scheme.clean_ty_scheme ~loc ([], ty, constraints);
-      location = loc;
-    }
+  let r = Params.fresh_region_param () in
+  let drt = {Type.ops = [eff_name, r]; Type.rest = Params.fresh_dirt_param ()} in
+  let ty = Type.Arrow (ty_par, (ty_res, drt)) in
+  let constraints = Constraints.add_full_region r Constraints.empty in
+  {
+    term = Effect eff;
+    scheme = Scheme.clean_ty_scheme ~loc ([], ty, constraints);
+    location = loc;
+  }
 
 let handler ?loc h =
-    let loc = backup_location loc (
+  let loc = backup_location loc (
       [h.value_clause.location; h.finally_clause.location] @
       List.map (fun (_, a2) -> a2.location) h.effect_clauses
     ) in
-    let drt_mid = Type.fresh_dirt () in
-    let ty_mid = Type.fresh_ty () in
+  let drt_mid = Type.fresh_dirt () in
+  let ty_mid = Type.fresh_ty () in
 
-    let fold ((_, (ty_par, ty_arg)), a2) (ctx, constraints) =
-      let ctx_a, (ty_p, ty_k, drty_c), cnstrs_a = a2.scheme in
-      ctx_a @ ctx,
-      Constraints.list_union [constraints; cnstrs_a]
-      |> Constraints.add_ty_constraint ~loc ty_par ty_p
-      |> Constraints.add_ty_constraint ~loc (Type.Arrow (ty_arg, (ty_mid, drt_mid))) ty_k
-      |> Constraints.add_dirty_constraint ~loc drty_c (ty_mid, drt_mid)
-    in
-    let ctxs, constraints = List.fold_right fold h.effect_clauses ([], Constraints.empty) in
+  let fold ((_, (ty_par, ty_arg)), a2) (ctx, constraints) =
+    let ctx_a, (ty_p, ty_k, drty_c), cnstrs_a = a2.scheme in
+    ctx_a @ ctx,
+    Constraints.list_union [constraints; cnstrs_a]
+    |> Constraints.add_ty_constraint ~loc ty_par ty_p
+    |> Constraints.add_ty_constraint ~loc (Type.Arrow (ty_arg, (ty_mid, drt_mid))) ty_k
+    |> Constraints.add_dirty_constraint ~loc drty_c (ty_mid, drt_mid)
+  in
+  let ctxs, constraints = List.fold_right fold h.effect_clauses ([], Constraints.empty) in
 
-    let make_dirt (eff, _) (effs_in, effs_out) =
-      let r_in = Params.fresh_region_param () in
-      let r_out = Params.fresh_region_param () in
-      (eff, r_in) :: effs_in, (eff, r_out) :: effs_out
-    in
-    let effs_in, effs_out = List.fold_right make_dirt (Common.uniq (List.map fst h.effect_clauses)) ([], []) in
+  let make_dirt (eff, _) (effs_in, effs_out) =
+    let r_in = Params.fresh_region_param () in
+    let r_out = Params.fresh_region_param () in
+    (eff, r_in) :: effs_in, (eff, r_out) :: effs_out
+  in
+  let effs_in, effs_out = List.fold_right make_dirt (Common.uniq (List.map fst h.effect_clauses)) ([], []) in
 
-    let ctx_val, (ty_val, drty_val), cnstrs_val = h.value_clause.scheme in
-    let ctx_fin, (ty_fin, drty_fin), cnstrs_fin = h.finally_clause.scheme in
+  let ctx_val, (ty_val, drty_val), cnstrs_val = h.value_clause.scheme in
+  let ctx_fin, (ty_fin, drty_fin), cnstrs_fin = h.finally_clause.scheme in
 
-    let ty_in = Type.fresh_ty () in
-    let drt_rest = Params.fresh_dirt_param () in
-    let drt_in = {Type.ops = effs_in; Type.rest = drt_rest} in
-    let drt_out = Type.fresh_dirt () in
-    let ty_out = Type.fresh_ty () in
+  let ty_in = Type.fresh_ty () in
+  let drt_rest = Params.fresh_dirt_param () in
+  let drt_in = {Type.ops = effs_in; Type.rest = drt_rest} in
+  let drt_out = Type.fresh_dirt () in
+  let ty_out = Type.fresh_ty () in
 
-    let constraints =
-      Constraints.list_union [constraints; cnstrs_val; cnstrs_fin]
-      |> Constraints.add_dirt_constraint {Type.ops = effs_out; Type.rest = drt_rest} drt_mid
-      |> Constraints.add_ty_constraint ~loc ty_in ty_val
-      |> Constraints.add_dirty_constraint ~loc drty_val (ty_mid, drt_mid)
-      |> Constraints.add_ty_constraint ~loc ty_mid ty_fin
-      |> Constraints.add_dirt_constraint drt_mid drt_out
-      |> Constraints.add_dirty_constraint ~loc drty_fin (ty_out, drt_out)
+  let constraints =
+    Constraints.list_union [constraints; cnstrs_val; cnstrs_fin]
+    |> Constraints.add_dirt_constraint {Type.ops = effs_out; Type.rest = drt_rest} drt_mid
+    |> Constraints.add_ty_constraint ~loc ty_in ty_val
+    |> Constraints.add_dirty_constraint ~loc drty_val (ty_mid, drt_mid)
+    |> Constraints.add_ty_constraint ~loc ty_mid ty_fin
+    |> Constraints.add_dirt_constraint drt_mid drt_out
+    |> Constraints.add_dirty_constraint ~loc drty_fin (ty_out, drt_out)
 
-    in
+  in
 
-    let ty_sch = (ctx_val @ ctx_fin @ ctxs, Type.Handler((ty_in, drt_in), (ty_out, drt_out)), constraints) in
-    {
-      term = Handler h;
-      scheme = Scheme.clean_ty_scheme ~loc ty_sch;
-      location = loc;
-    }
+  let ty_sch = (ctx_val @ ctx_fin @ ctxs, Type.Handler((ty_in, drt_in), (ty_out, drt_out)), constraints) in
+  {
+    term = Handler h;
+    scheme = Scheme.clean_ty_scheme ~loc ty_sch;
+    location = loc;
+  }
 
 let pure ?loc c =
   (* XXX We are just throwing away the dirt, but we should check that it is empty
@@ -686,21 +686,21 @@ let pure ?loc c =
 
 let match' ?loc e cases =
   let loc = backup_location loc (
-    e.location :: List.map (fun a -> a.location) cases
-  ) in
+      e.location :: List.map (fun a -> a.location) cases
+    ) in
   let ctx_e, ty_e, cnstrs_e = e.scheme in
   let drty = Type.fresh_dirty () in
   let drty_sch = match cases with
-  | [] ->
+    | [] ->
       let constraints = Constraints.add_ty_constraint ~loc ty_e Type.empty_ty cnstrs_e in
       (ctx_e, drty, constraints)
-  | _::_ ->
+    | _::_ ->
       let fold a (ctx, constraints) =
         let ctx_a, (ty_p, drty_c), cnstrs_a = a.scheme in
         ctx_a @ ctx,
-          Constraints.list_union [cnstrs_a; constraints]
-          |> Constraints.add_ty_constraint ~loc:e.location ty_e ty_p
-          |> Constraints.add_dirty_constraint ~loc:a.location drty_c drty
+        Constraints.list_union [cnstrs_a; constraints]
+        |> Constraints.add_ty_constraint ~loc:e.location ty_e ty_p
+        |> Constraints.add_dirty_constraint ~loc:a.location drty_c drty
       in
       let ctx, constraints = List.fold_right fold cases (ctx_e, cnstrs_e) in
       (ctx, drty, constraints)
@@ -752,8 +752,8 @@ let check ?loc c =
 
 let let' ?loc defs c =
   let loc = backup_location loc (
-    List.fold_right (fun (p, c) locs -> p.location :: c.location :: locs) defs [c.location]
-  ) in
+      List.fold_right (fun (p, c) locs -> p.location :: c.location :: locs) defs [c.location]
+    ) in
   (* XXX Check for implicit sequencing *)
   let drt = Type.fresh_dirt () in
   let add_binding (p, c) (poly_tys, nonpoly_tys, ctx, chngs) =
@@ -762,10 +762,10 @@ let let' ?loc defs c =
     let poly_tys, nonpoly_tys =
       match c.term with
       | Value _ ->
-          ctx_p @ poly_tys, nonpoly_tys
+        ctx_p @ poly_tys, nonpoly_tys
       | Apply _ | Match _ | Handle _ | Let _ | LetRec _
       | Check _ | Bind _ | LetIn _ | Call _ ->
-          poly_tys, ctx_p @ nonpoly_tys
+        poly_tys, ctx_p @ nonpoly_tys
     in
     poly_tys, nonpoly_tys, ctx_c @ ctx, [
       Scheme.dirty_less ~loc:c.location drty_c (ty_p, drt);
@@ -776,16 +776,16 @@ let let' ?loc defs c =
   let poly_tys, nonpoly_tys, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
   let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
-      Scheme.less_context ~loc nonpoly_tys;
-      Scheme.dirt_less drt_c drt;
-      Scheme.just cnstrs_c;
-    ] @ chngs)
+        Scheme.less_context ~loc nonpoly_tys;
+        Scheme.dirt_less drt_c drt;
+        Scheme.just cnstrs_c;
+      ] @ chngs)
   in
   let change2 (ctx_c, drty_c, cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx_c) drty_c ([
-      Scheme.remove_context ~loc nonpoly_tys;
-      Scheme.just cnstrs_c
-    ])
+        Scheme.remove_context ~loc nonpoly_tys;
+        Scheme.just cnstrs_c
+      ])
   in
   {
     term = Let (defs, c);
@@ -795,8 +795,8 @@ let let' ?loc defs c =
 
 let let_rec' ?loc defs c =
   let loc = backup_location loc (
-    c.location :: List.map (fun (_, a) -> a.location) defs
-  ) in
+      c.location :: List.map (fun (_, a) -> a.location) defs
+    ) in
   let drt = Type.fresh_dirt () in
   let add_binding (x, a) (poly_tys, nonpoly_tys, ctx, chngs) =
     let ctx_a, (ty_p, drty_c), cnstrs_a = a.scheme in
@@ -809,15 +809,15 @@ let let_rec' ?loc defs c =
   let chngs = Scheme.trim_context ~loc poly_tys :: chngs in
   let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
-      Scheme.dirt_less drt_c drt;
-      Scheme.just cnstrs_c;
-    ] @ chngs)
+        Scheme.dirt_less drt_c drt;
+        Scheme.just cnstrs_c;
+      ] @ chngs)
   in
   let change2 (ctx_c, drty_c, cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx_c) drty_c ([
-      Scheme.remove_context ~loc nonpoly_tys;
-      Scheme.just cnstrs_c
-    ])
+        Scheme.remove_context ~loc nonpoly_tys;
+        Scheme.just cnstrs_c
+      ])
   in
   {
     term = LetRec (defs, c);
@@ -858,25 +858,25 @@ let let_in ?loc e1 c2 =
 
 
 let call ?loc ((eff_name, (ty_par, ty_res)) as eff) e a =
-    let loc = backup_location loc [e.location; a.location] in
-    let ctx_e, ty_e, constraints_e = e.scheme
-    and ctx_a, (ty_a, drty_a), constraints_a = a.scheme in
-    let r = Params.fresh_region_param () in
-    let drt_eff = {Type.ops = [eff_name, r]; Type.rest = Params.fresh_dirt_param ()} in
-    let ((ty_out, drt_out) as drty_out) = Type.fresh_dirty () in
-    let constraints =
-      Constraints.union constraints_e constraints_a
-      |> Constraints.add_full_region r
-      |> Constraints.add_ty_constraint ~loc:e.location ty_e ty_par
-      |> Constraints.add_ty_constraint ~loc:a.location ty_res ty_a
-      |> Constraints.add_dirt_constraint drt_eff drt_out
-      |> Constraints.add_dirty_constraint ~loc drty_a drty_out
-    in
-    {
-      term = Call (eff, e, a);
-      scheme = Scheme.clean_dirty_scheme ~loc (ctx_e @ ctx_a, drty_out, constraints);
-      location = loc;
-    }
+  let loc = backup_location loc [e.location; a.location] in
+  let ctx_e, ty_e, constraints_e = e.scheme
+  and ctx_a, (ty_a, drty_a), constraints_a = a.scheme in
+  let r = Params.fresh_region_param () in
+  let drt_eff = {Type.ops = [eff_name, r]; Type.rest = Params.fresh_dirt_param ()} in
+  let ((ty_out, drt_out) as drty_out) = Type.fresh_dirty () in
+  let constraints =
+    Constraints.union constraints_e constraints_a
+    |> Constraints.add_full_region r
+    |> Constraints.add_ty_constraint ~loc:e.location ty_e ty_par
+    |> Constraints.add_ty_constraint ~loc:a.location ty_res ty_a
+    |> Constraints.add_dirt_constraint drt_eff drt_out
+    |> Constraints.add_dirty_constraint ~loc drty_a drty_out
+  in
+  {
+    term = Call (eff, e, a);
+    scheme = Scheme.clean_dirty_scheme ~loc (ctx_e @ ctx_a, drty_out, constraints);
+    location = loc;
+  }
 
 let pattern_match p e =
   let _, ty_e, constraints_e = e.scheme
@@ -890,26 +890,26 @@ let pattern_match p e =
     match p.term, e.term with
     | PVar x, e -> Common.update x e sbst
     | PAs (p, x), e' ->
-        let sbst = extend_subst p e sbst in
-          Common.update x e' sbst
+      let sbst = extend_subst p e sbst in
+      Common.update x e' sbst
     | PNonbinding, _ -> sbst
     | PTuple ps, Tuple es -> List.fold_right2 extend_subst ps es sbst
     | PRecord ps, Record es ->
-        begin
-          let rec extend_record ps es sbst =
-            match ps with
-              | [] -> sbst
-              | (f, p) :: ps ->
-                  let e = List.assoc f es in
-                    extend_record ps es (extend_subst p e sbst)
-          in
-            try
-              extend_record ps es sbst
-            with Not_found -> Error.runtime ~loc:e.location "Incompatible records in substitution."
-        end
+      begin
+        let rec extend_record ps es sbst =
+          match ps with
+          | [] -> sbst
+          | (f, p) :: ps ->
+            let e = List.assoc f es in
+            extend_record ps es (extend_subst p e sbst)
+        in
+        try
+          extend_record ps es sbst
+        with Not_found -> Error.runtime ~loc:e.location "Incompatible records in substitution."
+      end
     | PVariant (lbl, None), Variant (lbl', None) when lbl = lbl' -> sbst
     | PVariant (lbl, Some p), Variant (lbl', Some e) when lbl = lbl' ->
-        extend_subst p e sbst
+      extend_subst p e sbst
     | PConst c, Const c' when Const.equal c c' -> sbst
     | _, _ -> Error.runtime ~loc:e.location "Cannot substitute an expression in a pattern."
   in
@@ -926,15 +926,15 @@ let rec free_vars_comp c =
   match c.term with
   | Value e -> free_vars_expr e
   | Let (li, cf) ->
-      let xs, vars = List.fold_right (fun (p, c) (xs, vars) ->
+    let xs, vars = List.fold_right (fun (p, c) (xs, vars) ->
         pattern_vars p, free_vars_comp c @@@ vars
       ) li ([], ([], [])) in
-      vars @@@ (free_vars_comp cf --- xs)
+    vars @@@ (free_vars_comp cf --- xs)
   | LetRec (li, c1) ->
-      let xs, vars = List.fold_right (fun (x, a) (xs, vars) ->
+    let xs, vars = List.fold_right (fun (x, a) (xs, vars) ->
         x :: xs, free_vars_abs a @@@ vars
       ) li ([], free_vars_comp c1) in
-      vars --- xs
+    vars --- xs
   | Match (e, li) -> free_vars_expr e @@@ concat_vars (List.map free_vars_abs li)
   | Apply (e1, e2) -> free_vars_expr e1 @@@ free_vars_expr e2
   | Handle (e, c1) -> free_vars_expr e @@@ free_vars_comp c1
@@ -982,75 +982,75 @@ let rec print_pattern ?max_level p ppf =
   | PVariant (lbl, None) when lbl = Common.nil -> print "[]"
   | PVariant (lbl, None) -> print "%s" lbl
   | PVariant ("(::)", Some ({ term = PTuple [p1; p2] })) ->
-      print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
+    print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
   | PVariant (lbl, Some p) ->
-      print ~at_level:1 "(%s @[<hov>%t@])" lbl (print_pattern p)
+    print ~at_level:1 "(%s @[<hov>%t@])" lbl (print_pattern p)
   | PNonbinding -> print "_"
 
 let rec print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match e.term with
   | Var x ->
-      print "%t" (print_variable x)
+    print "%t" (print_variable x)
   | BuiltIn s ->
-      print "%s" s
+    print "%s" s
   | Const c ->
-      print "%t" (Const.print c)
+    print "%t" (Const.print c)
   | Tuple lst ->
-      Print.tuple print_expression lst ppf
+    Print.tuple print_expression lst ppf
   | Record lst ->
-      Print.record print_expression lst ppf
+    Print.record print_expression lst ppf
   | Variant (lbl, None) ->
-      print "%s" lbl
+    print "%s" lbl
   | Variant (lbl, Some e) ->
-      print ~at_level:1 "%s %t" lbl (print_expression e)
+    print ~at_level:1 "%s %t" lbl (print_expression e)
   | Lambda a ->
-      print ~at_level:2 "fun %t" (print_abstraction a)
+    print ~at_level:2 "fun %t" (print_abstraction a)
   | Handler h ->
-      print "{@[<hov> value_clause = (@[fun %t@]);@ finally_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
+    print "{@[<hov> value_clause = (@[fun %t@]);@ finally_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
              ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
       (print_abstraction h.value_clause) (print_abstraction h.finally_clause)
       (print_effect_clauses h.effect_clauses)
   | Effect eff ->
-      print ~at_level:2 "effect %t" (print_effect eff)
+    print ~at_level:2 "effect %t" (print_effect eff)
   | Pure c ->
-      print ~at_level:1 "pure %t" (print_computation ~max_level:0 c)
+    print ~at_level:1 "pure %t" (print_computation ~max_level:0 c)
 
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.term with
   | Apply (e1, e2) ->
-      print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
+    print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
   | Value e ->
-      print ~at_level:1 "value %t" (print_expression ~max_level:0 e)
+    print ~at_level:1 "value %t" (print_expression ~max_level:0 e)
   | Match (e, []) ->
-      print ~at_level:2 "(match %t with _ -> assert false)" (print_expression e)
+    print ~at_level:2 "(match %t with _ -> assert false)" (print_expression e)
   | Match (e, lst) ->
-      print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e) (Print.cases print_abstraction lst)
+    print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e) (Print.cases print_abstraction lst)
   | Handle (e, c) ->
-      print ~at_level:1 "handle %t %t" (print_expression ~max_level:0 e) (print_computation ~max_level:0 c)
+    print ~at_level:1 "handle %t %t" (print_expression ~max_level:0 e) (print_computation ~max_level:0 c)
   | Let (lst, c) ->
-      print ~at_level:2 "%t" (print_multiple_bind (lst, c))
+    print ~at_level:2 "%t" (print_multiple_bind (lst, c))
   | LetRec (lst, c) ->
-      print ~at_level:2 "let rec @[<hov>%t@] in %t"
+    print ~at_level:2 "let rec @[<hov>%t@] in %t"
       (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
   | Check c' ->
-      print ~at_level:1 "check %S %t" (Common.to_string Location.print c.location) (print_computation ~max_level:0 c')
+    print ~at_level:1 "check %S %t" (Common.to_string Location.print c.location) (print_computation ~max_level:0 c')
   | Call (eff, e, a) ->
-      print ~at_level:1 "call %t %t (@[fun %t@])"
+    print ~at_level:1 "call %t %t (@[fun %t@])"
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
   | Bind (c1, a) ->
-      print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
+    print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
   | LetIn (e, {term = (p, c)}) ->
-      print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression e) (print_computation c)
+    print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression e) (print_computation c)
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match eff_clauses with
   | [] ->
-      print "| eff' -> fun arg k -> Call (eff', arg, k)"
+    print "| eff' -> fun arg k -> Call (eff', arg, k)"
   | (((_, (t1, t2)) as eff), {term = (p1, p2, c)}) :: cases ->
-      print ~at_level:1 "| %t -> (fun %t %t -> %t) %t"
+    print ~at_level:1 "| %t -> (fun %t %t -> %t) %t"
       (print_effect eff) (print_pattern p1) (print_pattern p2) (print_computation c) (print_effect_clauses cases)
 
 and print_abstraction {term = (p, c)} ppf =
@@ -1063,7 +1063,7 @@ and print_multiple_bind (lst, c') ppf =
   match lst with
   | [] -> Format.fprintf ppf "%t" (print_computation c')
   | (p, c) :: lst ->
-      Format.fprintf ppf "%t >> fun %t -> %t"
+    Format.fprintf ppf "%t >> fun %t -> %t"
       (print_computation c) (print_pattern p) (print_multiple_bind (lst, c'))
 
 and print_let_abstraction (p, c) ppf =

@@ -1,35 +1,35 @@
 module TyPoset = Poset.Make(struct
-  type t = Params.ty_param
-  let compare = Pervasives.compare
-  let print = Params.print_ty_param ~non_poly:Params.empty
-end)
+    type t = Params.ty_param
+    let compare = Pervasives.compare
+    let print = Params.print_ty_param ~non_poly:Params.empty
+  end)
 
 module DirtPoset = Poset.Make(struct
-  type t = Params.dirt_param
-  let compare = Pervasives.compare
-  let print = Params.print_dirt_param ~non_poly:Params.empty
-end)
+    type t = Params.dirt_param
+    let compare = Pervasives.compare
+    let print = Params.print_dirt_param ~non_poly:Params.empty
+  end)
 
 module RegionPoset = Poset.Make(struct
-  type t = Params.region_param
-  let compare = Pervasives.compare
-  let print = Params.print_region_param ~non_poly:Params.empty
-end)
+    type t = Params.region_param
+    let compare = Pervasives.compare
+    let print = Params.print_region_param ~non_poly:Params.empty
+  end)
 
 module FullRegions = Set.Make(struct
-  type t = Params.region_param
-  let compare = Pervasives.compare
-end)
+    type t = Params.region_param
+    let compare = Pervasives.compare
+  end)
 
 module TyMap = Map.Make(struct
-  type t = Params.ty_param
-  let compare = Pervasives.compare
-end)
+    type t = Params.ty_param
+    let compare = Pervasives.compare
+  end)
 
 module DirtMap = Map.Make(struct
-  type t = Params.dirt_param
-  let compare = Pervasives.compare
-end)
+    type t = Params.dirt_param
+    let compare = Pervasives.compare
+  end)
 
 type t = {
   ty_poset : TyPoset.t;
@@ -46,18 +46,18 @@ let is_pure { dirt_poset; region_poset; full_regions } { Type.ops; Type.rest } =
   DirtPoset.get_prec rest dirt_poset = []
 
 (* let add_prec constraints (pos_ts, pos_ds, pos_rs) =
-  let pos_ds = 
+   let pos_ds = 
       pos_ds
       |> List.map (fun d -> d :: DirtPoset.get_prec d constraints.dirt_poset)
       |> List.concat
       |> List.sort_uniq Pervasives.compare
-  and pos_rs = 
+   and pos_rs = 
       pos_rs
       |> List.map (fun r -> r :: RegionPoset.get_prec r constraints.region_poset)
       |> List.concat
       |> List.sort_uniq Pervasives.compare
-  in
-  (pos_ts, pos_ds, pos_rs) *)
+   in
+   (pos_ts, pos_ds, pos_rs) *)
 
 let must_be_empty {dirt_poset; region_poset; full_regions} {Type.ops; Type.rest} =
   if List.exists (fun (_, r) -> FullRegions.mem r full_regions) ops then
@@ -83,10 +83,10 @@ let param_expansion = {
 }
 
 let global_add_ty p ty = 
-    param_expansion.ty_expansion <- TyMap.add p ty param_expansion.ty_expansion
+  param_expansion.ty_expansion <- TyMap.add p ty param_expansion.ty_expansion
 
 let global_add_dirt d drt =
-    param_expansion.dirt_expansion <- DirtMap.add d drt param_expansion.dirt_expansion
+  param_expansion.dirt_expansion <- DirtMap.add d drt param_expansion.dirt_expansion
 
 let rec lookup_ty_param p =
   try
@@ -97,7 +97,7 @@ let rec lookup_ty_param p =
     Not_found -> None
 
 and lookup_dirt_param d =
- try
+  try
     let drt = expand_dirt (DirtMap.find d param_expansion.dirt_expansion) in
     global_add_dirt d drt;
     Some drt
@@ -108,8 +108,8 @@ and expand_ty ty = match ty with
   | Type.Apply (ty_name, args) -> Type.Apply (ty_name, expand_args args)
   | Type.Param t ->
     begin match lookup_ty_param t with
-    | Some ty' -> ty'
-    | None -> ty
+      | Some ty' -> ty'
+      | None -> ty
     end
   | Type.Basic _ -> ty
   | Type.Tuple tys -> Type.Tuple (Common.map expand_ty tys)
@@ -121,7 +121,7 @@ and expand_dirty (ty, drt) = (expand_ty ty, expand_dirt drt)
 and expand_dirt ({Type.ops=ops; Type.rest=rest} as drt) =
   match lookup_dirt_param rest with
   | Some {Type.ops=new_ops; Type.rest=new_rest} ->
-      {Type.ops = new_ops @ ops; Type.rest = new_rest }
+    {Type.ops = new_ops @ ops; Type.rest = new_rest }
   | None -> drt
 
 and expand_args (tys, drts, rs) =
@@ -132,11 +132,11 @@ let is_pure_for_handler { dirt_poset; region_poset; full_regions } { Type.ops; T
   let check_effect eff r =
     (* check if 'eff' is present in the eff_clause, otherwise we don't care *)
     let rec effect_is_ignored = function
-    | [] -> true
-    | ((eff_name,(_,_)),_)::tail when eff_name = eff ->
+      | [] -> true
+      | ((eff_name,(_,_)),_)::tail when eff_name = eff ->
         RegionPoset.get_prec r region_poset = [] &&
         not (FullRegions.mem r full_regions)
-    | _ :: tail -> effect_is_ignored tail
+      | _ :: tail -> effect_is_ignored tail
     in
     effect_is_ignored effect_clauses
   in
@@ -193,52 +193,52 @@ let rec add_ty_constraint ~loc ty1 ty2 constraints =
   | (Type.Param t1, Type.Param t2) -> add_ty_param_constraint t1 t2 constraints
 
   | (Type.Param t, ty) ->
-      add_ty_constraint ~loc (Type.Param t) ty (add_ty_expansion ~loc t ty constraints)
+    add_ty_constraint ~loc (Type.Param t) ty (add_ty_expansion ~loc t ty constraints)
 
   | (ty, Type.Param t) ->
-      add_ty_constraint ~loc ty (Type.Param t) (add_ty_expansion ~loc t ty constraints)
+    add_ty_constraint ~loc ty (Type.Param t) (add_ty_expansion ~loc t ty constraints)
 
   | (Type.Arrow (ty1, drty1), Type.Arrow (ty2, drty2)) ->
-      add_ty_constraint ~loc ty2 ty1 (add_dirty_constraint ~loc drty1 drty2 constraints)
+    add_ty_constraint ~loc ty2 ty1 (add_dirty_constraint ~loc drty1 drty2 constraints)
 
   | (Type.Tuple tys1, Type.Tuple tys2)
-      when List.length tys1 = List.length tys2 ->
-      List.fold_right2 (add_ty_constraint ~loc) tys1 tys2 constraints
+    when List.length tys1 = List.length tys2 ->
+    List.fold_right2 (add_ty_constraint ~loc) tys1 tys2 constraints
 
   | (Type.Apply (ty_name1, args1), Type.Apply (ty_name2, args2)) when ty_name1 = ty_name2 ->
-      begin match Tctx.lookup_params ty_name1 with
+    begin match Tctx.lookup_params ty_name1 with
       | None -> Error.typing ~loc "Undefined type %s" ty_name1
       | Some params -> add_args_constraint ~loc params args1 args2 constraints
-      end
+    end
 
   (* The following two cases cannot be merged into one, as the whole matching
      fails if both types are Apply, but only the second one is transparent. *)
   | (Type.Apply (ty_name, args), ty) when Tctx.transparent ~loc ty_name ->
-      begin match Tctx.ty_apply ~loc ty_name args with
+    begin match Tctx.ty_apply ~loc ty_name args with
       | Tctx.Inline ty' -> add_ty_constraint ~loc ty' ty constraints
       | Tctx.Sum _ | Tctx.Record _ -> assert false (* None of these are transparent *)
-      end
+    end
 
   | (ty, Type.Apply (ty_name, args)) when Tctx.transparent ~loc ty_name ->
-      begin match Tctx.ty_apply ~loc ty_name args with
+    begin match Tctx.ty_apply ~loc ty_name args with
       | Tctx.Inline ty' -> add_ty_constraint ~loc ty ty' constraints
       | Tctx.Sum _ | Tctx.Record _ -> assert false (* None of these are transparent *)
-      end
+    end
 
   | (Type.Handler (drty_in1, drty_out1), Type.Handler (drty_in2, drty_out2)) ->
-      add_dirty_constraint ~loc drty_in2 drty_in1 (add_dirty_constraint ~loc drty_out1 drty_out2 constraints)
+    add_dirty_constraint ~loc drty_in2 drty_in1 (add_dirty_constraint ~loc drty_out1 drty_out2 constraints)
 
   | (ty1, ty2) ->
-      let skeletons = skeletons constraints in
-      Error.typing ~loc "This expression has type %t but it should have type %t." (Type.print_ty ty1) (Type.print_ty ty2)
+    let skeletons = skeletons constraints in
+    Error.typing ~loc "This expression has type %t but it should have type %t." (Type.print_ty ty1) (Type.print_ty ty2)
 
 and add_args_constraint ~loc (ts, ds, rs) (tys1, drts1, rs1) (tys2, drts2, rs2) constraints =
   (* NB: it is assumed here that
      List.length tys1 = List.length tys2 && List.length drts1 = List.length drts2 && List.length rgns1 = List.length rgns2 *)
   let for_parameters add ps lst1 lst2 constraints =
     List.fold_right2 (fun (_, (cov, contra)) (ty1, ty2) constraints ->
-                        let constraints = if cov then add ty1 ty2 constraints else constraints in
-                        if contra then add ty2 ty1 constraints else constraints) ps (List.combine lst1 lst2) constraints
+        let constraints = if cov then add ty1 ty2 constraints else constraints in
+        if contra then add ty2 ty1 constraints else constraints) ps (List.combine lst1 lst2) constraints
   in
   let constraints = for_parameters (add_ty_constraint ~loc) ts tys1 tys2 constraints in
   let constraints = for_parameters (add_dirt_constraint) ds drts1 drts2 constraints in
@@ -280,9 +280,9 @@ and add_dirt_constraint drt1 drt2 constraints =
   and ops2 = new_ops2 @ ops2 in
   let op_less (op, dt1) constraints =
     begin match Common.lookup op ops2 with
-    | Some dt2 -> add_region_param_constraint dt1 dt2 constraints
-    | None -> assert false
-  end
+      | Some dt2 -> add_region_param_constraint dt1 dt2 constraints
+      | None -> assert false
+    end
   in
   List.fold_right op_less ops1 (add_dirt_param_constraint rest1 rest2 constraints)
 
@@ -297,7 +297,7 @@ let empty = {
   dirt_poset = DirtPoset.empty;
   region_poset = RegionPoset.empty;
   full_regions = FullRegions.empty;
- }
+}
 
 let union constraints1 constraints2 =
   {
@@ -319,14 +319,14 @@ let subst sbst constraints = {
   dirt_poset = DirtPoset.map sbst.Params.dirt_param constraints.dirt_poset;
   region_poset = RegionPoset.map sbst.Params.region_param constraints.region_poset;
   full_regions = FullRegions.fold (fun r s -> FullRegions.add (sbst.Params.region_param r) s) constraints.full_regions FullRegions.empty;
- }
+}
 
 let garbage_collect pos neg constraints = {
   ty_poset = TyPoset.filter (fun x y -> Params.ty_param_mem x neg && Params.ty_param_mem y pos) constraints.ty_poset;
   dirt_poset = DirtPoset.filter (fun x y -> Params.dirt_param_mem x neg && Params.dirt_param_mem y pos) constraints.dirt_poset;
   region_poset = RegionPoset.filter (fun x y -> Params.region_param_mem x neg && Params.region_param_mem y pos && not (FullRegions.mem y constraints.full_regions)) constraints.region_poset;
   full_regions = FullRegions.filter (fun r -> Params.region_param_mem r pos) constraints.full_regions;
- }
+}
 
 let print constraints ppf =
   TyPoset.print constraints.ty_poset ppf;

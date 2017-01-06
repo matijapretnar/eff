@@ -32,45 +32,45 @@ let float_float_to_float f =
 (* Comparison of values is a trickier business than you might think. *)
 let rec compare v1 v2 =
   match v1 with
-    | V.Closure _ | V.Handler _ -> Common.Invalid
-    | V.Const c ->
-      (match v2 with
-        | V.Closure _ | V.Handler _ -> Common.Invalid
-        | V.Const c' -> Const.compare c c'
-        | V.Tuple _ | V.Record _ | V.Variant _ -> Common.Less)
-    | V.Tuple lst ->
-      (match v2 with
-        | V.Closure _ | V.Handler _ -> Common.Invalid
-        | V.Const _ -> Common.Greater
-        | V.Tuple lst' -> compare_list lst lst'
-        | V.Record _ | V.Variant _ -> Common.Less)
-    | V.Record lst ->
-      (match v2 with
-        | V.Closure _ | V.Handler _ -> Common.Invalid
-        | V.Const _ | V.Tuple _ -> Common.Greater
-        | V.Record lst' -> compare_record lst lst'
-        | V.Variant _ -> Common.Less)
-    | V.Variant (lbl, u)->
-      (match v2 with
-        | V.Closure _ | V.Handler _ -> Common.Invalid
-        | V.Const _ | V.Tuple _ | V.Record _ -> Common.Greater
-        | V.Variant (lbl', u') ->
-          let r = Pervasives.compare lbl lbl' in
-            if r < 0 then Common.Less
-            else if r > 0 then Common.Greater
-            else compare_option u u')
+  | V.Closure _ | V.Handler _ -> Common.Invalid
+  | V.Const c ->
+    (match v2 with
+     | V.Closure _ | V.Handler _ -> Common.Invalid
+     | V.Const c' -> Const.compare c c'
+     | V.Tuple _ | V.Record _ | V.Variant _ -> Common.Less)
+  | V.Tuple lst ->
+    (match v2 with
+     | V.Closure _ | V.Handler _ -> Common.Invalid
+     | V.Const _ -> Common.Greater
+     | V.Tuple lst' -> compare_list lst lst'
+     | V.Record _ | V.Variant _ -> Common.Less)
+  | V.Record lst ->
+    (match v2 with
+     | V.Closure _ | V.Handler _ -> Common.Invalid
+     | V.Const _ | V.Tuple _ -> Common.Greater
+     | V.Record lst' -> compare_record lst lst'
+     | V.Variant _ -> Common.Less)
+  | V.Variant (lbl, u)->
+    (match v2 with
+     | V.Closure _ | V.Handler _ -> Common.Invalid
+     | V.Const _ | V.Tuple _ | V.Record _ -> Common.Greater
+     | V.Variant (lbl', u') ->
+       let r = Pervasives.compare lbl lbl' in
+       if r < 0 then Common.Less
+       else if r > 0 then Common.Greater
+       else compare_option u u')
 
 and compare_list lst1 lst2 =
   match lst1, lst2 with
-    | ([], []) -> Common.Equal
-    | (u::lst1, v::lst2) ->
-      (match compare u v with
-        | Common.Less -> Common.Less
-        | Common.Equal -> compare_list lst1 lst2
-        | Common.Greater -> Common.Greater
-        | Common.Invalid -> Common.Invalid)
-    | ([], _ :: _) -> Common.Less
-    | (_ :: _, []) -> Common.Greater
+  | ([], []) -> Common.Equal
+  | (u::lst1, v::lst2) ->
+    (match compare u v with
+     | Common.Less -> Common.Less
+     | Common.Equal -> compare_list lst1 lst2
+     | Common.Greater -> Common.Greater
+     | Common.Invalid -> Common.Invalid)
+  | ([], _ :: _) -> Common.Less
+  | (_ :: _, []) -> Common.Greater
 
 and compare_record lst1 lst2 =
   (* Is is easiest to canonically sort the fields, then compare as lists. *)
@@ -78,41 +78,41 @@ and compare_record lst1 lst2 =
     | [], [] -> Common.Equal
     | (fld1,v1)::lst1, (fld2,v2)::lst2 ->
       let r = Pervasives.compare fld1 fld2 in
-        if r < 0 then Common.Less
-        else if r > 0 then Common.Greater 
-        else
-          (match compare v1 v2 with
-            | Common.Less -> Common.Less
-            | Common.Equal -> comp (lst1, lst2)
-            | Common.Greater -> Common.Greater
-            | Common.Invalid -> Common.Invalid)
+      if r < 0 then Common.Less
+      else if r > 0 then Common.Greater 
+      else
+        (match compare v1 v2 with
+         | Common.Less -> Common.Less
+         | Common.Equal -> comp (lst1, lst2)
+         | Common.Greater -> Common.Greater
+         | Common.Invalid -> Common.Invalid)
     | [], _ :: _ -> Common.Less
     | _ :: _, [] -> Common.Greater
   in
-    comp
-      ((List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst1),
-       (List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst2))
+  comp
+    ((List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst1),
+     (List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst2))
 
 and compare_option o1 o2 =
   match o1, o2 with
-    | None, None -> Common.Equal
-    | Some v1, Some v2 -> compare v1 v2
-    | None, Some _ -> Common.Less
-    | Some _, None -> Common.Greater
+  | None, None -> Common.Equal
+  | Some v1, Some v2 -> compare v1 v2
+  | None, Some _ -> Common.Less
+  | Some _, None -> Common.Greater
 
 (* Now it is easy to get equality and less than, not to mention we
    can now easily add a builtin "compare". *)
 let equal v1 v2 =
   match compare v1 v2 with
-    | Common.Equal -> true
-    | Common.Less | Common.Greater -> false
-    | Common.Invalid -> Error.runtime "invalid comparison with ="
+  | Common.Equal -> true
+  | Common.Less | Common.Greater -> false
+  | Common.Invalid -> Error.runtime "invalid comparison with ="
 
 let less_than v1 v2 =
   match compare v1 v2 with
-    | Common.Less -> true
-    | Common.Greater | Common.Equal -> false
-    | Common.Invalid -> Error.runtime "invalid comparison with <"
+  | Common.Less -> true
+  | Common.Greater | Common.Equal -> false
+  | Common.Invalid -> Error.runtime "invalid comparison with <"
 
 let comparison_functions = [
   ("=", binary_closure (fun v1 v2 -> value_bool (equal v1 v2)));
@@ -128,8 +128,8 @@ let rec pow a = function
   | 0 -> 1
   | 1 -> a
   | n -> 
-     let b = pow a (n / 2) in
-     if n mod 2 = 0 then b * b else b * b * a
+    let b = pow a (n / 2) in
+    if n mod 2 = 0 then b * b else b * b * a
 
 let arithmetic_operations = [
   ("~-", from_fun (fun v -> value_int (~- (V.to_int v))));
@@ -149,55 +149,55 @@ let arithmetic_operations = [
 let string_operations = [
   ("^", binary_closure (fun v1 v2 -> value_str (V.to_str v1 ^ V.to_str v2)));
   ("string_length",
-    from_fun (fun v -> value_int (String.length (V.to_str v))));
+   from_fun (fun v -> value_int (String.length (V.to_str v))));
 ]
 
 let conversion_functions = [
   ("to_string",
-    let to_string v =
-      let s = Common.to_string Value.print_value v in
-      value_str s
-    in
-    from_fun to_string);
+   let to_string v =
+     let s = Common.to_string Value.print_value v in
+     value_str s
+   in
+   from_fun to_string);
   ("float_of_int",
-    from_fun (fun v -> value_float (float_of_int (V.to_int v))));
+   from_fun (fun v -> value_float (float_of_int (V.to_int v))));
 ]
 
 let std_print v =
   let str = V.to_str v in
-    print_string str;
-    flush stdout;
-    V.unit_value
+  print_string str;
+  flush stdout;
+  V.unit_value
 and std_read _ =
   let str = read_line () in
   from_str str
 
 (* let create_exception v = 
-  let exc_name = V.to_str v in
-  let exception_raise param =
+   let exc_name = V.to_str v in
+   let exception_raise param =
     Error.runtime "%s %t." exc_name (Value.print_value param)
-  in
+   in
     V.Value (external_instance exc_name [
       ("raise", exception_raise);
     ])
 
-let rnd_int v =
-  from_int (Random.int (V.to_int v))
-and rnd_float v =
-  from_float (Random.float (V.to_float v)) *)
+   let rnd_int v =
+   from_int (Random.int (V.to_int v))
+   and rnd_float v =
+   from_float (Random.float (V.to_float v)) *)
 
 let effect_instances = [
-(*   ("std", external_instance "standard I/O" [
-    ("print", std_print);
-    ("read", std_read);
-  ]);
+  (*   ("std", external_instance "standard I/O" [
+       ("print", std_print);
+       ("read", std_read);
+       ]);
 
-  ("exception", from_fun create_exception);
+       ("exception", from_fun create_exception);
 
-  ("rnd", external_instance "random number generator" [
-    ("int", rnd_int);
-    ("float", rnd_float);
-  ]); *)
+       ("rnd", external_instance "random number generator" [
+       ("int", rnd_int);
+       ("float", rnd_float);
+       ]); *)
 ]
 
 (** [values] is an association list of external names and values, consisting of

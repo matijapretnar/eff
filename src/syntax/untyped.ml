@@ -100,16 +100,16 @@ let rec print_pattern ?max_level p ppf =
   | PVariant (lbl, None) when lbl = Common.nil -> print "[]"
   | PVariant (lbl, None) -> print "%s" lbl
   | PVariant (lbl, Some ({ term = PTuple [p1; p2] })) when lbl = Common.cons ->
-      print ~at_level:1 "[@[<hov>@[%t@]%t@]]" (print_pattern p1) (pattern_list p2)
+    print ~at_level:1 "[@[<hov>@[%t@]%t@]]" (print_pattern p1) (pattern_list p2)
   | PVariant (lbl, Some p) ->
-      print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
+    print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
   | PNonbinding -> print "_"
 
 and pattern_list ?(max_length=299) p ppf =
   if max_length > 1 then
     match p.term with
     | PVariant (lbl, Some ({ term = PTuple [v1; v2] })) when lbl = Common.cons ->
-        Format.fprintf ppf ",@ %t%t" (print_pattern v1) (pattern_list ~max_length:(max_length - 1) v2)
+      Format.fprintf ppf ",@ %t%t" (print_pattern v1) (pattern_list ~max_length:(max_length - 1) v2)
     | PVariant (lbl, None) when lbl = Common.nil -> ()
     | _ -> Format.fprintf ppf "(??? %t ???)" (print_pattern p)
   else

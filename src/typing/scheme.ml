@@ -92,9 +92,9 @@ let normalize_context ~loc (ctx, ty, cnstrs) =
     | [] -> assert false
     | [ty] -> ((x, ty) :: ctx, typ, cnstrs)
     | tys ->
-        let ty' = Type.fresh_ty () in
-        let ctx' = (x, ty') :: ctx in
-        List.fold_right (fun ty ty_sch -> ty_less ~loc ty' ty ty_sch) tys (ctx', typ, cnstrs)
+      let ty' = Type.fresh_ty () in
+      let ctx' = (x, ty') :: ctx in
+      List.fold_right (fun ty ty_sch -> ty_less ~loc ty' ty ty_sch) tys (ctx', typ, cnstrs)
   in
   List.fold_right add ctx ([], ty, cnstrs)
 
@@ -156,26 +156,26 @@ let finalize_pattern_scheme ~loc ctx ty chngs =
 
 let add_to_top ~loc ctx cnstrs (ctx_c, drty_c, cnstrs_c) =
   finalize_dirty_scheme ~loc (ctx @ ctx_c) drty_c ([
-    just cnstrs_c;
-    just cnstrs
-  ])
+      just cnstrs_c;
+      just cnstrs
+    ])
 
 let abstract ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
   match finalize_ty_scheme ~loc ctx_c (Type.Arrow (ty_p, drty_c)) [
-    trim_context ~loc ctx_p;
-    just cnstrs_p;
-    just cnstrs_c
-  ] with
+      trim_context ~loc ctx_p;
+      just cnstrs_p;
+      just cnstrs_c
+    ] with
   | ctx, Type.Arrow (ty_p, drty_c), cnstrs -> ctx, (ty_p, drty_c), cnstrs
   | _ -> assert false
 
 and abstract2 ~loc (ctx_p1, ty_p1, cnstrs_p1) (ctx_p2, ty_p2, cnstrs_p2) (ctx_c, drty_c, cnstrs_c) =
   match finalize_ty_scheme ~loc ctx_c (Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c)) [
-    trim_context ~loc (ctx_p1 @ ctx_p2);
-    just cnstrs_p1;
-    just cnstrs_p2;
-    just cnstrs_c
-  ] with
+      trim_context ~loc (ctx_p1 @ ctx_p2);
+      just cnstrs_p1;
+      just cnstrs_p2;
+      just cnstrs_c
+    ] with
   | ctx, Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c), cnstrs -> ctx, (ty_p1, ty_p2, drty_c), cnstrs
   | _ -> assert false
 
@@ -190,7 +190,7 @@ let beautify_dirty_scheme drty_sch =
 let extend_non_poly params skeletons =
   let add_skel skel new_params =
     if List.exists (fun t -> Params.ty_param_mem t params) skel then
-    List.fold_right Params.add_ty_param skel new_params else new_params
+      List.fold_right Params.add_ty_param skel new_params else new_params
   in
   let new_params = List.fold_right add_skel skeletons params in
   Params.uniq new_params
@@ -255,11 +255,11 @@ let is_pure ?(loc=Location.unknown) ignored_params (ctx, (_, drt), cnstrs) =
   match Constraints.must_be_empty cnstrs (Constraints.expand_dirt drt) with
   | None -> false
   | Some (ds, rs) ->
-      let ds_t = List.for_all (fun d -> not (Params.dirt_param_mem d params)) ds
-      and rs_t = List.for_all (fun r -> not (Params.region_param_mem r params)) rs
-      in
-      (* Print.debug "%b /// %b" ds_t rs_t; *)
-      ds_t && rs_t
+    let ds_t = List.for_all (fun d -> not (Params.dirt_param_mem d params)) ds
+    and rs_t = List.for_all (fun r -> not (Params.region_param_mem r params)) rs
+    in
+    (* Print.debug "%b /// %b" ds_t rs_t; *)
+    ds_t && rs_t
 
 let is_pure_function_type ?loc ignored (ctx, ty, cnstrs) =
   match Constraints.expand_ty ty with

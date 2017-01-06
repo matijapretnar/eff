@@ -10,4 +10,4 @@ let lookup x env =
   try
     Some (EnvMap.find x env)
   with
-    | Not_found -> None      
+  | Not_found -> None      

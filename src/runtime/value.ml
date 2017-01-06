@@ -46,9 +46,9 @@ let rec print_value ?max_level v ppf =
   | Variant (lbl, None) when lbl = Common.nil -> print "[]"
   | Variant (lbl, None) -> print "%s" lbl
   | Variant (lbl, Some (Tuple [v1; v2])) when lbl = Common.cons ->
-      print "[@[<hov>@[%t@]%t@]]" (print_value v1) (list v2)
+    print "[@[<hov>@[%t@]%t@]]" (print_value v1) (list v2)
   | Variant (lbl, Some v) ->
-      print ~at_level:1 "%s @[<hov>%t@]" lbl (print_value v)
+    print ~at_level:1 "%s @[<hov>%t@]" lbl (print_value v)
   | Closure _ -> print "<fun>"
   | Handler _  -> print "<handler>"
 
@@ -56,7 +56,7 @@ and list ?(max_length=299) v ppf =
   if max_length > 1 then
     match v with
     | Variant (lbl, Some (Tuple [v1; v2])) when lbl = Common.cons ->
-        Format.fprintf ppf ";@ %t%t" (print_value v1) (list ~max_length:(max_length - 1) v2)
+      Format.fprintf ppf ";@ %t%t" (print_value v1) (list ~max_length:(max_length - 1) v2)
     | Variant (lbl, None) when lbl = Common.nil -> ()
     | _ -> assert false
   else
@@ -66,4 +66,4 @@ let print_result r ppf =
   match r with
   | Value v -> print_value v ppf
   | Call (eff, v, _) ->
-      Format.fprintf ppf "Call %t %t" (print_effect eff) (print_value v)
+    Format.fprintf ppf "Call %t %t" (print_effect eff) (print_value v)
