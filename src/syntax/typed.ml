@@ -834,43 +834,11 @@ let check ?loc c =
 let let' ?loc defs c =
   let loc = backup_location loc (
       List.fold_right (fun (p, c) locs -> p.location :: c.location :: locs) defs [c.location]
-    ) in
-  (* XXX Check for implicit sequencing *)
-  let drt = Type.fresh_dirt () in
-  let add_binding (p, c) (poly_tys, nonpoly_tys, ctx, chngs) =
-    let ctx_p, ty_p, cnstrs_p = p.scheme in
-    let ctx_c, drty_c, cnstrs_c = c.scheme in
-    let poly_tys, nonpoly_tys =
-      match c.term with
-      | Value _ ->
-        ctx_p @ poly_tys, nonpoly_tys
-      | Apply _ | Match _ | Handle _ | Let _ | LetRec _
-      | Check _ | Bind _ | LetIn _ | Call _ ->
-        poly_tys, ctx_p @ nonpoly_tys
-    in
-    poly_tys, nonpoly_tys, ctx_c @ ctx, [
-      Scheme.dirty_less ~loc:c.location drty_c (ty_p, drt);
-      Scheme.just cnstrs_p;
-      Scheme.just cnstrs_c
-    ] @ chngs
-  in
-  let poly_tys, nonpoly_tys, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
-  let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
-    Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
-        Scheme.less_context ~loc nonpoly_tys;
-        Scheme.dirt_less drt_c drt;
-        Scheme.just cnstrs_c;
-      ] @ chngs)
-  in
-  let change2 (ctx_c, drty_c, cnstrs_c) =
-    Scheme.finalize_dirty_scheme ~loc (ctx_c) drty_c ([
-        Scheme.remove_context ~loc nonpoly_tys;
-        Scheme.just cnstrs_c
-      ])
+    )
   in
   {
     term = Let (defs, c);
-    scheme = change2 (change c.scheme);
+    scheme = c.scheme;
     location = loc;
   }
 
@@ -878,31 +846,9 @@ let let_rec' ?loc defs c =
   let loc = backup_location loc (
       c.location :: List.map (fun (_, a) -> a.location) defs
     ) in
-  let drt = Type.fresh_dirt () in
-  let add_binding (x, a) (poly_tys, nonpoly_tys, ctx, chngs) =
-    let ctx_a, (ty_p, drty_c), cnstrs_a = a.scheme in
-    let poly_tys, nonpoly_tys = (x, Type.Arrow (ty_p, drty_c)) :: poly_tys, nonpoly_tys in
-    poly_tys, nonpoly_tys, ctx_a @ ctx, [
-      Scheme.just cnstrs_a
-    ] @ chngs
-  in
-  let poly_tys, nonpoly_tys, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
-  let chngs = Scheme.trim_context ~loc poly_tys :: chngs in
-  let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
-    Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
-        Scheme.dirt_less drt_c drt;
-        Scheme.just cnstrs_c;
-      ] @ chngs)
-  in
-  let change2 (ctx_c, drty_c, cnstrs_c) =
-    Scheme.finalize_dirty_scheme ~loc (ctx_c) drty_c ([
-        Scheme.remove_context ~loc nonpoly_tys;
-        Scheme.just cnstrs_c
-      ])
-  in
   {
     term = LetRec (defs, c);
-    scheme = change2 (change c.scheme);
+    scheme = c.scheme;
     location = loc;
   }
 

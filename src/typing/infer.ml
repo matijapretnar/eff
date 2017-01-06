@@ -164,13 +164,29 @@ and type_comp env {Untyped.term=comp; Untyped.location=loc} =
     | Untyped.Check c ->
       Typed.check ~loc (type_comp env c)
     | Untyped.Let (defs, c) ->
-      let defs, poly_tyschs, _, _ = type_let_defs ~loc env defs in
+      let defs, poly_tyschs, nonpoly_tys, change = type_let_defs ~loc env defs in
       let env' = extend_env poly_tyschs env in
-      Typed.let' ~loc defs (type_comp env' c)
+      let change2 (ctx_c, drty_c, cnstrs_c) =
+        Scheme.finalize_dirty_scheme ~loc (ctx_c) drty_c ([
+            Scheme.remove_context ~loc nonpoly_tys;
+            Scheme.just cnstrs_c
+          ])
+      in
+      let c = type_comp env' c in
+      let c = {c with Typed.scheme = change2 (change (c.Typed.scheme))} in
+      Typed.let' ~loc defs c
     | Untyped.LetRec (defs, c) ->
-      let defs, poly_tyschs, _, _ = type_let_rec_defs ~loc env defs in
+      let defs, poly_tyschs, nonpoly_tys, change = type_let_rec_defs ~loc env defs in
       let env' = extend_env poly_tyschs env in
-      Typed.let_rec' ~loc defs (type_comp env' c)
+      let change2 (ctx_c, drty_c, cnstrs_c) =
+        Scheme.finalize_dirty_scheme ~loc (ctx_c) drty_c ([
+            Scheme.remove_context ~loc nonpoly_tys;
+            Scheme.just cnstrs_c
+          ])
+      in
+      let c = type_comp env' c in
+      let c = {c with Typed.scheme = change2 (change (c.Typed.scheme))} in
+      Typed.let_rec' ~loc defs c
   in
   (* Print.debug ~loc:typed_comp.Typed.location "%t" (Scheme.print_dirty_scheme typed_comp.Typed.scheme); *)
   typed_comp
@@ -242,7 +258,8 @@ and type_let_rec_defs ~loc env defs =
         just cnstrs_c;
       ] @ chngs)
   in
-  Common.assoc_map (Typed.remove_rec_abs (poly_tys, constraints)) defs, poly_tyschs, nonpoly_tys, change
+  let defs = Common.assoc_map (Typed.remove_rec_abs (poly_tys, constraints)) defs in
+  defs, poly_tyschs, nonpoly_tys, change
 
 type toplevel_state = {
   change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
