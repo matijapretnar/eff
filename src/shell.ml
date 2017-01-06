@@ -84,7 +84,7 @@ let rec exec_cmd ppf interactive st d =
   | Untyped.Use fn -> use_file ppf st (fn, interactive)
   | Untyped.TopLet defs ->
       (* XXX What to do about the dirts? *)
-      let vars, nonpoly, change = Infer.infer_let ~loc st.typing defs in
+      let _, vars, nonpoly, change = Infer.type_let_defs ~loc st.typing defs in
       let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
       let extend_nonpoly (x, ty) env =
         (x, ([(x, ty)], ty, Constraints.empty)) :: env
@@ -95,7 +95,7 @@ let rec exec_cmd ppf interactive st d =
         let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
         (ctx, ty, cnstrs)
       in
-      let defs', poly_tyschs = Infer.type_let_defs ~loc st.typing defs in
+      let defs', poly_tyschs, _, _ = Infer.type_let_defs ~loc st.typing defs in
       List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let env =
         List.fold_right
@@ -116,8 +116,8 @@ let rec exec_cmd ppf interactive st d =
           environment = env;
         }
     | Untyped.TopLetRec defs ->
-        let vars, _, change = Infer.infer_let_rec ~loc st.typing defs in
-        let defs', poly_tyschs = Infer.type_let_rec_defs ~loc st.typing defs in
+        let _, vars, _, change = Infer.type_let_rec_defs ~loc st.typing defs in
+        let defs', poly_tyschs, _, _ = Infer.type_let_rec_defs ~loc st.typing defs in
         let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
         let top_change = Common.compose st.change change in
         let sch_change (ctx, ty, cnstrs) =
