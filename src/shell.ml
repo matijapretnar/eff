@@ -27,17 +27,17 @@ let initial_state = {
   typing = Infer.empty;
 }
 
-let print_ty_scheme =
+let print_ty_scheme sch =
   if !Config.smart_print then
-    SmartPrint.print_ty_scheme
+    SmartPrint.print_ty_scheme sch
   else
-    Scheme.print_ty_scheme
+    Scheme.print_ty_scheme sch
 
-let print_dirty_scheme =
+let print_dirty_scheme sch =
   if !Config.smart_print then
-    SmartPrint.print_dirty_scheme
+    SmartPrint.print_dirty_scheme sch
   else
-    Scheme.print_dirty_scheme
+    Scheme.print_dirty_scheme sch
 
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
