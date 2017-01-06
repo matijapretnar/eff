@@ -396,6 +396,87 @@ and remove_rec_abs st a =
 and remove_rec_abs2 st a2 =
   a2a2 @@ remove_rec_abs st @@ a22a @@ a2
 
+let rec push_constraints_expr constraints e =
+  let ctx, ty, cnstrs = e.scheme in
+  let joint_cnstrs = Constraints.union cnstrs constraints in
+  let scheme =
+    Scheme.finalize_ty_scheme ~loc:e.location ctx ty [
+      Scheme.just joint_cnstrs;
+    ]
+  in
+  {
+    e with term = push_constraints_expr' joint_cnstrs e.term;
+           scheme
+  }
+and push_constraints_expr' st = function
+  | Pure c ->
+    Pure (push_constraints_comp st c)
+  | Lambda a ->
+    Lambda (push_constraints_abs st a)
+  | Handler h ->
+    Handler (push_constraints_handler st h)
+  | Tuple es ->
+    Tuple (List.map (push_constraints_expr st) es)
+  | Record flds ->
+    Record (Common.assoc_map (push_constraints_expr st) flds)
+  | Variant (lbl, e) ->
+    Variant (lbl, Common.option_map (push_constraints_expr st) e)
+  | (Var _ | BuiltIn _ | Const _ | Effect _) as e -> e
+and push_constraints_comp constraints c =
+  let ctx, ty, cnstrs = c.scheme in
+  let joint_cnstrs = Constraints.union cnstrs constraints in
+  let scheme =
+    Scheme.finalize_dirty_scheme ~loc:c.location ctx ty [
+      Scheme.just joint_cnstrs;
+    ]
+  in
+  {
+    c with term = push_constraints_comp' joint_cnstrs c.term;
+           scheme
+  }
+and push_constraints_comp' st = function
+    | Bind (c1, c2) ->
+      Bind (push_constraints_comp st c1, push_constraints_abs st c2)
+    | LetIn (e, a) ->
+      LetIn (push_constraints_expr st e, push_constraints_abs st a)
+    | Let (li, c1) ->
+      let li' = List.map (fun (p, c) ->
+          (* XXX Should we check that p & st have disjoint variables? *)
+          (p, push_constraints_comp st c)
+        ) li
+      in
+      Let (li', push_constraints_comp st c1)
+    | LetRec (li, c1) ->
+      let li' = List.map (fun (x, a) ->
+          (* XXX Should we check that x does not appear in st? *)
+          (x, push_constraints_abs st a)
+        ) li
+      in
+      LetRec (li', push_constraints_comp st c1)
+    | Match (e, li) ->
+      Match (push_constraints_expr st e, List.map (push_constraints_abs st) li)
+    | Apply (e1, e2) ->
+      Apply (push_constraints_expr st e1, push_constraints_expr st e2)
+    | Handle (e, c) ->
+      Handle (push_constraints_expr st e, push_constraints_comp st c)
+    | Check c ->
+      Check (push_constraints_comp st c)
+    | Call (eff, e, a) ->
+      Call (eff, push_constraints_expr st e, push_constraints_abs st a)
+    | Value e ->
+      Value (push_constraints_expr st e)
+and push_constraints_handler st h = {
+  effect_clauses = Common.assoc_map (push_constraints_abs2 st) h.effect_clauses;
+  value_clause = push_constraints_abs st h.value_clause;
+  finally_clause = push_constraints_abs st h.finally_clause;
+}
+and push_constraints_abs st a = 
+  let (p, c) = a.term in
+  (* XXX Should we check that p & st have disjoint variables? *)
+  {a with term = (p, push_constraints_comp st c)}
+and push_constraints_abs2 st a2 =
+  a2a2 @@ push_constraints_abs st @@ a22a @@ a2
+
 
 let assoc_equal eq flds flds' : bool =
   let rec equal_fields flds =
