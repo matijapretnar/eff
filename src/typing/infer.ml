@@ -279,33 +279,31 @@ let infer_toplevel ~loc st = function
       Typed.Tydef defs, st
   | Untyped.TopLet defs ->
       (* XXX What to do about the dirts? *)
-      let _, vars, nonpoly, change = type_let_defs ~loc st.typing defs in
-      let typing_env = List.fold_right (fun (x, ty_sch) env -> add_def env x ty_sch) vars st.typing in
+      let defs', poly_tyschs, nonpoly, change = type_let_defs ~loc st.typing defs in
+      let typing_env = List.fold_right (fun (x, ty_sch) env -> add_def env x ty_sch) poly_tyschs st.typing in
       let extend_nonpoly (x, ty) env =
         (x, ([(x, ty)], ty, Constraints.empty)) :: env
       in
-      let vars = List.fold_right extend_nonpoly nonpoly vars in
+      let vars = List.fold_right extend_nonpoly nonpoly poly_tyschs in
       let top_change = Common.compose st.change change in
       let sch_change (ctx, ty, cnstrs) =
         let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
         (ctx, ty, cnstrs)
       in
-      let defs', poly_tyschs, _, _ = type_let_defs ~loc st.typing defs in
       List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
       let vars = Common.assoc_map sch_change vars in
       let st = {typing = typing_env; change = top_change} in
       Typed.TopLet (defs', vars), st
   | Untyped.TopLetRec defs ->
-      let _, vars, _, change = type_let_rec_defs ~loc st.typing defs in
-      let defs', poly_tyschs, _, _ = type_let_rec_defs ~loc st.typing defs in
-      let typing_env = List.fold_right (fun (x, ty_sch) env -> add_def env x ty_sch) vars st.typing in
+      let defs', poly_tyschs, _, change = type_let_rec_defs ~loc st.typing defs in
+      let typing_env = List.fold_right (fun (x, ty_sch) env -> add_def env x ty_sch) poly_tyschs st.typing in
       let top_change = Common.compose st.change change in
       let sch_change (ctx, ty, cnstrs) =
         let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
         (ctx, ty, cnstrs)
       in
       List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
-      let vars = Common.assoc_map sch_change vars in
+      let vars = Common.assoc_map sch_change poly_tyschs in
       let st = {typing = typing_env; change = top_change} in
       Typed.TopLetRec (defs', vars), st
   | Untyped.External (x, ty, f) ->
