@@ -1,7 +1,6 @@
 type state = {
   environment : RuntimeEnv.t;
-  change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
-  typing : Infer.state;
+  typing : Infer.toplevel_state;
 }
 
 val initial_state : state

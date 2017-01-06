@@ -94,7 +94,7 @@ let compile_file st filename =
   (* Here, we insert a simple command to be later on able to separate the source from pervasives *)
   let separator = (Sugared.Term (Sugared.Const (Const.of_string "End of pervasives"), Location.unknown), Location.unknown) in
   let cmds = List.map Desugar.toplevel (pervasives_cmds @ separator :: cmds) in
-  let cmds, _ = Infer.type_cmds {Infer.typing = st.Shell.typing; Infer.change = st.Shell.change} cmds in
+  let cmds, _ = Infer.type_cmds st.Shell.typing cmds in
   let cmds_no_opt = cmds in
   let cmds = if !Config.disable_optimization then cmds else Optimize.optimize_commands cmds in
 

@@ -19,29 +19,13 @@ let parse parser lex =
 
 type state = {
   environment : RuntimeEnv.t;
-  change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
-  typing : Infer.state;
+  typing : Infer.toplevel_state;
 }
 
 let initial_state = {
   environment = RuntimeEnv.empty;
-  change = Common.id;
-  typing = Infer.initial;
+  typing = Infer.initial_ctxenv;
 }
-
-let infer_top_comp st c =
-  let c' = Infer.type_comp st.typing c in
-  let ctx', (ty', drt'), cnstrs' = c'.Typed.scheme in
-  let change = Scheme.add_to_top ~loc:c'.Typed.location ctx' cnstrs' in
-  let top_change = Common.compose st.change change in
-  let ctx = match c'.Typed.term with
-  | Typed.Value _ -> ctx'
-  | _ -> (Desugar.fresh_variable (Some "$top_comp"), ty') :: ctx'
-  in
-  let drty_sch = top_change (ctx, (ty', drt'), cnstrs') in
-  Exhaust.check_comp c;
-
-  drty_sch, c', top_change
 
 let print_ty_scheme =
   if !Config.smart_print then
@@ -60,92 +44,59 @@ let print_dirty_scheme =
     and return the new environment. *)
 let rec exec_cmd ppf interactive st d =
   let loc = d.Untyped.location in
-  match d.Untyped.term with
-  | Untyped.Computation c ->
-      let drty_sch, c', new_change = infer_top_comp st c in
-      let v = Eval.run st.environment c' in
+  let d, typing = Infer.infer_toplevel ~loc st.typing d.Untyped.term in
+  let st = {st with typing} in
+  match d with
+  | Typed.Computation c ->
+      let v = Eval.run st.environment c in
       if interactive then Format.fprintf ppf "@[- : %t = %t@]@."
-        (print_dirty_scheme drty_sch)
+        (print_dirty_scheme c.Typed.scheme)
         (Value.print_value v);
-      {st with change = new_change}
-  | Untyped.TypeOf c ->
-      let drty_sch, c', new_change = infer_top_comp st c in
-      Format.fprintf ppf "@[- : %t@]@." (print_dirty_scheme drty_sch);
-      {st with change = new_change}
-  | Untyped.Reset ->
+      st
+  | Typed.TypeOf c ->
+      Format.fprintf ppf "@[- : %t@]@." (print_dirty_scheme c.Typed.scheme);
+      st
+  | Typed.Reset ->
       Tctx.reset ();
       print_endline ("Environment reset."); initial_state
-  | Untyped.Help ->
+  | Typed.Help ->
       print_endline help_text;
       st
-  | Untyped.DefEffect (eff, (ty1, ty2)) ->
-      {st with typing = Infer.add_effect st.typing eff (ty1, ty2)}
-  | Untyped.Quit -> exit 0
-  | Untyped.Use fn -> use_file ppf st (fn, interactive)
-  | Untyped.TopLet defs ->
-      (* XXX What to do about the dirts? *)
-      let _, vars, nonpoly, change = Infer.type_let_defs ~loc st.typing defs in
-      let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
-      let extend_nonpoly (x, ty) env =
-        (x, ([(x, ty)], ty, Constraints.empty)) :: env
-      in
-      let vars = List.fold_right extend_nonpoly nonpoly vars in
-      let top_change = Common.compose st.change change in
-      let sch_change (ctx, ty, cnstrs) =
-        let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
-        (ctx, ty, cnstrs)
-      in
-      let defs', poly_tyschs, _, _ = Infer.type_let_defs ~loc st.typing defs in
-      List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
+  | Typed.DefEffect (eff, (ty1, ty2)) ->
+      st
+  | Typed.Quit -> exit 0
+  | Typed.Use fn -> use_file ppf st (fn, interactive)
+  | Typed.TopLet (defs, vars) ->
       let env =
         List.fold_right
           (fun (p,c) env -> let v = Eval.run env c in Eval.extend p v env)
-          defs' st.environment
+          defs st.environment
       in
         if interactive then begin
           List.iter (fun (x, tysch) ->
                        match RuntimeEnv.lookup x env with
                          | None -> assert false
                          | Some v ->
-                         Format.fprintf ppf "@[val %t : %t = %t@]@." (Untyped.Variable.print x) (print_ty_scheme (sch_change tysch)) (Value.print_value v))
+                         Format.fprintf ppf "@[val %t : %t = %t@]@." (Typed.Variable.print x) (print_ty_scheme tysch) (Value.print_value v))
             vars
         end;
-        {
-          typing = typing_env;
-          change = top_change;
-          environment = env;
-        }
-    | Untyped.TopLetRec defs ->
-        let _, vars, _, change = Infer.type_let_rec_defs ~loc st.typing defs in
-        let defs', poly_tyschs, _, _ = Infer.type_let_rec_defs ~loc st.typing defs in
-        let typing_env = List.fold_right (fun (x, ty_sch) env -> Infer.add_def env x ty_sch) vars st.typing in
-        let top_change = Common.compose st.change change in
-        let sch_change (ctx, ty, cnstrs) =
-          let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
-          (ctx, ty, cnstrs)
-        in
-        List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
-        let env = Eval.extend_let_rec st.environment defs' in
+        {st with environment = env}
+    | Typed.TopLetRec (defs, vars) ->
+        let env = Eval.extend_let_rec st.environment defs in
           if interactive then begin
-            List.iter (fun (x, tysch) -> Format.fprintf ppf "@[val %t : %t = <fun>@]@." (Untyped.Variable.print x) (print_ty_scheme (sch_change tysch))) vars
+            List.iter (fun (x, tysch) -> Format.fprintf ppf "@[val %t : %t = <fun>@]@." (Typed.Variable.print x) (print_ty_scheme tysch)) vars
           end;
         {
-          typing = typing_env;
-          change = top_change;
-          environment = env;
+          st with environment = env;
         }
-    | Untyped.External (x, ty, f) ->
-      let typing_env = Infer.add_def st.typing x ([], ty, Constraints.empty) in
+    | Typed.External (x, ty, f) ->
         begin match Common.lookup f External.values with
           | Some v -> {
-              typing = typing_env;
-              change = st.change;
-              environment = RuntimeEnv.update x v st.environment;
+              st with environment = RuntimeEnv.update x v st.environment;
             }
           | None -> Error.runtime "unknown external symbol %s." f
         end
-    | Untyped.Tydef tydefs ->
-        Tctx.extend_tydefs ~loc tydefs ;
+    | Typed.Tydef tydefs ->
         st
 
 and use_file ppf env (filename, interactive) =
