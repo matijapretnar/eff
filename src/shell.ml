@@ -69,7 +69,7 @@ let rec exec_cmd ppf interactive st d =
   | Typed.TopLet (defs, vars) ->
     let env =
       List.fold_right
-        (fun (p,c) env -> let v = Eval.run env c in Eval.extend p v env)
+        (fun (p, c) env -> let v = Eval.run env c in Eval.extend p v env)
         defs st.environment
     in
     if interactive then begin
