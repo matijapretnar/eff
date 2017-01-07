@@ -831,6 +831,58 @@ let check ?loc c =
     location = loc;
   }
 
+and let_defs ~loc defs =
+  let drt = Type.fresh_dirt () in
+  let add_binding (p, c) (poly_tys, nonpoly_tys, ctx, chngs, defs) =
+    let ctx_p, ty_p, cnstrs_p = p.scheme in
+    let ctx_c, drty_c, cnstrs_c = c.scheme in
+    let poly_tys, nonpoly_tys =
+      match c.term with
+      | Value _ ->
+        ctx_p @ poly_tys, nonpoly_tys
+      | Apply _ | Match _ | Handle _ | Let _ | LetRec _
+      | Check _ | Bind _ | LetIn _ | Call _ ->
+        poly_tys, ctx_p @ nonpoly_tys
+    in
+    poly_tys, nonpoly_tys, ctx_c @ ctx, [
+      Scheme.dirty_less ~loc:c.location drty_c (ty_p, drt);
+      Scheme.just cnstrs_p;
+      Scheme.just cnstrs_c
+    ] @ chngs, (p, c) :: defs
+  in
+  let poly_tys, nonpoly_tys, ctx, chngs, defs = List.fold_right add_binding defs ([], [], [], [], []) in
+  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
+    Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
+        Scheme.less_context ~loc nonpoly_tys;
+        Scheme.dirt_less drt_c drt;
+        Scheme.just cnstrs_c;
+      ] @ chngs)
+  in
+  defs, poly_tyschs, nonpoly_tys, change
+and let_rec_defs ~loc defs =
+  let drt = Type.fresh_dirt () in
+  let add_binding (x, a) (poly_tys, nonpoly_tys, ctx, chngs, defs) =
+    let ctx_a, (ty_p, drty_c), cnstrs_a = a.scheme in
+    let poly_tys, nonpoly_tys = (x, Type.Arrow (ty_p, drty_c)) :: poly_tys, nonpoly_tys in
+    poly_tys, nonpoly_tys, ctx_a @ ctx, [
+      Scheme.just cnstrs_a
+    ] @ chngs, (x, a) :: defs
+  in
+  let poly_tys, nonpoly_tys, ctx, chngs, defs = List.fold_right add_binding defs ([], [], [], [], []) in
+  let chngs = Scheme.trim_context ~loc poly_tys :: chngs in
+  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  let constraints = Scheme.collect_constraints chngs in
+  let [(_, sch)] = poly_tyschs in
+  let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
+    Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
+        Scheme.dirt_less drt_c drt;
+        Scheme.just cnstrs_c;
+      ] @ chngs)
+  in
+  let defs = Common.assoc_map (remove_rec_abs (poly_tys, constraints)) defs in
+  defs, poly_tyschs, nonpoly_tys, change
+
 let let' ?loc defs c =
   let loc = backup_location loc (
       List.fold_right (fun (p, c) locs -> p.location :: c.location :: locs) defs [c.location]
