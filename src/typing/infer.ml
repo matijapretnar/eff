@@ -164,24 +164,11 @@ and type_comp env {Untyped.term=comp; Untyped.location=loc} =
     | Untyped.Check c ->
       Typed.check ~loc (type_comp env c)
     | Untyped.Let (defs, c) ->
-      let defs', poly_tyschs, nonpoly_tys, change, env' = type_let_defs ~loc env defs in
-
-      let change2 (ctx_c, drty_c, cnstrs_c) =
-        Scheme.finalize_dirty_scheme ~loc (ctx_c) drty_c ([
-            Scheme.remove_context ~loc nonpoly_tys;
-            Scheme.just cnstrs_c
-          ])
-      in
-
-      let c = type_comp env' c in
-      let c = {c with Typed.scheme = change2 (change (c.Typed.scheme))} in
-
-      Typed.let' ~loc defs' c
+      let env', defs' = type_let_defs ~loc env defs in
+      Typed.let' ~loc defs' (type_comp env' c)
     | Untyped.LetRec (defs, c) ->
-      let defs, poly_tyschs, change, env' = type_let_rec_defs ~loc env defs in
-      let c = type_comp env' c in
-      let c = {c with Typed.scheme = change (c.Typed.scheme)} in
-      Typed.let_rec' ~loc defs c
+      let env', defs' = type_let_rec_defs ~loc env defs in
+      Typed.let_rec' ~loc defs' (type_comp env' c)
   in
   (* Print.debug ~loc:typed_comp.Typed.location "%t" (Scheme.print_dirty_scheme typed_comp.Typed.scheme); *)
   typed_comp
@@ -198,16 +185,30 @@ and type_handler env h =
     Typed.value_clause = type_abstraction env h.Untyped.value_clause;
     Typed.finally_clause = type_abstraction env h.Untyped.finally_clause;
   }
-and type_let_defs ~loc env defs'' =
-  let defs = List.map (fun (p, c) -> (type_pattern p, type_comp env c)) defs'' in
-  let defs', poly_tyschs, nonpoly_tys, change = Typed.let_defs ~loc defs in
+and type_let_defs ~loc env defs =
+  let defs' = List.map (fun (p, c) -> (type_pattern p, type_comp env c)) defs in
+  let defs'', poly_tyschs, _, _ = Typed.let_defs ~loc defs' in
   let env' = extend_env poly_tyschs env in
-  defs', poly_tyschs, nonpoly_tys, change, env'
-and type_let_rec_defs ~loc env defs'' =
-  let defs = Common.assoc_map (type_abstraction env) defs'' in
-  let defs', poly_tyschs, change = Typed.let_rec_defs ~loc defs in
+  env', defs''
+and type_let_rec_defs ~loc env defs =
+  let defs' = Common.assoc_map (type_abstraction env) defs in
+  let defs'', poly_tyschs, _ = Typed.let_rec_defs ~loc defs' in
   let env' = extend_env poly_tyschs env in
-  defs', poly_tyschs, change, env'
+  env', defs''
+and type_top_let_defs ~loc env defs =
+  let defs' = List.map (fun (p, c) -> (type_pattern p, type_comp env c)) defs in
+  let defs'', poly_tyschs, nonpoly_tys, change = Typed.let_defs ~loc defs' in
+  let env' = extend_env poly_tyschs env in
+  let extend_nonpoly (x, ty) env =
+    (x, ([(x, ty)], ty, Constraints.empty)) :: env
+  in
+  let vars = List.fold_right extend_nonpoly nonpoly_tys poly_tyschs in
+  env', vars, defs'', change
+and type_top_let_rec_defs ~loc env defs =
+  let defs' = Common.assoc_map (type_abstraction env) defs in
+  let defs'', poly_tyschs, change = Typed.let_rec_defs ~loc defs' in
+  let env' = extend_env poly_tyschs env in
+  env', poly_tyschs, defs'', change
 
 type toplevel_state = {
   change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
@@ -242,12 +243,7 @@ let infer_toplevel ~loc st = function
     Typed.Tydef defs, st
   | Untyped.TopLet defs ->
     (* XXX What to do about the dirts? *)
-    let defs', poly_tyschs, nonpoly, change, env' = type_let_defs ~loc st.typing defs in
-
-    let extend_nonpoly (x, ty) env =
-      (x, ([(x, ty)], ty, Constraints.empty)) :: env
-    in
-    let vars = List.fold_right extend_nonpoly nonpoly poly_tyschs in
+    let env', vars, defs', change = type_top_let_defs ~loc st.typing defs in
     let top_change = Common.compose st.change change in
     let sch_change (ctx, ty, cnstrs) =
       let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
@@ -259,15 +255,15 @@ let infer_toplevel ~loc st = function
 
     Typed.TopLet (defs', vars), st
   | Untyped.TopLetRec defs'' ->
-    let defs', poly_tyschs, change, typing_env = type_let_rec_defs ~loc st.typing defs'' in
+    let env', vars, defs', change = type_top_let_rec_defs ~loc st.typing defs'' in
     let top_change = Common.compose st.change change in
     let sch_change (ctx, ty, cnstrs) =
       let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
       (ctx, ty, cnstrs)
     in
     List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs'' ;
-    let vars = Common.assoc_map sch_change poly_tyschs in
-    let st = {typing = typing_env; change = top_change} in
+    let vars = Common.assoc_map sch_change vars in
+    let st = {typing = env'; change = top_change} in
     Typed.TopLetRec (defs', vars), st
   | Untyped.External (x, ty, f) ->
     let st = {st with typing = add_def st.typing x ([], ty, Constraints.empty)} in
