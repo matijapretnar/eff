@@ -267,7 +267,7 @@ let is_pure_function_type ?loc ignored (ctx, ty, cnstrs) =
   | _ -> false
 
 let polymorphic_dirt (ctx, ty, cnstrs) =
-  true
+  Constraints.non_empty_dirts cnstrs
 
 let pos_dirt_params tysch =
   Params.project_dirt_params (fst (pos_neg_ty_scheme tysch))
