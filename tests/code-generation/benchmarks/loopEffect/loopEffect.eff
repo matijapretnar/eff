@@ -1,0 +1,54 @@
+effect Tick : unit -> unit;;
+effect Get: unit -> int;;
+effect Put: int -> unit;;
+
+let tickHandler = handler
+    | val y -> (fun x -> x)
+    | #Tick () k -> (fun x -> k () (x+1))
+;;
+let tickHandlerUnit = handler
+    | val y -> (fun x -> y)
+    | #Tick () k -> (fun x -> k () (x+1))
+;;
+let tickHandlerTuple = handler
+    | val y -> (fun x -> (x, y))
+    | #Tick () k -> (fun x -> k () (x+1))
+;;
+let tickHandlerNoInc = handler
+    | val y -> (fun x -> x)
+    | #Tick () k -> (fun x -> k () (x))
+;;
+let tickHandlerState = handler
+    | val y -> (fun x -> x)
+    | #Get () k -> (fun s -> k s s)
+    | #Put s' k -> (fun _ -> k () s')
+;;
+
+let rec loop n =
+    if n = 0 then ()
+    else
+        let _ = #Tick () in
+        loop (n-1)
+;;
+
+let rec loopState n =
+    if n = 0 then ()
+    else
+        let _ = #Put ((#Get ()) + 1) in
+        loopState (n-1)
+;;
+
+let loop_w_handler0 n = (with tickHandler handle (loop n)) 0;;
+(* let res0 = loop_w_handler0 10;; *)
+
+let loop_w_handler1 n = (with tickHandlerUnit handle (loop n)) 0;;
+(* let res1 = loop_w_handler1 10;; *)
+
+let loop_w_handler2 n = (with tickHandlerTuple handle (loop n)) 0;;
+(* let res2 = loop_w_handler2 10;; *)
+
+let loop_w_handler3 n = (with tickHandlerNoInc handle (loop n)) 0;;
+(* let res2 = loop_w_handler3 10;; *)
+
+let loop_w_handler4 n = (with tickHandlerState handle (loopState n)) 0;;
+(* let res3 = loop_w_handler4 10;; *)
