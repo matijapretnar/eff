@@ -31,18 +31,38 @@ let find_in_stack st x = Common.lookup x st.stack
 
 let find_in_let_rec_mem st v = Common.lookup v st.letrec_memory
 
+
+let alphaeq_handler_no_vc eqvars h h'=
+let (Handler ht) = h.term in
+let (Handler h't) = h'.term in 
+ assoc_equal (alphaeq_abs2 eqvars) ht.effect_clauses h't.effect_clauses &&
+  alphaeq_abs eqvars ht.finally_clause h't.finally_clause
+
 let find_in_handlers_func_mem st f_name h_exp =
+  let loc = h_exp.location in 
   let findres = List.filter
-                  (fun (h,old_f,new_f) -> (f_name == old_f) && alphaeq_expr [] h h_exp) st.handlers_functions_mem in
-  begin match findres with
-  | [] -> let findres2 = List.filter
                   (fun (h,old_f,new_f) -> (f_name == old_f) ) st.handlers_functions_mem in
-                  begin match findres2 with 
-                  | [] -> (false,None)
-                  | _ -> (true,None)
-                end
-  | [(_,_,newf)] -> (true,Some newf)
+  begin match findres with
+  | [] -> (false,None)
+  | [(h,_,newf)] -> 
+      if (alphaeq_expr [] h h_exp) 
+      then 
+        (true,Some newf)
+      else begin
+        if (alphaeq_handler_no_vc [] h h_exp)
+        then begin
+          Print.debug ~loc:h_exp.Typed.location"ONLY VALUE CLAUSE IS DIFFERENT !! %t" (Typed.print_expression h_exp);
+          (false,Some newf)
+        end
+        else 
+          begin 
+          Print.debug ~loc:h_exp.Typed.location"Conflicting specialization call on\n %t \n=====================================\n %t "  (Typed.print_expression h_exp) (Typed.print_expression h);
+          (true,None)
+          end
+      end
+
   end
+
 
 let a22a a2 = Typed.a22a a2
 let pa2a pa = Typed.pa2a pa
@@ -227,7 +247,7 @@ and optimize_sub_expr st e =
     pure_let_in ~loc (optimize_expr st e1) (optimize_pure_abs st pa)
   | Handler h ->
     handler ~loc {
-      effect_clauses = Common.assoc_map (optimize_abs2 st) h.effect_clauses;
+      effect_clauses = (*Common.assoc_map (optimize_abs2 st)*) h.effect_clauses;
       value_clause = optimize_abs st h.value_clause;
       finally_clause = optimize_abs st h.finally_clause;
     }
@@ -435,12 +455,41 @@ and reduce_comp st c =
     begin match ae1.term with
       | Var v ->
             begin match (find_in_handlers_func_mem st v e1) with
+             (*function exist,Same handler, same value clause*)
              | (true,Some new_f_exp) ->
                                 let res = apply new_f_exp ae2
                                 in reduce_comp st res
+
+             (*function exist,Same handler, different value clause*)
+             | (false, Some new_f_exp)-> 
+               begin match (find_in_let_rec_mem st v) with
+                | Some abs -> 
+                   let (let_rec_p,let_rec_c) = abs.term in
+                  Print.debug "THE ABSTRACTION OF SAME HANDLER DIFF VALUE :- %t" (Typed.print_abstraction abs);
+                  let Handler ha = e1.term in 
+                  Print.debug "THE VALUE CLAUSE :- %t" (Typed.print_abstraction ha.value_clause);
+                  let ctx2, (ty2 , _ ), cnstrs2 = ha.value_clause.scheme in
+                  let sch = (ctx2,ty2,cnstrs2) in 
+                  let k_var, k_pat = make_var "k_val"  sch in
+                  let ctx1, ty1, cnstrs1 = let_rec_p.scheme in 
+                  (*let new_pattern = {
+                    term = PTuple [let_rec_p; k_pat];
+                    scheme = (
+                      ctx1 @ ctx2,
+                      Type.Tuple [ty1; ty2],
+                      Constraints.union cnstrs1 cnstrs2
+                    );
+                    location = ae1.location;
+                  } in
+                 
+                  let identity_var,identity_pat = make_var "identity" ty2 in
+                  let mh.value_clause = abstraction identity_pat @@ (value identity_var) *)
+                   c 
+                | _ -> c
+               end
              | (true, None) ->
                   c
-             |_ -> 
+             | _ -> 
                begin match find_in_stack st v with
                | Some ({term = Lambda k}) ->
                   let {term = (newdp, newdc)} = refresh_abs k in
@@ -478,7 +527,7 @@ and reduce_comp st c =
                                     let Var newfvar = new_f_var.term in
                                     let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
                                     let st = {st with handlers_functions_mem = (e1,v,new_f_var) :: st.handlers_functions_mem} in
-                                    Print.debug " the ccc is %t" (Typed.print_computation c);
+                                    (*Print.debug " the ccc is %t" (Typed.print_computation c);*)
                                     let res =
                                       let_rec' defs @@
                                       apply new_f_var ae2
@@ -557,10 +606,10 @@ and reduce_comp st c =
 
   (* XXX simplify *)
   | LetRec (defs, co) ->
-    Print.debug "the letrec comp  %t" (Typed.print_computation co);
+    (*Print.debug "the letrec comp  %t" (Typed.print_computation co);*)
     let st = 
     List.fold_right (fun (var,abs) st ->
-            Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs);
+            (*Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs);*)
             {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
     let_rec' defs (reduce_comp st co)
 
