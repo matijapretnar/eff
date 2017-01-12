@@ -30,6 +30,7 @@ let infer_effect ~loc env eff =
   | Not_found -> Error.typing ~loc "Unbound effect %s" eff
 
 let tag_polymorphic_dirt tysch =
+  let tysch = Scheme.refresh tysch in
   let r = Params.fresh_region_param ()
   and d = Params.fresh_dirt_param ()
   and ds = Scheme.polymorphic_dirt tysch in
