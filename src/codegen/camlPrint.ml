@@ -359,7 +359,7 @@ and print_abstraction ~pure st {Typed.term = (p, c)} ppf =
 
 and print_multiple_bind ~pure st (lst, c') ppf =
   match lst with
-  | [] -> Format.fprintf ppf "%t" (print_computation ~pure:false st c')
+  | [] -> Format.fprintf ppf "%t" (print_computation ~pure st c')
   | (p, c) :: lst ->
     if pure then
       Format.fprintf ppf "let %t = %t in %t"
