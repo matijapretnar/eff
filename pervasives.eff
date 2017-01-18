@@ -231,11 +231,11 @@ let print_endline v =
 effect Lookup: unit -> int
 effect Update: int -> unit
 
-let state r x = handler
+(* let state r x = handler
   | val y -> (fun _ -> y)
   | #Lookup () k -> (fun s -> k s s)
   | #Update s' k -> (fun _ -> k () s')
-  | finally f -> f x;;
+  | finally f -> f x;; *)
 
 (* let ref x =
   new ref @ x with
