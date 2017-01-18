@@ -1,0 +1,17 @@
+BLANK
+- works
+
+LOOP
+- works
+
+LOOP EFFECT
+- works when removing unused handlers (higher order impure functions?)
+
+QUEENS
+- backtracking doesn't work (higher order impure functions?)
+
+PARSER
+- loops with the test cases, doesn't work without them
+
+INTERPRETER
+- loops with the test cases, works without them
