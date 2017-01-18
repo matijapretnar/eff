@@ -31,17 +31,41 @@ let find_in_stack st x = Common.lookup x st.stack
 
 let find_in_let_rec_mem st v = Common.lookup v st.letrec_memory
 
+
+let alphaeq_handler_no_vc eqvars h h'=
+let (Handler ht) = h.term in
+let (Handler h't) = h'.term in 
+ assoc_equal (alphaeq_abs2 eqvars) ht.effect_clauses h't.effect_clauses &&
+  alphaeq_abs eqvars ht.finally_clause h't.finally_clause
+
 let find_in_handlers_func_mem st f_name h_exp =
+  let loc = h_exp.location in 
   let findres = List.filter
-      (fun (h,old_f,new_f) -> (f_name == old_f) (*&& alphaeq_expr [] h h_exp*)) st.handlers_functions_mem in
+                  (fun (h,old_f,new_f) -> (f_name == old_f) ) st.handlers_functions_mem in
   begin match findres with
-    | [] -> None
-    | [(_,_,newf)] -> Some newf
+  | [] -> (false,None)
+  | [(h,_,newf)] -> 
+      if (alphaeq_expr [] h h_exp) 
+      then 
+        (true,Some newf)
+      else begin
+        if (alphaeq_handler_no_vc [] h h_exp)
+        then begin
+          Print.debug ~loc:h_exp.Typed.location"ONLY VALUE CLAUSE IS DIFFERENT !! %t" (Typed.print_expression h_exp);
+          (false,Some newf)
+        end
+        else 
+          begin 
+          Print.debug ~loc:h_exp.Typed.location"Conflicting specialization call on\n %t \n=====================================\n %t "  (Typed.print_expression h_exp) (Typed.print_expression h);
+          (true,None)
+          end
+      end
+
   end
+
 
 let a22a a2 = Typed.a22a a2
 let a2a2 a = Typed.a2a2 a
-
 
 let inlinable_definitions =
   let unary_builtin f ty1 ty2 =
@@ -76,6 +100,7 @@ let inlinable_definitions =
     ("^", monomorphic @@ binary_builtin "(^)" Type.string_ty Type.string_ty Type.string_ty);
     ("string_length", monomorphic @@ unary_builtin "string_length" Type.string_ty Type.int_ty)
   ]
+
 
 let make_var ?(loc=Location.unknown) ann scheme =
   let x = Typed.Variable.fresh ann in
@@ -132,16 +157,15 @@ and beta_reduce st ({term = (p, c)} as a) e =
     let a =
       begin match p with
         | {term = Typed.PVar x} ->
-          (* Print.debug "Added to stack ==== %t" (Typed.print_variable x); *)
+          Print.debug "Added to stack ==== %t" (Typed.print_variable x);
           let st = {st with stack = Common.update x e st.stack} in
           abstraction p (optimize_comp st c)
         | _ ->
-          (* Print.debug "We are now in the let in 5 novar for %t" (Typed.print_pattern p); *)
+          Print.debug "We are now in the let in 5 novar for %t" (Typed.print_pattern p);
           a
       end
     in
     let_in e a
-
 
 and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
 and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
@@ -161,7 +185,7 @@ and optimize_sub_expr st e =
     pure ~loc (optimize_comp st c)
   | Handler h ->
     handler ~loc {
-      effect_clauses = Common.assoc_map (optimize_abs2 st) h.effect_clauses;
+      effect_clauses = (*Common.assoc_map (optimize_abs2 st)*) h.effect_clauses;
       value_clause = optimize_abs st h.value_clause;
       finally_clause = optimize_abs st h.finally_clause;
     }
@@ -196,257 +220,282 @@ and optimize_abs2 st a2 = a2a2 @@ optimize_abs st @@ a22a @@ a2
 and reduce_expr st e =
   let e' = match e.term with
 
-    | Var x ->
-      begin match find_inlinable st x with
-        | Some ({term = Handler _} as d) -> reduce_expr st (refresh_expr d)
-        | Some d -> reduce_expr st d
-        | _ -> e
-      end
+  | Var x ->
+    begin match find_inlinable st x with
+      | Some ({term = Handler _} as d) -> reduce_expr st (refresh_expr d)
+      | Some d -> reduce_expr st d
+      | _ -> e
+    end
 
-    | Effect eff ->
-      let (eff_name, (ty_par, ty_res)) = eff in
-      let param_var, param_pat = make_var "param" (Scheme.simple ty_par) in
-      let result_var, result_pat = make_var "result" (Scheme.simple ty_res) in
-      let k = abstraction result_pat (value result_var) in
-      let call_eff_param_var_k = reduce_comp st (call eff param_var k) in
-      let res =
-        lambda (abstraction param_pat call_eff_param_var_k)
-      in
-      (* Body is already reduced and it's a lambda *)
-      res
+  | Effect eff ->
+    let (eff_name, (ty_par, ty_res)) = eff in
+    let param_var, param_pat = make_var "param" (Scheme.simple ty_par) in
+    let result_var, result_pat = make_var "result" (Scheme.simple ty_res) in
+    let k = abstraction result_pat (value result_var) in
+    let call_eff_param_var_k = reduce_comp st (call eff param_var k) in
+    let res =
+      lambda (abstraction param_pat call_eff_param_var_k)
+    in
+    (* Body is already reduced and it's a lambda *)
+    res
 
-    | Pure {term = Value e} ->
-      e
-
-    | _ -> e
+  | _ -> e
   in
-  (*   if e <> e' then
-       Print.debug ~loc:e.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
-       (Typed.print_expression e) (Scheme.print_ty_scheme e.Typed.scheme)
-       (Typed.print_expression e') (Scheme.print_ty_scheme e'.Typed.scheme); *)
+  if e <> e' then
+  Print.debug ~loc:e.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
+    (Typed.print_expression e) (Scheme.print_ty_scheme e.Typed.scheme)
+    (Typed.print_expression e') (Scheme.print_ty_scheme e'.Typed.scheme);
   e'
 
 
 and reduce_comp st c =
   let c' = match c.term with
 
-    (* Convert simultaneous let into a sequence of binds *)
-    | Let (defs, c) ->
-      let binds = List.fold_right (fun (p_def, c_def) binds ->
-          bind c_def (abstraction p_def binds)
-        ) defs c in
-      reduce_comp st binds
+  (* Convert simultaneous let into a sequence of binds *)
+  | Let (defs, c) ->
+    let binds = List.fold_right (fun (p_def, c_def) binds ->
+        bind c_def (abstraction p_def binds)
+      ) defs c in
+    reduce_comp st binds
 
-    | Match ({term = Const cst}, cases) ->
-      let rec find_const_case = function
-        | [] -> c
-        | ({term = {term = PConst cst'}, c'}) :: _ when Const.equal cst cst' -> c'
-        | _ :: cases -> find_const_case cases
-      in
-      find_const_case cases
+  | Match ({term = Const cst}, cases) ->
+    let rec find_const_case = function
+      | [] -> c
+      | ({term = {term = PConst cst'}, c'}) :: _ when Const.equal cst cst' -> c'
+      | _ :: cases -> find_const_case cases
+    in
+    find_const_case cases
 
-    | Bind (c1, c2) when Scheme.is_pure Params.empty c1.scheme ->
-      beta_reduce st c2 (reduce_expr st (pure c1))
+  | Bind ({term = Value e}, c) ->
+    beta_reduce st c e
 
-    | Bind ({term = Bind (c1, {term = (p1, c2)})}, c3) ->
-      let bind_c2_c3 = reduce_comp st (bind c2 c3) in
-      let res =
-        bind c1 (abstraction p1 bind_c2_c3)
-      in
-      reduce_comp st res
+  | Bind ({term = Bind (c1, {term = (p1, c2)})}, c3) ->
+    let bind_c2_c3 = reduce_comp st (bind c2 c3) in
+    let res =
+      bind c1 (abstraction p1 bind_c2_c3)
+    in
+    reduce_comp st res
 
-    | Bind ({term = LetIn (e1, {term = (p1, c2)})}, c3) ->
-      let bind_c2_c3 = reduce_comp st (bind c2 c3) in
-      let res =
-        let_in e1 (abstraction p1 (bind_c2_c3))
-      in
-      reduce_comp st res
+  | Bind ({term = LetIn (e1, {term = (p1, c2)})}, c3) ->
+    let bind_c2_c3 = reduce_comp st (bind c2 c3) in
+    let res =
+      let_in e1 (abstraction p1 (bind_c2_c3))
+    in
+    reduce_comp st res
 
-    | Bind ({term = Call (eff, param, k)}, c) ->
-      let {term = (k_pat, k_body)} = refresh_abs k in
-      let bind_k_c = reduce_comp st (bind k_body c) in
-      let res =
-        call eff param (abstraction k_pat bind_k_c)
-      in
-      reduce_comp st res
+  | Bind ({term = Call (eff, param, k)}, c) ->
+    let {term = (k_pat, k_body)} = refresh_abs k in
+    let bind_k_c = reduce_comp st (bind k_body c) in
+    let res =
+      call eff param (abstraction k_pat bind_k_c)
+    in
+    reduce_comp st res
 
-    | Handle (h, {term = LetIn (e, {term = (p, c)})}) ->
-      let handle_h_c = reduce_comp st (handle h c) in
-      let res =
-        let_in e (abstraction p (handle_h_c))
-      in
-      reduce_comp st res
+  | Handle (h, {term = LetIn (e, {term = (p, c)})}) ->
+    let handle_h_c = reduce_comp st (handle h c) in
+    let res =
+      let_in e (abstraction p (handle_h_c))
+    in
+    reduce_comp st res
 
-    | Handle (h, {term = LetRec (defs, co)}) ->
-      let handle_h_c = reduce_comp st (handle h co) in
-      let res =
-        let_rec' defs handle_h_c
-      in
-      reduce_comp st res
+  | Handle (h, {term = LetRec (defs, co)}) ->
+    let handle_h_c = reduce_comp st (handle h co) in
+    let res =
+      let_rec' defs handle_h_c
+    in
+    reduce_comp st res
 
-    | Handle ({term = Handler h}, c1)
-      when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
-      (* Print.debug "Remove handler, since no effects in common with computation"; *)
-      reduce_comp st (bind c1 h.value_clause)
+  | Handle ({term = Handler h}, c1)
+        when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
+    Print.debug "Remove handler, since no effects in common with computation";
+    reduce_comp st (bind c1 h.value_clause)
 
-    | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})})
-      when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
-      (* Print.debug "Remove handler of outer Bind, since no effects in common with computation"; *)
-      reduce_comp st (bind (reduce_comp st c1) (abstraction p1 (reduce_comp st (handle (refresh_expr handler) c2))))
+  | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})})
+        when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
+    Print.debug "Remove handler of outer Bind, since no effects in common with computation";
+    reduce_comp st (bind (reduce_comp st c1) (abstraction p1 (reduce_comp st (handle (refresh_expr handler) c2))))
 
-    | Handle ({term = Handler h}, c) when Scheme.is_pure Params.empty c.scheme ->
-      beta_reduce st h.value_clause (reduce_expr st (pure c))
+  | Handle ({term = Handler h}, {term = Bind (c1, {term = (p1, c2)})})
+        when (Scheme.is_pure_for_handler c2.Typed.scheme h.effect_clauses) ->
+    Print.debug "Move inner bind into the value case";
+    let new_value_clause = optimize_abs st (abstraction p1 (bind (reduce_comp st c2) (refresh_abs h.value_clause))) in
+    let hdlr = handler {
+      effect_clauses = h.effect_clauses;
+      value_clause = refresh_abs new_value_clause;
+      finally_clause = h.finally_clause;
+    } in
+    reduce_comp st (handle (refresh_expr hdlr) c1)
 
-    | Handle ({term = Handler h}, {term = Bind (c1, {term = (p1, c2)})})
-      when (Scheme.is_pure_for_handler c2.Typed.scheme h.effect_clauses) ->
-      (* Print.debug "Move inner bind into the value case"; *)
-      let new_value_clause = abstraction p1 (bind (reduce_comp st c2) (refresh_abs h.value_clause)) in
-      let hdlr = handler {
-          effect_clauses = h.effect_clauses;
-          value_clause = refresh_abs new_value_clause;
-          finally_clause = h.finally_clause;
-        } in
-      reduce_comp st (handle (refresh_expr hdlr) c1)
+  | Handle ({term = Handler h} as h2, {term = Bind (c1, {term = (p, c2)})}) ->
+    Print.debug "Move (dirty) inner bind into the value case";
+    let new_value_clause = optimize_abs st (abstraction p (handle (refresh_expr h2) (refresh_comp (reduce_comp st c2) ))) in
+    let hdlr = handler {
+      effect_clauses = h.effect_clauses;
+      value_clause = refresh_abs new_value_clause;
+      finally_clause = h.finally_clause;
+    } in
+    reduce_comp st (handle (refresh_expr hdlr) (refresh_comp c1))
 
-    | Handle ({term = Handler h} as h2, {term = Bind (c1, {term = (p, c2)})}) ->
-      (* Print.debug "Move (dirty) inner bind into the value case"; *)
-      let new_value_clause = abstraction p (handle (refresh_expr h2) (refresh_comp (reduce_comp st c2) )) in
-      let hdlr = handler {
-          effect_clauses = h.effect_clauses;
-          value_clause = refresh_abs new_value_clause;
-          finally_clause = h.finally_clause;
-        } in
-      reduce_comp st (handle (refresh_expr hdlr) (refresh_comp c1))
+  | Handle ({term = Handler h}, {term = Value v}) ->
+    beta_reduce st h.value_clause v
 
-    | Handle ({term = Handler h} as handler, {term = Call (eff, param, k)}) ->
-      let {term = (k_pat, k_body)} = refresh_abs k in
-      let handled_k =
-        abstraction k_pat
-          (reduce_comp st (handle (refresh_expr handler) k_body))
-      in
-      begin match Common.lookup eff h.effect_clauses with
-        | Some eff_clause ->
-          let {term = (p1, p2, c)} = refresh_abs2 eff_clause in
-          (* Shouldn't we check for inlinability of p1 and p2 here? *)
-          substitute_pattern_comp st (substitute_pattern_comp st c p1 param) p2 (lambda handled_k)
-        | None ->
-          let res =
-            call eff param handled_k
-          in
-          reduce_comp st res
-      end
+  | Handle ({term = Handler h} as handler, {term = Call (eff, param, k)}) ->
+    let {term = (k_pat, k_body)} = refresh_abs k in
+    let handled_k =
+      abstraction k_pat
+        (reduce_comp st (handle (refresh_expr handler) k_body))
+    in
+    begin match Common.lookup eff h.effect_clauses with
+      | Some eff_clause ->
+        let {term = (p1, p2, c)} = refresh_abs2 eff_clause in
+        (* Shouldn't we check for inlinability of p1 and p2 here? *)
+        substitute_pattern_comp st (substitute_pattern_comp st c p1 param) p2 (lambda handled_k)
+      | None ->
+        let res =
+          call eff param handled_k
+        in
+        reduce_comp st res
+    end
 
-    | Apply ({term = Lambda a}, e) ->
-      beta_reduce st a e
+  | Apply ({term = Lambda a}, e) ->
+    beta_reduce st a e
 
-    | Apply ({term = Var v}, e2) ->
-      begin match Common.lookup v st.impure_wrappers with
-        | Some f ->
-          let res =
-            value (pure (apply f e2))
-          in
-          reduce_comp st res
-        | None -> c
-      end
+(*
+  | Apply ({term = Var v}, e2) ->
+    begin match Common.lookup v st.impure_wrappers with
+      | Some f ->
+        let res =
+          value (pure_apply f e2)
+        in
+        reduce_comp st res
+      | None -> c
+    end
+*)
 
-    | Handle (e1, {term = Match (e2, cases)}) ->
-      let push_handler = fun {term = (p, c)} ->
-        abstraction p (reduce_comp st (handle (refresh_expr e1) c))
-      in
-      let res =
-        match' e2 (List.map push_handler cases)
-      in
-      res
 
-    | Handle (e1, {term = Apply (ae1, ae2)}) ->
-      begin match ae1.term with
-        | Var v ->
-          begin match find_in_stack st v with
-            | Some ({term = Lambda k}) ->
-              let {term = (newdp, newdc)} = refresh_abs k in
-              let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
-              let (f_ctx,Type.Arrow(f_ty_in, f_ty_out ),f_const) = ae1.scheme in 
-              let constraints = Constraints.list_union [h_const; f_const]
-                                |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
-              let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
-              let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
-              let f_var, f_pat = make_var "newvar"  function_scheme in
-              let f_def =
-                lambda @@
-                abstraction newdp @@
-                handle e1 newdc in
-              let res =
-                let_in f_def @@
-                abstraction f_pat @@
-                apply f_var ae2
-              in
-              optimize_comp st res
-            | _ -> begin match (find_in_handlers_func_mem st v e1) with
-                | Some new_f_exp ->
-                  let res = apply new_f_exp ae2
-                  in reduce_comp st res
-                | _ ->
-                  begin match (find_in_let_rec_mem st v) with
-                    | Some abs ->
-                      let (let_rec_p,let_rec_c) = abs.term in
-                      let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
-                      let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
-                      let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
-                      let constraints = Constraints.list_union [h_const; f_const]
-                                        |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
-                      let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
-                      let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
-                      let new_f_var, new_f_pat = make_var "newvar"  function_scheme in
-                      let new_handler_call = handle e1 let_rec_c in
-                      let Var newfvar = new_f_var.term in
-                      let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
-                      let st = {st with handlers_functions_mem = (e1,v,new_f_var) :: st.handlers_functions_mem} in
-                      Print.debug " the ccc is %t" (Typed.print_computation c);
-                      let res =
-                        let_rec' defs @@
-                        apply new_f_var ae2
-                      in
-                      optimize_comp st res
-                    | None -> 
-                      Print.debug "Its a none";
-                      Print.debug "The handle exp : %t" (Typed.print_expression ae1);c
-                  end
-              end
-          end
-        (* XXX What to do with this optimization? *)
-        (*       | PureApply ({term = Var fname}, pae2)->
-                 begin match find_in_stack st fname with
-                  | Some {term = PureLambda {term = (dp1, {term = Lambda ({term = (dp2,dc)})})}} ->
-                    let f_var, f_pat = make_var "newvar" ae1.scheme in
-                    let f_def =
-                      pure_lambda @@
-                      pure_abstraction dp1 @@
-                      lambda @@
-                      abstraction dp2 @@
-                      (* Why don't we refresh dc here? *)
-                      handle e1 dc
-                    in
-                    let res =
-                      let_in f_def @@
-                      abstraction f_pat @@
-                      apply (pure_apply f_var pae2) ae2
-                    in
-                    optimize_comp st res
-                  | _ -> c
-                 end *)
-        | _ -> c
-      end
+  | Handle (e1, {term = Apply (ae1, ae2)}) ->
+    begin match ae1.term with
+      | Var v ->
+            begin match (find_in_handlers_func_mem st v e1) with
+             (*function exist,Same handler, same value clause*)
+             | (true,Some new_f_exp) ->
+                                let res = apply new_f_exp ae2
+                                in reduce_comp st res
 
-    | Handle (e1, {term = Match (e2, cases)}) ->
-      let push_handler = fun {term = (p, c)} ->
-        abstraction p (reduce_comp st (handle (refresh_expr e1) c))
-      in
-      let res =
-        match' e2 (List.map push_handler cases)
-      in
-      res
+             (*function exist,Same handler, different value clause*)
+             | (false, Some new_f_exp)-> 
+               begin match (find_in_let_rec_mem st v) with
+                | Some abs -> 
+                   let (let_rec_p,let_rec_c) = abs.term in
+                  Print.debug "THE ABSTRACTION OF SAME HANDLER DIFF VALUE :- %t" (Typed.print_abstraction abs);
+                  let Handler ha = e1.term in 
+                  Print.debug "THE VALUE CLAUSE :- %t" (Typed.print_abstraction ha.value_clause);
+                  let ctx2, (ty2 , _ ), cnstrs2 = ha.value_clause.scheme in
+                  let sch = (ctx2,ty2,cnstrs2) in 
+                  let k_var, k_pat = make_var "k_val"  sch in
+                  let ctx1, ty1, cnstrs1 = let_rec_p.scheme in 
+                  (*let new_pattern = {
+                    term = PTuple [let_rec_p; k_pat];
+                    scheme = (
+                      ctx1 @ ctx2,
+                      Type.Tuple [ty1; ty2],
+                      Constraints.union cnstrs1 cnstrs2
+                    );
+                    location = ae1.location;
+                  } in
+                 
+                  let identity_var,identity_pat = make_var "identity" ty2 in
+                  let mh.value_clause = abstraction identity_pat @@ (value identity_var) *)
+                   c 
+                | _ -> c
+               end
+             | (true, None) ->
+                  c
+             | _ -> 
+               begin match find_in_stack st v with
+               | Some ({term = Lambda k}) ->
+                  let {term = (newdp, newdc)} = refresh_abs k in
+                  let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
+                  let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
+                  let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
+                  let constraints = Constraints.list_union [h_const; f_const]
+                                    |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
+                  let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
+                  let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
+                  let f_var, f_pat = make_var "newvar"  function_scheme in
+                  let f_def =
+                    lambda @@
+                    abstraction newdp @@
+                    handle e1 newdc in
+                  let res =
+                    let_in f_def @@
+                    abstraction f_pat @@
+                    apply f_var ae2
+                  in
+                  optimize_comp st res
+                | _ -> 
+                       begin match (find_in_let_rec_mem st v) with
+                       | Some abs ->
+                                    let (let_rec_p,let_rec_c) = abs.term in
+                                    let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
+                                    let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
+                                    let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
+                                    let constraints = Constraints.list_union [h_const; f_const]
+                                          |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
+                                    let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
+                                    let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
+                                    let new_f_var, new_f_pat = make_var "newvar"  function_scheme in
+                                    let new_handler_call = handle e1 let_rec_c in
+                                    let Var newfvar = new_f_var.term in
+                                    let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
+                                    let st = {st with handlers_functions_mem = (e1,v,new_f_var) :: st.handlers_functions_mem} in
+                                    (*Print.debug " the ccc is %t" (Typed.print_computation c);*)
+                                    let res =
+                                      let_rec' defs @@
+                                      apply new_f_var ae2
+                                    in
+                                    optimize_comp st res
+                       | None -> 
+                        Print.debug "Its a none";
+                                    Print.debug "The handle exp : %t" (Typed.print_expression ae1);c
+                       end
+               end
+        end
+(*
+      | PureApply ({term = Var fname}, pae2)->
+        begin match find_in_stack st fname with
+          | Some {term = PureLambda {term = (dp1, {term = Lambda ({term = (dp2,dc)})})}} ->
+            let f_var, f_pat = make_var "newvar" ae1.scheme in
+            let f_def =
+              pure_lambda @@
+              pure_abstraction dp1 @@
+              lambda @@
+              abstraction dp2 @@
+              (* Why don't we refresh dc here? *)
+              handle e1 dc
+            in
+            let res =
+              let_in f_def @@
+              abstraction f_pat @@
+              apply (pure_apply f_var pae2) ae2
+            in
+            optimize_comp st res
+          | _ -> c
+        end
+*)
+      | _ -> c
+    end
 
-    (* XXX What to do with this optimization? *)
+| Handle (e1, {term = Match (e2, cases)}) ->
+    let push_handler = fun {term = (p, c)} ->
+      abstraction p (reduce_comp st (handle (refresh_expr e1) c))
+    in
+    let res =
+      match' e2 (List.map push_handler cases)
+    in
+    res
+
+(*
     (*
       let f = \p. val lambda in c
        ~~> (append f := f1 to impure_wrappers)
@@ -454,42 +503,44 @@ and reduce_comp st c =
       let f = \new_p. val (f1 new_p) in
       c
     *)
-    (*   | LetIn ({term = Lambda ({term = (p, {term = Value ({term = Lambda _ } as in_lambda)} )})}, ({term = ({term = PVar f} as f_pat,_)} as a) )->
-         Print.debug "We are now in the let in 4 for %t" (Typed.print_pattern f_pat);
-         let f1_var, f1_pat = make_var "f1" f_pat.scheme in
-         let new_p_var, new_p_pat = make_var "new_p" p.scheme in
-         let first_fun =
-          pure_lambda @@
-          pure_abstraction p @@
-          in_lambda
-         and second_fun =
-          lambda @@
-          abstraction new_p_pat @@
-          value (pure_apply f1_var new_p_var)
-         in
-         let st = {st with impure_wrappers = (f, f1_var) :: st.impure_wrappers} in
-         let res =
-          let_in first_fun @@
-          abstraction f1_pat @@
-          let_in second_fun @@
-          a
-         in
-         optimize_comp st res *)
+  | LetIn ({term = Lambda ({term = (p, {term = Value ({term = Lambda _ } as in_lambda)} )})}, ({term = ({term = PVar f} as f_pat,_)} as a) )->
+    Print.debug "We are now in the let in 4 for %t" (Typed.print_pattern f_pat);
+    let f1_var, f1_pat = make_var "f1" f_pat.scheme in
+    let new_p_var, new_p_pat = make_var "new_p" p.scheme in
+    let first_fun =
+      pure_lambda @@
+      pure_abstraction p @@
+      in_lambda
+    and second_fun =
+      lambda @@
+      abstraction new_p_pat @@
+      value (pure_apply f1_var new_p_var)
+    in
+    let st = {st with impure_wrappers = (f, f1_var) :: st.impure_wrappers} in
+    let res =
+      let_in first_fun @@
+      abstraction f1_pat @@
+      let_in second_fun @@
+      a
+    in
+    optimize_comp st res
+*)
 
-    | LetIn (e, ({term = (p, cp)} as a)) ->
-      (* Print.debug "We are now in the let in 1, 3 or 5 for %t" (Typed.print_pattern p); *)
-      beta_reduce st a e
+  | LetIn (e, ({term = (p, cp)} as a)) ->
+    Print.debug "We are now in the let in 1, 3 or 5 for %t" (Typed.print_pattern p);
+    beta_reduce st a e
 
-    (* XXX simplify *)
-    | LetRec (defs, co) ->
-      (* Print.debug "the letrec comp  %t" (Typed.print_computation co); *)
-      let st = 
-        List.fold_right (fun (var,abs) st ->
-            (* Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs); *)
+  (* XXX simplify *)
+  | LetRec (defs, co) ->
+    (*Print.debug "the letrec comp  %t" (Typed.print_computation co);*)
+    let st = 
+    List.fold_right (fun (var,abs) st ->
+            (*Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs);*)
             {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
-      let_rec' defs (reduce_comp st co)
+    let_rec' defs (reduce_comp st co)
 
-    | _ -> c
+
+  | _ -> c
 
   in 
   (*
@@ -505,9 +556,6 @@ let optimize_command st = function
     st, Typed.Computation (optimize_comp st c)
   | Typed.TopLet (defs, vars) ->
     let defs' = Common.assoc_map (optimize_comp st) defs in
-    let defs' = Common.assoc_map (fun c ->
-        if Scheme.is_pure Params.empty c.scheme then value (reduce_expr st (pure c)) else c
-      ) defs' in
     let st' = begin match defs' with
       (* If we define a single simple handler, we inline it *)
       | [({ term = Typed.PVar x}, { term = Value ({ term = Handler _ } as e)})] ->
@@ -521,9 +569,9 @@ let optimize_command st = function
   | Typed.TopLetRec (defs, vars) ->
     let defs' = Common.assoc_map (optimize_abs st) defs in
     let st' = 
-      List.fold_right (fun (var,abs) st ->
-          Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs);
-          {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
+    List.fold_right (fun (var,abs) st ->
+            Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs);
+            {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
     st', Typed.TopLetRec (defs', vars)
 
   | Typed.External (x, _, f) as cmd ->
@@ -540,9 +588,9 @@ let optimize_command st = function
 
 let optimize_commands cmds =
   let _, cmds = 
-    List.fold_left (fun (st, cmds) (cmd, loc) ->
-        let st', cmd' = optimize_command st cmd in
-        st', (cmd', loc) :: cmds
-      ) (initial, []) cmds
-  in
-  List.rev cmds
+  List.fold_left (fun (st, cmds) (cmd, loc) ->
+    let st', cmd' = optimize_command st cmd in
+    st', (cmd', loc) :: cmds
+  ) (initial, []) cmds
+in
+List.rev cmds
