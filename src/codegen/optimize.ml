@@ -239,6 +239,8 @@ and reduce_expr st e =
     (* Body is already reduced and it's a lambda *)
     res
 
+  | Pure {term = Value e} -> e
+
   | _ -> e
   in
   if e <> e' then
@@ -266,8 +268,8 @@ and reduce_comp st c =
     in
     find_const_case cases
 
-  | Bind ({term = Value e}, c) ->
-    beta_reduce st c e
+  | Bind (c1, c2) when Scheme.is_pure Params.empty c1.scheme ->
+    beta_reduce st c2 (reduce_expr st (pure c1))
 
   | Bind ({term = Bind (c1, {term = (p1, c2)})}, c3) ->
     let bind_c2_c3 = reduce_comp st (bind c2 c3) in
@@ -336,8 +338,8 @@ and reduce_comp st c =
     } in
     reduce_comp st (handle (refresh_expr hdlr) (refresh_comp c1))
 
-  | Handle ({term = Handler h}, {term = Value v}) ->
-    beta_reduce st h.value_clause v
+  | Handle ({term = Handler h}, c) when Scheme.is_pure Params.empty c.scheme ->
+    beta_reduce st h.value_clause (reduce_expr st (pure c))
 
   | Handle ({term = Handler h} as handler, {term = Call (eff, param, k)}) ->
     let {term = (k_pat, k_body)} = refresh_abs k in
@@ -360,17 +362,15 @@ and reduce_comp st c =
   | Apply ({term = Lambda a}, e) ->
     beta_reduce st a e
 
-(*
   | Apply ({term = Var v}, e2) ->
     begin match Common.lookup v st.impure_wrappers with
       | Some f ->
         let res =
-          value (pure_apply f e2)
+          value (pure (apply f e2))
         in
         reduce_comp st res
       | None -> c
     end
-*)
 
 
   | Handle (e1, {term = Apply (ae1, ae2)}) ->
