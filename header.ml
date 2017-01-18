@@ -60,3 +60,6 @@ let ( ** ) =
 
 let string_length _ = assert false
 let to_string _ = assert false
+
+let lift_unary f = fun x -> value (f x)
+let lift_binary f = fun x -> value (fun y -> value (f x y))

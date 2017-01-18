@@ -83,8 +83,13 @@ let rec print_expression ?max_level e ppf =
   match e.Typed.term with
   | Typed.Var x ->
       print "%t" (print_variable x)
-  | Typed.BuiltIn s ->
-      print "%s" s
+  | Typed.BuiltIn (s, n) ->
+      if n = 1 then
+        print ~at_level:1 "lift_unary %s" s
+      else if n = 2 then
+        print ~at_level:1 "lift_binary %s" s
+      else
+        assert false
   | Typed.Const c ->
       print "%t" (Const.print c)
   | Typed.Tuple lst ->

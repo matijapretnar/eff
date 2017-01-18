@@ -43,7 +43,7 @@ let annotate t sch loc = {
 type expression = (plain_expression, Scheme.ty_scheme) annotation
 and plain_expression =
   | Var of variable
-  | BuiltIn of string
+  | BuiltIn of string * int
   | Const of Const.t
   | Tuple of expression list
   | Record of (Common.field, expression) Common.assoc
@@ -527,8 +527,8 @@ and alphaeq_expr' eqvars e e' =
     lbl = lbl'
   | Variant (lbl, Some e), Variant (lbl', Some e') ->
     lbl = lbl' && alphaeq_expr eqvars e e'
-  | BuiltIn f, BuiltIn f' ->
-    f = f'
+  | BuiltIn (f, n), BuiltIn (f', n') ->
+    f = f' && n = n'
   | Const cst, Const cst' ->
     Const.equal cst cst'
   | Effect eff, Effect eff' ->
@@ -594,10 +594,10 @@ let var ?loc x ty_sch =
     location = loc;
   }
 
-let built_in ?loc x ty_sch =
+let built_in ?loc x n ty_sch =
   let loc = backup_location loc [] in
   {
-    term = BuiltIn x;
+    term = BuiltIn (x, n);
     scheme = ty_sch;
     location = loc;
   }
@@ -1078,7 +1078,7 @@ let rec print_expression ?max_level e ppf =
   match e.term with
   | Var x ->
     print "%t" (print_variable x)
-  | BuiltIn s ->
+  | BuiltIn (s, _) ->
     print "%s" s
   | Const c ->
     print "%t" (Const.print c)

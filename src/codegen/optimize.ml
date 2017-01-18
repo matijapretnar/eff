@@ -70,11 +70,11 @@ let a2a2 a = Typed.a2a2 a
 let inlinable_definitions =
   let unary_builtin f ty1 ty2 =
     let drt = Type.fresh_dirt () in
-    built_in f (Scheme.simple (Type.Arrow (ty1, (ty2, drt))))
+    built_in f 1 (Scheme.simple (Type.Arrow (ty1, (ty2, drt))))
   and binary_builtin f ty1 ty2 ty =
     let drt = Type.fresh_dirt ()
     and drt2 = Type.fresh_dirt () in
-    built_in f (Scheme.simple (Type.Arrow (ty1, (Type.Arrow (ty2, (ty, drt)), drt2))))
+    built_in f 2 (Scheme.simple (Type.Arrow (ty1, (Type.Arrow (ty2, (ty, drt)), drt2))))
   and polymorphic expr_of_ty = fun () -> expr_of_ty (Type.fresh_ty ())
   and monomorphic expr = fun () -> expr in
   [

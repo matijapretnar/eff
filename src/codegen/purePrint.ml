@@ -224,7 +224,7 @@ let rec print_expression ?max_level st e ppf =
   match e.Typed.term with
   | Typed.Var x ->
     print "%t" (print_variable x)
-  | Typed.BuiltIn s ->
+  | Typed.BuiltIn (s, _) ->
     print "%s" s
   | Typed.Const c ->
     print "%t" (Const.print c)
