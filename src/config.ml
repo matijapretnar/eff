@@ -26,3 +26,5 @@ let wrapper = ref None
 let verbosity = ref 3
 
 let smart_print = ref true
+
+let pure_print = ref false

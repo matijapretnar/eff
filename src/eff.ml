@@ -35,6 +35,9 @@ let options = Arg.align [
     ("--no-wrapper",
      Arg.Unit (fun () -> wrapper := None),
      " Do not use a command-line wrapper");
+    ("--pure",
+     Arg.Set Config.pure_print,
+     " Print computations using the pure printer");
     ("--ascii",
      Arg.Set Config.ascii,
      " Use ASCII output");
@@ -75,6 +78,13 @@ let parse parser lex =
     Error.syntax ~loc:(Location.of_lexeme lex) ""
   | Failure "lexing: empty token" ->
     Error.syntax ~loc:(Location.of_lexeme lex) "unrecognised symbol."
+
+let print_commands cmds =
+  if !Config.pure_print then
+    PurePrint.print_commands cmds
+  else
+    CamlPrint.print_commands cmds
+
 
 let compile_file st filename =
   let pervasives_cmds =
@@ -119,7 +129,7 @@ let compile_file st filename =
   let out_channel = open_out temporary_file in
   Format.fprintf (Format.formatter_of_out_channel out_channel)
     "%s\n;;\n%t@."
-    header (CamlPrint.print_commands cmds_no_opt);
+    header (print_commands cmds_no_opt);
   flush out_channel;
   close_out out_channel;
 
@@ -128,7 +138,7 @@ let compile_file st filename =
   let out_channel = open_out temporary_file in
   Format.fprintf (Format.formatter_of_out_channel out_channel)
     "%s\n;;\n%t@."
-    header (CamlPrint.print_commands cmds);
+    header (print_commands cmds);
   flush out_channel;
   close_out out_channel;
 

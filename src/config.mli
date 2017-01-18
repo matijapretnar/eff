@@ -47,3 +47,6 @@ val verbosity : int ref
 
 (** Should we use smart printing for type schemes? *)
 val smart_print : bool ref
+
+(** Should we use pure printing for computations? *)
+val pure_print : bool ref
