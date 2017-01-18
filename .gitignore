@@ -31,3 +31,7 @@ examples/tests/errors/*.out
 examples/codegen/_tmp*
 examples/codegen/*.ml
 examples/codegen/a.out
+
+# Temporary folders for codegen
+_tmp
+_tmp_no_opt
