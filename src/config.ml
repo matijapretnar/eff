@@ -15,6 +15,8 @@ let disable_typing = ref false
 
 let disable_optimization = ref false
 
+let optimization_fuel = ref 100
+
 let ascii = ref false
 
 let interactive_shell = ref true

@@ -58,6 +58,9 @@ let options = Arg.align [
     ("--no-opt",
      Arg.Set Config.disable_optimization,
      " Disable optimization of compiled files");
+    ("--fuel",
+     Arg.Set_int Config.optimization_fuel,
+     "<fuel> Optimize with <fuel>");
     ("-V",
      Arg.Set_int Config.verbosity,
      "<n> Set printing verbosity to <n>");

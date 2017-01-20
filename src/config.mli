@@ -28,6 +28,8 @@ val disable_typing : bool ref
 (** Should compiled computations be optimized? *)
 val disable_optimization : bool ref
 
+val optimization_fuel : int ref
+
 (** Should we use ASCII instead of Unicode for printing out types? *)
 val ascii : bool ref
 

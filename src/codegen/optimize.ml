@@ -11,7 +11,8 @@ type state = {
   stack : (Typed.variable, Typed.expression) Common.assoc;
   letrec_memory : (Typed.variable, Typed.abstraction) Common.assoc;
   handlers_functions_mem : (Typed.expression * Typed.variable * Typed.expression) list;
-  impure_wrappers : (Typed.variable, Typed.expression) Common.assoc
+  impure_wrappers : (Typed.variable, Typed.expression) Common.assoc;
+  fuel : int ref
 }
 
 let initial = {
@@ -19,8 +20,25 @@ let initial = {
   stack = [];
   letrec_memory = [];
   handlers_functions_mem = [];
-  impure_wrappers = []
+  impure_wrappers = [];
+  fuel = ref (!(Config.optimization_fuel));
 }
+
+(* -------------------------------------------------------------------------- *)
+(* OPTIMIZATION FUEL                                                          *)
+(* -------------------------------------------------------------------------- *)
+
+let refuel st =
+  st.fuel := !(Config.optimization_fuel)
+
+let outOfFuel st =
+  print_string "outOfFuel: "; print_int (!(st.fuel)); print_newline ();
+  !(st.fuel) < 1
+
+let useFuel st =
+  st.fuel := !(st.fuel) - 1
+
+(* -END OPTIMIZATION FUEL --------------------------------------------------- *)
 
 let find_inlinable st x =
   match Common.lookup x st.inlinable with
@@ -231,6 +249,8 @@ and optimize_abs2 st a2 = a2a2 @@ optimize_abs st @@ a22a @@ a2
 and reduce_expr st e =
   let e' = match e.term with
 
+  | _ when outOfFuel st -> e
+
   | Var x ->
     begin match find_inlinable st x with
       | Some ({term = Handler _} as d) -> reduce_expr st (refresh_expr d)
@@ -264,8 +284,11 @@ and reduce_expr st e =
 and reduce_comp st c =
   let c' = match c.term with
 
+  | _ when outOfFuel st -> c
+
   (* Convert simultaneous let into a sequence of binds *)
   | Let (defs, c) ->
+    useFuel;
     let binds = List.fold_right (fun (p_def, c_def) binds ->
         bind c_def (abstraction p_def binds)
       ) defs c in
@@ -274,15 +297,18 @@ and reduce_comp st c =
   | Match ({term = Const cst}, cases) ->
     let rec find_const_case = function
       | [] -> c
-      | ({term = {term = PConst cst'}, c'}) :: _ when Const.equal cst cst' -> c'
+      | ({term = {term = PConst cst'}, c'}) :: _ when Const.equal cst cst'
+         -> useFuel st; c'
       | _ :: cases -> find_const_case cases
     in
     find_const_case cases
 
   | Bind (c1, c2) when Scheme.is_pure Params.empty c1.scheme ->
+    useFuel st;
     beta_reduce st c2 (reduce_expr st (pure c1))
 
   | Bind ({term = Bind (c1, {term = (p1, c2)})}, c3) ->
+    useFuel st;
     let bind_c2_c3 = reduce_comp st (bind c2 c3) in
     let res =
       bind c1 (abstraction p1 bind_c2_c3)
@@ -290,6 +316,7 @@ and reduce_comp st c =
     reduce_comp st res
 
   | Bind ({term = LetIn (e1, {term = (p1, c2)})}, c3) ->
+    useFuel st;
     let bind_c2_c3 = reduce_comp st (bind c2 c3) in
     let res =
       let_in e1 (abstraction p1 (bind_c2_c3))
@@ -297,6 +324,7 @@ and reduce_comp st c =
     reduce_comp st res
 
   | Bind ({term = Call (eff, param, k)}, c) ->
+    useFuel st;
     let {term = (k_pat, k_body)} = refresh_abs k in
     let bind_k_c = reduce_comp st (bind k_body c) in
     let res =
@@ -305,6 +333,7 @@ and reduce_comp st c =
     reduce_comp st res
 
   | Handle (h, {term = LetIn (e, {term = (p, c)})}) ->
+    useFuel st;
     let handle_h_c = reduce_comp st (handle h c) in
     let res =
       let_in e (abstraction p (handle_h_c))
@@ -312,6 +341,7 @@ and reduce_comp st c =
     reduce_comp st res
 
   | Handle (h, {term = LetRec (defs, co)}) ->
+    useFuel st;
     let handle_h_c = reduce_comp st (handle h co) in
     let res =
       let_rec' defs handle_h_c
@@ -320,16 +350,19 @@ and reduce_comp st c =
 
   | Handle ({term = Handler h}, c1)
         when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
+    useFuel st;
     Print.debug "Remove handler, since no effects in common with computation";
     reduce_comp st (bind c1 h.value_clause)
 
   | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})})
         when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
+    useFuel st;
     Print.debug "Remove handler of outer Bind, since no effects in common with computation";
     reduce_comp st (bind (reduce_comp st c1) (abstraction p1 (reduce_comp st (handle (refresh_expr handler) c2))))
 
   | Handle ({term = Handler h}, {term = Bind (c1, {term = (p1, c2)})})
         when (Scheme.is_pure_for_handler c2.Typed.scheme h.effect_clauses) ->
+    useFuel st;
     Print.debug "Move inner bind into the value case";
     let new_value_clause = optimize_abs st (abstraction p1 (bind (reduce_comp st c2) (refresh_abs h.value_clause))) in
     let hdlr = handler {
@@ -340,6 +373,7 @@ and reduce_comp st c =
     reduce_comp st (handle (refresh_expr hdlr) c1)
 
   | Handle ({term = Handler h} as h2, {term = Bind (c1, {term = (p, c2)})}) ->
+    useFuel st;
     Print.debug "Move (dirty) inner bind into the value case";
     let new_value_clause = optimize_abs st (abstraction p (handle (refresh_expr h2) (refresh_comp (reduce_comp st c2) ))) in
     let hdlr = handler {
@@ -350,9 +384,11 @@ and reduce_comp st c =
     reduce_comp st (handle (refresh_expr hdlr) (refresh_comp c1))
 
   | Handle ({term = Handler h}, c) when Scheme.is_pure Params.empty c.scheme ->
+    useFuel st;
     beta_reduce st h.value_clause (reduce_expr st (pure c))
 
   | Handle ({term = Handler h} as handler, {term = Call (eff, param, k)}) ->
+    useFuel st;
     let {term = (k_pat, k_body)} = refresh_abs k in
     let handled_k =
       abstraction k_pat
@@ -371,11 +407,13 @@ and reduce_comp st c =
     end
 
   | Apply ({term = Lambda a}, e) ->
+    useFuel st;
     beta_reduce st a e
 
   | Apply ({term = Var v}, e2) ->
     begin match Common.lookup v st.impure_wrappers with
       | Some f ->
+        useFuel st;
         let res =
           value (pure (apply f e2))
         in
@@ -385,6 +423,7 @@ and reduce_comp st c =
 
 
   | Handle (e1, {term = Apply (ae1, ae2)}) ->
+    useFuel st;
     begin match ae1.term with
       | Var v ->
             begin match (find_in_handlers_func_mem st v e1) with
@@ -499,6 +538,7 @@ and reduce_comp st c =
     end
 
 | Handle (e1, {term = Match (e2, cases)}) ->
+    useFuel st;
     let push_handler = fun {term = (p, c)} ->
       abstraction p (reduce_comp st (handle (refresh_expr e1) c))
     in
@@ -539,11 +579,13 @@ and reduce_comp st c =
 *)
 
   | LetIn (e, ({term = (p, cp)} as a)) ->
+    useFuel st;
     Print.debug "We are now in the let in 1, 3 or 5 for %t" (Typed.print_pattern p);
     beta_reduce st a e
 
   (* XXX simplify *)
   | LetRec (defs, co) ->
+    useFuel st;
     (*Print.debug "the letrec comp  %t" (Typed.print_computation co);*)
     let st = 
     List.fold_right (fun (var,abs) st ->
@@ -563,7 +605,9 @@ and reduce_comp st c =
   c'
 
 
-let optimize_command st = function
+let optimize_command st = 
+  refuel;
+  function
   | Typed.Computation c ->
     st, Typed.Computation (optimize_comp st c)
   | Typed.TopLet (defs, vars) ->
