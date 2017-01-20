@@ -31,6 +31,17 @@ let find_in_stack st x = Common.lookup x st.stack
 
 let find_in_let_rec_mem st v = Common.lookup v st.letrec_memory
 
+let specialized_counter = ref []
+
+let specialized_count v =
+  match Common.lookup v !specialized_counter with
+  | Some n -> n
+  | None -> 0
+
+let incr_specialized_count v =
+  let n = specialized_count v in
+  specialized_counter := Common.update v (n + 1) !specialized_counter
+
 
 let alphaeq_handler_no_vc eqvars h h'=
 let (Handler ht) = h.term in
@@ -435,7 +446,7 @@ and reduce_comp st c =
                   optimize_comp st res
                 | _ -> 
                        begin match (find_in_let_rec_mem st v) with
-                       | Some abs ->
+                       | Some abs when specialized_count v <= 5 ->
                                     let (let_rec_p,let_rec_c) = abs.term in
                                     let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
                                     let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
@@ -448,6 +459,7 @@ and reduce_comp st c =
                                     let new_handler_call = handle e1 let_rec_c in
                                     let Var newfvar = new_f_var.term in
                                     let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
+                                    incr_specialized_count v;
                                     let st = {st with handlers_functions_mem = (e1,v,new_f_var) :: st.handlers_functions_mem} in
                                     (*Print.debug " the ccc is %t" (Typed.print_computation c);*)
                                     let res =
@@ -455,7 +467,7 @@ and reduce_comp st c =
                                       apply new_f_var ae2
                                     in
                                     optimize_comp st res
-                       | None -> 
+                       | _ -> 
                         Print.debug "Its a none";
                                     Print.debug "The handle exp : %t" (Typed.print_expression ae1);c
                        end
