@@ -32,7 +32,7 @@ let refuel st =
   st.fuel := !(Config.optimization_fuel)
 
 let outOfFuel st =
-  print_string "outOfFuel: "; print_int (!(st.fuel)); print_newline ();
+  (* print_string "outOfFuel: "; print_int (!(st.fuel)); print_newline (); *)
   !(st.fuel) < 1
 
 let useFuel st =
@@ -606,7 +606,7 @@ and reduce_comp st c =
 
 
 let optimize_command st = 
-  refuel;
+  refuel st;
   function
   | Typed.Computation c ->
     st, Typed.Computation (optimize_comp st c)
@@ -643,6 +643,7 @@ let optimize_command st =
   | Typed.Tydef _ | Typed.TypeOf _ | Typed.Help as cmd -> st, cmd
 
 let optimize_commands cmds =
+  refuel initial;
   let _, cmds = 
   List.fold_left (fun (st, cmds) (cmd, loc) ->
     let st', cmd' = optimize_command st cmd in
