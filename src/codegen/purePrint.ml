@@ -181,6 +181,3 @@ let print_command (cmd, _) ppf =
     Print.print ppf "(* #type directive not supported by OCaml *)"
   | Typed.Help ->
     Print.print ppf "(* #help directive not supported by OCaml *)"
-
-let print_commands cmds ppf =
-  Print.sequence "\n\n;;\n\n" print_command cmds ppf

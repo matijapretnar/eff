@@ -83,10 +83,10 @@ let parse parser lex =
     Error.syntax ~loc:(Location.of_lexeme lex) "unrecognised symbol."
 
 let print_commands cmds =
-  if !Config.pure_print then
-    PurePrint.print_commands cmds
-  else
-    SimplePrint.print_commands cmds
+  let print_command =
+    if !Config.pure_print then PurePrint.print_command else SimplePrint.print_command
+  in
+  Print.sequence "\n\n;;\n\n" print_command cmds
 
 
 let compile_file st filename =
