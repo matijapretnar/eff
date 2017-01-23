@@ -86,7 +86,7 @@ let print_commands cmds =
   if !Config.pure_print then
     PurePrint.print_commands cmds
   else
-    CamlPrint.print_commands cmds
+    SimplePrint.print_commands cmds
 
 
 let compile_file st filename =
@@ -128,7 +128,7 @@ let compile_file st filename =
 
   (* write a temporary compiled file *)
   ignore (Sys.command ("mkdir -p _tmp_no_opt"));
-  let temporary_file = "_tmp_no_opt/" ^ CamlPrint.compiled_filename filename in
+  let temporary_file = "_tmp_no_opt/" ^ CommonPrint.compiled_filename filename in
   let out_channel = open_out temporary_file in
   Format.fprintf (Format.formatter_of_out_channel out_channel)
     "%s\n;;\n%t@."
@@ -137,7 +137,7 @@ let compile_file st filename =
   close_out out_channel;
 
   ignore (Sys.command ("mkdir -p _tmp"));
-  let temporary_file = "_tmp/" ^ CamlPrint.compiled_filename filename in
+  let temporary_file = "_tmp/" ^ CommonPrint.compiled_filename filename in
   let out_channel = open_out temporary_file in
   Format.fprintf (Format.formatter_of_out_channel out_channel)
     "%s\n;;\n%t@."
@@ -145,7 +145,7 @@ let compile_file st filename =
   flush out_channel;
   close_out out_channel;
 
-  let compiled_file = CamlPrint.compiled_filename filename in
+  let compiled_file = CommonPrint.compiled_filename filename in
   ignore (Sys.command ("echo '(*\n=== GENERATED FROM " ^ filename ^ " ===' > " ^ compiled_file));
   ignore (Sys.command ("echo '=== BEGIN SOURCE ==='" ^ " >> " ^ compiled_file));
   ignore (Sys.command ("echo ''" ^ " >> " ^ compiled_file));
