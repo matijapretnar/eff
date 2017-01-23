@@ -1,114 +1,8 @@
 (** PRINTER STATE *)
 
-type state = {
-  debug: bool;
-  ignored: Params.t;
-}
+type state = unit
 
-let initial = {
-  debug = true;
-  ignored = Params.empty;
-}
-
-let rec pair_up_ty ~loc ty1 ty2 pairs =
-  let ty1 = Constraints.expand_ty ty1
-  and ty2 = Constraints.expand_ty ty2 in
-  match ty1, ty2 with
-
-  | (ty1, ty2) when ty1 = ty2 -> pairs
-
-  | (Type.Param t1, Type.Param t2) ->
-    let (ts, ds, rs) = pairs in
-    ((t1, t2) :: ts, ds, rs)
-
-  | (Type.Arrow (ty1, drty1), Type.Arrow (ty2, drty2)) ->
-    pair_up_ty ~loc ty2 ty1 (pair_up_dirty ~loc drty1 drty2 pairs)
-
-  | (Type.Tuple tys1, Type.Tuple tys2) ->
-    assert (List.length tys1 = List.length tys2);
-    List.fold_right2 (pair_up_ty ~loc) tys1 tys2 pairs
-
-  | (Type.Apply (ty_name1, args1), Type.Apply (ty_name2, args2)) ->
-    assert (ty_name1 = ty_name2);
-    begin match Tctx.lookup_params ty_name1 with
-      | None -> Error.typing ~loc "Undefined type %s" ty_name1
-      | Some params -> pair_up_args ~loc params args1 args2 pairs
-    end
-
-  (* The following two cases cannot be merged into one, as the whole matching
-     fails if both types are Apply, but only the second one is transparent. *)
-  | (Type.Apply (ty_name, args), ty) when Tctx.transparent ~loc ty_name ->
-    begin match Tctx.ty_apply ~loc ty_name args with
-      | Tctx.Inline ty' -> pair_up_ty ~loc ty' ty pairs
-      | Tctx.Sum _ | Tctx.Record _ -> assert false (* None of these are transparent *)
-    end
-
-  | (ty, Type.Apply (ty_name, args)) when Tctx.transparent ~loc ty_name ->
-    begin match Tctx.ty_apply ~loc ty_name args with
-      | Tctx.Inline ty' -> pair_up_ty ~loc ty ty' pairs
-      | Tctx.Sum _ | Tctx.Record _ -> assert false (* None of these are transparent *)
-    end
-
-  | (Type.Handler (drty_in1, drty_out1), Type.Handler (drty_in2, drty_out2)) ->
-    pair_up_dirty ~loc drty_in2 drty_in1 (pair_up_dirty ~loc drty_out1 drty_out2 pairs)
-
-  | (ty1, ty2) ->
-    Print.debug "%t <<>> %t" (Type.print_ty ty1) (Type.print_ty ty2);
-    assert false
-
-and pair_up_args ~loc (ts, ds, rs) (tys1, drts1, rs1) (tys2, drts2, rs2) pairs =
-  (* NB: it is assumed here that
-     List.length tys1 = List.length tys2 && List.length drts1 = List.length drts2 && List.length rgns1 = List.length rgns2 *)
-  let for_parameters add ps lst1 lst2 pairs =
-    List.fold_right2 (fun (_, (cov, contra)) (ty1, ty2) pairs ->
-        let pairs = if cov then add ty1 ty2 pairs else pairs in
-        if contra then add ty2 ty1 pairs else pairs) ps (List.combine lst1 lst2) pairs
-  in
-  let pairs = for_parameters (pair_up_ty ~loc) ts tys1 tys2 pairs in
-  let pairs = for_parameters (pair_up_dirt) ds drts1 drts2 pairs in
-  for_parameters (fun r1 r2 (ts, ds, rs) -> (ts, ds, (r1, r2) :: rs)) rs rs1 rs2 pairs
-
-and pair_up_dirty ~loc (ty1, drt1) (ty2, drt2) pairs =
-  pair_up_ty ~loc ty1 ty2 (pair_up_dirt drt1 drt2 pairs)
-
-and pair_up_dirt drt1 drt2 (ts, ds, rs) =
-  let {Type.ops = ops1; Type.rest = rest1} = Constraints.expand_dirt drt1
-  and {Type.ops = ops2; Type.rest = rest2} = Constraints.expand_dirt drt2 in
-  let op_less (op, dt1) (ts, ds, rs) =
-    begin match Common.lookup op ops2 with
-      | Some dt2 -> (ts, ds, (dt1, dt2) :: rs)
-      | None -> (ts, ds, rs)
-    end
-  in
-  List.fold_right op_less ops1 (ts, (rest1, rest2) :: ds, rs)
-
-let safely_ignored (ts, ds, rs) constraints =
-  let ignored = Params.empty in
-  let ignored = List.fold_right (fun (t1, t2) ignored ->
-      if Constraints.pure_ty_param t2 constraints then Params.add_ty_param t1 ignored else ignored
-    ) ts ignored in
-  let ignored = List.fold_right (fun (d1, d2) ignored ->
-      if Constraints.pure_dirt_param d2 constraints then Params.add_dirt_param d1 ignored else ignored
-    ) ds ignored in
-  let ignored = List.fold_right (fun (r1, r2) ignored ->
-      if Constraints.pure_region_param r2 constraints then Params.add_region_param r1 ignored else ignored
-    ) rs ignored in
-  ignored
-
-let determine_pure_recursive_functions st defs =
-  let fold (x, ({Typed.term = (_, c)} as a)) st =
-    let c_ctx, _, _ = c.Typed.scheme in
-    match Common.lookup x c_ctx with
-    | Some in_ty ->
-      let (_, (a_in, a_out), constraints) = a.Typed.scheme in
-      let out_ty = Type.Arrow (a_in, a_out) in
-      let pairs = pair_up_ty ~loc:a.Typed.location in_ty out_ty ([], [], []) in
-      let ignored = safely_ignored pairs constraints in
-      {st with ignored = Params.append ignored st.ignored}
-    | None -> 
-      st
-  in
-  List.fold_right fold defs st
+let initial = ()
 
 
 (** TYPES *)
@@ -202,19 +96,11 @@ let rec print_pattern ?max_level p ppf =
   | Typed.PNonbinding ->
     print "_"
 
-let compute_ignored st (ctx, _, cstrs) =
-  (* let (_, ds, rs) = st.ignored in *)
-  (* Print.debug "ignored dirt param: %t" (Print.sequence "," Type.print_dirt_param ds); *)
-  (* Print.debug "ignored region param: %t" (Print.sequence "," Type.print_region_param rs); *)
-  st.ignored
-
 let is_pure_function st e =
-  let ignored = compute_ignored st e.Typed.scheme in
-  Scheme.is_pure_function_type ~loc:e.Typed.location ignored e.Typed.scheme
+  Scheme.is_pure_function_type ~loc:e.Typed.location e.Typed.scheme
 
 let is_pure_abstraction st {Typed.term = (_, c)} =
-  let ignored = compute_ignored st c.Typed.scheme in
-  Scheme.is_pure ignored c.Typed.scheme
+  Scheme.is_pure c.Typed.scheme
 
 let is_pure_handler st e =
   false
@@ -255,24 +141,8 @@ and print_function_argument ?max_level st e ppf =
     print_expression ~max_level:0 st e ppf
 
 and print_computation ?max_level ~pure st c ppf =
-  let ignored = compute_ignored st c.Typed.scheme in
-  let is_pure_computation = Scheme.is_pure ~loc:c.Typed.location ignored c.Typed.scheme in
+  let is_pure_computation = Scheme.is_pure ~loc:c.Typed.location c.Typed.scheme in
   let expect_pure_computation = pure in
-  (*   let ignored = 
-       if pure then
-        let params = Scheme.present_in_abstraction a.Typed.scheme in
-        Params.append params st.ignored
-       else
-        st.ignored
-       in
-       (* *)  let (_, _, cstrs) = a.Typed.scheme in *)
-  (* let st = {st with ignored = Constraints.add_prec cstrs ignored} in *)
-  if st.debug then
-    Print.debug ~loc:c.Typed.location "%t@.expect: %b, is: %b@.BEGIN@.%t@.END"
-      (Scheme.print_dirty_scheme c.Typed.scheme)
-      expect_pure_computation
-      is_pure_computation
-      (Typed.print_computation c);
   match expect_pure_computation, is_pure_computation with
   | true, true ->
     print_computation' ?max_level ~pure:true st c ppf
@@ -306,7 +176,6 @@ and print_computation' ?max_level ~pure st c ppf =
   | Typed.Let (lst, c) ->
     print ~at_level:2 "%t" (print_multiple_bind ~pure st (lst, c))
   | Typed.LetRec (lst, c) ->
-    let st = determine_pure_recursive_functions st lst in
     print ~at_level:2 "let rec @[<hov>%t@] in %t"
       (Print.sequence " and " (print_let_rec_abstraction st) lst) (print_computation ~pure st c)
   | Typed.Call (eff, e, a) ->
@@ -414,7 +283,6 @@ let print_command st (cmd, _) ppf =
   | Typed.TopLet (defs, _) ->
     Print.print ppf "let %t" (Print.sequence "\nand\n" (print_top_let_abstraction st) defs)
   | Typed.TopLetRec (defs, _) ->
-    let st = determine_pure_recursive_functions st defs in
     Print.print ppf "let rec %t" (Print.sequence "\nand\n" (print_let_rec_abstraction st) defs)
   | Typed.Use fn ->
     Print.print ppf "#use %S" (compiled_filename fn)

@@ -45,33 +45,6 @@ let is_pure { dirt_poset; region_poset; full_regions } { Type.ops; Type.rest } =
   List.for_all (fun (_, r) -> check_region r) ops &&
   DirtPoset.get_prec rest dirt_poset = []
 
-(* let add_prec constraints (pos_ts, pos_ds, pos_rs) =
-   let pos_ds = 
-      pos_ds
-      |> List.map (fun d -> d :: DirtPoset.get_prec d constraints.dirt_poset)
-      |> List.concat
-      |> List.sort_uniq Pervasives.compare
-   and pos_rs = 
-      pos_rs
-      |> List.map (fun r -> r :: RegionPoset.get_prec r constraints.region_poset)
-      |> List.concat
-      |> List.sort_uniq Pervasives.compare
-   in
-   (pos_ts, pos_ds, pos_rs) *)
-
-let must_be_empty {dirt_poset; region_poset; full_regions} {Type.ops; Type.rest} =
-  if List.exists (fun (_, r) -> FullRegions.mem r full_regions) ops then
-    None
-  else
-    let regions =
-      ops
-      |> List.map (fun (_, r) -> r :: RegionPoset.get_prec r region_poset)
-      |> List.concat
-      |> List.sort_uniq Pervasives.compare
-    in
-    let ds = rest :: DirtPoset.get_prec rest dirt_poset in
-    Some (ds, regions)
-
 type param_expansion = {
   mutable ty_expansion : Type.ty TyMap.t;
   mutable dirt_expansion : Type.dirt DirtMap.t;
@@ -336,10 +309,3 @@ let print constraints ppf =
   RegionPoset.print constraints.region_poset ppf;
   if not (RegionPoset.is_empty constraints.region_poset) then Format.pp_print_string ppf "; ";
   Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Params.print_region_param x) (Symbols.top ())) (FullRegions.elements constraints.full_regions) ppf
-
-let pure_ty_param t {ty_poset} =
-  TyPoset.get_prec t ty_poset = []
-let pure_dirt_param d {dirt_poset} =
-  DirtPoset.get_prec d dirt_poset = []
-let pure_region_param r {region_poset; full_regions} =
-  RegionPoset.get_prec r region_poset = [] && not (FullRegions.mem r full_regions)

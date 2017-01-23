@@ -35,11 +35,3 @@ val non_empty_dirts : t -> Params.dirt_param list
 val non_empty_regions : t -> Params.region_param list
 
 val print : t -> Format.formatter -> unit
-
-val must_be_empty : t -> Type.dirt -> (Params.dirt_param list * Params.region_param list) option
-
-val pure_ty_param : Params.ty_param -> t -> bool
-val pure_dirt_param : Params.dirt_param -> t -> bool
-val pure_region_param : Params.region_param -> t -> bool
-
-(* val add_prec : t -> Params.t -> Params.t *)

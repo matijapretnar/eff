@@ -303,7 +303,7 @@ and reduce_comp st c =
     in
     find_const_case cases
 
-  | Bind (c1, c2) when Scheme.is_pure Params.empty c1.scheme ->
+  | Bind (c1, c2) when Scheme.is_pure c1.scheme ->
     useFuel st;
     beta_reduce st c2 (reduce_expr st (pure c1))
 
@@ -383,7 +383,7 @@ and reduce_comp st c =
     } in
     reduce_comp st (handle (refresh_expr hdlr) (refresh_comp c1))
 
-  | Handle ({term = Handler h}, c) when Scheme.is_pure Params.empty c.scheme ->
+  | Handle ({term = Handler h}, c) when Scheme.is_pure c.scheme ->
     useFuel st;
     beta_reduce st h.value_clause (reduce_expr st (pure c))
 
