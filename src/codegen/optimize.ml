@@ -11,9 +11,12 @@ type state = {
   stack : (Typed.variable, Typed.expression) Common.assoc;
   letrec_memory : (Typed.variable, Typed.abstraction) Common.assoc;
   handlers_functions_mem : (Typed.expression * Typed.variable * Typed.expression) list;
+  handlers_functions_ref_mem : ((Typed.expression * Typed.variable * Typed.expression) list) ref;
   impure_wrappers : (Typed.variable, Typed.expression) Common.assoc;
   fuel : int ref
 }
+
+
 
 let initial = {
   inlinable = [];
@@ -21,6 +24,7 @@ let initial = {
   letrec_memory = [];
   handlers_functions_mem = [];
   impure_wrappers = [];
+  handlers_functions_ref_mem = ref [];
   fuel = ref (!(Config.optimization_fuel));
 }
 
@@ -49,9 +53,9 @@ let find_in_stack st x = Common.lookup x st.stack
 
 let find_in_let_rec_mem st v = Common.lookup v st.letrec_memory
 
-let specialized_counter = ref []
+(*let specialized_counter = ref []
 
-let specialized_count v =
+ let specialized_count v =
   match Common.lookup v !specialized_counter with
   | Some n -> n
   | None -> 0
@@ -59,7 +63,7 @@ let specialized_count v =
 let incr_specialized_count v =
   let n = specialized_count v in
   specialized_counter := Common.update v (n + 1) !specialized_counter
-
+ *)
 
 let alphaeq_handler_no_vc eqvars h h'=
 let (Handler ht) = h.term in
@@ -91,6 +95,40 @@ let find_in_handlers_func_mem st f_name h_exp =
       end
 
   end
+
+
+let different_branch_specialized defs st =
+  Print.debug "\n\nthe letrec defs size:- %i \n" (List.length defs);
+  Print.debug "\n\nthe global size:- %i \n" (List.length !(st.handlers_functions_ref_mem));
+  let findresinlocal = fun f_name -> (
+                  List.filter
+                  (fun (h,old_f,new_f) -> 
+                      let Var vv = new_f.term in 
+                      (f_name == vv) )   (st.handlers_functions_mem)) in 
+  let findresinglobal = fun f_name -> (
+                  List.filter
+                  (fun (h,old_f,new_f) -> 
+                      let Var vv = new_f.term in 
+                      (f_name == vv) )   !(st.handlers_functions_ref_mem)) in 
+  let globalboollist = 
+      (List.map (fun (var,abs) ->
+            begin match findresinglobal var with 
+            | [] -> false
+            | _ -> true
+            end) defs ) in 
+  let global_bool = List.fold_right (||) globalboollist false in 
+  let localboollist = 
+      (List.map (fun (var,abs) ->
+            begin match findresinlocal var with 
+            | [] -> false
+            | (h,old_f,new_f) :: _ -> Print.debug "\n my old function :- %t \n" (Typed.print_variable old_f);
+                                      Print.debug "\n my new function :- %t \n" (Typed.print_expression new_f); 
+                                      true
+            end) defs ) in
+  let local_bool = List.fold_right (||) localboollist false in
+  Print.debug "LOCAL BOOL :- %b \n Global Bool :- %b\n\n" (local_bool) (global_bool);
+  (global_bool && ( not local_bool) )
+
 
 
 let a22a a2 = Typed.a22a a2
@@ -226,6 +264,27 @@ and optimize_sub_comp st c =
     value ~loc (optimize_expr st e)
   | Let (li, c1) ->
     let' ~loc (Common.assoc_map (optimize_comp st) li) (optimize_comp st c1)
+  
+  | LetRec (defs, c1) when different_branch_specialized defs st ->
+    (* List.fold_right (fun (var,abs) st ->
+      {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st; *)
+      let [(var,abst)] = defs in 
+      Print.debug "\nst out length %i\n" (List.length (st.handlers_functions_mem) );
+      let findresinglobal = fun f_name -> (
+                  List.filter
+                  (fun (h,old_f,new_f) -> 
+                      let Var vv = new_f.term in 
+                      (f_name == vv) )   !(st.handlers_functions_ref_mem)) in 
+      begin match findresinglobal var with 
+      | [] -> let_rec' ~loc (Common.assoc_map (optimize_abs st) defs) (optimize_comp st c1)
+      | (h,old_f,new_f) :: _ -> 
+      Print.debug "\nold st length %i\n" (List.length (st.handlers_functions_mem) );
+            let st = {st with handlers_functions_mem = (h,old_f,new_f) :: st.handlers_functions_mem} in
+            Print.debug "\nnew st length %i\n" (List.length (st.handlers_functions_mem) ); 
+            let_rec' ~loc (Common.assoc_map (optimize_abs st) defs) (optimize_comp st c1) 
+      end
+
+
   | LetRec (li, c1) ->
     let_rec' ~loc (Common.assoc_map (optimize_abs st) li) (optimize_comp st c1)
   | Match (e, li) ->
@@ -485,27 +544,27 @@ and reduce_comp st c =
                   optimize_comp st res
                 | _ -> 
                        begin match (find_in_let_rec_mem st v) with
-                       | Some abs when specialized_count v <= 5 ->
-                                    let (let_rec_p,let_rec_c) = abs.term in
-                                    let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
-                                    let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
-                                    let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
-                                    let constraints = Constraints.list_union [h_const; f_const]
-                                          |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
-                                    let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
-                                    let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
-                                    let new_f_var, new_f_pat = make_var "newvar"  function_scheme in
-                                    let new_handler_call = handle e1 let_rec_c in
-                                    let Var newfvar = new_f_var.term in
-                                    let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
-                                    incr_specialized_count v;
-                                    let st = {st with handlers_functions_mem = (e1,v,new_f_var) :: st.handlers_functions_mem} in
-                                    (*Print.debug " the ccc is %t" (Typed.print_computation c);*)
-                                    let res =
-                                      let_rec' defs @@
-                                      apply new_f_var ae2
-                                    in
-                                    optimize_comp st res
+                       | Some abs ->
+                            let (let_rec_p,let_rec_c) = abs.term in
+                            let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
+                            let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
+                            let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
+                            let constraints = Constraints.list_union [h_const; f_const]
+                                  |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
+                            let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
+                            let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
+                            let new_f_var, new_f_pat = make_var "newvar"  function_scheme in
+                            let new_handler_call = handle e1 let_rec_c in
+                            let Var newfvar = new_f_var.term in
+                            let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
+                            let st = {st with handlers_functions_mem = (e1,v,new_f_var) :: st.handlers_functions_mem} in
+                            st.handlers_functions_ref_mem := (e1,v,new_f_var) :: !(st.handlers_functions_ref_mem) ;
+                            (*Print.debug " the ccc is %t" (Typed.print_computation c);*)
+                            let res =
+                              let_rec' defs @@
+                              apply new_f_var ae2
+                            in
+                            optimize_comp st res
                        | _ -> 
                         Print.debug "Its a none";
                                     Print.debug "The handle exp : %t" (Typed.print_expression ae1);c
