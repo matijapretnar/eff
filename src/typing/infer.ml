@@ -164,7 +164,11 @@ let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
       let eff = infer_effect ~loc env eff in
       Typed.effect ~loc eff
     | Untyped.Handler h ->
-      Typed.handler ~loc (type_handler env h)
+      let h' = type_handler env h in
+      begin match h.Untyped.finally_clause with
+      | None -> Typed.handler ~loc h'
+      | Some a -> Typed.finally_handler ~loc h' (type_abstraction env a)
+      end
   in
   (* Print.debug ~loc:typed_expr.Typed.location "%t" (Scheme.print_ty_scheme typed_expr.Typed.scheme); *)
   typed_expr
@@ -198,10 +202,13 @@ and type_handler env h =
   let type_handler_clause (eff, (p1, p2, c)) =
     let eff = infer_effect ~loc:(c.Untyped.location) env eff in
     (eff, type_abstraction2 env (p1, p2, c)) in
+  let value_clause = match h.Untyped.value_clause with
+  | Some a -> a
+  | None -> Desugar.id_abstraction Location.unknown
+  in
   {
     Typed.effect_clauses = Common.map type_handler_clause h.Untyped.effect_clauses;
-    Typed.value_clause = type_abstraction env h.Untyped.value_clause;
-    Typed.finally_clause = type_abstraction env h.Untyped.finally_clause;
+    Typed.value_clause = type_abstraction env value_clause;
   }
 and type_let_defs ~loc env defs =
   let defs' = List.map (fun (p, c) -> (type_pattern p, type_comp env c)) defs in

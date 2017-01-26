@@ -379,10 +379,8 @@ and handler loc ctx {Sugared.effect_clauses=ops; Sugared.value_clause=val_a; Sug
   in
   let ops = operation_cases ops in
   [], { Untyped.effect_clauses = ops;
-        Untyped.value_clause =
-          (match val_a with None -> id_abstraction loc | Some a -> abstraction ctx a);
-        Untyped.finally_clause =
-          (match fin_a with None -> id_abstraction loc | Some a -> abstraction ctx a)}
+        Untyped.value_clause = Common.option_map (abstraction ctx) val_a;
+        Untyped.finally_clause = Common.option_map (abstraction ctx) fin_a}
 
 let top_ctx = ref []
 
