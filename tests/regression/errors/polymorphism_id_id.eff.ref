@@ -1,4 +1,4 @@
-val _u_257 : τ₁ ⟶  τ₂ | τ₁ < τ₂;  = <fun>
-val _v_259 : _τ₁ ⟶  _τ₂ | τ₁ < τ₂;  = <fun>
+val u : τ₁ ⟶  τ₂ | τ₁ < τ₂;  = <fun>
+val v : _τ₁ ⟶  _τ₂ | τ₁ < τ₂;  = <fun>
 Typing error (file "./errors/polymorphism_id_id.eff", line 3, char 1 - line 3, char 16):
 This expression has type int but it should have type string.

@@ -2,7 +2,7 @@ module type Annotation =
 sig
   type t
 
-  val print : t -> int -> Format.formatter -> unit
+  val print : bool -> t -> int -> Format.formatter -> unit
 end
 
 module Anonymous : Annotation with type t = unit
@@ -17,7 +17,7 @@ sig
   val compare : t -> t -> int
   val fresh : annot -> t
   val refresh : t -> t
-  val print : t -> Format.formatter -> unit
+  val print : ?safe:bool -> t -> Format.formatter -> unit
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t

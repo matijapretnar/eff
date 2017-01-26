@@ -57,7 +57,7 @@ let print_tydefs tydefs ppf =
 
 (** SYNTAX *)
 
-let print_variable = Typed.Variable.print
+let print_variable = Typed.Variable.print ~safe:true
 
 
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
