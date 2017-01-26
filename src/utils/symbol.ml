@@ -2,25 +2,28 @@ module type Annotation =
 sig
   type t
 
-  val print : t -> int -> Format.formatter -> unit
+  val print : bool -> t -> int -> Format.formatter -> unit
 end
 
 module Anonymous : Annotation with type t = unit =
 struct
   type t = unit
 
-  let print _ n ppf = Format.pp_print_int ppf n
+  let print _ _ n ppf = Format.pp_print_int ppf n
 end
 
 module String : Annotation with type t = string =
 struct
   type t = string
 
-  let print desc n ppf =
-    match desc.[0] with
-    | ('a'..'z' | '_') ->
-      Format.fprintf ppf "_%s_%d" desc n
-    | _ -> Format.fprintf ppf "_var_%d (* %s *)" n desc
+  let print safe desc n ppf =
+    if safe then
+      match desc.[0] with
+      | ('a'..'z' | '_') ->
+        Format.fprintf ppf "_%s_%d" desc n
+      | _ -> Format.fprintf ppf "_var_%d (* %s *)" n desc
+    else
+      Format.fprintf ppf "%s" desc
 
 end
 
@@ -32,7 +35,7 @@ sig
   val compare : t -> t -> int
   val fresh : annot -> t
   val refresh : t -> t
-  val print : t -> Format.formatter -> unit
+  val print : ?safe:bool -> t -> Format.formatter -> unit
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t =
@@ -52,5 +55,5 @@ struct
     incr count;
     (!count, ann)
 
-  let print (n, ann) = Annot.print ann n
+  let print ?(safe=false) (n, ann) = Annot.print safe ann n
 end

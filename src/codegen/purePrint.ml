@@ -105,12 +105,10 @@ and print_handler ~pure h ppf =
   Print.print ppf
     "{@[<hov>
       value_clause = (@[fun %t@]);@ 
-      finally_clause = (@[fun %t@]);@ 
       effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
         ((match x with %t) : a -> (b -> _ computation) -> _ computation))
     @]}"
     (print_abstraction ~pure h.Typed.value_clause)
-    (print_abstraction ~pure h.Typed.finally_clause)
     (print_effect_clauses ~pure h.Typed.effect_clauses)
 
 and print_effect_clauses ~pure eff_clauses ppf =

@@ -51,7 +51,7 @@ and plain_expression =
   | Lambda of abstraction
   | Effect of effect
   | Handler of handler
-
+  | FinallyHandler of (handler * abstraction)
   | Pure of computation
 
 (** Impure computations *)
@@ -73,7 +73,6 @@ and plain_computation =
 and handler = {
   effect_clauses : (effect, abstraction2) Common.assoc;
   value_clause : abstraction;
-  finally_clause : abstraction;
 }
 
 (** Abstractions that take one argument. *)
@@ -194,6 +193,8 @@ and refresh_expr' sbst = function
     Lambda (refresh_abs sbst a)
   | Handler h ->
     Handler (refresh_handler sbst h)
+  | FinallyHandler h ->
+    FinallyHandler (refresh_finally_handler sbst h)
   | Tuple es ->
     Tuple (List.map (refresh_expr sbst) es)
   | Record flds ->
@@ -239,8 +240,9 @@ and refresh_comp' sbst = function
 and refresh_handler sbst h = {
   effect_clauses = Common.assoc_map (refresh_abs2 sbst) h.effect_clauses;
   value_clause = refresh_abs sbst h.value_clause;
-  finally_clause = refresh_abs sbst h.finally_clause;
 }
+and refresh_finally_handler sbst (h, finally_clause) =
+  (refresh_handler sbst h, refresh_abs sbst finally_clause)
 and refresh_abs sbst a = 
   let (p, c) = a.term in
   let sbst, p' = refresh_pattern sbst p in
@@ -262,6 +264,8 @@ and subst_expr' sbst = function
     Lambda (subst_abs sbst a)
   | Handler h ->
     Handler (subst_handler sbst h)
+  | FinallyHandler h ->
+    FinallyHandler (subst_finally_handler sbst h)
   | Tuple es ->
     Tuple (List.map (subst_expr sbst) es)
   | Record flds ->
@@ -305,8 +309,9 @@ and subst_comp' sbst = function
 and subst_handler sbst h = {
   effect_clauses = Common.assoc_map (subst_abs2 sbst) h.effect_clauses;
   value_clause = subst_abs sbst h.value_clause;
-  finally_clause = subst_abs sbst h.finally_clause;
 }
+and subst_finally_handler sbst (h, finally_clause) =
+  (subst_handler sbst h, subst_abs sbst finally_clause)
 and subst_abs sbst a = 
   let (p, c) = a.term in
   (* XXX Should we check that p & sbst have disjoint variables? *)
@@ -334,6 +339,8 @@ and remove_rec_expr' st = function
     Lambda (remove_rec_abs st a)
   | Handler h ->
     Handler (remove_rec_handler st h)
+  | FinallyHandler h ->
+    FinallyHandler (remove_rec_finally_handler st h)
   | Tuple es ->
     Tuple (List.map (remove_rec_expr st) es)
   | Record flds ->
@@ -387,8 +394,9 @@ and remove_rec_comp (poly_tys, constraints) c =
 and remove_rec_handler st h = {
   effect_clauses = Common.assoc_map (remove_rec_abs2 st) h.effect_clauses;
   value_clause = remove_rec_abs st h.value_clause;
-  finally_clause = remove_rec_abs st h.finally_clause;
 }
+and remove_rec_finally_handler st (h, finally_clause) =
+  (remove_rec_handler st h, remove_rec_abs st finally_clause)
 and remove_rec_abs st a = 
   let (p, c) = a.term in
   (* XXX Should we check that p & st have disjoint variables? *)
@@ -415,6 +423,8 @@ and push_constraints_expr' st = function
     Lambda (push_constraints_abs st a)
   | Handler h ->
     Handler (push_constraints_handler st h)
+  | FinallyHandler (h, finally) ->
+    FinallyHandler (push_constraints_finally_handler st (h, finally))
   | Tuple es ->
     Tuple (List.map (push_constraints_expr st) es)
   | Record flds ->
@@ -468,8 +478,9 @@ and push_constraints_comp' st = function
 and push_constraints_handler st h = {
   effect_clauses = Common.assoc_map (push_constraints_abs2 st) h.effect_clauses;
   value_clause = push_constraints_abs st h.value_clause;
-  finally_clause = push_constraints_abs st h.finally_clause;
 }
+and push_constraints_finally_handler st (h, finally_clause) =
+  (push_constraints_handler st h, push_constraints_abs st finally_clause)
 and push_constraints_abs st a = 
   let (p, c) = a.term in
   (* XXX Should we check that p & st have disjoint variables? *)
@@ -575,8 +586,13 @@ and alphaeq_comp' eqvars c c' =
   | _, _ -> false
 and alphaeq_handler eqvars h h' =
   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
-  alphaeq_abs eqvars h.value_clause h'.value_clause &&
-  alphaeq_abs eqvars h.finally_clause h'.finally_clause
+  alphaeq_abs eqvars h.value_clause h'.value_clause
+and alphaeq_finally_handler eqvars (h, finally_clause) (h', finally_clause') =
+  alphaeq_handler eqvars h h' &&
+  match finally_clause, finally_clause with
+  | Some fin, Some fin' -> alphaeq_abs eqvars fin fin'
+  | None, None -> true
+  | _, _ -> false
 and alphaeq_abs eqvars {term = (p, c)} {term = (p', c')} =
   match make_equal_pattern eqvars p p' with
   | Some eqvars' -> alphaeq_comp eqvars' c c'
@@ -703,7 +719,54 @@ let effect ?loc ((eff_name, (ty_par, ty_res)) as eff) =
 
 let handler ?loc h =
   let loc = backup_location loc (
-      [h.value_clause.location; h.finally_clause.location] @
+      h.value_clause.location ::
+      List.map (fun (_, a2) -> a2.location) h.effect_clauses
+    ) in
+  let drt_out = Type.fresh_dirt () in
+  let ty_out = Type.fresh_ty () in
+
+  let fold ((_, (ty_par, ty_arg)), a2) (ctx, constraints) =
+    let ctx_a, (ty_p, ty_k, drty_c), cnstrs_a = a2.scheme in
+    ctx_a @ ctx,
+    Constraints.list_union [constraints; cnstrs_a]
+    |> Constraints.add_ty_constraint ~loc ty_par ty_p
+    |> Constraints.add_ty_constraint ~loc (Type.Arrow (ty_arg, (ty_out, drt_out))) ty_k
+    |> Constraints.add_dirty_constraint ~loc drty_c (ty_out, drt_out)
+  in
+  let ctxs, constraints = List.fold_right fold h.effect_clauses ([], Constraints.empty) in
+
+  let make_dirt (eff, _) (effs_in, effs_out) =
+    let r_in = Params.fresh_region_param () in
+    let r_out = Params.fresh_region_param () in
+    (eff, r_in) :: effs_in, (eff, r_out) :: effs_out
+  in
+  let effs_in, effs_out = List.fold_right make_dirt (Common.uniq (List.map fst h.effect_clauses)) ([], []) in
+
+  let ctx_val, (ty_val, drty_val), cnstrs_val = h.value_clause.scheme in
+
+  let ty_in = Type.fresh_ty () in
+  let drt_rest = Params.fresh_dirt_param () in
+  let drt_in = {Type.ops = effs_in; Type.rest = drt_rest} in
+
+  let constraints =
+    Constraints.list_union [constraints; cnstrs_val]
+    |> Constraints.add_dirt_constraint {Type.ops = effs_out; Type.rest = drt_rest} drt_out
+    |> Constraints.add_ty_constraint ~loc ty_in ty_val
+    |> Constraints.add_dirty_constraint ~loc drty_val (ty_out, drt_out)
+
+  in
+
+  let ty_sch = (ctx_val @ ctxs, Type.Handler((ty_in, drt_in), (ty_out, drt_out)), constraints) in
+  {
+    term = Handler h;
+    scheme = Scheme.clean_ty_scheme ~loc ty_sch;
+    location = loc;
+  }
+
+let finally_handler ?loc h finally_clause =
+  let loc = backup_location loc (
+      h.value_clause.location ::
+      finally_clause.location ::
       List.map (fun (_, a2) -> a2.location) h.effect_clauses
     ) in
   let drt_mid = Type.fresh_dirt () in
@@ -727,7 +790,7 @@ let handler ?loc h =
   let effs_in, effs_out = List.fold_right make_dirt (Common.uniq (List.map fst h.effect_clauses)) ([], []) in
 
   let ctx_val, (ty_val, drty_val), cnstrs_val = h.value_clause.scheme in
-  let ctx_fin, (ty_fin, drty_fin), cnstrs_fin = h.finally_clause.scheme in
+  let ctx_fin, (ty_fin, drty_fin), cnstrs_fin = finally_clause.scheme in
 
   let ty_in = Type.fresh_ty () in
   let drt_rest = Params.fresh_dirt_param () in
@@ -748,7 +811,7 @@ let handler ?loc h =
 
   let ty_sch = (ctx_val @ ctx_fin @ ctxs, Type.Handler((ty_in, drt_in), (ty_out, drt_out)), constraints) in
   {
-    term = Handler h;
+    term = FinallyHandler (h, finally_clause);
     scheme = Scheme.clean_ty_scheme ~loc ty_sch;
     location = loc;
   }
@@ -1035,14 +1098,17 @@ and free_vars_expr e =
   | Tuple es -> concat_vars (List.map free_vars_expr es)
   | Lambda a -> free_vars_abs a
   | Handler h -> free_vars_handler h
+  | FinallyHandler h -> free_vars_finally_handler h
   | Record flds -> concat_vars (List.map (fun (_, e) -> free_vars_expr e) flds)
   | Variant (_, None) -> ([], [])
   | Variant (_, Some e) -> free_vars_expr e
   | (BuiltIn _ | Effect _ | Const _) -> ([], [])
 and free_vars_handler h =
   free_vars_abs h.value_clause @@@
-  free_vars_abs h.finally_clause @@@
   concat_vars (List.map (fun (_, a2) -> free_vars_abs2 a2) h.effect_clauses)
+and free_vars_finally_handler (h, finally_clause) =
+  free_vars_handler h @@@
+  free_vars_abs finally_clause
 and free_vars_abs a =
   let (p, c) = a.term in
   let (inside, outside) = free_vars_comp c --- pattern_vars p in
@@ -1093,9 +1159,9 @@ let rec print_expression ?max_level e ppf =
   | Lambda a ->
     print ~at_level:2 "fun %t" (print_abstraction a)
   | Handler h ->
-    print "{@[<hov> value_clause = (@[fun %t@]);@ finally_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
+    print "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
              ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
-      (print_abstraction h.value_clause) (print_abstraction h.finally_clause)
+      (print_abstraction h.value_clause)
       (print_effect_clauses h.effect_clauses)
   | Effect eff ->
     print ~at_level:2 "effect %t" (print_effect eff)

@@ -68,8 +68,7 @@ let incr_specialized_count v =
 let alphaeq_handler_no_vc eqvars h h'=
 let (Handler ht) = h.term in
 let (Handler h't) = h'.term in 
- assoc_equal (alphaeq_abs2 eqvars) ht.effect_clauses h't.effect_clauses &&
-  alphaeq_abs eqvars ht.finally_clause h't.finally_clause
+ assoc_equal (alphaeq_abs2 eqvars) ht.effect_clauses h't.effect_clauses
 
 let find_in_handlers_func_mem st f_name h_exp =
   let loc = h_exp.location in 
@@ -254,7 +253,6 @@ and optimize_sub_expr st e =
     handler ~loc {
       effect_clauses = (*Common.assoc_map (optimize_abs2 st)*) h.effect_clauses;
       value_clause = optimize_abs st h.value_clause;
-      finally_clause = optimize_abs st h.finally_clause;
     }
   | (Var _ | Const _ | BuiltIn _ | Effect _) -> e
 and optimize_sub_comp st c =
@@ -427,7 +425,6 @@ and reduce_comp st c =
     let hdlr = handler {
       effect_clauses = h.effect_clauses;
       value_clause = refresh_abs new_value_clause;
-      finally_clause = h.finally_clause;
     } in
     reduce_comp st (handle (refresh_expr hdlr) c1)
 
@@ -438,7 +435,6 @@ and reduce_comp st c =
     let hdlr = handler {
       effect_clauses = h.effect_clauses;
       value_clause = refresh_abs new_value_clause;
-      finally_clause = h.finally_clause;
     } in
     reduce_comp st (handle (refresh_expr hdlr) (refresh_comp c1))
 

@@ -52,8 +52,8 @@ and plain_computation =
 (** Handler definitions *)
 and handler = {
   effect_clauses : (effect, abstraction2) Common.assoc;
-  value_clause : abstraction;
-  finally_clause : abstraction;
+  value_clause : abstraction option;
+  finally_clause : abstraction option;
 }
 
 (** Abstractions that take one argument. *)

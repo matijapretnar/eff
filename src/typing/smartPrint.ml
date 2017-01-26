@@ -2,14 +2,19 @@ open Scheme
 open Type
 
 
+let filter_polymorphism drt =
+  {drt with ops = List.filter (fun (op, _) -> op <> "///") drt.ops}
+
 let show_dirt ~non_empty_dirts drt =
-  drt.ops != [] || List.mem drt.rest non_empty_dirts
+  let drt = filter_polymorphism drt in
+  drt.ops <> [] || List.mem drt.rest non_empty_dirts
 
 
 let print_operation ~non_poly r_ops =
-  Print.sequence ", " (fun (op, r) ppf -> Print.print ppf "%s:%t" op (Params.print_region_param ~non_poly r)) r_ops
+  Print.sequence ", " (fun (op, r) ppf -> if op <> "///" then Print.print ppf "%s:%t" op (Params.print_region_param ~non_poly r)) r_ops
 
 let print_dirt ~non_poly ~non_empty_dirts drt ppf =
+  let drt = filter_polymorphism drt in
   match drt.ops with
   | [] ->
     if List.mem drt.rest non_empty_dirts then
@@ -19,6 +24,7 @@ let print_dirt ~non_poly ~non_empty_dirts drt ppf =
       Print.print ppf "{%t|%t}" (print_operation ~non_poly drt.ops) (Params.print_dirt_param ~non_poly drt.rest)
     else
       Print.print ppf "{%t}" (print_operation ~non_poly drt.ops)
+
 
 let print_ty ~non_poly ~non_empty_dirts ~skeletons t ppf =
   let rec ty ?max_level t ppf =

@@ -118,8 +118,10 @@ and veval env e =
   | Typed.Effect eff ->
     V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | Typed.Handler h -> V.Handler (eval_handler env h)
+  | Typed.FinallyHandler (h, finally) ->
+      V.Handler (fun r_in -> sequence (eval_closure env finally) (eval_handler env h r_in))
 
-and eval_handler env {Typed.effect_clauses=ops; Typed.value_clause=value; Typed.finally_clause=fin} =
+and eval_handler env {Typed.effect_clauses=ops; Typed.value_clause=value} =
   let eval_op (op, a2) =
     let (p, kvar, c) = a2.Typed.term in
     let f u k = eval_closure (extend kvar (V.Closure k) env) (Typed.abstraction ~loc:a2.Typed.location p c) u in
@@ -135,7 +137,7 @@ and eval_handler env {Typed.effect_clauses=ops; Typed.value_clause=value; Typed.
         | None -> V.Call (eff, v, k')
       end
   in
-  fun r -> sequence (eval_closure env fin) (h r)
+  h
 
 and eval_closure env a v =
   let p, c = a.Typed.term in
