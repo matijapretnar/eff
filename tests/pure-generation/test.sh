@@ -1,16 +1,16 @@
 #!/bin/bash
 
 echo "BLANK"
-../../eff.native --compile blank.eff
+../../eff.native --pure --compile blank.eff
 echo "INTERPRETER"
 echo "  DIVERGES"
-# ../../eff.native --compile interp.eff
+# ../../eff.native --pure --compile interp.eff
 echo "LOOP"
-../../eff.native --compile loop.eff
+../../eff.native --pure --compile loop.eff
 echo "LOOP EFFECTS"
-../../eff.native --compile loopEffect.eff
+../../eff.native --pure --compile loopEffect.eff
 echo "PARSER"
 echo "  DIVERGES"
-# ../../eff.native --compile parser.eff
+# ../../eff.native --pure --compile parser.eff
 echo "QUEENS"
-../../eff.native --compile queens.eff
+../../eff.native --pure --compile queens.eff
