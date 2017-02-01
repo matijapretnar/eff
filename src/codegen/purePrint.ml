@@ -4,8 +4,10 @@ type conversion =
   | Identity
   | Tuple of conversion list
   | Value
+  | Run
   | Compose of conversion * conversion
-  | PrePostCompose of conversion * conversion
+  | PreCompose of conversion
+  | PostCompose of conversion
 
 let rec ty_scheme_conversion (ctx, ty, constraints) (ctx', ty', constraints') =
   match ty, ty' with
@@ -15,9 +17,9 @@ let rec ty_scheme_conversion (ctx, ty, constraints) (ctx', ty', constraints') =
         ty_scheme_conversion (ctx, ty, constraints) (ctx', ty', constraints')
       ) tys tys')
   | Type.Arrow (ty, drty), Type.Arrow (ty', drty') ->
-      PrePostCompose (
-        ty_scheme_conversion (ctx', ty', constraints') (ctx, ty, constraints),
-        dirty_scheme_conversion (ctx, drty, constraints) (ctx', drty', constraints')
+      Compose (
+        PreCompose (ty_scheme_conversion (ctx', ty', constraints') (ctx, ty, constraints)),
+        PostCompose (dirty_scheme_conversion (ctx, drty, constraints) (ctx', drty', constraints'))
       )
   | _, _ -> Identity
 
@@ -28,10 +30,38 @@ and dirty_scheme_conversion (ctx, (ty, drt), constraints) (ctx', (ty', drt'), co
     and pure' = Scheme.is_pure (ctx', (ty', drt'), constraints') in
     match pure, pure' with
     | true, false -> Value
-    | false, true -> assert false
+    | false, true -> Run
     | _, _ -> Identity
   in
   Compose (ty_conversion, dirt_conversion)
+
+let rec optimize_conversion = function
+  | Identity -> Identity
+  | Tuple convs ->
+      let convs = List.map optimize_conversion convs in
+      Tuple convs
+  | Value -> Value
+  | Compose (conv1, conv2) ->
+      let conv1 = optimize_conversion conv1
+      and conv2 = optimize_conversion conv2 in
+      begin match conv1, conv2 with
+      | Identity, _ -> conv2
+      | _, Identity -> conv1
+      | conv1, conv2 -> Compose (conv1, conv2)
+      end
+  | PreCompose conv ->
+      let conv = optimize_conversion conv in
+      begin match conv with
+      | Identity -> Identity
+      | conv -> PreCompose conv
+      end
+  | PostCompose conv ->
+      let conv = optimize_conversion conv in
+      begin match conv with
+      | Identity -> Identity
+      | conv -> PostCompose conv
+      end
+  | Run -> Run
 
 let rec print_conversion ?max_level conv ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -40,18 +70,22 @@ let rec print_conversion ?max_level conv ppf =
       print ~at_level:1 "fun x -> x"
   | Value ->
       print ~at_level:0 "value"
+  | Run ->
+      print ~at_level:0 "run"
   | Compose (conv1, conv2) ->
       print ~at_level:1 "fun x -> %t (%t x)"
         (print_conversion ~max_level:0 conv1)
         (print_conversion ~max_level:0 conv2)
-  | PrePostCompose (conv1, conv2) ->
-      print ~at_level:1 "fun f -> fun x -> %t (f (%t x))"
-        (print_conversion ~max_level:0 conv1)
-        (print_conversion ~max_level:0 conv2)
+  | PreCompose conv ->
+      print ~at_level:1 "fun f -> fun x -> f (%t x)"
+        (print_conversion ~max_level:0 conv)
+  | PostCompose conv ->
+      print ~at_level:1 "fun f -> fun x -> %t (f x)"
+        (print_conversion ~max_level:0 conv)
 
 let optional_conversion f = function
   | None -> Identity
-  | Some x -> f x
+  | Some x -> optimize_conversion (f x)
 
 let rec print_expression ?max_level ?expected_scheme e ppf =
   match optional_conversion (ty_scheme_conversion e.Typed.scheme) expected_scheme with
@@ -59,7 +93,7 @@ let rec print_expression ?max_level ?expected_scheme e ppf =
     print_expression' ?max_level e ppf
   | conv ->
     Print.print ?max_level ~at_level:1 ppf "%t %t"
-      (print_conversion conv) (print_expression' ~max_level:0 e)
+      (print_conversion ~max_level:0 conv) (print_expression' ~max_level:0 e)
 
 and print_expression' ?max_level e ppf =
   let (ctx, ty, constraints) = e.Typed.scheme in
@@ -94,15 +128,20 @@ and print_computation ?max_level ?expected_scheme c ppf =
     print_computation' ?max_level c ppf
   | conv ->
     Print.print ?max_level ~at_level:1 ppf "%t %t"
-      (print_conversion conv) (print_computation' ~max_level:0 c)
+      (print_conversion ~max_level:0 conv) (print_computation' ~max_level:0 c)
 
 and print_computation' ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.Typed.term with
   | Typed.Apply (e1, e2) ->
+    let (ctx, drty, constraints) = c.Typed.scheme in
+    let (ctx1, (Type.Arrow (ty1, drty1)), constraints1) = e1.Typed.scheme in
+    let (ctx2, ty2, constraints2) = e2.Typed.scheme in
+    let expected_scheme1 = (ctx, (Type.Arrow (ty1, drty)), constraints)
+    and expected_scheme2 = (ctx, ty1, constraints) in
     print ~at_level:1 "%t@ %t"
-      (print_expression ~max_level:1 e1)
-      (print_expression ~max_level:0 e2)
+      (print_expression ~max_level:1 ~expected_scheme:expected_scheme1 e1)
+      (print_expression ~max_level:0 ~expected_scheme:expected_scheme2 e2)
   | Typed.Value e ->
     let (ctx, (ty, _), constraints) = c.Typed.scheme in
     let expected_scheme = (ctx, ty, constraints) in
@@ -125,22 +164,25 @@ and print_computation' ?max_level c ppf =
     print ~at_level:2 "let rec @[<hov>%t@] in %t"
       (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
   | Typed.Call (eff, e, a) ->
+    let expected_scheme = c.Typed.scheme in
     print ~at_level:1 "call %t %t (@[fun %t@])"
-      (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
+      (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction ~expected_scheme a)
   | Typed.Bind (c1, {Typed.term = (p, c2)}) when Scheme.is_pure c1.Typed.scheme ->
     print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t"
       (print_pattern p)
       (print_computation ~max_level:0 c1)
       (print_computation c2)
   | Typed.Bind (c1, a) ->
+    let expected_scheme = c.Typed.scheme in
     print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]"
       (print_computation ~max_level:0 c1)
-      (print_abstraction a)
+      (print_abstraction ~expected_scheme a)
   | Typed.LetIn (e, {Typed.term = (p, c)}) ->
+    let expected_scheme = c.Typed.scheme in
     print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t"
       (print_pattern p)
       (print_expression e)
-      (print_computation c)
+      (print_computation ~expected_scheme c)
 
 and print_handler h ppf =
   Print.print ppf
@@ -167,7 +209,7 @@ and print_effect_clauses eff_clauses ppf =
       (print_effect_clauses cases)
 
 and print_abstraction ?expected_scheme {Typed.term = (p, c)} ppf =
-  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
+  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation ?expected_scheme c)
 
 and print_multiple_bind (lst, c') ppf =
   match lst with
