@@ -1121,7 +1121,7 @@ let occurrences x (inside, outside) =
 
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
 
-let print_variable = Variable.print
+let print_variable = Variable.print ~safe:true
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

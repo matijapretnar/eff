@@ -224,7 +224,7 @@ let skeletons_non_poly_scheme (ctx, _, cnstrs) =
 
 let print_context ctx ppf =
   let print_binding (x, t) ppf =
-    Print.print ppf "%t : %t" (Untyped.Variable.print x) (Type.print_ty t)
+    Print.print ppf "%t : %t" (Untyped.Variable.print ~safe:true x) (Type.print_ty t)
   in
   Print.sequence ", " print_binding ctx ppf
 
