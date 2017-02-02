@@ -974,10 +974,13 @@ let let_rec' ?loc defs c =
     location = loc;
   }
 
-let bind ?loc c1 c2 =
+let bind ?loc c1 {term = (p, c2)} =
   let loc = backup_location loc [c1.location; c2.location] in
   let ctx_c1, (ty_c1, drt_c1), constraints_c1 = c1.scheme
-  and ctx_c2, (ty_p, (ty_c2, drt_c2)), constraints_c2 = c2.scheme in
+  and ctx_p, ty_p, constraints_p = p.scheme
+  in
+  let c2 = remove_rec_comp (ctx_p, constraints_p) c2 in
+  let ctx_c2, (ty_c2, drt_c2), constraints_c2 = c2.scheme in
   let drt = Type.fresh_dirt () in
   let constraints =
     Constraints.union constraints_c1 constraints_c2 |>
@@ -986,21 +989,24 @@ let bind ?loc c1 c2 =
     Constraints.add_ty_constraint ~loc ty_c1 ty_p
   in
   {
-    term = Bind (c1, c2);
+    term = Bind (c1, (abstraction p c2));
     scheme = Scheme.clean_dirty_scheme ~loc (ctx_c1 @ ctx_c2, (ty_c2, drt), constraints);
     location = loc;
   }
 
-let let_in ?loc e1 c2 =
+let let_in ?loc e1 {term = (p, c2)} =
   let loc = backup_location loc [e1.location; c2.location] in
   let ctx_e1, ty_e1, constraints_e1 = e1.scheme
-  and ctx_c2, (ty_p, drty_c2), constraints_c2 = c2.scheme in
+  and ctx_p, ty_p, constraints_p = p.scheme
+  in
+  let c2 = remove_rec_comp (ctx_p, constraints_p) c2 in
+  let ctx_c2, drty_c2, constraints_c2 = c2.scheme in
   let constraints =
     Constraints.union constraints_e1 constraints_c2 |>
     Constraints.add_ty_constraint ~loc ty_e1 ty_p
   in
   {
-    term = LetIn (e1, c2);
+    term = LetIn (e1, (abstraction p c2));
     scheme = Scheme.clean_dirty_scheme ~loc (ctx_e1 @ ctx_c2, drty_c2, constraints);
     location = loc;
   }
