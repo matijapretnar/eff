@@ -1,102 +1,140 @@
 open CommonPrint
 
-type conversion =
-  | Identity
-  | Tuple of conversion list
-  | Value
-  | Run
-  | Compose of conversion * conversion
-  | PreCompose of conversion
-  | PostCompose of conversion
+type ty_shape =
+  | Basic
+  | Arrow of ty_shape * dirty_shape
+  | Tuple of ty_shape list
+and dirty_shape =
+  | Value of ty_shape
+  | Computation of ty_shape
 
-let rec ty_scheme_conversion (ctx, ty, constraints) (ctx', ty', constraints') =
-  match ty, ty' with
-  | Type.Basic _, Type.Basic _ -> Identity
-  | Type.Tuple tys, Type.Tuple tys' ->
-      Tuple (List.map2 (fun ty ty' ->
-        ty_scheme_conversion (ctx, ty, constraints) (ctx', ty', constraints')
-      ) tys tys')
-  | Type.Arrow (ty, drty), Type.Arrow (ty', drty') ->
-      Compose (
-        PreCompose (ty_scheme_conversion (ctx', ty', constraints') (ctx, ty, constraints)),
-        PostCompose (dirty_scheme_conversion (ctx, drty, constraints) (ctx', drty', constraints'))
-      )
-  | _, _ -> Identity
+let rec shape_of_ty st = function
+  | Type.Param _ -> Basic
+  | Type.Apply _ -> Basic
+  | Type.Basic _ -> Basic
+  | Type.Arrow (ty, dirty) -> Arrow (shape_of_ty st ty, shape_of_dirty st dirty)
+  | Type.Tuple tys -> Tuple (List.map (shape_of_ty st) tys)
+  | ty -> Print.debug "Don't know the shape of %t" (Type.print_ty ty); assert false
+and shape_of_dirty ((ctx, constraints) as st) (ty, drt) =
+  if Scheme.is_surely_pure (ctx, (ty, drt), constraints) then
+    Value (shape_of_ty st ty)
+  else
+    Computation (shape_of_ty st ty)
 
-and dirty_scheme_conversion (ctx, (ty, drt), constraints) (ctx', (ty', drt'), constraints') =
-  let ty_conversion = ty_scheme_conversion (ctx, ty, constraints) (ctx', ty', constraints')
-  and dirt_conversion =
-    let pure = Scheme.is_surely_pure (ctx, (ty, drt), constraints)
-    and pure' = Scheme.is_surely_pure (ctx', (ty', drt'), constraints') in
-    match pure, pure' with
-    | true, false -> Value
-    | false, true -> Run
-    | _, _ -> Identity
-  in
-  Compose (ty_conversion, dirt_conversion)
+type ty_conversion =
+  | TyIdentity
+  | DontKnow
+  | Lift of ty_conversion * dirty_conversion
+  | Tuple of ty_conversion list
+and dirty_conversion =
+  | DirtyIdentity
+  | Value of ty_conversion
+  | ConvertValues of ty_conversion
+  | ConvertComps of ty_conversion
 
-let rec optimize_conversion = function
-  | Identity -> Identity
+let rec simplify_ty_conversion = function
+  | TyIdentity -> TyIdentity
+  | DontKnow -> DontKnow
   | Tuple convs ->
-      let convs = List.map optimize_conversion convs in
-      Tuple convs
-  | Value -> Value
-  | Compose (conv1, conv2) ->
-      let conv1 = optimize_conversion conv1
-      and conv2 = optimize_conversion conv2 in
-      begin match conv1, conv2 with
-      | Identity, _ -> conv2
-      | _, Identity -> conv1
-      | conv1, conv2 -> Compose (conv1, conv2)
+      let convs = List.map simplify_ty_conversion convs in
+      if List.for_all (fun conv -> conv = TyIdentity) convs then
+        TyIdentity
+      else
+        Tuple convs
+  | Lift (conv1, conv2) ->
+      begin match simplify_ty_conversion conv1, simplify_dirty_conversion conv2 with
+      | TyIdentity, DirtyIdentity -> TyIdentity
+      | conv1, conv2 -> Lift (conv1, conv2)
       end
-  | PreCompose conv ->
-      let conv = optimize_conversion conv in
-      begin match conv with
-      | Identity -> Identity
-      | conv -> PreCompose conv
+and simplify_dirty_conversion = function
+  | DirtyIdentity -> DirtyIdentity
+  | Value conv -> Value (simplify_ty_conversion conv)
+  | ConvertValues conv ->
+      begin match simplify_ty_conversion conv with
+      | TyIdentity -> DirtyIdentity
+      | conv -> ConvertValues conv
       end
-  | PostCompose conv ->
-      let conv = optimize_conversion conv in
-      begin match conv with
-      | Identity -> Identity
-      | conv -> PostCompose conv
+  | ConvertComps conv ->
+      begin match simplify_ty_conversion conv with
+      | TyIdentity -> DirtyIdentity
+      | conv -> ConvertComps conv
       end
-  | Run -> Run
 
-let rec print_conversion ?max_level conv ppf =
+let rec ty_shape_conversion = function
+  | Basic _, Basic _ -> TyIdentity
+  | Arrow (shape1, shape2), Arrow (shape1', shape2') ->
+      Lift (
+        ty_shape_conversion (shape1', shape1),
+        dirty_shape_conversion (shape2, shape2')
+      )
+  | Tuple shapes1, Tuple shapes2 ->
+      Tuple (List.map2 (fun shape1 shape2 -> ty_shape_conversion (shape1, shape2)) shapes1 shapes2)
+  | _, _ -> DontKnow
+
+and dirty_shape_conversion = function
+  | Value shape, Value shape' ->
+      ConvertValues (ty_shape_conversion (shape, shape'))
+  | Value shape, Computation shape' ->
+      Value (ty_shape_conversion (shape, shape'))
+  | Computation shape, Computation shape' ->
+      ConvertComps (ty_shape_conversion (shape, shape'))
+  | Computation _, Value _ -> assert false
+
+let rec print_ty_conversion ?max_level conv term ppf : unit =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match conv with
-  | Identity ->
-      print ~at_level:1 "fun x -> x"
-  | Value ->
-      print ~at_level:0 "value"
-  | Run ->
-      print ~at_level:0 "run"
-  | Compose (conv1, conv2) ->
-      print ~at_level:1 "fun x -> %t (%t x)"
-        (print_conversion ~max_level:0 conv1)
-        (print_conversion ~max_level:0 conv2)
-  | PreCompose conv ->
-      print ~at_level:1 "fun f -> fun x -> f (%t x)"
-        (print_conversion ~max_level:0 conv)
-  | PostCompose conv ->
-      print ~at_level:1 "fun f -> fun x -> %t (f x)"
-        (print_conversion ~max_level:0 conv)
+  | TyIdentity ->
+      print "%t" term
+  | Lift (conv1, conv2) ->
+      let x = Typed.Variable.fresh "x" in
+          print ~at_level:1 "(* both *)fun %t -> %t"
+                (print_variable x)
+                (print_dirty_conversion ~max_level:0 conv2
+                (fun ppf -> Print.print ppf "%t %t"
+                  term
+                  (print_ty_conversion ~max_level:0 conv1 (fun ppf -> Print.print ppf "%t" (print_variable x)))
+                )
+              )
+  | Tuple convs ->
+      let xs = List.mapi (fun i conv -> (Typed.Variable.fresh ("x" ^ string_of_int i), conv)) convs in
+      print ~at_level:1 "let (%t) = %t in (%t)"
+        (Print.sequence ", " print_variable (List.map fst xs))
+        term
+        (Print.sequence ", " (fun (x, conv) -> print_ty_conversion conv (print_variable x)) xs)
+  | DontKnow -> print "????"
+and print_dirty_conversion ?max_level conv term ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match conv with
+  | DirtyIdentity ->
+      print "%t" term
+  | ConvertValues conv ->
+      print_ty_conversion ?max_level conv term ppf
+  | Value conv ->
+      print ~at_level:0 "value (%t)"
+      (print_ty_conversion ~max_level:0 conv term)
 
-let optional_conversion f = function
-  | None -> Identity
-  | Some x -> optimize_conversion (f x)
+let ty_scheme_conversion (ctx1, ty1, constraints1) tysch2 =
+  match tysch2 with
+  | None -> TyIdentity
+  | Some (ctx2, ty2, constraints2) ->
+      let shp1 = shape_of_ty (ctx1, constraints1) ty1
+      and shp2 = shape_of_ty (ctx2, constraints2) ty2 in
+      simplify_ty_conversion (ty_shape_conversion (shp1, shp2))
+and dirty_scheme_conversion (ctx1, drty1, constraints1) tysch2 =
+  match tysch2 with
+  | None -> DirtyIdentity
+  | Some (ctx2, drty2, constraints2) ->
+      let shp1 = shape_of_dirty (ctx1, constraints1) drty1
+      and shp2 = shape_of_dirty (ctx2, constraints2) drty2 in
+      simplify_dirty_conversion (dirty_shape_conversion (shp1, shp2))
 
-let rec print_expression ?max_level ?expected_scheme e ppf =
-  match optional_conversion (ty_scheme_conversion e.Typed.scheme) expected_scheme with
-  | Identity ->
-    print_expression' ?max_level e ppf
-  | conv ->
-    Print.print ?max_level ~at_level:1 ppf "%t %t"
-      (print_conversion ~max_level:0 conv) (print_expression' ~max_level:0 e)
+let rec print_expression ?max_level ?expected_scheme e ppf : unit=
+  let conv = ty_scheme_conversion e.Typed.scheme expected_scheme in
+  print_ty_conversion ~max_level:0 conv (print_expression' ~max_level:0 e) ppf
 
 and print_expression' ?max_level e ppf =
   let (ctx, ty, constraints) = e.Typed.scheme in
+  Print.debug "printing %t : %t" (Typed.print_expression e) (Scheme.print_ty_scheme e.Typed.scheme);
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match e.Typed.term with
   | Typed.Var x ->
@@ -123,20 +161,16 @@ and print_expression' ?max_level e ppf =
     print_computation ?max_level c ppf
 
 and print_computation ?max_level ?expected_scheme c ppf =
-  match optional_conversion (dirty_scheme_conversion c.Typed.scheme) expected_scheme with
-  | Identity ->
-    print_computation' ?max_level c ppf
-  | conv ->
-    Print.print ?max_level ~at_level:1 ppf "%t %t"
-      (print_conversion ~max_level:0 conv) (print_computation' ~max_level:0 c)
+  let conv = dirty_scheme_conversion c.Typed.scheme expected_scheme in
+  print_dirty_conversion ~max_level:0 conv (print_computation' ~max_level:0 c) ppf
 
 and print_computation' ?max_level c ppf =
+  Print.debug "printing %t : %t" (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme);
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.Typed.term with
   | Typed.Apply (e1, e2) ->
     let (ctx, drty, constraints) = c.Typed.scheme in
-    let (ctx1, (Type.Arrow (ty1, drty1)), constraints1) = e1.Typed.scheme in
-    let (ctx2, ty2, constraints2) = e2.Typed.scheme in
+    let (_, (Type.Arrow (ty1, _)), _) = e1.Typed.scheme in
     let expected_scheme1 = (ctx, (Type.Arrow (ty1, drty)), constraints)
     and expected_scheme2 = (ctx, ty1, constraints) in
     print ~at_level:1 "%t@ %t"
@@ -222,11 +256,7 @@ and print_multiple_bind (lst, c') ppf =
         (print_computation c) (print_pattern p) (print_multiple_bind (lst, c'))
 
 and print_top_let_abstraction (p, c) ppf =
-  match c.Typed.term with
-  | Typed.Value e -> 
-    Format.fprintf ppf "%t = %t" (print_pattern p) (print_expression ~max_level:0 e)
-  | _ -> 
-    Format.fprintf ppf "%t = run %t" (print_pattern p) (print_computation ~max_level:0 c)
+  Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation ~max_level:0 c)
 
 and print_let_rec_abstraction (x, a) ppf =
   Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction a)
