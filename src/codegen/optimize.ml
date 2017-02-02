@@ -12,6 +12,7 @@ type state = {
   letrec_memory : (Typed.variable, Typed.abstraction) Common.assoc;
   handlers_functions_mem : (Typed.expression * Typed.variable * Typed.expression) list;
   handlers_functions_ref_mem : ((Typed.expression * Typed.variable * Typed.expression) list) ref;
+  handlers_functions_cont_mem : ((Typed.expression * Typed.variable * Typed.expression) list);
   impure_wrappers : (Typed.variable, Typed.expression) Common.assoc;
   fuel : int ref
 }
@@ -25,6 +26,7 @@ let initial = {
   handlers_functions_mem = [];
   impure_wrappers = [];
   handlers_functions_ref_mem = ref [];
+  handlers_functions_cont_mem =[];
   fuel = ref (!(Config.optimization_fuel));
 }
 
@@ -72,27 +74,42 @@ let (Handler h't) = h'.term in
 
 let find_in_handlers_func_mem st f_name h_exp =
   let loc = h_exp.location in 
+  let findres_cont_list = List.filter
+                  (fun (h,old_f,new_f) -> (f_name == old_f) ) (st.handlers_functions_cont_mem) in 
   let findres = List.filter
                   (fun (h,old_f,new_f) -> (f_name == old_f) ) st.handlers_functions_mem in
-  begin match findres with
-  | [] -> (false,None)
-  | [(h,_,newf)] -> 
-      if (alphaeq_expr [] h h_exp) 
-      then 
-        (true,Some newf)
-      else begin
-        if (alphaeq_handler_no_vc [] h h_exp)
-        then begin
-          Print.debug ~loc:h_exp.Typed.location"ONLY VALUE CLAUSE IS DIFFERENT !! %t" (Typed.print_expression h_exp);
-          (false,Some newf)
-        end
-        else 
-          begin 
-          Print.debug ~loc:h_exp.Typed.location"Conflicting specialization call on\n %t \n=====================================\n %t "  (Typed.print_expression h_exp) (Typed.print_expression h);
-          (true,None)
-          end
-      end
+  begin match findres_cont_list with
+  |(h,_,newf):: _ -> 
+                if (alphaeq_handler_no_vc [] h h_exp)
+                then begin
+                     let Handler hh = h.term in 
+                     (true, Some newf, Some hh.value_clause)
+                     end
+                else begin
+                (true,None,None)
+              end
+  | [] ->
+        begin match findres with
+        | [] -> (false,None,None)
+        | [(h,_,newf)] -> 
+            if (alphaeq_expr [] h h_exp) 
+            then 
+              (true,Some newf,None)
+            else begin
+              if (alphaeq_handler_no_vc [] h h_exp)
+              then begin
+                Print.debug ~loc:h_exp.Typed.location"ONLY VALUE CLAUSE IS DIFFERENT !! %t" (Typed.print_expression h_exp);
+                let Handler hh = h.term in 
+                (false,Some newf,Some hh.value_clause)
+              end
+              else 
+                begin 
+                Print.debug ~loc:h_exp.Typed.location"Conflicting specialization call on\n %t \n=====================================\n %t "  (Typed.print_expression h_exp) (Typed.print_expression h);
+                (true,None,None)
+                end
+            end
 
+        end
   end
 
 
@@ -483,38 +500,62 @@ and reduce_comp st c =
       | Var v ->
             begin match (find_in_handlers_func_mem st v e1) with
              (*function exist,Same handler, same value clause*)
-             | (true,Some new_f_exp) ->
+             | (true,Some new_f_exp,None) ->
                                 let res = apply new_f_exp ae2
                                 in reduce_comp st res
+             | (true,Some special_f_exp, Some original_val_clause) ->
+                  let Handler h1 = e1.term in
+                  let h1_v_clause = h1.value_clause in 
+                  let orig_vc_lambda = optimize_expr st (lambda (h1_v_clause)) in 
+                  let res = apply special_f_exp (tuple [ae2;orig_vc_lambda]) in 
+                  reduce_comp st res
 
              (*function exist,Same handler, different value clause*)
-             | (false, Some new_f_exp)-> 
+             | (false, Some new_f_exp,Some original_val_clause)-> 
                begin match (find_in_let_rec_mem st v) with
                 | Some abs -> 
-                   let (let_rec_p,let_rec_c) = abs.term in
+                  let (let_rec_p,let_rec_c) = abs.term in
                   Print.debug "THE ABSTRACTION OF SAME HANDLER DIFF VALUE :- %t" (Typed.print_abstraction abs);
                   let Handler ha = e1.term in 
                   Print.debug "THE VALUE CLAUSE :- %t" (Typed.print_abstraction ha.value_clause);
-                  let ctx2, (ty2 , _ ), cnstrs2 = ha.value_clause.scheme in
-                  let sch = (ctx2,ty2,cnstrs2) in 
-                  let k_var, k_pat = make_var "k_val"  sch in
+                  let ctx_val, (tyin_val , (tyout_val,drt_val)), cnstrs_val = ha.value_clause.scheme in
+                  let continuation_var_scheme = (ctx_val, Type.Arrow(tyin_val , Type.fresh_dirty ()), cnstrs_val) in
+                  let k_var, k_pat = make_var "k_val"  continuation_var_scheme in
                   let ctx1, ty1, cnstrs1 = let_rec_p.scheme in 
-                  (*let new_pattern = {
+                  let newf_input_tuple_pat = {
                     term = PTuple [let_rec_p; k_pat];
                     scheme = (
-                      ctx1 @ ctx2,
-                      Type.Tuple [ty1; ty2],
-                      Constraints.union cnstrs1 cnstrs2
+                      ctx_val @ ctx1,
+                      Type.Tuple [ty1 ; Type.Arrow(tyin_val , Type.fresh_dirty ())],
+                      Constraints.union cnstrs_val cnstrs1
                     );
                     location = ae1.location;
                   } in
-                 
-                  let identity_var,identity_pat = make_var "identity" ty2 in
-                  let mh.value_clause = abstraction identity_pat @@ (value identity_var) *)
-                   c 
+                  let(newf_ctx,newf_ty,newf_const) = newf_input_tuple_pat.scheme in
+                  let (f_ctx,ae1Ty,f_const) = ae1.scheme in
+                  let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
+                  let newf_scheme = Scheme.clean_ty_scheme ~loc:c.location (newf_ctx , Type.Arrow (newf_ty, (tyout_val,drt_val)), newf_const) in
+                  let newf_var, newf_pat = make_var "new_special_var"  newf_scheme in
+                  let Var newfvar = newf_var.term in
+                  let Handler hndlr = e1.term in 
+                  let vc_var_scheme = (ctx_val,tyin_val,cnstrs_val) in 
+                  let vc_var, vc_pat = make_var "vcvar"  vc_var_scheme in
+                  let new_value_clause = abstraction vc_pat (apply k_var vc_var) in
+                  let new_handler =  handler {
+                                      effect_clauses = hndlr.effect_clauses;
+                                      value_clause =  new_value_clause;
+                                    } in 
+                  let st = {st with handlers_functions_cont_mem = (new_handler, v, newf_var ) :: (st.handlers_functions_cont_mem)} in
+                  let new_handler_call = reduce_comp st (handle new_handler let_rec_c) in
+                  let newf_body = abstraction newf_input_tuple_pat new_handler_call in 
+                  let defs = [(newfvar, newf_body)] in
+                  let orig_vc_lambda = optimize_expr st (lambda (hndlr.value_clause)) in 
+                  let res = let_rec' defs @@  apply newf_var  ( tuple [ae2; orig_vc_lambda] ) in 
+                  Print.debug "THE resulting computation :-  %t" (Typed.print_computation res);
+                   optimize_comp st res
                 | _ -> c
                end
-             | (true, None) ->
+             | (true, None,_) ->
                   c
              | _ -> 
                begin match find_in_stack st v with

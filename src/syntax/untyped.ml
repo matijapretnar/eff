@@ -92,8 +92,8 @@ and plain_toplevel =
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p.term with
-  | PVar x -> print "%t" (Variable.print x)
-  | PAs (p, x) -> print "%t as %t" (print_pattern p) (Variable.print x)
+  | PVar x -> print "%t" (Variable.print ~safe:true x)
+  | PAs (p, x) -> print "%t as %t" (print_pattern p) (Variable.print ~safe:true x)
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
   | PRecord lst -> Print.record print_pattern lst ppf
@@ -130,7 +130,7 @@ let rec print_computation ?max_level c ppf =
 and print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match e.term with
-  | Var x -> print "%t" (Variable.print x)
+  | Var x -> print "%t" (Variable.print ~safe:true x)
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record lst -> Print.record print_expression lst ppf
