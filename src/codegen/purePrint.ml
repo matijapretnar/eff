@@ -26,8 +26,8 @@ let rec ty_scheme_conversion (ctx, ty, constraints) (ctx', ty', constraints') =
 and dirty_scheme_conversion (ctx, (ty, drt), constraints) (ctx', (ty', drt'), constraints') =
   let ty_conversion = ty_scheme_conversion (ctx, ty, constraints) (ctx', ty', constraints')
   and dirt_conversion =
-    let pure = Scheme.is_pure (ctx, (ty, drt), constraints)
-    and pure' = Scheme.is_pure (ctx', (ty', drt'), constraints') in
+    let pure = Scheme.is_surely_pure (ctx, (ty, drt), constraints)
+    and pure' = Scheme.is_surely_pure (ctx', (ty', drt'), constraints') in
     match pure, pure' with
     | true, false -> Value
     | false, true -> Run

@@ -256,6 +256,19 @@ let is_pure ?(loc=Location.unknown) (ctx, (_, drt), cnstrs) =
   not (List.exists (fun (_, r) -> Params.region_param_mem r params) drt.Type.ops) &&
   not (Params.dirt_param_mem drt.Type.rest params)
 
+let is_surely_pure ?(loc=Location.unknown) (ctx, (_, drt), cnstrs) =
+  let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
+    let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances (Constraints.expand_ty ctx_ty)
+    and (@@@) = Params.append in
+    neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
+  in
+  let pos, neg = List.fold_right add_ctx_pos_neg ctx (Params.empty, Params.empty) in
+  let params = Params.append pos neg in
+  Constraints.is_surely_pure cnstrs drt &&
+  (* Check if the rest occurs in the free parameters *)
+  not (List.exists (fun (_, r) -> Params.region_param_mem r params) drt.Type.ops) &&
+  not (Params.dirt_param_mem drt.Type.rest params)
+
 let is_pure_function_type ?loc (ctx, ty, cnstrs) =
   match Constraints.expand_ty ty with
   | Type.Arrow (_, drty) -> is_pure ?loc (ctx, drty, cnstrs)

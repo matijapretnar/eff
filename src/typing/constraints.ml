@@ -45,6 +45,15 @@ let is_pure { dirt_poset; region_poset; full_regions } { Type.ops; Type.rest } =
   List.for_all (fun (_, r) -> check_region r) ops &&
   DirtPoset.get_prec rest dirt_poset = []
 
+let is_surely_pure { dirt_poset; region_poset; full_regions } { Type.ops; Type.rest } =
+  let check_region r =
+    RegionPoset.get_prec r region_poset = [] &&
+    RegionPoset.get_succ r region_poset = [] &&
+    not (FullRegions.mem r full_regions) in
+  List.for_all (fun (_, r) -> check_region r) ops &&
+  DirtPoset.get_prec rest dirt_poset = [] &&
+  DirtPoset.get_succ rest dirt_poset = []
+
 type param_expansion = {
   mutable ty_expansion : Type.ty TyMap.t;
   mutable dirt_expansion : Type.dirt DirtMap.t;
