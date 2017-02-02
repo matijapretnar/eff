@@ -3,6 +3,7 @@ open CommonPrint
 type ty_shape =
   | Basic
   | Arrow of ty_shape * dirty_shape
+  | Handler of dirty_shape * dirty_shape
   | Tuple of ty_shape list
 and dirty_shape =
   | Value of ty_shape
@@ -14,6 +15,7 @@ let rec shape_of_ty st = function
   | Type.Basic _ -> Basic
   | Type.Arrow (ty, dirty) -> Arrow (shape_of_ty st ty, shape_of_dirty st dirty)
   | Type.Tuple tys -> Tuple (List.map (shape_of_ty st) tys)
+  | Type.Handler (dirty1, dirty2) -> Handler (shape_of_dirty st dirty1, shape_of_dirty st dirty2)
   | ty -> Print.debug "Don't know the shape of %t" (Type.print_ty ty); assert false
 and shape_of_dirty ((ctx, constraints) as st) (ty, drt) =
   if Scheme.is_surely_pure (ctx, (ty, drt), constraints) then
@@ -25,6 +27,7 @@ type ty_conversion =
   | TyIdentity
   | DontKnow
   | Lift of ty_conversion * dirty_conversion
+  | LiftHandler of dirty_conversion * dirty_conversion
   | Tuple of ty_conversion list
 and dirty_conversion =
   | DirtyIdentity
@@ -34,7 +37,6 @@ and dirty_conversion =
 
 let rec simplify_ty_conversion = function
   | TyIdentity -> TyIdentity
-  | DontKnow -> DontKnow
   | Tuple convs ->
       let convs = List.map simplify_ty_conversion convs in
       if List.for_all (fun conv -> conv = TyIdentity) convs then
@@ -45,6 +47,11 @@ let rec simplify_ty_conversion = function
       begin match simplify_ty_conversion conv1, simplify_dirty_conversion conv2 with
       | TyIdentity, DirtyIdentity -> TyIdentity
       | conv1, conv2 -> Lift (conv1, conv2)
+      end
+  | LiftHandler (conv1, conv2) ->
+      begin match simplify_dirty_conversion conv1, simplify_dirty_conversion conv2 with
+      | DirtyIdentity, DirtyIdentity -> TyIdentity
+      | conv1, conv2 -> LiftHandler (conv1, conv2)
       end
 and simplify_dirty_conversion = function
   | DirtyIdentity -> DirtyIdentity
@@ -67,6 +74,11 @@ let rec ty_shape_conversion = function
         ty_shape_conversion (shape1', shape1),
         dirty_shape_conversion (shape2, shape2')
       )
+  | Handler (shape1, shape2), Handler (shape1', shape2') ->
+      LiftHandler (
+        dirty_shape_conversion (shape1', shape1),
+        dirty_shape_conversion (shape2, shape2')
+      )
   | Tuple shapes1, Tuple shapes2 ->
       Tuple (List.map2 (fun shape1 shape2 -> ty_shape_conversion (shape1, shape2)) shapes1 shapes2)
   | _, _ -> DontKnow
@@ -85,6 +97,20 @@ let rec print_ty_conversion ?max_level conv term ppf : unit =
   match conv with
   | TyIdentity ->
       print "%t" term
+  | Lift (TyIdentity, conv2) ->
+      let x = Typed.Variable.fresh "x" in
+          print ~at_level:1 "(* codomain *)fun %t -> %t"
+                (print_variable x)
+                (print_dirty_conversion ~max_level:0 conv2
+                (fun ppf -> Print.print ppf "%t %t"
+                  term
+                  (print_variable x)))
+  | Lift (conv1, DirtyIdentity) ->
+      let x = Typed.Variable.fresh "x" in
+          print ~at_level:1 "(* domain *)fun %t -> (%t) (%t)"
+                (print_variable x)
+                term
+                (print_ty_conversion ~max_level:0 conv1 (print_variable x))
   | Lift (conv1, conv2) ->
       let x = Typed.Variable.fresh "x" in
           print ~at_level:1 "(* both *)fun %t -> %t"
@@ -95,13 +121,14 @@ let rec print_ty_conversion ?max_level conv term ppf : unit =
                   (print_ty_conversion ~max_level:0 conv1 (fun ppf -> Print.print ppf "%t" (print_variable x)))
                 )
               )
+  | LiftHandler (conv1, conv2) ->
+      ()
   | Tuple convs ->
       let xs = List.mapi (fun i conv -> (Typed.Variable.fresh ("x" ^ string_of_int i), conv)) convs in
       print ~at_level:1 "let (%t) = %t in (%t)"
         (Print.sequence ", " print_variable (List.map fst xs))
         term
         (Print.sequence ", " (fun (x, conv) -> print_ty_conversion conv (print_variable x)) xs)
-  | DontKnow -> print "????"
 and print_dirty_conversion ?max_level conv term ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match conv with
