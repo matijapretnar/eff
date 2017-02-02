@@ -36,14 +36,14 @@ let tag_polymorphic_dirt tysch =
   and ds = Scheme.polymorphic_dirt tysch in
   let drt = {Type.ops = ["///", r]; Type.rest = d} in
   let (ctx, ty, cnstrs) = tysch in
-  Print.debug "BEFORE: %t" (Scheme.print_ty_scheme tysch);
+  (* Print.debug "BEFORE: %t" (Scheme.print_ty_scheme tysch); *)
   let tysch =
   Scheme.finalize_ty_scheme ~loc:Location.unknown ctx ty (
     List.map (fun d -> Scheme.dirt_less drt (Type.simple_dirt d)) ds @ [
     Scheme.just cnstrs;
     Scheme.add_full_region r
   ]) in
-  Print.debug "AFTER: %t" (Scheme.print_ty_scheme tysch);
+  (* Print.debug "AFTER: %t" (Scheme.print_ty_scheme tysch); *)
   tysch
 
 (* [infer_pattern p] infers the type scheme of a pattern [p].

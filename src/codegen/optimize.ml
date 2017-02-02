@@ -98,13 +98,13 @@ let find_in_handlers_func_mem st f_name h_exp =
             else begin
               if (alphaeq_handler_no_vc [] h h_exp)
               then begin
-                Print.debug ~loc:h_exp.Typed.location"ONLY VALUE CLAUSE IS DIFFERENT !! %t" (Typed.print_expression h_exp);
+                (* Print.debug ~loc:h_exp.Typed.location"ONLY VALUE CLAUSE IS DIFFERENT !! %t" (Typed.print_expression h_exp); *)
                 let Handler hh = h.term in 
                 (false,Some newf,Some hh.value_clause)
               end
               else 
                 begin 
-                Print.debug ~loc:h_exp.Typed.location"Conflicting specialization call on\n %t \n=====================================\n %t "  (Typed.print_expression h_exp) (Typed.print_expression h);
+                (* Print.debug ~loc:h_exp.Typed.location"Conflicting specialization call on\n %t \n=====================================\n %t "  (Typed.print_expression h_exp) (Typed.print_expression h); *)
                 (true,None,None)
                 end
             end
@@ -114,8 +114,8 @@ let find_in_handlers_func_mem st f_name h_exp =
 
 
 let different_branch_specialized defs st =
-  Print.debug "\n\nthe letrec defs size:- %i \n" (List.length defs);
-  Print.debug "\n\nthe global size:- %i \n" (List.length !(st.handlers_functions_ref_mem));
+  (* Print.debug "\n\nthe letrec defs size:- %i \n" (List.length defs); *)
+  (* Print.debug "\n\nthe global size:- %i \n" (List.length !(st.handlers_functions_ref_mem)); *)
   let findresinlocal = fun f_name -> (
                   List.filter
                   (fun (h,old_f,new_f) -> 
@@ -137,12 +137,12 @@ let different_branch_specialized defs st =
       (List.map (fun (var,abs) ->
             begin match findresinlocal var with 
             | [] -> false
-            | (h,old_f,new_f) :: _ -> Print.debug "\n my old function :- %t \n" (Typed.print_variable old_f);
-                                      Print.debug "\n my new function :- %t \n" (Typed.print_expression new_f); 
+            | (h,old_f,new_f) :: _ -> (* Print.debug "\n my old function :- %t \n" (Typed.print_variable old_f); *)
+                                      (* Print.debug "\n my new function :- %t \n" (Typed.print_expression new_f);  *)
                                       true
             end) defs ) in
   let local_bool = List.fold_right (||) localboollist false in
-  Print.debug "LOCAL BOOL :- %b \n Global Bool :- %b\n\n" (local_bool) (global_bool);
+  (* Print.debug "LOCAL BOOL :- %b \n Global Bool :- %b\n\n" (local_bool) (global_bool); *)
   (global_bool && ( not local_bool) )
 
 
@@ -240,11 +240,11 @@ and beta_reduce st ({term = (p, c)} as a) e =
     let a =
       begin match p with
         | {term = Typed.PVar x} ->
-          Print.debug "Added to stack ==== %t" (Typed.print_variable x);
+          (* Print.debug "Added to stack ==== %t" (Typed.print_variable x); *)
           let st = {st with stack = Common.update x e st.stack} in
           abstraction p (optimize_comp st c)
         | _ ->
-          Print.debug "We are now in the let in 5 novar for %t" (Typed.print_pattern p);
+          (* Print.debug "We are now in the let in 5 novar for %t" (Typed.print_pattern p); *)
           a
       end
     in
@@ -284,7 +284,7 @@ and optimize_sub_comp st c =
     (* List.fold_right (fun (var,abs) st ->
       {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st; *)
       let [(var,abst)] = defs in 
-      Print.debug "\nst out length %i\n" (List.length (st.handlers_functions_mem) );
+      (* Print.debug "\nst out length %i\n" (List.length (st.handlers_functions_mem) ); *)
       let findresinglobal = fun f_name -> (
                   List.filter
                   (fun (h,old_f,new_f) -> 
@@ -293,9 +293,9 @@ and optimize_sub_comp st c =
       begin match findresinglobal var with 
       | [] -> let_rec' ~loc (Common.assoc_map (optimize_abs st) defs) (optimize_comp st c1)
       | (h,old_f,new_f) :: _ -> 
-      Print.debug "\nold st length %i\n" (List.length (st.handlers_functions_mem) );
+      (* Print.debug "\nold st length %i\n" (List.length (st.handlers_functions_mem) ); *)
             let st = {st with handlers_functions_mem = (h,old_f,new_f) :: st.handlers_functions_mem} in
-            Print.debug "\nnew st length %i\n" (List.length (st.handlers_functions_mem) ); 
+            (* Print.debug "\nnew st length %i\n" (List.length (st.handlers_functions_mem) );  *)
             let_rec' ~loc (Common.assoc_map (optimize_abs st) defs) (optimize_comp st c1) 
       end
 
@@ -348,10 +348,10 @@ and reduce_expr st e =
 
   | _ -> e
   in
-  if e <> e' then
-  Print.debug ~loc:e.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
+  (* if e <> e' then *)
+(*   Print.debug ~loc:e.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
     (Typed.print_expression e) (Scheme.print_ty_scheme e.Typed.scheme)
-    (Typed.print_expression e') (Scheme.print_ty_scheme e'.Typed.scheme);
+    (Typed.print_expression e') (Scheme.print_ty_scheme e'.Typed.scheme); *)
   e'
 
 
@@ -425,19 +425,19 @@ and reduce_comp st c =
   | Handle ({term = Handler h}, c1)
         when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
     useFuel st;
-    Print.debug "Remove handler, since no effects in common with computation";
+    (* Print.debug "Remove handler, since no effects in common with computation"; *)
     reduce_comp st (bind c1 h.value_clause)
 
   | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})})
         when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
     useFuel st;
-    Print.debug "Remove handler of outer Bind, since no effects in common with computation";
+    (* Print.debug "Remove handler of outer Bind, since no effects in common with computation"; *)
     reduce_comp st (bind (reduce_comp st c1) (abstraction p1 (reduce_comp st (handle (refresh_expr handler) c2))))
 
   | Handle ({term = Handler h}, {term = Bind (c1, {term = (p1, c2)})})
         when (Scheme.is_pure_for_handler c2.Typed.scheme h.effect_clauses) ->
     useFuel st;
-    Print.debug "Move inner bind into the value case";
+    (* Print.debug "Move inner bind into the value case"; *)
     let new_value_clause = optimize_abs st (abstraction p1 (bind (reduce_comp st c2) (refresh_abs h.value_clause))) in
     let hdlr = handler {
       effect_clauses = h.effect_clauses;
@@ -447,7 +447,7 @@ and reduce_comp st c =
 
   | Handle ({term = Handler h} as h2, {term = Bind (c1, {term = (p, c2)})}) ->
     useFuel st;
-    Print.debug "Move (dirty) inner bind into the value case";
+    (* Print.debug "Move (dirty) inner bind into the value case"; *)
     let new_value_clause = optimize_abs st (abstraction p (handle (refresh_expr h2) (refresh_comp (reduce_comp st c2) ))) in
     let hdlr = handler {
       effect_clauses = h.effect_clauses;
@@ -515,9 +515,9 @@ and reduce_comp st c =
                begin match (find_in_let_rec_mem st v) with
                 | Some abs -> 
                   let (let_rec_p,let_rec_c) = abs.term in
-                  Print.debug "THE ABSTRACTION OF SAME HANDLER DIFF VALUE :- %t" (Typed.print_abstraction abs);
+                  (* Print.debug "THE ABSTRACTION OF SAME HANDLER DIFF VALUE :- %t" (Typed.print_abstraction abs); *)
                   let Handler ha = e1.term in 
-                  Print.debug "THE VALUE CLAUSE :- %t" (Typed.print_abstraction ha.value_clause);
+                  (* Print.debug "THE VALUE CLAUSE :- %t" (Typed.print_abstraction ha.value_clause); *)
                   let ctx_val, (tyin_val , (tyout_val,drt_val)), cnstrs_val = ha.value_clause.scheme in
                   let continuation_var_scheme = (ctx_val, Type.Arrow(tyin_val , Type.fresh_dirty ()), cnstrs_val) in
                   let k_var, k_pat = make_var "k_val"  continuation_var_scheme in
@@ -551,7 +551,7 @@ and reduce_comp st c =
                   let defs = [(newfvar, newf_body)] in
                   let orig_vc_lambda = optimize_expr st (lambda (hndlr.value_clause)) in 
                   let res = let_rec' defs @@  apply newf_var  ( tuple [ae2; orig_vc_lambda] ) in 
-                  Print.debug "THE resulting computation :-  %t" (Typed.print_computation res);
+                  (* Print.debug "THE resulting computation :-  %t" (Typed.print_computation res); *)
                    optimize_comp st res
                 | _ -> c
                end
@@ -603,8 +603,9 @@ and reduce_comp st c =
                             in
                             optimize_comp st res
                        | _ -> 
-                        Print.debug "Its a none";
-                                    Print.debug "The handle exp : %t" (Typed.print_expression ae1);c
+                        (* Print.debug "Its a none"; *)
+                                    (* Print.debug "The handle exp : %t" (Typed.print_expression ae1); *)
+                                    c
                        end
                end
         end
@@ -676,7 +677,7 @@ and reduce_comp st c =
 
   | LetIn (e, ({term = (p, cp)} as a)) ->
     useFuel st;
-    Print.debug "We are now in the let in 1, 3 or 5 for %t" (Typed.print_pattern p);
+    (* Print.debug "We are now in the let in 1, 3 or 5 for %t" (Typed.print_pattern p); *)
     beta_reduce st a e
 
   (* XXX simplify *)
@@ -722,7 +723,7 @@ let optimize_command st =
     let defs' = Common.assoc_map (optimize_abs st) defs in
     let st' = 
     List.fold_right (fun (var,abs) st ->
-            Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs);
+            (* Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs); *)
             {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
     st', Typed.TopLetRec (defs', vars)
 
