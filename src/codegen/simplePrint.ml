@@ -25,8 +25,8 @@ let rec print_expression ?max_level e ppf =
   | Typed.Lambda a ->
       print ~at_level:2 "fun %t" (print_abstraction a)
   | Typed.Handler h ->
-      print "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
+      print ~at_level:2 "fun c -> handler {@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
+             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]} c"
       (print_abstraction h.Typed.value_clause)
       (print_effect_clauses h.Typed.effect_clauses)
   | Typed.Effect eff ->
@@ -46,7 +46,7 @@ and print_computation ?max_level c ppf =
   | Typed.Match (e, lst) ->
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e) (Print.cases print_abstraction lst)
   | Typed.Handle (e, c) ->
-      print ~at_level:1 "handle %t %t" (print_expression ~max_level:0 e) (print_computation ~max_level:0 c)
+      print ~at_level:1 "%t %t" (print_expression ~max_level:0 e) (print_computation ~max_level:0 c)
   | Typed.Let (lst, c) ->
       print ~at_level:2 "%t" (print_multiple_bind (lst, c))
   | Typed.LetRec (lst, c) ->

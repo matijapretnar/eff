@@ -6,20 +6,15 @@ type 'a computation =
       ('eff_arg, 'eff_res) effect * 'eff_arg * ('eff_res -> 'a computation)
         -> 'a computation
 
-type ('a, 'b) value_clause = 'a -> 'b computation
-
-type ('a, 'b) finally_clause = 'a -> 'b computation
-
 type ('eff_arg, 'eff_res, 'b) effect_clauses =
       (('eff_arg, 'eff_res) effect ->
-      ('eff_arg -> ('eff_res -> 'b computation) -> 'b computation))
+      ('eff_arg -> ('eff_res -> 'b) -> 'b))
 
-type ('a, 'b) handler =
+type ('a, 'b) handler_clauses =
   {
-    value_clause : ('a, 'b) value_clause;
+    value_clause : 'a -> 'b;
     effect_clauses : 'eff_arg 'eff_res. ('eff_arg, 'eff_res, 'b) effect_clauses
   }
-
 
 
 let rec ( >> ) (c : 'a computation) (f : 'a -> 'b computation) =
@@ -27,16 +22,16 @@ let rec ( >> ) (c : 'a computation) (f : 'a -> 'b computation) =
   | Value x -> f x
   | Call (eff, arg, k) -> Call (eff, arg, (fun y -> (k y) >> f))
   
-let rec handle (h : ('a, 'b) handler) (c : 'a computation) :
-  'c computation =
+let rec handler (h : ('a, 'b) handler_clauses) : 'a computation -> 'b =
   let rec handler =
     function
     | Value x -> h.value_clause x
     | Call (eff, arg, k) ->
         let clause = h.effect_clauses eff
         in clause arg (fun y -> handler (k y))
-  in (handler c)
-  
+  in
+  handler
+
 let value (x : 'a) : 'a computation = Value x
   
 let call (eff : ('a, 'b) effect) (arg : 'a) (cont : 'b -> 'c computation) :
