@@ -126,16 +126,6 @@ let compile_file st filename =
   really_input header_channel header 0 n;
   close_in header_channel;
 
-  (* write a temporary compiled file *)
-  ignore (Sys.command ("mkdir -p _tmp_no_opt"));
-  let temporary_file = "_tmp_no_opt/" ^ CommonPrint.compiled_filename filename in
-  let out_channel = open_out temporary_file in
-  Format.fprintf (Format.formatter_of_out_channel out_channel)
-    "%s\n;;\n%t@."
-    header (print_commands cmds_no_opt);
-  flush out_channel;
-  close_out out_channel;
-
   ignore (Sys.command ("mkdir -p _tmp"));
   let temporary_file = "_tmp/" ^ CommonPrint.compiled_filename filename in
   let out_channel = open_out temporary_file in

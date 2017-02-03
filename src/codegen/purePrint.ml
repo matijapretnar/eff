@@ -9,6 +9,31 @@ and dirty_shape =
   | ValueS of ty_shape
   | Computation of ty_shape
 
+let rec print_ty_shape ?(max_level=1000) shape ppf =
+  let print ?at_level = Print.print ~max_level ?at_level ppf in
+  match shape with
+  | Basic ->
+    print "*"
+  | Tuple shapes ->
+    print ~at_level:2 "@[<hov>(%t)@]"
+      (Print.sequence ", " (print_ty_shape ~max_level:1) shapes)
+  | Arrow (shape1, shape2) ->
+    print ~at_level:5 "@[%t -> %t@]"
+      (print_ty_shape ~max_level:4 shape1)
+      (print_dirty_shape ~max_level:5 shape2)
+  | Handler (shape1, shape2) ->
+    print ~at_level:6 "@[%t => %t@]"
+      (print_dirty_shape ~max_level:4 shape1)
+      (print_dirty_shape ~max_level:5 shape2)
+and print_dirty_shape ?(max_level=1000) shape ppf =
+  let print ?at_level = Print.print ~max_level ?at_level ppf in
+  match shape with
+  | ValueS shape ->
+    print_ty_shape ~max_level shape ppf
+  | Computation shape ->
+    print ~at_level:3 "@[%t computation@]"
+      (print_ty_shape ~max_level:3 shape)
+
 let rec shape_of_ty st = function
   | Type.Param _ -> Basic
   | Type.Apply (ty_name, args) when Tctx.transparent ~loc:Location.unknown ty_name ->
@@ -29,9 +54,13 @@ and shape_of_dirty ((ctx, constraints) as st) (ty, drt) =
     Computation (shape_of_ty st ty)
 
 let shape_of_ty_scheme (ctx, ty, constraints) =
-  shape_of_ty (ctx, constraints) ty
-let shape_of_dirty_scheme (ctx, drty, constraints) =
-  shape_of_dirty (ctx, constraints) drty
+  let shp = shape_of_ty (ctx, constraints) ty in
+  (* Print.debug "Shape of %t is %t" (Scheme.print_ty_scheme (ctx, ty, constraints)) (print_ty_shape ~max_level:1000 shp); *)
+  shp
+let shape_of_dirty_scheme (ctx, dirty, constraints) =
+  let shp = shape_of_dirty (ctx, constraints) dirty in
+  (* Print.debug "Shape of %t is %t" (Scheme.print_dirty_scheme (ctx, dirty, constraints)) (print_dirty_shape ~max_level:1000 shp); *)
+  shp
 
 type ty_conversion =
   | TyIdentity
@@ -157,17 +186,27 @@ and print_dirty_conversion ?(max_level=1000) conv term ppf =
 
 let ty_scheme_conversion shp1 shp2 =
   match shp2 with
-  | None -> TyIdentity
+  | None ->
+      Print.debug "There is no expected shape";
+      TyIdentity
   | Some shp2 ->
+      Print.debug "Expected shape is %t" (print_ty_shape shp2);
       simplify_ty_conversion (ty_shape_conversion (shp1, shp2))
 and dirty_scheme_conversion shp1 shp2 =
   match shp2 with
-  | None -> DirtyIdentity
+  | None ->
+      Print.debug "There is no expected shape";
+      DirtyIdentity
   | Some shp2 ->
+      Print.debug "Expected shape is %t" (print_dirty_shape shp2);
       simplify_dirty_conversion (dirty_shape_conversion (shp1, shp2))
 
 let rec print_expression ?max_level ?expected_shape e ppf=
-  let conv = ty_scheme_conversion (shape_of_ty_scheme e.Typed.scheme) expected_shape in
+  Print.debug "Printing expression %t" (Typed.print_expression e);
+  Print.debug "Type is %t" (Scheme.print_ty_scheme e.Typed.scheme);
+  let shp = shape_of_ty_scheme e.Typed.scheme in
+  Print.debug "Shape is %t" (print_ty_shape shp);
+  let conv = ty_scheme_conversion shp expected_shape in
   print_converted_expression ?max_level ppf (conv, e)
 
 and print_converted_expression ?max_level ppf = function
@@ -196,7 +235,8 @@ and print_expression' ?max_level e ppf =
   | Typed.Variant (lbl, Some e) ->
     print ~at_level:1 "(%s %t)" lbl (print_expression e)
   | Typed.Lambda a ->
-    print ~at_level:2 "fun %t" (print_abstraction a)
+    let Arrow (_, expected_shape) = shape_of_ty_scheme e.Typed.scheme in
+    print ~at_level:2 "fun %t" (print_abstraction ~expected_shape a)
   | Typed.Handler h ->
     Print.debug "Printing handler! %t" (Scheme.print_ty_scheme e.Typed.scheme);
     let (Handler (_, expected_shape)) = shape_of_ty_scheme e.Typed.scheme in
@@ -207,7 +247,11 @@ and print_expression' ?max_level e ppf =
     print_computation ?max_level c ppf
 
 and print_computation ?max_level ?expected_shape c ppf =
-  let conv = dirty_scheme_conversion (shape_of_dirty_scheme c.Typed.scheme) expected_shape in
+  Print.debug "Printing computation %t" (Typed.print_computation c);
+  Print.debug "Type is %t" (Scheme.print_dirty_scheme c.Typed.scheme);
+  let shp = shape_of_dirty_scheme c.Typed.scheme in
+  Print.debug "Shape is %t" (print_dirty_shape shp);
+  let conv = dirty_scheme_conversion shp expected_shape in
   print_converted_computation ?max_level ppf (conv, c)
 
 and print_converted_computation ?max_level ppf = function
@@ -215,7 +259,7 @@ and print_converted_computation ?max_level ppf = function
       print_dirty_conversion ?max_level conv (fun m -> print_computation' ~max_level:m c) ppf
 
 and print_computation' ?max_level c ppf =
-  Print.debug "printing %t : %t" (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme);
+  (* Print.debug "printing %t : %t" (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme); *)
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.Typed.term with
   | Typed.Apply (e1, e2) ->
@@ -266,6 +310,7 @@ and print_computation' ?max_level c ppf =
       (print_computation ~expected_shape c)
 
 and print_handler h ~expected_shape ppf =
+  (* Print.debug "Printing handler of expected shape %t" (print_dirty_shape expected_shape); *)
   Print.print ppf
     "{@[<hov>
       value_clause = (@[fun %t@]);@ 
@@ -289,8 +334,8 @@ and print_effect_clauses ~expected_shape eff_clauses ppf =
       (print_computation ~expected_shape c)
       (print_effect_clauses ~expected_shape cases)
 
-and print_abstraction ?expected_shape {Typed.term = (p, c)} ppf =
-  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation ?expected_shape c)
+and print_abstraction ~expected_shape {Typed.term = (p, c)} ppf =
+  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation ~expected_shape c)
 
 and print_multiple_bind (lst, c') ppf =
   match lst with
@@ -306,7 +351,9 @@ and print_top_let_abstraction (p, c) ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation ~max_level:0 c)
 
 and print_let_rec_abstraction (x, a) ppf =
-  Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction a)
+  let {Typed.term = (_, {Typed.scheme = sch})} = a in
+  let expected_shape = shape_of_dirty_scheme sch in
+  Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction ~expected_shape a)
 
 (** COMMANDS *)
 
