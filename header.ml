@@ -37,6 +37,10 @@ let value (x : 'a) : 'a computation = Value x
 let call (eff : ('a, 'b) effect) (arg : 'a) (cont : 'b -> 'c computation) :
   'c computation = Call (eff, arg, cont)
   
+let rec lift (f : 'a -> 'b) : 'a computation -> 'b computation = function
+  | Value x -> Value (f x)
+  | Call (eff, arg, k) -> Call (eff, arg, fun y -> lift f (k y))
+
 let effect eff arg = call eff arg value
 
 let run =

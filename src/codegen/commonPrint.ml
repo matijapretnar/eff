@@ -15,11 +15,11 @@ let rec print_type ?max_level ty ppf =
     print ~at_level:1 "(%t)" (Print.sequence "*" print_type tys)
   | Type.Arrow (ty, drty) ->
     print ~at_level:2 "(%t -> %t)" (print_type ~max_level:1 ty) (print_dirty_type drty)
-  | Type.Handler ((ty1, _), (ty2, _)) ->
-    print ~at_level:2 "(%t, ???, %t) handler" (print_type ty1) (print_type ty2)
+  | Type.Handler (drty1, drty2) ->
+    print ~at_level:2 "(%t -> %t)" (print_dirty_type drty1) (print_dirty_type drty2)
 
-and print_dirty_type (ty, drt) ppf =
-  Format.fprintf ppf "_"
+and print_dirty_type (ty, _) ppf =
+  Format.fprintf ppf "%t computation" (print_type ~max_level:0 ty)
 
 and print_args (tys, _, _) ppf =
   match tys with

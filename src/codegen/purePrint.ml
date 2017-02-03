@@ -11,6 +11,11 @@ and dirty_shape =
 
 let rec shape_of_ty st = function
   | Type.Param _ -> Basic
+  | Type.Apply (ty_name, args) when Tctx.transparent ~loc:Location.unknown ty_name ->
+    begin match Tctx.ty_apply ~loc:Location.unknown ty_name args with
+    | Tctx.Inline ty' -> shape_of_ty st ty'
+    | _ -> assert false
+    end
   | Type.Apply _ -> Basic
   | Type.Basic _ -> Basic
   | Type.Arrow (ty, dirty) -> Arrow (shape_of_ty st ty, shape_of_dirty st dirty)
@@ -28,9 +33,11 @@ type ty_conversion =
   | Lift of ty_conversion * dirty_conversion
   | LiftHandler of dirty_conversion * dirty_conversion
   | Tuple of ty_conversion list
+  | DontKnow
 and dirty_conversion =
   | DirtyIdentity
   | Value of ty_conversion
+  | Run of ty_conversion
   | ConvertValues of ty_conversion
   | ConvertComps of ty_conversion
 
@@ -52,9 +59,11 @@ let rec simplify_ty_conversion = function
       | DirtyIdentity, DirtyIdentity -> TyIdentity
       | conv1, conv2 -> LiftHandler (conv1, conv2)
       end
+  | DontKnow -> DontKnow
 and simplify_dirty_conversion = function
   | DirtyIdentity -> DirtyIdentity
   | Value conv -> Value (simplify_ty_conversion conv)
+  | Run conv -> Run (simplify_ty_conversion conv)
   | ConvertValues conv ->
       begin match simplify_ty_conversion conv with
       | TyIdentity -> DirtyIdentity
@@ -67,7 +76,7 @@ and simplify_dirty_conversion = function
       end
 
 let rec ty_shape_conversion = function
-  | Basic _, Basic _ -> TyIdentity
+  | Basic, Basic -> TyIdentity
   | Arrow (shape1, shape2), Arrow (shape1', shape2') ->
       Lift (
         ty_shape_conversion (shape1', shape1),
@@ -80,7 +89,7 @@ let rec ty_shape_conversion = function
       )
   | Tuple shapes1, Tuple shapes2 ->
       Tuple (List.map2 (fun shape1 shape2 -> ty_shape_conversion (shape1, shape2)) shapes1 shapes2)
-  | _, _ -> TyIdentity
+  | _, _ -> DontKnow
 
 and dirty_shape_conversion = function
   | Value shape, Value shape' ->
@@ -89,27 +98,14 @@ and dirty_shape_conversion = function
       Value (ty_shape_conversion (shape, shape'))
   | Computation shape, Computation shape' ->
       ConvertComps (ty_shape_conversion (shape, shape'))
-  | Computation _, Value _ -> assert false
+  | Computation shape, Value shape' ->
+      Run (ty_shape_conversion (shape, shape'))
 
 let rec print_ty_conversion ?(max_level=100000) conv term ppf =
   let print ?at_level = Print.print ~max_level ?at_level ppf in
   match conv with
   | TyIdentity ->
       (term max_level) ppf
-  | Lift (TyIdentity, conv2) ->
-      let x = Typed.Variable.fresh "x" in
-          print ~at_level:2 "(* codomain *)fun %t -> %t"
-                (print_variable x)
-                (print_dirty_conversion conv2
-                (fun m ppf -> Print.print ~max_level:m ppf "%t %t"
-                  (term 1)
-                  (print_variable x)))
-  | Lift (conv1, DirtyIdentity) ->
-      let x = Typed.Variable.fresh "x" in
-          print ~at_level:2 "(* domain *)fun %t -> %t %t"
-                (print_variable x)
-                (term 1)
-                (print_ty_conversion ~max_level:0 conv1 (fun _ -> print_variable x))
   | Lift (conv1, conv2) ->
       let x = Typed.Variable.fresh "x" in
           print ~at_level:2 "(* both *)fun %t -> %t"
@@ -121,13 +117,22 @@ let rec print_ty_conversion ?(max_level=100000) conv term ppf =
                 )
               )
   | LiftHandler (conv1, conv2) ->
-      ()
+      let x = Typed.Variable.fresh "x" in
+          print ~at_level:2 "(* both *)fun %t -> %t"
+                (print_variable x)
+                (print_dirty_conversion conv2
+                (fun m ppf -> Print.print ~max_level:m ppf "%t %t"
+                  (term 1)
+                  (print_dirty_conversion ~max_level:0 conv1 (fun _ -> print_variable x))
+                )
+              )
   | Tuple convs ->
       let xs = List.mapi (fun i conv -> (Typed.Variable.fresh ("x" ^ string_of_int i), conv)) convs in
       print ~at_level:2 "let (%t) = %t in (%t)"
         (Print.sequence ", " print_variable (List.map fst xs))
         (term 100000000)
         (Print.sequence ", " (fun (x, conv) -> print_ty_conversion conv (fun _ -> print_variable x)) xs)
+  | DontKnow -> print "???"
 and print_dirty_conversion ?(max_level=1000) conv term ppf =
   let print ?at_level = Print.print ~max_level ?at_level ppf in
   match conv with
@@ -135,8 +140,14 @@ and print_dirty_conversion ?(max_level=1000) conv term ppf =
       term max_level ppf
   | ConvertValues conv ->
       print_ty_conversion ~max_level conv term ppf
+  | ConvertComps conv ->
+      print ~at_level:1 "lift (%t)"
+      (print_ty_conversion ~max_level:0 conv term)
   | Value conv ->
       print ~at_level:1 "value (%t)"
+      (print_ty_conversion ~max_level:0 conv term)
+  | Run conv ->
+      print ~at_level:1 "run (%t)"
       (print_ty_conversion ~max_level:0 conv term)
 
 let ty_scheme_conversion (ctx1, ty1, constraints1) tysch2 =
@@ -227,7 +238,7 @@ and print_computation' ?max_level c ppf =
       (print_expression e)
       (Print.cases (print_abstraction ~expected_scheme) lst)
   | Typed.Handle (e, c) ->
-    print ~at_level:1 "handle %t %t"
+    print ~at_level:1 "handler %t %t"
       (print_expression ~max_level:0 e)
       (print_computation ~max_level:0 c)
   | Typed.Let (lst, c) ->
