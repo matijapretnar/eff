@@ -25,7 +25,6 @@ and shape_of_dirty ((ctx, constraints) as st) (ty, drt) =
 
 type ty_conversion =
   | TyIdentity
-  | DontKnow
   | Lift of ty_conversion * dirty_conversion
   | LiftHandler of dirty_conversion * dirty_conversion
   | Tuple of ty_conversion list
@@ -81,7 +80,7 @@ let rec ty_shape_conversion = function
       )
   | Tuple shapes1, Tuple shapes2 ->
       Tuple (List.map2 (fun shape1 shape2 -> ty_shape_conversion (shape1, shape2)) shapes1 shapes2)
-  | _, _ -> DontKnow
+  | _, _ -> TyIdentity
 
 and dirty_shape_conversion = function
   | Value shape, Value shape' ->
@@ -92,52 +91,52 @@ and dirty_shape_conversion = function
       ConvertComps (ty_shape_conversion (shape, shape'))
   | Computation _, Value _ -> assert false
 
-let rec print_ty_conversion ?max_level conv term ppf : unit =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
+let rec print_ty_conversion ?(max_level=100000) conv term ppf =
+  let print ?at_level = Print.print ~max_level ?at_level ppf in
   match conv with
   | TyIdentity ->
-      print "%t" term
+      (term max_level) ppf
   | Lift (TyIdentity, conv2) ->
       let x = Typed.Variable.fresh "x" in
-          print ~at_level:1 "(* codomain *)fun %t -> %t"
+          print ~at_level:2 "(* codomain *)fun %t -> %t"
                 (print_variable x)
-                (print_dirty_conversion ~max_level:0 conv2
-                (fun ppf -> Print.print ppf "%t %t"
-                  term
+                (print_dirty_conversion conv2
+                (fun m ppf -> Print.print ~max_level:m ppf "%t %t"
+                  (term 1)
                   (print_variable x)))
   | Lift (conv1, DirtyIdentity) ->
       let x = Typed.Variable.fresh "x" in
-          print ~at_level:1 "(* domain *)fun %t -> (%t) (%t)"
+          print ~at_level:2 "(* domain *)fun %t -> %t %t"
                 (print_variable x)
-                term
-                (print_ty_conversion ~max_level:0 conv1 (print_variable x))
+                (term 1)
+                (print_ty_conversion ~max_level:0 conv1 (fun _ -> print_variable x))
   | Lift (conv1, conv2) ->
       let x = Typed.Variable.fresh "x" in
-          print ~at_level:1 "(* both *)fun %t -> %t"
+          print ~at_level:2 "(* both *)fun %t -> %t"
                 (print_variable x)
-                (print_dirty_conversion ~max_level:0 conv2
-                (fun ppf -> Print.print ppf "%t %t"
-                  term
-                  (print_ty_conversion ~max_level:0 conv1 (fun ppf -> Print.print ppf "%t" (print_variable x)))
+                (print_dirty_conversion conv2
+                (fun m ppf -> Print.print ~max_level:m ppf "%t %t"
+                  (term 1)
+                  (print_ty_conversion ~max_level:0 conv1 (fun _ -> print_variable x))
                 )
               )
   | LiftHandler (conv1, conv2) ->
       ()
   | Tuple convs ->
       let xs = List.mapi (fun i conv -> (Typed.Variable.fresh ("x" ^ string_of_int i), conv)) convs in
-      print ~at_level:1 "let (%t) = %t in (%t)"
+      print ~at_level:2 "let (%t) = %t in (%t)"
         (Print.sequence ", " print_variable (List.map fst xs))
-        term
-        (Print.sequence ", " (fun (x, conv) -> print_ty_conversion conv (print_variable x)) xs)
-and print_dirty_conversion ?max_level conv term ppf =
+        (term 100000000)
+        (Print.sequence ", " (fun (x, conv) -> print_ty_conversion conv (fun _ -> print_variable x)) xs)
+and print_dirty_conversion ?max_level conv (term : int -> Format.formatter -> unit) ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match conv with
   | DirtyIdentity ->
-      print "%t" term
+      (term : int -> Format.formatter -> unit) 1000000 ppf
   | ConvertValues conv ->
       print_ty_conversion ?max_level conv term ppf
   | Value conv ->
-      print ~at_level:0 "value (%t)"
+      print ~at_level:1 "value %t"
       (print_ty_conversion ~max_level:0 conv term)
 
 let ty_scheme_conversion (ctx1, ty1, constraints1) tysch2 =
@@ -155,9 +154,9 @@ and dirty_scheme_conversion (ctx1, drty1, constraints1) tysch2 =
       and shp2 = shape_of_dirty (ctx2, constraints2) drty2 in
       simplify_dirty_conversion (dirty_shape_conversion (shp1, shp2))
 
-let rec print_expression ?max_level ?expected_scheme e ppf : unit=
+let rec print_expression ?max_level ?expected_scheme e ppf=
   let conv = ty_scheme_conversion e.Typed.scheme expected_scheme in
-  print_ty_conversion ~max_level:0 conv (print_expression' ~max_level:0 e) ppf
+  print_ty_conversion ?max_level conv (fun m -> print_expression' ~max_level:m e) ppf
 
 and print_expression' ?max_level e ppf =
   let (ctx, ty, constraints) = e.Typed.scheme in
@@ -189,7 +188,7 @@ and print_expression' ?max_level e ppf =
 
 and print_computation ?max_level ?expected_scheme c ppf =
   let conv = dirty_scheme_conversion c.Typed.scheme expected_scheme in
-  print_dirty_conversion ~max_level:0 conv (print_computation' ~max_level:0 c) ppf
+  print_dirty_conversion ?max_level conv (fun m -> print_computation' ~max_level:m c) ppf
 
 and print_computation' ?max_level c ppf =
   Print.debug "printing %t : %t" (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme);
