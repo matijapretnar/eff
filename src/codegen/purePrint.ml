@@ -128,15 +128,15 @@ let rec print_ty_conversion ?(max_level=100000) conv term ppf =
         (Print.sequence ", " print_variable (List.map fst xs))
         (term 100000000)
         (Print.sequence ", " (fun (x, conv) -> print_ty_conversion conv (fun _ -> print_variable x)) xs)
-and print_dirty_conversion ?max_level conv (term : int -> Format.formatter -> unit) ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
+and print_dirty_conversion ?(max_level=1000) conv term ppf =
+  let print ?at_level = Print.print ~max_level ?at_level ppf in
   match conv with
   | DirtyIdentity ->
-      (term : int -> Format.formatter -> unit) 1000000 ppf
+      term max_level ppf
   | ConvertValues conv ->
-      print_ty_conversion ?max_level conv term ppf
+      print_ty_conversion ~max_level conv term ppf
   | Value conv ->
-      print ~at_level:1 "value %t"
+      print ~at_level:1 "value (%t)"
       (print_ty_conversion ~max_level:0 conv term)
 
 let ty_scheme_conversion (ctx1, ty1, constraints1) tysch2 =
@@ -156,7 +156,15 @@ and dirty_scheme_conversion (ctx1, drty1, constraints1) tysch2 =
 
 let rec print_expression ?max_level ?expected_scheme e ppf=
   let conv = ty_scheme_conversion e.Typed.scheme expected_scheme in
-  print_ty_conversion ?max_level conv (fun m -> print_expression' ~max_level:m e) ppf
+  print_converted_expression ?max_level ppf (conv, e)
+
+and print_converted_expression ?max_level ppf = function
+  | Tuple convs, {term = Typed.Tuple lst} ->
+      Print.print ?max_level ppf "(%t)"
+        (Print.sequence ", " (fun (conv, e) ppf -> print_converted_expression ppf (conv, e)) (List.combine convs lst))
+  | conv, e ->
+      print_ty_conversion ?max_level conv (fun m -> print_expression' ~max_level:m e) ppf
+
 
 and print_expression' ?max_level e ppf =
   let (ctx, ty, constraints) = e.Typed.scheme in
@@ -188,7 +196,11 @@ and print_expression' ?max_level e ppf =
 
 and print_computation ?max_level ?expected_scheme c ppf =
   let conv = dirty_scheme_conversion c.Typed.scheme expected_scheme in
-  print_dirty_conversion ?max_level conv (fun m -> print_computation' ~max_level:m c) ppf
+  print_converted_computation ?max_level ppf (conv, c)
+
+and print_converted_computation ?max_level ppf = function
+  | conv, c ->
+      print_dirty_conversion ?max_level conv (fun m -> print_computation' ~max_level:m c) ppf
 
 and print_computation' ?max_level c ppf =
   Print.debug "printing %t : %t" (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme);
