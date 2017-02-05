@@ -1,11 +1,15 @@
 let no_attack (x, y) (x', y') =
   x <> x' && y <> y' && abs (x - x') <> abs (y - y')
 
+let rec not_attacked x' = function
+  | [] -> true
+  | x :: xs -> if no_attack x' x then not_attacked x' xs else false
+
 let available (number_of_queens, x, qs) =
   let rec loop (possible, y) =
     if y < 1 then
       possible
-    else if forall (no_attack (x, y)) qs then
+    else if not_attacked (x, y) qs then
       loop ((y :: possible), (y - 1))
     else
       loop (possible, (y - 1))
