@@ -404,6 +404,91 @@ and remove_rec_abs st a =
 and remove_rec_abs2 st a2 =
   a2a2 @@ remove_rec_abs st @@ a22a @@ a2
 
+let rec less_context_expr (poly_tys, constraints) e =
+  let ctx, ty, cnstrs = e.scheme in
+  let joint_cnstrs = Constraints.union cnstrs constraints in
+  let scheme =
+    Scheme.finalize_ty_scheme ~loc:e.location ctx ty [
+      Scheme.just joint_cnstrs;
+      Scheme.less_context ~loc:e.location poly_tys
+    ]
+  in
+  {
+    e with term = less_context_expr' (poly_tys, joint_cnstrs) e.term;
+           scheme
+  }
+and less_context_expr' st = function
+  | Pure c ->
+    Pure (less_context_comp st c)
+  | Lambda a ->
+    Lambda (less_context_abs st a)
+  | Handler h ->
+    Handler (less_context_handler st h)
+  | FinallyHandler h ->
+    FinallyHandler (less_context_finally_handler st h)
+  | Tuple es ->
+    Tuple (List.map (less_context_expr st) es)
+  | Record flds ->
+    Record (Common.assoc_map (less_context_expr st) flds)
+  | Variant (lbl, e) ->
+    Variant (lbl, Common.option_map (less_context_expr st) e)
+  | (Var _ | BuiltIn _ | Const _ | Effect _) as e -> e
+and less_context_comp (poly_tys, constraints) c =
+  let ctx, ty, cnstrs = c.scheme in
+  let joint_cnstrs = Constraints.union cnstrs constraints in
+  let scheme =
+    Scheme.finalize_dirty_scheme ~loc:c.location ctx ty [
+      Scheme.just joint_cnstrs;
+      Scheme.less_context ~loc:c.location poly_tys
+    ]
+  in
+  {
+    c with term = less_context_comp' (poly_tys, joint_cnstrs) c.term;
+           scheme
+  }and less_context_comp' st = function
+    | Bind (c1, c2) ->
+      Bind (less_context_comp st c1, less_context_abs st c2)
+    | LetIn (e, a) ->
+      LetIn (less_context_expr st e, less_context_abs st a)
+    | Let (li, c1) ->
+      let li' = List.map (fun (p, c) ->
+          (* XXX Should we check that p & st have disjoint variables? *)
+          (p, less_context_comp st c)
+        ) li
+      in
+      Let (li', less_context_comp st c1)
+    | LetRec (li, c1) ->
+      let li' = List.map (fun (x, a) ->
+          (* XXX Should we check that x does not appear in st? *)
+          (x, less_context_abs st a)
+        ) li
+      in
+      LetRec (li', less_context_comp st c1)
+    | Match (e, li) ->
+      Match (less_context_expr st e, List.map (less_context_abs st) li)
+    | Apply (e1, e2) ->
+      Apply (less_context_expr st e1, less_context_expr st e2)
+    | Handle (e, c) ->
+      Handle (less_context_expr st e, less_context_comp st c)
+    | Check c ->
+      Check (less_context_comp st c)
+    | Call (eff, e, a) ->
+      Call (eff, less_context_expr st e, less_context_abs st a)
+    | Value e ->
+      Value (less_context_expr st e)
+and less_context_handler st h = {
+  effect_clauses = Common.assoc_map (less_context_abs2 st) h.effect_clauses;
+  value_clause = less_context_abs st h.value_clause;
+}
+and less_context_finally_handler st (h, finally_clause) =
+  (less_context_handler st h, less_context_abs st finally_clause)
+and less_context_abs st a = 
+  let (p, c) = a.term in
+  (* XXX Should we check that p & st have disjoint variables? *)
+  {a with term = (p, less_context_comp st c)}
+and less_context_abs2 st a2 =
+  a2a2 @@ less_context_abs st @@ a22a @@ a2
+
 let rec push_constraints_expr constraints e =
   let ctx, ty, cnstrs = e.scheme in
   let joint_cnstrs = Constraints.union cnstrs constraints in
@@ -725,15 +810,22 @@ let handler ?loc h =
   let drt_out = Type.fresh_dirt () in
   let ty_out = Type.fresh_ty () in
 
-  let fold ((_, (ty_par, ty_arg)), a2) (ctx, constraints) =
+  let fold ((_, (ty_par, ty_arg)), a2) (ctx, constraints, less_contexts) =
     let ctx_a, (ty_p, ty_k, drty_c), cnstrs_a = a2.scheme in
+    let (_, p2, _) = a2.term in
+    let less_context = match p2.term with
+    | PVar k -> fun drty -> [(k, Type.Arrow (ty_arg, drty))]
+    | PNonbinding -> fun _ -> []
+    | _ -> assert false
+    in
     ctx_a @ ctx,
     Constraints.list_union [constraints; cnstrs_a]
     |> Constraints.add_ty_constraint ~loc ty_par ty_p
     |> Constraints.add_ty_constraint ~loc (Type.Arrow (ty_arg, (ty_out, drt_out))) ty_k
-    |> Constraints.add_dirty_constraint ~loc drty_c (ty_out, drt_out)
+    |> Constraints.add_dirty_constraint ~loc drty_c (ty_out, drt_out),
+    less_context :: less_contexts
   in
-  let ctxs, constraints = List.fold_right fold h.effect_clauses ([], Constraints.empty) in
+  let ctxs, constraints, less_contexts = List.fold_right fold h.effect_clauses ([], Constraints.empty, []) in
 
   let make_dirt (eff, _) (effs_in, effs_out) =
     let r_in = Params.fresh_region_param () in
@@ -757,9 +849,14 @@ let handler ?loc h =
   in
 
   let ty_sch = (ctx_val @ ctxs, Type.Handler((ty_in, drt_in), (ty_out, drt_out)), constraints) in
+  let scheme = Scheme.clean_ty_scheme ~loc ty_sch in
+  let (ctx, Type.Handler(_, drty), constraints) = scheme in
+  let effect_clauses = List.map2 (fun less_ctx (op, a2) ->
+    (op, less_context_abs2 (less_ctx drty, constraints) a2)
+  ) less_contexts h.effect_clauses in
   {
-    term = Handler h;
-    scheme = Scheme.clean_ty_scheme ~loc ty_sch;
+    term = Handler {h with effect_clauses};
+    scheme = scheme;
     location = loc;
   }
 
