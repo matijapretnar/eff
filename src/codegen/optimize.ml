@@ -712,7 +712,7 @@ let optimize_command st =
     let st' = begin match defs' with
       (* If we define a single simple handler, we inline it *)
       | [({ term = Typed.PVar x}, { term = Value ({ term = Handler _ } as e)})] ->
-        {st with inlinable = Common.update x (fun () -> e) st.inlinable}
+        {st with inlinable = Common.update x (fun () -> (optimize_expr st e)) st.inlinable}
       | [({ term = Typed.PVar x}, ({ term = Value ({term = Lambda _ } as e )} ))] ->
         {st with stack = Common.update x e st.stack}
       | _ -> st
