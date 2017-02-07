@@ -47,6 +47,7 @@ let () =
       Bench.Test.create ~name:"Handlers - 29c8f51 (22-12-2016)" (fun () -> Queens29c8f51._queens_one_322 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - faebf45 (02-01-2017)" (fun () -> Queensfaebf45._queens_one_319 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - hand-written" (fun () -> QueensHandlers.queens_one number_of_queens_one);
+      Bench.Test.create ~name:"Handlers - 14b03fe (07-02-2017 tweaked)" (fun () -> Queens14b03fe._queens_one_285 number_of_queens_all);
       Bench.Test.create ~name:"Native - option" (fun () -> QueensNative.queens_one_option number_of_queens_one);
       Bench.Test.create ~name:"Native - fail" (fun () -> QueensNative.queens_one_fail number_of_queens_one);
     ]);
@@ -60,6 +61,7 @@ let () =
       Bench.Test.create ~name:"Handlers - 29c8f51 (22-12-2016)" (fun () -> Queens29c8f51._queens_all_324 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - faebf45 (02-01-2017)" (fun () -> Queensfaebf45._queens_all_321 number_of_queens_one);
       Bench.Test.create ~name:"Handlers - hand-written" (fun () -> QueensHandlers.queens_all number_of_queens_all);
+      Bench.Test.create ~name:"Handlers - 14b03fe (07-02-2017 tweaked)" (fun () -> Queens14b03fe._queens_all_289 number_of_queens_all);
       Bench.Test.create ~name:"Native - lists" (fun () -> QueensNative.queens_all number_of_queens_all);
     ]);
   Printf.printf "\n\n"
