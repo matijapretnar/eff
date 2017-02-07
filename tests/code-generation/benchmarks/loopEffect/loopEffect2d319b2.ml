@@ -2,60 +2,44 @@
 === GENERATED FROM loopEffect.eff ===
 === BEGIN SOURCE ===
 
-effect Tick : unit -> unit;;
-effect Get: unit -> int;;
-effect Put: int -> unit;;
+effect Incr : unit -> unit
+effect Get: unit -> int
+effect Put: int -> unit
 
-let tickHandler = handler
-    | val y -> (fun x -> x)
-    | #Tick () k -> (fun x -> k () (x+1))
-;;
-let tickHandlerUnit = handler
-    | val y -> (fun x -> y)
-    | #Tick () k -> (fun x -> k () (x+1))
-;;
-let tickHandlerTuple = handler
-    | val y -> (fun x -> (x, y))
-    | #Tick () k -> (fun x -> k () (x+1))
-;;
-let tickHandlerNoInc = handler
-    | val y -> (fun x -> x)
-    | #Tick () k -> (fun x -> k () (x))
-;;
-let tickHandlerState = handler
-    | val y -> (fun x -> x)
-    | #Get () k -> (fun s -> k s s)
-    | #Put s' k -> (fun _ -> k () s')
-;;
+let incr_handler = handler
+| val y -> (fun x -> x)
+| #Incr () k -> (fun x -> k () (x + 1))
 
-let rec loop n =
-    if n = 0 then ()
+let state_handler = handler
+| val y -> (fun x -> x)
+| #Get () k -> (fun s -> k s s)
+| #Put s' k -> (fun _ -> k () s')
+
+let rec loop_pure n a =
+    if n = 0 then
+        a
     else
-        let _ = #Tick () in
-        loop (n-1)
-;;
+        loop_pure (n - 1) (a + 1)
 
-let rec loopState n =
-    if n = 0 then ()
+let rec loop_incr n =
+    if n = 0 then
+        ()
     else
-        let _ = #Put ((#Get ()) + 1) in
-        loopState (n-1)
-;;
+        (#Incr (); loop_incr (n - 1))
 
-let loop_w_handler0 n = (with tickHandler handle (loop n)) 0;;
-(* let res0 = loop_w_handler0 10;; *)
+let rec loop_state n =
+    if n = 0 then
+        ()
+    else
+        (#Put ((#Get ()) + 1); loop_state (n - 1))
 
-let loop_w_handler1 n = (with tickHandlerUnit handle (loop n)) 0;;
-(* let res1 = loop_w_handler1 10;; *)
+let pure n = loop_pure n 0
 
-let loop_w_handler2 n = (with tickHandlerTuple handle (loop n)) 0;;
-(* let res2 = loop_w_handler2 10;; *)
+let incr n =
+    (with incr_handler handle loop_incr n) 0
 
-let loop_w_handler3 n = (with tickHandlerNoInc handle (loop n)) 0;;
-(* let res2 = loop_w_handler3 10;; *)
-
-let loop_w_handler4 n = (with tickHandlerState handle (loopState n)) 0;;
-(* let res3 = loop_w_handler4 10;; *)
+let state n =
+    (with state_handler handle loop_state n) 0
 
 === END SOURCE ===
 *)
@@ -233,7 +217,7 @@ let rec _exists_110 _p_111 _gen_function_112 =
   
 let _mem_117 _x_118 =
   _exists_110
-    (fun _x_243  -> value ((fun _x'_119  -> _x_118 = _x'_119) _x_243))
+    (fun _x_129  -> value ((fun _x'_119  -> _x_118 = _x'_119) _x_129))
   
 let rec _filter_121 _p_122 _gen_function_123 =
   match _gen_function_123 with
@@ -317,56 +301,102 @@ type (_,_) effect +=
   | Effect_Update: (int,unit) effect 
 ;;"End of pervasives"
 type (_,_) effect +=
-  | Effect_Tick: (unit,unit) effect 
+  | Effect_Incr: (unit,unit) effect 
 type (_,_) effect +=
   | Effect_Get: (unit,int) effect 
 type (_,_) effect +=
   | Effect_Put: (int,unit) effect 
- 
-let rec _loop_255 _n_256 =
-  match _n_256 = 0 with
+let _incr_handler_216 =
+  {
+    value_clause = (fun _y_222  -> value (fun _x_223  -> _x_223));
+    effect_clauses = fun (type a) -> fun (type b) ->
+      fun (x : (a,b) effect)  ->
+        (match x with
+         | Effect_Incr  ->
+             (fun (() : unit)  ->
+                fun (_k_217 : unit -> _ computation)  ->
+                  value
+                    (fun _x_130  ->
+                       run
+                         ((fun _x_218  ->
+                             (_k_217 ()) >>
+                               (fun _gen_bind_219  ->
+                                  value
+                                    (let _gen_bind_220 = _x_218 + 1  in
+                                     _gen_bind_219 _gen_bind_220))) _x_130)))
+         | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
+                                                                   (b ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                    _
+                                                                    computation)
+  } 
+let _state_handler_224 =
+  {
+    value_clause = (fun _y_231  -> value (fun _x_232  -> _x_232));
+    effect_clauses = fun (type a) -> fun (type b) ->
+      fun (x : (a,b) effect)  ->
+        (match x with
+         | Effect_Get  ->
+             (fun (() : unit)  ->
+                fun (_k_228 : int -> _ computation)  ->
+                  value
+                    (fun _x_131  ->
+                       run
+                         ((fun _s_229  ->
+                             (_k_228 _s_229) >>
+                               (fun _gen_bind_230  ->
+                                  value (_gen_bind_230 _s_229))) _x_131)))
+         | Effect_Put  ->
+             (fun (_s'_225 : int)  ->
+                fun (_k_226 : unit -> _ computation)  ->
+                  value
+                    (fun _x_132  ->
+                       run
+                         ((fun _  ->
+                             (_k_226 ()) >>
+                               (fun _gen_bind_227  ->
+                                  value (_gen_bind_227 _s'_225))) _x_132)))
+         | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
+                                                                   (b ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                    _
+                                                                    computation)
+  } 
+let rec _loop_pure_233 _n_234 _a_235 =
+  match _n_234 = 0 with
+  | true  -> _a_235
+  | false  -> _loop_pure_233 (_n_234 - 1) (_a_235 + 1) 
+let rec _loop_incr_243 _n_244 =
+  match _n_244 = 0 with
   | true  -> value ()
-  | false  -> call Effect_Tick () (fun _result_30  -> _loop_255 (_n_256 - 1)) 
-let rec _loopState_261 _n_262 =
-  match _n_262 = 0 with
+  | false  ->
+      call Effect_Incr () (fun _result_30  -> _loop_incr_243 (_n_244 - 1))
+  
+let rec _loop_state_249 _n_250 =
+  match _n_250 = 0 with
   | true  -> value ()
   | false  ->
       call Effect_Get ()
         (fun _result_38  ->
            call Effect_Put (_result_38 + 1)
-             (fun _result_40  -> _loopState_261 (_n_262 - 1)))
+             (fun _result_40  -> _loop_state_249 (_n_250 - 1)))
   
-let _loop_w_handler0_270 _n_271 =
-  (let rec _newvar_48 _n_256 =
-     match _n_256 = 0 with
-     | true  -> (fun _x_53  -> _x_53)
-     | false  -> (fun _x_75  -> _newvar_48 (_n_256 - 1) (_x_75 + 1))  in
-   _newvar_48 _n_271) 0
+let _pure_258 _n_259 = _loop_pure_233 _n_259 0 
+let _incr_261 _n_262 =
+  (let rec _newvar_46 _n_244 =
+     match _n_244 = 0 with
+     | true  -> (fun _x_51  -> _x_51)
+     | false  -> (fun _x_67  -> _newvar_46 (_n_244 - 1) (_x_67 + 1))  in
+   _newvar_46 _n_262) 0
   
-let _loop_w_handler1_273 _n_274 =
-  (let rec _newvar_86 _n_256 =
-     match _n_256 = 0 with
-     | true  -> let _y_90 = ()  in (fun _x_91  -> _y_90)
-     | false  -> (fun _x_113  -> _newvar_86 (_n_256 - 1) (_x_113 + 1))  in
-   _newvar_86 _n_274) 0
+let _state_264 _n_265 =
+  (let rec _newvar_77 _n_250 =
+     match _n_250 = 0 with
+     | true  -> (fun _x_89  -> _x_89)
+     | false  -> (fun _s_127  -> _newvar_77 (_n_250 - 1) (_s_127 + 1))  in
+   _newvar_77 _n_265) 0
   
-let _loop_w_handler2_276 _n_277 =
-  (let rec _newvar_124 _n_256 =
-     match _n_256 = 0 with
-     | true  -> let _y_128 = ()  in (fun _x_129  -> (_x_129, _y_128))
-     | false  -> (fun _x_151  -> _newvar_124 (_n_256 - 1) (_x_151 + 1))  in
-   _newvar_124 _n_277) 0
-  
-let _loop_w_handler3_279 _n_280 =
-  (let rec _newvar_160 _n_256 =
-     match _n_256 = 0 with
-     | true  -> (fun _x_165  -> _x_165)
-     | false  -> (fun _x_181  -> _newvar_160 (_n_256 - 1) _x_181)  in
-   _newvar_160 _n_280) 0
-  
-let _loop_w_handler4_282 _n_283 =
-  (let rec _newvar_191 _n_262 =
-     match _n_262 = 0 with
-     | true  -> (fun _x_203  -> _x_203)
-     | false  -> (fun _s_241  -> _newvar_191 (_n_262 - 1) (_s_241 + 1))  in
-   _newvar_191 _n_283) 0
