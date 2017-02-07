@@ -268,7 +268,7 @@ and optimize_sub_expr st e =
     pure ~loc (optimize_comp st c)
   | Handler h ->
     handler ~loc {
-      effect_clauses = Common.assoc_map (optimize_abs2 st) h.effect_clauses;
+      effect_clauses = (* Common.assoc_map (optimize_abs2 st) *) h.effect_clauses;
       value_clause = optimize_abs st h.value_clause;
     }
   | (Var _ | Const _ | BuiltIn _ | Effect _) -> e
