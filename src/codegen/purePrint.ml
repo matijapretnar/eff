@@ -13,7 +13,7 @@ let rec print_ty_shape ?(max_level=1000) shape ppf =
   let print ?at_level = Print.print ~max_level ?at_level ppf in
   match shape with
   | Basic ->
-    print "*"
+    print "X"
   | Tuple shapes ->
     print ~at_level:2 "@[<hov>(%t)@]"
       (Print.sequence ", " (print_ty_shape ~max_level:1) shapes)
@@ -67,7 +67,6 @@ type ty_conversion =
   | Lift of ty_conversion * dirty_conversion
   | LiftHandler of dirty_conversion * dirty_conversion
   | Tuple of ty_conversion list
-  | DontKnow
 and dirty_conversion =
   | DirtyIdentity
   | Value of ty_conversion
@@ -93,7 +92,6 @@ let rec simplify_ty_conversion = function
       | DirtyIdentity, DirtyIdentity -> TyIdentity
       | conv1, conv2 -> LiftHandler (conv1, conv2)
       end
-  | DontKnow -> DontKnow
 and simplify_dirty_conversion = function
   | DirtyIdentity -> DirtyIdentity
   | Value conv -> Value (simplify_ty_conversion conv)
@@ -123,7 +121,8 @@ let rec ty_shape_conversion = function
       )
   | Tuple shapes1, Tuple shapes2 ->
       Tuple (List.map2 (fun shape1 shape2 -> ty_shape_conversion (shape1, shape2)) shapes1 shapes2)
-  | _, _ -> DontKnow
+  | shape1, shape2 ->
+      Error.runtime "%t ~~> %t" (print_ty_shape shape1) (print_ty_shape shape2)
 
 and dirty_shape_conversion = function
   | ValueS shape, ValueS shape' ->
@@ -166,7 +165,6 @@ let rec print_ty_conversion ?(max_level=100000) conv term ppf =
         (Print.sequence ", " print_variable (List.map fst xs))
         (term 100000000)
         (Print.sequence ", " (fun (x, conv) -> print_ty_conversion conv (fun _ -> print_variable x)) xs)
-  | DontKnow -> print "???"
 and print_dirty_conversion ?(max_level=1000) conv term ppf =
   let print ?at_level = Print.print ~max_level ?at_level ppf in
   match conv with
@@ -202,10 +200,11 @@ and dirty_scheme_conversion shp1 shp2 =
       simplify_dirty_conversion (dirty_shape_conversion (shp1, shp2))
 
 let rec print_expression ?max_level ?expected_shape e ppf=
-  Print.debug "Printing expression %t" (Typed.print_expression e);
-  Print.debug "Type is %t" (Scheme.print_ty_scheme e.Typed.scheme);
   let shp = shape_of_ty_scheme e.Typed.scheme in
-  Print.debug "Shape is %t" (print_ty_shape shp);
+  Print.debug ~loc:e.Typed.location "Printing expression %t@. Type is %t@. Shape is %t"
+    (Typed.print_expression e)
+    (Scheme.print_ty_scheme e.Typed.scheme)
+    (print_ty_shape shp);
   let conv = ty_scheme_conversion shp expected_shape in
   print_converted_expression ?max_level ppf (conv, e)
 
@@ -238,7 +237,6 @@ and print_expression' ?max_level e ppf =
     let Arrow (_, expected_shape) = shape_of_ty_scheme e.Typed.scheme in
     print ~at_level:2 "fun %t" (print_abstraction ~expected_shape a)
   | Typed.Handler h ->
-    Print.debug "Printing handler! %t" (Scheme.print_ty_scheme e.Typed.scheme);
     let (Handler (_, expected_shape)) = shape_of_ty_scheme e.Typed.scheme in
     print "%t" (print_handler ~expected_shape h)
   | Typed.Effect eff ->
@@ -247,10 +245,11 @@ and print_expression' ?max_level e ppf =
     print_computation ?max_level c ppf
 
 and print_computation ?max_level ?expected_shape c ppf =
-  Print.debug "Printing computation %t" (Typed.print_computation c);
-  Print.debug "Type is %t" (Scheme.print_dirty_scheme c.Typed.scheme);
   let shp = shape_of_dirty_scheme c.Typed.scheme in
-  Print.debug "Shape is %t" (print_dirty_shape shp);
+  Print.debug ~loc:c.Typed.location "Printing computation %t@. Type is %t@. Shape is %t"
+    (Typed.print_computation c)
+    (Scheme.print_dirty_scheme c.Typed.scheme)
+    (print_dirty_shape shp);
   let conv = dirty_scheme_conversion shp expected_shape in
   print_converted_computation ?max_level ppf (conv, c)
 
