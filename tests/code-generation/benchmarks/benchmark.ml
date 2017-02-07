@@ -21,6 +21,7 @@ let () =
       Bench.Test.create ~name:"Handlers - 7cc7606 (18-03-2016)" (fun () -> Loop7cc7606._loop_281 number_of_loops);
       Bench.Test.create ~name:"Handlers - ce4263d (10-10-2016)" (fun () -> Loopce4263d._loop_279 number_of_loops);
       Bench.Test.create ~name:"Handlers - hand-written" (fun () -> LoopHandlers.loop number_of_loops);
+      Bench.Test.create ~name:"Handlers - 14b03fe (07-02-2017)" (fun () -> Loop14b03fe._loop_216 number_of_loops);
       Bench.Test.create ~name:"Native - option" (fun () -> LoopNative.loop_option number_of_loops);
       Bench.Test.create ~name:"Native - fail" (fun () -> LoopNative.loop_fail number_of_loops);
     ]);
@@ -32,6 +33,7 @@ let () =
       Bench.Test.create ~name:"Handlers - 7cc7606 (18-03-2016)" (fun () -> Loop7cc7606.run (Loop7cc7606._loop_acc_292 number_of_loops) 0);
       Bench.Test.create ~name:"Handlers - ce4263d (10-10-2016)" (fun () -> Loopce4263d.run (Loopce4263d._loop_acc_290 number_of_loops) 0);
       Bench.Test.create ~name:"Handlers - hand-written" (fun () -> LoopHandlers.loop_acc number_of_loops 0);
+      Bench.Test.create ~name:"Handlers - 14b03fe (07-02-2017)" (fun () -> Loop14b03fe._loop_acc_227 number_of_loops 0);
       Bench.Test.create ~name:"Native - option" (fun () -> LoopNative.loop_acc_option number_of_loops 0);
       Bench.Test.create ~name:"Native - fail" (fun () -> LoopNative.loop_acc_fail number_of_loops 0);
     ]);
