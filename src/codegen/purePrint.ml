@@ -273,6 +273,13 @@ and print_computation' ?max_level c ppf =
   | Typed.Match (e, []) ->
     print ~at_level:2 "(match %t with _ -> assert false)"
       (print_expression e)
+  | Typed.Match (e, [{Typed.term = ({Typed.term = PConst (Boolean true )},c1)};
+                     {Typed.term = ({Typed.term = PConst (Boolean false)},c2)}]) ->
+    let expected_shape = shape_of_dirty_scheme c.Typed.scheme in
+    print ~at_level:2 "(if %t then %t else %t)"
+      (print_expression e)
+      (print_computation ~expected_shape c1)
+      (print_computation ~expected_shape c2)
   | Typed.Match (e, lst) ->
     let expected_shape = shape_of_dirty_scheme c.Typed.scheme in
     print ~at_level:2 "(match %t with @[<v>| %t@])"
