@@ -89,10 +89,13 @@ let () =
   Printf.printf "LOOP WITH EFFECT (%d loops):\n" number_of_loops_effect;
   Command.run (Bench.make_command [
       Bench.Test.create ~name:"Handlers - pure - 2d319b2 (07-02-2017)" (fun () -> LoopEffect2d319b2._pure_258 number_of_loops_effect);
+      Bench.Test.create ~name:"Handlers - pure - cb62001 (09-02-2017)" (fun () -> LoopEffectcb62001._pure_258 number_of_loops_effect);
       Bench.Test.create ~name:"Native - pure" (fun () -> LoopEffectNative.pure number_of_loops_effect);
       Bench.Test.create ~name:"Handlers - incr - 2d319b2 (07-02-2017)" (fun () -> LoopEffect2d319b2._incr_261 number_of_loops_effect);
+      Bench.Test.create ~name:"Handlers - incr - cb62001 (09-02-2017)" (fun () -> LoopEffectcb62001._incr_261 number_of_loops_effect);
       Bench.Test.create ~name:"Native - incr" (fun () -> LoopEffectNative.incr number_of_loops_effect);
       Bench.Test.create ~name:"Handlers - state - 2d319b2 (07-02-2017)" (fun () -> LoopEffect2d319b2._state_264 number_of_loops_effect);
+      Bench.Test.create ~name:"Handlers - state - cb62001 (09-02-2017)" (fun () -> LoopEffectcb62001._state_264 number_of_loops_effect);
       Bench.Test.create ~name:"Native - state" (fun () -> LoopEffectNative.state number_of_loops_effect);
     ]);
   Printf.printf "\n\n"
