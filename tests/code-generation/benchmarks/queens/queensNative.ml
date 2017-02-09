@@ -55,6 +55,20 @@ let queens_one_option number_of_queens =
 
 (******************************************************************************)
 
+let queens_one_cps number_of_queens =
+  let rec place (x, qs) =
+    if x > number_of_queens then (fun _ -> qs) else
+      let rec choose = function
+          | [] -> (fun k  -> k ())
+          | y::ys ->
+              (fun k  -> place ((x + 1), ((x, y) :: qs)) (fun ()  -> choose ys (fun ()  -> k ())))
+      in
+      (fun a -> (choose (available (number_of_queens,x, qs)) a))
+  in
+  place (1, []) (fun () -> [])
+
+(******************************************************************************)
+
 let queens_all number_of_queens =
   let rec place (x, qs) =
     if x > number_of_queens then [qs] else
