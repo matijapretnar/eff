@@ -218,6 +218,11 @@ let applicable_pattern p vars =
 let is_atomic e =
   match e.term with | Var _ -> true | Const _ -> true | _ -> false
 
+let unused x c =
+  let vars = Typed.free_vars_comp  c in
+  let inside_occ, outside_occ = Typed.occurrences x vars in
+  inside_occ == 0 && outside_occ == 0
+
 let refresh_abs a = Typed.refresh_abs [] a
 let refresh_abs2 a2 = Typed.refresh_abs2 [] a2
 let refresh_expr e = Typed.refresh_expr [] e
@@ -232,6 +237,7 @@ and substitute_pattern_expr st e p exp =
   optimize_expr st (Typed.subst_expr (Typed.pattern_match p exp) e)
 
 and beta_reduce st ({term = (p, c)} as a) e =
+  Print.debug  "Inlining? %t[%t -> %t]" (Typed.print_computation c) (Typed.print_pattern p) (Typed.print_expression e) ;
   match applicable_pattern p (Typed.free_vars_comp c) with
   | NotInlinable when is_atomic e -> substitute_pattern_comp st c p e
   | Inlinable -> substitute_pattern_comp st c p e
@@ -300,6 +306,10 @@ and optimize_sub_comp st c =
       end
 
 
+  | LetRec ( [(var,abst)], c1)
+      when unused var c1 -> 
+    Print.debug "TOM: dropping unused let-rec definition";
+    c1
   | LetRec (li, c1) ->
     let_rec' ~loc (Common.assoc_map (optimize_abs st) li) (optimize_comp st c1)
   | Match (e, li) ->
