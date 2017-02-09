@@ -70,7 +70,6 @@ type ty_conversion =
 and dirty_conversion =
   | DirtyIdentity
   | Value of ty_conversion
-  | Run of ty_conversion
   | ConvertValues of ty_conversion
   | ConvertComps of ty_conversion
 
@@ -95,7 +94,6 @@ let rec simplify_ty_conversion = function
 and simplify_dirty_conversion = function
   | DirtyIdentity -> DirtyIdentity
   | Value conv -> Value (simplify_ty_conversion conv)
-  | Run conv -> Run (simplify_ty_conversion conv)
   | ConvertValues conv ->
       begin match simplify_ty_conversion conv with
       | TyIdentity -> DirtyIdentity
@@ -122,7 +120,7 @@ let rec ty_shape_conversion = function
   | Tuple shapes1, Tuple shapes2 ->
       Tuple (List.map2 (fun shape1 shape2 -> ty_shape_conversion (shape1, shape2)) shapes1 shapes2)
   | shape1, shape2 ->
-      Error.runtime "%t ~~> %t" (print_ty_shape shape1) (print_ty_shape shape2)
+      TyIdentity
 
 and dirty_shape_conversion = function
   | ValueS shape, ValueS shape' ->
@@ -132,7 +130,7 @@ and dirty_shape_conversion = function
   | Computation shape, Computation shape' ->
       ConvertComps (ty_shape_conversion (shape, shape'))
   | Computation shape, ValueS shape' ->
-      Run (ty_shape_conversion (shape, shape'))
+      ConvertValues (ty_shape_conversion (shape, shape'))
 
 let rec print_ty_conversion ?(max_level=100000) conv term ppf =
   let print ?at_level = Print.print ~max_level ?at_level ppf in
@@ -177,9 +175,6 @@ and print_dirty_conversion ?(max_level=1000) conv term ppf =
       (print_ty_conversion ~max_level:0 conv term)
   | Value conv ->
       print ~at_level:1 "value (%t)"
-      (print_ty_conversion ~max_level:0 conv term)
-  | Run conv ->
-      print ~at_level:1 "run (%t)"
       (print_ty_conversion ~max_level:0 conv term)
 
 let ty_scheme_conversion shp1 shp2 =
@@ -238,7 +233,7 @@ and print_expression' ?max_level e ppf =
     print ~at_level:2 "fun %t" (print_abstraction ~expected_shape a)
   | Typed.Handler h ->
     let (Handler (_, expected_shape)) = shape_of_ty_scheme e.Typed.scheme in
-    print "%t" (print_handler ~expected_shape h)
+    print ~at_level:2 "fun comp -> handler %t comp" (print_handler ~expected_shape h)
   | Typed.Effect eff ->
     print ~at_level:2 "effect %t" (print_effect eff)
   | Typed.Pure c ->
@@ -279,7 +274,7 @@ and print_computation' ?max_level c ppf =
       (print_expression e)
       (Print.cases (print_abstraction ~expected_shape) lst)
   | Typed.Handle (e, c) ->
-    print ~at_level:1 "handler %t %t"
+    print ~at_level:1 "%t %t"
       (print_expression ~max_level:0 e)
       (print_computation ~max_level:0 c)
   | Typed.Let (lst, c) ->
@@ -314,7 +309,7 @@ and print_handler h ~expected_shape ppf =
     "{@[<hov>
       value_clause = (@[fun %t@]);@ 
       effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-        ((match x with %t) : a -> (b -> _ computation) -> _ computation))
+        ((match x with %t) : a -> (b -> _ (* computation *)) -> _ (* computation *)))
     @]}"
     (print_abstraction ~expected_shape h.Typed.value_clause)
     (print_effect_clauses ~expected_shape h.Typed.effect_clauses)
@@ -326,7 +321,7 @@ and print_effect_clauses ~expected_shape eff_clauses ppf =
     print "| eff' -> fun arg k -> Call (eff', arg, k)"
   | (((_, (t1, t2)) as eff), {Typed.term = (p1, p2, c)}) :: cases ->
     print ~at_level:1
-      "| %t -> (fun (%t : %t) (%t : %t -> _ computation) -> %t) %t"
+      "| %t -> (fun (%t : %t) (%t : %t -> _ (* computation *)) -> %t) %t"
       (print_effect eff)
       (print_pattern p1) (print_type t1)
       (print_pattern p2) (print_type t2)
