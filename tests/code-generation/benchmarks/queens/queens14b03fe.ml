@@ -355,7 +355,78 @@ let rec _choose_255 _gen_let_rec_function_256 =
            match _result_33 with
            | true  -> value _x_258
            | false  -> _choose_255 _xs_259)
-
+  
+let _backtrack_261 =
+  {
+    value_clause = (fun _y_267  -> value (fun _  -> _y_267));
+    effect_clauses = fun (type a) -> fun (type b) ->
+      fun (x : (a,b) effect)  ->
+        (match x with
+         | Effect_Decide  ->
+             (fun (_ : unit)  ->
+                fun (_k_263 : bool -> _ computation)  ->
+                  value
+                    (fun _x_202  ->
+                       run
+                         ((fun _kf_264  ->
+                             (_k_263 true) >>
+                               (fun _gen_bind_265  ->
+                                  value
+                                    (_gen_bind_265
+                                       (fun _x_203  ->
+                                          run
+                                            ((fun ()  ->
+                                                (_k_263 false) >>
+                                                  (fun _gen_bind_266  ->
+                                                     value
+                                                       (_gen_bind_266
+                                                          (fun _x_204  ->
+                                                             run
+                                                               (_kf_264
+                                                                  _x_204)))))
+                                               _x_203)))))
+                            (fun _x_205  -> value (_x_202 _x_205)))))
+         | Effect_Fail  ->
+             (fun (_ : unit)  ->
+                fun (_ : unit -> _ computation)  ->
+                  value
+                    (fun _x_206  ->
+                       run
+                         ((fun _kf_262  -> _kf_262 ())
+                            (fun _x_207  -> value (_x_206 _x_207)))))
+         | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
+                                                                   (b ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                    _
+                                                                    computation)
+  } 
+let _choose_all_268 =
+  {
+    value_clause = (fun _x_273  -> value [_x_273]);
+    effect_clauses = fun (type a) -> fun (type b) ->
+      fun (x : (a,b) effect)  ->
+        (match x with
+         | Effect_Decide  ->
+             (fun (_ : unit)  ->
+                fun (_k_269 : bool -> _ computation)  ->
+                  (_k_269 true) >>
+                    (fun _gen_bind_271  ->
+                       let _gen_bind_270 = _var_149 _gen_bind_271  in
+                       (_k_269 false) >>
+                         (fun _gen_bind_272  ->
+                            value (_gen_bind_270 _gen_bind_272))))
+         | Effect_Fail  ->
+             (fun (_ : unit)  -> fun (_ : unit -> _ computation)  -> value [])
+         | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
+                                                                   (b ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                    _
+                                                                    computation)
+  } 
 let _queens_274 _number_of_queens_275 =
   let rec _place_276 (_x_277,_qs_278) =
     match _x_277 > _number_of_queens_275 with
@@ -369,9 +440,18 @@ let _queens_274 _number_of_queens_275 =
      in
   _place_276 (1, []) 
 let _queens_one_285 _number_of_queens_286 =
-  (fun _x_204  ->
+  (fun _x_208  ->
      value
-       ((
+       ((let rec _place_44 (_x_46,_qs_45) =
+           match _x_46 > _number_of_queens_286 with
+           | true  -> value _qs_45
+           | false  ->
+               (_choose_255
+                  (_available_240 (_number_of_queens_286, _x_46, _qs_45)))
+                 >>
+                 ((fun _y_47  ->
+                     _place_44 ((_x_46 + 1), ((_x_46, _y_47) :: _qs_45))))
+            in
          let rec _newvar_49 (_x_46,_qs_45) =
            match _x_46 > _number_of_queens_286 with
            | true  -> (fun _  -> _qs_45)
@@ -381,30 +461,40 @@ let _queens_one_285 _number_of_queens_286 =
                  | [] -> (fun _kf_95  -> _kf_95 ())
                  | _x_258::_xs_259 ->
                      (fun _kf_122  ->
-                        (fun _x_205  ->
-                           value
+                        (fun _x_209  ->
+                           (* value *)
                              (_newvar_49
                                 ((_x_46 + 1), ((_x_46, _x_258) :: _qs_45))
-                                _x_205))
-                          (fun _x_206  ->
-                             run
+                                _x_209))
+                          (fun _x_210  ->
+                             (* run *)
                                ((fun ()  ->
-                                   (fun _x_207  ->
-                                      value (_newvar_75 _xs_259 _x_207))
-                                     (fun _x_208  -> (_kf_122 _x_208)))
-                                  _x_206)))
+                                   (fun _x_211  ->
+                                      (* value *) (_newvar_75 _xs_259 _x_211))
+                                     (fun _x_212  -> (* run *) (_kf_122 _x_212)))
+                                  _x_210)))
                   in
-               (fun x -> run (_newvar_75
-                                (_available_240 (_number_of_queens_286, _x_46, _qs_45)) x))
+               _newvar_75
+                 (_available_240 (_number_of_queens_286, _x_46, _qs_45))
             in
-         _newvar_49 (1, [])) _x_204))
-    (fun _x_209  ->
+         _newvar_49 (1, [])) _x_208))
+    (fun _x_213  ->
        run
          ((fun ()  ->
              call Effect_Fail ()
-               (fun _result_36  -> value (_absurd_8 _result_36))) _x_209))
+               (fun _result_36  -> value (_absurd_8 _result_36))) _x_213))
   
 let _queens_all_289 _number_of_queens_290 =
+  let rec _place_131 (_x_133,_qs_132) =
+    match _x_133 > _number_of_queens_290 with
+    | true  -> value _qs_132
+    | false  ->
+        (_choose_255
+           (_available_240 (_number_of_queens_290, _x_133, _qs_132)))
+          >>
+          ((fun _y_134  ->
+              _place_131 ((_x_133 + 1), ((_x_133, _y_134) :: _qs_132))))
+     in
   let rec _newvar_136 (_x_133,_qs_132) =
     match _x_133 > _number_of_queens_290 with
     | true  -> [_qs_132]
