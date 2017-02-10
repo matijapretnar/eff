@@ -72,8 +72,11 @@ let rec ceval env c =
     let h = V.to_handler v in
     h r
 
-  | Typed.Let (lst, c) ->
-    eval_let env lst c
+  | Typed.LetIn (e, a) ->
+    (eval_closure env a) (veval env e)
+
+  | Typed.Bind (c, a) ->
+    sequence (eval_closure env a) (ceval env c)
 
   | Typed.LetRec (defs, c) ->
     let env = extend_let_rec env defs in
@@ -83,13 +86,6 @@ let rec ceval env c =
     let r = ceval env c in
     Print.check ~loc "%t" (Value.print_result r);
     V.unit_result
-
-and eval_let env lst c =
-  match lst with
-  | [] -> ceval env c
-  | (p, d) :: lst ->
-    let r = ceval env d in
-    sequence (fun v -> eval_let (extend p v env) lst c) r
 
 and extend_let_rec env defs =
   let env' = ref env in

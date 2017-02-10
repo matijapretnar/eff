@@ -58,7 +58,6 @@ and plain_expression =
 and computation = (plain_computation, Scheme.dirty_scheme) annotation
 and plain_computation =
   | Value of expression
-  | Let of (pattern * computation) list * computation
   | LetRec of (variable * abstraction) list * computation
   | Match of expression * abstraction list
   | Apply of expression * expression
@@ -209,13 +208,6 @@ and refresh_comp' sbst = function
     Bind (refresh_comp sbst c1, refresh_abs sbst c2)
   | LetIn (e, a) ->
     LetIn (refresh_expr sbst e, refresh_abs sbst a)
-  | Let (li, c1) ->
-    let sbst', li' = List.fold_right (fun (p, c) (sbst', li') ->
-        (* sbst' is what will be used for c1, but for definitons c, we use sbst *)
-        let sbst', p' = refresh_pattern sbst' p in
-        sbst', (p', refresh_comp sbst c) :: li'
-      ) li (sbst, []) in
-    Let (li', refresh_comp sbst' c1)
   | LetRec (li, c1) ->
     let new_xs, sbst' = List.fold_right (fun (x, _) (new_xs, sbst') ->
         let x' = Variable.refresh x in
@@ -280,13 +272,6 @@ and subst_comp' sbst = function
     Bind (subst_comp sbst c1, subst_abs sbst c2)
   | LetIn (e, a) ->
     LetIn (subst_expr sbst e, subst_abs sbst a)
-  | Let (li, c1) ->
-    let li' = List.map (fun (p, c) ->
-        (* XXX Should we check that p & sbst have disjoint variables? *)
-        (p, subst_comp sbst c)
-      ) li
-    in
-    Let (li', subst_comp sbst c1)
   | LetRec (li, c1) ->
     let li' = List.map (fun (x, a) ->
         (* XXX Should we check that x does not appear in sbst? *)
@@ -365,13 +350,6 @@ and remove_rec_comp (poly_tys, constraints) c =
       Bind (remove_rec_comp st c1, remove_rec_abs st c2)
     | LetIn (e, a) ->
       LetIn (remove_rec_expr st e, remove_rec_abs st a)
-    | Let (li, c1) ->
-      let li' = List.map (fun (p, c) ->
-          (* XXX Should we check that p & st have disjoint variables? *)
-          (p, remove_rec_comp st c)
-        ) li
-      in
-      Let (li', remove_rec_comp st c1)
     | LetRec (li, c1) ->
       let li' = List.map (fun (x, a) ->
           (* XXX Should we check that x does not appear in st? *)
@@ -450,13 +428,6 @@ and less_context_comp (poly_tys, constraints) c =
       Bind (less_context_comp st c1, less_context_abs st c2)
     | LetIn (e, a) ->
       LetIn (less_context_expr st e, less_context_abs st a)
-    | Let (li, c1) ->
-      let li' = List.map (fun (p, c) ->
-          (* XXX Should we check that p & st have disjoint variables? *)
-          (p, less_context_comp st c)
-        ) li
-      in
-      Let (li', less_context_comp st c1)
     | LetRec (li, c1) ->
       let li' = List.map (fun (x, a) ->
           (* XXX Should we check that x does not appear in st? *)
@@ -534,13 +505,6 @@ and push_constraints_comp' st = function
       Bind (push_constraints_comp st c1, push_constraints_abs st c2)
     | LetIn (e, a) ->
       LetIn (push_constraints_expr st e, push_constraints_abs st a)
-    | Let (li, c1) ->
-      let li' = List.map (fun (p, c) ->
-          (* XXX Should we check that p & st have disjoint variables? *)
-          (p, push_constraints_comp st c)
-        ) li
-      in
-      Let (li', push_constraints_comp st c1)
     | LetRec (li, c1) ->
       let li' = List.map (fun (x, a) ->
           (* XXX Should we check that x does not appear in st? *)
@@ -640,19 +604,6 @@ and alphaeq_comp' eqvars c c' =
     alphaeq_comp eqvars c1 c1' && alphaeq_abs eqvars c2 c2'
   | LetIn (e, a), LetIn (e', a') ->
     alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a'
-  | Let (li, c1), Let (li', c1') ->
-    let eqvars' = List.fold_right2 (fun (p, c) (p', c') -> function
-        | None -> None
-        | Some eqvars' ->
-          begin match make_equal_pattern eqvars' p p' with
-            | Some eqvars' when alphaeq_comp eqvars c c' -> Some eqvars'
-            | _ -> None
-          end
-      ) li li' (Some eqvars) in
-    begin match eqvars' with
-      | None -> false
-      | Some eqvars' -> alphaeq_comp eqvars' c1 c1'
-    end
   | LetRec (li, c1), LetRec (li', c1') ->
     (* XXX Not yet implemented *)
     false
@@ -1000,7 +951,7 @@ let let_defs ~loc defs =
       match c.term with
       | Value _ ->
         ctx_p @ poly_tys, nonpoly_tys
-      | Apply _ | Match _ | Handle _ | Let _ | LetRec _
+      | Apply _ | Match _ | Handle _ | LetRec _
       | Check _ | Bind _ | LetIn _ | Call _ ->
         poly_tys, ctx_p @ nonpoly_tys
     in
@@ -1020,24 +971,6 @@ let let_defs ~loc defs =
       ] @ chngs)
   in
   defs, poly_tyschs, nonpoly_tys, change
-
-let let' ?loc defs c =
-  let loc = backup_location loc (
-      List.fold_right (fun (p, c) locs -> p.location :: c.location :: locs) defs [c.location]
-    )
-  in
-  let defs', poly_tyschs, nonpoly_tys, change = let_defs ~loc defs in
-  let change2 (ctx_c, drty_c, cnstrs_c) =
-    Scheme.finalize_dirty_scheme ~loc (ctx_c) drty_c ([
-        Scheme.remove_context ~loc nonpoly_tys;
-        Scheme.just cnstrs_c
-      ])
-  in
-  {
-    term = Let (defs', c);
-    scheme = change2 (change (c.scheme));
-    location = loc;
-  }
 
 let let_rec_defs ~loc defs =
   let add_binding (x, a) (poly_tys, ctx, chngs, defs) =
@@ -1108,6 +1041,12 @@ let let_in ?loc e1 {term = (p, c2)} =
     location = loc;
   }
 
+let let' ?loc defs c =
+  List.fold_right (fun (p_def, c_def) binds ->
+    match c_def.term with
+    | Value e_def -> let_in e_def (abstraction p_def binds)
+    | _ ->  bind c_def (abstraction p_def binds)
+  ) defs c
 
 let call ?loc ((eff_name, (ty_par, ty_res)) as eff) e a =
   let loc = backup_location loc [e.location; a.location] in
@@ -1177,11 +1116,6 @@ let concat_vars vars = List.fold_right (@@@) vars ([], [])
 let rec free_vars_comp c =
   match c.term with
   | Value e -> free_vars_expr e
-  | Let (li, cf) ->
-    let xs, vars = List.fold_right (fun (p, c) (xs, vars) ->
-        pattern_vars p, free_vars_comp c @@@ vars
-      ) li ([], ([], [])) in
-    vars @@@ (free_vars_comp cf --- xs)
   | LetRec (li, c1) ->
     let xs, vars = List.fold_right (fun (x, a) (xs, vars) ->
         x :: xs, free_vars_abs a @@@ vars
@@ -1284,8 +1218,6 @@ and print_computation ?max_level c ppf =
     print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e) (Print.cases print_abstraction lst)
   | Handle (e, c) ->
     print ~at_level:1 "handle %t %t" (print_expression ~max_level:0 e) (print_computation ~max_level:0 c)
-  | Let (lst, c) ->
-    print ~at_level:2 "%t" (print_multiple_bind (lst, c))
   | LetRec (lst, c) ->
     print ~at_level:2 "let rec @[<hov>%t@] in %t"
       (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
@@ -1313,13 +1245,6 @@ and print_abstraction {term = (p, c)} ppf =
 
 and print_pure_abstraction {term = (p, e)} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_expression e)
-
-and print_multiple_bind (lst, c') ppf =
-  match lst with
-  | [] -> Format.fprintf ppf "%t" (print_computation c')
-  | (p, c) :: lst ->
-    Format.fprintf ppf "%t >> fun %t -> %t"
-      (print_computation c) (print_pattern p) (print_multiple_bind (lst, c'))
 
 and print_let_abstraction (p, c) ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)

@@ -47,8 +47,6 @@ and print_computation ?max_level c ppf =
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e) (Print.cases print_abstraction lst)
   | Typed.Handle (e, c) ->
       print ~at_level:1 "%t %t" (print_expression ~max_level:0 e) (print_computation ~max_level:0 c)
-  | Typed.Let (lst, c) ->
-      print ~at_level:2 "%t" (print_multiple_bind (lst, c))
   | Typed.LetRec (lst, c) ->
       print ~at_level:2 "let rec @[<hov>%t@] in %t"
       (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
@@ -73,13 +71,6 @@ and print_effect_clauses eff_clauses ppf =
 
 and print_abstraction {Typed.term = (p, c)} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
-
-and print_multiple_bind (lst, c') ppf =
-  match lst with
-  | [] -> Format.fprintf ppf "%t" (print_computation c')
-  | (p, c) :: lst ->
-      Format.fprintf ppf "%t >> fun %t -> %t"
-      (print_computation c) (print_pattern p) (print_multiple_bind (lst, c'))
 
 and print_let_abstraction (p, c) ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)

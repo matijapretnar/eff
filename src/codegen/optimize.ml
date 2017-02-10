@@ -283,8 +283,6 @@ and optimize_sub_comp st c =
   match c.term with
   | Value e ->
     value ~loc (optimize_expr st e)
-  | Let (li, c1) ->
-    let' ~loc (Common.assoc_map (optimize_comp st) li) (optimize_comp st c1)
   
   | LetRec (defs, c1) when different_branch_specialized defs st ->
     (* List.fold_right (fun (var,abs) st ->
@@ -369,14 +367,6 @@ and reduce_comp st c =
   let c' = match c.term with
 
   | _ when outOfFuel st -> c
-
-  (* Convert simultaneous let into a sequence of binds *)
-  | Let (defs, c) ->
-    useFuel;
-    let binds = List.fold_right (fun (p_def, c_def) binds ->
-        bind c_def (abstraction p_def binds)
-      ) defs c in
-    reduce_comp st binds
 
   | Match ({term = Const cst}, cases) ->
     let rec find_const_case = function
