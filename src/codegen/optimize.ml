@@ -482,6 +482,10 @@ and reduce_comp st c =
     useFuel st;
     beta_reduce st a e
 
+  | Apply ({term = Pure {term = LetRec (defs,c)}}, e) ->
+    useFuel st;
+    let_rec' defs (apply (pure c) e)
+
   | Apply ({term = Var v}, e2) ->
     begin match Common.lookup v st.impure_wrappers with
       | Some f ->
