@@ -761,22 +761,16 @@ let handler ?loc h =
   let drt_out = Type.fresh_dirt () in
   let ty_out = Type.fresh_ty () in
 
-  let fold ((_, (ty_par, ty_arg)), a2) (ctx, constraints, less_contexts) =
+  let fold ((_, (ty_par, ty_arg)), a2) (ctx, constraints) =
     let ctx_a, (ty_p, ty_k, drty_c), cnstrs_a = a2.scheme in
     let (_, p2, _) = a2.term in
-    let less_context = match p2.term with
-    | PVar k -> fun drty -> [(k, Type.Arrow (ty_arg, drty))]
-    | PNonbinding -> fun _ -> []
-    | _ -> assert false
-    in
     ctx_a @ ctx,
     Constraints.list_union [constraints; cnstrs_a]
     |> Constraints.add_ty_constraint ~loc ty_par ty_p
     |> Constraints.add_ty_constraint ~loc (Type.Arrow (ty_arg, (ty_out, drt_out))) ty_k
-    |> Constraints.add_dirty_constraint ~loc drty_c (ty_out, drt_out),
-    less_context :: less_contexts
+    |> Constraints.add_dirty_constraint ~loc drty_c (ty_out, drt_out)
   in
-  let ctxs, constraints, less_contexts = List.fold_right fold h.effect_clauses ([], Constraints.empty, []) in
+  let ctxs, constraints = List.fold_right fold h.effect_clauses ([], Constraints.empty) in
 
   let make_dirt (eff, _) (effs_in, effs_out) =
     let r_in = Params.fresh_region_param () in
@@ -802,11 +796,8 @@ let handler ?loc h =
   let ty_sch = (ctx_val @ ctxs, Type.Handler((ty_in, drt_in), (ty_out, drt_out)), constraints) in
   let scheme = Scheme.clean_ty_scheme ~loc ty_sch in
   let (ctx, Type.Handler(_, drty), constraints) = scheme in
-  let effect_clauses = List.map2 (fun less_ctx (op, a2) ->
-    (op, less_context_abs2 (less_ctx drty, constraints) a2)
-  ) less_contexts h.effect_clauses in
   {
-    term = Handler {h with effect_clauses};
+    term = Handler h;
     scheme = scheme;
     location = loc;
   }
