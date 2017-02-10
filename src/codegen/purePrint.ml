@@ -284,18 +284,20 @@ and print_computation' ?max_level c ppf =
     print ~at_level:1 "%t %t"
       (print_expression ~max_level:0 e)
       (print_computation ~max_level:0 c)
-  | Typed.LetRec (lst, c) ->
+  | Typed.LetRec (lst, c') ->
+    let expected_shape = shape_of_dirty_scheme c.Typed.scheme in
     print ~at_level:2 "let rec @[<hov>%t@] in %t"
-      (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
+      (Print.sequence " and " print_let_rec_abstraction lst) (print_computation ~expected_shape c')
   | Typed.Call (eff, e, a) ->
     let expected_shape = shape_of_dirty_scheme c.Typed.scheme in
     print ~at_level:1 "call %t %t (@[fun %t@])"
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction ~expected_shape a)
   | Typed.Bind (c1, {Typed.term = (p, c2)}) when Scheme.is_pure c1.Typed.scheme ->
+    let expected_shape = shape_of_dirty_scheme c.Typed.scheme in
     print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t"
       (print_pattern p)
       (print_computation ~max_level:0 c1)
-      (print_computation c2)
+      (print_computation ~expected_shape c2)
   | Typed.Bind (c1, a) ->
     let expected_shape = shape_of_dirty_scheme c.Typed.scheme in
     print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]"
