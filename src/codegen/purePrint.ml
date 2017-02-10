@@ -138,7 +138,7 @@ let rec print_ty_conversion ?(max_level=100000) conv term ppf =
   | TyIdentity ->
       (term max_level) ppf
   | Lift (conv1, conv2) ->
-      let x = Typed.Variable.fresh "x" in
+      let x = Typed.Variable.fresh "lift_fun" in
           print ~at_level:2 "(* both *)fun %t -> %t"
                 (print_variable x)
                 (print_dirty_conversion conv2
@@ -148,7 +148,7 @@ let rec print_ty_conversion ?(max_level=100000) conv term ppf =
                 )
               )
   | LiftHandler (conv1, conv2) ->
-      let x = Typed.Variable.fresh "x" in
+      let x = Typed.Variable.fresh "lift_handler" in
           print ~at_level:2 "(* both *)fun %t -> %t"
                 (print_variable x)
                 (print_dirty_conversion conv2
@@ -158,7 +158,7 @@ let rec print_ty_conversion ?(max_level=100000) conv term ppf =
                 )
               )
   | Tuple convs ->
-      let xs = List.mapi (fun i conv -> (Typed.Variable.fresh ("x" ^ string_of_int i), conv)) convs in
+      let xs = List.mapi (fun i conv -> (Typed.Variable.fresh ("comp" ^ string_of_int i), conv)) convs in
       print ~at_level:2 "let (%t) = %t in (%t)"
         (Print.sequence ", " print_variable (List.map fst xs))
         (term 100000000)
