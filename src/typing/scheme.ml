@@ -111,12 +111,14 @@ let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
   (ctx, drty, cnstrs)
 
 let expand_ty_scheme (ctx, ty, constraints) =
-  (Common.assoc_map Constraints.expand_ty ctx, Constraints.expand_ty ty, constraints)
+  (Common.assoc_map Constraints.expand_ty ctx,
+  Constraints.expand_ty ty,
+  Constraints.expand_constraints constraints)
 
 let expand_dirty_scheme (ctx, (ty, drt), constraints) = (
   Common.assoc_map Constraints.expand_ty ctx,
   (Constraints.expand_ty ty, Constraints.expand_dirt drt),
-  constraints
+  Constraints.expand_constraints constraints
 )
 
 let create_ty_scheme ctx ty changes =

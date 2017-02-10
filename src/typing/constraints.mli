@@ -36,3 +36,4 @@ val non_empty_dirts : t -> Params.dirt_param list
 val non_empty_regions : t -> Params.region_param list
 
 val print : t -> Format.formatter -> unit
+val expand_constraints : t -> t

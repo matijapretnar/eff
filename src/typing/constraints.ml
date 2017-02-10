@@ -281,6 +281,14 @@ let empty = {
   full_regions = FullRegions.empty;
 }
 
+let expand_constraints constraints =
+  let loc = Location.unknown in
+  empty
+  |> TyPoset.fold (fun t1 t2 -> add_ty_constraint ~loc (Type.Param t1) (Type.Param t2)) constraints.ty_poset
+  |> DirtPoset.fold (fun d1 d2 -> add_dirt_constraint (Type.simple_dirt d1) (Type.simple_dirt d2)) constraints.dirt_poset
+  |> RegionPoset.fold add_region_param_constraint constraints.region_poset
+  |> FullRegions.fold add_full_region constraints.full_regions
+
 let union constraints1 constraints2 =
   {
     ty_poset = TyPoset.merge constraints1.ty_poset constraints2.ty_poset;
