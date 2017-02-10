@@ -345,7 +345,7 @@ and print_multiple_bind (lst, c') ppf =
       Format.fprintf ppf "let %t = %t in %t"
         (print_pattern p) (print_computation c) (print_multiple_bind (lst, c'))
   | (p, c) :: lst ->
-      Format.fprintf ppf "%t >> fun %t -> %t"
+      Format.fprintf ppf "(%t) >> (fun %t -> %t)"
         (print_computation c) (print_pattern p) (print_multiple_bind (lst, c'))
 
 and print_top_let_abstraction (p, c) ppf =
