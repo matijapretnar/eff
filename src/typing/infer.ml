@@ -256,7 +256,7 @@ let infer_toplevel ~loc st = function
   | Untyped.TopLet defs ->
     (* XXX What to do about the dirts? *)
     let env', vars, defs', change = type_top_let_defs ~loc st.typing defs in
-    let defs' = Common.assoc_map (Typed.push_constraints_comp Constraints.empty) defs' in
+    let defs' = Common.assoc_map (Typed.wrap_up_comp Typed.initial_wrap_up_state) defs' in
     let top_change = Common.compose st.change change in
     let sch_change (ctx, ty, cnstrs) =
       let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
@@ -270,7 +270,7 @@ let infer_toplevel ~loc st = function
   | Untyped.TopLetRec defs'' ->
     let env', vars, defs', change = type_top_let_rec_defs ~loc st.typing defs'' in
     let env', vars, defs', change = type_top_let_rec_defs ~loc env' defs'' in
-    let defs' = Common.assoc_map (Typed.push_constraints_abs Constraints.empty) defs' in
+    let defs' = Common.assoc_map (Typed.wrap_up_abs Typed.initial_wrap_up_state) defs' in
     let top_change = Common.compose st.change change in
     let sch_change (ctx, ty, cnstrs) =
       let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
@@ -288,7 +288,7 @@ let infer_toplevel ~loc st = function
     Typed.DefEffect ((eff, (ty1, ty2)), (ty1, ty2)), st
   | Untyped.Computation c ->
     let c, st = infer_top_comp st c in
-    let c = Typed.push_constraints_comp Constraints.empty c in
+    let c = Typed.wrap_up_comp Typed.initial_wrap_up_state c in
     Typed.Computation c, st
   | Untyped.Use fn ->
     Typed.Use fn, st
@@ -300,7 +300,7 @@ let infer_toplevel ~loc st = function
     Typed.Quit, st
   | Untyped.TypeOf c ->
     let c, st = infer_top_comp st c in
-    let c = Typed.push_constraints_comp Constraints.empty c in
+    let c = Typed.wrap_up_comp Typed.initial_wrap_up_state c in
     Typed.TypeOf c, st
 
 

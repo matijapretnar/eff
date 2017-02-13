@@ -304,257 +304,101 @@ and subst_abs sbst a =
 and subst_abs2 sbst a2 =
   a2a2 @@ subst_abs sbst @@ a22a @@ a2
 
+
 type wrap_up_state = {
   constraints: Constraints.t;
   trim_context: Scheme.context; 
+  less_context: Scheme.context; 
 }
+
 let initial_wrap_up_state = {
   constraints = Constraints.empty;
   trim_context = [];
+  less_context = [];
 }
 
-let rec remove_rec_expr  e =
+let rec wrap_up_expr st e =
   let ctx, ty, cnstrs = e.scheme in
   let joint_cnstrs = Constraints.union cnstrs st.constraints in
   let scheme =
     Scheme.finalize_ty_scheme ~collect:false ~loc:e.location ctx ty [
       Scheme.just joint_cnstrs;
-      Scheme.trim_context ~loc:e.location st.trim_context
+      Scheme.less_context ~loc:e.location st.less_context;
+      Scheme.trim_context ~loc:e.location st.trim_context;
     ]
   in
-  let st = {st with constraints}
+  let st = {st with constraints = joint_cnstrs} in
   {
-    e with term = remove_rec_expr' (poly_tys, joint_cnstrs) e.term;
+    e with term = wrap_up_expr' st e.term;
            scheme
   }
-and remove_rec_expr' st = function
+and wrap_up_expr' st = function
   | Pure c ->
-    Pure (remove_rec_comp st c)
+    Pure (wrap_up_comp st c)
   | Lambda a ->
-    Lambda (remove_rec_abs st a)
+    Lambda (wrap_up_abs st a)
   | Handler h ->
-    Handler (remove_rec_handler st h)
+    Handler (wrap_up_handler st h)
   | FinallyHandler h ->
-    FinallyHandler (remove_rec_finally_handler st h)
+    FinallyHandler (wrap_up_finally_handler st h)
   | Tuple es ->
-    Tuple (List.map (remove_rec_expr st) es)
+    Tuple (List.map (wrap_up_expr st) es)
   | Record flds ->
-    Record (Common.assoc_map (remove_rec_expr st) flds)
+    Record (Common.assoc_map (wrap_up_expr st) flds)
   | Variant (lbl, e) ->
-    Variant (lbl, Common.option_map (remove_rec_expr st) e)
+    Variant (lbl, Common.option_map (wrap_up_expr st) e)
   | (Var _ | BuiltIn _ | Const _ | Effect _) as e -> e
-and remove_rec_comp (poly_tys, constraints) c =
+and wrap_up_comp st c =
   let ctx, ty, cnstrs = c.scheme in
-  let joint_cnstrs = Constraints.union cnstrs constraints in
+  let joint_cnstrs = Constraints.union cnstrs st.constraints in
   let scheme =
     Scheme.finalize_dirty_scheme ~collect:false ~loc:c.location ctx ty [
       Scheme.just joint_cnstrs;
-      Scheme.trim_context ~loc:c.location poly_tys
+      Scheme.less_context ~loc:c.location st.less_context;
+      Scheme.trim_context ~loc:c.location st.trim_context
     ]
   in
+  let st = {st with constraints = joint_cnstrs} in
   {
-    c with term = remove_rec_comp' (poly_tys, joint_cnstrs) c.term;
+    c with term = wrap_up_comp' st c.term;
            scheme
-  }and remove_rec_comp' st = function
+  }
+and wrap_up_comp' st = function
     | Bind (c1, c2) ->
-      Bind (remove_rec_comp st c1, remove_rec_abs st c2)
+      Bind (wrap_up_comp st c1, wrap_up_abs st c2)
     | LetIn (e, a) ->
-      LetIn (remove_rec_expr st e, remove_rec_abs st a)
+      LetIn (wrap_up_expr st e, wrap_up_abs st a)
     | LetRec (li, c1) ->
       let li' = List.map (fun (x, a) ->
           (* XXX Should we check that x does not appear in st? *)
-          (x, remove_rec_abs st a)
+          (x, wrap_up_abs st a)
         ) li
       in
-      LetRec (li', remove_rec_comp st c1)
+      LetRec (li', wrap_up_comp st c1)
     | Match (e, li) ->
-      Match (remove_rec_expr st e, List.map (remove_rec_abs st) li)
+      Match (wrap_up_expr st e, List.map (wrap_up_abs st) li)
     | Apply (e1, e2) ->
-      Apply (remove_rec_expr st e1, remove_rec_expr st e2)
+      Apply (wrap_up_expr st e1, wrap_up_expr st e2)
     | Handle (e, c) ->
-      Handle (remove_rec_expr st e, remove_rec_comp st c)
+      Handle (wrap_up_expr st e, wrap_up_comp st c)
     | Check c ->
-      Check (remove_rec_comp st c)
+      Check (wrap_up_comp st c)
     | Call (eff, e, a) ->
-      Call (eff, remove_rec_expr st e, remove_rec_abs st a)
+      Call (eff, wrap_up_expr st e, wrap_up_abs st a)
     | Value e ->
-      Value (remove_rec_expr st e)
-and remove_rec_handler st h = {
-  effect_clauses = Common.assoc_map (remove_rec_abs2 st) h.effect_clauses;
-  value_clause = remove_rec_abs st h.value_clause;
+      Value (wrap_up_expr st e)
+and wrap_up_handler st h = {
+  effect_clauses = Common.assoc_map (wrap_up_abs2 st) h.effect_clauses;
+  value_clause = wrap_up_abs st h.value_clause;
 }
-and remove_rec_finally_handler st (h, finally_clause) =
-  (remove_rec_handler st h, remove_rec_abs st finally_clause)
-and remove_rec_abs st a = 
+and wrap_up_finally_handler st (h, finally_clause) =
+  (wrap_up_handler st h, wrap_up_abs st finally_clause)
+and wrap_up_abs st a = 
   let (p, c) = a.term in
   (* XXX Should we check that p & st have disjoint variables? *)
-  {a with term = (p, remove_rec_comp st c)}
-and remove_rec_abs2 st a2 =
-  a2a2 @@ remove_rec_abs st @@ a22a @@ a2
-
-let rec less_context_expr (poly_tys, constraints) e =
-  let ctx, ty, cnstrs = e.scheme in
-  let joint_cnstrs = Constraints.union cnstrs constraints in
-  let scheme =
-    Scheme.finalize_ty_scheme ~collect:false ~loc:e.location ctx ty [
-      Scheme.just joint_cnstrs;
-      Scheme.less_context ~loc:e.location poly_tys
-    ]
-  in
-  {
-    e with term = less_context_expr' (poly_tys, joint_cnstrs) e.term;
-           scheme
-  }
-and less_context_expr' st = function
-  | Pure c ->
-    Pure (less_context_comp st c)
-  | Lambda a ->
-    Lambda (less_context_abs st a)
-  | Handler h ->
-    Handler (less_context_handler st h)
-  | FinallyHandler h ->
-    FinallyHandler (less_context_finally_handler st h)
-  | Tuple es ->
-    Tuple (List.map (less_context_expr st) es)
-  | Record flds ->
-    Record (Common.assoc_map (less_context_expr st) flds)
-  | Variant (lbl, e) ->
-    Variant (lbl, Common.option_map (less_context_expr st) e)
-  | (Var _ | BuiltIn _ | Const _ | Effect _) as e -> e
-and less_context_comp (poly_tys, constraints) c =
-  let ctx, ty, cnstrs = c.scheme in
-  let joint_cnstrs = Constraints.union cnstrs constraints in
-  let scheme =
-    Scheme.finalize_dirty_scheme ~collect:false ~loc:c.location ctx ty [
-      Scheme.just joint_cnstrs;
-      Scheme.less_context ~loc:c.location poly_tys
-    ]
-  in
-  {
-    c with term = less_context_comp' (poly_tys, joint_cnstrs) c.term;
-           scheme
-  }and less_context_comp' st = function
-    | Bind (c1, c2) ->
-      Bind (less_context_comp st c1, less_context_abs st c2)
-    | LetIn (e, a) ->
-      LetIn (less_context_expr st e, less_context_abs st a)
-    | LetRec (li, c1) ->
-      let li' = List.map (fun (x, a) ->
-          (* XXX Should we check that x does not appear in st? *)
-          (x, less_context_abs st a)
-        ) li
-      in
-      LetRec (li', less_context_comp st c1)
-    | Match (e, li) ->
-      Match (less_context_expr st e, List.map (less_context_abs st) li)
-    | Apply (e1, e2) ->
-      Apply (less_context_expr st e1, less_context_expr st e2)
-    | Handle (e, c) ->
-      Handle (less_context_expr st e, less_context_comp st c)
-    | Check c ->
-      Check (less_context_comp st c)
-    | Call (eff, e, a) ->
-      Call (eff, less_context_expr st e, less_context_abs st a)
-    | Value e ->
-      Value (less_context_expr st e)
-and less_context_handler st h = {
-  effect_clauses = Common.assoc_map (less_context_abs2 st) h.effect_clauses;
-  value_clause = less_context_abs st h.value_clause;
-}
-and less_context_finally_handler st (h, finally_clause) =
-  (less_context_handler st h, less_context_abs st finally_clause)
-and less_context_abs st a = 
-  let (p, c) = a.term in
-  (* XXX Should we check that p & st have disjoint variables? *)
-  {a with term = (p, less_context_comp st c)}
-and less_context_abs2 st a2 =
-  a2a2 @@ less_context_abs st @@ a22a @@ a2
-
-let rec push_constraints_expr constraints e =
-  let ctx, ty, cnstrs = e.scheme in
-  let joint_cnstrs = Constraints.union cnstrs constraints in
-  let scheme =
-    Scheme.finalize_ty_scheme ~collect:false ~loc:e.location ctx ty [
-      Scheme.just joint_cnstrs;
-    ]
-  in
-  {
-    e with term = push_constraints_expr' scheme joint_cnstrs e.term;
-           scheme
-  }
-and push_constraints_expr' scheme st = function
-  | Pure c ->
-    Pure (push_constraints_comp st c)
-  | Lambda a ->
-    Lambda (push_constraints_abs st a)
-  | Handler h ->
-    Handler (push_constraints_handler scheme st h)
-  | FinallyHandler (h, finally) ->
-    FinallyHandler (push_constraints_finally_handler scheme st (h, finally))
-  | Tuple es ->
-    Tuple (List.map (push_constraints_expr st) es)
-  | Record flds ->
-    Record (Common.assoc_map (push_constraints_expr st) flds)
-  | Variant (lbl, e) ->
-    Variant (lbl, Common.option_map (push_constraints_expr st) e)
-  | (Var _ | BuiltIn _ | Const _ | Effect _) as e -> e
-and push_constraints_comp constraints c =
-  let ctx, ty, cnstrs = c.scheme in
-  let joint_cnstrs = Constraints.union cnstrs constraints in
-  let scheme =
-    Scheme.finalize_dirty_scheme ~collect:false ~loc:c.location ctx ty [
-      Scheme.just joint_cnstrs;
-    ]
-  in
-  {
-    c with term = push_constraints_comp' joint_cnstrs c.term;
-           scheme
-  }
-and push_constraints_comp' st = function
-    | Bind (c1, c2) ->
-      Bind (push_constraints_comp st c1, push_constraints_abs st c2)
-    | LetIn (e, a) ->
-      LetIn (push_constraints_expr st e, push_constraints_abs st a)
-    | LetRec (li, c1) ->
-      let li' = List.map (fun (x, a) ->
-          (* XXX Should we check that x does not appear in st? *)
-          (x, push_constraints_abs st a)
-        ) li
-      in
-      LetRec (li', push_constraints_comp st c1)
-    | Match (e, li) ->
-      Match (push_constraints_expr st e, List.map (push_constraints_abs st) li)
-    | Apply (e1, e2) ->
-      Apply (push_constraints_expr st e1, push_constraints_expr st e2)
-    | Handle (e, c) ->
-      Handle (push_constraints_expr st e, push_constraints_comp st c)
-    | Check c ->
-      Check (push_constraints_comp st c)
-    | Call (eff, e, a) ->
-      Call (eff, push_constraints_expr st e, push_constraints_abs st a)
-    | Value e ->
-      Value (push_constraints_expr st e)
-and push_constraints_handler scheme st h =
-{
-  effect_clauses = Common.assoc_map (push_constraints_abs2 scheme st) h.effect_clauses;
-  value_clause = push_constraints_abs st h.value_clause;
-}
-and push_constraints_finally_handler scheme st (h, finally_clause) =
-  (push_constraints_handler scheme st h, push_constraints_abs st finally_clause)
-and push_constraints_abs st a = 
-  let (p, c) = a.term in
-  (* XXX Should we check that p & st have disjoint variables? *)
-  {a with term = (p, push_constraints_comp st c)}
-and push_constraints_abs2 scheme st ({term = (p, k, c)} as a2) =
-  let st = match k with
-  | {term = PNonbinding} -> st
-  | {term = PVar k} ->
-      let (ctx, _, _) = c.scheme in
-      let (Some (Type.Arrow (ty, _))) = Common.lookup k ctx in
-      let (_, Type.Handler (_, drty), _) = scheme in
-      Constraints.add_st
-  in
-  a2a2 @@ push_constraints_abs st @@ a22a @@ a2
+  {a with term = (p, wrap_up_comp st c)}
+and wrap_up_abs2 st a2 =
+  a2a2 @@ wrap_up_abs st @@ a22a @@ a2
 
 
 let assoc_equal eq flds flds' : bool =
@@ -1005,7 +849,7 @@ let let_rec_defs ~loc defs =
         Scheme.just cnstrs_c;
       ] @ chngs)
   in
-  let defs = Common.assoc_map (remove_rec_abs (poly_tys, constraints)) defs in
+  let defs = Common.assoc_map (wrap_up_abs {initial_wrap_up_state with trim_context = poly_tys; constraints}) defs in
   defs, poly_tyschs, change
 
 
