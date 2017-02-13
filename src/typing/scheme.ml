@@ -290,19 +290,28 @@ let polymorphic_dirt (ctx, ty, cnstrs) =
 
 let poly_op = "*poly*"
 
-let tag_polymorphic_dirt tysch =
+let tag_polymorphic_dirt' tysch =
   let tysch = refresh tysch in
-  let r = Params.fresh_region_param ()
-  and d = Params.fresh_dirt_param ()
-  and ds = polymorphic_dirt tysch in
-  let drt = {Type.ops = [poly_op, r]; Type.rest = d} in
+  let ds = polymorphic_dirt tysch in
+  let rs = List.map (fun d ->
+    let {Type.ops=ops; rest} = Constraints.expand_dirt (Type.simple_dirt d) in
+    match Common.lookup poly_op ops with
+    | Some r -> add_full_region r
+    | None ->
+        let r = Params.fresh_region_param ()
+        and d' = Params.fresh_dirt_param () in
+        let drt = {Type.ops = [poly_op, r]; Type.rest = d'} in
+        dirt_less drt (Type.simple_dirt d)
+  ) ds
+  in
   let (ctx, ty, cnstrs) = tysch in
   (* Print.debug "BEFORE: %t" (print_ty_scheme tysch); *)
   let tysch =
   finalize_ty_scheme ~loc:Location.unknown ctx ty (
-    List.map (fun d -> dirt_less drt (Type.simple_dirt d)) ds @ [
-    just cnstrs;
-    add_full_region r
+    rs @ [
+    just cnstrs
   ]) in
   (* Print.debug "AFTER: %t" (print_ty_scheme tysch); *)
   tysch
+
+let tag_polymorphic_dirt tysch = tag_polymorphic_dirt' (tag_polymorphic_dirt' tysch)
