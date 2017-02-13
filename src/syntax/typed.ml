@@ -801,7 +801,6 @@ let handler ?loc h =
 
   let ty_sch = (ctx_val @ ctxs, Type.Handler((ty_in, drt_in), (ty_out, drt_out)), constraints) in
   let scheme = Scheme.clean_ty_scheme ~loc ty_sch in
-  let scheme = Scheme.tag_polymorphic_dirt scheme in
   let (ctx, Type.Handler(_, drty), constraints) = scheme in
   {
     term = Handler h;
@@ -969,6 +968,7 @@ let let_defs ~loc defs =
         Scheme.just cnstrs_c;
       ] @ chngs)
   in
+  let poly_tyschs = Common.assoc_map Scheme.tag_polymorphic_dirt poly_tyschs in
   defs, poly_tyschs, nonpoly_tys, change
 
 let let_rec_defs ~loc defs =
@@ -989,6 +989,7 @@ let let_rec_defs ~loc defs =
       ] @ chngs)
   in
   let defs = Common.assoc_map (wrap_up_abs {initial_wrap_up_state with trim_context = poly_tys; constraints}) defs in
+  let poly_tyschs = Common.assoc_map Scheme.tag_polymorphic_dirt poly_tyschs in
   defs, poly_tyschs, change
 
 

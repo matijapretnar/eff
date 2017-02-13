@@ -204,19 +204,16 @@ and type_handler env h =
 and type_let_defs ~loc env defs =
   let defs' = List.map (fun (p, c) -> (type_pattern p, type_comp env c)) defs in
   let defs'', poly_tyschs, _, _ = Typed.let_defs ~loc defs' in
-  let poly_tyschs = Common.assoc_map Scheme.tag_polymorphic_dirt poly_tyschs in
   let env' = extend_env poly_tyschs env in
   env', defs''
 and type_let_rec_defs ~loc env defs =
   let defs' = Common.assoc_map (type_abstraction env) defs in
   let defs'', poly_tyschs, _ = Typed.let_rec_defs ~loc defs' in
-  let poly_tyschs = Common.assoc_map Scheme.tag_polymorphic_dirt poly_tyschs in
   let env' = extend_env poly_tyschs env in
   env', defs''
 and type_top_let_defs ~loc env defs =
   let defs' = List.map (fun (p, c) -> (type_pattern p, type_comp env c)) defs in
   let defs'', poly_tyschs, nonpoly_tys, change = Typed.let_defs ~loc defs' in
-  let poly_tyschs = Common.assoc_map Scheme.tag_polymorphic_dirt poly_tyschs in
   let env' = extend_env poly_tyschs env in
   let extend_nonpoly (x, ty) env =
     (x, ([(x, ty)], ty, Constraints.empty)) :: env
@@ -226,7 +223,6 @@ and type_top_let_defs ~loc env defs =
 and type_top_let_rec_defs ~loc env defs =
   let defs' = Common.assoc_map (type_abstraction env) defs in
   let defs'', poly_tyschs, change = Typed.let_rec_defs ~loc defs' in
-  let poly_tyschs = Common.assoc_map Scheme.tag_polymorphic_dirt poly_tyschs in
   let env' = extend_env poly_tyschs env in
   env', poly_tyschs, defs'', change
 
