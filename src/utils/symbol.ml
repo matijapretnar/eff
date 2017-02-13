@@ -59,5 +59,5 @@ struct
   let print ?(safe=false) (n, ann, special) ppf =
     Format.fprintf ppf "%t%s" (Annot.print safe ann n) (if special then "" else "")
 
-  let is_special (_, _, special) = special
+  let is_special (_, _, special) = false
 end

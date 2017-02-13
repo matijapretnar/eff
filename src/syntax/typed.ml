@@ -634,7 +634,7 @@ let handler ?loc h =
     Constraints.list_union [constraints; cnstrs_a]
     |> Constraints.add_full_region r
     |> Constraints.add_ty_constraint ~loc ty_par ty_p
-    |> Constraints.add_dirt_constraint drt drt_out
+    (* |> Constraints.add_dirt_constraint drt drt_out *)
     |> Constraints.add_ty_constraint ~loc (Type.Arrow (ty_arg, (ty_out, drt_out))) ty_k
     |> Constraints.add_dirty_constraint ~loc drty_c (ty_out, drt_out)
   in

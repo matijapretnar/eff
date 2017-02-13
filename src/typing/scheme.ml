@@ -134,7 +134,7 @@ let collect_constraints changes =
 let clean_ty_scheme ?(collect=true) ~loc ty_sch =
   let ty_sch = normalize_context ~loc ty_sch in
   let ty_sch = expand_ty_scheme ty_sch in
-  if collect then
+  if true then
     let pos, neg = pos_neg_ty_scheme ty_sch in
     garbage_collect pos neg ty_sch
   else
@@ -294,7 +294,7 @@ let tag_polymorphic_dirt tysch =
   let r = Params.fresh_region_param ()
   and d = Params.fresh_dirt_param ()
   and ds = polymorphic_dirt tysch in
-  let drt = {Type.ops = ["///", r]; Type.rest = d} in
+  let drt = {Type.ops = ["*poly*", r]; Type.rest = d} in
   let (ctx, ty, cnstrs) = tysch in
   (* Print.debug "BEFORE: %t" (print_ty_scheme tysch); *)
   let tysch =
