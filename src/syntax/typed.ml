@@ -329,18 +329,18 @@ let rec wrap_up_expr st e =
   in
   let st = {st with constraints = joint_cnstrs} in
   {
-    e with term = wrap_up_expr' st e.term;
+    e with term = wrap_up_expr' e.scheme st e.term;
            scheme
   }
-and wrap_up_expr' st = function
+and wrap_up_expr' scheme st = function
   | Pure c ->
     Pure (wrap_up_comp st c)
   | Lambda a ->
     Lambda (wrap_up_abs st a)
   | Handler h ->
-    Handler (wrap_up_handler st h)
+    Handler (wrap_up_handler scheme st h)
   | FinallyHandler h ->
-    FinallyHandler (wrap_up_finally_handler st h)
+    FinallyHandler (wrap_up_finally_handler scheme st h)
   | Tuple es ->
     Tuple (List.map (wrap_up_expr st) es)
   | Record flds ->
@@ -400,16 +400,29 @@ and wrap_up_comp' st = function
       Call (eff, wrap_up_expr st e, wrap_up_abs st a)
     | Value e ->
       Value (wrap_up_expr st e)
-and wrap_up_handler st h = {
-  effect_clauses = Common.assoc_map (wrap_up_abs2 st) h.effect_clauses;
+and wrap_up_handler scheme st h = {
+  effect_clauses = Common.assoc_map (wrap_up_abs2 scheme st) h.effect_clauses;
   value_clause = wrap_up_abs st h.value_clause;
 }
-and wrap_up_finally_handler st (h, finally_clause) =
-  (wrap_up_handler st h, wrap_up_abs st finally_clause)
+and wrap_up_finally_handler scheme st (h, finally_clause) =
+  (wrap_up_handler scheme st h, wrap_up_abs st finally_clause)
 and wrap_up_abs st a = 
   let (p, c) = a.term in
   {a with term = (p, wrap_up_comp st c)}
-and wrap_up_abs2 st a2 =
+and wrap_up_abs2 scheme st ({term = (_, k, c)} as a2) =
+  let st = match k with
+  | {term = PNonbinding} -> st
+  | {term = PVar k} ->
+      let (ctx, _, con_c) = c.scheme in
+      begin match (Common.lookup k ctx) with
+      | None -> st
+      | Some ty' ->
+        let (Type.Arrow (ty, _)) = Constraints.expand_ty ty' in
+        let (_, Type.Handler (_, drty), con) = scheme in
+        let st' = {st with less_context = [(k, Type.Arrow (ty, drty))] @ st.less_context; constraints = Constraints.list_union [con_c; con; st.constraints]} in
+        st'
+      end
+  in
   a2a2 @@ wrap_up_abs st @@ a22a @@ a2
 
 
