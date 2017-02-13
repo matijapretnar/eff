@@ -52,16 +52,6 @@ let is_pure { dirt_poset; region_poset; full_regions; polymorphic_dirts } { Type
   DirtPoset.get_prec rest dirt_poset = [] &&
   not (PolymorphicDirts.mem rest polymorphic_dirts)
 
-let is_surely_pure { dirt_poset; region_poset; full_regions; polymorphic_dirts } { Type.ops; Type.rest } =
-  let check_region r =
-    RegionPoset.get_prec r region_poset = [] &&
-    RegionPoset.get_succ r region_poset = [] &&
-    not (FullRegions.mem r full_regions) in
-  List.for_all (fun (_, r) -> check_region r) ops &&
-  DirtPoset.get_prec rest dirt_poset = [] &&
-  DirtPoset.get_succ rest dirt_poset = [] &&
-  not (PolymorphicDirts.mem rest polymorphic_dirts)
-
 type param_expansion = {
   mutable ty_expansion : Type.ty TyMap.t;
   mutable dirt_expansion : Type.dirt DirtMap.t;

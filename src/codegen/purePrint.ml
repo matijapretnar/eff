@@ -48,7 +48,7 @@ let rec shape_of_ty st = function
   | Type.Handler (dirty1, dirty2) -> Handler (shape_of_dirty st dirty1, shape_of_dirty st dirty2)
   | ty -> Print.debug "Don't know the shape of %t" (Type.print_ty ty); assert false
 and shape_of_dirty ((ctx, constraints) as st) (ty, drt) =
-  if Scheme.is_surely_pure (ctx, (ty, drt), constraints) then
+  if Scheme.is_pure (ctx, (ty, drt), constraints) then
     ValueS (shape_of_ty st ty)
   else
     Computation (shape_of_ty st ty)

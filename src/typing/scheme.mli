@@ -32,7 +32,6 @@ val skeletons_non_poly_scheme : 'a t -> Params.ty_param list list * Params.t
 val print_ty_scheme : ty_scheme -> Format.formatter -> unit
 val print_dirty_scheme : dirty_scheme -> Format.formatter -> unit
 val is_pure : ?loc:Location.t -> dirty_scheme -> bool
-val is_surely_pure : ?loc:Location.t -> dirty_scheme -> bool
 val is_pure_function_type : ?loc:Location.t -> ty_scheme -> bool
 val is_pure_for_handler : dirty_scheme -> ((Common.effect * ('a * 'b)) * 'c) list -> bool
 val tag_polymorphic_dirt : ty_scheme -> ty_scheme

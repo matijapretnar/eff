@@ -26,8 +26,6 @@ val add_full_region : Params.region_param -> t -> t
 val add_polymorphic_dirt : Params.dirt_param -> t -> t
 
 val is_pure : t -> Type.dirt -> bool
-val is_surely_pure : t -> Type.dirt -> bool
-
 val is_pure_for_handler : t -> Type.dirt -> ((Common.effect * ('a * 'b)) * 'c) list -> bool
 
 val expand_ty : Type.ty -> Type.ty
