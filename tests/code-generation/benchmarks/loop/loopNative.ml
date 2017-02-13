@@ -1,37 +1,47 @@
-exception Fail
+let rec loop_pure n =
+    if n = 0 then
+        ()
+    else
+        loop_pure (n - 1)
 
-let rec loop_fail n =
-  if n < 0 then
-    raise Fail
-  else if n = 0 then
-    0
-  else
-    loop_fail (n - 1) + 1
-
-let rec loop_acc_fail n acc =
-  if n < 0 then
-    raise Fail
-  else if n = 0 then
-    acc
-  else
-    loop_acc_fail (n - 1) (acc + 1)
+let test_pure n =
+    loop_pure n
 
 (******************************************************************************)
 
-let rec loop_option n =
-  if n < 0 then
-    None
-  else if n = 0 then
-    Some 0
-  else
-    match loop_option (n - 1) with
-    | Some x -> Some (x + 1)
-    | None -> None
+exception Fail
 
-let rec loop_acc_option n acc =
-  if n < 0 then
-    None
-  else if n = 0 then
-    Some acc
-  else
-    loop_acc_option (n - 1) (acc + 1)
+let rec loop_latent n =
+    if n = 0 then
+        ()
+    else if n < 0 then
+        raise Fail
+    else
+        loop_latent (n - 1)
+
+let test_latent n =
+    loop_latent n
+
+(******************************************************************************)
+
+let rec loop_incr counter n =
+    if n = 0 then
+        ()
+    else
+        (incr counter; loop_incr counter (n - 1))
+
+let test_incr n =
+    let counter = ref 0 in
+    loop_incr counter n
+
+(******************************************************************************)
+
+let rec loop_state state n =
+    if n = 0 then
+        ()
+    else
+        (state := !state + 1; loop_state state (n - 1))
+
+let test_state n =
+    let state = ref 0 in
+    loop_state state n
