@@ -364,17 +364,30 @@ and wrap_up_comp st c =
            scheme
   }
 and wrap_up_comp' st = function
-    | Bind (c1, c2) ->
-      Bind (wrap_up_comp st c1, wrap_up_abs st c2)
-    | LetIn (e, a) ->
+    | Bind (c1, {term = (p, c2)}) ->
+      let ctx_p, ty_p, constraints_p = p.scheme in
+      let st' = {
+        st with
+        trim_context = ctx_p @ st.trim_context;
+        constraints = Constraints.union constraints_p st.constraints
+      }
+      in
+      let c2 = wrap_up_comp st' c2 in
+      let a = abstraction p c2 in
+      Bind (wrap_up_comp st c1, wrap_up_abs st a)
+    | LetIn (e, {term = (p, c)}) ->
+      let ctx_p, ty_p, constraints_p = p.scheme in
+      let st' = {
+        st with
+        trim_context = ctx_p @ st.trim_context;
+        constraints = Constraints.union constraints_p st.constraints
+      }
+      in
+      let c = wrap_up_comp st' c in
+      let a = abstraction p c in
       LetIn (wrap_up_expr st e, wrap_up_abs st a)
     | LetRec (li, c1) ->
-      let li' = List.map (fun (x, a) ->
-          (* XXX Should we check that x does not appear in st? *)
-          (x, wrap_up_abs st a)
-        ) li
-      in
-      LetRec (li', wrap_up_comp st c1)
+      LetRec (Common.assoc_map (wrap_up_abs st) li, wrap_up_comp st c1)
     | Match (e, li) ->
       Match (wrap_up_expr st e, List.map (wrap_up_abs st) li)
     | Apply (e1, e2) ->
@@ -395,7 +408,6 @@ and wrap_up_finally_handler st (h, finally_clause) =
   (wrap_up_handler st h, wrap_up_abs st finally_clause)
 and wrap_up_abs st a = 
   let (p, c) = a.term in
-  (* XXX Should we check that p & st have disjoint variables? *)
   {a with term = (p, wrap_up_comp st c)}
 and wrap_up_abs2 st a2 =
   a2a2 @@ wrap_up_abs st @@ a22a @@ a2
