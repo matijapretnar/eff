@@ -182,22 +182,22 @@ let tydefs defs =
 
 (** [fresh_variable ()] creates a fresh variable ["gen_gen1"], ["gen_gen2"], ... on
     each call *)
-let fresh_variable = function
-  | None -> Untyped.Variable.fresh "anon"
-  | Some x -> Untyped.Variable.fresh x
+let fresh_variable ?special = function
+  | None -> Untyped.Variable.fresh ?special "anon"
+  | Some x -> Untyped.Variable.fresh ?special x
 
 let id_abstraction loc =
   let x = fresh_variable (Some "gen_id_par") in
   (Untyped.add_loc (Untyped.PVar x) loc, (Untyped.add_loc (Untyped.Value (Untyped.add_loc (Untyped.Var x) loc)) loc))
 
-let pattern ?(forbidden=[]) (p, loc) =
+let pattern ?(special=false) ?(forbidden=[]) (p, loc) =
   let vars = ref [] in
   let forbidden = ref forbidden in
   let new_var x =
     if List.mem x !forbidden then
       Error.syntax ~loc "Variable %s occurs more than once in a pattern" x
     else
-      let var = fresh_variable (Some x) in
+      let var = fresh_variable ~special (Some x) in
       vars := (x, var) :: !vars;
       forbidden := x :: !forbidden;
       var
@@ -344,7 +344,7 @@ and abstraction ctx (p, t) =
 
 and abstraction2 ctx (p1, p2, t) =
   let vars1, p1 = pattern p1 in
-  let vars2, p2 = pattern p2 in
+  let vars2, p2 = pattern ~special:true p2 in
   (p1, p2, computation (vars1 @ vars2 @ ctx) t)
 
 and let_rec ctx (e, loc) =

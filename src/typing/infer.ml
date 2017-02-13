@@ -29,23 +29,6 @@ let infer_effect ~loc env eff =
   with
   | Not_found -> Error.typing ~loc "Unbound effect %s" eff
 
-let tag_polymorphic_dirt tysch =
-  let tysch = Scheme.refresh tysch in
-  let r = Params.fresh_region_param ()
-  and d = Params.fresh_dirt_param ()
-  and ds = Scheme.polymorphic_dirt tysch in
-  let drt = {Type.ops = ["///", r]; Type.rest = d} in
-  let (ctx, ty, cnstrs) = tysch in
-  (* Print.debug "BEFORE: %t" (Scheme.print_ty_scheme tysch); *)
-  let tysch =
-  Scheme.finalize_ty_scheme ~loc:Location.unknown ctx ty (
-    List.map (fun d -> Scheme.dirt_less drt (Type.simple_dirt d)) ds @ [
-    Scheme.just cnstrs;
-    Scheme.add_full_region r
-  ]) in
-  (* Print.debug "AFTER: %t" (Scheme.print_ty_scheme tysch); *)
-  tysch
-
 (* [infer_pattern p] infers the type scheme of a pattern [p].
    This consists of:
    - the context, which contains bound variables and their types,
@@ -213,19 +196,19 @@ and type_handler env h =
 and type_let_defs ~loc env defs =
   let defs' = List.map (fun (p, c) -> (type_pattern p, type_comp env c)) defs in
   let defs'', poly_tyschs, _, _ = Typed.let_defs ~loc defs' in
-  let poly_tyschs = Common.assoc_map tag_polymorphic_dirt poly_tyschs in
+  let poly_tyschs = Common.assoc_map Scheme.tag_polymorphic_dirt poly_tyschs in
   let env' = extend_env poly_tyschs env in
   env', defs''
 and type_let_rec_defs ~loc env defs =
   let defs' = Common.assoc_map (type_abstraction env) defs in
   let defs'', poly_tyschs, _ = Typed.let_rec_defs ~loc defs' in
-  let poly_tyschs = Common.assoc_map tag_polymorphic_dirt poly_tyschs in
+  let poly_tyschs = Common.assoc_map Scheme.tag_polymorphic_dirt poly_tyschs in
   let env' = extend_env poly_tyschs env in
   env', defs''
 and type_top_let_defs ~loc env defs =
   let defs' = List.map (fun (p, c) -> (type_pattern p, type_comp env c)) defs in
   let defs'', poly_tyschs, nonpoly_tys, change = Typed.let_defs ~loc defs' in
-  let poly_tyschs = Common.assoc_map tag_polymorphic_dirt poly_tyschs in
+  let poly_tyschs = Common.assoc_map Scheme.tag_polymorphic_dirt poly_tyschs in
   let env' = extend_env poly_tyschs env in
   let extend_nonpoly (x, ty) env =
     (x, ([(x, ty)], ty, Constraints.empty)) :: env
@@ -235,7 +218,7 @@ and type_top_let_defs ~loc env defs =
 and type_top_let_rec_defs ~loc env defs =
   let defs' = Common.assoc_map (type_abstraction env) defs in
   let defs'', poly_tyschs, change = Typed.let_rec_defs ~loc defs' in
-  let poly_tyschs = Common.assoc_map tag_polymorphic_dirt poly_tyschs in
+  let poly_tyschs = Common.assoc_map Scheme.tag_polymorphic_dirt poly_tyschs in
   let env' = extend_env poly_tyschs env in
   env', poly_tyschs, defs'', change
 

@@ -33,27 +33,31 @@ sig
   type t
 
   val compare : t -> t -> int
-  val fresh : annot -> t
+  val fresh : ?special:bool -> annot -> t
   val refresh : t -> t
   val print : ?safe:bool -> t -> Format.formatter -> unit
+  val is_special : t -> bool
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t =
 struct
   type annot = Annot.t
-  type t = int * annot
+  type t = int * annot * bool
 
-  let compare (n1, _) (n2, _) = Pervasives.compare n1 n2
+  let compare (n1, _, _) (n2, _, _) = Pervasives.compare n1 n2
 
   let count = ref 0
 
-  let fresh ann =
+  let fresh ?(special=false) ann =
     incr count;
-    (!count, ann)
+    (!count, ann, special)
 
-  let refresh (_, ann) =
+  let refresh (_, ann, special) =
     incr count;
-    (!count, ann)
+    (!count, ann, special)
 
-  let print ?(safe=false) (n, ann) = Annot.print safe ann n
+  let print ?(safe=false) (n, ann, special) ppf =
+    Format.fprintf ppf "%t%s" (Annot.print safe ann n) (if special then "" else "")
+
+  let is_special (_, _, special) = special
 end

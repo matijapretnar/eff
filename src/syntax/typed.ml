@@ -304,15 +304,25 @@ and subst_abs sbst a =
 and subst_abs2 sbst a2 =
   a2a2 @@ subst_abs sbst @@ a22a @@ a2
 
-let rec remove_rec_expr (poly_tys, constraints) e =
+type wrap_up_state = {
+  constraints: Constraints.t;
+  trim_context: Scheme.context; 
+}
+let initial_wrap_up_state = {
+  constraints = Constraints.empty;
+  trim_context = [];
+}
+
+let rec remove_rec_expr  e =
   let ctx, ty, cnstrs = e.scheme in
-  let joint_cnstrs = Constraints.union cnstrs constraints in
+  let joint_cnstrs = Constraints.union cnstrs st.constraints in
   let scheme =
-    Scheme.finalize_ty_scheme ~loc:e.location ctx ty [
+    Scheme.finalize_ty_scheme ~collect:false ~loc:e.location ctx ty [
       Scheme.just joint_cnstrs;
-      Scheme.trim_context ~loc:e.location poly_tys
+      Scheme.trim_context ~loc:e.location st.trim_context
     ]
   in
+  let st = {st with constraints}
   {
     e with term = remove_rec_expr' (poly_tys, joint_cnstrs) e.term;
            scheme
@@ -337,7 +347,7 @@ and remove_rec_comp (poly_tys, constraints) c =
   let ctx, ty, cnstrs = c.scheme in
   let joint_cnstrs = Constraints.union cnstrs constraints in
   let scheme =
-    Scheme.finalize_dirty_scheme ~loc:c.location ctx ty [
+    Scheme.finalize_dirty_scheme ~collect:false ~loc:c.location ctx ty [
       Scheme.just joint_cnstrs;
       Scheme.trim_context ~loc:c.location poly_tys
     ]
@@ -386,7 +396,7 @@ let rec less_context_expr (poly_tys, constraints) e =
   let ctx, ty, cnstrs = e.scheme in
   let joint_cnstrs = Constraints.union cnstrs constraints in
   let scheme =
-    Scheme.finalize_ty_scheme ~loc:e.location ctx ty [
+    Scheme.finalize_ty_scheme ~collect:false ~loc:e.location ctx ty [
       Scheme.just joint_cnstrs;
       Scheme.less_context ~loc:e.location poly_tys
     ]
@@ -415,7 +425,7 @@ and less_context_comp (poly_tys, constraints) c =
   let ctx, ty, cnstrs = c.scheme in
   let joint_cnstrs = Constraints.union cnstrs constraints in
   let scheme =
-    Scheme.finalize_dirty_scheme ~loc:c.location ctx ty [
+    Scheme.finalize_dirty_scheme ~collect:false ~loc:c.location ctx ty [
       Scheme.just joint_cnstrs;
       Scheme.less_context ~loc:c.location poly_tys
     ]
@@ -464,23 +474,23 @@ let rec push_constraints_expr constraints e =
   let ctx, ty, cnstrs = e.scheme in
   let joint_cnstrs = Constraints.union cnstrs constraints in
   let scheme =
-    Scheme.finalize_ty_scheme ~loc:e.location ctx ty [
+    Scheme.finalize_ty_scheme ~collect:false ~loc:e.location ctx ty [
       Scheme.just joint_cnstrs;
     ]
   in
   {
-    e with term = push_constraints_expr' joint_cnstrs e.term;
+    e with term = push_constraints_expr' scheme joint_cnstrs e.term;
            scheme
   }
-and push_constraints_expr' st = function
+and push_constraints_expr' scheme st = function
   | Pure c ->
     Pure (push_constraints_comp st c)
   | Lambda a ->
     Lambda (push_constraints_abs st a)
   | Handler h ->
-    Handler (push_constraints_handler st h)
+    Handler (push_constraints_handler scheme st h)
   | FinallyHandler (h, finally) ->
-    FinallyHandler (push_constraints_finally_handler st (h, finally))
+    FinallyHandler (push_constraints_finally_handler scheme st (h, finally))
   | Tuple es ->
     Tuple (List.map (push_constraints_expr st) es)
   | Record flds ->
@@ -492,7 +502,7 @@ and push_constraints_comp constraints c =
   let ctx, ty, cnstrs = c.scheme in
   let joint_cnstrs = Constraints.union cnstrs constraints in
   let scheme =
-    Scheme.finalize_dirty_scheme ~loc:c.location ctx ty [
+    Scheme.finalize_dirty_scheme ~collect:false ~loc:c.location ctx ty [
       Scheme.just joint_cnstrs;
     ]
   in
@@ -524,17 +534,26 @@ and push_constraints_comp' st = function
       Call (eff, push_constraints_expr st e, push_constraints_abs st a)
     | Value e ->
       Value (push_constraints_expr st e)
-and push_constraints_handler st h = {
-  effect_clauses = Common.assoc_map (push_constraints_abs2 st) h.effect_clauses;
+and push_constraints_handler scheme st h =
+{
+  effect_clauses = Common.assoc_map (push_constraints_abs2 scheme st) h.effect_clauses;
   value_clause = push_constraints_abs st h.value_clause;
 }
-and push_constraints_finally_handler st (h, finally_clause) =
-  (push_constraints_handler st h, push_constraints_abs st finally_clause)
+and push_constraints_finally_handler scheme st (h, finally_clause) =
+  (push_constraints_handler scheme st h, push_constraints_abs st finally_clause)
 and push_constraints_abs st a = 
   let (p, c) = a.term in
   (* XXX Should we check that p & st have disjoint variables? *)
   {a with term = (p, push_constraints_comp st c)}
-and push_constraints_abs2 st a2 =
+and push_constraints_abs2 scheme st ({term = (p, k, c)} as a2) =
+  let st = match k with
+  | {term = PNonbinding} -> st
+  | {term = PVar k} ->
+      let (ctx, _, _) = c.scheme in
+      let (Some (Type.Arrow (ty, _))) = Common.lookup k ctx in
+      let (_, Type.Handler (_, drty), _) = scheme in
+      Constraints.add_st
+  in
   a2a2 @@ push_constraints_abs st @@ a22a @@ a2
 
 
@@ -764,9 +783,14 @@ let handler ?loc h =
   let fold ((_, (ty_par, ty_arg)), a2) (ctx, constraints) =
     let ctx_a, (ty_p, ty_k, drty_c), cnstrs_a = a2.scheme in
     let (_, p2, _) = a2.term in
+    let r = Params.fresh_region_param ()
+    and d = Params.fresh_dirt_param () in
+    let drt = {Type.ops = ["XXX", r]; Type.rest = d} in
     ctx_a @ ctx,
     Constraints.list_union [constraints; cnstrs_a]
+    |> Constraints.add_full_region r
     |> Constraints.add_ty_constraint ~loc ty_par ty_p
+    |> Constraints.add_dirt_constraint drt drt_out
     |> Constraints.add_ty_constraint ~loc (Type.Arrow (ty_arg, (ty_out, drt_out))) ty_k
     |> Constraints.add_dirty_constraint ~loc drty_c (ty_out, drt_out)
   in
@@ -795,6 +819,7 @@ let handler ?loc h =
 
   let ty_sch = (ctx_val @ ctxs, Type.Handler((ty_in, drt_in), (ty_out, drt_out)), constraints) in
   let scheme = Scheme.clean_ty_scheme ~loc ty_sch in
+  let scheme = Scheme.tag_polymorphic_dirt scheme in
   let (ctx, Type.Handler(_, drty), constraints) = scheme in
   {
     term = Handler h;
@@ -995,39 +1020,33 @@ let let_rec' ?loc defs c =
     location = loc;
   }
 
-let bind ?loc c1 {term = (p, c2)} =
+let bind ?loc c1 c2 =
   let loc = backup_location loc [c1.location; c2.location] in
   let ctx_c1, (ty_c1, drt_c1), constraints_c1 = c1.scheme
-  and ctx_p, ty_p, constraints_p = p.scheme
-  in
-  let c2 = remove_rec_comp (ctx_p, constraints_p) c2 in
-  let ctx_c2, (ty_c2, drt_c2), constraints_c2 = c2.scheme in
+  and ctx_c2, (ty_p, (ty_c2, drt_c2)), constraints_c2 = c2.scheme in
   let drt = Type.fresh_dirt () in
   let constraints =
-    Constraints.union constraints_c1 constraints_c2 |>
+    Constraints.list_union [constraints_c1; constraints_c2] |>
     Constraints.add_dirt_constraint drt_c1 drt |>
     Constraints.add_dirt_constraint drt_c2 drt |>
     Constraints.add_ty_constraint ~loc ty_c1 ty_p
   in
   {
-    term = Bind (c1, (abstraction p c2));
+    term = Bind (c1, c2);
     scheme = Scheme.clean_dirty_scheme ~loc (ctx_c1 @ ctx_c2, (ty_c2, drt), constraints);
     location = loc;
   }
 
-let let_in ?loc e1 {term = (p, c2)} =
+let let_in ?loc e1 c2 =
   let loc = backup_location loc [e1.location; c2.location] in
   let ctx_e1, ty_e1, constraints_e1 = e1.scheme
-  and ctx_p, ty_p, constraints_p = p.scheme
-  in
-  let c2 = remove_rec_comp (ctx_p, constraints_p) c2 in
-  let ctx_c2, drty_c2, constraints_c2 = c2.scheme in
+  and ctx_c2, (ty_p, drty_c2), constraints_c2 = c2.scheme in
   let constraints =
     Constraints.union constraints_e1 constraints_c2 |>
     Constraints.add_ty_constraint ~loc ty_e1 ty_p
   in
   {
-    term = LetIn (e1, (abstraction p c2));
+    term = LetIn (e1, c2);
     scheme = Scheme.clean_dirty_scheme ~loc (ctx_e1 @ ctx_c2, drty_c2, constraints);
     location = loc;
   }

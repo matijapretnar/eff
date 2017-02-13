@@ -15,9 +15,10 @@ sig
   type t
 
   val compare : t -> t -> int
-  val fresh : annot -> t
+  val fresh : ?special:bool -> annot -> t
   val refresh : t -> t
   val print : ?safe:bool -> t -> Format.formatter -> unit
+  val is_special : t -> bool
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t
