@@ -21,6 +21,11 @@ module FullRegions = Set.Make(struct
     let compare = Pervasives.compare
   end)
 
+module PolymorphicDirts = Set.Make(struct
+    type t = Params.dirt_param
+    let compare = Pervasives.compare
+  end)
+
 module TyMap = Map.Make(struct
     type t = Params.ty_param
     let compare = Pervasives.compare
@@ -36,23 +41,26 @@ type t = {
   dirt_poset: DirtPoset.t;
   region_poset: RegionPoset.t;
   full_regions: FullRegions.t;
+  polymorphic_dirts: PolymorphicDirts.t;
 }
 
-let is_pure { dirt_poset; region_poset; full_regions } { Type.ops; Type.rest } =
+let is_pure { dirt_poset; region_poset; full_regions; polymorphic_dirts } { Type.ops; Type.rest } =
   let check_region r =
     RegionPoset.get_prec r region_poset = [] &&
     not (FullRegions.mem r full_regions) in
   List.for_all (fun (_, r) -> check_region r) ops &&
-  DirtPoset.get_prec rest dirt_poset = []
+  DirtPoset.get_prec rest dirt_poset = [] &&
+  not (PolymorphicDirts.mem rest polymorphic_dirts)
 
-let is_surely_pure { dirt_poset; region_poset; full_regions } { Type.ops; Type.rest } =
+let is_surely_pure { dirt_poset; region_poset; full_regions; polymorphic_dirts } { Type.ops; Type.rest } =
   let check_region r =
     RegionPoset.get_prec r region_poset = [] &&
     RegionPoset.get_succ r region_poset = [] &&
     not (FullRegions.mem r full_regions) in
   List.for_all (fun (_, r) -> check_region r) ops &&
   DirtPoset.get_prec rest dirt_poset = [] &&
-  DirtPoset.get_succ rest dirt_poset = []
+  DirtPoset.get_succ rest dirt_poset = [] &&
+  not (PolymorphicDirts.mem rest polymorphic_dirts)
 
 type param_expansion = {
   mutable ty_expansion : Type.ty TyMap.t;
@@ -134,7 +142,16 @@ let remove_ty_param t constraints =
   let smaller, greater, ty_poset = TyPoset.remove t constraints.ty_poset in
   smaller, greater, {constraints with ty_poset = ty_poset}
 
+let add_polymorphic_dirt d constraints =
+  let new_polymorphic_dirts = d :: DirtPoset.get_succ d constraints.dirt_poset in
+  {constraints with polymorphic_dirts = List.fold_right PolymorphicDirts.add new_polymorphic_dirts constraints.polymorphic_dirts}
+
 let add_dirt_param_constraint d1 d2 constraints =
+  if PolymorphicDirts.mem d1 constraints.polymorphic_dirts then
+    add_polymorphic_dirt d2 constraints
+  else if PolymorphicDirts.mem d2 constraints.polymorphic_dirts then
+    add_polymorphic_dirt d1 constraints
+  else
   {constraints with dirt_poset = DirtPoset.add d1 d2 constraints.dirt_poset}
 
 let remove_dirt_param d constraints =
@@ -279,6 +296,7 @@ let empty = {
   dirt_poset = DirtPoset.empty;
   region_poset = RegionPoset.empty;
   full_regions = FullRegions.empty;
+  polymorphic_dirts = PolymorphicDirts.empty;
 }
 
 let expand_constraints constraints =
@@ -288,16 +306,20 @@ let expand_constraints constraints =
   |> DirtPoset.fold (fun d1 d2 -> add_dirt_constraint (Type.simple_dirt d1) (Type.simple_dirt d2)) constraints.dirt_poset
   |> RegionPoset.fold add_region_param_constraint constraints.region_poset
   |> FullRegions.fold add_full_region constraints.full_regions
+  |> PolymorphicDirts.fold add_polymorphic_dirt constraints.polymorphic_dirts
 
 let union constraints1 constraints2 =
   {
     ty_poset = TyPoset.merge constraints1.ty_poset constraints2.ty_poset;
     dirt_poset = DirtPoset.merge constraints1.dirt_poset constraints2.dirt_poset;
     region_poset = RegionPoset.merge constraints1.region_poset constraints2.region_poset;
-    full_regions = constraints1.full_regions;
+    full_regions = FullRegions.empty;
+    polymorphic_dirts = PolymorphicDirts.empty;
   }
   |> FullRegions.fold add_full_region constraints1.full_regions
   |> FullRegions.fold add_full_region constraints2.full_regions
+  |> PolymorphicDirts.fold add_polymorphic_dirt constraints1.polymorphic_dirts
+  |> PolymorphicDirts.fold add_polymorphic_dirt constraints2.polymorphic_dirts
 
 let list_union = function
   | [] -> empty
@@ -309,13 +331,26 @@ let subst sbst constraints = {
   dirt_poset = DirtPoset.map sbst.Params.dirt_param constraints.dirt_poset;
   region_poset = RegionPoset.map sbst.Params.region_param constraints.region_poset;
   full_regions = FullRegions.fold (fun r s -> FullRegions.add (sbst.Params.region_param r) s) constraints.full_regions FullRegions.empty;
+  polymorphic_dirts = PolymorphicDirts.fold (fun d s -> PolymorphicDirts.add (sbst.Params.dirt_param d) s) constraints.polymorphic_dirts PolymorphicDirts.empty;
 }
 
 let garbage_collect pos neg constraints = {
-  ty_poset = TyPoset.filter (fun x y -> Params.ty_param_mem x neg && Params.ty_param_mem y pos) constraints.ty_poset;
-  dirt_poset = DirtPoset.filter (fun x y -> Params.dirt_param_mem x neg && Params.dirt_param_mem y pos) constraints.dirt_poset;
-  region_poset = RegionPoset.filter (fun x y -> Params.region_param_mem x neg && Params.region_param_mem y pos) constraints.region_poset;
-  full_regions = FullRegions.filter (fun r -> Params.region_param_mem r pos || Params.region_param_mem r neg) constraints.full_regions;
+  ty_poset = TyPoset.filter (fun x y ->
+    Params.ty_param_mem x neg && Params.ty_param_mem y pos
+  ) constraints.ty_poset;
+  dirt_poset = DirtPoset.filter (fun x y ->
+    Params.dirt_param_mem x neg && Params.dirt_param_mem y pos
+  ) constraints.dirt_poset;
+  region_poset = RegionPoset.filter (fun x y ->
+    Params.region_param_mem x neg && Params.region_param_mem y pos
+    && not (FullRegions.mem y constraints.full_regions)
+  ) constraints.region_poset;
+  full_regions = FullRegions.filter (fun r ->
+    Params.region_param_mem r pos
+  ) constraints.full_regions;
+  polymorphic_dirts = PolymorphicDirts.filter (fun d ->
+    Params.dirt_param_mem d pos
+  ) constraints.polymorphic_dirts;
 }
 
 let print constraints ppf =
@@ -325,4 +360,6 @@ let print constraints ppf =
   if not (DirtPoset.is_empty constraints.dirt_poset) then Format.pp_print_string ppf "; ";
   RegionPoset.print constraints.region_poset ppf;
   if not (RegionPoset.is_empty constraints.region_poset) then Format.pp_print_string ppf "; ";
-  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Params.print_region_param x) (Symbols.top ())) (FullRegions.elements constraints.full_regions) ppf
+  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Params.print_region_param x) (Symbols.top ())) (FullRegions.elements constraints.full_regions) ppf;
+  if not (FullRegions.is_empty constraints.full_regions) then Format.pp_print_string ppf "; ";
+  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t poly" (Params.print_dirt_param x)) (PolymorphicDirts.elements constraints.polymorphic_dirts) ppf

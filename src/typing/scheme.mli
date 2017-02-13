@@ -35,5 +35,4 @@ val is_pure : ?loc:Location.t -> dirty_scheme -> bool
 val is_surely_pure : ?loc:Location.t -> dirty_scheme -> bool
 val is_pure_function_type : ?loc:Location.t -> ty_scheme -> bool
 val is_pure_for_handler : dirty_scheme -> ((Common.effect * ('a * 'b)) * 'c) list -> bool
-val polymorphic_dirt : ty_scheme -> Params.dirt_param list
 val tag_polymorphic_dirt : ty_scheme -> ty_scheme

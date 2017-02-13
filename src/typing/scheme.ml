@@ -30,6 +30,8 @@ and region_param_less r1 r2 (ctx, ty, cnstrs) =
   (ctx, ty, Constraints.add_region_param_constraint r1 r2 cnstrs)
 and add_full_region r (ctx, ty, cnstrs) =
   (ctx, ty, Constraints.add_full_region r cnstrs)
+and add_polymorphic_dirt d (ctx, ty, cnstrs) =
+  (ctx, ty, Constraints.add_polymorphic_dirt d cnstrs)
 and dirt_less drt1 drt2 (ctx, ty, cnstrs) =
   (ctx, ty, Constraints.add_dirt_constraint drt1 drt2 cnstrs)
 and ty_less ~loc ty1 ty2 (ctx, ty, cnstrs) =
@@ -285,33 +287,8 @@ let is_pure_function_type ?loc (ctx, ty, cnstrs) =
   | Type.Arrow (_, drty) -> is_pure ?loc (ctx, drty, cnstrs)
   | _ -> false
 
-let polymorphic_dirt (ctx, ty, cnstrs) =
-  Constraints.non_empty_dirts cnstrs
-
-let poly_op = "*poly*"
-
-let tag_polymorphic_dirt' tysch =
-  let tysch = refresh tysch in
-  let ds = polymorphic_dirt tysch in
-  let rs = List.map (fun d ->
-    let {Type.ops=ops; rest} = Constraints.expand_dirt (Type.simple_dirt d) in
-    match Common.lookup poly_op ops with
-    | Some r -> add_full_region r
-    | None ->
-        let r = Params.fresh_region_param ()
-        and d' = Params.fresh_dirt_param () in
-        let drt = {Type.ops = [poly_op, r]; Type.rest = d'} in
-        dirt_less drt (Type.simple_dirt d)
-  ) ds
-  in
-  let (ctx, ty, cnstrs) = tysch in
-  (* Print.debug "BEFORE: %t" (print_ty_scheme tysch); *)
-  let tysch =
+let tag_polymorphic_dirt (ctx, ty, cnstrs) =
   finalize_ty_scheme ~loc:Location.unknown ctx ty (
-    rs @ [
-    just cnstrs
-  ]) in
-  (* Print.debug "AFTER: %t" (print_ty_scheme tysch); *)
-  tysch
-
-let tag_polymorphic_dirt tysch = tag_polymorphic_dirt' (tag_polymorphic_dirt' tysch)
+    just cnstrs ::
+    List.map add_polymorphic_dirt (Constraints.non_empty_dirts cnstrs)
+  )

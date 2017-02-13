@@ -23,6 +23,8 @@ val add_region_param_constraint : Params.region_param -> Params.region_param -> 
 
 val add_full_region : Params.region_param -> t -> t
 
+val add_polymorphic_dirt : Params.dirt_param -> t -> t
+
 val is_pure : t -> Type.dirt -> bool
 val is_surely_pure : t -> Type.dirt -> bool
 
