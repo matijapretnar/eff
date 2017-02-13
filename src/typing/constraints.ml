@@ -314,8 +314,8 @@ let subst sbst constraints = {
 let garbage_collect pos neg constraints = {
   ty_poset = TyPoset.filter (fun x y -> Params.ty_param_mem x neg && Params.ty_param_mem y pos) constraints.ty_poset;
   dirt_poset = DirtPoset.filter (fun x y -> Params.dirt_param_mem x neg && Params.dirt_param_mem y pos) constraints.dirt_poset;
-  region_poset = RegionPoset.filter (fun x y -> Params.region_param_mem x neg && Params.region_param_mem y pos && not (FullRegions.mem y constraints.full_regions)) constraints.region_poset;
-  full_regions = FullRegions.filter (fun r -> Params.region_param_mem r pos) constraints.full_regions;
+  region_poset = RegionPoset.filter (fun x y -> Params.region_param_mem x neg && Params.region_param_mem y pos) constraints.region_poset;
+  full_regions = FullRegions.filter (fun r -> Params.region_param_mem r pos || Params.region_param_mem r neg) constraints.full_regions;
 }
 
 let print constraints ppf =

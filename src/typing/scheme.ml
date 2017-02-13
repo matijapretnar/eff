@@ -288,13 +288,14 @@ let is_pure_function_type ?loc (ctx, ty, cnstrs) =
 let polymorphic_dirt (ctx, ty, cnstrs) =
   Constraints.non_empty_dirts cnstrs
 
+let poly_op = "*poly*"
 
 let tag_polymorphic_dirt tysch =
   let tysch = refresh tysch in
   let r = Params.fresh_region_param ()
   and d = Params.fresh_dirt_param ()
   and ds = polymorphic_dirt tysch in
-  let drt = {Type.ops = ["*poly*", r]; Type.rest = d} in
+  let drt = {Type.ops = [poly_op, r]; Type.rest = d} in
   let (ctx, ty, cnstrs) = tysch in
   (* Print.debug "BEFORE: %t" (print_ty_scheme tysch); *)
   let tysch =

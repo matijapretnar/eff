@@ -131,7 +131,7 @@ let pos_neg_params get_variances ty =
   and pos_dirty is_pos (ty, drt) =
     pos_ty is_pos ty @@@ pos_dirt is_pos drt
   and pos_dirt is_pos drt =
-    pos_dirt_param is_pos drt.rest @@@ Params.flatten_map (fun (_, dt) -> pos_region_param is_pos dt) drt.ops
+    pos_dirt_param is_pos drt.rest @@@ Params.flatten_map (fun (op, dt) -> if op = "*poly*" then pos_region_param true dt @@@ pos_region_param false dt else pos_region_param is_pos dt) drt.ops
   and pos_dirt_param is_pos d =
     if is_pos then Params.add_dirt_param d Params.empty else Params.empty
   and pos_region_param is_pos r =

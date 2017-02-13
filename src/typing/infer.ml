@@ -121,15 +121,23 @@ let rec type_pattern p =
 let extend_env vars env =
   List.fold_right (fun (x, ty_sch) env -> {env with context = TypingEnv.update env.context x ty_sch}) vars env
 
+let params = ref []
+
 let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
   let typed_expr = match expr with
     | Untyped.Var x ->
       let ty_sch = begin match TypingEnv.lookup env.context x with
         | Some ty_sch -> ty_sch
         | None ->
-          let ty = Type.fresh_ty () in
+          let ty = begin match Common.lookup x !params with
+          | None ->
+            let ty = Type.fresh_ty () in
+            params := Common.update x ty !params;
+            ty
+          | Some ty -> ty 
+          end in
           ([(x, ty)], ty, Constraints.empty)
-      end
+        end
       in
       Typed.var ~loc x ty_sch
     | Untyped.Const const -> Typed.const ~loc const
