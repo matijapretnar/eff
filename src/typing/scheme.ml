@@ -65,10 +65,7 @@ let (@@@) = Params.append
 let pos_neg_ty_scheme (ctx, ty, cnstrs) =
   let add_ctx_pos_neg (x, ctx_ty) (pos, neg) =
     let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty in
-    if Untyped.Variable.is_special x then
-      pos_ctx_ty @@@ neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg_ctx_ty @@@ neg
-    else
-      neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
+    neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
   let pos, neg = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
   Params.uniq pos, Params.uniq neg
@@ -133,26 +130,23 @@ let collect_constraints changes =
   let _, _, constraints = create_ty_scheme [] Type.unit_ty changes in
   constraints
 
-let clean_ty_scheme ?(collect=true) ~loc ty_sch =
+let clean_ty_scheme ~loc ty_sch =
   let ty_sch = normalize_context ~loc ty_sch in
   let ty_sch = expand_ty_scheme ty_sch in
-  if true then
-    let pos, neg = pos_neg_ty_scheme ty_sch in
-    garbage_collect pos neg ty_sch
-  else
-    ty_sch
+  let pos, neg = pos_neg_ty_scheme ty_sch in
+  garbage_collect pos neg ty_sch
 
-let clean_dirty_scheme ?collect ~loc (ctx, drty, constraints) =
-  match clean_ty_scheme ?collect ~loc (ctx, (Type.Arrow (Type.unit_ty, drty)), constraints) with
+let clean_dirty_scheme ~loc (ctx, drty, constraints) =
+  match clean_ty_scheme ~loc (ctx, (Type.Arrow (Type.unit_ty, drty)), constraints) with
   | ctx, Type.Arrow (_, drty), cnstrs -> (ctx, drty, cnstrs)
   | _ -> assert false
 
-let finalize_ty_scheme ?collect ~loc ctx ty changes =
+let finalize_ty_scheme ~loc ctx ty changes =
   let ty_sch = create_ty_scheme ctx ty changes in
-  clean_ty_scheme ?collect ~loc ty_sch
+  clean_ty_scheme ~loc ty_sch
 
-let finalize_dirty_scheme ?collect ~loc ctx drty changes =
-  match finalize_ty_scheme ?collect ~loc ctx (Type.Arrow (Type.unit_ty, drty)) changes with
+let finalize_dirty_scheme ~loc ctx drty changes =
+  match finalize_ty_scheme ~loc ctx (Type.Arrow (Type.unit_ty, drty)) changes with
   | ctx, Type.Arrow (_, drty), cnstrs -> (ctx, drty, cnstrs)
   | _ -> assert false
 
@@ -216,10 +210,7 @@ let is_pure_for_handler (ctx, (_, drt), cnstrs) eff_clause =
   let add_ctx_pos_neg (x, ctx_ty) (pos, neg) =
     let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty
     and (@@@) = Params.append in
-    if Untyped.Variable.is_special x then
-      pos_ctx_ty @@@ neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg_ctx_ty @@@ neg
-    else
-      neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
+    neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
   let pos, neg = List.fold_right add_ctx_pos_neg ctx (Params.empty, Params.empty) in
   let params = Params.append pos neg in
@@ -258,11 +249,6 @@ let print_dirty_scheme ty_sch ppf =
 
 let is_pure ?(loc=Location.unknown) (ctx, (_, drt), cnstrs) =
   Constraints.is_pure cnstrs drt
-
-let is_pure_function_type ?loc (ctx, ty, cnstrs) =
-  match Constraints.expand_ty ty with
-  | Type.Arrow (_, drty) -> is_pure ?loc (ctx, drty, cnstrs)
-  | _ -> false
 
 let tag_polymorphic_dirt ((ctx, ty, cnstrs) as ty_sch) =
   let _, neg = pos_neg_ty_scheme ty_sch in

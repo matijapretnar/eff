@@ -410,13 +410,11 @@ and subst_abs2 sbst a2 =
 
 type wrap_up_state = {
   constraints: Constraints.t;
-  trim_context: Scheme.context; 
   less_context: Scheme.context; 
 }
 
 let initial_wrap_up_state = {
   constraints = Constraints.empty;
-  trim_context = [];
   less_context = [];
 }
 
@@ -424,13 +422,11 @@ let rec wrap_up_expr st e =
   let ctx, ty, cnstrs = e.scheme in
   let joint_cnstrs = Constraints.union cnstrs st.constraints in
   let scheme =
-    Scheme.finalize_ty_scheme ~collect:false ~loc:e.location ctx ty [
+    Scheme.finalize_ty_scheme ~loc:e.location ctx ty [
       Scheme.less_context ~loc:e.location st.less_context;
-      Scheme.trim_context ~loc:e.location st.trim_context;
       Scheme.just joint_cnstrs;
     ]
   in
-  Print.debug ~loc:e.location "%t@.%t@.~~>@.%t" (print_expression e) (Scheme.print_ty_scheme e.scheme) (Scheme.print_ty_scheme scheme);
   let (_, _, joint_cnstrs) = scheme in
   let st = {st with constraints = joint_cnstrs} in
   {
@@ -443,9 +439,11 @@ and wrap_up_expr' scheme st = function
   | Lambda a ->
     Lambda (wrap_up_abs st a)
   | Handler h ->
-    Handler (wrap_up_handler scheme st h)
+    let (_, Type.Handler(_, drty_out), _) = scheme in
+    Handler (wrap_up_handler drty_out st h)
   | FinallyHandler h ->
-    FinallyHandler (wrap_up_finally_handler scheme st h)
+    let (_, Type.Handler(_, drty_out), _) = scheme in
+    FinallyHandler (wrap_up_finally_handler drty_out st h)
   | Tuple es ->
     Tuple (List.map (wrap_up_expr st) es)
   | Record flds ->
@@ -457,13 +455,11 @@ and wrap_up_comp st c =
   let ctx, ty, cnstrs = c.scheme in
   let joint_cnstrs = Constraints.union cnstrs st.constraints in
   let scheme =
-    Scheme.finalize_dirty_scheme ~collect:false ~loc:c.location ctx ty [
+    Scheme.finalize_dirty_scheme ~loc:c.location ctx ty [
       Scheme.just joint_cnstrs;
       Scheme.less_context ~loc:c.location st.less_context;
-      Scheme.trim_context ~loc:c.location st.trim_context
     ]
   in
-  Print.debug ~loc:c.location "%t@.%t@.~~>@.%t" (print_computation c) (Scheme.print_dirty_scheme c.scheme) (Scheme.print_dirty_scheme scheme);
   let (_, _, joint_cnstrs) = scheme in
   let st = {st with constraints = joint_cnstrs} in
   {
@@ -473,32 +469,28 @@ and wrap_up_comp st c =
 and wrap_up_comp' st = function
     | Bind (c1, {term = (p, c2)}) ->
       let c1 = wrap_up_comp st c1 in
-      let ctx_e, (ty_e, _), constraints_e = c1.scheme in
-      let ctx_p, ty_p, constraints_p = p.scheme in
+      let _, (ty_e, _), constraints_e = c1.scheme in
+      let _, ty_p, _ = p.scheme in
       let st' = {
         st with
-        (* less_context = ctx_p @ st.less_context; *)
-        constraints = Constraints.list_union [constraints_p; constraints_e; st.constraints]
+        constraints = Constraints.list_union [constraints_e; st.constraints]
           |> Constraints.add_ty_constraint ~loc:c1.location ty_e ty_p
       }
       in
       let c2 = wrap_up_comp st' c2 in
-      let a = abstraction p c2 in
-      Bind (c1, wrap_up_abs st' a)
+      Bind (c1, abstraction p c2)
     | LetIn (e, {term = (p, c)}) ->
       let e = wrap_up_expr st e in
-      let ctx_e, ty_e, constraints_e = e.scheme in
-      let ctx_p, ty_p, constraints_p = p.scheme in
+      let _, ty_e, constraints_e = e.scheme in
+      let _, ty_p, _ = p.scheme in
       let st' = {
         st with
-        (* less_context = ctx_p @ st.less_context; *)
-        constraints = Constraints.list_union [constraints_p; constraints_e; st.constraints]
+        constraints = Constraints.list_union [constraints_e; st.constraints]
           |> Constraints.add_ty_constraint ~loc:e.location ty_e ty_p
       }
       in
-      (* let c = wrap_up_comp st' c in *)
-      let a = abstraction p c in
-      LetIn (e, wrap_up_abs st' a)
+      let c = wrap_up_comp st' c in
+      LetIn (e, abstraction p c)
     | LetRec (li, c1) ->
       LetRec (Common.assoc_map (wrap_up_abs st) li, wrap_up_comp st c1)
     | Match (e, li) ->
@@ -513,27 +505,24 @@ and wrap_up_comp' st = function
       Call (eff, wrap_up_expr st e, wrap_up_abs st a)
     | Value e ->
       Value (wrap_up_expr st e)
-and wrap_up_handler scheme st h = {
-  effect_clauses = Common.assoc_map (wrap_up_abs2 scheme st) h.effect_clauses;
+and wrap_up_handler drty_out st h = {
+  effect_clauses = Common.assoc_map (wrap_up_abs2 drty_out st) h.effect_clauses;
   value_clause = wrap_up_abs st h.value_clause;
 }
-and wrap_up_finally_handler scheme st (h, finally_clause) =
-  (wrap_up_handler scheme st h, wrap_up_abs st finally_clause)
+and wrap_up_finally_handler drty_out st (h, finally_clause) =
+  (wrap_up_handler drty_out st h, wrap_up_abs st finally_clause)
 and wrap_up_abs st a = 
   let (p, c) = a.term in
   {a with term = (p, wrap_up_comp st c)}
-and wrap_up_abs2 scheme st ({term = (p, k, c)} as a2) =
+and wrap_up_abs2 drty_out st ({term = (p, k, c)} as a2) =
   let st = match k with
   | {term = PNonbinding} -> st
   | {term = PVar k} ->
       let (ctx, _, con_c) = c.scheme in
       begin match (Common.lookup k ctx) with
       | None -> st
-      | Some ty' ->
-        let (Type.Arrow (ty, _)) = Constraints.expand_ty ty' in
-        let (_, Type.Handler (_, ((_, drt) as drty)), con) = scheme in
-        let st' = {st with less_context = [(k, Type.Arrow (ty, drty))] @ st.less_context; constraints = Constraints.list_union [con_c; con; st.constraints] |> Constraints.add_polymorphic_dirt drt.rest} in
-        st'
+      | Some Type.Arrow (ty, _) ->
+        {st with less_context = [(k, Type.Arrow (ty, drty_out))] @ st.less_context}
       end
   in
   {a2 with term = (p, k, wrap_up_comp st c)}
@@ -990,7 +979,6 @@ let let_rec_defs ~loc defs =
         Scheme.just cnstrs_c;
       ] @ chngs)
   in
-  (* let defs = Common.assoc_map (wrap_up_abs {initial_wrap_up_state with trim_context = poly_tys; constraints}) defs in *)
   let poly_tyschs = Common.assoc_map Scheme.tag_polymorphic_dirt poly_tyschs in
   defs, poly_tyschs, change
 
