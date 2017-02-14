@@ -98,7 +98,10 @@ let print_command (cmd, _) ppf =
   | Typed.Use fn ->
       Print.print ppf "#use %S" (compiled_filename fn)
   | Typed.External (x, ty, f) ->
-      Print.print ppf "let %t = ( %s )" (print_variable x) (* (print_type ty) *) f
+      begin match ty with
+      | Type.Arrow (_, (Type.Arrow _, _)) -> Print.print ppf "let %t x = lift_binary ( %s ) x" (print_variable x) f
+      | Type.Arrow (_, _) -> Print.print ppf "let %t x = lift_unary ( %s ) x" (print_variable x) f
+      end
   | Typed.Tydef tydefs ->
       print_tydefs tydefs ppf
   | Typed.Reset ->
