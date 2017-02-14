@@ -46,14 +46,13 @@ type t = {
 
 let is_pure { dirt_poset; region_poset; full_regions; polymorphic_dirts } { Type.ops; Type.rest } =
   let check_region r =
-    RegionPoset.get_prec r region_poset = [] &&
-    not (FullRegions.mem r full_regions) in
+    not (FullRegions.mem r full_regions)
+  in
   List.for_all (fun (_, r) -> check_region r) ops &&
-  DirtPoset.get_prec rest dirt_poset = [] &&
   not (PolymorphicDirts.mem rest polymorphic_dirts) &&
-  List.for_all (fun succ ->
-    not (PolymorphicDirts.mem succ polymorphic_dirts)
-  ) (DirtPoset.get_succ rest dirt_poset)
+  List.for_all (fun prec ->
+    not (PolymorphicDirts.mem prec polymorphic_dirts)
+  ) (DirtPoset.get_prec rest dirt_poset)
 
 type param_expansion = {
   mutable ty_expansion : Type.ty TyMap.t;
@@ -141,8 +140,8 @@ let add_polymorphic_dirt d constraints =
 
 let add_dirt_param_constraint d1 d2 constraints =
   let constraints = {constraints with dirt_poset = DirtPoset.add d1 d2 constraints.dirt_poset} in
-  if PolymorphicDirts.mem d1 constraints.polymorphic_dirts then
-    add_polymorphic_dirt d2 constraints
+  if PolymorphicDirts.mem d2 constraints.polymorphic_dirts then
+    add_polymorphic_dirt d1 constraints
   else
     constraints
 
@@ -341,7 +340,7 @@ let garbage_collect pos neg constraints = {
     Params.region_param_mem r pos
   ) constraints.full_regions;
   polymorphic_dirts = PolymorphicDirts.filter (fun d ->
-    Params.dirt_param_mem d pos
+    Params.dirt_param_mem d neg
   ) constraints.polymorphic_dirts;
 }
 
