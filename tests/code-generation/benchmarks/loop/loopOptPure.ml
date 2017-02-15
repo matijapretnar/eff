@@ -166,8 +166,7 @@ let _incr_handler_30 comp =
                     value
                       (fun _x_32  ->
                          (_k_31 ()) >>
-                           (fun _gen_bind_33  ->
-                              (* value *) (_gen_bind_33 (_x_32 + 1)))))
+                           (fun _gen_bind_33  -> _gen_bind_33 (_x_32 + 1))))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b -> _)
                                                                     -> 
@@ -210,14 +209,14 @@ let _state_handler_50 comp =
                     value
                       (fun _s_55  ->
                          (_k_54 _s_55) >>
-                           (fun _gen_bind_56  -> (* value *) (_gen_bind_56 _s_55))))
+                           (fun _gen_bind_56  -> _gen_bind_56 _s_55)))
            | Effect_Put  ->
                (fun (_s'_51 : int)  ->
                   fun (_k_52 : unit -> _)  ->
                     value
                       (fun _  ->
                          (_k_52 ()) >>
-                           (fun _gen_bind_53  -> (* value *) (_gen_bind_53 _s'_51))))
+                           (fun _gen_bind_53  -> _gen_bind_53 _s'_51)))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b -> _)
                                                                     -> 

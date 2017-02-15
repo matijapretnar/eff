@@ -124,10 +124,10 @@ let to_string _ = assert false
 let lift_unary f x = value (f x) 
 let lift_binary f x = value (fun y  -> value (f x y)) 
 ;;value "End of pervasives"
-let _var_1 = lift_binary (=) 
-let _var_2 = lift_binary (<) 
-let _var_3 = lift_binary (-) 
-let _var_4 = lift_binary (+) 
+let _var_1 x = lift_binary (=) x 
+let _var_2 x = lift_binary (<) x 
+let _var_3 x = lift_binary (-) x 
+let _var_4 x = lift_binary (+) x 
 let rec _loop_pure_5 _n_6 =
   ((_var_1 _n_6) >> (fun _gen_bind_8  -> _gen_bind_8 0)) >>
     (fun _gen_bind_7  ->
@@ -252,3 +252,8 @@ let _state_handler_50 c =
                                                                     _
                                                                     computation)
     } c
+  
+let _test_state_59 _n_60 =
+  (_state_handler_50 (_loop_state_41 _n_60)) >>
+    (fun _gen_bind_61  -> _gen_bind_61 0)
+  

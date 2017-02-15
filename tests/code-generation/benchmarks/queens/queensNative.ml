@@ -1,5 +1,3 @@
-exception Fail
-
 (******************************************************************************)
 
 let no_attack (x, y) (x', y') =
@@ -22,7 +20,9 @@ let available (number_of_queens, x, qs) =
 
 (******************************************************************************)
 
-let queens_one_fail number_of_queens =
+exception Fail
+
+let queens_one_exceptions number_of_queens =
   let rec place (x, qs) =
     if x > number_of_queens then qs else
       let rec choose = function

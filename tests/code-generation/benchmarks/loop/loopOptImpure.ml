@@ -124,10 +124,10 @@ let to_string _ = assert false
 let lift_unary f x = value (f x) 
 let lift_binary f x = value (fun y  -> value (f x y)) 
 ;;value "End of pervasives"
-let _var_1 = (=) 
-let _var_2 = (<) 
-let _var_3 = (-) 
-let _var_4 = (+) 
+let _var_1 x = lift_binary (=) x 
+let _var_2 x = lift_binary (<) x 
+let _var_3 x = lift_binary (-) x 
+let _var_4 x = lift_binary (+) x 
 let rec _loop_pure_5 _n_6 =
   match run ((run (lift_binary (=) _n_6)) 0) with
   | true  -> value ()

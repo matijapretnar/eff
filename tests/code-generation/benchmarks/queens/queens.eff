@@ -1,3 +1,20 @@
+external ( <> ) : int -> int -> bool = "<>"
+external ( < ) : int -> int -> bool = "<"
+external ( > ) : int -> int -> bool = ">"
+external ( - ) : int -> int -> int = "-"
+external ( + ) : int -> int -> int = "+"
+external ( ~- ) : int -> int = "~-"
+
+let absurd void = match void with;;
+
+let abs x = if x < 0 then -x else x
+
+let rec (@) xs ys =
+  match xs with
+  | [] -> ys
+  | x :: xs -> x :: (xs @ ys)
+
+(******************************************************************************)
 let no_attack (x, y) (x', y') =
   x <> x' && y <> y' && abs (x - x') <> abs (y - y')
 

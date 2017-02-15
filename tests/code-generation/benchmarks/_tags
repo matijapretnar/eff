@@ -2,6 +2,5 @@
 <queens/**>: include
 <interp/**>: include
 <parser/**>: include
-<loopEffect/**>: include
 true:package(core, core_bench)
 true:thread

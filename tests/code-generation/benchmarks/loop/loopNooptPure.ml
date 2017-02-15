@@ -187,11 +187,10 @@ let _incr_handler_30 comp =
                       (fun _x_32  ->
                          (_k_31 ()) >>
                            (fun _gen_bind_33  ->
-                              (* value *)
-                                (let _gen_bind_34 =
-                                   let _gen_bind_35 = _var_4 _x_32  in
-                                   _gen_bind_35 1  in
-                                 _gen_bind_33 _gen_bind_34))))
+                              let _gen_bind_34 =
+                                let _gen_bind_35 = _var_4 _x_32  in
+                                _gen_bind_35 1  in
+                              _gen_bind_33 _gen_bind_34)))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b -> _)
                                                                     -> 
@@ -199,8 +198,9 @@ let _incr_handler_30 comp =
     } comp
   
 let _test_incr_38 _n_39 =
-  _incr_handler_30 (_loop_incr_24 _n_39) >> fun _gen_bind_40 ->
-  _gen_bind_40 0 
+  (_incr_handler_30 (_loop_incr_24 _n_39)) >>
+    (fun _gen_bind_40  -> _gen_bind_40 0)
+  
 type (_,_) effect +=
   | Effect_Get: (unit,int) effect 
 type (_,_) effect +=
@@ -236,14 +236,14 @@ let _state_handler_50 comp =
                     value
                       (fun _s_55  ->
                          (_k_54 _s_55) >>
-                           (fun _gen_bind_56  -> (* value *) (_gen_bind_56 _s_55))))
+                           (fun _gen_bind_56  -> _gen_bind_56 _s_55)))
            | Effect_Put  ->
                (fun (_s'_51 : int)  ->
                   fun (_k_52 : unit -> _)  ->
                     value
                       (fun _  ->
                          (_k_52 ()) >>
-                           (fun _gen_bind_53  -> (* value *) (_gen_bind_53 _s'_51))))
+                           (fun _gen_bind_53  -> _gen_bind_53 _s'_51)))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b -> _)
                                                                     -> 
@@ -251,5 +251,6 @@ let _state_handler_50 comp =
     } comp
   
 let _test_state_59 _n_60 =
-  _state_handler_50 (_loop_state_41 _n_60) >> fun _gen_bind_61 ->
-  _gen_bind_61 0 
+  (_state_handler_50 (_loop_state_41 _n_60)) >>
+    (fun _gen_bind_61  -> _gen_bind_61 0)
+  

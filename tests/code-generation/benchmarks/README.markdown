@@ -23,19 +23,15 @@ and run it with
 
 We run the following benchmarks:
 
-* a simple loop that could fail, though never does
-* the same loop as before, though written with a tail call
+* a pure loop
+* a loop with a latent effet that is never called
+* a loop that increments a counter
+* a loop that increments a reference
 * finding a first solution of the n-queens problem using backtracking
 * finding all solutions of the n-queens problem
 
 We compare:
 
-* the automatically generated code using our library (marked with a `Handlers - /commit SHA/`)
-* a hand-written solution that uses our library (marked with `Handlers - hand-written`)
-* a natural solution one would write without handlers (marked with `Native - /technique used/`)
-
-The compared commits:
-
-* `02e9f8c`: 2016-12-23 (first time we use generated recursive functions)
-* `ce4263d`: 2016-10-10 (when we started with systematic benchmarks)
-* `7cc7606`: 2016-03-18 (from Dagstuhl the first generated code that uses the new library)
+* the automatically generated code (marked with a `Generated - /variant/`)
+* a hand-written solution that uses our library (marked with `Hand written`)
+* a natural solution one would write without handlers (marked with `Native - /variant/`)
