@@ -91,9 +91,6 @@ let () =
   if run_parser then begin
   Printf.printf "PARSER BENCHMARK:\n";
   Command.run (Bench.make_command [
-      Bench.Test.create ~name:"Handlers - not optimized" (fun () -> Parserunopt._parseTest_348 ());
-      Bench.Test.create ~name:"Handlers - faebf45 (03-01-2017)" (fun () -> Parserfaebf45._parseTest_348 ());
-      Bench.Test.create ~name:"Handlers - 4f3a6da (04-01-2017)" (fun () -> Parser4f3a6da._parseTest_348 ());
       Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> ParserNoOptImpure._parseTest_98 ());
       (* Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> ParserOptImpure._parseTest_98 ()); *)
       (* Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> ParserNoOptPure._parseTest_98 ()); *)
@@ -105,8 +102,6 @@ let () =
   if run_interp then begin
   Printf.printf "INTERPRETER BENCHMARK:\n";
   Command.run (Bench.make_command [
-      Bench.Test.create ~name:"Handlers - not optimized" (fun () -> Interpunopt._bigTest_424 ());
-      Bench.Test.create ~name:"Handlers - 4f3a6da (04-01-2017)" (fun () -> Interp4f3a6da._bigTest_424 ());
       Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> InterpNoOptImpure._bigTest_179 ());
       (* Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> InterpOptImpure._bigTest_179 ()); *)
       (* Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> InterpNoOptPure._bigTest_179 ()); *)
