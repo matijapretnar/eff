@@ -10,8 +10,8 @@ and run_loop_incr = true
 and run_loop_state = true
 and run_queens_one = true
 and run_queens_all = true
+and run_parser = true
 and run_interp = true
-and run_parser_short = true
 
 let () =
   if run_loop_pure then begin
@@ -88,21 +88,30 @@ let () =
     ]);
   Printf.printf "\n\n"
   end;
-  if run_interp then begin
-  Printf.printf "INTERPRETER BENCHMARK:\n";
-  Command.run (Bench.make_command [
-      Bench.Test.create ~name:"Handlers - not optimized" (fun () -> Interpunopt._bigTest_424 ());
-      Bench.Test.create ~name:"Handlers - 4f3a6da (04-01-2017)" (fun () -> Interp4f3a6da._bigTest_424 ());
-    ]);
-  Printf.printf "\n\n"
-  end;
-  if run_parser_short then begin
+  if run_parser then begin
   Printf.printf "PARSER BENCHMARK:\n";
   Command.run (Bench.make_command [
       Bench.Test.create ~name:"Handlers - not optimized" (fun () -> Parserunopt._parseTest_348 ());
       Bench.Test.create ~name:"Handlers - faebf45 (03-01-2017)" (fun () -> Parserfaebf45._parseTest_348 ());
       Bench.Test.create ~name:"Handlers - 4f3a6da (04-01-2017)" (fun () -> Parser4f3a6da._parseTest_348 ());
-      Bench.Test.create ~name:"Native - option" (fun () -> ParserNative.parseTest ());
+      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> ParserNoOptImpure._parseTest_98 ());
+      (* Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> ParserOptImpure._parseTest_98 ()); *)
+      (* Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> ParserNoOptPure._parseTest_98 ()); *)
+      (* Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> ParserOptPure._parseTest_98 ()); *)
+      Bench.Test.create ~name:"Native" (fun () -> ParserNative.parseTest ());
+    ]);
+  Printf.printf "\n\n"
+  end;
+  if run_interp then begin
+  Printf.printf "INTERPRETER BENCHMARK:\n";
+  Command.run (Bench.make_command [
+      Bench.Test.create ~name:"Handlers - not optimized" (fun () -> Interpunopt._bigTest_424 ());
+      Bench.Test.create ~name:"Handlers - 4f3a6da (04-01-2017)" (fun () -> Interp4f3a6da._bigTest_424 ());
+      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> InterpNoOptImpure._bigTest_179 ());
+      (* Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> InterpOptImpure._bigTest_179 ()); *)
+      (* Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> InterpNoOptPure._bigTest_179 ()); *)
+      (* Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> InterpOptPure._bigTest_179 ()); *)
+      (* Bench.Test.create ~name:"Native" (fun () -> InterpNative.bigTest ()); *)
     ]);
   Printf.printf "\n\n"
   end;

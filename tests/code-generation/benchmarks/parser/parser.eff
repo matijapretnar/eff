@@ -1,3 +1,12 @@
+let absurd void = match void with;;
+external ( = ) : 'a -> 'a -> bool = "="
+let rec (@) xs ys =
+  match xs with
+  | [] -> ys
+  | x :: xs -> x :: (xs @ ys)
+external ( + ) : int -> int -> int = "+"
+external ( * ) : int -> int -> int = "*"
+
 (***********************************
 *********** The Parser *************
 ***********************************)

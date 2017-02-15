@@ -1,3 +1,14 @@
+let absurd void = match void with;;
+external ( = ) : 'a -> 'a -> bool = "="
+external ( + ) : int -> int -> int = "+"
+external ( * ) : int -> int -> int = "*"
+external ( - ) : int -> int -> int = "-"
+external ( ~-) : int -> int = "~-"
+external ( / ) : int -> int -> int = "/"
+let rec (@) xs ys =
+  match xs with
+  | [] -> ys
+  | x :: xs -> x :: (xs @ ys)
 
 (***********************************
 ******* The Building Blocks ********
