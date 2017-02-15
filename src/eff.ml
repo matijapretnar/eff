@@ -137,6 +137,7 @@ let compile_file st filename =
 
   let compiled_file = CommonPrint.compiled_filename filename in
   ignore (Sys.command ("echo '(*\n=== GENERATED FROM " ^ filename ^ " ===' > " ^ compiled_file));
+  ignore (Sys.command ("echo \"commit SHA: $(git rev-parse HEAD)\" >> " ^ compiled_file));
   ignore (Sys.command ("echo '=== BEGIN SOURCE ==='" ^ " >> " ^ compiled_file));
   ignore (Sys.command ("echo ''" ^ " >> " ^ compiled_file));
   ignore (Sys.command ("cat " ^ filename ^ " >> " ^ compiled_file));
