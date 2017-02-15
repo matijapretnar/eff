@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM parser.eff ===
-commit SHA: 0a8185f252df28fb2b1a33ec39799392a1190567
+commit SHA: ec8d6d094577edb51f0603c9a7d9f74d8bd5c47a
 === BEGIN SOURCE ===
 
 let absurd void = match void with;;
@@ -20,7 +20,7 @@ external ( * ) : int -> int -> int = "*"
 * Effects
 ********************************)
 
-effect Symbol : string -> unit -> string;;
+effect Symbol : string -> string;;
 effect Fail : unit -> empty;;
 effect Decide : unit -> bool
 
@@ -32,14 +32,14 @@ let parse = handler
     | val y -> (fun s ->
         begin match s with
         | [] -> y
-        | _ -> absurd (#Fail ())
+        | _ -> (absurd (#Fail ()))
         end
     )
     | #Symbol c k ->
         fun s ->
         (begin match s with
-            | [] -> k (fun () -> (absurd (#Fail ()))) []
-            | (x :: xs) -> if (c = x) then k (fun () -> x) xs else k (fun () -> (absurd (#Fail ()))) s
+            | [] -> (absurd (#Fail ()))
+            | (x :: xs) -> if (c = x) then k x xs else (absurd (#Fail ()))
         end
         )
 ;;
@@ -87,16 +87,15 @@ let rec toNum l = parseNum (l, 0);;
 ********************************)
 
 let digit () =
-    with backtrack handle (
+
         let nums = ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"] in
         let rec checkNums n =
             begin match n with
             | [] -> (absurd (#Fail ()))
             | (x :: xs) ->
-                if (#Decide ()) then (#Symbol x ()) else (checkNums xs)
+                if (#Decide ()) then (#Symbol x) else (checkNums xs)
             end in
         checkNums nums
-    )
 ;;
 
 let rec many m = if (#Decide ()) then (m ()) else ([]);;
@@ -114,15 +113,15 @@ let rec expr () =
                 let i = many1 () in
                 (toNum i)
             ) else (
-                let p = #Symbol "(" () in
+                let p = #Symbol "(" in
                 let j = expr () in
-                let p = #Symbol ")" () in
+                let p = #Symbol ")" in
                 j
             )
         in
         if (#Decide ()) then (
             let i = factor () in
-            let p = #Symbol "*" () in
+            let p = #Symbol "*" in
             let j = term () in
             i * j
         ) else (
@@ -131,7 +130,7 @@ let rec expr () =
     in
     if (#Decide ()) then (
         let i = term () in
-        let p = #Symbol "+" () in
+        let p = #Symbol "+" in
         let j = expr () in
         i + j
     ) else (
@@ -144,13 +143,12 @@ let rec expr () =
 ********************************)
 
 let parseTest () =
-    with allsols handle (
-        (with parse handle (
+    with allsols handle (with parse handle (
             expr ()
         )) ["4"; "3"; "*"; "("; "3"; "+"; "3"; ")"]
-    )
 ;;
 
+let x = parseTest ()
 === END SOURCE ===
 *)
 
@@ -218,7 +216,7 @@ let rec _var_4 _xs_5 =
 let _var_11 x = lift_binary (+) x 
 let _var_12 x = lift_binary ( * ) x 
 type (_,_) effect +=
-  | Effect_Symbol: (string,unit -> string computation) effect 
+  | Effect_Symbol: (string,string) effect 
 type (_,_) effect +=
   | Effect_Fail: (unit,unit) effect 
 type (_,_) effect +=
@@ -227,11 +225,11 @@ let _parse_13 c =
   handler
     {
       value_clause =
-        (fun _y_26  ->
+        (fun _y_24  ->
            value
-             (fun _s_27  ->
-                match _s_27 with
-                | [] -> value _y_26
+             (fun _s_25  ->
+                match _s_25 with
+                | [] -> value _y_24
                 | _ ->
                     call Effect_Fail ()
                       (fun _result_3  -> _absurd_1 _result_3)));
@@ -240,31 +238,23 @@ let _parse_13 c =
           (match x with
            | Effect_Symbol  ->
                (fun (_c_14 : string)  ->
-                  fun (_k_15 : (unit -> string computation) -> _ computation)
-                     ->
+                  fun (_k_15 : string -> _ computation)  ->
                     value
                       (fun _s_16  ->
                          match _s_16 with
                          | [] ->
-                             (run
-                                (_k_15
-                                   (fun ()  ->
-                                      call Effect_Fail ()
-                                        (fun _result_6  ->
-                                           _absurd_1 _result_6)))) []
-                         | _x_19::_xs_20 ->
-                             (match run ((run (lift_binary (=) _c_14)) _x_19)
+                             call Effect_Fail ()
+                               (fun _result_6  -> _absurd_1 _result_6)
+                         | _x_18::_xs_19 ->
+                             (match run ((run (lift_binary (=) _c_14)) _x_18)
                               with
                               | true  ->
-                                  (run (_k_15 (fun ()  -> value _x_19)))
-                                    _xs_20
+                                  (_k_15 _x_18) >>
+                                    ((fun _gen_bind_22  ->
+                                        _gen_bind_22 _xs_19))
                               | false  ->
-                                  (run
-                                     (_k_15
-                                        (fun ()  ->
-                                           call Effect_Fail ()
-                                             (fun _result_9  ->
-                                                _absurd_1 _result_9)))) _s_16)))
+                                  call Effect_Fail ()
+                                    (fun _result_9  -> _absurd_1 _result_9))))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b ->
                                                                     _
@@ -274,21 +264,21 @@ let _parse_13 c =
                                                                     computation)
     } c
   
-let _allsols_29 c =
+let _allsols_27 c =
   handler
     {
-      value_clause = (fun _x_34  -> value [_x_34]);
+      value_clause = (fun _x_32  -> value [_x_32]);
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_Decide  ->
                (fun (_ : unit)  ->
-                  fun (_k_30 : bool -> _ computation)  ->
-                    (_k_30 true) >>
-                      (fun _gen_bind_32  ->
-                         let _gen_bind_31 = run (_var_4 _gen_bind_32)  in
-                         (_k_30 false) >>
-                           (fun _gen_bind_33  -> _gen_bind_31 _gen_bind_33)))
+                  fun (_k_28 : bool -> _ computation)  ->
+                    (_k_28 true) >>
+                      (fun _gen_bind_30  ->
+                         let _gen_bind_29 = run (_var_4 _gen_bind_30)  in
+                         (_k_28 false) >>
+                           (fun _gen_bind_31  -> _gen_bind_29 _gen_bind_31)))
            | Effect_Fail  ->
                (fun (_ : unit)  ->
                   fun (_ : unit -> _ computation)  -> value [])
@@ -301,17 +291,33 @@ let _allsols_29 c =
                                                                     computation)
     } c
   
-let _backtrack_35 c =
+let _backtrack_33 c =
   handler
     {
-      value_clause = (fun _gen_id_par_100  -> value _gen_id_par_100);
+      value_clause = (fun _gen_id_par_94  -> value _gen_id_par_94);
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_Decide  ->
                (fun (_ : unit)  ->
-                  fun (_k_36 : bool -> _ computation)  ->
-                    value (run (_k_36 true)))
+                  fun (_k_34 : bool -> _ computation)  ->
+                    (fun c  ->
+                       handler
+                         {
+                           value_clause =
+                             (fun _gen_id_par_95  -> value _gen_id_par_95);
+                           effect_clauses = fun (type a) -> fun (type b) ->
+                             fun (x : (a,b) effect)  ->
+                               (match x with
+                                | Effect_Fail  ->
+                                    (fun (_ : unit)  ->
+                                       fun (_ : unit -> _ computation)  ->
+                                         _k_34 false)
+                                | eff' ->
+                                    (fun arg  ->
+                                       fun k  -> Call (eff', arg, k)) : 
+                               a -> (b -> _ computation) -> _ computation)
+                         } c) (_k_34 true))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b ->
                                                                     _
@@ -321,1234 +327,944 @@ let _backtrack_35 c =
                                                                     computation)
     } c
   
-let _createNumber_37 (_prev_38,_num_39) =
-  (run (lift_binary (+) (run ((run (lift_binary ( * ) _prev_38)) 10))))
-    _num_39
+let _createNumber_35 (_prev_36,_num_37) =
+  (run (lift_binary (+) (run ((run (lift_binary ( * ) _prev_36)) 10))))
+    _num_37
   
-let rec _parseNum_43 (_l_44,_v_45) =
-  match _l_44 with
-  | [] -> value _v_45
-  | _x_46::_xs_47 ->
-      (match _x_46 with
-       | "0" -> _parseNum_43 (_xs_47, (run (_createNumber_37 (_v_45, 0))))
-       | "1" -> _parseNum_43 (_xs_47, (run (_createNumber_37 (_v_45, 1))))
-       | "2" -> _parseNum_43 (_xs_47, (run (_createNumber_37 (_v_45, 2))))
-       | "3" -> _parseNum_43 (_xs_47, (run (_createNumber_37 (_v_45, 3))))
-       | "4" -> _parseNum_43 (_xs_47, (run (_createNumber_37 (_v_45, 4))))
-       | "5" -> _parseNum_43 (_xs_47, (run (_createNumber_37 (_v_45, 5))))
-       | "6" -> _parseNum_43 (_xs_47, (run (_createNumber_37 (_v_45, 6))))
-       | "7" -> _parseNum_43 (_xs_47, (run (_createNumber_37 (_v_45, 7))))
-       | "8" -> _parseNum_43 (_xs_47, (run (_createNumber_37 (_v_45, 8))))
-       | "9" -> _parseNum_43 (_xs_47, (run (_createNumber_37 (_v_45, 9)))))
+let rec _parseNum_41 (_l_42,_v_43) =
+  match _l_42 with
+  | [] -> value _v_43
+  | _x_44::_xs_45 ->
+      (match _x_44 with
+       | "0" -> _parseNum_41 (_xs_45, (run (_createNumber_35 (_v_43, 0))))
+       | "1" -> _parseNum_41 (_xs_45, (run (_createNumber_35 (_v_43, 1))))
+       | "2" -> _parseNum_41 (_xs_45, (run (_createNumber_35 (_v_43, 2))))
+       | "3" -> _parseNum_41 (_xs_45, (run (_createNumber_35 (_v_43, 3))))
+       | "4" -> _parseNum_41 (_xs_45, (run (_createNumber_35 (_v_43, 4))))
+       | "5" -> _parseNum_41 (_xs_45, (run (_createNumber_35 (_v_43, 5))))
+       | "6" -> _parseNum_41 (_xs_45, (run (_createNumber_35 (_v_43, 6))))
+       | "7" -> _parseNum_41 (_xs_45, (run (_createNumber_35 (_v_43, 7))))
+       | "8" -> _parseNum_41 (_xs_45, (run (_createNumber_35 (_v_43, 8))))
+       | "9" -> _parseNum_41 (_xs_45, (run (_createNumber_35 (_v_43, 9)))))
   
-let rec _toNum_58 _l_59 = _parseNum_43 (_l_59, 0) 
-let _digit_60 () =
-  let rec _checkNums_62 _n_63 =
-    match _n_63 with
+let rec _toNum_56 _l_57 = _parseNum_41 (_l_57, 0) 
+let _digit_58 () =
+  let rec _checkNums_60 _n_61 =
+    match _n_61 with
     | [] -> call Effect_Fail () (fun _result_12  -> _absurd_1 _result_12)
-    | _x_65::_xs_66 ->
+    | _x_63::_xs_64 ->
         call Effect_Decide ()
-          (fun _result_18  ->
-             match _result_18 with
+          (fun _result_17  ->
+             match _result_17 with
              | true  ->
-                 call Effect_Symbol _x_65 (fun _result_15  -> _result_15 ())
-             | false  -> _checkNums_62 _xs_66)
+                 call Effect_Symbol _x_63
+                   (fun _result_14  -> value _result_14)
+             | false  -> _checkNums_60 _xs_64)
      in
-  let rec _newvar_21 _n_63 =
-    match _n_63 with
-    | [] ->
-        call Effect_Fail ()
-          (fun _result_24  -> value (run (_absurd_1 _result_24)))
-    | _x_65::_xs_66 ->
-        value
-          (run
-             (call Effect_Symbol _x_65
-                (fun _result_33  -> value (run (_result_33 ())))))
-     in
-  _newvar_21 ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"] 
-let rec _many_69 _m_70 =
+  _checkNums_60 ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"] 
+let rec _many_66 _m_67 =
   call Effect_Decide ()
-    (fun _result_41  ->
-       match _result_41 with | true  -> _m_70 () | false  -> value [])
+    (fun _result_20  ->
+       match _result_20 with | true  -> _m_67 () | false  -> value [])
   
-let rec _many1_72 () =
-  (_digit_60 ()) >>
-    (fun _x_73  ->
-       (_many_69 _many1_72) >> (fun _xs_74  -> (run (_var_4 [_x_73])) _xs_74))
+let rec _many1_69 () =
+  (_digit_58 ()) >>
+    (fun _x_70  ->
+       (_many_66 _many1_69) >> (fun _xs_71  -> (run (_var_4 [_x_70])) _xs_71))
   
-let rec _expr_76 () =
-  let rec _term_77 () =
-    let rec _factor_78 () =
+let rec _expr_73 () =
+  let rec _term_74 () =
+    let rec _factor_75 () =
       call Effect_Decide ()
-        (fun _result_66  ->
-           match _result_66 with
-           | true  -> (_many1_72 ()) >> ((fun _i_80  -> _toNum_58 _i_80))
+        (fun _result_41  ->
+           match _result_41 with
+           | true  -> (_many1_69 ()) >> ((fun _i_77  -> _toNum_56 _i_77))
            | false  ->
                call Effect_Symbol "("
-                 (fun _result_63  ->
-                    (_expr_76 ()) >>
-                      (fun _j_83  ->
+                 (fun _result_38  ->
+                    (_expr_73 ()) >>
+                      (fun _j_79  ->
                          call Effect_Symbol ")"
-                           (fun _result_59  -> value _j_83))))
+                           (fun _result_35  -> value _j_79))))
        in
     call Effect_Decide ()
-      (fun _result_55  ->
-         match _result_55 with
+      (fun _result_32  ->
+         match _result_32 with
          | true  ->
-             (_factor_78 ()) >>
-               ((fun _i_87  ->
+             (_factor_75 ()) >>
+               ((fun _i_82  ->
                    call Effect_Symbol "*"
-                     (fun _result_52  ->
-                        (_term_77 ()) >>
-                          (fun _j_90  ->
-                             (run (lift_binary ( * ) _i_87)) _j_90))))
-         | false  -> _factor_78 ())
+                     (fun _result_29  ->
+                        (_term_74 ()) >>
+                          (fun _j_84  ->
+                             (run (lift_binary ( * ) _i_82)) _j_84))))
+         | false  -> _factor_75 ())
      in
   call Effect_Decide ()
-    (fun _result_48  ->
-       match _result_48 with
+    (fun _result_26  ->
+       match _result_26 with
        | true  ->
-           (_term_77 ()) >>
-             ((fun _i_93  ->
+           (_term_74 ()) >>
+             ((fun _i_87  ->
                  call Effect_Symbol "+"
-                   (fun _result_45  ->
-                      (_expr_76 ()) >>
-                        (fun _j_96  -> (run (lift_binary (+) _i_93)) _j_96))))
-       | false  -> _term_77 ())
+                   (fun _result_23  ->
+                      (_expr_73 ()) >>
+                        (fun _j_89  -> (run (lift_binary (+) _i_87)) _j_89))))
+       | false  -> _term_74 ())
   
-let _parseTest_98 () =
-  let rec _newvar_283 () =
-    let rec _term_284 () =
-      let rec _factor_285 () =
+let _parseTest_91 () =
+  let rec _newvar_222 () =
+    let rec _term_223 () =
+      let rec _factor_224 () =
         call Effect_Decide ()
-          (fun _result_286  ->
-             match _result_286 with
-             | true  -> (_many1_72 ()) >> ((fun _i_287  -> _toNum_58 _i_287))
+          (fun _result_225  ->
+             match _result_225 with
+             | true  -> (_many1_69 ()) >> ((fun _i_226  -> _toNum_56 _i_226))
              | false  ->
                  call Effect_Symbol "("
-                   (fun _result_288  ->
-                      (_expr_76 ()) >>
-                        (fun _j_289  ->
+                   (fun _result_227  ->
+                      (_expr_73 ()) >>
+                        (fun _j_228  ->
                            call Effect_Symbol ")"
-                             (fun _result_290  -> value _j_289))))
+                             (fun _result_229  -> value _j_228))))
          in
       call Effect_Decide ()
-        (fun _result_291  ->
-           match _result_291 with
+        (fun _result_230  ->
+           match _result_230 with
            | true  ->
-               (_factor_285 ()) >>
-                 ((fun _i_292  ->
+               (_factor_224 ()) >>
+                 ((fun _i_231  ->
                      call Effect_Symbol "*"
-                       (fun _result_293  ->
-                          (_term_284 ()) >>
-                            (fun _j_294  ->
-                               (run (lift_binary ( * ) _i_292)) _j_294))))
-           | false  -> _factor_285 ())
+                       (fun _result_232  ->
+                          (_term_223 ()) >>
+                            (fun _j_233  ->
+                               (run (lift_binary ( * ) _i_231)) _j_233))))
+           | false  -> _factor_224 ())
        in
     call Effect_Decide ()
-      (fun _result_295  ->
-         match _result_295 with
+      (fun _result_234  ->
+         match _result_234 with
          | true  ->
              ((fun c  ->
                  handler
                    {
                      value_clause =
-                       (fun _i_296  ->
+                       (fun _i_235  ->
                           value
-                            (fun _s_297  ->
-                               match _s_297 with
+                            (fun _s_236  ->
+                               match _s_236 with
                                | [] ->
-                                   (run
-                                      ((fun c  ->
-                                          handler
-                                            {
-                                              value_clause =
-                                                (fun _j_298  ->
-                                                   let _y_299 =
-                                                     run
-                                                       ((run
-                                                           (lift_binary (+)
-                                                              _i_296)) _j_298)
-                                                      in
-                                                   value
-                                                     (fun _s_300  ->
-                                                        match _s_300 with
-                                                        | [] -> value _y_299
-                                                        | _ ->
-                                                            call Effect_Fail
-                                                              ()
-                                                              (fun
-                                                                 _result_301 
-                                                                 ->
-                                                                 _absurd_1
-                                                                   _result_301)));
-                                              effect_clauses = fun (type a)
-                                                -> fun (type b) ->
-                                                fun (x : (a,b) effect)  ->
-                                                  (match x with
-                                                   | Effect_Symbol  ->
-                                                       (fun (_c_303 : string)
-                                                           ->
-                                                          fun
-                                                            (_k_302 :
-                                                              (unit ->
-                                                                 string
-                                                                   computation)
-                                                                ->
-                                                                _ computation)
-                                                             ->
-                                                            value
-                                                              (fun _s_304  ->
-                                                                 match _s_304
-                                                                 with
-                                                                 | [] ->
-                                                                    (run
-                                                                    (_k_302
-                                                                    (fun () 
-                                                                    ->
-                                                                    call
-                                                                    Effect_Fail
-                                                                    ()
-                                                                    (fun
-                                                                    _result_305
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_305))))
-                                                                    []
-                                                                 | _x_307::_xs_306
-                                                                    ->
-                                                                    (match 
-                                                                    run
-                                                                    ((run
-                                                                    (lift_binary
-                                                                    (=)
-                                                                    _c_303))
-                                                                    _x_307)
-                                                                    with
-                                                                    | 
-                                                                    true  ->
-                                                                    (run
-                                                                    (_k_302
-                                                                    (fun () 
-                                                                    ->
-                                                                    value
-                                                                    _x_307)))
-                                                                    _xs_306
-                                                                    | 
-                                                                    false  ->
-                                                                    (run
-                                                                    (_k_302
-                                                                    (fun () 
-                                                                    ->
-                                                                    call
-                                                                    Effect_Fail
-                                                                    ()
-                                                                    (fun
-                                                                    _result_308
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_308))))
-                                                                    _s_304)))
-                                                   | eff' ->
-                                                       (fun arg  ->
-                                                          fun k  ->
-                                                            Call
-                                                              (eff', arg, k)) : 
-                                                  a ->
-                                                    (b -> _ computation) ->
-                                                      _ computation)
-                                            } c) (_expr_76 ()))) []
-                               | _x_310::_xs_309 ->
+                                   call Effect_Fail ()
+                                     (fun _result_237  ->
+                                        _absurd_1 _result_237)
+                               | _x_239::_xs_238 ->
                                    (match run
                                             ((run (lift_binary (=) "+"))
-                                               _x_310)
+                                               _x_239)
                                     with
                                     | true  ->
-                                        (run
-                                           ((fun c  ->
-                                               handler
-                                                 {
-                                                   value_clause =
-                                                     (fun _j_311  ->
-                                                        let _y_312 =
-                                                          run
-                                                            ((run
-                                                                (lift_binary
-                                                                   (+) _i_296))
-                                                               _j_311)
-                                                           in
-                                                        value
-                                                          (fun _s_313  ->
-                                                             match _s_313
-                                                             with
-                                                             | [] ->
-                                                                 value _y_312
-                                                             | _ ->
-                                                                 call
-                                                                   Effect_Fail
-                                                                   ()
-                                                                   (fun
-                                                                    _result_314
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_314)));
-                                                   effect_clauses = fun (type
-                                                     a) -> fun (type b) ->
-                                                     fun (x : (a,b) effect) 
-                                                       ->
-                                                       (match x with
-                                                        | Effect_Symbol  ->
-                                                            (fun
-                                                               (_c_316 :
-                                                                 string)
-                                                                ->
-                                                               fun
-                                                                 (_k_315 :
-                                                                   (unit ->
-                                                                    string
+                                        ((fun c  ->
+                                            handler
+                                              {
+                                                value_clause =
+                                                  (fun _j_241  ->
+                                                     let _y_242 =
+                                                       run
+                                                         ((run
+                                                             (lift_binary (+)
+                                                                _i_235))
+                                                            _j_241)
+                                                        in
+                                                     value
+                                                       (fun _s_243  ->
+                                                          match _s_243 with
+                                                          | [] ->
+                                                              value _y_242
+                                                          | _ ->
+                                                              call
+                                                                Effect_Fail
+                                                                ()
+                                                                (fun
+                                                                   _result_244
+                                                                    ->
+                                                                   _absurd_1
+                                                                    _result_244)));
+                                                effect_clauses = fun (type a)
+                                                  -> fun (type b) ->
+                                                  fun (x : (a,b) effect)  ->
+                                                    (match x with
+                                                     | Effect_Symbol  ->
+                                                         (fun
+                                                            (_c_246 : string)
+                                                             ->
+                                                            fun
+                                                              (_k_245 :
+                                                                string ->
+                                                                  _
                                                                     computation)
-                                                                    ->
-                                                                    _
-                                                                    computation)
-                                                                  ->
-                                                                 value
-                                                                   (fun
-                                                                    _s_317 
-                                                                    ->
-                                                                    match _s_317
-                                                                    with
-                                                                    | 
-                                                                    [] ->
-                                                                    (run
-                                                                    (_k_315
-                                                                    (fun () 
-                                                                    ->
+                                                               ->
+                                                              value
+                                                                (fun _s_247 
+                                                                   ->
+                                                                   match _s_247
+                                                                   with
+                                                                   | 
+                                                                   [] ->
                                                                     call
                                                                     Effect_Fail
                                                                     ()
                                                                     (fun
-                                                                    _result_318
+                                                                    _result_248
                                                                      ->
                                                                     _absurd_1
-                                                                    _result_318))))
-                                                                    []
-                                                                    | 
-                                                                    _x_320::_xs_319
+                                                                    _result_248)
+                                                                   | 
+                                                                   _x_250::_xs_249
                                                                     ->
                                                                     (match 
                                                                     run
                                                                     ((run
                                                                     (lift_binary
                                                                     (=)
-                                                                    _c_316))
-                                                                    _x_320)
+                                                                    _c_246))
+                                                                    _x_250)
                                                                     with
                                                                     | 
                                                                     true  ->
-                                                                    (run
-                                                                    (_k_315
-                                                                    (fun () 
-                                                                    ->
-                                                                    value
-                                                                    _x_320)))
-                                                                    _xs_319
+                                                                    (_k_245
+                                                                    _x_250)
+                                                                    >>
+                                                                    ((fun
+                                                                    _gen_bind_251
+                                                                     ->
+                                                                    _gen_bind_251
+                                                                    _xs_249))
                                                                     | 
                                                                     false  ->
-                                                                    (run
-                                                                    (_k_315
-                                                                    (fun () 
-                                                                    ->
                                                                     call
                                                                     Effect_Fail
                                                                     ()
                                                                     (fun
-                                                                    _result_321
+                                                                    _result_252
                                                                      ->
                                                                     _absurd_1
-                                                                    _result_321))))
-                                                                    _s_317)))
-                                                        | eff' ->
-                                                            (fun arg  ->
-                                                               fun k  ->
-                                                                 Call
-                                                                   (eff',
-                                                                    arg, k)) : 
-                                                       a ->
-                                                         (b -> _ computation)
-                                                           -> _ computation)
-                                                 } c) (_expr_76 ()))) _xs_309
+                                                                    _result_252))))
+                                                     | eff' ->
+                                                         (fun arg  ->
+                                                            fun k  ->
+                                                              Call
+                                                                (eff', arg,
+                                                                  k)) : 
+                                                    a ->
+                                                      (b -> _ computation) ->
+                                                        _ computation)
+                                              } c) (_expr_73 ()))
+                                          >>
+                                          ((fun _gen_bind_240  ->
+                                              _gen_bind_240 _xs_238))
                                     | false  ->
-                                        (run
-                                           ((fun c  ->
-                                               handler
-                                                 {
-                                                   value_clause =
-                                                     (fun _j_322  ->
-                                                        let _y_323 =
-                                                          run
-                                                            ((run
-                                                                (lift_binary
-                                                                   (+) _i_296))
-                                                               _j_322)
-                                                           in
-                                                        value
-                                                          (fun _s_324  ->
-                                                             match _s_324
-                                                             with
-                                                             | [] ->
-                                                                 value _y_323
-                                                             | _ ->
-                                                                 call
-                                                                   Effect_Fail
-                                                                   ()
-                                                                   (fun
-                                                                    _result_325
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_325)));
-                                                   effect_clauses = fun (type
-                                                     a) -> fun (type b) ->
-                                                     fun (x : (a,b) effect) 
-                                                       ->
-                                                       (match x with
-                                                        | Effect_Symbol  ->
-                                                            (fun
-                                                               (_c_327 :
-                                                                 string)
-                                                                ->
-                                                               fun
-                                                                 (_k_326 :
-                                                                   (unit ->
-                                                                    string
-                                                                    computation)
-                                                                    ->
-                                                                    _
-                                                                    computation)
-                                                                  ->
-                                                                 value
-                                                                   (fun
-                                                                    _s_328 
-                                                                    ->
-                                                                    match _s_328
-                                                                    with
-                                                                    | 
-                                                                    [] ->
-                                                                    (run
-                                                                    (_k_326
-                                                                    (fun () 
-                                                                    ->
-                                                                    call
-                                                                    Effect_Fail
-                                                                    ()
-                                                                    (fun
-                                                                    _result_329
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_329))))
-                                                                    []
-                                                                    | 
-                                                                    _x_331::_xs_330
-                                                                    ->
-                                                                    (match 
-                                                                    run
-                                                                    ((run
-                                                                    (lift_binary
-                                                                    (=)
-                                                                    _c_327))
-                                                                    _x_331)
-                                                                    with
-                                                                    | 
-                                                                    true  ->
-                                                                    (run
-                                                                    (_k_326
-                                                                    (fun () 
-                                                                    ->
-                                                                    value
-                                                                    _x_331)))
-                                                                    _xs_330
-                                                                    | 
-                                                                    false  ->
-                                                                    (run
-                                                                    (_k_326
-                                                                    (fun () 
-                                                                    ->
-                                                                    call
-                                                                    Effect_Fail
-                                                                    ()
-                                                                    (fun
-                                                                    _result_332
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_332))))
-                                                                    _s_328)))
-                                                        | eff' ->
-                                                            (fun arg  ->
-                                                               fun k  ->
-                                                                 Call
-                                                                   (eff',
-                                                                    arg, k)) : 
-                                                       a ->
-                                                         (b -> _ computation)
-                                                           -> _ computation)
-                                                 } c) (_expr_76 ()))) _s_297)));
+                                        call Effect_Fail ()
+                                          (fun _result_253  ->
+                                             _absurd_1 _result_253))));
                      effect_clauses = fun (type a) -> fun (type b) ->
                        fun (x : (a,b) effect)  ->
                          (match x with
                           | Effect_Symbol  ->
-                              (fun (_c_334 : string)  ->
-                                 fun
-                                   (_k_333 :
-                                     (unit -> string computation) ->
-                                       _ computation)
-                                    ->
+                              (fun (_c_255 : string)  ->
+                                 fun (_k_254 : string -> _ computation)  ->
                                    value
-                                     (fun _s_335  ->
-                                        match _s_335 with
+                                     (fun _s_256  ->
+                                        match _s_256 with
                                         | [] ->
-                                            (run
-                                               (_k_333
-                                                  (fun ()  ->
-                                                     call Effect_Fail ()
-                                                       (fun _result_336  ->
-                                                          _absurd_1
-                                                            _result_336))))
-                                              []
-                                        | _x_338::_xs_337 ->
+                                            call Effect_Fail ()
+                                              (fun _result_257  ->
+                                                 _absurd_1 _result_257)
+                                        | _x_259::_xs_258 ->
                                             (match run
                                                      ((run
                                                          (lift_binary (=)
-                                                            _c_334)) _x_338)
+                                                            _c_255)) _x_259)
                                              with
                                              | true  ->
-                                                 (run
-                                                    (_k_333
-                                                       (fun ()  ->
-                                                          value _x_338)))
-                                                   _xs_337
+                                                 (_k_254 _x_259) >>
+                                                   ((fun _gen_bind_260  ->
+                                                       _gen_bind_260 _xs_258))
                                              | false  ->
-                                                 (run
-                                                    (_k_333
-                                                       (fun ()  ->
-                                                          call Effect_Fail ()
-                                                            (fun _result_339 
-                                                               ->
-                                                               _absurd_1
-                                                                 _result_339))))
-                                                   _s_335)))
+                                                 call Effect_Fail ()
+                                                   (fun _result_261  ->
+                                                      _absurd_1 _result_261))))
                           | eff' ->
                               (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                          a -> (b -> _ computation) -> _ computation)
-                   } c)) (_term_284 ())
+                   } c)) (_term_223 ())
          | false  ->
              ((fun c  ->
                  handler
                    {
                      value_clause =
-                       (fun _y_340  ->
+                       (fun _y_262  ->
                           value
-                            (fun _s_341  ->
-                               match _s_341 with
-                               | [] -> value _y_340
+                            (fun _s_263  ->
+                               match _s_263 with
+                               | [] -> value _y_262
                                | _ ->
                                    call Effect_Fail ()
-                                     (fun _result_342  ->
-                                        _absurd_1 _result_342)));
+                                     (fun _result_264  ->
+                                        _absurd_1 _result_264)));
                      effect_clauses = fun (type a) -> fun (type b) ->
                        fun (x : (a,b) effect)  ->
                          (match x with
                           | Effect_Symbol  ->
-                              (fun (_c_344 : string)  ->
-                                 fun
-                                   (_k_343 :
-                                     (unit -> string computation) ->
-                                       _ computation)
-                                    ->
+                              (fun (_c_266 : string)  ->
+                                 fun (_k_265 : string -> _ computation)  ->
                                    value
-                                     (fun _s_345  ->
-                                        match _s_345 with
+                                     (fun _s_267  ->
+                                        match _s_267 with
                                         | [] ->
-                                            (run
-                                               (_k_343
-                                                  (fun ()  ->
-                                                     call Effect_Fail ()
-                                                       (fun _result_346  ->
-                                                          _absurd_1
-                                                            _result_346))))
-                                              []
-                                        | _x_348::_xs_347 ->
+                                            call Effect_Fail ()
+                                              (fun _result_268  ->
+                                                 _absurd_1 _result_268)
+                                        | _x_270::_xs_269 ->
                                             (match run
                                                      ((run
                                                          (lift_binary (=)
-                                                            _c_344)) _x_348)
+                                                            _c_266)) _x_270)
                                              with
                                              | true  ->
-                                                 (run
-                                                    (_k_343
-                                                       (fun ()  ->
-                                                          value _x_348)))
-                                                   _xs_347
+                                                 (_k_265 _x_270) >>
+                                                   ((fun _gen_bind_271  ->
+                                                       _gen_bind_271 _xs_269))
                                              | false  ->
-                                                 (run
-                                                    (_k_343
-                                                       (fun ()  ->
-                                                          call Effect_Fail ()
-                                                            (fun _result_349 
-                                                               ->
-                                                               _absurd_1
-                                                                 _result_349))))
-                                                   _s_345)))
+                                                 call Effect_Fail ()
+                                                   (fun _result_272  ->
+                                                      _absurd_1 _result_272))))
                           | eff' ->
                               (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                          a -> (b -> _ computation) -> _ computation)
-                   } c)) (_term_284 ()))
+                   } c)) (_term_223 ()))
      in
-  let rec _newvar_360 () =
+  let rec _newvar_278 () =
     (fun c  ->
        handler
          {
            value_clause =
-             (fun _gen_bind_350  ->
-                (fun c  ->
-                   handler
-                     {
-                       value_clause = (fun _x_351  -> value [_x_351]);
-                       effect_clauses = fun (type a) -> fun (type b) ->
-                         fun (x : (a,b) effect)  ->
-                           (match x with
-                            | Effect_Decide  ->
-                                (fun (_ : unit)  ->
-                                   fun (_k_352 : bool -> _ computation)  ->
-                                     (_k_352 true) >>
-                                       (fun _gen_bind_353  ->
-                                          let _gen_bind_354 =
-                                            run (_var_4 _gen_bind_353)  in
-                                          (_k_352 false) >>
-                                            (fun _gen_bind_355  ->
-                                               _gen_bind_354 _gen_bind_355)))
-                            | Effect_Fail  ->
-                                (fun (_ : unit)  ->
-                                   fun (_ : unit -> _ computation)  ->
-                                     value [])
-                            | eff' ->
-                                (fun arg  -> fun k  -> Call (eff', arg, k)) : 
-                           a -> (b -> _ computation) -> _ computation)
-                     } c)
-                  (_gen_bind_350 ["4"; "3"; "*"; "("; "3"; "+"; "3"; ")"]));
+             (fun _gen_bind_273  ->
+                value
+                  [run
+                     (_gen_bind_273 ["4"; "3"; "*"; "("; "3"; "+"; "3"; ")"])]);
            effect_clauses = fun (type a) -> fun (type b) ->
              fun (x : (a,b) effect)  ->
                (match x with
                 | Effect_Decide  ->
                     (fun (_ : unit)  ->
-                       fun (_k_356 : bool -> _ computation)  ->
-                         (_k_356 true) >>
-                           (fun _gen_bind_357  ->
-                              let _gen_bind_358 = run (_var_4 _gen_bind_357)
+                       fun (_k_274 : bool -> _ computation)  ->
+                         (_k_274 true) >>
+                           (fun _gen_bind_275  ->
+                              let _gen_bind_276 = run (_var_4 _gen_bind_275)
                                  in
-                              (_k_356 false) >>
-                                (fun _gen_bind_359  ->
-                                   _gen_bind_358 _gen_bind_359)))
+                              (_k_274 false) >>
+                                (fun _gen_bind_277  ->
+                                   _gen_bind_276 _gen_bind_277)))
                 | Effect_Fail  ->
                     (fun (_ : unit)  ->
                        fun (_ : unit -> _ computation)  -> value [])
                 | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                a -> (b -> _ computation) -> _ computation)
          } c)
-      (let rec _term_284 () =
-         let rec _factor_285 () =
+      (let rec _term_223 () =
+         let rec _factor_224 () =
            call Effect_Decide ()
-             (fun _result_286  ->
-                match _result_286 with
+             (fun _result_225  ->
+                match _result_225 with
                 | true  ->
-                    (_many1_72 ()) >> ((fun _i_287  -> _toNum_58 _i_287))
+                    (_many1_69 ()) >> ((fun _i_226  -> _toNum_56 _i_226))
                 | false  ->
                     call Effect_Symbol "("
-                      (fun _result_288  ->
-                         (_expr_76 ()) >>
-                           (fun _j_289  ->
+                      (fun _result_227  ->
+                         (_expr_73 ()) >>
+                           (fun _j_228  ->
                               call Effect_Symbol ")"
-                                (fun _result_290  -> value _j_289))))
+                                (fun _result_229  -> value _j_228))))
             in
          call Effect_Decide ()
-           (fun _result_291  ->
-              match _result_291 with
+           (fun _result_230  ->
+              match _result_230 with
               | true  ->
-                  (_factor_285 ()) >>
-                    ((fun _i_292  ->
+                  (_factor_224 ()) >>
+                    ((fun _i_231  ->
                         call Effect_Symbol "*"
-                          (fun _result_293  ->
-                             (_term_284 ()) >>
-                               (fun _j_294  ->
-                                  (run (lift_binary ( * ) _i_292)) _j_294))))
-              | false  -> _factor_285 ())
+                          (fun _result_232  ->
+                             (_term_223 ()) >>
+                               (fun _j_233  ->
+                                  (run (lift_binary ( * ) _i_231)) _j_233))))
+              | false  -> _factor_224 ())
           in
        call Effect_Decide ()
-         (fun _result_295  ->
-            match _result_295 with
+         (fun _result_234  ->
+            match _result_234 with
             | true  ->
                 ((fun c  ->
                     handler
                       {
                         value_clause =
-                          (fun _i_296  ->
+                          (fun _i_235  ->
                              value
-                               (fun _s_297  ->
-                                  match _s_297 with
+                               (fun _s_236  ->
+                                  match _s_236 with
                                   | [] ->
-                                      (run
-                                         (let rec _newvar_361 () =
-                                            let rec _term_77 () =
-                                              let rec _factor_78 () =
-                                                call Effect_Decide ()
-                                                  (fun _result_386  ->
-                                                     match _result_386 with
-                                                     | true  ->
-                                                         (_many1_72 ()) >>
-                                                           ((fun _i_80  ->
-                                                               _toNum_58
-                                                                 _i_80))
-                                                     | false  ->
-                                                         call Effect_Symbol
-                                                           "("
-                                                           (fun _result_383 
-                                                              ->
-                                                              (_expr_76 ())
-                                                                >>
-                                                                (fun _j_83 
-                                                                   ->
-                                                                   call
+                                      call Effect_Fail ()
+                                        (fun _result_237  ->
+                                           _absurd_1 _result_237)
+                                  | _x_239::_xs_238 ->
+                                      (match run
+                                               ((run (lift_binary (=) "+"))
+                                                  _x_239)
+                                       with
+                                       | true  ->
+                                           (let rec _newvar_279 () =
+                                              let rec _term_74 () =
+                                                let rec _factor_75 () =
+                                                  call Effect_Decide ()
+                                                    (fun _result_300  ->
+                                                       match _result_300 with
+                                                       | true  ->
+                                                           (_many1_69 ()) >>
+                                                             ((fun _i_77  ->
+                                                                 _toNum_56
+                                                                   _i_77))
+                                                       | false  ->
+                                                           call Effect_Symbol
+                                                             "("
+                                                             (fun _result_297
+                                                                 ->
+                                                                (_expr_73 ())
+                                                                  >>
+                                                                  (fun _j_79 
+                                                                    ->
+                                                                    call
                                                                     Effect_Symbol
                                                                     ")"
                                                                     (fun
-                                                                    _result_379
+                                                                    _result_294
                                                                      ->
                                                                     value
-                                                                    _j_83))))
-                                                 in
-                                              call Effect_Decide ()
-                                                (fun _result_375  ->
-                                                   match _result_375 with
-                                                   | true  ->
-                                                       (_factor_78 ()) >>
-                                                         ((fun _i_87  ->
-                                                             call
-                                                               Effect_Symbol
-                                                               "*"
-                                                               (fun
-                                                                  _result_372
-                                                                   ->
-                                                                  (_term_77
-                                                                    ()) >>
-                                                                    (
-                                                                    fun _j_90
+                                                                    _j_79))))
+                                                   in
+                                                call Effect_Decide ()
+                                                  (fun _result_291  ->
+                                                     match _result_291 with
+                                                     | true  ->
+                                                         (_factor_75 ()) >>
+                                                           ((fun _i_82  ->
+                                                               call
+                                                                 Effect_Symbol
+                                                                 "*"
+                                                                 (fun
+                                                                    _result_288
                                                                      ->
+                                                                    (_term_74
+                                                                    ()) >>
+                                                                    (fun
+                                                                    _j_84  ->
                                                                     (run
                                                                     (lift_binary
                                                                     ( * )
-                                                                    _i_87))
-                                                                    _j_90))))
-                                                   | false  -> _factor_78 ())
+                                                                    _i_82))
+                                                                    _j_84))))
+                                                     | false  ->
+                                                         _factor_75 ())
+                                                 in
+                                              call Effect_Decide ()
+                                                (fun _result_301  ->
+                                                   match _result_301 with
+                                                   | true  ->
+                                                       ((fun c  ->
+                                                           handler
+                                                             {
+                                                               value_clause =
+                                                                 (fun _i_404 
+                                                                    ->
+                                                                    value
+                                                                    (fun
+                                                                    _s_405 
+                                                                    ->
+                                                                    match _s_405
+                                                                    with
+                                                                    | 
+                                                                    [] ->
+                                                                    call
+                                                                    Effect_Fail
+                                                                    ()
+                                                                    (fun
+                                                                    _result_406
+                                                                     ->
+                                                                    _absurd_1
+                                                                    _result_406)
+                                                                    | 
+                                                                    _x_408::_xs_407
+                                                                    ->
+                                                                    (match 
+                                                                    run
+                                                                    ((run
+                                                                    (lift_binary
+                                                                    (=) "+"))
+                                                                    _x_408)
+                                                                    with
+                                                                    | 
+                                                                    true  ->
+                                                                    ((fun c 
+                                                                    ->
+                                                                    handler
+                                                                    {
+                                                                    value_clause
+                                                                    =
+                                                                    (fun
+                                                                    _j_410 
+                                                                    ->
+                                                                    let _y_411
+                                                                    =
+                                                                    run
+                                                                    ((run
+                                                                    (lift_binary
+                                                                    (+)
+                                                                    _i_235))
+                                                                    (run
+                                                                    ((run
+                                                                    (lift_binary
+                                                                    (+)
+                                                                    _i_404))
+                                                                    _j_410)))
+                                                                     in
+                                                                    value
+                                                                    (fun
+                                                                    _s_412 
+                                                                    ->
+                                                                    match _s_412
+                                                                    with
+                                                                    | 
+                                                                    [] ->
+                                                                    value
+                                                                    _y_411
+                                                                    | 
+                                                                    _ ->
+                                                                    call
+                                                                    Effect_Fail
+                                                                    ()
+                                                                    (fun
+                                                                    _result_413
+                                                                     ->
+                                                                    _absurd_1
+                                                                    _result_413)));
+                                                                    effect_clauses
+                                                                    = fun
+                                                                    (type a)
+                                                                    -> fun
+                                                                    (type b)
+                                                                    ->
+                                                                    fun
+                                                                    (x :
+                                                                    (a,
+                                                                    b) effect)
+                                                                     ->
+                                                                    (match x
+                                                                    with
+                                                                    | 
+                                                                    Effect_Symbol
+                                                                     ->
+                                                                    (fun
+                                                                    (_c_415 :
+                                                                    string) 
+                                                                    ->
+                                                                    fun
+                                                                    (_k_414 :
+                                                                    string ->
+                                                                    _
+                                                                    computation)
+                                                                     ->
+                                                                    value
+                                                                    (fun
+                                                                    _s_416 
+                                                                    ->
+                                                                    match _s_416
+                                                                    with
+                                                                    | 
+                                                                    [] ->
+                                                                    call
+                                                                    Effect_Fail
+                                                                    ()
+                                                                    (fun
+                                                                    _result_417
+                                                                     ->
+                                                                    _absurd_1
+                                                                    _result_417)
+                                                                    | 
+                                                                    _x_419::_xs_418
+                                                                    ->
+                                                                    (match 
+                                                                    run
+                                                                    ((run
+                                                                    (lift_binary
+                                                                    (=)
+                                                                    _c_415))
+                                                                    _x_419)
+                                                                    with
+                                                                    | 
+                                                                    true  ->
+                                                                    (_k_414
+                                                                    _x_419)
+                                                                    >>
+                                                                    ((fun
+                                                                    _gen_bind_420
+                                                                     ->
+                                                                    _gen_bind_420
+                                                                    _xs_418))
+                                                                    | 
+                                                                    false  ->
+                                                                    call
+                                                                    Effect_Fail
+                                                                    ()
+                                                                    (fun
+                                                                    _result_421
+                                                                     ->
+                                                                    _absurd_1
+                                                                    _result_421))))
+                                                                    | 
+                                                                    eff' ->
+                                                                    (fun arg 
+                                                                    ->
+                                                                    fun k  ->
+                                                                    Call
+                                                                    (eff',
+                                                                    arg, k)) : 
+                                                                    a ->
+                                                                    (b ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                    _
+                                                                    computation)
+                                                                    } c)
+                                                                    (_expr_73
+                                                                    ())) >>
+                                                                    ((fun
+                                                                    _gen_bind_409
+                                                                     ->
+                                                                    _gen_bind_409
+                                                                    _xs_407))
+                                                                    | 
+                                                                    false  ->
+                                                                    call
+                                                                    Effect_Fail
+                                                                    ()
+                                                                    (fun
+                                                                    _result_422
+                                                                     ->
+                                                                    _absurd_1
+                                                                    _result_422))));
+                                                               effect_clauses
+                                                                 = fun (type
+                                                                 a) -> fun
+                                                                 (type b) ->
+                                                                 fun
+                                                                   (x :
+                                                                    (a,
+                                                                    b) effect)
+                                                                    ->
+                                                                   (match x
+                                                                    with
+                                                                    | 
+                                                                    Effect_Symbol
+                                                                     ->
+                                                                    (fun
+                                                                    (_c_424 :
+                                                                    string) 
+                                                                    ->
+                                                                    fun
+                                                                    (_k_423 :
+                                                                    string ->
+                                                                    _
+                                                                    computation)
+                                                                     ->
+                                                                    value
+                                                                    (fun
+                                                                    _s_425 
+                                                                    ->
+                                                                    match _s_425
+                                                                    with
+                                                                    | 
+                                                                    [] ->
+                                                                    call
+                                                                    Effect_Fail
+                                                                    ()
+                                                                    (fun
+                                                                    _result_426
+                                                                     ->
+                                                                    _absurd_1
+                                                                    _result_426)
+                                                                    | 
+                                                                    _x_428::_xs_427
+                                                                    ->
+                                                                    (match 
+                                                                    run
+                                                                    ((run
+                                                                    (lift_binary
+                                                                    (=)
+                                                                    _c_424))
+                                                                    _x_428)
+                                                                    with
+                                                                    | 
+                                                                    true  ->
+                                                                    (_k_423
+                                                                    _x_428)
+                                                                    >>
+                                                                    ((fun
+                                                                    _gen_bind_429
+                                                                     ->
+                                                                    _gen_bind_429
+                                                                    _xs_427))
+                                                                    | 
+                                                                    false  ->
+                                                                    call
+                                                                    Effect_Fail
+                                                                    ()
+                                                                    (fun
+                                                                    _result_430
+                                                                     ->
+                                                                    _absurd_1
+                                                                    _result_430))))
+                                                                    | 
+                                                                    eff' ->
+                                                                    (fun arg 
+                                                                    ->
+                                                                    fun k  ->
+                                                                    Call
+                                                                    (eff',
+                                                                    arg, k)) : 
+                                                                   a ->
+                                                                    (b ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                    _
+                                                                    computation)
+                                                             } c))
+                                                         (_term_74 ())
+                                                   | false  ->
+                                                       ((fun c  ->
+                                                           handler
+                                                             {
+                                                               value_clause =
+                                                                 (fun _j_431 
+                                                                    ->
+                                                                    let _y_432
+                                                                    =
+                                                                    run
+                                                                    ((run
+                                                                    (lift_binary
+                                                                    (+)
+                                                                    _i_235))
+                                                                    _j_431)
+                                                                     in
+                                                                    value
+                                                                    (fun
+                                                                    _s_433 
+                                                                    ->
+                                                                    match _s_433
+                                                                    with
+                                                                    | 
+                                                                    [] ->
+                                                                    value
+                                                                    _y_432
+                                                                    | 
+                                                                    _ ->
+                                                                    call
+                                                                    Effect_Fail
+                                                                    ()
+                                                                    (fun
+                                                                    _result_434
+                                                                     ->
+                                                                    _absurd_1
+                                                                    _result_434)));
+                                                               effect_clauses
+                                                                 = fun (type
+                                                                 a) -> fun
+                                                                 (type b) ->
+                                                                 fun
+                                                                   (x :
+                                                                    (a,
+                                                                    b) effect)
+                                                                    ->
+                                                                   (match x
+                                                                    with
+                                                                    | 
+                                                                    Effect_Symbol
+                                                                     ->
+                                                                    (fun
+                                                                    (_c_436 :
+                                                                    string) 
+                                                                    ->
+                                                                    fun
+                                                                    (_k_435 :
+                                                                    string ->
+                                                                    _
+                                                                    computation)
+                                                                     ->
+                                                                    value
+                                                                    (fun
+                                                                    _s_437 
+                                                                    ->
+                                                                    match _s_437
+                                                                    with
+                                                                    | 
+                                                                    [] ->
+                                                                    call
+                                                                    Effect_Fail
+                                                                    ()
+                                                                    (fun
+                                                                    _result_438
+                                                                     ->
+                                                                    _absurd_1
+                                                                    _result_438)
+                                                                    | 
+                                                                    _x_440::_xs_439
+                                                                    ->
+                                                                    (match 
+                                                                    run
+                                                                    ((run
+                                                                    (lift_binary
+                                                                    (=)
+                                                                    _c_436))
+                                                                    _x_440)
+                                                                    with
+                                                                    | 
+                                                                    true  ->
+                                                                    (_k_435
+                                                                    _x_440)
+                                                                    >>
+                                                                    ((fun
+                                                                    _gen_bind_441
+                                                                     ->
+                                                                    _gen_bind_441
+                                                                    _xs_439))
+                                                                    | 
+                                                                    false  ->
+                                                                    call
+                                                                    Effect_Fail
+                                                                    ()
+                                                                    (fun
+                                                                    _result_442
+                                                                     ->
+                                                                    _absurd_1
+                                                                    _result_442))))
+                                                                    | 
+                                                                    eff' ->
+                                                                    (fun arg 
+                                                                    ->
+                                                                    fun k  ->
+                                                                    Call
+                                                                    (eff',
+                                                                    arg, k)) : 
+                                                                   a ->
+                                                                    (b ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                    _
+                                                                    computation)
+                                                             } c))
+                                                         (_term_74 ()))
                                                in
-                                            (fun c  ->
-                                               handler
-                                                 {
-                                                   value_clause =
-                                                     (fun _j_298  ->
-                                                        let _y_299 =
-                                                          run
-                                                            ((run
-                                                                (lift_binary
-                                                                   (+) _i_296))
-                                                               _j_298)
-                                                           in
-                                                        value
-                                                          (fun _s_300  ->
-                                                             match _s_300
-                                                             with
-                                                             | [] ->
-                                                                 value _y_299
-                                                             | _ ->
-                                                                 call
-                                                                   Effect_Fail
-                                                                   ()
-                                                                   (fun
-                                                                    _result_301
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_301)));
-                                                   effect_clauses = fun (type
-                                                     a) -> fun (type b) ->
-                                                     fun (x : (a,b) effect) 
-                                                       ->
-                                                       (match x with
-                                                        | Effect_Symbol  ->
-                                                            (fun
-                                                               (_c_303 :
-                                                                 string)
-                                                                ->
-                                                               fun
-                                                                 (_k_302 :
-                                                                   (unit ->
-                                                                    string
-                                                                    computation)
-                                                                    ->
-                                                                    _
-                                                                    computation)
-                                                                  ->
-                                                                 value
-                                                                   (fun
-                                                                    _s_304 
-                                                                    ->
-                                                                    match _s_304
-                                                                    with
-                                                                    | 
-                                                                    [] ->
-                                                                    (run
-                                                                    (_k_302
-                                                                    (fun () 
-                                                                    ->
-                                                                    call
-                                                                    Effect_Fail
-                                                                    ()
-                                                                    (fun
-                                                                    _result_305
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_305))))
-                                                                    []
-                                                                    | 
-                                                                    _x_307::_xs_306
-                                                                    ->
-                                                                    (match 
-                                                                    run
-                                                                    ((run
-                                                                    (lift_binary
-                                                                    (=)
-                                                                    _c_303))
-                                                                    _x_307)
-                                                                    with
-                                                                    | 
-                                                                    true  ->
-                                                                    (run
-                                                                    (_k_302
-                                                                    (fun () 
-                                                                    ->
-                                                                    value
-                                                                    _x_307)))
-                                                                    _xs_306
-                                                                    | 
-                                                                    false  ->
-                                                                    (run
-                                                                    (_k_302
-                                                                    (fun () 
-                                                                    ->
-                                                                    call
-                                                                    Effect_Fail
-                                                                    ()
-                                                                    (fun
-                                                                    _result_308
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_308))))
-                                                                    _s_304)))
-                                                        | eff' ->
-                                                            (fun arg  ->
-                                                               fun k  ->
-                                                                 Call
-                                                                   (eff',
-                                                                    arg, k)) : 
-                                                       a ->
-                                                         (b -> _ computation)
-                                                           -> _ computation)
-                                                 } c)
-                                              (call Effect_Decide ()
-                                                 (fun _result_368  ->
-                                                    match _result_368 with
-                                                    | true  ->
-                                                        (_term_77 ()) >>
-                                                          ((fun _i_93  ->
-                                                              call
-                                                                Effect_Symbol
-                                                                "+"
-                                                                (fun
-                                                                   _result_365
-                                                                    ->
-                                                                   (_expr_76
-                                                                    ()) >>
-                                                                    (fun
-                                                                    _j_96  ->
-                                                                    (run
-                                                                    (lift_binary
-                                                                    (+) _i_93))
-                                                                    _j_96))))
-                                                    | false  -> _term_77 ()))
-                                             in
-                                          _newvar_361 ())) []
-                                  | _x_310::_xs_309 ->
-                                      (match run
-                                               ((run (lift_binary (=) "+"))
-                                                  _x_310)
-                                       with
-                                       | true  ->
-                                           (run
-                                              ((fun c  ->
-                                                  handler
-                                                    {
-                                                      value_clause =
-                                                        (fun _j_311  ->
-                                                           let _y_312 =
-                                                             run
-                                                               ((run
-                                                                   (lift_binary
-                                                                    (+)
-                                                                    _i_296))
-                                                                  _j_311)
-                                                              in
-                                                           value
-                                                             (fun _s_313  ->
-                                                                match _s_313
-                                                                with
-                                                                | [] ->
-                                                                    value
-                                                                    _y_312
-                                                                | _ ->
-                                                                    call
-                                                                    Effect_Fail
-                                                                    ()
-                                                                    (fun
-                                                                    _result_314
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_314)));
-                                                      effect_clauses = fun
-                                                        (type a) -> fun (type
-                                                        b) ->
-                                                        fun
-                                                          (x : (a,b) effect) 
-                                                          ->
-                                                          (match x with
-                                                           | Effect_Symbol 
-                                                               ->
-                                                               (fun
-                                                                  (_c_316 :
-                                                                    string)
-                                                                   ->
-                                                                  fun
-                                                                    (_k_315 :
-                                                                    (unit ->
-                                                                    string
-                                                                    computation)
-                                                                    ->
-                                                                    _
-                                                                    computation)
-                                                                     ->
-                                                                    value
-                                                                    (fun
-                                                                    _s_317 
-                                                                    ->
-                                                                    match _s_317
-                                                                    with
-                                                                    | 
-                                                                    [] ->
-                                                                    (run
-                                                                    (_k_315
-                                                                    (fun () 
-                                                                    ->
-                                                                    call
-                                                                    Effect_Fail
-                                                                    ()
-                                                                    (fun
-                                                                    _result_318
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_318))))
-                                                                    []
-                                                                    | 
-                                                                    _x_320::_xs_319
-                                                                    ->
-                                                                    (match 
-                                                                    run
-                                                                    ((run
-                                                                    (lift_binary
-                                                                    (=)
-                                                                    _c_316))
-                                                                    _x_320)
-                                                                    with
-                                                                    | 
-                                                                    true  ->
-                                                                    (run
-                                                                    (_k_315
-                                                                    (fun () 
-                                                                    ->
-                                                                    value
-                                                                    _x_320)))
-                                                                    _xs_319
-                                                                    | 
-                                                                    false  ->
-                                                                    (run
-                                                                    (_k_315
-                                                                    (fun () 
-                                                                    ->
-                                                                    call
-                                                                    Effect_Fail
-                                                                    ()
-                                                                    (fun
-                                                                    _result_321
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_321))))
-                                                                    _s_317)))
-                                                           | eff' ->
-                                                               (fun arg  ->
-                                                                  fun k  ->
-                                                                    Call
-                                                                    (eff',
-                                                                    arg, k)) : 
-                                                          a ->
-                                                            (b ->
-                                                               _ computation)
-                                                              ->
-                                                              _ computation)
-                                                    } c) (_expr_76 ())))
-                                             _xs_309
+                                            _newvar_279 ()) >>
+                                             ((fun _gen_bind_240  ->
+                                                 _gen_bind_240 _xs_238))
                                        | false  ->
-                                           (run
-                                              ((fun c  ->
-                                                  handler
-                                                    {
-                                                      value_clause =
-                                                        (fun _j_322  ->
-                                                           let _y_323 =
-                                                             run
-                                                               ((run
-                                                                   (lift_binary
-                                                                    (+)
-                                                                    _i_296))
-                                                                  _j_322)
-                                                              in
-                                                           value
-                                                             (fun _s_324  ->
-                                                                match _s_324
-                                                                with
-                                                                | [] ->
-                                                                    value
-                                                                    _y_323
-                                                                | _ ->
-                                                                    call
-                                                                    Effect_Fail
-                                                                    ()
-                                                                    (fun
-                                                                    _result_325
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_325)));
-                                                      effect_clauses = fun
-                                                        (type a) -> fun (type
-                                                        b) ->
-                                                        fun
-                                                          (x : (a,b) effect) 
-                                                          ->
-                                                          (match x with
-                                                           | Effect_Symbol 
-                                                               ->
-                                                               (fun
-                                                                  (_c_327 :
-                                                                    string)
-                                                                   ->
-                                                                  fun
-                                                                    (_k_326 :
-                                                                    (unit ->
-                                                                    string
-                                                                    computation)
-                                                                    ->
-                                                                    _
-                                                                    computation)
-                                                                     ->
-                                                                    value
-                                                                    (fun
-                                                                    _s_328 
-                                                                    ->
-                                                                    match _s_328
-                                                                    with
-                                                                    | 
-                                                                    [] ->
-                                                                    (run
-                                                                    (_k_326
-                                                                    (fun () 
-                                                                    ->
-                                                                    call
-                                                                    Effect_Fail
-                                                                    ()
-                                                                    (fun
-                                                                    _result_329
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_329))))
-                                                                    []
-                                                                    | 
-                                                                    _x_331::_xs_330
-                                                                    ->
-                                                                    (match 
-                                                                    run
-                                                                    ((run
-                                                                    (lift_binary
-                                                                    (=)
-                                                                    _c_327))
-                                                                    _x_331)
-                                                                    with
-                                                                    | 
-                                                                    true  ->
-                                                                    (run
-                                                                    (_k_326
-                                                                    (fun () 
-                                                                    ->
-                                                                    value
-                                                                    _x_331)))
-                                                                    _xs_330
-                                                                    | 
-                                                                    false  ->
-                                                                    (run
-                                                                    (_k_326
-                                                                    (fun () 
-                                                                    ->
-                                                                    call
-                                                                    Effect_Fail
-                                                                    ()
-                                                                    (fun
-                                                                    _result_332
-                                                                     ->
-                                                                    _absurd_1
-                                                                    _result_332))))
-                                                                    _s_328)))
-                                                           | eff' ->
-                                                               (fun arg  ->
-                                                                  fun k  ->
-                                                                    Call
-                                                                    (eff',
-                                                                    arg, k)) : 
-                                                          a ->
-                                                            (b ->
-                                                               _ computation)
-                                                              ->
-                                                              _ computation)
-                                                    } c) (_expr_76 ())))
-                                             _s_297)));
+                                           call Effect_Fail ()
+                                             (fun _result_253  ->
+                                                _absurd_1 _result_253))));
                         effect_clauses = fun (type a) -> fun (type b) ->
                           fun (x : (a,b) effect)  ->
                             (match x with
                              | Effect_Symbol  ->
-                                 (fun (_c_334 : string)  ->
-                                    fun
-                                      (_k_333 :
-                                        (unit -> string computation) ->
-                                          _ computation)
-                                       ->
+                                 (fun (_c_255 : string)  ->
+                                    fun (_k_254 : string -> _ computation) 
+                                      ->
                                       value
-                                        (fun _s_335  ->
-                                           match _s_335 with
+                                        (fun _s_256  ->
+                                           match _s_256 with
                                            | [] ->
-                                               (run
-                                                  (_k_333
-                                                     (fun ()  ->
-                                                        call Effect_Fail ()
-                                                          (fun _result_336 
-                                                             ->
-                                                             _absurd_1
-                                                               _result_336))))
-                                                 []
-                                           | _x_338::_xs_337 ->
+                                               call Effect_Fail ()
+                                                 (fun _result_257  ->
+                                                    _absurd_1 _result_257)
+                                           | _x_259::_xs_258 ->
                                                (match run
                                                         ((run
                                                             (lift_binary (=)
-                                                               _c_334))
-                                                           _x_338)
+                                                               _c_255))
+                                                           _x_259)
                                                 with
                                                 | true  ->
-                                                    (run
-                                                       (_k_333
-                                                          (fun ()  ->
-                                                             value _x_338)))
-                                                      _xs_337
+                                                    (_k_254 _x_259) >>
+                                                      ((fun _gen_bind_260  ->
+                                                          _gen_bind_260
+                                                            _xs_258))
                                                 | false  ->
-                                                    (run
-                                                       (_k_333
-                                                          (fun ()  ->
-                                                             call Effect_Fail
-                                                               ()
-                                                               (fun
-                                                                  _result_339
-                                                                   ->
-                                                                  _absurd_1
-                                                                    _result_339))))
-                                                      _s_335)))
+                                                    call Effect_Fail ()
+                                                      (fun _result_261  ->
+                                                         _absurd_1
+                                                           _result_261))))
                              | eff' ->
                                  (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                             a -> (b -> _ computation) -> _ computation)
-                      } c)) (_term_284 ())
+                      } c)) (_term_223 ())
             | false  ->
                 ((fun c  ->
                     handler
                       {
                         value_clause =
-                          (fun _y_340  ->
+                          (fun _y_262  ->
                              value
-                               (fun _s_341  ->
-                                  match _s_341 with
-                                  | [] -> value _y_340
+                               (fun _s_263  ->
+                                  match _s_263 with
+                                  | [] -> value _y_262
                                   | _ ->
                                       call Effect_Fail ()
-                                        (fun _result_342  ->
-                                           _absurd_1 _result_342)));
+                                        (fun _result_264  ->
+                                           _absurd_1 _result_264)));
                         effect_clauses = fun (type a) -> fun (type b) ->
                           fun (x : (a,b) effect)  ->
                             (match x with
                              | Effect_Symbol  ->
-                                 (fun (_c_344 : string)  ->
-                                    fun
-                                      (_k_343 :
-                                        (unit -> string computation) ->
-                                          _ computation)
-                                       ->
+                                 (fun (_c_266 : string)  ->
+                                    fun (_k_265 : string -> _ computation) 
+                                      ->
                                       value
-                                        (fun _s_345  ->
-                                           match _s_345 with
+                                        (fun _s_267  ->
+                                           match _s_267 with
                                            | [] ->
-                                               (run
-                                                  (_k_343
-                                                     (fun ()  ->
-                                                        call Effect_Fail ()
-                                                          (fun _result_346 
-                                                             ->
-                                                             _absurd_1
-                                                               _result_346))))
-                                                 []
-                                           | _x_348::_xs_347 ->
+                                               call Effect_Fail ()
+                                                 (fun _result_268  ->
+                                                    _absurd_1 _result_268)
+                                           | _x_270::_xs_269 ->
                                                (match run
                                                         ((run
                                                             (lift_binary (=)
-                                                               _c_344))
-                                                           _x_348)
+                                                               _c_266))
+                                                           _x_270)
                                                 with
                                                 | true  ->
-                                                    (run
-                                                       (_k_343
-                                                          (fun ()  ->
-                                                             value _x_348)))
-                                                      _xs_347
+                                                    (_k_265 _x_270) >>
+                                                      ((fun _gen_bind_271  ->
+                                                          _gen_bind_271
+                                                            _xs_269))
                                                 | false  ->
-                                                    (run
-                                                       (_k_343
-                                                          (fun ()  ->
-                                                             call Effect_Fail
-                                                               ()
-                                                               (fun
-                                                                  _result_349
-                                                                   ->
-                                                                  _absurd_1
-                                                                    _result_349))))
-                                                      _s_345)))
+                                                    call Effect_Fail ()
+                                                      (fun _result_272  ->
+                                                         _absurd_1
+                                                           _result_272))))
                              | eff' ->
                                  (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                             a -> (b -> _ computation) -> _ computation)
-                      } c)) (_term_284 ())))
+                      } c)) (_term_223 ())))
      in
-  _newvar_360 () 
+  _newvar_278 () 
+let _x_93 = run (_parseTest_91 ()) 

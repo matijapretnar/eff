@@ -26,10 +26,10 @@ rm -rf _tmp
 cd ..
 echo "PARSER"
 cd parser
-# ../../../../eff.native --pure --no-pervasives --compile parser.eff
-# mv parser.eff.ml parserOptPure.ml
-# ../../../../eff.native --pure --no-opt --no-pervasives --compile parser.eff
-# mv parser.eff.ml parserNoOptPure.ml
+../../../../eff.native --pure --no-pervasives --compile parser.eff
+mv parser.eff.ml parserOptPure.ml
+../../../../eff.native --pure --no-opt --no-pervasives --compile parser.eff
+mv parser.eff.ml parserNoOptPure.ml
 ../../../../eff.native --no-pervasives --compile parser.eff
 mv parser.eff.ml parserOptImpure.ml
 ../../../../eff.native --no-opt --no-pervasives --compile parser.eff

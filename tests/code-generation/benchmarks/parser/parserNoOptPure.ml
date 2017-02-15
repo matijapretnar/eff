@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM parser.eff ===
-commit SHA: 0a8185f252df28fb2b1a33ec39799392a1190567
+commit SHA: ec8d6d094577edb51f0603c9a7d9f74d8bd5c47a
 === BEGIN SOURCE ===
 
 let absurd void = match void with;;
@@ -20,7 +20,7 @@ external ( * ) : int -> int -> int = "*"
 * Effects
 ********************************)
 
-effect Symbol : string -> unit -> string;;
+effect Symbol : string -> string;;
 effect Fail : unit -> empty;;
 effect Decide : unit -> bool
 
@@ -32,14 +32,14 @@ let parse = handler
     | val y -> (fun s ->
         begin match s with
         | [] -> y
-        | _ -> absurd (#Fail ())
+        | _ -> (absurd (#Fail ()))
         end
     )
     | #Symbol c k ->
         fun s ->
         (begin match s with
-            | [] -> k (fun () -> (absurd (#Fail ()))) []
-            | (x :: xs) -> if (c = x) then k (fun () -> x) xs else k (fun () -> (absurd (#Fail ()))) s
+            | [] -> (absurd (#Fail ()))
+            | (x :: xs) -> if (c = x) then k x xs else (absurd (#Fail ()))
         end
         )
 ;;
@@ -87,16 +87,15 @@ let rec toNum l = parseNum (l, 0);;
 ********************************)
 
 let digit () =
-    with backtrack handle (
+
         let nums = ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"] in
         let rec checkNums n =
             begin match n with
             | [] -> (absurd (#Fail ()))
             | (x :: xs) ->
-                if (#Decide ()) then (#Symbol x ()) else (checkNums xs)
+                if (#Decide ()) then (#Symbol x) else (checkNums xs)
             end in
         checkNums nums
-    )
 ;;
 
 let rec many m = if (#Decide ()) then (m ()) else ([]);;
@@ -114,15 +113,15 @@ let rec expr () =
                 let i = many1 () in
                 (toNum i)
             ) else (
-                let p = #Symbol "(" () in
+                let p = #Symbol "(" in
                 let j = expr () in
-                let p = #Symbol ")" () in
+                let p = #Symbol ")" in
                 j
             )
         in
         if (#Decide ()) then (
             let i = factor () in
-            let p = #Symbol "*" () in
+            let p = #Symbol "*" in
             let j = term () in
             i * j
         ) else (
@@ -131,7 +130,7 @@ let rec expr () =
     in
     if (#Decide ()) then (
         let i = term () in
-        let p = #Symbol "+" () in
+        let p = #Symbol "+" in
         let j = expr () in
         i + j
     ) else (
@@ -144,13 +143,12 @@ let rec expr () =
 ********************************)
 
 let parseTest () =
-    with allsols handle (
-        (with parse handle (
+    with allsols handle (with parse handle (
             expr ()
         )) ["4"; "3"; "*"; "("; "3"; "+"; "3"; ")"]
-    )
 ;;
 
+let x = parseTest ()
 === END SOURCE ===
 *)
 
@@ -219,7 +217,7 @@ let rec _var_4 _xs_5 _ys_6 =
 let _var_11 = (+) 
 let _var_12 = ( * ) 
 type (_,_) effect +=
-  | Effect_Symbol: (string,unit -> string computation) effect 
+  | Effect_Symbol: (string,string) effect 
 type (_,_) effect +=
   | Effect_Fail: (unit,unit) effect 
 type (_,_) effect +=
@@ -228,74 +226,62 @@ let _parse_13 comp =
   handler
     {
       value_clause =
-        (fun _y_26  ->
-           fun _s_27  ->
-             match _s_27 with
-             | [] -> value _y_26
-             | _ ->
-                 ((effect Effect_Fail) ()) >>
-                   ((fun _gen_bind_28  -> value (_absurd_1 _gen_bind_28))));
+        (fun _y_24  ->
+           value
+             (fun _s_25  ->
+                match _s_25 with
+                | [] -> value _y_24
+                | _ ->
+                    ((effect Effect_Fail) ()) >>
+                      ((fun _gen_bind_26  -> value (_absurd_1 _gen_bind_26)))));
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_Symbol  ->
                (fun (_c_14 : string)  ->
-                  fun (_k_15 : (unit -> string computation) -> _)  ->
-                    fun _s_16  ->
-                      match _s_16 with
-                      | [] ->
-                          let _gen_bind_17 =
-                            _k_15
-                              (fun ()  ->
-                                 ((effect Effect_Fail) ()) >>
-                                   (fun _gen_bind_18  ->
-                                      value (_absurd_1 _gen_bind_18)))
-                             in
-                          _gen_bind_17 []
-                      | _x_19::_xs_20 ->
-                          let _gen_bind_21 =
-                            let _gen_bind_22 = _var_3 _c_14  in
-                            _gen_bind_22 _x_19  in
-                          if _gen_bind_21
-                          then
-                            let _gen_bind_23 =
-                              _k_15
-                                (fun _lift_fun_1  ->
-                                   value ((fun ()  -> _x_19) _lift_fun_1))
-                               in
-                            _gen_bind_23 _xs_20
-                          else
-                            (let _gen_bind_24 =
-                               _k_15
-                                 (fun ()  ->
-                                    ((effect Effect_Fail) ()) >>
-                                      (fun _gen_bind_25  ->
-                                         value (_absurd_1 _gen_bind_25)))
-                                in
-                             _gen_bind_24 _s_16))
+                  fun (_k_15 : string -> _)  ->
+                    value
+                      (fun _s_16  ->
+                         match _s_16 with
+                         | [] ->
+                             ((effect Effect_Fail) ()) >>
+                               ((fun _gen_bind_17  ->
+                                   value (_absurd_1 _gen_bind_17)))
+                         | _x_18::_xs_19 ->
+                             let _gen_bind_20 =
+                               let _gen_bind_21 = _var_3 _c_14  in
+                               _gen_bind_21 _x_18  in
+                             if _gen_bind_20
+                             then
+                               (_k_15 _x_18) >>
+                                 ((fun _gen_bind_22  -> _gen_bind_22 _xs_19))
+                             else
+                               ((effect Effect_Fail) ()) >>
+                                 ((fun _gen_bind_23  ->
+                                     value (_absurd_1 _gen_bind_23)))))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b -> _)
                                                                     -> 
                                                                     _)
     } comp
   
-let _allsols_29 comp =
+let _allsols_27 comp =
   handler
     {
-      value_clause = (fun _x_34  -> value [_x_34]);
+      value_clause = (fun _x_32  -> value [_x_32]);
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_Decide  ->
                (fun (_ : unit)  ->
-                  fun (_k_30 : bool -> _)  ->
-                    ((_k_30 true) >>
-                       (fun _gen_bind_32  -> value (_var_4 _gen_bind_32)))
+                  fun (_k_28 : bool -> _)  ->
+                    ((_k_28 true) >>
+                       (fun _gen_bind_30  -> value (_var_4 _gen_bind_30)))
                       >>
-                      (fun _gen_bind_31  ->
-                         (_k_30 false) >>
-                           (fun _gen_bind_33  ->
-                              value (_gen_bind_31 _gen_bind_33))))
+                      (fun _gen_bind_29  ->
+                         (_k_28 false) >>
+                           (fun _gen_bind_31  ->
+                              value (_gen_bind_29 _gen_bind_31))))
            | Effect_Fail  ->
                (fun (_ : unit)  -> fun (_ : unit -> _)  -> value [])
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
@@ -304,169 +290,156 @@ let _allsols_29 comp =
                                                                     _)
     } comp
   
-let _backtrack_35 comp =
+let _backtrack_33 comp =
   handler
     {
-      value_clause = (fun _gen_id_par_100  -> _gen_id_par_100);
+      value_clause = (fun _gen_id_par_94  -> value _gen_id_par_94);
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_Decide  ->
                (fun (_ : unit)  ->
-                  fun (_k_36 : bool -> _)  ->
+                  fun (_k_34 : bool -> _)  ->
                     (fun comp  ->
                        handler
                          {
                            value_clause =
-                             (fun _gen_id_par_101  -> _gen_id_par_101);
+                             (fun _gen_id_par_95  -> value _gen_id_par_95);
                            effect_clauses = fun (type a) -> fun (type b) ->
                              fun (x : (a,b) effect)  ->
                                (match x with
                                 | Effect_Fail  ->
                                     (fun (_ : unit)  ->
-                                       fun (_ : unit -> _)  -> _k_36 false)
+                                       fun (_ : unit -> _)  -> _k_34 false)
                                 | eff' ->
                                     (fun arg  ->
                                        fun k  -> Call (eff', arg, k)) : 
                                a -> (b -> _) -> _)
-                         } comp) (_k_36 true))
+                         } comp) (_k_34 true))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b -> _)
                                                                     -> 
                                                                     _)
     } comp
   
-let _createNumber_37 (_prev_38,_num_39) =
-  let _gen_bind_40 =
-    let _gen_bind_41 =
-      let _gen_bind_42 = _var_12 _prev_38  in _gen_bind_42 10  in
-    _var_11 _gen_bind_41  in
-  _gen_bind_40 _num_39 
-let rec _parseNum_43 (_l_44,_v_45) =
-  match _l_44 with
-  | [] -> _v_45
-  | _x_46::_xs_47 ->
-      (match _x_46 with
+let _createNumber_35 (_prev_36,_num_37) =
+  let _gen_bind_38 =
+    let _gen_bind_39 =
+      let _gen_bind_40 = _var_12 _prev_36  in _gen_bind_40 10  in
+    _var_11 _gen_bind_39  in
+  _gen_bind_38 _num_37 
+let rec _parseNum_41 (_l_42,_v_43) =
+  match _l_42 with
+  | [] -> _v_43
+  | _x_44::_xs_45 ->
+      (match _x_44 with
        | "0" ->
-           let _gen_bind_48 = _createNumber_37 (_v_45, 0)  in
-           _parseNum_43 (_xs_47, _gen_bind_48)
+           let _gen_bind_46 = _createNumber_35 (_v_43, 0)  in
+           _parseNum_41 (_xs_45, _gen_bind_46)
        | "1" ->
-           let _gen_bind_49 = _createNumber_37 (_v_45, 1)  in
-           _parseNum_43 (_xs_47, _gen_bind_49)
+           let _gen_bind_47 = _createNumber_35 (_v_43, 1)  in
+           _parseNum_41 (_xs_45, _gen_bind_47)
        | "2" ->
-           let _gen_bind_50 = _createNumber_37 (_v_45, 2)  in
-           _parseNum_43 (_xs_47, _gen_bind_50)
+           let _gen_bind_48 = _createNumber_35 (_v_43, 2)  in
+           _parseNum_41 (_xs_45, _gen_bind_48)
        | "3" ->
-           let _gen_bind_51 = _createNumber_37 (_v_45, 3)  in
-           _parseNum_43 (_xs_47, _gen_bind_51)
+           let _gen_bind_49 = _createNumber_35 (_v_43, 3)  in
+           _parseNum_41 (_xs_45, _gen_bind_49)
        | "4" ->
-           let _gen_bind_52 = _createNumber_37 (_v_45, 4)  in
-           _parseNum_43 (_xs_47, _gen_bind_52)
+           let _gen_bind_50 = _createNumber_35 (_v_43, 4)  in
+           _parseNum_41 (_xs_45, _gen_bind_50)
        | "5" ->
-           let _gen_bind_53 = _createNumber_37 (_v_45, 5)  in
-           _parseNum_43 (_xs_47, _gen_bind_53)
+           let _gen_bind_51 = _createNumber_35 (_v_43, 5)  in
+           _parseNum_41 (_xs_45, _gen_bind_51)
        | "6" ->
-           let _gen_bind_54 = _createNumber_37 (_v_45, 6)  in
-           _parseNum_43 (_xs_47, _gen_bind_54)
+           let _gen_bind_52 = _createNumber_35 (_v_43, 6)  in
+           _parseNum_41 (_xs_45, _gen_bind_52)
        | "7" ->
-           let _gen_bind_55 = _createNumber_37 (_v_45, 7)  in
-           _parseNum_43 (_xs_47, _gen_bind_55)
+           let _gen_bind_53 = _createNumber_35 (_v_43, 7)  in
+           _parseNum_41 (_xs_45, _gen_bind_53)
        | "8" ->
-           let _gen_bind_56 = _createNumber_37 (_v_45, 8)  in
-           _parseNum_43 (_xs_47, _gen_bind_56)
+           let _gen_bind_54 = _createNumber_35 (_v_43, 8)  in
+           _parseNum_41 (_xs_45, _gen_bind_54)
        | "9" ->
-           let _gen_bind_57 = _createNumber_37 (_v_45, 9)  in
-           _parseNum_43 (_xs_47, _gen_bind_57))
+           let _gen_bind_55 = _createNumber_35 (_v_43, 9)  in
+           _parseNum_41 (_xs_45, _gen_bind_55))
   
-let rec _toNum_58 _l_59 = _parseNum_43 (_l_59, 0) 
-let _digit_60 () =
-  _backtrack_35
-    (let _nums_61 = ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"]  in
-     let rec _checkNums_62 _n_63 =
-       match _n_63 with
-       | [] ->
-           ((effect Effect_Fail) ()) >>
-             ((fun _gen_bind_64  -> value (_absurd_1 _gen_bind_64)))
-       | _x_65::_xs_66 ->
-           ((effect Effect_Decide) ()) >>
-             ((fun _gen_bind_67  ->
-                 if _gen_bind_67
-                 then
-                   ((effect Effect_Symbol) _x_65) >>
-                     (fun _gen_bind_68  -> value (_gen_bind_68 ()))
-                 else _checkNums_62 _xs_66))
-        in
-     _checkNums_62 _nums_61)
-  
-let rec _many_69 _m_70 =
+let rec _toNum_56 _l_57 = _parseNum_41 (_l_57, 0) 
+let _digit_58 () =
+  let _nums_59 = ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"]  in
+  let rec _checkNums_60 _n_61 =
+    match _n_61 with
+    | [] ->
+        ((effect Effect_Fail) ()) >>
+          ((fun _gen_bind_62  -> value (_absurd_1 _gen_bind_62)))
+    | _x_63::_xs_64 ->
+        ((effect Effect_Decide) ()) >>
+          ((fun _gen_bind_65  ->
+              if _gen_bind_65
+              then (effect Effect_Symbol) _x_63
+              else _checkNums_60 _xs_64))
+     in
+  _checkNums_60 _nums_59 
+let rec _many_66 _m_67 =
   ((effect Effect_Decide) ()) >>
-    (fun _gen_bind_71  -> value (if _gen_bind_71 then _m_70 () else []))
+    (fun _gen_bind_68  -> if _gen_bind_68 then _m_67 () else value [])
   
-let rec _many1_72 () =
-  (_digit_60 ()) >>
-    (fun _x_73  ->
-       (_many_69 _many1_72) >>
-         (fun _xs_74  ->
-            value (let _gen_bind_75 = _var_4 [_x_73]  in _gen_bind_75 _xs_74)))
+let rec _many1_69 () =
+  (_digit_58 ()) >>
+    (fun _x_70  ->
+       (_many_66 _many1_69) >>
+         (fun _xs_71  ->
+            value (let _gen_bind_72 = _var_4 [_x_70]  in _gen_bind_72 _xs_71)))
   
-let rec _expr_76 () =
-  let rec _term_77 () =
-    let rec _factor_78 () =
+let rec _expr_73 () =
+  let rec _term_74 () =
+    let rec _factor_75 () =
       ((effect Effect_Decide) ()) >>
-        (fun _gen_bind_79  ->
-           if _gen_bind_79
-           then (_many1_72 ()) >> (fun _i_80  -> value (_toNum_58 _i_80))
+        (fun _gen_bind_76  ->
+           if _gen_bind_76
+           then (_many1_69 ()) >> (fun _i_77  -> value (_toNum_56 _i_77))
            else
-             (((effect Effect_Symbol) "(") >>
-                (fun _gen_bind_82  -> value (_gen_bind_82 ())))
-               >>
-               ((fun _p_81  ->
-                   (_expr_76 ()) >>
-                     (fun _j_83  ->
-                        (((effect Effect_Symbol) ")") >>
-                           (fun _gen_bind_85  -> value (_gen_bind_85 ())))
-                          >> (fun _p_84  -> value _j_83)))))
+             ((effect Effect_Symbol) "(") >>
+               ((fun _p_78  ->
+                   (_expr_73 ()) >>
+                     (fun _j_79  ->
+                        ((effect Effect_Symbol) ")") >>
+                          (fun _p_80  -> value _j_79)))))
        in
     ((effect Effect_Decide) ()) >>
-      (fun _gen_bind_86  ->
-         if _gen_bind_86
+      (fun _gen_bind_81  ->
+         if _gen_bind_81
          then
-           (_factor_78 ()) >>
-             (fun _i_87  ->
-                (((effect Effect_Symbol) "*") >>
-                   (fun _gen_bind_89  -> value (_gen_bind_89 ())))
-                  >>
-                  (fun _p_88  ->
-                     (_term_77 ()) >>
-                       (fun _j_90  ->
+           (_factor_75 ()) >>
+             (fun _i_82  ->
+                ((effect Effect_Symbol) "*") >>
+                  (fun _p_83  ->
+                     (_term_74 ()) >>
+                       (fun _j_84  ->
                           value
-                            (let _gen_bind_91 = _var_12 _i_87  in
-                             _gen_bind_91 _j_90))))
-         else _factor_78 ())
+                            (let _gen_bind_85 = _var_12 _i_82  in
+                             _gen_bind_85 _j_84))))
+         else _factor_75 ())
      in
   ((effect Effect_Decide) ()) >>
-    (fun _gen_bind_92  ->
-       if _gen_bind_92
+    (fun _gen_bind_86  ->
+       if _gen_bind_86
        then
-         (_term_77 ()) >>
-           (fun _i_93  ->
-              (((effect Effect_Symbol) "+") >>
-                 (fun _gen_bind_95  -> value (_gen_bind_95 ())))
-                >>
-                (fun _p_94  ->
-                   (_expr_76 ()) >>
-                     (fun _j_96  ->
+         (_term_74 ()) >>
+           (fun _i_87  ->
+              ((effect Effect_Symbol) "+") >>
+                (fun _p_88  ->
+                   (_expr_73 ()) >>
+                     (fun _j_89  ->
                         value
-                          (let _gen_bind_97 = _var_11 _i_93  in
-                           _gen_bind_97 _j_96))))
-       else _term_77 ())
+                          (let _gen_bind_90 = _var_11 _i_87  in
+                           _gen_bind_90 _j_89))))
+       else _term_74 ())
   
-let _parseTest_98 () =
-  _allsols_29
-    ((_parse_13 (_expr_76 ())) >>
-       (fun _gen_bind_99  ->
-          _gen_bind_99 ["4"; "3"; "*"; "("; "3"; "+"; "3"; ")"]))
+let _parseTest_91 () =
+  _allsols_27
+    ((_parse_13 (_expr_73 ())) >>
+       (fun _gen_bind_92  ->
+          value (_gen_bind_92 ["4"; "3"; "*"; "("; "3"; "+"; "3"; ")"])))
   
-File "_tmp/parser.eff.ml", line 172, characters 93-112:
-Error: This expression has type 'a computation
-       but an expression was expected of type string list -> 'b
+let _x_93 = _parseTest_91 () 

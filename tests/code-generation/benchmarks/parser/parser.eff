@@ -15,7 +15,7 @@ external ( * ) : int -> int -> int = "*"
 * Effects
 ********************************)
 
-effect Symbol : string -> unit -> string;;
+effect Symbol : string -> string;;
 effect Fail : unit -> empty;;
 effect Decide : unit -> bool
 
@@ -27,14 +27,14 @@ let parse = handler
     | val y -> (fun s ->
         begin match s with
         | [] -> y
-        | _ -> absurd (#Fail ())
+        | _ -> (absurd (#Fail ()))
         end
     )
     | #Symbol c k ->
         fun s ->
         (begin match s with
-            | [] -> k (fun () -> (absurd (#Fail ()))) []
-            | (x :: xs) -> if (c = x) then k (fun () -> x) xs else k (fun () -> (absurd (#Fail ()))) s
+            | [] -> (absurd (#Fail ()))
+            | (x :: xs) -> if (c = x) then k x xs else (absurd (#Fail ()))
         end
         )
 ;;
@@ -82,16 +82,15 @@ let rec toNum l = parseNum (l, 0);;
 ********************************)
 
 let digit () =
-    with backtrack handle (
+
         let nums = ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"] in
         let rec checkNums n =
             begin match n with
             | [] -> (absurd (#Fail ()))
             | (x :: xs) ->
-                if (#Decide ()) then (#Symbol x ()) else (checkNums xs)
+                if (#Decide ()) then (#Symbol x) else (checkNums xs)
             end in
         checkNums nums
-    )
 ;;
 
 let rec many m = if (#Decide ()) then (m ()) else ([]);;
@@ -109,15 +108,15 @@ let rec expr () =
                 let i = many1 () in
                 (toNum i)
             ) else (
-                let p = #Symbol "(" () in
+                let p = #Symbol "(" in
                 let j = expr () in
-                let p = #Symbol ")" () in
+                let p = #Symbol ")" in
                 j
             )
         in
         if (#Decide ()) then (
             let i = factor () in
-            let p = #Symbol "*" () in
+            let p = #Symbol "*" in
             let j = term () in
             i * j
         ) else (
@@ -126,7 +125,7 @@ let rec expr () =
     in
     if (#Decide ()) then (
         let i = term () in
-        let p = #Symbol "+" () in
+        let p = #Symbol "+" in
         let j = expr () in
         i + j
     ) else (
@@ -139,9 +138,9 @@ let rec expr () =
 ********************************)
 
 let parseTest () =
-    with allsols handle (
-        (with parse handle (
+    with allsols handle (with parse handle (
             expr ()
         )) ["4"; "3"; "*"; "("; "3"; "+"; "3"; ")"]
-    )
 ;;
+
+let x = parseTest ()

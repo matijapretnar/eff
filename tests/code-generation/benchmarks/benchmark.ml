@@ -91,10 +91,10 @@ let () =
   if run_parser then begin
   Printf.printf "PARSER BENCHMARK:\n";
   Command.run (Bench.make_command [
-      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> ParserNoOptImpure._parseTest_98 ());
-      (* Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> ParserOptImpure._parseTest_98 ()); *)
-      (* Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> ParserNoOptPure._parseTest_98 ()); *)
-      (* Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> ParserOptPure._parseTest_98 ()); *)
+      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> ParserNoOptImpure._parseTest_91 ());
+      (* Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> ParserOptImpure._parseTest_91 ()); *)
+      (* Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> ParserNoOptPure._parseTest_91 ()); *)
+      (* Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> ParserOptPure._parseTest_91 ()); *)
       Bench.Test.create ~name:"Native" (fun () -> ParserNative.parseTest ());
     ]);
   Printf.printf "\n\n"
