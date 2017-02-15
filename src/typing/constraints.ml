@@ -297,7 +297,7 @@ let expand_constraints constraints =
   |> DirtPoset.fold (fun d1 d2 -> add_dirt_constraint (Type.simple_dirt d1) (Type.simple_dirt d2)) constraints.dirt_poset
   |> RegionPoset.fold add_region_param_constraint constraints.region_poset
   |> FullRegions.fold add_full_region constraints.full_regions
-  |> PolymorphicDirts.fold add_polymorphic_dirt constraints.polymorphic_dirts
+  |> PolymorphicDirts.fold (fun d -> add_polymorphic_dirt (expand_dirt (Type.simple_dirt d)).Type.rest) constraints.polymorphic_dirts
 
 let union constraints1 constraints2 =
   {
