@@ -427,8 +427,9 @@ let rec wrap_up_expr st e =
       Scheme.just joint_cnstrs;
     ]
   in
-  let (_, _, joint_cnstrs) = scheme in
-  let st = {st with constraints = joint_cnstrs} in
+  let (_, _, joint_cnstrs') = scheme in
+  Print.debug ~loc:e.location "%t@.%t@.~~>@.%t" (print_expression e) (Scheme.print_ty_scheme e.scheme) (Scheme.print_ty_scheme scheme);
+  let st = {st with constraints = Constraints.union joint_cnstrs joint_cnstrs'} in
   {
     e with term = wrap_up_expr' e.scheme st e.term;
            scheme
@@ -460,8 +461,9 @@ and wrap_up_comp st c =
       Scheme.less_context ~loc:c.location st.less_context;
     ]
   in
-  let (_, _, joint_cnstrs) = scheme in
-  let st = {st with constraints = joint_cnstrs} in
+  Print.debug ~loc:c.location "%t@.%t@.~~>@.%t" (print_computation c) (Scheme.print_dirty_scheme c.scheme) (Scheme.print_dirty_scheme scheme);
+  let (_, _, joint_cnstrs') = scheme in
+  let st = {st with constraints = Constraints.union joint_cnstrs joint_cnstrs'} in
   {
     c with term = wrap_up_comp' st c.term;
            scheme
@@ -470,13 +472,15 @@ and wrap_up_comp' st = function
     | Bind (c1, {term = (p, c2)}) ->
       let c1 = wrap_up_comp st c1 in
       let _, (ty_e, _), constraints_e = c1.scheme in
-      let _, ty_p, _ = p.scheme in
+      let _, ty_p, constraints_p = p.scheme in
       let st' = {
         st with
-        constraints = Constraints.list_union [constraints_e; st.constraints]
+        constraints = Constraints.list_union [constraints_e; constraints_p; st.constraints]
           |> Constraints.add_ty_constraint ~loc:c1.location ty_e ty_p
       }
       in
+      Print.debug "%t" (Constraints.print st'.constraints);
+      Print.debug "%t <= %t" (Type.print_ty (Constraints.expand_ty ty_e)) (Type.print_ty (Constraints.expand_ty ty_p));
       let c2 = wrap_up_comp st' c2 in
       Bind (c1, abstraction p c2)
     | LetIn (e, {term = (p, c)}) ->
