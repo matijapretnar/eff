@@ -30,8 +30,6 @@ and region_param_less r1 r2 (ctx, ty, cnstrs) =
   (ctx, ty, Constraints.add_region_param_constraint r1 r2 cnstrs)
 and add_full_region r (ctx, ty, cnstrs) =
   (ctx, ty, Constraints.add_full_region r cnstrs)
-and add_polymorphic_dirt d (ctx, ty, cnstrs) =
-  (ctx, ty, Constraints.add_polymorphic_dirt d cnstrs)
 and dirt_less drt1 drt2 (ctx, ty, cnstrs) =
   (ctx, ty, Constraints.add_dirt_constraint drt1 drt2 cnstrs)
 and ty_less ~loc ty1 ty2 (ctx, ty, cnstrs) =
@@ -249,10 +247,3 @@ let print_dirty_scheme ty_sch ppf =
 
 let is_pure ?(loc=Location.unknown) (ctx, (_, drt), cnstrs) =
   Constraints.is_pure cnstrs drt
-
-let tag_polymorphic_dirt ((ctx, ty, cnstrs) as ty_sch) =
-  let _, neg = pos_neg_ty_scheme ty_sch in
-  finalize_ty_scheme ~loc:Location.unknown ctx ty (
-    just cnstrs ::
-    List.map add_polymorphic_dirt (Params.project_dirt_params neg)
-  )

@@ -23,7 +23,9 @@ val add_region_param_constraint : Params.region_param -> Params.region_param -> 
 
 val add_full_region : Params.region_param -> t -> t
 
-val add_polymorphic_dirt : Params.dirt_param -> t -> t
+val add_full_dirt : Params.dirt_param -> t -> t
+val tag_wildcard_dirt_ty : Type.ty -> t -> t
+val tag_wildcard_dirt_dirty : Type.dirty -> t -> t
 
 val is_pure : t -> Type.dirt -> bool
 val is_pure_for_handler : t -> Type.dirt -> ((Common.effect * ('a * 'b)) * 'c) list -> bool

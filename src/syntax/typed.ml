@@ -468,7 +468,7 @@ and wrap_up_comp st c =
     match c.term with
     | Handle _ ->
         let (ctx, ((_, {Type.rest}) as drty), constraints) = scheme in
-        (ctx, drty, Constraints.add_polymorphic_dirt rest constraints)
+        (ctx, drty, Constraints.add_full_dirt rest constraints)
     | _ -> scheme
   in
   {
@@ -797,7 +797,7 @@ let handler ?loc h =
     |> Constraints.add_dirt_constraint {Type.ops = effs_out; Type.rest = drt_rest} drt_out
     |> Constraints.add_ty_constraint ~loc ty_in ty_val
     |> Constraints.add_dirty_constraint ~loc drty_val (ty_out, drt_out)
-    |> Constraints.add_polymorphic_dirt drt_rest
+    |> Constraints.add_full_dirt drt_rest
 
   in
 
@@ -853,7 +853,7 @@ let finally_handler ?loc h finally_clause =
     |> Constraints.add_ty_constraint ~loc ty_mid ty_fin
     |> Constraints.add_dirt_constraint drt_mid drt_out
     |> Constraints.add_dirty_constraint ~loc drty_fin (ty_out, drt_out)
-    |> Constraints.add_polymorphic_dirt drt_rest
+    |> Constraints.add_full_dirt drt_rest
 
   in
 
@@ -958,11 +958,13 @@ let let_defs ~loc defs =
     poly_tys, nonpoly_tys, ctx_c @ ctx, [
       Scheme.dirty_less ~loc:c.location drty_c (ty_p, drt);
       Scheme.just cnstrs_p;
-      Scheme.just cnstrs_c
+      Scheme.just cnstrs_c;
+      Scheme.just (Constraints.tag_wildcard_dirt_dirty drty_c Constraints.empty)
     ] @ chngs, (p, c) :: defs
   in
   let poly_tys, nonpoly_tys, ctx, chngs, defs = List.fold_right add_binding defs ([], [], [], [], []) in
   let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  let constraints = Scheme.collect_constraints chngs in
   let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
         Scheme.less_context ~loc nonpoly_tys;
@@ -970,7 +972,7 @@ let let_defs ~loc defs =
         Scheme.just cnstrs_c;
       ] @ chngs)
   in
-  let poly_tyschs = Common.assoc_map Scheme.tag_polymorphic_dirt poly_tyschs in
+  let defs = Common.assoc_map (wrap_up_comp {initial_wrap_up_state with constraints}) defs in
   defs, poly_tyschs, nonpoly_tys, change
 
 let let_rec_defs ~loc defs =
@@ -978,19 +980,20 @@ let let_rec_defs ~loc defs =
     let ctx_a, (ty_p, drty_c), cnstrs_a = a.scheme in
     let poly_tys = (x, Type.Arrow (ty_p, drty_c)) :: poly_tys in
     poly_tys, ctx_a @ ctx, [
-      Scheme.just cnstrs_a
+      Scheme.just cnstrs_a;
+      Scheme.just (Constraints.tag_wildcard_dirt_ty (Type.Arrow (ty_p, drty_c)) Constraints.empty)
     ] @ chngs, (x, a) :: defs
   in
   let poly_tys, ctx, chngs, defs = List.fold_right add_binding defs ([], [], [], []) in
   let chngs = Scheme.trim_context ~loc poly_tys :: chngs in
   let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
   let constraints = Scheme.collect_constraints chngs in
+  let defs = Common.assoc_map (wrap_up_abs {initial_wrap_up_state with constraints}) defs in
   let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt_c) ([
         Scheme.just cnstrs_c;
       ] @ chngs)
   in
-  let poly_tyschs = Common.assoc_map Scheme.tag_polymorphic_dirt poly_tyschs in
   defs, poly_tyschs, change
 
 
