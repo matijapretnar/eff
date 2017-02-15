@@ -281,9 +281,10 @@ and print_computation' ?max_level c ppf =
       (print_expression e)
       (Print.cases (print_abstraction ~expected_shape) lst)
   | Typed.Handle (e, c) ->
+    let (Handler (expected_shape, _)) = shape_of_ty_scheme e.Typed.scheme in
     print ~at_level:1 "%t %t"
       (print_expression ~max_level:0 e)
-      (print_computation ~max_level:0 c)
+      (print_computation ~max_level:0 ~expected_shape c)
   | Typed.LetRec (lst, c') ->
     let expected_shape = shape_of_dirty_scheme c.Typed.scheme in
     print ~at_level:2 "let rec @[<hov>%t@] in %t"

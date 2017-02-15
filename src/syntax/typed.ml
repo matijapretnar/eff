@@ -464,6 +464,13 @@ and wrap_up_comp st c =
   Print.debug ~loc:c.location "%t@.%t@.~~>@.%t" (print_computation c) (Scheme.print_dirty_scheme c.scheme) (Scheme.print_dirty_scheme scheme);
   let (_, _, joint_cnstrs') = scheme in
   let st = {st with constraints = Constraints.union joint_cnstrs joint_cnstrs'} in
+  let scheme =
+    match c.term with
+    | Handle _ ->
+        let (ctx, ((_, {Type.rest}) as drty), constraints) = scheme in
+        (ctx, drty, Constraints.add_polymorphic_dirt rest constraints)
+    | _ -> scheme
+  in
   {
     c with term = wrap_up_comp' st c.term;
            scheme
