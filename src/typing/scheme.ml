@@ -205,18 +205,7 @@ let extend_non_poly params skeletons =
         otherwise the dirty_scheme is pure
 *)
 let is_pure_for_handler (ctx, (_, drt), cnstrs) eff_clause =
-  let add_ctx_pos_neg (x, ctx_ty) (pos, neg) =
-    let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty
-    and (@@@) = Params.append in
-    neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
-  in
-  let pos, neg = List.fold_right add_ctx_pos_neg ctx (Params.empty, Params.empty) in
-  let params = Params.append pos neg in
-  (* Check if the constraints from the operations in the dirt are pure in terms of the handler *)
-  Constraints.is_pure_for_handler cnstrs drt eff_clause &&
-  (* Check if the rest occurs in the free parameters *)
-  not (List.exists (fun (_, r) -> Params.region_param_mem r params) drt.Type.ops) &&
-  not (Params.dirt_param_mem drt.Type.rest params)
+  Constraints.is_pure_for_handler cnstrs drt eff_clause
 
 let skeletons_non_poly_scheme (ctx, _, cnstrs) =
   let skeletons = Constraints.skeletons cnstrs in

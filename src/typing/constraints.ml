@@ -109,23 +109,16 @@ and expand_dirt ({Type.ops=ops; Type.rest=rest} as drt) =
 and expand_args (tys, drts, rs) =
   (Common.map expand_ty tys, Common.map expand_dirt drts, rs)
 
-let is_pure_for_handler { dirt_poset; region_poset; full_regions } { Type.ops; Type.rest } effect_clauses =
-  (* full_regions = unhandled effects in the computation *)
-  let check_effect eff r =
-    (* check if 'eff' is present in the eff_clause, otherwise we don't care *)
-    let rec effect_is_ignored = function
-      | [] -> true
-      | ((eff_name,(_,_)),_)::tail when eff_name = eff ->
-        RegionPoset.get_prec r region_poset = [] &&
-        not (FullRegions.mem r full_regions)
-      | _ :: tail -> effect_is_ignored tail
-    in
-    effect_is_ignored effect_clauses
+let is_pure_for_handler { dirt_poset; region_poset; full_regions; full_dirts } { Type.ops; Type.rest } effect_clauses =
+  let handled_effects = List.map (fun ((eff_name, _), _) -> eff_name) effect_clauses in
+  let check_region op r =
+    not (List.mem op handled_effects) && not (FullRegions.mem r full_regions)
   in
-  (* for all 'ops' check the region *)
-  List.for_all (fun (eff, r) -> check_effect eff r) ops &&
-  (* check the rest *)
-  DirtPoset.get_prec rest dirt_poset = []
+  List.for_all (fun (op, r) -> check_region op r) ops &&
+  not (FullDirts.mem rest full_dirts) &&
+  List.for_all (fun prec ->
+    not (FullDirts.mem prec full_dirts)
+  ) (DirtPoset.get_prec rest dirt_poset)
 
 let add_ty_param_constraint t1 t2 constraints =
   {constraints with ty_poset = TyPoset.add t1 t2 constraints.ty_poset}
