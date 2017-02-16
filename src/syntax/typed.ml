@@ -568,6 +568,9 @@ and make_equal_pattern' eqvars p p' =
       ) ps ps' (Some eqvars)
   | PConst cst, PConst cst' when Const.equal cst cst' -> Some eqvars
   | PNonbinding, PNonbinding -> Some eqvars
+  | PVariant (lbl, None), PVariant (lbl', None) when lbl = lbl' -> Some eqvars
+  | PVariant (lbl, Some p), PVariant (lbl', Some p') when lbl = lbl' ->
+      make_equal_pattern eqvars p p'
   | _, _ -> None
 
 let rec alphaeq_expr eqvars e e' =
