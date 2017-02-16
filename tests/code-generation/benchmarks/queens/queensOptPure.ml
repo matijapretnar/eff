@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM queens.eff ===
-commit SHA: ec8d6d094577edb51f0603c9a7d9f74d8bd5c47a
+commit SHA: a4fc6bd92723428911a2469b49b7b7e80480dc2f
 === BEGIN SOURCE ===
 
 external ( <> ) : int -> int -> bool = "<>"
@@ -43,16 +43,23 @@ let available (number_of_queens, x, qs) =
 effect Decide : unit -> bool
 effect Fail : unit -> empty
 
+type 'a option = None | Some of 'a
+
 let rec choose = function
   | [] -> (match (#Fail ()) with)
   | x::xs -> if #Decide () then x else choose xs
+
+let optionalize = handler
+  | val y -> (Some y)
+  | #Decide _ k -> (match k true with Some x -> Some x | None -> k false)
+  | #Fail _ _ -> None
 
 let backtrack = handler
   | val y -> (fun _ -> y)
   | #Decide _ k -> (fun kf -> k true (fun () -> k false kf) )  
   | #Fail _ _ -> (fun kf -> kf ())
 
- let choose_all = handler
+let choose_all = handler
   | val x -> [x]
   | #Decide _ k -> k true @ k false
   | #Fail _ _ -> []
@@ -67,7 +74,10 @@ let queens number_of_queens =
   in
   place (1, [])
 
-let queens_one number_of_queens =
+let queens_one_option number_of_queens =
+  with optionalize handle queens number_of_queens
+
+let queens_one_cps number_of_queens =
   (with backtrack handle queens number_of_queens) (fun () -> (absurd (#Fail ())))
 
 let queens_all number_of_queens =
@@ -169,6 +179,9 @@ type (_,_) effect +=
   | Effect_Decide: (unit,bool) effect 
 type (_,_) effect +=
   | Effect_Fail: (unit,unit) effect 
+type 't1 option =
+  | None 
+  | Some of 't1 
 let rec _choose_59 _gen_let_rec_function_60 =
   match _gen_let_rec_function_60 with
   | [] ->
@@ -179,53 +192,76 @@ let rec _choose_59 _gen_let_rec_function_60 =
         (fun _result_6  ->
            if _result_6 then value _x_62 else _choose_59 _xs_63)
   
-let _backtrack_65 comp =
+let _optionalize_65 comp =
   handler
     {
-      value_clause =
-        (fun _y_71  ->
-           value
-             (fun _lift_fun_174  -> value ((fun _  -> _y_71) _lift_fun_174)));
+      value_clause = (fun _y_69  -> value (Some _y_69));
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_Decide  ->
                (fun (_ : unit)  ->
-                  fun (_k_67 : bool -> _)  ->
-                    value
-                      (fun _kf_68  ->
-                         (_k_67 true) >>
-                           (fun _gen_bind_69  ->
-                              _gen_bind_69
-                                (fun ()  ->
-                                   (_k_67 false) >>
-                                     (fun _gen_bind_70  ->
-                                        _gen_bind_70 _kf_68)))))
+                  fun (_k_66 : bool -> _)  ->
+                    (_k_66 true) >>
+                      (fun _gen_bind_68  ->
+                         match _gen_bind_68 with
+                         | Some _x_67 -> value (Some _x_67)
+                         | None  -> _k_66 false))
            | Effect_Fail  ->
-               (fun (_ : unit)  ->
-                  fun (_ : unit -> _)  -> value (fun _kf_66  -> _kf_66 ()))
+               (fun (_ : unit)  -> fun (_ : unit -> _)  -> value None)
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b -> _)
                                                                     -> 
                                                                     _)
     } comp
   
-let _choose_all_72 comp =
+let _backtrack_70 comp =
   handler
     {
-      value_clause = (fun _x_77  -> value [_x_77]);
+      value_clause =
+        (fun _y_76  ->
+           value
+             (fun _lift_fun_238  -> value ((fun _  -> _y_76) _lift_fun_238)));
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_Decide  ->
                (fun (_ : unit)  ->
-                  fun (_k_73 : bool -> _)  ->
-                    (_k_73 true) >>
-                      (fun _gen_bind_75  ->
-                         let _gen_bind_74 = _var_13 _gen_bind_75  in
-                         (_k_73 false) >>
-                           (fun _gen_bind_76  ->
-                              value (_gen_bind_74 _gen_bind_76))))
+                  fun (_k_72 : bool -> _)  ->
+                    value
+                      (fun _kf_73  ->
+                         (_k_72 true) >>
+                           (fun _gen_bind_74  ->
+                              _gen_bind_74
+                                (fun ()  ->
+                                   (_k_72 false) >>
+                                     (fun _gen_bind_75  ->
+                                        _gen_bind_75 _kf_73)))))
+           | Effect_Fail  ->
+               (fun (_ : unit)  ->
+                  fun (_ : unit -> _)  -> value (fun _kf_71  -> _kf_71 ()))
+           | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
+                                                                    (b -> _)
+                                                                    -> 
+                                                                    _)
+    } comp
+  
+let _choose_all_77 comp =
+  handler
+    {
+      value_clause = (fun _x_82  -> value [_x_82]);
+      effect_clauses = fun (type a) -> fun (type b) ->
+        fun (x : (a,b) effect)  ->
+          (match x with
+           | Effect_Decide  ->
+               (fun (_ : unit)  ->
+                  fun (_k_78 : bool -> _)  ->
+                    (_k_78 true) >>
+                      (fun _gen_bind_80  ->
+                         let _gen_bind_79 = _var_13 _gen_bind_80  in
+                         (_k_78 false) >>
+                           (fun _gen_bind_81  ->
+                              value (_gen_bind_79 _gen_bind_81))))
            | Effect_Fail  ->
                (fun (_ : unit)  -> fun (_ : unit -> _)  -> value [])
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
@@ -234,47 +270,63 @@ let _choose_all_72 comp =
                                                                     _)
     } comp
   
-let _queens_78 _number_of_queens_79 =
-  let rec _place_80 (_x_81,_qs_82) =
-    if _x_81 > _number_of_queens_79
-    then value _qs_82
+let _queens_83 _number_of_queens_84 =
+  let rec _place_85 (_x_86,_qs_87) =
+    if _x_86 > _number_of_queens_84
+    then value _qs_87
     else
-      (_choose_59 (_available_44 (_number_of_queens_79, _x_81, _qs_82))) >>
-        ((fun _y_85  -> _place_80 ((_x_81 + 1), ((_x_81, _y_85) :: _qs_82))))
+      (_choose_59 (_available_44 (_number_of_queens_84, _x_86, _qs_87))) >>
+        ((fun _y_90  -> _place_85 ((_x_86 + 1), ((_x_86, _y_90) :: _qs_87))))
      in
-  _place_80 (1, []) 
-let _queens_one_89 _number_of_queens_90 =
-  let rec _newvar_22 (_x_19,_qs_18) =
-    if _x_19 > _number_of_queens_90
-    then fun _lift_fun_175  -> value ((fun _  -> _qs_18) _lift_fun_175)
+  _place_85 (1, []) 
+let _queens_one_option_94 _number_of_queens_95 =
+  let rec _newvar_17 (_x_14,_qs_13) =
+    if _x_14 > _number_of_queens_95
+    then Some _qs_13
     else
-      (let rec _newvar_48 _gen_let_rec_function_60 =
+      (let rec _newvar_35 _gen_let_rec_function_60 =
          match _gen_let_rec_function_60 with
-         | [] -> (fun _kf_68  -> _kf_68 ())
+         | [] -> None
          | _x_62::_xs_63 ->
-             (fun _kf_95  ->
-                _newvar_22 ((_x_19 + 1), ((_x_19, _x_62) :: _qs_18))
-                  (fun ()  -> _newvar_48 _xs_63 _kf_95))
+             (match _newvar_17 ((_x_14 + 1), ((_x_14, _x_62) :: _qs_13)) with
+              | Some _x_70 -> Some _x_70
+              | None  -> _newvar_35 _xs_63)
           in
-       _newvar_48 (_available_44 (_number_of_queens_90, _x_19, _qs_18)))
+       _newvar_35 (_available_44 (_number_of_queens_95, _x_14, _qs_13)))
      in
-  _newvar_22 (1, [])
-    (fun ()  ->
-       call Effect_Fail () (fun _result_9  -> value (_absurd_7 _result_9)))
-  
-let _queens_all_93 _number_of_queens_94 =
-  let rec _newvar_109 (_x_106,_qs_105) =
-    if _x_106 > _number_of_queens_94
-    then [_qs_105]
+  _newvar_17 (1, []) 
+let _queens_one_cps_96 _number_of_queens_97 =
+  let rec _newvar_86 (_x_83,_qs_82) =
+    if _x_83 > _number_of_queens_97
+    then fun _lift_fun_239  -> value ((fun _  -> _qs_82) _lift_fun_239)
     else
-      (let rec _newvar_131 _gen_let_rec_function_60 =
+      (let rec _newvar_112 _gen_let_rec_function_60 =
+         match _gen_let_rec_function_60 with
+         | [] -> (fun _kf_132  -> _kf_132 ())
+         | _x_62::_xs_63 ->
+             (fun _kf_159  ->
+                _newvar_86 ((_x_83 + 1), ((_x_83, _x_62) :: _qs_82))
+                  (fun ()  -> _newvar_112 _xs_63 _kf_159))
+          in
+       _newvar_112 (_available_44 (_number_of_queens_97, _x_83, _qs_82)))
+     in
+  _newvar_86 (1, [])
+    (fun ()  ->
+       call Effect_Fail () (fun _result_73  -> value (_absurd_7 _result_73)))
+  
+let _queens_all_100 _number_of_queens_101 =
+  let rec _newvar_173 (_x_170,_qs_169) =
+    if _x_170 > _number_of_queens_101
+    then [_qs_169]
+    else
+      (let rec _newvar_195 _gen_let_rec_function_60 =
          match _gen_let_rec_function_60 with
          | [] -> []
          | _x_62::_xs_63 ->
              _var_13
-               (_newvar_109 ((_x_106 + 1), ((_x_106, _x_62) :: _qs_105)))
-               (_newvar_131 _xs_63)
+               (_newvar_173 ((_x_170 + 1), ((_x_170, _x_62) :: _qs_169)))
+               (_newvar_195 _xs_63)
           in
-       _newvar_131 (_available_44 (_number_of_queens_94, _x_106, _qs_105)))
+       _newvar_195 (_available_44 (_number_of_queens_101, _x_170, _qs_169)))
      in
-  _newvar_109 (1, []) 
+  _newvar_173 (1, []) 

@@ -38,16 +38,23 @@ let available (number_of_queens, x, qs) =
 effect Decide : unit -> bool
 effect Fail : unit -> empty
 
+type 'a option = None | Some of 'a
+
 let rec choose = function
   | [] -> (match (#Fail ()) with)
   | x::xs -> if #Decide () then x else choose xs
+
+let optionalize = handler
+  | val y -> (Some y)
+  | #Decide _ k -> (match k true with Some x -> Some x | None -> k false)
+  | #Fail _ _ -> None
 
 let backtrack = handler
   | val y -> (fun _ -> y)
   | #Decide _ k -> (fun kf -> k true (fun () -> k false kf) )  
   | #Fail _ _ -> (fun kf -> kf ())
 
- let choose_all = handler
+let choose_all = handler
   | val x -> [x]
   | #Decide _ k -> k true @ k false
   | #Fail _ _ -> []
@@ -62,7 +69,10 @@ let queens number_of_queens =
   in
   place (1, [])
 
-let queens_one number_of_queens =
+let queens_one_option number_of_queens =
+  with optionalize handle queens number_of_queens
+
+let queens_one_cps number_of_queens =
   (with backtrack handle queens number_of_queens) (fun () -> (absurd (#Fail ())))
 
 let queens_all number_of_queens =

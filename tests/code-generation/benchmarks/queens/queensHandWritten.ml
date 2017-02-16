@@ -110,6 +110,18 @@ let backtrack = handler {
   )
 }
 
+let optionalize = handler {
+  value_clause = (fun y -> Some y);
+  effect_clauses = fun (type a) (type b) (eff : (a, b) effect) -> (
+    match eff with
+    | Effect_decide -> fun _ k ->
+        (match k true with Some x -> Some x | None -> k false)
+    | Effect_fail -> fun _ _ -> None
+    :
+    a -> (b -> _) -> _
+  )
+}
+
 let choose_all = handler {
   value_clause = (fun x -> [x]);
   effect_clauses = fun (type a) (type b) (eff : (a, b) effect) -> (
@@ -133,7 +145,10 @@ let queens number_of_queens =
   in
   place (1, [])
 
-let queens_one number_of_queens =
+let queens_one_option number_of_queens =
+  (optionalize (queens number_of_queens))
+
+let queens_one_cps number_of_queens =
   (backtrack (queens number_of_queens)) (fun () -> assert false)
 
 let queens_all number_of_queens =

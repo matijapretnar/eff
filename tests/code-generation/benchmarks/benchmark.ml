@@ -63,14 +63,26 @@ let () =
   Printf.printf "\n\n"
   end;
   if run_queens_one then begin
-  Printf.printf "QUEENS ONE BENCHMARK (%d queens):\n" number_of_queens;
+  Printf.printf "QUEENS ONE CPS BENCHMARK (%d queens):\n" number_of_queens;
   Command.run (Bench.make_command [
-      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> QueensNoOptImpure._queens_one_89 number_of_queens);
-      Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> QueensOptImpure._queens_one_89 number_of_queens);
-      Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> QueensNoOptPure._queens_one_89 number_of_queens);
-      Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> QueensOptPure._queens_one_89 number_of_queens);
-      Bench.Test.create ~name:"Hand written" (fun () -> QueensHandWritten.queens_one number_of_queens);
+      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> QueensNoOptImpure._queens_one_cps_96 number_of_queens);
+      Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> QueensOptImpure._queens_one_cps_96 number_of_queens);
+      Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> QueensNoOptPure._queens_one_cps_96 number_of_queens);
+      Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> QueensOptPure._queens_one_cps_96 number_of_queens);
+      Bench.Test.create ~name:"Hand written" (fun () -> QueensHandWritten.queens_one_cps number_of_queens);
       Bench.Test.create ~name:"Native - CPS" (fun () -> QueensNative.queens_one_cps number_of_queens);
+      Bench.Test.create ~name:"Native - exceptions" (fun () -> QueensNative.queens_one_exceptions number_of_queens);
+    ]);
+  Printf.printf "\n\n"
+  end;
+  if run_queens_one then begin
+  Printf.printf "QUEENS ONE OPTION BENCHMARK (%d queens):\n" number_of_queens;
+  Command.run (Bench.make_command [
+      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> QueensNoOptImpure._queens_one_option_94 number_of_queens);
+      Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> QueensOptImpure._queens_one_option_94 number_of_queens);
+      Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> QueensNoOptPure._queens_one_option_94 number_of_queens);
+      Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> QueensOptPure._queens_one_option_94 number_of_queens);
+      Bench.Test.create ~name:"Hand written" (fun () -> QueensHandWritten.queens_one_option number_of_queens);
       Bench.Test.create ~name:"Native - option" (fun () -> QueensNative.queens_one_option number_of_queens);
       Bench.Test.create ~name:"Native - exceptions" (fun () -> QueensNative.queens_one_exceptions number_of_queens);
     ]);
@@ -79,10 +91,10 @@ let () =
   if run_queens_all then begin
   Printf.printf "QUEENS ALL BENCHMARK (%d queens):\n" number_of_queens;
   Command.run (Bench.make_command [
-      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> QueensNoOptImpure._queens_all_93 number_of_queens);
-      Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> QueensOptImpure._queens_all_93 number_of_queens);
-      Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> QueensNoOptPure._queens_all_93 number_of_queens);
-      Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> QueensOptPure._queens_all_93 number_of_queens);
+      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> QueensNoOptImpure._queens_all_100 number_of_queens);
+      Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> QueensOptImpure._queens_all_100 number_of_queens);
+      Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> QueensNoOptPure._queens_all_100 number_of_queens);
+      Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> QueensOptPure._queens_all_100 number_of_queens);
       Bench.Test.create ~name:"Hand written" (fun () -> QueensHandWritten.queens_all number_of_queens);
       Bench.Test.create ~name:"Native" (fun () -> QueensNative.queens_all number_of_queens);
     ]);
