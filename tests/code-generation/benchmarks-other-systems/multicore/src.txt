@@ -1,0 +1,1 @@
+https://github.com/ocamllabs/multicore-opam/blob/master/README.md

@@ -1,0 +1,82 @@
+Hi Tom,
+
+Apologies for the late response, but I wanted make sure the following steps are reproducible. For experimenting with Links OCaml Backend I recommend using the OCaml Effects Compiler -- like the Multicore OCaml Compiler it has (unchecked) algebraic effects and handlers, but it does not have any multicore capabilities. Moreover, most opam packages tend to work nicely with the effects compiler, whereas the multicore compiler breaks a lot of packages (due to its new garbage collector and C runtime API).
+
+To install the effects compiler (or any other experimental OCaml compiler) I recommend first installing Gabriel Scherer's `opam compiler-conf`:
+
+https://github.com/gasche/opam-compiler-conf
+
+After that download and install the effects compiler:
+
+~$ git clone -b 4.02.2+effects git@github.com:ocamllabs/ocaml-effects.git
+
+ocaml-effects$ opam compiler-conf configure
+
+ocaml-effects$ make world.opt
+
+ocaml-effects$ opam compiler-conf install
+
+After installation is done, `opam' will ask you to update the environment, i.e. eval `opam config env`.
+
+In order to install Links you need the packages `deriving' and `lwt' from opam. However, the former depends on `ppx_tools' which is broken under the multicore/effects compiler. Fortunately, KC has patched version on his github. We can pin it directly in opam:
+
+opam pin add ppx_tools https://github.com/kayceesrk/ppx_tools/archive/v4.02.3-effects.zip
+
+In addition to pinning the package, the above command should also install the package. Now you ought to be able to install `lwt' and `deriving':
+
+opam install lwt deriving
+
+At this point you should be able to build the Links Effect Handlers compiler:
+
+~$ git clone -b effect-handlers-compilation git@github.com:links-lang/links.git links-effects
+
+links-effects$ make nc
+
+If successful you should be able to compile and run the `cointoss.links` program, i.e.
+
+links-effects$ ./links -c programs/cointoss.links -o toss
+
+links-effects$ ./toss
+
+# examples
+#1 randomResult(toss):
+Heads
+
+#2 allResults(toss):
+[Heads,Tails]
+
+[ I have omitted rest of the output ]
+
+Remark: The effects compiler is now unmaintained, it has been replaced in favour of the multicore compiler, the compiler does a some known bugs. For example for some programs it does not allocate a large enough minor heap. This can be worked around by setting the OCaml run time parameter `s' manually, e.g.
+links-effects$ OCAMLRUNPARAM="s=100M" ./toss
+sets the minor heap size to 100 megabytes.
+
+I suppose you want to use the OCaml backend as a compilation target for your own language. If that is the case, then it may be worthwhile to target the Multicore OCaml Backend rather than the Effects backend. However, if your compiler depends some opam packages then it might be better to go with the Effects backend after all due to compatibility issues. Nevertheless, the procedure remains the same. In order to target the OCaml backend you should compile against the `compiler-libs'. In your makefile add the following as packages (dependencies):
+compiler-libs.bytecomp compiler-libs.optcomp
+These two packages enable both the byte code and native code compilation pipelines. Both pipelines start from the intermediate language Lambda. This is the highest level IR exposed by the OCaml backend. See [https://github.com/ocamllabs/ocaml-effects/blob/4.02.2%2Beffects/bytecomp/lambda.mli] for the Lambda interface. To give you a flavour of Lambda I have included a "Hello World" program written directly in Lambda:
+let hello_world : unit -> Lambda.lambda =
+  fun () ->
+  let env = Compmisc.initial_env () in
+  Lambda.(
+    let () = Ident.reinit() in
+    let print_endline, _ = Env.lookup_value
+                 (Longident.(Ldot (Lident "Pervasives", "print_endline")))
+                 env
+    in
+    let id = Ident.( { name = "Hello" ; flags = 1 ; stamp = 0 } ) in
+    let body =
+      Lapply (transl_path Env.empty print_endline,
+              [Lconst (Const_immstring "Hello, world!")],
+              no_apply_info)
+    in
+    Lsequence (body, Lprim (Pmakeblock(0, Asttypes.Immutable), []))
+  )
+The bold faced segments are the actually Lambda code, and the italic segment shows how you may interface with functions in other modules -- in this case the `print_endline' from the Pervasives module.
+
+It would be an understatement to say that the semantics of Lambda is not very well defined. I have found no documentation of the semantics. At the moment the only option is to ask OCaml compiler hackers and otherwise reverse-engineer the intended semantics. Fortunately, you can ask the OCaml compiler to dump the Lambda code of any OCaml program, e.g.
+ocamlc -dlambda <your program.ml>
+Beware that the generated code may differ between the byte code compiler (ocamlc) and the native compiler (ocamlopt).
+
+Let me know if you have any further questions, I'd be happy to help out.
+
+Kind regards, Daniel
