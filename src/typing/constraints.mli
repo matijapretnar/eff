@@ -28,7 +28,8 @@ val tag_wildcard_dirt_ty : Type.ty -> t -> t
 val tag_wildcard_dirt_dirty : Type.dirty -> t -> t
 
 val is_pure : t -> Type.dirt -> bool
-val is_pure_for_handler : t -> Type.dirt -> ((Common.effect * ('a * 'b)) * 'c) list -> bool
+val is_surely_pure : t -> Type.dirt -> bool
+val is_surely_pure_for_handler : t -> Type.dirt -> Common.effect list -> bool
 
 val expand_ty : Type.ty -> Type.ty
 val expand_dirt : Type.dirt -> Type.dirt

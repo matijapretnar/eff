@@ -73,10 +73,10 @@ let (Handler h't) = h'.term in
  assoc_equal (alphaeq_abs2 eqvars) ht.effect_clauses h't.effect_clauses
 
 let is_pure c =
-  Scheme.is_pure c.Typed.scheme
+  Scheme.is_surely_pure c.Typed.scheme
 
 let is_pure_for_handler c clauses =
-  Scheme.is_pure_for_handler c.Typed.scheme clauses
+  Scheme.is_surely_pure_for_handler c.Typed.scheme (List.map (fun ((eff, _), _) -> eff) clauses)
 
 let find_in_handlers_func_mem st f_name h_exp =
   let loc = h_exp.location in 
@@ -393,7 +393,7 @@ and reduce_comp st c =
     in
     find_const_case cases
 
-  | Bind (c1, c2) when Scheme.is_pure c1.scheme ->
+  | Bind (c1, c2) when is_pure c1 ->
     useFuel st;
     beta_reduce st c2 (reduce_expr st (pure c1))
 

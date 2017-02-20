@@ -54,6 +54,28 @@ let is_pure { dirt_poset; region_poset; full_regions; full_dirts } { Type.ops; T
     not (FullDirts.mem prec full_dirts)
   ) (DirtPoset.get_prec rest dirt_poset)
 
+let is_surely_pure { dirt_poset; region_poset; full_regions; full_dirts } { Type.ops; Type.rest } =
+  let check_region r =
+    not (FullRegions.mem r full_regions) &&
+    RegionPoset.get_prec r region_poset = []
+  in
+  DirtPoset.get_prec rest dirt_poset = [] &&
+  List.for_all (fun (_, r) -> check_region r) ops &&
+  not (FullDirts.mem rest full_dirts) &&
+  List.for_all (fun prec ->
+    not (FullDirts.mem prec full_dirts)
+  ) (DirtPoset.get_prec rest dirt_poset)
+
+let is_surely_pure_for_handler { dirt_poset; region_poset; full_regions; full_dirts } { Type.ops; Type.rest } handled_effects =
+  let check_region op r =
+    not (List.mem op handled_effects) && not (FullRegions.mem r full_regions)
+  in
+  List.for_all (fun (op, r) -> check_region op r) ops &&
+  not (FullDirts.mem rest full_dirts) &&
+  List.for_all (fun prec ->
+    not (FullDirts.mem prec full_dirts)
+  ) (DirtPoset.get_prec rest dirt_poset)
+
 type param_expansion = {
   mutable ty_expansion : Type.ty TyMap.t;
   mutable dirt_expansion : Type.dirt DirtMap.t;
@@ -108,17 +130,6 @@ and expand_dirt ({Type.ops=ops; Type.rest=rest} as drt) =
 
 and expand_args (tys, drts, rs) =
   (Common.map expand_ty tys, Common.map expand_dirt drts, rs)
-
-let is_pure_for_handler { dirt_poset; region_poset; full_regions; full_dirts } { Type.ops; Type.rest } effect_clauses =
-  let handled_effects = List.map (fun ((eff_name, _), _) -> eff_name) effect_clauses in
-  let check_region op r =
-    not (List.mem op handled_effects) && not (FullRegions.mem r full_regions)
-  in
-  List.for_all (fun (op, r) -> check_region op r) ops &&
-  not (FullDirts.mem rest full_dirts) &&
-  List.for_all (fun prec ->
-    not (FullDirts.mem prec full_dirts)
-  ) (DirtPoset.get_prec rest dirt_poset)
 
 let add_ty_param_constraint t1 t2 constraints =
   {constraints with ty_poset = TyPoset.add t1 t2 constraints.ty_poset}

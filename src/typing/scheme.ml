@@ -197,16 +197,6 @@ let extend_non_poly params skeletons =
   let new_params = List.fold_right add_skel skeletons params in
   Params.uniq new_params
 
-(*
-    check whether the dirty_scheme is pure in terms of the handler
-    ie.
-        check if any operations from the handler can occur in the computation
-        if so => the dirty_scheme is dirty
-        otherwise the dirty_scheme is pure
-*)
-let is_pure_for_handler (ctx, (_, drt), cnstrs) eff_clause =
-  Constraints.is_pure_for_handler cnstrs drt eff_clause
-
 let skeletons_non_poly_scheme (ctx, _, cnstrs) =
   let skeletons = Constraints.skeletons cnstrs in
   let non_poly = Params.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
@@ -236,3 +226,17 @@ let print_dirty_scheme ty_sch ppf =
 
 let is_pure ?(loc=Location.unknown) (ctx, (_, drt), cnstrs) =
   Constraints.is_pure cnstrs drt
+
+let is_surely_pure ?(loc=Location.unknown) (ctx, (_, drt), cnstrs) =
+  Constraints.is_surely_pure cnstrs drt
+
+(*
+    check whether the dirty_scheme is pure in terms of the handler
+    ie.
+        check if any operations from the handler can occur in the computation
+        if so => the dirty_scheme is dirty
+        otherwise the dirty_scheme is pure
+*)
+let is_surely_pure_for_handler (ctx, (_, drt), cnstrs) eff_clause =
+  Constraints.is_surely_pure_for_handler cnstrs drt eff_clause
+
