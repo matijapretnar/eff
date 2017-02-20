@@ -195,6 +195,16 @@ let make_var ?(loc=Location.unknown) ann scheme =
   } in
   x_var, x_pat
 
+let refresh_var ?(loc=Location.unknown) oldvar scheme =
+  let x = Typed.Variable.refresh oldvar in
+  let x_var = var ~loc x scheme
+  and x_pat = {
+    term = Typed.PVar x;
+    location = loc;
+    scheme = scheme
+  } in
+  x_var, x_pat
+
 type inlinability =
   | NotInlinable (* Pattern variables occur more than once or inside a binder *)
   | NotPresent (* Pattern variables are not present in the body *)
@@ -572,7 +582,7 @@ and reduce_comp st c =
                                     |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
                   let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
                   let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
-                  let f_var, f_pat = make_var "newvar"  function_scheme in
+                  let f_var, f_pat = refresh_var v function_scheme in
                   let f_def =
                     lambda @@
                     abstraction newdp @@
@@ -594,7 +604,7 @@ and reduce_comp st c =
                                   |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
                             let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
                             let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
-                            let new_f_var, new_f_pat = make_var "newvar"  function_scheme in
+                            let new_f_var, new_f_pat = refresh_var v function_scheme in
                             let new_handler_call = handle e1 let_rec_c in
                             let Var newfvar = new_f_var.term in
                             let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
