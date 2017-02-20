@@ -72,6 +72,12 @@ let (Handler ht) = h.term in
 let (Handler h't) = h'.term in 
  assoc_equal (alphaeq_abs2 eqvars) ht.effect_clauses h't.effect_clauses
 
+let is_pure c =
+  Scheme.is_pure c.Typed.scheme
+
+let is_pure_for_handler c clauses =
+  Scheme.is_pure_for_handler c.Typed.scheme clauses
+
 let find_in_handlers_func_mem st f_name h_exp =
   let loc = h_exp.location in 
   let findres_cont_list = List.filter
@@ -433,19 +439,19 @@ and reduce_comp st c =
     reduce_comp st res
 
   | Handle ({term = Handler h}, c1)
-        when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
+        when (is_pure_for_handler c1 h.effect_clauses) ->
     useFuel st;
     (* Print.debug "Remove handler, since no effects in common with computation"; *)
     reduce_comp st (bind c1 h.value_clause)
 
   | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})})
-        when (Scheme.is_pure_for_handler c1.Typed.scheme h.effect_clauses) ->
+        when (is_pure_for_handler c1 h.effect_clauses) ->
     useFuel st;
     (* Print.debug "Remove handler of outer Bind, since no effects in common with computation"; *)
     reduce_comp st (bind (reduce_comp st c1) (abstraction p1 (reduce_comp st (handle (refresh_expr handler) c2))))
 
   | Handle ({term = Handler h}, {term = Bind (c1, {term = (p1, c2)})})
-        when (Scheme.is_pure_for_handler c2.Typed.scheme h.effect_clauses) ->
+        when (is_pure_for_handler c2 h.effect_clauses) ->
     useFuel st;
     (* Print.debug "Move inner bind into the value case"; *)
     let new_value_clause = optimize_abs st (abstraction p1 (bind (reduce_comp st c2) (refresh_abs h.value_clause))) in
@@ -465,7 +471,7 @@ and reduce_comp st c =
     } in
     reduce_comp st (handle (refresh_expr hdlr) (refresh_comp c1))
 
-  | Handle ({term = Handler h}, c) when Scheme.is_pure c.scheme ->
+  | Handle ({term = Handler h}, c) when is_pure c ->
     useFuel st;
     beta_reduce st h.value_clause (reduce_expr st (pure c))
 
