@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM loop.eff ===
-commit SHA: ec8d6d094577edb51f0603c9a7d9f74d8bd5c47a
+commit SHA: 503a5108792f58491aa1e035aa42e7cd14c90a93
 === BEGIN SOURCE ===
 
 external ( = ) : int -> int -> bool = "="
@@ -183,16 +183,16 @@ let _incr_handler_30 c =
     } c
   
 let _test_incr_38 _n_39 =
-  let rec _newvar_12 _n_25 =
+  let rec _loop_incr_12 _n_25 =
     match run ((run (lift_binary (=) _n_25)) 0) with
     | true  -> value (fun _x_17  -> value _x_17)
     | false  ->
         value
           (fun _x_33  ->
-             (run (_newvar_12 (run ((run (lift_binary (-) _n_25)) 1))))
+             (run (_loop_incr_12 (run ((run (lift_binary (-) _n_25)) 1))))
                (run ((run (lift_binary (+) _x_33)) 1)))
      in
-  (run (_newvar_12 _n_39)) 0 
+  (run (_loop_incr_12 _n_39)) 0 
 type (_,_) effect +=
   | Effect_Get: (unit,int) effect 
 type (_,_) effect +=
@@ -238,13 +238,13 @@ let _state_handler_50 c =
     } c
   
 let _test_state_59 _n_60 =
-  let rec _newvar_53 _n_42 =
+  let rec _loop_state_53 _n_42 =
     match run ((run (lift_binary (=) _n_42)) 0) with
     | true  -> value (fun _x_65  -> value _x_65)
     | false  ->
         value
           (fun _s_103  ->
-             (run (_newvar_53 (run ((run (lift_binary (-) _n_42)) 1))))
+             (run (_loop_state_53 (run ((run (lift_binary (-) _n_42)) 1))))
                (run ((run (lift_binary (+) _s_103)) 1)))
      in
-  (run (_newvar_53 _n_60)) 0 
+  (run (_loop_state_53 _n_60)) 0 

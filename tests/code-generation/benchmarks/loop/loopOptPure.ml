@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM loop.eff ===
-commit SHA: ec8d6d094577edb51f0603c9a7d9f74d8bd5c47a
+commit SHA: 503a5108792f58491aa1e035aa42e7cd14c90a93
 === BEGIN SOURCE ===
 
 external ( = ) : int -> int -> bool = "="
@@ -175,11 +175,11 @@ let _incr_handler_30 comp =
     } comp
   
 let _test_incr_38 _n_39 =
-  let rec _newvar_12 _n_25 =
+  let rec _loop_incr_12 _n_25 =
     if _n_25 = 0
     then fun _x_17  -> _x_17
-    else (fun _x_33  -> _newvar_12 (_n_25 - 1) (_x_33 + 1))  in
-  _newvar_12 _n_39 0 
+    else (fun _x_33  -> _loop_incr_12 (_n_25 - 1) (_x_33 + 1))  in
+  _loop_incr_12 _n_39 0 
 type (_,_) effect +=
   | Effect_Get: (unit,int) effect 
 type (_,_) effect +=
@@ -225,8 +225,8 @@ let _state_handler_50 comp =
     } comp
   
 let _test_state_59 _n_60 =
-  let rec _newvar_53 _n_42 =
+  let rec _loop_state_53 _n_42 =
     if _n_42 = 0
     then fun _x_65  -> _x_65
-    else (fun _s_103  -> _newvar_53 (_n_42 - 1) (_s_103 + 1))  in
-  _newvar_53 _n_60 0 
+    else (fun _s_103  -> _loop_state_53 (_n_42 - 1) (_s_103 + 1))  in
+  _loop_state_53 _n_60 0 

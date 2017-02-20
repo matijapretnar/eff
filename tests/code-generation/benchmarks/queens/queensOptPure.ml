@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM queens.eff ===
-commit SHA: a4fc6bd92723428911a2469b49b7b7e80480dc2f
+commit SHA: 503a5108792f58491aa1e035aa42e7cd14c90a93
 === BEGIN SOURCE ===
 
 external ( <> ) : int -> int -> bool = "<>"
@@ -280,53 +280,53 @@ let _queens_83 _number_of_queens_84 =
      in
   _place_85 (1, []) 
 let _queens_one_option_94 _number_of_queens_95 =
-  let rec _newvar_17 (_x_14,_qs_13) =
+  let rec _place_17 (_x_14,_qs_13) =
     if _x_14 > _number_of_queens_95
     then Some _qs_13
     else
-      (let rec _newvar_35 _gen_let_rec_function_60 =
+      (let rec _choose_35 _gen_let_rec_function_60 =
          match _gen_let_rec_function_60 with
          | [] -> None
          | _x_62::_xs_63 ->
-             (match _newvar_17 ((_x_14 + 1), ((_x_14, _x_62) :: _qs_13)) with
+             (match _place_17 ((_x_14 + 1), ((_x_14, _x_62) :: _qs_13)) with
               | Some _x_70 -> Some _x_70
-              | None  -> _newvar_35 _xs_63)
+              | None  -> _choose_35 _xs_63)
           in
-       _newvar_35 (_available_44 (_number_of_queens_95, _x_14, _qs_13)))
+       _choose_35 (_available_44 (_number_of_queens_95, _x_14, _qs_13)))
      in
-  _newvar_17 (1, []) 
+  _place_17 (1, []) 
 let _queens_one_cps_96 _number_of_queens_97 =
-  let rec _newvar_86 (_x_83,_qs_82) =
+  let rec _place_86 (_x_83,_qs_82) =
     if _x_83 > _number_of_queens_97
     then fun _lift_fun_239  -> value ((fun _  -> _qs_82) _lift_fun_239)
     else
-      (let rec _newvar_112 _gen_let_rec_function_60 =
+      (let rec _choose_112 _gen_let_rec_function_60 =
          match _gen_let_rec_function_60 with
          | [] -> (fun _kf_132  -> _kf_132 ())
          | _x_62::_xs_63 ->
              (fun _kf_159  ->
-                _newvar_86 ((_x_83 + 1), ((_x_83, _x_62) :: _qs_82))
-                  (fun ()  -> _newvar_112 _xs_63 _kf_159))
+                _place_86 ((_x_83 + 1), ((_x_83, _x_62) :: _qs_82))
+                  (fun ()  -> _choose_112 _xs_63 _kf_159))
           in
-       _newvar_112 (_available_44 (_number_of_queens_97, _x_83, _qs_82)))
+       _choose_112 (_available_44 (_number_of_queens_97, _x_83, _qs_82)))
      in
-  _newvar_86 (1, [])
+  _place_86 (1, [])
     (fun ()  ->
        call Effect_Fail () (fun _result_73  -> value (_absurd_7 _result_73)))
   
 let _queens_all_100 _number_of_queens_101 =
-  let rec _newvar_173 (_x_170,_qs_169) =
+  let rec _place_173 (_x_170,_qs_169) =
     if _x_170 > _number_of_queens_101
     then [_qs_169]
     else
-      (let rec _newvar_195 _gen_let_rec_function_60 =
+      (let rec _choose_195 _gen_let_rec_function_60 =
          match _gen_let_rec_function_60 with
          | [] -> []
          | _x_62::_xs_63 ->
              _var_13
-               (_newvar_173 ((_x_170 + 1), ((_x_170, _x_62) :: _qs_169)))
-               (_newvar_195 _xs_63)
+               (_place_173 ((_x_170 + 1), ((_x_170, _x_62) :: _qs_169)))
+               (_choose_195 _xs_63)
           in
-       _newvar_195 (_available_44 (_number_of_queens_101, _x_170, _qs_169)))
+       _choose_195 (_available_44 (_number_of_queens_101, _x_170, _qs_169)))
      in
-  _newvar_173 (1, []) 
+  _place_173 (1, []) 

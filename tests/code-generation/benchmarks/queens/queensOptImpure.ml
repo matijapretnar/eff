@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM queens.eff ===
-commit SHA: a4fc6bd92723428911a2469b49b7b7e80480dc2f
+commit SHA: 503a5108792f58491aa1e035aa42e7cd14c90a93
 === BEGIN SOURCE ===
 
 external ( <> ) : int -> int -> bool = "<>"
@@ -316,67 +316,67 @@ let _queens_83 _number_of_queens_84 =
      in
   _place_85 (1, []) 
 let _queens_one_option_94 _number_of_queens_95 =
-  let rec _newvar_17 (_x_14,_qs_13) =
+  let rec _place_17 (_x_14,_qs_13) =
     match run ((run (lift_binary (>) _x_14)) _number_of_queens_95) with
     | true  -> value (Some _qs_13)
     | false  ->
-        let rec _newvar_35 _gen_let_rec_function_60 =
+        let rec _choose_35 _gen_let_rec_function_60 =
           match _gen_let_rec_function_60 with
           | [] -> value None
           | _x_62::_xs_63 ->
               (match run
-                       (_newvar_17
+                       (_place_17
                           ((run ((run (lift_binary (+) _x_14)) 1)),
                             ((_x_14, _x_62) :: _qs_13)))
                with
                | Some _x_70 -> value (Some _x_70)
-               | None  -> _newvar_35 _xs_63)
+               | None  -> _choose_35 _xs_63)
            in
-        _newvar_35
+        _choose_35
           (run (_available_44 (_number_of_queens_95, _x_14, _qs_13)))
      in
-  _newvar_17 (1, []) 
+  _place_17 (1, []) 
 let _queens_one_cps_96 _number_of_queens_97 =
-  let rec _newvar_86 (_x_83,_qs_82) =
+  let rec _place_86 (_x_83,_qs_82) =
     match run ((run (lift_binary (>) _x_83)) _number_of_queens_97) with
     | true  -> value (fun _  -> value _qs_82)
     | false  ->
-        let rec _newvar_112 _gen_let_rec_function_60 =
+        let rec _choose_112 _gen_let_rec_function_60 =
           match _gen_let_rec_function_60 with
           | [] -> value (fun _kf_132  -> _kf_132 ())
           | _x_62::_xs_63 ->
               value
                 (fun _kf_159  ->
                    (run
-                      (_newvar_86
+                      (_place_86
                          ((run ((run (lift_binary (+) _x_83)) 1)),
                            ((_x_83, _x_62) :: _qs_82))))
-                     (fun ()  -> (run (_newvar_112 _xs_63)) _kf_159))
+                     (fun ()  -> (run (_choose_112 _xs_63)) _kf_159))
            in
-        _newvar_112
+        _choose_112
           (run (_available_44 (_number_of_queens_97, _x_83, _qs_82)))
      in
-  (run (_newvar_86 (1, [])))
+  (run (_place_86 (1, [])))
     (fun ()  -> call Effect_Fail () (fun _result_73  -> _absurd_7 _result_73))
   
 let _queens_all_100 _number_of_queens_101 =
-  let rec _newvar_173 (_x_170,_qs_169) =
+  let rec _place_173 (_x_170,_qs_169) =
     match run ((run (lift_binary (>) _x_170)) _number_of_queens_101) with
     | true  -> value [_qs_169]
     | false  ->
-        let rec _newvar_195 _gen_let_rec_function_60 =
+        let rec _choose_195 _gen_let_rec_function_60 =
           match _gen_let_rec_function_60 with
           | [] -> value []
           | _x_62::_xs_63 ->
               (run
                  (_var_13
                     (run
-                       (_newvar_173
+                       (_place_173
                           ((run ((run (lift_binary (+) _x_170)) 1)),
                             ((_x_170, _x_62) :: _qs_169))))))
-                (run (_newvar_195 _xs_63))
+                (run (_choose_195 _xs_63))
            in
-        _newvar_195
+        _choose_195
           (run (_available_44 (_number_of_queens_101, _x_170, _qs_169)))
      in
-  _newvar_173 (1, []) 
+  _place_173 (1, []) 

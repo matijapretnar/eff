@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM loop.eff ===
-commit SHA: ec8d6d094577edb51f0603c9a7d9f74d8bd5c47a
+commit SHA: 503a5108792f58491aa1e035aa42e7cd14c90a93
 === BEGIN SOURCE ===
 
 external ( = ) : int -> int -> bool = "="

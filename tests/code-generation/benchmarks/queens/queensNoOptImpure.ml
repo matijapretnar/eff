@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM queens.eff ===
-commit SHA: a4fc6bd92723428911a2469b49b7b7e80480dc2f
+commit SHA: 503a5108792f58491aa1e035aa42e7cd14c90a93
 === BEGIN SOURCE ===
 
 external ( <> ) : int -> int -> bool = "<>"
