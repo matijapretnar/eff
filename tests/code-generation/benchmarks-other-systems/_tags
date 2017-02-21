@@ -1,8 +1,4 @@
-<loop/**>: include
 <queens/**>: include
-<interp/**>: include
-<parser/**>: include
-<loopEffect/**>: include
 <effocaml/**>: include
 <handlersinocaml/**>: include
 true:package(core, core_bench, delimcc)

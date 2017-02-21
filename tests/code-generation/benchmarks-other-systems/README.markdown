@@ -3,6 +3,17 @@ Efficient handlers
 
 An efficient implementation of handlers of algebraic effects
 
+### Running multicore benchmarks
+
+#### Install multicore compiler:
+First install multicore ocaml
+    opam remote add multicore https://github.com/ocamllabs/multicore-opam.git
+    opam switch 4.02.2+multicore
+
+After installing multicore, run the benchmark file
+
+    ./benchmark_multicore.sh
+
 ### Running benchmarks
 
 To compile the benchmarks, first install [OPAM](https://opam.ocaml.org).
