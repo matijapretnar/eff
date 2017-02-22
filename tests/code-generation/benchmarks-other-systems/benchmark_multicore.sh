@@ -18,7 +18,7 @@ NUMBER_OF_QUEENS=8
 
 cd multicore
 echo "\n\nMULTICORE"
-echo "\n\nMulticore ocaml: ONE QUEENS: CPS ($QUALITY runs)"
+echo "Multicore ocaml: ONE QUEENS: CPS ($QUALITY runs)"
 time for ((i=1;i<=$QUALITY;i++)); do ./multicore_cps.native $NUMBER_OF_QUEENS; done
 echo "\n\nMulticore ocaml: ONE QUEENS: OPTION ($QUALITY runs)"
 time for ((i=1;i<=$QUALITY;i++)); do ./multicore_option.native $NUMBER_OF_QUEENS; done
@@ -26,7 +26,7 @@ echo "\n\nMulticore ocaml: ALL QUEENS ($QUALITY runs)"
 time for ((i=1;i<=$QUALITY;i++)); do ./multicore_all.native $NUMBER_OF_QUEENS; done
 
 echo "\n\n\n\nEFF"
-echo "\n\nGenerated, pure, optimized: ONE QUEENS: CPS ($QUALITY runs)"
+echo "Generated, pure, optimized: ONE QUEENS: CPS ($QUALITY runs)"
 time for ((i=1;i<=$QUALITY;i++)); do ./queens_cps.native $NUMBER_OF_QUEENS; done
 echo "\n\nGenerated, pure, optimized: ONE QUEENS: OPTION ($QUALITY runs)"
 time for ((i=1;i<=$QUALITY;i++)); do ./queens_option.native $NUMBER_OF_QUEENS; done
@@ -34,11 +34,12 @@ echo "\n\nGenerated, pure, optimized: ALL QUEENS ($QUALITY runs)"
 time for ((i=1;i<=$QUALITY;i++)); do ./queens_all.native $NUMBER_OF_QUEENS; done
 cd ..
 
-# cd links
-# echo "Links: ONE QUEENS: CPS"
-# time for a in {1..QUALITY}; do ./queens_cps.native; done
-# echo "Links: ONE QUEENS: OPTION"
-# time for a in {1..QUALITY}; do ./queens_option.native; done
-# echo "Links: ALL QUEENS"
-# time for a in {1..QUALITY}; do ./queens_all.native; done
-# cd ..
+cd links
+echo "\n\n\n\nLINKS"
+echo "Links: ONE QUEENS: CPS"
+time for ((i=1;i<=$QUALITY;i++)); do ./queens_cps; done
+echo "\n\nLinks: ONE QUEENS: OPTION"
+time for ((i=1;i<=$QUALITY;i++)); do ./queens_option; done
+echo "\n\nLinks: ALL QUEENS"
+time for ((i=1;i<=$QUALITY;i++)); do ./queens_all; done
+cd ..

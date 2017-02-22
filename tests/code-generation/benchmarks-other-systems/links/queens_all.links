@@ -1,0 +1,176 @@
+fun intersperse(y, xs) {
+   switch (xs) {
+     case []      -> []
+     case [x]     -> [x]
+     case x :: xs -> x :: y :: intersperse(y,xs)
+   }
+}
+
+fun showList(showX)(xs) {
+  var xs = fold_left(fun (acc, x) { acc ^^ x }
+                    , ""
+                    , intersperse(",", map(showX, xs)));
+  "[" ^^ xs ^^ "]"
+}
+
+fun showMaybe(s)(m) {
+   switch (m) {
+      case Just(x) -> "Just(" ^^ s(x) ^^ ")"
+      case Nothing -> "Nothing"
+   }
+}
+
+#sig showPair : forall a, b . ((a) -e-> String, (b) -e-> String) -> ((a,b)) -e-> String
+fun showPair(showX,showY)((x,y)) {
+    "(" ^^ showX(x) ^^ ", " ^^ showY(y) ^^ ")"
+}
+
+fun no_attack((a,b),(c,d)) {
+  a <> c && b <> d && abs(a - c) <> abs(b - d)
+}
+
+fun not_attacked (y, l) {
+  switch (l) {
+    case [] -> true
+    case x :: xs -> if (no_attack(y, x)) not_attacked(y, xs)
+                    else false
+  }
+}
+
+fun available(number_of_queens, x, qs) {
+  # filter(fun(b) { for_all(noAttack((a,b)), qs) }, l)
+
+  fun loop(possible, y) {
+      if (y < 1) possible
+      else if (not_attacked((x, y), qs)) loop ((y :: possible), (y - 1))
+      else {
+        loop (possible, (y - 1))
+      }
+  }
+
+  loop([], number_of_queens)
+}
+
+###############################################
+#effect Decide : unit -> bool
+#effect Fail : unit -> empty
+#
+#type 'a option = None | Some of 'a
+#
+#let rec choose = function
+#  | [] -> (match (#Fail ()) with)
+#  | x::xs -> if #Decide () then x else choose xs
+#
+#let optionalize = handler
+#  | val y -> (Some y)
+#  | #Decide _ k -> (match k true with Some x -> Some x | None -> k false)
+#  | #Fail _ _ -> None
+#
+#let backtrack = handler
+#  | val y -> (fun _ -> y)
+#  | #Decide _ k -> (fun kf -> k true (fun () -> k false kf) )
+#  | #Fail _ _ -> (fun kf -> kf ())
+#
+#let choose_all = handler
+#  | val x -> [x]
+#  | #Decide _ k -> k true @ k false
+#  | #Fail _ _ -> []
+###############################################
+
+#sig choose : ([Int]) {Fail:() {}-> Int, Decide:() {}-> Bool |_}~> Int
+#fun choose(xs) {
+#  switch (xs) {
+#    case [] -> do Fail()
+#    case x :: xs -> if (do Decide()) x
+#                    else choose(xs)
+#  }
+#}
+
+sig choose : ([a]) {Choose:([a]) {}-> a |_}-> a
+fun choose(xs) { do Choose(xs) }
+
+fun optionalize(m) {
+    handle(m) {
+      case Return(x) -> Just(x)
+      case Choose(xs,k) -> {
+           fun loop(xs) {
+              switch(xs) {
+                case []      -> Nothing
+                case x :: xs ->
+                  switch (k(x)) {
+                    case Nothing -> loop(xs)
+                    case Just(x) -> Just(x)
+                  }
+              }
+           }
+           loop(xs)
+      }
+    }
+}
+
+
+fun backtrack(m) {
+    handle(m) {
+      case Return(x) -> {
+        fun res(a) {
+          x
+        }
+        res
+      }
+      case Choose(xs,k) -> {
+        fun loop(xs) {
+            switch (xs) {
+              case [] -> {
+                fun res(kf) {
+                  kf (1)
+                }
+                res
+              }
+              case x :: xs -> {
+                fun res(kf) {
+                  fun res2(a) {
+                    loop(xs)(kf)
+                  }
+                  k(x)(res2)
+                }
+                res
+              }
+            }
+        }
+        loop(xs)
+      }
+    }
+}
+
+fun choose_all(m) {
+    handle(m) {
+      case Return(x) -> [x]
+      case Choose(xs,k) -> {
+           fun loop(xs) {
+              switch(xs) {
+                case []      -> []
+                case x :: xs -> k(x) ++ loop(xs)
+              }
+           }
+           loop(xs)
+      }
+    }
+}
+
+fun queens(number_of_queens)() {
+    fun place(x, qs) {
+        if (x > number_of_queens) qs
+        else {
+          var y = choose(available(number_of_queens, x, qs));
+          place(x+1, (x,y) :: qs)
+        }
+    }
+
+    place(1, [])
+}
+
+fun main() {
+    choose_all(queens(8))
+}
+
+main()
