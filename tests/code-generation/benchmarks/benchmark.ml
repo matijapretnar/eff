@@ -118,7 +118,7 @@ let () =
       (* Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> InterpOptImpure._bigTest_179 ()); *)
       (* Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> InterpNoOptPure._bigTest_179 ()); *)
       (* Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> InterpOptPure._bigTest_179 ()); *)
-      (* Bench.Test.create ~name:"Native" (fun () -> InterpNative.bigTest ()); *)
+      Bench.Test.create ~name:"Native" (fun () -> InterpNative.bigTest ());
     ]);
   Printf.printf "\n\n"
   end;
