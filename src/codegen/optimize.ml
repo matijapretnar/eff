@@ -338,8 +338,6 @@ and optimize_sub_comp st c =
     call ~loc eff (optimize_expr st e1) (optimize_abs st a1)
   | Bind (c1, a1) ->
     bind ~loc (optimize_comp st c1) (optimize_abs st a1)
-  | LetIn (e, a) ->
-    let_in ~loc (optimize_expr st e) (optimize_abs st a)
 and optimize_abs st {term = (p, c); location = loc} =
   abstraction ~loc p (optimize_comp st c)
 and optimize_abs2 st a2 = a2a2 @@ optimize_abs st @@ a22a @@ a2
@@ -405,28 +403,12 @@ and reduce_comp st c =
     in
     reduce_comp st res
 
-  | Bind ({term = LetIn (e1, {term = (p1, c2)})}, c3) ->
-    useFuel st;
-    let bind_c2_c3 = reduce_comp st (bind c2 c3) in
-    let res =
-      let_in e1 (abstraction p1 (bind_c2_c3))
-    in
-    reduce_comp st res
-
   | Bind ({term = Call (eff, param, k)}, c) ->
     useFuel st;
     let {term = (k_pat, k_body)} = refresh_abs k in
     let bind_k_c = reduce_comp st (bind k_body c) in
     let res =
       call eff param (abstraction k_pat bind_k_c)
-    in
-    reduce_comp st res
-
-  | Handle (h, {term = LetIn (e, {term = (p, c)})}) ->
-    useFuel st;
-    let handle_h_c = reduce_comp st (handle h c) in
-    let res =
-      let_in e (abstraction p (handle_h_c))
     in
     reduce_comp st res
 
@@ -694,11 +676,6 @@ and reduce_comp st c =
     in
     optimize_comp st res
 *)
-
-  | LetIn (e, ({term = (p, cp)} as a)) ->
-    useFuel st;
-    (* Print.debug "We are now in the let in 1, 3 or 5 for %t" (Typed.print_pattern p); *)
-    beta_reduce st a e
 
   (* XXX simplify *)
   | LetRec (defs, co) ->

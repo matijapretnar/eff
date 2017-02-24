@@ -72,9 +72,6 @@ let rec ceval env c =
     let h = V.to_handler v in
     h r
 
-  | Typed.LetIn (e, a) ->
-    (eval_closure env a) (veval env e)
-
   | Typed.Bind (c, a) ->
     sequence (eval_closure env a) (ceval env c)
 

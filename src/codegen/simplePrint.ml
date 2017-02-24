@@ -55,10 +55,10 @@ and print_computation ?max_level c ppf =
   | Typed.Call (eff, e, a) ->
       print ~at_level:1 "call %t %t (@[fun %t@])"
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
+  | Typed.Bind ({Typed.term = Value e}, {Typed.term = (p, c)}) ->
+      print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression e) (print_computation c)
   | Typed.Bind (c1, a) ->
       print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
-  | Typed.LetIn (e, {Typed.term = (p, c)}) ->
-      print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression e) (print_computation c)
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in

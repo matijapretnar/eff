@@ -304,12 +304,6 @@ and print_computation' ?max_level c ppf =
     print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]"
       (print_computation ~max_level:0 c1)
       (print_abstraction ~expected_shape a)
-  | Typed.LetIn (e, {Typed.term = (p, c)}) ->
-    let expected_shape = shape_of_dirty_scheme c.Typed.scheme in
-    print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t"
-      (print_pattern p)
-      (print_expression e)
-      (print_computation ~expected_shape c)
 
 and print_handler h ~expected_shape ppf =
   (* Print.debug "Printing handler of expected shape %t" (print_dirty_shape expected_shape); *)

@@ -66,7 +66,6 @@ and plain_computation =
 
   | Call of effect * expression * abstraction
   | Bind of computation * abstraction
-  | LetIn of expression * abstraction
 
 (** Handler definitions *)
 and handler = {
@@ -166,8 +165,6 @@ and print_computation ?max_level c ppf =
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
   | Bind (c1, a) ->
     print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
-  | LetIn (e, {term = (p, c)}) ->
-    print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression e) (print_computation c)
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
@@ -309,8 +306,6 @@ and refresh_comp sbst c =
 and refresh_comp' sbst = function
   | Bind (c1, c2) ->
     Bind (refresh_comp sbst c1, refresh_abs sbst c2)
-  | LetIn (e, a) ->
-    LetIn (refresh_expr sbst e, refresh_abs sbst a)
   | LetRec (li, c1) ->
     let new_xs, sbst' = List.fold_right (fun (x, _) (new_xs, sbst') ->
         let x' = Variable.refresh x in
@@ -373,8 +368,6 @@ and subst_comp sbst c =
 and subst_comp' sbst = function
   | Bind (c1, c2) ->
     Bind (subst_comp sbst c1, subst_abs sbst c2)
-  | LetIn (e, a) ->
-    LetIn (subst_expr sbst e, subst_abs sbst a)
   | LetRec (li, c1) ->
     let li' = List.map (fun (x, a) ->
         (* XXX Should we check that x does not appear in sbst? *)
@@ -487,17 +480,6 @@ and wrap_up_comp' st = function
       }
       in
       Bind (c1, wrap_up_abs st' c2)
-    | LetIn (e, ({term = (p, _)} as c)) ->
-      let e = wrap_up_expr st e in
-      let _, ty_e, constraints_e = e.scheme in
-      let _, ty_p, constraints_p = p.scheme in
-      let st' = {
-        st with
-        constraints = Constraints.list_union [constraints_e; st.constraints; constraints_p]
-          |> Constraints.add_ty_constraint ~loc:e.location ty_e ty_p
-      }
-      in
-      LetIn (e, wrap_up_abs st' c)
     | LetRec (li, c1) ->
       LetRec (Common.assoc_map (wrap_up_abs st) li, wrap_up_comp st c1)
     | Match (e, li) ->
@@ -613,8 +595,6 @@ and alphaeq_comp' eqvars c c' =
   match c, c' with
   | Bind (c1, c2), Bind (c1', c2') ->
     alphaeq_comp eqvars c1 c1' && alphaeq_abs eqvars c2 c2'
-  | LetIn (e, a), LetIn (e', a') ->
-    alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a'
   | LetRec (li, c1), LetRec (li', c1') ->
     (* XXX Not yet implemented *)
     false
@@ -962,7 +942,7 @@ let let_defs ~loc defs =
       | Value _ ->
         ctx_p @ poly_tys, nonpoly_tys
       | Apply _ | Match _ | Handle _ | LetRec _
-      | Check _ | Bind _ | LetIn _ | Call _ ->
+      | Check _ | Bind _ | Call _ ->
         poly_tys, ctx_p @ nonpoly_tys
     in
     poly_tys, nonpoly_tys, ctx_c @ ctx, [
@@ -1036,18 +1016,7 @@ let bind ?loc c1 c2 =
   }
 
 let let_in ?loc e1 c2 =
-  let loc = backup_location loc [e1.location; c2.location] in
-  let ctx_e1, ty_e1, constraints_e1 = e1.scheme
-  and ctx_c2, (ty_p, drty_c2), constraints_c2 = c2.scheme in
-  let constraints =
-    Constraints.union constraints_e1 constraints_c2 |>
-    Constraints.add_ty_constraint ~loc ty_e1 ty_p
-  in
-  {
-    term = LetIn (e1, c2);
-    scheme = Scheme.clean_dirty_scheme ~loc (ctx_e1 @ ctx_c2, drty_c2, constraints);
-    location = loc;
-  }
+  bind (value e1) c2
 
 let let' ?loc defs c =
   List.fold_right (fun (p_def, c_def) binds ->
@@ -1135,7 +1104,6 @@ let rec free_vars_comp c =
   | Check c1 -> free_vars_comp c1
   | Call (_, e1, a1) -> free_vars_expr e1 @@@ free_vars_abs a1
   | Bind (c1, a1) -> free_vars_comp c1 @@@ free_vars_abs a1
-  | LetIn (e, a) -> free_vars_expr e @@@ free_vars_abs a
 and free_vars_expr e =
   match e.term with
   | Var v -> ([], [v])
