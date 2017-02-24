@@ -476,7 +476,7 @@ and wrap_up_comp st c =
            scheme
   }
 and wrap_up_comp' st = function
-    | Bind (c1, {term = (p, c2)}) ->
+    | Bind (c1, ({term = (p, _)} as c2)) ->
       let c1 = wrap_up_comp st c1 in
       let _, (ty_e, _), constraints_e = c1.scheme in
       let _, ty_p, constraints_p = p.scheme in
@@ -486,22 +486,18 @@ and wrap_up_comp' st = function
           |> Constraints.add_ty_constraint ~loc:c1.location ty_e ty_p
       }
       in
-      Print.debug "%t" (Constraints.print st'.constraints);
-      Print.debug "%t <= %t" (Type.print_ty (Constraints.expand_ty ty_e)) (Type.print_ty (Constraints.expand_ty ty_p));
-      let c2 = wrap_up_comp st' c2 in
-      Bind (c1, abstraction p c2)
-    | LetIn (e, {term = (p, c)}) ->
+      Bind (c1, wrap_up_abs st' c2)
+    | LetIn (e, ({term = (p, _)} as c)) ->
       let e = wrap_up_expr st e in
       let _, ty_e, constraints_e = e.scheme in
-      let _, ty_p, _ = p.scheme in
+      let _, ty_p, constraints_p = p.scheme in
       let st' = {
         st with
-        constraints = Constraints.list_union [constraints_e; st.constraints]
+        constraints = Constraints.list_union [constraints_e; st.constraints; constraints_p]
           |> Constraints.add_ty_constraint ~loc:e.location ty_e ty_p
       }
       in
-      let c = wrap_up_comp st' c in
-      LetIn (e, abstraction p c)
+      LetIn (e, wrap_up_abs st' c)
     | LetRec (li, c1) ->
       LetRec (Common.assoc_map (wrap_up_abs st) li, wrap_up_comp st c1)
     | Match (e, li) ->
@@ -524,16 +520,27 @@ and wrap_up_finally_handler drty_out st (h, finally_clause) =
   (wrap_up_handler drty_out st h, wrap_up_abs st finally_clause)
 and wrap_up_abs st a = 
   let (p, c) = a.term in
-  {a with term = (p, wrap_up_comp st c)}
+  let (ctx_p, _, constraints_p) = p.scheme in
+  let st' = {
+    constraints = Constraints.union constraints_p st.constraints;
+    less_context = ctx_p @ st.less_context
+  } in
+  {a with term = (p, wrap_up_comp st' c)}
 and wrap_up_abs2 drty_out st ({term = (p, k, c)} as a2) =
+  let (ctx_p, _, constraints_p) = p.scheme in
+  let (ctx_k, _, constraints_k) = k.scheme in
+  let st' = {
+    constraints = Constraints.list_union [constraints_p; constraints_k; st.constraints];
+    less_context = ctx_p @ ctx_k @ st.less_context
+  } in
   let st = match k with
-  | {term = PNonbinding} -> st
+  | {term = PNonbinding} -> st'
   | {term = PVar k} ->
       let (ctx, _, con_c) = c.scheme in
       begin match (Common.lookup k ctx) with
-      | None -> st
+      | None -> st'
       | Some Type.Arrow (ty, _) ->
-        {st with less_context = [(k, Type.Arrow (ty, drty_out))] @ st.less_context}
+        {st' with less_context = [(k, Type.Arrow (ty, drty_out))] @ st.less_context}
       end
   in
   {a2 with term = (p, k, wrap_up_comp st c)}
