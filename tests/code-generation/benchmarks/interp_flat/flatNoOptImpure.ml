@@ -1,6 +1,6 @@
 (*
-=== GENERATED FROM interp_new.eff ===
-commit SHA: 8f656e76c864217cc2b5b5a28751baf31d907c57
+=== GENERATED FROM flat.eff ===
+commit SHA: 39964fd44c01db0e6d99619f0940b04f0a17de99
 === BEGIN SOURCE ===
 
 
@@ -474,21 +474,22 @@ let string_length _ = assert false
 let to_string _ = assert false 
 let lift_unary f x = value (f x) 
 let lift_binary f x = value (fun y  -> value (f x y)) 
-;;"End of pervasives"
+;;value "End of pervasives"
 let _absurd_1 _void_2 = match _void_2 with | _ -> assert false 
-let _var_3 = (=) 
-let _var_4 = (+) 
-let _var_5 = ( * ) 
-let _var_6 = (-) 
-let _var_7 = (~-) 
-let _var_8 = (/) 
-let rec _var_9 _xs_10 _ys_11 =
-  match _xs_10 with
-  | [] -> _ys_11
-  | _x_12::_xs_13 ->
-      let _gen_bind_14 =
-        let _gen_bind_15 = _var_9 _xs_13  in _gen_bind_15 _ys_11  in
-      _x_12 :: _gen_bind_14
+let _var_3 x = lift_binary (=) x 
+let _var_4 x = lift_binary (+) x 
+let _var_5 x = lift_binary ( * ) x 
+let _var_6 x = lift_binary (-) x 
+let _var_7 x = lift_unary (~-) x 
+let _var_8 x = lift_binary (/) x 
+let rec _var_9 _xs_10 =
+  value
+    (fun _ys_11  ->
+       match _xs_10 with
+       | [] -> value _ys_11
+       | _x_12::_xs_13 ->
+           ((_var_9 _xs_13) >> (fun _gen_bind_15  -> _gen_bind_15 _ys_11)) >>
+             ((fun _gen_bind_14  -> value (_x_12 :: _gen_bind_14))))
   
 type num = int
 type func = int -> int computation
@@ -529,40 +530,48 @@ let rec _lookupState_16 (_x_17,_y_18) =
   match _y_18 with
   | [] ->
       ((effect Effect_VarNotFound) ()) >>
-        ((fun _gen_bind_19  -> value (_absurd_1 _gen_bind_19)))
+        ((fun _gen_bind_19  -> _absurd_1 _gen_bind_19))
   | (_x'_20,_y_21)::_lst_22 ->
-      let _gen_bind_23 =
-        let _gen_bind_24 = _var_3 _x_17  in _gen_bind_24 _x'_20  in
-      if _gen_bind_23 then value _y_21 else _lookupState_16 (_x_17, _lst_22)
+      ((_var_3 _x_17) >> (fun _gen_bind_24  -> _gen_bind_24 _x'_20)) >>
+        ((fun _gen_bind_23  ->
+            match _gen_bind_23 with
+            | true  -> value _y_21
+            | false  -> _lookupState_16 (_x_17, _lst_22)))
   
-let _updateState_25 (_k_26,_v_27,_env_28) = (_k_26, _v_27) :: _env_28 
+let _updateState_25 (_k_26,_v_27,_env_28) = value ((_k_26, _v_27) :: _env_28) 
 let rec _checkLoc_29 (_x_30,_env_31) =
   match _env_31 with
-  | [] -> false
+  | [] -> value false
   | (_x'_32,_y_33)::_lst_34 ->
-      let _gen_bind_35 =
-        let _gen_bind_36 = _var_3 _x_30  in _gen_bind_36 _x'_32  in
-      if _gen_bind_35 then true else _checkLoc_29 (_x_30, _lst_34)
+      ((_var_3 _x_30) >> (fun _gen_bind_36  -> _gen_bind_36 _x'_32)) >>
+        ((fun _gen_bind_35  ->
+            match _gen_bind_35 with
+            | true  -> value true
+            | false  -> _checkLoc_29 (_x_30, _lst_34)))
   
 let rec _createLoc_37 (_i_38,_env_39) =
-  let _gen_bind_40 = _checkLoc_29 (_i_38, _env_39)  in
-  if _gen_bind_40
-  then
-    let _gen_bind_41 = let _gen_bind_42 = _var_4 _i_38  in _gen_bind_42 1  in
-    _createLoc_37 (_gen_bind_41, _env_39)
-  else _i_38 
+  (_checkLoc_29 (_i_38, _env_39)) >>
+    (fun _gen_bind_40  ->
+       match _gen_bind_40 with
+       | true  ->
+           ((_var_4 _i_38) >> (fun _gen_bind_42  -> _gen_bind_42 1)) >>
+             ((fun _gen_bind_41  -> _createLoc_37 (_gen_bind_41, _env_39)))
+       | false  -> value _i_38)
+  
 let _getNewLoc_43 _env_44 = _createLoc_37 (0, _env_44) 
 let rec _lookupEnv_45 (_x_46,_y_47) =
   match _y_47 with
   | [] ->
       ((effect Effect_VarNotFound) ()) >>
-        ((fun _gen_bind_48  -> value (_absurd_1 _gen_bind_48)))
+        ((fun _gen_bind_48  -> _absurd_1 _gen_bind_48))
   | (_x'_49,_y_50)::_lst_51 ->
-      let _gen_bind_52 =
-        let _gen_bind_53 = _var_3 _x_46  in _gen_bind_53 _x'_49  in
-      if _gen_bind_52 then value _y_50 else _lookupState_16 (_x_46, _lst_51)
+      ((_var_3 _x_46) >> (fun _gen_bind_53  -> _gen_bind_53 _x'_49)) >>
+        ((fun _gen_bind_52  ->
+            match _gen_bind_52 with
+            | true  -> value _y_50
+            | false  -> _lookupState_16 (_x_46, _lst_51)))
   
-let _extendEnv_54 (_k_55,_v_56,_env_57) = (_k_55, _v_56) :: _env_57 
+let _extendEnv_54 (_k_55,_v_56,_env_57) = value ((_k_55, _v_56) :: _env_57) 
 let rec _interp_58 _a_59 =
   match _a_59 with
   | Num _b_60 -> value _b_60
@@ -571,30 +580,26 @@ let rec _interp_58 _a_59 =
         ((fun _x_63  ->
             (_interp_58 _r_62) >>
               (fun _y_64  ->
-                 value
-                   (let _gen_bind_65 = _var_4 _x_63  in _gen_bind_65 _y_64))))
+                 (_var_4 _x_63) >> (fun _gen_bind_65  -> _gen_bind_65 _y_64))))
   | Mul (_l_66,_r_67) ->
       (_interp_58 _l_66) >>
         ((fun _x_68  ->
             (_interp_58 _r_67) >>
               (fun _y_69  ->
-                 value
-                   (let _gen_bind_70 = _var_5 _x_68  in _gen_bind_70 _y_69))))
+                 (_var_5 _x_68) >> (fun _gen_bind_70  -> _gen_bind_70 _y_69))))
   | Sub (_l_71,_r_72) ->
       (_interp_58 _l_71) >>
         ((fun _x_73  ->
             (_interp_58 _r_72) >>
               (fun _y_74  ->
-                 value
-                   (let _gen_bind_75 = _var_6 _x_73  in _gen_bind_75 _y_74))))
+                 (_var_6 _x_73) >> (fun _gen_bind_75  -> _gen_bind_75 _y_74))))
   | Div (_l_76,_r_77) ->
       (_interp_58 _r_77) >>
         ((fun _r_num_78  ->
             (_interp_58 _l_76) >>
               (fun _l_num_79  ->
-                 value
-                   (let _gen_bind_80 = _var_8 _l_num_79  in
-                    _gen_bind_80 _r_num_78))))
+                 (_var_8 _l_num_79) >>
+                   (fun _gen_bind_80  -> _gen_bind_80 _r_num_78))))
   | Ref _x_81 ->
       (_interp_58 _x_81) >>
         ((fun _x_interp_82  ->
@@ -621,14 +626,14 @@ let rec _interp_58 _a_59 =
              ((fun _envi_97  ->
                  value
                    (fun _v_98  ->
-                      let _ext_99 = _extendEnv_54 (_s_95, _v_98, _envi_97)
-                         in
-                      ((effect Effect_SetEnv) _ext_99) >>
-                        (fun _ext_2_100  ->
-                           (_interp_58 _t_96) >>
-                             (fun _t_res_101  ->
-                                (effect Effect_InEnv)
-                                  (_ext_2_100, _t_res_101))))))
+                      (_extendEnv_54 (_s_95, _v_98, _envi_97)) >>
+                        (fun _ext_99  ->
+                           ((effect Effect_SetEnv) _ext_99) >>
+                             (fun _ext_2_100  ->
+                                (_interp_58 _t_96) >>
+                                  (fun _t_res_101  ->
+                                     (effect Effect_InEnv)
+                                       (_ext_2_100, _t_res_101)))))))
        | LambdaL (_s_102,_t_103) ->
            ((effect Effect_ReadEnv) ()) >>
              ((fun _envi_104  ->
@@ -647,10 +652,9 @@ let rec _interp_58 _a_59 =
                                      (((effect Effect_LookupLoc) _x_loc_106)
                                         >>
                                         (fun _gen_bind_110  ->
-                                           value
-                                             (_extendEnv_54
-                                                (_s_102, _gen_bind_110,
-                                                  _envi_104))))
+                                           _extendEnv_54
+                                             (_s_102, _gen_bind_110,
+                                               _envi_104)))
                                        >>
                                        (fun _ext_109  ->
                                           ((effect Effect_SetEnv) _ext_109)
@@ -673,31 +677,32 @@ let rec _interp_58 _a_59 =
                            ((effect Effect_InEnv)
                               (_envi2_116, _e2_interp_115))
                              >>
-                             (fun _in_env_117  ->
-                                (* value *) (_e1_interp_113 _in_env_117)))))))
+                             (fun _in_env_117  -> _e1_interp_113 _in_env_117))))))
   
-let rec _interpTopLevel_118 _lst_119 _results_120 =
-  match _lst_119 with
-  | [] -> value _results_120
-  | _top_121::_tail_122 ->
-      let _gen_bind_123 = _interpTopLevel_118 _tail_122  in
-      (let _gen_bind_125 = _var_9 _results_120  in
-       (_interp_58 _top_121) >>
-         (fun _gen_bind_126  -> value (_gen_bind_125 [_gen_bind_126])))
-        >> ((fun _gen_bind_124  -> (* value *) (_gen_bind_123 _gen_bind_124)))
+let rec _interpTopLevel_118 _lst_119 =
+  value
+    (fun _results_120  ->
+       match _lst_119 with
+       | [] -> value _results_120
+       | _top_121::_tail_122 ->
+           (_interpTopLevel_118 _tail_122) >>
+             ((fun _gen_bind_123  ->
+                 ((_var_9 _results_120) >>
+                    (fun _gen_bind_125  ->
+                       (_interp_58 _top_121) >>
+                         (fun _gen_bind_126  -> _gen_bind_125 [_gen_bind_126])))
+                   >> (fun _gen_bind_124  -> _gen_bind_123 _gen_bind_124))))
   
-let _storeHandler_127 comp =
+let _storeHandler_127 c =
   handler
     {
-      value_clause =
-        (fun _y_143  ->
-           value (fun _lift_fun_1  -> value ((fun _  -> _y_143) _lift_fun_1)));
+      value_clause = (fun _y_143  -> value (fun _  -> value _y_143));
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_LookupLoc  ->
                (fun (_x_138 : loc)  ->
-                  fun (_k_139 : int -> _)  ->
+                  fun (_k_139 : int -> _ computation)  ->
                     value
                       (fun _s_140  ->
                          ((_lookupState_16 (_x_138, _s_140)) >>
@@ -705,76 +710,78 @@ let _storeHandler_127 comp =
                            >> (fun _gen_bind_141  -> _gen_bind_141 _s_140)))
            | Effect_UpdateLoc  ->
                (fun ((_x_132,_y_133) : (loc* int))  ->
-                  fun (_k_134 : loc -> _)  ->
+                  fun (_k_134 : loc -> _ computation)  ->
                     value
                       (fun _s_135  ->
                          (_k_134 _x_132) >>
                            (fun _gen_bind_136  ->
-                              let _gen_bind_137 =
-                                _updateState_25 (_x_132, _y_133, _s_135)  in
-                              _gen_bind_136 _gen_bind_137)))
+                              (_updateState_25 (_x_132, _y_133, _s_135)) >>
+                                (fun _gen_bind_137  ->
+                                   _gen_bind_136 _gen_bind_137))))
            | Effect_AllocLoc  ->
                (fun (() : unit)  ->
-                  fun (_k_128 : loc -> _)  ->
+                  fun (_k_128 : loc -> _ computation)  ->
                     value
                       (fun _s_129  ->
-                         (let _gen_bind_131 = _getNewLoc_43 _s_129  in
-                          _k_128 _gen_bind_131) >>
-                           (fun _gen_bind_130  -> _gen_bind_130 _s_129)))
+                         ((_getNewLoc_43 _s_129) >>
+                            (fun _gen_bind_131  -> _k_128 _gen_bind_131))
+                           >> (fun _gen_bind_130  -> _gen_bind_130 _s_129)))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
-                                                                    (b -> _)
-                                                                    -> 
-                                                                    _)
-    } comp
+                                                                    (b ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                    _
+                                                                    computation)
+    } c
   
-let _environmentHandler_144 comp =
+let _environmentHandler_144 c =
   handler
     {
-      value_clause =
-        (fun _y_155  ->
-           value (fun _lift_fun_2  -> value ((fun _  -> _y_155) _lift_fun_2)));
+      value_clause = (fun _y_155  -> value (fun _  -> value _y_155));
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_InEnv  ->
                (fun ((_env_151,_s_152) : (env* int))  ->
-                  fun (_k_153 : int -> _)  ->
+                  fun (_k_153 : int -> _ computation)  ->
                     value
                       (fun _  ->
                          (_k_153 _s_152) >>
                            (fun _gen_bind_154  -> _gen_bind_154 _env_151)))
            | Effect_ReadEnv  ->
                (fun (() : unit)  ->
-                  fun (_k_148 : env -> _)  ->
+                  fun (_k_148 : env -> _ computation)  ->
                     value
                       (fun _env_149  ->
                          (_k_148 _env_149) >>
                            (fun _gen_bind_150  -> _gen_bind_150 _env_149)))
            | Effect_SetEnv  ->
                (fun (_env_145 : env)  ->
-                  fun (_k_146 : env -> _)  ->
+                  fun (_k_146 : env -> _ computation)  ->
                     value
                       (fun _  ->
                          (_k_146 _env_145) >>
                            (fun _gen_bind_147  -> _gen_bind_147 _env_145)))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
-                                                                    (b -> _)
-                                                                    -> 
-                                                                    _)
-    } comp
+                                                                    (b ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                    _
+                                                                    computation)
+    } c
   
-let _environment_store_Handler_156 comp =
+let _environment_store_Handler_156 c =
   handler
     {
-      value_clause =
-        (fun _y_188  ->
-           value (fun _lift_fun_3  -> value ((fun _  -> _y_188) _lift_fun_3)));
+      value_clause = (fun _y_188  -> value (fun _  -> value _y_188));
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_InEnv  ->
                (fun ((_env_183,_e_184) : (env* int))  ->
-                  fun (_k_185 : int -> _)  ->
+                  fun (_k_185 : int -> _ computation)  ->
                     value
                       (fun (_,_s_186)  ->
                          (_k_185 _e_184) >>
@@ -782,7 +789,7 @@ let _environment_store_Handler_156 comp =
                               _gen_bind_187 (_env_183, _s_186))))
            | Effect_ReadEnv  ->
                (fun (() : unit)  ->
-                  fun (_k_179 : env -> _)  ->
+                  fun (_k_179 : env -> _ computation)  ->
                     value
                       (fun (_env_180,_s_181)  ->
                          (_k_179 _env_180) >>
@@ -790,7 +797,7 @@ let _environment_store_Handler_156 comp =
                               _gen_bind_182 (_env_180, _s_181))))
            | Effect_SetEnv  ->
                (fun (_env_175 : env)  ->
-                  fun (_k_176 : env -> _)  ->
+                  fun (_k_176 : env -> _ computation)  ->
                     value
                       (fun (_,_s_177)  ->
                          (_k_176 _env_175) >>
@@ -798,7 +805,7 @@ let _environment_store_Handler_156 comp =
                               _gen_bind_178 (_env_175, _s_177))))
            | Effect_LookupLoc  ->
                (fun (_x_169 : loc)  ->
-                  fun (_k_170 : int -> _)  ->
+                  fun (_k_170 : int -> _ computation)  ->
                     value
                       (fun (_env_171,_s_172)  ->
                          ((_lookupState_16 (_x_169, _s_172)) >>
@@ -808,28 +815,32 @@ let _environment_store_Handler_156 comp =
                               _gen_bind_173 (_env_171, _s_172))))
            | Effect_UpdateLoc  ->
                (fun ((_x_162,_y_163) : (loc* int))  ->
-                  fun (_k_164 : loc -> _)  ->
+                  fun (_k_164 : loc -> _ computation)  ->
                     value
                       (fun (_env_165,_s_166)  ->
                          (_k_164 _x_162) >>
                            (fun _gen_bind_167  ->
-                              let _gen_bind_168 =
-                                _updateState_25 (_x_162, _y_163, _s_166)  in
-                              _gen_bind_167 (_env_165, _gen_bind_168))))
+                              (_updateState_25 (_x_162, _y_163, _s_166)) >>
+                                (fun _gen_bind_168  ->
+                                   _gen_bind_167 (_env_165, _gen_bind_168)))))
            | Effect_AllocLoc  ->
                (fun (() : unit)  ->
-                  fun (_k_157 : loc -> _)  ->
+                  fun (_k_157 : loc -> _ computation)  ->
                     value
                       (fun (_env_158,_s_159)  ->
-                         (let _gen_bind_161 = _getNewLoc_43 _s_159  in
-                          _k_157 _gen_bind_161) >>
+                         ((_getNewLoc_43 _s_159) >>
+                            (fun _gen_bind_161  -> _k_157 _gen_bind_161))
+                           >>
                            (fun _gen_bind_160  ->
                               _gen_bind_160 (_env_158, _s_159))))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
-                                                                    (b -> _)
-                                                                    -> 
-                                                                    _)
-    } comp
+                                                                    (b ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                    _
+                                                                    computation)
+    } c
   
 let _lambdaCase_189 = LambdaV ("a", (Add ((Var "a"), (Num 22)))) 
 let _addCase_190 =
@@ -899,15 +910,15 @@ let _testCaseD_194 =
   
 let rec _createCase_195 _n_196 =
   match _n_196 with
-  | 1 -> _testCaseD_194
+  | 1 -> value _testCaseD_194
   | _ ->
-      let _gen_bind_197 =
-        let _gen_bind_198 =
-          let _gen_bind_199 = _var_6 _n_196  in _gen_bind_199 1  in
-        _createCase_195 _gen_bind_198  in
-      App (_lambdaCase_189, _gen_bind_197)
+      (((_var_6 _n_196) >> (fun _gen_bind_199  -> _gen_bind_199 1)) >>
+         (fun _gen_bind_198  -> _createCase_195 _gen_bind_198))
+        >>
+        ((fun _gen_bind_197  -> value (App (_lambdaCase_189, _gen_bind_197))))
   
-let _finalCase_200 = _createCase_195 200 
+let _finalCase_200 = run (_createCase_195 200) 
 let _bigTest_201 () =
   (_environment_store_Handler_156 (_interp_58 _finalCase_200)) >>
-    (fun _gen_bind_202  -> (* value *) (_gen_bind_202 ([], [])))
+    (fun _gen_bind_202  -> _gen_bind_202 ([], []))
+  

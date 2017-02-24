@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM interp.eff ===
-commit SHA: ec8d6d094577edb51f0603c9a7d9f74d8bd5c47a
+commit SHA: 39964fd44c01db0e6d99619f0940b04f0a17de99
 === BEGIN SOURCE ===
 
 let absurd void = match void with;;
@@ -698,7 +698,8 @@ let rec _interpTopLevel_127 _lst_128 =
            let _gen_bind_134 = run (_var_9 _results_129)  in
            (_interp_86 _top_130) >>
              ((fun _gen_bind_135  ->
-                 _gen_bind_132 (run (_gen_bind_134 [_gen_bind_135])))))
+                 (_gen_bind_134 [_gen_bind_135]) >>
+                   (fun _gen_bind_133  -> _gen_bind_132 _gen_bind_133))))
   
 let _arithmeticHandler_136 c =
   handler
@@ -882,7 +883,7 @@ let rec _createCase_173 _n_174 =
 let _finalCase_178 = run (_createCase_173 200) 
 let _bigTest_179 () =
   (_storeHandler_138
-     ((let rec _newvar_80 _a_87 =
+     ((let rec _interp_80 _a_87 =
          match _a_87 with
          | Num _b_88 -> value (fun _  -> value _b_88)
          | Add (_l_89,_r_90) ->
@@ -890,104 +891,358 @@ let _bigTest_179 () =
                  handler
                    {
                      value_clause =
-                       (fun _gen_bind_842  ->
-                          let _gen_bind_843 =
-                            run (lift_binary (+) _gen_bind_842)  in
-                          let rec _new_special_var_844 (_a_846,_k_val_845) =
-                            match _a_846 with
-                            | Num _b_847 -> _k_val_845 _b_847
-                            | Add (_l_849,_r_848) ->
-                                _new_special_var_844
-                                  (_l_849,
-                                    (fun _gen_bind_850  ->
-                                       let _gen_bind_851 =
-                                         run (lift_binary (+) _gen_bind_850)
+                       (fun _gen_bind_1064  ->
+                          let _gen_bind_1065 =
+                            run (lift_binary (+) _gen_bind_1064)  in
+                          let rec _new_special_var_1066 (_a_1068,_k_val_1067)
+                            =
+                            match _a_1068 with
+                            | Num _b_1069 -> _k_val_1067 _b_1069
+                            | Add (_l_1071,_r_1070) ->
+                                _new_special_var_1066
+                                  (_l_1071,
+                                    (fun _gen_bind_1072  ->
+                                       let _gen_bind_1073 =
+                                         run (lift_binary (+) _gen_bind_1072)
                                           in
-                                       _new_special_var_844
-                                         (_r_848,
-                                           (fun _gen_bind_852  ->
-                                              _k_val_845
-                                                (run
-                                                   (_gen_bind_851
-                                                      _gen_bind_852))))))
-                            | Mul (_l_854,_r_853) ->
-                                _new_special_var_844
-                                  (_l_854,
-                                    (fun _gen_bind_855  ->
-                                       let _gen_bind_856 =
+                                       _new_special_var_1066
+                                         (_r_1070,
+                                           (fun _gen_bind_1074  ->
+                                              (fun c  ->
+                                                 handler
+                                                   {
+                                                     value_clause =
+                                                       (fun _vcvar_1075  ->
+                                                          _k_val_1067
+                                                            _vcvar_1075);
+                                                     effect_clauses = fun
+                                                       (type a) -> fun (type
+                                                       b) ->
+                                                       fun (x : (a,b) effect)
+                                                          ->
+                                                         (match x with
+                                                          | Effect_InEnv  ->
+                                                              (fun
+                                                                 ((_env_1078,_s_1077)
+                                                                   :
+                                                                   (env* int))
+                                                                  ->
+                                                                 fun
+                                                                   (_k_1076 :
+                                                                    int ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                   value
+                                                                    (fun _ 
+                                                                    ->
+                                                                    (_k_1076
+                                                                    _s_1077)
+                                                                    >>
+                                                                    (fun
+                                                                    _gen_bind_1079
+                                                                     ->
+                                                                    _gen_bind_1079
+                                                                    _env_1078)))
+                                                          | Effect_ReadEnv 
+                                                              ->
+                                                              (fun
+                                                                 (() : unit) 
+                                                                 ->
+                                                                 fun
+                                                                   (_k_1080 :
+                                                                    env ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                   value
+                                                                    (fun
+                                                                    _env_1081
+                                                                     ->
+                                                                    (_k_1080
+                                                                    _env_1081)
+                                                                    >>
+                                                                    (fun
+                                                                    _gen_bind_1082
+                                                                     ->
+                                                                    _gen_bind_1082
+                                                                    _env_1081)))
+                                                          | Effect_SetEnv  ->
+                                                              (fun
+                                                                 (_env_1084 :
+                                                                   env)
+                                                                  ->
+                                                                 fun
+                                                                   (_k_1083 :
+                                                                    env ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                   value
+                                                                    (fun _ 
+                                                                    ->
+                                                                    (_k_1083
+                                                                    _env_1084)
+                                                                    >>
+                                                                    (fun
+                                                                    _gen_bind_1085
+                                                                     ->
+                                                                    _gen_bind_1085
+                                                                    _env_1084)))
+                                                          | eff' ->
+                                                              (fun arg  ->
+                                                                 fun k  ->
+                                                                   Call
+                                                                    (eff',
+                                                                    arg, k)) : 
+                                                         a ->
+                                                           (b ->
+                                                              _ computation)
+                                                             -> _ computation)
+                                                   } c)
+                                                (_gen_bind_1073
+                                                   _gen_bind_1074)))))
+                            | Mul (_l_1087,_r_1086) ->
+                                _new_special_var_1066
+                                  (_l_1087,
+                                    (fun _gen_bind_1088  ->
+                                       let _gen_bind_1089 =
                                          run
-                                           (lift_binary ( * ) _gen_bind_855)
+                                           (lift_binary ( * ) _gen_bind_1088)
                                           in
-                                       _new_special_var_844
-                                         (_r_853,
-                                           (fun _gen_bind_857  ->
-                                              _k_val_845
-                                                (run
-                                                   (_gen_bind_856
-                                                      _gen_bind_857))))))
-                            | Sub (_l_859,_r_858) ->
-                                _new_special_var_844
-                                  (_l_859,
-                                    (fun _gen_bind_860  ->
-                                       let _gen_bind_861 =
-                                         run (lift_binary (-) _gen_bind_860)
+                                       _new_special_var_1066
+                                         (_r_1086,
+                                           (fun _gen_bind_1090  ->
+                                              (fun c  ->
+                                                 handler
+                                                   {
+                                                     value_clause =
+                                                       (fun _vcvar_1091  ->
+                                                          _k_val_1067
+                                                            _vcvar_1091);
+                                                     effect_clauses = fun
+                                                       (type a) -> fun (type
+                                                       b) ->
+                                                       fun (x : (a,b) effect)
+                                                          ->
+                                                         (match x with
+                                                          | Effect_InEnv  ->
+                                                              (fun
+                                                                 ((_env_1094,_s_1093)
+                                                                   :
+                                                                   (env* int))
+                                                                  ->
+                                                                 fun
+                                                                   (_k_1092 :
+                                                                    int ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                   value
+                                                                    (fun _ 
+                                                                    ->
+                                                                    (_k_1092
+                                                                    _s_1093)
+                                                                    >>
+                                                                    (fun
+                                                                    _gen_bind_1095
+                                                                     ->
+                                                                    _gen_bind_1095
+                                                                    _env_1094)))
+                                                          | Effect_ReadEnv 
+                                                              ->
+                                                              (fun
+                                                                 (() : unit) 
+                                                                 ->
+                                                                 fun
+                                                                   (_k_1096 :
+                                                                    env ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                   value
+                                                                    (fun
+                                                                    _env_1097
+                                                                     ->
+                                                                    (_k_1096
+                                                                    _env_1097)
+                                                                    >>
+                                                                    (fun
+                                                                    _gen_bind_1098
+                                                                     ->
+                                                                    _gen_bind_1098
+                                                                    _env_1097)))
+                                                          | Effect_SetEnv  ->
+                                                              (fun
+                                                                 (_env_1100 :
+                                                                   env)
+                                                                  ->
+                                                                 fun
+                                                                   (_k_1099 :
+                                                                    env ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                   value
+                                                                    (fun _ 
+                                                                    ->
+                                                                    (_k_1099
+                                                                    _env_1100)
+                                                                    >>
+                                                                    (fun
+                                                                    _gen_bind_1101
+                                                                     ->
+                                                                    _gen_bind_1101
+                                                                    _env_1100)))
+                                                          | eff' ->
+                                                              (fun arg  ->
+                                                                 fun k  ->
+                                                                   Call
+                                                                    (eff',
+                                                                    arg, k)) : 
+                                                         a ->
+                                                           (b ->
+                                                              _ computation)
+                                                             -> _ computation)
+                                                   } c)
+                                                (_gen_bind_1089
+                                                   _gen_bind_1090)))))
+                            | Sub (_l_1103,_r_1102) ->
+                                _new_special_var_1066
+                                  (_l_1103,
+                                    (fun _gen_bind_1104  ->
+                                       let _gen_bind_1105 =
+                                         run (lift_binary (-) _gen_bind_1104)
                                           in
-                                       _new_special_var_844
-                                         (_r_858,
-                                           (fun _gen_bind_862  ->
-                                              _k_val_845
-                                                (run
-                                                   (_gen_bind_861
-                                                      _gen_bind_862))))))
-                            | Div (_l_864,_r_863) ->
-                                _new_special_var_844
-                                  (_r_863,
-                                    (fun _r_num_865  ->
-                                       match _r_num_865 with
+                                       _new_special_var_1066
+                                         (_r_1102,
+                                           (fun _gen_bind_1106  ->
+                                              (fun c  ->
+                                                 handler
+                                                   {
+                                                     value_clause =
+                                                       (fun _vcvar_1107  ->
+                                                          _k_val_1067
+                                                            _vcvar_1107);
+                                                     effect_clauses = fun
+                                                       (type a) -> fun (type
+                                                       b) ->
+                                                       fun (x : (a,b) effect)
+                                                          ->
+                                                         (match x with
+                                                          | Effect_InEnv  ->
+                                                              (fun
+                                                                 ((_env_1110,_s_1109)
+                                                                   :
+                                                                   (env* int))
+                                                                  ->
+                                                                 fun
+                                                                   (_k_1108 :
+                                                                    int ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                   value
+                                                                    (fun _ 
+                                                                    ->
+                                                                    (_k_1108
+                                                                    _s_1109)
+                                                                    >>
+                                                                    (fun
+                                                                    _gen_bind_1111
+                                                                     ->
+                                                                    _gen_bind_1111
+                                                                    _env_1110)))
+                                                          | Effect_ReadEnv 
+                                                              ->
+                                                              (fun
+                                                                 (() : unit) 
+                                                                 ->
+                                                                 fun
+                                                                   (_k_1112 :
+                                                                    env ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                   value
+                                                                    (fun
+                                                                    _env_1113
+                                                                     ->
+                                                                    (_k_1112
+                                                                    _env_1113)
+                                                                    >>
+                                                                    (fun
+                                                                    _gen_bind_1114
+                                                                     ->
+                                                                    _gen_bind_1114
+                                                                    _env_1113)))
+                                                          | Effect_SetEnv  ->
+                                                              (fun
+                                                                 (_env_1116 :
+                                                                   env)
+                                                                  ->
+                                                                 fun
+                                                                   (_k_1115 :
+                                                                    env ->
+                                                                    _
+                                                                    computation)
+                                                                    ->
+                                                                   value
+                                                                    (fun _ 
+                                                                    ->
+                                                                    (_k_1115
+                                                                    _env_1116)
+                                                                    >>
+                                                                    (fun
+                                                                    _gen_bind_1117
+                                                                     ->
+                                                                    _gen_bind_1117
+                                                                    _env_1116)))
+                                                          | eff' ->
+                                                              (fun arg  ->
+                                                                 fun k  ->
+                                                                   Call
+                                                                    (eff',
+                                                                    arg, k)) : 
+                                                         a ->
+                                                           (b ->
+                                                              _ computation)
+                                                             -> _ computation)
+                                                   } c)
+                                                (_gen_bind_1105
+                                                   _gen_bind_1106)))))
+                            | Div (_l_1119,_r_1118) ->
+                                _new_special_var_1066
+                                  (_r_1118,
+                                    (fun _r_num_1120  ->
+                                       match _r_num_1120 with
                                        | 0 ->
                                            call Effect_Arith_DivByZero ()
-                                             (fun _result_866  ->
-                                                _k_val_845 _result_866)
+                                             (fun _result_1121  ->
+                                                _k_val_1067 _result_1121)
                                        | _ ->
-                                           _new_special_var_844
-                                             (_l_864,
-                                               (fun _gen_bind_867  ->
-                                                  _k_val_845
+                                           _new_special_var_1066
+                                             (_l_1119,
+                                               (fun _gen_bind_1122  ->
+                                                  _k_val_1067
                                                     (run
                                                        ((run
                                                            (lift_binary (/)
-                                                              _gen_bind_867))
-                                                          _r_num_865))))))
-                            | Ref _x_868 ->
-                                _new_special_var_844
-                                  (_x_868,
-                                    (fun _x_interp_869  ->
-                                       call Effect_AllocLoc ()
-                                         (fun _result_870  ->
-                                            call Effect_UpdateLoc
-                                              (_result_870, _x_interp_869)
-                                              (fun _result_871  ->
-                                                 _k_val_845 _result_871))))
-                            | Deref _x_872 ->
-                                _new_special_var_844
-                                  (_x_872,
-                                    (fun _x_interp_873  ->
-                                       call Effect_LookupLoc _x_interp_873
-                                         (fun _result_874  ->
-                                            _k_val_845 _result_874)))
-                            | Assign (_lhs_876,_rhs_875) ->
+                                                              _gen_bind_1122))
+                                                          _r_num_1120))))))
+                            | Ref _x_1123 ->
                                 ((fun c  ->
                                     handler
                                       {
                                         value_clause =
-                                          (fun _x_loc_877  ->
+                                          (fun _x_interp_1124  ->
                                              (fun c  ->
                                                 handler
                                                   {
                                                     value_clause =
-                                                      (fun _vcvar_880  ->
-                                                         _k_val_845
-                                                           _vcvar_880);
+                                                      (fun _vcvar_1128  ->
+                                                         _k_val_1067
+                                                           _vcvar_1128);
                                                     effect_clauses = fun
                                                       (type a) -> fun (type
                                                       b) ->
@@ -996,12 +1251,12 @@ let _bigTest_179 () =
                                                         (match x with
                                                          | Effect_InEnv  ->
                                                              (fun
-                                                                ((_env_883,_s_882)
+                                                                ((_env_1131,_s_1130)
                                                                   :
                                                                   (env* int))
                                                                  ->
                                                                 fun
-                                                                  (_k_881 :
+                                                                  (_k_1129 :
                                                                     int ->
                                                                     _
                                                                     computation)
@@ -1009,19 +1264,19 @@ let _bigTest_179 () =
                                                                   value
                                                                     (
                                                                     fun _  ->
-                                                                    (_k_881
-                                                                    _s_882)
+                                                                    (_k_1129
+                                                                    _s_1130)
                                                                     >>
                                                                     (fun
-                                                                    _gen_bind_884
+                                                                    _gen_bind_1132
                                                                      ->
-                                                                    _gen_bind_884
-                                                                    _env_883)))
+                                                                    _gen_bind_1132
+                                                                    _env_1131)))
                                                          | Effect_ReadEnv  ->
                                                              (fun (() : unit)
                                                                  ->
                                                                 fun
-                                                                  (_k_885 :
+                                                                  (_k_1133 :
                                                                     env ->
                                                                     _
                                                                     computation)
@@ -1029,23 +1284,23 @@ let _bigTest_179 () =
                                                                   value
                                                                     (
                                                                     fun
-                                                                    _env_886 
-                                                                    ->
-                                                                    (_k_885
-                                                                    _env_886)
+                                                                    _env_1134
+                                                                     ->
+                                                                    (_k_1133
+                                                                    _env_1134)
                                                                     >>
                                                                     (fun
-                                                                    _gen_bind_887
+                                                                    _gen_bind_1135
                                                                      ->
-                                                                    _gen_bind_887
-                                                                    _env_886)))
+                                                                    _gen_bind_1135
+                                                                    _env_1134)))
                                                          | Effect_SetEnv  ->
                                                              (fun
-                                                                (_env_889 :
+                                                                (_env_1137 :
                                                                   env)
                                                                  ->
                                                                 fun
-                                                                  (_k_888 :
+                                                                  (_k_1136 :
                                                                     env ->
                                                                     _
                                                                     computation)
@@ -1053,14 +1308,14 @@ let _bigTest_179 () =
                                                                   value
                                                                     (
                                                                     fun _  ->
-                                                                    (_k_888
-                                                                    _env_889)
+                                                                    (_k_1136
+                                                                    _env_1137)
                                                                     >>
                                                                     (fun
-                                                                    _gen_bind_890
+                                                                    _gen_bind_1138
                                                                      ->
-                                                                    _gen_bind_890
-                                                                    _env_889)))
+                                                                    _gen_bind_1138
+                                                                    _env_1137)))
                                                          | eff' ->
                                                              (fun arg  ->
                                                                 fun k  ->
@@ -1071,68 +1326,70 @@ let _bigTest_179 () =
                                                           (b -> _ computation)
                                                             -> _ computation)
                                                   } c)
-                                               ((_interp_86 _rhs_875) >>
-                                                  (fun _x_interp_878  ->
-                                                     call Effect_UpdateLoc
-                                                       (_x_loc_877,
-                                                         _x_interp_878)
-                                                       (fun _result_879  ->
-                                                          (value _result_879)
-                                                            >>
-                                                            (fun _  ->
+                                               (call Effect_AllocLoc ()
+                                                  (fun _result_1125  ->
+                                                     (value _result_1125) >>
+                                                       (fun _x_loc_1126  ->
+                                                          call
+                                                            Effect_UpdateLoc
+                                                            (_x_loc_1126,
+                                                              _x_interp_1124)
+                                                            (fun _result_1127
+                                                                ->
                                                                value
-                                                                 _x_interp_878)))));
+                                                                 _result_1127)))));
                                         effect_clauses = fun (type a) -> fun
                                           (type b) ->
                                           fun (x : (a,b) effect)  ->
                                             (match x with
                                              | Effect_InEnv  ->
                                                  (fun
-                                                    ((_env_893,_s_892) :
+                                                    ((_env_1141,_s_1140) :
                                                       (env* int))
                                                      ->
                                                     fun
-                                                      (_k_891 :
+                                                      (_k_1139 :
                                                         int -> _ computation)
                                                        ->
                                                       value
                                                         (fun _  ->
-                                                           (_k_891 _s_892) >>
+                                                           (_k_1139 _s_1140)
+                                                             >>
                                                              (fun
-                                                                _gen_bind_894
+                                                                _gen_bind_1142
                                                                  ->
-                                                                _gen_bind_894
-                                                                  _env_893)))
+                                                                _gen_bind_1142
+                                                                  _env_1141)))
                                              | Effect_ReadEnv  ->
                                                  (fun (() : unit)  ->
                                                     fun
-                                                      (_k_895 :
+                                                      (_k_1143 :
                                                         env -> _ computation)
                                                        ->
                                                       value
-                                                        (fun _env_896  ->
-                                                           (_k_895 _env_896)
+                                                        (fun _env_1144  ->
+                                                           (_k_1143 _env_1144)
                                                              >>
                                                              (fun
-                                                                _gen_bind_897
+                                                                _gen_bind_1145
                                                                  ->
-                                                                _gen_bind_897
-                                                                  _env_896)))
+                                                                _gen_bind_1145
+                                                                  _env_1144)))
                                              | Effect_SetEnv  ->
-                                                 (fun (_env_899 : env)  ->
+                                                 (fun (_env_1147 : env)  ->
                                                     fun
-                                                      (_k_898 :
+                                                      (_k_1146 :
                                                         env -> _ computation)
                                                        ->
                                                       value
                                                         (fun _  ->
-                                                           (_k_898 _env_899)
+                                                           (_k_1146 _env_1147)
                                                              >>
                                                              (fun
-                                                                _gen_bind_900
+                                                                _gen_bind_1148
                                                                  ->
-                                                                _gen_bind_900
-                                                                  _env_899)))
+                                                                _gen_bind_1148
+                                                                  _env_1147)))
                                              | eff' ->
                                                  (fun arg  ->
                                                     fun k  ->
@@ -1140,65 +1397,213 @@ let _bigTest_179 () =
                                             a ->
                                               (b -> _ computation) ->
                                                 _ computation)
-                                      } c)) (_interp_86 _lhs_876)
-                            | Var _v_901 ->
+                                      } c)) (_interp_86 _x_1123)
+                            | Deref _x_1149 ->
                                 ((fun c  ->
                                     handler
                                       {
                                         value_clause =
-                                          (fun _vcvar_903  ->
-                                             _k_val_845 _vcvar_903);
+                                          (fun _vcvar_1151  ->
+                                             _k_val_1067 _vcvar_1151);
                                         effect_clauses = fun (type a) -> fun
                                           (type b) ->
                                           fun (x : (a,b) effect)  ->
                                             (match x with
                                              | Effect_InEnv  ->
                                                  (fun
-                                                    ((_env_906,_s_905) :
+                                                    ((_env_1154,_s_1153) :
                                                       (env* int))
                                                      ->
                                                     fun
-                                                      (_k_904 :
+                                                      (_k_1152 :
                                                         int -> _ computation)
                                                        ->
                                                       value
                                                         (fun _  ->
-                                                           (_k_904 _s_905) >>
+                                                           (_k_1152 _s_1153)
+                                                             >>
                                                              (fun
-                                                                _gen_bind_907
+                                                                _gen_bind_1155
                                                                  ->
-                                                                _gen_bind_907
-                                                                  _env_906)))
+                                                                _gen_bind_1155
+                                                                  _env_1154)))
                                              | Effect_ReadEnv  ->
                                                  (fun (() : unit)  ->
                                                     fun
-                                                      (_k_908 :
+                                                      (_k_1156 :
                                                         env -> _ computation)
                                                        ->
                                                       value
-                                                        (fun _env_909  ->
-                                                           (_k_908 _env_909)
+                                                        (fun _env_1157  ->
+                                                           (_k_1156 _env_1157)
                                                              >>
                                                              (fun
-                                                                _gen_bind_910
+                                                                _gen_bind_1158
                                                                  ->
-                                                                _gen_bind_910
-                                                                  _env_909)))
+                                                                _gen_bind_1158
+                                                                  _env_1157)))
                                              | Effect_SetEnv  ->
-                                                 (fun (_env_912 : env)  ->
+                                                 (fun (_env_1160 : env)  ->
                                                     fun
-                                                      (_k_911 :
+                                                      (_k_1159 :
                                                         env -> _ computation)
                                                        ->
                                                       value
                                                         (fun _  ->
-                                                           (_k_911 _env_912)
+                                                           (_k_1159 _env_1160)
                                                              >>
                                                              (fun
-                                                                _gen_bind_913
+                                                                _gen_bind_1161
                                                                  ->
-                                                                _gen_bind_913
-                                                                  _env_912)))
+                                                                _gen_bind_1161
+                                                                  _env_1160)))
+                                             | eff' ->
+                                                 (fun arg  ->
+                                                    fun k  ->
+                                                      Call (eff', arg, k)) : 
+                                            a ->
+                                              (b -> _ computation) ->
+                                                _ computation)
+                                      } c))
+                                  ((_interp_86 _x_1149) >>
+                                     (fun _x_interp_1150  ->
+                                        (effect Effect_LookupLoc)
+                                          _x_interp_1150))
+                            | Assign (_lhs_1163,_rhs_1162) ->
+                                ((fun c  ->
+                                    handler
+                                      {
+                                        value_clause =
+                                          (fun _vcvar_1166  ->
+                                             _k_val_1067 _vcvar_1166);
+                                        effect_clauses = fun (type a) -> fun
+                                          (type b) ->
+                                          fun (x : (a,b) effect)  ->
+                                            (match x with
+                                             | Effect_InEnv  ->
+                                                 (fun
+                                                    ((_env_1169,_s_1168) :
+                                                      (env* int))
+                                                     ->
+                                                    fun
+                                                      (_k_1167 :
+                                                        int -> _ computation)
+                                                       ->
+                                                      value
+                                                        (fun _  ->
+                                                           (_k_1167 _s_1168)
+                                                             >>
+                                                             (fun
+                                                                _gen_bind_1170
+                                                                 ->
+                                                                _gen_bind_1170
+                                                                  _env_1169)))
+                                             | Effect_ReadEnv  ->
+                                                 (fun (() : unit)  ->
+                                                    fun
+                                                      (_k_1171 :
+                                                        env -> _ computation)
+                                                       ->
+                                                      value
+                                                        (fun _env_1172  ->
+                                                           (_k_1171 _env_1172)
+                                                             >>
+                                                             (fun
+                                                                _gen_bind_1173
+                                                                 ->
+                                                                _gen_bind_1173
+                                                                  _env_1172)))
+                                             | Effect_SetEnv  ->
+                                                 (fun (_env_1175 : env)  ->
+                                                    fun
+                                                      (_k_1174 :
+                                                        env -> _ computation)
+                                                       ->
+                                                      value
+                                                        (fun _  ->
+                                                           (_k_1174 _env_1175)
+                                                             >>
+                                                             (fun
+                                                                _gen_bind_1176
+                                                                 ->
+                                                                _gen_bind_1176
+                                                                  _env_1175)))
+                                             | eff' ->
+                                                 (fun arg  ->
+                                                    fun k  ->
+                                                      Call (eff', arg, k)) : 
+                                            a ->
+                                              (b -> _ computation) ->
+                                                _ computation)
+                                      } c))
+                                  ((_interp_86 _lhs_1163) >>
+                                     (fun _x_loc_1164  ->
+                                        (_interp_86 _rhs_1162) >>
+                                          (fun _x_interp_1165  ->
+                                             ((effect Effect_UpdateLoc)
+                                                (_x_loc_1164, _x_interp_1165))
+                                               >>
+                                               (fun _  ->
+                                                  value _x_interp_1165))))
+                            | Var _v_1177 ->
+                                ((fun c  ->
+                                    handler
+                                      {
+                                        value_clause =
+                                          (fun _vcvar_1179  ->
+                                             _k_val_1067 _vcvar_1179);
+                                        effect_clauses = fun (type a) -> fun
+                                          (type b) ->
+                                          fun (x : (a,b) effect)  ->
+                                            (match x with
+                                             | Effect_InEnv  ->
+                                                 (fun
+                                                    ((_env_1182,_s_1181) :
+                                                      (env* int))
+                                                     ->
+                                                    fun
+                                                      (_k_1180 :
+                                                        int -> _ computation)
+                                                       ->
+                                                      value
+                                                        (fun _  ->
+                                                           (_k_1180 _s_1181)
+                                                             >>
+                                                             (fun
+                                                                _gen_bind_1183
+                                                                 ->
+                                                                _gen_bind_1183
+                                                                  _env_1182)))
+                                             | Effect_ReadEnv  ->
+                                                 (fun (() : unit)  ->
+                                                    fun
+                                                      (_k_1184 :
+                                                        env -> _ computation)
+                                                       ->
+                                                      value
+                                                        (fun _env_1185  ->
+                                                           (_k_1184 _env_1185)
+                                                             >>
+                                                             (fun
+                                                                _gen_bind_1186
+                                                                 ->
+                                                                _gen_bind_1186
+                                                                  _env_1185)))
+                                             | Effect_SetEnv  ->
+                                                 (fun (_env_1188 : env)  ->
+                                                    fun
+                                                      (_k_1187 :
+                                                        env -> _ computation)
+                                                       ->
+                                                      value
+                                                        (fun _  ->
+                                                           (_k_1187 _env_1188)
+                                                             >>
+                                                             (fun
+                                                                _gen_bind_1189
+                                                                 ->
+                                                                _gen_bind_1189
+                                                                  _env_1188)))
                                              | eff' ->
                                                  (fun arg  ->
                                                     fun k  ->
@@ -1208,66 +1613,68 @@ let _bigTest_179 () =
                                                 _ computation)
                                       } c))
                                   (((effect Effect_ReadEnv) ()) >>
-                                     (fun _gen_bind_902  ->
-                                        _lookupEnv_45 (_v_901, _gen_bind_902)))
-                            | App (_e1_915,_e2_914) ->
+                                     (fun _gen_bind_1178  ->
+                                        _lookupEnv_45
+                                          (_v_1177, _gen_bind_1178)))
+                            | App (_e1_1191,_e2_1190) ->
                                 ((fun c  ->
                                     handler
                                       {
                                         value_clause =
-                                          (fun _vcvar_921  ->
-                                             _k_val_845 _vcvar_921);
+                                          (fun _vcvar_1197  ->
+                                             _k_val_1067 _vcvar_1197);
                                         effect_clauses = fun (type a) -> fun
                                           (type b) ->
                                           fun (x : (a,b) effect)  ->
                                             (match x with
                                              | Effect_InEnv  ->
                                                  (fun
-                                                    ((_env_924,_s_923) :
+                                                    ((_env_1200,_s_1199) :
                                                       (env* int))
                                                      ->
                                                     fun
-                                                      (_k_922 :
+                                                      (_k_1198 :
                                                         int -> _ computation)
                                                        ->
                                                       value
                                                         (fun _  ->
-                                                           (_k_922 _s_923) >>
+                                                           (_k_1198 _s_1199)
+                                                             >>
                                                              (fun
-                                                                _gen_bind_925
+                                                                _gen_bind_1201
                                                                  ->
-                                                                _gen_bind_925
-                                                                  _env_924)))
+                                                                _gen_bind_1201
+                                                                  _env_1200)))
                                              | Effect_ReadEnv  ->
                                                  (fun (() : unit)  ->
                                                     fun
-                                                      (_k_926 :
+                                                      (_k_1202 :
                                                         env -> _ computation)
                                                        ->
                                                       value
-                                                        (fun _env_927  ->
-                                                           (_k_926 _env_927)
+                                                        (fun _env_1203  ->
+                                                           (_k_1202 _env_1203)
                                                              >>
                                                              (fun
-                                                                _gen_bind_928
+                                                                _gen_bind_1204
                                                                  ->
-                                                                _gen_bind_928
-                                                                  _env_927)))
+                                                                _gen_bind_1204
+                                                                  _env_1203)))
                                              | Effect_SetEnv  ->
-                                                 (fun (_env_930 : env)  ->
+                                                 (fun (_env_1206 : env)  ->
                                                     fun
-                                                      (_k_929 :
+                                                      (_k_1205 :
                                                         env -> _ computation)
                                                        ->
                                                       value
                                                         (fun _  ->
-                                                           (_k_929 _env_930)
+                                                           (_k_1205 _env_1206)
                                                              >>
                                                              (fun
-                                                                _gen_bind_931
+                                                                _gen_bind_1207
                                                                  ->
-                                                                _gen_bind_931
-                                                                  _env_930)))
+                                                                _gen_bind_1207
+                                                                  _env_1206)))
                                              | eff' ->
                                                  (fun arg  ->
                                                     fun k  ->
@@ -1276,57 +1683,121 @@ let _bigTest_179 () =
                                               (b -> _ computation) ->
                                                 _ computation)
                                       } c))
-                                  ((_interpFunc_58 (_e1_915, _interp_86)) >>
-                                     (fun _e1_interp_916  ->
+                                  ((_interpFunc_58 (_e1_1191, _interp_86)) >>
+                                     (fun _e1_interp_1192  ->
                                         ((effect Effect_ReadEnv) ()) >>
-                                          (fun _envi_917  ->
-                                             (_interp_86 _e2_914) >>
-                                               (fun _e2_interp_918  ->
+                                          (fun _envi_1193  ->
+                                             (_interp_86 _e2_1190) >>
+                                               (fun _e2_interp_1194  ->
                                                   ((effect Effect_SetEnv)
-                                                     _envi_917)
+                                                     _envi_1193)
                                                     >>
-                                                    (fun _envi_919  ->
+                                                    (fun _envi_1195  ->
                                                        ((effect Effect_InEnv)
-                                                          (_envi_919,
-                                                            _e2_interp_918))
+                                                          (_envi_1195,
+                                                            _e2_interp_1194))
                                                          >>
-                                                         (fun _in_env_920  ->
-                                                            _e1_interp_916
-                                                              _in_env_920))))))
+                                                         (fun _in_env_1196 
+                                                            ->
+                                                            _e1_interp_1192
+                                                              _in_env_1196))))))
                              in
-                          _new_special_var_844
+                          _new_special_var_1066
                             (_r_90,
-                              (fun _gen_bind_932  ->
-                                 let _y_933 =
-                                   run (_gen_bind_843 _gen_bind_932)  in
-                                 value (fun _  -> value _y_933))));
+                              (fun _gen_bind_1208  ->
+                                 (fun c  ->
+                                    handler
+                                      {
+                                        value_clause =
+                                          (fun _y_1209  ->
+                                             value (fun _  -> value _y_1209));
+                                        effect_clauses = fun (type a) -> fun
+                                          (type b) ->
+                                          fun (x : (a,b) effect)  ->
+                                            (match x with
+                                             | Effect_InEnv  ->
+                                                 (fun
+                                                    ((_env_1212,_s_1211) :
+                                                      (env* int))
+                                                     ->
+                                                    fun
+                                                      (_k_1210 :
+                                                        int -> _ computation)
+                                                       ->
+                                                      value
+                                                        (fun _  ->
+                                                           (_k_1210 _s_1211)
+                                                             >>
+                                                             (fun
+                                                                _gen_bind_1213
+                                                                 ->
+                                                                _gen_bind_1213
+                                                                  _env_1212)))
+                                             | Effect_ReadEnv  ->
+                                                 (fun (() : unit)  ->
+                                                    fun
+                                                      (_k_1214 :
+                                                        env -> _ computation)
+                                                       ->
+                                                      value
+                                                        (fun _env_1215  ->
+                                                           (_k_1214 _env_1215)
+                                                             >>
+                                                             (fun
+                                                                _gen_bind_1216
+                                                                 ->
+                                                                _gen_bind_1216
+                                                                  _env_1215)))
+                                             | Effect_SetEnv  ->
+                                                 (fun (_env_1218 : env)  ->
+                                                    fun
+                                                      (_k_1217 :
+                                                        env -> _ computation)
+                                                       ->
+                                                      value
+                                                        (fun _  ->
+                                                           (_k_1217 _env_1218)
+                                                             >>
+                                                             (fun
+                                                                _gen_bind_1219
+                                                                 ->
+                                                                _gen_bind_1219
+                                                                  _env_1218)))
+                                             | eff' ->
+                                                 (fun arg  ->
+                                                    fun k  ->
+                                                      Call (eff', arg, k)) : 
+                                            a ->
+                                              (b -> _ computation) ->
+                                                _ computation)
+                                      } c) (_gen_bind_1065 _gen_bind_1208))));
                      effect_clauses = fun (type a) -> fun (type b) ->
                        fun (x : (a,b) effect)  ->
                          (match x with
                           | Effect_InEnv  ->
-                              (fun ((_env_936,_s_935) : (env* int))  ->
-                                 fun (_k_934 : int -> _ computation)  ->
+                              (fun ((_env_1222,_s_1221) : (env* int))  ->
+                                 fun (_k_1220 : int -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_934 _s_935) >>
-                                          (fun _gen_bind_937  ->
-                                             _gen_bind_937 _env_936)))
+                                        (_k_1220 _s_1221) >>
+                                          (fun _gen_bind_1223  ->
+                                             _gen_bind_1223 _env_1222)))
                           | Effect_ReadEnv  ->
                               (fun (() : unit)  ->
-                                 fun (_k_938 : env -> _ computation)  ->
+                                 fun (_k_1224 : env -> _ computation)  ->
                                    value
-                                     (fun _env_939  ->
-                                        (_k_938 _env_939) >>
-                                          (fun _gen_bind_940  ->
-                                             _gen_bind_940 _env_939)))
+                                     (fun _env_1225  ->
+                                        (_k_1224 _env_1225) >>
+                                          (fun _gen_bind_1226  ->
+                                             _gen_bind_1226 _env_1225)))
                           | Effect_SetEnv  ->
-                              (fun (_env_942 : env)  ->
-                                 fun (_k_941 : env -> _ computation)  ->
+                              (fun (_env_1228 : env)  ->
+                                 fun (_k_1227 : env -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_941 _env_942) >>
-                                          (fun _gen_bind_943  ->
-                                             _gen_bind_943 _env_942)))
+                                        (_k_1227 _env_1228) >>
+                                          (fun _gen_bind_1229  ->
+                                             _gen_bind_1229 _env_1228)))
                           | eff' ->
                               (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                          a -> (b -> _ computation) -> _ computation)
@@ -1336,34 +1807,34 @@ let _bigTest_179 () =
                  handler
                    {
                      value_clause =
-                       (fun _y_944  -> value (fun _  -> value _y_944));
+                       (fun _y_1230  -> value (fun _  -> value _y_1230));
                      effect_clauses = fun (type a) -> fun (type b) ->
                        fun (x : (a,b) effect)  ->
                          (match x with
                           | Effect_InEnv  ->
-                              (fun ((_env_947,_s_946) : (env* int))  ->
-                                 fun (_k_945 : int -> _ computation)  ->
+                              (fun ((_env_1233,_s_1232) : (env* int))  ->
+                                 fun (_k_1231 : int -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_945 _s_946) >>
-                                          (fun _gen_bind_948  ->
-                                             _gen_bind_948 _env_947)))
+                                        (_k_1231 _s_1232) >>
+                                          (fun _gen_bind_1234  ->
+                                             _gen_bind_1234 _env_1233)))
                           | Effect_ReadEnv  ->
                               (fun (() : unit)  ->
-                                 fun (_k_949 : env -> _ computation)  ->
+                                 fun (_k_1235 : env -> _ computation)  ->
                                    value
-                                     (fun _env_950  ->
-                                        (_k_949 _env_950) >>
-                                          (fun _gen_bind_951  ->
-                                             _gen_bind_951 _env_950)))
+                                     (fun _env_1236  ->
+                                        (_k_1235 _env_1236) >>
+                                          (fun _gen_bind_1237  ->
+                                             _gen_bind_1237 _env_1236)))
                           | Effect_SetEnv  ->
-                              (fun (_env_953 : env)  ->
-                                 fun (_k_952 : env -> _ computation)  ->
+                              (fun (_env_1239 : env)  ->
+                                 fun (_k_1238 : env -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_952 _env_953) >>
-                                          (fun _gen_bind_954  ->
-                                             _gen_bind_954 _env_953)))
+                                        (_k_1238 _env_1239) >>
+                                          (fun _gen_bind_1240  ->
+                                             _gen_bind_1240 _env_1239)))
                           | eff' ->
                               (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                          a -> (b -> _ computation) -> _ computation)
@@ -1379,34 +1850,34 @@ let _bigTest_179 () =
                  handler
                    {
                      value_clause =
-                       (fun _y_955  -> value (fun _  -> value _y_955));
+                       (fun _y_1241  -> value (fun _  -> value _y_1241));
                      effect_clauses = fun (type a) -> fun (type b) ->
                        fun (x : (a,b) effect)  ->
                          (match x with
                           | Effect_InEnv  ->
-                              (fun ((_env_958,_s_957) : (env* int))  ->
-                                 fun (_k_956 : int -> _ computation)  ->
+                              (fun ((_env_1244,_s_1243) : (env* int))  ->
+                                 fun (_k_1242 : int -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_956 _s_957) >>
-                                          (fun _gen_bind_959  ->
-                                             _gen_bind_959 _env_958)))
+                                        (_k_1242 _s_1243) >>
+                                          (fun _gen_bind_1245  ->
+                                             _gen_bind_1245 _env_1244)))
                           | Effect_ReadEnv  ->
                               (fun (() : unit)  ->
-                                 fun (_k_960 : env -> _ computation)  ->
+                                 fun (_k_1246 : env -> _ computation)  ->
                                    value
-                                     (fun _env_961  ->
-                                        (_k_960 _env_961) >>
-                                          (fun _gen_bind_962  ->
-                                             _gen_bind_962 _env_961)))
+                                     (fun _env_1247  ->
+                                        (_k_1246 _env_1247) >>
+                                          (fun _gen_bind_1248  ->
+                                             _gen_bind_1248 _env_1247)))
                           | Effect_SetEnv  ->
-                              (fun (_env_964 : env)  ->
-                                 fun (_k_963 : env -> _ computation)  ->
+                              (fun (_env_1250 : env)  ->
+                                 fun (_k_1249 : env -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_963 _env_964) >>
-                                          (fun _gen_bind_965  ->
-                                             _gen_bind_965 _env_964)))
+                                        (_k_1249 _env_1250) >>
+                                          (fun _gen_bind_1251  ->
+                                             _gen_bind_1251 _env_1250)))
                           | eff' ->
                               (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                          a -> (b -> _ computation) -> _ computation)
@@ -1422,34 +1893,34 @@ let _bigTest_179 () =
                  handler
                    {
                      value_clause =
-                       (fun _y_966  -> value (fun _  -> value _y_966));
+                       (fun _y_1252  -> value (fun _  -> value _y_1252));
                      effect_clauses = fun (type a) -> fun (type b) ->
                        fun (x : (a,b) effect)  ->
                          (match x with
                           | Effect_InEnv  ->
-                              (fun ((_env_969,_s_968) : (env* int))  ->
-                                 fun (_k_967 : int -> _ computation)  ->
+                              (fun ((_env_1255,_s_1254) : (env* int))  ->
+                                 fun (_k_1253 : int -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_967 _s_968) >>
-                                          (fun _gen_bind_970  ->
-                                             _gen_bind_970 _env_969)))
+                                        (_k_1253 _s_1254) >>
+                                          (fun _gen_bind_1256  ->
+                                             _gen_bind_1256 _env_1255)))
                           | Effect_ReadEnv  ->
                               (fun (() : unit)  ->
-                                 fun (_k_971 : env -> _ computation)  ->
+                                 fun (_k_1257 : env -> _ computation)  ->
                                    value
-                                     (fun _env_972  ->
-                                        (_k_971 _env_972) >>
-                                          (fun _gen_bind_973  ->
-                                             _gen_bind_973 _env_972)))
+                                     (fun _env_1258  ->
+                                        (_k_1257 _env_1258) >>
+                                          (fun _gen_bind_1259  ->
+                                             _gen_bind_1259 _env_1258)))
                           | Effect_SetEnv  ->
-                              (fun (_env_975 : env)  ->
-                                 fun (_k_974 : env -> _ computation)  ->
+                              (fun (_env_1261 : env)  ->
+                                 fun (_k_1260 : env -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_974 _env_975) >>
-                                          (fun _gen_bind_976  ->
-                                             _gen_bind_976 _env_975)))
+                                        (_k_1260 _env_1261) >>
+                                          (fun _gen_bind_1262  ->
+                                             _gen_bind_1262 _env_1261)))
                           | eff' ->
                               (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                          a -> (b -> _ computation) -> _ computation)
@@ -1470,34 +1941,34 @@ let _bigTest_179 () =
                  handler
                    {
                      value_clause =
-                       (fun _y_977  -> value (fun _  -> value _y_977));
+                       (fun _y_1263  -> value (fun _  -> value _y_1263));
                      effect_clauses = fun (type a) -> fun (type b) ->
                        fun (x : (a,b) effect)  ->
                          (match x with
                           | Effect_InEnv  ->
-                              (fun ((_env_980,_s_979) : (env* int))  ->
-                                 fun (_k_978 : int -> _ computation)  ->
+                              (fun ((_env_1266,_s_1265) : (env* int))  ->
+                                 fun (_k_1264 : int -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_978 _s_979) >>
-                                          (fun _gen_bind_981  ->
-                                             _gen_bind_981 _env_980)))
+                                        (_k_1264 _s_1265) >>
+                                          (fun _gen_bind_1267  ->
+                                             _gen_bind_1267 _env_1266)))
                           | Effect_ReadEnv  ->
                               (fun (() : unit)  ->
-                                 fun (_k_982 : env -> _ computation)  ->
+                                 fun (_k_1268 : env -> _ computation)  ->
                                    value
-                                     (fun _env_983  ->
-                                        (_k_982 _env_983) >>
-                                          (fun _gen_bind_984  ->
-                                             _gen_bind_984 _env_983)))
+                                     (fun _env_1269  ->
+                                        (_k_1268 _env_1269) >>
+                                          (fun _gen_bind_1270  ->
+                                             _gen_bind_1270 _env_1269)))
                           | Effect_SetEnv  ->
-                              (fun (_env_986 : env)  ->
-                                 fun (_k_985 : env -> _ computation)  ->
+                              (fun (_env_1272 : env)  ->
+                                 fun (_k_1271 : env -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_985 _env_986) >>
-                                          (fun _gen_bind_987  ->
-                                             _gen_bind_987 _env_986)))
+                                        (_k_1271 _env_1272) >>
+                                          (fun _gen_bind_1273  ->
+                                             _gen_bind_1273 _env_1272)))
                           | eff' ->
                               (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                          a -> (b -> _ computation) -> _ computation)
@@ -1513,34 +1984,34 @@ let _bigTest_179 () =
                  handler
                    {
                      value_clause =
-                       (fun _y_988  -> value (fun _  -> value _y_988));
+                       (fun _y_1274  -> value (fun _  -> value _y_1274));
                      effect_clauses = fun (type a) -> fun (type b) ->
                        fun (x : (a,b) effect)  ->
                          (match x with
                           | Effect_InEnv  ->
-                              (fun ((_env_991,_s_990) : (env* int))  ->
-                                 fun (_k_989 : int -> _ computation)  ->
+                              (fun ((_env_1277,_s_1276) : (env* int))  ->
+                                 fun (_k_1275 : int -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_989 _s_990) >>
-                                          (fun _gen_bind_992  ->
-                                             _gen_bind_992 _env_991)))
+                                        (_k_1275 _s_1276) >>
+                                          (fun _gen_bind_1278  ->
+                                             _gen_bind_1278 _env_1277)))
                           | Effect_ReadEnv  ->
                               (fun (() : unit)  ->
-                                 fun (_k_993 : env -> _ computation)  ->
+                                 fun (_k_1279 : env -> _ computation)  ->
                                    value
-                                     (fun _env_994  ->
-                                        (_k_993 _env_994) >>
-                                          (fun _gen_bind_995  ->
-                                             _gen_bind_995 _env_994)))
+                                     (fun _env_1280  ->
+                                        (_k_1279 _env_1280) >>
+                                          (fun _gen_bind_1281  ->
+                                             _gen_bind_1281 _env_1280)))
                           | Effect_SetEnv  ->
-                              (fun (_env_997 : env)  ->
-                                 fun (_k_996 : env -> _ computation)  ->
+                              (fun (_env_1283 : env)  ->
+                                 fun (_k_1282 : env -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_996 _env_997) >>
-                                          (fun _gen_bind_998  ->
-                                             _gen_bind_998 _env_997)))
+                                        (_k_1282 _env_1283) >>
+                                          (fun _gen_bind_1284  ->
+                                             _gen_bind_1284 _env_1283)))
                           | eff' ->
                               (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                          a -> (b -> _ computation) -> _ computation)
@@ -1554,34 +2025,34 @@ let _bigTest_179 () =
                  handler
                    {
                      value_clause =
-                       (fun _y_999  -> value (fun _  -> value _y_999));
+                       (fun _y_1285  -> value (fun _  -> value _y_1285));
                      effect_clauses = fun (type a) -> fun (type b) ->
                        fun (x : (a,b) effect)  ->
                          (match x with
                           | Effect_InEnv  ->
-                              (fun ((_env_1002,_s_1001) : (env* int))  ->
-                                 fun (_k_1000 : int -> _ computation)  ->
+                              (fun ((_env_1288,_s_1287) : (env* int))  ->
+                                 fun (_k_1286 : int -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_1000 _s_1001) >>
-                                          (fun _gen_bind_1003  ->
-                                             _gen_bind_1003 _env_1002)))
+                                        (_k_1286 _s_1287) >>
+                                          (fun _gen_bind_1289  ->
+                                             _gen_bind_1289 _env_1288)))
                           | Effect_ReadEnv  ->
                               (fun (() : unit)  ->
-                                 fun (_k_1004 : env -> _ computation)  ->
+                                 fun (_k_1290 : env -> _ computation)  ->
                                    value
-                                     (fun _env_1005  ->
-                                        (_k_1004 _env_1005) >>
-                                          (fun _gen_bind_1006  ->
-                                             _gen_bind_1006 _env_1005)))
+                                     (fun _env_1291  ->
+                                        (_k_1290 _env_1291) >>
+                                          (fun _gen_bind_1292  ->
+                                             _gen_bind_1292 _env_1291)))
                           | Effect_SetEnv  ->
-                              (fun (_env_1008 : env)  ->
-                                 fun (_k_1007 : env -> _ computation)  ->
+                              (fun (_env_1294 : env)  ->
+                                 fun (_k_1293 : env -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_1007 _env_1008) >>
-                                          (fun _gen_bind_1009  ->
-                                             _gen_bind_1009 _env_1008)))
+                                        (_k_1293 _env_1294) >>
+                                          (fun _gen_bind_1295  ->
+                                             _gen_bind_1295 _env_1294)))
                           | eff' ->
                               (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                          a -> (b -> _ computation) -> _ computation)
@@ -1597,34 +2068,34 @@ let _bigTest_179 () =
                  handler
                    {
                      value_clause =
-                       (fun _y_1010  -> value (fun _  -> value _y_1010));
+                       (fun _y_1296  -> value (fun _  -> value _y_1296));
                      effect_clauses = fun (type a) -> fun (type b) ->
                        fun (x : (a,b) effect)  ->
                          (match x with
                           | Effect_InEnv  ->
-                              (fun ((_env_1013,_s_1012) : (env* int))  ->
-                                 fun (_k_1011 : int -> _ computation)  ->
+                              (fun ((_env_1299,_s_1298) : (env* int))  ->
+                                 fun (_k_1297 : int -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_1011 _s_1012) >>
-                                          (fun _gen_bind_1014  ->
-                                             _gen_bind_1014 _env_1013)))
+                                        (_k_1297 _s_1298) >>
+                                          (fun _gen_bind_1300  ->
+                                             _gen_bind_1300 _env_1299)))
                           | Effect_ReadEnv  ->
                               (fun (() : unit)  ->
-                                 fun (_k_1015 : env -> _ computation)  ->
+                                 fun (_k_1301 : env -> _ computation)  ->
                                    value
-                                     (fun _env_1016  ->
-                                        (_k_1015 _env_1016) >>
-                                          (fun _gen_bind_1017  ->
-                                             _gen_bind_1017 _env_1016)))
+                                     (fun _env_1302  ->
+                                        (_k_1301 _env_1302) >>
+                                          (fun _gen_bind_1303  ->
+                                             _gen_bind_1303 _env_1302)))
                           | Effect_SetEnv  ->
-                              (fun (_env_1019 : env)  ->
-                                 fun (_k_1018 : env -> _ computation)  ->
+                              (fun (_env_1305 : env)  ->
+                                 fun (_k_1304 : env -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_1018 _env_1019) >>
-                                          (fun _gen_bind_1020  ->
-                                             _gen_bind_1020 _env_1019)))
+                                        (_k_1304 _env_1305) >>
+                                          (fun _gen_bind_1306  ->
+                                             _gen_bind_1306 _env_1305)))
                           | eff' ->
                               (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                          a -> (b -> _ computation) -> _ computation)
@@ -1636,34 +2107,34 @@ let _bigTest_179 () =
                  handler
                    {
                      value_clause =
-                       (fun _y_1021  -> value (fun _  -> value _y_1021));
+                       (fun _y_1307  -> value (fun _  -> value _y_1307));
                      effect_clauses = fun (type a) -> fun (type b) ->
                        fun (x : (a,b) effect)  ->
                          (match x with
                           | Effect_InEnv  ->
-                              (fun ((_env_1024,_s_1023) : (env* int))  ->
-                                 fun (_k_1022 : int -> _ computation)  ->
+                              (fun ((_env_1310,_s_1309) : (env* int))  ->
+                                 fun (_k_1308 : int -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_1022 _s_1023) >>
-                                          (fun _gen_bind_1025  ->
-                                             _gen_bind_1025 _env_1024)))
+                                        (_k_1308 _s_1309) >>
+                                          (fun _gen_bind_1311  ->
+                                             _gen_bind_1311 _env_1310)))
                           | Effect_ReadEnv  ->
                               (fun (() : unit)  ->
-                                 fun (_k_1026 : env -> _ computation)  ->
+                                 fun (_k_1312 : env -> _ computation)  ->
                                    value
-                                     (fun _env_1027  ->
-                                        (_k_1026 _env_1027) >>
-                                          (fun _gen_bind_1028  ->
-                                             _gen_bind_1028 _env_1027)))
+                                     (fun _env_1313  ->
+                                        (_k_1312 _env_1313) >>
+                                          (fun _gen_bind_1314  ->
+                                             _gen_bind_1314 _env_1313)))
                           | Effect_SetEnv  ->
-                              (fun (_env_1030 : env)  ->
-                                 fun (_k_1029 : env -> _ computation)  ->
+                              (fun (_env_1316 : env)  ->
+                                 fun (_k_1315 : env -> _ computation)  ->
                                    value
                                      (fun _  ->
-                                        (_k_1029 _env_1030) >>
-                                          (fun _gen_bind_1031  ->
-                                             _gen_bind_1031 _env_1030)))
+                                        (_k_1315 _env_1316) >>
+                                          (fun _gen_bind_1317  ->
+                                             _gen_bind_1317 _env_1316)))
                           | eff' ->
                               (fun arg  -> fun k  -> Call (eff', arg, k)) : 
                          a -> (b -> _ computation) -> _ computation)
@@ -1681,6 +2152,6 @@ let _bigTest_179 () =
                                       (fun _result_98  ->
                                          _e1_interp_122 _result_98))))))
           in
-       _newvar_80 _finalCase_178) >> (fun _gen_bind_181  -> _gen_bind_181 [])))
+       _interp_80 _finalCase_178) >> (fun _gen_bind_181  -> _gen_bind_181 [])))
     >> (fun _gen_bind_180  -> _gen_bind_180 [])
   

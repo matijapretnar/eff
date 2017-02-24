@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM parser.eff ===
-commit SHA: ec8d6d094577edb51f0603c9a7d9f74d8bd5c47a
+commit SHA: 39964fd44c01db0e6d99619f0940b04f0a17de99
 === BEGIN SOURCE ===
 
 let absurd void = match void with;;
@@ -440,6 +440,6 @@ let _parseTest_91 () =
   _allsols_27
     ((_parse_13 (_expr_73 ())) >>
        (fun _gen_bind_92  ->
-          value (_gen_bind_92 ["4"; "3"; "*"; "("; "3"; "+"; "3"; ")"])))
+          _gen_bind_92 ["4"; "3"; "*"; "("; "3"; "+"; "3"; ")"]))
   
 let _x_93 = _parseTest_91 () 

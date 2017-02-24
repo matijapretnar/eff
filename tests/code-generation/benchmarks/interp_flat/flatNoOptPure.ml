@@ -1,7 +1,9 @@
 (*
-=== GENERATED FROM interp.eff ===
+=== GENERATED FROM flat.eff ===
 commit SHA: 39964fd44c01db0e6d99619f0940b04f0a17de99
 === BEGIN SOURCE ===
+
+
 
 let absurd void = match void with;;
 external ( = ) : 'a -> 'a -> bool = "="
@@ -43,7 +45,6 @@ type term =
     (* | Amb of term list *)
 and
   termF =
-    | LambdaN of (string * term)
     | LambdaV of (string * term)
     | LambdaL of (string * term)
     (* | CallCC *)
@@ -121,52 +122,22 @@ let extendEnv (k, v, env) =
 * Main interpreter method
 ********************************)
 
-let rec interpFunc (a, interpT) =
-    begin match a with
-    | LambdaN (s, t) ->
-        let envi = (#ReadEnv ()) in
-        (fun v ->
-            let ext = (extendEnv (s, v, envi) ) in
-            let ext = #SetEnv ext in
-            #InEnv (ext, interpT t)
-        )
-    | LambdaV (s, t) ->
-        let envi = (#ReadEnv ()) in
-        (fun v ->
-            let ext = (extendEnv (s, v, envi)) in
-            let ext = #SetEnv ext in
-            #InEnv (ext, interpT t)
-        )
-    | LambdaL (s, t) ->
-        let envi = (#ReadEnv ()) in
-        (fun v ->
-            let x_loc = #AllocLoc () in
-            let thunk = #UpdateLoc (x_loc, v); v in
-            let tmp = #UpdateLoc (x_loc, thunk) in
-            let ext = (extendEnv (s, (#LookupLoc x_loc), envi)) in
-            let ext = #SetEnv ext in
-            #InEnv (ext, interpT t)
-        )
-    (* | CallCC ->
-        (fun f ->
-            let f' = f in
-            #Callcc (fun k -> f' (fun a -> k))
-        ) *)
-    end
-;;
 
 let rec interp a =
     begin match a with
     | Num b -> b
-    | Add (l, r) -> (interp l) + (interp r)
-    | Mul (l, r) -> (interp l) * (interp r)
-    | Sub (l, r) -> (interp l) - (interp r)
-    | Div (l, r) ->
-        let r_num = (interp r) in
-        begin match r_num with
-        | 0 -> #Arith_DivByZero ()
-        | _ -> (interp l) / r_num
-        end
+    | Add (l, r) -> let x = (interp l) in
+                    let y = (interp r) in 
+                    x + y
+    | Mul (l, r) -> let x = (interp l) in
+                    let y = (interp r) in 
+                    x * y
+    | Sub (l, r) -> let x = (interp l) in
+                    let y = (interp r) in 
+                    x - y
+    | Div (l, r) -> let r_num = (interp r) in
+                    let l_num = (interp l) in 
+                    l_num / r_num      
     | Ref x ->
         let x_interp = interp x in
         let x_loc = #AllocLoc () in
@@ -181,12 +152,36 @@ let rec interp a =
         x_interp
     | Var v -> lookupEnv (v, (#ReadEnv ()))
     | App (e1, e2) ->
-        let e1_interp = (interpFunc (e1, interp)) in
+            let interpFunc  =
+                 begin match e1 with        
+                 | LambdaV (s, t) ->
+                            let envi = (#ReadEnv ()) in
+                            (fun v ->
+                                let ext = (extendEnv (s, v, envi)) in
+                                let ext_2 = #SetEnv ext in
+                                let t_res = interp t in 
+                                #InEnv (ext_2, t_res)
+                            )
+
+                 | LambdaL (s, t) ->
+                        let envi = (#ReadEnv ()) in
+                        (fun v ->
+                          let x_loc = #AllocLoc () in
+                          let thunk = #UpdateLoc (x_loc, v); v in
+                          let tmp = #UpdateLoc (x_loc, thunk) in
+                          let ext = (extendEnv (s, (#LookupLoc x_loc), envi)) in
+                          let ext_2 = #SetEnv ext in
+                          let t_res = interp t in 
+                         #InEnv (ext_2, t_res)
+                        )
+                 end 
+        in
+        let e1_interp = (interpFunc) in
         let envi = (#ReadEnv ()) in
         let e2_interp = (interp e2) in
-        let envi = #SetEnv envi in
-        let in_env = (#InEnv (envi, e2_interp)) in
-        e1_interp in_env
+        let envi2 = #SetEnv envi in
+        let in_env = (#InEnv (envi2, e2_interp)) in
+        e1_interp in_env 
     (* | Amb t -> #Merge (map interp t) *)
     end
 ;;
@@ -203,11 +198,11 @@ let rec interpTopLevel lst results =
 * Use effect handler to mimic
 * monad transformers
 ********************************)
-
+(* 
 let arithmeticHandler = handler
     | #Arith_DivByZero () k ->  -1 (* (absurd (#DivisionByZero ())) *)
 
-;;
+;; *)
 
 let storeHandler = handler
     | val y -> (fun _ -> y)
@@ -224,6 +219,16 @@ let environmentHandler = handler
     | #SetEnv env k -> (fun _ -> k env env)
 ;;
 
+
+let environment_store_Handler = handler
+    | val y -> (fun _ -> y)
+    | #InEnv (env, e) k -> (fun (_,s) -> k e (env,s))
+    | #ReadEnv () k -> (fun (env, s) -> k env (env,s))
+    | #SetEnv env k -> (fun (_,s) -> k env (env,s))
+    | #LookupLoc x k -> (fun (env, s) -> k (lookupState (x, s)) (env, s))
+    | #UpdateLoc (x, y) k -> (fun (env, s) -> k x (env,(updateState (x, y, s))))
+    | #AllocLoc () k -> (fun (env, s) -> k (getNewLoc s) (env, s))
+;;
 (*
 let outputHandler = handler
     | #Write s k -> k ()
@@ -246,49 +251,31 @@ let continuationHandler = handler
 (********************************
 * Big Test
 ********************************)
-
+ 
 let lambdaCase =
     LambdaV (
         "a",
         Add (
-            Add (
-                Add (
-                    (Var "a"),
-                    (Num 2)
-                ),
-                Add (
-                    (Num 1),
-                    (Num 2)
-                )
-            ),
-            Add (
-                Add (
-                    (Num 1),
-                    (Num 2)
-                ),
-                Add (
-                    (Num 1),
-                    (Num 2)
-                )
-            )
-        )
+        (Var "a"),
+    Num 22)
+                   
     );;
 
 let addCase =
     Add (
         Add (
             Add (
-                (Num 1),
+                (Num 20),
                 (Num 2)
             ),
-            Add (
+            Mul (
                 (Num 1),
                 (Num 2)
             )
         ),
-        Add (
+        Sub (
             Add (
-                (Num 1),
+                (Num 2),
                 (Num 2)
             ),
             Add (
@@ -315,12 +302,10 @@ let rec createCase n =
 let finalCase = createCase 200;;
 
 let bigTest () =
-    (with storeHandler handle (
-        (with environmentHandler handle (
+    
+        (with environment_store_Handler handle (
             interp (finalCase)
-        )) []
-    )) [];;
-
+        )) ([],[])
 (********************************
 * Tests
 ********************************)
@@ -328,12 +313,13 @@ let bigTest () =
 (* Simple arithmetic test *)
 (* let test1 = interp (Add (Num 5, Num 3));;
 assert(test1 = 8);;
-
+*)
 
 (* Division by zero test *)
-let test2 = with arithmeticHandler handle (
-    interp (Div (Num 5, Num 0))
-);;
+(* let test2 = with arithmeticHandler handle (
+    interp (Div(Num 2, Num 1))
+);; *)
+(*
 assert(test2 = -1);;
 
 (* Statehandler test *)
@@ -521,7 +507,6 @@ type term =
   | Var of string 
   | App of (termF* term) 
 and termF =
-  | LambdaN of (string* term) 
   | LambdaV of (string* term) 
   | LambdaL of (string* term) 
 type (_,_) effect +=
@@ -578,313 +563,351 @@ let rec _lookupEnv_45 (_x_46,_y_47) =
       if _gen_bind_52 then value _y_50 else _lookupState_16 (_x_46, _lst_51)
   
 let _extendEnv_54 (_k_55,_v_56,_env_57) = (_k_55, _v_56) :: _env_57 
-let rec _interpFunc_58 (_a_59,_interpT_60) =
+let rec _interp_58 _a_59 =
   match _a_59 with
-  | LambdaN (_s_61,_t_62) ->
-      ((effect Effect_ReadEnv) ()) >>
-        ((fun _envi_63  ->
-            value
-              (fun _v_64  ->
-                 let _ext_65 = _extendEnv_54 (_s_61, _v_64, _envi_63)  in
-                 ((effect Effect_SetEnv) _ext_65) >>
-                   (fun _ext_66  ->
-                      (_interpT_60 _t_62) >>
-                        (fun _gen_bind_67  ->
-                           (effect Effect_InEnv) (_ext_66, _gen_bind_67))))))
-  | LambdaV (_s_68,_t_69) ->
-      ((effect Effect_ReadEnv) ()) >>
-        ((fun _envi_70  ->
-            value
-              (fun _v_71  ->
-                 let _ext_72 = _extendEnv_54 (_s_68, _v_71, _envi_70)  in
-                 ((effect Effect_SetEnv) _ext_72) >>
-                   (fun _ext_73  ->
-                      (_interpT_60 _t_69) >>
-                        (fun _gen_bind_74  ->
-                           (effect Effect_InEnv) (_ext_73, _gen_bind_74))))))
-  | LambdaL (_s_75,_t_76) ->
-      ((effect Effect_ReadEnv) ()) >>
-        ((fun _envi_77  ->
-            value
-              (fun _v_78  ->
-                 ((effect Effect_AllocLoc) ()) >>
-                   (fun _x_loc_79  ->
-                      (((effect Effect_UpdateLoc) (_x_loc_79, _v_78)) >>
-                         (fun _  -> value _v_78))
-                        >>
-                        (fun _thunk_80  ->
-                           ((effect Effect_UpdateLoc) (_x_loc_79, _thunk_80))
-                             >>
-                             (fun _tmp_81  ->
-                                (((effect Effect_LookupLoc) _x_loc_79) >>
-                                   (fun _gen_bind_83  ->
-                                      value
-                                        (_extendEnv_54
-                                           (_s_75, _gen_bind_83, _envi_77))))
-                                  >>
-                                  (fun _ext_82  ->
-                                     ((effect Effect_SetEnv) _ext_82) >>
-                                       (fun _ext_84  ->
-                                          (_interpT_60 _t_76) >>
-                                            (fun _gen_bind_85  ->
-                                               (effect Effect_InEnv)
-                                                 (_ext_84, _gen_bind_85))))))))))
-  
-let rec _interp_86 _a_87 =
-  match _a_87 with
-  | Num _b_88 -> value _b_88
-  | Add (_l_89,_r_90) ->
-      ((_interp_86 _l_89) >>
-         (fun _gen_bind_92  -> value (_var_4 _gen_bind_92)))
-        >>
-        ((fun _gen_bind_91  ->
-            (_interp_86 _r_90) >>
-              (fun _gen_bind_93  -> value (_gen_bind_91 _gen_bind_93))))
-  | Mul (_l_94,_r_95) ->
-      ((_interp_86 _l_94) >>
-         (fun _gen_bind_97  -> value (_var_5 _gen_bind_97)))
-        >>
-        ((fun _gen_bind_96  ->
-            (_interp_86 _r_95) >>
-              (fun _gen_bind_98  -> value (_gen_bind_96 _gen_bind_98))))
-  | Sub (_l_99,_r_100) ->
-      ((_interp_86 _l_99) >>
-         (fun _gen_bind_102  -> value (_var_6 _gen_bind_102)))
-        >>
-        ((fun _gen_bind_101  ->
-            (_interp_86 _r_100) >>
-              (fun _gen_bind_103  -> value (_gen_bind_101 _gen_bind_103))))
-  | Div (_l_104,_r_105) ->
-      (_interp_86 _r_105) >>
-        ((fun _r_num_106  ->
-            match _r_num_106 with
-            | 0 -> (effect Effect_Arith_DivByZero) ()
-            | _ ->
-                ((_interp_86 _l_104) >>
-                   (fun _gen_bind_108  -> value (_var_8 _gen_bind_108)))
-                  >>
-                  ((fun _gen_bind_107  -> value (_gen_bind_107 _r_num_106)))))
-  | Ref _x_109 ->
-      (_interp_86 _x_109) >>
-        ((fun _x_interp_110  ->
+  | Num _b_60 -> value _b_60
+  | Add (_l_61,_r_62) ->
+      (_interp_58 _l_61) >>
+        ((fun _x_63  ->
+            (_interp_58 _r_62) >>
+              (fun _y_64  ->
+                 value
+                   (let _gen_bind_65 = _var_4 _x_63  in _gen_bind_65 _y_64))))
+  | Mul (_l_66,_r_67) ->
+      (_interp_58 _l_66) >>
+        ((fun _x_68  ->
+            (_interp_58 _r_67) >>
+              (fun _y_69  ->
+                 value
+                   (let _gen_bind_70 = _var_5 _x_68  in _gen_bind_70 _y_69))))
+  | Sub (_l_71,_r_72) ->
+      (_interp_58 _l_71) >>
+        ((fun _x_73  ->
+            (_interp_58 _r_72) >>
+              (fun _y_74  ->
+                 value
+                   (let _gen_bind_75 = _var_6 _x_73  in _gen_bind_75 _y_74))))
+  | Div (_l_76,_r_77) ->
+      (_interp_58 _r_77) >>
+        ((fun _r_num_78  ->
+            (_interp_58 _l_76) >>
+              (fun _l_num_79  ->
+                 value
+                   (let _gen_bind_80 = _var_8 _l_num_79  in
+                    _gen_bind_80 _r_num_78))))
+  | Ref _x_81 ->
+      (_interp_58 _x_81) >>
+        ((fun _x_interp_82  ->
             ((effect Effect_AllocLoc) ()) >>
-              (fun _x_loc_111  ->
-                 (effect Effect_UpdateLoc) (_x_loc_111, _x_interp_110))))
-  | Deref _x_112 ->
-      (_interp_86 _x_112) >>
-        ((fun _x_interp_113  -> (effect Effect_LookupLoc) _x_interp_113))
-  | Assign (_lhs_114,_rhs_115) ->
-      (_interp_86 _lhs_114) >>
-        ((fun _x_loc_116  ->
-            (_interp_86 _rhs_115) >>
-              (fun _x_interp_117  ->
-                 ((effect Effect_UpdateLoc) (_x_loc_116, _x_interp_117)) >>
-                   (fun _  -> value _x_interp_117))))
-  | Var _v_118 ->
+              (fun _x_loc_83  ->
+                 (effect Effect_UpdateLoc) (_x_loc_83, _x_interp_82))))
+  | Deref _x_84 ->
+      (_interp_58 _x_84) >>
+        ((fun _x_interp_85  -> (effect Effect_LookupLoc) _x_interp_85))
+  | Assign (_lhs_86,_rhs_87) ->
+      (_interp_58 _lhs_86) >>
+        ((fun _x_loc_88  ->
+            (_interp_58 _rhs_87) >>
+              (fun _x_interp_89  ->
+                 ((effect Effect_UpdateLoc) (_x_loc_88, _x_interp_89)) >>
+                   (fun _  -> value _x_interp_89))))
+  | Var _v_90 ->
       ((effect Effect_ReadEnv) ()) >>
-        ((fun _gen_bind_119  -> _lookupEnv_45 (_v_118, _gen_bind_119)))
-  | App (_e1_120,_e2_121) ->
-      (_interpFunc_58 (_e1_120, _interp_86)) >>
-        ((fun _e1_interp_122  ->
-            ((effect Effect_ReadEnv) ()) >>
-              (fun _envi_123  ->
-                 (_interp_86 _e2_121) >>
-                   (fun _e2_interp_124  ->
-                      ((effect Effect_SetEnv) _envi_123) >>
-                        (fun _envi_125  ->
-                           ((effect Effect_InEnv) (_envi_125, _e2_interp_124))
+        ((fun _gen_bind_91  -> _lookupEnv_45 (_v_90, _gen_bind_91)))
+  | App (_e1_92,_e2_93) ->
+      (match _e1_92 with
+       | LambdaV (_s_95,_t_96) ->
+           ((effect Effect_ReadEnv) ()) >>
+             ((fun _envi_97  ->
+                 value
+                   (fun _v_98  ->
+                      let _ext_99 = _extendEnv_54 (_s_95, _v_98, _envi_97)
+                         in
+                      ((effect Effect_SetEnv) _ext_99) >>
+                        (fun _ext_2_100  ->
+                           (_interp_58 _t_96) >>
+                             (fun _t_res_101  ->
+                                (effect Effect_InEnv)
+                                  (_ext_2_100, _t_res_101))))))
+       | LambdaL (_s_102,_t_103) ->
+           ((effect Effect_ReadEnv) ()) >>
+             ((fun _envi_104  ->
+                 value
+                   (fun _v_105  ->
+                      ((effect Effect_AllocLoc) ()) >>
+                        (fun _x_loc_106  ->
+                           (((effect Effect_UpdateLoc) (_x_loc_106, _v_105))
+                              >> (fun _  -> value _v_105))
                              >>
-                             (fun _in_env_126  -> _e1_interp_122 _in_env_126))))))
+                             (fun _thunk_107  ->
+                                ((effect Effect_UpdateLoc)
+                                   (_x_loc_106, _thunk_107))
+                                  >>
+                                  (fun _tmp_108  ->
+                                     (((effect Effect_LookupLoc) _x_loc_106)
+                                        >>
+                                        (fun _gen_bind_110  ->
+                                           value
+                                             (_extendEnv_54
+                                                (_s_102, _gen_bind_110,
+                                                  _envi_104))))
+                                       >>
+                                       (fun _ext_109  ->
+                                          ((effect Effect_SetEnv) _ext_109)
+                                            >>
+                                            (fun _ext_2_111  ->
+                                               (_interp_58 _t_103) >>
+                                                 (fun _t_res_112  ->
+                                                    (effect Effect_InEnv)
+                                                      (_ext_2_111,
+                                                        _t_res_112)))))))))))
+        >>
+        ((fun _interpFunc_94  ->
+            let _e1_interp_113 = _interpFunc_94  in
+            ((effect Effect_ReadEnv) ()) >>
+              (fun _envi_114  ->
+                 (_interp_58 _e2_93) >>
+                   (fun _e2_interp_115  ->
+                      ((effect Effect_SetEnv) _envi_114) >>
+                        (fun _envi2_116  ->
+                           ((effect Effect_InEnv)
+                              (_envi2_116, _e2_interp_115))
+                             >>
+                             (fun _in_env_117  -> _e1_interp_113 _in_env_117))))))
   
-let rec _interpTopLevel_127 _lst_128 _results_129 =
-  match _lst_128 with
-  | [] -> value _results_129
-  | _top_130::_tail_131 ->
-      let _gen_bind_132 = _interpTopLevel_127 _tail_131  in
-      (let _gen_bind_134 = _var_9 _results_129  in
-       (_interp_86 _top_130) >>
-         (fun _gen_bind_135  -> value (_gen_bind_134 [_gen_bind_135])))
-        >> ((fun _gen_bind_133  -> _gen_bind_132 _gen_bind_133))
+let rec _interpTopLevel_118 _lst_119 _results_120 =
+  match _lst_119 with
+  | [] -> value _results_120
+  | _top_121::_tail_122 ->
+      let _gen_bind_123 = _interpTopLevel_118 _tail_122  in
+      (let _gen_bind_125 = _var_9 _results_120  in
+       (_interp_58 _top_121) >>
+         (fun _gen_bind_126  -> value (_gen_bind_125 [_gen_bind_126])))
+        >> ((fun _gen_bind_124  -> _gen_bind_123 _gen_bind_124))
   
-let _arithmeticHandler_136 comp =
-  handler
-    {
-      value_clause = (fun _gen_id_par_182  -> value _gen_id_par_182);
-      effect_clauses = fun (type a) -> fun (type b) ->
-        fun (x : (a,b) effect)  ->
-          (match x with
-           | Effect_Arith_DivByZero  ->
-               (fun (() : unit)  ->
-                  fun (_k_137 : int -> _)  -> value (_var_7 1))
-           | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
-                                                                    (b -> _)
-                                                                    -> 
-                                                                    _)
-    } comp
-  
-let _storeHandler_138 comp =
+let _storeHandler_127 comp =
   handler
     {
       value_clause =
-        (fun _y_154  ->
-           value (fun _lift_fun_1  -> value ((fun _  -> _y_154) _lift_fun_1)));
+        (fun _y_143  ->
+           value (fun _lift_fun_1  -> value ((fun _  -> _y_143) _lift_fun_1)));
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_LookupLoc  ->
-               (fun (_x_149 : loc)  ->
-                  fun (_k_150 : int -> _)  ->
-                    value
-                      (fun _s_151  ->
-                         ((_lookupState_16 (_x_149, _s_151)) >>
-                            (fun _gen_bind_153  -> _k_150 _gen_bind_153))
-                           >> (fun _gen_bind_152  -> _gen_bind_152 _s_151)))
-           | Effect_UpdateLoc  ->
-               (fun ((_x_143,_y_144) : (loc* int))  ->
-                  fun (_k_145 : loc -> _)  ->
-                    value
-                      (fun _s_146  ->
-                         (_k_145 _x_143) >>
-                           (fun _gen_bind_147  ->
-                              let _gen_bind_148 =
-                                _updateState_25 (_x_143, _y_144, _s_146)  in
-                              _gen_bind_147 _gen_bind_148)))
-           | Effect_AllocLoc  ->
-               (fun (() : unit)  ->
-                  fun (_k_139 : loc -> _)  ->
+               (fun (_x_138 : loc)  ->
+                  fun (_k_139 : int -> _)  ->
                     value
                       (fun _s_140  ->
-                         (let _gen_bind_142 = _getNewLoc_43 _s_140  in
-                          _k_139 _gen_bind_142) >>
-                           (fun _gen_bind_141  -> _gen_bind_141 _s_140)))
+                         ((_lookupState_16 (_x_138, _s_140)) >>
+                            (fun _gen_bind_142  -> _k_139 _gen_bind_142))
+                           >> (fun _gen_bind_141  -> _gen_bind_141 _s_140)))
+           | Effect_UpdateLoc  ->
+               (fun ((_x_132,_y_133) : (loc* int))  ->
+                  fun (_k_134 : loc -> _)  ->
+                    value
+                      (fun _s_135  ->
+                         (_k_134 _x_132) >>
+                           (fun _gen_bind_136  ->
+                              let _gen_bind_137 =
+                                _updateState_25 (_x_132, _y_133, _s_135)  in
+                              _gen_bind_136 _gen_bind_137)))
+           | Effect_AllocLoc  ->
+               (fun (() : unit)  ->
+                  fun (_k_128 : loc -> _)  ->
+                    value
+                      (fun _s_129  ->
+                         (let _gen_bind_131 = _getNewLoc_43 _s_129  in
+                          _k_128 _gen_bind_131) >>
+                           (fun _gen_bind_130  -> _gen_bind_130 _s_129)))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b -> _)
                                                                     -> 
                                                                     _)
     } comp
   
-let _environmentHandler_155 comp =
+let _environmentHandler_144 comp =
   handler
     {
       value_clause =
-        (fun _y_166  ->
-           value (fun _lift_fun_2  -> value ((fun _  -> _y_166) _lift_fun_2)));
+        (fun _y_155  ->
+           value (fun _lift_fun_2  -> value ((fun _  -> _y_155) _lift_fun_2)));
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_InEnv  ->
-               (fun ((_env_162,_s_163) : (env* int))  ->
-                  fun (_k_164 : int -> _)  ->
+               (fun ((_env_151,_s_152) : (env* int))  ->
+                  fun (_k_153 : int -> _)  ->
                     value
                       (fun _  ->
-                         (_k_164 _s_163) >>
-                           (fun _gen_bind_165  -> _gen_bind_165 _env_162)))
+                         (_k_153 _s_152) >>
+                           (fun _gen_bind_154  -> _gen_bind_154 _env_151)))
            | Effect_ReadEnv  ->
                (fun (() : unit)  ->
-                  fun (_k_159 : env -> _)  ->
+                  fun (_k_148 : env -> _)  ->
                     value
-                      (fun _env_160  ->
-                         (_k_159 _env_160) >>
-                           (fun _gen_bind_161  -> _gen_bind_161 _env_160)))
+                      (fun _env_149  ->
+                         (_k_148 _env_149) >>
+                           (fun _gen_bind_150  -> _gen_bind_150 _env_149)))
            | Effect_SetEnv  ->
-               (fun (_env_156 : env)  ->
-                  fun (_k_157 : env -> _)  ->
+               (fun (_env_145 : env)  ->
+                  fun (_k_146 : env -> _)  ->
                     value
                       (fun _  ->
-                         (_k_157 _env_156) >>
-                           (fun _gen_bind_158  -> _gen_bind_158 _env_156)))
+                         (_k_146 _env_145) >>
+                           (fun _gen_bind_147  -> _gen_bind_147 _env_145)))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b -> _)
                                                                     -> 
                                                                     _)
     } comp
   
-let _lambdaCase_167 =
-  LambdaV
-    ("a",
-      (Add
-         ((Add ((Add ((Var "a"), (Num 2))), (Add ((Num 1), (Num 2))))),
-           (Add ((Add ((Num 1), (Num 2))), (Add ((Num 1), (Num 2))))))))
+let _environment_store_Handler_156 comp =
+  handler
+    {
+      value_clause =
+        (fun _y_188  ->
+           value (fun _lift_fun_3  -> value ((fun _  -> _y_188) _lift_fun_3)));
+      effect_clauses = fun (type a) -> fun (type b) ->
+        fun (x : (a,b) effect)  ->
+          (match x with
+           | Effect_InEnv  ->
+               (fun ((_env_183,_e_184) : (env* int))  ->
+                  fun (_k_185 : int -> _)  ->
+                    value
+                      (fun (_,_s_186)  ->
+                         (_k_185 _e_184) >>
+                           (fun _gen_bind_187  ->
+                              _gen_bind_187 (_env_183, _s_186))))
+           | Effect_ReadEnv  ->
+               (fun (() : unit)  ->
+                  fun (_k_179 : env -> _)  ->
+                    value
+                      (fun (_env_180,_s_181)  ->
+                         (_k_179 _env_180) >>
+                           (fun _gen_bind_182  ->
+                              _gen_bind_182 (_env_180, _s_181))))
+           | Effect_SetEnv  ->
+               (fun (_env_175 : env)  ->
+                  fun (_k_176 : env -> _)  ->
+                    value
+                      (fun (_,_s_177)  ->
+                         (_k_176 _env_175) >>
+                           (fun _gen_bind_178  ->
+                              _gen_bind_178 (_env_175, _s_177))))
+           | Effect_LookupLoc  ->
+               (fun (_x_169 : loc)  ->
+                  fun (_k_170 : int -> _)  ->
+                    value
+                      (fun (_env_171,_s_172)  ->
+                         ((_lookupState_16 (_x_169, _s_172)) >>
+                            (fun _gen_bind_174  -> _k_170 _gen_bind_174))
+                           >>
+                           (fun _gen_bind_173  ->
+                              _gen_bind_173 (_env_171, _s_172))))
+           | Effect_UpdateLoc  ->
+               (fun ((_x_162,_y_163) : (loc* int))  ->
+                  fun (_k_164 : loc -> _)  ->
+                    value
+                      (fun (_env_165,_s_166)  ->
+                         (_k_164 _x_162) >>
+                           (fun _gen_bind_167  ->
+                              let _gen_bind_168 =
+                                _updateState_25 (_x_162, _y_163, _s_166)  in
+                              _gen_bind_167 (_env_165, _gen_bind_168))))
+           | Effect_AllocLoc  ->
+               (fun (() : unit)  ->
+                  fun (_k_157 : loc -> _)  ->
+                    value
+                      (fun (_env_158,_s_159)  ->
+                         (let _gen_bind_161 = _getNewLoc_43 _s_159  in
+                          _k_157 _gen_bind_161) >>
+                           (fun _gen_bind_160  ->
+                              _gen_bind_160 (_env_158, _s_159))))
+           | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
+                                                                    (b -> _)
+                                                                    -> 
+                                                                    _)
+    } comp
   
-let _addCase_168 =
+let _lambdaCase_189 = LambdaV ("a", (Add ((Var "a"), (Num 22)))) 
+let _addCase_190 =
   Add
-    ((Add ((Add ((Num 1), (Num 2))), (Add ((Num 1), (Num 2))))),
-      (Add ((Add ((Num 1), (Num 2))), (Add ((Num 1), (Num 2))))))
+    ((Add ((Add ((Num 20), (Num 2))), (Mul ((Num 1), (Num 2))))),
+      (Sub ((Add ((Num 2), (Num 2))), (Add ((Num 1), (Num 2))))))
   
-let _testCaseA_169 =
+let _testCaseA_191 =
   App
-    (_lambdaCase_167,
+    (_lambdaCase_189,
       (App
-         (_lambdaCase_167,
+         (_lambdaCase_189,
            (App
-              (_lambdaCase_167,
+              (_lambdaCase_189,
                 (App
-                   (_lambdaCase_167,
+                   (_lambdaCase_189,
                      (App
-                        (_lambdaCase_167,
+                        (_lambdaCase_189,
                           (App
-                             (_lambdaCase_167,
-                               (App (_lambdaCase_167, _addCase_168)))))))))))))
+                             (_lambdaCase_189,
+                               (App (_lambdaCase_189, _addCase_190)))))))))))))
   
-let _testCaseB_170 =
+let _testCaseB_192 =
   App
-    (_lambdaCase_167,
+    (_lambdaCase_189,
       (App
-         (_lambdaCase_167,
+         (_lambdaCase_189,
            (App
-              (_lambdaCase_167,
+              (_lambdaCase_189,
                 (App
-                   (_lambdaCase_167,
+                   (_lambdaCase_189,
                      (App
-                        (_lambdaCase_167,
+                        (_lambdaCase_189,
                           (App
-                             (_lambdaCase_167,
-                               (App (_lambdaCase_167, _testCaseA_169)))))))))))))
+                             (_lambdaCase_189,
+                               (App (_lambdaCase_189, _testCaseA_191)))))))))))))
   
-let _testCaseC_171 =
+let _testCaseC_193 =
   App
-    (_lambdaCase_167,
+    (_lambdaCase_189,
       (App
-         (_lambdaCase_167,
+         (_lambdaCase_189,
            (App
-              (_lambdaCase_167,
+              (_lambdaCase_189,
                 (App
-                   (_lambdaCase_167,
+                   (_lambdaCase_189,
                      (App
-                        (_lambdaCase_167,
+                        (_lambdaCase_189,
                           (App
-                             (_lambdaCase_167,
-                               (App (_lambdaCase_167, _testCaseB_170)))))))))))))
+                             (_lambdaCase_189,
+                               (App (_lambdaCase_189, _testCaseB_192)))))))))))))
   
-let _testCaseD_172 =
+let _testCaseD_194 =
   App
-    (_lambdaCase_167,
+    (_lambdaCase_189,
       (App
-         (_lambdaCase_167,
+         (_lambdaCase_189,
            (App
-              (_lambdaCase_167,
+              (_lambdaCase_189,
                 (App
-                   (_lambdaCase_167,
+                   (_lambdaCase_189,
                      (App
-                        (_lambdaCase_167,
+                        (_lambdaCase_189,
                           (App
-                             (_lambdaCase_167,
-                               (App (_lambdaCase_167, _testCaseC_171)))))))))))))
+                             (_lambdaCase_189,
+                               (App (_lambdaCase_189, _testCaseC_193)))))))))))))
   
-let rec _createCase_173 _n_174 =
-  match _n_174 with
-  | 1 -> _testCaseD_172
+let rec _createCase_195 _n_196 =
+  match _n_196 with
+  | 1 -> _testCaseD_194
   | _ ->
-      let _gen_bind_175 =
-        let _gen_bind_176 =
-          let _gen_bind_177 = _var_6 _n_174  in _gen_bind_177 1  in
-        _createCase_173 _gen_bind_176  in
-      App (_lambdaCase_167, _gen_bind_175)
+      let _gen_bind_197 =
+        let _gen_bind_198 =
+          let _gen_bind_199 = _var_6 _n_196  in _gen_bind_199 1  in
+        _createCase_195 _gen_bind_198  in
+      App (_lambdaCase_189, _gen_bind_197)
   
-let _finalCase_178 = _createCase_173 200 
-let _bigTest_179 () =
-  (_storeHandler_138
-     ((_environmentHandler_155 (_interp_86 _finalCase_178)) >>
-        (fun _gen_bind_181  -> _gen_bind_181 [])))
-    >> (fun _gen_bind_180  -> _gen_bind_180 [])
+let _finalCase_200 = _createCase_195 200 
+let _bigTest_201 () =
+  (_environment_store_Handler_156 (_interp_58 _finalCase_200)) >>
+    (fun _gen_bind_202  -> _gen_bind_202 ([], []))
   

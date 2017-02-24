@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM queens.eff ===
-commit SHA: 503a5108792f58491aa1e035aa42e7cd14c90a93
+commit SHA: 39964fd44c01db0e6d99619f0940b04f0a17de99
 === BEGIN SOURCE ===
 
 external ( <> ) : int -> int -> bool = "<>"
@@ -326,11 +326,10 @@ let _queens_one_option_94 _number_of_queens_95 =
 let _queens_one_cps_96 _number_of_queens_97 =
   (_backtrack_70 (_queens_83 _number_of_queens_97)) >>
     (fun _gen_bind_98  ->
-       value
-         (_gen_bind_98
-            (fun ()  ->
-               ((effect Effect_Fail) ()) >>
-                 (fun _gen_bind_99  -> value (_absurd_7 _gen_bind_99)))))
+       _gen_bind_98
+         (fun ()  ->
+            ((effect Effect_Fail) ()) >>
+              (fun _gen_bind_99  -> value (_absurd_7 _gen_bind_99))))
   
 let _queens_all_100 _number_of_queens_101 =
   _choose_all_77 (_queens_83 _number_of_queens_101) 
