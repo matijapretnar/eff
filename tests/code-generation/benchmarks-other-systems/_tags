@@ -1,5 +1,4 @@
 <queens/**>: include
-<effocaml/**>: include
-<handlersinocaml/**>: include
+<delimcc/**>: include
 true:package(core, core_bench, delimcc)
 true:thread
