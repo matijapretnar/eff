@@ -8,7 +8,7 @@ To compile eff:
 
      * The command generates an ml file with the same name that runs on OCaml 2.0.2.
 
-3) You can access the help through the command 
+3) You can display the list of top-level options using the command:
 
      ./eff.native -help
 
