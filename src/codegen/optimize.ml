@@ -253,7 +253,7 @@ and substitute_pattern_expr st e p exp =
   optimize_expr st (Typed.subst_expr (Typed.pattern_match p exp) e)
 
 and beta_reduce st ({term = (p, c)} as a) e =
-  Print.debug  "Inlining? %t[%t -> %t]" (Typed.print_computation c) (Typed.print_pattern p) (Typed.print_expression e) ;
+  (* Print.debug  "Inlining? %t[%t -> %t]" (Typed.print_computation c) (Typed.print_pattern p) (Typed.print_expression e) ; *)
   match applicable_pattern p (Typed.free_vars_comp c) with
   | NotInlinable when is_atomic e -> substitute_pattern_comp st c p e
   | Inlinable -> substitute_pattern_comp st c p e
@@ -322,7 +322,7 @@ and optimize_sub_comp st c =
 
   | LetRec ( [(var,abst)], c1)
       when unused var c1 -> 
-    Print.debug "TOM: dropping unused let-rec definition";
+    (* Print.debug "dropping unused let-rec definition"; *)
     c1
   | LetRec (li, c1) ->
     let_rec' ~loc (Common.assoc_map (optimize_abs st) li) (optimize_comp st c1)
@@ -598,7 +598,6 @@ and reduce_comp st c =
                             let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
                             let st = {st with handlers_functions_mem = (e1,v,new_f_var) :: st.handlers_functions_mem} in
                             st.handlers_functions_ref_mem := (e1,v,new_f_var) :: !(st.handlers_functions_ref_mem) ;
-                            (*Print.debug " the ccc is %t" (Typed.print_computation c);*)
                             let res =
                               let_rec' defs @@
                               apply new_f_var ae2

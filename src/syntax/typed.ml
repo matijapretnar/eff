@@ -421,7 +421,7 @@ let rec wrap_up_expr st e =
     ]
   in
   let (_, _, joint_cnstrs') = scheme in
-  Print.debug ~loc:e.location "%t@.%t@.~~>@.%t" (print_expression e) (Scheme.print_ty_scheme e.scheme) (Scheme.print_ty_scheme scheme);
+  (* Print.debug ~loc:e.location "%t@.%t@.~~>@.%t" (print_expression e) (Scheme.print_ty_scheme e.scheme) (Scheme.print_ty_scheme scheme); *)
   let st = {st with constraints = Constraints.union joint_cnstrs joint_cnstrs'} in
   {
     e with term = wrap_up_expr' e.scheme st e.term;
@@ -454,7 +454,7 @@ and wrap_up_comp st c =
       Scheme.less_context ~loc:c.location st.less_context;
     ]
   in
-  Print.debug ~loc:c.location "%t@.%t@.~~>@.%t" (print_computation c) (Scheme.print_dirty_scheme c.scheme) (Scheme.print_dirty_scheme scheme);
+  (* Print.debug ~loc:c.location "%t@.%t@.~~>@.%t" (print_computation c) (Scheme.print_dirty_scheme c.scheme) (Scheme.print_dirty_scheme scheme); *)
   let (_, _, joint_cnstrs') = scheme in
   let st = {st with constraints = Constraints.union joint_cnstrs joint_cnstrs'} in
   let scheme =
@@ -631,7 +631,7 @@ and alphaeq_abs2 eqvars a2 a2' =
 
 let var ?loc x ty_sch =
   let loc = backup_location loc [] in
-  Print.debug ~loc "Var %t" (Scheme.print_ty_scheme ty_sch);
+  (* Print.debug ~loc "Var %t" (Scheme.print_ty_scheme ty_sch); *)
   {
     term = Var x;
     scheme = ty_sch;
