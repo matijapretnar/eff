@@ -3,15 +3,17 @@ open Core_bench.Std
 
 let number_of_loops = 10000
 and number_of_queens = 8
+and number_of_range = 10000
 
-let run_loop_pure = true
-and run_loop_latent = true
-and run_loop_incr = true
-and run_loop_state = true
-and run_queens_one = true
-and run_queens_all = true
-and run_parser = true
-and run_interp = true
+let run_loop_pure = false
+and run_loop_latent = false
+and run_loop_incr = false
+and run_loop_state = false
+and run_queens_one = false
+and run_queens_all = false
+and run_parser = false
+and run_interp = false
+and run_range = true
 
 let () =
   if run_loop_pure then begin
@@ -129,6 +131,17 @@ let () =
       Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> FlatOptImpure._bigTest_201 ());
       Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> FlatNoOptPure._bigTest_201 ());
       (* Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> FlatOptPure._bigTest_201 ()); *)
+      (* Bench.Test.create ~name:"Native" (fun () -> FlatNative.bigTest ()); *)
+    ]);
+  Printf.printf "\n\n"
+  end;
+  if run_range then begin
+  Printf.printf "RANGE BENCHMARKS:\n";
+  Command.run (Bench.make_command [
+      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> RangeNoPureNoOpt._test_222 number_of_range);
+      Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> RangeOptNoPure._test_222 number_of_range);
+      Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> RangePureNoOpt._test_222 number_of_range);
+       Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> RangeOptPure._test_222 number_of_range);
       (* Bench.Test.create ~name:"Native" (fun () -> FlatNative.bigTest ()); *)
     ]);
   Printf.printf "\n\n"
