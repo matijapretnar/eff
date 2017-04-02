@@ -3,78 +3,70 @@
 
 (* An operation which makes a binary choice. *)
 
-type choice = effect
-  operation decide : unit -> bool
-end;;
-
-(* We create an instance of choice to work with. *)
-
-let c = new choice;;
+effect Decide : unit -> bool;;
 
 (* The following piece of code chooses 10 or 20 for x and 0 or 5 for y,
    but since it is not wrapped in a handler it just produces a runtime
    error about an uncought operation:
 
-   let x = (if c#decide () then 10 else 20) in
-   let y = (if c#decide () then 0 else 5) in
+   let x = (if #Decide () then 10 else 20) in
+   let y = (if #Decide () then 0 else 5) in
      x - y;;
 *)
 
-(* If we wrap it in a handler which handles c#decide by
+(* If we wrap it in a handler which handles #Decide by
    passing true to the continuation, then x gets 10 and
    y gets 0. *)
 
 handle
-  let x = (if c#decide () then 10 else 20) in
-  let y = (if c#decide () then 0 else 5) in
+  let x = (if #Decide () then 10 else 20) in
+  let y = (if #Decide () then 0 else 5) in
     x - y
 with
-| c#decide () k -> k true;;
+| #Decide () k -> k true;;
 
 (* This handler collects all results that we can get by making different choices. *)
 
-let choose_all d = handler
-  | d#decide () k -> k true @ k false
+let choose_all = handler
+  | #Decide () k -> k true @ k false
   | val x -> [x];;
 
 (* This returns a list of four possibilities [10; 5; 20; 15] *)
 
-with choose_all c handle
-  let x = (if c#decide () then 10 else 20) in
-  let y = (if c#decide () then 0 else 5) in
+with choose_all handle
+  let x = (if #Decide () then 10 else 20) in
+  let y = (if #Decide () then 0 else 5) in
     x - y;;
+
+let choose_all2 = handler
+  | #Decide2 () k -> k true @ k false
+  | val x -> [x];;
 
 (* We can create two instances and handle each one separately. The inner handler produces
    two results in a list, and the outer handler then produces a list of two lists of two
    results, so the answer is [[10; 5]; [20; 15]]. *)
 
-let c1 = new choice in
-let c2 = new choice in
-  with choose_all c1 handle
-  with choose_all c2 handle
-    let x = (if c1#decide () then 10 else 20) in
-    let y = (if c2#decide () then 0 else 5) in
-      x - y;;
+with choose_all handle
+with choose_all2 handle
+  let x = (if #Decide () then 10 else 20) in
+  let y = (if #Decide2 () then 0 else 5) in
+    x - y;;
 
 (* If we switch the order of handlers and operations we also get a list of two lists of
    two results, but in a different order: [[10; 20]; [5; 15]] *)
 
-let c1 = new choice in
-let c2 = new choice in
-  with choose_all c2 handle
-  with choose_all c1 handle
-    let y = (if c2#decide () then 0 else 5) in
-    let x = (if c1#decide () then 10 else 20) in
-      x - y;;
+with choose_all2 handle
+with choose_all handle
+  let y = (if #Decide2 () then 0 else 5) in
+  let x = (if #Decide () then 10 else 20) in
+    x - y;;
 
 (* However, switching around only the handler but not the operations, produces a list of
    _four_ lists of two elements each: [[10; 20]; [10; 15]; [5; 20]; [5; 15]]
    Exercise: explain this. *)
 
-let c1 = new choice in
-let c2 = new choice in
-  with choose_all c2 handle
-  with choose_all c1 handle
-    let x = (if c1#decide () then 10 else 20) in
-    let y = (if c2#decide () then 0 else 5) in
-      x - y;;
+with choose_all2 handle
+with choose_all handle
+  let x = (if #Decide () then 10 else 20) in
+  let y = (if #Decide2 () then 0 else 5) in
+    x - y;;
