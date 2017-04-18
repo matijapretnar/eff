@@ -14,7 +14,17 @@ type state = {
   handlers_functions_ref_mem : ((Typed.expression * Typed.variable * Typed.expression) list) ref;
   handlers_functions_cont_mem : ((Typed.expression * Typed.variable * Typed.expression) list);
   impure_wrappers : (Typed.variable, Typed.expression) Common.assoc;
-  fuel : int ref
+  fuel : int ref;
+  optimization_total : int ref;
+  optimization_App_Fun : int ref;
+  optimization_Do_Ret : int ref ; 
+  optimization_Do_Op : int ref;
+  optimization_handler_With_LetRec : int ref;
+  optimization_handler_With_Ret : int ref;
+  optimization_handler_With_Handled_Op : int ref;
+  optimization_handler_With_Pure : int ref;
+  optimization_handler_with_do : int ref;
+  optimization_function_specialization : int ref;
 }
 
 
@@ -28,7 +38,18 @@ let initial = {
   handlers_functions_ref_mem = ref [];
   handlers_functions_cont_mem =[];
   fuel = ref (!(Config.optimization_fuel));
+  optimization_total = ref 0;
+  optimization_App_Fun = ref 0;
+  optimization_Do_Ret = ref 0;
+  optimization_Do_Op = ref 0;
+  optimization_handler_With_LetRec = ref 0;
+  optimization_handler_With_Ret = ref 0;
+  optimization_handler_With_Handled_Op = ref 0;
+  optimization_handler_With_Pure = ref 0;
+  optimization_handler_with_do = ref 0;
+  optimization_function_specialization = ref 0;
 }
+
 
 (* -------------------------------------------------------------------------- *)
 (* OPTIMIZATION FUEL                                                          *)
@@ -393,10 +414,14 @@ and reduce_comp st c =
 
   | Bind (c1, c2) when is_pure c1 ->
     useFuel st;
+    st.optimization_Do_Ret := !(st.optimization_Do_Ret ) + 1;
+    st.optimization_total := !(st.optimization_total) + 1;
     beta_reduce st c2 (reduce_expr st (pure c1))
 
   | Bind ({term = Bind (c1, {term = (p1, c2)})}, c3) ->
     useFuel st;
+    st.optimization_Do_Op := !(st.optimization_Do_Op) + 1;
+    st.optimization_total := !(st.optimization_total) + 1;
     let bind_c2_c3 = reduce_comp st (bind c2 c3) in
     let res =
       bind c1 (abstraction p1 bind_c2_c3)
@@ -414,6 +439,8 @@ and reduce_comp st c =
 
   | Handle (h, {term = LetRec (defs, co)}) ->
     useFuel st;
+    st.optimization_handler_With_LetRec := !(st.optimization_handler_With_LetRec) + 1;
+    st.optimization_total := !(st.optimization_total) + 1;
     let handle_h_c = reduce_comp st (handle h co) in
     let res =
       let_rec' defs handle_h_c
@@ -423,18 +450,24 @@ and reduce_comp st c =
   | Handle ({term = Handler h}, c1)
         when (is_pure_for_handler c1 h.effect_clauses) ->
     useFuel st;
+    st.optimization_handler_With_Pure := !(st.optimization_handler_With_Pure) + 1;
+    st.optimization_total := !(st.optimization_total) + 1;
     (* Print.debug "Remove handler, since no effects in common with computation"; *)
     reduce_comp st (bind c1 h.value_clause)
 
   | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})})
         when (is_pure_for_handler c1 h.effect_clauses) ->
     useFuel st;
+    st.optimization_handler_with_do := !(st.optimization_handler_with_do) + 1;
+    st.optimization_total := !(st.optimization_total) + 1;
     (* Print.debug "Remove handler of outer Bind, since no effects in common with computation"; *)
     reduce_comp st (bind (reduce_comp st c1) (abstraction p1 (reduce_comp st (handle (refresh_expr handler) c2))))
 
   | Handle ({term = Handler h}, {term = Bind (c1, {term = (p1, c2)})})
         when (is_pure_for_handler c2 h.effect_clauses) ->
     useFuel st;
+    st.optimization_handler_With_Ret := !(st.optimization_handler_With_Ret) + 1;
+    st.optimization_total := !(st.optimization_total) + 1;
     (* Print.debug "Move inner bind into the value case"; *)
     let new_value_clause = optimize_abs st (abstraction p1 (bind (reduce_comp st c2) (refresh_abs h.value_clause))) in
     let hdlr = handler {
@@ -445,6 +478,8 @@ and reduce_comp st c =
 
   | Handle ({term = Handler h} as h2, {term = Bind (c1, {term = (p, c2)})}) ->
     useFuel st;
+    st.optimization_handler_With_Ret := !(st.optimization_handler_With_Ret) + 1;
+    st.optimization_total := !(st.optimization_total) + 1;
     (* Print.debug "Move (dirty) inner bind into the value case"; *)
     let new_value_clause = optimize_abs st (abstraction p (handle (refresh_expr h2) (refresh_comp (reduce_comp st c2) ))) in
     let hdlr = handler {
@@ -455,6 +490,8 @@ and reduce_comp st c =
 
   | Handle ({term = Handler h}, c) when is_pure c ->
     useFuel st;
+    st.optimization_handler_With_Pure := !(st.optimization_handler_With_Pure) + 1;
+    st.optimization_total := !(st.optimization_total) + 1;
     beta_reduce st h.value_clause (reduce_expr st (pure c))
 
   | Handle ({term = Handler h} as handler, {term = Call (eff, param, k)}) ->
@@ -466,6 +503,8 @@ and reduce_comp st c =
     in
     begin match Common.lookup eff h.effect_clauses with
       | Some eff_clause ->
+      st.optimization_handler_With_Handled_Op := !(st.optimization_handler_With_Handled_Op) + 1;
+      st.optimization_total := !(st.optimization_total) + 1;
         let {term = (p1, p2, c)} = refresh_abs2 eff_clause in
         (* Shouldn't we check for inlinability of p1 and p2 here? *)
         substitute_pattern_comp st (substitute_pattern_comp st c p1 param) p2 (lambda handled_k)
@@ -478,16 +517,22 @@ and reduce_comp st c =
 
   | Apply ({term = Lambda a}, e) ->
     useFuel st;
+    st.optimization_App_Fun := !(st.optimization_App_Fun ) + 1;
+    st.optimization_total := !(st.optimization_total) + 1;
     beta_reduce st a e
 
   | Apply ({term = Pure {term = LetRec (defs,c)}}, e) ->
     useFuel st;
+    st.optimization_App_Fun := !(st.optimization_App_Fun ) + 1;
+    st.optimization_total := !(st.optimization_total) + 1;
     let_rec' defs (apply (pure c) e)
 
   | Apply ({term = Var v}, e2) ->
     begin match Common.lookup v st.impure_wrappers with
       | Some f ->
         useFuel st;
+        st.optimization_App_Fun := !(st.optimization_App_Fun ) + 1;
+        st.optimization_total := !(st.optimization_total) + 1;
         let res =
           value (pure (apply f e2))
         in
@@ -516,6 +561,8 @@ and reduce_comp st c =
              | (false, Some new_f_exp,Some original_val_clause)-> 
                begin match (find_in_let_rec_mem st v) with
                 | Some abs -> 
+                  st.optimization_function_specialization := !(st.optimization_function_specialization ) + 1;
+                  st.optimization_total := !(st.optimization_total) + 1;
                   let (let_rec_p,let_rec_c) = abs.term in
                   (* Print.debug "THE ABSTRACTION OF SAME HANDLER DIFF VALUE :- %t" (Typed.print_abstraction abs); *)
                   let Handler ha = e1.term in 
@@ -562,6 +609,8 @@ and reduce_comp st c =
              | _ -> 
                begin match find_in_stack st v with
                | Some ({term = Lambda k}) ->
+                  st.optimization_function_specialization := !(st.optimization_function_specialization ) + 1;
+                  st.optimization_total := !(st.optimization_total) + 1;
                   let {term = (newdp, newdc)} = refresh_abs k in
                   let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
                   let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
@@ -584,6 +633,8 @@ and reduce_comp st c =
                 | _ -> 
                        begin match (find_in_let_rec_mem st v) with
                        | Some abs ->
+                            st.optimization_function_specialization := !(st.optimization_function_specialization ) + 1;
+                            st.optimization_total := !(st.optimization_total) + 1;
                             let (let_rec_p,let_rec_c) = abs.term in
                             let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
                             let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
@@ -743,4 +794,21 @@ let optimize_commands cmds =
     st', (cmd', loc) :: cmds
   ) (initial, []) cmds
 in
-List.rev cmds
+(* Print.debug "The optimization total %i" !(initial.optimization_total);
+Print.debug "The optimization App-Fun %i" !(initial.optimization_App_Fun);
+Print.debug "The optimization Do-Ret %i" !(initial.optimization_Do_Ret);
+Print.debug "The optimization Do-Op %i" !(initial.optimization_Do_Op);
+Print.debug "The optimization With-Ret %i" !(initial.optimization_handler_With_Ret);
+Print.debug "The optimization With-Pure %i" !(initial.optimization_handler_With_Pure);
+Print.debug "The optimization With-do %i" !(initial.optimization_handler_with_do);
+Print.debug "The optimization handled-op %i" !(initial.optimization_handler_With_Handled_Op);
+Print.debug "The optimization With-LetRec %i" !(initial.optimization_handler_With_LetRec);
+Print.debug "The optimization function Specilization  %i" !(initial.optimization_function_specialization);
+Print.debug "Simplifications %i" 
+  ( !(initial.optimization_App_Fun)+ !(initial.optimization_Do_Ret)+ !(initial.optimization_Do_Op) );
+Print.debug "Handler Reductions %i"
+ ( !(initial.optimization_handler_With_Ret)+ !(initial.optimization_handler_With_Pure) 
+  + !(initial.optimization_handler_with_do) + !(initial.optimization_handler_With_Handled_Op)
+  +  !(initial.optimization_handler_With_LetRec));
+Print.debug "Specialization %i" !(initial.optimization_function_specialization); *)
+List.rev cmds;
