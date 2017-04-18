@@ -87,7 +87,7 @@ fun backtrack(m)() {
 }
 
 fun queens() {
-    var number_of_queens = 8;
+    var number_of_queens = 9;
     fun place(x, qs) {
         if (x > number_of_queens) qs
         else {
@@ -104,8 +104,17 @@ fun run(m) { m() }
 
 fun failFun() { do Fail }
 
-fun choose_all_queens() { run(choose_all(queens)) }
-fun choose_one_queens_option() { run(optionalize(queens)) }
-fun choose_one_queens_cps() { backtrack(queens)()(failFun) }
+fun choose_all_queens() {
+  var _ = run(choose_all(queens));
+  ()
+}
+fun choose_one_queens_option() {
+  var _ = run(optionalize(queens));
+  ()
+}
+fun choose_one_queens_cps() {
+  var _ = backtrack(queens)()(failFun);
+  ()
+}
 
-choose_one_queens_cps()
+choose_all_queens()

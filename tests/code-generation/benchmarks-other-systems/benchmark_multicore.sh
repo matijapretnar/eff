@@ -33,11 +33,18 @@ ocamlbuild -use-ocamlfind -package delimcc handlersInAction_cps.byte
 ocamlbuild -use-ocamlfind -package delimcc handlersInAction_option.byte
 ocamlbuild -use-ocamlfind -package delimcc handlersInAction_all.byte
 cd ..
+cd native
+echo "compiling native byte"
+ocamlbuild native_cps.byte
+ocamlbuild native_option.byte
+ocamlbuild native_exep.byte
+ocamlbuild native_all.byte
+cd ..
 
 QUALITY=5
 #NUMBER_OF_QUEENS=11
 
-for NUMBER_OF_QUEENS in 8 9 10 11 12
+for NUMBER_OF_QUEENS in 8 9 10 11 12 13 14
 do
   # cd multicore
   # echo "\n\nMULTICORE ($NUMBER_OF_QUEENS queens)"
@@ -45,7 +52,7 @@ do
   # time for ((i=1;i<=$QUALITY;i++)); do ./multicore_cps.native $NUMBER_OF_QUEENS; done
   # echo "\n\nMulticore ocaml: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
   # time for ((i=1;i<=$QUALITY;i++)); do ./multicore_option.native $NUMBER_OF_QUEENS; done
-  # echo "\n\nMulticore ocaml: ALL QUEENS ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  # echo "\n\nMulticore ocaml: ALL QUEENS ($NUMBER_OF_QUEENS queens) (5 runs)"
   # time for ((i=1;i<=$QUALITY;i++)); do ./multicore_all.native $NUMBER_OF_QUEENS; done
   # cd ..
 
@@ -98,14 +105,50 @@ do
   #echo "\n\nHandlers in action: ALL QUEENS ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
   #time for ((i=1;i<=$QUALITY;i++)); do ./handlersInAction_all.byte $NUMBER_OF_QUEENS; done
   #cd ..
+
+  cd native
+  echo "\n\n\n\nNATIVE BYTE ($NUMBER_OF_QUEENS queens)"
+  echo "\n\nNative: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) (5 runs)"
+  time for ((i=1;i<=$QUALITY;i++)); do ./native_cps.byte $NUMBER_OF_QUEENS; done
+  echo "\n\nNative: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
+  time for ((i=1;i<=$QUALITY;i++)); do ./native_option.byte $NUMBER_OF_QUEENS; done
+  echo "\n\nNative: ONE QUEENS: EXCEPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
+  time for ((i=1;i<=$QUALITY;i++)); do ./native_exep.byte $NUMBER_OF_QUEENS; done
+  # echo "\n\nNative: ALL QUEENS ($NUMBER_OF_QUEENS queens) (5 runs)"
+  # time for ((i=1;i<=$QUALITY;i++)); do ./native_all.byte $NUMBER_OF_QUEENS; done
+  cd ..
 done
 
-#cd links
-#echo "\n\n\n\nLINKS"
-#echo "Links: ONE QUEENS: CPS"
-#time for ((i=1;i<=$QUALITY;i++)); do ./queens_cps; done
-#echo "\n\nLinks: ONE QUEENS: OPTION"
-#time for ((i=1;i<=$QUALITY;i++)); do ./queens_option; done
-#echo "\n\nLinks: ALL QUEENS"
-#time for ((i=1;i<=$QUALITY;i++)); do ./queens_all; done
-#cd ..
+# cd links
+# echo "\n\n\n\nLINKS"
+# echo "Links: ONE QUEENS: CPS (8 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_cps_8.links; done
+# echo "Links: ONE QUEENS: CPS (9 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_cps_9.links; done
+# echo "Links: ONE QUEENS: CPS (10 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_cps_10.links; done
+# echo "Links: ONE QUEENS: CPS (11 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_cps_11.links; done
+# echo "Links: ONE QUEENS: CPS (12 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_cps_12.links; done
+# echo "\n\nLinks: ONE QUEENS: OPTION (8 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_option_8.links; done
+# echo "\n\nLinks: ONE QUEENS: OPTION (9 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_option_9.links; done
+# echo "\n\nLinks: ONE QUEENS: OPTION (10 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_option_10.links; done
+# echo "\n\nLinks: ONE QUEENS: OPTION (11 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_option_11.links; done
+# echo "\n\nLinks: ONE QUEENS: OPTION (12 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_option_12.links; done
+# echo "\n\nLinks: ALL QUEENS (8 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_all_8.links; done
+# echo "\n\nLinks: ALL QUEENS (9 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_all_9.links; done
+# echo "\n\nLinks: ALL QUEENS (10 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_all_10.links; done
+# echo "\n\nLinks: ALL QUEENS (11 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_all_11.links; done
+# echo "\n\nLinks: ALL QUEENS (12 queens) (5 runs)"
+# time for ((i=1;i<=$QUALITY;i++)); do ./links-effects/links queens_all_12.links; done
+# cd ..
