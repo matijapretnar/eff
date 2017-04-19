@@ -13,6 +13,7 @@ and run_queens_one = false
 and run_queens_all = false
 and run_parser = false
 and run_interp = false
+and run_small_interp = true
 and run_range = true
 
 let () =
@@ -132,6 +133,15 @@ let () =
       Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> FlatNoOptPure._bigTest_201 ());
       (* Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> FlatOptPure._bigTest_201 ()); *)
       (* Bench.Test.create ~name:"Native" (fun () -> FlatNative.bigTest ()); *)
+    ]);
+  Printf.printf "\n\n"
+  end;
+  if run_small_interp then begin
+  Printf.printf "SMALL INTERPRETER BENCHMARK:\n";
+  Command.run (Bench.make_command [
+      Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> Interp_small.bigTest ());
+      (* Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> FlatOptPure._bigTest_201 ()); *)
+      Bench.Test.create ~name:"Native" (fun () -> InterpNative.bigTest ());
     ]);
   Printf.printf "\n\n"
   end;

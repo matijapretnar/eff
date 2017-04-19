@@ -3,5 +3,7 @@
 <interp/**>: include
 <parser/**>: include
 <interp_flat/**>: include
+<interp_small/**>: include
+<range/**>: include
 true:package(core, core_bench)
 true:thread
