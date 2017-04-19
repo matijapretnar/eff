@@ -131,4 +131,6 @@ let n =
     then int_of_string Sys.argv.(1)
     else 8
   in
-queens_one_cps n;;
+  for i = 1 to 1000 do
+queens_one_cps n
+done;;
