@@ -18,6 +18,10 @@ ocamlbuild queens_cps.native
 ocamlbuild queens_option.native
 ocamlbuild queens_all.native
 cd ..
+cd loop
+echo "compiling loop multicore native"
+ocamlbuild multicore.native
+cd ..
 eval `opam config env --switch=4.02.2+local-git-`
 cd delimcc
 echo "compiling eff byte"
@@ -40,84 +44,115 @@ ocamlbuild native_option.byte
 ocamlbuild native_exep.byte
 ocamlbuild native_all.byte
 cd ..
+cd native
+echo "compiling native native"
+ocamlbuild native_cps.native
+ocamlbuild native_option.native
+ocamlbuild native_exep.native
+ocamlbuild native_all.native
+cd ..
+cd loop
+echo "compiling loop eff native"
+ocamlbuild loop.native
+cd ..
 
 QUALITY=5
 #NUMBER_OF_QUEENS=11
 
-for NUMBER_OF_QUEENS in 8 9 10 11 12 13 14
-do
+# for NUMBER_OF_QUEENS in 8 9 10 11 12 13 14
+# do
   # cd multicore
-  # echo "\n\nMULTICORE ($NUMBER_OF_QUEENS queens)"
-  # echo "Multicore ocaml: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  # echo "\n\nMULTICORE NATIVE ($NUMBER_OF_QUEENS queens)"
+  # echo "Multicore ocaml: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) (5 runs)"
   # time for ((i=1;i<=$QUALITY;i++)); do ./multicore_cps.native $NUMBER_OF_QUEENS; done
-  # echo "\n\nMulticore ocaml: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  # echo "\n\nMulticore ocaml: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
   # time for ((i=1;i<=$QUALITY;i++)); do ./multicore_option.native $NUMBER_OF_QUEENS; done
   # echo "\n\nMulticore ocaml: ALL QUEENS ($NUMBER_OF_QUEENS queens) (5 runs)"
   # time for ((i=1;i<=$QUALITY;i++)); do ./multicore_all.native $NUMBER_OF_QUEENS; done
   # cd ..
 
-  cd multicore
-  echo "\n\nMULTICORE BYTE ($NUMBER_OF_QUEENS queens)"
-  #echo "Multicore ocaml: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
-  #time for ((i=1;i<=$QUALITY;i++)); do ./multicore_cps.byte $NUMBER_OF_QUEENS; done
-  #echo "\n\nMulticore ocaml: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
-  #time for ((i=1;i<=$QUALITY;i++)); do ./multicore_option.byte $NUMBER_OF_QUEENS; done
-  echo "\n\nMulticore ocaml: ALL QUEENS ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
-  time for ((i=1;i<=$QUALITY;i++)); do ./multicore_all.byte $NUMBER_OF_QUEENS; done
-  cd ..
+  # cd multicore
+  # echo "\n\nMULTICORE BYTE ($NUMBER_OF_QUEENS queens)"
+  # echo "Multicore ocaml: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) (5 runs)"
+  # time for ((i=1;i<=$QUALITY;i++)); do ./multicore_cps.byte $NUMBER_OF_QUEENS; done
+  # echo "\n\nMulticore ocaml: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
+  # time for ((i=1;i<=$QUALITY;i++)); do ./multicore_option.byte $NUMBER_OF_QUEENS; done
+  # echo "\n\nMulticore ocaml: ALL QUEENS ($NUMBER_OF_QUEENS queens) (5 runs)"
+  # time for ((i=1;i<=$QUALITY;i++)); do ./multicore_all.byte $NUMBER_OF_QUEENS; done
+  # cd ..
 
   # cd multicore
   # echo "\n\n\n\nEFF ($NUMBER_OF_QUEENS queens)"
-  # echo "Generated, pure, optimized: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  # echo "Generated, pure, optimized: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) (5 runs)"
   # time for ((i=1;i<=$QUALITY;i++)); do ./queens_cps.native $NUMBER_OF_QUEENS; done
-  # echo "\n\nGenerated, pure, optimized: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  # echo "\n\nGenerated, pure, optimized: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
   # time for ((i=1;i<=$QUALITY;i++)); do ./queens_option.native $NUMBER_OF_QUEENS; done
-  # echo "\n\nGenerated, pure, optimized: ALL QUEENS ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  # echo "\n\nGenerated, pure, optimized: ALL QUEENS ($NUMBER_OF_QUEENS queens) (5 runs)"
   # time for ((i=1;i<=$QUALITY;i++)); do ./queens_all.native $NUMBER_OF_QUEENS; done
   # cd ..
 
   #cd delimcc
   #echo "\n\n\n\nEFF BYTE ($NUMBER_OF_QUEENS queens)"
-  #echo "Generated, pure, optimized: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  #echo "Generated, pure, optimized: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) (5 runs)"
   #time for ((i=1;i<=$QUALITY;i++)); do ./queens_cps.byte $NUMBER_OF_QUEENS; done
-  #echo "\n\nGenerated, pure, optimized: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  #echo "\n\nGenerated, pure, optimized: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
   #time for ((i=1;i<=$QUALITY;i++)); do ./queens_option.byte $NUMBER_OF_QUEENS; done
-  #echo "\n\nGenerated, pure, optimized: ALL QUEENS ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  #echo "\n\nGenerated, pure, optimized: ALL QUEENS ($NUMBER_OF_QUEENS queens) (5 runs)"
   #time for ((i=1;i<=$QUALITY;i++)); do ./queens_all.byte $NUMBER_OF_QUEENS; done
   #cd ..
 
   #cd delimcc
   #echo "\n\n\n\nEFF IN OCAML BYTE ($NUMBER_OF_QUEENS queens)"
-  #echo "\n\nEff in OCaml: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  #echo "\n\nEff in OCaml: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) (5 runs)"
   #time for ((i=1;i<=$QUALITY;i++)); do ./effInOcaml_cps.byte $NUMBER_OF_QUEENS; done
-  #echo "\n\nEff in OCaml: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  #echo "\n\nEff in OCaml: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
   #time for ((i=1;i<=$QUALITY;i++)); do ./effInOcaml_option.byte $NUMBER_OF_QUEENS; done
-  #echo "\n\nEff in OCaml: ALL QUEENS ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  #echo "\n\nEff in OCaml: ALL QUEENS ($NUMBER_OF_QUEENS queens) (5 runs)"
   #time for ((i=1;i<=$QUALITY;i++)); do ./effInOcaml_all.byte $NUMBER_OF_QUEENS; done
   #cd ..
 
   #cd delimcc
   #echo "\n\n\n\nHANDLERS IN ACTION ($NUMBER_OF_QUEENS queens)"
-  #echo "\n\nHandlers in action: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  #echo "\n\nHandlers in action: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) (5 runs)"
   #time for ((i=1;i<=$QUALITY;i++)); do ./handlersInAction_cps.byte $NUMBER_OF_QUEENS; done
-  #echo "\n\nHandlers in action: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  #echo "\n\nHandlers in action: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
   #time for ((i=1;i<=$QUALITY;i++)); do ./handlersInAction_option.byte $NUMBER_OF_QUEENS; done
-  #echo "\n\nHandlers in action: ALL QUEENS ($NUMBER_OF_QUEENS queens) ($QUALITY runs)"
+  #echo "\n\nHandlers in action: ALL QUEENS ($NUMBER_OF_QUEENS queens) (5 runs)"
   #time for ((i=1;i<=$QUALITY;i++)); do ./handlersInAction_all.byte $NUMBER_OF_QUEENS; done
   #cd ..
 
-  cd native
-  echo "\n\n\n\nNATIVE BYTE ($NUMBER_OF_QUEENS queens)"
-  echo "\n\nNative: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) (5 runs)"
-  time for ((i=1;i<=$QUALITY;i++)); do ./native_cps.byte $NUMBER_OF_QUEENS; done
-  echo "\n\nNative: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
-  time for ((i=1;i<=$QUALITY;i++)); do ./native_option.byte $NUMBER_OF_QUEENS; done
-  echo "\n\nNative: ONE QUEENS: EXCEPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
-  time for ((i=1;i<=$QUALITY;i++)); do ./native_exep.byte $NUMBER_OF_QUEENS; done
+  #cd native
+  #echo "\n\n\n\nNATIVE BYTE ($NUMBER_OF_QUEENS queens)"
+  #echo "\n\nNative: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) (5 runs)"
+  #time for ((i=1;i<=$QUALITY;i++)); do ./native_cps.byte $NUMBER_OF_QUEENS; done
+  #echo "\n\nNative: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
+  #time for ((i=1;i<=$QUALITY;i++)); do ./native_option.byte $NUMBER_OF_QUEENS; done
+  #echo "\n\nNative: ONE QUEENS: EXCEPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
+  #time for ((i=1;i<=$QUALITY;i++)); do ./native_exep.byte $NUMBER_OF_QUEENS; done
+  #echo "\n\nNative: ALL QUEENS ($NUMBER_OF_QUEENS queens) (5 runs)"
+  #time for ((i=1;i<=$QUALITY;i++)); do ./native_all.byte $NUMBER_OF_QUEENS; done
+  #cd ..
+
+  # cd native
+  # echo "\n\n\n\nNATIVE NATIVE ($NUMBER_OF_QUEENS queens)"
+  # echo "\n\nNative: ONE QUEENS: CPS ($NUMBER_OF_QUEENS queens) (5 runs)"
+  # time for ((i=1;i<=$QUALITY;i++)); do ./native_cps.native $NUMBER_OF_QUEENS; done
+  # echo "\n\nNative: ONE QUEENS: OPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
+  # time for ((i=1;i<=$QUALITY;i++)); do ./native_option.native $NUMBER_OF_QUEENS; done
+  # echo "\n\nNative: ONE QUEENS: EXCEPTION ($NUMBER_OF_QUEENS queens) (5 runs)"
+  # time for ((i=1;i<=$QUALITY;i++)); do ./native_exep.native $NUMBER_OF_QUEENS; done
   # echo "\n\nNative: ALL QUEENS ($NUMBER_OF_QUEENS queens) (5 runs)"
-  # time for ((i=1;i<=$QUALITY;i++)); do ./native_all.byte $NUMBER_OF_QUEENS; done
-  cd ..
-done
+  # time for ((i=1;i<=$QUALITY;i++)); do ./native_all.native $NUMBER_OF_QUEENS; done
+  # cd ..
+# done
+
+cd loop
+echo "\n\n\n\nCOMPARISON LOOP MULTICORE-EFF NATIVE"
+echo "\n\nMulticore"
+time for ((i=1;i<=$QUALITY;i++)); do ./multicore.native $NUMBER_OF_QUEENS; done
+echo "\n\nEff"
+time for ((i=1;i<=$QUALITY;i++)); do ./loop.native $NUMBER_OF_QUEENS; done
+cd ..
 
 # cd links
 # echo "\n\n\n\nLINKS"
