@@ -3,7 +3,7 @@ external ( < ) : int -> int -> bool = "<"
 external ( - ) : int -> int -> int = "-"
 external ( + ) : int -> int -> int = "+"
 
-effect Fail : unit -> bool
+effect Fail : unit -> int
 
 let rec loop_latent n =
     if n = 0 then
@@ -15,9 +15,19 @@ let rec loop_latent n =
 
 let latent_handler = handler
 | val y -> y
-| #Fail () k -> k true
+| #Fail () k -> k 0
 
 let test_latent n =
     loop_latent n;;
 
-with latent_handler handle (test_latent 100);;
+let test_once () =
+    with latent_handler handle (test_latent 10000);;
+
+let rec test_many n =
+    if n = 0 then
+        ()
+    else
+        let a = test_once () in
+        test_many (n - 1 + a);;
+
+test_many 10000000
