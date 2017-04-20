@@ -11,10 +11,8 @@ and run_loop_incr = false
 and run_loop_state = false
 and run_queens_one = false
 and run_queens_all = false
-and run_parser = false
-and run_interp = false
-and run_small_interp = true
-and run_range = true
+and run_interp = true
+and run_range = false
 
 let () =
   if run_loop_pure then begin
@@ -103,44 +101,13 @@ let () =
     ]);
   Printf.printf "\n\n"
   end;
-  if run_parser then begin
-  Printf.printf "PARSER BENCHMARK:\n";
-  Command.run (Bench.make_command [
-      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> ParserNoOptImpure._parseTest_91 ());
-      Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> ParserOptImpure._parseTest_91 ());
-      Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> ParserNoOptPure._parseTest_91 ());
-      (* Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> ParserOptPure._parseTest_91 ()); *)
-      Bench.Test.create ~name:"Native" (fun () -> ParserNative.parseTest ());
-    ]);
-  Printf.printf "\n\n"
-  end;
   if run_interp then begin
   Printf.printf "INTERPRETER BENCHMARK:\n";
   Command.run (Bench.make_command [
-      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> InterpNoOptImpure._bigTest_179 ());
-      Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> InterpOptImpure._bigTest_179 ());
-      Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> InterpNoOptPure._bigTest_179 ());
-      (* Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> InterpOptPure._bigTest_179 ()); *)
-      Bench.Test.create ~name:"Native" (fun () -> InterpNative.bigTest ());
-    ]);
-  Printf.printf "\n\n"
-  end;
-  if run_interp then begin
-  Printf.printf "FLAT INTERPRETER BENCHMARK:\n";
-  Command.run (Bench.make_command [
-      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> FlatNoOptImpure._bigTest_201 ());
-      Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> FlatOptImpure._bigTest_201 ());
-      Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> FlatNoOptPure._bigTest_201 ());
-      (* Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> FlatOptPure._bigTest_201 ()); *)
-      (* Bench.Test.create ~name:"Native" (fun () -> FlatNative.bigTest ()); *)
-    ]);
-  Printf.printf "\n\n"
-  end;
-  if run_small_interp then begin
-  Printf.printf "SMALL INTERPRETER BENCHMARK:\n";
-  Command.run (Bench.make_command [
-      Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> Interp_small.bigTest ());
-      (* Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> FlatOptPure._bigTest_201 ()); *)
+      Bench.Test.create ~name:"Generated, impure, not optimized" (fun () -> InterpNoOptImpure._bigTest_38 ());
+      Bench.Test.create ~name:"Generated, impure, optimized" (fun () -> InterpOptImpure._bigTest_38 ());
+      Bench.Test.create ~name:"Generated, pure, not optimized" (fun () -> InterpNoOptPure._bigTest_38 ());
+      Bench.Test.create ~name:"Generated, pure, optimized" (fun () -> InterpOptPure._bigTest_38 ());
       Bench.Test.create ~name:"Native" (fun () -> InterpNative.bigTest ());
     ]);
   Printf.printf "\n\n"
