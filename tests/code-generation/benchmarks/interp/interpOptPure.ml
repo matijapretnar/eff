@@ -182,11 +182,11 @@ let _arithmeticHandler_29 comp =
 let _addCase_31 =
   Add
     ((Add ((Add ((Num 20), (Num 2))), (Mul ((Num 1), (Num 2))))),
-      (Sub ((Add ((Num 2), (Num 2))), (Div ((Num 1), (Num 0))))))
+      (Sub ((Add ((Num 2), (Num 2))), (Div ((Num 1), (Num 10))))))
   
 let rec _createCase_32 _n_33 =
   match _n_33 with
-  | 1 -> Div ((Num 100), (Num 10))
+  | 1 -> Div ((Num 100), (Num 0))
   | _ -> Add (_addCase_31, (_createCase_32 (_n_33 - 1))) 
 let _finalCase_37 = _createCase_32 200 
 let _bigTest_38 () =

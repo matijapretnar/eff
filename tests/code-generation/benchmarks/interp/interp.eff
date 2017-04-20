@@ -50,13 +50,13 @@ let addCase =
         ),
         Sub (
             Add ((Num 2), (Num 2)),
-            Div ((Num 1), (Num 0))
+            Div ((Num 1), (Num 10))
         )
     );;
 
 let rec createCase n =
     begin match n with
-    | 1 -> (Div (Num 100, Num 10))
+    | 1 -> (Div (Num 100, Num 0))
     | _ -> Add (addCase, (createCase (n - 1)))
     end
 

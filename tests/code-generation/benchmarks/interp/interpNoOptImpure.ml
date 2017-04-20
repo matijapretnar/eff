@@ -192,11 +192,11 @@ let _arithmeticHandler_29 c =
 let _addCase_31 =
   Add
     ((Add ((Add ((Num 20), (Num 2))), (Mul ((Num 1), (Num 2))))),
-      (Sub ((Add ((Num 2), (Num 2))), (Div ((Num 1), (Num 0))))))
+      (Sub ((Add ((Num 2), (Num 2))), (Div ((Num 1), (Num 10))))))
   
 let rec _createCase_32 _n_33 =
   match _n_33 with
-  | 1 -> value (Div ((Num 100), (Num 10)))
+  | 1 -> value (Div ((Num 100), (Num 0)))
   | _ ->
       (((_var_3 _n_33) >> (fun _gen_bind_36  -> _gen_bind_36 1)) >>
          (fun _gen_bind_35  -> _createCase_32 _gen_bind_35))
