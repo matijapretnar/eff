@@ -36,6 +36,18 @@ let test_incr n =
 
 (******************************************************************************)
 
+let rec loop_incr' counter n =
+    if n = 0 then
+        ()
+    else
+        (loop_incr' counter (n - 1); incr counter)
+
+let test_incr' n =
+    let counter = ref 0 in
+    loop_incr' counter n
+
+(******************************************************************************)
+
 let rec loop_state state n =
     if n = 0 then
         ()

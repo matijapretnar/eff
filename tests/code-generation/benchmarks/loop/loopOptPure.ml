@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM loop.eff ===
-commit SHA: 03cdc167bd82ae792396973571e61b43009cf73a
+commit SHA: 10c3083ed943a7b344260277712d720fe6044a42
 === BEGIN SOURCE ===
 
 external ( = ) : int -> int -> bool = "="
@@ -50,6 +50,17 @@ let incr_handler = handler
 
 let test_incr n =
     (with incr_handler handle loop_incr n) 0
+
+(******************************************************************************)
+
+let rec loop_incr' n =
+    if n = 0 then
+        ()
+    else
+        (loop_incr' (n - 1); #Incr ())
+
+let test_incr' n =
+    (with incr_handler handle loop_incr' n) 0
 
 (******************************************************************************)
 
@@ -156,8 +167,8 @@ let _incr_handler_30 comp =
       value_clause =
         (fun _y_36  ->
            value
-             (fun _lift_fun_105  ->
-                value ((fun _x_37  -> _x_37) _lift_fun_105)));
+             (fun _lift_fun_195  ->
+                value ((fun _x_37  -> _x_37) _lift_fun_195)));
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
@@ -180,53 +191,81 @@ let _test_incr_38 _n_39 =
     then fun _x_17  -> _x_17
     else (fun _x_33  -> _loop_incr_12 (_n_25 - 1) (_x_33 + 1))  in
   _loop_incr_12 _n_39 0 
+let rec _loop_incr'_41 _n_42 =
+  if _n_42 = 0
+  then value ()
+  else
+    (_loop_incr'_41 (_n_42 - 1)) >>
+      ((fun _  -> call Effect_Incr () (fun _result_36  -> value _result_36)))
+  
+let _test_incr'_47 _n_48 =
+  let rec _loop_incr'_42 _n_42 =
+    if _n_42 = 0
+    then fun _x_46  -> _x_46
+    else
+      (let rec _new_special_var_76 (_n_42,_k_val_75) =
+         if _n_42 = 0
+         then _k_val_75 ()
+         else
+           _new_special_var_76
+             ((_n_42 - 1),
+               (fun _lift_fun_196  ->
+                  
+                    (fun _lift_fun_197  ->
+                       
+                         ((fun _  -> fun _x_121  -> _k_val_75 () (_x_121 + 1))
+                            _lift_fun_196 _lift_fun_197))))
+          in
+       _new_special_var_76 ((_n_42 - 1), (fun _  -> fun _x_71  -> _x_71 + 1)))
+     in
+  _loop_incr'_42 _n_48 0 
 type (_,_) effect +=
   | Effect_Get: (unit,int) effect 
 type (_,_) effect +=
   | Effect_Put: (int,unit) effect 
-let rec _loop_state_41 _n_42 =
-  if _n_42 = 0
+let rec _loop_state_50 _n_51 =
+  if _n_51 = 0
   then value ()
   else
     call Effect_Get ()
-      (fun _result_42  ->
-         call Effect_Put (_result_42 + 1)
-           (fun _result_44  -> _loop_state_41 (_n_42 - 1)))
+      (fun _result_132  ->
+         call Effect_Put (_result_132 + 1)
+           (fun _result_134  -> _loop_state_50 (_n_51 - 1)))
   
-let _state_handler_50 comp =
+let _state_handler_59 comp =
   handler
     {
       value_clause =
-        (fun _y_57  ->
+        (fun _y_66  ->
            value
-             (fun _lift_fun_106  ->
-                value ((fun _x_58  -> _x_58) _lift_fun_106)));
+             (fun _lift_fun_198  ->
+                value ((fun _x_67  -> _x_67) _lift_fun_198)));
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_Get  ->
                (fun (() : unit)  ->
-                  fun (_k_54 : int -> _)  ->
+                  fun (_k_63 : int -> _)  ->
                     value
-                      (fun _s_55  ->
-                         (_k_54 _s_55) >>
-                           (fun _gen_bind_56  -> _gen_bind_56 _s_55)))
+                      (fun _s_64  ->
+                         (_k_63 _s_64) >>
+                           (fun _gen_bind_65  -> _gen_bind_65 _s_64)))
            | Effect_Put  ->
-               (fun (_s'_51 : int)  ->
-                  fun (_k_52 : unit -> _)  ->
+               (fun (_s'_60 : int)  ->
+                  fun (_k_61 : unit -> _)  ->
                     value
                       (fun _  ->
-                         (_k_52 ()) >>
-                           (fun _gen_bind_53  -> _gen_bind_53 _s'_51)))
+                         (_k_61 ()) >>
+                           (fun _gen_bind_62  -> _gen_bind_62 _s'_60)))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b -> _)
                                                                     -> 
                                                                     _)
     } comp
   
-let _test_state_59 _n_60 =
-  let rec _loop_state_53 _n_42 =
-    if _n_42 = 0
-    then fun _x_65  -> _x_65
-    else (fun _s_103  -> _loop_state_53 (_n_42 - 1) (_s_103 + 1))  in
-  _loop_state_53 _n_60 0 
+let _test_state_68 _n_69 =
+  let rec _loop_state_143 _n_51 =
+    if _n_51 = 0
+    then fun _x_155  -> _x_155
+    else (fun _s_193  -> _loop_state_143 (_n_51 - 1) (_s_193 + 1))  in
+  _loop_state_143 _n_69 0 

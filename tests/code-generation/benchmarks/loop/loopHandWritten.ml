@@ -115,6 +115,15 @@ let incr_handler = handler {
 let test_incr n =
     incr_handler (loop_incr n) 0
 
+let rec loop_incr' n =
+    if n = 0 then
+        value ()
+    else
+        loop_incr' (n - 1) >> fun _ -> incr ()
+
+let test_incr' n =
+    incr_handler (loop_incr' n) 0
+
 (******************************************************************************)
 
 type (_, _) effect += Effect_get: (unit, int) effect

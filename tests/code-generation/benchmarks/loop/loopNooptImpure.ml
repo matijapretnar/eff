@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM loop.eff ===
-commit SHA: 03cdc167bd82ae792396973571e61b43009cf73a
+commit SHA: 10c3083ed943a7b344260277712d720fe6044a42
 === BEGIN SOURCE ===
 
 external ( = ) : int -> int -> bool = "="
@@ -50,6 +50,17 @@ let incr_handler = handler
 
 let test_incr n =
     (with incr_handler handle loop_incr n) 0
+
+(******************************************************************************)
+
+let rec loop_incr' n =
+    if n = 0 then
+        ()
+    else
+        (loop_incr' (n - 1); #Incr ())
+
+let test_incr' n =
+    (with incr_handler handle loop_incr' n) 0
 
 (******************************************************************************)
 
@@ -205,46 +216,60 @@ let _test_incr_38 _n_39 =
   (_incr_handler_30 (_loop_incr_24 _n_39)) >>
     (fun _gen_bind_40  -> _gen_bind_40 0)
   
-type (_,_) effect +=
-  | Effect_Get: (unit,int) effect 
-type (_,_) effect +=
-  | Effect_Put: (int,unit) effect 
-let rec _loop_state_41 _n_42 =
+let rec _loop_incr'_41 _n_42 =
   ((_var_1 _n_42) >> (fun _gen_bind_44  -> _gen_bind_44 0)) >>
     (fun _gen_bind_43  ->
        match _gen_bind_43 with
        | true  -> value ()
        | false  ->
+           (((_var_3 _n_42) >> (fun _gen_bind_46  -> _gen_bind_46 1)) >>
+              (fun _gen_bind_45  -> _loop_incr'_41 _gen_bind_45))
+             >> ((fun _  -> (effect Effect_Incr) ())))
+  
+let _test_incr'_47 _n_48 =
+  (_incr_handler_30 (_loop_incr'_41 _n_48)) >>
+    (fun _gen_bind_49  -> _gen_bind_49 0)
+  
+type (_,_) effect +=
+  | Effect_Get: (unit,int) effect 
+type (_,_) effect +=
+  | Effect_Put: (int,unit) effect 
+let rec _loop_state_50 _n_51 =
+  ((_var_1 _n_51) >> (fun _gen_bind_53  -> _gen_bind_53 0)) >>
+    (fun _gen_bind_52  ->
+       match _gen_bind_52 with
+       | true  -> value ()
+       | false  ->
            (((((effect Effect_Get) ()) >>
-                (fun _gen_bind_47  -> _var_4 _gen_bind_47))
-               >> (fun _gen_bind_46  -> _gen_bind_46 1))
-              >> (fun _gen_bind_45  -> (effect Effect_Put) _gen_bind_45))
+                (fun _gen_bind_56  -> _var_4 _gen_bind_56))
+               >> (fun _gen_bind_55  -> _gen_bind_55 1))
+              >> (fun _gen_bind_54  -> (effect Effect_Put) _gen_bind_54))
              >>
              ((fun _  ->
-                 ((_var_3 _n_42) >> (fun _gen_bind_49  -> _gen_bind_49 1)) >>
-                   (fun _gen_bind_48  -> _loop_state_41 _gen_bind_48))))
+                 ((_var_3 _n_51) >> (fun _gen_bind_58  -> _gen_bind_58 1)) >>
+                   (fun _gen_bind_57  -> _loop_state_50 _gen_bind_57))))
   
-let _state_handler_50 c =
+let _state_handler_59 c =
   handler
     {
-      value_clause = (fun _y_57  -> value (fun _x_58  -> value _x_58));
+      value_clause = (fun _y_66  -> value (fun _x_67  -> value _x_67));
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_Get  ->
                (fun (() : unit)  ->
-                  fun (_k_54 : int -> _ computation)  ->
+                  fun (_k_63 : int -> _ computation)  ->
                     value
-                      (fun _s_55  ->
-                         (_k_54 _s_55) >>
-                           (fun _gen_bind_56  -> _gen_bind_56 _s_55)))
+                      (fun _s_64  ->
+                         (_k_63 _s_64) >>
+                           (fun _gen_bind_65  -> _gen_bind_65 _s_64)))
            | Effect_Put  ->
-               (fun (_s'_51 : int)  ->
-                  fun (_k_52 : unit -> _ computation)  ->
+               (fun (_s'_60 : int)  ->
+                  fun (_k_61 : unit -> _ computation)  ->
                     value
                       (fun _  ->
-                         (_k_52 ()) >>
-                           (fun _gen_bind_53  -> _gen_bind_53 _s'_51)))
+                         (_k_61 ()) >>
+                           (fun _gen_bind_62  -> _gen_bind_62 _s'_60)))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b ->
                                                                     _
@@ -254,7 +279,7 @@ let _state_handler_50 c =
                                                                     computation)
     } c
   
-let _test_state_59 _n_60 =
-  (_state_handler_50 (_loop_state_41 _n_60)) >>
-    (fun _gen_bind_61  -> _gen_bind_61 0)
+let _test_state_68 _n_69 =
+  (_state_handler_59 (_loop_state_50 _n_69)) >>
+    (fun _gen_bind_70  -> _gen_bind_70 0)
   

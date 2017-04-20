@@ -1,6 +1,6 @@
 (*
 === GENERATED FROM loop.eff ===
-commit SHA: 03cdc167bd82ae792396973571e61b43009cf73a
+commit SHA: 10c3083ed943a7b344260277712d720fe6044a42
 === BEGIN SOURCE ===
 
 external ( = ) : int -> int -> bool = "="
@@ -50,6 +50,17 @@ let incr_handler = handler
 
 let test_incr n =
     (with incr_handler handle loop_incr n) 0
+
+(******************************************************************************)
+
+let rec loop_incr' n =
+    if n = 0 then
+        ()
+    else
+        (loop_incr' (n - 1); #Incr ())
+
+let test_incr' n =
+    (with incr_handler handle loop_incr' n) 0
 
 (******************************************************************************)
 
@@ -193,41 +204,72 @@ let _test_incr_38 _n_39 =
                (run ((run (lift_binary (+) _x_33)) 1)))
      in
   (run (_loop_incr_12 _n_39)) 0 
+let rec _loop_incr'_41 _n_42 =
+  match run ((run (lift_binary (=) _n_42)) 0) with
+  | true  -> value ()
+  | false  ->
+      (_loop_incr'_41 (run ((run (lift_binary (-) _n_42)) 1))) >>
+        ((fun _  -> call Effect_Incr () (fun _result_36  -> value _result_36)))
+  
+let _test_incr'_47 _n_48 =
+  let rec _loop_incr'_42 _n_42 =
+    match run ((run (lift_binary (=) _n_42)) 0) with
+    | true  -> value (fun _x_46  -> value _x_46)
+    | false  ->
+        let rec _new_special_var_76 (_n_42,_k_val_75) =
+          match run ((run (lift_binary (=) _n_42)) 0) with
+          | true  -> _k_val_75 ()
+          | false  ->
+              _new_special_var_76
+                ((run ((run (lift_binary (-) _n_42)) 1)),
+                  (fun _  ->
+                     value
+                       (fun _x_121  ->
+                          (run (_k_val_75 ()))
+                            (run ((run (lift_binary (+) _x_121)) 1)))))
+           in
+        _new_special_var_76
+          ((run ((run (lift_binary (-) _n_42)) 1)),
+            (fun _  ->
+               value
+                 (fun _x_71  -> value (run ((run (lift_binary (+) _x_71)) 1)))))
+     in
+  (run (_loop_incr'_42 _n_48)) 0 
 type (_,_) effect +=
   | Effect_Get: (unit,int) effect 
 type (_,_) effect +=
   | Effect_Put: (int,unit) effect 
-let rec _loop_state_41 _n_42 =
-  match run ((run (lift_binary (=) _n_42)) 0) with
+let rec _loop_state_50 _n_51 =
+  match run ((run (lift_binary (=) _n_51)) 0) with
   | true  -> value ()
   | false  ->
       call Effect_Get ()
-        (fun _result_42  ->
-           call Effect_Put (run ((run (lift_binary (+) _result_42)) 1))
-             (fun _result_44  ->
-                _loop_state_41 (run ((run (lift_binary (-) _n_42)) 1))))
+        (fun _result_132  ->
+           call Effect_Put (run ((run (lift_binary (+) _result_132)) 1))
+             (fun _result_134  ->
+                _loop_state_50 (run ((run (lift_binary (-) _n_51)) 1))))
   
-let _state_handler_50 c =
+let _state_handler_59 c =
   handler
     {
-      value_clause = (fun _y_57  -> value (fun _x_58  -> value _x_58));
+      value_clause = (fun _y_66  -> value (fun _x_67  -> value _x_67));
       effect_clauses = fun (type a) -> fun (type b) ->
         fun (x : (a,b) effect)  ->
           (match x with
            | Effect_Get  ->
                (fun (() : unit)  ->
-                  fun (_k_54 : int -> _ computation)  ->
+                  fun (_k_63 : int -> _ computation)  ->
                     value
-                      (fun _s_55  ->
-                         (_k_54 _s_55) >>
-                           (fun _gen_bind_56  -> _gen_bind_56 _s_55)))
+                      (fun _s_64  ->
+                         (_k_63 _s_64) >>
+                           (fun _gen_bind_65  -> _gen_bind_65 _s_64)))
            | Effect_Put  ->
-               (fun (_s'_51 : int)  ->
-                  fun (_k_52 : unit -> _ computation)  ->
+               (fun (_s'_60 : int)  ->
+                  fun (_k_61 : unit -> _ computation)  ->
                     value
                       (fun _  ->
-                         (_k_52 ()) >>
-                           (fun _gen_bind_53  -> _gen_bind_53 _s'_51)))
+                         (_k_61 ()) >>
+                           (fun _gen_bind_62  -> _gen_bind_62 _s'_60)))
            | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
                                                                     (b ->
                                                                     _
@@ -237,14 +279,14 @@ let _state_handler_50 c =
                                                                     computation)
     } c
   
-let _test_state_59 _n_60 =
-  let rec _loop_state_53 _n_42 =
-    match run ((run (lift_binary (=) _n_42)) 0) with
-    | true  -> value (fun _x_65  -> value _x_65)
+let _test_state_68 _n_69 =
+  let rec _loop_state_143 _n_51 =
+    match run ((run (lift_binary (=) _n_51)) 0) with
+    | true  -> value (fun _x_155  -> value _x_155)
     | false  ->
         value
-          (fun _s_103  ->
-             (run (_loop_state_53 (run ((run (lift_binary (-) _n_42)) 1))))
-               (run ((run (lift_binary (+) _s_103)) 1)))
+          (fun _s_193  ->
+             (run (_loop_state_143 (run ((run (lift_binary (-) _n_51)) 1))))
+               (run ((run (lift_binary (+) _s_193)) 1)))
      in
-  (run (_loop_state_53 _n_60)) 0 
+  (run (_loop_state_143 _n_69)) 0 

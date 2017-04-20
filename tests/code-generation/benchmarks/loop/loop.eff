@@ -48,6 +48,17 @@ let test_incr n =
 
 (******************************************************************************)
 
+let rec loop_incr' n =
+    if n = 0 then
+        ()
+    else
+        (loop_incr' (n - 1); #Incr ())
+
+let test_incr' n =
+    (with incr_handler handle loop_incr' n) 0
+
+(******************************************************************************)
+
 effect Get: unit -> int
 effect Put: int -> unit
 
