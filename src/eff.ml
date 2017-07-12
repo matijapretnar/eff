@@ -99,17 +99,20 @@ let main =
     begin match !Config.wrapper with
       | None -> ()
       | Some lst ->
-          let n = Array.length Sys.argv + 2 in
-          let args = Array.make n "" in
-            Array.blit Sys.argv 0 args 1 (n - 2);
-            args.(n - 1) <- "--no-wrapper";
-            List.iter
-              (fun wrapper ->
-                 try
-                   args.(0) <- wrapper;
-                   Unix.execvp wrapper args
-                 with Unix.Unix_error _ -> ())
-              lst
+          if not (Array.mem "--no-wrapper" Sys.argv) then
+            let n = Array.length Sys.argv + 2 in
+            let args = Array.make n "" in
+              Array.blit Sys.argv 0 args 1 (n - 2);
+              args.(n - 1) <- "--no-wrapper";
+              List.iter
+                (fun wrapper ->
+                   try
+                     args.(0) <- wrapper;
+                     Unix.execvp wrapper args
+                   with Unix.Unix_error _ -> ())
+                lst
+          else
+            ( )
     end;
   (* Files were listed in the wrong order, so we reverse them *)
   files := List.rev !files;
