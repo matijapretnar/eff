@@ -1,5 +1,5 @@
 let usage = "Usage: eff [option] ... [file] ..."
-let wrapper = ref (Some ["rlwrap"; "ledit"])
+let wrapper = Config.wrapper
 
 
 (* A list of files to be loaded and run. *)
