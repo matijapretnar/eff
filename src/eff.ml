@@ -1,6 +1,4 @@
 let usage = "Usage: eff [option] ... [file] ..."
-let wrapper = ref (Some ["rlwrap"; "ledit"])
-
 
 (* A list of files to be loaded and run. *)
 let files = ref []
@@ -27,10 +25,10 @@ let options = Arg.align [
     Arg.Clear Config.smart_print,
     " Disable smart printing of type schemes");
   ("--wrapper",
-    Arg.String (fun str -> wrapper := Some [str]),
+    Arg.String (fun str -> Config.wrapper := Some [str]),
     "<program> Specify a command-line wrapper to be used (such as rlwrap or ledit)");
   ("--no-wrapper",
-    Arg.Unit (fun () -> wrapper := None),
+    Arg.Unit (fun () -> Config.wrapper := None),
     " Do not use a command-line wrapper");
   ("--ascii",
     Arg.Set Config.ascii,
