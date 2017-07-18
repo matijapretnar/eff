@@ -6,6 +6,8 @@
 *)
 open Typed
 
+let x = Types.PrimTy BoolTy;;
+
 type state = {
   inlinable : (Typed.variable, unit -> Typed.expression) Common.assoc;
   stack : (Typed.variable, Typed.expression) Common.assoc;

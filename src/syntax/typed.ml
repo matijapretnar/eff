@@ -1,5 +1,7 @@
 (** Syntax of the core language. *)
 
+open Types
+
 module Variable = Symbol.Make(Symbol.String)
 module EffectMap = Map.Make(String)
 
@@ -52,6 +54,11 @@ and plain_expression =
   | Effect of effect
   | Handler of handler
   | FinallyHandler of (handler * abstraction)
+  | CastExp of expression * ty_coercion
+  | ApplyTy of expression * target_ty
+  | ApplyDirt of expression * Types.dirt
+  | ApplyTyCoercion of expression * ty_coercion
+  | ApplyDirtCoercion of expression * dirt_coercion
 
 (** Impure computations *)
 and computation = (plain_computation, Scheme.dirty_scheme) annotation
@@ -63,6 +70,25 @@ and plain_computation =
   | Handle of expression * computation
   | Call of effect * expression * abstraction
   | Bind of computation * abstraction
+  | CastComp of computation * dirty_coercion
+
+and ty_coercion =
+  | ReflInt
+  | ReflBool
+  | RefTy of Params.ty_param
+  | ArrowCoersion of ty_coercion * dirty_coercion
+  | HandlerCoersion of dirty_coercion * dirty_coercion
+  | TyCoercionVar of Params.ty_coercion_param
+  | Connect of  ty_coercion * ty_coercion
+
+and dirt_coercion = 
+  | ReflDirt of Params.dirt_param
+  | DirtCoercionVar of Params.dirt_coercion_param
+  | Empty
+  | Union of ( Common.effect * dirt_coercion)
+  | Connect of dirt_coercion * dirt_coercion
+
+and dirty_coercion = ty_coercion * dirt_coercion
 
 (** Handler definitions *)
 and handler = {

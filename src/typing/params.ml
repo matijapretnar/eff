@@ -1,10 +1,17 @@
 type ty_param = int
 type dirt_param = int
 type region_param = int
+type ty_coercion_param = int
+type dirt_coercion_param = int
+type dirty_coercion_param = int
 
 let fresh_ty_param = Common.fresh Common.id
 let fresh_dirt_param = Common.fresh Common.id
 let fresh_region_param = Common.fresh Common.id
+let fresh_ty_coercion_param = Common.fresh Common.id
+let fresh_dirty_coercion_param = Common.fresh Common.id
+let fresh_dirt_coercion_param = Common.fresh Common.id
+
 
 type t = ty_param list * dirt_param list * region_param list
 

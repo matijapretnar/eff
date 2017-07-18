@@ -1,10 +1,16 @@
 type ty_param
 type dirt_param
 type region_param
+type ty_coercion_param
+type dirt_coercion_param
+type dirty_coercion_param
 
 val fresh_ty_param : unit -> ty_param
 val fresh_dirt_param : unit -> dirt_param
 val fresh_region_param : unit -> region_param
+val fresh_ty_coercion_param: unit -> ty_coercion_param
+val fresh_dirt_coercion_param: unit -> dirt_coercion_param
+val fresh_dirty_coercion_param: unit -> dirty_coercion_param
 
 type t
 
