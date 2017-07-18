@@ -93,11 +93,11 @@ let (Handler ht) = h.term in
 let (Handler h't) = h'.term in 
  assoc_equal (alphaeq_abs2 eqvars) ht.effect_clauses h't.effect_clauses
 
-let is_pure c =
-  Scheme.is_surely_pure c.Typed.scheme
+let is_pure c = false
+(*   Scheme.is_surely_pure c.Typed.scheme *)
 
-let is_pure_for_handler c clauses =
-  Scheme.is_surely_pure_for_handler c.Typed.scheme (List.map (fun ((eff, _), _) -> eff) clauses)
+let is_pure_for_handler c clauses = false
+(*   Scheme.is_surely_pure_for_handler c.Typed.scheme (List.map (fun ((eff, _), _) -> eff) clauses) *)
 
 let find_in_handlers_func_mem st f_name h_exp =
   let loc = h_exp.location in 
@@ -307,8 +307,6 @@ and optimize_sub_expr st e =
     tuple ~loc (List.map (optimize_expr st) lst)
   | Lambda a ->
     lambda ~loc (optimize_abs st a)
-  | Pure c ->
-    pure ~loc (optimize_comp st c)
   | Handler h ->
     handler ~loc {
       effect_clauses = Common.assoc_map (optimize_abs2 st) h.effect_clauses;
@@ -385,8 +383,6 @@ and reduce_expr st e =
     (* Body is already reduced and it's a lambda *)
     res
 
-  | Pure {term = Value e} -> e
-
   | _ -> e
   in
   (* if e <> e' then *)
@@ -410,11 +406,11 @@ and reduce_comp st c =
     in
     find_const_case cases
 
-  | Bind (c1, c2) when is_pure c1 ->
+(*   | Bind (c1, c2) when is_pure c1 ->
     useFuel st;
     st.optimization_Do_Ret := !(st.optimization_Do_Ret ) + 1;
     st.optimization_total := !(st.optimization_total) + 1;
-    beta_reduce st c2 (reduce_expr st (pure c1))
+    beta_reduce st c2 (reduce_expr st ( c1)) *)
 
   | Bind ({term = Bind (c1, {term = (p1, c2)})}, c3) ->
     useFuel st;
@@ -486,11 +482,11 @@ and reduce_comp st c =
     } in
     reduce_comp st (handle (refresh_expr hdlr) (refresh_comp c1))
 
-  | Handle ({term = Handler h}, c) when is_pure c ->
+(*   | Handle ({term = Handler h}, c) when is_pure c ->
     useFuel st;
     st.optimization_handler_With_Pure := !(st.optimization_handler_With_Pure) + 1;
     st.optimization_total := !(st.optimization_total) + 1;
-    beta_reduce st h.value_clause (reduce_expr st (pure c))
+    beta_reduce st h.value_clause (reduce_expr st (pure c)) *)
 
   | Handle ({term = Handler h} as handler, {term = Call (eff, param, k)}) ->
     useFuel st;
@@ -519,13 +515,13 @@ and reduce_comp st c =
     st.optimization_total := !(st.optimization_total) + 1;
     beta_reduce st a e
 
-  | Apply ({term = Pure {term = LetRec (defs,c)}}, e) ->
+(*   | Apply ({term = Pure {term = LetRec (defs,c)}}, e) ->
     useFuel st;
     st.optimization_App_Fun := !(st.optimization_App_Fun ) + 1;
     st.optimization_total := !(st.optimization_total) + 1;
     let_rec' defs (apply (pure c) e)
-
-  | Apply ({term = Var v}, e2) ->
+ *)
+(*   | Apply ({term = Var v}, e2) ->
     begin match Common.lookup v st.impure_wrappers with
       | Some f ->
         useFuel st;
@@ -537,7 +533,7 @@ and reduce_comp st c =
         reduce_comp st res
       | None -> c
     end
-
+ *)
 
   | Handle (e1, {term = Apply (ae1, ae2)}) ->
     useFuel st;

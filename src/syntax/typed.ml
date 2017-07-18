@@ -52,7 +52,6 @@ and plain_expression =
   | Effect of effect
   | Handler of handler
   | FinallyHandler of (handler * abstraction)
-  | Pure of computation
 
 (** Impure computations *)
 and computation = (plain_computation, Scheme.dirty_scheme) annotation
@@ -62,8 +61,6 @@ and plain_computation =
   | Match of expression * abstraction list
   | Apply of expression * expression
   | Handle of expression * computation
-
-
   | Call of effect * expression * abstraction
   | Bind of computation * abstraction
 
@@ -139,8 +136,6 @@ let rec print_expression ?max_level e ppf =
       (print_effect_clauses h.effect_clauses)
   | Effect eff ->
     print ~at_level:2 "effect %t" (print_effect eff)
-  | Pure c ->
-    print ~at_level:1 "pure %t" (print_computation ~max_level:0 c)
 
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -284,8 +279,6 @@ and refresh_expr' sbst = function
       | Some x' -> Var x'
       | None -> e
     end
-  | Pure c ->
-    Pure (refresh_comp sbst c)
   | Lambda a ->
     Lambda (refresh_abs sbst a)
   | Handler h ->
@@ -344,8 +337,6 @@ and subst_expr' sbst = function
       | Some e' -> e'
       | None -> e
     end
-  | Pure c ->
-    Pure (subst_comp sbst c)
   | Lambda a ->
     Lambda (subst_abs sbst a)
   | Handler h ->
@@ -422,8 +413,6 @@ let rec wrap_up_expr st e =
            scheme
   }
 and wrap_up_expr' scheme st = function
-  | Pure c ->
-    Pure (wrap_up_comp st c)
   | Lambda a ->
     Lambda (wrap_up_abs st a)
   | Handler h ->
@@ -578,8 +567,6 @@ and alphaeq_expr' eqvars e e' =
     Const.equal cst cst'
   | Effect eff, Effect eff' ->
     eff = eff'
-  | Pure c, Pure c' ->
-    alphaeq_comp eqvars c c'
   | _, _ -> false
 and alphaeq_comp eqvars c c' =
   alphaeq_comp' eqvars c.term c'.term
@@ -844,17 +831,6 @@ let finally_handler ?loc h finally_clause =
     location = loc;
   }
 
-let pure ?loc c =
-  (* XXX We are just throwing away the dirt, but we should check that it is empty
-     and maybe recompute the constraints, though that likely won't be necessary
-     in case the dirt is pure *)
-  let loc = backup_location loc [c.location] in
-  let ctx, (ty, _), constraints = c.scheme in
-  {
-    term = Pure c;
-    scheme = (ctx, ty, constraints);
-    location = loc
-  }
 
 let match' ?loc e cases =
   let loc = backup_location loc (
@@ -1087,7 +1063,6 @@ let rec free_vars_comp c =
 and free_vars_expr e =
   match e.term with
   | Var v -> ([], [v])
-  | Pure c -> free_vars_comp c
   | Tuple es -> concat_vars (List.map free_vars_expr es)
   | Lambda a -> free_vars_abs a
   | Handler h -> free_vars_handler h
