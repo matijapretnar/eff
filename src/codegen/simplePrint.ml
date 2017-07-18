@@ -50,8 +50,6 @@ and print_computation ?max_level c ppf =
   | Typed.LetRec (lst, c) ->
       print ~at_level:2 "let rec @[<hov>%t@] in %t"
       (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
-  | Typed.Check c' ->
-      print ~at_level:1 "check %S %t" (Common.to_string Location.print c.Typed.location) (print_computation ~max_level:0 c')
   | Typed.Call (eff, e, a) ->
       print ~at_level:1 "call %t %t (@[fun %t@])"
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)

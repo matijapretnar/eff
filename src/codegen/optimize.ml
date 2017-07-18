@@ -353,8 +353,6 @@ and optimize_sub_comp st c =
     apply ~loc (optimize_expr st e1) (optimize_expr st e2)
   | Handle (e, c1) ->
     handle ~loc (optimize_expr st e) (optimize_comp st c1)
-  | Check c1 ->
-    check ~loc (optimize_comp st c1)
   | Call (eff, e1, a1) ->
     call ~loc eff (optimize_expr st e1) (optimize_abs st a1)
   | Bind (c1, a1) ->
