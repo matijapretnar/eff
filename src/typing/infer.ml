@@ -134,7 +134,7 @@ let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
             let ty = Type.fresh_ty () in
             params := Common.update x ty !params;
             ty
-          | Some ty -> ty 
+          | Some ty -> ty
           end in
           ([(x, ty)], ty, Constraints.empty)
         end
@@ -173,8 +173,6 @@ and type_comp env {Untyped.term=comp; Untyped.location=loc} =
       Typed.apply ~loc (type_expr env e1) (type_expr env e2)
     | Untyped.Handle (e, c) ->
       Typed.handle ~loc (type_expr env e) (type_comp env c)
-    | Untyped.Check c ->
-      Typed.check ~loc (type_comp env c)
     | Untyped.Let (defs, c) ->
       let env', defs' = type_let_defs ~loc env defs in
       Typed.let' ~loc defs' (type_comp env' c)

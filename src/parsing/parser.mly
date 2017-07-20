@@ -54,7 +54,6 @@ let collect_handler_clauses clauses =
                                                                                                                         %token AMPER AMPERAMPER
                                                                                                                         %token LAND LOR LXOR
                                                                                                                         %token <string> PREFIXOP INFIXOP0 INFIXOP1 INFIXOP2 INFIXOP3 INFIXOP4
-                                                                                                                                        %token CHECK
                                                                                                                                         %token QUIT USE HELP RESET
                                                                                                                                         %token EOF
 
@@ -186,7 +185,7 @@ let collect_handler_clauses clauses =
         }
 | t1 = binop_term CONS t2 = binop_term
     { Variant (Common.cons, Some (Tuple [t1; t2], Location.make $startpos $endpos)) }
-| t = plain_uminus_term 
+| t = plain_uminus_term
     { t }
 
     uminus_term: mark_position(plain_uminus_term) { $1 }
@@ -201,8 +200,6 @@ let collect_handler_clauses clauses =
     { t }
 
     plain_app_term:
-    | CHECK t = prefix_term
-        { Check t }
 | t = prefix_term ts = prefix_term+
                        {
                          match fst t, ts with

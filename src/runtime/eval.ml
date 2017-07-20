@@ -79,11 +79,6 @@ let rec ceval env c =
     let env = extend_let_rec env defs in
     ceval env c
 
-  | Typed.Check c ->
-    let r = ceval env c in
-    Print.check ~loc "%t" (Value.print_result r);
-    V.unit_result
-
 and extend_let_rec env defs =
   let env' = ref env in
   let env = List.fold_right

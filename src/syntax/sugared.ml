@@ -37,8 +37,6 @@ and plain_term =
   (** [t1 t2] *)
   | Handle of term * term
   (** [with t1 handle t2] *)
-  | Check of term
-  (** [check t] *)
 
 and handler = {
   effect_clauses : (effect, abstraction2) Common.assoc;
@@ -104,4 +102,3 @@ and plain_toplevel =
   (** [#quit] *)
   | TypeOf of term
   (** [#type t] *)
-

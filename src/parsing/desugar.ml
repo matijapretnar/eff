@@ -81,7 +81,7 @@ let fill_args_tydef def =
     let params, ty = fill_args ty in
     params, Sugared.TyInline ty
 
-(* Desugar a type, where only the given type, dirt and region parameters may appear. 
+(* Desugar a type, where only the given type, dirt and region parameters may appear.
    If a type application with missing dirt and region parameters is encountered,
    it uses [ds] and [rs] instead. This is used in desugaring of recursive type definitions
    where we need to figure out which type and dirt parameters are missing in a type defnition.
@@ -96,7 +96,7 @@ let ty (ts, ds, rs) =
       and (drts, rgns) = begin match drts_rgns with
         | Some (drts, rgns) -> (List.map (dirt loc) drts, List.map (region loc) rgns)
         | None -> (List.map (fun (_, d) -> Type.simple_dirt d) ds, List.map (fun (_, r) -> r) rs)
-      end 
+      end
       in
       T.Apply (t, (tys, drts, rgns))
     | Sugared.TyParam t ->
@@ -164,7 +164,7 @@ let tydef params d =
 
 (** [tydefs defs] desugars the simultaneous type definitions [defs]. *)
 let tydefs defs =
-  (* The first thing to do is to fill the missing dirt and region parameters. 
+  (* The first thing to do is to fill the missing dirt and region parameters.
      At the end [ds] and [rs] hold the newly introduces dirt and region parameters.
      These become parameters to type definitions in the second stage. *)
   let ds, rs, defs =
@@ -260,7 +260,7 @@ let rec expression ctx (t, loc) =
     (* Terms that are desugared into computations. We list them explicitly in
        order to catch any future constructs. *)
     | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
-    | Sugared.Handle _ | Sugared.Conditional _ | Sugared.Check _ ->
+    | Sugared.Handle _ | Sugared.Conditional _ ->
       let x = fresh_variable (Some "gen_bind") in
       let c = computation ctx (t, loc) in
       let w = [Untyped.add_loc (Untyped.PVar x) loc, c] in
@@ -301,8 +301,6 @@ and computation ctx (t, loc) =
       let c1 = computation ctx t1 in
       let c2 = computation ctx t2 in
       w, if_then_else e c1 c2
-    | Sugared.Check t ->
-      [], Untyped.Check (computation ctx t)
     | Sugared.Let (defs, t) ->
       let ctx', defs, _ =
         List.fold_right (fun (p, c) (ctx', defs, forbidden) ->
@@ -457,4 +455,3 @@ and plain_toplevel = function
   | Sugared.TypeOf t ->
     let c = top_computation t in
     Untyped.TypeOf c
-

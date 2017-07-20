@@ -62,7 +62,6 @@ and plain_computation =
   | Match of expression * abstraction list
   | Apply of expression * expression
   | Handle of expression * computation
-  | Check of computation
 
   | Call of effect * expression * abstraction
   | Bind of computation * abstraction
@@ -158,8 +157,6 @@ and print_computation ?max_level c ppf =
   | LetRec (lst, c) ->
     print ~at_level:2 "let rec @[<hov>%t@] in %t"
       (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
-  | Check c' ->
-    print ~at_level:1 "check %S %t" (Common.to_string Location.print c.location) (print_computation ~max_level:0 c')
   | Call (eff, e, a) ->
     print ~at_level:1 "call %t %t (@[fun %t@])"
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
@@ -274,7 +271,7 @@ and refresh_pattern' sbst = function
   | PVariant (lbl, None) ->
     sbst, PVariant (lbl, None)
   | PVariant (lbl, Some p) ->
-    let sbst, p' = refresh_pattern sbst p in 
+    let sbst, p' = refresh_pattern sbst p in
     sbst, PVariant (lbl, Some p')
   | (PConst _ | PNonbinding) as p -> sbst, p
 
@@ -321,8 +318,6 @@ and refresh_comp' sbst = function
     Apply (refresh_expr sbst e1, refresh_expr sbst e2)
   | Handle (e, c) ->
     Handle (refresh_expr sbst e, refresh_comp sbst c)
-  | Check c ->
-    Check (refresh_comp sbst c)
   | Call (eff, e, a) ->
     Call (eff, refresh_expr sbst e, refresh_abs sbst a)
   | Value e ->
@@ -333,7 +328,7 @@ and refresh_handler sbst h = {
 }
 and refresh_finally_handler sbst (h, finally_clause) =
   (refresh_handler sbst h, refresh_abs sbst finally_clause)
-and refresh_abs sbst a = 
+and refresh_abs sbst a =
   let (p, c) = a.term in
   let sbst, p' = refresh_pattern sbst p in
   {a with term = (p', refresh_comp sbst c)}
@@ -381,8 +376,6 @@ and subst_comp' sbst = function
     Apply (subst_expr sbst e1, subst_expr sbst e2)
   | Handle (e, c) ->
     Handle (subst_expr sbst e, subst_comp sbst c)
-  | Check c ->
-    Check (subst_comp sbst c)
   | Call (eff, e, a) ->
     Call (eff, subst_expr sbst e, subst_abs sbst a)
   | Value e ->
@@ -393,7 +386,7 @@ and subst_handler sbst h = {
 }
 and subst_finally_handler sbst (h, finally_clause) =
   (subst_handler sbst h, subst_abs sbst finally_clause)
-and subst_abs sbst a = 
+and subst_abs sbst a =
   let (p, c) = a.term in
   (* XXX Should we check that p & sbst have disjoint variables? *)
   {a with term = (p, subst_comp sbst c)}
@@ -403,7 +396,7 @@ and subst_abs2 sbst a2 =
 
 type wrap_up_state = {
   constraints: Constraints.t;
-  less_context: Scheme.context; 
+  less_context: Scheme.context;
 }
 
 let initial_wrap_up_state = {
@@ -488,8 +481,6 @@ and wrap_up_comp' st = function
       Apply (wrap_up_expr st e1, wrap_up_expr st e2)
     | Handle (e, c) ->
       Handle (wrap_up_expr st e, wrap_up_comp st c)
-    | Check c ->
-      Check (wrap_up_comp st c)
     | Call (eff, e, a) ->
       Call (eff, wrap_up_expr st e, wrap_up_abs st a)
     | Value e ->
@@ -500,7 +491,7 @@ and wrap_up_handler drty_out st h = {
 }
 and wrap_up_finally_handler drty_out st (h, finally_clause) =
   (wrap_up_handler drty_out st h, wrap_up_abs st finally_clause)
-and wrap_up_abs st a = 
+and wrap_up_abs st a =
   let (p, c) = a.term in
   let (ctx_p, _, constraints_p) = p.scheme in
   let st' = {
@@ -604,8 +595,6 @@ and alphaeq_comp' eqvars c c' =
     alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2'
   | Handle (e, c), Handle (e', c') ->
     alphaeq_expr eqvars e e' && alphaeq_comp eqvars c c'
-  | Check c, Check c' ->
-    alphaeq_comp eqvars c c'
   | Call (eff, e, a), Call (eff', e', a') ->
     eff = eff' && alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a'
   | Value e, Value e' ->
@@ -924,14 +913,6 @@ let handle ?loc e c =
     location = loc;
   }
 
-let check ?loc c =
-  let loc = backup_location loc [c.location] in
-  {
-    term = Check c;
-    scheme = ([], (Type.unit_ty, Type.fresh_dirt ()), Constraints.empty);
-    location = loc;
-  }
-
 let let_defs ~loc defs =
   let drt = Type.fresh_dirt () in
   let add_binding (p, c) (poly_tys, nonpoly_tys, ctx, chngs, defs) =
@@ -942,7 +923,7 @@ let let_defs ~loc defs =
       | Value _ ->
         ctx_p @ poly_tys, nonpoly_tys
       | Apply _ | Match _ | Handle _ | LetRec _
-      | Check _ | Bind _ | Call _ ->
+      | Bind _ | Call _ ->
         poly_tys, ctx_p @ nonpoly_tys
     in
     poly_tys, nonpoly_tys, ctx_c @ ctx, [
@@ -1101,7 +1082,6 @@ let rec free_vars_comp c =
   | Match (e, li) -> free_vars_expr e @@@ concat_vars (List.map free_vars_abs li)
   | Apply (e1, e2) -> free_vars_expr e1 @@@ free_vars_expr e2
   | Handle (e, c1) -> free_vars_expr e @@@ free_vars_comp c1
-  | Check c1 -> free_vars_comp c1
   | Call (_, e1, a1) -> free_vars_expr e1 @@@ free_vars_abs a1
   | Bind (c1, a1) -> free_vars_comp c1 @@@ free_vars_abs a1
 and free_vars_expr e =

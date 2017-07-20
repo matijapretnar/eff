@@ -47,7 +47,6 @@ and plain_computation =
   | Match of expression * abstraction list
   | Apply of expression * expression
   | Handle of expression * computation
-  | Check of computation
 
 (** Handler definitions *)
 and handler = {
@@ -124,7 +123,6 @@ let rec print_computation ?max_level c ppf =
   | Handle (e, c) -> print "handle %t with %t" (print_expression e) (print_computation c)
   | Let (lst, c) -> print "let @[<hov>%t@] in %t" (Print.sequence " | " let_abstraction lst) (print_computation c)
   | LetRec (lst, c) -> print "let rec ... in %t" (print_computation c)
-  | Check c -> print "check %t" (print_computation c)
 
 
 and print_expression ?max_level e ppf =
