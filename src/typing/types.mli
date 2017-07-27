@@ -25,3 +25,5 @@ and
  prim_ty =
  | IntTy
  | BoolTy
+ | StrigTy
+ | FloatTy
