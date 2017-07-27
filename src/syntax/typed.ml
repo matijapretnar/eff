@@ -79,16 +79,26 @@ and ty_coercion =
   | ArrowCoersion of ty_coercion * dirty_coercion
   | HandlerCoersion of dirty_coercion * dirty_coercion
   | TyCoercionVar of Params.ty_coercion_param
-  | Connect of  ty_coercion * ty_coercion
+  | ConnectTyCoer of  ty_coercion * ty_coercion
+  | LeftArrow of ty_coercion
+  | ForallTy of (Params.ty_param) * ty_coercion
+  | ApplyTy of ty_coercion * target_ty
+  | ForallDirt of (Params.dirt_param) * ty_coercion
+  | ApplyDirt of ty_coercion * dirt
 
 and dirt_coercion = 
   | ReflDirt of Params.dirt_param
   | DirtCoercionVar of Params.dirt_coercion_param
-  | Empty
-  | Union of ( Common.effect * dirt_coercion)
-  | Connect of dirt_coercion * dirt_coercion
+  | Empty of dirt
+  | UnionTy of ( Common.effect * dirt_coercion)
+  | ConnectDirtCoer of dirt_coercion * dirt_coercion
 
-and dirty_coercion = ty_coercion * dirt_coercion
+and dirty_coercion =
+  | BangCoercion of ty_coercion * dirt_coercion
+  | RightArrow of ty_coercion
+  | RightHandler of ty_coercion
+  | LeftHandler of ty_coercion
+  | ConnectDirtyCoer of (dirty_coercion * dirty_coercion)
 
 (** Handler definitions *)
 and handler = {
