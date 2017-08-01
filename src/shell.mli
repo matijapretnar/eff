@@ -1,6 +1,6 @@
 type state = {
   environment : RuntimeEnv.t;
-  typing : Infer.toplevel_state;
+  typing : Infer.state;
 }
 
 val initial_state : state

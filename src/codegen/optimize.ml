@@ -176,9 +176,6 @@ let different_branch_specialized defs st =
 
 
 
-let a22a a2 = Typed.a22a a2
-let a2a2 a = Typed.a2a2 a
-
 let inlinable_definitions =
   let unary_builtin f ty1 ty2 =
     let drt = Type.fresh_dirt () in
