@@ -48,12 +48,15 @@ and plain_expression =
   | Tuple of expression list
   | Record of (Common.field, expression) Common.assoc
   | Variant of Common.label * expression option
-  | Lambda of abstraction
+  | Lambda of (pattern * Types.target_ty * computation)
   | Effect of effect
   | Handler of handler
-  | FinallyHandler of (handler * abstraction)
+  | BigLambdaTy of Params.ty_param * expression
+  | BigLambdaDirt of Params.dirt_param * expression  
   | CastExp of expression * ty_coercion
   | ApplyTy of expression * target_ty
+  | LambdaTyCoerVar of Params.ty_coercion_param * Types.ct * expression 
+  | LambdaDirtyCoerVar of Params.dirt_coercion_param * Types.ct * expression 
   | ApplyDirt of expression * Types.dirt
   | ApplyTyCoercion of expression * ty_coercion
   | ApplyDirtCoercion of expression * dirt_coercion
@@ -77,7 +80,7 @@ and ty_coercion =
   | ArrowCoersion of ty_coercion * dirty_coercion
   | HandlerCoersion of dirty_coercion * dirty_coercion
   | TyCoercionVar of Params.ty_coercion_param
-  | ConnectTyCoer of  ty_coercion * ty_coercion
+  | SequenceTyCoer of  ty_coercion * ty_coercion
   | LeftArrow of ty_coercion
   | ForallTy of (Params.ty_param) * ty_coercion
   | ApplyTy of ty_coercion * target_ty
@@ -89,14 +92,14 @@ and dirt_coercion =
   | DirtCoercionVar of Params.dirt_coercion_param
   | Empty of dirt
   | UnionTy of ( Common.effect * dirt_coercion)
-  | ConnectDirtCoer of dirt_coercion * dirt_coercion
+  | SequenceDirtCoer of dirt_coercion * dirt_coercion
 
 and dirty_coercion =
   | BangCoercion of ty_coercion * dirt_coercion
   | RightArrow of ty_coercion
   | RightHandler of ty_coercion
   | LeftHandler of ty_coercion
-  | ConnectDirtyCoer of (dirty_coercion * dirty_coercion)
+  | SequenceDirtyCoer of (dirty_coercion * dirty_coercion)
 
 (** Handler definitions *)
 and handler = {
@@ -173,8 +176,8 @@ let rec print_expression ?max_level e ppf =
     print "%s" lbl
   | Variant (lbl, Some e) ->
     print ~at_level:1 "%s %t" lbl (print_expression e)
-  | Lambda a ->
-    print ~at_level:2 "fun %t" (print_abstraction a)
+  | Lambda (_,_,_) ->
+    assert false (*Still needs to be done*)
   | Handler h ->
     print "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
              ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
@@ -281,12 +284,10 @@ and refresh_expr' sbst = function
       | Some x' -> Var x'
       | None -> e
     end
-  | Lambda a ->
-    Lambda (refresh_abs sbst a)
+   | Lambda a ->
+    assert false  
   | Handler h ->
     Handler (refresh_handler sbst h)
-  | FinallyHandler h ->
-    FinallyHandler (refresh_finally_handler sbst h)
   | Tuple es ->
     Tuple (List.map (refresh_expr sbst) es)
   | Record flds ->
@@ -322,8 +323,6 @@ and refresh_handler sbst h = {
   effect_clauses = Common.assoc_map (refresh_abs2 sbst) h.effect_clauses;
   value_clause = refresh_abs sbst h.value_clause;
 }
-and refresh_finally_handler sbst (h, finally_clause) =
-  (refresh_handler sbst h, refresh_abs sbst finally_clause)
 and refresh_abs sbst a = 
   let (p, c) = a.term in
   let sbst, p' = refresh_pattern sbst p in
@@ -341,11 +340,9 @@ and subst_expr' sbst = function
       | None -> e
     end
   | Lambda a ->
-    Lambda (subst_abs sbst a)
+    assert false
   | Handler h ->
     Handler (subst_handler sbst h)
-  | FinallyHandler h ->
-    FinallyHandler (subst_finally_handler sbst h)
   | Tuple es ->
     Tuple (List.map (subst_expr sbst) es)
   | Record flds ->
@@ -379,8 +376,6 @@ and subst_handler sbst h = {
   effect_clauses = Common.assoc_map (subst_abs2 sbst) h.effect_clauses;
   value_clause = subst_abs sbst h.value_clause;
 }
-and subst_finally_handler sbst (h, finally_clause) =
-  (subst_handler sbst h, subst_abs sbst finally_clause)
 and subst_abs sbst a = 
   let (p, c) = a.term in
   (* XXX Should we check that p & sbst have disjoint variables? *)
@@ -433,7 +428,7 @@ and alphaeq_expr' eqvars e e' =
   | Var x, Var y ->
     List.mem (x, y) eqvars ||  Variable.compare x y = 0
   | Lambda a, Lambda a' ->
-    alphaeq_abs eqvars a a'
+    assert false
   | Handler h, Handler h' ->
     alphaeq_handler eqvars h h'
   | Tuple es, Tuple es' ->
@@ -474,12 +469,6 @@ and alphaeq_comp' eqvars c c' =
 and alphaeq_handler eqvars h h' =
   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
   alphaeq_abs eqvars h.value_clause h'.value_clause
-and alphaeq_finally_handler eqvars (h, finally_clause) (h', finally_clause') =
-  alphaeq_handler eqvars h h' &&
-  match finally_clause, finally_clause with
-  | Some fin, Some fin' -> alphaeq_abs eqvars fin fin'
-  | None, None -> true
-  | _, _ -> false
 and alphaeq_abs eqvars {term = (p, c)} {term = (p', c')} =
   match make_equal_pattern eqvars p p' with
   | Some eqvars' -> alphaeq_comp eqvars' c c'
@@ -550,9 +539,8 @@ and free_vars_expr e =
   match e.term with
   | Var v -> ([], [v])
   | Tuple es -> concat_vars (List.map free_vars_expr es)
-  | Lambda a -> free_vars_abs a
+  | Lambda a -> assert false
   | Handler h -> free_vars_handler h
-  | FinallyHandler h -> free_vars_finally_handler h
   | Record flds -> concat_vars (List.map (fun (_, e) -> free_vars_expr e) flds)
   | Variant (_, None) -> ([], [])
   | Variant (_, Some e) -> free_vars_expr e

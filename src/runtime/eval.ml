@@ -103,12 +103,10 @@ and veval env e =
   | Typed.Record es -> V.Record (List.map (fun (f, e) -> (f, veval env e)) es)
   | Typed.Variant (lbl, None) -> V.Variant (lbl, None)
   | Typed.Variant (lbl, Some e) -> V.Variant (lbl, Some (veval env e))
-  | Typed.Lambda a -> V.Closure (eval_closure env a)
+  | Typed.Lambda a -> assert false
   | Typed.Effect eff ->
     V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | Typed.Handler h -> V.Handler (eval_handler env h)
-  | Typed.FinallyHandler (h, finally) ->
-      V.Handler (fun r_in -> sequence (eval_closure env finally) (eval_handler env h r_in))
 
 and eval_handler env {Typed.effect_clauses=ops; Typed.value_clause=value} =
   let eval_op (op, a2) =
