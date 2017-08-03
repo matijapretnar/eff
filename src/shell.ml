@@ -19,15 +19,17 @@ let parse parser lex =
 
 type state = {
   environment : RuntimeEnv.t;
-  typing : Infer.toplevel_state;
+  typing : Infer.state;
 }
 
 let initial_state = {
   environment = RuntimeEnv.empty;
-  typing = Infer.empty;
+  typing = {
+    Infer.context = TypingEnv.empty
+  }
 }
 
-let print_ty_scheme sch =
+(* let print_ty_scheme sch =
   if !Config.smart_print then
     SmartPrint.print_ty_scheme sch
   else
@@ -37,24 +39,21 @@ let print_dirty_scheme sch =
   if !Config.smart_print then
     SmartPrint.print_dirty_scheme sch
   else
-    Scheme.print_dirty_scheme sch
+    Scheme.print_dirty_scheme sch *)
 
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
     and return the new environment. *)
-let rec exec_cmd ppf interactive st d =
-  let loc = d.Untyped.location in
-  let d, typing = Infer.infer_toplevel ~loc st.typing d.Untyped.term in
+let rec exec_cmd ppf interactive st cmd =
+  let loc = cmd.Untyped.location in
+  let cmd_typed, typing = Infer.type_toplevel ~loc st.typing cmd.Untyped.term in
   let st = {st with typing} in
-  match d with
+  match cmd_typed with
   | Typed.Computation c ->
     let v = Eval.run st.environment c in
-    if interactive then Format.fprintf ppf "@[- : %t = %t@]@."
-        (print_dirty_scheme c.Typed.scheme)
+    if interactive then Format.fprintf ppf "@[- : ? = %t@]@."
+        (* (print_dirty_scheme c.Typed.scheme) *)
         (Value.print_value v);
-    st
-  | Typed.TypeOf c ->
-    Format.fprintf ppf "@[- : %t@]@." (print_dirty_scheme c.Typed.scheme);
     st
   | Typed.Reset ->
     Tctx.reset ();
@@ -62,11 +61,11 @@ let rec exec_cmd ppf interactive st d =
   | Typed.Help ->
     print_endline help_text;
     st
-  | Typed.DefEffect (eff, (ty1, ty2)) ->
+(*   | Typed.DefEffect (eff, (ty1, ty2)) ->
     st
-  | Typed.Quit -> exit 0
+ *)  | Typed.Quit -> exit 0
   | Typed.Use fn -> use_file ppf st (fn, interactive)
-  | Typed.TopLet (defs, vars) ->
+(*   | Typed.TopLet (defs, vars) ->
     let env =
       List.fold_right
         (fun (p, c) env -> let v = Eval.run env c in Eval.extend p v env)
@@ -98,7 +97,7 @@ let rec exec_cmd ppf interactive st d =
     end
   | Typed.Tydef tydefs ->
     st
-
+ *)
 and use_file ppf env (filename, interactive) =
   let cmds = Lexer.read_file (parse Parser.file) filename in
   let cmds = List.map Desugar.toplevel cmds in

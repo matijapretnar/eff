@@ -1,4 +1,4 @@
-module TyPoset = Poset.Make(struct
+(* module TyPoset = Poset.Make(struct
     type t = Params.ty_param
     let compare = Pervasives.compare
     let print = Params.print_ty_param ~non_poly:Params.empty
@@ -86,7 +86,7 @@ let param_expansion = {
   dirt_expansion = DirtMap.empty;
 }
 
-let global_add_ty p ty = 
+let global_add_ty p ty =
   param_expansion.ty_expansion <- TyMap.add p ty param_expansion.ty_expansion
 
 let global_add_dirt d drt =
@@ -115,7 +115,7 @@ and expand_ty ty = match ty with
       | Some ty' -> ty'
       | None -> ty
     end
-  | Type.Basic _ -> ty
+  | Type.Prim _ -> ty
   | Type.Tuple tys -> Type.Tuple (Common.map expand_ty tys)
   | Type.Arrow (ty, drty) -> Type.Arrow (expand_ty ty, expand_dirty drty)
   | Type.Handler (drty1, drty2) -> Type.Handler (expand_dirty drty1, expand_dirty drty2)
@@ -364,4 +364,4 @@ let print constraints ppf =
   if not (RegionPoset.is_empty constraints.region_poset) then Format.pp_print_string ppf "; ";
   Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Params.print_region_param x) (Symbols.top ())) (FullRegions.elements constraints.full_regions) ppf;
   if not (FullRegions.is_empty constraints.full_regions) then Format.pp_print_string ppf "; ";
-  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Params.print_dirt_param x) (Symbols.top ())) (FullDirts.elements constraints.full_dirts) ppf
+  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Params.print_dirt_param x) (Symbols.top ())) (FullDirts.elements constraints.full_dirts) ppf *)

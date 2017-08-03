@@ -1,4 +1,4 @@
-open Scheme
+(* open Scheme
 open Type
 
 
@@ -34,7 +34,7 @@ let print_ty ~non_poly ~non_empty_dirts ~skeletons t ppf =
           (ty ~max_level:5 t2)
       else
         print ~at_level:5 "@[%t@ %s@ %t@]" (ty ~max_level:4 t1) (Symbols.arrow ()) (ty ~max_level:5 t2)
-    | Basic b -> print "%s" b
+    | Prim b -> print "%s" (prim_to_string b)
     | Apply (t, (lst, _, _)) ->
       begin match lst with
         | [] -> print "%s" t
@@ -85,4 +85,4 @@ let print_dirty_scheme drty_sch ppf =
         (print_ty ~non_poly ~non_empty_dirts ~skeletons ty)
         (Constraints.print cnstrs)
   else
-    print_ty ~non_poly ~non_empty_dirts ~skeletons ty ppf
+    print_ty ~non_poly ~non_empty_dirts ~skeletons ty ppf *)

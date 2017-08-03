@@ -236,8 +236,6 @@ and print_expression' ?max_level e ppf =
     print ~at_level:2 "fun comp -> handler %t comp" (print_handler ~expected_shape h)
   | Typed.Effect eff ->
     print ~at_level:2 "effect %t" (print_effect eff)
-  | Typed.Pure c ->
-    print_computation ?max_level c ppf
 
 and print_computation ?max_level ?expected_shape c ppf =
   let shp = shape_of_dirty_scheme c.Typed.scheme in

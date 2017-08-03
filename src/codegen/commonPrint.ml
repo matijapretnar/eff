@@ -93,30 +93,3 @@ let compiled_filename fn = fn ^ ".ml"
 
 let print_tydefs tydefs ppf =
   Format.fprintf ppf "type %t" (Print.sequence "\nand\n" print_tydef tydefs)
-
-let print_computation_effects ?max_level c ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  let get_dirt (_,(_,dirt),_) = dirt in
-  let get_type (_,(ty,dirt),_) = ty in
-  let rest = (get_dirt(c.Typed.scheme)).Type.rest in
-  (* Here we have access to the effects *)
-  (
-    Format.fprintf ppf "Effects of a computation: \n";
-    let f elem =
-      Format.fprintf ppf "\t%t\n" (print_effect_region elem) in
-    List.iter f (get_dirt(c.Typed.scheme)).Type.ops;
-    Format.fprintf ppf "\nRest: %t\n" (Params.print_dirt_param rest);
-    Format.fprintf ppf "Type: %t\n" (print_type (get_type(c.Typed.scheme)));
-  )
-
-
-(** THE REST *)
-
-let print_computation_effects ?max_level c ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  let get_dirt (_,(_,dirt),_) = dirt in
-  (* Here we have access to the effects *)
-  (Format.fprintf ppf "Effects of a computation: \n";
-   let f elem =
-     Format.fprintf ppf "\t%t" (print_effect elem) in
-   List.iter f (get_dirt(c.Typed.scheme)).Type.ops;)

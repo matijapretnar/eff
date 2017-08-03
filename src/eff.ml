@@ -82,14 +82,14 @@ let parse parser lex =
   | Failure "lexing: empty token" ->
     Error.syntax ~loc:(Location.of_lexeme lex) "unrecognised symbol."
 
-let print_commands cmds =
+(* let print_commands cmds =
   let print_command =
     if !Config.pure_print then PurePrint.print_command else SimplePrint.print_command
   in
-  Print.sequence "\n\n;;\n\n" print_command cmds
+  Print.sequence "\n\n;;\n\n" print_command cmds *)
 
 
-let compile_file st filename =
+(* let compile_file st filename =
   let pervasives_cmds =
     match !Config.pervasives_file with
     | Config.PervasivesNone -> []
@@ -109,7 +109,7 @@ let compile_file st filename =
   let cmds = List.map Desugar.toplevel (pervasives_cmds @ separator :: cmds) in
   let cmds, _ = Infer.type_cmds st.Shell.typing cmds in
   let cmds_no_opt = cmds in
-  let cmds = if !Config.disable_optimization then cmds else Optimize.optimize_commands cmds in
+  (* let cmds = if !Config.disable_optimization then cmds else Optimize.optimize_commands cmds in *)
 
   (* read the source file *)
   let source_channel = open_in filename in
@@ -118,7 +118,7 @@ let compile_file st filename =
   really_input source_channel source 0 n;
   close_in source_channel;
 
-  (* look for header.ml next to the executable  *)
+  look for header.ml next to the executable 
   let header_file = Filename.concat (Filename.dirname Sys.argv.(0)) "header.ml" in
   let header_channel = open_in header_file in
   let n = in_channel_length header_channel in
@@ -145,7 +145,7 @@ let compile_file st filename =
   ignore (Sys.command ("echo '=== END SOURCE ===\n*)'" ^ " >> " ^ compiled_file));
   ignore (Sys.command ("echo ''" ^ " >> " ^ compiled_file));
   ignore (Sys.command ("ocamlc " ^ temporary_file));
-  ignore (Sys.command ("ocamlc -dsource -w -A " ^ temporary_file ^ " >>" ^ compiled_file ^ " 2>&1"))
+  ignore (Sys.command ("ocamlc -dsource -w -A " ^ temporary_file ^ " >>" ^ compiled_file ^ " 2>&1")) *)
 
 (* Interactive toplevel *)
 let toplevel ctxenv =
@@ -210,7 +210,7 @@ let main =
   try
     (* Run and load all the specified files. *)
     let ctxenv = List.fold_left (Shell.use_file Format.std_formatter) Shell.initial_state !files in
-    List.iter (compile_file ctxenv) !to_be_compiled;
+    (* List.iter (compile_file ctxenv) !to_be_compiled; *)
     if !Config.interactive_shell then toplevel ctxenv
   with
     Error.Error err -> Error.print err; exit 1

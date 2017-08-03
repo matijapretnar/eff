@@ -31,8 +31,6 @@ let rec print_expression ?max_level e ppf =
       (print_effect_clauses h.Typed.effect_clauses)
   | Typed.Effect eff ->
       print ~at_level:2 "effect %t" (print_effect eff)
-  | Typed.Pure c ->
-      print ~at_level:2 "run %t" (print_computation ~max_level:0 c)
 
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

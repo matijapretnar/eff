@@ -4,13 +4,31 @@
 
 type ty =
   | Apply of Common.tyname * args
-  | Param of Params.ty_param
-  | Basic of string
+  | Prim of prim_ty (* Basic of string *)
   | Tuple of ty list
   | Arrow of ty * dirty
   | Handler of dirty * dirty
+  (* Type variable *)
+  | TyVar of Params.ty_param
+  (* Polytype *)
+  | PolyType of Params.ty_param * ty
+
+(* Primitive types *)
+and prim_ty =
+  | BoolTy
+  | IntTy
+  | FloatTy
+  | StringTy
+  | UnitTy
+  | UniTy
 
 and dirty = ty * dirt
+
+(* The dirt defined as a row *)
+(* and dirt =
+  | Op of (Common.effect * dirt)
+  | DirtVar of P.dirt_param
+  | Empty *)
 
 and dirt = {
   ops: (Common.effect, Params.region_param) Common.assoc;
@@ -19,17 +37,33 @@ and dirt = {
 
 and args = ty list * dirt list * Params.region_param list
 
-
-let int_ty = Basic "int"
+(* let int_ty = Basic "int"
 let string_ty = Basic "string"
 let bool_ty = Basic "bool"
 let float_ty = Basic "float"
 let unit_ty = Tuple []
+let empty_ty = Apply ("empty", ([], [], [])) *)
+
+let int_ty = Prim IntTy
+let string_ty = Prim StringTy
+let bool_ty = Prim BoolTy
+let float_ty = Prim FloatTy
+let unit_ty = Prim UnitTy
 let empty_ty = Apply ("empty", ([], [], []))
+
+let prim_to_string prim =
+  begin match prim with
+    | BoolTy -> "bool"
+    | IntTy -> "int"
+    | FloatTy -> "float"
+    | StringTy -> "string"
+    | UnitTy -> "unit"
+    | UniTy -> "universal"
+  end
 
 (** [fresh_ty ()] gives a type [Param p] where [p] is a new type parameter on
     each call. *)
-let fresh_ty () = Param (Params.fresh_ty_param ())
+let fresh_ty () = TyVar (Params.fresh_ty_param ())
 let simple_dirt d = { ops = []; rest = d }
 let fresh_dirt () = simple_dirt (Params.fresh_dirt_param ())
 let fresh_dirty () = (fresh_ty (), fresh_dirt ())
@@ -37,8 +71,8 @@ let fresh_dirty () = (fresh_ty (), fresh_dirt ())
 (* These types are used when type checking is turned off. Their names
    are syntactically incorrect so that the programmer cannot accidentally
    define it. *)
-let universal_ty = Basic "_"
-let universal_dirty = (Basic "_", fresh_dirt ())
+let universal_ty = UniTy (* Basic "_" *)
+let universal_dirty = (UniTy, fresh_dirt ()) (* (Basic "_", fresh_dirt ()) *)
 
 
 type replacement = {
@@ -50,8 +84,8 @@ type replacement = {
 (** [replace_ty rpls ty] replaces type parameters in [ty] according to [rpls]. *)
 let rec replace_ty rpls = function
   | Apply (ty_name, args) -> Apply (ty_name, replace_args rpls args)
-  | Param p -> rpls.ty_param_repl p
-  | Basic _ as ty -> ty
+  | TyVar p -> rpls.ty_param_repl p
+  | Prim _ as ty -> ty
   | Tuple tys -> Tuple (Common.map (replace_ty rpls) tys)
   | Arrow (ty1, (ty2, drt)) ->
     let ty1 = replace_ty rpls ty1 in
@@ -82,8 +116,8 @@ and replace_args rpls (tys, drts, rs) =
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 let rec subst_ty sbst = function
   | Apply (ty_name, args) -> Apply (ty_name, subst_args sbst args)
-  | Param p -> Param (sbst.Params.ty_param p)
-  | Basic _ as ty -> ty
+  | TyVar p -> TyVar (sbst.Params.ty_param p)
+  | Prim _ as ty -> ty
   | Tuple tys -> Tuple (Common.map (subst_ty sbst) tys)
   | Arrow (ty1, (ty2, drt)) ->
     let ty1 = subst_ty sbst ty1 in
@@ -123,8 +157,8 @@ let for_parameters get_params is_pos ps lst =
 let pos_neg_params get_variances ty =
   let rec pos_ty is_pos = function
     | Apply (ty_name, args) -> pos_args is_pos ty_name args
-    | Param p -> if is_pos then Params.add_ty_param p Params.empty else Params.empty
-    | Basic _ -> Params.empty
+    | TyVar p -> if is_pos then Params.add_ty_param p Params.empty else Params.empty
+    | Prim _ -> Params.empty
     | Tuple tys -> Params.flatten_map (pos_ty is_pos) tys
     | Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
     | Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
@@ -165,8 +199,8 @@ let rec print_ty ?max_level ty ppf =
     print ~at_level:1 "%t %s" (print_ty ~max_level:1 ty) ty_name
   | Apply (ty_name, (tys, _, _)) ->
     print ~at_level:1 "(%t) %s" (Print.sequence ", " print_ty tys) ty_name
-  | Param p -> Params.print_ty_param p ppf
-  | Basic b -> print "%s" b
+  | TyVar p -> Params.print_ty_param p ppf
+  | Prim b -> print "%s" (prim_to_string b)
   | Tuple [] -> print "unit"
   | Tuple tys ->
     print ~at_level:2 "@[<hov>%t@]"
