@@ -25,7 +25,8 @@ type state = {
 let initial_state = {
   environment = RuntimeEnv.empty;
   typing = {
-    Infer.context = TypingEnv.empty
+    Infer.context = TypingEnv.empty;
+    Infer.effects = Untyped.EffectMap.empty;
   }
 }
 
@@ -61,11 +62,11 @@ let rec exec_cmd ppf interactive st cmd =
   | Typed.Help ->
     print_endline help_text;
     st
-(*   | Typed.DefEffect (eff, (ty1, ty2)) ->
+  | Typed.DefEffect (eff, (ty1, ty2)) ->
     st
- *)  | Typed.Quit -> exit 0
+  | Typed.Quit -> exit 0
   | Typed.Use fn -> use_file ppf st (fn, interactive)
-(*   | Typed.TopLet (defs, vars) ->
+  (* | Typed.TopLet (defs, vars) ->
     let env =
       List.fold_right
         (fun (p, c) env -> let v = Eval.run env c in Eval.extend p v env)
@@ -87,7 +88,10 @@ let rec exec_cmd ppf interactive st cmd =
     end;
     {
       st with environment = env;
-    }
+    } *)
+  (* | Typed.TypeOf c ->
+    Format.fprintf ppf "@[- : %t@]@." (print_dirty_scheme c.Typed.scheme);
+    st *)
   | Typed.External (x, ty, f) ->
     begin match Common.lookup f External.values with
       | Some v -> {
@@ -97,7 +101,7 @@ let rec exec_cmd ppf interactive st cmd =
     end
   | Typed.Tydef tydefs ->
     st
- *)
+
 and use_file ppf env (filename, interactive) =
   let cmds = Lexer.read_file (parse Parser.file) filename in
   let cmds = List.map Desugar.toplevel cmds in

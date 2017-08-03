@@ -84,11 +84,11 @@ and abstractionType = (Params.ty_param * expression)
 
 type toplevel = plain_toplevel * Location.t
 and plain_toplevel =
-  (* | Tydef of (Common.tyname, Params.t * Tctx.tydef) Common.assoc *)
-  (* | TopLet of (pattern * computation) list * (variable * Scheme.ty_scheme) list *)
-  (* | TopLetRec of (variable * abstraction) list * (variable * Scheme.ty_scheme) list *)
-  (* | External of variable * Type.ty * string *)
-  (* | DefEffect of effect * (Type.ty * Type.ty) *)
+  | Tydef of (Common.tyname, Params.t * Tctx.tydef) Common.assoc
+  | TopLet of (pattern * computation) list * (variable * Scheme.ty_scheme) list
+  | TopLetRec of (variable * abstraction) list * (variable * Scheme.ty_scheme) list
+  | External of variable * Type.ty * string
+  | DefEffect of effect * (Type.ty * Type.ty)
   | Computation of computation
   | Use of string
   | Reset
@@ -198,13 +198,6 @@ and print_top_let_abstraction (p, c) ppf =
 
 and print_let_rec_abstraction (x, a) ppf =
   Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction a)
-
-
-let backup_location loc locs =
-  match loc with
-  | None -> Location.union locs
-  | Some loc -> loc
-
 
 
 let rec refresh_pattern sbst p =

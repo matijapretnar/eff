@@ -1,4 +1,4 @@
-(* open Scheme
+open Scheme
 open Type
 
 
@@ -41,7 +41,7 @@ let print_ty ~non_poly ~non_empty_dirts ~skeletons t ppf =
         | [s] -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
         | ts -> print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
       end
-    | Param p -> Params.print_ty_param ~non_poly p ppf
+    | TyVar p -> Params.print_ty_param ~non_poly p ppf
     | Tuple [] -> print "unit"
     | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence (Symbols.times ()) (ty ~max_level:1) ts)
     | Handler ((t1, drt1), (t2, drt2)) ->
@@ -56,7 +56,7 @@ let print_ty ~non_poly ~non_empty_dirts ~skeletons t ppf =
         print ~at_level:6 "%t %s@ %t" (ty ~max_level:4 t1) (Symbols.handler_arrow ()) (ty ~max_level:4 t2)
   in ty t ppf
 
-
+(*
 let print_ty_scheme ty_sch ppf =
   let ty_sch = Scheme.beautify_ty_scheme ty_sch in
   let skeletons, non_poly = Scheme.skeletons_non_poly_scheme ty_sch in

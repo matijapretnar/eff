@@ -29,20 +29,12 @@ and dirty = ty * dirt
   | Op of (Common.effect * dirt)
   | DirtVar of P.dirt_param
   | Empty *)
-
 and dirt = {
   ops: (Common.effect, Params.region_param) Common.assoc;
   rest: Params.dirt_param
 }
 
 and args = ty list * dirt list * Params.region_param list
-
-(* let int_ty = Basic "int"
-let string_ty = Basic "string"
-let bool_ty = Basic "bool"
-let float_ty = Basic "float"
-let unit_ty = Tuple []
-let empty_ty = Apply ("empty", ([], [], [])) *)
 
 let int_ty = Prim IntTy
 let string_ty = Prim StringTy
@@ -71,8 +63,8 @@ let fresh_dirty () = (fresh_ty (), fresh_dirt ())
 (* These types are used when type checking is turned off. Their names
    are syntactically incorrect so that the programmer cannot accidentally
    define it. *)
-let universal_ty = UniTy (* Basic "_" *)
-let universal_dirty = (UniTy, fresh_dirt ()) (* (Basic "_", fresh_dirt ()) *)
+let universal_ty = Prim UniTy (* Basic "_" *)
+let universal_dirty = (Prim UniTy, fresh_dirt ()) (* (Basic "_", fresh_dirt ()) *)
 
 
 type replacement = {
