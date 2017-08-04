@@ -24,3 +24,6 @@ val add_to_context : Untyped.variable -> Type.ty -> ty_scheme -> ty_scheme
 
 (* Get the type from a type scheme *)
 val get_type : ty_scheme -> Type.ty
+
+(* Make a type scheme for an abstraction *)
+val abstract : loc:Location.t -> ty_scheme -> dirty_scheme -> abstraction_scheme

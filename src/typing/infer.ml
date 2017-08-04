@@ -42,8 +42,8 @@ let extend_env vars env =
 (**************************)
 
 let rec type_pattern st {Untyped.term=pat; Untyped.location=loc} =
-  let scheme, p = type_plain_pattern st pat in
-  scheme, Typed.annotate p loc
+  let scheme, pattern = type_plain_pattern st pat in
+  Typed.annotate pattern scheme loc
 
 (* [type_pattern p] infers the type scheme of a pattern [p].
    This consists of:
@@ -86,12 +86,10 @@ and type_plain_pattern st = function
 (* Type an expression
     type_expr will annotate the terms with location information
 *)
-let rec type_expr st {Untyped.term=expr; Untyped.location=loc} =
-  let e, constraints = type_plain_expr st expr in
-  Typed.annotate e loc, constraints
+let rec type_expr st {Untyped.term=expr; Untyped.location=loc} = type_plain_expr st loc expr
 
 (* Type a plain expression *)
-and type_plain_expr st = function
+and type_plain_expr st loc = function
   | Untyped.Var x ->
     let ty_sch = begin match TypingEnv.lookup st.context x with
       | Some ty_sch -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
@@ -100,14 +98,15 @@ and type_plain_expr st = function
     in
     assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Const const ->
-      Typed.Const const, []
+      Ctor.const ~loc const
   | Untyped.Tuple es -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Record lst -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Variant (lbl, e) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Lambda (p, c) ->
-    let sch, pt = type_pattern st p in
+    assert false
+    (* let sch, pt = type_pattern st p in
     let ct, constraints = type_comp st c in
-    Typed.Lambda (pt, Scheme.get_type sch, ct), constraints
+    Typed.Lambda (pt, Scheme.get_type sch, ct), constraints *)
   | Untyped.Effect eff -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Handler h -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
@@ -118,21 +117,20 @@ and type_plain_expr st = function
 (* Type a computation
     type_comp will annotate the terms with location information
 *)
-and type_comp st {Untyped.term=comp; Untyped.location=loc} =
-  let c, constraints = type_plain_comp st comp in
-  Typed.annotate c loc, constraints
+and type_comp st {Untyped.term=comp; Untyped.location=loc} = type_plain_comp st loc comp
 
 (* Type a plain computation *)
-and type_plain_comp st = function
+and type_plain_comp st loc = function
   | Untyped.Value e ->
-      let typed_e, constraints = type_expr st e in
-      Typed.Value typed_e, constraints
+    let typed_e = type_expr st e in
+    Ctor.value ~loc typed_e
   | Untyped.Match (e, cases) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Apply (e1, e2) ->
-    let expr1, _ = type_expr st e1 in
+    assert false
+    (* let expr1, _ = type_expr st e1 in
     let expr2, _ = type_expr st e2 in
     (* Smartconstructors.apply ~loc expr1 expr2, constraints *)
-    Typed.Apply (expr1, expr2), []
+    Typed.Apply (expr1, expr2), [] *)
   | Untyped.Handle (e, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Let (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.LetRec (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
@@ -145,7 +143,7 @@ and type_plain_comp st = function
 let type_toplevel ~loc st = function
   (* Main toplevel command for toplevel computations *)
   | Untyped.Computation c ->
-    let c, constraints = type_comp st c in
+    let c = type_comp st c in
     (* Print.debug "A LOT OF CONSTRAINTS"; *)
     Typed.Computation c, st
   (* Use keyword: include a file *)

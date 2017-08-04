@@ -14,3 +14,6 @@ let get_type (ctx, ty, u) = ty
 let refresh (ctx, ty, cnstrs) =
   let sbst = Params.refreshing_subst () in
   Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, (* Constraints.subst sbst *) cnstrs
+
+let abstract ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
+  ([], (ty_p, drty_c), Unification.empty)

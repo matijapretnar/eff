@@ -6,12 +6,13 @@ module EffectMap = Map.Make(String)
 type variable = Variable.t
 type effect = Common.effect * (Type.ty * Type.ty)
 
-type 'term annotation = {
+type ('term, 'scheme) annotation = {
   term: 'term;
+  scheme: 'scheme;
   location: Location.t;
 }
 
-type pattern = plain_pattern annotation
+type pattern = (plain_pattern, Scheme.ty_scheme) annotation
 and plain_pattern =
   | PVar of variable
   | PAs of pattern * variable
@@ -32,13 +33,14 @@ let rec pattern_vars p =
   | PConst _ -> []
   | PNonbinding -> []
 
-let annotate t loc = {
+let annotate t sch loc = {
   term = t;
+  scheme = sch;
   location = loc;
 }
 
 (** Pure expressions *)
-type expression = plain_expression annotation
+type expression = (plain_expression, Scheme.ty_scheme) annotation
 and plain_expression =
   | Var of variable
   | BuiltIn of string * int
@@ -53,7 +55,7 @@ and plain_expression =
   | ApplyTy of expression * Type.ty
 
 (** Impure computations *)
-and computation = plain_computation annotation
+and computation = (plain_computation, Scheme.dirty_scheme) annotation
 and plain_computation =
   | Value of expression
   | LetRec of (variable * abstraction) list * computation
@@ -71,10 +73,10 @@ and handler = {
 }
 
 (** Abstractions that take one argument. *)
-and abstraction = (pattern * computation) annotation
+and abstraction = (pattern * computation, Scheme.abstraction_scheme) annotation
 
 (** Abstractions that take two arguments. *)
-and abstraction2 = (pattern * pattern * computation) annotation
+and abstraction2 = (pattern * pattern * computation, Scheme.abstraction2_scheme) annotation
 
 (** Abstractions that take one argument but is typed. *)
 and abstractionLambda = (pattern * Type.ty * computation)
@@ -94,12 +96,19 @@ and plain_toplevel =
   | Reset
   | Help
   | Quit
-  (* | TypeOf of computation *)
+  | TypeOf of computation
+
+let backup_location loc locs =
+  match loc with
+  | None -> Location.union locs
+  | Some loc -> loc
 
 let abstraction ?loc p c : abstraction =
+  let loc = backup_location loc [p.location; c.location] in
   {
     term = (p, c);
-    location = c.location;
+    scheme = Scheme.abstract ~loc p.scheme c.scheme;
+    location = loc;
   }
 
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
