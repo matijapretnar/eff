@@ -11,7 +11,7 @@ type ty =
   (* Type variable *)
   | TyVar of Params.ty_param
   (* Polytype *)
-  | PolyType of Params.ty_param * ty
+  | PolyType of Params.ty_param * ty list
 
 (* Primitive types *)
 and prim_ty =
