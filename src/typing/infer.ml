@@ -23,6 +23,40 @@ let ty_of_const = function
 let add_def env x ty_sch =
   {env with context = TypingEnv.update env.context x ty_sch}
 
+
+let rec make_target_effects effects =
+  begin match effects with
+   | [] -> Types.Empty
+   | ((x,_)::xs) -> Types.Union (x ,  make_target_effects xs)
+ end
+
+
+let rec source_to_target ty = 
+  begin match ty with
+    | T.Apply (_,_) -> assert false
+    | T.Param x -> Types.Tyvar x
+    | T.Basic s -> begin match s with
+                   | "int" -> Types.PrimTy IntTy
+                   | "string" -> Types.PrimTy StringTy
+                   | "bool" -> Types.PrimTy BoolTy
+                   | "float" -> Types.PrimTy FloatTy
+                   end
+    | T.Tuple l -> let new_l = List.map source_to_target l
+                   in Types.Tuple new_l
+    | T.Arrow  (ty1 ,dirty1) -> let dirtyt = source_to_target_dirty dirty1
+                             in let tyt = source_to_target ty1
+                             in Types.Arrow (tyt,dirtyt) 
+    | T.Handler (dirty1, dirty2) -> Types.Handler (source_to_target_dirty dirty1, source_to_target_dirty dirty2)
+  end
+
+and source_to_target_dirty dirty_type = 
+  let (ty,dirt) = dirty_type in 
+  let new_ty = source_to_target ty in
+  let ops = dirt.ops in
+  let new_dirt = make_target_effects ops in 
+  (new_ty, new_dirt)  
+
+
 (* let infer_effect ~loc env eff =
   try
     eff, (Untyped.EffectMap.find eff env.effects)

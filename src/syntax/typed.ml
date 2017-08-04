@@ -114,11 +114,6 @@ and abstraction = (pattern * computation) annotation
 and abstraction2 = (pattern * pattern * computation) annotation
 
 
-
-and target_expression = (expression * Types.target_ty)
-
-and target_computation = (computation * Types.target_dirty)
-
 type toplevel = plain_toplevel * Location.t
 and plain_toplevel =
   (* | Tydef of (Common.tyname, Params.t * Tctx.tydef) Common.assoc *)

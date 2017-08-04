@@ -3,7 +3,7 @@ type target_ty =
   | Tyvar of Params.ty_param
   | Arrow of target_ty * target_dirty
   | Tuple of target_ty list
-  | Handler of target_ty * target_dirty
+  | Handler of target_dirty * target_dirty
   | PrimTy of prim_ty
   | QualTy of ct * target_ty
   | TySchemeTy of Params.ty_param * target_ty
@@ -25,5 +25,5 @@ and
  prim_ty =
  | IntTy
  | BoolTy
- | StrigTy
+ | StringTy
  | FloatTy
