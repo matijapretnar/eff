@@ -1,0 +1,7 @@
+external ( + ) : int -> int -> int = "+";;
+
+3;;
+
+(* (fun 2 -> 3);; *)
+
+(fun x -> x) 3;;
