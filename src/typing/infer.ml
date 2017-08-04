@@ -72,23 +72,22 @@ and source_to_target_dirty dirty_type =
    pattern type is negative. *)
 let rec type_pattern p =
   let loc = p.Untyped.location in
-  let unify = Scheme.finalize_pattern_scheme ~loc in
-  let ty_sch, pat = match p.Untyped.term with
+  let pat = match p.Untyped.term with
 
     | Untyped.PVar x ->
-        assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+        Typed.PVar x
 
     | Untyped.PAs (p, x) ->
-        assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+        Typed.PAs (type_pattern p, x)
 
     | Untyped.PNonbinding ->
-        assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+        Typed.PNonbinding
 
     | Untyped.PConst const ->
-        assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+        Typed.PConst const
 
     | Untyped.PTuple ps ->
-        assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+        Typed.PTuple (List.map type_pattern ps)
 
     | Untyped.PRecord [] ->
         assert false
@@ -110,7 +109,7 @@ let extend_env vars env =
   List.fold_right (fun (x, ty_sch) env -> {env with context = TypingEnv.update env.context x ty_sch}) vars env
 
 let rec type_expr st {Untyped.term=expr; Untyped.location=loc} =
-  let e, constraints = type_plain_expr st expr in
+  let e, ttype, constraints = type_plain_expr st expr in
   Typed.annotate e loc, constraints
 and type_plain_expr st = function
   | Untyped.Var x ->
@@ -120,8 +119,14 @@ and type_plain_expr st = function
       end
     in
     assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  | Untyped.Const const ->
-      Typed.Const const, []
+  | Untyped.Const const -> 
+        begin match const with
+        | Integer _ -> (Typed.Const const, Types.PrimTy IntTy, [])
+        | String _ -> (Typed.Const const, Types.PrimTy StringTy, [])
+        | Boolean _ -> (Typed.Const const, Types.PrimTy BoolTy, [])
+        | Float _ -> (Typed.Const const, Types.PrimTy FloatTy, [])
+      end 
+      
   | Untyped.Tuple es -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Record lst -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Variant (lbl, e) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
