@@ -47,7 +47,7 @@ let print_dirty_scheme sch =
     and return the new environment. *)
 let rec exec_cmd ppf interactive st cmd =
   let loc = cmd.Untyped.location in
-  let cmd_typed, typing = Infer.type_toplevel ~loc st.typing cmd.Untyped.term in
+  let cmd_typed, typing = Infer.type_toplevel ~loc ppf st.typing cmd.Untyped.term in
   let st = {st with typing} in
   st
   (* match cmd_typed with

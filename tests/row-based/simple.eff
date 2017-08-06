@@ -1,11 +1,13 @@
 external ( + ) : int -> int -> int = "+";;
 
-(* 3;; *)
+3;;
 
-(* (fun x -> x) ;;  *)
+(fun x -> x) ;;
 
-(fun x -> x x) 3;;
+(* (fun x -> x x);; *)
+
+(fun x -> x) 3;;
 
 (* (fun x -> (fun y -> (x, y)));; *)
 
-(* fun f x -> f (f x);; *)
+fun f x -> f (f x);; 

@@ -10,10 +10,30 @@
     A unification algorithm is used to determine the solution
 *)
 
+(********************)
+(* TYPE DEFINITIONS *)
+(********************)
+
+(* Typing constraint *)
+type ty_cnstr
+(* Dirt constraint *)
+type dirt_cnstr
+
+(* A constraint set *)
 type t
 
-(** The empty graph. *)
+(*************************)
+(* CONSTRAINT OPERATIONS *)
+(*************************)
+
+(* The empty graph. *)
 val empty : t
+
+(* Add a typing constraint: T = S *)
+val add_ty_constraint : Type.ty -> Type.ty -> t -> t
 
 (* Combine two constraint sets to a single set *)
 val union : t -> t -> t
+
+(* Print constraints *)
+val print : t -> Format.formatter -> unit

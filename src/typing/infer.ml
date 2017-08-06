@@ -162,11 +162,12 @@ and type_plain_comp st loc = function
 (***************************)
 
 (* Execute type inference for a toplevel command *)
-let type_toplevel ~loc st = function
+let type_toplevel ~loc ppf st = function
   (* Main toplevel command for toplevel computations *)
   | Untyped.Computation c ->
       (* Do not capture state since we do not want to persist it *)
       let c, _ = type_comp st c in
+      Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme c.Typed.scheme);
       Typed.Computation c, st
   (* Use keyword: include a file *)
   | Untyped.Use fn ->
@@ -209,7 +210,7 @@ let type_toplevel ~loc st = function
 (* Execute typing for a single toplevel command *)
 let type_cmd st cmd =
   let loc = cmd.Untyped.location in
-  let cmd, st = type_toplevel ~loc st cmd.Untyped.term in
+  (* let cmd, st = type_toplevel ~loc st cmd.Untyped.term in *)
   (cmd, loc), st
 
 (* Go through all *toplevel* commands and execute type inference *)

@@ -48,3 +48,10 @@ val var : Untyped.variable -> Type.ty -> ty_scheme
 
 (* Create a scheme for a Lambda expression *)
 val lambda : loc:Location.t -> ty_scheme -> dirty_scheme -> ty_scheme
+
+(**********************)
+(* PRINTING UTILITIES *)
+(**********************)
+
+val print_ty_scheme : ty_scheme -> Format.formatter -> unit
+val print_dirty_scheme : dirty_scheme -> Format.formatter -> unit

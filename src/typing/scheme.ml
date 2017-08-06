@@ -14,8 +14,8 @@ type abstraction2_scheme = (Type.ty * Type.ty * Type.dirty) t
 (* HELPER FUNCTIONS *)
 (********************)
 
-let ty_less ~loc ty1 ty2 (ctx, ty, cnstrs) = (ctx, ty, cnstrs)
-  (* (ctx, ty, Constraints.add_ty_constraint ~loc ty1 ty2 cnstrs) *)
+let ty_cnstr ~loc ty1 ty2 (ctx, ty, cnstrs) =
+  (ctx, ty, Unification.add_ty_constraint ty1 ty2 cnstrs)
 
 let remove_context ~loc ctx_p (ctx, ty, cnstrs) =
   let trim (x, t) (ctx, ty, cnstrs) =
@@ -29,7 +29,7 @@ let less_context ~loc ctx_p (ctx, ty, cnstrs) =
   let trim (x, t) (ctx, ty, cnstrs) =
     match Common.lookup x ctx_p with
     | None -> ((x, t) :: ctx, ty, cnstrs)
-    | Some u -> ty_less ~loc u t ((x, u) :: ctx, ty, cnstrs)
+    | Some u -> ty_cnstr ~loc u t ((x, u) :: ctx, ty, cnstrs)
   in
   List.fold_right trim ctx ([], ty, cnstrs)
 
@@ -87,7 +87,29 @@ let lambda ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
 (**********************)
 (* PRINTING FUNCTIONS *)
 (**********************)
-(*
+
+(* @TODO Constraint substitution *)
+let subst_ty_scheme sbst (ctx, ty, cnstrs) =
+  let ty = Type.subst_ty sbst ty in
+  (* let cnstrs = Constraints.subst sbst cnstrs in *)
+  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  (ctx, ty, cnstrs)
+
+(* @TODO Constraint substitution *)
+let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
+  let drty = Type.subst_dirty sbst drty in
+  (* let cnstrs = Constraints.subst sbst cnstrs in *)
+  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  (ctx, drty, cnstrs)
+
+let beautify_ty_scheme ty_sch =
+  let sbst = Params.beautifying_subst () in
+  subst_ty_scheme sbst (ty_sch)
+
+let beautify_dirty_scheme drty_sch =
+  let sbst = Params.beautifying_subst () in
+  subst_dirty_scheme sbst (drty_sch)
+
 let print_context ctx ppf =
   let print_binding (x, t) ppf =
     Print.print ppf "%t : %t" (Untyped.Variable.print ~safe:true x) (Type.print_ty t)
@@ -99,7 +121,7 @@ let print_ty_scheme ty_sch ppf =
   Print.print ppf "%t |- %t | %t"
     (print_context ctx)
     (Type.print_ty ty)
-    (Constraints.print cnstrs)
+    (Unification.print cnstrs)
 
 let print_dirty_scheme ty_sch ppf =
   let (ctx, (ty, drt), cnstrs) = beautify_dirty_scheme ty_sch in
@@ -107,4 +129,4 @@ let print_dirty_scheme ty_sch ppf =
     (print_context ctx)
     (Type.print_ty ty)
     (Type.print_dirt drt)
-    (Constraints.print cnstrs) *)
+    (Unification.print cnstrs)
