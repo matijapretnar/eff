@@ -75,15 +75,36 @@ let abstract ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
 (* SMART CONSTRUCTORS *)
 (**********************)
 
-(* Abstraction
-Use primary ctx from c
-Use Arrow type
-Union constraints from p and c
+let var x ty = ([(x, ty)], ty, Unification.empty)
 
-*)
 let lambda ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
   create_ty_scheme ctx_c (Type.Arrow (ty_p, drty_c)) [
       trim_context ~loc ctx_p;
       just cnstrs_p;
       just cnstrs_c
     ]
+
+(**********************)
+(* PRINTING FUNCTIONS *)
+(**********************)
+(*
+let print_context ctx ppf =
+  let print_binding (x, t) ppf =
+    Print.print ppf "%t : %t" (Untyped.Variable.print ~safe:true x) (Type.print_ty t)
+  in
+  Print.sequence ", " print_binding ctx ppf
+
+let print_ty_scheme ty_sch ppf =
+  let (ctx, ty, cnstrs) = beautify_ty_scheme ty_sch in
+  Print.print ppf "%t |- %t | %t"
+    (print_context ctx)
+    (Type.print_ty ty)
+    (Constraints.print cnstrs)
+
+let print_dirty_scheme ty_sch ppf =
+  let (ctx, (ty, drt), cnstrs) = beautify_dirty_scheme ty_sch in
+  Print.print ppf "%t |- %t ! %t | %t"
+    (print_context ctx)
+    (Type.print_ty ty)
+    (Type.print_dirt drt)
+    (Constraints.print cnstrs) *)

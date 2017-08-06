@@ -43,4 +43,8 @@ val abstract : loc:Location.t -> ty_scheme -> dirty_scheme -> abstraction_scheme
 (* SMART CONSTRUCTORS *)
 (**********************)
 
+(* Create a scheme for a variable expression *)
+val var : Untyped.variable -> Type.ty -> ty_scheme
+
+(* Create a scheme for a Lambda expression *)
 val lambda : loc:Location.t -> ty_scheme -> dirty_scheme -> ty_scheme

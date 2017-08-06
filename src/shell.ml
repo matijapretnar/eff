@@ -49,7 +49,8 @@ let rec exec_cmd ppf interactive st cmd =
   let loc = cmd.Untyped.location in
   let cmd_typed, typing = Infer.type_toplevel ~loc st.typing cmd.Untyped.term in
   let st = {st with typing} in
-  match cmd_typed with
+  st
+  (* match cmd_typed with
   | Typed.Computation c ->
     let v = Eval.run st.environment c in
     if interactive then Format.fprintf ppf "@[- : ? = %t@]@."
@@ -65,7 +66,7 @@ let rec exec_cmd ppf interactive st cmd =
   | Typed.DefEffect (eff, (ty1, ty2)) ->
     st
   | Typed.Quit -> exit 0
-  | Typed.Use fn -> use_file ppf st (fn, interactive)
+  | Typed.Use fn -> use_file ppf st (fn, interactive) *)
   (* | Typed.TopLet (defs, vars) ->
     let env =
       List.fold_right
@@ -92,7 +93,7 @@ let rec exec_cmd ppf interactive st cmd =
   (* | Typed.TypeOf c ->
     Format.fprintf ppf "@[- : %t@]@." (print_dirty_scheme c.Typed.scheme);
     st *)
-  | Typed.External (x, ty, f) ->
+  (* | Typed.External (x, ty, f) ->
     begin match Common.lookup f External.values with
       | Some v -> {
           st with environment = RuntimeEnv.update x v st.environment;
@@ -100,7 +101,7 @@ let rec exec_cmd ppf interactive st cmd =
       | None -> Error.runtime "unknown external symbol %s." f
     end
   | Typed.Tydef tydefs ->
-    st
+    st *)
 
 and use_file ppf env (filename, interactive) =
   let cmds = Lexer.read_file (parse Parser.file) filename in

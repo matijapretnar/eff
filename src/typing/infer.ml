@@ -11,44 +11,48 @@ eg.
   (fun x -> x);;
 *)
 
-(* Parameter matching
-    By using global map
-      This can be done since each ty_param is generated uniquely
-    What to do when types don't match
-*)
-
-(* Constraints
-    What do they do?
-*)
-
-(* Typedef and polytype, how do they go together
-*)
-
 type state = {
   context : TypingEnv.t;
   effects : (Type.ty * Type.ty) Untyped.EffectMap.t
 }
 
+(* Get the type of a constant *)
 let ty_of_const = function
   | Const.Integer _ -> Type.int_ty
   | Const.String _ -> Type.string_ty
   | Const.Boolean _ -> Type.bool_ty
   | Const.Float _ -> Type.float_ty
 
-let add_effect env eff (ty1, ty2) =
-  {env with effects = Untyped.EffectMap.add eff (ty1, ty2) env.effects}
 
-let add_def env x ty_sch =
-  {env with context = TypingEnv.update env.context x ty_sch}
-
+(* Infer the effect or throw an error when the effect doesn't exist *)
 let infer_effect ~loc env eff =
   try
     eff, (Untyped.EffectMap.find eff env.effects)
   with
-  | Not_found -> Error.typing ~loc "Unbound effect %s" eff
+    | Not_found -> Error.typing ~loc "Unbound effect %s" eff
 
-let extend_env vars env =
+(* Add an effect to the environment *)
+let add_effect env eff (ty1, ty2) =
+  {env with effects = Untyped.EffectMap.add eff (ty1, ty2) env.effects}
+
+(* Add x : Typed.variable, ty_sch : Scheme.ty_scheme to the environment *)
+let add_def env x ty_sch =
+  {env with context = TypingEnv.update env.context x ty_sch}
+
+(* Add vars : (Typed.variable * Scheme.ty_scheme) list to the environment *)
+let add_multiple_defs vars env =
   List.fold_right (fun (x, ty_sch) env -> {env with context = TypingEnv.update env.context x ty_sch}) vars env
+
+(* Lookup a type scheme for a variable in the typing environment
+    Otherwise, create a new scheme (and add it to the typing environment)
+*)
+let get_var_scheme_env st x =
+  begin match TypingEnv.lookup st.context x with
+    | Some ty_sch -> ty_sch, st
+    | None -> let ty = Type.fresh_ty () in
+              let sch = Scheme.var x ty in
+              sch, add_def st x sch
+  end
 
 (**************************)
 (* PATTERN TYPE INFERENCE *)
@@ -100,21 +104,20 @@ let rec type_expr st {Untyped.term=expr; Untyped.location=loc} = type_plain_expr
 (* Type a plain expression *)
 and type_plain_expr st loc = function
   | Untyped.Var x ->
-    let ty_sch = begin match TypingEnv.lookup st.context x with
-      | Some ty_sch -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-      | None -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-      end
-    in
-    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    (* Print.debug "Variable: %t" (Location.print loc); *)
+    let ty_sch, st = get_var_scheme_env st x in
+    Ctor.var ~loc x ty_sch, st
   | Untyped.Const const ->
-    Ctor.const ~loc const
+    (* Print.debug "Constant: %t" (Location.print loc); *)
+    Ctor.const ~loc const, st
   | Untyped.Tuple es -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Record lst -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Variant (lbl, e) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Lambda (p, c) ->
+    (* Print.debug "Lambda: %t" (Location.print loc); *)
     let pat = type_pattern st p in
-    let comp = type_comp st c in
-    Ctor.lambda ~loc pat comp
+    let comp, st = type_comp st c in
+    Ctor.lambda ~loc pat comp, st
   | Untyped.Effect eff -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Handler h -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
@@ -130,15 +133,17 @@ and type_comp st {Untyped.term=comp; Untyped.location=loc} = type_plain_comp st 
 (* Type a plain computation *)
 and type_plain_comp st loc = function
   | Untyped.Value e ->
-    let typed_e = type_expr st e in
-    Ctor.value ~loc typed_e
+    (* Print.debug "Value: %t" (Location.print loc); *)
+    let typed_e, st = type_expr st e in
+    Ctor.value ~loc typed_e, st
   | Untyped.Match (e, cases) ->
     assert false
     (* Typed.match' ~loc (type_expr env e) (List.map (type_abstraction env) cases) *)
   | Untyped.Apply (e1, e2) ->
-    let expr1 = type_expr st e1 in
-    let expr2 = type_expr st e1 in
-    Ctor.apply ~loc expr1 expr2
+    (* Print.debug "Application: %t" (Location.print loc); *)
+    let expr1, st = type_expr st e1 in
+    let expr2, st = type_expr st e2 in
+    Ctor.apply ~loc expr1 expr2, st
   | Untyped.Handle (e, c) ->
     assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
     (* Typed.handle ~loc (type_expr env e) (type_comp env c) *)
@@ -160,8 +165,8 @@ and type_plain_comp st loc = function
 let type_toplevel ~loc st = function
   (* Main toplevel command for toplevel computations *)
   | Untyped.Computation c ->
-      let c = type_comp st c in
-      (* Print.debug "A LOT OF CONSTRAINTS"; *)
+      (* Do not capture state since we do not want to persist it *)
+      let c, _ = type_comp st c in
       Typed.Computation c, st
   (* Use keyword: include a file *)
   | Untyped.Use fn ->
