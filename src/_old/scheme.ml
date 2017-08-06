@@ -1,4 +1,4 @@
-(* type context = (Untyped.variable, Type.ty) Common.assoc
+type context = (Untyped.variable, Type.ty) Common.assoc
 type 'a t = context * 'a * Constraints.t
 type ty_scheme = Type.ty t
 type dirty_scheme = Type.dirty t
@@ -239,4 +239,3 @@ let is_surely_pure ?(loc=Location.unknown) (ctx, (_, drt), cnstrs) =
 *)
 let is_surely_pure_for_handler (ctx, (_, drt), cnstrs) eff_clause =
   Constraints.is_surely_pure_for_handler cnstrs drt eff_clause
- *)

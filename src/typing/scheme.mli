@@ -1,3 +1,7 @@
+(********************)
+(* TYPE DEFINITIONS *)
+(********************)
+
 (* Represents a context and contains all free variables that occur *)
 type context = (Untyped.variable, Type.ty) Common.assoc
 
@@ -13,8 +17,9 @@ type abstraction_scheme = (Type.ty * Type.dirty) t
 (* Type scheme for effect clauses *)
 type abstraction2_scheme = (Type.ty * Type.ty * Type.dirty) t
 
-(* Refresh a type scheme *)
-val refresh : ty_scheme -> ty_scheme
+(*************************)
+(* INTERFACE DEFINITIONS *)
+(*************************)
 
 (* Make a simple (empty) type scheme *)
 val simple : 'a -> 'a t
@@ -25,5 +30,17 @@ val add_to_context : Untyped.variable -> Type.ty -> ty_scheme -> ty_scheme
 (* Get the type from a type scheme *)
 val get_type : ty_scheme -> Type.ty
 
+(* Makes a scheme dirty *)
+val make_dirty : ty_scheme -> dirty_scheme
+
+(* Refresh a type scheme *)
+val refresh : ty_scheme -> ty_scheme
+
 (* Make a type scheme for an abstraction *)
 val abstract : loc:Location.t -> ty_scheme -> dirty_scheme -> abstraction_scheme
+
+(**********************)
+(* SMART CONSTRUCTORS *)
+(**********************)
+
+val lambda : loc:Location.t -> ty_scheme -> dirty_scheme -> ty_scheme

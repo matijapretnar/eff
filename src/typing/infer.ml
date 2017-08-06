@@ -11,6 +11,19 @@ eg.
   (fun x -> x);;
 *)
 
+(* Parameter matching
+    By using global map
+      This can be done since each ty_param is generated uniquely
+    What to do when types don't match
+*)
+
+(* Constraints
+    What do they do?
+*)
+
+(* Typedef and polytype, how do they go together
+*)
+
 type state = {
   context : TypingEnv.t;
   effects : (Type.ty * Type.ty) Untyped.EffectMap.t
@@ -41,9 +54,7 @@ let extend_env vars env =
 (* PATTERN TYPE INFERENCE *)
 (**************************)
 
-let rec type_pattern st {Untyped.term=pat; Untyped.location=loc} =
-  let scheme, pattern = type_plain_pattern st pat in
-  Typed.annotate pattern scheme loc
+let rec type_pattern st {Untyped.term=pat; Untyped.location=loc} = type_plain_pattern st loc pat
 
 (* [type_pattern p] infers the type scheme of a pattern [p].
    This consists of:
@@ -52,32 +63,30 @@ let rec type_pattern st {Untyped.term=pat; Untyped.location=loc} =
    - constraints connecting all these types.
    Note that unlike in ordinary type schemes, context types are positive while
    pattern type is negative. *)
-and type_plain_pattern st = function
+and type_plain_pattern st loc = function
   | Untyped.PVar x ->
-      let ty = Type.fresh_ty () in
-      let sch = Scheme.simple ty in
-      let sch = Scheme.add_to_context x ty sch in
-      sch, Typed.PVar x
+    Ctor.pvar ~loc x
+
   | Untyped.PAs (p, x) ->
-      assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
   | Untyped.PNonbinding ->
-      assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
   | Untyped.PConst const ->
-      assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
   | Untyped.PTuple ps ->
-      assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
   | Untyped.PRecord [] ->
-      assert false
+    assert false
 
   | Untyped.PRecord (((fld, _) :: _) as lst) ->
-      assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
   | Untyped.PVariant (lbl, p) ->
-      assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
 (*****************************)
 (* EXPRESSION TYPE INFERENCE *)
@@ -98,15 +107,14 @@ and type_plain_expr st loc = function
     in
     assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Const const ->
-      Ctor.const ~loc const
+    Ctor.const ~loc const
   | Untyped.Tuple es -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Record lst -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Variant (lbl, e) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Lambda (p, c) ->
-    assert false
-    (* let sch, pt = type_pattern st p in
-    let ct, constraints = type_comp st c in
-    Typed.Lambda (pt, Scheme.get_type sch, ct), constraints *)
+    let pat = type_pattern st p in
+    let comp = type_comp st c in
+    Ctor.lambda ~loc pat comp
   | Untyped.Effect eff -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Handler h -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
@@ -124,16 +132,25 @@ and type_plain_comp st loc = function
   | Untyped.Value e ->
     let typed_e = type_expr st e in
     Ctor.value ~loc typed_e
-  | Untyped.Match (e, cases) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  | Untyped.Apply (e1, e2) ->
+  | Untyped.Match (e, cases) ->
     assert false
-    (* let expr1, _ = type_expr st e1 in
-    let expr2, _ = type_expr st e2 in
-    (* Smartconstructors.apply ~loc expr1 expr2, constraints *)
-    Typed.Apply (expr1, expr2), [] *)
-  | Untyped.Handle (e, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  | Untyped.Let (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  | Untyped.LetRec (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    (* Typed.match' ~loc (type_expr env e) (List.map (type_abstraction env) cases) *)
+  | Untyped.Apply (e1, e2) ->
+    let expr1 = type_expr st e1 in
+    let expr2 = type_expr st e1 in
+    Ctor.apply ~loc expr1 expr2
+  | Untyped.Handle (e, c) ->
+    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    (* Typed.handle ~loc (type_expr env e) (type_comp env c) *)
+  | Untyped.Let (defs, c) ->
+    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    (* let env', defs' = type_let_defs ~loc env defs in
+    Typed.let' ~loc defs' (type_comp env' c) *)
+  | Untyped.LetRec (defs, c) ->
+    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    (* let env', defs' = type_let_rec_defs ~loc env defs in
+    let env', defs' = type_let_rec_defs ~loc env' defs in
+    Typed.let_rec' ~loc defs' (type_comp env' c) *)
 
 (***************************)
 (* TOPLEVEL TYPE INFERENCE *)
@@ -143,42 +160,42 @@ and type_plain_comp st loc = function
 let type_toplevel ~loc st = function
   (* Main toplevel command for toplevel computations *)
   | Untyped.Computation c ->
-    let c = type_comp st c in
-    (* Print.debug "A LOT OF CONSTRAINTS"; *)
-    Typed.Computation c, st
+      let c = type_comp st c in
+      (* Print.debug "A LOT OF CONSTRAINTS"; *)
+      Typed.Computation c, st
   (* Use keyword: include a file *)
   | Untyped.Use fn ->
-    Typed.Use fn, st
+      Typed.Use fn, st
   (* Reset keyword *)
   | Untyped.Reset ->
-    Typed.Reset, st
+      Typed.Reset, st
   (* Help keyword *)
   | Untyped.Help ->
-    Typed.Help, st
+      Typed.Help, st
   (* Quit keyword: exit interactive toplevel *)
   | Untyped.Quit ->
-    Typed.Quit, st
+      Typed.Quit, st
   (* Type definition *)
   | Untyped.Tydef defs ->
-    Tctx.extend_tydefs ~loc defs;
-    Typed.Tydef defs, st
+      Tctx.extend_tydefs ~loc defs;
+      Typed.Tydef defs, st
   (* Top let command: let x = c1 in c2 *)
   | Untyped.TopLet defs ->
-    assert false
+      assert false
   (* Top letrec command: let rec x = c1 in c2 *)
   | Untyped.TopLetRec defs'' ->
-    assert false
+      assert false
   (* Exernal definition *)
   | Untyped.External (x, ty, f) ->
-    let st = add_def st x (Scheme.simple ty) in
-    Typed.External (x, ty, f), st
+      let st = add_def st x (Scheme.simple ty) in
+      Typed.External (x, ty, f), st
   (* Define an effect *)
   | Untyped.DefEffect (eff, (ty1, ty2)) ->
-    let st = add_effect st eff (ty1, ty2) in
-    Typed.DefEffect ((eff, (ty1, ty2)), (ty1, ty2)), st
+      let st = add_effect st eff (ty1, ty2) in
+      Typed.DefEffect ((eff, (ty1, ty2)), (ty1, ty2)), st
   (* Get the type of *)
   | Untyped.TypeOf c ->
-    assert false
+      assert false
 
 (**************************)
 (* COMMAND TYPE INFERENCE *)

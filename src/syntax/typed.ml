@@ -111,6 +111,10 @@ let abstraction ?loc p c : abstraction =
     location = loc;
   }
 
+(**********************)
+(* PRINTING FUNCTIONS *)
+(**********************)
+
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
 
 let print_variable = Variable.print ~safe:true
@@ -209,6 +213,10 @@ and print_let_rec_abstraction (x, a) ppf =
   Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction a)
 
 
+(************************)
+(* REFRESHING FUNCTIONS *)
+(************************)
+
 let rec refresh_pattern sbst p =
   let sbst', p' = refresh_pattern' sbst p.term in
   sbst', {p with term = p'}
@@ -296,6 +304,11 @@ and refresh_abs2 sbst a2 =
   (* a2a2 @@ refresh_abs sbst @@ a22a @@ a2 *)
   assert false
 
+
+(**************************)
+(* SUBSTITUTION FUNCTIONS *)
+(**************************)
+
 let rec subst_expr sbst e =
   {e with term = subst_expr' sbst e.term}
 and subst_expr' sbst = function
@@ -349,8 +362,9 @@ and subst_abs2 sbst a2 =
   (* a2a2 @@ subst_abs sbst @@ a22a @@ a2 *)
   assert false
 
-
-
+(********************)
+(* HELPER FUNCTIONS *)
+(********************)
 
 let assoc_equal eq flds flds' : bool =
   let rec equal_fields flds =

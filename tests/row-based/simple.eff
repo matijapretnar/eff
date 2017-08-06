@@ -2,6 +2,10 @@ external ( + ) : int -> int -> int = "+";;
 
 3;;
 
-(* (fun 2 -> 3);; *)
+(fun x -> x) ;;
 
 (fun x -> x) 3;;
+
+(fun x -> (fun y -> (x, y)));;
+
+let double = fun f x -> f (f x);;

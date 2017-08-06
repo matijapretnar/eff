@@ -1,4 +1,4 @@
-(* module TyPoset = Poset.Make(struct
+module TyPoset = Poset.Make(struct
     type t = Params.ty_param
     let compare = Pervasives.compare
     let print = Params.print_ty_param ~non_poly:Params.empty
@@ -364,4 +364,4 @@ let print constraints ppf =
   if not (RegionPoset.is_empty constraints.region_poset) then Format.pp_print_string ppf "; ";
   Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Params.print_region_param x) (Symbols.top ())) (FullRegions.elements constraints.full_regions) ppf;
   if not (FullRegions.is_empty constraints.full_regions) then Format.pp_print_string ppf "; ";
-  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Params.print_dirt_param x) (Symbols.top ())) (FullDirts.elements constraints.full_dirts) ppf *)
+  Print.sequence "," (fun x ppf -> Format.fprintf ppf "%t = %s" (Params.print_dirt_param x) (Symbols.top ())) (FullDirts.elements constraints.full_dirts) ppf

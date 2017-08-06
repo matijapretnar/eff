@@ -1,4 +1,4 @@
-(* type context = (Untyped.variable, Type.ty) Common.assoc
+type context = (Untyped.variable, Type.ty) Common.assoc
 type 'a t = context * 'a * Constraints.t
 type ty_scheme = Type.ty t
 type dirty_scheme = Type.dirty t
@@ -33,4 +33,4 @@ val print_ty_scheme : ty_scheme -> Format.formatter -> unit
 val print_dirty_scheme : dirty_scheme -> Format.formatter -> unit
 val is_pure : ?loc:Location.t -> dirty_scheme -> bool
 val is_surely_pure : ?loc:Location.t -> dirty_scheme -> bool
-val is_surely_pure_for_handler : dirty_scheme -> Common.effect list -> bool *)
+val is_surely_pure_for_handler : dirty_scheme -> Common.effect list -> bool
