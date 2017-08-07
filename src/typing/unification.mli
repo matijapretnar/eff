@@ -32,8 +32,27 @@ val empty : t
 (* Add a typing constraint: T = S *)
 val add_ty_constraint : Type.ty -> Type.ty -> t -> t
 
+(* Add a dirt constraint: ... *)
+(* val add_dirt_constraint : *)
+
+(* Add a dirty constraint: ... *)
+(* val add_dirty_constraint : *)
+
 (* Combine two constraint sets to a single set *)
 val union : t -> t -> t
+
+(* Combine mutliple constraint sets to a single set *)
+val union_list : t list -> t
+
+(* Unify the constraints to find a solution *)
+val unify : t -> t
+
+(* Perform a substitution *)
+(* val subst : Params.substitution -> t -> t *)
+
+(***********************)
+(* PRINTING OPERATIONS *)
+(***********************)
 
 (* Print constraints *)
 val print : t -> Format.formatter -> unit

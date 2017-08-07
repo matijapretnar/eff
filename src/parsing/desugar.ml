@@ -188,7 +188,7 @@ let fresh_variable = function
 
 let id_abstraction loc =
   let x = fresh_variable (Some "gen_id_par") in
-  (Untyped.add_loc (Untyped.PVar x) loc, (Untyped.add_loc (Untyped.Value (Untyped.add_loc (Untyped.Var x) loc)) loc))
+  (Untyped.annotate (Untyped.PVar x) loc, (Untyped.annotate (Untyped.Value (Untyped.annotate (Untyped.Var x) loc)) loc))
 
 let pattern ?(forbidden=[]) (p, loc) =
   let vars = ref [] in
@@ -239,7 +239,7 @@ let rec expression ctx (t, loc) =
     | Sugared.Function cs ->
       let x = fresh_variable (Some "gen_function") in
       let cs = List.map (abstraction ctx) cs in
-      [], Untyped.Lambda ((Untyped.add_loc (Untyped.PVar x) loc), Untyped.add_loc (Untyped.Match (Untyped.add_loc (Untyped.Var x) loc, cs)) loc)
+      [], Untyped.Lambda ((Untyped.annotate (Untyped.PVar x) loc), Untyped.annotate (Untyped.Match (Untyped.annotate (Untyped.Var x) loc, cs)) loc)
     | Sugared.Handler cs ->
       let w, h = handler loc ctx cs in
       w, Untyped.Handler h
@@ -263,27 +263,27 @@ let rec expression ctx (t, loc) =
     | Sugared.Handle _ | Sugared.Conditional _ ->
       let x = fresh_variable (Some "gen_bind") in
       let c = computation ctx (t, loc) in
-      let w = [Untyped.add_loc (Untyped.PVar x) loc, c] in
+      let w = [Untyped.annotate (Untyped.PVar x) loc, c] in
       w, Untyped.Var x
   in
-  w, Untyped.add_loc e loc
+  w, Untyped.annotate e loc
 
 and computation ctx (t, loc) =
   let if_then_else e c1 c2 =
     Untyped.Match (e, [
-        ((Untyped.add_loc (Untyped.PConst (Const.of_true)) c1.Untyped.location), c1);
-        ((Untyped.add_loc (Untyped.PConst (Const.of_false)) c2.Untyped.location), c2)
+        ((Untyped.annotate (Untyped.PConst (Const.of_true)) c1.Untyped.location), c1);
+        ((Untyped.annotate (Untyped.PConst (Const.of_false)) c2.Untyped.location), c2)
       ])
   in
   let w, c = match t with
     | Sugared.Apply ((Sugared.Apply ((Sugared.Var "&&", loc1), t1), loc2), t2) ->
       let w1, e1 = expression ctx t1 in
       let c2 = computation ctx t2 in
-      w1, if_then_else e1 c2 (Untyped.add_loc (Untyped.Value (Untyped.add_loc (Untyped.Const Const.of_false) loc2)) loc2)
+      w1, if_then_else e1 c2 (Untyped.annotate (Untyped.Value (Untyped.annotate (Untyped.Const Const.of_false) loc2)) loc2)
     | Sugared.Apply ((Sugared.Apply ((Sugared.Var "||", loc1), t1), loc2), t2) ->
       let w1, e1 = expression ctx t1 in
       let c2 = computation ctx t2 in
-      w1, if_then_else e1 (Untyped.add_loc (Untyped.Value (Untyped.add_loc (Untyped.Const Const.of_true) loc2)) loc2) c2
+      w1, if_then_else e1 (Untyped.annotate (Untyped.Value (Untyped.annotate (Untyped.Const Const.of_true) loc2)) loc2) c2
     | Sugared.Apply (t1, t2) ->
       let w1, e1 = expression ctx t1 in
       let w2, e2 = expression ctx t2 in
@@ -333,8 +333,8 @@ and computation ctx (t, loc) =
       w, Untyped.Value e
   in
   match w with
-  | [] -> Untyped.add_loc c loc
-  | _ :: _ -> Untyped.add_loc (Untyped.Let (w, Untyped.add_loc c loc)) loc
+  | [] -> Untyped.annotate c loc
+  | _ :: _ -> Untyped.annotate (Untyped.Let (w, Untyped.annotate c loc)) loc
 
 and abstraction ctx (p, t) =
   let vars, p = pattern p in
@@ -351,7 +351,7 @@ and let_rec ctx (e, loc) =
   | Sugared.Function cs ->
     let x = fresh_variable (Some "gen_let_rec_function") in
     let cs = List.map (abstraction ctx) cs in
-    (Untyped.add_loc (Untyped.PVar x) loc), Untyped.add_loc (Untyped.Match (Untyped.add_loc (Untyped.Var x) loc, cs)) loc
+    (Untyped.annotate (Untyped.PVar x) loc), Untyped.annotate (Untyped.Match (Untyped.annotate (Untyped.Var x) loc, cs)) loc
   | _ -> Error.syntax ~loc "This kind of expression is not allowed in a recursive definition"
 
 and expressions ctx = function

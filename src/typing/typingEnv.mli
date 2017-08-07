@@ -15,6 +15,6 @@ val empty : t
     to the variable [x] in the context [ctx]. *)
 val lookup : t -> Typed.variable -> Scheme.ty_scheme option
 
-(** [extend x ty_scheme ctx] returns the context [ctx] extended with
+(** [update x ty_scheme ctx] returns the context [ctx] extended with
     a variable [x] bound to the type scheme [ty_scheme]. *)
 val update : t -> Typed.variable -> Scheme.ty_scheme -> t

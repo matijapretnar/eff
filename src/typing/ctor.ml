@@ -8,6 +8,15 @@ let backup_location loc locs =
   | None -> Location.union locs
   | Some loc -> loc
 
+(* TEMPORARY *)
+let abstraction ?loc p c : Typed.abstraction =
+  let loc = backup_location loc [p.Typed.location; c.Typed.location] in
+  {
+    term = (p, c);
+    scheme = Scheme.abstract ~loc p.scheme c.scheme;
+    location = loc;
+  }
+
 (*********************************)
 (* EXPRESSION SMART CONSTRUCTORS *)
 (*********************************)
@@ -46,9 +55,8 @@ let apply ?loc e1 e2 =
   let ctx_e1, ty_e1, cnstrs_e1 = e1.Typed.scheme in
   let ctx_e2, ty_e2, cnstrs_e2 = e2.Typed.scheme in
   let drty = Type.fresh_dirty () in
-  let constraints = Unification.empty in
-  (* Constraints.list_union [cnstrs_e1; cnstrs_e2] *)
-  (* |> Constraints.add_ty_constraint ~loc ty_e1 (Type.Arrow (ty_e2, drty)) in *)
+  let constraints = Unification.union cnstrs_e1 cnstrs_e2  in
+  let constraints = Unification.add_ty_constraint ty_e1 (Type.Arrow (ty_e2, drty)) constraints in
   let drty_sch = (ctx_e1 @ ctx_e2, drty, constraints) in
   Typed.annotate (Typed.Apply (e1, e2)) drty_sch loc
 

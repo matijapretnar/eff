@@ -10,4 +10,4 @@ external ( + ) : int -> int -> int = "+";;
 
 (* (fun x -> (fun y -> (x, y)));; *)
 
-fun f x -> f (f x);; 
+(* fun f x -> f (f x);; *)

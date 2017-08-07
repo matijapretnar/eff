@@ -1,5 +1,7 @@
 (* This file contains all smartconstructors for the typed terms *)
 
+val abstraction : ?loc:Location.t -> Typed.pattern -> Typed.computation -> Typed.abstraction
+
 (**************************)
 (* EXPRESSION CONSTRUCTORS*)
 (**************************)
