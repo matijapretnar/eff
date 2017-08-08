@@ -159,10 +159,17 @@ and type_plain_comp st = function
       (Typed.Value typed_e, (tt, Types.Empty) ,constraints)
   | Untyped.Match (e, cases) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Apply (e1, e2) -> 
-      let (typed_e1, tt_1, constraints_1) = type_expr st e1 in
-      let (typed_e2, tt_2, constraints_2) = type_expr st e2 in 
       Print.debug "in infer apply";
-      ((Typed.Apply (typed_e1,typed_e2)), (tt_2,Types.Empty), [])
+      let (typed_e1, tt_1, constraints_1) = type_expr st e1 in
+      let (typed_e2, tt_2, constraints_2) = type_expr st e2 in
+      let new_ty_var = Types.Tyvar (Params.fresh_ty_param ()) in 
+      let new_ty_var_2 = Types.Tyvar (Params.fresh_ty_param ()) in
+      let new_dirt_var = Types.DirtVar (Params.fresh_dirt_param ()) in 
+      let fresh_dirty_ty =  (new_ty_var_2, new_dirt_var) in 
+      let cons1 = Types.LeqTy (tt_1 , Types.Arrow (new_ty_var, fresh_dirty_ty)) in
+      let cons2 = Types.LeqTy (tt_2, new_ty_var) in 
+      let constraints = List.append [cons1, cons2] (List.append constraints_1 constraints_2) in 
+      ((Typed.Apply (typed_e1,typed_e2)), fresh_dirty_ty , constraints)
   | Untyped.Handle (e, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Let (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.LetRec (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
