@@ -110,11 +110,13 @@ let extend_env vars env =
 
 let rec type_expr st {Untyped.term=expr; Untyped.location=loc} =
   let e, ttype, constraints = type_plain_expr st expr in
-  Typed.annotate e loc, constraints
+  Typed.annotate e loc, ttype, constraints
 and type_plain_expr st = function
   | Untyped.Var x ->
     let ty_sch = begin match TypingEnv.lookup st.context x with
-      | Some ty_sch -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+      | Some ty_schi -> let (_,v_source_type,_) = ty_schi in 
+                       let v_target_type = source_to_target v_source_type in 
+                       (Typed.Var x, v_target_type, [])
       | None -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
       end
     in
@@ -130,18 +132,32 @@ and type_plain_expr st = function
   | Untyped.Tuple es -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Record lst -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Variant (lbl, e) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  | Untyped.Lambda a -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+  | Untyped.Lambda a -> 
+        Print.debug "in infer lambda";
+        let (p,c) = a in 
+        let new_ty_var = Params.fresh_ty_param () in
+        let in_ty = Types.Tyvar new_ty_var in
+        let target_pattern = (type_pattern p) in
+        let (target_comp_term,target_comp_ty,target_comp_cons)= (type_comp st c) in
+        (*need to extend the environment*)
+        let target_ty = Types.Arrow (in_ty, target_comp_ty) in
+        let target_lambda = Typed.Lambda (target_pattern,in_ty,target_comp_term) in 
+        (target_lambda,target_ty,[])
   | Untyped.Effect eff -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Handler h -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 and type_comp st {Untyped.term=comp; Untyped.location=loc} =
-  let c, constraints = type_plain_comp st comp in
-  Typed.annotate c loc, constraints
+  let c, ttype, constraints = type_plain_comp st comp in
+  Typed.annotate c loc, ttype, constraints
 and type_plain_comp st = function
   | Untyped.Value e ->
-      let typed_e, constraints = type_expr st e in
-      Typed.Value typed_e, constraints
+      let (typed_e, tt, constraints) = type_expr st e in
+      (Typed.Value typed_e, (tt, Types.Empty) ,constraints)
   | Untyped.Match (e, cases) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  | Untyped.Apply (e1, e2) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+  | Untyped.Apply (e1, e2) -> 
+      let (typed_e1, tt_1, constraints_1) = type_expr st e1 in
+      let (typed_e2, tt_2, constraints_2) = type_expr st e2 in 
+      Print.debug "in infer apply";
+      ((Typed.Apply (typed_e1,typed_e2)), (tt_2,Types.Empty), [])
   | Untyped.Handle (e, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Let (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.LetRec (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
@@ -149,7 +165,7 @@ and type_plain_comp st = function
 
 let type_toplevel ~loc st = function
   | Untyped.Computation c ->
-    let c, constraints = type_comp st c in
+    let c, _,constraints = type_comp st c in
     Print.debug "A LOT OF CONSTRAINTS";
     Typed.Computation c, st
   | Untyped.Use fn ->
