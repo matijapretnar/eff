@@ -54,4 +54,5 @@ val lambda : loc:Location.t -> ty_scheme -> dirty_scheme -> ty_scheme
 (**********************)
 
 val print_ty_scheme : ty_scheme -> Format.formatter -> unit
+
 val print_dirty_scheme : dirty_scheme -> Format.formatter -> unit

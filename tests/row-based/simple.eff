@@ -8,6 +8,10 @@ external ( + ) : int -> int -> int = "+";;
 
 (fun x -> x) 3;;
 
+effect Op : unit -> int;;
+
+(fun x -> #Op ())
+
 (* (fun x -> (fun y -> (x, y)));; *)
 
 (* fun f x -> f (f x);; *)

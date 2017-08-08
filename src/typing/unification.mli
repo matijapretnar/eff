@@ -48,7 +48,7 @@ val union_list : t list -> t
 val unify : t -> t
 
 (* Perform a substitution *)
-(* val subst : Params.substitution -> t -> t *)
+val subst : Params.substitution -> t -> t
 
 (***********************)
 (* PRINTING OPERATIONS *)

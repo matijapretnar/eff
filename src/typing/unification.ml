@@ -1,3 +1,7 @@
+(********************)
+(* TYPE DEFINITIONS *)
+(********************)
+
 (* Typing constraint *)
 type ty_cnstr = (Type.ty * Type.ty)
 (* Dirt constraint *)
@@ -9,20 +13,15 @@ type t = {
   dirt : dirt_cnstr list
 }
 
-(* The empty constraint set *)
-let empty = {
-  types = [];
-  dirt = []
-}
+(******************)
+(* HELPER METHODS *)
+(******************)
 
 (* Add a type constraint to a constraint set *)
 let add_type ty cnstr = {
   types = ty :: cnstr.types;
   dirt = cnstr.dirt
 }
-
-(* Add a type constraint to a constraint set *)
-let add_ty_constraint ty1 ty2 cnstr = add_type (ty1, ty2) cnstr
 
 (* Add a drt constraint to a constraint set *)
 let add_dirt drt cnstr = {
@@ -33,6 +32,21 @@ let add_dirt drt cnstr = {
 let combine_types types cnstr = List.fold_right add_type types cnstr
 
 let combine_dirts types cnstr = List.fold_right add_dirt types cnstr
+
+let subst_ty_cnstr sbst (ty1, ty2) = (Type.subst_ty sbst ty1, Type.subst_ty sbst ty2)
+
+(*************************)
+(* CONSTRAINT OPERATIONS *)
+(*************************)
+
+(* The empty constraint set *)
+let empty = {
+  types = [];
+  dirt = []
+}
+
+(* Add a type constraint to a constraint set *)
+let add_ty_constraint ty1 ty2 cnstr = add_type (ty1, ty2) cnstr
 
 (* Combine two constraint sets to a single set *)
 let union c1 c2 =
@@ -46,6 +60,14 @@ let union_list c_list =
 
 (* Unify the constraints to find a solution *)
 let unify cnstr = cnstr
+
+(* Perform a substitution *)
+let subst sbst constraints =
+  {constraints with types=List.map (subst_ty_cnstr sbst) constraints.types }
+
+(***********************)
+(* PRINTING OPERATIONS *)
+(***********************)
 
 (* Print constraints *)
 let print constraints ppf =

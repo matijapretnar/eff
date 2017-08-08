@@ -70,27 +70,20 @@ let rec type_pattern st {Untyped.term=pat; Untyped.location=loc} = type_plain_pa
 and type_plain_pattern st loc = function
   | Untyped.PVar x ->
     Ctor.pvar ~loc x
-
   | Untyped.PAs (p, x) ->
-    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-
+    assert false
   | Untyped.PNonbinding ->
-    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-
+    assert false
   | Untyped.PConst const ->
-    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-
+    assert false
   | Untyped.PTuple ps ->
-    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-
+    assert false
   | Untyped.PRecord [] ->
     assert false
-
   | Untyped.PRecord (((fld, _) :: _) as lst) ->
-    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-
+    assert false
   | Untyped.PVariant (lbl, p) ->
-    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    assert false
 
 (*****************************)
 (* EXPRESSION TYPE INFERENCE *)
@@ -104,22 +97,24 @@ let rec type_expr st {Untyped.term=expr; Untyped.location=loc} = type_plain_expr
 (* Type a plain expression *)
 and type_plain_expr st loc = function
   | Untyped.Var x ->
-    (* Print.debug "Variable: %t" (Location.print loc); *)
     let ty_sch, st = get_var_scheme_env st x in
     Ctor.var ~loc x ty_sch, st
   | Untyped.Const const ->
-    (* Print.debug "Constant: %t" (Location.print loc); *)
     Ctor.const ~loc const, st
-  | Untyped.Tuple es -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  | Untyped.Record lst -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  | Untyped.Variant (lbl, e) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+  | Untyped.Tuple es ->
+    assert false
+  | Untyped.Record lst ->
+    assert false
+  | Untyped.Variant (lbl, e) ->
+    assert false
   | Untyped.Lambda (p, c) ->
-    (* Print.debug "Lambda: %t" (Location.print loc); *)
     let pat = type_pattern st p in
     let comp, st = type_comp st c in
     Ctor.lambda ~loc pat comp, st
-  | Untyped.Effect eff -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  | Untyped.Handler h -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+  | Untyped.Effect eff ->
+    assert false
+  | Untyped.Handler h ->
+    assert false
 
 (******************************)
 (* COMPUTATION TYPE INFERENCE *)
@@ -133,26 +128,24 @@ and type_comp st {Untyped.term=comp; Untyped.location=loc} = type_plain_comp st 
 (* Type a plain computation *)
 and type_plain_comp st loc = function
   | Untyped.Value e ->
-    (* Print.debug "Value: %t" (Location.print loc); *)
     let typed_e, st = type_expr st e in
     Ctor.value ~loc typed_e, st
   | Untyped.Match (e, cases) ->
     assert false
     (* Typed.match' ~loc (type_expr env e) (List.map (type_abstraction env) cases) *)
   | Untyped.Apply (e1, e2) ->
-    (* Print.debug "Application: %t" (Location.print loc); *)
     let expr1, st = type_expr st e1 in
     let expr2, st = type_expr st e2 in
     Ctor.apply ~loc expr1 expr2, st
   | Untyped.Handle (e, c) ->
-    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    assert false
     (* Typed.handle ~loc (type_expr env e) (type_comp env c) *)
   | Untyped.Let (defs, c) ->
-    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    assert false
     (* let env', defs' = type_let_defs ~loc env defs in
     Typed.let' ~loc defs' (type_comp env' c) *)
   | Untyped.LetRec (defs, c) ->
-    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+    assert false
     (* let env', defs' = type_let_rec_defs ~loc env defs in
     let env', defs' = type_let_rec_defs ~loc env' defs in
     Typed.let_rec' ~loc defs' (type_comp env' c) *)

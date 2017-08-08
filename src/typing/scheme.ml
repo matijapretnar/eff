@@ -88,17 +88,15 @@ let lambda ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
 (* PRINTING FUNCTIONS *)
 (**********************)
 
-(* @TODO Constraint substitution *)
 let subst_ty_scheme sbst (ctx, ty, cnstrs) =
   let ty = Type.subst_ty sbst ty in
-  (* let cnstrs = Constraints.subst sbst cnstrs in *)
+  let cnstrs = Unification.subst sbst cnstrs in
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   (ctx, ty, cnstrs)
 
-(* @TODO Constraint substitution *)
 let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
   let drty = Type.subst_dirty sbst drty in
-  (* let cnstrs = Constraints.subst sbst cnstrs in *)
+  let cnstrs = Unification.subst sbst cnstrs in
   let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
   (ctx, drty, cnstrs)
 
