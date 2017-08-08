@@ -129,7 +129,12 @@ and type_plain_expr st = function
         | Float _ -> (Typed.Const const, Types.PrimTy FloatTy, [])
       end 
       
-  | Untyped.Tuple es -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+  | Untyped.Tuple es -> 
+      let target_list = (List.map (type_expr st) es) in
+      let target_terms = Typed.Tuple (List.fold_right (fun (x,_,_) xs -> x ::xs )  target_list []) in
+      let target_types = Types.Tuple(List.fold_right (fun (_,x,_) xs -> x::xs )  target_list []) in
+      let target_cons = List.fold_right (fun (_,_,x) xs -> List.append x xs )  target_list [] in
+      (target_terms, target_types, target_cons) 
   | Untyped.Record lst -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Variant (lbl, e) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Lambda a -> 
