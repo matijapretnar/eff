@@ -113,14 +113,11 @@ let rec type_expr st {Untyped.term=expr; Untyped.location=loc} =
   Typed.annotate e loc, ttype, constraints
 and type_plain_expr st = function
   | Untyped.Var x ->
-    (* let ty_sch = begin match TypingEnv.lookup st.context x with
-      | Some ty_schi -> let (_,v_source_type,_) = ty_schi in 
-                       let v_target_type = source_to_target v_source_type in 
-                       (Typed.Var x, v_target_type, [])
+    let target_ty = begin match TypingEnv.lookup st.context x with
+      | Some ty_schi ->  source_to_target ty_schi
       | None -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-      end
-    in *)
-    assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+      end in
+      (Typed.Var x, target_ty, [])
   | Untyped.Const const -> 
         begin match const with
         | Integer _ -> (Typed.Const const, Types.PrimTy IntTy, [])
@@ -144,7 +141,8 @@ and type_plain_expr st = function
         let in_ty = Types.Tyvar new_ty_var in
         let target_pattern = (type_pattern p) in
         let (target_comp_term,target_comp_ty,target_comp_cons)= (type_comp st c) in
-        (*need to extend the environment*)
+        let Untyped.PVar x = p.Untyped.term in
+        let new_st = add_def st x (Type.Param new_ty_var) in
         let target_ty = Types.Arrow (in_ty, target_comp_ty) in
         let target_lambda = Typed.Lambda (target_pattern,in_ty,target_comp_term) in 
         (target_lambda,target_ty,[])
