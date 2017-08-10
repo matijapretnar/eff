@@ -166,10 +166,28 @@ and type_plain_comp st = function
       let fresh_dirty_ty =  (new_ty_var_2, new_dirt_var) in 
       let cons1 = Types.LeqTy (tt_1 , Types.Arrow (new_ty_var, fresh_dirty_ty)) in
       let cons2 = Types.LeqTy (tt_2, new_ty_var) in 
-      let constraints = List.append [cons1, cons2] (List.append constraints_1 constraints_2) in 
+      let constraints = List.append [cons1;cons2] (List.append constraints_1 constraints_2) in 
       ((Typed.Apply (typed_e1,typed_e2)), fresh_dirty_ty , constraints)
-  | Untyped.Handle (e, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+  
+  | Untyped.Handle (e, c) ->
+      let alpha_2 = Types.Tyvar (Params.fresh_ty_param ()) in
+      let alpha_1 = Types.Tyvar (Params.fresh_ty_param ()) in
+      let gamma_1 = Types.DirtVar (Params.fresh_dirt_param ()) in 
+      let gamma_2 = Types.DirtVar (Params.fresh_dirt_param ()) in
+      let dirty_1 = (alpha_1, gamma_1) in 
+      let dirty_2 = (alpha_2, gamma_2) in
+      let (typed_exp,exp_type,exp_constraints) = type_expr st e in
+      let (typed_comp,comp_dirty_type,comp_constraints) = type_comp st c in
+      let (comp_type,comp_dirt) = comp_dirty_type in
+      let cons1 = Types.LeqTy (exp_type, (Types.Handler (dirty_1, dirty_2))) in
+      let cons2 = Types.LeqTy (comp_type, alpha_1) in
+      let cons3 = Types.LeqDirt (comp_dirt, gamma_1) in 
+      let constraints = List.append [cons1;cons2;cons3] (List.append exp_constraints comp_constraints) in
+      ((Typed.Handle (typed_exp, typed_comp)) , dirty_2 , constraints)
+
+  
   | Untyped.Let (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+  
   | Untyped.LetRec (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
 
