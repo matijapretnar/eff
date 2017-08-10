@@ -139,10 +139,10 @@ and type_plain_expr st = function
         let (p,c) = a in 
         let new_ty_var = Params.fresh_ty_param () in
         let in_ty = Types.Tyvar new_ty_var in
+        let Untyped.PVar x = p.Untyped.term in
         let target_pattern = (type_pattern p) in
         let new_st = add_def st x (Type.Param new_ty_var) in
         let (target_comp_term,target_comp_ty,target_comp_cons)= (type_comp new_st c) in
-        let Untyped.PVar x = p.Untyped.term in
         let target_ty = Types.Arrow (in_ty, target_comp_ty) in
         let target_lambda = Typed.Lambda (target_pattern,in_ty,target_comp_term) in 
         (target_lambda,target_ty,[])

@@ -70,6 +70,7 @@ and plain_computation =
   | Apply of expression * expression
   | Handle of expression * computation
   | Call of effect * expression * abstraction
+  | Op of expression
   | Bind of computation * abstraction
   | CastComp of computation * dirty_coercion
 
@@ -81,6 +82,7 @@ and ty_coercion =
   | HandlerCoersion of dirty_coercion * dirty_coercion
   | TyCoercionVar of Params.ty_coercion_param
   | SequenceTyCoer of  ty_coercion * ty_coercion
+  | TupleCoercion of ty_coercion list
   | LeftArrow of ty_coercion
   | ForallTy of (Params.ty_param) * ty_coercion
   | ApplyTy of ty_coercion * target_ty
