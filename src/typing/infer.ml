@@ -113,13 +113,13 @@ let rec type_expr st {Untyped.term=expr; Untyped.location=loc} =
   Typed.annotate e loc, ttype, constraints
 and type_plain_expr st = function
   | Untyped.Var x ->
-    let ty_sch = begin match TypingEnv.lookup st.context x with
+    (* let ty_sch = begin match TypingEnv.lookup st.context x with
       | Some ty_schi -> let (_,v_source_type,_) = ty_schi in 
                        let v_target_type = source_to_target v_source_type in 
                        (Typed.Var x, v_target_type, [])
       | None -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
       end
-    in
+    in *)
     assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Const const -> 
         begin match const with

@@ -16,9 +16,9 @@ let beautify2 ty1 ty2 cnstrs =
   let skeletons = Constraints.skeletons cnstrs in
   (ty1, ty2, skeletons)
 
-let refresh (ctx, ty, cnstrs) =
+(* let refresh (ctx, ty, cnstrs) =
   let sbst = Params.refreshing_subst () in
-  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst sbst cnstrs
+  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst sbst cnstrs *)
 
 let ty_param_less p q (ctx, ty, cnstrs) =
   (ctx, ty, Constraints.add_ty_constraint p q cnstrs)

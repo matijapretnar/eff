@@ -6,7 +6,7 @@ type abstraction_scheme = (Type.ty * Type.dirty) t
 type abstraction2_scheme = (Type.ty * Type.ty * Type.dirty) t
 type change
 
-val refresh : ty_scheme -> ty_scheme
+(* val refresh : ty_scheme -> ty_scheme *)
 val simple : 'a -> 'a t
 val abstract : loc:Location.t -> ty_scheme -> dirty_scheme -> abstraction_scheme
 val abstract2 : loc:Location.t -> ty_scheme -> ty_scheme -> dirty_scheme -> abstraction2_scheme
