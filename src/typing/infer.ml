@@ -145,9 +145,12 @@ and type_plain_expr st = function
         let (target_comp_term,target_comp_ty,target_comp_cons)= (type_comp new_st c) in
         let target_ty = Types.Arrow (in_ty, target_comp_ty) in
         let target_lambda = Typed.Lambda (target_pattern,in_ty,target_comp_term) in 
-        (target_lambda,target_ty,[])
+        (target_lambda,target_ty,target_comp_cons)
   | Untyped.Effect eff -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Handler h -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+
+
+
 and type_comp st {Untyped.term=comp; Untyped.location=loc} =
   let c, ttype, constraints = type_plain_comp st comp in
   Typed.annotate c loc, ttype, constraints
@@ -167,7 +170,9 @@ and type_plain_comp st = function
       let cons1 = Types.LeqTy (tt_1 , Types.Arrow (new_ty_var, fresh_dirty_ty)) in
       let cons2 = Types.LeqTy (tt_2, new_ty_var) in 
       let constraints = List.append [cons1;cons2] (List.append constraints_1 constraints_2) in 
-      ((Typed.Apply (typed_e1,typed_e2)), fresh_dirty_ty , constraints)
+      let e1_coerced = Typed.annotate (Typed.CastExp (typed_e1, Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons1))) typed_e1.location in 
+      let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2,  Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons2))) typed_e2.location in 
+      ( (Typed.Apply (e1_coerced,e2_coerced) ), fresh_dirty_ty , constraints)
   
   | Untyped.Handle (e, c) ->
       let alpha_2 = Types.Tyvar (Params.fresh_ty_param ()) in
@@ -182,8 +187,13 @@ and type_plain_comp st = function
       let cons1 = Types.LeqTy (exp_type, (Types.Handler (dirty_1, dirty_2))) in
       let cons2 = Types.LeqTy (comp_type, alpha_1) in
       let cons3 = Types.LeqDirt (comp_dirt, gamma_1) in 
+      let coer1 = Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons1) in
+      let coer2 = Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons2) in
+      let coer3 = Typed.DirtCoercionVar( (Params.fresh_dirt_coercion_param ()), cons3) in 
+      let coer_exp = Typed.annotate (Typed.CastExp (typed_exp,coer1)) typed_exp.location in
+      let coer_comp =  Typed.annotate (Typed.CastComp (typed_comp, Typed.BangCoercion (coer2,coer3))) typed_comp.location in
       let constraints = List.append [cons1;cons2;cons3] (List.append exp_constraints comp_constraints) in
-      ((Typed.Handle (typed_exp, typed_comp)) , dirty_2 , constraints)
+      ((Typed.Handle (coer_exp, coer_comp)) , dirty_2 , constraints)
 
   
   | Untyped.Let (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)

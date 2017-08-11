@@ -80,7 +80,7 @@ and ty_coercion =
   | RefTy of Params.ty_param
   | ArrowCoersion of ty_coercion * dirty_coercion
   | HandlerCoersion of dirty_coercion * dirty_coercion
-  | TyCoercionVar of Params.ty_coercion_param
+  | TyCoercionVar of (Params.ty_coercion_param * Types.ct)
   | SequenceTyCoer of  ty_coercion * ty_coercion
   | TupleCoercion of ty_coercion list
   | LeftArrow of ty_coercion
@@ -91,7 +91,7 @@ and ty_coercion =
 
 and dirt_coercion = 
   | ReflDirt of Params.dirt_param
-  | DirtCoercionVar of Params.dirt_coercion_param
+  | DirtCoercionVar of (Params.dirt_coercion_param * Types.ct)
   | Empty of dirt
   | UnionTy of ( Common.effect * dirt_coercion)
   | SequenceDirtCoer of dirt_coercion * dirt_coercion
