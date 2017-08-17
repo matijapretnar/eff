@@ -114,7 +114,7 @@ let rec type_expr st {Untyped.term=expr; Untyped.location=loc} =
 and type_plain_expr st = function
   | Untyped.Var x ->
     let target_ty = begin match TypingEnv.lookup st.context x with
-      | Some ty_schi ->  source_to_target ty_schi
+      | Some ty_schi ->  ty_schi
       | None -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
       end in
       (Typed.Var x, target_ty, [])
@@ -141,7 +141,7 @@ and type_plain_expr st = function
         let in_ty = Types.Tyvar new_ty_var in
         let Untyped.PVar x = p.Untyped.term in
         let target_pattern = (type_pattern p) in
-        let new_st = add_def st x (Type.Param new_ty_var) in
+        let new_st = add_def st x in_ty in
         let (target_comp_term,target_comp_ty,target_comp_cons)= (type_comp new_st c) in
         let target_ty = Types.Arrow (in_ty, target_comp_ty) in
         let target_lambda = Typed.Lambda (target_pattern,in_ty,target_comp_term) in 
@@ -196,8 +196,24 @@ and type_plain_comp st = function
       ((Typed.Handle (coer_exp, coer_comp)) , dirty_2 , constraints)
 
   
-  | Untyped.Let (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  
+  | Untyped.Let (defs, c_2) -> 
+    let [(p_def, c_1)] = defs in 
+    let (typed_c1,(type_c1,dirt_c1),cons_c1) = type_comp st c_1 in
+    let Untyped.PVar x = p_def.Untyped.term in
+    let new_st = add_def st x type_c1 in 
+    let (typed_c2,(type_c2,dirt_c2),cons_c2) = type_comp new_st c_2 in 
+    let new_dirt_var = Types.DirtVar (Params.fresh_dirt_param ()) in 
+    let cons1 = Types.LeqDirt (dirt_c1,new_dirt_var) in
+    let cons2 = Types.LeqDirt (dirt_c2,new_dirt_var) in
+    let coer1 = Typed.DirtCoercionVar((Params.fresh_dirt_coercion_param ()), cons1) in 
+    let coer2 = Typed.DirtCoercionVar((Params.fresh_dirt_coercion_param ()), cons2) in 
+    let coer_c1 = Typed.annotate (Typed.CastComp_dirt (typed_c1, coer1) ) typed_c1.location in  
+    let coer_c2 = Typed.annotate (Typed.CastComp_dirt (typed_c2, coer2) ) typed_c2.location in
+    let typed_pattern = type_pattern p_def in 
+    let abstraction = Typed.annotate  (typed_pattern,coer_c2) (typed_c2.location) in 
+    let constraints = List.append [cons1;cons2] (List.append cons_c1 cons_c2) in
+    ((Typed.Bind (coer_c1,abstraction)), (type_c2,new_dirt_var), constraints) 
+
   | Untyped.LetRec (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
 

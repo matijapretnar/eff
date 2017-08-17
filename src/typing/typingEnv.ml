@@ -1,4 +1,4 @@
-type t = (Typed.variable, Type.ty) Common.assoc
+type t = (Typed.variable, Types.target_ty) Common.assoc
 
 let empty = []
 

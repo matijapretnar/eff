@@ -73,6 +73,8 @@ and plain_computation =
   | Op of expression
   | Bind of computation * abstraction
   | CastComp of computation * dirty_coercion
+  | CastComp_ty of computation * ty_coercion
+  | CastComp_dirt of computation * dirt_coercion
 
 and ty_coercion =
   | ReflInt
