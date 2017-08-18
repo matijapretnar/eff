@@ -27,3 +27,10 @@ and
  | BoolTy
  | StringTy
  | FloatTy
+
+
+val print_target_ty : ?max_level:int -> target_ty -> Format.formatter -> unit
+
+val print_target_dirt : dirt -> Format.formatter -> unit
+
+val print_constraint :  ct -> Format.formatter -> unit

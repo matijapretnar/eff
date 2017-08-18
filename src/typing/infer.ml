@@ -145,6 +145,7 @@ and type_plain_expr st = function
         let (target_comp_term,target_comp_ty,target_comp_cons)= (type_comp new_st c) in
         let target_ty = Types.Arrow (in_ty, target_comp_ty) in
         let target_lambda = Typed.Lambda (target_pattern,in_ty,target_comp_term) in 
+        Print.debug "lambda ty: %t" (Types.print_target_ty target_ty);
         (target_lambda,target_ty,target_comp_cons)
   | Untyped.Effect eff -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Handler h -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
@@ -163,6 +164,8 @@ and type_plain_comp st = function
       Print.debug "in infer apply";
       let (typed_e1, tt_1, constraints_1) = type_expr st e1 in
       let (typed_e2, tt_2, constraints_2) = type_expr st e2 in
+      Print.debug "e1 apply type : %t" (Types.print_target_ty tt_1);
+      Print.debug "e2 apply type : %t" (Types.print_target_ty tt_2);
       let new_ty_var = Types.Tyvar (Params.fresh_ty_param ()) in 
       let new_ty_var_2 = Types.Tyvar (Params.fresh_ty_param ()) in
       let new_dirt_var = Types.DirtVar (Params.fresh_dirt_param ()) in 
@@ -219,8 +222,9 @@ and type_plain_comp st = function
 
 let type_toplevel ~loc st = function
   | Untyped.Computation c ->
-    let c, _,constraints = type_comp st c in
-    Print.debug "A LOT OF CONSTRAINTS";
+    let c, (ttype,_),constraints = type_comp st c in
+    Print.debug "Computation type : %t" (Types.print_target_ty ttype);
+    List.map (fun cons -> Print.debug "constraint: %t" (Types.print_constraint cons)) constraints;
     Typed.Computation c, st
   | Untyped.Use fn ->
     Typed.Use fn, st
