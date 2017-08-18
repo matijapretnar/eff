@@ -81,8 +81,8 @@ type tydef =
   (** [ty] *)
 
 (* Toplevel commands (the first four do not need to be separated by [;;]) *)
-type toplevel = plain_toplevel * Location.t
-and plain_toplevel =
+type command = plain_command * Location.t
+and plain_command =
   | Tydef of (Common.tyname, (Common.typaram list * tydef)) Common.assoc
   (** [type t = tydef] *)
   | TopLet of (variable Pattern.t * term) list

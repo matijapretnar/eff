@@ -70,8 +70,7 @@
 %left  INFIXOP3 STAR MOD LAND LOR LXOR
 %right INFIXOP4 LSL LSR ASR
 
-%start <Sugared.toplevel list> file
-%start <Sugared.toplevel> commandline
+%start <Sugared.command list> commands
 
 %%
 
@@ -79,24 +78,24 @@
 
 (* If you're going to "optimize" this, please make sure we don't require;; at the
    end of the file. *)
-file:
-  | lst = file_topdef
+commands:
+  | lst = topdef_list
     { lst }
   | t = topterm EOF
      { [t] }
-  | t = topterm SEMISEMI lst = file
+  | t = topterm SEMISEMI lst = commands
      { t :: lst }
   | dir = topdirective EOF
      { [dir] }
-  | dir = topdirective SEMISEMI lst = file
+  | dir = topdirective SEMISEMI lst = commands
      { dir :: lst }
 
-file_topdef:
+topdef_list:
   | EOF
      { [] }
-  | def = topdef SEMISEMI lst = file
+  | def = topdef SEMISEMI lst = commands
      { def :: lst }
-  | def = topdef lst = file_topdef
+  | def = topdef lst = topdef_list
      { def :: lst }
 
 commandline:

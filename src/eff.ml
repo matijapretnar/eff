@@ -55,16 +55,6 @@ let anonymous str =
   Config.interactive_shell := false
 
 
-(* Parser wrapper *)
-let parse parser lex =
-  try
-    parser Lexer.token lex
-  with
-  | Parser.Error ->
-      Error.syntax ~loc:(Location.of_lexeme lex) ""
-  | Failure "lexing: empty token" ->
-      Error.syntax ~loc:(Location.of_lexeme lex) "unrecognised symbol."
-
 (* Interactive toplevel *)
 let toplevel ctxenv =
   let eof = match Sys.os_type with
@@ -78,9 +68,7 @@ let toplevel ctxenv =
     let ctxenv = ref ctxenv in
     while true do
       try
-        let cmd = Lexer.read_toplevel (Shell.parse Parser.commandline) () in
-        let cmd = Desugar.toplevel cmd in
-        ctxenv := Shell.exec_cmd Format.std_formatter true !ctxenv cmd
+        ctxenv := Shell.use_toplevel Format.std_formatter !ctxenv
       with
         | Error.Error err -> Error.print err
         | Sys.Break -> prerr_endline "Interrupted."

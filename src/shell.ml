@@ -7,16 +7,6 @@ let help_text = "Toplevel commands:
 #quit;;            exit eff
 #use \"<file>\";;  load commands from file";;
 
-(* Parser wrapper *)
-let parse parser lex =
-  try
-    parser Lexer.token lex
-  with
-  | Parser.Error ->
-      Error.syntax ~loc:(Location.of_lexeme lex) ""
-  | Failure "lexing: empty token" ->
-      Error.syntax ~loc:(Location.of_lexeme lex) "unrecognised symbol."
-
 type state = {
   environment : RuntimeEnv.t;
   change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
@@ -74,9 +64,10 @@ let rec exec_cmd ppf interactive st d =
       {st with change = new_change}
   | Untyped.Reset ->
       Tctx.reset ();
-      print_endline ("Environment reset."); initial_state
+      Format.fprintf ppf "Environment reset.";
+      initial_state
   | Untyped.Help ->
-      print_endline help_text;
+      Format.fprintf ppf "%s" help_text;
       st
   | Untyped.DefEffect (eff, (ty1, ty2)) ->
       {st with typing = Infer.add_effect st.typing eff (ty1, ty2)}
@@ -148,7 +139,28 @@ let rec exec_cmd ppf interactive st d =
         Tctx.extend_tydefs ~loc tydefs ;
         st
 
-and use_file ppf env (filename, interactive) =
-  let cmds = Lexer.read_file (parse Parser.file) filename in
+and desugar_and_exec_cmds ppf interactive env cmds =
   let cmds = List.map Desugar.toplevel cmds in
     List.fold_left (exec_cmd ppf interactive) env cmds
+
+(* Parser wrapper *)
+and parse lex =
+  try
+    Parser.commands Lexer.token lex
+  with
+  | Parser.Error ->
+      Error.syntax ~loc:(Location.of_lexeme lex) ""
+  | Failure "lexing: empty token" ->
+      Error.syntax ~loc:(Location.of_lexeme lex) "unrecognised symbol."
+
+and use_file ppf env (filename, interactive) =
+  Lexer.read_file parse filename
+  |> desugar_and_exec_cmds ppf interactive env
+
+and use_textfile ppf env str =
+  Lexer.read_string parse str
+  |> desugar_and_exec_cmds ppf true env
+
+and use_toplevel ppf env =
+  Lexer.read_toplevel parse ()
+  |> desugar_and_exec_cmds ppf true env
