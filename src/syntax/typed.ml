@@ -70,7 +70,7 @@ and plain_computation =
   | Apply of expression * expression
   | Handle of expression * computation
   | Call of effect * expression * abstraction
-  | Op of expression
+  | Op of effect * expression
   | Bind of computation * abstraction
   | CastComp of computation * dirty_coercion
   | CastComp_ty of computation * ty_coercion

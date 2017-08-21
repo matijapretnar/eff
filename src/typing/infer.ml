@@ -148,7 +148,10 @@ and type_plain_expr st = function
         let target_lambda = Typed.Lambda (target_pattern,in_ty,target_comp_term) in 
         Print.debug "lambda ty: %t" (Types.print_target_ty target_ty);
         (target_lambda,target_ty,target_comp_cons)
-  | Untyped.Effect eff -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+  | Untyped.Effect eff -> 
+        let (in_ty,out_ty) =  Untyped.EffectMap.find eff st.effects in
+        (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,Types.Union(eff,Types.Empty))), []) 
+        
   | Untyped.Handler h -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
 
@@ -167,17 +170,24 @@ and type_plain_comp st = function
       let (typed_e2, tt_2, constraints_2) = type_expr st e2 in
       Print.debug "e1 apply type : %t" (Types.print_target_ty tt_1);
       Print.debug "e2 apply type : %t" (Types.print_target_ty tt_2);
-      let new_ty_var = Types.Tyvar (Params.fresh_ty_param ()) in 
-      let new_ty_var_2 = Types.Tyvar (Params.fresh_ty_param ()) in
-      let new_dirt_var = Types.DirtVar (Params.fresh_dirt_param ()) in 
-      let fresh_dirty_ty =  (new_ty_var_2, new_dirt_var) in 
-      let cons1 = Types.LeqTy (tt_1 , Types.Arrow (new_ty_var, fresh_dirty_ty)) in
-      let cons2 = Types.LeqTy (tt_2, new_ty_var) in 
-      let constraints = List.append [cons1;cons2] (List.append constraints_1 constraints_2) in 
-      let e1_coerced = Typed.annotate (Typed.CastExp (typed_e1, Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons1))) typed_e1.location in 
-      let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2,  Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons2))) typed_e2.location in 
-      ( (Typed.Apply (e1_coerced,e2_coerced) ), fresh_dirty_ty , constraints)
-  
+      begin match typed_e1.term with
+      | Typed.Effect (eff, (eff_in,eff_out)) ->
+           let cons1 = Types.LeqTy (tt_2, eff_in) in
+           let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2, Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons1))) typed_e1.location in
+           let constraints = List.append [cons1] constraints_2 in
+           (Typed.Op ( (eff, (eff_in,eff_out)) ,e2_coerced), (eff_out, Types.Union(eff,Types.Empty)), constraints)
+      | _ ->
+          let new_ty_var = Types.Tyvar (Params.fresh_ty_param ()) in 
+          let new_ty_var_2 = Types.Tyvar (Params.fresh_ty_param ()) in
+          let new_dirt_var = Types.DirtVar (Params.fresh_dirt_param ()) in 
+          let fresh_dirty_ty =  (new_ty_var_2, new_dirt_var) in 
+          let cons1 = Types.LeqTy (tt_1 , Types.Arrow (new_ty_var, fresh_dirty_ty)) in
+          let cons2 = Types.LeqTy (tt_2, new_ty_var) in 
+          let constraints = List.append [cons1;cons2] (List.append constraints_1 constraints_2) in 
+          let e1_coerced = Typed.annotate (Typed.CastExp (typed_e1, Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons1))) typed_e1.location in 
+          let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2,  Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons2))) typed_e2.location in 
+          ( (Typed.Apply (e1_coerced,e2_coerced) ), fresh_dirty_ty , constraints)
+      end
   | Untyped.Handle (e, c) ->
       let alpha_2 = Types.Tyvar (Params.fresh_ty_param ()) in
       let alpha_1 = Types.Tyvar (Params.fresh_ty_param ()) in
@@ -223,8 +233,8 @@ and type_plain_comp st = function
 
 let type_toplevel ~loc st = function
   | Untyped.Computation c ->
-    let c, (ttype,_),constraints = type_comp st c in
-    Print.debug "Computation type : %t" (Types.print_target_ty ttype);
+    let c, (ttype,dirt),constraints = type_comp st c in
+    Print.debug "Computation type : %t ! {%t}" (Types.print_target_ty ttype) (Types.print_target_dirt dirt);
     List.map (fun cons -> Print.debug "constraint: %t" (Types.print_constraint cons)) constraints;
     Typed.Computation c, st
   | Untyped.Use fn ->
