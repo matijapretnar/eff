@@ -62,9 +62,9 @@ let rec exec_cmd ppf interactive st cmd =
   | Typed.Help ->
     print_endline help_text;
     st
-(*   | Typed.DefEffect (eff, (ty1, ty2)) ->
+   | Typed.DefEffect (eff, (ty1, ty2)) ->
     st
- *)  | Typed.Quit -> exit 0
+   | Typed.Quit -> exit 0
   | Typed.Use fn -> use_file ppf st (fn, interactive)
 (*   | Typed.TopLet (defs, vars) ->
     let env =

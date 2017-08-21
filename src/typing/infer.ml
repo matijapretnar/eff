@@ -33,6 +33,7 @@ let rec make_target_effects effects =
 
 let rec source_to_target ty = 
   begin match ty with
+    | T.Apply (ty_name, ([], _, _)) -> source_to_target (T.Basic ty_name)
     | T.Apply (_,_) -> assert false
     | T.Param x -> Types.Tyvar x
     | T.Basic s -> begin match s with
@@ -235,6 +236,7 @@ let type_toplevel ~loc st = function
   | Untyped.Quit ->
     Typed.Quit, st
   | Untyped.DefEffect ( eff , (ty1 , ty2) ) ->
+    Print.debug "%t ----> %t"  (Type.print_ty ty1) (Type.print_ty ty2);
     let target_ty1 = source_to_target ty1 in 
     let target_ty2 = source_to_target ty2 in
     let new_st =  add_effect st eff (target_ty1, target_ty2) in 
