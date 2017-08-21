@@ -8,7 +8,7 @@ let trim_context = Scheme.trim_context
 
 type state = {
   context : TypingEnv.t;
-  (* effects : (Type.ty * Type.ty) Untyped.EffectMap.t *)
+  effects : (Types.target_ty * Types.target_ty) Untyped.EffectMap.t
 }
 
 let ty_of_const = function
@@ -17,9 +17,9 @@ let ty_of_const = function
   | Const.Boolean _ -> Type.bool_ty
   | Const.Float _ -> Type.float_ty
 
-(* let add_effect env eff (ty1, ty2) =
+ let add_effect env eff (ty1, ty2) =
   {env with effects = Untyped.EffectMap.add eff (ty1, ty2) env.effects}
- *)
+
 let add_def env x ty_sch =
   {env with context = TypingEnv.update env.context x ty_sch}
 
@@ -234,7 +234,11 @@ let type_toplevel ~loc st = function
     Typed.Help, st
   | Untyped.Quit ->
     Typed.Quit, st
-
+  | Untyped.DefEffect ( eff , (ty1 , ty2) ) ->
+    let target_ty1 = source_to_target ty1 in 
+    let target_ty2 = source_to_target ty2 in
+    let new_st =  add_effect st eff (target_ty1, target_ty2) in 
+    Typed.DefEffect( eff , (target_ty1 , target_ty2) ) , new_st
 
 let type_cmd st cmd =
   let loc = cmd.Untyped.location in

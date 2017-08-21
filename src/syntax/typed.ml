@@ -6,7 +6,7 @@ module Variable = Symbol.Make(Symbol.String)
 module EffectMap = Map.Make(String)
 
 type variable = Variable.t
-type effect = Common.effect * (Type.ty * Type.ty)
+type effect = Common.effect * (Types.target_ty * Types.target_ty)
 
 type 'term annotation = {
   term: 'term;
@@ -124,7 +124,7 @@ and plain_toplevel =
   (* | TopLet of (pattern * computation) list * (variable * Scheme.ty_scheme) list *)
   (* | TopLetRec of (variable * abstraction) list * (variable * Scheme.ty_scheme) list *)
   (* | External of variable * Type.ty * string *)
-  (* | DefEffect of effect * (Type.ty * Type.ty) *)
+  | DefEffect of effect
   | Computation of computation
   | Use of string
   | Reset

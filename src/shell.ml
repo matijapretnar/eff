@@ -25,7 +25,8 @@ type state = {
 let initial_state = {
   environment = RuntimeEnv.empty;
   typing = {
-    Infer.context = TypingEnv.empty
+    Infer.context = TypingEnv.empty;
+    Infer.effects = Untyped.EffectMap.empty
   }
 }
 
