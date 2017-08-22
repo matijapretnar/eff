@@ -100,6 +100,7 @@ and dirt_coercion =
 
 and dirty_coercion =
   | BangCoercion of ty_coercion * dirt_coercion
+  | DirtyCoercionVar of (Params.dirty_coercion_param * Types.ct)
   | RightArrow of ty_coercion
   | RightHandler of ty_coercion
   | LeftHandler of ty_coercion

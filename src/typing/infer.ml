@@ -152,7 +152,43 @@ and type_plain_expr st = function
         let (in_ty,out_ty) =  Untyped.EffectMap.find eff st.effects in
         (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,Types.Union(eff,Types.Empty))), []) 
         
-  | Untyped.Handler h -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+  | Untyped.Handler h -> 
+        let out_ty = Types.Tyvar (Params.fresh_ty_param ()) in 
+        let out_dirt = Types.DirtVar (Params.fresh_dirt_param ()) in 
+        let Some (pv,cv) = h.value_clause in
+        let new_ty_var = Params.fresh_ty_param () in
+        let x_ty = Types.Tyvar new_ty_var in
+        let Untyped.PVar x = pv.Untyped.term in
+        let target_pattern = (type_pattern pv) in
+        let new_st = add_def st x x_ty in
+        let (cv_target, (b_r,delta_r), constraints_cr) = type_comp new_st cv in 
+        let mapper_function (eff,abs2) = 
+            let (in_op_ty,out_op_ty) =  Untyped.EffectMap.find eff st.effects in
+            let (x,k,c_op) = abs2 in
+            let Untyped.PVar x_var = x.Untyped.term in
+            let Untyped.PVar k_var = k.Untyped.term in
+            let alpha_op = Types.Tyvar (Params.fresh_ty_param ()) in 
+            let delta_op =  Types.DirtVar (Params.fresh_dirt_param ()) in 
+            let tmp_st = add_def st x_var in_op_ty in
+            let new_st = add_def tmp_st k_var (Types.Arrow(out_op_ty,(alpha_op,delta_op))) in 
+            let (typed_c_op, typed_c_op_type, c_op_constraints) = type_comp new_st c_op in 
+            let (out_op_ty,_) = typed_c_op_type in 
+            let cons_2 = Types.LeqDirty (typed_c_op_type , (out_ty,out_dirt)) in
+            let cons_3 = Types.LeqTy ( (Types.Arrow (out_op_ty, (out_ty,out_dirt))), (Types.Arrow (out_op_ty , (alpha_op,delta_op))) ) in 
+            let omega_2 = Typed.DirtyCoercionVar( (Params.fresh_dirty_coercion_param ()), cons_2) in
+            let omega_3 = Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons_3) in 
+            let coerced_c_op = Typed.annotate (Typed.CastComp (typed_c_op,omega_2)) typed_c_op.location in 
+            let l_var_name = Typed.Variable.fresh "fresh_var" in 
+            let l = Typed.PVar (l_var_name ) in 
+            let exp_l = Typed.annotate (Typed.Var l_var_name) Location.unknown in 
+            let coerced_l = Typed.annotate (Typed.CastExp (exp_l ,omega_3)) Location.unknown in
+            let lambda = Typed.annotate (Typed.Lambda ((type_pattern k), out_op_ty, coerced_c_op)) coerced_c_op.location in 
+            let application = Typed.annotate (Typed.Apply (lambda,coerced_l)) lambda.location in
+            let final_abstraction2 = Typed.annotate(((type_pattern x ), l , application) ) application.location in
+            let operation_clause = (eff, final_abstraction2) in 
+            (operation_clause, (List.append c_op_constraints[ cons_2;cons_3])) in 
+
+        assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
 
 
