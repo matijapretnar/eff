@@ -1,4 +1,5 @@
 module T = Type
+module Typed = Typed
 
 let ty_less = Scheme.ty_less
 let dirt_less = Scheme.dirt_less
@@ -153,8 +154,14 @@ and type_plain_expr st = function
         (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,Types.Union(eff,Types.Empty))), []) 
         
   | Untyped.Handler h -> 
-        let out_ty = Types.Tyvar (Params.fresh_ty_param ()) in 
-        let out_dirt = Types.DirtVar (Params.fresh_dirt_param ()) in 
+        let in_ty_var = Params.fresh_ty_param () in 
+        let in_dirt_var = Params.fresh_dirt_param () in
+        let out_ty_var = Params.fresh_ty_param () in 
+        let out_dirt_var = Params.fresh_dirt_param () in
+        let in_ty = Types.Tyvar in_ty_var in 
+        let in_dirt = Types.DirtVar (in_dirt_var) in 
+        let out_ty = Types.Tyvar (out_ty_var) in 
+        let out_dirt = Types.DirtVar (out_dirt_var) in 
         let Some (pv,cv) = h.value_clause in
         let new_ty_var = Params.fresh_ty_param () in
         let x_ty = Types.Tyvar new_ty_var in
@@ -162,6 +169,19 @@ and type_plain_expr st = function
         let target_pattern = (type_pattern pv) in
         let new_st = add_def st x x_ty in
         let (cv_target, (b_r,delta_r), constraints_cr) = type_comp new_st cv in 
+        let cons_1 = Types.LeqDirty ((b_r,delta_r),(out_ty,out_dirt)) in 
+        let omega_1 =  Typed.DirtyCoercionVar( (Params.fresh_dirty_coercion_param ()), cons_1) in
+        let coerced_cv = Typed.annotate (Typed.CastComp(cv_target,omega_1)) cv_target.location in
+        let cons_4 = Types.LeqTy(in_ty,x_ty) in
+        let omega_4 = Typed.TyCoercionVar((Params.fresh_ty_coercion_param ()), cons_4) in
+        let y_var_name = Typed.Variable.fresh "fresh_var" in 
+        let y = Typed.PVar (y_var_name ) in 
+        let annot_y = Typed.annotate y Location.unknown in 
+        let exp_y = Typed.annotate (Typed.Var y_var_name) Location.unknown in
+        let coerced_y = Typed.annotate (Typed.CastExp(exp_y,omega_4)) exp_y.location in 
+        let lambda_v_clause = Typed.annotate (Typed.Lambda((target_pattern, x_ty, coerced_cv))) coerced_cv.location in
+        let application_v_clause =Typed.annotate (Typed.Apply (lambda_v_clause, coerced_y)) Location.unknown in 
+        let target_v_clause = Typed.abstraction annot_y application_v_clause in 
         let mapper_function (eff,abs2) = 
             let (in_op_ty,out_op_ty) =  Untyped.EffectMap.find eff st.effects in
             let (x,k,c_op) = abs2 in
@@ -180,15 +200,33 @@ and type_plain_expr st = function
             let coerced_c_op = Typed.annotate (Typed.CastComp (typed_c_op,omega_2)) typed_c_op.location in 
             let l_var_name = Typed.Variable.fresh "fresh_var" in 
             let l = Typed.PVar (l_var_name ) in 
+            let annot_l = Typed.annotate l Location.unknown in
             let exp_l = Typed.annotate (Typed.Var l_var_name) Location.unknown in 
             let coerced_l = Typed.annotate (Typed.CastExp (exp_l ,omega_3)) Location.unknown in
             let lambda = Typed.annotate (Typed.Lambda ((type_pattern k), out_op_ty, coerced_c_op)) coerced_c_op.location in 
             let application = Typed.annotate (Typed.Apply (lambda,coerced_l)) lambda.location in
-            let final_abstraction2 = Typed.annotate(((type_pattern x ), l , application) ) application.location in
-            let operation_clause = (eff, final_abstraction2) in 
-            (operation_clause, (List.append c_op_constraints[ cons_2;cons_3])) in 
-
-        assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+            let final_abstraction2 = Typed.abstraction2 (type_pattern x ) annot_l  application in
+            let tagert_effect = (eff, (in_op_ty,out_op_ty)) in 
+            let operation_clause = ( tagert_effect, final_abstraction2) in 
+            (operation_clause, (List.append c_op_constraints [ cons_2;cons_3])) in
+        let map_list = Common.map mapper_function h.effect_clauses in 
+        let op_clauses = Common.map (fun (x,_) -> x) map_list in
+        let target_handler = 
+            {
+            Typed.effect_clauses = op_clauses;
+            value_clause = target_v_clause;
+            } in
+        let target_type = Types.Handler ((in_ty,in_dirt), (out_ty,out_dirt)) in 
+        let target_handler = Typed.annotate (Typed.Handler target_handler) Location.unknown in 
+        let handlers_ops = List.fold_right (fun ((eff,(_,_)),_) b -> Types.Union(eff,b)) op_clauses out_dirt in
+        let cons_5 = Types.LeqDirt (in_dirt, handlers_ops) in
+        let omega_5 = Typed.DirtCoercionVar ((Params.fresh_dirt_coercion_param ()) ,cons_5) in  
+        let in_handler_coercion = Typed.BangCoercion ((Typed.ReflTy (in_ty_var)), omega_5) in 
+        let out_handler_coercion = Typed.BangCoercion ((Typed.ReflTy(out_ty_var)), Typed.ReflDirt(out_dirt_var)) in 
+        let handler_coercion = Typed.HandlerCoercion (in_handler_coercion, out_handler_coercion) in 
+        let constraints = List.append ( List.append constraints_cr [cons_5] ) (List.flatten (Common.map (fun(_,x) -> x) map_list)) in 
+        let coerced_handler = Typed.CastExp (target_handler, handler_coercion) in  
+        (coerced_handler,target_type,constraints)
 
 
 

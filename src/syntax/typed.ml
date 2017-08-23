@@ -79,9 +79,9 @@ and plain_computation =
 and ty_coercion =
   | ReflInt
   | ReflBool
-  | RefTy of Params.ty_param
-  | ArrowCoersion of ty_coercion * dirty_coercion
-  | HandlerCoersion of dirty_coercion * dirty_coercion
+  | ReflTy of Params.ty_param
+  | ArrowCoercion of ty_coercion * dirty_coercion
+  | HandlerCoercion of dirty_coercion * dirty_coercion
   | TyCoercionVar of (Params.ty_coercion_param * Types.ct)
   | SequenceTyCoer of  ty_coercion * ty_coercion
   | TupleCoercion of ty_coercion list
@@ -136,6 +136,12 @@ and plain_toplevel =
 let abstraction ?loc p c : abstraction =
   {
     term = (p, c);
+    location = c.location;
+  }
+
+let abstraction2 ?loc p1 p2 c : abstraction2 =
+  {
+    term = (p1, p2, c);
     location = c.location;
   }
 
