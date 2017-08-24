@@ -42,3 +42,29 @@ let region_param index poly ppf =
   else
     let c = if poly then "_ρ" else "ρ" in
     Print.print ppf "%s%s" c (subscript (Some (index + 1)))
+
+
+let ty_coercion_param index poly ppf =
+  if !Config.ascii then
+    let c = if poly then "_tycoer" else "tycoer" in
+    Print.print ppf "%s%s" c (subscript (Some (index + 1)))
+  else
+    let c = if poly then "_τycoer" else "τycoer" in
+    Print.print ppf "%s%s" c (subscript (Some (index + 1)))
+
+
+let dirt_coercion_param index poly ppf =
+  if !Config.ascii then
+    let c = if poly then "_dirtcoer" else "dirtcoer" in
+    Print.print ppf "%s%s" c (subscript (Some (index + 1)))
+  else
+    let c = if poly then "_dirtcoer" else "dirtcoer" in
+    Print.print ppf "%s%s" c (subscript (Some (index + 1)))
+
+let dirty_coercion_param index poly ppf =
+  if !Config.ascii then
+    let c = if poly then "_dirtycoer" else "dirtycoer" in
+    Print.print ppf "%s%s" c (subscript (Some (index + 1)))
+  else
+    let c = if poly then "_dirtycoer" else "dirtycoer" in
+    Print.print ppf "%s%s" c (subscript (Some (index + 1)))

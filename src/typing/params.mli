@@ -49,6 +49,9 @@ val diff : t -> t -> t
 val uniq : t -> t
 
 val print_ty_param : ?non_poly:t -> ty_param -> Format.formatter -> unit
+val print_ty_coercion_param : ?non_poly:t -> ty_coercion_param -> Format.formatter -> unit
+val print_dirty_coercion_param : ?non_poly:t -> dirty_coercion_param -> Format.formatter -> unit
+val print_dirt_coercion_param : ?non_poly:t -> dirt_coercion_param -> Format.formatter -> unit
 val print_dirt_param : ?non_poly:t -> dirt_param -> Format.formatter -> unit
 val print_region_param : ?non_poly:t -> region_param -> Format.formatter -> unit
 val print_type_param : ty_param -> Format.formatter -> unit

@@ -96,5 +96,18 @@ let print_region_param ?(non_poly=empty) r ppf =
 let print_type_param t ppf =
   Format.fprintf ppf "'t%d" t
 
+
+let print_ty_coercion_param ?(non_poly=empty) t ppf =
+  let (ts, _, _) = non_poly in
+  Symbols.ty_coercion_param t (List.mem t ts) ppf
+
+let print_dirty_coercion_param ?(non_poly=empty) t ppf =
+  let (ts, _, _) = non_poly in
+  Symbols.dirty_coercion_param t (List.mem t ts) ppf
+
+let print_dirt_coercion_param ?(non_poly=empty) t ppf =
+  let (ts, _, _) = non_poly in
+  Symbols.dirt_coercion_param t (List.mem t ts) ppf
+
 let project_ty_params (ts, _, _) = ts
 let project_dirt_params (_, ds, _) = ds

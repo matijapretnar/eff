@@ -191,6 +191,8 @@ let rec print_expression ?max_level e ppf =
       (print_effect_clauses h.effect_clauses)
   | Effect eff ->
     print ~at_level:2 "effect %t" (print_effect eff)
+  | CastExp (e1,tc) ->
+    print "%t |> [%t]" (print_expression e1) (print_ty_coercion tc)
 
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -213,6 +215,49 @@ and print_computation ?max_level c ppf =
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
   | Bind (c1, a) ->
     print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
+  | CastComp (c1,dc) ->
+    print "%t |> [%t]" (print_computation c1) (print_dirty_coercion dc)
+  | CastComp_ty (c1,dc) ->
+    print "%t |> [%t]" (print_computation c1) (print_ty_coercion dc)
+  | CastComp_dirt (c1,dc) ->
+    print "%t |> [%t]" (print_computation c1) (print_dirt_coercion dc)
+
+
+and print_ty_coercion ?max_level c ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match c with
+  | ReflInt ->
+      print "<Int>"
+  | ReflBool -> 
+      print  "<Bool>"
+  | ReflTy p ->
+      Params.print_ty_param p ppf
+  | ArrowCoercion (tc,dc) ->
+      print  "%t -> %t" (print_ty_coercion tc) (print_dirty_coercion dc)
+  | HandlerCoercion (dc1,dc2) ->
+      print  "%t -> %t" (print_dirty_coercion dc1) (print_dirty_coercion dc2)
+  | TyCoercionVar (tcp, cons) ->
+     print "%t:%t" (Params.print_ty_coercion_param tcp) (Types.print_constraint cons)
+  | SequenceTyCoer (tc1,tc2) ->
+      print "%t ; %t" (print_ty_coercion tc1) (print_ty_coercion tc2)
+
+
+and print_dirty_coercion ?max_level c ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match c with 
+  | BangCoercion (tc, dirtc) ->
+      print "%t ! %t" (print_ty_coercion tc) (print_dirt_coercion dirtc )
+   | DirtyCoercionVar (tcp, cons) ->
+      print "%t:%t" (Params.print_dirty_coercion_param tcp) (Types.print_constraint cons)
+
+and print_dirt_coercion ?max_level c ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match c with 
+  | ReflDirt p ->
+      Params.print_dirt_param p ppf
+  | DirtCoercionVar(tcp, cons) ->
+      print "%t:%t" (Params.print_dirt_coercion_param tcp) (Types.print_constraint cons)
+
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
