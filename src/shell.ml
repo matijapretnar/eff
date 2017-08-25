@@ -48,13 +48,13 @@ let print_dirty_scheme =
 (* [exec_cmd env c] executes toplevel command [c] in global
     environment [(ctx, env)]. It prints the result on standard output
     and return the new environment. *)
-let rec exec_cmd ppf interactive st d =
+let rec exec_cmd ppf st d =
   let loc = d.Untyped.location in
   match d.Untyped.term with
   | Untyped.Computation c ->
       let drty_sch, c', new_change = infer_top_comp st c in
       let v = Eval.run st.environment c' in
-      if interactive then Format.fprintf ppf "@[- : %t = %t@]@."
+      Format.fprintf ppf "@[- : %t = %t@]@."
         (print_dirty_scheme drty_sch)
         (Value.print_value v);
       {st with change = new_change}
@@ -72,7 +72,7 @@ let rec exec_cmd ppf interactive st d =
   | Untyped.DefEffect (eff, (ty1, ty2)) ->
       {st with typing = Infer.add_effect st.typing eff (ty1, ty2)}
   | Untyped.Quit -> exit 0
-  | Untyped.Use fn -> use_file ppf st (fn, interactive)
+  | Untyped.Use fn -> use_file ppf fn st
   | Untyped.TopLet defs ->
       (* XXX What to do about the dirts? *)
       let vars, nonpoly, change = Infer.infer_let ~loc st.typing defs in
@@ -93,14 +93,12 @@ let rec exec_cmd ppf interactive st d =
           (fun (p,c) env -> let v = Eval.run env c in Eval.extend p v env)
           defs' st.environment
       in
-        if interactive then begin
           List.iter (fun (x, tysch) ->
                        match RuntimeEnv.lookup x env with
                          | None -> assert false
                          | Some v ->
                          Format.fprintf ppf "@[val %t : %t = %t@]@." (Untyped.Variable.print x) (print_ty_scheme (sch_change tysch)) (Value.print_value v))
-            vars
-        end;
+            vars;
         {
           typing = typing_env;
           change = top_change;
@@ -117,9 +115,7 @@ let rec exec_cmd ppf interactive st d =
         in
         List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
         let env = Eval.extend_let_rec st.environment defs' in
-          if interactive then begin
-            List.iter (fun (x, tysch) -> Format.fprintf ppf "@[val %t : %t = <fun>@]@." (Untyped.Variable.print x) (print_ty_scheme (sch_change tysch))) vars
-          end;
+        List.iter (fun (x, tysch) -> Format.fprintf ppf "@[val %t : %t = <fun>@]@." (Untyped.Variable.print x) (print_ty_scheme (sch_change tysch))) vars;
         {
           typing = typing_env;
           change = top_change;
@@ -139,9 +135,9 @@ let rec exec_cmd ppf interactive st d =
         Tctx.extend_tydefs ~loc tydefs ;
         st
 
-and desugar_and_exec_cmds ppf interactive env cmds =
+and desugar_and_exec_cmds ppf env cmds =
   let cmds = List.map Desugar.toplevel cmds in
-    List.fold_left (exec_cmd ppf interactive) env cmds
+    List.fold_left (exec_cmd ppf) env cmds
 
 (* Parser wrapper *)
 and parse lex =
@@ -153,14 +149,14 @@ and parse lex =
   | Failure "lexing: empty token" ->
       Error.syntax ~loc:(Location.of_lexeme lex) "unrecognised symbol."
 
-and use_file ppf env (filename, interactive) =
+and use_file ppf filename env =
   Lexer.read_file parse filename
-  |> desugar_and_exec_cmds ppf interactive env
+  |> desugar_and_exec_cmds ppf env
 
-and use_textfile ppf env str =
+and use_textfile ppf str env =
   Lexer.read_string parse str
-  |> desugar_and_exec_cmds ppf true env
+  |> desugar_and_exec_cmds ppf env
 
 and use_toplevel ppf env =
   Lexer.read_toplevel parse ()
-  |> desugar_and_exec_cmds ppf true env
+  |> desugar_and_exec_cmds ppf env

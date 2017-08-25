@@ -1,8 +1,9 @@
 let usage = "Usage: eff [option] ... [file] ..."
 
 (* A list of files to be loaded and run. *)
-let files = ref []
-let add_file interactive filename = (files := (filename, interactive) :: !files)
+let file_queue = ref []
+let enqueue_file ~print_output filename =
+    file_queue := (filename, print_output) :: !file_queue
 
 (* Command-line options *)
 let options = Arg.align [
@@ -42,7 +43,7 @@ let options = Arg.align [
     Arg.Clear Config.interactive_shell,
     " Do not run the interactive toplevel");
   ("-l",
-    Arg.String (fun str -> add_file false str),
+    Arg.String (fun str -> enqueue_file ~print_output:false str),
     "<file> Load <file> into the initial environment");
   ("-V",
     Arg.Set_int Config.verbosity,
@@ -51,7 +52,7 @@ let options = Arg.align [
 
 (* Treat anonymous arguments as files to be run. *)
 let anonymous str =
-  add_file true str;
+  enqueue_file ~print_output:true str;
   Config.interactive_shell := false
 
 
@@ -98,12 +99,12 @@ let main =
               lst
     end;
   (* Files were listed in the wrong order, so we reverse them *)
-  files := List.rev !files;
+  file_queue := List.rev !file_queue;
   (* Load the pervasives. *)
   begin
     match !Config.pervasives_file with
     | Config.PervasivesNone -> ()
-    | Config.PervasivesFile f -> add_file false f
+    | Config.PervasivesFile f -> enqueue_file ~print_output:false f
     | Config.PervasivesDefault ->
       (* look for pervasives next to the executable and in the installation
       directory if they are not there *)
@@ -111,11 +112,19 @@ let main =
       let f = (if Sys.file_exists pervasives_development
         then pervasives_development
         else Filename.concat Version.effdir "pervasives.eff") in
-      add_file false f
+      enqueue_file ~print_output:false f
   end;
   try
     (* Run and load all the specified files. *)
-    let ctxenv = List.fold_left (Shell.use_file Format.std_formatter) Shell.initial_state !files in
+    let ignore_all_formatter =
+      Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ())
+    in
+    let ctxenv = List.fold_left (fun env (filename, print_output) ->
+      if print_output then
+        Shell.use_file Format.std_formatter filename env
+      else
+        Shell.use_file ignore_all_formatter filename env
+    ) Shell.initial_state !file_queue in
     if !Config.interactive_shell then toplevel ctxenv
   with
     Error.Error err -> Error.print err; exit 1
