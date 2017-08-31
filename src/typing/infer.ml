@@ -307,10 +307,11 @@ and type_plain_comp st = function
 
 let type_toplevel ~loc st = function
   | Untyped.Computation c ->
-    let c, (ttype,dirt),constraints = type_comp st c in
+    let ct, (ttype,dirt),constraints = type_comp st c in
+    Print.debug "Computation : %t" (Typed.print_computation ct);
     Print.debug "Computation type : %t ! {%t}" (Types.print_target_ty ttype) (Types.print_target_dirt dirt);
     List.map (fun cons -> Print.debug "constraint: %t" (Types.print_constraint cons)) constraints;
-    Typed.Computation c, st
+    Typed.Computation ct, st
   | Untyped.Use fn ->
     Typed.Use fn, st
   | Untyped.Reset ->

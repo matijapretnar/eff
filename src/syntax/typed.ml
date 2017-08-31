@@ -182,8 +182,8 @@ let rec print_expression ?max_level e ppf =
     print "%s" lbl
   | Variant (lbl, Some e) ->
     print ~at_level:1 "%s %t" lbl (print_expression e)
-  | Lambda (_,_,_) ->
-    assert false (*Still needs to be done*)
+  | Lambda (x,t,c) ->
+    print "fun (%t:%t) -> %t" (print_pattern x) (Types.print_target_ty t) (print_computation c)
   | Handler h ->
     print "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
              ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
@@ -213,6 +213,8 @@ and print_computation ?max_level c ppf =
   | Call (eff, e, a) ->
     print ~at_level:1 "call %t %t (@[fun %t@])"
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
+  | Op (eff,e) -> 
+    print ~at_level:1 "(#%t %t)" (print_effect eff) (print_expression e)
   | Bind (c1, a) ->
     print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
   | CastComp (c1,dc) ->
