@@ -119,6 +119,12 @@ and abstraction = (pattern * computation) annotation
 and abstraction2 = (pattern * pattern * computation) annotation
 
 
+type omega_ct =
+    | TyOmega of (Params.ty_coercion_param * Types.ct)
+    | DirtOmega of (Params.dirt_coercion_param * Types.ct)
+    | DirtyOmega of  (Params.dirty_coercion_param * Types.ct)
+
+
 type toplevel = plain_toplevel * Location.t
 and plain_toplevel =
   (* | Tydef of (Common.tyname, Params.t * Tctx.tydef) Common.assoc *)

@@ -153,7 +153,7 @@ and type_plain_expr st = function
         let (in_ty,out_ty) =  Untyped.EffectMap.find eff st.effects in
         (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,Types.Union(eff,Types.Empty))), []) 
         
-  | Untyped.Handler h -> 
+   | Untyped.Handler h -> 
         let in_ty_var = Params.fresh_ty_param () in 
         let in_dirt_var = Params.fresh_dirt_param () in
         let out_ty_var = Params.fresh_ty_param () in 
@@ -170,10 +170,14 @@ and type_plain_expr st = function
         let new_st = add_def st x x_ty in
         let (cv_target, (b_r,delta_r), constraints_cr) = type_comp new_st cv in 
         let cons_1 = Types.LeqDirty ((b_r,delta_r),(out_ty,out_dirt)) in 
-        let omega_1 =  Typed.DirtyCoercionVar( (Params.fresh_dirty_coercion_param ()), cons_1) in
+        let coerp1 = Params.fresh_dirty_coercion_param () in 
+        let omega_1 =  Typed.DirtyCoercionVar( coerp1, cons_1) in
+        let omega_cons_1 = Typed.DirtyOmega(coerp1,cons_1) in 
         let coerced_cv = Typed.annotate (Typed.CastComp(cv_target,omega_1)) cv_target.location in
         let cons_4 = Types.LeqTy(in_ty,x_ty) in
-        let omega_4 = Typed.TyCoercionVar((Params.fresh_ty_coercion_param ()), cons_4) in
+        let coerp4 = Params.fresh_ty_coercion_param () in 
+        let omega_4 = Typed.TyCoercionVar(coerp4, cons_4) in
+        let omega_cons_4 = Typed.TyOmega (coerp4, cons_4) in 
         let y_var_name = Typed.Variable.fresh "fresh_var" in 
         let y = Typed.PVar (y_var_name ) in 
         let annot_y = Typed.annotate y Location.unknown in 
@@ -195,8 +199,12 @@ and type_plain_expr st = function
             let (out_op_ty,_) = typed_c_op_type in 
             let cons_2 = Types.LeqDirty (typed_c_op_type , (out_ty,out_dirt)) in
             let cons_3 = Types.LeqTy ( (Types.Arrow (out_op_ty, (out_ty,out_dirt))), (Types.Arrow (out_op_ty , (alpha_op,delta_op))) ) in 
-            let omega_2 = Typed.DirtyCoercionVar( (Params.fresh_dirty_coercion_param ()), cons_2) in
-            let omega_3 = Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons_3) in 
+            let coerp2 = Params.fresh_dirty_coercion_param () in 
+            let coerp3 = Params.fresh_ty_coercion_param () in
+            let omega_2 = Typed.DirtyCoercionVar( coerp2, cons_2) in
+            let omega_3 = Typed.TyCoercionVar( coerp3, cons_3) in 
+            let cons_omega_2 = Typed.DirtyOmega (coerp2,cons_2) in 
+            let cons_omega_3 = Typed.TyOmega (coerp3, cons_3) in 
             let coerced_c_op = Typed.annotate (Typed.CastComp (typed_c_op,omega_2)) typed_c_op.location in 
             let l_var_name = Typed.Variable.fresh "fresh_var" in 
             let l = Typed.PVar (l_var_name ) in 
@@ -208,7 +216,7 @@ and type_plain_expr st = function
             let final_abstraction2 = Typed.abstraction2 (type_pattern x ) annot_l  application in
             let tagert_effect = (eff, (in_op_ty,out_op_ty)) in 
             let operation_clause = ( tagert_effect, final_abstraction2) in 
-            (operation_clause, (List.append c_op_constraints [ cons_2;cons_3])) in
+            (operation_clause, (List.append c_op_constraints [ cons_omega_2;cons_omega_3])) in
         let map_list = Common.map mapper_function h.effect_clauses in 
         let op_clauses = Common.map (fun (x,_) -> x) map_list in
         let target_handler = 
@@ -220,11 +228,14 @@ and type_plain_expr st = function
         let target_handler = Typed.annotate (Typed.Handler target_handler) Location.unknown in 
         let handlers_ops = List.fold_right (fun ((eff,(_,_)),_) b -> Types.Union(eff,b)) op_clauses out_dirt in
         let cons_5 = Types.LeqDirt (in_dirt, handlers_ops) in
-        let omega_5 = Typed.DirtCoercionVar ((Params.fresh_dirt_coercion_param ()) ,cons_5) in  
+        let coerp5 = Params.fresh_dirt_coercion_param () in
+        let omega_5 = Typed.DirtCoercionVar (coerp5 ,cons_5) in 
+        let omega_cons_5 = Typed.DirtOmega (coerp5,cons_5) in  
         let in_handler_coercion = Typed.BangCoercion ((Typed.ReflTy (in_ty_var)), omega_5) in 
         let out_handler_coercion = Typed.BangCoercion ((Typed.ReflTy(out_ty_var)), Typed.ReflDirt(out_dirt_var)) in 
         let handler_coercion = Typed.HandlerCoercion (in_handler_coercion, out_handler_coercion) in 
-        let constraints = List.append ( List.append constraints_cr [cons_5] ) (List.flatten (Common.map (fun(_,x) -> x) map_list)) in 
+        let constraints = List.append ( List.append constraints_cr [omega_cons_5;omega_cons_1;omega_cons_4] ) 
+                          (List.flatten (Common.map (fun(_,x) -> x) map_list)) in 
         let coerced_handler = Typed.CastExp (target_handler, handler_coercion) in  
         (coerced_handler,target_type,constraints)
 
@@ -247,8 +258,10 @@ and type_plain_comp st = function
       begin match typed_e1.term with
       | Typed.Effect (eff, (eff_in,eff_out)) ->
            let cons1 = Types.LeqTy (tt_2, eff_in) in
-           let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2, Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons1))) typed_e1.location in
-           let constraints = List.append [cons1] constraints_2 in
+           let coerp1 = Params.fresh_ty_coercion_param () in 
+           let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2, Typed.TyCoercionVar( coerp1 , cons1))) typed_e1.location in
+           let omega_cons_1 = Typed.TyOmega (coerp1,cons1) in 
+           let constraints = List.append [omega_cons_1] constraints_2 in
            (Typed.Op ( (eff, (eff_in,eff_out)) ,e2_coerced), (eff_out, Types.Union(eff,Types.Empty)), constraints)
       | _ ->
           let new_ty_var = Types.Tyvar (Params.fresh_ty_param ()) in 
@@ -256,13 +269,17 @@ and type_plain_comp st = function
           let new_dirt_var = Types.DirtVar (Params.fresh_dirt_param ()) in 
           let fresh_dirty_ty =  (new_ty_var_2, new_dirt_var) in 
           let cons1 = Types.LeqTy (tt_1 , Types.Arrow (new_ty_var, fresh_dirty_ty)) in
-          let cons2 = Types.LeqTy (tt_2, new_ty_var) in 
-          let constraints = List.append [cons1;cons2] (List.append constraints_1 constraints_2) in 
-          let e1_coerced = Typed.annotate (Typed.CastExp (typed_e1, Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons1))) typed_e1.location in 
-          let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2,  Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons2))) typed_e2.location in 
+          let cons2 = Types.LeqTy (tt_2, new_ty_var) in
+          let coerp1 = Params.fresh_ty_coercion_param () in
+          let coerp2 = Params.fresh_ty_coercion_param () in 
+          let omega_cons_1 = Typed.TyOmega (coerp1,cons1) in
+          let omega_cons_2 = Typed.TyOmega (coerp2,cons2) in
+          let constraints = List.append [omega_cons_1;omega_cons_2] (List.append constraints_1 constraints_2) in 
+          let e1_coerced = Typed.annotate (Typed.CastExp (typed_e1, Typed.TyCoercionVar( coerp1, cons1))) typed_e1.location in 
+          let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2,  Typed.TyCoercionVar( coerp2, cons2))) typed_e2.location in 
           ( (Typed.Apply (e1_coerced,e2_coerced) ), fresh_dirty_ty , constraints)
       end
-  | Untyped.Handle (e, c) ->
+   | Untyped.Handle (e, c) ->
       let alpha_2 = Types.Tyvar (Params.fresh_ty_param ()) in
       let alpha_1 = Types.Tyvar (Params.fresh_ty_param ()) in
       let gamma_1 = Types.DirtVar (Params.fresh_dirt_param ()) in 
@@ -275,12 +292,18 @@ and type_plain_comp st = function
       let cons1 = Types.LeqTy (exp_type, (Types.Handler (dirty_1, dirty_2))) in
       let cons2 = Types.LeqTy (comp_type, alpha_1) in
       let cons3 = Types.LeqDirt (comp_dirt, gamma_1) in 
-      let coer1 = Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons1) in
-      let coer2 = Typed.TyCoercionVar( (Params.fresh_ty_coercion_param ()), cons2) in
-      let coer3 = Typed.DirtCoercionVar( (Params.fresh_dirt_coercion_param ()), cons3) in 
+      let coerp1 = Params.fresh_ty_coercion_param () in
+      let coerp2 = Params.fresh_ty_coercion_param () in 
+      let coerp3 = Params.fresh_dirt_coercion_param () in
+      let coer1 = Typed.TyCoercionVar( coerp1, cons1) in
+      let coer2 = Typed.TyCoercionVar( coerp2, cons2) in
+      let coer3 = Typed.DirtCoercionVar( coerp3, cons3) in 
+      let omega_cons_1 = Typed.TyOmega (coerp1,cons1) in
+      let omega_cons_2 = Typed.TyOmega (coerp2,cons2) in
+      let omega_cons_3 = Typed.DirtOmega (coerp3,cons3) in
       let coer_exp = Typed.annotate (Typed.CastExp (typed_exp,coer1)) typed_exp.location in
       let coer_comp =  Typed.annotate (Typed.CastComp (typed_comp, Typed.BangCoercion (coer2,coer3))) typed_comp.location in
-      let constraints = List.append [cons1;cons2;cons3] (List.append exp_constraints comp_constraints) in
+      let constraints = List.append [omega_cons_1;omega_cons_2;omega_cons_3] (List.append exp_constraints comp_constraints) in
       ((Typed.Handle (coer_exp, coer_comp)) , dirty_2 , constraints)
 
   
@@ -293,13 +316,17 @@ and type_plain_comp st = function
     let new_dirt_var = Types.DirtVar (Params.fresh_dirt_param ()) in 
     let cons1 = Types.LeqDirt (dirt_c1,new_dirt_var) in
     let cons2 = Types.LeqDirt (dirt_c2,new_dirt_var) in
-    let coer1 = Typed.DirtCoercionVar((Params.fresh_dirt_coercion_param ()), cons1) in 
-    let coer2 = Typed.DirtCoercionVar((Params.fresh_dirt_coercion_param ()), cons2) in 
+    let coerp1 = Params.fresh_dirt_coercion_param () in
+    let coerp2 = Params.fresh_dirt_coercion_param () in
+    let coer1 = Typed.DirtCoercionVar(coerp1 , cons1) in 
+    let coer2 = Typed.DirtCoercionVar(coerp2, cons2) in 
+    let omega_cons_1 = Typed.DirtOmega (coerp1,cons1) in
+    let omega_cons_2 = Typed.DirtOmega (coerp2,cons2) in
     let coer_c1 = Typed.annotate (Typed.CastComp_dirt (typed_c1, coer1) ) typed_c1.location in  
     let coer_c2 = Typed.annotate (Typed.CastComp_dirt (typed_c2, coer2) ) typed_c2.location in
     let typed_pattern = type_pattern p_def in 
     let abstraction = Typed.annotate  (typed_pattern,coer_c2) (typed_c2.location) in 
-    let constraints = List.append [cons1;cons2] (List.append cons_c1 cons_c2) in
+    let constraints = List.append [omega_cons_1;omega_cons_2] (List.append cons_c1 cons_c2) in
     ((Typed.Bind (coer_c1,abstraction)), (type_c2,new_dirt_var), constraints) 
 
   | Untyped.LetRec (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
@@ -310,7 +337,7 @@ let type_toplevel ~loc st = function
     let ct, (ttype,dirt),constraints = type_comp st c in
     Print.debug "Computation : %t" (Typed.print_computation ct);
     Print.debug "Computation type : %t ! {%t}" (Types.print_target_ty ttype) (Types.print_target_dirt dirt);
-    List.map (fun cons -> Print.debug "constraint: %t" (Types.print_constraint cons)) constraints;
+    (* List.map (fun cons -> Print.debug "constraint: %t" (Types.print_constraint cons)) constraints; *)
     Typed.Computation ct, st
   | Untyped.Use fn ->
     Typed.Use fn, st
