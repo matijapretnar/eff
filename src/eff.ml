@@ -180,7 +180,8 @@ let produce_compiled_file st filename =
     match cmd_typed with
     | Typed.Computation c ->
         print_endline "found something!";
-        Typed.print_computation c out_ppf;
+        SimplePrint.print_computation c out_ppf;
+        print_endline "ended found something!";
         st
     | _ -> st
   in

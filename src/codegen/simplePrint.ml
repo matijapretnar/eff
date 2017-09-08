@@ -2,6 +2,7 @@ open CommonPrint
 
 let rec print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
+  Print.debug "THE EXP IS %t" (Typed.print_expression e) ;
   match e.Typed.term with
   | Typed.Var x ->
       print "%t" (print_variable x)
@@ -20,10 +21,10 @@ let rec print_expression ?max_level e ppf =
       Print.record print_expression lst ppf
   | Typed.Variant (lbl, None) ->
       print "%s" lbl
+  | Lambda (x,_,c) ->
+    print "fun (%t) -> %t" (print_pattern x) (print_computation c)
   | Typed.Variant (lbl, Some e) ->
       print ~at_level:1 "(%s %t)" lbl (print_expression e)
-  | Typed.Lambda a ->
-      print ~at_level:2 "fun %t" (print_abstraction a)
   | Typed.Handler h ->
       print ~at_level:2 "fun c -> handler {@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
              ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]} c"
@@ -31,9 +32,11 @@ let rec print_expression ?max_level e ppf =
       (print_effect_clauses h.Typed.effect_clauses)
   | Typed.Effect eff ->
       print ~at_level:2 "effect %t" (print_effect eff)
-
+  | CastExp (e1,_) ->
+    print "%t" (print_expression e1)
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
+  Print.debug "THE Comp IS %t" (Typed.print_computation c) ;
   match c.Typed.term with
   | Typed.Apply (e1, e2) ->
       print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
@@ -55,15 +58,16 @@ and print_computation ?max_level c ppf =
       print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression e) (print_computation c)
   | Typed.Bind (c1, a) ->
       print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
-
+  | CastComp_dirt (c1,_) ->
+    print "%t" (print_computation c1)
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match eff_clauses with
   | [] ->
       print "| eff' -> fun arg k -> Call (eff', arg, k)"
-  | (((_, (t1, t2)) as eff), {Typed.term = (p1, p2, c)}) :: cases ->
+  | (((eff_name, (t1, t2)) as eff), {Typed.term = (p1, p2, c)}) :: cases ->
       print ~at_level:1 "| %t -> (fun (%t : %t) (%t : %t -> _ computation) -> %t) %t"
-      (print_effect eff) (print_pattern p1) (print_type t1) (print_pattern p2) (print_type t2) (print_computation c) (print_effect_clauses cases)
+      (print_effect eff) (print_pattern p1) (Types.print_target_ty t1) (print_pattern p2) (Types.print_target_ty t2) (print_computation c) (print_effect_clauses cases)
 
 and print_abstraction {Typed.term = (p, c)} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
@@ -83,11 +87,11 @@ and print_let_rec_abstraction (x, a) ppf =
 
 let print_command (cmd, _) ppf =
   match cmd with
-  | Typed.DefEffect (eff, (ty1, ty2)) ->
-      Print.print ppf "type (_, _) effect += %t : (%t, %t) effect" (print_effect eff) (print_type ty1) (print_type ty2)
+  | Typed.DefEffect (eff, (ty1, ty2)) as full_effect ->
+      Print.print ppf "type (_, _) effect += %s : (%t, %t) effect" (eff) (Types.print_target_ty ty1) (Types.print_target_ty ty2)
   | Typed.Computation c ->
       print_computation c ppf
-  | Typed.TopLet (defs, _) ->
+(*   | Typed.TopLet (defs, _) ->
       Print.print ppf "let %t" (Print.sequence "\nand\n" print_top_let_abstraction defs)
   | Typed.TopLetRec (defs, _) ->
       Print.print ppf "let rec %t" (Print.sequence "\nand\n" print_let_rec_abstraction defs)
@@ -97,14 +101,16 @@ let print_command (cmd, _) ppf =
       begin match ty with
       | Type.Arrow (_, (Type.Arrow _, _)) -> Print.print ppf "let %t x = lift_binary ( %s ) x" (print_variable x) f
       | Type.Arrow (_, _) -> Print.print ppf "let %t x = lift_unary ( %s ) x" (print_variable x) f
-      end
+      end 
   | Typed.Tydef tydefs ->
       print_tydefs tydefs ppf
+  | Typed.TypeOf _ ->
+      Print.print ppf "(* #type directive not supported by OCaml *)"
+*)
   | Typed.Reset ->
       Print.print ppf "(* #reset directive not supported by OCaml *)"
   | Typed.Quit ->
       Print.print ppf "(* #quit directive not supported by OCaml *)"
-  | Typed.TypeOf _ ->
-      Print.print ppf "(* #type directive not supported by OCaml *)"
+ 
   | Typed.Help ->
       Print.print ppf "(* #help directive not supported by OCaml *)"
