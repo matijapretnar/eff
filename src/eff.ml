@@ -1,9 +1,13 @@
 let usage = "Usage: eff [option] ... [file] ..."
 
 (* A list of files to be loaded and run. *)
+type use_file =
+  | Run of string
+  | Load of string
+
 let file_queue = ref []
-let enqueue_file ~print_output filename =
-    file_queue := (filename, print_output) :: !file_queue
+let enqueue_file filename =
+    file_queue := filename :: !file_queue
 
 (* Command-line options *)
 let options = Arg.align [
@@ -43,7 +47,7 @@ let options = Arg.align [
     Arg.Clear Config.interactive_shell,
     " Do not run the interactive toplevel");
   ("-l",
-    Arg.String (fun str -> enqueue_file ~print_output:false str),
+    Arg.String (fun str -> enqueue_file (Load str)),
     "<file> Load <file> into the initial environment");
   ("-V",
     Arg.Set_int Config.verbosity,
@@ -51,13 +55,20 @@ let options = Arg.align [
 ]
 
 (* Treat anonymous arguments as files to be run. *)
-let anonymous str =
-  enqueue_file ~print_output:true str;
+let anonymous filename =
+  enqueue_file (Run filename);
   Config.interactive_shell := false
 
+let run_under_wrapper wrapper args =
+  let n = Array.length args + 2 in
+  let args_with_wrapper = Array.make n "" in
+  args_with_wrapper.(0) <- wrapper;
+  Array.blit args 0 args_with_wrapper 1 (n - 2);
+  args_with_wrapper.(n - 1) <- "--no-wrapper";
+  Unix.execvp wrapper args_with_wrapper
 
 (* Interactive toplevel *)
-let toplevel ctxenv =
+let toplevel st =
   let eof = match Sys.os_type with
     | "Unix" | "Cygwin" -> "Ctrl-D"
     | "Win32" -> "Ctrl-Z"
@@ -66,10 +77,11 @@ let toplevel ctxenv =
   print_endline ("eff " ^ Version.version);
   print_endline ("[Type " ^ eof ^ " to exit or #help;; for help.]");
   try
-    let ctxenv = ref ctxenv in
+    let st = ref st in
+    Sys.catch_break true;
     while true do
       try
-        ctxenv := Shell.use_toplevel Format.std_formatter !ctxenv
+        st := Shell.use_toplevel Format.std_formatter !st
       with
         | Error.Error err -> Error.print err
         | Sys.Break -> prerr_endline "Interrupted."
@@ -78,7 +90,6 @@ let toplevel ctxenv =
 
 (* Main program *)
 let main =
-  Sys.catch_break true;
   (* Parse the arguments. *)
   Arg.parse options anonymous usage;
   (* Attemp to wrap yourself with a line-editing wrapper. *)
@@ -86,17 +97,12 @@ let main =
     begin match !Config.wrapper with
       | None -> ()
       | Some lst ->
-          let n = Array.length Sys.argv + 2 in
-          let args = Array.make n "" in
-            Array.blit Sys.argv 0 args 1 (n - 2);
-            args.(n - 1) <- "--no-wrapper";
-            List.iter
-              (fun wrapper ->
-                 try
-                   args.(0) <- wrapper;
-                   Unix.execvp wrapper args
-                 with Unix.Unix_error _ -> ())
-              lst
+          List.iter (fun wrapper ->
+            try
+              run_under_wrapper wrapper Sys.argv
+            with
+              Unix.Unix_error _ -> ()
+          ) lst
     end;
   (* Files were listed in the wrong order, so we reverse them *)
   file_queue := List.rev !file_queue;
@@ -104,7 +110,7 @@ let main =
   begin
     match !Config.pervasives_file with
     | Config.PervasivesNone -> ()
-    | Config.PervasivesFile f -> enqueue_file ~print_output:false f
+    | Config.PervasivesFile f -> enqueue_file (Load f)
     | Config.PervasivesDefault ->
       (* look for pervasives next to the executable and in the installation
       directory if they are not there *)
@@ -112,19 +118,18 @@ let main =
       let f = (if Sys.file_exists pervasives_development
         then pervasives_development
         else Filename.concat Version.effdir "pervasives.eff") in
-      enqueue_file ~print_output:false f
+      enqueue_file (Load f)
   end;
   try
     (* Run and load all the specified files. *)
     let ignore_all_formatter =
       Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ())
     in
-    let ctxenv = List.fold_left (fun env (filename, print_output) ->
-      if print_output then
-        Shell.use_file Format.std_formatter filename env
-      else
-        Shell.use_file ignore_all_formatter filename env
-    ) Shell.initial_state !file_queue in
-    if !Config.interactive_shell then toplevel ctxenv
+    let use_file env = function
+      | Run filename -> Shell.use_file Format.std_formatter filename env
+      | Load filename ->  Shell.use_file ignore_all_formatter filename env
+    in
+    let st = List.fold_left use_file Shell.initial_state !file_queue in
+    if !Config.interactive_shell then toplevel st
   with
     Error.Error err -> Error.print err; exit 1
