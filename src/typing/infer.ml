@@ -286,3 +286,71 @@ let infer_let_rec ~loc env defs =
     ] @ chngs)
   in
   poly_tyschs, nonpoly_tys, change
+
+
+type t = {
+  typing : state;
+  change : Scheme.dirty_scheme -> Scheme.dirty_scheme;
+}
+
+let empty = {
+  typing = initial;
+  change = Common.id;
+}
+
+let infer_top_comp st c =
+  let c' = type_comp st.typing c in
+  let ctx', (ty', drt'), cnstrs' = c'.Typed.scheme in
+  let change = Scheme.add_to_top ~loc:c'.Typed.location ctx' cnstrs' in
+  let top_change = Common.compose st.change change in
+  let ctx = match c'.Typed.term with
+  | Typed.Value _ -> ctx'
+  | _ -> (Desugar.fresh_variable (Some "$top_comp"), ty') :: ctx'
+  in
+  let drty_sch = top_change (ctx, (ty', drt'), cnstrs') in
+  Exhaust.check_comp c;
+
+  drty_sch, c', {st with change = top_change}
+
+let add_top_effect st eff (ty1, ty2) =
+  {st with typing = add_effect st.typing eff (ty1, ty2)}
+
+let infer_top_let ~loc st defs =
+  (* XXX What to do about the dirts? *)
+  let vars, nonpoly, change = infer_let ~loc st.typing defs in
+  let typing_env = List.fold_right (fun (x, ty_sch) env -> add_def env x ty_sch) vars st.typing in
+  let extend_nonpoly (x, ty) env =
+    (x, ([(x, ty)], ty, Constraints.empty)) :: env
+  in
+  let vars = List.fold_right extend_nonpoly nonpoly vars in
+  let top_change = Common.compose st.change change in
+  let sch_change (ctx, ty, cnstrs) =
+    let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
+    (ctx, ty, cnstrs)
+  in
+  let defs', poly_tyschs = type_let_defs ~loc st.typing defs in
+  List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs;
+  let vars' = Common.assoc_map sch_change vars in
+  defs', vars', {
+    typing = typing_env;
+    change = top_change;
+  }
+
+let infer_top_let_rec ~loc st defs =
+  let vars, _, change = infer_let_rec ~loc st.typing defs in
+  let defs', poly_tyschs = type_let_rec_defs ~loc st.typing defs in
+  let typing_env = List.fold_right (fun (x, ty_sch) env -> add_def env x ty_sch) vars st.typing in
+  let top_change = Common.compose st.change change in
+  let sch_change (ctx, ty, cnstrs) =
+    let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
+    (ctx, ty, cnstrs)
+  in
+  List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
+  let vars' = Common.assoc_map sch_change vars in
+  defs', vars', {
+    typing = typing_env;
+    change = top_change;
+  }
+
+let add_top_def st x ty =
+  { st with typing = add_def st.typing x ([], ty, Constraints.empty) }
