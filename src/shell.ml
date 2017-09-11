@@ -7,12 +7,12 @@ let help_text = "Toplevel commands:
 ";;
 
 type state = {
-  runtime : RuntimeEnv.t;
+  runtime : Eval.state;
   typing : Infer.t;
 }
 
 let initial_state = {
-  runtime = RuntimeEnv.empty;
+  runtime = Eval.empty;
   typing = Infer.empty;
 }
 
@@ -61,7 +61,7 @@ let rec exec_cmd ppf st cmd =
           defs' st.runtime
       in
       List.iter (fun (x, tysch) ->
-        match RuntimeEnv.lookup x runtime with
+        match Eval.lookup x runtime with
           | None -> assert false
           | Some v ->
             Format.fprintf ppf "@[val %t : %t = %t@]@."
@@ -83,7 +83,7 @@ let rec exec_cmd ppf st cmd =
         begin match Common.lookup f External.values with
         | Some v -> {
             typing = Infer.add_top_def st.typing x ty;
-            runtime = RuntimeEnv.update x v st.runtime;
+            runtime = Eval.update x v st.runtime;
           }
         | None -> Error.runtime "unknown external symbol %s." f
         end

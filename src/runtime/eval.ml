@@ -2,14 +2,28 @@
 
 module V = Value
 
+module RuntimeEnv = Map.Make(Untyped.Variable)
+
+type state = Value.value RuntimeEnv.t
+
+let empty = RuntimeEnv.empty
+
+let update x = RuntimeEnv.add x
+
+let lookup x env =
+  try
+    Some (RuntimeEnv.find x env)
+  with
+    | Not_found -> None      
+
 exception PatternMatch of Location.t
 
 let rec extend_value p v env =
   match p.Typed.term, v with
-  | Typed.PVar x, v -> RuntimeEnv.update x v env
+  | Typed.PVar x, v -> update x v env
   | Typed.PAs (p, x), v ->
       let env = extend_value p v env in
-        RuntimeEnv.update x v env
+        update x v env
   | Typed.PNonbinding, _ -> env
   | Typed.PTuple ps, Value.Tuple vs -> List.fold_right2 extend_value ps vs env
   | Typed.PRecord ps, Value.Record vs ->
@@ -97,7 +111,7 @@ and extend_let_rec env defs =
     (fun (f, a) env ->
         let (p, c) = a.Typed.term in
        let g = V.Closure (fun v -> ceval (extend p v !env') c) in
-       RuntimeEnv.update f g env)
+       update f g env)
     defs env in
   env' := env;
   env
@@ -105,7 +119,7 @@ and extend_let_rec env defs =
 and veval env e =
   match e.Typed.term with
   | Typed.Var x ->
-      begin match RuntimeEnv.lookup x env with
+      begin match lookup x env with
       | Some v -> v
       | None -> Error.runtime "Name %t is not defined." (Typed.Variable.print x)
       end
