@@ -8,6 +8,24 @@ let dirty_less = Scheme.dirty_less
 let just = Scheme.just
 let trim_context = Scheme.trim_context
 
+module type TYPINGENV =
+sig
+  type t
+
+  val empty : t
+  val lookup : t -> TypedSyntax.variable -> Scheme.ty_scheme option
+  val update : t -> TypedSyntax.variable -> Scheme.ty_scheme -> t
+end
+
+module TypingEnv : TYPINGENV =
+struct
+  type t = (Typed.variable, Scheme.ty_scheme) Common.assoc
+
+  let empty = []
+  let lookup ctx x = Common.option_map Scheme.refresh (Common.lookup x ctx)
+  let update ctx x sch = (x, sch) :: ctx
+end
+
 type state = {
   context : TypingEnv.t;
   effects : (Type.ty * Type.ty) Untyped.EffectMap.t
