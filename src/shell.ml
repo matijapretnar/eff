@@ -20,40 +20,40 @@ let initial_state = {
 (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
    It prints the result to [ppf] and returns the new state. *)
 let rec exec_cmd ppf st cmd =
-  let loc = cmd.Untyped.location
+  let loc = cmd.CoreSyntax.location
   and print_ty_scheme =
     if !Config.smart_print then SmartPrint.print_ty_scheme else Scheme.print_ty_scheme
   and print_dirty_scheme =
     if !Config.smart_print then SmartPrint.print_dirty_scheme else Scheme.print_dirty_scheme
   in
-  match cmd.Untyped.term with
-  | Untyped.Computation c ->
+  match cmd.CoreSyntax.term with
+  | CoreSyntax.Computation c ->
       let drty_sch, c', typing = Infer.infer_top_comp st.typing c in
       let v = Eval.run st.runtime c' in
       Format.fprintf ppf "@[- : %t = %t@]@."
         (print_dirty_scheme drty_sch)
         (Value.print_value v);
       { st with typing }
-  | Untyped.TypeOf c ->
+  | CoreSyntax.TypeOf c ->
       let drty_sch, _, typing = Infer.infer_top_comp st.typing c in
       Format.fprintf ppf "@[- : %t@]@."
         (print_dirty_scheme drty_sch);
       { st with typing }
-  | Untyped.Reset ->
+  | CoreSyntax.Reset ->
       Format.fprintf ppf "Environment reset.";
       Tctx.reset ();
       initial_state
-  | Untyped.Help ->
+  | CoreSyntax.Help ->
       Format.fprintf ppf "%s" help_text;
       st
-  | Untyped.DefEffect (eff, (ty1, ty2)) ->
+  | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
       let typing = Infer.add_top_effect st.typing eff (ty1, ty2) in
       { st with typing }
-  | Untyped.Quit ->
+  | CoreSyntax.Quit ->
       exit 0
-  | Untyped.Use fn ->
+  | CoreSyntax.Use fn ->
       use_file ppf fn st
-  | Untyped.TopLet defs ->
+  | CoreSyntax.TopLet defs ->
       let defs', vars, typing = Infer.infer_top_let ~loc st.typing defs in
       let runtime =
         List.fold_right
@@ -65,21 +65,21 @@ let rec exec_cmd ppf st cmd =
           | None -> assert false
           | Some v ->
             Format.fprintf ppf "@[val %t : %t = %t@]@."
-              (Untyped.Variable.print x)
+              (CoreSyntax.Variable.print x)
               (print_ty_scheme tysch)
               (Value.print_value v)
       ) vars;
       { typing; runtime }
-    | Untyped.TopLetRec defs ->
+    | CoreSyntax.TopLetRec defs ->
         let defs', vars, typing = Infer.infer_top_let_rec ~loc st.typing defs in
         let runtime = Eval.extend_let_rec st.runtime defs' in
         List.iter (fun (x, tysch) ->
           Format.fprintf ppf "@[val %t : %t = <fun>@]@."
-            (Untyped.Variable.print x)
+            (CoreSyntax.Variable.print x)
             (print_ty_scheme tysch)
         ) vars;
         { typing; runtime }
-    | Untyped.External (x, ty, f) ->
+    | CoreSyntax.External (x, ty, f) ->
         begin match Common.lookup f External.values with
         | Some v -> {
             typing = Infer.add_top_def st.typing x ty;
@@ -87,7 +87,7 @@ let rec exec_cmd ppf st cmd =
           }
         | None -> Error.runtime "unknown external symbol %s." f
         end
-    | Untyped.Tydef tydefs ->
+    | CoreSyntax.Tydef tydefs ->
         Tctx.extend_tydefs ~loc tydefs;
         st
 

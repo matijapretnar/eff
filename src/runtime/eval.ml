@@ -1,8 +1,9 @@
 (* Evaluation of the intermediate language, big step. *)
 
 module V = Value
+module Typed = TypedSyntax
 
-module RuntimeEnv = Map.Make(Untyped.Variable)
+module RuntimeEnv = Map.Make(CoreSyntax.Variable)
 
 type state = Value.value RuntimeEnv.t
 

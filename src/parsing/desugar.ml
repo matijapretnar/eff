@@ -2,6 +2,8 @@
 
 module C = Common
 module T = Type
+module Sugared = SugaredSyntax
+module Untyped = CoreSyntax
 
 (* ***** Desugaring of types. ***** *)
 

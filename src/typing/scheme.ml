@@ -1,4 +1,4 @@
-type context = (Untyped.variable, Type.ty) Common.assoc
+type context = (CoreSyntax.variable, Type.ty) Common.assoc
 type 'a t = context * 'a * Constraints.t
 type ty_scheme = Type.ty t
 type dirty_scheme = Type.dirty t
@@ -194,7 +194,7 @@ let skeletons_non_poly_scheme (ctx, _, cnstrs) =
 
 let print_context ctx ppf =
   let print_binding (x, t) ppf =
-    Print.print ppf "%t : %t" (Untyped.Variable.print x) (Type.print_ty t)
+    Print.print ppf "%t : %t" (CoreSyntax.Variable.print x) (Type.print_ty t)
   in
   Print.sequence ", " print_binding ctx ppf
 

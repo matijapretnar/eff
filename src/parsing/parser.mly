@@ -1,5 +1,5 @@
 %{
-  open Sugared
+  open SugaredSyntax
 
   type handler_clause =
     | EffectClause of Common.effect * abstraction2
@@ -70,7 +70,7 @@
 %left  INFIXOP3 STAR MOD LAND LOR LXOR
 %right INFIXOP4 LSL LSR ASR
 
-%start <Sugared.command list> commands
+%start <SugaredSyntax.command list> commands
 
 %%
 

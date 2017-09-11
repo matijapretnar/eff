@@ -1,4 +1,4 @@
-type context = (Untyped.variable, Type.ty) Common.assoc
+type context = (CoreSyntax.variable, Type.ty) Common.assoc
 type 'a t = context * 'a * Constraints.t
 type ty_scheme = Type.ty t
 type dirty_scheme = Type.dirty t

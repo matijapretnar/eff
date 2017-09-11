@@ -1,4 +1,6 @@
 module T = Type
+module Untyped = CoreSyntax
+module Typed = TypedSyntax
 
 let ty_less = Scheme.ty_less
 let dirt_less = Scheme.dirt_less

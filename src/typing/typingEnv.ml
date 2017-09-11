@@ -1,3 +1,4 @@
+module Typed = TypedSyntax
 type t = (Typed.variable, Scheme.ty_scheme) Common.assoc
 
 let empty = []

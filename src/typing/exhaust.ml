@@ -1,5 +1,7 @@
 module C = Common
 module P = Pattern
+module Untyped = CoreSyntax
+
 
 (* Pattern matching exhaustiveness checking as described by Maranget [1]. These
    functions assume that patterns are type correct, so they should be run only
