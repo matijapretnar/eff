@@ -35,7 +35,7 @@ MKTOP=jsoo_mktop -verbose $(SAFESTRING) \
 	${addprefix -top-syntax , ${SYNTAXES}} \
 	-dont-export-unit gc \
 	${addprefix -export-package , ${PACKAGES}} \
-	${addprefix -export-unit , html5_types html5_sigs xml_wrap } \
+	${addprefix -export-unit , html_types html_sigs xml_wrap } \
 
 TOPLEVEL_NAME=toplevel
 TOPLEVEL_OBJS=toplevel.cmo
@@ -50,13 +50,6 @@ $(TOPLEVEL_NAME).js: $(TOPLEVEL_OBJS)
 	${addprefix -jsopt , -I ./ --file pervasives.eff} \
 	-package base64 \
 	-o $(TOPLEVEL_NAME).byte \
-
-EVAL_NAME=eval
-EVAL_OBJS=eval.cmo
-$(EVAL_NAME).js: $(EVAL_OBJS)
-	$(MKTOP) $(EVAL_OBJS) \
-	${addprefix -jsopt , ${JSFILES}} \
-	-o $(EVAL_NAME).byte
 
 effApi.cmo:
 	cd .. && ocamlbuild -no-hygiene effApi.cmo
