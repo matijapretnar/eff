@@ -200,18 +200,18 @@ let pattern ?(forbidden=[]) (p, loc) =
   in
   let rec pattern (p, loc) =
     let p = match p with
-    | Pattern.Var x ->
+    | Sugared.PVar x ->
         let x = new_var x in
         Untyped.PVar x
-    | Pattern.As (p, x) ->
+    | Sugared.PAs (p, x) ->
         let x = new_var x in
         let p' = pattern p in
         Untyped.PAs (p', x)
-    | Pattern.Tuple ps -> Untyped.PTuple (List.map pattern ps)
-    | Pattern.Record flds -> Untyped.PRecord (OldUtils.assoc_map pattern flds)
-    | Pattern.Variant (lbl, p) -> Untyped.PVariant (lbl, OldUtils.option_map pattern p)
-    | Pattern.Const c -> Untyped.PConst c
-    | Pattern.Nonbinding -> Untyped.PNonbinding
+    | Sugared.PTuple ps -> Untyped.PTuple (List.map pattern ps)
+    | Sugared.PRecord flds -> Untyped.PRecord (OldUtils.assoc_map pattern flds)
+    | Sugared.PVariant (lbl, p) -> Untyped.PVariant (lbl, OldUtils.option_map pattern p)
+    | Sugared.PConst c -> Untyped.PConst c
+    | Sugared.PNonbinding -> Untyped.PNonbinding
     in
     { Untyped.term = p; Untyped.location = loc }
   in

@@ -1,5 +1,5 @@
 module C = OldUtils
-module P = Pattern
+module Sugared = SugaredSyntax
 module Untyped = CoreSyntax
 
 
@@ -37,32 +37,32 @@ let arity = function
 
 (* Removes the top-most [As] pattern wrappers, if present (e.g. [2 as x] -> [2]). *)
 let rec remove_as = function
-  | Pattern.As ((p', _), _) -> remove_as p'
+  | Sugared.PAs ((p', _), _) -> remove_as p'
   | p -> p
 
-(* Reads constructor description from a pattern, discarding any [P.As] layers. *)
+(* Reads constructor description from a pattern, discarding any [Sugared.PAs] layers. *)
 let rec cons_of_pattern p =
   match fst p with
-    | P.As (p, _) -> cons_of_pattern p
-    | P.Tuple lst -> Tuple (List.length lst)
-    | P.Record [] -> assert false
-    | P.Record ((lbl, _) :: _) ->
+    | Sugared.PAs (p, _) -> cons_of_pattern p
+    | Sugared.PTuple lst -> Tuple (List.length lst)
+    | Sugared.PRecord [] -> assert false
+    | Sugared.PRecord ((lbl, _) :: _) ->
         (match Tctx.find_field lbl with
           | None -> Error.typing ~loc:(snd p) "Unbound record field label %s in a pattern" lbl
           | Some (_, _, flds) -> Record (List.map fst flds))
-    | P.Variant (lbl, opt) -> Variant (lbl, opt <> None)
-    | P.Const c -> Const c
-    | P.Var _ | P.Nonbinding -> Wildcard
+    | Sugared.PVariant (lbl, opt) -> Variant (lbl, opt <> None)
+    | Sugared.PConst c -> Const c
+    | Sugared.PVar _ | Sugared.PNonbinding -> Wildcard
 
 (* Constructs a pattern from a constructor and a list of subpatterns, which must
    contain [arity c] elements. *)
 let pattern_of_cons ~loc c lst =
   let plain = match c with
-    | Tuple n -> P.Tuple lst
-    | Record flds -> P.Record (List.combine flds lst)
-    | Const const -> P.Const const
-    | Variant (lbl, opt) -> P.Variant (lbl, if opt then Some (List.hd lst) else None)
-    | Wildcard -> P.Nonbinding
+    | Tuple n -> Sugared.PTuple lst
+    | Record flds -> Sugared.PRecord (List.combine flds lst)
+    | Const const -> Sugared.PConst const
+    | Variant (lbl, opt) -> Sugared.PVariant (lbl, if opt then Some (List.hd lst) else None)
+    | Wildcard -> Sugared.PNonbinding
   in
   (plain, loc)
 
@@ -124,20 +124,20 @@ let specialize_vector ~loc con = function
   | [] -> None
   | (p1, _) :: lst ->
       begin match con, remove_as p1 with
-        | Tuple _, P.Tuple l -> Some (l @ lst)
-        | Record all, P.Record def ->
+        | Tuple _, Sugared.PTuple l -> Some (l @ lst)
+        | Record all, Sugared.PRecord def ->
             let get_pattern defs lbl = match C.lookup lbl defs with
               | Some p' -> p'
-              | None -> (P.Nonbinding, loc)
+              | None -> (Sugared.PNonbinding, loc)
             in
             Some ((List.map (get_pattern def) all) @ lst)
-        | Variant (lbl, _), P.Variant (lbl', opt) when lbl = lbl' ->
+        | Variant (lbl, _), Sugared.PVariant (lbl', opt) when lbl = lbl' ->
             begin match opt with
               | Some p -> Some (p :: lst)
               | None -> Some lst
             end
-        | Const c, P.Const c' when Const.equal c c' -> Some lst
-        | _, (P.Nonbinding | P.Var _) -> Some ((C.repeat (P.Nonbinding, loc) (arity con)) @ lst)
+        | Const c, Sugared.PConst c' when Const.equal c c' -> Some lst
+        | _, (Sugared.PNonbinding | Sugared.PVar _) -> Some ((C.repeat (Sugared.PNonbinding, loc) (arity con)) @ lst)
         | _, _ -> None
       end
 
@@ -156,7 +156,7 @@ let rec default = function
   | [] :: lst -> default lst (* Only for completeness. *)
   | ((p,_) :: ps) :: lst ->
       begin match remove_as p with
-        | (P.Nonbinding | P.Var _) -> ps :: (default lst)
+        | (Sugared.PNonbinding | Sugared.PVar _) -> ps :: (default lst)
         | _ -> default lst
       end
 
@@ -216,32 +216,32 @@ let rec exhaustive ~loc p = function
           | None -> None
           | Some lst ->
               let c = List.hd missing in
-              Some ((pattern_of_cons ~loc c (C.repeat (P.Nonbinding, loc) (arity c))) :: lst)
+              Some ((pattern_of_cons ~loc c (C.repeat (Sugared.PNonbinding, loc) (arity c))) :: lst)
 
 
 let rec old_of_new_pattern p =
   let old_p =
     match p.Untyped.term with
-    | Untyped.PAs (p, x) -> P.As (old_of_new_pattern p, x)
-    | Untyped.PTuple lst -> P.Tuple (List.map old_of_new_pattern lst)
-    | Untyped.PRecord lst -> P.Record (OldUtils.assoc_map old_of_new_pattern lst)
-    | Untyped.PVariant (lbl, opt) -> P.Variant (lbl, OldUtils.option_map old_of_new_pattern opt)
-    | Untyped.PConst c -> P.Const c
-    | Untyped.PVar x -> P.Var x
-    | Untyped.PNonbinding -> P.Nonbinding
+    | Untyped.PAs (p, x) -> Sugared.PAs (old_of_new_pattern p, x)
+    | Untyped.PTuple lst -> Sugared.PTuple (List.map old_of_new_pattern lst)
+    | Untyped.PRecord lst -> Sugared.PRecord (OldUtils.assoc_map old_of_new_pattern lst)
+    | Untyped.PVariant (lbl, opt) -> Sugared.PVariant (lbl, OldUtils.option_map old_of_new_pattern opt)
+    | Untyped.PConst c -> Sugared.PConst c
+    | Untyped.PVar x -> Sugared.PVar x
+    | Untyped.PNonbinding -> Sugared.PNonbinding
   in
   (old_p, p.Untyped.location)
 
 let rec new_of_old_pattern p =
   let new_p =
     match fst p with
-    | P.As (p, x) -> Untyped.PAs (new_of_old_pattern p, x)
-    | P.Tuple lst -> Untyped.PTuple (List.map new_of_old_pattern lst)
-    | P.Record lst -> Untyped.PRecord (OldUtils.assoc_map new_of_old_pattern lst)
-    | P.Variant (lbl, opt) -> Untyped.PVariant (lbl, OldUtils.option_map new_of_old_pattern opt)
-    | P.Const c -> Untyped.PConst c
-    | P.Var x -> Untyped.PVar x
-    | P.Nonbinding -> Untyped.PNonbinding
+    | Sugared.PAs (p, x) -> Untyped.PAs (new_of_old_pattern p, x)
+    | Sugared.PTuple lst -> Untyped.PTuple (List.map new_of_old_pattern lst)
+    | Sugared.PRecord lst -> Untyped.PRecord (OldUtils.assoc_map new_of_old_pattern lst)
+    | Sugared.PVariant (lbl, opt) -> Untyped.PVariant (lbl, OldUtils.option_map new_of_old_pattern opt)
+    | Sugared.PConst c -> Untyped.PConst c
+    | Sugared.PVar x -> Untyped.PVar x
+    | Sugared.PNonbinding -> Untyped.PNonbinding
   in
   {
     Untyped.term = new_p;

@@ -4,6 +4,18 @@
 type variable = string
 type effect = OldUtils.effect
 
+type 'var pattern = 'var plain_pattern * Location.t
+and 'var plain_pattern =
+  | PVar of 'var
+  | PAs of 'var pattern * 'var
+  | PTuple of ('var pattern) list
+  | PRecord of (OldUtils.field * 'var pattern) list
+  | PVariant of OldUtils.label * ('var pattern) option
+  | PConst of Const.t
+  | PNonbinding
+(* Changing the datatype [plain_pattern] will break [specialize_vector] in [exhaust.ml] because
+   of wildcard matches there. *)
+
 type term = plain_term * Location.t
 and plain_term =
   | Var of variable
@@ -25,7 +37,7 @@ and plain_term =
   | Handler of handler
   (** [handler clauses], where [clauses] are described below. *)
 
-  | Let of (variable Pattern.t * term) list * term
+  | Let of (variable pattern * term) list * term
   (** [let p1 = t1 and ... and pn = tn in t] *)
   | LetRec of (variable * term) list * term
   (** [let rec f1 p1 = t1 and ... and fn pn = tn in t] *)
@@ -49,9 +61,9 @@ and handler = {
   (** [finally p -> t] *)
 }
 
-and abstraction = variable Pattern.t * term
+and abstraction = variable pattern * term
 
-and abstraction2 = variable Pattern.t * variable Pattern.t * term
+and abstraction2 = variable pattern * variable pattern * term
 
 type dirt =
   | DirtParam of OldUtils.dirtparam
@@ -85,7 +97,7 @@ type command = plain_command * Location.t
 and plain_command =
   | Tydef of (OldUtils.tyname, (OldUtils.typaram list * tydef)) OldUtils.assoc
   (** [type t = tydef] *)
-  | TopLet of (variable Pattern.t * term) list
+  | TopLet of (variable pattern * term) list
   (** [let p1 = t1 and ... and pn = tn] *)
   | TopLetRec of (variable * term) list
   (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)

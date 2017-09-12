@@ -161,7 +161,7 @@ plain_term:
   | WITH h = term HANDLE t = term
     { Handle (h, t) }
   | t1 = term SEMI t2 = term
-    { Let ([(Pattern.Nonbinding, snd t1), t1], t2) }
+    { Let ([(PNonbinding, snd t1), t1], t2) }
   | IF t_cond = comma_term THEN t_true = term ELSE t_false = term
     { Conditional (t_cond, t_true, t_false) }
   | t = plain_comma_term
@@ -281,7 +281,7 @@ let_def:
   | p = pattern EQUAL t = term
     { (p, t) }
   | x = mark_position(ident) t = lambdas1(EQUAL)
-    { ((Pattern.Var (fst x), (snd x)), t) }
+    { ((PVar (fst x), (snd x)), t) }
 
 let_rec_def:
   | f = ident t = lambdas0(EQUAL)
@@ -301,50 +301,50 @@ plain_pattern:
   | p = comma_pattern
     { fst p }
   | p = pattern AS x = lname
-    { Pattern.As (p, x) }
+    { PAs (p, x) }
 
 comma_pattern: mark_position(plain_comma_pattern) { $1 }
 plain_comma_pattern:
   | ps = separated_nonempty_list(COMMA, cons_pattern)
-    { match ps with [(p, _)] -> p | ps -> Pattern.Tuple ps }
+    { match ps with [(p, _)] -> p | ps -> PTuple ps }
 
 cons_pattern: mark_position(plain_cons_pattern) { $1 }
 plain_cons_pattern:
   | p = variant_pattern
     { fst p }
   | p1 = variant_pattern CONS p2 = cons_pattern
-    { Pattern.Variant (OldUtils.cons, Some (Pattern.Tuple [p1; p2], Location.make $startpos $endpos)) }
+    { PVariant (OldUtils.cons, Some (PTuple [p1; p2], Location.make $startpos $endpos)) }
 
 variant_pattern: mark_position(plain_variant_pattern) { $1 }
 plain_variant_pattern:
   | lbl = UNAME p = simple_pattern
-    { Pattern.Variant (lbl, Some p) }
+    { PVariant (lbl, Some p) }
   | p = simple_pattern
     { fst p }
 
 simple_pattern: mark_position(plain_simple_pattern) { $1 }
 plain_simple_pattern:
   | x = ident
-    { Pattern.Var x }
+    { PVar x }
   | lbl = UNAME
-    { Pattern.Variant (lbl, None) }
+    { PVariant (lbl, None) }
   | UNDERSCORE
-    { Pattern.Nonbinding }
+    { PNonbinding }
   | cst = const_term
-    { Pattern.Const cst }
+    { PConst cst }
   | LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, pattern)) RBRACE
-    { Pattern.Record flds }
+    { PRecord flds }
   | LBRACK ts = separated_list(SEMI, pattern) RBRACK
     {
-      let nil = (Pattern.Variant (OldUtils.nil, None), Location.make $endpos $endpos) in
+      let nil = (PVariant (OldUtils.nil, None), Location.make $endpos $endpos) in
       let cons ((_, loc_t) as t) ((_, loc_ts) as ts) =
         let loc = Location.union [loc_t; loc_ts] in
-        (Pattern.Variant (OldUtils.cons, Some (Pattern.Tuple [t; ts], loc)), loc)
+        (PVariant (OldUtils.cons, Some (PTuple [t; ts], loc)), loc)
       in
         fst (List.fold_right cons ts nil)
     }
   | LPAREN RPAREN
-    { Pattern.Tuple [] }
+    { PTuple [] }
   | LPAREN p = pattern RPAREN
     { fst p }
 
