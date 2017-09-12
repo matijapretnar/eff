@@ -3,8 +3,8 @@ and 'var plain_t =
   | Var of 'var
   | As of 'var t * 'var
   | Tuple of ('var t) list
-  | Record of (Common.field * 'var t) list
-  | Variant of Common.label * ('var t) option
+  | Record of (OldUtils.field * 'var t) list
+  | Variant of OldUtils.label * ('var t) option
   | Const of Const.t
   | Nonbinding
 (* Changing the datatype [plain_t] will break [specialize_vector] in [exhaust.ml] because
@@ -35,7 +35,7 @@ let linear_pattern p =
       | Const _ -> true
       | Nonbinding -> true
   in
-    Common.injective (fun x -> x) (pattern_vars p) && linear_records p
+    OldUtils.injective (fun x -> x) (pattern_vars p) && linear_records p
 
 (* [linear_record r] verifies that a record or a record pattern has linear field names. *)
-let linear_record lst = Common.injective fst lst
+let linear_record lst = OldUtils.injective fst lst

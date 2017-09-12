@@ -2,7 +2,7 @@
 
 (** Terms *)
 type variable = string
-type effect = Common.effect
+type effect = OldUtils.effect
 
 type term = plain_term * Location.t
 and plain_term =
@@ -12,9 +12,9 @@ and plain_term =
   (** integers, strings, booleans, and floats *)
   | Tuple of term list
   (** [(t1, t2, ..., tn)] *)
-  | Record of (Common.field, term) Common.assoc
+  | Record of (OldUtils.field, term) OldUtils.assoc
   (** [{field1 = t1; field2 = t2; ...; fieldn = tn}] *)
-  | Variant of Common.label * term option
+  | Variant of OldUtils.label * term option
   (** [Label] or [Label t] *)
   | Lambda of abstraction
   (** [fun p1 p2 ... pn -> t] *)
@@ -41,7 +41,7 @@ and plain_term =
   (** [check t] *)
 
 and handler = {
-  effect_clauses : (effect, abstraction2) Common.assoc;
+  effect_clauses : (effect, abstraction2) OldUtils.assoc;
   (** [t1#op1 p1 k1 -> t1' | ... | tn#opn pn kn -> tn'] *)
   value_clause : abstraction option;
   (** [val p -> t] *)
@@ -54,16 +54,16 @@ and abstraction = variable Pattern.t * term
 and abstraction2 = variable Pattern.t * variable Pattern.t * term
 
 type dirt =
-  | DirtParam of Common.dirtparam
+  | DirtParam of OldUtils.dirtparam
 
 type region =
-  | RegionParam of Common.regionparam
+  | RegionParam of OldUtils.regionparam
 
 type ty = plain_ty * Location.t
 and plain_ty =
-  | TyApply of Common.tyname * ty list * (dirt list * region list) option
+  | TyApply of OldUtils.tyname * ty list * (dirt list * region list) option
   (** [(ty1, ty2, ..., tyn) type_name] *)
-  | TyParam of Common.typaram
+  | TyParam of OldUtils.typaram
   (** ['a] *)
   | TyArrow of ty * ty * dirt option
   (** [ty1 -> ty2] *)
@@ -73,9 +73,9 @@ and plain_ty =
   (** [ty1 => ty2] *)
 
 type tydef =
-  | TyRecord of (Common.field, ty) Common.assoc
+  | TyRecord of (OldUtils.field, ty) OldUtils.assoc
   (** [{ field1 : ty1; field2 : ty2; ...; fieldn : tyn }] *)
-  | TySum of (Common.label, ty option) Common.assoc
+  | TySum of (OldUtils.label, ty option) OldUtils.assoc
   (** [Label1 of ty1 | Label2 of ty2 | ... | Labeln of tyn | Label' | Label''] *)
   | TyInline of ty
   (** [ty] *)
@@ -83,7 +83,7 @@ type tydef =
 (* Toplevel commands (the first four do not need to be separated by [;;]) *)
 type command = plain_command * Location.t
 and plain_command =
-  | Tydef of (Common.tyname, (Common.typaram list * tydef)) Common.assoc
+  | Tydef of (OldUtils.tyname, (OldUtils.typaram list * tydef)) OldUtils.assoc
   (** [type t = tydef] *)
   | TopLet of (variable Pattern.t * term) list
   (** [let p1 = t1 and ... and pn = tn] *)

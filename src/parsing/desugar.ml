@@ -1,14 +1,14 @@
 (** Desugaring of syntax into the core language. *)
 
-module C = Common
+module C = OldUtils
 module T = Type
 module Sugared = SugaredSyntax
 module Untyped = CoreSyntax
 
 (* ***** Desugaring of types. ***** *)
 
-let fresh_dirt_param = Common.fresh (fun n -> Sugared.DirtParam n)
-let fresh_region_param = Common.fresh (fun n -> Sugared.RegionParam n)
+let fresh_dirt_param = OldUtils.fresh (fun n -> Sugared.DirtParam n)
+let fresh_region_param = OldUtils.fresh (fun n -> Sugared.RegionParam n)
 
 (* Fill in missing dirt and region parameters in a type with fresh ones. Also resolves
    type applications so that applications of effect types are equipped with the extra region
@@ -64,7 +64,7 @@ let fill_args_tydef def =
           (fun (fld, ty) (ds, rs, lst) ->
             let (ds', rs'), ty = fill_args ty in
               (ds' @ ds, rs' @ rs, (fld, ty) :: lst))
-          lst Common.trio_empty
+          lst OldUtils.trio_empty
       in
         (ds, rs), Sugared.TyRecord lst
     | Sugared.TySum lst ->
@@ -76,7 +76,7 @@ let fill_args_tydef def =
               | Some ty ->
                 let (ds', rs'), ty = fill_args ty in
                   (ds' @ ds, rs' @ rs, (lbl, Some ty) :: lst))
-          lst Common.trio_empty
+          lst OldUtils.trio_empty
       in
         (ds, rs), Sugared.TySum lst
     | Sugared.TyInline ty ->
@@ -124,23 +124,23 @@ let ty (ts, ds, rs) =
 
 (** [free_params t] returns a triple of all free type, dirt, and region params in [t]. *)
 let free_params t =
-  let (@@@) = Common.trio_append
+  let (@@@) = OldUtils.trio_append
   and optional f = function
-    | None -> Common.trio_empty
+    | None -> OldUtils.trio_empty
     | Some x -> f x
   in
   let rec ty (t, loc) = match t with
   | Sugared.TyApply (_, tys, drts_rgns) ->
-      Common.trio_flatten_map ty tys @@@ (optional dirts_regions) drts_rgns
+      OldUtils.trio_flatten_map ty tys @@@ (optional dirts_regions) drts_rgns
   | Sugared.TyParam s -> ([s], [], [])
   | Sugared.TyArrow (t1, t2, drt) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt
-  | Sugared.TyTuple lst -> Common.trio_flatten_map ty lst
+  | Sugared.TyTuple lst -> OldUtils.trio_flatten_map ty lst
   | Sugared.TyHandler (t1, drt1, t2, drt2) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt1 @@@ (optional dirt) drt2
   and dirt (Sugared.DirtParam d) = ([], [d], [])
   and region (Sugared.RegionParam r) = ([], [], [r])
-  and dirts_regions (drts, rgns) = Common.trio_flatten_map dirt drts @@@ Common.trio_flatten_map region rgns
+  and dirts_regions (drts, rgns) = OldUtils.trio_flatten_map dirt drts @@@ OldUtils.trio_flatten_map region rgns
   in
-  Common.trio_uniq (ty t)
+  OldUtils.trio_uniq (ty t)
 
 let syntax_to_core_params (ts, ds, rs) = (
     List.map (fun p -> (p, Type.fresh_ty_param ())) ts,
@@ -151,7 +151,7 @@ let syntax_to_core_params (ts, ds, rs) = (
 (** [tydef params d] desugars the type definition with parameters [params] and definition [d]. *)
 let tydef params d =
   let (ts, ds, rs) as sbst = syntax_to_core_params params in
-    (Common.trio_snds (ts, ds, rs),
+    (OldUtils.trio_snds (ts, ds, rs),
      begin match d with
        | Sugared.TyRecord lst -> Tctx.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
        | Sugared.TySum lst -> Tctx.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
@@ -168,7 +168,7 @@ let tydefs defs =
       (fun (tyname, (params, def)) (ds, rs, defs) ->
         let (d, r), def = fill_args_tydef def in
           (d @ ds, r @ rs, ((tyname, (params, def)) :: defs)))
-      defs Common.trio_empty
+      defs OldUtils.trio_empty
   in
     (* Now we traverse again and the rest of the work. *)
     List.map (fun (tyname, (ts, def)) -> (tyname, tydef (ts, ds, rs) def)) defs
@@ -208,8 +208,8 @@ let pattern ?(forbidden=[]) (p, loc) =
         let p' = pattern p in
         Untyped.PAs (p', x)
     | Pattern.Tuple ps -> Untyped.PTuple (List.map pattern ps)
-    | Pattern.Record flds -> Untyped.PRecord (Common.assoc_map pattern flds)
-    | Pattern.Variant (lbl, p) -> Untyped.PVariant (lbl, Common.option_map pattern p)
+    | Pattern.Record flds -> Untyped.PRecord (OldUtils.assoc_map pattern flds)
+    | Pattern.Variant (lbl, p) -> Untyped.PVariant (lbl, OldUtils.option_map pattern p)
     | Pattern.Const c -> Untyped.PConst c
     | Pattern.Nonbinding -> Untyped.PNonbinding
     in
@@ -223,7 +223,7 @@ let pattern ?(forbidden=[]) (p, loc) =
 let rec expression ctx (t, loc) =
   let w, e = match t with
   | Sugared.Var x ->
-      begin match Common.lookup x ctx with
+      begin match OldUtils.lookup x ctx with
       | Some n -> [], Untyped.Var n
       | None -> Error.typing ~loc "Unknown variable %s" x
       end
@@ -436,8 +436,8 @@ and plain_toplevel = function
       let x, ty = external_ty x ty in
       Untyped.External (x, ty, y)
   | Sugared.DefEffect (eff, (ty1, ty2)) ->
-      let ty1 = ty Common.trio_empty ty1
-      and ty2 = ty Common.trio_empty ty2 in
+      let ty1 = ty OldUtils.trio_empty ty1
+      and ty2 = ty OldUtils.trio_empty ty2 in
       Untyped.DefEffect (eff, (ty1, ty2))
   | Sugared.Term t ->
       let c = top_computation t in

@@ -4,7 +4,7 @@ module Variable = Symbol.Make(Symbol.String)
 module EffectMap = Map.Make(String)
 
 type variable = Variable.t
-type effect = Common.effect
+type effect = OldUtils.effect
 
 type ('term, 'scheme) annotation = {
   term: 'term;
@@ -17,8 +17,8 @@ and plain_pattern =
   | PVar of variable
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (Common.field, pattern) Common.assoc
-  | PVariant of Common.label * pattern option
+  | PRecord of (OldUtils.field, pattern) OldUtils.assoc
+  | PVariant of OldUtils.label * pattern option
   | PConst of Const.t
   | PNonbinding
 
@@ -45,8 +45,8 @@ and plain_expression =
   | Var of variable
   | Const of Const.t
   | Tuple of expression list
-  | Record of (Common.field, expression) Common.assoc
-  | Variant of Common.label * expression option
+  | Record of (OldUtils.field, expression) OldUtils.assoc
+  | Variant of OldUtils.label * expression option
   | Lambda of abstraction
   | Effect of effect
   | Handler of handler
@@ -64,7 +64,7 @@ and plain_computation =
 
 (** Handler definitions *)
 and handler = {
-  effect_clauses : (effect, abstraction2) Common.assoc;
+  effect_clauses : (effect, abstraction2) OldUtils.assoc;
   value_clause : abstraction;
   finally_clause : abstraction;
 }
@@ -145,7 +145,7 @@ let record ?loc lst =
         if List.length lst <> List.length fld_tys then
           Error.typing ~loc "The record of type %s has an incorrect number of fields" ty_name;
         let infer (fld, e) (ctx, constraints) =
-          begin match Common.lookup fld fld_tys with
+          begin match OldUtils.lookup fld fld_tys with
           | None -> Error.typing ~loc "Unexpected field %s in a record of type %s" fld ty_name
           | Some fld_ty ->
               let e_ctx, e_ty, e_constraints = e.scheme in
@@ -233,7 +233,7 @@ let handler ?loc h signature =
       let r_out = Type.fresh_region_param () in
       (op, r_in) :: ops_in, (op, r_out) :: ops_out
     in
-    let ops_in, ops_out = List.fold_right make_dirt (Common.uniq (List.map fst h.effect_clauses)) ([], []) in
+    let ops_in, ops_out = List.fold_right make_dirt (OldUtils.uniq (List.map fst h.effect_clauses)) ([], []) in
 
     let ctx_val, (ty_val, drty_val), cnstrs_val = h.value_clause.scheme in
     let ctx_fin, (ty_fin, drty_fin), cnstrs_fin = h.finally_clause.scheme in
@@ -360,7 +360,7 @@ let let' ?loc defs c =
     ] @ chngs
   in
   let poly_tys, nonpoly_tys, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
-  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
   let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
       Scheme.less_context ~loc nonpoly_tys;
@@ -394,7 +394,7 @@ let let_rec' ?loc defs c =
   in
   let poly_tys, nonpoly_tys, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
   let chngs = Scheme.trim_context ~loc poly_tys :: chngs in
-  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
   let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
       Scheme.dirt_less drt_c drt;

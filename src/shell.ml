@@ -80,7 +80,7 @@ let rec exec_cmd ppf st cmd =
         ) vars;
         { typing; runtime }
     | CoreSyntax.External (x, ty, f) ->
-        begin match Common.lookup f External.values with
+        begin match OldUtils.lookup f External.values with
         | Some v -> {
             typing = Infer.add_top_def st.typing x ty;
             runtime = Eval.update x v st.runtime;

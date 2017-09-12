@@ -105,10 +105,10 @@ rule token = parse
   | float               { FLOAT (float_of_string(Lexing.lexeme lexbuf)) }
   | '"'                 { STRING (string "" lexbuf) }
   | lname               { let s = Lexing.lexeme lexbuf in
-                            match Common.lookup s reserved with
+                            match OldUtils.lookup s reserved with
                               | Some t -> t
                               | None ->
-                                  begin match Common.lookup s directives with
+                                  begin match OldUtils.lookup s directives with
                                     | Some d -> d
                                     | None -> LNAME s
                                   end

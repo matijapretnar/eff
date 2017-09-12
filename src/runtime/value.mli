@@ -1,14 +1,14 @@
 type value =
   | Const of Const.t
   | Tuple of value list
-  | Record of (Common.field, value) Common.assoc
-  | Variant of Common.label * value option
+  | Record of (OldUtils.field, value) OldUtils.assoc
+  | Variant of OldUtils.label * value option
   | Closure of closure
   | Handler of (result -> result)
 
 and result =
   | Value of value
-  | Call of Common.effect * value * closure
+  | Call of OldUtils.effect * value * closure
 
 and closure = value -> result
 
@@ -22,5 +22,5 @@ val to_str : value -> string
 val to_handler : value -> result -> result
 
 val print_value : ?max_level:int -> value -> Format.formatter -> unit
-val print_effect : Common.effect -> Format.formatter -> unit
+val print_effect : OldUtils.effect -> Format.formatter -> unit
 val print_result : result -> Format.formatter -> unit

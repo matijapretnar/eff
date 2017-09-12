@@ -4,7 +4,7 @@ module Variable = Symbol.Make(Symbol.String)
 module EffectMap = Map.Make(String)
 
 type variable = Variable.t
-type effect = Common.effect
+type effect = OldUtils.effect
 
 type 'term annotation = {
   term: 'term;
@@ -21,8 +21,8 @@ and plain_pattern =
   | PVar of variable
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (Common.field, pattern) Common.assoc
-  | PVariant of Common.label * pattern option
+  | PRecord of (OldUtils.field, pattern) OldUtils.assoc
+  | PVariant of OldUtils.label * pattern option
   | PConst of Const.t
   | PNonbinding
 
@@ -32,8 +32,8 @@ and plain_expression =
   | Var of variable
   | Const of Const.t
   | Tuple of expression list
-  | Record of (Common.field, expression) Common.assoc
-  | Variant of Common.label * expression option
+  | Record of (OldUtils.field, expression) OldUtils.assoc
+  | Variant of OldUtils.label * expression option
   | Lambda of abstraction
   | Effect of effect
   | Handler of handler
@@ -51,7 +51,7 @@ and plain_computation =
 
 (** Handler definitions *)
 and handler = {
-  effect_clauses : (effect, abstraction2) Common.assoc;
+  effect_clauses : (effect, abstraction2) OldUtils.assoc;
   value_clause : abstraction;
   finally_clause : abstraction;
 }
@@ -66,7 +66,7 @@ and abstraction2 = pattern * pattern * computation
 (* Toplevel commands (the first four do not need to be separated by [;;]) *)
 type command = plain_command annotation
 and plain_command =
-  | Tydef of (Common.tyname, (Type.ty_param, Type.dirt_param, Type.region_param) Common.trio * Tctx.tydef) Common.assoc
+  | Tydef of (OldUtils.tyname, (Type.ty_param, Type.dirt_param, Type.region_param) OldUtils.trio * Tctx.tydef) OldUtils.assoc
   (** [type t = tydef] *)
   | TopLet of (pattern * computation) list
   (** [let p1 = t1 and ... and pn = tn] *)
@@ -97,9 +97,9 @@ let rec print_pattern ?max_level p ppf =
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
   | PRecord lst -> Print.record print_pattern lst ppf
-  | PVariant (lbl, None) when lbl = Common.nil -> print "[]"
+  | PVariant (lbl, None) when lbl = OldUtils.nil -> print "[]"
   | PVariant (lbl, None) -> print "%s" lbl
-  | PVariant (lbl, Some ({ term = PTuple [v1; v2] })) when lbl = Common.cons ->
+  | PVariant (lbl, Some ({ term = PTuple [v1; v2] })) when lbl = OldUtils.cons ->
       print "[@[<hov>@[%t@]%t@]]" (print_pattern v1) (pattern_list v2)
   | PVariant (lbl, Some p) ->
       print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
@@ -108,9 +108,9 @@ let rec print_pattern ?max_level p ppf =
 and pattern_list ?(max_length=299) p ppf =
   if max_length > 1 then
     match p.term with
-    | PVariant (lbl, Some ({ term = PTuple [v1; v2] })) when lbl = Common.cons ->
+    | PVariant (lbl, Some ({ term = PTuple [v1; v2] })) when lbl = OldUtils.cons ->
         Format.fprintf ppf ",@ %t%t" (print_pattern v1) (pattern_list ~max_length:(max_length - 1) v2)
-    | PVariant (lbl, None) when lbl = Common.nil -> ()
+    | PVariant (lbl, None) when lbl = OldUtils.nil -> ()
     | _ -> Format.fprintf ppf "(??? %t ???)" (print_pattern p)
   else
     Format.fprintf ppf ",@ ..."

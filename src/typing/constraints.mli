@@ -12,8 +12,8 @@ val subst : Type.substitution -> t -> t
 val expand_ty : t -> Type.ty -> Type.ty
 
 val garbage_collect :
-    (Type.ty_param, Type.dirt_param, Type.region_param) Common.trio ->
-    (Type.ty_param, Type.dirt_param, Type.region_param) Common.trio ->
+    (Type.ty_param, Type.dirt_param, Type.region_param) OldUtils.trio ->
+    (Type.ty_param, Type.dirt_param, Type.region_param) OldUtils.trio ->
     t -> t
 
 val add_ty_constraint : loc:Location.t -> Type.ty -> Type.ty -> t -> t

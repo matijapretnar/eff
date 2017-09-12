@@ -32,62 +32,62 @@ let float_float_to_float f =
 (* Comparison of values is a trickier business than you might think. *)
 let rec compare v1 v2 =
   match v1 with
-    | V.Closure _ | V.Handler _ -> Common.Invalid
+    | V.Closure _ | V.Handler _ -> OldUtils.Invalid
     | V.Const c ->
       (match v2 with
-        | V.Closure _ | V.Handler _ -> Common.Invalid
+        | V.Closure _ | V.Handler _ -> OldUtils.Invalid
         | V.Const c' -> Const.compare c c'
-        | V.Tuple _ | V.Record _ | V.Variant _ -> Common.Less)
+        | V.Tuple _ | V.Record _ | V.Variant _ -> OldUtils.Less)
     | V.Tuple lst ->
       (match v2 with
-        | V.Closure _ | V.Handler _ -> Common.Invalid
-        | V.Const _ -> Common.Greater
+        | V.Closure _ | V.Handler _ -> OldUtils.Invalid
+        | V.Const _ -> OldUtils.Greater
         | V.Tuple lst' -> compare_list lst lst'
-        | V.Record _ | V.Variant _ -> Common.Less)
+        | V.Record _ | V.Variant _ -> OldUtils.Less)
     | V.Record lst ->
       (match v2 with
-        | V.Closure _ | V.Handler _ -> Common.Invalid
-        | V.Const _ | V.Tuple _ -> Common.Greater
+        | V.Closure _ | V.Handler _ -> OldUtils.Invalid
+        | V.Const _ | V.Tuple _ -> OldUtils.Greater
         | V.Record lst' -> compare_record lst lst'
-        | V.Variant _ -> Common.Less)
+        | V.Variant _ -> OldUtils.Less)
     | V.Variant (lbl, u)->
       (match v2 with
-        | V.Closure _ | V.Handler _ -> Common.Invalid
-        | V.Const _ | V.Tuple _ | V.Record _ -> Common.Greater
+        | V.Closure _ | V.Handler _ -> OldUtils.Invalid
+        | V.Const _ | V.Tuple _ | V.Record _ -> OldUtils.Greater
         | V.Variant (lbl', u') ->
           let r = Pervasives.compare lbl lbl' in
-            if r < 0 then Common.Less
-            else if r > 0 then Common.Greater
+            if r < 0 then OldUtils.Less
+            else if r > 0 then OldUtils.Greater
             else compare_option u u')
 
 and compare_list lst1 lst2 =
   match lst1, lst2 with
-    | ([], []) -> Common.Equal
+    | ([], []) -> OldUtils.Equal
     | (u::lst1, v::lst2) ->
       (match compare u v with
-        | Common.Less -> Common.Less
-        | Common.Equal -> compare_list lst1 lst2
-        | Common.Greater -> Common.Greater
-        | Common.Invalid -> Common.Invalid)
-    | ([], _ :: _) -> Common.Less
-    | (_ :: _, []) -> Common.Greater
+        | OldUtils.Less -> OldUtils.Less
+        | OldUtils.Equal -> compare_list lst1 lst2
+        | OldUtils.Greater -> OldUtils.Greater
+        | OldUtils.Invalid -> OldUtils.Invalid)
+    | ([], _ :: _) -> OldUtils.Less
+    | (_ :: _, []) -> OldUtils.Greater
 
 and compare_record lst1 lst2 =
   (* Is is easiest to canonically sort the fields, then compare as lists. *)
   let rec comp = function
-    | [], [] -> Common.Equal
+    | [], [] -> OldUtils.Equal
     | (fld1,v1)::lst1, (fld2,v2)::lst2 ->
       let r = Pervasives.compare fld1 fld2 in
-        if r < 0 then Common.Less
-        else if r > 0 then Common.Greater 
+        if r < 0 then OldUtils.Less
+        else if r > 0 then OldUtils.Greater 
         else
           (match compare v1 v2 with
-            | Common.Less -> Common.Less
-            | Common.Equal -> comp (lst1, lst2)
-            | Common.Greater -> Common.Greater
-            | Common.Invalid -> Common.Invalid)
-    | [], _ :: _ -> Common.Less
-    | _ :: _, [] -> Common.Greater
+            | OldUtils.Less -> OldUtils.Less
+            | OldUtils.Equal -> comp (lst1, lst2)
+            | OldUtils.Greater -> OldUtils.Greater
+            | OldUtils.Invalid -> OldUtils.Invalid)
+    | [], _ :: _ -> OldUtils.Less
+    | _ :: _, [] -> OldUtils.Greater
   in
     comp
       ((List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst1),
@@ -95,24 +95,24 @@ and compare_record lst1 lst2 =
 
 and compare_option o1 o2 =
   match o1, o2 with
-    | None, None -> Common.Equal
+    | None, None -> OldUtils.Equal
     | Some v1, Some v2 -> compare v1 v2
-    | None, Some _ -> Common.Less
-    | Some _, None -> Common.Greater
+    | None, Some _ -> OldUtils.Less
+    | Some _, None -> OldUtils.Greater
 
 (* Now it is easy to get equality and less than, not to mention we
    can now easily add a builtin "compare". *)
 let equal v1 v2 =
   match compare v1 v2 with
-    | Common.Equal -> true
-    | Common.Less | Common.Greater -> false
-    | Common.Invalid -> Error.runtime "invalid comparison with ="
+    | OldUtils.Equal -> true
+    | OldUtils.Less | OldUtils.Greater -> false
+    | OldUtils.Invalid -> Error.runtime "invalid comparison with ="
 
 let less_than v1 v2 =
   match compare v1 v2 with
-    | Common.Less -> true
-    | Common.Greater | Common.Equal -> false
-    | Common.Invalid -> Error.runtime "invalid comparison with <"
+    | OldUtils.Less -> true
+    | OldUtils.Greater | OldUtils.Equal -> false
+    | OldUtils.Invalid -> Error.runtime "invalid comparison with <"
 
 let comparison_functions = [
   ("=", binary_closure (fun v1 v2 -> value_bool (equal v1 v2)));

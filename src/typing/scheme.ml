@@ -1,4 +1,4 @@
-type context = (CoreSyntax.variable, Type.ty) Common.assoc
+type context = (CoreSyntax.variable, Type.ty) OldUtils.assoc
 type 'a t = context * 'a * Constraints.t
 type ty_scheme = Type.ty t
 type dirty_scheme = Type.dirty t
@@ -18,7 +18,7 @@ let beautify2 ty1 ty2 cnstrs =
 
 let refresh (ctx, ty, cnstrs) =
   let sbst = Type.refreshing_subst () in
-  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst sbst cnstrs
+  OldUtils.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst sbst cnstrs
 
 let ty_param_less p q (ctx, ty, cnstrs) =
   (ctx, ty, Constraints.add_ty_constraint p q cnstrs)
@@ -39,7 +39,7 @@ and dirty_less ~loc drty1 drty2 (ctx, ty, cnstrs) =
 
 let remove_context ~loc ctx_p (ctx, ty, cnstrs) =
   let trim (x, t) (ctx, ty, cnstrs) =
-    match Common.lookup x ctx_p with
+    match OldUtils.lookup x ctx_p with
     | None -> ((x, t) :: ctx, ty, cnstrs)
     | Some u -> (ctx, ty, cnstrs)
   in
@@ -47,7 +47,7 @@ let remove_context ~loc ctx_p (ctx, ty, cnstrs) =
 
 let less_context ~loc ctx_p (ctx, ty, cnstrs) =
   let trim (x, t) (ctx, ty, cnstrs) =
-    match Common.lookup x ctx_p with
+    match OldUtils.lookup x ctx_p with
     | None -> ((x, t) :: ctx, ty, cnstrs)
     | Some u -> ty_less ~loc u t ((x, u) :: ctx, ty, cnstrs)
   in
@@ -58,7 +58,7 @@ let trim_context ~loc ctx_p ty_sch =
   let ty_sch = remove_context ~loc ctx_p ty_sch in
   ty_sch
 
-let (@@@) = Common.trio_append
+let (@@@) = OldUtils.trio_append
 
 let pos_neg_ty_scheme (ctx, ty, cnstrs) =
   let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
@@ -66,7 +66,7 @@ let pos_neg_ty_scheme (ctx, ty, cnstrs) =
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
   let (((_, _, pos_rs) as pos), ((_, _, neg_rs) as neg)) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
-  Common.trio_uniq pos, Common.trio_uniq neg
+  OldUtils.trio_uniq pos, OldUtils.trio_uniq neg
 
 let pos_neg_dirtyscheme (ctx, drty, cnstrs) =
   pos_neg_ty_scheme (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs)
@@ -76,7 +76,7 @@ let garbage_collect pos neg (ctx, ty, cnstrs) =
 
 let normalize_context ~loc (ctx, ty, cnstrs) =
   let collect (x, ty) ctx =
-    match Common.lookup x ctx with
+    match OldUtils.lookup x ctx with
     | None -> (x, ref [ty]) :: ctx
     | Some tys -> tys := ty :: !tys; ctx
   in
@@ -96,21 +96,21 @@ let normalize_context ~loc (ctx, ty, cnstrs) =
 let subst_ty_scheme sbst (ctx, ty, cnstrs) =
   let ty = Type.subst_ty sbst ty in
   let cnstrs = Constraints.subst sbst cnstrs in
-  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  let ctx = OldUtils.assoc_map (Type.subst_ty sbst) ctx in
   (ctx, ty, cnstrs)
 
 let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
   let drty = Type.subst_dirty sbst drty in
   let cnstrs = Constraints.subst sbst cnstrs in
-  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  let ctx = OldUtils.assoc_map (Type.subst_ty sbst) ctx in
   (ctx, drty, cnstrs)
 
 let finalize ctx ty chngs =
-  let ctx, ty, cnstrs = List.fold_right Common.id chngs (ctx, ty, Constraints.empty) in
-  (Common.assoc_map (Constraints.expand_ty cnstrs) ctx, Constraints.expand_ty cnstrs ty, cnstrs)
+  let ctx, ty, cnstrs = List.fold_right OldUtils.id chngs (ctx, ty, Constraints.empty) in
+  (OldUtils.assoc_map (Constraints.expand_ty cnstrs) ctx, Constraints.expand_ty cnstrs ty, cnstrs)
 
 let expand_ty_scheme (ctx, ty, constraints) =
-  (Common.assoc_map (Constraints.expand_ty constraints) ctx, Constraints.expand_ty constraints ty, constraints)
+  (OldUtils.assoc_map (Constraints.expand_ty constraints) ctx, Constraints.expand_ty constraints ty, constraints)
 
 let clean_ty_scheme ~loc ty_sch =
   let ty_sch = normalize_context ~loc ty_sch in
@@ -124,7 +124,7 @@ let clean_dirty_scheme ~loc (ctx, drty, constraints) =
   | _ -> assert false
 
 let create_ty_scheme ctx ty changes =
-  List.fold_right Common.id changes (ctx, ty, Constraints.empty)
+  List.fold_right OldUtils.id changes (ctx, ty, Constraints.empty)
 
 let finalize_ty_scheme ~loc ctx ty changes =
   let ty_sch = create_ty_scheme ctx ty changes in
@@ -175,7 +175,7 @@ let beautify_ty_scheme ty_sch =
 let beautify_dirty_scheme drty_sch = 
   let sbst = Type.beautifying_subst () in
   let _, (_, ds, _) = pos_neg_dirtyscheme drty_sch in
-  ignore (Common.map sbst.Type.dirt_param ds);
+  ignore (OldUtils.map sbst.Type.dirt_param ds);
   subst_dirty_scheme sbst drty_sch
 
 let extend_non_poly (ts, ds, rs) skeletons =
@@ -184,11 +184,11 @@ let extend_non_poly (ts, ds, rs) skeletons =
     skel @ new_ts else new_ts
   in
   let ts = List.fold_right add_skel skeletons ts in
-  (Common.uniq ts, ds, rs)
+  (OldUtils.uniq ts, ds, rs)
 
 let skeletons_non_poly_scheme (ctx, _, cnstrs) =
   let skeletons = Constraints.skeletons cnstrs in
-  let non_poly = Common.trio_flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
+  let non_poly = OldUtils.trio_flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
   skeletons, non_poly
 

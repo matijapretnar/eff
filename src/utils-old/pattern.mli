@@ -3,8 +3,8 @@ and 'var plain_t =
   | Var of 'var
   | As of 'var t * 'var
   | Tuple of ('var t) list
-  | Record of (Common.field * 'var t) list
-  | Variant of Common.label * ('var t) option
+  | Record of (OldUtils.field * 'var t) list
+  | Variant of OldUtils.label * ('var t) option
   | Const of Const.t
   | Nonbinding
 val pattern_vars : 'var t -> 'var list

@@ -19,10 +19,10 @@ end
 
 module TypingEnv : TYPINGENV =
 struct
-  type t = (Typed.variable, Scheme.ty_scheme) Common.assoc
+  type t = (Typed.variable, Scheme.ty_scheme) OldUtils.assoc
 
   let empty = []
-  let lookup ctx x = Common.option_map Scheme.refresh (Common.lookup x ctx)
+  let lookup ctx x = OldUtils.option_map Scheme.refresh (OldUtils.lookup x ctx)
   let update ctx x sch = (x, sch) :: ctx
 end
 
@@ -98,12 +98,12 @@ let rec type_pattern p =
   | Untyped.PRecord (((fld, _) :: _) as lst) ->
       if not (Pattern.linear_record lst) then
         Error.typing ~loc "Fields in a record must be distinct";
-      let lst = Common.assoc_map type_pattern lst in
+      let lst = OldUtils.assoc_map type_pattern lst in
       begin match Tctx.infer_field fld with
       | None -> Error.typing ~loc "Unbound record field label %s" fld
       | Some (ty, (ty_name, fld_tys)) ->
           let infer (fld, p) (ctx, chngs) =
-            begin match Common.lookup fld fld_tys with
+            begin match OldUtils.lookup fld fld_tys with
             | None -> Error.typing ~loc "Unexpected field %s in a pattern of type %s" fld ty_name
             | Some fld_ty ->
                 let ctx_p, ty_p, cnstrs_p = p.Typed.scheme in
@@ -162,10 +162,10 @@ let rec type_expr env {Untyped.term=expr; Untyped.location=loc} =
       let es = List.map (type_expr env) es in
       Typed.tuple ~loc es
   | Untyped.Record lst ->
-      let lst = Common.assoc_map (type_expr env) lst in
+      let lst = OldUtils.assoc_map (type_expr env) lst in
       Typed.record ~loc lst
   | Untyped.Variant (lbl, e) ->
-      Typed.variant ~loc (lbl, Common.option_map (type_expr env) e)
+      Typed.variant ~loc (lbl, OldUtils.option_map (type_expr env) e)
   | Untyped.Lambda a ->
       Typed.lambda ~loc (type_abstraction env a)
   | Untyped.Effect eff ->
@@ -198,7 +198,7 @@ and type_abstraction2 env (p1, p2, c) =
   Typed.abstraction2 ~loc:(c.Untyped.location) (type_pattern p1) (type_pattern p2) (type_comp env c)
 and type_handler env h =
   {
-    Typed.effect_clauses = Common.assoc_map (type_abstraction2 env) h.Untyped.effect_clauses;
+    Typed.effect_clauses = OldUtils.assoc_map (type_abstraction2 env) h.Untyped.effect_clauses;
     Typed.value_clause = type_abstraction env h.Untyped.value_clause;
     Typed.finally_clause = type_abstraction env h.Untyped.finally_clause;
   }
@@ -224,7 +224,7 @@ and type_let_defs ~loc env defs =
     ] @ chngs, (p, c) :: defs
   in
   let poly_tys, nonpoly_tys, ctx, chngs, defs = List.fold_right add_binding defs ([], [], [], [], []) in
-  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
   defs, poly_tyschs
 and type_let_rec_defs ~loc env defs =
   let add_binding (x, a) (poly_tys, nonpoly_tys, ctx, chngs, defs) =
@@ -237,7 +237,7 @@ and type_let_rec_defs ~loc env defs =
   in
   let poly_tys, nonpoly_tys, ctx, chngs, defs = List.fold_right add_binding defs ([], [], [], [], []) in
   let chngs = Scheme.trim_context ~loc poly_tys :: chngs in
-  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
   defs, poly_tyschs
 
 (* [infer_comp env c] infers the dirty type scheme of a computation [c] in a
@@ -277,7 +277,7 @@ let infer_let ~loc env defs =
     ] @ chngs
   in
   let poly_tys, nonpoly_tys, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
-  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
   let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
       Scheme.less_context ~loc nonpoly_tys;
@@ -298,7 +298,7 @@ let infer_let_rec ~loc env defs =
   in
   let poly_tys, nonpoly_tys, ctx, chngs = List.fold_right add_binding defs ([], [], [], []) in
   let chngs = trim_context ~loc poly_tys :: chngs in
-  let poly_tyschs = Common.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
+  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.finalize_ty_scheme ~loc ctx ty chngs) poly_tys in
   let change (ctx_c, (ty_c, drt_c), cnstrs_c) =
     Scheme.finalize_dirty_scheme ~loc (ctx @ ctx_c) (ty_c, drt) ([
       dirt_less drt_c drt;
@@ -315,14 +315,14 @@ type t = {
 
 let empty = {
   typing = initial;
-  change = Common.id;
+  change = OldUtils.id;
 }
 
 let infer_top_comp st c =
   let c' = type_comp st.typing c in
   let ctx', (ty', drt'), cnstrs' = c'.Typed.scheme in
   let change = Scheme.add_to_top ~loc:c'.Typed.location ctx' cnstrs' in
-  let top_change = Common.compose st.change change in
+  let top_change = OldUtils.compose st.change change in
   let ctx = match c'.Typed.term with
   | Typed.Value _ -> ctx'
   | _ -> (Desugar.fresh_variable (Some "$top_comp"), ty') :: ctx'
@@ -343,14 +343,14 @@ let infer_top_let ~loc st defs =
     (x, ([(x, ty)], ty, Constraints.empty)) :: env
   in
   let vars = List.fold_right extend_nonpoly nonpoly vars in
-  let top_change = Common.compose st.change change in
+  let top_change = OldUtils.compose st.change change in
   let sch_change (ctx, ty, cnstrs) =
     let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
     (ctx, ty, cnstrs)
   in
   let defs', poly_tyschs = type_let_defs ~loc st.typing defs in
   List.iter (fun (p, c) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs;
-  let vars' = Common.assoc_map sch_change vars in
+  let vars' = OldUtils.assoc_map sch_change vars in
   defs', vars', {
     typing = typing_env;
     change = top_change;
@@ -360,13 +360,13 @@ let infer_top_let_rec ~loc st defs =
   let vars, _, change = infer_let_rec ~loc st.typing defs in
   let defs', poly_tyschs = type_let_rec_defs ~loc st.typing defs in
   let typing_env = List.fold_right (fun (x, ty_sch) env -> add_def env x ty_sch) vars st.typing in
-  let top_change = Common.compose st.change change in
+  let top_change = OldUtils.compose st.change change in
   let sch_change (ctx, ty, cnstrs) =
     let (ctx, (ty, _), cnstrs) = top_change (ctx, (ty, Type.fresh_dirt ()), cnstrs) in
     (ctx, ty, cnstrs)
   in
   List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs ;
-  let vars' = Common.assoc_map sch_change vars in
+  let vars' = OldUtils.assoc_map sch_change vars in
   defs', vars', {
     typing = typing_env;
     change = top_change;

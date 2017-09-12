@@ -1,4 +1,4 @@
-module C = Common
+module C = OldUtils
 module P = Pattern
 module Untyped = CoreSyntax
 
@@ -224,8 +224,8 @@ let rec old_of_new_pattern p =
     match p.Untyped.term with
     | Untyped.PAs (p, x) -> P.As (old_of_new_pattern p, x)
     | Untyped.PTuple lst -> P.Tuple (List.map old_of_new_pattern lst)
-    | Untyped.PRecord lst -> P.Record (Common.assoc_map old_of_new_pattern lst)
-    | Untyped.PVariant (lbl, opt) -> P.Variant (lbl, Common.option_map old_of_new_pattern opt)
+    | Untyped.PRecord lst -> P.Record (OldUtils.assoc_map old_of_new_pattern lst)
+    | Untyped.PVariant (lbl, opt) -> P.Variant (lbl, OldUtils.option_map old_of_new_pattern opt)
     | Untyped.PConst c -> P.Const c
     | Untyped.PVar x -> P.Var x
     | Untyped.PNonbinding -> P.Nonbinding
@@ -237,8 +237,8 @@ let rec new_of_old_pattern p =
     match fst p with
     | P.As (p, x) -> Untyped.PAs (new_of_old_pattern p, x)
     | P.Tuple lst -> Untyped.PTuple (List.map new_of_old_pattern lst)
-    | P.Record lst -> Untyped.PRecord (Common.assoc_map new_of_old_pattern lst)
-    | P.Variant (lbl, opt) -> Untyped.PVariant (lbl, Common.option_map new_of_old_pattern opt)
+    | P.Record lst -> Untyped.PRecord (OldUtils.assoc_map new_of_old_pattern lst)
+    | P.Variant (lbl, opt) -> Untyped.PVariant (lbl, OldUtils.option_map new_of_old_pattern opt)
     | P.Const c -> Untyped.PConst c
     | P.Var x -> Untyped.PVar x
     | P.Nonbinding -> Untyped.PNonbinding
@@ -290,7 +290,7 @@ let check_comp c =
         List.iter (fun (_, (p, c)) -> is_irrefutable p ; check c) lst ;
       | Untyped.Match (_, []) -> () (* Skip empty match to avoid an unwanted warning. *)
       | Untyped.Match (_, lst) -> 
-        check_patterns ~loc:c.Untyped.location (List.map (Common.compose old_of_new_pattern fst) lst) ;
+        check_patterns ~loc:c.Untyped.location (List.map (OldUtils.compose old_of_new_pattern fst) lst) ;
         List.iter (fun (_, c) -> check c) lst
       | Untyped.Apply _ -> ()
       | Untyped.Handle (_, c) -> check c

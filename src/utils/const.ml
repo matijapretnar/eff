@@ -21,32 +21,32 @@ let print c ppf =
 let compare c1 c2 =
   let cmp x y =
     let r = Pervasives.compare x y in
-      if r < 0 then Common.Less
-      else if r > 0 then Common.Greater
-      else Common.Equal
+      if r < 0 then OldUtils.Less
+      else if r > 0 then OldUtils.Greater
+      else OldUtils.Equal
   in
     match c1 with
       | Integer k ->
         (match c2 with
           | Integer k' -> 
             let r = Pervasives.compare k k' in
-              if r < 0 then Common.Less
-              else if r > 0 then Common.Greater
-              else Common.Equal
-          | String _ | Boolean _ | Float _ -> Common.Less)
+              if r < 0 then OldUtils.Less
+              else if r > 0 then OldUtils.Greater
+              else OldUtils.Equal
+          | String _ | Boolean _ | Float _ -> OldUtils.Less)
     | String s ->
       (match c2 with
-        | Integer _ -> Common.Greater
+        | Integer _ -> OldUtils.Greater
         | String s' -> cmp s s'
-        | Boolean _ | Float _ -> Common.Less)
+        | Boolean _ | Float _ -> OldUtils.Less)
     | Boolean b ->
       (match c2 with
-        | Integer _ | String _ -> Common.Greater
+        | Integer _ | String _ -> OldUtils.Greater
         | Boolean b' -> cmp b b'
-        | Float _ -> Common.Less)
+        | Float _ -> OldUtils.Less)
     | Float x ->
       (match c2 with
-        | Integer _ | String _ | Boolean _ -> Common.Greater
+        | Integer _ | String _ | Boolean _ -> OldUtils.Greater
         | Float x' -> cmp x x')
 
-let equal c1 c2 = (compare c1 c2 = Common.Equal)
+let equal c1 c2 = (compare c1 c2 = OldUtils.Equal)

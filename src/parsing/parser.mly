@@ -2,7 +2,7 @@
   open SugaredSyntax
 
   type handler_clause =
-    | EffectClause of Common.effect * abstraction2
+    | EffectClause of OldUtils.effect * abstraction2
     | ReturnClause of abstraction
     | FinallyClause of abstraction
 
@@ -39,8 +39,8 @@
 %token <string> STRING
 %token <bool> BOOL
 %token <float> FLOAT
-%token <Common.label> UNAME
-%token <Common.typaram> PARAM
+%token <OldUtils.label> UNAME
+%token <OldUtils.typaram> PARAM
 %token TYPE ARROW HARROW OF EFFECT
 %token EXTERNAL
 %token MATCH WITH FUNCTION HASH
@@ -184,7 +184,7 @@ plain_binop_term:
       Apply ((partial, partial_pos), t2)
     }
   | t1 = binop_term CONS t2 = binop_term
-    { Variant (Common.cons, Some (Tuple [t1; t2], Location.make $startpos $endpos)) }
+    { Variant (OldUtils.cons, Some (Tuple [t1; t2], Location.make $startpos $endpos)) }
   | t = plain_uminus_term 
     { t }
 
@@ -236,10 +236,10 @@ plain_simple_term:
     { Effect eff }
   | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
-      let nil = (Variant (Common.nil, None), Location.make $endpos $endpos) in
+      let nil = (Variant (OldUtils.nil, None), Location.make $endpos $endpos) in
       let cons ((_, loc_t) as t) ((_, loc_ts) as ts) =
         let loc = Location.union [loc_t; loc_ts] in
-        (Variant (Common.cons, Some (Tuple [t; ts], loc)), loc) in
+        (Variant (OldUtils.cons, Some (Tuple [t; ts], loc)), loc) in
       fst (List.fold_right cons ts nil)
     }
   | LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, comma_term)) RBRACE
@@ -313,7 +313,7 @@ plain_cons_pattern:
   | p = variant_pattern
     { fst p }
   | p1 = variant_pattern CONS p2 = cons_pattern
-    { Pattern.Variant (Common.cons, Some (Pattern.Tuple [p1; p2], Location.make $startpos $endpos)) }
+    { Pattern.Variant (OldUtils.cons, Some (Pattern.Tuple [p1; p2], Location.make $startpos $endpos)) }
 
 variant_pattern: mark_position(plain_variant_pattern) { $1 }
 plain_variant_pattern:
@@ -336,10 +336,10 @@ plain_simple_pattern:
     { Pattern.Record flds }
   | LBRACK ts = separated_list(SEMI, pattern) RBRACK
     {
-      let nil = (Pattern.Variant (Common.nil, None), Location.make $endpos $endpos) in
+      let nil = (Pattern.Variant (OldUtils.nil, None), Location.make $endpos $endpos) in
       let cons ((_, loc_t) as t) ((_, loc_ts) as ts) =
         let loc = Location.union [loc_t; loc_ts] in
-        (Pattern.Variant (Common.cons, Some (Pattern.Tuple [t; ts], loc)), loc)
+        (Pattern.Variant (OldUtils.cons, Some (Pattern.Tuple [t; ts], loc)), loc)
       in
         fst (List.fold_right cons ts nil)
     }
