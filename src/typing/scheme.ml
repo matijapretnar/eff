@@ -58,7 +58,7 @@ let trim_context ~loc ctx_p ty_sch =
   let ty_sch = remove_context ~loc ctx_p ty_sch in
   ty_sch
 
-let (@@@) = Trio.append
+let (@@@) = Common.trio_append
 
 let pos_neg_ty_scheme (ctx, ty, cnstrs) =
   let add_ctx_pos_neg (_, ctx_ty) (pos, neg) =
@@ -66,7 +66,7 @@ let pos_neg_ty_scheme (ctx, ty, cnstrs) =
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
   let (((_, _, pos_rs) as pos), ((_, _, neg_rs) as neg)) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
-  Trio.uniq pos, Trio.uniq neg
+  Common.trio_uniq pos, Common.trio_uniq neg
 
 let pos_neg_dirtyscheme (ctx, drty, cnstrs) =
   pos_neg_ty_scheme (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs)
@@ -188,7 +188,7 @@ let extend_non_poly (ts, ds, rs) skeletons =
 
 let skeletons_non_poly_scheme (ctx, _, cnstrs) =
   let skeletons = Constraints.skeletons cnstrs in
-  let non_poly = Trio.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
+  let non_poly = Common.trio_flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
   let non_poly = extend_non_poly non_poly skeletons in
   skeletons, non_poly
 

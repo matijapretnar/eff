@@ -64,7 +64,7 @@ let fill_args_tydef def =
           (fun (fld, ty) (ds, rs, lst) ->
             let (ds', rs'), ty = fill_args ty in
               (ds' @ ds, rs' @ rs, (fld, ty) :: lst))
-          lst Trio.empty
+          lst Common.trio_empty
       in
         (ds, rs), Sugared.TyRecord lst
     | Sugared.TySum lst ->
@@ -76,7 +76,7 @@ let fill_args_tydef def =
               | Some ty ->
                 let (ds', rs'), ty = fill_args ty in
                   (ds' @ ds, rs' @ rs, (lbl, Some ty) :: lst))
-          lst Trio.empty
+          lst Common.trio_empty
       in
         (ds, rs), Sugared.TySum lst
     | Sugared.TyInline ty ->
@@ -124,23 +124,23 @@ let ty (ts, ds, rs) =
 
 (** [free_params t] returns a triple of all free type, dirt, and region params in [t]. *)
 let free_params t =
-  let (@@@) = Trio.append
+  let (@@@) = Common.trio_append
   and optional f = function
-    | None -> Trio.empty
+    | None -> Common.trio_empty
     | Some x -> f x
   in
   let rec ty (t, loc) = match t with
   | Sugared.TyApply (_, tys, drts_rgns) ->
-      Trio.flatten_map ty tys @@@ (optional dirts_regions) drts_rgns
+      Common.trio_flatten_map ty tys @@@ (optional dirts_regions) drts_rgns
   | Sugared.TyParam s -> ([s], [], [])
   | Sugared.TyArrow (t1, t2, drt) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt
-  | Sugared.TyTuple lst -> Trio.flatten_map ty lst
+  | Sugared.TyTuple lst -> Common.trio_flatten_map ty lst
   | Sugared.TyHandler (t1, drt1, t2, drt2) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt1 @@@ (optional dirt) drt2
   and dirt (Sugared.DirtParam d) = ([], [d], [])
   and region (Sugared.RegionParam r) = ([], [], [r])
-  and dirts_regions (drts, rgns) = Trio.flatten_map dirt drts @@@ Trio.flatten_map region rgns
+  and dirts_regions (drts, rgns) = Common.trio_flatten_map dirt drts @@@ Common.trio_flatten_map region rgns
   in
-  Trio.uniq (ty t)
+  Common.trio_uniq (ty t)
 
 let syntax_to_core_params (ts, ds, rs) = (
     List.map (fun p -> (p, Type.fresh_ty_param ())) ts,
@@ -151,7 +151,7 @@ let syntax_to_core_params (ts, ds, rs) = (
 (** [tydef params d] desugars the type definition with parameters [params] and definition [d]. *)
 let tydef params d =
   let (ts, ds, rs) as sbst = syntax_to_core_params params in
-    (Trio.snds (ts, ds, rs),
+    (Common.trio_snds (ts, ds, rs),
      begin match d with
        | Sugared.TyRecord lst -> Tctx.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
        | Sugared.TySum lst -> Tctx.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
@@ -168,7 +168,7 @@ let tydefs defs =
       (fun (tyname, (params, def)) (ds, rs, defs) ->
         let (d, r), def = fill_args_tydef def in
           (d @ ds, r @ rs, ((tyname, (params, def)) :: defs)))
-      defs Trio.empty
+      defs Common.trio_empty
   in
     (* Now we traverse again and the rest of the work. *)
     List.map (fun (tyname, (ts, def)) -> (tyname, tydef (ts, ds, rs) def)) defs
@@ -436,8 +436,8 @@ and plain_toplevel = function
       let x, ty = external_ty x ty in
       Untyped.External (x, ty, y)
   | Sugared.DefEffect (eff, (ty1, ty2)) ->
-      let ty1 = ty Trio.empty ty1
-      and ty2 = ty Trio.empty ty2 in
+      let ty1 = ty Common.trio_empty ty1
+      and ty2 = ty Common.trio_empty ty2 in
       Untyped.DefEffect (eff, (ty1, ty2))
   | Sugared.Term t ->
       let c = top_computation t in

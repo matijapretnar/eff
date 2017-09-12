@@ -120,3 +120,12 @@ let assoc_flatten lst =
   in
   let lst = List.fold_right add lst [] in
   assoc_map (!) lst
+
+type ('a, 'b, 'c) trio = 'a list * 'b list * 'c list
+let trio_empty = ([], [], [])
+let trio_append (xs, ys, zs) (us, vs, ws) = (xs @ us, ys @ vs, zs @ ws)
+let trio_snds (xs, ys, zs) = (List.map snd xs, List.map snd ys, List.map snd zs)
+let trio_flatten_map f lst = List.fold_left trio_append trio_empty (List.map f lst)
+let trio_diff (xs, ys, zs) (us, vs, ws) = (diff xs us, diff ys vs, diff zs ws)
+let trio_uniq (xs, ys, zs) = (uniq xs, uniq ys, uniq zs)
+

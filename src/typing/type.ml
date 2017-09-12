@@ -24,7 +24,7 @@ and dirt = {
   rest: dirt_param
 }
 
-and args = (ty, dirt, region_param) Trio.t
+and args = (ty, dirt, region_param) Common.trio
 
 
 let int_ty = Basic "int"
@@ -32,7 +32,7 @@ let string_ty = Basic "string"
 let bool_ty = Basic "bool"
 let float_ty = Basic "float"
 let unit_ty = Tuple []
-let empty_ty = Apply ("empty", Trio.empty)
+let empty_ty = Apply ("empty", Common.trio_empty)
 
 (** [fresh_ty ()] gives a type [Param p] where [p] is a new type parameter on
     each call. *)
@@ -170,25 +170,25 @@ let refresh ty =
   let sbst = refreshing_subst () in
   subst_ty sbst ty
 
-let (@@@) = Trio.append
+let (@@@) = Common.trio_append
 
 let for_parameters get_params is_pos ps lst =
   List.fold_right2 (fun (_, (cov, contra)) el params ->
                       let params = if cov then get_params is_pos el @@@ params else params in
-                      if contra then get_params (not is_pos) el @@@ params else params) ps lst Trio.empty
+                      if contra then get_params (not is_pos) el @@@ params else params) ps lst Common.trio_empty
 
 let pos_neg_params get_variances ty =
   let rec pos_ty is_pos = function
   | Apply (ty_name, args) -> pos_args is_pos ty_name args
   | Param p -> ((if is_pos then [p] else []), [], [])
-  | Basic _ -> Trio.empty
-  | Tuple tys -> Trio.flatten_map (pos_ty is_pos) tys
+  | Basic _ -> Common.trio_empty
+  | Tuple tys -> Common.trio_flatten_map (pos_ty is_pos) tys
   | Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
   | Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
   and pos_dirty is_pos (ty, drt) =
     pos_ty is_pos ty @@@ pos_dirt is_pos drt
   and pos_dirt is_pos drt =
-    pos_dirt_param is_pos drt.rest @@@ Trio.flatten_map (fun (_, dt) -> pos_region_param is_pos dt) drt.ops
+    pos_dirt_param is_pos drt.rest @@@ Common.trio_flatten_map (fun (_, dt) -> pos_region_param is_pos dt) drt.ops
   and pos_dirt_param is_pos p =
     ([], (if is_pos then [p] else []), [])
   and pos_region_param is_pos r =
@@ -199,7 +199,7 @@ let pos_neg_params get_variances ty =
     for_parameters pos_dirt is_pos ds drts @@@
     for_parameters pos_region_param is_pos rs rgns
   in
-  Trio.uniq (pos_ty true ty), Trio.uniq (pos_ty false ty)
+  Common.trio_uniq (pos_ty true ty), Common.trio_uniq (pos_ty false ty)
 
 let print_ty_param (Ty_Param k) ppf =
   Symbols.ty_param k false ppf

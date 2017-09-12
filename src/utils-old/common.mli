@@ -27,3 +27,13 @@ val uniq : 'a list -> 'a list
 val split : int -> 'a list -> 'a list * 'a list
 val diff : 'a list -> 'a list -> 'a list
 val assoc_flatten : ('a * 'b) list -> ('a * 'b list) list
+
+type ('a, 'b, 'c) trio = 'a list * 'b list * 'c list
+
+val trio_empty : ('a, 'b, 'c) trio
+
+val trio_append : ('a, 'b, 'c) trio -> ('a, 'b, 'c) trio -> ('a, 'b, 'c) trio
+val trio_snds :  ('a * 'b, 'c * 'd, 'e * 'f) trio -> ('b, 'd, 'f) trio
+val trio_flatten_map : ('a -> ('b, 'c, 'd) trio) -> 'a list -> ('b, 'c, 'd) trio
+val trio_diff : ('a, 'b, 'c) trio -> ('a, 'b, 'c) trio -> ('a, 'b, 'c) trio
+val trio_uniq : ('a, 'b, 'c) trio -> ('a, 'b, 'c) trio
