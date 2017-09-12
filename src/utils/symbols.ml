@@ -3,7 +3,6 @@ let handler_arrow () = if !Config.ascii then "=>" else "⟹ "
 let arrow () = if !Config.ascii then "->" else "⟶ "
 let short_arrow () = if !Config.ascii then "->" else "→"
 let times () = if !Config.ascii then " * " else " × "
-let union () = if !Config.ascii then "+" else "∪"
 let top () = if !Config.ascii then "T" else "⊤"
 
 let subscript sub =
@@ -19,26 +18,12 @@ let subscript sub =
         in
         sub i
 
-let ty_param index poly ppf =
-  if !Config.ascii then
-    let c = if poly then "_ty" else "ty" in
-    Print.print ppf "%s%s" c (subscript (Some (index + 1)))
-  else
-    let c = if poly then "_τ" else "τ" in
-    Print.print ppf "%s%s" c (subscript (Some (index + 1)))
+let param ascii_symbol utf8_symbol index poly ppf =
+  let prefix = if poly then "_" else ""
+  and symbol = if !Config.ascii then ascii_symbol else utf8_symbol
+  in
+  Print.print ppf "%s%s%s" prefix symbol (subscript (Some (index + 1)))
 
-let dirt_param index poly ppf =
-  if !Config.ascii then
-    let c = if poly then "_drt" else "drt" in
-    Print.print ppf "%s%s" c (subscript (Some (index + 1)))
-  else
-    let c = if poly then "_δ" else "δ" in
-    Print.print ppf "%s%s" c (subscript (Some (index + 1)))
-
-let region_param index poly ppf =
-  if !Config.ascii then
-    let c = if poly then "_rgn" else "rgn" in
-    Print.print ppf "%s%s" c (subscript (Some (index + 1)))
-  else
-    let c = if poly then "_ρ" else "ρ" in
-    Print.print ppf "%s%s" c (subscript (Some (index + 1)))
+let ty_param = param "ty" "τ"
+let dirt_param = param "drt" "δ"
+let region_param  = param "rgn" "ρ"

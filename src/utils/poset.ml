@@ -102,5 +102,5 @@ struct
 
   let print poset ppf =
     let pairs = fold (fun x y lst -> (x, y) :: lst) poset [] in
-    Print.sequence "," (fun (x, y) ppf -> Format.fprintf ppf "%t < %t" (Elt.print x) (Elt.print y)) pairs ppf
+    Print.sequence "," (fun (x, y) ppf -> Format.fprintf ppf "%t %s %t" (Elt.print x) (Symbols.less ()) (Elt.print y)) pairs ppf
   end
