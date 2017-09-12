@@ -96,7 +96,7 @@ let rec type_pattern p =
       assert false
 
   | Untyped.PRecord (((fld, _) :: _) as lst) ->
-      if not (Pattern.linear_record lst) then
+      if not (OldUtils.injective fst lst) then
         Error.typing ~loc "Fields in a record must be distinct";
       let lst = OldUtils.assoc_map type_pattern lst in
       begin match Tctx.infer_field fld with

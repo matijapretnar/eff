@@ -22,17 +22,6 @@ and plain_pattern =
   | PConst of Const.t
   | PNonbinding
 
-let rec pattern_vars p =
-  match p.term with
-    | PVar x -> [x]
-    | PAs (p,x) -> x :: pattern_vars p
-    | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
-    | PRecord lst -> List.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
-    | PVariant (_, None) -> []
-    | PVariant (_, Some p) -> pattern_vars p
-    | PConst _ -> []
-    | PNonbinding -> []
-
 let annotate t sch loc = {
   term = t;
   scheme = sch;
@@ -137,7 +126,7 @@ let record ?loc lst =
   match lst with
   | [] -> assert false
   | ((fld, _) :: _) as lst ->
-    if not (Pattern.linear_record lst) then
+    if not (OldUtils.injective fst lst) then
       Error.typing ~loc "Fields in a record must be distinct";
     begin match Tctx.infer_field fld with
     | None -> Error.typing ~loc "Unbound record field label %s" fld
