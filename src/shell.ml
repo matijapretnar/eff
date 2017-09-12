@@ -29,7 +29,7 @@ let rec exec_cmd ppf st cmd =
   match cmd.CoreSyntax.term with
   | CoreSyntax.Computation c ->
       let drty_sch, c', typing = Infer.infer_top_comp st.typing c in
-      let v = Eval.run st.runtime c' in
+      let v = Eval.run st.runtime c in
       Format.fprintf ppf "@[- : %t = %t@]@."
         (print_dirty_scheme drty_sch)
         (Value.print_value v);
@@ -58,7 +58,7 @@ let rec exec_cmd ppf st cmd =
       let runtime =
         List.fold_right
           (fun (p, c) env -> let v = Eval.run env c in Eval.extend p v env)
-          defs' st.runtime
+          defs st.runtime
       in
       List.iter (fun (x, tysch) ->
         match Eval.lookup x runtime with
@@ -72,7 +72,7 @@ let rec exec_cmd ppf st cmd =
       { typing; runtime }
     | CoreSyntax.TopLetRec defs ->
         let defs', vars, typing = Infer.infer_top_let_rec ~loc st.typing defs in
-        let runtime = Eval.extend_let_rec st.runtime defs' in
+        let runtime = Eval.extend_let_rec st.runtime defs in
         List.iter (fun (x, tysch) ->
           Format.fprintf ppf "@[val %t : %t = <fun>@]@."
             (CoreSyntax.Variable.print x)
