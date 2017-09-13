@@ -181,6 +181,7 @@ let produce_compiled_file st filename =
     | Typed.Computation c ->
         print_endline "found something!";
         SimplePrint.print_computation c out_ppf;
+        Format.fprintf out_ppf "\n;;\n ";
         print_endline "ended found something!";
         st
     | _ -> st
@@ -189,6 +190,7 @@ let produce_compiled_file st filename =
   let cmds = Lexer.read_file (parse Parser.file) filename in
   let cmds = List.map Desugar.toplevel cmds in
   let st = List.fold_left compile_cmd st cmds in
+    Format.fprintf out_ppf "@? ";
   flush out_channel;
   close_out out_channel
 
