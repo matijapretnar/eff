@@ -5,7 +5,8 @@ type target_ty =
   | Tuple of target_ty list
   | Handler of target_dirty * target_dirty
   | PrimTy of prim_ty
-  | QualTy of ct * target_ty
+  | QualTy of ct_ty * target_ty
+  | QualDirt of ct_dirt * target_ty
   | TySchemeTy of Params.ty_param * target_ty
   | TySchemeDirt of Params.dirt_param * target_ty
 
@@ -27,7 +28,12 @@ and
  | BoolTy
  | StringTy
  | FloatTy
-
+and
+ct_ty = (target_ty * target_ty)
+and
+ct_dirt = (dirt * dirt)
+and 
+ct_dirty = (target_dirty * target_dirty)
 
 let rec print_target_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -51,7 +57,7 @@ let rec print_target_ty ?max_level ty ppf =
       (print_target_ty ~max_level:4 t2)
       (print_target_dirt drt2)
   | PrimTy p -> print_prim_ty p ppf
-  | QualTy (c,tty) -> print "%t => %t" (print_constraint c) (print_target_ty tty)
+  | QualTy (c,tty) -> print "%t => %t" (print_ct_ty c) (print_target_ty tty)
   | TySchemeTy (p,tty) -> print "ForallTy %t. %t" (Params.print_ty_param p ) (print_target_ty tty)
   | TySchemeDirt (p,tty) -> print "ForallDirt %t. %t" (Params.print_dirt_param p ) (print_target_ty tty)
   end
@@ -65,6 +71,10 @@ and print_target_dirt drt ppf =
 	 | Union (eff,d) -> print "%s U %t" eff (print_target_dirt d)
 	  end
 
+and print_target_dirty (t1, drt1) ppf = 
+  let print ?at_level = Print.print  ?at_level ppf in
+  print "%t ! %t" (print_target_ty t1) (print_target_dirt drt1)
+
 and print_constraint c ppf=
 	let print ?at_level = Print.print  ?at_level ppf in
 	begin match c with
@@ -77,6 +87,13 @@ and print_constraint c ppf=
       (print_target_dirt drt2)
 	| LeqDirt (d1,d2) -> print "%t <= %t"  (print_target_dirt d1)  (print_target_dirt d2)
 	end
+
+and print_ct_ty (ty1,ty2) ppf = 
+    let print ?at_level = Print.print  ?at_level ppf in
+    print "%t <= %t"  (print_target_ty ty1)  (print_target_ty ty2)
+
+
+
 and print_prim_ty pty ppf=
 	let print ?at_level = Print.print  ?at_level ppf in
 	begin match pty with

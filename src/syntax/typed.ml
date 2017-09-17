@@ -55,8 +55,8 @@ and plain_expression =
   | BigLambdaDirt of Params.dirt_param * expression  
   | CastExp of expression * ty_coercion
   | ApplyTy of expression * target_ty
-  | LambdaTyCoerVar of Params.ty_coercion_param * Types.ct * expression 
-  | LambdaDirtyCoerVar of Params.dirt_coercion_param * Types.ct * expression 
+  | LambdaTyCoerVar of Params.ty_coercion_param * Types.ct_ty * expression 
+  | LambdaDirtyCoerVar of Params.dirt_coercion_param * Types.ct_dirt * expression 
   | ApplyDirt of expression * Types.dirt
   | ApplyTyCoercion of expression * ty_coercion
   | ApplyDirtCoercion of expression * dirt_coercion
@@ -77,12 +77,12 @@ and plain_computation =
   | CastComp_dirt of computation * dirt_coercion
 
 and ty_coercion =
-  | ReflInt
-  | ReflBool
-  | ReflTy of Params.ty_param
+  (* | ReflInt
+  | ReflBool *)
+  | ReflTy of Types.target_ty
   | ArrowCoercion of ty_coercion * dirty_coercion
   | HandlerCoercion of dirty_coercion * dirty_coercion
-  | TyCoercionVar of (Params.ty_coercion_param * Types.ct)
+  | TyCoercionVar of Params.ty_coercion_param 
   | SequenceTyCoer of  ty_coercion * ty_coercion
   | TupleCoercion of ty_coercion list
   | LeftArrow of ty_coercion
@@ -90,17 +90,19 @@ and ty_coercion =
   | ApplyTy of ty_coercion * target_ty
   | ForallDirt of (Params.dirt_param) * ty_coercion
   | ApplyDirt of ty_coercion * dirt
+  | PureCoercion of dirty_coercion
 
 and dirt_coercion = 
   | ReflDirt of Params.dirt_param
-  | DirtCoercionVar of (Params.dirt_coercion_param * Types.ct)
+  | DirtCoercionVar of Params.dirt_coercion_param 
   | Empty of dirt
   | UnionTy of ( Common.effect * dirt_coercion)
   | SequenceDirtCoer of dirt_coercion * dirt_coercion
+  | DirtCoercion of dirty_coercion
 
 and dirty_coercion =
   | BangCoercion of ty_coercion * dirt_coercion
-  | DirtyCoercionVar of (Params.dirty_coercion_param * Types.ct)
+  | DirtyCoercionVar of Params.dirty_coercion_param 
   | RightArrow of ty_coercion
   | RightHandler of ty_coercion
   | LeftHandler of ty_coercion
@@ -120,9 +122,9 @@ and abstraction2 = (pattern * pattern * computation) annotation
 
 
 type omega_ct =
-    | TyOmega of (Params.ty_coercion_param * Types.ct)
-    | DirtOmega of (Params.dirt_coercion_param * Types.ct)
-    | DirtyOmega of  (Params.dirty_coercion_param * Types.ct)
+    | TyOmega of (Params.ty_coercion_param * Types.ct_ty)
+    | DirtOmega of (Params.dirt_coercion_param * Types.ct_dirt)
+    | DirtyOmega of  (Params.dirty_coercion_param * Types.ct_dirty)
 
 
 type toplevel = plain_toplevel * Location.t
@@ -234,18 +236,14 @@ and print_computation ?max_level c ppf =
 and print_ty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with
-  | ReflInt ->
-      print "<Int>"
-  | ReflBool -> 
-      print  "<Bool>"
   | ReflTy p ->
-      Params.print_ty_param p ppf
+     print "<%t>" (Types.print_target_ty p)
   | ArrowCoercion (tc,dc) ->
       print  "%t -> %t" (print_ty_coercion tc) (print_dirty_coercion dc)
   | HandlerCoercion (dc1,dc2) ->
       print  "%t -> %t" (print_dirty_coercion dc1) (print_dirty_coercion dc2)
-  | TyCoercionVar (tcp, cons) ->
-     print "%t:%t" (Params.print_ty_coercion_param tcp) (Types.print_constraint cons)
+  | TyCoercionVar (tcp) ->
+     print "%t " (Params.print_ty_coercion_param tcp)
   | SequenceTyCoer (tc1,tc2) ->
       print "%t ; %t" (print_ty_coercion tc1) (print_ty_coercion tc2)
 
@@ -255,16 +253,26 @@ and print_dirty_coercion ?max_level c ppf =
   match c with 
   | BangCoercion (tc, dirtc) ->
       print "%t ! %t" (print_ty_coercion tc) (print_dirt_coercion dirtc )
-   | DirtyCoercionVar (tcp, cons) ->
-      print "%t:%t" (Params.print_dirty_coercion_param tcp) (Types.print_constraint cons)
+  | DirtyCoercionVar (tcp) ->
+      print "%t" (Params.print_dirty_coercion_param tcp)
 
 and print_dirt_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with 
   | ReflDirt p ->
       Params.print_dirt_param p ppf
-  | DirtCoercionVar(tcp, cons) ->
-      print "%t:%t" (Params.print_dirt_coercion_param tcp) (Types.print_constraint cons)
+  | DirtCoercionVar(tcp) ->
+      print "%t" (Params.print_dirt_coercion_param tcp)
+
+and print_omega_ct ?max_level c ppf = 
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match c with
+  | TyOmega (p, (ty1,ty2)) ->  print "%t: (%t =< %t)" 
+                              (Params.print_ty_coercion_param p) (Types.print_target_ty ty1) (Types.print_target_ty ty2)
+  | DirtOmega (p,(ty1,ty2)) ->  print "%t: (%t =< %t)" 
+                              (Params.print_dirt_coercion_param p) (Types.print_target_dirt ty1) (Types.print_target_dirt ty2)
+  | DirtyOmega (p,(ty1,ty2)) ->  print "%t: (%t =< %t)" 
+                              (Params.print_dirty_coercion_param p) (Types.print_target_dirty ty1) (Types.print_target_dirty ty2) 
 
 
 and print_effect_clauses eff_clauses ppf =
