@@ -5,25 +5,77 @@ type substitution =
    | CoerDirtyVartoDirtyCoercion of (Params.dirty_coercion_param * Typed.dirty_coercion)
    | TyVarToTy of (Params.ty_param * Types.target_ty)
 
- let rec free_target_ty t = 
+let rec free_target_ty t = 
  begin match t with 
  | Tyvar x -> [x]
  | Arrow (a,c) -> (free_target_ty a) @ (free_target_dirty c)
  | Tuple tup -> List.flatten (List.map (free_target_ty) tup)
  | Handler (c1,c2) -> (free_target_dirty c1) @ (free_target_dirty c2)
  | PrimTy _ -> []
- | QualTy ( _, a) -> (free_target_ty a)
- | QualDirt ( _, a) -> (free_target_ty a)
+ | QualTy ( _, a) -> assert false
+ | QualDirt ( _, a) -> assert false
  | TySchemeTy (ty_param,a) -> 
  	let free_a = free_target_ty a in 
  	List.filter (fun x -> not (List.mem x [ty_param])) free_a
  | TySchemeDirt (dirt_param,a) -> free_target_ty a 
  end
 and
-free_target_dirty (a,_) = free_target_ty a 
+free_target_dirty (a,d) = free_target_ty a 
 
 
+
+let rec refresh_target_ty (ty_sbst,dirt_sbst) t=
+ begin match t with 
+ | Tyvar x -> 
+ 	begin match Common.lookup x ty_sbst with
+      | Some x' -> (ty_sbst,dirt_sbst) , Tyvar x'
+      | None -> 
+      	let y = (Params.fresh_ty_param ()) in
+      	( (Common.update x y ty_sbst ), dirt_sbst) , Tyvar y
+    end
+ | Arrow (a,c) -> 
+ 		  let (a_ty_sbst, a_dirt_sbst), a' =  refresh_target_ty (ty_sbst,dirt_sbst) a in
+		  let temp_ty_sbst = a_ty_sbst @ ty_sbst in 
+		  let temp_dirt_sbst= a_dirt_sbst @ dirt_sbst in 
+		  let (c_ty_sbst, c_dirt_sbst), c' = refresh_target_dirty(temp_ty_sbst,temp_dirt_sbst) c in 
+		  (c_ty_sbst, c_dirt_sbst), Arrow(a',c')
+ | Tuple tup -> (ty_sbst,dirt_sbst), t
+ | Handler (c1,c2) -> 
+ 		   let (c1_ty_sbst, c1_dirt_sbst), c1' =  refresh_target_dirty (ty_sbst,dirt_sbst) c1 in
+		   let temp_ty_sbst = c1_ty_sbst @ ty_sbst in 
+		   let temp_dirt_sbst= c1_dirt_sbst @ dirt_sbst in 
+		   let (c2_ty_sbst, c2_dirt_sbst), c2' = refresh_target_dirty(temp_ty_sbst,temp_dirt_sbst) c2 in 
+		  (c2_ty_sbst, c2_dirt_sbst), Handler(c1',c2')
+ | PrimTy x ->  (ty_sbst,dirt_sbst), PrimTy x
+ | QualTy ( _, a) -> assert false
+ | QualDirt ( _, a) -> assert false
+ | TySchemeTy (ty_param,a) -> assert false
+ | TySchemeDirt (dirt_param,a) -> assert false
+end 
  
+and refresh_target_dirty (ty_sbst, dirt_sbst) (t,d)=  
+ 		let (t_ty_sbst, t_dirt_sbst), t' =  refresh_target_ty (ty_sbst,dirt_sbst) t in
+ 		let temp_ty_sbst = t_ty_sbst @ ty_sbst  in 
+ 		let temp_dirt_sbst= t_dirt_sbst @ dirt_sbst in 
+ 		let (d_ty_sbst, d_dirt_sbst), d' = refresh_target_dirt(temp_ty_sbst,temp_dirt_sbst) d in 
+ 		(d_ty_sbst,d_dirt_sbst) ,(t',d')
+
+and refresh_target_dirt (ty_sbst, dirt_sbst) t = 
+ begin match t with 
+ | Empty -> ((ty_sbst, dirt_sbst) , Types.Empty)
+ | DirtVar x ->  
+	begin match Common.lookup x dirt_sbst with
+    | Some x' -> (ty_sbst,dirt_sbst), DirtVar x'
+    | None -> 
+    	let y = (Params.fresh_dirt_param ()) in
+    	( ty_sbst, (Common.update x y dirt_sbst )) , DirtVar y
+   end
+| Union (eff,d) -> let (ty_sbst', dirt_sbst'), d' = refresh_target_dirt (ty_sbst, dirt_sbst) d in 
+				   (ty_sbst', dirt_sbst') , Union(eff,d') 
+end
+
+
+
 let rec unify(sub, paused, queue) =
  if (queue == []) then (sub,paused)
  else
