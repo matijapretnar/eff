@@ -5,27 +5,25 @@ type substitution =
    | CoerDirtyVartoDirtyCoercion of (Params.dirty_coercion_param * Typed.dirty_coercion)
    | TyVarToTy of (Params.ty_param * Types.target_ty)
 
-(* let rec free_target_ty t = 
+ let rec free_target_ty t = 
  begin match t with 
- | Tyvar x -> ([x],[])
+ | Tyvar x -> [x]
  | Arrow (a,c) -> (free_target_ty a) @ (free_target_dirty c)
  | Tuple tup -> List.flatten (List.map (free_target_ty) tup)
  | Handler (c1,c2) -> (free_target_dirty c1) @ (free_target_dirty c2)
- | PrimTy _ -> ([],[])
+ | PrimTy _ -> []
  | QualTy ( _, a) -> (free_target_ty a)
  | QualDirt ( _, a) -> (free_target_ty a)
- | TySchemeTy (ty_param,a) -> assert false
- | TySchemeDirt (dirt_param,a) -> assert false
+ | TySchemeTy (ty_param,a) -> 
+ 	let free_a = free_target_ty a in 
+ 	List.filter (fun x -> not (List.mem x [ty_param])) free_a
+ | TySchemeDirt (dirt_param,a) -> free_target_ty a 
  end
 and
-free_target_dirty (a,delta) = 
-	let(freetys_a,freedirts_a) = free_target_ty a in 
-	let(freetys_delta,freedirts_delta) = free_target_dirt delta in 
-	((freetys_a @ freetys_delta), (freedirts_a @ freedirts_delta))
-and
-free_target_dirt d = ([],[])
+free_target_dirty (a,_) = free_target_ty a 
 
- *)
+
+ 
 let rec unify(sub, paused, queue) =
  if (queue == []) then (sub,paused)
  else
