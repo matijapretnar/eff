@@ -1,5 +1,9 @@
+module STyVars = Set.Make (struct
+                             type t = Params.ty_param
+                             let compare = compare
+                           end);;
+let set_of_list = List.fold_left (fun acc x -> STyVars.add x acc) STyVars.empty;;
 open Types
-
 type substitution =
    | CoerTyVarToTyCoercion of (Params.ty_coercion_param * Typed.ty_coercion) 
    | CoerDirtyVartoDirtyCoercion of (Params.dirty_coercion_param * Typed.dirty_coercion)
@@ -75,6 +79,27 @@ and refresh_target_dirt (ty_sbst, dirt_sbst) t =
 end
 
 
+let rec union_find_tyvar tyvar acc c_list = 
+  begin match c_list with 
+  | [] -> acc
+  | (x::xs) -> 
+  	begin match x with 
+  	| Typed.TyOmega (_,tycons) -> 
+  		begin match tycons with
+  		| (Types.Tyvar a, Types.Tyvar b) when (a == tyvar)->
+  			if (List.mem b acc)
+  			then union_find_tyvar tyvar acc xs 
+  			else Common.uniq (((union_find_tyvar b acc c_list) @ (union_find_tyvar tyvar acc xs)))
+  		| (Types.Tyvar b, Types.Tyvar a) when (a == tyvar)->
+  			if (List.mem b acc)
+  			then union_find_tyvar tyvar acc xs 
+  			else Common.uniq (((union_find_tyvar b acc c_list) @ (union_find_tyvar tyvar acc xs)))
+  		end 
+  	| Typed.DirtyOmega(_,((a,_),(b,_))) -> 
+  			union_find_tyvar tyvar acc ( (Typed.TyOmega((Params.fresh_ty_coercion_param ()), (a,b) )) :: c_list)
+  	| _ -> union_find_tyvar tyvar acc xs
+  	end
+  end
 
 let rec unify(sub, paused, queue) =
  if (queue == []) then (sub,paused)
@@ -107,6 +132,17 @@ let rec unify(sub, paused, queue) =
    		let dirty_cons = Typed.DirtyOmega(new_dirty_coercion_var,(c2,c1)) in 
    		let dirty_cons_2 = Typed.DirtyOmega(new_dirty_coercion_var,(d1,d2)) in
    		unify ((sub1::sub), paused, (List.append [dirty_cons;dirty_cons_2] rest_queue)) 
+ 	| (Types.Tyvar tv, a) ->
+ 		let free_a = free_target_ty a in 
+ 		let dependent_tyvars = Common.diff (union_find_tyvar tv [] paused) [tv] in
+ 		let s1 = set_of_list free_a in 
+ 		let s2 = set_of_list dependent_tyvars in 
+ 		if (not (STyVars.is_empty (STyVars.inter s1 s2))) then assert false 
+ 		else
+ 		let mapper_f = fun x -> let (_,_), a' = refresh_target_ty ([],[]) a in 
+ 								TyVarToTy(x, a') in
+ 		let sub' = List.map mapper_f dependent_tyvars in
+ 		assert false 		
  	| _ -> assert false
  	end
  | Typed.DirtyOmega(omega,((t1,d1),(t2,d2))) ->
