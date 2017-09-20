@@ -185,7 +185,7 @@ let rec unify(sub, paused, queue) =
  		let sub' = List.map mapper_f dependent_tyvars in
  		let paused' = dependent_constraints dependent_tyvars [] paused in 
  		let new_paused = Common.diff paused paused' in 
- 		let sub_queue = apply_sub sub' queue in 
+ 		let sub_queue = apply_sub sub' rest_queue in 
  		let sub_paused' = apply_sub sub' paused' in 
  		let [cons'] = apply_sub sub' [cons] in 
  		let new_queue = (sub_queue @ sub_paused') @ [cons'] in 
@@ -202,13 +202,14 @@ let rec unify(sub, paused, queue) =
  		let sub' = List.map mapper_f dependent_tyvars in
  		let paused' = dependent_constraints dependent_tyvars [] paused in 
  		let new_paused = Common.diff paused paused' in 
- 		let sub_queue = apply_sub sub' queue in 
+ 		let sub_queue = apply_sub sub' rest_queue in 
  		let sub_paused' = apply_sub sub' paused' in 
  		let [cons'] = apply_sub sub' [cons] in 
  		let new_queue = (sub_queue @ sub_paused') @ [cons'] in 
  		unify ( (sub @ sub') , new_paused, new_queue)		
  	| _ -> assert false
  	end
+ 
  | Typed.DirtyOmega(omega,((t1,d1),(t2,d2))) ->
    let new_ty_coercion_var = Params.fresh_ty_coercion_param () in 
    let new_dirt_coercion_var = Params.fresh_dirt_coercion_param () in
@@ -218,6 +219,7 @@ let rec unify(sub, paused, queue) =
    let ty_cons = Typed.TyOmega(new_ty_coercion_var,(t1,t2)) in 
    let dirt_cons = Typed.DirtOmega(new_dirt_coercion_var,(d1,d2)) in 
    unify ((sub1::sub), paused, (List.append [ty_cons;dirt_cons] rest_queue))
- | _ -> assert false 
+ 
+ | Typed.DirtOmega(_, _) -> unify (sub ,(cons::paused), rest_queue)
  end 
 
