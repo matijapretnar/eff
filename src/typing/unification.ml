@@ -174,39 +174,9 @@ let rec unify(sub, paused, queue) =
    		let dirty_cons_2 = Typed.DirtyOmega(new_dirty_coercion_var,(d1,d2)) in
    		unify ((sub1::sub), paused, (List.append [dirty_cons;dirty_cons_2] rest_queue)) 
  	| (Types.Tyvar tv, a) ->
- 		let free_a = free_target_ty a in 
- 		let dependent_tyvars = (union_find_tyvar tv [] paused) in
- 		let s1 = set_of_list free_a in 
- 		let s2 = set_of_list dependent_tyvars in 
- 		if (not (STyVars.is_empty (STyVars.inter s1 s2))) then assert false 
- 		else
- 		let mapper_f = fun x -> let (_,_), a' = refresh_target_ty ([],[]) a in 
- 								TyVarToTy(x, a') in
- 		let sub' = List.map mapper_f dependent_tyvars in
- 		let paused' = dependent_constraints dependent_tyvars [] paused in 
- 		let new_paused = Common.diff paused paused' in 
- 		let sub_queue = apply_sub sub' rest_queue in 
- 		let sub_paused' = apply_sub sub' paused' in 
- 		let [cons'] = apply_sub sub' [cons] in 
- 		let new_queue = (sub_queue @ sub_paused') @ [cons'] in 
- 		unify ( (sub @ sub') , new_paused, new_queue)	
+ 		unify_ty_vars (sub,paused,rest_queue) tv a cons
  	| ( a , Types.Tyvar tv) ->
- 		let free_a = free_target_ty a in 
- 		let dependent_tyvars = (union_find_tyvar tv [] paused) in
- 		let s1 = set_of_list free_a in 
- 		let s2 = set_of_list dependent_tyvars in 
- 		if (not (STyVars.is_empty (STyVars.inter s1 s2))) then assert false 
- 		else
- 		let mapper_f = fun x -> let (_,_), a' = refresh_target_ty ([],[]) a in 
- 								TyVarToTy(x, a') in
- 		let sub' = List.map mapper_f dependent_tyvars in
- 		let paused' = dependent_constraints dependent_tyvars [] paused in 
- 		let new_paused = Common.diff paused paused' in 
- 		let sub_queue = apply_sub sub' rest_queue in 
- 		let sub_paused' = apply_sub sub' paused' in 
- 		let [cons'] = apply_sub sub' [cons] in 
- 		let new_queue = (sub_queue @ sub_paused') @ [cons'] in 
- 		unify ( (sub @ sub') , new_paused, new_queue)		
+ 		unify_ty_vars (sub,paused,rest_queue) tv a cons
  	| _ -> assert false
  	end
  
@@ -223,3 +193,20 @@ let rec unify(sub, paused, queue) =
  | Typed.DirtOmega(_, _) -> unify (sub ,(cons::paused), rest_queue)
  end 
 
+and unify_ty_vars (sub,paused,rest_queue) tv a cons= 
+	let free_a = free_target_ty a in 
+	let dependent_tyvars = (union_find_tyvar tv [] paused) in
+	let s1 = set_of_list free_a in 
+	let s2 = set_of_list dependent_tyvars in 
+	if (not (STyVars.is_empty (STyVars.inter s1 s2))) then assert false 
+	else
+	let mapper_f = fun x -> let (_,_), a' = refresh_target_ty ([],[]) a in 
+							TyVarToTy(x, a') in
+	let sub' = List.map mapper_f dependent_tyvars in
+	let paused' = dependent_constraints dependent_tyvars [] paused in 
+	let new_paused = Common.diff paused paused' in 
+	let sub_queue = apply_sub sub' rest_queue in 
+	let sub_paused' = apply_sub sub' paused' in 
+	let [cons'] = apply_sub sub' [cons] in 
+	let new_queue = (sub_queue @ sub_paused') @ [cons'] in 
+	unify ( (sub @ sub') , new_paused, new_queue)
