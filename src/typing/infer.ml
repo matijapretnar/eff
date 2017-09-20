@@ -335,7 +335,7 @@ and type_plain_comp st = function
 let type_toplevel ~loc st = function
   | Untyped.Computation c ->
     let ct, (ttype,dirt),constraints = type_comp st c in
-    let [x;xs] = constraints in 
+    let x::xs = constraints in 
     Print.debug "Single constraint : %t" (Typed.print_omega_ct x);
     Print.debug "Computation : %t" (Typed.print_computation ct);
     Print.debug "Computation type : %t ! {%t}" (Types.print_target_ty ttype) (Types.print_target_dirt dirt);

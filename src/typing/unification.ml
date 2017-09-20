@@ -114,33 +114,78 @@ and refresh_target_dirt (ty_sbst, dirt_sbst) t =
 end
 
 
+let rec print_c_list = function 
+[] -> Print.debug "---------------------"
+| e::l -> Print.debug "%t" (Typed.print_omega_ct e)  ; print_c_list l
+
+let rec print_s_list = function 
+[] -> Print.debug "---------------------"
+| e::l -> Print.debug "%t" (print_sub e)  ; print_s_list l
+
+let rec print_var_list = function
+[] -> Print.debug "---------------------"
+| e::l -> Print.debug "%t" (Params.print_ty_param e)  ; print_var_list l
+
+
 let rec union_find_tyvar tyvar acc c_list = 
-  Print.debug "In uf";	
+(*   Print.debug "In uf";	
+  Print.debug "The Type Variable : %t" (Params.print_ty_param tyvar);
+  Print.debug "The accumilator : -------------";
+  print_var_list acc;
+  print_c_list c_list;
+  Print.debug "-------------end UF----------------"; *)
   begin match c_list with 
   | [] -> (tyvar::acc)
   | (x::xs) -> 
   	begin match x with 
   	| Typed.TyOmega (_,tycons) -> 
   		begin match tycons with
-  		| (Types.Tyvar a, Types.Tyvar b) when (a == tyvar)->
+  		| (Types.Tyvar a, Types.Tyvar b) when (a = tyvar)->
   			if (List.mem b acc)
   			then union_find_tyvar tyvar acc xs 
-  			else Common.uniq (((union_find_tyvar b acc c_list) @ (union_find_tyvar tyvar acc xs)))
-  		| (Types.Tyvar b, Types.Tyvar a) when (a == tyvar)->
+  			else Common.uniq (((union_find_tyvar b acc xs) @ (union_find_tyvar tyvar acc xs)))
+  		| (Types.Tyvar b, Types.Tyvar a) when (a = tyvar)->
   			if (List.mem b acc)
   			then union_find_tyvar tyvar acc xs 
-  			else Common.uniq (((union_find_tyvar b acc c_list) @ (union_find_tyvar tyvar acc xs)))
+  			else Common.uniq (((union_find_tyvar b acc xs) @ (union_find_tyvar tyvar acc xs)))
   		| _ -> union_find_tyvar tyvar acc xs
   		end 
-  	| Typed.DirtyOmega(_,((a,_),(b,_))) -> 
-  			union_find_tyvar tyvar acc ( (Typed.TyOmega((Params.fresh_ty_coercion_param ()), (a,b) )) :: c_list)
+   	| Typed.DirtyOmega(_,((a,_),(b,_))) -> 
+  			union_find_tyvar tyvar acc ( (Typed.TyOmega((Params.fresh_ty_coercion_param ()), (a,b) )) :: xs)
   	| _ -> union_find_tyvar tyvar acc xs
   	end
   end
 
 
+let rec fix_union_find fixpoint c_list =
+  Print.debug "--------------start list-------";
+  print_var_list fixpoint;
+  Print.debug "---------------end list-------";
+  let mapper = fun x ->
+               begin match x with
+               | Typed.TyOmega (_,tycons) -> 
+                      begin match tycons with
+                      | (Types.Tyvar a, Types.Tyvar b) when ( (List.mem a fixpoint) && (not (List.mem b fixpoint)))->
+                            [b]
+                      | (Types.Tyvar b, Types.Tyvar a) when ( (List.mem a fixpoint) && (not (List.mem b fixpoint)))->
+                            [b]
+                      | _ -> []    
+                    end
+               | Typed.DirtyOmega(_,((Types.Tyvar a,_),(Types.Tyvar b,_))) when ( (List.mem a fixpoint) && (not (List.mem b fixpoint))) ->
+                  [b]
+               | Typed.DirtyOmega(_,((Types.Tyvar b,_),(Types.Tyvar a,_))) when ( (List.mem a fixpoint) && (not (List.mem b fixpoint))) ->
+                  [b]
+               | _-> []
+               end in
+  let new_fixpoint = fixpoint @ Common.flatten_map mapper c_list in 
+  let sort_new_fixpoint = List.sort compare new_fixpoint in
+  if (sort_new_fixpoint = fixpoint ) then sort_new_fixpoint else
+  fix_union_find sort_new_fixpoint c_list
+
+
+
 let rec dependent_constraints dep_list acc c_list = 
-  Print.debug "In dc";
+(*   Print.debug "In dc"; *)
   begin match c_list with 
   | [] -> acc
   | (x::xs) -> 
@@ -155,13 +200,6 @@ let rec dependent_constraints dep_list acc c_list =
   	end
   end
 
-let rec print_c_list = function 
-[] -> Print.debug "---------------------"
-| e::l -> Print.debug "%t" (Typed.print_omega_ct e)  ; print_c_list l
-
-let rec print_s_list = function 
-[] -> Print.debug "---------------------"
-| e::l -> Print.debug "%t" (print_sub e)  ; print_s_list l
 
 let rec unify(sub, paused, queue) =
  Print.debug "=============Start loop============";
@@ -171,7 +209,6 @@ let rec unify(sub, paused, queue) =
  print_c_list paused;
  Print.debug "-----queue-----";
  print_c_list queue;
- Print.debug "=========End loop============";
  if (queue == []) then (sub,paused)
  else
  let cons::rest_queue = queue in 
@@ -180,8 +217,10 @@ let rec unify(sub, paused, queue) =
  	begin match tycons with
  	| (x,y) when x=y -> 
  		let sub1 = CoerTyVarToTyCoercion (omega, Typed.ReflTy(x)) in
+    Print.debug "=========End loop============";
  		unify (sub1::sub, paused, rest_queue)
  	| (Types.Tyvar a, Types.Tyvar b) ->
+    Print.debug "=========End loop============";
  		unify (sub, (cons::paused), rest_queue)
  	| (Types.Arrow(a1,c1) , Types.Arrow(a2,c2)) ->
  	    let new_ty_coercion_var = Params.fresh_ty_coercion_param () in 
@@ -191,7 +230,8 @@ let rec unify(sub, paused, queue) =
    		let sub1 = CoerTyVarToTyCoercion (omega, Typed.ArrowCoercion (new_ty_coercion_var_coer,new_dirty_coercion_var_coer)) in 
    		let ty_cons = Typed.TyOmega(new_ty_coercion_var,(a2,a1)) in 
    		let dirty_cons = Typed.DirtyOmega(new_dirty_coercion_var,(c1,c2)) in
-   		unify ((sub1::sub), paused, (List.append [ty_cons;dirty_cons] rest_queue))
+   		Print.debug "=========End loop============";
+      unify ((sub1::sub), paused, (List.append [ty_cons;dirty_cons] rest_queue))
    	| (Types.Handler(c1,d1) , Types.Handler(c2,d2)) ->
  	    let new_dirty_coercion_var = Params.fresh_dirty_coercion_param () in 
    		let new_dirty_coercion_var_2 = Params.fresh_dirty_coercion_param () in
@@ -200,9 +240,10 @@ let rec unify(sub, paused, queue) =
    		let sub1 = CoerTyVarToTyCoercion (omega, Typed.HandlerCoercion (new_dirty_coercion_var_coer,new_dirty_coercion_var_coer_2)) in 
    		let dirty_cons = Typed.DirtyOmega(new_dirty_coercion_var,(c2,c1)) in 
    		let dirty_cons_2 = Typed.DirtyOmega(new_dirty_coercion_var,(d1,d2)) in
-   		unify ((sub1::sub), paused, (List.append [dirty_cons;dirty_cons_2] rest_queue)) 
+   		Print.debug "=========End loop============";
+      unify ((sub1::sub), paused, (List.append [dirty_cons;dirty_cons_2] rest_queue)) 
  	| (Types.Tyvar tv, a) ->
- 		unify_ty_vars (sub,paused,rest_queue) tv a cons
+    unify_ty_vars (sub,paused,rest_queue) tv a cons
  	| ( a , Types.Tyvar tv) ->
  		unify_ty_vars (sub,paused,rest_queue) tv a cons
  	| _ -> assert false
@@ -216,14 +257,16 @@ let rec unify(sub, paused, queue) =
    let sub1 = CoerDirtyVartoDirtyCoercion(omega, Typed.BangCoercion(new_ty_coercion_var_coer,new_dirt_coercion_var_coer)) in 
    let ty_cons = Typed.TyOmega(new_ty_coercion_var,(t1,t2)) in 
    let dirt_cons = Typed.DirtOmega(new_dirt_coercion_var,(d1,d2)) in 
+   Print.debug "=========End loop============";
    unify ((sub1::sub), paused, (List.append [ty_cons;dirt_cons] rest_queue))
  
- | Typed.DirtOmega(_, _) -> unify (sub ,(cons::paused), rest_queue)
+ | Typed.DirtOmega(_, _) -> Print.debug "=========End loop============";unify (sub ,(cons::paused), rest_queue)
  end 
 
 and unify_ty_vars (sub,paused,rest_queue) tv a cons= 
 	let free_a = free_target_ty a in 
-	let dependent_tyvars = (union_find_tyvar tv [] paused) in
+(* 	let dependent_tyvars = (union_find_tyvar tv [] paused) in *)
+  let dependent_tyvars = (fix_union_find [tv] paused) in 
 	let s1 = set_of_list free_a in 
 	let s2 = set_of_list dependent_tyvars in 
 	if (not (STyVars.is_empty (STyVars.inter s1 s2))) then assert false 
@@ -231,10 +274,14 @@ and unify_ty_vars (sub,paused,rest_queue) tv a cons=
 	let mapper_f = fun x -> let (_,_), a' = refresh_target_ty ([],[]) a in 
 							TyVarToTy(x, a') in
 	let sub' = List.map mapper_f dependent_tyvars in
-	let paused' = dependent_constraints dependent_tyvars [] paused in 
+	let paused' = dependent_constraints dependent_tyvars [] paused in
+(*   Print.debug "Paused' = ";
+  print_c_list paused'; 
+  Print.debug "end Paused --"; *)
 	let new_paused = Common.diff paused paused' in 
 	let sub_queue = apply_sub sub' rest_queue in 
 	let sub_paused' = apply_sub sub' paused' in 
 	let [cons'] = apply_sub sub' [cons] in 
 	let new_queue = (sub_queue @ sub_paused') @ [cons'] in 
+  Print.debug "=========End loops============";
 	unify ( (sub @ sub') , new_paused, new_queue)
