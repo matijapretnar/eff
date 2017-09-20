@@ -9,6 +9,31 @@ type substitution =
    | CoerDirtyVartoDirtyCoercion of (Params.dirty_coercion_param * Typed.dirty_coercion)
    | TyVarToTy of (Params.ty_param * Types.target_ty)
 
+
+
+let rec apply_sub sub c_list =
+	begin match sub with 
+	| [] -> c_list
+	| (x::xs) -> 
+		begin match x with
+		| TyVarToTy (type_p,target_type) ->
+			let mapper = fun cons ->
+				begin match cons with 
+				| Typed.TyOmega (coer_p, (Tyvar tv,ty2)) when (type_p == tv) ->  
+						Typed.TyOmega (coer_p, (target_type,ty2)) 
+			    | Typed.TyOmega (coer_p, (ty2,Tyvar tv)) when (type_p == tv) ->  
+						Typed.TyOmega (coer_p, (ty2,target_type)) 
+				| Typed.DirtyOmega (coer_p,( ( Tyvar ty1, dirt1) , (ty2, dirt2))) when (ty1 == type_p)->
+					Typed.DirtyOmega (coer_p,( ( target_type, dirt1) , (ty2, dirt2)))
+				| Typed.DirtyOmega (coer_p,( ( ty1, dirt1) , (Tyvar ty2, dirt2))) when (ty2 == type_p)->
+					Typed.DirtyOmega (coer_p,( ( target_type, dirt1) , (target_type, dirt2)))
+				| _ -> cons
+				end in
+			let result_c_list = List.map mapper c_list in 
+			apply_sub xs result_c_list
+		| _ -> apply_sub xs c_list
+		end
+	end
 let rec free_target_ty t = 
  begin match t with 
  | Tyvar x -> [x]
@@ -101,6 +126,22 @@ let rec union_find_tyvar tyvar acc c_list =
   	end
   end
 
+
+let rec dependent_constraints dep_list acc c_list = 
+  begin match c_list with 
+  | [] -> acc
+  | (x::xs) -> 
+  	begin match x with 
+  	| Typed.TyOmega (_,tycons) -> 
+  		begin match tycons with
+  		| (Types.Tyvar a, Types.Tyvar b) when (List.mem a dep_list && List.mem b dep_list)->
+  			dependent_constraints dep_list (x :: acc) xs 
+  		| _ -> dependent_constraints dep_list acc xs
+  		end 
+  	| _ -> dependent_constraints dep_list acc xs
+  	end
+  end
+
 let rec unify(sub, paused, queue) =
  if (queue == []) then (sub,paused)
  else
@@ -134,7 +175,7 @@ let rec unify(sub, paused, queue) =
    		unify ((sub1::sub), paused, (List.append [dirty_cons;dirty_cons_2] rest_queue)) 
  	| (Types.Tyvar tv, a) ->
  		let free_a = free_target_ty a in 
- 		let dependent_tyvars = Common.diff (union_find_tyvar tv [] paused) [tv] in
+ 		let dependent_tyvars = (union_find_tyvar tv [] paused) in
  		let s1 = set_of_list free_a in 
  		let s2 = set_of_list dependent_tyvars in 
  		if (not (STyVars.is_empty (STyVars.inter s1 s2))) then assert false 
@@ -142,7 +183,30 @@ let rec unify(sub, paused, queue) =
  		let mapper_f = fun x -> let (_,_), a' = refresh_target_ty ([],[]) a in 
  								TyVarToTy(x, a') in
  		let sub' = List.map mapper_f dependent_tyvars in
- 		assert false 		
+ 		let paused' = dependent_constraints dependent_tyvars [] paused in 
+ 		let new_paused = Common.diff paused paused' in 
+ 		let sub_queue = apply_sub sub' queue in 
+ 		let sub_paused' = apply_sub sub' paused' in 
+ 		let [cons'] = apply_sub sub' [cons] in 
+ 		let new_queue = (sub_queue @ sub_paused') @ [cons'] in 
+ 		unify ( (sub @ sub') , new_paused, new_queue)	
+ 	| ( a , Types.Tyvar tv) ->
+ 		let free_a = free_target_ty a in 
+ 		let dependent_tyvars = (union_find_tyvar tv [] paused) in
+ 		let s1 = set_of_list free_a in 
+ 		let s2 = set_of_list dependent_tyvars in 
+ 		if (not (STyVars.is_empty (STyVars.inter s1 s2))) then assert false 
+ 		else
+ 		let mapper_f = fun x -> let (_,_), a' = refresh_target_ty ([],[]) a in 
+ 								TyVarToTy(x, a') in
+ 		let sub' = List.map mapper_f dependent_tyvars in
+ 		let paused' = dependent_constraints dependent_tyvars [] paused in 
+ 		let new_paused = Common.diff paused paused' in 
+ 		let sub_queue = apply_sub sub' queue in 
+ 		let sub_paused' = apply_sub sub' paused' in 
+ 		let [cons'] = apply_sub sub' [cons] in 
+ 		let new_queue = (sub_queue @ sub_paused') @ [cons'] in 
+ 		unify ( (sub @ sub') , new_paused, new_queue)		
  	| _ -> assert false
  	end
  | Typed.DirtyOmega(omega,((t1,d1),(t2,d2))) ->
