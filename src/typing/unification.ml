@@ -11,6 +11,16 @@ type substitution =
 
 
 
+let print_sub ?max_level c ppf = 
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  begin match c with
+  | CoerTyVarToTyCoercion (p, t) ->  print "%t :-coertyTotyCoer-> %t" 
+                              (Params.print_ty_coercion_param p) (Typed.print_ty_coercion t)
+  | CoerDirtyVartoDirtyCoercion (p,d) ->  print "%t :-coertyDirtyoDirtyCoer-> %t"
+                              (Params.print_dirty_coercion_param p) (Typed.print_dirty_coercion d)
+  | TyVarToTy (p,t) ->  print "%t :-tyvarToTargetty-> %t" 
+                              (Params.print_ty_param p) (Types.print_target_ty t) 
+  end
 let rec apply_sub sub c_list =
 	begin match sub with 
 	| [] -> c_list
@@ -105,8 +115,9 @@ end
 
 
 let rec union_find_tyvar tyvar acc c_list = 
+  Print.debug "In uf";	
   begin match c_list with 
-  | [] -> acc
+  | [] -> (tyvar::acc)
   | (x::xs) -> 
   	begin match x with 
   	| Typed.TyOmega (_,tycons) -> 
@@ -119,6 +130,7 @@ let rec union_find_tyvar tyvar acc c_list =
   			if (List.mem b acc)
   			then union_find_tyvar tyvar acc xs 
   			else Common.uniq (((union_find_tyvar b acc c_list) @ (union_find_tyvar tyvar acc xs)))
+  		| _ -> union_find_tyvar tyvar acc xs
   		end 
   	| Typed.DirtyOmega(_,((a,_),(b,_))) -> 
   			union_find_tyvar tyvar acc ( (Typed.TyOmega((Params.fresh_ty_coercion_param ()), (a,b) )) :: c_list)
@@ -128,6 +140,7 @@ let rec union_find_tyvar tyvar acc c_list =
 
 
 let rec dependent_constraints dep_list acc c_list = 
+  Print.debug "In dc";
   begin match c_list with 
   | [] -> acc
   | (x::xs) -> 
@@ -142,7 +155,23 @@ let rec dependent_constraints dep_list acc c_list =
   	end
   end
 
+let rec print_c_list = function 
+[] -> Print.debug "---------------------"
+| e::l -> Print.debug "%t" (Typed.print_omega_ct e)  ; print_c_list l
+
+let rec print_s_list = function 
+[] -> Print.debug "---------------------"
+| e::l -> Print.debug "%t" (print_sub e)  ; print_s_list l
+
 let rec unify(sub, paused, queue) =
+ Print.debug "=============Start loop============";
+ Print.debug "-----Subs-----";
+ print_s_list sub;
+ Print.debug "-----paused-----";
+ print_c_list paused;
+ Print.debug "-----queue-----";
+ print_c_list queue;
+ Print.debug "=========End loop============";
  if (queue == []) then (sub,paused)
  else
  let cons::rest_queue = queue in 
@@ -151,8 +180,7 @@ let rec unify(sub, paused, queue) =
  	begin match tycons with
  	| (x,y) when x=y -> 
  		let sub1 = CoerTyVarToTyCoercion (omega, Typed.ReflTy(x)) in
- 		let new_sub = List.append sub [sub1] in 
- 		unify (new_sub, paused, rest_queue)
+ 		unify (sub1::sub, paused, rest_queue)
  	| (Types.Tyvar a, Types.Tyvar b) ->
  		unify (sub, (cons::paused), rest_queue)
  	| (Types.Arrow(a1,c1) , Types.Arrow(a2,c2)) ->
