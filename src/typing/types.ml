@@ -13,6 +13,15 @@ let list_to_effect_set l =
 let effect_set_to_list s = 
       EffectSet.fold (fun a b -> (a:: b)) s []
 
+let effect_set_diff s1 s2 = 
+      EffectSet.diff s1 s2
+
+let effect_set_union s1 s2 = 
+      EffectSet.union s1 s2
+
+let effect_set_is_empty s = 
+      EffectSet.is_empty s
+
 type target_ty = 
   | Tyvar of Params.ty_param
   | Arrow of target_ty * target_dirty

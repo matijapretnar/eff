@@ -7,7 +7,9 @@ open Types
 type substitution =
    | CoerTyVarToTyCoercion of (Params.ty_coercion_param * Typed.ty_coercion) 
    | CoerDirtyVartoDirtyCoercion of (Params.dirty_coercion_param * Typed.dirty_coercion)
+   | CoerDirtVartoDirtCoercion of (Params.dirt_coercion_param * Typed.dirt_coercion)
    | TyVarToTy of (Params.ty_param * Types.target_ty)
+   | DirtVarToDirt of (Params.dirt_param * Types.dirt)
 
 
 
@@ -18,8 +20,12 @@ let print_sub ?max_level c ppf =
                               (Params.print_ty_coercion_param p) (Typed.print_ty_coercion t)
   | CoerDirtyVartoDirtyCoercion (p,d) ->  print "%t :-coertyDirtyoDirtyCoer-> %t"
                               (Params.print_dirty_coercion_param p) (Typed.print_dirty_coercion d)
+  | CoerDirtVartoDirtCoercion (p,d) ->  print "%t :-coertyDirtoDirtCoer-> %t"
+                              (Params.print_dirt_coercion_param p) (Typed.print_dirt_coercion d)
   | TyVarToTy (p,t) ->  print "%t :-tyvarToTargetty-> %t" 
                               (Params.print_ty_param p) (Types.print_target_ty t) 
+  | DirtVarToDirt (p,d) ->  print "%t :-dirtvarToTargetdirt-> %t" 
+                              (Params.print_dirt_param p) (Types.print_target_dirt d) 
   end
 let rec apply_sub sub c_list =
 	begin match sub with 
@@ -41,7 +47,23 @@ let rec apply_sub sub c_list =
 				end in
 			let result_c_list = List.map mapper c_list in 
 			apply_sub xs result_c_list
-		| _ -> apply_sub xs c_list
+		
+    | DirtVarToDirt (type_p,target_dirt) ->
+      let mapper = fun cons ->
+        begin match cons with
+        | Typed.DirtOmega (coer_p,(SetVar (s1,dv) , d2)) when (dv == type_p)->
+          let SetVar (diff_set, new_var) = target_dirt in
+          let new_set =  effect_set_union s1 diff_set in 
+          Typed.DirtOmega(coer_p,(SetVar(new_set,new_var),d2))
+        | Typed.DirtOmega (coer_p,(d2, SetVar (s1,dv) )) when (dv == type_p)->
+          let SetVar (diff_set, new_var) = target_dirt in
+          let new_set =  effect_set_union s1 diff_set in 
+          Typed.DirtOmega(coer_p,(d2,SetVar(new_set,new_var)))
+        | _ -> cons
+        end in 
+        let result_c_list = List.map mapper c_list in 
+        apply_sub xs result_c_list
+    | _ -> apply_sub xs c_list
 		end
 	end
 let rec free_target_ty t = 
@@ -230,7 +252,7 @@ let rec unify(sub, paused, queue) =
    		let dirty_cons = Typed.DirtyOmega(new_dirty_coercion_var,(c1,c2)) in
    		Print.debug "=========End loop============";
       unify ((sub1::sub), paused, (List.append [ty_cons;dirty_cons] rest_queue))
-   	| (Types.Handler(c1,d1) , Types.Handler(c2,d2)) ->
+  | (Types.Handler(c1,d1) , Types.Handler(c2,d2)) ->
  	    let new_dirty_coercion_var = Params.fresh_dirty_coercion_param () in 
    		let new_dirty_coercion_var_2 = Params.fresh_dirty_coercion_param () in
    		let new_dirty_coercion_var_coer = Typed.DirtyCoercionVar new_dirty_coercion_var in 
@@ -258,7 +280,25 @@ let rec unify(sub, paused, queue) =
    Print.debug "=========End loop============";
    unify ((sub1::sub), paused, (List.append [ty_cons;dirt_cons] rest_queue))
  
- | Typed.DirtOmega(_, _) -> Print.debug "=========End loop============";unify (sub ,(cons::paused), rest_queue)
+ | Typed.DirtOmega(omega, dcons) ->
+   begin match dcons with 
+    | (Types.SetVar(s1,v1) ,Types.SetVar(s2,v2) ) ->
+      if (Types.effect_set_is_empty s1) then 
+      begin 
+        Print.debug "=========End loop============";
+        unify (sub ,(cons::paused), rest_queue)
+        end 
+      else begin 
+        let diff_set = Types.effect_set_diff s1 s2 in
+        let sub' = DirtVarToDirt(v2, Types.SetVar (diff_set, (Params.fresh_dirt_param ()))) in 
+        let paused' = apply_sub [sub'] paused in 
+        let new_cons = apply_sub [sub'] [(Typed.DirtOmega(omega, (Types.SetVar( (Types.empty_effect_set),v1 ) , Types.SetVar(s2,v2))))] in 
+        Print.debug "=========End loop============";
+        unify ((sub' :: sub), [] , ((new_cons @ paused') @ rest_queue ))
+      end
+   | _ -> Print.debug "=========End loop============";
+        unify (sub ,(cons::paused), rest_queue)
+   end 
  end 
 
 and unify_ty_vars (sub,paused,rest_queue) tv a cons= 

@@ -55,3 +55,9 @@ val empty_effect_set : effect_set
 val list_to_effect_set : Common.effect list -> effect_set
 
 val effect_set_to_list: effect_set -> (Common.effect list)
+
+val effect_set_diff: effect_set -> effect_set -> effect_set
+
+val effect_set_union: effect_set -> effect_set -> effect_set
+
+val effect_set_is_empty: effect_set -> bool
