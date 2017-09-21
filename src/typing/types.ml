@@ -1,3 +1,17 @@
+module EffectSet = Set.Make (struct
+                             type t = Common.effect
+                             let compare = compare
+                           end);;
+
+type effect_set = EffectSet.t
+
+let empty_effect_set =  EffectSet.empty
+
+let list_to_effect_set l = 
+      List.fold_right (EffectSet.add) l (EffectSet.empty) 
+
+let effect_set_to_list s = 
+      EffectSet.fold (fun a b -> (a:: b)) s []
 
 type target_ty = 
   | Tyvar of Params.ty_param
@@ -14,9 +28,8 @@ and
  target_dirty = ( target_ty * dirt)
 and
  dirt = 
- | Empty
- | DirtVar of Params.dirt_param
- | Union of ( Common.effect * dirt)
+ | SetVar of effect_set * Params.dirt_param
+ | SetEmpty of effect_set
 and
  ct = 
  | LeqTy of (target_ty * target_ty)
@@ -58,18 +71,30 @@ let rec print_target_ty ?max_level ty ppf =
       (print_target_dirt drt2)
   | PrimTy p -> print_prim_ty p ppf
   | QualTy (c,tty) -> print "%t => %t" (print_ct_ty c) (print_target_ty tty)
+  | QualDirt (c,tty) -> print "%t => %t" (print_ct_dirt c) (print_target_ty tty)
   | TySchemeTy (p,tty) -> print "ForallTy %t. %t" (Params.print_ty_param p ) (print_target_ty tty)
   | TySchemeDirt (p,tty) -> print "ForallDirt %t. %t" (Params.print_dirt_param p ) (print_target_ty tty)
   end
 
 
+
 and print_target_dirt drt ppf = 
 	let print ?at_level = Print.print  ?at_level ppf in
 	 begin match drt with
-	 | Empty -> print "(/)"
-	 | DirtVar p -> print "%t" (Params.print_dirt_param p )
-	 | Union (eff,d) -> print "%s U %t" eff (print_target_dirt d)
+   | SetVar(set,p) -> 
+        let eff_list = effect_set_to_list set in
+        print "{%t} U %t" (print_effect_list eff_list)  (Params.print_dirt_param p )
+   | SetEmpty set -> 
+        let eff_list = effect_set_to_list set in
+        print "{%t} U (/)" (print_effect_list eff_list)
 	  end
+
+and print_effect_list eff_list ppf =
+  let print ?at_level = Print.print  ?at_level ppf in
+  match eff_list with 
+  | [] -> ()
+  | (x::[]) -> print "%s" x
+  | (x::xs) -> print "%s, %t" x  (print_effect_list xs)
 
 and print_target_dirty (t1, drt1) ppf = 
   let print ?at_level = Print.print  ?at_level ppf in
@@ -92,7 +117,9 @@ and print_ct_ty (ty1,ty2) ppf =
     let print ?at_level = Print.print  ?at_level ppf in
     print "%t <= %t"  (print_target_ty ty1)  (print_target_ty ty2)
 
-
+and print_ct_dirt (ty1,ty2) ppf = 
+    let print ?at_level = Print.print  ?at_level ppf in
+    print "%t <= %t"  (print_target_dirt ty1)  (print_target_dirt ty2)
 
 and print_prim_ty pty ppf=
 	let print ?at_level = Print.print  ?at_level ppf in

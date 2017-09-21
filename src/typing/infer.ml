@@ -26,10 +26,9 @@ let add_def env x ty_sch =
 
 
 let rec make_target_effects effects =
-  begin match effects with
-   | [] -> Types.Empty
-   | ((x,_)::xs) -> Types.Union (x ,  make_target_effects xs)
- end
+  let new_effects = List.map (fun (x,_) ->  x ) effects in 
+  let new_set = Types.list_to_effect_set new_effects in 
+  Types.SetEmpty new_set
 
 
 let rec source_to_target ty = 
@@ -151,7 +150,8 @@ and type_plain_expr st = function
         (target_lambda,target_ty,target_comp_cons)
   | Untyped.Effect eff -> 
         let (in_ty,out_ty) =  Untyped.EffectMap.find eff st.effects in
-        (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,Types.Union(eff,Types.Empty))), []) 
+        let s = Types.list_to_effect_set [eff] in
+        (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,(Types.SetEmpty s))) , []) 
         
    | Untyped.Handler h -> 
         let in_ty_var = Params.fresh_ty_param () in 
@@ -159,9 +159,9 @@ and type_plain_expr st = function
         let out_ty_var = Params.fresh_ty_param () in 
         let out_dirt_var = Params.fresh_dirt_param () in
         let in_ty = Types.Tyvar in_ty_var in 
-        let in_dirt = Types.DirtVar (in_dirt_var) in 
+        let in_dirt = Types.SetVar (Types.empty_effect_set, in_dirt_var) in 
         let out_ty = Types.Tyvar (out_ty_var) in 
-        let out_dirt = Types.DirtVar (out_dirt_var) in 
+        let out_dirt = Types.SetVar (Types.empty_effect_set, out_dirt_var) in 
         let Some (pv,cv) = h.value_clause in
         let new_ty_var = Params.fresh_ty_param () in
         let x_ty = Types.Tyvar new_ty_var in
@@ -192,7 +192,7 @@ and type_plain_expr st = function
             let Untyped.PVar x_var = x.Untyped.term in
             let Untyped.PVar k_var = k.Untyped.term in
             let alpha_op = Types.Tyvar (Params.fresh_ty_param ()) in 
-            let delta_op =  Types.DirtVar (Params.fresh_dirt_param ()) in 
+            let delta_op =  Types.SetVar (Types.empty_effect_set,Params.fresh_dirt_param ()) in 
             let tmp_st = add_def st x_var in_op_ty in
             let new_st = add_def tmp_st k_var (Types.Arrow(out_op_ty,(alpha_op,delta_op))) in 
             let (typed_c_op, typed_c_op_type, c_op_constraints) = type_comp new_st c_op in 
@@ -226,7 +226,9 @@ and type_plain_expr st = function
             } in
         let target_type = Types.Handler ((in_ty,in_dirt), (out_ty,out_dirt)) in 
         let target_handler = Typed.annotate (Typed.Handler target_handler) Location.unknown in 
-        let handlers_ops = List.fold_right (fun ((eff,(_,_)),_) b -> Types.Union(eff,b)) op_clauses out_dirt in
+        let for_set_handlers_ops = List.map (fun ((eff,(_,_)),_)-> eff) op_clauses in 
+        let ops_set = Types.list_to_effect_set for_set_handlers_ops in 
+        let handlers_ops = Types.SetVar (ops_set,out_dirt_var) in 
         let cons_5 = (in_dirt, handlers_ops) in
         let coerp5 = Params.fresh_dirt_coercion_param () in
         let omega_5 = Typed.DirtCoercionVar (coerp5) in 
@@ -247,7 +249,7 @@ and type_comp st {Untyped.term=comp; Untyped.location=loc} =
 and type_plain_comp st = function
   | Untyped.Value e ->
       let (typed_e, tt, constraints) = type_expr st e in
-      (Typed.Value typed_e, (tt, Types.Empty) ,constraints)
+      (Typed.Value typed_e, (tt, (Types.SetEmpty Types.empty_effect_set)) ,constraints)
   | Untyped.Match (e, cases) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Apply (e1, e2) -> 
       Print.debug "in infer apply";
@@ -262,11 +264,12 @@ and type_plain_comp st = function
            let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2, Typed.TyCoercionVar( coerp1 ))) typed_e1.location in
            let omega_cons_1 = Typed.TyOmega (coerp1,cons1) in 
            let constraints = List.append [omega_cons_1] constraints_2 in
-           (Typed.Op ( (eff, (eff_in,eff_out)) ,e2_coerced), (eff_out, Types.Union(eff,Types.Empty)), constraints)
+           let dirt_of_out_ty = Types.list_to_effect_set [eff] in 
+           (Typed.Op ( (eff, (eff_in,eff_out)) ,e2_coerced), (eff_out, (Types.SetEmpty dirt_of_out_ty)), constraints)
       | _ ->
           let new_ty_var = Types.Tyvar (Params.fresh_ty_param ()) in 
           let new_ty_var_2 = Types.Tyvar (Params.fresh_ty_param ()) in
-          let new_dirt_var = Types.DirtVar (Params.fresh_dirt_param ()) in 
+          let new_dirt_var = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
           let fresh_dirty_ty =  (new_ty_var_2, new_dirt_var) in 
           let cons1 = (tt_1 , Types.Arrow (new_ty_var, fresh_dirty_ty)) in
           let cons2 = (tt_2, new_ty_var) in
@@ -282,8 +285,8 @@ and type_plain_comp st = function
    | Untyped.Handle (e, c) ->
       let alpha_2 = Types.Tyvar (Params.fresh_ty_param ()) in
       let alpha_1 = Types.Tyvar (Params.fresh_ty_param ()) in
-      let gamma_1 = Types.DirtVar (Params.fresh_dirt_param ()) in 
-      let gamma_2 = Types.DirtVar (Params.fresh_dirt_param ()) in
+      let gamma_1 = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
+      let gamma_2 = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in
       let dirty_1 = (alpha_1, gamma_1) in 
       let dirty_2 = (alpha_2, gamma_2) in
       let (typed_exp,exp_type,exp_constraints) = type_expr st e in
@@ -313,7 +316,7 @@ and type_plain_comp st = function
     let Untyped.PVar x = p_def.Untyped.term in
     let new_st = add_def st x type_c1 in 
     let (typed_c2,(type_c2,dirt_c2),cons_c2) = type_comp new_st c_2 in 
-    let new_dirt_var = Types.DirtVar (Params.fresh_dirt_param ()) in 
+    let new_dirt_var = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
     let cons1 = (dirt_c1,new_dirt_var) in
     let cons2 = (dirt_c2,new_dirt_var) in
     let coerp1 = Params.fresh_dirt_coercion_param () in

@@ -101,16 +101,14 @@ and refresh_target_dirty (ty_sbst, dirt_sbst) (t,d)=
 
 and refresh_target_dirt (ty_sbst, dirt_sbst) t = 
  begin match t with 
- | Empty -> ((ty_sbst, dirt_sbst) , Types.Empty)
- | DirtVar x ->  
-	begin match Common.lookup x dirt_sbst with
-    | Some x' -> (ty_sbst,dirt_sbst), DirtVar x'
+ | SetVar(set,x) -> 
+    begin match Common.lookup x dirt_sbst with
+    | Some x' -> (ty_sbst,dirt_sbst), Types.SetVar(set,x')
     | None -> 
-    	let y = (Params.fresh_dirt_param ()) in
-    	( ty_sbst, (Common.update x y dirt_sbst )) , DirtVar y
+      let y = (Params.fresh_dirt_param ()) in
+      ( ty_sbst, (Common.update x y dirt_sbst )) , SetVar(set,y)
    end
-| Union (eff,d) -> let (ty_sbst', dirt_sbst'), d' = refresh_target_dirt (ty_sbst, dirt_sbst) d in 
-				   (ty_sbst', dirt_sbst') , Union(eff,d') 
+ | SetEmpty set -> ((ty_sbst, dirt_sbst) , (Types.SetEmpty set))
 end
 
 

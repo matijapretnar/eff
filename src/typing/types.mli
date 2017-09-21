@@ -1,3 +1,5 @@
+type effect_set
+
 
 type target_ty = 
   | Tyvar of Params.ty_param
@@ -14,9 +16,8 @@ and
  target_dirty = ( target_ty * dirt)
 and
  dirt = 
- | Empty
- | DirtVar of Params.dirt_param
- | Union of ( Common.effect * dirt)
+ | SetVar of effect_set * Params.dirt_param
+ | SetEmpty of effect_set
 and
  ct = 
  | LeqTy of (target_ty * target_ty)
@@ -39,8 +40,18 @@ val print_target_ty : ?max_level:int -> target_ty -> Format.formatter -> unit
 
 val print_target_dirt : dirt -> Format.formatter -> unit
 
+val print_effect_list :  Common.effect list -> Format.formatter -> unit
+
 val print_target_dirty: target_dirty -> Format.formatter -> unit
 
 val print_constraint :  ct -> Format.formatter -> unit
 
 val print_ct_ty : ct_ty -> Format.formatter -> unit
+
+
+
+val empty_effect_set : effect_set
+
+val list_to_effect_set : Common.effect list -> effect_set
+
+val effect_set_to_list: effect_set -> (Common.effect list)
