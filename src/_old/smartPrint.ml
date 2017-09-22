@@ -7,7 +7,7 @@ let show_dirt ~non_empty_dirts drt =
 
 
 let print_operation ~non_poly r_ops =
-  Print.sequence ", " (fun (op, r) ppf -> Print.print ppf "%s:%t" op (Params.print_region_param ~non_poly r)) r_ops
+  Print.sequence ", " (fun (op, r) ppf -> Print.print ppf "%s" op) r_ops
 
 let print_dirt ~non_poly ~non_empty_dirts drt ppf =
   match drt.ops with

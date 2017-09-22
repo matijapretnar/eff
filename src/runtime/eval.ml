@@ -111,7 +111,7 @@ and veval env e =
 and eval_handler env {Typed.effect_clauses=ops; Typed.value_clause=value} =
   let eval_op (op, a2) =
     let (p, kvar, c) = a2.Typed.term in
-    let f u k = eval_closure (extend kvar (V.Closure k) env) (Typed.abstraction ~loc:a2.Typed.location p c) u in
+    let f u k = eval_closure (extend kvar (V.Closure k) env) (Ctor.abstraction ~loc:a2.Typed.location p c) u in
     (op, f)
   in
   let ops = List.map eval_op ops in

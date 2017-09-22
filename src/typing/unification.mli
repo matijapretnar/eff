@@ -33,10 +33,10 @@ val empty : t
 val add_ty_constraint : Type.ty -> Type.ty -> t -> t
 
 (* Add a dirt constraint: ... *)
-(* val add_dirt_constraint : *)
+val add_dirt_constraint : Type.dirt -> Type.dirt -> t -> t
 
 (* Add a dirty constraint: ... *)
-(* val add_dirty_constraint : *)
+val add_dirty_constraint : Type.dirty -> Type.dirty -> t -> t
 
 (* Combine two constraint sets to a single set *)
 val union : t -> t -> t
@@ -49,6 +49,8 @@ val unify : t -> t
 
 (* Perform a substitution *)
 val subst : Params.substitution -> t -> t
+
+val list_union : t list -> t
 
 (***********************)
 (* PRINTING OPERATIONS *)

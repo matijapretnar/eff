@@ -69,7 +69,13 @@ let refresh (ctx, ty, cnstrs) =
   Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, (* Constraints.subst sbst *) cnstrs
 
 let abstract ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
-  ([], (ty_p, drty_c), Unification.empty)
+  match create_ty_scheme ctx_c (Type.Arrow (ty_p, drty_c)) [
+      trim_context ~loc ctx_p;
+      just cnstrs_p;
+      just cnstrs_c
+    ] with
+  | ctx, Type.Arrow (ty_p, drty_c), cnstrs -> ctx, (ty_p, drty_c), cnstrs
+  | _ -> assert false
 
 (**********************)
 (* SMART CONSTRUCTORS *)
@@ -83,6 +89,7 @@ let lambda ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
       just cnstrs_p;
       just cnstrs_c
     ]
+
 
 (**********************)
 (* PRINTING FUNCTIONS *)

@@ -25,23 +25,19 @@ and prim_ty =
 and dirty = ty * dirt
 
 (* The dirt defined as a row *)
-(* and dirt =
-  | Op of (Common.effect * dirt)
-  | DirtVar of P.dirt_param
-  | Empty *)
 and dirt = {
-  ops: (Common.effect, Params.region_param) Common.assoc;
+  ops: Common.effect list;
   rest: Params.dirt_param
 }
 
-and args = ty list * dirt list * Params.region_param list
+and args = ty list * dirt list
 
 let int_ty = Prim IntTy
 let string_ty = Prim StringTy
 let bool_ty = Prim BoolTy
 let float_ty = Prim FloatTy
 let unit_ty = Prim UnitTy
-let empty_ty = Apply ("empty", ([], [], []))
+let empty_ty = Apply ("empty", ([], []))
 
 let prim_to_string prim =
   begin match prim with
@@ -70,7 +66,6 @@ let universal_dirty = (Prim UniTy, fresh_dirt ()) (* (Basic "_", fresh_dirt ()) 
 type replacement = {
   ty_param_repl : Params.ty_param -> ty;
   dirt_param_repl : Params.dirt_param -> dirt;
-  region_param_repl : Params.region_param -> Params.region_param;
 }
 
 (** [replace_ty rpls ty] replaces type parameters in [ty] according to [rpls]. *)
@@ -90,20 +85,18 @@ let rec replace_ty rpls = function
     Handler (drty1, drty2)
 
 and replace_dirt rpls drt =
-  let ops = Common.assoc_map rpls.region_param_repl drt.ops in
   let { ops = new_ops; rest = new_rest } = rpls.dirt_param_repl drt.rest in
-  { ops = new_ops @ ops; rest = new_rest }
+  { ops = new_ops @ drt.ops; rest = new_rest }
 
 and replace_dirty rpls (ty, drt) =
   let ty = replace_ty rpls ty in
   let drt = replace_dirt rpls drt in
   (ty, drt)
 
-and replace_args rpls (tys, drts, rs) =
+and replace_args rpls (tys, drts) =
   let tys = Common.map (replace_ty rpls) tys in
   let drts = Common.map (replace_dirt rpls) drts in
-  let rs = Common.map rpls.region_param_repl rs in
-  (tys, drts, rs)
+  (tys, drts)
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 let rec subst_ty sbst = function
@@ -122,18 +115,17 @@ let rec subst_ty sbst = function
     Handler (drty1, drty2)
 
 and subst_dirt sbst {ops; rest} =
-  { ops = Common.assoc_map sbst.Params.region_param ops; rest = sbst.Params.dirt_param rest }
+  { ops = ops; rest = sbst.Params.dirt_param rest }
 
 and subst_dirty sbst (ty, drt) =
   let ty = subst_ty sbst ty in
   let drt = subst_dirt sbst drt in
   (ty, drt)
 
-and subst_args sbst (tys, drts, rs) =
+and subst_args sbst (tys, drts) =
   let tys = Common.map (subst_ty sbst) tys in
   let drts = Common.map (subst_dirt sbst) drts in
-  let rs = Common.map sbst.Params.region_param rs in
-  (tys, drts, rs)
+  (tys, drts)
 
 let refresh ty =
   let sbst = Params.refreshing_subst () in
@@ -146,37 +138,13 @@ let for_parameters get_params is_pos ps lst =
       let params = if cov then get_params is_pos el @@@ params else params in
       if contra then get_params (not is_pos) el @@@ params else params) ps lst Params.empty
 
-let pos_neg_params get_variances ty =
-  let rec pos_ty is_pos = function
-    | Apply (ty_name, args) -> pos_args is_pos ty_name args
-    | TyVar p -> if is_pos then Params.add_ty_param p Params.empty else Params.empty
-    | Prim _ -> Params.empty
-    | Tuple tys -> Params.flatten_map (pos_ty is_pos) tys
-    | Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
-    | Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
-  and pos_dirty is_pos (ty, drt) =
-    pos_ty is_pos ty @@@ pos_dirt is_pos drt
-  and pos_dirt is_pos drt =
-    pos_dirt_param is_pos drt.rest @@@ Params.flatten_map (fun (op, dt) -> if op = "*poly*" then pos_region_param true dt @@@ pos_region_param false dt else pos_region_param is_pos dt) drt.ops
-  and pos_dirt_param is_pos d =
-    if is_pos then Params.add_dirt_param d Params.empty else Params.empty
-  and pos_region_param is_pos r =
-    if is_pos then Params.add_region_param r Params.empty else Params.empty
-  and pos_args is_pos ty_name (tys, drts, rgns) =
-    let (ps, ds, rs) = get_variances ty_name in
-    for_parameters pos_ty is_pos ps tys @@@
-    for_parameters pos_dirt is_pos ds drts @@@
-    for_parameters pos_region_param is_pos rs rgns
-  in
-  Params.uniq (pos_ty true ty), Params.uniq (pos_ty false ty)
-
 let print_dirt drt ppf =
   match drt.ops with
   | [] ->
     Print.print ppf "%t" (Params.print_dirt_param drt.rest)
   | _ ->
-    let print_operation (op, r) ppf =
-      Print.print ppf "%s:%t" op (Params.print_region_param r)
+    let print_operation op ppf =
+      Print.print ppf "%s" op
     in
     Print.print ppf "{%t|%t}"
       (Print.sequence ", " print_operation drt.ops)
@@ -185,11 +153,11 @@ let print_dirt drt ppf =
 let rec print_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
-  | Apply (ty_name, ([], _, _)) ->
+  | Apply (ty_name, ([], _)) ->
     print "%s" ty_name
-  | Apply (ty_name, ([ty], _, _)) ->
+  | Apply (ty_name, ([ty], _)) ->
     print ~at_level:1 "%t %s" (print_ty ~max_level:1 ty) ty_name
-  | Apply (ty_name, (tys, _, _)) ->
+  | Apply (ty_name, (tys, _)) ->
     print ~at_level:1 "(%t) %s" (Print.sequence ", " print_ty tys) ty_name
   | TyVar p -> Params.print_ty_param p ppf
   | Prim b -> print "%s" (prim_to_string b)

@@ -16,14 +16,6 @@ type state = {
   effects : (Type.ty * Type.ty) Untyped.EffectMap.t
 }
 
-(* Get the type of a constant *)
-let ty_of_const = function
-  | Const.Integer _ -> Type.int_ty
-  | Const.String _ -> Type.string_ty
-  | Const.Boolean _ -> Type.bool_ty
-  | Const.Float _ -> Type.float_ty
-
-
 (* Infer the effect or throw an error when the effect doesn't exist *)
 let infer_effect ~loc env eff =
   try
@@ -71,13 +63,15 @@ and type_plain_pattern st loc = function
   | Untyped.PVar x ->
     Ctor.pvar ~loc x
   | Untyped.PAs (p, x) ->
-    assert false
+    let pat = type_pattern st p in
+    Ctor.pas ~loc pat x
   | Untyped.PNonbinding ->
-    assert false
+    Ctor.pnonbinding ~loc
   | Untyped.PConst const ->
-    assert false
+    Ctor.pconst ~loc const
   | Untyped.PTuple ps ->
-    assert false
+    let pats = List.map (type_pattern st) ps in
+    Ctor.ptuple ~loc pats
   | Untyped.PRecord [] ->
     assert false
   | Untyped.PRecord (((fld, _) :: _) as lst) ->
@@ -102,7 +96,8 @@ and type_plain_expr st loc = function
   | Untyped.Const const ->
     Ctor.const ~loc const, st
   | Untyped.Tuple es ->
-    assert false
+    let els = List.map (fun (a, b) -> a) (List.map (type_expr st) es) in
+    Ctor.tuple ~loc els, st
   | Untyped.Record lst ->
     assert false
   | Untyped.Variant (lbl, e) ->
@@ -120,6 +115,11 @@ and type_plain_expr st loc = function
 (* COMPUTATION TYPE INFERENCE *)
 (******************************)
 
+and type_abstraction st loc (p, c) =
+  let pat = type_pattern st p in
+  let comp, st = type_comp st c in
+  Ctor.abstraction ~loc pat comp, st
+
 (* Type a computation
     type_comp will annotate the terms with location information
 *)
@@ -130,9 +130,10 @@ and type_plain_comp st loc = function
   | Untyped.Value e ->
     let typed_e, st = type_expr st e in
     Ctor.value ~loc typed_e, st
-  | Untyped.Match (e, cases) ->
-    assert false
-    (* Typed.match' ~loc (type_expr env e) (List.map (type_abstraction env) cases) *)
+  | Untyped.Match (e, es) ->
+    let cases = List.map (fun (a, b) -> a) (List.map (type_abstraction st loc) es) in
+    let exp, st = (type_expr st e) in
+    Ctor.patmatch ~loc exp cases, st
   | Untyped.Apply (e1, e2) ->
     let expr1, st = type_expr st e1 in
     let expr2, st = type_expr st e2 in
@@ -158,43 +159,44 @@ and type_plain_comp st loc = function
 let type_toplevel ~loc ppf st = function
   (* Main toplevel command for toplevel computations *)
   | Untyped.Computation c ->
-      (* Do not capture state since we do not want to persist it *)
-      let c, _ = type_comp st c in
-      Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme c.Typed.scheme);
-      Typed.Computation c, st
+    (* Do not capture state since we do not want to persist it *)
+    let c, _ = type_comp st c in
+    Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme c.Typed.scheme);
+    Typed.Computation c, st
   (* Use keyword: include a file *)
   | Untyped.Use fn ->
-      Typed.Use fn, st
+    Typed.Use fn, st
   (* Reset keyword *)
   | Untyped.Reset ->
-      Typed.Reset, st
+    Typed.Reset, st
   (* Help keyword *)
   | Untyped.Help ->
-      Typed.Help, st
+    Typed.Help, st
   (* Quit keyword: exit interactive toplevel *)
   | Untyped.Quit ->
-      Typed.Quit, st
+    Typed.Quit, st
   (* Type definition *)
   | Untyped.Tydef defs ->
-      Tctx.extend_tydefs ~loc defs;
-      Typed.Tydef defs, st
+    Tctx.extend_tydefs ~loc defs;
+    Typed.Tydef defs, st
   (* Top let command: let x = c1 in c2 *)
   | Untyped.TopLet defs ->
-      assert false
+    assert false
   (* Top letrec command: let rec x = c1 in c2 *)
   | Untyped.TopLetRec defs'' ->
-      assert false
+    assert false
   (* Exernal definition *)
   | Untyped.External (x, ty, f) ->
-      let st = add_def st x (Scheme.simple ty) in
-      Typed.External (x, ty, f), st
+    let st = add_def st x (Scheme.simple ty) in
+    Typed.External (x, ty, f), st
   (* Define an effect *)
   | Untyped.DefEffect (eff, (ty1, ty2)) ->
-      let st = add_effect st eff (ty1, ty2) in
-      Typed.DefEffect ((eff, (ty1, ty2)), (ty1, ty2)), st
+    let st = add_effect st eff (ty1, ty2) in
+    Typed.DefEffect ((eff, (ty1, ty2)), (ty1, ty2)), st
   (* Get the type of *)
   | Untyped.TypeOf c ->
-      assert false
+    let c, st = type_comp st c in
+    Typed.TypeOf c, st
 
 (**************************)
 (* COMMAND TYPE INFERENCE *)

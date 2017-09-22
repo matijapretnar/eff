@@ -1,41 +1,35 @@
 type ty_param = int
 type dirt_param = int
-type region_param = int
 
 let fresh_ty_param = Common.fresh Common.id
 let fresh_dirt_param = Common.fresh Common.id
-let fresh_region_param = Common.fresh Common.id
 
-type t = ty_param list * dirt_param list * region_param list
+type t = ty_param list * dirt_param list
 
-let make (ts, ds, rs) = (ts, ds, rs)
-let unmake (ts, ds, rs) = (ts, ds, rs)
+let make (ts, ds) = (ts, ds)
+let unmake (ts, ds) = (ts, ds)
 
-let empty = ([], [], [])
-let append (ts1, ds1, rs1) (ts2, ds2, rs2) = (ts1 @ ts2, ds1 @ ds2, rs1 @ rs2)
+let empty = ([], [])
+let append (ts1, ds1) (ts2, ds2) = (ts1 @ ts2, ds1 @ ds2)
 let flatten_map f lst = List.fold_left append empty (List.map f lst)
-let diff (ts1, ds1, rs1) (ts2, ds2, rs2) = (Common.diff ts1 ts2, Common.diff ds1 ds2, Common.diff rs1 rs2)
-let uniq (ts1, ds1, rs1) = (Common.uniq ts1, Common.uniq ds1, Common.uniq rs1)
+let diff (ts1, ds1) (ts2, ds2) = (Common.diff ts1 ts2, Common.diff ds1 ds2)
+let uniq (ts1, ds1) = (Common.uniq ts1, Common.uniq ds1)
 
-let add_ty_param t (ts, ds, rs) = (t::ts, ds, rs)
-let add_dirt_param d (ts, ds, rs) = (ts, d::ds, rs)
-let add_region_param r (ts, ds, rs) = (ts, ds, r::rs)
+let add_ty_param t (ts, ds) = (t::ts, ds)
+let add_dirt_param d (ts, ds) = (ts, d::ds)
 
-let ty_param_mem t (ts, _, _) = List.mem t ts
-let dirt_param_mem d (_, ds, _) = List.mem d ds
-let region_param_mem r (_, _, rs) = List.mem r rs
+let ty_param_mem t (ts, _) = List.mem t ts
+let dirt_param_mem d (_, ds) = List.mem d ds
 
 type substitution = {
   ty_param : ty_param -> ty_param;
   dirt_param : dirt_param -> dirt_param;
-  region_param : region_param -> region_param;
 }
 
 let identity_subst =
   {
     ty_param = Common.id;
     dirt_param = Common.id;
-    region_param = Common.id;
   }
 
 (** [compose_subst sbst1 sbst2] returns a substitution that first performs
@@ -44,7 +38,6 @@ let compose_subst sbst1 sbst2 =
   {
     ty_param = Common.compose sbst1.ty_param sbst2.ty_param;
     dirt_param = Common.compose sbst1.dirt_param sbst2.dirt_param;
-    region_param = Common.compose sbst1.region_param sbst2.region_param;
   }
 
 let refresher fresh =
@@ -64,30 +57,24 @@ let beautifying_subst () =
     {
       ty_param = refresher (Common.fresh Common.id);
       dirt_param = refresher (Common.fresh Common.id);
-      region_param = refresher (Common.fresh Common.id);
     }
 
 let refreshing_subst () =
   {
     ty_param = refresher fresh_ty_param;
     dirt_param = refresher fresh_dirt_param;
-    region_param = refresher fresh_region_param;
   }
 
 let print_ty_param ?(non_poly=empty) t ppf =
-  let (ts, _, _) = non_poly in
+  let (ts, _) = non_poly in
   Symbols.ty_param t (List.mem t ts) ppf
 
 let print_dirt_param ?(non_poly=empty) d ppf =
-  let (_, ds, _) = non_poly in
+  let (_, ds) = non_poly in
   Symbols.dirt_param d (List.mem d ds) ppf
-
-let print_region_param ?(non_poly=empty) r ppf =
-  let (_, _, rs) = non_poly in
-  Symbols.region_param r (List.mem r rs) ppf
 
 let print_type_param t ppf =
   Format.fprintf ppf "'t%d" t
 
-let project_ty_params (ts, _, _) = ts
-let project_dirt_params (_, ds, _) = ds
+let project_ty_params (ts, _) = ts
+let project_dirt_params (_, ds) = ds

@@ -54,12 +54,9 @@ and abstraction2 = variable Pattern.t * variable Pattern.t * term
 type dirt =
   | DirtParam of Common.dirtparam
 
-type region =
-  | RegionParam of Common.regionparam
-
 type ty = plain_ty * Location.t
 and plain_ty =
-  | TyApply of Common.tyname * ty list * (dirt list * region list) option
+  | TyApply of Common.tyname * ty list * (dirt list) option
   (** [(ty1, ty2, ..., tyn) type_name] *)
   | TyParam of Common.typaram
   (** ['a] *)

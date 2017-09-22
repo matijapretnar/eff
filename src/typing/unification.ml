@@ -48,6 +48,11 @@ let empty = {
 (* Add a type constraint to a constraint set *)
 let add_ty_constraint ty1 ty2 cnstr = add_type (ty1, ty2) cnstr
 
+let add_dirt_constraint drt1 drt2 cnstr = cnstr
+
+let add_dirty_constraint (ty1, drt1) (ty2, drt2) cnstr = add_type (ty1, ty2) (add_dirt_constraint drt1 drt2 cnstr)
+
+
 (* Combine two constraint sets to a single set *)
 let union c1 c2 =
   let c' = combine_dirts c1.dirt c2 in
@@ -64,6 +69,12 @@ let unify cnstr = cnstr
 (* Perform a substitution *)
 let subst sbst constraints =
   {constraints with types=List.map (subst_ty_cnstr sbst) constraints.types }
+
+let list_union = function
+  | [] -> empty
+  | [constraints] -> constraints
+  | constraints :: constraints_lst -> List.fold_right union constraints_lst constraints
+
 
 (***********************)
 (* PRINTING OPERATIONS *)
