@@ -116,7 +116,7 @@ and expand_ty ty = match ty with
       | None -> ty
     end
   | Type.Basic _ -> ty
-  | Type.Tuple tys -> Type.Tuple (Common.map expand_ty tys)
+  | Type.Tuple tys -> Type.Tuple (OldUtils.map expand_ty tys)
   | Type.Arrow (ty, drty) -> Type.Arrow (expand_ty ty, expand_dirty drty)
   | Type.Handler (drty1, drty2) -> Type.Handler (expand_dirty drty1, expand_dirty drty2)
 
@@ -129,7 +129,7 @@ and expand_dirt ({Type.ops=ops; Type.rest=rest} as drt) =
   | None -> drt
 
 and expand_args (tys, drts, rs) =
-  (Common.map expand_ty tys, Common.map expand_dirt drts, rs)
+  (OldUtils.map expand_ty tys, OldUtils.map expand_dirt drts, rs)
 
 let add_ty_param_constraint t1 t2 constraints =
   {constraints with ty_poset = TyPoset.add t1 t2 constraints.ty_poset}
@@ -280,10 +280,10 @@ and add_dirt_constraint drt1 drt2 constraints =
   let ops1 = new_ops1 @ ops1
   and ops2 = new_ops2 @ ops2 in
   let op_less (op, dt1) constraints =
-    begin match Common.lookup op ops2 with
-      | Some dt2 -> add_region_param_constraint dt1 dt2 constraints
-      | None -> assert false
-    end
+    begin match OldUtils.lookup op ops2 with
+    | Some dt2 -> add_region_param_constraint dt1 dt2 constraints
+    | None -> assert false
+  end
   in
   List.fold_right op_less ops1 (add_dirt_param_constraint rest1 rest2 constraints)
 

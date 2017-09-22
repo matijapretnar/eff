@@ -2,26 +2,26 @@
 module T = Type
 
 type tydef =
-  | Record of (Common.field, Type.ty) Common.assoc
-  | Sum of (Common.label, Type.ty option) Common.assoc
+  | Record of (OldUtils.field, Type.ty) OldUtils.assoc
+  | Sum of (OldUtils.label, Type.ty option) OldUtils.assoc
   | Inline of Type.ty
 
 type variance = bool * bool
 type params = (Params.ty_param * variance) list * (Params.dirt_param * variance) list * (Params.region_param * variance) list
 
-type tyctx = (Common.tyname, params * tydef) Common.assoc
+type tyctx = (OldUtils.tyname, params * tydef) OldUtils.assoc
 
 let initial_tctx : tyctx = [
-  ("bool", (([], [], []), Inline T.bool_ty));
-  ("unit", (([], [], []), Inline T.unit_ty));
-  ("int", (([], [], []), Inline T.int_ty));
-  ("string", (([], [], []), Inline T.string_ty));
-  ("float", (([], [], []), Inline T.float_ty));
-  ("list", (let a = Params.fresh_ty_param () in
-            (([a, (true, false)], [], []),
-             Sum [(Common.nil, None);
-                  (Common.cons, Some (T.Tuple [T.Param a; T.Apply ("list", ([T.Param a], [], []))]))])));
-  ("empty", (([], [], []), Sum []))
+  ("bool", (OldUtils.trio_empty, Inline T.bool_ty));
+  ("unit", (OldUtils.trio_empty, Inline T.unit_ty));
+  ("int", (OldUtils.trio_empty, Inline T.int_ty));
+  ("string", (OldUtils.trio_empty, Inline T.string_ty));
+  ("float", (OldUtils.trio_empty, Inline T.float_ty));
+  ("list", (let a = Type.fresh_ty_param () in
+              (([a, (true, false)], [], []),
+                 Sum [(OldUtils.nil, None);
+                      (OldUtils.cons, Some (T.Tuple [T.Param a; T.Apply ("list", ([T.Param a], [], []))]))])));
+  ("empty", (OldUtils.trio_empty, Sum []))
 ]
 
 let tctx = ref initial_tctx
@@ -32,22 +32,22 @@ let reset () =
 let subst_tydef sbst =
   let subst = Type.subst_ty sbst in
   function
-  | Record tys -> Record (Common.assoc_map subst tys)
-  | Sum tys -> Sum (Common.assoc_map (Common.option_map subst) tys)
+  | Record tys -> Record (OldUtils.assoc_map subst tys)
+  | Sum tys -> Sum (OldUtils.assoc_map (OldUtils.option_map subst) tys)
   | Inline ty -> Inline (subst ty)
 
 let replace_tydef rpls =
   let replace = Type.replace_ty rpls in
   function
-  | Record tys -> Record (Common.assoc_map replace tys)
-  | Sum tys -> Sum (Common.assoc_map (Common.option_map replace) tys)
+  | Record tys -> Record (OldUtils.assoc_map replace tys)
+  | Sum tys -> Sum (OldUtils.assoc_map (OldUtils.option_map replace) tys)
   | Inline ty -> Inline (replace ty)
 
 (* Lookup type parameters for a given type. *)
 let lookup_params ty_name =
-  match Common.lookup ty_name !tctx with
-  | None -> None
-  | Some (params, _) -> Some params
+  match OldUtils.lookup ty_name !tctx with
+    | None -> None
+    | Some (params, _) -> Some params
 
 let get_variances ty_name =
   match lookup_params ty_name with
@@ -57,7 +57,7 @@ let get_variances ty_name =
 let remove_variances (ps, ds, rs) = (List.map fst ps, List.map fst ds, List.map fst rs)
 
 let lookup_tydef ~loc ty_name =
-  match Common.lookup ty_name !tctx with
+  match OldUtils.lookup ty_name !tctx with
   | None -> Error.typing ~loc "Unknown type %s" ty_name
   | Some (params, tydef) -> (remove_variances params, tydef)
 
@@ -68,9 +68,9 @@ let refreshing_subst (ps, ds, rs) =
   and refresh_region_param = sbst.Params.region_param in
   Params.make (List.map refresh_ty_param ps, List.map refresh_dirt_param ds, List.map refresh_region_param rs),
   {
-    Params.ty_param = (fun p -> refresh_ty_param p);
-    Params.dirt_param = Common.id;
-    Params.region_param = refresh_region_param;
+    Type.ty_param = (fun p -> refresh_ty_param p);
+    Type.dirt_param = OldUtils.id;
+    Type.region_param = refresh_region_param;
   }
 
 (** [find_variant lbl] returns the information about the variant type that defines the
@@ -79,7 +79,7 @@ let find_variant lbl =
   let rec find = function
     | [] -> None
     | (ty_name, (ps, Sum vs)) :: lst ->
-      begin match Common.lookup lbl vs with
+      begin match OldUtils.lookup lbl vs with
         | Some us -> Some (ty_name, ps, vs, us)
         | None -> find lst
       end
@@ -112,22 +112,22 @@ let apply_to_params t params =
     inference. *)
 let infer_variant lbl =
   match find_variant lbl with
-  | None -> None
-  | Some (ty_name, ps, _, u) ->
-    let ps', fresh_subst = refreshing_subst (remove_variances ps) in
-    let u = Common.option_map (T.subst_ty fresh_subst) u in
-    Some (apply_to_params ty_name ps', u)
+    | None -> None
+    | Some (ty_name, ps, _, u) ->
+      let ps', fresh_subst = refreshing_subst (remove_variances ps) in
+      let u = OldUtils.option_map (T.subst_ty fresh_subst) u in
+        Some (apply_to_params ty_name ps', u)
 
 
 (** [infer_field fld] finds a record type that defines the field [fld] and returns it with
     refreshed type parameters and additional information needed for type inference. *)
 let infer_field fld =
   match find_field fld with
-  | None -> None
-  | Some (ty_name, ps, us) ->
-    let ps', fresh_subst = refreshing_subst (remove_variances ps) in
-    let us' = Common.assoc_map (T.subst_ty fresh_subst) us in
-    Some (apply_to_params ty_name ps', (ty_name, us'))
+    | None -> None
+    | Some (ty_name, ps, us) ->
+      let ps', fresh_subst = refreshing_subst (remove_variances ps) in
+      let us' = OldUtils.assoc_map (T.subst_ty fresh_subst) us in
+        Some (apply_to_params ty_name ps', (ty_name, us'))
 
 
 let transparent ~loc ty_name =
@@ -149,9 +149,9 @@ let ty_apply ~loc ty_name (tys, drts, rgns) : tydef =
       Invalid_argument "List.combine" -> Error.typing ~loc "Type constructors %s should be applied to %d region arguments" ty_name (List.length rs)
   in
   replace_tydef {
-    T.ty_param_repl = (fun p -> Common.lookup_default p ty_sbst (Type.Param p));
-    T.dirt_param_repl = (fun d -> Common.lookup_default d dirt_sbst (Type.simple_dirt d));
-    T.region_param_repl = (fun r -> Common.lookup_default r region_sbst r);
+    T.ty_param_repl = (fun p -> OldUtils.lookup_default p ty_sbst (Type.Param p));
+    T.dirt_param_repl = (fun d -> OldUtils.lookup_default d dirt_sbst (Type.simple_dirt d));
+    T.region_param_repl = (fun r -> OldUtils.lookup_default r region_sbst r);
   } ty
 
 (** [check_well_formed ~loc ty] checks that type [ty] is well-formed. *)
@@ -178,13 +178,13 @@ let check_well_formed ~loc tydef =
   in
   match tydef with
   | Record fields ->
-    if not (Common.injective fst fields) then
-      Error.typing ~loc "Field labels in a record type must be distinct";
-    List.iter (fun (_, ty) -> check ty) fields
+      if not (OldUtils.injective fst fields) then
+        Error.typing ~loc "Field labels in a record type must be distinct";
+      List.iter (fun (_, ty) -> check ty) fields
   | Sum constuctors ->
-    if not (Common.injective fst constuctors) then
-      Error.typing ~loc "Constructors of a sum type must be distinct";
-    List.iter (function (_, None) -> () | (_, Some ty) -> check ty) constuctors
+      if not (OldUtils.injective fst constuctors) then
+        Error.typing ~loc "Constructors of a sum type must be distinct";
+      List.iter (function (_, None) -> () | (_, Some ty) -> check ty) constuctors
   | Inline ty -> check ty
 
 (** [check_noncyclic ~loc ty] checks that the definition of type [ty] is non-cyclic. *)
@@ -233,19 +233,19 @@ let extend_with_variances ~loc tydefs =
   let prepare_variances (params, def) =
     let (ps, ds, rs) = Params.unmake params in
     ((prepare_variance ps, prepare_variance ds, prepare_variance rs), def) in
-  let prepared_tydefs = Common.assoc_map prepare_variances tydefs in
+  let prepared_tydefs = OldUtils.assoc_map prepare_variances tydefs in
   let set_variances (ty_name, ((ps, ds, rs), def)) =
     let rec ty posi nega = function
       | T.Basic _ -> ()
       | T.Param p ->
-        begin match Common.lookup p ps with
+          begin match OldUtils.lookup p ps with
           | None -> assert false
           | Some (posvar, negvar) ->
             posvar := !posvar || posi;
             negvar := !negvar || nega
         end
       | T.Apply (t, (tys, drts, rgns)) ->
-        begin match Common.lookup t !tctx with
+          begin match OldUtils.lookup t !tctx with
           | None ->
             (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
             List.iter (ty true true) tys;
@@ -283,16 +283,16 @@ let extend_with_variances ~loc tydefs =
       List.iter (fun (_, prs) -> region_param posi nega prs) drt.Type.ops;
       dirt_param posi nega drt.Type.rest
     and dirt_param posi nega d =
-      begin match Common.lookup d ds with
-        | None -> assert false
-        | Some (posvar, negvar) ->
+      begin match OldUtils.lookup d ds with
+      | None -> assert false
+      | Some (posvar, negvar) ->
           posvar := !posvar || posi;
           negvar := !negvar || nega
       end
     and region_param posi nega r =
-      begin match Common.lookup r rs with
-        | None -> assert false
-        | Some (posvar, negvar) ->
+      begin match OldUtils.lookup r rs with
+      | None -> assert false
+      | Some (posvar, negvar) ->
           posvar := !posvar || posi;
           negvar := !negvar || nega
       end
@@ -302,7 +302,7 @@ let extend_with_variances ~loc tydefs =
     | Inline t -> ty true false t
   in
   List.iter set_variances prepared_tydefs;
-  let unref lst = Common.assoc_map (fun (ref1, ref2) -> (!ref1, !ref2)) lst in
+  let unref lst = OldUtils.assoc_map (fun (ref1, ref2) -> (!ref1, !ref2)) lst in
   let extend_with_variance (ty_name, ((ps, ds, rs), def)) =
     (ty_name, ((unref ps, unref ds, unref rs), def))
   in

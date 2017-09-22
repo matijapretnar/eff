@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <title>Eff — a functional language with effect handlers</title>
+
+    <link rel="stylesheet" href="css/inuit.css">
+    <link rel="stylesheet" href="css/grid.inuit.css">
+    <link rel="stylesheet" href="css/style.css">
+
+    <link rel="shortcut icon" href="img/favicon.ico">
+    <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+</head>
+
+<body class="wrapper">
+
+    <div class="header">
+        <h1><em>Eff</em></h1>
+        <h3>
+            <em>Eff</em> is a functional language with handlers of not only exceptions,
+            but also of other computational effects such as state or I/O.
+            With handlers, you can simply implement transactions, redirections, backtracking, multi-threading,
+            and much more…
+        </h3>
+    </div>
+
+    <hr />
+
+    <div class="header">
+        <h2>Reasons to like <em>Eff</em></h2>
+    </div>
+
+    <div class="grids">
+        <div class="grid-4">
+            <h3>Effects are first-class citizens</h3>
+            <p>
+                <em>Eff</em> is built around a powerful uniform representation of effects,
+                which allows you to
+                seamlessly combine effects (no <code>do</code>s, no monad transformers),
+                override existing effects
+                and define your own effects.
+            </p>
+        </div><!-- /grid-4 -->
+
+        <div class="grid-4">
+            <h3>Precise control over effects</h3>
+            <p>
+                <em>Eff</em> infers not only the type of the result, but also the set of all effects that may happen when computing it.
+                To boot, handlers allow you to change an effectful computation into one bound to be pure.</a>
+            </p>
+        </div><!-- /grid-4 -->
+
+        <div class="grid-4">
+            <h3>Strong theoretical foundations</h3>
+            <p>
+                <em>Eff</em> was built to test the mathematical ideas of algebraic effects in practice.
+                Thus, every new feature of <em>Eff</em> is backed by peer-reviewed research.
+            </p>
+        </div><!-- /grid-4 -->
+    </div>
+
+    <hr />
+
+    <div class="header">
+        <h2>Interested?</h2>
+    </div>
+
+    <p>
+        The best place to start is to try
+            <a href="try">the online version of <em>Eff</em></a>,
+        which also comes with a few examples that show the main features of <em>Eff</em>.
+        Then, to learn more about the theoretical background, you can read
+            <a href="handlers-tutorial.pdf">An Introduction to Algebraic Effects and Handlers</a>.
+        When you are ready to get your hands dirty, download the source code,
+        which is freely available on <a href="https://github.com/matijapretnar/eff">Github</a>.
+    </p>
+
+    <p>
+        If you want to know more about the theory, take a look at:
+        <ul>
+            <li>GitHub repository listing <a href="https://github.com/yallop/effects-bibliography">papers on computational effects</a>
+            <li>the paper <a href="http://arxiv.org/abs/1203.1539">Programming with Algebraic Effects and Handlers</a>,
+                which introduces <em>Eff</em>
+            <li>the paper <a href="http://arxiv.org/abs/1306.6316">An Effect System for Algebraic Effects and Handlers</a>,
+                which describes the effect system of <em>Eff</em>
+            <li>the paper <a href="http://arxiv.org/abs/1312.2334">Inferring Algebraic Effects</a>,
+                which describes the algorithm that <em>Eff</em> uses to infer effects
+            <li>the paper <a href="http://arxiv.org/abs/1312.1399">Handling Algebraic Effects</a>,
+                which describes the mathematical background of handlers
+            <li>old Mathematics and Computation <a href="http://math.andrej.com/category/programming/Eff/">posts about Eff</a>
+                (beware that some of them are fairly old and talk about an outdated version of Eff)
+        </ul>
+    </p>
+
+
+    <div class="footer">
+        <p>
+            &copy; Andrej Bauer and Matija Pretnar
+            (made with <a href="http://csswizardry.com/inuitcss/">inuit.css</a>)
+        </p>
+    </div>
+
+</body>
+</html>

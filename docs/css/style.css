@@ -1,0 +1,105 @@
+@charset "UTF-8";
+/*------------------------------------*\
+	STYLE.CSS
+\*------------------------------------*/
+/*
+Author:             Harry Roberts
+Twitter:            @csswizardry
+Author URL:         csswizardry.com
+
+
+
+
+
+/*------------------------------------*\
+	CONTENTS
+\*------------------------------------*/
+/*
+SHARED
+MAIN
+HEADER
+FOOTER
+TYPE
+*/
+
+
+/*------------------------------------*\
+	$SHARED
+\*------------------------------------*/
+pre,
+code{
+	background-color:#fef8c4;
+}
+
+
+
+
+
+/*------------------------------------*\
+	$MAIN
+\*------------------------------------*/
+html{
+	font-family:Georgia, "Times New Roman", serif;
+	text-align: justify;
+}
+
+h1,h2,h3{
+	text-align: center;
+}
+
+
+
+
+/*------------------------------------*\
+	$HEADER
+\*------------------------------------*/
+.header{
+	padding:1.5em 0;
+}
+
+
+
+/*------------------------------------*\
+	$FOOTER
+\*------------------------------------*/
+.footer{
+	padding-top:1.5em;
+	border-top:1px solid #ccc;
+	color:#999;
+}
+
+
+
+
+
+/*------------------------------------*\
+	$TYPE
+\*------------------------------------*/
+a{
+	color:#4a8ec2;
+}
+mark{
+	border-bottom:2px solid;
+}
+pre{
+	padding:10px;
+}
+pre code,
+pre mark{
+	background:none;
+}
+
+
+
+
+/*------------------------------------*\
+	$MISC
+\*------------------------------------*/
+::selection		{ background-color:#4a8ec2; color:#fff; }
+::-moz-selection{ background-color:#4a8ec2; color:#fff; }
+hr{
+	padding:0;
+	border:none;
+	height:1px;
+	background-color:#ccc;
+}

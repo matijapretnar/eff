@@ -1,3 +1,7 @@
-val extend : Typed.pattern -> Value.value -> RuntimeEnv.t -> RuntimeEnv.t
-val extend_let_rec : RuntimeEnv.t -> (Typed.variable, Typed.abstraction) Common.assoc -> RuntimeEnv.t
-val run : RuntimeEnv.t -> Typed.computation -> Value.value
+type state
+val empty : state
+val extend : CoreSyntax.pattern -> Value.value -> state -> state
+val extend_let_rec : state -> (CoreSyntax.variable, CoreSyntax.abstraction) OldUtils.assoc -> state
+val run : state -> CoreSyntax.computation -> Value.value
+val update : CoreSyntax.variable -> Value.value -> state -> state
+val lookup : CoreSyntax.variable -> state -> Value.value option

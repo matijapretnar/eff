@@ -1,13 +1,7 @@
-type state = {
-  environment : RuntimeEnv.t;
-  typing : Infer.state;
-}
+type state
 
 val initial_state : state
 
-val parse :
-  ((Lexing.lexbuf -> Parser.token) -> Lexing.lexbuf -> 'a) -> Lexing.lexbuf -> 'a
-
-val exec_cmd : Format.formatter -> bool -> state -> Untyped.toplevel -> state
-
-val use_file : Format.formatter -> state -> string * bool -> state
+val use_file : Format.formatter -> string -> state -> state
+val use_textfile : Format.formatter -> string -> state -> state
+val use_toplevel : Format.formatter -> state -> state

@@ -31,7 +31,10 @@ struct
   let initialize () =
     print_endline version;
     ctxenv := EffApi.Shell.initial_state;
-    ctxenv := EffApi.Shell.use_file Format.std_formatter !ctxenv ("/static/pervasives.eff", false)
+    let ignore_all_formatter =
+      Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ())
+    in
+    ctxenv := EffApi.Shell.use_file ignore_all_formatter "/static/pervasives.eff" !ctxenv
       
   (** [execute is_file ppf content] Execute [content].
     [pp_code] formatter can be use to output ocaml source during lexing. *)
@@ -42,14 +45,7 @@ struct
       | Some ppf -> Format.fprintf ppf "%s@?" content
     end ;
     try
-      if is_file then
-        let cmds = EffApi.Lexer.read_string (EffApi.Shell.parse EffApi.Parser.file) content in
-        let cmds = List.map EffApi.Desugar.toplevel cmds in
-        ctxenv := List.fold_left (EffApi.Shell.exec_cmd ppf true) !ctxenv cmds
-      else
-        let cmd = EffApi.Lexer.read_string (EffApi.Shell.parse EffApi.Parser.commandline) content in
-        let cmd = EffApi.Desugar.toplevel cmd in
-        ctxenv := EffApi.Shell.exec_cmd ppf true !ctxenv cmd
+      ctxenv := EffApi.Shell.use_textfile ppf content !ctxenv
     with
       EffApi.Error.Error err -> EffApi.Error.print err
 

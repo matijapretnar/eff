@@ -1,108 +1,107 @@
 %{
-open Sugared
+  open SugaredSyntax
 
-type handler_clause =
-  | EffectClause of Common.effect * abstraction2
-  | ReturnClause of abstraction
-  | FinallyClause of abstraction
+  type handler_clause =
+    | EffectClause of OldUtils.effect * abstraction2
+    | ReturnClause of abstraction
+    | FinallyClause of abstraction
 
-let collect_handler_clauses clauses =
-  let (eff_cs, val_c, fin_c) =
-    List.fold_left
-      (fun (eff_cs, val_c, fin_c) -> function
-         | (EffectClause (eff, a2), _) ->  ((eff, a2) :: eff_cs, val_c, fin_c)
-         | (ReturnClause a, loc) ->
-           begin match val_c with
-             | None -> (eff_cs, Some a, fin_c)
-             | Some _ -> Error.syntax ~loc "Multiple value clauses in a handler."
-           end
-         | (FinallyClause a, loc) ->
-           begin match fin_c with
-             | None -> (eff_cs, val_c, Some a)
-             | Some _ -> Error.syntax ~loc "Multiple finally clauses in a handler."
-           end)
-      ([], None, None)
-      clauses
-  in
-  { effect_clauses = List.rev eff_cs;
-    value_clause = val_c;
-    finally_clause = fin_c }
+  let collect_handler_clauses clauses =
+    let (eff_cs, val_c, fin_c) =
+      List.fold_left
+        (fun (eff_cs, val_c, fin_c) -> function
+          | (EffectClause (eff, a2), _) ->  ((eff, a2) :: eff_cs, val_c, fin_c)
+          | (ReturnClause a, loc) ->
+            begin match val_c with
+              | None -> (eff_cs, Some a, fin_c)
+              | Some _ -> Error.syntax ~loc "Multiple value clauses in a handler."
+            end
+          | (FinallyClause a, loc) ->
+            begin match fin_c with
+            | None -> (eff_cs, val_c, Some a)
+            | Some _ -> Error.syntax ~loc "Multiple finally clauses in a handler."
+            end)
+        ([], None, None)
+        clauses
+    in
+    { effect_clauses = List.rev eff_cs;
+      value_clause = val_c;
+      finally_clause = fin_c }
 
-  %}
+%}
 
 %token LPAREN RPAREN LBRACK RBRACK LBRACE RBRACE
 %token COLON COMMA SEMI SEMISEMI EQUAL CONS
 %token BEGIN END
 %token <string> LNAME
-                %token UNDERSCORE AS
-                %token <int> INT
-                             %token <string> STRING
-                                             %token <bool> BOOL
-                                                           %token <float> FLOAT
-                                                                          %token <Common.label> UNAME
-                                                                                                %token <Common.typaram> PARAM
-                                                                                                                        %token TYPE ARROW HARROW OF EFFECT
-                                                                                                                        %token EXTERNAL
-                                                                                                                        %token MATCH WITH FUNCTION HASH
-                                                                                                                        %token LET REC AND IN
-                                                                                                                        %token FUN BAR BARBAR
-                                                                                                                        %token IF THEN ELSE
-                                                                                                                        %token HANDLER AT VAL FINALLY HANDLE
-                                                                                                                        %token PLUS STAR MINUS MINUSDOT
-                                                                                                                        %token LSL LSR ASR
-                                                                                                                        %token MOD OR
-                                                                                                                        %token AMPER AMPERAMPER
-                                                                                                                        %token LAND LOR LXOR
-                                                                                                                        %token <string> PREFIXOP INFIXOP0 INFIXOP1 INFIXOP2 INFIXOP3 INFIXOP4
-                                                                                                                                        %token CHECK
-                                                                                                                                        %token QUIT USE HELP RESET
-                                                                                                                                        %token EOF
+%token UNDERSCORE AS
+%token <int> INT
+%token <string> STRING
+%token <bool> BOOL
+%token <float> FLOAT
+%token <OldUtils.label> UNAME
+%token <OldUtils.typaram> PARAM
+%token TYPE ARROW HARROW OF EFFECT
+%token EXTERNAL
+%token MATCH WITH FUNCTION HASH
+%token LET REC AND IN
+%token FUN BAR BARBAR
+%token IF THEN ELSE
+%token HANDLER AT VAL FINALLY HANDLE
+%token PLUS STAR MINUS MINUSDOT
+%token LSL LSR ASR
+%token MOD OR
+%token AMPER AMPERAMPER
+%token LAND LOR LXOR
+%token <string> PREFIXOP INFIXOP0 INFIXOP1 INFIXOP2 INFIXOP3 INFIXOP4
+%token CHECK
+%token QUIT USE HELP RESET
+%token EOF
 
-                                                                                                                                        %nonassoc HANDLE ARROW IN
-                                                                                                                                        %right SEMI
-                                                                                                                                        %nonassoc ELSE
-                                                                                                                                        %right OR BARBAR
-                                                                                                                                        %right AMPER AMPERAMPER
-                                                                                                                                        %left  INFIXOP0 EQUAL
-                                                                                                                                        %right INFIXOP1 AT
-                                                                                                                                        %right CONS
-                                                                                                                                        %left  INFIXOP2 PLUS MINUS MINUSDOT
-                                                                                                                                        %left  INFIXOP3 STAR MOD LAND LOR LXOR
-                                                                                                                                        %right INFIXOP4 LSL LSR ASR
+%nonassoc HANDLE ARROW IN
+%right SEMI
+%nonassoc ELSE
+%right OR BARBAR
+%right AMPER AMPERAMPER
+%left  INFIXOP0 EQUAL
+%right INFIXOP1 AT
+%right CONS
+%left  INFIXOP2 PLUS MINUS MINUSDOT
+%left  INFIXOP3 STAR MOD LAND LOR LXOR
+%right INFIXOP4 LSL LSR ASR
 
-                                                                                                                                        %start <Sugared.toplevel list> file
-                                                                                                                                                                       %start <Sugared.toplevel> commandline
+%start <SugaredSyntax.command list> commands
 
-                                                                                                                                                                                                 %%
+%%
 
-                                                                                                                                                                                                 (* Toplevel syntax *)
+(* Toplevel syntax *)
 
-                                                                                                                                                                                                 (* If you're going to "optimize" this, please make sure we don't require;; at the
-                                                                                                                                                                                                    end of the file. *)
-                                                                                                                                                                                                 file:
-  | lst = file_topdef
-      { lst }
-| t = topterm EOF
-    { [t] }
-| t = topterm SEMISEMI lst = file
-    { t :: lst }
-| dir = topdirective EOF
-    { [dir] }
-| dir = topdirective SEMISEMI lst = file
-    { dir :: lst }
+(* If you're going to "optimize" this, please make sure we don't require;; at the
+   end of the file. *)
+commands:
+  | lst = topdef_list
+    { lst }
+  | t = topterm EOF
+     { [t] }
+  | t = topterm SEMISEMI lst = commands
+     { t :: lst }
+  | dir = topdirective EOF
+     { [dir] }
+  | dir = topdirective SEMISEMI lst = commands
+     { dir :: lst }
 
-    file_topdef:
-    | EOF
-      { [] }
-| def = topdef SEMISEMI lst = file
-    { def :: lst }
-| def = topdef lst = file_topdef
-    { def :: lst }
+topdef_list:
+  | EOF
+     { [] }
+  | def = topdef SEMISEMI lst = commands
+     { def :: lst }
+  | def = topdef lst = topdef_list
+     { def :: lst }
 
-    commandline:
-    | def = topdef SEMISEMI
-        { def }
-| t = topterm SEMISEMI
+commandline:
+  | def = topdef SEMISEMI
+    { def }
+  | t = topterm SEMISEMI
     { t }
 | dir = topdirective SEMISEMI
     { dir }
@@ -175,18 +174,18 @@ let collect_handler_clauses clauses =
 | t = plain_binop_term
     { t }
 
-    binop_term: mark_position(plain_binop_term) { $1 }
-      plain_binop_term:
-    | t1 = binop_term op = binop t2 = binop_term
-        {
-          let op_loc = Location.make $startpos(op) $endpos(op) in
-          let partial = Apply ((Var op, op_loc), t1) in
-          let partial_pos = Location.make $startpos(t1) $endpos(op) in
-          Apply ((partial, partial_pos), t2)
-        }
-| t1 = binop_term CONS t2 = binop_term
-    { Variant (Common.cons, Some (Tuple [t1; t2], Location.make $startpos $endpos)) }
-| t = plain_uminus_term 
+binop_term: mark_position(plain_binop_term) { $1 }
+plain_binop_term:
+  | t1 = binop_term op = binop t2 = binop_term
+    {
+      let op_loc = Location.make $startpos(op) $endpos(op) in
+      let partial = Apply ((Var op, op_loc), t1) in
+      let partial_pos = Location.make $startpos(t1) $endpos(op) in
+      Apply ((partial, partial_pos), t2)
+    }
+  | t1 = binop_term CONS t2 = binop_term
+    { Variant (OldUtils.cons, Some (Tuple [t1; t2], Location.make $startpos $endpos)) }
+  | t = plain_uminus_term 
     { t }
 
     uminus_term: mark_position(plain_uminus_term) { $1 }
@@ -237,10 +236,10 @@ let collect_handler_clauses clauses =
     { Effect eff }
 | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
-      let nil = (Variant (Common.nil, None), Location.make $endpos $endpos) in
+      let nil = (Variant (OldUtils.nil, None), Location.make $endpos $endpos) in
       let cons ((_, loc_t) as t) ((_, loc_ts) as ts) =
         let loc = Location.union [loc_t; loc_ts] in
-        (Variant (Common.cons, Some (Tuple [t; ts], loc)), loc) in
+        (Variant (OldUtils.cons, Some (Tuple [t; ts], loc)), loc) in
       fst (List.fold_right cons ts nil)
     }
 | LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, comma_term)) RBRACE
@@ -278,11 +277,11 @@ let collect_handler_clauses clauses =
     | p = simple_pattern t = lambdas0(SEP)
         { (Lambda (p, t), Location.make $startpos $endpos) }
 
-        let_def:
-    | p = pattern EQUAL t = term
-        { (p, t) }
-| x = mark_position(ident) t = lambdas1(EQUAL)
-    { ((Pattern.Var (fst x), (snd x)), t) }
+let_def:
+  | p = pattern EQUAL t = term
+    { (p, t) }
+  | x = mark_position(ident) t = lambdas1(EQUAL)
+    { ((PVar (fst x), (snd x)), t) }
 
     let_rec_def:
     | f = ident t = lambdas0(EQUAL)
@@ -297,56 +296,56 @@ let collect_handler_clauses clauses =
 | FINALLY c = match_case
     { FinallyClause c }
 
-    pattern: mark_position(plain_pattern) { $1 }
-      plain_pattern:
-    | p = comma_pattern
-        { fst p }
-| p = pattern AS x = lname
-    { Pattern.As (p, x) }
+pattern: mark_position(plain_pattern) { $1 }
+plain_pattern:
+  | p = comma_pattern
+    { fst p }
+  | p = pattern AS x = lname
+    { PAs (p, x) }
 
-    comma_pattern: mark_position(plain_comma_pattern) { $1 }
-      plain_comma_pattern:
-    | ps = separated_nonempty_list(COMMA, cons_pattern)
-        { match ps with [(p, _)] -> p | ps -> Pattern.Tuple ps }
+comma_pattern: mark_position(plain_comma_pattern) { $1 }
+plain_comma_pattern:
+  | ps = separated_nonempty_list(COMMA, cons_pattern)
+    { match ps with [(p, _)] -> p | ps -> PTuple ps }
 
-        cons_pattern: mark_position(plain_cons_pattern) { $1 }
-      plain_cons_pattern:
-    | p = variant_pattern
-        { fst p }
-| p1 = variant_pattern CONS p2 = cons_pattern
-    { Pattern.Variant (Common.cons, Some (Pattern.Tuple [p1; p2], Location.make $startpos $endpos)) }
+cons_pattern: mark_position(plain_cons_pattern) { $1 }
+plain_cons_pattern:
+  | p = variant_pattern
+    { fst p }
+  | p1 = variant_pattern CONS p2 = cons_pattern
+    { PVariant (OldUtils.cons, Some (PTuple [p1; p2], Location.make $startpos $endpos)) }
 
-    variant_pattern: mark_position(plain_variant_pattern) { $1 }
-      plain_variant_pattern:
-    | lbl = UNAME p = simple_pattern
-        { Pattern.Variant (lbl, Some p) }
-| p = simple_pattern
+variant_pattern: mark_position(plain_variant_pattern) { $1 }
+plain_variant_pattern:
+  | lbl = UNAME p = simple_pattern
+    { PVariant (lbl, Some p) }
+  | p = simple_pattern
     { fst p }
 
-    simple_pattern: mark_position(plain_simple_pattern) { $1 }
-      plain_simple_pattern:
-    | x = ident
-        { Pattern.Var x }
-| lbl = UNAME
-    { Pattern.Variant (lbl, None) }
-| UNDERSCORE
-  { Pattern.Nonbinding }
-| cst = const_term
-    { Pattern.Const cst }
-| LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, pattern)) RBRACE
-    { Pattern.Record flds }
-| LBRACK ts = separated_list(SEMI, pattern) RBRACK
+simple_pattern: mark_position(plain_simple_pattern) { $1 }
+plain_simple_pattern:
+  | x = ident
+    { PVar x }
+  | lbl = UNAME
+    { PVariant (lbl, None) }
+  | UNDERSCORE
+    { PNonbinding }
+  | cst = const_term
+    { PConst cst }
+  | LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, pattern)) RBRACE
+    { PRecord flds }
+  | LBRACK ts = separated_list(SEMI, pattern) RBRACK
     {
-      let nil = (Pattern.Variant (Common.nil, None), Location.make $endpos $endpos) in
+      let nil = (PVariant (OldUtils.nil, None), Location.make $endpos $endpos) in
       let cons ((_, loc_t) as t) ((_, loc_ts) as ts) =
         let loc = Location.union [loc_t; loc_ts] in
-        (Pattern.Variant (Common.cons, Some (Pattern.Tuple [t; ts], loc)), loc)
+        (PVariant (OldUtils.cons, Some (PTuple [t; ts], loc)), loc)
       in
       fst (List.fold_right cons ts nil)
     }
-| LPAREN RPAREN
-  { Pattern.Tuple [] }
-| LPAREN p = pattern RPAREN
+  | LPAREN RPAREN
+    { PTuple [] }
+  | LPAREN p = pattern RPAREN
     { fst p }
 
     handler: mark_position(plain_handler) { $1 }

@@ -3,7 +3,7 @@
 *)
 
 type ty =
-  | Apply of Common.tyname * args
+  | Apply of OldUtils.tyname * args
   | Param of Params.ty_param
   | Basic of string
   | Tuple of ty list
@@ -13,7 +13,7 @@ type ty =
 and dirty = ty * dirt
 
 and dirt = {
-  ops: (Common.effect, Params.region_param) Common.assoc;
+  ops: (OldUtils.effect, Params.region_param) OldUtils.assoc;
   rest: Params.dirt_param
 }
 
@@ -52,7 +52,7 @@ let rec replace_ty rpls = function
   | Apply (ty_name, args) -> Apply (ty_name, replace_args rpls args)
   | Param p -> rpls.ty_param_repl p
   | Basic _ as ty -> ty
-  | Tuple tys -> Tuple (Common.map (replace_ty rpls) tys)
+  | Tuple tys -> Tuple (OldUtils.map (replace_ty rpls) tys)
   | Arrow (ty1, (ty2, drt)) ->
     let ty1 = replace_ty rpls ty1 in
     let drt = replace_dirt rpls drt in
@@ -64,7 +64,7 @@ let rec replace_ty rpls = function
     Handler (drty1, drty2)
 
 and replace_dirt rpls drt =
-  let ops = Common.assoc_map rpls.region_param_repl drt.ops in
+  let ops = OldUtils.assoc_map rpls.region_param_repl drt.ops in
   let { ops = new_ops; rest = new_rest } = rpls.dirt_param_repl drt.rest in
   { ops = new_ops @ ops; rest = new_rest }
 
@@ -74,9 +74,9 @@ and replace_dirty rpls (ty, drt) =
   (ty, drt)
 
 and replace_args rpls (tys, drts, rs) =
-  let tys = Common.map (replace_ty rpls) tys in
-  let drts = Common.map (replace_dirt rpls) drts in
-  let rs = Common.map rpls.region_param_repl rs in
+  let tys = OldUtils.map (replace_ty rpls) tys in
+  let drts = OldUtils.map (replace_dirt rpls) drts in
+  let rs = OldUtils.map rpls.region_param_repl rs in
   (tys, drts, rs)
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
@@ -84,7 +84,7 @@ let rec subst_ty sbst = function
   | Apply (ty_name, args) -> Apply (ty_name, subst_args sbst args)
   | Param p -> Param (sbst.Params.ty_param p)
   | Basic _ as ty -> ty
-  | Tuple tys -> Tuple (Common.map (subst_ty sbst) tys)
+  | Tuple tys -> Tuple (OldUtils.map (subst_ty sbst) tys)
   | Arrow (ty1, (ty2, drt)) ->
     let ty1 = subst_ty sbst ty1 in
     let drt = subst_dirt sbst drt in
@@ -96,7 +96,7 @@ let rec subst_ty sbst = function
     Handler (drty1, drty2)
 
 and subst_dirt sbst {ops; rest} =
-  { ops = Common.assoc_map sbst.Params.region_param ops; rest = sbst.Params.dirt_param rest }
+  { ops = OldUtils.assoc_map sbst.Params.region_param ops; rest = sbst.Params.dirt_param rest }
 
 and subst_dirty sbst (ty, drt) =
   let ty = subst_ty sbst ty in
@@ -104,10 +104,54 @@ and subst_dirty sbst (ty, drt) =
   (ty, drt)
 
 and subst_args sbst (tys, drts, rs) =
-  let tys = Common.map (subst_ty sbst) tys in
-  let drts = Common.map (subst_dirt sbst) drts in
-  let rs = Common.map sbst.Params.region_param rs in
+  let tys = OldUtils.map (subst_ty sbst) tys in
+  let drts = OldUtils.map (subst_dirt sbst) drts in
+  let rs = OldUtils.map sbst.Params.region_param rs in
   (tys, drts, rs)
+
+(** [identity_subst] is a substitution that makes no changes. *)
+let identity_subst =
+  {
+    ty_param = OldUtils.id;
+    dirt_param = OldUtils.id;
+    region_param = OldUtils.id;
+  }
+
+(** [compose_subst sbst1 sbst2] returns a substitution that first performs
+    [sbst2] and then [sbst1]. *)
+let compose_subst sbst1 sbst2 =
+  {
+    ty_param = OldUtils.compose sbst1.ty_param sbst2.ty_param;
+    dirt_param = OldUtils.compose sbst1.dirt_param sbst2.dirt_param;
+    region_param = OldUtils.compose sbst1.region_param sbst2.region_param;
+  }
+
+let refresher fresh =
+  let substitution = ref [] in
+  fun p ->
+    match OldUtils.lookup p !substitution with
+    | None ->
+        let p' = fresh () in
+        substitution := OldUtils.update p p' !substitution;
+        p'
+    | Some p' -> p'
+
+let beautifying_subst () =
+  if !Config.disable_beautify then
+    identity_subst
+  else
+    {
+      ty_param = refresher (OldUtils.fresh (fun n -> Ty_Param n));
+      dirt_param = refresher (OldUtils.fresh (fun n -> Dirt_Param n));
+      region_param = refresher (OldUtils.fresh (fun n -> Region_Param n));
+    }
+
+let refreshing_subst () =
+  {
+    ty_param = refresher fresh_ty_param;
+    dirt_param = refresher fresh_dirt_param;
+    region_param = refresher fresh_region_param;
+  }
 
 let refresh ty =
   let sbst = Params.refreshing_subst () in
@@ -143,6 +187,15 @@ let pos_neg_params get_variances ty =
     for_parameters pos_region_param is_pos rs rgns
   in
   Params.uniq (pos_ty true ty), Params.uniq (pos_ty false ty)
+
+let print_ty_param (Ty_Param k) ppf =
+  Symbols.ty_param k false ppf
+
+let print_dirt_param (Dirt_Param k) ppf =
+  Symbols.dirt_param k false ppf
+
+let print_region_param (Region_Param k) ppf =
+  Symbols.region_param k false ppf
 
 let print_dirt drt ppf =
   match drt.ops with
