@@ -331,41 +331,18 @@ and type_plain_comp st = function
   | Untyped.LetRec (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
 
-let type_toplevel ~loc st = function
-  | Untyped.Computation c ->
+let type_toplevel ~loc st c =
     let ct, (ttype,dirt),constraints = type_comp st c in
     let x::xs = constraints in 
     Print.debug "Single constraint : %t" (Typed.print_omega_ct x);
     Print.debug "Computation : %t" (Typed.print_computation ct);
     Print.debug "Computation type : %t ! {%t}" (Types.print_target_ty ttype) (Types.print_target_dirt dirt);
     let (sub,final) = Unification.unify ([],[],constraints) in
+    ct, st
 
-    Typed.Computation ct, st
-  | Untyped.Use fn ->
-    Typed.Use fn, st
-  | Untyped.Reset ->
-    Typed.Reset, st
-  | Untyped.Help ->
-    Typed.Help, st
-  | Untyped.Quit ->
-    Typed.Quit, st
-  | Untyped.DefEffect ( eff , (ty1 , ty2) ) ->
+let add_effect eff (ty1 , ty2) st =
     Print.debug "%t ----> %t"  (Type.print_ty ty1) (Type.print_ty ty2);
     let target_ty1 = source_to_target ty1 in 
     let target_ty2 = source_to_target ty2 in
     let new_st =  add_effect st eff (target_ty1, target_ty2) in 
-    Typed.DefEffect( eff , (target_ty1 , target_ty2) ) , new_st
-
-let type_cmd st cmd =
-  let loc = cmd.Untyped.location in
-  let cmd, st = type_toplevel ~loc st cmd.Untyped.term in
-  (cmd, loc), st
-
-let type_cmds st cmds =
-  let cmds, st =
-    List.fold_left (fun (cmds, st) cmd ->
-        let cmd, st = type_cmd st cmd in
-        (cmd :: cmds, st)
-      ) ([], st) cmds
-  in
-  List.rev cmds, st
+    new_st

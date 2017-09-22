@@ -31,10 +31,10 @@ let rec exec_cmd ppf st cmd =
   in
   match cmd.CoreSyntax.term with
   | CoreSyntax.Computation c ->
-      let drty_sch = () in
+      let _, typing = Infer.type_toplevel ~loc:c.CoreSyntax.location st.typing c in
       let v = Eval.run st.runtime c in
       Format.fprintf ppf "@[- : %t = %t@]@."
-        (print_dirty_scheme drty_sch)
+        (print_dirty_scheme ())
         (Value.print_value v);
       st
   | CoreSyntax.TypeOf c ->
@@ -50,8 +50,7 @@ let rec exec_cmd ppf st cmd =
       Format.fprintf ppf "%s" help_text;
       st
   | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
-     (* Add typing *)
-      let typing = st.typing in
+      let typing = Infer.add_effect eff (ty1, ty2) st.typing in
       { st with typing }
   | CoreSyntax.Quit ->
       exit 0
@@ -128,15 +127,14 @@ let compile_file ppf filename st =
 
   let compile_cmd st cmd =
     let loc = cmd.CoreSyntax.location in
-    let cmd_typed, typing = Infer.type_toplevel ~loc st.typing cmd.CoreSyntax.term in
-    let st = {st with typing} in
-    match cmd_typed with
-    | Typed.Computation c ->
+    match cmd.CoreSyntax.term with
+    | CoreSyntax.Computation c ->
+        let ct, typing = Infer.type_toplevel ~loc st.typing c in
         print_endline "found something!";
-        SimplePrint.print_computation c out_ppf;
+        SimplePrint.print_computation ct out_ppf;
         Format.fprintf out_ppf "\n;;\n ";
         print_endline "ended found something!";
-        st
+        {st with typing}
     | _ -> st
   in
 
@@ -146,5 +144,3 @@ let compile_file ppf filename st =
   flush out_channel;
   close_out out_channel;
   st
-
-
