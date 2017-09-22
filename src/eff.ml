@@ -1,3 +1,5 @@
+open Unification
+
 let usage = "Usage: eff [option] ... [file] ..."
 let wrapper = ref (Some ["rlwrap"; "ledit"])
 

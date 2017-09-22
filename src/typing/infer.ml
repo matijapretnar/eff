@@ -234,7 +234,8 @@ and type_plain_expr st = function
         let omega_5 = Typed.DirtCoercionVar (coerp5) in 
         let omega_cons_5 = Typed.DirtOmega (coerp5,cons_5) in  
         let in_handler_coercion = Typed.BangCoercion ((Typed.ReflTy ((Types.Tyvar in_ty_var))), omega_5) in 
-        let out_handler_coercion = Typed.BangCoercion ((Typed.ReflTy((Types.Tyvar out_ty_var))), Typed.ReflDirt(out_dirt_var)) in 
+        let out_handler_dirt = Types.SetVar (Types.empty_effect_set , out_dirt_var) in
+        let out_handler_coercion = Typed.BangCoercion ((Typed.ReflTy((Types.Tyvar out_ty_var))), Typed.ReflDirt(out_handler_dirt)) in 
         let handler_coercion = Typed.HandlerCoercion (in_handler_coercion, out_handler_coercion) in 
         let constraints = List.append ( List.append constraints_cr [omega_cons_5;omega_cons_1;omega_cons_4] ) 
                           (List.flatten (Common.map (fun(_,x) -> x) map_list)) in 

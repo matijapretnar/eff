@@ -93,7 +93,7 @@ and ty_coercion =
   | PureCoercion of dirty_coercion
 
 and dirt_coercion = 
-  | ReflDirt of Params.dirt_param
+  | ReflDirt of dirt
   | DirtCoercionVar of Params.dirt_coercion_param 
   | Empty of dirt
   | UnionTy of ( Common.effect * dirt_coercion)
@@ -260,7 +260,7 @@ and print_dirt_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with 
   | ReflDirt p ->
-      Params.print_dirt_param p ppf
+      print "<%t>" (Types.print_target_dirt p)
   | DirtCoercionVar(tcp) ->
       print "%t" (Params.print_dirt_coercion_param tcp)
 
