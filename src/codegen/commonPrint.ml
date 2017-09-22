@@ -77,7 +77,7 @@ let rec print_pattern ?max_level p ppf =
     Print.tuple print_pattern lst ppf
   | Typed.PRecord lst ->
     Print.record print_pattern lst ppf
-  | Typed.PVariant (lbl, None) when lbl = Common.nil ->
+  | Typed.PVariant (lbl, None) when lbl = OldUtils.nil ->
     print "[]"
   | Typed.PVariant (lbl, None) ->
     print "%s" lbl

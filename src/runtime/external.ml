@@ -155,7 +155,7 @@ let string_operations = [
 let conversion_functions = [
   ("to_string",
    let to_string v =
-     let s = Common.to_string Value.print_value v in
+     let s = OldUtils.to_string Value.print_value v in
      value_str s
    in
    from_fun to_string);

@@ -95,32 +95,6 @@ let toplevel st =
     done
   with End_of_file -> ()
 
-let produce_compiled_file st filename =
-  let out_channel = open_out (filename ^ ".ml") in
-  let out_ppf = Format.formatter_of_out_channel out_channel in
-
-  let compile_cmd st cmd =
-    let loc = cmd.Untyped.location in
-    let cmd_typed, typing = Infer.type_toplevel ~loc st.Shell.typing cmd.Untyped.term in
-    let st = {st with Shell.typing} in
-    match cmd_typed with
-    | Typed.Computation c ->
-        print_endline "found something!";
-        SimplePrint.print_computation c out_ppf;
-        Format.fprintf out_ppf "\n;;\n ";
-        print_endline "ended found something!";
-        st
-    | _ -> st
-  in
-
-  let cmds = Lexer.read_file (parse Parser.file) filename in
-  let cmds = List.map Desugar.toplevel cmds in
-  let st = List.fold_left compile_cmd st cmds in
-    Format.fprintf out_ppf "@? ";
-  flush out_channel;
-  close_out out_channel
-
-
 
 (* Main program *)
 let main =
@@ -162,7 +136,7 @@ let main =
     let use_file env = function
       | Run filename -> Shell.use_file Format.std_formatter filename env
       | Load filename ->  Shell.use_file ignore_all_formatter filename env
-      | Compile filename ->  Compile.compile_file Format.std_formatter filename env
+      | Compile filename -> Shell.compile_file Format.std_formatter filename env
     in
     let st = List.fold_left use_file Shell.initial_state !file_queue in
     if !Config.interactive_shell then toplevel st

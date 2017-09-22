@@ -12,16 +12,16 @@ type params = (Params.ty_param * variance) list * (Params.dirt_param * variance)
 type tyctx = (OldUtils.tyname, params * tydef) OldUtils.assoc
 
 let initial_tctx : tyctx = [
-  ("bool", (OldUtils.trio_empty, Inline T.bool_ty));
-  ("unit", (OldUtils.trio_empty, Inline T.unit_ty));
-  ("int", (OldUtils.trio_empty, Inline T.int_ty));
-  ("string", (OldUtils.trio_empty, Inline T.string_ty));
-  ("float", (OldUtils.trio_empty, Inline T.float_ty));
-  ("list", (let a = Type.fresh_ty_param () in
-              (([a, (true, false)], [], []),
-                 Sum [(OldUtils.nil, None);
-                      (OldUtils.cons, Some (T.Tuple [T.Param a; T.Apply ("list", ([T.Param a], [], []))]))])));
-  ("empty", (OldUtils.trio_empty, Sum []))
+  ("bool", (([], [], []), Inline T.bool_ty));
+  ("unit", (([], [], []), Inline T.unit_ty));
+  ("int", (([], [], []), Inline T.int_ty));
+  ("string", (([], [], []), Inline T.string_ty));
+  ("float", (([], [], []), Inline T.float_ty));
+  ("list", (let a = Params.fresh_ty_param () in
+            (([a, (true, false)], [], []),
+             Sum [(OldUtils.nil, None);
+                  (OldUtils.cons, Some (T.Tuple [T.Param a; T.Apply ("list", ([T.Param a], [], []))]))])));
+  ("empty", (([], [], []), Sum []))
 ]
 
 let tctx = ref initial_tctx
@@ -46,8 +46,8 @@ let replace_tydef rpls =
 (* Lookup type parameters for a given type. *)
 let lookup_params ty_name =
   match OldUtils.lookup ty_name !tctx with
-    | None -> None
-    | Some (params, _) -> Some params
+  | None -> None
+  | Some (params, _) -> Some params
 
 let get_variances ty_name =
   match lookup_params ty_name with
@@ -68,9 +68,9 @@ let refreshing_subst (ps, ds, rs) =
   and refresh_region_param = sbst.Params.region_param in
   Params.make (List.map refresh_ty_param ps, List.map refresh_dirt_param ds, List.map refresh_region_param rs),
   {
-    Type.ty_param = (fun p -> refresh_ty_param p);
-    Type.dirt_param = OldUtils.id;
-    Type.region_param = refresh_region_param;
+    Params.ty_param = (fun p -> refresh_ty_param p);
+    Params.dirt_param = OldUtils.id;
+    Params.region_param = refresh_region_param;
   }
 
 (** [find_variant lbl] returns the information about the variant type that defines the
@@ -112,22 +112,22 @@ let apply_to_params t params =
     inference. *)
 let infer_variant lbl =
   match find_variant lbl with
-    | None -> None
-    | Some (ty_name, ps, _, u) ->
-      let ps', fresh_subst = refreshing_subst (remove_variances ps) in
-      let u = OldUtils.option_map (T.subst_ty fresh_subst) u in
-        Some (apply_to_params ty_name ps', u)
+  | None -> None
+  | Some (ty_name, ps, _, u) ->
+    let ps', fresh_subst = refreshing_subst (remove_variances ps) in
+    let u = OldUtils.option_map (T.subst_ty fresh_subst) u in
+    Some (apply_to_params ty_name ps', u)
 
 
 (** [infer_field fld] finds a record type that defines the field [fld] and returns it with
     refreshed type parameters and additional information needed for type inference. *)
 let infer_field fld =
   match find_field fld with
-    | None -> None
-    | Some (ty_name, ps, us) ->
-      let ps', fresh_subst = refreshing_subst (remove_variances ps) in
-      let us' = OldUtils.assoc_map (T.subst_ty fresh_subst) us in
-        Some (apply_to_params ty_name ps', (ty_name, us'))
+  | None -> None
+  | Some (ty_name, ps, us) ->
+    let ps', fresh_subst = refreshing_subst (remove_variances ps) in
+    let us' = OldUtils.assoc_map (T.subst_ty fresh_subst) us in
+    Some (apply_to_params ty_name ps', (ty_name, us'))
 
 
 let transparent ~loc ty_name =
@@ -178,13 +178,13 @@ let check_well_formed ~loc tydef =
   in
   match tydef with
   | Record fields ->
-      if not (OldUtils.injective fst fields) then
-        Error.typing ~loc "Field labels in a record type must be distinct";
-      List.iter (fun (_, ty) -> check ty) fields
+    if not (OldUtils.injective fst fields) then
+      Error.typing ~loc "Field labels in a record type must be distinct";
+    List.iter (fun (_, ty) -> check ty) fields
   | Sum constuctors ->
-      if not (OldUtils.injective fst constuctors) then
-        Error.typing ~loc "Constructors of a sum type must be distinct";
-      List.iter (function (_, None) -> () | (_, Some ty) -> check ty) constuctors
+    if not (OldUtils.injective fst constuctors) then
+      Error.typing ~loc "Constructors of a sum type must be distinct";
+    List.iter (function (_, None) -> () | (_, Some ty) -> check ty) constuctors
   | Inline ty -> check ty
 
 (** [check_noncyclic ~loc ty] checks that the definition of type [ty] is non-cyclic. *)
@@ -238,14 +238,14 @@ let extend_with_variances ~loc tydefs =
     let rec ty posi nega = function
       | T.Basic _ -> ()
       | T.Param p ->
-          begin match OldUtils.lookup p ps with
+        begin match OldUtils.lookup p ps with
           | None -> assert false
           | Some (posvar, negvar) ->
             posvar := !posvar || posi;
             negvar := !negvar || nega
         end
       | T.Apply (t, (tys, drts, rgns)) ->
-          begin match OldUtils.lookup t !tctx with
+        begin match OldUtils.lookup t !tctx with
           | None ->
             (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
             List.iter (ty true true) tys;
@@ -284,15 +284,15 @@ let extend_with_variances ~loc tydefs =
       dirt_param posi nega drt.Type.rest
     and dirt_param posi nega d =
       begin match OldUtils.lookup d ds with
-      | None -> assert false
-      | Some (posvar, negvar) ->
+        | None -> assert false
+        | Some (posvar, negvar) ->
           posvar := !posvar || posi;
           negvar := !negvar || nega
       end
     and region_param posi nega r =
       begin match OldUtils.lookup r rs with
-      | None -> assert false
-      | Some (posvar, negvar) ->
+        | None -> assert false
+        | Some (posvar, negvar) ->
           posvar := !posvar || posi;
           negvar := !negvar || nega
       end

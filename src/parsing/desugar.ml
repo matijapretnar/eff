@@ -125,8 +125,8 @@ let ty (ts, ds, rs) =
 let trio_empty = ([], [], [])
 let trio_append (ts1, ds1, rs1) (ts2, ds2, rs2) = (ts1 @ ts2, ds1 @ ds2, rs1 @ rs2)
 let trio_flatten_map f lst = List.fold_left trio_append trio_empty (List.map f lst)
-let trio_diff (ts1, ds1, rs1) (ts2, ds2, rs2) = (Common.diff ts1 ts2, Common.diff ds1 ds2, Common.diff rs1 rs2)
-let trio_uniq (ts1, ds1, rs1) = (Common.uniq ts1, Common.uniq ds1, Common.uniq rs1)
+let trio_diff (ts1, ds1, rs1) (ts2, ds2, rs2) = (OldUtils.diff ts1 ts2, OldUtils.diff ds1 ds2, OldUtils.diff rs1 rs2)
+let trio_uniq (ts1, ds1, rs1) = (OldUtils.uniq ts1, OldUtils.uniq ds1, OldUtils.uniq rs1)
 
 (** [free_params t] returns a triple of all free type, dirt, and region params in [t]. *)
 let free_params t =
@@ -381,8 +381,8 @@ and handler loc ctx {Sugared.effect_clauses=ops; Sugared.value_clause=val_a; Sug
   in
   let ops = operation_cases ops in
   [], { Untyped.effect_clauses = ops;
-        Untyped.value_clause = Common.option_map (abstraction ctx) val_a;
-        Untyped.finally_clause = Common.option_map (abstraction ctx) fin_a}
+        Untyped.value_clause = OldUtils.option_map (abstraction ctx) val_a;
+        Untyped.finally_clause = OldUtils.option_map (abstraction ctx) fin_a}
 
 let top_ctx = ref []
 

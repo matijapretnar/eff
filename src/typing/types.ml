@@ -1,5 +1,5 @@
 module EffectSet = Set.Make (struct
-                             type t = Common.effect
+                             type t = OldUtils.effect
                              let compare = compare
                            end);;
 

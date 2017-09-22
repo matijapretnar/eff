@@ -109,50 +109,6 @@ and subst_args sbst (tys, drts, rs) =
   let rs = OldUtils.map sbst.Params.region_param rs in
   (tys, drts, rs)
 
-(** [identity_subst] is a substitution that makes no changes. *)
-let identity_subst =
-  {
-    ty_param = OldUtils.id;
-    dirt_param = OldUtils.id;
-    region_param = OldUtils.id;
-  }
-
-(** [compose_subst sbst1 sbst2] returns a substitution that first performs
-    [sbst2] and then [sbst1]. *)
-let compose_subst sbst1 sbst2 =
-  {
-    ty_param = OldUtils.compose sbst1.ty_param sbst2.ty_param;
-    dirt_param = OldUtils.compose sbst1.dirt_param sbst2.dirt_param;
-    region_param = OldUtils.compose sbst1.region_param sbst2.region_param;
-  }
-
-let refresher fresh =
-  let substitution = ref [] in
-  fun p ->
-    match OldUtils.lookup p !substitution with
-    | None ->
-        let p' = fresh () in
-        substitution := OldUtils.update p p' !substitution;
-        p'
-    | Some p' -> p'
-
-let beautifying_subst () =
-  if !Config.disable_beautify then
-    identity_subst
-  else
-    {
-      ty_param = refresher (OldUtils.fresh (fun n -> Ty_Param n));
-      dirt_param = refresher (OldUtils.fresh (fun n -> Dirt_Param n));
-      region_param = refresher (OldUtils.fresh (fun n -> Region_Param n));
-    }
-
-let refreshing_subst () =
-  {
-    ty_param = refresher fresh_ty_param;
-    dirt_param = refresher fresh_dirt_param;
-    region_param = refresher fresh_region_param;
-  }
-
 let refresh ty =
   let sbst = Params.refreshing_subst () in
   subst_ty sbst ty
@@ -187,15 +143,6 @@ let pos_neg_params get_variances ty =
     for_parameters pos_region_param is_pos rs rgns
   in
   Params.uniq (pos_ty true ty), Params.uniq (pos_ty false ty)
-
-let print_ty_param (Ty_Param k) ppf =
-  Symbols.ty_param k false ppf
-
-let print_dirt_param (Dirt_Param k) ppf =
-  Symbols.dirt_param k false ppf
-
-let print_region_param (Region_Param k) ppf =
-  Symbols.region_param k false ppf
 
 let print_dirt drt ppf =
   match drt.ops with

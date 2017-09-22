@@ -88,11 +88,11 @@ free_target_dirty (a,d) = free_target_ty a
 let rec refresh_target_ty (ty_sbst,dirt_sbst) t=
  begin match t with 
  | Tyvar x -> 
- 	begin match Common.lookup x ty_sbst with
+ 	begin match OldUtils.lookup x ty_sbst with
       | Some x' -> (ty_sbst,dirt_sbst) , Tyvar x'
       | None -> 
       	let y = (Params.fresh_ty_param ()) in
-      	( (Common.update x y ty_sbst ), dirt_sbst) , Tyvar y
+      	( (OldUtils.update x y ty_sbst ), dirt_sbst) , Tyvar y
     end
  | Arrow (a,c) -> 
  		  let (a_ty_sbst, a_dirt_sbst), a' =  refresh_target_ty (ty_sbst,dirt_sbst) a in
@@ -124,11 +124,11 @@ and refresh_target_dirty (ty_sbst, dirt_sbst) (t,d)=
 and refresh_target_dirt (ty_sbst, dirt_sbst) t = 
  begin match t with 
  | SetVar(set,x) -> 
-    begin match Common.lookup x dirt_sbst with
+    begin match OldUtils.lookup x dirt_sbst with
     | Some x' -> (ty_sbst,dirt_sbst), Types.SetVar(set,x')
     | None -> 
       let y = (Params.fresh_dirt_param ()) in
-      ( ty_sbst, (Common.update x y dirt_sbst )) , SetVar(set,y)
+      ( ty_sbst, (OldUtils.update x y dirt_sbst )) , SetVar(set,y)
    end
  | SetEmpty set -> ((ty_sbst, dirt_sbst) , (Types.SetEmpty set))
 end
@@ -163,11 +163,11 @@ let rec union_find_tyvar tyvar acc c_list =
   		| (Types.Tyvar a, Types.Tyvar b) when (a = tyvar)->
   			if (List.mem b acc)
   			then union_find_tyvar tyvar acc xs 
-  			else Common.uniq (((union_find_tyvar b acc xs) @ (union_find_tyvar tyvar acc xs)))
+  			else OldUtils.uniq (((union_find_tyvar b acc xs) @ (union_find_tyvar tyvar acc xs)))
   		| (Types.Tyvar b, Types.Tyvar a) when (a = tyvar)->
   			if (List.mem b acc)
   			then union_find_tyvar tyvar acc xs 
-  			else Common.uniq (((union_find_tyvar b acc xs) @ (union_find_tyvar tyvar acc xs)))
+  			else OldUtils.uniq (((union_find_tyvar b acc xs) @ (union_find_tyvar tyvar acc xs)))
   		| _ -> union_find_tyvar tyvar acc xs
   		end 
    	| Typed.DirtyOmega(_,((a,_),(b,_))) -> 
@@ -197,7 +197,7 @@ let rec fix_union_find fixpoint c_list =
                   [b]
                | _-> []
                end in
-  let new_fixpoint = fixpoint @ Common.flatten_map mapper c_list in 
+  let new_fixpoint = fixpoint @ OldUtils.flatten_map mapper c_list in 
   let sort_new_fixpoint = List.sort compare new_fixpoint in
   if (sort_new_fixpoint = fixpoint ) then sort_new_fixpoint else
   fix_union_find sort_new_fixpoint c_list
@@ -316,7 +316,7 @@ and unify_ty_vars (sub,paused,rest_queue) tv a cons=
 (*   Print.debug "Paused' = ";
   print_c_list paused'; 
   Print.debug "end Paused --"; *)
-	let new_paused = Common.diff paused paused' in 
+	let new_paused = OldUtils.diff paused paused' in 
 	let sub_queue = apply_sub sub' rest_queue in 
 	let sub_paused' = apply_sub sub' paused' in 
 	let [cons'] = apply_sub sub' [cons] in 

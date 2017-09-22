@@ -40,7 +40,7 @@ val print_target_ty : ?max_level:int -> target_ty -> Format.formatter -> unit
 
 val print_target_dirt : dirt -> Format.formatter -> unit
 
-val print_effect_list :  Common.effect list -> Format.formatter -> unit
+val print_effect_list :  OldUtils.effect list -> Format.formatter -> unit
 
 val print_target_dirty: target_dirty -> Format.formatter -> unit
 
@@ -52,9 +52,9 @@ val print_ct_ty : ct_ty -> Format.formatter -> unit
 
 val empty_effect_set : effect_set
 
-val list_to_effect_set : Common.effect list -> effect_set
+val list_to_effect_set : OldUtils.effect list -> effect_set
 
-val effect_set_to_list: effect_set -> (Common.effect list)
+val effect_set_to_list: effect_set -> (OldUtils.effect list)
 
 val effect_set_diff: effect_set -> effect_set -> effect_set
 

@@ -6,7 +6,7 @@ module Variable = Symbol.Make(Symbol.String)
 module EffectMap = Map.Make(String)
 
 type variable = Variable.t
-type effect = Common.effect * (Types.target_ty * Types.target_ty)
+type effect = OldUtils.effect * (Types.target_ty * Types.target_ty)
 
 type 'term annotation = {
   term: 'term;
@@ -18,8 +18,8 @@ and plain_pattern =
   | PVar of variable
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (Common.field, pattern) Common.assoc
-  | PVariant of Common.label * pattern option
+  | PRecord of (OldUtils.field, pattern) OldUtils.assoc
+  | PVariant of OldUtils.label * pattern option
   | PConst of Const.t
   | PNonbinding
 
@@ -46,8 +46,8 @@ and plain_expression =
   | BuiltIn of string * int
   | Const of Const.t
   | Tuple of expression list
-  | Record of (Common.field, expression) Common.assoc
-  | Variant of Common.label * expression option
+  | Record of (OldUtils.field, expression) OldUtils.assoc
+  | Variant of OldUtils.label * expression option
   | Lambda of (pattern * Types.target_ty * computation)
   | Effect of effect
   | Handler of handler
@@ -96,7 +96,7 @@ and dirt_coercion =
   | ReflDirt of dirt
   | DirtCoercionVar of Params.dirt_coercion_param 
   | Empty of dirt
-  | UnionTy of ( Common.effect * dirt_coercion)
+  | UnionTy of ( OldUtils.effect * dirt_coercion)
   | SequenceDirtCoer of dirt_coercion * dirt_coercion
   | DirtCoercion of dirty_coercion
 
@@ -110,7 +110,7 @@ and dirty_coercion =
 
 (** Handler definitions *)
 and handler = {
-  effect_clauses : (effect, abstraction2) Common.assoc;
+  effect_clauses : (effect, abstraction2) OldUtils.assoc;
   value_clause : abstraction;
 }
 
@@ -129,7 +129,7 @@ type omega_ct =
 
 type toplevel = plain_toplevel * Location.t
 and plain_toplevel =
-  (* | Tydef of (Common.tyname, Params.t * Tctx.tydef) Common.assoc *)
+  (* | Tydef of (OldUtils.tyname, Params.t * Tctx.tydef) OldUtils.assoc *)
   (* | TopLet of (pattern * computation) list * (variable * Scheme.ty_scheme) list *)
   (* | TopLetRec of (variable * abstraction) list * (variable * Scheme.ty_scheme) list *)
   (* | External of variable * Type.ty * string *)
@@ -165,7 +165,7 @@ let rec print_pattern ?max_level p ppf =
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
   | PRecord lst -> Print.record print_pattern lst ppf
-  | PVariant (lbl, None) when lbl = Common.nil -> print "[]"
+  | PVariant (lbl, None) when lbl = OldUtils.nil -> print "[]"
   | PVariant (lbl, None) -> print "%s" lbl
   | PVariant ("(::)", Some ({ term = PTuple [p1; p2] })) ->
     print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
@@ -317,10 +317,10 @@ let rec refresh_pattern sbst p =
 and refresh_pattern' sbst = function
   | PVar x ->
     let x' = Variable.refresh x in
-    Common.update x x' sbst, PVar x'
+    OldUtils.update x x' sbst, PVar x'
   | PAs (p, x) ->
     let x' = Variable.refresh x in
-    let sbst, p' = refresh_pattern (Common.update x x' sbst) p in
+    let sbst, p' = refresh_pattern (OldUtils.update x x' sbst) p in
     sbst, PAs (p', x')
   | PTuple ps ->
     let sbst, ps' =
@@ -347,7 +347,7 @@ let rec refresh_expr sbst e =
   {e with term = refresh_expr' sbst e.term}
 and refresh_expr' sbst = function
   | (Var x) as e ->
-    begin match Common.lookup x sbst with
+    begin match OldUtils.lookup x sbst with
       | Some x' -> Var x'
       | None -> e
     end
@@ -358,9 +358,9 @@ and refresh_expr' sbst = function
   | Tuple es ->
     Tuple (List.map (refresh_expr sbst) es)
   | Record flds ->
-    Record (Common.assoc_map (refresh_expr sbst) flds)
+    Record (OldUtils.assoc_map (refresh_expr sbst) flds)
   | Variant (lbl, e) ->
-    Variant (lbl, Common.option_map (refresh_expr sbst) e)
+    Variant (lbl, OldUtils.option_map (refresh_expr sbst) e)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
 and refresh_comp sbst c =
   {c with term = refresh_comp' sbst c.term}
@@ -370,7 +370,7 @@ and refresh_comp' sbst = function
   | LetRec (li, c1) ->
     let new_xs, sbst' = List.fold_right (fun (x, _) (new_xs, sbst') ->
         let x' = Variable.refresh x in
-        x' :: new_xs, Common.update x x' sbst'
+        x' :: new_xs, OldUtils.update x x' sbst'
       ) li ([], sbst) in
     let li' =
       List.combine new_xs (List.map (fun (_, a) -> refresh_abs sbst' a) li)
@@ -387,7 +387,7 @@ and refresh_comp' sbst = function
   | Value e ->
     Value (refresh_expr sbst e)
 and refresh_handler sbst h = {
-  effect_clauses = Common.assoc_map (refresh_abs2 sbst) h.effect_clauses;
+  effect_clauses = OldUtils.assoc_map (refresh_abs2 sbst) h.effect_clauses;
   value_clause = refresh_abs sbst h.value_clause;
 }
 and refresh_abs sbst a = 
@@ -402,7 +402,7 @@ let rec subst_expr sbst e =
   {e with term = subst_expr' sbst e.term}
 and subst_expr' sbst = function
   | (Var x) as e ->
-    begin match Common.lookup x sbst with
+    begin match OldUtils.lookup x sbst with
       | Some e' -> e'
       | None -> e
     end
@@ -413,9 +413,9 @@ and subst_expr' sbst = function
   | Tuple es ->
     Tuple (List.map (subst_expr sbst) es)
   | Record flds ->
-    Record (Common.assoc_map (subst_expr sbst) flds)
+    Record (OldUtils.assoc_map (subst_expr sbst) flds)
   | Variant (lbl, e) ->
-    Variant (lbl, Common.option_map (subst_expr sbst) e)
+    Variant (lbl, OldUtils.option_map (subst_expr sbst) e)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
 and subst_comp sbst c =
   {c with term = subst_comp' sbst c.term}
@@ -440,7 +440,7 @@ and subst_comp' sbst = function
   | Value e ->
     Value (subst_expr sbst e)
 and subst_handler sbst h = {
-  effect_clauses = Common.assoc_map (subst_abs2 sbst) h.effect_clauses;
+  effect_clauses = OldUtils.assoc_map (subst_abs2 sbst) h.effect_clauses;
   value_clause = subst_abs sbst h.value_clause;
 }
 and subst_abs sbst a = 
@@ -459,7 +459,7 @@ let assoc_equal eq flds flds' : bool =
     match flds with
     | [] -> true
     | (f, x) :: flds ->
-      begin match Common.lookup f flds' with
+      begin match OldUtils.lookup f flds' with
         | Some x' when eq x x' -> equal_fields flds
         | _ -> false
       end
@@ -473,7 +473,7 @@ and make_equal_pattern' eqvars p p' =
   match p, p' with
   | PVar x, PVar x' -> Some ((x, x') :: eqvars)
   | PAs (p, x), PAs (p', x') ->
-    Common.option_map (fun eqvars ->
+    OldUtils.option_map (fun eqvars ->
         (x, x') :: eqvars
       ) (make_equal_pattern eqvars p p')
   | PTuple ps, PTuple ps' ->
@@ -555,10 +555,10 @@ let pattern_match p e =
   ignore constraints; *)
   let rec extend_subst p e sbst =
     match p.term, e.term with
-    | PVar x, e -> Common.update x e sbst
+    | PVar x, e -> OldUtils.update x e sbst
     | PAs (p, x), e' ->
       let sbst = extend_subst p e sbst in
-      Common.update x e' sbst
+      OldUtils.update x e' sbst
     | PNonbinding, _ -> sbst
     | PTuple ps, Tuple es -> List.fold_right2 extend_subst ps es sbst
     | PRecord ps, Record es ->

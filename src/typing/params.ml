@@ -5,12 +5,12 @@ type ty_coercion_param = int
 type dirt_coercion_param = int
 type dirty_coercion_param = int
 
-let fresh_ty_param = Common.fresh Common.id
-let fresh_dirt_param = Common.fresh Common.id
-let fresh_region_param = Common.fresh Common.id
-let fresh_ty_coercion_param = Common.fresh Common.id
-let fresh_dirty_coercion_param = Common.fresh Common.id
-let fresh_dirt_coercion_param = Common.fresh Common.id
+let fresh_ty_param = OldUtils.fresh OldUtils.id
+let fresh_dirt_param = OldUtils.fresh OldUtils.id
+let fresh_region_param = OldUtils.fresh OldUtils.id
+let fresh_ty_coercion_param = OldUtils.fresh OldUtils.id
+let fresh_dirty_coercion_param = OldUtils.fresh OldUtils.id
+let fresh_dirt_coercion_param = OldUtils.fresh OldUtils.id
 
 
 type t = ty_param list * dirt_param list * region_param list
@@ -21,8 +21,8 @@ let unmake (ts, ds, rs) = (ts, ds, rs)
 let empty = ([], [], [])
 let append (ts1, ds1, rs1) (ts2, ds2, rs2) = (ts1 @ ts2, ds1 @ ds2, rs1 @ rs2)
 let flatten_map f lst = List.fold_left append empty (List.map f lst)
-let diff (ts1, ds1, rs1) (ts2, ds2, rs2) = (Common.diff ts1 ts2, Common.diff ds1 ds2, Common.diff rs1 rs2)
-let uniq (ts1, ds1, rs1) = (Common.uniq ts1, Common.uniq ds1, Common.uniq rs1)
+let diff (ts1, ds1, rs1) (ts2, ds2, rs2) = (OldUtils.diff ts1 ts2, OldUtils.diff ds1 ds2, OldUtils.diff rs1 rs2)
+let uniq (ts1, ds1, rs1) = (OldUtils.uniq ts1, OldUtils.uniq ds1, OldUtils.uniq rs1)
 
 let add_ty_param t (ts, ds, rs) = (t::ts, ds, rs)
 let add_dirt_param d (ts, ds, rs) = (ts, d::ds, rs)
@@ -40,27 +40,27 @@ type substitution = {
 
 let identity_subst =
   {
-    ty_param = Common.id;
-    dirt_param = Common.id;
-    region_param = Common.id;
+    ty_param = OldUtils.id;
+    dirt_param = OldUtils.id;
+    region_param = OldUtils.id;
   }
 
 (** [compose_subst sbst1 sbst2] returns a substitution that first performs
     [sbst2] and then [sbst1]. *)
 let compose_subst sbst1 sbst2 =
   {
-    ty_param = Common.compose sbst1.ty_param sbst2.ty_param;
-    dirt_param = Common.compose sbst1.dirt_param sbst2.dirt_param;
-    region_param = Common.compose sbst1.region_param sbst2.region_param;
+    ty_param = OldUtils.compose sbst1.ty_param sbst2.ty_param;
+    dirt_param = OldUtils.compose sbst1.dirt_param sbst2.dirt_param;
+    region_param = OldUtils.compose sbst1.region_param sbst2.region_param;
   }
 
 let refresher fresh =
   let substitution = ref [] in
   fun p ->
-    match Common.lookup p !substitution with
+    match OldUtils.lookup p !substitution with
     | None ->
       let p' = fresh () in
-      substitution := Common.update p p' !substitution;
+      substitution := OldUtils.update p p' !substitution;
       p'
     | Some p' -> p'
 
@@ -69,9 +69,9 @@ let beautifying_subst () =
     identity_subst
   else
     {
-      ty_param = refresher (Common.fresh Common.id);
-      dirt_param = refresher (Common.fresh Common.id);
-      region_param = refresher (Common.fresh Common.id);
+      ty_param = refresher (OldUtils.fresh OldUtils.id);
+      dirt_param = refresher (OldUtils.fresh OldUtils.id);
+      region_param = refresher (OldUtils.fresh OldUtils.id);
     }
 
 let refreshing_subst () =

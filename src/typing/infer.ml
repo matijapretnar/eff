@@ -1,11 +1,6 @@
 module T = Type
 module Typed = Typed
-
-let ty_less = Scheme.ty_less
-let dirt_less = Scheme.dirt_less
-let dirty_less = Scheme.dirty_less
-let just = Scheme.just
-let trim_context = Scheme.trim_context
+module Untyped = CoreSyntax
 
 type state = {
   context : TypingEnv.t;
@@ -217,8 +212,8 @@ and type_plain_expr st = function
             let tagert_effect = (eff, (in_op_ty,out_op_ty)) in 
             let operation_clause = ( tagert_effect, final_abstraction2) in 
             (operation_clause, (List.append c_op_constraints [ cons_omega_2;cons_omega_3])) in
-        let map_list = Common.map mapper_function h.effect_clauses in 
-        let op_clauses = Common.map (fun (x,_) -> x) map_list in
+        let map_list = OldUtils.map mapper_function h.effect_clauses in 
+        let op_clauses = OldUtils.map (fun (x,_) -> x) map_list in
         let target_handler = 
             {
             Typed.effect_clauses = op_clauses;
@@ -238,7 +233,7 @@ and type_plain_expr st = function
         let out_handler_coercion = Typed.BangCoercion ((Typed.ReflTy((Types.Tyvar out_ty_var))), Typed.ReflDirt(out_handler_dirt)) in 
         let handler_coercion = Typed.HandlerCoercion (in_handler_coercion, out_handler_coercion) in 
         let constraints = List.append ( List.append constraints_cr [omega_cons_5;omega_cons_1;omega_cons_4] ) 
-                          (List.flatten (Common.map (fun(_,x) -> x) map_list)) in 
+                          (List.flatten (OldUtils.map (fun(_,x) -> x) map_list)) in 
         let coerced_handler = Typed.CastExp (target_handler, handler_coercion) in  
         (coerced_handler,target_type,constraints)
 

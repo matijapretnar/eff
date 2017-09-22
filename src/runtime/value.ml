@@ -35,7 +35,7 @@ let to_handler = function
   | Handler h -> h
   | _ -> Error.runtime "A handler expected."
 
-let print_effect (eff, _) ppf = Format.fprintf ppf "%s" eff
+let print_effect eff ppf = Format.fprintf ppf "%s" eff
 
 let rec print_value ?max_level v ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

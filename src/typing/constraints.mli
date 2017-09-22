@@ -9,11 +9,7 @@ val list_union : t list -> t
 
 val subst : Params.substitution -> t -> t
 
-val garbage_collect :
-    (Type.ty_param, Type.dirt_param, Type.region_param) OldUtils.trio ->
-    (Type.ty_param, Type.dirt_param, Type.region_param) OldUtils.trio ->
-    t -> t
-val expand_ty : t -> Type.ty -> Type.ty
+val garbage_collect : Params.t -> Params.t -> t -> t
 
 val add_ty_constraint : loc:Location.t -> Type.ty -> Type.ty -> t -> t
 

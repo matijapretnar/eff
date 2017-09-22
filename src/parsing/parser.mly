@@ -161,7 +161,7 @@ commandline:
 | WITH h = term HANDLE t = term
     { Handle (h, t) }
 | t1 = term SEMI t2 = term
-    { Let ([(Pattern.Nonbinding, snd t1), t1], t2) }
+    { Let ([(PNonbinding, snd t1), t1], t2) }
 | IF t_cond = comma_term THEN t_true = term ELSE t_false = term
     { Conditional (t_cond, t_true, t_false) }
 | t = plain_comma_term

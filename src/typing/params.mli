@@ -12,7 +12,7 @@ val fresh_ty_coercion_param: unit -> ty_coercion_param
 val fresh_dirt_coercion_param: unit -> dirt_coercion_param
 val fresh_dirty_coercion_param: unit -> dirty_coercion_param
 
-type t
+type t = ty_param list * dirt_param list * region_param list
 
 val make : ty_param list * dirt_param list * region_param list -> t
 val unmake : t -> ty_param list * dirt_param list * region_param list
