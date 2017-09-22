@@ -20,7 +20,7 @@ val tuple : ?loc:Location.t -> Typed.expression list -> Typed.expression
 
 (* val handler : ?loc:Location.t ->  *)
 
-(* val effect : ?loc:Location.t ->  *)
+val effect : ?loc:Location.t ->  Untyped.EffectMap.key * (Type.ty * Type.ty) -> Typed.expression
 
 (***************************)
 (* COMPUTATION CONSTRUCTORS*)

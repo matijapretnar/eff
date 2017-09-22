@@ -49,6 +49,9 @@ val var : Untyped.variable -> Type.ty -> ty_scheme
 (* Create a scheme for a Lambda expression *)
 val lambda : loc:Location.t -> ty_scheme -> dirty_scheme -> ty_scheme
 
+(* Create a scheme for an Effect *)
+val effect : Type.ty -> Type.ty -> Type.dirt -> ty_scheme
+
 (**********************)
 (* PRINTING UTILITIES *)
 (**********************)

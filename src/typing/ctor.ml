@@ -64,6 +64,13 @@ let tuple ?loc es =
   let scheme = (ctx, Type.Tuple tys, constraints) in
   Typed.annotate term scheme loc
 
+let effect ?loc ((eff_name, (ty_par, ty_res)) as eff) =
+  let loc = backup_location loc [] in
+  let drt = {Type.ops = [eff_name]; Type.rest = Params.fresh_dirt_param ()} in
+  let sch = Scheme.effect ty_par ty_res drt in
+  let term = Typed.Effect eff in
+  Typed.annotate term sch loc
+
 (**********************************)
 (* COMPUTATION SMART CONSTRUCTORS *)
 (**********************************)
@@ -103,6 +110,8 @@ let patmatch ?loc es cases =
   in
   let term = Typed.Match (es, cases) in
   Typed.annotate term drty_sch loc
+
+
 
 (******************************)
 (* PATTERN SMART CONSTRUCTORS *)

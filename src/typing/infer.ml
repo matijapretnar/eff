@@ -17,9 +17,9 @@ type state = {
 }
 
 (* Infer the effect or throw an error when the effect doesn't exist *)
-let infer_effect ~loc env eff =
+let infer_effect ~loc st eff =
   try
-    eff, (Untyped.EffectMap.find eff env.effects)
+    eff, (Untyped.EffectMap.find eff st.effects)
   with
     | Not_found -> Error.typing ~loc "Unbound effect %s" eff
 
@@ -75,8 +75,10 @@ and type_plain_pattern st loc = function
   | Untyped.PRecord [] ->
     assert false
   | Untyped.PRecord (((fld, _) :: _) as lst) ->
+    (* TODO *)
     assert false
   | Untyped.PVariant (lbl, p) ->
+    (* TODO *)
     assert false
 
 (*****************************)
@@ -99,16 +101,20 @@ and type_plain_expr st loc = function
     let els = List.map (fun (a, b) -> a) (List.map (type_expr st) es) in
     Ctor.tuple ~loc els, st
   | Untyped.Record lst ->
+    (* TODO *)
     assert false
   | Untyped.Variant (lbl, e) ->
+    (* TODO *)
     assert false
   | Untyped.Lambda (p, c) ->
     let pat = type_pattern st p in
     let comp, st = type_comp st c in
     Ctor.lambda ~loc pat comp, st
   | Untyped.Effect eff ->
-    assert false
+    let eff = infer_effect ~loc st eff in
+    Ctor.effect ~loc eff, st
   | Untyped.Handler h ->
+    (* TODO *)
     assert false
 
 (******************************)
@@ -139,13 +145,16 @@ and type_plain_comp st loc = function
     let expr2, st = type_expr st e2 in
     Ctor.apply ~loc expr1 expr2, st
   | Untyped.Handle (e, c) ->
+    (* TODO *)
     assert false
     (* Typed.handle ~loc (type_expr env e) (type_comp env c) *)
   | Untyped.Let (defs, c) ->
+    (* TODO *)
     assert false
     (* let env', defs' = type_let_defs ~loc env defs in
     Typed.let' ~loc defs' (type_comp env' c) *)
   | Untyped.LetRec (defs, c) ->
+    (* TODO *)
     assert false
     (* let env', defs' = type_let_rec_defs ~loc env defs in
     let env', defs' = type_let_rec_defs ~loc env' defs in
@@ -181,9 +190,11 @@ let type_toplevel ~loc ppf st = function
     Typed.Tydef defs, st
   (* Top let command: let x = c1 in c2 *)
   | Untyped.TopLet defs ->
+    (* TODO *)
     assert false
   (* Top letrec command: let rec x = c1 in c2 *)
   | Untyped.TopLetRec defs'' ->
+    (* TODO *)
     assert false
   (* Exernal definition *)
   | Untyped.External (x, ty, f) ->

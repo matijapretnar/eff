@@ -66,7 +66,7 @@ let make_dirty (ctx, ty, constraints) = (ctx, (ty, Type.fresh_dirt ()), constrai
 (* Refresh a scheme (generate new type/dirt variables) *)
 let refresh (ctx, ty, cnstrs) =
   let sbst = Params.refreshing_subst () in
-  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, (* Constraints.subst sbst *) cnstrs
+  Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Unification.subst sbst cnstrs
 
 let abstract ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
   match create_ty_scheme ctx_c (Type.Arrow (ty_p, drty_c)) [
@@ -90,6 +90,9 @@ let lambda ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
       just cnstrs_c
     ]
 
+let effect ty_par ty_res drt =
+  let ty = Type.Arrow (ty_par, (ty_res, drt)) in
+  simple ty
 
 (**********************)
 (* PRINTING FUNCTIONS *)
