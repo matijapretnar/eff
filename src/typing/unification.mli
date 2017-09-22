@@ -14,40 +14,41 @@
 (* TYPE DEFINITIONS *)
 (********************)
 
-(* Typing constraint *)
+(* typing constraint *)
 type ty_cnstr
-(* Dirt constraint *)
+
+(* dirt constraint *)
 type dirt_cnstr
 
-(* A constraint set *)
+(* a constraint set *)
 type t
 
 (*************************)
 (* CONSTRAINT OPERATIONS *)
 (*************************)
 
-(* The empty graph. *)
+(* the empty graph. *)
 val empty : t
 
-(* Add a typing constraint: T = S *)
+(* add a typing constraint: T = S *)
 val add_ty_constraint : Type.ty -> Type.ty -> t -> t
 
-(* Add a dirt constraint: ... *)
+(* add a dirt constraint: ... *)
 val add_dirt_constraint : Type.dirt -> Type.dirt -> t -> t
 
-(* Add a dirty constraint: ... *)
+(* add a dirty constraint: ... *)
 val add_dirty_constraint : Type.dirty -> Type.dirty -> t -> t
 
-(* Combine two constraint sets to a single set *)
+(* combine two constraint sets to a single set *)
 val union : t -> t -> t
 
-(* Combine mutliple constraint sets to a single set *)
+(* combine mutliple constraint sets to a single set *)
 val union_list : t list -> t
 
-(* Unify the constraints to find a solution *)
+(* unify the constraints to find a solution *)
 val unify : t -> t
 
-(* Perform a substitution *)
+(* perform a substitution *)
 val subst : Params.substitution -> t -> t
 
 val list_union : t list -> t
@@ -56,5 +57,5 @@ val list_union : t list -> t
 (* PRINTING OPERATIONS *)
 (***********************)
 
-(* Print constraints *)
+(* print constraints *)
 val print : t -> Format.formatter -> unit

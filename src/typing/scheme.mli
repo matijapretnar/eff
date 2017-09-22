@@ -2,19 +2,22 @@
 (* TYPE DEFINITIONS *)
 (********************)
 
-(* Represents a context and contains all free variables that occur *)
+(* represents a context and contains all free variables that occur *)
 type context = (Untyped.variable, Type.ty) Common.assoc
 
-(* Represents a generic scheme *)
+(* represents a generic scheme *)
 type 'a t = context * 'a * Unification.t
 
-(* Type scheme for expressions *)
+(* type scheme for expressions *)
 type ty_scheme = Type.ty t
-(* Type scheme for computations *)
+
+(* type scheme for computations *)
 type dirty_scheme = Type.dirty t
-(* Type scheme for letrec, call, match, bind *)
+
+(* type scheme for letrec, call, match, bind *)
 type abstraction_scheme = (Type.ty * Type.dirty) t
-(* Type scheme for effect clauses *)
+
+(* type scheme for effect clauses *)
 type abstraction2_scheme = (Type.ty * Type.ty * Type.dirty) t
 
 (*************************)
@@ -36,21 +39,55 @@ val make_dirty : ty_scheme -> dirty_scheme
 (* Refresh a type scheme *)
 val refresh : ty_scheme -> ty_scheme
 
+(****************************)
+(* ABSTRACTION CONSTRUCTORS *)
+(****************************)
+
 (* Make a type scheme for an abstraction *)
 val abstract : loc:Location.t -> ty_scheme -> dirty_scheme -> abstraction_scheme
 
-(**********************)
-(* SMART CONSTRUCTORS *)
-(**********************)
+(* Make a type scheme for an abstraction *)
+val abstract2 : loc:Location.t -> ty_scheme -> ty_scheme -> dirty_scheme -> abstraction2_scheme
+
+(***************************)
+(* EXPRESSION CONSTRUCTORS *)
+(***************************)
 
 (* Create a scheme for a variable expression *)
 val var : Untyped.variable -> Type.ty -> ty_scheme
 
+(* create a scheme for a const *)
+val const : Const.t -> ty_scheme
+
 (* Create a scheme for a Lambda expression *)
 val lambda : loc:Location.t -> ty_scheme -> dirty_scheme -> ty_scheme
 
+(* smart constructor for the Tuple term : expression *)
+val tuple : ty_scheme list -> ty_scheme
+
 (* Create a scheme for an Effect *)
-val effect : Type.ty -> Type.ty -> Type.dirt -> ty_scheme
+val effect : Type.ty -> Type.ty -> Untyped.EffectMap.key -> ty_scheme
+
+(* smart constructor for the handler term : expression *)
+(* val handler : ?loc:Location.t ->  Typed.abstraction2 list -> Typed.abstraction -> ty_scheme *)
+
+(***************************)
+(* COMPUTATION CONSTRUCTORS*)
+(***************************)
+
+(************************)
+(* PATTERN CONSTRUCTORS *)
+(************************)
+
+(* val pvar : Untyped.variable -> ty_scheme
+
+val pnonbinding : unit -> ty_scheme
+
+val pconst : Const.t -> ty_scheme
+
+val pas : ty_scheme -> Untyped.variable -> ty_scheme
+
+val ptuple : ty_scheme list -> ty_scheme *)
 
 (**********************)
 (* PRINTING UTILITIES *)

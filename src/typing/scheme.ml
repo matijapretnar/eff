@@ -68,6 +68,10 @@ let refresh (ctx, ty, cnstrs) =
   let sbst = Params.refreshing_subst () in
   Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Unification.subst sbst cnstrs
 
+(****************************)
+(* ABSTRACTION CONSTRUCTORS *)
+(****************************)
+
 let abstract ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
   match create_ty_scheme ctx_c (Type.Arrow (ty_p, drty_c)) [
       trim_context ~loc ctx_p;
@@ -77,11 +81,30 @@ let abstract ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
   | ctx, Type.Arrow (ty_p, drty_c), cnstrs -> ctx, (ty_p, drty_c), cnstrs
   | _ -> assert false
 
-(**********************)
-(* SMART CONSTRUCTORS *)
-(**********************)
+and abstract2 ~loc (ctx_p1, ty_p1, cnstrs_p1) (ctx_p2, ty_p2, cnstrs_p2) (ctx_c, drty_c, cnstrs_c) =
+  match create_ty_scheme ctx_c (Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c)) [
+      trim_context ~loc (ctx_p1 @ ctx_p2);
+      just cnstrs_p1;
+      just cnstrs_p2;
+      just cnstrs_c
+    ] with
+  | ctx, Type.Arrow (Type.Tuple [ty_p1; ty_p2], drty_c), cnstrs -> ctx, (ty_p1, ty_p2, drty_c), cnstrs
+  | _ -> assert false
+
+(***************************)
+(* EXPRESSION CONSTRUCTORS *)
+(***************************)
 
 let var x ty = ([(x, ty)], ty, Unification.empty)
+
+let const c =
+  let ty = match c with
+    | Const.Integer _ -> Type.int_ty
+    | Const.String _ -> Type.string_ty
+    | Const.Boolean _ -> Type.bool_ty
+    | Const.Float _ -> Type.float_ty
+  in
+  simple ty
 
 let lambda ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
   create_ty_scheme ctx_c (Type.Arrow (ty_p, drty_c)) [
@@ -90,9 +113,57 @@ let lambda ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
       just cnstrs_c
     ]
 
-let effect ty_par ty_res drt =
+let tuple es =
+  let ctx, tys, constraints =
+    List.fold_right (fun e (ctx, tys, constraints) ->
+        let e_ctx, e_ty, e_constraints = e in
+        e_ctx @ ctx, e_ty :: tys, Unification.list_union [e_constraints; constraints]
+      ) es ([], [], Unification.empty)
+  in
+  (ctx, Type.Tuple tys, constraints)
+
+let effect ty_par ty_res eff_name =
+  let drt = {Type.ops = [eff_name]; Type.rest = Params.fresh_dirt_param ()} in
   let ty = Type.Arrow (ty_par, (ty_res, drt)) in
   simple ty
+
+let handler effect_clauses value_clause =
+  simple Type.int_ty
+
+(***************************)
+(* COMPUTATION CONSTRUCTORS*)
+(***************************)
+
+
+(************************)
+(* PATTERN CONSTRUCTORS *)
+(************************)
+
+let pvar x =
+  let ty = Type.fresh_ty () in
+  let scheme = Scheme.simple ty in
+  add_to_context x ty scheme
+
+let pconst const =
+  let ty = ty_of_const const in
+  simple ty
+
+let pnonbinding () =
+  let ty = Type.fresh_ty () in
+  simple ty
+
+let pas p x =
+  let ty = Scheme.get_type p in
+  add_to_context x ty p
+
+let ptuple ps =
+  let infer p (ctx, tys, chngs) =
+    let ctx_p, ty_p, cnstrs_p = p in
+    ctx_p @ ctx, ty_p :: tys, Unification.union cnstrs_p chngs
+  in
+  let ctx, tys, chngs = List.fold_right infer ps ([], [], Unification.empty) in
+  let ty = Type.Tuple tys in
+  scheme.simple ty
 
 (**********************)
 (* PRINTING FUNCTIONS *)

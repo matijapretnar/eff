@@ -81,6 +81,21 @@ and type_plain_pattern st loc = function
     (* TODO *)
     assert false
 
+(******************************)
+(* ABSTRACTION TYPE INFERENCE *)
+(******************************)
+
+and type_abstraction st loc (p, c) =
+  let pat = type_pattern st p in
+  let comp, st = type_comp st c in
+  Ctor.abstraction ~loc pat comp, st
+
+and type_abstraction2 st loc (p1, p2, c) =
+  let pat1 = type_pattern st p1 in
+  let pat2 = type_pattern st p2 in
+  let comp, st = type_comp st c in
+  Ctor.abstraction2 ~loc pat1 pat2 comp, st
+
 (*****************************)
 (* EXPRESSION TYPE INFERENCE *)
 (*****************************)
@@ -88,7 +103,7 @@ and type_plain_pattern st loc = function
 (* Type an expression
     type_expr will annotate the terms with location information
 *)
-let rec type_expr st {Untyped.term=expr; Untyped.location=loc} = type_plain_expr st loc expr
+and type_expr st {Untyped.term=expr; Untyped.location=loc} = type_plain_expr st loc expr
 
 (* Type a plain expression *)
 and type_plain_expr st loc = function
@@ -113,18 +128,29 @@ and type_plain_expr st loc = function
   | Untyped.Effect eff ->
     let eff = infer_effect ~loc st eff in
     Ctor.effect ~loc eff, st
-  | Untyped.Handler h ->
-    (* TODO *)
+  | Untyped.Handler {
+      effect_clauses=effect_cases;
+      value_clause=value_case;
+      finally_clause=finally_case;
+    } ->
     assert false
+    (* let type_handler_clause (eff, (p1, p2, c)) =
+      let eff = infer_effect ~loc:(c.Untyped.location) st eff in
+      (eff, type_abstraction2 st loc (p1, p2, c))
+    in
+    let typed_effect_cases = Common.map type_handler_clause effect_cases in
+    let untyped_value_clause =
+      match value_case with
+        | Some a -> a
+        | None -> Desugar.id_abstraction Location.unknown
+    in
+    let typed_value_clause = type_abstraction st loc untyped_value_clause in
+    (* let typed_finally_clause =  *)
+    Ctor.handler ~loc typed_effect_cases typed_value_clause, st *)
 
 (******************************)
 (* COMPUTATION TYPE INFERENCE *)
 (******************************)
-
-and type_abstraction st loc (p, c) =
-  let pat = type_pattern st p in
-  let comp, st = type_comp st c in
-  Ctor.abstraction ~loc pat comp, st
 
 (* Type a computation
     type_comp will annotate the terms with location information

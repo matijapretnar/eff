@@ -27,23 +27,28 @@ let abstraction ?loc p c : Typed.abstraction =
     location = loc;
   }
 
+let abstraction2 ?loc p1 p2 c : Typed.abstraction2 =
+  let loc = backup_location loc [p1.Typed.location; p2.Typed.location; c.Typed.location] in
+  {
+    term = (p1, p2, c);
+    scheme = Scheme.abstract2 ~loc p.scheme c.scheme;
+    location = loc;
+  }
+
 (*********************************)
 (* EXPRESSION SMART CONSTRUCTORS *)
 (*********************************)
 
-let var ?loc x ty_sch =
+let var ?loc x sch =
   let loc = backup_location loc [] in
-  Typed.annotate (Typed.Var x) ty_sch loc
+  let term = Typed.Var x in
+  Typed.annotate term sch loc
 
 let const ?loc c =
   let loc = backup_location loc [] in
-  let ty = match c with
-    | Const.Integer _ -> Type.int_ty
-    | Const.String _ -> Type.string_ty
-    | Const.Boolean _ -> Type.bool_ty
-    | Const.Float _ -> Type.float_ty
-  in
-  Typed.annotate (Typed.Const c) (Scheme.simple ty) loc
+  let term = Typed.Const c in
+  let sch = Scheme.const c in
+  Typed.annotate term sch loc
 
 let lambda ?loc p c =
   let loc = backup_location loc [p.Typed.location; c.Typed.location] in
@@ -54,22 +59,25 @@ let lambda ?loc p c =
 
 let tuple ?loc es =
   let loc = backup_location loc (List.map (fun e -> e.Typed.location) es) in
-  let ctx, tys, constraints =
-    List.fold_right (fun e (ctx, tys, constraints) ->
-        let e_ctx, e_ty, e_constraints = e.Typed.scheme in
-        e_ctx @ ctx, e_ty :: tys, Unification.list_union [e_constraints; constraints]
-      ) es ([], [], Unification.empty)
-  in
-  let term = Typed.Tuple es in
-  let scheme = (ctx, Type.Tuple tys, constraints) in
-  Typed.annotate term scheme loc
+  let term = Typed.Tuple (List.map (fun e -> e.Typed.scheme) es) in
+  let sch = Scheme.tuple in
+  Typed.annotate term sch loc
 
 let effect ?loc ((eff_name, (ty_par, ty_res)) as eff) =
   let loc = backup_location loc [] in
-  let drt = {Type.ops = [eff_name]; Type.rest = Params.fresh_dirt_param ()} in
-  let sch = Scheme.effect ty_par ty_res drt in
+  let sch = Scheme.effect ty_par ty_res eff_name in
   let term = Typed.Effect eff in
   Typed.annotate term sch loc
+
+let handler ?loc effect_clauses value_clause =
+  let loc = backup_location loc (List.map (fun e -> e.Typed.location) (effect_clauses :: value_clause)) in
+  let term = Typed.Handler {
+    effect_clauses=effect_clauses;
+    value_clause=value_clause
+  } in
+  (* let sch = Scheme.handler effect_clauses value_clause in *)
+  Typed.annotate term sch loc
+
 
 (**********************************)
 (* COMPUTATION SMART CONSTRUCTORS *)
@@ -120,30 +128,38 @@ let patmatch ?loc es cases =
 let pvar ?loc x =
   let loc = backup_location loc [] in
   let ty = Type.fresh_ty () in
+
   let scheme = Scheme.simple ty in
   let scheme = Scheme.add_to_context x ty scheme in
+
   let pattern = Typed.PVar x in
   Typed.annotate pattern scheme loc
 
 let pconst ?loc const =
   let loc = backup_location loc [] in
+
   let ty = ty_of_const const in
   let scheme = Scheme.simple ty in
+
   let pat = Typed.PConst const in
   Typed.annotate pat scheme loc
 
 let pnonbinding ?loc =
   let loc = backup_location loc [] in
+
   let ty = Type.fresh_ty () in
   let scheme = Scheme.simple ty in
+
   let pat = Typed.PNonbinding in
   Typed.annotate pat scheme loc
 
 let pas ?loc p x =
   let loc = backup_location loc [p.Typed.location] in
   let pat = Typed.PAs (p, x) in
+
   let ty = Scheme.get_type p.Typed.scheme in
   let scheme = Scheme.add_to_context x ty p.Typed.scheme in
+
   Typed.annotate pat scheme loc
 
 let ptuple ?loc ps =
