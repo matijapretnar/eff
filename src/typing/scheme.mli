@@ -75,11 +75,17 @@ val effect : Type.ty -> Type.ty -> Untyped.EffectMap.key -> ty_scheme
 (* COMPUTATION CONSTRUCTORS*)
 (***************************)
 
+val value : ty_scheme -> dirty_scheme
+
+val apply : ty_scheme -> ty_scheme -> dirty_scheme
+
+val patmatch : ty_scheme -> abstraction_scheme list -> dirty_scheme
+
 (************************)
 (* PATTERN CONSTRUCTORS *)
 (************************)
 
-(* val pvar : Untyped.variable -> ty_scheme
+val pvar : Untyped.variable -> ty_scheme
 
 val pnonbinding : unit -> ty_scheme
 
@@ -87,7 +93,7 @@ val pconst : Const.t -> ty_scheme
 
 val pas : ty_scheme -> Untyped.variable -> ty_scheme
 
-val ptuple : ty_scheme list -> ty_scheme *)
+val ptuple : ty_scheme list -> ty_scheme
 
 (**********************)
 (* PRINTING UTILITIES *)

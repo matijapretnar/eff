@@ -134,6 +134,33 @@ let handler effect_clauses value_clause =
 (* COMPUTATION CONSTRUCTORS*)
 (***************************)
 
+let value e = make_dirty e
+
+let apply e1 e2 =
+  let ctx_e1, ty_e1, cnstrs_e1 = e1 in
+  let ctx_e2, ty_e2, cnstrs_e2 = e2 in
+  let drty = Type.fresh_dirty () in
+  let constraints = Unification.union cnstrs_e1 cnstrs_e2  in
+  let constraints = Unification.add_ty_constraint ty_e1 (Type.Arrow (ty_e2, drty)) constraints in
+  (ctx_e1 @ ctx_e2, drty, constraints)
+
+let patmatch es cases =
+  let ctx_e, ty_e, cnstrs_e = es in
+  let drty = Type.fresh_dirty () in
+  match cases with
+    | [] ->
+      let constraints = Unification.add_ty_constraint ty_e Type.empty_ty cnstrs_e in
+      (ctx_e, drty, constraints)
+    | _::_ ->
+      let fold a (ctx, constraints) =
+        let ctx_a, (ty_p, drty_c), cnstrs_a = a in
+        ctx_a @ ctx,
+        Unification.list_union [cnstrs_a; constraints]
+        |> Unification.add_ty_constraint ty_e ty_p
+        |> Unification.add_dirty_constraint drty_c drty
+      in
+      let ctx, constraints = List.fold_right fold cases (ctx_e, cnstrs_e) in
+      (ctx, drty, constraints)
 
 (************************)
 (* PATTERN CONSTRUCTORS *)
@@ -141,11 +168,16 @@ let handler effect_clauses value_clause =
 
 let pvar x =
   let ty = Type.fresh_ty () in
-  let scheme = Scheme.simple ty in
-  add_to_context x ty scheme
+  let sch = simple ty in
+  add_to_context x ty sch
 
 let pconst const =
-  let ty = ty_of_const const in
+  let ty = match const with
+    | Const.Integer _ -> Type.int_ty
+    | Const.String _ -> Type.string_ty
+    | Const.Boolean _ -> Type.bool_ty
+    | Const.Float _ -> Type.float_ty
+  in
   simple ty
 
 let pnonbinding () =
@@ -153,7 +185,7 @@ let pnonbinding () =
   simple ty
 
 let pas p x =
-  let ty = Scheme.get_type p in
+  let ty = get_type p in
   add_to_context x ty p
 
 let ptuple ps =
@@ -163,7 +195,7 @@ let ptuple ps =
   in
   let ctx, tys, chngs = List.fold_right infer ps ([], [], Unification.empty) in
   let ty = Type.Tuple tys in
-  scheme.simple ty
+  simple ty
 
 (**********************)
 (* PRINTING FUNCTIONS *)
