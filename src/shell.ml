@@ -135,6 +135,9 @@ let compile_file ppf filename st =
         Format.fprintf out_ppf "\n;;\n ";
         print_endline "ended found something!";
         {st with typing}
+    | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
+        let typing = Infer.add_effect eff (ty1, ty2) st.typing in
+        { st with typing }
     | _ -> st
   in
 
