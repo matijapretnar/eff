@@ -75,11 +75,45 @@ and type_plain_pattern st loc = function
   | Untyped.PRecord [] ->
     assert false
   | Untyped.PRecord (((fld, _) :: _) as lst) ->
-    (* TODO *)
     assert false
+    (* if not (Pattern.linear_record lst) then
+      Error.typing ~loc "Fields in a record must be distinct";
+    let lst = Common.assoc_map type_pattern lst in
+    begin match Tctx.infer_field fld with
+      | None -> Error.typing ~loc "Unbound record field label %s" fld
+      | Some (ty, (ty_name, fld_tys)) ->
+        let infer (fld, p) (ctx, chngs) =
+          begin match Common.lookup fld fld_tys with
+            | None -> Error.typing ~loc "Unexpected field %s in a pattern of type %s" fld ty_name
+            | Some fld_ty ->
+              let ctx_p, ty_p, cnstrs_p = p.Typed.scheme in
+              ctx_p @ ctx, [
+                Scheme.ty_cnstr ~loc fld_ty ty_p;
+                Scheme.just cnstrs_p
+              ] @ chngs
+          end
+        in
+        let ctx, chngs = List.fold_right infer lst ([], []) in
+        unify ctx ty chngs, Typed.PRecord lst
+    end *)
   | Untyped.PVariant (lbl, p) ->
-    (* TODO *)
     assert false
+    (* begin match Tctx.infer_variant lbl with
+      | None -> Error.typing ~loc "Unbound constructor %s" lbl
+      | Some (ty, arg_ty) ->
+        begin match p, arg_ty with
+          | None, None -> Scheme.simple ty, Typed.PVariant (lbl, None)
+          | Some p, Some arg_ty ->
+            let p = type_pattern p in
+            let ctx_p, ty_p, cnstrs_p = p.Typed.scheme in
+            unify ctx_p ty [
+              Scheme.ty_cnstr ~loc arg_ty ty_p;
+              Scheme.just cnstrs_p
+            ], Typed.PVariant (lbl, Some p)
+          | None, Some _ -> Error.typing ~loc "Constructor %s should be applied to an argument" lbl
+          | Some _, None -> Error.typing ~loc "Constructor %s cannot be applied to an argument" lbl
+        end
+    end *)
 
 (******************************)
 (* ABSTRACTION TYPE INFERENCE *)
@@ -94,7 +128,7 @@ and type_abstraction2 st loc (p1, p2, c) =
   let pat1 = type_pattern st p1 in
   let pat2 = type_pattern st p2 in
   let comp, st = type_comp st c in
-  Ctor.abstraction2 ~loc pat1 pat2 comp, st
+  Ctor.abstraction2 ~loc pat1 pat2 comp
 
 (*****************************)
 (* EXPRESSION TYPE INFERENCE *)
@@ -133,20 +167,19 @@ and type_plain_expr st loc = function
       value_clause=value_case;
       finally_clause=finally_case;
     } ->
-    assert false
-    (* let type_handler_clause (eff, (p1, p2, c)) =
+    let type_handler_clause (eff, (p1, p2, c)) =
       let eff = infer_effect ~loc:(c.Untyped.location) st eff in
       (eff, type_abstraction2 st loc (p1, p2, c))
     in
-    let typed_effect_cases = Common.map type_handler_clause effect_cases in
+    let typed_effect_clauses = Common.map type_handler_clause effect_cases in
     let untyped_value_clause =
       match value_case with
         | Some a -> a
         | None -> Desugar.id_abstraction Location.unknown
     in
-    let typed_value_clause = type_abstraction st loc untyped_value_clause in
+    let typed_value_clause, st = type_abstraction st loc untyped_value_clause in
     (* let typed_finally_clause =  *)
-    Ctor.handler ~loc typed_effect_cases typed_value_clause, st *)
+    Ctor.handler ~loc typed_effect_clauses typed_value_clause, st
 
 (******************************)
 (* COMPUTATION TYPE INFERENCE *)
@@ -171,9 +204,9 @@ and type_plain_comp st loc = function
     let expr2, st = type_expr st e2 in
     Ctor.apply ~loc expr1 expr2, st
   | Untyped.Handle (e, c) ->
-    (* TODO *)
-    assert false
-    (* Typed.handle ~loc (type_expr env e) (type_comp env c) *)
+    let exp, st = type_expr st e in
+    let comp, st = type_comp st c in
+    Ctor.handle ~loc exp comp, st
   | Untyped.Let (defs, c) ->
     (* TODO *)
     assert false

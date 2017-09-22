@@ -20,6 +20,11 @@ type abstraction_scheme = (Type.ty * Type.dirty) t
 (* type scheme for effect clauses *)
 type abstraction2_scheme = (Type.ty * Type.ty * Type.dirty) t
 
+
+val just : Unification.t -> ty_scheme -> ty_scheme
+
+val ty_cnstr : loc:Location.t -> Type.ty -> Type.ty -> ty_scheme -> ty_scheme
+
 (*************************)
 (* INTERFACE DEFINITIONS *)
 (*************************)
@@ -69,7 +74,7 @@ val tuple : ty_scheme list -> ty_scheme
 val effect : Type.ty -> Type.ty -> Untyped.EffectMap.key -> ty_scheme
 
 (* smart constructor for the handler term : expression *)
-(* val handler : ?loc:Location.t ->  Typed.abstraction2 list -> Typed.abstraction -> ty_scheme *)
+val handler : abstraction2_scheme list -> abstraction_scheme -> ty_scheme
 
 (***************************)
 (* COMPUTATION CONSTRUCTORS*)
@@ -80,6 +85,8 @@ val value : ty_scheme -> dirty_scheme
 val apply : ty_scheme -> ty_scheme -> dirty_scheme
 
 val patmatch : ty_scheme -> abstraction_scheme list -> dirty_scheme
+
+val handle : ty_scheme -> dirty_scheme -> dirty_scheme
 
 (************************)
 (* PATTERN CONSTRUCTORS *)

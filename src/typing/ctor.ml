@@ -62,15 +62,14 @@ let effect ?loc ((eff_name, (ty_par, ty_res)) as eff) =
   let term = Typed.Effect eff in
   Typed.annotate term sch loc
 
-(* let handler ?loc value_clause effect_clauses =
-  let loc = backup_location loc (List.map (fun e -> e.Typed.location) (effect_clauses :: value_clause)) in
+let handler ?loc effect_clauses value_clause =
+  let loc = backup_location loc (value_clause.Typed.location :: (List.map (fun (_, e) -> e.Typed.location) effect_clauses)) in
   let term = Typed.Handler {
     effect_clauses=effect_clauses;
     value_clause=value_clause
   } in
-  (* let sch = Scheme.handler effect_clauses value_clause in *)
-  Typed.annotate term sch loc *)
-
+  let sch = Scheme.handler (List.map (fun (_, e) -> e.Typed.scheme) effect_clauses) value_clause.Typed.scheme in
+  Typed.annotate term sch loc
 
 (**********************************)
 (* COMPUTATION SMART CONSTRUCTORS *)
@@ -92,6 +91,12 @@ let patmatch ?loc es cases =
   let loc = backup_location loc (List.map (fun e -> e.Typed.location) cases) in
   let term = Typed.Match (es, cases) in
   let sch = Scheme.patmatch es.Typed.scheme (List.map (fun e -> e.Typed.scheme) cases) in
+  Typed.annotate term sch loc
+
+let handle ?loc e c =
+  let loc = backup_location loc [e.Typed.location; c.Typed.location] in
+  let sch = Scheme.handle e.Typed.scheme c.Typed.scheme in
+  let term = Typed.Handle (e, c) in
   Typed.annotate term sch loc
 
 (******************************)

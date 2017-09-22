@@ -162,6 +162,16 @@ let patmatch es cases =
       let ctx, constraints = List.fold_right fold cases (ctx_e, cnstrs_e) in
       (ctx, drty, constraints)
 
+let handle e c =
+  let ctx_e, ty_e, cnstrs_e = e in
+  let ctx_c, drty_c, cnstrs_c = c in
+  let drty = Type.fresh_dirty () in
+  let constraints =
+    Unification.list_union [cnstrs_e; cnstrs_c]
+    |> Unification.add_ty_constraint ty_e (Type.Handler (drty_c, drty))
+  in
+  (ctx_e @ ctx_c, drty, constraints)
+
 (************************)
 (* PATTERN CONSTRUCTORS *)
 (************************)

@@ -24,11 +24,11 @@ val lambda : ?loc:Location.t -> Typed.pattern -> Typed.computation -> Typed.expr
 (* smart constructor for the Tuple term : expression *)
 val tuple : ?loc:Location.t -> Typed.expression list -> Typed.expression
 
-(* smart constructor for the handler term : expression *)
-(* val handler : ?loc:Location.t ->  Typed.abstraction2 list -> Typed.abstraction -> Typed.expression *)
-
 (* smart constructor for the effect term : expression *)
-val effect : ?loc:Location.t ->  Untyped.EffectMap.key * (Type.ty * Type.ty) -> Typed.expression
+val effect : ?loc:Location.t ->  Typed.effect -> Typed.expression
+
+(* smart constructor for the handler term : expression *)
+val handler : ?loc:Location.t ->  (Typed.effect, Typed.abstraction2) Common.assoc -> Typed.abstraction -> Typed.expression
 
 (***************************)
 (* COMPUTATION CONSTRUCTORS*)
@@ -42,6 +42,8 @@ val apply : ?loc:Location.t -> Typed.expression -> Typed.expression -> Typed.com
 
 (* match computation *)
 val patmatch : ?loc:Location.t -> Typed.expression -> Typed.abstraction list -> Typed.computation
+
+val handle : ?loc:Location.t -> Typed.expression -> Typed.computation -> Typed.computation
 
 (*************************************)
 (* TOPLEVEL COMPUTATION CONSTRUCTORS *)
