@@ -1,4 +1,4 @@
-type context = (Untyped.variable, Type.ty) Common.assoc
+type context = (CoreSyntax.variable, Type.ty) OldUtils.assoc
 type 'a t = context * 'a * Constraints.t
 type ty_scheme = Type.ty t
 type dirty_scheme = Type.dirty t
@@ -17,8 +17,13 @@ let beautify2 ty1 ty2 cnstrs =
   (ty1, ty2, skeletons)
 
 let refresh (ctx, ty, cnstrs) =
+<<<<<<< HEAD
   let sbst = Params.refreshing_subst () in
   Common.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst sbst cnstrs
+=======
+  let sbst = Type.refreshing_subst () in
+  OldUtils.assoc_map (Type.subst_ty sbst) ctx, Type.subst_ty sbst ty, Constraints.subst sbst cnstrs
+>>>>>>> master
 
 let ty_param_less p q (ctx, ty, cnstrs) =
   (ctx, ty, Constraints.add_ty_constraint p q cnstrs)
@@ -39,7 +44,7 @@ and dirty_less ~loc drty1 drty2 (ctx, ty, cnstrs) =
 
 let remove_context ~loc ctx_p (ctx, ty, cnstrs) =
   let trim (x, t) (ctx, ty, cnstrs) =
-    match Common.lookup x ctx_p with
+    match OldUtils.lookup x ctx_p with
     | None -> ((x, t) :: ctx, ty, cnstrs)
     | Some u -> (ctx, ty, cnstrs)
   in
@@ -47,7 +52,7 @@ let remove_context ~loc ctx_p (ctx, ty, cnstrs) =
 
 let less_context ~loc ctx_p (ctx, ty, cnstrs) =
   let trim (x, t) (ctx, ty, cnstrs) =
-    match Common.lookup x ctx_p with
+    match OldUtils.lookup x ctx_p with
     | None -> ((x, t) :: ctx, ty, cnstrs)
     | Some u -> ty_less ~loc u t ((x, u) :: ctx, ty, cnstrs)
   in
@@ -58,15 +63,24 @@ let trim_context ~loc ctx_p ty_sch =
   let ty_sch = remove_context ~loc ctx_p ty_sch in
   ty_sch
 
+<<<<<<< HEAD
 let (@@@) = Params.append
+=======
+let (@@@) = OldUtils.trio_append
+>>>>>>> master
 
 let pos_neg_ty_scheme (ctx, ty, cnstrs) =
   let add_ctx_pos_neg (x, ctx_ty) (pos, neg) =
     let pos_ctx_ty, neg_ctx_ty = Type.pos_neg_params Tctx.get_variances ctx_ty in
     neg_ctx_ty @@@ pos, pos_ctx_ty @@@ neg
   in
+<<<<<<< HEAD
   let pos, neg = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
   Params.uniq pos, Params.uniq neg
+=======
+  let (((_, _, pos_rs) as pos), ((_, _, neg_rs) as neg)) = List.fold_right add_ctx_pos_neg ctx (Type.pos_neg_params Tctx.get_variances ty) in
+  OldUtils.trio_uniq pos, OldUtils.trio_uniq neg
+>>>>>>> master
 
 let pos_neg_dirtyscheme (ctx, drty, cnstrs) =
   pos_neg_ty_scheme (ctx, Type.Arrow (Type.unit_ty, drty), cnstrs)
@@ -81,7 +95,7 @@ let garbage_collect pos neg (ctx, ty, cnstrs) =
 
 let normalize_context ~loc (ctx, ty, cnstrs) =
   let collect (x, ty) ctx =
-    match Common.lookup x ctx with
+    match OldUtils.lookup x ctx with
     | None -> (x, ref [ty]) :: ctx
     | Some tys -> tys := ty :: !tys; ctx
   in
@@ -101,15 +115,16 @@ let normalize_context ~loc (ctx, ty, cnstrs) =
 let subst_ty_scheme sbst (ctx, ty, cnstrs) =
   let ty = Type.subst_ty sbst ty in
   let cnstrs = Constraints.subst sbst cnstrs in
-  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  let ctx = OldUtils.assoc_map (Type.subst_ty sbst) ctx in
   (ctx, ty, cnstrs)
 
 let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
   let drty = Type.subst_dirty sbst drty in
   let cnstrs = Constraints.subst sbst cnstrs in
-  let ctx = Common.assoc_map (Type.subst_ty sbst) ctx in
+  let ctx = OldUtils.assoc_map (Type.subst_ty sbst) ctx in
   (ctx, drty, cnstrs)
 
+<<<<<<< HEAD
 let expand_ty_scheme (ctx, ty, constraints) =
   (Common.assoc_map Constraints.expand_ty ctx,
   Constraints.expand_ty ty,
@@ -127,6 +142,14 @@ let create_ty_scheme ctx ty changes =
 let collect_constraints changes =
   let _, _, constraints = create_ty_scheme [] Type.unit_ty changes in
   constraints
+=======
+let finalize ctx ty chngs =
+  let ctx, ty, cnstrs = List.fold_right OldUtils.id chngs (ctx, ty, Constraints.empty) in
+  (OldUtils.assoc_map (Constraints.expand_ty cnstrs) ctx, Constraints.expand_ty cnstrs ty, cnstrs)
+
+let expand_ty_scheme (ctx, ty, constraints) =
+  (OldUtils.assoc_map (Constraints.expand_ty constraints) ctx, Constraints.expand_ty constraints ty, constraints)
+>>>>>>> master
 
 let clean_ty_scheme ~loc ty_sch =
   let ty_sch = normalize_context ~loc ty_sch in
@@ -139,6 +162,12 @@ let clean_dirty_scheme ~loc (ctx, drty, constraints) =
   | ctx, Type.Arrow (_, drty), cnstrs -> (ctx, drty, cnstrs)
   | _ -> assert false
 
+<<<<<<< HEAD
+=======
+let create_ty_scheme ctx ty changes =
+  List.fold_right OldUtils.id changes (ctx, ty, Constraints.empty)
+
+>>>>>>> master
 let finalize_ty_scheme ~loc ctx ty changes =
   let ty_sch = create_ty_scheme ctx ty changes in
   clean_ty_scheme ~loc ty_sch
@@ -186,6 +215,7 @@ let beautify_ty_scheme ty_sch =
   subst_ty_scheme sbst (expand_ty_scheme ty_sch)
 
 let beautify_dirty_scheme drty_sch = 
+<<<<<<< HEAD
   let sbst = Params.beautifying_subst () in
   subst_dirty_scheme sbst (expand_dirty_scheme drty_sch)
 
@@ -200,12 +230,34 @@ let extend_non_poly params skeletons =
 let skeletons_non_poly_scheme (ctx, _, cnstrs) =
   let skeletons = Constraints.skeletons cnstrs in
   let non_poly = Params.flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
+=======
+  let sbst = Type.beautifying_subst () in
+  let _, (_, ds, _) = pos_neg_dirtyscheme drty_sch in
+  ignore (OldUtils.map sbst.Type.dirt_param ds);
+  subst_dirty_scheme sbst drty_sch
+
+let extend_non_poly (ts, ds, rs) skeletons =
+  let add_skel skel new_ts =
+    if List.exists (fun t -> List.mem t ts) skel then
+    skel @ new_ts else new_ts
+  in
+  let ts = List.fold_right add_skel skeletons ts in
+  (OldUtils.uniq ts, ds, rs)
+
+let skeletons_non_poly_scheme (ctx, _, cnstrs) =
+  let skeletons = Constraints.skeletons cnstrs in
+  let non_poly = OldUtils.trio_flatten_map (fun (x, t) -> let pos, neg = Type.pos_neg_params Tctx.get_variances t in pos @@@ neg) ctx in
+>>>>>>> master
   let non_poly = extend_non_poly non_poly skeletons in
   skeletons, non_poly
 
 let print_context ctx ppf =
   let print_binding (x, t) ppf =
+<<<<<<< HEAD
     Print.print ppf "%t : %t" (Untyped.Variable.print ~safe:true x) (Type.print_ty t)
+=======
+    Print.print ppf "%t : %t" (CoreSyntax.Variable.print x) (Type.print_ty t)
+>>>>>>> master
   in
   Print.sequence ", " print_binding ctx ppf
 

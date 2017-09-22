@@ -11,4 +11,4 @@
 *)
 
 (** [values] is an association list of external names and values. *)
-val values : (string, Value.value) Common.assoc
+val values : (string, Value.value) OldUtils.assoc

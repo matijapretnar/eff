@@ -1,12 +1,14 @@
 (** Desugaring of syntax into the core language. *)
 
-module C = Common
+module C = OldUtils
 module T = Type
+module Sugared = SugaredSyntax
+module Untyped = CoreSyntax
 
 (* ***** Desugaring of types. ***** *)
 
-let fresh_dirt_param = Common.fresh (fun n -> Sugared.DirtParam n)
-let fresh_region_param = Common.fresh (fun n -> Sugared.RegionParam n)
+let fresh_dirt_param = OldUtils.fresh (fun n -> Sugared.DirtParam n)
+let fresh_region_param = OldUtils.fresh (fun n -> Sugared.RegionParam n)
 
 (* Fill in missing dirt and region parameters in a type with fresh ones. Also resolves
    type applications so that applications of effect types are equipped with the extra region
@@ -56,30 +58,30 @@ let fill_args ty =
 
 let fill_args_tydef def =
   match def with
-  | Sugared.TyRecord lst ->
-    let (ds, rs, lst) =
-      List.fold_right
-        (fun (fld, ty) (ds, rs, lst) ->
-           let (ds', rs'), ty = fill_args ty in
-           (ds' @ ds, rs' @ rs, (fld, ty) :: lst))
-        lst ([], [], [])
-    in
-    (ds, rs), Sugared.TyRecord lst
-  | Sugared.TySum lst ->
-    let (ds, rs, lst) =
-      List.fold_right
-        (fun (lbl, ty_op) (ds, rs, lst) ->
-           match ty_op with
-           | None -> (ds, rs, (lbl, None) :: lst)
-           | Some ty ->
-             let (ds', rs'), ty = fill_args ty in
-             (ds' @ ds, rs' @ rs, (lbl, Some ty) :: lst))
-        lst ([], [], [])
-    in
-    (ds, rs), Sugared.TySum lst
-  | Sugared.TyInline ty ->
-    let params, ty = fill_args ty in
-    params, Sugared.TyInline ty
+    | Sugared.TyRecord lst ->
+      let (ds, rs, lst) =
+        List.fold_right
+          (fun (fld, ty) (ds, rs, lst) ->
+            let (ds', rs'), ty = fill_args ty in
+              (ds' @ ds, rs' @ rs, (fld, ty) :: lst))
+          lst OldUtils.trio_empty
+      in
+        (ds, rs), Sugared.TyRecord lst
+    | Sugared.TySum lst ->
+      let (ds, rs, lst) =
+        List.fold_right
+          (fun (lbl, ty_op) (ds, rs, lst) ->
+            match ty_op with
+              | None -> (ds, rs, (lbl, None) :: lst)
+              | Some ty ->
+                let (ds', rs'), ty = fill_args ty in
+                  (ds' @ ds, rs' @ rs, (lbl, Some ty) :: lst))
+          lst OldUtils.trio_empty
+      in
+        (ds, rs), Sugared.TySum lst
+    | Sugared.TyInline ty ->
+      let params, ty = fill_args ty in
+        params, Sugared.TyInline ty
 
 (* Desugar a type, where only the given type, dirt and region parameters may appear. 
    If a type application with missing dirt and region parameters is encountered,
@@ -128,23 +130,23 @@ let trio_uniq (ts1, ds1, rs1) = (Common.uniq ts1, Common.uniq ds1, Common.uniq r
 
 (** [free_params t] returns a triple of all free type, dirt, and region params in [t]. *)
 let free_params t =
-  let (@@@) = trio_append
+  let (@@@) = OldUtils.trio_append
   and optional f = function
-    | None -> trio_empty
+    | None -> OldUtils.trio_empty
     | Some x -> f x
   in
   let rec ty (t, loc) = match t with
-    | Sugared.TyApply (_, tys, drts_rgns) ->
-      trio_flatten_map ty tys @@@ (optional dirts_regions) drts_rgns
-    | Sugared.TyParam s -> ([s], [], [])
-    | Sugared.TyArrow (t1, t2, drt) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt
-    | Sugared.TyTuple lst -> trio_flatten_map ty lst
-    | Sugared.TyHandler (t1, drt1, t2, drt2) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt1 @@@ (optional dirt) drt2
+  | Sugared.TyApply (_, tys, drts_rgns) ->
+      OldUtils.trio_flatten_map ty tys @@@ (optional dirts_regions) drts_rgns
+  | Sugared.TyParam s -> ([s], [], [])
+  | Sugared.TyArrow (t1, t2, drt) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt
+  | Sugared.TyTuple lst -> OldUtils.trio_flatten_map ty lst
+  | Sugared.TyHandler (t1, drt1, t2, drt2) -> ty t1 @@@ ty t2 @@@ (optional dirt) drt1 @@@ (optional dirt) drt2
   and dirt (Sugared.DirtParam d) = ([], [d], [])
   and region (Sugared.RegionParam r) = ([], [], [r])
-  and dirts_regions (drts, rgns) = trio_flatten_map dirt drts @@@ trio_flatten_map region rgns
+  and dirts_regions (drts, rgns) = OldUtils.trio_flatten_map dirt drts @@@ OldUtils.trio_flatten_map region rgns
   in
-  trio_uniq (ty t)
+  OldUtils.trio_uniq (ty t)
 
 let syntax_to_core_params (ts, ds, rs) = (
   List.map (fun p -> (p, Params.fresh_ty_param ())) ts,
@@ -155,12 +157,12 @@ let syntax_to_core_params (ts, ds, rs) = (
 (** [tydef params d] desugars the type definition with parameters [params] and definition [d]. *)
 let tydef params d =
   let (ts, ds, rs) as sbst = syntax_to_core_params params in
-  (Params.make (List.map snd ts, List.map snd ds, List.map snd rs),
-   begin match d with
-     | Sugared.TyRecord lst -> Tctx.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
-     | Sugared.TySum lst -> Tctx.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
-     | Sugared.TyInline t -> Tctx.Inline (ty sbst t)
-   end)
+    (OldUtils.trio_snds (ts, ds, rs),
+     begin match d with
+       | Sugared.TyRecord lst -> Tctx.Record (List.map (fun (f,t) -> (f, ty sbst t)) lst)
+       | Sugared.TySum lst -> Tctx.Sum (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
+       | Sugared.TyInline t -> Tctx.Inline (ty sbst t)
+     end)
 
 (** [tydefs defs] desugars the simultaneous type definitions [defs]. *)
 let tydefs defs =
@@ -170,9 +172,9 @@ let tydefs defs =
   let ds, rs, defs =
     List.fold_right
       (fun (tyname, (params, def)) (ds, rs, defs) ->
-         let (d, r), def = fill_args_tydef def in
-         (d @ ds, r @ rs, ((tyname, (params, def)) :: defs)))
-      defs trio_empty
+        let (d, r), def = fill_args_tydef def in
+          (d @ ds, r @ rs, ((tyname, (params, def)) :: defs)))
+      defs OldUtils.trio_empty
   in
   (* Now we traverse again and the rest of the work. *)
   List.map (fun (tyname, (ts, def)) -> (tyname, tydef (ts, ds, rs) def)) defs
@@ -204,18 +206,18 @@ let pattern ?(forbidden=[]) (p, loc) =
   in
   let rec pattern (p, loc) =
     let p = match p with
-      | Pattern.Var x ->
+    | Sugared.PVar x ->
         let x = new_var x in
         Untyped.PVar x
-      | Pattern.As (p, x) ->
+    | Sugared.PAs (p, x) ->
         let x = new_var x in
         let p' = pattern p in
         Untyped.PAs (p', x)
-      | Pattern.Tuple ps -> Untyped.PTuple (List.map pattern ps)
-      | Pattern.Record flds -> Untyped.PRecord (Common.assoc_map pattern flds)
-      | Pattern.Variant (lbl, p) -> Untyped.PVariant (lbl, Common.option_map pattern p)
-      | Pattern.Const c -> Untyped.PConst c
-      | Pattern.Nonbinding -> Untyped.PNonbinding
+    | Sugared.PTuple ps -> Untyped.PTuple (List.map pattern ps)
+    | Sugared.PRecord flds -> Untyped.PRecord (OldUtils.assoc_map pattern flds)
+    | Sugared.PVariant (lbl, p) -> Untyped.PVariant (lbl, OldUtils.option_map pattern p)
+    | Sugared.PConst c -> Untyped.PConst c
+    | Sugared.PNonbinding -> Untyped.PNonbinding
     in
     { Untyped.term = p; Untyped.location = loc }
   in
@@ -226,10 +228,10 @@ let pattern ?(forbidden=[]) (p, loc) =
 
 let rec expression ctx (t, loc) =
   let w, e = match t with
-    | Sugared.Var x ->
-      begin match Common.lookup x ctx with
-        | Some n -> [], Untyped.Var n
-        | None -> Error.typing ~loc "Unknown variable %s" x
+  | Sugared.Var x ->
+      begin match OldUtils.lookup x ctx with
+      | Some n -> [], Untyped.Var n
+      | None -> Error.typing ~loc "Unknown variable %s" x
       end
     | Sugared.Const k ->
       [], Untyped.Const k
@@ -440,9 +442,9 @@ and plain_toplevel = function
   | Sugared.DefEffect (eff, (ty1, ty2)) ->
     let (ds1, rs1), ty1 = fill_args ty1
     and (ds2, rs2), ty2 = fill_args ty2 in
-    let ty1 = ty (syntax_to_core_params ([], ds1, rs1)) ty1
-    and ty2 = ty (syntax_to_core_params ([], ds2, rs2)) ty2 in
-    Untyped.DefEffect (eff, (ty1, ty2))
+      let ty1 = ty OldUtils.trio_empty ty1
+      and ty2 = ty OldUtils.trio_empty ty2 in
+      Untyped.DefEffect (eff, (ty1, ty2))
   | Sugared.Term t ->
     let c = top_computation t in
     Untyped.Computation c
