@@ -63,3 +63,9 @@ val pconst : ?loc:Location.t -> Const.t -> Typed.pattern
 val pas : ?loc:Location.t -> Typed.pattern -> Typed.variable -> Typed.pattern
 
 val ptuple : ?loc:Location.t -> Typed.pattern list -> Typed.pattern
+
+val precord : ?loc:Location.t -> Common.field -> (Common.field * Typed.pattern) list -> Typed.pattern
+
+val pvariant_none : ?loc:Location.t -> Common.label -> Type.ty -> Typed.pattern
+
+val pvariant_some : ?loc:Location.t -> Common.label -> Type.ty -> Type.ty -> Typed.pattern -> Typed.pattern

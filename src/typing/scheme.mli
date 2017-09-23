@@ -102,6 +102,8 @@ val pas : ty_scheme -> Untyped.variable -> ty_scheme
 
 val ptuple : ty_scheme list -> ty_scheme
 
+val precord : context -> Type.ty -> (ty_scheme -> ty_scheme) list -> ty_scheme
+
 (**********************)
 (* PRINTING UTILITIES *)
 (**********************)

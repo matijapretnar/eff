@@ -207,6 +207,9 @@ let ptuple ps =
   let ty = Type.Tuple tys in
   simple ty
 
+let precord ctx ty changes = create_ty_scheme ctx ty changes
+
+
 (**********************)
 (* PRINTING FUNCTIONS *)
 (**********************)

@@ -75,45 +75,23 @@ and type_plain_pattern st loc = function
   | Untyped.PRecord [] ->
     assert false
   | Untyped.PRecord (((fld, _) :: _) as lst) ->
-    assert false
-    (* if not (Pattern.linear_record lst) then
+    if not (Pattern.linear_record lst) then
       Error.typing ~loc "Fields in a record must be distinct";
-    let lst = Common.assoc_map type_pattern lst in
-    begin match Tctx.infer_field fld with
-      | None -> Error.typing ~loc "Unbound record field label %s" fld
-      | Some (ty, (ty_name, fld_tys)) ->
-        let infer (fld, p) (ctx, chngs) =
-          begin match Common.lookup fld fld_tys with
-            | None -> Error.typing ~loc "Unexpected field %s in a pattern of type %s" fld ty_name
-            | Some fld_ty ->
-              let ctx_p, ty_p, cnstrs_p = p.Typed.scheme in
-              ctx_p @ ctx, [
-                Scheme.ty_cnstr ~loc fld_ty ty_p;
-                Scheme.just cnstrs_p
-              ] @ chngs
-          end
-        in
-        let ctx, chngs = List.fold_right infer lst ([], []) in
-        unify ctx ty chngs, Typed.PRecord lst
-    end *)
+    let lst = Common.assoc_map (type_pattern st) lst in
+    Ctor.precord ~loc fld lst
   | Untyped.PVariant (lbl, p) ->
-    assert false
-    (* begin match Tctx.infer_variant lbl with
+    begin match Tctx.infer_variant lbl with
       | None -> Error.typing ~loc "Unbound constructor %s" lbl
       | Some (ty, arg_ty) ->
         begin match p, arg_ty with
-          | None, None -> Scheme.simple ty, Typed.PVariant (lbl, None)
+          | None, None -> Ctor.pvariant_none ~loc lbl ty
           | Some p, Some arg_ty ->
-            let p = type_pattern p in
-            let ctx_p, ty_p, cnstrs_p = p.Typed.scheme in
-            unify ctx_p ty [
-              Scheme.ty_cnstr ~loc arg_ty ty_p;
-              Scheme.just cnstrs_p
-            ], Typed.PVariant (lbl, Some p)
+            let p = type_pattern st p in
+            Ctor.pvariant_some ~loc lbl arg_ty ty p
           | None, Some _ -> Error.typing ~loc "Constructor %s should be applied to an argument" lbl
           | Some _, None -> Error.typing ~loc "Constructor %s cannot be applied to an argument" lbl
         end
-    end *)
+    end
 
 (******************************)
 (* ABSTRACTION TYPE INFERENCE *)

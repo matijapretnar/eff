@@ -132,3 +132,40 @@ let ptuple ?loc ps =
   let sch = Scheme.ptuple (List.map (fun e -> e.Typed.scheme) ps) in
   let pat = Typed.PTuple ps in
   Typed.annotate pat sch loc
+
+let precord ?loc fld lst =
+  let loc = backup_location loc [] in
+  begin match Tctx.infer_field fld with
+    | None -> Error.typing ~loc "Unbound record field label %s" fld
+    | Some (ty, (ty_name, fld_tys)) ->
+      let infer (fld, p) (ctx, chngs) =
+        begin match Common.lookup fld fld_tys with
+          | None -> Error.typing ~loc "Unexpected field %s in a pattern of type %s" fld ty_name
+          | Some fld_ty ->
+            let ctx_p, ty_p, cnstrs_p = p.Typed.scheme in
+            ctx_p @ ctx, [
+              Scheme.ty_cnstr ~loc fld_ty ty_p;
+              Scheme.just cnstrs_p
+            ] @ chngs
+        end
+      in
+      let ctx, chngs = List.fold_right infer lst ([], []) in
+      let sch = Scheme.precord ctx ty chngs in
+      let pat = Typed.PRecord lst in
+      Typed.annotate pat sch loc
+  end
+
+let pvariant_none ?loc lbl ty =
+  let loc = backup_location loc [] in
+  Typed.annotate (Typed.PVariant (lbl, None)) (Scheme.simple ty) loc
+
+let pvariant_some ?loc lbl arg_ty ty p =
+  let loc = backup_location loc [] in
+  let ctx_p, ty_p, cnstrs_p = p.Typed.scheme in
+  let chngs = [
+    Scheme.ty_cnstr ~loc arg_ty ty_p;
+    Scheme.just cnstrs_p
+  ] in
+  let sch = Scheme.precord ctx_p ty chngs in
+  let pat = Typed.PVariant (lbl, Some p) in
+  Typed.annotate pat sch loc
