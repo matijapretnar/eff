@@ -108,6 +108,12 @@ and type_abstraction2 st loc (p1, p2, c) =
   let comp, st = type_comp st c in
   Ctor.abstraction2 ~loc pat1 pat2 comp
 
+(* and type_let_defs ~loc env defs =
+  let defs' = List.map (fun (p, c) -> (type_pattern st p, type_comp st c)) defs in
+  let defs'', poly_tyschs, _, _ = Typed.let_defs ~loc defs' in
+  let env' = extend_env poly_tyschs env in
+  env', defs'' *)
+
 (*****************************)
 (* EXPRESSION TYPE INFERENCE *)
 (*****************************)
@@ -125,14 +131,14 @@ and type_plain_expr st loc = function
   | Untyped.Const const ->
     Ctor.const ~loc const, st
   | Untyped.Tuple es ->
-    let els = List.map (fun (a, b) -> a) (List.map (type_expr st) es) in
+    let els = List.map (fun (e, _) -> e) (List.map (type_expr st) es) in
     Ctor.tuple ~loc els, st
   | Untyped.Record lst ->
-    (* TODO *)
-    assert false
+    let lst = List.map (fun (f, (e, _)) -> (f, e)) (Common.assoc_map (type_expr st) lst) in
+    Ctor.record ~loc lst, st
   | Untyped.Variant (lbl, e) ->
-    (* TODO *)
-    assert false
+    let exp = Common.option_map (fun (e, _) -> e) (Common.option_map (type_expr st) e) in
+    Ctor.variant ~loc (lbl, exp), st
   | Untyped.Lambda (p, c) ->
     let pat = type_pattern st p in
     let comp, st = type_comp st c in
@@ -157,6 +163,8 @@ and type_plain_expr st loc = function
     in
     let typed_value_clause, st = type_abstraction st loc untyped_value_clause in
     (* let typed_finally_clause =  *)
+    (* with h handle c *)
+    (* Apply finally (with h handle c) *)
     Ctor.handler ~loc typed_effect_clauses typed_value_clause, st
 
 (******************************)
@@ -186,10 +194,10 @@ and type_plain_comp st loc = function
     let comp, st = type_comp st c in
     Ctor.handle ~loc exp comp, st
   | Untyped.Let (defs, c) ->
-    (* TODO *)
     assert false
-    (* let env', defs' = type_let_defs ~loc env defs in
-    Typed.let' ~loc defs' (type_comp env' c) *)
+    (* let defs, st = type_let_defs ~loc st defs in *)
+    (* let c = type_comp st c in *)
+    (* Ctor.letbinding ~loc defs c *)
   | Untyped.LetRec (defs, c) ->
     (* TODO *)
     assert false

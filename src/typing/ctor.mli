@@ -18,6 +18,12 @@ val var : ?loc:Location.t -> Typed.variable -> Scheme.ty_scheme -> Typed.express
 (* smart constructor for the Const term : expression *)
 val const : ?loc:Location.t -> Const.t -> Typed.expression
 
+(* smart constructor for the Record term : expression *)
+val record : ?loc:Location.t -> (Common.field * Typed.expression) list -> Typed.expression
+
+(* smart constructor for the Variant term : expression *)
+val variant : ?loc:Location.t -> (Common.label * Typed.expression option) -> Typed.expression
+
 (* smart constructor for the Lambda term : expression *)
 val lambda : ?loc:Location.t -> Typed.pattern -> Typed.computation -> Typed.expression
 
@@ -44,6 +50,10 @@ val apply : ?loc:Location.t -> Typed.expression -> Typed.expression -> Typed.com
 val patmatch : ?loc:Location.t -> Typed.expression -> Typed.abstraction list -> Typed.computation
 
 val handle : ?loc:Location.t -> Typed.expression -> Typed.computation -> Typed.computation
+
+(* val letbinding : ?loc:Location.t -> (Typed.pattern * Typed.computation) -> Typed.computation -> Typed.computation *)
+
+(* val letrecbinding : ?loc:Location.t -> (Typed.variable * Typed.abstraction) -> Typed.computation -> Typed.computation *)
 
 (*************************************)
 (* TOPLEVEL COMPUTATION CONSTRUCTORS *)

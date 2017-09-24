@@ -43,6 +43,51 @@ let const ?loc c =
   let sch = Scheme.const c in
   Typed.annotate term sch loc
 
+let record ?loc lst =
+  let loc = backup_location loc (List.map (fun (_, e) -> e.Typed.location) lst) in
+  match lst with
+  | [] -> assert false
+  | ((fld, _) :: _) as lst ->
+    if not (Pattern.linear_record lst) then
+      Error.typing ~loc "Fields in a record must be distinct";
+    begin match Tctx.infer_field fld with
+      | None -> Error.typing ~loc "Unbound record field label %s" fld
+      | Some (ty, (ty_name, fld_tys)) ->
+        if List.length lst <> List.length fld_tys then
+          Error.typing ~loc "The record of type %s has an incorrect number of fields" ty_name;
+        let infer (fld, e) (ctx, constraints) =
+          begin match Common.lookup fld fld_tys with
+            | None -> Error.typing ~loc "Unexpected field %s in a record of type %s" fld ty_name
+            | Some fld_ty ->
+              let e_ctx, e_ty, e_constraints = e.Typed.scheme in
+              e_ctx @ ctx, Unification.add_ty_constraint e_ty fld_ty constraints
+          end
+        in
+        let ctx, constraints = List.fold_right infer lst ([], Unification.empty) in
+        let sch = (ctx, ty, constraints) in
+        let term = Typed.Record lst in
+        Typed.annotate term sch loc
+    end
+
+let variant ?loc (lbl, e) =
+  let loc = backup_location loc (match e with None -> [] | Some e -> [e.Typed.location]) in
+  begin match Tctx.infer_variant lbl with
+    | None -> Error.typing ~loc "Unbound constructor %s" lbl
+    | Some (ty, arg_ty) ->
+      let sch = begin match e, arg_ty with
+        | None, None -> ([], ty, Unification.empty)
+        | Some e, Some arg_ty ->
+          let e_ctx, e_ty, e_constraints = e.Typed.scheme in
+          let constraints = Unification.add_ty_constraint e_ty arg_ty e_constraints in
+          e_ctx, ty, constraints
+        | None, Some _ -> Error.typing ~loc "Constructor %s should be applied to an argument" lbl
+        | Some _, None -> Error.typing ~loc "Constructor %s cannot be applied to an argument" lbl
+      end
+      in
+      let term = Typed.Variant (lbl, e) in
+      Typed.annotate term sch loc
+  end
+
 let lambda ?loc p c =
   let loc = backup_location loc [p.Typed.location; c.Typed.location] in
   let param_ty = Scheme.get_type p.Typed.scheme in
@@ -68,7 +113,7 @@ let handler ?loc effect_clauses value_clause =
     effect_clauses=effect_clauses;
     value_clause=value_clause
   } in
-  let sch = Scheme.handler (List.map (fun (_, e) -> e.Typed.scheme) effect_clauses) value_clause.Typed.scheme in
+  let sch = Scheme.handler (List.map (fun (eff, e) -> (eff, e.Typed.scheme)) effect_clauses) value_clause.Typed.scheme in
   Typed.annotate term sch loc
 
 (**********************************)
@@ -81,16 +126,16 @@ let value ?loc e =
   let sch = Scheme.value e.Typed.scheme in
   Typed.annotate term sch loc
 
-let apply ?loc e1 e2 =
-  let loc = backup_location loc [e1.Typed.location; e2.Typed.location] in
-  let term = Typed.Apply (e1, e2) in
-  let sch = Scheme.apply e1.Typed.scheme e2.Typed.scheme in
-  Typed.annotate term sch loc
-
 let patmatch ?loc es cases =
   let loc = backup_location loc (List.map (fun e -> e.Typed.location) cases) in
   let term = Typed.Match (es, cases) in
   let sch = Scheme.patmatch es.Typed.scheme (List.map (fun e -> e.Typed.scheme) cases) in
+  Typed.annotate term sch loc
+
+let apply ?loc e1 e2 =
+  let loc = backup_location loc [e1.Typed.location; e2.Typed.location] in
+  let term = Typed.Apply (e1, e2) in
+  let sch = Scheme.apply e1.Typed.scheme e2.Typed.scheme in
   Typed.annotate term sch loc
 
 let handle ?loc e c =
@@ -98,6 +143,18 @@ let handle ?loc e c =
   let sch = Scheme.handle e.Typed.scheme c.Typed.scheme in
   let term = Typed.Handle (e, c) in
   Typed.annotate term sch loc
+
+(* let letbinding ?loc defs c =
+  let loc = backup_location loc [c.Typed.location] in
+  let term = Typed.LetRec (defs, c) in
+  let sch = Scheme.simple Type.int_ty in
+  Typed.annotate term sch loc
+
+let letrecbinding ?loc defs c =
+  let loc = backup_location loc [c.Typed.location] in
+  let term = Typed.LetRec (defs, c) in
+  let sch = Scheme.simple Type.int_ty in
+  Typed.annotate term sch loc *)
 
 (******************************)
 (* PATTERN SMART CONSTRUCTORS *)

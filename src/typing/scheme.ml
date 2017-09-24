@@ -128,7 +128,41 @@ let effect ty_par ty_res eff_name =
   simple ty
 
 let handler effect_clauses value_clause =
-  simple Type.int_ty
+  (* make the required elements for the handler *)
+  let param = Type.fresh_dirty () in
+  let ret = Type.fresh_dirty () in
+  let (ret_ty, ret_drt) = ret in
+  let (param_ty, param_drt) = param in
+  let cnstr = Unification.empty in
+  let ctx = [] in
+
+  (* add constraints for the value clause *)
+  let (ctx_v, (ty_p_v, drty_r_v), cnstr_v) = value_clause in
+  let cnstr = Unification.add_dirty_constraint ret drty_r_v cnstr in
+  let cnstr = Unification.add_ty_constraint param_ty ty_p_v cnstr in
+  let cnstr = Unification.list_union [cnstr; cnstr_v] in
+  let ctx = ctx_v @ ctx in
+
+  (* add constraints for the effect clause *)
+  let handle_effect_clause ((_, (ty_par, ty_ret)), abstr) (ctx, cnstr) =
+    let (ctx_e, (ty_p_e, ty_k_e, drty_r_e), cnstr_e) = abstr in
+    let ctx = ctx_e @ ctx in
+    let cnstr = Unification.add_ty_constraint ty_par ty_p_e cnstr in
+    let cnstr = Unification.add_ty_constraint (Type.Arrow (ty_ret, ret)) ty_k_e cnstr in
+    let cnstr = Unification.add_dirty_constraint ret drty_r_e cnstr in
+    let cnstr = Unification.list_union [cnstr; cnstr_e] in
+    (ctx, cnstr)
+  in
+  let (ctx, cnstr) = List.fold_right handle_effect_clause effect_clauses (ctx, cnstr) in
+
+  (* loop over all effect that can be handled, input and output contain these effects *)
+  let effs = List.map (fun (eff, _) -> eff) (Common.uniq (List.map fst effect_clauses)) in
+  let cnstr = Unification.add_dirt_constraint (Type.fresh_dirt_ops effs) ret_drt cnstr in
+  let param_drt = Type.add_ops effs param_drt in
+
+  (* result *)
+  let ty = Type.Handler ((param_ty, param_drt), ret) in
+  (ctx, ty, cnstr)
 
 (***************************)
 (* COMPUTATION CONSTRUCTORS*)
@@ -249,7 +283,7 @@ let print_ty_scheme ty_sch ppf =
 
 let print_dirty_scheme ty_sch ppf =
   let (ctx, (ty, drt), cnstrs) = beautify_dirty_scheme ty_sch in
-  Print.print ppf "%t |- %t ! %t | %t"
+  Print.print ppf "(%t) |- (%t) ! (%t) | %t"
     (print_context ctx)
     (Type.print_ty ty)
     (Type.print_dirt drt)

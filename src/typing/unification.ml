@@ -83,6 +83,6 @@ let list_union = function
 
 (* Print constraints *)
 let print constraints ppf =
-  Print.sequence "," (fun (x, y) ppf -> Format.fprintf ppf "%t = %t" (Type.print_ty x) (Type.print_ty y)) constraints.types ppf;
+  Print.sequence "," (fun (x, y) ppf -> Format.fprintf ppf "(%t = %t)" (Type.print_ty x) (Type.print_ty y)) constraints.types ppf;
   Format.pp_print_string ppf " ; ";
-  Print.sequence "," (fun (x, y) ppf -> Format.fprintf ppf "%t = %t" (Type.print_dirt x) (Type.print_dirt y)) constraints.dirts ppf
+  Print.sequence "," (fun (x, y) ppf -> Format.fprintf ppf "(%t = %t)" (Type.print_dirt x) (Type.print_dirt y)) constraints.dirts ppf

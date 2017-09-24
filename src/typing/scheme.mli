@@ -74,7 +74,7 @@ val tuple : ty_scheme list -> ty_scheme
 val effect : Type.ty -> Type.ty -> Untyped.EffectMap.key -> ty_scheme
 
 (* smart constructor for the handler term : expression *)
-val handler : abstraction2_scheme list -> abstraction_scheme -> ty_scheme
+val handler : ((Common.effect * (Type.ty * Type.ty)) * abstraction2_scheme) list -> abstraction_scheme -> ty_scheme
 
 (***************************)
 (* COMPUTATION CONSTRUCTORS*)

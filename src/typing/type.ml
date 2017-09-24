@@ -56,6 +56,9 @@ let simple_dirt d = { ops = []; rest = d }
 let fresh_dirt () = simple_dirt (Params.fresh_dirt_param ())
 let fresh_dirty () = (fresh_ty (), fresh_dirt ())
 
+let add_ops ops d = { ops = Common.uniq (ops @ d.ops); rest = d.rest }
+let fresh_dirt_ops ops = add_ops ops (fresh_dirt ())
+
 (* These types are used when type checking is turned off. Their names
    are syntactically incorrect so that the programmer cannot accidentally
    define it. *)
