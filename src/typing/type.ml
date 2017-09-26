@@ -19,7 +19,7 @@ and prim_ty =
   | IntTy
   | FloatTy
   | StringTy
-  | UnitTy
+  (* | UnitTy *)
   | UniTy
 
 and dirty = ty * dirt
@@ -36,7 +36,7 @@ let int_ty = Prim IntTy
 let string_ty = Prim StringTy
 let bool_ty = Prim BoolTy
 let float_ty = Prim FloatTy
-let unit_ty = Prim UnitTy
+let unit_ty = Tuple []
 let empty_ty = Apply ("empty", ([], []))
 
 let prim_to_string prim =
@@ -45,7 +45,7 @@ let prim_to_string prim =
     | IntTy -> "int"
     | FloatTy -> "float"
     | StringTy -> "string"
-    | UnitTy -> "unit"
+    (* | UnitTy -> "unit" *)
     | UniTy -> "universal"
   end
 
@@ -58,6 +58,8 @@ let fresh_dirty () = (fresh_ty (), fresh_dirt ())
 
 let add_ops ops d = { ops = Common.uniq (ops @ d.ops); rest = d.rest }
 let fresh_dirt_ops ops = add_ops ops (fresh_dirt ())
+
+let make_dirt ops rest = { ops = ops; rest = rest }
 
 (* These types are used when type checking is turned off. Their names
    are syntactically incorrect so that the programmer cannot accidentally
@@ -157,7 +159,7 @@ let rec print_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
   | Apply (ty_name, ([], _)) ->
-    print "%s" ty_name
+    print ".%s" ty_name
   | Apply (ty_name, ([ty], _)) ->
     print ~at_level:1 "%t %s" (print_ty ~max_level:1 ty) ty_name
   | Apply (ty_name, (tys, _)) ->

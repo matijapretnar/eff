@@ -15,7 +15,7 @@ type abstraction2_scheme = (Type.ty * Type.ty * Type.dirty) t
 (********************)
 
 let ty_cnstr ~loc ty1 ty2 (ctx, ty, cnstrs) =
-  (ctx, ty, Unification.add_ty_constraint ty1 ty2 cnstrs)
+  (ctx, ty, Unification.add_ty_constraint ~loc ty1 ty2 cnstrs)
 
 let remove_context ~loc ctx_p (ctx, ty, cnstrs) =
   let trim (x, t) (ctx, ty, cnstrs) =
@@ -46,6 +46,20 @@ let just new_cnstrs (ctx, ty, cnstrs) =
 *)
 let create_ty_scheme ctx ty changes =
   List.fold_right Common.id changes (ctx, ty, Unification.empty)
+
+(******************)
+(* SCHEME SOLVERS *)
+(******************)
+
+let solve_ty (ctx, ty, cnstrs) =
+  let cnstrs = Unification.unify ctx cnstrs in
+  let ty = Unification.find_ty_solution ty cnstrs in
+  (ctx, ty, cnstrs)
+
+let solve_dirty (ctx, ty, cnstrs) =
+  let cnstrs = Unification.unify ctx cnstrs in
+  let ty = Unification.find_dirty_solution ty cnstrs in
+  (ctx, ty, cnstrs)
 
 (*****************************)
 (* INTERFACE IMPLEMENTATIONS *)
@@ -95,39 +109,40 @@ and abstract2 ~loc (ctx_p1, ty_p1, cnstrs_p1) (ctx_p2, ty_p2, cnstrs_p2) (ctx_c,
 (* EXPRESSION CONSTRUCTORS *)
 (***************************)
 
-let var x ty = ([(x, ty)], ty, Unification.empty)
+let var ~loc x ty = solve_ty ([(x, ty)], ty, Unification.empty)
 
-let const c =
+let const ~loc c =
   let ty = match c with
     | Const.Integer _ -> Type.int_ty
     | Const.String _ -> Type.string_ty
     | Const.Boolean _ -> Type.bool_ty
     | Const.Float _ -> Type.float_ty
   in
-  simple ty
+  solve_ty (simple ty)
 
 let lambda ~loc (ctx_p, ty_p, cnstrs_p) (ctx_c, drty_c, cnstrs_c) =
-  create_ty_scheme ctx_c (Type.Arrow (ty_p, drty_c)) [
+  let sch = create_ty_scheme ctx_c (Type.Arrow (ty_p, drty_c)) [
       trim_context ~loc ctx_p;
       just cnstrs_p;
       just cnstrs_c
-    ]
+    ] in
+  solve_ty sch
 
-let tuple es =
+let tuple ~loc es =
   let ctx, tys, constraints =
     List.fold_right (fun e (ctx, tys, constraints) ->
         let e_ctx, e_ty, e_constraints = e in
         e_ctx @ ctx, e_ty :: tys, Unification.list_union [e_constraints; constraints]
       ) es ([], [], Unification.empty)
   in
-  (ctx, Type.Tuple tys, constraints)
+  solve_ty (ctx, Type.Tuple tys, constraints)
 
-let effect ty_par ty_res eff_name =
+let effect ~loc ty_par ty_res eff_name =
   let drt = {Type.ops = [eff_name]; Type.rest = Params.fresh_dirt_param ()} in
   let ty = Type.Arrow (ty_par, (ty_res, drt)) in
-  simple ty
+  solve_ty (simple ty)
 
-let handler effect_clauses value_clause =
+let handler ~loc effect_clauses value_clause =
   (* make the required elements for the handler *)
   let param = Type.fresh_dirty () in
   let ret = Type.fresh_dirty () in
@@ -138,8 +153,8 @@ let handler effect_clauses value_clause =
 
   (* add constraints for the value clause *)
   let (ctx_v, (ty_p_v, drty_r_v), cnstr_v) = value_clause in
-  let cnstr = Unification.add_dirty_constraint ret drty_r_v cnstr in
-  let cnstr = Unification.add_ty_constraint param_ty ty_p_v cnstr in
+  let cnstr = Unification.add_dirty_constraint ~loc ret drty_r_v cnstr in
+  let cnstr = Unification.add_ty_constraint ~loc param_ty ty_p_v cnstr in
   let cnstr = Unification.list_union [cnstr; cnstr_v] in
   let ctx = ctx_v @ ctx in
 
@@ -147,9 +162,9 @@ let handler effect_clauses value_clause =
   let handle_effect_clause ((_, (ty_par, ty_ret)), abstr) (ctx, cnstr) =
     let (ctx_e, (ty_p_e, ty_k_e, drty_r_e), cnstr_e) = abstr in
     let ctx = ctx_e @ ctx in
-    let cnstr = Unification.add_ty_constraint ty_par ty_p_e cnstr in
-    let cnstr = Unification.add_ty_constraint (Type.Arrow (ty_ret, ret)) ty_k_e cnstr in
-    let cnstr = Unification.add_dirty_constraint ret drty_r_e cnstr in
+    let cnstr = Unification.add_ty_constraint ~loc ty_par ty_p_e cnstr in
+    let cnstr = Unification.add_ty_constraint ~loc (Type.Arrow (ty_ret, ret)) ty_k_e cnstr in
+    let cnstr = Unification.add_dirty_constraint ~loc ret drty_r_e cnstr in
     let cnstr = Unification.list_union [cnstr; cnstr_e] in
     (ctx, cnstr)
   in
@@ -157,92 +172,92 @@ let handler effect_clauses value_clause =
 
   (* loop over all effect that can be handled, input and output contain these effects *)
   let effs = List.map (fun (eff, _) -> eff) (Common.uniq (List.map fst effect_clauses)) in
-  let cnstr = Unification.add_dirt_constraint (Type.fresh_dirt_ops effs) ret_drt cnstr in
   let param_drt = Type.add_ops effs param_drt in
+  let cnstr = Unification.add_dirt_constraint ~loc param_drt ret_drt cnstr in
+
 
   (* result *)
   let ty = Type.Handler ((param_ty, param_drt), ret) in
-  (ctx, ty, cnstr)
+  solve_ty (ctx, ty, cnstr)
 
 (***************************)
 (* COMPUTATION CONSTRUCTORS*)
 (***************************)
 
-let value e = make_dirty e
+let value ~loc e = solve_dirty (make_dirty e)
 
-let apply e1 e2 =
+let apply ~loc e1 e2 =
   let ctx_e1, ty_e1, cnstrs_e1 = e1 in
   let ctx_e2, ty_e2, cnstrs_e2 = e2 in
   let drty = Type.fresh_dirty () in
   let constraints = Unification.union cnstrs_e1 cnstrs_e2  in
-  let constraints = Unification.add_ty_constraint ty_e1 (Type.Arrow (ty_e2, drty)) constraints in
-  (ctx_e1 @ ctx_e2, drty, constraints)
+  let constraints = Unification.add_ty_constraint ~loc ty_e1 (Type.Arrow (ty_e2, drty)) constraints in
+  solve_dirty (ctx_e1 @ ctx_e2, drty, constraints)
 
-let patmatch es cases =
+let patmatch ~loc es cases =
   let ctx_e, ty_e, cnstrs_e = es in
   let drty = Type.fresh_dirty () in
   match cases with
     | [] ->
-      let constraints = Unification.add_ty_constraint ty_e Type.empty_ty cnstrs_e in
-      (ctx_e, drty, constraints)
+      let constraints = Unification.add_ty_constraint ~loc ty_e Type.empty_ty cnstrs_e in
+      solve_dirty (ctx_e, drty, constraints)
     | _::_ ->
       let fold a (ctx, constraints) =
         let ctx_a, (ty_p, drty_c), cnstrs_a = a in
         ctx_a @ ctx,
         Unification.list_union [cnstrs_a; constraints]
-        |> Unification.add_ty_constraint ty_e ty_p
-        |> Unification.add_dirty_constraint drty_c drty
+        |> Unification.add_ty_constraint ~loc ty_e ty_p
+        |> Unification.add_dirty_constraint ~loc drty_c drty
       in
       let ctx, constraints = List.fold_right fold cases (ctx_e, cnstrs_e) in
-      (ctx, drty, constraints)
+      solve_dirty (ctx, drty, constraints)
 
-let handle e c =
+let handle ~loc e c =
   let ctx_e, ty_e, cnstrs_e = e in
   let ctx_c, drty_c, cnstrs_c = c in
   let drty = Type.fresh_dirty () in
   let constraints =
     Unification.list_union [cnstrs_e; cnstrs_c]
-    |> Unification.add_ty_constraint ty_e (Type.Handler (drty_c, drty))
+    |> Unification.add_ty_constraint ~loc ty_e (Type.Handler (drty_c, drty))
   in
-  (ctx_e @ ctx_c, drty, constraints)
+  solve_dirty (ctx_e @ ctx_c, drty, constraints)
 
 (************************)
 (* PATTERN CONSTRUCTORS *)
 (************************)
 
-let pvar x =
+let pvar ~loc x =
   let ty = Type.fresh_ty () in
   let sch = simple ty in
-  add_to_context x ty sch
+  solve_ty (add_to_context x ty sch)
 
-let pconst const =
+let pconst ~loc const =
   let ty = match const with
     | Const.Integer _ -> Type.int_ty
     | Const.String _ -> Type.string_ty
     | Const.Boolean _ -> Type.bool_ty
     | Const.Float _ -> Type.float_ty
   in
-  simple ty
+  solve_ty (simple ty)
 
-let pnonbinding () =
+let pnonbinding ~loc () =
   let ty = Type.fresh_ty () in
-  simple ty
+  solve_ty (simple ty)
 
-let pas p x =
+let pas ~loc p x =
   let ty = get_type p in
-  add_to_context x ty p
+  solve_ty (add_to_context x ty p)
 
-let ptuple ps =
+let ptuple ~loc ps =
   let infer p (ctx, tys, chngs) =
     let ctx_p, ty_p, cnstrs_p = p in
     ctx_p @ ctx, ty_p :: tys, Unification.union cnstrs_p chngs
   in
   let ctx, tys, chngs = List.fold_right infer ps ([], [], Unification.empty) in
   let ty = Type.Tuple tys in
-  simple ty
+  solve_ty (simple ty)
 
-let precord ctx ty changes = create_ty_scheme ctx ty changes
-
+let precord ~loc ctx ty changes = solve_ty (create_ty_scheme ctx ty changes)
 
 (**********************)
 (* PRINTING FUNCTIONS *)

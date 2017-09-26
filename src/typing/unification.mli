@@ -23,6 +23,9 @@ type dirt_cnstr
 (* a constraint set *)
 type t
 
+(* represents a context and contains all free variables that occur *)
+type context = (Untyped.variable, Type.ty) Common.assoc
+
 (*************************)
 (* CONSTRAINT OPERATIONS *)
 (*************************)
@@ -31,13 +34,13 @@ type t
 val empty : t
 
 (* add a typing constraint: T = S *)
-val add_ty_constraint : Type.ty -> Type.ty -> t -> t
+val add_ty_constraint : loc:Location.t -> Type.ty -> Type.ty -> t -> t
 
 (* add a dirt constraint: ... *)
-val add_dirt_constraint : Type.dirt -> Type.dirt -> t -> t
+val add_dirt_constraint : loc:Location.t -> Type.dirt -> Type.dirt -> t -> t
 
 (* add a dirty constraint: ... *)
-val add_dirty_constraint : Type.dirty -> Type.dirty -> t -> t
+val add_dirty_constraint : loc:Location.t -> Type.dirty -> Type.dirty -> t -> t
 
 (* combine two constraint sets to a single set *)
 val union : t -> t -> t
@@ -45,13 +48,27 @@ val union : t -> t -> t
 (* combine mutliple constraint sets to a single set *)
 val union_list : t list -> t
 
-(* unify the constraints to find a solution *)
-val unify : t -> t
-
 (* perform a substitution *)
 val subst : Params.substitution -> t -> t
 
+(* combine multiple constraint sets to a single set *)
 val list_union : t list -> t
+
+(************************)
+(* CONSTRAINT SOLUTIONS *)
+(************************)
+
+(* perform unification on the constraint set *)
+val unify : context -> t -> t
+
+(* find a principal solution for types *)
+val find_ty_solution : Type.ty -> t -> Type.ty
+
+(* find a principal solution for a dirt *)
+val find_dirt_solution : Type.dirt -> t -> Type.dirt
+
+(* find a principal solution for a dirty type *)
+val find_dirty_solution : Type.dirty -> t -> Type.dirty
 
 (***********************)
 (* PRINTING OPERATIONS *)

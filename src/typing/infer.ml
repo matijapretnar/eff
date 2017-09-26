@@ -38,11 +38,11 @@ let add_multiple_defs vars env =
 (* Lookup a type scheme for a variable in the typing environment
     Otherwise, create a new scheme (and add it to the typing environment)
 *)
-let get_var_scheme_env st x =
+let get_var_scheme_env ~loc st x =
   begin match TypingEnv.lookup st.context x with
     | Some ty_sch -> ty_sch, st
     | None -> let ty = Type.fresh_ty () in
-              let sch = Scheme.var x ty in
+              let sch = Scheme.var ~loc x ty in
               sch, add_def st x sch
   end
 
@@ -126,7 +126,7 @@ and type_expr st {Untyped.term=expr; Untyped.location=loc} = type_plain_expr st 
 (* Type a plain expression *)
 and type_plain_expr st loc = function
   | Untyped.Var x ->
-    let ty_sch, st = get_var_scheme_env st x in
+    let ty_sch, st = get_var_scheme_env ~loc st x in
     Ctor.var ~loc x ty_sch, st
   | Untyped.Const const ->
     Ctor.const ~loc const, st
@@ -252,6 +252,7 @@ let type_toplevel ~loc ppf st = function
   (* Get the type of *)
   | Untyped.TypeOf c ->
     let c, st = type_comp st c in
+    Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme c.Typed.scheme);
     Typed.TypeOf c, st
 
 (**************************)
