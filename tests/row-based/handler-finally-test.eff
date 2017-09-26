@@ -1,0 +1,15 @@
+external ( + ) : int -> int -> int = "+";;
+effect Op : unit -> int;;
+
+let h1 = handler
+  | val y -> y
+  | #Op () k -> k 3
+  | finally f -> f + 1;;
+
+let h2 = handler
+  | val y -> y
+  | #Op () k -> k 3;;
+
+with h1 handle (#Op () + #Op ());;
+
+with h2 handle ((fun x -> x + 1) (#Op () + #Op ()));;
