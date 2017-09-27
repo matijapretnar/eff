@@ -22,6 +22,9 @@ let effect_set_union s1 s2 =
 let effect_set_is_empty s = 
       EffectSet.is_empty s
 
+let effect_set_is_subseteq s1 s2 =
+      (EffectSet.subset s1 s2) || (EffectSet.equal s1 s2)
+
 type target_ty = 
   | Tyvar of Params.ty_param
   | Arrow of target_ty * target_dirty
