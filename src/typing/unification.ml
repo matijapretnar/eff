@@ -229,7 +229,11 @@ let rec unify(sub, paused, queue) =
  print_c_list paused;
  Print.debug "-----queue-----";
  print_c_list queue;
- if (queue == []) then (sub,paused)
+ if (queue == []) then 
+ begin 
+ Print.debug "=============FINAL LOOP Result============";
+  (sub,paused)
+ end
  else
  let cons::rest_queue = queue in 
  begin match cons with
