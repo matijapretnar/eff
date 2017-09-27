@@ -96,7 +96,7 @@ and dirt_coercion =
   | ReflDirt of dirt
   | DirtCoercionVar of Params.dirt_coercion_param 
   | Empty of dirt
-  | UnionTy of ( OldUtils.effect * dirt_coercion)
+  | UnionDirt of ( Types.effect_set * dirt_coercion)
   | SequenceDirtCoer of dirt_coercion * dirt_coercion
   | DirtCoercion of dirty_coercion
 

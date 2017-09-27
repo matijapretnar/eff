@@ -305,18 +305,29 @@ let rec unify(sub, paused, queue) =
       Print.debug "=========End loop============";
       unify(sub, paused, rest_queue)
 
-   | (Types.SetVar (s1,v1), Types.SetEmpty s2) when ((Types.effect_set_is_empty s1) && (Types.effect_set_is_empty s1) ) ->
+   | (Types.SetVar (s1,v1), Types.SetEmpty s2) when ((Types.effect_set_is_empty s1) && (Types.effect_set_is_empty s2) ) ->
       let sub' = [CoerDirtVartoDirtCoercion(omega,(Typed.Empty (Types.SetEmpty Types.empty_effect_set))) ; 
                   DirtVarToDirt(v1, (Types.SetEmpty Types.empty_effect_set))] in 
       let new_queue = apply_sub sub' (paused @ rest_queue) in 
       Print.debug "=========End loop============";
       unify( (sub' @ sub), [], new_queue )
 
-(*    | (Types.SetEmpty s1, Types.SetEmpty s2)->
-      if(Types.effect_set_subseteq s1 s2) then
+   | (Types.SetEmpty s1, Types.SetEmpty s2)->
+      if(Types.effect_set_is_subseteq s1 s2) then
       begin 
-        let sub' = CoerDirtVartoDirtCoercion (omega, Typed.) *)
+        let sub' = CoerDirtVartoDirtCoercion (omega, Typed.UnionDirt ( s2, (Typed.Empty (Types.SetEmpty (Types.effect_set_diff s2 s1))))) in 
+        Print.debug "=========End loop============";
+        unify( (sub' :: sub), paused, rest_queue ) 
+      end
+      else assert false
    
+   | (Types.SetEmpty s1, Types.SetVar(s2,v2)) ->
+     let sub' = [ CoerDirtVartoDirtCoercion (omega, Typed.UnionDirt ( s2, (Typed.Empty (Types.SetEmpty (Types.effect_set_diff s2 s1)))));
+                  DirtVarToDirt(v2, Types.SetVar ( (Types.effect_set_diff s1 s2) ,  Params.fresh_dirt_param () ))] in 
+     let new_queue = apply_sub sub' (paused @ rest_queue) in 
+      Print.debug "=========End loop============";
+      unify( (sub' @ sub), [], new_queue )    
+ 
    | _ -> Print.debug "=========End loop============";
         unify (sub ,(cons::paused), rest_queue)
    end 
