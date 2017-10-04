@@ -21,9 +21,9 @@ effect Op3 : unit -> int;;
 
 #Op;;
 
-(fun a -> if a then (#Op ()) else 2);;
+(* #Op ();; *)
 
-(* (fun a -> if a then true else 2);; *)
+(fun a -> if a then (#Op ()) else 2);;
 
 (fun a -> match a with
           | true -> #Op ()

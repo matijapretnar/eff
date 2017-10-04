@@ -23,9 +23,20 @@ let infer_effect ~loc st eff =
   with
     | Not_found -> Error.typing ~loc "Unbound effect %s" eff
 
+(* Change the types in effect to primitives *)
+let fix_type ty =
+  begin match ty with
+    | Type.Apply ("unit", ([], _)) -> Type.Tuple []
+    | Type.Apply ("bool", ([], _)) -> Type.Prim Type.BoolTy
+    | Type.Apply ("int", ([], _)) -> Type.Prim Type.IntTy
+    | Type.Apply ("string", ([], _)) -> Type.Prim Type.StringTy
+    | Type.Apply ("float", ([], _)) -> Type.Prim Type.FloatTy
+    | _ -> ty
+  end
+
 (* Add an effect to the environment *)
 let add_effect env eff (ty1, ty2) =
-  {env with effects = Untyped.EffectMap.add eff (ty1, ty2) env.effects}
+  {env with effects = Untyped.EffectMap.add eff (fix_type ty1, fix_type ty2) env.effects}
 
 (* Add x : Typed.variable, ty_sch : Scheme.ty_scheme to the environment *)
 let add_def env x ty_sch =

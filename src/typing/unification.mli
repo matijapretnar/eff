@@ -59,16 +59,10 @@ val list_union : t list -> t
 (************************)
 
 (* perform unification on the constraint set *)
-val unify : context -> t -> t
+val unify_ty : context -> Type.ty -> t -> (context * Type.ty * t)
 
-(* find a principal solution for types *)
-val find_ty_solution : Type.ty -> t -> Type.ty
-
-(* find a principal solution for a dirt *)
-val find_dirt_solution : Type.dirt -> t -> Type.dirt
-
-(* find a principal solution for a dirty type *)
-val find_dirty_solution : Type.dirty -> t -> Type.dirty
+(* perform unification on the constraint set *)
+val unify_dirty : context -> Type.dirty -> t -> (context * Type.dirty * t)
 
 (***********************)
 (* PRINTING OPERATIONS *)

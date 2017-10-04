@@ -52,14 +52,10 @@ let create_ty_scheme ctx ty changes =
 (******************)
 
 let solve_ty (ctx, ty, cnstrs) =
-  let cnstrs = Unification.unify ctx cnstrs in
-  let ty = Unification.find_ty_solution ty cnstrs in
-  (ctx, ty, cnstrs)
+  Unification.unify_ty ctx ty cnstrs
 
 let solve_dirty (ctx, ty, cnstrs) =
-  let cnstrs = Unification.unify ctx cnstrs in
-  let ty = Unification.find_dirty_solution ty cnstrs in
-  (ctx, ty, cnstrs)
+  Unification.unify_dirty ctx ty cnstrs
 
 (*****************************)
 (* INTERFACE IMPLEMENTATIONS *)

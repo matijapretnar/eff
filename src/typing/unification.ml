@@ -16,260 +16,20 @@ type t = {
 (* represents a context and contains all free variables that occur *)
 type context = (Untyped.variable, Type.ty) Common.assoc
 
-(**********************)
-(* SIMPLY CONSTRAINTS *)
-(**********************)
-
-let print_types str constraints =
-  Print.sequence "," (fun (x, y, _) ppf -> Format.fprintf ppf "(%t = %t)" (Type.print_ty x) (Type.print_ty y)) constraints Format.std_formatter;
-  Format.pp_print_string Format.std_formatter str
-
-
-(* Add a dirt to a constraint set *)
-let add_dirt_only drt cnstr = {
-  types = cnstr.types;
-  dirts = drt :: cnstr.dirts
-}
-
-(* Add a type to a constraint set *)
-let add_ty_only ty cnstr = {
-  types = ty :: cnstr.types;
-  dirts = cnstr.dirts
-}
-
-let rec contains x = function
-  | [] -> false
-  | x' :: lst -> if (x = x') then true else contains x lst
-
-let rec remove_duplicates occ cnstr =
-  begin match occ with
-    | [] -> []
-    | item :: tail when contains item cnstr -> remove_duplicates tail cnstr
-    | item :: tail -> item :: (remove_duplicates tail cnstr)
-  end
-
-(* Check if two dirts are the same (with no operations) *)
-let dirt_var_equal drt1 drt2 =
-  begin match drt1.Type.ops, drt2.Type.ops with
-    | [], [] -> drt1.Type.rest = drt2.Type.rest
-    | _ -> false
-  end
-
-(* Check if a dirt only contains a var and no operations *)
-let is_drt_var drt =
-  begin match drt.Type.ops with
-    | [] -> true
-    | _ -> false
-  end
-
-let fix_type ty =
-  begin match ty with
-    | Type.Apply ("unit", ([], _)) -> Type.Tuple []
-    | Type.Apply ("bool", ([], _)) -> Type.Prim Type.BoolTy
-    | Type.Apply ("int", ([], _)) -> Type.Prim Type.IntTy
-    | Type.Apply ("string", ([], _)) -> Type.Prim Type.StringTy
-    | Type.Apply ("float", ([], _)) -> Type.Prim Type.FloatTy
-    | _ -> ty
-  end
-
-(* FIX THIS: Type.Apply ("unit", ([], _)) *)
-let prim_equal t1 t2 =
-  let t1 = fix_type t1 in
-  let t2 = fix_type t2 in
-  begin match t1, t2 with
-    | Type.Prim Type.BoolTy, Type.Prim Type.BoolTy -> true
-    | Type.Prim Type.IntTy, Type.Prim Type.IntTy -> true
-    | Type.Prim Type.FloatTy, Type.Prim Type.FloatTy -> true
-    | Type.Prim Type.StringTy, Type.Prim Type.StringTy -> true
-    | Type.Tuple [], Type.Tuple [] -> true
-    (* | Type.UnitTy, Type.UniTy -> true *)
-    | Type.Prim Type.UniTy, Type.Prim Type.UniTy -> true
-    | _ -> false
-  end
-
-(* Find matching dirts *)
-let rec find_other_dirt drt cnstr =
-  begin match cnstr with
-    | [] -> None, []
-    | (drt1, drt2, loc) :: cnstr when dirt_var_equal drt drt1 && not (is_drt_var drt2) ->
-      Some drt2, cnstr
-    | (drt2, drt1, loc) :: cnstr when dirt_var_equal drt drt1 && not (is_drt_var drt2)->
-      Some drt2, cnstr
-    | (drt1, drt2, loc) :: cnstr ->
-      let opt, cnstr = find_other_dirt drt cnstr in
-      opt, (drt1, drt2, loc) :: cnstr
-  end
-
-(*
-  Unify two dirts of the form:
-    d1 = {ops... ; d2}
-    d1 = {ops... ; d3}
-  into:
-    d2 = {ops... ; d4}
-    d3 = {ops... ; d4}
-    d1 = {ops... ; d4}
-*)
-let unify_single_dirt loc drt2 drt3 =
-  let out = Type.fresh_dirt () in
-  let out = Type.add_ops drt2.Type.ops out in
-  let out = Type.add_ops drt3.Type.ops out in
-  let out2_l = Type.make_dirt [] drt2.Type.rest in
-  let out3_l = Type.make_dirt [] drt3.Type.rest in
-  let out2_r = Type.make_dirt drt3.Type.ops out.Type.rest in
-  let out3_r = Type.make_dirt drt2.Type.ops out.Type.rest in
-  out, (out2_l, out2_r, loc), (out3_l, out3_r, loc)
-
-(* Add a dirt to a constraint set and perform some unification *)
-let rec simplify_dirt (drt1, drt2, loc) cnstr =
-  begin match drt1, drt2 with
-    | (drt1, drt2) when dirt_var_equal drt1 drt2 ->
-      cnstr
-    | (drt1, drt2) when is_drt_var drt1 && is_drt_var drt2 ->
-      add_dirt_only (drt1, drt2, loc) cnstr
-    | (drt1, drt2) when is_drt_var drt1 ->
-      let drt3_option, dirts = find_other_dirt drt1 cnstr.dirts in
-      let cnstr = {cnstr with dirts=dirts} in
-      begin match drt3_option with
-        | None -> add_dirt_only (drt1, drt2, loc) cnstr
-        | Some drt3 ->
-          let new1, new2, new3 = unify_single_dirt loc drt2 drt3 in
-          let cnstr = add_dirt_only (drt1, new1, loc) cnstr in
-          let cnstr = simplify_dirt new2 cnstr in
-          let cnstr = simplify_dirt new3 cnstr in
-          (* let cnstr = expand_dirts drt1 drt2 loc cnstr in *)
-          cnstr
-      end
-    | (drt2, drt1) when is_drt_var drt1 ->
-      let drt3_option, dirts = find_other_dirt drt1 cnstr.dirts in
-      let cnstr = {cnstr with dirts=dirts} in
-      begin match drt3_option with
-        | None -> add_dirt_only (drt1, drt2, loc) cnstr
-        | Some drt3 ->
-          let new1, new2, new3 = unify_single_dirt loc drt2 drt3 in
-          let cnstr = add_dirt_only (drt1, new1, loc) cnstr in
-          let cnstr = simplify_dirt new2 cnstr in
-          let cnstr = simplify_dirt new3 cnstr in
-          (* let cnstr = expand_dirts drt1 drt2 loc cnstr in *)
-          cnstr
-      end
-    | (drt1, drt2) ->
-      let new1, new2, new3 = unify_single_dirt loc drt1 drt2 in
-      let cnstr = simplify_dirt new2 cnstr in
-      let cnstr = simplify_dirt new3 cnstr in
-      cnstr
-  end
-
-(* Add a drt constraint to a constraint set *)
-and add_dirt drt cnstr = simplify_dirt drt cnstr
-
-let rec find_occurences ty cnstr =
-  begin match cnstr with
-    | [] -> []
-    | (ty1, ty2, loc) :: cnstr when ty = ty1 ->
-      (ty1, ty2, loc) :: (find_occurences ty cnstr)
-    | (ty1, ty2, loc) :: cnstr when ty = ty2 ->
-      (ty1, ty2, loc) :: (find_occurences ty cnstr)
-    | _ :: cnstr -> find_occurences ty cnstr
-  end
-
-let rec replace_type ty_replace ty_new occ =
-  begin match occ with
-    | [] -> []
-    | (ty1, ty2, loc) :: occ when ty_replace = ty1 ->
-      (ty_new, ty2, loc) :: (replace_type ty_replace ty_new occ)
-    | (ty1, ty2, loc) :: occ when ty_replace = ty2 ->
-      (ty1, ty_new, loc) :: (replace_type ty_replace ty_new occ)
-    | _ :: occ -> replace_type ty_replace ty_new occ
-  end
-
-let rec replace_type_reverse ty_replace ty_new occ =
-  begin match occ with
-    | [] -> []
-    | (ty1, ty2, loc) :: occ when ty_replace = ty1 ->
-      (ty_new, ty2, loc) :: (replace_type_reverse ty_replace ty_new occ)
-    | (ty1, ty2, loc) :: occ when ty_replace = ty2 ->
-      (ty1, ty_new, loc) :: (replace_type_reverse ty_replace ty_new occ)
-    | _ :: occ -> replace_type_reverse ty_replace ty_new occ
-  end
-
-let remove_duplicate_list l =
-  let rec tail_uniq a l =
-    match l with
-      | [] -> a
-      | hd::tl -> tail_uniq (hd::a) (List.filter (fun x -> x  != hd) tl) in
-  tail_uniq [] l
-
-(* Add a dirt to a constraint set and perform some unification *)
-let rec simplify_type (ty1, ty2, loc) cnstr =
-  let rec add_new_types occ cnstr =
-    begin match occ with
-      | [] -> cnstr
-      | item :: tail -> add_new_types tail (add_type item cnstr)
-    end
-  in
-  begin match ty1, ty2 with
-    | (ty1, ty2) when ty1 = ty2 ->
-      cnstr
-    | (Type.TyVar t1, Type.TyVar t2) ->
-      let occ1 = find_occurences ty1 cnstr.types in
-      let occ2 = find_occurences ty2 cnstr.types in
-      let occ1 = replace_type ty1 ty2 occ1 in
-      let occ2 = replace_type ty2 ty1 occ2 in
-      let occ = remove_duplicate_list (occ1 @ occ2) in
-      let occ = remove_duplicates occ cnstr.types in
-      let cnstr = add_ty_only (ty1, ty2, loc) cnstr in
-      (* let cnstr = add_new_types occ cnstr in *)
-      cnstr
-    | (Type.TyVar t1, t2) ->
-      let occ = find_occurences ty1 cnstr.types in
-      let occ = replace_type_reverse ty1 ty2 occ in
-      let occ = remove_duplicates occ cnstr.types in
-      let cnstr = add_ty_only (ty1, ty2, loc) cnstr in
-      let cnstr = add_new_types occ cnstr in
-      cnstr
-    | (t1, Type.TyVar t2) ->
-      let occ = find_occurences ty2 cnstr.types in
-      (* print_types " type_end "[ty1, ty2, loc];
-      print_types " occ_end " occ;
-      print_types " cnstr_end " cnstr.types; *)
-      let occ = replace_type_reverse ty2 ty1 occ in
-      let occ = remove_duplicates occ cnstr.types in
-      let cnstr = add_ty_only (ty1, ty2, loc) cnstr in
-      let cnstr = add_new_types occ cnstr in
-      cnstr
-    | (t1, t2) when prim_equal t1 t2 ->
-      cnstr
-    | (Type.Arrow (ty1_in, dirty1_out), Type.Arrow (ty2_in, dirty2_out)) ->
-      let (ty1_out, drt1) = dirty1_out in
-      let (ty2_out, drt2) = dirty2_out in
-      let cnstr = simplify_dirt (drt1, drt2, loc) cnstr in
-      let cnstr = add_type (ty1_in, ty2_in, loc) cnstr in
-      let cnstr = add_type (ty1_out, ty2_out, loc) cnstr in
-      cnstr
-    | (Type.Handler (dirty1_in, dirty1_out), Type.Handler (dirty2_in, dirty2_out)) ->
-      let (ty1_in, drt1_in) = dirty1_in in
-      let (ty2_in, drt2_in) = dirty2_in in
-      let (ty1_out, drt1_out) = dirty1_out in
-      let (ty2_out, drt2_out) = dirty2_out in
-      let cnstr = simplify_dirt (drt1_in, drt2_in, loc) cnstr in
-      let cnstr = simplify_dirt (drt1_out, drt2_out, loc) cnstr in
-      let cnstr = add_type (ty1_in, ty2_in, loc) cnstr in
-      let cnstr = add_type (ty1_out, ty2_out, loc) cnstr in
-      cnstr
-    | _ -> Error.typing ~loc "This expression has type %t but it should have type %t." (Type.print_ty ty1) (Type.print_ty ty2)
-  end
-
 (******************)
 (* HELPER METHODS *)
 (******************)
 
 (* Add a type constraint to a constraint set *)
-and add_type (ty1, ty2, loc) cnstr =
-  let t1 = fix_type ty1 in
-  let t2 = fix_type ty2 in
-  let ty = (t1, t2, loc) in
-  if (contains ty cnstr.types) then cnstr else (simplify_type ty cnstr)
+let add_type ty cnstr = {
+  types = ty :: cnstr.types;
+  dirts = cnstr.dirts
+}
 
+let add_dirt drt cnstr = {
+  types = cnstr.types;
+  dirts = drt :: cnstr.dirts
+}
 
 let combine_types types cnstr = List.fold_right add_type types cnstr
 
@@ -296,7 +56,6 @@ let add_dirt_constraint ~loc drt1 drt2 cnstr = add_dirt (drt1, drt2, loc) cnstr
 
 let add_dirty_constraint ~loc (ty1, drt1) (ty2, drt2) cnstr = add_ty_constraint ~loc ty1 ty2 (add_dirt_constraint ~loc drt1 drt2 cnstr)
 
-
 (* Combine two constraint sets to a single set *)
 let union c1 c2 =
   let c' = combine_dirts c1.dirts c2 in
@@ -320,80 +79,256 @@ let list_union = function
 (* CONSTRAINT SOLUTIONS *)
 (************************)
 
-let rec search_constraints_type ty full cnstr exclude =
-  begin match cnstr with
-    | [] -> ty
-    | (ty1, ty2, _) :: cnstr when (ty1 = ty) && (not (contains ty exclude)) ->
-      begin match ty2 with
-        | Type.Prim _ -> ty2
-        | Type.TyVar a -> search_constraints_type ty2 full cnstr (ty :: exclude)
-        | _ -> search_constraints_type ty full cnstr exclude
-      end
-    | (ty2, ty1, _) :: cnstr when (ty1 = ty) && (not (contains ty exclude)) ->
-      begin match ty2 with
-        | Type.Prim _ -> ty2
-        | Type.TyVar a -> search_constraints_type ty2 full cnstr (ty :: exclude)
-        | _ -> search_constraints_type ty full cnstr exclude
-      end
-    | (ty2, ty1, _) :: cnstr -> search_constraints_type ty full cnstr exclude
+let rec check_ctx ty ctx =
+  begin match ctx with
+    | [] -> true
+    | (x, y) :: lst -> if y = ty then false else check_ctx ty lst
   end
 
-let rec search_constraints_dirt drt cnstr =
-  begin match cnstr with
-    | [] -> None
-    | (drt1, drt2, loc) :: cnstr when dirt_var_equal drt drt1 && not (is_drt_var drt2) ->
-      Some (Type.add_ops drt2.Type.ops drt)
-      (* let next = search_constraints_dirt drt2 cnstr in
-      begin match next with
-        | None -> search_constraints_dirt drt cnstr
-        | Some drt -> Some (Type.add_ops drt2.Type.ops drt)
-      end *)
-    | (drt2, drt1, loc) :: cnstr when dirt_var_equal drt drt1 && not (is_drt_var drt2) ->
-      Some (Type.add_ops drt2.Type.ops drt)
-      (* let next = search_constraints_dirt drt2 cnstr in
-      begin match next with
-        | None -> search_constraints_dirt drt cnstr
-        | Some drt -> Some (Type.add_ops drt2.Type.ops drt)
-      end *)
-    | (drt1, drt2, loc) :: cnstr ->
-      search_constraints_dirt drt cnstr
+(* within [ty] substitute [ty_old] with [ty_new] *)
+let rec perform_subst_ty ty_old ty_new ty =
+  begin match ty with
+    | t when t = ty_old -> ty_new
+    | Type.Arrow (ty_in, (ty_out, d)) ->
+      let ty_in = perform_subst_ty ty_old ty_new ty_in in
+      let ty_out = perform_subst_ty ty_old ty_new ty_out in
+      Type.Arrow (ty_in, (ty_out, d))
+    | Type.Handler ((ty_in, d1), (ty_out, d2)) ->
+      let ty_in = perform_subst_ty ty_old ty_new ty_in in
+      let ty_out = perform_subst_ty ty_old ty_new ty_out in
+      Type.Handler ((ty_in, d1), (ty_out, d2))
+    | Type.Tuple lst ->
+      let lst = List.map (perform_subst_ty ty_old ty_new) lst in
+      Type.Tuple lst
+    | Type.Apply (ty_name, (lst, drts)) ->
+      let lst = List.map (perform_subst_ty ty_old ty_new) lst in
+      Type.Apply (ty_name, (lst, drts))
+    (* not matching or primitive *)
+    | _ -> ty
   end
 
+(* unify types *)
+let rec unify_types ctx ty cnstr =
+  begin match cnstr.types with
+    | [] -> (ctx, ty, cnstr)
+    | (ty1, ty2, loc) :: tail ->
+      let cnstr_new = {cnstr with types=tail} in
+      begin match ty1, ty2 with
+        | (ty1, ty2) when ty1 = ty2 -> unify_types ctx ty cnstr_new
+
+        | (Type.Tuple tys1, Type.Tuple tys2) when List.length tys1 = List.length tys2 ->
+          let cnstr = List.fold_right2 (add_ty_constraint ~loc) tys1 tys2 cnstr_new in
+          unify_types ctx ty cnstr
+
+        (* | (Type.Apply (ty_name1, args1), Type.Apply (ty_name2, args2)) when ty_name1 = ty_name2 ->
+          begin match Tctx.lookup_params ty_name1 with
+            | None -> Error.typing ~loc "Undefined type %s" ty_name1
+            | Some params -> add_args_constraint ~loc params args1 args2 constraints
+          end *)
+      (*
+      (* The following two cases cannot be merged into one, as the whole matching
+         fails if both types are Apply, but only the second one is transparent. *)
+      | (Type.Apply (ty_name, args), ty) when Tctx.transparent ~loc ty_name ->
+        begin match Tctx.ty_apply ~loc ty_name args with
+          | Tctx.Inline ty' -> add_ty_constraint ~loc ty' ty constraints
+          | Tctx.Sum _ | Tctx.Record _ -> assert false (* None of these are transparent *)
+        end
+
+      | (ty, Type.Apply (ty_name, args)) when Tctx.transparent ~loc ty_name ->
+        begin match Tctx.ty_apply ~loc ty_name args with
+          | Tctx.Inline ty' -> add_ty_constraint ~loc ty ty' constraints
+          | Tctx.Sum _ | Tctx.Record _ -> assert false (* None of these are transparent *)
+        end *)
+
+        (* substitute ty1 with ty2 (if ty1 is not a FTV) *)
+        | (Type.TyVar t1, t2) when check_ctx ty1 ctx ->
+          let ty = perform_subst_ty ty1 ty2 ty in
+          let cnstr_types = List.map (
+            fun (t1, t2, loc) ->
+              let t1 = perform_subst_ty ty1 ty2 t1 in
+              let t2 = perform_subst_ty ty1 ty2 t2 in
+              (t1, t2, loc)
+          ) cnstr_new.types in
+          let cnstr = {cnstr_new with types=cnstr_types} in
+          unify_types ctx ty cnstr
+
+        (* substitute ty2 with ty1 (if ty2 is not a FTV) *)
+        | (t1, Type.TyVar t2) when check_ctx ty2 ctx ->
+          let ty = perform_subst_ty ty2 ty1 ty in
+          let cnstr_types = List.map (
+            fun (t1, t2, loc) ->
+              let t1 = perform_subst_ty ty2 ty1 t1 in
+              let t2 = perform_subst_ty ty2 ty1 t2 in
+              (t1, t2, loc)
+          ) cnstr_new.types in
+          let cnstr = {cnstr_new with types=cnstr_types} in
+          unify_types ctx ty cnstr
+
+        (* A -> B ! a = C -> D ! b translates into: A=C, B=D, a=b *)
+        | (Type.Arrow (ty1_in, dirty1_out), Type.Arrow (ty2_in, dirty2_out)) ->
+          let cnstr = add_ty_constraint ~loc ty1_in ty2_in cnstr_new in
+          let cnstr = add_dirty_constraint ~loc dirty1_out dirty2_out cnstr in
+          unify_types ctx ty cnstr
+
+        (* A ! a => B ! b = C ! c => D ! d translates into: A=C, B=D, a=c, b=d *)
+        | (Type.Handler (dirty1_in, dirty1_out), Type.Handler (dirty2_in, dirty2_out)) ->
+          let cnstr = add_dirty_constraint ~loc dirty1_in dirty2_in cnstr_new in
+          let cnstr = add_dirty_constraint ~loc dirty1_out dirty2_out cnstr in
+          unify_types ctx ty cnstr
+
+        (* keep constraints when ty1 is an element of the context *)
+        | (Type.TyVar t1, t2) when not (check_ctx ty1 ctx) ->
+          let (ctx, ty, cnstr) = unify_types ctx ty cnstr_new in
+          let cnstr = add_ty_constraint ~loc ty1 ty2 cnstr in
+          (ctx, ty, cnstr)
+
+        (* keep constraints when ty2 is an element of the context *)
+        | (t1, Type.TyVar t2) when not (check_ctx ty2 ctx) ->
+          let (ctx, ty, cnstr) = unify_types ctx ty cnstr_new in
+          let cnstr = add_ty_constraint ~loc ty1 ty2 cnstr in
+          (ctx, ty, cnstr)
+
+        (* Primitives *)
+        | (Type.Prim Type.BoolTy, Type.Prim Type.BoolTy) -> unify_types ctx ty cnstr_new
+        | (Type.Prim Type.IntTy, Type.Prim Type.IntTy) -> unify_types ctx ty cnstr_new
+        | (Type.Prim Type.FloatTy, Type.Prim Type.FloatTy) -> unify_types ctx ty cnstr_new
+        | (Type.Prim Type.StringTy, Type.Prim Type.StringTy) -> unify_types ctx ty cnstr_new
+        | (Type.Tuple [], Type.Tuple []) -> unify_types ctx ty cnstr_new
+        | (Type.Prim Type.UniTy, Type.Prim Type.UniTy) -> unify_types ctx ty cnstr_new
+
+        (* Constraints could not be unified *)
+        | _ -> Error.typing ~loc "This expression has type %t but it should have type %t." (Type.print_ty ty1) (Type.print_ty ty2)
+      end
+  end
+
+(* Check if a dirt only contains a var and no operations *)
+let is_drt_var drt =
+  begin match drt.Type.ops with
+    | [] -> true
+    | _ -> false
+  end
+
+let rec contains x = function
+  | [] -> false
+  | x' :: lst -> if (x = x') then true else contains x lst
+
+
+let rec dirt_difference main minus =
+    begin match main with
+    | [] -> []
+    | d :: lst when (contains d minus) -> dirt_difference lst minus
+    | d :: lst -> d :: dirt_difference lst minus
+    end
+
+let contains_ops main other =
+  let rec check main other =
+    begin match other with
+      | [] -> []
+      | d :: lst when (contains d main) -> check main lst
+      | d :: lst -> d :: check main lst
+    end in
+  List.length (check main other) = 0
+
+let check_drt drt_old drt_new drt =
+  begin match drt with
+    | drt when (drt = drt_old) && (is_drt_var drt_old) -> drt_new
+    | drt when (drt.Type.rest = drt_old.Type.rest) && (is_drt_var drt_old) ->
+      Type.add_ops drt.Type.ops drt_new
+    | drt when (drt.Type.rest = drt_old.Type.rest) && (contains_ops drt.Type.ops drt_old.Type.ops) ->
+      Type.add_ops (dirt_difference drt.Type.ops drt_old.Type.ops) drt_new
+    | _ -> drt
+  end
+
+(* within [ty] substitute [ty_old] with [ty_new] *)
+let rec perform_subst_drty drt_old drt_new ty =
+  begin match ty with
+    | Type.Arrow (ty_in, (ty_out, d)) ->
+      let ty_in = perform_subst_drty drt_old drt_new ty_in in
+      let ty_out = perform_subst_drty drt_old drt_new ty_out in
+      let d = check_drt drt_old drt_new d in
+      Type.Arrow (ty_in, (ty_out, d))
+    | Type.Handler ((ty_in, d1), (ty_out, d2)) ->
+      let ty_in = perform_subst_drty drt_old drt_new ty_in in
+      let ty_out = perform_subst_drty drt_old drt_new ty_out in
+      let d1 = check_drt drt_old drt_new d1 in
+      let d2 = check_drt drt_old drt_new d2 in
+      Type.Handler ((ty_in, d1), (ty_out, d2))
+    | Type.Tuple lst ->
+      let lst = List.map (perform_subst_drty drt_old drt_new) lst in
+      Type.Tuple lst
+    | Type.Apply (ty_name, (lst, drts)) ->
+      let lst = List.map (perform_subst_drty drt_old drt_new) lst in
+      let drts = List.map (check_drt drt_old drt_new) drts in
+      Type.Apply (ty_name, (lst, drts))
+    (* not matching or primitive *)
+    | _ -> ty
+  end
+
+(*
+  Unify two dirts of the form:
+    d1 = {ops... ; d2}
+    d1 = {ops... ; d3}
+  into:
+    d2 = {ops... ; d4}
+    d3 = {ops... ; d4}
+    d1 = {ops... ; d4}
+*)
+let unify_single_dirt loc drt2 drt3 =
+  let out = Type.fresh_dirt () in
+  let out = Type.add_ops drt2.Type.ops out in
+  let out = Type.add_ops drt3.Type.ops out in
+  let out2_l = Type.make_dirt [] drt2.Type.rest in
+  let out3_l = Type.make_dirt [] drt3.Type.rest in
+  let out2_r = Type.make_dirt (dirt_difference drt3.Type.ops drt2.Type.ops) out.Type.rest in
+  let out3_r = Type.make_dirt (dirt_difference drt2.Type.ops drt3.Type.ops) out.Type.rest in
+  out, (out2_l, out2_r, loc), (out3_l, out3_r, loc)
+
+(* unify types *)
+let rec unify_dirts ctx (ty, drt) cnstr =
+  begin match cnstr.dirts with
+    | [] -> (ctx, (ty, drt), cnstr)
+    | (drt1, drt2, loc) :: tail ->
+      let cnstr_new = {cnstr with dirts=tail} in
+      begin match drt1, drt2 with
+        | (drt1, drt2) when drt1 = drt2 -> unify_dirts ctx (ty, drt) cnstr_new
+        | (drt1, drt2) when is_drt_var drt1 ->
+          let ty = perform_subst_drty drt1 drt2 ty in
+          let drt = check_drt drt1 drt2 drt in
+          let cnstr_dirts = List.map (
+            fun (d1, d2, loc) ->
+              let d1 = check_drt drt1 drt2 d1 in
+              let d2 = check_drt drt1 drt2 d2 in
+              (d1, d2, loc)
+          ) cnstr_new.dirts in
+          let cnstr = {cnstr_new with dirts=cnstr_dirts} in
+          unify_dirts ctx (ty, drt) cnstr
+        | (drt2, drt1) when is_drt_var drt1 ->
+          let ty = perform_subst_drty drt1 drt2 ty in
+          let drt = check_drt drt1 drt2 drt in
+          let cnstr_dirts = List.map (
+            fun (d1, d2, loc) ->
+              let d1 = check_drt drt1 drt2 d1 in
+              let d2 = check_drt drt1 drt2 d2 in
+              (d1, d2, loc)
+          ) cnstr_new.dirts in
+          let cnstr = {cnstr_new with dirts=cnstr_dirts} in
+          unify_dirts ctx (ty, drt) cnstr
+        | (drt1, drt2) ->
+          let new1, new2, new3 = unify_single_dirt loc drt1 drt2 in
+          let cnstr = add_dirt new2 cnstr_new in
+          let cnstr = add_dirt new3 cnstr in
+          unify_dirts ctx (ty, drt) cnstr
+      end
+  end
 
 (* Unify the constraints to find a solution *)
-let unify ctx cnstr =
-  (* let dirt_extra, types = unify_types [] [] cnstr.types in *)
-  (* let dirts = unify_dirts [] (cnstr.dirts) in *)
-  {
-    types = cnstr.types;
-    dirts = cnstr.dirts
-  }
+let unify_ty ctx ty cnstr = unify_types ctx ty cnstr
 
-(* find a principal solution for types *)
-let rec find_ty_solution ty cnstr =
-  let ty = fix_type ty in
-  begin match ty with
-    | Type.Prim _ -> ty
-    | Type.Tuple lst -> Type.Tuple (List.map (fun x -> find_ty_solution x cnstr) lst)
-    | Type.Arrow (ty, dirty) -> Type.Arrow (find_ty_solution ty cnstr, find_dirty_solution dirty cnstr)
-    | Type.Handler (dirty1, dirty2) -> Type.Handler (find_dirty_solution dirty1 cnstr, find_dirty_solution dirty2 cnstr)
-    | Type.TyVar a -> search_constraints_type ty cnstr.types cnstr.types []
-    | Type.Apply (name, (ty_list, dirt_list)) ->
-      let ty_list = List.map (fun x -> find_ty_solution x cnstr) ty_list in
-      let dirt_list = List.map (fun x -> find_dirt_solution x cnstr) dirt_list in
-      Type.Apply (name, (ty_list, dirt_list))
-  end
-
-
-(* find a principal solution for a dirt *)
-and find_dirt_solution drt cnstr =
-  begin match search_constraints_dirt drt cnstr.dirts with
-    | None -> drt
-    | Some drt -> drt
-  end
-
-(* find a principal solution for a dirty type *)
-and find_dirty_solution (ty, drt) cnstr = (find_ty_solution ty cnstr, find_dirt_solution drt cnstr)
+(* Unify the constraints to find a solution *)
+let unify_dirty ctx (ty, drt) cnstr =
+  let ctx, ty, cnstr = unify_ty ctx ty cnstr in
+  let ctx, (ty, drt), cnstr = unify_dirts ctx (ty, drt) cnstr in
+  (ctx, (ty, drt), cnstr)
 
 (***********************)
 (* PRINTING OPERATIONS *)
