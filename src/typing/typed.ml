@@ -65,6 +65,7 @@ and plain_expression =
 and computation = plain_computation annotation
 and plain_computation =
   | Value of expression
+  | LetVal of variable * expression * computation 
   | LetRec of (variable * abstraction) list * computation
   | Match of expression * abstraction list
   | Apply of expression * expression
@@ -75,6 +76,7 @@ and plain_computation =
   | CastComp of computation * dirty_coercion
   | CastComp_ty of computation * ty_coercion
   | CastComp_dirt of computation * dirt_coercion
+
 
 and ty_coercion =
   (* | ReflInt
