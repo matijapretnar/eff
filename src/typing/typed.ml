@@ -104,7 +104,6 @@ and dirt_coercion =
 
 and dirty_coercion =
   | BangCoercion of ty_coercion * dirt_coercion
-  | DirtyCoercionVar of Params.dirty_coercion_param 
   | RightArrow of ty_coercion
   | RightHandler of ty_coercion
   | LeftHandler of ty_coercion
@@ -126,7 +125,6 @@ and abstraction2 = (pattern * pattern * computation) annotation
 type omega_ct =
     | TyOmega of (Params.ty_coercion_param * Types.ct_ty)
     | DirtOmega of (Params.dirt_coercion_param * Types.ct_dirt)
-    | DirtyOmega of  (Params.dirty_coercion_param * Types.ct_dirty)
 
 
 type toplevel = plain_toplevel * Location.t
@@ -255,8 +253,8 @@ and print_dirty_coercion ?max_level c ppf =
   match c with 
   | BangCoercion (tc, dirtc) ->
       print "%t ! %t" (print_ty_coercion tc) (print_dirt_coercion dirtc )
-  | DirtyCoercionVar (tcp) ->
-      print "%t" (Params.print_dirty_coercion_param tcp)
+(*   | DirtyCoercionVar (tcp) ->
+      print "%t" (Params.print_dirty_coercion_param tcp) *)
 
 and print_dirt_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -273,9 +271,9 @@ and print_omega_ct ?max_level c ppf =
                               (Params.print_ty_coercion_param p) (Types.print_target_ty ty1) (Types.print_target_ty ty2)
   | DirtOmega (p,(ty1,ty2)) ->  print "%t: (%t =< %t)" 
                               (Params.print_dirt_coercion_param p) (Types.print_target_dirt ty1) (Types.print_target_dirt ty2)
-  | DirtyOmega (p,(ty1,ty2)) ->  print "%t: (%t =< %t)" 
+(*   | DirtyOmega (p,(ty1,ty2)) ->  print "%t: (%t =< %t)" 
                               (Params.print_dirty_coercion_param p) (Types.print_target_dirty ty1) (Types.print_target_dirty ty2) 
-
+ *)
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in

@@ -6,7 +6,6 @@ let set_of_list = List.fold_left (fun acc x -> STyVars.add x acc) STyVars.empty;
 open Types
 type substitution =
    | CoerTyVarToTyCoercion of (Params.ty_coercion_param * Typed.ty_coercion) 
-   | CoerDirtyVartoDirtyCoercion of (Params.dirty_coercion_param * Typed.dirty_coercion)
    | CoerDirtVartoDirtCoercion of (Params.dirt_coercion_param * Typed.dirt_coercion)
    | TyVarToTy of (Params.ty_param * Types.target_ty)
    | DirtVarToDirt of (Params.dirt_param * Types.dirt)
@@ -18,8 +17,8 @@ let print_sub ?max_level c ppf =
   begin match c with
   | CoerTyVarToTyCoercion (p, t) ->  print "%t :-coertyTotyCoer-> %t" 
                               (Params.print_ty_coercion_param p) (Typed.print_ty_coercion t)
-  | CoerDirtyVartoDirtyCoercion (p,d) ->  print "%t :-coertyDirtyoDirtyCoer-> %t"
-                              (Params.print_dirty_coercion_param p) (Typed.print_dirty_coercion d)
+ (*  | CoerDirtyVartoDirtyCoercion (p,d) ->  print "%t :-coertyDirtyoDirtyCoer-> %t"
+                              (Params.print_dirty_coercion_param p) (Typed.print_dirty_coercion d) *)
   | CoerDirtVartoDirtCoercion (p,d) ->  print "%t :-coertyDirtoDirtCoer-> %t"
                               (Params.print_dirt_coercion_param p) (Typed.print_dirt_coercion d)
   | TyVarToTy (p,t) ->  print "%t :-tyvarToTargetty-> %t" 
@@ -39,10 +38,6 @@ let rec apply_sub sub c_list =
 						Typed.TyOmega (coer_p, (target_type,ty2)) 
 			    | Typed.TyOmega (coer_p, (ty2,Tyvar tv)) when (type_p == tv) ->  
 						Typed.TyOmega (coer_p, (ty2,target_type)) 
-				| Typed.DirtyOmega (coer_p,( ( Tyvar ty1, dirt1) , (ty2, dirt2))) when (ty1 == type_p)->
-					Typed.DirtyOmega (coer_p,( ( target_type, dirt1) , (ty2, dirt2)))
-				| Typed.DirtyOmega (coer_p,( ( ty1, dirt1) , (Tyvar ty2, dirt2))) when (ty2 == type_p)->
-					Typed.DirtyOmega (coer_p,( ( target_type, dirt1) , (target_type, dirt2)))
 				| _ -> cons
 				end in
 			let result_c_list = List.map mapper c_list in 
@@ -170,8 +165,6 @@ let rec union_find_tyvar tyvar acc c_list =
   			else OldUtils.uniq (((union_find_tyvar b acc xs) @ (union_find_tyvar tyvar acc xs)))
   		| _ -> union_find_tyvar tyvar acc xs
   		end 
-   	| Typed.DirtyOmega(_,((a,_),(b,_))) -> 
-  			union_find_tyvar tyvar acc ( (Typed.TyOmega((Params.fresh_ty_coercion_param ()), (a,b) )) :: xs)
   	| _ -> union_find_tyvar tyvar acc xs
   	end
   end
@@ -191,10 +184,6 @@ let rec fix_union_find fixpoint c_list =
                             [b]
                       | _ -> []    
                     end
-               | Typed.DirtyOmega(_,((Types.Tyvar a,_),(Types.Tyvar b,_))) when ( (List.mem a fixpoint) && (not (List.mem b fixpoint))) ->
-                  [b]
-               | Typed.DirtyOmega(_,((Types.Tyvar b,_),(Types.Tyvar a,_))) when ( (List.mem a fixpoint) && (not (List.mem b fixpoint))) ->
-                  [b]
                | _-> []
                end in
   let new_fixpoint = fixpoint @ OldUtils.flatten_map mapper c_list in 
@@ -246,26 +235,38 @@ let rec unify(sub, paused, queue) =
  	| (Types.Tyvar a, Types.Tyvar b) ->
     Print.debug "=========End loop============";
  		unify (sub, (cons::paused), rest_queue)
- 	| (Types.Arrow(a1,c1) , Types.Arrow(a2,c2)) ->
+ 	| (Types.Arrow(a1,(aa1,d1)) , Types.Arrow(a2,(aa2,d2))) ->
  	    let new_ty_coercion_var = Params.fresh_ty_coercion_param () in 
-   		let new_dirty_coercion_var = Params.fresh_dirty_coercion_param () in
-   		let new_ty_coercion_var_coer = Typed.TyCoercionVar new_ty_coercion_var in 
-   		let new_dirty_coercion_var_coer = Typed.DirtyCoercionVar new_dirty_coercion_var in
-   		let sub1 = CoerTyVarToTyCoercion (omega, Typed.ArrowCoercion (new_ty_coercion_var_coer,new_dirty_coercion_var_coer)) in 
-   		let ty_cons = Typed.TyOmega(new_ty_coercion_var,(a2,a1)) in 
-   		let dirty_cons = Typed.DirtyOmega(new_dirty_coercion_var,(c1,c2)) in
+      let new_ty_coercion_var_coer = Typed.TyCoercionVar new_ty_coercion_var in 
+      let new_ty_coercion_var2 = Params.fresh_ty_coercion_param () in 
+      let new_ty_coercion_var_coer2 = Typed.TyCoercionVar new_ty_coercion_var2 in
+      let new_dirt_coercion_var = Params.fresh_dirt_coercion_param () in
+      let new_dirt_coercion_var_coer = Typed.DirtCoercionVar new_dirt_coercion_var in
+      let dirty_coercion_c = Typed.BangCoercion (new_ty_coercion_var_coer2, new_dirt_coercion_var_coer) in 
+   		let sub1 = CoerTyVarToTyCoercion (omega, Typed.ArrowCoercion (new_ty_coercion_var_coer,dirty_coercion_c)) in 
+   		let ty_cons = Typed.TyOmega(new_ty_coercion_var,(a2,a1)) in
+      let ty2_cons = Typed.TyOmega (new_ty_coercion_var2,(aa1,aa2) ) in 
+      let dirt_cons = Typed.DirtOmega(new_dirt_coercion_var,(d1,d2) )in 
    		Print.debug "=========End loop============";
-      unify ((sub1::sub), paused, (List.append [ty_cons;dirty_cons] rest_queue))
-  | (Types.Handler(c1,d1) , Types.Handler(c2,d2)) ->
- 	    let new_dirty_coercion_var = Params.fresh_dirty_coercion_param () in 
-   		let new_dirty_coercion_var_2 = Params.fresh_dirty_coercion_param () in
-   		let new_dirty_coercion_var_coer = Typed.DirtyCoercionVar new_dirty_coercion_var in 
-   		let new_dirty_coercion_var_coer_2 = Typed.DirtyCoercionVar new_dirty_coercion_var_2 in
-   		let sub1 = CoerTyVarToTyCoercion (omega, Typed.HandlerCoercion (new_dirty_coercion_var_coer,new_dirty_coercion_var_coer_2)) in 
-   		let dirty_cons = Typed.DirtyOmega(new_dirty_coercion_var,(c2,c1)) in 
-   		let dirty_cons_2 = Typed.DirtyOmega(new_dirty_coercion_var,(d1,d2)) in
+      unify ((sub1::sub), paused, (List.append [ty_cons;ty2_cons;dirt_cons] rest_queue))
+  | (Types.Handler((a1,d1),(a11,d11)) , Types.Handler((a2,d2),(a22,d22))) ->
+
+      let new_ty_coercion_var_1 = Params.fresh_ty_coercion_param () in
+      let new_dirt_coercion_var_2 = Params.fresh_dirt_coercion_param () in 
+      let new_ty_coercion_var_3 = Params.fresh_ty_coercion_param () in 
+      let new_dirt_coercion_var_4 = Params.fresh_dirt_coercion_param () in 
+      let new_ty_coercion_var_coer_1 = Typed.TyCoercionVar new_ty_coercion_var_1 in 
+      let new_dirt_coercion_var_coer_2 = Typed.DirtCoercionVar new_dirt_coercion_var_2 in 
+      let new_ty_coercion_var_coer_3 = Typed.TyCoercionVar new_ty_coercion_var_3 in 
+      let new_dirt_coercion_var_coer_4 = Typed.DirtCoercionVar new_dirt_coercion_var_4 in
+      let sub1 = CoerTyVarToTyCoercion (omega, Typed.HandlerCoercion ( Typed.BangCoercion (new_ty_coercion_var_coer_1,new_dirt_coercion_var_coer_2),
+                                                                       Typed.BangCoercion (new_ty_coercion_var_coer_3,new_dirt_coercion_var_coer_4))) in
+      let cons1 = Typed.TyOmega(new_ty_coercion_var_1, (a2,a1)) in 
+      let cons2 = Typed.DirtOmega(new_dirt_coercion_var_2, (d2,d1)) in 
+      let cons3 = Typed.TyOmega(new_ty_coercion_var_3, (a11,a22)) in
+      let cons4 = Typed.DirtOmega(new_dirt_coercion_var_4, (d11,d22)) in 
    		Print.debug "=========End loop============";
-      unify ((sub1::sub), paused, (List.append [dirty_cons;dirty_cons_2] rest_queue)) 
+      unify ((sub1::sub), paused, (List.append [cons1;cons2;cons3;cons4] rest_queue)) 
  	| (Types.Tyvar tv, a) ->
     unify_ty_vars (sub,paused,rest_queue) tv a cons
  	| ( a , Types.Tyvar tv) ->
@@ -273,16 +274,6 @@ let rec unify(sub, paused, queue) =
  	| _ -> assert false
  	end
  
- | Typed.DirtyOmega(omega,((t1,d1),(t2,d2))) ->
-   let new_ty_coercion_var = Params.fresh_ty_coercion_param () in 
-   let new_dirt_coercion_var = Params.fresh_dirt_coercion_param () in
-   let new_ty_coercion_var_coer = Typed.TyCoercionVar new_ty_coercion_var in 
-   let new_dirt_coercion_var_coer = Typed.DirtCoercionVar new_dirt_coercion_var in 
-   let sub1 = CoerDirtyVartoDirtyCoercion(omega, Typed.BangCoercion(new_ty_coercion_var_coer,new_dirt_coercion_var_coer)) in 
-   let ty_cons = Typed.TyOmega(new_ty_coercion_var,(t1,t2)) in 
-   let dirt_cons = Typed.DirtOmega(new_dirt_coercion_var,(d1,d2)) in 
-   Print.debug "=========End loop============";
-   unify ((sub1::sub), paused, (List.append [ty_cons;dirt_cons] rest_queue))
  
  | Typed.DirtOmega(omega, dcons) ->
    begin match dcons with 

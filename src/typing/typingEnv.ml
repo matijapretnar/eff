@@ -5,3 +5,5 @@ let empty = []
 let lookup ctx x =  (OldUtils.lookup x ctx)
 
 let update ctx x sch = (x, sch) :: ctx
+
+let return_context ctx = ctx 
