@@ -56,7 +56,7 @@ and plain_expression =
   | CastExp of expression * ty_coercion
   | ApplyTyExp of expression * Types.target_ty
   | LambdaTyCoerVar of Params.ty_coercion_param * Types.ct_ty * expression 
-  | LambdaDirtyCoerVar of Params.dirt_coercion_param * Types.ct_dirt * expression 
+  | LambdaDirtCoerVar of Params.dirt_coercion_param * Types.ct_dirt * expression 
   | ApplyDirtExp of expression * Types.dirt
   | ApplyTyCoercion of expression * ty_coercion
   | ApplyDirtCoercion of expression * dirt_coercion
@@ -201,6 +201,18 @@ let rec print_expression ?max_level e ppf =
     print ~at_level:2 "effect %t" (print_effect eff)
   | CastExp (e1,tc) ->
     print "%t |> [%t]" (print_expression e1) (print_ty_coercion tc)
+  | BigLambdaTy (p,e) -> print "BigLambda_ty_%t. %t "(Params.print_ty_param p) (print_expression e)
+  | BigLambdaDirt (p,e) -> print "BigLambda_dirt_%t. %t "(Params.print_dirt_param p) (print_expression e) 
+  | ApplyTyExp (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (Types.print_target_ty tty)
+  | LambdaTyCoerVar (p,(tty1,tty2),e) -> 
+      print "BigLambda_ty_(%t:%t<=%t). %t "(Params.print_ty_coercion_param p) (Types.print_target_ty tty1) (Types.print_target_ty tty2)
+                                           (print_expression e)
+  | LambdaDirtCoerVar (p,(tty1,tty2),e) -> 
+      print "BigLambda_ty_(%t:%t<=%t). %t "(Params.print_dirt_coercion_param p) (Types.print_target_dirt tty1) 
+                                            (Types.print_target_dirt tty2) (print_expression e)
+  | ApplyDirtExp (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (Types.print_target_dirt tty)
+  | ApplyTyCoercion  (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (print_ty_coercion tty)
+  | ApplyDirtCoercion (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (print_dirt_coercion tty)
 
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

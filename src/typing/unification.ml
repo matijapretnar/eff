@@ -4,6 +4,7 @@ module STyVars = Set.Make (struct
                            end);;
 let set_of_list = List.fold_left (fun acc x -> STyVars.add x acc) STyVars.empty;;
 open Types
+open Typed
 type substitution =
    | CoerTyVarToTyCoercion of (Params.ty_coercion_param * Typed.ty_coercion) 
    | CoerDirtVartoDirtCoercion of (Params.dirt_coercion_param * Typed.dirt_coercion)
@@ -231,7 +232,7 @@ let rec unify(sub, paused, queue) =
  	| (x,y) when x=y -> 
  		let sub1 = CoerTyVarToTyCoercion (omega, Typed.ReflTy(x)) in
     Print.debug "=========End loop============";
- 		unify (sub1::sub, paused, rest_queue)
+ 		unify (sub @ [sub1], paused, rest_queue)
  	| (Types.Tyvar a, Types.Tyvar b) ->
     Print.debug "=========End loop============";
  		unify (sub, (cons::paused), rest_queue)
@@ -248,7 +249,7 @@ let rec unify(sub, paused, queue) =
       let ty2_cons = Typed.TyOmega (new_ty_coercion_var2,(aa1,aa2) ) in 
       let dirt_cons = Typed.DirtOmega(new_dirt_coercion_var,(d1,d2) )in 
    		Print.debug "=========End loop============";
-      unify ((sub1::sub), paused, (List.append [ty_cons;ty2_cons;dirt_cons] rest_queue))
+      unify (sub @ [sub1], paused, (List.append [ty_cons;ty2_cons;dirt_cons] rest_queue))
   | (Types.Handler((a1,d1),(a11,d11)) , Types.Handler((a2,d2),(a22,d22))) ->
 
       let new_ty_coercion_var_1 = Params.fresh_ty_coercion_param () in
@@ -266,7 +267,7 @@ let rec unify(sub, paused, queue) =
       let cons3 = Typed.TyOmega(new_ty_coercion_var_3, (a11,a22)) in
       let cons4 = Typed.DirtOmega(new_dirt_coercion_var_4, (d11,d22)) in 
    		Print.debug "=========End loop============";
-      unify ((sub1::sub), paused, (List.append [cons1;cons2;cons3;cons4] rest_queue)) 
+      unify (sub @ [sub1], paused, (List.append [cons1;cons2;cons3;cons4] rest_queue)) 
  	| (Types.Tyvar tv, a) ->
     unify_ty_vars (sub,paused,rest_queue) tv a cons
  	| ( a , Types.Tyvar tv) ->
@@ -289,7 +290,7 @@ let rec unify(sub, paused, queue) =
         let paused' = apply_sub [sub'] paused in 
         let new_cons = apply_sub [sub'] [(Typed.DirtOmega(omega, (Types.SetVar( (Types.empty_effect_set),v1 ) , Types.SetVar(s2,v2))))] in 
         Print.debug "=========End loop============";
-        unify ((sub' :: sub), [] , ((new_cons @ paused') @ rest_queue ))
+        unify (sub @ [sub'], [] , ((new_cons @ paused') @ rest_queue ))
       end
    | (Types.SetEmpty s1, d) when (Types.effect_set_is_empty s1) ->
       let sub' = CoerDirtVartoDirtCoercion(omega,(Typed.Empty d)) in 
@@ -301,14 +302,14 @@ let rec unify(sub, paused, queue) =
                   DirtVarToDirt(v1, (Types.SetEmpty Types.empty_effect_set))] in 
       let new_queue = apply_sub sub' (paused @ rest_queue) in 
       Print.debug "=========End loop============";
-      unify( (sub' @ sub), [], new_queue )
+      unify( (sub @ sub'), [], new_queue )
 
    | (Types.SetEmpty s1, Types.SetEmpty s2)->
       if(Types.effect_set_is_subseteq s1 s2) then
       begin 
         let sub' = CoerDirtVartoDirtCoercion (omega, Typed.UnionDirt ( s2, (Typed.Empty (Types.SetEmpty (Types.effect_set_diff s2 s1))))) in 
         Print.debug "=========End loop============";
-        unify( (sub' :: sub), paused, rest_queue ) 
+        unify( sub @ [sub'], paused, rest_queue ) 
       end
       else assert false
    
@@ -317,7 +318,7 @@ let rec unify(sub, paused, queue) =
                   DirtVarToDirt(v2, Types.SetVar ( (Types.effect_set_diff s1 s2) ,  Params.fresh_dirt_param () ))] in 
      let new_queue = apply_sub sub' (paused @ rest_queue) in 
       Print.debug "=========End loop============";
-      unify( (sub' @ sub), [], new_queue )    
+      unify( (sub @ sub'), [], new_queue )    
  
    | _ -> Print.debug "=========End loop============";
         unify (sub ,(cons::paused), rest_queue)
@@ -346,3 +347,13 @@ and unify_ty_vars (sub,paused,rest_queue) tv a cons=
 	let new_queue = (sub_queue @ sub_paused') @ [cons'] in 
   Print.debug "=========End loops============";
 	unify ( (sub @ sub') , new_paused, new_queue)
+
+
+
+let apply_substitution sub ci =
+  let c = ci.term  in 
+  let c'= 
+  begin match sub with
+  | [] -> c
+  | _ -> c
+  end in annotate c' ci.location

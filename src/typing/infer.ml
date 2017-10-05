@@ -293,11 +293,17 @@ let rec type_expr st {Untyped.term=expr; Untyped.location=loc} =
 and type_plain_expr st = function
   | Untyped.Var x ->
     begin match TypingEnv.lookup st.context x with
-      | Some ty_schi ->
+      | Some ty_schi -> 
                 let (bind_tyvar_sub,bind_dirtvar_sub) = get_sub_of_ty ty_schi in
+                Print.debug "in Var";
+                Print.debug " var : %t" (Typed.print_variable x);
+                Print.debug " typeSch: %t " (Types.print_target_ty ty_schi);
                 let basic_type = get_basic_type ty_schi in
+                Print.debug "basicTy: %t" (Types.print_target_ty basic_type); 
                 let applied_basic_type = apply_sub_to_type bind_tyvar_sub bind_dirtvar_sub basic_type in
                 let (returned_x, returnd_cons) = apply_types bind_tyvar_sub bind_dirtvar_sub x ty_schi in 
+                Print.debug "returned: %t" (Typed.print_expression returned_x) ;
+                Print.debug "returned_type: %t" (Types.print_target_ty applied_basic_type);
                 (returned_x.term , applied_basic_type, returnd_cons)
       | None -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
       end
@@ -523,7 +529,7 @@ and type_plain_comp st = function
         let var_exp = List.fold_right(fun cons acc -> 
                                           begin match cons with 
                                           | Typed.TyOmega(om,t) -> Typed.annotate (Typed.LambdaTyCoerVar (om,t,acc)) typed_c2.location
-                                          | Typed.DirtOmega(om,t) -> Typed.annotate(Typed.LambdaDirtyCoerVar(om,t,acc)) typed_c2.location
+                                          | Typed.DirtOmega(om,t) -> Typed.annotate(Typed.LambdaDirtCoerVar(om,t,acc)) typed_c2.location
                                           end 
                                       ) split_cons1 typed_e1 in 
         let var_exp_dirt_lamda = List.fold_right (fun cons acc -> Typed.annotate ( Typed.BigLambdaDirt (cons,acc) ) typed_c2.location )  split_dirt_vars var_exp in
@@ -563,7 +569,9 @@ let type_toplevel ~loc st c =
     Print.debug "Computation : %t" (Typed.print_computation ct);
     Print.debug "Computation type : %t ! {%t}" (Types.print_target_ty ttype) (Types.print_target_dirt dirt);
     let (sub,final) = Unification.unify ([],[],constraints) in
-    ct, st
+    let ct' = Unification.apply_substitution sub ct in 
+    Print.debug "New Computation : %t" (Typed.print_computation ct');
+    ct', st
 
 let add_effect eff (ty1 , ty2) st =
     Print.debug "%t ----> %t"  (Type.print_ty ty1) (Type.print_ty ty2);
