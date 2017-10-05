@@ -211,16 +211,96 @@ let splitter st constraints simple_ty =
    (alpha_list,delta_list,cons1,cons2) 
 
 
+let rec get_sub_of_ty ty_sch = 
+  begin match ty_sch with
+  | Types.TySchemeTy (p,t) -> 
+          let new_p = Params.fresh_ty_param () in 
+          ( ((p,new_p) :: (fst (get_sub_of_ty t))) , (snd (get_sub_of_ty t) ) )
+  | Types.TySchemeDirt(p,t) -> 
+          let new_p = Params.fresh_dirt_param () in 
+          ( (fst (get_sub_of_ty t)) , ((p,new_p) :: (snd (get_sub_of_ty t))))
+  | _ -> ([],[])
+  end
+
+
+let rec get_basic_type ty_sch =
+  begin match ty_sch with
+  | Types.TySchemeTy (_,t) -> get_basic_type t
+  | Types.TySchemeDirt(_,t) -> get_basic_type t
+  | Types.QualTy(_,t) -> get_basic_type t
+  | Types.QualDirt(_,t)-> get_basic_type t
+  | t -> t
+  end
+
+
+let rec apply_sub_to_type ty_subs dirt_subs ty =
+  begin match ty with
+  | Types.Tyvar p -> 
+      begin match (OldUtils.lookup p ty_subs) with
+      | Some p' -> Types.Tyvar p'
+      | None -> ty
+      end
+  
+  | Types.Arrow (a,(b,d)) -> Types.Arrow ((apply_sub_to_type ty_subs dirt_subs a), ((apply_sub_to_type ty_subs dirt_subs b),(apply_sub_to_dirt dirt_subs d)))
+  | Types.Tuple ty_list -> Types.Tuple (List.map ( fun x -> (apply_sub_to_type ty_subs dirt_subs x)) ty_list) 
+  | Types.Handler ((a,b),(c,d)) -> Types.Handler (  ((apply_sub_to_type ty_subs dirt_subs a),(apply_sub_to_dirt dirt_subs b))  ,   ((apply_sub_to_type ty_subs dirt_subs c),(apply_sub_to_dirt dirt_subs d)) )
+  | Types.PrimTy _ -> ty
+  | _ -> assert false
+  end
+and apply_sub_to_dirt dirt_subs ty =
+  begin match ty with 
+  | Types.SetVar (s,p)->
+      begin match (OldUtils.lookup p dirt_subs) with
+      | Some p' -> Types.SetVar (s,p')
+      | None -> ty
+      end
+  | x -> x
+end
+
+
+let rec get_applied_cons_from_ty ty_subs dirt_subs ty = 
+  begin match ty with 
+  | Types.TySchemeTy (_,t) -> get_applied_cons_from_ty ty_subs dirt_subs t
+  | Types.TySchemeDirt(_,t) -> get_applied_cons_from_ty ty_subs dirt_subs t
+  | Types.QualTy(cons,t) -> 
+              let (c1,c2) =  get_applied_cons_from_ty ty_subs dirt_subs t in
+              let (ty1,ty2) =  cons in 
+              let (newty1,newty2) = (apply_sub_to_type ty_subs dirt_subs ty1 , apply_sub_to_type ty_subs dirt_subs ty2) in 
+              let new_omega = Params.fresh_ty_coercion_param () in 
+              let new_cons = Typed.TyOmega (new_omega, (newty1,newty2) ) in
+              (new_cons::c1 , c2 )
+  | Types.QualDirt(cons,t)-> 
+              let (c1,c2) =  get_applied_cons_from_ty ty_subs dirt_subs t in
+              let (ty1,ty2) =  cons in 
+              let (newty1,newty2) = (apply_sub_to_dirt dirt_subs ty1 , apply_sub_to_dirt dirt_subs ty2) in 
+              let new_omega = Params.fresh_dirt_coercion_param () in 
+              let new_cons = Typed.DirtOmega (new_omega, (newty1,newty2) ) in
+              (c1 , new_cons::c2 )
+  | _ -> [],[]
+end
+
+let apply_types ty_subs dirt_subs var ty_sch =
+   let ty_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplyTyExp (a, Types.Tyvar b)) Location.unknown)  ) (Typed.annotate (Typed.Var var) Location.unknown) ty_subs in 
+   let dirt_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplyDirtExp (a, Types.SetVar (Types.empty_effect_set ,b) )) Location.unknown)  ) ty_apps dirt_subs in 
+   let (ty_cons,dirt_cons) = get_applied_cons_from_ty ty_subs dirt_subs ty_sch in 
+   let ty_cons_apps = List.fold_left (fun a (Typed.TyOmega (omega, _ )) -> (Typed.annotate (Typed.ApplyTyCoercion (a, Typed.TyCoercionVar omega)) Location.unknown) ) dirt_apps ty_cons in 
+   let dirt_cons_apps = List.fold_left (fun a (Typed.DirtOmega (omega, _ )) -> (Typed.annotate (Typed.ApplyDirtCoercion (a, Typed.DirtCoercionVar omega)) Location.unknown) ) ty_cons_apps dirt_cons in 
+   (dirt_cons_apps , (ty_cons @ dirt_cons ))
+
 let rec type_expr st {Untyped.term=expr; Untyped.location=loc} =
   let e, ttype, constraints = type_plain_expr st expr in
   Typed.annotate e loc, ttype, constraints
 and type_plain_expr st = function
   | Untyped.Var x ->
-    let target_ty = begin match TypingEnv.lookup st.context x with
-      | Some ty_schi ->  ty_schi
+    begin match TypingEnv.lookup st.context x with
+      | Some ty_schi ->
+                let (bind_tyvar_sub,bind_dirtvar_sub) = get_sub_of_ty ty_schi in
+                let basic_type = get_basic_type ty_schi in
+                let applied_basic_type = apply_sub_to_type bind_tyvar_sub bind_dirtvar_sub basic_type in
+                let (returned_x, returnd_cons) = apply_types bind_tyvar_sub bind_dirtvar_sub x ty_schi in 
+                (returned_x.term , applied_basic_type, returnd_cons)
       | None -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-      end in
-      (Typed.Var x, target_ty, [])
+      end
   | Untyped.Const const -> 
         begin match const with
         | Integer _ -> (Typed.Const const, Types.PrimTy IntTy, [])
@@ -428,7 +508,7 @@ and type_plain_comp st = function
      | Untyped.Value e_1 -> 
         let (typed_e1, type_e1,cons_e1) = type_expr st e_1 in 
         let (split_ty_vars, split_dirt_vars, split_cons1, split_cons2) = splitter (TypingEnv.return_context st.context) cons_e1 type_e1 in 
-        let new_var = Typed.Variable.fresh "fresh_poly_let_var" in 
+        let Untyped.PVar x = p_def.Untyped.term in
         let qual_ty = List.fold_right (fun cons acc -> 
                                           begin match cons with 
                                           | Typed.TyOmega(_,t) -> Types.QualTy (t,acc)
@@ -437,7 +517,7 @@ and type_plain_comp st = function
                                       ) split_cons1 type_e1 in 
         let ty_sc_dirt = List.fold_right (fun cons acc -> Types.TySchemeDirt (cons,acc)) split_dirt_vars qual_ty in
         let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,acc)) split_ty_vars ty_sc_dirt in 
-        let new_st = add_def st new_var ty_sc_ty in 
+        let new_st = add_def st x ty_sc_ty in 
         let (typed_c2,type_c2,cons_c2) = type_comp new_st c_2 in
 
         let var_exp = List.fold_right(fun cons acc -> 
@@ -448,7 +528,7 @@ and type_plain_comp st = function
                                       ) split_cons1 typed_e1 in 
         let var_exp_dirt_lamda = List.fold_right (fun cons acc -> Typed.annotate ( Typed.BigLambdaDirt (cons,acc) ) typed_c2.location )  split_dirt_vars var_exp in
         let var_exp_ty_lambda = List.fold_right (fun cons acc -> Typed.annotate (Typed.BigLambdaTy (cons,acc) )typed_c2.location ) split_ty_vars var_exp_dirt_lamda in
-        let return_term = Typed.LetVal (new_var, var_exp_ty_lambda, typed_c2) in 
+        let return_term = Typed.LetVal (x, var_exp_ty_lambda, typed_c2) in 
         (return_term, type_c2 , (cons_c2 @ split_cons2))
 
 
@@ -478,8 +558,8 @@ and type_plain_comp st = function
 
 let type_toplevel ~loc st c =
     let ct, (ttype,dirt),constraints = type_comp st c in
-    let x::xs = constraints in 
-    Print.debug "Single constraint : %t" (Typed.print_omega_ct x);
+    (* let x::xs = constraints in 
+    Print.debug "Single constraint : %t" (Typed.print_omega_ct x); *)
     Print.debug "Computation : %t" (Typed.print_computation ct);
     Print.debug "Computation type : %t ! {%t}" (Types.print_target_ty ttype) (Types.print_target_dirt dirt);
     let (sub,final) = Unification.unify ([],[],constraints) in

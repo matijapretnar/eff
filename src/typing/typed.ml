@@ -54,10 +54,10 @@ and plain_expression =
   | BigLambdaTy of Params.ty_param * expression
   | BigLambdaDirt of Params.dirt_param * expression  
   | CastExp of expression * ty_coercion
-  | ApplyTy of expression * target_ty
+  | ApplyTyExp of expression * Types.target_ty
   | LambdaTyCoerVar of Params.ty_coercion_param * Types.ct_ty * expression 
   | LambdaDirtyCoerVar of Params.dirt_coercion_param * Types.ct_dirt * expression 
-  | ApplyDirt of expression * Types.dirt
+  | ApplyDirtExp of expression * Types.dirt
   | ApplyTyCoercion of expression * ty_coercion
   | ApplyDirtCoercion of expression * dirt_coercion
 
@@ -89,9 +89,9 @@ and ty_coercion =
   | TupleCoercion of ty_coercion list
   | LeftArrow of ty_coercion
   | ForallTy of (Params.ty_param) * ty_coercion
-  | ApplyTy of ty_coercion * target_ty
+  | ApplyTyCoer of ty_coercion * target_ty
   | ForallDirt of (Params.dirt_param) * ty_coercion
-  | ApplyDirt of ty_coercion * dirt
+  | ApplyDirCoer of ty_coercion * dirt
   | PureCoercion of dirty_coercion
 
 and dirt_coercion = 
@@ -231,6 +231,8 @@ and print_computation ?max_level c ppf =
     print "%t |> [%t]" (print_computation c1) (print_ty_coercion dc)
   | CastComp_dirt (c1,dc) ->
     print "%t |> [%t]" (print_computation c1) (print_dirt_coercion dc)
+  | LetVal(v,e1,c1) -> 
+    print "let %t = %t in %t" (print_variable v) (print_expression e1) (print_computation c1)
 
 
 and print_ty_coercion ?max_level c ppf =
