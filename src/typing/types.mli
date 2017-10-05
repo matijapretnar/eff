@@ -33,8 +33,6 @@ and
 ct_ty = (target_ty * target_ty)
 and
 ct_dirt = (dirt * dirt)
-and 
-ct_dirty = (target_dirty * target_dirty)
 
 val print_target_ty : ?max_level:int -> target_ty -> Format.formatter -> unit
 

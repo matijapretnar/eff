@@ -425,16 +425,32 @@ and type_plain_comp st = function
   | Untyped.Let (defs, c_2) -> 
     let [(p_def, c_1)] = defs in 
      begin match c_1.term with 
-(*     | Untyped.Value e_1 -> 
+     | Untyped.Value e_1 -> 
         let (typed_e1, type_e1,cons_e1) = type_expr st e_1 in 
         let (split_ty_vars, split_dirt_vars, split_cons1, split_cons2) = splitter (TypingEnv.return_context st.context) cons_e1 type_e1 in 
         let new_var = Typed.Variable.fresh "fresh_poly_let_var" in 
         let qual_ty = List.fold_right (fun cons acc -> 
                                           begin match cons with 
-                                          | TyOmega(_,t) -> 
+                                          | Typed.TyOmega(_,t) -> Types.QualTy (t,acc)
+                                          | Typed.DirtOmega(_,t) -> Types.QualDirt(t,acc) 
                                           end 
-                                      )
- *)
+                                      ) split_cons1 type_e1 in 
+        let ty_sc_dirt = List.fold_right (fun cons acc -> Types.TySchemeDirt (cons,acc)) split_dirt_vars qual_ty in
+        let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,acc)) split_ty_vars ty_sc_dirt in 
+        let new_st = add_def st new_var ty_sc_ty in 
+        let (typed_c2,type_c2,cons_c2) = type_comp new_st c_2 in
+
+        let var_exp = List.fold_right(fun cons acc -> 
+                                          begin match cons with 
+                                          | Typed.TyOmega(om,t) -> Typed.annotate (Typed.LambdaTyCoerVar (om,t,acc)) typed_c2.location
+                                          | Typed.DirtOmega(om,t) -> Typed.annotate(Typed.LambdaDirtyCoerVar(om,t,acc)) typed_c2.location
+                                          end 
+                                      ) split_cons1 typed_e1 in 
+        let var_exp_dirt_lamda = List.fold_right (fun cons acc -> Typed.annotate ( Typed.BigLambdaDirt (cons,acc) ) typed_c2.location )  split_dirt_vars var_exp in
+        let var_exp_ty_lambda = List.fold_right (fun cons acc -> Typed.annotate (Typed.BigLambdaTy (cons,acc) )typed_c2.location ) split_ty_vars var_exp_dirt_lamda in
+        let return_term = Typed.LetVal (new_var, var_exp_ty_lambda, typed_c2) in 
+        (return_term, type_c2 , (cons_c2 @ split_cons2))
+
 
      | _-> 
         let (typed_c1,(type_c1,dirt_c1),cons_c1) = type_comp st c_1 in
