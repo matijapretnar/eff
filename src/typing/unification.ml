@@ -351,9 +351,9 @@ and unify_ty_vars (sub,paused,rest_queue) tv a cons=
 let rec apply_substitution s ci =
   begin match s with
   | [] -> ci
-  | (s1::sub) -> 
+  | (s1::ss) -> 
       let subbed_term = apply_sub_comp s1 ci in 
-      apply_substitution s subbed_term
+      apply_substitution ss subbed_term
   end
 
 and apply_sub_comp sub c =
