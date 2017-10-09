@@ -18,8 +18,6 @@ let print_sub ?max_level c ppf =
   begin match c with
   | CoerTyVarToTyCoercion (p, t) ->  print "%t :-coertyTotyCoer-> %t" 
                               (Params.print_ty_coercion_param p) (Typed.print_ty_coercion t)
- (*  | CoerDirtyVartoDirtyCoercion (p,d) ->  print "%t :-coertyDirtyoDirtyCoer-> %t"
-                              (Params.print_dirty_coercion_param p) (Typed.print_dirty_coercion d) *)
   | CoerDirtVartoDirtCoercion (p,d) ->  print "%t :-coertyDirtoDirtCoer-> %t"
                               (Params.print_dirt_coercion_param p) (Typed.print_dirt_coercion d)
   | TyVarToTy (p,t) ->  print "%t :-tyvarToTargetty-> %t" 
@@ -350,10 +348,88 @@ and unify_ty_vars (sub,paused,rest_queue) tv a cons=
 
 
 
-let apply_substitution sub ci =
-  let c = ci.term  in 
-  let c'= 
-  begin match sub with
-  | [] -> c
-  | _ -> c
-  end in annotate c' ci.location
+let rec apply_substitution s ci =
+  begin match s with
+  | [] -> ci
+  | (s1::sub) -> 
+      let subbed_term = apply_sub_comp s1 ci in 
+      apply_substitution s subbed_term
+  end
+
+and apply_sub_comp sub c =
+let c' = apply_sub_plain_comp sub c in
+  Typed.annotate c' c.location
+and apply_sub_plain_comp sub c =
+  begin match c.term with 
+  | Value e -> Value (apply_sub_exp sub e) 
+  | LetVal (v1,e1,c1) -> LetVal (v1, (apply_sub_exp sub e1), (apply_sub_comp sub c1))
+  | LetRec (l,c1) -> LetRec (l,c1)
+  | Match (e,alist) -> Match (e,alist)
+  | Apply (e1,e2) -> Apply ((apply_sub_exp sub e1), (apply_sub_exp sub e2))
+  | Handle (e1,c1) -> Handle ((apply_sub_exp sub e1), (apply_sub_comp sub c1))
+  | Call (effect,e1,abs) -> Call (effect, (apply_sub_exp sub e1), (apply_sub_abs sub abs))
+  | Op(ef,e1) -> Op (ef, (apply_sub_exp sub e1 ))
+  | Bind (c1,a1) -> Bind ((apply_sub_comp sub c1), (apply_sub_abs sub a1))
+  | CastComp (c1,dc1) -> CastComp ((apply_sub_comp sub c1), (apply_sub_dirtycoer sub dc1))
+  | CastComp_ty (c1,tc1)-> CastComp_ty ( (apply_sub_comp sub c1) , (apply_sub_tycoer sub tc1) )
+  | CastComp_dirt (c1,tc1)-> CastComp_dirt ( (apply_sub_comp sub c1) , (apply_sub_dirtcoer sub tc1) ) 
+  end
+
+and apply_sub_exp sub exp =
+let e' = apply_sub_plain_exp sub exp in
+  Typed.annotate e' (exp.location)
+and apply_sub_plain_exp sub e =
+  begin match e.term with 
+  | Var v -> Var v
+  | BuiltIn(s,i) -> BuiltIn (s,i)
+  | Const c -> Const c 
+  | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
+  | Record r -> Record r 
+  | Variant (lbl, e1) -> Variant (lbl, e1)
+  | Lambda (pat,ty1,c1)-> Lambda (pat, (apply_sub_ty sub ty1), (apply_sub_comp sub c1))
+  | Effect eff -> Effect eff
+  | Handler h -> Handler (apply_sub_handler sub h)
+  | BigLambdaTy(ty_param,e1) -> BigLambdaTy( ty_param, (apply_sub_exp sub e1))
+  | BigLambdaDirt(dirt_param,e1) -> BigLambdaDirt (dirt_param, (apply_sub_exp sub e1))
+  | CastExp (e1,tc1) -> CastExp ( (apply_sub_exp sub e1) , (apply_sub_tycoer sub tc1) )
+  | ApplyTyExp (e1,tty) -> ApplyTyExp ( (apply_sub_exp sub e1), (apply_sub_ty sub tty))
+  | LambdaTyCoerVar (tcp1,ct_ty1,e1) ->LambdaTyCoerVar (tcp1, ct_ty1, (apply_sub_exp sub e1))
+  | LambdaDirtCoerVar (dcp1,ct_dirt1,e1) ->LambdaDirtCoerVar (dcp1, ct_dirt1, (apply_sub_exp sub e1))
+  | ApplyDirtExp (e1,d1) -> ApplyDirtExp ((apply_sub_exp sub e1), (apply_sub_dirt sub sub d1))
+  | ApplyTyCoercion (e1,tc1) -> ApplyTyCoercion ((apply_sub_exp sub e1), (apply_sub_tycoer sub tc1))
+  | ApplyDirtCoercion (e1,dc1) -> ApplyDirtCoercion ((apply_sub_exp sub e1), (apply_sub_dirtcoer sub dc1))
+end
+
+and apply_sub_abs sub abs = assert false
+
+and apply_sub_handler sub h = assert false
+
+and apply_sub_tycoer sub ty_coer = assert false 
+
+and apply_sub_dirtcoer sub dirt_coer = assert false 
+
+and apply_sub_dirtycoer sub dirty_coer = assert false
+
+and apply_sub_ty sub ty = 
+  begin match ty with 
+  | Tyvar typ1 ->
+        begin match sub with 
+        | TyVarToTy (typ2,ttype) when (typ1 = typ2) -> ttype
+        | _ -> ty
+        end
+  | Arrow (tty1,tty2) -> Arrow ((apply_sub_ty sub tty1),(apply_sub_dirty_ty sub tty2))
+  | Tuple ttyl ->Tuple (List.map (fun x -> apply_sub_ty sub x) ttyl)
+  | Handler (tydrty1,tydrty2) -> Handler ((apply_sub_dirty_ty sub tydrty1), (apply_sub_dirty_ty sub tydrty2) )
+  | PrimTy _ -> ty
+  | QualTy (ct_ty1,tty1) -> QualTy (apply_sub_ct_ty sub ct_ty1, apply_sub_ty sub tty1)
+  | QualDirt (ct_drt1,tty1) -> QualDirt (apply_sub_ct_dirt sub ct_drt1,apply_sub_ty sub tty1 )
+  | TySchemeTy (ty_param ,tty1) -> TySchemeTy (ty_param, apply_sub_ty sub tty1)
+  | TySchemeDirt (dirt_param ,tty1) -> TySchemeDirt (dirt_param, apply_sub_ty sub tty1)
+  end
+and apply_sub_dirty_ty sub drty_ty = assert false
+
+and apply_sub_dirt sub drt = assert false
+
+and apply_sub_ct_ty sub ct_ty1 = assert false
+
+and apply_sub_ct_dirt sub ct_drt = assert false

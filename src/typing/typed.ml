@@ -267,17 +267,19 @@ and print_dirty_coercion ?max_level c ppf =
   match c with 
   | BangCoercion (tc, dirtc) ->
       print "%t ! %t" (print_ty_coercion tc) (print_dirt_coercion dirtc )
-(*   | DirtyCoercionVar (tcp) ->
-      print "%t" (Params.print_dirty_coercion_param tcp) *)
 
 and print_dirt_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with 
   | ReflDirt p ->
       print "<%t>" (Types.print_target_dirt p)
-  | DirtCoercionVar(tcp) ->
+  | DirtCoercionVar tcp ->
       print "%t" (Params.print_dirt_coercion_param tcp)
-
+  | Empty d ->
+      print "(/)_%t" (Types.print_target_dirt d) 
+  | UnionDirt (eset,dc)->
+        let eff_list = Types.effect_set_to_list eset in
+        print "{%t} U %t" (Types.print_effect_list eff_list)  (print_dirt_coercion dc)
 and print_omega_ct ?max_level c ppf = 
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with
