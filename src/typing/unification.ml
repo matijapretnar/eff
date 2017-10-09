@@ -395,7 +395,7 @@ and apply_sub_plain_exp sub e =
   | ApplyTyExp (e1,tty) -> ApplyTyExp ( (apply_sub_exp sub e1), (apply_sub_ty sub tty))
   | LambdaTyCoerVar (tcp1,ct_ty1,e1) ->LambdaTyCoerVar (tcp1, ct_ty1, (apply_sub_exp sub e1))
   | LambdaDirtCoerVar (dcp1,ct_dirt1,e1) ->LambdaDirtCoerVar (dcp1, ct_dirt1, (apply_sub_exp sub e1))
-  | ApplyDirtExp (e1,d1) -> ApplyDirtExp ((apply_sub_exp sub e1), (apply_sub_dirt sub sub d1))
+  | ApplyDirtExp (e1,d1) -> ApplyDirtExp ((apply_sub_exp sub e1), (apply_sub_dirt sub d1))
   | ApplyTyCoercion (e1,tc1) -> ApplyTyCoercion ((apply_sub_exp sub e1), (apply_sub_tycoer sub tc1))
   | ApplyDirtCoercion (e1,dc1) -> ApplyDirtCoercion ((apply_sub_exp sub e1), (apply_sub_dirtcoer sub dc1))
 end
@@ -404,9 +404,39 @@ and apply_sub_abs sub abs = assert false
 
 and apply_sub_handler sub h = assert false
 
-and apply_sub_tycoer sub ty_coer = assert false 
+and apply_sub_tycoer sub ty_coer =
+  begin match ty_coer with 
+  | ReflTy tty -> ReflTy (apply_sub_ty sub tty)
+  | ArrowCoercion(tycoer1,dirtycoer) -> ArrowCoercion (apply_sub_tycoer sub tycoer1, apply_sub_dirtycoer sub dirtycoer)
+  | HandlerCoercion (dirtycoer1,dirtycoer2) -> HandlerCoercion (apply_sub_dirtycoer sub dirtycoer1, apply_sub_dirtycoer sub dirtycoer2)
+  | TyCoercionVar p ->
+      begin match sub with 
+      | CoerTyVarToTyCoercion (p',t_coer) when (p = p') -> t_coer
+      | _ -> TyCoercionVar p
+    end
+  | SequenceTyCoer (ty_coer1,ty_coer2) -> SequenceTyCoer (apply_sub_tycoer sub ty_coer1, apply_sub_tycoer sub ty_coer2)
+  | TupleCoercion tcl -> TupleCoercion (List.map (fun x-> apply_sub_tycoer sub x) tcl)
+  | LeftArrow tc1 -> LeftArrow (apply_sub_tycoer sub tc1)
+  | ForallTy (ty_param,ty_coer1) -> ForallTy (ty_param, apply_sub_tycoer sub ty_coer1)
+  | ApplyTyCoer (ty_coer1,tty1) -> ApplyTyCoer (apply_sub_tycoer sub ty_coer1, apply_sub_ty sub tty1)
+  | ForallDirt (dirt_param,ty_coer1) -> ForallDirt (dirt_param, apply_sub_tycoer sub ty_coer1)
+  | ApplyDirCoer (ty_coer1,drt) -> ApplyDirCoer (apply_sub_tycoer sub ty_coer1, apply_sub_dirt sub drt)
+  | PureCoercion dirty_coer1 -> PureCoercion (apply_sub_dirtycoer sub dirty_coer1)
+  end
 
-and apply_sub_dirtcoer sub dirt_coer = assert false 
+and apply_sub_dirtcoer sub dirt_coer = 
+  begin match dirt_coer with 
+  | ReflDirt d -> ReflDirt (apply_sub_dirt sub d)
+  | DirtCoercionVar p ->
+      begin match sub with 
+      | CoerDirtVartoDirtCoercion (p' , dc) when (p' = p) -> dc
+      | _ -> dirt_coer
+    end
+  | Empty d -> Empty (apply_sub_dirt sub d )
+  | UnionDirt (es,dirt_coer1) -> UnionDirt (es, (apply_sub_dirtcoer sub dirt_coer1))
+  | SequenceDirtCoer(dirt_coer1, dirt_coer2) -> SequenceDirtCoer (apply_sub_dirtcoer sub dirt_coer1, apply_sub_dirtcoer sub dirt_coer2)
+  | DirtCoercion (dirty_coer1) -> DirtCoercion (apply_sub_dirtycoer sub dirty_coer1)
+  end
 
 and apply_sub_dirtycoer sub dirty_coer = assert false
 
