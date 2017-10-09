@@ -400,15 +400,27 @@ and apply_sub_plain_exp sub e =
   | ApplyDirtCoercion (e1,dc1) -> ApplyDirtCoercion ((apply_sub_exp sub e1), (apply_sub_dirtcoer sub dc1))
 end
 
-and apply_sub_abs sub abs = assert false
+and apply_sub_abs sub abs = 
+  let (p,c) = abs.term in 
+  annotate (p, apply_sub_comp sub c) abs.location
 
-and apply_sub_handler sub h = assert false
+and apply_sub_abs2 sub abs2 = 
+  let (p1,p2,c) = abs2.term in 
+  annotate (p1, p2, apply_sub_comp sub c) abs2.location
+
+and apply_sub_handler sub h =
+  let eff_clauses = h.effect_clauses in 
+  let new_value_clause = apply_sub_abs sub h.value_clause in 
+  let new_eff_clauses = OldUtils.assoc_map (fun abs2 ->apply_sub_abs2 sub abs2) eff_clauses in 
+  { effect_clauses= new_eff_clauses;
+    value_clause = new_value_clause;}
 
 and apply_sub_tycoer sub ty_coer =
   begin match ty_coer with 
   | ReflTy tty -> ReflTy (apply_sub_ty sub tty)
   | ArrowCoercion(tycoer1,dirtycoer) -> ArrowCoercion (apply_sub_tycoer sub tycoer1, apply_sub_dirtycoer sub dirtycoer)
-  | HandlerCoercion (dirtycoer1,dirtycoer2) -> HandlerCoercion (apply_sub_dirtycoer sub dirtycoer1, apply_sub_dirtycoer sub dirtycoer2)
+  | HandlerCoercion (dirtycoer1,dirtycoer2) -> 
+        HandlerCoercion (apply_sub_dirtycoer sub dirtycoer1, apply_sub_dirtycoer sub dirtycoer2)
   | TyCoercionVar p ->
       begin match sub with 
       | CoerTyVarToTyCoercion (p',t_coer) when (p = p') -> t_coer
@@ -434,11 +446,21 @@ and apply_sub_dirtcoer sub dirt_coer =
     end
   | Empty d -> Empty (apply_sub_dirt sub d )
   | UnionDirt (es,dirt_coer1) -> UnionDirt (es, (apply_sub_dirtcoer sub dirt_coer1))
-  | SequenceDirtCoer(dirt_coer1, dirt_coer2) -> SequenceDirtCoer (apply_sub_dirtcoer sub dirt_coer1, apply_sub_dirtcoer sub dirt_coer2)
-  | DirtCoercion (dirty_coer1) -> DirtCoercion (apply_sub_dirtycoer sub dirty_coer1)
+  | SequenceDirtCoer(dirt_coer1, dirt_coer2) -> 
+        SequenceDirtCoer (apply_sub_dirtcoer sub dirt_coer1, apply_sub_dirtcoer sub dirt_coer2)
+  | DirtCoercion (dirty_coer1) -> 
+        DirtCoercion (apply_sub_dirtycoer sub dirty_coer1)
   end
 
-and apply_sub_dirtycoer sub dirty_coer = assert false
+and apply_sub_dirtycoer sub dirty_coer =
+  begin match dirty_coer with 
+  | BangCoercion (ty_coer,dirt_coer) -> BangCoercion (apply_sub_tycoer sub ty_coer, apply_sub_dirtcoer sub dirt_coer)
+  | RightArrow ty_coer1 -> RightArrow (apply_sub_tycoer sub ty_coer1)
+  | RightHandler ty_coer1 -> RightHandler (apply_sub_tycoer sub ty_coer1)
+  | LeftHandler ty_coer1 -> LeftHandler (apply_sub_tycoer sub ty_coer1)
+  | SequenceDirtyCoer(dirty_coer1,dirty_coer2) -> 
+        SequenceDirtyCoer (apply_sub_dirtycoer sub dirty_coer1, apply_sub_dirtycoer sub dirty_coer2) 
+  end
 
 and apply_sub_ty sub ty = 
   begin match ty with 
@@ -456,10 +478,31 @@ and apply_sub_ty sub ty =
   | TySchemeTy (ty_param ,tty1) -> TySchemeTy (ty_param, apply_sub_ty sub tty1)
   | TySchemeDirt (dirt_param ,tty1) -> TySchemeDirt (dirt_param, apply_sub_ty sub tty1)
   end
-and apply_sub_dirty_ty sub drty_ty = assert false
+and apply_sub_dirty_ty sub drty_ty = 
+  let (ty1,drt1) = drty_ty in 
+  ( (apply_sub_ty sub ty1), (apply_sub_dirt sub drt1))
 
-and apply_sub_dirt sub drt = assert false
+and apply_sub_dirt sub drt =
+  begin match drt with 
+  | SetVar (eset,p) ->
+      begin match sub with 
+      | DirtVarToDirt (p', drt2) when (p = p')-> 
+          begin match drt2 with 
+          | SetVar (eset2,pp) ->
+              let eset_union = effect_set_union eset eset2 in 
+              SetVar (eset_union,pp)
+          | SetEmpty eset2 ->
+              SetEmpty (effect_set_union eset eset2)
+          end
+      | _ -> drt
+      end
+  | _ -> drt
+  end
 
-and apply_sub_ct_ty sub ct_ty1 = assert false
+and apply_sub_ct_ty sub ct_ty1 = 
+  let (ct_tya,ct_tyb) = ct_ty1 in 
+  ( (apply_sub_ty sub ct_tya), (apply_sub_ty sub ct_tyb) )
 
-and apply_sub_ct_dirt sub ct_drt = assert false
+and apply_sub_ct_dirt sub ct_drt =
+  let (ct_tya,ct_tyb) = ct_drt in 
+  ( (apply_sub_dirt sub ct_tya), (apply_sub_dirt sub ct_tyb) )
