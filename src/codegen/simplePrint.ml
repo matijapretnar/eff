@@ -34,9 +34,19 @@ let rec print_expression ?max_level e ppf =
       print ~at_level:2 "effect %t" (print_effect eff)
   | CastExp (e1,_) ->
     print "%t" (print_expression e1)
+  | BigLambdaTy (_,e1) -> print "%t " (print_expression e1)
+  | BigLambdaDirt (_,e1) ->  print "%t " (print_expression e1) 
+  | ApplyTyExp (e1,_)-> print "%t " (print_expression e1)
+  | LambdaTyCoerVar (_,_,e1) -> 
+      print "%t " (print_expression e1)
+  | LambdaDirtCoerVar (_,_,e1) -> 
+       print "%t " (print_expression e1)
+  | ApplyDirtExp (e1,_)->  print "%t " (print_expression e1)
+  | ApplyTyCoercion  (e1,_)->  print "%t " (print_expression e1)
+  | ApplyDirtCoercion (e1,_)->  print "%t " (print_expression e1)
+
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  Print.debug "THE Comp IS %t" (Typed.print_computation c) ;
   match c.Typed.term with
   | Typed.Apply (e1, e2) ->
       print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
@@ -58,8 +68,10 @@ and print_computation ?max_level c ppf =
       print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression e) (print_computation c)
   | Typed.Bind (c1, a) ->
       print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
-  | CastComp_dirt (c1,_) ->
-    print "%t" (print_computation c1)
+  | CastComp (c1,_) -> print " %t " (print_computation c1)
+  | CastComp_ty (c1,_) -> print " %t " (print_computation c1)
+  | CastComp_dirt (c1,_) -> print " %t " (print_computation c1)
+  | LetVal(v,e1,c1) ->  print "let %t = (Value %t) in %t" (print_variable v) (print_expression e1) (print_computation c1)
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match eff_clauses with
