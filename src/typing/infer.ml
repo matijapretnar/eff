@@ -116,6 +116,8 @@ let rec type_pattern p =
 let extend_env vars env =
   List.fold_right (fun (x, ty_sch) env -> {env with context = TypingEnv.update env.context x ty_sch}) vars env
 
+let print_env env = 
+  List.map (fun (x, ty_sch) -> Print.debug "%t : %t" (Typed.print_variable x ) (Types.print_target_ty ty_sch) ;) env
 
 let constraint_free_ty_vars cons = 
   begin match cons with 
@@ -192,22 +194,40 @@ let set_of_ty_list = List.fold_left (fun acc x -> TyVarSet.add x acc) TyVarSet.e
 let set_of_dirt_list = List.fold_left (fun acc x -> DirtVarSet.add x acc) DirtVarSet.empty
 
 let splitter st constraints simple_ty =
+   Print.debug "Splitter Input Constraints: ";
+   Unification.print_c_list constraints;
+   Print.debug "Splitter Input Ty: %t" (Types.print_target_ty simple_ty);
+   Print.debug "Splitter Env :";
+   print_env st ;
    let simple_ty_freevars_ty = set_of_ty_list (free_ty_vars_ty simple_ty) in 
+   Print.debug "Simple type free vars: ";
+   List.iter (fun x -> Print.debug "%t" (Params.print_ty_param x) ) (free_ty_vars_ty simple_ty);
    let simple_ty_freevars_dirt = set_of_dirt_list (free_dirt_vars_ty simple_ty) in
-   let state_freevars_ty = set_of_ty_list (state_free_ty_vars st) in 
+   let state_freevars_ty = set_of_ty_list (state_free_ty_vars st) in
+    Print.debug "state free vars: ";
+   List.iter (fun x -> Print.debug "%t" (Params.print_ty_param x) ) (state_free_ty_vars st); 
    let state_freevars_dirt = set_of_dirt_list (state_free_dirt_vars st) in
    let cons2 = List.filter (fun cons -> 
                                       let cons_freevars_ty = set_of_ty_list (constraint_free_ty_vars cons) in 
                                       let cons_freevars_dirt = set_of_dirt_list (constraint_free_dirt_vars cons) in
                                       let is_sub_ty = ( TyVarSet.subset cons_freevars_ty state_freevars_ty) || (TyVarSet.equal cons_freevars_ty state_freevars_ty) in 
                                       let is_sub_dirt = (DirtVarSet.subset cons_freevars_dirt state_freevars_dirt) || (DirtVarSet.equal cons_freevars_dirt state_freevars_dirt) in 
-                                      is_sub_ty || is_sub_dirt
+                                      is_sub_ty && is_sub_dirt
                            ) constraints in 
    let cons1 = OldUtils.diff constraints cons2 in 
    let constraints_freevars_ty= List.fold_right ( fun cons acc -> TyVarSet.union (set_of_ty_list (constraint_free_ty_vars cons)) acc ) constraints TyVarSet.empty in 
    let constraints_freevars_dirt= List.fold_right ( fun cons acc -> DirtVarSet.union (set_of_dirt_list (constraint_free_dirt_vars cons)) acc ) constraints DirtVarSet.empty in
    let alpha_list = TyVarSet.elements (TyVarSet.diff (TyVarSet.union constraints_freevars_ty simple_ty_freevars_ty) state_freevars_ty) in
    let delta_list = DirtVarSet.elements (DirtVarSet.diff (DirtVarSet.union constraints_freevars_dirt simple_ty_freevars_dirt) state_freevars_dirt) in
+   Print.debug "Splitter output free_ty_vars: ";
+   List.iter (fun x -> Print.debug "%t" (Params.print_ty_param x) ) alpha_list;
+   Print.debug "Splitter output free_dirt_vars: ";
+   List.iter (fun x -> Print.debug "%t" (Params.print_dirt_param x) ) delta_list;
+   Print.debug "Splitter first constraints list :";
+   Unification.print_c_list cons1;
+   Print.debug "Splitter second constraints list :";
+   Unification.print_c_list cons2;
+
    (alpha_list,delta_list,cons1,cons2) 
 
 

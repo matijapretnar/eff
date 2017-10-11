@@ -205,10 +205,10 @@ let rec print_expression ?max_level e ppf =
   | BigLambdaDirt (p,e) -> print "BigLambda_dirt_%t. %t "(Params.print_dirt_param p) (print_expression e) 
   | ApplyTyExp (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (Types.print_target_ty tty)
   | LambdaTyCoerVar (p,(tty1,tty2),e) -> 
-      print "BigLambda_ty_(%t:%t<=%t).( %t ) "(Params.print_ty_coercion_param p) (Types.print_target_ty tty1) (Types.print_target_ty tty2)
+      print "BigLambda_tyCoer_(%t:%t<=%t).( %t ) "(Params.print_ty_coercion_param p) (Types.print_target_ty tty1) (Types.print_target_ty tty2)
                                            (print_expression e)
   | LambdaDirtCoerVar (p,(tty1,tty2),e) -> 
-      print "BigLambda_ty_(%t:%t<=%t).( %t )"(Params.print_dirt_coercion_param p) (Types.print_target_dirt tty1) 
+      print "BigLambda_DirtCoer_(%t:%t<=%t).( %t )"(Params.print_dirt_coercion_param p) (Types.print_target_dirt tty1) 
                                             (Types.print_target_dirt tty2) (print_expression e)
   | ApplyDirtExp (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (Types.print_target_dirt tty)
   | ApplyTyCoercion  (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (print_ty_coercion tty)
@@ -218,9 +218,9 @@ and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.term with
   | Apply (e1, e2) ->
-    print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
+    print ~at_level:1 "(%t@ %t)" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
   | Value e ->
-    print ~at_level:1 "value %t" (print_expression ~max_level:0 e)
+    print ~at_level:1 "value (%t)" (print_expression ~max_level:0 e)
   | Match (e, []) ->
     print ~at_level:2 "(match %t with _ -> assert false)" (print_expression e)
   | Match (e, lst) ->
@@ -231,7 +231,7 @@ and print_computation ?max_level c ppf =
     print ~at_level:2 "let rec @[<hov>%t@] in %t"
       (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
   | Call (eff, e, a) ->
-    print ~at_level:1 "call %t %t (@[fun %t@])"
+    print ~at_level:1 "call (%t) (%t) ((@[fun %t@]))"
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
   | Op (eff,e) -> 
     print ~at_level:1 "(#%t %t)" (print_effect eff) (print_expression e)
@@ -244,7 +244,7 @@ and print_computation ?max_level c ppf =
   | CastComp_dirt (c1,dc) ->
     print "( %t |> [%t])" (print_computation c1) (print_dirt_coercion dc)
   | LetVal(v,e1,c1) -> 
-    print "let (%t = %t) in (%t)" (print_variable v) (print_expression e1) (print_computation c1)
+    print "let (%t = (%t)) in (%t)" (print_variable v) (print_expression e1) (print_computation c1)
 
 
 and print_ty_coercion ?max_level c ppf =
