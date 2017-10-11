@@ -205,10 +205,10 @@ let rec print_expression ?max_level e ppf =
   | BigLambdaDirt (p,e) -> print "BigLambda_dirt_%t. %t "(Params.print_dirt_param p) (print_expression e) 
   | ApplyTyExp (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (Types.print_target_ty tty)
   | LambdaTyCoerVar (p,(tty1,tty2),e) -> 
-      print "BigLambda_ty_(%t:%t<=%t). %t "(Params.print_ty_coercion_param p) (Types.print_target_ty tty1) (Types.print_target_ty tty2)
+      print "BigLambda_ty_(%t:%t<=%t).( %t ) "(Params.print_ty_coercion_param p) (Types.print_target_ty tty1) (Types.print_target_ty tty2)
                                            (print_expression e)
   | LambdaDirtCoerVar (p,(tty1,tty2),e) -> 
-      print "BigLambda_ty_(%t:%t<=%t). %t "(Params.print_dirt_coercion_param p) (Types.print_target_dirt tty1) 
+      print "BigLambda_ty_(%t:%t<=%t).( %t )"(Params.print_dirt_coercion_param p) (Types.print_target_dirt tty1) 
                                             (Types.print_target_dirt tty2) (print_expression e)
   | ApplyDirtExp (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (Types.print_target_dirt tty)
   | ApplyTyCoercion  (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (print_ty_coercion tty)
@@ -238,13 +238,13 @@ and print_computation ?max_level c ppf =
   | Bind (c1, a) ->
     print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
   | CastComp (c1,dc) ->
-    print "%t |> [%t]" (print_computation c1) (print_dirty_coercion dc)
+    print " ( %t |> [%t] ) " (print_computation c1) (print_dirty_coercion dc)
   | CastComp_ty (c1,dc) ->
-    print "%t |> [%t]" (print_computation c1) (print_ty_coercion dc)
+    print " ( %t |> [%t] )" (print_computation c1) (print_ty_coercion dc)
   | CastComp_dirt (c1,dc) ->
-    print "%t |> [%t]" (print_computation c1) (print_dirt_coercion dc)
+    print "( %t |> [%t])" (print_computation c1) (print_dirt_coercion dc)
   | LetVal(v,e1,c1) -> 
-    print "let %t = %t in %t" (print_variable v) (print_expression e1) (print_computation c1)
+    print "let (%t = %t) in (%t)" (print_variable v) (print_expression e1) (print_computation c1)
 
 
 and print_ty_coercion ?max_level c ppf =

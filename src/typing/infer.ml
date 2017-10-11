@@ -463,7 +463,22 @@ and type_plain_comp st = function
            let omega_cons_1 = Typed.TyOmega (coerp1,cons1) in 
            let constraints = List.append [omega_cons_1] constraints_2 in
            let dirt_of_out_ty = Types.list_to_effect_set [eff] in 
-           (Typed.Op ( (eff, (eff_in,eff_out)) ,e2_coerced), (eff_out, (Types.SetEmpty dirt_of_out_ty)), constraints)
+           let new_var = Typed.Variable.fresh "cont_bind" in
+           let continuation_comp = Untyped.Value ( Untyped.annotate (Untyped.Var new_var) typed_e2.location ) in 
+           let new_st = add_def st new_var eff_out in 
+           let (typed_cont_comp, typed_cont_comp_dirty_ty, cont_comp_cons)= 
+                    type_comp new_st (Untyped.annotate continuation_comp typed_e2.location) in 
+           let (typed_comp_ty,typed_comp_dirt) = typed_cont_comp_dirty_ty in 
+           let final_dirt = 
+              begin match typed_comp_dirt with 
+              | Types.SetVar (s,dv) -> Types.SetVar (Types.effect_set_union s (Types.list_to_effect_set [eff]), dv)
+              | Types.SetEmpty s -> Types.SetEmpty (Types.effect_set_union s (Types.list_to_effect_set [eff]))
+              end in 
+          let cont_abstraction = Typed.annotate ((Typed.annotate (Typed.PVar new_var) typed_e2.location), typed_cont_comp) 
+                                 typed_e2.location in
+          ( Typed.Call( (eff, (eff_in,eff_out)) ,e2_coerced, cont_abstraction ),
+            (typed_comp_ty,final_dirt),
+            cont_comp_cons @ constraints)
       | _ ->
           let new_ty_var = Types.Tyvar (Params.fresh_ty_param ()) in 
           let new_ty_var_2 = Types.Tyvar (Params.fresh_ty_param ()) in

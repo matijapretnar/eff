@@ -63,6 +63,11 @@ and abstraction = pattern * computation
 and abstraction2 = pattern * pattern * computation
 
 
+let annotate t loc = {
+  term = t;
+  location = loc;
+}
+
 (* Toplevel commands (the first four do not need to be separated by [;;]) *)
 type toplevel = plain_toplevel annotation
 and plain_toplevel =
