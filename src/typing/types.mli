@@ -61,3 +61,7 @@ val effect_set_union: effect_set -> effect_set -> effect_set
 val effect_set_is_empty: effect_set -> bool
 
 val effect_set_is_subseteq: effect_set -> effect_set -> bool
+
+val effect_set_mem: OldUtils.effect -> effect_set -> bool
+
+val is_effect_member:OldUtils.effect -> dirt -> bool

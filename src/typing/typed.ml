@@ -93,6 +93,10 @@ and ty_coercion =
   | ForallDirt of (Params.dirt_param) * ty_coercion
   | ApplyDirCoer of ty_coercion * dirt
   | PureCoercion of dirty_coercion
+  | QualTyCoer of ct_ty * ty_coercion
+  | QualDirtCoer of ct_dirt * ty_coercion
+  | ApplyQualTyCoer of ty_coercion * ct_ty
+  | ApplyQualDirtCoer of ty_coercion * ct_dirt
 
 and dirt_coercion = 
   | ReflDirt of dirt

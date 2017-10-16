@@ -22,6 +22,9 @@ let effect_set_union s1 s2 =
 let effect_set_is_empty s = 
       EffectSet.is_empty s
 
+let effect_set_mem eff s = 
+      EffectSet.mem eff s
+
 let effect_set_is_subseteq s1 s2 =
       (EffectSet.subset s1 s2) || (EffectSet.equal s1 s2)
 
@@ -59,6 +62,14 @@ and
 ct_dirt = (dirt * dirt)
 and 
 ct_dirty = (target_dirty * target_dirty)
+
+let is_effect_member eff drt =
+  begin match drt with
+  | SetVar (eset,_) when (effect_set_mem eff eset) -> true
+  | SetEmpty (eset) when (effect_set_mem eff eset) -> true
+  | _ -> false
+  end 
+
 
 let rec print_target_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

@@ -587,8 +587,8 @@ and type_plain_comp st = function
         let coer2 = Typed.DirtCoercionVar(coerp2) in 
         let omega_cons_1 = Typed.DirtOmega (coerp1,cons1) in
         let omega_cons_2 = Typed.DirtOmega (coerp2,cons2) in
-        let coer_c1 = Typed.annotate (Typed.CastComp_dirt (typed_c1, coer1) ) typed_c1.location in  
-        let coer_c2 = Typed.annotate (Typed.CastComp_dirt (typed_c2, coer2) ) typed_c2.location in
+        let coer_c1 = Typed.annotate (Typed.CastComp (typed_c1, Typed.BangCoercion (Typed.ReflTy type_c1,coer1)) ) typed_c1.location in  
+        let coer_c2 = Typed.annotate (Typed.CastComp (typed_c2, Typed.BangCoercion (Typed.ReflTy type_c2,coer2)) ) typed_c2.location in
         let typed_pattern = type_pattern p_def in 
         let abstraction = Typed.annotate  (typed_pattern,coer_c2) (typed_c2.location) in 
         let constraints = List.append [omega_cons_1;omega_cons_2] (List.append cons_c1 cons_c2) in
@@ -606,6 +606,7 @@ let type_toplevel ~loc st c =
     let (sub,final) = Unification.unify ([],[],constraints) in
     let ct' =  Unification.apply_substitution sub ct in
     Print.debug "New Computation : %t" (Typed.print_computation ct');
+    let type_checked_result = TypeChecker.type_check_comp (TypeChecker.new_checker_state) ct'.term in 
     ct', st
 
 let add_effect eff (ty1 , ty2) st =
