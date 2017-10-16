@@ -100,6 +100,47 @@ let rec type_check_comp st c =
   | CastComp_dirt (c1,tc1)-> assert false
   end
 
+
+and type_check_exp st e =
+begin match e with 
+  | Var v -> 
+      begin match (OldUtils.lookup v st.term_vars) with
+      | Some ty -> ty
+      | _ -> assert false
+    end
+  | BuiltIn(s,i) -> assert false
+  | Const const -> 
+      begin match const with
+        | Integer _ ->  Types.PrimTy IntTy
+        | String _ -> Types.PrimTy StringTy
+        | Boolean _ -> Types.PrimTy BoolTy
+        | Float _ -> Types.PrimTy FloatTy
+      end 
+  | Tuple elist -> assert false
+  | Record r -> assert false 
+  | Variant (lbl, e1) -> assert false
+  | Lambda (pat,ty1,c1)-> 
+      let PVar p = pat.term in 
+      let ty1' = type_check_ty st ty1 in 
+      let st' = extend_state_term_vars st p ty1 in
+      let c_ty = type_check_comp st' c1.term in 
+      Types.Arrow (ty1,c_ty) 
+
+  | Effect (eff,(eff_in,eff_out)) -> 
+      Types.Arrow(eff_in, (eff_out, Types.SetEmpty (list_to_effect_set [eff])))
+
+ (* | Handler h -> Handler (apply_sub_handler sub h)
+  | BigLambdaTy(ty_param,e1) -> BigLambdaTy( ty_param, (apply_sub_exp sub e1))
+  | BigLambdaDirt(dirt_param,e1) -> BigLambdaDirt (dirt_param, (apply_sub_exp sub e1))
+  | CastExp (e1,tc1) -> CastExp ( (apply_sub_exp sub e1) , (apply_sub_tycoer sub tc1) )
+  | ApplyTyExp (e1,tty) -> ApplyTyExp ( (apply_sub_exp sub e1), (apply_sub_ty sub tty))
+  | LambdaTyCoerVar (tcp1,ct_ty1,e1) ->LambdaTyCoerVar (tcp1, ct_ty1, (apply_sub_exp sub e1))
+  | LambdaDirtCoerVar (dcp1,ct_dirt1,e1) ->LambdaDirtCoerVar (dcp1, ct_dirt1, (apply_sub_exp sub e1))
+  | ApplyDirtExp (e1,d1) -> ApplyDirtExp ((apply_sub_exp sub e1), (apply_sub_dirt sub d1))
+  | ApplyTyCoercion (e1,tc1) -> ApplyTyCoercion ((apply_sub_exp sub e1), (apply_sub_tycoer sub tc1))
+  | ApplyDirtCoercion (e1,dc1) -> ApplyDirtCoercion ((apply_sub_exp sub e1), (apply_sub_dirtcoer sub dc1)) *)
+end
+
 and type_check_ty_coercion st ty_coer = 
   begin match ty_coer with 
   | ReflTy tty -> (tty,tty)
@@ -269,4 +310,3 @@ and type_check_dirty_ty st (ty,drt) =
   let _ = type_check_dirt st drt in 
   (ty,drt)
 
-and type_check_exp st e = Types.PrimTy Types.IntTy
