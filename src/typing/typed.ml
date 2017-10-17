@@ -95,8 +95,8 @@ and ty_coercion =
   | PureCoercion of dirty_coercion
   | QualTyCoer of ct_ty * ty_coercion
   | QualDirtCoer of ct_dirt * ty_coercion
-  | ApplyQualTyCoer of ty_coercion * ct_ty
-  | ApplyQualDirtCoer of ty_coercion * ct_dirt
+  | ApplyQualTyCoer of ty_coercion * ty_coercion
+  | ApplyQualDirtCoer of ty_coercion * dirt_coercion
 
 and dirt_coercion = 
   | ReflDirt of dirt

@@ -132,7 +132,7 @@ begin match e with
       let ty1' = type_check_ty st ty1 in 
       let st' = extend_state_term_vars st p ty1 in
       let c_ty = type_check_comp st' c1.term in 
-      Types.Arrow (ty1,c_ty) 
+      Types.Arrow (ty1',c_ty) 
  
   | Effect (eff,(eff_in,eff_out)) -> 
       Types.Arrow(eff_in, (eff_out, Types.SetEmpty (list_to_effect_set [eff])))
@@ -213,13 +213,29 @@ and type_check_ty_coercion st ty_coer =
       let (t1,t2) = type_check_ty_coercion new_st ty_coer1 in 
       (Types.TySchemeTy (ty_param,t1) , Types.TySchemeTy (ty_param,t2))
 
-  | ApplyTyCoer (ty_coer1,tty1) -> assert false
+  | ApplyTyCoer (ty_coer1,tty1) -> 
+      let (Types.TySchemeTy (ty_param1,t1) , Types.TySchemeTy (ty_param2,t2)) = type_check_ty_coercion st ty_coer1 in 
+      let tt = type_check_ty st tty1 in
+      let sub = Unification.TyVarToTy(ty_param1,tt) in 
+      if(ty_param1 = ty_param2) then 
+      (Unification.apply_sub_ty sub t1, Unification.apply_sub_ty sub t2)
+      else
+      assert false
+
   | ForallDirt (dirt_param,ty_coer1) -> 
       let new_st = extend_state_dirt_vars st dirt_param in
       let (t1,t2) = type_check_ty_coercion new_st ty_coer1 in 
       (Types.TySchemeDirt (dirt_param,t1) , Types.TySchemeDirt (dirt_param,t2))
 
-  | ApplyDirCoer (ty_coer1,drt) -> assert false
+  | ApplyDirCoer (ty_coer1,drt) ->
+      let (Types.TySchemeDirt (drt_param1,t1) , Types.TySchemeDirt (drt_param2,t2)) = type_check_ty_coercion st ty_coer1 in 
+      let tt = type_check_dirt st drt in
+      let sub = Unification.DirtVarToDirt(drt_param1,tt) in 
+      if(drt_param1 = drt_param2) then 
+      (Unification.apply_sub_ty sub t1, Unification.apply_sub_ty sub t2)
+      else
+      assert false
+  
   | PureCoercion dirty_coer1 -> 
       let ((t1,_),(t2,_)) = type_check_dirty_coercion st dirty_coer1 in 
       (t1,t2)
@@ -230,11 +246,19 @@ and type_check_ty_coercion st ty_coer =
       ( QualTy((tc1,tc2),t1) , QualTy((tc1,tc2),t2) )
   
   | QualDirtCoer (dirt_cons,ty_coer1) -> 
-      let bval = type_check_dirt_cons st dirt_cons in 
+      let _ = type_check_dirt_cons st dirt_cons in 
       let (t1,t2) = type_check_ty_coercion st ty_coer1 in 
       (QualDirt(dirt_cons,t1) , QualDirt(dirt_cons,t2))
-  | ApplyQualTyCoer (_,_) -> assert false
-  | ApplyQualDirtCoer (_,_) -> assert false
+  
+  | ApplyQualTyCoer (ty_coer1,ty_coer_applied) ->
+      let ty_coer_applied_cons = type_check_ty_coercion st ty_coer_applied in
+      let ( QualTy(cons1,t1) , QualTy(cons2,t2) ) = type_check_ty_coercion st ty_coer1 in 
+      if (cons1 = cons2 && cons2 = ty_coer_applied_cons) then (t1,t2) else assert false
+  
+  | ApplyQualDirtCoer (ty_coer1,dirt_coer_applied) ->
+      let dirt_coer_applied_cons = type_check_dirt_coercion st dirt_coer_applied in
+      let ( QualDirt(cons1,t1) , QualDirt(cons2,t2) ) = type_check_ty_coercion st ty_coer1 in 
+      if (cons1 = cons2 && cons2 = dirt_coer_applied_cons) then (t1,t2) else assert false
   end
 
 and type_check_dirty_coercion st dirty_coer =
@@ -281,7 +305,7 @@ and type_check_dirt_coercion st dirt_coer =
           | SetVar (es1,v) -> SetVar ((effect_set_union es es1),v)
           | SetEmpty (es1) -> SetEmpty(effect_set_union es es1)
           end in 
-       (dc_a',dc_a')
+       (dc_a',dc_b')
   | SequenceDirtCoer(dc1, dc2) -> 
         let (t1,t2) = type_check_dirt_coercion st dc1 in 
         let (t2,t3) = type_check_dirt_coercion st dc2 in 
@@ -294,7 +318,7 @@ and type_check_dirt_coercion st dirt_coer =
 and type_check_ty_cons st (t1,t2) =
   let t1' = type_check_ty st t1 in 
   let t2' = type_check_ty st t2 in 
-  (t1,t2) 
+  (t1',t2') 
 
 and type_check_dirt_cons st (d1,d2) =
   let d1' = type_check_dirt st d1 in 
@@ -304,9 +328,9 @@ and type_check_dirt_cons st (d1,d2) =
 and type_check_dirt st d =
   begin match d with 
   | SetEmpty eset when (effect_set_is_empty eset)-> d
-  | SetEmpty eset ->
+  | SetEmpty _ ->
       d
-  | SetVar(eset,v) ->
+  | SetVar(_,v) ->
       if List.mem v st.dirt_vars then 
         d
       else 
@@ -317,14 +341,14 @@ and type_check_ty st ty =
   begin match ty with 
   | Tyvar typ1 when( List.mem typ1 st.type_vars) -> ty
   | Arrow (tty1,tty2) ->
-      let tty1' = type_check_ty st tty1 in 
-      let tty2' = type_check_dirty_ty st tty2 in 
+      let _ = type_check_ty st tty1 in 
+      let _ = type_check_dirty_ty st tty2 in 
       ty 
 
   | Tuple ttyl ->Tuple (List.map (fun x -> type_check_ty st x) ttyl)
   | Handler (tty1,tty2) ->
-      let tty1' = type_check_dirty_ty st tty1 in 
-      let tty2' = type_check_dirty_ty st tty2 in 
+      let _ = type_check_dirty_ty st tty1 in 
+      let _ = type_check_dirty_ty st tty2 in 
       ty 
   | PrimTy _ -> ty
   | QualTy (ct_ty1,tty1) ->
