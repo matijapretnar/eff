@@ -1,5 +1,6 @@
-open Types
 open Typed
+open Types
+open Unification
 
 type ('term, 'ttype) target_term = {
   term: 'term;
@@ -25,6 +26,13 @@ let extend_state_term_vars st t_var tty =
 
 let extend_state_dirt_vars st dirt_var = 
     {st with dirt_vars = dirt_var::st.dirt_vars}
+
+let extend_state_omega_ty st tcp ctty =
+   {st with omega_ty = (tcp,ctty) :: st.omega_ty}
+
+
+let extend_state_omega_dirt st tcp ctdrt =
+   {st with omega_dirt = (tcp,ctdrt) :: st.omega_dirt}
 
 
 let new_checker_state = 
@@ -125,20 +133,53 @@ begin match e with
       let st' = extend_state_term_vars st p ty1 in
       let c_ty = type_check_comp st' c1.term in 
       Types.Arrow (ty1,c_ty) 
-
+ 
   | Effect (eff,(eff_in,eff_out)) -> 
       Types.Arrow(eff_in, (eff_out, Types.SetEmpty (list_to_effect_set [eff])))
 
- (* | Handler h -> Handler (apply_sub_handler sub h)
-  | BigLambdaTy(ty_param,e1) -> BigLambdaTy( ty_param, (apply_sub_exp sub e1))
-  | BigLambdaDirt(dirt_param,e1) -> BigLambdaDirt (dirt_param, (apply_sub_exp sub e1))
-  | CastExp (e1,tc1) -> CastExp ( (apply_sub_exp sub e1) , (apply_sub_tycoer sub tc1) )
-  | ApplyTyExp (e1,tty) -> ApplyTyExp ( (apply_sub_exp sub e1), (apply_sub_ty sub tty))
-  | LambdaTyCoerVar (tcp1,ct_ty1,e1) ->LambdaTyCoerVar (tcp1, ct_ty1, (apply_sub_exp sub e1))
-  | LambdaDirtCoerVar (dcp1,ct_dirt1,e1) ->LambdaDirtCoerVar (dcp1, ct_dirt1, (apply_sub_exp sub e1))
-  | ApplyDirtExp (e1,d1) -> ApplyDirtExp ((apply_sub_exp sub e1), (apply_sub_dirt sub d1))
-  | ApplyTyCoercion (e1,tc1) -> ApplyTyCoercion ((apply_sub_exp sub e1), (apply_sub_tycoer sub tc1))
-  | ApplyDirtCoercion (e1,dc1) -> ApplyDirtCoercion ((apply_sub_exp sub e1), (apply_sub_dirtcoer sub dc1)) *)
+  | Handler h -> assert false
+  | BigLambdaTy(ty_param,e1) -> 
+      let st' = extend_state_ty_vars st ty_param in 
+      let e1_ty = type_check_exp st' e1.term in 
+      TySchemeTy (ty_param,e1_ty)
+  | BigLambdaDirt(dirt_param,e1) ->
+      let st' = extend_state_dirt_vars st dirt_param in 
+      let e1_ty = type_check_exp st' e1.term in 
+      TySchemeDirt (dirt_param,e1_ty) 
+   | CastExp (e1,tc1) -> 
+      let e1_ty = type_check_exp st e1.term in 
+      let (tc1a,tc1b) = type_check_ty_coercion st tc1 in 
+      if (tc1a = e1_ty) then tc1b else assert false
+  | ApplyTyExp (e1,tty) ->
+      let (Types.TySchemeTy (p_e1,ty_e1)) = type_check_exp st e1.term in 
+      let tty1 = type_check_ty st tty in
+      let sub = Unification.TyVarToTy (p_e1,tty1) in
+      Unification.apply_sub_ty sub ty_e1 
+  | ApplyDirtExp (e1,d1) ->
+      let (Types.TySchemeDirt (p_e1,ty_e1)) = type_check_exp st e1.term in 
+      let tty1 = type_check_dirt st d1 in
+      let sub = Unification.DirtVarToDirt (p_e1,tty1) in
+      Unification.apply_sub_ty sub ty_e1
+  | LambdaTyCoerVar (tcp1,ct_ty1,e1) ->
+      let st' = extend_state_omega_ty st tcp1 ct_ty1 in 
+      let e1_ty = type_check_exp st' e1.term in 
+      let ct_ty1' = type_check_ty_cons st ct_ty1 in 
+      Types.QualTy(ct_ty1',e1_ty)
+
+  | LambdaDirtCoerVar (dcp1,ct_dirt1,e1) ->
+      let st' = extend_state_omega_dirt st dcp1 ct_dirt1 in 
+      let e1_ty = type_check_exp st' e1.term in 
+      let ct_dirt1' = type_check_dirt_cons st ct_dirt1 in 
+      Types.QualDirt(ct_dirt1',e1_ty)
+  | ApplyTyCoercion (e1,tc1) ->
+      let tc1' = type_check_ty_coercion st tc1 in 
+      let QualTy (cons,e1_ty) = type_check_exp st e1.term in 
+      if(tc1' = cons) then e1_ty else assert false
+
+  | ApplyDirtCoercion (e1,dc1) ->
+      let dc1' = type_check_dirt_coercion st dc1 in 
+      let QualDirt (cons,e1_ty) = type_check_exp st e1.term in 
+      if(dc1' = cons) then e1_ty else assert false
 end
 
 and type_check_ty_coercion st ty_coer = 

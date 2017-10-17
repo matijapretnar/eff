@@ -606,7 +606,8 @@ let type_toplevel ~loc st c =
     let (sub,final) = Unification.unify ([],[],constraints) in
     let ct' =  Unification.apply_substitution sub ct in
     Print.debug "New Computation : %t" (Typed.print_computation ct');
-    let type_checked_result = TypeChecker.type_check_comp (TypeChecker.new_checker_state) ct'.term in 
+    let (tch_ty,tch_dirt) = TypeChecker.type_check_comp (TypeChecker.new_checker_state) ct'.term in 
+    Print.debug "Type from Type Checker : %t ! %t" (Types.print_target_ty tch_ty) (Types.print_target_dirt tch_dirt);
     ct', st
 
 let add_effect eff (ty1 , ty2) st =
