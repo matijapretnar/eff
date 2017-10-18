@@ -195,7 +195,7 @@ let rec print_expression ?max_level e ppf =
   | Variant (lbl, Some e) ->
     print ~at_level:1 "%s %t" lbl (print_expression e)
   | Lambda (x,t,c) ->
-    print "fun (%t:%t) -> %t" (print_pattern x) (Types.print_target_ty t) (print_computation c)
+    print "fun (%t:%t) -> (%t)" (print_pattern x) (Types.print_target_ty t) (print_computation c)
   | Handler h ->
     print "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
              ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
@@ -204,7 +204,7 @@ let rec print_expression ?max_level e ppf =
   | Effect eff ->
     print ~at_level:2 "effect %t" (print_effect eff)
   | CastExp (e1,tc) ->
-    print "%t |> [%t]" (print_expression e1) (print_ty_coercion tc)
+    print "(%t) |> [%t]" (print_expression e1) (print_ty_coercion tc)
   | BigLambdaTy (p,e) -> print "BigLambda_ty_%t. %t "(Params.print_ty_param p) (print_expression e)
   | BigLambdaDirt (p,e) -> print "BigLambda_dirt_%t. %t "(Params.print_dirt_param p) (print_expression e) 
   | ApplyTyExp (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (Types.print_target_ty tty)
@@ -222,7 +222,7 @@ and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.term with
   | Apply (e1, e2) ->
-    print ~at_level:1 "(%t@ %t)" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
+    print ~at_level:1 "((%t)@ (%t))" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
   | Value e ->
     print ~at_level:1 "value (%t)" (print_expression ~max_level:0 e)
   | Match (e, []) ->
@@ -242,11 +242,11 @@ and print_computation ?max_level c ppf =
   | Bind (c1, a) ->
     print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
   | CastComp (c1,dc) ->
-    print " ( %t |> [%t] ) " (print_computation c1) (print_dirty_coercion dc)
+    print " ( (%t) |> [%t] ) " (print_computation c1) (print_dirty_coercion dc)
   | CastComp_ty (c1,dc) ->
-    print " ( %t |> [%t] )" (print_computation c1) (print_ty_coercion dc)
+    print " ( (%t) |> [%t] )" (print_computation c1) (print_ty_coercion dc)
   | CastComp_dirt (c1,dc) ->
-    print "( %t |> [%t])" (print_computation c1) (print_dirt_coercion dc)
+    print "( (%t) |> [%t])" (print_computation c1) (print_dirt_coercion dc)
   | LetVal(v,e1,c1) -> 
     print "let (%t = (%t)) in (%t)" (print_variable v) (print_expression e1) (print_computation c1)
 
@@ -280,7 +280,7 @@ and print_dirt_coercion ?max_level c ppf =
   | DirtCoercionVar tcp ->
       print "%t" (Params.print_dirt_coercion_param tcp)
   | Empty d ->
-      print "(/)_%t" (Types.print_target_dirt d) 
+      print "Empty__(%t)" (Types.print_target_dirt d) 
   | UnionDirt (eset,dc)->
         let eff_list = Types.effect_set_to_list eset in
         print "{%t} U %t" (Types.print_effect_list eff_list)  (print_dirt_coercion dc)

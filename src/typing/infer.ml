@@ -603,6 +603,8 @@ let type_toplevel ~loc st c =
     Print.debug "Single constraint : %t" (Typed.print_omega_ct x); *)
     Print.debug "Computation : %t" (Typed.print_computation ct);
     Print.debug "Computation type : %t ! {%t}" (Types.print_target_ty ttype) (Types.print_target_dirt dirt);
+    Print.debug "Starting Set of Constraints ";
+    Unification.print_c_list constraints;
     let (sub,final) = Unification.unify ([],[],constraints) in
     let ct' =  Unification.apply_substitution sub ct in
     Print.debug "New Computation : %t" (Typed.print_computation ct');

@@ -25,6 +25,171 @@ let print_sub ?max_level c ppf =
   | DirtVarToDirt (p,d) ->  print "%t :-dirtvarToTargetdirt-> %t" 
                               (Params.print_dirt_param p) (Types.print_target_dirt d) 
   end
+
+
+
+
+let rec apply_substitution s ci =
+  begin match s with
+  | [] -> ci
+  | (s1::ss) -> 
+      let subbed_term = apply_sub_comp s1 ci in 
+      apply_substitution ss subbed_term
+  end
+
+and apply_sub_comp sub c =
+let c' = apply_sub_plain_comp sub c in
+  Typed.annotate c' c.location
+and apply_sub_plain_comp sub c =
+  begin match c.term with 
+  | Value e -> Value (apply_sub_exp sub e) 
+  | LetVal (v1,e1,c1) -> LetVal (v1, (apply_sub_exp sub e1), (apply_sub_comp sub c1))
+  | LetRec (l,c1) -> LetRec (l,c1)
+  | Match (e,alist) -> Match (e,alist)
+  | Apply (e1,e2) -> Apply ((apply_sub_exp sub e1), (apply_sub_exp sub e2))
+  | Handle (e1,c1) -> Handle ((apply_sub_exp sub e1), (apply_sub_comp sub c1))
+  | Call (effect,e1,abs) -> Call (effect, (apply_sub_exp sub e1), (apply_sub_abs sub abs))
+  | Op(ef,e1) -> Op (ef, (apply_sub_exp sub e1 ))
+  | Bind (c1,a1) -> Bind ((apply_sub_comp sub c1), (apply_sub_abs sub a1))
+  | CastComp (c1,dc1) -> CastComp ((apply_sub_comp sub c1), (apply_sub_dirtycoer sub dc1))
+  | CastComp_ty (c1,tc1)-> CastComp_ty ( (apply_sub_comp sub c1) , (apply_sub_tycoer sub tc1) )
+  | CastComp_dirt (c1,tc1)-> CastComp_dirt ( (apply_sub_comp sub c1) , (apply_sub_dirtcoer sub tc1) ) 
+  end
+
+and apply_sub_exp sub exp =
+let e' = apply_sub_plain_exp sub exp in
+  Typed.annotate e' (exp.location)
+and apply_sub_plain_exp sub e =
+  begin match e.term with 
+  | Var v -> Var v
+  | BuiltIn(s,i) -> BuiltIn (s,i)
+  | Const c -> Const c 
+  | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
+  | Record r -> Record r 
+  | Variant (lbl, e1) -> Variant (lbl, e1)
+  | Lambda (pat,ty1,c1)-> Lambda (pat, (apply_sub_ty sub ty1), (apply_sub_comp sub c1))
+  | Effect eff -> Effect eff
+  | Handler h -> Handler (apply_sub_handler sub h)
+  | BigLambdaTy(ty_param,e1) -> BigLambdaTy( ty_param, (apply_sub_exp sub e1))
+  | BigLambdaDirt(dirt_param,e1) -> BigLambdaDirt (dirt_param, (apply_sub_exp sub e1))
+  | CastExp (e1,tc1) -> CastExp ( (apply_sub_exp sub e1) , (apply_sub_tycoer sub tc1) )
+  | ApplyTyExp (e1,tty) -> ApplyTyExp ( (apply_sub_exp sub e1), (apply_sub_ty sub tty))
+  | LambdaTyCoerVar (tcp1,ct_ty1,e1) ->LambdaTyCoerVar (tcp1, ct_ty1, (apply_sub_exp sub e1))
+  | LambdaDirtCoerVar (dcp1,ct_dirt1,e1) ->LambdaDirtCoerVar (dcp1, ct_dirt1, (apply_sub_exp sub e1))
+  | ApplyDirtExp (e1,d1) -> ApplyDirtExp ((apply_sub_exp sub e1), (apply_sub_dirt sub d1))
+  | ApplyTyCoercion (e1,tc1) -> ApplyTyCoercion ((apply_sub_exp sub e1), (apply_sub_tycoer sub tc1))
+  | ApplyDirtCoercion (e1,dc1) -> ApplyDirtCoercion ((apply_sub_exp sub e1), (apply_sub_dirtcoer sub dc1))
+end
+
+and apply_sub_abs sub abs = 
+  let (p,c) = abs.term in 
+  annotate (p, apply_sub_comp sub c) abs.location
+
+and apply_sub_abs2 sub abs2 = 
+  let (p1,p2,c) = abs2.term in 
+  annotate (p1, p2, apply_sub_comp sub c) abs2.location
+
+and apply_sub_handler sub h =
+  let eff_clauses = h.effect_clauses in 
+  let new_value_clause = apply_sub_abs sub h.value_clause in 
+  let new_eff_clauses = OldUtils.assoc_map (fun abs2 ->apply_sub_abs2 sub abs2) eff_clauses in 
+  { effect_clauses= new_eff_clauses;
+    value_clause = new_value_clause;}
+
+and apply_sub_tycoer sub ty_coer =
+  begin match ty_coer with 
+  | ReflTy tty -> ReflTy (apply_sub_ty sub tty)
+  | ArrowCoercion(tycoer1,dirtycoer) -> ArrowCoercion (apply_sub_tycoer sub tycoer1, apply_sub_dirtycoer sub dirtycoer)
+  | HandlerCoercion (dirtycoer1,dirtycoer2) -> 
+        HandlerCoercion (apply_sub_dirtycoer sub dirtycoer1, apply_sub_dirtycoer sub dirtycoer2)
+  | TyCoercionVar p ->
+      begin match sub with 
+      | CoerTyVarToTyCoercion (p',t_coer) when (p = p') -> t_coer
+      | _ -> TyCoercionVar p
+    end
+  | SequenceTyCoer (ty_coer1,ty_coer2) -> SequenceTyCoer (apply_sub_tycoer sub ty_coer1, apply_sub_tycoer sub ty_coer2)
+  | TupleCoercion tcl -> TupleCoercion (List.map (fun x-> apply_sub_tycoer sub x) tcl)
+  | LeftArrow tc1 -> LeftArrow (apply_sub_tycoer sub tc1)
+  | ForallTy (ty_param,ty_coer1) -> ForallTy (ty_param, apply_sub_tycoer sub ty_coer1)
+  | ApplyTyCoer (ty_coer1,tty1) -> ApplyTyCoer (apply_sub_tycoer sub ty_coer1, apply_sub_ty sub tty1)
+  | ForallDirt (dirt_param,ty_coer1) -> ForallDirt (dirt_param, apply_sub_tycoer sub ty_coer1)
+  | ApplyDirCoer (ty_coer1,drt) -> ApplyDirCoer (apply_sub_tycoer sub ty_coer1, apply_sub_dirt sub drt)
+  | PureCoercion dirty_coer1 -> PureCoercion (apply_sub_dirtycoer sub dirty_coer1)
+  end
+
+and apply_sub_dirtcoer sub dirt_coer = 
+  begin match dirt_coer with 
+  | ReflDirt d -> ReflDirt (apply_sub_dirt sub d)
+  | DirtCoercionVar p ->
+      begin match sub with 
+      | CoerDirtVartoDirtCoercion (p' , dc) when (p' = p) -> dc
+      | _ -> dirt_coer
+    end
+  | Empty d -> Empty (apply_sub_dirt sub d )
+  | UnionDirt (es,dirt_coer1) -> UnionDirt (es, (apply_sub_dirtcoer sub dirt_coer1))
+  | SequenceDirtCoer(dirt_coer1, dirt_coer2) -> 
+        SequenceDirtCoer (apply_sub_dirtcoer sub dirt_coer1, apply_sub_dirtcoer sub dirt_coer2)
+  | DirtCoercion (dirty_coer1) -> 
+        DirtCoercion (apply_sub_dirtycoer sub dirty_coer1)
+  end
+
+and apply_sub_dirtycoer sub dirty_coer =
+  begin match dirty_coer with 
+  | BangCoercion (ty_coer,dirt_coer) -> BangCoercion (apply_sub_tycoer sub ty_coer, apply_sub_dirtcoer sub dirt_coer)
+  | RightArrow ty_coer1 -> RightArrow (apply_sub_tycoer sub ty_coer1)
+  | RightHandler ty_coer1 -> RightHandler (apply_sub_tycoer sub ty_coer1)
+  | LeftHandler ty_coer1 -> LeftHandler (apply_sub_tycoer sub ty_coer1)
+  | SequenceDirtyCoer(dirty_coer1,dirty_coer2) -> 
+        SequenceDirtyCoer (apply_sub_dirtycoer sub dirty_coer1, apply_sub_dirtycoer sub dirty_coer2) 
+  end
+
+and apply_sub_ty sub ty = 
+  begin match ty with 
+  | Tyvar typ1 ->
+        begin match sub with 
+        | TyVarToTy (typ2,ttype) when (typ1 = typ2) -> ttype
+        | _ -> ty
+        end
+  | Arrow (tty1,tty2) -> Arrow ((apply_sub_ty sub tty1),(apply_sub_dirty_ty sub tty2))
+  | Tuple ttyl ->Tuple (List.map (fun x -> apply_sub_ty sub x) ttyl)
+  | Handler (tydrty1,tydrty2) -> Handler ((apply_sub_dirty_ty sub tydrty1), (apply_sub_dirty_ty sub tydrty2) )
+  | PrimTy _ -> ty
+  | QualTy (ct_ty1,tty1) -> QualTy (apply_sub_ct_ty sub ct_ty1, apply_sub_ty sub tty1)
+  | QualDirt (ct_drt1,tty1) -> QualDirt (apply_sub_ct_dirt sub ct_drt1,apply_sub_ty sub tty1 )
+  | TySchemeTy (ty_param ,tty1) -> TySchemeTy (ty_param, apply_sub_ty sub tty1)
+  | TySchemeDirt (dirt_param ,tty1) -> TySchemeDirt (dirt_param, apply_sub_ty sub tty1)
+  end
+and apply_sub_dirty_ty sub drty_ty = 
+  let (ty1,drt1) = drty_ty in 
+  ( (apply_sub_ty sub ty1), (apply_sub_dirt sub drt1))
+
+and apply_sub_dirt sub drt =
+  begin match drt with 
+  | SetVar (eset,p) ->
+      begin match sub with 
+      | DirtVarToDirt (p', drt2) when (p = p')-> 
+          begin match drt2 with 
+          | SetVar (eset2,pp) ->
+              let eset_union = effect_set_union eset eset2 in 
+              SetVar (eset_union,pp)
+          | SetEmpty eset2 ->
+              SetEmpty (effect_set_union eset eset2)
+          end
+      | _ -> drt
+      end
+  | _ -> drt
+  end
+
+and apply_sub_ct_ty sub ct_ty1 = 
+  let (ct_tya,ct_tyb) = ct_ty1 in 
+  ( (apply_sub_ty sub ct_tya), (apply_sub_ty sub ct_tyb) )
+
+and apply_sub_ct_dirt sub ct_drt =
+  let (ct_tya,ct_tyb) = ct_drt in 
+  ( (apply_sub_dirt sub ct_tya), (apply_sub_dirt sub ct_tyb) )
+
+
+
 let rec apply_sub sub c_list =
 	begin match sub with 
 	| [] -> c_list
@@ -33,9 +198,9 @@ let rec apply_sub sub c_list =
 		| TyVarToTy (type_p,target_type) ->
 			let mapper = fun cons ->
 				begin match cons with 
-				| Typed.TyOmega (coer_p, (Tyvar tv,ty2)) when (type_p == tv) ->  
+				| Typed.TyOmega (coer_p, (Tyvar tv,ty2)) when (type_p = tv) ->  
 						Typed.TyOmega (coer_p, (target_type,ty2)) 
-			    | Typed.TyOmega (coer_p, (ty2,Tyvar tv)) when (type_p == tv) ->  
+			    | Typed.TyOmega (coer_p, (ty2,Tyvar tv)) when (type_p = tv) ->  
 						Typed.TyOmega (coer_p, (ty2,target_type)) 
 				| _ -> cons
 				end in
@@ -45,11 +210,11 @@ let rec apply_sub sub c_list =
     | DirtVarToDirt (type_p,target_dirt) ->
       let mapper = fun cons ->
         begin match cons with
-        | Typed.DirtOmega (coer_p,(SetVar (s1,dv) , d2)) when (dv == type_p)->
+        | Typed.DirtOmega (coer_p,(SetVar (s1,dv) , d2)) when (dv = type_p)->
           let SetVar (diff_set, new_var) = target_dirt in
           let new_set =  effect_set_union s1 diff_set in 
           Typed.DirtOmega(coer_p,(SetVar(new_set,new_var),d2))
-        | Typed.DirtOmega (coer_p,(d2, SetVar (s1,dv) )) when (dv == type_p)->
+        | Typed.DirtOmega (coer_p,(d2, SetVar (s1,dv) )) when (dv = type_p)->
           let SetVar (diff_set, new_var) = target_dirt in
           let new_set =  effect_set_union s1 diff_set in 
           Typed.DirtOmega(coer_p,(d2,SetVar(new_set,new_var)))
@@ -293,7 +458,7 @@ let rec unify(sub, paused, queue) =
    | (Types.SetEmpty s1, d) when (Types.effect_set_is_empty s1) ->
       let sub' = CoerDirtVartoDirtCoercion(omega,(Typed.Empty d)) in 
       Print.debug "=========End loop============";
-      unify(sub, paused, rest_queue)
+      unify(sub @ [sub'], paused, rest_queue)
 
    | (Types.SetVar (s1,v1), Types.SetEmpty s2) when ((Types.effect_set_is_empty s1) && (Types.effect_set_is_empty s2) ) ->
       let sub' = [CoerDirtVartoDirtCoercion(omega,(Typed.Empty (Types.SetEmpty Types.empty_effect_set))) ; 
@@ -345,164 +510,3 @@ and unify_ty_vars (sub,paused,rest_queue) tv a cons=
 	let new_queue = (sub_queue @ sub_paused') @ [cons'] in 
   Print.debug "=========End loops============";
 	unify ( (sub @ sub') , new_paused, new_queue)
-
-
-
-let rec apply_substitution s ci =
-  begin match s with
-  | [] -> ci
-  | (s1::ss) -> 
-      let subbed_term = apply_sub_comp s1 ci in 
-      apply_substitution ss subbed_term
-  end
-
-and apply_sub_comp sub c =
-let c' = apply_sub_plain_comp sub c in
-  Typed.annotate c' c.location
-and apply_sub_plain_comp sub c =
-  begin match c.term with 
-  | Value e -> Value (apply_sub_exp sub e) 
-  | LetVal (v1,e1,c1) -> LetVal (v1, (apply_sub_exp sub e1), (apply_sub_comp sub c1))
-  | LetRec (l,c1) -> LetRec (l,c1)
-  | Match (e,alist) -> Match (e,alist)
-  | Apply (e1,e2) -> Apply ((apply_sub_exp sub e1), (apply_sub_exp sub e2))
-  | Handle (e1,c1) -> Handle ((apply_sub_exp sub e1), (apply_sub_comp sub c1))
-  | Call (effect,e1,abs) -> Call (effect, (apply_sub_exp sub e1), (apply_sub_abs sub abs))
-  | Op(ef,e1) -> Op (ef, (apply_sub_exp sub e1 ))
-  | Bind (c1,a1) -> Bind ((apply_sub_comp sub c1), (apply_sub_abs sub a1))
-  | CastComp (c1,dc1) -> CastComp ((apply_sub_comp sub c1), (apply_sub_dirtycoer sub dc1))
-  | CastComp_ty (c1,tc1)-> CastComp_ty ( (apply_sub_comp sub c1) , (apply_sub_tycoer sub tc1) )
-  | CastComp_dirt (c1,tc1)-> CastComp_dirt ( (apply_sub_comp sub c1) , (apply_sub_dirtcoer sub tc1) ) 
-  end
-
-and apply_sub_exp sub exp =
-let e' = apply_sub_plain_exp sub exp in
-  Typed.annotate e' (exp.location)
-and apply_sub_plain_exp sub e =
-  begin match e.term with 
-  | Var v -> Var v
-  | BuiltIn(s,i) -> BuiltIn (s,i)
-  | Const c -> Const c 
-  | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
-  | Record r -> Record r 
-  | Variant (lbl, e1) -> Variant (lbl, e1)
-  | Lambda (pat,ty1,c1)-> Lambda (pat, (apply_sub_ty sub ty1), (apply_sub_comp sub c1))
-  | Effect eff -> Effect eff
-  | Handler h -> Handler (apply_sub_handler sub h)
-  | BigLambdaTy(ty_param,e1) -> BigLambdaTy( ty_param, (apply_sub_exp sub e1))
-  | BigLambdaDirt(dirt_param,e1) -> BigLambdaDirt (dirt_param, (apply_sub_exp sub e1))
-  | CastExp (e1,tc1) -> CastExp ( (apply_sub_exp sub e1) , (apply_sub_tycoer sub tc1) )
-  | ApplyTyExp (e1,tty) -> ApplyTyExp ( (apply_sub_exp sub e1), (apply_sub_ty sub tty))
-  | LambdaTyCoerVar (tcp1,ct_ty1,e1) ->LambdaTyCoerVar (tcp1, ct_ty1, (apply_sub_exp sub e1))
-  | LambdaDirtCoerVar (dcp1,ct_dirt1,e1) ->LambdaDirtCoerVar (dcp1, ct_dirt1, (apply_sub_exp sub e1))
-  | ApplyDirtExp (e1,d1) -> ApplyDirtExp ((apply_sub_exp sub e1), (apply_sub_dirt sub d1))
-  | ApplyTyCoercion (e1,tc1) -> ApplyTyCoercion ((apply_sub_exp sub e1), (apply_sub_tycoer sub tc1))
-  | ApplyDirtCoercion (e1,dc1) -> ApplyDirtCoercion ((apply_sub_exp sub e1), (apply_sub_dirtcoer sub dc1))
-end
-
-and apply_sub_abs sub abs = 
-  let (p,c) = abs.term in 
-  annotate (p, apply_sub_comp sub c) abs.location
-
-and apply_sub_abs2 sub abs2 = 
-  let (p1,p2,c) = abs2.term in 
-  annotate (p1, p2, apply_sub_comp sub c) abs2.location
-
-and apply_sub_handler sub h =
-  let eff_clauses = h.effect_clauses in 
-  let new_value_clause = apply_sub_abs sub h.value_clause in 
-  let new_eff_clauses = OldUtils.assoc_map (fun abs2 ->apply_sub_abs2 sub abs2) eff_clauses in 
-  { effect_clauses= new_eff_clauses;
-    value_clause = new_value_clause;}
-
-and apply_sub_tycoer sub ty_coer =
-  begin match ty_coer with 
-  | ReflTy tty -> ReflTy (apply_sub_ty sub tty)
-  | ArrowCoercion(tycoer1,dirtycoer) -> ArrowCoercion (apply_sub_tycoer sub tycoer1, apply_sub_dirtycoer sub dirtycoer)
-  | HandlerCoercion (dirtycoer1,dirtycoer2) -> 
-        HandlerCoercion (apply_sub_dirtycoer sub dirtycoer1, apply_sub_dirtycoer sub dirtycoer2)
-  | TyCoercionVar p ->
-      begin match sub with 
-      | CoerTyVarToTyCoercion (p',t_coer) when (p = p') -> t_coer
-      | _ -> TyCoercionVar p
-    end
-  | SequenceTyCoer (ty_coer1,ty_coer2) -> SequenceTyCoer (apply_sub_tycoer sub ty_coer1, apply_sub_tycoer sub ty_coer2)
-  | TupleCoercion tcl -> TupleCoercion (List.map (fun x-> apply_sub_tycoer sub x) tcl)
-  | LeftArrow tc1 -> LeftArrow (apply_sub_tycoer sub tc1)
-  | ForallTy (ty_param,ty_coer1) -> ForallTy (ty_param, apply_sub_tycoer sub ty_coer1)
-  | ApplyTyCoer (ty_coer1,tty1) -> ApplyTyCoer (apply_sub_tycoer sub ty_coer1, apply_sub_ty sub tty1)
-  | ForallDirt (dirt_param,ty_coer1) -> ForallDirt (dirt_param, apply_sub_tycoer sub ty_coer1)
-  | ApplyDirCoer (ty_coer1,drt) -> ApplyDirCoer (apply_sub_tycoer sub ty_coer1, apply_sub_dirt sub drt)
-  | PureCoercion dirty_coer1 -> PureCoercion (apply_sub_dirtycoer sub dirty_coer1)
-  end
-
-and apply_sub_dirtcoer sub dirt_coer = 
-  begin match dirt_coer with 
-  | ReflDirt d -> ReflDirt (apply_sub_dirt sub d)
-  | DirtCoercionVar p ->
-      begin match sub with 
-      | CoerDirtVartoDirtCoercion (p' , dc) when (p' = p) -> dc
-      | _ -> dirt_coer
-    end
-  | Empty d -> Empty (apply_sub_dirt sub d )
-  | UnionDirt (es,dirt_coer1) -> UnionDirt (es, (apply_sub_dirtcoer sub dirt_coer1))
-  | SequenceDirtCoer(dirt_coer1, dirt_coer2) -> 
-        SequenceDirtCoer (apply_sub_dirtcoer sub dirt_coer1, apply_sub_dirtcoer sub dirt_coer2)
-  | DirtCoercion (dirty_coer1) -> 
-        DirtCoercion (apply_sub_dirtycoer sub dirty_coer1)
-  end
-
-and apply_sub_dirtycoer sub dirty_coer =
-  begin match dirty_coer with 
-  | BangCoercion (ty_coer,dirt_coer) -> BangCoercion (apply_sub_tycoer sub ty_coer, apply_sub_dirtcoer sub dirt_coer)
-  | RightArrow ty_coer1 -> RightArrow (apply_sub_tycoer sub ty_coer1)
-  | RightHandler ty_coer1 -> RightHandler (apply_sub_tycoer sub ty_coer1)
-  | LeftHandler ty_coer1 -> LeftHandler (apply_sub_tycoer sub ty_coer1)
-  | SequenceDirtyCoer(dirty_coer1,dirty_coer2) -> 
-        SequenceDirtyCoer (apply_sub_dirtycoer sub dirty_coer1, apply_sub_dirtycoer sub dirty_coer2) 
-  end
-
-and apply_sub_ty sub ty = 
-  begin match ty with 
-  | Tyvar typ1 ->
-        begin match sub with 
-        | TyVarToTy (typ2,ttype) when (typ1 = typ2) -> ttype
-        | _ -> ty
-        end
-  | Arrow (tty1,tty2) -> Arrow ((apply_sub_ty sub tty1),(apply_sub_dirty_ty sub tty2))
-  | Tuple ttyl ->Tuple (List.map (fun x -> apply_sub_ty sub x) ttyl)
-  | Handler (tydrty1,tydrty2) -> Handler ((apply_sub_dirty_ty sub tydrty1), (apply_sub_dirty_ty sub tydrty2) )
-  | PrimTy _ -> ty
-  | QualTy (ct_ty1,tty1) -> QualTy (apply_sub_ct_ty sub ct_ty1, apply_sub_ty sub tty1)
-  | QualDirt (ct_drt1,tty1) -> QualDirt (apply_sub_ct_dirt sub ct_drt1,apply_sub_ty sub tty1 )
-  | TySchemeTy (ty_param ,tty1) -> TySchemeTy (ty_param, apply_sub_ty sub tty1)
-  | TySchemeDirt (dirt_param ,tty1) -> TySchemeDirt (dirt_param, apply_sub_ty sub tty1)
-  end
-and apply_sub_dirty_ty sub drty_ty = 
-  let (ty1,drt1) = drty_ty in 
-  ( (apply_sub_ty sub ty1), (apply_sub_dirt sub drt1))
-
-and apply_sub_dirt sub drt =
-  begin match drt with 
-  | SetVar (eset,p) ->
-      begin match sub with 
-      | DirtVarToDirt (p', drt2) when (p = p')-> 
-          begin match drt2 with 
-          | SetVar (eset2,pp) ->
-              let eset_union = effect_set_union eset eset2 in 
-              SetVar (eset_union,pp)
-          | SetEmpty eset2 ->
-              SetEmpty (effect_set_union eset eset2)
-          end
-      | _ -> drt
-      end
-  | _ -> drt
-  end
-
-and apply_sub_ct_ty sub ct_ty1 = 
-  let (ct_tya,ct_tyb) = ct_ty1 in 
-  ( (apply_sub_ty sub ct_tya), (apply_sub_ty sub ct_tyb) )
-
-and apply_sub_ct_dirt sub ct_drt =
-  let (ct_tya,ct_tyb) = ct_drt in 
-  ( (apply_sub_dirt sub ct_tya), (apply_sub_dirt sub ct_tyb) )
