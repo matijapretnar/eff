@@ -467,7 +467,9 @@ and type_comp st {Untyped.term=comp; Untyped.location=loc} =
 and type_plain_comp st = function
   | Untyped.Value e ->
       let (typed_e, tt, constraints) = type_expr st e in
-      (Typed.Value typed_e, (tt, (Types.SetEmpty Types.empty_effect_set)) ,constraints)
+      (* let new_d_ty = (tt , (Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())))) in  *)
+      let new_d_ty = (tt , (Types.SetEmpty (Types.empty_effect_set))) in 
+      (Typed.Value typed_e, new_d_ty ,constraints)
   | Untyped.Match (e, cases) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Apply (e1, e2) -> 
       Print.debug "in infer apply";
