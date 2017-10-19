@@ -37,6 +37,22 @@ let rec apply_substitution s ci =
       apply_substitution ss subbed_term
   end
 
+and apply_substitution_exp s ei =
+  begin match s with
+  | [] -> ei
+  | (s1::ss) -> 
+      let subbed_term = apply_sub_exp s1 ei in 
+      apply_substitution_exp ss subbed_term
+  end
+
+and apply_substitution_ty s ty1 =
+  begin match s with
+  | [] -> ty1
+  | (s1::ss) -> 
+      let subbed_term = apply_sub_ty s1 ty1 in 
+      apply_substitution_ty ss subbed_term
+  end
+
 and apply_sub_comp sub c =
 let c' = apply_sub_plain_comp sub c in
   Typed.annotate c' c.location

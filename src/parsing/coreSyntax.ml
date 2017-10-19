@@ -68,6 +68,9 @@ let annotate t loc = {
   location = loc;
 }
 
+let return_term t = 
+    t.term
+
 (* Toplevel commands (the first four do not need to be separated by [;;]) *)
 type toplevel = plain_toplevel annotation
 and plain_toplevel =

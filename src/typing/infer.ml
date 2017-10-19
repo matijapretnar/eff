@@ -600,6 +600,43 @@ and type_plain_comp st = function
 
 
 let type_toplevel ~loc st c =
+  let c' = Untyped.return_term c in
+  begin match c' with 
+  | Untyped.Value e ->
+    let et, ttype,constraints = type_expr st e in
+    Print.debug "Expression : %t" (Typed.print_expression et);
+    Print.debug "Expression type : %t " (Types.print_target_ty ttype);
+    Print.debug "Starting Set of Constraints ";
+    Unification.print_c_list constraints;
+    let (sub,final) = Unification.unify ([],[],constraints) in
+    let et' = Unification.apply_substitution_exp sub et in
+    let ttype' = Unification.apply_substitution_ty sub ttype in
+    let (split_ty_vars, split_dirt_vars, split_cons1, split_cons2)= splitter (TypingEnv.return_context st.context) final ttype' in 
+    let qual_ty = List.fold_right (fun cons acc -> 
+                                          begin match cons with 
+                                          | Typed.TyOmega(_,t) -> Types.QualTy (t,acc)
+                                          | Typed.DirtOmega(_,t) -> Types.QualDirt(t,acc) 
+                                          end 
+                                      ) split_cons1 ttype' in 
+    let ty_sc_dirt = List.fold_right (fun cons acc -> Types.TySchemeDirt (cons,acc)) split_dirt_vars qual_ty in
+    let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,acc)) split_ty_vars ty_sc_dirt in  
+    let var_exp = List.fold_right(fun cons acc -> 
+                                          begin match cons with 
+                                          | Typed.TyOmega(om,t) -> Typed.annotate (Typed.LambdaTyCoerVar (om,t,acc)) Location.unknown
+                                          | Typed.DirtOmega(om,t) -> Typed.annotate(Typed.LambdaDirtCoerVar(om,t,acc)) Location.unknown
+                                          end 
+                                      ) split_cons1 et' in 
+    let var_exp_dirt_lamda = 
+      List.fold_right (fun cons acc -> Typed.annotate ( Typed.BigLambdaDirt (cons,acc) ) Location.unknown )  split_dirt_vars var_exp in
+    let var_exp_ty_lambda = 
+      List.fold_right (fun cons acc -> Typed.annotate (Typed.BigLambdaTy (cons,acc) )Location.unknown ) split_ty_vars var_exp_dirt_lamda in
+    Print.debug "New Expr : %t" (Typed.print_expression var_exp_ty_lambda);
+    Print.debug "New Expr ty : %t" (Types.print_target_ty ty_sc_ty);
+    let tch_ty = TypeChecker.type_check_exp (TypeChecker.new_checker_state) var_exp_ty_lambda.term in
+    Print.debug "Type from Type Checker : %t" (Types.print_target_ty tch_ty);
+    (Typed.annotate (Typed.Value var_exp_ty_lambda) Location.unknown), st
+  | _ ->
+    begin
     let ct, (ttype,dirt),constraints = type_comp st c in
     (* let x::xs = constraints in 
     Print.debug "Single constraint : %t" (Typed.print_omega_ct x); *)
@@ -613,6 +650,8 @@ let type_toplevel ~loc st c =
     let (tch_ty,tch_dirt) = TypeChecker.type_check_comp (TypeChecker.new_checker_state) ct'.term in 
     Print.debug "Type from Type Checker : %t ! %t" (Types.print_target_ty tch_ty) (Types.print_target_dirt tch_dirt);
     ct', st
+    end
+  end
 
 let add_effect eff (ty1 , ty2) st =
     Print.debug "%t ----> %t"  (Type.print_ty ty1) (Type.print_ty ty2);
