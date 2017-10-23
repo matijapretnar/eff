@@ -4,6 +4,7 @@ type region_param = int
 type ty_coercion_param = int
 type dirt_coercion_param = int
 type dirty_coercion_param = int
+type skel_param = int
 
 let fresh_ty_param = OldUtils.fresh OldUtils.id
 let fresh_dirt_param = OldUtils.fresh OldUtils.id
@@ -11,6 +12,7 @@ let fresh_region_param = OldUtils.fresh OldUtils.id
 let fresh_ty_coercion_param = OldUtils.fresh OldUtils.id
 let fresh_dirty_coercion_param = OldUtils.fresh OldUtils.id
 let fresh_dirt_coercion_param = OldUtils.fresh OldUtils.id
+let fresh_skel_param = OldUtils.fresh OldUtils.id
 
 
 type t = ty_param list * dirt_param list * region_param list

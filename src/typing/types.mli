@@ -1,5 +1,11 @@
 type effect_set
 
+type skeleton =
+  | SkelVar of Params.skel_param
+  | PrimSkel
+  | SkelArrow of skeleton * skeleton
+  | SkelHandler of skeleton * skeleton
+  | ForallSkel of Params.skel_param * skeleton
 
 type target_ty = 
   | Tyvar of Params.ty_param
