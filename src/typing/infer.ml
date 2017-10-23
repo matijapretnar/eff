@@ -308,8 +308,8 @@ let apply_types ty_subs dirt_subs var ty_sch =
    (dirt_cons_apps , (ty_cons @ dirt_cons ))
 
 let rec type_expr st {Untyped.term=expr; Untyped.location=loc} =
-  let e, ttype, constraints = type_plain_expr st expr in
-  Typed.annotate e loc, ttype, constraints
+  let e, ttype, constraints, sub_list = type_plain_expr st expr in
+  Typed.annotate e loc, ttype, constraints, sub_list
 and type_plain_expr st = function
   | Untyped.Var x ->
     begin match TypingEnv.lookup st.context x with
@@ -324,23 +324,24 @@ and type_plain_expr st = function
                 let (returned_x, returnd_cons) = apply_types bind_tyvar_sub bind_dirtvar_sub x ty_schi in 
                 Print.debug "returned: %t" (Typed.print_expression returned_x) ;
                 Print.debug "returned_type: %t" (Types.print_target_ty applied_basic_type);
-                (returned_x.term , applied_basic_type, returnd_cons)
+                (returned_x.term , applied_basic_type, returnd_cons, [])
       | None -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
       end
   | Untyped.Const const -> 
         begin match const with
-        | Integer _ -> (Typed.Const const, Types.PrimTy IntTy, [])
-        | String _ -> (Typed.Const const, Types.PrimTy StringTy, [])
-        | Boolean _ -> (Typed.Const const, Types.PrimTy BoolTy, [])
-        | Float _ -> (Typed.Const const, Types.PrimTy FloatTy, [])
+        | Integer _ -> (Typed.Const const, Types.PrimTy IntTy, [], [])
+        | String _ -> (Typed.Const const, Types.PrimTy StringTy, [], [])
+        | Boolean _ -> (Typed.Const const, Types.PrimTy BoolTy, [], [])
+        | Float _ -> (Typed.Const const, Types.PrimTy FloatTy, [], [])
       end 
       
   | Untyped.Tuple es -> 
       let target_list = (List.map (type_expr st) es) in
-      let target_terms = Typed.Tuple (List.fold_right (fun (x,_,_) xs -> x ::xs )  target_list []) in
-      let target_types = Types.Tuple(List.fold_right (fun (_,x,_) xs -> x::xs )  target_list []) in
-      let target_cons = List.fold_right (fun (_,_,x) xs -> List.append x xs )  target_list [] in
-      (target_terms, target_types, target_cons) 
+      let target_terms = Typed.Tuple (List.fold_right (fun (x,_,_,_) xs -> x ::xs )  target_list []) in
+      let target_types = Types.Tuple(List.fold_right (fun (_,x,_,_) xs -> x::xs )  target_list []) in
+      let target_cons = List.fold_right (fun (_,_,x,_) xs -> List.append x xs )  target_list [] in
+      let target_sub = List.fold_right (fun (_,_,_,x) xs -> List.append x xs )  target_list [] in
+      (target_terms, target_types, target_cons, target_sub) 
   | Untyped.Record lst -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Variant (lbl, e) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Lambda a -> 
@@ -351,15 +352,15 @@ and type_plain_expr st = function
         let Untyped.PVar x = p.Untyped.term in
         let target_pattern = (type_pattern p) in
         let new_st = add_def st x in_ty in
-        let (target_comp_term,target_comp_ty,target_comp_cons)= (type_comp new_st c) in
+        let (target_comp_term,target_comp_ty,target_comp_cons, target_comp_sub)= (type_comp new_st c) in
         let target_ty = Types.Arrow (in_ty, target_comp_ty) in
         let target_lambda = Typed.Lambda (target_pattern,in_ty,target_comp_term) in 
         Print.debug "lambda ty: %t" (Types.print_target_ty target_ty);
-        (target_lambda,target_ty,target_comp_cons)
+        (target_lambda,target_ty,target_comp_cons, [])
   | Untyped.Effect eff -> 
         let (in_ty,out_ty) =  Untyped.EffectMap.find eff st.effects in
         let s = Types.list_to_effect_set [eff] in
-        (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,(Types.SetEmpty s))) , []) 
+        (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,(Types.SetEmpty s))) , [], []) 
         
    | Untyped.Handler h -> 
         let in_ty_var = Params.fresh_ty_param () in 
@@ -376,7 +377,7 @@ and type_plain_expr st = function
         let Untyped.PVar x = pv.Untyped.term in
         let target_pattern = (type_pattern pv) in
         let new_st = add_def st x x_ty in
-        let (cv_target, (b_r,delta_r), constraints_cr) = type_comp new_st cv in 
+        let (cv_target, (b_r,delta_r), constraints_cr, subs_cr) = type_comp new_st cv in 
         let cons_1a =(b_r,out_ty) in 
         let cons_1b = (delta_r,out_dirt) in 
         let coerp1a = Params.fresh_ty_coercion_param () in 
@@ -407,7 +408,7 @@ and type_plain_expr st = function
             let delta_op =  Types.SetVar (Types.empty_effect_set,Params.fresh_dirt_param ()) in 
             let tmp_st = add_def st x_var in_op_ty in
             let new_st = add_def tmp_st k_var (Types.Arrow(out_op_ty,(alpha_op,delta_op))) in 
-            let (typed_c_op, typed_c_op_type, c_op_constraints) = type_comp new_st c_op in 
+            let (typed_c_op, typed_c_op_type, c_op_constraints, c_op_subs) = type_comp new_st c_op in 
             let (out_op_ty,_) = typed_c_op_type in
             let (c_op_ty,c_op_dirt) = typed_c_op_type in 
             let cons_2a = (c_op_ty,out_ty) in 
@@ -457,24 +458,24 @@ and type_plain_expr st = function
         let constraints = List.append ( List.append constraints_cr [omega_cons_5;omega_cons_1a;omega_cons_1b;omega_cons_4] ) 
                           (List.flatten (OldUtils.map (fun(_,x) -> x) map_list)) in 
         let coerced_handler = Typed.CastExp (target_handler, handler_coercion) in  
-        (coerced_handler,target_type,constraints)
+        (coerced_handler,target_type,constraints, [])
 
 
 
 and type_comp st {Untyped.term=comp; Untyped.location=loc} =
-  let c, ttype, constraints = type_plain_comp st comp in
-  Typed.annotate c loc, ttype, constraints
+  let c, ttype, constraints , sub_list = type_plain_comp st comp in
+  Typed.annotate c loc, ttype, constraints, sub_list
 and type_plain_comp st = function
   | Untyped.Value e ->
-      let (typed_e, tt, constraints) = type_expr st e in
+      let (typed_e, tt, constraints, subs_e) = type_expr st e in
       (* let new_d_ty = (tt , (Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())))) in  *)
       let new_d_ty = (tt , (Types.SetEmpty (Types.empty_effect_set))) in 
-      (Typed.Value typed_e, new_d_ty ,constraints)
+      (Typed.Value typed_e, new_d_ty ,constraints, [])
   | Untyped.Match (e, cases) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Apply (e1, e2) -> 
       Print.debug "in infer apply";
-      let (typed_e1, tt_1, constraints_1) = type_expr st e1 in
-      let (typed_e2, tt_2, constraints_2) = type_expr st e2 in
+      let (typed_e1, tt_1, constraints_1,subs_e1) = type_expr st e1 in
+      let (typed_e2, tt_2, constraints_2, subs_e2) = type_expr st e2 in
       Print.debug "e1 apply type : %t" (Types.print_target_ty tt_1);
       Print.debug "e2 apply type : %t" (Types.print_target_ty tt_2);
       begin match typed_e1.term with
@@ -488,7 +489,7 @@ and type_plain_comp st = function
            let new_var = Typed.Variable.fresh "cont_bind" in
            let continuation_comp = Untyped.Value ( Untyped.annotate (Untyped.Var new_var) typed_e2.location ) in 
            let new_st = add_def st new_var eff_out in 
-           let (typed_cont_comp, typed_cont_comp_dirty_ty, cont_comp_cons)= 
+           let (typed_cont_comp, typed_cont_comp_dirty_ty, cont_comp_cons, cont_comp_subs)= 
                     type_comp new_st (Untyped.annotate continuation_comp typed_e2.location) in 
            let (typed_comp_ty,typed_comp_dirt) = typed_cont_comp_dirty_ty in 
            let final_dirt = 
@@ -498,9 +499,11 @@ and type_plain_comp st = function
               end in 
           let cont_abstraction = Typed.annotate ((Typed.annotate (Typed.PVar new_var) typed_e2.location), typed_cont_comp) 
                                  typed_e2.location in
+          Print.debug "THE FINAL DIRT :- %t" (Types.print_target_dirt final_dirt);
           ( Typed.Call( (eff, (eff_in,eff_out)) ,e2_coerced, cont_abstraction ),
             (typed_comp_ty,final_dirt),
-            cont_comp_cons @ constraints)
+            cont_comp_cons @ constraints,
+             [])
       | _ ->
           let new_ty_var = Types.Tyvar (Params.fresh_ty_param ()) in 
           let new_ty_var_2 = Types.Tyvar (Params.fresh_ty_param ()) in
@@ -515,7 +518,7 @@ and type_plain_comp st = function
           let constraints = List.append [omega_cons_1;omega_cons_2] (List.append constraints_1 constraints_2) in 
           let e1_coerced = Typed.annotate (Typed.CastExp (typed_e1, Typed.TyCoercionVar( coerp1))) typed_e1.location in 
           let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2,  Typed.TyCoercionVar( coerp2))) typed_e2.location in 
-          ( (Typed.Apply (e1_coerced,e2_coerced) ), fresh_dirty_ty , constraints)
+          ( (Typed.Apply (e1_coerced,e2_coerced) ), fresh_dirty_ty , constraints, [])
       end
    | Untyped.Handle (e, c) ->
       let alpha_2 = Types.Tyvar (Params.fresh_ty_param ()) in
@@ -524,8 +527,8 @@ and type_plain_comp st = function
       let gamma_2 = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in
       let dirty_1 = (alpha_1, gamma_1) in 
       let dirty_2 = (alpha_2, gamma_2) in
-      let (typed_exp,exp_type,exp_constraints) = type_expr st e in
-      let (typed_comp,comp_dirty_type,comp_constraints) = type_comp st c in
+      let (typed_exp,exp_type,exp_constraints,sub_exp) = type_expr st e in
+      let (typed_comp,comp_dirty_type,comp_constraints,sub_comp) = type_comp st c in
       let (comp_type,comp_dirt) = comp_dirty_type in
       let cons1 = (exp_type, (Types.Handler (dirty_1, dirty_2))) in
       let cons2 = (comp_type, alpha_1) in
@@ -542,14 +545,14 @@ and type_plain_comp st = function
       let coer_exp = Typed.annotate (Typed.CastExp (typed_exp,coer1)) typed_exp.location in
       let coer_comp =  Typed.annotate (Typed.CastComp (typed_comp, Typed.BangCoercion (coer2,coer3))) typed_comp.location in
       let constraints = List.append [omega_cons_1;omega_cons_2;omega_cons_3] (List.append exp_constraints comp_constraints) in
-      ((Typed.Handle (coer_exp, coer_comp)) , dirty_2 , constraints)
+      ((Typed.Handle (coer_exp, coer_comp)) , dirty_2 , constraints, [])
 
   
   | Untyped.Let (defs, c_2) -> 
     let [(p_def, c_1)] = defs in 
      begin match c_1.term with 
      | Untyped.Value e_1 -> 
-        let (typed_e1, type_e1,cons_e1) = type_expr st e_1 in 
+        let (typed_e1, type_e1,cons_e1,sub_e1) = type_expr st e_1 in 
         let (split_ty_vars, split_dirt_vars, split_cons1, split_cons2) = splitter (TypingEnv.return_context st.context) cons_e1 type_e1 in 
         let Untyped.PVar x = p_def.Untyped.term in
         let qual_ty = List.fold_right (fun cons acc -> 
@@ -561,7 +564,7 @@ and type_plain_comp st = function
         let ty_sc_dirt = List.fold_right (fun cons acc -> Types.TySchemeDirt (cons,acc)) split_dirt_vars qual_ty in
         let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,acc)) split_ty_vars ty_sc_dirt in 
         let new_st = add_def st x ty_sc_ty in 
-        let (typed_c2,type_c2,cons_c2) = type_comp new_st c_2 in
+        let (typed_c2,type_c2,cons_c2,subs_c2) = type_comp new_st c_2 in
 
         let var_exp = List.fold_right(fun cons acc -> 
                                           begin match cons with 
@@ -572,14 +575,14 @@ and type_plain_comp st = function
         let var_exp_dirt_lamda = List.fold_right (fun cons acc -> Typed.annotate ( Typed.BigLambdaDirt (cons,acc) ) typed_c2.location )  split_dirt_vars var_exp in
         let var_exp_ty_lambda = List.fold_right (fun cons acc -> Typed.annotate (Typed.BigLambdaTy (cons,acc) )typed_c2.location ) split_ty_vars var_exp_dirt_lamda in
         let return_term = Typed.LetVal (x, var_exp_ty_lambda, typed_c2) in 
-        (return_term, type_c2 , (cons_c2 @ split_cons2))
+        (return_term, type_c2 , (cons_c2 @ split_cons2), [])
 
 
      | _-> 
-        let (typed_c1,(type_c1,dirt_c1),cons_c1) = type_comp st c_1 in
+        let (typed_c1,(type_c1,dirt_c1),cons_c1,subs_c1) = type_comp st c_1 in
         let Untyped.PVar x = p_def.Untyped.term in
         let new_st = add_def st x type_c1 in 
-        let (typed_c2,(type_c2,dirt_c2),cons_c2) = type_comp new_st c_2 in 
+        let (typed_c2,(type_c2,dirt_c2),cons_c2,subs_c2) = type_comp new_st c_2 in 
         let new_dirt_var = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
         let cons1 = (dirt_c1,new_dirt_var) in
         let cons2 = (dirt_c2,new_dirt_var) in
@@ -594,7 +597,7 @@ and type_plain_comp st = function
         let typed_pattern = type_pattern p_def in 
         let abstraction = Typed.annotate  (typed_pattern,coer_c2) (typed_c2.location) in 
         let constraints = List.append [omega_cons_1;omega_cons_2] (List.append cons_c1 cons_c2) in
-        ((Typed.Bind (coer_c1,abstraction)), (type_c2,new_dirt_var), constraints) 
+        ((Typed.Bind (coer_c1,abstraction)), (type_c2,new_dirt_var), constraints, []) 
      end 
   | Untyped.LetRec (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
@@ -603,7 +606,7 @@ let type_toplevel ~loc st c =
   let c' = Untyped.return_term c in
   begin match c' with 
   | Untyped.Value e ->
-    let et, ttype,constraints = type_expr st e in
+    let et, ttype,constraints, sub_list = type_expr st e in
     Print.debug "Expression : %t" (Typed.print_expression et);
     Print.debug "Expression type : %t " (Types.print_target_ty ttype);
     Print.debug "Starting Set of Constraints ";
@@ -637,7 +640,7 @@ let type_toplevel ~loc st c =
     (Typed.annotate (Typed.Value var_exp_ty_lambda) Location.unknown), st
   | _ ->
     begin
-    let ct, (ttype,dirt),constraints = type_comp st c in
+    let ct, (ttype,dirt),constraints, sub_list = type_comp st c in
     (* let x::xs = constraints in 
     Print.debug "Single constraint : %t" (Typed.print_omega_ct x); *)
     Print.debug "Computation : %t" (Typed.print_computation ct);
