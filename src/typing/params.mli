@@ -55,6 +55,7 @@ val print_ty_coercion_param : ?non_poly:t -> ty_coercion_param -> Format.formatt
 val print_dirty_coercion_param : ?non_poly:t -> dirty_coercion_param -> Format.formatter -> unit
 val print_dirt_coercion_param : ?non_poly:t -> dirt_coercion_param -> Format.formatter -> unit
 val print_dirt_param : ?non_poly:t -> dirt_param -> Format.formatter -> unit
+val print_skel_param : ?non_poly:t -> skel_param -> Format.formatter -> unit
 val print_region_param : ?non_poly:t -> region_param -> Format.formatter -> unit
 val print_type_param : ty_param -> Format.formatter -> unit
 

@@ -53,11 +53,13 @@ and plain_expression =
   | Handler of handler
   | BigLambdaTy of Params.ty_param * expression
   | BigLambdaDirt of Params.dirt_param * expression  
+  | BigLambdaSkel of Params.skel_param * expression
   | CastExp of expression * ty_coercion
   | ApplyTyExp of expression * Types.target_ty
   | LambdaTyCoerVar of Params.ty_coercion_param * Types.ct_ty * expression 
   | LambdaDirtCoerVar of Params.dirt_coercion_param * Types.ct_dirt * expression 
   | ApplyDirtExp of expression * Types.dirt
+  | ApplySkelExp of expression * Types.skeleton
   | ApplyTyCoercion of expression * ty_coercion
   | ApplyDirtCoercion of expression * dirt_coercion
 
@@ -79,8 +81,6 @@ and plain_computation =
 
 
 and ty_coercion =
-  (* | ReflInt
-  | ReflBool *)
   | ReflTy of Types.target_ty
   | ArrowCoercion of ty_coercion * dirty_coercion
   | HandlerCoercion of dirty_coercion * dirty_coercion
@@ -97,6 +97,8 @@ and ty_coercion =
   | QualDirtCoer of ct_dirt * ty_coercion
   | ApplyQualTyCoer of ty_coercion * ty_coercion
   | ApplyQualDirtCoer of ty_coercion * dirt_coercion
+  | ForallSkel of (Params.skel_param) *ty_coercion
+  | ApplySkelCoer of ty_coercion * skeleton
 
 and dirt_coercion = 
   | ReflDirt of dirt
@@ -217,6 +219,8 @@ let rec print_expression ?max_level e ppf =
   | ApplyDirtExp (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (Types.print_target_dirt tty)
   | ApplyTyCoercion  (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (print_ty_coercion tty)
   | ApplyDirtCoercion (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (print_dirt_coercion tty)
+  | BigLambdaSkel (p,e) -> print "BigLambda_skel_%t. %t "(Params.print_skel_param p) (print_expression e)
+  | ApplySkelExp (e,sk) -> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (Types.print_skeleton sk)
 
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

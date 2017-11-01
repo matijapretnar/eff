@@ -151,7 +151,7 @@ let rec free_ty_vars_ty t =
  | Types.PrimTy _ -> []
  | Types.QualTy ( _, a) -> free_ty_vars_ty a
  | Types.QualDirt ( _, a) -> free_ty_vars_ty a
- | Types.TySchemeTy (ty_param,a) -> 
+ | Types.TySchemeTy (ty_param,_,a) -> 
   let free_a = free_ty_vars_ty a in 
   List.filter (fun x -> not (List.mem x [ty_param])) free_a
  | Types.TySchemeDirt (dirt_param,a) -> free_ty_vars_ty a 
@@ -166,7 +166,7 @@ let rec free_dirt_vars_ty t =
  | Types.Handler (c1,c2) -> (free_dirt_vars_dirty c1) @ (free_dirt_vars_dirty c2)
  | Types.QualTy ( _, a) -> free_dirt_vars_ty a
  | Types.QualDirt ( _, a) -> free_dirt_vars_ty a
- | Types.TySchemeTy (ty_param,a) ->  free_dirt_vars_ty a
+ | Types.TySchemeTy (ty_param,_,a) ->  free_dirt_vars_ty a
  | Types.TySchemeDirt (dirt_param,a) -> 
       let free_a = free_dirt_vars_ty a in 
         List.filter (fun x -> not (List.mem x [dirt_param])) free_a
@@ -233,7 +233,7 @@ let splitter st constraints simple_ty =
 
 let rec get_sub_of_ty ty_sch = 
   begin match ty_sch with
-  | Types.TySchemeTy (p,t) -> 
+  | Types.TySchemeTy (p,_,t) -> 
           let new_p = Params.fresh_ty_param () in 
           ( ((p,new_p) :: (fst (get_sub_of_ty t))) , (snd (get_sub_of_ty t) ) )
   | Types.TySchemeDirt(p,t) -> 
@@ -245,7 +245,7 @@ let rec get_sub_of_ty ty_sch =
 
 let rec get_basic_type ty_sch =
   begin match ty_sch with
-  | Types.TySchemeTy (_,t) -> get_basic_type t
+  | Types.TySchemeTy (_,_,t) -> get_basic_type t
   | Types.TySchemeDirt(_,t) -> get_basic_type t
   | Types.QualTy(_,t) -> get_basic_type t
   | Types.QualDirt(_,t)-> get_basic_type t
@@ -280,7 +280,7 @@ end
 
 let rec get_applied_cons_from_ty ty_subs dirt_subs ty = 
   begin match ty with 
-  | Types.TySchemeTy (_,t) -> get_applied_cons_from_ty ty_subs dirt_subs t
+  | Types.TySchemeTy (_,_,t) -> get_applied_cons_from_ty ty_subs dirt_subs t
   | Types.TySchemeDirt(_,t) -> get_applied_cons_from_ty ty_subs dirt_subs t
   | Types.QualTy(cons,t) -> 
               let (c1,c2) =  get_applied_cons_from_ty ty_subs dirt_subs t in
@@ -562,7 +562,7 @@ and type_plain_comp st = function
                                           end 
                                       ) split_cons1 type_e1 in 
         let ty_sc_dirt = List.fold_right (fun cons acc -> Types.TySchemeDirt (cons,acc)) split_dirt_vars qual_ty in
-        let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,acc)) split_ty_vars ty_sc_dirt in 
+        let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,Types.PrimSkel,acc)) split_ty_vars ty_sc_dirt in 
         let new_st = add_def st x ty_sc_ty in 
         let (typed_c2,type_c2,cons_c2,subs_c2) = type_comp new_st c_2 in
 
@@ -622,7 +622,7 @@ let type_toplevel ~loc st c =
                                           end 
                                       ) split_cons1 ttype' in 
     let ty_sc_dirt = List.fold_right (fun cons acc -> Types.TySchemeDirt (cons,acc)) split_dirt_vars qual_ty in
-    let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,acc)) split_ty_vars ty_sc_dirt in  
+    let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,Types.PrimSkel,acc)) split_ty_vars ty_sc_dirt in  
     let var_exp = List.fold_right(fun cons acc -> 
                                           begin match cons with 
                                           | Typed.TyOmega(om,t) -> Typed.annotate (Typed.LambdaTyCoerVar (om,t,acc)) Location.unknown

@@ -172,7 +172,7 @@ and apply_sub_ty sub ty =
   | PrimTy _ -> ty
   | QualTy (ct_ty1,tty1) -> QualTy (apply_sub_ct_ty sub ct_ty1, apply_sub_ty sub tty1)
   | QualDirt (ct_drt1,tty1) -> QualDirt (apply_sub_ct_dirt sub ct_drt1,apply_sub_ty sub tty1 )
-  | TySchemeTy (ty_param ,tty1) -> TySchemeTy (ty_param, apply_sub_ty sub tty1)
+  | TySchemeTy (ty_param ,sk,tty1) -> TySchemeTy (ty_param,sk, apply_sub_ty sub tty1)
   | TySchemeDirt (dirt_param ,tty1) -> TySchemeDirt (dirt_param, apply_sub_ty sub tty1)
   end
 and apply_sub_dirty_ty sub drty_ty = 
@@ -250,7 +250,7 @@ let rec free_target_ty t =
  | PrimTy _ -> []
  | QualTy ( _, a) -> assert false
  | QualDirt ( _, a) -> assert false
- | TySchemeTy (ty_param,a) -> 
+ | TySchemeTy (ty_param,_,a) -> 
  	let free_a = free_target_ty a in 
  	List.filter (fun x -> not (List.mem x [ty_param])) free_a
  | TySchemeDirt (dirt_param,a) -> free_target_ty a 
@@ -285,7 +285,7 @@ let rec refresh_target_ty (ty_sbst,dirt_sbst) t=
  | PrimTy x ->  (ty_sbst,dirt_sbst), PrimTy x
  | QualTy ( _, a) -> assert false
  | QualDirt ( _, a) -> assert false
- | TySchemeTy (ty_param,a) -> assert false
+ | TySchemeTy (ty_param,_,a) -> assert false
  | TySchemeDirt (dirt_param,a) -> assert false
 end 
  

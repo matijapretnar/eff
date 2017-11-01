@@ -45,8 +45,9 @@ type target_ty =
   | PrimTy of prim_ty
   | QualTy of ct_ty * target_ty
   | QualDirt of ct_dirt * target_ty
-  | TySchemeTy of Params.ty_param * target_ty
+  | TySchemeTy of Params.ty_param * skeleton * target_ty
   | TySchemeDirt of Params.dirt_param * target_ty
+  | TySchemeSkel of Params.skel_param * target_ty
 
 and
  target_dirty = ( target_ty * dirt)
@@ -104,11 +105,21 @@ let rec print_target_ty ?max_level ty ppf =
   | PrimTy p -> print_prim_ty p ppf
   | QualTy (c,tty) -> print "%t => %t" (print_ct_ty c) (print_target_ty tty)
   | QualDirt (c,tty) -> print "%t => %t" (print_ct_dirt c) (print_target_ty tty)
-  | TySchemeTy (p,tty) -> print "ForallTy %t. %t" (Params.print_ty_param p ) (print_target_ty tty)
+  | TySchemeTy (p,sk,tty) -> print "ForallTy (%t:%t). %t" (Params.print_ty_param p ) (print_skeleton sk) (print_target_ty tty)
   | TySchemeDirt (p,tty) -> print "ForallDirt %t. %t" (Params.print_dirt_param p ) (print_target_ty tty)
+  | TySchemeSkel (p,tty) -> print "ForallSkel %t. %t" (Params.print_skel_param p ) (print_target_ty tty)
   end
 
 
+and print_skeleton ?max_level sk ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  begin match sk with
+  | SkelVar p -> Params.print_skel_param p ppf
+  | PrimSkel -> print "prim_skel"
+  | SkelArrow (sk1,sk2) -> print "%t -sk-> %t" (print_skeleton sk1) (print_skeleton sk2)
+  | SkelHandler (sk1,sk2) -> print "%t =sk=> %t" (print_skeleton sk1) (print_skeleton sk2)
+  | ForallSkel (p,sk1)-> print "ForallSkelSkel %t. %t" (Params.print_skel_param p) (print_skeleton sk1)
+  end
 
 and print_target_dirt drt ppf = 
 	let print ?at_level = Print.print  ?at_level ppf in

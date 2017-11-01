@@ -87,6 +87,10 @@ let print_ty_param ?(non_poly=empty) t ppf =
   let (ts, _, _) = non_poly in
   Symbols.ty_param t (List.mem t ts) ppf
 
+let print_skel_param ?(non_poly=empty) t ppf =
+  let (ts, _, _) = non_poly in
+  Symbols.skel_param t (List.mem t ts) ppf
+
 let print_dirt_param ?(non_poly=empty) d ppf =
   let (_, ds, _) = non_poly in
   Symbols.dirt_param d (List.mem d ds) ppf

@@ -7,6 +7,7 @@ type skeleton =
   | SkelHandler of skeleton * skeleton
   | ForallSkel of Params.skel_param * skeleton
 
+
 type target_ty = 
   | Tyvar of Params.ty_param
   | Arrow of target_ty * target_dirty
@@ -15,8 +16,9 @@ type target_ty =
   | PrimTy of prim_ty
   | QualTy of ct_ty * target_ty
   | QualDirt of ct_dirt * target_ty
-  | TySchemeTy of Params.ty_param * target_ty
+  | TySchemeTy of Params.ty_param * skeleton * target_ty
   | TySchemeDirt of Params.dirt_param * target_ty
+  | TySchemeSkel of Params.skel_param * target_ty
 
 and
  target_dirty = ( target_ty * dirt)
@@ -43,6 +45,8 @@ ct_dirt = (dirt * dirt)
 val print_target_ty : ?max_level:int -> target_ty -> Format.formatter -> unit
 
 val print_target_dirt : dirt -> Format.formatter -> unit
+
+val print_skeleton : ?max_level:int -> skeleton -> Format.formatter -> unit
 
 val print_effect_list :  OldUtils.effect list -> Format.formatter -> unit
 

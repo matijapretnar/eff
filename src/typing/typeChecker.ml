@@ -141,7 +141,7 @@ begin match e with
   | BigLambdaTy(ty_param,e1) -> 
       let st' = extend_state_ty_vars st ty_param in 
       let e1_ty = type_check_exp st' e1.term in 
-      TySchemeTy (ty_param,e1_ty)
+      TySchemeTy (ty_param, Types.PrimSkel, e1_ty)
   | BigLambdaDirt(dirt_param,e1) ->
       let st' = extend_state_dirt_vars st dirt_param in 
       let e1_ty = type_check_exp st' e1.term in 
@@ -151,7 +151,7 @@ begin match e with
       let (tc1a,tc1b) = type_check_ty_coercion st tc1 in 
       if (tc1a = e1_ty) then tc1b else assert false
   | ApplyTyExp (e1,tty) ->
-      let (Types.TySchemeTy (p_e1,ty_e1)) = type_check_exp st e1.term in 
+      let (Types.TySchemeTy (p_e1,_,ty_e1)) = type_check_exp st e1.term in 
       let tty1 = type_check_ty st tty in
       let sub = Unification.TyVarToTy (p_e1,tty1) in
       Unification.apply_sub_ty sub ty_e1 
@@ -211,10 +211,10 @@ and type_check_ty_coercion st ty_coer =
   | ForallTy (ty_param,ty_coer1) -> 
       let new_st = extend_state_ty_vars st ty_param in
       let (t1,t2) = type_check_ty_coercion new_st ty_coer1 in 
-      (Types.TySchemeTy (ty_param,t1) , Types.TySchemeTy (ty_param,t2))
+      (Types.TySchemeTy (ty_param,Types.PrimSkel,t1) , Types.TySchemeTy (ty_param,Types.PrimSkel,t2))
 
   | ApplyTyCoer (ty_coer1,tty1) -> 
-      let (Types.TySchemeTy (ty_param1,t1) , Types.TySchemeTy (ty_param2,t2)) = type_check_ty_coercion st ty_coer1 in 
+      let (Types.TySchemeTy (ty_param1,_,t1) , Types.TySchemeTy (ty_param2,_,t2)) = type_check_ty_coercion st ty_coer1 in 
       let tt = type_check_ty st tty1 in
       let sub = Unification.TyVarToTy(ty_param1,tt) in 
       if(ty_param1 = ty_param2) then 
@@ -359,7 +359,7 @@ and type_check_ty st ty =
     let _ = type_check_dirt_cons st ct_ty1 in 
     let _ = type_check_ty st tty1 in 
     ty  
-  | TySchemeTy (ty_param ,tty1) -> 
+  | TySchemeTy (ty_param ,_,tty1) -> 
       let st' = extend_state_ty_vars st ty_param in 
       let _ = type_check_ty st' tty1 in 
       ty 
