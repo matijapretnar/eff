@@ -2,13 +2,13 @@ type effect_set
 
 type skeleton =
   | SkelVar of Params.skel_param
-  | PrimSkel
+  | PrimSkel of prim_ty
   | SkelArrow of skeleton * skeleton
   | SkelHandler of skeleton * skeleton
   | ForallSkel of Params.skel_param * skeleton
 
 
-type target_ty = 
+and target_ty = 
   | Tyvar of Params.ty_param
   | Arrow of target_ty * target_dirty
   | Tuple of target_ty list

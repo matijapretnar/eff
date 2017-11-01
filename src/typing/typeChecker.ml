@@ -141,7 +141,7 @@ begin match e with
   | BigLambdaTy(ty_param,e1) -> 
       let st' = extend_state_ty_vars st ty_param in 
       let e1_ty = type_check_exp st' e1.term in 
-      TySchemeTy (ty_param, Types.PrimSkel, e1_ty)
+      TySchemeTy (ty_param, Types.PrimSkel Types.IntTy, e1_ty)
   | BigLambdaDirt(dirt_param,e1) ->
       let st' = extend_state_dirt_vars st dirt_param in 
       let e1_ty = type_check_exp st' e1.term in 
@@ -211,7 +211,7 @@ and type_check_ty_coercion st ty_coer =
   | ForallTy (ty_param,ty_coer1) -> 
       let new_st = extend_state_ty_vars st ty_param in
       let (t1,t2) = type_check_ty_coercion new_st ty_coer1 in 
-      (Types.TySchemeTy (ty_param,Types.PrimSkel,t1) , Types.TySchemeTy (ty_param,Types.PrimSkel,t2))
+      (Types.TySchemeTy (ty_param,Types.PrimSkel Types.IntTy,t1) , Types.TySchemeTy (ty_param,Types.PrimSkel Types.IntTy,t2))
 
   | ApplyTyCoer (ty_coer1,tty1) -> 
       let (Types.TySchemeTy (ty_param1,_,t1) , Types.TySchemeTy (ty_param2,_,t2)) = type_check_ty_coercion st ty_coer1 in 

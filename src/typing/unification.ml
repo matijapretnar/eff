@@ -10,6 +10,7 @@ type substitution =
    | CoerDirtVartoDirtCoercion of (Params.dirt_coercion_param * Typed.dirt_coercion)
    | TyVarToTy of (Params.ty_param * Types.target_ty)
    | DirtVarToDirt of (Params.dirt_param * Types.dirt)
+   | SkelVarToSkel of (Params.skel_param * Types.skeleton)
 
 
 
@@ -24,6 +25,8 @@ let print_sub ?max_level c ppf =
                               (Params.print_ty_param p) (Types.print_target_ty t) 
   | DirtVarToDirt (p,d) ->  print "%t :-dirtvarToTargetdirt-> %t" 
                               (Params.print_dirt_param p) (Types.print_target_dirt d) 
+  | SkelVarToSkel (p,s) ->  print "%t :-dirtvarToTargetdirt-> %t" 
+                              (Params.print_skel_param p) (Types.print_skeleton s) 
   end
 
 
@@ -406,6 +409,44 @@ let rec unify(sub, paused, queue) =
  else
  let cons::rest_queue = queue in 
  begin match cons with
+ | Typed.TyvarHasSkel (tvar,skel) ->
+    begin match skel with 
+    | SkelVar p ->
+        Print.debug "=========End loop============";
+        unify (sub , paused @ [cons] , rest_queue)
+    | PrimSkel ps -> 
+        let sub1 = TyVarToTy (tvar, Types.PrimTy ps) in 
+        Print.debug "=========End loop============";
+        unify (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
+    | SkelArrow (sk1,sk2) ->
+        let ty_p1 = Params.fresh_ty_param () in 
+        let ty_p2 = Params.fresh_ty_param () in 
+        let tvar1 = Types.Tyvar (ty_p1) in 
+        let tvar2 = Types.Tyvar (ty_p2) in 
+        let d_p1 = Params.fresh_dirt_param () in 
+        let dvar1 = Types.SetVar (empty_effect_set , d_p1) in 
+        let sub1= TyVarToTy (tvar, Types.Arrow (tvar1 , (tvar2,dvar1))) in 
+        let cons1 = TyvarHasSkel (ty_p1,sk1) in 
+        let cons2 = TyvarHasSkel (ty_p2,sk2) in
+        Print.debug "=========End loop============";
+        unify ( sub @ [sub1], [], [cons1;cons2] @ (apply_sub [sub1] (rest_queue @ paused) ) ) 
+
+    | SkelHandler (sk1,sk2) ->
+        let ty_p1 = Params.fresh_ty_param () in 
+        let ty_p2 = Params.fresh_ty_param () in 
+        let tvar1 = Types.Tyvar (ty_p1) in 
+        let tvar2 = Types.Tyvar (ty_p2) in 
+        let d_p1 = Params.fresh_dirt_param () in 
+        let dvar1 = Types.SetVar (empty_effect_set , d_p1) in 
+        let d_p2 = Params.fresh_dirt_param () in 
+        let dvar2 = Types.SetVar (empty_effect_set , d_p2) in 
+        let sub1= TyVarToTy (tvar, Types.Handler ((tvar1,dvar1) , (tvar2,dvar2))) in 
+        let cons1 = TyvarHasSkel (ty_p1,sk1) in 
+        let cons2 = TyvarHasSkel (ty_p2,sk2) in
+        Print.debug "=========End loop============";
+        unify ( sub @ [sub1], [], [cons1;cons2] @ (apply_sub [sub1] (rest_queue @ paused) ) ) 
+    | ForallSkel (p,sk1)-> assert false
+    end
  | Typed.TyOmega (omega,tycons) ->
  	begin match tycons with
  	| (x,y) when x=y -> 

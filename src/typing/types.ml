@@ -31,13 +31,13 @@ let effect_set_is_subseteq s1 s2 =
 
 type skeleton =
   | SkelVar of Params.skel_param
-  | PrimSkel
+  | PrimSkel of prim_ty
   | SkelArrow of skeleton * skeleton
   | SkelHandler of skeleton * skeleton
   | ForallSkel of Params.skel_param * skeleton
 
 
-type target_ty = 
+and target_ty = 
   | Tyvar of Params.ty_param
   | Arrow of target_ty * target_dirty
   | Tuple of target_ty list
@@ -115,7 +115,7 @@ and print_skeleton ?max_level sk ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   begin match sk with
   | SkelVar p -> Params.print_skel_param p ppf
-  | PrimSkel -> print "prim_skel"
+  | PrimSkel _ -> print "prim_skel"
   | SkelArrow (sk1,sk2) -> print "%t -sk-> %t" (print_skeleton sk1) (print_skeleton sk2)
   | SkelHandler (sk1,sk2) -> print "%t =sk=> %t" (print_skeleton sk1) (print_skeleton sk2)
   | ForallSkel (p,sk1)-> print "ForallSkelSkel %t. %t" (Params.print_skel_param p) (print_skeleton sk1)

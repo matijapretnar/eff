@@ -131,6 +131,8 @@ and abstraction2 = (pattern * pattern * computation) annotation
 type omega_ct =
     | TyOmega of (Params.ty_coercion_param * Types.ct_ty)
     | DirtOmega of (Params.dirt_coercion_param * Types.ct_dirt)
+    | SkelEq of skeleton * skeleton
+    | TyvarHasSkel of (Params.ty_param * skeleton)
 
 
 type toplevel = plain_toplevel * Location.t
@@ -295,9 +297,8 @@ and print_omega_ct ?max_level c ppf =
                               (Params.print_ty_coercion_param p) (Types.print_target_ty ty1) (Types.print_target_ty ty2)
   | DirtOmega (p,(ty1,ty2)) ->  print "%t: (%t =< %t)" 
                               (Params.print_dirt_coercion_param p) (Types.print_target_dirt ty1) (Types.print_target_dirt ty2)
-(*   | DirtyOmega (p,(ty1,ty2)) ->  print "%t: (%t =< %t)" 
-                              (Params.print_dirty_coercion_param p) (Types.print_target_dirty ty1) (Types.print_target_dirty ty2) 
- *)
+  | SkelEq (sk1,sk2) -> print "%t ~ %t" (Types.print_skeleton sk1) (Types.print_skeleton sk2)
+  | TyvarHasSkel(tp ,sk1) -> print "%t : %t" (Params.print_ty_param tp) (Types.print_skeleton sk1)
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in

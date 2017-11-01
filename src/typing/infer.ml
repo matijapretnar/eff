@@ -562,7 +562,7 @@ and type_plain_comp st = function
                                           end 
                                       ) split_cons1 type_e1 in 
         let ty_sc_dirt = List.fold_right (fun cons acc -> Types.TySchemeDirt (cons,acc)) split_dirt_vars qual_ty in
-        let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,Types.PrimSkel,acc)) split_ty_vars ty_sc_dirt in 
+        let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,Types.PrimSkel Types.IntTy,acc)) split_ty_vars ty_sc_dirt in 
         let new_st = add_def st x ty_sc_ty in 
         let (typed_c2,type_c2,cons_c2,subs_c2) = type_comp new_st c_2 in
 
@@ -622,7 +622,7 @@ let type_toplevel ~loc st c =
                                           end 
                                       ) split_cons1 ttype' in 
     let ty_sc_dirt = List.fold_right (fun cons acc -> Types.TySchemeDirt (cons,acc)) split_dirt_vars qual_ty in
-    let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,Types.PrimSkel,acc)) split_ty_vars ty_sc_dirt in  
+    let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,Types.PrimSkel Types.IntTy,acc)) split_ty_vars ty_sc_dirt in  
     let var_exp = List.fold_right(fun cons acc -> 
                                           begin match cons with 
                                           | Typed.TyOmega(om,t) -> Typed.annotate (Typed.LambdaTyCoerVar (om,t,acc)) Location.unknown
