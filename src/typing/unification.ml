@@ -91,6 +91,7 @@ and apply_sub_plain_exp sub e =
   | Handler h -> Handler (apply_sub_handler sub h)
   | BigLambdaTy(ty_param,e1) -> BigLambdaTy( ty_param, (apply_sub_exp sub e1))
   | BigLambdaDirt(dirt_param,e1) -> BigLambdaDirt (dirt_param, (apply_sub_exp sub e1))
+  | BigLambdaSkel(skel_param,e1) -> BigLambdaSkel (skel_param, (apply_sub_exp sub e1))
   | CastExp (e1,tc1) -> CastExp ( (apply_sub_exp sub e1) , (apply_sub_tycoer sub tc1) )
   | ApplyTyExp (e1,tty) -> ApplyTyExp ( (apply_sub_exp sub e1), (apply_sub_ty sub tty))
   | LambdaTyCoerVar (tcp1,ct_ty1,e1) ->LambdaTyCoerVar (tcp1, ct_ty1, (apply_sub_exp sub e1))
@@ -98,6 +99,7 @@ and apply_sub_plain_exp sub e =
   | ApplyDirtExp (e1,d1) -> ApplyDirtExp ((apply_sub_exp sub e1), (apply_sub_dirt sub d1))
   | ApplyTyCoercion (e1,tc1) -> ApplyTyCoercion ((apply_sub_exp sub e1), (apply_sub_tycoer sub tc1))
   | ApplyDirtCoercion (e1,dc1) -> ApplyDirtCoercion ((apply_sub_exp sub e1), (apply_sub_dirtcoer sub dc1))
+  | ApplySkelExp (e1, s1) -> ApplySkelExp ((apply_sub_exp sub e1), (apply_sub_skel sub s1))
 end
 
 and apply_sub_abs sub abs = 
@@ -134,6 +136,8 @@ and apply_sub_tycoer sub ty_coer =
   | ForallDirt (dirt_param,ty_coer1) -> ForallDirt (dirt_param, apply_sub_tycoer sub ty_coer1)
   | ApplyDirCoer (ty_coer1,drt) -> ApplyDirCoer (apply_sub_tycoer sub ty_coer1, apply_sub_dirt sub drt)
   | PureCoercion dirty_coer1 -> PureCoercion (apply_sub_dirtycoer sub dirty_coer1)
+  | ForallSkel (ty_param,ty_coer1) -> ForallSkel (ty_param, apply_sub_tycoer sub ty_coer1)
+  | ApplySkelCoer (ty_coer1,sk1) -> ApplySkelCoer (apply_sub_tycoer sub ty_coer1, apply_sub_skel sub sk1)
   end
 
 and apply_sub_dirtcoer sub dirt_coer = 
@@ -175,7 +179,7 @@ and apply_sub_ty sub ty =
   | PrimTy _ -> ty
   | QualTy (ct_ty1,tty1) -> QualTy (apply_sub_ct_ty sub ct_ty1, apply_sub_ty sub tty1)
   | QualDirt (ct_drt1,tty1) -> QualDirt (apply_sub_ct_dirt sub ct_drt1,apply_sub_ty sub tty1 )
-  | TySchemeTy (ty_param ,sk,tty1) -> TySchemeTy (ty_param,sk, apply_sub_ty sub tty1)
+  | TySchemeTy (ty_param ,sk,tty1) -> TySchemeTy (ty_param, apply_sub_skel sub sk, apply_sub_ty sub tty1)
   | TySchemeDirt (dirt_param ,tty1) -> TySchemeDirt (dirt_param, apply_sub_ty sub tty1)
   end
 and apply_sub_dirty_ty sub drty_ty = 
@@ -199,6 +203,18 @@ and apply_sub_dirt sub drt =
   | _ -> drt
   end
 
+and apply_sub_skel sub sk =
+  begin match sk with 
+  | SkelVar p -> 
+      begin match sub with 
+      | SkelVarToSkel (skv,sk1) when (skv = p) -> sk1
+      | _ -> sk
+      end
+  | PrimSkel _ -> sk
+  | SkelArrow (sk1,sk2) -> SkelArrow ( (apply_sub_skel sub sk1) , (apply_sub_skel sub sk2)) 
+  | SkelHandler (sk1,sk2) -> SkelHandler ( (apply_sub_skel sub sk1) , (apply_sub_skel sub sk2)) 
+  | ForallSkel (p,sk1)->  ForallSkel (p, apply_sub_skel sub sk1)
+  end
 and apply_sub_ct_ty sub ct_ty1 = 
   let (ct_tya,ct_tyb) = ct_ty1 in 
   ( (apply_sub_ty sub ct_tya), (apply_sub_ty sub ct_tyb) )
@@ -244,6 +260,20 @@ let rec apply_sub sub c_list =
     | _ -> apply_sub xs c_list
 		end
 	end
+
+
+let rec free_skeleton sk = 
+  begin match sk with 
+  | SkelVar p -> [p]
+  | PrimSkel _ -> []
+  | SkelArrow (sk1,sk2) -> (free_skeleton sk1) @ (free_skeleton sk2) 
+  | SkelHandler (sk1,sk2) -> (free_skeleton sk1) @ (free_skeleton sk2) 
+  | ForallSkel (p,sk1)-> 
+      let free_a = free_skeleton sk1 in 
+      List.filter (fun x -> not (List.mem x [p])) free_a
+  end
+
+
 let rec free_target_ty t = 
  begin match t with 
  | Tyvar x -> [x]
@@ -261,6 +291,23 @@ let rec free_target_ty t =
 and
 free_target_dirty (a,d) = free_target_ty a 
 
+
+
+let rec get_skel_of_tyvar tyvar clist = 
+  begin match clist with
+  | [] -> assert false 
+  | (TyvarHasSkel (tv,skel))::_ when (tyvar = tv) -> skel
+  | _::xs -> get_skel_of_tyvar tyvar xs
+  end
+
+let rec skeleton_of_target_ty tty conslist = 
+  begin match tty with 
+ | Tyvar x -> (get_skel_of_tyvar x conslist)
+ | Arrow (a1,(a2,_)) -> SkelArrow (skeleton_of_target_ty a1 conslist, skeleton_of_target_ty a2 conslist)
+ | Tuple tup -> assert false
+ | Handler ((a1,_),(a2,_)) -> SkelHandler (skeleton_of_target_ty a1 conslist, skeleton_of_target_ty a2 conslist)
+ | PrimTy pt -> PrimSkel pt 
+  end
 
 
 let rec refresh_target_ty (ty_sbst,dirt_sbst) t=
@@ -447,6 +494,32 @@ let rec unify(sub, paused, queue) =
         unify ( sub @ [sub1], [], [cons1;cons2] @ (apply_sub [sub1] (rest_queue @ paused) ) ) 
     | ForallSkel (p,sk1)-> assert false
     end
+ 
+ | Typed.SkelEq (sk1,sk2) ->
+    begin match (sk1,sk2) with
+    | (SkelVar sp1, sk2a) when (not (List.mem sp1 (free_skeleton sk2a))) ->
+        let sub1 = SkelVarToSkel (sp1,sk2a) in 
+        Print.debug "=========End loop============";
+        unify (sub @ [sub1], [] , apply_sub [sub1] (rest_queue @ paused))
+    
+    | (sk2a, SkelVar sp1) when (not (List.mem sp1 (free_skeleton sk2a))) ->
+        let sub1 = SkelVarToSkel (sp1,sk2a) in 
+        Print.debug "=========End loop============";
+        unify (sub @ [sub1], [] , apply_sub [sub1] (rest_queue @ paused))
+    
+    | (PrimSkel ps1, PrimSkel ps2) when (ps1 = ps2) ->
+        Print.debug "=========End loop============";
+        unify (sub, paused, rest_queue)
+
+    | (SkelArrow (ska,skb) , SkelArrow (skc,skd)) ->
+        Print.debug "=========End loop============";
+        unify (sub, paused, [Typed.SkelEq(ska,skc); Typed.SkelEq(skb,skd)] @ rest_queue)
+
+    | (SkelHandler (ska,skb) , SkelHandler (skc,skd)) ->
+        Print.debug "=========End loop============";
+        unify (sub, paused, [Typed.SkelEq(ska,skc); Typed.SkelEq(skb,skd)] @ rest_queue)
+    | _ -> assert false
+    end
  | Typed.TyOmega (omega,tycons) ->
  	begin match tycons with
  	| (x,y) when x=y -> 
@@ -489,9 +562,33 @@ let rec unify(sub, paused, queue) =
    		Print.debug "=========End loop============";
       unify (sub @ [sub1], paused, (List.append [cons1;cons2;cons3;cons4] rest_queue)) 
  	| (Types.Tyvar tv, a) ->
-    unify_ty_vars (sub,paused,rest_queue) tv a cons
+    (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
+    let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in 
+    let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in 
+    if skel_tv = skel_a then 
+    begin 
+    Print.debug "=========End loop============";
+    unify(sub, cons :: paused , rest_queue)
+    end
+    else
+    begin
+    Print.debug "=========End loop============";
+    unify(sub, cons :: paused , (SkelEq(skel_tv,skel_a)) :: rest_queue)
+    end
  	| ( a , Types.Tyvar tv) ->
- 		unify_ty_vars (sub,paused,rest_queue) tv a cons
+ 		(* unify_ty_vars (sub,paused,rest_queue) tv a cons *)
+    let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in 
+    let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in 
+    if skel_tv = skel_a then 
+    begin 
+    Print.debug "=========End loop============";
+    unify(sub, cons :: paused , rest_queue)
+    end
+    else
+    begin
+    Print.debug "=========End loop============";
+    unify(sub, cons :: paused , (SkelEq(skel_tv,skel_a)) :: rest_queue)
+    end
  	| _ -> assert false
  	end
  
