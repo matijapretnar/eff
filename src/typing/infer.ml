@@ -25,11 +25,14 @@ let ty_of_const = function
   | Const.Boolean _ -> Type.bool_ty
   | Const.Float _ -> Type.float_ty
 
- let add_effect env eff (ty1, ty2) =
+let add_effect env eff (ty1, ty2) =
   {env with effects = Untyped.EffectMap.add eff (ty1, ty2) env.effects}
 
 let add_def env x ty_sch =
   {env with context = TypingEnv.update env.context x ty_sch}
+
+let apply_sub_to_env env sub = 
+  {env with context = TypingEnv.apply_sub (env.context) sub}
 
 
 let rec make_target_effects effects =
@@ -474,7 +477,7 @@ and type_plain_comp st = function
   | Untyped.Match (e, cases) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Apply (e1, e2) -> 
       Print.debug "in infer apply";
-      let (typed_e1, tt_1, constraints_1,subs_e1) = type_expr st e1 in
+      let (typed_e1, tt_1, constraints_1, subs_e1) = type_expr st e1 in
       let (typed_e2, tt_2, constraints_2, subs_e2) = type_expr st e2 in
       Print.debug "e1 apply type : %t" (Types.print_target_ty tt_1);
       Print.debug "e2 apply type : %t" (Types.print_target_ty tt_2);

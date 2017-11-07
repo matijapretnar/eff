@@ -6,7 +6,7 @@
 *)
 
 (** The type of contexts. *)
-type t
+type t = (Typed.variable, Types.target_ty) OldUtils.assoc
 
 (** [empty] is the empty context. *)
 val empty : t
@@ -21,3 +21,5 @@ val update : t -> Typed.variable -> Types.target_ty -> t
 
 
 val return_context: t -> (Typed.variable * Types.target_ty) list 
+
+val apply_sub: t -> Unification.substitution list -> t
