@@ -332,10 +332,10 @@ and type_plain_expr in_cons st = function
       end
   | Untyped.Const const -> 
         begin match const with
-        | Integer _ -> (Typed.Const const, Types.PrimTy IntTy, [], [])
-        | String _ -> (Typed.Const const, Types.PrimTy StringTy, [], [])
-        | Boolean _ -> (Typed.Const const, Types.PrimTy BoolTy, [], [])
-        | Float _ -> (Typed.Const const, Types.PrimTy FloatTy, [], [])
+        | Integer _ -> (Typed.Const const, Types.PrimTy IntTy, in_cons, [])
+        | String _ -> (Typed.Const const, Types.PrimTy StringTy, in_cons, [])
+        | Boolean _ -> (Typed.Const const, Types.PrimTy BoolTy, in_cons, [])
+        | Float _ -> (Typed.Const const, Types.PrimTy FloatTy, in_cons, [])
       end 
       
   | Untyped.Tuple es -> 
@@ -344,23 +344,25 @@ and type_plain_expr in_cons st = function
       let target_types = Types.Tuple(List.fold_right (fun (_,x,_,_) xs -> x::xs )  target_list []) in
       let target_cons = List.fold_right (fun (_,_,x,_) xs -> List.append x xs )  target_list [] in
       let target_sub = List.fold_right (fun (_,_,_,x) xs -> List.append x xs )  target_list [] in
-      (target_terms, target_types, target_cons, target_sub) 
+      (target_terms, target_types, in_cons @ target_cons, target_sub) 
   | Untyped.Record lst -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Variant (lbl, e) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Lambda a -> 
         Print.debug "in infer lambda";
         let (p,c) = a in 
         let new_ty_var = Params.fresh_ty_param () in
+        let new_skel_var = Params.fresh_skel_param () in 
+        let new_in_cons = [Typed.TyvarHasSkel (new_ty_var,Types.SkelVar new_skel_var)] @ in_cons in
         let in_ty = Types.Tyvar new_ty_var in
         let Untyped.PVar x = p.Untyped.term in
         let target_pattern = (type_pattern p) in
         let new_st = add_def st x in_ty in
-        let (target_comp_term,target_comp_ty,target_comp_cons, target_comp_sub)= (type_comp in_cons new_st c) in
-        let target_ty = Types.Arrow (in_ty, target_comp_ty) in
-        let target_lambda = Typed.Lambda (target_pattern,in_ty,target_comp_term) in 
+        let (target_comp_term,target_comp_ty,target_comp_cons, target_comp_sub)= (type_comp new_in_cons new_st c) in
+        let target_ty = Types.Arrow (Unification.apply_substitution_ty target_comp_sub in_ty, target_comp_ty) in
+        let target_lambda = Typed.Lambda (target_pattern,Unification.apply_substitution_ty target_comp_sub in_ty,target_comp_term) in 
         Print.debug "lambda ty: %t" (Types.print_target_ty target_ty);
-        (target_lambda,target_ty,target_comp_cons, [])
-  | Untyped.Effect eff -> 
+        (target_lambda,target_ty,target_comp_cons, target_comp_sub)
+ (*  | Untyped.Effect eff -> 
         let (in_ty,out_ty) =  Untyped.EffectMap.find eff st.effects in
         let s = Types.list_to_effect_set [eff] in
         (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,(Types.SetEmpty s))) , [], []) 
@@ -462,7 +464,7 @@ and type_plain_expr in_cons st = function
                           (List.flatten (OldUtils.map (fun(_,x) -> x) map_list)) in 
         let coerced_handler = Typed.CastExp (target_handler, handler_coercion) in  
         (coerced_handler,target_type,constraints, [])
-
+ *)
 
 
 and type_comp in_cons st {Untyped.term=comp; Untyped.location=loc} =
@@ -471,18 +473,18 @@ and type_comp in_cons st {Untyped.term=comp; Untyped.location=loc} =
 and type_plain_comp in_cons st = function
   | Untyped.Value e ->
       let (typed_e, tt, constraints, subs_e) = type_expr in_cons st e in
-      (* let new_d_ty = (tt , (Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())))) in  *)
       let new_d_ty = (tt , (Types.SetEmpty (Types.empty_effect_set))) in 
-      (Typed.Value typed_e, new_d_ty ,constraints, [])
+      (Typed.Value typed_e, new_d_ty ,constraints, subs_e)
   | Untyped.Match (e, cases) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Apply (e1, e2) -> 
       Print.debug "in infer apply";
       let (typed_e1, tt_1, constraints_1, subs_e1) = type_expr in_cons st e1 in
-      let (typed_e2, tt_2, constraints_2, subs_e2) = type_expr in_cons st e2 in
+      let st_subbed = apply_sub_to_env st subs_e1  in 
+      let (typed_e2, tt_2, constraints_2, subs_e2) = type_expr constraints_1 st_subbed e2 in
       Print.debug "e1 apply type : %t" (Types.print_target_ty tt_1);
       Print.debug "e2 apply type : %t" (Types.print_target_ty tt_2);
       begin match typed_e1.term with
-      | Typed.Effect (eff, (eff_in,eff_out)) ->
+      (* | Typed.Effect (eff, (eff_in,eff_out)) ->
            let cons1 = (tt_2, eff_in) in
            let coerp1 = Params.fresh_ty_coercion_param () in 
            let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2, Typed.TyCoercionVar( coerp1 ))) typed_e1.location in
@@ -507,23 +509,20 @@ and type_plain_comp in_cons st = function
             (typed_comp_ty,final_dirt),
             cont_comp_cons @ constraints,
              [])
+       *)
       | _ ->
-          let new_ty_var = Types.Tyvar (Params.fresh_ty_param ()) in 
-          let new_ty_var_2 = Types.Tyvar (Params.fresh_ty_param ()) in
+          let new_ty_param = Params.fresh_ty_param () in 
+          let new_ty_var = Types.Tyvar (new_ty_param) in 
           let new_dirt_var = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
-          let fresh_dirty_ty =  (new_ty_var_2, new_dirt_var) in 
-          let cons1 = (tt_1 , Types.Arrow (new_ty_var, fresh_dirty_ty)) in
-          let cons2 = (tt_2, new_ty_var) in
+          let fresh_dirty_ty =  (new_ty_var, new_dirt_var) in 
+          let cons1 = Typed.TyvarHasSkel (new_ty_param, Types.SkelVar (Params.fresh_skel_param ())) in 
+          let cons2 = (Unification.apply_substitution_ty subs_e2 tt_1 , Types.Arrow (tt_2, fresh_dirty_ty)) in
           let coerp1 = Params.fresh_ty_coercion_param () in
-          let coerp2 = Params.fresh_ty_coercion_param () in 
-          let omega_cons_1 = Typed.TyOmega (coerp1,cons1) in
-          let omega_cons_2 = Typed.TyOmega (coerp2,cons2) in
-          let constraints = List.append [omega_cons_1;omega_cons_2] (List.append constraints_1 constraints_2) in 
-          let e1_coerced = Typed.annotate (Typed.CastExp (typed_e1, Typed.TyCoercionVar( coerp1))) typed_e1.location in 
-          let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2,  Typed.TyCoercionVar( coerp2))) typed_e2.location in 
-          ( (Typed.Apply (e1_coerced,e2_coerced) ), fresh_dirty_ty , constraints, [])
+          let omega_cons_1 = Typed.TyOmega (coerp1,cons2) in
+          let e1_coerced = Typed.annotate (Typed.CastExp (Unification.apply_substitution_exp subs_e2 typed_e1, Typed.TyCoercionVar( coerp1))) typed_e1.location in 
+          ( (Typed.Apply (e1_coerced,typed_e2) ), fresh_dirty_ty , [cons1; omega_cons_1] @ constraints_2, subs_e2 @ subs_e1)
       end
-   | Untyped.Handle (e, c) ->
+ (*   | Untyped.Handle (e, c) ->
       let alpha_2 = Types.Tyvar (Params.fresh_ty_param ()) in
       let alpha_1 = Types.Tyvar (Params.fresh_ty_param ()) in
       let gamma_1 = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
@@ -604,7 +603,7 @@ and type_plain_comp in_cons st = function
      end 
   | Untyped.LetRec (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
-
+ *)
 let type_toplevel ~loc st c =
   let c' = Untyped.return_term c in
   begin match c' with 
@@ -653,8 +652,8 @@ let type_toplevel ~loc st c =
     let (sub,final) = Unification.unify ([],[],constraints) in
     let ct' =  Unification.apply_substitution sub ct in
     Print.debug "New Computation : %t" (Typed.print_computation ct');
-    let (tch_ty,tch_dirt) = TypeChecker.type_check_comp (TypeChecker.new_checker_state) ct'.term in 
-    Print.debug "Type from Type Checker : %t ! %t" (Types.print_target_ty tch_ty) (Types.print_target_dirt tch_dirt);
+    (* let (tch_ty,tch_dirt) = TypeChecker.type_check_comp (TypeChecker.new_checker_state) ct'.term in 
+    Print.debug "Type from Type Checker : %t ! %t" (Types.print_target_ty tch_ty) (Types.print_target_dirt tch_dirt); *)
     ct', st
     end
   end

@@ -25,7 +25,7 @@ let print_sub ?max_level c ppf =
                               (Params.print_ty_param p) (Types.print_target_ty t) 
   | DirtVarToDirt (p,d) ->  print "%t :-dirtvarToTargetdirt-> %t" 
                               (Params.print_dirt_param p) (Types.print_target_dirt d) 
-  | SkelVarToSkel (p,s) ->  print "%t :-dirtvarToTargetdirt-> %t" 
+  | SkelVarToSkel (p,s) ->  print "%t :-skelvarToSkeleton-> %t" 
                               (Params.print_skel_param p) (Types.print_skeleton s) 
   end
 
@@ -257,6 +257,15 @@ let rec apply_sub sub c_list =
         end in 
         let result_c_list = List.map mapper c_list in 
         apply_sub xs result_c_list
+    | SkelVarToSkel (skel_var,skel) ->
+        let mapper = fun cons ->
+        begin match cons with 
+        | Typed.TyvarHasSkel (tv, Types.SkelVar sv) when (skel_var = sv) ->
+            Typed.TyvarHasSkel (tv, skel)
+        | _ -> cons
+        end in
+      let result_c_list = List.map mapper c_list in 
+      apply_sub xs result_c_list
     | _ -> apply_sub xs c_list
 		end
 	end

@@ -115,7 +115,7 @@ and print_skeleton ?max_level sk ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   begin match sk with
   | SkelVar p -> Params.print_skel_param p ppf
-  | PrimSkel _ -> print "prim_skel"
+  | PrimSkel s -> print "prim_skel %t" (print_prim_ty s)
   | SkelArrow (sk1,sk2) -> print "%t -sk-> %t" (print_skeleton sk1) (print_skeleton sk2)
   | SkelHandler (sk1,sk2) -> print "%t =sk=> %t" (print_skeleton sk1) (print_skeleton sk2)
   | ForallSkel (p,sk1)-> print "ForallSkelSkel %t. %t" (Params.print_skel_param p) (print_skeleton sk1)
