@@ -310,10 +310,10 @@ let apply_types ty_subs dirt_subs var ty_sch =
    let dirt_cons_apps = List.fold_left (fun a (Typed.DirtOmega (omega, _ )) -> (Typed.annotate (Typed.ApplyDirtCoercion (a, Typed.DirtCoercionVar omega)) Location.unknown) ) ty_cons_apps dirt_cons in 
    (dirt_cons_apps , (ty_cons @ dirt_cons ))
 
-let rec type_expr st {Untyped.term=expr; Untyped.location=loc} =
-  let e, ttype, constraints, sub_list = type_plain_expr st expr in
+let rec type_expr in_cons st {Untyped.term=expr; Untyped.location=loc} =
+  let e, ttype, constraints, sub_list = type_plain_expr in_cons st expr in
   Typed.annotate e loc, ttype, constraints, sub_list
-and type_plain_expr st = function
+and type_plain_expr in_cons st = function
   | Untyped.Var x ->
     begin match TypingEnv.lookup st.context x with
       | Some ty_schi -> 
@@ -339,7 +339,7 @@ and type_plain_expr st = function
       end 
       
   | Untyped.Tuple es -> 
-      let target_list = (List.map (type_expr st) es) in
+      let target_list = (List.map (type_expr in_cons st) es) in
       let target_terms = Typed.Tuple (List.fold_right (fun (x,_,_,_) xs -> x ::xs )  target_list []) in
       let target_types = Types.Tuple(List.fold_right (fun (_,x,_,_) xs -> x::xs )  target_list []) in
       let target_cons = List.fold_right (fun (_,_,x,_) xs -> List.append x xs )  target_list [] in
@@ -355,7 +355,7 @@ and type_plain_expr st = function
         let Untyped.PVar x = p.Untyped.term in
         let target_pattern = (type_pattern p) in
         let new_st = add_def st x in_ty in
-        let (target_comp_term,target_comp_ty,target_comp_cons, target_comp_sub)= (type_comp new_st c) in
+        let (target_comp_term,target_comp_ty,target_comp_cons, target_comp_sub)= (type_comp in_cons new_st c) in
         let target_ty = Types.Arrow (in_ty, target_comp_ty) in
         let target_lambda = Typed.Lambda (target_pattern,in_ty,target_comp_term) in 
         Print.debug "lambda ty: %t" (Types.print_target_ty target_ty);
@@ -380,7 +380,7 @@ and type_plain_expr st = function
         let Untyped.PVar x = pv.Untyped.term in
         let target_pattern = (type_pattern pv) in
         let new_st = add_def st x x_ty in
-        let (cv_target, (b_r,delta_r), constraints_cr, subs_cr) = type_comp new_st cv in 
+        let (cv_target, (b_r,delta_r), constraints_cr, subs_cr) = type_comp in_cons new_st cv in 
         let cons_1a =(b_r,out_ty) in 
         let cons_1b = (delta_r,out_dirt) in 
         let coerp1a = Params.fresh_ty_coercion_param () in 
@@ -411,7 +411,7 @@ and type_plain_expr st = function
             let delta_op =  Types.SetVar (Types.empty_effect_set,Params.fresh_dirt_param ()) in 
             let tmp_st = add_def st x_var in_op_ty in
             let new_st = add_def tmp_st k_var (Types.Arrow(out_op_ty,(alpha_op,delta_op))) in 
-            let (typed_c_op, typed_c_op_type, c_op_constraints, c_op_subs) = type_comp new_st c_op in 
+            let (typed_c_op, typed_c_op_type, c_op_constraints, c_op_subs) = type_comp in_cons new_st c_op in 
             let (out_op_ty,_) = typed_c_op_type in
             let (c_op_ty,c_op_dirt) = typed_c_op_type in 
             let cons_2a = (c_op_ty,out_ty) in 
@@ -465,20 +465,20 @@ and type_plain_expr st = function
 
 
 
-and type_comp st {Untyped.term=comp; Untyped.location=loc} =
-  let c, ttype, constraints , sub_list = type_plain_comp st comp in
+and type_comp in_cons st {Untyped.term=comp; Untyped.location=loc} =
+  let c, ttype, constraints , sub_list = type_plain_comp in_cons st comp in
   Typed.annotate c loc, ttype, constraints, sub_list
-and type_plain_comp st = function
+and type_plain_comp in_cons st = function
   | Untyped.Value e ->
-      let (typed_e, tt, constraints, subs_e) = type_expr st e in
+      let (typed_e, tt, constraints, subs_e) = type_expr in_cons st e in
       (* let new_d_ty = (tt , (Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())))) in  *)
       let new_d_ty = (tt , (Types.SetEmpty (Types.empty_effect_set))) in 
       (Typed.Value typed_e, new_d_ty ,constraints, [])
   | Untyped.Match (e, cases) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Apply (e1, e2) -> 
       Print.debug "in infer apply";
-      let (typed_e1, tt_1, constraints_1, subs_e1) = type_expr st e1 in
-      let (typed_e2, tt_2, constraints_2, subs_e2) = type_expr st e2 in
+      let (typed_e1, tt_1, constraints_1, subs_e1) = type_expr in_cons st e1 in
+      let (typed_e2, tt_2, constraints_2, subs_e2) = type_expr in_cons st e2 in
       Print.debug "e1 apply type : %t" (Types.print_target_ty tt_1);
       Print.debug "e2 apply type : %t" (Types.print_target_ty tt_2);
       begin match typed_e1.term with
@@ -493,7 +493,7 @@ and type_plain_comp st = function
            let continuation_comp = Untyped.Value ( Untyped.annotate (Untyped.Var new_var) typed_e2.location ) in 
            let new_st = add_def st new_var eff_out in 
            let (typed_cont_comp, typed_cont_comp_dirty_ty, cont_comp_cons, cont_comp_subs)= 
-                    type_comp new_st (Untyped.annotate continuation_comp typed_e2.location) in 
+                    type_comp in_cons new_st (Untyped.annotate continuation_comp typed_e2.location) in 
            let (typed_comp_ty,typed_comp_dirt) = typed_cont_comp_dirty_ty in 
            let final_dirt = 
               begin match typed_comp_dirt with 
@@ -530,8 +530,8 @@ and type_plain_comp st = function
       let gamma_2 = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in
       let dirty_1 = (alpha_1, gamma_1) in 
       let dirty_2 = (alpha_2, gamma_2) in
-      let (typed_exp,exp_type,exp_constraints,sub_exp) = type_expr st e in
-      let (typed_comp,comp_dirty_type,comp_constraints,sub_comp) = type_comp st c in
+      let (typed_exp,exp_type,exp_constraints,sub_exp) = type_expr in_cons st e in
+      let (typed_comp,comp_dirty_type,comp_constraints,sub_comp) = type_comp in_cons st c in
       let (comp_type,comp_dirt) = comp_dirty_type in
       let cons1 = (exp_type, (Types.Handler (dirty_1, dirty_2))) in
       let cons2 = (comp_type, alpha_1) in
@@ -555,7 +555,7 @@ and type_plain_comp st = function
     let [(p_def, c_1)] = defs in 
      begin match c_1.term with 
      | Untyped.Value e_1 -> 
-        let (typed_e1, type_e1,cons_e1,sub_e1) = type_expr st e_1 in 
+        let (typed_e1, type_e1,cons_e1,sub_e1) = type_expr in_cons st e_1 in 
         let (split_ty_vars, split_dirt_vars, split_cons1, split_cons2) = splitter (TypingEnv.return_context st.context) cons_e1 type_e1 in 
         let Untyped.PVar x = p_def.Untyped.term in
         let qual_ty = List.fold_right (fun cons acc -> 
@@ -567,7 +567,7 @@ and type_plain_comp st = function
         let ty_sc_dirt = List.fold_right (fun cons acc -> Types.TySchemeDirt (cons,acc)) split_dirt_vars qual_ty in
         let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,Types.PrimSkel Types.IntTy,acc)) split_ty_vars ty_sc_dirt in 
         let new_st = add_def st x ty_sc_ty in 
-        let (typed_c2,type_c2,cons_c2,subs_c2) = type_comp new_st c_2 in
+        let (typed_c2,type_c2,cons_c2,subs_c2) = type_comp in_cons new_st c_2 in
 
         let var_exp = List.fold_right(fun cons acc -> 
                                           begin match cons with 
@@ -582,10 +582,10 @@ and type_plain_comp st = function
 
 
      | _-> 
-        let (typed_c1,(type_c1,dirt_c1),cons_c1,subs_c1) = type_comp st c_1 in
+        let (typed_c1,(type_c1,dirt_c1),cons_c1,subs_c1) = type_comp in_cons st c_1 in
         let Untyped.PVar x = p_def.Untyped.term in
         let new_st = add_def st x type_c1 in 
-        let (typed_c2,(type_c2,dirt_c2),cons_c2,subs_c2) = type_comp new_st c_2 in 
+        let (typed_c2,(type_c2,dirt_c2),cons_c2,subs_c2) = type_comp in_cons new_st c_2 in 
         let new_dirt_var = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
         let cons1 = (dirt_c1,new_dirt_var) in
         let cons2 = (dirt_c2,new_dirt_var) in
@@ -609,7 +609,7 @@ let type_toplevel ~loc st c =
   let c' = Untyped.return_term c in
   begin match c' with 
   | Untyped.Value e ->
-    let et, ttype,constraints, sub_list = type_expr st e in
+    let et, ttype,constraints, sub_list = type_expr [] st e in
     Print.debug "Expression : %t" (Typed.print_expression et);
     Print.debug "Expression type : %t " (Types.print_target_ty ttype);
     Print.debug "Starting Set of Constraints ";
@@ -643,7 +643,7 @@ let type_toplevel ~loc st c =
     (Typed.annotate (Typed.Value var_exp_ty_lambda) Location.unknown), st
   | _ ->
     begin
-    let ct, (ttype,dirt),constraints, sub_list = type_comp st c in
+    let ct, (ttype,dirt),constraints, sub_list = type_comp [] st c in
     (* let x::xs = constraints in 
     Print.debug "Single constraint : %t" (Typed.print_omega_ct x); *)
     Print.debug "Computation : %t" (Typed.print_computation ct);
