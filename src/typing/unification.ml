@@ -56,6 +56,14 @@ and apply_substitution_ty s ty1 =
       apply_substitution_ty ss subbed_term
   end
 
+and apply_substitution_dirt s drt =
+  begin match s with
+  | [] -> drt
+  | (s1::ss) -> 
+      let subbed_term = apply_sub_dirt s1 drt in 
+      apply_substitution_dirt ss subbed_term
+  end
+
 and apply_sub_comp sub c =
 let c' = apply_sub_plain_comp sub c in
   Typed.annotate c' c.location
@@ -89,7 +97,7 @@ and apply_sub_plain_exp sub e =
   | Lambda (pat,ty1,c1)-> Lambda (pat, (apply_sub_ty sub ty1), (apply_sub_comp sub c1))
   | Effect eff -> Effect eff
   | Handler h -> Handler (apply_sub_handler sub h)
-  | BigLambdaTy(ty_param,e1) -> BigLambdaTy( ty_param, (apply_sub_exp sub e1))
+  | BigLambdaTy(ty_param,sk,e1) -> BigLambdaTy( ty_param, (apply_sub_skel sub sk) , (apply_sub_exp sub e1))
   | BigLambdaDirt(dirt_param,e1) -> BigLambdaDirt (dirt_param, (apply_sub_exp sub e1))
   | BigLambdaSkel(skel_param,e1) -> BigLambdaSkel (skel_param, (apply_sub_exp sub e1))
   | CastExp (e1,tc1) -> CastExp ( (apply_sub_exp sub e1) , (apply_sub_tycoer sub tc1) )

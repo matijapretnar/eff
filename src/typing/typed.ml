@@ -51,7 +51,7 @@ and plain_expression =
   | Lambda of (pattern * Types.target_ty * computation)
   | Effect of effect
   | Handler of handler
-  | BigLambdaTy of Params.ty_param * expression
+  | BigLambdaTy of Params.ty_param * skeleton * expression
   | BigLambdaDirt of Params.dirt_param * expression  
   | BigLambdaSkel of Params.skel_param * expression
   | CastExp of expression * ty_coercion
@@ -209,7 +209,7 @@ let rec print_expression ?max_level e ppf =
     print ~at_level:2 "effect %t" (print_effect eff)
   | CastExp (e1,tc) ->
     print "(%t) |> [%t]" (print_expression e1) (print_ty_coercion tc)
-  | BigLambdaTy (p,e) -> print "BigLambda_ty_%t. %t "(Params.print_ty_param p) (print_expression e)
+  | BigLambdaTy (p,s,e) -> print "BigLambda_ty_%t:%t. %t "(Params.print_ty_param p) (print_skeleton s) (print_expression e)
   | BigLambdaDirt (p,e) -> print "BigLambda_dirt_%t. %t "(Params.print_dirt_param p) (print_expression e) 
   | ApplyTyExp (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (Types.print_target_ty tty)
   | LambdaTyCoerVar (p,(tty1,tty2),e) -> 

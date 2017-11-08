@@ -34,7 +34,7 @@ let rec print_expression ?max_level e ppf =
       print ~at_level:2 "effect %t" (print_effect eff)
   | CastExp (e1,_) ->
     print "%t" (print_expression e1)
-  | BigLambdaTy (_,e1) -> print "%t " (print_expression e1)
+  | BigLambdaTy (_,_,e1) -> print "%t " (print_expression e1)
   | BigLambdaDirt (_,e1) ->  print "%t " (print_expression e1) 
   | ApplyTyExp (e1,_)-> print "%t " (print_expression e1)
   | LambdaTyCoerVar (_,_,e1) -> 
