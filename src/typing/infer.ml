@@ -260,18 +260,25 @@ let splitter st constraints simple_ty =
 
 let rec get_sub_of_ty ty_sch = 
   begin match ty_sch with
+  | Types.TySchemeSkel (s,t)->
+          let new_s = Params.fresh_skel_param () in 
+          let (skels,tys,dirts) = get_sub_of_ty t in
+          (new_s::skels,tys,dirts)
   | Types.TySchemeTy (p,_,t) -> 
           let new_p = Params.fresh_ty_param () in 
-          ( ((p,new_p) :: (fst (get_sub_of_ty t))) , (snd (get_sub_of_ty t) ) )
+          let (skels,tys,dirts) = get_sub_of_ty t in
+          (skels,(p,new_p)::tys,dirts)
   | Types.TySchemeDirt(p,t) -> 
           let new_p = Params.fresh_dirt_param () in 
-          ( (fst (get_sub_of_ty t)) , ((p,new_p) :: (snd (get_sub_of_ty t))))
-  | _ -> ([],[])
+          let (skels,tys,dirts) = get_sub_of_ty t in
+          (skels,tys,(p,new_p)::dirts)
+  | _ -> ([],[],[])
   end
 
 
 let rec get_basic_type ty_sch =
   begin match ty_sch with
+  | Types.TySchemeSkel (_,t) -> get_basic_type t
   | Types.TySchemeTy (_,_,t) -> get_basic_type t
   | Types.TySchemeDirt(_,t) -> get_basic_type t
   | Types.QualTy(_,t) -> get_basic_type t
@@ -290,7 +297,8 @@ let rec apply_sub_to_type ty_subs dirt_subs ty =
   
   | Types.Arrow (a,(b,d)) -> Types.Arrow ((apply_sub_to_type ty_subs dirt_subs a), ((apply_sub_to_type ty_subs dirt_subs b),(apply_sub_to_dirt dirt_subs d)))
   | Types.Tuple ty_list -> Types.Tuple (List.map ( fun x -> (apply_sub_to_type ty_subs dirt_subs x)) ty_list) 
-  | Types.Handler ((a,b),(c,d)) -> Types.Handler (  ((apply_sub_to_type ty_subs dirt_subs a),(apply_sub_to_dirt dirt_subs b))  ,   ((apply_sub_to_type ty_subs dirt_subs c),(apply_sub_to_dirt dirt_subs d)) )
+  | Types.Handler ((a,b),(c,d)) -> Types.Handler (  ((apply_sub_to_type ty_subs dirt_subs a),(apply_sub_to_dirt dirt_subs b))  ,   
+                                                  ((apply_sub_to_type ty_subs dirt_subs c),(apply_sub_to_dirt dirt_subs d)) )
   | Types.PrimTy _ -> ty
   | _ -> assert false
   end
@@ -326,8 +334,9 @@ let rec get_applied_cons_from_ty ty_subs dirt_subs ty =
   | _ -> [],[]
 end
 
-let apply_types ty_subs dirt_subs var ty_sch =
-   let ty_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplyTyExp (a, Types.Tyvar b)) Location.unknown)  ) (Typed.annotate (Typed.Var var) Location.unknown) ty_subs in 
+let apply_types skel_subs ty_subs dirt_subs var ty_sch =
+   let skel_apps = List.fold_left (fun a b -> (Typed.annotate (Typed.ApplySkelExp (a, Types.SkelVar b)) Location.unknown)  ) (Typed.annotate (Typed.Var var) Location.unknown) skel_subs in 
+   let ty_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplyTyExp (a, Types.Tyvar b)) Location.unknown)  ) skel_apps ty_subs in 
    let dirt_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplyDirtExp (a, Types.SetVar (Types.empty_effect_set ,b) )) Location.unknown)  ) ty_apps dirt_subs in 
    let (ty_cons,dirt_cons) = get_applied_cons_from_ty ty_subs dirt_subs ty_sch in 
    let ty_cons_apps = List.fold_left (fun a (Typed.TyOmega (omega, _ )) -> (Typed.annotate (Typed.ApplyTyCoercion (a, Typed.TyCoercionVar omega)) Location.unknown) ) dirt_apps ty_cons in 
@@ -341,17 +350,17 @@ and type_plain_expr in_cons st = function
   | Untyped.Var x ->
     begin match TypingEnv.lookup st.context x with
       | Some ty_schi -> 
-                let (bind_tyvar_sub,bind_dirtvar_sub) = get_sub_of_ty ty_schi in
+                let (bind_skelvar_sub,bind_tyvar_sub,bind_dirtvar_sub) = get_sub_of_ty ty_schi in
                 Print.debug "in Var";
                 Print.debug " var : %t" (Typed.print_variable x);
                 Print.debug " typeSch: %t " (Types.print_target_ty ty_schi);
                 let basic_type = get_basic_type ty_schi in
                 Print.debug "basicTy: %t" (Types.print_target_ty basic_type); 
                 let applied_basic_type = apply_sub_to_type bind_tyvar_sub bind_dirtvar_sub basic_type in
-                let (returned_x, returnd_cons) = apply_types bind_tyvar_sub bind_dirtvar_sub x ty_schi in 
+                let (returned_x, returnd_cons) = apply_types bind_skelvar_sub bind_tyvar_sub bind_dirtvar_sub x ty_schi in 
                 Print.debug "returned: %t" (Typed.print_expression returned_x) ;
                 Print.debug "returned_type: %t" (Types.print_target_ty applied_basic_type);
-                (returned_x.term , applied_basic_type, returnd_cons, [])
+                (returned_x.term , applied_basic_type, returnd_cons @ in_cons, [])
       | None -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
       end
   | Untyped.Const const -> 
