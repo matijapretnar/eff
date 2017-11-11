@@ -49,8 +49,6 @@ and plain_term =
   (** [t1 t2] *)
   | Handle of term * term
   (** [with t1 handle t2] *)
-  | Check of term
-  (** [check t] *)
 
 and handler = {
   effect_clauses : (effect, abstraction2) OldUtils.assoc;
@@ -68,12 +66,9 @@ and abstraction2 = variable pattern * variable pattern * term
 type dirt =
   | DirtParam of OldUtils.dirtparam
 
-type region =
-  | RegionParam of OldUtils.regionparam
-
 type ty = plain_ty * Location.t
 and plain_ty =
-  | TyApply of OldUtils.tyname * ty list * (dirt list * region list) option
+  | TyApply of OldUtils.tyname * ty list * dirt list option
   (** [(ty1, ty2, ..., tyn) type_name] *)
   | TyParam of OldUtils.typaram
   (** ['a] *)
@@ -116,4 +111,3 @@ and plain_command =
   (** [#quit] *)
   | TypeOf of term
   (** [#type t] *)
-

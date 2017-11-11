@@ -121,14 +121,13 @@ let assoc_flatten lst =
   let lst = List.fold_right add lst [] in
   assoc_map (!) lst
 
-type ('a, 'b, 'c) trio = 'a list * 'b list * 'c list
-let trio_empty = ([], [], [])
-let trio_append (xs, ys, zs) (us, vs, ws) = (xs @ us, ys @ vs, zs @ ws)
-let trio_snds (xs, ys, zs) = (List.map snd xs, List.map snd ys, List.map snd zs)
-let trio_flatten_map f lst = List.fold_left trio_append trio_empty (List.map f lst)
-let trio_diff (xs, ys, zs) (us, vs, ws) = (diff xs us, diff ys vs, diff zs ws)
-let trio_uniq (xs, ys, zs) = (uniq xs, uniq ys, uniq zs)
-
+type ('a, 'b) tuple = 'a list * 'b list
+let tuple_empty = ([], [])
+let tuple_append (xs, ys) (us, vs) = (xs @ us, ys @ vs)
+let tuple_snds (xs, ys) = (List.map snd xs, List.map snd ys)
+let tuple_flatten_map f lst = List.fold_left tuple_append tuple_empty (List.map f lst)
+let tuple_diff (xs, ys) (us, vs) = (diff xs us, diff ys vs)
+let tuple_uniq (xs, ys) = (uniq xs, uniq ys)
 
 let to_string print x =
   print x Format.str_formatter;

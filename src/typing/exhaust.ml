@@ -287,11 +287,10 @@ let check_comp c =
     | Untyped.LetRec (lst, c) ->
       List.iter (fun (_, (p, c)) -> is_irrefutable p ; check c) lst ;
     | Untyped.Match (_, []) -> () (* Skip empty match to avoid an unwanted warning. *)
-    | Untyped.Match (_, lst) -> 
+    | Untyped.Match (_, lst) ->
       check_patterns ~loc:c.Untyped.location (List.map (Common.compose old_of_new_pattern fst) lst) ;
       List.iter (fun (_, c) -> check c) lst
     | Untyped.Apply _ -> ()
     | Untyped.Handle (_, c) -> check c
-    | Untyped.Check c -> check c
   in
   check c

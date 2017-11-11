@@ -7,10 +7,10 @@ let rec print_type ?max_level ty ppf =
     print "unit"
   | Type.Apply (ty_name, args) ->
     print ~at_level:1 "%t %s" (print_args args) ty_name
-  | Type.Param p ->
+  | Type.TyVar p ->
     print "%t" (Params.print_type_param p)
-  | Type.Basic t ->
-    print "(%s)" t
+  | Type.Prim t ->
+    print "(%s)" (Type.prim_to_string t)
   | Type.Tuple tys ->
     print ~at_level:1 "(%t)" (Print.sequence "*" print_type tys)
   | Type.Arrow (ty, drty) ->
@@ -21,7 +21,7 @@ let rec print_type ?max_level ty ppf =
 and print_dirty_type (ty, _) ppf =
   Format.fprintf ppf "%t computation" (print_type ~max_level:0 ty)
 
-and print_args (tys, _, _) ppf =
+and print_args (tys, _) ppf =
   match tys with
   | [] -> ()
   | _ -> Format.fprintf ppf "(%t)" (Print.sequence "," print_type tys)
@@ -61,8 +61,6 @@ let print_variable = Typed.Variable.print ~safe:true
 
 
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
-
-let print_effect_region (eff, (region)) ppf = Print.print ppf "Effect_%s -> %t" eff (Params.print_region_param region)
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

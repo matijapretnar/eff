@@ -1,5 +1,5 @@
 %{
-  open SugaredSyntax
+  open Sugared
 
   type handler_clause =
     | EffectClause of OldUtils.effect * abstraction2
@@ -54,7 +54,6 @@
 %token AMPER AMPERAMPER
 %token LAND LOR LXOR
 %token <string> PREFIXOP INFIXOP0 INFIXOP1 INFIXOP2 INFIXOP3 INFIXOP4
-%token CHECK
 %token QUIT USE HELP RESET
 %token EOF
 
@@ -70,7 +69,7 @@
 %left  INFIXOP3 STAR MOD LAND LOR LXOR
 %right INFIXOP4 LSL LSR ASR
 
-%start <SugaredSyntax.command list> commands
+%start <Sugared.command list> commands
 
 %%
 
@@ -200,8 +199,6 @@ plain_binop_term:
     { t }
 
     plain_app_term:
-    | CHECK t = prefix_term
-        { Check t }
 | t = prefix_term ts = prefix_term+
                        {
                          match fst t, ts with
