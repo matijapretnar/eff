@@ -7,7 +7,9 @@ external ( < ) : 'a -> 'a -> bool = "<"
 
 effect Print : string -> unit
 effect Read : unit -> string
-effect Raise : unit -> empty
+effect Raise : string -> empty
+effect Random_int : int -> int
+effect Random_float: float -> float
 
 let absurd void = match void with;;
 

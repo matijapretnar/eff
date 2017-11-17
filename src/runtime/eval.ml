@@ -15,7 +15,7 @@ let lookup x env =
   try
     Some (RuntimeEnv.find x env)
   with
-    | Not_found -> None      
+    | Not_found -> None
 
 exception PatternMatch of Location.t
 
@@ -162,8 +162,27 @@ and eval_closure2 env a2 v1 v2 =
 
 let rec top_handle = function
   | V.Value v -> v
+  | V.Call ("Print", v, k) ->
+    let str = V.to_str v in
+    print_string str;
+    flush stdout;
+    top_handle (k V.unit_value)
+  | V.Call ("Raise", v, k) ->
+    Error.runtime "%t" (Value.print_value v)
+  | V.Call ("Random_int", v, k) ->
+    let rnd_int = Random.int (Value.to_int v) in
+    let rnd_int_v = V.Const( Const.of_integer rnd_int) in
+    top_handle (k rnd_int_v)
+  | V.Call ("Random_float", v, k) ->
+    let rnd_float = Random.float (Value.to_float v) in
+    let rnd_float_v = V.Const( Const.of_float rnd_float) in
+    top_handle (k rnd_float_v)
+  | V.Call ("Read", v, k) ->
+    let str = read_line () in
+    let str_v = V.Const (Const.of_string str) in
+    top_handle (k str_v)
   | V.Call (eff, v, k) ->
-      Error.runtime "uncaught effect %t %t." (Value.print_effect eff) (Value.print_value v)
+    Error.runtime "uncaught effect %t %t." (Value.print_effect eff) (Value.print_value v)
 
 let run env c =
   top_handle (ceval env c)
