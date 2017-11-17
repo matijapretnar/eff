@@ -55,14 +55,6 @@
     (" ", " ");
   ]
 
-let bigint_of_string s =
-  (* get rid of _ *)
-  let j = ref 0 in
-  for i = 0 to String.length s - 1 do
-    if s.[i] <> '_' then (Bytes.set s (!j) s.[i]; incr j)
-  done;
-  int_of_string (String.sub s 0 !j)
-
 }
 
 let lname = ( ['a'-'z'] ['_' 'a'-'z' 'A'-'Z' '0'-'9' '\'']*
@@ -97,7 +89,7 @@ rule token = parse
   | '\n'                { Lexing.new_line lexbuf; token lexbuf }
   | [' ' '\r' '\t']     { token lexbuf }
   | "(*"                { comment 0 lexbuf }
-  | int                 { INT (bigint_of_string (Lexing.lexeme lexbuf)) }
+  | int                 { INT (int_of_string (Lexing.lexeme lexbuf)) }
   | xxxint              { try
                             INT (int_of_string (Lexing.lexeme lexbuf))
                           with Failure _ -> Error.syntax ~loc:(Location.of_lexeme lexbuf) "Invalid integer constant"
