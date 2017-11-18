@@ -79,7 +79,7 @@ and compare_record lst1 lst2 =
     | (fld1,v1)::lst1, (fld2,v2)::lst2 ->
       let r = Pervasives.compare fld1 fld2 in
         if r < 0 then OldUtils.Less
-        else if r > 0 then OldUtils.Greater 
+        else if r > 0 then OldUtils.Greater
         else
           (match compare v1 v2 with
             | OldUtils.Less -> OldUtils.Less
@@ -122,7 +122,7 @@ let comparison_functions = [
 let rec pow a = function
   | 0 -> 1
   | 1 -> a
-  | n -> 
+  | n ->
      let b = pow a (n / 2) in
      if n mod 2 = 0 then b * b else b * b * a
 
@@ -168,34 +168,6 @@ and std_read _ =
   let str = read_line () in
   from_str str
 
-(* let create_exception v = 
-  let exc_name = V.to_str v in
-  let exception_raise param =
-    Error.runtime "%s %t." exc_name (Value.print_value param)
-  in
-    V.Value (external_instance exc_name [
-      ("raise", exception_raise);
-    ])
-
-let rnd_int v =
-  from_int (Random.int (V.to_int v))
-and rnd_float v =
-  from_float (Random.float (V.to_float v)) *)
-
-let effect_instances = [
-(*   ("std", external_instance "standard I/O" [
-    ("print", std_print);
-    ("read", std_read);
-  ]);
-
-  ("exception", from_fun create_exception);
-
-  ("rnd", external_instance "random number generator" [
-    ("int", rnd_int);
-    ("float", rnd_float);
-  ]); *)
-]
-
 (** [values] is an association list of external names and values, consisting of
     comparison functions, arithmetic operations, string operations, conversion
     functions, and effect instances. *)
@@ -203,5 +175,4 @@ let values =
   comparison_functions @
   arithmetic_operations @
   string_operations @
-  conversion_functions @
-  effect_instances
+  conversion_functions
