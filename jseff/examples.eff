@@ -117,47 +117,74 @@ with collect handle
 
 (** Non-determinism *)
 
-type choice = effect
-  operation fail : unit -> empty
-  operation decide : unit -> bool
-end
+(* We will model non-determinism by implementing two operations, Decide and
+   Fail. Decide will be used to `non-deterministically' choose the correct path
+   while Fail signals that a choice fails to return a suitable answer. *)
 
-let c = new choice
-let fail () = match c#fail () with
+effect Fail : unit -> empty
+effect Decide : unit -> bool
 
-let choose_left =
+(* We use a trick to ensure that using Fail typechecks correctly by wrapping
+   it into a function. For aesthetic purposes we also wrap Decide in a function. *)
+
+let fail () = (match #Fail () with)
+let decide () = #Decide ()
+;;
+
+(* We create a few different handlers to handle the above effects. The simplest
+   handler is "choose_true" that always decides to use true. A more interesting
+   example is the "choose_max" handler, that returns the maximal result for all
+   possible choices, while "choose_all" instead returns a list of all possible
+   results. *)
+
+let choose_true =
     handler
-    | c#decide () k -> k true
+    | #Decide () k -> k true
 
 let choose_max =
     handler
-    | c#decide () k -> max (k true) (k false)
+    | #Decide () k -> max (k true) (k false)
 
 let choose_all =
     handler
     | val x -> [x]
-    | c#fail () _ -> []
-    | c#decide () k -> (k true) @ (k false)
-
+    | #Fail () _ -> []
+    | #Decide () k -> (k true) @ (k false)
 ;;
 
-(* Try also "choose_max" and "choose_all" *)
-with choose_left handle
-  let x = (if c#decide () then 10 else 20) in
-  let y = (if c#decide () then 0 else 5) in
+(* Even on a small example the behaviour of the three handlers varies greatly. *)
+with choose_true handle
+  let x = (if #Decide () then 10 else 20) in
+  let y = (if #Decide () then 0 else 5) in
   x - y
-
 ;;
+
+with choose_max handle
+  let x = (if #Decide () then 10 else 20) in
+  let y = (if #Decide () then 0 else 5) in
+  x - y
+;;
+
+with choose_all handle
+  let x = (if #Decide () then 10 else 20) in
+  let y = (if #Decide () then 0 else 5) in
+  x - y
+;;
+
+(* We can use our boolean decision to construct a decision over integers.
+   In the decision we only consider integers on an interval [m,n]. *)
 
 let rec choose_int m n =
   if m > n then
     fail ()
-  else if c#decide () then
+  else if #Decide () then
     m
   else
     choose_int (m + 1) n
+;;
 
-let sqrt m =
+(* This can be used for finding pythagorean triples. *)
+let int_sqrt m =
   let rec try n =
     let n2 = n ** 2 in
     if n2 > m then
@@ -170,37 +197,40 @@ let sqrt m =
   try 0
 
 let pythagorean m n =
+  (* Choose bigger integer. *)
   let a = choose_int m (n - 1) in
+  (* Choose smaller integer. *)
   let b = choose_int a n in
-  match sqrt (a ** 2 + b ** 2) with
+  (* Check if they are part of a pythagorean triple. *)
+  match int_sqrt (a ** 2 + b ** 2) with
   | None -> fail ()
   | Some c -> (a, b, c)
-
-let backtrack = handler
-| c#decide () k ->
-    handle k false with
-    | c#fail () _ -> k true
-
 ;;
 
+(* We also construct an additional handler that simply tries to get one viable
+   solution. *)
+let backtrack = handler
+| #Decide () k ->
+    handle k false with
+    | #Fail () _ -> k true
+;;
+
+
+(* You can test the above handlers on the following examples. *)
 with choose_all handle
   pythagorean 5 7
-
 ;;
 
 with backtrack handle
   pythagorean 5 15
-
 ;;
 
 with choose_all handle
   pythagorean 3 4
-
 ;;
 
 with choose_all handle
   pythagorean 5 15
-
 ;;
 
 
