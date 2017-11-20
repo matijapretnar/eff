@@ -236,14 +236,17 @@ with choose_all handle
 
 (* Eight queens problem *)
 
-let rec choose xs =
-  match xs with
+(* Using the non-determinism approach we can also solve more complex problems,
+   for instance the well known eight queens problem. *)
+
+let rec choose = function
   | [] -> fail ()
-  | x :: xs -> if c#decide () then x else choose xs
+  | x :: xs -> if #Decide () then x else choose xs
 
 let no_attack (x, y) (x', y') =
   x <> x' && y <> y' && abs (x - x') <> abs (y - y');;
 
+(* For a given x check available y. *)
 let available x qs =
   filter (fun y -> forall (no_attack (x, y)) qs) [1; 2; 3; 4; 5; 6; 7; 8];;
 
@@ -253,46 +256,49 @@ let rec place x qs =
   place (x + 1) ((x, y) :: qs)
 
 let backtrack = handler
-| c#decide () k ->
+| #Decide () k ->
     handle k true with
-    | c#fail () _ -> k false
-
+    | #Fail () _ -> k false
 ;;
 
 with backtrack handle
   place 1 []
-
-
 ;;
 
 (** Probability *)
 
-type random_choice = effect
-  operation toss : float -> bool
-end
+(* As seen in non-determinism examples, effects can be used to simulate choice.
+   In order to use randomness we also need to use effects, but with more advanced
+   handlers we can compute more interesting things, for instance the expected
+   value of a discrete random variable. *)
 
-let c = new random_choice
+(* We define an operation Toss to use as a random coin toss. *)
+effect Toss : float -> bool
 
+(* Using the operation Toss we can define other distributions as well. *)
 let rec uniform = function
   | [x] -> x
   | x :: xs ->
       let n = length xs + 1 in
       let p = 1.0 /. float_of_int n in
-      if c#toss p then x else uniform xs
+      if #Toss p then x else uniform xs
 
-let expectation f = handler
-  | val v -> f v
-  | c#toss p k -> p *. k true +. (1.0 -. p) *. k false
-
+let expectation = handler
+  | val v -> v
+  | #Toss p k -> p *. k true +. (1.0 -. p) *. k false
 ;;
 
-with expectation (fun x -> float_of_int (x + 3)) handle
-  let x = uniform [1; 2; 3; 4; 5; 6] in
-  let y = uniform [1; 2; 3; 4; 5; 6] in
-  x + y
-
+with expectation handle
+  let x = uniform [1.; 2.; 3.; 4.; 5.; 6.] in
+  let y = uniform [1.; 2.; 3.; 4.; 5.; 6.] in
+  x +. y
 ;;
 
+(* We can also compute the distribution of outcomes for a probabilisitic
+   computation. *)
+
+(* We first write a function that combines two outcome distributions where
+   the first outome distribution is chosen with the probability p. *)
 let combine p dist1 dist2 =
   let scale p dist = map (fun (x, q) -> (x, p *. q)) dist in
   let rec add (x, p) = function
@@ -304,19 +310,15 @@ let combine p dist1 dist2 =
   let dist2 = scale (1.0 -. p) dist2 in
   fold_right add dist1 dist2
 
-(* This handler computes the distribution of outcomes of a probabilisitic
-   computation. *)
 let distribution = handler
   | val v -> [(v, 1.0)]
-  | c#toss p k -> combine p (k true) (k false)
-
+  | #Toss p k -> combine p (k true) (k false)
 ;;
 
 with distribution handle
   let x = uniform [1; 2; 3; 4; 5; 6] in
   let y = uniform [1; 2; 3; 4; 5; 6] in
   x + y
-
 ;;
 
 (** State *)
