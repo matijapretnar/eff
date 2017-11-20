@@ -181,7 +181,7 @@ and type_expr st {Untyped.term=expr; Untyped.location=loc} = type_plain_expr st 
 and type_plain_expr st loc = function
   | Untyped.Var x ->
     let ty_sch, st = get_var_scheme_env ~loc st x in
-    Ctor.var ~loc x ty_sch, st
+    Ctor.lambdavar ~loc x ty_sch, st
   | Untyped.Const const ->
     Ctor.const ~loc const, st
   | Untyped.Tuple es ->
@@ -217,8 +217,6 @@ and type_plain_expr st loc = function
     in
     let typed_value_clause, st = type_abstraction st loc untyped_value_clause in
     (* let typed_finally_clause =  *)
-    (* with h handle c *)
-    (* Apply finally (with h handle c) *)
     Ctor.handler ~loc typed_effect_clauses typed_value_clause, st
 
 (******************************)
@@ -252,9 +250,9 @@ and type_plain_comp st loc = function
     (* let defs, st = type_let_defs ~loc st defs in *)
     (* let c = type_comp st c in *)
     (* Ctor.letbinding ~loc defs c *)
-  | Untyped.LetRec (defs, c) ->
+  (* | Untyped.LetRec (defs, c) -> *)
     (* TODO *)
-    assert false
+    (* assert false *)
     (* let env', defs' = type_let_rec_defs ~loc env defs in
     let env', defs' = type_let_rec_defs ~loc env' defs in
     Typed.let_rec' ~loc defs' (type_comp env' c) *)
@@ -292,9 +290,9 @@ let type_toplevel ~loc ppf st = function
     (* TODO *)
     assert false
   (* Top letrec command: let rec x = c1 in c2 *)
-  | Untyped.TopLetRec defs'' ->
+  (* | Untyped.TopLetRec defs'' -> *)
     (* TODO *)
-    assert false
+    (* assert false *)
   (* Exernal definition *)
   | Untyped.External (x, ty, f) ->
     let st = add_def st x (Scheme.simple ty) in

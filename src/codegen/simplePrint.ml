@@ -4,8 +4,10 @@ let rec print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   Print.debug "THE EXP IS %t" (PrintTyped.print_expression e) ;
   match e.Typed.term with
-  | Typed.Var x ->
+  | Typed.LambdaVar x ->
       print "%t" (print_variable x)
+  | Typed.LetVar x ->
+    print "%t" (print_variable x)
   | Typed.BuiltIn (s, n) ->
       if n = 1 then
         print ~at_level:1 "lift_unary %s" s
@@ -21,7 +23,7 @@ let rec print_expression ?max_level e ppf =
       Print.record print_expression lst ppf
   | Typed.Variant (lbl, None) ->
       print "%s" lbl
-  | Typed.Lambda (x,_,c) ->
+  | Typed.Lambda (x,c) ->
     print "fun (%t) -> %t" (print_pattern x) (print_computation c)
   | Typed.Variant (lbl, Some e) ->
       print ~at_level:1 "(%s %t)" lbl (print_expression e)
@@ -46,9 +48,9 @@ and print_computation ?max_level c ppf =
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e) (Print.cases print_abstraction lst)
   | Typed.Handle (e, c) ->
       print ~at_level:1 "%t %t" (print_expression ~max_level:0 e) (print_computation ~max_level:0 c)
-  | Typed.LetRec (lst, c) ->
+  (* | Typed.LetRec (lst, c) ->
       print ~at_level:2 "let rec @[<hov>%t@] in %t"
-      (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
+      (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c) *)
   | Typed.Call (eff, e, a) ->
       print ~at_level:1 "call %t %t (@[fun %t@])"
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
@@ -56,10 +58,6 @@ and print_computation ?max_level c ppf =
       print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression e) (print_computation c)
   | Typed.Bind (c1, a) ->
       print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
-  (* | CastComp (c1,_) -> print " %t " (print_computation c1) *)
-  (* | CastComp_ty (c1,_) -> print " %t " (print_computation c1) *)
-  (* | CastComp_dirt (c1,_) -> print " %t " (print_computation c1) *)
-  (* | LetVal(v,e1,c1) ->  print "let %t = (Value %t) in %t" (print_variable v) (print_expression e1) (print_computation c1) *)
   
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in

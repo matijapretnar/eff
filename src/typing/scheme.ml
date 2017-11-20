@@ -149,7 +149,7 @@ let handler ~loc effect_clauses value_clause =
 
   (* add constraints for the value clause *)
   let (ctx_v, (ty_p_v, drty_r_v), cnstr_v) = value_clause in
-  let cnstr = Unification.add_dirty_constraint ~loc ret drty_r_v cnstr in
+  let cnstr = Unification.add_dirty_constraint ~loc drty_r_v ret cnstr in
   let cnstr = Unification.add_ty_constraint ~loc param_ty ty_p_v cnstr in
   let cnstr = Unification.list_union [cnstr; cnstr_v] in
   let ctx = ctx_v @ ctx in
@@ -160,7 +160,7 @@ let handler ~loc effect_clauses value_clause =
     let ctx = ctx_e @ ctx in
     let cnstr = Unification.add_ty_constraint ~loc ty_par ty_p_e cnstr in
     let cnstr = Unification.add_ty_constraint ~loc (Type.Arrow (ty_ret, ret)) ty_k_e cnstr in
-    let cnstr = Unification.add_dirty_constraint ~loc ret drty_r_e cnstr in
+    let cnstr = Unification.add_dirty_constraint ~loc drty_r_e ret cnstr in
     let cnstr = Unification.list_union [cnstr; cnstr_e] in
     (ctx, cnstr)
   in

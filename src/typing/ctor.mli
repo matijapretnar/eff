@@ -13,7 +13,7 @@ val abstraction2 : ?loc:Location.t -> Typed.pattern -> Typed.pattern -> Typed.co
 (***************************)
 
 (* smart constructor for the Var term : expression *)
-val var : ?loc:Location.t -> Typed.variable -> Scheme.ty_scheme -> Typed.expression
+val lambdavar : ?loc:Location.t -> Typed.variable -> Scheme.ty_scheme -> Typed.expression
 
 (* smart constructor for the Const term : expression *)
 val const : ?loc:Location.t -> Const.t -> Typed.expression

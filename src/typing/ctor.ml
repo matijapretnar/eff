@@ -35,9 +35,9 @@ let abstraction2 ?loc p1 p2 c : Typed.abstraction2 =
 (* EXPRESSION SMART CONSTRUCTORS *)
 (*********************************)
 
-let var ?loc x sch =
+let lambdavar ?loc x sch =
   let loc = backup_location loc [] in
-  let term = Typed.Var x in
+  let term = Typed.LambdaVar x in
   Typed.annotate term sch loc
 
 let const ?loc c =
@@ -93,8 +93,7 @@ let variant ?loc (lbl, e) =
 
 let lambda ?loc p c =
   let loc = backup_location loc [p.Typed.location; c.Typed.location] in
-  let param_ty = Scheme.get_type p.Typed.scheme in
-  let term = Typed.Lambda (p, param_ty, c) in
+  let term = Typed.Lambda (p, c) in
   let sch = Scheme.lambda ~loc p.Typed.scheme c.Typed.scheme in
   Typed.annotate term sch loc
 

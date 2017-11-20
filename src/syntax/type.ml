@@ -1,17 +1,19 @@
-(* We need three sorts of parameters, for types, dirt, and regions.
+(* We need two sorts of parameters, for types and dirt.
    In order not to confuse them, we define separate types for them.
 *)
 
 type ty =
   | Apply of OldUtils.tyname * args
-  | Prim of prim_ty (* Basic of string *)
+  | Prim of prim_ty
   | Tuple of ty list
   | Arrow of ty * dirty
   | Handler of dirty * dirty
-  (* Type variable *)
   | TyVar of Params.ty_param
-  (* Polytype *)
-  | PolyType of Params.ty_param * ty list
+  | Bottom
+  | Top
+  | RecType of Params.ty_param * ty
+  | Union of ty * ty
+  | Intersection of ty * ty
 
 (* Primitive types *)
 and prim_ty =
@@ -19,7 +21,6 @@ and prim_ty =
   | IntTy
   | FloatTy
   | StringTy
-  (* | UnitTy *)
   | UniTy
 
 and dirty = ty * dirt
@@ -45,7 +46,6 @@ let prim_to_string prim =
     | IntTy -> "int"
     | FloatTy -> "float"
     | StringTy -> "string"
-    (* | UnitTy -> "unit" *)
     | UniTy -> "universal"
   end
 

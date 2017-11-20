@@ -79,14 +79,14 @@ let list_union = function
 (* CONSTRAINT SOLUTIONS *)
 (************************)
 
-let rec check_ctx ty ctx =
+(* let rec check_ctx ty ctx =
   begin match ctx with
     | [] -> true
     | (x, y) :: lst -> if y = ty then false else check_ctx ty lst
-  end
+  end *)
 
 (* within [ty] substitute [ty_old] with [ty_new] *)
-let rec perform_subst_ty ty_old ty_new ty =
+(* let rec perform_subst_ty ty_old ty_new ty =
   begin match ty with
     | t when t = ty_old -> ty_new
     | Type.Arrow (ty_in, (ty_out, d)) ->
@@ -105,10 +105,10 @@ let rec perform_subst_ty ty_old ty_new ty =
       Type.Apply (ty_name, (lst, drts))
     (* not matching or primitive *)
     | _ -> ty
-  end
+  end *)
 
 (* unify types *)
-let rec unify_types ctx ty cnstr =
+(* let rec unify_types ctx ty cnstr =
   begin match cnstr.types with
     | [] -> (ctx, ty, cnstr)
     | (ty1, ty2, loc) :: tail ->
@@ -199,37 +199,36 @@ let rec unify_types ctx ty cnstr =
         (* Constraints could not be unified *)
         | _ -> Error.typing ~loc "This expression has type %t but it should have type %t." (Type.print_ty ty1) (Type.print_ty ty2)
       end
-  end
+  end *)
 
 (* Check if a dirt only contains a var and no operations *)
-let is_drt_var drt =
+(* let is_drt_var drt =
   begin match drt.Type.ops with
     | [] -> true
     | _ -> false
-  end
+  end *)
 
-let rec contains x = function
+(* let rec contains x = function
   | [] -> false
-  | x' :: lst -> if (x = x') then true else contains x lst
+  | x' :: lst -> if (x = x') then true else contains x lst *)
 
-
-let rec dirt_difference main minus =
+(* let rec dirt_difference main minus =
     begin match main with
     | [] -> []
     | d :: lst when (contains d minus) -> dirt_difference lst minus
     | d :: lst -> d :: dirt_difference lst minus
-    end
+    end *)
 
-let contains_ops main other =
+(* let contains_ops main other =
   let rec check main other =
     begin match other with
       | [] -> []
       | d :: lst when (contains d main) -> check main lst
       | d :: lst -> d :: check main lst
     end in
-  List.length (check main other) = 0
+  List.length (check main other) = 0 *)
 
-let check_drt drt_old drt_new drt =
+(* let check_drt drt_old drt_new drt =
   begin match drt with
     | drt when (drt = drt_old) && (is_drt_var drt_old) -> drt_new
     | drt when (drt.Type.rest = drt_old.Type.rest) && (is_drt_var drt_old) ->
@@ -237,10 +236,10 @@ let check_drt drt_old drt_new drt =
     | drt when (drt.Type.rest = drt_old.Type.rest) && (contains_ops drt.Type.ops drt_old.Type.ops) ->
       Type.add_ops (dirt_difference drt.Type.ops drt_old.Type.ops) drt_new
     | _ -> drt
-  end
+  end *)
 
 (* within [ty] substitute [ty_old] with [ty_new] *)
-let rec perform_subst_drty drt_old drt_new ty =
+(* let rec perform_subst_drty drt_old drt_new ty =
   begin match ty with
     | Type.Arrow (ty_in, (ty_out, d)) ->
       let ty_in = perform_subst_drty drt_old drt_new ty_in in
@@ -262,7 +261,7 @@ let rec perform_subst_drty drt_old drt_new ty =
       Type.Apply (ty_name, (lst, drts))
     (* not matching or primitive *)
     | _ -> ty
-  end
+  end *)
 
 (*
   Unify two dirts of the form:
@@ -273,7 +272,7 @@ let rec perform_subst_drty drt_old drt_new ty =
     d3 = {ops... ; d4}
     d1 = {ops... ; d4}
 *)
-let unify_single_dirt loc drt2 drt3 =
+(* let unify_single_dirt loc drt2 drt3 =
   let out = Type.fresh_dirt () in
   let out = Type.add_ops drt2.Type.ops out in
   let out = Type.add_ops drt3.Type.ops out in
@@ -281,10 +280,10 @@ let unify_single_dirt loc drt2 drt3 =
   let out3_l = Type.make_dirt [] drt3.Type.rest in
   let out2_r = Type.make_dirt (dirt_difference drt3.Type.ops drt2.Type.ops) out.Type.rest in
   let out3_r = Type.make_dirt (dirt_difference drt2.Type.ops drt3.Type.ops) out.Type.rest in
-  out, (out2_l, out2_r, loc), (out3_l, out3_r, loc)
+  out, (out2_l, out2_r, loc), (out3_l, out3_r, loc) *)
 
 (* unify types *)
-let rec unify_dirts ctx (ty, drt) cnstr =
+(* let rec unify_dirts ctx (ty, drt) cnstr =
   begin match cnstr.dirts with
     | [] -> (ctx, (ty, drt), cnstr)
     | (drt1, drt2, loc) :: tail ->
@@ -319,15 +318,27 @@ let rec unify_dirts ctx (ty, drt) cnstr =
           let cnstr = add_dirt new3 cnstr in
           unify_dirts ctx (ty, drt) cnstr
       end
-  end
+  end *)
+
+(*
+Strategy:
+  biunify 
+  subi -> match
+  atomic -> match + create subst (see subst)
+  constructed -> simple match
+
+  substitute -> (keeps track of polarity)
+*)
 
 (* Unify the constraints to find a solution *)
-let unify_ty ctx ty cnstr = unify_types ctx ty cnstr
+let unify_ty ctx ty cnstr = 
+  (* let ctx, ty, cnstr = unify_types ctx ty cnstr in *)
+  (ctx, ty, cnstr)
 
 (* Unify the constraints to find a solution *)
 let unify_dirty ctx (ty, drt) cnstr =
-  let ctx, ty, cnstr = unify_ty ctx ty cnstr in
-  let ctx, (ty, drt), cnstr = unify_dirts ctx (ty, drt) cnstr in
+  (* let ctx, ty, cnstr = unify_ty ctx ty cnstr in *)
+  (* let ctx, (ty, drt), cnstr = unify_dirts ctx (ty, drt) cnstr in *)
   (ctx, (ty, drt), cnstr)
 
 (***********************)
@@ -336,6 +347,6 @@ let unify_dirty ctx (ty, drt) cnstr =
 
 (* Print constraints *)
 let print constraints ppf =
-  Print.sequence "," (fun (x, y, _) ppf -> Format.fprintf ppf "(%t = %t)" (Type.print_ty x) (Type.print_ty y)) constraints.types ppf;
+  Print.sequence "," (fun (x, y, _) ppf -> Format.fprintf ppf "(%t %s %t)" (Type.print_ty x) (Symbols.less ()) (Type.print_ty y)) constraints.types ppf;
   Format.pp_print_string ppf " ; ";
-  Print.sequence "," (fun (x, y, _) ppf -> Format.fprintf ppf "(%t = %t)" (Type.print_dirt x) (Type.print_dirt y)) constraints.dirts ppf
+  Print.sequence "," (fun (x, y, _) ppf -> Format.fprintf ppf "(%t %s %t)" (Type.print_dirt x) (Symbols.less ()) (Type.print_dirt y)) constraints.dirts ppf

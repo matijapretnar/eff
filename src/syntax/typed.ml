@@ -42,7 +42,8 @@ let annotate t sch loc = {
 (** Pure expressions *)
 type expression = (plain_expression, Scheme.ty_scheme) annotation
 and plain_expression =
-  | Var of variable
+  | LambdaVar of variable
+  | LetVar of variable
   | BuiltIn of string * int
   | Const of Const.t
   | Tuple of expression list
@@ -51,17 +52,14 @@ and plain_expression =
   | Effect of effect
   | Handler of handler
   | Lambda of abstractionLambda
-  | BigLambdaTy of abstractionType
-  | ApplyTy of expression * Type.ty
 
 (** Impure computations *)
 and computation = (plain_computation, Scheme.dirty_scheme) annotation
 and plain_computation =
   | Value of expression
-  | LetRec of (variable * abstraction) list * computation
+  (* | LetRec of (variable * abstraction) list * computation *)
   | Match of expression * abstraction list
   | Apply of expression * expression
-  (* | TyApple of expression * target_ty *)
   | Handle of expression * computation
   | Call of effect * expression * abstraction
   | Bind of computation * abstraction
@@ -79,10 +77,7 @@ and abstraction = (pattern * computation, Scheme.abstraction_scheme) annotation
 and abstraction2 = (pattern * pattern * computation, Scheme.abstraction2_scheme) annotation
 
 (** Abstractions that take one argument but is typed. *)
-and abstractionLambda = (pattern * Type.ty * computation)
-
-(** Abstraction that take one *type* argument. **)
-and abstractionType = (Params.ty_param * expression)
+and abstractionLambda = (pattern * computation)
 
 type toplevel = plain_toplevel * Location.t
 and plain_toplevel =

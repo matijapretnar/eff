@@ -28,7 +28,9 @@ let rec print_pattern ?max_level p ppf =
 let rec print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match e.Typed.term with
-  | Typed.Var x ->
+  | Typed.LambdaVar x ->
+    print "%t" (print_variable x)
+  | Typed.LetVar x ->
     print "%t" (print_variable x)
   | Typed.BuiltIn (s, _) ->
     print "%s" s
@@ -42,7 +44,7 @@ let rec print_expression ?max_level e ppf =
     print "%s" lbl
   | Typed.Variant (lbl, Some e) ->
     print ~at_level:1 "%s %t" lbl (print_expression e)
-  | Typed.Lambda (_,_,_) ->
+  | Typed.Lambda (_,_) ->
     assert false (*Still needs to be done*)
   | Typed.Handler h ->
     print "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
@@ -65,9 +67,9 @@ and print_computation ?max_level c ppf =
     print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e) (Print.cases print_abstraction lst)
   | Typed.Handle (e, c) ->
     print ~at_level:1 "handle %t %t" (print_expression ~max_level:0 e) (print_computation ~max_level:0 c)
-  | Typed.LetRec (lst, c) ->
+  (* | Typed.LetRec (lst, c) ->
     print ~at_level:2 "let rec @[<hov>%t@] in %t"
-      (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
+      (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c) *)
   | Typed.Call (eff, e, a) ->
     print ~at_level:1 "call %t %t (@[fun %t@])"
       (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
