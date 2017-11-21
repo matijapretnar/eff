@@ -362,6 +362,7 @@ let rec biunify_h_dirty ctx dirty cnstr history =
 
 (* START *)
 let biunify ctx ty cnstr = biunify_h ctx ty cnstr empty
+let biunify_dirty ctx ty cnstr = biunify_h_dirty ctx ty cnstr empty
 
 (* Unify the constraints to find a solution *)
 let unify_ty ctx ty cnstr = 
@@ -370,6 +371,5 @@ let unify_ty ctx ty cnstr =
 
 (* Unify the constraints to find a solution *)
 let unify_dirty ctx (ty, drt) cnstr =
-  let ctx, (ty, drt), cnstr = biunify_h_dirty ctx (ty, drt) cnstr empty in
-  (* let ctx, (ty, drt), cnstr = unify_dirts ctx (ty, drt) cnstr in *)
+  let ctx, (ty, drt), cnstr = biunify_dirty ctx (ty, drt) cnstr in
   (ctx, (ty, drt), cnstr)
