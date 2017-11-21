@@ -266,7 +266,7 @@ let extend_with_variances ~loc tydefs =
         dirt nega posi drt1;
         dirt posi nega drt2
     and dirt posi nega drt =
-      dirt_param posi nega drt.Type.rest
+      dirt_param posi nega (Type.get_var drt)
     and dirt_param posi nega d =
       begin match OldUtils.lookup d ds with
         | None -> assert false

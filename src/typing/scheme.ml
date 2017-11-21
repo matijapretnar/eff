@@ -47,6 +47,51 @@ let just new_cnstrs (ctx, ty, cnstrs) =
 let create_ty_scheme ctx ty changes =
   List.fold_right OldUtils.id changes (ctx, ty, Unification.empty)
 
+(**********************)
+(* PRINTING FUNCTIONS *)
+(**********************)
+
+let subst_ty_scheme sbst (ctx, ty, cnstrs) =
+  let ty = Type.subst_ty sbst ty in
+  let cnstrs = Unification.subst sbst cnstrs in
+  let ctx = OldUtils.assoc_map (Type.subst_ty sbst) ctx in
+  (ctx, ty, cnstrs)
+
+let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
+  let drty = Type.subst_dirty sbst drty in
+  let cnstrs = Unification.subst sbst cnstrs in
+  let ctx = OldUtils.assoc_map (Type.subst_ty sbst) ctx in
+  (ctx, drty, cnstrs)
+
+let beautify_ty_scheme ty_sch =
+  let sbst = Params.beautifying_subst () in
+  subst_ty_scheme sbst (ty_sch)
+
+let beautify_dirty_scheme drty_sch =
+  let sbst = Params.beautifying_subst () in
+  subst_dirty_scheme sbst (drty_sch)
+
+let print_context ctx ppf =
+  let print_binding (x, t) ppf =
+    Print.print ppf "%t : %t" (Untyped.Variable.print ~safe:true x) (Type.print_ty t)
+  in
+  Print.sequence ", " print_binding ctx ppf
+
+let print_ty_scheme ty_sch ppf =
+  let (ctx, ty, cnstrs) = beautify_ty_scheme ty_sch in
+  Print.print ppf "(%t) |- (%t) | %t"
+    (print_context ctx)
+    (Type.print_ty ty)
+    (Unification.print cnstrs)
+
+let print_dirty_scheme ty_sch ppf =
+  let (ctx, (ty, drt), cnstrs) = beautify_dirty_scheme ty_sch in
+  Print.print ppf "(%t) |- (%t) ! (%t) | %t"
+    (print_context ctx)
+    (Type.print_ty ty)
+    (Type.print_dirt drt)
+    (Unification.print cnstrs)
+
 (******************)
 (* SCHEME SOLVERS *)
 (******************)
@@ -69,6 +114,9 @@ let add_to_context v ty (ctx, t, u) = (OldUtils.update v ty ctx, t, u)
 
 (* Get the type from a scheme *)
 let get_type (ctx, ty, u) = ty
+
+(* Get the context from a scheme *)
+let get_context (ctx, ty, u) = ctx
 
 (* Convert a type scheme to a new dirty type scheme (used for values) *)
 let make_dirty (ctx, ty, constraints) = (ctx, (ty, Type.fresh_dirt ()), constraints)
@@ -134,7 +182,8 @@ let tuple ~loc es =
   solve_ty (ctx, Type.Tuple tys, constraints)
 
 let effect ~loc ty_par ty_res eff_name =
-  let drt = {Type.ops = [eff_name]; Type.rest = Params.fresh_dirt_param ()} in
+  (* let drt = {Type.ops = [eff_name]; Type.rest = Params.fresh_dirt_param ()} in *)
+  let drt = Type.fresh_dirt_ops (Type.Op eff_name) in
   let ty = Type.Arrow (ty_par, (ty_res, drt)) in
   solve_ty (simple ty)
 
@@ -168,9 +217,8 @@ let handler ~loc effect_clauses value_clause =
 
   (* loop over all effect that can be handled, input and output contain these effects *)
   let effs = List.map (fun (eff, _) -> eff) (OldUtils.uniq (List.map fst effect_clauses)) in
-  let param_drt = Type.add_ops effs param_drt in
+  let param_drt = Type.add_ops_list effs param_drt in
   let cnstr = Unification.add_dirt_constraint ~loc param_drt ret_drt cnstr in
-
 
   (* result *)
   let ty = Type.Handler ((param_ty, param_drt), ret) in
@@ -255,47 +303,3 @@ let ptuple ~loc ps =
 
 let precord ~loc ctx ty changes = solve_ty (create_ty_scheme ctx ty changes)
 
-(**********************)
-(* PRINTING FUNCTIONS *)
-(**********************)
-
-let subst_ty_scheme sbst (ctx, ty, cnstrs) =
-  let ty = Type.subst_ty sbst ty in
-  let cnstrs = Unification.subst sbst cnstrs in
-  let ctx = OldUtils.assoc_map (Type.subst_ty sbst) ctx in
-  (ctx, ty, cnstrs)
-
-let subst_dirty_scheme sbst (ctx, drty, cnstrs) =
-  let drty = Type.subst_dirty sbst drty in
-  let cnstrs = Unification.subst sbst cnstrs in
-  let ctx = OldUtils.assoc_map (Type.subst_ty sbst) ctx in
-  (ctx, drty, cnstrs)
-
-let beautify_ty_scheme ty_sch =
-  let sbst = Params.beautifying_subst () in
-  subst_ty_scheme sbst (ty_sch)
-
-let beautify_dirty_scheme drty_sch =
-  let sbst = Params.beautifying_subst () in
-  subst_dirty_scheme sbst (drty_sch)
-
-let print_context ctx ppf =
-  let print_binding (x, t) ppf =
-    Print.print ppf "%t : %t" (Untyped.Variable.print ~safe:true x) (Type.print_ty t)
-  in
-  Print.sequence ", " print_binding ctx ppf
-
-let print_ty_scheme ty_sch ppf =
-  let (ctx, ty, cnstrs) = beautify_ty_scheme ty_sch in
-  Print.print ppf "%t |- %t | %t"
-    (print_context ctx)
-    (Type.print_ty ty)
-    (Unification.print cnstrs)
-
-let print_dirty_scheme ty_sch ppf =
-  let (ctx, (ty, drt), cnstrs) = beautify_dirty_scheme ty_sch in
-  Print.print ppf "(%t) |- (%t) ! (%t) | %t"
-    (print_context ctx)
-    (Type.print_ty ty)
-    (Type.print_dirt drt)
-    (Unification.print cnstrs)

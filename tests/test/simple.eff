@@ -2,7 +2,9 @@
 
 (* 3;; *)
 
-(fun x -> x) ;;
+(* (fun x -> x) ;; *)
+
+(* (fun x -> true) ;; *)
 
 (* (fun x -> x x);; *)
 
@@ -10,27 +12,38 @@
 
 (* (fun (x,y) -> 3);; *)
 
+(* if true then 1 else 2;; *)
+
 (* (fun a -> if a then 1 else 2);; *)
+
+(* (fun b -> b);; *)
+
+(* (fun b -> if true then b else b);; *)
 
 effect Op : unit -> int;;
 
 effect Op2 : unit -> int;;
 
 effect Op3 : unit -> int;;
-(* (fun x -> #Op ());; *)
 
-#Op;;
+(fun x -> #Op ());;
+
+(* #Op;; *)
 
 (* #Op ();; *)
 
-(fun a -> if a then (#Op ()) else 2);;
+(fun a -> if a then true else 2);;
+
+(fun a -> if true then true else 2);;
+
+(fun v -> if true then v else true);;
 
 (fun a -> match a with
           | true -> #Op ()
           | false -> #Op2 ()
   );;
 
-(fun x -> (fun y -> (x, y)));;
+(* (fun x -> (fun y -> (x, y)));; *)
 
 (* fun f x -> f (f x);; *)
 
@@ -38,6 +51,14 @@ handler
   | #Op () k ->  k 3
   | #Op2 () k ->  k 3;;
 
-#type handle (#Op3 ()) with
+(* #type handle (#Op3 ()) with
   | #Op () k ->  k 3
-  | #Op2 () k ->  k 3
+  | #Op2 () k ->  k 3 *)
+
+handle 3 with
+  | #Op () k -> true
+  ;;
+
+handle (#Op3 ()) with
+  | #Op () k ->  k 3
+  | #Op2 () k ->  k 3;;

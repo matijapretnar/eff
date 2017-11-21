@@ -56,6 +56,17 @@ let rec exec_cmd ppf st cmd =
       exit 0
   | Untyped.Use fn ->
       use_file ppf fn st
+  | Untyped.External (x, ty, f) ->
+    begin match OldUtils.lookup f External.values with
+      | Some v -> {
+          typing = Infer.add_def st.typing x (Scheme.simple ty);
+          runtime = Eval.update x v st.runtime;
+        }
+      | None -> Error.runtime "unknown external symbol %s." f
+    end
+  | Untyped.Tydef tydefs ->
+    Tctx.extend_tydefs ~loc tydefs;
+    st 
 (*   | Untyped.TopLet defs ->
       let defs', vars, typing = Infer.infer_top_let ~loc st.typing defs in
       let runtime =
@@ -82,17 +93,7 @@ let rec exec_cmd ppf st cmd =
             (print_ty_scheme tysch)
         ) vars;
         { typing; runtime }
-    | Untyped.External (x, ty, f) ->
-        begin match OldUtils.lookup f External.values with
-        | Some v -> {
-            typing = Infer.add_top_def st.typing x ty;
-            runtime = Eval.update x v st.runtime;
-          }
-        | None -> Error.runtime "unknown external symbol %s." f
-        end
-    | Untyped.Tydef tydefs ->
-        Tctx.extend_tydefs ~loc tydefs;
-        st *)
+    |*)
 
 and desugar_and_exec_cmds ppf env cmds =
   cmds

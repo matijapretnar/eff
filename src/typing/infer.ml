@@ -2,16 +2,7 @@ module T = Type
 module Typed = Typed
 module Untyped = Untyped
 
-
-module TyVarSet = Set.Make (struct
-                             type t = Params.ty_param
-                             let compare = compare
-                           end);;
-
-module DirtVarSet = Set.Make (struct
-                             type t = Params.dirt_param
-                             let compare = compare
-                           end);;
+module Variable = Symbol.Make(Symbol.String)
 
 (* Shadowing
 The state is altered in order to store variables and effects
@@ -115,33 +106,33 @@ let rec type_pattern st {Untyped.term=pat; Untyped.location=loc} = type_plain_pa
    pattern type is negative. *)
 and type_plain_pattern st loc = function
   | Untyped.PVar x ->
-    Ctor.pvar ~loc x
+    Ctor.pvar ~loc x, st
   | Untyped.PAs (p, x) ->
-    let pat = type_pattern st p in
-    Ctor.pas ~loc pat x
+    let pat, st = type_pattern st p in
+    Ctor.pas ~loc pat x, st
   | Untyped.PNonbinding ->
-    Ctor.pnonbinding ~loc
+    Ctor.pnonbinding ~loc, st
   | Untyped.PConst const ->
-    Ctor.pconst ~loc const
+    Ctor.pconst ~loc const, st
   | Untyped.PTuple ps ->
-    let pats = List.map (type_pattern st) ps in
-    Ctor.ptuple ~loc pats
+    let pats = List.map (fun (e, _) -> e) (List.map (type_pattern st) ps) in
+    Ctor.ptuple ~loc pats, st
   | Untyped.PRecord [] ->
     assert false
   | Untyped.PRecord (((fld, _) :: _) as lst) ->
     if not (linear_record lst) then
       Error.typing ~loc "Fields in a record must be distinct";
-    let lst = OldUtils.assoc_map (type_pattern st) lst in
-    Ctor.precord ~loc fld lst
+    let lst = OldUtils.assoc_map (fun (e, _) -> e) (OldUtils.assoc_map (type_pattern st) lst) in
+    Ctor.precord ~loc fld lst, st
   | Untyped.PVariant (lbl, p) ->
     begin match Tctx.infer_variant lbl with
       | None -> Error.typing ~loc "Unbound constructor %s" lbl
       | Some (ty, arg_ty) ->
         begin match p, arg_ty with
-          | None, None -> Ctor.pvariant_none ~loc lbl ty
+          | None, None -> Ctor.pvariant_none ~loc lbl ty, st
           | Some p, Some arg_ty ->
-            let p = type_pattern st p in
-            Ctor.pvariant_some ~loc lbl arg_ty ty p
+            let p, st = type_pattern st p in
+            Ctor.pvariant_some ~loc lbl arg_ty ty p, st
           | None, Some _ -> Error.typing ~loc "Constructor %s should be applied to an argument" lbl
           | Some _, None -> Error.typing ~loc "Constructor %s cannot be applied to an argument" lbl
         end
@@ -151,15 +142,15 @@ and type_plain_pattern st loc = function
 (* ABSTRACTION TYPE INFERENCE *)
 (******************************)
 
-and type_abstraction st loc (p, c) =
-  let pat = type_pattern st p in
-  let comp, st = type_comp st c in
+and type_abstraction st loc ctx (p, c) =
+  let pat, st = type_pattern st p in
+  let comp, st = type_comp_ctx st (ctx @ (Scheme.get_context pat.Typed.scheme)) c in
   Ctor.abstraction ~loc pat comp, st
 
-and type_abstraction2 st loc (p1, p2, c) =
-  let pat1 = type_pattern st p1 in
-  let pat2 = type_pattern st p2 in
-  let comp, st = type_comp st c in
+and type_abstraction2 st loc ctx (p1, p2, c) =
+  let pat1, st = type_pattern st p1 in
+  let pat2, st = type_pattern st p2 in
+  let comp, st = type_comp_ctx st (ctx @ (Scheme.get_context pat1.Typed.scheme) @ (Scheme.get_context pat2.Typed.scheme)) c in
   Ctor.abstraction2 ~loc pat1 pat2 comp
 
 (* and type_let_defs ~loc env defs =
@@ -175,27 +166,31 @@ and type_abstraction2 st loc (p1, p2, c) =
 (* Type an expression
     type_expr will annotate the terms with location information
 *)
-and type_expr st {Untyped.term=expr; Untyped.location=loc} = type_plain_expr st loc expr
+and type_expr st ctx {Untyped.term=expr; Untyped.location=loc} = type_plain_expr st loc ctx expr
 
 (* Type a plain expression *)
-and type_plain_expr st loc = function
+and type_plain_expr st loc ctx = function
   | Untyped.Var x ->
-    let ty_sch, st = get_var_scheme_env ~loc st x in
-    Ctor.lambdavar ~loc x ty_sch, st
+    (* let ty_sch, st = get_var_scheme_env ~loc st x in *)
+    let ty = begin match OldUtils.lookup x ctx with
+        | Some ty -> ty
+        | None -> Error.typing ~loc "Unbound variable %t" (Variable.print ~safe:true x)
+      end in
+    Ctor.lambdavar ~loc x ty, st
   | Untyped.Const const ->
     Ctor.const ~loc const, st
   | Untyped.Tuple es ->
-    let els = List.map (fun (e, _) -> e) (List.map (type_expr st) es) in
+    let els = List.map (fun (e, _) -> e) (List.map (type_expr st ctx) es) in
     Ctor.tuple ~loc els, st
   | Untyped.Record lst ->
-    let lst = List.map (fun (f, (e, _)) -> (f, e)) (OldUtils.assoc_map (type_expr st) lst) in
+    let lst = List.map (fun (f, (e, _)) -> (f, e)) (OldUtils.assoc_map (type_expr st ctx) lst) in
     Ctor.record ~loc lst, st
   | Untyped.Variant (lbl, e) ->
-    let exp = OldUtils.option_map (fun (e, _) -> e) (OldUtils.option_map (type_expr st) e) in
+    let exp = OldUtils.option_map (fun (e, _) -> e) (OldUtils.option_map (type_expr st ctx) e) in
     Ctor.variant ~loc (lbl, exp), st
   | Untyped.Lambda (p, c) ->
-    let pat = type_pattern st p in
-    let comp, st = type_comp st c in
+    let pat, st = type_pattern st p in
+    let comp, st = type_comp_ctx st (ctx @ (Scheme.get_context pat.Typed.scheme)) c in
     Ctor.lambda ~loc pat comp, st
   | Untyped.Effect eff ->
     let eff = infer_effect ~loc st eff in
@@ -207,7 +202,7 @@ and type_plain_expr st loc = function
     } ->
     let type_handler_clause (eff, (p1, p2, c)) =
       let eff = infer_effect ~loc:(c.Untyped.location) st eff in
-      (eff, type_abstraction2 st loc (p1, p2, c))
+      (eff, type_abstraction2 st loc ctx (p1, p2, c))
     in
     let typed_effect_clauses = OldUtils.map type_handler_clause effect_cases in
     let untyped_value_clause =
@@ -215,7 +210,7 @@ and type_plain_expr st loc = function
         | Some a -> a
         | None -> Desugar.id_abstraction Location.unknown
     in
-    let typed_value_clause, st = type_abstraction st loc untyped_value_clause in
+    let typed_value_clause, st = type_abstraction st loc ctx untyped_value_clause in
     (* let typed_finally_clause =  *)
     Ctor.handler ~loc typed_effect_clauses typed_value_clause, st
 
@@ -226,23 +221,25 @@ and type_plain_expr st loc = function
 (* Type a computation
     type_comp will annotate the terms with location information
 *)
-and type_comp st {Untyped.term=comp; Untyped.location=loc} = type_plain_comp st loc comp
+and type_comp st {Untyped.term=comp; Untyped.location=loc} = type_plain_comp st loc [] comp
+
+and type_comp_ctx st ctx {Untyped.term=comp; Untyped.location=loc} = type_plain_comp st loc ctx comp
 
 (* Type a plain computation *)
-and type_plain_comp st loc = function
+and type_plain_comp st loc ctx = function
   | Untyped.Value e ->
-    let typed_e, st = type_expr st e in
+    let typed_e, st = type_expr st ctx e in
     Ctor.value ~loc typed_e, st
   | Untyped.Match (e, es) ->
-    let cases = List.map (fun (a, b) -> a) (List.map (type_abstraction st loc) es) in
-    let exp, st = (type_expr st e) in
+    let cases = List.map (fun (a, b) -> a) (List.map (type_abstraction st loc ctx) es) in
+    let exp, st = (type_expr st ctx e) in
     Ctor.patmatch ~loc exp cases, st
   | Untyped.Apply (e1, e2) ->
-    let expr1, st = type_expr st e1 in
-    let expr2, st = type_expr st e2 in
+    let expr1, st = type_expr st ctx e1 in
+    let expr2, st = type_expr st ctx e2 in
     Ctor.apply ~loc expr1 expr2, st
   | Untyped.Handle (e, c) ->
-    let exp, st = type_expr st e in
+    let exp, st = type_expr st ctx e in
     let comp, st = type_comp st c in
     Ctor.handle ~loc exp comp, st
   | Untyped.Let (defs, c) ->

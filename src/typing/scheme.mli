@@ -38,6 +38,9 @@ val add_to_context : Untyped.variable -> Type.ty -> ty_scheme -> ty_scheme
 (* Get the type from a type scheme *)
 val get_type : ty_scheme -> Type.ty
 
+(* Get the type from a type scheme *)
+val get_context : ty_scheme -> context
+
 (* Makes a scheme dirty *)
 val make_dirty : ty_scheme -> dirty_scheme
 

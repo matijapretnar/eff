@@ -62,6 +62,9 @@ val list_union : t list -> t
 val unify_ty : context -> Type.ty -> t -> (context * Type.ty * t)
 
 (* perform unification on the constraint set *)
+(* val unify_abs : context -> (Type.ty * Type.dirty) -> t -> (context * (Type.ty * Type.dirty) * t) *)
+
+(* perform unification on the constraint set *)
 val unify_dirty : context -> Type.dirty -> t -> (context * Type.dirty * t)
 
 (***********************)
