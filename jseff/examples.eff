@@ -323,47 +323,49 @@ with distribution handle
 
 (** State *)
 
-type 'a state = effect
-  operation get: unit -> 'a
-  operation set: 'a -> unit
-end
+(* It is often beneficial to have some form of a mutable state, which can be
+   implemented using handlers. Below is an example of a simple integer state. *)
 
-let r = new state
+effect Get: unit -> int
+effect Set: int -> unit
 
-let monad_state r = handler
+(* The monad_state handler wraps the computation in a function and the state
+   is passed around as the function input. The initial value of the state
+   is given to the transformed computation as input. *)
+
+let monad_state = handler
   | val y -> (fun _ -> y)
-  | r#get () k -> (fun s -> k s s)
-  | r#set s' k -> (fun _ -> k () s')
-
+  | #Get () k -> (fun s -> k s s)
+  | #Set s' k -> (fun _ -> k () s')
 ;;
 
-let f = with monad_state r handle
-    let x = r#get () in
-    r#set (2 * x);
-    r#get ()
+let f = with monad_state handle
+    let x = #Get () in
+    #Set (2 * x);
+    #Get () + 10
 in
 f 30
-
 ;;
 
-let better_state r x = handler
+(* We can improve it by giving the state a default initial value using the
+   "finally" keyword. The value of the initial value is given to the handler
+   as a parameter. By modifying the case for values we also return the result
+   and the final state value. *)
+
+let better_state initial = handler
   | val y -> (fun s -> (y, s))
-  | r#get () k -> (fun s -> k s s)
-  | r#set s' k -> (fun _ -> k () s')
-  | finally f -> f x
-
-let r' = new state
+  | #Get () k -> (fun s -> k s s)
+  | #Set s' k -> (fun _ -> k () s')
+  | finally f -> f initial
 ;;
 
-with better_state r 20 handle
-    with better_state r' 30 handle
-        let x = r#get () in
-        let y = r'#get () in
-        r'#set (x * y);
-        r'#get () + 1
-
+with better_state 30 handle
+  let x = #Get () in
+  #Set (2 * x);
+  #Get () + 10
 ;;
 
+(*
 let transaction r = handler
   | r#get () k -> (fun s -> k s s)
   | r#set s' k -> (fun s -> k () s')
@@ -385,13 +387,14 @@ with better_state r 10 handle
   e#raise x _ -> print (x, r#get ())
 
 ;;
+*)
+
 
 (** Multi-threading *)
 
-type coop = effect
-  operation yield : unit -> unit
-  operation spawn : (unit -> unit) -> unit
-end
+effect Yield : unit -> unit
+effect Spawn : (unit -> unit) -> unit
+
 
 let round_robin c =
   let threads = ref [] in
