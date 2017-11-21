@@ -40,14 +40,14 @@ with amb handle
 (* We add a state handler to use as a que. *)
 
 effect Get_next : unit -> ((bool -> result)*bool) option
-effect Add_to_que : (result*(bool -> result)) -> unit
+effect Add_to_que : ((bool -> result)*bool) -> unit
 
 let que initial = handler
   | #Get_next () k ->
     ( function
     | [] -> k None []
     | hd::tl -> k (Some hd) tl )
-  | #Add_to_que x k -> ( fun que -> k () (x::que))
+  | #Add_to_que x k -> ( fun que -> k () (que @ [x]))
   | val x -> ( fun _ -> x)
   | finally x -> x initial
 ;;
