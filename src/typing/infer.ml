@@ -263,7 +263,7 @@ let rec get_sub_of_ty ty_sch =
   | Types.TySchemeSkel (s,t)->
           let new_s = Params.fresh_skel_param () in 
           let (skels,tys,dirts) = get_sub_of_ty t in
-          (new_s::skels,tys,dirts)
+          ((s,new_s)::skels,tys,dirts)
   | Types.TySchemeTy (p,_,t) -> 
           let new_p = Params.fresh_ty_param () in 
           let (skels,tys,dirts) = get_sub_of_ty t in
@@ -335,7 +335,7 @@ let rec get_applied_cons_from_ty ty_subs dirt_subs ty =
 end
 
 let apply_types skel_subs ty_subs dirt_subs var ty_sch =
-   let skel_apps = List.fold_left (fun a b -> (Typed.annotate (Typed.ApplySkelExp (a, Types.SkelVar b)) Location.unknown)  ) (Typed.annotate (Typed.Var var) Location.unknown) skel_subs in 
+   let skel_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplySkelExp (a, Types.SkelVar b)) Location.unknown)  ) (Typed.annotate (Typed.Var var) Location.unknown) skel_subs in 
    let ty_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplyTyExp (a, Types.Tyvar b)) Location.unknown)  ) skel_apps ty_subs in 
    let dirt_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplyDirtExp (a, Types.SetVar (Types.empty_effect_set ,b) )) Location.unknown)  ) ty_apps dirt_subs in 
    let (ty_cons,dirt_cons) = get_applied_cons_from_ty ty_subs dirt_subs ty_sch in 
