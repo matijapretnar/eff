@@ -64,6 +64,14 @@ and apply_substitution_dirt s drt =
       apply_substitution_dirt ss subbed_term
   end
 
+and apply_substitution_skel s ty1 =
+  begin match s with
+  | [] -> ty1
+  | (s1::ss) -> 
+      let subbed_term = apply_sub_skel s1 ty1 in 
+      apply_substitution_skel ss subbed_term
+  end
+
 and apply_sub_comp sub c =
 let c' = apply_sub_plain_comp sub c in
   Typed.annotate c' c.location
@@ -308,9 +316,23 @@ let rec free_target_ty t =
 and
 free_target_dirty (a,d) = free_target_ty a 
 
+let rec print_c_list = function 
+[] -> Print.debug "---------------------"
+| e::l -> Print.debug "%t" (Typed.print_omega_ct e)  ; print_c_list l
 
+let rec print_s_list = function 
+[] -> Print.debug "---------------------"
+| e::l -> Print.debug "%t" (print_sub e)  ; print_s_list l
+
+let rec print_var_list = function
+[] -> Print.debug "---------------------"
+| e::l -> Print.debug "%t" (Params.print_ty_param e)  ; print_var_list l
 
 let rec get_skel_of_tyvar tyvar clist = 
+  Print.debug "getting skeleton of tyvar from list";
+  Print.debug " Tyvar : %t" (Params.print_ty_param tyvar);
+  Print.debug "Constraint list :";
+  print_c_list clist;
   begin match clist with
   | [] -> assert false 
   | (TyvarHasSkel (tv,skel))::_ when (tyvar = tv) -> skel
@@ -376,17 +398,7 @@ and refresh_target_dirt (ty_sbst, dirt_sbst) t =
 end
 
 
-let rec print_c_list = function 
-[] -> Print.debug "---------------------"
-| e::l -> Print.debug "%t" (Typed.print_omega_ct e)  ; print_c_list l
 
-let rec print_s_list = function 
-[] -> Print.debug "---------------------"
-| e::l -> Print.debug "%t" (print_sub e)  ; print_s_list l
-
-let rec print_var_list = function
-[] -> Print.debug "---------------------"
-| e::l -> Print.debug "%t" (Params.print_ty_param e)  ; print_var_list l
 
 
 let rec union_find_tyvar tyvar acc c_list = 

@@ -278,12 +278,15 @@ let rec get_sub_of_ty ty_sch =
 
 let rec get_basic_type ty_sch =
   begin match ty_sch with
-  | Types.TySchemeSkel (_,t) -> get_basic_type t
-  | Types.TySchemeTy (_,_,t) -> get_basic_type t
-  | Types.TySchemeDirt(_,t) -> get_basic_type t
-  | Types.QualTy(_,t) -> get_basic_type t
-  | Types.QualDirt(_,t)-> get_basic_type t
-  | t -> t
+  | Types.TySchemeSkel (_,t) -> get_basic_type t 
+
+  | Types.TySchemeTy (typ,sk,t) -> 
+        let (a,b) = get_basic_type t in 
+        ((typ,sk)::a , b)
+  | Types.TySchemeDirt(_,t) -> get_basic_type t 
+  | Types.QualTy(_,t) -> get_basic_type t 
+  | Types.QualDirt(_,t)-> get_basic_type t 
+  | t -> ([],t)
   end
 
 
@@ -334,14 +337,25 @@ let rec get_applied_cons_from_ty ty_subs dirt_subs ty =
   | _ -> [],[]
 end
 
-let apply_types skel_subs ty_subs dirt_subs var ty_sch =
+let rec get_skel_constraints alphas_has_skels ty_subs skel_subs =
+    begin match alphas_has_skels with
+    | (tvar,skel)::ss ->
+        let new_skel = Unification.apply_substitution_skel skel_subs skel in 
+        let Some new_tyvar = OldUtils.lookup tvar ty_subs in 
+        (Typed.TyvarHasSkel(new_tyvar,new_skel)) :: (get_skel_constraints ss ty_subs skel_subs)
+    | [] -> []
+    end
+
+let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
+   let new_skel_subs = List.map (fun (a,b) -> Unification.SkelVarToSkel (a, Types.SkelVar b)) skel_subs in 
+   let skel_constraints = get_skel_constraints alphas_has_skels ty_subs new_skel_subs in 
    let skel_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplySkelExp (a, Types.SkelVar b)) Location.unknown)  ) (Typed.annotate (Typed.Var var) Location.unknown) skel_subs in 
    let ty_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplyTyExp (a, Types.Tyvar b)) Location.unknown)  ) skel_apps ty_subs in 
    let dirt_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplyDirtExp (a, Types.SetVar (Types.empty_effect_set ,b) )) Location.unknown)  ) ty_apps dirt_subs in 
    let (ty_cons,dirt_cons) = get_applied_cons_from_ty ty_subs dirt_subs ty_sch in 
    let ty_cons_apps = List.fold_left (fun a (Typed.TyOmega (omega, _ )) -> (Typed.annotate (Typed.ApplyTyCoercion (a, Typed.TyCoercionVar omega)) Location.unknown) ) dirt_apps ty_cons in 
    let dirt_cons_apps = List.fold_left (fun a (Typed.DirtOmega (omega, _ )) -> (Typed.annotate (Typed.ApplyDirtCoercion (a, Typed.DirtCoercionVar omega)) Location.unknown) ) ty_cons_apps dirt_cons in 
-   (dirt_cons_apps , (ty_cons @ dirt_cons ))
+   (dirt_cons_apps , (skel_constraints @ ty_cons @ dirt_cons ))
 
 let rec type_expr in_cons st {Untyped.term=expr; Untyped.location=loc} =
   let e, ttype, constraints, sub_list = type_plain_expr in_cons st expr in
@@ -354,10 +368,10 @@ and type_plain_expr in_cons st = function
                 Print.debug "in Var";
                 Print.debug " var : %t" (Typed.print_variable x);
                 Print.debug " typeSch: %t " (Types.print_target_ty ty_schi);
-                let basic_type = get_basic_type ty_schi in
+                let (alphas_has_skels,basic_type) = get_basic_type ty_schi in
                 Print.debug "basicTy: %t" (Types.print_target_ty basic_type); 
                 let applied_basic_type = apply_sub_to_type bind_tyvar_sub bind_dirtvar_sub basic_type in
-                let (returned_x, returnd_cons) = apply_types bind_skelvar_sub bind_tyvar_sub bind_dirtvar_sub x ty_schi in 
+                let (returned_x, returnd_cons) = apply_types alphas_has_skels bind_skelvar_sub bind_tyvar_sub bind_dirtvar_sub x ty_schi in 
                 Print.debug "returned: %t" (Typed.print_expression returned_x) ;
                 Print.debug "returned_type: %t" (Types.print_target_ty applied_basic_type);
                 (returned_x.term , applied_basic_type, returnd_cons @ in_cons, [])
