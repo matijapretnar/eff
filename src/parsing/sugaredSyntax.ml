@@ -73,15 +73,15 @@ type region =
 
 type ty = plain_ty * Location.t
 and plain_ty =
-  | TyApply of OldUtils.tyname * ty list * (dirt list * region list) option
+  | TyApply of OldUtils.tyname * ty list
   (** [(ty1, ty2, ..., tyn) type_name] *)
   | TyParam of OldUtils.typaram
   (** ['a] *)
-  | TyArrow of ty * ty * dirt option
+  | TyArrow of ty * ty
   (** [ty1 -> ty2] *)
   | TyTuple of ty list
   (** [ty1 * ty2 * ... * tyn] *)
-  | TyHandler of ty * dirt option * ty * dirt option
+  | TyHandler of ty * ty
   (** [ty1 => ty2] *)
 
 type tydef =
