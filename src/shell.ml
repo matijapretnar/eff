@@ -77,7 +77,7 @@ let rec exec_cmd ppf st cmd =
     | CoreSyntax.External (x, ty, f) ->
         begin match OldUtils.lookup f External.values with
         | Some v -> {
-            typing = Ctx.extend_ty st.typing x ty;
+            typing = Ctx.extend st.typing x (Type.free_params ty, ty);
             runtime = Eval.update x v st.runtime;
           }
         | None -> Error.runtime "unknown external symbol %s." f
