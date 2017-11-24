@@ -26,13 +26,13 @@ let rec exec_cmd ppf st cmd =
       let typing, ty = Infer.infer_top_comp st.typing c in
       let v = Eval.run st.runtime c in
       Format.fprintf ppf "@[- : %t = %t@]@."
-        (Type.print ty)
+        (Type.print_beautiful ty)
         (Value.print_value v);
       { st with typing }
   | CoreSyntax.TypeOf c ->
       let typing, ty = Infer.infer_top_comp st.typing c in
       Format.fprintf ppf "@[- : %t@]@."
-        (Type.print ty);
+        (Type.print_beautiful ty);
       { st with typing }
   | CoreSyntax.Reset ->
       Format.fprintf ppf "Environment reset.";
@@ -61,7 +61,7 @@ let rec exec_cmd ppf st cmd =
           | Some v ->
             Format.fprintf ppf "@[val %t : %t = %t@]@."
               (CoreSyntax.Variable.print x)
-              (Type.print tysch)
+              (Type.print_beautiful tysch)
               (Value.print_value v)
       ) vars;
       { typing; runtime }
@@ -71,7 +71,7 @@ let rec exec_cmd ppf st cmd =
         List.iter (fun (x, tysch) ->
           Format.fprintf ppf "@[val %t : %t = <fun>@]@."
             (CoreSyntax.Variable.print x)
-            (Type.print tysch)
+            (Type.print_beautiful tysch)
         ) vars;
         { typing; runtime }
     | CoreSyntax.External (x, ty, f) ->

@@ -120,15 +120,17 @@ let print (ps as poly, t) ppf =
       | Apply (t, [s]) ->
           print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
       | Apply (t, ts) ->
-          print ~at_level:1 "(%t) %s" (Print.sequence "," ty ts) t
+          print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
       | TyParam ((Ty_Param k) as p) ->
           let c = (if List.mem p ps then "'" else "'_") in
           if 0 <= k && k <= 25
           then print "%s%c" c (char_of_int (k + int_of_char 'a'))
           else print "%sty%i" c (k - 25)
       | Tuple [] -> print "unit"
-      | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence " *" (ty ~max_level:1) ts)
+      | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence " * " (ty ~max_level:1) ts)
       | Handler {value=t1; finally=t2} ->
           print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
   in
     ty t ppf
+
+let print_beautiful sch = print (beautify sch)
