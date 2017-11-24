@@ -37,3 +37,5 @@ val subst_ctx : t -> Type.substitution -> t
     not appear in [ctx] are universally quantified. *)
 val generalize : t -> bool -> Type.ty -> ty_scheme
 
+val infer_effect : t -> CoreSyntax.effect -> (Type.ty * Type.ty) option
+val add_effect : t -> CoreSyntax.effect -> (Type.ty * Type.ty) -> t

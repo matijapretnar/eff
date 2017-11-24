@@ -41,9 +41,9 @@ let rec exec_cmd ppf st cmd =
   | CoreSyntax.Help ->
       Format.fprintf ppf "%s" help_text;
       st
-(*   | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
-      let typing = Infer.add_top_effect st.typing eff (ty1, ty2) in
-      { st with typing } *)
+  | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
+      let typing = Ctx.add_effect st.typing eff (ty1, ty2) in
+      { st with typing }
   | CoreSyntax.Quit ->
       exit 0
   | CoreSyntax.Use fn ->
@@ -77,8 +77,7 @@ let rec exec_cmd ppf st cmd =
     | CoreSyntax.External (x, ty, f) ->
         begin match OldUtils.lookup f External.values with
         | Some v -> {
-            (* typing = Infer.add_top_def st.typing x ty; *)
-            typing = st.typing;
+            typing = Ctx.extend_ty st.typing x ty;
             runtime = Eval.update x v st.runtime;
           }
         | None -> Error.runtime "unknown external symbol %s." f

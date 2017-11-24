@@ -214,33 +214,24 @@ and infer_expr ctx cstr e =
         T.Arrow (t1, t2)
         
     | Core.Effect op ->
-        failwith "Not implemented yet!"
-(*       (match Tctx.infer_operation op with
+      (match Ctx.infer_effect ctx op with
         | None -> Error.typing ~loc "Unbound operation %s" op
-        | Some (ty, (t1, t2)) ->
-          let u = infer_expr ctx cstr e in
-          let dirt = T.DirtAtom (T.fresh_region (), op) in
-            (* XXX do something about regions *)
-            add_ty_constraint cstr loc u ty;
-            T.Arrow (t1, (t2, dirt))) *)
+        | Some (t1, t2) -> T.Arrow (t1, t2))
 
     | Core.Handler {Core.effect_clauses=ops; Core.value_clause=a_val; Core.finally_clause=a_fin} -> 
         let t_value = T.fresh_ty () in
         let t_finally = T.fresh_ty () in
         let t_yield = T.fresh_ty () in
         let unify_operation (op, a2) =
-          failwith "Not implemented!"
-(*           (match Tctx.infer_operation op with
+          (match Ctx.infer_effect ctx op with
             | None -> Error.typing ~loc "Unbound operation %s in a handler" op
-            | Some (ty, (t1, t2)) ->
-              let u = infer_expr ctx cstr e in
-                add_ty_constraint cstr loc u ty;
+            | Some (t1, t2) ->
                 let tk, u1, u2 = infer_handler_case_abstraction ctx cstr a2 in
                   add_ty_constraint cstr loc t1 u1;
                   (* XXX maybe we need to change the direction of inequalities here,
                      or even require equalities. *)
-                  add_ty_constraint cstr loc tk (T.Arrow (t2, (t_yield, dirt)));
-                  add_dirty_constraint cstr loc (t_yield, dirt) u2) *)
+                  add_ty_constraint cstr loc tk (T.Arrow (t2, t_yield));
+                  add_ty_constraint cstr loc t_yield u2)
         in
           List.iter unify_operation ops;
           let (valt1, valt2) = infer_abstraction ctx cstr a_val in
