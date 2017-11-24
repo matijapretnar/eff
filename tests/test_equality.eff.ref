@@ -5,3 +5,4 @@
 - : bool = false
 - : bool = true
 - : string * bool * bool * bool = ("nested", true, false, true)
+val f : 'a -> 'a -> bool = <fun>
