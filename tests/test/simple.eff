@@ -26,37 +26,40 @@ effect Op2 : unit -> int;;
 
 effect Op3 : unit -> int;;
 
-(fun x -> #Op ());;
+(* (fun x -> #Op ()) true;; *)
 
 (* #Op;; *)
 
 (* #Op ();; *)
 
-(fun a -> if a then true else 2);;
+(* (fun a -> if a then true else 2);; *)
 
-(fun a -> if true then true else 2);;
+(* (fun a -> if true then true else 2);; *)
 
-(fun v -> if true then v else true);;
+(* (fun v -> if true then v else true);; *)
 
-(fun a -> match a with
+(* (fun a -> match a with
           | true -> #Op ()
           | false -> #Op2 ()
-  );;
+  );; *)
 
 (* (fun x -> (fun y -> (x, y)));; *)
 
 (* fun f x -> f (f x);; *)
 
 handler
-  | #Op () k ->  k 3
-  | #Op2 () k ->  k 3;;
+  | #Op () k ->  k 3;;
 
 (* #type handle (#Op3 ()) with
   | #Op () k ->  k 3
   | #Op2 () k ->  k 3 *)
 
+(* #Op3 ;; *)
+
+(* #Op3 () ;;  *)
+
 handle 3 with
-  | #Op () k -> true
+  | #Op () k -> k 3
   ;;
 
 handle (#Op3 ()) with

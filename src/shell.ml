@@ -31,11 +31,11 @@ let rec exec_cmd ppf st cmd =
   match cmd.Untyped.term with
   | Untyped.Computation c ->
       let ct, typing = Infer.type_comp st.typing c in
-      Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme ct.Typed.scheme);
-      (* let v = Eval.run st.runtime c in *)
-      (* Format.fprintf ppf "@[- : %t = %t@]@."
-        (print_dirty_scheme ())
-        (Value.print_value v); *)
+      (* Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme ct.Typed.scheme); *)
+      let v = Eval.run st.runtime c in
+      Format.fprintf ppf "@[- : %t = %t@]@."
+        (Scheme.print_dirty_scheme ct.Typed.scheme)
+        (Value.print_value v);
       st
   | Untyped.TypeOf c ->
       let c, _ = Infer.type_comp st.typing c in

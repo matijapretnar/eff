@@ -79,14 +79,14 @@ let print_context ctx ppf =
 
 let print_ty_scheme ty_sch ppf =
   let (ctx, ty, cnstrs) = beautify_ty_scheme ty_sch in
-  Print.print ppf "(%t) |- (%t) | %t"
+  Print.print ppf "(%t) |- (%t) | [%t]"
     (print_context ctx)
     (Type.print_ty ty)
     (Unification.print cnstrs)
 
 let print_dirty_scheme ty_sch ppf =
   let (ctx, (ty, drt), cnstrs) = beautify_dirty_scheme ty_sch in
-  Print.print ppf "(%t) |- (%t) ! (%t) | %t"
+  Print.print ppf "(%t) |- (%t) ! (%t) | [%t]"
     (print_context ctx)
     (Type.print_ty ty)
     (Type.print_dirt drt)

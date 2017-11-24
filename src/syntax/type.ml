@@ -224,7 +224,7 @@ let rec print_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
   | Apply (ty_name, ([], _)) ->
-    print ".%s" ty_name
+    print "%s" ty_name
   | Apply (ty_name, ([ty], _)) ->
     print ~at_level:1 "%t %s" (print_ty ~max_level:1 ty) ty_name
   | Apply (ty_name, (tys, _)) ->

@@ -225,8 +225,9 @@ let atomic_drt cnstr =
 let is_atomic_drt el =
   begin match el with
     | (Type.DirtVar a, Type.DirtVar b, _) when a != b-> true
-    | (Type.DirtVar _, Op _, _) -> true
-    | (Op _, Type.DirtVar _, _) -> true
+    | (Type.DirtVar _, Type.Op _, _) -> true
+    | (Type.Op _, Type.DirtVar _, _) -> true
+    | (Type.DirtVar _, Type.DirtUnion (_, _), _) -> true
     | _ -> false
   end
 
@@ -244,13 +245,13 @@ let decompose_ty_cnstr (ty1, ty2, loc) =
 
     (* A -> B ! a = C -> D ! b translates into: A=C, B=D, a=b *)
     | (Type.Arrow (ty1_in, dirty1_out), Type.Arrow (ty2_in, dirty2_out)) ->
-      let cnstr = add_ty_constraint ~loc ty1_in ty2_in empty in
+      let cnstr = add_ty_constraint ~loc ty2_in ty1_in empty in
       let cnstr = add_dirty_constraint ~loc dirty1_out dirty2_out cnstr in
       cnstr
 
     (* A ! a => B ! b = C ! c => D ! d translates into: A=C, B=D, a=c, b=d *)
     | (Type.Handler (dirty1_in, dirty1_out), Type.Handler (dirty2_in, dirty2_out)) ->
-      let cnstr = add_dirty_constraint ~loc dirty1_in dirty2_in empty in
+      let cnstr = add_dirty_constraint ~loc dirty2_in dirty1_in empty in
       let cnstr = add_dirty_constraint ~loc dirty1_out dirty2_out cnstr in
       cnstr
 
@@ -279,6 +280,25 @@ let decompose_ty_cnstr (ty1, ty2, loc) =
     | _ -> Error.typing ~loc "This expression has type %t but it should have type %t." (Type.print_ty ty1) (Type.print_ty ty2)
   end
 
+let rec check_occurence drt lst =
+  begin match lst with
+  | Type.Op op -> drt == lst
+  | Type.DirtVar d -> false
+  | Type.DirtUnion (d1, d2) -> (check_occurence drt d1) || (check_occurence drt d2)
+  | Type.DirtIntersection (d1, d2) -> (check_occurence drt d1) && (check_occurence drt d2)
+end
+
+let rec make_dirt_constraint drt lst loc =
+  begin match lst with
+  | Type.Op op -> empty
+  | Type.DirtVar d -> add_dirt_constraint ~loc drt lst empty
+  | Type.DirtUnion (d1, d2) -> union (make_dirt_constraint drt d1 loc) (make_dirt_constraint drt d2 loc)
+  (* | Type.DirtUnion (Type.Op d1, d2) -> add_dirt_constraint ~loc drt d2 empty
+  | Type.DirtUnion (d1, Type.Op d2) -> add_dirt_constraint ~loc drt d1 empty
+  | Type.DirtUnion (d1, d2) -> union (add_dirt_constraint ~loc drt d1 empty) (add_dirt_constraint ~loc drt d2 empty) *)
+  | Type.DirtIntersection (d1, d2) -> add_dirt_constraint ~loc drt lst empty
+end
+
 let decompose_drt_cnstr (drt1, drt2, loc) = 
   begin match drt1, drt2 with
     | (Type.DirtVar a, Type.DirtVar b) when a = b -> empty
@@ -288,14 +308,23 @@ let decompose_drt_cnstr (drt1, drt2, loc) =
     (* | (_, Type.Top) -> empty *)
 
     | (Type.DirtUnion (drt_left, drt_right), drt2) ->
-    let cnstr = add_dirt_constraint ~loc drt_left drt2 empty in
-    let cnstr = add_dirt_constraint ~loc drt_right drt2 cnstr in
-    cnstr
-  
-  | (drt1, Type.DirtIntersection (drt_left, drt_right)) ->
-    let cnstr = add_dirt_constraint ~loc drt1 drt_left empty in
-    let cnstr = add_dirt_constraint ~loc drt1 drt_right cnstr in
-    cnstr
+      let cnstr = add_dirt_constraint ~loc drt_left drt2 empty in
+      let cnstr = add_dirt_constraint ~loc drt_right drt2 cnstr in
+      cnstr
+    
+    | (drt1, Type.DirtUnion (_, _)) ->
+      let is_satisfied = check_occurence drt1 drt2 in
+      if is_satisfied then empty else make_dirt_constraint drt1 drt2 loc
+    
+    | (drt1, Type.DirtIntersection (drt_left, drt_right)) ->
+      let cnstr = add_dirt_constraint ~loc drt1 drt_left empty in
+      let cnstr = add_dirt_constraint ~loc drt1 drt_right cnstr in
+      cnstr
+
+    | (d1, d2) ->
+      let ppf = Format.std_formatter in
+      (Type.print_dirt d1 ppf); (Print.print ppf " %s " (Symbols.less ())); (Type.print_dirt d2 ppf);
+      assert false
   end
 
 let rec contains x = function
