@@ -20,7 +20,6 @@ type abstraction_scheme = (Type.ty * Type.dirty) t
 (* type scheme for effect clauses *)
 type abstraction2_scheme = (Type.ty * Type.ty * Type.dirty) t
 
-
 val just : Unification.t -> ty_scheme -> ty_scheme
 
 val ty_cnstr : loc:Location.t -> Type.ty -> Type.ty -> ty_scheme -> ty_scheme
@@ -31,6 +30,9 @@ val ty_cnstr : loc:Location.t -> Type.ty -> Type.ty -> ty_scheme -> ty_scheme
 
 (* Make a simple (empty) type scheme *)
 val simple : 'a -> 'a t
+
+(* Make a scheme from a type and a context *)
+val make : context -> 'a -> 'a t
 
 (* Add a variable to the type scheme context *)
 val add_to_context : Untyped.variable -> Type.ty -> ty_scheme -> ty_scheme
@@ -43,6 +45,9 @@ val get_context : ty_scheme -> context
 
 (* Makes a scheme dirty *)
 val make_dirty : ty_scheme -> dirty_scheme
+
+(* Makes a scheme dirty *)
+val make_clean : dirty_scheme -> ty_scheme
 
 (* Refresh a type scheme *)
 val refresh : ty_scheme -> ty_scheme
@@ -74,6 +79,9 @@ val abstract2 : loc:Location.t -> ty_scheme -> ty_scheme -> dirty_scheme -> abst
 (* Create a scheme for a variable expression *)
 val var : loc:Location.t -> Untyped.variable -> Type.ty -> ty_scheme
 
+(* Create a scheme for a variable expression *)
+val tmpvar : loc:Location.t -> Untyped.variable -> Type.ty -> ty_scheme
+
 (* create a scheme for a const *)
 val const : loc:Location.t -> Const.t -> ty_scheme
 
@@ -100,6 +108,8 @@ val apply : loc:Location.t -> ty_scheme -> ty_scheme -> dirty_scheme
 val patmatch : loc:Location.t -> ty_scheme -> abstraction_scheme list -> dirty_scheme
 
 val handle : loc:Location.t -> ty_scheme -> dirty_scheme -> dirty_scheme
+
+val letbinding : loc:Location.t -> dirty_scheme -> abstraction_scheme -> dirty_scheme
 
 (************************)
 (* PATTERN CONSTRUCTORS *)

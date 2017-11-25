@@ -15,6 +15,9 @@ val abstraction2 : ?loc:Location.t -> Typed.pattern -> Typed.pattern -> Typed.co
 (* smart constructor for the Var term : expression *)
 val lambdavar : ?loc:Location.t -> Typed.variable -> Type.ty -> Typed.expression
 
+(* smart constructor for the Var term : expression *)
+val letvar : ?loc:Location.t -> Typed.variable -> Scheme.ty_scheme -> Typed.expression
+
 (* smart constructor for the Const term : expression *)
 val const : ?loc:Location.t -> Const.t -> Typed.expression
 
@@ -51,9 +54,13 @@ val patmatch : ?loc:Location.t -> Typed.expression -> Typed.abstraction list -> 
 
 val handle : ?loc:Location.t -> Typed.expression -> Typed.computation -> Typed.computation
 
-(* val letbinding : ?loc:Location.t -> (Typed.pattern * Typed.computation) -> Typed.computation -> Typed.computation *)
+val letrecbinding : ?loc:Location.t -> (Typed.variable * Typed.abstraction) list -> Typed.computation -> Typed.computation
 
-(* val letrecbinding : ?loc:Location.t -> (Typed.variable * Typed.abstraction) -> Typed.computation -> Typed.computation *)
+val bind : ?loc:Location.t -> Typed.computation -> Typed.abstraction -> Typed.computation 
+
+val let_in : ?loc:Location.t -> Typed.expression -> Typed.abstraction -> Typed.computation 
+
+val letbinding : ?loc:Location.t -> (Typed.pattern * Typed.computation) list -> Typed.computation -> Typed.computation
 
 (*************************************)
 (* TOPLEVEL COMPUTATION CONSTRUCTORS *)

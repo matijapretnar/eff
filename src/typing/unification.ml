@@ -160,6 +160,7 @@ let identity_subst = {
   ty_param_repl = (function (p, polarity) -> Type.TyVar p);
   dirt_param_repl = (function (d, polarity) -> Type.simple_dirt d);
 }
+
 (************************)
 (* CONSTRAINT SOLUTIONS *)
 (************************)
@@ -269,6 +270,16 @@ let decompose_ty_cnstr (ty1, ty2, loc) =
     | (_, Type.Top) -> empty
 
     (* Primitives *)
+    | (Type.Prim Type.BoolTy, Type.Apply ("bool", ([], _))) -> empty
+    | (Type.Prim Type.IntTy, Type.Apply ("int", ([], _))) -> empty
+    | (Type.Prim Type.FloatTy, Type.Apply ("float", ([], _))) -> empty
+    | (Type.Prim Type.StringTy, Type.Apply ("string", ([], _))) -> empty
+
+    | (Type.Apply ("bool", ([], _)), Type.Prim Type.BoolTy) -> empty
+    | (Type.Apply ("int", ([], _)), Type.Prim Type.IntTy) -> empty
+    | (Type.Apply ("float", ([], _)), Type.Prim Type.FloatTy) -> empty
+    | (Type.Apply ("string", ([], _)), Type.Prim Type.StringTy) -> empty
+
     | (Type.Prim Type.BoolTy, Type.Prim Type.BoolTy) -> empty
     | (Type.Prim Type.IntTy, Type.Prim Type.IntTy) -> empty
     | (Type.Prim Type.FloatTy, Type.Prim Type.FloatTy) -> empty
@@ -402,3 +413,58 @@ let unify_ty ctx ty cnstr =
 let unify_dirty ctx (ty, drt) cnstr =
   let ctx, (ty, drt), cnstr = biunify_dirty ctx (ty, drt) cnstr in
   (ctx, (ty, drt), cnstr)
+
+(**********************)
+(* UNIFY LET PAT-COMP *)
+(**********************)
+
+let rec unify_let (ctx_p, ty_p) (ctx_c, (ty_c, drt_c)) =
+  begin match ty_p, ty_c with
+  | Type.Prim _, _ ->
+    let sbst = {
+      ty_param_repl = id_ty;
+      dirt_param_repl = id_drt;
+    } in
+    let ctx_p = OldUtils.assoc_map (replace_ty sbst false) ctx_p in
+    ctx_p
+  | Type.TyVar b, _ ->
+    let sbst = {
+      ty_param_repl = (function (p, polarity) -> if (p == b) then ty_c else Type.TyVar p);
+      dirt_param_repl = id_drt;
+    } in
+    let ctx_p = OldUtils.assoc_map (replace_ty sbst false) ctx_p in
+    ctx_p
+  | Type.Tuple ty_p_l, Type.Tuple ty_c_l -> 
+    let rec looper ctx_p ty_p_l ty_c_l =
+      begin match ty_p_l, ty_c_l with
+        | [], [] -> ctx_p
+        | ty_p1 :: tail_p, ty_c1 :: tail_c -> 
+          let ctx_p = unify_let (ctx_p, ty_p1) (ctx_c, (ty_c1, drt_c)) in
+          looper ctx_p tail_p tail_c
+      end in
+    looper ctx_p ty_p_l ty_c_l
+
+  (* | Type.Apply (ty_name, args) -> Type.Apply (ty_name, replace_args rpls polarity args) *)
+  
+  (* | Type.Tuple tys -> Type.Tuple (OldUtils.map (replace_ty rpls polarity) tys)
+  | Type.Arrow (ty1, (ty2, drt)) ->
+    let ty1 = replace_ty rpls (not polarity) ty1 in
+    let drt = replace_dirt rpls polarity drt in
+    let ty2 = replace_ty rpls polarity ty2 in
+    Type.Arrow (ty1, (ty2, drt))
+  | Type.Handler (drty1, drty2) ->
+    let drty1 = replace_dirty rpls (not polarity) drty1 in
+    let drty2 = replace_dirty rpls polarity drty2 in
+    Type.Handler (drty1, drty2)
+  | Type.Bottom when polarity == true -> Type.Bottom
+  | Type.Top when polarity == false -> Type.Top
+  | Type.Union (ty1, ty2) when polarity == true ->
+    let ty1 = replace_ty rpls polarity ty1 in
+    let ty2 = replace_ty rpls polarity ty2 in
+    Type.Union (ty1, ty2)
+  | Type.Intersection (ty1, ty2) when polarity == false ->
+    let ty1 = replace_ty rpls polarity ty1 in
+    let ty2 = replace_ty rpls polarity ty2 in
+    Type.Intersection (ty1, ty2) *)
+
+  end

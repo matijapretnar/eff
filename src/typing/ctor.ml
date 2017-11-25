@@ -41,6 +41,11 @@ let lambdavar ?loc x ty =
   let term = Typed.LambdaVar x in
   Typed.annotate term sch loc
 
+let letvar ?loc x sch =
+  let loc = backup_location loc [] in
+  let term = Typed.LetVar x in
+  Typed.annotate term sch loc
+
 let const ?loc c =
   let loc = backup_location loc [] in
   let term = Typed.Const c in
@@ -147,17 +152,32 @@ let handle ?loc e c =
   let term = Typed.Handle (e, c) in
   Typed.annotate term sch loc
 
-(* let letbinding ?loc defs c =
-  let loc = backup_location loc [c.Typed.location] in
+let letrecbinding ?loc defs c =
+  let loc = backup_location loc (
+    c.Typed.location :: List.map (fun (_, a) -> a.Typed.location) defs
+  ) in
   let term = Typed.LetRec (defs, c) in
-  let sch = Scheme.simple Type.int_ty in
+  (* let defs, poly_tyschs, change = let_rec_defs ~loc defs in *)
+  let sch = c.Typed.scheme in
   Typed.annotate term sch loc
 
-let letrecbinding ?loc defs c =
-  let loc = backup_location loc [c.Typed.location] in
-  let term = Typed.LetRec (defs, c) in
-  let sch = Scheme.simple Type.int_ty in
-  Typed.annotate term sch loc *)
+let bind ?loc c1 c2 =
+  let loc = backup_location loc [c1.Typed.location; c2.Typed.location] in
+  let sch = Scheme.letbinding ~loc c1.Typed.scheme c2.Typed.scheme in
+  let term = Typed.Bind (c1, c2) in
+  Typed.annotate term sch loc
+
+let let_in ?loc e1 c2 =
+  let loc = backup_location loc [] in
+  bind ~loc (value ~loc e1) c2
+
+let letbinding ?loc defs c =
+  let loc = backup_location loc [] in
+  List.fold_right (fun (p_def, c_def) binds ->
+    match c_def.Typed.term with
+    | Typed.Value e_def -> let_in ~loc e_def (abstraction ~loc p_def binds)
+    | _ ->  bind ~loc c_def (abstraction ~loc p_def binds)
+  ) defs c
 
 (******************************)
 (* PATTERN SMART CONSTRUCTORS *)

@@ -42,7 +42,7 @@ and plain_expression =
 and computation = plain_computation annotation
 and plain_computation =
   | Value of expression
-  | Let of (pattern * computation) list * computation
+  | Let of abstraction list * computation
   | LetRec of (variable * abstraction) list * computation
   | Match of expression * abstraction list
   | Apply of expression * expression

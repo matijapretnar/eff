@@ -22,12 +22,7 @@ let initial_state = {
 (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
    It prints the result to [ppf] and returns the new state. *)
 let rec exec_cmd ppf st cmd =
-  let loc = cmd.Untyped.location
-  and print_ty_scheme _ ppf =
-    Format.fprintf ppf "ty_scheme"
-  and print_dirty_scheme _ ppf =
-    Format.fprintf ppf "dirty_scheme"
-  in
+  let loc = cmd.Untyped.location in
   match cmd.Untyped.term with
   | Untyped.Computation c ->
       let ct, typing = Infer.type_comp st.typing c in
@@ -67,33 +62,32 @@ let rec exec_cmd ppf st cmd =
   | Untyped.Tydef tydefs ->
     Tctx.extend_tydefs ~loc tydefs;
     st 
-(*   | Untyped.TopLet defs ->
-      let defs', vars, typing = Infer.infer_top_let ~loc st.typing defs in
-      let runtime =
-        List.fold_right
-          (fun (p, c) env -> let v = Eval.run env c in Eval.extend p v env)
-          defs st.runtime
-      in
-      List.iter (fun (x, tysch) ->
-        match Eval.lookup x runtime with
-          | None -> assert false
-          | Some v ->
-            Format.fprintf ppf "@[val %t : %t = %t@]@."
-              (Untyped.Variable.print x)
-              (print_ty_scheme tysch)
-              (Value.print_value v)
-      ) vars;
-      { typing; runtime }
-    | Untyped.TopLetRec defs ->
-        let defs', vars, typing = Infer.infer_top_let_rec ~loc st.typing defs in
-        let runtime = Eval.extend_let_rec st.runtime defs in
-        List.iter (fun (x, tysch) ->
-          Format.fprintf ppf "@[val %t : %t = <fun>@]@."
+  | Untyped.TopLet defs ->
+    let defs', vars, typing = Infer.infer_top_let ~loc st.typing defs in
+    let runtime =
+      List.fold_right
+        (fun (p, c) env -> let v = Eval.run env c in Eval.extend p v env)
+        defs st.runtime
+    in
+    List.iter (fun (x, tysch) ->
+      match Eval.lookup x runtime with
+        | None -> assert false
+        | Some v ->
+          Format.fprintf ppf "@[val %t : %t = %t@]@."
             (Untyped.Variable.print x)
-            (print_ty_scheme tysch)
-        ) vars;
-        { typing; runtime }
-    |*)
+            (Scheme.print_ty_scheme tysch)
+            (Value.print_value v)
+    ) vars;
+    { typing; runtime }
+  | Untyped.TopLetRec defs ->
+    let _, vars, typing = Infer.infer_top_let_rec ~loc st.typing defs in
+    let runtime = Eval.extend_let_rec st.runtime defs in
+    List.iter (fun (x, tysch) ->
+      Format.fprintf ppf "@[val %t : %t = <fun>@]@."
+        (Untyped.Variable.print x)
+        (Scheme.print_ty_scheme tysch)
+    ) vars;
+    { typing; runtime }
 
 and desugar_and_exec_cmds ppf env cmds =
   cmds

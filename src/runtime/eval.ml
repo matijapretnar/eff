@@ -86,10 +86,19 @@ let rec ceval env c =
     let h = V.to_handler v in
     h r
 
+  | Core.Let (lst, c) ->
+    eval_let env lst c
+
   | Core.LetRec (defs, c) ->
     let env = extend_let_rec env defs in
     ceval env c
 
+and eval_let env lst c =
+  match lst with
+    | [] -> ceval env c
+    | (p, d) :: lst ->
+      let r = ceval env d in
+      sequence (fun v -> eval_let (extend p v env) lst c) r
 
 and extend_let_rec env defs =
   let env' = ref env in
@@ -113,7 +122,7 @@ and veval env e =
   | Core.Record es -> V.Record (List.map (fun (f, e) -> (f, veval env e)) es)
   | Core.Variant (lbl, None) -> V.Variant (lbl, None)
   | Core.Variant (lbl, Some e) -> V.Variant (lbl, Some (veval env e))
-  | Core.Lambda a -> assert false
+  | Core.Lambda a -> V.Closure (eval_closure env a)
   | Core.Effect eff ->
     V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | Core.Handler h -> V.Handler (eval_handler env h)

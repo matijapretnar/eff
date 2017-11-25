@@ -67,6 +67,12 @@ val unify_ty : context -> Type.ty -> t -> (context * Type.ty * t)
 (* perform unification on the constraint set *)
 val unify_dirty : context -> Type.dirty -> t -> (context * Type.dirty * t)
 
+(**********************)
+(* UNIFY LET PAT-COMP *)
+(**********************)
+
+val unify_let : (context * Type.ty) -> (context * Type.dirty) -> context
+
 (***********************)
 (* PRINTING OPERATIONS *)
 (***********************)

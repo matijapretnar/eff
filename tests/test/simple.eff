@@ -1,4 +1,6 @@
-(* external ( + ) : int -> int -> int = "+";; *)
+external ( + ) : int -> int -> int = "+";;
+
+external ( - ) : int -> int -> int = "-";;
 
 (* 3;; *)
 
@@ -47,8 +49,8 @@ effect Op3 : unit -> int;;
 
 (* fun f x -> f (f x);; *)
 
-handler
-  | #Op () k ->  k 3;;
+(* handler
+  | #Op () k ->  k 3;; *)
 
 (* #type handle (#Op3 ()) with
   | #Op () k ->  k 3
@@ -58,10 +60,32 @@ handler
 
 (* #Op3 () ;;  *)
 
-handle 3 with
-  | #Op () k -> k 3
-  ;;
+(* let x = fun y -> y in x true;; *)
 
-handle (#Op3 ()) with
+(* let x = 3 in x;; *)
+
+(* let (x, y) = (1, 2) in x;; *)
+
+(* let x = 1 and y = 2 in x + y;; *)
+
+(* let x = (fun y -> y) in (x true, x 2);; *)
+
+(* let id x = x;; *)
+
+let id x = x;;
+
+id 3;;
+
+let rec check n =
+  begin match n with
+  | 1 -> 1
+  | _ -> n + check (n - 1)
+  end
+
+(* handle 3 with
+  | #Op () k -> k 3
+  ;; *)
+
+(* handle (#Op3 ()) with
   | #Op () k ->  k 3
-  | #Op2 () k ->  k 3;;
+  | #Op2 () k ->  k 3;; *)

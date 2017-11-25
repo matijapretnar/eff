@@ -57,7 +57,7 @@ and plain_expression =
 and computation = (plain_computation, Scheme.dirty_scheme) annotation
 and plain_computation =
   | Value of expression
-  (* | LetRec of (variable * abstraction) list * computation *)
+  | LetRec of (variable * abstraction) list * computation
   | Match of expression * abstraction list
   | Apply of expression * expression
   | Handle of expression * computation

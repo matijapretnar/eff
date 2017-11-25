@@ -109,6 +109,9 @@ let solve_dirty (ctx, ty, cnstrs) =
 (* Create a simple scheme (with only a type) *)
 let simple ty = ([], ty, Unification.empty)
 
+(* Create a simple scheme (with only a type and a context) *)
+let make ctx ty = (ctx, ty, Unification.empty)
+
 (* Add a key:v value:ty pair to the context *)
 let add_to_context v ty (ctx, t, u) = (OldUtils.update v ty ctx, t, u)
 
@@ -120,6 +123,9 @@ let get_context (ctx, ty, u) = ctx
 
 (* Convert a type scheme to a new dirty type scheme (used for values) *)
 let make_dirty (ctx, ty, constraints) = (ctx, (ty, Type.fresh_dirt ()), constraints)
+
+(* Convert a dirty type scheme to a clean type scheme *)
+let make_clean (ctx, (ty, drt), constraints) = (ctx, ty, constraints)
 
 (* Refresh a scheme (generate new type/dirt variables) *)
 let refresh (ctx, ty, cnstrs) =
@@ -154,6 +160,8 @@ and abstract2 ~loc (ctx_p1, ty_p1, cnstrs_p1) (ctx_p2, ty_p2, cnstrs_p2) (ctx_c,
 (***************************)
 
 let var ~loc x ty = solve_ty ([(x, ty)], ty, Unification.empty)
+
+let tmpvar ~loc x ty = solve_ty ([], ty, Unification.empty)
 
 let const ~loc c =
   let ty = match c with
@@ -266,6 +274,11 @@ let handle ~loc e c =
   in
   solve_dirty (ctx_e @ ctx_c, drty, constraints)
 
+let letbinding ~loc c1 c2 =
+  let ctx_c1, ty_c1, cnstrs_c1 = c1 in
+  let ctx_c2, (ty_p, ty_c2), cnstrs_c2 = c2 in
+  solve_dirty (ctx_c1 @ ctx_c2, ty_c2, Unification.empty)
+
 (************************)
 (* PATTERN CONSTRUCTORS *)
 (************************)
@@ -299,7 +312,7 @@ let ptuple ~loc ps =
   in
   let ctx, tys, chngs = List.fold_right infer ps ([], [], Unification.empty) in
   let ty = Type.Tuple tys in
-  solve_ty (simple ty)
+  solve_ty (make ctx ty)
 
 let precord ~loc ctx ty changes = solve_ty (create_ty_scheme ctx ty changes)
 

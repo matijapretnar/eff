@@ -39,28 +39,33 @@ let fix_type ty =
   end
 
 (* Add an effect to the environment *)
-let add_effect env eff (ty1, ty2) =
-  {env with effects = Untyped.EffectMap.add eff (fix_type ty1, fix_type ty2) env.effects}
+let add_effect st eff (ty1, ty2) =
+  {st with effects = Untyped.EffectMap.add eff (fix_type ty1, fix_type ty2) st.effects}
 
 (* Add x : Typed.variable, ty_sch : Scheme.ty_scheme to the environment *)
-let add_def env x ty_sch =
-  {env with context = TypingEnv.update env.context x ty_sch}
+let add_def st x ty_sch =
+  {st with context = TypingEnv.update st.context x ty_sch}
 
 (* Add vars : (Typed.variable * Scheme.ty_scheme) list to the environment *)
-let add_multiple_defs vars env =
-  List.fold_right (fun (x, ty_sch) env -> {env with context = TypingEnv.update env.context x ty_sch}) vars env
+let add_multiple_defs vars st =
+  List.fold_right (fun (x, ty_sch) st -> {st with context = TypingEnv.update st.context x ty_sch}) vars st
 
 (* Lookup a type scheme for a variable in the typing environment
     Otherwise, create a new scheme (and add it to the typing environment)
 *)
 let get_var_scheme_env ~loc st x =
   begin match TypingEnv.lookup st.context x with
-    | Some ty_sch -> ty_sch, st
-    | None -> let ty = Type.fresh_ty () in
-              let sch = Scheme.var ~loc x ty in
-              sch, add_def st x sch
+    | Some ty_sch -> ty_sch
+    | None -> (* Error.typing ~loc "Unbound poly variable %t" (Variable.print ~safe:true x) *)
+              let ty = Type.fresh_ty () in
+              let sch = Scheme.tmpvar ~loc x ty in
+              sch
   end
 
+let backup_location loc locs =
+  match loc with
+  | None -> Location.union locs
+  | Some loc -> loc
 (**************************)
 (* PATTERN TYPE INFERENCE *)
 (**************************)
@@ -153,11 +158,50 @@ and type_abstraction2 st loc ctx (p1, p2, c) =
   let comp, st = type_comp_ctx st (ctx @ (Scheme.get_context pat1.Typed.scheme) @ (Scheme.get_context pat2.Typed.scheme)) c in
   Ctor.abstraction2 ~loc pat1 pat2 comp
 
-(* and type_let_defs ~loc env defs =
+and let_rec_defs ~loc defs =
+  let add_binding (x, a) (poly_tys, ctx) =
+    let ctx_a, (ty_p, drty_c), cnstrs_a = a.Typed.scheme in
+    let poly_tys = (x, Type.Arrow (ty_p, drty_c)) :: poly_tys in
+    poly_tys, ctx_a @ ctx
+  in
+  let poly_tys, ctx = List.fold_right add_binding defs ([], []) in
+  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.make ctx ty) poly_tys in
+  poly_tyschs
+
+and type_let_rec_defs ~loc st defs =
+  let defs' = OldUtils.assoc_map (type_abstraction st loc []) defs in
+  let defs' = OldUtils.assoc_map (fun (a, st) -> a) defs' in
+  let poly_tyschs = let_rec_defs ~loc defs' in
+  let st = add_multiple_defs poly_tyschs st in
+  let defs' = OldUtils.assoc_map (type_abstraction st loc []) defs in
+  let defs' = OldUtils.assoc_map (fun (a, st) -> a) defs' in
+  defs', poly_tyschs, st
+
+and let_defs ~loc defs =
+  let add_binding (p, c) (poly_tys, ctx) =
+    let ctx_p, ty_p, _ = p.Typed.scheme in
+    let ctx_c, drty_c, _ = c.Typed.scheme in
+    let ctx_let = Unification.unify_let (ctx_p, ty_p) (ctx_c, drty_c) in
+    let poly_tys =
+      match c.Typed.term with
+      | Typed.Value _ ->
+        ctx_let @ poly_tys
+      | Typed.Apply _ | Typed.Match _ | Typed.Handle _ 
+      | Typed.LetRec _ | Typed.Bind _ | Typed.Call _ ->
+        ctx_let @ poly_tys
+    in
+    poly_tys, ctx_c @ ctx
+  in
+  let poly_tys, ctx = List.fold_right add_binding defs ([], []) in
+  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.make ctx ty) poly_tys in
+  poly_tyschs
+
+and type_let_defs ~loc st defs =
   let defs' = List.map (fun (p, c) -> (type_pattern st p, type_comp st c)) defs in
-  let defs'', poly_tyschs, _, _ = Typed.let_defs ~loc defs' in
-  let env' = extend_env poly_tyschs env in
-  env', defs'' *)
+  let defs' = List.map (fun ((p, _), (c, _)) -> (p, c)) defs' in
+  let poly_tyschs = let_defs ~loc defs' in
+  let st = add_multiple_defs poly_tyschs st in
+  defs', poly_tyschs, st
 
 (*****************************)
 (* EXPRESSION TYPE INFERENCE *)
@@ -171,12 +215,20 @@ and type_expr st ctx {Untyped.term=expr; Untyped.location=loc} = type_plain_expr
 (* Type a plain expression *)
 and type_plain_expr st loc ctx = function
   | Untyped.Var x ->
-    (* let ty_sch, st = get_var_scheme_env ~loc st x in *)
-    let ty = begin match OldUtils.lookup x ctx with
-        | Some ty -> ty
-        | None -> Error.typing ~loc "Unbound variable %t" (Variable.print ~safe:true x)
-      end in
-    Ctor.lambdavar ~loc x ty, st
+    (* the parser only parses into Untyped.var and 
+       does not distinguish between lambda-bound variables
+       and let-bound variables. 
+       Thus, we need to make this distinction ourselves.
+       
+       Lookup the variable in the context, which includes only
+       lambda-bound variables.
+       If we can find the variable, it is lambda-bound.
+       Otherwise, check the (polymorphic) context 
+    *)
+    begin match OldUtils.lookup x ctx with
+        | Some ty -> Ctor.lambdavar ~loc x ty, st
+        | None -> Ctor.letvar ~loc x (get_var_scheme_env ~loc st x), st
+      end
   | Untyped.Const const ->
     Ctor.const ~loc const, st
   | Untyped.Tuple es ->
@@ -243,28 +295,36 @@ and type_plain_comp st loc ctx = function
     let comp, st = type_comp st c in
     Ctor.handle ~loc exp comp, st
   | Untyped.Let (defs, c) ->
-    assert false
-    (* let defs, st = type_let_defs ~loc st defs in *)
-    (* let c = type_comp st c in *)
-    (* Ctor.letbinding ~loc defs c *)
-  (* | Untyped.LetRec (defs, c) -> *)
-    (* TODO *)
-    (* assert false *)
-    (* let env', defs' = type_let_rec_defs ~loc env defs in
-    let env', defs' = type_let_rec_defs ~loc env' defs in
-    Typed.let_rec' ~loc defs' (type_comp env' c) *)
+    let defs, _, st = type_let_defs ~loc st defs in
+    let c, st = type_comp st c in
+    Ctor.letbinding ~loc defs c, st
+  | Untyped.LetRec (defs, c) ->
+    let defs, _, st = type_let_rec_defs ~loc st defs in
+    let c, st = type_comp st c in
+    Ctor.letrecbinding ~loc defs c, st
 
 (***************************)
 (* TOPLEVEL TYPE INFERENCE *)
 (***************************)
 
+let infer_top_let_rec ?loc st defs =
+  let loc = backup_location loc [] in
+  let defs, vars, st = type_let_rec_defs ~loc st defs in
+  (* List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs; *)
+  defs, vars, st
+
+let infer_top_let ?loc st defs =
+  let loc = backup_location loc [] in
+  let defs, vars, st = type_let_defs ~loc st defs in
+  (* List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs; *)
+  defs, vars, st
+
 (* Execute type inference for a toplevel command *)
-let type_toplevel ~loc ppf st = function
+let type_toplevel ~loc st = function
   (* Main toplevel command for toplevel computations *)
   | Untyped.Computation c ->
     (* Do not capture state since we do not want to persist it *)
     let c, _ = type_comp st c in
-    Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme c.Typed.scheme);
     Typed.Computation c, st
   (* Use keyword: include a file *)
   | Untyped.Use fn ->
@@ -284,12 +344,12 @@ let type_toplevel ~loc ppf st = function
     Typed.Tydef defs, st
   (* Top let command: let x = c1 in c2 *)
   | Untyped.TopLet defs ->
-    (* TODO *)
-    assert false
+    let defs, vars, st = infer_top_let ~loc st defs in
+    Typed.TopLet (defs, vars), st
   (* Top letrec command: let rec x = c1 in c2 *)
-  (* | Untyped.TopLetRec defs'' -> *)
-    (* TODO *)
-    (* assert false *)
+  | Untyped.TopLetRec defs ->
+    let defs, vars, st = infer_top_let_rec ~loc st defs in
+    Typed.TopLetRec (defs, vars), st
   (* Exernal definition *)
   | Untyped.External (x, ty, f) ->
     let st = add_def st x (Scheme.simple ty) in
@@ -301,7 +361,6 @@ let type_toplevel ~loc ppf st = function
   (* Get the type of *)
   | Untyped.TypeOf c ->
     let c, st = type_comp st c in
-    Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme c.Typed.scheme);
     Typed.TypeOf c, st
 
 (**************************)
@@ -311,7 +370,7 @@ let type_toplevel ~loc ppf st = function
 (* Execute typing for a single toplevel command *)
 let type_cmd st cmd =
   let loc = cmd.Untyped.location in
-  (* let cmd, st = type_toplevel ~loc st cmd.Untyped.term in *)
+  let cmd, st = type_toplevel ~loc st cmd.Untyped.term in
   (cmd, loc), st
 
 (* Go through all *toplevel* commands and execute type inference *)
