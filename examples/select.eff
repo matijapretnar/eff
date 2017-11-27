@@ -4,48 +4,75 @@
 (* A version of ambivalent choice which tells how it found the desired value. *)
 
 type 'a result = Failure | Success of 'a
-  
-type ('a, 'b) selection = effect
-    operation select: 'a * 'b list -> 'b
- end
 
-let select s v = handler
-  | s#select (x,ys) k -> (fun cs ->
-    (match assoc x cs with
-     | Some y -> k y cs
+(* #Select_int takes a variable name and a list of possible integer choices
+   and chooses one. *)
+
+effect Select_int: string * int list -> int
+
+(* The handler tries out all choices until it finds one that leads to the
+   desired outcome. All current choices are saved in an association list. *)
+
+let selection_collector desired_outcome = handler
+  | #Select_int (name, choices) k -> (fun selected ->
+    (* Check association list if variable already chosen. *)
+    (match assoc name selected with
+     | Some y -> k y selected
      | None ->
+       (* Select a value and try to get desired outcome. *)
          let rec try = function
            | [] -> Failure
            | y::ys ->
-               (match k y ((x,y)::cs) with
+               (match k y ((name,y)::selected) with
                   | Success lst -> Success lst
                   | Failure -> try ys)
-         in try ys))
-  | val u -> (fun cs ->
-      if u = v then Success cs else Failure)
-  | finally f -> f [];;
+         in try choices))
+  | val outcome -> (fun selected ->
+    (* Check if outcome is the desired one. *)
+    if outcome = desired_outcome then Success selected else Failure)
+  (* Because we are passing a state, we need to start with an empty assoc list.*)
+  | finally f -> f []
+;;
 
 (* Search for a Pythagorean triple. It finds a=5, b=12, c=13. *)
-let s = new selection in
-with select s true handle
-  let a = s#select ("a", [5;6;7;8]) in
-  let b = s#select ("b", [9;10;11;12]) in
-  let c = s#select ("c", [13;14;15;16]) in
+with selection_collector true handle
+  let a = #Select_int ("a", [5;6;7;8]) in
+  let b = #Select_int ("b", [9;10;11;12]) in
+  let c = #Select_int ("c", [13;14;15;16]) in
     a*a + b*b = c*c;;
 
 (* Martin Escardo's epsilon. *)
 
+effect Select_bool: int * bool list -> bool
+
+(* Modify handler for booleans.*)
+let selection_collector desired_outcome = handler
+  | #Select_bool (name, choices) k -> (fun selected ->
+    (match assoc name selected with
+     | Some y -> k y selected
+     | None ->
+         let rec try = function
+           | [] -> Failure
+           | y::ys ->
+               (match k y ((name,y)::selected) with
+                  | Success lst -> Success lst
+                  | Failure -> try ys)
+         in try choices))
+  | val outcome -> (fun selected ->
+    if outcome = desired_outcome then Success selected else Failure)
+  | finally f -> f [];;
+
+(* Define epsilon. *)
 let epsilon p =
-  let s = new selection in
-  let r = (with select s true handle
-             p (fun n -> s#select (n, [false; true])))
-  in
-    match r with
-      | Failure -> (fun _ -> false)
-      | Success lst ->
-        (fun n -> match assoc n lst with
-                  | None -> false | Some b -> b)
-;;
+    let r = (with selection_collector true handle
+               p (fun n -> #Select_bool (n, [false; true])))
+    in
+      match r with
+        | Failure -> (fun _ -> false)
+        | Success lst ->
+          (fun n -> match assoc n lst with
+                    | None -> false | Some b -> b)
+  ;;
 
 (* From epsilon we can define existential and universal quantifiers. *)
 let some p = p (epsilon p);;
@@ -67,9 +94,9 @@ let rec xor n x =
 take (epsilon (xor 300)) 300;;
 
 (* To get an example which takes some time we need a predicate
-   whic is true only on a small portion of the entire space.*)
+   which is true only on a small portion of the entire space. *)
 let rec is_alternating n b x =
-  if n = 0 then x 0 = b else 
+  if n = 0 then x 0 = b else
     let u = (x n = b) in
     let v = is_alternating (n-1) (not b) x in
       u && v;;
