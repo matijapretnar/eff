@@ -413,7 +413,121 @@ and type_plain_expr in_cons st = function
         let (in_ty,out_ty) =  Untyped.EffectMap.find eff st.effects in
         let s = Types.list_to_effect_set [eff] in
         (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,(Types.SetEmpty s))) , [], []) 
+
+  | Untyped.Handler h -> 
+        let in_ty_var = Params.fresh_ty_param () in 
+        let in_dirt_var = Params.fresh_dirt_param () in
+        let out_ty_var = Params.fresh_ty_param () in 
+        let out_dirt_var = Params.fresh_dirt_param () in
+        let in_ty = Types.Tyvar in_ty_var in 
+        let in_dirt = Types.SetVar (Types.empty_effect_set, in_dirt_var) in 
+        let out_ty = Types.Tyvar (out_ty_var) in 
+        let out_dirt = Types.SetVar (Types.empty_effect_set, out_dirt_var) in
+        let in_skel_var = Params.fresh_skel_param () in
+        let in_skel = Types.SkelVar (in_skel_var) in 
+        let out_skel_var = Params.fresh_skel_param () in 
+        let out_skel = Types.SkelVar (out_skel_var) in 
+        let skel_cons_in = Typed.TyvarHasSkel (in_ty_var, in_skel) in 
+        let skel_cons_out = Typed.TyvarHasSkel (out_ty_var, out_skel) in 
+
+
+        let target_type = Types.Handler ((in_ty,in_dirt), (out_ty,out_dirt)) in 
+        let r_ty_var = Params.fresh_ty_param () in 
+        let r_skel_var = Params.fresh_skel_param () in 
+        let r_ty = Types.Tyvar r_ty_var in
+        let r_skel = Types.SkelVar r_skel_var in 
+        let r_ty_skel_cons = Typed.TyvarHasSkel (r_ty_var, r_skel) in
+        let r_cons = r_ty_skel_cons :: in_cons in 
+        let Some (pr,cr) = h.value_clause in  
+        let Untyped.PVar x = pr.Untyped.term in
+        let r_st = add_def st x r_ty in
+        let (target_cr_term,(target_cr_ty,target_cr_dirt),target_cr_cons,target_cr_sub) = type_comp r_cons r_st cr in 
         
+
+        let r_subbed_st = apply_sub_to_env st target_cr_sub in
+        let folder = 
+          fun (acc_terms,acc_tys,acc_st,acc_cons,acc_subs,acc_alpha_delta_i) (eff,abs2) -> 
+            let (typed_c_op, typed_co_op_ty, s_st, co_op_cons, c_op_sub, (alpha_i,delta_i)) = get_handler_op_clause eff abs2 acc_st acc_cons acc_subs in 
+            (typed_c_op :: acc_terms, typed_co_op_ty:: acc_tys, s_st, co_op_cons @ acc_cons , c_op_sub @ acc_subs , (alpha_i,delta_i) :: acc_alpha_delta_i ) in
+        let folder_function = List.fold_left folder ([],[],r_subbed_st,target_cr_cons,[],[]) h.effect_clauses in 
+        let (typed_op_terms,typed_op_terms_ty, _,cons_n, subs_n , alpha_delta_i_s) = folder_function in 
+        let cons_1 = (( Unification.apply_substitution_ty (target_cr_sub @ subs_n) target_cr_ty ), out_ty) in 
+        let cons_2 = ((Unification.apply_substitution_dirt subs_n target_cr_dirt), out_dirt) in
+        let cons_6 = (in_ty, Unification.apply_substitution_ty (target_cr_sub @subs_n) r_ty) in 
+        let coer1 = Params.fresh_ty_coercion_param () in 
+        let coer2 = Params.fresh_dirt_coercion_param () in 
+        let coer6 = Params.fresh_ty_coercion_param () in 
+        let omega_1 = Typed.TyCoercionVar coer1 in 
+        let omega_2 = Typed.DirtCoercionVar coer2 in
+        let omega_6 = Typed.TyCoercionVar coer6 in 
+        let omega_cons_1 = Typed.TyOmega (coer1 , cons_1) in 
+        let omega_cons_2 = Typed.DirtOmega (coer2, cons_2) in
+        let omega_cons_6 = Typed.TyOmega (coer6, cons_6) in 
+
+        let y_var_name = Typed.Variable.fresh "fresh_var" in 
+        let y = Typed.PVar (y_var_name ) in 
+        let annot_y = Typed.annotate y Location.unknown in 
+        let exp_y = Typed.annotate (Typed.Var y_var_name) Location.unknown in
+        let coerced_y = Typed.annotate (Typed.CastExp(exp_y,omega_6)) exp_y.location in
+        let substituted_c_r = Typed.subst_comp [(x, coerced_y.term)] (Unification.apply_substitution (subs_n) target_cr_term) in 
+        let coerced_substiuted_c_r = Typed.annotate (Typed.CastComp(substituted_c_r,Typed.BangCoercion(omega_1,omega_2))) Location.unknown in
+        let typed_value_clause = Typed.abstraction annot_y coerced_substiuted_c_r in 
+
+        let mapper =
+          fun (op_term,(op_term_ty,op_term_dirt),(alpha_i,delta_i)) (eff,abs2) ->
+            let (in_op_ty,out_op_ty) =  Untyped.EffectMap.find eff st.effects in
+            let (x,k,c_op) = abs2 in
+            let Untyped.PVar x_var = x.Untyped.term in
+            let Untyped.PVar k_var = k.Untyped.term in
+            let cons_3 = ((Unification.apply_substitution_ty subs_n op_term_ty), out_ty ) in
+            let cons_4 = ((Unification.apply_substitution_dirt subs_n op_term_dirt), out_dirt) in 
+            let cons_5a = Types.Arrow (out_op_ty, (out_ty,out_dirt)) in 
+            let cons_5b = Types.Arrow (out_op_ty, ((Unification.apply_substitution_ty subs_n alpha_i), (Unification.apply_substitution_dirt subs_n delta_i))) in 
+            let cons_5 = (cons_5a, cons_5b) in 
+            let coer3 = Params.fresh_ty_coercion_param () in 
+            let coer4 = Params.fresh_dirt_coercion_param () in 
+            let coer5 = Params.fresh_ty_coercion_param () in 
+            let omega_3 = Typed.TyCoercionVar coer1 in 
+            let omega_4 = Typed.DirtCoercionVar coer2 in
+            let omega_5 = Typed.TyCoercionVar coer6 in 
+            let omega_cons_3 = Typed.TyOmega (coer3 , cons_3) in 
+            let omega_cons_4 = Typed.DirtOmega (coer4, cons_4) in
+            let omega_cons_5 = Typed.TyOmega (coer5, cons_5) in
+            let l_var_name = Typed.Variable.fresh "fresh_var" in 
+            let l = Typed.PVar (l_var_name ) in 
+            let annot_l = Typed.annotate l Location.unknown in
+            let exp_l = Typed.annotate (Typed.Var l_var_name) Location.unknown in 
+            let coerced_l = Typed.annotate (Typed.CastExp (exp_l ,omega_5)) Location.unknown in 
+            let substituted_c_op= Typed.subst_comp [(k_var, coerced_l.term)] (Unification.apply_substitution (subs_n) op_term) in 
+            let coerced_substiuted_c_op = Typed.annotate (Typed.CastComp(substituted_c_op,Typed.BangCoercion(omega_3,omega_4))) Location.unknown in
+            let target_effect = (eff, (in_op_ty,out_op_ty)) in 
+            ((target_effect, Typed.abstraction2 (type_pattern x) annot_l coerced_substiuted_c_op),
+              [omega_cons_3; omega_cons_4; omega_cons_5]) in 
+        
+        let mapper_input_a = List.map2 (fun a b -> (a,b) ) typed_op_terms typed_op_terms_ty in 
+        let mapper_input = List.map2 (fun (a,b) c -> (a,b,c)) mapper_input_a alpha_delta_i_s in
+        let new_op_clauses_with_cons = List.map2  mapper mapper_input h.effect_clauses in 
+        let new_op_clauses = List.map (fun (x,y) -> x) new_op_clauses_with_cons in
+        let ops_cons = OldUtils.flatten_map (fun (x,y) -> y ) new_op_clauses_with_cons in  
+        let target_handler = 
+            {
+            Typed.effect_clauses = new_op_clauses;
+            value_clause = typed_value_clause;
+            } in
+        let typed_handler = Typed.annotate (Typed.Handler target_handler) Location.unknown in
+        let for_set_handlers_ops = List.map (fun ((eff,(_,_)),_)-> eff) new_op_clauses in 
+        let ops_set = Types.list_to_effect_set for_set_handlers_ops in 
+        let handlers_ops = Types.SetVar (ops_set,out_dirt_var) in 
+        let cons_7 = (in_dirt, handlers_ops) in
+        let coer_7 = Params.fresh_dirt_coercion_param () in
+        let omega_7 = Typed.DirtCoercionVar (coer_7) in
+        let omega_cons_7 = Typed.DirtOmega (coer_7, cons_7) in 
+        let handler_in_bang = Typed.BangCoercion ((Typed.ReflTy (in_ty)), omega_7) in
+        let handler_out_bang = Typed.BangCoercion ((Typed.ReflTy(out_ty)), Typed.ReflDirt(out_dirt)) in
+        let handler_coercion = Typed.HandlerCoercion (handler_in_bang, handler_out_bang) in 
+        let coerced_handler = Typed.CastExp (typed_handler, handler_coercion) in 
+        let all_cons = [skel_cons_in; skel_cons_out; omega_cons_1; omega_cons_2; omega_cons_6; omega_cons_7] @ ops_cons in 
+        (coerced_handler,target_type, all_cons, subs_n @ target_cr_sub )
  (*   | Untyped.Handler h -> 
         let in_ty_var = Params.fresh_ty_param () in 
         let in_dirt_var = Params.fresh_dirt_param () in
@@ -663,6 +777,28 @@ and type_plain_comp in_cons st = function
         ((Typed.Bind (coer_c1,abstraction)), (type_c2,new_dirt_var), constraints, subs_c2 @ subs_c1) 
      end 
   | Untyped.LetRec (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+
+
+
+and get_handler_op_clause eff abs2 in_st in_cons in_sub =
+  let (in_op_ty,out_op_ty) =  Untyped.EffectMap.find eff in_st.effects in
+  let (x,k,c_op) = abs2 in
+  let Untyped.PVar x_var = x.Untyped.term in
+  let Untyped.PVar k_var = k.Untyped.term in
+  let alpha_i_param = Params.fresh_ty_param () in 
+  let alpha_i = Types.Tyvar (alpha_i_param) in 
+  let skel_i = Types.SkelVar (Params.fresh_skel_param ()) in 
+  let delta_i =  Types.SetVar (Types.empty_effect_set,Params.fresh_dirt_param ()) in
+  let st_subbed = apply_sub_to_env in_st in_sub in 
+  let temp_st = add_def st_subbed x_var in_op_ty in
+  let new_st = add_def temp_st k_var (Types.Arrow (out_op_ty, (alpha_i,delta_i))) in 
+  let cons = (Typed.TyvarHasSkel (alpha_i_param, skel_i)) :: in_cons in 
+  let (typed_c_op, typed_co_op_ty, co_op_cons, c_op_sub) = type_comp cons new_st c_op in
+  (typed_c_op, typed_co_op_ty, st_subbed, co_op_cons, c_op_sub, (alpha_i,delta_i)) 
+
+
+
+
 
 let type_toplevel ~loc st c =
   let c' = Untyped.return_term c in
