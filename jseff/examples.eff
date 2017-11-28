@@ -307,8 +307,9 @@ with expectation handle
    computation. *)
 
 (* We first write a function that combines two outcome distributions where
-   the first outome distribution is chosen with the probability p and the second
+   the first outcome distribution is chosen with the probability p and the second
    with probability 1-p. *)
+
 let combine p dist1 dist2 =
   let scale p dist = map (fun (x, q) -> (x, p *. q)) dist in
   let rec add (x, p) = function
