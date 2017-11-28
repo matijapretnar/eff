@@ -1,35 +1,52 @@
 (* Yield from http://parametricity.net/dropbox/yield.subc.pdf *)
 
-type ('i, 'o) yield = effect
-  operation yield : 'o -> 'i
-end
+(* The type is output_type -> input_type. *)
+effect Yield : int -> int
 
 type ('i, 'o, 'r) iterator =
+  (* Final result of iterator. *)
   | Result of 'r
+  (* Suspended value encapsulating the yielded value and the updated iterator. *)
   | Susp of 'o * ('i -> ('i, 'o, 'r) iterator)
+;;
 
-let run y = handler
-  | y#yield x k -> Susp (x, k)
-  | val x -> Result x
+let run = handler
+  | #Yield x k -> Susp (x, k) (* Return the value of yield and the continuation
+                                as the updated iterator. *)
+  | val x -> Result x (* The iterator has finished. *)
+;;
+
+(* Example of depthWalk presented in the original paper. *)
 
 type 'a tree = Node of 'a tree * 'a tree | Leaf of 'a;;
 
-let rec depthWalk y = function
+(* A function that traverses the tree and transforms the leaves by using the
+   iterator. *)
+let rec depthWalk = function
   | Node (l, r) ->
-      let l' = depthWalk y l in
-      let r' = depthWalk y r in
+      let l' = depthWalk l in
+      let r' = depthWalk r in
       Node (l', r')
   | Leaf a ->
-      let b = y#yield a in
-      Leaf b;;
+      let b = #Yield a in
+      Leaf b
+;;
 
-let renum y = handler
-  | y#yield n k -> k (n + 1);;
+(* The actual iterator behaviour is defined in the handler. *)
+let rec renum = function
+  | Susp(x,k) -> renum (k (x+1))
+  | Result r -> r
+;;
 
-let y = new yield in
-with renum y handle
-  depthWalk y (Node (Leaf 10, Leaf 20));;
+let iter_tree =
+  (with run handle
+  depthWalk (Node (Leaf 10, Leaf 20)))
+in
+renum iter_tree
+;;
 
+
+(* Translation of yield to shift and reset. *)
 let shift y f = y#yield f
 
 let rec reset y thunk =
@@ -49,4 +66,3 @@ let yin = (fun k -> std#print "@"; k) (shift y (fun k -> k k)) in
 let yang = (fun k -> std#print "*"; k) (shift y (fun k -> k k)) in
   yin yang);;
 *)
-

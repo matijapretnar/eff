@@ -71,6 +71,7 @@ let state = handler
   | finally g -> g 0.
 ;;
 
+(* A function that simulates a walk. *)
 let walk n p q =
   let s = 1.0 -. p -. q in
   with state handle
