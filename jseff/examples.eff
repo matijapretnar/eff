@@ -64,9 +64,7 @@ let perimeter = function
    but the handler overrides it just as an exception handler would override an
    exception. Thus, the program should output just:
 
-    "I see you tried to print A. Not so fast!"
-
-   *)
+    "I see you tried to print A. Not so fast!" *)
 
 handle
     #Print "A";
@@ -79,12 +77,12 @@ with
 ;;
 
 (* You may be wondering what the second parameter "k" in the handling clause
-   for #Print is. It stands for the continuation, i.e. the part of the program
+   for Print is. It stands for the continuation, i.e. the part of the program
    that is waiting for the result of print. The difference between exception
    handlers and general effect handlers is that we may call this continuation.
    For example, instead of stopping after the first print like above, we may
    handle it and then resume the continuation by passing it "()", the unit
-   result expected from the call of "#Print". *)
+   result expected from the call of Print. *)
 
 handle
     #Print "A";
@@ -98,13 +96,16 @@ with
 ;;
 
 (* The handlers may be even more complex. For example, we may create a handler
-   to collect all #Print calls, and instead of printing the strings separately,
-   the handler returns a combined string. *)
+   to collect all Print calls, and instead of printing the strings separately,
+   the handler returns a combined string of all prints. *)
 
 let collect = handler
+    (* We return the value of the computation and a string. *)
     | val x -> (x, "")
     | #Print msg k ->
-        let (result, msgs) = k () in
+      (* First see what the rest of the computation returns and prints... *)
+      let (result, msgs) = k () in
+      (* Add the string that we want to print at the begining. *)
         (result, msg ^ msgs)
 ;;
 
@@ -125,7 +126,7 @@ effect Fail : unit -> empty
 effect Decide : unit -> bool
 
 (* We use a trick to ensure that using Fail typechecks correctly by wrapping
-   it into a function. For aesthetic purposes we also wrap Decide in a function. *)
+   it in a function. For aesthetic purposes we also wrap Decide in a function. *)
 
 let fail () = (match #Fail () with)
 let decide () = #Decide ()
@@ -133,7 +134,7 @@ let decide () = #Decide ()
 
 (* We create a few different handlers to handle the above effects. The simplest
    handler is "choose_true" that always decides to use true. A more interesting
-   example is the "choose_max" handler, that returns the maximal result for all
+   example is the "choose_max" handler, that returns the maximal result of all
    possible choices, while "choose_all" instead returns a list of all possible
    results. *)
 
@@ -141,6 +142,7 @@ let choose_true =
     handler
     | #Decide () k -> k true
 
+(* In the case of choose_max and choose_all the continuation is used twice.*)
 let choose_max =
     handler
     | #Decide () k -> max (k true) (k false)
@@ -154,20 +156,20 @@ let choose_all =
 
 (* Even on a small example the behaviour of the three handlers varies greatly. *)
 with choose_true handle
-  let x = (if #Decide () then 10 else 20) in
-  let y = (if #Decide () then 0 else 5) in
+  let x = (if decide () then 10 else 20) in
+  let y = (if decide () then 0 else 5) in
   x - y
 ;;
 
 with choose_max handle
-  let x = (if #Decide () then 10 else 20) in
-  let y = (if #Decide () then 0 else 5) in
+  let x = (if decide () then 10 else 20) in
+  let y = (if decide () then 0 else 5) in
   x - y
 ;;
 
 with choose_all handle
-  let x = (if #Decide () then 10 else 20) in
-  let y = (if #Decide () then 0 else 5) in
+  let x = (if decide () then 10 else 20) in
+  let y = (if decide () then 0 else 5) in
   x - y
 ;;
 
@@ -177,14 +179,16 @@ with choose_all handle
 let rec choose_int m n =
   if m > n then
     fail ()
-  else if #Decide () then
+  else if decide () then
     m
   else
     choose_int (m + 1) n
 ;;
 
 (* This can be used for finding pythagorean triples. *)
+
 let int_sqrt m =
+  (* Returns an integer square root if it exists. *)
   let rec try n =
     let n2 = n ** 2 in
     if n2 > m then
@@ -197,9 +201,9 @@ let int_sqrt m =
   try 0
 
 let pythagorean m n =
-  (* Choose bigger integer. *)
+  (* Choose the bigger integer. *)
   let a = choose_int m (n - 1) in
-  (* Choose smaller integer. *)
+  (* Choose the smaller integer. *)
   let b = choose_int a n in
   (* Check if they are part of a pythagorean triple. *)
   match int_sqrt (a ** 2 + b ** 2) with
@@ -210,13 +214,13 @@ let pythagorean m n =
 (* We also construct an additional handler that simply tries to get one viable
    solution. *)
 let backtrack = handler
-| #Decide () k ->
+  | #Decide () k ->
+    (* We use a second handler to handle the continuation. *)
     handle k false with
     | #Fail () _ -> k true
 ;;
 
-
-(* You can test the above handlers on the following examples. *)
+(* You can test the different handlers on the following examples. *)
 with choose_all handle
   pythagorean 5 7
 ;;
@@ -241,7 +245,7 @@ with choose_all handle
 
 let rec choose = function
   | [] -> fail ()
-  | x :: xs -> if #Decide () then x else choose xs
+  | x :: xs -> if decide () then x else choose xs
 
 let no_attack (x, y) (x', y') =
   x <> x' && y <> y' && abs (x - x') <> abs (y - y');;
@@ -268,9 +272,9 @@ with backtrack handle
 (** Probability *)
 
 (* As seen in non-determinism examples, effects can be used to simulate choice.
-   In order to use randomness we also need to use effects, but with more advanced
-   handlers we can compute more interesting things, for instance the expected
-   value of a discrete random variable. *)
+   In order to use randomness we also need to use effects, for instance
+   Random_int and Random_float. We can also use handlers to compute some
+   properties, for instance the expected value of a discrete random variable. *)
 
 (* We define an operation Toss to use as a random coin toss. *)
 effect Toss : float -> bool
@@ -282,6 +286,11 @@ let rec uniform = function
       let n = length xs + 1 in
       let p = 1.0 /. float_of_int n in
       if #Toss p then x else uniform xs
+
+let random_value = handler
+  | val v -> v
+  | #Toss p k ->
+    let toss = #Random_float 1. < p in k toss
 
 let expectation = handler
   | val v -> v
@@ -298,7 +307,8 @@ with expectation handle
    computation. *)
 
 (* We first write a function that combines two outcome distributions where
-   the first outome distribution is chosen with the probability p. *)
+   the first outome distribution is chosen with the probability p and the second
+   with probability 1-p. *)
 let combine p dist1 dist2 =
   let scale p dist = map (fun (x, q) -> (x, p *. q)) dist in
   let rec add (x, p) = function
@@ -311,8 +321,8 @@ let combine p dist1 dist2 =
   fold_right add dist1 dist2
 
 let distribution = handler
-  | val v -> [(v, 1.0)]
-  | #Toss p k -> combine p (k true) (k false)
+  | val v -> [(v, 1.0)] (* Distribution of only one value. *)
+  | #Toss p k -> combine p (k true) (k false) (* Combine possible distributions. *)
 ;;
 
 with distribution handle
@@ -350,7 +360,7 @@ f 30
 (* We can improve it by giving the state a default initial value using the
    "finally" keyword. The value of the initial value is given to the handler
    as a parameter. By modifying the case for values we also return the result
-   and the final state value. *)
+   and the final state value instead of just the result. *)
 
 let better_state initial = handler
   | val y -> (fun s -> (y, s))
@@ -364,31 +374,6 @@ with better_state 30 handle
   #Set (2 * x);
   #Get () + 10
 ;;
-
-(*
-let transaction r = handler
-  | r#get () k -> (fun s -> k s s)
-  | r#set s' k -> (fun s -> k () s')
-  | val x -> (fun s -> r#set s; x)
-  | finally f -> f (r#get ())
-
-let e = new exception
-
-;;
-
-with better_state r 10 handle
-  handle
-    r#set 20;
-    (with transaction r handle
-      r#set 30;
-      r#set 50);
-    print (r#get ())
-  with
-  e#raise x _ -> print (x, r#get ())
-
-;;
-*)
-
 
 (** Multi-threading *)
 
