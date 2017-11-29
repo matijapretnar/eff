@@ -42,22 +42,35 @@ with amb handle
 effect Get_next : unit -> ((bool -> result)*bool) option
 effect Add_to_que : ((bool -> result)*bool) -> unit
 
+(* The que has two operations, Get_next that returns the next element of the
+   que, and Add_to_que that enqueues the given element. *)
+
 let que initial = handler
   | #Get_next () k ->
-    ( function
+    ( fun que -> match que with
     | [] -> k None []
     | hd::tl -> k (Some hd) tl )
-  | #Add_to_que x k -> ( fun que -> k () (que @ [x]))
+  | #Add_to_que y k -> ( fun que -> k () (que @ [y]))
   | val x -> ( fun _ -> x)
   | finally x -> x initial
 ;;
 
+(* Runs the next choice from the que. *)
+let run_next () =
+  (match #Get_next () with
+  | None -> Failure
+  | Some (k,x) -> k x)
+
 let bfs = handler
   | #Select () k ->
-    (#Add_to_que (k, true); #Add_to_que (k, false);
-     match #Get_next () with
-        | None -> Failure
-        | Some (k,x) -> k x)
+    (* Add both choices to que and run next choice from que. *)
+    (#Add_to_que (k, true); #Add_to_que (k, false); run_next ())
+  | val r ->
+  (* When the computation fails, run the next choice. Final Failure comes
+     from the function run_next when the que is empty. *)
+    (match r with
+    |Success x -> Success x
+    |Failure -> run_next ())
 ;;
 
 (* We repeat 8-queen example with breadth-first-search. It is much slower
@@ -72,3 +85,6 @@ with bfs handle
       | None -> Failure
   in place 1 []
 ;;
+
+(* In this case using BFS is both slower and requires more code because we need
+   to have a que, but it is an example of how neatly handlers can be nested. *)
