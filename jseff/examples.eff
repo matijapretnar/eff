@@ -199,6 +199,7 @@ let int_sqrt m =
       try (n + 1)
   in
   try 0
+;;
 
 let pythagorean m n =
   (* Choose the bigger integer. *)
@@ -221,10 +222,6 @@ let backtrack = handler
 ;;
 
 (* You can test the different handlers on the following examples. *)
-with choose_all handle
-  pythagorean 5 7
-;;
-
 with backtrack handle
   pythagorean 5 15
 ;;
@@ -236,7 +233,6 @@ with choose_all handle
 with choose_all handle
   pythagorean 5 15
 ;;
-
 
 (* Eight queens problem *)
 
@@ -286,11 +282,13 @@ let rec uniform = function
       let n = length xs + 1 in
       let p = 1.0 /. float_of_int n in
       if #Toss p then x else uniform xs
+;;
 
 let random_value = handler
   | val v -> v
   | #Toss p k ->
     let toss = #Random_float 1. < p in k toss
+;;
 
 let expectation = handler
   | val v -> v
@@ -320,6 +318,7 @@ let combine p dist1 dist2 =
   let dist1 = scale p dist1 in
   let dist2 = scale (1.0 -. p) dist2 in
   fold_right add dist1 dist2
+;;
 
 let distribution = handler
   | val v -> [(v, 1.0)] (* Distribution of only one value. *)
@@ -381,52 +380,65 @@ with better_state 30 handle
 effect Yield : unit -> unit
 effect Spawn : (unit -> unit) -> unit
 
+(* We will need a que to keep track of inactive threads. *)
+effect Get_next : unit -> (unit -> unit) option
+effect Add_to_que : (unit -> unit) -> unit
 
-let round_robin c =
-  let threads = ref [] in
-  let enqueue t = threads := !threads @ [t] in
-  let dequeue () =
-    match !threads with
-    | [] -> ()
-    | t :: ts -> threads := ts; t ()
-  in
-  let rec scheduler () = handler
-    | c#yield () k -> enqueue k; dequeue ()
-    | c#spawn t k -> enqueue k; with scheduler () handle t ()
-    | val () -> dequeue ()
-  in
-  scheduler ()
-
-let c = new coop
-
+let que initial = handler
+  | #Get_next () k ->
+    ( fun que -> match que with
+    | [] -> k None []
+    | hd::tl -> k (Some hd) tl )
+  | #Add_to_que y k -> ( fun que -> k () (que @ [y]))
+  | val x -> ( fun _ -> x)
+  | finally x -> x initial
 ;;
 
-with round_robin c handle
-  c#spawn (fun _ ->
-    iter (fun x -> #Print x; c#yield ()) ["a"; "b"; "c"; "d"; "e"]
-  );
-  c#spawn (fun _ ->
-    iter (fun x -> #Print x; c#yield ()) ["A"; "B"; "C"; "D"; "E"]
-  )
+let round_robin =
+  let enqueue t =
+    #Add_to_que t
+  in
+  let dequeue () =
+    match #Get_next () with
+    | None -> ()
+    | Some t -> t ()
+  in
+  let rec rr_handler () = handler
+    | #Yield () k -> enqueue k; dequeue ()
+    | #Spawn t k -> enqueue k; with rr_handler () handle t ()
+    | val () -> dequeue ()
+  in
+  rr_handler ()
+;;
 
+(* Because the round_robin handler uses our que, we must nest the handlers. *)
+with que [] handle
+with round_robin handle
+  #Spawn (fun _ ->
+    iter (fun x -> #Print x; #Yield ()) ["a"; "b"; "c"; "d"; "e"]
+  );
+  #Spawn (fun _ ->
+    iter (fun x -> #Print x; #Yield ()) ["A"; "B"; "C"; "D"; "E"]
+  )
 ;;
 
 let rec fractions d e =
+  let rec find_fractions n =
+    (* If the fraction is reduced, print it and yield *)
+    if (gcd n d = 1) && d > n then
+      #Print (to_string n ^ "/" ^ to_string d ^ ", ");
+      #Yield (); find_fractions (n+1)
+    else if d < n then
+      find_fractions (n+1)
+    else ()
+  in
   (* Spawn a thread for the next denominator *)
-    if d <= e then c#spawn (fun _ -> c#yield (); fractions (d + 1) e) else () ;
-    (* List all the fractions with the current denominator *)
-    for numerator = 1 to d - 1 do
-      (* If the fraction is reduced, print it and yield *)
-      if gcd numerator d = 1 then
-        print_string (to_string numerator ^ "/" ^ to_string d ^ ", ");
-        c#yield ()
-      else ()
-    done
-
+  if d < e then #Spawn (fun _ -> #Yield (); fractions (d + 1) e) else () ;
+  (* List all the fractions with the current denominator *)
+  find_fractions 1
 ;;
 
-(* You can try this, but it may not stop. *)
-(*
-with round_robin c handle
-  fractions 1 4
-*)
+with que [] handle
+with round_robin handle
+  fractions 1 10
+;;

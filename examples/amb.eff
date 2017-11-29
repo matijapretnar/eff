@@ -42,9 +42,6 @@ with amb handle
 effect Get_next : unit -> ((bool -> result)*bool) option
 effect Add_to_que : ((bool -> result)*bool) -> unit
 
-(* The que has two operations, Get_next that returns the next element of the
-   que, and Add_to_que that enqueues the given element. *)
-
 let que initial = handler
   | #Get_next () k ->
     ( fun que -> match que with
@@ -55,19 +52,19 @@ let que initial = handler
   | finally x -> x initial
 ;;
 
-(* Runs the next choice from the que. *)
-let run_next () =
-  (match #Get_next () with
-  | None -> Failure
-  | Some (k,x) -> k x)
 
-let bfs = handler
-  | #Select () k ->
-    (* Add both choices to que and run next choice from que. *)
-    (#Add_to_que (k, true); #Add_to_que (k, false); run_next ())
+let bfs =
+  (* Auxilary function that runs the next choice. *)
+  let run_next () =
+    match #Get_next () with
+    | None -> Failure
+    | Some (k,x) -> k x
+  in
+  handler (* Handler definition. *)
+  | #Select () k -> #Add_to_que (k, true); #Add_to_que (k, false); run_next ()
+  (* When the computation fails, run the next choice. Final Failure
+     comes from run_next when the que is empty. *)
   | val r ->
-  (* When the computation fails, run the next choice. Final Failure comes
-     from the function run_next when the que is empty. *)
     (match r with
     |Success x -> Success x
     |Failure -> run_next ())
