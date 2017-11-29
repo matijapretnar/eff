@@ -422,13 +422,15 @@ with round_robin handle
   )
 ;;
 
+(* We can run an unbounded amount of threads. The following example enumerates all
+   reduced positive fractions less than 1 by spawning a thread for each denominator
+   between d and e. *)
 let rec fractions d e =
   let rec find_fractions n =
     (* If the fraction is reduced, print it and yield *)
-    if (gcd n d = 1) && d > n then
-      #Print (to_string n ^ "/" ^ to_string d ^ ", ");
-      #Yield (); find_fractions (n+1)
-    else if d < n then
+    (if (gcd n d = 1) then
+      #Print (to_string n ^ "/" ^ to_string d ^ ", "); #Yield ());
+    if d > n then
       find_fractions (n+1)
     else ()
   in
