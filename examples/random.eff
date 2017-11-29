@@ -3,63 +3,94 @@
 
 (* We represent finite distributions as lists of pairs (x,p) where
    p is the probability of event x. *)
-type 'a random = effect
-  operation pick : ('a * float) list -> 'a
-end
+effect Pick : float -> bool
 
-(* The uniofrm distribution on a given list of events. *)
-let uniform lst =
-  let n = length lst in
-    map (fun x -> (x, 1.0 /. float_of_int n)) lst;;
+(* Picks uniformly from given list of events. *)
+let rec uniform_pick = function
+  | [x] -> x
+  | x :: xs ->
+      let n = length xs + 1 in
+      let p = 1.0 /. float_of_int n in
+      if #Pick p then x else uniform_pick xs
+;;
 
-(* Combine a probability distribution of probability distributions
-   into a single probability distribution. This is the multiplication
-   of the relevant monad. *)
-let combine lst =
-  let scale p xs = map (fun (i, x) -> (i, p *. x)) xs in
-  let rec add (i,x) = function
-    | [] -> [(i,x)]
-    | (j,y)::lst ->
-      if i = j then (j, x +. y) :: lst else (j,y) :: add (i,x) lst
+(* Picks according to distribution from a distribution list.
+   It is assumed that the distribution makes sense. *)
+
+let rec distribution_pick l =
+  let rec pick_aux acc = function
+  | [(x, _)] -> x
+  | (x, p)::xs ->
+    let adjusted_p = (p/.(1. -. acc)) in
+      if #Pick adjusted_p then x else dist_pick_aux (acc +. p) xs
   in
-    fold_left (fun e (d,p) -> fold_right add (scale p d) e) [] lst;;
+  pick_aux 0. l
+;;
+
+(* Combine two outcome distributions where the first outcome distribution is
+   chosen with the probability p and the second with probability 1-p. *)
+
+let combine p dist1 dist2 =
+  let scale p dist = map (fun (x, q) -> (x, p *. q)) dist in
+  let rec add (x, p) = function
+    | [] -> [(x, p)]
+    | (y, q) :: dist ->
+      if x = y then (x, p +. q) :: dist else (y, q) :: add (x, p) dist
+  in
+  let dist1 = scale p dist1 in
+  let dist2 = scale (1.0 -. p) dist2 in
+  fold_right add dist1 dist2
+;;
 
 (* This handler computes the distribution of outcomes of a probabilisitic
    computation. *)
-let distribution r = handler
-  | val v -> [(v, 1.0)]
-  | r#pick lst k ->
-      combine (map (fun (x,p) -> (k x, p)) lst);;
+let distribution = handler
+  | val v -> [(v, 1.0)] (* Distribution of only one value. *)
+  | #Pick p k -> combine p (k true) (k false) (* Combine possible distributions. *)
+;;
 
 (* The handler computing the expected value of a probabilistic computation
    of type float. *)
-let expectation r = handler
+let expectation = handler
   | val v -> v
-  | r#pick lst k ->
-      fold_right (fun (x,p) e -> e +. p *. k x) lst 0.0;;
+  | #Pick p k -> p *. k true +. (1.0 -. p) *. k false
+;;
 
 (* Examples. *)
 
 (* A random walk of n steps where the probability of going left is p and probability of
    going right is q. *)
-let walk r n p q =
+
+(* Set up a state to keep track of position. *)
+effect Get: unit -> float
+effect Set: float -> unit
+let state = handler
+  | val y -> (fun _ -> y)
+  | #Get () k -> (fun s -> k s s)
+  | #Set s' k -> (fun _ -> k () s')
+  | finally g -> g 0.
+;;
+
+(* A function that simulates a walk. *)
+let walk n p q =
   let s = 1.0 -. p -. q in
-  let x = new ref in
-    with state x 0.0 handle
-      for i = 1 to n do
-         x := !x +. r#pick [(-1.0, p); (0.0, s); (1.0, q)]
-      done;
-      !x;;
+  with state handle
+  (let rec step_maker m =
+     #Set (#Get () +. distribution_pick [(-1.0, p); (0.0, s); (1.0, q)]);
+     if m > 0 then step_maker (m-1) else #Get()
+   in
+   step_maker n)
+;;
 
 (* Where do we expect to land after 5 steps in a symmetric walk? (Answer: 0.0) *)
-let r = new random in
-  with expectation r handle
-    walk r 5 (1.0 /. 3.0) (1.0 /. 3.0);;
+with expectation handle
+  walk 5 (1.0 /. 3.0) (1.0 /. 3.0)
+;;
 
 (* Instead of the expected value we can calculate the distribution. *)
-let r = new random in
-  with distribution r handle
-    walk r 5 (1.0 /. 3.0) (1.0 /. 3.0);;
+with distribution handle
+  walk 5 (1.0 /. 3.0) (1.0 /. 3.0)
+;;
 
 (* Finally, let us solve the Monty Hall problem, see
    http://en.wikipedia.org/wiki/Monty_Hall_problem *)
@@ -68,25 +99,26 @@ let r = new random in
    it takes a flag indicating whether we change our mind. The function
    return true if we get the prize, and false otherwise. *)
 
-let monty_hall r change =
+let monty_hall change =
   let doors = ["A"; "B"; "C"] in
   (* The prize goes behind one of the doors. *)
-  let prize = r#pick (uniform doors) in
+  let prize = (uniform_pick doors) in
   (* We make random guess. *)
-  let guess = r#pick (uniform doors) in
+  let guess = (uniform_pick doors) in
   (* The host shows what is behind a door which does not contain the prize. *)
-  let show = r#pick (uniform (complement doors [prize; guess])) in
+  let show = (uniform_pick (complement doors [prize; guess])) in
   (* What is our final answer? *)
   let final = (if change then hd (complement doors [guess; show]) else guess) in
   (* Did we get the prize? *)
-    final = prize;;
+  final = prize
+;;
 
 (* The distribution if we stay with our initial guess. *)
-let r = new random in
-  with distribution r handle
-    monty_hall r false;;
+with distribution handle
+  monty_hall false
+;;
 
 (* The distribution if we switch the door. *)
-let r = new random in
-  with distribution r handle
-    monty_hall r true;;
+with distribution handle
+  monty_hall true
+;;
