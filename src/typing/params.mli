@@ -5,8 +5,10 @@ type ty_coercion_param
 type dirt_coercion_param
 type dirty_coercion_param
 type skel_param
+type e_ty_param
 
 val fresh_ty_param : unit -> ty_param
+val fresh_e_ty_param : unit -> e_ty_param
 val fresh_dirt_param : unit -> dirt_param
 val fresh_region_param : unit -> region_param
 val fresh_ty_coercion_param: unit -> ty_coercion_param
@@ -58,6 +60,8 @@ val print_dirt_param : ?non_poly:t -> dirt_param -> Format.formatter -> unit
 val print_skel_param : ?non_poly:t -> skel_param -> Format.formatter -> unit
 val print_region_param : ?non_poly:t -> region_param -> Format.formatter -> unit
 val print_type_param : ty_param -> Format.formatter -> unit
+
+val print_e_ty_param : ?non_poly:t -> e_ty_param -> Format.formatter -> unit
 
 val project_ty_params : t -> ty_param list
 val project_dirt_params : t -> dirt_param list

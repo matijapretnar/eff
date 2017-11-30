@@ -5,6 +5,7 @@ type ty_coercion_param = int
 type dirt_coercion_param = int
 type dirty_coercion_param = int
 type skel_param = int
+type e_ty_param = int
 
 let fresh_ty_param = OldUtils.fresh OldUtils.id
 let fresh_dirt_param = OldUtils.fresh OldUtils.id
@@ -13,7 +14,7 @@ let fresh_ty_coercion_param = OldUtils.fresh OldUtils.id
 let fresh_dirty_coercion_param = OldUtils.fresh OldUtils.id
 let fresh_dirt_coercion_param = OldUtils.fresh OldUtils.id
 let fresh_skel_param = OldUtils.fresh OldUtils.id
-
+let fresh_e_ty_param = OldUtils.fresh OldUtils.id
 
 type t = ty_param list * dirt_param list * region_param list
 
@@ -114,6 +115,10 @@ let print_dirty_coercion_param ?(non_poly=empty) t ppf =
 let print_dirt_coercion_param ?(non_poly=empty) t ppf =
   let (ts, _, _) = non_poly in
   Symbols.dirt_coercion_param t (List.mem t ts) ppf
+
+let print_e_ty_param ?(non_poly=empty) t ppf =
+  let (ts, _, _) = non_poly in
+  Symbols.ty_param t (List.mem t ts) ppf
 
 let project_ty_params (ts, _, _) = ts
 let project_dirt_params (_, ds, _) = ds

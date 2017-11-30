@@ -134,6 +134,7 @@ let compile_file ppf filename st =
         SimplePrint.print_computation ct out_ppf;
         Format.fprintf out_ppf "\n;;\n ";
         print_endline "ended found something!";
+        let ereasure_ct = EreasureTerms.typed_to_ereasure_comp [] ct in 
         {st with typing}
     | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
         let typing = Infer.add_effect eff (ty1, ty2) st.typing in

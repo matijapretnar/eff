@@ -28,7 +28,7 @@ let rec print_expression ?max_level e ppf =
   | Typed.Handler h ->
       print ~at_level:2 "fun c -> handler {@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
              ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]} c"
-      (print_abstraction h.Typed.value_clause)
+      (print_abstraction_with_ty h.Typed.value_clause)
       (print_effect_clauses h.Typed.effect_clauses)
   | Typed.Effect eff ->
       print ~at_level:2 "effect %t" (print_effect eff)
@@ -63,7 +63,7 @@ and print_computation ?max_level c ppf =
       (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
   | Typed.Call (eff, e, a) ->
       print ~at_level:1 "call %t %t (@[fun %t@])"
-      (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
+      (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction_with_ty a)
   | Typed.Bind ({Typed.term = Value e}, {Typed.term = (p, c)}) ->
       print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression e) (print_computation c)
   | Typed.Bind (c1, a) ->
@@ -82,6 +82,9 @@ and print_effect_clauses eff_clauses ppf =
       (print_effect eff) (print_pattern p1) (Types.print_target_ty t1) (print_pattern p2) (Types.print_target_ty t2) (print_computation c) (print_effect_clauses cases)
 
 and print_abstraction {Typed.term = (p, c)} ppf =
+  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
+
+and print_abstraction_with_ty {Typed.term = (p,_, c)} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
 
 and print_let_abstraction (p, c) ppf =

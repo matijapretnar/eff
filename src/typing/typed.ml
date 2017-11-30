@@ -72,7 +72,7 @@ and plain_computation =
   | Match of expression * abstraction list
   | Apply of expression * expression
   | Handle of expression * computation
-  | Call of effect * expression * abstraction
+  | Call of effect * expression * abstraction_with_ty
   | Op of effect * expression
   | Bind of computation * abstraction
   | CastComp of computation * dirty_coercion
@@ -118,11 +118,13 @@ and dirty_coercion =
 (** Handler definitions *)
 and handler = {
   effect_clauses : (effect, abstraction2) OldUtils.assoc;
-  value_clause : abstraction;
+  value_clause : abstraction_with_ty;
 }
 
 (** Abstractions that take one argument. *)
 and abstraction = (pattern * computation) annotation
+
+and abstraction_with_ty = (pattern * Types.target_ty * computation) annotation
 
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * computation) annotation
@@ -152,6 +154,12 @@ and plain_toplevel =
 let abstraction ?loc p c : abstraction =
   {
     term = (p, c);
+    location = c.location;
+  }
+
+let abstraction_with_ty ?loc p tty c : abstraction_with_ty =
+  {
+    term = (p, tty, c);
     location = c.location;
   }
 
@@ -203,7 +211,7 @@ let rec print_expression ?max_level e ppf =
   | Handler h ->
     print "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
              ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
-      (print_abstraction h.value_clause)
+      (print_abstraction_with_ty h.value_clause)
       (print_effect_clauses h.effect_clauses)
   | Effect eff ->
     print ~at_level:2 "effect %t" (print_effect eff)
@@ -242,11 +250,11 @@ and print_computation ?max_level c ppf =
       (Print.sequence " and " print_let_rec_abstraction lst) (print_computation c)
   | Call (eff, e, a) ->
     print ~at_level:1 "call (%t) (%t) ((@[fun %t@]))"
-      (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction a)
+      (print_effect eff) (print_expression ~max_level:0 e) (print_abstraction_with_ty a)
   | Op (eff,e) -> 
     print ~at_level:1 "(#%t %t)" (print_effect eff) (print_expression e)
   | Bind (c1, a) ->
-    print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a)
+    print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]" (print_computation ~max_level:0 c1) (print_abstraction a) 
   | CastComp (c1,dc) ->
     print " ( (%t) |> [%t] ) " (print_computation c1) (print_dirty_coercion dc)
   | CastComp_ty (c1,dc) ->
@@ -265,7 +273,7 @@ and print_ty_coercion ?max_level c ppf =
   | ArrowCoercion (tc,dc) ->
       print  "%t -> %t" (print_ty_coercion tc) (print_dirty_coercion dc)
   | HandlerCoercion (dc1,dc2) ->
-      print  "%t -> %t" (print_dirty_coercion dc1) (print_dirty_coercion dc2)
+      print  "%t ==> %t" (print_dirty_coercion dc1) (print_dirty_coercion dc2)
   | TyCoercionVar (tcp) ->
      print "%t " (Params.print_ty_coercion_param tcp)
   | SequenceTyCoer (tc1,tc2) ->
@@ -311,6 +319,9 @@ and print_effect_clauses eff_clauses ppf =
 
 and print_abstraction {term = (p, c)} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
+
+and print_abstraction_with_ty {term = (p,tty, c)} ppf =
+  Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern p) (Types.print_target_ty tty) (print_computation c)
 
 and print_pure_abstraction {term = (p, e)} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_expression e)
@@ -407,14 +418,15 @@ and refresh_comp' sbst = function
     Apply (refresh_expr sbst e1, refresh_expr sbst e2)
   | Handle (e, c) ->
     Handle (refresh_expr sbst e, refresh_comp sbst c)
-  | Call (eff, e, a) ->
-    Call (eff, refresh_expr sbst e, refresh_abs sbst a)
+(*   | Call (eff, e, a) ->
+    Call (eff, refresh_expr sbst e, refresh_abs sbst a) *)
   | Value e ->
     Value (refresh_expr sbst e)
-and refresh_handler sbst h = {
+and refresh_handler sbst h = assert false
+(* {
   effect_clauses = OldUtils.assoc_map (refresh_abs2 sbst) h.effect_clauses;
   value_clause = refresh_abs sbst h.value_clause;
-}
+} *)
 and refresh_abs sbst a = 
   let (p, c) = a.term in
   let sbst, p' = refresh_pattern sbst p in
@@ -431,8 +443,12 @@ and subst_expr' sbst = function
       | Some e' -> e'
       | None -> e
     end
-  | Lambda a ->
-    assert false
+  | Lambda (xp,t,c) ->
+    let PVar v = xp.term in
+    begin match OldUtils.lookup v sbst with
+      | Some _ -> Lambda (xp,t,c)
+      | None -> Lambda (xp,t,(subst_comp sbst c))
+    end
   | Handler h ->
     Handler (subst_handler sbst h)
   | Tuple es ->
@@ -442,6 +458,7 @@ and subst_expr' sbst = function
   | Variant (lbl, e) ->
     Variant (lbl, OldUtils.option_map (subst_expr sbst) e)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
+  | e -> e
 and subst_comp sbst c =
   {c with term = subst_comp' sbst c.term}
 and subst_comp' sbst = function
@@ -461,17 +478,23 @@ and subst_comp' sbst = function
   | Handle (e, c) ->
     Handle (subst_expr sbst e, subst_comp sbst c)
   | Call (eff, e, a) ->
-    Call (eff, subst_expr sbst e, subst_abs sbst a)
+    Call (eff, subst_expr sbst e, subst_abs_with_ty sbst a)
   | Value e ->
     Value (subst_expr sbst e)
+  | c -> c
 and subst_handler sbst h = {
   effect_clauses = OldUtils.assoc_map (subst_abs2 sbst) h.effect_clauses;
-  value_clause = subst_abs sbst h.value_clause;
+  value_clause = subst_abs_with_ty sbst h.value_clause;
 }
 and subst_abs sbst a = 
   let (p, c) = a.term in
   (* XXX Should we check that p & sbst have disjoint variables? *)
   {a with term = (p, subst_comp sbst c)}
+
+and subst_abs_with_ty sbst a = 
+  let (p, t, c) = a.term in
+  (* XXX Should we check that p & sbst have disjoint variables? *)
+  {a with term = (p, t, subst_comp sbst c)}
 and subst_abs2 sbst a2 =
   (* a2a2 @@ subst_abs sbst @@ a22a @@ a2 *)
   assert false
@@ -553,14 +576,14 @@ and alphaeq_comp' eqvars c c' =
     alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2'
   | Handle (e, c), Handle (e', c') ->
     alphaeq_expr eqvars e e' && alphaeq_comp eqvars c c'
-  | Call (eff, e, a), Call (eff', e', a') ->
-    eff = eff' && alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a'
+(*   | Call (eff, e, a), Call (eff', e', a') ->
+    eff = eff' && alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a' *)
   | Value e, Value e' ->
     alphaeq_expr eqvars e e'
   | _, _ -> false
-and alphaeq_handler eqvars h h' =
-  assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
-  alphaeq_abs eqvars h.value_clause h'.value_clause
+and alphaeq_handler eqvars h h' = assert false
+(*   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
+  alphaeq_abs eqvars h.value_clause h'.value_clause *)
 and alphaeq_abs eqvars {term = (p, c)} {term = (p', c')} =
   match make_equal_pattern eqvars p p' with
   | Some eqvars' -> alphaeq_comp eqvars' c c'
@@ -625,7 +648,7 @@ let rec free_vars_comp c =
   | Match (e, li) -> free_vars_expr e @@@ concat_vars (List.map free_vars_abs li)
   | Apply (e1, e2) -> free_vars_expr e1 @@@ free_vars_expr e2
   | Handle (e, c1) -> free_vars_expr e @@@ free_vars_comp c1
-  | Call (_, e1, a1) -> free_vars_expr e1 @@@ free_vars_abs a1
+  | Call (_, e1, a1) -> free_vars_expr e1 @@@ free_vars_abs_with_ty a1
   | Bind (c1, a1) -> free_vars_comp c1 @@@ free_vars_abs a1
 and free_vars_expr e =
   match e.term with
@@ -638,7 +661,7 @@ and free_vars_expr e =
   | Variant (_, Some e) -> free_vars_expr e
   | (BuiltIn _ | Effect _ | Const _) -> ([], [])
 and free_vars_handler h =
-  free_vars_abs h.value_clause @@@
+  free_vars_abs_with_ty h.value_clause @@@
   concat_vars (List.map (fun (_, a2) -> free_vars_abs2 a2) h.effect_clauses)
 and free_vars_finally_handler (h, finally_clause) =
   free_vars_handler h @@@
@@ -647,6 +670,11 @@ and free_vars_abs a =
   let (p, c) = a.term in
   let (inside, outside) = free_vars_comp c --- pattern_vars p in
   (inside @ outside, [])
+and free_vars_abs_with_ty a =
+  let (p,_, c) = a.term in
+  let (inside, outside) = free_vars_comp c --- pattern_vars p in
+  (inside @ outside, [])
+
 and free_vars_abs2 a2 =
   (* free_vars_abs @@ a22a @@ a2 *)
   assert false

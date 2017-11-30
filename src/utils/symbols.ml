@@ -24,7 +24,9 @@ let param ascii_symbol utf8_symbol index poly ppf =
   in
   Print.print ppf "%s%s%s" prefix symbol (subscript (Some (index + 1)))
 
+let e_ty_param = param "ety" "eτ"
 let ty_param = param "ty" "τ"
 let dirt_param = param "drt" "δ"
 let region_param  = param "rgn" "ρ"
 let skel_param = param "skl" "s"
+

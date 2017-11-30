@@ -471,7 +471,7 @@ and type_plain_expr in_cons st = function
         let coerced_y = Typed.annotate (Typed.CastExp(exp_y,omega_6)) exp_y.location in
         let substituted_c_r = Typed.subst_comp [(x, coerced_y.term)] (Unification.apply_substitution (subs_n) target_cr_term) in 
         let coerced_substiuted_c_r = Typed.annotate (Typed.CastComp(substituted_c_r,Typed.BangCoercion(omega_1,omega_2))) Location.unknown in
-        let typed_value_clause = Typed.abstraction annot_y coerced_substiuted_c_r in 
+
 
         let mapper =
           fun (op_term,(op_term_ty,op_term_dirt),(alpha_i,delta_i)) (eff,abs2) ->
@@ -509,6 +509,12 @@ and type_plain_expr in_cons st = function
         let new_op_clauses_with_cons = List.map2  mapper mapper_input h.effect_clauses in 
         let new_op_clauses = List.map (fun (x,y) -> x) new_op_clauses_with_cons in
         let ops_cons = OldUtils.flatten_map (fun (x,y) -> y ) new_op_clauses_with_cons in  
+
+
+        let y_type = Unification.apply_substitution_ty ( target_cr_sub @ subs_n ) r_ty in  
+        let typed_value_clause = Typed.abstraction_with_ty annot_y y_type coerced_substiuted_c_r in 
+
+
         let target_handler = 
             {
             Typed.effect_clauses = new_op_clauses;
@@ -526,7 +532,7 @@ and type_plain_expr in_cons st = function
         let handler_out_bang = Typed.BangCoercion ((Typed.ReflTy(out_ty)), Typed.ReflDirt(out_dirt)) in
         let handler_coercion = Typed.HandlerCoercion (handler_in_bang, handler_out_bang) in 
         let coerced_handler = Typed.CastExp (typed_handler, handler_coercion) in 
-        let all_cons = [skel_cons_in; skel_cons_out; omega_cons_1; omega_cons_2; omega_cons_6; omega_cons_7] @ ops_cons in 
+        let all_cons = [skel_cons_in; skel_cons_out; omega_cons_1; omega_cons_2; omega_cons_6; omega_cons_7] @ ops_cons @ r_cons in 
         (coerced_handler,target_type, all_cons, subs_n @ target_cr_sub )
  (*   | Untyped.Handler h -> 
         let in_ty_var = Params.fresh_ty_param () in 

@@ -83,7 +83,7 @@ and apply_sub_plain_comp sub c =
   | Match (e,alist) -> Match (e,alist)
   | Apply (e1,e2) -> Apply ((apply_sub_exp sub e1), (apply_sub_exp sub e2))
   | Handle (e1,c1) -> Handle ((apply_sub_exp sub e1), (apply_sub_comp sub c1))
-  | Call (effect,e1,abs) -> Call (effect, (apply_sub_exp sub e1), (apply_sub_abs sub abs))
+  | Call (effect,e1,abs) -> Call (effect, (apply_sub_exp sub e1), (apply_sub_abs_with_ty sub abs))
   | Op(ef,e1) -> Op (ef, (apply_sub_exp sub e1 ))
   | Bind (c1,a1) -> Bind ((apply_sub_comp sub c1), (apply_sub_abs sub a1))
   | CastComp (c1,dc1) -> CastComp ((apply_sub_comp sub c1), (apply_sub_dirtycoer sub dc1))
@@ -122,13 +122,17 @@ and apply_sub_abs sub abs =
   let (p,c) = abs.term in 
   annotate (p, apply_sub_comp sub c) abs.location
 
+and apply_sub_abs_with_ty sub abs = 
+  let (p,t,c) = abs.term in 
+  annotate (p, (apply_sub_ty sub t), apply_sub_comp sub c) abs.location
+
 and apply_sub_abs2 sub abs2 = 
   let (p1,p2,c) = abs2.term in 
   annotate (p1, p2, apply_sub_comp sub c) abs2.location
 
 and apply_sub_handler sub h =
   let eff_clauses = h.effect_clauses in 
-  let new_value_clause = apply_sub_abs sub h.value_clause in 
+  let new_value_clause = apply_sub_abs_with_ty sub h.value_clause in 
   let new_eff_clauses = OldUtils.assoc_map (fun abs2 ->apply_sub_abs2 sub abs2) eff_clauses in 
   { effect_clauses= new_eff_clauses;
     value_clause = new_value_clause;}
