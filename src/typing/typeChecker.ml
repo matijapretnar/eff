@@ -13,6 +13,8 @@ type checker_state = {
   term_vars : (Typed.variable, Types.target_ty) OldUtils.assoc;
   type_vars : Params.ty_param list;
   dirt_vars : Params.dirt_param list;
+  skel_vars : Params.skel_param list;
+  tvhasskel : (Params.ty_param, Types.skeleton) OldUtils.assoc;
   omega_ty  : (Params.ty_coercion_param ,  Types.ct_ty) OldUtils.assoc;
   omega_dirt: (Params.dirt_coercion_param ,  Types.ct_dirt) OldUtils.assoc;
   omega_dirty: (Params.dirty_coercion_param , (Types.target_dirty * Types.target_dirty) ) OldUtils.assoc;
@@ -27,6 +29,10 @@ let extend_state_term_vars st t_var tty =
 let extend_state_dirt_vars st dirt_var = 
     {st with dirt_vars = dirt_var::st.dirt_vars}
 
+
+let extend_state_skel_vars st sk_var = 
+    {st with skel_vars = (sk_var::st.skel_vars)}
+
 let extend_state_omega_ty st tcp ctty =
    {st with omega_ty = (tcp,ctty) :: st.omega_ty}
 
@@ -34,12 +40,16 @@ let extend_state_omega_ty st tcp ctty =
 let extend_state_omega_dirt st tcp ctdrt =
    {st with omega_dirt = (tcp,ctdrt) :: st.omega_dirt}
 
+let extend_state_ty_var_skel st tv sk =
+   {st with tvhasskel = (tv,sk) :: st.tvhasskel}
 
 let new_checker_state = 
 {
   term_vars = [];
   type_vars = [];
   dirt_vars = [];
+  skel_vars = [];
+  tvhasskel = [];
   omega_ty = [];
   omega_dirt = [];
   omega_dirty = [];
@@ -78,7 +88,7 @@ let rec type_check_comp st c =
       let e2_ty = type_check_exp st e2.term in 
       begin match  e2_ty with 
       | eff_in ->  
-              let (x,c1) = abs.term in 
+              let (x,ty_eff,c1) = abs.term in 
               let Typed.PVar p = x.term in 
               let st' = extend_state_term_vars st p eff_out in 
               let (final_ty,final_dirt) = type_check_comp st' c1.term in
@@ -138,10 +148,15 @@ begin match e with
       Types.Arrow(eff_in, (eff_out, Types.SetEmpty (list_to_effect_set [eff])))
 
   | Handler h -> assert false
-  | BigLambdaTy(ty_param,e1) -> 
-      let st' = extend_state_ty_vars st ty_param in 
+  | BigLambdaTy(ty_param,skel,e1) -> 
+      let st' = extend_state_ty_var_skel st ty_param skel in 
       let e1_ty = type_check_exp st' e1.term in 
-      TySchemeTy (ty_param, Types.PrimSkel Types.IntTy, e1_ty)
+      TySchemeTy (ty_param, skel , e1_ty)
+  | BigLambdaSkel(skel_param,e1)->
+      let st' = extend_state_skel_vars st skel_param in 
+      let e1_ty = type_check_exp st' e1.term in 
+      TySchemeSkel (skel_param,e1_ty)
+
   | BigLambdaDirt(dirt_param,e1) ->
       let st' = extend_state_dirt_vars st dirt_param in 
       let e1_ty = type_check_exp st' e1.term in 
@@ -151,9 +166,14 @@ begin match e with
       let (tc1a,tc1b) = type_check_ty_coercion st tc1 in 
       if (tc1a = e1_ty) then tc1b else assert false
   | ApplyTyExp (e1,tty) ->
-      let (Types.TySchemeTy (p_e1,_,ty_e1)) = type_check_exp st e1.term in 
+      let (Types.TySchemeTy (p_e1,skel,ty_e1)) = type_check_exp st e1.term in 
       let tty1 = type_check_ty st tty in
       let sub = Unification.TyVarToTy (p_e1,tty1) in
+      Unification.apply_sub_ty sub ty_e1 
+  | ApplySkelExp (e1,sk) ->
+      let (Types.TySchemeSkel (p_e1,ty_e1)) = type_check_exp st e1.term in 
+      let sk1 = type_check_skel st sk in
+      let sub = Unification.SkelVarToSkel (p_e1,sk1) in
       Unification.apply_sub_ty sub ty_e1 
   | ApplyDirtExp (e1,d1) ->
       let (Types.TySchemeDirt (p_e1,ty_e1)) = type_check_exp st e1.term in 
@@ -338,8 +358,11 @@ and type_check_dirt st d =
   end
 
 and type_check_ty st ty =
+  Print.debug "NOW CHECKING %t" (Types.print_target_ty ty);
   begin match ty with 
-  | Tyvar typ1 when( List.mem typ1 st.type_vars) -> ty
+  | Tyvar typ ->
+      let ty_var_list = List.map (fun (x,y) -> x) st.tvhasskel in
+      if  List.mem typ ty_var_list then ty else assert false
   | Arrow (tty1,tty2) ->
       let _ = type_check_ty st tty1 in 
       let _ = type_check_dirty_ty st tty2 in 
@@ -359,12 +382,16 @@ and type_check_ty st ty =
     let _ = type_check_dirt_cons st ct_ty1 in 
     let _ = type_check_ty st tty1 in 
     ty  
-  | TySchemeTy (ty_param ,_,tty1) -> 
-      let st' = extend_state_ty_vars st ty_param in 
-      let _ = type_check_ty st' tty1 in 
+  | TySchemeTy (ty_param ,skel,tty1) -> 
+      let st' = extend_state_ty_var_skel st ty_param skel in 
+      let tty1' = type_check_ty st' tty1 in 
       ty 
   | TySchemeDirt (dirt_param ,tty1) ->
       let st' = extend_state_dirt_vars st dirt_param in 
+      let _ = type_check_ty st' tty1 in 
+      ty 
+  | TySchemeSkel (skel_param,tty1) -> 
+      let st' = extend_state_skel_vars st skel_param in 
       let _ = type_check_ty st' tty1 in 
       ty 
   | _ -> assert false
@@ -375,3 +402,14 @@ and type_check_dirty_ty st (ty,drt) =
   let _ = type_check_dirt st drt in 
   (ty,drt)
 
+and type_check_skel st sk =
+  begin match sk with 
+  | SkelVar typ1 when( List.mem typ1 st.skel_vars) -> sk
+  | PrimSkel p -> PrimSkel p
+  | SkelArrow (sk1,sk2) -> SkelArrow (type_check_skel st sk1, type_check_skel st sk2 )
+  | SkelHandler (sk1,sk2) -> SkelHandler (type_check_skel st sk1, type_check_skel st sk2 )
+  | ForallSkel (skp,sk1) -> 
+      let st' = extend_state_skel_vars st skp in 
+      ForallSkel(skp, (type_check_skel st' sk1))
+  | _ -> assert false
+  end
