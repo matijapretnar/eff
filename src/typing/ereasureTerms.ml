@@ -1,7 +1,7 @@
 (** Syntax of the core language. *)
 
 open EreasureTypes
-
+open Typed
 module Variable = Symbol.Make(Symbol.String)
 module EffectMap = Map.Make(String)
 
@@ -12,6 +12,7 @@ type 'term annotation = {
   term: 'term;
   location: Location.t;
 }
+
 
 type e_pattern = e_plain_pattern annotation
 and e_plain_pattern =
@@ -39,10 +40,10 @@ and e_plain_expression =
   | ERecord of (OldUtils.field, e_expression) OldUtils.assoc
   | EVariant of OldUtils.label * e_expression option
   | ELambda of (e_pattern * Types.skeleton * e_computation)
-  | Effect of effect
+  | EEffect of effect
   | EHandler of e_handler
-  | EBigLambdaTy of Params.skel_param * e_expression
-  | ApplyTyExp of e_expression * EreasureTypes.e_ty
+  | EBigLambdaSkel of Params.skel_param * e_expression
+  | EApplySkelExp of e_expression * Types.skeleton
 
 (** Impure computations *)
 and e_computation = e_plain_computation annotation
@@ -51,23 +52,22 @@ and e_plain_computation =
   | ELetVal of variable * e_expression * e_computation 
   | EApply of e_expression * e_expression
   | EHandle of e_expression * e_computation
-  | ECall of effect * e_expression * e_abstraction
+  | ECall of effect * e_expression * e_abstraction_with_ty
   | EBind of e_computation * e_abstraction
 
 
 (** Handler definitions *)
 and e_handler = {
-  e_effect_clauses : (effect, e_abstraction2) OldUtils.assoc;
-  e_value_clause : e_abstraction;
+  effect_clauses : (effect, e_abstraction2) OldUtils.assoc;
+  value_clause : e_abstraction_with_ty;
 }
-
 (** Abstractions that take one argument. *)
-and e_abstraction = (e_pattern * Types.skeleton * e_computation) annotation
+and e_abstraction = (e_pattern * e_computation) annotation
+
+and e_abstraction_with_ty = (e_pattern * Types.skeleton * e_computation) annotation
 
 (** Abstractions that take two arguments. *)
 and e_abstraction2 = (e_pattern * e_pattern * e_computation) annotation
-
-
 
 
 let rec typed_to_ereasure_ty sub typed_ty = 
@@ -106,24 +106,38 @@ and typed_to_ereasure_exp' sub tt =
   | Typed.BuiltIn (s,i) -> assert false
   | Typed.Const c -> EConst c
   | Typed.Tuple elist -> ETuple (List.map ( fun x -> typed_to_ereasure_exp sub x ) elist)
-  | Lambda (p,tty,co) -> assert false
+  | Typed.Lambda (p,tty,co) -> 
+      ELambda (typed_to_ereasure_pattern p, typed_to_ereasure_ty sub tty, typed_to_ereasure_comp sub co)
 
-  | Effect e -> assert false
-  | Handler h -> assert false
+  | Typed.Effect e -> EEffect e
+  | Typed.Handler h -> 
+      let (e_pat,tty,v_comp) = (h.value_clause).term in
+      let op_c = h.effect_clauses in 
+      let new_vc = typed_to_ereasure_abs_with_ty sub (h.value_clause) in 
+      let new_op_c =
+          OldUtils.map (fun (eff, e_a2) -> 
+                        let new_e_a2 = typed_to_ereasure_abs_2 sub e_a2 in 
+                        (eff, new_e_a2)) op_c in 
+      let new_h = 
+        {
+          value_clause = new_vc;
+          effect_clauses = new_op_c;
+        } in 
+      EHandler new_h
   | Typed.BigLambdaTy (tp,sk,e) -> 
       let sub1 = sub @ [(tp,sk)] in
       (typed_to_ereasure_exp sub1 e).term 
 
-(*   | BigLambdaDirt of Params.dirt_param * expression  
-  | BigLambdaSkel of Params.skel_param * expression
-  | CastExp of expression * ty_coercion
-  | ApplyTyExp of expression * Types.target_ty
-  | LambdaTyCoerVar of Params.ty_coercion_param * Types.ct_ty * expression 
-  | LambdaDirtCoerVar of Params.dirt_coercion_param * Types.ct_dirt * expression 
-  | ApplyDirtExp of expression * Types.dirt
-  | ApplySkelExp of expression * Types.skeleton
-  | ApplyTyCoercion of expression * ty_coercion
-  | ApplyDirtCoercion of expression * dirt_coercion *)
+  | BigLambdaDirt (_,e) -> typed_to_ereasure_exp' sub e.term 
+  | BigLambdaSkel (sk_p,e) -> EBigLambdaSkel (sk_p, typed_to_ereasure_exp sub e)
+  | CastExp (e,_) -> typed_to_ereasure_exp' sub e.term 
+  | ApplyTyExp (e,_) -> typed_to_ereasure_exp' sub e.term 
+  | LambdaTyCoerVar (_,_,e) -> typed_to_ereasure_exp' sub e.term 
+  | LambdaDirtCoerVar  (_,_,e) -> typed_to_ereasure_exp' sub e.term 
+  | ApplyDirtExp (e,_) -> typed_to_ereasure_exp' sub e.term 
+  | ApplySkelExp (e,s) -> EApplySkelExp (typed_to_ereasure_exp sub e, s) 
+  | ApplyTyCoercion (e,_) -> typed_to_ereasure_exp' sub e.term
+  | ApplyDirtCoercion (e,_) -> typed_to_ereasure_exp' sub e.term
   
   end
 
@@ -160,6 +174,21 @@ and typed_to_ereasure_comp' sub tt =
   end
 
 
-and typed_to_ereasure_abs_with_ty = assert false
-and typed_to_ereasure_abs = assert false
-
+and typed_to_ereasure_abs_with_ty sub abs_w_ty =
+    let (e_p,e_ty,e_c) = abs_w_ty.term in 
+    annotate (typed_to_ereasure_pattern e_p, typed_to_ereasure_ty sub e_ty, typed_to_ereasure_comp sub e_c) e_c.location
+and typed_to_ereasure_abs sub abs =
+    let (e_p,e_c) = abs.term in 
+    annotate (typed_to_ereasure_pattern e_p, typed_to_ereasure_comp sub e_c) e_c.location
+and typed_to_ereasure_abs_2 sub abs = 
+    let (e_p1,e_p2,e_c) = abs.Typed.term in 
+    annotate (typed_to_ereasure_pattern e_p1, typed_to_ereasure_pattern e_p2, typed_to_ereasure_comp sub e_c) e_c.location
+and typed_to_ereasure_pattern p = 
+  let loc = p.Typed.location in
+  let pat =  match p.Typed.term with
+    | Typed.PVar x -> PEVar x
+    | Typed.PAs (p, x) -> PEAs (typed_to_ereasure_pattern p, x)
+    | Typed.PNonbinding -> PENonbinding
+    | Typed.PConst const -> PEConst const
+  in
+  annotate pat loc
