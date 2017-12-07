@@ -76,6 +76,19 @@ let id x = x;;
 
 id 3;;
 
+fun () -> #Op ();;
+
+id (fun () -> #Op ());;
+
+let h = handler
+  | #Op () k -> k 3;;
+
+
+let h2 = handler
+  | #Op2 () k -> k 3;;
+
+let r = with h2 handle (with h handle (#Op2 ()));;
+
 let rec check n =
   begin match n with
   | 1 -> 1

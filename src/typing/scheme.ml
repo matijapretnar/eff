@@ -122,7 +122,7 @@ let get_type (ctx, ty, u) = ty
 let get_context (ctx, ty, u) = ctx
 
 (* Convert a type scheme to a new dirty type scheme (used for values) *)
-let make_dirty (ctx, ty, constraints) = (ctx, (ty, Type.fresh_dirt ()), constraints)
+let make_dirty (ctx, ty, constraints) = (ctx, (ty, Type.DirtBottom), constraints)
 
 (* Convert a dirty type scheme to a clean type scheme *)
 let make_clean (ctx, (ty, drt), constraints) = (ctx, ty, constraints)
