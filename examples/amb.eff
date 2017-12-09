@@ -34,30 +34,64 @@ with amb handle
       | None -> Failure
   in place 1 []
 ;;
+<<<<<<< HEAD
 
 (* Breadth-first search. *)
 
 (* We add a state handler to use as a que. *)
 
+=======
+
+(* Breadth-first search. *)
+
+(* We add a state handler to use as a que. *)
+
+>>>>>>> simple-type-system-examples
 effect Get_next : unit -> ((bool -> result)*bool) option
 effect Add_to_que : ((bool -> result)*bool) -> unit
 
 let que initial = handler
   | #Get_next () k ->
+<<<<<<< HEAD
     ( function
     | [] -> k None []
     | hd::tl -> k (Some hd) tl )
   | #Add_to_que x k -> ( fun que -> k () (que @ [x]))
+=======
+    ( fun que -> match que with
+    | [] -> k None []
+    | hd::tl -> k (Some hd) tl )
+  | #Add_to_que y k -> ( fun que -> k () (que @ [y]))
+>>>>>>> simple-type-system-examples
   | val x -> ( fun _ -> x)
   | finally x -> x initial
 ;;
 
+<<<<<<< HEAD
 let bfs = handler
   | #Select () k ->
     (#Add_to_que (k, true); #Add_to_que (k, false);
      match #Get_next () with
         | None -> Failure
         | Some (k,x) -> k x)
+=======
+
+let bfs =
+  (* Auxilary function that runs the next choice. *)
+  let run_next () =
+    match #Get_next () with
+    | None -> Failure
+    | Some (k,x) -> k x
+  in
+  handler (* Handler definition. *)
+  | #Select () k -> #Add_to_que (k, true); #Add_to_que (k, false); run_next ()
+  (* When the computation fails, run the next choice. Final Failure
+     comes from run_next when the que is empty. *)
+  | val r ->
+    (match r with
+    |Success x -> Success x
+    |Failure -> run_next ())
+>>>>>>> simple-type-system-examples
 ;;
 
 (* We repeat 8-queen example with breadth-first-search. It is much slower
@@ -72,3 +106,9 @@ with bfs handle
       | None -> Failure
   in place 1 []
 ;;
+<<<<<<< HEAD
+=======
+
+(* In this case using BFS is both slower and requires more code because we need
+   to have a que, but it is an example of how neatly handlers can be nested. *)
+>>>>>>> simple-type-system-examples

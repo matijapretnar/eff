@@ -1,6 +1,0 @@
-let r = ref [] in
-let q = r in
-  q#update ["foo"];
-  r#update (5 :: r#lookup ());
-  r#lookup ();;
-

@@ -1,10 +1,10 @@
-- : bool ! {DivisionByZero:ρ₁} | ρ₁ = ⊤ = false
-- : bool ! {DivisionByZero:ρ₁} | ρ₁ = ⊤ = true
-- : bool |  = false
-- : bool |  = false
-- : bool |  = false
-- : bool |  = true
-- : bool |  = false
-- : bool |  = true
-- : bool |  = true
-- : bool |  = true
+- : bool = false
+- : bool = true
+- : bool = false
+- : bool = false
+- : bool = false
+- : bool = true
+- : bool = false
+- : bool = true
+- : bool = true
+- : bool = true

@@ -1,16 +1,34 @@
 (* This example is described in Section 6.11 of "Programming with Algebraic Effects and
    Handlers" by A. Bauer and M. Pretnar. *)
 
-type ('a, 'b) delimited =
-effect
-  operation shift : (('a -> 'b) -> 'b) -> 'a
-end
+effect Shift : ((int -> int) -> int) -> int
+(* Such operations are currently less usefull due to lack of polymorphism in
+   current version of eff. In version 3.0 it is possible to have a polymorphic
+   version. *)
 
-let rec reset d = handler
-  | d#shift f k -> with reset d handle (f k);;
+let reset =
+  let rec reset_handler () = handler
+    | #Shift f k -> with reset_handler () handle (f k)
+  in
+  reset_handler ()
+;;
 
 (* An example from http://lamp.epfl.ch/~rompf/continuations-icfp09.pdf *)
 
-let d = new delimited in
-with reset d handle
-  d#shift (fun k -> k (k (k 7))) * 2 + 1;;
+with reset handle
+  #Shift (fun k -> k (k (k 7))) * 2 + 1
+;;
+
+(* The yin-yang puzzle, see
+   http://stackoverflow.com/questions/2694679/how-the-yin-yang-puzzle-works
+
+   Warning: To run this example you have to turn off type checking:
+
+        eff --no-types delimited.eff*)
+
+(*
+with reset handle
+let yin = (fun k -> #Print "@"; k) (#Shift (fun k -> k k)) in
+let yang = (fun k -> #Print "*"; k) (#Shift (fun k -> k k)) in
+yin yang;;
+*)
