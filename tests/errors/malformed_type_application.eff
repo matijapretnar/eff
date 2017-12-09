@@ -1,4 +1,4 @@
 (* Malformed type application *)
 type 'a foo = 'a * 'a
-type bar = (int, int) foo
+type bar = (integer, integer) foo
 

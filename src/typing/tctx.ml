@@ -1,4 +1,5 @@
 (** Type inference contexts *)
+module C = OldUtils
 module T = Type
 
 type tydef =
@@ -6,28 +7,25 @@ type tydef =
   | Sum of (OldUtils.label, Type.ty option) OldUtils.assoc
   | Inline of Type.ty
 
-type variance = bool * bool
-type params = (Type.ty_param * variance) list * (Type.dirt_param * variance) list * (Type.region_param * variance) list
+type tyctx = (OldUtils.tyname, Type.ty_param list * tydef) OldUtils.assoc
 
-type tyctx = (OldUtils.tyname, params * tydef) OldUtils.assoc
-
-let initial_tctx : tyctx = [
-  ("bool", (OldUtils.trio_empty, Inline T.bool_ty));
-  ("unit", (OldUtils.trio_empty, Inline T.unit_ty));
-  ("int", (OldUtils.trio_empty, Inline T.int_ty));
-  ("string", (OldUtils.trio_empty, Inline T.string_ty));
-  ("float", (OldUtils.trio_empty, Inline T.float_ty));
+let initial : tyctx = [
+  ("bool", ([], Inline T.bool_ty));
+  ("unit", ([], Inline T.unit_ty));
+  ("int", ([], Inline T.int_ty));
+  ("string", ([], Inline T.string_ty));
+  ("float", ([], Inline T.float_ty));
   ("list", (let a = Type.fresh_ty_param () in
-              (([a, (true, false)], [], []),
-                 Sum [(OldUtils.nil, None);
-                      (OldUtils.cons, Some (T.Tuple [T.Param a; T.Apply ("list", ([T.Param a], [], []))]))])));
-  ("empty", (OldUtils.trio_empty, Sum []))
+              ([a],
+               Sum [(OldUtils.nil, None);
+                      (OldUtils.cons, Some (T.Tuple [T.TyParam a; T.Apply ("list", [T.TyParam a])]))])));
+  ("empty", ([], Sum []))
 ]
 
-let tctx = ref initial_tctx
 
-let reset () =
-  tctx := initial_tctx
+let global = ref initial
+
+let reset () = global := initial
 
 let subst_tydef sbst =
   let subst = Type.subst_ty sbst in
@@ -36,46 +34,15 @@ let subst_tydef sbst =
   | Sum tys -> Sum (OldUtils.assoc_map (OldUtils.option_map subst) tys)
   | Inline ty -> Inline (subst ty)
 
-let replace_tydef rpls =
-  let replace = Type.replace_ty rpls in
-  function
-  | Record tys -> Record (OldUtils.assoc_map replace tys)
-  | Sum tys -> Sum (OldUtils.assoc_map (OldUtils.option_map replace) tys)
-  | Inline ty -> Inline (replace ty)
-
-(* Lookup type parameters for a given type. *)
-let lookup_params ty_name =
-  match OldUtils.lookup ty_name !tctx with
-    | None -> None
-    | Some (params, _) -> Some params
-
-let get_variances ty_name =
-  match lookup_params ty_name with
-  | None -> assert false (* this function should only be called after types have been checked. *)
-  | Some params -> params
-
-let remove_variances (ps, ds, rs) = (List.map fst ps, List.map fst ds, List.map fst rs)
-
 let lookup_tydef ~loc ty_name =
-  match OldUtils.lookup ty_name !tctx with
+  match OldUtils.lookup ty_name !global with
   | None -> Error.typing ~loc "Unknown type %s" ty_name
-  | Some (params, tydef) -> (remove_variances params, tydef)
-
-let refreshing_subst (ps, ds, rs) =
-  let refresh_ty_param = Type.refresher Type.fresh_ty_param
-  and refresh_dirt_param = Type.refresher Type.fresh_dirt_param
-  and refresh_region_param = Type.refresher Type.fresh_region_param in
-  (List.map refresh_ty_param ps, List.map refresh_dirt_param ds, List.map refresh_region_param rs),
-  {
-    Type.ty_param = (fun p -> refresh_ty_param p);
-    Type.dirt_param = OldUtils.id;
-    Type.region_param = refresh_region_param;
-  }
+  | Some (params, tydef) -> (params, tydef)
 
 let fresh_tydef ~loc ty_name =
   let (params, tydef) = lookup_tydef ~loc ty_name in
-  let params', sbst = refreshing_subst params in
-    params', subst_tydef sbst tydef
+  let params', sbst = Type.refreshing_subst params in
+  params', subst_tydef sbst tydef
 
 (** [find_variant lbl] returns the information about the variant type that defines the
     label [lbl]. *)
@@ -89,7 +56,7 @@ let find_variant lbl =
       end
     | _ :: lst -> find lst
   in
-    find !tctx
+    find !global
 
 (** [find_field fld] returns the information about the record type that defines the field
     [fld]. *)
@@ -102,13 +69,10 @@ let find_field fld =
       else find lst
     | _ :: lst -> find lst
   in
-    find !tctx
+    find !global
 
-
-let apply_to_params t (ps, ds, rs) =
-  Type.Apply (t, (
-    List.map (fun p -> Type.Param p) ps, List.map Type.simple_dirt ds, rs
-  ))
+let apply_to_params t ps =
+  Type.Apply (t, List.map (fun p -> Type.TyParam p) ps)
 
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
     with refreshed type parameters and additional information needed for type
@@ -117,8 +81,8 @@ let infer_variant lbl =
   match find_variant lbl with
     | None -> None
     | Some (ty_name, ps, _, u) ->
-      let ps', fresh_subst = refreshing_subst (remove_variances ps) in
-      let u = OldUtils.option_map (T.subst_ty fresh_subst) u in
+      let ps', fresh_subst = T.refreshing_subst ps in
+      let u = C.option_map (T.subst_ty fresh_subst) u in
         Some (apply_to_params ty_name ps', u)
 
 
@@ -128,56 +92,38 @@ let infer_field fld =
   match find_field fld with
     | None -> None
     | Some (ty_name, ps, us) ->
-      let ps', fresh_subst = refreshing_subst (remove_variances ps) in
-      let us' = OldUtils.assoc_map (T.subst_ty fresh_subst) us in
+      let ps', fresh_subst = T.refreshing_subst ps in
+      let us' = C.assoc_map (T.subst_ty fresh_subst) us in
         Some (apply_to_params ty_name ps', (ty_name, us'))
 
 
 let transparent ~loc ty_name =
-    match snd (lookup_tydef ~loc ty_name) with
+  let (_, ty) = lookup_tydef ~loc ty_name in
+    match ty with
       | Sum _ | Record _ -> false
       | Inline _ -> true
 
-(* [ty_apply ~loc t lst] applies the type constructor [t] to the given list of arguments. *)
-let ty_apply ~loc ty_name (tys, drts, rgns) : tydef =
-  let ((ts, ds, rs), ty) = lookup_tydef ~loc ty_name in
-  let ty_sbst =
-    try List.combine ts tys with
-      Invalid_argument "List.combine" -> Error.typing ~loc "Type constructors %s should be applied to %d type arguments" ty_name (List.length ts)
-  and dirt_sbst =
-    try List.combine ds drts with
-      Invalid_argument "List.combine" -> Error.typing ~loc "Type constructors %s should be applied to %d dirt arguments" ty_name (List.length ds)
-  and region_sbst =
-    try List.combine rs rgns with
-      Invalid_argument "List.combine" -> Error.typing ~loc "Type constructors %s should be applied to %d region arguments" ty_name (List.length rs)
-  in
-  replace_tydef {
-    T.ty_param_repl = (fun p -> OldUtils.lookup_default p ty_sbst (Type.Param p));
-    T.dirt_param_repl = (fun d -> OldUtils.lookup_default d dirt_sbst (Type.simple_dirt d));
-    T.region_param_repl = (fun r -> OldUtils.lookup_default r region_sbst r);
-  } ty
+(* [ty_apply pos t lst] applies the type constructor [t] to the given list of arguments. *)
+let ty_apply ~loc ty_name lst =
+  let (xs, ty) = lookup_tydef ~loc ty_name in
+  try
+      subst_tydef (List.combine xs lst) ty
+  with
+    Invalid_argument "List.combine" ->
+      Error.typing ~loc "Type constructors %s should be applied to %d arguments" ty_name (List.length xs)
 
 (** [check_well_formed ~loc ty] checks that type [ty] is well-formed. *)
 let check_well_formed ~loc tydef =
   let rec check = function
-  | T.Basic _ | T.Param _ -> ()
-  | T.Apply (ty_name, (tys, drts, rgns)) ->
-    begin match lookup_tydef ~loc ty_name with
-      | (ts, ds, rs), (Sum _  | Record _ | Inline _) ->
-        let n = List.length ts in
-          if List.length tys <> n then
-            Error.typing ~loc "The type constructor %s expects %d type arguments" ty_name n;
-          let n = List.length ds in
-            if List.length drts <> n then
-              Error.typing ~loc "The type constructor %s expects %d dirt arguments" ty_name n;
-            let n = List.length rs in
-              if List.length rgns <> n then
-                Error.typing ~loc "The type constructor %s expects %d region arguments" ty_name n
-    end
-  | T.Arrow (ty1, drty2) -> check ty1; check_dirty drty2
+  | T.Basic _ | T.TyParam _ -> ()
+  | T.Apply (ty_name, tys) ->
+      let (params, _) = lookup_tydef ~loc ty_name in
+      let n = List.length params in
+      if List.length tys <> n then
+        Error.typing ~loc "The type constructor %s expects %d arguments" ty_name n
+  | T.Arrow (ty1, ty2) -> check ty1; check ty2
   | T.Tuple tys -> List.iter check tys
-  | T.Handler ((ty1, _), drty2) -> check ty1; check_dirty drty2
-  and check_dirty (ty, _) = check ty
+  | T.Handler {T.value = ty1; T.finally = ty2} -> check ty1; check ty2
   in
   match tydef with
   | Record fields ->
@@ -190,18 +136,18 @@ let check_well_formed ~loc tydef =
       List.iter (function (_, None) -> () | (_, Some ty) -> check ty) constuctors
   | Inline ty -> check ty
 
-(** [check_noncyclic ~loc ty] checks that the definition of type [ty] is non-cyclic. *)
+(** [check_well_formed ~loc ty] checks that the definition of type [ty] is non-cyclic. *)
 let check_noncyclic ~loc =
   let rec check forbidden = function
-  | T.Basic _ | T.Param _ -> ()
-  | T.Apply (t, args) ->
+  | T.Basic _ | T.TyParam _ -> ()
+  | T.Apply (t, lst) ->
       if List.mem t forbidden then
         Error.typing ~loc "Type definition %s is cyclic." t
       else
-        check_tydef (t :: forbidden) (ty_apply ~loc t args)
-  | T.Arrow (ty1, (ty2, _)) -> check forbidden ty1; check forbidden ty2
+        check_tydef (t :: forbidden) (ty_apply ~loc t lst)
+  | T.Arrow (ty1, ty2) -> check forbidden ty1; check forbidden ty2
   | T.Tuple tys -> List.iter (check forbidden) tys
-  | T.Handler ((ty1, _), (ty2, _)) ->
+  | T.Handler {T.value = ty1; T.finally = ty2} ->
       check forbidden ty1; check forbidden ty2
   and check_tydef forbidden = function
   | Sum _ -> ()
@@ -231,99 +177,18 @@ let check_shadowing ~loc = function
     ) lst
   | Inline _ -> ()
 
-let extend_with_variances ~loc tydefs =
-  let prepare_variance lst = List.map (fun p -> (p, (ref false, ref false))) lst in
-  let prepare_variances ((ps, ds, rs), def) =
-    ((prepare_variance ps, prepare_variance ds, prepare_variance rs), def) in
-  let prepared_tydefs = OldUtils.assoc_map prepare_variances tydefs in
-  let set_variances (ty_name, ((ps, ds, rs), def)) =
-    let rec ty posi nega = function
-      | T.Basic _ -> ()
-      | T.Param p ->
-          begin match OldUtils.lookup p ps with
-          | None -> assert false
-          | Some (posvar, negvar) ->
-              posvar := !posvar || posi;
-              negvar := !negvar || nega
-          end
-      | T.Apply (t, (tys, drts, rgns)) ->
-          begin match OldUtils.lookup t !tctx with
-          | None ->
-              (* XXX Here, we should do some sort of an equivalence relation algorithm to compute better variances. *)
-              List.iter (ty true true) tys;
-              List.iter (dirt true true) drts;
-              List.iter (region_param true true) rgns
-          | Some ((ps, ds, rs), _) ->
-              if List.length ps != List.length tys then
-                Error.typing ~loc "The type constructor %s expects %d type arguments" t (List.length ps);
-              if List.length ds != List.length drts then
-                Error.typing ~loc "The type constructor %s expects %d dirt arguments" t (List.length drts);
-              if List.length rs != List.length rgns then
-                Error.typing ~loc "The type constructor %s expects %d region arguments" t (List.length rgns);
-              if posi then begin
-                List.iter2 (fun (_, (posi', nega')) -> ty posi' nega') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> dirt posi' nega') ds drts;
-                List.iter2 (fun (_, (posi', nega')) -> region_param posi' nega') rs rgns
-              end;
-              if nega then begin
-                List.iter2 (fun (_, (posi', nega')) -> ty nega' posi') ps tys;
-                List.iter2 (fun (_, (posi', nega')) -> dirt nega' posi') ds drts;
-                List.iter2 (fun (_, (posi', nega')) -> region_param nega' posi') rs rgns
-              end
-          end
-      | T.Arrow (ty1, (ty2, drt)) ->
-          ty nega posi ty1;
-          ty posi nega ty2;
-          dirt posi nega drt
-      | T.Tuple tys -> List.iter (ty posi nega) tys
-      | T.Handler ((ty1, drt1), (ty2, drt2)) ->
-          ty nega posi ty1;
-          ty posi nega ty2;
-          dirt nega posi drt1;
-          dirt posi nega drt2
-    and dirt posi nega drt =
-      List.iter (fun (_, prs) -> region_param posi nega prs) drt.Type.ops;
-      dirt_param posi nega drt.Type.rest
-    and dirt_param posi nega d =
-      begin match OldUtils.lookup d ds with
-      | None -> assert false
-      | Some (posvar, negvar) ->
-          posvar := !posvar || posi;
-          negvar := !negvar || nega
-      end
-    and region_param posi nega r =
-      begin match OldUtils.lookup r rs with
-      | None -> assert false
-      | Some (posvar, negvar) ->
-          posvar := !posvar || posi;
-          negvar := !negvar || nega
-      end
-    in match def with
-      | Record tys -> List.iter (fun (_, t) -> ty true false t) tys
-      | Sum tys -> List.iter (function (_, Some t) -> ty true false t | (_, None) -> ()) tys
-      | Inline t -> ty true false t
-  in
-  List.iter set_variances prepared_tydefs;
-  let unref lst = OldUtils.assoc_map (fun (ref1, ref2) -> (!ref1, !ref2)) lst in
-  let extend_with_variance (ty_name, ((ps, ds, rs), def)) =
-    (ty_name, ((unref ps, unref ds, unref rs), def))
-  in
-  List.map extend_with_variance prepared_tydefs
-
 (** [extend_tydefs ~loc tydefs] checks that the simulatenous type definitions [tydefs] are
     well-formed and returns the extended context. *)
 let extend_tydefs ~loc tydefs =
   (* We wish we wrote this in eff, where we could have transactional memory. *)
-  let tctx_orig = !tctx in
-  let tydefs = extend_with_variances ~loc tydefs in
-  let extend_tydef ((tyname, (_, ty)) as tydef) =
-    if List.mem_assoc tyname !tctx then Error.typing ~loc "Type %s is already defined" tyname ;
+  let global_orig = !global in
+  let extend_tydef ((_, (_, ty)) as tydef) =
     check_shadowing ~loc ty ;
-    tctx := tydef :: !tctx
+    global := tydef :: !global
   in 
     try 
       List.iter extend_tydef tydefs ;
       List.iter (fun (_, (_, ty)) -> check_well_formed ~loc ty) tydefs;
       List.iter (fun (_, (_, ty)) -> check_noncyclic ~loc ty) tydefs
     with e ->
-      tctx := tctx_orig ; raise e (* reinstate the context on error *)
+      global := global_orig ; raise e (* reinstate the context on error *)

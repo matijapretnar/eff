@@ -1,252 +1,136 @@
 (* We need three sorts of parameters, for types, dirt, and regions.
    In order not to confuse them, we define separate types for them.
  *)
+
 type ty_param = Ty_Param of int
-type dirt_param = Dirt_Param of int
-type region_param = Region_Param of int
 
 let fresh_ty_param = OldUtils.fresh (fun n -> Ty_Param n)
-let fresh_dirt_param = OldUtils.fresh (fun n -> Dirt_Param n)
-let fresh_region_param = OldUtils.fresh (fun n -> Region_Param n)
 
 type ty =
-  | Apply of OldUtils.tyname * args
-  | Param of ty_param
+  | Apply of OldUtils.tyname * ty list
+  | TyParam of ty_param
   | Basic of string
   | Tuple of ty list
-  | Arrow of ty * dirty
-  | Handler of dirty * dirty
+  | Arrow of ty * ty
+  | Handler of handler_ty
 
-and dirty = ty * dirt
-
-and dirt = {
-  ops: (OldUtils.effect, region_param) OldUtils.assoc;
-  rest: dirt_param
+and handler_ty = {
+  value: ty; (* the type of the _argument_ of value *)
+  finally: ty; (* the return type of finally *)
 }
 
-and args = (ty, dirt, region_param) OldUtils.trio
-
+(* This type is used when type checking is turned off. Its name
+   is syntactically incorrect so that the programmer cannot accidentally
+   define it. *)
+let universal_ty = Basic "_"
 
 let int_ty = Basic "int"
 let string_ty = Basic "string"
 let bool_ty = Basic "bool"
 let float_ty = Basic "float"
 let unit_ty = Tuple []
-let empty_ty = Apply ("empty", OldUtils.trio_empty)
+let empty_ty = Apply ("empty", [])
 
-(** [fresh_ty ()] gives a type [Param p] where [p] is a new type parameter on
-    each call. *)
-let fresh_ty () = Param (fresh_ty_param ())
-let simple_dirt d = { ops = []; rest = d }
-let fresh_dirt () = simple_dirt (fresh_dirt_param ())
-let fresh_dirty () = (fresh_ty (), fresh_dirt ())
-
-(* These types are used when type checking is turned off. Their names
-   are syntactically incorrect so that the programmer cannot accidentally
-   define it. *)
-let universal_ty = Basic "_"
-let universal_dirty = (Basic "_", fresh_dirt ())
-
-
-type replacement = {
-  ty_param_repl : ty_param -> ty;
-  dirt_param_repl : dirt_param -> dirt;
-  region_param_repl : region_param -> region_param;
-}
-
-(** [replace_ty rpls ty] replaces type parameters in [ty] according to [rpls]. *)
-let rec replace_ty rpls = function
-  | Apply (ty_name, args) -> Apply (ty_name, replace_args rpls args)
-  | Param p -> rpls.ty_param_repl p
-  | Basic _ as ty -> ty
-  | Tuple tys -> Tuple (OldUtils.map (replace_ty rpls) tys)
-  | Arrow (ty1, (ty2, drt)) ->
-      let ty1 = replace_ty rpls ty1 in
-      let drt = replace_dirt rpls drt in
-      let ty2 = replace_ty rpls ty2 in
-      Arrow (ty1, (ty2, drt))
-  | Handler (drty1, drty2) ->
-      let drty1 = replace_dirty rpls drty1 in
-      let drty2 = replace_dirty rpls drty2 in
-      Handler (drty1, drty2)
-
-and replace_dirt rpls drt =
-  let ops = OldUtils.assoc_map rpls.region_param_repl drt.ops in
-  let { ops = new_ops; rest = new_rest } = rpls.dirt_param_repl drt.rest in
-  { ops = new_ops @ ops; rest = new_rest }
-
-and replace_dirty rpls (ty, drt) =
-  let ty = replace_ty rpls ty in
-  let drt = replace_dirt rpls drt in
-  (ty, drt)
-
-and replace_args rpls (tys, drts, rs) =
-  let tys = OldUtils.map (replace_ty rpls) tys in
-  let drts = OldUtils.map (replace_dirt rpls) drts in
-  let rs = OldUtils.map rpls.region_param_repl rs in
-  (tys, drts, rs)
-
-type substitution = {
-  ty_param : ty_param -> ty_param;
-  dirt_param : dirt_param -> dirt_param;
-  region_param : region_param -> region_param;
-}
+type substitution = (ty_param * ty) list
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
-let rec subst_ty sbst = function
-  | Apply (ty_name, args) -> Apply (ty_name, subst_args sbst args)
-  | Param p -> Param (sbst.ty_param p)
+let rec subst_ty sbst ty =
+  let rec subst = function
+  | Apply (ty_name, tys) -> Apply (ty_name, List.map subst tys)
+  | TyParam p as ty ->
+    (match OldUtils.lookup p sbst with
+      | Some ty -> ty
+      | None -> ty)
   | Basic _ as ty -> ty
-  | Tuple tys -> Tuple (OldUtils.map (subst_ty sbst) tys)
-  | Arrow (ty1, (ty2, drt)) ->
-      let ty1 = subst_ty sbst ty1 in
-      let drt = subst_dirt sbst drt in
-      let ty2 = subst_ty sbst ty2 in
-      Arrow (ty1, (ty2, drt))
-  | Handler (drty1, drty2) ->
-      let drty1 = subst_dirty sbst drty1 in
-      let drty2 = subst_dirty sbst drty2 in
-      Handler (drty1, drty2)
-
-and subst_dirt sbst {ops; rest} =
-  { ops = OldUtils.assoc_map sbst.region_param ops; rest = sbst.dirt_param rest }
-
-and subst_dirty sbst (ty, drt) =
-  let ty = subst_ty sbst ty in
-  let drt = subst_dirt sbst drt in
-  (ty, drt)
-
-and subst_args sbst (tys, drts, rs) =
-  let tys = OldUtils.map (subst_ty sbst) tys in
-  let drts = OldUtils.map (subst_dirt sbst) drts in
-  let rs = OldUtils.map sbst.region_param rs in
-  (tys, drts, rs)
+  | Tuple tys -> Tuple (List.map subst tys)
+  | Arrow (ty1, ty2) -> Arrow (subst ty1, subst_ty sbst ty2)
+  | Handler {value = ty1; finally = ty2} ->
+      Handler {value = subst ty1; finally = subst ty2}
+  in
+  subst ty
 
 (** [identity_subst] is a substitution that makes no changes. *)
-let identity_subst =
-  {
-    ty_param = OldUtils.id;
-    dirt_param = OldUtils.id;
-    region_param = OldUtils.id;
-  }
+let identity_subst = []
 
 (** [compose_subst sbst1 sbst2] returns a substitution that first performs
     [sbst2] and then [sbst1]. *)
 let compose_subst sbst1 sbst2 =
-  {
-    ty_param = OldUtils.compose sbst1.ty_param sbst2.ty_param;
-    dirt_param = OldUtils.compose sbst1.dirt_param sbst2.dirt_param;
-    region_param = OldUtils.compose sbst1.region_param sbst2.region_param;
-  }
+  sbst1 @ OldUtils.assoc_map (subst_ty sbst1) sbst2
 
-let refresher fresh =
-  let substitution = ref [] in
-  fun p ->
-    match OldUtils.lookup p !substitution with
-    | None ->
-        let p' = fresh () in
-        substitution := OldUtils.update p p' !substitution;
-        p'
-    | Some p' -> p'
-
-let beautifying_subst () =
-  if !Config.disable_beautify then
-    identity_subst
-  else
-    {
-      ty_param = refresher (OldUtils.fresh (fun n -> Ty_Param n));
-      dirt_param = refresher (OldUtils.fresh (fun n -> Dirt_Param n));
-      region_param = refresher (OldUtils.fresh (fun n -> Region_Param n));
-    }
-
-let refreshing_subst () =
-  {
-    ty_param = refresher fresh_ty_param;
-    dirt_param = refresher fresh_dirt_param;
-    region_param = refresher fresh_region_param;
-  }
-
-let refresh ty =
-  let sbst = refreshing_subst () in
-  subst_ty sbst ty
-
-let (@@@) = OldUtils.trio_append
-
-let for_parameters get_params is_pos ps lst =
-  List.fold_right2 (fun (_, (cov, contra)) el params ->
-                      let params = if cov then get_params is_pos el @@@ params else params in
-                      if contra then get_params (not is_pos) el @@@ params else params) ps lst OldUtils.trio_empty
-
-let pos_neg_params get_variances ty =
-  let rec pos_ty is_pos = function
-  | Apply (ty_name, args) -> pos_args is_pos ty_name args
-  | Param p -> ((if is_pos then [p] else []), [], [])
-  | Basic _ -> OldUtils.trio_empty
-  | Tuple tys -> OldUtils.trio_flatten_map (pos_ty is_pos) tys
-  | Arrow (ty1, drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirty is_pos drty2
-  | Handler ((ty1, drt1), drty2) -> pos_ty (not is_pos) ty1 @@@ pos_dirt (not is_pos) drt1 @@@ pos_dirty is_pos drty2
-  and pos_dirty is_pos (ty, drt) =
-    pos_ty is_pos ty @@@ pos_dirt is_pos drt
-  and pos_dirt is_pos drt =
-    pos_dirt_param is_pos drt.rest @@@ OldUtils.trio_flatten_map (fun (_, dt) -> pos_region_param is_pos dt) drt.ops
-  and pos_dirt_param is_pos p =
-    ([], (if is_pos then [p] else []), [])
-  and pos_region_param is_pos r =
-    ([], [], if is_pos then [r] else [])
-  and pos_args is_pos ty_name (tys, drts, rgns) =
-    let (ps, ds, rs) = get_variances ty_name in
-    for_parameters pos_ty is_pos ps tys @@@
-    for_parameters pos_dirt is_pos ds drts @@@
-    for_parameters pos_region_param is_pos rs rgns
+(** [free_params ty] returns three lists of type parameters that occur in [ty].
+    Each parameter is listed only once and in order in which it occurs when
+    [ty] is displayed. *)
+let free_params ty =
+  let flatten_map f lst = List.fold_left (@) [] (List.map f lst) in
+  let rec free_ty = function
+    | Apply (_, tys) -> flatten_map free_ty tys
+    | TyParam p -> [p]
+    | Basic _ -> []
+    | Tuple tys -> flatten_map free_ty tys
+    | Arrow (ty1, ty2) -> free_ty ty1 @ free_ty ty2
+    | Handler {value = ty1; finally = ty2} -> free_ty ty1 @ free_ty ty2
   in
-  OldUtils.trio_uniq (pos_ty true ty), OldUtils.trio_uniq (pos_ty false ty)
+  OldUtils.uniq (free_ty ty)
 
-let print_ty_param (Ty_Param k) ppf =
-  Symbols.ty_param k false ppf
+(** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
+let occurs_in_ty p ty = List.mem p (free_params ty)
 
-let print_dirt_param (Dirt_Param k) ppf =
-  Symbols.dirt_param k false ppf
+(** [fresh_ty ()] gives a type [TyParam p] where [p] is a new type parameter on
+    each call. *)
+let fresh_ty () = TyParam (fresh_ty_param ())
 
-let print_region_param (Region_Param k) ppf =
-  Symbols.region_param k false ppf
+let refreshing_subst ps =
+  let ps' = List.map (fun p -> (p, fresh_ty_param ())) ps in
+  let sbst = OldUtils.assoc_map (fun p' -> TyParam p') ps' in
+  List.map snd ps', sbst
 
-let print_dirt drt ppf =
-  match drt.ops with
-  | [] ->
-      Print.print ppf "%t" (print_dirt_param drt.rest)
-  | _ ->
-      let print_operation (op, r) ppf =
-        Print.print ppf "%s:%t" op (print_region_param r)
-      in
-      Print.print ppf "{%t|%t}"
-        (Print.sequence ", " print_operation drt.ops)
-        (print_dirt_param drt.rest)
+(** [refresh (ps,qs,rs) ty] replaces the polymorphic parameters [ps,qs,rs] in [ty] with fresh
+    parameters. It returns the  *)
+let refresh params ty =
+  let params', sbst = refreshing_subst params in
+    params', subst_ty sbst ty
 
-let rec print_ty ?max_level ty ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match ty with
-  | Apply (ty_name, ([], _, _)) ->
-      print "%s" ty_name
-  | Apply (ty_name, ([ty], _, _)) ->
-      print ~at_level:1 "%t %s" (print_ty ~max_level:1 ty) ty_name
-  | Apply (ty_name, (tys, _, _)) ->
-      print ~at_level:1 "(%t) %s" (Print.sequence ", " print_ty tys) ty_name
-  | Param p -> print_ty_param p ppf
-  | Basic b -> print "%s" b
-  | Tuple [] -> print "unit"
-  | Tuple tys ->
-      print ~at_level:2 "@[<hov>%t@]"
-      (Print.sequence (Symbols.times ()) (print_ty ~max_level:1) tys)
-  | Arrow (t1, (t2, drt)) ->
-      print ~at_level:5 "@[%t -%t%s@ %t@]"
-        (print_ty ~max_level:4 t1)
-        (print_dirt drt)
-        (Symbols.short_arrow ())
-        (print_ty ~max_level:5 t2)
-  | Handler ((t1, drt1), (t2, drt2)) ->
-      print ~at_level:6 "%t ! %t %s@ %t ! %t"
-        (print_ty ~max_level:4 t1)
-        (print_dirt drt1)
-        (Symbols.handler_arrow ())
-        (print_ty ~max_level:4 t2)
-        (print_dirt drt2)
+(** [beautify ty] returns a sequential replacement of all type parameters in
+    [ty] that can be used for its pretty printing. *)
+let beautify (ps, ty) =
+  let next_ty_param = OldUtils.fresh (fun n -> Ty_Param n) in
+  let xs = free_params ty in
+  let xs_map = List.map (fun p -> (p, next_ty_param ())) xs in
+  let subst ps ps_map = List.map (fun p ->
+    match OldUtils.lookup p ps_map with
+    | None -> p
+    | Some p' -> p') ps in
+  let sbst = OldUtils.assoc_map (fun p' -> TyParam p') xs_map in
+  subst ps xs_map, subst_ty sbst ty
+
+let beautify2 ty1 ty2 =
+  match beautify ([], Tuple [ty1; ty2]) with
+  | (ps, Tuple [ty1; ty2]) -> (ps, ty1), (ps, ty2)
+  | _ -> assert false
+
+let print (ps as poly, t) ppf =
+  let rec ty ?max_level t ppf =
+    let print ?at_level = Print.print ?max_level ?at_level ppf in
+    match t with
+      | Arrow (t1, t2) ->
+          print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2)
+      | Basic b -> print "%s" b
+      | Apply (t, []) ->
+          print "%s" t
+      | Apply (t, [s]) ->
+          print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
+      | Apply (t, ts) ->
+          print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
+      | TyParam ((Ty_Param k) as p) ->
+          let c = (if List.mem p ps then "'" else "'_") in
+          if 0 <= k && k <= 25
+          then print "%s%c" c (char_of_int (k + int_of_char 'a'))
+          else print "%sty%i" c (k - 25)
+      | Tuple [] -> print "unit"
+      | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence " * " (ty ~max_level:1) ts)
+      | Handler {value=t1; finally=t2} ->
+          print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
+  in
+    ty t ppf
+
+let print_beautiful sch = print (beautify sch)

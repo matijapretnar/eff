@@ -1,7 +1,8 @@
-- : bool |  = true
-- : bool |  = false
-- : bool |  = true
-- : bool |  = false
-- : bool |  = false
-- : bool |  = true
-- : string × bool × bool × bool |  = ("nested", true, false, true)
+- : bool = true
+- : bool = false
+- : bool = true
+- : bool = false
+- : bool = false
+- : bool = true
+- : string * bool * bool * bool = ("nested", true, false, true)
+val f : 'a -> 'a -> bool = <fun>

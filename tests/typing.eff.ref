@@ -1,27 +1,26 @@
-- : int | 
-- : bool | 
-- : string | 
-- : unit | 
-- : float | 
-- : int × int | 
-- : τ₁ list × string | 
-- : (string, τ₁) cow | 
-- : (τ₁, string) cow | 
-- : (int, string list) cow ⟶  (string list, int) cow | 
-- : (int, string) bull | 
-- : (int, τ₁) bull ⟶  int | 
-- : (τ₁, τ₂ list list) bull ⟶  τ₂ list list | 
-- : string -{Bark:ρ₁}→ string | ρ₁ = ⊤
-- : string ! {Bark:ρ₁} | ρ₁ = ⊤
-- : int ! {Wag:ρ₁} | ρ₁ = ⊤
-- : τ₁ ⟶  τ₂ | τ₁ < τ₂; 
-- : _τ₁ ⟶  _τ₂ | τ₁ < τ₂; 
-- : τ₁ ⟶  τ₂ × τ₃ | τ₁ < τ₃,τ₁ < τ₂; 
-- : (τ₁ ⟶  τ₂) × τ₃ list | τ₁ < τ₂; 
-- : (_τ₁ ⟶  _τ₂) × (_τ₃ ⟶  _τ₄) | τ₃ < τ₄,
-τ₁ < τ₂; 
-- : τ₁ ⟶  τ₂ ⟶  τ₃ | τ₁ < τ₃; 
-- : τ₁ list list list | 
-- : τ₁ ⟶  τ₂ ⟶  τ₃ | τ₁ < τ₃; 
-val h : τ₁ ⟶  τ₂ | τ₁ < τ₂;  = <fun>
-- : τ₁ ⟶  τ₂ | τ₁ < τ₂; 
+- : int
+- : bool
+- : string
+- : unit
+- : float
+- : int * int
+- : 'a list * string
+- : (string, 'a) cow
+- : ('a, string) cow
+- : (int, string list) cow -> (string list, int) cow
+- : (int, string) bull
+- : (int, 'a) bull -> int
+- : ('a, 'b list list) bull -> 'b list list
+- : string -> string
+- : string
+- : int
+- : 'a -> 'a
+- : '_a -> '_a
+- : 'a -> 'a * 'a
+- : ('a -> 'a) * 'b list
+- : ('_a -> '_a) * ('_b -> '_b)
+- : 'a -> 'b -> 'a
+- : 'a list list list
+- : 'a -> 'b -> 'a
+val h : 'a -> 'a = <fun>
+- : 'a -> 'a

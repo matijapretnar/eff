@@ -1,5 +1,0 @@
-val local_store : α ref ⟶  α ⟶  (β ⟹  β) = <fun>
-val put : _α list ⟶  unit = <fun>
-val get : unit ⟶  _α list = <fun>
-val s : _α list ref = <instance #6>
-Typing error (file "./errors/polymorphic_ref.eff", line 15, char 6): This expression has type int but it should have type string.

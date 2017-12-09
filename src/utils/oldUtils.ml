@@ -1,4 +1,4 @@
-(** Common definitions. *)
+(** OldUtils.definitions. *)
 
 (** Types shared by different modules *)
 type effect = string (** effect symbols *)

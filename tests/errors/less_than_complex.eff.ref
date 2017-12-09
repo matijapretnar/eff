@@ -1,6 +1,4 @@
-val h : τ₁ !  ⟹ 
-τ₂ ! δ₂ | τ₁ < τ₂; δ₁ < δ₂;  = <handler>
-val g : τ₁ !  ⟹ 
-τ₂ ! δ₂ | τ₁ < τ₂; δ₁ < δ₂;  = <handler>
+val h : 'a => 'a = <handler>
+val g : 'a => 'a = <handler>
 Runtime error (unknown location):
 invalid comparison with <
