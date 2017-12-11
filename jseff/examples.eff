@@ -121,7 +121,6 @@ with collect handle
 (* We will model non-determinism by implementing two operations, Decide and
    Fail. Decide will be used to `non-deterministically' choose the correct path
    while Fail signals that a choice fails to return a suitable answer. *)
-<<<<<<< HEAD
 
 effect Fail : unit -> empty
 effect Decide : unit -> bool
@@ -133,19 +132,6 @@ let fail () = (match #Fail () with)
 let decide () = #Decide ()
 ;;
 
-=======
-
-effect Fail : unit -> empty
-effect Decide : unit -> bool
-
-(* We use a trick to ensure that using Fail typechecks correctly by wrapping
-   it in a function. For aesthetic purposes we also wrap Decide in a function. *)
-
-let fail () = (match #Fail () with)
-let decide () = #Decide ()
-;;
-
->>>>>>> simple-type-system-examples
 (* We create a few different handlers to handle the above effects. The simplest
    handler is "choose_true" that always decides to use true. A more interesting
    example is the "choose_max" handler, that returns the maximal result of all
@@ -198,15 +184,9 @@ let rec choose_int m n =
   else
     choose_int (m + 1) n
 ;;
-<<<<<<< HEAD
 
 (* This can be used for finding pythagorean triples. *)
 
-=======
-
-(* This can be used for finding pythagorean triples. *)
-
->>>>>>> simple-type-system-examples
 let int_sqrt m =
   (* Returns an integer square root if it exists. *)
   let rec try n =
@@ -239,14 +219,6 @@ let backtrack = handler
     (* We use a second handler to handle the continuation. *)
     handle k false with
     | #Fail () _ -> k true
-<<<<<<< HEAD
-;;
-
-(* You can test the different handlers on the following examples. *)
-with choose_all handle
-  pythagorean 5 7
-=======
->>>>>>> simple-type-system-examples
 ;;
 
 (* You can test the different handlers on the following examples. *)
@@ -310,19 +282,6 @@ let rec uniform = function
       let n = length xs + 1 in
       let p = 1.0 /. float_of_int n in
       if #Toss p then x else uniform xs
-<<<<<<< HEAD
-
-let random_value = handler
-  | val v -> v
-  | #Toss p k ->
-    let toss = #Random_float 1. < p in k toss
-
-let expectation = handler
-  | val v -> v
-  | #Toss p k -> p *. k true +. (1.0 -. p) *. k false
-;;
-
-=======
 ;;
 
 let random_value = handler
@@ -336,7 +295,6 @@ let expectation = handler
   | #Toss p k -> p *. k true +. (1.0 -. p) *. k false
 ;;
 
->>>>>>> simple-type-system-examples
 with expectation handle
   let x = uniform [1.; 2.; 3.; 4.; 5.; 6.] in
   let y = uniform [1.; 2.; 3.; 4.; 5.; 6.] in
@@ -422,8 +380,6 @@ with better_state 30 handle
 effect Yield : unit -> unit
 effect Spawn : (unit -> unit) -> unit
 
-<<<<<<< HEAD
-=======
 (* We will need a que to keep track of inactive threads. *)
 effect Get_next : unit -> (unit -> unit) option
 effect Add_to_que : (unit -> unit) -> unit
@@ -437,7 +393,6 @@ let que initial = handler
   | val x -> ( fun _ -> x)
   | finally x -> x initial
 ;;
->>>>>>> simple-type-system-examples
 
 let round_robin =
   let enqueue t =
@@ -456,14 +411,6 @@ let round_robin =
   rr_handler ()
 ;;
 
-<<<<<<< HEAD
-with round_robin c handle
-  c#spawn (fun _ ->
-    iter (fun x -> #Print x; c#yield ()) ["a"; "b"; "c"; "d"; "e"]
-  );
-  c#spawn (fun _ ->
-    iter (fun x -> #Print x; c#yield ()) ["A"; "B"; "C"; "D"; "E"]
-=======
 (* Because the round_robin handler uses our que, we must nest the handlers. *)
 with que [] handle
 with round_robin handle
@@ -472,7 +419,6 @@ with round_robin handle
   );
   #Spawn (fun _ ->
     iter (fun x -> #Print x; #Yield ()) ["A"; "B"; "C"; "D"; "E"]
->>>>>>> simple-type-system-examples
   )
 ;;
 
