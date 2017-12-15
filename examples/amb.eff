@@ -1,77 +1,87 @@
 (* This example is described in Section 6.7 of "Programming with Algebraic Effects and
    Handlers" by A. Bauer and M. Pretnar. *)
 
-type 'a result = Failure | Success of 'a
+type result = Failure | Success of (int*int) list
 
-type 'a selection = effect
-  operation select : 'a list -> 'a
-end
+effect Select : unit -> bool
 
-let amb s = handler
-  | s#select lst k ->
-    let rec try = function
-      | [] -> Failure
-      | x::xs -> (match k x with
-                    | Failure -> try xs
-                    | Success y -> Success y)
-    in
-      try lst ;;
+let amb = handler
+  | #Select () k ->
+    (match k true with
+    | Success y -> Success y
+    | Failure -> k false)
+;;
 
 (* The 8 queens problem. *)
 
+let rec select_from = function
+  | [] -> None
+  | x::xs -> if #Select () then Some x else select_from xs
+
 let no_attack (x,y) (x',y') =
-  x <> x' && y <> y' && abs (x - x') <> abs (y - y');;
+  x <> x' && y <> y' && abs (x - x') <> abs (y - y')
 
 let available x qs =
-  filter (fun y -> forall (no_attack (x,y)) qs) [1;2;3;4;5;6;7;8];;
+  filter (fun y -> forall (no_attack (x,y)) qs) [1;2;3;4;5;6;7;8]
+;;
 
 (* This one finds [(8, 4); (7, 2); (6, 7); (5, 3); (4, 6); (3, 8); (2, 5); (1, 1)]. *)
-let s = new selection in
-with amb s handle
+with amb handle
   let rec place x qs =
     if x = 9 then Success qs else
-      let y = s#select (available x qs) in
-      place (x+1) ((x, y) :: qs)
-  in place 1 [];;
-
-(* This one does not work because state is handled outside amb. *)
-let s = new selection in
-with amb s handle
-  let qs = ref [] in
-  for x = 1 to 8 do
-    let y = s#select (available x !qs) in
-    qs := (x, y) :: !qs
-  done;
-  Success !qs;;
-
-(* Watch this, it works and finds the same solution as the first one. *)
-let s = new selection in
-with amb s handle
-  let qs = new ref in
-  with state qs [] handle
-    for x = 1 to 8 do
-      let y = s#select (available x !qs) in
-      qs := (x, y) :: !qs
-    done;
-    Success !qs;;
+      match select_from (available x qs) with
+      | Some y -> place (x+1) ((x, y) :: qs)
+      | None -> Failure
+  in place 1 []
+;;
 
 (* Breadth-first search. *)
-let bfs s =
-  let q = ref [] in
-  handler
-    | s#select lst k ->
-      (q := !q @ (map (fun x -> (k,x)) lst);
-       match !q with
-        | [] -> Failure
-        | (k,x) :: lst -> q := lst; k x);;
+
+(* We add a state handler to use as a queue. *)
+
+effect Get_next : unit -> ((bool -> result)*bool) option
+effect Add_to_queue : ((bool -> result)*bool) -> unit
+
+let queue initial = handler
+  | #Get_next () k ->
+    ( fun queue -> match queue with
+    | [] -> k None []
+    | hd::tl -> k (Some hd) tl )
+  | #Add_to_queue y k -> ( fun queue -> k () (queue @ [y]))
+  | val x -> ( fun _ -> x)
+  | finally x -> x initial
+;;
+
+
+let bfs =
+  (* Auxilary function that runs the next choice. *)
+  let run_next () =
+    match #Get_next () with
+    | None -> Failure
+    | Some (k,x) -> k x
+  in
+  handler (* Handler definition. *)
+  | #Select () k -> #Add_to_queue (k, true); #Add_to_queue (k, false); run_next ()
+  (* When the computation fails, run the next choice. Final Failure
+     comes from run_next when the queue is empty. *)
+  | val r ->
+    (match r with
+    |Success x -> Success x
+    |Failure -> run_next ())
+;;
 
 (* We repeat 8-queen example with breadth-first-search. It is much slower
    than amb, which is not surprising. It still finds the same solution
    (which is what we would expect in this case). *)
-let s = new selection in
-with bfs s handle
+with queue [] handle
+with bfs handle
   let rec place x qs =
     if x = 9 then Success qs else
-      let y = s#select (available x qs) in
-      place (x+1) ((x, y) :: qs)
-  in place 1 [];;
+      match select_from (available x qs) with
+      | Some y -> place (x+1) ((x, y) :: qs)
+      | None -> Failure
+  in place 1 []
+;;
+
+(* In this case using BFS is both slower and requires more code because we need
+   to have a queue, but it is an example of how neatly handlers can be nested. *)
