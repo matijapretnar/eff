@@ -37,17 +37,17 @@ with amb handle
 
 (* Breadth-first search. *)
 
-(* We add a state handler to use as a que. *)
+(* We add a state handler to use as a queue. *)
 
 effect Get_next : unit -> ((bool -> result)*bool) option
-effect Add_to_que : ((bool -> result)*bool) -> unit
+effect Add_to_queue : ((bool -> result)*bool) -> unit
 
-let que initial = handler
+let queue initial = handler
   | #Get_next () k ->
-    ( fun que -> match que with
+    ( fun queue -> match queue with
     | [] -> k None []
     | hd::tl -> k (Some hd) tl )
-  | #Add_to_que y k -> ( fun que -> k () (que @ [y]))
+  | #Add_to_queue y k -> ( fun queue -> k () (queue @ [y]))
   | val x -> ( fun _ -> x)
   | finally x -> x initial
 ;;
@@ -61,9 +61,9 @@ let bfs =
     | Some (k,x) -> k x
   in
   handler (* Handler definition. *)
-  | #Select () k -> #Add_to_que (k, true); #Add_to_que (k, false); run_next ()
+  | #Select () k -> #Add_to_queue (k, true); #Add_to_queue (k, false); run_next ()
   (* When the computation fails, run the next choice. Final Failure
-     comes from run_next when the que is empty. *)
+     comes from run_next when the queue is empty. *)
   | val r ->
     (match r with
     |Success x -> Success x
@@ -73,7 +73,7 @@ let bfs =
 (* We repeat 8-queen example with breadth-first-search. It is much slower
    than amb, which is not surprising. It still finds the same solution
    (which is what we would expect in this case). *)
-with que [] handle
+with queue [] handle
 with bfs handle
   let rec place x qs =
     if x = 9 then Success qs else
@@ -84,4 +84,4 @@ with bfs handle
 ;;
 
 (* In this case using BFS is both slower and requires more code because we need
-   to have a que, but it is an example of how neatly handlers can be nested. *)
+   to have a queue, but it is an example of how neatly handlers can be nested. *)

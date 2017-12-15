@@ -380,23 +380,23 @@ with better_state 30 handle
 effect Yield : unit -> unit
 effect Spawn : (unit -> unit) -> unit
 
-(* We will need a que to keep track of inactive threads. *)
+(* We will need a queue to keep track of inactive threads. *)
 effect Get_next : unit -> (unit -> unit) option
-effect Add_to_que : (unit -> unit) -> unit
+effect Add_to_queue : (unit -> unit) -> unit
 
-let que initial = handler
+let queue initial = handler
   | #Get_next () k ->
-    ( fun que -> match que with
+    ( fun queue -> match queue with
     | [] -> k None []
     | hd::tl -> k (Some hd) tl )
-  | #Add_to_que y k -> ( fun que -> k () (que @ [y]))
+  | #Add_to_queue y k -> ( fun queue -> k () (queue @ [y]))
   | val x -> ( fun _ -> x)
   | finally x -> x initial
 ;;
 
 let round_robin =
   let enqueue t =
-    #Add_to_que t
+    #Add_to_queue t
   in
   let dequeue () =
     match #Get_next () with
@@ -411,8 +411,8 @@ let round_robin =
   rr_handler ()
 ;;
 
-(* Because the round_robin handler uses our que, we must nest the handlers. *)
-with que [] handle
+(* Because the round_robin handler uses our queue, we must nest the handlers. *)
+with queue [] handle
 with round_robin handle
   #Spawn (fun _ ->
     iter (fun x -> #Print x; #Yield ()) ["a"; "b"; "c"; "d"; "e"]
@@ -440,7 +440,7 @@ let rec fractions d e =
   find_fractions 1
 ;;
 
-with que [] handle
+with queue [] handle
 with round_robin handle
   fractions 1 10
 ;;
