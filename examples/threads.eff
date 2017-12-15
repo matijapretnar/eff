@@ -58,8 +58,9 @@ with round_robin handle
 let rec fractions d e =
   let rec find_fractions n =
     (* If the fraction is reduced, print it and yield *)
-    (if (gcd n d = 1) then
-      #Print (to_string n ^ "/" ^ to_string d ^ ", "); #Yield ());
+    if gcd n d = 1 then
+      #Print (to_string n ^ "/" ^ to_string d ^ ", "); #Yield ()
+    else ();
     if d > n then
       find_fractions (n+1)
     else ()

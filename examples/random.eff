@@ -22,7 +22,7 @@ let rec distribution_pick l =
   | [(x, _)] -> x
   | (x, p)::xs ->
     let adjusted_p = (p/.(1. -. acc)) in
-      if #Pick adjusted_p then x else dist_pick_aux (acc +. p) xs
+      if #Pick adjusted_p then x else pick_aux (acc +. p) xs
   in
   pick_aux 0. l
 ;;
