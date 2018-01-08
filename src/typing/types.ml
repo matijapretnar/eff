@@ -125,11 +125,13 @@ and print_target_dirt drt ppf =
 	let print ?at_level = Print.print  ?at_level ppf in
 	 begin match drt with
    | SetVar(set,p) -> 
-        let eff_list = effect_set_to_list set in
-        print "{%t} U %t" (print_effect_list eff_list)  (Params.print_dirt_param p )
+        if effect_set_is_empty set
+          then print "%t" (Params.print_dirt_param p)
+          else let eff_list = effect_set_to_list set in
+               print "{%t} U %t" (print_effect_list eff_list)  (Params.print_dirt_param p )
    | SetEmpty set -> 
         let eff_list = effect_set_to_list set in
-        print "{%t} U (/)" (print_effect_list eff_list)
+        print "{%t}" (print_effect_list eff_list)
 	  end
 
 and print_effect_list eff_list ppf =
