@@ -1,6 +1,8 @@
 module C = OldUtils
 module T = Type
 module Core = CoreSyntax
+module Ctx = SimpleCtx
+module Unify = SimpleUnify
 
 type t = Ctx.t
 

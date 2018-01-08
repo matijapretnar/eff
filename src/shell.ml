@@ -8,12 +8,12 @@ let help_text = "Toplevel commands:
 
 type state = {
   runtime : Eval.state;
-  typing : Infer.t;
+  typing : SimpleInfer.t;
 }
 
 let initial_state = {
   runtime = Eval.empty;
-  typing = Infer.empty;
+  typing = SimpleInfer.empty;
 }
 
 
@@ -23,14 +23,14 @@ let rec exec_cmd ppf st cmd =
   let loc = cmd.CoreSyntax.location in
   match cmd.CoreSyntax.term with
   | CoreSyntax.Computation c ->
-      let typing, ty = Infer.infer_top_comp st.typing c in
+      let typing, ty = SimpleInfer.infer_top_comp st.typing c in
       let v = Eval.run st.runtime c in
       Format.fprintf ppf "@[- : %t = %t@]@."
         (Type.print_beautiful ty)
         (Value.print_value v);
       { st with typing }
   | CoreSyntax.TypeOf c ->
-      let typing, ty = Infer.infer_top_comp st.typing c in
+      let typing, ty = SimpleInfer.infer_top_comp st.typing c in
       Format.fprintf ppf "@[- : %t@]@."
         (Type.print_beautiful ty);
       { st with typing }
@@ -42,14 +42,14 @@ let rec exec_cmd ppf st cmd =
       Format.fprintf ppf "%s" help_text;
       st
   | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
-      let typing = Ctx.add_effect st.typing eff (ty1, ty2) in
+      let typing = SimpleCtx.add_effect st.typing eff (ty1, ty2) in
       { st with typing }
   | CoreSyntax.Quit ->
       exit 0
   | CoreSyntax.Use fn ->
       use_file ppf fn st
   | CoreSyntax.TopLet defs ->
-      let vars, typing = Infer.infer_top_let ~loc st.typing defs in
+      let vars, typing = SimpleInfer.infer_top_let ~loc st.typing defs in
       let runtime =
         List.fold_right
           (fun (p, c) env -> let v = Eval.run env c in Eval.extend p v env)
@@ -66,7 +66,7 @@ let rec exec_cmd ppf st cmd =
       ) vars;
       { typing; runtime }
     | CoreSyntax.TopLetRec defs ->
-        let vars, typing = Infer.infer_top_let_rec ~loc st.typing defs in
+        let vars, typing = SimpleInfer.infer_top_let_rec ~loc st.typing defs in
         let runtime = Eval.extend_let_rec st.runtime defs in
         List.iter (fun (x, tysch) ->
           Format.fprintf ppf "@[val %t : %t = <fun>@]@."
@@ -77,7 +77,7 @@ let rec exec_cmd ppf st cmd =
     | CoreSyntax.External (x, ty, f) ->
         begin match OldUtils.lookup f External.values with
         | Some v -> {
-            typing = Ctx.extend st.typing x (Type.free_params ty, ty);
+            typing = SimpleCtx.extend st.typing x (Type.free_params ty, ty);
             runtime = Eval.update x v st.runtime;
           }
         | None -> Error.runtime "unknown external symbol %s." f
