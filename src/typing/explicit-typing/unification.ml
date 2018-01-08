@@ -664,8 +664,9 @@ let rec unify(sub, paused, queue) =
       else assert false
    
    | (Types.SetEmpty s1, Types.SetVar(s2,v2)) ->
-     let sub' = [ CoerDirtVartoDirtCoercion (omega, Typed.UnionDirt ( s2, (Typed.Empty (Types.SetEmpty (Types.effect_set_diff s2 s1)))));
-                  DirtVarToDirt(v2, Types.SetVar ( (Types.effect_set_diff s1 s2) ,  Params.fresh_dirt_param () ))] in 
+     let v2' = Params.fresh_dirt_param () in
+     let sub' = [ CoerDirtVartoDirtCoercion (omega, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetVar(Types.effect_set_diff s2 s1, v2')))));
+                  DirtVarToDirt(v2, Types.SetVar ( (Types.effect_set_diff s1 s2) ,  v2'))] in 
      let new_queue = apply_sub sub' (paused @ rest_queue) in 
       Print.debug "=========End loop============";
       unify( (sub @ sub'), [], new_queue )    
@@ -676,9 +677,9 @@ let rec unify(sub, paused, queue) =
  end 
 
 and unify_ty_vars (sub,paused,rest_queue) tv a cons= 
-	let free_a = free_target_ty a in 
-(* 	let dependent_tyvars = (union_find_tyvar tv [] paused) in *)
   let dependent_tyvars = (fix_union_find [tv] paused) in 
+       let free_a = free_target_ty a in
+(*     let dependent_tyvars = (union_find_tyvar tv [] paused) in *)
 	let s1 = set_of_list free_a in 
 	let s2 = set_of_list dependent_tyvars in 
 	if (not (STyVars.is_empty (STyVars.inter s1 s2))) then assert false 
