@@ -5,19 +5,11 @@ external ( = ) : 'a -> 'a -> bool = "="
 
 external ( < ) : 'a -> 'a -> bool = "<"
 
-external ( > ) : 'a -> 'a -> bool = ">"
-
-external ( <> ) : 'a -> 'a -> bool = "<>"
-
-external ( <= ) : 'a -> 'a -> bool = "<="
-
-external ( >= ) : 'a -> 'a -> bool = ">="
-
-external ( != ) : 'a -> 'a -> bool = "!="
-
 effect Print : string -> unit
 effect Read : unit -> string
-effect Raise : unit -> empty
+effect Raise : string -> empty
+effect Random_int : int -> int
+effect Random_float: float -> float
 
 let absurd void = match void with;;
 
@@ -30,6 +22,8 @@ effect Failure : string -> empty
 let failwith msg = absurd (#Failure msg) ;;
 
 effect AssertionFault : unit -> empty
+
+let assert b = if b then () else absurd (#AssertionFault ()) ;;
 
 external ( ~- ) : int -> int = "~-"
 
@@ -84,7 +78,7 @@ let default_catch exc default = handler
  *)
 let not x = if x then false else true
 
-(* let (>) x y = y < x
+let (>) x y = y < x
 
 let (<=) x y =
   let lt = x < y in
@@ -95,7 +89,7 @@ let (>=) x y = (y <= x)
 
 let (<>) x y = not (x = y)
 
-let (!=) x y = not (x = y) *)
+let (!=) x y = not (x = y)
 
 
 let rec range m n =
@@ -113,6 +107,10 @@ let rec map f = function
       y :: ys;;
 
 let ignore _ = ()
+
+let hd (x :: _) = x
+
+let tl (_ :: lst) = lst
 
 let take f k =
   let r = range 0 k in map f r
@@ -149,6 +147,10 @@ let rec filter p = function
   | x :: xs ->
     if p x then (x :: filter p xs) else filter p xs
 
+let complement xs ys = filter (fun x -> not (mem x ys)) xs
+
+let intersection xs ys = filter (fun x -> mem x ys) xs
+
 let rec zip xs ys =
   match (xs, ys) with
   | ([], []) -> []
@@ -175,19 +177,24 @@ let head = function
   | [] ->  absurd (#InvalidArgument "head: empty list")
   | x :: _ -> x
 
-let tail = function
+let rec tail = function
   | [] ->  absurd (#InvalidArgument "tail: empty list")
   | x :: xs -> xs
-
-let hd = head
-
-let tl = tail
 
 let abs x = if x < 0 then -x else x
 
 let min x y = if x < y then x else y
 
 let max x y = if x < y then y else x
+
+let rec gcd m n =
+  match n with
+  | 0 -> m
+  | _ ->
+    let g = gcd n in g (m mod n)
+
+let rec lcm m n =
+  let d = gcd m n in (m * n) / d
 
 let odd x = (x mod 2 = 1)
 
@@ -216,11 +223,11 @@ let print_endline v =
 effect Lookup: unit -> int
 effect Update: int -> unit
 
-(* let state r x = handler
+let state r x = handler
   | val y -> (fun _ -> y)
   | #Lookup () k -> (fun s -> k s s)
   | #Update s' k -> (fun _ -> k () s')
-  | finally f -> f x;; *)
+  | finally f -> f x;;
 
 (* let ref x =
   new ref @ x with

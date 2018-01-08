@@ -6,31 +6,58 @@ type nat = int
    functional f : (nat -> nat) -> nat and a sequence a : nat -> nat
    and returns a number m such that the value (f a) depends on at most
    the first m terms of a. In other words, if a and b agree up to the
-   n-th term, then f a = f b. *)
+   m-th term, then f a = f b. *)
 
-(* We can implement modulus of continuity as usual with references *)
+(* We can implement modulus of continuity as usual with a reference. *)
 
+effect Get : unit -> int
+effect Set : int -> unit
+
+let state initial = handler
+  | val x -> (fun _ -> x)
+  | #Get () k -> (fun m -> k m m)
+  | #Set n k -> (fun m -> k () n)
+  | finally g -> g initial
+;;
+
+let unhandled_ref_mu f a =
+  #Set 0;
+  (* The sequence "b" behaves the same as "a", except that it first
+     saves the largest i for which a lookup was made. *)
+  let b i =
+    let current = #Get () in
+    let new = max current i in
+    #Set new;
+    a i
+  in
+  ignore (f b); #Get ()
+;;
+
+(* Handle it with the state handler. *)
 let ref_mu f a =
-  let k = ref 0 in
-  let b i = (k := max !k i; a i) in
-    ignore (f b); !k
+  with state 0 handle
+    unhandled_ref_mu f a
+;;
 
-(* Or we can define a custom operation and a handler which does essentially
-   the same thing. *)
+(* We can also modify the sequence itself, by wrapping it in a handler.
+   We transform the sequence "a" into a sequence of operations "Call",
+   where the transformed sequence also modifies the state. *)
 
-type 'a modulus =
-effect
-  operation call : int -> 'a
-end
+effect Call : int -> nat
+
+let sequence_transformer sequence= handler
+  | #Call n k -> (* #Call i is the same as sequence i with state adjusting. *)
+    (fun i ->
+       let j = max i n in
+       k (sequence n) j) (* Here j represents the largest seen lookup index. *)
+  | val x -> (fun n -> n) (* We want the final state, not the result. *)
+  | finally g -> g 0
+;;
 
 let mu f a =
-  let m = new modulus in
-    handle
-      f m#call
-    with
-      | m#call n k -> (fun i -> let j = max i n in k (a n) j)
-      | val _ -> fun i -> i
-      | finally g -> g 0;;
+  with sequence_transformer a handle
+    f #Call
+;;
 
 (* A couple of examples. *)
 let f a = 0 * a 10;;

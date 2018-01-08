@@ -7,21 +7,21 @@ let rec print_type ?max_level ty ppf =
     print "unit"
   | Type.Apply (ty_name, args) ->
     print ~at_level:1 "%t %s" (print_args args) ty_name
-  | Type.Param p ->
-    print "%t" (Params.print_type_param p)
+  | Type.TyParam (Type.Ty_Param d) ->
+    print "'t%d" d
   | Type.Basic t ->
     print "(%s)" t
   | Type.Tuple tys ->
     print ~at_level:1 "(%t)" (Print.sequence "*" print_type tys)
   | Type.Arrow (ty, drty) ->
     print ~at_level:2 "(%t -> %t)" (print_type ~max_level:1 ty) (print_dirty_type drty)
-  | Type.Handler (drty1, drty2) ->
+  | Type.Handler {value=drty1; finally=drty2} ->
     print ~at_level:2 "(%t -> %t)" (print_dirty_type drty1) (print_dirty_type drty2)
 
-and print_dirty_type (ty, _) ppf =
+and print_dirty_type ty ppf =
   Format.fprintf ppf "%t computation" (print_type ~max_level:0 ty)
 
-and print_args (tys, _, _) ppf =
+and print_args tys ppf =
   match tys with
   | [] -> ()
   | _ -> Format.fprintf ppf "(%t)" (Print.sequence "," print_type tys)

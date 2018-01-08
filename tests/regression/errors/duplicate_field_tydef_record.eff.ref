@@ -1,2 +1,2 @@
-Typing error (file "./errors/duplicate_field_tydef_record.eff", line 2, char 1 - line 2, char 31):
+Typing error (file "./errors/duplicate_field_tydef_record.eff", line 2, char 1 - line 2, char 35):
 Field labels in a record type must be distinct

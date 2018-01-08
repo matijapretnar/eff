@@ -52,3 +52,6 @@ val smart_print : bool ref
 
 (** Should we use pure printing for computations? *)
 val pure_print : bool ref
+
+(** Should we use the new explicit subtyping effect system? *)
+val explicit_subtyping : bool ref

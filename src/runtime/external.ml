@@ -79,7 +79,7 @@ and compare_record lst1 lst2 =
     | (fld1,v1)::lst1, (fld2,v2)::lst2 ->
       let r = Pervasives.compare fld1 fld2 in
         if r < 0 then OldUtils.Less
-        else if r > 0 then OldUtils.Greater 
+        else if r > 0 then OldUtils.Greater
         else
           (match compare v1 v2 with
             | OldUtils.Less -> OldUtils.Less
@@ -89,9 +89,9 @@ and compare_record lst1 lst2 =
     | [], _ :: _ -> OldUtils.Less
     | _ :: _, [] -> OldUtils.Greater
   in
-  comp
-    ((List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst1),
-     (List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst2))
+    comp
+      ((List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst1),
+       (List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst2))
 
 and compare_option o1 o2 =
   match o1, o2 with
@@ -117,19 +117,14 @@ let less_than v1 v2 =
 let comparison_functions = [
   ("=", binary_closure (fun v1 v2 -> value_bool (equal v1 v2)));
   ("<", binary_closure (fun v1 v2 -> value_bool (less_than v1 v2)));
-  (">", binary_closure (fun v1 v2 -> value_bool (less_than v2 v1)));
-  ("<=", binary_closure (fun v1 v2 -> value_bool (not (less_than v2 v1))));
-  (">=", binary_closure (fun v1 v2 -> value_bool (not (less_than v1 v2))));
-  ("<>", binary_closure (fun v1 v2 -> value_bool (not (equal v1 v2))));
-  ("!=", binary_closure (fun v1 v2 -> value_bool (not (equal v1 v2))));
 ]
 
 let rec pow a = function
   | 0 -> 1
   | 1 -> a
-  | n -> 
-    let b = pow a (n / 2) in
-    if n mod 2 = 0 then b * b else b * b * a
+  | n ->
+     let b = pow a (n / 2) in
+     if n mod 2 = 0 then b * b else b * b * a
 
 let arithmetic_operations = [
   ("~-", from_fun (fun v -> value_int (~- (V.to_int v))));
@@ -149,56 +144,29 @@ let arithmetic_operations = [
 let string_operations = [
   ("^", binary_closure (fun v1 v2 -> value_str (V.to_str v1 ^ V.to_str v2)));
   ("string_length",
-   from_fun (fun v -> value_int (String.length (V.to_str v))));
+    from_fun (fun v -> value_int (String.length (V.to_str v))));
 ]
 
 let conversion_functions = [
   ("to_string",
-   let to_string v =
-     let s = OldUtils.to_string Value.print_value v in
-     value_str s
-   in
-   from_fun to_string);
+    let to_string v =
+      Value.print_value v Format.str_formatter;
+      let s = Format.flush_str_formatter () in
+      value_str s
+    in
+    from_fun to_string);
   ("float_of_int",
-   from_fun (fun v -> value_float (float_of_int (V.to_int v))));
+    from_fun (fun v -> value_float (float_of_int (V.to_int v))));
 ]
 
 let std_print v =
   let str = V.to_str v in
-  print_string str;
-  flush stdout;
-  V.unit_value
+    print_string str;
+    flush stdout;
+    V.unit_value
 and std_read _ =
   let str = read_line () in
   from_str str
-
-(* let create_exception v = 
-   let exc_name = V.to_str v in
-   let exception_raise param =
-    Error.runtime "%s %t." exc_name (Value.print_value param)
-   in
-    V.Value (external_instance exc_name [
-      ("raise", exception_raise);
-    ])
-
-   let rnd_int v =
-   from_int (Random.int (V.to_int v))
-   and rnd_float v =
-   from_float (Random.float (V.to_float v)) *)
-
-let effect_instances = [
-  (*   ("std", external_instance "standard I/O" [
-       ("print", std_print);
-       ("read", std_read);
-       ]);
-
-       ("exception", from_fun create_exception);
-
-       ("rnd", external_instance "random number generator" [
-       ("int", rnd_int);
-       ("float", rnd_float);
-       ]); *)
-]
 
 (** [values] is an association list of external names and values, consisting of
     comparison functions, arithmetic operations, string operations, conversion
@@ -207,5 +175,4 @@ let values =
   comparison_functions @
   arithmetic_operations @
   string_operations @
-  conversion_functions @
-  effect_instances
+  conversion_functions

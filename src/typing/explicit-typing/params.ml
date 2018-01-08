@@ -7,6 +7,7 @@ type dirty_coercion_param = int
 type skel_param = int
 type e_ty_param = int
 
+let transform_old_ty_param = OldUtils.id
 let fresh_ty_param = OldUtils.fresh OldUtils.id
 let fresh_dirt_param = OldUtils.fresh OldUtils.id
 let fresh_region_param = OldUtils.fresh OldUtils.id
