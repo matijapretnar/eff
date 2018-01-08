@@ -1,63 +1,77 @@
 (* This example is described in Section 6.10 of "Programming with Algebraic Effects and
    Handlers" by A. Bauer and M. Pretnar. *)
 
-type coop = effect
-  operation yield : unit -> unit
-  operation spawn : (unit -> unit) -> unit
-end
 
-let round_robin c =
-  let threads = ref [] in
-  let enqueue t = threads := !threads @ [t] in
-  let dequeue () =
-    match !threads with
-    | [] -> ()
-    | t :: ts -> threads := ts; t ()
+effect Yield : unit -> unit
+effect Spawn : (unit -> unit) -> unit
+
+(* We will need a queue to keep track of inactive threads. *)
+
+effect Get_next : unit -> (unit -> unit) option
+effect Add_to_queue : (unit -> unit) -> unit
+
+let queue initial = handler
+  | #Get_next () k ->
+    ( fun queue -> match queue with
+    | [] -> k None []
+    | hd::tl -> k (Some hd) tl )
+  | #Add_to_queue y k -> ( fun queue -> k () (queue @ [y]))
+  | val x -> ( fun _ -> x)
+  | finally x -> x initial
+;;
+
+let round_robin =
+  let enqueue t =
+    #Add_to_queue t
   in
-  let rec scheduler () = handler
-    | c#yield () k -> enqueue k; dequeue ()
-    | c#spawn t k -> enqueue k; with scheduler () handle t ()
+  let dequeue () =
+    match #Get_next () with
+    | None -> ()
+    | Some t -> t ()
+  in
+  let rec rr_handler () = handler (*Needs to be defined recursively.*)
+    | #Yield () k -> enqueue k; dequeue ()
+    | #Spawn t k -> enqueue k; with rr_handler () handle t ()
     | val () -> dequeue ()
   in
-    scheduler ();;
+  rr_handler ()
+;;
 
 (* An example of nested multithreading. We have a thread which prints
    the letter a and another one which has two sub-threads printing x and y. *)
-let c = new coop in
-with round_robin c handle
-  c#spawn (fun _ ->
-    for i = 1 to 5 do
-      print_string "a";
-      c#yield ()
-    done);
-  let d = new coop in
-  with round_robin d handle
-    d#spawn (fun _ ->
-      for j = 1 to 5 do
-         print_string "x";
-         d#yield ()
-    done);
-    for k = 1 to 5 do
-      print_string "y";
-      d#yield ();
-      c#yield ()
-    done
+
+with queue [] handle
+with round_robin handle
+ #Spawn (fun _ ->
+   iter (fun x -> #Print x; #Yield ()) ["a"; "b"; "c"; "d"; "e"]
+ );
+ #Spawn (fun _ ->
+   iter (fun x -> #Print x; #Yield ()) ["A"; "B"; "C"; "D"; "E"]
+ )
 ;;
 
+
 (* We can run an unbounded amount of threads. The following example enumerates all
-   reduced positive fractions less than 1 by spawning a thread for each denominator. *)
-let c = new coop in
-let rec fractions denominator =
-  (* For the next denominator *)
-    c#spawn (fun _ -> c#yield (); fractions (denominator + 1));
-    (* And list all the fractions with the current one *)
-    for numerator = 1 to denominator - 1 do
-      (* Print if the fraction is reduced. *)
-      if gcd numerator denominator = 1 then
-        print_string (to_string numerator ^ "/" ^ to_string denominator ^ ", ")
-      else ();
-      c#yield ()
-    done
-in
-with round_robin c handle
-  fractions 1;;
+   reduced positive fractions less than 1 by spawning a thread for each denominator
+   between d and e. *)
+
+let rec fractions d e =
+  let rec find_fractions n =
+    (* If the fraction is reduced, print it and yield *)
+    if gcd n d = 1 then
+      #Print (to_string n ^ "/" ^ to_string d ^ ", "); #Yield ()
+    else ();
+    if d > n then
+      find_fractions (n+1)
+    else ()
+  in
+  (* Spawn a thread for the next denominator *)
+  (if d < e then #Spawn (fun _ -> #Yield (); fractions (d + 1) e) else ()) ;
+  (* List all the fractions with the current denominator *)
+  find_fractions 1
+;;
+
+with queue [] handle
+with round_robin handle
+ fractions 1 10
+;;

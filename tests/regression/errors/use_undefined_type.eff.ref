@@ -1,2 +1,2 @@
-Typing error (file "./errors/use_undefined_type.eff", line 1, char 1 - line 1, char 31):
+Typing error (file "./errors/use_undefined_type.eff", line 1, char 1 - line 1, char 35):
 Unknown type bar

@@ -1,2 +1,2 @@
-Typing error (file "./errors/malformed_type_application.eff", line 3, char 1 - line 3, char 26):
-The type constructor foo expects 1 type arguments
+Typing error (file "./errors/malformed_type_application.eff", line 3, char 1 - line 3, char 34):
+The type constructor foo expects 1 arguments

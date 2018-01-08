@@ -11,3 +11,5 @@ type ('a,'b) rabbit = { eye : 'a; tail : 'b list } ;;
 let x = ([1,2], {eye = 7; tail = []}) in
 let y = ([1,3], {eye = 7; tail = []}) in
   ("nested", x = x, x = y, y = y) ;;
+
+let f x y = x = y ;;

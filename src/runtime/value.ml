@@ -48,7 +48,7 @@ let rec print_value ?max_level v ppf =
   | Variant (lbl, Some (Tuple [v1; v2])) when lbl = OldUtils.cons ->
       print "[@[<hov>@[%t@]%t@]]" (print_value v1) (list v2)
   | Variant (lbl, Some v) ->
-    print ~at_level:1 "%s @[<hov>%t@]" lbl (print_value v)
+      print ~at_level:1 "%s @[<hov>%t@]" lbl (print_value v)
   | Closure _ -> print "<fun>"
   | Handler _  -> print "<handler>"
 
@@ -66,4 +66,4 @@ let print_result r ppf =
   match r with
   | Value v -> print_value v ppf
   | Call (eff, v, _) ->
-    Format.fprintf ppf "Call %t %t" (print_effect eff) (print_value v)
+      Format.fprintf ppf "Call %s %t" eff (print_value v)
