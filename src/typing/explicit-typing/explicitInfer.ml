@@ -207,6 +207,91 @@ let rec state_free_ty_vars st =
 let rec state_free_dirt_vars st = 
   List.fold_right (fun (_,ty) acc-> List.append (free_dirt_vars_ty ty) acc) st []
 
+(* free dirt variables in target terms *)
+
+let rec
+  free_dirt_vars_expression e =
+  begin match e.Typed.term with
+  | Typed.Var _ -> []
+  | Typed.BuiltIn _ -> []
+  | Typed.Const _ -> []
+  | Typed.Tuple es -> List.concat (List.map free_dirt_vars_expression es)
+  | Typed.Record _ -> assert false 
+  | Typed.Variant _ -> assert false 
+  | Typed.Lambda (pat,ty,c) -> free_dirt_vars_ty ty @ free_dirt_vars_computation c
+  | Typed.Effect  _ -> []
+  | Typed.Handler h -> assert false 
+  | Typed.BigLambdaTy (tp,sk,e) -> free_dirt_vars_expression e
+  | Typed.BigLambdaDirt (dp,e) -> List.filter (fun x -> not (x == dp)) (free_dirt_vars_expression e)
+  | Typed.BigLambdaSkel (skp,e) -> free_dirt_vars_expression e
+  | Typed.CastExp (e,tc) -> free_dirt_vars_expression e @ free_dirt_vars_ty_coercion tc
+  | Typed.ApplyTyExp (e,ty) -> free_dirt_vars_expression e @ free_dirt_vars_ty ty
+  | Typed.LambdaTyCoerVar (tcp,ctty,e) -> free_dirt_vars_expression e
+  | Typed.LambdaDirtCoerVar (dcp,ctd,e) -> free_dirt_vars_expression e
+  | Typed.ApplyDirtExp (e,d) -> free_dirt_vars_expression e @ free_dirt_vars_dirt d
+  | Typed.ApplySkelExp (e,sk) -> free_dirt_vars_expression e
+  | Typed.ApplyTyCoercion (e,tc) -> free_dirt_vars_expression e @ free_dirt_vars_ty_coercion tc
+  | Typed.ApplyDirtCoercion (e,dc) -> free_dirt_vars_expression e @ free_dirt_vars_dirt_coercion dc
+  end
+and
+  free_dirt_vars_computation c =
+  begin match c.Typed.term with
+  | Typed.Value e -> free_dirt_vars_expression e
+  | Typed.LetVal (v,e,c) -> free_dirt_vars_expression e @ free_dirt_vars_computation c
+  | Typed.LetRec _ -> assert false 
+  | Typed.Match (_,_) -> assert false 
+  | Typed.Apply (e1,e2) -> free_dirt_vars_expression e1 @ free_dirt_vars_expression e2
+  | Typed.Handle (e,c) -> free_dirt_vars_expression e @ free_dirt_vars_computation c
+  | Typed.Call (_,e,awty) -> assert false 
+  | Typed.Op (_,e) -> free_dirt_vars_expression e
+  | Typed.Bind (c,a) -> assert false 
+  | Typed.CastComp (c,dc) -> free_dirt_vars_computation c @ free_dirt_vars_dirty_coercion dc
+  | Typed.CastComp_ty (c,tc) -> free_dirt_vars_computation c @ free_dirt_vars_ty_coercion tc
+  | Typed.CastComp_dirt (c,dc) -> free_dirt_vars_computation c @ free_dirt_vars_dirt_coercion dc
+  end
+and
+  free_dirt_vars_ty_coercion tc = 
+  begin match tc with
+  | Typed.ReflTy ty -> free_dirt_vars_ty ty
+  | Typed.ArrowCoercion (tc,dc) -> free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirty_coercion dc
+  | Typed.HandlerCoercion (dc1,dc2) -> free_dirt_vars_dirty_coercion dc1 @ free_dirt_vars_dirty_coercion dc2
+  | Typed.TyCoercionVar tcp -> []
+  | Typed.SequenceTyCoer (tc1,tc2) -> free_dirt_vars_ty_coercion tc1 @ free_dirt_vars_ty_coercion tc2
+  | Typed.TupleCoercion tcs -> List.flatten (List.map free_dirt_vars_ty_coercion tcs)
+  | Typed.LeftArrow tc -> free_dirt_vars_ty_coercion tc
+  | Typed.ForallTy (_,tc) -> free_dirt_vars_ty_coercion tc 
+  | Typed.ApplyTyCoer (tc,ty) -> free_dirt_vars_ty_coercion tc @ free_dirt_vars_ty ty
+  | Typed.ForallDirt (dp,tc) -> List.filter (fun x -> not (x == dp)) (free_dirt_vars_ty_coercion tc)
+  | Typed.ApplyDirCoer (tc,d) -> free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirt d
+  | Typed.PureCoercion dc -> free_dirt_vars_dirty_coercion dc
+  | Typed.QualTyCoer (ctty,tc) -> free_dirt_vars_ty_coercion tc
+  | Typed.QualDirtCoer (ctd,tc) -> free_dirt_vars_ty_coercion tc
+  | Typed.ApplyQualTyCoer (tc1,tc2) -> free_dirt_vars_ty_coercion tc1 @ free_dirt_vars_ty_coercion tc2
+  | Typed.ApplyQualDirtCoer (tc,dc) -> free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirt_coercion dc
+  | Typed.ForallSkel (skp,tc) -> free_dirt_vars_ty_coercion tc
+  | Typed.ApplySkelCoer (tc,sk) -> free_dirt_vars_ty_coercion tc
+  end
+and
+  free_dirt_vars_dirt_coercion dc = 
+  begin match dc with 
+  | Typed.ReflDirt d                 -> free_dirt_vars_dirt d
+  | Typed.DirtCoercionVar dcv        -> []
+  | Typed.Empty d                    -> free_dirt_vars_dirt d
+  | Typed.UnionDirt (_,dc)           -> free_dirt_vars_dirt_coercion dc
+  | Typed.SequenceDirtCoer (dc1,dc2) -> free_dirt_vars_dirt_coercion dc1 @ free_dirt_vars_dirt_coercion dc2
+  | Typed.DirtCoercion dc            -> free_dirt_vars_dirty_coercion dc
+  end
+and
+  free_dirt_vars_dirty_coercion dc = 
+  begin match dc with
+  | Typed.BangCoercion (tc,dc)        -> free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirt_coercion dc
+  | Typed.RightArrow tc               -> free_dirt_vars_ty_coercion tc
+  | Typed.RightHandler tc             -> free_dirt_vars_ty_coercion tc
+  | Typed.LeftHandler tc              -> free_dirt_vars_ty_coercion tc
+  | Typed.SequenceDirtyCoer (dc1,dc2) -> free_dirt_vars_dirty_coercion dc1 @ free_dirt_vars_dirty_coercion dc2
+  end
+
+(* ... *)
 
 let set_of_ty_list = List.fold_left (fun acc x -> TyVarSet.add x acc) TyVarSet.empty
 
@@ -756,9 +841,16 @@ let type_toplevel ~loc st c =
     let (sub,final) = Unification.unify ([],[],constraints) in
     let ct' =  Unification.apply_substitution sub ct in
     Print.debug "New Computation : %t" (Typed.print_computation ct');
-    let (tch_ty,tch_dirt) = TypeChecker.type_check_comp (TypeChecker.new_checker_state) ct'.term in 
+    let sub2 = List.map (fun dp -> Unification.DirtVarToDirt (dp,Types.SetEmpty (Types.list_to_effect_set [])))  (List.sort_uniq compare (free_dirt_vars_computation ct')) in
+    let ct'' = Unification.apply_substitution sub2 ct' in 
+    Print.debug "New Computation : %t" (Typed.print_computation ct'');
+    Print.debug "Final Set of Constraints ";
+    Unification.print_c_list final;
+    (* Print.debug "Remaining dirt variables "; *)
+    (* List.iter (fun dp -> Print.debug "%t" (Params.print_dirt_param dp)) (List.sort_uniq compare (free_dirt_vars_computation ct')); *)
+    let (tch_ty,tch_dirt) = TypeChecker.type_check_comp (TypeChecker.new_checker_state) ct''.term in 
     Print.debug "Type from Type Checker : %t ! %t" (Types.print_target_ty tch_ty) (Types.print_target_dirt tch_dirt);
-    ct', st
+    ct'', st
     end
   end
 
