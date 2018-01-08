@@ -33,6 +33,9 @@ let options = Arg.align [
   ("--no-smart-print",
     Arg.Clear Config.smart_print,
     " Disable smart printing of type schemes");
+  ("--explicit-subtyping",
+    Arg.Set Config.explicit_subtyping,
+    " Enable the experimental explicit subtyping inference engine");
   ("--wrapper",
     Arg.String (fun str -> Config.wrapper := Some [str]),
     "<program> Specify a command-line wrapper to be used (such as rlwrap or ledit)");
