@@ -8,14 +8,14 @@ let help_text = "Toplevel commands:
 
 type state = {
   runtime : Eval.state;
-  typing : Infer.state;
+  typing : ExplicitInfer.state;
 }
 
 let initial_state = {
   runtime = Eval.empty;
   typing = {
-    Infer.context = TypingEnv.empty;
-    Infer.effects = CoreSyntax.EffectMap.empty
+    ExplicitInfer.context = TypingEnv.empty;
+    ExplicitInfer.effects = CoreSyntax.EffectMap.empty
   }
 }
 
@@ -31,7 +31,7 @@ let rec exec_cmd ppf st cmd =
   in
   match cmd.CoreSyntax.term with
   | CoreSyntax.Computation c ->
-      let _, typing = Infer.type_toplevel ~loc:c.CoreSyntax.location st.typing c in
+      let _, typing = ExplicitInfer.type_toplevel ~loc:c.CoreSyntax.location st.typing c in
       let v = Eval.run st.runtime c in
       Format.fprintf ppf "@[- : %t = %t@]@."
         (print_dirty_scheme ())
@@ -50,49 +50,12 @@ let rec exec_cmd ppf st cmd =
       Format.fprintf ppf "%s" help_text;
       st
   | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
-      let typing = Infer.add_effect eff (ty1, ty2) st.typing in
+      let typing = ExplicitInfer.add_effect eff (ty1, ty2) st.typing in
       { st with typing }
   | CoreSyntax.Quit ->
       exit 0
   | CoreSyntax.Use fn ->
       use_file ppf fn st
-(*   | CoreSyntax.TopLet defs ->
-      let defs', vars, typing = Infer.infer_top_let ~loc st.typing defs in
-      let runtime =
-        List.fold_right
-          (fun (p, c) env -> let v = Eval.run env c in Eval.extend p v env)
-          defs st.runtime
-      in
-      List.iter (fun (x, tysch) ->
-        match Eval.lookup x runtime with
-          | None -> assert false
-          | Some v ->
-            Format.fprintf ppf "@[val %t : %t = %t@]@."
-              (CoreSyntax.Variable.print x)
-              (print_ty_scheme tysch)
-              (Value.print_value v)
-      ) vars;
-      { typing; runtime }
-    | CoreSyntax.TopLetRec defs ->
-        let defs', vars, typing = Infer.infer_top_let_rec ~loc st.typing defs in
-        let runtime = Eval.extend_let_rec st.runtime defs in
-        List.iter (fun (x, tysch) ->
-          Format.fprintf ppf "@[val %t : %t = <fun>@]@."
-            (CoreSyntax.Variable.print x)
-            (print_ty_scheme tysch)
-        ) vars;
-        { typing; runtime }
-    | CoreSyntax.External (x, ty, f) ->
-        begin match OldUtils.lookup f External.values with
-        | Some v -> {
-            typing = Infer.add_top_def st.typing x ty;
-            runtime = Eval.update x v st.runtime;
-          }
-        | None -> Error.runtime "unknown external symbol %s." f
-        end
-    | CoreSyntax.Tydef tydefs ->
-        Tctx.extend_tydefs ~loc tydefs;
-        st *)
 
 and desugar_and_exec_cmds ppf env cmds =
   cmds
@@ -129,7 +92,7 @@ let compile_file ppf filename st =
     let loc = cmd.CoreSyntax.location in
     match cmd.CoreSyntax.term with
     | CoreSyntax.Computation c ->
-        let ct, typing = Infer.type_toplevel ~loc st.typing c in
+        let ct, typing = ExplicitInfer.type_toplevel ~loc st.typing c in
         print_endline "found something!";
         SimplePrint.print_computation ct out_ppf;
         Format.fprintf out_ppf "\n;;\n ";
@@ -137,7 +100,7 @@ let compile_file ppf filename st =
         let ereasure_ct = EreasureTerms.typed_to_ereasure_comp [] ct in 
         {st with typing}
     | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
-        let typing = Infer.add_effect eff (ty1, ty2) st.typing in
+        let typing = ExplicitInfer.add_effect eff (ty1, ty2) st.typing in
         { st with typing }
     | _ -> st
   in

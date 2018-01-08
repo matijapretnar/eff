@@ -52,8 +52,8 @@ and plain_computation =
 (** Handler definitions *)
 and handler = {
   effect_clauses : (effect, abstraction2) OldUtils.assoc;
-  value_clause : abstraction option;
-  finally_clause : abstraction option;
+  value_clause : abstraction;
+  finally_clause : abstraction;
 }
 
 (** Abstractions that take one argument. *)
@@ -63,18 +63,10 @@ and abstraction = pattern * computation
 and abstraction2 = pattern * pattern * computation
 
 
-let annotate t loc = {
-  term = t;
-  location = loc;
-}
-
-let return_term t = 
-    t.term
-
 (* Toplevel commands (the first four do not need to be separated by [;;]) *)
-type toplevel = plain_toplevel annotation
-and plain_toplevel =
-  | Tydef of (OldUtils.tyname, Params.t * Tctx.tydef) OldUtils.assoc
+type command = plain_command annotation
+and plain_command =
+  | Tydef of (OldUtils.tyname, Type.ty_param list * Tctx.tydef) OldUtils.assoc
   (** [type t = tydef] *)
   | TopLet of (pattern * computation) list
   (** [let p1 = t1 and ... and pn = tn] *)
@@ -100,17 +92,17 @@ and plain_toplevel =
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p.term with
-  | PVar x -> print "%t" (Variable.print ~safe:true x)
-  | PAs (p, x) -> print "%t as %t" (print_pattern p) (Variable.print ~safe:true x)
+  | PVar x -> print "%t" (Variable.print x)
+  | PAs (p, x) -> print "%t as %t" (print_pattern p) (Variable.print x)
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
   | PRecord lst -> Print.record print_pattern lst ppf
   | PVariant (lbl, None) when lbl = OldUtils.nil -> print "[]"
   | PVariant (lbl, None) -> print "%s" lbl
-  | PVariant (lbl, Some ({ term = PTuple [p1; p2] })) when lbl = OldUtils.cons ->
-      print ~at_level:1 "[@[<hov>@[%t@]%t@]]" (print_pattern p1) (pattern_list p2)
+  | PVariant (lbl, Some ({ term = PTuple [v1; v2] })) when lbl = OldUtils.cons ->
+      print "[@[<hov>@[%t@]%t@]]" (print_pattern v1) (pattern_list v2)
   | PVariant (lbl, Some p) ->
-    print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
+      print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
   | PNonbinding -> print "_"
 
 and pattern_list ?(max_length=299) p ppf =
@@ -138,7 +130,7 @@ let rec print_computation ?max_level c ppf =
 and print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match e.term with
-  | Var x -> print "%t" (Variable.print ~safe:true x)
+  | Var x -> print "%t" (Variable.print x)
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record lst -> Print.record print_expression lst ppf

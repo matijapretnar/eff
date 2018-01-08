@@ -125,11 +125,7 @@ and eval_handler env {Core.effect_clauses=ops; Core.value_clause=value} =
   in
   let ops = List.map eval_op ops in
   let rec h = function
-    | V.Value v ->
-        begin match value with
-        | Some value -> eval_closure env value v
-        | None -> V.Value v
-        end
+    | V.Value v -> eval_closure env value v
     | V.Call (eff, v, k) ->
       let k' u = h (k u) in
       begin match OldUtils.lookup eff ops with

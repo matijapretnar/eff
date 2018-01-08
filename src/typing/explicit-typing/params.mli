@@ -7,6 +7,7 @@ type dirty_coercion_param
 type skel_param
 type e_ty_param
 
+val transform_old_ty_param : int -> ty_param
 val fresh_ty_param : unit -> ty_param
 val fresh_e_ty_param : unit -> e_ty_param
 val fresh_dirt_param : unit -> dirt_param

@@ -103,75 +103,75 @@ commandline:
     { def }
   | t = topterm SEMISEMI
     { t }
-| dir = topdirective SEMISEMI
+  | dir = topdirective SEMISEMI
     { dir }
 
-    topterm: mark_position(plain_topterm) { $1 }
-      plain_topterm:
-    | t = term
-        { Term t }
+topterm: mark_position(plain_topterm) { $1 }
+plain_topterm:
+  | t = term
+    { Term t }
 
-        (* Things that can be defined on toplevel. *)
-        topdef: mark_position(plain_topdef) { $1 }
-      plain_topdef:
-    | TYPE defs = separated_nonempty_list(AND, ty_def)
-        { Tydef defs }
-| LET defs = separated_nonempty_list(AND, let_def)
+(* Things that can be defined on toplevel. *)
+topdef: mark_position(plain_topdef) { $1 }
+plain_topdef:
+  | TYPE defs = separated_nonempty_list(AND, ty_def)
+    { Tydef defs }
+  | LET defs = separated_nonempty_list(AND, let_def)
     { TopLet defs }
-| LET REC defs = separated_nonempty_list(AND, let_rec_def)
+  | LET REC defs = separated_nonempty_list(AND, let_rec_def)
     { TopLetRec defs }
-| EXTERNAL x = ident COLON t = ty EQUAL n = STRING
+  | EXTERNAL x = ident COLON t = ty EQUAL n = STRING
     { External (x, t, n) }
-| EFFECT eff = effect COLON t1 = prod_ty ARROW t2 = ty
+  | EFFECT eff = effect COLON t1 = prod_ty ARROW t2 = ty
     { DefEffect (eff, (t1, t2))}
 
-    (* Toplevel directive If you change these, make sure to update lname as well,
-       or a directive might become a reserved word. *)
-    topdirective: mark_position(plain_topdirective) { $1 }
-      plain_topdirective:
-    | HASH QUIT
-      { Quit }
-| HASH HELP
-  { Help }
-| HASH RESET
-  { Reset }
-| HASH TYPE t = term
+(* Toplevel directive If you change these, make sure to update lname as well,
+   or a directive might become a reserved word. *)
+topdirective: mark_position(plain_topdirective) { $1 }
+plain_topdirective:
+  | HASH QUIT
+    { Quit }
+  | HASH HELP
+    { Help }
+  | HASH RESET
+    { Reset }
+  | HASH TYPE t = term
     { TypeOf t }
-| HASH USE fn = STRING
+  | HASH USE fn = STRING
     { Use fn }
 
-    (* Main syntax tree *)
+(* Main syntax tree *)
 
-    term: mark_position(plain_term) { $1 }
-      plain_term:
-    | MATCH t = term WITH cases = cases0(match_case) (* END *)
-        { Match (t, cases) }
-| FUNCTION cases = cases(match_case) (* END *)
+term: mark_position(plain_term) { $1 }
+plain_term:
+  | MATCH t = term WITH cases = cases0(match_case) (* END *)
+    { Match (t, cases) }
+  | FUNCTION cases = cases(match_case) (* END *)
     { Function cases }
-| HANDLER h = handler (* END *)
+  | HANDLER h = handler (* END *)
     { fst h }
-| HANDLE t = term WITH h = handler (* END *)
+  | HANDLE t = term WITH h = handler (* END *)
     { Handle (h, t) }
-| FUN t = lambdas1(ARROW)
+  | FUN t = lambdas1(ARROW)
     { fst t }
-| LET defs = separated_nonempty_list(AND, let_def) IN t = term
+  | LET defs = separated_nonempty_list(AND, let_def) IN t = term
     { Let (defs, t) }
-| LET REC defs = separated_nonempty_list(AND, let_rec_def) IN t = term
+  | LET REC defs = separated_nonempty_list(AND, let_rec_def) IN t = term
     { LetRec (defs, t) }
-| WITH h = term HANDLE t = term
+  | WITH h = term HANDLE t = term
     { Handle (h, t) }
-| t1 = term SEMI t2 = term
+  | t1 = term SEMI t2 = term
     { Let ([(PNonbinding, snd t1), t1], t2) }
-| IF t_cond = comma_term THEN t_true = term ELSE t_false = term
+  | IF t_cond = comma_term THEN t_true = term ELSE t_false = term
     { Conditional (t_cond, t_true, t_false) }
-| t = plain_comma_term
+  | t = plain_comma_term
     { t }
 
-    comma_term: mark_position(plain_comma_term) { $1 }
-      plain_comma_term:
-    | t = binop_term COMMA ts = separated_list(COMMA, binop_term)
-        { Tuple (t :: ts) }
-| t = plain_binop_term
+comma_term: mark_position(plain_comma_term) { $1 }
+plain_comma_term:
+  | t = binop_term COMMA ts = separated_list(COMMA, binop_term)
+    { Tuple (t :: ts) }
+  | t = plain_binop_term
     { t }
 
 binop_term: mark_position(plain_binop_term) { $1 }
@@ -188,53 +188,53 @@ plain_binop_term:
   | t = plain_uminus_term 
     { t }
 
-    uminus_term: mark_position(plain_uminus_term) { $1 }
-      plain_uminus_term:
-    | MINUS t = uminus_term
-        { let op_loc = Location.make $startpos($1) $endpos($1) in
-          Apply ((Var "~-", op_loc), t) }
-| MINUSDOT t = uminus_term
+uminus_term: mark_position(plain_uminus_term) { $1 }
+plain_uminus_term:
+  | MINUS t = uminus_term
+    { let op_loc = Location.make $startpos($1) $endpos($1) in
+      Apply ((Var "~-", op_loc), t) }
+  | MINUSDOT t = uminus_term
     { let op_loc = Location.make $startpos($1) $endpos($1) in
       Apply ((Var "~-.", op_loc), t) }
-| t = plain_app_term
+  | t = plain_app_term
     { t }
 
-    plain_app_term:
-    | CHECK t = prefix_term
-        { Check t }
-| t = prefix_term ts = prefix_term+
-                       {
-                         match fst t, ts with
-                         | Variant (lbl, None), [t] -> Variant (lbl, Some t)
-                         | Variant (lbl, _), _ -> Error.syntax ~loc:(snd t) "Label %s applied to too many argument" lbl
-                         | _, _ ->
-                           let apply ((_, loc1) as t1) ((_, loc2) as t2) = (Apply(t1, t2), Location.union [loc1; loc2]) in
-                           fst (List.fold_left apply t ts)
-                       }
-| t = plain_prefix_term
+plain_app_term:
+  | CHECK t = prefix_term
+    { Check t }
+  | t = prefix_term ts = prefix_term+
+    {
+      match fst t, ts with
+      | Variant (lbl, None), [t] -> Variant (lbl, Some t)
+      | Variant (lbl, _), _ -> Error.syntax ~loc:(snd t) "Label %s applied to too many argument" lbl
+      | _, _ ->
+        let apply ((_, loc1) as t1) ((_, loc2) as t2) = (Apply(t1, t2), Location.union [loc1; loc2]) in
+        fst (List.fold_left apply t ts)
+    }
+  | t = plain_prefix_term
     { t }
 
-    prefix_term: mark_position(plain_prefix_term) { $1 }
-      plain_prefix_term:
-    | op = prefixop t = simple_term
-        {
-          let op_loc = Location.make $startpos(op) $endpos(op) in
-          Apply ((Var op, op_loc), t)
-        }
-| t = plain_simple_term
+prefix_term: mark_position(plain_prefix_term) { $1 }
+plain_prefix_term:
+  | op = prefixop t = simple_term
+    {
+      let op_loc = Location.make $startpos(op) $endpos(op) in
+      Apply ((Var op, op_loc), t)
+    }
+  | t = plain_simple_term
     { t }
 
-    simple_term: mark_position(plain_simple_term) { $1 }
-      plain_simple_term:
-    | x = ident
-        { Var x }
-| lbl = UNAME
+simple_term: mark_position(plain_simple_term) { $1 }
+plain_simple_term:
+  | x = ident
+    { Var x }
+  | lbl = UNAME
     { Variant (lbl, None) }
-| cst = const_term
+  | cst = const_term
     { Const cst }
-| HASH eff = effect
+  | HASH eff = effect
     { Effect eff }
-| LBRACK ts = separated_list(SEMI, comma_term) RBRACK
+  | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
       let nil = (Variant (OldUtils.nil, None), Location.make $endpos $endpos) in
       let cons ((_, loc_t) as t) ((_, loc_ts) as ts) =
@@ -242,40 +242,40 @@ plain_binop_term:
         (Variant (OldUtils.cons, Some (Tuple [t; ts], loc)), loc) in
       fst (List.fold_right cons ts nil)
     }
-| LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, comma_term)) RBRACE
+  | LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, comma_term)) RBRACE
     { Record flds }
-| LPAREN RPAREN
-  { Tuple [] }
-| LPAREN t = plain_term RPAREN
+  | LPAREN RPAREN
+    { Tuple [] }
+  | LPAREN t = plain_term RPAREN
     { t }
-| BEGIN t = plain_term END
+  | BEGIN t = plain_term END
     { t }
 
-    (* Auxilliary definitions *)
+(* Auxilliary definitions *)
 
-    const_term:
-    | n = INT
-        { Const.of_integer n }
-| str = STRING
+const_term:
+  | n = INT
+    { Const.of_integer n }
+  | str = STRING
     { Const.of_string str }
-| b = BOOL
+  | b = BOOL
     { Const.of_boolean b }
-| f = FLOAT
+  | f = FLOAT
     { Const.of_float f }
 
-    match_case:
-    | p = pattern ARROW t = term
-        { (p, t) }
+match_case:
+  | p = pattern ARROW t = term
+    { (p, t) }
 
-        lambdas0(SEP):
-    | SEP t = term
-        { t }
-| p = simple_pattern t = lambdas0(SEP)
+lambdas0(SEP):
+  | SEP t = term
+    { t }
+  | p = simple_pattern t = lambdas0(SEP)
     { (Lambda (p, t), Location.make $startpos $endpos) }
 
-    lambdas1(SEP):
-    | p = simple_pattern t = lambdas0(SEP)
-        { (Lambda (p, t), Location.make $startpos $endpos) }
+lambdas1(SEP):
+  | p = simple_pattern t = lambdas0(SEP)
+    { (Lambda (p, t), Location.make $startpos $endpos) }
 
 let_def:
   | p = pattern EQUAL t = term
@@ -283,17 +283,17 @@ let_def:
   | x = mark_position(ident) t = lambdas1(EQUAL)
     { ((PVar (fst x), (snd x)), t) }
 
-    let_rec_def:
-    | f = ident t = lambdas0(EQUAL)
-        { (f, t) }
+let_rec_def:
+  | f = ident t = lambdas0(EQUAL)
+    { (f, t) }
 
-        handler_clause: mark_position(plain_handler_clause) { $1 }
-      plain_handler_clause:
-    | HASH eff = effect p = simple_pattern k = simple_pattern ARROW t2 = term
-        { EffectClause (eff, (p, k, t2)) }
-| VAL c = match_case
+handler_clause: mark_position(plain_handler_clause) { $1 }
+plain_handler_clause:
+  | HASH eff = effect p = simple_pattern k = simple_pattern ARROW t2 = term
+    { EffectClause (eff, (p, k, t2)) }
+  | VAL c = match_case
     { ReturnClause c }
-| FINALLY c = match_case
+  | FINALLY c = match_case
     { FinallyClause c }
 
 pattern: mark_position(plain_pattern) { $1 }
@@ -341,172 +341,172 @@ plain_simple_pattern:
         let loc = Location.union [loc_t; loc_ts] in
         (PVariant (OldUtils.cons, Some (PTuple [t; ts], loc)), loc)
       in
-      fst (List.fold_right cons ts nil)
+        fst (List.fold_right cons ts nil)
     }
   | LPAREN RPAREN
     { PTuple [] }
   | LPAREN p = pattern RPAREN
     { fst p }
 
-    handler: mark_position(plain_handler) { $1 }
-      plain_handler:
-    | cs = cases(handler_clause)
-        { Handler (collect_handler_clauses cs) }
+handler: mark_position(plain_handler) { $1 }
+plain_handler:
+  | cs = cases(handler_clause)
+    { Handler (collect_handler_clauses cs) }
 
-        lname:
-    | x = LNAME
-        { x }
-| QUIT
-  { "quit" }
-| HELP
-  { "help" }
-| USE
-  { "use" }
-| RESET
-  { "reset" }
+lname:
+  | x = LNAME
+    { x }
+  | QUIT
+    { "quit" }
+  | HELP
+    { "help" }
+  | USE
+    { "use" }
+  | RESET
+    { "reset" }
 
-  field:
-    | f = lname
-        { f }
+field:
+  | f = lname
+    { f }
 
-        tyname:
-    | t = lname
-        { t }
+tyname:
+  | t = lname
+    { t }
 
-        ident:
-    | x = lname
-        { x }
-| LPAREN op = binop RPAREN
+ident:
+  | x = lname
+    { x }
+  | LPAREN op = binop RPAREN
     { op }
-| LPAREN op = PREFIXOP RPAREN
+  | LPAREN op = PREFIXOP RPAREN
     { op }
 
-              %inline binop:
-    | OR
-      { "or" }
-| BARBAR
-  { "||" }
-| AMPER
-  { "&" }
-| AMPERAMPER
-  { "&&" }
-| AT
-  { "@" }
-| op = INFIXOP0
+%inline binop:
+  | OR
+    { "or" }
+  | BARBAR
+    { "||" }
+  | AMPER
+    { "&" }
+  | AMPERAMPER
+    { "&&" }
+  | AT
+    { "@" }
+  | op = INFIXOP0
     { op }
-| op = INFIXOP1
+  | op = INFIXOP1
     { op }
-| op = INFIXOP2
+  | op = INFIXOP2
     { op }
-| PLUS
-  { "+" }
-| MINUSDOT
-  { "-." }
-| MINUS
-  { "-" }
-| EQUAL
-  { "=" }
-| op = INFIXOP3
+  | PLUS
+    { "+" }
+  | MINUSDOT
+    { "-." }
+  | MINUS
+    { "-" }
+  | EQUAL
+    { "=" }
+  | op = INFIXOP3
     { op }
-| STAR
-  { "*" }
-| op = INFIXOP4
+  | STAR
+    { "*" }
+  | op = INFIXOP4
     { op }
-| MOD
-  { "mod" }
-| LAND
-  { "land" }
-| LOR
-  { "lor" }
-| LXOR
-  { "lxor" }
-| LSL
-  { "lsl" }
-| LSR
-  { "lsr" }
-| ASR
-  { "asr" }
+  | MOD
+    { "mod" }
+  | LAND
+    { "land" }
+  | LOR
+    { "lor" }
+  | LXOR
+    { "lxor" }
+  | LSL
+    { "lsl" }
+  | LSR
+    { "lsr" }
+  | ASR
+    { "asr" }
 
-  %inline prefixop:
-    | op = PREFIXOP
-        { op }
+%inline prefixop:
+  | op = PREFIXOP
+    { op }
 
-        cases0(case):
-    | BAR? cs = separated_list(BAR, case)
-        { cs }
+cases0(case):
+  | BAR? cs = separated_list(BAR, case)
+    { cs }
 
-        cases(case):
-    | BAR? cs = separated_nonempty_list(BAR, case)
-        { cs }
+cases(case):
+  | BAR? cs = separated_nonempty_list(BAR, case)
+    { cs }
 
-        mark_position(X):
-    x = X
-      { x, Location.make $startpos $endpos}
+mark_position(X):
+  x = X
+  { x, Location.make $startpos $endpos}
 
-      params:
-    |
+params:
+  |
     { [] }
-| p = PARAM
+  | p = PARAM
     { [p] }
-| LPAREN ps = separated_nonempty_list(COMMA, PARAM) RPAREN
+  | LPAREN ps = separated_nonempty_list(COMMA, PARAM) RPAREN
     { ps }
 
-    ty_def:
-    | ps = params t = tyname EQUAL x = defined_ty
-        { (t, (ps, x)) }
+ty_def:
+  | ps = params t = tyname EQUAL x = defined_ty
+    { (t, (ps, x)) }
 
-        defined_ty:
-    | LBRACE lst = separated_nonempty_list(SEMI, separated_pair(field, COLON, ty)) RBRACE
-        { TyRecord lst }
-| lst = cases(sum_case)
+defined_ty:
+  | LBRACE lst = separated_nonempty_list(SEMI, separated_pair(field, COLON, ty)) RBRACE
+    { TyRecord lst }
+  | lst = cases(sum_case)
     { TySum lst }
-| t = ty
+  | t = ty
     { TyInline t }
 
-    ty: mark_position(plain_ty) { $1 }
-      plain_ty:
-    | t1 = ty_apply ARROW t2 = ty
-        { TyArrow (t1, t2, None) }
-| t1 = ty_apply HARROW t2 = ty
-    { TyHandler (t1, None, t2, None) }
-| t = plain_prod_ty
+ty: mark_position(plain_ty) { $1 }
+plain_ty:
+  | t1 = ty_apply ARROW t2 = ty
+    { TyArrow (t1, t2) }
+  | t1 = ty_apply HARROW t2 = ty
+    { TyHandler (t1, t2) }
+  | t = plain_prod_ty
     { t }
 
-    prod_ty: mark_position(plain_prod_ty) { $1 }
-      plain_prod_ty:
-    | ts = separated_nonempty_list(STAR, ty_apply)
-        {
-          match ts with
-          | [] -> assert false
-          | [t] -> fst t
-          | _ -> TyTuple ts
-        }
+prod_ty: mark_position(plain_prod_ty) { $1 }
+plain_prod_ty:
+  | ts = separated_nonempty_list(STAR, ty_apply)
+    {
+      match ts with
+      | [] -> assert false
+      | [t] -> fst t
+      | _ -> TyTuple ts
+     }
 
-        ty_apply: mark_position(plain_ty_apply) { $1 }
-      plain_ty_apply:
-    | LPAREN t = ty COMMA ts = separated_nonempty_list(COMMA, ty) RPAREN t2 = tyname
-        { TyApply (t2, (t :: ts), None) }
-| t = ty_apply t2 = tyname
-    { TyApply (t2, [t], None) }
-| t = plain_simple_ty
+ty_apply: mark_position(plain_ty_apply) { $1 }
+plain_ty_apply:
+  | LPAREN t = ty COMMA ts = separated_nonempty_list(COMMA, ty) RPAREN t2 = tyname
+    { TyApply (t2, (t :: ts)) }
+  | t = ty_apply t2 = tyname
+    { TyApply (t2, [t]) }
+  | t = plain_simple_ty
     { t }
 
-    plain_simple_ty:
-    | t = tyname
-        { TyApply (t, [], None) }
-| t = PARAM
+plain_simple_ty:
+  | t = tyname
+    { TyApply (t, []) }
+  | t = PARAM
     { TyParam t }
-| LPAREN t = ty RPAREN
+  | LPAREN t = ty RPAREN
     { fst t }
 
-    sum_case:
-    | lbl = UNAME
-        { (lbl, None) }
-| lbl = UNAME OF t = ty
+sum_case:
+  | lbl = UNAME
+    { (lbl, None) }
+  | lbl = UNAME OF t = ty
     { (lbl, Some t) }
 
-    effect:
-    | eff = UNAME
-        { eff }
+effect:
+  | eff = UNAME
+    { eff }
 
-            %%
+%%

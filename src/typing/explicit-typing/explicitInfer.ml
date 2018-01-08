@@ -43,9 +43,9 @@ let rec make_target_effects effects =
 
 let rec source_to_target ty = 
   begin match ty with
-    | T.Apply (ty_name, ([], _, _)) -> source_to_target (T.Basic ty_name)
+    | T.Apply (ty_name, []) -> source_to_target (T.Basic ty_name)
     | T.Apply (_,_) -> assert false
-    | T.Param x -> Types.Tyvar x
+    | T.TyParam (T.Ty_Param x) -> Types.Tyvar (Params.transform_old_ty_param x)
     | T.Basic s -> begin match s with
                    | "int" -> Types.PrimTy IntTy
                    | "string" -> Types.PrimTy StringTy
@@ -57,14 +57,14 @@ let rec source_to_target ty =
     | T.Arrow  (ty1 ,dirty1) -> let dirtyt = source_to_target_dirty dirty1
                              in let tyt = source_to_target ty1
                              in Types.Arrow (tyt,dirtyt) 
-    | T.Handler (dirty1, dirty2) -> Types.Handler (source_to_target_dirty dirty1, source_to_target_dirty dirty2)
+    | T.Handler {value=dirty1; finally=dirty2} -> Types.Handler (source_to_target_dirty dirty1, source_to_target_dirty dirty2)
   end
 
 and source_to_target_dirty dirty_type = 
-  let (ty,dirt) = dirty_type in 
+  let ty = dirty_type in 
   let new_ty = source_to_target ty in
-  let ops = dirt.ops in
-  let new_dirt = make_target_effects ops in 
+  (* let ops = dirt.ops in *)
+  let new_dirt = make_target_effects [] in 
   (new_ty, new_dirt)  
 
 
@@ -438,7 +438,7 @@ and type_plain_expr in_cons st = function
         let r_skel = Types.SkelVar r_skel_var in 
         let r_ty_skel_cons = Typed.TyvarHasSkel (r_ty_var, r_skel) in
         let r_cons = r_ty_skel_cons :: in_cons in 
-        let Some (pr,cr) = h.value_clause in  
+        let (pr,cr) = h.value_clause in  
         let Untyped.PVar x = pr.Untyped.term in
         let r_st = add_def st x r_ty in
         let (target_cr_term,(target_cr_ty,target_cr_dirt),target_cr_cons,target_cr_sub) = type_comp r_cons r_st cr in 
@@ -709,7 +709,7 @@ and get_handler_op_clause eff abs2 in_st in_cons in_sub =
 
 
 let type_toplevel ~loc st c =
-  let c' = Untyped.return_term c in
+  let c' = c.Untyped.term in
   begin match c' with 
  (* | Untyped.Value e -> assert false
      let et, ttype,constraints, sub_list = type_expr [] st e in
@@ -763,7 +763,7 @@ let type_toplevel ~loc st c =
   end
 
 let add_effect eff (ty1 , ty2) st =
-    Print.debug "%t ----> %t"  (Type.print_ty ty1) (Type.print_ty ty2);
+    Print.debug "%t ----> %t"  (Type.print ([], ty1)) (Type.print ([], ty2));
     let target_ty1 = source_to_target ty1 in 
     let target_ty2 = source_to_target ty2 in
     let new_st =  add_effect st eff (target_ty1, target_ty2) in 
