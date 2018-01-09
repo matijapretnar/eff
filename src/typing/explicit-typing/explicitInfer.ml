@@ -492,12 +492,13 @@ and type_plain_expr in_cons st = function
         let (target_comp_term,target_comp_ty,target_comp_cons, target_comp_sub)= (type_comp new_in_cons new_st c) in
         let target_ty = Types.Arrow (Unification.apply_substitution_ty target_comp_sub in_ty, target_comp_ty) in
         let target_lambda = Typed.Lambda (target_pattern,Unification.apply_substitution_ty target_comp_sub in_ty,target_comp_term) in 
+        Unification.print_c_list target_comp_cons;
         Print.debug "lambda ty: %t" (Types.print_target_ty target_ty);
         (target_lambda,target_ty,target_comp_cons, target_comp_sub)
   | Untyped.Effect eff -> 
         let (in_ty,out_ty) =  Untyped.EffectMap.find eff st.effects in
         let s = Types.list_to_effect_set [eff] in
-        (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,(Types.SetEmpty s))) , [], []) 
+        (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,(Types.SetEmpty s))) , in_cons, []) 
 
   | Untyped.Handler h -> 
         let in_ty_var = Params.fresh_ty_param () in 
