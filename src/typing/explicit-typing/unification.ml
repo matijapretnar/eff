@@ -275,9 +275,14 @@ let apply_sub1 c_list sub1 =
                                 Typed.DirtOmega(coer_p,(SetEmpty new_set,d2))
                              end
                         | Typed.DirtOmega (coer_p,(d2, SetVar (s1,dv) )) when (dv = type_p) ->
-                           let SetVar (diff_set, new_var) = target_dirt in
-                           let new_set =  effect_set_union s1 diff_set in 
-                           Typed.DirtOmega(coer_p,(d2,SetVar(new_set,new_var)))
+                             begin match target_dirt with
+                             | SetVar (diff_set, new_var) ->
+                                let new_set =  effect_set_union s1 diff_set in 
+                                Typed.DirtOmega(coer_p,(d2,SetVar(new_set,new_var)))
+                             | SetEmpty diff_set ->
+                                let new_set =  effect_set_union s1 diff_set in 
+                                Typed.DirtOmega(coer_p,(d2,SetEmpty(new_set)))
+                             end
                         | cons -> cons
                       in 
        List.map mapper c_list
