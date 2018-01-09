@@ -252,10 +252,14 @@ let apply_sub1 c_list sub1 =
        let mapper = fun cons ->
        	              begin 
                         match cons with 
+                        | Typed.TyOmega (coer_p, (ty1,ty2)) ->
+                           Typed.TyOmega (coer_p, (apply_sub_ty sub1 ty1, apply_sub_ty sub1 ty2))
+(*
        	                | Typed.TyOmega (coer_p, (Tyvar tv,ty2)) when (type_p = tv) ->  
        			   Typed.TyOmega (coer_p, (target_type,ty2)) 
                         | Typed.TyOmega (coer_p, (ty2,Tyvar tv)) when (type_p = tv) ->  
        			   Typed.TyOmega (coer_p, (ty2,target_type)) 
+ *)
        	                | _ -> cons
        	              end in
        List.map mapper c_list
@@ -338,10 +342,12 @@ let rec get_skel_of_tyvar tyvar clist =
   Print.debug " Tyvar : %t" (Params.print_ty_param tyvar);
   Print.debug "Constraint list :";
   print_c_list clist;
+  get_skel_of_tyvar_ tyvar clist
+and get_skel_of_tyvar_ tyvar clist =
   begin match clist with
   | [] -> assert false 
   | (TyvarHasSkel (tv,skel))::_ when (tyvar = tv) -> skel
-  | _::xs -> get_skel_of_tyvar tyvar xs
+  | _::xs -> get_skel_of_tyvar_ tyvar xs
   end
 
 let rec skeleton_of_target_ty tty conslist = 
