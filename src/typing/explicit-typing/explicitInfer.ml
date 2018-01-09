@@ -789,9 +789,47 @@ and get_handler_op_clause eff abs2 in_st in_cons in_sub =
   let (typed_c_op, typed_co_op_ty, co_op_cons, c_op_sub) = type_comp cons new_st c_op in
   (typed_c_op, typed_co_op_ty, st_subbed, co_op_cons, c_op_sub, (alpha_i,delta_i)) 
 
+(* Finalize a list of constraints, setting all dirt variables to the empty set. *)
 
+let finalize_constraint sub =
+  begin
+  function Typed.TyOmega (tcp,ctty) -> 
+            Error.typing ~loc:Location.unknown "Unsolved type inequality in top-level computation: %t" (Typed.print_omega_ct (Typed.TyOmega (tcp,ctty)))
+         | Typed.DirtOmega (dcp,(d1,d2)) -> 
+            begin match (d1,d2) with
+            | (SetEmpty s1, SetVar (s2,dv2)) ->
+               assert (Types.effect_set_is_subseteq s1 s2);
+               Unification.CoerDirtVartoDirtCoercion (dcp, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetEmpty (Types.effect_set_diff s2 s1))))) :: 
+                 Unification.DirtVarToDirt (dv2,Types.SetEmpty (Types.list_to_effect_set [])) :: 
+                   sub
+            | (SetVar (s1,dv1), SetEmpty s2) ->
+               assert (Types.effect_set_is_subseteq s1 s2);
+               Unification.CoerDirtVartoDirtCoercion (dcp, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetEmpty (Types.effect_set_diff s2 s1))))) :: 
+                 Unification.DirtVarToDirt (dv1,Types.SetEmpty (Types.list_to_effect_set [])) :: 
+                   sub
+            | (SetVar (s1,dv1), SetVar (s2,dv2)) ->
+               assert (Types.effect_set_is_subseteq s1 s2);
+               Unification.CoerDirtVartoDirtCoercion (dcp, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetEmpty (Types.effect_set_diff s2 s1))))) :: 
+                 Unification.DirtVarToDirt (dv1,Types.SetEmpty (Types.list_to_effect_set [])) :: 
+                   Unification.DirtVarToDirt (dv2,Types.SetEmpty (Types.list_to_effect_set [])) :: 
+                     sub
+            | (SetEmpty s1, SetEmpty s2) -> 
+               assert (Types.effect_set_is_subseteq s1 s2);
+               Unification.CoerDirtVartoDirtCoercion (dcp, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetEmpty (Types.effect_set_diff s2 s1))))) :: sub 
+            end
+         | Typed.SkelEq (sk1,sk2)       -> 
+            assert false
+         | Typed.TyvarHasSkel (tp,sk)   -> 
+            assert false
+  end
 
+let finalize_constraints c_list =
+  List.fold_left finalize_constraint [] c_list
 
+(* Typing top-level 
+
+     Assumes it concerns a top-level computation.
+*)
 
 let type_toplevel ~loc st c =
   let c' = c.Untyped.term in
@@ -842,15 +880,15 @@ let type_toplevel ~loc st c =
     let ct' =  Unification.apply_substitution sub ct in
     Print.debug "New Computation : %t" (Typed.print_computation ct');
     let sub2 = List.map (fun dp -> Unification.DirtVarToDirt (dp,Types.SetEmpty (Types.list_to_effect_set [])))  (List.sort_uniq compare (free_dirt_vars_computation ct')) in
-    let ct'' = Unification.apply_substitution sub2 ct' in 
-    Print.debug "New Computation : %t" (Typed.print_computation ct'');
-    Print.debug "Final Set of Constraints ";
-    Unification.print_c_list final;
+    let ct2  = Unification.apply_substitution sub2 ct' in 
+    let sub3 = finalize_constraints (Unification.apply_sub sub2 final) in
+    let ct3  = Unification.apply_substitution sub3 ct2 in
+    Print.debug "New Computation : %t" (Typed.print_computation ct3);
     (* Print.debug "Remaining dirt variables "; *)
     (* List.iter (fun dp -> Print.debug "%t" (Params.print_dirt_param dp)) (List.sort_uniq compare (free_dirt_vars_computation ct')); *)
-    let (tch_ty,tch_dirt) = TypeChecker.type_check_comp (TypeChecker.new_checker_state) ct''.term in 
+    let (tch_ty,tch_dirt) = TypeChecker.type_check_comp (TypeChecker.new_checker_state) ct3.term in 
     Print.debug "Type from Type Checker : %t ! %t" (Types.print_target_ty tch_ty) (Types.print_target_dirt tch_dirt);
-    ct'', st
+    ct3, st
     end
   end
 

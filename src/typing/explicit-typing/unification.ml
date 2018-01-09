@@ -244,52 +244,53 @@ and apply_sub_ct_dirt sub ct_drt =
   ( (apply_sub_dirt sub ct_tya), (apply_sub_dirt sub ct_tyb) )
 
 
-
-let rec apply_sub sub c_list =
-	begin match sub with 
-	| [] -> c_list
-	| (x::xs) -> 
-		begin match x with
-		| TyVarToTy (type_p,target_type) ->
-			let mapper = fun cons ->
-				begin match cons with 
-				| Typed.TyOmega (coer_p, (Tyvar tv,ty2)) when (type_p = tv) ->  
-						Typed.TyOmega (coer_p, (target_type,ty2)) 
-			    | Typed.TyOmega (coer_p, (ty2,Tyvar tv)) when (type_p = tv) ->  
-						Typed.TyOmega (coer_p, (ty2,target_type)) 
-				| _ -> cons
-				end in
-			let result_c_list = List.map mapper c_list in 
-			apply_sub xs result_c_list
-		
+(* apply a single sub to a list of constraints *)
+let apply_sub1 c_list sub1 =
+  begin 
+    match sub1 with
+    | TyVarToTy (type_p,target_type) ->
+       let mapper = fun cons ->
+       	              begin 
+                        match cons with 
+       	                | Typed.TyOmega (coer_p, (Tyvar tv,ty2)) when (type_p = tv) ->  
+       			   Typed.TyOmega (coer_p, (target_type,ty2)) 
+                        | Typed.TyOmega (coer_p, (ty2,Tyvar tv)) when (type_p = tv) ->  
+       			   Typed.TyOmega (coer_p, (ty2,target_type)) 
+       	                | _ -> cons
+       	              end in
+       List.map mapper c_list
     | DirtVarToDirt (type_p,target_dirt) ->
-      let mapper = fun cons ->
-        begin match cons with
-        | Typed.DirtOmega (coer_p,(SetVar (s1,dv) , d2)) when (dv = type_p)->
-          let SetVar (diff_set, new_var) = target_dirt in
-          let new_set =  effect_set_union s1 diff_set in 
-          Typed.DirtOmega(coer_p,(SetVar(new_set,new_var),d2))
-        | Typed.DirtOmega (coer_p,(d2, SetVar (s1,dv) )) when (dv = type_p)->
-          let SetVar (diff_set, new_var) = target_dirt in
-          let new_set =  effect_set_union s1 diff_set in 
-          Typed.DirtOmega(coer_p,(d2,SetVar(new_set,new_var)))
-        | _ -> cons
-        end in 
-        let result_c_list = List.map mapper c_list in 
-        apply_sub xs result_c_list
+       let mapper = function 
+                          Typed.DirtOmega (coer_p,(SetVar (s1,dv) , d2)) when (dv = type_p) ->
+                             begin match target_dirt with
+                             | SetVar (diff_set, new_var) ->
+                                let new_set =  effect_set_union s1 diff_set in 
+                                Typed.DirtOmega(coer_p,(SetVar(new_set,new_var),d2))
+                             | SetEmpty diff_set ->
+                                let new_set =  effect_set_union s1 diff_set in 
+                                Typed.DirtOmega(coer_p,(SetEmpty new_set,d2))
+                             end
+                        | Typed.DirtOmega (coer_p,(d2, SetVar (s1,dv) )) when (dv = type_p) ->
+                           let SetVar (diff_set, new_var) = target_dirt in
+                           let new_set =  effect_set_union s1 diff_set in 
+                           Typed.DirtOmega(coer_p,(d2,SetVar(new_set,new_var)))
+                        | cons -> cons
+                      in 
+       List.map mapper c_list
     | SkelVarToSkel (skel_var,skel) ->
-        let mapper = fun cons ->
-        begin match cons with 
-        | Typed.TyvarHasSkel (tv, Types.SkelVar sv) when (skel_var = sv) ->
-            Typed.TyvarHasSkel (tv, skel)
-        | _ -> cons
-        end in
-      let result_c_list = List.map mapper c_list in 
-      apply_sub xs result_c_list
-    | _ -> apply_sub xs c_list
-		end
-	end
+       let mapper = fun cons ->
+                      begin match cons with 
+                      | Typed.TyvarHasSkel (tv, Types.SkelVar sv) when (skel_var = sv) ->
+                         Typed.TyvarHasSkel (tv, skel)
+                      | _ -> cons
+                    end in
+       List.map mapper c_list
+    | _ -> c_list
+  end
 
+(* apply substitution-list to a list of constraints *)
+let rec apply_sub sub c_list =
+  List.fold_left apply_sub1 c_list sub
 
 let rec free_skeleton sk = 
   begin match sk with 

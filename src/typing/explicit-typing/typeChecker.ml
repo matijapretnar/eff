@@ -307,7 +307,7 @@ and type_check_dirt_coercion st dirt_coer =
   | ReflDirt d -> (d,d)
   | DirtCoercionVar p ->
       begin match (OldUtils.lookup p st.omega_dirt) with 
-      | None -> assert false
+      | None -> Error.typing ~loc:Location.unknown "This dirt coercion variable is unbound: %t" (Typed.print_dirt_coercion dirt_coer)
       | Some pi -> pi
     end
   | Empty d ->
