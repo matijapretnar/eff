@@ -362,7 +362,9 @@ and type_check_ty st ty =
   begin match ty with 
   | Tyvar typ ->
       let ty_var_list = List.map (fun (x,y) -> x) st.tvhasskel in
-      if  List.mem typ ty_var_list then ty else assert false
+      if List.mem typ ty_var_list 
+        then ty 
+        else Error.typing ~loc:Location.unknown "This type variable is unbound: %t" (Types.print_target_ty ty)
   | Arrow (tty1,tty2) ->
       let _ = type_check_ty st tty1 in 
       let _ = type_check_dirty_ty st tty2 in 
