@@ -104,12 +104,20 @@ let rec type_check_comp st c =
   | Bind (c1,a1) -> 
       let (c1_ty,c1_drt) = type_check_comp st c1.term in 
       let (x,c2) = a1.term in 
-      let Typed.PVar p = x.term in 
-      let st' = extend_state_term_vars st p c1_ty in 
-      let (c2_ty,c2_drt) = type_check_comp st' c2.term in 
-      if (c1_drt = c2_drt) then 
-          (c2_ty,c2_drt)
-      else assert false 
+      begin match x.term with
+      | Typed.PVar p -> 
+         let st' = extend_state_term_vars st p c1_ty in 
+         let (c2_ty,c2_drt) = type_check_comp st' c2.term in 
+         if (c1_drt = c2_drt) then 
+             (c2_ty,c2_drt)
+         else assert false 
+      | Typed.PNonbinding ->
+         let (c2_ty,c2_drt) = type_check_comp st c2.term in 
+         if (c1_drt = c2_drt) then 
+             (c2_ty,c2_drt)
+         else assert false 
+      | _ -> assert false
+      end
   | CastComp (c1,dc) -> 
       let c1_drty_ty = type_check_comp st c1.term in 
       let (dc1_1,dc_2) = type_check_dirty_coercion st dc in 

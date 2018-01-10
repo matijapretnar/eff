@@ -244,10 +244,15 @@ and
   | Typed.Handle (e,c) -> free_dirt_vars_expression e @ free_dirt_vars_computation c
   | Typed.Call (_,e,awty) -> assert false 
   | Typed.Op (_,e) -> free_dirt_vars_expression e
-  | Typed.Bind (c,a) -> assert false 
+  | Typed.Bind (c,a) -> free_dirt_vars_computation c @ free_dirt_vars_abstraction a
   | Typed.CastComp (c,dc) -> free_dirt_vars_computation c @ free_dirt_vars_dirty_coercion dc
   | Typed.CastComp_ty (c,tc) -> free_dirt_vars_computation c @ free_dirt_vars_ty_coercion tc
   | Typed.CastComp_dirt (c,dc) -> free_dirt_vars_computation c @ free_dirt_vars_dirt_coercion dc
+  end
+and
+  free_dirt_vars_abstraction a =
+  begin match a.term with
+  | (_pat,c) -> free_dirt_vars_computation c
   end
 and
   free_dirt_vars_ty_coercion tc = 
@@ -749,26 +754,48 @@ and type_plain_comp in_cons st = function
 
      | _-> 
         let (typed_c1,(type_c1,dirt_c1),cons_c1,subs_c1) = type_comp in_cons st c_1 in
-        let Untyped.PVar x = p_def.Untyped.term in
-        let new_st = add_def (apply_sub_to_env st subs_c1) x type_c1 in 
-        let (typed_c2,(type_c2,dirt_c2),cons_c2,subs_c2) = type_comp cons_c1 new_st c_2 in 
-        let new_dirt_var = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
-        let cons1 = (Unification.apply_substitution_dirt subs_c1 dirt_c1,new_dirt_var) in
-        let cons2 = (dirt_c2,new_dirt_var) in
-        let coerp1 = Params.fresh_dirt_coercion_param () in
-        let coerp2 = Params.fresh_dirt_coercion_param () in
-        let coer1 = Typed.DirtCoercionVar(coerp1) in 
-        let coer2 = Typed.DirtCoercionVar(coerp2) in 
-        let omega_cons_1 = Typed.DirtOmega (coerp1,cons1) in
-        let omega_cons_2 = Typed.DirtOmega (coerp2,cons2) in
-        let coer_c1 = Typed.annotate (Typed.CastComp (Unification.apply_substitution subs_c2 typed_c1, 
-                                      Typed.BangCoercion (Typed.ReflTy (Unification.apply_substitution_ty subs_c2 type_c1),coer1)) )
-                                      typed_c1.location in  
-        let coer_c2 = Typed.annotate (Typed.CastComp (typed_c2, Typed.BangCoercion (Typed.ReflTy type_c2,coer2)) ) typed_c2.location in
-        let typed_pattern = type_pattern p_def in 
-        let abstraction = Typed.annotate  (typed_pattern,coer_c2) (typed_c2.location) in 
-        let constraints =  [omega_cons_1;omega_cons_2] @ cons_c2 in
-        ((Typed.Bind (coer_c1,abstraction)), (type_c2,new_dirt_var), constraints, subs_c2 @ subs_c1) 
+        match p_def.Untyped.term with
+        | Untyped.PVar x ->
+           let new_st = add_def (apply_sub_to_env st subs_c1) x type_c1 in 
+           let (typed_c2,(type_c2,dirt_c2),cons_c2,subs_c2) = type_comp cons_c1 new_st c_2 in 
+           let new_dirt_var = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
+           let cons1 = (Unification.apply_substitution_dirt subs_c1 dirt_c1,new_dirt_var) in
+           let cons2 = (dirt_c2,new_dirt_var) in
+           let coerp1 = Params.fresh_dirt_coercion_param () in
+           let coerp2 = Params.fresh_dirt_coercion_param () in
+           let coer1 = Typed.DirtCoercionVar(coerp1) in 
+           let coer2 = Typed.DirtCoercionVar(coerp2) in 
+           let omega_cons_1 = Typed.DirtOmega (coerp1,cons1) in
+           let omega_cons_2 = Typed.DirtOmega (coerp2,cons2) in
+           let coer_c1 = Typed.annotate (Typed.CastComp (Unification.apply_substitution subs_c2 typed_c1, 
+                                         Typed.BangCoercion (Typed.ReflTy (Unification.apply_substitution_ty subs_c2 type_c1),coer1)) )
+                                         typed_c1.location in  
+           let coer_c2 = Typed.annotate (Typed.CastComp (typed_c2, Typed.BangCoercion (Typed.ReflTy type_c2,coer2)) ) typed_c2.location in
+           let typed_pattern = type_pattern p_def in 
+           let abstraction = Typed.annotate  (typed_pattern,coer_c2) (typed_c2.location) in 
+           let constraints =  [omega_cons_1;omega_cons_2] @ cons_c2 in
+           ((Typed.Bind (coer_c1,abstraction)), (type_c2,new_dirt_var), constraints, subs_c2 @ subs_c1) 
+       | Untyped.PNonbinding ->
+           let new_st = apply_sub_to_env st subs_c1 in 
+           let (typed_c2,(type_c2,dirt_c2),cons_c2,subs_c2) = type_comp cons_c1 new_st c_2 in 
+           let new_dirt_var = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
+           let cons1 = (Unification.apply_substitution_dirt subs_c1 dirt_c1,new_dirt_var) in
+           let cons2 = (dirt_c2,new_dirt_var) in
+           let coerp1 = Params.fresh_dirt_coercion_param () in
+           let coerp2 = Params.fresh_dirt_coercion_param () in
+           let coer1 = Typed.DirtCoercionVar(coerp1) in 
+           let coer2 = Typed.DirtCoercionVar(coerp2) in 
+           let omega_cons_1 = Typed.DirtOmega (coerp1,cons1) in
+           let omega_cons_2 = Typed.DirtOmega (coerp2,cons2) in
+           let coer_c1 = Typed.annotate (Typed.CastComp (Unification.apply_substitution subs_c2 typed_c1, 
+                                         Typed.BangCoercion (Typed.ReflTy (Unification.apply_substitution_ty subs_c2 type_c1),coer1)) )
+                                         typed_c1.location in  
+           let coer_c2 = Typed.annotate (Typed.CastComp (typed_c2, Typed.BangCoercion (Typed.ReflTy type_c2,coer2)) ) typed_c2.location in
+           let typed_pattern = type_pattern p_def in 
+           let abstraction = Typed.annotate  (typed_pattern,coer_c2) (typed_c2.location) in 
+           let constraints =  [omega_cons_1;omega_cons_2] @ cons_c2 in
+           ((Typed.Bind (coer_c1,abstraction)), (type_c2,new_dirt_var), constraints, subs_c2 @ subs_c1) 
+       | pat -> assert false 
      end 
   | Untyped.LetRec (defs, c) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
