@@ -220,7 +220,7 @@ let rec
   | Typed.Variant _ -> assert false 
   | Typed.Lambda (pat,ty,c) -> free_dirt_vars_ty ty @ free_dirt_vars_computation c
   | Typed.Effect  _ -> []
-  | Typed.Handler h -> assert false 
+  | Typed.Handler h -> free_dirt_vars_abstraction_with_ty h.value_clause
   | Typed.BigLambdaTy (tp,sk,e) -> free_dirt_vars_expression e
   | Typed.BigLambdaDirt (dp,e) -> List.filter (fun x -> not (x == dp)) (free_dirt_vars_expression e)
   | Typed.BigLambdaSkel (skp,e) -> free_dirt_vars_expression e
@@ -253,6 +253,11 @@ and
   free_dirt_vars_abstraction a =
   begin match a.term with
   | (_pat,c) -> free_dirt_vars_computation c
+  end
+and
+  free_dirt_vars_abstraction_with_ty a =
+  begin match a.term with
+  | (_pat,ty,c) -> free_dirt_vars_ty ty @ free_dirt_vars_computation c
   end
 and
   free_dirt_vars_ty_coercion tc = 
