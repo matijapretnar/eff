@@ -75,7 +75,7 @@ let rec type_check_comp st c =
       if (ty_1 = ty_e2) then 
       dty_1 
       else
-      assert false
+        Error.typing ~loc:Location.unknown "Mismatch in types of formal and actual argument types: %t vs. %t" (Types.print_target_ty ty_1) (Types.print_target_ty ty_e2)
  | Handle (e1,c1) ->
       let t_e1 = type_check_exp st e1.term in 
       let Types.Handler(dty_1,dty_2) = t_e1 in 
@@ -164,7 +164,8 @@ begin match e with
    | CastExp (e1,tc1) -> 
       let e1_ty = type_check_exp st e1.term in 
       let (tc1a,tc1b) = type_check_ty_coercion st tc1 in 
-      if (tc1a = e1_ty) then tc1b else assert false
+      if (tc1a = e1_ty) then tc1b 
+        else Error.typing ~loc:Location.unknown "Mismatch in types of cast source: %t vs. %t" (Types.print_target_ty e1_ty) (Types.print_target_ty tc1a)
   | ApplyTyExp (e1,tty) ->
       let (Types.TySchemeTy (p_e1,skel,ty_e1)) = type_check_exp st e1.term in 
       let tty1 = type_check_ty st tty in

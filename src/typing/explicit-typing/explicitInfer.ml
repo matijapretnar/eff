@@ -878,6 +878,8 @@ let type_toplevel ~loc st c =
     Print.debug "Starting Set of Constraints ";
     Unification.print_c_list constraints;
     let (sub,final) = Unification.unify ([],[],constraints) in
+    Print.debug "Final Constraints:";
+    Unification.print_c_list final;
     let ct' =  Unification.apply_substitution sub ct in
     Print.debug "New Computation : %t" (Typed.print_computation ct');
     let sub2 = List.map (fun dp -> Unification.DirtVarToDirt (dp,Types.SetEmpty (Types.list_to_effect_set [])))  (List.sort_uniq compare (free_dirt_vars_computation ct')) in
