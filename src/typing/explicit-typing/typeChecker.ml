@@ -147,7 +147,29 @@ begin match e with
   | Effect (eff,(eff_in,eff_out)) -> 
       Types.Arrow(eff_in, (eff_out, Types.SetEmpty (list_to_effect_set [eff])))
 
-  | Handler h -> assert false
+  | Handler h ->
+      let (pv,tv,cv) = (h.value_clause).term in 
+      let Typed.PVar v = pv.term in 
+      let st' = extend_state_term_vars st v tv in 
+      let type_cv = type_check_comp st' cv.term in 
+      let mapper = 
+          (fun (effe,abs2) -> 
+               let (eff, (in_op_ty,out_op_ty)) = effe in 
+               (* let (x,y,c_op) = abs2.term in 
+               let Typed.PVar xv = x.term in 
+               let Typed.PVar yv = y.term in 
+               let st_temp = extend_state_term_vars st xv in_op_ty in 
+               let st' = extend_state_term_vars st_temp yv (Types.Arrow (out_op_ty, type_cv)) in 
+               let type_cop = type_check_comp st' c_op.term  in  *)
+               eff) in 
+      let handlers_ops = OldUtils.map mapper h.effect_clauses in 
+      let handlers_ops_set = Types.list_to_effect_set handlers_ops in 
+      let (t_cv,d_cv) = type_cv in 
+      let input_dirt = begin match d_cv with
+                       | Types.SetVar (es,param) -> Types.SetVar ( (Types.effect_set_union es handlers_ops_set), param  )
+                       | Types.SetEmpty es -> Types.SetEmpty (Types.effect_set_union es handlers_ops_set)
+                       end in
+      Types.Handler ((tv,input_dirt), type_cv)
   | BigLambdaTy(ty_param,skel,e1) -> 
       let st' = extend_state_ty_var_skel st ty_param skel in 
       let e1_ty = type_check_exp st' e1.term in 

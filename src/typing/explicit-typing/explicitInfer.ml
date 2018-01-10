@@ -618,7 +618,7 @@ and type_plain_expr in_cons st = function
         let handler_out_bang = Typed.BangCoercion ((Typed.ReflTy(out_ty)), Typed.ReflDirt(out_dirt)) in
         let handler_coercion = Typed.HandlerCoercion (handler_in_bang, handler_out_bang) in 
         let coerced_handler = Typed.CastExp (typed_handler, handler_coercion) in 
-        let all_cons = [skel_cons_in; skel_cons_out; omega_cons_1; omega_cons_2; omega_cons_6; omega_cons_7] @ ops_cons @ r_cons in 
+        let all_cons = [skel_cons_in; skel_cons_out; omega_cons_1; omega_cons_2; omega_cons_6; omega_cons_7] @ ops_cons @ r_cons @ cons_n in 
         (coerced_handler,target_type, all_cons, subs_n @ target_cr_sub )
 
 
