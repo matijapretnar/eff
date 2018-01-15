@@ -658,7 +658,7 @@ let rec unify(sub, paused, queue) =
         let diff_set  = Types.effect_set_diff s1 s2 in
         let union_set = Types.effect_set_union s1 s2 in
         let sub'      = [ DirtVarToDirt(v2, Types.SetVar (diff_set, (Params.fresh_dirt_param ())))
-                        ; CoerDirtVartoDirtCoercion(omega, Typed.UnionDirt (union_set, DirtCoercionVar omega'))] in 
+                        ; CoerDirtVartoDirtCoercion(omega, Typed.UnionDirt (s1, DirtCoercionVar omega'))] in 
         let new_cons  = (Typed.DirtOmega(omega', (Types.SetVar( (Types.empty_effect_set),v1) , Types.SetVar(union_set,v2)))) in 
         Print.debug "=========End loop============";
         unify (sub @ sub', [] , apply_sub sub' ((new_cons :: paused) @ rest_queue ))
