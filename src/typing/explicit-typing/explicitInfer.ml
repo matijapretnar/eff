@@ -123,46 +123,25 @@ let print_env env =
   List.map (fun (x, ty_sch) -> Print.debug "%t : %t" (Typed.print_variable x ) (Types.print_target_ty ty_sch) ;) env
 
 
-let rec get_skel_vars_from_constraints cons =
-  begin match cons with 
+let rec get_skel_vars_from_constraints = function
   | [] -> []
-  | (x::xs) -> 
-    begin match x with 
-    | Typed.TyvarHasSkel (_,sk) ->
-        begin match sk with 
-        | Types.SkelVar sv ->
-            sv :: (get_skel_vars_from_constraints xs)
-        | _ -> get_skel_vars_from_constraints xs
-        end
-    | _ -> get_skel_vars_from_constraints xs
-    end
-  end
+  | Typed.TyvarHasSkel (_, Types.SkelVar sv) :: xs -> sv :: get_skel_vars_from_constraints xs
+  | _ :: xs -> get_skel_vars_from_constraints xs
 
-let constraint_free_ty_vars cons = 
-  begin match cons with 
-  | Typed.TyOmega (_,(ty1,ty2)) ->
-        begin match (ty1,ty2) with 
-        | (Types.Tyvar a, Types.Tyvar b) -> [a;b]
-        | (Types.Tyvar a, _ ) -> [a]
-        | (_, Types.Tyvar a) -> [a]
-        end
+let constraint_free_ty_vars = function 
+  | Typed.TyOmega (_, (Types.Tyvar a, Types.Tyvar b)) -> [a; b]
+  | Typed.TyOmega (_, (Types.Tyvar a, _)) -> [a]
+  | Typed.TyOmega (_, (_, Types.Tyvar a)) -> [a]
   | _ -> []
-  end
 
-let constraint_free_dirt_vars cons = 
-  begin match cons with 
-  | Typed.DirtOmega (_, (ty1, ty2)) ->
-        begin match (ty1,ty2) with 
-        | (Types.SetVar (_,a), Types.SetVar (_,b)) -> [a;b]
-        | (Types.SetVar (_,a), _ ) -> [a]
-        | (_, Types.SetVar (_,a)) -> [a]
-        end
+let constraint_free_dirt_vars = function 
+  | Typed.DirtOmega (_, (Types.SetVar (_,a), Types.SetVar (_,b))) -> [a;b]
+  | Typed.DirtOmega (_, (Types.SetVar (_,a), _ )) -> [a]
+  | Typed.DirtOmega (_, (_, Types.SetVar (_,a))) -> [a]
   | _ -> []
-  end
 
 
-let rec free_ty_vars_ty t = 
- begin match t with 
+let rec free_ty_vars_ty = function
  | Types.Tyvar x -> [x]
  | Types.Arrow (a,c) -> (free_ty_vars_ty a) @ (free_ty_var_dirty c)
  | Types.Tuple tup -> List.flatten (List.map (free_ty_vars_ty) tup)
@@ -170,16 +149,13 @@ let rec free_ty_vars_ty t =
  | Types.PrimTy _ -> []
  | Types.QualTy ( _, a) -> free_ty_vars_ty a
  | Types.QualDirt ( _, a) -> free_ty_vars_ty a
- | Types.TySchemeTy (ty_param,_,a) -> 
-  let free_a = free_ty_vars_ty a in 
-  List.filter (fun x -> not (List.mem x [ty_param])) free_a
+ | Types.TySchemeTy (ty_param, _, a) -> 
+    let free_a = free_ty_vars_ty a in 
+    List.filter (fun x -> not (List.mem x [ty_param])) free_a
  | Types.TySchemeDirt (dirt_param,a) -> free_ty_vars_ty a 
- end
-and
-free_ty_var_dirty (a,d) = free_ty_vars_ty a 
+and free_ty_var_dirty (a, _) = free_ty_vars_ty a
 
-let rec free_dirt_vars_ty t = 
- begin match t with 
+let rec free_dirt_vars_ty = function 
  | Types.Arrow (a,c) -> (free_dirt_vars_ty a) @ (free_dirt_vars_dirty c)
  | Types.Tuple tup -> List.flatten (List.map (free_dirt_vars_ty) tup)
  | Types.Handler (c1,c2) -> (free_dirt_vars_dirty c1) @ (free_dirt_vars_dirty c2)
@@ -187,18 +163,14 @@ let rec free_dirt_vars_ty t =
  | Types.QualDirt ( _, a) -> free_dirt_vars_ty a
  | Types.TySchemeTy (ty_param,_,a) ->  free_dirt_vars_ty a
  | Types.TySchemeDirt (dirt_param,a) -> 
-      let free_a = free_dirt_vars_ty a in 
-        List.filter (fun x -> not (List.mem x [dirt_param])) free_a
+    let free_a = free_dirt_vars_ty a in 
+    List.filter (fun x -> not (List.mem x [dirt_param])) free_a
  | _ -> []
- end
-and
-free_dirt_vars_dirty (a,d) = free_dirt_vars_dirt d
-and
-free_dirt_vars_dirt d = 
- begin match d with 
- | Types.SetVar(_,sv) -> [sv]
+and free_dirt_vars_dirty (a,d) =
+  free_dirt_vars_dirt d
+and free_dirt_vars_dirt = function
+ | Types.SetVar(_, sv) -> [sv]
  | _ -> []
- end 
 
 let rec state_free_ty_vars st = 
   List.fold_right (fun (_,ty) acc-> List.append (free_ty_vars_ty ty) acc) st []
@@ -209,9 +181,8 @@ let rec state_free_dirt_vars st =
 
 (* free dirt variables in target terms *)
 
-let rec
-  free_dirt_vars_expression e =
-  begin match e.Typed.term with
+let rec free_dirt_vars_expression e =
+  match e.Typed.term with
   | Typed.Var _ -> []
   | Typed.BuiltIn _ -> []
   | Typed.Const _ -> []
@@ -232,10 +203,8 @@ let rec
   | Typed.ApplySkelExp (e,sk) -> free_dirt_vars_expression e
   | Typed.ApplyTyCoercion (e,tc) -> free_dirt_vars_expression e @ free_dirt_vars_ty_coercion tc
   | Typed.ApplyDirtCoercion (e,dc) -> free_dirt_vars_expression e @ free_dirt_vars_dirt_coercion dc
-  end
-and
-  free_dirt_vars_computation c =
-  begin match c.Typed.term with
+and free_dirt_vars_computation c =
+  match c.Typed.term with
   | Typed.Value e -> free_dirt_vars_expression e
   | Typed.LetVal (v,e,c) -> free_dirt_vars_expression e @ free_dirt_vars_computation c
   | Typed.LetRec _ -> assert false 
@@ -248,20 +217,10 @@ and
   | Typed.CastComp (c,dc) -> free_dirt_vars_computation c @ free_dirt_vars_dirty_coercion dc
   | Typed.CastComp_ty (c,tc) -> free_dirt_vars_computation c @ free_dirt_vars_ty_coercion tc
   | Typed.CastComp_dirt (c,dc) -> free_dirt_vars_computation c @ free_dirt_vars_dirt_coercion dc
-  end
-and
-  free_dirt_vars_abstraction a =
-  begin match a.term with
-  | (_pat,c) -> free_dirt_vars_computation c
-  end
-and
-  free_dirt_vars_abstraction_with_ty a =
-  begin match a.term with
-  | (_pat,ty,c) -> free_dirt_vars_ty ty @ free_dirt_vars_computation c
-  end
-and
-  free_dirt_vars_ty_coercion tc = 
-  begin match tc with
+and free_dirt_vars_abstraction { term = (_, c) } = free_dirt_vars_computation c
+and free_dirt_vars_abstraction_with_ty { term = (_, ty, c) } =
+  free_dirt_vars_ty ty @ free_dirt_vars_computation c
+and free_dirt_vars_ty_coercion = function
   | Typed.ReflTy ty -> free_dirt_vars_ty ty
   | Typed.ArrowCoercion (tc,dc) -> free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirty_coercion dc
   | Typed.HandlerCoercion (dc1,dc2) -> free_dirt_vars_dirty_coercion dc1 @ free_dirt_vars_dirty_coercion dc2
@@ -280,26 +239,19 @@ and
   | Typed.ApplyQualDirtCoer (tc,dc) -> free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirt_coercion dc
   | Typed.ForallSkel (skp,tc) -> free_dirt_vars_ty_coercion tc
   | Typed.ApplySkelCoer (tc,sk) -> free_dirt_vars_ty_coercion tc
-  end
-and
-  free_dirt_vars_dirt_coercion dc = 
-  begin match dc with 
+and free_dirt_vars_dirt_coercion = function
   | Typed.ReflDirt d                 -> free_dirt_vars_dirt d
   | Typed.DirtCoercionVar dcv        -> []
   | Typed.Empty d                    -> free_dirt_vars_dirt d
   | Typed.UnionDirt (_,dc)           -> free_dirt_vars_dirt_coercion dc
   | Typed.SequenceDirtCoer (dc1,dc2) -> free_dirt_vars_dirt_coercion dc1 @ free_dirt_vars_dirt_coercion dc2
   | Typed.DirtCoercion dc            -> free_dirt_vars_dirty_coercion dc
-  end
-and
-  free_dirt_vars_dirty_coercion dc = 
-  begin match dc with
+and free_dirt_vars_dirty_coercion = function
   | Typed.BangCoercion (tc,dc)        -> free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirt_coercion dc
   | Typed.RightArrow tc               -> free_dirt_vars_ty_coercion tc
   | Typed.RightHandler tc             -> free_dirt_vars_ty_coercion tc
   | Typed.LeftHandler tc              -> free_dirt_vars_ty_coercion tc
   | Typed.SequenceDirtyCoer (dc1,dc2) -> free_dirt_vars_dirty_coercion dc1 @ free_dirt_vars_dirty_coercion dc2
-  end
 
 (* ... *)
 
