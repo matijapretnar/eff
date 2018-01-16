@@ -6,7 +6,7 @@
 *)
 
 (** The types of contexts and type schemes. *)
-type ty_scheme = Type.ty_param list * Type.ty
+type ty_scheme = Params.ty_param list * Type.ty
 
 type t
 

@@ -68,6 +68,9 @@ let refresher fresh =
       p'
     | Some p' -> p'
 
+let beautifying_ty_subst () =
+  OldUtils.fresh OldUtils.id
+
 let beautifying_subst () =
   if !Config.disable_beautify then
     identity_subst
@@ -103,6 +106,12 @@ let print_region_param ?(non_poly=empty) r ppf =
 
 let print_type_param t ppf =
   Format.fprintf ppf "'t%d" t
+
+let print_old_ty_param ?(poly=[]) k ppf =
+  let c = (if List.mem k poly then "'" else "'_") in
+  if 0 <= k && k <= 25
+  then Format.fprintf ppf "%s%c" c (char_of_int (k + int_of_char 'a'))
+  else Format.fprintf ppf "%sty%i" c (k - 25)
 
 
 let print_ty_coercion_param ?(non_poly=empty) t ppf =

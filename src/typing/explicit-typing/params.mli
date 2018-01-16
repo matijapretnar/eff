@@ -41,6 +41,8 @@ val identity_subst : substitution
 
 val beautifying_subst : unit -> substitution
 
+val beautifying_ty_subst : unit -> (unit -> ty_param)
+
 val refreshing_subst : unit -> substitution
 
 val empty : t
@@ -61,6 +63,7 @@ val print_dirt_param : ?non_poly:t -> dirt_param -> Format.formatter -> unit
 val print_skel_param : ?non_poly:t -> skel_param -> Format.formatter -> unit
 val print_region_param : ?non_poly:t -> region_param -> Format.formatter -> unit
 val print_type_param : ty_param -> Format.formatter -> unit
+val print_old_ty_param : ?poly:ty_param list -> ty_param -> Format.formatter -> unit
 
 val print_e_ty_param : ?non_poly:t -> e_ty_param -> Format.formatter -> unit
 

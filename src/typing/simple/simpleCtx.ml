@@ -1,4 +1,4 @@
-type ty_scheme = Type.ty_param list * Type.ty
+type ty_scheme = Params.ty_param list * Type.ty
 type t = {
   variables : (CoreSyntax.variable, ty_scheme) OldUtils.assoc;
   effects : (Type.ty * Type.ty) CoreSyntax.EffectMap.t
