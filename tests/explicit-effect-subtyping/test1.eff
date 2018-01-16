@@ -1,0 +1,3 @@
+effect Op : int -> int ;;
+(fun f -> f 1) (fun x -> #Op x);;
+

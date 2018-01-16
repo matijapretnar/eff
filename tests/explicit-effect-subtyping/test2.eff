@@ -1,0 +1,3 @@
+effect Op : int -> int ;;
+#Op 1 ; #Op 2 ;;
+
