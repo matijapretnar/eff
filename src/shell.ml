@@ -26,9 +26,12 @@ let rec exec_cmd ppf st cmd =
   match cmd.CoreSyntax.term with
   | CoreSyntax.Computation c ->
       if !Config.explicit_subtyping then
-        let _, explicit_typing = ExplicitInfer.type_toplevel ~loc:c.CoreSyntax.location st.explicit_typing c in
+        let ct, explicit_typing = ExplicitInfer.type_toplevel ~loc:c.CoreSyntax.location st.explicit_typing c in
+        let (ty, drt) = TypeChecker.type_check_comp TypeChecker.new_checker_state ct.Typed.term in
         let v = Eval.run st.runtime c in
-        Format.fprintf ppf "@[- : ??? = %t@]@."
+        Format.fprintf ppf "@[- : %t ! %t = %t@]@."
+          (Types.print_target_ty ty)
+          (Types.print_target_dirt drt)
           (Value.print_value v);
           {st with explicit_typing}
       else
@@ -39,10 +42,18 @@ let rec exec_cmd ppf st cmd =
           (Value.print_value v);
         {st with typing}
   | CoreSyntax.TypeOf c ->
-      let typing, ty = SimpleInfer.infer_top_comp st.typing c in
-      Format.fprintf ppf "@[- : %t@]@."
-        (Type.print_beautiful ty);
-      { st with typing }
+      if !Config.explicit_subtyping then
+        let ct, explicit_typing = ExplicitInfer.type_toplevel ~loc:c.CoreSyntax.location st.explicit_typing c in
+        let (ty, drt) = TypeChecker.type_check_comp TypeChecker.new_checker_state ct.Typed.term in
+        Format.fprintf ppf "@[- : %t ! %t@]@."
+          (Types.print_target_ty ty)
+          (Types.print_target_dirt drt);
+          {st with explicit_typing}
+      else
+        let typing, ty = SimpleInfer.infer_top_comp st.typing c in
+        Format.fprintf ppf "@[- : %t@]@."
+          (Type.print_beautiful ty);
+        { st with typing }
   | CoreSyntax.Reset ->
       Format.fprintf ppf "Environment reset.";
       Tctx.reset ();
