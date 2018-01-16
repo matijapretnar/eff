@@ -45,7 +45,7 @@ let rec source_to_target ty =
   begin match ty with
     | T.Apply (ty_name, []) -> source_to_target (T.Basic ty_name)
     | T.Apply (_,_) -> assert false
-    | T.TyParam (T.Ty_Param x) -> Types.Tyvar (Params.transform_old_ty_param x)
+    | T.TyParam p -> Types.Tyvar p
     | T.Basic s -> begin match s with
                    | "int" -> Types.PrimTy IntTy
                    | "string" -> Types.PrimTy StringTy

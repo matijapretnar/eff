@@ -2,13 +2,11 @@
    In order not to confuse them, we define separate types for them.
  *)
 
-type ty_param = Ty_Param of int
-
-let fresh_ty_param = OldUtils.fresh (fun n -> Ty_Param n)
+let fresh_ty_param = Params.fresh_ty_param
 
 type ty =
   | Apply of OldUtils.tyname * ty list
-  | TyParam of ty_param
+  | TyParam of Params.ty_param
   | Basic of string
   | Tuple of ty list
   | Arrow of ty * ty
@@ -31,7 +29,7 @@ let float_ty = Basic "float"
 let unit_ty = Tuple []
 let empty_ty = Apply ("empty", [])
 
-type substitution = (ty_param * ty) list
+type substitution = (Params.ty_param * ty) list
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 let rec subst_ty sbst ty =
@@ -93,7 +91,7 @@ let refresh params ty =
 (** [beautify ty] returns a sequential replacement of all type parameters in
     [ty] that can be used for its pretty printing. *)
 let beautify (ps, ty) =
-  let next_ty_param = OldUtils.fresh (fun n -> Ty_Param n) in
+  let next_ty_param = Params.beautifying_ty_subst () in
   let xs = free_params ty in
   let xs_map = List.map (fun p -> (p, next_ty_param ())) xs in
   let subst ps ps_map = List.map (fun p ->
@@ -121,11 +119,8 @@ let print (ps as poly, t) ppf =
           print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
       | Apply (t, ts) ->
           print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
-      | TyParam ((Ty_Param k) as p) ->
-          let c = (if List.mem p ps then "'" else "'_") in
-          if 0 <= k && k <= 25
-          then print "%s%c" c (char_of_int (k + int_of_char 'a'))
-          else print "%sty%i" c (k - 25)
+      | TyParam p ->
+          print "%t" (Params.print_old_ty_param ~poly:ps p)
       | Tuple [] -> print "unit"
       | Tuple ts -> print ~at_level:2 "@[<hov>%t@]" (Print.sequence " * " (ty ~max_level:1) ts)
       | Handler {value=t1; finally=t2} ->

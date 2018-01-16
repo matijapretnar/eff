@@ -7,7 +7,7 @@ type tydef =
   | Sum of (OldUtils.label, Type.ty option) OldUtils.assoc
   | Inline of Type.ty
 
-type tyctx = (OldUtils.tyname, Type.ty_param list * tydef) OldUtils.assoc
+type tyctx = (OldUtils.tyname, Params.ty_param list * tydef) OldUtils.assoc
 
 let initial : tyctx = [
   ("bool", ([], Inline T.bool_ty));

@@ -1,9 +1,6 @@
-let less () = if !Config.ascii then "<=" else "≤"
 let handler_arrow () = if !Config.ascii then "=>" else "⟹ "
-let arrow () = if !Config.ascii then "->" else "⟶ "
 let short_arrow () = if !Config.ascii then "->" else "→"
 let times () = if !Config.ascii then " * " else " × "
-let top () = if !Config.ascii then "T" else "⊤"
 
 let subscript sub =
   match sub with
@@ -29,4 +26,6 @@ let ty_param = param "ty" "τ"
 let dirt_param = param "drt" "δ"
 let region_param  = param "rgn" "ρ"
 let skel_param = param "skl" "s"
-
+let ty_coercion_param = param "tycoer" "τycoer"
+let dirt_coercion_param = param "dirtcoer" "dirtcoer"
+let dirty_coercion_param = param "dirtycoer" "dirtycoer"
