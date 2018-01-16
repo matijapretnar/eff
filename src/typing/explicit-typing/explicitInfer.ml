@@ -18,6 +18,10 @@ type state = {
   context : TypingEnv.t;
   effects : (Types.target_ty * Types.target_ty) Untyped.EffectMap.t
 }
+let empty = {
+  context = TypingEnv.empty;
+  effects = CoreSyntax.EffectMap.empty
+}
 
 let ty_of_const = function
   | Const.Integer _ -> Type.int_ty

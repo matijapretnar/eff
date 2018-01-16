@@ -6,8 +6,6 @@ let help_text = "Toplevel commands:
 #use \"<file>\";;  load commands from file
 ";;
 
-module ExplicitInfer = ExplicitInfer
-
 type state = {
   runtime : Eval.state;
   explicit_typing : ExplicitInfer.state;
@@ -16,10 +14,7 @@ type state = {
 
 let initial_state = {
   runtime = Eval.empty;
-  explicit_typing = {
-    ExplicitInfer.context = TypingEnv.empty;
-    ExplicitInfer.effects = CoreSyntax.EffectMap.empty
-  };
+  explicit_typing = ExplicitInfer.empty;
   typing = SimpleInfer.empty;
 }
 
