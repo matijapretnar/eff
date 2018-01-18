@@ -1,0 +1,7 @@
+effect Op1 : int -> int ;;
+effect Op2 : int -> int ;;
+
+handler
+  | val x -> x 
+  | #Op1 n k -> 1 
+  | #Op2 n k -> 2 ;;

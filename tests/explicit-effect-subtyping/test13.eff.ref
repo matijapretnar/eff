@@ -1,0 +1,3 @@
+Typing error (unknown location):
+Mismatch in types of cast source: int ! {Op2, Op1} ⟹ 
+int ! {} vs. int ! {Op2, Op1} ⟹  int ! {}
