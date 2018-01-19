@@ -142,19 +142,30 @@ let compile_file ppf filename st =
   let out_channel = open_out (filename ^ ".ml") in
   let out_ppf = Format.formatter_of_out_channel out_channel in
 
+  (* look for header.ml next to the executable  *)
+  let header_file = Filename.concat (Filename.dirname Sys.argv.(0)) "header.ml" in
+  let header_channel = open_in header_file in
+  let n = in_channel_length header_channel in
+  let header = really_input_string header_channel n in
+  close_in header_channel;
+
+  Format.fprintf out_ppf "%s\n;;\n@." header;
+
   let compile_cmd st cmd =
     let loc = cmd.CoreSyntax.location in
     match cmd.CoreSyntax.term with
      | CoreSyntax.Computation c ->
         let ct, explicit_typing = ExplicitInfer.type_toplevel ~loc st.explicit_typing c in
         print_endline "found something!";
-        SimplePrint.print_computation ct out_ppf;
+        let erasure_ct = Erasure.typed_to_erasure_comp [] ct in
+        NewPrint.print_computation erasure_ct out_ppf;
         Format.fprintf out_ppf "\n;;\n ";
         print_endline "ended found something!";
-        let ereasure_ct = EreasureTerms.typed_to_ereasure_comp [] ct in 
-        {st with explicit_typing}
+        { st with explicit_typing }
     | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
         let explicit_typing = ExplicitInfer.add_effect eff (ty1, ty2) st.explicit_typing in
+        Print.print out_ppf "type (_, _) effect += Effect_%s : (int, int) effect" (eff);
+        Format.fprintf out_ppf "\n;;\n ";
         { st with explicit_typing }
     | _ -> st
   in
