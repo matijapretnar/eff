@@ -680,7 +680,9 @@ let rec unify(sub, paused, queue) =
  
  (* ω : Δ₁ <= Δ₂ *)
  | Typed.DirtOmega(omega, dcons) ->
-   begin match dcons with 
+    begin match dcons with 
+
+    (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *) 
     | (Types.SetVar(s1,v1) ,Types.SetVar(s2,v2) ) ->
       if (Types.effect_set_is_empty s1) then 
       begin 
@@ -697,17 +699,21 @@ let rec unify(sub, paused, queue) =
         Print.debug "=========End loop============";
         unify (sub @ sub', [] , apply_sub sub' ((new_cons :: paused) @ rest_queue ))
       end
+
+    (* ω : Ø <= Δ₂ *) 
    | (Types.SetEmpty s1, d) when (Types.effect_set_is_empty s1) ->
       let sub1 = CoerDirtVartoDirtCoercion(omega,(Typed.Empty d)) in 
       Print.debug "=========End loop============";
       unify(sub @ [sub1], paused, rest_queue)
 
+    (* ω : δ₁ <= Ø *) 
    | (Types.SetVar (s1,v1), Types.SetEmpty s2) when ((Types.effect_set_is_empty s1) && (Types.effect_set_is_empty s2) ) ->
       let sub1 = [CoerDirtVartoDirtCoercion(omega,(Typed.Empty (Types.SetEmpty Types.empty_effect_set))) ; 
                   DirtVarToDirt(v1, (Types.SetEmpty Types.empty_effect_set))] in 
       Print.debug "=========End loop============";
       unify( (sub @ sub1), [], apply_sub sub1 (paused @ rest_queue))
 
+    (* ω : O₁ <= O₂ *) 
    | (Types.SetEmpty s1, Types.SetEmpty s2)->
       if(Types.effect_set_is_subseteq s1 s2) then
       begin 
@@ -717,6 +723,7 @@ let rec unify(sub, paused, queue) =
       end
       else assert false
    
+    (* ω : O₁ <= O₂ ∪ δ₂ *) 
    | (Types.SetEmpty s1, Types.SetVar(s2,v2)) ->
      let v2' = Params.fresh_dirt_param () in
      let sub1 = [ CoerDirtVartoDirtCoercion (omega, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetVar(Types.effect_set_diff s2 s1, v2')))));
