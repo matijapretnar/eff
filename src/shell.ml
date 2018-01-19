@@ -148,13 +148,15 @@ let compile_file ppf filename st =
      | CoreSyntax.Computation c ->
         let ct, explicit_typing = ExplicitInfer.type_toplevel ~loc st.explicit_typing c in
         print_endline "found something!";
-        SimplePrint.print_computation ct out_ppf;
+        let erasure_ct = Erasure.typed_to_erasure_comp [] ct in
+        NewPrint.print_computation erasure_ct out_ppf;
         Format.fprintf out_ppf "\n;;\n ";
         print_endline "ended found something!";
-        let erasure_ct = Erasure.typed_to_erasure_comp [] ct in 
-        {st with explicit_typing }
+        { st with explicit_typing }
     | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
         let explicit_typing = ExplicitInfer.add_effect eff (ty1, ty2) st.explicit_typing in
+        Print.print out_ppf "type (_, _) effect += Effect_%s : (int, int) effect" (eff);
+        Format.fprintf out_ppf "\n;;\n ";
         { st with explicit_typing }
     | _ -> st
   in
