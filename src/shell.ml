@@ -151,8 +151,8 @@ let compile_file ppf filename st =
         SimplePrint.print_computation ct out_ppf;
         Format.fprintf out_ppf "\n;;\n ";
         print_endline "ended found something!";
-        let ereasure_ct = EreasureTerms.typed_to_ereasure_comp [] ct in 
-        {st with explicit_typing}
+        let erasure_ct = Erasure.typed_to_erasure_comp [] ct in 
+        {st with explicit_typing }
     | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
         let explicit_typing = ExplicitInfer.add_effect eff (ty1, ty2) st.explicit_typing in
         { st with explicit_typing }
