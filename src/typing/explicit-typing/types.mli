@@ -42,6 +42,14 @@ ct_ty = (target_ty * target_ty)
 and
 ct_dirt = (dirt * dirt)
 
+
+val types_are_equal: target_ty -> target_ty -> bool
+
+val dirty_types_are_equal: target_dirty -> target_dirty -> bool
+
+val dirts_are_equal: dirt -> dirt -> bool
+
+
 val print_target_ty : ?max_level:int -> target_ty -> Format.formatter -> unit
 
 val print_target_dirt : dirt -> Format.formatter -> unit

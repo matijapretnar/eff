@@ -1,6 +1,6 @@
 effect Op1 : int -> int ;;
 effect Op2 : int -> int ;;
 
-handle #Op1 1 with
+#type handle #Op1 1 with
   | val x -> x 
   | #Op1 n k -> #Op2 2 ;;

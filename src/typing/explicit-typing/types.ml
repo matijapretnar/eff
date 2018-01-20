@@ -80,6 +80,23 @@ let is_effect_member eff drt =
   | _ -> false
   end 
 
+let rec types_are_equal ty1 ty2 =
+  begin match (ty1,ty2) with
+  | (Tyvar tv1, Tyvar tv2) -> tv1 = tv2
+  | (Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1)) -> (types_are_equal ttya1 ttyb1) && (dirty_types_are_equal dirtya1 dirtyb1)
+  | (Handler (dirtya1,dirtya2), Handler (dirtyb1,dirtyb2)) -> (dirty_types_are_equal dirtya1 dirtyb1) && (dirty_types_are_equal dirtya2 dirtyb2)
+  | (PrimTy ptya, PrimTy ptyb) -> ptya = ptyb
+  | _ -> false
+  end
+
+and dirty_types_are_equal (ty1,d1) (ty2,d2) = (types_are_equal ty1 ty2) && (dirts_are_equal d1 d2)
+
+and dirts_are_equal d1 d2 =
+  begin match (d1,d2) with
+  | (SetVar (es1,dv1), SetVar(es2,dv2) ) -> ( EffectSet.equal es1 es2 ) && (dv1 = dv2)
+  | (SetEmpty es1, SetEmpty es2) ->  ( EffectSet.equal es1 es2 )
+  | _ -> false
+  end
 
 let rec print_target_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
