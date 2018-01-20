@@ -592,7 +592,7 @@ let rec unify(sub, paused, queue) =
     begin match tycons with
 
     (* ω : A <= A *)
-    | (x,y) when x=y ->  (* TODO: requires proper type equality *)
+    | (x,y) when Types.types_are_equal x y ->
         let sub1 = CoerTyVarToTyCoercion (omega, Typed.ReflTy(x)) in
         Print.debug "=========End loop============";
  	unify (sub @ [sub1], paused, rest_queue)
