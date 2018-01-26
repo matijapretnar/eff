@@ -24,7 +24,6 @@ let param ascii_symbol utf8_symbol index poly ppf =
 let e_ty_param = param "ety" "eτ"
 let ty_param = param "ty" "τ"
 let dirt_param = param "drt" "δ"
-let region_param  = param "rgn" "ρ"
 let skel_param = param "skl" "s"
 let ty_coercion_param = param "tycoer" "τycoer"
 let dirt_coercion_param = param "dirtcoer" "dirtcoer"
