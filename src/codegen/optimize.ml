@@ -1,10 +1,15 @@
+
+let optimize_comp c = c;;
+
 (*
  To Do list for optimization :
 
   ==> Handlers inline.
 
 *)
-open Typed
+(* open Typed *)
+
+(*
 
 let x = Types.PrimTy BoolTy;;
 
@@ -805,3 +810,4 @@ Print.debug "Handler Reductions %i"
   +  !(initial.optimization_handler_With_LetRec));
 Print.debug "Specialization %i" !(initial.optimization_function_specialization); *)
 List.rev cmds;
+*)
