@@ -66,20 +66,6 @@ val print_ct_ty : ct_ty -> Format.formatter -> unit
 
 
 
-val empty_effect_set : effect_set
-
-val list_to_effect_set : OldUtils.effect list -> effect_set
-
-val effect_set_to_list: effect_set -> (OldUtils.effect list)
-
-val effect_set_diff: effect_set -> effect_set -> effect_set
-
-val effect_set_union: effect_set -> effect_set -> effect_set
-
-val effect_set_is_empty: effect_set -> bool
-
-val effect_set_is_subseteq: effect_set -> effect_set -> bool
-
-val effect_set_mem: OldUtils.effect -> effect_set -> bool
+module EffectSet : Set.S with type elt = OldUtils.effect and type t = effect_set
 
 val is_effect_member:OldUtils.effect -> dirt -> bool

@@ -41,7 +41,7 @@ let apply_sub_to_env env sub =
 
 let rec make_target_effects effects =
   let new_effects = List.map (fun (x,_) ->  x ) effects in 
-  let new_set = Types.list_to_effect_set new_effects in 
+  let new_set = Types.EffectSet.of_list new_effects in 
   Types.SetEmpty new_set
 
 
@@ -402,7 +402,7 @@ let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
    let skel_constraints = get_skel_constraints alphas_has_skels ty_subs new_skel_subs in 
    let skel_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplySkelExp (a, Types.SkelVar b)) Location.unknown)  ) (Typed.annotate (Typed.Var var) Location.unknown) skel_subs in 
    let ty_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplyTyExp (a, Types.Tyvar b)) Location.unknown)  ) skel_apps ty_subs in 
-   let dirt_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplyDirtExp (a, Types.SetVar (Types.empty_effect_set ,b) )) Location.unknown)  ) ty_apps dirt_subs in 
+   let dirt_apps = List.fold_left (fun a (_,b) -> (Typed.annotate (Typed.ApplyDirtExp (a, Types.SetVar (Types.EffectSet.empty ,b) )) Location.unknown)  ) ty_apps dirt_subs in 
    let (ty_cons,dirt_cons) = get_applied_cons_from_ty ty_subs dirt_subs ty_sch in 
    let ty_cons_apps = List.fold_left (fun a (Typed.TyOmega (omega, _ )) -> (Typed.annotate (Typed.ApplyTyCoercion (a, Typed.TyCoercionVar omega)) Location.unknown) ) dirt_apps ty_cons in 
    let dirt_cons_apps = List.fold_left (fun a (Typed.DirtOmega (omega, _ )) -> (Typed.annotate (Typed.ApplyDirtCoercion (a, Typed.DirtCoercionVar omega)) Location.unknown) ) ty_cons_apps dirt_cons in 
@@ -463,7 +463,7 @@ and type_plain_expr in_cons st = function
         (target_lambda,target_ty,target_comp_cons, target_comp_sub)
   | Untyped.Effect eff -> 
         let (in_ty,out_ty) =  Untyped.EffectMap.find eff st.effects in
-        let s = Types.list_to_effect_set [eff] in
+        let s = Types.EffectSet.singleton eff in
         (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,(Types.SetEmpty s))) , in_cons, []) 
 
   | Untyped.Handler h -> 
@@ -472,9 +472,9 @@ and type_plain_expr in_cons st = function
         let out_ty_var = Params.fresh_ty_param () in 
         let out_dirt_var = Params.fresh_dirt_param () in
         let in_ty = Types.Tyvar in_ty_var in 
-        let in_dirt = Types.SetVar (Types.empty_effect_set, in_dirt_var) in 
+        let in_dirt = Types.SetVar (Types.EffectSet.empty, in_dirt_var) in 
         let out_ty = Types.Tyvar (out_ty_var) in 
-        let out_dirt = Types.SetVar (Types.empty_effect_set, out_dirt_var) in
+        let out_dirt = Types.SetVar (Types.EffectSet.empty, out_dirt_var) in
         let in_skel_var = Params.fresh_skel_param () in
         let in_skel = Types.SkelVar (in_skel_var) in 
         let out_skel_var = Params.fresh_skel_param () in 
@@ -574,7 +574,7 @@ and type_plain_expr in_cons st = function
             } in
         let typed_handler = Typed.annotate (Typed.Handler target_handler) Location.unknown in
         let for_set_handlers_ops = List.map (fun ((eff,(_,_)),_)-> eff) new_op_clauses in 
-        let ops_set = Types.list_to_effect_set for_set_handlers_ops in 
+        let ops_set = Types.EffectSet.of_list for_set_handlers_ops in 
         let handlers_ops = Types.SetVar (ops_set,out_dirt_var) in 
         let cons_7 = (in_dirt, handlers_ops) in
         let coer_7 = Params.fresh_dirt_coercion_param () in
@@ -594,7 +594,7 @@ and type_comp in_cons st {Untyped.term=comp; Untyped.location=loc} =
 and type_plain_comp in_cons st = function
   | Untyped.Value e ->
       let (typed_e, tt, constraints, subs_e) = type_expr in_cons st e in
-      let new_d_ty = (tt , (Types.SetEmpty (Types.empty_effect_set))) in 
+      let new_d_ty = (tt , (Types.SetEmpty (Types.EffectSet.empty))) in 
       (Typed.Value typed_e, new_d_ty ,constraints, subs_e)
   | Untyped.Match (e, cases) -> assert false (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Apply (e1, e2) -> 
@@ -611,7 +611,7 @@ and type_plain_comp in_cons st = function
            let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2, Typed.TyCoercionVar( coerp1 ))) typed_e1.location in
            let omega_cons_1 = Typed.TyOmega (coerp1,cons1) in 
            let constraints = List.append [omega_cons_1] constraints_2 in
-           let dirt_of_out_ty = Types.list_to_effect_set [eff] in 
+           let dirt_of_out_ty = Types.EffectSet.singleton eff in 
            let new_var = Typed.Variable.fresh "cont_bind" in
            let continuation_comp = Untyped.Value ( Untyped.annotate (Untyped.Var new_var) typed_e2.location ) in 
            let new_st = add_def st new_var eff_out in 
@@ -620,8 +620,8 @@ and type_plain_comp in_cons st = function
            let (typed_comp_ty,typed_comp_dirt) = typed_cont_comp_dirty_ty in 
            let final_dirt = 
               begin match typed_comp_dirt with 
-              | Types.SetVar (s,dv) -> Types.SetVar (Types.effect_set_union s (Types.list_to_effect_set [eff]), dv)
-              | Types.SetEmpty s -> Types.SetEmpty (Types.effect_set_union s (Types.list_to_effect_set [eff]))
+              | Types.SetVar (s,dv) -> Types.SetVar (Types.effect_set_union s (Types.EffectSet.singleton eff), dv)
+              | Types.SetEmpty s -> Types.SetEmpty (Types.effect_set_union s (Types.EffectSet.singleton eff))
               end in 
           let cont_abstraction = Typed.annotate ((Typed.annotate (Typed.PVar new_var) typed_e2.location), typed_cont_comp) 
                                  typed_e2.location in
@@ -634,7 +634,7 @@ and type_plain_comp in_cons st = function
       | _ ->
           let new_ty_param = Params.fresh_ty_param () in 
           let new_ty_var = Types.Tyvar (new_ty_param) in 
-          let new_dirt_var = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
+          let new_dirt_var = Types.SetVar (Types.EffectSet.empty, (Params.fresh_dirt_param ())) in 
           let fresh_dirty_ty =  (new_ty_var, new_dirt_var) in 
           let cons1 = Typed.TyvarHasSkel (new_ty_param, Types.SkelVar (Params.fresh_skel_param ())) in 
           let cons2 = (Unification.apply_substitution_ty subs_e2 tt_1 , Types.Arrow (tt_2, fresh_dirty_ty)) in
@@ -650,8 +650,8 @@ and type_plain_comp in_cons st = function
       let skel_param2 = Params.fresh_skel_param () in 
       let alpha_2 = Types.Tyvar (ty_param2) in
       let alpha_1 = Types.Tyvar (ty_param1) in
-      let delta_1 = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
-      let delta_2 = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in
+      let delta_1 = Types.SetVar (Types.EffectSet.empty, (Params.fresh_dirt_param ())) in 
+      let delta_2 = Types.SetVar (Types.EffectSet.empty, (Params.fresh_dirt_param ())) in
       let dirty_1 = (alpha_1, delta_1) in 
       let dirty_2 = (alpha_2, delta_2) in
       let (typed_exp,exp_type,exp_constraints,sub_exp) = type_expr in_cons st e in
@@ -719,7 +719,7 @@ and type_plain_comp in_cons st = function
         | Untyped.PVar x ->
            let new_st = add_def (apply_sub_to_env st subs_c1) x type_c1 in 
            let (typed_c2,(type_c2,dirt_c2),cons_c2,subs_c2) = type_comp cons_c1 new_st c_2 in 
-           let new_dirt_var = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
+           let new_dirt_var = Types.SetVar (Types.EffectSet.empty, (Params.fresh_dirt_param ())) in 
            let cons1 = (Unification.apply_substitution_dirt subs_c1 dirt_c1,new_dirt_var) in
            let cons2 = (dirt_c2,new_dirt_var) in
            let coerp1 = Params.fresh_dirt_coercion_param () in
@@ -739,7 +739,7 @@ and type_plain_comp in_cons st = function
        | Untyped.PNonbinding ->
            let new_st = apply_sub_to_env st subs_c1 in 
            let (typed_c2,(type_c2,dirt_c2),cons_c2,subs_c2) = type_comp cons_c1 new_st c_2 in 
-           let new_dirt_var = Types.SetVar (Types.empty_effect_set, (Params.fresh_dirt_param ())) in 
+           let new_dirt_var = Types.SetVar (Types.EffectSet.empty, (Params.fresh_dirt_param ())) in 
            let cons1 = (Unification.apply_substitution_dirt subs_c1 dirt_c1,new_dirt_var) in
            let cons2 = (dirt_c2,new_dirt_var) in
            let coerp1 = Params.fresh_dirt_coercion_param () in
@@ -770,7 +770,7 @@ and get_handler_op_clause eff abs2 in_st in_cons in_sub =
   let alpha_i_param = Params.fresh_ty_param () in 
   let alpha_i = Types.Tyvar (alpha_i_param) in 
   let skel_i = Types.SkelVar (Params.fresh_skel_param ()) in 
-  let delta_i =  Types.SetVar (Types.empty_effect_set,Params.fresh_dirt_param ()) in
+  let delta_i =  Types.SetVar (Types.EffectSet.empty,Params.fresh_dirt_param ()) in
   let st_subbed = apply_sub_to_env in_st in_sub in 
   let temp_st = add_def st_subbed x_var in_op_ty in
   let new_st = add_def temp_st k_var (Types.Arrow (out_op_ty, (alpha_i,delta_i))) in 
@@ -787,24 +787,24 @@ let finalize_constraint sub =
          | Typed.DirtOmega (dcp,(d1,d2)) -> 
             begin match (d1,d2) with
             | (SetEmpty s1, SetVar (s2,dv2)) ->
-               assert (Types.effect_set_is_subseteq s1 s2);
-               Unification.CoerDirtVartoDirtCoercion (dcp, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetEmpty (Types.effect_set_diff s2 s1))))) :: 
-                 Unification.DirtVarToDirt (dv2,Types.SetEmpty (Types.list_to_effect_set [])) :: 
+               assert (Types.EffectSet.subset s1 s2);
+               Unification.CoerDirtVartoDirtCoercion (dcp, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetEmpty (Types.EffectSet.diff s2 s1))))) :: 
+                 Unification.DirtVarToDirt (dv2,Types.SetEmpty (Types.EffectSet.empty)) :: 
                    sub
             | (SetVar (s1,dv1), SetEmpty s2) ->
-               assert (Types.effect_set_is_subseteq s1 s2);
-               Unification.CoerDirtVartoDirtCoercion (dcp, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetEmpty (Types.effect_set_diff s2 s1))))) :: 
-                 Unification.DirtVarToDirt (dv1,Types.SetEmpty (Types.list_to_effect_set [])) :: 
+               assert (Types.EffectSet.subset s1 s2);
+               Unification.CoerDirtVartoDirtCoercion (dcp, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetEmpty (Types.EffectSet.diff s2 s1))))) :: 
+                 Unification.DirtVarToDirt (dv1,Types.SetEmpty (Types.EffectSet.empty)) :: 
                    sub
             | (SetVar (s1,dv1), SetVar (s2,dv2)) ->
-               assert (Types.effect_set_is_subseteq s1 s2);
-               Unification.CoerDirtVartoDirtCoercion (dcp, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetEmpty (Types.effect_set_diff s2 s1))))) :: 
-                 Unification.DirtVarToDirt (dv1,Types.SetEmpty (Types.list_to_effect_set [])) :: 
-                   Unification.DirtVarToDirt (dv2,Types.SetEmpty (Types.list_to_effect_set [])) :: 
+               assert (Types.EffectSet.subset s1 s2);
+               Unification.CoerDirtVartoDirtCoercion (dcp, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetEmpty (Types.EffectSet.diff s2 s1))))) :: 
+                 Unification.DirtVarToDirt (dv1,Types.SetEmpty (Types.EffectSet.empty)) :: 
+                   Unification.DirtVarToDirt (dv2,Types.SetEmpty (Types.EffectSet.empty)) :: 
                      sub
             | (SetEmpty s1, SetEmpty s2) -> 
-               assert (Types.effect_set_is_subseteq s1 s2);
-               Unification.CoerDirtVartoDirtCoercion (dcp, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetEmpty (Types.effect_set_diff s2 s1))))) :: sub 
+               assert (Types.EffectSet.subset s1 s2);
+               Unification.CoerDirtVartoDirtCoercion (dcp, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetEmpty (Types.EffectSet.diff s2 s1))))) :: sub 
             end
          | Typed.SkelEq (sk1,sk2)       -> 
             assert false
@@ -870,7 +870,7 @@ let type_toplevel ~loc st c =
     Unification.print_c_list final;
     let ct' =  Unification.apply_substitution sub ct in
     Print.debug "New Computation : %t" (Typed.print_computation ct');
-    let sub2 = List.map (fun dp -> Unification.DirtVarToDirt (dp,Types.SetEmpty (Types.list_to_effect_set [])))  (List.sort_uniq compare (free_dirt_vars_computation ct')) in
+    let sub2 = List.map (fun dp -> Unification.DirtVarToDirt (dp,Types.SetEmpty (Types.EffectSet.empty)))  (List.sort_uniq compare (free_dirt_vars_computation ct')) in
     let ct2  = Unification.apply_substitution sub2 ct' in 
     let sub3 = finalize_constraints (Unification.apply_sub sub2 final) in
     let ct3  = Unification.apply_substitution sub3 ct2 in

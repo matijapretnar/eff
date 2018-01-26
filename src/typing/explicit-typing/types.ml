@@ -5,30 +5,6 @@ module EffectSet = Set.Make (struct
 
 type effect_set = EffectSet.t
 
-let empty_effect_set =  EffectSet.empty
-
-let list_to_effect_set l = 
-      List.fold_right (EffectSet.add) l (EffectSet.empty) 
-
-let effect_set_to_list s = 
-      EffectSet.fold (fun a b -> (a:: b)) s []
-
-let effect_set_diff s1 s2 = 
-      EffectSet.diff s1 s2
-
-let effect_set_union s1 s2 = 
-      EffectSet.union s1 s2
-
-let effect_set_is_empty s = 
-      EffectSet.is_empty s
-
-let effect_set_mem eff s = 
-      EffectSet.mem eff s
-
-let effect_set_is_subseteq s1 s2 =
-      (EffectSet.subset s1 s2) || (EffectSet.equal s1 s2)
-
-
 type skeleton =
   | SkelVar of Params.skel_param
   | PrimSkel of prim_ty
@@ -75,8 +51,8 @@ ct_dirty = (target_dirty * target_dirty)
 
 let is_effect_member eff drt =
   begin match drt with
-  | SetVar (eset,_) when (effect_set_mem eff eset) -> true
-  | SetEmpty (eset) when (effect_set_mem eff eset) -> true
+  | SetVar (eset,_) when (EffectSet.mem eff eset) -> true
+  | SetEmpty (eset) when (EffectSet.mem eff eset) -> true
   | _ -> false
   end 
 
@@ -142,12 +118,12 @@ and print_target_dirt drt ppf =
 	let print ?at_level = Print.print  ?at_level ppf in
 	 begin match drt with
    | SetVar(set,p) -> 
-        if effect_set_is_empty set
+        if EffectSet.is_empty set
           then print "%t" (Params.print_dirt_param p)
-          else let eff_list = effect_set_to_list set in
+          else let eff_list = EffectSet.elements set in
                print "{%t} U %t" (print_effect_list eff_list)  (Params.print_dirt_param p )
    | SetEmpty set -> 
-        let eff_list = effect_set_to_list set in
+        let eff_list = EffectSet.elements set in
         print "{%t}" (print_effect_list eff_list)
 	  end
 

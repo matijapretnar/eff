@@ -213,10 +213,10 @@ and apply_sub_dirt sub1 drt =
       | DirtVarToDirt (p', drt2) when (p = p')-> 
           begin match drt2 with 
           | SetVar (eset2,pp) ->
-              let eset_union = effect_set_union eset eset2 in 
+              let eset_union = EffectSet.union eset eset2 in 
               SetVar (eset_union,pp)
           | SetEmpty eset2 ->
-              SetEmpty (effect_set_union eset eset2)
+              SetEmpty (EffectSet.union eset eset2)
           end
       | _ -> drt
       end
@@ -274,19 +274,19 @@ let apply_sub1 c_list sub1 =
                           Typed.DirtOmega (coer_p,(SetVar (s1,dv) , d2)) when (dv = type_p) ->
                              begin match target_dirt with
                              | SetVar (diff_set, new_var) ->
-                                let new_set =  effect_set_union s1 diff_set in 
+                                let new_set =  EffectSet.union s1 diff_set in 
                                 Typed.DirtOmega(coer_p,(SetVar(new_set,new_var),d2))
                              | SetEmpty diff_set ->
-                                let new_set =  effect_set_union s1 diff_set in 
+                                let new_set =  EffectSet.union s1 diff_set in 
                                 Typed.DirtOmega(coer_p,(SetEmpty new_set,d2))
                              end
                         | Typed.DirtOmega (coer_p,(d2, SetVar (s1,dv) )) when (dv = type_p) ->
                              begin match target_dirt with
                              | SetVar (diff_set, new_var) ->
-                                let new_set =  effect_set_union s1 diff_set in 
+                                let new_set =  EffectSet.union s1 diff_set in 
                                 Typed.DirtOmega(coer_p,(d2,SetVar(new_set,new_var)))
                              | SetEmpty diff_set ->
-                                let new_set =  effect_set_union s1 diff_set in 
+                                let new_set =  EffectSet.union s1 diff_set in 
                                 Typed.DirtOmega(coer_p,(d2,SetEmpty(new_set)))
                              end
                         | cons -> cons
@@ -527,7 +527,7 @@ let rec unify(sub, paused, queue) =
         let tvar1 = Types.Tyvar (ty_p1) in 
         let tvar2 = Types.Tyvar (ty_p2) in 
         let d_p1  = Params.fresh_dirt_param () in 
-        let dvar1 = Types.SetVar (empty_effect_set , d_p1) in 
+        let dvar1 = Types.SetVar (EffectSet.empty , d_p1) in 
         let sub1  = TyVarToTy (tvar, Types.Arrow (tvar1 , (tvar2,dvar1))) in 
         let cons1 = TyvarHasSkel (ty_p1,sk1) in 
         let cons2 = TyvarHasSkel (ty_p2,sk2) in
@@ -540,9 +540,9 @@ let rec unify(sub, paused, queue) =
         let tvar1 = Types.Tyvar (ty_p1) in 
         let tvar2 = Types.Tyvar (ty_p2) in 
         let d_p1 = Params.fresh_dirt_param () in 
-        let dvar1 = Types.SetVar (empty_effect_set , d_p1) in 
+        let dvar1 = Types.SetVar (EffectSet.empty , d_p1) in 
         let d_p2 = Params.fresh_dirt_param () in 
-        let dvar2 = Types.SetVar (empty_effect_set , d_p2) in 
+        let dvar2 = Types.SetVar (EffectSet.empty , d_p2) in 
         let sub1= TyVarToTy (tvar, Types.Handler ((tvar1,dvar1) , (tvar2,dvar2))) in 
         let cons1 = TyvarHasSkel (ty_p1,sk1) in 
         let cons2 = TyvarHasSkel (ty_p2,sk2) in
@@ -684,40 +684,40 @@ let rec unify(sub, paused, queue) =
 
     (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *) 
     | (Types.SetVar(s1,v1) ,Types.SetVar(s2,v2) ) ->
-      if (Types.effect_set_is_empty s1) then 
+      if (Types.EffectSet.is_empty s1) then 
       begin 
         Print.debug "=========End loop============";
         unify (sub ,(cons::paused), rest_queue)
         end 
       else begin 
         let omega'    = Params.fresh_dirt_coercion_param() in
-        let diff_set  = Types.effect_set_diff s1 s2 in
-        let union_set = Types.effect_set_union s1 s2 in
+        let diff_set  = Types.EffectSet.diff s1 s2 in
+        let union_set = Types.EffectSet.union s1 s2 in
         let sub'      = [ DirtVarToDirt(v2, Types.SetVar (diff_set, (Params.fresh_dirt_param ())))
                         ; CoerDirtVartoDirtCoercion(omega, Typed.UnionDirt (s1, DirtCoercionVar omega'))] in 
-        let new_cons  = (Typed.DirtOmega(omega', (Types.SetVar( (Types.empty_effect_set),v1) , Types.SetVar(union_set,v2)))) in 
+        let new_cons  = (Typed.DirtOmega(omega', (Types.SetVar( (Types.EffectSet.empty),v1) , Types.SetVar(union_set,v2)))) in 
         Print.debug "=========End loop============";
         unify (sub @ sub', [] , apply_sub sub' ((new_cons :: paused) @ rest_queue ))
       end
 
     (* ω : Ø <= Δ₂ *) 
-   | (Types.SetEmpty s1, d) when (Types.effect_set_is_empty s1) ->
+   | (Types.SetEmpty s1, d) when (Types.EffectSet.is_empty s1) ->
       let sub1 = CoerDirtVartoDirtCoercion(omega,(Typed.Empty d)) in 
       Print.debug "=========End loop============";
       unify(sub @ [sub1], paused, rest_queue)
 
     (* ω : δ₁ <= Ø *) 
-   | (Types.SetVar (s1,v1), Types.SetEmpty s2) when ((Types.effect_set_is_empty s1) && (Types.effect_set_is_empty s2) ) ->
-      let sub1 = [CoerDirtVartoDirtCoercion(omega,(Typed.Empty (Types.SetEmpty Types.empty_effect_set))) ; 
-                  DirtVarToDirt(v1, (Types.SetEmpty Types.empty_effect_set))] in 
+   | (Types.SetVar (s1,v1), Types.SetEmpty s2) when ((Types.EffectSet.is_empty s1) && (Types.EffectSet.is_empty s2) ) ->
+      let sub1 = [CoerDirtVartoDirtCoercion(omega,(Typed.Empty (Types.SetEmpty Types.EffectSet.empty))) ; 
+                  DirtVarToDirt(v1, (Types.SetEmpty Types.EffectSet.empty))] in 
       Print.debug "=========End loop============";
       unify( (sub @ sub1), [], apply_sub sub1 (paused @ rest_queue))
 
     (* ω : O₁ <= O₂ *) 
    | (Types.SetEmpty s1, Types.SetEmpty s2)->
-      if(Types.effect_set_is_subseteq s1 s2) then
+      if(Types.EffectSet.subset s1 s2) then
       begin 
-        let sub1 = CoerDirtVartoDirtCoercion (omega, Typed.UnionDirt ( s2, (Typed.Empty (Types.SetEmpty (Types.effect_set_diff s2 s1))))) in 
+        let sub1 = CoerDirtVartoDirtCoercion (omega, Typed.UnionDirt ( s2, (Typed.Empty (Types.SetEmpty (Types.EffectSet.diff s2 s1))))) in 
         Print.debug "=========End loop============";
         unify( sub @ [sub1], paused, rest_queue ) 
       end
@@ -726,8 +726,8 @@ let rec unify(sub, paused, queue) =
     (* ω : O₁ <= O₂ ∪ δ₂ *) 
    | (Types.SetEmpty s1, Types.SetVar(s2,v2)) ->
      let v2' = Params.fresh_dirt_param () in
-     let sub1 = [ CoerDirtVartoDirtCoercion (omega, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetVar(Types.effect_set_diff s2 s1, v2')))));
-                  DirtVarToDirt(v2, Types.SetVar ( (Types.effect_set_diff s1 s2) ,  v2'))] in 
+     let sub1 = [ CoerDirtVartoDirtCoercion (omega, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetVar(Types.EffectSet.diff s2 s1, v2')))));
+                  DirtVarToDirt(v2, Types.SetVar ( (Types.EffectSet.diff s1 s2) ,  v2'))] in 
       Print.debug "=========End loop============";
       unify( (sub @ sub1), [], apply_sub sub1 (paused @ rest_queue))    
  

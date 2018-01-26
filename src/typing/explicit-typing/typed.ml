@@ -296,7 +296,7 @@ and print_dirt_coercion ?max_level c ppf =
   | Empty d ->
       print "Empty__(%t)" (Types.print_target_dirt d) 
   | UnionDirt (eset,dc)->
-        let eff_list = Types.effect_set_to_list eset in
+        let eff_list = Types.EffectSet.elements eset in
         print "{%t} U %t" (Types.print_effect_list eff_list)  (print_dirt_coercion dc)
 and print_omega_ct ?max_level c ppf = 
   let print ?at_level = Print.print ?max_level ?at_level ppf in

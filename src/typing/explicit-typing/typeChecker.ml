@@ -60,7 +60,7 @@ let rec type_check_comp st c =
   begin match c with 
   | Value e -> 
       let ty1 = type_check_exp st e.term in 
-      (ty1,SetEmpty (empty_effect_set))
+      (ty1,SetEmpty (EffectSet.empty))
    | LetVal (v1,e1,c1) ->
       let t_v = type_check_exp st e1.term in 
       let st' = extend_state_term_vars st v1 t_v in 
@@ -153,7 +153,7 @@ begin match e with
       Types.Arrow (ty1',c_ty) 
  
   | Effect (eff,(eff_in,eff_out)) -> 
-      Types.Arrow(eff_in, (eff_out, Types.SetEmpty (list_to_effect_set [eff])))
+      Types.Arrow(eff_in, (eff_out, Types.SetEmpty (EffectSet.singleton eff)))
 
   | Handler h ->
       let (pv,tv,cv) = (h.value_clause).term in 
@@ -171,11 +171,11 @@ begin match e with
                let type_cop = type_check_comp st' c_op.term  in  *)
                eff) in 
       let handlers_ops = OldUtils.map mapper h.effect_clauses in 
-      let handlers_ops_set = Types.list_to_effect_set handlers_ops in 
+      let handlers_ops_set = Types.EffectSet.of_list handlers_ops in 
       let (t_cv,d_cv) = type_cv in 
       let input_dirt = begin match d_cv with
-                       | Types.SetVar (es,param) -> Types.SetVar ( (Types.effect_set_union es handlers_ops_set), param  )
-                       | Types.SetEmpty es -> Types.SetEmpty (Types.effect_set_union es handlers_ops_set)
+                       | Types.SetVar (es,param) -> Types.SetVar ( (Types.EffectSet.union es handlers_ops_set), param  )
+                       | Types.SetEmpty es -> Types.SetEmpty (Types.EffectSet.union es handlers_ops_set)
                        end in
       Types.Handler ((tv,input_dirt), type_cv)
   | BigLambdaTy(ty_param,skel,e1) -> 
@@ -343,18 +343,18 @@ and type_check_dirt_coercion st dirt_coer =
     end
   | Empty d ->
         let d' = type_check_dirt st d in  
-        ( SetEmpty (Types.empty_effect_set), d')
+        ( SetEmpty (Types.EffectSet.empty), d')
   | UnionDirt (es,dirt_coer1) ->
         let (dc_a,dc_b) = type_check_dirt_coercion st dirt_coer1 in 
         let dc_a' = 
           begin match dc_a with 
-          | SetVar (es1,v) -> SetVar ((effect_set_union es es1),v)
-          | SetEmpty (es1) -> SetEmpty(effect_set_union es es1)
+          | SetVar (es1,v) -> SetVar ((EffectSet.union es es1),v)
+          | SetEmpty (es1) -> SetEmpty(EffectSet.union es es1)
           end in 
         let dc_b' = 
           begin match dc_b with 
-          | SetVar (es1,v) -> SetVar ((effect_set_union es es1),v)
-          | SetEmpty (es1) -> SetEmpty(effect_set_union es es1)
+          | SetVar (es1,v) -> SetVar ((EffectSet.union es es1),v)
+          | SetEmpty (es1) -> SetEmpty(EffectSet.union es es1)
           end in 
        (dc_a',dc_b')
   | SequenceDirtCoer(dc1, dc2) -> 
@@ -378,7 +378,7 @@ and type_check_dirt_cons st (d1,d2) =
 
 and type_check_dirt st d =
   begin match d with 
-  | SetEmpty eset when (effect_set_is_empty eset)-> d
+  | SetEmpty eset when (EffectSet.is_empty eset)-> d
   | SetEmpty _ ->
       d
   | SetVar(_,v) ->
