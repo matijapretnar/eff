@@ -62,7 +62,7 @@ and e_plain_expression =
 and e_computation = e_plain_computation annotation
 and e_plain_computation =
   | EValue of e_expression
-  | ELetVal of variable * e_expression * e_computation 
+  | ELetVal of e_pattern * e_expression * e_computation 
   | EApply of e_expression * e_expression
   | EHandle of e_expression * e_computation
   | ECall of effect * e_expression * e_abstraction_with_ty
@@ -160,10 +160,11 @@ and typed_to_erasure_comp sub {Typed.term=comp; Typed.location=loc} =
 and typed_to_erasure_comp' sub tt =
   begin match tt with 
   | Typed.Value e -> EValue (typed_to_erasure_exp sub e)
-  | Typed.LetVal (v,e,c) -> 
+  | Typed.LetVal (e,(p,_ty,c)) -> 
+      let p' = typed_to_erasure_pattern p in
       let e' = typed_to_erasure_exp sub e in 
       let c' = typed_to_erasure_comp sub c in 
-      ELetVal (v,e',c')
+      ELetVal (p',e',c')
   | Typed.Apply (e1,e2) -> 
       let e1' = typed_to_erasure_exp sub e1 in 
       let e2' = typed_to_erasure_exp sub e2 in 

@@ -67,7 +67,7 @@ and plain_expression =
 and computation = plain_computation annotation
 and plain_computation =
   | Value of expression
-  | LetVal of variable * expression * computation 
+  | LetVal of expression * (pattern * Types.target_ty * computation) 
   | LetRec of (variable * abstraction) list * computation
   | Match of expression * abstraction list
   | Apply of expression * expression
@@ -261,8 +261,8 @@ and print_computation ?max_level c ppf =
     print " ( (%t) |> [%t] )" (print_computation c1) (print_ty_coercion dc)
   | CastComp_dirt (c1,dc) ->
     print "( (%t) |> [%t])" (print_computation c1) (print_dirt_coercion dc)
-  | LetVal(v,e1,c1) -> 
-    print "let (%t = (%t)) in (%t)" (print_variable v) (print_expression e1) (print_computation c1)
+  | LetVal(e1,(p,ty,c1)) -> 
+    print "let (%t = (%t)) in (%t)" (print_pattern p) (print_expression e1) (print_computation c1)
 
 
 and print_ty_coercion ?max_level c ppf =

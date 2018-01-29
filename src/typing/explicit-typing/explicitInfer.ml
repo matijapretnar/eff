@@ -210,7 +210,7 @@ let rec free_dirt_vars_expression e =
 and free_dirt_vars_computation c =
   match c.Typed.term with
   | Typed.Value e -> free_dirt_vars_expression e
-  | Typed.LetVal (v,e,c) -> free_dirt_vars_expression e @ free_dirt_vars_computation c
+  | Typed.LetVal (e,(p,ty,c)) -> free_dirt_vars_expression e @ free_dirt_vars_computation c
   | Typed.LetRec _ -> assert false 
   | Typed.Match (_,_) -> assert false 
   | Typed.Apply (e1,e2) -> free_dirt_vars_expression e1 @ free_dirt_vars_expression e2
@@ -685,7 +685,7 @@ and type_plain_comp in_cons st = function
         let var_exp_dirt_lamda = List.fold_right (fun cons acc -> Typed.annotate ( Typed.BigLambdaDirt (cons,acc) ) typed_c2.location )  split_dirt_vars var_exp in
         let var_exp_ty_lambda = List.fold_right (fun cons acc -> Typed.annotate (Typed.BigLambdaTy (cons,(Unification.get_skel_of_tyvar cons cons_e1' ),acc) )typed_c2.location ) split_ty_vars var_exp_dirt_lamda in
         let var_exp_skel_lamda = List.fold_right (fun cons acc -> Typed.annotate ( Typed.BigLambdaSkel (cons,acc) ) typed_c2.location )  split_skel_vars var_exp_ty_lambda in
-        let return_term = Typed.LetVal (x, var_exp_skel_lamda, typed_c2) in 
+        let return_term = Typed.LetVal (var_exp_skel_lamda, ((Typed.annotate (Typed.PVar x) p_def.Untyped.location), ty_sc_skel, typed_c2)) in 
         (return_term, type_c2 , cons_c2 ,  subs_c2 @ sub_e1' @ sub_e1)
 
 

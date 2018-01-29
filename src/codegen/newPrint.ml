@@ -133,8 +133,8 @@ and print_computation ?max_level c ppf =
   match c.Erasure.term with
   | Erasure.EValue e ->
       print ~at_level:1 "value %t" (print_expression ~max_level:0 e)
-  | Erasure.ELetVal (x, e, c) ->
-      print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_variable x) (print_expression e) (print_computation c)
+  | Erasure.ELetVal (p, e, c) ->
+      print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p) (print_expression e) (print_computation c)
   | Erasure.EApply (e1, e2) ->
       print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e1) (print_expression ~max_level:0 e2)
   | Erasure.EHandle (e, c) ->

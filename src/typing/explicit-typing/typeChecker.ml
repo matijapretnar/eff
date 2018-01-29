@@ -61,10 +61,14 @@ let rec type_check_comp st c =
   | Value e -> 
       let ty1 = type_check_exp st e.term in 
       (ty1,SetEmpty (EffectSet.empty))
-   | LetVal (v1,e1,c1) ->
+   | LetVal (e1,(p1,ty,c1)) ->
       let t_v = type_check_exp st e1.term in 
-      let st' = extend_state_term_vars st v1 t_v in 
-      type_check_comp st' c1.term
+      if (Types.types_are_equal t_v ty) then 
+        let PVar v1 = p1.term in  (* TODO: generalize to all forms of patterns *)
+        let st' = extend_state_term_vars st v1 t_v in 
+        type_check_comp st' c1.term
+      else
+        Error.typing ~loc:Location.unknown "Mismatch in types of let-bound expression and its type annotation : %t vs. %t" (Types.print_target_ty t_v) (Types.print_target_ty ty)
 
   | LetRec (l,c1) -> assert false 
   | Match (e,alist) -> assert false

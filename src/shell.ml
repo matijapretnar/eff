@@ -157,7 +157,7 @@ let compile_file ppf filename st =
      | CoreSyntax.Computation c ->
         let ct, explicit_typing = ExplicitInfer.type_toplevel ~loc st.explicit_typing c in
         print_endline "found something!";
-        let ct = if !Config.disable_optimization then ct else Optimize.optimize_comp ct in
+        let ct = if !Config.disable_optimization then ct else Optimize.optimize_main_comp ct in
         let erasure_ct = Erasure.typed_to_erasure_comp [] ct in
         NewPrint.print_computation erasure_ct out_ppf;
         Format.fprintf out_ppf "\n;;\n ";

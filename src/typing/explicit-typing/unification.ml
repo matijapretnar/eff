@@ -144,7 +144,7 @@ let c' = apply_sub_plain_comp sub c in
 and apply_sub_plain_comp sub c =
   begin match c.term with 
   | Value e -> Value (apply_sub_exp sub e) 
-  | LetVal (v1,e1,c1) -> LetVal (v1, (apply_sub_exp sub e1), (apply_sub_comp sub c1))
+  | LetVal (e1,(p,ty,c1)) -> LetVal (apply_sub_exp sub e1,(p, apply_sub_ty sub ty, apply_sub_comp sub c1))
   | LetRec (l,c1) -> LetRec (l,c1)
   | Match (e,alist) -> Match (e,alist)
   | Apply (e1,e2) -> Apply ((apply_sub_exp sub e1), (apply_sub_exp sub e2))
