@@ -2,17 +2,9 @@ module T = Type
 module Typed = Typed
 module Untyped = CoreSyntax
 
-module TyVarSet = Set.Make (struct
-  type t = Params.Ty.t
+module TyVarSet = Set.Make (Params.Ty)
 
-  let compare = compare
-end)
-
-module DirtVarSet = Set.Make (struct
-  type t = Params.Dirt.t
-
-  let compare = compare
-end)
+module DirtVarSet = Set.Make (Params.Dirt)
 
 type state =
   { context: TypingEnv.t

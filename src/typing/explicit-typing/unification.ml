@@ -1,11 +1,7 @@
 open Types
 open Typed
 
-module STyVars = Set.Make (struct
-  type t = Params.Ty.t
-
-  let compare = compare
-end)
+module STyVars = Set.Make (Params.Ty)
 
 let set_of_list = List.fold_left (fun acc x -> STyVars.add x acc) STyVars.empty
 
