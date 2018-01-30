@@ -5,9 +5,8 @@
    [1] http://pauillac.inria.fr/~maranget/papers/warn/index.html
 *)
 
-(** Check that a pattern is irrefutable. *)
 val is_irrefutable : CoreSyntax.pattern -> unit
+(** Check that a pattern is irrefutable. *)
 
-(** Check for refutable patterns in let statements and non-exhaustive match statements. *)
 val check_comp : CoreSyntax.computation -> unit
-
+(** Check for refutable patterns in let statements and non-exhaustive match statements. *)

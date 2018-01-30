@@ -1,22 +1,24 @@
 (** Pretty-printing functions *)
 
+val error :
+  ?loc:Location.t -> string -> ('a, Format.formatter, unit) format -> 'a
 (** Print an error to the standard error channel. *)
-val error : ?loc:Location.t -> string -> ('a, Format.formatter, unit) format -> 'a
 
-(** Print a check to the standard error channel. *)
 val check : ?loc:Location.t -> ('a, Format.formatter, unit) format -> 'a
+(** Print a check to the standard error channel. *)
 
-(** Print a warning to the standard error channel. *)
 val warning : ?loc:Location.t -> ('a, Format.formatter, unit) format -> 'a
+(** Print a warning to the standard error channel. *)
 
-(** Print a debug message to the standard error channel. *)
 val debug : ?loc:Location.t -> ('a, Format.formatter, unit) format -> 'a
+(** Print a debug message to the standard error channel. *)
 
-(** Print a construct to a given formatter, possibly parenthesizing it. *)
 val print :
-  ?at_level:int -> ?max_level:int ->
-  Format.formatter -> ('a, Format.formatter, unit) format -> 'a
-(** Each construct has a level [at_level] at which it is printed. The lower the
+  ?at_level:int -> ?max_level:int -> Format.formatter
+  -> ('a, Format.formatter, unit) format -> 'a
+(** Print a construct to a given formatter, possibly parenthesizing it.
+
+    Each construct has a level [at_level] at which it is printed. The lower the
     level, the tighter the construct. Next, each construct is printed in some
     context, which determines the maximum allowed level [max_level] at which the
     construct can still be printed without putting it in parentheses.
@@ -66,15 +68,20 @@ val print :
     [if] and [then], or a body of the quantifier, which is on one side delimited
     by [.] and on the other side unlimited. *)
 
+val sequence :
+  string -> ('a -> Format.formatter -> unit) -> 'a list -> Format.formatter
+  -> unit
 (** [sequence sep pp lst ppf] uses pretty-printer [pp] to print elements of
     [lst] separated by [sep] to the formatter [ppf]. *)
-val sequence : string -> ('a -> Format.formatter -> unit) -> 'a list -> Format.formatter -> unit
 
+val tuple :
+  ('a -> Format.formatter -> unit) -> 'a list -> Format.formatter -> unit
 (** [tuple pp lst ppf] prints a tuple given by a list of elements [lst] using
     a pretty-printer [pp] to the formatter [ppf]. *)
-val tuple : ('a -> Format.formatter -> unit) -> 'a list -> Format.formatter -> unit
 
+val record :
+  ('a -> Format.formatter -> unit) -> (string, 'a) OldUtils.assoc
+  -> Format.formatter -> unit
 (** [record pp lst ppf] prints a record given by an associative list of elements
     [lst] using a pretty-printer [pp] (applied only to values) to the formatter
     [ppf]. *)
-val record : ('a -> Format.formatter -> unit) -> (string, 'a) OldUtils.assoc -> Format.formatter -> unit

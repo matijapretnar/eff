@@ -9,38 +9,42 @@
     we'll deal with that when Eff actually gets used by more than a dozen
     people. *)
 type pervasives =
-  | PervasivesNone             (* do not use pervasives *)
-  | PervasivesDefault          (* look in the default locations *)
-  | PervasivesFile of string   (* look for pervasives in a specific location *)
+  | PervasivesNone
+  (* do not use pervasives *)
+  | PervasivesDefault
+  (* look in the default locations *)
+  | PervasivesFile of string
 
-(** Location of the pervasives file *)
+(* look for pervasives in a specific location *)
+
 val pervasives_file : pervasives ref
+(** Location of the pervasives file *)
 
-(** Should effect annotations be printed? *)
 val effect_annotations : bool ref
+(** Should effect annotations be printed? *)
 
-(** Should beautification of types be disabled? *)
 val disable_beautify : bool ref
+(** Should beautification of types be disabled? *)
 
-(** Should type-checking be disabled? *)
 val disable_typing : bool ref
+(** Should type-checking be disabled? *)
 
-(** Should we use ASCII instead of Unicode for printing out types? *)
 val ascii : bool ref
+(** Should we use ASCII instead of Unicode for printing out types? *)
 
-(** Should the interactive shell be run? *)
 val interactive_shell : bool ref
+(** Should the interactive shell be run? *)
 
-(** The command-line wrappers that we look for *)
 val wrapper : string list option ref
+(** The command-line wrappers that we look for *)
 
+val verbosity : int ref
 (** Select which messages should be printed:
     - 0 no messages
     - 1 only errors
     - 2 errors and check
     - 3 errors, check, and warnings
     - 4 errors, check, warnings, and debug messages *)
-val verbosity : int ref
 
-(** Should we use smart printing for type schemes? *)
 val smart_print : bool ref
+(** Should we use smart printing for type schemes? *)

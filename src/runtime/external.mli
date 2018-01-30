@@ -10,5 +10,5 @@
     [external id : ty = "external_name"].
 *)
 
-(** [values] is an association list of external names and values. *)
 val values : (string, Value.value) OldUtils.assoc
+(** [values] is an association list of external names and values. *)
