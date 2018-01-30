@@ -9,7 +9,7 @@ module TyVarSet = Set.Make (struct
                            end);;
 
 module DirtVarSet = Set.Make (struct
-                             type t = Params.dirt_param
+                             type t = Params.Dirt.t
                              let compare = compare
                            end);;
 
@@ -300,7 +300,7 @@ let splitter st constraints simple_ty =
    Print.debug "Splitter output free_ty_vars: ";
    List.iter (fun x -> Print.debug "%t" (Params.print_ty_param x) ) alpha_list;
    Print.debug "Splitter output free_dirt_vars: ";
-   List.iter (fun x -> Print.debug "%t" (Params.print_dirt_param x) ) delta_list;
+   List.iter (fun x -> Print.debug "%t" (Params.Dirt.print x) ) delta_list;
    Print.debug "Splitter first constraints list :";
    Unification.print_c_list cons1;
    Print.debug "Splitter second constraints list :";
@@ -312,7 +312,7 @@ let splitter st constraints simple_ty =
 let rec get_sub_of_ty ty_sch = 
   begin match ty_sch with
   | Types.TySchemeSkel (s,t)->
-          let new_s = Params.fresh_skel_param () in 
+          let new_s = Params.Skel.fresh () in 
           let (skels,tys,dirts) = get_sub_of_ty t in
           ((s,new_s)::skels,tys,dirts)
   | Types.TySchemeTy (p,_,t) -> 
@@ -320,7 +320,7 @@ let rec get_sub_of_ty ty_sch =
           let (skels,tys,dirts) = get_sub_of_ty t in
           (skels,(p,new_p)::tys,dirts)
   | Types.TySchemeDirt(p,t) -> 
-          let new_p = Params.fresh_dirt_param () in 
+          let new_p = Params.Dirt.fresh () in 
           let (skels,tys,dirts) = get_sub_of_ty t in
           (skels,tys,(p,new_p)::dirts)
   | _ -> ([],[],[])
@@ -375,14 +375,14 @@ let rec get_applied_cons_from_ty ty_subs dirt_subs ty =
               let (c1,c2) =  get_applied_cons_from_ty ty_subs dirt_subs t in
               let (ty1,ty2) =  cons in 
               let (newty1,newty2) = (apply_sub_to_type ty_subs dirt_subs ty1 , apply_sub_to_type ty_subs dirt_subs ty2) in 
-              let new_omega = Params.fresh_ty_coercion_param () in 
+              let new_omega = Params.TyCoercion.fresh () in 
               let new_cons = Typed.TyOmega (new_omega, (newty1,newty2) ) in
               (new_cons::c1 , c2 )
   | Types.QualDirt(cons,t)-> 
               let (c1,c2) =  get_applied_cons_from_ty ty_subs dirt_subs t in
               let (ty1,ty2) =  cons in 
               let (newty1,newty2) = (apply_sub_to_dirt dirt_subs ty1 , apply_sub_to_dirt dirt_subs ty2) in 
-              let new_omega = Params.fresh_dirt_coercion_param () in 
+              let new_omega = Params.DirtCoercion.fresh () in 
               let new_cons = Typed.DirtOmega (new_omega, (newty1,newty2) ) in
               (c1 , new_cons::c2 )
   | _ -> [],[]
@@ -410,24 +410,24 @@ let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
 
 let fresh_ty_with_skel () =
   let ty_var = Params.fresh_ty_param ()
-  and skel_var = Params.fresh_skel_param () in
+  and skel_var = Params.Skel.fresh () in
   (Types.Tyvar ty_var, Typed.TyvarHasSkel (ty_var, Types.SkelVar skel_var))
 
 let no_effect_dirt dirt_param =
   Types.SetVar (Types.EffectSet.empty, dirt_param)
 
 let fresh_dirt () =
-  no_effect_dirt (Params.fresh_dirt_param ())
+  no_effect_dirt (Params.Dirt.fresh ())
 
 let make_dirty ty =
   (ty, fresh_dirt ())
 
 let fresh_ty_coer cons =
-  let param = Params.fresh_ty_coercion_param () in
+  let param = Params.TyCoercion.fresh () in
   (Typed.TyCoercionVar param, Typed.TyOmega (param, cons))
 
 let fresh_dirt_coer cons =
-  let param = Params.fresh_dirt_coercion_param () in
+  let param = Params.DirtCoercion.fresh () in
   (Typed.DirtCoercionVar param, Typed.DirtOmega (param, cons))
 
 let rec type_expr in_cons st {Untyped.term=expr; Untyped.location=loc} =
@@ -487,7 +487,7 @@ and type_plain_expr in_cons st = function
         (Typed.Effect (eff,(in_ty,out_ty)) , Types.Arrow (in_ty,(out_ty,(Types.SetEmpty s))) , in_cons, []) 
 
   | Untyped.Handler h -> 
-        let out_dirt_var = Params.fresh_dirt_param () in
+        let out_dirt_var = Params.Dirt.fresh () in
         let in_dirt = fresh_dirt ()
         and out_dirt = no_effect_dirt out_dirt_var
         and in_ty, skel_cons_in = fresh_ty_with_skel ()
@@ -843,7 +843,7 @@ let type_toplevel ~loc st c =
     let ct3  = Unification.apply_substitution sub3 ct2 in
     Print.debug "New Computation : %t" (Typed.print_computation ct3);
     (* Print.debug "Remaining dirt variables "; *)
-    (* List.iter (fun dp -> Print.debug "%t" (Params.print_dirt_param dp)) (List.sort_uniq compare (free_dirt_vars_computation ct')); *)
+    (* List.iter (fun dp -> Print.debug "%t" (Params.Dirt.print dp)) (List.sort_uniq compare (free_dirt_vars_computation ct')); *)
     let (tch_ty,tch_dirt) = TypeChecker.type_check_comp (TypeChecker.new_checker_state) ct3.term in 
     Print.debug "Type from Type Checker : %t ! %t" (Types.print_target_ty tch_ty) (Types.print_target_dirt tch_dirt);
     ct3, st

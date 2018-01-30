@@ -12,12 +12,12 @@ type ('term, 'ttype) target_term = {
 type checker_state = {
   term_vars : (Typed.variable, Types.target_ty) OldUtils.assoc;
   type_vars : Params.ty_param list;
-  dirt_vars : Params.dirt_param list;
-  skel_vars : Params.skel_param list;
+  dirt_vars : Params.Dirt.t list;
+  skel_vars : Params.Skel.t list;
   tvhasskel : (Params.ty_param, Types.skeleton) OldUtils.assoc;
-  omega_ty  : (Params.ty_coercion_param ,  Types.ct_ty) OldUtils.assoc;
-  omega_dirt: (Params.dirt_coercion_param ,  Types.ct_dirt) OldUtils.assoc;
-  omega_dirty: (Params.dirty_coercion_param , (Types.target_dirty * Types.target_dirty) ) OldUtils.assoc;
+  omega_ty  : (Params.TyCoercion.t ,  Types.ct_ty) OldUtils.assoc;
+  omega_dirt: (Params.DirtCoercion.t ,  Types.ct_dirt) OldUtils.assoc;
+  omega_dirty: (Params.DirtyCoercion.t , (Types.target_dirty * Types.target_dirty) ) OldUtils.assoc;
 } ;;
 
 let extend_state_ty_vars st ty_var = 

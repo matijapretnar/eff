@@ -52,12 +52,12 @@ and plain_expression =
   | Effect of effect
   | Handler of handler
   | BigLambdaTy of Params.ty_param * skeleton * expression
-  | BigLambdaDirt of Params.dirt_param * expression  
-  | BigLambdaSkel of Params.skel_param * expression
+  | BigLambdaDirt of Params.Dirt.t * expression  
+  | BigLambdaSkel of Params.Skel.t * expression
   | CastExp of expression * ty_coercion
   | ApplyTyExp of expression * Types.target_ty
-  | LambdaTyCoerVar of Params.ty_coercion_param * Types.ct_ty * expression 
-  | LambdaDirtCoerVar of Params.dirt_coercion_param * Types.ct_dirt * expression 
+  | LambdaTyCoerVar of Params.TyCoercion.t * Types.ct_ty * expression 
+  | LambdaDirtCoerVar of Params.DirtCoercion.t * Types.ct_dirt * expression 
   | ApplyDirtExp of expression * Types.dirt
   | ApplySkelExp of expression * Types.skeleton
   | ApplyTyCoercion of expression * ty_coercion
@@ -84,25 +84,25 @@ and ty_coercion =
   | ReflTy of Types.target_ty
   | ArrowCoercion of ty_coercion * dirty_coercion
   | HandlerCoercion of dirty_coercion * dirty_coercion
-  | TyCoercionVar of Params.ty_coercion_param 
+  | TyCoercionVar of Params.TyCoercion.t 
   | SequenceTyCoer of  ty_coercion * ty_coercion
   | TupleCoercion of ty_coercion list
   | LeftArrow of ty_coercion
   | ForallTy of (Params.ty_param) * ty_coercion
   | ApplyTyCoer of ty_coercion * target_ty
-  | ForallDirt of (Params.dirt_param) * ty_coercion
+  | ForallDirt of (Params.Dirt.t) * ty_coercion
   | ApplyDirCoer of ty_coercion * dirt
   | PureCoercion of dirty_coercion
   | QualTyCoer of ct_ty * ty_coercion
   | QualDirtCoer of ct_dirt * ty_coercion
   | ApplyQualTyCoer of ty_coercion * ty_coercion
   | ApplyQualDirtCoer of ty_coercion * dirt_coercion
-  | ForallSkel of (Params.skel_param) *ty_coercion
+  | ForallSkel of (Params.Skel.t) *ty_coercion
   | ApplySkelCoer of ty_coercion * skeleton
 
 and dirt_coercion = 
   | ReflDirt of dirt
-  | DirtCoercionVar of Params.dirt_coercion_param 
+  | DirtCoercionVar of Params.DirtCoercion.t 
   | Empty of dirt
   | UnionDirt of ( Types.effect_set * dirt_coercion)
   | SequenceDirtCoer of dirt_coercion * dirt_coercion
@@ -131,8 +131,8 @@ and abstraction2 = (pattern * pattern * computation) annotation
 
 
 type omega_ct =
-    | TyOmega of (Params.ty_coercion_param * Types.ct_ty)
-    | DirtOmega of (Params.dirt_coercion_param * Types.ct_dirt)
+    | TyOmega of (Params.TyCoercion.t * Types.ct_ty)
+    | DirtOmega of (Params.DirtCoercion.t * Types.ct_dirt)
     | SkelEq of skeleton * skeleton
     | TyvarHasSkel of (Params.ty_param * skeleton)
 
@@ -218,18 +218,18 @@ let rec print_expression ?max_level e ppf =
   | CastExp (e1,tc) ->
     print "(%t) |> [%t]" (print_expression e1) (print_ty_coercion tc)
   | BigLambdaTy (p,s,e) -> print "BigLambda_ty_%t:%t. %t "(Params.print_ty_param p) (print_skeleton s) (print_expression e)
-  | BigLambdaDirt (p,e) -> print "BigLambda_dirt_%t. %t "(Params.print_dirt_param p) (print_expression e) 
+  | BigLambdaDirt (p,e) -> print "BigLambda_dirt_%t. %t "(Params.Dirt.print p) (print_expression e) 
   | ApplyTyExp (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (Types.print_target_ty tty)
   | LambdaTyCoerVar (p,(tty1,tty2),e) -> 
-      print "BigLambda_tyCoer_(%t:%t<=%t).( %t ) "(Params.print_ty_coercion_param p) (Types.print_target_ty tty1) (Types.print_target_ty tty2)
+      print "BigLambda_tyCoer_(%t:%t<=%t).( %t ) "(Params.TyCoercion.print p) (Types.print_target_ty tty1) (Types.print_target_ty tty2)
                                            (print_expression e)
   | LambdaDirtCoerVar (p,(tty1,tty2),e) -> 
-      print "BigLambda_DirtCoer_(%t:%t<=%t).( %t )"(Params.print_dirt_coercion_param p) (Types.print_target_dirt tty1) 
+      print "BigLambda_DirtCoer_(%t:%t<=%t).( %t )"(Params.DirtCoercion.print p) (Types.print_target_dirt tty1) 
                                             (Types.print_target_dirt tty2) (print_expression e)
   | ApplyDirtExp (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (Types.print_target_dirt tty)
   | ApplyTyCoercion  (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (print_ty_coercion tty)
   | ApplyDirtCoercion (e,tty)-> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (print_dirt_coercion tty)
-  | BigLambdaSkel (p,e) -> print "BigLambda_skel_%t. %t "(Params.print_skel_param p) (print_expression e)
+  | BigLambdaSkel (p,e) -> print "BigLambda_skel_%t. %t "(Params.Skel.print p) (print_expression e)
   | ApplySkelExp (e,sk) -> print ~at_level:1 "%t@ %t" (print_expression ~max_level:1 e) (Types.print_skeleton sk)
 
 and print_computation ?max_level c ppf =
@@ -275,7 +275,7 @@ and print_ty_coercion ?max_level c ppf =
   | HandlerCoercion (dc1,dc2) ->
       print  "%t ==> %t" (print_dirty_coercion dc1) (print_dirty_coercion dc2)
   | TyCoercionVar (tcp) ->
-     print "%t " (Params.print_ty_coercion_param tcp)
+     print "%t " (Params.TyCoercion.print tcp)
   | SequenceTyCoer (tc1,tc2) ->
       print "%t ; %t" (print_ty_coercion tc1) (print_ty_coercion tc2)
 
@@ -292,7 +292,7 @@ and print_dirt_coercion ?max_level c ppf =
   | ReflDirt p ->
       print "<%t>" (Types.print_target_dirt p)
   | DirtCoercionVar tcp ->
-      print "%t" (Params.print_dirt_coercion_param tcp)
+      print "%t" (Params.DirtCoercion.print tcp)
   | Empty d ->
       print "Empty__(%t)" (Types.print_target_dirt d) 
   | UnionDirt (eset,dc)->
@@ -302,9 +302,9 @@ and print_omega_ct ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with
   | TyOmega (p, (ty1,ty2)) ->  print "%t: (%t =< %t)" 
-                              (Params.print_ty_coercion_param p) (Types.print_target_ty ty1) (Types.print_target_ty ty2)
+                              (Params.TyCoercion.print p) (Types.print_target_ty ty1) (Types.print_target_ty ty2)
   | DirtOmega (p,(ty1,ty2)) ->  print "%t: (%t =< %t)" 
-                              (Params.print_dirt_coercion_param p) (Types.print_target_dirt ty1) (Types.print_target_dirt ty2)
+                              (Params.DirtCoercion.print p) (Types.print_target_dirt ty1) (Types.print_target_dirt ty2)
   | SkelEq (sk1,sk2) -> print "%t ~ %t" (Types.print_skeleton sk1) (Types.print_skeleton sk2)
   | TyvarHasSkel(tp ,sk1) -> print "%t : %t" (Params.print_ty_param tp) (Types.print_skeleton sk1)
 

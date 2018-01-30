@@ -1,11 +1,11 @@
 type effect_set
 
 type skeleton =
-  | SkelVar of Params.skel_param
+  | SkelVar of Params.Skel.t
   | PrimSkel of prim_ty
   | SkelArrow of skeleton * skeleton
   | SkelHandler of skeleton * skeleton
-  | ForallSkel of Params.skel_param * skeleton
+  | ForallSkel of Params.Skel.t * skeleton
 
 
 and target_ty = 
@@ -17,14 +17,14 @@ and target_ty =
   | QualTy of ct_ty * target_ty
   | QualDirt of ct_dirt * target_ty
   | TySchemeTy of Params.ty_param * skeleton * target_ty
-  | TySchemeDirt of Params.dirt_param * target_ty
-  | TySchemeSkel of Params.skel_param * target_ty
+  | TySchemeDirt of Params.Dirt.t * target_ty
+  | TySchemeSkel of Params.Skel.t * target_ty
 
 and
  target_dirty = ( target_ty * dirt)
 and
  dirt = 
- | SetVar of effect_set * Params.dirt_param
+ | SetVar of effect_set * Params.Dirt.t
  | SetEmpty of effect_set
 and
  ct = 

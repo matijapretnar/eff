@@ -6,11 +6,11 @@ module EffectSet = Set.Make (struct
 type effect_set = EffectSet.t
 
 type skeleton =
-  | SkelVar of Params.skel_param
+  | SkelVar of Params.Skel.t
   | PrimSkel of prim_ty
   | SkelArrow of skeleton * skeleton
   | SkelHandler of skeleton * skeleton
-  | ForallSkel of Params.skel_param * skeleton
+  | ForallSkel of Params.Skel.t * skeleton
 
 
 and target_ty = 
@@ -22,14 +22,14 @@ and target_ty =
   | QualTy of ct_ty * target_ty
   | QualDirt of ct_dirt * target_ty
   | TySchemeTy of Params.ty_param * skeleton * target_ty
-  | TySchemeDirt of Params.dirt_param * target_ty
-  | TySchemeSkel of Params.skel_param * target_ty
+  | TySchemeDirt of Params.Dirt.t * target_ty
+  | TySchemeSkel of Params.Skel.t * target_ty
 
 and
  target_dirty = ( target_ty * dirt)
 and
  dirt = 
- | SetVar of effect_set * Params.dirt_param
+ | SetVar of effect_set * Params.Dirt.t
  | SetEmpty of effect_set
 and
  ct = 
@@ -99,19 +99,19 @@ let rec print_target_ty ?max_level ty ppf =
   | QualTy (c,tty) -> print "%t => %t" (print_ct_ty c) (print_target_ty tty)
   | QualDirt (c,tty) -> print "%t => %t" (print_ct_dirt c) (print_target_ty tty)
   | TySchemeTy (p,sk,tty) -> print "ForallTy (%t:%t). %t" (Params.print_ty_param p ) (print_skeleton sk) (print_target_ty tty)
-  | TySchemeDirt (p,tty) -> print "ForallDirt %t. %t" (Params.print_dirt_param p ) (print_target_ty tty)
-  | TySchemeSkel (p,tty) -> print "ForallSkel %t. %t" (Params.print_skel_param p ) (print_target_ty tty)
+  | TySchemeDirt (p,tty) -> print "ForallDirt %t. %t" (Params.Dirt.print p ) (print_target_ty tty)
+  | TySchemeSkel (p,tty) -> print "ForallSkel %t. %t" (Params.Skel.print p ) (print_target_ty tty)
   end
 
 
 and print_skeleton ?max_level sk ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   begin match sk with
-  | SkelVar p -> Params.print_skel_param p ppf
+  | SkelVar p -> Params.Skel.print p ppf
   | PrimSkel s -> print "prim_skel %t" (print_prim_ty s)
   | SkelArrow (sk1,sk2) -> print "%t -sk-> %t" (print_skeleton sk1) (print_skeleton sk2)
   | SkelHandler (sk1,sk2) -> print "%t =sk=> %t" (print_skeleton sk1) (print_skeleton sk2)
-  | ForallSkel (p,sk1)-> print "ForallSkelSkel %t. %t" (Params.print_skel_param p) (print_skeleton sk1)
+  | ForallSkel (p,sk1)-> print "ForallSkelSkel %t. %t" (Params.Skel.print p) (print_skeleton sk1)
   end
 
 and print_target_dirt drt ppf = 
@@ -119,9 +119,9 @@ and print_target_dirt drt ppf =
 	 begin match drt with
    | SetVar(set,p) -> 
         if EffectSet.is_empty set
-          then print "%t" (Params.print_dirt_param p)
+          then print "%t" (Params.Dirt.print p)
           else let eff_list = EffectSet.elements set in
-               print "{%t} U %t" (print_effect_list eff_list)  (Params.print_dirt_param p )
+               print "{%t} U %t" (print_effect_list eff_list)  (Params.Dirt.print p )
    | SetEmpty set -> 
         let eff_list = EffectSet.elements set in
         print "{%t}" (print_effect_list eff_list)

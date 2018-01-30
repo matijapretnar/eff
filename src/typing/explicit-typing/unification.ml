@@ -8,11 +8,11 @@ module STyVars = Set.Make (struct
 let set_of_list = List.fold_left (fun acc x -> STyVars.add x acc) STyVars.empty;;
 
 type substitution =
-   | CoerTyVarToTyCoercion of (Params.ty_coercion_param * Typed.ty_coercion) 
-   | CoerDirtVartoDirtCoercion of (Params.dirt_coercion_param * Typed.dirt_coercion)
+   | CoerTyVarToTyCoercion of (Params.TyCoercion.t * Typed.ty_coercion) 
+   | CoerDirtVartoDirtCoercion of (Params.DirtCoercion.t * Typed.dirt_coercion)
    | TyVarToTy of (Params.ty_param * Types.target_ty)
-   | DirtVarToDirt of (Params.dirt_param * Types.dirt)
-   | SkelVarToSkel of (Params.skel_param * Types.skeleton)
+   | DirtVarToDirt of (Params.Dirt.t * Types.dirt)
+   | SkelVarToSkel of (Params.Skel.t * Types.skeleton)
 
 
 
@@ -20,15 +20,15 @@ let print_sub ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   begin match c with
   | CoerTyVarToTyCoercion (p, t) ->  print "%t :-coertyTotyCoer-> %t" 
-                              (Params.print_ty_coercion_param p) (Typed.print_ty_coercion t)
+                              (Params.TyCoercion.print p) (Typed.print_ty_coercion t)
   | CoerDirtVartoDirtCoercion (p,d) ->  print "%t :-coertyDirtoDirtCoer-> %t"
-                              (Params.print_dirt_coercion_param p) (Typed.print_dirt_coercion d)
+                              (Params.DirtCoercion.print p) (Typed.print_dirt_coercion d)
   | TyVarToTy (p,t) ->  print "%t :-tyvarToTargetty-> %t" 
                               (Params.print_ty_param p) (Types.print_target_ty t) 
   | DirtVarToDirt (p,d) ->  print "%t :-dirtvarToTargetdirt-> %t" 
-                              (Params.print_dirt_param p) (Types.print_target_dirt d) 
+                              (Params.Dirt.print p) (Types.print_target_dirt d) 
   | SkelVarToSkel (p,s) ->  print "%t :-skelvarToSkeleton-> %t" 
-                              (Params.print_skel_param p) (Types.print_skeleton s) 
+                              (Params.Skel.print p) (Types.print_skeleton s) 
   end
 
 
@@ -381,7 +381,7 @@ and refresh_target_dirt (ty_sbst, dirt_sbst) t =
     begin match OldUtils.lookup x dirt_sbst with
     | Some x' -> (ty_sbst,dirt_sbst), Types.SetVar(set,x')
     | None -> 
-      let y = (Params.fresh_dirt_param ()) in
+      let y = (Params.Dirt.fresh ()) in
       ( ty_sbst, (OldUtils.update x y dirt_sbst )) , SetVar(set,y)
    end
  | SetEmpty set -> ((ty_sbst, dirt_sbst) , (Types.SetEmpty set))
@@ -493,7 +493,7 @@ let rec unify(sub, paused, queue) =
         let ty_p2 = Params.fresh_ty_param () in 
         let tvar1 = Types.Tyvar (ty_p1) in 
         let tvar2 = Types.Tyvar (ty_p2) in 
-        let d_p1  = Params.fresh_dirt_param () in 
+        let d_p1  = Params.Dirt.fresh () in 
         let dvar1 = Types.SetVar (EffectSet.empty , d_p1) in 
         let sub1  = TyVarToTy (tvar, Types.Arrow (tvar1 , (tvar2,dvar1))) in 
         let cons1 = TyvarHasSkel (ty_p1,sk1) in 
@@ -506,9 +506,9 @@ let rec unify(sub, paused, queue) =
         let ty_p2 = Params.fresh_ty_param () in 
         let tvar1 = Types.Tyvar (ty_p1) in 
         let tvar2 = Types.Tyvar (ty_p2) in 
-        let d_p1 = Params.fresh_dirt_param () in 
+        let d_p1 = Params.Dirt.fresh () in 
         let dvar1 = Types.SetVar (EffectSet.empty , d_p1) in 
-        let d_p2 = Params.fresh_dirt_param () in 
+        let d_p2 = Params.Dirt.fresh () in 
         let dvar2 = Types.SetVar (EffectSet.empty , d_p2) in 
         let sub1= TyVarToTy (tvar, Types.Handler ((tvar1,dvar1) , (tvar2,dvar2))) in 
         let cons1 = TyvarHasSkel (ty_p1,sk1) in 
@@ -576,11 +576,11 @@ let rec unify(sub, paused, queue) =
 
     (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
     | (Types.Arrow(a1,(aa1,d1)) , Types.Arrow(a2,(aa2,d2))) ->
- 	let new_ty_coercion_var = Params.fresh_ty_coercion_param () in 
+ 	let new_ty_coercion_var = Params.TyCoercion.fresh () in 
         let new_ty_coercion_var_coer = Typed.TyCoercionVar new_ty_coercion_var in 
-        let new_ty_coercion_var2 = Params.fresh_ty_coercion_param () in 
+        let new_ty_coercion_var2 = Params.TyCoercion.fresh () in 
         let new_ty_coercion_var_coer2 = Typed.TyCoercionVar new_ty_coercion_var2 in
-        let new_dirt_coercion_var = Params.fresh_dirt_coercion_param () in
+        let new_dirt_coercion_var = Params.DirtCoercion.fresh () in
         let new_dirt_coercion_var_coer = Typed.DirtCoercionVar new_dirt_coercion_var in
         let dirty_coercion_c = Typed.BangCoercion (new_ty_coercion_var_coer2, new_dirt_coercion_var_coer) in 
    	let sub1 = CoerTyVarToTyCoercion (omega, Typed.ArrowCoercion (new_ty_coercion_var_coer,dirty_coercion_c)) in 
@@ -592,10 +592,10 @@ let rec unify(sub, paused, queue) =
 
     (* ω : D₁ => C₁ <= D₂ => C₂ *)
     | (Types.Handler((a1,d1),(a11,d11)) , Types.Handler((a2,d2),(a22,d22))) ->
-        let new_ty_coercion_var_1 = Params.fresh_ty_coercion_param () in
-        let new_dirt_coercion_var_2 = Params.fresh_dirt_coercion_param () in 
-        let new_ty_coercion_var_3 = Params.fresh_ty_coercion_param () in 
-        let new_dirt_coercion_var_4 = Params.fresh_dirt_coercion_param () in 
+        let new_ty_coercion_var_1 = Params.TyCoercion.fresh () in
+        let new_dirt_coercion_var_2 = Params.DirtCoercion.fresh () in 
+        let new_ty_coercion_var_3 = Params.TyCoercion.fresh () in 
+        let new_dirt_coercion_var_4 = Params.DirtCoercion.fresh () in 
         let new_ty_coercion_var_coer_1 = Typed.TyCoercionVar new_ty_coercion_var_1 in 
         let new_dirt_coercion_var_coer_2 = Typed.DirtCoercionVar new_dirt_coercion_var_2 in 
         let new_ty_coercion_var_coer_3 = Typed.TyCoercionVar new_ty_coercion_var_3 in 
@@ -657,10 +657,10 @@ let rec unify(sub, paused, queue) =
         unify (sub ,(cons::paused), rest_queue)
         end 
       else begin 
-        let omega'    = Params.fresh_dirt_coercion_param() in
+        let omega'    = Params.DirtCoercion.fresh() in
         let diff_set  = Types.EffectSet.diff s1 s2 in
         let union_set = Types.EffectSet.union s1 s2 in
-        let sub'      = [ DirtVarToDirt(v2, Types.SetVar (diff_set, (Params.fresh_dirt_param ())))
+        let sub'      = [ DirtVarToDirt(v2, Types.SetVar (diff_set, (Params.Dirt.fresh ())))
                         ; CoerDirtVartoDirtCoercion(omega, Typed.UnionDirt (s1, DirtCoercionVar omega'))] in 
         let new_cons  = (Typed.DirtOmega(omega', (Types.SetVar( (Types.EffectSet.empty),v1) , Types.SetVar(union_set,v2)))) in 
         Print.debug "=========End loop============";
@@ -692,7 +692,7 @@ let rec unify(sub, paused, queue) =
    
     (* ω : O₁ <= O₂ ∪ δ₂ *) 
    | (Types.SetEmpty s1, Types.SetVar(s2,v2)) ->
-     let v2' = Params.fresh_dirt_param () in
+     let v2' = Params.Dirt.fresh () in
      let sub1 = [ CoerDirtVartoDirtCoercion (omega, Typed.UnionDirt ( s1, (Typed.Empty (Types.SetVar(Types.EffectSet.diff s2 s1, v2')))));
                   DirtVarToDirt(v2, Types.SetVar ( (Types.EffectSet.diff s1 s2) ,  v2'))] in 
       Print.debug "=========End loop============";

@@ -1,12 +1,12 @@
 (** Syntax of the core language. *)
 
 type e_ty = 
-  | ETyvar of Params.e_ty_param
+  | ETyvar of Params.ETy.t
   | Arrow of e_ty * e_ty
   | Tuple of e_ty list
   | Handler of e_ty * e_ty
   | PrimTy of prim_ty
-  | TySchemeTy of Params.e_ty_param  * e_ty
+  | TySchemeTy of Params.ETy.t  * e_ty
 
  and 
  prim_ty =
@@ -55,7 +55,7 @@ and e_plain_expression =
   | ELambda of (e_pattern * Types.skeleton * e_computation)
   | EEffect of effect
   | EHandler of e_handler
-  | EBigLambdaSkel of Params.skel_param * e_expression
+  | EBigLambdaSkel of Params.Skel.t * e_expression
   | EApplySkelExp of e_expression * Types.skeleton
 
 (** Impure computations *)

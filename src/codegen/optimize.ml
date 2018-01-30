@@ -93,11 +93,11 @@ let rec substitute_pattern_comp st c p exp =
           | Effect of effect
           | Handler of handler
           | BigLambdaTy of Params.ty_param * skeleton * expression
-          | BigLambdaDirt of Params.dirt_param * expression  
-          | BigLambdaSkel of Params.skel_param * expression
+          | BigLambdaDirt of Params.Dirt.t * expression  
+          | BigLambdaSkel of Params.Skel.t * expression
           | ApplyTyExp of expression * Types.target_ty
-          | LambdaTyCoerVar of Params.ty_coercion_param * Types.ct_ty * expression 
-          | LambdaDirtCoerVar of Params.dirt_coercion_param * Types.ct_dirt * expression 
+          | LambdaTyCoerVar of Params.TyCoercion.t * Types.ct_ty * expression 
+          | LambdaDirtCoerVar of Params.DirtCoercion.t * Types.ct_dirt * expression 
           | ApplyDirtExp of expression * Types.dirt
           | ApplySkelExp of expression * Types.skeleton
           | ApplyTyCoercion of expression * ty_coercion

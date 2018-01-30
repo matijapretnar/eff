@@ -29,32 +29,10 @@ module DirtyCoercion = Symbol.Make(Symbol.Parameter(struct
 end))
 
 type ty_param = int
-type dirt_param = Dirt.t
-type ty_coercion_param = TyCoercion.t
-type dirt_coercion_param = DirtCoercion.t
-type dirty_coercion_param = DirtyCoercion.t
-type skel_param = Skel.t
-type e_ty_param = ETy.t
-
 let fresh_ty_param = OldUtils.fresh OldUtils.id
-let fresh_dirt_param = Dirt.fresh
-let fresh_ty_coercion_param = TyCoercion.fresh
-let fresh_dirt_coercion_param = DirtCoercion.fresh
-let fresh_dirty_coercion_param = DirtyCoercion.fresh
-let fresh_skel_param = Skel.fresh
-let fresh_e_ty_param = ETy.fresh
-
 let beautifying_ty_subst () =
   OldUtils.fresh OldUtils.id
-
 let print_ty_param t ppf = Symbols.ty_param t true ppf
-let print_dirt_param = Dirt.print ~safe:false
-let print_ty_coercion_param = TyCoercion.print ~safe:false
-let print_dirt_coercion_param = DirtCoercion.print ~safe:false
-let print_dirty_coercion_param = DirtyCoercion.print ~safe:false
-let print_skel_param = Skel.print ~safe:false
-let print_e_ty_param = ETy.print ~safe:false
-
 let print_type_param t ppf = Format.fprintf ppf "'t%d" t
 let print_old_ty_param ?(poly=[]) k ppf =
   let c = (if List.mem k poly then "'" else "'_") in
