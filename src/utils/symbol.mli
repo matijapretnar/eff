@@ -1,5 +1,4 @@
-module type Annotation =
-sig
+module type Annotation = sig
   type t
 
   val print : bool -> t -> int -> Format.formatter -> unit
@@ -11,17 +10,22 @@ module String : Annotation with type t = string
 
 module Parameter (Param : sig
   val ascii_symbol : string
-  val utf8_symbol : string
-end) : Annotation with type t = unit
 
-module type S =
-sig
+  val utf8_symbol : string
+end) :
+  Annotation with type t = unit
+
+module type S = sig
   type annot
+
   type t
 
   val compare : t -> t -> int
+
   val fresh : annot -> t
+
   val refresh : t -> t
+
   val print : ?safe:bool -> t -> Format.formatter -> unit
 end
 
