@@ -2,11 +2,11 @@
    In order not to confuse them, we define separate types for them.
  *)
 
-let fresh_ty_param = Params.fresh_ty_param
+let fresh_ty_param = Params.Ty.fresh
 
 type ty =
   | Apply of OldUtils.tyname * ty list
-  | TyParam of Params.ty_param
+  | TyParam of Params.Ty.t
   | Basic of string
   | Tuple of ty list
   | Arrow of ty * ty
@@ -35,7 +35,7 @@ let unit_ty = Tuple []
 
 let empty_ty = Apply ("empty", [])
 
-type substitution = (Params.ty_param * ty) list
+type substitution = (Params.Ty.t * ty) list
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 let rec subst_ty sbst ty =
@@ -100,7 +100,7 @@ let refresh params ty =
 (** [beautify ty] returns a sequential replacement of all type parameters in
     [ty] that can be used for its pretty printing. *)
 let beautify (ps, ty) =
-  let next_ty_param = Params.beautifying_ty_subst () in
+  let next_ty_param = Params.Ty.new_fresh () in
   let xs = free_params ty in
   let xs_map = List.map (fun p -> (p, next_ty_param ())) xs in
   let subst ps ps_map =
@@ -129,7 +129,7 @@ let print ((ps as poly), t) ppf =
     | Apply (t, [s]) -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
     | Apply (t, ts) ->
         print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
-    | TyParam p -> print "%t" (Params.print_old_ty_param ~poly:ps p)
+    | TyParam p -> print "%t" (Params.Ty.print_old ~poly:ps p)
     | Tuple [] -> print "unit"
     | Tuple ts ->
         print ~at_level:2 "@[<hov>%t@]"

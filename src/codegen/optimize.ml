@@ -105,7 +105,7 @@ and reduce_expr st e =
           | Lambda of (pattern * Types.target_ty * computation)
           | Effect of effect
           | Handler of handler
-          | BigLambdaTy of Params.ty_param * skeleton * expression
+          | BigLambdaTy of Params.Ty.t * skeleton * expression
           | BigLambdaDirt of Params.Dirt.t * expression  
           | BigLambdaSkel of Params.Skel.t * expression
           | ApplyTyExp of expression * Types.target_ty

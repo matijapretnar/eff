@@ -2,7 +2,7 @@ open Types
 open Typed
 
 module STyVars = Set.Make (struct
-  type t = Params.ty_param
+  type t = Params.Ty.t
 
   let compare = compare
 end)
@@ -12,7 +12,7 @@ let set_of_list = List.fold_left (fun acc x -> STyVars.add x acc) STyVars.empty
 type substitution =
   | CoerTyVarToTyCoercion of (Params.TyCoercion.t * Typed.ty_coercion)
   | CoerDirtVartoDirtCoercion of (Params.DirtCoercion.t * Typed.dirt_coercion)
-  | TyVarToTy of (Params.ty_param * Types.target_ty)
+  | TyVarToTy of (Params.Ty.t * Types.target_ty)
   | DirtVarToDirt of (Params.Dirt.t * Types.dirt)
   | SkelVarToSkel of (Params.Skel.t * Types.skeleton)
 
@@ -28,7 +28,7 @@ let print_sub ?max_level c ppf =
         (Params.DirtCoercion.print p)
         (Typed.print_dirt_coercion d)
   | TyVarToTy (p, t) ->
-      print "%t :-tyvarToTargetty-> %t" (Params.print_ty_param p)
+      print "%t :-tyvarToTargetty-> %t" (Params.Ty.print p)
         (Types.print_target_ty t)
   | DirtVarToDirt (p, d) ->
       print "%t :-dirtvarToTargetdirt-> %t" (Params.Dirt.print p)
@@ -387,13 +387,13 @@ let rec print_s_list = function
 let rec print_var_list = function
   | [] -> Print.debug "---------------------"
   | e :: l ->
-      Print.debug "%t" (Params.print_ty_param e) ;
+      Print.debug "%t" (Params.Ty.print e) ;
       print_var_list l
 
 
 let rec get_skel_of_tyvar tyvar clist =
   Print.debug "getting skeleton of tyvar from list" ;
-  Print.debug " Tyvar : %t" (Params.print_ty_param tyvar) ;
+  Print.debug " Tyvar : %t" (Params.Ty.print tyvar) ;
   Print.debug "Constraint list :" ;
   print_c_list clist ;
   get_skel_of_tyvar_ tyvar clist
@@ -425,7 +425,7 @@ let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
     match OldUtils.lookup x ty_sbst with
     | Some x' -> ((ty_sbst, dirt_sbst), Tyvar x')
     | None ->
-        let y = Params.fresh_ty_param () in
+        let y = Params.Ty.fresh () in
         ((OldUtils.update x y ty_sbst, dirt_sbst), Tyvar y) )
   | Arrow (a, c) ->
       let (a_ty_sbst, a_dirt_sbst), a' =
@@ -480,7 +480,7 @@ and refresh_target_dirt (ty_sbst, dirt_sbst) t =
 
 let rec union_find_tyvar tyvar acc c_list =
   (*   Print.debug "In uf";	
-  Print.debug "The Type Variable : %t" (Params.print_ty_param tyvar);
+  Print.debug "The Type Variable : %t" (Params.Ty.print tyvar);
   Print.debug "The accumilator : -------------";
   print_var_list acc;
   print_c_list c_list;
@@ -571,8 +571,8 @@ let rec unify (sub, paused, queue) =
           unify (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
       (* α : τ₁ -> τ₂ *)
       | SkelArrow (sk1, sk2) ->
-          let ty_p1 = Params.fresh_ty_param () in
-          let ty_p2 = Params.fresh_ty_param () in
+          let ty_p1 = Params.Ty.fresh () in
+          let ty_p2 = Params.Ty.fresh () in
           let tvar1 = Types.Tyvar ty_p1 in
           let tvar2 = Types.Tyvar ty_p2 in
           let d_p1 = Params.Dirt.fresh () in
@@ -587,8 +587,8 @@ let rec unify (sub, paused, queue) =
             , [cons1; cons2] @ apply_sub [sub1] (rest_queue @ paused) )
       (* α : τ₁ => τ₂ *)
       | SkelHandler (sk1, sk2) ->
-          let ty_p1 = Params.fresh_ty_param () in
-          let ty_p2 = Params.fresh_ty_param () in
+          let ty_p1 = Params.Ty.fresh () in
+          let ty_p2 = Params.Ty.fresh () in
           let tvar1 = Types.Tyvar ty_p1 in
           let tvar2 = Types.Tyvar ty_p2 in
           let d_p1 = Params.Dirt.fresh () in

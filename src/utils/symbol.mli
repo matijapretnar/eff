@@ -24,9 +24,13 @@ module type S = sig
 
   val fresh : annot -> t
 
+  val new_fresh : unit -> annot -> t
+
   val refresh : t -> t
 
   val print : ?safe:bool -> t -> Format.formatter -> unit
+
+  val fold : (annot -> int -> 'a) -> t -> 'a
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t

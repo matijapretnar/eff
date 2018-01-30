@@ -14,14 +14,14 @@ type skeleton =
   | ForallSkel of Params.Skel.t * skeleton
 
 and target_ty =
-  | Tyvar of Params.ty_param
+  | Tyvar of Params.Ty.t
   | Arrow of target_ty * target_dirty
   | Tuple of target_ty list
   | Handler of target_dirty * target_dirty
   | PrimTy of prim_ty
   | QualTy of ct_ty * target_ty
   | QualDirt of ct_dirt * target_ty
-  | TySchemeTy of Params.ty_param * skeleton * target_ty
+  | TySchemeTy of Params.Ty.t * skeleton * target_ty
   | TySchemeDirt of Params.Dirt.t * target_ty
   | TySchemeSkel of Params.Skel.t * target_ty
 
@@ -76,7 +76,7 @@ and dirts_are_equal d1 d2 =
 let rec print_target_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
-  | Tyvar p -> Params.print_ty_param p ppf
+  | Tyvar p -> Params.Ty.print p ppf
   | Arrow (t1, (t2, drt)) ->
       print ~at_level:5 "@[%t -%t%s@ %t@]"
         (print_target_ty ~max_level:4 t1)
@@ -97,7 +97,7 @@ let rec print_target_ty ?max_level ty ppf =
   | QualDirt (c, tty) ->
       print "%t => %t" (print_ct_dirt c) (print_target_ty tty)
   | TySchemeTy (p, sk, tty) ->
-      print "ForallTy (%t:%t). %t" (Params.print_ty_param p)
+      print "ForallTy (%t:%t). %t" (Params.Ty.print p)
         (print_skeleton sk) (print_target_ty tty)
   | TySchemeDirt (p, tty) ->
       print "ForallDirt %t. %t" (Params.Dirt.print p) (print_target_ty tty)

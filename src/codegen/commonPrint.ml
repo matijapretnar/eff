@@ -6,7 +6,7 @@ let rec print_type ?max_level ty ppf =
   | Type.Apply ("empty", _) -> print "unit"
   | Type.Apply (ty_name, args) ->
       print ~at_level:1 "%t %s" (print_args args) ty_name
-  | Type.TyParam p -> print "%t" (Params.print_ty_param p)
+  | Type.TyParam p -> print "%t" (Params.Ty.print p)
   | Type.Basic t -> print "(%s)" t
   | Type.Tuple tys ->
       print ~at_level:1 "(%t)" (Print.sequence "*" print_type tys)

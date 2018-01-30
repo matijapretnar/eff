@@ -52,9 +52,13 @@ module type S = sig
 
   val fresh : annot -> t
 
+  val new_fresh : unit -> annot -> t
+
   val refresh : t -> t
 
   val print : ?safe:bool -> t -> Format.formatter -> unit
+
+  val fold : (annot -> int -> 'a) -> t -> 'a
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t = struct
@@ -64,11 +68,17 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
 
   let compare (n1, _) (n2, _) = Pervasives.compare n1 n2
 
-  let count = ref 0
+  let new_fresh () =
+    let count = ref 0 in
+    let fresh ann = incr count ; (!count, ann) in
+    fresh
 
-  let fresh ann = incr count ; (!count, ann)
 
-  let refresh (_, ann) = incr count ; (!count, ann)
+  let fresh = new_fresh ()
+
+  let refresh (_, ann) = fresh ann
 
   let print ?(safe= false) (n, ann) ppf = Annot.print safe ann n ppf
+
+  let fold f (n, ann) = f ann n
 end

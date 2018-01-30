@@ -1,3 +1,23 @@
+module Ty = struct
+  include Symbol.Make (Symbol.Parameter (struct
+  let ascii_symbol = "ty"
+
+  let utf8_symbol = "\207\132"
+  end))
+
+  let print_type_param t ppf = fold (
+    fun _ n -> Format.fprintf ppf "'t%d" n
+  ) t
+
+  let print_old ?(poly= []) k ppf = 
+    let c = if List.mem k poly then "'" else "'_" in
+    fold (fun _ k ->
+      if 0 <= k && k <= 25 then
+        Format.fprintf ppf "%s%c" c (char_of_int (k + int_of_char 'a'))
+      else Format.fprintf ppf "%sty%i" c (k - 25)
+    ) k
+end
+
 module ETy = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "ety"
 
@@ -33,25 +53,3 @@ module DirtyCoercion = Symbol.Make (Symbol.Parameter (struct
 
   let utf8_symbol = "dirtycoer"
 end))
-
-type ty_param = int
-
-let beautifying_ty_subst () =
-  let counter = ref (-1) in
-  fun () ->
-    incr counter ;
-    assert (!counter >= 0) ;
-    !counter
-
-
-let fresh_ty_param = beautifying_ty_subst ()
-
-let print_ty_param t ppf = Symbols.ty_param t true ppf
-
-let print_type_param t ppf = Format.fprintf ppf "'t%d" t
-
-let print_old_ty_param ?(poly= []) k ppf =
-  let c = if List.mem k poly then "'" else "'_" in
-  if 0 <= k && k <= 25 then
-    Format.fprintf ppf "%s%c" c (char_of_int (k + int_of_char 'a'))
-  else Format.fprintf ppf "%sty%i" c (k - 25)

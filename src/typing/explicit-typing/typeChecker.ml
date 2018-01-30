@@ -7,10 +7,10 @@ type ('term, 'ttype) target_term =
 
 type checker_state =
   { term_vars: (Typed.variable, Types.target_ty) OldUtils.assoc
-  ; type_vars: Params.ty_param list
+  ; type_vars: Params.Ty.t list
   ; dirt_vars: Params.Dirt.t list
   ; skel_vars: Params.Skel.t list
-  ; tvhasskel: (Params.ty_param, Types.skeleton) OldUtils.assoc
+  ; tvhasskel: (Params.Ty.t, Types.skeleton) OldUtils.assoc
   ; omega_ty: (Params.TyCoercion.t, Types.ct_ty) OldUtils.assoc
   ; omega_dirt: (Params.DirtCoercion.t, Types.ct_dirt) OldUtils.assoc
   ; omega_dirty:

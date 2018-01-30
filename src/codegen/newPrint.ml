@@ -8,7 +8,7 @@
   | Erasure.Apply (ty_name, args) ->
     print ~at_level:1 "%t %s" (print_args args) ty_name
   | Erasure.TyParam p ->
-    print "%t" (Params.print_ty_param p)
+    print "%t" (Params.Ty.print p)
   | Erasure.Basic t ->
     print "(%s)" t
   | Erasure.Tuple tys ->

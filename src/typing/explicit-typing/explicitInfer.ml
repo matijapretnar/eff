@@ -3,7 +3,7 @@ module Typed = Typed
 module Untyped = CoreSyntax
 
 module TyVarSet = Set.Make (struct
-  type t = Params.ty_param
+  type t = Params.Ty.t
 
   let compare = compare
 end)
@@ -322,7 +322,7 @@ let splitter st constraints simple_ty =
   let simple_ty_freevars_ty = set_of_ty_list (free_ty_vars_ty simple_ty) in
   Print.debug "Simple type free vars: " ;
   List.iter
-    (fun x -> Print.debug "%t" (Params.print_ty_param x))
+    (fun x -> Print.debug "%t" (Params.Ty.print x))
     (free_ty_vars_ty simple_ty) ;
   let simple_ty_freevars_dirt =
     set_of_dirt_list (free_dirt_vars_ty simple_ty)
@@ -330,7 +330,7 @@ let splitter st constraints simple_ty =
   let state_freevars_ty = set_of_ty_list (state_free_ty_vars st) in
   Print.debug "state free vars: " ;
   List.iter
-    (fun x -> Print.debug "%t" (Params.print_ty_param x))
+    (fun x -> Print.debug "%t" (Params.Ty.print x))
     (state_free_ty_vars st) ;
   let state_freevars_dirt = set_of_dirt_list (state_free_dirt_vars st) in
   (*   let cons2 = List.filter (fun cons -> 
@@ -386,7 +386,7 @@ let splitter st constraints simple_ty =
          state_freevars_dirt)
   in
   Print.debug "Splitter output free_ty_vars: " ;
-  List.iter (fun x -> Print.debug "%t" (Params.print_ty_param x)) alpha_list ;
+  List.iter (fun x -> Print.debug "%t" (Params.Ty.print x)) alpha_list ;
   Print.debug "Splitter output free_dirt_vars: " ;
   List.iter (fun x -> Print.debug "%t" (Params.Dirt.print x)) delta_list ;
   Print.debug "Splitter first constraints list :" ;
@@ -403,7 +403,7 @@ let rec get_sub_of_ty ty_sch =
       let skels, tys, dirts = get_sub_of_ty t in
       ((s, new_s) :: skels, tys, dirts)
   | Types.TySchemeTy (p, _, t) ->
-      let new_p = Params.fresh_ty_param () in
+      let new_p = Params.Ty.fresh () in
       let skels, tys, dirts = get_sub_of_ty t in
       (skels, (p, new_p) :: tys, dirts)
   | Types.TySchemeDirt (p, t) ->
@@ -545,7 +545,7 @@ let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
 
 
 let fresh_ty_with_skel () =
-  let ty_var = Params.fresh_ty_param () and skel_var = Params.Skel.fresh () in
+  let ty_var = Params.Ty.fresh () and skel_var = Params.Skel.fresh () in
   (Types.Tyvar ty_var, Typed.TyvarHasSkel (ty_var, Types.SkelVar skel_var))
 
 
@@ -1127,7 +1127,7 @@ and get_handler_op_clause eff abs2 in_st in_cons in_sub =
   let x, k, c_op = abs2 in
   let Untyped.PVar x_var = x.Untyped.term in
   let Untyped.PVar k_var = k.Untyped.term in
-  let alpha_i_param = Params.fresh_ty_param () in
+  let alpha_i_param = Params.Ty.fresh () in
   let alpha_i, alpha_cons = fresh_ty_with_skel () in
   let alpha_dirty = make_dirty alpha_i in
   let st_subbed = apply_sub_to_env in_st in_sub in

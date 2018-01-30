@@ -48,7 +48,7 @@ and plain_expression =
   | Lambda of (pattern * Types.target_ty * computation)
   | Effect of effect
   | Handler of handler
-  | BigLambdaTy of Params.ty_param * skeleton * expression
+  | BigLambdaTy of Params.Ty.t * skeleton * expression
   | BigLambdaDirt of Params.Dirt.t * expression
   | BigLambdaSkel of Params.Skel.t * expression
   | CastExp of expression * ty_coercion
@@ -85,7 +85,7 @@ and ty_coercion =
   | SequenceTyCoer of ty_coercion * ty_coercion
   | TupleCoercion of ty_coercion list
   | LeftArrow of ty_coercion
-  | ForallTy of Params.ty_param * ty_coercion
+  | ForallTy of Params.Ty.t * ty_coercion
   | ApplyTyCoer of ty_coercion * target_ty
   | ForallDirt of Params.Dirt.t * ty_coercion
   | ApplyDirCoer of ty_coercion * dirt
@@ -129,7 +129,7 @@ type omega_ct =
   | TyOmega of (Params.TyCoercion.t * Types.ct_ty)
   | DirtOmega of (Params.DirtCoercion.t * Types.ct_dirt)
   | SkelEq of skeleton * skeleton
-  | TyvarHasSkel of (Params.ty_param * skeleton)
+  | TyvarHasSkel of (Params.Ty.t * skeleton)
 
 type toplevel = (plain_toplevel * Location.t)
 
@@ -200,7 +200,7 @@ let rec print_expression ?max_level e ppf =
   | CastExp (e1, tc) ->
       print "(%t) |> [%t]" (print_expression e1) (print_ty_coercion tc)
   | BigLambdaTy (p, s, e) ->
-      print "BigLambda_ty_%t:%t. %t " (Params.print_ty_param p)
+      print "BigLambda_ty_%t:%t. %t " (Params.Ty.print p)
         (print_skeleton s) (print_expression e)
   | BigLambdaDirt (p, e) ->
       print "BigLambda_dirt_%t. %t " (Params.Dirt.print p) (print_expression e)
@@ -332,7 +332,7 @@ and print_omega_ct ?max_level c ppf =
   | SkelEq (sk1, sk2) ->
       print "%t ~ %t" (Types.print_skeleton sk1) (Types.print_skeleton sk2)
   | TyvarHasSkel (tp, sk1) ->
-      print "%t : %t" (Params.print_ty_param tp) (Types.print_skeleton sk1)
+      print "%t : %t" (Params.Ty.print tp) (Types.print_skeleton sk1)
 
 
 and print_effect_clauses eff_clauses ppf =

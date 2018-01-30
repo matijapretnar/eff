@@ -8,14 +8,14 @@ type skeleton =
   | ForallSkel of Params.Skel.t * skeleton
 
 and target_ty =
-  | Tyvar of Params.ty_param
+  | Tyvar of Params.Ty.t
   | Arrow of target_ty * target_dirty
   | Tuple of target_ty list
   | Handler of target_dirty * target_dirty
   | PrimTy of prim_ty
   | QualTy of ct_ty * target_ty
   | QualDirt of ct_dirt * target_ty
-  | TySchemeTy of Params.ty_param * skeleton * target_ty
+  | TySchemeTy of Params.Ty.t * skeleton * target_ty
   | TySchemeDirt of Params.Dirt.t * target_ty
   | TySchemeSkel of Params.Skel.t * target_ty
 
