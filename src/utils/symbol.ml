@@ -12,6 +12,25 @@ struct
   let print _ _ n ppf = Format.pp_print_int ppf n
 end
 
+module type Parameter =
+sig
+  val ascii_symbol : string
+  val utf8_symbol : string
+end
+
+module Parameter (Param : sig
+  val ascii_symbol : string
+  val utf8_symbol : string
+end) : Annotation with type t = unit =
+struct
+  type t = unit
+
+  let print _ _ n ppf =
+    let symbol = if !Config.ascii then Param.ascii_symbol else Param.utf8_symbol
+    in
+    Print.print ppf "%s%s" symbol (Symbols.subscript (Some (n + 1)))
+end
+
 module String : Annotation with type t = string =
 struct
   type t = string

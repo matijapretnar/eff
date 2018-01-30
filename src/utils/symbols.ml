@@ -21,10 +21,4 @@ let param ascii_symbol utf8_symbol index poly ppf =
   in
   Print.print ppf "%s%s%s" prefix symbol (subscript (Some (index + 1)))
 
-let e_ty_param = param "ety" "eτ"
 let ty_param = param "ty" "τ"
-let dirt_param = param "drt" "δ"
-let skel_param = param "skl" "s"
-let ty_coercion_param = param "tycoer" "τycoer"
-let dirt_coercion_param = param "dirtcoer" "dirtcoer"
-let dirty_coercion_param = param "dirtycoer" "dirtycoer"
