@@ -29,9 +29,15 @@ module DirtyCoercion = Symbol.Make(Symbol.Parameter(struct
 end))
 
 type ty_param = int
-let fresh_ty_param = OldUtils.fresh OldUtils.id
+
 let beautifying_ty_subst () =
-  OldUtils.fresh OldUtils.id
+  let counter = ref (-1) in
+  fun () ->
+    incr counter;
+    assert (!counter >= 0);
+    !counter
+let fresh_ty_param = beautifying_ty_subst ()
+
 let print_ty_param t ppf = Symbols.ty_param t true ppf
 let print_type_param t ppf = Format.fprintf ppf "'t%d" t
 let print_old_ty_param ?(poly=[]) k ppf =
