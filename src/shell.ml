@@ -1,5 +1,9 @@
 let help_text =
-  "Toplevel commands:\n#type <expr>;;     print the type of <expr> without evaluating it\n#reset;;           forget all definitions (including pervasives)\n#help;;            print this help\n#quit;;            exit eff\n#use \"<file>\";;  load commands from file\n"
+  "Toplevel commands:\n"
+  ^ "#type <expr>;;     print the type of <expr> without evaluating it\n"
+  ^ "#reset;;           forget all definitions (including pervasives)\n"
+  ^ "#help;;            print this help\n" ^ "#quit;;            exit eff\n"
+  ^ "#use \"<file>\";;  load commands from file\n"
 
 
 type state =
