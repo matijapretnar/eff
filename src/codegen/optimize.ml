@@ -118,13 +118,10 @@ let rec substitute_pattern_comp st c p exp =
           | LetRec (bindings, c1)             -> c
           | Match (e1, abstractions)          -> c
           | Apply (e1, e2)                    -> 
-            Print.debug "reduce_comp (Apply (e1,e2)";
             begin match e1 with
             | {term = Lambda (p,ty,c)}     -> 
-                 Print.debug "e1 is a lambda";
                  beta_reduce st (annotate (p,ty,c) e1.location) e2
             | _                            -> 
-                 Print.debug "e1 is not a lambda"; (* TODO: support case where it's a cast of a lambda *)
                  c
             end
           | Handle (e1, c1)                   -> c
@@ -237,12 +234,6 @@ let rec substitute_pattern_comp st c p exp =
         in
         reduce_comp st res
     end
-
-  | Apply ({term = Lambda a}, e) ->
-    useFuel st;
-    st.optimization_App_Fun := !(st.optimization_App_Fun ) + 1;
-    st.optimization_total := !(st.optimization_total) + 1;
-    beta_reduce st a e
 
   | Handle (e1, {term = Apply (ae1, ae2)}) ->
     useFuel st;
