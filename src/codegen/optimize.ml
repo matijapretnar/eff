@@ -62,6 +62,9 @@ and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
 
 and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
 
+and optimize_abs st {term = (p, c); location = loc} =
+  {term = (p,optimize_comp st c); location = loc}
+
 and optimize_sub_expr st e =
   let loc = e.location in
   let plain_e' =
@@ -84,8 +87,8 @@ and optimize_sub_comp st c =
     | Handle (e1, c1) -> Handle (optimize_expr st e1, optimize_comp st c1)
     | Call (op, e1, a_w_ty) -> Call (op, optimize_expr st e1, assert false)
     | Op (op, e1) -> Op (op, optimize_expr st e1)
-    | Bind (c1, abstraction) -> Bind (optimize_comp st c1, assert false)
-    | CastComp (c1, dirty_coercion) -> assert false
+    | Bind (c1, abstraction) -> Bind (optimize_comp st c1, optimize_abs st abstraction)
+    | CastComp (c1, dirty_coercion) -> CastComp (optimize_comp st c1, dirty_coercion)
     | CastComp_ty (c1, ty_coercion) -> assert false
     | CastComp_dirt (c1, dirt_coercion) -> assert false
   in
@@ -145,8 +148,18 @@ and reduce_comp st c =
   | Handle (e1, c1) -> c
   | Call (op, e1, a_w_ty) -> c
   | Op (op, e1) -> c
-  | Bind (c1, abstraction) -> c
-  | CastComp (c1, dirty_coercion) -> c
+  | Bind (c1, abstraction2) -> 
+      begin match c1 with
+      | {term = Bind (c11, {term = (p1, c12)})} ->
+          let c2' = reduce_comp st { term = Bind (c12,abstraction2); location = c12.location} in
+          reduce_comp st {term = Bind (c11, {term = (p1, c2'); location = c.location }) ; location  = c.location} 
+      | _ -> c
+      end 
+  | CastComp (c1, dirty_coercion) -> 
+      let dty1, dty2 = TypeChecker.type_check_dirty_coercion TypeChecker.new_checker_state dirty_coercion in
+       if Types.dirty_types_are_equal dty1 dty2
+         then c1
+         else c
   | CastComp_ty (c1, ty_coercion) -> c
   | CastComp_dirt (c1, dirt_coercion) -> c
 
@@ -162,15 +175,6 @@ and reduce_comp st c =
     in
     find_const_case cases
 
-  | Bind ({term = Bind (c1, {term = (p1, c2)})}, c3) ->
-    useFuel st;
-    st.optimization_Do_Op := !(st.optimization_Do_Op) + 1;
-    st.optimization_total := !(st.optimization_total) + 1;
-    let bind_c2_c3 = reduce_comp st (bind c2 c3) in
-    let res =
-      bind c1 (abstraction p1 bind_c2_c3)
-    in
-    reduce_comp st res
 
   | Bind ({term = Call (eff, param, k)}, c) ->
     useFuel st;
