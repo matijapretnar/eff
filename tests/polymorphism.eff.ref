@@ -6,7 +6,7 @@ val u : 'a list = []
 - : int list * string list = ([1], ["foo"])
 val v : 'a list list = [[]]
 - : 'a list list * int list list = ([[]; []], [[2]; []])
-- : 'a -> 'a
-- : 'a -> 'a
+- : 'a -> 'a = <fun>
+- : 'a -> 'a = <fun>
 val u : 'a -> 'b = <fun>
-- : 'a -> 'b
+- : 'a -> 'b = <fun>
