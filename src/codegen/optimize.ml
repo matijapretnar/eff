@@ -1,49 +1,52 @@
 open Types
 open Typed
 
-type state = { 
-  fuel : int ref
-}
+type state = {fuel: int ref}
 
-let inititial_state = {
-  fuel = ref (!(Config.optimization_fuel));
-}
-
+let inititial_state = {fuel= ref !Config.optimization_fuel}
 
 let is_atomic e =
-  match e.term with | Var _ -> true | Const _ -> true | _ -> false
+  match e.term with Var _ -> true | Const _ -> true | _ -> false
+
 
 type inlinability =
-  | NotInlinable (* Pattern variables occur more than once or inside a binder *)
-  | NotPresent   (* Pattern variables are not present in the body *)
-  | Inlinable    (* Pattern variables occur each at most once outside a binder *)
+  | NotInlinable
+  (* Pattern variables occur more than once or inside a binder *)
+  | NotPresent
+  (* Pattern variables are not present in the body *)
+  | Inlinable
+
+(* Pattern variables occur each at most once outside a binder *)
 
 let applicable_pattern p vars =
   let rec check_variables = function
     | [] -> NotPresent
     | x :: xs ->
-      let inside_occ, outside_occ = Typed.occurrences x vars in
-      if inside_occ > 0 || outside_occ > 1 then
-        NotInlinable
-      else
-        begin match check_variables xs with
+        let inside_occ, outside_occ = Typed.occurrences x vars in
+        if inside_occ > 0 || outside_occ > 1 then NotInlinable
+        else
+          match check_variables xs with
           | NotPresent -> if outside_occ = 0 then NotPresent else Inlinable
           | inlinability -> inlinability
-        end
   in
   check_variables (Typed.pattern_vars p)
 
+
 let rec substitute_pattern_comp st c p exp =
-          optimize_comp st (Typed.subst_comp (Typed.pattern_match p exp) c)
-    and beta_reduce st ({term = (p, ty, c)} as a) e =
-          match applicable_pattern p (Typed.free_vars_comp c) with
-          | Inlinable                     -> substitute_pattern_comp st c p e
-          | NotPresent                    -> c
-          | NotInlinable when is_atomic e -> 
-              Print.debug "beta_reduce not-inlinable is_atomci";
-              substitute_pattern_comp st c p e
-          | NotInlinable                  -> {term=LetVal (e,(p,ty,c)); location=a.location}
-            (*
+  optimize_comp st (Typed.subst_comp (Typed.pattern_match p exp) c)
+
+
+and beta_reduce st ({term= p, ty, c} as a) e =
+  match applicable_pattern p (Typed.free_vars_comp c) with
+  | Inlinable -> substitute_pattern_comp st c p e
+  | NotPresent -> c
+  | NotInlinable when is_atomic e ->
+      Print.debug "beta_reduce not-inlinable is_atomci" ;
+      substitute_pattern_comp st c p e
+  | NotInlinable -> {term= LetVal (e, (p, ty, c)); location= a.location}
+
+
+(*
             let a =
               begin match p with
                 | {term = Typed.PVar x} ->
@@ -55,34 +58,44 @@ let rec substitute_pattern_comp st c p exp =
             in
             let_in e a
              *)
+and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
 
-    and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
-    and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
-    and optimize_sub_expr st e =
-          let loc = e.location in
-          let plain_e' = match e.term with
-          | plain_e -> plain_e (* TODO: implement *)
-          in {term=plain_e';location=loc}
-    and optimize_sub_comp st c =
-          let loc = c.location in
-          let plain_c' = match c.term with
-          | Value e1                          -> Value (optimize_expr st e1)
-          | LetVal (e1, (p, ty, c1))          -> LetVal (optimize_expr st e1,(p, ty, optimize_comp st c1))
-          | LetRec (bindings, c1)             -> assert false
-          | Match (e1, abstractions)          -> assert false
-          | Apply (e1, e2)                    -> Apply (optimize_expr st e1, optimize_expr st e2)
-          | Handle (e1, c1)                   -> Handle (optimize_expr st e1, optimize_comp st c1)
-          | Call (op, e1, a_w_ty)             -> Call (op, optimize_expr st e1, assert false)
-          | Op (op, e1)                       -> Op (op, optimize_expr st e1)
-          | Bind (c1, abstraction)            -> Bind (optimize_comp st c1, assert false)
-          | CastComp (c1, dirty_coercion)     -> assert false
-          | CastComp_ty (c1, ty_coercion)     -> assert false
-          | CastComp_dirt (c1, dirt_coercion) -> assert false
-          in {term=plain_c';location=loc}
-    and reduce_expr st e =
-          Print.debug "reduce_exp %t" (Typed.print_expression e);
-          match e.term with
-          (*
+and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
+
+and optimize_sub_expr st e =
+  let loc = e.location in
+  let plain_e' =
+    match e.term with plain_e -> plain_e
+    (* TODO: implement *)
+  in
+  {term= plain_e'; location= loc}
+
+
+and optimize_sub_comp st c =
+  let loc = c.location in
+  let plain_c' =
+    match c.term with
+    | Value e1 -> Value (optimize_expr st e1)
+    | LetVal (e1, (p, ty, c1)) ->
+        LetVal (optimize_expr st e1, (p, ty, optimize_comp st c1))
+    | LetRec (bindings, c1) -> assert false
+    | Match (e1, abstractions) -> assert false
+    | Apply (e1, e2) -> Apply (optimize_expr st e1, optimize_expr st e2)
+    | Handle (e1, c1) -> Handle (optimize_expr st e1, optimize_comp st c1)
+    | Call (op, e1, a_w_ty) -> Call (op, optimize_expr st e1, assert false)
+    | Op (op, e1) -> Op (op, optimize_expr st e1)
+    | Bind (c1, abstraction) -> Bind (optimize_comp st c1, assert false)
+    | CastComp (c1, dirty_coercion) -> assert false
+    | CastComp_ty (c1, ty_coercion) -> assert false
+    | CastComp_dirt (c1, dirt_coercion) -> assert false
+  in
+  {term= plain_c'; location= loc}
+
+
+and reduce_expr st e =
+  Print.debug "reduce_exp %t" (Typed.print_expression e) ;
+  match e.term with
+  (*
           | Var of variable
           | BuiltIn of string * int
           | Const of Const.t
@@ -92,45 +105,50 @@ let rec substitute_pattern_comp st c p exp =
           | Lambda of (pattern * Types.target_ty * computation)
           | Effect of effect
           | Handler of handler
-          | BigLambdaTy of Params.ty_param * skeleton * expression
-          | BigLambdaDirt of Params.dirt_param * expression  
-          | BigLambdaSkel of Params.skel_param * expression
+          | BigLambdaTy of Params.Ty.t * skeleton * expression
+          | BigLambdaDirt of Params.Dirt.t * expression  
+          | BigLambdaSkel of Params.Skel.t * expression
           | ApplyTyExp of expression * Types.target_ty
-          | LambdaTyCoerVar of Params.ty_coercion_param * Types.ct_ty * expression 
-          | LambdaDirtCoerVar of Params.dirt_coercion_param * Types.ct_dirt * expression 
+          | LambdaTyCoerVar of Params.TyCoercion.t * Types.ct_ty * expression 
+          | LambdaDirtCoerVar of Params.DirtCoercion.t * Types.ct_dirt * expression 
           | ApplyDirtExp of expression * Types.dirt
           | ApplySkelExp of expression * Types.skeleton
           | ApplyTyCoercion of expression * ty_coercion
           | ApplyDirtCoercion of expression * dirt_coercion
           | ApplyTyCoercion (e1,ty_co) ->
           *)
-          | CastExp (e1, ty_co) ->
-              Print.debug "reduce_exp (ApplyTyCoercion (e1,ty_co))";
-              let (ty1,ty2) = TypeChecker.type_check_ty_coercion TypeChecker.new_checker_state ty_co in
-              if (Types.types_are_equal ty1 ty2)
-                then e1
-                else e
-          | plain_e -> e
-    and reduce_comp st c =
-          match c.term with
-          | Value _                           -> c
-          | LetVal (e1, (p, ty, c1))          -> c
-          | LetRec (bindings, c1)             -> c
-          | Match (e1, abstractions)          -> c
-          | Apply (e1, e2)                    -> 
-            begin match e1 with
-            | {term = Lambda (p,ty,c)}     -> 
-                 beta_reduce st (annotate (p,ty,c) e1.location) e2
-            | _                            -> 
-                 c
-            end
-          | Handle (e1, c1)                   -> c
-          | Call (op, e1, a_w_ty)             -> c
-          | Op (op, e1)                       -> c
-          | Bind (c1, abstraction)            -> c
-          | CastComp (c1, dirty_coercion)     -> c
-          | CastComp_ty (c1, ty_coercion)     -> c
-          | CastComp_dirt (c1, dirt_coercion) -> c
+  | CastExp (e1, ty_co) ->
+      Print.debug "reduce_exp (ApplyTyCoercion (e1,ty_co))" ;
+      let ty1, ty2 =
+        TypeChecker.type_check_ty_coercion TypeChecker.new_checker_state ty_co
+      in
+      if Types.types_are_equal ty1 ty2 then e1 else e
+  | plain_e -> e
+
+
+and reduce_comp st c =
+  match c.term with
+  | Value _ -> c
+  | LetVal (e1, (p, ty, c1)) -> c
+  | LetRec (bindings, c1) -> c
+  | Match (e1, abstractions) -> c
+  | Apply (e1, e2) -> (
+      Print.debug "reduce_comp (Apply (e1,e2)" ;
+      match e1 with
+      | {term= Lambda (p, ty, c)} ->
+          Print.debug "e1 is a lambda" ;
+          beta_reduce st (annotate (p, ty, c) e1.location) e2
+      | _ ->
+          Print.debug "e1 is not a lambda" ;
+          (* TODO: support case where it's a cast of a lambda *)
+          c )
+  | Handle (e1, c1) -> c
+  | Call (op, e1, a_w_ty) -> c
+  | Op (op, e1) -> c
+  | Bind (c1, abstraction) -> c
+  | CastComp (c1, dirty_coercion) -> c
+  | CastComp_ty (c1, ty_coercion) -> c
+  | CastComp_dirt (c1, dirt_coercion) -> c
 
 (*
   | _ when outOfFuel st -> c
@@ -421,9 +439,7 @@ let rec substitute_pattern_comp st c p exp =
   c'
 *)
 
-let optimize_main_comp c = 
-  optimize_comp inititial_state c
-
+let optimize_main_comp c = optimize_comp inititial_state c
 
 (*
  To Do list for optimization :
@@ -432,7 +448,6 @@ let optimize_main_comp c =
 
 *)
 (* open Typed *)
-
 (*
 
 let x = Types.PrimTy BoolTy;;

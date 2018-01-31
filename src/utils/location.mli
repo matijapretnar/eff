@@ -8,17 +8,17 @@
 (** Type of locations. *)
 type t
 
-(** Print a location. *)
 val print : t -> Format.formatter -> unit
+(** Print a location. *)
 
-(** Unknown location. *)
 val unknown : t
+(** Unknown location. *)
 
-(** Make a location from two lexing positions. *)
 val make : Lexing.position -> Lexing.position -> t
+(** Make a location from two lexing positions. *)
 
-(** Computes the smallest location containing all known locations in the list. *)
 val union : t list -> t
+(** Computes the smallest location containing all known locations in the list. *)
 
-(** Get the location of the current lexeme in a lexing buffer. *)
 val of_lexeme : Lexing.lexbuf -> t
+(** Get the location of the current lexeme in a lexing buffer. *)
