@@ -168,6 +168,8 @@ let compile_file ppf filename st =
           if !Config.disable_optimization then ct
           else Optimize.optimize_main_comp ct
         in
+        Print.debug "-- Before Erasure ------------------------------------------";
+        Print.debug "%t" (Typed.print_computation ct);
         let erasure_ct = Erasure.typed_to_erasure_comp [] ct in
         NewPrint.print_computation erasure_ct out_ppf ;
         Format.fprintf out_ppf "\n;;\n " ;
