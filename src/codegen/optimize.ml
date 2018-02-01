@@ -31,6 +31,79 @@ let applicable_pattern p vars =
   in
   check_variables (Typed.pattern_vars p)
 
+let rec optimize_ty_coercion st tyco =
+  reduce_ty_coercion st (optimize_sub_ty_coercion st tyco)
+
+and optimize_dirty_coercion st dtyco =
+  reduce_dirty_coercion st (optimize_sub_dirty_coercion st dtyco)
+
+and optimize_dirt_coercion st dco =
+  reduce_dirt_coercion st (optimize_sub_dirt_coercion st dco)
+
+and optimize_sub_ty_coercion st tyco =
+  match tyco with
+  | ReflTy ty -> tyco
+  | ArrowCoercion (tyco1,dtyco2) -> ArrowCoercion ((optimize_ty_coercion st tyco1),(optimize_dirty_coercion st dtyco2)) 
+  | HandlerCoercion (dtyco1,dtyco2) -> HandlerCoercion (optimize_dirty_coercion st dtyco1,(optimize_dirty_coercion st dtyco2)) 
+  | TyCoercionVar tycovar -> TyCoercionVar tycovar 
+  | SequenceTyCoer (tyco1,tyco2) -> SequenceTyCoer ((optimize_ty_coercion st tyco1),(optimize_ty_coercion st tyco2))  
+  | TupleCoercion tycos -> TupleCoercion tycos 
+  | LeftArrow tyco1 -> LeftArrow (optimize_ty_coercion st tyco1) 
+  | ForallTy (tv,tyco1) -> ForallTy (tv,(optimize_ty_coercion st tyco1)) 
+  | ApplyTyCoer (tyco1,ty) -> ApplyTyCoer ((optimize_ty_coercion st tyco1),ty) 
+  | ForallDirt (dv,tyco1) -> ForallDirt (dv,(optimize_ty_coercion st tyco1)) 
+  | ApplyDirCoer (tyco1,d) -> ApplyDirCoer ((optimize_ty_coercion st tyco1),d) 
+  | PureCoercion (dtyco1) -> PureCoercion (optimize_dirty_coercion st dtyco1) 
+  | QualTyCoer (ct_ty,tyco1) -> QualTyCoer (ct_ty,(optimize_ty_coercion st tyco1)) 
+  | QualDirtCoer (ct_dirt,tyco1) -> QualDirtCoer (ct_dirt,(optimize_ty_coercion st tyco1)) 
+  | ApplyQualTyCoer (tyco1,tyco2) -> ApplyQualTyCoer ((optimize_ty_coercion st tyco1),(optimize_ty_coercion st tyco2)) 
+  | ApplyQualDirtCoer (tyco1,dco) -> ApplyQualDirtCoer ((optimize_ty_coercion st tyco1),(optimize_sub_dirt_coercion st dco)) 
+  | ForallSkel (sv,tyco1) -> ForallSkel (sv,(optimize_ty_coercion st tyco1)) 
+  | ApplySkelCoer (tyco1,sk) -> ApplySkelCoer ((optimize_ty_coercion st tyco1),sk) 
+
+and optimize_sub_dirty_coercion st dtyco =
+  dtyco
+
+and optimize_sub_dirt_coercion st dco =
+  dco
+
+and reduce_ty_coercion st tyco =
+  match tyco with
+  | ReflTy ty -> tyco
+  | ArrowCoercion (tyco1,dtyco2) -> tyco
+  | HandlerCoercion (dtyco1,dtyco2) -> tyco
+  | TyCoercionVar tycovar -> tyco
+  | SequenceTyCoer (tyco1,tyco2) -> tyco 
+  | TupleCoercion tycos -> tyco
+  | LeftArrow tyco1 -> tyco
+  | ForallTy (tv,tyco1) -> tyco
+  | ApplyTyCoer (tyco1,ty) -> tyco
+  | ForallDirt (dv,tyco1) -> tyco
+  | ApplyDirCoer (tyco1,d) -> tyco
+  | PureCoercion (dtyco1) -> tyco
+  | QualTyCoer (ct_ty,tyco1) -> tyco
+  | QualDirtCoer (ct_dirt,tyco1) -> tyco
+  | ApplyQualTyCoer (tyco1,tyco2) -> tyco
+  | ApplyQualDirtCoer (tyco1,dco) -> tyco
+  | ForallSkel (sv,tyco1) -> tyco
+  | ApplySkelCoer (tyco1,sk) -> tyco
+
+and reduce_dirty_coercion st dtyco =
+  match dtyco with
+  | BangCoercion (tyco1,dco2) -> dtyco
+  | RightArrow tyco1 -> dtyco
+  | RightHandler tyco1 -> dtyco
+  | LeftHandler tyco1 -> dtyco
+  | SequenceDirtyCoer (dtyco1,dtyco2) -> dtyco
+
+and reduce_dirt_coercion st dco =
+  match dco with
+  | ReflDirt d -> dco
+  | DirtCoercionVar (dcov) -> dco
+  | Empty d -> dco
+  | UnionDirt (ops,dco1) -> dco
+  | SequenceDirtCoer (dco1,dco2) -> dco
+  | DirtCoercion dtyco -> dco
 
 let rec substitute_pattern_comp st c p exp =
   optimize_comp st (Typed.subst_comp (Typed.pattern_match p exp) c)
@@ -66,13 +139,32 @@ and optimize_abs st {term = (p, c); location = loc} =
   {term = (p,optimize_comp st c); location = loc}
 
 and optimize_sub_expr st e =
-  let loc = e.location in
   let plain_e' =
-    match e.term with plain_e -> plain_e
-    (* TODO: implement *)
+    match e.term with 
+    | Handler h           -> Handler (optimize_sub_handler st h)
+    | CastExp (e1, tyco1) -> CastExp (optimize_expr st e1, optimize_ty_coercion st tyco1)
+    | plain_e -> plain_e (* TODO: implement *)
   in
-  {term= plain_e'; location= loc}
+  {term= plain_e'; location=e.location}
 
+and optimize_sub_handler st h =
+    match h with
+    | { effect_clauses = ecs; value_clause = vc }
+    -> { effect_clauses = OldUtils.assoc_map (optimize_sub_abstraction2 st) ecs; value_clause = optimize_sub_abstraction_with_ty st vc }
+
+and optimize_sub_abstraction_with_ty st a_w_ty =
+  let plain_a_w_ty' =
+    match a_w_ty.term with
+    | (p,ty,c) ->
+        (p,ty,optimize_comp st c)
+  in { term = plain_a_w_ty'; location = a_w_ty.location } 
+
+and optimize_sub_abstraction2 st a2 =
+  let plain_a2' =
+    match a2.term with
+    | (p1,p2,c) ->
+        (p1,p2,optimize_comp st c)
+  in { term = plain_a2'; location = a2.location } 
 
 and optimize_sub_comp st c =
   let loc = c.location in
