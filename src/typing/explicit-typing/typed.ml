@@ -125,6 +125,11 @@ and abstraction_with_ty = (pattern * Types.target_ty * computation) annotation
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * computation) annotation
 
+let abstraction_with_ty_to_abstraction a_w_ty =
+  let (p,_,c) = a_w_ty.term
+  in {term = (p,c); location=a_w_ty.location}
+  
+
 type omega_ct =
   | TyOmega of (Params.TyCoercion.t * Types.ct_ty)
   | DirtOmega of (Params.DirtCoercion.t * Types.ct_dirt)
@@ -299,8 +304,17 @@ and print_ty_coercion ?max_level c ppf =
 
 and print_dirty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c with BangCoercion (tc, dirtc) ->
+  match c with 
+  | BangCoercion (tc, dirtc) ->
     print "%t ! %t" (print_ty_coercion tc) (print_dirt_coercion dirtc)
+  | LeftHandler tyco ->
+    print "fst(%t)" (print_ty_coercion tyco)
+  | RightHandler tyco ->
+    print "snd(%t)" (print_ty_coercion tyco)
+  | RightArrow tyco ->
+    print "snd(%t)" (print_ty_coercion tyco)
+  | SequenceDirtyCoer (c1,c2) ->
+    print "(%t;%t)" (print_dirty_coercion c1) (print_dirty_coercion c2)
 
 
 and print_dirt_coercion ?max_level c ppf =

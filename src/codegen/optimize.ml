@@ -5,9 +5,20 @@ type state = {fuel: int ref}
 
 let inititial_state = {fuel= ref !Config.optimization_fuel}
 
+
+let is_relatively_pure st c h =
+  match TypeChecker.type_check_comp TypeChecker.new_checker_state c.term with
+  | (_,SetEmpty ops) -> 
+     let handled_ops = EffectSet.of_list (List.map (fun ((eff, _), _) -> eff) h.effect_clauses) in
+     if EffectSet.is_empty(EffectSet.inter handled_ops ops)
+       then
+         None
+       else 
+         None
+  | (_,SetVar _) -> None (* var can be instantiated to anything *)
+
 let is_atomic e =
   match e.term with Var _ -> true | Const _ -> true | _ -> false
-
 
 type inlinability =
   | NotInlinable
@@ -91,9 +102,21 @@ and reduce_ty_coercion st tyco =
 and reduce_dirty_coercion st dtyco =
   match dtyco with
   | BangCoercion (tyco1,dco2) -> dtyco
-  | RightArrow tyco1 -> dtyco
-  | RightHandler tyco1 -> dtyco
-  | LeftHandler tyco1 -> dtyco
+  | RightArrow tyco1 -> 
+      begin match tyco1 with
+      | ArrowCoercion (tyco11,dtyco12) -> dtyco12
+      | _ -> dtyco
+      end
+  | RightHandler tyco1 ->
+      begin match tyco1 with
+      | HandlerCoercion (dtyco11,dtyco12) -> dtyco12
+      | _ -> dtyco
+      end
+  | LeftHandler tyco1 -> 
+      begin match tyco1 with
+      | HandlerCoercion (dtyco11,dtyco12) -> dtyco11
+      | _ -> dtyco
+      end
   | SequenceDirtyCoer (dtyco1,dtyco2) -> dtyco
 
 and reduce_dirt_coercion st dco =
@@ -180,7 +203,7 @@ and optimize_sub_comp st c =
     | Call (op, e1, a_w_ty) -> Call (op, optimize_expr st e1, assert false)
     | Op (op, e1) -> Op (op, optimize_expr st e1)
     | Bind (c1, abstraction) -> Bind (optimize_comp st c1, optimize_abs st abstraction)
-    | CastComp (c1, dirty_coercion) -> CastComp (optimize_comp st c1, dirty_coercion)
+    | CastComp (c1, dirty_coercion) -> CastComp (optimize_comp st c1, optimize_dirty_coercion st dirty_coercion)
     | CastComp_ty (c1, ty_coercion) -> assert false
     | CastComp_dirt (c1, dirt_coercion) -> assert false
   in
@@ -237,7 +260,23 @@ and reduce_comp st c =
           Print.debug "e1 is not a lambda" ;
           (* TODO: support case where it's a cast of a lambda *)
           c )
-  | Handle (e1, c1) -> c
+  | Handle (e1, c1) -> 
+      begin match e1.term with
+      | CastExp (e11, tyco1) -> 
+          let c1' = { term = CastComp (c1, LeftHandler tyco1); location = c1.location } in
+          let c'  = { term = Handle (e11, c1'); location = c.location } in
+          optimize_comp st { term = CastComp (c', RightHandler tyco1) ; location = c.location }
+      | Handler h ->
+          begin match c1.term with
+          | CastComp (c1', dtyco1) -> 
+              begin match is_relatively_pure st c1' h with
+              | Some dtyco -> reduce_comp st { term = Bind ({term = CastComp (c1',dtyco);location=c.location},Typed.abstraction_with_ty_to_abstraction h.value_clause); location = c.location }
+              | None -> c
+              end
+          | _ -> c
+          end
+      | _ -> c
+      end
   | Call (op, e1, a_w_ty) -> c
   | Op (op, e1) -> c
   | Bind (c1, abstraction2) -> 

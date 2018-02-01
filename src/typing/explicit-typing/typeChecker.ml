@@ -122,31 +122,7 @@ let rec type_check_comp st c =
   | CastComp_ty (c1, tc1) -> assert false
   | CastComp_dirt (c1, tc1) -> assert false
 
-and type_check_exp st e =
-  match e with
-  | Var v -> (
-    match OldUtils.lookup v st.term_vars with
-    | Some ty -> ty
-    | _ -> assert false )
-  | BuiltIn (s, i) -> assert false
-  | Const const -> (
-    match const with
-    | Integer _ -> Types.PrimTy IntTy
-    | String _ -> Types.PrimTy StringTy
-    | Boolean _ -> Types.PrimTy BoolTy
-    | Float _ -> Types.PrimTy FloatTy )
-  | Tuple elist -> assert false
-  | Record r -> assert false
-  | Variant (lbl, e1) -> assert false
-  | Lambda (pat, ty1, c1) ->
-      let PVar p = pat.term in
-      let ty1' = type_check_ty st ty1 in
-      let st' = extend_state_term_vars st p ty1 in
-      let c_ty = type_check_comp st' c1.term in
-      Types.Arrow (ty1', c_ty)
-  | Effect (eff, (eff_in, eff_out)) ->
-      Types.Arrow (eff_in, (eff_out, Types.SetEmpty (EffectSet.singleton eff)))
-  | Handler h ->
+and type_check_handler st h =
       let pv, tv, cv = h.value_clause.term in
       let Typed.PVar v = pv.term in
       let st' = extend_state_term_vars st v tv in
@@ -172,6 +148,59 @@ and type_check_exp st e =
             Types.SetEmpty (Types.EffectSet.union es handlers_ops_set)
       in
       Types.Handler ((tv, input_dirt), type_cv)
+
+and type_check_exp st e =
+  match e with
+  | Var v -> (
+    match OldUtils.lookup v st.term_vars with
+    | Some ty -> ty
+    | _ -> assert false )
+  | BuiltIn (s, i) -> assert false
+  | Const const -> (
+    match const with
+    | Integer _ -> Types.PrimTy IntTy
+    | String _ -> Types.PrimTy StringTy
+    | Boolean _ -> Types.PrimTy BoolTy
+    | Float _ -> Types.PrimTy FloatTy )
+  | Tuple elist -> assert false
+  | Record r -> assert false
+  | Variant (lbl, e1) -> assert false
+  | Lambda (pat, ty1, c1) ->
+      let PVar p = pat.term in
+      let ty1' = type_check_ty st ty1 in
+      let st' = extend_state_term_vars st p ty1 in
+      let c_ty = type_check_comp st' c1.term in
+      Types.Arrow (ty1', c_ty)
+  | Effect (eff, (eff_in, eff_out)) ->
+      Types.Arrow (eff_in, (eff_out, Types.SetEmpty (EffectSet.singleton eff)))
+  | Handler h -> type_check_handler st h
+(*
+      let pv, tv, cv = h.value_clause.term in
+      let Typed.PVar v = pv.term in
+      let st' = extend_state_term_vars st v tv in
+      let type_cv = type_check_comp st' cv.term in
+      let mapper (effe, abs2) =
+        let eff, (in_op_ty, out_op_ty) = effe in
+        (* let (x,y,c_op) = abs2.term in 
+               let Typed.PVar xv = x.term in 
+               let Typed.PVar yv = y.term in 
+               let st_temp = extend_state_term_vars st xv in_op_ty in 
+               let st' = extend_state_term_vars st_temp yv (Types.Arrow (out_op_ty, type_cv)) in 
+               let type_cop = type_check_comp st' c_op.term  in  *)
+        eff
+      in
+      let handlers_ops = OldUtils.map mapper h.effect_clauses in
+      let handlers_ops_set = Types.EffectSet.of_list handlers_ops in
+      let t_cv, d_cv = type_cv in
+      let input_dirt =
+        match d_cv with
+        | Types.SetVar (es, param) ->
+            Types.SetVar (Types.EffectSet.union es handlers_ops_set, param)
+        | Types.SetEmpty es ->
+            Types.SetEmpty (Types.EffectSet.union es handlers_ops_set)
+      in
+      Types.Handler ((tv, input_dirt), type_cv)
+*)
   | BigLambdaTy (ty_param, skel, e1) ->
       let st' = extend_state_ty_var_skel st ty_param skel in
       let e1_ty = type_check_exp st' e1.term in
