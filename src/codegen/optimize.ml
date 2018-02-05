@@ -288,7 +288,9 @@ and reduce_comp st c =
           let c2' = reduce_comp st { term = Bind (c12,abstraction2); location = c12.location} in
           reduce_comp st {term = Bind (c11, {term = (p1, c2'); location = c.location }) ; location  = c.location} 
       | {term = Value e11} ->
-          beta_reduce st abstraction2 e11
+          let ty11 = TypeChecker.type_check_exp TypeChecker.new_checker_state e11.term in
+          let {term = (p2,c2); location = location2} = abstraction2 in
+          beta_reduce st {term=(p2,ty11,c2);location=location2} e11
       | _ -> c
       end 
   | CastComp (c1, dirty_coercion) -> 
