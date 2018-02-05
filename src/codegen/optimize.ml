@@ -8,11 +8,14 @@ let inititial_state = {fuel= ref !Config.optimization_fuel}
 
 let is_relatively_pure st c h =
   match TypeChecker.type_check_comp TypeChecker.new_checker_state c.term with
-  | (_,SetEmpty ops) -> 
+  | (ty,SetEmpty ops) -> 
      let handled_ops = EffectSet.of_list (List.map (fun ((eff, _), _) -> eff) h.effect_clauses) in
      if EffectSet.is_empty(EffectSet.inter handled_ops ops)
        then
-         None
+         let Types.Handler (_,(_,output_dirt)) = TypeChecker.type_check_handler TypeChecker.new_checker_state h in 
+         match output_dirt with
+         | SetEmpty ops'     -> Some (BangCoercion (ReflTy ty,UnionDirt(EffectSet.inter ops ops',Empty (SetEmpty (EffectSet.diff ops' ops)))))
+         | SetVar (ops',var) -> Some (BangCoercion (ReflTy ty,UnionDirt(EffectSet.inter ops ops',Empty (SetVar (EffectSet.diff ops' ops,var)))))
        else 
          None
   | (_,SetVar _) -> None (* var can be instantiated to anything *)
@@ -137,7 +140,7 @@ and beta_reduce st ({term= p, ty, c} as a) e =
   | Inlinable -> substitute_pattern_comp st c p e
   | NotPresent -> c
   | NotInlinable when is_atomic e ->
-      Print.debug "beta_reduce not-inlinable is_atomci" ;
+      Print.debug "beta_reduce not-inlinable is_atomc" ;
       substitute_pattern_comp st c p e
   | NotInlinable -> {term= LetVal (e, (p, ty, c)); location= a.location}
 
@@ -270,7 +273,7 @@ and reduce_comp st c =
           begin match c1.term with
           | CastComp (c1', dtyco1) -> 
               begin match is_relatively_pure st c1' h with
-              | Some dtyco -> reduce_comp st { term = Bind ({term = CastComp (c1',dtyco);location=c.location},Typed.abstraction_with_ty_to_abstraction h.value_clause); location = c.location }
+              | Some dtyco -> optimize_comp st { term = Bind ({term = CastComp (c1',dtyco);location=c.location},Typed.abstraction_with_ty_to_abstraction h.value_clause); location = c.location }
               | None -> c
               end
           | _ -> c
@@ -284,6 +287,8 @@ and reduce_comp st c =
       | {term = Bind (c11, {term = (p1, c12)})} ->
           let c2' = reduce_comp st { term = Bind (c12,abstraction2); location = c12.location} in
           reduce_comp st {term = Bind (c11, {term = (p1, c2'); location = c.location }) ; location  = c.location} 
+      | {term = Value e11} ->
+          beta_reduce st abstraction2 e11
       | _ -> c
       end 
   | CastComp (c1, dirty_coercion) -> 
