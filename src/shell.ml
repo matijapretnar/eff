@@ -193,6 +193,20 @@ let compile_file ppf filename st =
           "type (_, _) effect += Effect_%s : (int, int) effect" eff ;
         Format.fprintf out_ppf "\n;;\n " ;
         {st with explicit_typing}
+    | CoreSyntax.External (x, ty, f) -> (
+      match OldUtils.lookup f External.values with
+      | Some v ->
+          let new_ty = ExplicitInfer.source_to_target ty in
+          { st with
+            typing= SimpleCtx.extend st.typing x (Type.free_params ty, ty)
+          ; explicit_typing=
+              { st.explicit_typing with
+                ExplicitInfer.context=
+                  TypingEnv.update st.explicit_typing.context x new_ty }
+          ; type_checker=
+              TypeChecker.extend_state_term_vars st.type_checker x new_ty
+          ; runtime= Eval.update x v st.runtime }
+      | None -> Error.runtime "unknown external symbol %s." f )
     | _ -> st
   in
   let cmds = Lexer.read_file parse filename |> List.map Desugar.toplevel in
