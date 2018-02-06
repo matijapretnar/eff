@@ -91,8 +91,8 @@ let rec type_check_comp st c =
       if Types.dirty_types_are_equal dty_1 ty_c1 then dty_2 else assert false
   | Call ((eff, (eff_in, eff_out)), e2, abs) -> (
       let e2_ty = type_check_exp st e2.term in
-      match e2_ty with
-      | eff_in -> (
+      if Types.types_are_equal e2_ty eff_in
+        then (
           let x, ty_eff, c1 = abs.term in
           let Typed.PVar p = x.term in
           let st' = extend_state_term_vars st p eff_out in
@@ -100,7 +100,7 @@ let rec type_check_comp st c =
           match Types.is_effect_member eff final_dirt with
           | true -> (final_ty, final_dirt)
           | _ -> assert false )
-      | _ -> assert false )
+        else assert false )
   | Op (ef, e1) -> assert false
   | Bind (c1, a1) -> (
       let c1_ty, c1_drt = type_check_comp st c1.term in
