@@ -204,7 +204,7 @@ and optimize_sub_comp st c =
     | Apply (e1, e2) -> Apply (optimize_expr st e1, optimize_expr st e2)
     | Handle (e1, c1) -> Handle (optimize_expr st e1, optimize_comp st c1)
     | Call (op, e1, a_w_ty) -> Call (op, optimize_expr st e1, assert false)
-    | Op (op, e1) -> Op (op, optimize_expr st e1)
+    | Op (op, e1) -> Print.debug "optimize_sub_comp Op"; Op (op, optimize_expr st e1)
     | Bind (c1, abstraction) -> Bind (optimize_comp st c1, optimize_abs st abstraction)
     | CastComp (c1, dirty_coercion) -> CastComp (optimize_comp st c1, optimize_dirty_coercion st dirty_coercion)
     | CastComp_ty (c1, ty_coercion) -> assert false
@@ -224,7 +224,6 @@ and reduce_expr st e =
           | Record of (OldUtils.field, expression) OldUtils.assoc
           | Variant of OldUtils.label * expression option
           | Lambda of (pattern * Types.target_ty * computation)
-          | Effect of effect
           | Handler of handler
           | BigLambdaTy of Params.Ty.t * skeleton * expression
           | BigLambdaDirt of Params.Dirt.t * expression  
@@ -238,6 +237,9 @@ and reduce_expr st e =
           | ApplyDirtCoercion of expression * dirt_coercion
           | ApplyTyCoercion (e1,ty_co) ->
           *)
+  | Effect op ->
+      Print.debug "reduce_exp Effect";
+      e
   | CastExp (e1, ty_co) ->
       Print.debug "reduce_exp (ApplyTyCoercion (e1,ty_co))" ;
       let ty1, ty2 =
@@ -259,6 +261,13 @@ and reduce_comp st c =
       | {term= Lambda (p, ty, c)} ->
           Print.debug "e1 is a lambda" ;
           beta_reduce st (annotate (p, ty, c) e1.location) e2
+      | {term = Effect op} ->
+          Print.debug "Op -> Call";
+          let ty = TypeChecker.type_check_exp TypeChecker.new_checker_state e2.term in
+          let var = Typed.Variable.fresh "call_var" in
+          let c_cont = {term = Value {term = Var var ; location = c.location}; location = c.location} in
+          let a_w_ty = {term = ({term = PVar var; location = c.location},ty,c_cont); location = c.location} in
+          {term = Call (op, e2, a_w_ty); location=c.location}
       | _ ->
           Print.debug "e1 is not a lambda" ;
           (* TODO: support case where it's a cast of a lambda *)
@@ -281,7 +290,8 @@ and reduce_comp st c =
       | _ -> c
       end
   | Call (op, e1, a_w_ty) -> c
-  | Op (op, e1) -> c
+  | Op (op, e1) -> 
+      assert false
   | Bind (c1, abstraction2) -> 
       begin match c1 with
       | {term = Bind (c11, {term = (p1, c12)})} ->
@@ -332,14 +342,6 @@ and reduce_comp st c =
       let_rec' defs handle_h_c
     in
     reduce_comp st res
-
-  | Handle ({term = Handler h}, c1)
-        when (is_pure_for_handler c1 h.effect_clauses) ->
-    useFuel st;
-    st.optimization_handler_With_Pure := !(st.optimization_handler_With_Pure) + 1;
-    st.optimization_total := !(st.optimization_total) + 1;
-    (* Print.debug "Remove handler, since no effects in common with computation"; *)
-    reduce_comp st (bind c1 h.value_clause)
 
   | Handle ({term = Handler h} as handler, {term = Bind (c1, {term = (p1, c2)})})
         when (is_pure_for_handler c1 h.effect_clauses) ->

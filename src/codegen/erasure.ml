@@ -165,6 +165,8 @@ and typed_to_erasure_comp' sub tt =
       let e' = typed_to_erasure_exp sub e in
       let abs' = typed_to_erasure_abs_with_ty sub abs in
       ECall (eff, e', abs')
+  | Typed.Op (eff,e) ->
+      assert false
   | Typed.Bind (c, a) ->
       let c' = typed_to_erasure_comp sub c in
       let a' = typed_to_erasure_abs sub a in
