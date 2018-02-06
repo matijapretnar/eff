@@ -175,6 +175,11 @@ let compile_file ppf filename st =
           if !Config.disable_optimization then ct
           else Optimize.optimize_main_comp ct
         in
+        Print.debug "-- After Optimization ------------------------------------------";
+        Print.debug "%t" (Typed.print_computation ct);
+        let ct_ty, ct_dirt = TypeChecker.type_check_comp TypeChecker.new_checker_state ct.term in
+        Print.debug "Type from Type Checker : %t ! %t" (Types.print_target_ty ct_ty) (Types.print_target_dirt ct_dirt) ;
+ 
         let erasure_ct = Erasure.typed_to_erasure_comp [] ct in
         NewPrint.print_computation erasure_ct out_ppf ;
         Format.fprintf out_ppf "\n;;\n " ;

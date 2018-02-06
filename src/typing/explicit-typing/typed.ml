@@ -125,6 +125,11 @@ and abstraction_with_ty = (pattern * Types.target_ty * computation) annotation
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * computation) annotation
 
+let abstraction_with_ty_to_abstraction a_w_ty =
+  let (p,_,c) = a_w_ty.term
+  in {term = (p,c); location=a_w_ty.location}
+  
+
 type omega_ct =
   | TyOmega of (Params.TyCoercion.t * Types.ct_ty)
   | DirtOmega of (Params.DirtCoercion.t * Types.ct_dirt)
@@ -146,6 +151,11 @@ and plain_toplevel =
   | Quit
 
 (* | TypeOf of computation *)
+
+let lambda ?loc ((_,_,c) as abs) : expression = {term = Lambda abs; location=c.location}
+
+let call ?loc eff e abs : computation = {term = Call (eff,e,abs); location=e.location}
+let handle ?loc e c : computation = {term = Handle (e,c); location=c.location}
 
 let abstraction ?loc p c : abstraction = {term= (p, c); location= c.location}
 
@@ -299,8 +309,17 @@ and print_ty_coercion ?max_level c ppf =
 
 and print_dirty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c with BangCoercion (tc, dirtc) ->
+  match c with 
+  | BangCoercion (tc, dirtc) ->
     print "%t ! %t" (print_ty_coercion tc) (print_dirt_coercion dirtc)
+  | LeftHandler tyco ->
+    print "fst(%t)" (print_ty_coercion tyco)
+  | RightHandler tyco ->
+    print "snd(%t)" (print_ty_coercion tyco)
+  | RightArrow tyco ->
+    print "snd(%t)" (print_ty_coercion tyco)
+  | SequenceDirtyCoer (c1,c2) ->
+    print "(%t;%t)" (print_dirty_coercion c1) (print_dirty_coercion c2)
 
 
 and print_dirt_coercion ?max_level c ppf =
@@ -451,10 +470,11 @@ and refresh_comp' sbst = function
   | Match (e, li) -> Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
   | Apply (e1, e2) -> Apply (refresh_expr sbst e1, refresh_expr sbst e2)
   | Handle (e, c) -> Handle (refresh_expr sbst e, refresh_comp sbst c)
-  (*   | Call (eff, e, a) ->
-    Call (eff, refresh_expr sbst e, refresh_abs sbst a) *)
+  | Call (eff, e, a) ->
+    Call (eff, refresh_expr sbst e, refresh_abs_with_ty sbst a)
   | Value e ->
       Value (refresh_expr sbst e)
+  | CastComp (c,dtyco) -> CastComp (refresh_comp sbst c, dtyco)
 
 
 and refresh_handler sbst h = assert false
@@ -467,6 +487,11 @@ and refresh_abs sbst a =
   let p, c = a.term in
   let sbst, p' = refresh_pattern sbst p in
   {a with term= (p', refresh_comp sbst c)}
+
+and refresh_abs_with_ty sbst a =
+  let p, ty, c = a.term in
+  let sbst, p' = refresh_pattern sbst p in
+  {a with term= (p', ty, refresh_comp sbst c)}
 
 
 and refresh_abs2 sbst a2 =
