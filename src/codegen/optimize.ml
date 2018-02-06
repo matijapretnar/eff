@@ -265,7 +265,8 @@ and reduce_comp st c =
           Print.debug "Op -> Call";
           let ty = TypeChecker.type_check_exp TypeChecker.new_checker_state e2.term in
           let var = Typed.Variable.fresh "call_var" in
-          let c_cont = {term = Value {term = Var var ; location = c.location}; location = c.location} in
+          let (eff,_) = op in
+          let c_cont = {term = CastComp ({term = Value {term = Var var ; location = c.location}; location = c.location},BangCoercion (ReflTy ty,Empty (SetEmpty (EffectSet.singleton eff))));location=c.location} in
           let a_w_ty = {term = ({term = PVar var; location = c.location},ty,c_cont); location = c.location} in
           {term = Call (op, e2, a_w_ty); location=c.location}
       | _ ->
