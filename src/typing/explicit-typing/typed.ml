@@ -477,12 +477,11 @@ and refresh_comp' sbst = function
   | CastComp (c,dtyco) -> CastComp (refresh_comp sbst c, dtyco)
 
 
-and refresh_handler sbst h = assert false
+and refresh_handler sbst h =
+  { effect_clauses = OldUtils.assoc_map (refresh_abs2 sbst) h.effect_clauses
+  ; value_clause   = refresh_abs_with_ty sbst h.value_clause
+  }
 
-(* {
-  effect_clauses = OldUtils.assoc_map (refresh_abs2 sbst) h.effect_clauses;
-  value_clause = refresh_abs sbst h.value_clause;
-} *)
 and refresh_abs sbst a =
   let p, c = a.term in
   let sbst, p' = refresh_pattern sbst p in
@@ -493,12 +492,13 @@ and refresh_abs_with_ty sbst a =
   let sbst, p' = refresh_pattern sbst p in
   {a with term= (p', ty, refresh_comp sbst c)}
 
-
 and refresh_abs2 sbst a2 =
-  (* a2a2 @@ refresh_abs sbst @@ a22a @@ a2 *)
-  assert false
-
-
+  let p1, p2, c = a2.term in
+  let sbst, p1' = refresh_pattern sbst p1 in
+  let sbst, p2' = refresh_pattern sbst p2 in
+  let       c'  = refresh_comp    sbst c  in
+  {a2 with term = (p1',p2',c')} 
+ 
 let rec subst_expr sbst e = {e with term= subst_expr' sbst e.term}
 
 and subst_expr' sbst = function

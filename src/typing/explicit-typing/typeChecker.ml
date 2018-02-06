@@ -154,7 +154,11 @@ and type_check_exp st e =
   | Var v -> (
     match OldUtils.lookup v st.term_vars with
     | Some ty -> ty
-    | _ -> assert false )
+    | _ -> 
+        Error.typing ~loc:Location.unknown
+          "Term variable not found/bound: %t"
+          (Typed.print_variable v)
+    )
   | BuiltIn (s, i) -> assert false
   | Const const -> (
     match const with
