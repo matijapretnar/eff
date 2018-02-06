@@ -1,10 +1,16 @@
 open Types
 open Typed
 
-type state = {fuel: int ref}
+type state = 
+  { fuel: int ref
+  ; tc_state : TypeChecker.checker_state
+  }
 
-let inititial_state = {fuel= ref !Config.optimization_fuel}
+let inititial_state = {fuel= ref !Config.optimization_fuel; tc_state = TypeChecker.new_checker_state}
 
+let extend_state_ty_var st ty_var = {st with tc_state = TypeChecker.extend_state_ty_vars st.tc_state ty_var}
+
+let extend_state_term_var st t_var ty = {st with tc_state = TypeChecker.extend_state_term_vars st.tc_state t_var ty}
 
 let refresh_expr e = Typed.refresh_expr [] e
 let refresh_abs a = Typed.refresh_abs [] a
@@ -12,12 +18,12 @@ let refresh_abs_with_ty a = Typed.refresh_abs_with_ty [] a
 let refresh_abs2 a2 = Typed.refresh_abs2 [] a2
 
 let is_relatively_pure st c h =
-  match TypeChecker.type_check_comp TypeChecker.new_checker_state c.term with
+  match TypeChecker.type_check_comp st.tc_state c.term with
   | (ty,SetEmpty ops) -> 
      let handled_ops = EffectSet.of_list (List.map (fun ((eff, _), _) -> eff) h.effect_clauses) in
      if EffectSet.is_empty(EffectSet.inter handled_ops ops)
        then
-         let Types.Handler (_,(_,output_dirt)) = TypeChecker.type_check_handler TypeChecker.new_checker_state h in 
+         let Types.Handler (_,(_,output_dirt)) = TypeChecker.type_check_handler st.tc_state h in 
          match output_dirt with
          | SetEmpty ops'     -> Some (BangCoercion (ReflTy ty,UnionDirt(EffectSet.inter ops ops',Empty (SetEmpty (EffectSet.diff ops' ops)))))
          | SetVar (ops',var) -> Some (BangCoercion (ReflTy ty,UnionDirt(EffectSet.inter ops ops',Empty (SetVar (EffectSet.diff ops' ops,var)))))
@@ -68,7 +74,7 @@ and optimize_sub_ty_coercion st tyco =
   | SequenceTyCoer (tyco1,tyco2) -> SequenceTyCoer ((optimize_ty_coercion st tyco1),(optimize_ty_coercion st tyco2))  
   | TupleCoercion tycos -> TupleCoercion tycos 
   | LeftArrow tyco1 -> LeftArrow (optimize_ty_coercion st tyco1) 
-  | ForallTy (tv,tyco1) -> ForallTy (tv,(optimize_ty_coercion st tyco1)) 
+  | ForallTy (tv,tyco1) -> ForallTy (tv,(optimize_ty_coercion (extend_state_ty_var st tv) tyco1)) 
   | ApplyTyCoer (tyco1,ty) -> ApplyTyCoer ((optimize_ty_coercion st tyco1),ty) 
   | ForallDirt (dv,tyco1) -> ForallDirt (dv,(optimize_ty_coercion st tyco1)) 
   | ApplyDirCoer (tyco1,d) -> ApplyDirCoer ((optimize_ty_coercion st tyco1),d) 
@@ -167,6 +173,7 @@ and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
 and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
 
 and optimize_abs st {term = (p, c); location = loc} =
+  (* TODO: extend tc_state *)
   {term = (p,optimize_comp st c); location = loc}
 
 and optimize_sub_expr st e =
@@ -187,13 +194,15 @@ and optimize_sub_abstraction_with_ty st a_w_ty =
   let plain_a_w_ty' =
     match a_w_ty.term with
     | (p,ty,c) ->
-        (p,ty,optimize_comp st c)
+        let PVar var = p.term in
+        (p,ty,optimize_comp (extend_state_term_var st var ty) c)
   in { term = plain_a_w_ty'; location = a_w_ty.location } 
 
 and optimize_sub_abstraction2 st a2 =
   let plain_a2' =
     match a2.term with
     | (p1,p2,c) ->
+        (* TODO: extend tc_state *)
         (p1,p2,optimize_comp st c)
   in { term = plain_a2'; location = a2.location } 
 
@@ -203,7 +212,9 @@ and optimize_sub_comp st c =
     match c.term with
     | Value e1 -> Value (optimize_expr st e1)
     | LetVal (e1, (p, ty, c1)) ->
-        LetVal (optimize_expr st e1, (p, ty, optimize_comp st c1))
+        let PVar var = p.term in
+        let st' = extend_state_term_var st var ty in
+        LetVal (optimize_expr st e1, (p, ty, optimize_comp st' c1))
     | LetRec (bindings, c1) -> assert false
     | Match (e1, abstractions) -> assert false
     | Apply (e1, e2) -> Apply (optimize_expr st e1, optimize_expr st e2)
@@ -248,13 +259,14 @@ and reduce_expr st e =
   | CastExp (e1, ty_co) ->
       Print.debug "reduce_exp (ApplyTyCoercion (e1,ty_co))" ;
       let ty1, ty2 =
-        TypeChecker.type_check_ty_coercion TypeChecker.new_checker_state ty_co
+        TypeChecker.type_check_ty_coercion st.tc_state ty_co
       in
       if Types.types_are_equal ty1 ty2 then e1 else e
   | plain_e -> e
 
 
 and reduce_comp st c =
+  Print.debug "reduce_comp: %t" (Typed.print_computation c);
   match c.term with
   | Value _ -> c
   | LetVal (e1, (p, ty, c1)) -> c
@@ -268,7 +280,7 @@ and reduce_comp st c =
           beta_reduce st (annotate (p, ty, c) e1.location) e2
       | {term = Effect op} ->
           Print.debug "Op -> Call";
-          let ty = TypeChecker.type_check_exp TypeChecker.new_checker_state e2.term in
+          let ty = TypeChecker.type_check_exp st.tc_state e2.term in
           let var = Typed.Variable.fresh "call_var" in
           let (eff,_) = op in
           let c_cont = {term = CastComp ({term = Value {term = Var var ; location = c.location}; location = c.location},BangCoercion (ReflTy ty,Empty (SetEmpty (EffectSet.singleton eff))));location=c.location} in
@@ -293,7 +305,8 @@ and reduce_comp st c =
               end
           | Call (eff, e11, k_abs) ->
               let {term = (k_pat, k_ty, k_c)} = refresh_abs_with_ty k_abs in
-              let {term=(k_pat',k_c')} as handled_k = abstraction k_pat (reduce_comp st (handle (refresh_expr e1) k_c)) in
+              let PVar k_var = k_pat.term in 
+              let {term=(k_pat',k_c')} as handled_k = abstraction k_pat (reduce_comp (extend_state_term_var st k_var k_ty) (handle (refresh_expr e1) k_c)) in
               begin match OldUtils.lookup eff h.effect_clauses with
               | Some eff_clause ->
                   let {term = (p1, p2, c)} = refresh_abs2 eff_clause in
@@ -315,13 +328,13 @@ and reduce_comp st c =
           let c2' = reduce_comp st { term = Bind (c12,abstraction2); location = c12.location} in
           reduce_comp st {term = Bind (c11, {term = (p1, c2'); location = c.location }) ; location  = c.location} 
       | {term = Value e11} ->
-          let ty11 = TypeChecker.type_check_exp TypeChecker.new_checker_state e11.term in
+          let ty11 = TypeChecker.type_check_exp st.tc_state e11.term in
           let {term = (p2,c2); location = location2} = abstraction2 in
           beta_reduce st {term=(p2,ty11,c2);location=location2} e11
       | _ -> c
       end 
   | CastComp (c1, dirty_coercion) -> 
-      let dty1, dty2 = TypeChecker.type_check_dirty_coercion TypeChecker.new_checker_state dirty_coercion in
+      let dty1, dty2 = TypeChecker.type_check_dirty_coercion st.tc_state dirty_coercion in
        if Types.dirty_types_are_equal dty1 dty2
          then c1
          else c
