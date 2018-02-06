@@ -6,6 +6,11 @@ type state = {fuel: int ref}
 let inititial_state = {fuel= ref !Config.optimization_fuel}
 
 
+let refresh_expr e = Typed.refresh_expr [] e
+let refresh_abs a = Typed.refresh_abs [] a
+let refresh_abs_with_ty a = Typed.refresh_abs_with_ty [] a
+let refresh_abs2 a2 = Typed.refresh_abs2 [] a2
+
 let is_relatively_pure st c h =
   match TypeChecker.type_check_comp TypeChecker.new_checker_state c.term with
   | (ty,SetEmpty ops) -> 
@@ -285,6 +290,17 @@ and reduce_comp st c =
               begin match is_relatively_pure st c1' h with
               | Some dtyco -> optimize_comp st { term = Bind ({term = CastComp (c1',dtyco);location=c.location},Typed.abstraction_with_ty_to_abstraction h.value_clause); location = c.location }
               | None -> c
+              end
+          | Call (eff, e11, k_abs) ->
+              let {term = (k_pat, k_ty, k_c)} = refresh_abs_with_ty k_abs in
+              let {term=(k_pat',k_c')} as handled_k = abstraction k_pat (reduce_comp st (handle (refresh_expr e1) k_c)) in
+              begin match OldUtils.lookup eff h.effect_clauses with
+              | Some eff_clause ->
+                  let {term = (p1, p2, c)} = refresh_abs2 eff_clause in
+                  (* Shouldn't we check for inlinability of p1 and p2 here? *)
+                  substitute_pattern_comp st (substitute_pattern_comp st c p1 e11) p2 (lambda (k_pat',k_ty,k_c'))
+              | None ->
+                  let res = call eff e11 {term=(k_pat',k_ty,k_c');location=handled_k.location} in reduce_comp st res
               end
           | _ -> c
           end
@@ -848,9 +864,6 @@ let unused x c =
   let inside_occ, outside_occ = Typed.occurrences x vars in
   inside_occ == 0 && outside_occ == 0
 
-let refresh_abs a = Typed.refresh_abs [] a
-let refresh_abs2 a2 = Typed.refresh_abs2 [] a2
-let refresh_expr e = Typed.refresh_expr [] e
 let refresh_comp c = Typed.refresh_comp [] c
 let refresh_handler h = Typed.refresh_handler [] h
 

@@ -152,6 +152,11 @@ and plain_toplevel =
 
 (* | TypeOf of computation *)
 
+let lambda ?loc ((_,_,c) as abs) : expression = {term = Lambda abs; location=c.location}
+
+let call ?loc eff e abs : computation = {term = Call (eff,e,abs); location=e.location}
+let handle ?loc e c : computation = {term = Handle (e,c); location=c.location}
+
 let abstraction ?loc p c : abstraction = {term= (p, c); location= c.location}
 
 let abstraction_with_ty ?loc p tty c : abstraction_with_ty =
@@ -465,10 +470,11 @@ and refresh_comp' sbst = function
   | Match (e, li) -> Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
   | Apply (e1, e2) -> Apply (refresh_expr sbst e1, refresh_expr sbst e2)
   | Handle (e, c) -> Handle (refresh_expr sbst e, refresh_comp sbst c)
-  (*   | Call (eff, e, a) ->
-    Call (eff, refresh_expr sbst e, refresh_abs sbst a) *)
+  | Call (eff, e, a) ->
+    Call (eff, refresh_expr sbst e, refresh_abs_with_ty sbst a)
   | Value e ->
       Value (refresh_expr sbst e)
+  | CastComp (c,dtyco) -> CastComp (refresh_comp sbst c, dtyco)
 
 
 and refresh_handler sbst h = assert false
@@ -481,6 +487,11 @@ and refresh_abs sbst a =
   let p, c = a.term in
   let sbst, p' = refresh_pattern sbst p in
   {a with term= (p', refresh_comp sbst c)}
+
+and refresh_abs_with_ty sbst a =
+  let p, ty, c = a.term in
+  let sbst, p' = refresh_pattern sbst p in
+  {a with term= (p', ty, refresh_comp sbst c)}
 
 
 and refresh_abs2 sbst a2 =
