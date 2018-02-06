@@ -1211,13 +1211,13 @@ let type_toplevel ~loc st c =
     Print.debug "New Computation : %t" (Typed.print_computation ct3) ;
     (* Print.debug "Remaining dirt variables "; *)
     (* List.iter (fun dp -> Print.debug "%t" (Params.Dirt.print dp)) (List.sort_uniq compare (free_dirt_vars_computation ct')); *)
-    let tch_ty, tch_dirt =
+(*     let tch_ty, tch_dirt =
       TypeChecker.type_check_comp TypeChecker.new_checker_state ct3.term
     in
     Print.debug "Type from Type Checker : %t ! %t"
       (Types.print_target_ty tch_ty)
       (Types.print_target_dirt tch_dirt) ;
-    (ct3, st)
+ *)    (ct3, st)
 
 
 let add_effect eff (ty1, ty2) st =

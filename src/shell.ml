@@ -9,11 +9,13 @@ let help_text =
 type state =
   { runtime: Eval.state
   ; explicit_typing: ExplicitInfer.state
+  ; type_checker: TypeChecker.checker_state
   ; typing: SimpleInfer.t }
 
 let initial_state =
   { runtime= Eval.empty
   ; explicit_typing= ExplicitInfer.empty
+  ; type_checker= TypeChecker.new_checker_state
   ; typing= SimpleInfer.empty }
 
 
@@ -29,8 +31,7 @@ let rec exec_cmd ppf st cmd =
             st.explicit_typing c
         in
         let ty, drt =
-          TypeChecker.type_check_comp TypeChecker.new_checker_state
-            ct.Typed.term
+          TypeChecker.type_check_comp st.type_checker ct.Typed.term
         in
         let v = Eval.run st.runtime c in
         Format.fprintf ppf "@[- : %t ! %t = %t@]@." (Types.print_target_ty ty)
@@ -50,8 +51,7 @@ let rec exec_cmd ppf st cmd =
             st.explicit_typing c
         in
         let ty, drt =
-          TypeChecker.type_check_comp TypeChecker.new_checker_state
-            ct.Typed.term
+          TypeChecker.type_check_comp st.type_checker ct.Typed.term
         in
         Format.fprintf ppf "@[- : %t ! %t@]@." (Types.print_target_ty ty)
           (Types.print_target_dirt drt) ;
@@ -111,8 +111,15 @@ let rec exec_cmd ppf st cmd =
   | CoreSyntax.External (x, ty, f) -> (
     match OldUtils.lookup f External.values with
     | Some v ->
+        let new_ty = ExplicitInfer.source_to_target ty in
         { st with
           typing= SimpleCtx.extend st.typing x (Type.free_params ty, ty)
+        ; explicit_typing=
+            { st.explicit_typing with
+              ExplicitInfer.context=
+                TypingEnv.update st.explicit_typing.context x new_ty }
+        ; type_checker=
+            TypeChecker.extend_state_term_vars st.type_checker x new_ty
         ; runtime= Eval.update x v st.runtime }
     | None -> Error.runtime "unknown external symbol %s." f )
   | CoreSyntax.Tydef tydefs ->
