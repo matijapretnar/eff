@@ -1,9 +1,7 @@
 module T = Type
 module Typed = Typed
 module Untyped = CoreSyntax
-
 module TyVarSet = Set.Make (Params.Ty)
-
 module DirtVarSet = Set.Make (Params.Dirt)
 
 type state =
@@ -31,12 +29,6 @@ let apply_sub_to_env env sub =
   {env with context= TypingEnv.apply_sub env.context sub}
 
 
-let rec make_target_effects effects =
-  let new_effects = List.map (fun (x, _) -> x) effects in
-  let new_set = Types.EffectSet.of_list new_effects in
-  Types.SetEmpty new_set
-
-
 let rec source_to_target ty =
   match ty with
   | T.Apply (ty_name, []) -> source_to_target (T.Basic ty_name)
@@ -48,58 +40,36 @@ let rec source_to_target ty =
     | "string" -> Types.PrimTy StringTy
     | "bool" -> Types.PrimTy BoolTy
     | "float" -> Types.PrimTy FloatTy )
-  | T.Tuple l ->
-      let new_l = List.map source_to_target l in
-      Types.Tuple new_l
-  | T.Arrow (ty1, dirty1) ->
-      let dirtyt = source_to_target_dirty dirty1 in
-      let tyt = source_to_target ty1 in
-      Types.Arrow (tyt, dirtyt)
+  | T.Tuple l -> Types.Tuple (List.map source_to_target l)
+  | T.Arrow (ty, dirty) ->
+      Types.Arrow (source_to_target ty, source_to_target_dirty dirty)
   | T.Handler {value= dirty1; finally= dirty2} ->
       Types.Handler
         (source_to_target_dirty dirty1, source_to_target_dirty dirty2)
 
 
-and source_to_target_dirty dirty_type =
-  let ty = dirty_type in
-  let new_ty = source_to_target ty in
-  (* let ops = dirt.ops in *)
-  let new_dirt = make_target_effects [] in
-  (new_ty, new_dirt)
+and source_to_target_dirty ty =
+  (source_to_target ty, Types.SetEmpty Types.EffectSet.empty)
 
 
-(* let infer_effect ~loc env eff =
-  try
-    eff, (Untyped.EffectMap.find eff env.effects)
-  with
-  | Not_found -> Error.typing ~loc "Unbound effect %s" eff
- *)
-(* [type_pattern p] infers the type scheme of a pattern [p].
-   This consists of:
-   - the context, which contains bound variables and their types,
-   - the type of the whole pattern (what it matches against), and
-   - constraints connecting all these types.
-   Note that unlike in ordinary type schemes, context types are positive while
-   pattern type is negative. *)
 let rec type_pattern p =
-  let loc = p.Untyped.location in
-  let pat =
-    match p.Untyped.term with
-    | Untyped.PVar x -> Typed.PVar x
-    | Untyped.PAs (p, x) -> Typed.PAs (type_pattern p, x)
-    | Untyped.PNonbinding -> Typed.PNonbinding
-    | Untyped.PConst const -> Typed.PConst const
-    | Untyped.PTuple ps -> Typed.PTuple (List.map type_pattern ps)
-    | Untyped.PRecord [] -> assert false
-    | Untyped.PRecord ((fld, _) :: _ as lst) ->
-        assert false
-        (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-    | Untyped.PVariant (lbl, p) -> assert false
-    (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  in
-  (* Print.debug "%t : %t" (Untyped.print_pattern (p, loc)) (Scheme.print_ty_scheme ty_sch); *)
-  {Typed.term= pat; Typed.location= loc}
+  {Typed.term= type_plain_pattern p.Untyped.term; Typed.location= p.Untyped.location}
 
+
+and type_plain_pattern = function
+  | Untyped.PVar x -> Typed.PVar x
+  | Untyped.PAs (p, x) -> Typed.PAs (type_pattern p, x)
+  | Untyped.PNonbinding -> Typed.PNonbinding
+  | Untyped.PConst const -> Typed.PConst const
+  | Untyped.PTuple ps -> Typed.PTuple (List.map type_pattern ps)
+  | Untyped.PRecord [] -> assert false
+  | Untyped.PRecord ((fld, _) :: _ as lst) ->
+      assert false
+      (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+  | Untyped.PVariant (lbl, p) -> assert false
+
+
+(* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
 let extend_env vars env =
   List.fold_right
@@ -124,17 +94,18 @@ let rec get_skel_vars_from_constraints = function
 
 
 let constraint_free_ty_vars = function
-  | Typed.TyOmega (_, (Types.Tyvar a, Types.Tyvar b)) -> [a; b]
-  | Typed.TyOmega (_, (Types.Tyvar a, _)) -> [a]
-  | Typed.TyOmega (_, (_, Types.Tyvar a)) -> [a]
-  | _ -> []
+  | Typed.TyOmega (_, (Types.Tyvar a, Types.Tyvar b)) -> TyVarSet.of_list [a; b]
+  | Typed.TyOmega (_, (Types.Tyvar a, _)) -> TyVarSet.singleton a
+  | Typed.TyOmega (_, (_, Types.Tyvar a)) -> TyVarSet.singleton a
+  | _ -> TyVarSet.empty
 
 
 let constraint_free_dirt_vars = function
-  | Typed.DirtOmega (_, (Types.SetVar (_, a), Types.SetVar (_, b))) -> [a; b]
-  | Typed.DirtOmega (_, (Types.SetVar (_, a), _)) -> [a]
-  | Typed.DirtOmega (_, (_, Types.SetVar (_, a))) -> [a]
-  | _ -> []
+  | Typed.DirtOmega (_, (Types.SetVar (_, a), Types.SetVar (_, b))) ->
+      DirtVarSet.of_list [a; b]
+  | Typed.DirtOmega (_, (Types.SetVar (_, a), _)) -> DirtVarSet.singleton a
+  | Typed.DirtOmega (_, (_, Types.SetVar (_, a))) -> DirtVarSet.singleton a
+  | _ -> DirtVarSet.empty
 
 
 let rec free_ty_vars_ty = function
@@ -296,14 +267,6 @@ and free_dirt_vars_dirty_coercion = function
 
 (* ... *)
 
-let set_of_ty_list =
-  List.fold_left (fun acc x -> TyVarSet.add x acc) TyVarSet.empty
-
-
-let set_of_dirt_list =
-  List.fold_left (fun acc x -> DirtVarSet.add x acc) DirtVarSet.empty
-
-
 let splitter st constraints simple_ty =
   Print.debug "Splitter Input Constraints: " ;
   Unification.print_c_list constraints ;
@@ -311,23 +274,23 @@ let splitter st constraints simple_ty =
   Print.debug "Splitter Env :" ;
   print_env st ;
   let skel_list = OldUtils.uniq (get_skel_vars_from_constraints constraints) in
-  let simple_ty_freevars_ty = set_of_ty_list (free_ty_vars_ty simple_ty) in
+  let simple_ty_freevars_ty = TyVarSet.of_list (free_ty_vars_ty simple_ty) in
   Print.debug "Simple type free vars: " ;
   List.iter
     (fun x -> Print.debug "%t" (Params.Ty.print x))
     (free_ty_vars_ty simple_ty) ;
   let simple_ty_freevars_dirt =
-    set_of_dirt_list (free_dirt_vars_ty simple_ty)
+    DirtVarSet.of_list (free_dirt_vars_ty simple_ty)
   in
-  let state_freevars_ty = set_of_ty_list (state_free_ty_vars st) in
+  let state_freevars_ty = TyVarSet.of_list (state_free_ty_vars st) in
   Print.debug "state free vars: " ;
   List.iter
     (fun x -> Print.debug "%t" (Params.Ty.print x))
     (state_free_ty_vars st) ;
-  let state_freevars_dirt = set_of_dirt_list (state_free_dirt_vars st) in
+  let state_freevars_dirt = DirtVarSet.of_list (state_free_dirt_vars st) in
   (*   let cons2 = List.filter (fun cons -> 
-                                      let cons_freevars_ty = set_of_ty_list (constraint_free_ty_vars cons) in 
-                                      let cons_freevars_dirt = set_of_dirt_list (constraint_free_dirt_vars cons) in
+                                      let cons_freevars_ty = constraint_free_ty_vars cons in 
+                                      let cons_freevars_dirt = constraint_free_dirt_vars cons in
                                       let is_sub_ty = ( TyVarSet.subset cons_freevars_ty state_freevars_ty) || (TyVarSet.equal cons_freevars_ty state_freevars_ty) in 
                                       let is_sub_dirt = (DirtVarSet.subset cons_freevars_dirt state_freevars_dirt) || (DirtVarSet.equal cons_freevars_dirt state_freevars_dirt) in 
                                       is_sub_ty && is_sub_dirt
@@ -335,10 +298,8 @@ let splitter st constraints simple_ty =
   let cons1 =
     List.filter
       (fun cons ->
-        let cons_freevars_ty = set_of_ty_list (constraint_free_ty_vars cons) in
-        let cons_freevars_dirt =
-          set_of_dirt_list (constraint_free_dirt_vars cons)
-        in
+        let cons_freevars_ty = constraint_free_ty_vars cons in
+        let cons_freevars_dirt = constraint_free_dirt_vars cons in
         let is_sub_ty =
           TyVarSet.subset cons_freevars_ty state_freevars_ty
           || TyVarSet.equal cons_freevars_ty state_freevars_ty
@@ -353,16 +314,12 @@ let splitter st constraints simple_ty =
   let cons2 = OldUtils.diff constraints cons1 in
   let constraints_freevars_ty =
     List.fold_right
-      (fun cons acc ->
-        TyVarSet.union (set_of_ty_list (constraint_free_ty_vars cons)) acc )
+      (fun cons acc -> TyVarSet.union (constraint_free_ty_vars cons) acc)
       constraints TyVarSet.empty
   in
   let constraints_freevars_dirt =
     List.fold_right
-      (fun cons acc ->
-        DirtVarSet.union
-          (set_of_dirt_list (constraint_free_dirt_vars cons))
-          acc )
+      (fun cons acc -> DirtVarSet.union (constraint_free_dirt_vars cons) acc)
       constraints DirtVarSet.empty
   in
   let alpha_list =
@@ -1254,13 +1211,13 @@ let type_toplevel ~loc st c =
     Print.debug "New Computation : %t" (Typed.print_computation ct3) ;
     (* Print.debug "Remaining dirt variables "; *)
     (* List.iter (fun dp -> Print.debug "%t" (Params.Dirt.print dp)) (List.sort_uniq compare (free_dirt_vars_computation ct')); *)
-    let tch_ty, tch_dirt =
+(*     let tch_ty, tch_dirt =
       TypeChecker.type_check_comp TypeChecker.new_checker_state ct3.term
     in
     Print.debug "Type from Type Checker : %t ! %t"
       (Types.print_target_ty tch_ty)
       (Types.print_target_dirt tch_dirt) ;
-    (ct3, st)
+ *)    (ct3, st)
 
 
 let add_effect eff (ty1, ty2) st =
