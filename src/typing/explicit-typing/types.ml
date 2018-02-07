@@ -48,6 +48,10 @@ let is_effect_member eff drt =
   | SetEmpty eset when EffectSet.mem eff eset -> true
   | _ -> false
 
+let effect_set_of_dirt drt =
+  match drt with
+  | SetVar (eset, _) -> eset
+  | SetEmpty eset    -> eset
 
 let rec types_are_equal ty1 ty2 =
   match (ty1, ty2) with

@@ -34,6 +34,8 @@ and ct_ty = target_ty * target_ty
 
 and ct_dirt = dirt * dirt
 
+val effect_set_of_dirt : dirt -> effect_set
+
 val types_are_equal : target_ty -> target_ty -> bool
 
 val dirty_types_are_equal : target_dirty -> target_dirty -> bool

@@ -87,12 +87,24 @@ and optimize_sub_ty_coercion st tyco =
   | ApplySkelCoer (tyco1,sk) -> ApplySkelCoer ((optimize_ty_coercion st tyco1),sk) 
 
 and optimize_sub_dirty_coercion st dtyco =
-  dtyco
+  match dtyco with
+  | BangCoercion (tyco1,dco2) -> BangCoercion (optimize_ty_coercion st tyco1, optimize_dirt_coercion st dco2)
+  | RightArrow tyco1 -> RightArrow (optimize_ty_coercion st tyco1)
+  | RightHandler tyco1 -> RightHandler (optimize_ty_coercion st tyco1)
+  | LeftHandler tyco1 -> LeftHandler (optimize_ty_coercion st tyco1)
+  | SequenceDirtyCoer (dtyco1,dtyco2) -> SequenceDirtyCoer (optimize_dirty_coercion st dtyco1, optimize_dirty_coercion st dtyco2)
 
 and optimize_sub_dirt_coercion st dco =
-  dco
+  match dco with
+  | ReflDirt d -> dco
+  | DirtCoercionVar (dcov) -> dco
+  | Empty d -> dco
+  | UnionDirt (ops,dco1) -> UnionDirt (ops,optimize_dirt_coercion st dco1)
+  | SequenceDirtCoer (dco1,dco2) -> SequenceDirtCoer (optimize_dirt_coercion st dco1, optimize_dirt_coercion st dco2)
+  | DirtCoercion dtyco -> DirtCoercion (optimize_sub_dirty_coercion st dtyco)
 
 and reduce_ty_coercion st tyco =
+  Print.debug "reduce_ty_coercion: %t" (Typed.print_ty_coercion tyco);
   match tyco with
   | ReflTy ty -> tyco
   | ArrowCoercion (tyco1,dtyco2) -> tyco
@@ -114,6 +126,7 @@ and reduce_ty_coercion st tyco =
   | ApplySkelCoer (tyco1,sk) -> tyco
 
 and reduce_dirty_coercion st dtyco =
+  Print.debug "reduce_dirty_coercion: %t" (Typed.print_dirty_coercion dtyco);
   match dtyco with
   | BangCoercion (tyco1,dco2) -> dtyco
   | RightArrow tyco1 -> 
@@ -138,7 +151,12 @@ and reduce_dirt_coercion st dco =
   | ReflDirt d -> dco
   | DirtCoercionVar (dcov) -> dco
   | Empty d -> dco
-  | UnionDirt (ops,dco1) -> dco
+  | UnionDirt (ops,dco1) -> 
+      let (d1,d2) = TypeChecker.type_check_dirt_coercion st.tc_state dco1 in
+      let ops' = EffectSet.diff ops (EffectSet.inter (Types.effect_set_of_dirt d1) (Types.effect_set_of_dirt d2)) in
+      if EffectSet.is_empty ops'
+        then dco1
+        else UnionDirt (ops',dco1)
   | SequenceDirtCoer (dco1,dco2) -> dco
   | DirtCoercion dtyco -> dco
 
@@ -221,7 +239,7 @@ and optimize_sub_comp st c =
     | Match (e1, abstractions) -> assert false
     | Apply (e1, e2) -> Apply (optimize_expr st e1, optimize_expr st e2)
     | Handle (e1, c1) -> Handle (optimize_expr st e1, optimize_comp st c1)
-    | Call (op, e1, a_w_ty) -> Call (op, optimize_expr st e1, assert false)
+    | Call (op, e1, a_w_ty) -> Call (op, optimize_expr st e1, optimize_sub_abstraction_with_ty st a_w_ty)
     | Op (op, e1) -> Print.debug "optimize_sub_comp Op"; Op (op, optimize_expr st e1)
     | Bind (c1, abstraction) -> 
         let (ty,_) = TypeChecker.type_check_comp st.tc_state c1.term in

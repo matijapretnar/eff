@@ -109,7 +109,11 @@ let rec type_check_comp st c =
       | Typed.PVar p ->
           let st' = extend_state_term_vars st p c1_ty in
           let c2_ty, c2_drt = type_check_comp st' c2.term in
-          if c1_drt = c2_drt then (c2_ty, c2_drt) else assert false
+          if Types.dirts_are_equal c1_drt c2_drt 
+            then (c2_ty, c2_drt) 
+            else Error.typing ~loc:(c1.location) "Dirts of computations in bind not match: %t vs %t"
+              (Types.print_target_dirt c1_drt)
+              (Types.print_target_dirt c2_drt)
       | Typed.PNonbinding ->
           let c2_ty, c2_drt = type_check_comp st c2.term in
           if Types.dirts_are_equal c1_drt c2_drt then (c2_ty, c2_drt)
