@@ -720,6 +720,7 @@ and type_plain_expr in_cons st = function
           Typed.subst_comp [(k_var, coerced_l.term)]
             (Unification.apply_substitution subs_n op_term)
         in
+        Print.debug "substituted_c_op [%t/%t]: %t" (CoreSyntax.Variable.print ~safe:true l_var_name) (CoreSyntax.Variable.print ~safe:true k_var) (Typed.print_computation substituted_c_op);
         let coerced_substiuted_c_op =
           Typed.annotate
             (Typed.CastComp

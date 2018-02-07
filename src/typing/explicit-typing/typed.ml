@@ -438,16 +438,23 @@ and refresh_pattern' sbst = function
   | (PConst _ | PNonbinding) as p -> (sbst, p)
 
 
-let rec refresh_expr sbst e = {e with term= refresh_expr' sbst e.term}
+let rec refresh_expr sbst e = 
+  let res = {e with term= refresh_expr' sbst e.term} in
+  Print.debug "refres_expr" ;
+  res
 
 and refresh_expr' sbst = function
   | Var x as e -> (
     match OldUtils.lookup x sbst with Some x' -> Var x' | None -> e )
-  | Lambda a -> assert false
+  | Lambda (p,ty,c) -> 
+     let PVar x = p.term in
+     let sbst', p' = refresh_pattern sbst p in
+     Lambda (p',ty,refresh_comp sbst' c)
   | Handler h -> Handler (refresh_handler sbst h)
   | Tuple es -> Tuple (List.map (refresh_expr sbst) es)
   | Record flds -> Record (OldUtils.assoc_map (refresh_expr sbst) flds)
   | Variant (lbl, e) -> Variant (lbl, OldUtils.option_map (refresh_expr sbst) e)
+  | CastExp (e1, tyco) -> CastExp (refresh_expr sbst e1, tyco)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
 
 
@@ -514,7 +521,7 @@ and subst_expr' sbst = function
   | Record flds -> Record (OldUtils.assoc_map (subst_expr sbst) flds)
   | Variant (lbl, e) -> Variant (lbl, OldUtils.option_map (subst_expr sbst) e)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
-  | e -> e
+  | CastExp (e,tyco) -> CastExp (subst_expr sbst e,tyco)
 
 
 and subst_comp sbst c = {c with term= subst_comp' sbst c.term}
@@ -535,7 +542,7 @@ and subst_comp' sbst = function
   | Handle (e, c) -> Handle (subst_expr sbst e, subst_comp sbst c)
   | Call (eff, e, a) -> Call (eff, subst_expr sbst e, subst_abs_with_ty sbst a)
   | Value e -> Value (subst_expr sbst e)
-  | c -> c
+  | CastComp (c,dtyco) -> CastComp (subst_comp sbst c, dtyco)
 
 
 and subst_handler sbst h =

@@ -167,10 +167,12 @@ let compile_file ppf filename st =
     let loc = cmd.CoreSyntax.location in
     match cmd.CoreSyntax.term with
     | CoreSyntax.Computation c ->
+        Print.debug "Compiling: %t" (CoreSyntax.print_computation c);
         let ct, explicit_typing =
           ExplicitInfer.type_toplevel ~loc st.explicit_typing c
         in
-        print_endline "found something!" ;
+        Print.debug "-- After Type Inference ----------------------------------------";
+        Print.debug "%t" (Typed.print_computation ct);
         let ct =
           if !Config.disable_optimization then ct
           else Optimize.optimize_main_comp st.type_checker ct
