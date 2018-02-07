@@ -339,25 +339,35 @@ and reduce_comp st c =
   | Call (op, e1, a_w_ty) -> c
   | Op (op, e1) -> 
       assert false
-  | Bind (c1, abstraction2) -> 
-      begin match c1 with
-      | {term = Bind (c11, {term = (p1, c12)})} ->
+  | Bind (c1, a2) -> 
+      begin match c1.term with
+      | Bind (c11, {term = (p1, c12)}) ->
           let PVar var1 = p1.term in
           let (ty1,_) = TypeChecker.type_check_comp st.tc_state c11.term in
           let st' = extend_state_term_var st var1 ty1 in  
-          let c2' = reduce_comp st' { term = Bind (c12,abstraction2); location = c12.location} in
+          let c2' = reduce_comp st' { term = Bind (c12,a2); location = c12.location} in
           reduce_comp st {term = Bind (c11, {term = (p1, c2'); location = c.location }) ; location  = c.location} 
-      | {term = Value e11} ->
+      | Value e11 ->
           let ty11 = TypeChecker.type_check_exp st.tc_state e11.term in
-          let {term = (p2,c2); location = location2} = abstraction2 in
+          let {term = (p2,c2); location = location2} = a2 in
           beta_reduce st {term=(p2,ty11,c2);location=location2} e11
+      | Call (op, e11, ({term = (p12,ty12,c12)} as a_w_ty)) ->
+          let PVar var12 = p12.term in
+          let st' = extend_state_term_var st var12 ty12 in
+          let c12' = reduce_comp st' {term = Bind (c12,a2);location=c12.location} in
+          {term = Call (op, e11, {a_w_ty with term = (p12,ty12,c12')}); location=c.location}
       | _ -> c
       end 
   | CastComp (c1, dirty_coercion) -> 
       let dty1, dty2 = TypeChecker.type_check_dirty_coercion st.tc_state dirty_coercion in
-       if Types.dirty_types_are_equal dty1 dty2
-         then c1
-         else c
+      match c1.term with
+      | _ when Types.dirty_types_are_equal dty1 dty2 -> c1
+      | Call (op, e11, ({term = (p12,ty12,c12)} as a_w_ty)) ->
+          let PVar var12 = p12.term in
+          let st' = extend_state_term_var st var12 ty12 in
+          let c12' = reduce_comp st' {term = CastComp(c12,dirty_coercion);location=c12.location} in
+          {term = Call (op, e11, {a_w_ty with term = (p12, ty12, c12')});location=c.location}
+      | _ -> c
   | CastComp_ty (c1, ty_coercion) -> c
   | CastComp_dirt (c1, dirt_coercion) -> c
 
