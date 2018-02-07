@@ -172,8 +172,9 @@ and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
 
 and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
 
-and optimize_abs st {term = (p, c); location = loc} =
-  (* TODO: extend tc_state *)
+and optimize_abs st ty {term = (p, c); location = loc} =
+  let PVar var = p.term in
+  let st = extend_state_term_var st var ty in
   {term = (p,optimize_comp st c); location = loc}
 
 and optimize_sub_expr st e =
@@ -207,6 +208,7 @@ and optimize_sub_abstraction2 st a2 =
   in { term = plain_a2'; location = a2.location } 
 
 and optimize_sub_comp st c =
+  Print.debug "optimize_sub_comp: %t" (Typed.print_computation c) ;
   let loc = c.location in
   let plain_c' =
     match c.term with
@@ -221,7 +223,9 @@ and optimize_sub_comp st c =
     | Handle (e1, c1) -> Handle (optimize_expr st e1, optimize_comp st c1)
     | Call (op, e1, a_w_ty) -> Call (op, optimize_expr st e1, assert false)
     | Op (op, e1) -> Print.debug "optimize_sub_comp Op"; Op (op, optimize_expr st e1)
-    | Bind (c1, abstraction) -> Bind (optimize_comp st c1, optimize_abs st abstraction)
+    | Bind (c1, abstraction) -> 
+        let (ty,_) = TypeChecker.type_check_comp st.tc_state c1.term in
+        Bind (optimize_comp st c1, optimize_abs st ty abstraction)
     | CastComp (c1, dirty_coercion) -> CastComp (optimize_comp st c1, optimize_dirty_coercion st dirty_coercion)
     | CastComp_ty (c1, ty_coercion) -> assert false
     | CastComp_dirt (c1, dirt_coercion) -> assert false
@@ -230,7 +234,7 @@ and optimize_sub_comp st c =
 
 
 and reduce_expr st e =
-  Print.debug "reduce_exp %t" (Typed.print_expression e) ;
+  Print.debug "reduce_exp: %t" (Typed.print_expression e) ;
   match e.term with
   (*
           | Var of variable
@@ -254,10 +258,8 @@ and reduce_expr st e =
           | ApplyTyCoercion (e1,ty_co) ->
           *)
   | Effect op ->
-      Print.debug "reduce_exp Effect";
       e
   | CastExp (e1, ty_co) ->
-      Print.debug "reduce_exp (ApplyTyCoercion (e1,ty_co))" ;
       let ty1, ty2 =
         TypeChecker.type_check_ty_coercion st.tc_state ty_co
       in
@@ -273,18 +275,15 @@ and reduce_comp st c =
   | LetRec (bindings, c1) -> c
   | Match (e1, abstractions) -> c
   | Apply (e1, e2) -> (
-      Print.debug "reduce_comp (Apply (e1,e2)" ;
       match e1 with
       | {term= Lambda (p, ty, c)} ->
-          Print.debug "e1 is a lambda" ;
           beta_reduce st (annotate (p, ty, c) e1.location) e2
       | {term = Effect op} ->
           Print.debug "Op -> Call";
-          let ty = TypeChecker.type_check_exp st.tc_state e2.term in
           let var = Typed.Variable.fresh "call_var" in
-          let (eff,_) = op in
-          let c_cont = {term = CastComp ({term = Value {term = Var var ; location = c.location}; location = c.location},BangCoercion (ReflTy ty,Empty (SetEmpty (EffectSet.singleton eff))));location=c.location} in
-          let a_w_ty = {term = ({term = PVar var; location = c.location},ty,c_cont); location = c.location} in
+          let (eff,(ty_in,ty_out)) = op in
+          let c_cont = {term = CastComp ({term = Value {term = Var var ; location = c.location}; location = c.location},BangCoercion (ReflTy ty_out,Empty (SetEmpty (EffectSet.singleton eff))));location=c.location} in
+          let a_w_ty = {term = ({term = PVar var; location = c.location},ty_out,c_cont); location = c.location} in
           {term = Call (op, e2, a_w_ty); location=c.location}
       | _ ->
           Print.debug "e1 is not a lambda" ;
@@ -325,7 +324,10 @@ and reduce_comp st c =
   | Bind (c1, abstraction2) -> 
       begin match c1 with
       | {term = Bind (c11, {term = (p1, c12)})} ->
-          let c2' = reduce_comp st { term = Bind (c12,abstraction2); location = c12.location} in
+          let PVar var1 = p1.term in
+          let (ty1,_) = TypeChecker.type_check_comp st.tc_state c11.term in
+          let st' = extend_state_term_var st var1 ty1 in  
+          let c2' = reduce_comp st' { term = Bind (c12,abstraction2); location = c12.location} in
           reduce_comp st {term = Bind (c11, {term = (p1, c2'); location = c.location }) ; location  = c.location} 
       | {term = Value e11} ->
           let ty11 = TypeChecker.type_check_exp st.tc_state e11.term in
@@ -613,7 +615,7 @@ and reduce_comp st c =
   c'
 *)
 
-let optimize_main_comp c = optimize_comp inititial_state c
+let optimize_main_comp tc_state c = optimize_comp {inititial_state with tc_state = tc_state}  c
 
 (*
  To Do list for optimization :

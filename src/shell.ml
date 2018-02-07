@@ -173,7 +173,7 @@ let compile_file ppf filename st =
         print_endline "found something!" ;
         let ct =
           if !Config.disable_optimization then ct
-          else Optimize.optimize_main_comp ct
+          else Optimize.optimize_main_comp st.type_checker ct
         in
         Print.debug "-- After Optimization ------------------------------------------";
         Print.debug "%t" (Typed.print_computation ct);

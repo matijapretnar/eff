@@ -118,7 +118,13 @@ let rec type_check_comp st c =
   | CastComp (c1, dc) ->
       let c1_drty_ty = type_check_comp st c1.term in
       let dc1_1, dc_2 = type_check_dirty_coercion st dc in
-      if c1_drty_ty = dc1_1 then dc_2 else assert false
+      if Types.dirty_types_are_equal c1_drty_ty dc1_1 
+        then dc_2
+        else Error.typing ~loc:(c1.location) "Dirty types of computation and cast do not match: %t vs %t in %t |> %t" 
+          (Types.print_target_dirty c1_drty_ty) 
+          (Types.print_target_dirty dc1_1)
+          (Typed.print_computation c1)
+          (Typed.print_dirty_coercion dc)
   | CastComp_ty (c1, tc1) -> assert false
   | CastComp_dirt (c1, tc1) -> assert false
 
