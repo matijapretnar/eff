@@ -211,7 +211,6 @@ and optimize_sub_expr st e =
           | Tuple of expression list
           | Record of (OldUtils.field, expression) OldUtils.assoc
           | Variant of OldUtils.label * expression option
-          | Handler of handler
           | BigLambdaTy of Params.Ty.t * skeleton * expression
           | BigLambdaDirt of Params.Dirt.t * expression  
           | BigLambdaSkel of Params.Skel.t * expression
@@ -231,7 +230,7 @@ and optimize_sub_expr st e =
     | Effect op           -> Effect op
     | Handler h           -> Handler (optimize_sub_handler st h)
     | CastExp (e1, tyco1) -> CastExp (optimize_expr st e1, optimize_ty_coercion st tyco1)
-    | plain_e             -> plain_e (* TODO: implement *)
+    | Handler h           -> e.term (* TODO: implement *)
   in
   {term= plain_e'; location=e.location}
 
@@ -388,6 +387,15 @@ and reduce_comp st c =
           let st' = extend_state_term_var st var12 ty12 in
           let c12' = reduce_comp st' {term = Bind (c12,a2);location=c12.location} in
           {term = Call (op, e11, {a_w_ty with term = (p12,ty12,c12')}); location=c.location}
+      | CastComp (c11,dtyco) ->
+          begin match c11.term with
+          | Value e111 -> 
+              let p_e111' = CastExp (e111,PureCoercion dtyco) in
+              let ty111 = TypeChecker.type_check_exp st.tc_state p_e111' in
+              let {term = (p2,c2); location = location2} = a2 in
+              beta_reduce st {term=(p2,ty111,c2);location=location2} {term = p_e111';location = e111.location}
+          | _ -> c
+          end
       | _ -> c
       end 
   | CastComp (c1, dirty_coercion) -> 

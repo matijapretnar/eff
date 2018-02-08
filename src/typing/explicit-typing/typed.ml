@@ -305,6 +305,8 @@ and print_ty_coercion ?max_level c ppf =
   | TyCoercionVar tcp -> print "%t " (Params.TyCoercion.print tcp)
   | SequenceTyCoer (tc1, tc2) ->
       print "%t ; %t" (print_ty_coercion tc1) (print_ty_coercion tc2)
+  | PureCoercion dtyco ->
+      print "pure(%t)" (print_dirty_coercion dtyco)
 
 
 and print_dirty_coercion ?max_level c ppf =
