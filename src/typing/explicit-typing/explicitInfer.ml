@@ -514,8 +514,15 @@ let fresh_dirt_coer cons =
   (Typed.DirtCoercionVar param, Typed.DirtOmega (param, cons))
 
 
-let rec type_expr in_cons st {Untyped.term= expr; Untyped.location= loc} =
+let rec type_expr in_cons st ({Untyped.term= expr; Untyped.location= loc} as e) =
+  Print.debug "type_expr: %t" (CoreSyntax.print_expression e);
+  Print.debug "### Constraints Before ###";
+  Unification.print_c_list in_cons;
+  Print.debug "##########################";
   let e, ttype, constraints, sub_list = type_plain_expr in_cons st expr in
+  Print.debug "### Constraints After ####";
+  Unification.print_c_list constraints;
+  Print.debug "##########################";
   (Typed.annotate e loc, ttype, constraints, sub_list)
 
 
@@ -631,26 +638,37 @@ and type_plain_expr in_cons st = function
       in
       let r_subbed_st = apply_sub_to_env st target_cr_sub in
       let folder
+  (*
           (acc_terms, acc_tys, acc_st, acc_cons, acc_subs, acc_alpha_delta_i)
           (eff, abs2) =
+   *)
+          (eff, abs2)
+          (acc_terms, acc_tys, acc_st, acc_cons, acc_subs, acc_alpha_delta_i) =
         let ( typed_c_op
             , typed_co_op_ty
             , s_st
             , co_op_cons
             , c_op_sub
             , (alpha_i, delta_i) ) =
+          Print.debug "get_handler_op_clause: %t" (CoreSyntax.abstraction2 abs2);
           get_handler_op_clause eff abs2 acc_st acc_cons acc_subs
         in
         ( typed_c_op :: acc_terms
         , typed_co_op_ty :: acc_tys
         , s_st
-        , co_op_cons @ acc_cons
+        , co_op_cons (* @ acc_cons *)
         , c_op_sub @ acc_subs
         , (alpha_i, delta_i) :: acc_alpha_delta_i )
       in
+(*
       let folder_function =
         List.fold_left folder ([], [], r_subbed_st, target_cr_cons, [], [])
           h.effect_clauses
+      in
+*)
+      let folder_function =
+        List.fold_right folder 
+          h.effect_clauses ([], [], r_subbed_st, target_cr_cons, [], [])
       in
       let typed_op_terms, typed_op_terms_ty, _, cons_n, subs_n, alpha_delta_i_s =
         folder_function
@@ -784,6 +802,16 @@ and type_plain_expr in_cons st = function
         ; omega_cons_7 ]
         @ ops_cons @ r_cons @ cons_n
       in
+      Print.debug "### Handler r_cons             ###";
+      Unification.print_c_list r_cons;
+      Print.debug "### Handler cons_n             ###";
+      Unification.print_c_list cons_n;
+      Print.debug "### Constraints before Handler ###";
+      Unification.print_c_list in_cons;
+      Print.debug "#################################";
+      Print.debug "### Constraints after Handler ###";
+      Unification.print_c_list all_cons;
+      Print.debug "#################################";
       (coerced_handler, target_type, all_cons, subs_n @ target_cr_sub)
 
 
@@ -1069,9 +1097,8 @@ and type_plain_comp in_cons st = function
               , subs_c2 @ subs_c1 )
           | pat -> assert false )
   | Untyped.LetRec (defs, c) -> assert false
-
-
 (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+
 and get_handler_op_clause eff abs2 in_st in_cons in_sub =
   let in_op_ty, out_op_ty = Untyped.EffectMap.find eff in_st.effects in
   let x, k, c_op = abs2 in
