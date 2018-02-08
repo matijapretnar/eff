@@ -358,11 +358,10 @@ and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match eff_clauses with
   | [] -> print "| eff' -> fun arg k -> Call (eff', arg, k)"
-  | (((_, (t1, t2)) as eff), {term= p1, p2, c}) :: cases ->
-      print ~at_level:1 "| %t -> (fun %t %t -> %t) %t" (print_effect eff)
-        (print_pattern p1) (print_pattern p2) (print_computation c)
+  | (((_, (t1, t2)) as eff), a2) :: cases ->
+      print ~at_level:1 "| %t -> %t %t" (print_effect eff)
+        (print_abstraction2 a2)
         (print_effect_clauses cases)
-
 
 and print_abstraction {term= p, c} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
@@ -373,6 +372,9 @@ and print_abstraction_with_ty {term= p, tty, c} ppf =
     (Types.print_target_ty tty)
     (print_computation c)
 
+and print_abstraction2 {term= p1,p2,c} ppf =
+  Format.fprintf ppf "(fun %t %t -> %t)"
+        (print_pattern p1) (print_pattern p2) (print_computation c)
 
 and print_pure_abstraction {term= p, e} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_expression e)
@@ -564,7 +566,8 @@ and subst_abs_with_ty sbst a =
 
 and subst_abs2 sbst a2 =
   (* a2a2 @@ subst_abs sbst @@ a22a @@ a2 *)
-  assert false
+  let (p1,p2,c) = a2.term in
+  {a2 with term = (p1,p2, subst_comp sbst c)}
 
 
 let assoc_equal eq flds flds' : bool =
@@ -724,18 +727,30 @@ let rec free_vars_comp c =
   | Handle (e, c1) -> free_vars_expr e @@@ free_vars_comp c1
   | Call (_, e1, a1) -> free_vars_expr e1 @@@ free_vars_abs_with_ty a1
   | Bind (c1, a1) -> free_vars_comp c1 @@@ free_vars_abs a1
+  | CastComp (c1, dtyco) -> free_vars_comp c1
 
 
 and free_vars_expr e =
   match e.term with
   | Var v -> ([], [v])
   | Tuple es -> concat_vars (List.map free_vars_expr es)
-  | Lambda a -> assert false
+  | Lambda a -> free_vars_plain_abs_with_ty a
   | Handler h -> free_vars_handler h
   | Record flds -> concat_vars (List.map (fun (_, e) -> free_vars_expr e) flds)
   | Variant (_, None) -> ([], [])
   | Variant (_, Some e) -> free_vars_expr e
+  | CastExp (e',tyco) -> free_vars_expr e'
   | BuiltIn _ | Effect _ | Const _ -> ([], [])
+  | BigLambdaTy _ -> assert false
+  | BigLambdaDirt _ -> assert false
+  | BigLambdaSkel _ -> assert false
+  | ApplyTyExp _ -> assert false
+  | LambdaTyCoerVar _ -> assert false
+  | LambdaDirtCoerVar _ -> assert false
+  | ApplyDirtExp _ -> assert false
+  | ApplySkelExp _ -> assert false
+  | ApplyTyCoercion _ -> assert false
+  | ApplyDirtCoercion _ -> assert false
 
 
 and free_vars_handler h =
@@ -747,22 +762,24 @@ and free_vars_handler h =
 and free_vars_finally_handler (h, finally_clause) =
   free_vars_handler h @@@ free_vars_abs finally_clause
 
-
 and free_vars_abs a =
   let p, c = a.term in
   let inside, outside = free_vars_comp c --- pattern_vars p in
   (inside @ outside, [])
 
-
 and free_vars_abs_with_ty a =
-  let p, _, c = a.term in
+  free_vars_plain_abs_with_ty a.term
+
+and free_vars_plain_abs_with_ty p_a =
+  let p, _, c = p_a in
   let inside, outside = free_vars_comp c --- pattern_vars p in
   (inside @ outside, [])
 
-
 and free_vars_abs2 a2 =
   (* free_vars_abs @@ a22a @@ a2 *)
-  assert false
+  let (p1,p2,c) = a2.term in
+  let inside, outside = (free_vars_comp c --- pattern_vars p2) --- pattern_vars p1 in
+  (inside @ outside, [])
 
 
 let occurrences x (inside, outside) =

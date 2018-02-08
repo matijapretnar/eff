@@ -12,10 +12,19 @@ let extend_state_ty_var st ty_var = {st with tc_state = TypeChecker.extend_state
 
 let extend_state_term_var st t_var ty = {st with tc_state = TypeChecker.extend_state_term_vars st.tc_state t_var ty}
 
-let refresh_expr e = Typed.refresh_expr [] e
+let refresh_expr e =
+  let res = Typed.refresh_expr [] e in
+  Print.debug "refresh_expr  : %t" (Typed.print_expression e);
+  Print.debug "refresh_expr'd: %t" (Typed.print_expression res);
+  res
+
 let refresh_abs a = Typed.refresh_abs [] a
 let refresh_abs_with_ty a = Typed.refresh_abs_with_ty [] a
-let refresh_abs2 a2 = Typed.refresh_abs2 [] a2
+let refresh_abs2 a2 = 
+  let res = Typed.refresh_abs2 [] a2 in
+  Print.debug "refresh_abs2  : %t" (Typed.print_abstraction2 a2);
+  Print.debug "refresh_abs2'd: %t" (Typed.print_abstraction2 res);
+  res
 
 let is_relatively_pure st c h =
   match TypeChecker.type_check_comp st.tc_state c.term with
@@ -198,32 +207,55 @@ and optimize_abs st ty {term = (p, c); location = loc} =
 and optimize_sub_expr st e =
   let plain_e' =
     match e.term with 
+  (*
+          | Tuple of expression list
+          | Record of (OldUtils.field, expression) OldUtils.assoc
+          | Variant of OldUtils.label * expression option
+          | Handler of handler
+          | BigLambdaTy of Params.Ty.t * skeleton * expression
+          | BigLambdaDirt of Params.Dirt.t * expression  
+          | BigLambdaSkel of Params.Skel.t * expression
+          | ApplyTyExp of expression * Types.target_ty
+          | LambdaTyCoerVar of Params.TyCoercion.t * Types.ct_ty * expression 
+          | LambdaDirtCoerVar of Params.DirtCoercion.t * Types.ct_dirt * expression 
+          | ApplyDirtExp of expression * Types.dirt
+          | ApplySkelExp of expression * Types.skeleton
+          | ApplyTyCoercion of expression * ty_coercion
+          | ApplyDirtCoercion of expression * dirt_coercion
+          | ApplyTyCoercion (e1,ty_co) ->
+          *)
+    | Var v               -> Var v
+    | BuiltIn (s,i)       -> BuiltIn (s,i)
+    | Const c             -> Const c
+    | Lambda plain_a_w_ty -> Lambda (optimize_plain_abstraction_with_ty st plain_a_w_ty)
+    | Effect op           -> Effect op
     | Handler h           -> Handler (optimize_sub_handler st h)
     | CastExp (e1, tyco1) -> CastExp (optimize_expr st e1, optimize_ty_coercion st tyco1)
-    | plain_e -> plain_e (* TODO: implement *)
+    | plain_e             -> plain_e (* TODO: implement *)
   in
   {term= plain_e'; location=e.location}
 
-and optimize_sub_handler st h =
-    match h with
-    | { effect_clauses = ecs; value_clause = vc }
-    -> { effect_clauses = OldUtils.assoc_map (optimize_sub_abstraction2 st) ecs; value_clause = optimize_sub_abstraction_with_ty st vc }
+and optimize_sub_handler st { effect_clauses = ecs; value_clause = vc } =
+    let vc'   = optimize_abstraction_with_ty st vc in
+    let _,dty = TypeChecker.type_check_abstraction_with_ty st.tc_state vc  in
+    let ecs'  = List.map (optimize_abstraction2 st dty) ecs in
+    { effect_clauses = ecs'; value_clause = vc' }
 
-and optimize_sub_abstraction_with_ty st a_w_ty =
-  let plain_a_w_ty' =
-    match a_w_ty.term with
-    | (p,ty,c) ->
-        let PVar var = p.term in
-        (p,ty,optimize_comp (extend_state_term_var st var ty) c)
-  in { term = plain_a_w_ty'; location = a_w_ty.location } 
+and optimize_abstraction_with_ty st a_w_ty =
+  let plain_a_w_ty' = optimize_plain_abstraction_with_ty st a_w_ty.term in
+  { term = plain_a_w_ty'; location = a_w_ty.location } 
 
-and optimize_sub_abstraction2 st a2 =
-  let plain_a2' =
-    match a2.term with
-    | (p1,p2,c) ->
-        (* TODO: extend tc_state *)
-        (p1,p2,optimize_comp st c)
-  in { term = plain_a2'; location = a2.location } 
+and optimize_plain_abstraction_with_ty st (p,ty,c) =
+  let PVar var = p.term in
+  (p,ty,optimize_comp (extend_state_term_var st var ty) c)
+
+and optimize_abstraction2 st dty (effect,a2) =
+  let op, (in_op, out_op) = effect in
+  let (p1,p2,c)     = a2.term in 
+  let Typed.PVar v1 = p1.term in 
+  let Typed.PVar v2 = p2.term in 
+  let st = extend_state_term_var (extend_state_term_var st v1 in_op) v2 (Types.Arrow (out_op, dty)) in
+  (effect,{a2 with term = (p1,p2,optimize_comp st c)})
 
 and optimize_sub_comp st c =
   Print.debug "optimize_sub_comp: %t" (Typed.print_computation c) ;
@@ -239,7 +271,7 @@ and optimize_sub_comp st c =
     | Match (e1, abstractions) -> assert false
     | Apply (e1, e2) -> Apply (optimize_expr st e1, optimize_expr st e2)
     | Handle (e1, c1) -> Handle (optimize_expr st e1, optimize_comp st c1)
-    | Call (op, e1, a_w_ty) -> Call (op, optimize_expr st e1, optimize_sub_abstraction_with_ty st a_w_ty)
+    | Call (op, e1, a_w_ty) -> Call (op, optimize_expr st e1, optimize_abstraction_with_ty st a_w_ty)
     | Op (op, e1) -> Print.debug "optimize_sub_comp Op"; Op (op, optimize_expr st e1)
     | Bind (c1, abstraction) -> 
         let (ty,_) = TypeChecker.type_check_comp st.tc_state c1.term in
@@ -328,7 +360,7 @@ and reduce_comp st c =
               | Some eff_clause ->
                   let {term = (p1, p2, c)} = refresh_abs2 eff_clause in
                   (* Shouldn't we check for inlinability of p1 and p2 here? *)
-                  substitute_pattern_comp st (substitute_pattern_comp st c p1 e11) p2 (lambda (k_pat',k_ty,k_c'))
+                  substitute_pattern_comp st ((Typed.subst_comp (Typed.pattern_match p1 e11) c)) p2 (lambda (k_pat',k_ty,k_c'))
               | None ->
                   let res = call eff e11 {term=(k_pat',k_ty,k_c');location=handled_k.location} in reduce_comp st res
               end
@@ -1145,6 +1177,7 @@ and reduce_comp st c =
       st.optimization_total := !(st.optimization_total) + 1;
         let {term = (p1, p2, c)} = refresh_abs2 eff_clause in
         (* Shouldn't we check for inlinability of p1 and p2 here? *)
+        let PVar v
         substitute_pattern_comp st (substitute_pattern_comp st c p1 param) p2 (lambda handled_k)
       | None ->
         let res =

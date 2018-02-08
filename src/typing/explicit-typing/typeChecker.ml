@@ -2,8 +2,10 @@ open Typed
 open Types
 open Unification
 
+(*
 type ('term, 'ttype) target_term =
   {term: 'term; target_type: 'ttype; location: Location.t}
+ *)
 
 type checker_state =
   { term_vars: (Typed.variable, Types.target_ty) OldUtils.assoc
@@ -132,20 +134,22 @@ let rec type_check_comp st c =
   | CastComp_ty (c1, tc1) -> assert false
   | CastComp_dirt (c1, tc1) -> assert false
 
-and type_check_handler st h =
-      let pv, tv, cv = h.value_clause.term in
+and type_check_abstraction_with_ty st {term = (pv,tv,cv)} =
       let Typed.PVar v = pv.term in
       let st' = extend_state_term_vars st v tv in
-      let type_cv = type_check_comp st' cv.term in
-      let mapper (effe, abs2) =
+      (tv,type_check_comp st' cv.term)
+
+and type_check_handler st h =
+      let (tv,type_cv) = type_check_abstraction_with_ty st h.value_clause in
+      let mapper (effe, abs2) = (
         let eff, (in_op_ty, out_op_ty) = effe in
-        (* let (x,y,c_op) = abs2.term in 
-               let Typed.PVar xv = x.term in 
-               let Typed.PVar yv = y.term in 
-               let st_temp = extend_state_term_vars st xv in_op_ty in 
-               let st' = extend_state_term_vars st_temp yv (Types.Arrow (out_op_ty, type_cv)) in 
-               let type_cop = type_check_comp st' c_op.term  in  *)
-        eff
+        let (x,y,c_op) = abs2.term in 
+        let Typed.PVar xv = x.term in 
+        let Typed.PVar yv = y.term in 
+        let st_temp = extend_state_term_vars st xv in_op_ty in 
+        let st' = extend_state_term_vars st_temp yv (Types.Arrow (out_op_ty, type_cv)) in 
+        let type_cop = type_check_comp st' c_op.term  in
+        eff)
       in
       let handlers_ops = OldUtils.map mapper h.effect_clauses in
       let handlers_ops_set = Types.EffectSet.of_list handlers_ops in
