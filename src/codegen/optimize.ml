@@ -367,13 +367,13 @@ and reduce_comp st c =
               | Some dtyco -> optimize_comp st { term = Bind ({term = CastComp (c1',dtyco);location=c.location},Typed.abstraction_with_ty_to_abstraction h.value_clause); location = c.location }
               | None -> c
               end
-          | Bind (c11,a1) ->
+          | Bind (({term = CastComp (c111,_)} as c11),a1) ->
               (* TODO: Fix *)
-              begin match is_relatively_pure st c11 h with
+              begin match is_relatively_pure st c111 h with
               | Some dtyco -> 
                   let (p12,c12) = a1.term in
                   let PVar var12 = p12.term in
-                  optimize_comp st { c with term = Bind ({c11 with term = CastComp (c11,dtyco)}, abstraction p12 (handle (refresh_expr e1) c12))} 
+                  optimize_comp st { c with term = Bind ({c11 with term = CastComp (c111,dtyco)}, abstraction p12 (handle (refresh_expr e1) c12))} 
               | None -> c
               end
           | Call (eff, e11, k_abs) ->
