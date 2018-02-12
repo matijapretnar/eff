@@ -30,6 +30,7 @@ let is_relatively_pure st c h =
   match TypeChecker.type_check_comp st.tc_state c.term with
   | (ty,SetEmpty ops) -> 
      let handled_ops = EffectSet.of_list (List.map (fun ((eff, _), _) -> eff) h.effect_clauses) in
+     Print.debug "is_relatively_pure: %t:  %t vs %t" (Typed.print_computation c) (Types.print_effect_list (EffectSet.elements handled_ops)) (Types.print_effect_list (EffectSet.elements ops));
      if EffectSet.is_empty(EffectSet.inter handled_ops ops)
        then
          let Types.Handler (_,(_,output_dirt)) = TypeChecker.type_check_handler st.tc_state h in 
@@ -178,7 +179,11 @@ and reduce_dirt_coercion st p_ops dco =
         then dco1
         else UnionDirt (ops',dco1)
   | SequenceDirtCoer (dco1,dco2) -> dco
-  | DirtCoercion dtyco -> dco
+  | DirtCoercion dtyco -> 
+      begin match dtyco with
+      | BangCoercion (_,dco1) -> dco1
+      | _ -> dco
+      end
 
 let rec substitute_pattern_comp st c p exp =
   optimize_comp st (Typed.subst_comp (Typed.pattern_match p exp) c)
@@ -362,6 +367,15 @@ and reduce_comp st c =
               | Some dtyco -> optimize_comp st { term = Bind ({term = CastComp (c1',dtyco);location=c.location},Typed.abstraction_with_ty_to_abstraction h.value_clause); location = c.location }
               | None -> c
               end
+          | Bind (c11,a1) ->
+              (* TODO: Fix *)
+              begin match is_relatively_pure st c11 h with
+              | Some dtyco -> 
+                  let (p12,c12) = a1.term in
+                  let PVar var12 = p12.term in
+                  optimize_comp st { c with term = Bind ({c11 with term = CastComp (c11,dtyco)}, abstraction p12 (handle (refresh_expr e1) c12))} 
+              | None -> c
+              end
           | Call (eff, e11, k_abs) ->
               let {term = (k_pat, k_ty, k_c)} = refresh_abs_with_ty k_abs in
               let PVar k_var = k_pat.term in 
@@ -405,18 +419,30 @@ and reduce_comp st c =
               let ty111 = TypeChecker.type_check_exp st.tc_state p_e111' in
               let {term = (p2,c2); location = location2} = a2 in
               beta_reduce st {term=(p2,ty111,c2);location=location2} {term = p_e111';location = e111.location}
+          | Bind (c111, abs112) -> 
+              let (p112,c112) = abs112.term in
+              let PVar var112 = p112.term in
+              let (ty111,_) = TypeChecker.type_check_comp st.tc_state c111.term in
+              let c112' = { c112 with term = CastComp (c112,dtyco) } in
+              let st' = extend_state_term_var st var112 ty111 in  
+              let c2' = reduce_comp st' { c112 with term = Bind (c112',a2) } in
+              let dtyco' = optimize_dirty_coercion st (BangCoercion (ReflTy ty111,DirtCoercion dtyco)) in
+              let c111' = reduce_comp st { c111 with term = CastComp (c111,dtyco') } in
+              reduce_comp st {c with term = Bind (c111', {abs112 with term = (p112, c2') })} 
           | _ -> c
           end
       | _ -> c
       end 
-  | CastComp (c1, dirty_coercion) -> 
-      let dty1, dty2 = TypeChecker.type_check_dirty_coercion st.tc_state dirty_coercion in
+  | CastComp (c1, dtyco) -> 
+      let dty1, dty2 = TypeChecker.type_check_dirty_coercion st.tc_state dtyco in
       match c1.term with
       | _ when Types.dirty_types_are_equal dty1 dty2 -> c1
+      | CastComp (c11,dtyco12) ->
+          {c with term = CastComp (c11, optimize_dirty_coercion st (SequenceDirtyCoer (dtyco12,dtyco)))}
       | Call (op, e11, ({term = (p12,ty12,c12)} as a_w_ty)) ->
           let PVar var12 = p12.term in
           let st' = extend_state_term_var st var12 ty12 in
-          let c12' = reduce_comp st' {term = CastComp(c12,dirty_coercion);location=c12.location} in
+          let c12' = reduce_comp st' {term = CastComp(c12,dtyco);location=c12.location} in
           {term = Call (op, e11, {a_w_ty with term = (p12, ty12, c12')});location=c.location}
       | _ -> c
   | CastComp_ty (c1, ty_coercion) -> c

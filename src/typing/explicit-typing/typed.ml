@@ -335,7 +335,8 @@ and print_dirt_coercion ?max_level c ppf =
       print "{%t} U %t"
         (Types.print_effect_list eff_list)
         (print_dirt_coercion dc)
-
+  | DirtCoercion dtyco -> 
+      print "dirtOf(%t)" (print_dirty_coercion dtyco)
 
 and print_omega_ct ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
