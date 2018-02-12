@@ -72,7 +72,10 @@ and optimize_dirty_coercion st dtyco =
   reduce_dirty_coercion st (optimize_sub_dirty_coercion st dtyco)
 
 and optimize_dirt_coercion st dco =
-  reduce_dirt_coercion st (optimize_sub_dirt_coercion st dco)
+  optimize_dirt_coercion' st EffectSet.empty dco
+
+and optimize_dirt_coercion' st ops dco =
+  reduce_dirt_coercion st ops (optimize_sub_dirt_coercion st ops dco)
 
 and optimize_sub_ty_coercion st tyco =
   match tyco with
@@ -91,7 +94,7 @@ and optimize_sub_ty_coercion st tyco =
   | QualTyCoer (ct_ty,tyco1) -> QualTyCoer (ct_ty,(optimize_ty_coercion st tyco1)) 
   | QualDirtCoer (ct_dirt,tyco1) -> QualDirtCoer (ct_dirt,(optimize_ty_coercion st tyco1)) 
   | ApplyQualTyCoer (tyco1,tyco2) -> ApplyQualTyCoer ((optimize_ty_coercion st tyco1),(optimize_ty_coercion st tyco2)) 
-  | ApplyQualDirtCoer (tyco1,dco) -> ApplyQualDirtCoer ((optimize_ty_coercion st tyco1),(optimize_sub_dirt_coercion st dco)) 
+  | ApplyQualDirtCoer (tyco1,dco) -> ApplyQualDirtCoer ((optimize_ty_coercion st tyco1),(optimize_dirt_coercion st dco)) 
   | ForallSkel (sv,tyco1) -> ForallSkel (sv,(optimize_ty_coercion st tyco1)) 
   | ApplySkelCoer (tyco1,sk) -> ApplySkelCoer ((optimize_ty_coercion st tyco1),sk) 
 
@@ -103,14 +106,14 @@ and optimize_sub_dirty_coercion st dtyco =
   | LeftHandler tyco1 -> LeftHandler (optimize_ty_coercion st tyco1)
   | SequenceDirtyCoer (dtyco1,dtyco2) -> SequenceDirtyCoer (optimize_dirty_coercion st dtyco1, optimize_dirty_coercion st dtyco2)
 
-and optimize_sub_dirt_coercion st dco =
+and optimize_sub_dirt_coercion st p_ops dco =
   match dco with
   | ReflDirt d -> dco
   | DirtCoercionVar (dcov) -> dco
   | Empty d -> dco
-  | UnionDirt (ops,dco1) -> UnionDirt (ops,optimize_dirt_coercion st dco1)
-  | SequenceDirtCoer (dco1,dco2) -> SequenceDirtCoer (optimize_dirt_coercion st dco1, optimize_dirt_coercion st dco2)
-  | DirtCoercion dtyco -> DirtCoercion (optimize_sub_dirty_coercion st dtyco)
+  | UnionDirt (ops,dco1) -> UnionDirt (ops,optimize_dirt_coercion' st (EffectSet.union p_ops ops) dco1)
+  | SequenceDirtCoer (dco1,dco2) -> SequenceDirtCoer (optimize_dirt_coercion' st p_ops dco1, optimize_dirt_coercion' st p_ops dco2)
+  | DirtCoercion dtyco -> DirtCoercion (optimize_dirty_coercion st dtyco)
 
 and reduce_ty_coercion st tyco =
   Print.debug "reduce_ty_coercion: %t" (Typed.print_ty_coercion tyco);
@@ -155,11 +158,19 @@ and reduce_dirty_coercion st dtyco =
       end
   | SequenceDirtyCoer (dtyco1,dtyco2) -> dtyco
 
-and reduce_dirt_coercion st dco =
+and reduce_dirt_coercion st p_ops dco =
   match dco with
   | ReflDirt d -> dco
   | DirtCoercionVar (dcov) -> dco
-  | Empty d -> dco
+  | Empty d -> 
+      begin match d with
+      | SetEmpty ops      ->
+          let ops' = EffectSet.diff ops p_ops in
+          Empty (SetEmpty ops')
+      | SetVar (ops,var)  -> 
+          let ops' = EffectSet.diff ops p_ops in
+          Empty (SetVar (ops',var))
+      end 
   | UnionDirt (ops,dco1) -> 
       let (d1,d2) = TypeChecker.type_check_dirt_coercion st.tc_state dco1 in
       let ops' = EffectSet.diff ops (EffectSet.inter (Types.effect_set_of_dirt d1) (Types.effect_set_of_dirt d2)) in
