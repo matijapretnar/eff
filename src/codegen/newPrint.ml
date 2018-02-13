@@ -130,7 +130,10 @@ and print_computation ?max_level c ppf =
       print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]"
         (print_computation ~max_level:0 c1)
         (print_abstraction a)
-  | Erasure.EMatch (e, alist) -> assert false
+  | Erasure.EMatch (e, alist) -> 
+      print ~at_level:1 "match %t with %t"
+        (print_expression ~max_level:0 e)
+        (print_cases alist)
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
@@ -142,6 +145,18 @@ and print_effect_clauses eff_clauses ppf =
         (print_effect eff) (print_pattern p1) (Types.print_target_ty t1)
         (print_pattern p2) (Types.print_target_ty t2) (print_computation c)
         (print_effect_clauses cases)
+
+and print_cases cases ppf =
+  let print ?at_level = Print.print ?at_level ppf in
+  match cases with
+  | [] -> ()
+  | ({term = (p,c)}:: cases) ->
+      print ~at_level:1
+        "| %t -> %t %t"
+        (print_pattern p)
+        (print_computation c)
+        (print_cases cases) 
+     
 
 and print_abstraction {Erasure.term= p, c} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
