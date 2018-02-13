@@ -75,7 +75,19 @@ let rec type_check_comp st c =
           (Types.print_target_ty t_v)
           (Types.print_target_ty ty)
   | LetRec (l, c1) -> assert false
-  | Match (e, alist) -> assert false
+  | Match (e, alist) -> 
+      let t_e     = type_check_exp st e.term in
+      let ty_list = List.map (type_check_abstraction st t_e) alist in
+      begin match ty_list with
+      | [] -> Error.typing ~loc:Location.unknown
+                "Match computations without branches"
+      | dty::dtys ->
+         if List.for_all (Types.dirty_types_are_equal dty) dtys
+           then dty
+           else Error.typing ~loc:Location.unknown
+                  "The types of the branches of a match computation do not agree."
+      end
+
   | Apply (e1, e2) ->
       let t_e1 = type_check_exp st e1.term in
       let Types.Arrow (ty_1, dty_1) = t_e1 in
@@ -138,6 +150,11 @@ and type_check_abstraction_with_ty st {term = (pv,tv,cv)} =
       let Typed.PVar v = pv.term in
       let st' = extend_state_term_vars st v tv in
       (tv,type_check_comp st' cv.term)
+
+and type_check_abstraction st ty {term = (pv,cv)} =
+      let Typed.PVar v = pv.term in
+      let st' = extend_state_term_vars st v ty in
+      type_check_comp st' cv.term
 
 and type_check_handler st h =
       let (tv,type_cv) = type_check_abstraction_with_ty st h.value_clause in
@@ -287,7 +304,7 @@ and type_check_ty_coercion st ty_coer =
       (Types.Handler (c_1, c_2), Types.Handler (c_3, c_4))
   | TyCoercionVar p -> (
     match OldUtils.lookup p st.omega_ty with
-    | None -> assert false
+    | None -> Error.typing ~loc:Location.unknown "unknown type coercion variable: %t" (Typed.print_ty_coercion ty_coer)
     | Some pi -> pi )
   | SequenceTyCoer (ty_coer1, ty_coer2) ->
       let t1, t2 = type_check_ty_coercion st ty_coer1 in

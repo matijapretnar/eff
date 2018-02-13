@@ -52,6 +52,11 @@ and source_to_target_dirty ty =
   (source_to_target ty, Types.SetEmpty Types.EffectSet.empty)
 
 
+let fresh_ty_with_skel () =
+  let ty_var = Params.Ty.fresh () and skel_var = Params.Skel.fresh () in
+  (Types.Tyvar ty_var, Typed.TyvarHasSkel (ty_var, Types.SkelVar skel_var))
+
+
 let rec type_pattern p =
   {Typed.term= type_plain_pattern p.Untyped.term; Typed.location= p.Untyped.location}
 
@@ -67,9 +72,29 @@ and type_plain_pattern = function
       assert false
       (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.PVariant (lbl, p) -> assert false
-
-
 (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+
+
+(*
+
+     ===========================
+     Q; Γ ⊢ p : A ~> p' ⊣ Γ'; Q' 
+     ===========================
+
+  ---------------------------------
+  Q; Γ ⊢ x : A ~> x ⊣ Γ,x:α; Q
+
+ *)
+
+and type_pattern' in_cons st pat ty =
+  let pat', st', out_cons = type_plain_pattern' in_cons st pat.Untyped.term ty in
+  ({Typed.term = pat'; Typed.location = pat.Untyped.location}, st', out_cons)
+
+and type_plain_pattern' in_cons st pat ty =
+  match pat with
+  | Untyped.PVar x -> 
+      let st' = add_def st x ty
+      in (Typed.PVar x, st', in_cons)
 
 let extend_env vars env =
   List.fold_right
@@ -192,7 +217,8 @@ and free_dirt_vars_computation c =
   | Typed.LetVal (e, (p, ty, c)) ->
       free_dirt_vars_expression e @ free_dirt_vars_computation c
   | Typed.LetRec _ -> assert false
-  | Typed.Match (_, _) -> assert false
+  | Typed.Match (e, cases) -> 
+      free_dirt_vars_expression e @ List.concat (List.map free_dirt_vars_abstraction cases)
   | Typed.Apply (e1, e2) ->
       free_dirt_vars_expression e1 @ free_dirt_vars_expression e2
   | Typed.Handle (e, c) ->
@@ -492,10 +518,6 @@ let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
   in
   (dirt_cons_apps, skel_constraints @ ty_cons @ dirt_cons)
 
-
-let fresh_ty_with_skel () =
-  let ty_var = Params.Ty.fresh () and skel_var = Params.Skel.fresh () in
-  (Types.Tyvar ty_var, Typed.TyvarHasSkel (ty_var, Types.SkelVar skel_var))
 
 
 let no_effect_dirt dirt_param = Types.SetVar (Types.EffectSet.empty, dirt_param)
@@ -826,7 +848,27 @@ and type_plain_comp in_cons st = function
       let new_d_ty = (tt, Types.SetEmpty Types.EffectSet.empty) in
       (Typed.Value typed_e, new_d_ty, constraints, subs_e)
   | Untyped.Match (e, cases) ->
-      assert false
+      (*
+           α,δ,ωi fresh
+
+           Q;Γ ⊢ e : A | Q₀; σ₀ ~> e'
+
+           forall i in 1..n:
+
+             Qi₋₁;σi₋₁(Γ) ⊢ casei : A -> Bi ! Δi | Qi ; σi ~> casei'
+ 
+             ωi : σ^n(Bi ! Δi) <:  (α ! δ)          
+ 
+           -----------------------------------------------------------------
+           Q;Γ ⊢ Match (e, cases) : σ^n(α ! δ) | σ^n(Q,Q₀,...,Qn) ~> Match (e', cases' |> ωi) 
+      *)
+      (* TODO: ignoring the substitutions for now *)
+      let (e', ty_A, cons0, sigma0) = type_expr in_cons st e in
+      let ty_alpha , q_alpha = fresh_ty_with_skel () in
+      let dirt_delta = fresh_dirt () in
+      let (cases', cons1, sigma1) = type_cases (q_alpha :: cons0) st cases ty_A (ty_alpha, dirt_delta) in 
+      (Typed.Match (e', cases'), (ty_alpha, dirt_delta), cons1, sigma0 @ sigma1)
+
       (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Apply (e1, e2) -> (
       Print.debug "in infer apply" ;
@@ -1115,6 +1157,23 @@ and get_handler_op_clause eff abs2 in_st in_cons in_sub =
     type_comp cons new_st c_op
   in
   (typed_c_op, typed_co_op_ty, st_subbed, co_op_cons, c_op_sub, alpha_dirty)
+
+and type_cases in_cons st cases ty_in dty_out = 
+      match cases with
+      | []           -> ([], in_cons, [])
+      | (case::cases) ->
+           let (case', cons1, sub1)  = type_case in_cons st case ty_in dty_out in
+           let (cases', cons2, sub2) = type_cases cons1 st cases ty_in dty_out in
+           (case'::cases', cons2, sub1 @ sub2)
+
+and type_case in_cons st case ty_in (ty_out, dirt_out) =
+  let (p,c) = case in
+  let (p',st',cons1) = type_pattern' in_cons st p ty_in in
+  let (c', (ty_c, dirt_c), cons2, sublist) = type_comp cons1 st' c in
+  let (tyco,q1) = fresh_ty_coer (ty_c,ty_out) in
+  let (dco,q2) = fresh_dirt_coer (dirt_c,dirt_out) in
+  let c'' = {Typed.term = Typed.CastComp (c', BangCoercion (tyco,dco)); Typed.location = c'.Typed.location } in
+  ({Typed.term = (p',c'');Typed.location=c''.Typed.location}, q1 :: q2 :: cons2, sublist)
 
 
 (* Finalize a list of constraints, setting all dirt variables to the empty set. *)

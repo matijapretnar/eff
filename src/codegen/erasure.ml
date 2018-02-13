@@ -58,6 +58,7 @@ and e_plain_computation =
   | EHandle of e_expression * e_computation
   | ECall of effect * e_expression * e_abstraction_with_ty
   | EBind of e_computation * e_abstraction
+  | EMatch of e_expression * e_abstraction list
 
 (** Handler definitions *)
 and e_handler =
@@ -171,6 +172,10 @@ and typed_to_erasure_comp' sub tt =
       let c' = typed_to_erasure_comp sub c in
       let a' = typed_to_erasure_abs sub a in
       EBind (c', a')
+  | Typed.Match (e, alist) ->
+      let e' = typed_to_erasure_exp sub e in
+      let alist' = List.map (typed_to_erasure_abs sub) alist in
+      EMatch (e', alist')
   | Typed.CastComp (c, _) -> typed_to_erasure_comp' sub c.term
   | Typed.CastComp_ty (c, _) -> typed_to_erasure_comp' sub c.term
   | Typed.CastComp_dirt (c, _) -> typed_to_erasure_comp' sub c.term

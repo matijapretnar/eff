@@ -264,6 +264,11 @@ and optimize_plain_abstraction_with_ty st (p,ty,c) =
   let PVar var = p.term in
   (p,ty,optimize_comp (extend_state_term_var st var ty) c)
 
+and optimize_abstraction st ty a =
+  let (p,c) = a.term in
+  let PVar var = p.term in
+  { a with term = (p,optimize_comp (extend_state_term_var st var ty) c) }
+
 and optimize_abstraction2 st dty (effect,a2) =
   let op, (in_op, out_op) = effect in
   let (p1,p2,c)     = a2.term in 
@@ -283,7 +288,9 @@ and optimize_sub_comp st c =
         let st' = extend_state_term_var st var ty in
         LetVal (optimize_expr st e1, (p, ty, optimize_comp st' c1))
     | LetRec (bindings, c1) -> assert false
-    | Match (e1, abstractions) -> assert false
+    | Match (e1, abstractions) -> 
+       let ty = TypeChecker.type_check_exp st.tc_state e1.term in
+       Match (optimize_expr st e1, List.map (optimize_abstraction st ty) abstractions)
     | Apply (e1, e2) -> Apply (optimize_expr st e1, optimize_expr st e2)
     | Handle (e1, c1) -> Handle (optimize_expr st e1, optimize_comp st c1)
     | Call (op, e1, a_w_ty) -> Call (op, optimize_expr st e1, optimize_abstraction_with_ty st a_w_ty)

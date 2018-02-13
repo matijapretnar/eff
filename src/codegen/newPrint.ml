@@ -130,6 +130,7 @@ and print_computation ?max_level c ppf =
       print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]"
         (print_computation ~max_level:0 c1)
         (print_abstraction a)
+  | Erasure.EMatch (e, alist) -> assert false
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
