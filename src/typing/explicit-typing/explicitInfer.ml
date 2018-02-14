@@ -56,6 +56,11 @@ let fresh_ty_with_skel () =
   let ty_var = Params.Ty.fresh () and skel_var = Params.Skel.fresh () in
   (Types.Tyvar ty_var, Typed.TyvarHasSkel (ty_var, Types.SkelVar skel_var))
 
+let fresh_ty_coer cons =
+  let param = Params.TyCoercion.fresh () in
+  (Typed.TyCoercionVar param, Typed.TyOmega (param, cons))
+
+
 
 let rec type_pattern p =
   {Typed.term= type_plain_pattern p.Untyped.term; Typed.location= p.Untyped.location}
@@ -84,6 +89,13 @@ and type_plain_pattern = function
   ---------------------------------
   Q; Γ ⊢ x : A ~> x ⊣ Γ,x:α; Q
 
+  ---------------------------------
+  Q; Γ ⊢ _ : A ~> _ ⊣ Γ; Q
+
+  ⊢ c : B
+  ------------------------------------ [we don't use ω, we just force the types to be equal]
+  Q; Γ ⊢ c : A ~> c ⊣ Γ; Q, ω : B <: A
+
  *)
 
 and type_pattern' in_cons st pat ty =
@@ -95,6 +107,16 @@ and type_plain_pattern' in_cons st pat ty =
   | Untyped.PVar x -> 
       let st' = add_def st x ty
       in (Typed.PVar x, st', in_cons)
+  | Untyped.PNonbinding ->
+      (Typed.PNonbinding, st, in_cons)
+  | Untyped.PAs (p,v) -> assert false
+  | Untyped.PTuple l -> assert false
+  | Untyped.PRecord r -> assert false
+  | Untyped.PVariant (l,p) -> assert false
+  | Untyped.PConst c -> 
+      let ty_c = source_to_target (ty_of_const c) in
+      let _omega, q = fresh_ty_coer (ty_c,ty) in
+      (Typed.PConst c, st, q :: in_cons)
 
 let extend_env vars env =
   List.fold_right
@@ -525,10 +547,6 @@ let no_effect_dirt dirt_param = Types.SetVar (Types.EffectSet.empty, dirt_param)
 let fresh_dirt () = no_effect_dirt (Params.Dirt.fresh ())
 
 let make_dirty ty = (ty, fresh_dirt ())
-
-let fresh_ty_coer cons =
-  let param = Params.TyCoercion.fresh () in
-  (Typed.TyCoercionVar param, Typed.TyOmega (param, cons))
 
 
 let fresh_dirt_coer cons =

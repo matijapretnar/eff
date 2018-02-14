@@ -8,9 +8,13 @@ type state =
 
 let inititial_state = {fuel= ref !Config.optimization_fuel; tc_state = TypeChecker.new_checker_state}
 
-let extend_state_ty_var st ty_var = {st with tc_state = TypeChecker.extend_state_ty_vars st.tc_state ty_var}
-
 let extend_state_term_var st t_var ty = {st with tc_state = TypeChecker.extend_state_term_vars st.tc_state t_var ty}
+let extend_state_ty_var st ty_var = {st with tc_state = TypeChecker.extend_state_ty_vars st.tc_state ty_var}
+let extend_state_dirt_var st t_var = {st with tc_state = TypeChecker.extend_state_dirt_vars st.tc_state t_var}
+let extend_state_skel_var st t_var = {st with tc_state = TypeChecker.extend_state_skel_vars st.tc_state t_var}
+let extend_state_omega_ty st omega ct = {st with tc_state = TypeChecker.extend_state_omega_ty st.tc_state omega ct}
+let extend_state_omega_dirt st omega ct = {st with tc_state = TypeChecker.extend_state_omega_dirt st.tc_state omega ct}
+let extend_state_ty_var_skel st omega ct = {st with tc_state = TypeChecker.extend_state_ty_var_skel st.tc_state omega ct}
 
 let refresh_expr e =
   let res = Typed.refresh_expr [] e in
@@ -216,9 +220,8 @@ and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
 and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
 
 and optimize_abs st ty {term = (p, c); location = loc} =
-  let PVar var = p.term in
-  let st = extend_state_term_var st var ty in
-  {term = (p,optimize_comp st c); location = loc}
+  let st' = optimize_pattern st ty p in
+  {term = (p,optimize_comp st' c); location = loc}
 
 and optimize_sub_expr st e =
   let plain_e' =
@@ -227,18 +230,27 @@ and optimize_sub_expr st e =
           | Tuple of expression list
           | Record of (OldUtils.field, expression) OldUtils.assoc
           | Variant of OldUtils.label * expression option
-          | BigLambdaTy of Params.Ty.t * skeleton * expression
-          | BigLambdaDirt of Params.Dirt.t * expression  
-          | BigLambdaSkel of Params.Skel.t * expression
-          | ApplyTyExp of expression * Types.target_ty
-          | LambdaTyCoerVar of Params.TyCoercion.t * Types.ct_ty * expression 
-          | LambdaDirtCoerVar of Params.DirtCoercion.t * Types.ct_dirt * expression 
-          | ApplyDirtExp of expression * Types.dirt
-          | ApplySkelExp of expression * Types.skeleton
-          | ApplyTyCoercion of expression * ty_coercion
-          | ApplyDirtCoercion of expression * dirt_coercion
-          | ApplyTyCoercion (e1,ty_co) ->
           *)
+    | BigLambdaTy (ty_var,sk,e) -> 
+        let st' = extend_state_ty_var_skel (extend_state_ty_var st ty_var) ty_var sk in
+        BigLambdaTy (ty_var, sk, optimize_expr st' e)
+    | BigLambdaDirt (dirt_var,e) -> 
+        let st' = extend_state_dirt_var st dirt_var in
+        BigLambdaDirt (dirt_var, optimize_expr st' e)
+    | BigLambdaSkel (sk_var, e) -> 
+        let st' = extend_state_skel_var st sk_var in
+        BigLambdaSkel (sk_var, optimize_expr st' e)
+    | LambdaTyCoerVar (tyco_var, ct_ty, e) -> 
+        let st' = extend_state_omega_ty st tyco_var ct_ty in
+        LambdaTyCoerVar (tyco_var, ct_ty, optimize_expr st' e)
+    | LambdaDirtCoerVar (dco_var,ct_dirt,e) -> 
+        let st' = extend_state_omega_dirt st dco_var ct_dirt in
+        LambdaDirtCoerVar (dco_var,ct_dirt,optimize_expr st' e) 
+    | ApplyTyExp (e,ty) -> ApplyTyExp (optimize_expr st e, ty)
+    | ApplyDirtExp (e,dirt) -> ApplyDirtExp (optimize_expr st e, dirt)
+    | ApplySkelExp (e,sk) -> ApplySkelExp (optimize_expr st e, sk)
+    | ApplyDirtCoercion (e,dco) -> ApplyDirtCoercion (optimize_expr st e, dco)
+    | ApplyTyCoercion (e,tyco) -> ApplyTyCoercion (optimize_expr st e, tyco) 
     | Var v               -> Var v
     | BuiltIn (s,i)       -> BuiltIn (s,i)
     | Const c             -> Const c
@@ -266,8 +278,13 @@ and optimize_plain_abstraction_with_ty st (p,ty,c) =
 
 and optimize_abstraction st ty a =
   let (p,c) = a.term in
-  let PVar var = p.term in
-  { a with term = (p,optimize_comp (extend_state_term_var st var ty) c) }
+  let st' = optimize_pattern st ty p in
+  { a with term = (p,optimize_comp st' c) }
+
+and optimize_pattern st ty p =
+  match p.term with
+  | PVar x -> extend_state_term_var st x ty
+  | PNonbinding -> st
 
 and optimize_abstraction2 st dty (effect,a2) =
   let op, (in_op, out_op) = effect in

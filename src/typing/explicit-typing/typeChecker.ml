@@ -152,9 +152,13 @@ and type_check_abstraction_with_ty st {term = (pv,tv,cv)} =
       (tv,type_check_comp st' cv.term)
 
 and type_check_abstraction st ty {term = (pv,cv)} =
-      let Typed.PVar v = pv.term in
-      let st' = extend_state_term_vars st v ty in
+      let st' = type_check_pattern st ty pv in
       type_check_comp st' cv.term
+
+and type_check_pattern st ty p =
+  match p.term with
+  | PVar x -> extend_state_term_vars st x ty
+  | PNonbinding -> st
 
 and type_check_handler st h =
       let (tv,type_cv) = type_check_abstraction_with_ty st h.value_clause in
