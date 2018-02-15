@@ -989,6 +989,7 @@ and type_plain_comp in_cons st = function
       | Untyped.Value e_1 ->
           let typed_e1, type_e1, cons_e1, sub_e1 = type_expr in_cons st e_1 in
           let sub_e1', cons_e1' = Unification.unify ([], [], cons_e1) in
+          let typed_e1 = Unification.apply_substitution_exp sub_e1' typed_e1 in
           let st_subbed = apply_sub_to_env st (sub_e1' @ sub_e1) in
           let ( split_skel_vars
               , split_ty_vars

@@ -62,6 +62,11 @@ let rec types_are_equal ty1 ty2 =
       dirty_types_are_equal dirtya1 dirtyb1
       && dirty_types_are_equal dirtya2 dirtyb2
   | PrimTy ptya, PrimTy ptyb -> ptya = ptyb
+  | QualTy (ctty1,ty1), QualTy (ctty2,ty2) -> assert false
+  | QualDirt (ctd1,ty1), QualDirt (ctd2,ty2) -> ctd1 = ctd2 && types_are_equal ty1 ty2
+  | TySchemeTy (tyvar1,sk1,ty1), TySchemeTy (tyvar2,sk2,ty2) -> assert false
+  | TySchemeDirt (dvar1,ty1), TySchemeDirt (dvar2,ty2) -> dvar1 = dvar2 && types_are_equal ty1 ty2
+  | TySchemeSkel (skvar1,ty1), TySchemeSkel (skvar2,ty2) -> assert false
   | _ -> false
 
 

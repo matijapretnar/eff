@@ -33,6 +33,12 @@ let print_sub ?max_level c ppf =
       print "%t :-skelvarToSkeleton-> %t" (Params.Skel.print p)
         (Types.print_skeleton s)
 
+let rec print_s_list = function
+  | [] -> Print.debug "---------------------"
+  | e :: l ->
+      Print.debug "%t" (print_sub e) ;
+      print_s_list l
+
 
 let apply_sub_dirt sub drt =
   match drt with
@@ -162,6 +168,7 @@ and apply_sub_dirtycoer sub dirty_coer =
 
 let rec apply_sub_comp sub c =
   let c' = apply_sub_plain_comp sub c in
+  Print.debug "apply_sub_comp: %t %t" (print_sub sub) (print_computation c);
   Typed.annotate c' c.location
 
 
@@ -189,6 +196,7 @@ and apply_sub_plain_comp sub c =
 
 and apply_sub_exp sub exp =
   let e' = apply_sub_plain_exp sub exp in
+  Print.debug "apply_sub_exp: %t %t" (print_sub sub) (print_expression exp);
   Typed.annotate e' exp.location
 
 
@@ -214,10 +222,10 @@ and apply_sub_plain_exp sub e =
       CastExp (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
   | ApplyTyExp (e1, tty) ->
       ApplyTyExp (apply_sub_exp sub e1, apply_sub_ty sub tty)
-  | LambdaTyCoerVar (tcp1, ct_ty1, e1) ->
-      LambdaTyCoerVar (tcp1, ct_ty1, apply_sub_exp sub e1)
-  | LambdaDirtCoerVar (dcp1, ct_dirt1, e1) ->
-      LambdaDirtCoerVar (dcp1, ct_dirt1, apply_sub_exp sub e1)
+  | LambdaTyCoerVar (tcp1, (ty1,ty2), e1) ->
+      LambdaTyCoerVar (tcp1, (apply_sub_ty sub ty1, apply_sub_ty sub ty2), apply_sub_exp sub e1)
+  | LambdaDirtCoerVar (dcp1, (d1,d2), e1) ->
+      LambdaDirtCoerVar (dcp1, (apply_sub_dirt sub d1, apply_sub_dirt sub d2), apply_sub_exp sub e1)
   | ApplyDirtExp (e1, d1) ->
       ApplyDirtExp (apply_sub_exp sub e1, apply_sub_dirt sub d1)
   | ApplyTyCoercion (e1, tc1) ->
@@ -372,12 +380,6 @@ let rec print_c_list = function
       Print.debug "%t" (Typed.print_omega_ct e) ;
       print_c_list l
 
-
-let rec print_s_list = function
-  | [] -> Print.debug "---------------------"
-  | e :: l ->
-      Print.debug "%t" (print_sub e) ;
-      print_s_list l
 
 
 let rec print_var_list = function

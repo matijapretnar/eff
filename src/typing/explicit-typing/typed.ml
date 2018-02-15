@@ -527,6 +527,16 @@ and subst_expr' sbst = function
   | Variant (lbl, e) -> Variant (lbl, OldUtils.option_map (subst_expr sbst) e)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
   | CastExp (e,tyco) -> CastExp (subst_expr sbst e,tyco)
+  | BigLambdaTy (tyvar,sk,e) -> BigLambdaTy (tyvar,sk,subst_expr sbst e)
+  | BigLambdaDirt (dvar,e) -> BigLambdaDirt (dvar,subst_expr sbst e)
+  | BigLambdaSkel (skvar,e) -> BigLambdaSkel (skvar,subst_expr sbst e)
+  | ApplyTyExp (e,ty) -> ApplyTyExp (subst_expr sbst e,ty)
+  | LambdaTyCoerVar (tycovar,ct,e) -> LambdaTyCoerVar (tycovar,ct,subst_expr sbst e)
+  | LambdaDirtCoerVar (dcovar,ct,e) -> LambdaDirtCoerVar (dcovar,ct,subst_expr sbst e)
+  | ApplyDirtExp (e,d) -> ApplyDirtExp (subst_expr sbst e, d)
+  | ApplySkelExp (e,sk) -> ApplySkelExp (subst_expr sbst e, sk)
+  | ApplyTyCoercion (e,tyco) -> ApplyTyCoercion (subst_expr sbst e, tyco)
+  | ApplyDirtCoercion (e,dco) -> ApplyDirtCoercion (subst_expr sbst e,dco)
 
 
 and subst_comp sbst c = {c with term= subst_comp' sbst c.term}
@@ -750,10 +760,10 @@ and free_vars_expr e =
   | ApplyTyExp _ -> assert false
   | LambdaTyCoerVar _ -> assert false
   | LambdaDirtCoerVar _ -> assert false
-  | ApplyDirtExp _ -> assert false
-  | ApplySkelExp _ -> assert false
-  | ApplyTyCoercion _ -> assert false
-  | ApplyDirtCoercion _ -> assert false
+  | ApplyDirtExp (e,d) -> free_vars_expr e
+  | ApplySkelExp (e,sk) -> free_vars_expr e
+  | ApplyTyCoercion (e,tyco) -> free_vars_expr e
+  | ApplyDirtCoercion (e,dco) -> free_vars_expr e
 
 
 and free_vars_handler h =

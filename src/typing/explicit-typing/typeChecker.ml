@@ -159,6 +159,14 @@ and type_check_pattern st ty p =
   match p.term with
   | PVar x -> extend_state_term_vars st x ty
   | PNonbinding -> st
+  | PConst c -> 
+      let ty_c = ExplicitInfer.source_to_target (ExplicitInfer.ty_of_const c) in
+      if Types.types_are_equal ty_c ty
+        then st
+        else Error.typing  ~loc:Location.unknown "Type of constant pattern does not match exected type: %t vs %t"
+               (Types.print_target_ty ty_c)
+               (Types.print_target_ty ty)
+          
 
 and type_check_handler st h =
       let (tv,type_cv) = type_check_abstraction_with_ty st h.value_clause in

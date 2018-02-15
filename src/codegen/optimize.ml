@@ -285,6 +285,7 @@ and optimize_pattern st ty p =
   match p.term with
   | PVar x -> extend_state_term_var st x ty
   | PNonbinding -> st
+  | PConst c -> st
 
 and optimize_abstraction2 st dty (effect,a2) =
   let op, (in_op, out_op) = effect in
@@ -340,12 +341,22 @@ and reduce_expr st e =
           | ApplyTyExp of expression * Types.target_ty
           | LambdaTyCoerVar of Params.TyCoercion.t * Types.ct_ty * expression 
           | LambdaDirtCoerVar of Params.DirtCoercion.t * Types.ct_dirt * expression 
-          | ApplyDirtExp of expression * Types.dirt
           | ApplySkelExp of expression * Types.skeleton
           | ApplyTyCoercion of expression * ty_coercion
-          | ApplyDirtCoercion of expression * dirt_coercion
           | ApplyTyCoercion (e1,ty_co) ->
           *)
+  | ApplyDirtCoercion (e1,dco) ->
+      begin match e1.term with
+      | LambdaDirtCoerVar (dcovar,ctd,e11) ->
+          Unification.apply_sub_exp (Unification.CoerDirtVartoDirtCoercion (dcovar,dco)) e11
+      | _ -> e
+      end
+  | ApplyDirtExp (e1,d) ->
+      begin match e1.term with
+      | BigLambdaDirt (dvar,e11) ->
+          Unification.apply_sub_exp (Unification.DirtVarToDirt (dvar,d)) e11
+      | _ -> e
+      end
   | Effect op ->
       e
   | CastExp (e1, ty_co) ->
@@ -360,7 +371,8 @@ and reduce_comp st c =
   Print.debug "reduce_comp: %t" (Typed.print_computation c);
   match c.term with
   | Value _ -> c
-  | LetVal (e1, (p, ty, c1)) -> c
+  | LetVal (e1, (p, ty, c1)) ->
+      beta_reduce st (annotate (p, ty, c1) c.location) e1
   | LetRec (bindings, c1) -> c
   | Match (e1, abstractions) -> c
   | Apply (e1, e2) -> (
