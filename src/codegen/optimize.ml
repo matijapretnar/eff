@@ -338,13 +338,24 @@ and reduce_expr st e =
           | BigLambdaTy of Params.Ty.t * skeleton * expression
           | BigLambdaDirt of Params.Dirt.t * expression  
           | BigLambdaSkel of Params.Skel.t * expression
-          | ApplyTyExp of expression * Types.target_ty
           | LambdaTyCoerVar of Params.TyCoercion.t * Types.ct_ty * expression 
           | LambdaDirtCoerVar of Params.DirtCoercion.t * Types.ct_dirt * expression 
           | ApplySkelExp of expression * Types.skeleton
           | ApplyTyCoercion of expression * ty_coercion
           | ApplyTyCoercion (e1,ty_co) ->
           *)
+  | ApplySkelExp (e1,sk) ->
+      begin match e1.term with
+      | BigLambdaSkel (skvar,e11) ->
+          Unification.apply_sub_exp (Unification.SkelVarToSkel(skvar,sk)) e11
+      | _ -> e
+      end 
+  | ApplyTyExp (e1,ty) ->
+      begin match e1.term with
+      | BigLambdaTy (tyvar,sk,e11) ->
+          Unification.apply_sub_exp (Unification.TyVarToTy (tyvar,ty)) e11
+      | _ -> e
+      end 
   | ApplyDirtCoercion (e1,dco) ->
       begin match e1.term with
       | LambdaDirtCoerVar (dcovar,ctd,e11) ->

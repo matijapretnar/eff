@@ -336,14 +336,7 @@ let splitter st constraints simple_ty =
     (fun x -> Print.debug "%t" (Params.Ty.print x))
     (state_free_ty_vars st) ;
   let state_freevars_dirt = DirtVarSet.of_list (state_free_dirt_vars st) in
-  (*   let cons2 = List.filter (fun cons -> 
-                                      let cons_freevars_ty = constraint_free_ty_vars cons in 
-                                      let cons_freevars_dirt = constraint_free_dirt_vars cons in
-                                      let is_sub_ty = ( TyVarSet.subset cons_freevars_ty state_freevars_ty) || (TyVarSet.equal cons_freevars_ty state_freevars_ty) in 
-                                      let is_sub_dirt = (DirtVarSet.subset cons_freevars_dirt state_freevars_dirt) || (DirtVarSet.equal cons_freevars_dirt state_freevars_dirt) in 
-                                      is_sub_ty && is_sub_dirt
-                           ) constraints in  *)
-  let cons1 =
+  let local_cons =
     List.filter
       (fun cons ->
         let cons_freevars_ty = constraint_free_ty_vars cons in
@@ -359,7 +352,6 @@ let splitter st constraints simple_ty =
         not (is_sub_ty && is_sub_dirt) )
       constraints
   in
-  let cons2 = OldUtils.diff constraints cons1 in
   let constraints_freevars_ty =
     List.fold_right
       (fun cons acc -> TyVarSet.union (constraint_free_ty_vars cons) acc)
@@ -382,15 +374,22 @@ let splitter st constraints simple_ty =
          (DirtVarSet.union constraints_freevars_dirt simple_ty_freevars_dirt)
          state_freevars_dirt)
   in
+  let global_cons' = OldUtils.diff constraints local_cons in
+  let global_cons  = List.filter (
+          fun c ->
+            match c with
+            | Typed.TyvarHasSkel (tyvar,skvar) -> not (List.mem tyvar alpha_list)
+            | _                                -> true
+       ) global_cons' in
   Print.debug "Splitter output free_ty_vars: " ;
   List.iter (fun x -> Print.debug "%t" (Params.Ty.print x)) alpha_list ;
   Print.debug "Splitter output free_dirt_vars: " ;
   List.iter (fun x -> Print.debug "%t" (Params.Dirt.print x)) delta_list ;
-  Print.debug "Splitter first constraints list :" ;
-  Unification.print_c_list cons1 ;
-  Print.debug "Splitter second constraints list :" ;
-  Unification.print_c_list cons2 ;
-  (skel_list, alpha_list, delta_list, cons1, cons2)
+  Print.debug "Splitter global constraints list :" ;
+  Unification.print_c_list local_cons ;
+  Print.debug "Splitter global constraints list :" ;
+  Unification.print_c_list global_cons ;
+  (skel_list, alpha_list, delta_list, local_cons, global_cons)
 
 
 let rec get_sub_of_ty ty_sch =

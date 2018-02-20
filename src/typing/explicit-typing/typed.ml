@@ -757,7 +757,7 @@ and free_vars_expr e =
   | BigLambdaTy _ -> assert false
   | BigLambdaDirt _ -> assert false
   | BigLambdaSkel _ -> assert false
-  | ApplyTyExp _ -> assert false
+  | ApplyTyExp (e,ty) -> free_vars_expr e
   | LambdaTyCoerVar _ -> assert false
   | LambdaDirtCoerVar _ -> assert false
   | ApplyDirtExp (e,d) -> free_vars_expr e

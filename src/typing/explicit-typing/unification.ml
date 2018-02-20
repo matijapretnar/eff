@@ -86,7 +86,8 @@ let rec apply_sub_ty sub ty =
       TySchemeTy (ty_param, apply_sub_skel sub sk, apply_sub_ty sub tty1)
   | TySchemeDirt (dirt_param, tty1) ->
       TySchemeDirt (dirt_param, apply_sub_ty sub tty1)
-
+  | TySchemeSkel (skvar, ty) -> 
+      TySchemeSkel (skvar, apply_sub_ty sub ty)
 
 and apply_sub_dirty_ty sub (ty, drt) =
   (apply_sub_ty sub ty, apply_sub_dirt sub drt)
