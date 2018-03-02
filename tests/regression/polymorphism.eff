@@ -14,9 +14,9 @@ let v = [[]];;
 
 ([] :: v, [2] :: v);;
 
-#type (fun x -> let h t u = u in h x x);;
+(fun x -> let h t u = u in h x x);;
 
-#type (fun x -> let h t u = t in h x x);;
+(fun x -> let h t u = t in h x x);;
 
 let rec u x = u x;;
-#type u;;
+u;;

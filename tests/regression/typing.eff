@@ -1,43 +1,43 @@
 (* Basic types *)
-#type 3;;
-#type true;;
-#type "foo";;
-#type ();;
-#type 4.2;;
+3;;
+true;;
+"foo";;
+();;
+4.2;;
 
 (* Tuples *)
-#type (3,4);;
-#type ([], "foo");;
+(3,4);;
+([], "foo");;
 
 (* variants *)
 type ('a,'b) cow = Small of 'a | Large of 'b;;
-#type Small "brown";;
-#type Large "white";;
-#type (fun cow -> match cow with Small k -> Large (k + 3) | Large s -> Small ("foo"::s));;
+Small "brown";;
+Large "white";;
+(fun cow -> match cow with Small k -> Large (k + 3) | Large s -> Small ("foo"::s));;
 
 (* records *)
 type ('a,'b) bull = {small : 'a; large : 'b};;
-#type {small = 5; large = "foo"};;
-#type (fun {small=k} -> k + 2);;
-#type (fun {large=l} -> [] :: l);;
+{small = 5; large = "foo"};;
+(fun {small=k} -> k + 2);;
+(fun {large=l} -> [] :: l);;
 
 (* effects *)
 effect Bark : string -> string
 effect Wag : unit -> int;;
 
-#type #Bark;;
-#type #Bark "tree";;
-#type #Wag ();;
+fun _ -> #Bark;;
+fun _ -> #Bark "tree";;
+fun _ -> #Wag ();;
 
 (* Polymorphism *)
-#type (fun x -> x);;
-#type (fun x -> x) (fun y -> y);;
-#type (fun x -> (x, x));;
-#type ((fun x -> x), []);;
-#type ((fun x -> x), (fun x -> x) (fun y -> y));;
-#type (fun x y -> x);;
-#type [[[]]];;
-#type (fun x y -> (fun a -> a) x);;
+(fun x -> x);;
+(fun x -> x) (fun y -> y);;
+(fun x -> (x, x));;
+((fun x -> x), []);;
+((fun x -> x), (fun x -> x) (fun y -> y));;
+(fun x y -> x);;
+[[[]]];;
+(fun x y -> (fun a -> a) x);;
 
 let rec h x = x;;
-#type h;;
+h;;
