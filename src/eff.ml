@@ -14,19 +14,9 @@ let options =
       , Arg.String
           (fun str -> Config.pervasives_file := Config.PervasivesFile str)
       , " Specify the pervasives.eff file" )
-    ; ( "--no-effects"
-      , Arg.Clear Config.effect_annotations
-      , " Hide the output of effect inference" )
-    ; ( "--no-beautify"
-      , Arg.Set Config.disable_beautify
-      , " Do not beautify types" )
     ; ( "--no-pervasives"
       , Arg.Unit (fun () -> Config.pervasives_file := Config.PervasivesNone)
       , " Do not load pervasives.eff" )
-    ; ("--no-types", Arg.Set Config.disable_typing, " Disable typechecking")
-    ; ( "--no-smart-print"
-      , Arg.Clear Config.smart_print
-      , " Disable smart printing of type schemes" )
     ; ( "--wrapper"
       , Arg.String (fun str -> Config.wrapper := Some [str])
       , "<program> Specify a command-line wrapper to be used (such as rlwrap or ledit)"
@@ -34,6 +24,7 @@ let options =
     ; ( "--no-wrapper"
       , Arg.Unit (fun () -> Config.wrapper := None)
       , " Do not use a command-line wrapper" )
+    ; ("--no-types", Arg.Set Config.disable_typing, " Disable typechecking")
     ; ("--ascii", Arg.Set Config.ascii, " Use ASCII output")
     ; ( "-v"
       , Arg.Unit
