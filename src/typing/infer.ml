@@ -159,13 +159,13 @@ and type_abstraction2 st loc ctx (p1, p2, c) =
   Ctor.abstraction2 ~loc pat1 pat2 comp
 
 and let_rec_defs ~loc defs =
-  let add_binding (x, a) (poly_tys, ctx) =
+  let add_binding (x, a) (poly_tys, ctx, cnstr) =
     let ctx_a, (ty_p, drty_c), cnstrs_a = a.Typed.scheme in
     let poly_tys = (x, Type.Arrow (ty_p, drty_c)) :: poly_tys in
-    poly_tys, ctx_a @ ctx
+    poly_tys, ctx_a @ ctx, cnstr @ [Scheme.just cnstrs_a]
   in
-  let poly_tys, ctx = List.fold_right add_binding defs ([], []) in
-  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.make ctx ty) poly_tys in
+  let poly_tys, ctx, cnstr = List.fold_right add_binding defs ([], [], []) in
+  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.make ctx ty cnstr) poly_tys in
   poly_tyschs
 
 and type_let_rec_defs ~loc st defs =
@@ -178,9 +178,9 @@ and type_let_rec_defs ~loc st defs =
   defs', poly_tyschs, st
 
 and let_defs ~loc defs =
-  let add_binding (p, c) (poly_tys, ctx) =
-    let ctx_p, ty_p, _ = p.Typed.scheme in
-    let ctx_c, drty_c, _ = c.Typed.scheme in
+  let add_binding (p, c) (poly_tys, ctx, cnstr) =
+    let ctx_p, ty_p, cnstrs_p = p.Typed.scheme in
+    let ctx_c, drty_c, cnstrs_c = c.Typed.scheme in
     let ctx_let = Unification.unify_let (ctx_p, ty_p) (ctx_c, drty_c) in
     let poly_tys =
       match c.Typed.term with
@@ -190,14 +190,15 @@ and let_defs ~loc defs =
       | Typed.LetRec _ | Typed.Bind _ | Typed.Call _ ->
         ctx_let @ poly_tys
     in
-    poly_tys, ctx_c @ ctx
+    poly_tys, ctx_c @ ctx, cnstr @ [Scheme.just cnstrs_p;
+    Scheme.just cnstrs_c]
   in
-  let poly_tys, ctx = List.fold_right add_binding defs ([], []) in
-  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.make ctx ty) poly_tys in
+  let poly_tys, ctx, cnstr = List.fold_right add_binding defs ([], [], []) in
+  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.make ctx ty cnstr) poly_tys in
   poly_tyschs
 
-and type_let_defs ~loc st defs =
-  let defs' = List.map (fun (p, c) -> (type_pattern st p, type_comp st c)) defs in
+and type_let_defs ~loc st ctx defs =
+  let defs' = List.map (fun (p, c) -> (type_pattern st p, type_comp_ctx st ctx c)) defs in
   let defs' = List.map (fun ((p, _), (c, _)) -> (p, c)) defs' in
   let poly_tyschs = let_defs ~loc defs' in
   let st = add_multiple_defs poly_tyschs st in
@@ -292,15 +293,15 @@ and type_plain_comp st loc ctx = function
     Ctor.apply ~loc expr1 expr2, st
   | Untyped.Handle (e, c) ->
     let exp, st = type_expr st ctx e in
-    let comp, st = type_comp st c in
+    let comp, st = type_comp_ctx st ctx c in
     Ctor.handle ~loc exp comp, st
   | Untyped.Let (defs, c) ->
-    let defs, _, st = type_let_defs ~loc st defs in
-    let c, st = type_comp st c in
+    let defs, _, st = type_let_defs ~loc st ctx defs in
+    let c, st = type_comp_ctx st ctx c in
     Ctor.letbinding ~loc defs c, st
   | Untyped.LetRec (defs, c) ->
     let defs, _, st = type_let_rec_defs ~loc st defs in
-    let c, st = type_comp st c in
+    let c, st = type_comp_ctx st ctx c in
     Ctor.letrecbinding ~loc defs c, st
 
 (***************************)
@@ -309,14 +310,14 @@ and type_plain_comp st loc ctx = function
 
 let infer_top_let_rec ?loc st defs =
   let loc = backup_location loc [] in
-  let defs, vars, st = type_let_rec_defs ~loc st defs in
   (* List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs; *)
+  let defs, vars, st = type_let_rec_defs ~loc st defs in
   defs, vars, st
 
 let infer_top_let ?loc st defs =
   let loc = backup_location loc [] in
-  let defs, vars, st = type_let_defs ~loc st defs in
   (* List.iter (fun (_, (p, c)) -> Exhaust.is_irrefutable p; Exhaust.check_comp c) defs; *)
+  let defs, vars, st = type_let_defs ~loc st [] defs in
   defs, vars, st
 
 (* Execute type inference for a toplevel command *)

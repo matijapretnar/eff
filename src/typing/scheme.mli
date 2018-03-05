@@ -32,7 +32,7 @@ val ty_cnstr : loc:Location.t -> Type.ty -> Type.ty -> ty_scheme -> ty_scheme
 val simple : 'a -> 'a t
 
 (* Make a scheme from a type and a context *)
-val make : context -> 'a -> 'a t
+val make : context -> 'a -> (('a t-> 'a t) list) -> 'a t
 
 (* Add a variable to the type scheme context *)
 val add_to_context : Untyped.variable -> Type.ty -> ty_scheme -> ty_scheme

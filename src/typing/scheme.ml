@@ -110,7 +110,7 @@ let solve_dirty (ctx, ty, cnstrs) =
 let simple ty = ([], ty, Unification.empty)
 
 (* Create a simple scheme (with only a type and a context) *)
-let make ctx ty = (ctx, ty, Unification.empty)
+let make ctx ty cnstr = create_ty_scheme ctx ty cnstr
 
 (* Add a key:v value:ty pair to the context *)
 let add_to_context v ty (ctx, t, u) = (OldUtils.update v ty ctx, t, u)
@@ -277,7 +277,7 @@ let handle ~loc e c =
 let letbinding ~loc c1 c2 =
   let ctx_c1, ty_c1, cnstrs_c1 = c1 in
   let ctx_c2, (ty_p, ty_c2), cnstrs_c2 = c2 in
-  solve_dirty (ctx_c1 @ ctx_c2, ty_c2, Unification.empty)
+  solve_dirty (ctx_c1 @ ctx_c2, ty_c2, Unification.list_union [cnstrs_c1; cnstrs_c2])
 
 (************************)
 (* PATTERN CONSTRUCTORS *)
@@ -312,7 +312,7 @@ let ptuple ~loc ps =
   in
   let ctx, tys, chngs = List.fold_right infer ps ([], [], Unification.empty) in
   let ty = Type.Tuple tys in
-  solve_ty (make ctx ty)
+  solve_ty (ctx, ty, Unification.empty)
 
 let precord ~loc ctx ty changes = solve_ty (create_ty_scheme ctx ty changes)
 

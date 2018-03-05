@@ -72,7 +72,7 @@ effect Op3 : unit -> int;;
 
 (* let id x = x;; *)
 
-let id x = x;;
+(* let id x = x;;
 
 id 3;;
 
@@ -93,7 +93,7 @@ let rec check n =
   begin match n with
   | 1 -> 1
   | _ -> n + check (n - 1)
-  end
+  end *)
 
 (* handle 3 with
   | #Op () k -> k 3
@@ -102,3 +102,37 @@ let rec check n =
 (* handle (#Op3 ()) with
   | #Op () k ->  k 3
   | #Op2 () k ->  k 3;; *)
+
+
+(* fun f -> f 1;; *)
+
+(* fun f x -> f x;; *)
+
+fun f x -> f (f x);;
+
+(* let t2 = (fun x -> x) 1;; *)
+(* let id x = x;; *)
+
+(* (fun f x -> f x);; *)
+
+(* (fun f x -> 
+  let y = f x in 
+  y
+);; *)
+
+(fun x -> 
+  let y = x in 
+  y
+);;
+
+(* (fun x -> 
+  let rec check y =
+    begin match y with
+    | a -> a
+    end
+  in 
+  check x
+);;
+   *)
+
+(* let y = id 1 in y *)
