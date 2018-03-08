@@ -8,8 +8,6 @@ module Dirt : Symbol.S with type annot = unit
 
 module Skel : Symbol.S with type annot = unit
 
-module ETy : Symbol.S with type annot = unit
-
 module DirtCoercion : Symbol.S with type annot = unit
 
 module TyCoercion : Symbol.S with type annot = unit

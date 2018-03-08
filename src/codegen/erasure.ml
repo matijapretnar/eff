@@ -1,15 +1,5 @@
 (** Syntax of the core language. *)
 
-type e_ty =
-  | ETyvar of Params.ETy.t
-  | Arrow of e_ty * e_ty
-  | Tuple of e_ty list
-  | Handler of e_ty * e_ty
-  | PrimTy of prim_ty
-  | TySchemeTy of Params.ETy.t * e_ty
-
-and prim_ty = IntTy | BoolTy | StringTy | FloatTy
-
 module Variable = Symbol.Make (Symbol.String)
 module EffectMap = Map.Make (String)
 

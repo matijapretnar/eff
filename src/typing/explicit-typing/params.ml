@@ -18,12 +18,6 @@ module Ty = struct
     ) k
 end
 
-module ETy = Symbol.Make (Symbol.Parameter (struct
-  let ascii_symbol = "ety"
-
-  let utf8_symbol = "e\207\132"
-end))
-
 module Dirt = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "drt"
 
