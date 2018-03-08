@@ -242,8 +242,7 @@ and reduce_dirt_coercion st p_ops dco =
   match dco with
   | ReflDirt d -> dco
   | DirtCoercionVar dcov -> dco
-  | Empty d ->
-      Empty {d with Types.effect_set= EffectSet.diff d.effect_set p_ops}
+  | Empty d -> Empty (Types.remove_effects p_ops d)
   | UnionDirt (ops, dco1) ->
       let d1, d2 = TypeChecker.type_check_dirt_coercion st.tc_state dco1 in
       let ops' =

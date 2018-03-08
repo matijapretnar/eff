@@ -47,7 +47,7 @@ let apply_sub_dirt sub drt =
   | ParamRow p -> (
     match sub with
     | DirtVarToDirt (p', drt2) when p = p' ->
-        {drt2 with effect_set= EffectSet.union drt.effect_set drt2.effect_set}
+        Types.add_effects drt.effect_set drt2
     | _ -> drt )
   | EmptyRow -> drt
 

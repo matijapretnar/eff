@@ -249,9 +249,7 @@ and type_check_dirt_coercion st dirt_coer =
       (Types.empty_dirt, d')
   | UnionDirt (es, dirt_coer1) ->
       let dc_a, dc_b = type_check_dirt_coercion st dirt_coer1 in
-      let dc_a' = {dc_a with effect_set= EffectSet.union es dc_a.effect_set} in
-      let dc_b' = {dc_b with effect_set= EffectSet.union es dc_b.effect_set} in
-      (dc_a', dc_b')
+      (Types.add_effects es dc_a, Types.add_effects es dc_b)
   | SequenceDirtCoer (dc1, dc2) ->
       let t1, t2 = type_check_dirt_coercion st dc1 in
       let t2, t3 = type_check_dirt_coercion st dc2 in
@@ -443,11 +441,7 @@ and type_check_handler st h =
   let handlers_ops = OldUtils.map mapper h.effect_clauses in
   let handlers_ops_set = Types.EffectSet.of_list handlers_ops in
   let t_cv, d_cv = type_cv in
-  let input_dirt =
-    { d_cv with
-      Types.effect_set=
-        Types.EffectSet.union d_cv.Types.effect_set handlers_ops_set }
-  in
+  let input_dirt = Types.add_effects handlers_ops_set d_cv in
   Types.Handler ((tv, input_dirt), type_cv)
 
 and type_check_abstraction st ty {term= pv, cv} =
