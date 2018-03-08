@@ -17,6 +17,12 @@ let extend_var_types st t_var tty =
   {st with var_types= (t_var, tty) :: st.var_types}
 
 
+let extend_pattern_types st p ty =
+  match p.term with
+  | Typed.PVar v -> extend_var_types st v ty
+  | _ -> failwith "Not yet implemented"
+
+
 let extend_dirt_params st dirt_var =
   {st with dirt_params= dirt_var :: st.dirt_params}
 
@@ -80,36 +86,35 @@ let rec type_check_ty st ty =
       assert (List.mem typ ty_var_list) ;
       ty
   | Arrow (tty1, tty2) ->
-      let _ = type_check_ty st tty1 in
-      let _ = type_check_dirty_ty st tty2 in
+      ignore (type_check_ty st tty1) ;
+      ignore (type_check_dirty_ty st tty2) ;
       ty
   | Tuple ttyl -> Tuple (List.map (fun x -> type_check_ty st x) ttyl)
   | Handler (tty1, tty2) ->
-      let _ = type_check_dirty_ty st tty1 in
-      let _ = type_check_dirty_ty st tty2 in
+      ignore (type_check_dirty_ty st tty1) ;
+      ignore (type_check_dirty_ty st tty2) ;
       ty
   | PrimTy _ -> ty
   | QualTy (ct_ty1, tty1) ->
-      let _ = type_check_ty_cons st ct_ty1 in
-      let _ = type_check_ty st tty1 in
+      ignore (type_check_ty_cons st ct_ty1) ;
+      ignore (type_check_ty st tty1) ;
       ty
   | QualDirt (ct_ty1, tty1) ->
-      let _ = type_check_dirt_cons st ct_ty1 in
-      let _ = type_check_ty st tty1 in
+      ignore (type_check_dirt_cons st ct_ty1) ;
+      ignore (type_check_ty st tty1) ;
       ty
   | TySchemeTy (ty_param, skel, tty1) ->
       let st' = extend_ty_param_skeletons st ty_param skel in
-      let tty1' = type_check_ty st' tty1 in
+      ignore (type_check_ty st' tty1) ;
       ty
   | TySchemeDirt (dirt_param, tty1) ->
       let st' = extend_dirt_params st dirt_param in
-      let _ = type_check_ty st' tty1 in
+      ignore (type_check_ty st' tty1) ;
       ty
   | TySchemeSkel (skel_param, tty1) ->
       let st' = extend_skel_params st skel_param in
-      let _ = type_check_ty st' tty1 in
+      ignore (type_check_ty st' tty1) ;
       ty
-  | _ -> failwith "Not yet implemented"
 
 
 and type_check_dirty_ty st (ty, drt) =
@@ -149,39 +154,35 @@ let rec type_check_ty_coercion st ty_coer =
       let t1, t2 = type_check_ty_coercion st ty_coer1 in
       let t2, t3 = type_check_ty_coercion st ty_coer2 in
       (t1, t3)
-  | TupleCoercion tcl -> failwith "Not yet implemented"
-  | LeftArrow tc1 ->
-      let Types.Arrow (t1, _), Types.Arrow (t2, _) =
-        type_check_ty_coercion st tc1
-      in
-      (t2, t1)
+  | LeftArrow tc1 -> (
+    match type_check_ty_coercion st tc1 with
+    | Types.Arrow (t1, _), Types.Arrow (t2, _) -> (t2, t1)
+    | _ -> assert false )
   | ForallTy (ty_param, ty_coer1) ->
       let new_st = extend_ty_params st ty_param in
       let t1, t2 = type_check_ty_coercion new_st ty_coer1 in
       ( Types.TySchemeTy (ty_param, Types.PrimSkel Types.IntTy, t1)
       , Types.TySchemeTy (ty_param, Types.PrimSkel Types.IntTy, t2) )
-  | ApplyTyCoer (ty_coer1, tty1) ->
-      let ( Types.TySchemeTy (ty_param1, _, t1)
-          , Types.TySchemeTy (ty_param2, _, t2) ) =
-        type_check_ty_coercion st ty_coer1
-      in
-      let tt = type_check_ty st tty1 in
-      let sub = Unification.TyParamToTy (ty_param1, tt) in
-      assert (ty_param1 = ty_param2) ;
-      (Unification.apply_sub_ty sub t1, Unification.apply_sub_ty sub t2)
+  | ApplyTyCoer (ty_coer1, tty1) -> (
+    match type_check_ty_coercion st ty_coer1 with
+    | Types.TySchemeTy (ty_param1, _, t1), Types.TySchemeTy (ty_param2, _, t2) ->
+        let tt = type_check_ty st tty1 in
+        let sub = Unification.TyParamToTy (ty_param1, tt) in
+        assert (ty_param1 = ty_param2) ;
+        (Unification.apply_sub_ty sub t1, Unification.apply_sub_ty sub t2)
+    | _ -> assert false )
   | ForallDirt (dirt_param, ty_coer1) ->
       let new_st = extend_dirt_params st dirt_param in
       let t1, t2 = type_check_ty_coercion new_st ty_coer1 in
       (Types.TySchemeDirt (dirt_param, t1), Types.TySchemeDirt (dirt_param, t2))
-  | ApplyDirCoer (ty_coer1, drt) ->
-      let ( Types.TySchemeDirt (drt_param1, t1)
-          , Types.TySchemeDirt (drt_param2, t2) ) =
-        type_check_ty_coercion st ty_coer1
-      in
-      let tt = type_check_dirt st drt in
-      let sub = Unification.DirtVarToDirt (drt_param1, tt) in
-      assert (drt_param1 = drt_param2) ;
-      (Unification.apply_sub_ty sub t1, Unification.apply_sub_ty sub t2)
+  | ApplyDirCoer (ty_coer1, drt) -> (
+    match type_check_ty_coercion st ty_coer1 with
+    | Types.TySchemeDirt (drt_param1, t1), Types.TySchemeDirt (drt_param2, t2) ->
+        let tt = type_check_dirt st drt in
+        let sub = Unification.DirtVarToDirt (drt_param1, tt) in
+        assert (drt_param1 = drt_param2) ;
+        (Unification.apply_sub_ty sub t1, Unification.apply_sub_ty sub t2)
+    | _ -> assert false )
   | PureCoercion dirty_coer1 ->
       let (t1, _), (t2, _) = type_check_dirty_coercion st dirty_coer1 in
       (t1, t2)
@@ -190,25 +191,26 @@ let rec type_check_ty_coercion st ty_coer =
       let t1, t2 = type_check_ty_coercion st ty_coer1 in
       (QualTy ((tc1, tc2), t1), QualTy ((tc1, tc2), t2))
   | QualDirtCoer (dirt_cons, ty_coer1) ->
-      let _ = type_check_dirt_cons st dirt_cons in
+      ignore (type_check_dirt_cons st dirt_cons) ;
       let t1, t2 = type_check_ty_coercion st ty_coer1 in
       (QualDirt (dirt_cons, t1), QualDirt (dirt_cons, t2))
-  | ApplyQualTyCoer (ty_coer1, ty_coer_applied) ->
+  | ApplyQualTyCoer (ty_coer1, ty_coer_applied) -> (
       let ty_coer_applied_cons = type_check_ty_coercion st ty_coer_applied in
-      let QualTy (cons1, t1), QualTy (cons2, t2) =
-        type_check_ty_coercion st ty_coer1
-      in
-      assert (cons1 = cons2 && cons2 = ty_coer_applied_cons) ;
-      (t1, t2)
-  | ApplyQualDirtCoer (ty_coer1, dirt_coer_applied) ->
+      match type_check_ty_coercion st ty_coer1 with
+      | QualTy (cons1, t1), QualTy (cons2, t2) ->
+          assert (cons1 = cons2 && cons2 = ty_coer_applied_cons) ;
+          (t1, t2)
+      | _ -> assert false )
+  | ApplyQualDirtCoer (ty_coer1, dirt_coer_applied) -> (
       let dirt_coer_applied_cons =
         type_check_dirt_coercion st dirt_coer_applied
       in
-      let QualDirt (cons1, t1), QualDirt (cons2, t2) =
-        type_check_ty_coercion st ty_coer1
-      in
-      assert (cons1 = cons2 && cons2 = dirt_coer_applied_cons) ;
-      (t1, t2)
+      match type_check_ty_coercion st ty_coer1 with
+      | QualDirt (cons1, t1), QualDirt (cons2, t2) ->
+          assert (cons1 = cons2 && cons2 = dirt_coer_applied_cons) ;
+          (t1, t2)
+      | _ -> assert false )
+  | _ -> failwith "Not yet implemented"
 
 
 and type_check_dirty_coercion st dirty_coer =
@@ -217,21 +219,18 @@ and type_check_dirty_coercion st dirty_coer =
       let t1, t2 = type_check_ty_coercion st tc in
       let d1, d2 = type_check_dirt_coercion st dc in
       ((t1, d1), (t2, d2))
-  | RightArrow tc ->
-      let Types.Arrow (_, c1), Types.Arrow (_, c2) =
-        type_check_ty_coercion st tc
-      in
-      (c1, c2)
-  | RightHandler tc ->
-      let Types.Handler (_, c1), Types.Handler (_, c2) =
-        type_check_ty_coercion st tc
-      in
-      (c1, c2)
-  | LeftHandler tc ->
-      let Types.Handler (c2, _), Types.Handler (c1, _) =
-        type_check_ty_coercion st tc
-      in
-      (c1, c2)
+  | RightArrow tc -> (
+    match type_check_ty_coercion st tc with
+    | Types.Arrow (_, c1), Types.Arrow (_, c2) -> (c1, c2)
+    | _ -> assert false )
+  | RightHandler tc -> (
+    match type_check_ty_coercion st tc with
+    | Types.Handler (_, c1), Types.Handler (_, c2) -> (c1, c2)
+    | _ -> assert false )
+  | LeftHandler tc -> (
+    match type_check_ty_coercion st tc with
+    | Types.Handler (c2, _), Types.Handler (c1, _) -> (c1, c2)
+    | _ -> assert false )
   | SequenceDirtyCoer (dc1, dc2) ->
       let t1, t2 = type_check_dirty_coercion st dc1 in
       let t2, t3 = type_check_dirty_coercion st dc2 in
@@ -272,6 +271,7 @@ let rec type_check_pattern st ty p =
       in
       assert (Types.types_are_equal ty_c ty) ;
       st
+  | _ -> failwith "Not yet implemented"
 
 
 let type_check_const = function
@@ -293,9 +293,8 @@ let rec type_check_exp st e =
   | Record r -> failwith "Not yet implemented"
   | Variant (lbl, e1) -> failwith "Not yet implemented"
   | Lambda (pat, ty1, c1) ->
-      let PVar p = pat.term in
       let ty1' = type_check_ty st ty1 in
-      let st' = extend_var_types st p ty1 in
+      let st' = extend_pattern_types st pat ty1 in
       let c_ty = type_check_comp st' c1.term in
       Types.Arrow (ty1', c_ty)
   | Effect (eff, (eff_in, eff_out)) ->
@@ -319,21 +318,27 @@ let rec type_check_exp st e =
       let tc1a, tc1b = type_check_ty_coercion st tc1 in
       assert (Types.types_are_equal tc1a e1_ty) ;
       tc1b
-  | ApplyTyExp (e1, tty) ->
-      let Types.TySchemeTy (p_e1, skel, ty_e1) = type_check_exp st e1.term in
-      let tty1 = type_check_ty st tty in
-      let sub = Unification.TyParamToTy (p_e1, tty1) in
-      Unification.apply_sub_ty sub ty_e1
-  | ApplySkelExp (e1, sk) ->
-      let Types.TySchemeSkel (p_e1, ty_e1) = type_check_exp st e1.term in
-      let sk1 = type_check_skel st sk in
-      let sub = Unification.SkelParamToSkel (p_e1, sk1) in
-      Unification.apply_sub_ty sub ty_e1
-  | ApplyDirtExp (e1, d1) ->
-      let Types.TySchemeDirt (p_e1, ty_e1) = type_check_exp st e1.term in
-      let tty1 = type_check_dirt st d1 in
-      let sub = Unification.DirtVarToDirt (p_e1, tty1) in
-      Unification.apply_sub_ty sub ty_e1
+  | ApplyTyExp (e1, tty) -> (
+    match type_check_exp st e1.term with
+    | Types.TySchemeTy (p_e1, skel, ty_e1) ->
+        let tty1 = type_check_ty st tty in
+        let sub = Unification.TyParamToTy (p_e1, tty1) in
+        Unification.apply_sub_ty sub ty_e1
+    | _ -> assert false )
+  | ApplySkelExp (e1, sk) -> (
+    match type_check_exp st e1.term with
+    | Types.TySchemeSkel (p_e1, ty_e1) ->
+        let sk1 = type_check_skel st sk in
+        let sub = Unification.SkelParamToSkel (p_e1, sk1) in
+        Unification.apply_sub_ty sub ty_e1
+    | _ -> assert false )
+  | ApplyDirtExp (e1, d1) -> (
+    match type_check_exp st e1.term with
+    | Types.TySchemeDirt (p_e1, ty_e1) ->
+        let tty1 = type_check_dirt st d1 in
+        let sub = Unification.DirtVarToDirt (p_e1, tty1) in
+        Unification.apply_sub_ty sub ty_e1
+    | _ -> assert false )
   | LambdaTyCoerVar (tcp1, ct_ty1, e1) ->
       let st' = extend_ty_coer_types st tcp1 ct_ty1 in
       let e1_ty = type_check_exp st' e1.term in
@@ -344,16 +349,20 @@ let rec type_check_exp st e =
       let e1_ty = type_check_exp st' e1.term in
       let ct_dirt1' = type_check_dirt_cons st ct_dirt1 in
       Types.QualDirt (ct_dirt1', e1_ty)
-  | ApplyTyCoercion (e1, tc1) ->
+  | ApplyTyCoercion (e1, tc1) -> (
       let tc1' = type_check_ty_coercion st tc1 in
-      let QualTy (cons, e1_ty) = type_check_exp st e1.term in
-      assert (tc1' = cons) ;
-      e1_ty
+      match type_check_exp st e1.term with
+      | QualTy (cons, e1_ty) ->
+          assert (tc1' = cons) ;
+          e1_ty
+      | _ -> assert false )
   | ApplyDirtCoercion (e1, dc1) ->
       let dc1' = type_check_dirt_coercion st dc1 in
-      let QualDirt (cons, e1_ty) = type_check_exp st e1.term in
-      assert (dc1' = cons) ;
-      e1_ty
+      match type_check_exp st e1.term with
+      | QualDirt (cons, e1_ty) ->
+          assert (dc1' = cons) ;
+          e1_ty
+      | _ -> assert false
 
 and type_check_comp st c =
   match c with
@@ -363,9 +372,7 @@ and type_check_comp st c =
   | LetVal (e1, (p1, ty, c1)) ->
       let t_v = type_check_exp st e1.term in
       assert (Types.types_are_equal t_v ty) ;
-      let PVar v1 = p1.term in
-      (* TODO: generalize to all forms of patterns *)
-      let st' = extend_var_types st v1 t_v in
+      let st' = extend_pattern_types st p1 t_v in
       type_check_comp st' c1.term
   | LetRec (l, c1) -> failwith "Not yet implemented"
   | Match (e, alist) -> (
@@ -376,24 +383,25 @@ and type_check_comp st c =
       | dty :: dtys ->
           assert (List.for_all (Types.dirty_types_are_equal dty) dtys) ;
           dty )
-  | Apply (e1, e2) ->
-      let t_e1 = type_check_exp st e1.term in
-      let Types.Arrow (ty1, dty1) = t_e1 in
-      let ty_e2 = type_check_exp st e2.term in
-      assert (Types.types_are_equal ty1 ty_e2) ;
-      dty1
-  | Handle (e1, c1) ->
-      let t_e1 = type_check_exp st e1.term in
-      let Types.Handler (dty1, dty2) = t_e1 in
-      let ty_c1 = type_check_comp st c1.term in
-      assert (Types.dirty_types_are_equal dty1 ty_c1) ;
-      dty2
+  | Apply (e1, e2) -> (
+    match type_check_exp st e1.term with
+    | Types.Arrow (ty1, dty1) ->
+        let ty_e2 = type_check_exp st e2.term in
+        assert (Types.types_are_equal ty1 ty_e2) ;
+        dty1
+    | _ -> assert false )
+  | Handle (e1, c1) -> (
+    match type_check_exp st e1.term with
+    | Types.Handler (dty1, dty2) ->
+        let ty_c1 = type_check_comp st c1.term in
+        assert (Types.dirty_types_are_equal dty1 ty_c1) ;
+        dty2
+    | _ -> assert false )
   | Call ((eff, (eff_in, eff_out)), e2, abs) ->
       let e2_ty = type_check_exp st e2.term in
       assert (Types.types_are_equal e2_ty eff_in) ;
-      let x, ty_eff, c1 = abs.term in
-      let Typed.PVar p = x.term in
-      let st' = extend_var_types st p eff_out in
+      let p, ty_eff, c1 = abs.term in
+      let st' = extend_pattern_types st p eff_out in
       let final_ty, final_dirt = type_check_comp st' c1.term in
       assert (Types.EffectSet.mem eff final_dirt.Types.effect_set) ;
       (final_ty, final_dirt)
@@ -425,11 +433,11 @@ and type_check_handler st h =
   let mapper (effe, abs2) =
     let eff, (in_op_ty, out_op_ty) = effe in
     let x, y, c_op = abs2.term in
-    let Typed.PVar xv = x.term in
-    let Typed.PVar yv = y.term in
-    let st_temp = extend_var_types st xv in_op_ty in
-    let st' = extend_var_types st_temp yv (Types.Arrow (out_op_ty, type_cv)) in
-    let type_cop = type_check_comp st' c_op.term in
+    let st_temp = extend_pattern_types st x in_op_ty in
+    let st' =
+      extend_pattern_types st_temp y (Types.Arrow (out_op_ty, type_cv))
+    in
+    ignore (type_check_comp st' c_op.term) ;
     eff
   in
   let handlers_ops = OldUtils.map mapper h.effect_clauses in
@@ -447,6 +455,5 @@ and type_check_abstraction st ty {term= pv, cv} =
   type_check_comp st' cv.term
 
 and type_check_abstraction_with_ty st {term= pv, tv, cv} =
-  let Typed.PVar v = pv.term in
-  let st' = extend_var_types st v tv in
+  let st' = extend_pattern_types st pv tv in
   (tv, type_check_comp st' cv.term)
