@@ -333,10 +333,7 @@ and print_dirt_coercion ?max_level c ppf =
   | DirtCoercionVar tcp -> print "%t" (Params.DirtCoercion.print tcp)
   | Empty d -> print "Empty__(%t)" (Types.print_target_dirt d)
   | UnionDirt (eset, dc) ->
-      let eff_list = Types.EffectSet.elements eset in
-      print "{%t} U %t"
-        (Types.print_effect_list eff_list)
-        (print_dirt_coercion dc)
+      print "{%t} U %t" (Types.print_effect_set eset) (print_dirt_coercion dc)
   | DirtCoercion dtyco -> print "dirtOf(%t)" (print_dirty_coercion dtyco)
   | _ -> failwith "Not yet implemented"
 

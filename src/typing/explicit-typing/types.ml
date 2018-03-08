@@ -133,19 +133,13 @@ and print_target_dirt drt ppf =
   match drt with
   | SetVar (set, p) ->
       if EffectSet.is_empty set then print "%t" (Params.Dirt.print p)
-      else
-        let eff_list = EffectSet.elements set in
-        print "{%t} U %t" (print_effect_list eff_list) (Params.Dirt.print p)
-  | SetEmpty set ->
-      let eff_list = EffectSet.elements set in
-      print "{%t}" (print_effect_list eff_list)
+      else print "{%t} U %t" (print_effect_set set) (Params.Dirt.print p)
+  | SetEmpty set -> print "{%t}" (print_effect_set set)
 
-and print_effect_list eff_list ppf =
-  let print ?at_level = Print.print ?at_level ppf in
-  match eff_list with
-  | [] -> ()
-  | [x] -> print "%s" x
-  | x :: xs -> print "%s, %t" x (print_effect_list xs)
+and print_effect_set effect_set =
+  Print.sequence ","
+    (fun str ppf -> Format.pp_print_string ppf str)
+    (EffectSet.elements effect_set)
 
 and print_target_dirty (t1, drt1) ppf =
   let print ?at_level = Print.print ?at_level ppf in

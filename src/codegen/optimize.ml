@@ -62,8 +62,8 @@ let is_relatively_pure st c h =
       in
       Print.debug "is_relatively_pure: %t:  %t vs %t"
         (Typed.print_computation c)
-        (Types.print_effect_list (EffectSet.elements handled_ops))
-        (Types.print_effect_list (EffectSet.elements ops)) ;
+        (Types.print_effect_set handled_ops)
+        (Types.print_effect_set ops) ;
       if EffectSet.is_empty (EffectSet.inter handled_ops ops) then
         let Types.Handler (_, (_, output_dirt)) =
           TypeChecker.type_check_handler st.tc_state h

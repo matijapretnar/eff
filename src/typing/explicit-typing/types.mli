@@ -48,8 +48,6 @@ val print_target_dirt : dirt -> Format.formatter -> unit
 
 val print_skeleton : ?max_level:int -> skeleton -> Format.formatter -> unit
 
-val print_effect_list : OldUtils.effect list -> Format.formatter -> unit
-
 val print_target_dirty : target_dirty -> Format.formatter -> unit
 
 val print_constraint : ct -> Format.formatter -> unit
@@ -58,5 +56,7 @@ val print_ct_ty : ct_ty -> Format.formatter -> unit
 
 module EffectSet :
   Set.S with type elt = OldUtils.effect and type t = effect_set
+
+val print_effect_set : EffectSet.t -> Format.formatter -> unit
 
 val is_effect_member : OldUtils.effect -> dirt -> bool
