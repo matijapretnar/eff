@@ -116,6 +116,7 @@ let rec print_target_ty ?max_level ty ppf =
   | TySchemeSkel (p, tty) ->
       print "ForallSkel %t. %t" (Params.Skel.print p) (print_target_ty tty)
 
+
 and print_skeleton ?max_level sk ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match sk with
@@ -128,6 +129,7 @@ and print_skeleton ?max_level sk ppf =
   | ForallSkel (p, sk1) ->
       print "ForallSkelSkel %t. %t" (Params.Skel.print p) (print_skeleton sk1)
 
+
 and print_target_dirt drt ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match drt with
@@ -136,14 +138,17 @@ and print_target_dirt drt ppf =
       else print "{%t} U %t" (print_effect_set set) (Params.Dirt.print p)
   | SetEmpty set -> print "{%t}" (print_effect_set set)
 
+
 and print_effect_set effect_set =
   Print.sequence ","
     (fun str ppf -> Format.pp_print_string ppf str)
     (EffectSet.elements effect_set)
 
+
 and print_target_dirty (t1, drt1) ppf =
   let print ?at_level = Print.print ?at_level ppf in
   print "%t ! %t" (print_target_ty t1) (print_target_dirt drt1)
+
 
 and print_constraint c ppf =
   let print ?at_level = Print.print ?at_level ppf in
@@ -156,13 +161,16 @@ and print_constraint c ppf =
   | LeqDirt (d1, d2) ->
       print "%t <= %t" (print_target_dirt d1) (print_target_dirt d2)
 
+
 and print_ct_ty (ty1, ty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
   print "%t <= %t" (print_target_ty ty1) (print_target_ty ty2)
 
+
 and print_ct_dirt (ty1, ty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
   print "%t <= %t" (print_target_dirt ty1) (print_target_dirt ty2)
+
 
 and print_prim_ty pty ppf =
   let print ?at_level = Print.print ?at_level ppf in
@@ -171,3 +179,10 @@ and print_prim_ty pty ppf =
   | BoolTy -> print "bool"
   | StringTy -> print "string"
   | FloatTy -> print "float"
+
+
+let no_effect_dirt dirt_param = SetVar (EffectSet.empty, dirt_param)
+
+let fresh_dirt () = no_effect_dirt (Params.Dirt.fresh ())
+
+let make_dirty ty = (ty, fresh_dirt ())

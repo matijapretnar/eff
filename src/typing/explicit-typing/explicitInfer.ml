@@ -52,17 +52,6 @@ and source_to_target_dirty ty =
   (source_to_target ty, Types.SetEmpty Types.EffectSet.empty)
 
 
-let fresh_ty_with_skel () =
-  let ty_var = Params.Ty.fresh () and skel_var = Params.Skel.fresh () in
-  ( Types.TyParam ty_var
-  , Typed.TyParamHasSkel (ty_var, Types.SkelParam skel_var) )
-
-
-let fresh_ty_coer cons =
-  let param = Params.TyCoercion.fresh () in
-  (Typed.TyCoercionVar param, Typed.TyOmega (param, cons))
-
-
 let rec type_pattern p =
   { Typed.term= type_plain_pattern p.Untyped.term
   ; Typed.location= p.Untyped.location }
@@ -118,7 +107,7 @@ and type_plain_pattern' in_cons st pat ty =
   | Untyped.PVariant (l, p) -> assert false
   | Untyped.PConst c ->
       let ty_c = source_to_target (ty_of_const c) in
-      let _omega, q = fresh_ty_coer (ty_c, ty) in
+      let _omega, q = Typed.fresh_ty_coer (ty_c, ty) in
       (Typed.PConst c, st, q :: in_cons)
 
 
@@ -549,17 +538,6 @@ let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
   (dirt_cons_apps, skel_constraints @ ty_cons @ dirt_cons)
 
 
-let no_effect_dirt dirt_param = Types.SetVar (Types.EffectSet.empty, dirt_param)
-
-let fresh_dirt () = no_effect_dirt (Params.Dirt.fresh ())
-
-let make_dirty ty = (ty, fresh_dirt ())
-
-let fresh_dirt_coer cons =
-  let param = Params.DirtCoercion.fresh () in
-  (Typed.DirtCoercionVar param, Typed.DirtOmega (param, cons))
-
-
 let rec type_expr in_cons st ({Untyped.term= expr; Untyped.location= loc} as e) =
   Print.debug "type_expr: %t" (CoreSyntax.print_expression e) ;
   Print.debug "### Constraints Before ###" ;
@@ -635,7 +613,7 @@ and type_plain_expr in_cons st = function
   | Untyped.Lambda a ->
       Print.debug "in infer lambda" ;
       let p, c = a in
-      let in_ty, in_ty_skel = fresh_ty_with_skel () in
+      let in_ty, in_ty_skel = Typed.fresh_ty_with_skel () in
       let new_in_cons = in_ty_skel :: in_cons in
       let Untyped.PVar x = p.Untyped.term in
       let target_pattern = type_pattern p in
@@ -666,12 +644,12 @@ and type_plain_expr in_cons st = function
       , [] )
   | Untyped.Handler h ->
       let out_dirt_var = Params.Dirt.fresh () in
-      let in_dirt = fresh_dirt ()
-      and out_dirt = no_effect_dirt out_dirt_var
-      and in_ty, skel_cons_in = fresh_ty_with_skel ()
-      and out_ty, skel_cons_out = fresh_ty_with_skel () in
+      let in_dirt = Types.fresh_dirt ()
+      and out_dirt = Types.no_effect_dirt out_dirt_var
+      and in_ty, skel_cons_in = Typed.fresh_ty_with_skel ()
+      and out_ty, skel_cons_out = Typed.fresh_ty_with_skel () in
       let target_type = Types.Handler ((in_ty, in_dirt), (out_ty, out_dirt)) in
-      let r_ty, r_ty_skel_cons = fresh_ty_with_skel () in
+      let r_ty, r_ty_skel_cons = Typed.fresh_ty_with_skel () in
       let r_cons = r_ty_skel_cons :: in_cons in
       let pr, cr = h.value_clause in
       let Untyped.PVar x = pr.Untyped.term in
@@ -731,9 +709,9 @@ and type_plain_expr in_cons st = function
       let cons_6 =
         (in_ty, Unification.apply_substitution_ty (target_cr_sub @ subs_n) r_ty)
       in
-      let omega_1, omega_cons_1 = fresh_ty_coer cons_1
-      and omega_2, omega_cons_2 = fresh_dirt_coer cons_2
-      and omega_6, omega_cons_6 = fresh_ty_coer cons_6 in
+      let omega_1, omega_cons_1 = Typed.fresh_ty_coer cons_1
+      and omega_2, omega_cons_2 = Typed.fresh_dirt_coer cons_2
+      and omega_6, omega_cons_6 = Typed.fresh_ty_coer cons_6 in
       let y_var_name = Typed.Variable.fresh "fresh_var" in
       let y = Typed.PVar y_var_name in
       let annot_y = Typed.annotate y Location.unknown in
@@ -771,9 +749,9 @@ and type_plain_expr in_cons st = function
               , Unification.apply_substitution_dirt subs_n delta_i ) )
         in
         let cons_5 = (cons_5a, cons_5b) in
-        let omega_3, omega_cons_3 = fresh_ty_coer cons_3 in
-        let omega_4, omega_cons_4 = fresh_dirt_coer cons_4 in
-        let omega_5, omega_cons_5 = fresh_ty_coer cons_5 in
+        let omega_3, omega_cons_3 = Typed.fresh_ty_coer cons_3 in
+        let omega_4, omega_cons_4 = Typed.fresh_dirt_coer cons_4 in
+        let omega_5, omega_cons_5 = Typed.fresh_ty_coer cons_5 in
         let l_var_name = Typed.Variable.fresh "fresh_var" in
         let l = Typed.PVar l_var_name in
         let annot_l = Typed.annotate l Location.unknown in
@@ -834,7 +812,7 @@ and type_plain_expr in_cons st = function
       let ops_set = Types.EffectSet.of_list for_set_handlers_ops in
       let handlers_ops = Types.SetVar (ops_set, out_dirt_var) in
       let cons_7 = (in_dirt, handlers_ops) in
-      let omega_7, omega_cons_7 = fresh_dirt_coer cons_7 in
+      let omega_7, omega_cons_7 = Typed.fresh_dirt_coer cons_7 in
       let handler_in_bang = Typed.BangCoercion (Typed.ReflTy in_ty, omega_7) in
       let handler_out_bang =
         Typed.BangCoercion (Typed.ReflTy out_ty, Typed.ReflDirt out_dirt)
@@ -892,8 +870,8 @@ and type_plain_comp in_cons st = function
       *)
       (* TODO: ignoring the substitutions for now *)
       let e', ty_A, cons0, sigma0 = type_expr in_cons st e in
-      let ty_alpha, q_alpha = fresh_ty_with_skel () in
-      let dirt_delta = fresh_dirt () in
+      let ty_alpha, q_alpha = Typed.fresh_ty_with_skel () in
+      let dirt_delta = Types.fresh_dirt () in
       let cases', cons1, sigma1 =
         type_cases (q_alpha :: cons0) st cases ty_A (ty_alpha, dirt_delta)
       in
@@ -912,7 +890,7 @@ and type_plain_comp in_cons st = function
       with
       (* | Typed.Effect (eff, (eff_in,eff_out)) ->
            let cons1 = (tt_2, eff_in) in
-           let coer1, omega_cons_1 = fresh_ty_coer cons1 in
+           let coer1, omega_cons_1 = Typed.fresh_ty_coer cons1 in
            let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2,coer1)) typed_e1.location in
            let constraints = List.append [omega_cons_1] constraints_2 in
            let dirt_of_out_ty = Types.EffectSet.singleton eff in 
@@ -937,13 +915,13 @@ and type_plain_comp in_cons st = function
        *)
       | _
       ->
-        let new_ty_var, cons1 = fresh_ty_with_skel () in
-        let fresh_dirty_ty = make_dirty new_ty_var in
+        let new_ty_var, cons1 = Typed.fresh_ty_with_skel () in
+        let fresh_dirty_ty = Types.make_dirty new_ty_var in
         let cons2 =
           ( Unification.apply_substitution_ty subs_e2 tt_1
           , Types.Arrow (tt_2, fresh_dirty_ty) )
         in
-        let omega_1, omega_cons_1 = fresh_ty_coer cons2 in
+        let omega_1, omega_cons_1 = Typed.fresh_ty_coer cons2 in
         let e1_coerced =
           Typed.annotate
             (Typed.CastExp
@@ -955,10 +933,10 @@ and type_plain_comp in_cons st = function
         , [cons1; omega_cons_1] @ constraints_2
         , subs_e2 @ subs_e1 ) )
   | Untyped.Handle (e, c) ->
-      let alpha_1, cons_skel_1 = fresh_ty_with_skel () in
-      let alpha_2, cons_skel_2 = fresh_ty_with_skel () in
-      let delta_1 = fresh_dirt () in
-      let delta_2 = fresh_dirt () in
+      let alpha_1, cons_skel_1 = Typed.fresh_ty_with_skel () in
+      let alpha_2, cons_skel_2 = Typed.fresh_ty_with_skel () in
+      let delta_1 = Types.fresh_dirt () in
+      let delta_2 = Types.fresh_dirt () in
       let dirty_1 = (alpha_1, delta_1) in
       let dirty_2 = (alpha_2, delta_2) in
       let typed_exp, exp_type, exp_constraints, sub_exp =
@@ -975,9 +953,9 @@ and type_plain_comp in_cons st = function
       in
       let cons2 = (comp_type, alpha_1) in
       let cons3 = (comp_dirt, delta_1) in
-      let coer1, omega_cons_1 = fresh_ty_coer cons1
-      and coer2, omega_cons_2 = fresh_ty_coer cons2
-      and coer3, omega_cons_3 = fresh_dirt_coer cons3 in
+      let coer1, omega_cons_1 = Typed.fresh_ty_coer cons1
+      and coer2, omega_cons_2 = Typed.fresh_ty_coer cons2
+      and coer3, omega_cons_3 = Typed.fresh_dirt_coer cons3 in
       let coer_exp =
         Typed.annotate (Typed.CastExp (typed_exp, coer1)) typed_exp.location
       in
@@ -1096,14 +1074,14 @@ and type_plain_comp in_cons st = function
               let typed_c2, (type_c2, dirt_c2), cons_c2, subs_c2 =
                 type_comp cons_c1 new_st c_2
               in
-              let new_dirt_var = fresh_dirt () in
+              let new_dirt_var = Types.fresh_dirt () in
               let cons1 =
                 ( Unification.apply_substitution_dirt subs_c1 dirt_c1
                 , new_dirt_var )
               in
               let cons2 = (dirt_c2, new_dirt_var) in
-              let coer1, omega_cons_1 = fresh_dirt_coer cons1 in
-              let coer2, omega_cons_2 = fresh_dirt_coer cons2 in
+              let coer1, omega_cons_1 = Typed.fresh_dirt_coer cons1 in
+              let coer2, omega_cons_2 = Typed.fresh_dirt_coer cons2 in
               let coer_c1 =
                 Typed.annotate
                   (Typed.CastComp
@@ -1134,14 +1112,14 @@ and type_plain_comp in_cons st = function
               let typed_c2, (type_c2, dirt_c2), cons_c2, subs_c2 =
                 type_comp cons_c1 new_st c_2
               in
-              let new_dirt_var = fresh_dirt () in
+              let new_dirt_var = Types.fresh_dirt () in
               let cons1 =
                 ( Unification.apply_substitution_dirt subs_c1 dirt_c1
                 , new_dirt_var )
               in
               let cons2 = (dirt_c2, new_dirt_var) in
-              let coer1, omega_cons_1 = fresh_dirt_coer cons1 in
-              let coer2, omega_cons_2 = fresh_dirt_coer cons2 in
+              let coer1, omega_cons_1 = Typed.fresh_dirt_coer cons1 in
+              let coer2, omega_cons_2 = Typed.fresh_dirt_coer cons2 in
               let coer_c1 =
                 Typed.annotate
                   (Typed.CastComp
@@ -1178,8 +1156,8 @@ and get_handler_op_clause eff abs2 in_st in_cons in_sub =
   let Untyped.PVar x_var = x.Untyped.term in
   let Untyped.PVar k_var = k.Untyped.term in
   let alpha_i_param = Params.Ty.fresh () in
-  let alpha_i, alpha_cons = fresh_ty_with_skel () in
-  let alpha_dirty = make_dirty alpha_i in
+  let alpha_i, alpha_cons = Typed.fresh_ty_with_skel () in
+  let alpha_dirty = Types.make_dirty alpha_i in
   let st_subbed = apply_sub_to_env in_st in_sub in
   let temp_st = add_def st_subbed x_var in_op_ty in
   let new_st = add_def temp_st k_var (Types.Arrow (out_op_ty, alpha_dirty)) in
@@ -1203,8 +1181,8 @@ and type_case in_cons st case ty_in (ty_out, dirt_out) =
   let p, c = case in
   let p', st', cons1 = type_pattern' in_cons st p ty_in in
   let c', (ty_c, dirt_c), cons2, sublist = type_comp cons1 st' c in
-  let tyco, q1 = fresh_ty_coer (ty_c, ty_out) in
-  let dco, q2 = fresh_dirt_coer (dirt_c, dirt_out) in
+  let tyco, q1 = Typed.fresh_ty_coer (ty_c, ty_out) in
+  let dco, q2 = Typed.fresh_dirt_coer (dirt_c, dirt_out) in
   let c'' =
     { Typed.term= Typed.CastComp (c', BangCoercion (tyco, dco))
     ; Typed.location= c'.Typed.location }

@@ -809,3 +809,18 @@ and free_vars_abs2 a2 =
 let occurrences x (inside, outside) =
   let count ys = List.length (List.filter (fun y -> x = y) ys) in
   (count inside, count outside)
+
+
+let fresh_dirt_coer cons =
+  let param = Params.DirtCoercion.fresh () in
+  (DirtCoercionVar param, DirtOmega (param, cons))
+
+
+let fresh_ty_with_skel () =
+  let ty_var = Params.Ty.fresh () and skel_var = Params.Skel.fresh () in
+  (Types.TyParam ty_var, TyParamHasSkel (ty_var, Types.SkelParam skel_var))
+
+
+let fresh_ty_coer cons =
+  let param = Params.TyCoercion.fresh () in
+  (TyCoercionVar param, TyOmega (param, cons))
