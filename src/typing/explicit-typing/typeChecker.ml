@@ -25,7 +25,9 @@ let extend_skel_params st sk_var =
   {st with skel_params= sk_var :: st.skel_params}
 
 
-let extend_ty_coer_types st tcp ctty = {st with ty_coer_types= (tcp, ctty) :: st.ty_coer_types}
+let extend_ty_coer_types st tcp ctty =
+  {st with ty_coer_types= (tcp, ctty) :: st.ty_coer_types}
+
 
 let extend_dirt_coer_types st tcp ctdrt =
   {st with dirt_coer_types= (tcp, ctdrt) :: st.dirt_coer_types}

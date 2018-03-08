@@ -1,9 +1,10 @@
 open Types
 open Typed
-
 module STyParams = Set.Make (Params.Ty)
 
-let set_of_list = List.fold_left (fun acc x -> STyParams.add x acc) STyParams.empty
+let set_of_list =
+  List.fold_left (fun acc x -> STyParams.add x acc) STyParams.empty
+
 
 type substitution =
   | CoerTyParamToTyCoercion of (Params.TyCoercion.t * Typed.ty_coercion)
@@ -32,6 +33,7 @@ let print_sub ?max_level c ppf =
   | SkelParamToSkel (p, s) ->
       print "%t :-skelvarToSkeleton-> %t" (Params.Skel.print p)
         (Types.print_skeleton s)
+
 
 let rec print_s_list = function
   | [] -> Print.debug "---------------------"
@@ -86,8 +88,8 @@ let rec apply_sub_ty sub ty =
       TySchemeTy (ty_param, apply_sub_skel sub sk, apply_sub_ty sub tty1)
   | TySchemeDirt (dirt_param, tty1) ->
       TySchemeDirt (dirt_param, apply_sub_ty sub tty1)
-  | TySchemeSkel (skvar, ty) -> 
-      TySchemeSkel (skvar, apply_sub_ty sub ty)
+  | TySchemeSkel (skvar, ty) -> TySchemeSkel (skvar, apply_sub_ty sub ty)
+
 
 and apply_sub_dirty_ty sub (ty, drt) =
   (apply_sub_ty sub ty, apply_sub_dirt sub drt)
@@ -169,7 +171,7 @@ and apply_sub_dirtycoer sub dirty_coer =
 
 let rec apply_sub_comp sub c =
   let c' = apply_sub_plain_comp sub c in
-  Print.debug "apply_sub_comp: %t %t" (print_sub sub) (print_computation c);
+  Print.debug "apply_sub_comp: %t %t" (print_sub sub) (print_computation c) ;
   Typed.annotate c' c.location
 
 
@@ -180,7 +182,8 @@ and apply_sub_plain_comp sub c =
       LetVal
         (apply_sub_exp sub e1, (p, apply_sub_ty sub ty, apply_sub_comp sub c1))
   | LetRec (l, c1) -> assert false (* LetRec (l, c1) *)
-  | Match (e, alist) -> Match (apply_sub_exp sub e, List.map (apply_sub_abs sub) alist)
+  | Match (e, alist) ->
+      Match (apply_sub_exp sub e, List.map (apply_sub_abs sub) alist)
   | Apply (e1, e2) -> Apply (apply_sub_exp sub e1, apply_sub_exp sub e2)
   | Handle (e1, c1) -> Handle (apply_sub_exp sub e1, apply_sub_comp sub c1)
   | Call (effect, e1, abs) ->
@@ -197,7 +200,7 @@ and apply_sub_plain_comp sub c =
 
 and apply_sub_exp sub exp =
   let e' = apply_sub_plain_exp sub exp in
-  Print.debug "apply_sub_exp: %t %t" (print_sub sub) (print_expression exp);
+  Print.debug "apply_sub_exp: %t %t" (print_sub sub) (print_expression exp) ;
   Typed.annotate e' exp.location
 
 
@@ -223,10 +226,16 @@ and apply_sub_plain_exp sub e =
       CastExp (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
   | ApplyTyExp (e1, tty) ->
       ApplyTyExp (apply_sub_exp sub e1, apply_sub_ty sub tty)
-  | LambdaTyCoerVar (tcp1, (ty1,ty2), e1) ->
-      LambdaTyCoerVar (tcp1, (apply_sub_ty sub ty1, apply_sub_ty sub ty2), apply_sub_exp sub e1)
-  | LambdaDirtCoerVar (dcp1, (d1,d2), e1) ->
-      LambdaDirtCoerVar (dcp1, (apply_sub_dirt sub d1, apply_sub_dirt sub d2), apply_sub_exp sub e1)
+  | LambdaTyCoerVar (tcp1, (ty1, ty2), e1) ->
+      LambdaTyCoerVar
+        ( tcp1
+        , (apply_sub_ty sub ty1, apply_sub_ty sub ty2)
+        , apply_sub_exp sub e1 )
+  | LambdaDirtCoerVar (dcp1, (d1, d2), e1) ->
+      LambdaDirtCoerVar
+        ( dcp1
+        , (apply_sub_dirt sub d1, apply_sub_dirt sub d2)
+        , apply_sub_exp sub e1 )
   | ApplyDirtExp (e1, d1) ->
       ApplyDirtExp (apply_sub_exp sub e1, apply_sub_dirt sub d1)
   | ApplyTyCoercion (e1, tc1) ->
@@ -380,7 +389,6 @@ let rec print_c_list = function
   | e :: l ->
       Print.debug "%t" (Typed.print_omega_ct e) ;
       print_c_list l
-
 
 
 let rec print_var_list = function

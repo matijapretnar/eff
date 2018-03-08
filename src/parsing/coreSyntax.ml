@@ -137,9 +137,10 @@ and print_expression ?max_level e ppf =
   | Variant (lbl, Some e) ->
       print ~at_level:1 "%s @[<hov>%t@]" lbl (print_expression e)
   | Lambda a -> print "fun %t" (abstraction a)
-  | Handler h -> print "{effect_clauses = %t; value_clause = (%t)}" 
-      (Print.sequence " | " effect_clause h.effect_clauses)
-      (abstraction h.value_clause)
+  | Handler h ->
+      print "{effect_clauses = %t; value_clause = (%t)}"
+        (Print.sequence " | " effect_clause h.effect_clauses)
+        (abstraction h.value_clause)
   | Effect eff -> print "%s" eff
 
 and abstraction (p, c) ppf =
@@ -153,5 +154,6 @@ and case a ppf = Format.fprintf ppf "%t" (abstraction a)
 and effect_clause (eff, a2) ppf =
   Format.fprintf ppf "| %s -> %t" eff (abstraction2 a2)
 
-and abstraction2 (p1,p2,c) ppf =
-  Format.fprintf ppf "%t %t -> %t" (print_pattern p1) (print_pattern p2) (print_computation c)
+and abstraction2 (p1, p2, c) ppf =
+  Format.fprintf ppf "%t %t -> %t" (print_pattern p1) (print_pattern p2)
+    (print_computation c)

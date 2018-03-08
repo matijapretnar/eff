@@ -48,10 +48,10 @@ let is_effect_member eff drt =
   | SetEmpty eset when EffectSet.mem eff eset -> true
   | _ -> false
 
+
 let effect_set_of_dirt drt =
-  match drt with
-  | SetVar (eset, _) -> eset
-  | SetEmpty eset    -> eset
+  match drt with SetVar (eset, _) -> eset | SetEmpty eset -> eset
+
 
 let rec types_are_equal ty1 ty2 =
   match (ty1, ty2) with
@@ -62,11 +62,14 @@ let rec types_are_equal ty1 ty2 =
       dirty_types_are_equal dirtya1 dirtyb1
       && dirty_types_are_equal dirtya2 dirtyb2
   | PrimTy ptya, PrimTy ptyb -> ptya = ptyb
-  | QualTy (ctty1,ty1), QualTy (ctty2,ty2) -> assert false
-  | QualDirt (ctd1,ty1), QualDirt (ctd2,ty2) -> ctd1 = ctd2 && types_are_equal ty1 ty2
-  | TySchemeTy (tyvar1,sk1,ty1), TySchemeTy (tyvar2,sk2,ty2) -> assert false
-  | TySchemeDirt (dvar1,ty1), TySchemeDirt (dvar2,ty2) -> dvar1 = dvar2 && types_are_equal ty1 ty2
-  | TySchemeSkel (skvar1,ty1), TySchemeSkel (skvar2,ty2) -> assert false
+  | QualTy (ctty1, ty1), QualTy (ctty2, ty2) -> assert false
+  | QualDirt (ctd1, ty1), QualDirt (ctd2, ty2) ->
+      ctd1 = ctd2 && types_are_equal ty1 ty2
+  | TySchemeTy (tyvar1, sk1, ty1), TySchemeTy (tyvar2, sk2, ty2) ->
+      assert false
+  | TySchemeDirt (dvar1, ty1), TySchemeDirt (dvar2, ty2) ->
+      dvar1 = dvar2 && types_are_equal ty1 ty2
+  | TySchemeSkel (skvar1, ty1), TySchemeSkel (skvar2, ty2) -> assert false
   | _ -> false
 
 
@@ -106,8 +109,8 @@ let rec print_target_ty ?max_level ty ppf =
   | QualDirt (c, tty) ->
       print "%t => %t" (print_ct_dirt c) (print_target_ty tty)
   | TySchemeTy (p, sk, tty) ->
-      print "ForallTy (%t:%t). %t" (Params.Ty.print p)
-        (print_skeleton sk) (print_target_ty tty)
+      print "ForallTy (%t:%t). %t" (Params.Ty.print p) (print_skeleton sk)
+        (print_target_ty tty)
   | TySchemeDirt (p, tty) ->
       print "ForallDirt %t. %t" (Params.Dirt.print p) (print_target_ty tty)
   | TySchemeSkel (p, tty) ->

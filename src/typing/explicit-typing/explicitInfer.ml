@@ -54,16 +54,18 @@ and source_to_target_dirty ty =
 
 let fresh_ty_with_skel () =
   let ty_var = Params.Ty.fresh () and skel_var = Params.Skel.fresh () in
-  (Types.TyParam ty_var, Typed.TyParamHasSkel (ty_var, Types.SkelParam skel_var))
+  ( Types.TyParam ty_var
+  , Typed.TyParamHasSkel (ty_var, Types.SkelParam skel_var) )
+
 
 let fresh_ty_coer cons =
   let param = Params.TyCoercion.fresh () in
   (Typed.TyCoercionVar param, Typed.TyOmega (param, cons))
 
 
-
 let rec type_pattern p =
-  {Typed.term= type_plain_pattern p.Untyped.term; Typed.location= p.Untyped.location}
+  { Typed.term= type_plain_pattern p.Untyped.term
+  ; Typed.location= p.Untyped.location }
 
 
 and type_plain_pattern = function
@@ -77,9 +79,9 @@ and type_plain_pattern = function
       assert false
       (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.PVariant (lbl, p) -> assert false
+
+
 (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-
-
 (*
 
      ===========================
@@ -97,26 +99,28 @@ and type_plain_pattern = function
   Q; Γ ⊢ c : A ~> c ⊣ Γ; Q, ω : B <: A
 
  *)
-
 and type_pattern' in_cons st pat ty =
-  let pat', st', out_cons = type_plain_pattern' in_cons st pat.Untyped.term ty in
-  ({Typed.term = pat'; Typed.location = pat.Untyped.location}, st', out_cons)
+  let pat', st', out_cons =
+    type_plain_pattern' in_cons st pat.Untyped.term ty
+  in
+  ({Typed.term= pat'; Typed.location= pat.Untyped.location}, st', out_cons)
+
 
 and type_plain_pattern' in_cons st pat ty =
   match pat with
-  | Untyped.PVar x -> 
-      let st' = add_def st x ty
-      in (Typed.PVar x, st', in_cons)
-  | Untyped.PNonbinding ->
-      (Typed.PNonbinding, st, in_cons)
-  | Untyped.PAs (p,v) -> assert false
+  | Untyped.PVar x ->
+      let st' = add_def st x ty in
+      (Typed.PVar x, st', in_cons)
+  | Untyped.PNonbinding -> (Typed.PNonbinding, st, in_cons)
+  | Untyped.PAs (p, v) -> assert false
   | Untyped.PTuple l -> assert false
   | Untyped.PRecord r -> assert false
-  | Untyped.PVariant (l,p) -> assert false
-  | Untyped.PConst c -> 
+  | Untyped.PVariant (l, p) -> assert false
+  | Untyped.PConst c ->
       let ty_c = source_to_target (ty_of_const c) in
-      let _omega, q = fresh_ty_coer (ty_c,ty) in
+      let _omega, q = fresh_ty_coer (ty_c, ty) in
       (Typed.PConst c, st, q :: in_cons)
+
 
 let extend_env vars env =
   List.fold_right
@@ -141,7 +145,8 @@ let rec get_skel_vars_from_constraints = function
 
 
 let constraint_free_ty_vars = function
-  | Typed.TyOmega (_, (Types.TyParam a, Types.TyParam b)) -> TyParamSet.of_list [a; b]
+  | Typed.TyOmega (_, (Types.TyParam a, Types.TyParam b)) ->
+      TyParamSet.of_list [a; b]
   | Typed.TyOmega (_, (Types.TyParam a, _)) -> TyParamSet.singleton a
   | Typed.TyOmega (_, (_, Types.TyParam a)) -> TyParamSet.singleton a
   | _ -> TyParamSet.empty
@@ -239,8 +244,9 @@ and free_dirt_vars_computation c =
   | Typed.LetVal (e, (p, ty, c)) ->
       free_dirt_vars_expression e @ free_dirt_vars_computation c
   | Typed.LetRec _ -> assert false
-  | Typed.Match (e, cases) -> 
-      free_dirt_vars_expression e @ List.concat (List.map free_dirt_vars_abstraction cases)
+  | Typed.Match (e, cases) ->
+      free_dirt_vars_expression e
+      @ List.concat (List.map free_dirt_vars_abstraction cases)
   | Typed.Apply (e1, e2) ->
       free_dirt_vars_expression e1 @ free_dirt_vars_expression e2
   | Typed.Handle (e, c) ->
@@ -375,12 +381,15 @@ let splitter st constraints simple_ty =
          state_freevars_dirt)
   in
   let global_cons' = OldUtils.diff constraints local_cons in
-  let global_cons  = List.filter (
-          fun c ->
-            match c with
-            | Typed.TyParamHasSkel (tyvar,skvar) -> not (List.mem tyvar alpha_list)
-            | _                                -> true
-       ) global_cons' in
+  let global_cons =
+    List.filter
+      (fun c ->
+        match c with
+        | Typed.TyParamHasSkel (tyvar, skvar) ->
+            not (List.mem tyvar alpha_list)
+        | _ -> true )
+      global_cons'
+  in
   Print.debug "Splitter output free_ty_vars: " ;
   List.iter (fun x -> Print.debug "%t" (Params.Ty.print x)) alpha_list ;
   Print.debug "Splitter output free_dirt_vars: " ;
@@ -540,13 +549,11 @@ let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
   (dirt_cons_apps, skel_constraints @ ty_cons @ dirt_cons)
 
 
-
 let no_effect_dirt dirt_param = Types.SetVar (Types.EffectSet.empty, dirt_param)
 
 let fresh_dirt () = no_effect_dirt (Params.Dirt.fresh ())
 
 let make_dirty ty = (ty, fresh_dirt ())
-
 
 let fresh_dirt_coer cons =
   let param = Params.DirtCoercion.fresh () in
@@ -554,14 +561,14 @@ let fresh_dirt_coer cons =
 
 
 let rec type_expr in_cons st ({Untyped.term= expr; Untyped.location= loc} as e) =
-  Print.debug "type_expr: %t" (CoreSyntax.print_expression e);
-  Print.debug "### Constraints Before ###";
-  Unification.print_c_list in_cons;
-  Print.debug "##########################";
+  Print.debug "type_expr: %t" (CoreSyntax.print_expression e) ;
+  Print.debug "### Constraints Before ###" ;
+  Unification.print_c_list in_cons ;
+  Print.debug "##########################" ;
   let e, ttype, constraints, sub_list = type_plain_expr in_cons st expr in
-  Print.debug "### Constraints After ####";
-  Unification.print_c_list constraints;
-  Print.debug "##########################";
+  Print.debug "### Constraints After ####" ;
+  Unification.print_c_list constraints ;
+  Print.debug "##########################" ;
   (Typed.annotate e loc, ttype, constraints, sub_list)
 
 
@@ -676,8 +683,8 @@ and type_plain_expr in_cons st = function
         type_comp r_cons r_st cr
       in
       let r_subbed_st = apply_sub_to_env st target_cr_sub in
-      let folder
-  (*
+      let folder 
+          (*
           (acc_terms, acc_tys, acc_st, acc_cons, acc_subs, acc_alpha_delta_i)
           (eff, abs2) =
    *)
@@ -689,7 +696,8 @@ and type_plain_expr in_cons st = function
             , co_op_cons
             , c_op_sub
             , (alpha_i, delta_i) ) =
-          Print.debug "get_handler_op_clause: %t" (CoreSyntax.abstraction2 abs2);
+          Print.debug "get_handler_op_clause: %t"
+            (CoreSyntax.abstraction2 abs2) ;
           get_handler_op_clause eff abs2 acc_st acc_cons acc_subs
         in
         ( typed_c_op :: acc_terms
@@ -699,15 +707,15 @@ and type_plain_expr in_cons st = function
         , c_op_sub @ acc_subs
         , (alpha_i, delta_i) :: acc_alpha_delta_i )
       in
-(*
+      (*
       let folder_function =
         List.fold_left folder ([], [], r_subbed_st, target_cr_cons, [], [])
           h.effect_clauses
       in
 *)
       let folder_function =
-        List.fold_right folder 
-          h.effect_clauses ([], [], r_subbed_st, target_cr_cons, [], [])
+        List.fold_right folder h.effect_clauses
+          ([], [], r_subbed_st, target_cr_cons, [], [])
       in
       let typed_op_terms, typed_op_terms_ty, _, cons_n, subs_n, alpha_delta_i_s =
         folder_function
@@ -777,7 +785,10 @@ and type_plain_expr in_cons st = function
           Typed.subst_comp [(k_var, coerced_l.term)]
             (Unification.apply_substitution subs_n op_term)
         in
-        Print.debug "substituted_c_op [%t/%t]: %t" (CoreSyntax.Variable.print ~safe:true l_var_name) (CoreSyntax.Variable.print ~safe:true k_var) (Typed.print_computation substituted_c_op);
+        Print.debug "substituted_c_op [%t/%t]: %t"
+          (CoreSyntax.Variable.print ~safe:true l_var_name)
+          (CoreSyntax.Variable.print ~safe:true k_var)
+          (Typed.print_computation substituted_c_op) ;
         let coerced_substiuted_c_op =
           Typed.annotate
             (Typed.CastComp
@@ -841,16 +852,16 @@ and type_plain_expr in_cons st = function
         ; omega_cons_7 ]
         @ ops_cons @ r_cons @ cons_n
       in
-      Print.debug "### Handler r_cons             ###";
-      Unification.print_c_list r_cons;
-      Print.debug "### Handler cons_n             ###";
-      Unification.print_c_list cons_n;
-      Print.debug "### Constraints before Handler ###";
-      Unification.print_c_list in_cons;
-      Print.debug "#################################";
-      Print.debug "### Constraints after Handler ###";
-      Unification.print_c_list all_cons;
-      Print.debug "#################################";
+      Print.debug "### Handler r_cons             ###" ;
+      Unification.print_c_list r_cons ;
+      Print.debug "### Handler cons_n             ###" ;
+      Unification.print_c_list cons_n ;
+      Print.debug "### Constraints before Handler ###" ;
+      Unification.print_c_list in_cons ;
+      Print.debug "#################################" ;
+      Print.debug "### Constraints after Handler ###" ;
+      Unification.print_c_list all_cons ;
+      Print.debug "#################################" ;
       (coerced_handler, target_type, all_cons, subs_n @ target_cr_sub)
 
 
@@ -880,12 +891,13 @@ and type_plain_comp in_cons st = function
            Q;Γ ⊢ Match (e, cases) : σ^n(α ! δ) | σ^n(Q,Q₀,...,Qn) ~> Match (e', cases' |> ωi) 
       *)
       (* TODO: ignoring the substitutions for now *)
-      let (e', ty_A, cons0, sigma0) = type_expr in_cons st e in
-      let ty_alpha , q_alpha = fresh_ty_with_skel () in
+      let e', ty_A, cons0, sigma0 = type_expr in_cons st e in
+      let ty_alpha, q_alpha = fresh_ty_with_skel () in
       let dirt_delta = fresh_dirt () in
-      let (cases', cons1, sigma1) = type_cases (q_alpha :: cons0) st cases ty_A (ty_alpha, dirt_delta) in 
+      let cases', cons1, sigma1 =
+        type_cases (q_alpha :: cons0) st cases ty_A (ty_alpha, dirt_delta)
+      in
       (Typed.Match (e', cases'), (ty_alpha, dirt_delta), cons1, sigma0 @ sigma1)
-
       (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Apply (e1, e2) -> (
       Print.debug "in infer apply" ;
@@ -1157,8 +1169,9 @@ and type_plain_comp in_cons st = function
               , subs_c2 @ subs_c1 )
           | pat -> assert false )
   | Untyped.LetRec (defs, c) -> assert false
-(* in fact it is not yet implemented, but assert false gives us source location automatically *)
 
+
+(* in fact it is not yet implemented, but assert false gives us source location automatically *)
 and get_handler_op_clause eff abs2 in_st in_cons in_sub =
   let in_op_ty, out_op_ty = Untyped.EffectMap.find eff in_st.effects in
   let x, k, c_op = abs2 in
@@ -1176,22 +1189,29 @@ and get_handler_op_clause eff abs2 in_st in_cons in_sub =
   in
   (typed_c_op, typed_co_op_ty, st_subbed, co_op_cons, c_op_sub, alpha_dirty)
 
-and type_cases in_cons st cases ty_in dty_out = 
-      match cases with
-      | []           -> ([], in_cons, [])
-      | (case::cases) ->
-           let (case', cons1, sub1)  = type_case in_cons st case ty_in dty_out in
-           let (cases', cons2, sub2) = type_cases cons1 st cases ty_in dty_out in
-           (case'::cases', cons2, sub1 @ sub2)
+
+and type_cases in_cons st cases ty_in dty_out =
+  match cases with
+  | [] -> ([], in_cons, [])
+  | case :: cases ->
+      let case', cons1, sub1 = type_case in_cons st case ty_in dty_out in
+      let cases', cons2, sub2 = type_cases cons1 st cases ty_in dty_out in
+      (case' :: cases', cons2, sub1 @ sub2)
+
 
 and type_case in_cons st case ty_in (ty_out, dirt_out) =
-  let (p,c) = case in
-  let (p',st',cons1) = type_pattern' in_cons st p ty_in in
-  let (c', (ty_c, dirt_c), cons2, sublist) = type_comp cons1 st' c in
-  let (tyco,q1) = fresh_ty_coer (ty_c,ty_out) in
-  let (dco,q2) = fresh_dirt_coer (dirt_c,dirt_out) in
-  let c'' = {Typed.term = Typed.CastComp (c', BangCoercion (tyco,dco)); Typed.location = c'.Typed.location } in
-  ({Typed.term = (p',c'');Typed.location=c''.Typed.location}, q1 :: q2 :: cons2, sublist)
+  let p, c = case in
+  let p', st', cons1 = type_pattern' in_cons st p ty_in in
+  let c', (ty_c, dirt_c), cons2, sublist = type_comp cons1 st' c in
+  let tyco, q1 = fresh_ty_coer (ty_c, ty_out) in
+  let dco, q2 = fresh_dirt_coer (dirt_c, dirt_out) in
+  let c'' =
+    { Typed.term= Typed.CastComp (c', BangCoercion (tyco, dco))
+    ; Typed.location= c'.Typed.location }
+  in
+  ( {Typed.term= (p', c''); Typed.location= c''.Typed.location}
+  , q1 :: q2 :: cons2
+  , sublist )
 
 
 (* Finalize a list of constraints, setting all dirt variables to the empty set. *)
@@ -1316,13 +1336,14 @@ let type_toplevel ~loc st c =
     Print.debug "New Computation : %t" (Typed.print_computation ct3) ;
     (* Print.debug "Remaining dirt variables "; *)
     (* List.iter (fun dp -> Print.debug "%t" (Params.Dirt.print dp)) (List.sort_uniq compare (free_dirt_vars_computation ct')); *)
-(*     let tch_ty, tch_dirt =
+    (*     let tch_ty, tch_dirt =
       TypeChecker.type_check_comp TypeChecker.new_checker_state ct3.term
     in
     Print.debug "Type from Type Checker : %t ! %t"
       (Types.print_target_ty tch_ty)
       (Types.print_target_dirt tch_dirt) ;
- *)    (ct3, st)
+ *)
+    (ct3, st)
 
 
 let add_effect eff (ty1, ty2) st =
