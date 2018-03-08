@@ -55,7 +55,7 @@ let refresh_abs2 a2 =
 
 let is_relatively_pure st c h =
   match TypeChecker.type_check_comp st.tc_state c.term with
-  | ty, SetEmpty ops ->
+  | ty, {Types.effect_set= ops; Types.row= Types.EmptyRow} ->
       let handled_ops =
         EffectSet.of_list
           (List.map (fun ((eff, _), _) -> eff) h.effect_clauses)
@@ -69,22 +69,24 @@ let is_relatively_pure st c h =
           TypeChecker.type_check_handler st.tc_state h
         in
         match output_dirt with
-        | SetEmpty ops' ->
+        | {Types.effect_set= ops'; Types.row= Types.EmptyRow} ->
             Some
               (BangCoercion
                  ( ReflTy ty
                  , UnionDirt
                      ( EffectSet.inter ops ops'
-                     , Empty (SetEmpty (EffectSet.diff ops' ops)) ) ))
-        | SetVar (ops', var) ->
+                     , Empty (Types.closed_dirt (EffectSet.diff ops' ops)) ) ))
+        | {Types.effect_set= ops'; Types.row= Types.ParamRow var} ->
             Some
               (BangCoercion
                  ( ReflTy ty
                  , UnionDirt
                      ( EffectSet.inter ops ops'
-                     , Empty (SetVar (EffectSet.diff ops' ops, var)) ) ))
+                     , Empty
+                         { Types.effect_set= EffectSet.diff ops' ops
+                         ; Types.row= Types.ParamRow var } ) ))
       else None
-  | _, SetVar _ -> None
+  | _, _ -> None
 
 
 (* var can be instantiated to anything *)
@@ -240,21 +242,13 @@ and reduce_dirt_coercion st p_ops dco =
   match dco with
   | ReflDirt d -> dco
   | DirtCoercionVar dcov -> dco
-  | Empty d -> (
-    match d with
-    | SetEmpty ops ->
-        let ops' = EffectSet.diff ops p_ops in
-        Empty (SetEmpty ops')
-    | SetVar (ops, var) ->
-        let ops' = EffectSet.diff ops p_ops in
-        Empty (SetVar (ops', var)) )
+  | Empty d ->
+      Empty {d with Types.effect_set= EffectSet.diff d.effect_set p_ops}
   | UnionDirt (ops, dco1) ->
       let d1, d2 = TypeChecker.type_check_dirt_coercion st.tc_state dco1 in
       let ops' =
         EffectSet.diff ops
-          (EffectSet.inter
-             (Types.effect_set_of_dirt d1)
-             (Types.effect_set_of_dirt d2))
+          (EffectSet.inter d1.Types.effect_set d2.Types.effect_set)
       in
       if EffectSet.is_empty ops' then dco1 else UnionDirt (ops', dco1)
   | SequenceDirtCoer (dco1, dco2) -> dco
@@ -491,8 +485,8 @@ and reduce_comp st c =
                 ( { term= Value {term= Var var; location= c.location}
                   ; location= c.location }
                 , BangCoercion
-                    (ReflTy ty_out, Empty (SetEmpty (EffectSet.singleton eff)))
-                )
+                    ( ReflTy ty_out
+                    , Empty (Types.closed_dirt (EffectSet.singleton eff)) ) )
           ; location= c.location }
         in
         let a_w_ty =

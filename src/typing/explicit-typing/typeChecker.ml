@@ -63,9 +63,11 @@ let rec type_check_skel st sk =
 
 let type_check_dirt st d =
   match d with
-  | SetEmpty eset when EffectSet.is_empty eset -> d
-  | SetEmpty _ -> d
-  | SetVar (_, v) ->
+  | {Types.effect_set= eset; Types.row= Types.EmptyRow}
+    when EffectSet.is_empty eset ->
+      d
+  | {Types.row= Types.EmptyRow} -> d
+  | {Types.row= Types.ParamRow v} ->
       assert (List.mem v st.dirt_params) ;
       d
 
@@ -245,19 +247,11 @@ and type_check_dirt_coercion st dirt_coer =
     | Some pi -> pi )
   | Empty d ->
       let d' = type_check_dirt st d in
-      (SetEmpty Types.EffectSet.empty, d')
+      (Types.empty_dirt, d')
   | UnionDirt (es, dirt_coer1) ->
       let dc_a, dc_b = type_check_dirt_coercion st dirt_coer1 in
-      let dc_a' =
-        match dc_a with
-        | SetVar (es1, v) -> SetVar (EffectSet.union es es1, v)
-        | SetEmpty es1 -> SetEmpty (EffectSet.union es es1)
-      in
-      let dc_b' =
-        match dc_b with
-        | SetVar (es1, v) -> SetVar (EffectSet.union es es1, v)
-        | SetEmpty es1 -> SetEmpty (EffectSet.union es es1)
-      in
+      let dc_a' = {dc_a with effect_set= EffectSet.union es dc_a.effect_set} in
+      let dc_b' = {dc_b with effect_set= EffectSet.union es dc_b.effect_set} in
       (dc_a', dc_b')
   | SequenceDirtCoer (dc1, dc2) ->
       let t1, t2 = type_check_dirt_coercion st dc1 in
@@ -305,7 +299,8 @@ let rec type_check_exp st e =
       let c_ty = type_check_comp st' c1.term in
       Types.Arrow (ty1', c_ty)
   | Effect (eff, (eff_in, eff_out)) ->
-      Types.Arrow (eff_in, (eff_out, Types.SetEmpty (EffectSet.singleton eff)))
+      Types.Arrow
+        (eff_in, (eff_out, Types.closed_dirt (EffectSet.singleton eff)))
   | Handler h -> type_check_handler st h
   | BigLambdaTy (ty_param, skel, e1) ->
       let st' = extend_ty_param_skeletons st ty_param skel in
@@ -364,7 +359,7 @@ and type_check_comp st c =
   match c with
   | Value e ->
       let ty1 = type_check_exp st e.term in
-      (ty1, SetEmpty EffectSet.empty)
+      (ty1, Types.empty_dirt)
   | LetVal (e1, (p1, ty, c1)) ->
       let t_v = type_check_exp st e1.term in
       assert (Types.types_are_equal t_v ty) ;
@@ -400,7 +395,7 @@ and type_check_comp st c =
       let Typed.PVar p = x.term in
       let st' = extend_var_types st p eff_out in
       let final_ty, final_dirt = type_check_comp st' c1.term in
-      assert (Types.is_effect_member eff final_dirt) ;
+      assert (Types.EffectSet.mem eff final_dirt.Types.effect_set) ;
       (final_ty, final_dirt)
   | Op (ef, e1) -> failwith "Not yet implemented"
   | Bind (c1, a1) -> (
@@ -441,11 +436,9 @@ and type_check_handler st h =
   let handlers_ops_set = Types.EffectSet.of_list handlers_ops in
   let t_cv, d_cv = type_cv in
   let input_dirt =
-    match d_cv with
-    | Types.SetVar (es, param) ->
-        Types.SetVar (Types.EffectSet.union es handlers_ops_set, param)
-    | Types.SetEmpty es ->
-        Types.SetEmpty (Types.EffectSet.union es handlers_ops_set)
+    { d_cv with
+      Types.effect_set=
+        Types.EffectSet.union d_cv.Types.effect_set handlers_ops_set }
   in
   Types.Handler ((tv, input_dirt), type_cv)
 

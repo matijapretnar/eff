@@ -27,7 +27,9 @@ and target_ty =
 
 and target_dirty = (target_ty * dirt)
 
-and dirt = SetVar of effect_set * Params.Dirt.t | SetEmpty of effect_set
+and dirt = {effect_set: effect_set; row: row}
+
+and row = ParamRow of Params.Dirt.t | EmptyRow
 
 and ct =
   | LeqTy of (target_ty * target_ty)
@@ -41,17 +43,6 @@ and ct_ty = (target_ty * target_ty)
 and ct_dirt = (dirt * dirt)
 
 and ct_dirty = (target_dirty * target_dirty)
-
-let is_effect_member eff drt =
-  match drt with
-  | SetVar (eset, _) when EffectSet.mem eff eset -> true
-  | SetEmpty eset when EffectSet.mem eff eset -> true
-  | _ -> false
-
-
-let effect_set_of_dirt drt =
-  match drt with SetVar (eset, _) -> eset | SetEmpty eset -> eset
-
 
 let rec types_are_equal ty1 ty2 =
   match (ty1, ty2) with
@@ -78,11 +69,7 @@ and dirty_types_are_equal (ty1, d1) (ty2, d2) =
 
 
 and dirts_are_equal d1 d2 =
-  match (d1, d2) with
-  | SetVar (es1, dv1), SetVar (es2, dv2) ->
-      EffectSet.equal es1 es2 && dv1 = dv2
-  | SetEmpty es1, SetEmpty es2 -> EffectSet.equal es1 es2
-  | _ -> false
+  EffectSet.equal d1.effect_set d2.effect_set && d1.row = d2.row
 
 
 let rec print_target_ty ?max_level ty ppf =
@@ -132,11 +119,12 @@ and print_skeleton ?max_level sk ppf =
 
 and print_target_dirt drt ppf =
   let print ?at_level = Print.print ?at_level ppf in
-  match drt with
-  | SetVar (set, p) ->
-      if EffectSet.is_empty set then print "%t" (Params.Dirt.print p)
-      else print "{%t} U %t" (print_effect_set set) (Params.Dirt.print p)
-  | SetEmpty set -> print "{%t}" (print_effect_set set)
+  match (drt.effect_set, drt.row) with
+  | effect_set, EmptyRow -> print "{%t}" (print_effect_set effect_set)
+  | effect_set, ParamRow p when EffectSet.is_empty effect_set ->
+      print "%t" (Params.Dirt.print p)
+  | effect_set, ParamRow p ->
+      print "{%t} U %t" (print_effect_set effect_set) (Params.Dirt.print p)
 
 
 and print_effect_set effect_set =
@@ -181,8 +169,14 @@ and print_prim_ty pty ppf =
   | FloatTy -> print "float"
 
 
-let no_effect_dirt dirt_param = SetVar (EffectSet.empty, dirt_param)
+let no_effect_dirt dirt_param =
+  {effect_set= EffectSet.empty; row= ParamRow dirt_param}
+
 
 let fresh_dirt () = no_effect_dirt (Params.Dirt.fresh ())
+
+let closed_dirt effect_set = {effect_set; row= EmptyRow}
+
+let empty_dirt = closed_dirt EffectSet.empty
 
 let make_dirty ty = (ty, fresh_dirt ())

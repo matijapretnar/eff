@@ -48,9 +48,7 @@ let rec source_to_target ty =
         (source_to_target_dirty dirty1, source_to_target_dirty dirty2)
 
 
-and source_to_target_dirty ty =
-  (source_to_target ty, Types.SetEmpty Types.EffectSet.empty)
-
+and source_to_target_dirty ty = (source_to_target ty, Types.empty_dirt)
 
 let rec type_pattern p =
   { Typed.term= type_plain_pattern p.Untyped.term
@@ -141,12 +139,16 @@ let constraint_free_ty_vars = function
   | _ -> TyParamSet.empty
 
 
+let constraint_free_row_vars = function
+  | Types.ParamRow p -> DirtVarSet.singleton p
+  | Types.EmptyRow -> DirtVarSet.empty
+
+
 let constraint_free_dirt_vars = function
-  | Typed.DirtOmega (_, (Types.SetVar (_, a), Types.SetVar (_, b))) ->
-      DirtVarSet.of_list [a; b]
-  | Typed.DirtOmega (_, (Types.SetVar (_, a), _)) -> DirtVarSet.singleton a
-  | Typed.DirtOmega (_, (_, Types.SetVar (_, a))) -> DirtVarSet.singleton a
-  | _ -> DirtVarSet.empty
+  | Typed.DirtOmega (_, (drt1, drt2)) ->
+      DirtVarSet.union
+        (constraint_free_row_vars drt1.Types.row)
+        (constraint_free_row_vars drt2.Types.row)
 
 
 let rec free_ty_vars_ty = function
@@ -180,7 +182,9 @@ let rec free_dirt_vars_ty = function
 
 and free_dirt_vars_dirty (a, d) = free_dirt_vars_dirt d
 
-and free_dirt_vars_dirt = function Types.SetVar (_, sv) -> [sv] | _ -> []
+and free_dirt_vars_dirt drt =
+  DirtVarSet.elements (constraint_free_row_vars drt.Types.row)
+
 
 let rec state_free_ty_vars st =
   List.fold_right
@@ -442,13 +446,13 @@ let rec apply_sub_to_type ty_subs dirt_subs ty =
   | _ -> assert false
 
 
-and apply_sub_to_dirt dirt_subs ty =
-  match ty with
-  | Types.SetVar (s, p) -> (
+and apply_sub_to_dirt dirt_subs drt =
+  match drt.row with
+  | Types.ParamRow p -> (
     match OldUtils.lookup p dirt_subs with
-    | Some p' -> Types.SetVar (s, p')
-    | None -> ty )
-  | x -> x
+    | Some p' -> {drt with row= Types.ParamRow p'}
+    | None -> drt )
+  | Types.EmptyRow -> drt
 
 
 let rec get_applied_cons_from_ty ty_subs dirt_subs ty =
@@ -514,8 +518,7 @@ let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
   let dirt_apps =
     List.fold_left
       (fun a (_, b) ->
-        Typed.annotate
-          (Typed.ApplyDirtExp (a, Types.SetVar (Types.EffectSet.empty, b)))
+        Typed.annotate (Typed.ApplyDirtExp (a, Types.no_effect_dirt b))
           Location.unknown )
       ty_apps dirt_subs
   in
@@ -639,7 +642,7 @@ and type_plain_expr in_cons st = function
       let in_ty, out_ty = Untyped.EffectMap.find eff st.effects in
       let s = Types.EffectSet.singleton eff in
       ( Typed.Effect (eff, (in_ty, out_ty))
-      , Types.Arrow (in_ty, (out_ty, Types.SetEmpty s))
+      , Types.Arrow (in_ty, (out_ty, Types.closed_dirt s))
       , in_cons
       , [] )
   | Untyped.Handler h ->
@@ -810,7 +813,9 @@ and type_plain_expr in_cons st = function
         List.map (fun ((eff, (_, _)), _) -> eff) new_op_clauses
       in
       let ops_set = Types.EffectSet.of_list for_set_handlers_ops in
-      let handlers_ops = Types.SetVar (ops_set, out_dirt_var) in
+      let handlers_ops =
+        Types.{effect_set= ops_set; row= ParamRow out_dirt_var}
+      in
       let cons_7 = (in_dirt, handlers_ops) in
       let omega_7, omega_cons_7 = Typed.fresh_dirt_coer cons_7 in
       let handler_in_bang = Typed.BangCoercion (Typed.ReflTy in_ty, omega_7) in
@@ -851,7 +856,7 @@ and type_comp in_cons st {Untyped.term= comp; Untyped.location= loc} =
 and type_plain_comp in_cons st = function
   | Untyped.Value e ->
       let typed_e, tt, constraints, subs_e = type_expr in_cons st e in
-      let new_d_ty = (tt, Types.SetEmpty Types.EffectSet.empty) in
+      let new_d_ty = (tt, Types.empty_dirt) in
       (Typed.Value typed_e, new_d_ty, constraints, subs_e)
   | Untyped.Match (e, cases) ->
       (*
@@ -1199,44 +1204,29 @@ let finalize_constraint sub = function
       Error.typing ~loc:Location.unknown
         "Unsolved type inequality in top-level computation: %t"
         (Typed.print_omega_ct (Typed.TyOmega (tcp, ctty)))
-  | Typed.DirtOmega (dcp, (d1, d2)) -> (
-    match (d1, d2) with
-    | SetEmpty s1, SetVar (s2, dv2) ->
-        assert (Types.EffectSet.subset s1 s2) ;
+  | Typed.DirtOmega
+      ( dcp
+      , ( {Types.effect_set= s1; Types.row= row1}
+        , {Types.effect_set= s2; Types.row= row2} ) ) ->
+      assert (Types.EffectSet.subset s1 s2) ;
+      let effect_subst =
         Unification.CoerDirtVartoDirtCoercion
           ( dcp
           , Typed.UnionDirt
-              (s1, Typed.Empty (Types.SetEmpty (Types.EffectSet.diff s2 s1)))
+              (s1, Typed.Empty (Types.closed_dirt (Types.EffectSet.diff s2 s1)))
           )
-        :: Unification.DirtVarToDirt (dv2, Types.SetEmpty Types.EffectSet.empty)
-        :: sub
-    | SetVar (s1, dv1), SetEmpty s2 ->
-        assert (Types.EffectSet.subset s1 s2) ;
-        Unification.CoerDirtVartoDirtCoercion
-          ( dcp
-          , Typed.UnionDirt
-              (s1, Typed.Empty (Types.SetEmpty (Types.EffectSet.diff s2 s1)))
-          )
-        :: Unification.DirtVarToDirt (dv1, Types.SetEmpty Types.EffectSet.empty)
-        :: sub
-    | SetVar (s1, dv1), SetVar (s2, dv2) ->
-        assert (Types.EffectSet.subset s1 s2) ;
-        Unification.CoerDirtVartoDirtCoercion
-          ( dcp
-          , Typed.UnionDirt
-              (s1, Typed.Empty (Types.SetEmpty (Types.EffectSet.diff s2 s1)))
-          )
-        :: Unification.DirtVarToDirt (dv1, Types.SetEmpty Types.EffectSet.empty)
-        :: Unification.DirtVarToDirt (dv2, Types.SetEmpty Types.EffectSet.empty)
-        :: sub
-    | SetEmpty s1, SetEmpty s2 ->
-        assert (Types.EffectSet.subset s1 s2) ;
-        Unification.CoerDirtVartoDirtCoercion
-          ( dcp
-          , Typed.UnionDirt
-              (s1, Typed.Empty (Types.SetEmpty (Types.EffectSet.diff s2 s1)))
-          )
-        :: sub )
+      and row_substs =
+        match (row1, row2) with
+        | Types.EmptyRow, Types.ParamRow dv2 ->
+            [Unification.DirtVarToDirt (dv2, Types.empty_dirt)]
+        | Types.ParamRow dv1, Types.EmptyRow ->
+            [Unification.DirtVarToDirt (dv1, Types.empty_dirt)]
+        | Types.ParamRow dv1, Types.ParamRow dv2 ->
+            [ Unification.DirtVarToDirt (dv1, Types.empty_dirt)
+            ; Unification.DirtVarToDirt (dv2, Types.empty_dirt) ]
+        | Types.EmptyRow, Types.EmptyRow -> []
+      in
+      effect_subst :: row_substs @ sub
   | Typed.SkelEq (sk1, sk2) -> assert false
   | Typed.TyParamHasSkel (tp, sk) -> assert false
 
@@ -1303,9 +1293,7 @@ let type_toplevel ~loc st c =
     Print.debug "New Computation : %t" (Typed.print_computation ct') ;
     let sub2 =
       List.map
-        (fun dp ->
-          Unification.DirtVarToDirt (dp, Types.SetEmpty Types.EffectSet.empty)
-          )
+        (fun dp -> Unification.DirtVarToDirt (dp, Types.empty_dirt))
         (List.sort_uniq compare (free_dirt_vars_computation ct'))
     in
     let ct2 = Unification.apply_substitution sub2 ct' in

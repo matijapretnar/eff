@@ -43,17 +43,13 @@ let rec print_s_list = function
 
 
 let apply_sub_dirt sub drt =
-  match drt with
-  | SetVar (eset, p) -> (
+  match drt.row with
+  | ParamRow p -> (
     match sub with
-    | DirtVarToDirt (p', drt2) when p = p' -> (
-      match drt2 with
-      | SetVar (eset2, pp) ->
-          let eset_union = EffectSet.union eset eset2 in
-          SetVar (eset_union, pp)
-      | SetEmpty eset2 -> SetEmpty (EffectSet.union eset eset2) )
+    | DirtVarToDirt (p', drt2) when p = p' ->
+        {drt2 with effect_set= EffectSet.union drt.effect_set drt2.effect_set}
     | _ -> drt )
-  | SetEmpty _ -> drt
+  | EmptyRow -> drt
 
 
 let rec apply_sub_skel sub sk =
@@ -474,15 +470,16 @@ and refresh_target_dirty (ty_sbst, dirt_sbst) (t, d) =
   ((d_ty_sbst, d_dirt_sbst), (t', d'))
 
 
-and refresh_target_dirt (ty_sbst, dirt_sbst) t =
-  match t with
-  | SetVar (set, x) -> (
+and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
+  match drt.row with
+  | ParamRow x -> (
     match OldUtils.lookup x dirt_sbst with
-    | Some x' -> ((ty_sbst, dirt_sbst), Types.SetVar (set, x'))
+    | Some x' -> ((ty_sbst, dirt_sbst), {drt with row= ParamRow x'})
     | None ->
         let y = Params.Dirt.fresh () in
-        ((ty_sbst, OldUtils.update x y dirt_sbst), SetVar (set, y)) )
-  | SetEmpty set -> ((ty_sbst, dirt_sbst), Types.SetEmpty set)
+        ((ty_sbst, OldUtils.update x y dirt_sbst), {drt with row= ParamRow y})
+    )
+  | EmptyRow -> ((ty_sbst, dirt_sbst), drt)
 
 
 let rec union_find_tyvar tyvar acc c_list =
@@ -582,8 +579,7 @@ let rec unify (sub, paused, queue) =
           let ty_p2 = Params.Ty.fresh () in
           let tvar1 = Types.TyParam ty_p1 in
           let tvar2 = Types.TyParam ty_p2 in
-          let d_p1 = Params.Dirt.fresh () in
-          let dvar1 = Types.SetVar (EffectSet.empty, d_p1) in
+          let dvar1 = Types.fresh_dirt () in
           let sub1 = TyParamToTy (tvar, Types.Arrow (tvar1, (tvar2, dvar1))) in
           let cons1 = TyParamHasSkel (ty_p1, sk1) in
           let cons2 = TyParamHasSkel (ty_p2, sk2) in
@@ -598,10 +594,8 @@ let rec unify (sub, paused, queue) =
           let ty_p2 = Params.Ty.fresh () in
           let tvar1 = Types.TyParam ty_p1 in
           let tvar2 = Types.TyParam ty_p2 in
-          let d_p1 = Params.Dirt.fresh () in
-          let dvar1 = Types.SetVar (EffectSet.empty, d_p1) in
-          let d_p2 = Params.Dirt.fresh () in
-          let dvar2 = Types.SetVar (EffectSet.empty, d_p2) in
+          let dvar1 = Types.fresh_dirt () in
+          let dvar2 = Types.fresh_dirt () in
           let sub1 =
             TyParamToTy (tvar, Types.Handler ((tvar1, dvar1), (tvar2, dvar2)))
           in
@@ -767,7 +761,7 @@ let rec unify (sub, paused, queue) =
     | Typed.DirtOmega (omega, dcons) ->
       match dcons with
       (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
-      | Types.SetVar (s1, v1), Types.SetVar (s2, v2) ->
+      | {effect_set= s1; row= ParamRow v1}, {effect_set= s2; row= ParamRow v2} ->
           if Types.EffectSet.is_empty s1 then (
             Print.debug "=========End loop============" ;
             unify (sub, cons :: paused, rest_queue) )
@@ -777,51 +771,53 @@ let rec unify (sub, paused, queue) =
             let union_set = Types.EffectSet.union s1 s2 in
             let sub' =
               [ DirtVarToDirt
-                  (v2, Types.SetVar (diff_set, Params.Dirt.fresh ()))
+                  ( v2
+                  , let open Types in
+                    {effect_set= diff_set; row= ParamRow (Params.Dirt.fresh ())}
+                  )
               ; CoerDirtVartoDirtCoercion
                   (omega, Typed.UnionDirt (s1, DirtCoercionVar omega')) ]
             in
             let new_cons =
               Typed.DirtOmega
                 ( omega'
-                , ( Types.SetVar (Types.EffectSet.empty, v1)
-                  , Types.SetVar (union_set, v2) ) )
+                , ( Types.{effect_set= Types.EffectSet.empty; row= ParamRow v1}
+                  , Types.{effect_set= union_set; row= ParamRow v2} ) )
             in
             Print.debug "=========End loop============" ;
             unify
               (sub @ sub', [], apply_sub sub' (new_cons :: paused @ rest_queue))
       (* ω : Ø <= Δ₂ *)
-      | Types.SetEmpty s1, d
+      | {effect_set= s1; row= EmptyRow}, d
         when Types.EffectSet.is_empty s1 ->
           let sub1 = CoerDirtVartoDirtCoercion (omega, Typed.Empty d) in
           Print.debug "=========End loop============" ;
           unify (sub @ [sub1], paused, rest_queue)
       (* ω : δ₁ <= Ø *)
-      | Types.SetVar (s1, v1), Types.SetEmpty s2
+      | {effect_set= s1; row= ParamRow v1}, {effect_set= s2; row= EmptyRow}
         when Types.EffectSet.is_empty s1 && Types.EffectSet.is_empty s2 ->
           let sub1 =
-            [ CoerDirtVartoDirtCoercion
-                (omega, Typed.Empty (Types.SetEmpty Types.EffectSet.empty))
-            ; DirtVarToDirt (v1, Types.SetEmpty Types.EffectSet.empty) ]
+            [ CoerDirtVartoDirtCoercion (omega, Typed.Empty Types.empty_dirt)
+            ; DirtVarToDirt (v1, Types.empty_dirt) ]
           in
           Print.debug "=========End loop============" ;
           unify (sub @ sub1, [], apply_sub sub1 (paused @ rest_queue))
       (* ω : O₁ <= O₂ *)
-      | Types.SetEmpty s1, Types.SetEmpty s2 ->
+      | {effect_set= s1; row= EmptyRow}, {effect_set= s2; row= EmptyRow} ->
           if Types.EffectSet.subset s1 s2 then
             let sub1 =
               CoerDirtVartoDirtCoercion
                 ( omega
                 , Typed.UnionDirt
                     ( s2
-                    , Typed.Empty (Types.SetEmpty (Types.EffectSet.diff s2 s1))
-                    ) )
+                    , Typed.Empty
+                        (Types.closed_dirt (Types.EffectSet.diff s2 s1)) ) )
             in
             Print.debug "=========End loop============" ;
             unify (sub @ [sub1], paused, rest_queue)
           else assert false
       (* ω : O₁ <= O₂ ∪ δ₂ *)
-      | Types.SetEmpty s1, Types.SetVar (s2, v2) ->
+      | {effect_set= s1; row= EmptyRow}, {effect_set= s2; row= ParamRow v2} ->
           let v2' = Params.Dirt.fresh () in
           let sub1 =
             [ CoerDirtVartoDirtCoercion
@@ -829,9 +825,13 @@ let rec unify (sub, paused, queue) =
                 , Typed.UnionDirt
                     ( s1
                     , Typed.Empty
-                        (Types.SetVar (Types.EffectSet.diff s2 s1, v2')) ) )
-            ; DirtVarToDirt (v2, Types.SetVar (Types.EffectSet.diff s1 s2, v2'))
-            ]
+                        Types.
+                          {effect_set= EffectSet.diff s2 s1; row= ParamRow v2'}
+                    ) )
+            ; DirtVarToDirt
+                ( v2
+                , Types.{effect_set= EffectSet.diff s1 s2; row= ParamRow v2'}
+                ) ]
           in
           Print.debug "=========End loop============" ;
           unify (sub @ sub1, [], apply_sub sub1 (paused @ rest_queue))
