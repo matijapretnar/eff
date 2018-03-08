@@ -31,7 +31,7 @@ let rec exec_cmd ppf st cmd =
             st.explicit_typing c
         in
         let ty, drt =
-          TypeChecker.type_check_comp st.type_checker ct.Typed.term
+          TypeChecker.type_of_computation st.type_checker ct.Typed.term
         in
         let v = Eval.run st.runtime c in
         Format.fprintf ppf "@[- : %t ! %t = %t@]@." (Types.print_target_ty ty)
@@ -51,7 +51,7 @@ let rec exec_cmd ppf st cmd =
             st.explicit_typing c
         in
         let ty, drt =
-          TypeChecker.type_check_comp st.type_checker ct.Typed.term
+          TypeChecker.type_of_computation st.type_checker ct.Typed.term
         in
         Format.fprintf ppf "@[- : %t ! %t@]@." (Types.print_target_ty ty)
           (Types.print_target_dirt drt) ;
@@ -181,7 +181,7 @@ let compile_file ppf filename st =
           "-- After Optimization ------------------------------------------" ;
         Print.debug "%t" (Typed.print_computation ct) ;
         let ct_ty, ct_dirt =
-          TypeChecker.type_check_comp st.type_checker ct.term
+          TypeChecker.type_of_computation st.type_checker ct.term
         in
         Print.debug "Type from Type Checker : %t ! %t"
           (Types.print_target_ty ct_ty)
