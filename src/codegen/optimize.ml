@@ -66,7 +66,7 @@ let is_relatively_pure st c h =
         (Types.print_effect_set ops) ;
       if EffectSet.is_empty (EffectSet.inter handled_ops ops) then
         let Types.Handler (_, (_, output_dirt)) =
-          TypeChecker.type_check_handler st.tc_state h
+          TypeChecker.type_of_handler st.tc_state h
         in
         match output_dirt with
         | {Types.effect_set= ops'; Types.row= Types.EmptyRow} ->
@@ -337,7 +337,7 @@ and optimize_sub_expr st e =
 
 and optimize_sub_handler st {effect_clauses= ecs; value_clause= vc} =
   let vc' = optimize_abstraction_with_ty st vc in
-  let _, dty = TypeChecker.type_check_abstraction_with_ty st.tc_state vc in
+  let _, dty = TypeChecker.type_of_abstraction_with_ty st.tc_state vc in
   let ecs' = List.map (optimize_abstraction2 st dty) ecs in
   {effect_clauses= ecs'; value_clause= vc'}
 

@@ -261,11 +261,7 @@ let rec type_of_expression st e =
     match OldUtils.lookup v st.var_types with
     | Some ty -> ty
     | _ -> assert false )
-  | BuiltIn (s, i) -> failwith "Not yet implemented"
   | Const const -> type_of_const const
-  | Tuple elist -> failwith "Not yet implemented"
-  | Record r -> failwith "Not yet implemented"
-  | Variant (lbl, e1) -> failwith "Not yet implemented"
   | Lambda (pat, ty1, c1) ->
       check_well_formed_ty st ty1 ;
       let st' = extend_pattern_types st pat ty1 in
@@ -337,6 +333,7 @@ let rec type_of_expression st e =
           assert (dc1' = cons) ;
           e1_ty
       | _ -> assert false
+      | _ -> failwith "Not yet implemented"
 
 and type_of_computation st c =
   match c with
@@ -348,7 +345,6 @@ and type_of_computation st c =
       assert (Types.types_are_equal t_v ty) ;
       let st' = extend_pattern_types st p1 t_v in
       type_of_computation st' c1.term
-  | LetRec (l, c1) -> failwith "Not yet implemented"
   | Match (e, alist) -> (
       let t_e = type_of_expression st e.term in
       let ty_list = List.map (type_of_abstraction st t_e) alist in
@@ -379,39 +375,29 @@ and type_of_computation st c =
       let final_ty, final_dirt = type_of_computation st' c1.term in
       assert (Types.EffectSet.mem eff final_dirt.Types.effect_set) ;
       (final_ty, final_dirt)
-  | Op (ef, e1) -> failwith "Not yet implemented"
-  | Bind (c1, a1) -> (
+  | Bind (c1, a1) ->
       let c1_ty, c1_drt = type_of_computation st c1.term in
-      let x, c2 = a1.term in
-      match x.term with
-      | Typed.PVar p ->
-          let st' = extend_var_types st p c1_ty in
-          let c2_ty, c2_drt = type_of_computation st' c2.term in
-          assert (Types.dirts_are_equal c1_drt c2_drt) ;
-          (c2_ty, c2_drt)
-      | Typed.PNonbinding ->
-          let c2_ty, c2_drt = type_of_computation st c2.term in
-          assert (Types.dirts_are_equal c1_drt c2_drt) ;
-          (c2_ty, c2_drt)
-      | _ -> failwith "Not yet implemented" )
+      let p, c2 = a1.term in
+      let st' = extend_pattern_types st p c1_ty in
+      let c2_ty, c2_drt = type_of_computation st' c2.term in
+      assert (Types.dirts_are_equal c1_drt c2_drt) ;
+      (c2_ty, c2_drt)
   | CastComp (c1, dc) ->
       let c1_drty_ty = type_of_computation st c1.term in
       let dc11, dc2 = type_of_dirty_coercion st dc in
       assert (Types.dirty_types_are_equal c1_drty_ty dc11) ;
       dc2
-  | CastComp_ty (c1, tc1) -> failwith "Not yet implemented"
-  | CastComp_dirt (c1, tc1) -> failwith "Not yet implemented"
+  | _ -> failwith "Not yet implemented"
 
 and type_of_handler st h =
   let tv, type_cv = type_of_abstraction_with_ty st h.value_clause in
   let mapper (effe, abs2) =
     let eff, (in_op_ty, out_op_ty) = effe in
     let x, y, c_op = abs2.term in
-    let st_temp = extend_pattern_types st x in_op_ty in
-    let st' =
-      extend_pattern_types st_temp y (Types.Arrow (out_op_ty, type_cv))
-    in
-    ignore (type_of_computation st' c_op.term) ;
+    let st' = extend_pattern_types st x in_op_ty in
+    let st'' = extend_pattern_types st' y (Types.Arrow (out_op_ty, type_cv)) in
+    let ty_op = type_of_computation st'' c_op.term in
+    assert (Types.dirty_types_are_equal type_cv ty_op) ;
     eff
   in
   let handlers_ops = OldUtils.map mapper h.effect_clauses in
