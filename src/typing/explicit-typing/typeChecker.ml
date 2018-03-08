@@ -75,10 +75,8 @@ let rec type_check_ty st ty =
   match ty with
   | TyParam typ ->
       let ty_var_list = List.map (fun (x, y) -> x) st.ty_param_skeletons in
-      if List.mem typ ty_var_list then ty
-      else
-        Error.typing ~loc:Location.unknown "This type variable is unbound: %t"
-          (Types.print_target_ty ty)
+      assert (List.mem typ ty_var_list) ;
+      ty
   | Arrow (tty1, tty2) ->
       let _ = type_check_ty st tty1 in
       let _ = type_check_dirty_ty st tty2 in
@@ -143,9 +141,7 @@ let rec type_check_ty_coercion st ty_coer =
       (Types.Handler (c1, c2), Types.Handler (c3, c4))
   | TyCoercionVar p -> (
     match OldUtils.lookup p st.ty_coer_types with
-    | None ->
-        Error.typing ~loc:Location.unknown "unknown type coercion variable: %t"
-          (Typed.print_ty_coercion ty_coer)
+    | None -> assert false
     | Some pi -> pi )
   | SequenceTyCoer (ty_coer1, ty_coer2) ->
       let t1, t2 = type_check_ty_coercion st ty_coer1 in
@@ -245,10 +241,7 @@ and type_check_dirt_coercion st dirt_coer =
   | ReflDirt d -> (d, d)
   | DirtCoercionVar p -> (
     match OldUtils.lookup p st.dirt_coer_types with
-    | None ->
-        Error.typing ~loc:Location.unknown
-          "This dirt coercion variable is unbound: %t"
-          (Typed.print_dirt_coercion dirt_coer)
+    | None -> assert false
     | Some pi -> pi )
   | Empty d ->
       let d' = type_check_dirt st d in
@@ -283,12 +276,8 @@ let rec type_check_pattern st ty p =
       let ty_c =
         ExplicitInfer.source_to_target (ExplicitInfer.ty_of_const c)
       in
-      if Types.types_are_equal ty_c ty then st
-      else
-        Error.typing ~loc:Location.unknown
-          "Type of constant pattern does not match exected type: %t vs %t"
-          (Types.print_target_ty ty_c)
-          (Types.print_target_ty ty)
+      assert (Types.types_are_equal ty_c ty) ;
+      st
 
 
 let type_check_const = function
@@ -303,9 +292,7 @@ let rec type_check_exp st e =
   | Var v -> (
     match OldUtils.lookup v st.var_types with
     | Some ty -> ty
-    | _ ->
-        Error.typing ~loc:Location.unknown "Term variable not found/bound: %t"
-          (Typed.print_variable v) )
+    | _ -> assert false )
   | BuiltIn (s, i) -> failwith "Not yet implemented"
   | Const const -> type_check_const const
   | Tuple elist -> failwith "Not yet implemented"
@@ -335,12 +322,8 @@ let rec type_check_exp st e =
   | CastExp (e1, tc1) ->
       let e1_ty = type_check_exp st e1.term in
       let tc1a, tc1b = type_check_ty_coercion st tc1 in
-      if Types.types_are_equal tc1a e1_ty then tc1b
-      else
-        Error.typing ~loc:Location.unknown
-          "Mismatch in types of cast source: %t vs. %t"
-          (Types.print_target_ty e1_ty)
-          (Types.print_target_ty tc1a)
+      assert (Types.types_are_equal tc1a e1_ty) ;
+      tc1b
   | ApplyTyExp (e1, tty) ->
       let Types.TySchemeTy (p_e1, skel, ty_e1) = type_check_exp st e1.term in
       let tty1 = type_check_ty st tty in
@@ -384,40 +367,26 @@ and type_check_comp st c =
       (ty1, SetEmpty EffectSet.empty)
   | LetVal (e1, (p1, ty, c1)) ->
       let t_v = type_check_exp st e1.term in
-      if Types.types_are_equal t_v ty then
-        let PVar v1 = p1.term in
-        (* TODO: generalize to all forms of patterns *)
-        let st' = extend_var_types st v1 t_v in
-        type_check_comp st' c1.term
-      else
-        Error.typing ~loc:Location.unknown
-          "Mismatch in types of let-bound expression and its type annotation : %t vs. %t"
-          (Types.print_target_ty t_v)
-          (Types.print_target_ty ty)
+      assert (Types.types_are_equal t_v ty) ;
+      let PVar v1 = p1.term in
+      (* TODO: generalize to all forms of patterns *)
+      let st' = extend_var_types st v1 t_v in
+      type_check_comp st' c1.term
   | LetRec (l, c1) -> failwith "Not yet implemented"
   | Match (e, alist) -> (
       let t_e = type_check_exp st e.term in
       let ty_list = List.map (type_check_abstraction st t_e) alist in
       match ty_list with
-      | [] ->
-          Error.typing ~loc:Location.unknown
-            "Match computations without branches"
+      | [] -> assert false
       | dty :: dtys ->
-          if List.for_all (Types.dirty_types_are_equal dty) dtys then dty
-          else
-            Error.typing ~loc:Location.unknown
-              "The types of the branches of a match computation do not agree."
-      )
+          assert (List.for_all (Types.dirty_types_are_equal dty) dtys) ;
+          dty )
   | Apply (e1, e2) ->
       let t_e1 = type_check_exp st e1.term in
       let Types.Arrow (ty1, dty1) = t_e1 in
       let ty_e2 = type_check_exp st e2.term in
-      if Types.types_are_equal ty1 ty_e2 then dty1
-      else
-        Error.typing ~loc:Location.unknown
-          "Mismatch in types of formal and actual argument types: %t vs. %t"
-          (Types.print_target_ty ty1)
-          (Types.print_target_ty ty_e2)
+      assert (Types.types_are_equal ty1 ty_e2) ;
+      dty1
   | Handle (e1, c1) ->
       let t_e1 = type_check_exp st e1.term in
       let Types.Handler (dty1, dty2) = t_e1 in
@@ -441,12 +410,8 @@ and type_check_comp st c =
       | Typed.PVar p ->
           let st' = extend_var_types st p c1_ty in
           let c2_ty, c2_drt = type_check_comp st' c2.term in
-          if Types.dirts_are_equal c1_drt c2_drt then (c2_ty, c2_drt)
-          else
-            Error.typing ~loc:c1.location
-              "Dirts of computations in bind not match: %t vs %t"
-              (Types.print_target_dirt c1_drt)
-              (Types.print_target_dirt c2_drt)
+          assert (Types.dirts_are_equal c1_drt c2_drt) ;
+          (c2_ty, c2_drt)
       | Typed.PNonbinding ->
           let c2_ty, c2_drt = type_check_comp st c2.term in
           assert (Types.dirts_are_equal c1_drt c2_drt) ;
@@ -455,14 +420,8 @@ and type_check_comp st c =
   | CastComp (c1, dc) ->
       let c1_drty_ty = type_check_comp st c1.term in
       let dc11, dc2 = type_check_dirty_coercion st dc in
-      if Types.dirty_types_are_equal c1_drty_ty dc11 then dc2
-      else
-        Error.typing ~loc:c1.location
-          "Dirty types of computation and cast do not match: %t vs %t in %t |> %t"
-          (Types.print_target_dirty c1_drty_ty)
-          (Types.print_target_dirty dc11)
-          (Typed.print_computation c1)
-          (Typed.print_dirty_coercion dc)
+      assert (Types.dirty_types_are_equal c1_drty_ty dc11) ;
+      dc2
   | CastComp_ty (c1, tc1) -> failwith "Not yet implemented"
   | CastComp_dirt (c1, tc1) -> failwith "Not yet implemented"
 
