@@ -7,14 +7,14 @@ end)
 type effect_set = EffectSet.t
 
 type skeleton =
-  | SkelVar of Params.Skel.t
+  | SkelParam of Params.Skel.t
   | PrimSkel of prim_ty
   | SkelArrow of skeleton * skeleton
   | SkelHandler of skeleton * skeleton
   | ForallSkel of Params.Skel.t * skeleton
 
 and target_ty =
-  | Tyvar of Params.Ty.t
+  | TyParam of Params.Ty.t
   | Arrow of target_ty * target_dirty
   | Tuple of target_ty list
   | Handler of target_dirty * target_dirty
@@ -55,7 +55,7 @@ let effect_set_of_dirt drt =
 
 let rec types_are_equal ty1 ty2 =
   match (ty1, ty2) with
-  | Tyvar tv1, Tyvar tv2 -> tv1 = tv2
+  | TyParam tv1, TyParam tv2 -> tv1 = tv2
   | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
       types_are_equal ttya1 ttyb1 && dirty_types_are_equal dirtya1 dirtyb1
   | Handler (dirtya1, dirtya2), Handler (dirtyb1, dirtyb2) ->
@@ -85,7 +85,7 @@ and dirts_are_equal d1 d2 =
 let rec print_target_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
-  | Tyvar p -> Params.Ty.print p ppf
+  | TyParam p -> Params.Ty.print p ppf
   | Arrow (t1, (t2, drt)) ->
       print ~at_level:5 "@[%t -%t%s@ %t@]"
         (print_target_ty ~max_level:4 t1)
@@ -116,7 +116,7 @@ let rec print_target_ty ?max_level ty ppf =
 and print_skeleton ?max_level sk ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match sk with
-  | SkelVar p -> Params.Skel.print p ppf
+  | SkelParam p -> Params.Skel.print p ppf
   | PrimSkel s -> print "prim_skel %t" (print_prim_ty s)
   | SkelArrow (sk1, sk2) ->
       print "%t -sk-> %t" (print_skeleton sk1) (print_skeleton sk2)

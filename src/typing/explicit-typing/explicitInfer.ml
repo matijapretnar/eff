@@ -1,7 +1,7 @@
 module T = Type
 module Typed = Typed
 module Untyped = CoreSyntax
-module TyVarSet = Set.Make (Params.Ty)
+module TyParamSet = Set.Make (Params.Ty)
 module DirtVarSet = Set.Make (Params.Dirt)
 
 type state =
@@ -33,7 +33,7 @@ let rec source_to_target ty =
   match ty with
   | T.Apply (ty_name, []) -> source_to_target (T.Basic ty_name)
   | T.Apply (_, _) -> assert false
-  | T.TyParam p -> Types.Tyvar p
+  | T.TyParam p -> Types.TyParam p
   | T.Basic s -> (
     match s with
     | "int" -> Types.PrimTy IntTy
@@ -54,7 +54,7 @@ and source_to_target_dirty ty =
 
 let fresh_ty_with_skel () =
   let ty_var = Params.Ty.fresh () and skel_var = Params.Skel.fresh () in
-  (Types.Tyvar ty_var, Typed.TyvarHasSkel (ty_var, Types.SkelVar skel_var))
+  (Types.TyParam ty_var, Typed.TyParamHasSkel (ty_var, Types.SkelParam skel_var))
 
 let fresh_ty_coer cons =
   let param = Params.TyCoercion.fresh () in
@@ -135,16 +135,16 @@ let print_env env =
 
 let rec get_skel_vars_from_constraints = function
   | [] -> []
-  | (Typed.TyvarHasSkel (_, Types.SkelVar sv)) :: xs ->
+  | (Typed.TyParamHasSkel (_, Types.SkelParam sv)) :: xs ->
       sv :: get_skel_vars_from_constraints xs
   | _ :: xs -> get_skel_vars_from_constraints xs
 
 
 let constraint_free_ty_vars = function
-  | Typed.TyOmega (_, (Types.Tyvar a, Types.Tyvar b)) -> TyVarSet.of_list [a; b]
-  | Typed.TyOmega (_, (Types.Tyvar a, _)) -> TyVarSet.singleton a
-  | Typed.TyOmega (_, (_, Types.Tyvar a)) -> TyVarSet.singleton a
-  | _ -> TyVarSet.empty
+  | Typed.TyOmega (_, (Types.TyParam a, Types.TyParam b)) -> TyParamSet.of_list [a; b]
+  | Typed.TyOmega (_, (Types.TyParam a, _)) -> TyParamSet.singleton a
+  | Typed.TyOmega (_, (_, Types.TyParam a)) -> TyParamSet.singleton a
+  | _ -> TyParamSet.empty
 
 
 let constraint_free_dirt_vars = function
@@ -156,7 +156,7 @@ let constraint_free_dirt_vars = function
 
 
 let rec free_ty_vars_ty = function
-  | Types.Tyvar x -> [x]
+  | Types.TyParam x -> [x]
   | Types.Arrow (a, c) -> free_ty_vars_ty a @ free_ty_var_dirty c
   | Types.Tuple tup -> List.flatten (List.map free_ty_vars_ty tup)
   | Types.Handler (c1, c2) -> free_ty_var_dirty c1 @ free_ty_var_dirty c2
@@ -322,7 +322,7 @@ let splitter st constraints simple_ty =
   Print.debug "Splitter Env :" ;
   print_env st ;
   let skel_list = OldUtils.uniq (get_skel_vars_from_constraints constraints) in
-  let simple_ty_freevars_ty = TyVarSet.of_list (free_ty_vars_ty simple_ty) in
+  let simple_ty_freevars_ty = TyParamSet.of_list (free_ty_vars_ty simple_ty) in
   Print.debug "Simple type free vars: " ;
   List.iter
     (fun x -> Print.debug "%t" (Params.Ty.print x))
@@ -330,7 +330,7 @@ let splitter st constraints simple_ty =
   let simple_ty_freevars_dirt =
     DirtVarSet.of_list (free_dirt_vars_ty simple_ty)
   in
-  let state_freevars_ty = TyVarSet.of_list (state_free_ty_vars st) in
+  let state_freevars_ty = TyParamSet.of_list (state_free_ty_vars st) in
   Print.debug "state free vars: " ;
   List.iter
     (fun x -> Print.debug "%t" (Params.Ty.print x))
@@ -342,8 +342,8 @@ let splitter st constraints simple_ty =
         let cons_freevars_ty = constraint_free_ty_vars cons in
         let cons_freevars_dirt = constraint_free_dirt_vars cons in
         let is_sub_ty =
-          TyVarSet.subset cons_freevars_ty state_freevars_ty
-          || TyVarSet.equal cons_freevars_ty state_freevars_ty
+          TyParamSet.subset cons_freevars_ty state_freevars_ty
+          || TyParamSet.equal cons_freevars_ty state_freevars_ty
         in
         let is_sub_dirt =
           DirtVarSet.subset cons_freevars_dirt state_freevars_dirt
@@ -354,8 +354,8 @@ let splitter st constraints simple_ty =
   in
   let constraints_freevars_ty =
     List.fold_right
-      (fun cons acc -> TyVarSet.union (constraint_free_ty_vars cons) acc)
-      constraints TyVarSet.empty
+      (fun cons acc -> TyParamSet.union (constraint_free_ty_vars cons) acc)
+      constraints TyParamSet.empty
   in
   let constraints_freevars_dirt =
     List.fold_right
@@ -363,9 +363,9 @@ let splitter st constraints simple_ty =
       constraints DirtVarSet.empty
   in
   let alpha_list =
-    TyVarSet.elements
-      (TyVarSet.diff
-         (TyVarSet.union constraints_freevars_ty simple_ty_freevars_ty)
+    TyParamSet.elements
+      (TyParamSet.diff
+         (TyParamSet.union constraints_freevars_ty simple_ty_freevars_ty)
          state_freevars_ty)
   in
   let delta_list =
@@ -378,7 +378,7 @@ let splitter st constraints simple_ty =
   let global_cons  = List.filter (
           fun c ->
             match c with
-            | Typed.TyvarHasSkel (tyvar,skvar) -> not (List.mem tyvar alpha_list)
+            | Typed.TyParamHasSkel (tyvar,skvar) -> not (List.mem tyvar alpha_list)
             | _                                -> true
        ) global_cons' in
   Print.debug "Splitter output free_ty_vars: " ;
@@ -423,9 +423,9 @@ let rec get_basic_type ty_sch =
 
 let rec apply_sub_to_type ty_subs dirt_subs ty =
   match ty with
-  | Types.Tyvar p -> (
+  | Types.TyParam p -> (
     match OldUtils.lookup p ty_subs with
-    | Some p' -> Types.Tyvar p'
+    | Some p' -> Types.TyParam p'
     | None -> ty )
   | Types.Arrow (a, (b, d)) ->
       Types.Arrow
@@ -484,7 +484,7 @@ let rec get_skel_constraints alphas_has_skels ty_subs skel_subs =
   | (tvar, skel) :: ss ->
       let new_skel = Unification.apply_substitution_skel skel_subs skel in
       let Some new_tyvar = OldUtils.lookup tvar ty_subs in
-      Typed.TyvarHasSkel (new_tyvar, new_skel)
+      Typed.TyParamHasSkel (new_tyvar, new_skel)
       :: get_skel_constraints ss ty_subs skel_subs
   | [] -> []
 
@@ -492,7 +492,7 @@ let rec get_skel_constraints alphas_has_skels ty_subs skel_subs =
 let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
   let new_skel_subs =
     List.map
-      (fun (a, b) -> Unification.SkelVarToSkel (a, Types.SkelVar b))
+      (fun (a, b) -> Unification.SkelParamToSkel (a, Types.SkelParam b))
       skel_subs
   in
   let skel_constraints =
@@ -501,7 +501,7 @@ let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
   let skel_apps =
     List.fold_left
       (fun a (_, b) ->
-        Typed.annotate (Typed.ApplySkelExp (a, Types.SkelVar b))
+        Typed.annotate (Typed.ApplySkelExp (a, Types.SkelParam b))
           Location.unknown )
       (Typed.annotate (Typed.Var var) Location.unknown)
       skel_subs
@@ -509,7 +509,7 @@ let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
   let ty_apps =
     List.fold_left
       (fun a (_, b) ->
-        Typed.annotate (Typed.ApplyTyExp (a, Types.Tyvar b)) Location.unknown
+        Typed.annotate (Typed.ApplyTyExp (a, Types.TyParam b)) Location.unknown
         )
       skel_apps ty_subs
   in
@@ -1240,7 +1240,7 @@ let finalize_constraint sub = function
           )
         :: sub )
   | Typed.SkelEq (sk1, sk2) -> assert false
-  | Typed.TyvarHasSkel (tp, sk) -> assert false
+  | Typed.TyParamHasSkel (tp, sk) -> assert false
 
 
 let finalize_constraints c_list = List.fold_left finalize_constraint [] c_list

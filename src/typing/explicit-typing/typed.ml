@@ -35,6 +35,41 @@ let rec pattern_vars p =
 
 let annotate t loc = {term= t; location= loc}
 
+type ty_coercion =
+  | ReflTy of Types.target_ty
+  | ArrowCoercion of ty_coercion * dirty_coercion
+  | HandlerCoercion of dirty_coercion * dirty_coercion
+  | TyCoercionVar of Params.TyCoercion.t
+  | SequenceTyCoer of ty_coercion * ty_coercion
+  | TupleCoercion of ty_coercion list
+  | LeftArrow of ty_coercion
+  | ForallTy of Params.Ty.t * ty_coercion
+  | ApplyTyCoer of ty_coercion * target_ty
+  | ForallDirt of Params.Dirt.t * ty_coercion
+  | ApplyDirCoer of ty_coercion * dirt
+  | PureCoercion of dirty_coercion
+  | QualTyCoer of ct_ty * ty_coercion
+  | QualDirtCoer of ct_dirt * ty_coercion
+  | ApplyQualTyCoer of ty_coercion * ty_coercion
+  | ApplyQualDirtCoer of ty_coercion * dirt_coercion
+  | ForallSkel of Params.Skel.t * ty_coercion
+  | ApplySkelCoer of ty_coercion * skeleton
+
+and dirt_coercion =
+  | ReflDirt of dirt
+  | DirtCoercionVar of Params.DirtCoercion.t
+  | Empty of dirt
+  | UnionDirt of (Types.effect_set * dirt_coercion)
+  | SequenceDirtCoer of dirt_coercion * dirt_coercion
+  | DirtCoercion of dirty_coercion
+
+and dirty_coercion =
+  | BangCoercion of ty_coercion * dirt_coercion
+  | RightArrow of ty_coercion
+  | RightHandler of ty_coercion
+  | LeftHandler of ty_coercion
+  | SequenceDirtyCoer of (dirty_coercion * dirty_coercion)
+
 (** Pure expressions *)
 type expression = plain_expression annotation
 
@@ -77,41 +112,6 @@ and plain_computation =
   | CastComp_ty of computation * ty_coercion
   | CastComp_dirt of computation * dirt_coercion
 
-and ty_coercion =
-  | ReflTy of Types.target_ty
-  | ArrowCoercion of ty_coercion * dirty_coercion
-  | HandlerCoercion of dirty_coercion * dirty_coercion
-  | TyCoercionVar of Params.TyCoercion.t
-  | SequenceTyCoer of ty_coercion * ty_coercion
-  | TupleCoercion of ty_coercion list
-  | LeftArrow of ty_coercion
-  | ForallTy of Params.Ty.t * ty_coercion
-  | ApplyTyCoer of ty_coercion * target_ty
-  | ForallDirt of Params.Dirt.t * ty_coercion
-  | ApplyDirCoer of ty_coercion * dirt
-  | PureCoercion of dirty_coercion
-  | QualTyCoer of ct_ty * ty_coercion
-  | QualDirtCoer of ct_dirt * ty_coercion
-  | ApplyQualTyCoer of ty_coercion * ty_coercion
-  | ApplyQualDirtCoer of ty_coercion * dirt_coercion
-  | ForallSkel of Params.Skel.t * ty_coercion
-  | ApplySkelCoer of ty_coercion * skeleton
-
-and dirt_coercion =
-  | ReflDirt of dirt
-  | DirtCoercionVar of Params.DirtCoercion.t
-  | Empty of dirt
-  | UnionDirt of (Types.effect_set * dirt_coercion)
-  | SequenceDirtCoer of dirt_coercion * dirt_coercion
-  | DirtCoercion of dirty_coercion
-
-and dirty_coercion =
-  | BangCoercion of ty_coercion * dirt_coercion
-  | RightArrow of ty_coercion
-  | RightHandler of ty_coercion
-  | LeftHandler of ty_coercion
-  | SequenceDirtyCoer of (dirty_coercion * dirty_coercion)
-
 (** Handler definitions *)
 and handler =
   { effect_clauses: (effect, abstraction2) OldUtils.assoc
@@ -126,15 +126,15 @@ and abstraction_with_ty = (pattern * Types.target_ty * computation) annotation
 and abstraction2 = (pattern * pattern * computation) annotation
 
 let abstraction_with_ty_to_abstraction a_w_ty =
-  let (p,_,c) = a_w_ty.term
-  in {term = (p,c); location=a_w_ty.location}
-  
+  let p, _, c = a_w_ty.term in
+  {term= (p, c); location= a_w_ty.location}
+
 
 type omega_ct =
   | TyOmega of (Params.TyCoercion.t * Types.ct_ty)
   | DirtOmega of (Params.DirtCoercion.t * Types.ct_dirt)
   | SkelEq of skeleton * skeleton
-  | TyvarHasSkel of (Params.Ty.t * skeleton)
+  | TyParamHasSkel of (Params.Ty.t * skeleton)
 
 type toplevel = (plain_toplevel * Location.t)
 
@@ -152,10 +152,15 @@ and plain_toplevel =
 
 (* | TypeOf of computation *)
 
-let lambda ?loc ((_,_,c) as abs) : expression = {term = Lambda abs; location=c.location}
+let lambda ?loc ((_, _, c) as abs) : expression =
+  {term= Lambda abs; location= c.location}
 
-let call ?loc eff e abs : computation = {term = Call (eff,e,abs); location=e.location}
-let handle ?loc e c : computation = {term = Handle (e,c); location=c.location}
+
+let call ?loc eff e abs : computation =
+  {term= Call (eff, e, abs); location= e.location}
+
+
+let handle ?loc e c : computation = {term= Handle (e, c); location= c.location}
 
 let abstraction ?loc p c : abstraction = {term= (p, c); location= c.location}
 
@@ -210,8 +215,8 @@ let rec print_expression ?max_level e ppf =
   | CastExp (e1, tc) ->
       print "(%t) |> [%t]" (print_expression e1) (print_ty_coercion tc)
   | BigLambdaTy (p, s, e) ->
-      print "BigLambda_ty_%t:%t. %t " (Params.Ty.print p)
-        (print_skeleton s) (print_expression e)
+      print "BigLambda_ty_%t:%t. %t " (Params.Ty.print p) (print_skeleton s)
+        (print_expression e)
   | BigLambdaDirt (p, e) ->
       print "BigLambda_dirt_%t. %t " (Params.Dirt.print p) (print_expression e)
   | ApplyTyExp (e, tty) ->
@@ -305,23 +310,20 @@ and print_ty_coercion ?max_level c ppf =
   | TyCoercionVar tcp -> print "%t " (Params.TyCoercion.print tcp)
   | SequenceTyCoer (tc1, tc2) ->
       print "%t ; %t" (print_ty_coercion tc1) (print_ty_coercion tc2)
-  | PureCoercion dtyco ->
-      print "pure(%t)" (print_dirty_coercion dtyco)
+  | PureCoercion dtyco -> print "pure(%t)" (print_dirty_coercion dtyco)
+  | _ -> failwith "Not yet implemented"
 
 
 and print_dirty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c with 
+  match c with
   | BangCoercion (tc, dirtc) ->
-    print "%t ! %t" (print_ty_coercion tc) (print_dirt_coercion dirtc)
-  | LeftHandler tyco ->
-    print "fst(%t)" (print_ty_coercion tyco)
-  | RightHandler tyco ->
-    print "snd(%t)" (print_ty_coercion tyco)
-  | RightArrow tyco ->
-    print "snd(%t)" (print_ty_coercion tyco)
-  | SequenceDirtyCoer (c1,c2) ->
-    print "(%t;%t)" (print_dirty_coercion c1) (print_dirty_coercion c2)
+      print "%t ! %t" (print_ty_coercion tc) (print_dirt_coercion dirtc)
+  | LeftHandler tyco -> print "fst(%t)" (print_ty_coercion tyco)
+  | RightHandler tyco -> print "snd(%t)" (print_ty_coercion tyco)
+  | RightArrow tyco -> print "snd(%t)" (print_ty_coercion tyco)
+  | SequenceDirtyCoer (c1, c2) ->
+      print "(%t;%t)" (print_dirty_coercion c1) (print_dirty_coercion c2)
 
 
 and print_dirt_coercion ?max_level c ppf =
@@ -335,8 +337,9 @@ and print_dirt_coercion ?max_level c ppf =
       print "{%t} U %t"
         (Types.print_effect_list eff_list)
         (print_dirt_coercion dc)
-  | DirtCoercion dtyco -> 
-      print "dirtOf(%t)" (print_dirty_coercion dtyco)
+  | DirtCoercion dtyco -> print "dirtOf(%t)" (print_dirty_coercion dtyco)
+  | _ -> failwith "Not yet implemented"
+
 
 and print_omega_ct ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -353,7 +356,7 @@ and print_omega_ct ?max_level c ppf =
         (Types.print_target_dirt ty2)
   | SkelEq (sk1, sk2) ->
       print "%t ~ %t" (Types.print_skeleton sk1) (Types.print_skeleton sk2)
-  | TyvarHasSkel (tp, sk1) ->
+  | TyParamHasSkel (tp, sk1) ->
       print "%t : %t" (Params.Ty.print tp) (Types.print_skeleton sk1)
 
 
@@ -366,6 +369,7 @@ and print_effect_clauses eff_clauses ppf =
         (print_abstraction2 a2)
         (print_effect_clauses cases)
 
+
 and print_abstraction {term= p, c} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
 
@@ -375,9 +379,11 @@ and print_abstraction_with_ty {term= p, tty, c} ppf =
     (Types.print_target_ty tty)
     (print_computation c)
 
-and print_abstraction2 {term= p1,p2,c} ppf =
-  Format.fprintf ppf "(fun %t %t -> %t)"
-        (print_pattern p1) (print_pattern p2) (print_computation c)
+
+and print_abstraction2 {term= p1, p2, c} ppf =
+  Format.fprintf ppf "(fun %t %t -> %t)" (print_pattern p1) (print_pattern p2)
+    (print_computation c)
+
 
 and print_pure_abstraction {term= p, e} ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_expression e)
@@ -443,24 +449,24 @@ and refresh_pattern' sbst = function
   | (PConst _ | PNonbinding) as p -> (sbst, p)
 
 
-let rec refresh_expr sbst e = 
+let rec refresh_expr sbst e =
   let res = {e with term= refresh_expr' sbst e.term} in
-  Print.debug "refres_expr" ;
-  res
+  Print.debug "refres_expr" ; res
+
 
 and refresh_expr' sbst = function
   | Var x as e -> (
     match OldUtils.lookup x sbst with Some x' -> Var x' | None -> e )
-  | Lambda (p,ty,c) -> 
-     let PVar x = p.term in
-     let sbst', p' = refresh_pattern sbst p in
-     Lambda (p',ty,refresh_comp sbst' c)
+  | Lambda (p, ty, c) ->
+      let sbst', p' = refresh_pattern sbst p in
+      Lambda (p', ty, refresh_comp sbst' c)
   | Handler h -> Handler (refresh_handler sbst h)
   | Tuple es -> Tuple (List.map (refresh_expr sbst) es)
   | Record flds -> Record (OldUtils.assoc_map (refresh_expr sbst) flds)
   | Variant (lbl, e) -> Variant (lbl, OldUtils.option_map (refresh_expr sbst) e)
   | CastExp (e1, tyco) -> CastExp (refresh_expr sbst e1, tyco)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
+  | _ -> failwith "Not yet implemented"
 
 
 and refresh_comp sbst c = {c with term= refresh_comp' sbst c.term}
@@ -483,34 +489,36 @@ and refresh_comp' sbst = function
   | Apply (e1, e2) -> Apply (refresh_expr sbst e1, refresh_expr sbst e2)
   | Handle (e, c) -> Handle (refresh_expr sbst e, refresh_comp sbst c)
   | Call (eff, e, a) ->
-    Call (eff, refresh_expr sbst e, refresh_abs_with_ty sbst a)
-  | Value e ->
-      Value (refresh_expr sbst e)
-  | CastComp (c,dtyco) -> CastComp (refresh_comp sbst c, dtyco)
+      Call (eff, refresh_expr sbst e, refresh_abs_with_ty sbst a)
+  | Value e -> Value (refresh_expr sbst e)
+  | CastComp (c, dtyco) -> CastComp (refresh_comp sbst c, dtyco)
 
 
 and refresh_handler sbst h =
-  { effect_clauses = OldUtils.assoc_map (refresh_abs2 sbst) h.effect_clauses
-  ; value_clause   = refresh_abs_with_ty sbst h.value_clause
-  }
+  { effect_clauses= OldUtils.assoc_map (refresh_abs2 sbst) h.effect_clauses
+  ; value_clause= refresh_abs_with_ty sbst h.value_clause }
+
 
 and refresh_abs sbst a =
   let p, c = a.term in
   let sbst, p' = refresh_pattern sbst p in
   {a with term= (p', refresh_comp sbst c)}
 
+
 and refresh_abs_with_ty sbst a =
   let p, ty, c = a.term in
   let sbst, p' = refresh_pattern sbst p in
   {a with term= (p', ty, refresh_comp sbst c)}
 
+
 and refresh_abs2 sbst a2 =
   let p1, p2, c = a2.term in
   let sbst, p1' = refresh_pattern sbst p1 in
   let sbst, p2' = refresh_pattern sbst p2 in
-  let       c'  = refresh_comp    sbst c  in
-  {a2 with term = (p1',p2',c')} 
- 
+  let c' = refresh_comp sbst c in
+  {a2 with term= (p1', p2', c')}
+
+
 let rec subst_expr sbst e = {e with term= subst_expr' sbst e.term}
 
 and subst_expr' sbst = function
@@ -526,17 +534,19 @@ and subst_expr' sbst = function
   | Record flds -> Record (OldUtils.assoc_map (subst_expr sbst) flds)
   | Variant (lbl, e) -> Variant (lbl, OldUtils.option_map (subst_expr sbst) e)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
-  | CastExp (e,tyco) -> CastExp (subst_expr sbst e,tyco)
-  | BigLambdaTy (tyvar,sk,e) -> BigLambdaTy (tyvar,sk,subst_expr sbst e)
-  | BigLambdaDirt (dvar,e) -> BigLambdaDirt (dvar,subst_expr sbst e)
-  | BigLambdaSkel (skvar,e) -> BigLambdaSkel (skvar,subst_expr sbst e)
-  | ApplyTyExp (e,ty) -> ApplyTyExp (subst_expr sbst e,ty)
-  | LambdaTyCoerVar (tycovar,ct,e) -> LambdaTyCoerVar (tycovar,ct,subst_expr sbst e)
-  | LambdaDirtCoerVar (dcovar,ct,e) -> LambdaDirtCoerVar (dcovar,ct,subst_expr sbst e)
-  | ApplyDirtExp (e,d) -> ApplyDirtExp (subst_expr sbst e, d)
-  | ApplySkelExp (e,sk) -> ApplySkelExp (subst_expr sbst e, sk)
-  | ApplyTyCoercion (e,tyco) -> ApplyTyCoercion (subst_expr sbst e, tyco)
-  | ApplyDirtCoercion (e,dco) -> ApplyDirtCoercion (subst_expr sbst e,dco)
+  | CastExp (e, tyco) -> CastExp (subst_expr sbst e, tyco)
+  | BigLambdaTy (tyvar, sk, e) -> BigLambdaTy (tyvar, sk, subst_expr sbst e)
+  | BigLambdaDirt (dvar, e) -> BigLambdaDirt (dvar, subst_expr sbst e)
+  | BigLambdaSkel (skvar, e) -> BigLambdaSkel (skvar, subst_expr sbst e)
+  | ApplyTyExp (e, ty) -> ApplyTyExp (subst_expr sbst e, ty)
+  | LambdaTyCoerVar (tycovar, ct, e) ->
+      LambdaTyCoerVar (tycovar, ct, subst_expr sbst e)
+  | LambdaDirtCoerVar (dcovar, ct, e) ->
+      LambdaDirtCoerVar (dcovar, ct, subst_expr sbst e)
+  | ApplyDirtExp (e, d) -> ApplyDirtExp (subst_expr sbst e, d)
+  | ApplySkelExp (e, sk) -> ApplySkelExp (subst_expr sbst e, sk)
+  | ApplyTyCoercion (e, tyco) -> ApplyTyCoercion (subst_expr sbst e, tyco)
+  | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (subst_expr sbst e, dco)
 
 
 and subst_comp sbst c = {c with term= subst_comp' sbst c.term}
@@ -557,7 +567,7 @@ and subst_comp' sbst = function
   | Handle (e, c) -> Handle (subst_expr sbst e, subst_comp sbst c)
   | Call (eff, e, a) -> Call (eff, subst_expr sbst e, subst_abs_with_ty sbst a)
   | Value e -> Value (subst_expr sbst e)
-  | CastComp (c,dtyco) -> CastComp (subst_comp sbst c, dtyco)
+  | CastComp (c, dtyco) -> CastComp (subst_comp sbst c, dtyco)
 
 
 and subst_handler sbst h =
@@ -579,8 +589,8 @@ and subst_abs_with_ty sbst a =
 
 and subst_abs2 sbst a2 =
   (* a2a2 @@ subst_abs sbst @@ a22a @@ a2 *)
-  let (p1,p2,c) = a2.term in
-  {a2 with term = (p1,p2, subst_comp sbst c)}
+  let p1, p2, c = a2.term in
+  {a2 with term= (p1, p2, subst_comp sbst c)}
 
 
 let assoc_equal eq flds flds' : bool =
@@ -752,18 +762,18 @@ and free_vars_expr e =
   | Record flds -> concat_vars (List.map (fun (_, e) -> free_vars_expr e) flds)
   | Variant (_, None) -> ([], [])
   | Variant (_, Some e) -> free_vars_expr e
-  | CastExp (e',tyco) -> free_vars_expr e'
+  | CastExp (e', tyco) -> free_vars_expr e'
   | BuiltIn _ | Effect _ | Const _ -> ([], [])
   | BigLambdaTy _ -> assert false
   | BigLambdaDirt _ -> assert false
   | BigLambdaSkel _ -> assert false
-  | ApplyTyExp (e,ty) -> free_vars_expr e
+  | ApplyTyExp (e, ty) -> free_vars_expr e
   | LambdaTyCoerVar _ -> assert false
   | LambdaDirtCoerVar _ -> assert false
-  | ApplyDirtExp (e,d) -> free_vars_expr e
-  | ApplySkelExp (e,sk) -> free_vars_expr e
-  | ApplyTyCoercion (e,tyco) -> free_vars_expr e
-  | ApplyDirtCoercion (e,dco) -> free_vars_expr e
+  | ApplyDirtExp (e, d) -> free_vars_expr e
+  | ApplySkelExp (e, sk) -> free_vars_expr e
+  | ApplyTyCoercion (e, tyco) -> free_vars_expr e
+  | ApplyDirtCoercion (e, dco) -> free_vars_expr e
 
 
 and free_vars_handler h =
@@ -775,23 +785,27 @@ and free_vars_handler h =
 and free_vars_finally_handler (h, finally_clause) =
   free_vars_handler h @@@ free_vars_abs finally_clause
 
+
 and free_vars_abs a =
   let p, c = a.term in
   let inside, outside = free_vars_comp c --- pattern_vars p in
   (inside @ outside, [])
 
-and free_vars_abs_with_ty a =
-  free_vars_plain_abs_with_ty a.term
+
+and free_vars_abs_with_ty a = free_vars_plain_abs_with_ty a.term
 
 and free_vars_plain_abs_with_ty p_a =
   let p, _, c = p_a in
   let inside, outside = free_vars_comp c --- pattern_vars p in
   (inside @ outside, [])
 
+
 and free_vars_abs2 a2 =
   (* free_vars_abs @@ a22a @@ a2 *)
-  let (p1,p2,c) = a2.term in
-  let inside, outside = (free_vars_comp c --- pattern_vars p2) --- pattern_vars p1 in
+  let p1, p2, c = a2.term in
+  let inside, outside =
+    free_vars_comp c --- pattern_vars p2 --- pattern_vars p1
+  in
   (inside @ outside, [])
 
 

@@ -1,21 +1,21 @@
 open Types
 open Typed
 
-module STyVars = Set.Make (Params.Ty)
+module STyParams = Set.Make (Params.Ty)
 
-let set_of_list = List.fold_left (fun acc x -> STyVars.add x acc) STyVars.empty
+let set_of_list = List.fold_left (fun acc x -> STyParams.add x acc) STyParams.empty
 
 type substitution =
-  | CoerTyVarToTyCoercion of (Params.TyCoercion.t * Typed.ty_coercion)
+  | CoerTyParamToTyCoercion of (Params.TyCoercion.t * Typed.ty_coercion)
   | CoerDirtVartoDirtCoercion of (Params.DirtCoercion.t * Typed.dirt_coercion)
-  | TyVarToTy of (Params.Ty.t * Types.target_ty)
+  | TyParamToTy of (Params.Ty.t * Types.target_ty)
   | DirtVarToDirt of (Params.Dirt.t * Types.dirt)
-  | SkelVarToSkel of (Params.Skel.t * Types.skeleton)
+  | SkelParamToSkel of (Params.Skel.t * Types.skeleton)
 
 let print_sub ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with
-  | CoerTyVarToTyCoercion (p, t) ->
+  | CoerTyParamToTyCoercion (p, t) ->
       print "%t :-coertyTotyCoer-> %t"
         (Params.TyCoercion.print p)
         (Typed.print_ty_coercion t)
@@ -23,13 +23,13 @@ let print_sub ?max_level c ppf =
       print "%t :-coertyDirtoDirtCoer-> %t"
         (Params.DirtCoercion.print p)
         (Typed.print_dirt_coercion d)
-  | TyVarToTy (p, t) ->
+  | TyParamToTy (p, t) ->
       print "%t :-tyvarToTargetty-> %t" (Params.Ty.print p)
         (Types.print_target_ty t)
   | DirtVarToDirt (p, d) ->
       print "%t :-dirtvarToTargetdirt-> %t" (Params.Dirt.print p)
         (Types.print_target_dirt d)
-  | SkelVarToSkel (p, s) ->
+  | SkelParamToSkel (p, s) ->
       print "%t :-skelvarToSkeleton-> %t" (Params.Skel.print p)
         (Types.print_skeleton s)
 
@@ -56,8 +56,8 @@ let apply_sub_dirt sub drt =
 
 let rec apply_sub_skel sub sk =
   match sk with
-  | SkelVar p -> (
-    match sub with SkelVarToSkel (skv, sk1) when skv = p -> sk1 | _ -> sk )
+  | SkelParam p -> (
+    match sub with SkelParamToSkel (skv, sk1) when skv = p -> sk1 | _ -> sk )
   | PrimSkel _ -> sk
   | SkelArrow (sk1, sk2) ->
       SkelArrow (apply_sub_skel sub sk1, apply_sub_skel sub sk2)
@@ -68,9 +68,9 @@ let rec apply_sub_skel sub sk =
 
 let rec apply_sub_ty sub ty =
   match ty with
-  | Tyvar typ1 -> (
+  | TyParam typ1 -> (
     match sub with
-    | TyVarToTy (typ2, ttype) when typ1 = typ2 -> ttype
+    | TyParamToTy (typ2, ttype) when typ1 = typ2 -> ttype
     | _ -> ty )
   | Arrow (tty1, tty2) ->
       Arrow (apply_sub_ty sub tty1, apply_sub_dirty_ty sub tty2)
@@ -112,7 +112,7 @@ let rec apply_sub_tycoer sub ty_coer =
         (apply_sub_dirtycoer sub dirtycoer1, apply_sub_dirtycoer sub dirtycoer2)
   | TyCoercionVar p -> (
     match sub with
-    | CoerTyVarToTyCoercion (p', t_coer) when p = p' -> t_coer
+    | CoerTyParamToTyCoercion (p', t_coer) when p = p' -> t_coer
     | _ -> TyCoercionVar p )
   | SequenceTyCoer (ty_coer1, ty_coer2) ->
       SequenceTyCoer
@@ -284,16 +284,16 @@ and apply_substitution_skel s ty1 =
 (* apply a single sub to a list of constraints *)
 let apply_sub1 c_list sub1 =
   match sub1 with
-  | TyVarToTy (type_p, target_type) ->
+  | TyParamToTy (type_p, target_type) ->
       let mapper cons =
         match cons with
         | Typed.TyOmega (coer_p, (ty1, ty2)) ->
             Typed.TyOmega
               (coer_p, (apply_sub_ty sub1 ty1, apply_sub_ty sub1 ty2))
         (*
-       	                | Typed.TyOmega (coer_p, (Tyvar tv,ty2)) when (type_p = tv) ->  
+       	                | Typed.TyOmega (coer_p, (TyParam tv,ty2)) when (type_p = tv) ->  
        			   Typed.TyOmega (coer_p, (target_type,ty2)) 
-                        | Typed.TyOmega (coer_p, (ty2,Tyvar tv)) when (type_p = tv) ->  
+                        | Typed.TyOmega (coer_p, (ty2,TyParam tv)) when (type_p = tv) ->  
        			   Typed.TyOmega (coer_p, (ty2,target_type)) 
  *)
         | _ ->
@@ -333,11 +333,11 @@ let apply_sub1 c_list sub1 =
  *)
       in
       List.map mapper c_list
-  | SkelVarToSkel (skel_var, skel) ->
+  | SkelParamToSkel (skel_var, skel) ->
       let mapper cons =
         match cons with
-        | Typed.TyvarHasSkel (tv, Types.SkelVar sv) when skel_var = sv ->
-            Typed.TyvarHasSkel (tv, skel)
+        | Typed.TyParamHasSkel (tv, Types.SkelParam sv) when skel_var = sv ->
+            Typed.TyParamHasSkel (tv, skel)
         | _ -> cons
       in
       List.map mapper c_list
@@ -349,7 +349,7 @@ let rec apply_sub sub c_list = List.fold_left apply_sub1 c_list sub
 
 let rec free_skeleton sk =
   match sk with
-  | SkelVar p -> [p]
+  | SkelParam p -> [p]
   | PrimSkel _ -> []
   | SkelArrow (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
   | SkelHandler (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
@@ -360,7 +360,7 @@ let rec free_skeleton sk =
 
 let rec free_target_ty t =
   match t with
-  | Tyvar x -> [x]
+  | TyParam x -> [x]
   | Arrow (a, c) -> free_target_ty a @ free_target_dirty c
   | Tuple tup -> List.flatten (List.map free_target_ty tup)
   | Handler (c1, c2) -> free_target_dirty c1 @ free_target_dirty c2
@@ -392,7 +392,7 @@ let rec print_var_list = function
 
 let rec get_skel_of_tyvar tyvar clist =
   Print.debug "getting skeleton of tyvar from list" ;
-  Print.debug " Tyvar : %t" (Params.Ty.print tyvar) ;
+  Print.debug " TyParam : %t" (Params.Ty.print tyvar) ;
   Print.debug "Constraint list :" ;
   print_c_list clist ;
   get_skel_of_tyvar_ tyvar clist
@@ -401,13 +401,13 @@ let rec get_skel_of_tyvar tyvar clist =
 and get_skel_of_tyvar_ tyvar clist =
   match clist with
   | [] -> assert false
-  | (TyvarHasSkel (tv, skel)) :: _ when tyvar = tv -> skel
+  | (TyParamHasSkel (tv, skel)) :: _ when tyvar = tv -> skel
   | _ :: xs -> get_skel_of_tyvar_ tyvar xs
 
 
 let rec skeleton_of_target_ty tty conslist =
   match tty with
-  | Tyvar x -> get_skel_of_tyvar x conslist
+  | TyParam x -> get_skel_of_tyvar x conslist
   | Arrow (a1, (a2, _)) ->
       SkelArrow
         (skeleton_of_target_ty a1 conslist, skeleton_of_target_ty a2 conslist)
@@ -420,12 +420,12 @@ let rec skeleton_of_target_ty tty conslist =
 
 let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
   match t with
-  | Tyvar x -> (
+  | TyParam x -> (
     match OldUtils.lookup x ty_sbst with
-    | Some x' -> ((ty_sbst, dirt_sbst), Tyvar x')
+    | Some x' -> ((ty_sbst, dirt_sbst), TyParam x')
     | None ->
         let y = Params.Ty.fresh () in
-        ((OldUtils.update x y ty_sbst, dirt_sbst), Tyvar y) )
+        ((OldUtils.update x y ty_sbst, dirt_sbst), TyParam y) )
   | Arrow (a, c) ->
       let (a_ty_sbst, a_dirt_sbst), a' =
         refresh_target_ty (ty_sbst, dirt_sbst) a
@@ -490,12 +490,12 @@ let rec union_find_tyvar tyvar acc c_list =
     match x with
     | Typed.TyOmega (_, tycons) -> (
       match tycons with
-      | Types.Tyvar a, Types.Tyvar b when a = tyvar ->
+      | Types.TyParam a, Types.TyParam b when a = tyvar ->
           if List.mem b acc then union_find_tyvar tyvar acc xs
           else
             OldUtils.uniq
               (union_find_tyvar b acc xs @ union_find_tyvar tyvar acc xs)
-      | Types.Tyvar b, Types.Tyvar a when a = tyvar ->
+      | Types.TyParam b, Types.TyParam a when a = tyvar ->
           if List.mem b acc then union_find_tyvar tyvar acc xs
           else
             OldUtils.uniq
@@ -512,10 +512,10 @@ let rec fix_union_find fixpoint c_list =
     match x with
     | Typed.TyOmega (_, tycons) -> (
       match tycons with
-      | Types.Tyvar a, Types.Tyvar b
+      | Types.TyParam a, Types.TyParam b
         when List.mem a fixpoint && not (List.mem b fixpoint) ->
           [b]
-      | Types.Tyvar b, Types.Tyvar a
+      | Types.TyParam b, Types.TyParam a
         when List.mem a fixpoint && not (List.mem b fixpoint) ->
           [b]
       | _ -> [] )
@@ -535,7 +535,7 @@ let rec dependent_constraints dep_list acc c_list =
     match x with
     | Typed.TyOmega (_, tycons) -> (
       match tycons with
-      | Types.Tyvar a, Types.Tyvar b
+      | Types.TyParam a, Types.TyParam b
         when List.mem a dep_list && List.mem b dep_list ->
           dependent_constraints dep_list (x :: acc) xs
       | _ -> dependent_constraints dep_list acc xs )
@@ -557,28 +557,28 @@ let rec unify (sub, paused, queue) =
     let cons :: rest_queue = queue in
     match cons with
     (* α : τ *)
-    | Typed.TyvarHasSkel (tvar, skel) -> (
+    | Typed.TyParamHasSkel (tvar, skel) -> (
       match skel with
       (* α : ς *)
-      | SkelVar p ->
+      | SkelParam p ->
           Print.debug "=========End loop============" ;
           unify (sub, paused @ [cons], rest_queue)
       (* α : int *)
       | PrimSkel ps ->
-          let sub1 = TyVarToTy (tvar, Types.PrimTy ps) in
+          let sub1 = TyParamToTy (tvar, Types.PrimTy ps) in
           Print.debug "=========End loop============" ;
           unify (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
       (* α : τ₁ -> τ₂ *)
       | SkelArrow (sk1, sk2) ->
           let ty_p1 = Params.Ty.fresh () in
           let ty_p2 = Params.Ty.fresh () in
-          let tvar1 = Types.Tyvar ty_p1 in
-          let tvar2 = Types.Tyvar ty_p2 in
+          let tvar1 = Types.TyParam ty_p1 in
+          let tvar2 = Types.TyParam ty_p2 in
           let d_p1 = Params.Dirt.fresh () in
           let dvar1 = Types.SetVar (EffectSet.empty, d_p1) in
-          let sub1 = TyVarToTy (tvar, Types.Arrow (tvar1, (tvar2, dvar1))) in
-          let cons1 = TyvarHasSkel (ty_p1, sk1) in
-          let cons2 = TyvarHasSkel (ty_p2, sk2) in
+          let sub1 = TyParamToTy (tvar, Types.Arrow (tvar1, (tvar2, dvar1))) in
+          let cons1 = TyParamHasSkel (ty_p1, sk1) in
+          let cons2 = TyParamHasSkel (ty_p2, sk2) in
           Print.debug "=========End loop============" ;
           unify
             ( sub @ [sub1]
@@ -588,17 +588,17 @@ let rec unify (sub, paused, queue) =
       | SkelHandler (sk1, sk2) ->
           let ty_p1 = Params.Ty.fresh () in
           let ty_p2 = Params.Ty.fresh () in
-          let tvar1 = Types.Tyvar ty_p1 in
-          let tvar2 = Types.Tyvar ty_p2 in
+          let tvar1 = Types.TyParam ty_p1 in
+          let tvar2 = Types.TyParam ty_p2 in
           let d_p1 = Params.Dirt.fresh () in
           let dvar1 = Types.SetVar (EffectSet.empty, d_p1) in
           let d_p2 = Params.Dirt.fresh () in
           let dvar2 = Types.SetVar (EffectSet.empty, d_p2) in
           let sub1 =
-            TyVarToTy (tvar, Types.Handler ((tvar1, dvar1), (tvar2, dvar2)))
+            TyParamToTy (tvar, Types.Handler ((tvar1, dvar1), (tvar2, dvar2)))
           in
-          let cons1 = TyvarHasSkel (ty_p1, sk1) in
-          let cons2 = TyvarHasSkel (ty_p2, sk2) in
+          let cons1 = TyParamHasSkel (ty_p1, sk1) in
+          let cons2 = TyParamHasSkel (ty_p2, sk2) in
           Print.debug "=========End loop============" ;
           unify
             ( sub @ [sub1]
@@ -609,19 +609,19 @@ let rec unify (sub, paused, queue) =
     | Typed.SkelEq (sk1, sk2) -> (
       match (sk1, sk2) with
       (* ς = ς *)
-      | SkelVar sp1, SkelVar sp2 when sp1 = sp2 ->
+      | SkelParam sp1, SkelParam sp2 when sp1 = sp2 ->
           Print.debug "=========End loop============" ;
           unify (sub, paused, rest_queue)
       (* ς₁ = τ₂ *)
-      | SkelVar sp1, sk2a
+      | SkelParam sp1, sk2a
         when not (List.mem sp1 (free_skeleton sk2a)) ->
-          let sub1 = SkelVarToSkel (sp1, sk2a) in
+          let sub1 = SkelParamToSkel (sp1, sk2a) in
           Print.debug "=========End loop============" ;
           unify (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
       (* τ₁ = ς₂ *)
-      | sk2a, SkelVar sp1
+      | sk2a, SkelParam sp1
         when not (List.mem sp1 (free_skeleton sk2a)) ->
-          let sub1 = SkelVarToSkel (sp1, sk2a) in
+          let sub1 = SkelParamToSkel (sp1, sk2a) in
           Print.debug "=========End loop============" ;
           unify (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
       (* int = int *)
@@ -650,7 +650,7 @@ let rec unify (sub, paused, queue) =
       match tycons with
       (* ω : A <= A *)
       | x, y when Types.types_are_equal x y ->
-          let sub1 = CoerTyVarToTyCoercion (omega, Typed.ReflTy x) in
+          let sub1 = CoerTyParamToTyCoercion (omega, Typed.ReflTy x) in
           Print.debug "=========End loop============" ;
           unify (sub @ [sub1], paused, rest_queue)
       (* ω : α <= β *)
@@ -658,7 +658,7 @@ let rec unify (sub, paused, queue) =
             and is otherwise correctly subsumed by one of the two type variable cases below 
             so we'd better get rid of it.
 
-    | (Types.Tyvar a, Types.Tyvar b) ->
+    | (Types.TyParam a, Types.TyParam b) ->
         Print.debug "=========End loop============";
  	unify (sub, (cons::paused), rest_queue)
     *)
@@ -681,7 +681,7 @@ let rec unify (sub, paused, queue) =
               (new_ty_coercion_var_coer2, new_dirt_coercion_var_coer)
           in
           let sub1 =
-            CoerTyVarToTyCoercion
+            CoerTyParamToTyCoercion
               ( omega
               , Typed.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
               )
@@ -714,7 +714,7 @@ let rec unify (sub, paused, queue) =
             Typed.DirtCoercionVar new_dirt_coercion_var_4
           in
           let sub1 =
-            CoerTyVarToTyCoercion
+            CoerTyParamToTyCoercion
               ( omega
               , Typed.HandlerCoercion
                   ( Typed.BangCoercion
@@ -733,7 +733,7 @@ let rec unify (sub, paused, queue) =
             , paused
             , List.append [cons1; cons2; cons3; cons4] rest_queue )
       (* ω : α <= A *)
-      | Types.Tyvar tv, a ->
+      | Types.TyParam tv, a ->
           (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
           let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in
           let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
@@ -744,7 +744,7 @@ let rec unify (sub, paused, queue) =
             Print.debug "=========End loop============" ;
             unify (sub, cons :: paused, SkelEq (skel_tv, skel_a) :: rest_queue) )
       (* ω : A <= α *)
-      | a, Types.Tyvar tv ->
+      | a, Types.TyParam tv ->
           (* unify_ty_vars (sub,paused,rest_queue) tv a cons *)
           let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in
           let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
@@ -837,11 +837,11 @@ and unify_ty_vars (sub, paused, rest_queue) tv a cons =
   (*     let dependent_tyvars = (union_find_tyvar tv [] paused) in *)
   let s1 = set_of_list free_a in
   let s2 = set_of_list dependent_tyvars in
-  if not (STyVars.is_empty (STyVars.inter s1 s2)) then assert false
+  if not (STyParams.is_empty (STyParams.inter s1 s2)) then assert false
   else
     let mapper_f x =
       let (_, _), a' = refresh_target_ty ([], []) a in
-      TyVarToTy (x, a')
+      TyParamToTy (x, a')
     in
     let sub' = List.map mapper_f dependent_tyvars in
     let paused' = dependent_constraints dependent_tyvars [] paused in

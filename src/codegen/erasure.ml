@@ -66,7 +66,7 @@ and e_abstraction2 = (e_pattern * e_pattern * e_computation) annotation
 
 let rec typed_to_erasure_ty sub typed_ty =
   match typed_ty with
-  | Types.Tyvar p -> (
+  | Types.TyParam p -> (
     match OldUtils.lookup p sub with Some x' -> x' | None -> assert false )
   | Types.Arrow (t1, (t2, drt)) ->
       let t1' = typed_to_erasure_ty sub t1 in

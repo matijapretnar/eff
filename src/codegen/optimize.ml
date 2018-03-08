@@ -1,52 +1,97 @@
 open Types
 open Typed
 
-type state = 
-  { fuel: int ref
-  ; tc_state : TypeChecker.checker_state
-  }
+type state = {fuel: int ref; tc_state: TypeChecker.state}
 
-let inititial_state = {fuel= ref !Config.optimization_fuel; tc_state = TypeChecker.new_checker_state}
+let inititial_state =
+  {fuel= ref !Config.optimization_fuel; tc_state= TypeChecker.initial_state}
 
-let extend_state_term_var st t_var ty = {st with tc_state = TypeChecker.extend_state_term_vars st.tc_state t_var ty}
-let extend_state_ty_var st ty_var = {st with tc_state = TypeChecker.extend_state_ty_vars st.tc_state ty_var}
-let extend_state_dirt_var st t_var = {st with tc_state = TypeChecker.extend_state_dirt_vars st.tc_state t_var}
-let extend_state_skel_var st t_var = {st with tc_state = TypeChecker.extend_state_skel_vars st.tc_state t_var}
-let extend_state_omega_ty st omega ct = {st with tc_state = TypeChecker.extend_state_omega_ty st.tc_state omega ct}
-let extend_state_omega_dirt st omega ct = {st with tc_state = TypeChecker.extend_state_omega_dirt st.tc_state omega ct}
-let extend_state_ty_var_skel st omega ct = {st with tc_state = TypeChecker.extend_state_ty_var_skel st.tc_state omega ct}
+
+let extend_var_type st t_var ty =
+  {st with tc_state= TypeChecker.extend_var_types st.tc_state t_var ty}
+
+
+let extend_ty_params st ty_var =
+  {st with tc_state= TypeChecker.extend_ty_params st.tc_state ty_var}
+
+
+let extend_dirt_params st t_var =
+  {st with tc_state= TypeChecker.extend_dirt_params st.tc_state t_var}
+
+
+let extend_skel_params st t_var =
+  {st with tc_state= TypeChecker.extend_skel_params st.tc_state t_var}
+
+
+let extend_ty_coer_types st omega ct =
+  {st with tc_state= TypeChecker.extend_ty_coer_types st.tc_state omega ct}
+
+
+let extend_dirt_coer_types st omega ct =
+  {st with tc_state= TypeChecker.extend_dirt_coer_types st.tc_state omega ct}
+
+
+let extend_ty_param_skeletons st omega ct =
+  {st with tc_state= TypeChecker.extend_ty_param_skeletons st.tc_state omega ct}
+
 
 let refresh_expr e =
   let res = Typed.refresh_expr [] e in
-  Print.debug "refresh_expr  : %t" (Typed.print_expression e);
-  Print.debug "refresh_expr'd: %t" (Typed.print_expression res);
+  Print.debug "refresh_expr  : %t" (Typed.print_expression e) ;
+  Print.debug "refresh_expr'd: %t" (Typed.print_expression res) ;
   res
 
+
 let refresh_abs a = Typed.refresh_abs [] a
+
 let refresh_abs_with_ty a = Typed.refresh_abs_with_ty [] a
-let refresh_abs2 a2 = 
+
+let refresh_abs2 a2 =
   let res = Typed.refresh_abs2 [] a2 in
-  Print.debug "refresh_abs2  : %t" (Typed.print_abstraction2 a2);
-  Print.debug "refresh_abs2'd: %t" (Typed.print_abstraction2 res);
+  Print.debug "refresh_abs2  : %t" (Typed.print_abstraction2 a2) ;
+  Print.debug "refresh_abs2'd: %t" (Typed.print_abstraction2 res) ;
   res
+
 
 let is_relatively_pure st c h =
   match TypeChecker.type_check_comp st.tc_state c.term with
-  | (ty,SetEmpty ops) -> 
-     let handled_ops = EffectSet.of_list (List.map (fun ((eff, _), _) -> eff) h.effect_clauses) in
-     Print.debug "is_relatively_pure: %t:  %t vs %t" (Typed.print_computation c) (Types.print_effect_list (EffectSet.elements handled_ops)) (Types.print_effect_list (EffectSet.elements ops));
-     if EffectSet.is_empty(EffectSet.inter handled_ops ops)
-       then
-         let Types.Handler (_,(_,output_dirt)) = TypeChecker.type_check_handler st.tc_state h in 
-         match output_dirt with
-         | SetEmpty ops'     -> Some (BangCoercion (ReflTy ty,UnionDirt(EffectSet.inter ops ops',Empty (SetEmpty (EffectSet.diff ops' ops)))))
-         | SetVar (ops',var) -> Some (BangCoercion (ReflTy ty,UnionDirt(EffectSet.inter ops ops',Empty (SetVar (EffectSet.diff ops' ops,var)))))
-       else 
-         None
-  | (_,SetVar _) -> None (* var can be instantiated to anything *)
+  | ty, SetEmpty ops ->
+      let handled_ops =
+        EffectSet.of_list
+          (List.map (fun ((eff, _), _) -> eff) h.effect_clauses)
+      in
+      Print.debug "is_relatively_pure: %t:  %t vs %t"
+        (Typed.print_computation c)
+        (Types.print_effect_list (EffectSet.elements handled_ops))
+        (Types.print_effect_list (EffectSet.elements ops)) ;
+      if EffectSet.is_empty (EffectSet.inter handled_ops ops) then
+        let Types.Handler (_, (_, output_dirt)) =
+          TypeChecker.type_check_handler st.tc_state h
+        in
+        match output_dirt with
+        | SetEmpty ops' ->
+            Some
+              (BangCoercion
+                 ( ReflTy ty
+                 , UnionDirt
+                     ( EffectSet.inter ops ops'
+                     , Empty (SetEmpty (EffectSet.diff ops' ops)) ) ))
+        | SetVar (ops', var) ->
+            Some
+              (BangCoercion
+                 ( ReflTy ty
+                 , UnionDirt
+                     ( EffectSet.inter ops ops'
+                     , Empty (SetVar (EffectSet.diff ops' ops, var)) ) ))
+      else None
+  | _, SetVar _ -> None
+
+
+(* var can be instantiated to anything *)
 
 let is_atomic e =
   match e.term with Var _ -> true | Const _ -> true | _ -> false
+
 
 type inlinability =
   | NotInlinable
@@ -70,124 +115,152 @@ let applicable_pattern p vars =
   in
   check_variables (Typed.pattern_vars p)
 
+
 let rec optimize_ty_coercion st tyco =
   reduce_ty_coercion st (optimize_sub_ty_coercion st tyco)
+
 
 and optimize_dirty_coercion st dtyco =
   reduce_dirty_coercion st (optimize_sub_dirty_coercion st dtyco)
 
+
 and optimize_dirt_coercion st dco =
   optimize_dirt_coercion' st EffectSet.empty dco
+
 
 and optimize_dirt_coercion' st ops dco =
   reduce_dirt_coercion st ops (optimize_sub_dirt_coercion st ops dco)
 
+
 and optimize_sub_ty_coercion st tyco =
   match tyco with
   | ReflTy ty -> tyco
-  | ArrowCoercion (tyco1,dtyco2) -> ArrowCoercion ((optimize_ty_coercion st tyco1),(optimize_dirty_coercion st dtyco2)) 
-  | HandlerCoercion (dtyco1,dtyco2) -> HandlerCoercion (optimize_dirty_coercion st dtyco1,(optimize_dirty_coercion st dtyco2)) 
-  | TyCoercionVar tycovar -> TyCoercionVar tycovar 
-  | SequenceTyCoer (tyco1,tyco2) -> SequenceTyCoer ((optimize_ty_coercion st tyco1),(optimize_ty_coercion st tyco2))  
-  | TupleCoercion tycos -> TupleCoercion tycos 
-  | LeftArrow tyco1 -> LeftArrow (optimize_ty_coercion st tyco1) 
-  | ForallTy (tv,tyco1) -> ForallTy (tv,(optimize_ty_coercion (extend_state_ty_var st tv) tyco1)) 
-  | ApplyTyCoer (tyco1,ty) -> ApplyTyCoer ((optimize_ty_coercion st tyco1),ty) 
-  | ForallDirt (dv,tyco1) -> ForallDirt (dv,(optimize_ty_coercion st tyco1)) 
-  | ApplyDirCoer (tyco1,d) -> ApplyDirCoer ((optimize_ty_coercion st tyco1),d) 
-  | PureCoercion (dtyco1) -> PureCoercion (optimize_dirty_coercion st dtyco1) 
-  | QualTyCoer (ct_ty,tyco1) -> QualTyCoer (ct_ty,(optimize_ty_coercion st tyco1)) 
-  | QualDirtCoer (ct_dirt,tyco1) -> QualDirtCoer (ct_dirt,(optimize_ty_coercion st tyco1)) 
-  | ApplyQualTyCoer (tyco1,tyco2) -> ApplyQualTyCoer ((optimize_ty_coercion st tyco1),(optimize_ty_coercion st tyco2)) 
-  | ApplyQualDirtCoer (tyco1,dco) -> ApplyQualDirtCoer ((optimize_ty_coercion st tyco1),(optimize_dirt_coercion st dco)) 
-  | ForallSkel (sv,tyco1) -> ForallSkel (sv,(optimize_ty_coercion st tyco1)) 
-  | ApplySkelCoer (tyco1,sk) -> ApplySkelCoer ((optimize_ty_coercion st tyco1),sk) 
+  | ArrowCoercion (tyco1, dtyco2) ->
+      ArrowCoercion
+        (optimize_ty_coercion st tyco1, optimize_dirty_coercion st dtyco2)
+  | HandlerCoercion (dtyco1, dtyco2) ->
+      HandlerCoercion
+        (optimize_dirty_coercion st dtyco1, optimize_dirty_coercion st dtyco2)
+  | TyCoercionVar tycovar -> TyCoercionVar tycovar
+  | SequenceTyCoer (tyco1, tyco2) ->
+      SequenceTyCoer
+        (optimize_ty_coercion st tyco1, optimize_ty_coercion st tyco2)
+  | TupleCoercion tycos -> TupleCoercion tycos
+  | LeftArrow tyco1 -> LeftArrow (optimize_ty_coercion st tyco1)
+  | ForallTy (tv, tyco1) ->
+      ForallTy (tv, optimize_ty_coercion (extend_ty_params st tv) tyco1)
+  | ApplyTyCoer (tyco1, ty) -> ApplyTyCoer (optimize_ty_coercion st tyco1, ty)
+  | ForallDirt (dv, tyco1) -> ForallDirt (dv, optimize_ty_coercion st tyco1)
+  | ApplyDirCoer (tyco1, d) -> ApplyDirCoer (optimize_ty_coercion st tyco1, d)
+  | PureCoercion dtyco1 -> PureCoercion (optimize_dirty_coercion st dtyco1)
+  | QualTyCoer (ct_ty, tyco1) ->
+      QualTyCoer (ct_ty, optimize_ty_coercion st tyco1)
+  | QualDirtCoer (ct_dirt, tyco1) ->
+      QualDirtCoer (ct_dirt, optimize_ty_coercion st tyco1)
+  | ApplyQualTyCoer (tyco1, tyco2) ->
+      ApplyQualTyCoer
+        (optimize_ty_coercion st tyco1, optimize_ty_coercion st tyco2)
+  | ApplyQualDirtCoer (tyco1, dco) ->
+      ApplyQualDirtCoer
+        (optimize_ty_coercion st tyco1, optimize_dirt_coercion st dco)
+  | ForallSkel (sv, tyco1) -> ForallSkel (sv, optimize_ty_coercion st tyco1)
+  | ApplySkelCoer (tyco1, sk) ->
+      ApplySkelCoer (optimize_ty_coercion st tyco1, sk)
+
 
 and optimize_sub_dirty_coercion st dtyco =
   match dtyco with
-  | BangCoercion (tyco1,dco2) -> BangCoercion (optimize_ty_coercion st tyco1, optimize_dirt_coercion st dco2)
+  | BangCoercion (tyco1, dco2) ->
+      BangCoercion
+        (optimize_ty_coercion st tyco1, optimize_dirt_coercion st dco2)
   | RightArrow tyco1 -> RightArrow (optimize_ty_coercion st tyco1)
   | RightHandler tyco1 -> RightHandler (optimize_ty_coercion st tyco1)
   | LeftHandler tyco1 -> LeftHandler (optimize_ty_coercion st tyco1)
-  | SequenceDirtyCoer (dtyco1,dtyco2) -> SequenceDirtyCoer (optimize_dirty_coercion st dtyco1, optimize_dirty_coercion st dtyco2)
+  | SequenceDirtyCoer (dtyco1, dtyco2) ->
+      SequenceDirtyCoer
+        (optimize_dirty_coercion st dtyco1, optimize_dirty_coercion st dtyco2)
+
 
 and optimize_sub_dirt_coercion st p_ops dco =
   match dco with
   | ReflDirt d -> dco
-  | DirtCoercionVar (dcov) -> dco
+  | DirtCoercionVar dcov -> dco
   | Empty d -> dco
-  | UnionDirt (ops,dco1) -> UnionDirt (ops,optimize_dirt_coercion' st (EffectSet.union p_ops ops) dco1)
-  | SequenceDirtCoer (dco1,dco2) -> SequenceDirtCoer (optimize_dirt_coercion' st p_ops dco1, optimize_dirt_coercion' st p_ops dco2)
+  | UnionDirt (ops, dco1) ->
+      UnionDirt
+        (ops, optimize_dirt_coercion' st (EffectSet.union p_ops ops) dco1)
+  | SequenceDirtCoer (dco1, dco2) ->
+      SequenceDirtCoer
+        ( optimize_dirt_coercion' st p_ops dco1
+        , optimize_dirt_coercion' st p_ops dco2 )
   | DirtCoercion dtyco -> DirtCoercion (optimize_dirty_coercion st dtyco)
 
+
 and reduce_ty_coercion st tyco =
-  Print.debug "reduce_ty_coercion: %t" (Typed.print_ty_coercion tyco);
+  Print.debug "reduce_ty_coercion: %t" (Typed.print_ty_coercion tyco) ;
   match tyco with
   | ReflTy ty -> tyco
-  | ArrowCoercion (tyco1,dtyco2) -> tyco
-  | HandlerCoercion (dtyco1,dtyco2) -> tyco
+  | ArrowCoercion (tyco1, dtyco2) -> tyco
+  | HandlerCoercion (dtyco1, dtyco2) -> tyco
   | TyCoercionVar tycovar -> tyco
-  | SequenceTyCoer (tyco1,tyco2) -> tyco 
+  | SequenceTyCoer (tyco1, tyco2) -> tyco
   | TupleCoercion tycos -> tyco
   | LeftArrow tyco1 -> tyco
-  | ForallTy (tv,tyco1) -> tyco
-  | ApplyTyCoer (tyco1,ty) -> tyco
-  | ForallDirt (dv,tyco1) -> tyco
-  | ApplyDirCoer (tyco1,d) -> tyco
-  | PureCoercion (dtyco1) -> tyco
-  | QualTyCoer (ct_ty,tyco1) -> tyco
-  | QualDirtCoer (ct_dirt,tyco1) -> tyco
-  | ApplyQualTyCoer (tyco1,tyco2) -> tyco
-  | ApplyQualDirtCoer (tyco1,dco) -> tyco
-  | ForallSkel (sv,tyco1) -> tyco
-  | ApplySkelCoer (tyco1,sk) -> tyco
+  | ForallTy (tv, tyco1) -> tyco
+  | ApplyTyCoer (tyco1, ty) -> tyco
+  | ForallDirt (dv, tyco1) -> tyco
+  | ApplyDirCoer (tyco1, d) -> tyco
+  | PureCoercion dtyco1 -> tyco
+  | QualTyCoer (ct_ty, tyco1) -> tyco
+  | QualDirtCoer (ct_dirt, tyco1) -> tyco
+  | ApplyQualTyCoer (tyco1, tyco2) -> tyco
+  | ApplyQualDirtCoer (tyco1, dco) -> tyco
+  | ForallSkel (sv, tyco1) -> tyco
+  | ApplySkelCoer (tyco1, sk) -> tyco
+
 
 and reduce_dirty_coercion st dtyco =
-  Print.debug "reduce_dirty_coercion: %t" (Typed.print_dirty_coercion dtyco);
+  Print.debug "reduce_dirty_coercion: %t" (Typed.print_dirty_coercion dtyco) ;
   match dtyco with
-  | BangCoercion (tyco1,dco2) -> dtyco
-  | RightArrow tyco1 -> 
-      begin match tyco1 with
-      | ArrowCoercion (tyco11,dtyco12) -> dtyco12
-      | _ -> dtyco
-      end
-  | RightHandler tyco1 ->
-      begin match tyco1 with
-      | HandlerCoercion (dtyco11,dtyco12) -> dtyco12
-      | _ -> dtyco
-      end
-  | LeftHandler tyco1 -> 
-      begin match tyco1 with
-      | HandlerCoercion (dtyco11,dtyco12) -> dtyco11
-      | _ -> dtyco
-      end
-  | SequenceDirtyCoer (dtyco1,dtyco2) -> dtyco
+  | BangCoercion (tyco1, dco2) -> dtyco
+  | RightArrow tyco1 -> (
+    match tyco1 with ArrowCoercion (tyco11, dtyco12) -> dtyco12 | _ -> dtyco )
+  | RightHandler tyco1 -> (
+    match tyco1 with
+    | HandlerCoercion (dtyco11, dtyco12) -> dtyco12
+    | _ -> dtyco )
+  | LeftHandler tyco1 -> (
+    match tyco1 with
+    | HandlerCoercion (dtyco11, dtyco12) -> dtyco11
+    | _ -> dtyco )
+  | SequenceDirtyCoer (dtyco1, dtyco2) -> dtyco
+
 
 and reduce_dirt_coercion st p_ops dco =
   match dco with
   | ReflDirt d -> dco
-  | DirtCoercionVar (dcov) -> dco
-  | Empty d -> 
-      begin match d with
-      | SetEmpty ops      ->
-          let ops' = EffectSet.diff ops p_ops in
-          Empty (SetEmpty ops')
-      | SetVar (ops,var)  -> 
-          let ops' = EffectSet.diff ops p_ops in
-          Empty (SetVar (ops',var))
-      end 
-  | UnionDirt (ops,dco1) -> 
-      let (d1,d2) = TypeChecker.type_check_dirt_coercion st.tc_state dco1 in
-      let ops' = EffectSet.diff ops (EffectSet.inter (Types.effect_set_of_dirt d1) (Types.effect_set_of_dirt d2)) in
-      if EffectSet.is_empty ops'
-        then dco1
-        else UnionDirt (ops',dco1)
-  | SequenceDirtCoer (dco1,dco2) -> dco
-  | DirtCoercion dtyco -> 
-      begin match dtyco with
-      | BangCoercion (_,dco1) -> dco1
-      | _ -> dco
-      end
+  | DirtCoercionVar dcov -> dco
+  | Empty d -> (
+    match d with
+    | SetEmpty ops ->
+        let ops' = EffectSet.diff ops p_ops in
+        Empty (SetEmpty ops')
+    | SetVar (ops, var) ->
+        let ops' = EffectSet.diff ops p_ops in
+        Empty (SetVar (ops', var)) )
+  | UnionDirt (ops, dco1) ->
+      let d1, d2 = TypeChecker.type_check_dirt_coercion st.tc_state dco1 in
+      let ops' =
+        EffectSet.diff ops
+          (EffectSet.inter
+             (Types.effect_set_of_dirt d1)
+             (Types.effect_set_of_dirt d2))
+      in
+      if EffectSet.is_empty ops' then dco1 else UnionDirt (ops', dco1)
+  | SequenceDirtCoer (dco1, dco2) -> dco
+  | DirtCoercion dtyco ->
+    match dtyco with BangCoercion (_, dco1) -> dco1 | _ -> dco
+
 
 let rec substitute_pattern_comp st c p exp =
   optimize_comp st (Typed.subst_comp (Typed.pattern_match p exp) c)
@@ -219,81 +292,98 @@ and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
 
 and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
 
-and optimize_abs st ty {term = (p, c); location = loc} =
+and optimize_abs st ty {term= p, c; location= loc} =
   let st' = optimize_pattern st ty p in
-  {term = (p,optimize_comp st' c); location = loc}
+  {term= (p, optimize_comp st' c); location= loc}
+
 
 and optimize_sub_expr st e =
   let plain_e' =
-    match e.term with 
-  (*
+    match e.term with
+    (*
           | Tuple of expression list
           | Record of (OldUtils.field, expression) OldUtils.assoc
           | Variant of OldUtils.label * expression option
           *)
-    | BigLambdaTy (ty_var,sk,e) -> 
-        let st' = extend_state_ty_var_skel (extend_state_ty_var st ty_var) ty_var sk in
+    | BigLambdaTy (ty_var, sk, e) ->
+        let st' =
+          extend_ty_param_skeletons (extend_ty_params st ty_var) ty_var sk
+        in
         BigLambdaTy (ty_var, sk, optimize_expr st' e)
-    | BigLambdaDirt (dirt_var,e) -> 
-        let st' = extend_state_dirt_var st dirt_var in
+    | BigLambdaDirt (dirt_var, e) ->
+        let st' = extend_dirt_params st dirt_var in
         BigLambdaDirt (dirt_var, optimize_expr st' e)
-    | BigLambdaSkel (sk_var, e) -> 
-        let st' = extend_state_skel_var st sk_var in
+    | BigLambdaSkel (sk_var, e) ->
+        let st' = extend_skel_params st sk_var in
         BigLambdaSkel (sk_var, optimize_expr st' e)
-    | LambdaTyCoerVar (tyco_var, ct_ty, e) -> 
-        let st' = extend_state_omega_ty st tyco_var ct_ty in
+    | LambdaTyCoerVar (tyco_var, ct_ty, e) ->
+        let st' = extend_ty_coer_types st tyco_var ct_ty in
         LambdaTyCoerVar (tyco_var, ct_ty, optimize_expr st' e)
-    | LambdaDirtCoerVar (dco_var,ct_dirt,e) -> 
-        let st' = extend_state_omega_dirt st dco_var ct_dirt in
-        LambdaDirtCoerVar (dco_var,ct_dirt,optimize_expr st' e) 
-    | ApplyTyExp (e,ty) -> ApplyTyExp (optimize_expr st e, ty)
-    | ApplyDirtExp (e,dirt) -> ApplyDirtExp (optimize_expr st e, dirt)
-    | ApplySkelExp (e,sk) -> ApplySkelExp (optimize_expr st e, sk)
-    | ApplyDirtCoercion (e,dco) -> ApplyDirtCoercion (optimize_expr st e, dco)
-    | ApplyTyCoercion (e,tyco) -> ApplyTyCoercion (optimize_expr st e, tyco) 
-    | Var v               -> Var v
-    | BuiltIn (s,i)       -> BuiltIn (s,i)
-    | Const c             -> Const c
-    | Lambda plain_a_w_ty -> Lambda (optimize_plain_abstraction_with_ty st plain_a_w_ty)
-    | Effect op           -> Effect op
-    | Handler h           -> Handler (optimize_sub_handler st h)
-    | CastExp (e1, tyco1) -> CastExp (optimize_expr st e1, optimize_ty_coercion st tyco1)
-    | Handler h           -> e.term (* TODO: implement *)
+    | LambdaDirtCoerVar (dco_var, ct_dirt, e) ->
+        let st' = extend_dirt_coer_types st dco_var ct_dirt in
+        LambdaDirtCoerVar (dco_var, ct_dirt, optimize_expr st' e)
+    | ApplyTyExp (e, ty) -> ApplyTyExp (optimize_expr st e, ty)
+    | ApplyDirtExp (e, dirt) -> ApplyDirtExp (optimize_expr st e, dirt)
+    | ApplySkelExp (e, sk) -> ApplySkelExp (optimize_expr st e, sk)
+    | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (optimize_expr st e, dco)
+    | ApplyTyCoercion (e, tyco) -> ApplyTyCoercion (optimize_expr st e, tyco)
+    | Var v -> Var v
+    | BuiltIn (s, i) -> BuiltIn (s, i)
+    | Const c -> Const c
+    | Lambda plain_a_w_ty ->
+        Lambda (optimize_plain_abstraction_with_ty st plain_a_w_ty)
+    | Effect op -> Effect op
+    | Handler h -> Handler (optimize_sub_handler st h)
+    | CastExp (e1, tyco1) ->
+        CastExp (optimize_expr st e1, optimize_ty_coercion st tyco1)
+    | Handler h -> e.term
+    (* TODO: implement *)
   in
-  {term= plain_e'; location=e.location}
+  {term= plain_e'; location= e.location}
 
-and optimize_sub_handler st { effect_clauses = ecs; value_clause = vc } =
-    let vc'   = optimize_abstraction_with_ty st vc in
-    let _,dty = TypeChecker.type_check_abstraction_with_ty st.tc_state vc  in
-    let ecs'  = List.map (optimize_abstraction2 st dty) ecs in
-    { effect_clauses = ecs'; value_clause = vc' }
+
+and optimize_sub_handler st {effect_clauses= ecs; value_clause= vc} =
+  let vc' = optimize_abstraction_with_ty st vc in
+  let _, dty = TypeChecker.type_check_abstraction_with_ty st.tc_state vc in
+  let ecs' = List.map (optimize_abstraction2 st dty) ecs in
+  {effect_clauses= ecs'; value_clause= vc'}
+
 
 and optimize_abstraction_with_ty st a_w_ty =
   let plain_a_w_ty' = optimize_plain_abstraction_with_ty st a_w_ty.term in
-  { term = plain_a_w_ty'; location = a_w_ty.location } 
+  {term= plain_a_w_ty'; location= a_w_ty.location}
 
-and optimize_plain_abstraction_with_ty st (p,ty,c) =
+
+and optimize_plain_abstraction_with_ty st (p, ty, c) =
   let PVar var = p.term in
-  (p,ty,optimize_comp (extend_state_term_var st var ty) c)
+  (p, ty, optimize_comp (extend_var_type st var ty) c)
+
 
 and optimize_abstraction st ty a =
-  let (p,c) = a.term in
+  let p, c = a.term in
   let st' = optimize_pattern st ty p in
-  { a with term = (p,optimize_comp st' c) }
+  {a with term= (p, optimize_comp st' c)}
+
 
 and optimize_pattern st ty p =
   match p.term with
-  | PVar x -> extend_state_term_var st x ty
+  | PVar x -> extend_var_type st x ty
   | PNonbinding -> st
   | PConst c -> st
 
-and optimize_abstraction2 st dty (effect,a2) =
+
+and optimize_abstraction2 st dty (effect, a2) =
   let op, (in_op, out_op) = effect in
-  let (p1,p2,c)     = a2.term in 
-  let Typed.PVar v1 = p1.term in 
-  let Typed.PVar v2 = p2.term in 
-  let st = extend_state_term_var (extend_state_term_var st v1 in_op) v2 (Types.Arrow (out_op, dty)) in
-  (effect,{a2 with term = (p1,p2,optimize_comp st c)})
+  let p1, p2, c = a2.term in
+  let Typed.PVar v1 = p1.term in
+  let Typed.PVar v2 = p2.term in
+  let st =
+    extend_var_type
+      (extend_var_type st v1 in_op)
+      v2 (Types.Arrow (out_op, dty))
+  in
+  (effect, {a2 with term= (p1, p2, optimize_comp st c)})
+
 
 and optimize_sub_comp st c =
   Print.debug "optimize_sub_comp: %t" (Typed.print_computation c) ;
@@ -303,20 +393,27 @@ and optimize_sub_comp st c =
     | Value e1 -> Value (optimize_expr st e1)
     | LetVal (e1, (p, ty, c1)) ->
         let PVar var = p.term in
-        let st' = extend_state_term_var st var ty in
+        let st' = extend_var_type st var ty in
         LetVal (optimize_expr st e1, (p, ty, optimize_comp st' c1))
     | LetRec (bindings, c1) -> assert false
-    | Match (e1, abstractions) -> 
-       let ty = TypeChecker.type_check_exp st.tc_state e1.term in
-       Match (optimize_expr st e1, List.map (optimize_abstraction st ty) abstractions)
+    | Match (e1, abstractions) ->
+        let ty = TypeChecker.type_check_exp st.tc_state e1.term in
+        Match
+          ( optimize_expr st e1
+          , List.map (optimize_abstraction st ty) abstractions )
     | Apply (e1, e2) -> Apply (optimize_expr st e1, optimize_expr st e2)
     | Handle (e1, c1) -> Handle (optimize_expr st e1, optimize_comp st c1)
-    | Call (op, e1, a_w_ty) -> Call (op, optimize_expr st e1, optimize_abstraction_with_ty st a_w_ty)
-    | Op (op, e1) -> Print.debug "optimize_sub_comp Op"; Op (op, optimize_expr st e1)
-    | Bind (c1, abstraction) -> 
-        let (ty,_) = TypeChecker.type_check_comp st.tc_state c1.term in
+    | Call (op, e1, a_w_ty) ->
+        Call (op, optimize_expr st e1, optimize_abstraction_with_ty st a_w_ty)
+    | Op (op, e1) ->
+        Print.debug "optimize_sub_comp Op" ;
+        Op (op, optimize_expr st e1)
+    | Bind (c1, abstraction) ->
+        let ty, _ = TypeChecker.type_check_comp st.tc_state c1.term in
         Bind (optimize_comp st c1, optimize_abs st ty abstraction)
-    | CastComp (c1, dirty_coercion) -> CastComp (optimize_comp st c1, optimize_dirty_coercion st dirty_coercion)
+    | CastComp (c1, dirty_coercion) ->
+        CastComp
+          (optimize_comp st c1, optimize_dirty_coercion st dirty_coercion)
     | CastComp_ty (c1, ty_coercion) -> assert false
     | CastComp_dirt (c1, dirt_coercion) -> assert false
   in
@@ -344,42 +441,36 @@ and reduce_expr st e =
           | ApplyTyCoercion of expression * ty_coercion
           | ApplyTyCoercion (e1,ty_co) ->
           *)
-  | ApplySkelExp (e1,sk) ->
-      begin match e1.term with
-      | BigLambdaSkel (skvar,e11) ->
-          Unification.apply_sub_exp (Unification.SkelVarToSkel(skvar,sk)) e11
-      | _ -> e
-      end 
-  | ApplyTyExp (e1,ty) ->
-      begin match e1.term with
-      | BigLambdaTy (tyvar,sk,e11) ->
-          Unification.apply_sub_exp (Unification.TyVarToTy (tyvar,ty)) e11
-      | _ -> e
-      end 
-  | ApplyDirtCoercion (e1,dco) ->
-      begin match e1.term with
-      | LambdaDirtCoerVar (dcovar,ctd,e11) ->
-          Unification.apply_sub_exp (Unification.CoerDirtVartoDirtCoercion (dcovar,dco)) e11
-      | _ -> e
-      end
-  | ApplyDirtExp (e1,d) ->
-      begin match e1.term with
-      | BigLambdaDirt (dvar,e11) ->
-          Unification.apply_sub_exp (Unification.DirtVarToDirt (dvar,d)) e11
-      | _ -> e
-      end
-  | Effect op ->
-      e
+  | ApplySkelExp (e1, sk) -> (
+    match e1.term with
+    | BigLambdaSkel (skvar, e11) ->
+        Unification.apply_sub_exp (Unification.SkelParamToSkel (skvar, sk)) e11
+    | _ -> e )
+  | ApplyTyExp (e1, ty) -> (
+    match e1.term with
+    | BigLambdaTy (tyvar, sk, e11) ->
+        Unification.apply_sub_exp (Unification.TyParamToTy (tyvar, ty)) e11
+    | _ -> e )
+  | ApplyDirtCoercion (e1, dco) -> (
+    match e1.term with
+    | LambdaDirtCoerVar (dcovar, ctd, e11) ->
+        Unification.apply_sub_exp
+          (Unification.CoerDirtVartoDirtCoercion (dcovar, dco)) e11
+    | _ -> e )
+  | ApplyDirtExp (e1, d) -> (
+    match e1.term with
+    | BigLambdaDirt (dvar, e11) ->
+        Unification.apply_sub_exp (Unification.DirtVarToDirt (dvar, d)) e11
+    | _ -> e )
+  | Effect op -> e
   | CastExp (e1, ty_co) ->
-      let ty1, ty2 =
-        TypeChecker.type_check_ty_coercion st.tc_state ty_co
-      in
+      let ty1, ty2 = TypeChecker.type_check_ty_coercion st.tc_state ty_co in
       if Types.types_are_equal ty1 ty2 then e1 else e
   | plain_e -> e
 
 
 and reduce_comp st c =
-  Print.debug "reduce_comp: %t" (Typed.print_computation c);
+  Print.debug "reduce_comp: %t" (Typed.print_computation c) ;
   match c.term with
   | Value _ -> c
   | LetVal (e1, (p, ty, c1)) ->
@@ -387,113 +478,170 @@ and reduce_comp st c =
   | LetRec (bindings, c1) -> c
   | Match (e1, abstractions) -> c
   | Apply (e1, e2) -> (
-      match e1 with
-      | {term= Lambda (p, ty, c)} ->
-          beta_reduce st (annotate (p, ty, c) e1.location) e2
-      | {term = Effect op} ->
-          Print.debug "Op -> Call";
-          let var = Typed.Variable.fresh "call_var" in
-          let (eff,(ty_in,ty_out)) = op in
-          let c_cont = {term = CastComp ({term = Value {term = Var var ; location = c.location}; location = c.location},BangCoercion (ReflTy ty_out,Empty (SetEmpty (EffectSet.singleton eff))));location=c.location} in
-          let a_w_ty = {term = ({term = PVar var; location = c.location},ty_out,c_cont); location = c.location} in
-          {term = Call (op, e2, a_w_ty); location=c.location}
-      | _ ->
-          Print.debug "e1 is not a lambda" ;
-          (* TODO: support case where it's a cast of a lambda *)
-          c )
-  | Handle (e1, c1) -> 
-      begin match e1.term with
-      | CastExp (e11, tyco1) -> 
-          let c1' = { term = CastComp (c1, LeftHandler tyco1); location = c1.location } in
-          let c'  = { term = Handle (e11, c1'); location = c.location } in
-          optimize_comp st { term = CastComp (c', RightHandler tyco1) ; location = c.location }
-      | Handler h ->
-          begin match c1.term with
-          | CastComp (c1', dtyco1) -> 
-              begin match is_relatively_pure st c1' h with
-              | Some dtyco -> optimize_comp st { term = Bind ({term = CastComp (c1',dtyco);location=c.location},Typed.abstraction_with_ty_to_abstraction h.value_clause); location = c.location }
-              | None -> c
-              end
-          | Bind (({term = CastComp (c111,_)} as c11),a1) ->
-              (* TODO: Fix *)
-              begin match is_relatively_pure st c111 h with
-              | Some dtyco -> 
-                  let (p12,c12) = a1.term in
-                  let PVar var12 = p12.term in
-                  optimize_comp st { c with term = Bind ({c11 with term = CastComp (c111,dtyco)}, abstraction p12 (handle (refresh_expr e1) c12))} 
-              | None -> c
-              end
-          | Call (eff, e11, k_abs) ->
-              let {term = (k_pat, k_ty, k_c)} = refresh_abs_with_ty k_abs in
-              let PVar k_var = k_pat.term in 
-              let {term=(k_pat',k_c')} as handled_k = abstraction k_pat (reduce_comp (extend_state_term_var st k_var k_ty) (handle (refresh_expr e1) k_c)) in
-              begin match OldUtils.lookup eff h.effect_clauses with
-              | Some eff_clause ->
-                  let {term = (p1, p2, c)} = refresh_abs2 eff_clause in
-                  (* Shouldn't we check for inlinability of p1 and p2 here? *)
-                  substitute_pattern_comp st ((Typed.subst_comp (Typed.pattern_match p1 e11) c)) p2 (lambda (k_pat',k_ty,k_c'))
-              | None ->
-                  let res = call eff e11 {term=(k_pat',k_ty,k_c');location=handled_k.location} in reduce_comp st res
-              end
-          | _ -> c
-          end
-      | _ -> c
-      end
+    match e1 with
+    | {term= Lambda (p, ty, c)} ->
+        beta_reduce st (annotate (p, ty, c) e1.location) e2
+    | {term= Effect op} ->
+        Print.debug "Op -> Call" ;
+        let var = Typed.Variable.fresh "call_var" in
+        let eff, (ty_in, ty_out) = op in
+        let c_cont =
+          { term=
+              CastComp
+                ( { term= Value {term= Var var; location= c.location}
+                  ; location= c.location }
+                , BangCoercion
+                    (ReflTy ty_out, Empty (SetEmpty (EffectSet.singleton eff)))
+                )
+          ; location= c.location }
+        in
+        let a_w_ty =
+          { term= ({term= PVar var; location= c.location}, ty_out, c_cont)
+          ; location= c.location }
+        in
+        {term= Call (op, e2, a_w_ty); location= c.location}
+    | _ ->
+        Print.debug "e1 is not a lambda" ;
+        (* TODO: support case where it's a cast of a lambda *)
+        c )
+  | Handle (e1, c1) -> (
+    match e1.term with
+    | CastExp (e11, tyco1) ->
+        let c1' =
+          {term= CastComp (c1, LeftHandler tyco1); location= c1.location}
+        in
+        let c' = {term= Handle (e11, c1'); location= c.location} in
+        optimize_comp st
+          {term= CastComp (c', RightHandler tyco1); location= c.location}
+    | Handler h -> (
+      match c1.term with
+      | CastComp (c1', dtyco1) -> (
+        match is_relatively_pure st c1' h with
+        | Some dtyco ->
+            optimize_comp st
+              { term=
+                  Bind
+                    ( {term= CastComp (c1', dtyco); location= c.location}
+                    , Typed.abstraction_with_ty_to_abstraction h.value_clause
+                    )
+              ; location= c.location }
+        | None -> c )
+      | Bind (({term= CastComp (c111, _)} as c11), a1) -> (
+        match (* TODO: Fix *)
+              is_relatively_pure st c111 h with
+        | Some dtyco ->
+            let p12, c12 = a1.term in
+            let PVar var12 = p12.term in
+            optimize_comp st
+              { c with
+                term=
+                  Bind
+                    ( {c11 with term= CastComp (c111, dtyco)}
+                    , abstraction p12 (handle (refresh_expr e1) c12) ) }
+        | None -> c )
+      | Call (eff, e11, k_abs) -> (
+          let {term= k_pat, k_ty, k_c} = refresh_abs_with_ty k_abs in
+          let PVar k_var = k_pat.term in
+          let {term= k_pat', k_c'} as handled_k =
+            abstraction k_pat
+              (reduce_comp
+                 (extend_var_type st k_var k_ty)
+                 (handle (refresh_expr e1) k_c))
+          in
+          match OldUtils.lookup eff h.effect_clauses with
+          | Some eff_clause ->
+              let {term= p1, p2, c} = refresh_abs2 eff_clause in
+              (* Shouldn't we check for inlinability of p1 and p2 here? *)
+              substitute_pattern_comp st
+                (Typed.subst_comp (Typed.pattern_match p1 e11) c)
+                p2
+                (lambda (k_pat', k_ty, k_c'))
+          | None ->
+              let res =
+                call eff e11
+                  {term= (k_pat', k_ty, k_c'); location= handled_k.location}
+              in
+              reduce_comp st res )
+      | _ -> c )
+    | _ -> c )
   | Call (op, e1, a_w_ty) -> c
-  | Op (op, e1) -> 
-      assert false
-  | Bind (c1, a2) -> 
-      begin match c1.term with
-      | Bind (c11, {term = (p1, c12)}) ->
-          let PVar var1 = p1.term in
-          let (ty1,_) = TypeChecker.type_check_comp st.tc_state c11.term in
-          let st' = extend_state_term_var st var1 ty1 in  
-          let c2' = reduce_comp st' { term = Bind (c12,a2); location = c12.location} in
-          reduce_comp st {term = Bind (c11, {term = (p1, c2'); location = c.location }) ; location  = c.location} 
-      | Value e11 ->
-          let ty11 = TypeChecker.type_check_exp st.tc_state e11.term in
-          let {term = (p2,c2); location = location2} = a2 in
-          beta_reduce st {term=(p2,ty11,c2);location=location2} e11
-      | Call (op, e11, ({term = (p12,ty12,c12)} as a_w_ty)) ->
-          let PVar var12 = p12.term in
-          let st' = extend_state_term_var st var12 ty12 in
-          let c12' = reduce_comp st' {term = Bind (c12,a2);location=c12.location} in
-          {term = Call (op, e11, {a_w_ty with term = (p12,ty12,c12')}); location=c.location}
-      | CastComp (c11,dtyco) ->
-          begin match c11.term with
-          | Value e111 -> 
-              let p_e111' = CastExp (e111,PureCoercion dtyco) in
-              let ty111 = TypeChecker.type_check_exp st.tc_state p_e111' in
-              let {term = (p2,c2); location = location2} = a2 in
-              beta_reduce st {term=(p2,ty111,c2);location=location2} {term = p_e111';location = e111.location}
-          | Bind (c111, abs112) -> 
-              let (p112,c112) = abs112.term in
-              let PVar var112 = p112.term in
-              let (ty111,_) = TypeChecker.type_check_comp st.tc_state c111.term in
-              let c112' = { c112 with term = CastComp (c112,dtyco) } in
-              let st' = extend_state_term_var st var112 ty111 in  
-              let c2' = reduce_comp st' { c112 with term = Bind (c112',a2) } in
-              let dtyco' = optimize_dirty_coercion st (BangCoercion (ReflTy ty111,DirtCoercion dtyco)) in
-              let c111' = reduce_comp st { c111 with term = CastComp (c111,dtyco') } in
-              reduce_comp st {c with term = Bind (c111', {abs112 with term = (p112, c2') })} 
-          | _ -> c
-          end
-      | _ -> c
-      end 
-  | CastComp (c1, dtyco) -> 
-      let dty1, dty2 = TypeChecker.type_check_dirty_coercion st.tc_state dtyco in
+  | Op (op, e1) -> assert false
+  | Bind (c1, a2) -> (
+    match c1.term with
+    | Bind (c11, {term= p1, c12}) ->
+        let PVar var1 = p1.term in
+        let ty1, _ = TypeChecker.type_check_comp st.tc_state c11.term in
+        let st' = extend_var_type st var1 ty1 in
+        let c2' =
+          reduce_comp st' {term= Bind (c12, a2); location= c12.location}
+        in
+        reduce_comp st
+          { term= Bind (c11, {term= (p1, c2'); location= c.location})
+          ; location= c.location }
+    | Value e11 ->
+        let ty11 = TypeChecker.type_check_exp st.tc_state e11.term in
+        let {term= p2, c2; location= location2} = a2 in
+        beta_reduce st {term= (p2, ty11, c2); location= location2} e11
+    | Call (op, e11, ({term= p12, ty12, c12} as a_w_ty)) ->
+        let PVar var12 = p12.term in
+        let st' = extend_var_type st var12 ty12 in
+        let c12' =
+          reduce_comp st' {term= Bind (c12, a2); location= c12.location}
+        in
+        { term= Call (op, e11, {a_w_ty with term= (p12, ty12, c12')})
+        ; location= c.location }
+    | CastComp (c11, dtyco) -> (
+      match c11.term with
+      | Value e111 ->
+          let p_e111' = CastExp (e111, PureCoercion dtyco) in
+          let ty111 = TypeChecker.type_check_exp st.tc_state p_e111' in
+          let {term= p2, c2; location= location2} = a2 in
+          beta_reduce st {term= (p2, ty111, c2); location= location2}
+            {term= p_e111'; location= e111.location}
+      | Bind (c111, abs112) ->
+          let p112, c112 = abs112.term in
+          let PVar var112 = p112.term in
+          let ty111, _ = TypeChecker.type_check_comp st.tc_state c111.term in
+          let c112' = {c112 with term= CastComp (c112, dtyco)} in
+          let st' = extend_var_type st var112 ty111 in
+          let c2' = reduce_comp st' {c112 with term= Bind (c112', a2)} in
+          let dtyco' =
+            optimize_dirty_coercion st
+              (BangCoercion (ReflTy ty111, DirtCoercion dtyco))
+          in
+          let c111' =
+            reduce_comp st {c111 with term= CastComp (c111, dtyco')}
+          in
+          reduce_comp st
+            {c with term= Bind (c111', {abs112 with term= (p112, c2')})}
+      | _ -> c )
+    | _ -> c )
+  | CastComp (c1, dtyco) ->
+      let dty1, dty2 =
+        TypeChecker.type_check_dirty_coercion st.tc_state dtyco
+      in
       match c1.term with
       | _ when Types.dirty_types_are_equal dty1 dty2 -> c1
-      | CastComp (c11,dtyco12) ->
-          {c with term = CastComp (c11, optimize_dirty_coercion st (SequenceDirtyCoer (dtyco12,dtyco)))}
-      | Call (op, e11, ({term = (p12,ty12,c12)} as a_w_ty)) ->
+      | CastComp (c11, dtyco12) ->
+          { c with
+            term=
+              CastComp
+                ( c11
+                , optimize_dirty_coercion st
+                    (SequenceDirtyCoer (dtyco12, dtyco)) ) }
+      | Call (op, e11, ({term= p12, ty12, c12} as a_w_ty)) ->
           let PVar var12 = p12.term in
-          let st' = extend_state_term_var st var12 ty12 in
-          let c12' = reduce_comp st' {term = CastComp(c12,dtyco);location=c12.location} in
-          {term = Call (op, e11, {a_w_ty with term = (p12, ty12, c12')});location=c.location}
+          let st' = extend_var_type st var12 ty12 in
+          let c12' =
+            reduce_comp st'
+              {term= CastComp (c12, dtyco); location= c12.location}
+          in
+          { term= Call (op, e11, {a_w_ty with term= (p12, ty12, c12')})
+          ; location= c.location }
       | _ -> c
-  | CastComp_ty (c1, ty_coercion) -> c
-  | CastComp_dirt (c1, dirt_coercion) -> c
+      | CastComp_ty (c1, ty_coercion) -> c
+      | CastComp_dirt (c1, dirt_coercion) -> c
+
 
 (*
   | _ when outOfFuel st -> c
@@ -767,7 +915,8 @@ and reduce_comp st c =
   c'
 *)
 
-let optimize_main_comp tc_state c = optimize_comp {inititial_state with tc_state = tc_state}  c
+let optimize_main_comp tc_state c =
+  optimize_comp {inititial_state with tc_state} c
 
 (*
  To Do list for optimization :

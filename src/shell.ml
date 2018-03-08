@@ -9,13 +9,13 @@ let help_text =
 type state =
   { runtime: Eval.state
   ; explicit_typing: ExplicitInfer.state
-  ; type_checker: TypeChecker.checker_state
+  ; type_checker: TypeChecker.state
   ; typing: SimpleInfer.t }
 
 let initial_state =
   { runtime= Eval.empty
   ; explicit_typing= ExplicitInfer.empty
-  ; type_checker= TypeChecker.new_checker_state
+  ; type_checker= TypeChecker.initial_state
   ; typing= SimpleInfer.empty }
 
 
@@ -119,7 +119,7 @@ let rec exec_cmd ppf st cmd =
               ExplicitInfer.context=
                 TypingEnv.update st.explicit_typing.context x new_ty }
         ; type_checker=
-            TypeChecker.extend_state_term_vars st.type_checker x new_ty
+            TypeChecker.extend_var_types st.type_checker x new_ty
         ; runtime= Eval.update x v st.runtime }
     | None -> Error.runtime "unknown external symbol %s." f )
   | CoreSyntax.Tydef tydefs ->
@@ -209,7 +209,7 @@ let compile_file ppf filename st =
                 ExplicitInfer.context=
                   TypingEnv.update st.explicit_typing.context x new_ty }
           ; type_checker=
-              TypeChecker.extend_state_term_vars st.type_checker x new_ty
+              TypeChecker.extend_var_types st.type_checker x new_ty
           ; runtime= Eval.update x v st.runtime }
       | None -> Error.runtime "unknown external symbol %s." f )
     | _ -> st
