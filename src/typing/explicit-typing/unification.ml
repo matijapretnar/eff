@@ -432,6 +432,238 @@ let rec dependent_constraints dep_list acc c_list =
     | _ -> dependent_constraints dep_list acc xs
 
 
+let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
+  match skel with
+  (* α : ς *)
+  | SkelParam p -> (sub, paused @ [cons], rest_queue)
+  (* α : int *)
+  | PrimSkel ps ->
+      let sub1 = TyParamToTy (tvar, Types.PrimTy ps) in
+      (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
+  (* α : τ₁ -> τ₂ *)
+  | SkelArrow (sk1, sk2) ->
+      let ty_p1 = Params.Ty.fresh () in
+      let ty_p2 = Params.Ty.fresh () in
+      let tvar1 = Types.TyParam ty_p1 in
+      let tvar2 = Types.TyParam ty_p2 in
+      let dvar1 = Types.fresh_dirt () in
+      let sub1 = TyParamToTy (tvar, Types.Arrow (tvar1, (tvar2, dvar1))) in
+      let cons1 = TyParamHasSkel (ty_p1, sk1) in
+      let cons2 = TyParamHasSkel (ty_p2, sk2) in
+      ( sub @ [sub1]
+      , []
+      , [cons1; cons2] @ apply_sub [sub1] (rest_queue @ paused) )
+  (* α : τ₁ => τ₂ *)
+  | SkelHandler (sk1, sk2) ->
+      let ty_p1 = Params.Ty.fresh () in
+      let ty_p2 = Params.Ty.fresh () in
+      let tvar1 = Types.TyParam ty_p1 in
+      let tvar2 = Types.TyParam ty_p2 in
+      let dvar1 = Types.fresh_dirt () in
+      let dvar2 = Types.fresh_dirt () in
+      let sub1 =
+        TyParamToTy (tvar, Types.Handler ((tvar1, dvar1), (tvar2, dvar2)))
+      in
+      let cons1 = TyParamHasSkel (ty_p1, sk1) in
+      let cons2 = TyParamHasSkel (ty_p2, sk2) in
+      ( sub @ [sub1]
+      , []
+      , [cons1; cons2] @ apply_sub [sub1] (rest_queue @ paused) )
+  | ForallSkel (p, sk1) -> assert false
+
+
+and skel_eq_step sub paused cons rest_queue sk1 sk2 =
+  match (sk1, sk2) with
+  (* ς = ς *)
+  | SkelParam sp1, SkelParam sp2 when sp1 = sp2 -> (sub, paused, rest_queue)
+  (* ς₁ = τ₂ *)
+  | SkelParam sp1, sk2a
+    when not (List.mem sp1 (free_skeleton sk2a)) ->
+      let sub1 = SkelParamToSkel (sp1, sk2a) in
+      (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
+  (* τ₁ = ς₂ *)
+  | sk2a, SkelParam sp1
+    when not (List.mem sp1 (free_skeleton sk2a)) ->
+      let sub1 = SkelParamToSkel (sp1, sk2a) in
+      (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
+  (* int = int *)
+  | PrimSkel ps1, PrimSkel ps2 when ps1 = ps2 -> (sub, paused, rest_queue)
+  (* τ₁₁ -> τ₁₂ = τ₂₁ -> τ₂₂ *)
+  | SkelArrow (ska, skb), SkelArrow (skc, skd) ->
+      ( sub
+      , paused
+      , [Typed.SkelEq (ska, skc); Typed.SkelEq (skb, skd)] @ rest_queue )
+  (* τ₁₁ => τ₁₂ = τ₂₁ => τ₂₂ *)
+  | SkelHandler (ska, skb), SkelHandler (skc, skd) ->
+      ( sub
+      , paused
+      , [Typed.SkelEq (ska, skc); Typed.SkelEq (skb, skd)] @ rest_queue )
+  | _ -> assert false
+
+
+and ty_omega_step sub paused cons rest_queue omega tycons =
+  match tycons with
+  (* ω : A <= A *)
+  | x, y when Types.types_are_equal x y ->
+      let sub1 = CoerTyParamToTyCoercion (omega, Typed.ReflTy x) in
+      (sub @ [sub1], paused, rest_queue)
+  (* ω : α <= β *)
+  (* TOM: I think this case is wrong because it does not propagate skeleton equality 
+            and is otherwise correctly subsumed by one of the two type variable cases below 
+            so we'd better get rid of it.
+
+    | (Types.TyParam a, Types.TyParam b) ->
+        Print.debug "=========End loop============";
+   (sub, (cons::paused), rest_queue)
+    *)
+  (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
+  | Types.Arrow (a1, (aa1, d1)), Types.Arrow (a2, (aa2, d2)) ->
+      let new_ty_coercion_var = Params.TyCoercion.fresh () in
+      let new_ty_coercion_var_coer = Typed.TyCoercionVar new_ty_coercion_var in
+      let new_ty_coercion_var2 = Params.TyCoercion.fresh () in
+      let new_ty_coercion_var_coer2 =
+        Typed.TyCoercionVar new_ty_coercion_var2
+      in
+      let new_dirt_coercion_var = Params.DirtCoercion.fresh () in
+      let new_dirt_coercion_var_coer =
+        Typed.DirtCoercionVar new_dirt_coercion_var
+      in
+      let dirty_coercion_c =
+        Typed.BangCoercion
+          (new_ty_coercion_var_coer2, new_dirt_coercion_var_coer)
+      in
+      let sub1 =
+        CoerTyParamToTyCoercion
+          ( omega
+          , Typed.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c) )
+      in
+      let ty_cons = Typed.TyOmega (new_ty_coercion_var, (a2, a1)) in
+      let ty2_cons = Typed.TyOmega (new_ty_coercion_var2, (aa1, aa2)) in
+      let dirt_cons = Typed.DirtOmega (new_dirt_coercion_var, (d1, d2)) in
+      ( sub @ [sub1]
+      , paused
+      , List.append [ty_cons; ty2_cons; dirt_cons] rest_queue )
+  (* ω : D₁ => C₁ <= D₂ => C₂ *)
+  | Types.Handler ((a1, d1), (a11, d11)), Types.Handler ((a2, d2), (a22, d22)) ->
+      let new_ty_coercion_var_1 = Params.TyCoercion.fresh () in
+      let new_dirt_coercion_var_2 = Params.DirtCoercion.fresh () in
+      let new_ty_coercion_var_3 = Params.TyCoercion.fresh () in
+      let new_dirt_coercion_var_4 = Params.DirtCoercion.fresh () in
+      let new_ty_coercion_var_coer_1 =
+        Typed.TyCoercionVar new_ty_coercion_var_1
+      in
+      let new_dirt_coercion_var_coer_2 =
+        Typed.DirtCoercionVar new_dirt_coercion_var_2
+      in
+      let new_ty_coercion_var_coer_3 =
+        Typed.TyCoercionVar new_ty_coercion_var_3
+      in
+      let new_dirt_coercion_var_coer_4 =
+        Typed.DirtCoercionVar new_dirt_coercion_var_4
+      in
+      let sub1 =
+        CoerTyParamToTyCoercion
+          ( omega
+          , Typed.HandlerCoercion
+              ( Typed.BangCoercion
+                  (new_ty_coercion_var_coer_1, new_dirt_coercion_var_coer_2)
+              , Typed.BangCoercion
+                  (new_ty_coercion_var_coer_3, new_dirt_coercion_var_coer_4) )
+          )
+      in
+      let cons1 = Typed.TyOmega (new_ty_coercion_var_1, (a2, a1)) in
+      let cons2 = Typed.DirtOmega (new_dirt_coercion_var_2, (d2, d1)) in
+      let cons3 = Typed.TyOmega (new_ty_coercion_var_3, (a11, a22)) in
+      let cons4 = Typed.DirtOmega (new_dirt_coercion_var_4, (d11, d22)) in
+      ( sub @ [sub1]
+      , paused
+      , List.append [cons1; cons2; cons3; cons4] rest_queue )
+  (* ω : α <= A *)
+  | Types.TyParam tv, a ->
+      (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
+      let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in
+      let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
+      if skel_tv = skel_a then (sub, cons :: paused, rest_queue)
+      else (sub, cons :: paused, SkelEq (skel_tv, skel_a) :: rest_queue)
+  (* ω : A <= α *)
+  | a, Types.TyParam tv ->
+      (* unify_ty_vars (sub,paused,rest_queue) tv a cons *)
+      let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in
+      let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
+      if skel_tv = skel_a then (sub, cons :: paused, rest_queue)
+      else (sub, cons :: paused, SkelEq (skel_tv, skel_a) :: rest_queue)
+  | _ -> assert false
+
+
+and dirt_omega_step sub paused cons rest_queue omega dcons =
+  match dcons with
+  (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
+  | {effect_set= s1; row= ParamRow v1}, {effect_set= s2; row= ParamRow v2} ->
+      if Types.EffectSet.is_empty s1 then (sub, cons :: paused, rest_queue)
+      else
+        let omega' = Params.DirtCoercion.fresh () in
+        let diff_set = Types.EffectSet.diff s1 s2 in
+        let union_set = Types.EffectSet.union s1 s2 in
+        let sub' =
+          [ DirtVarToDirt
+              ( v2
+              , let open Types in
+                {effect_set= diff_set; row= ParamRow (Params.Dirt.fresh ())} )
+          ; CoerDirtVartoDirtCoercion
+              (omega, Typed.UnionDirt (s1, DirtCoercionVar omega')) ]
+        in
+        let new_cons =
+          Typed.DirtOmega
+            ( omega'
+            , ( Types.{effect_set= Types.EffectSet.empty; row= ParamRow v1}
+              , Types.{effect_set= union_set; row= ParamRow v2} ) )
+        in
+        (sub @ sub', [], apply_sub sub' (new_cons :: paused @ rest_queue))
+  (* ω : Ø <= Δ₂ *)
+  | {effect_set= s1; row= EmptyRow}, d
+    when Types.EffectSet.is_empty s1 ->
+      let sub1 = CoerDirtVartoDirtCoercion (omega, Typed.Empty d) in
+      (sub @ [sub1], paused, rest_queue)
+  (* ω : δ₁ <= Ø *)
+  | {effect_set= s1; row= ParamRow v1}, {effect_set= s2; row= EmptyRow}
+    when Types.EffectSet.is_empty s1 && Types.EffectSet.is_empty s2 ->
+      let sub1 =
+        [ CoerDirtVartoDirtCoercion (omega, Typed.Empty Types.empty_dirt)
+        ; DirtVarToDirt (v1, Types.empty_dirt) ]
+      in
+      (sub @ sub1, [], apply_sub sub1 (paused @ rest_queue))
+  (* ω : O₁ <= O₂ *)
+  | {effect_set= s1; row= EmptyRow}, {effect_set= s2; row= EmptyRow} ->
+      if Types.EffectSet.subset s1 s2 then
+        let sub1 =
+          CoerDirtVartoDirtCoercion
+            ( omega
+            , Typed.UnionDirt
+                ( s2
+                , Typed.Empty (Types.closed_dirt (Types.EffectSet.diff s2 s1))
+                ) )
+        in
+        (sub @ [sub1], paused, rest_queue)
+      else assert false
+  (* ω : O₁ <= O₂ ∪ δ₂ *)
+  | {effect_set= s1; row= EmptyRow}, {effect_set= s2; row= ParamRow v2} ->
+      let v2' = Params.Dirt.fresh () in
+      let sub1 =
+        [ CoerDirtVartoDirtCoercion
+            ( omega
+            , Typed.UnionDirt
+                ( s1
+                , Typed.Empty
+                    Types.{effect_set= EffectSet.diff s2 s1; row= ParamRow v2'}
+                ) )
+        ; DirtVarToDirt
+            (v2, Types.{effect_set= EffectSet.diff s1 s2; row= ParamRow v2'})
+        ]
+      in
+      (sub @ sub1, [], apply_sub sub1 (paused @ rest_queue))
+  | _ -> (sub, cons :: paused, rest_queue)
+
+
 let rec unify (sub, paused, queue) =
   Print.debug "=============Start loop============" ;
   Print.debug "-----Subs-----" ;
@@ -440,286 +672,25 @@ let rec unify (sub, paused, queue) =
   print_c_list paused ;
   Print.debug "-----queue-----" ;
   print_c_list queue ;
-  if queue == [] then (
-    Print.debug "=============FINAL LOOP Result============" ;
-    (sub, paused) )
-  else
-    let cons :: rest_queue = queue in
-    match cons with
-    (* α : τ *)
-    | Typed.TyParamHasSkel (tvar, skel) -> (
-      match skel with
-      (* α : ς *)
-      | SkelParam p ->
-          Print.debug "=========End loop============" ;
-          unify (sub, paused @ [cons], rest_queue)
-      (* α : int *)
-      | PrimSkel ps ->
-          let sub1 = TyParamToTy (tvar, Types.PrimTy ps) in
-          Print.debug "=========End loop============" ;
-          unify (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
-      (* α : τ₁ -> τ₂ *)
-      | SkelArrow (sk1, sk2) ->
-          let ty_p1 = Params.Ty.fresh () in
-          let ty_p2 = Params.Ty.fresh () in
-          let tvar1 = Types.TyParam ty_p1 in
-          let tvar2 = Types.TyParam ty_p2 in
-          let dvar1 = Types.fresh_dirt () in
-          let sub1 = TyParamToTy (tvar, Types.Arrow (tvar1, (tvar2, dvar1))) in
-          let cons1 = TyParamHasSkel (ty_p1, sk1) in
-          let cons2 = TyParamHasSkel (ty_p2, sk2) in
-          Print.debug "=========End loop============" ;
-          unify
-            ( sub @ [sub1]
-            , []
-            , [cons1; cons2] @ apply_sub [sub1] (rest_queue @ paused) )
-      (* α : τ₁ => τ₂ *)
-      | SkelHandler (sk1, sk2) ->
-          let ty_p1 = Params.Ty.fresh () in
-          let ty_p2 = Params.Ty.fresh () in
-          let tvar1 = Types.TyParam ty_p1 in
-          let tvar2 = Types.TyParam ty_p2 in
-          let dvar1 = Types.fresh_dirt () in
-          let dvar2 = Types.fresh_dirt () in
-          let sub1 =
-            TyParamToTy (tvar, Types.Handler ((tvar1, dvar1), (tvar2, dvar2)))
-          in
-          let cons1 = TyParamHasSkel (ty_p1, sk1) in
-          let cons2 = TyParamHasSkel (ty_p2, sk2) in
-          Print.debug "=========End loop============" ;
-          unify
-            ( sub @ [sub1]
-            , []
-            , [cons1; cons2] @ apply_sub [sub1] (rest_queue @ paused) )
-      | ForallSkel (p, sk1) -> assert false )
-    (* τ₁ = τ₂ *)
-    | Typed.SkelEq (sk1, sk2) -> (
-      match (sk1, sk2) with
-      (* ς = ς *)
-      | SkelParam sp1, SkelParam sp2 when sp1 = sp2 ->
-          Print.debug "=========End loop============" ;
-          unify (sub, paused, rest_queue)
-      (* ς₁ = τ₂ *)
-      | SkelParam sp1, sk2a
-        when not (List.mem sp1 (free_skeleton sk2a)) ->
-          let sub1 = SkelParamToSkel (sp1, sk2a) in
-          Print.debug "=========End loop============" ;
-          unify (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
-      (* τ₁ = ς₂ *)
-      | sk2a, SkelParam sp1
-        when not (List.mem sp1 (free_skeleton sk2a)) ->
-          let sub1 = SkelParamToSkel (sp1, sk2a) in
-          Print.debug "=========End loop============" ;
-          unify (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
-      (* int = int *)
-      | PrimSkel ps1, PrimSkel ps2 when ps1 = ps2 ->
-          Print.debug "=========End loop============" ;
-          unify (sub, paused, rest_queue)
-      (* τ₁₁ -> τ₁₂ = τ₂₁ -> τ₂₂ *)
-      | SkelArrow (ska, skb), SkelArrow (skc, skd) ->
-          Print.debug "=========End loop============" ;
-          unify
-            ( sub
-            , paused
-            , [Typed.SkelEq (ska, skc); Typed.SkelEq (skb, skd)] @ rest_queue
-            )
-      (* τ₁₁ => τ₁₂ = τ₂₁ => τ₂₂ *)
-      | SkelHandler (ska, skb), SkelHandler (skc, skd) ->
-          Print.debug "=========End loop============" ;
-          unify
-            ( sub
-            , paused
-            , [Typed.SkelEq (ska, skc); Typed.SkelEq (skb, skd)] @ rest_queue
-            )
-      | _ -> assert false )
-    (* ω : A <= B *)
-    | Typed.TyOmega (omega, tycons) -> (
-      match tycons with
-      (* ω : A <= A *)
-      | x, y when Types.types_are_equal x y ->
-          let sub1 = CoerTyParamToTyCoercion (omega, Typed.ReflTy x) in
-          Print.debug "=========End loop============" ;
-          unify (sub @ [sub1], paused, rest_queue)
-      (* ω : α <= β *)
-      (* TOM: I think this case is wrong because it does not propagate skeleton equality 
-            and is otherwise correctly subsumed by one of the two type variable cases below 
-            so we'd better get rid of it.
-
-    | (Types.TyParam a, Types.TyParam b) ->
-        Print.debug "=========End loop============";
- 	unify (sub, (cons::paused), rest_queue)
-    *)
-      (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
-      | Types.Arrow (a1, (aa1, d1)), Types.Arrow (a2, (aa2, d2)) ->
-          let new_ty_coercion_var = Params.TyCoercion.fresh () in
-          let new_ty_coercion_var_coer =
-            Typed.TyCoercionVar new_ty_coercion_var
-          in
-          let new_ty_coercion_var2 = Params.TyCoercion.fresh () in
-          let new_ty_coercion_var_coer2 =
-            Typed.TyCoercionVar new_ty_coercion_var2
-          in
-          let new_dirt_coercion_var = Params.DirtCoercion.fresh () in
-          let new_dirt_coercion_var_coer =
-            Typed.DirtCoercionVar new_dirt_coercion_var
-          in
-          let dirty_coercion_c =
-            Typed.BangCoercion
-              (new_ty_coercion_var_coer2, new_dirt_coercion_var_coer)
-          in
-          let sub1 =
-            CoerTyParamToTyCoercion
-              ( omega
-              , Typed.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
-              )
-          in
-          let ty_cons = Typed.TyOmega (new_ty_coercion_var, (a2, a1)) in
-          let ty2_cons = Typed.TyOmega (new_ty_coercion_var2, (aa1, aa2)) in
-          let dirt_cons = Typed.DirtOmega (new_dirt_coercion_var, (d1, d2)) in
-          Print.debug "=========End loop============" ;
-          unify
-            ( sub @ [sub1]
-            , paused
-            , List.append [ty_cons; ty2_cons; dirt_cons] rest_queue )
-      (* ω : D₁ => C₁ <= D₂ => C₂ *)
-      | ( Types.Handler ((a1, d1), (a11, d11))
-        , Types.Handler ((a2, d2), (a22, d22)) ) ->
-          let new_ty_coercion_var_1 = Params.TyCoercion.fresh () in
-          let new_dirt_coercion_var_2 = Params.DirtCoercion.fresh () in
-          let new_ty_coercion_var_3 = Params.TyCoercion.fresh () in
-          let new_dirt_coercion_var_4 = Params.DirtCoercion.fresh () in
-          let new_ty_coercion_var_coer_1 =
-            Typed.TyCoercionVar new_ty_coercion_var_1
-          in
-          let new_dirt_coercion_var_coer_2 =
-            Typed.DirtCoercionVar new_dirt_coercion_var_2
-          in
-          let new_ty_coercion_var_coer_3 =
-            Typed.TyCoercionVar new_ty_coercion_var_3
-          in
-          let new_dirt_coercion_var_coer_4 =
-            Typed.DirtCoercionVar new_dirt_coercion_var_4
-          in
-          let sub1 =
-            CoerTyParamToTyCoercion
-              ( omega
-              , Typed.HandlerCoercion
-                  ( Typed.BangCoercion
-                      (new_ty_coercion_var_coer_1, new_dirt_coercion_var_coer_2)
-                  , Typed.BangCoercion
-                      (new_ty_coercion_var_coer_3, new_dirt_coercion_var_coer_4)
-                  ) )
-          in
-          let cons1 = Typed.TyOmega (new_ty_coercion_var_1, (a2, a1)) in
-          let cons2 = Typed.DirtOmega (new_dirt_coercion_var_2, (d2, d1)) in
-          let cons3 = Typed.TyOmega (new_ty_coercion_var_3, (a11, a22)) in
-          let cons4 = Typed.DirtOmega (new_dirt_coercion_var_4, (d11, d22)) in
-          Print.debug "=========End loop============" ;
-          unify
-            ( sub @ [sub1]
-            , paused
-            , List.append [cons1; cons2; cons3; cons4] rest_queue )
-      (* ω : α <= A *)
-      | Types.TyParam tv, a ->
-          (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
-          let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in
-          let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
-          if skel_tv = skel_a then (
-            Print.debug "=========End loop============" ;
-            unify (sub, cons :: paused, rest_queue) )
-          else (
-            Print.debug "=========End loop============" ;
-            unify (sub, cons :: paused, SkelEq (skel_tv, skel_a) :: rest_queue) )
-      (* ω : A <= α *)
-      | a, Types.TyParam tv ->
-          (* unify_ty_vars (sub,paused,rest_queue) tv a cons *)
-          let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in
-          let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
-          if skel_tv = skel_a then (
-            Print.debug "=========End loop============" ;
-            unify (sub, cons :: paused, rest_queue) )
-          else (
-            Print.debug "=========End loop============" ;
-            unify (sub, cons :: paused, SkelEq (skel_tv, skel_a) :: rest_queue) )
-      | _ -> assert false )
-    (* ω : Δ₁ <= Δ₂ *)
-    | Typed.DirtOmega (omega, dcons) ->
-      match dcons with
-      (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
-      | {effect_set= s1; row= ParamRow v1}, {effect_set= s2; row= ParamRow v2} ->
-          if Types.EffectSet.is_empty s1 then (
-            Print.debug "=========End loop============" ;
-            unify (sub, cons :: paused, rest_queue) )
-          else
-            let omega' = Params.DirtCoercion.fresh () in
-            let diff_set = Types.EffectSet.diff s1 s2 in
-            let union_set = Types.EffectSet.union s1 s2 in
-            let sub' =
-              [ DirtVarToDirt
-                  ( v2
-                  , let open Types in
-                    {effect_set= diff_set; row= ParamRow (Params.Dirt.fresh ())}
-                  )
-              ; CoerDirtVartoDirtCoercion
-                  (omega, Typed.UnionDirt (s1, DirtCoercionVar omega')) ]
-            in
-            let new_cons =
-              Typed.DirtOmega
-                ( omega'
-                , ( Types.{effect_set= Types.EffectSet.empty; row= ParamRow v1}
-                  , Types.{effect_set= union_set; row= ParamRow v2} ) )
-            in
-            Print.debug "=========End loop============" ;
-            unify
-              (sub @ sub', [], apply_sub sub' (new_cons :: paused @ rest_queue))
-      (* ω : Ø <= Δ₂ *)
-      | {effect_set= s1; row= EmptyRow}, d
-        when Types.EffectSet.is_empty s1 ->
-          let sub1 = CoerDirtVartoDirtCoercion (omega, Typed.Empty d) in
-          Print.debug "=========End loop============" ;
-          unify (sub @ [sub1], paused, rest_queue)
-      (* ω : δ₁ <= Ø *)
-      | {effect_set= s1; row= ParamRow v1}, {effect_set= s2; row= EmptyRow}
-        when Types.EffectSet.is_empty s1 && Types.EffectSet.is_empty s2 ->
-          let sub1 =
-            [ CoerDirtVartoDirtCoercion (omega, Typed.Empty Types.empty_dirt)
-            ; DirtVarToDirt (v1, Types.empty_dirt) ]
-          in
-          Print.debug "=========End loop============" ;
-          unify (sub @ sub1, [], apply_sub sub1 (paused @ rest_queue))
-      (* ω : O₁ <= O₂ *)
-      | {effect_set= s1; row= EmptyRow}, {effect_set= s2; row= EmptyRow} ->
-          if Types.EffectSet.subset s1 s2 then
-            let sub1 =
-              CoerDirtVartoDirtCoercion
-                ( omega
-                , Typed.UnionDirt
-                    ( s2
-                    , Typed.Empty
-                        (Types.closed_dirt (Types.EffectSet.diff s2 s1)) ) )
-            in
-            Print.debug "=========End loop============" ;
-            unify (sub @ [sub1], paused, rest_queue)
-          else assert false
-      (* ω : O₁ <= O₂ ∪ δ₂ *)
-      | {effect_set= s1; row= EmptyRow}, {effect_set= s2; row= ParamRow v2} ->
-          let v2' = Params.Dirt.fresh () in
-          let sub1 =
-            [ CoerDirtVartoDirtCoercion
-                ( omega
-                , Typed.UnionDirt
-                    ( s1
-                    , Typed.Empty
-                        Types.
-                          {effect_set= EffectSet.diff s2 s1; row= ParamRow v2'}
-                    ) )
-            ; DirtVarToDirt
-                ( v2
-                , Types.{effect_set= EffectSet.diff s1 s2; row= ParamRow v2'}
-                ) ]
-          in
-          Print.debug "=========End loop============" ;
-          unify (sub @ sub1, [], apply_sub sub1 (paused @ rest_queue))
-      | _ ->
-          Print.debug "=========End loop============" ;
-          unify (sub, cons :: paused, rest_queue)
+  match queue with
+  | [] ->
+      Print.debug "=============FINAL LOOP Result============" ;
+      (sub, paused)
+  | cons :: rest_queue ->
+      let new_state =
+        match cons with
+        (* α : τ *)
+        | Typed.TyParamHasSkel (tvar, skel) ->
+            ty_param_has_skel_step sub paused cons rest_queue tvar skel
+        (* τ₁ = τ₂ *)
+        | Typed.SkelEq (sk1, sk2) ->
+            skel_eq_step sub paused cons rest_queue sk1 sk2
+        (* ω : A <= B *)
+        | Typed.TyOmega (omega, tycons) ->
+            ty_omega_step sub paused cons rest_queue omega tycons
+        (* ω : Δ₁ <= Δ₂ *)
+        | Typed.DirtOmega (omega, dcons) ->
+            dirt_omega_step sub paused cons rest_queue omega dcons
+      in
+      Print.debug "=========End loop============" ;
+      unify new_state
