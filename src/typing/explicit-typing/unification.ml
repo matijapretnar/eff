@@ -501,33 +501,16 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
   | _ -> assert false
 
 
-and ty_omega_step sub paused cons rest_queue omega tycons =
-  match tycons with
+and ty_omega_step sub paused cons rest_queue omega = function
   (* ω : A <= A *)
   | x, y when Types.types_are_equal x y ->
       let sub1 = CoerTyParamToTyCoercion (omega, Typed.ReflTy x) in
       (sub @ [sub1], paused, rest_queue)
-  (* ω : α <= β *)
-  (* TOM: I think this case is wrong because it does not propagate skeleton equality 
-            and is otherwise correctly subsumed by one of the two type variable cases below 
-            so we'd better get rid of it.
-
-    | (Types.TyParam a, Types.TyParam b) ->
-        Print.debug "=========End loop============";
-   (sub, (cons::paused), rest_queue)
-    *)
   (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
   | Types.Arrow (a1, (aa1, d1)), Types.Arrow (a2, (aa2, d2)) ->
-      let new_ty_coercion_var = Params.TyCoercion.fresh () in
-      let new_ty_coercion_var_coer = Typed.TyCoercionVar new_ty_coercion_var in
-      let new_ty_coercion_var2 = Params.TyCoercion.fresh () in
-      let new_ty_coercion_var_coer2 =
-        Typed.TyCoercionVar new_ty_coercion_var2
-      in
-      let new_dirt_coercion_var = Params.DirtCoercion.fresh () in
-      let new_dirt_coercion_var_coer =
-        Typed.DirtCoercionVar new_dirt_coercion_var
-      in
+      let new_ty_coercion_var_coer, ty_cons = fresh_ty_coer (a2, a1)
+      and new_ty_coercion_var_coer2, ty2_cons = fresh_ty_coer (aa1, aa2)
+      and new_dirt_coercion_var_coer, dirt_cons = fresh_dirt_coer (d1, d2) in
       let dirty_coercion_c =
         Typed.BangCoercion
           (new_ty_coercion_var_coer2, new_dirt_coercion_var_coer)
@@ -537,30 +520,15 @@ and ty_omega_step sub paused cons rest_queue omega tycons =
           ( omega
           , Typed.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c) )
       in
-      let ty_cons = Typed.TyOmega (new_ty_coercion_var, (a2, a1)) in
-      let ty2_cons = Typed.TyOmega (new_ty_coercion_var2, (aa1, aa2)) in
-      let dirt_cons = Typed.DirtOmega (new_dirt_coercion_var, (d1, d2)) in
       ( sub @ [sub1]
       , paused
       , List.append [ty_cons; ty2_cons; dirt_cons] rest_queue )
   (* ω : D₁ => C₁ <= D₂ => C₂ *)
   | Types.Handler ((a1, d1), (a11, d11)), Types.Handler ((a2, d2), (a22, d22)) ->
-      let new_ty_coercion_var_1 = Params.TyCoercion.fresh () in
-      let new_dirt_coercion_var_2 = Params.DirtCoercion.fresh () in
-      let new_ty_coercion_var_3 = Params.TyCoercion.fresh () in
-      let new_dirt_coercion_var_4 = Params.DirtCoercion.fresh () in
-      let new_ty_coercion_var_coer_1 =
-        Typed.TyCoercionVar new_ty_coercion_var_1
-      in
-      let new_dirt_coercion_var_coer_2 =
-        Typed.DirtCoercionVar new_dirt_coercion_var_2
-      in
-      let new_ty_coercion_var_coer_3 =
-        Typed.TyCoercionVar new_ty_coercion_var_3
-      in
-      let new_dirt_coercion_var_coer_4 =
-        Typed.DirtCoercionVar new_dirt_coercion_var_4
-      in
+      let new_ty_coercion_var_coer_1, cons1 = fresh_ty_coer (a2, a1)
+      and new_dirt_coercion_var_coer_2, cons2 = fresh_dirt_coer (d2, d1)
+      and new_ty_coercion_var_coer_3, cons3 = fresh_ty_coer (a11, a22)
+      and new_dirt_coercion_var_coer_4, cons4 = fresh_dirt_coer (d11, d22) in
       let sub1 =
         CoerTyParamToTyCoercion
           ( omega
@@ -571,23 +539,13 @@ and ty_omega_step sub paused cons rest_queue omega tycons =
                   (new_ty_coercion_var_coer_3, new_dirt_coercion_var_coer_4) )
           )
       in
-      let cons1 = Typed.TyOmega (new_ty_coercion_var_1, (a2, a1)) in
-      let cons2 = Typed.DirtOmega (new_dirt_coercion_var_2, (d2, d1)) in
-      let cons3 = Typed.TyOmega (new_ty_coercion_var_3, (a11, a22)) in
-      let cons4 = Typed.DirtOmega (new_dirt_coercion_var_4, (d11, d22)) in
       ( sub @ [sub1]
       , paused
       , List.append [cons1; cons2; cons3; cons4] rest_queue )
-  (* ω : α <= A *)
-  | Types.TyParam tv, a ->
+  (* ω : α <= A /  ω : A <= α *)
+  | Types.TyParam tv, a
+   |a, Types.TyParam tv ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
-      let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in
-      let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
-      if skel_tv = skel_a then (sub, cons :: paused, rest_queue)
-      else (sub, cons :: paused, SkelEq (skel_tv, skel_a) :: rest_queue)
-  (* ω : A <= α *)
-  | a, Types.TyParam tv ->
-      (* unify_ty_vars (sub,paused,rest_queue) tv a cons *)
       let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in
       let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
       if skel_tv = skel_a then (sub, cons :: paused, rest_queue)
