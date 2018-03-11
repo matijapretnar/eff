@@ -31,11 +31,6 @@ and dirt = {effect_set: effect_set; row: row}
 
 and row = ParamRow of Params.Dirt.t | EmptyRow
 
-and ct =
-  | LeqTy of (target_ty * target_ty)
-  | LeqDirty of (target_dirty * target_dirty)
-  | LeqDirt of (dirt * dirt)
-
 and prim_ty = IntTy | BoolTy | StringTy | FloatTy
 
 and ct_ty = (target_ty * target_ty)
@@ -136,18 +131,6 @@ and print_effect_set effect_set =
 and print_target_dirty (t1, drt1) ppf =
   let print ?at_level = Print.print ?at_level ppf in
   print "%t ! %t" (print_target_ty t1) (print_target_dirt drt1)
-
-
-and print_constraint c ppf =
-  let print ?at_level = Print.print ?at_level ppf in
-  match c with
-  | LeqTy (ty1, ty2) ->
-      print "%t <= %t" (print_target_ty ty1) (print_target_ty ty2)
-  | LeqDirty ((t1, drt1), (t2, drt2)) ->
-      print "%t ! %t <= %t ! %t" (print_target_ty t1) (print_target_dirt drt1)
-        (print_target_ty t2) (print_target_dirt drt2)
-  | LeqDirt (d1, d2) ->
-      print "%t <= %t" (print_target_dirt d1) (print_target_dirt d2)
 
 
 and print_ct_ty (ty1, ty2) ppf =
