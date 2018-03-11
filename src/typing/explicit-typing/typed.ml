@@ -824,3 +824,9 @@ let fresh_ty_with_skel () =
 let fresh_ty_coer cons =
   let param = Params.TyCoercion.fresh () in
   (TyCoercionVar param, TyOmega (param, cons))
+
+
+let fresh_dirty_coer ((ty1, drt1), (ty2, drt2)) =
+  let ty_coer, ty_cons = fresh_ty_coer (ty1, ty2)
+  and dirt_coer, dirt_cons = fresh_dirt_coer (drt1, drt2) in
+  (BangCoercion (ty_coer, dirt_coer), ty_cons, dirt_cons)

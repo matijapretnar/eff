@@ -509,11 +509,8 @@ and ty_omega_step sub paused cons rest_queue omega = function
   (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
   | Types.Arrow (a1, (aa1, d1)), Types.Arrow (a2, (aa2, d2)) ->
       let new_ty_coercion_var_coer, ty_cons = fresh_ty_coer (a2, a1)
-      and new_ty_coercion_var_coer2, ty2_cons = fresh_ty_coer (aa1, aa2)
-      and new_dirt_coercion_var_coer, dirt_cons = fresh_dirt_coer (d1, d2) in
-      let dirty_coercion_c =
-        Typed.BangCoercion
-          (new_ty_coercion_var_coer2, new_dirt_coercion_var_coer)
+      and dirty_coercion_c, ty2_cons, dirt_cons =
+        fresh_dirty_coer ((aa1, d1), (aa2, d2))
       in
       let sub1 =
         CoerTyParamToTyCoercion
@@ -524,20 +521,12 @@ and ty_omega_step sub paused cons rest_queue omega = function
       , paused
       , List.append [ty_cons; ty2_cons; dirt_cons] rest_queue )
   (* ω : D₁ => C₁ <= D₂ => C₂ *)
-  | Types.Handler ((a1, d1), (a11, d11)), Types.Handler ((a2, d2), (a22, d22)) ->
-      let new_ty_coercion_var_coer_1, cons1 = fresh_ty_coer (a2, a1)
-      and new_dirt_coercion_var_coer_2, cons2 = fresh_dirt_coer (d2, d1)
-      and new_ty_coercion_var_coer_3, cons3 = fresh_ty_coer (a11, a22)
-      and new_dirt_coercion_var_coer_4, cons4 = fresh_dirt_coer (d11, d22) in
+  | Types.Handler (drty11, drty12), Types.Handler (drty21, drty22) ->
+      let drty_coer1, cons1, cons2 = fresh_dirty_coer (drty21, drty11)
+      and drty_coer2, cons3, cons4 = fresh_dirty_coer (drty12, drty22) in
       let sub1 =
         CoerTyParamToTyCoercion
-          ( omega
-          , Typed.HandlerCoercion
-              ( Typed.BangCoercion
-                  (new_ty_coercion_var_coer_1, new_dirt_coercion_var_coer_2)
-              , Typed.BangCoercion
-                  (new_ty_coercion_var_coer_3, new_dirt_coercion_var_coer_4) )
-          )
+          (omega, Typed.HandlerCoercion (drty_coer1, drty_coer2))
       in
       ( sub @ [sub1]
       , paused
