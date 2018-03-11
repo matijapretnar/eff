@@ -352,34 +352,6 @@ let apply_sub1 c_list sub1 =
 (* apply substitution-list to a list of constraints *)
 let rec apply_sub sub c_list = List.fold_left apply_sub1 c_list sub
 
-let rec free_skeleton sk =
-  match sk with
-  | SkelParam p -> [p]
-  | PrimSkel _ -> []
-  | SkelArrow (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
-  | SkelHandler (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
-  | ForallSkel (p, sk1) ->
-      let free_a = free_skeleton sk1 in
-      List.filter (fun x -> not (List.mem x [p])) free_a
-
-
-let rec free_target_ty t =
-  match t with
-  | TyParam x -> [x]
-  | Arrow (a, c) -> free_target_ty a @ free_target_dirty c
-  | Tuple tup -> List.flatten (List.map free_target_ty tup)
-  | Handler (c1, c2) -> free_target_dirty c1 @ free_target_dirty c2
-  | PrimTy _ -> []
-  | QualTy (_, a) -> assert false
-  | QualDirt (_, a) -> assert false
-  | TySchemeTy (ty_param, _, a) ->
-      let free_a = free_target_ty a in
-      List.filter (fun x -> not (List.mem x [ty_param])) free_a
-  | TySchemeDirt (dirt_param, a) -> free_target_ty a
-
-
-and free_target_dirty (a, d) = free_target_ty a
-
 let rec print_c_list = function
   | [] -> Print.debug "---------------------"
   | e :: l ->
@@ -420,66 +392,6 @@ let rec skeleton_of_target_ty tty conslist =
       SkelHandler
         (skeleton_of_target_ty a1 conslist, skeleton_of_target_ty a2 conslist)
   | PrimTy pt -> PrimSkel pt
-
-
-let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
-  match t with
-  | TyParam x -> (
-    match OldUtils.lookup x ty_sbst with
-    | Some x' -> ((ty_sbst, dirt_sbst), TyParam x')
-    | None ->
-        let y = Params.Ty.fresh () in
-        ((OldUtils.update x y ty_sbst, dirt_sbst), TyParam y) )
-  | Arrow (a, c) ->
-      let (a_ty_sbst, a_dirt_sbst), a' =
-        refresh_target_ty (ty_sbst, dirt_sbst) a
-      in
-      let temp_ty_sbst = a_ty_sbst @ ty_sbst in
-      let temp_dirt_sbst = a_dirt_sbst @ dirt_sbst in
-      let (c_ty_sbst, c_dirt_sbst), c' =
-        refresh_target_dirty (temp_ty_sbst, temp_dirt_sbst) c
-      in
-      ((c_ty_sbst, c_dirt_sbst), Arrow (a', c'))
-  | Tuple tup -> ((ty_sbst, dirt_sbst), t)
-  | Handler (c1, c2) ->
-      let (c1_ty_sbst, c1_dirt_sbst), c1' =
-        refresh_target_dirty (ty_sbst, dirt_sbst) c1
-      in
-      let temp_ty_sbst = c1_ty_sbst @ ty_sbst in
-      let temp_dirt_sbst = c1_dirt_sbst @ dirt_sbst in
-      let (c2_ty_sbst, c2_dirt_sbst), c2' =
-        refresh_target_dirty (temp_ty_sbst, temp_dirt_sbst) c2
-      in
-      ((c2_ty_sbst, c2_dirt_sbst), Handler (c1', c2'))
-  | PrimTy x -> ((ty_sbst, dirt_sbst), PrimTy x)
-  | QualTy (_, a) -> assert false
-  | QualDirt (_, a) -> assert false
-  | TySchemeTy (ty_param, _, a) -> assert false
-  | TySchemeDirt (dirt_param, a) -> assert false
-
-
-and refresh_target_dirty (ty_sbst, dirt_sbst) (t, d) =
-  let (t_ty_sbst, t_dirt_sbst), t' =
-    refresh_target_ty (ty_sbst, dirt_sbst) t
-  in
-  let temp_ty_sbst = t_ty_sbst @ ty_sbst in
-  let temp_dirt_sbst = t_dirt_sbst @ dirt_sbst in
-  let (d_ty_sbst, d_dirt_sbst), d' =
-    refresh_target_dirt (temp_ty_sbst, temp_dirt_sbst) d
-  in
-  ((d_ty_sbst, d_dirt_sbst), (t', d'))
-
-
-and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
-  match drt.row with
-  | ParamRow x -> (
-    match OldUtils.lookup x dirt_sbst with
-    | Some x' -> ((ty_sbst, dirt_sbst), {drt with row= ParamRow x'})
-    | None ->
-        let y = Params.Dirt.fresh () in
-        ((ty_sbst, OldUtils.update x y dirt_sbst), {drt with row= ParamRow y})
-    )
-  | EmptyRow -> ((ty_sbst, dirt_sbst), drt)
 
 
 let rec union_find_tyvar tyvar acc c_list =
