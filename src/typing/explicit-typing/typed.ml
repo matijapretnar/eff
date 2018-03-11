@@ -816,9 +816,14 @@ let fresh_dirt_coer cons =
   (DirtCoercionVar param, DirtOmega (param, cons))
 
 
-let fresh_ty_with_skel () =
-  let ty_var = Params.Ty.fresh () and skel_var = Params.Skel.fresh () in
-  (Types.TyParam ty_var, TyParamHasSkel (ty_var, Types.SkelParam skel_var))
+let fresh_ty_with_skel skel =
+  let ty_var = Params.Ty.fresh () in
+  (Types.TyParam ty_var, TyParamHasSkel (ty_var, skel))
+
+
+let fresh_ty_with_fresh_skel () =
+  let skel_var = Params.Skel.fresh () in
+  fresh_ty_with_skel (Types.SkelParam skel_var)
 
 
 let fresh_ty_coer cons =

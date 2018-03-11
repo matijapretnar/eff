@@ -616,7 +616,7 @@ and type_plain_expr in_cons st = function
   | Untyped.Lambda a ->
       Print.debug "in infer lambda" ;
       let p, c = a in
-      let in_ty, in_ty_skel = Typed.fresh_ty_with_skel () in
+      let in_ty, in_ty_skel = Typed.fresh_ty_with_fresh_skel () in
       let new_in_cons = in_ty_skel :: in_cons in
       let Untyped.PVar x = p.Untyped.term in
       let target_pattern = type_pattern p in
@@ -649,10 +649,10 @@ and type_plain_expr in_cons st = function
       let out_dirt_var = Params.Dirt.fresh () in
       let in_dirt = Types.fresh_dirt ()
       and out_dirt = Types.no_effect_dirt out_dirt_var
-      and in_ty, skel_cons_in = Typed.fresh_ty_with_skel ()
-      and out_ty, skel_cons_out = Typed.fresh_ty_with_skel () in
+      and in_ty, skel_cons_in = Typed.fresh_ty_with_fresh_skel ()
+      and out_ty, skel_cons_out = Typed.fresh_ty_with_fresh_skel () in
       let target_type = Types.Handler ((in_ty, in_dirt), (out_ty, out_dirt)) in
-      let r_ty, r_ty_skel_cons = Typed.fresh_ty_with_skel () in
+      let r_ty, r_ty_skel_cons = Typed.fresh_ty_with_fresh_skel () in
       let r_cons = r_ty_skel_cons :: in_cons in
       let pr, cr = h.value_clause in
       let Untyped.PVar x = pr.Untyped.term in
@@ -875,7 +875,7 @@ and type_plain_comp in_cons st = function
       *)
       (* TODO: ignoring the substitutions for now *)
       let e', ty_A, cons0, sigma0 = type_expr in_cons st e in
-      let ty_alpha, q_alpha = Typed.fresh_ty_with_skel () in
+      let ty_alpha, q_alpha = Typed.fresh_ty_with_fresh_skel () in
       let dirt_delta = Types.fresh_dirt () in
       let cases', cons1, sigma1 =
         type_cases (q_alpha :: cons0) st cases ty_A (ty_alpha, dirt_delta)
@@ -920,7 +920,7 @@ and type_plain_comp in_cons st = function
        *)
       | _
       ->
-        let new_ty_var, cons1 = Typed.fresh_ty_with_skel () in
+        let new_ty_var, cons1 = Typed.fresh_ty_with_fresh_skel () in
         let fresh_dirty_ty = Types.make_dirty new_ty_var in
         let cons2 =
           ( Unification.apply_substitution_ty subs_e2 tt_1
@@ -938,8 +938,8 @@ and type_plain_comp in_cons st = function
         , [cons1; omega_cons_1] @ constraints_2
         , subs_e2 @ subs_e1 ) )
   | Untyped.Handle (e, c) ->
-      let alpha_1, cons_skel_1 = Typed.fresh_ty_with_skel () in
-      let alpha_2, cons_skel_2 = Typed.fresh_ty_with_skel () in
+      let alpha_1, cons_skel_1 = Typed.fresh_ty_with_fresh_skel () in
+      let alpha_2, cons_skel_2 = Typed.fresh_ty_with_fresh_skel () in
       let delta_1 = Types.fresh_dirt () in
       let delta_2 = Types.fresh_dirt () in
       let dirty_1 = (alpha_1, delta_1) in
@@ -1161,7 +1161,7 @@ and get_handler_op_clause eff abs2 in_st in_cons in_sub =
   let Untyped.PVar x_var = x.Untyped.term in
   let Untyped.PVar k_var = k.Untyped.term in
   let alpha_i_param = Params.Ty.fresh () in
-  let alpha_i, alpha_cons = Typed.fresh_ty_with_skel () in
+  let alpha_i, alpha_cons = Typed.fresh_ty_with_fresh_skel () in
   let alpha_dirty = Types.make_dirty alpha_i in
   let st_subbed = apply_sub_to_env in_st in_sub in
   let temp_st = add_def st_subbed x_var in_op_ty in

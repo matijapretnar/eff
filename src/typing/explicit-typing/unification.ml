@@ -442,30 +442,22 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
       (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
   (* α : τ₁ -> τ₂ *)
   | SkelArrow (sk1, sk2) ->
-      let ty_p1 = Params.Ty.fresh () in
-      let ty_p2 = Params.Ty.fresh () in
-      let tvar1 = Types.TyParam ty_p1 in
-      let tvar2 = Types.TyParam ty_p2 in
-      let dvar1 = Types.fresh_dirt () in
+      let tvar1, cons1 = Typed.fresh_ty_with_skel sk1
+      and tvar2, cons2 = Typed.fresh_ty_with_skel sk2
+      and dvar1 = Types.fresh_dirt () in
       let sub1 = TyParamToTy (tvar, Types.Arrow (tvar1, (tvar2, dvar1))) in
-      let cons1 = TyParamHasSkel (ty_p1, sk1) in
-      let cons2 = TyParamHasSkel (ty_p2, sk2) in
       ( sub @ [sub1]
       , []
       , [cons1; cons2] @ apply_sub [sub1] (rest_queue @ paused) )
   (* α : τ₁ => τ₂ *)
   | SkelHandler (sk1, sk2) ->
-      let ty_p1 = Params.Ty.fresh () in
-      let ty_p2 = Params.Ty.fresh () in
-      let tvar1 = Types.TyParam ty_p1 in
-      let tvar2 = Types.TyParam ty_p2 in
-      let dvar1 = Types.fresh_dirt () in
-      let dvar2 = Types.fresh_dirt () in
+      let tvar1, cons1 = Typed.fresh_ty_with_skel sk1
+      and tvar2, cons2 = Typed.fresh_ty_with_skel sk2
+      and dvar1 = Types.fresh_dirt ()
+      and dvar2 = Types.fresh_dirt () in
       let sub1 =
         TyParamToTy (tvar, Types.Handler ((tvar1, dvar1), (tvar2, dvar2)))
       in
-      let cons1 = TyParamHasSkel (ty_p1, sk1) in
-      let cons2 = TyParamHasSkel (ty_p2, sk2) in
       ( sub @ [sub1]
       , []
       , [cons1; cons2] @ apply_sub [sub1] (rest_queue @ paused) )
