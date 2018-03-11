@@ -468,13 +468,9 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
   match (sk1, sk2) with
   (* ς = ς *)
   | SkelParam sp1, SkelParam sp2 when sp1 = sp2 -> (sub, paused, rest_queue)
-  (* ς₁ = τ₂ *)
+  (* ς₁ = τ₂ / τ₁ = ς₂ *)
   | SkelParam sp1, sk2a
-    when not (List.mem sp1 (free_skeleton sk2a)) ->
-      let sub1 = SkelParamToSkel (sp1, sk2a) in
-      (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
-  (* τ₁ = ς₂ *)
-  | sk2a, SkelParam sp1
+   |sk2a, SkelParam sp1
     when not (List.mem sp1 (free_skeleton sk2a)) ->
       let sub1 = SkelParamToSkel (sp1, sk2a) in
       (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
@@ -573,17 +569,15 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
       (sub @ sub1, [], apply_sub sub1 (paused @ rest_queue))
   (* ω : O₁ <= O₂ *)
   | {effect_set= s1; row= EmptyRow}, {effect_set= s2; row= EmptyRow} ->
-      if Types.EffectSet.subset s1 s2 then
-        let sub1 =
-          CoerDirtVartoDirtCoercion
-            ( omega
-            , Typed.UnionDirt
-                ( s2
-                , Typed.Empty (Types.closed_dirt (Types.EffectSet.diff s2 s1))
-                ) )
-        in
-        (sub @ [sub1], paused, rest_queue)
-      else assert false
+      assert (Types.EffectSet.subset s1 s2) ;
+      let sub1 =
+        CoerDirtVartoDirtCoercion
+          ( omega
+          , Typed.UnionDirt
+              (s2, Typed.Empty (Types.closed_dirt (Types.EffectSet.diff s2 s1)))
+          )
+      in
+      (sub @ [sub1], paused, rest_queue)
   (* ω : O₁ <= O₂ ∪ δ₂ *)
   | {effect_set= s1; row= EmptyRow}, {effect_set= s2; row= ParamRow v2} ->
       let v2' = Params.Dirt.fresh () in
