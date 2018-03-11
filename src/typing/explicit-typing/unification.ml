@@ -394,33 +394,6 @@ let rec skeleton_of_target_ty tty conslist =
   | PrimTy pt -> PrimSkel pt
 
 
-let rec union_find_tyvar tyvar acc c_list =
-  (*   Print.debug "In uf";	
-  Print.debug "The Type Variable : %t" (Params.Ty.print tyvar);
-  Print.debug "The accumilator : -------------";
-  print_var_list acc;
-  print_c_list c_list;
-  Print.debug "-------------end UF----------------"; *)
-  match c_list with
-  | [] -> tyvar :: acc
-  | x :: xs ->
-    match x with
-    | Typed.TyOmega (_, tycons) -> (
-      match tycons with
-      | Types.TyParam a, Types.TyParam b when a = tyvar ->
-          if List.mem b acc then union_find_tyvar tyvar acc xs
-          else
-            OldUtils.uniq
-              (union_find_tyvar b acc xs @ union_find_tyvar tyvar acc xs)
-      | Types.TyParam b, Types.TyParam a when a = tyvar ->
-          if List.mem b acc then union_find_tyvar tyvar acc xs
-          else
-            OldUtils.uniq
-              (union_find_tyvar b acc xs @ union_find_tyvar tyvar acc xs)
-      | _ -> union_find_tyvar tyvar acc xs )
-    | _ -> union_find_tyvar tyvar acc xs
-
-
 let rec fix_union_find fixpoint c_list =
   Print.debug "--------------start list-------" ;
   print_var_list fixpoint ;
@@ -750,28 +723,3 @@ let rec unify (sub, paused, queue) =
       | _ ->
           Print.debug "=========End loop============" ;
           unify (sub, cons :: paused, rest_queue)
-
-and unify_ty_vars (sub, paused, rest_queue) tv a cons =
-  let dependent_tyvars = fix_union_find [tv] paused in
-  let free_a = free_target_ty a in
-  (*     let dependent_tyvars = (union_find_tyvar tv [] paused) in *)
-  let s1 = set_of_list free_a in
-  let s2 = set_of_list dependent_tyvars in
-  if not (STyParams.is_empty (STyParams.inter s1 s2)) then assert false
-  else
-    let mapper_f x =
-      let (_, _), a' = refresh_target_ty ([], []) a in
-      TyParamToTy (x, a')
-    in
-    let sub' = List.map mapper_f dependent_tyvars in
-    let paused' = dependent_constraints dependent_tyvars [] paused in
-    (*   Print.debug "Paused' = ";
-  print_c_list paused'; 
-  Print.debug "end Paused --"; *)
-    let new_paused = OldUtils.diff paused paused' in
-    let sub_queue = apply_sub sub' rest_queue in
-    let sub_paused' = apply_sub sub' paused' in
-    let [cons'] = apply_sub sub' [cons] in
-    let new_queue = (sub_queue @ sub_paused') @ [cons'] in
-    Print.debug "=========End loops============" ;
-    unify (sub @ sub', new_paused, new_queue)
