@@ -707,7 +707,7 @@ and type_plain_comp in_cons st = function
       in
       (Typed.Match (e', cases'), (ty_alpha, dirt_delta), cons1, sigma0 @ sigma1)
       (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  | Untyped.Apply (e1, e2) -> (
+  | Untyped.Apply (e1, e2) ->
       Print.debug "in infer apply" ;
       let typed_e1, tt_1, constraints_1, subs_e1 = type_expr in_cons st e1 in
       let st_subbed = apply_sub_to_env st subs_e1 in
@@ -716,52 +716,23 @@ and type_plain_comp in_cons st = function
       in
       Print.debug "e1 apply type : %t" (Types.print_target_ty tt_1) ;
       Print.debug "e2 apply type : %t" (Types.print_target_ty tt_2) ;
-      match typed_e1.term
-      with
-      (* | Typed.Effect (eff, (eff_in,eff_out)) ->
-           let cons1 = (tt_2, eff_in) in
-           let coer1, omega_cons_1 = Typed.fresh_ty_coer cons1 in
-           let e2_coerced = Typed.annotate (Typed.CastExp (typed_e2,coer1)) typed_e1.location in
-           let constraints = List.append [omega_cons_1] constraints_2 in
-           let dirt_of_out_ty = Types.EffectSet.singleton eff in 
-           let new_var = Typed.Variable.fresh "cont_bind" in
-           let continuation_comp = Untyped.Value ( Untyped.annotate (Untyped.Var new_var) typed_e2.location ) in 
-           let new_st = add_def st new_var eff_out in 
-           let (typed_cont_comp, typed_cont_comp_dirty_ty, cont_comp_cons, cont_comp_subs)= 
-                    type_comp in_cons new_st (Untyped.annotate continuation_comp typed_e2.location) in 
-           let (typed_comp_ty,typed_comp_dirt) = typed_cont_comp_dirty_ty in 
-           let final_dirt = 
-              begin match typed_comp_dirt with 
-              | Types.SetVar (s,dv) -> Types.SetVar (Types.effect_set_union s (Types.EffectSet.singleton eff), dv)
-              | Types.SetEmpty s -> Types.SetEmpty (Types.effect_set_union s (Types.EffectSet.singleton eff))
-              end in 
-          let cont_abstraction = Typed.annotate ((Typed.annotate (Typed.PVar new_var) typed_e2.location), typed_cont_comp) 
-                                 typed_e2.location in
-          Print.debug "THE FINAL DIRT :- %t" (Types.print_target_dirt final_dirt);
-          ( Typed.Call( (eff, (eff_in,eff_out)) ,e2_coerced, cont_abstraction ),
-            (typed_comp_ty,final_dirt),
-            cont_comp_cons @ constraints,
-             [])
-       *)
-      | _
-      ->
-        let new_ty_var, cons1 = Typed.fresh_ty_with_fresh_skel () in
-        let fresh_dirty_ty = Types.make_dirty new_ty_var in
-        let cons2 =
-          ( Unification.apply_substitution_ty subs_e2 tt_1
-          , Types.Arrow (tt_2, fresh_dirty_ty) )
-        in
-        let omega_1, omega_cons_1 = Typed.fresh_ty_coer cons2 in
-        let e1_coerced =
-          Typed.annotate
-            (Typed.CastExp
-               (Unification.apply_substitution_exp subs_e2 typed_e1, omega_1))
-            typed_e1.location
-        in
-        ( Typed.Apply (e1_coerced, typed_e2)
-        , fresh_dirty_ty
-        , [cons1; omega_cons_1] @ constraints_2
-        , subs_e2 @ subs_e1 ) )
+      let new_ty_var, cons1 = Typed.fresh_ty_with_fresh_skel () in
+      let fresh_dirty_ty = Types.make_dirty new_ty_var in
+      let cons2 =
+        ( Unification.apply_substitution_ty subs_e2 tt_1
+        , Types.Arrow (tt_2, fresh_dirty_ty) )
+      in
+      let omega_1, omega_cons_1 = Typed.fresh_ty_coer cons2 in
+      let e1_coerced =
+        Typed.annotate
+          (Typed.CastExp
+             (Unification.apply_substitution_exp subs_e2 typed_e1, omega_1))
+          typed_e1.location
+      in
+      ( Typed.Apply (e1_coerced, typed_e2)
+      , fresh_dirty_ty
+      , [cons1; omega_cons_1] @ constraints_2
+      , subs_e2 @ subs_e1 )
   | Untyped.Handle (e, c) ->
       let (alpha_1, delta_1), cons_skel_1 =
         Typed.fresh_dirty_with_fresh_skel ()
