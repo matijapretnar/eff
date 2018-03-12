@@ -845,3 +845,172 @@ let fresh_dirty_coer ((ty1, drt1), (ty2, drt2)) =
   let ty_coer, ty_cons = fresh_ty_coer (ty1, ty2)
   and dirt_coer, dirt_cons = fresh_dirt_coer (drt1, drt2) in
   (BangCoercion (ty_coer, dirt_coer), ty_cons, dirt_cons)
+
+
+let constraint_free_ty_vars = function
+  | TyOmega (_, (Types.TyParam a, Types.TyParam b)) -> TyParamSet.of_list [a; b]
+  | TyOmega (_, (Types.TyParam a, _)) -> TyParamSet.singleton a
+  | TyOmega (_, (_, Types.TyParam a)) -> TyParamSet.singleton a
+  | _ -> TyParamSet.empty
+
+
+let constraint_free_row_vars = function
+  | Types.ParamRow p -> DirtVarSet.singleton p
+  | Types.EmptyRow -> DirtVarSet.empty
+
+
+let constraint_free_dirt_vars = function
+  | DirtOmega (_, (drt1, drt2)) ->
+      DirtVarSet.union
+        (constraint_free_row_vars drt1.Types.row)
+        (constraint_free_row_vars drt2.Types.row)
+
+
+let rec free_ty_vars_ty = function
+  | Types.TyParam x -> [x]
+  | Types.Arrow (a, c) -> free_ty_vars_ty a @ free_ty_var_dirty c
+  | Types.Tuple tup -> List.flatten (List.map free_ty_vars_ty tup)
+  | Types.Handler (c1, c2) -> free_ty_var_dirty c1 @ free_ty_var_dirty c2
+  | Types.PrimTy _ -> []
+  | Types.QualTy (_, a) -> free_ty_vars_ty a
+  | Types.QualDirt (_, a) -> free_ty_vars_ty a
+  | Types.TySchemeTy (ty_param, _, a) ->
+      let free_a = free_ty_vars_ty a in
+      List.filter (fun x -> not (List.mem x [ty_param])) free_a
+  | Types.TySchemeDirt (dirt_param, a) -> free_ty_vars_ty a
+
+
+and free_ty_var_dirty (a, _) = free_ty_vars_ty a
+
+let rec free_dirt_vars_ty = function
+  | Types.Arrow (a, c) -> free_dirt_vars_ty a @ free_dirt_vars_dirty c
+  | Types.Tuple tup -> List.flatten (List.map free_dirt_vars_ty tup)
+  | Types.Handler (c1, c2) -> free_dirt_vars_dirty c1 @ free_dirt_vars_dirty c2
+  | Types.QualTy (_, a) -> free_dirt_vars_ty a
+  | Types.QualDirt (_, a) -> free_dirt_vars_ty a
+  | Types.TySchemeTy (ty_param, _, a) -> free_dirt_vars_ty a
+  | Types.TySchemeDirt (dirt_param, a) ->
+      let free_a = free_dirt_vars_ty a in
+      List.filter (fun x -> not (List.mem x [dirt_param])) free_a
+  | _ -> []
+
+
+and free_dirt_vars_dirty (a, d) = free_dirt_vars_dirt d
+
+and free_dirt_vars_dirt drt =
+  DirtVarSet.elements (constraint_free_row_vars drt.Types.row)
+
+
+let rec state_free_ty_vars st =
+  List.fold_right
+    (fun (_, ty) acc -> List.append (free_ty_vars_ty ty) acc)
+    st []
+
+
+let rec state_free_dirt_vars st =
+  List.fold_right
+    (fun (_, ty) acc -> List.append (free_dirt_vars_ty ty) acc)
+    st []
+
+
+(* free dirt variables in target terms *)
+
+let rec free_dirt_vars_expression e =
+  match e.term with
+  | Var _ -> []
+  | BuiltIn _ -> []
+  | Const _ -> []
+  | Tuple es -> List.concat (List.map free_dirt_vars_expression es)
+  | Record _ -> assert false
+  | Variant _ -> assert false
+  | Lambda (pat, ty, c) -> free_dirt_vars_ty ty @ free_dirt_vars_computation c
+  | Effect _ -> []
+  | Handler h -> free_dirt_vars_abstraction_with_ty h.value_clause
+  | BigLambdaTy (tp, sk, e) -> free_dirt_vars_expression e
+  | BigLambdaDirt (dp, e) ->
+      List.filter (fun x -> not (x == dp)) (free_dirt_vars_expression e)
+  | BigLambdaSkel (skp, e) -> free_dirt_vars_expression e
+  | CastExp (e, tc) ->
+      free_dirt_vars_expression e @ free_dirt_vars_ty_coercion tc
+  | ApplyTyExp (e, ty) -> free_dirt_vars_expression e @ free_dirt_vars_ty ty
+  | LambdaTyCoerVar (tcp, ctty, e) -> free_dirt_vars_expression e
+  | LambdaDirtCoerVar (dcp, ctd, e) -> free_dirt_vars_expression e
+  | ApplyDirtExp (e, d) -> free_dirt_vars_expression e @ free_dirt_vars_dirt d
+  | ApplySkelExp (e, sk) -> free_dirt_vars_expression e
+  | ApplyTyCoercion (e, tc) ->
+      free_dirt_vars_expression e @ free_dirt_vars_ty_coercion tc
+  | ApplyDirtCoercion (e, dc) ->
+      free_dirt_vars_expression e @ free_dirt_vars_dirt_coercion dc
+
+and free_dirt_vars_computation c =
+  match c.term with
+  | Value e -> free_dirt_vars_expression e
+  | LetVal (e, (p, ty, c)) ->
+      free_dirt_vars_expression e @ free_dirt_vars_computation c
+  | LetRec _ -> assert false
+  | Match (e, cases) ->
+      free_dirt_vars_expression e
+      @ List.concat (List.map free_dirt_vars_abstraction cases)
+  | Apply (e1, e2) ->
+      free_dirt_vars_expression e1 @ free_dirt_vars_expression e2
+  | Handle (e, c) -> free_dirt_vars_expression e @ free_dirt_vars_computation c
+  | Call (_, e, awty) -> assert false
+  | Op (_, e) -> free_dirt_vars_expression e
+  | Bind (c, a) -> free_dirt_vars_computation c @ free_dirt_vars_abstraction a
+  | CastComp (c, dc) ->
+      free_dirt_vars_computation c @ free_dirt_vars_dirty_coercion dc
+  | CastComp_ty (c, tc) ->
+      free_dirt_vars_computation c @ free_dirt_vars_ty_coercion tc
+  | CastComp_dirt (c, dc) ->
+      free_dirt_vars_computation c @ free_dirt_vars_dirt_coercion dc
+
+and free_dirt_vars_abstraction {term= _, c} = free_dirt_vars_computation c
+
+and free_dirt_vars_abstraction_with_ty {term= _, ty, c} =
+  free_dirt_vars_ty ty @ free_dirt_vars_computation c
+
+and free_dirt_vars_ty_coercion = function
+  | ReflTy ty -> free_dirt_vars_ty ty
+  | ArrowCoercion (tc, dc) ->
+      free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirty_coercion dc
+  | HandlerCoercion (dc1, dc2) ->
+      free_dirt_vars_dirty_coercion dc1 @ free_dirt_vars_dirty_coercion dc2
+  | TyCoercionVar tcp -> []
+  | SequenceTyCoer (tc1, tc2) ->
+      free_dirt_vars_ty_coercion tc1 @ free_dirt_vars_ty_coercion tc2
+  | TupleCoercion tcs -> List.flatten (List.map free_dirt_vars_ty_coercion tcs)
+  | LeftArrow tc -> free_dirt_vars_ty_coercion tc
+  | ForallTy (_, tc) -> free_dirt_vars_ty_coercion tc
+  | ApplyTyCoer (tc, ty) ->
+      free_dirt_vars_ty_coercion tc @ free_dirt_vars_ty ty
+  | ForallDirt (dp, tc) ->
+      List.filter (fun x -> not (x == dp)) (free_dirt_vars_ty_coercion tc)
+  | ApplyDirCoer (tc, d) ->
+      free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirt d
+  | PureCoercion dc -> free_dirt_vars_dirty_coercion dc
+  | QualTyCoer (ctty, tc) -> free_dirt_vars_ty_coercion tc
+  | QualDirtCoer (ctd, tc) -> free_dirt_vars_ty_coercion tc
+  | ApplyQualTyCoer (tc1, tc2) ->
+      free_dirt_vars_ty_coercion tc1 @ free_dirt_vars_ty_coercion tc2
+  | ApplyQualDirtCoer (tc, dc) ->
+      free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirt_coercion dc
+  | ForallSkel (skp, tc) -> free_dirt_vars_ty_coercion tc
+  | ApplySkelCoer (tc, sk) -> free_dirt_vars_ty_coercion tc
+
+and free_dirt_vars_dirt_coercion = function
+  | ReflDirt d -> free_dirt_vars_dirt d
+  | DirtCoercionVar dcv -> []
+  | Empty d -> free_dirt_vars_dirt d
+  | UnionDirt (_, dc) -> free_dirt_vars_dirt_coercion dc
+  | SequenceDirtCoer (dc1, dc2) ->
+      free_dirt_vars_dirt_coercion dc1 @ free_dirt_vars_dirt_coercion dc2
+  | DirtCoercion dc -> free_dirt_vars_dirty_coercion dc
+
+and free_dirt_vars_dirty_coercion = function
+  | BangCoercion (tc, dc) ->
+      free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirt_coercion dc
+  | RightArrow tc -> free_dirt_vars_ty_coercion tc
+  | RightHandler tc -> free_dirt_vars_ty_coercion tc
+  | LeftHandler tc -> free_dirt_vars_ty_coercion tc
+  | SequenceDirtyCoer (dc1, dc2) ->
+      free_dirt_vars_dirty_coercion dc1 @ free_dirt_vars_dirty_coercion dc2

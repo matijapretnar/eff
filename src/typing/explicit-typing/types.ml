@@ -4,6 +4,9 @@ module EffectSet = Set.Make (struct
   let compare = compare
 end)
 
+module TyParamSet = Set.Make (Params.Ty)
+module DirtVarSet = Set.Make (Params.Dirt)
+
 type effect_set = EffectSet.t
 
 type skeleton =
