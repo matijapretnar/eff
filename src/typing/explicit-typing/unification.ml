@@ -417,21 +417,6 @@ let rec fix_union_find fixpoint c_list =
   else fix_union_find sort_new_fixpoint c_list
 
 
-let rec dependent_constraints dep_list acc c_list =
-  (*   Print.debug "In dc"; *)
-  match c_list with
-  | [] -> acc
-  | x :: xs ->
-    match x with
-    | Typed.TyOmega (_, tycons) -> (
-      match tycons with
-      | Types.TyParam a, Types.TyParam b
-        when List.mem a dep_list && List.mem b dep_list ->
-          dependent_constraints dep_list (x :: acc) xs
-      | _ -> dependent_constraints dep_list acc xs )
-    | _ -> dependent_constraints dep_list acc xs
-
-
 let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
   match skel with
   (* α : ς *)

@@ -821,9 +821,19 @@ let fresh_ty_with_skel skel =
   (Types.TyParam ty_var, TyParamHasSkel (ty_var, skel))
 
 
+let fresh_dirty_with_skel skel =
+  let ty, cons = fresh_ty_with_skel skel and drt = Types.fresh_dirt () in
+  ((ty, drt), cons)
+
+
 let fresh_ty_with_fresh_skel () =
   let skel_var = Params.Skel.fresh () in
   fresh_ty_with_skel (Types.SkelParam skel_var)
+
+
+let fresh_dirty_with_fresh_skel () =
+  let skel_var = Params.Skel.fresh () in
+  fresh_dirty_with_skel (Types.SkelParam skel_var)
 
 
 let fresh_ty_coer cons =

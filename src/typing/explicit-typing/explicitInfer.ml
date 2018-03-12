@@ -938,10 +938,12 @@ and type_plain_comp in_cons st = function
         , [cons1; omega_cons_1] @ constraints_2
         , subs_e2 @ subs_e1 ) )
   | Untyped.Handle (e, c) ->
-      let alpha_1, cons_skel_1 = Typed.fresh_ty_with_fresh_skel () in
-      let alpha_2, cons_skel_2 = Typed.fresh_ty_with_fresh_skel () in
-      let delta_1 = Types.fresh_dirt () in
-      let delta_2 = Types.fresh_dirt () in
+      let (alpha_1, delta_1), cons_skel_1 =
+        Typed.fresh_dirty_with_fresh_skel ()
+      in
+      let (alpha_2, delta_2), cons_skel_2 =
+        Typed.fresh_dirty_with_fresh_skel ()
+      in
       let dirty_1 = (alpha_1, delta_1) in
       let dirty_2 = (alpha_2, delta_2) in
       let typed_exp, exp_type, exp_constraints, sub_exp =
