@@ -14,6 +14,23 @@ let unit_value = Tuple []
 
 let unit_result = Value unit_value
 
+let first = function
+  | Tuple (x::xs) -> x
+  | _ -> Error.runtime "tuple's first value expected."
+  
+let second = function
+  | Tuple (x::y::xs)-> y
+  | _ -> Error.runtime "tuple's second value expected."
+
+let to_in_channel = function
+   | Const (Const.In_channel b) -> b
+   | _ -> Error.runtime "A in_channel value expected."
+
+let to_out_channel = function
+ | Const (Const.Out_channel b) -> b
+ | _ -> Error.runtime "A out_channel value expected."
+
+
 let to_bool = function
   | Const Const.Boolean b -> b
   | _ -> Error.runtime "A boolean value expected."

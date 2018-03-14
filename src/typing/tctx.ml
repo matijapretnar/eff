@@ -10,7 +10,9 @@ type tydef =
 type tyctx = (OldUtils.tyname, Type.ty_param list * tydef) OldUtils.assoc
 
 let initial : tyctx =
-  [ ("bool", ([], Inline T.bool_ty))
+  [ ("in_channel", ([], Inline T.in_channel_ty))
+  ; ("out_channel", ([], Inline T.out_channel_ty))
+  ; ("bool", ([], Inline T.bool_ty))
   ; ("unit", ([], Inline T.unit_ty))
   ; ("int", ([], Inline T.int_ty))
   ; ("string", ([], Inline T.string_ty))

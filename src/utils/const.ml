@@ -1,4 +1,14 @@
-type t = Integer of int | String of string | Boolean of bool | Float of float
+type t =
+  | Integer of int
+  | String of string
+  | Boolean of bool
+  | Float of float
+  | In_channel of in_channel
+  | Out_channel of out_channel
+
+
+let of_in_channel n = In_channel n
+let of_out_channel n = Out_channel n
 
 let of_integer n = Integer n
 
@@ -18,6 +28,8 @@ let print c ppf =
   | String s -> Format.fprintf ppf "%S" s
   | Boolean b -> Format.fprintf ppf "%B" b
   | Float f -> Format.fprintf ppf "%F" f
+  | In_channel f -> Format.fprintf ppf "<In channel>"
+  | Out_channel f -> Format.fprintf ppf "<Out channel>" 
 
 
 let compare c1 c2 =

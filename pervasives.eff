@@ -7,6 +7,20 @@ external ( < ) : 'a -> 'a -> bool = "<"
 
 effect Print : string -> unit
 effect Read : unit -> string
+
+(*********** files effects *********)
+effect Open_in : string -> in_channel
+effect Open_out : string -> out_channel
+
+effect Close_in : in_channel -> unit
+effect Close_out : out_channel -> unit
+
+effect Write_file : (out_channel * string) -> unit
+effect Read_file : string -> string
+
+effect Read_line : in_channel -> string
+(***********************************)
+
 effect Raise : string -> empty
 effect Random_int : int -> int
 effect Random_float: float -> float

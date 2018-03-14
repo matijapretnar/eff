@@ -14,6 +14,12 @@ val unit_value : value
 
 val unit_result : result
 
+val first : value -> value
+val second : value -> value
+
+val to_out_channel : value -> out_channel
+val to_in_channel : value -> in_channel
+
 val to_bool : value -> bool
 
 val to_int : value -> int

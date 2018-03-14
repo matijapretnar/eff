@@ -43,6 +43,8 @@ let ty_of_const = function
   | Const.String _ -> Type.string_ty
   | Const.Boolean _ -> Type.bool_ty
   | Const.Float _ -> Type.float_ty
+  | Const.Out_channel _ -> Type.out_channel_ty
+  | Const.In_channel _ -> Type.in_channel_ty
 
 
 (* [infer_pattern cstr pp] infers the type of pattern [pp]. It returns the list of
