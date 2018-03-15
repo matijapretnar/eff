@@ -9,13 +9,13 @@ let help_text =
 type state =
   { runtime: Eval.state
   ; explicit_typing: ExplicitInfer.state
-  ; type_checker: TypeChecker.checker_state
+  ; type_checker: TypeChecker.state
   ; typing: SimpleInfer.t }
 
 let initial_state =
   { runtime= Eval.empty
   ; explicit_typing= ExplicitInfer.empty
-  ; type_checker= TypeChecker.new_checker_state
+  ; type_checker= TypeChecker.initial_state
   ; typing= SimpleInfer.empty }
 
 
@@ -31,7 +31,7 @@ let rec exec_cmd ppf st cmd =
             st.explicit_typing c
         in
         let ty, drt =
-          TypeChecker.type_check_comp st.type_checker ct.Typed.term
+          TypeChecker.type_of_computation st.type_checker ct.Typed.term
         in
         let v = Eval.run st.runtime c in
         Format.fprintf ppf "@[- : %t ! %t = %t@]@." (Types.print_target_ty ty)
@@ -51,7 +51,7 @@ let rec exec_cmd ppf st cmd =
             st.explicit_typing c
         in
         let ty, drt =
-          TypeChecker.type_check_comp st.type_checker ct.Typed.term
+          TypeChecker.type_of_computation st.type_checker ct.Typed.term
         in
         Format.fprintf ppf "@[- : %t ! %t@]@." (Types.print_target_ty ty)
           (Types.print_target_dirt drt) ;
@@ -118,8 +118,7 @@ let rec exec_cmd ppf st cmd =
             { st.explicit_typing with
               ExplicitInfer.context=
                 TypingEnv.update st.explicit_typing.context x new_ty }
-        ; type_checker=
-            TypeChecker.extend_state_term_vars st.type_checker x new_ty
+        ; type_checker= TypeChecker.extend_var_types st.type_checker x new_ty
         ; runtime= Eval.update x v st.runtime }
     | None -> Error.runtime "unknown external symbol %s." f )
   | CoreSyntax.Tydef tydefs ->
@@ -167,21 +166,26 @@ let compile_file ppf filename st =
     let loc = cmd.CoreSyntax.location in
     match cmd.CoreSyntax.term with
     | CoreSyntax.Computation c ->
-        Print.debug "Compiling: %t" (CoreSyntax.print_computation c);
+        Print.debug "Compiling: %t" (CoreSyntax.print_computation c) ;
         let ct, explicit_typing =
           ExplicitInfer.type_toplevel ~loc st.explicit_typing c
         in
-        Print.debug "-- After Type Inference ----------------------------------------";
-        Print.debug "%t" (Typed.print_computation ct);
+        Print.debug
+          "-- After Type Inference ----------------------------------------" ;
+        Print.debug "%t" (Typed.print_computation ct) ;
         let ct =
           if !Config.disable_optimization then ct
           else Optimize.optimize_main_comp st.type_checker ct
         in
-        Print.debug "-- After Optimization ------------------------------------------";
-        Print.debug "%t" (Typed.print_computation ct);
-        let ct_ty, ct_dirt = TypeChecker.type_check_comp st.type_checker ct.term in
-        Print.debug "Type from Type Checker : %t ! %t" (Types.print_target_ty ct_ty) (Types.print_target_dirt ct_dirt) ;
- 
+        Print.debug
+          "-- After Optimization ------------------------------------------" ;
+        Print.debug "%t" (Typed.print_computation ct) ;
+        let ct_ty, ct_dirt =
+          TypeChecker.type_of_computation st.type_checker ct.term
+        in
+        Print.debug "Type from Type Checker : %t ! %t"
+          (Types.print_target_ty ct_ty)
+          (Types.print_target_dirt ct_dirt) ;
         let erasure_ct = Erasure.typed_to_erasure_comp [] ct in
         NewPrint.print_computation erasure_ct out_ppf ;
         Format.fprintf out_ppf "\n;;\n " ;
@@ -199,14 +203,15 @@ let compile_file ppf filename st =
       match OldUtils.lookup f External.values with
       | Some v ->
           let new_ty = ExplicitInfer.source_to_target ty in
+          Print.print out_ppf "let %t = ( %s )" (NewPrint.print_variable x) f ;
+          Format.fprintf out_ppf "\n;;\n " ;
           { st with
             typing= SimpleCtx.extend st.typing x (Type.free_params ty, ty)
           ; explicit_typing=
               { st.explicit_typing with
                 ExplicitInfer.context=
                   TypingEnv.update st.explicit_typing.context x new_ty }
-          ; type_checker=
-              TypeChecker.extend_state_term_vars st.type_checker x new_ty
+          ; type_checker= TypeChecker.extend_var_types st.type_checker x new_ty
           ; runtime= Eval.update x v st.runtime }
       | None -> Error.runtime "unknown external symbol %s." f )
     | _ -> st

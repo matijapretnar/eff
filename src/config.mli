@@ -20,12 +20,6 @@ type pervasives =
 val pervasives_file : pervasives ref
 (** Location of the pervasives file *)
 
-val effect_annotations : bool ref
-(** Should effect annotations be printed? *)
-
-val disable_beautify : bool ref
-(** Should beautification of types be disabled? *)
-
 val disable_typing : bool ref
 (** Should type-checking be disabled? *)
 
@@ -50,9 +44,6 @@ val verbosity : int ref
     - 2 errors and check
     - 3 errors, check, and warnings
     - 4 errors, check, warnings, and debug messages *)
-
-val smart_print : bool ref
-(** Should we use smart printing for type schemes? *)
 
 val pure_print : bool ref
 (** Should we use pure printing for computations? *)

@@ -69,7 +69,7 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
   let compare (n1, _) (n2, _) = Pervasives.compare n1 n2
 
   let new_fresh () =
-    let count = ref 0 in
+    let count = ref (-1) in
     let fresh ann = incr count ; (!count, ann) in
     fresh
 

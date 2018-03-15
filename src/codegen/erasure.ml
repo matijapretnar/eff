@@ -1,15 +1,5 @@
 (** Syntax of the core language. *)
 
-type e_ty =
-  | ETyvar of Params.ETy.t
-  | Arrow of e_ty * e_ty
-  | Tuple of e_ty list
-  | Handler of e_ty * e_ty
-  | PrimTy of prim_ty
-  | TySchemeTy of Params.ETy.t * e_ty
-
-and prim_ty = IntTy | BoolTy | StringTy | FloatTy
-
 module Variable = Symbol.Make (Symbol.String)
 module EffectMap = Map.Make (String)
 
@@ -76,7 +66,7 @@ and e_abstraction2 = (e_pattern * e_pattern * e_computation) annotation
 
 let rec typed_to_erasure_ty sub typed_ty =
   match typed_ty with
-  | Types.Tyvar p -> (
+  | Types.TyParam p -> (
     match OldUtils.lookup p sub with Some x' -> x' | None -> assert false )
   | Types.Arrow (t1, (t2, drt)) ->
       let t1' = typed_to_erasure_ty sub t1 in
@@ -166,8 +156,7 @@ and typed_to_erasure_comp' sub tt =
       let e' = typed_to_erasure_exp sub e in
       let abs' = typed_to_erasure_abs_with_ty sub abs in
       ECall (eff, e', abs')
-  | Typed.Op (eff,e) ->
-      assert false
+  | Typed.Op (eff, e) -> assert false
   | Typed.Bind (c, a) ->
       let c' = typed_to_erasure_comp sub c in
       let a' = typed_to_erasure_abs sub a in

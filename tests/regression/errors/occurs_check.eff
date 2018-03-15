@@ -1,1 +1,1 @@
-#type let rec f x = f in f;;
+let rec f x = f in f;;
