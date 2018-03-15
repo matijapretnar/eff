@@ -79,6 +79,42 @@ and plain_command =
   | Quit  (** [#quit] *)
   | TypeOf of computation  (** [#type t] *)
 
+let rec contains_variable_expression var { term = e } = 
+  contains_variable_plain_expression var e
+
+and contains_variable_plain_expression var = function
+  | Var var' -> var = var'
+  | Const _  -> false
+  | Tuple es -> List.exists (contains_variable_expression var) es
+  | Record lab_e_assoc -> List.exists (fun (lab,e) -> contains_variable_expression var e) lab_e_assoc
+  | Variant (lab,e_option) -> OldUtils.map_default (contains_variable_expression var) false e_option
+  | Lambda abs -> contains_variable_abs var abs
+  | Effect _ -> false
+  | Handler h -> contains_variable_handler var h
+
+and contains_variable_abs var (pat, c) =
+  contains_variable_comp var c
+
+and contains_variable_comp var {term = c} =
+  contains_variable_plain_comp var c
+
+and contains_variable_plain_comp var = function
+  | Value e -> contains_variable_expression var e
+  | Let (([pat,c1]),c2) -> contains_variable_comp var c1 || contains_variable_comp var c2
+  | LetRec ([(v,abs)],c) -> contains_variable_abs var abs || contains_variable_comp var c
+  | Match (e,abs_list) -> contains_variable_expression var e || List.exists (contains_variable_abs var) abs_list
+  | Apply (e1,e2) -> contains_variable_expression var e1 || contains_variable_expression var e2
+  | Handle (e,c) -> contains_variable_expression var e || contains_variable_comp var c
+  | Check c -> contains_variable_comp var c
+
+and contains_variable_handler var { effect_clauses = eff_abs2_assoc; value_clause = abs1; finally_clause = abs2 } =
+     List.exists (fun (eff,abs2) -> contains_variable_abs2 var abs2) eff_abs2_assoc
+  || contains_variable_abs var abs1
+  || contains_variable_abs var abs2
+
+and contains_variable_abs2 var (pat1,pat2,c) =
+  contains_variable_comp var c
+
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p.term with
