@@ -238,7 +238,8 @@ and free_dirt_vars_computation c =
   | Typed.Value e -> free_dirt_vars_expression e
   | Typed.LetVal (e, (p, ty, c)) ->
       free_dirt_vars_expression e @ free_dirt_vars_computation c
-  | Typed.LetRec _ -> assert false
+  | Typed.LetRec ([(var,e)],c) -> 
+     free_dirt_vars_expression e @ free_dirt_vars_computation c 
   | Typed.Match (e, cases) -> 
       free_dirt_vars_expression e @ List.concat (List.map free_dirt_vars_abstraction cases)
   | Typed.Apply (e1, e2) ->
@@ -396,29 +397,37 @@ let rec get_sub_of_ty ty_sch =
   match ty_sch with
   | Types.TySchemeSkel (s, t) ->
       let new_s = Params.Skel.fresh () in
-      let skels, tys, dirts = get_sub_of_ty t in
-      ((s, new_s) :: skels, tys, dirts)
+      let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
+      ((s, new_s) :: skels, tys, dirts, tycos, dcos)
   | Types.TySchemeTy (p, _, t) ->
       let new_p = Params.Ty.fresh () in
-      let skels, tys, dirts = get_sub_of_ty t in
-      (skels, (p, new_p) :: tys, dirts)
+      let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
+      (skels, (p, new_p) :: tys, dirts, tycos, dcos)
   | Types.TySchemeDirt (p, t) ->
       let new_p = Params.Dirt.fresh () in
-      let skels, tys, dirts = get_sub_of_ty t in
-      (skels, tys, (p, new_p) :: dirts)
-  | _ -> ([], [], [])
+      let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
+      (skels, tys, (p, new_p) :: dirts, tycos, dcos)
+  | Types.QualTy ((p,ct), t)  ->
+      let new_p = Params.TyCoercion.fresh () in
+      let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
+      (skels, tys, dirts, (p,new_p)::tycos, dcos)
+  | Types.QualDirt ((p,ct), t) ->
+      let new_p = Params.DirtCoercion.fresh () in
+      let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
+      (skels, tys, dirts, tycos, (p,new_p)::dcos)
+  | _ -> ([], [], [], [], [])
 
 
 let rec get_basic_type ty_sch =
   match ty_sch with
-  | Types.TySchemeSkel (_, t) -> get_basic_type t
+  | Types.TySchemeSkel (_, t)     -> get_basic_type t
   | Types.TySchemeTy (typ, sk, t) ->
       let a, b = get_basic_type t in
       ((typ, sk) :: a, b)
-  | Types.TySchemeDirt (_, t) -> get_basic_type t
-  | Types.QualTy (_, t) -> get_basic_type t
-  | Types.QualDirt (_, t) -> get_basic_type t
-  | t -> ([], t)
+  | Types.TySchemeDirt (_, t)     -> get_basic_type t
+  | Types.QualTy (_, t)           -> get_basic_type t
+  | Types.QualDirt (_, t)         -> get_basic_type t
+  | t                             -> ([], t)
 
 
 let rec apply_sub_to_type ty_subs dirt_subs ty =
@@ -455,6 +464,7 @@ and apply_sub_to_dirt dirt_subs ty =
 
 let rec get_applied_cons_from_ty ty_subs dirt_subs ty =
   match ty with
+  | Types.TySchemeSkel (_, t) -> get_applied_cons_from_ty ty_subs dirt_subs t
   | Types.TySchemeTy (_, _, t) -> get_applied_cons_from_ty ty_subs dirt_subs t
   | Types.TySchemeDirt (_, t) -> get_applied_cons_from_ty ty_subs dirt_subs t
   | Types.QualTy (cons, t) ->
@@ -489,7 +499,7 @@ let rec get_skel_constraints alphas_has_skels ty_subs skel_subs =
   | [] -> []
 
 
-let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
+let apply_types alphas_has_skels skel_subs ty_subs dirt_subs bind_tyco_subs bind_dco_subs var ty_sch =
   let new_skel_subs =
     List.map
       (fun (a, b) -> Unification.SkelVarToSkel (a, Types.SkelVar b))
@@ -569,26 +579,15 @@ and type_plain_expr in_cons st = function
   | Untyped.Var x -> (
     match TypingEnv.lookup st.context x with
     | Some ty_schi ->
-        let bind_skelvar_sub, bind_tyvar_sub, bind_dirtvar_sub =
-          get_sub_of_ty ty_schi
-        in
-        Print.debug "in Var" ;
-        Print.debug " var : %t" (Typed.print_variable x) ;
-        Print.debug " typeSch: %t " (Types.print_target_ty ty_schi) ;
+        let bind_skelvar_sub, bind_tyvar_sub, bind_dirtvar_sub, bind_tyco_sub, bind_dco_sub = get_sub_of_ty ty_schi in
         let alphas_has_skels, basic_type = get_basic_type ty_schi in
-        Print.debug "basicTy: %t" (Types.print_target_ty basic_type) ;
-        let applied_basic_type =
-          apply_sub_to_type bind_tyvar_sub bind_dirtvar_sub basic_type
-        in
-        let returned_x, returnd_cons =
-          apply_types alphas_has_skels bind_skelvar_sub bind_tyvar_sub
-            bind_dirtvar_sub x ty_schi
-        in
+        let applied_basic_type = apply_sub_to_type bind_tyvar_sub bind_dirtvar_sub basic_type in
+        let returned_x, returnd_cons = apply_types alphas_has_skels bind_skelvar_sub bind_tyvar_sub bind_dirtvar_sub bind_tyco_sub bind_dco_sub x ty_schi in
         Print.debug "returned: %t" (Typed.print_expression returned_x) ;
-        Print.debug "returned_type: %t"
-          (Types.print_target_ty applied_basic_type) ;
+        Print.debug "returned_type: %t" (Types.print_target_ty applied_basic_type) ;
         (returned_x.term, applied_basic_type, returnd_cons @ in_cons, [])
     | None ->
+        Print.debug "Variable not found: %t" (Typed.print_variable x);
         assert false
         (* in fact it is not yet implemented, but assert false gives us source location automatically *)
     )
@@ -1156,8 +1155,124 @@ and type_plain_comp in_cons st = function
               , constraints
               , subs_c2 @ subs_c1 )
           | pat -> assert false )
-  | Untyped.LetRec (defs, c) -> assert false
-(* in fact it is not yet implemented, but assert false gives us source location automatically *)
+  | Untyped.LetRec ([(var,abs)], c2) when not (Untyped.contains_variable_abs var abs) -> 
+       assert false
+  | Untyped.LetRec ([(var,abs)], c2) -> 
+      (*
+
+         α, β, δ, ς₁, ς₂ fresh
+         Q₁,α:ς₁,β:ς₂ ; Γ, (f : α -> β ! δ), (x : α) |- c₁ : A₁ ! Δ₁ | Q₂; σ₁ ~> c₁'
+
+         (σ₂,Q₃) = solve(●;●;Q₂,ω₁:A₁<=β,ω₂:Δ₁<=δ)
+         (ςs,αs:τs,δѕ,ωs:πs,Q₅) = split(σ₂(σ₁(Γ)), Q₃, σ₂(A₁))
+         c1'' = σ₂(σ₁([f ςs αs δѕ ωs |> <α> -> ω₁ ! ω₂ / f]c1'))
+         Q₅; σ₂(σ₁(Γ)), (f : ∀ςs.∀(αs:τs).∀δѕ.πs=>σ₂(A₁) |- c₂: A₂ ! Δ₂ | Q₆; σ₃ ~> c₂'
+         -------------------------------------------------------------------------------------------
+         Q₁; Γ |- let rec f x = c₁ in c₂ : A₂ ! Δ₂ | Q₆; σ₃.σ₂.σ₁
+           ~> let rec f = σ₃(Λςs.Λ(αs:τs).Λδѕ.λ(ωs:πs).fun x : σ₃(σ₂(σ₁(α))) -> c₁'') in c₂'
+
+       *)
+      let ty_a, q_a     = fresh_ty_with_skel () in 
+      let ty_b, q_b     = fresh_ty_with_skel () in 
+      let dirt_d        = fresh_dirt() in 
+      let st1           = add_def st var (Types.Arrow (ty_a,(ty_b,dirt_d))) in
+      let cons1         = q_a :: q_b :: in_cons in
+      let ((pat',c1'), (ty_a', (ty_A1,dirt_D1)), cons2, sub_s1) = type_abs cons1 st1 abs ty_a in
+      let tyco1, q_ty   = fresh_ty_coer (ty_A1,ty_b) in
+      let dco2,  q_d    = fresh_dirt_coer (dirt_D1,dirt_d) in
+      let sub_s2, cons3 = Unification.unify ([], [], q_ty :: q_d :: cons2) in
+      let st2           = apply_sub_to_env st (sub_s1 @ sub_s2) in
+      let ty_A1'        = Unification.apply_substitution_ty sub_s2 ty_A1 in  
+      let ( skvars
+          , tyvars
+          , dirtvars
+          , cons4
+          , cons5 ) = splitter (TypingEnv.return_context st2.context) cons3 ty_A1' 
+      in
+      let ty_f = 
+            List.fold_right
+              (fun skvar ty -> Types.TySchemeSkel (skvar,ty))
+              skvars
+              (List.fold_right
+                 (fun tyvar ty -> Types.TySchemeTy (tyvar,Unification.get_skel_of_tyvar tyvar cons3,ty))
+                 tyvars
+                 (List.fold_right
+                   (fun dirtvar ty -> Types.TySchemeDirt (dirtvar,ty))
+                   dirtvars
+                   (List.fold_right
+                     (fun q ty ->
+                        match q with
+                        | Typed.TyOmega (_, ct)   -> Types.QualTy (ct, ty)
+                        | Typed.DirtOmega (_, ct) -> Types.QualDirt (ct, ty)
+                     )
+                    cons4 
+                    ty_A1'
+                   )
+                 )
+              )
+      in
+      let st3 = add_def st2 var ty_f in
+      let c2', dty2, cons6, sub_s3 = type_comp cons5 st3 c2 in
+      
+      let e_rec = (* f ςs αs δѕ ωs |> <α> -> ω₁ ! ω₂ *)
+            Typed.CastExp
+              (List.fold_right
+                 (fun q e ->
+                    match q with
+                    | Typed.TyOmega (tycovar, ct)  -> Typed.annotate (Typed.ApplyTyCoercion (e, TyCoercionVar tycovar)) Location.unknown
+                    | Typed.DirtOmega (dcovar, ct) -> Typed.annotate (Typed.ApplyDirtCoercion (e, DirtCoercionVar dcovar)) Location.unknown
+                 )
+                 cons4
+                 (List.fold_right
+                    (fun dv e -> Typed.annotate (Typed.ApplyDirtExp (e,no_effect_dirt dv)) Location.unknown)
+                    dirtvars 
+                    (List.fold_right
+                       (fun tv e -> Typed.annotate (Typed.ApplyTyExp (e,Types.Tyvar tv)) Location.unknown)
+                       tyvars
+                       (List.fold_right
+                          (fun skv e -> Typed.annotate (Typed.ApplySkelExp (e,Types.SkelVar skv)) Location.unknown)
+                          skvars
+                          (Typed.annotate (Typed.Var var) Location.unknown)
+                       )
+                    )
+                 )
+              ,ArrowCoercion (ReflTy (Unification.apply_substitution_ty sub_s2 ty_a'),BangCoercion (tyco1,dco2)))
+          
+      in
+      let c1'' = (* c1'' = σ₂(σ₁([e_rec / f]c1')) *)
+        Unification.apply_substitution (sub_s1 @ sub_s2)
+          (Typed.subst_comp [(var,e_rec)] c1')
+      in
+      let e_f =  (* σ₃(Λςs.Λ(αs:τs).Λδѕ.λ(ωs:πs).fun x : σ₃(σ₂(σ₁(α))) -> c₁'') *)
+            Unification.apply_substitution_exp sub_s3
+              (List.fold_right
+                 (fun skvar e -> Typed.annotate (Typed.BigLambdaSkel (skvar,e)) c1''.location)
+                 skvars
+                 (List.fold_right
+                    (fun tyvar e -> Typed.annotate (Typed.BigLambdaTy (tyvar,Unification.get_skel_of_tyvar tyvar cons3,e)) c1''.location)
+                    tyvars
+                    (List.fold_right
+                      (fun dirtvar e -> Typed.annotate (Typed.BigLambdaDirt (dirtvar,e)) c1''.location)
+                      dirtvars
+                      (List.fold_right
+                        (fun q e ->
+                           match q with
+                           | Typed.TyOmega (tycovar, ct)  -> Typed.annotate (Typed.LambdaTyCoerVar (tycovar, ct, e)) c1''.location
+                           | Typed.DirtOmega (dcovar, ct) -> Typed.annotate (Typed.LambdaDirtCoerVar (dcovar, ct, e)) c1''.location
+                        )
+                        cons4 
+                        (Typed.annotate (Typed.Lambda (pat',Unification.apply_substitution_ty sub_s2 ty_a',c1'')) c1''.location)
+                      )
+                    )
+                 )
+              )
+      in
+      (Typed.LetRec ([(var,e_f)],c2'), dty2, cons6, sub_s1 @ sub_s2 @ sub_s3)
+
+and type_abs in_cons st (pat,comp) ty_in =
+  let pat', st', cons1 = type_pattern' in_cons st pat ty_in in
+  let comp', dty, out_cons, sub_list = type_comp cons1 st' comp in
+  ((pat',comp'), (Unification.apply_substitution_ty sub_list ty_in,dty), out_cons, sub_list)
 
 and get_handler_op_clause eff abs2 in_st in_cons in_sub =
   let in_op_ty, out_op_ty = Untyped.EffectMap.find eff in_st.effects in
