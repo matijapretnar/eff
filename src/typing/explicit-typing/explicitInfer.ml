@@ -230,8 +230,8 @@ and free_dirt_vars_computation c =
   | Typed.Value e -> free_dirt_vars_expression e
   | Typed.LetVal (e, (p, ty, c)) ->
       free_dirt_vars_expression e @ free_dirt_vars_computation c
-  | Typed.LetRec ([(var,e)],c) -> 
-     free_dirt_vars_expression e @ free_dirt_vars_computation c 
+  | Typed.LetRec ([(var,ty,e)],c) -> 
+     free_dirt_vars_ty ty @ free_dirt_vars_expression e @ free_dirt_vars_computation c 
   | Typed.Match (e, cases) -> 
       free_dirt_vars_expression e @ List.concat (List.map free_dirt_vars_abstraction cases)
   | Typed.Apply (e1, e2) ->
@@ -572,6 +572,7 @@ and type_plain_expr in_cons st = function
         let applied_basic_type = apply_sub_to_type bind_tyvar_sub bind_dirtvar_sub basic_type in
         let returned_x, returnd_cons = apply_types alphas_has_skels bind_skelvar_sub bind_tyvar_sub bind_dirtvar_sub bind_tyco_sub bind_dco_sub x ty_schi in
         Print.debug "returned: %t" (Typed.print_expression returned_x) ;
+        Print.debug "original_type: %t" (Types.print_target_ty ty_schi) ;
         Print.debug "returned_type: %t" (Types.print_target_ty applied_basic_type) ;
         (returned_x.term, applied_basic_type, returnd_cons @ in_cons, [])
     | None ->
@@ -1134,7 +1135,7 @@ and type_plain_comp in_cons st = function
          (σ₂,Q₃) = solve(●;●;Q₂,ω₁:A₁<=β,ω₂:Δ₁<=δ)
          (ςs,αs:τs,δѕ,ωs:πs,Q₅) = split(σ₂(σ₁(Γ)), Q₃, σ₂(A₁))
          c1'' = σ₂(σ₁([f ςs αs δѕ ωs |> <α> -> ω₁ ! ω₂ / f]c1'))
-         Q₅; σ₂(σ₁(Γ)), (f : ∀ςs.∀(αs:τs).∀δѕ.πs=>σ₂(A₁) |- c₂: A₂ ! Δ₂ | Q₆; σ₃ ~> c₂'
+         Q₅; σ₂(σ₁(Γ)), (f : ∀ςs.∀(αs:τs).∀δѕ.πs=>σ₂(σ₁(α))->σ₂(A₁!Δ₁) |- c₂: A₂ ! Δ₂ | Q₆; σ₃ ~> c₂'
          -------------------------------------------------------------------------------------------
          Q₁; Γ |- let rec f x = c₁ in c₂ : A₂ ! Δ₂ | Q₆; σ₃.σ₂.σ₁
            ~> let rec f = σ₃(Λςs.Λ(αs:τs).Λδѕ.λ(ωs:πs).fun x : σ₃(σ₂(σ₁(α))) -> c₁'') in c₂'
@@ -1174,36 +1175,37 @@ and type_plain_comp in_cons st = function
                         | Typed.DirtOmega (_, ct) -> Types.QualDirt (ct, ty)
                      )
                     cons4 
-                    ty_A1'
+                    (Types.Arrow (Unification.apply_substitution_ty sub_s2 ty_a',(ty_A1',(Unification.apply_substitution_dirt sub_s2 dirt_D1))))
                    )
                  )
               )
       in
       let st3 = add_def st2 var ty_f in
       let c2', dty2, cons6, sub_s3 = type_comp cons5 st3 c2 in
+      let ty_f' = Unification.apply_substitution_ty sub_s3 ty_f in
       
       let e_rec = (* f ςs αs δѕ ωs |> <α> -> ω₁ ! ω₂ *)
             Typed.CastExp
-              (List.fold_right
-                 (fun q e ->
+              (List.fold_left
+                 (fun e q ->
                     match q with
                     | Typed.TyOmega (tycovar, ct)  -> Typed.annotate (Typed.ApplyTyCoercion (e, TyCoercionVar tycovar)) Location.unknown
                     | Typed.DirtOmega (dcovar, ct) -> Typed.annotate (Typed.ApplyDirtCoercion (e, DirtCoercionVar dcovar)) Location.unknown
                  )
-                 cons4
-                 (List.fold_right
-                    (fun dv e -> Typed.annotate (Typed.ApplyDirtExp (e,Types.no_effect_dirt dv)) Location.unknown)
-                    dirtvars 
-                    (List.fold_right
-                       (fun tv e -> Typed.annotate (Typed.ApplyTyExp (e,Types.TyParam tv)) Location.unknown)
-                       tyvars
-                       (List.fold_right
-                          (fun skv e -> Typed.annotate (Typed.ApplySkelExp (e,Types.SkelParam skv)) Location.unknown)
-                          skvars
+                 (List.fold_left
+                    (fun e dv -> Typed.annotate (Typed.ApplyDirtExp (e,Types.no_effect_dirt dv)) Location.unknown)
+                    (List.fold_left
+                       (fun e tv -> Typed.annotate (Typed.ApplyTyExp (e,Types.TyParam tv)) Location.unknown)
+                       (List.fold_left
+                          (fun e skv -> Typed.annotate (Typed.ApplySkelExp (e,Types.SkelParam skv)) Location.unknown)
                           (Typed.annotate (Typed.Var var) Location.unknown)
+                          skvars
                        )
+                       tyvars
                     )
+                    dirtvars 
                  )
+                 cons4
               ,ArrowCoercion (ReflTy (Unification.apply_substitution_ty sub_s2 ty_a'),BangCoercion (tyco1,dco2)))
           
       in
@@ -1235,7 +1237,7 @@ and type_plain_comp in_cons st = function
                  )
               )
       in
-      (Typed.LetRec ([(var,e_f)],c2'), dty2, cons6, sub_s1 @ sub_s2 @ sub_s3)
+      (Typed.LetRec ([(var,ty_f',e_f)],c2'), dty2, cons6, sub_s1 @ sub_s2 @ sub_s3)
 
 and type_abs in_cons st (pat,comp) ty_in =
   let pat', st', cons1 = type_pattern' in_cons st pat ty_in in

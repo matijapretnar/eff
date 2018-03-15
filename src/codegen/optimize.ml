@@ -388,7 +388,9 @@ and optimize_sub_comp st c =
         let PVar var = p.term in
         let st' = extend_var_type st var ty in
         LetVal (optimize_expr st e1, (p, ty, optimize_comp st' c1))
-    | LetRec (bindings, c1) -> assert false
+    | LetRec ([(var,ty,e1)], c1) -> 
+        let st' = extend_var_type st var ty in
+        LetRec ([(var,ty,optimize_expr st' e1)],optimize_comp st' c1)
     | Match (e1, abstractions) ->
         let ty = TypeChecker.type_of_expression st.tc_state e1.term in
         Match

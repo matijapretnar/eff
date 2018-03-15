@@ -101,7 +101,7 @@ and computation = plain_computation annotation
 and plain_computation =
   | Value of expression
   | LetVal of expression * (pattern * Types.target_ty * computation)
-  | LetRec of (variable * expression) list * computation
+  | LetRec of (variable * Types.target_ty * expression) list * computation
   | Match of expression * abstraction list
   | Apply of expression * expression
   | Handle of expression * computation
@@ -400,8 +400,8 @@ and print_top_let_abstraction (p, c) ppf =
         (print_computation ~max_level:0 c)
 
 
-and print_let_rec_abstraction (x, e) ppf =
-  Format.fprintf ppf "%t = %t" (print_variable x) (print_expression e)
+and print_let_rec_abstraction (x, ty, e) ppf =
+  Format.fprintf ppf "%t : %t = %t" (print_variable x) (print_target_ty ty) (print_expression e)
 
 
 let backup_location loc locs =
@@ -473,13 +473,13 @@ and refresh_comp' sbst = function
   | LetRec (li, c1) ->
       let new_xs, sbst' =
         List.fold_right
-          (fun (x, _) (new_xs, sbst') ->
+          (fun (x, _, _) (new_xs, sbst') ->
             let x' = Variable.refresh x in
             (x' :: new_xs, OldUtils.update x x' sbst') )
           li ([], sbst)
       in
       let li' =
-        List.combine new_xs (List.map (fun (_, e) -> refresh_expr sbst' e) li)
+        List.map (fun (x',(ty,e)) -> (x',ty,e)) (List.combine new_xs (List.map (fun (_, ty, e) -> (ty,refresh_expr sbst' e)) li))
       in
       LetRec (li', refresh_comp sbst' c1)
   | Match (e, li) -> Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
@@ -553,9 +553,9 @@ and subst_comp' sbst = function
   | LetRec (li, c1) ->
       let li' =
         List.map
-          (fun (x, e) ->
+          (fun (x, ty, e) ->
             (* XXX Should we check that x does not appear in sbst? *)
-            (x, subst_expr sbst e) )
+            (x, ty, subst_expr sbst e) )
           li
       in
       LetRec (li', subst_comp sbst c1)
@@ -737,7 +737,7 @@ let rec free_vars_comp c =
   | LetRec (li, c1) ->
       let xs, vars =
         List.fold_right
-          (fun (x, e) (xs, vars) -> (x :: xs, free_vars_expr e @@@ vars))
+          (fun (x, ty, e) (xs, vars) -> (x :: xs, free_vars_expr e @@@ vars))
           li ([], free_vars_comp c1)
       in
       vars --- xs

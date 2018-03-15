@@ -387,6 +387,10 @@ and type_of_computation st c =
       let dc11, dc2 = type_of_dirty_coercion st dc in
       assert (Types.dirty_types_are_equal c1_drty_ty dc11) ;
       dc2
+  | LetRec ([(var,ty,e1)],c1) ->
+      let st' = extend_var_types st var ty in 
+      assert (Types.types_are_equal ty (type_of_expression st' e1.term));
+      type_of_computation st' c1.term
   | _ -> failwith "Not yet implemented"
 
 and type_of_handler st h =
