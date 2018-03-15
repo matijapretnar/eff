@@ -179,7 +179,7 @@ and apply_sub_plain_comp sub c =
   | LetVal (e1, (p, ty, c1)) ->
       LetVal
         (apply_sub_exp sub e1, (p, apply_sub_ty sub ty, apply_sub_comp sub c1))
-  | LetRec (l, c1) -> assert false (* LetRec (l, c1) *)
+  | LetRec ([(var,e1)], c1) -> LetRec ([(var,apply_sub_exp sub e1)], apply_sub_comp sub c1)
   | Match (e, alist) -> Match (apply_sub_exp sub e, List.map (apply_sub_abs sub) alist)
   | Apply (e1, e2) -> Apply (apply_sub_exp sub e1, apply_sub_exp sub e2)
   | Handle (e1, c1) -> Handle (apply_sub_exp sub e1, apply_sub_comp sub c1)
