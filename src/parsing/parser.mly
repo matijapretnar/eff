@@ -41,7 +41,7 @@
 %token <float> FLOAT
 %token <OldUtils.label> UNAME
 %token <OldUtils.typaram> PARAM
-%token TYPE ARROW HARROW OF EFFECT
+%token TYPE ARROW HARROW OF EFFECT PERFORM
 %token EXTERNAL
 %token MATCH WITH FUNCTION HASH
 %token LET REC AND IN
@@ -185,7 +185,7 @@ plain_binop_term:
     }
   | t1 = binop_term CONS t2 = binop_term
     { Variant (OldUtils.cons, Some (Tuple [t1; t2], Location.make $startpos $endpos)) }
-  | t = plain_uminus_term 
+  | t = plain_uminus_term
     { t }
 
 uminus_term: mark_position(plain_uminus_term) { $1 }
@@ -232,7 +232,7 @@ plain_simple_term:
     { Variant (lbl, None) }
   | cst = const_term
     { Const cst }
-  | HASH eff = effect
+  | PERFORM eff = effect
     { Effect eff }
   | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
@@ -289,7 +289,7 @@ let_rec_def:
 
 handler_clause: mark_position(plain_handler_clause) { $1 }
 plain_handler_clause:
-  | HASH eff = effect p = simple_pattern k = simple_pattern ARROW t2 = term
+  | EFFECT eff = effect p = simple_pattern k = simple_pattern ARROW t2 = term
     { EffectClause (eff, (p, k, t2)) }
   | VAL c = match_case
     { ReturnClause c }
