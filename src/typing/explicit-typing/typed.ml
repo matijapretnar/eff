@@ -655,7 +655,7 @@ and make_equal_pattern' eqvars p p' =
   | _, _ -> None
 
 
-let rec alphaeq_expr eqvars e e' = alphaeq_expr' eqvars e.term e'.term
+let rec alphaeq_expr eqvars e e' = Print.debug "alphaeq_expr: %t vs %t" (print_expression e) (print_expression e'); alphaeq_expr' eqvars e.term e'.term
 
 and alphaeq_expr' eqvars e e' =
   match (e, e') with
@@ -670,6 +670,10 @@ and alphaeq_expr' eqvars e e' =
   | BuiltIn (f, n), BuiltIn (f', n') -> f = f' && n = n'
   | Const cst, Const cst' -> Const.equal cst cst'
   | Effect eff, Effect eff' -> eff = eff'
+  | ApplyDirtCoercion (e, dco) , ApplyDirtCoercion (e', dco') ->
+      dco = dco' && alphaeq_expr eqvars e e'
+  | ApplyDirtExp (e, d), ApplyDirtExp (e', d') ->
+      dirts_are_equal d d' && alphaeq_expr eqvars e e'
   | _, _ -> false
 
 

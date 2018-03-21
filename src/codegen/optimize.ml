@@ -5,12 +5,14 @@ type state =
   { fuel: int ref
   ; tc_state: TypeChecker.state
   ; recursive_functions: (variable, Types.target_ty * expression) OldUtils.assoc
+  ; knot_functions: (variable, expression * handler * variable) OldUtils.assoc
   }
 
 let inititial_state =
   { fuel 		= ref !Config.optimization_fuel
   ; tc_state 		= TypeChecker.initial_state
   ; recursive_functions	= []
+  ; knot_functions      = []
   }
 
 let extend_rec_fun st f ty e =
@@ -373,17 +375,37 @@ and optimize_sub_expr st e =
   in
   {term= plain_e'; location= e.location}
 
-and match_applied_function st e =
+and match_recursive_function st e =
   match e.term with
   | Var fvar ->
     (match OldUtils.lookup fvar st.recursive_functions with
      | None -> None
      | Some (fty,fbody) -> Some (fvar,fty,fbody))
-  | ApplyTyExp (e, ty) -> match_applied_function st e
-  | ApplyDirtExp (e, dirt) -> match_applied_function st e
-  | ApplySkelExp (e, sk) -> match_applied_function st e
-  | ApplyDirtCoercion (e, dco) -> match_applied_function st e
-  | ApplyTyCoercion (e, tyco) -> match_applied_function st e
+  | ApplyTyExp (e, ty) -> match_recursive_function st e
+  | ApplyDirtExp (e, dirt) -> match_recursive_function st e
+  | ApplySkelExp (e, sk) -> match_recursive_function st e
+  | ApplyDirtCoercion (e, dco) -> match_recursive_function st e
+  | ApplyTyCoercion (e, tyco) -> match_recursive_function st e
+  | _ -> None
+
+and match_knot_function st e h =
+  match_knot_function' st e e h
+
+and match_knot_function' st e e' h =
+  match e.term with
+  | Var fvar ->
+    (match OldUtils.lookup fvar st.knot_functions with
+     | None -> None
+     | Some (ef,hf,fvar') ->
+         Print.debug "%t vs. %t" (print_ha) ();
+         if alphaeq_expr [] e' ef && alphaeq_handler [] h h'
+           then Some fvar'
+           else None)
+  | ApplyTyExp (e, ty) -> match_knot_function' st e e' h
+  | ApplyDirtExp (e, dirt) -> match_knot_function' st e e' h
+  | ApplySkelExp (e, sk) -> match_knot_function' st e e' h
+  | ApplyDirtCoercion (e, dco) -> match_knot_function' st e e' h
+  | ApplyTyCoercion (e, tyco) -> match_knot_function' st e e' h
   | _ -> None
 
 and optimize_sub_handler st {effect_clauses= ecs; value_clause= vc} =
@@ -610,8 +632,7 @@ and reduce_comp st c =
               reduce_comp st res )
       | Apply (e11, e12) -> 
           (Print.debug "Looking for recursive function name";
-           match match_applied_function st e11 with
-           | None -> c
+           match match_recursive_function st e11 with
            | Some (fvar,fty,fbody) -> 
                (*
                    handle C[f] e12 with H
@@ -626,10 +647,17 @@ and reduce_comp st c =
                let fvar' = Variable.refresh fvar in
                let xvar = Variable.new_fresh () "__x_of_rec__" in
                let fty' = Arrow (ty_e12,dty_c) in
-               let fbody' = optimize_expr {st with recursive_functions = OldUtils.remove_assoc fvar st.recursive_functions}
+               let st' = {st with recursive_functions = OldUtils.remove_assoc fvar st.recursive_functions
+                                ; knot_functions = (fvar, (e11, h, fvar')) :: st.knot_functions } in
+               let fbody' = optimize_expr st'
                  (lambda (abstraction_with_ty (pvar xvar) ty_e12 (handle e1 (apply (Typed.subst_expr [(fvar,(refresh_expr fbody).term)] e11) (var xvar)))))
                in 
                {c with term = LetRec ([(fvar',fty',fbody')],apply (var fvar') e12)}
+           | None -> 
+               (match match_knot_function st e11 h with
+                | Some fvar' -> apply (var fvar') e12
+                | None -> c
+               )
           )
       | Match (e, branches) ->
           (*
