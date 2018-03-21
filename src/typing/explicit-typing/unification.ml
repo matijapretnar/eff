@@ -388,7 +388,8 @@ let rec skeleton_of_target_ty tty conslist =
   | Arrow (a1, (a2, _)) ->
       SkelArrow
         (skeleton_of_target_ty a1 conslist, skeleton_of_target_ty a2 conslist)
-  | Tuple tup -> assert false
+  | Tuple tup ->
+      SkelTuple (List.map (fun ty -> skeleton_of_target_ty ty conslist) tup)
   | Handler ((a1, _), (a2, _)) ->
       SkelHandler
         (skeleton_of_target_ty a1 conslist, skeleton_of_target_ty a2 conslist)
@@ -435,6 +436,17 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
       ( sub @ [sub1]
       , []
       , [cons1; cons2] @ apply_sub [sub1] (rest_queue @ paused) )
+  (* α : τ₁ x τ₂ ... *)
+  | SkelTuple sks ->
+      let tvars, conss =
+        List.fold_right
+          (fun sk (tvars, conss) ->
+            let tvar, cons = Typed.fresh_ty_with_skel sk in
+            (tvar :: tvars, cons :: conss) )
+          sks ([], [])
+      in
+      let sub1 = TyParamToTy (tvar, Types.Tuple tvars) in
+      (sub @ [sub1], [], conss @ apply_sub [sub1] (rest_queue @ paused))
   (* α : τ₁ => τ₂ *)
   | SkelHandler (sk1, sk2) ->
       let tvar1, cons1 = Typed.fresh_ty_with_skel sk1
@@ -494,6 +506,20 @@ and ty_omega_step sub paused cons rest_queue omega = function
       ( sub @ [sub1]
       , paused
       , List.append [ty_cons; ty2_cons; dirt_cons] rest_queue )
+  (* ω : A₁ x A₂ x ... <= B₁ x B₂ x ...  *)
+  | Types.Tuple tys, Types.Tuple tys'
+    when List.length tys = List.length tys' ->
+      let coercions, conss =
+        List.fold_right2
+          (fun ty ty' (coercions, conss) ->
+            let coercion, ty_cons = fresh_ty_coer (ty, ty') in
+            (coercion :: coercions, ty_cons :: conss) )
+          tys tys' ([], [])
+      in
+      let sub1 =
+        CoerTyParamToTyCoercion (omega, Typed.TupleCoercion coercions)
+      in
+      (sub @ [sub1], paused, List.append conss rest_queue)
   (* ω : D₁ => C₁ <= D₂ => C₂ *)
   | Types.Handler (drty11, drty12), Types.Handler (drty21, drty22) ->
       let drty_coer1, cons1, cons2 = fresh_dirty_coer (drty21, drty11)

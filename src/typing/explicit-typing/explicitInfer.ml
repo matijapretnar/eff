@@ -38,7 +38,8 @@ let rec source_to_target ty =
     | "int" -> Types.PrimTy IntTy
     | "string" -> Types.PrimTy StringTy
     | "bool" -> Types.PrimTy BoolTy
-    | "float" -> Types.PrimTy FloatTy )
+    | "float" -> Types.PrimTy FloatTy
+    | "unit" -> Types.Tuple [] )
   | T.Tuple l -> Types.Tuple (List.map source_to_target l)
   | T.Arrow (ty, dirty) ->
       Types.Arrow (source_to_target ty, source_to_target_dirty dirty)

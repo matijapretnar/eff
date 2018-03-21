@@ -122,6 +122,15 @@ let rec type_of_ty_coercion st ty_coer =
       let c3, c1 = type_of_dirty_coercion st dirtycoer1 in
       let c2, c4 = type_of_dirty_coercion st dirtycoer2 in
       (Types.Handler (c1, c2), Types.Handler (c3, c4))
+  | TupleCoercion tycoers ->
+      let tys1, tys2 =
+        List.fold_right
+          (fun ty_coer (tys1, tys2) ->
+            let ty1, ty2 = type_of_ty_coercion st ty_coer in
+            (ty1 :: tys1, ty2 :: tys2) )
+          tycoers ([], [])
+      in
+      (Types.Tuple tys1, Types.Tuple tys2)
   | TyCoercionVar p -> (
     match OldUtils.lookup p st.ty_coer_types with
     | None -> assert false
@@ -265,6 +274,8 @@ let rec type_of_expression st e =
   | Lambda abs ->
       let ty1, c_ty = type_of_abstraction_with_ty st abs in
       Types.Arrow (ty1, c_ty)
+  | Tuple es ->
+      Types.Tuple (List.map (fun e -> type_of_expression st e.term) es)
   | Effect (eff, (eff_in, eff_out)) ->
       Types.Arrow
         (eff_in, (eff_out, Types.closed_dirt (EffectSet.singleton eff)))

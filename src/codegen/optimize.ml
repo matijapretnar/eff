@@ -330,6 +330,7 @@ and optimize_sub_expr st e =
     | CastExp (e1, tyco1) ->
         CastExp (optimize_expr st e1, optimize_ty_coercion st tyco1)
     | Handler h -> e.term
+    | Tuple es -> Tuple (List.map (optimize_expr st) es)
     (* TODO: implement *)
   in
   {term= plain_e'; location= e.location}

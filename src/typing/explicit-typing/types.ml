@@ -14,6 +14,7 @@ type skeleton =
   | PrimSkel of prim_ty
   | SkelArrow of skeleton * skeleton
   | SkelHandler of skeleton * skeleton
+  | SkelTuple of skeleton list
   | ForallSkel of Params.Skel.t * skeleton
 
 and target_ty =
@@ -47,6 +48,7 @@ let rec types_are_equal ty1 ty2 =
   | TyParam tv1, TyParam tv2 -> tv1 = tv2
   | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
       types_are_equal ttya1 ttyb1 && dirty_types_are_equal dirtya1 dirtyb1
+  | Tuple tys1, Tuple tys2 -> List.for_all2 types_are_equal tys1 tys2
   | Handler (dirtya1, dirtya2), Handler (dirtyb1, dirtyb2) ->
       dirty_types_are_equal dirtya1 dirtyb1
       && dirty_types_are_equal dirtya2 dirtyb2
@@ -109,6 +111,10 @@ and print_skeleton ?max_level sk ppf =
   | PrimSkel s -> print "prim_skel %t" (print_prim_ty s)
   | SkelArrow (sk1, sk2) ->
       print "%t -sk-> %t" (print_skeleton sk1) (print_skeleton sk2)
+  | SkelTuple [] -> print "unit"
+  | SkelTuple sks ->
+      print ~at_level:2 "@[<hov>%t@]"
+        (Print.sequence (Symbols.times ()) (print_skeleton ~max_level:1) sks)
   | SkelHandler (sk1, sk2) ->
       print "%t =sk=> %t" (print_skeleton sk1) (print_skeleton sk2)
   | ForallSkel (p, sk1) ->
@@ -181,6 +187,7 @@ let rec free_skeleton sk =
   | PrimSkel _ -> []
   | SkelArrow (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
   | SkelHandler (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
+  | SkelTuple sks -> List.concat (List.map free_skeleton sks)
   | ForallSkel (p, sk1) ->
       let free_a = free_skeleton sk1 in
       List.filter (fun x -> not (List.mem x [p])) free_a

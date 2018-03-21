@@ -73,7 +73,7 @@ let rec typed_to_erasure_ty sub typed_ty =
       let t1' = typed_to_erasure_ty sub t1 in
       let t2' = typed_to_erasure_ty sub t2 in
       Types.SkelArrow (t1', t2')
-  | Types.Tuple tys -> assert false
+  | Types.Tuple tys -> Types.SkelTuple (List.map (typed_to_erasure_ty sub) tys)
   | Types.Handler ((t1, drt1), (t2, drt2)) ->
       let t1' = typed_to_erasure_ty sub t1 in
       let t2' = typed_to_erasure_ty sub t2 in
