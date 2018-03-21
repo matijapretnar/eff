@@ -232,8 +232,8 @@ plain_simple_term:
     { Variant (lbl, None) }
   | cst = const_term
     { Const cst }
-  | PERFORM eff = effect
-    { Effect eff }
+  | PERFORM LPAREN eff = effect t = term RPAREN
+    { Effect (eff, t)}
   | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
       let nil = (Variant (OldUtils.nil, None), Location.make $endpos $endpos) in
@@ -289,7 +289,7 @@ let_rec_def:
 
 handler_clause: mark_position(plain_handler_clause) { $1 }
 plain_handler_clause:
-  | EFFECT eff = effect p = simple_pattern k = simple_pattern ARROW t2 = term
+  | EFFECT LPAREN eff = effect p = simple_pattern RPAREN k = simple_pattern ARROW t2 = term
     { EffectClause (eff, (p, k, t2)) }
   | VAL c = match_case
     { ReturnClause c }

@@ -6,7 +6,7 @@ module Sugared = SugaredSyntax
 module Untyped = CoreSyntax
 
 (* ***** Desugaring of types. ***** *)
-(* Desugar a type, where only the given type, dirt and region parameters may appear. 
+(* Desugar a type, where only the given type, dirt and region parameters may appear.
    If a type application with missing dirt and region parameters is encountered,
    it uses [ds] and [rs] instead. This is used in desugaring of recursive type definitions
    where we need to figure out which type and dirt parameters are missing in a type defnition.
@@ -155,11 +155,11 @@ let rec expression ctx (t, loc) =
     | Sugared.Variant (lbl, Some t) ->
         let w, e = expression ctx t in
         (w, Untyped.Variant (lbl, Some e))
-    | Sugared.Effect eff -> ([], Untyped.Effect eff)
     (* Terms that are desugared into computations. We list them explicitly in
      order to catch any future constructs. *)
     | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
-     |Sugared.Handle _ | Sugared.Conditional _ | Sugared.Check _ ->
+     | Sugared.Handle _ | Sugared.Conditional _ | Sugared.Check _
+     | Sugared.Effect _ ->
         let x = fresh_variable (Some "$bind") in
         let c = computation ctx (t, loc) in
         let w = [(Untyped.add_loc (Untyped.PVar x) loc, c)] in
@@ -202,6 +202,10 @@ and computation ctx (t, loc) =
         let w1, e1 = expression ctx t1 in
         let w2, e2 = expression ctx t2 in
         (w1 @ w2, Untyped.Apply (e1, e2))
+    | Sugared.Effect (eff, t) ->
+        let w, e = expression ctx t in
+        let annotated_eff = Untyped.add_loc (Untyped.Effect eff) loc in
+          (w, Untyped.Apply (annotated_eff, e))
     | Sugared.Match (t, cs) ->
         let cs = List.map (abstraction ctx) cs in
         let w, e = expression ctx t in
