@@ -320,7 +320,7 @@ and print_ty_coercion ?max_level c ppf =
   | SequenceTyCoer (tc1, tc2) ->
       print "%t ; %t" (print_ty_coercion tc1) (print_ty_coercion tc2)
   | PureCoercion dtyco -> print "pure(%t)" (print_dirty_coercion dtyco)
-  | _ -> failwith "Not yet implemented"
+  | _ -> failwith "Not yet implemented __LOC__"
 
 
 and print_dirty_coercion ?max_level c ppf =
@@ -344,7 +344,9 @@ and print_dirt_coercion ?max_level c ppf =
   | UnionDirt (eset, dc) ->
       print "{%t} U %t" (Types.print_effect_set eset) (print_dirt_coercion dc)
   | DirtCoercion dtyco -> print "dirtOf(%t)" (print_dirty_coercion dtyco)
-  | _ -> failwith "Not yet implemented"
+  | SequenceDirtCoer (dco1,dco2) -> 
+      print "(%t;%t)" (print_dirt_coercion dco1) (print_dirt_coercion dco2)
+  | _ -> failwith "Not yet implemented __LOC__"
 
 
 and print_omega_ct ?max_level c ppf =

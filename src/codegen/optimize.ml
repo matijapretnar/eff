@@ -195,7 +195,10 @@ and optimize_sub_dirt_coercion st p_ops dco =
   match dco with
   | ReflDirt d -> dco
   | DirtCoercionVar dcov -> dco
-  | Empty d -> dco
+  | Empty d -> 
+     if dirts_are_equal d empty_dirt
+       then ReflDirt empty_dirt
+       else dco
   | UnionDirt (ops, dco1) ->
       UnionDirt
         (ops, optimize_dirt_coercion' st (EffectSet.union p_ops ops) dco1)
@@ -252,24 +255,42 @@ and reduce_dirty_coercion st dtyco =
     match tyco1 with
     | HandlerCoercion (dtyco11, dtyco12) -> dtyco11
     | _ -> dtyco )
-  | SequenceDirtyCoer (dtyco1, dtyco2) -> dtyco
+  | SequenceDirtyCoer (dtyco1, dtyco2) -> 
+    (match (dtyco1, dtyco2) with
+     | (BangCoercion (tyco1,dco1), BangCoercion (tyco2,dco2)) ->
+          BangCoercion (reduce_ty_coercion st (SequenceTyCoer (tyco1,tyco2)), optimize_dirt_coercion st (SequenceDirtCoer (dco1,dco2)))
+     | _ -> dtyco)
 
 
 and reduce_dirt_coercion st p_ops dco =
   match dco with
   | ReflDirt d -> dco
   | DirtCoercionVar dcov -> dco
-  | Empty d -> Empty (Types.remove_effects p_ops d)
+  | Empty d -> 
+      let d' = Types.remove_effects p_ops d in
+      if dirts_are_equal d' empty_dirt 
+        then ReflDirt empty_dirt
+        else Empty d'
   | UnionDirt (ops, dco1) ->
-      let d1, d2 = TypeChecker.type_of_dirt_coercion st.tc_state dco1 in
-      let ops' =
-        EffectSet.diff ops
-          (EffectSet.inter d1.Types.effect_set d2.Types.effect_set)
-      in
-      if EffectSet.is_empty ops' then dco1 else UnionDirt (ops', dco1)
-  | SequenceDirtCoer (dco1, dco2) -> dco
+      (match dco1 with
+       | ReflDirt d ->
+           ReflDirt (add_effects ops d)
+       | _ ->
+          let d1, d2 = TypeChecker.type_of_dirt_coercion st.tc_state dco1 in
+          let ops' =
+            EffectSet.diff ops
+              (EffectSet.inter d1.Types.effect_set d2.Types.effect_set)
+          in
+          if EffectSet.is_empty ops' then dco1 else UnionDirt (ops', dco1)
+      )
+  | SequenceDirtCoer (dco1, dco2) -> 
+     (match (dco1,dco2) with
+      | (ReflDirt _, _) -> dco2
+      | (_, ReflDirt _) -> dco1
+      | _               -> dco
+     )
   | DirtCoercion dtyco ->
-    match dtyco with BangCoercion (_, dco1) -> dco1 | _ -> dco
+    (match dtyco with BangCoercion (_, dco1) -> dco1 | _ -> dco)
 
 
 let rec substitute_pattern_comp st c p exp =
@@ -347,6 +368,7 @@ and optimize_sub_expr st e =
     | CastExp (e1, tyco1) ->
         CastExp (optimize_expr st e1, optimize_ty_coercion st tyco1)
     | Handler h -> e.term
+    | Tuple es -> Tuple (List.map (optimize_expr st) es)
     (* TODO: implement *)
   in
   {term= plain_e'; location= e.location}
