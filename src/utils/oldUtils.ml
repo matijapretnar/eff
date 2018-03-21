@@ -89,6 +89,8 @@ let flatten_map f xs = List.flatten (List.map f xs)
 (** [option_map f] maps [None] to [None] and [Some x] to [Some (f x)]. *)
 let option_map f = function None -> None | Some x -> Some (f x)
 
+let map_default f x = function None -> x | Some y -> f y
+
 (** [repeat x n] creates a list with [x] repeated [n] times. *)
 let rec repeat x = function 0 -> [] | n -> x :: repeat x (n - 1)
 

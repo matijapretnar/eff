@@ -386,7 +386,9 @@ and optimize_sub_comp st c =
     | Value e1 -> Value (optimize_expr st e1)
     | LetVal (e1, abs) ->
         LetVal (optimize_expr st e1, optimize_abstraction_with_ty st abs)
-    | LetRec (bindings, c1) -> assert false
+    | LetRec ([(var, ty, e1)], c1) ->
+        let st' = extend_var_type st var ty in
+        LetRec ([(var, ty, optimize_expr st' e1)], optimize_comp st' c1)
     | Match (e1, abstractions) ->
         let ty = TypeChecker.type_of_expression st.tc_state e1.term in
         Match
@@ -504,6 +506,9 @@ and reduce_comp st c =
           {term= CastComp (c', RightHandler tyco1); location= c.location}
     | Handler h -> (
       match c1.term with
+      | Value e1 ->
+          (* special case that happens when the handler has no effect clauses *)
+          optimize_comp st (beta_reduce st h.value_clause e1)
       | CastComp (c1', dtyco1) -> (
         match is_relatively_pure st c1' h with
         | Some dtyco ->

@@ -49,6 +49,7 @@ and e_plain_computation =
   | ECall of effect * e_expression * e_abstraction_with_ty
   | EBind of e_computation * e_abstraction
   | EMatch of e_expression * e_abstraction list
+  | ELetRec of (variable * Types.skeleton * e_expression) list * e_computation
 
 (** Handler definitions *)
 and e_handler =
@@ -164,6 +165,10 @@ and typed_to_erasure_comp' sub tt =
   | Typed.CastComp (c, _) -> typed_to_erasure_comp' sub c.term
   | Typed.CastComp_ty (c, _) -> typed_to_erasure_comp' sub c.term
   | Typed.CastComp_dirt (c, _) -> typed_to_erasure_comp' sub c.term
+  | Typed.LetRec ([(var, ty, e1)], c1) ->
+      ELetRec
+        ( [(var, typed_to_erasure_ty sub ty, typed_to_erasure_exp sub e1)]
+        , typed_to_erasure_comp sub c1 )
 
 and typed_to_erasure_abs_with_ty sub abs_w_ty =
   let e_p, e_ty, e_c = abs_w_ty.term in

@@ -101,7 +101,7 @@ and computation = plain_computation annotation
 and plain_computation =
   | Value of expression
   | LetVal of expression * abstraction_with_ty
-  | LetRec of (variable * abstraction) list * computation
+  | LetRec of (variable * Types.target_ty * expression) list * computation
   | Match of expression * abstraction list
   | Apply of expression * expression
   | Handle of expression * computation
@@ -398,8 +398,9 @@ and print_top_let_abstraction (p, c) ppf =
         (print_computation ~max_level:0 c)
 
 
-and print_let_rec_abstraction (x, a) ppf =
-  Format.fprintf ppf "%t = fun %t" (print_variable x) (print_abstraction a)
+and print_let_rec_abstraction (x, ty, e) ppf =
+  Format.fprintf ppf "%t : %t = %t" (print_variable x) (print_target_ty ty)
+    (print_expression e)
 
 
 let backup_location loc locs =
@@ -469,13 +470,16 @@ and refresh_comp' sbst = function
   | LetRec (li, c1) ->
       let new_xs, sbst' =
         List.fold_right
-          (fun (x, _) (new_xs, sbst') ->
+          (fun (x, _, _) (new_xs, sbst') ->
             let x' = Variable.refresh x in
             (x' :: new_xs, OldUtils.update x x' sbst') )
           li ([], sbst)
       in
       let li' =
-        List.combine new_xs (List.map (fun (_, a) -> refresh_abs sbst' a) li)
+        List.map
+          (fun (x', (ty, e)) -> (x', ty, e))
+          (List.combine new_xs
+             (List.map (fun (_, ty, e) -> (ty, refresh_expr sbst' e)) li))
       in
       LetRec (li', refresh_comp sbst' c1)
   | Match (e, li) -> Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
@@ -543,7 +547,13 @@ and subst_comp sbst c = {c with term= subst_comp' sbst c.term}
 and subst_comp' sbst = function
   | Bind (c1, c2) -> Bind (subst_comp sbst c1, subst_abs sbst c2)
   | LetRec (li, c1) ->
-      let li' = List.map (fun (x, a) -> (x, subst_abs sbst a)) li in
+      let li' =
+        List.map
+          (fun (x, ty, e) ->
+            (* XXX Should we check that x does not appear in sbst? *)
+            (x, ty, subst_expr sbst e) )
+          li
+      in
       LetRec (li', subst_comp sbst c1)
   | Match (e, li) -> Match (subst_expr sbst e, List.map (subst_abs sbst) li)
   | Apply (e1, e2) -> Apply (subst_expr sbst e1, subst_expr sbst e2)
@@ -724,7 +734,7 @@ let rec free_vars_comp c =
   | LetRec (li, c1) ->
       let xs, vars =
         List.fold_right
-          (fun (x, a) (xs, vars) -> (x :: xs, free_vars_abs a @@@ vars))
+          (fun (x, ty, e) (xs, vars) -> (x :: xs, free_vars_expr e @@@ vars))
           li ([], free_vars_comp c1)
       in
       vars --- xs
