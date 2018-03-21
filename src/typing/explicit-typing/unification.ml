@@ -174,9 +174,8 @@ let rec apply_sub_comp sub c =
 and apply_sub_plain_comp sub c =
   match c.term with
   | Value e -> Value (apply_sub_exp sub e)
-  | LetVal (e1, (p, ty, c1)) ->
-      LetVal
-        (apply_sub_exp sub e1, (p, apply_sub_ty sub ty, apply_sub_comp sub c1))
+  | LetVal (e1, abs) ->
+      LetVal (apply_sub_exp sub e1, apply_sub_abs_with_ty sub abs)
   | LetRec (l, c1) -> assert false (* LetRec (l, c1) *)
   | Match (e, alist) ->
       Match (apply_sub_exp sub e, List.map (apply_sub_abs sub) alist)
@@ -208,8 +207,7 @@ and apply_sub_plain_exp sub e =
   | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
   | Record r -> Record r
   | Variant (lbl, e1) -> Variant (lbl, e1)
-  | Lambda (pat, ty1, c1) ->
-      Lambda (pat, apply_sub_ty sub ty1, apply_sub_comp sub c1)
+  | Lambda abs -> Lambda (apply_sub_abs_with_ty sub abs)
   | Effect eff -> Effect eff
   | Handler h -> Handler (apply_sub_handler sub h)
   | BigLambdaTy (ty_param, sk, e1) ->

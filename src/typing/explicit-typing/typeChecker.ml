@@ -262,10 +262,8 @@ let rec type_of_expression st e =
     | Some ty -> ty
     | _ -> assert false )
   | Const const -> type_of_const const
-  | Lambda (pat, ty1, c1) ->
-      check_well_formed_ty st ty1 ;
-      let st' = extend_pattern_types st pat ty1 in
-      let c_ty = type_of_computation st' c1.term in
+  | Lambda abs ->
+      let ty1, c_ty = type_of_abstraction_with_ty st abs in
       Types.Arrow (ty1, c_ty)
   | Effect (eff, (eff_in, eff_out)) ->
       Types.Arrow
@@ -340,11 +338,11 @@ and type_of_computation st c =
   | Value e ->
       let ty1 = type_of_expression st e.term in
       (ty1, Types.empty_dirt)
-  | LetVal (e1, (p1, ty, c1)) ->
-      let t_v = type_of_expression st e1.term in
-      assert (Types.types_are_equal t_v ty) ;
-      let st' = extend_pattern_types st p1 t_v in
-      type_of_computation st' c1.term
+  | LetVal (e1, abs) ->
+      let t_v = type_of_expression st e1.term
+      and ty_in, ty_out = type_of_abstraction_with_ty st abs in
+      assert (Types.types_are_equal t_v ty_in) ;
+      ty_out
   | Match (e, alist) -> (
       let t_e = type_of_expression st e.term in
       let ty_list = List.map (type_of_abstraction st t_e) alist in
@@ -411,5 +409,6 @@ and type_of_abstraction st ty {term= pv, cv} =
   type_of_computation st' cv.term
 
 and type_of_abstraction_with_ty st {term= pv, tv, cv} =
+  check_well_formed_ty st tv ;
   let st' = extend_pattern_types st pv tv in
   (tv, type_of_computation st' cv.term)

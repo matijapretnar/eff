@@ -32,7 +32,7 @@ and e_plain_expression =
   | ETuple of e_expression list
   | ERecord of (OldUtils.field, e_expression) OldUtils.assoc
   | EVariant of OldUtils.label * e_expression option
-  | ELambda of (e_pattern * Types.skeleton * e_computation)
+  | ELambda of e_abstraction_with_ty
   | EEffect of effect
   | EHandler of e_handler
   | EBigLambdaSkel of Params.Skel.t * e_expression
@@ -99,11 +99,7 @@ and typed_to_erasure_exp' sub tt =
   | Typed.Const c -> EConst c
   | Typed.Tuple elist ->
       ETuple (List.map (fun x -> typed_to_erasure_exp sub x) elist)
-  | Typed.Lambda (p, tty, co) ->
-      ELambda
-        ( typed_to_erasure_pattern p
-        , typed_to_erasure_ty sub tty
-        , typed_to_erasure_comp sub co )
+  | Typed.Lambda abs -> ELambda (typed_to_erasure_abs_with_ty sub abs)
   | Typed.Effect e -> EEffect e
   | Typed.Handler h ->
       let e_pat, tty, v_comp = h.value_clause.term in
@@ -139,7 +135,7 @@ and typed_to_erasure_comp sub {Typed.term= comp; Typed.location= loc} =
 and typed_to_erasure_comp' sub tt =
   match tt with
   | Typed.Value e -> EValue (typed_to_erasure_exp sub e)
-  | Typed.LetVal (e, (p, _ty, c)) ->
+  | Typed.LetVal (e, {term= p, _ty, c}) ->
       let p' = typed_to_erasure_pattern p in
       let e' = typed_to_erasure_exp sub e in
       let c' = typed_to_erasure_comp sub c in

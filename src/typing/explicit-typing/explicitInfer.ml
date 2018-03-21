@@ -456,9 +456,9 @@ and type_plain_expr in_cons st = function
       in
       let target_lambda =
         Typed.Lambda
-          ( target_pattern
-          , Unification.apply_substitution_ty target_comp_sub in_ty
-          , target_comp_term )
+          (abstraction_with_ty target_pattern
+             (Unification.apply_substitution_ty target_comp_sub in_ty)
+             target_comp_term)
       in
       Unification.print_c_list target_comp_cons ;
       Print.debug "lambda ty: %t" (Types.print_target_ty target_ty) ;
@@ -862,9 +862,9 @@ and type_plain_comp in_cons st = function
           let return_term =
             Typed.LetVal
               ( var_exp_skel_lamda
-              , ( Typed.annotate (Typed.PVar x) p_def.Untyped.location
-                , ty_sc_skel
-                , typed_c2 ) )
+              , Typed.abstraction_with_ty
+                  (Typed.annotate (Typed.PVar x) p_def.Untyped.location)
+                  ty_sc_skel typed_c2 )
           in
           (return_term, type_c2, cons_c2, subs_c2 @ sub_e1' @ sub_e1)
       | _ ->

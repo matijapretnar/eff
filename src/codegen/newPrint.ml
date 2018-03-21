@@ -95,7 +95,7 @@ let rec print_expression ?max_level e ppf =
   | Erasure.EVariant (lbl, None) -> print "%s" lbl
   | Erasure.EVariant (lbl, Some e) ->
       print ~at_level:1 "(%s %t)" lbl (print_expression e)
-  | Erasure.ELambda (x, _, c) ->
+  | Erasure.ELambda {term= x, _, c} ->
       print "fun (%t) -> %t" (print_pattern x) (print_computation c)
   | Erasure.EEffect eff -> print ~at_level:2 "effect %t" (print_effect eff)
   | Erasure.EHandler h ->
