@@ -9,8 +9,8 @@ effect Decide : unit -> bool;;
    but since it is not wrapped in a handler it just produces a runtime
    error about an uncought operation:
 
-   let x = (if #Decide () then 10 else 20) in
-   let y = (if #Decide () then 0 else 5) in
+   let x = (if perform (Decide ()) then 10 else 20) in
+   let y = (if perform (Decide ()) then 0 else 5) in
      x - y;;
 *)
 
@@ -19,29 +19,29 @@ effect Decide : unit -> bool;;
    y gets 0. *)
 
 handle
-  let x = (if #Decide () then 10 else 20) in
-  let y = (if #Decide () then 0 else 5) in
+  let x = (if perform (Decide ()) then 10 else 20) in
+  let y = (if perform (Decide ()) then 0 else 5) in
     x - y
 with
-| #Decide () k -> k true;;
+| effect (Decide ()) k -> continue k true;;
 
 (* This handler collects all results that we can get by making different choices. *)
 
 let choose_all = handler
-  | #Decide () k -> k true @ k false
+  | effect (Decide ()) k -> continue k true @ continue k false
   | val x -> [x];;
 
 (* This returns a list of four possibilities [10; 5; 20; 15] *)
 
 with choose_all handle
-  let x = (if #Decide () then 10 else 20) in
-  let y = (if #Decide () then 0 else 5) in
+  let x = (if perform (Decide ()) then 10 else 20) in
+  let y = (if perform (Decide ()) then 0 else 5) in
     x - y;;
 
 effect Decide2 : unit -> bool;;
 
 let choose_all2 = handler
-  | #Decide2 () k -> k true @ k false
+  | effect (Decide2 ()) k -> continue k true @ continue k false
   | val x -> [x];;
 
 (* We can create two instances and handle each one separately. The inner handler produces
@@ -50,8 +50,8 @@ let choose_all2 = handler
 
 with choose_all handle
 with choose_all2 handle
-  let x = (if #Decide () then 10 else 20) in
-  let y = (if #Decide2 () then 0 else 5) in
+  let x = (if perform (Decide ()) then 10 else 20) in
+  let y = (if perform (Decide2 ()) then 0 else 5) in
     x - y;;
 
 (* If we switch the order of handlers and operations we also get a list of two lists of
@@ -59,8 +59,8 @@ with choose_all2 handle
 
 with choose_all2 handle
 with choose_all handle
-  let y = (if #Decide2 () then 0 else 5) in
-  let x = (if #Decide () then 10 else 20) in
+  let y = (if perform (Decide2 ()) then 0 else 5) in
+  let x = (if perform (Decide ()) then 10 else 20) in
     x - y;;
 
 (* However, switching around only the handler but not the operations, produces a list of
@@ -69,6 +69,6 @@ with choose_all handle
 
 with choose_all2 handle
 with choose_all handle
-  let x = (if #Decide () then 10 else 20) in
-  let y = (if #Decide2 () then 0 else 5) in
+  let x = (if perform (Decide ()) then 10 else 20) in
+  let y = (if perform (Decide2 ()) then 0 else 5) in
     x - y;;
