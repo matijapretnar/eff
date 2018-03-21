@@ -586,10 +586,14 @@ and reduce_comp st c =
                     , abstraction p12 (handle (refresh_expr e1) c12) ) }
         | None -> c )
       | Call (eff, e11, k_abs) -> (
+          (* handle call(eff,e11,y:ty.c) with H@{eff xi ki -> ci}
+             >-->
+              ci [(fun y:ty -> handle c with H)/ki, e11 / xi]
+           *)
           let {term= k_pat, k_ty, k_c} as k_abs' = refresh_abs_with_ty k_abs in
           let PVar k_var = k_pat.term in
-          let {term= k_pat', k_c'} as handled_k =
-            abstraction k_pat
+          let handled_k =
+            abstraction_with_ty k_pat k_ty
               (reduce_comp
                  (extend_var_type st k_var k_ty)
                  (handle (refresh_expr e1) k_c))
@@ -600,7 +604,7 @@ and reduce_comp st c =
               (* Shouldn't we check for inlinability of p1 and p2 here? *)
               substitute_pattern_comp st
                 (Typed.subst_comp (Typed.pattern_match p1 e11) c)
-                p2 (lambda k_abs')
+                p2 (lambda handled_k)
           | None ->
               let res = call eff e11 k_abs' in
               reduce_comp st res )
@@ -634,7 +638,7 @@ and reduce_comp st c =
              match e with {pi -> handle ci with H}
            *)
            let ty_e = TypeChecker.type_of_expression st.tc_state e.term in
-           case e (List.map (fun {term=(pi,ci)} -> (* optimize_abs st ty_e *) (abstraction pi (handle e1 ci))) branches)
+           case e (List.map (fun {term=(pi,ci)} -> optimize_abs st ty_e (abstraction pi (handle e1 ci))) branches)
       | _ -> c )
     | _ -> c )
   | Call (op, e1, a_w_ty) -> c
