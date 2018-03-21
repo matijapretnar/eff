@@ -164,6 +164,9 @@ let call ?loc eff e abs : computation =
   {term= Call (eff, e, abs); location= e.location}
 
 let handle ?loc e c : computation = {term= Handle (e, c); location= c.location}
+           
+let case ?loc:(l = Location.unknown) e branches: computation =
+  {term= Match (e,branches); location= l}
 
 let abstraction ?loc p c : abstraction = {term= (p, c); location= c.location}
 

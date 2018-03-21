@@ -210,10 +210,19 @@ and reduce_ty_coercion st tyco =
   Print.debug "reduce_ty_coercion: %t" (Typed.print_ty_coercion tyco) ;
   match tyco with
   | ReflTy ty -> tyco
-  | ArrowCoercion (tyco1, dtyco2) -> tyco
+  | ArrowCoercion (tyco1, dtyco2) -> 
+      (match (tyco1, dtyco2) with
+       | (ReflTy ty1, BangCoercion (ReflTy ty2, ReflDirt d)) -> ReflTy (Arrow (ty1, (ty2, d)))
+       | _ -> tyco
+      )
   | HandlerCoercion (dtyco1, dtyco2) -> tyco
   | TyCoercionVar tycovar -> tyco
-  | SequenceTyCoer (tyco1, tyco2) -> tyco
+  | SequenceTyCoer (tyco1, tyco2) ->
+      (match (tyco1, tyco2) with
+       | (ReflTy _, _) -> tyco2
+       | (_, ReflTy _) -> tyco1
+       | _           -> tyco 
+      )
   | TupleCoercion tycos -> tyco
   | LeftArrow tyco1 -> tyco
   | ForallTy (tv, tyco1) -> tyco
@@ -596,6 +605,14 @@ and reduce_comp st c =
                in 
                {c with term = LetRec ([(fvar',fty',fbody')],apply (var fvar') e12)}
           )
+      | Match (e, branches) ->
+          (*
+             handle (match e with {pi -> ci} ) with H
+             >-->
+             match e with {pi -> handle ci with H}
+           *)
+           let ty_e = TypeChecker.type_of_expression st.tc_state e.term in
+           case e (List.map (fun {term=(pi,ci)} -> (* optimize_abs st ty_e *) (abstraction pi (handle e1 ci))) branches)
       | _ -> c )
     | _ -> c )
   | Call (op, e1, a_w_ty) -> c
