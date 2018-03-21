@@ -152,13 +152,17 @@ and plain_toplevel =
 
 (* | TypeOf of computation *)
 
+let var ?loc:(l = Location.unknown) v: expression =
+  {term= Var v; location= l}
+
 let lambda ?loc ((_, _, c) as abs) : expression =
   {term= Lambda abs; location= c.location}
 
+let apply ?loc:(l = Location.unknown) e1 e2: computation =
+  {term= Apply (e1,e2); location = l}
 
 let call ?loc eff e abs : computation =
   {term= Call (eff, e, abs); location= e.location}
-
 
 let handle ?loc e c : computation = {term= Handle (e, c); location= c.location}
 
@@ -170,6 +174,9 @@ let abstraction_with_ty ?loc p tty c : abstraction_with_ty =
 
 let abstraction2 ?loc p1 p2 c : abstraction2 =
   {term= (p1, p2, c); location= c.location}
+
+let pvar ?loc:(l = Location.unknown) var : pattern =
+  {term = PVar var; location = l}
 
 
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
@@ -463,7 +470,25 @@ and refresh_expr' sbst = function
   | Variant (lbl, e) -> Variant (lbl, OldUtils.option_map (refresh_expr sbst) e)
   | CastExp (e1, tyco) -> CastExp (refresh_expr sbst e1, tyco)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
-  | _ -> failwith "Not yet implemented"
+  | BigLambdaTy (tyvar,sk,e) -> assert false
+  | BigLambdaDirt (dvar,e) ->  (* TODO: refresh dirt var *)
+      BigLambdaDirt (dvar, refresh_expr sbst e) 
+  | BigLambdaSkel (skvar,e)-> assert false
+  | LambdaTyCoerVar (tycovar,ct,e)-> assert false
+  | LambdaDirtCoerVar (dcovar,ct,e) -> (* TODO: refresh dco var *)
+      LambdaDirtCoerVar (dcovar,ct,refresh_expr sbst e)
+  | CastExp (e,tyco) ->
+      CastExp (refresh_expr sbst e, tyco)
+  | ApplyTyExp (e,ty) ->
+      ApplyTyExp (refresh_expr sbst e, ty)
+  | ApplyDirtExp (e,d) ->
+      ApplyDirtExp (refresh_expr sbst e, d)
+  | ApplySkelExp (e,sk) ->
+      ApplySkelExp (refresh_expr sbst e, sk)
+  | ApplyTyCoercion (e,tyco) -> 
+      ApplyTyCoercion (refresh_expr sbst e, tyco)
+  | ApplyDirtCoercion (e,dco) ->
+      ApplyDirtCoercion (refresh_expr sbst e, dco) 
 
 
 and refresh_comp sbst c = {c with term= refresh_comp' sbst c.term}

@@ -1,15 +1,23 @@
 open Types
 open Typed
 
-type state = {fuel: int ref; tc_state: TypeChecker.state}
+type state = 
+  { fuel: int ref
+  ; tc_state: TypeChecker.state
+  ; recursive_functions: (variable, Types.target_ty * expression) OldUtils.assoc
+  }
 
 let inititial_state =
-  {fuel= ref !Config.optimization_fuel; tc_state= TypeChecker.initial_state}
+  { fuel 		= ref !Config.optimization_fuel
+  ; tc_state 		= TypeChecker.initial_state
+  ; recursive_functions	= []
+  }
 
+let extend_rec_fun st f ty e =
+  {st with recursive_functions = (f,(ty,e)) :: st.recursive_functions}
 
 let extend_var_type st t_var ty =
   {st with tc_state= TypeChecker.extend_var_types st.tc_state t_var ty}
-
 
 let extend_ty_params st ty_var =
   {st with tc_state= TypeChecker.extend_ty_params st.tc_state ty_var}
@@ -334,6 +342,18 @@ and optimize_sub_expr st e =
   in
   {term= plain_e'; location= e.location}
 
+and match_applied_function st e =
+  match e.term with
+  | Var fvar ->
+    (match OldUtils.lookup fvar st.recursive_functions with
+     | None -> None
+     | Some (fty,fbody) -> Some (fvar,fty,fbody))
+  | ApplyTyExp (e, ty) -> match_applied_function st e
+  | ApplyDirtExp (e, dirt) -> match_applied_function st e
+  | ApplySkelExp (e, sk) -> match_applied_function st e
+  | ApplyDirtCoercion (e, dco) -> match_applied_function st e
+  | ApplyTyCoercion (e, tyco) -> match_applied_function st e
+  | _ -> None
 
 and optimize_sub_handler st {effect_clauses= ecs; value_clause= vc} =
   let vc' = optimize_abstraction_with_ty st vc in
@@ -389,8 +409,9 @@ and optimize_sub_comp st c =
         let st' = extend_var_type st var ty in
         LetVal (optimize_expr st e1, (p, ty, optimize_comp st' c1))
     | LetRec ([(var,ty,e1)], c1) -> 
-        let st' = extend_var_type st var ty in
-        LetRec ([(var,ty,optimize_expr st' e1)],optimize_comp st' c1)
+        let st'  = extend_var_type st var ty in
+        let st'' = extend_rec_fun st' var ty e1 in
+        LetRec ([(var,ty,optimize_expr st' e1)],optimize_comp st'' c1)
     | Match (e1, abstractions) ->
         let ty = TypeChecker.type_of_expression st.tc_state e1.term in
         Match
@@ -559,6 +580,29 @@ and reduce_comp st c =
                   {term= (k_pat', k_ty, k_c'); location= handled_k.location}
               in
               reduce_comp st res )
+      | Apply (e11, e12) -> 
+          (Print.debug "Looking for recursive function name";
+           match match_applied_function st e11 with
+           | None -> c
+           | Some (fvar,fty,fbody) -> 
+               (*
+                   handle C[f] e12 with H
+                   >->
+                   let rec f' : ty_{e12} -> dty_{handle C[f] e12 with H}
+                        = fun x : ty_{e12} -> handle C[fbody] x with H
+                   in f' e12
+                *)
+               Print.debug "Found recursive function call";
+               let dty_c = TypeChecker.type_of_computation st.tc_state c.term in
+               let ty_e12 = TypeChecker.type_of_expression st.tc_state e12.term in
+               let fvar' = Variable.refresh fvar in
+               let xvar = Variable.new_fresh () "__x_of_rec__" in
+               let fty' = Arrow (ty_e12,dty_c) in
+               let fbody' = optimize_expr {st with recursive_functions = OldUtils.remove_assoc fvar st.recursive_functions}
+                 (lambda (pvar xvar, ty_e12, handle e1 (apply (Typed.subst_expr [(fvar,(refresh_expr fbody).term)] e11) (var xvar))))
+               in 
+               {c with term = LetRec ([(fvar',fty',fbody')],apply (var fvar') e12)}
+          )
       | _ -> c )
     | _ -> c )
   | Call (op, e1, a_w_ty) -> c
