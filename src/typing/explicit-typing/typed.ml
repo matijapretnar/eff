@@ -80,7 +80,7 @@ and plain_expression =
   | Tuple of expression list
   | Record of (OldUtils.field, expression) OldUtils.assoc
   | Variant of OldUtils.label * expression option
-  | Lambda of (pattern * Types.target_ty * computation)
+  | Lambda of abstraction_with_ty
   | Effect of effect
   | Handler of handler
   | BigLambdaTy of Params.Ty.t * skeleton * expression
@@ -100,7 +100,7 @@ and computation = plain_computation annotation
 
 and plain_computation =
   | Value of expression
-  | LetVal of expression * (pattern * Types.target_ty * computation)
+  | LetVal of expression * abstraction_with_ty
   | LetRec of (variable * Types.target_ty * expression) list * computation
   | Match of expression * abstraction list
   | Apply of expression * expression
@@ -155,8 +155,7 @@ and plain_toplevel =
 let var ?loc:(l = Location.unknown) v: expression =
   {term= Var v; location= l}
 
-let lambda ?loc ((_, _, c) as abs) : expression =
-  {term= Lambda abs; location= c.location}
+let lambda ?loc abs : expression = {term= Lambda abs; location= abs.location}
 
 let apply ?loc:(l = Location.unknown) e1 e2: computation =
   {term= Apply (e1,e2); location = l}
@@ -210,7 +209,7 @@ let rec print_expression ?max_level e ppf =
   | Record lst -> Print.record print_expression lst ppf
   | Variant (lbl, None) -> print "%s" lbl
   | Variant (lbl, Some e) -> print ~at_level:1 "%s %t" lbl (print_expression e)
-  | Lambda (x, t, c) ->
+  | Lambda {term= x, t, c} ->
       print "fun (%t:%t) -> (%t)" (print_pattern x) (Types.print_target_ty t)
         (print_computation c)
   | Handler h ->
@@ -301,7 +300,7 @@ and print_computation ?max_level c ppf =
       print " ( (%t) |> [%t] )" (print_computation c1) (print_ty_coercion dc)
   | CastComp_dirt (c1, dc) ->
       print "( (%t) |> [%t])" (print_computation c1) (print_dirt_coercion dc)
-  | LetVal (e1, (p, ty, c1)) ->
+  | LetVal (e1, {term= p, ty, c1}) ->
       print "let (%t = (%t)) in (%t)" (print_pattern p) (print_expression e1)
         (print_computation c1)
 
@@ -408,7 +407,8 @@ and print_top_let_abstraction (p, c) ppf =
 
 
 and print_let_rec_abstraction (x, ty, e) ppf =
-  Format.fprintf ppf "%t : %t = %t" (print_variable x) (print_target_ty ty) (print_expression e)
+  Format.fprintf ppf "%t : %t = %t" (print_variable x) (print_target_ty ty)
+    (print_expression e)
 
 
 let backup_location loc locs =
@@ -461,9 +461,7 @@ let rec refresh_expr sbst e =
 and refresh_expr' sbst = function
   | Var x as e -> (
     match OldUtils.lookup x sbst with Some x' -> Var x' | None -> e )
-  | Lambda (p, ty, c) ->
-      let sbst', p' = refresh_pattern sbst p in
-      Lambda (p', ty, refresh_comp sbst' c)
+  | Lambda abs -> Lambda (refresh_abs_with_ty sbst abs)
   | Handler h -> Handler (refresh_handler sbst h)
   | Tuple es -> Tuple (List.map (refresh_expr sbst) es)
   | Record flds -> Record (OldUtils.assoc_map (refresh_expr sbst) flds)
@@ -504,7 +502,10 @@ and refresh_comp' sbst = function
           li ([], sbst)
       in
       let li' =
-        List.map (fun (x',(ty,e)) -> (x',ty,e)) (List.combine new_xs (List.map (fun (_, ty, e) -> (ty,refresh_expr sbst' e)) li))
+        List.map
+          (fun (x', (ty, e)) -> (x', ty, e))
+          (List.combine new_xs
+             (List.map (fun (_, ty, e) -> (ty, refresh_expr sbst' e)) li))
       in
       LetRec (li', refresh_comp sbst' c1)
   | Match (e, li) -> Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
@@ -546,11 +547,7 @@ let rec subst_expr sbst e = {e with term= subst_expr' sbst e.term}
 and subst_expr' sbst = function
   | Var x as e -> (
     match OldUtils.lookup x sbst with Some e' -> e' | None -> e )
-  | Lambda (xp, t, c) -> (
-      let PVar v = xp.term in
-      match OldUtils.lookup v sbst with
-      | Some _ -> Lambda (xp, t, c)
-      | None -> Lambda (xp, t, subst_comp sbst c) )
+  | Lambda abs -> Lambda (subst_abs_with_ty sbst abs)
   | Handler h -> Handler (subst_handler sbst h)
   | Tuple es -> Tuple (List.map (subst_expr sbst) es)
   | Record flds -> Record (OldUtils.assoc_map (subst_expr sbst) flds)
@@ -599,19 +596,20 @@ and subst_handler sbst h =
 
 and subst_abs sbst a =
   let p, c = a.term in
-  (* XXX Should we check that p & sbst have disjoint variables? *)
+  (* XXX We should assert that p & sbst have disjoint variables *)
   {a with term= (p, subst_comp sbst c)}
 
 
 and subst_abs_with_ty sbst a =
   let p, t, c = a.term in
-  (* XXX Should we check that p & sbst have disjoint variables? *)
+  (* XXX We should assert that p & sbst have disjoint variables *)
   {a with term= (p, t, subst_comp sbst c)}
 
 
 and subst_abs2 sbst a2 =
   (* a2a2 @@ subst_abs sbst @@ a22a @@ a2 *)
   let p1, p2, c = a2.term in
+  (* XXX We should assert that p1, p2 & sbst have disjoint variables *)
   {a2 with term= (p1, p2, subst_comp sbst c)}
 
 
@@ -779,7 +777,7 @@ and free_vars_expr e =
   match e.term with
   | Var v -> ([], [v])
   | Tuple es -> concat_vars (List.map free_vars_expr es)
-  | Lambda a -> free_vars_plain_abs_with_ty a
+  | Lambda a -> free_vars_abs_with_ty a
   | Handler h -> free_vars_handler h
   | Record flds -> concat_vars (List.map (fun (_, e) -> free_vars_expr e) flds)
   | Variant (_, None) -> ([], [])
@@ -948,7 +946,7 @@ let rec free_dirt_vars_expression e =
   | Tuple es -> List.concat (List.map free_dirt_vars_expression es)
   | Record _ -> assert false
   | Variant _ -> assert false
-  | Lambda (pat, ty, c) -> free_dirt_vars_ty ty @ free_dirt_vars_computation c
+  | Lambda abs -> free_dirt_vars_abstraction_with_ty abs
   | Effect _ -> []
   | Handler h -> free_dirt_vars_abstraction_with_ty h.value_clause
   | BigLambdaTy (tp, sk, e) -> free_dirt_vars_expression e
@@ -970,8 +968,8 @@ let rec free_dirt_vars_expression e =
 and free_dirt_vars_computation c =
   match c.term with
   | Value e -> free_dirt_vars_expression e
-  | LetVal (e, (p, ty, c)) ->
-      free_dirt_vars_expression e @ free_dirt_vars_computation c
+  | LetVal (e, c) ->
+      free_dirt_vars_expression e @ free_dirt_vars_abstraction_with_ty c
   | LetRec _ -> assert false
   | Match (e, cases) ->
       free_dirt_vars_expression e

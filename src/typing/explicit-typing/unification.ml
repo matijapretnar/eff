@@ -174,10 +174,12 @@ let rec apply_sub_comp sub c =
 and apply_sub_plain_comp sub c =
   match c.term with
   | Value e -> Value (apply_sub_exp sub e)
-  | LetVal (e1, (p, ty, c1)) ->
-      LetVal
-        (apply_sub_exp sub e1, (p, apply_sub_ty sub ty, apply_sub_comp sub c1))
-  | LetRec ([(var,ty,e1)], c1) -> LetRec ([(var,apply_sub_ty sub ty,apply_sub_exp sub e1)], apply_sub_comp sub c1)
+  | LetVal (e1, abs) ->
+      LetVal (apply_sub_exp sub e1, apply_sub_abs_with_ty sub abs)
+  | LetRec ([(var, ty, e1)], c1) ->
+      LetRec
+        ( [(var, apply_sub_ty sub ty, apply_sub_exp sub e1)]
+        , apply_sub_comp sub c1 )
   | Match (e, alist) ->
       Match (apply_sub_exp sub e, List.map (apply_sub_abs sub) alist)
   | Apply (e1, e2) -> Apply (apply_sub_exp sub e1, apply_sub_exp sub e2)
@@ -208,8 +210,7 @@ and apply_sub_plain_exp sub e =
   | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
   | Record r -> Record r
   | Variant (lbl, e1) -> Variant (lbl, e1)
-  | Lambda (pat, ty1, c1) ->
-      Lambda (pat, apply_sub_ty sub ty1, apply_sub_comp sub c1)
+  | Lambda abs -> Lambda (apply_sub_abs_with_ty sub abs)
   | Effect eff -> Effect eff
   | Handler h -> Handler (apply_sub_handler sub h)
   | BigLambdaTy (ty_param, sk, e1) ->
@@ -512,9 +513,10 @@ and ty_omega_step sub paused cons rest_queue omega = function
       let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
       if skel_tv = skel_a then (sub, cons :: paused, rest_queue)
       else (sub, cons :: paused, SkelEq (skel_tv, skel_a) :: rest_queue)
-  | a, b -> 
-   Print.debug "can't solve subtyping for types: %t and %t" (print_target_ty a) (print_target_ty b) ;
-   assert false
+  | a, b ->
+      Print.debug "can't solve subtyping for types: %t and %t"
+        (print_target_ty a) (print_target_ty b) ;
+      assert false
 
 
 and dirt_omega_step sub paused cons rest_queue omega dcons =

@@ -274,7 +274,7 @@ and beta_reduce st ({term= p, ty, c} as a) e =
   | NotInlinable when is_atomic e ->
       Print.debug "beta_reduce not-inlinable is_atomc" ;
       substitute_pattern_comp st c p e
-  | NotInlinable -> {term= LetVal (e, (p, ty, c)); location= a.location}
+  | NotInlinable -> {term= LetVal (e, a); location= a.location}
 
 
 (*
@@ -332,7 +332,7 @@ and optimize_sub_expr st e =
     | BuiltIn (s, i) -> BuiltIn (s, i)
     | Const c -> Const c
     | Lambda plain_a_w_ty ->
-        Lambda (optimize_plain_abstraction_with_ty st plain_a_w_ty)
+        Lambda (optimize_abstraction_with_ty st plain_a_w_ty)
     | Effect op -> Effect op
     | Handler h -> Handler (optimize_sub_handler st h)
     | CastExp (e1, tyco1) ->
@@ -404,10 +404,8 @@ and optimize_sub_comp st c =
   let plain_c' =
     match c.term with
     | Value e1 -> Value (optimize_expr st e1)
-    | LetVal (e1, (p, ty, c1)) ->
-        let PVar var = p.term in
-        let st' = extend_var_type st var ty in
-        LetVal (optimize_expr st e1, (p, ty, optimize_comp st' c1))
+    | LetVal (e1, abs) ->
+        LetVal (optimize_expr st e1, optimize_abstraction_with_ty st abs)
     | LetRec ([(var,ty,e1)], c1) -> 
         let st'  = extend_var_type st var ty in
         let st'' = extend_rec_fun st' var ty e1 in
@@ -489,14 +487,12 @@ and reduce_comp st c =
   Print.debug "reduce_comp: %t" (Typed.print_computation c) ;
   match c.term with
   | Value _ -> c
-  | LetVal (e1, (p, ty, c1)) ->
-      beta_reduce st (annotate (p, ty, c1) c.location) e1
+  | LetVal (e1, abs) -> beta_reduce st abs e1
   | LetRec (bindings, c1) -> c
   | Match (e1, abstractions) -> c
   | Apply (e1, e2) -> (
     match e1 with
-    | {term= Lambda (p, ty, c)} ->
-        beta_reduce st (annotate (p, ty, c) e1.location) e2
+    | {term= Lambda abs} -> beta_reduce st abs e2
     | {term= Effect op} ->
         Print.debug "Op -> Call" ;
         let var = Typed.Variable.fresh "call_var" in
@@ -531,8 +527,9 @@ and reduce_comp st c =
           {term= CastComp (c', RightHandler tyco1); location= c.location}
     | Handler h -> (
       match c1.term with
-      | Value e1 -> (* special case that happens when the handler has no effect clauses *)
-            optimize_comp st (beta_reduce st (h.value_clause) e1)
+      | Value e1 ->
+          (* special case that happens when the handler has no effect clauses *)
+          optimize_comp st (beta_reduce st h.value_clause e1)
       | CastComp (c1', dtyco1) -> (
         match is_relatively_pure st c1' h with
         | Some dtyco ->
@@ -558,7 +555,7 @@ and reduce_comp st c =
                     , abstraction p12 (handle (refresh_expr e1) c12) ) }
         | None -> c )
       | Call (eff, e11, k_abs) -> (
-          let {term= k_pat, k_ty, k_c} = refresh_abs_with_ty k_abs in
+          let {term= k_pat, k_ty, k_c} as k_abs' = refresh_abs_with_ty k_abs in
           let PVar k_var = k_pat.term in
           let {term= k_pat', k_c'} as handled_k =
             abstraction k_pat
@@ -572,13 +569,9 @@ and reduce_comp st c =
               (* Shouldn't we check for inlinability of p1 and p2 here? *)
               substitute_pattern_comp st
                 (Typed.subst_comp (Typed.pattern_match p1 e11) c)
-                p2
-                (lambda (k_pat', k_ty, k_c'))
+                p2 (lambda k_abs')
           | None ->
-              let res =
-                call eff e11
-                  {term= (k_pat', k_ty, k_c'); location= handled_k.location}
-              in
+              let res = call eff e11 k_abs' in
               reduce_comp st res )
       | Apply (e11, e12) -> 
           (Print.debug "Looking for recursive function name";
@@ -599,7 +592,7 @@ and reduce_comp st c =
                let xvar = Variable.new_fresh () "__x_of_rec__" in
                let fty' = Arrow (ty_e12,dty_c) in
                let fbody' = optimize_expr {st with recursive_functions = OldUtils.remove_assoc fvar st.recursive_functions}
-                 (lambda (pvar xvar, ty_e12, handle e1 (apply (Typed.subst_expr [(fvar,(refresh_expr fbody).term)] e11) (var xvar))))
+                 (lambda (abstraction_with_ty (pvar xvar) ty_e12 (handle e1 (apply (Typed.subst_expr [(fvar,(refresh_expr fbody).term)] e11) (var xvar)))))
                in 
                {c with term = LetRec ([(fvar',fty',fbody')],apply (var fvar') e12)}
           )
