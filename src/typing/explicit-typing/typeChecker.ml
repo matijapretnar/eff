@@ -59,7 +59,7 @@ let rec check_well_formed_skeleton st = function
   | ForallSkel (skp, sk1) ->
       let st' = extend_skel_params st skp in
       check_well_formed_skeleton st' sk1
-  | _ -> failwith "Not yet implemented"
+  | _ -> assert false
 
 
 let check_well_formed_dirt st = function
@@ -195,7 +195,7 @@ let rec type_of_ty_coercion st ty_coer =
           assert (cons1 = cons2 && cons2 = dirt_coer_applied_cons) ;
           (t1, t2)
       | _ -> assert false )
-  | _ -> failwith "Not yet implemented"
+  | _ -> assert false
 
 
 and type_of_dirty_coercion st dirty_coer =
@@ -254,7 +254,7 @@ let rec extend_pattern_types st p ty =
       in
       assert (Types.types_are_equal ty_c ty) ;
       st
-  | _ -> failwith "Not yet implemented"
+  | _ -> assert false
 
 
 let type_of_const = function
@@ -269,7 +269,7 @@ let rec type_of_expression st e =
   | Var v -> (
     match OldUtils.lookup v st.var_types with
     | Some ty -> ty
-    | _ -> assert false )
+    | _ -> Print.debug "type_of_expression: variable not found: %t" (Variable.print ~safe:true v) ; assert false )
   | Const const -> type_of_const const
   | Lambda abs ->
       let ty1, c_ty = type_of_abstraction_with_ty st abs in
@@ -342,7 +342,7 @@ let rec type_of_expression st e =
           assert (dc1' = cons) ;
           e1_ty
       | _ -> assert false
-      | _ -> failwith "Not yet implemented"
+      | _ -> assert false
 
 and type_of_computation st c =
   match c with
@@ -400,7 +400,7 @@ and type_of_computation st c =
       let st' = extend_var_types st var ty in
       assert (Types.types_are_equal ty (type_of_expression st' e1.term)) ;
       type_of_computation st' c1.term
-  | _ -> failwith "Not yet implemented"
+  | _ -> assert false
 
 and type_of_handler st h =
   let tv, type_cv = type_of_abstraction_with_ty st h.value_clause in

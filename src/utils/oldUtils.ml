@@ -47,6 +47,9 @@ let rec lookup x = function
 let lookup_default x =
   List.fold_right (fun (x', y) rest -> if x = x' then y else rest)
 
+let rec remove_assoc x = function
+  | [] -> []
+  | (k,v) :: ys -> if x = k then ys else (k,v) :: remove_assoc x ys
 
 let rec find p = function
   | [] -> None
