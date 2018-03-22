@@ -1,0 +1,447 @@
+(** Overview of syntax *)
+
+(* Before we take a look at effects, let us see the rest of Eff.
+   If you have ever programmed in OCaml, Eff should be very familiar as it
+   closely follows OCaml in everything except in the approach to effects.
+   If you are not familiar with OCaml, you should try it out at
+      http://try.ocamlpro.com *)
+
+(* You can define variables. *)
+let x = 10 + 10
+let y = x * 3
+
+(* You can define functions. *)
+let double x = 2 * x
+
+(* Functions can be recursive. *)
+let rec fact n =
+  if n = 0 then 1 else n * fact (n - 1)
+
+(* Or even mutually recursive. *)
+let rec even n =
+  match n with
+  | 0 -> true
+  | x -> odd (x-1)
+and odd n =
+  match n with
+  | 0 -> false
+  | x -> even (x-1)
+
+(* You can declare your own types. *)
+type shape =
+  | Circle of float
+  | Rectangle of float * float
+
+(* And you can use pattern matching to define functions on such types. *)
+let area shape =
+  match shape with
+  | Circle r -> 3.14159 *. r *. r
+  | Rectangle (w, h) -> w *. h
+
+(* You can write the above using the "function" shortcut. *)
+let perimeter = function
+  | Circle r -> 2.0 *. 3.14159 *. r
+  | Rectangle (w, h) -> 2.0 *. (w +. h)
+
+(* Like in OCaml, a double semicolon separates commands in a file. *)
+;;
+
+(** Printing to the standard output *)
+
+(* The main premise of algebraic effects, which is what Eff is based on,
+   is that each effect (manipulating memory, exceptions, ...) arises from
+   a set of basic operations, for example lookup & update or raise.
+   For example, we print out messages by calling the operation
+   "#Print". Here, "Print" is the operation name that signifies the action,
+   and "#" indicates that it is an operation. *)
+
+(* To recap: you print out messages by calling "#Print". For example: *)
+
+#Print "Hello, world!\n" ;;
+
+(* Where Eff really differs from OCaml is that you can handle such calls.
+   For example, the program inside the handler would print "A", "B", "C" and "D",
+   but the handler overrides it just as an exception handler would override an
+   exception. Thus, the program should output just:
+
+    "I see you tried to print A. Not so fast!" *)
+
+handle
+    #Print "A";
+    #Print "B";
+    #Print "C";
+    #Print "D"
+with
+| #Print msg k ->
+    #Print ("I see you tried to print " ^ msg ^ ". Not so fast!\n")
+;;
+
+(* You may be wondering what the second parameter "k" in the handling clause
+   for Print is. It stands for the continuation, i.e. the part of the program
+   that is waiting for the result of print. The difference between exception
+   handlers and general effect handlers is that we may call this continuation.
+   For example, instead of stopping after the first print like above, we may
+   handle it and then resume the continuation by passing it "()", the unit
+   result expected from the call of Print. *)
+
+handle
+    #Print "A";
+    #Print "B";
+    #Print "C";
+    #Print "D"
+with
+| #Print msg k ->
+    #Print ("I see you tried to print " ^ msg ^ ". Okay, you may.\n");
+    k ()
+;;
+
+(* The handlers may be even more complex. For example, we may create a handler
+   to collect all Print calls, and instead of printing the strings separately,
+   the handler returns a combined string of all prints. *)
+
+let collect = handler
+    (* We return the value of the computation and a string. *)
+    | val x -> (x, "")
+    | #Print msg k ->
+      (* First see what the rest of the computation returns and prints... *)
+      let (result, msgs) = k () in
+      (* Add the string that we want to print at the begining. *)
+        (result, msg ^ msgs)
+;;
+
+with collect handle
+    #Print "A";
+    #Print "B";
+    #Print "C";
+    #Print "D"
+;;
+
+(** Non-determinism *)
+
+(* We will model non-determinism by implementing two operations, Decide and
+   Fail. Decide will be used to `non-deterministically' choose the correct path
+   while Fail signals that a choice fails to return a suitable answer. *)
+
+effect Fail : unit -> empty
+effect Decide : unit -> bool
+
+(* We use a trick to ensure that using Fail typechecks correctly by wrapping
+   it in a function. For aesthetic purposes we also wrap Decide in a function. *)
+
+let fail () = (match #Fail () with)
+let decide () = #Decide ()
+;;
+
+(* We create a few different handlers to handle the above effects. The simplest
+   handler is "choose_true" that always decides to use true. A more interesting
+   example is the "choose_max" handler, that returns the maximal result of all
+   possible choices, while "choose_all" instead returns a list of all possible
+   results. *)
+
+let choose_true =
+    handler
+    | #Decide () k -> k true
+
+(* In the case of choose_max and choose_all the continuation is used twice.*)
+let choose_max =
+    handler
+    | #Decide () k -> max (k true) (k false)
+
+let choose_all =
+    handler
+    | val x -> [x]
+    | #Fail () _ -> []
+    | #Decide () k -> (k true) @ (k false)
+;;
+
+(* Even on a small example the behaviour of the three handlers varies greatly. *)
+with choose_true handle
+  let x = (if decide () then 10 else 20) in
+  let y = (if decide () then 0 else 5) in
+  x - y
+;;
+
+with choose_max handle
+  let x = (if decide () then 10 else 20) in
+  let y = (if decide () then 0 else 5) in
+  x - y
+;;
+
+with choose_all handle
+  let x = (if decide () then 10 else 20) in
+  let y = (if decide () then 0 else 5) in
+  x - y
+;;
+
+(* We can use our boolean decision to construct a decision over integers.
+   In the decision we only consider integers on an interval [m,n]. *)
+
+let rec choose_int m n =
+  if m > n then
+    fail ()
+  else if decide () then
+    m
+  else
+    choose_int (m + 1) n
+;;
+
+(* This can be used for finding pythagorean triples. *)
+
+let int_sqrt m =
+  (* Returns an integer square root if it exists. *)
+  let rec try n =
+    let n2 = n ** 2 in
+    if n2 > m then
+      None
+    else if n2 = m then
+      Some n
+    else
+      try (n + 1)
+  in
+  try 0
+;;
+
+let pythagorean m n =
+  (* Choose the bigger integer. *)
+  let a = choose_int m (n - 1) in
+  (* Choose the smaller integer. *)
+  let b = choose_int a n in
+  (* Check if they are part of a pythagorean triple. *)
+  match int_sqrt (a ** 2 + b ** 2) with
+  | None -> fail ()
+  | Some c -> (a, b, c)
+;;
+
+(* We also construct an additional handler that simply tries to get one viable
+   solution. *)
+let backtrack = handler
+  | #Decide () k ->
+    (* We use a second handler to handle the continuation. *)
+    handle k false with
+    | #Fail () _ -> k true
+;;
+
+(* You can test the different handlers on the following examples. *)
+with backtrack handle
+  pythagorean 5 15
+;;
+
+with choose_all handle
+  pythagorean 3 4
+;;
+
+with choose_all handle
+  pythagorean 5 15
+;;
+
+(* Eight queens problem *)
+
+(* Using the non-determinism approach we can also solve more complex problems,
+   for instance the well known eight queens problem. *)
+
+let rec choose = function
+  | [] -> fail ()
+  | x :: xs -> if decide () then x else choose xs
+
+let no_attack (x, y) (x', y') =
+  x <> x' && y <> y' && abs (x - x') <> abs (y - y');;
+
+(* For a given x check available y. *)
+let available x qs =
+  filter (fun y -> forall (no_attack (x, y)) qs) [1; 2; 3; 4; 5; 6; 7; 8];;
+
+let rec place x qs =
+  if x = 9 then qs else
+  let y = choose (available x qs) in
+  place (x + 1) ((x, y) :: qs)
+
+let backtrack = handler
+| #Decide () k ->
+    handle k true with
+    | #Fail () _ -> k false
+;;
+
+with backtrack handle
+  place 1 []
+;;
+
+(** Probability *)
+
+(* As seen in non-determinism examples, effects can be used to simulate choice.
+   In order to use randomness we also need to use effects, for instance
+   Random_int and Random_float. We can also use handlers to compute some
+   properties, for instance the expected value of a discrete random variable. *)
+
+(* We define an operation Toss to use as a random coin toss. *)
+effect Toss : float -> bool
+
+(* Using the operation Toss we can define other distributions as well. *)
+let rec uniform = function
+  | [x] -> x
+  | x :: xs ->
+      let n = length xs + 1 in
+      let p = 1.0 /. float_of_int n in
+      if #Toss p then x else uniform xs
+;;
+
+let random_value = handler
+  | val v -> v
+  | #Toss p k ->
+    let toss = #Random_float 1. < p in k toss
+;;
+
+let expectation = handler
+  | val v -> v
+  | #Toss p k -> p *. k true +. (1.0 -. p) *. k false
+;;
+
+with expectation handle
+  let x = uniform [1.; 2.; 3.; 4.; 5.; 6.] in
+  let y = uniform [1.; 2.; 3.; 4.; 5.; 6.] in
+  x +. y
+;;
+
+(* We can also compute the distribution of outcomes for a probabilisitic
+   computation. *)
+
+(* We first write a function that combines two outcome distributions where
+   the first outcome distribution is chosen with the probability p and the second
+   with probability 1-p. *)
+
+let combine p dist1 dist2 =
+  let scale p dist = map (fun (x, q) -> (x, p *. q)) dist in
+  let rec add (x, p) = function
+    | [] -> [(x, p)]
+    | (y, q) :: dist ->
+      if x = y then (x, p +. q) :: dist else (y, q) :: add (x, p) dist
+  in
+  let dist1 = scale p dist1 in
+  let dist2 = scale (1.0 -. p) dist2 in
+  fold_right add dist1 dist2
+;;
+
+let distribution = handler
+  | val v -> [(v, 1.0)] (* Distribution of only one value. *)
+  | #Toss p k -> combine p (k true) (k false) (* Combine possible distributions. *)
+;;
+
+with distribution handle
+  let x = uniform [1; 2; 3; 4; 5; 6] in
+  let y = uniform [1; 2; 3; 4; 5; 6] in
+  x + y
+;;
+
+(** State *)
+
+(* It is often beneficial to have some form of a mutable state, which can be
+   implemented using handlers. Below is an example of a simple integer state. *)
+
+effect Get: unit -> int
+effect Set: int -> unit
+
+(* The monad_state handler wraps the computation in a function and the state
+   is passed around as the function input. The initial value of the state
+   is given to the transformed computation as input. *)
+
+let monad_state = handler
+  | val y -> (fun _ -> y)
+  | #Get () k -> (fun s -> k s s)
+  | #Set s' k -> (fun _ -> k () s')
+;;
+
+let f = with monad_state handle
+    let x = #Get () in
+    #Set (2 * x);
+    #Get () + 10
+in
+f 30
+;;
+
+(* We can improve it by giving the state a default initial value using the
+   "finally" keyword. The value of the initial value is given to the handler
+   as a parameter. By modifying the case for values we also return the result
+   and the final state value instead of just the result. *)
+
+let better_state initial = handler
+  | val y -> (fun s -> (y, s))
+  | #Get () k -> (fun s -> k s s)
+  | #Set s' k -> (fun _ -> k () s')
+  | finally f -> f initial
+;;
+
+with better_state 30 handle
+  let x = #Get () in
+  #Set (2 * x);
+  #Get () + 10
+;;
+
+(** Multi-threading *)
+
+effect Yield : unit -> unit
+effect Spawn : (unit -> unit) -> unit
+
+(* We will need a queue to keep track of inactive threads. *)
+effect Get_next : unit -> (unit -> unit) option
+effect Add_to_queue : (unit -> unit) -> unit
+
+let queue initial = handler
+  | #Get_next () k ->
+    ( fun queue -> match queue with
+    | [] -> k None []
+    | hd::tl -> k (Some hd) tl )
+  | #Add_to_queue y k -> ( fun queue -> k () (queue @ [y]))
+  | val x -> ( fun _ -> x)
+  | finally x -> x initial
+;;
+
+let round_robin =
+  let enqueue t =
+    #Add_to_queue t
+  in
+  let dequeue () =
+    match #Get_next () with
+    | None -> ()
+    | Some t -> t ()
+  in
+  let rec rr_handler () = handler
+    | #Yield () k -> enqueue k; dequeue ()
+    | #Spawn t k -> enqueue k; with rr_handler () handle t ()
+    | val () -> dequeue ()
+  in
+  rr_handler ()
+;;
+
+(* Because the round_robin handler uses our queue, we must nest the handlers. *)
+with queue [] handle
+with round_robin handle
+  #Spawn (fun _ ->
+    iter (fun x -> #Print x; #Yield ()) ["a"; "b"; "c"; "d"; "e"]
+  );
+  #Spawn (fun _ ->
+    iter (fun x -> #Print x; #Yield ()) ["A"; "B"; "C"; "D"; "E"]
+  )
+;;
+
+(* We can run an unbounded amount of threads. The following example enumerates all
+   reduced positive fractions less than 1 by spawning a thread for each denominator
+   between d and e. *)
+let rec fractions d e =
+  let rec find_fractions n =
+    (* If the fraction is reduced, print it and yield *)
+    (if (gcd n d = 1) then
+      #Print (to_string n ^ "/" ^ to_string d ^ ", "); #Yield ()
+    else ());
+    if d > n then
+      find_fractions (n+1)
+    else ()
+  in
+  (* Spawn a thread for the next denominator *)
+  if d < e then #Spawn (fun _ -> #Yield (); fractions (d + 1) e) else () ;
+  (* List all the fractions with the current denominator *)
+  find_fractions 1
+;;
+
+with queue [] handle
+with round_robin handle
+  fractions 1 10
+;;

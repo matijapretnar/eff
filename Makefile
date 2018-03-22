@@ -37,6 +37,13 @@ configure:
 
 # OASIS_STOP
 
+OCAMLBUILD ?= ocamlbuild
+JSFLAGS = -use-menhir -menhir "menhir --explain" -use-ocamlfind -plugin-tag "package(js_of_ocaml.ocamlbuild)"
+
+jseff:
+	$(OCAMLBUILD) $(JSFLAGS) src/jseff.js
+	cp _build/src/jseff.js docs/try
+
 eff: setup.data
 	$(SETUP) -build $(BUILDFLAGS)
 
@@ -49,4 +56,4 @@ test: eff
 test-validate: eff
 	cd tests && sh ./test.sh -v
 
-.PHONY: test test-validate
+.PHONY: test test-validate jseff
