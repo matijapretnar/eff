@@ -14,6 +14,7 @@ Js.export "jseff"
 
      method reset echo =
        let ppf = js_formatter echo in
+       Tctx.reset ();
        Shell.initial_state
 
      method toplevel echo env cmd =

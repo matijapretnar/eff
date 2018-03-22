@@ -59,23 +59,7 @@
       <div class="row">
         <div class="col-8">
           <!-- CodeMirror editor -->
-          <textarea id="sourcecode">
--- Church numerals
-zero := ^ f x . x ;
-suc := ^ n f x . f (n f x) ;
-plus := ^ n m f x . n f (m f x) ;
-times := ^ n m f x . n (m f) x ;
-one := suc zero ;
-two := plus one one ;
-three := plus two one ;
-six := times two three ;
-:constant Z ;
-:constant S ;
-:eager ;
-(times six two) S Z ;
-:lazy ;
-(times six two) S Z
-</textarea>
+          <textarea id="sourcecode"></textarea>
           <script>
             var editor = CodeMirror.fromTextArea(document.getElementById("sourcecode"), {
             lineNumbers: true,
@@ -108,6 +92,9 @@ six := times two three ;
           });
 
          var env = jseff.reset()(terminal.echo);
+          jQuery.get('pervasives.eff', function(data) {
+            env = jseff.usefile()(function(){})(env)(data);
+          })
 
          $('#runButton').click(function () {
             env = jseff.usefile()(terminal.echo)(env)(editor.getValue());
@@ -116,7 +103,14 @@ six := times two three ;
          $('#resetButton').click(function () {
           terminal.clear();
           env = jseff.reset()(terminal.echo);
+          jQuery.get('pervasives.eff', function(data) {
+            env = jseff.usefile()(function(){})(env)(data);
+          })
          });
+
+jQuery.get('examples.eff', function(data) {
+   editor.setValue(data);
+});     
          </script>
         </div>
         <div class="col">
