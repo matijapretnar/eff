@@ -204,19 +204,22 @@ and computation ctx (t, loc) =
         (w1 @ w2, Untyped.Apply (e1, e2))
     | Sugared.Effect (eff, t) ->
         let w, e = expression ctx t in
-        let annotated_eff = Untyped.add_loc (Untyped.Effect eff) loc in
-          (w, Untyped.Apply (annotated_eff, e))
+        let loc_eff = Untyped.add_loc (Untyped.Effect eff) loc in
+          (w, Untyped.Apply (loc_eff, e))
     | Sugared.Match (t, cs) ->
       (* Separate value and effect cases. *)
-        let separate_cs case (val_cs, eff_cs) =
-          match case with
-          | Sugared.Val_match v_cs -> (v_cs::val_cs, eff_cs)
-          | Sugared.Eff_match e_cs -> (val_cs, e_cs::eff_cs)
-        in
-        let val_cs, eff_cs = List.fold_right separate_cs cs ([], []) in
+        let val_cs, eff_cs = separate_match_cases cs in
         let val_cs = List.map (abstraction ctx) val_cs in
-        let w, e = expression ctx t in
-        (w, Untyped.Match (e, val_cs))
+        let sugared_h =
+          { Sugared.effect_clauses = eff_cs
+          ; Sugared.value_clause = None
+          ; Sugared.finally_clause = None}
+        in
+        let w1, h = handler loc ctx sugared_h in
+        let w2, e = expression ctx t in
+        (* let loc_h = Untyped.add_loc (Untyped.Handler h) loc in
+           let loc_handle = Untyped.add_loc (Untyped.Handle (loc_h, c)) loc in *)
+        (w1 @ w2, Untyped.Match (e, val_cs))
     | Sugared.Handle (t1, t2) ->
         let w1, e1 = expression ctx t1 in
         let c2 = computation ctx t2 in
@@ -267,7 +270,7 @@ and computation ctx (t, loc) =
        future changes. *)
     | Sugared.Var _ | Sugared.Const _ | Sugared.Tuple _ | Sugared.Record _
      |Sugared.Variant _ | Sugared.Lambda _ | Sugared.Function _
-     |Sugared.Handler _ | Sugared.Effect _ ->
+     |Sugared.Handler _ ->
         let w, e = expression ctx (t, loc) in
         (w, Untyped.Value e)
   in
@@ -339,6 +342,13 @@ and handler loc ctx
         | None -> id_abstraction loc
         | Some a -> abstraction ctx a ) } )
 
+and separate_match_cases cs =
+  let separator case (val_cs, eff_cs) =
+    match case with
+    | Sugared.Val_match v_cs -> (v_cs::val_cs, eff_cs)
+    | Sugared.Eff_match e_cs -> (val_cs, e_cs::eff_cs)
+  in
+  List.fold_right separator cs ([], [])
 
 let top_ctx = ref []
 

@@ -91,7 +91,7 @@ let (!=) x y = not (x = y)
 (* Lists *)
 type 'a option = None | Some of 'a
 
-let rec assoc_opt x = function
+let rec assoc x = function
   | [] -> None
   | (y,z)::lst -> if x = y then Some z else assoc x lst
 
@@ -117,11 +117,11 @@ let rec map f = function
       y :: ys;;
 
 let hd = function
-  | [] ->  absurd (#InvalidArgument "head: empty list")
+  | [] ->  absurd (perform (InvalidArgument "head: empty list"))
   | x :: _ -> x
 
 let tl = function
-  | [] ->  absurd (#InvalidArgument "tail: empty list")
+  | [] ->  absurd (perform (InvalidArgument "tail: empty list"))
   | x :: xs -> xs
 
 let take f k =
