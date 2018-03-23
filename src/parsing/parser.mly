@@ -146,7 +146,7 @@ term: mark_position(plain_term) { $1 }
 plain_term:
   | MATCH t = term WITH cases = cases0(match_case) (* END *)
     { Match (t, cases) }
-  | FUNCTION cases = cases(match_case) (* END *)
+  | FUNCTION cases = cases(function_case) (* END *)
     { Function cases }
   | HANDLER h = handler (* END *)
     { fst h }
@@ -263,9 +263,15 @@ const_term:
   | f = FLOAT
     { Const.of_float f }
 
-match_case:
+function_case:
   | p = pattern ARROW t = term
     { (p, t) }
+
+match_case:
+  | p = pattern ARROW t = term
+    { Val_match (p, t) }
+  | EFFECT LPAREN eff = effect p = pattern RPAREN k = simple_pattern ARROW t = term
+    { Eff_match (eff, (p, k, t)) }
 
 lambdas0(SEP):
   | SEP t = term
@@ -291,9 +297,9 @@ handler_clause: mark_position(plain_handler_clause) { $1 }
 plain_handler_clause:
   | EFFECT LPAREN eff = effect p = simple_pattern RPAREN k = simple_pattern ARROW t2 = term
     { EffectClause (eff, (p, k, t2)) }
-  | VAL c = match_case
+  | VAL c = function_case
     { ReturnClause c }
-  | FINALLY c = match_case
+  | FINALLY c = function_case
     { FinallyClause c }
 
 pattern: mark_position(plain_pattern) { $1 }

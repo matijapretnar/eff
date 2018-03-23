@@ -207,9 +207,16 @@ and computation ctx (t, loc) =
         let annotated_eff = Untyped.add_loc (Untyped.Effect eff) loc in
           (w, Untyped.Apply (annotated_eff, e))
     | Sugared.Match (t, cs) ->
-        let cs = List.map (abstraction ctx) cs in
+      (* Separate value and effect cases. *)
+        let separate_cs case (val_cs, eff_cs) =
+          match case with
+          | Sugared.Val_match v_cs -> (v_cs::val_cs, eff_cs)
+          | Sugared.Eff_match e_cs -> (val_cs, e_cs::eff_cs)
+        in
+        let val_cs, eff_cs = List.fold_right separate_cs cs ([], []) in
+        let val_cs = List.map (abstraction ctx) val_cs in
         let w, e = expression ctx t in
-        (w, Untyped.Match (e, cs))
+        (w, Untyped.Match (e, val_cs))
     | Sugared.Handle (t1, t2) ->
         let w1, e1 = expression ctx t1 in
         let c2 = computation ctx t2 in
