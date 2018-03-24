@@ -207,19 +207,7 @@ and computation ctx (t, loc) =
         let loc_eff = Untyped.add_loc (Untyped.Effect eff) loc in
           (w, Untyped.Apply (loc_eff, e))
     | Sugared.Match (t, cs) ->
-      (* Separate value and effect cases. *)
-        let val_cs, eff_cs = separate_match_cases cs in
-        let val_cs = List.map (abstraction ctx) val_cs in
-        let sugared_h =
-          { Sugared.effect_clauses = eff_cs
-          ; Sugared.value_clause = None
-          ; Sugared.finally_clause = None}
-        in
-        let w1, h = handler loc ctx sugared_h in
-        let w2, e = expression ctx t in
-        (* let loc_h = Untyped.add_loc (Untyped.Handler h) loc in
-           let loc_handle = Untyped.add_loc (Untyped.Handle (loc_h, c)) loc in *)
-        (w1 @ w2, Untyped.Match (e, val_cs))
+        match_constructor ctx loc t cs
     | Sugared.Handle (t1, t2) ->
         let w1, e1 = expression ctx t1 in
         let c2 = computation ctx t2 in
@@ -341,6 +329,29 @@ and handler loc ctx
         ( match fin_a with
         | None -> id_abstraction loc
         | Some a -> abstraction ctx a ) } )
+
+and match_constructor ctx loc t cs =
+  (* Separate value and effect cases. *)
+  let val_cs, eff_cs = separate_match_cases cs in
+  match eff_cs with
+  | [] ->
+    let val_cs = List.map (abstraction ctx) val_cs in
+    let w, e = expression ctx t in
+    (w, Untyped.Match (e, val_cs))
+  | _ ->
+    let val_cs = List.map (fun cs -> Sugared.Val_match cs) val_cs in
+    let x = "$id_par" in
+    let value_match = (Sugared.Match ((Sugared.Var x, loc), val_cs), loc) in
+    let h_value_clause = Some ((Sugared.PVar x, loc), value_match) in
+    let sugared_h =
+      { Sugared.effect_clauses = eff_cs
+      ; Sugared.value_clause = h_value_clause
+      ; Sugared.finally_clause = None}
+    in
+    let w, h = handler loc ctx sugared_h in
+    let c = computation ctx t in
+    let loc_h = Untyped.add_loc (Untyped.Handler h) loc in
+    (w, Untyped.Handle (loc_h, c))
 
 and separate_match_cases cs =
   let separator case (val_cs, eff_cs) =
