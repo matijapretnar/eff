@@ -397,8 +397,7 @@ and match_knot_function' st e e' h =
     (match OldUtils.lookup fvar st.knot_functions with
      | None -> None
      | Some (ef,hf,fvar') ->
-         Print.debug "%t vs. %t" (print_ha) ();
-         if alphaeq_expr [] e' ef && alphaeq_handler [] h h'
+         if alphaeq_expr [] e' ef && alphaeq_handler [] hf h
            then Some fvar'
            else None)
   | ApplyTyExp (e, ty) -> match_knot_function' st e e' h
@@ -649,7 +648,8 @@ and reduce_comp st c =
                let fty' = Arrow (ty_e12,dty_c) in
                let st' = {st with recursive_functions = OldUtils.remove_assoc fvar st.recursive_functions
                                 ; knot_functions = (fvar, (e11, h, fvar')) :: st.knot_functions } in
-               let fbody' = optimize_expr st'
+               let st'' = extend_var_type st' fvar' fty' in 
+               let fbody' = optimize_expr st''
                  (lambda (abstraction_with_ty (pvar xvar) ty_e12 (handle e1 (apply (Typed.subst_expr [(fvar,(refresh_expr fbody).term)] e11) (var xvar)))))
                in 
                {c with term = LetRec ([(fvar',fty',fbody')],apply (var fvar') e12)}

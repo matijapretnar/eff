@@ -660,7 +660,7 @@ let rec alphaeq_expr eqvars e e' = Print.debug "alphaeq_expr: %t vs %t" (print_e
 and alphaeq_expr' eqvars e e' =
   match (e, e') with
   | Var x, Var y -> List.mem (x, y) eqvars || Variable.compare x y = 0
-  | Lambda a, Lambda a' -> assert false
+  | Lambda a, Lambda a' -> alphaeq_abs_with_ty eqvars a a'
   | Handler h, Handler h' -> alphaeq_handler eqvars h h'
   | Tuple es, Tuple es' -> List.for_all2 (alphaeq_expr eqvars) es es'
   | Record flds, Record flds' -> assoc_equal (alphaeq_expr eqvars) flds flds'
@@ -698,7 +698,15 @@ and alphaeq_comp' eqvars c c' =
   | _, _ -> false
 
 
-and alphaeq_handler eqvars h h' = assert false
+and alphaeq_handler eqvars h h' = 
+  alphaeq_abs_with_ty eqvars h.value_clause h'.value_clause    && 
+  List.length h.effect_clauses = List.length h'.effect_clauses &&
+  List.for_all (fun (effect,abs2) -> 
+                 match OldUtils.lookup effect h'.effect_clauses with
+                 | Some abs2' -> alphaeq_abs2 eqvars abs2 abs2'
+                 | None -> false
+              ) 
+    h.effect_clauses 
 
 (*   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
   alphaeq_abs eqvars h.value_clause h'.value_clause *)
@@ -707,11 +715,21 @@ and alphaeq_abs eqvars {term= p, c} {term= p', c'} =
   | Some eqvars' -> alphaeq_comp eqvars' c c'
   | None -> false
 
+and alphaeq_abs_with_ty eqvars {term= p, ty, c} {term= p', ty', c'} =
+  match make_equal_pattern eqvars p p' with
+  | Some eqvars' -> alphaeq_comp eqvars' c c'
+  | None -> false
 
-and alphaeq_abs2 eqvars a2 a2' =
+
+and alphaeq_abs2 eqvars {term= p1, p2, c} {term= p1', p2', c'} =
   (* alphaeq_abs eqvars (a22a a2) (a22a a2') *)
-  assert false
-
+  match make_equal_pattern eqvars p1 p1' with
+  | Some eqvars' -> 
+      (match make_equal_pattern eqvars' p2 p2' with 
+       | Some eqvars'' -> alphaeq_comp eqvars'' c c'
+       | None -> false
+      )
+  | None -> false
 
 let pattern_match p e =
   (* XXX The commented out part checked that p and e had matching types *)
