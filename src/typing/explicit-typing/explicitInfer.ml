@@ -31,7 +31,7 @@ let apply_sub_to_env env sub =
 let rec source_to_target ty =
   match ty with
   | T.Apply (ty_name, []) -> source_to_target (T.Basic ty_name)
-  | T.Apply (_, _) -> assert false
+  | T.Apply (_, _) -> failwith __LOC__
   | T.TyParam p -> Types.TyParam p
   | T.Basic s -> (
     match s with
@@ -62,13 +62,10 @@ and type_plain_pattern = function
   | Untyped.PConst const -> Typed.PConst const
   | Untyped.PTuple ps -> Typed.PTuple (List.map type_pattern ps)
   | Untyped.PRecord [] -> assert false
-  | Untyped.PRecord ((fld, _) :: _ as lst) ->
-      assert false
-      (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  | Untyped.PVariant (lbl, p) -> assert false
+  | Untyped.PRecord ((fld, _) :: _ as lst) -> failwith __LOC__
+  | Untyped.PVariant (lbl, p) -> failwith __LOC__
 
 
-(* in fact it is not yet implemented, but assert false gives us source location automatically *)
 (*
 
      ===========================
@@ -99,10 +96,10 @@ and type_plain_pattern' in_cons st pat ty =
       let st' = add_def st x ty in
       (Typed.PVar x, st', in_cons)
   | Untyped.PNonbinding -> (Typed.PNonbinding, st, in_cons)
-  | Untyped.PAs (p, v) -> assert false
-  | Untyped.PTuple l -> assert false
-  | Untyped.PRecord r -> assert false
-  | Untyped.PVariant (l, p) -> assert false
+  | Untyped.PAs (p, v) -> failwith __LOC__
+  | Untyped.PTuple l -> failwith __LOC__
+  | Untyped.PRecord r -> failwith __LOC__
+  | Untyped.PVariant (l, p) -> failwith __LOC__
   | Untyped.PConst c ->
       let ty_c = source_to_target (ty_of_const c) in
       let _omega, q = Typed.fresh_ty_coer (ty_c, ty) in
@@ -208,8 +205,8 @@ let rec free_dirt_vars_expression e =
   | Typed.BuiltIn _ -> []
   | Typed.Const _ -> []
   | Typed.Tuple es -> List.concat (List.map free_dirt_vars_expression es)
-  | Typed.Record _ -> assert false
-  | Typed.Variant _ -> assert false
+  | Typed.Record _ -> failwith __LOC__
+  | Typed.Variant _ -> failwith __LOC__
   | Typed.Lambda abs -> free_dirt_vars_abstraction_with_ty abs
   | Typed.Effect _ -> []
   | Typed.Handler h -> free_dirt_vars_abstraction_with_ty h.value_clause
@@ -247,7 +244,7 @@ and free_dirt_vars_computation c =
       free_dirt_vars_expression e1 @ free_dirt_vars_expression e2
   | Typed.Handle (e, c) ->
       free_dirt_vars_expression e @ free_dirt_vars_computation c
-  | Typed.Call (_, e, awty) -> assert false
+  | Typed.Call (_, e, awty) -> failwith __LOC__
   | Typed.Op (_, e) -> free_dirt_vars_expression e
   | Typed.Bind (c, a) ->
       free_dirt_vars_computation c @ free_dirt_vars_abstraction a
@@ -461,7 +458,7 @@ let rec apply_sub_to_type ty_subs dirt_subs ty =
         , (apply_sub_to_type ty_subs dirt_subs c, apply_sub_to_dirt dirt_subs d)
         )
   | Types.PrimTy _ -> ty
-  | _ -> assert false
+  | _ -> failwith __LOC__
 
 
 and apply_sub_to_dirt dirt_subs drt =
@@ -597,11 +594,7 @@ and type_plain_expr in_cons st = function
         Print.debug "returned_type: %t"
           (Types.print_target_ty applied_basic_type) ;
         (returned_x.term, applied_basic_type, returnd_cons @ in_cons, [])
-    | None ->
-        Print.debug "Variable not found: %t" (Typed.print_variable x) ;
-        assert false
-        (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-    )
+    | None -> Error.typing "Variable not found: %t" (Typed.print_variable x) )
   | Untyped.Const const -> (
     match const with
     | Integer _ -> (Typed.Const const, Types.PrimTy IntTy, in_cons, [])
@@ -629,12 +622,8 @@ and type_plain_expr in_cons st = function
           target_list []
       in
       (target_terms, target_types, in_cons @ target_cons, target_sub)
-  | Untyped.Record lst ->
-      assert false
-      (* in fact it is not yet implemented, but assert false gives us source location automatically *)
-  | Untyped.Variant (lbl, e) ->
-      assert false
-      (* in fact it is not yet implemented, but assert false gives us source location automatically *)
+  | Untyped.Record lst -> failwith __LOC__
+  | Untyped.Variant (lbl, e) -> failwith __LOC__
   | Untyped.Lambda a ->
       Print.debug "in infer lambda" ;
       let p, c = a in
@@ -903,7 +892,6 @@ and type_plain_comp in_cons st = function
         type_cases (q_alpha :: cons0) st cases ty_A (ty_alpha, dirt_delta)
       in
       (Typed.Match (e', cases'), (ty_alpha, dirt_delta), cons1, sigma0 @ sigma1)
-      (* in fact it is not yet implemented, but assert false gives us source location automatically *)
   | Untyped.Apply (e1, e2) ->
       Print.debug "in infer apply" ;
       let typed_e1, tt_1, constraints_1, subs_e1 = type_expr in_cons st e1 in
@@ -1145,10 +1133,10 @@ and type_plain_comp in_cons st = function
               , (type_c2, new_dirt_var)
               , constraints
               , subs_c2 @ subs_c1 )
-          | pat -> assert false )
+          | pat -> failwith __LOC__ )
   | Untyped.LetRec ([(var, abs)], c2)
     when not (Untyped.contains_variable_abs var abs) ->
-      assert false
+      failwith __LOC__
   | Untyped.LetRec ([(var, abs)], c2) ->
       (*
 
@@ -1302,7 +1290,6 @@ and type_abs in_cons st (pat, comp) ty_in =
   , sub_list )
 
 
-(* in fact it is not yet implemented, but assert false gives us source location automatically *)
 and get_handler_op_clause eff abs2 in_st in_cons in_sub =
   let in_op_ty, out_op_ty = Untyped.EffectMap.find eff in_st.effects in
   let x, k, c_op = abs2 in
@@ -1375,8 +1362,8 @@ let finalize_constraint sub = function
         | Types.EmptyRow, Types.EmptyRow -> []
       in
       effect_subst :: row_substs @ sub
-  | Typed.SkelEq (sk1, sk2) -> assert false
-  | Typed.TyParamHasSkel (tp, sk) -> assert false
+  | Typed.SkelEq (sk1, sk2) -> failwith __LOC__
+  | Typed.TyParamHasSkel (tp, sk) -> failwith __LOC__
 
 
 let finalize_constraints c_list = List.fold_left finalize_constraint [] c_list
@@ -1390,7 +1377,7 @@ let type_toplevel ~loc st c =
   let c' = c.Untyped.term in
   match c'
   with
-  (* | Untyped.Value e -> assert false
+  (* | Untyped.Value e -> failwith __LOC__
      let et, ttype,constraints, sub_list = type_expr [] st e in
     Print.debug "Expression : %t" (Typed.print_expression et);
     Print.debug "Expression type : %t " (Types.print_target_ty ttype);

@@ -152,16 +152,17 @@ and plain_toplevel =
 
 (* | TypeOf of computation *)
 
-let var ?loc:(l = Location.unknown) v: expression =
-  {term= Var v; location= l}
+let var ?loc:(l = Location.unknown) v : expression = {term= Var v; location= l}
 
 let lambda ?loc abs : expression = {term= Lambda abs; location= abs.location}
 
-let apply ?loc:(l = Location.unknown) e1 e2: computation =
-  {term= Apply (e1,e2); location = l}
+let apply ?loc:(l = Location.unknown) e1 e2 : computation =
+  {term= Apply (e1, e2); location= l}
+
 
 let call ?loc eff e abs : computation =
   {term= Call (eff, e, abs); location= e.location}
+
 
 let handle ?loc e c : computation = {term= Handle (e, c); location= c.location}
 
@@ -174,8 +175,9 @@ let abstraction_with_ty ?loc p tty c : abstraction_with_ty =
 let abstraction2 ?loc p1 p2 c : abstraction2 =
   {term= (p1, p2, c); location= c.location}
 
+
 let pvar ?loc:(l = Location.unknown) var : pattern =
-  {term = PVar var; location = l}
+  {term= PVar var; location= l}
 
 
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
@@ -468,25 +470,21 @@ and refresh_expr' sbst = function
   | Variant (lbl, e) -> Variant (lbl, OldUtils.option_map (refresh_expr sbst) e)
   | CastExp (e1, tyco) -> CastExp (refresh_expr sbst e1, tyco)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
-  | BigLambdaTy (tyvar,sk,e) -> assert false
-  | BigLambdaDirt (dvar,e) ->  (* TODO: refresh dirt var *)
-      BigLambdaDirt (dvar, refresh_expr sbst e) 
-  | BigLambdaSkel (skvar,e)-> assert false
-  | LambdaTyCoerVar (tycovar,ct,e)-> assert false
-  | LambdaDirtCoerVar (dcovar,ct,e) -> (* TODO: refresh dco var *)
-      LambdaDirtCoerVar (dcovar,ct,refresh_expr sbst e)
-  | CastExp (e,tyco) ->
-      CastExp (refresh_expr sbst e, tyco)
-  | ApplyTyExp (e,ty) ->
-      ApplyTyExp (refresh_expr sbst e, ty)
-  | ApplyDirtExp (e,d) ->
-      ApplyDirtExp (refresh_expr sbst e, d)
-  | ApplySkelExp (e,sk) ->
-      ApplySkelExp (refresh_expr sbst e, sk)
-  | ApplyTyCoercion (e,tyco) -> 
-      ApplyTyCoercion (refresh_expr sbst e, tyco)
-  | ApplyDirtCoercion (e,dco) ->
-      ApplyDirtCoercion (refresh_expr sbst e, dco) 
+  | BigLambdaTy (tyvar, sk, e) -> failwith __LOC__
+  | BigLambdaDirt (dvar, e) ->
+      (* TODO: refresh dirt var *)
+      BigLambdaDirt (dvar, refresh_expr sbst e)
+  | BigLambdaSkel (skvar, e) -> failwith __LOC__
+  | LambdaTyCoerVar (tycovar, ct, e) -> failwith __LOC__
+  | LambdaDirtCoerVar (dcovar, ct, e) ->
+      (* TODO: refresh dco var *)
+      LambdaDirtCoerVar (dcovar, ct, refresh_expr sbst e)
+  | CastExp (e, tyco) -> CastExp (refresh_expr sbst e, tyco)
+  | ApplyTyExp (e, ty) -> ApplyTyExp (refresh_expr sbst e, ty)
+  | ApplyDirtExp (e, d) -> ApplyDirtExp (refresh_expr sbst e, d)
+  | ApplySkelExp (e, sk) -> ApplySkelExp (refresh_expr sbst e, sk)
+  | ApplyTyCoercion (e, tyco) -> ApplyTyCoercion (refresh_expr sbst e, tyco)
+  | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (refresh_expr sbst e, dco)
 
 
 and refresh_comp sbst c = {c with term= refresh_comp' sbst c.term}
@@ -655,7 +653,7 @@ let rec alphaeq_expr eqvars e e' = alphaeq_expr' eqvars e.term e'.term
 and alphaeq_expr' eqvars e e' =
   match (e, e') with
   | Var x, Var y -> List.mem (x, y) eqvars || Variable.compare x y = 0
-  | Lambda a, Lambda a' -> assert false
+  | Lambda a, Lambda a' -> failwith __LOC__
   | Handler h, Handler h' -> alphaeq_handler eqvars h h'
   | Tuple es, Tuple es' -> List.for_all2 (alphaeq_expr eqvars) es es'
   | Record flds, Record flds' -> assoc_equal (alphaeq_expr eqvars) flds flds'
@@ -689,7 +687,7 @@ and alphaeq_comp' eqvars c c' =
   | _, _ -> false
 
 
-and alphaeq_handler eqvars h h' = assert false
+and alphaeq_handler eqvars h h' = failwith __LOC__
 
 (*   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
   alphaeq_abs eqvars h.value_clause h'.value_clause *)
@@ -701,7 +699,7 @@ and alphaeq_abs eqvars {term= p, c} {term= p', c'} =
 
 and alphaeq_abs2 eqvars a2 a2' =
   (* alphaeq_abs eqvars (a22a a2) (a22a a2') *)
-  assert false
+  failwith __LOC__
 
 
 let pattern_match p e =
@@ -784,12 +782,12 @@ and free_vars_expr e =
   | Variant (_, Some e) -> free_vars_expr e
   | CastExp (e', tyco) -> free_vars_expr e'
   | BuiltIn _ | Effect _ | Const _ -> ([], [])
-  | BigLambdaTy _ -> assert false
-  | BigLambdaDirt _ -> assert false
-  | BigLambdaSkel _ -> assert false
+  | BigLambdaTy _ -> failwith __LOC__
+  | BigLambdaDirt _ -> failwith __LOC__
+  | BigLambdaSkel _ -> failwith __LOC__
   | ApplyTyExp (e, ty) -> free_vars_expr e
-  | LambdaTyCoerVar _ -> assert false
-  | LambdaDirtCoerVar _ -> assert false
+  | LambdaTyCoerVar _ -> failwith __LOC__
+  | LambdaDirtCoerVar _ -> failwith __LOC__
   | ApplyDirtExp (e, d) -> free_vars_expr e
   | ApplySkelExp (e, sk) -> free_vars_expr e
   | ApplyTyCoercion (e, tyco) -> free_vars_expr e
@@ -944,8 +942,8 @@ let rec free_dirt_vars_expression e =
   | BuiltIn _ -> []
   | Const _ -> []
   | Tuple es -> List.concat (List.map free_dirt_vars_expression es)
-  | Record _ -> assert false
-  | Variant _ -> assert false
+  | Record _ -> failwith __LOC__
+  | Variant _ -> failwith __LOC__
   | Lambda abs -> free_dirt_vars_abstraction_with_ty abs
   | Effect _ -> []
   | Handler h -> free_dirt_vars_abstraction_with_ty h.value_clause
@@ -970,14 +968,14 @@ and free_dirt_vars_computation c =
   | Value e -> free_dirt_vars_expression e
   | LetVal (e, c) ->
       free_dirt_vars_expression e @ free_dirt_vars_abstraction_with_ty c
-  | LetRec _ -> assert false
+  | LetRec _ -> failwith __LOC__
   | Match (e, cases) ->
       free_dirt_vars_expression e
       @ List.concat (List.map free_dirt_vars_abstraction cases)
   | Apply (e1, e2) ->
       free_dirt_vars_expression e1 @ free_dirt_vars_expression e2
   | Handle (e, c) -> free_dirt_vars_expression e @ free_dirt_vars_computation c
-  | Call (_, e, awty) -> assert false
+  | Call (_, e, awty) -> failwith __LOC__
   | Op (_, e) -> free_dirt_vars_expression e
   | Bind (c, a) -> free_dirt_vars_computation c @ free_dirt_vars_abstraction a
   | CastComp (c, dc) ->

@@ -459,7 +459,7 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
       ( sub @ [sub1]
       , []
       , [cons1; cons2] @ apply_sub [sub1] (rest_queue @ paused) )
-  | ForallSkel (p, sk1) -> assert false
+  | ForallSkel (p, sk1) -> failwith __LOC__
 
 
 and skel_eq_step sub paused cons rest_queue sk1 sk2 =
@@ -484,7 +484,7 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
       ( sub
       , paused
       , [Typed.SkelEq (ska, skc); Typed.SkelEq (skb, skd)] @ rest_queue )
-  | _ -> assert false
+  | _ -> failwith __LOC__
 
 
 and ty_omega_step sub paused cons rest_queue omega = function
@@ -540,9 +540,8 @@ and ty_omega_step sub paused cons rest_queue omega = function
       if skel_tv = skel_a then (sub, cons :: paused, rest_queue)
       else (sub, cons :: paused, SkelEq (skel_tv, skel_a) :: rest_queue)
   | a, b ->
-      Print.debug "can't solve subtyping for types: %t and %t"
-        (print_target_ty a) (print_target_ty b) ;
-      assert false
+      Error.typing "can't solve subtyping for types: %t and %t"
+        (print_target_ty a) (print_target_ty b)
 
 
 and dirt_omega_step sub paused cons rest_queue omega dcons =

@@ -53,14 +53,14 @@ let rec types_are_equal ty1 ty2 =
       dirty_types_are_equal dirtya1 dirtyb1
       && dirty_types_are_equal dirtya2 dirtyb2
   | PrimTy ptya, PrimTy ptyb -> ptya = ptyb
-  | QualTy (ctty1, ty1), QualTy (ctty2, ty2) -> assert false
+  | QualTy (ctty1, ty1), QualTy (ctty2, ty2) -> failwith __LOC__
   | QualDirt (ctd1, ty1), QualDirt (ctd2, ty2) ->
       ctd1 = ctd2 && types_are_equal ty1 ty2
   | TySchemeTy (tyvar1, sk1, ty1), TySchemeTy (tyvar2, sk2, ty2) ->
-      assert false
+      failwith __LOC__
   | TySchemeDirt (dvar1, ty1), TySchemeDirt (dvar2, ty2) ->
       dvar1 = dvar2 && types_are_equal ty1 ty2
-  | TySchemeSkel (skvar1, ty1), TySchemeSkel (skvar2, ty2) -> assert false
+  | TySchemeSkel (skvar1, ty1), TySchemeSkel (skvar2, ty2) -> failwith __LOC__
   | _ -> false
 
 
@@ -200,8 +200,8 @@ let rec free_target_ty t =
   | Tuple tup -> List.flatten (List.map free_target_ty tup)
   | Handler (c1, c2) -> free_target_dirty c1 @ free_target_dirty c2
   | PrimTy _ -> []
-  | QualTy (_, a) -> assert false
-  | QualDirt (_, a) -> assert false
+  | QualTy (_, a) -> failwith __LOC__
+  | QualDirt (_, a) -> failwith __LOC__
   | TySchemeTy (ty_param, _, a) ->
       let free_a = free_target_ty a in
       List.filter (fun x -> not (List.mem x [ty_param])) free_a
@@ -240,10 +240,10 @@ let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
       in
       ((c2_ty_sbst, c2_dirt_sbst), Handler (c1', c2'))
   | PrimTy x -> ((ty_sbst, dirt_sbst), PrimTy x)
-  | QualTy (_, a) -> assert false
-  | QualDirt (_, a) -> assert false
-  | TySchemeTy (ty_param, _, a) -> assert false
-  | TySchemeDirt (dirt_param, a) -> assert false
+  | QualTy (_, a) -> failwith __LOC__
+  | QualDirt (_, a) -> failwith __LOC__
+  | TySchemeTy (ty_param, _, a) -> failwith __LOC__
+  | TySchemeDirt (dirt_param, a) -> failwith __LOC__
 
 and refresh_target_dirty (ty_sbst, dirt_sbst) (t, d) =
   let (t_ty_sbst, t_dirt_sbst), t' =

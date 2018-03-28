@@ -96,7 +96,7 @@ let rec typed_to_erasure_exp sub {Typed.term= exp; Typed.location= loc} =
 and typed_to_erasure_exp' sub tt =
   match tt with
   | Typed.Var v -> EVar v
-  | Typed.BuiltIn (s, i) -> assert false
+  | Typed.BuiltIn (s, i) -> failwith __LOC__
   | Typed.Const c -> EConst c
   | Typed.Tuple elist ->
       ETuple (List.map (fun x -> typed_to_erasure_exp sub x) elist)
@@ -153,7 +153,7 @@ and typed_to_erasure_comp' sub tt =
       let e' = typed_to_erasure_exp sub e in
       let abs' = typed_to_erasure_abs_with_ty sub abs in
       ECall (eff, e', abs')
-  | Typed.Op (eff, e) -> assert false
+  | Typed.Op (eff, e) -> failwith __LOC__
   | Typed.Bind (c, a) ->
       let c' = typed_to_erasure_comp sub c in
       let a' = typed_to_erasure_abs sub a in
