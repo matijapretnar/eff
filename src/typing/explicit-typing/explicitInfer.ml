@@ -594,7 +594,9 @@ and type_plain_expr in_cons st = function
         Print.debug "returned_type: %t"
           (Types.print_target_ty applied_basic_type) ;
         (returned_x.term, applied_basic_type, returnd_cons @ in_cons, [])
-    | None -> Error.typing "Variable not found: %t" (Typed.print_variable x) )
+    | None ->
+        Print.debug "Variable not found: %t" (Typed.print_variable x) ;
+        assert false )
   | Untyped.Const const -> (
     match const with
     | Integer _ -> (Typed.Const const, Types.PrimTy IntTy, in_cons, [])

@@ -5,12 +5,15 @@ type state =
   { fuel: int ref
   ; tc_state: TypeChecker.state
   ; recursive_functions:
-      (variable, Types.target_ty * expression) OldUtils.assoc }
+      (variable, Types.target_ty * expression) OldUtils.assoc
+  ; knot_functions: (variable, expression * handler * variable) OldUtils.assoc
+  }
 
 let inititial_state =
   { fuel= ref !Config.optimization_fuel
   ; tc_state= TypeChecker.initial_state
-  ; recursive_functions= [] }
+  ; recursive_functions= []
+  ; knot_functions= [] }
 
 
 let extend_rec_fun st f ty e =
@@ -197,7 +200,8 @@ and optimize_sub_dirt_coercion st p_ops dco =
   match dco with
   | ReflDirt d -> dco
   | DirtCoercionVar dcov -> dco
-  | Empty d -> dco
+  | Empty d ->
+      if dirts_are_equal d empty_dirt then ReflDirt empty_dirt else dco
   | UnionDirt (ops, dco1) ->
       UnionDirt
         (ops, optimize_dirt_coercion' st (EffectSet.union p_ops ops) dco1)
@@ -212,10 +216,18 @@ and reduce_ty_coercion st tyco =
   Print.debug "reduce_ty_coercion: %t" (Typed.print_ty_coercion tyco) ;
   match tyco with
   | ReflTy ty -> tyco
-  | ArrowCoercion (tyco1, dtyco2) -> tyco
+  | ArrowCoercion (tyco1, dtyco2) -> (
+    match (tyco1, dtyco2) with
+    | ReflTy ty1, BangCoercion (ReflTy ty2, ReflDirt d) ->
+        ReflTy (Arrow (ty1, (ty2, d)))
+    | _ -> tyco )
   | HandlerCoercion (dtyco1, dtyco2) -> tyco
   | TyCoercionVar tycovar -> tyco
-  | SequenceTyCoer (tyco1, tyco2) -> tyco
+  | SequenceTyCoer (tyco1, tyco2) -> (
+    match (tyco1, tyco2) with
+    | ReflTy _, _ -> tyco2
+    | _, ReflTy _ -> tyco1
+    | _ -> tyco )
   | TupleCoercion tycos -> tyco
   | LeftArrow tyco1 -> tyco
   | ForallTy (tv, tyco1) -> tyco
@@ -245,22 +257,37 @@ and reduce_dirty_coercion st dtyco =
     match tyco1 with
     | HandlerCoercion (dtyco11, dtyco12) -> dtyco11
     | _ -> dtyco )
-  | SequenceDirtyCoer (dtyco1, dtyco2) -> dtyco
+  | SequenceDirtyCoer (dtyco1, dtyco2) ->
+    match (dtyco1, dtyco2) with
+    | BangCoercion (tyco1, dco1), BangCoercion (tyco2, dco2) ->
+        BangCoercion
+          ( reduce_ty_coercion st (SequenceTyCoer (tyco1, tyco2))
+          , optimize_dirt_coercion st (SequenceDirtCoer (dco1, dco2)) )
+    | _ -> dtyco
 
 
 and reduce_dirt_coercion st p_ops dco =
   match dco with
   | ReflDirt d -> dco
   | DirtCoercionVar dcov -> dco
-  | Empty d -> Empty (Types.remove_effects p_ops d)
-  | UnionDirt (ops, dco1) ->
-      let d1, d2 = TypeChecker.type_of_dirt_coercion st.tc_state dco1 in
-      let ops' =
-        EffectSet.diff ops
-          (EffectSet.inter d1.Types.effect_set d2.Types.effect_set)
-      in
-      if EffectSet.is_empty ops' then dco1 else UnionDirt (ops', dco1)
-  | SequenceDirtCoer (dco1, dco2) -> dco
+  | Empty d ->
+      let d' = Types.remove_effects p_ops d in
+      if dirts_are_equal d' empty_dirt then ReflDirt empty_dirt else Empty d'
+  | UnionDirt (ops, dco1) -> (
+    match dco1 with
+    | ReflDirt d -> ReflDirt (add_effects ops d)
+    | _ ->
+        let d1, d2 = TypeChecker.type_of_dirt_coercion st.tc_state dco1 in
+        let ops' =
+          EffectSet.diff ops
+            (EffectSet.inter d1.Types.effect_set d2.Types.effect_set)
+        in
+        if EffectSet.is_empty ops' then dco1 else UnionDirt (ops', dco1) )
+  | SequenceDirtCoer (dco1, dco2) -> (
+    match (dco1, dco2) with
+    | ReflDirt _, _ -> dco2
+    | _, ReflDirt _ -> dco1
+    | _ -> dco )
   | DirtCoercion dtyco ->
     match dtyco with BangCoercion (_, dco1) -> dco1 | _ -> dco
 
@@ -346,17 +373,35 @@ and optimize_sub_expr st e =
   {term= plain_e'; location= e.location}
 
 
-and match_applied_function st e =
+and match_recursive_function st e =
   match e.term with
   | Var fvar -> (
     match OldUtils.lookup fvar st.recursive_functions with
     | None -> None
     | Some (fty, fbody) -> Some (fvar, fty, fbody) )
-  | ApplyTyExp (e, ty) -> match_applied_function st e
-  | ApplyDirtExp (e, dirt) -> match_applied_function st e
-  | ApplySkelExp (e, sk) -> match_applied_function st e
-  | ApplyDirtCoercion (e, dco) -> match_applied_function st e
-  | ApplyTyCoercion (e, tyco) -> match_applied_function st e
+  | ApplyTyExp (e, ty) -> match_recursive_function st e
+  | ApplyDirtExp (e, dirt) -> match_recursive_function st e
+  | ApplySkelExp (e, sk) -> match_recursive_function st e
+  | ApplyDirtCoercion (e, dco) -> match_recursive_function st e
+  | ApplyTyCoercion (e, tyco) -> match_recursive_function st e
+  | _ -> None
+
+
+and match_knot_function st e h = match_knot_function' st e e h
+
+and match_knot_function' st e e' h =
+  match e.term with
+  | Var fvar -> (
+    match OldUtils.lookup fvar st.knot_functions with
+    | None -> None
+    | Some (ef, hf, fvar') ->
+        if alphaeq_expr [] e' ef && alphaeq_handler [] hf h then Some fvar'
+        else None )
+  | ApplyTyExp (e, ty) -> match_knot_function' st e e' h
+  | ApplyDirtExp (e, dirt) -> match_knot_function' st e e' h
+  | ApplySkelExp (e, sk) -> match_knot_function' st e e' h
+  | ApplyDirtCoercion (e, dco) -> match_knot_function' st e e' h
+  | ApplyTyCoercion (e, tyco) -> match_knot_function' st e e' h
   | _ -> None
 
 
@@ -560,10 +605,14 @@ and reduce_comp st c =
                     , abstraction p12 (handle (refresh_expr e1) c12) ) }
         | None -> c )
       | Call (eff, e11, k_abs) -> (
+          (* handle call(eff,e11,y:ty.c) with H@{eff xi ki -> ci}
+             >-->
+              ci [(fun y:ty -> handle c with H)/ki, e11 / xi]
+           *)
           let {term= k_pat, k_ty, k_c} as k_abs' = refresh_abs_with_ty k_abs in
           let PVar k_var = k_pat.term in
-          let {term= k_pat', k_c'} as handled_k =
-            abstraction k_pat
+          let handled_k =
+            abstraction_with_ty k_pat k_ty
               (reduce_comp
                  (extend_var_type st k_var k_ty)
                  (handle (refresh_expr e1) k_c))
@@ -574,14 +623,13 @@ and reduce_comp st c =
               (* Shouldn't we check for inlinability of p1 and p2 here? *)
               substitute_pattern_comp st
                 (Typed.subst_comp (Typed.pattern_match p1 e11) c)
-                p2 (lambda k_abs')
+                p2 (lambda handled_k)
           | None ->
               let res = call eff e11 k_abs' in
               reduce_comp st res )
       | Apply (e11, e12) -> (
           Print.debug "Looking for recursive function name" ;
-          match match_applied_function st e11 with
-          | None -> c
+          match match_recursive_function st e11 with
           | Some (fvar, fty, fbody) ->
               (*
                    handle C[f] e12 with H
@@ -598,11 +646,16 @@ and reduce_comp st c =
               let fvar' = Variable.refresh fvar in
               let xvar = Variable.new_fresh () "__x_of_rec__" in
               let fty' = Arrow (ty_e12, dty_c) in
+              let st' =
+                { st with
+                  recursive_functions=
+                    OldUtils.remove_assoc fvar st.recursive_functions
+                ; knot_functions= (fvar, (e11, h, fvar')) :: st.knot_functions
+                }
+              in
+              let st'' = extend_var_type st' fvar' fty' in
               let fbody' =
-                optimize_expr
-                  { st with
-                    recursive_functions=
-                      OldUtils.remove_assoc fvar st.recursive_functions }
+                optimize_expr st''
                   (lambda
                      (abstraction_with_ty (pvar xvar) ty_e12
                         (handle e1
@@ -613,7 +666,23 @@ and reduce_comp st c =
               in
               { c with
                 term= LetRec ([(fvar', fty', fbody')], apply (var fvar') e12)
-              } )
+              }
+          | None ->
+            match match_knot_function st e11 h with
+            | Some fvar' -> apply (var fvar') e12
+            | None -> c )
+      | Match (e, branches) ->
+          (*
+             handle (match e with {pi -> ci} ) with H
+             >-->
+             match e with {pi -> handle ci with H}
+           *)
+          let ty_e = TypeChecker.type_of_expression st.tc_state e.term in
+          case e
+            (List.map
+               (fun {term= pi, ci} ->
+                 optimize_abs st ty_e (abstraction pi (handle e1 ci)) )
+               branches)
       | _ -> c )
     | _ -> c )
   | Call (op, e1, a_w_ty) -> c

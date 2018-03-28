@@ -540,8 +540,9 @@ and ty_omega_step sub paused cons rest_queue omega = function
       if skel_tv = skel_a then (sub, cons :: paused, rest_queue)
       else (sub, cons :: paused, SkelEq (skel_tv, skel_a) :: rest_queue)
   | a, b ->
-      Error.typing "can't solve subtyping for types: %t and %t"
-        (print_target_ty a) (print_target_ty b)
+      Print.debug "can't solve subtyping for types: %t and %t"
+        (print_target_ty a) (print_target_ty b) ;
+      assert false
 
 
 and dirt_omega_step sub paused cons rest_queue omega dcons =

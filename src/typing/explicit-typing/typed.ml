@@ -166,6 +166,10 @@ let call ?loc eff e abs : computation =
 
 let handle ?loc e c : computation = {term= Handle (e, c); location= c.location}
 
+let case ?loc:(l = Location.unknown) e branches : computation =
+  {term= Match (e, branches); location= l}
+
+
 let abstraction ?loc p c : abstraction = {term= (p, c); location= c.location}
 
 let abstraction_with_ty ?loc p tty c : abstraction_with_ty =
@@ -319,7 +323,7 @@ and print_ty_coercion ?max_level c ppf =
   | SequenceTyCoer (tc1, tc2) ->
       print "%t ; %t" (print_ty_coercion tc1) (print_ty_coercion tc2)
   | PureCoercion dtyco -> print "pure(%t)" (print_dirty_coercion dtyco)
-  | _ -> failwith "Not yet implemented"
+  | _ -> failwith "Not yet implemented __LOC__"
 
 
 and print_dirty_coercion ?max_level c ppf =
@@ -343,7 +347,9 @@ and print_dirt_coercion ?max_level c ppf =
   | UnionDirt (eset, dc) ->
       print "{%t} U %t" (Types.print_effect_set eset) (print_dirt_coercion dc)
   | DirtCoercion dtyco -> print "dirtOf(%t)" (print_dirty_coercion dtyco)
-  | _ -> failwith "Not yet implemented"
+  | SequenceDirtCoer (dco1, dco2) ->
+      print "(%t;%t)" (print_dirt_coercion dco1) (print_dirt_coercion dco2)
+  | _ -> failwith "Not yet implemented __LOC__"
 
 
 and print_omega_ct ?max_level c ppf =
@@ -648,12 +654,16 @@ and make_equal_pattern' eqvars p p' =
   | _, _ -> None
 
 
-let rec alphaeq_expr eqvars e e' = alphaeq_expr' eqvars e.term e'.term
+let rec alphaeq_expr eqvars e e' =
+  Print.debug "alphaeq_expr: %t vs %t" (print_expression e)
+    (print_expression e') ;
+  alphaeq_expr' eqvars e.term e'.term
+
 
 and alphaeq_expr' eqvars e e' =
   match (e, e') with
   | Var x, Var y -> List.mem (x, y) eqvars || Variable.compare x y = 0
-  | Lambda a, Lambda a' -> failwith __LOC__
+  | Lambda a, Lambda a' -> alphaeq_abs_with_ty eqvars a a'
   | Handler h, Handler h' -> alphaeq_handler eqvars h h'
   | Tuple es, Tuple es' -> List.for_all2 (alphaeq_expr eqvars) es es'
   | Record flds, Record flds' -> assoc_equal (alphaeq_expr eqvars) flds flds'
@@ -663,6 +673,10 @@ and alphaeq_expr' eqvars e e' =
   | BuiltIn (f, n), BuiltIn (f', n') -> f = f' && n = n'
   | Const cst, Const cst' -> Const.equal cst cst'
   | Effect eff, Effect eff' -> eff = eff'
+  | ApplyDirtCoercion (e, dco), ApplyDirtCoercion (e', dco') ->
+      dco = dco' && alphaeq_expr eqvars e e'
+  | ApplyDirtExp (e, d), ApplyDirtExp (e', d') ->
+      dirts_are_equal d d' && alphaeq_expr eqvars e e'
   | _, _ -> false
 
 
@@ -687,7 +701,16 @@ and alphaeq_comp' eqvars c c' =
   | _, _ -> false
 
 
-and alphaeq_handler eqvars h h' = failwith __LOC__
+and alphaeq_handler eqvars h h' =
+  alphaeq_abs_with_ty eqvars h.value_clause h'.value_clause
+  && List.length h.effect_clauses = List.length h'.effect_clauses
+  && List.for_all
+       (fun (effect, abs2) ->
+         match OldUtils.lookup effect h'.effect_clauses with
+         | Some abs2' -> alphaeq_abs2 eqvars abs2 abs2'
+         | None -> false )
+       h.effect_clauses
+
 
 (*   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
   alphaeq_abs eqvars h.value_clause h'.value_clause *)
@@ -697,9 +720,20 @@ and alphaeq_abs eqvars {term= p, c} {term= p', c'} =
   | None -> false
 
 
-and alphaeq_abs2 eqvars a2 a2' =
+and alphaeq_abs_with_ty eqvars {term= p, ty, c} {term= p', ty', c'} =
+  match make_equal_pattern eqvars p p' with
+  | Some eqvars' -> alphaeq_comp eqvars' c c'
+  | None -> false
+
+
+and alphaeq_abs2 eqvars {term= p1, p2, c} {term= p1', p2', c'} =
   (* alphaeq_abs eqvars (a22a a2) (a22a a2') *)
-  failwith __LOC__
+  match make_equal_pattern eqvars p1 p1' with
+  | Some eqvars' -> (
+    match make_equal_pattern eqvars' p2 p2' with
+    | Some eqvars'' -> alphaeq_comp eqvars'' c c'
+    | None -> false )
+  | None -> false
 
 
 let pattern_match p e =
