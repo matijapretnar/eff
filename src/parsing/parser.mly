@@ -270,7 +270,7 @@ function_case:
 match_case:
   | p = pattern ARROW t = term
     { Val_match (p, t) }
-  | EFFECT LPAREN eff = effect p = pattern RPAREN k = simple_pattern ARROW t = term
+  | EFFECT LPAREN eff = effect p = simple_pattern RPAREN k = simple_pattern ARROW t = term
     { Eff_match (eff, (p, k, t)) }
 
 lambdas0(SEP):
