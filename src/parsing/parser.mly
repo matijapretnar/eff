@@ -116,6 +116,9 @@ plain_topdef:
     { External (x, t, n) }
   | EFFECT eff = effect COLON t1 = prod_ty ARROW t2 = ty
     { DefEffect (eff, (t1, t2))}
+  | EFFECT eff = effect COLON t = prod_ty
+    { let unit_loc = Location.make $startpos(t) $endpos(t) in
+      DefEffect (eff, ((TyTuple [], unit_loc), t))}
 
 (* Toplevel directive If you change these, make sure to update lname as well,
    or a directive might become a reserved word. *)
@@ -226,6 +229,9 @@ plain_simple_term:
     { Const cst }
   | PERFORM LPAREN eff = effect t = term RPAREN
     { Effect (eff, t)}
+  | PERFORM eff = effect
+    { let unit_loc = Location.make $startpos(eff) $endpos(eff) in
+      Effect (eff, (Tuple [], unit_loc))}
   | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
       let nil = (Variant (OldUtils.nil, None), Location.make $endpos $endpos) in
@@ -264,6 +270,9 @@ match_case:
     { Val_match (p, t) }
   | EFFECT LPAREN eff = effect p = simple_pattern RPAREN k = simple_pattern ARROW t = term
     { Eff_match (eff, (p, k, t)) }
+  | EFFECT eff = effect k = simple_pattern ARROW t = term
+    { let unit_loc = Location.make $startpos(eff) $endpos(eff) in
+      Eff_match (eff, ((PTuple [], unit_loc), k, t)) }
 
 lambdas0(SEP):
   | SEP t = term
@@ -287,8 +296,11 @@ let_rec_def:
 
 handler_clause: mark_position(plain_handler_clause) { $1 }
 plain_handler_clause:
-  | EFFECT LPAREN eff = effect p = simple_pattern RPAREN k = simple_pattern ARROW t2 = term
-    { EffectClause (eff, (p, k, t2)) }
+  | EFFECT LPAREN eff = effect p = simple_pattern RPAREN k = simple_pattern ARROW t = term
+    { EffectClause (eff, (p, k, t)) }
+  | EFFECT eff = effect  k = simple_pattern ARROW t = term
+    { let unit_loc = Location.make $startpos(eff) $endpos(eff) in
+      EffectClause (eff, ((PTuple [], unit_loc), k, t)) }
   | VAL c = function_case
     { ReturnClause c }
   | FINALLY c = function_case

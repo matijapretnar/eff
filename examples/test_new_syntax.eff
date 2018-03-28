@@ -6,10 +6,12 @@ effect TestEff2 : unit -> bool;;
 handle
 let x = if perform (TestEff []) then [] else [1] in
 let y = if perform (TestEff [1]) then [2] else [3;4] in
-x @ y
+let z = if perform TestEff2 then [] else [3] in
+x @ y @ z
 with
 | effect (TestEff []) k -> continue k true
 | effect (TestEff (x::xs)) k -> continue k false
+| effect TestEff2 k -> continue k true
 | effect (TestEff (x::[])) k -> continue k true
 | val [] -> None
 | val [_] -> None
