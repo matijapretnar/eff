@@ -47,8 +47,8 @@ and plain_term =
 and handler =
   { effect_clauses: (effect, abstraction2) OldUtils.assoc
         (** [t1#op1 p1 k1 -> t1' | ... | tn#opn pn kn -> tn'] *)
-  ; value_clause: abstraction option  (** [val p -> t] *)
-  ; finally_clause: abstraction option  (** [finally p -> t] *) }
+  ; value_clause: abstraction list  (** [val p -> t] *)
+  ; finally_clause: abstraction list  (** [finally p -> t] *) }
 
 and match_case =
   | Val_match of abstraction

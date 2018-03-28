@@ -7,26 +7,18 @@
     | FinallyClause of abstraction
 
   let collect_handler_clauses clauses =
-    let (eff_cs, val_c, fin_c) =
+    let (eff_cs, val_cs, fin_cs) =
       List.fold_left
-        (fun (eff_cs, val_c, fin_c) -> function
-          | (EffectClause (eff, a2), _) ->  ((eff, a2) :: eff_cs, val_c, fin_c)
-          | (ReturnClause a, loc) ->
-            begin match val_c with
-              | None -> (eff_cs, Some a, fin_c)
-              | Some _ -> Error.syntax ~loc "Multiple value clauses in a handler."
-            end
-          | (FinallyClause a, loc) ->
-            begin match fin_c with
-            | None -> (eff_cs, val_c, Some a)
-            | Some _ -> Error.syntax ~loc "Multiple finally clauses in a handler."
-            end)
-        ([], None, None)
+        (fun (eff_cs, val_cs, fin_cs) -> function
+          | (EffectClause (eff, a2), _) ->  ((eff, a2) :: eff_cs, val_cs, fin_cs)
+          | (ReturnClause a, loc) -> (eff_cs, a :: val_cs, fin_cs)
+          | (FinallyClause a, loc) -> (eff_cs, val_cs, a :: fin_cs))
+        ([], [], [])
         clauses
     in
     { effect_clauses = List.rev eff_cs;
-      value_clause = val_c;
-      finally_clause = fin_c }
+      value_clause = List.rev val_cs;
+      finally_clause = List.rev fin_cs }
 
 %}
 

@@ -1,0 +1,21 @@
+
+effect TestEff : int list -> bool;;
+effect TestEff2 : unit -> bool;;
+
+
+handle
+let x = if perform (TestEff []) then [] else [1] in
+let y = if perform (TestEff [1]) then [2] else [3;4] in
+x @ y
+with
+| effect (TestEff []) k -> continue k true
+| effect (TestEff (x::xs)) k -> continue k false
+| effect (TestEff (x::[])) k -> continue k true
+| val [] -> None
+| val [_] -> None
+| val [x; _] -> Some x
+| val _ -> None
+| finally None -> 0
+| finally Some x -> x
+
+ ;;
