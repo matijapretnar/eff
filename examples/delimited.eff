@@ -8,7 +8,7 @@ effect Shift : ((int -> int) -> int) -> int
 
 let reset =
   let rec reset_handler () = handler
-    | #Shift f k -> with reset_handler () handle (f k)
+    | effect (Shift f) k -> with reset_handler () handle (f k)
   in
   reset_handler ()
 ;;
@@ -16,7 +16,7 @@ let reset =
 (* An example from http://lamp.epfl.ch/~rompf/continuations-icfp09.pdf *)
 
 with reset handle
-  #Shift (fun k -> k (k (k 7))) * 2 + 1
+  perform (Shift (fun k -> k (k (k 7)))) * 2 + 1
 ;;
 
 (* The yin-yang puzzle, see
@@ -28,7 +28,7 @@ with reset handle
 
 (*
 with reset handle
-let yin = (fun k -> #Print "@"; k) (#Shift (fun k -> k k)) in
-let yang = (fun k -> #Print "*"; k) (#Shift (fun k -> k k)) in
+let yin = (fun k -> perform Print "@"; k) (perform Shift (fun k -> k k)) in
+let yang = (fun k -> perform Print "*"; k) (perform Shift (fun k -> k k)) in
 yin yang;;
 *)
