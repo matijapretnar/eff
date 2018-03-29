@@ -19,7 +19,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/css/jquery.terminal.min.css" integrity="sha256-NPnczI0KjCueVIbIZBIjffajQholjsUnhVe4sQgL80U=" crossorigin="anonymous" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/js/jquery.terminal.min.js" integrity="sha256-Qm1Nw4js01hUsHFCa8xirKnSZeRXR8uNgbAKwjhn9mA=" crossorigin="anonymous"></script>
     <!-- local Javascript code -->
-    <script src="jseff.js"></script>
+    <script src="/try/jseff.js"></script>
     <style>
     .CodeMirror {
         height: 60vh;
@@ -145,7 +145,7 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
                 });
 
             var env = jseff.reset()(terminal.echo);
-            jQuery.get('pervasives.eff', function(data) {
+            jQuery.get('/try/pervasives.eff', function(data) {
                 env = jseff.usefile()(function() {})(env)(data);
             })
 
@@ -156,12 +156,12 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
             $('#resetButton').click(function() {
                 terminal.clear();
                 env = jseff.reset()(terminal.echo);
-                jQuery.get('pervasives.eff', function(data) {
+                jQuery.get('/try/pervasives.eff', function(data) {
                     env = jseff.usefile()(function() {})(env)(data);
                 })
             });
 
-            jQuery.get('examples.eff', function(data) {
+            jQuery.get('/try/examples.eff', function(data) {
                 editor.setValue(data);
             });
             </script>
