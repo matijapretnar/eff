@@ -1,144 +1,171 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <title>REPL in your browser (λ-calculus)</title>
+<!DOCTYPE html>
+<html>
 
-    <!-- Bootstrap required meta tags -->
+<head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Eff Programming Language</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.0-beta.40/css/uikit.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.0-beta.40/js/uikit.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.0-beta.40/js/uikit-icons.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.33.0/codemirror.min.js" integrity="sha256-ag7KgA1S7cuuU2FCC2G7/L8IpaijDSPqzcLLLeJv5Iw=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.33.0/codemirror.min.css" integrity="sha256-I8NyGs4wjbMuBSUE40o55W6k6P7tu/7G28/JGUUYCIs=" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.33.0/theme/monokai.min.css" integrity="sha256-6ov3WWd9ybfZPeJBlXBgQuD/aLhTRCEp5kBhqD9ke0o=" crossorigin="anonymous" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.33.0/mode/mllike/mllike.min.js" integrity="sha256-BOCKMndg6/AI2iWczANGB1/QIky96Pzxaj9l2yKKfkY=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.33.0/addon/edit/matchbrackets.min.js" integrity="sha256-BzzUspurJPtHi1Ux5geUVUtDLQDqDeUu9SMkOrsShUY=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.33.0/addon/edit/closebrackets.min.js" integrity="sha256-ckZJSSEwRjAtCl8YzZuhIqHYq+Bt+Csy3keSLdp8uxA=" crossorigin="anonymous"></script>
+    <!-- Jquery Terminal -->
+    <script src="https://code.jquery.com/jquery-2.2.4.min.js" integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/css/jquery.terminal.min.css" integrity="sha256-NPnczI0KjCueVIbIZBIjffajQholjsUnhVe4sQgL80U=" crossorigin="anonymous" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/js/jquery.terminal.min.js" integrity="sha256-Qm1Nw4js01hUsHFCa8xirKnSZeRXR8uNgbAKwjhn9mA=" crossorigin="anonymous"></script>
+    <!-- local Javascript code -->
+    <script src="jseff.js"></script>
+    <style>
+    .CodeMirror {
+        height: 60vh;
+        border: 1px solid #ddd;
+        margin-bottom: 10px;
+    }
 
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb" crossorigin="anonymous">
+    .CodeMirror pre {
+        padding-left: 7px;
+        line-height: 1.25;
+    }
 
-    <!-- CodeMirror editor -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.33.0/codemirror.min.js" integrity="sha256-ag7KgA1S7cuuU2FCC2G7/L8IpaijDSPqzcLLLeJv5Iw=" crossorigin="anonymous"></script>
+    em {
+        color: inherit !important;
+    }
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.33.0/codemirror.min.css" integrity="sha256-I8NyGs4wjbMuBSUE40o55W6k6P7tu/7G28/JGUUYCIs=" crossorigin="anonymous" />
+    body {
+        background: #f5f6fa;
+        color: #2f3640;
+    }
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.33.0/theme/monokai.min.css" integrity="sha256-6ov3WWd9ybfZPeJBlXBgQuD/aLhTRCEp5kBhqD9ke0o=" crossorigin="anonymous" />
+    .uk-navbar-container {
+        background: #192a56 !important;
+    }
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.33.0/mode/mllike/mllike.min.js" integrity="sha256-BOCKMndg6/AI2iWczANGB1/QIky96Pzxaj9l2yKKfkY=" crossorigin="anonymous"></script>
+    .uk-navbar-container, .uk-navbar-container a {
+        height: 40px !important;
+    }
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.33.0/addon/edit/matchbrackets.min.js" integrity="sha256-BzzUspurJPtHi1Ux5geUVUtDLQDqDeUu9SMkOrsShUY=" crossorigin="anonymous"></script>
+    .uk-navbar-container a,
+    .uk-button-primary {
+        color: rgba(255, 255, 255, 0.7) !important;
+    }
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.33.0/addon/edit/closebrackets.min.js" integrity="sha256-ckZJSSEwRjAtCl8YzZuhIqHYq+Bt+Csy3keSLdp8uxA=" crossorigin="anonymous"></script>
+.uk-navbar-container li.uk-active a {
+        color: rgba(255, 255, 255, 1) !important;
+    }
 
-  <!-- Jquery Terminal -->
-<script src="https://code.jquery.com/jquery-2.2.4.min.js"
-        integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44="
-        crossorigin="anonymous"></script>
+    a {
+        color: #0097e6;
+    }
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/css/jquery.terminal.min.css" integrity="sha256-NPnczI0KjCueVIbIZBIjffajQholjsUnhVe4sQgL80U=" crossorigin="anonymous" />
+    .uk-alert-danger, #resetButton {
+        background: #c23616;
+        color: rgba(255, 255, 255, 0.8);
+    }
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/js/jquery.terminal.min.js" integrity="sha256-Qm1Nw4js01hUsHFCa8xirKnSZeRXR8uNgbAKwjhn9mA=" crossorigin="anonymous"></script>
+    #runButton {
+        background: #0097e6;
+        color: rgba(255, 255, 255, 0.8);
+    }
 
-  <!-- local Javascript code -->
-  <script src="./jseff.js"></script>
+    #try-out {
+        font-weight: bold;
+        font-size: 1.5em;
+    }
 
-  <!-- CodeMirror style, should probably go to a CSS file -->
-  <style>
-    .CodeMirror { height: 400px; border: 1px solid #ddd; }
-    .CodeMirror-scroll { max-height: 500px; }
-    .CodeMirror pre { padding-left: 7px; line-height: 1.25; }
-  </style>
-  </head>
-  <body>
+span.cm-number, span.cm-string { color: #c23616 !important; }
+span.cm-comment { color: #718093 !important; }
+span.cm-variable, span.cm-operator { color: #2f3640 !important; }
+span.cm-keyword { color: #192a56 !important; font-weight: bold;}
 
-    <!-- More Bootstrap loading -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js" integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh" crossorigin="anonymous"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ" crossorigin="anonymous"></script>
+.CodeMirror-activeline-background { background: #e8f2ff; }
+.CodeMirror-matchingbracket { outline:1px solid grey; color:black !important; }
+    </style>
+</head>
 
-    <!-- Page content -->
-
-    <!-- The title and navigation bar -->
-    <nav class="navbar navbar-dark bg-dark">
-    <a class="navbar-brand" href="#">REPL in your browser (λ-calculus)</a>
+<body>
+    <nav class="uk-navbar-container" uk-navbar>
+        <div class="uk-navbar-center">
+            <a href="/" class="uk-navbar-item uk-logo" style="height: 50px">
+                EFF
+            </a>
+            <ul class="uk-navbar-nav">
+                <li class="uk-active"><a href="/try/">
+                    <span uk-icon="settings"></span>
+                    Try it out
+                </a></li>
+                <li><a href="/learn/">
+                    <span uk-icon="copy"></span>
+                    Learn more
+                </a></li>
+                <li><a href="https://github.com/matijapretnar/eff/">
+                    <span uk-icon="github"></span>
+                    Contribute
+                </a></li>
+            </ul>
+        </div>
     </nav>
-
-    <div class="container pt-5">
-      <div class="row">
-        <div class="col-8">
-          <!-- CodeMirror editor -->
-          <textarea id="sourcecode"></textarea>
-          <script>
+    <div class="uk-container uk-padding-small uk-container-small">
+        <div uk-height-viewport="offset-top: true" style="position: relative">
+            <textarea id="sourcecode"></textarea>
+            <script>
             var editor = CodeMirror.fromTextArea(document.getElementById("sourcecode"), {
-            lineNumbers: true,
-            matchBrackets: true
+                lineNumbers: true,
+                matchBrackets: true
             });
-          </script>
+            </script>
+<!--             <div class="uk-align-center" style="margin: 0 auto; width: 100%">
+                <button class="uk-button uk-button-primary uk-width-3-5" id="runButton">Run</button>
+                <button class="uk-button uk-button-danger uk-width-1-5" id="resetButton">Reset</button>
+            </div>
+ -->            <!-- The terminal window -->
+              <div style="position: absolute; right: 0px">
+                <button style="position: relative; float: right; z-index:100000" id="resetButton" class="uk-button uk-button-small uk-button-danger">RESET</button>
+                <button style="position: relative; float: right; z-index:100000" id="runButton" class="uk-button uk-button-small uk-button-primary">LOAD FILE</button>
+              </div>
+            <div id="terminal" style="--size: 16px">
+            </div>
+            <!-- Code to setup the terminal and the buttons -->
+            <script>
+            var terminal =
+                $('#terminal').terminal(function(command, term) {
+                    if (command !== '') {
+                        env = jseff.toplevel()(term.echo)(env)(command);
+                    }
+                }, {
+                    greetings: '',
+                    name: 'repl_terminal',
+                    height: '30vh',
+                    width: "auto",
+                    prompt: '# '
+                });
 
-          <!-- Run and Reset buttons (see also their activation below) -->
-          <div class="m-3">
-          <button type="button" class="btn btn-primary" id="runButton">Run</button>
-          <button type="button" class="btn btn-danger" id="resetButton">Reset</button>
-          </div>
+            var env = jseff.reset()(terminal.echo);
+            jQuery.get('pervasives.eff', function(data) {
+                env = jseff.usefile()(function() {})(env)(data);
+            })
 
-          <!-- The terminal window -->
-          <div id="terminal"></div>
+            $('#runButton').click(function() {
+                env = jseff.usefile()(terminal.echo)(env)(editor.getValue());
+            });
 
-          <!-- Code to setup the terminal and the buttons -->
-          <script>
-          var terminal =
-          $('#terminal').terminal(function(command, term) {
-              if (command !== '') {
-                  env = jseff.toplevel()(term.echo)(env)(command);
-              }
-          }, {
-              greetings: '',
-              name: 'repl_terminal',
-              height: 400,
-              width: "auto",
-              prompt: '# '
-          });
+            $('#resetButton').click(function() {
+                terminal.clear();
+                env = jseff.reset()(terminal.echo);
+                jQuery.get('pervasives.eff', function(data) {
+                    env = jseff.usefile()(function() {})(env)(data);
+                })
+            });
 
-         var env = jseff.reset()(terminal.echo);
-          jQuery.get('pervasives.eff', function(data) {
-            env = jseff.usefile()(function(){})(env)(data);
-          })
-
-         $('#runButton').click(function () {
-            env = jseff.usefile()(terminal.echo)(env)(editor.getValue());
-         });
-
-         $('#resetButton').click(function () {
-          terminal.clear();
-          env = jseff.reset()(terminal.echo);
-          jQuery.get('pervasives.eff', function(data) {
-            env = jseff.usefile()(function(){})(env)(data);
-          })
-         });
-
-jQuery.get('examples.eff', function(data) {
-   editor.setValue(data);
-});     
-         </script>
+            jQuery.get('examples.eff', function(data) {
+                editor.setValue(data);
+            });
+            </script>
         </div>
-        <div class="col">
-          <h5>Untyped λ-calculus interpreter</h5>
+</body>
 
-          <p>Expressions <code>E</code>:
-            <ul>
-              <li>λ-abstraction: <code>^ x y .. z . E</code>
-              <li>abstraction: <code>E₁ E₂</code>
-            </ul>
-          </p>
-          <p>Commands:
-            <ul>
-              <li> <code>E</code> – evaluate expression <code>E</code>
-              <li> <code>x := E</code> – define <code>x</code>
-              <li> <code>:constant x</code> – declare constant <code>x</code>
-              <li> <code>:context</code> – print current context
-              <li> <code>:lazy</code> – lazy evaluation
-              <li> <code>:eager</code> – eager evaluation
-              <li> <code>:deep</code> – evaluate inside λ-abstractions
-              <li> <code>:shallow</code> – only evaluate top level
-            </ul>
-          </p>
-          <p>
-            In a file commands must be separated with <code>;</code>.
-          </p>
-        </div>
-      </div>
-    </div>
-  </body>
 </html>
