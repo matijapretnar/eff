@@ -321,7 +321,7 @@ and handler loc ctx
   in
   let rec construct_eff_clause (eff, eff_cs_lst) =
     match eff_cs_lst with
-    | [] -> failwith "This should never happen."
+    | [] -> assert false
     | [a2] -> (eff, abstraction2 ctx a2)
     | a2s ->
       let x = fresh_variable (Some "$eff_param") in

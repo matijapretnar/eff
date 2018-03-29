@@ -51,13 +51,12 @@ let perimeter = function
 (* The main premise of algebraic effects, which is what Eff is based on,
    is that each effect (manipulating memory, exceptions, ...) arises from
    a set of basic operations, for example lookup & update or raise.
-   For example, we print out messages by calling the operation
-   "#Print". Here, "Print" is the operation name that signifies the action,
-   and "#" indicates that it is an operation. *)
+   For example, we print out messages by performing the operation
+   "Print". *)
 
-(* To recap: you print out messages by calling "#Print". For example: *)
+(* To recap: you print out messages by performing "Print". For example: *)
 
-#Print "Hello, world!\n" ;;
+perform (Print "Hello, world!\n") ;;
 
 (* Where Eff really differs from OCaml is that you can handle such calls.
    For example, the program inside the handler would print "A", "B", "C" and "D",
@@ -67,13 +66,13 @@ let perimeter = function
     "I see you tried to print A. Not so fast!" *)
 
 handle
-    #Print "A";
-    #Print "B";
-    #Print "C";
-    #Print "D"
+    perform (Print "A");
+    perform (Print "B");
+    perform (Print "C");
+    perform (Print "D")
 with
-| #Print msg k ->
-    #Print ("I see you tried to print " ^ msg ^ ". Not so fast!\n")
+| effect (Print msg) k ->
+    perform (Print ("I see you tried to print " ^ msg ^ ". Not so fast!\n"))
 ;;
 
 (* You may be wondering what the second parameter "k" in the handling clause
@@ -82,17 +81,18 @@ with
    handlers and general effect handlers is that we may call this continuation.
    For example, instead of stopping after the first print like above, we may
    handle it and then resume the continuation by passing it "()", the unit
-   result expected from the call of Print. *)
+   result expected from the call of Print. Continuations should be called with
+   "continue k ..." to be more easily distinguished from regular functions. *)
 
 handle
-    #Print "A";
-    #Print "B";
-    #Print "C";
-    #Print "D"
+    perform (Print "A");
+    perform (Print "B");
+    perform (Print "C");
+    perform (Print "D")
 with
-| #Print msg k ->
-    #Print ("I see you tried to print " ^ msg ^ ". Okay, you may.\n");
-    k ()
+| effect (Print msg) k ->
+    perform (Print ("I see you tried to print " ^ msg ^ ". Okay, you may.\n"));
+    continue k ()
 ;;
 
 (* The handlers may be even more complex. For example, we may create a handler
@@ -102,34 +102,38 @@ with
 let collect = handler
     (* We return the value of the computation and a string. *)
     | val x -> (x, "")
-    | #Print msg k ->
+    | effect (Print msg) k ->
       (* First see what the rest of the computation returns and prints... *)
-      let (result, msgs) = k () in
+      let (result, msgs) = continue k () in
       (* Add the string that we want to print at the begining. *)
         (result, msg ^ msgs)
 ;;
 
 with collect handle
-    #Print "A";
-    #Print "B";
-    #Print "C";
-    #Print "D"
+    perform (Print "A");
+    perform (Print "B");
+    perform (Print "C");
+    perform (Print "D")
 ;;
 
 (** Non-determinism *)
 
 (* We will model non-determinism by implementing two operations, Decide and
    Fail. Decide will be used to `non-deterministically' choose the correct path
-   while Fail signals that a choice fails to return a suitable answer. *)
+   while Fail signals that a choice fails to return a suitable answer.
 
-effect Fail : unit -> empty
-effect Decide : unit -> bool
+   Effects that do not need any input can be defined by using unit as input
+   or with the alternative syntax (demonstrated below) where they are implicitly
+   treated as effect with input of type unit.*)
+
+effect Fail : empty   (* This is equivalent to the type unit -> empty. *)
+effect Decide : bool
 
 (* We use a trick to ensure that using Fail typechecks correctly by wrapping
    it in a function. For aesthetic purposes we also wrap Decide in a function. *)
 
-let fail () = (match #Fail () with)
-let decide () = #Decide ()
+let fail () = absurd (perform Fail) (* Equivalent to perform (Fail ()). *)
+let decide () = perform Decide
 ;;
 
 (* We create a few different handlers to handle the above effects. The simplest
@@ -138,20 +142,17 @@ let decide () = #Decide ()
    possible choices, while "choose_all" instead returns a list of all possible
    results. *)
 
-let choose_true =
-    handler
-    | #Decide () k -> k true
+let choose_true = handler
+    | effect Decide k -> continue k true
 
 (* In the case of choose_max and choose_all the continuation is used twice.*)
-let choose_max =
-    handler
-    | #Decide () k -> max (k true) (k false)
+let choose_max = handler
+    | effect Decide k -> max (continue k true) (continue k false)
 
-let choose_all =
-    handler
+let choose_all = handler
     | val x -> [x]
-    | #Fail () _ -> []
-    | #Decide () k -> (k true) @ (k false)
+    | effect Fail _ -> []
+    | effect Decide k -> (continue k true) @ (continue k false)
 ;;
 
 (* Even on a small example the behaviour of the three handlers varies greatly. *)
@@ -215,10 +216,10 @@ let pythagorean m n =
 (* We also construct an additional handler that simply tries to get one viable
    solution. *)
 let backtrack = handler
-  | #Decide () k ->
+  | effect Decide k ->
     (* We use a second handler to handle the continuation. *)
-    handle k false with
-    | #Fail () _ -> k true
+    handle continue k false with
+    | effect Fail _ -> continue k true
 ;;
 
 (* You can test the different handlers on the following examples. *)
@@ -256,9 +257,9 @@ let rec place x qs =
   place (x + 1) ((x, y) :: qs)
 
 let backtrack = handler
-| #Decide () k ->
-    handle k true with
-    | #Fail () _ -> k false
+| effect Decide k ->
+    handle continue k true with
+    | effect Fail _ -> k false
 ;;
 
 with backtrack handle
@@ -281,18 +282,20 @@ let rec uniform = function
   | x :: xs ->
       let n = length xs + 1 in
       let p = 1.0 /. float_of_int n in
-      if #Toss p then x else uniform xs
+      if perform (Toss p) then x else uniform xs
 ;;
 
 let random_value = handler
   | val v -> v
-  | #Toss p k ->
-    let toss = #Random_float 1. < p in k toss
+  | effect (Toss p) k ->
+    let toss = perform (Random_float 1.) < p in
+    continue k toss
 ;;
 
 let expectation = handler
   | val v -> v
-  | #Toss p k -> p *. k true +. (1.0 -. p) *. k false
+  | effect (Toss p) k ->
+  p *. (continue k true) +. (1.0 -. p) *. (continue k false)
 ;;
 
 with expectation handle
@@ -321,8 +324,10 @@ let combine p dist1 dist2 =
 ;;
 
 let distribution = handler
-  | val v -> [(v, 1.0)] (* Distribution of only one value. *)
-  | #Toss p k -> combine p (k true) (k false) (* Combine possible distributions. *)
+    (* Distribution of only one value. *)
+  | val v -> [(v, 1.0)]
+    (* Combine possible distributions. *)
+  | effect (Toss p) k -> combine p (continue k true) (continue k false)
 ;;
 
 with distribution handle
@@ -336,7 +341,7 @@ with distribution handle
 (* It is often beneficial to have some form of a mutable state, which can be
    implemented using handlers. Below is an example of a simple integer state. *)
 
-effect Get: unit -> int
+effect Get: int
 effect Set: int -> unit
 
 (* The monad_state handler wraps the computation in a function and the state
@@ -345,14 +350,14 @@ effect Set: int -> unit
 
 let monad_state = handler
   | val y -> (fun _ -> y)
-  | #Get () k -> (fun s -> k s s)
-  | #Set s' k -> (fun _ -> k () s')
+  | effect Get k -> (fun s -> (continue k s) s)
+  | effect (Set s') k -> (fun _ -> (continue k ()) s')
 ;;
 
 let f = with monad_state handle
-    let x = #Get () in
-    #Set (2 * x);
-    #Get () + 10
+  let x = perform Get in
+  perform (Set (2 * x));
+  perform Get + 10
 in
 f 30
 ;;
@@ -364,81 +369,86 @@ f 30
 
 let better_state initial = handler
   | val y -> (fun s -> (y, s))
-  | #Get () k -> (fun s -> k s s)
-  | #Set s' k -> (fun _ -> k () s')
+  | effect Get k -> (fun s -> (continue k s) s)
+  | effect (Set s') k -> (fun _ -> (continue k ()) s')
   | finally f -> f initial
 ;;
 
 with better_state 30 handle
-  let x = #Get () in
-  #Set (2 * x);
-  #Get () + 10
+  let x = perform Get in
+  perform (Set (2 * x));
+  perform Get + 10
 ;;
+
 
 (** Multi-threading *)
 
-effect Yield : unit -> unit
+effect Yield : unit
 effect Spawn : (unit -> unit) -> unit
 
 (* We will need a queue to keep track of inactive threads. *)
-effect Get_next : unit -> (unit -> unit) option
+
+effect Get_next : (unit -> unit) option
 effect Add_to_queue : (unit -> unit) -> unit
 
 let queue initial = handler
-  | #Get_next () k ->
+  | effect Get_next k ->
     ( fun queue -> match queue with
-    | [] -> k None []
-    | hd::tl -> k (Some hd) tl )
-  | #Add_to_queue y k -> ( fun queue -> k () (queue @ [y]))
+        | [] -> (continue k None) []
+        | hd::tl -> (continue k (Some hd)) tl )
+  | effect (Add_to_queue y) k -> ( fun queue -> (continue k ()) (queue @ [y]))
   | val x -> ( fun _ -> x)
   | finally x -> x initial
 ;;
 
 let round_robin =
   let enqueue t =
-    #Add_to_queue t
+    perform (Add_to_queue t)
   in
   let dequeue () =
-    match #Get_next () with
+    match perform Get_next with
     | None -> ()
     | Some t -> t ()
   in
-  let rec rr_handler () = handler
-    | #Yield () k -> enqueue k; dequeue ()
-    | #Spawn t k -> enqueue k; with rr_handler () handle t ()
+  let rec rr_handler () = handler (*Needs to be defined recursively.*)
+    | effect Yield k -> enqueue k; dequeue ()
+    | effect (Spawn t) k -> enqueue k; with rr_handler () handle t ()
     | val () -> dequeue ()
   in
   rr_handler ()
 ;;
 
 (* Because the round_robin handler uses our queue, we must nest the handlers. *)
+
 with queue [] handle
 with round_robin handle
-  #Spawn (fun _ ->
-    iter (fun x -> #Print x; #Yield ()) ["a"; "b"; "c"; "d"; "e"]
-  );
-  #Spawn (fun _ ->
-    iter (fun x -> #Print x; #Yield ()) ["A"; "B"; "C"; "D"; "E"]
-  )
+ perform (Spawn (fun _ ->
+  iter (fun x -> perform (Print x); perform Yield) ["a"; "b"; "c"; "d"; "e"]
+  ));
+ perform (Spawn (fun _ ->
+  iter (fun x -> perform (Print x); perform Yield) ["A"; "B"; "C"; "D"; "E"]
+  ))
 ;;
 
 (* We can run an unbounded amount of threads. The following example enumerates all
    reduced positive fractions less than 1 by spawning a thread for each denominator
    between d and e. *)
+
 let rec fractions d e =
-  let rec find_fractions n =
-    (* If the fraction is reduced, print it and yield *)
-    (if (gcd n d = 1) then
-      #Print (to_string n ^ "/" ^ to_string d ^ ", "); #Yield ()
-    else ());
-    if d > n then
-      find_fractions (n+1)
-    else ()
-  in
-  (* Spawn a thread for the next denominator *)
-  if d < e then #Spawn (fun _ -> #Yield (); fractions (d + 1) e) else () ;
-  (* List all the fractions with the current denominator *)
-  find_fractions 1
+ let rec find_fractions n =
+   (* If the fraction is reduced, print it and yield *)
+   if gcd n d = 1 then
+     perform (Print (to_string n ^ "/" ^ to_string d ^ ", ")); perform Yield
+   else ();
+   if d > n then
+     find_fractions (n+1)
+   else ()
+ in
+ (* Spawn a thread for the next denominator *)
+ (if d < e then
+    perform (Spawn (fun _ -> perform Yield; fractions (d + 1) e)) else ()) ;
+ (* List all the fractions with the current denominator *)
+ find_fractions 1
 ;;
 
 with queue [] handle
