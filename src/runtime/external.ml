@@ -176,16 +176,6 @@ let conversion_functions =
     , from_fun (fun v -> value_float (float_of_int (V.to_int v))) ) ]
 
 
-let std_print v =
-  let str = V.to_str v in
-  print_string str ; flush stdout ; V.unit_value
-
-
-and std_read _ =
-  let str = read_line () in
-  from_str str
-
-
 (** [values] is an association list of external names and values, consisting of
     comparison functions, arithmetic operations, string operations, conversion
     functions, and effect instances. *)

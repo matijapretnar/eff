@@ -11,7 +11,6 @@
 - : (int, string) bull = {small = 5; large = "foo"}
 - : (int, 'a) bull -> int = <fun>
 - : ('a, 'b list list) bull -> 'b list list = <fun>
-- : 'a -> string -> string = <fun>
 - : 'a -> string = <fun>
 - : 'a -> int = <fun>
 - : 'a -> 'a = <fun>

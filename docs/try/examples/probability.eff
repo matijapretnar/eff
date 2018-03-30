@@ -14,18 +14,20 @@ let rec uniform = function
   | x :: xs ->
       let n = length xs + 1 in
       let p = 1.0 /. float_of_int n in
-      if #Toss p then x else uniform xs
+      if perform (Toss p) then x else uniform xs
 ;;
 
 let random_value = handler
-  | val v -> v
-  | #Toss p k ->
-    let toss = #Random_float 1. < p in k toss
+  | v -> v
+  | effect (Toss p) k ->
+    let toss = perform (Random_float 1.) < p in
+    continue k toss
 ;;
 
 let expectation = handler
-  | val v -> v
-  | #Toss p k -> p *. k true +. (1.0 -. p) *. k false
+  | v -> v
+  | effect (Toss p) k ->
+  p *. (continue k true) +. (1.0 -. p) *. (continue k false)
 ;;
 
 with expectation handle
@@ -54,8 +56,10 @@ let combine p dist1 dist2 =
 ;;
 
 let distribution = handler
-  | val v -> [(v, 1.0)] (* Distribution of only one value. *)
-  | #Toss p k -> combine p (k true) (k false) (* Combine possible distributions. *)
+    (* Distribution of only one value. *)
+  | v -> [(v, 1.0)]
+    (* Combine possible distributions. *)
+  | effect (Toss p) k -> combine p (continue k true) (continue k false)
 ;;
 
 with distribution handle
@@ -63,4 +67,3 @@ with distribution handle
   let y = uniform [1; 2; 3; 4; 5; 6] in
   x + y
 ;;
-

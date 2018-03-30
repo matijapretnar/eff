@@ -11,9 +11,10 @@ type ('i, 'o, 'r) iterator =
 ;;
 
 let run = handler
-  | #Yield x k -> Susp (x, k) (* Return the value of yield and the continuation
-                                as the updated iterator. *)
-  | val x -> Result x (* The iterator has finished. *)
+    (* Return the value of yield and the continuation as the updated iterator. *)
+  | effect (Yield x) k -> Susp (x, k)
+    (* The iterator has finished. *)
+  | x -> Result x
 ;;
 
 (* Example of depthWalk presented in the original paper. *)
@@ -28,7 +29,7 @@ let rec depthWalk = function
       let r' = depthWalk r in
       Node (l', r')
   | Leaf a ->
-      let b = #Yield a in
+      let b = perform (Yield a) in
       Leaf b
 ;;
 
@@ -48,8 +49,8 @@ renum iter_tree
 
 (* Translation of yield to shift and reset.
    [Doesn't work without better types for #Yield.]
-   
-let shift f = #Yield f
+
+let shift f = perform (Yield f)
 ;;
 
 let rec reset thunk =
@@ -66,7 +67,7 @@ and interp = function
 *)
 (*
 reset (fun () ->
-let yin = (fun k -> #Print "@"; k) (shift (fun k -> k k)) in
-let yang = (fun k -> #Print "*"; k) (shift (fun k -> k k)) in
+let yin = (fun k -> perform (Print "@"); k) (shift (fun k -> k k)) in
+let yang = (fun k -> perform (Print "*"); k) (shift (fun k -> k k)) in
   yin yang);;
 *)
