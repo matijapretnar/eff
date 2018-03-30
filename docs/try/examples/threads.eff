@@ -1,0 +1,70 @@
+(** Multi-threading *)
+
+effect Yield : unit -> unit
+effect Spawn : (unit -> unit) -> unit
+
+(* We will need a queue to keep track of inactive threads. *)
+effect Get_next : unit -> (unit -> unit) option
+effect Add_to_queue : (unit -> unit) -> unit
+
+let queue initial = handler
+  | #Get_next () k ->
+    ( fun queue -> match queue with
+    | [] -> k None []
+    | hd::tl -> k (Some hd) tl )
+  | #Add_to_queue y k -> ( fun queue -> k () (queue @ [y]))
+  | val x -> ( fun _ -> x)
+  | finally x -> x initial
+;;
+
+let round_robin =
+  let enqueue t =
+    #Add_to_queue t
+  in
+  let dequeue () =
+    match #Get_next () with
+    | None -> ()
+    | Some t -> t ()
+  in
+  let rec rr_handler () = handler
+    | #Yield () k -> enqueue k; dequeue ()
+    | #Spawn t k -> enqueue k; with rr_handler () handle t ()
+    | val () -> dequeue ()
+  in
+  rr_handler ()
+;;
+
+(* Because the round_robin handler uses our queue, we must nest the handlers. *)
+with queue [] handle
+with round_robin handle
+  #Spawn (fun _ ->
+    iter (fun x -> #Print x; #Yield ()) ["a"; "b"; "c"; "d"; "e"]
+  );
+  #Spawn (fun _ ->
+    iter (fun x -> #Print x; #Yield ()) ["A"; "B"; "C"; "D"; "E"]
+  )
+;;
+
+(* We can run an unbounded amount of threads. The following example enumerates all
+   reduced positive fractions less than 1 by spawning a thread for each denominator
+   between d and e. *)
+let rec fractions d e =
+  let rec find_fractions n =
+    (* If the fraction is reduced, print it and yield *)
+    (if (gcd n d = 1) then
+      #Print (to_string n ^ "/" ^ to_string d ^ ", "); #Yield ()
+    else ());
+    if d > n then
+      find_fractions (n+1)
+    else ()
+  in
+  (* Spawn a thread for the next denominator *)
+  if d < e then #Spawn (fun _ -> #Yield (); fractions (d + 1) e) else () ;
+  (* List all the fractions with the current denominator *)
+  find_fractions 1
+;;
+
+with queue [] handle
+with round_robin handle
+  fractions 1 10
+;;

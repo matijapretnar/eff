@@ -109,9 +109,18 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
             </ul>
         </div>
     </nav>
-    <div class="uk-container uk-padding-small uk-container-small">
+    <div class="uk-container uk-padding-small uk-container">
         <div uk-height-viewport="offset-top: true" style="position: relative">
+        <ul class="uk-tab" uk-tab>
+<li><a id="syntaxLoad">Syntax</a></li>
+<li><a id="printingLoad">Printing</a></li>
+<li><a id="nondeterminismLoad">Non-determinism</a></li>
+<li><a id="probabilityLoad">Probability</a></li>
+<li><a id="stateLoad">State</a></li>
+<li><a id="threadsLoad">Threads</a></li>
+        </ul>
             <textarea id="sourcecode"></textarea>
+
             <script>
             var editor = CodeMirror.fromTextArea(document.getElementById("sourcecode"), {
                 lineNumbers: true,
@@ -149,6 +158,10 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
                 env = jseff.usefile()(function() {})(env)(data);
             })
 
+            jQuery.get('/try/examples/syntax.eff', function(data) {
+                editor.setValue(data);
+            })
+
             $('#runButton').click(function() {
                 env = jseff.usefile()(terminal.echo)(env)(editor.getValue());
             });
@@ -161,8 +174,40 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
                 })
             });
 
-            jQuery.get('/try/examples.eff', function(data) {
-                editor.setValue(data);
+            $('#syntaxLoad').click(function() {
+                jQuery.get('/try/examples/syntax.eff', function(data) {
+                    editor.setValue(data);
+                })
+            });
+
+            $('#printingLoad').click(function() {
+                jQuery.get('/try/examples/printing.eff', function(data) {
+                    editor.setValue(data);
+                })
+            });
+
+            $('#nondeterminismLoad').click(function() {
+                jQuery.get('/try/examples/nondeterminism.eff', function(data) {
+                    editor.setValue(data);
+                })
+            });
+
+            $('#probabilityLoad').click(function() {
+                jQuery.get('/try/examples/probability.eff', function(data) {
+                    editor.setValue(data);
+                })
+            });
+
+            $('#stateLoad').click(function() {
+                jQuery.get('/try/examples/state.eff', function(data) {
+                    editor.setValue(data);
+                })
+            });
+
+            $('#threadsLoad').click(function() {
+                jQuery.get('/try/examples/threads.eff', function(data) {
+                    editor.setValue(data);
+                })
             });
             </script>
         </div>
