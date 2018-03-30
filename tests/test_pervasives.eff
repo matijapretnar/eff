@@ -122,13 +122,13 @@ let test_at = ([1;2;3] @ [4;5;6]);;
 
 let test_length = (length [1;2;3;4;5]);;
 
-let test_head = (head [1;2;3;4]);;
+let test_head = (hd [1;2;3;4]);;
 
-check (head []);;
+check (hd []);;
 
-let test_tail = (tail [1;2;3;4]);;
+let test_tail = (tl [1;2;3;4]);;
 
-check (tail []);;
+check (tl []);;
 
 let test_abs = (abs 5, abs (~-5), abs(-5));;
 
@@ -154,9 +154,9 @@ let test_fst = (fst ("foo", 4));;
 
 let test_snd = (snd ("foo", 4));;
 
-check (#Print "Does this work?");;
+check (perform (Print "Does this work?"));;
 
-check (#Read ());;
+check (perform Read);;
 
 (* check (failwith "The cows are home.");;
 

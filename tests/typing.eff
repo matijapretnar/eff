@@ -25,9 +25,8 @@ type ('a,'b) bull = {small : 'a; large : 'b};;
 effect Bark : string -> string
 effect Wag : unit -> int;;
 
-fun _ -> #Bark;;
-fun _ -> #Bark "tree";;
-fun _ -> #Wag ();;
+fun _ -> perform (Bark "tree");;
+fun _ -> perform Wag;;
 
 (* Polymorphism *)
 (fun x -> x);;
