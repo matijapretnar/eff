@@ -7,7 +7,11 @@ License:     BSD-3-clause
 Homepage:    http://www.eff-lang.org/
 Plugins:     DevFiles (0.4)
 XDevFilesMakefileNoTargets: test
+AlphaFeatures: ocamlbuild_more_args
+OCamlVersion: >= 4.02
 
+XOCamlbuildPluginTags:
+    package(js_of_ocaml.ocamlbuild)
 PostConfCommand:
     hash rlwrap >/dev/null 2>&1 || \
     hash ledit >/dev/null 2>&1 || \
