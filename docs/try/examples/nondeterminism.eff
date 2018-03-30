@@ -32,7 +32,7 @@ let choose_max = handler
     | effect Decide k -> max (continue k true) (continue k false)
 
 let choose_all = handler
-    | val x -> [x]
+    | x -> [x]
     | effect Fail _ -> []
     | effect Decide k -> (continue k true) @ (continue k false)
 ;;

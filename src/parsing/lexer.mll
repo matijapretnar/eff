@@ -34,7 +34,6 @@
     ("then", THEN);
     ("true", BOOL true);
     ("type", TYPE);
-    ("val", VAL);
     ("with", WITH)
   ]
 

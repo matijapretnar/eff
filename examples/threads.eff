@@ -16,7 +16,7 @@ let queue initial = handler
         | [] -> (continue k None) []
         | hd::tl -> (continue k (Some hd)) tl )
   | effect (Add_to_queue y) k -> ( fun queue -> (continue k ()) (queue @ [y]))
-  | val x -> ( fun _ -> x)
+  | x -> ( fun _ -> x)
   | finally x -> x initial
 ;;
 

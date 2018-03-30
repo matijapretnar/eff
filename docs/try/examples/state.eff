@@ -11,7 +11,7 @@ effect Set: int -> unit
    is given to the transformed computation as input. *)
 
 let monad_state = handler
-  | val y -> (fun _ -> y)
+  | y -> (fun _ -> y)
   | effect Get k -> (fun s -> (continue k s) s)
   | effect (Set s') k -> (fun _ -> (continue k ()) s')
 ;;
@@ -30,7 +30,7 @@ f 30
    and the final state value instead of just the result. *)
 
 let better_state initial = handler
-  | val y -> (fun s -> (y, s))
+  | y -> (fun s -> (y, s))
   | effect Get k -> (fun s -> (continue k s) s)
   | effect (Set s') k -> (fun _ -> (continue k ()) s')
   | finally f -> f initial

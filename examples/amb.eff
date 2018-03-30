@@ -48,7 +48,7 @@ let queue initial = handler
     | [] -> continue k None []
     | hd::tl -> continue k (Some hd) tl )
     | effect (Add_to_queue y) k -> ( fun queue -> (continue k ()) (queue @ [y]))
-  | val x -> ( fun _ -> x)
+  | x -> ( fun _ -> x)
   | finally x -> x initial
 ;;
 
@@ -67,8 +67,8 @@ let bfs =
   run_next ()
   (* When the computation fails, run the next choice. Final Failure
      comes from run_next when the queue is empty. *)
-| val Success x -> Success x
-| val Failure -> run_next ()
+| Success x -> Success x
+| Failure -> run_next ()
 ;;
 
 (* We repeat 8-queen example with breadth-first-search. It is much slower

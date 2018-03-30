@@ -14,7 +14,7 @@ let run = handler
     (* Return the value of yield and the continuation as the updated iterator. *)
   | effect (Yield x) k -> Susp (x, k)
     (* The iterator has finished. *)
-  | val x -> Result x
+  | x -> Result x
 ;;
 
 (* Example of depthWalk presented in the original paper. *)

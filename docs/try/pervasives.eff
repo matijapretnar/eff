@@ -1,15 +1,23 @@
 (* This is the equivalent of Haskell prelude or Ocaml pervasives,
    with some list handling functions thrown in. *)
 
+let continue x = x
+
+(* Top level effects. *)
+effect Print : string -> unit
+
+effect Read : unit -> string
+
+effect Raise : string -> empty
+
+effect Random_int : int -> int
+
+effect Random_float: float -> float
+
+(* Integers and Floats *)
 external ( = ) : 'a -> 'a -> bool = "="
 
 external ( < ) : 'a -> 'a -> bool = "<"
-
-effect Print : string -> unit
-effect Read : unit -> string
-effect Raise : string -> empty
-effect Random_int : int -> int
-effect Random_float: float -> float
 
 let absurd void = match void with;;
 
@@ -19,11 +27,11 @@ effect InvalidArgument : string -> empty
 
 effect Failure : string -> empty
 
-let failwith msg = absurd (#Failure msg) ;;
+let failwith msg = absurd (perform (Failure msg)) ;;
 
 effect AssertionFault : unit -> empty
 
-let assert b = if b then () else absurd (#AssertionFault ()) ;;
+let assert b = if b then () else absurd (perform (AssertionFault ())) ;;
 
 external ( ~- ) : int -> int = "~-"
 
@@ -35,7 +43,7 @@ external ( - ) : int -> int -> int = "-"
 
 external ( mod ) : int -> int -> int = "mod"
 let (mod) m n = match n with
-  | 0 -> absurd (#DivisionByZero ())
+  | 0 -> absurd (perform (DivisionByZero ()))
   | n -> m mod n
 
 external ( ~-. ) : float -> float = "~-."
@@ -52,9 +60,10 @@ external ( / ) : int -> int -> int = "/"
 external ( ** ) : int -> int -> int = "**"
 
 let ( / ) m n = match n with
-  | 0 -> absurd (#DivisionByZero ())
+  | 0 -> absurd (perform (DivisionByZero ()))
   | n -> (/) m n
 
+(* Strings *)
 external float_of_int : int -> float = "float_of_int"
 
 external ( ^ ) : string -> string -> string = "^"
@@ -63,19 +72,7 @@ external string_length : string -> int = "string_length"
 
 external to_string : 'a -> string  = "to_string"
 
-type 'a option = None | Some of 'a
-
-let rec assoc x = function
-  | [] -> None
-  | (y,z)::lst -> if x = y then Some z else assoc x lst
-
-(* let option_catch exc = handler
-  | exc#raise _ _ -> None
-  | val x -> Some x
-
-let default_catch exc default = handler
-  | exc#raise _ _ -> default
- *)
+(* Booleans *)
 let not x = if x then false else true
 
 let (>) x y = y < x
@@ -91,6 +88,12 @@ let (<>) x y = not (x = y)
 
 let (!=) x y = not (x = y)
 
+(* Lists *)
+type 'a option = None | Some of 'a
+
+let rec assoc x = function
+  | [] -> None
+  | (y,z)::lst -> if x = y then Some z else assoc x lst
 
 let rec range m n =
   if m > n
@@ -99,6 +102,13 @@ let rec range m n =
     let r = range in
     m :: r (m + 1) n
 
+let reverse lst =
+  let rec reverse_acc acc = function
+    | [] -> acc
+    | x :: xs -> reverse_acc (x :: acc) xs
+  in
+  reverse_acc [] lst
+
 let rec map f = function
   | [] -> []
   | x :: xs ->
@@ -106,11 +116,13 @@ let rec map f = function
     let ys = map f xs in
       y :: ys;;
 
-let ignore _ = ()
+let hd = function
+  | [] ->  absurd (perform (InvalidArgument "head: empty list"))
+  | x :: _ -> x
 
-let hd (x :: _) = x
-
-let tl (_ :: lst) = lst
+let tl = function
+  | [] ->  absurd (perform (InvalidArgument "tail: empty list"))
+  | x :: xs -> xs
 
 let take f k =
   let r = range 0 k in map f r
@@ -155,14 +167,7 @@ let rec zip xs ys =
   match (xs, ys) with
   | ([], []) -> []
   | (x :: xs, y :: ys) -> (x, y) :: (zip xs ys)
-  | (_, _) -> absurd (#InvalidArgument "zip: length mismatch")
-
-let reverse lst =
-  let rec reverse_acc acc = function
-    | [] -> acc
-    | x :: xs -> reverse_acc (x :: acc) xs
-  in
-    reverse_acc [] lst
+  | (_, _) -> absurd (perform (InvalidArgument "zip: length mismatch"))
 
 let rec (@) xs ys =
   match xs with
@@ -173,14 +178,7 @@ let rec length = function
   | [] -> 0
   | x :: xs -> length xs + 1
 
-let head = function
-  | [] ->  absurd (#InvalidArgument "head: empty list")
-  | x :: _ -> x
-
-let rec tail = function
-  | [] ->  absurd (#InvalidArgument "tail: empty list")
-  | x :: xs -> xs
-
+(* Basic functions *)
 let abs x = if x < 0 then -x else x
 
 let min x y = if x < y then x else y
@@ -204,52 +202,30 @@ let id x = x
 
 let compose f g x = f (g x)
 
+let ignore _ = ()
+
 let fst (x, _) = x
 
 let snd (_, y) = y
 
 let print v =
   let s = to_string v in
-    #Print s
+  perform (Print s)
 
 let print_string str =
-  #Print str
+  perform (Print str)
 
 let print_endline v =
   let s = to_string v in
-    #Print s;
-    #Print "\n"
+    perform (Print s);
+    perform (Print "\n")
 
+(* Basic Handlers *)
 effect Lookup: unit -> int
 effect Update: int -> unit
 
-let state r x = handler
-  | val y -> (fun _ -> y)
-  | #Lookup () k -> (fun s -> k s s)
-  | #Update s' k -> (fun _ -> k () s')
-  | finally f -> f x;;
-
-(* let ref x =
-  new ref @ x with
-    operation lookup _ @ x -> (x, x)
-    operation update y @ _ -> ((), y)
-  end
-
-let (!) r = r#lookup ()
-let (:=) r v = r#update v
-let incr r = r#update (r#lookup () + 1)
-let decr r = r#update (r#lookup () - 1)
- *)
-(* type random =
-effect
-  operation int : int -> int
-  operation float : float -> float
-end
-
-external rnd : random = "rnd";;
-
-This forces the evaluation of x before calling the check, allowing us
-   to write [check !l] and similar to get the result instead of an
-   operation
-let check_val x = check x
- *)
+let state initial = handler
+  | y -> (fun _ -> y)
+  | effect (Lookup ()) k -> (fun s -> continue k s s)
+  | effect (Update s') k -> (fun _ -> continue k () s')
+  | finally f -> f initial;;

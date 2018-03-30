@@ -16,7 +16,7 @@ effect Set : int -> unit
 let state initial = handler
   | effect Get k -> (fun m -> continue k m m)
   | effect (Set n) k -> (fun m -> continue k () n)
-  | val x -> (fun _ -> x)
+  | x -> (fun _ -> x)
   | finally g -> g initial
 ;;
 
@@ -52,7 +52,7 @@ let sequence_transformer sequence = handler
        let j = max i n in
        (* Here j represents the largest seen lookup index. *)
        continue k (sequence n) j)
-  | val x -> (fun n -> n) (* We want the final state, not the result. *)
+  | x -> (fun n -> n) (* We want the final state, not the result. *)
   | finally g -> g 0
 ;;
 

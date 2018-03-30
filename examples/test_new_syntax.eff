@@ -16,7 +16,7 @@ with
 | val [] -> None
 | val [_] -> None
 | val [x; _] -> Some x
-| val _ -> None
+| _ -> None
 | finally None -> 0
 | finally Some x -> x
 

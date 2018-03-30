@@ -3,12 +3,12 @@ effect Set: int -> unit
 effect Fail : empty ;;
 
 let state x = handler
-  | val y -> (fun _ -> y)
+  | y -> (fun _ -> y)
   | effect Get k -> (fun s -> k s s)
   | effect (Set s') k -> (fun _ -> k () s')
 
 let better_state x = handler
-  | val y -> (fun _ -> y)
+  | y -> (fun _ -> y)
   | effect Get k -> (fun s -> k s s)
   | effect (Set s') k -> (fun _ -> k () s')
   | finally f -> f x
@@ -16,7 +16,7 @@ let better_state x = handler
 let transaction = handler
   | effect Get k -> (fun s -> k s s)
   | effect (Set s') k -> (fun s -> k () s')
-  | val x -> (fun s -> perform (Set s); x)
+  | x -> (fun s -> perform (Set s); x)
   | finally f -> f (perform Get);;
 
 with better_state 10 handle

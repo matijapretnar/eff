@@ -39,7 +39,7 @@ with
 
 let choose_all = handler
   | effect Decide k -> continue k true @ continue k false
-  | val x -> [x];;
+  | x -> [x];;
 
 (* This returns a list of four possibilities [10; 5; 20; 15] *)
 
@@ -52,7 +52,7 @@ effect Decide2 : bool;;
 
 let choose_all2 = handler
   | effect Decide2 k -> continue k true @ continue k false
-  | val x -> [x];;
+  | x -> [x];;
 
 (* We can create two instances and handle each one separately. The inner handler produces
    two results in a list, and the outer handler then produces a list of two lists of two

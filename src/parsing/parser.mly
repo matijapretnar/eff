@@ -39,7 +39,7 @@
 %token LET REC AND IN
 %token FUN BAR BARBAR
 %token IF THEN ELSE
-%token HANDLER AT VAL FINALLY HANDLE
+%token HANDLER AT FINALLY HANDLE
 %token PLUS STAR MINUS MINUSDOT
 %token LSL LSR ASR
 %token MOD OR
@@ -301,7 +301,7 @@ plain_handler_clause:
   | EFFECT eff = effect  k = simple_pattern ARROW t = term
     { let unit_loc = Location.make $startpos(eff) $endpos(eff) in
       EffectClause (eff, ((PTuple [], unit_loc), k, t)) }
-  | VAL c = function_case
+  | c = function_case
     { ReturnClause c }
   | FINALLY c = function_case
     { FinallyClause c }

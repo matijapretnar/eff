@@ -27,7 +27,7 @@ let selection_collector desired_outcome = handler
                   | Success lst -> Success lst
                   | Failure -> try ys)
          in try choices))
-  | val outcome -> (fun selected ->
+  | outcome -> (fun selected ->
     (* Check if outcome is the desired one. *)
     if outcome = desired_outcome then Success selected else Failure)
   (* Because we are passing a state, we need to start with an empty assoc list.*)
@@ -58,7 +58,7 @@ let selection_collector desired_outcome = handler
                   | Success lst -> Success lst
                   | Failure -> try ys)
          in try choices))
-  | val outcome -> (fun selected ->
+  | outcome -> (fun selected ->
     if outcome = desired_outcome then Success selected else Failure)
   | finally f -> f [];;
 

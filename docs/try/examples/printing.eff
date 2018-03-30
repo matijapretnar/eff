@@ -53,7 +53,7 @@ with
 
 let collect = handler
     (* We return the value of the computation and a string. *)
-    | val x -> (x, "")
+    | x -> (x, "")
     | effect (Print msg) k ->
       (* First see what the rest of the computation returns and prints... *)
       let (result, msgs) = continue k () in
