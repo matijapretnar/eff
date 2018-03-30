@@ -2,16 +2,20 @@
 
 (* We will model non-determinism by implementing two operations, Decide and
    Fail. Decide will be used to `non-deterministically' choose the correct path
-   while Fail signals that a choice fails to return a suitable answer. *)
+   while Fail signals that a choice fails to return a suitable answer.
 
-effect Fail : unit -> empty
-effect Decide : unit -> bool
+   Effects that do not need any input can be defined by using unit as input
+   or with the alternative syntax (demonstrated below) where they are implicitly
+   treated as effect with input of type unit.*)
+
+effect Fail : empty   (* This is equivalent to the type unit -> empty. *)
+effect Decide : bool
 
 (* We use a trick to ensure that using Fail typechecks correctly by wrapping
    it in a function. For aesthetic purposes we also wrap Decide in a function. *)
 
-let fail () = (match #Fail () with)
-let decide () = #Decide ()
+let fail () = absurd (perform Fail) (* Equivalent to perform (Fail ()). *)
+let decide () = perform Decide
 ;;
 
 (* We create a few different handlers to handle the above effects. The simplest
@@ -20,20 +24,17 @@ let decide () = #Decide ()
    possible choices, while "choose_all" instead returns a list of all possible
    results. *)
 
-let choose_true =
-    handler
-    | #Decide () k -> k true
+let choose_true = handler
+    | effect Decide k -> continue k true
 
 (* In the case of choose_max and choose_all the continuation is used twice.*)
-let choose_max =
-    handler
-    | #Decide () k -> max (k true) (k false)
+let choose_max = handler
+    | effect Decide k -> max (continue k true) (continue k false)
 
-let choose_all =
-    handler
+let choose_all = handler
     | val x -> [x]
-    | #Fail () _ -> []
-    | #Decide () k -> (k true) @ (k false)
+    | effect Fail _ -> []
+    | effect Decide k -> (continue k true) @ (continue k false)
 ;;
 
 (* Even on a small example the behaviour of the three handlers varies greatly. *)
@@ -97,10 +98,10 @@ let pythagorean m n =
 (* We also construct an additional handler that simply tries to get one viable
    solution. *)
 let backtrack = handler
-  | #Decide () k ->
+  | effect Decide k ->
     (* We use a second handler to handle the continuation. *)
-    handle k false with
-    | #Fail () _ -> k true
+    handle continue k false with
+    | effect Fail _ -> continue k true
 ;;
 
 (* You can test the different handlers on the following examples. *)
@@ -138,12 +139,11 @@ let rec place x qs =
   place (x + 1) ((x, y) :: qs)
 
 let backtrack = handler
-| #Decide () k ->
-    handle k true with
-    | #Fail () _ -> k false
+| effect Decide k ->
+    handle continue k true with
+    | effect Fail _ -> k false
 ;;
 
 with backtrack handle
   place 1 []
 ;;
-

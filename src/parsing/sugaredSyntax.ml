@@ -30,14 +30,14 @@ and plain_term =
   | Variant of OldUtils.label * term option  (** [Label] or [Label t] *)
   | Lambda of abstraction  (** [fun p1 p2 ... pn -> t] *)
   | Function of abstraction list  (** [function p1 -> t1 | ... | pn -> tn] *)
-  | Effect of effect  (** [eff], where [eff] is an effect symbol. *)
+  | Effect of effect * term  (** [eff], where [eff] is an effect symbol. *)
   | Handler of handler
       (** [handler clauses], where [clauses] are described below. *)
   | Let of (variable pattern * term) list * term
       (** [let p1 = t1 and ... and pn = tn in t] *)
   | LetRec of (variable * term) list * term
       (** [let rec f1 p1 = t1 and ... and fn pn = tn in t] *)
-  | Match of term * abstraction list
+  | Match of term * match_case list
       (** [match t with p1 -> t1 | ... | pn -> tn] *)
   | Conditional of term * term * term  (** [if t then t1 else t2] *)
   | Apply of term * term  (** [t1 t2] *)
@@ -47,8 +47,12 @@ and plain_term =
 and handler =
   { effect_clauses: (effect, abstraction2) OldUtils.assoc
         (** [t1#op1 p1 k1 -> t1' | ... | tn#opn pn kn -> tn'] *)
-  ; value_clause: abstraction option  (** [val p -> t] *)
-  ; finally_clause: abstraction option  (** [finally p -> t] *) }
+  ; value_clause: abstraction list  (** [val p -> t] *)
+  ; finally_clause: abstraction list  (** [finally p -> t] *) }
+
+and match_case =
+  | Val_match of abstraction
+  | Eff_match of (effect * abstraction2)
 
 and abstraction = (variable pattern * term)
 

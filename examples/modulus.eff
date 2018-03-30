@@ -10,27 +10,27 @@ type nat = int
 
 (* We can implement modulus of continuity as usual with a reference. *)
 
-effect Get : unit -> int
+effect Get : int
 effect Set : int -> unit
 
 let state initial = handler
+  | effect Get k -> (fun m -> continue k m m)
+  | effect (Set n) k -> (fun m -> continue k () n)
   | val x -> (fun _ -> x)
-  | #Get () k -> (fun m -> k m m)
-  | #Set n k -> (fun m -> k () n)
   | finally g -> g initial
 ;;
 
 let unhandled_ref_mu f a =
-  #Set 0;
+  perform (Set 0);
   (* The sequence "b" behaves the same as "a", except that it first
      saves the largest i for which a lookup was made. *)
   let b i =
-    let current = #Get () in
+    let current = perform Get in
     let new = max current i in
-    #Set new;
+    perform (Set new);
     a i
   in
-  ignore (f b); #Get ()
+  ignore (f b); perform Get
 ;;
 
 (* Handle it with the state handler. *)
@@ -45,18 +45,20 @@ let ref_mu f a =
 
 effect Call : int -> nat
 
-let sequence_transformer sequence= handler
-  | #Call n k -> (* #Call i is the same as sequence i with state adjusting. *)
+let sequence_transformer sequence = handler
+  (* (Call i) is the same as sequence i with state adjusting. *)
+  | effect (Call n) k ->
     (fun i ->
        let j = max i n in
-       k (sequence n) j) (* Here j represents the largest seen lookup index. *)
+       (* Here j represents the largest seen lookup index. *)
+       continue k (sequence n) j)
   | val x -> (fun n -> n) (* We want the final state, not the result. *)
   | finally g -> g 0
 ;;
 
 let mu f a =
   with sequence_transformer a handle
-    f #Call
+  f (fun x -> perform (Call x))
 ;;
 
 (* A couple of examples. *)
