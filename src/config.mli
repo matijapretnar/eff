@@ -39,3 +39,5 @@ val verbosity : int ref
     - 2 errors and check
     - 3 errors, check, and warnings
     - 4 errors, check, warnings, and debug messages *)
+
+val output_formatter : Format.formatter ref

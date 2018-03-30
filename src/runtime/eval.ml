@@ -158,9 +158,9 @@ and eval_closure2 env a2 v1 v2 =
 let rec top_handle = function
   | V.Value v -> v
   | V.Call ("Print", v, k) ->
-      let str = V.to_str v in
-      print_string str ;
-      flush stdout ;
+  let str = V.to_str v in
+  Format.pp_print_string !Config.output_formatter str ;
+  Format.pp_print_flush !Config.output_formatter () ;
       top_handle (k V.unit_value)
   | V.Call ("Raise", v, k) -> Error.runtime "%t" (Value.print_value v)
   | V.Call ("Random_int", v, k) ->

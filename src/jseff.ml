@@ -13,7 +13,7 @@ Js.export "jseff"
   (object%js
 
      method reset echo =
-       let ppf = js_formatter echo in
+       Config.output_formatter := js_formatter echo;
        Tctx.reset ();
        Shell.initial_state
 
