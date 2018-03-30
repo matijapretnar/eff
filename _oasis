@@ -1,6 +1,6 @@
 OASISFormat: 0.4
 Name:        eff
-Version:     4.0
+Version:     5.0
 Synopsis:    A functional language with effect handlers
 Authors:     Andrej Bauer and Matija Pretnar
 License:     BSD-3-clause
