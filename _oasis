@@ -17,8 +17,7 @@ PostConfCommand:
     hash ledit >/dev/null 2>&1 || \
     echo "No line-editing wrapper found"
 PreBuildCommand:
-    echo "let version = \"$pkg_version\"" > src/version.ml
-    echo "let effdir = \"$datarootdir/$pkg_name\"" >> src/version.ml
+    echo "let effdir = \"$datarootdir/$pkg_name\"" >> src/local.ml
 PostBuildCommand:
     if [ -f "eff.native" ]; then
         ln -fs "eff.native" "eff"
@@ -26,7 +25,7 @@ PostBuildCommand:
         ln -fs "eff.byte" "eff"
     fi
 PostCleanCommand:
-    rm -f eff src/version.ml tests/*.out tests/*/*.out
+    rm -f eff src/local.ml tests/*.out tests/*/*.out
 
 Executable eff
   Path:           src

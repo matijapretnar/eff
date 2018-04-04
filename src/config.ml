@@ -1,5 +1,7 @@
 (** Configuration parameters *)
 
+let version = "5.0"
+
 type pervasives =
   | PervasivesNone
   | PervasivesDefault

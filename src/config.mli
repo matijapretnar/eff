@@ -1,5 +1,8 @@
 (** Configuration parameters *)
 
+(** Current version *)
+val version : string
+
 (** Possible locations of pervasives file
 
     Unless specified otherwise, we look for pervasives.eff _first_ next to the
