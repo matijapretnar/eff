@@ -49,11 +49,11 @@ eff: setup.data
 
 # "make test" to see if anything broke
 test: eff
-	cd tests && sh ./test.sh
+	cd tests/regression && sh ./test.sh
 
 # "make test-validate" to see if anything broke
 # and ask for validation of possibly broken things.
 test-validate: eff
-	cd tests && sh ./test.sh -v
+	cd tests/regression && sh ./test.sh -v
 
 .PHONY: test test-validate jseff

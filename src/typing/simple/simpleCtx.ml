@@ -1,4 +1,4 @@
-type ty_scheme = Type.ty_param list * Type.ty
+type ty_scheme = Params.Ty.t list * Type.ty
 
 type t =
   { variables: (CoreSyntax.variable, ty_scheme) OldUtils.assoc

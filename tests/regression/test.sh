@@ -11,15 +11,15 @@ then
     exit 1
 fi
 
-if [ -x "$BASEDIR/../eff" ]
+if [ -x "$BASEDIR/../../eff" ]
 then
-  EFF="$BASEDIR/../eff"
-elif [ -x "$BASEDIR/../eff.native" ]
+  EFF="$BASEDIR/../../eff"
+elif [ -x "$BASEDIR/../../eff.native" ]
 then
-  EFF="$BASEDIR/../eff.byte"
-elif [ -x "$BASEDIR/../eff.byte" ]
+  EFF="$BASEDIR/../../eff.byte"
+elif [ -x "$BASEDIR/../../eff.byte" ]
 then
-  EFF="$BASEDIR/../eff.byte"
+  EFF="$BASEDIR/../../eff.byte"
 else
   echo "Cannot find the eff executable. Compile eff first."
   exit 1
@@ -38,21 +38,21 @@ for FILE in $BASEDIR/*.eff $BASEDIR/*/*.eff
       then
       RESULT=`"$DIFF" "$FILE.out" "$FILE.ref"`
       if [ "$?" = "0" ]
-	  then
-	  echo "Passed:  $FILE"
-	  rm "$FILE.out"
+    then
+    echo "Passed:  $FILE"
+    rm "$FILE.out"
       else
-	  echo "FAILED:  $FILE"
-	  if [ $VALIDATE = "1" ]
-	      then
-	      "$DIFF" "$FILE.out" "$FILE.ref"
-	      read -p "Validate $FILE.out as new $FILE.ref? (y/n) [n] " ans
-	      if [ "$ans" = "y" -o "$ans" = "Y" ]
-		  then
-		  mv "$FILE.out" "$FILE.ref"
-		  echo "Validated: $FILE"
-	      fi
-	  fi
+    echo "FAILED:  $FILE"
+    if [ $VALIDATE = "1" ]
+        then
+        "$DIFF" "$FILE.out" "$FILE.ref"
+        read -p "Validate $FILE.out as new $FILE.ref? (y/n) [n] " ans
+        if [ "$ans" = "y" -o "$ans" = "Y" ]
+      then
+      mv "$FILE.out" "$FILE.ref"
+      echo "Validated: $FILE"
+        fi
+    fi
       fi
 
   else
