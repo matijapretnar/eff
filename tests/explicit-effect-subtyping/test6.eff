@@ -1,5 +1,5 @@
 effect Op : int -> int ;;
 
 handle 1 with
-  | val x -> x 
-  | #Op n k -> 2 ;;
+  | x -> x 
+  | effect (Op n) k -> 2 ;;

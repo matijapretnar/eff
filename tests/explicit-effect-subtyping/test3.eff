@@ -1,2 +1,2 @@
 handler 
-  | val x -> x ;;
+  | x -> x ;;

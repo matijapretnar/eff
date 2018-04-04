@@ -6,9 +6,9 @@ effect Get : unit -> int ;;
 effect Put : int -> unit ;;
 
 (let rec loop n =
-  if 0 < n then #Put (#Get () + 1); loop (n - 1) else ()
-in handle (loop 10) with
-   | val x -> (fun s -> x)
-   | #Get x k -> (fun s -> k s s)
-   | #Put s k -> (fun t -> k () s)
+  if 0 < n then perform (Put ((perform Get) + 1)); loop (n - 1) else ()
+in match (loop 10) with
+   | x -> (fun s -> x)
+   | effect (Get x) k -> (fun s -> k s s)
+   | effect (Put s) k -> (fun t -> k () s)
 ) 0

@@ -1,2 +1,2 @@
-handle 1 with
-  | val x -> x ;;
+with (handler
+  | x -> x) handle 1 ;;
