@@ -8,6 +8,7 @@ homepage: "http://www.eff-lang.org/"
 bug-reports: "https://github.com/matijapretnar/eff/issues"
 license: "BSD2"
 dev-repo: "git@github.com:matijapretnar/eff.git"
+available: [ ocaml-version >= "4.02.3" ]
 build: [
   ["./configure" "--prefix=%{prefix}%"]
   [make]
@@ -17,4 +18,7 @@ remove: [make "uninstall"]
 depends: [
   "ocamlfind"
   "menhir" 
+  "js_of_ocaml"
+  "js_of_ocaml-ocamlbuild"
+  "js_of_ocaml-ppx"
 ]
