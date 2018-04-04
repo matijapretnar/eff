@@ -1,7 +1,7 @@
 (** Configuration parameters *)
 
-(** Current version *)
 val version : string
+(** Current version *)
 
 (** Possible locations of pervasives file
 
