@@ -29,11 +29,11 @@
     ("mod", MOD);
     ("of", OF);
     ("or", OR);
+    ("perform", PERFORM);
     ("rec", REC);
     ("then", THEN);
     ("true", BOOL true);
     ("type", TYPE);
-    ("val", VAL);
     ("with", WITH)
   ]
 
@@ -72,7 +72,7 @@ let xxxint =
     | ("0b" | "0B") ['0' '1'] ['0' '1' '_']*)
 
 let float =
-  '-'? ['0'-'9'] ['0'-'9' '_']* 
+  '-'? ['0'-'9'] ['0'-'9' '_']*
   (('.' ['0'-'9' '_']*) (['e' 'E'] ['+' '-']? ['0'-'9'] ['0'-'9' '_']*)? |
    ('.' ['0'-'9' '_']*)? (['e' 'E'] ['+' '-']? ['0'-'9'] ['0'-'9' '_']*))
 
@@ -167,7 +167,7 @@ and escaped = parse
     let lex = Lexing.from_string (str ^ "\n") in
     let cmd = parser lex in
     cmd
-    
+
   let read_file parser fn =
   try
     let fh = open_in fn in

@@ -11,7 +11,7 @@ let rec uniform_pick = function
   | x :: xs ->
       let n = length xs + 1 in
       let p = 1.0 /. float_of_int n in
-      if #Pick p then x else uniform_pick xs
+      if perform (Pick p) then x else uniform_pick xs
 ;;
 
 (* Picks according to distribution from a distribution list.
@@ -22,7 +22,7 @@ let rec distribution_pick l =
   | [(x, _)] -> x
   | (x, p)::xs ->
     let adjusted_p = (p/.(1. -. acc)) in
-      if #Pick adjusted_p then x else pick_aux (acc +. p) xs
+    if perform (Pick adjusted_p) then x else pick_aux (acc +. p) xs
   in
   pick_aux 0. l
 ;;
@@ -45,15 +45,18 @@ let combine p dist1 dist2 =
 (* This handler computes the distribution of outcomes of a probabilisitic
    computation. *)
 let distribution = handler
-  | val v -> [(v, 1.0)] (* Distribution of only one value. *)
-  | #Pick p k -> combine p (k true) (k false) (* Combine possible distributions. *)
+      (* Distribution of only one value. *)
+  | v -> [(v, 1.0)]
+      (* Combine possible distributions. *)
+  | effect (Pick p) k -> combine p (continue k true) (continue k false)
 ;;
 
 (* The handler computing the expected value of a probabilistic computation
    of type float. *)
 let expectation = handler
-  | val v -> v
-  | #Pick p k -> p *. k true +. (1.0 -. p) *. k false
+  | v -> v
+  | effect (Pick p) k ->
+    p *. (continue k true) +. (1.0 -. p) *. (continue k false)
 ;;
 
 (* Examples. *)
@@ -62,12 +65,13 @@ let expectation = handler
    going right is q. *)
 
 (* Set up a state to keep track of position. *)
-effect Get: unit -> float
+effect Get: float
 effect Set: float -> unit
+
 let state = handler
-  | val y -> (fun _ -> y)
-  | #Get () k -> (fun s -> k s s)
-  | #Set s' k -> (fun _ -> k () s')
+  | y -> (fun _ -> y)
+  | effect Get k -> (fun s -> (continue k s) s)
+  | effect (Set s') k -> (fun _ -> (continue k ()) s')
   | finally g -> g 0.
 ;;
 
@@ -76,8 +80,11 @@ let walk n p q =
   let s = 1.0 -. p -. q in
   with state handle
   (let rec step_maker m =
-     #Set (#Get () +. distribution_pick [(-1.0, p); (0.0, s); (1.0, q)]);
-     if m > 0 then step_maker (m-1) else #Get()
+     let new_pos =
+       perform Get +. distribution_pick [(-1.0, p); (0.0, s); (1.0, q)]
+     in
+     perform (Set new_pos);
+     if m > 0 then step_maker (m-1) else perform Get
    in
    step_maker n)
 ;;

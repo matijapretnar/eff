@@ -1,5 +1,7 @@
 (** Configuration parameters *)
 
+let version = "5.0"
+
 type pervasives =
   | PervasivesNone
   | PervasivesDefault
@@ -26,3 +28,5 @@ let verbosity = ref 3
 let pure_print = ref false
 
 let explicit_subtyping = ref false
+
+let output_formatter = ref Format.std_formatter

@@ -5,7 +5,7 @@
 
 type 'a result = Failure | Success of 'a
 
-(* #Select_int takes a variable name and a list of possible integer choices
+(* Select_int takes a variable name and a list of possible integer choices
    and chooses one. *)
 
 effect Select_int: string * int list -> int
@@ -14,20 +14,20 @@ effect Select_int: string * int list -> int
    desired outcome. All current choices are saved in an association list. *)
 
 let selection_collector desired_outcome = handler
-  | #Select_int (name, choices) k -> (fun selected ->
+  | effect (Select_int (name, choices)) k -> (fun selected ->
     (* Check association list if variable already chosen. *)
     (match assoc name selected with
-     | Some y -> k y selected
+     | Some y -> (continue k y) selected
      | None ->
        (* Select a value and try to get desired outcome. *)
          let rec try = function
            | [] -> Failure
            | y::ys ->
-               (match k y ((name,y)::selected) with
+               (match (continue k y) ((name,y)::selected) with
                   | Success lst -> Success lst
                   | Failure -> try ys)
          in try choices))
-  | val outcome -> (fun selected ->
+  | outcome -> (fun selected ->
     (* Check if outcome is the desired one. *)
     if outcome = desired_outcome then Success selected else Failure)
   (* Because we are passing a state, we need to start with an empty assoc list.*)
@@ -36,9 +36,9 @@ let selection_collector desired_outcome = handler
 
 (* Search for a Pythagorean triple. It finds a=5, b=12, c=13. *)
 with selection_collector true handle
-  let a = #Select_int ("a", [5;6;7;8]) in
-  let b = #Select_int ("b", [9;10;11;12]) in
-  let c = #Select_int ("c", [13;14;15;16]) in
+  let a = perform (Select_int ("a", [5;6;7;8])) in
+  let b = perform (Select_int ("b", [9;10;11;12])) in
+  let c = perform (Select_int ("c", [13;14;15;16])) in
     a*a + b*b = c*c;;
 
 (* Martin Escardo's epsilon. *)
@@ -47,25 +47,25 @@ effect Select_bool: int * bool list -> bool
 
 (* Modify handler for booleans.*)
 let selection_collector desired_outcome = handler
-  | #Select_bool (name, choices) k -> (fun selected ->
+  | effect (Select_bool (name, choices)) k -> (fun selected ->
     (match assoc name selected with
-     | Some y -> k y selected
+     | Some y -> (continue k y) selected
      | None ->
          let rec try = function
            | [] -> Failure
            | y::ys ->
-               (match k y ((name,y)::selected) with
+               (match (continue k y) ((name,y)::selected) with
                   | Success lst -> Success lst
                   | Failure -> try ys)
          in try choices))
-  | val outcome -> (fun selected ->
+  | outcome -> (fun selected ->
     if outcome = desired_outcome then Success selected else Failure)
   | finally f -> f [];;
 
 (* Define epsilon. *)
 let epsilon p =
     let r = (with selection_collector true handle
-               p (fun n -> #Select_bool (n, [false; true])))
+               p (fun n -> perform (Select_bool (n, [false; true]))))
     in
       match r with
         | Failure -> (fun _ -> false)

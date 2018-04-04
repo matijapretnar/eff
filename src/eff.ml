@@ -35,7 +35,7 @@ let options =
     ; ( "-v"
       , Arg.Unit
           (fun () ->
-            print_endline ("eff " ^ Version.version ^ "(" ^ Sys.os_type ^ ")") ;
+            print_endline ("eff " ^ Config.version ^ "(" ^ Sys.os_type ^ ")") ;
             exit 0 )
       , " Print version information and exit" )
     ; ( "-n"
@@ -74,7 +74,7 @@ let toplevel st =
     | "Win32" -> "Ctrl-Z"
     | _ -> "EOF"
   in
-  print_endline ("eff " ^ Version.version) ;
+  print_endline ("eff " ^ Config.version) ;
   print_endline ("[Type " ^ eof ^ " to exit or #help;; for help.]") ;
   try
     let st = ref st in
@@ -115,7 +115,7 @@ let main =
       in
       let f =
         if Sys.file_exists pervasives_development then pervasives_development
-        else Filename.concat Version.effdir "pervasives.eff"
+        else Filename.concat Local.effdir "pervasives.eff"
       in
       enqueue_file (Load f) ) ;
   try

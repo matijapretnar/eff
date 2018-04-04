@@ -1,5 +1,8 @@
 (** Configuration parameters *)
 
+(** Current version *)
+val version : string
+
 (** Possible locations of pervasives file
 
     Unless specified otherwise, we look for pervasives.eff _first_ next to the
@@ -50,3 +53,5 @@ val pure_print : bool ref
 
 val explicit_subtyping : bool ref
 (** Should we use the new explicit subtyping effect system? *)
+
+val output_formatter : Format.formatter ref

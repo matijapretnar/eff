@@ -7,26 +7,18 @@
     | FinallyClause of abstraction
 
   let collect_handler_clauses clauses =
-    let (eff_cs, val_c, fin_c) =
+    let (eff_cs, val_cs, fin_cs) =
       List.fold_left
-        (fun (eff_cs, val_c, fin_c) -> function
-          | (EffectClause (eff, a2), _) ->  ((eff, a2) :: eff_cs, val_c, fin_c)
-          | (ReturnClause a, loc) ->
-            begin match val_c with
-              | None -> (eff_cs, Some a, fin_c)
-              | Some _ -> Error.syntax ~loc "Multiple value clauses in a handler."
-            end
-          | (FinallyClause a, loc) ->
-            begin match fin_c with
-            | None -> (eff_cs, val_c, Some a)
-            | Some _ -> Error.syntax ~loc "Multiple finally clauses in a handler."
-            end)
-        ([], None, None)
+        (fun (eff_cs, val_cs, fin_cs) -> function
+          | (EffectClause (eff, a2), _) ->  ((eff, a2) :: eff_cs, val_cs, fin_cs)
+          | (ReturnClause a, loc) -> (eff_cs, a :: val_cs, fin_cs)
+          | (FinallyClause a, loc) -> (eff_cs, val_cs, a :: fin_cs))
+        ([], [], [])
         clauses
     in
     { effect_clauses = List.rev eff_cs;
-      value_clause = val_c;
-      finally_clause = fin_c }
+      value_clause = List.rev val_cs;
+      finally_clause = List.rev fin_cs }
 
 %}
 
@@ -41,13 +33,13 @@
 %token <float> FLOAT
 %token <OldUtils.label> UNAME
 %token <OldUtils.typaram> PARAM
-%token TYPE ARROW HARROW OF EFFECT
+%token TYPE ARROW HARROW OF EFFECT PERFORM
 %token EXTERNAL
 %token MATCH WITH FUNCTION HASH
 %token LET REC AND IN
 %token FUN BAR BARBAR
 %token IF THEN ELSE
-%token HANDLER AT VAL FINALLY HANDLE
+%token HANDLER AT FINALLY HANDLE
 %token PLUS STAR MINUS MINUSDOT
 %token LSL LSR ASR
 %token MOD OR
@@ -124,6 +116,9 @@ plain_topdef:
     { External (x, t, n) }
   | EFFECT eff = effect COLON t1 = prod_ty ARROW t2 = ty
     { DefEffect (eff, (t1, t2))}
+  | EFFECT eff = effect COLON t = prod_ty
+    { let unit_loc = Location.make $startpos(t) $endpos(t) in
+      DefEffect (eff, ((TyTuple [], unit_loc), t))}
 
 (* Toplevel directive If you change these, make sure to update lname as well,
    or a directive might become a reserved word. *)
@@ -146,7 +141,7 @@ term: mark_position(plain_term) { $1 }
 plain_term:
   | MATCH t = term WITH cases = cases0(match_case) (* END *)
     { Match (t, cases) }
-  | FUNCTION cases = cases(match_case) (* END *)
+  | FUNCTION cases = cases(function_case) (* END *)
     { Function cases }
   | HANDLER h = handler (* END *)
     { fst h }
@@ -185,7 +180,7 @@ plain_binop_term:
     }
   | t1 = binop_term CONS t2 = binop_term
     { Variant (OldUtils.cons, Some (Tuple [t1; t2], Location.make $startpos $endpos)) }
-  | t = plain_uminus_term 
+  | t = plain_uminus_term
     { t }
 
 uminus_term: mark_position(plain_uminus_term) { $1 }
@@ -232,8 +227,11 @@ plain_simple_term:
     { Variant (lbl, None) }
   | cst = const_term
     { Const cst }
-  | HASH eff = effect
-    { Effect eff }
+  | PERFORM LPAREN eff = effect t = term RPAREN
+    { Effect (eff, t)}
+  | PERFORM eff = effect
+    { let unit_loc = Location.make $startpos(eff) $endpos(eff) in
+      Effect (eff, (Tuple [], unit_loc))}
   | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
       let nil = (Variant (OldUtils.nil, None), Location.make $endpos $endpos) in
@@ -263,9 +261,18 @@ const_term:
   | f = FLOAT
     { Const.of_float f }
 
-match_case:
+function_case:
   | p = pattern ARROW t = term
     { (p, t) }
+
+match_case:
+  | p = pattern ARROW t = term
+    { Val_match (p, t) }
+  | EFFECT LPAREN eff = effect p = simple_pattern RPAREN k = simple_pattern ARROW t = term
+    { Eff_match (eff, (p, k, t)) }
+  | EFFECT eff = effect k = simple_pattern ARROW t = term
+    { let unit_loc = Location.make $startpos(eff) $endpos(eff) in
+      Eff_match (eff, ((PTuple [], unit_loc), k, t)) }
 
 lambdas0(SEP):
   | SEP t = term
@@ -289,11 +296,14 @@ let_rec_def:
 
 handler_clause: mark_position(plain_handler_clause) { $1 }
 plain_handler_clause:
-  | HASH eff = effect p = simple_pattern k = simple_pattern ARROW t2 = term
-    { EffectClause (eff, (p, k, t2)) }
-  | VAL c = match_case
+  | EFFECT LPAREN eff = effect p = simple_pattern RPAREN k = simple_pattern ARROW t = term
+    { EffectClause (eff, (p, k, t)) }
+  | EFFECT eff = effect  k = simple_pattern ARROW t = term
+    { let unit_loc = Location.make $startpos(eff) $endpos(eff) in
+      EffectClause (eff, ((PTuple [], unit_loc), k, t)) }
+  | c = function_case
     { ReturnClause c }
-  | FINALLY c = match_case
+  | FINALLY c = function_case
     { FinallyClause c }
 
 pattern: mark_position(plain_pattern) { $1 }
