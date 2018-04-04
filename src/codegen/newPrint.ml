@@ -126,7 +126,7 @@ and print_computation ?max_level c ppf =
       print ~at_level:1 "call %t %t (fun %t)" (print_effect eff)
         (print_expression ~max_level:0 e)
         (print_abstraction_with_ty a)
-  | Erasure.EBind (c1, {Erasure.term=(p, c2)}) ->
+  | Erasure.EBind (c1, {Erasure.term= p, c2}) ->
       print ~at_level:2 "let %t = %t in %t" (print_pattern p)
         (print_computation c1) (print_computation c2)
   | Erasure.EMatch (e, alist) ->
@@ -134,8 +134,8 @@ and print_computation ?max_level c ppf =
         (print_expression ~max_level:0 e)
         (print_cases alist)
   | Erasure.ELetRec ([(var, _, e)], c) ->
-      print ~at_level:2 "let rec %t = %t in %t"
-        (print_variable var) (print_expression e) (print_computation c)
+      print ~at_level:2 "let rec %t = %t in %t" (print_variable var)
+        (print_expression e) (print_computation c)
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
