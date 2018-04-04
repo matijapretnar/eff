@@ -1,2 +1,2 @@
-Typing error (file "./errors/occurs_check.eff", line 1, char 21 - line 1, char 22):
+Typing error (file "./errors/occurs_check.eff", line 1, char 15):
 This expression has a forbidden cylclic type '_a = '_b -> '_a.

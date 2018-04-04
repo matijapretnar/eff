@@ -38,21 +38,21 @@ for FILE in $BASEDIR/*.eff $BASEDIR/*/*.eff
       then
       RESULT=`"$DIFF" "$FILE.out" "$FILE.ref"`
       if [ "$?" = "0" ]
-	  then
-	  echo "Passed:  $FILE"
-	  rm "$FILE.out"
+    then
+    echo "Passed:  $FILE"
+    rm "$FILE.out"
       else
-	  echo "FAILED:  $FILE"
-	  if [ $VALIDATE = "1" ]
-	      then
-	      "$DIFF" "$FILE.out" "$FILE.ref"
-	      read -p "Validate $FILE.out as new $FILE.ref? (y/n) [n] " ans
-	      if [ "$ans" = "y" -o "$ans" = "Y" ]
-		  then
-		  mv "$FILE.out" "$FILE.ref"
-		  echo "Validated: $FILE"
-	      fi
-	  fi
+    echo "FAILED:  $FILE"
+    if [ $VALIDATE = "1" ]
+        then
+        "$DIFF" "$FILE.out" "$FILE.ref"
+        read -p "Validate $FILE.out as new $FILE.ref? (y/n) [n] " ans
+        if [ "$ans" = "y" -o "$ans" = "Y" ]
+      then
+      mv "$FILE.out" "$FILE.ref"
+      echo "Validated: $FILE"
+        fi
+    fi
       fi
 
   else

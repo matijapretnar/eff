@@ -1,12 +1,12 @@
 - : int = 5
 - : int * int = (1, 2)
-Warning (file "./patterns.eff", line 3, char 5 - line 3, char 11):
+Warning (file "./patterns.eff", line 3, char 5):
 This pattern-matching is not exhaustive.
 
                                     Here is an example of a value that is not matched:
   []
 - : int * int list = (1, [2; 3; 4])
-Warning (file "./patterns.eff", line 4, char 5 - line 4, char 11):
+Warning (file "./patterns.eff", line 4, char 5):
 This pattern-matching is not exhaustive.
 
                                     Here is an example of a value that is not matched:

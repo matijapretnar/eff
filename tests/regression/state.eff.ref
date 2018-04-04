@@ -1,10 +1,10 @@
 val state : 'a -> 'b => int -> 'b = <fun>
 val better_state : int -> 'a => 'a = <fun>
 val transaction : 'a => 'a = <handler>
-Check (file "./state.eff", line 25, char 24 - line 25, char 31):
+Check (file "./state.eff", line 25, char 28):
 20
-Check (file "./state.eff", line 28, char 26 - line 28, char 33):
+Check (file "./state.eff", line 28, char 30):
 30
-Check (file "./state.eff", line 34, char 37 - line 34, char 44):
+Check (file "./state.eff", line 34, char 49):
 20
 - : int = 0
