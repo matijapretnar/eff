@@ -1,0 +1,43 @@
+CodeMirror.defineMIME('text/x-eff', {
+  name: 'mllike',
+  extraWords: {
+    'and' : 'keyword',
+    'as' : 'keyword',
+    'asr' : 'builtin',
+    'begin' : 'keyword',
+    'check' : 'keyword',
+    'effect' : 'keyword',
+    'else' : 'keyword',
+    'end' : 'keyword',
+    'external' : 'keyword',
+    'false' : 'builtin',
+    'finally' : 'keyword',
+    'fun' : 'keyword',
+    'function' : 'keyword',
+    'handle' : 'keyword',
+    'handler' : 'keyword',
+    'if' : 'keyword',
+    'in' : 'keyword',
+    'land' : 'builtin',
+    'let' : 'keyword',
+    'lor' : 'builtin',
+    'lsl' : 'builtin',
+    'lsr' : 'builtin',
+    'lxor' : 'builtin',
+    'match' : 'keyword',
+    'mod' : 'builtin',
+    'of' : 'keyword',
+    'or' : 'builtin',
+    'perform' : 'keyword',
+    'rec' : 'keyword',
+    'then' : 'keyword',
+    'true' : 'builtin',
+    'type' : 'keyword',
+    'with' : 'keyword',
+
+    // Pervasives
+    'assert' : 'builtin',
+    'option' : 'type'
+  },
+  slashComments: false
+});
