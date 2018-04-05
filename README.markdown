@@ -81,10 +81,10 @@ and run
 
     ./configure
 
-If it complains you will have to install missing prerequisites. The
-configuration script takes standard GNU Autoconf arguments, such as
-`--prefix` which determines where to install Eff. Type `./configure --help`
-for more information. Next, run
+If it complains you will have to install missing prerequisites. In case of
+problems, `make clean distclean` might help. The configuration script takes
+standard GNU Autoconf arguments, such as `--prefix` which determines where to
+install Eff. Type `./configure --help` for more information. Next, run
 
     make
 
