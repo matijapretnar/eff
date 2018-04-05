@@ -18,6 +18,8 @@
     <script src="https://code.jquery.com/jquery-2.2.4.min.js" integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/css/jquery.terminal.min.css" integrity="sha256-NPnczI0KjCueVIbIZBIjffajQholjsUnhVe4sQgL80U=" crossorigin="anonymous" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/js/jquery.terminal.min.js" integrity="sha256-Qm1Nw4js01hUsHFCa8xirKnSZeRXR8uNgbAKwjhn9mA=" crossorigin="anonymous"></script>
+    <!-- suport for resizable CodeMirror editor -->
+    <script src="https://unpkg.com/cm-resize"></script>
     <!-- local Javascript code -->
     <script src="/try/jseff.js"></script>
     <style>
@@ -126,6 +128,7 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
                 lineNumbers: true,
                 matchBrackets: true
             });
+            cmResize(editor, {resizableWidth: false});
             </script>
 <!--             <div class="uk-align-center" style="margin: 0 auto; width: 100%">
                 <button class="uk-button uk-button-primary uk-width-3-5" id="runButton">Run</button>
@@ -148,7 +151,7 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
                 }, {
                     greetings: '',
                     name: 'repl_terminal',
-                    height: '30vh',
+                    height: 'calc(30vh - 50px)',
                     width: "auto",
                     prompt: '# '
                 });
