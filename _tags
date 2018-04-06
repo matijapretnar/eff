@@ -1,4 +1,5 @@
 true: use_menhir, use_unix
+<src/jseff.{ml,byte}>: package(js_of_ocaml), package(js_of_ocaml.ppx)
 <src/**>: include
 
 # OASIS_START

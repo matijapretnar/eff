@@ -1,0 +1,69 @@
+(** Printing to the standard output *)
+
+(* The main premise of algebraic effects, which is what Eff is based on,
+   is that each effect (manipulating memory, exceptions, ...) arises from
+   a set of basic operations, for example lookup & update or raise.
+   For example, we print out messages by performing the operation
+   "Print". *)
+
+(* To recap: you print out messages by performing "Print". For example: *)
+
+perform (Print "Hello, world!\n") ;;
+
+(* Where Eff really differs from OCaml is that you can handle such calls.
+   For example, the program inside the handler would print "A", "B", "C" and "D",
+   but the handler overrides it just as an exception handler would override an
+   exception. Thus, the program should output just:
+
+    "I see you tried to print A. Not so fast!" *)
+
+handle
+    perform (Print "A");
+    perform (Print "B");
+    perform (Print "C");
+    perform (Print "D")
+with
+| effect (Print msg) k ->
+    perform (Print ("I see you tried to print " ^ msg ^ ". Not so fast!\n"))
+;;
+
+(* You may be wondering what the second parameter "k" in the handling clause
+   for Print is. It stands for the continuation, i.e. the part of the program
+   that is waiting for the result of print. The difference between exception
+   handlers and general effect handlers is that we may call this continuation.
+   For example, instead of stopping after the first print like above, we may
+   handle it and then resume the continuation by passing it "()", the unit
+   result expected from the call of Print. Continuations should be called with
+   "continue k ..." to be more easily distinguished from regular functions. *)
+
+handle
+    perform (Print "A");
+    perform (Print "B");
+    perform (Print "C");
+    perform (Print "D")
+with
+| effect (Print msg) k ->
+    perform (Print ("I see you tried to print " ^ msg ^ ". Okay, you may.\n"));
+    continue k ()
+;;
+
+(* The handlers may be even more complex. For example, we may create a handler
+   to collect all Print calls, and instead of printing the strings separately,
+   the handler returns a combined string of all prints. *)
+
+let collect = handler
+    (* We return the value of the computation and a string. *)
+    | x -> (x, "")
+    | effect (Print msg) k ->
+      (* First see what the rest of the computation returns and prints... *)
+      let (result, msgs) = continue k () in
+      (* Add the string that we want to print at the begining. *)
+        (result, msg ^ msgs)
+;;
+
+with collect handle
+    perform (Print "A");
+    perform (Print "B");
+    perform (Print "C");
+    perform (Print "D")
+;;

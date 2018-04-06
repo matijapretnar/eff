@@ -6,7 +6,7 @@ module Sugared = SugaredSyntax
 module Untyped = CoreSyntax
 
 (* ***** Desugaring of types. ***** *)
-(* Desugar a type, where only the given type, dirt and region parameters may appear. 
+(* Desugar a type, where only the given type, dirt and region parameters may appear.
    If a type application with missing dirt and region parameters is encountered,
    it uses [ds] and [rs] instead. This is used in desugaring of recursive type definitions
    where we need to figure out which type and dirt parameters are missing in a type defnition.
@@ -155,11 +155,11 @@ let rec expression ctx (t, loc) =
     | Sugared.Variant (lbl, Some t) ->
         let w, e = expression ctx t in
         (w, Untyped.Variant (lbl, Some e))
-    | Sugared.Effect eff -> ([], Untyped.Effect eff)
     (* Terms that are desugared into computations. We list them explicitly in
-     order to catch any future constructs. *)
+       order to catch any future constructs. *)
     | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
-     |Sugared.Handle _ | Sugared.Conditional _ | Sugared.Check _ ->
+     |Sugared.Handle _ | Sugared.Conditional _ | Sugared.Check _
+     |Sugared.Effect _ ->
         let x = fresh_variable (Some "$bind") in
         let c = computation ctx (t, loc) in
         let w = [(Untyped.add_loc (Untyped.PVar x) loc, c)] in
@@ -202,10 +202,11 @@ and computation ctx (t, loc) =
         let w1, e1 = expression ctx t1 in
         let w2, e2 = expression ctx t2 in
         (w1 @ w2, Untyped.Apply (e1, e2))
-    | Sugared.Match (t, cs) ->
-        let cs = List.map (abstraction ctx) cs in
+    | Sugared.Effect (eff, t) ->
         let w, e = expression ctx t in
-        (w, Untyped.Match (e, cs))
+        let loc_eff = Untyped.add_loc (Untyped.Effect eff) loc in
+        (w, Untyped.Apply (loc_eff, e))
+    | Sugared.Match (t, cs) -> match_constructor ctx loc t cs
     | Sugared.Handle (t1, t2) ->
         let w1, e1 = expression ctx t1 in
         let c2 = computation ctx t2 in
@@ -256,7 +257,7 @@ and computation ctx (t, loc) =
        future changes. *)
     | Sugared.Var _ | Sugared.Const _ | Sugared.Tuple _ | Sugared.Record _
      |Sugared.Variant _ | Sugared.Lambda _ | Sugared.Function _
-     |Sugared.Handler _ | Sugared.Effect _ ->
+     |Sugared.Handler _ ->
         let w, e = expression ctx (t, loc) in
         (w, Untyped.Value e)
   in
@@ -307,26 +308,104 @@ and record_expressions ctx = function
 
 
 and handler loc ctx
-    { Sugared.effect_clauses= ops
-    ; Sugared.value_clause= val_a
-    ; Sugared.finally_clause= fin_a } =
-  let rec operation_cases = function
-    | [] -> []
-    | (op, a2) :: cs ->
-        let cs' = operation_cases cs in
-        (op, abstraction2 ctx a2) :: cs'
+    { Sugared.effect_clauses= eff_cs
+    ; Sugared.value_clause= val_cs
+    ; Sugared.finally_clause= fin_cs } =
+  (* Construct a handler with match statements. *)
+  let rec group_eff_cs (eff, a2) = function
+    | [] -> [(eff, [a2])]
+    | (e, a2s) :: tl ->
+        if e = eff then (e, a2 :: a2s) :: tl
+        else (e, a2s) :: group_eff_cs (eff, a2) tl
   in
-  let ops = operation_cases ops in
+  let rec construct_eff_clause (eff, eff_cs_lst) =
+    match eff_cs_lst with
+    | [] -> assert false
+    | [a2] -> (eff, abstraction2 ctx a2)
+    | a2s ->
+        let x = fresh_variable (Some "$eff_param") in
+        let x_var = Untyped.add_loc (Untyped.Var x) loc in
+        let k = fresh_variable (Some "$continuation") in
+        let k_var = Untyped.add_loc (Untyped.Var k) loc in
+        let match_cs =
+          List.map
+            (fun (p1, p2, t) ->
+              let vars1, p1 = pattern p1 in
+              let vars2, p2 = pattern p2 in
+              let t = computation (vars1 @ vars2 @ ctx) t in
+              (Untyped.add_loc (Untyped.PTuple [p1; p2]) loc, t) )
+            a2s
+        in
+        let match_term =
+          Untyped.add_loc
+            (Untyped.Match
+               (Untyped.add_loc (Untyped.Tuple [x_var; k_var]) loc, match_cs))
+            loc
+        in
+        ( eff
+        , ( Untyped.add_loc (Untyped.PVar x) loc
+          , Untyped.add_loc (Untyped.PVar k) loc
+          , match_term ) )
+  in
+  let collected_eff_cs = List.fold_right group_eff_cs eff_cs [] in
+  let untyped_eff_cs = List.map construct_eff_clause collected_eff_cs in
+  let untyped_val_a =
+    match val_cs with
+    | [] -> id_abstraction loc
+    | cs ->
+        let v = fresh_variable (Some "$val_param") in
+        let v_var = Untyped.add_loc (Untyped.Var v) loc in
+        let cs = List.map (abstraction ctx) cs in
+        ( Untyped.add_loc (Untyped.PVar v) loc
+        , Untyped.add_loc (Untyped.Match (v_var, cs)) loc )
+  in
+  let untyped_fin_a =
+    match fin_cs with
+    | [] -> id_abstraction loc
+    | cs ->
+        let fin = fresh_variable (Some "$fin_param") in
+        let fin_var = Untyped.add_loc (Untyped.Var fin) loc in
+        let cs = List.map (abstraction ctx) cs in
+        ( Untyped.add_loc (Untyped.PVar fin) loc
+        , Untyped.add_loc (Untyped.Match (fin_var, cs)) loc )
+  in
   ( []
-  , { Untyped.effect_clauses= ops
-    ; Untyped.value_clause=
-        ( match val_a with
-        | None -> id_abstraction loc
-        | Some a -> abstraction ctx a )
-    ; Untyped.finally_clause=
-        ( match fin_a with
-        | None -> id_abstraction loc
-        | Some a -> abstraction ctx a ) } )
+  , { Untyped.effect_clauses= untyped_eff_cs
+    ; Untyped.value_clause= untyped_val_a
+    ; Untyped.finally_clause= untyped_fin_a } )
+
+
+and match_constructor ctx loc t cs =
+  (* Separate value and effect cases. *)
+  let val_cs, eff_cs = separate_match_cases cs in
+  match eff_cs with
+  | [] ->
+      let val_cs = List.map (abstraction ctx) val_cs in
+      let w, e = expression ctx t in
+      (w, Untyped.Match (e, val_cs))
+  | _ ->
+      let val_cs = List.map (fun cs -> Sugared.Val_match cs) val_cs in
+      let x = "$id_par" in
+      let value_match = (Sugared.Match ((Sugared.Var x, loc), val_cs), loc) in
+      let h_value_clause = ((Sugared.PVar x, loc), value_match) in
+      let sugared_h =
+        { Sugared.effect_clauses= eff_cs
+        ; Sugared.value_clause= [h_value_clause]
+        ; Sugared.finally_clause= [] }
+      in
+      let w, h = handler loc ctx sugared_h in
+      let c = computation ctx t in
+      let loc_h = Untyped.add_loc (Untyped.Handler h) loc in
+      (w, Untyped.Handle (loc_h, c))
+
+
+and separate_match_cases cs =
+  let separator case (val_cs, eff_cs) =
+    match case with
+    | Sugared.Val_match v_cs -> (v_cs :: val_cs, eff_cs)
+    | Sugared.Eff_match e_cs -> (val_cs, e_cs :: eff_cs)
+  in
+  List.fold_right separator cs ([], [])
 
 
 let top_ctx = ref []

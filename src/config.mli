@@ -1,5 +1,8 @@
 (** Configuration parameters *)
 
+val version : string
+(** Current version *)
+
 (** Possible locations of pervasives file
 
     Unless specified otherwise, we look for pervasives.eff _first_ next to the
@@ -39,3 +42,5 @@ val verbosity : int ref
     - 2 errors and check
     - 3 errors, check, and warnings
     - 4 errors, check, warnings, and debug messages *)
+
+val output_formatter : Format.formatter ref

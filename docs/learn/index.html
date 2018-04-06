@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Eff Programming Language</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.0-beta.40/css/uikit.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.0-beta.40/js/uikit.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.0-beta.40/js/uikit-icons.min.js"></script>
+    <style>
+    em {
+        color: inherit !important;
+    }
+
+    body {
+        background: #f5f6fa;
+        color: #2f3640;
+    }
+
+    .uk-navbar-container {
+        background: #192a56 !important;
+    }
+
+    .uk-navbar-container,
+    .uk-navbar-container a {
+        height: 40px !important;
+    }
+
+    .uk-navbar-container a,
+    .uk-button-primary {
+        color: rgba(255, 255, 255, 0.8) !important;
+    }
+
+    .uk-navbar-container .uk-active a,
+    .uk-button-primary {
+        color: rgba(255, 255, 255, 1) !important;
+    }
+
+    a {
+        color: #0097e6;
+    }
+
+    .uk-alert-danger {
+        background: #c23616;
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    #try-out {
+        font-weight: bold;
+        font-size: 1.5em;
+    }
+    </style>
+</head>
+
+<body>
+    <nav class="uk-navbar-container" uk-navbar>
+        <div class="uk-navbar-center">
+            <a href="/" class="uk-navbar-item uk-logo" style="height: 50px">
+                EFF
+            </a>
+            <ul class="uk-navbar-nav">
+                <li><a href="/try/">
+                    <span uk-icon="settings"></span>
+                    Try it out
+                </a></li>
+                <li class="uk-active"><a href="/learn/">
+                    <span uk-icon="copy"></span>
+                    Learn more
+                </a></li>
+                <li><a href="https://github.com/matijapretnar/eff/">
+                    <span uk-icon="github"></span>
+                    Contribute
+                </a></li>
+            </ul>
+        </div>
+    </nav>
+    <div class="uk-section" uk-height-viewport="offset-top: true">
+        <div class="uk-container uk-container-small">
+            <h3>Where should I start if I want to learn more about the <strong>theory behind <em>Eff</em></strong> ?</h3>
+            <p>
+                The best place to start is <a href="/handlers-tutorial.pdf">An Introduction to Algebraic Effects and Handlers</a>.
+            </p>
+            <h3>Where is the <strong>relevant literature</strong> if I want to dig deeper?</h3>
+            <p>
+                All literature on algebraic effects, handlers, and other approaches to computational effects can be found on the frequently updated <a href="https://github.com/yallop/effects-bibliography">effects bibliography</a>. Pretty much anything authored by Andrej Bauer or Matija Pretnar is relevant to <em>Eff</em>.
+            </p>
+            <h3>Why do I get a <strong>syntax error</strong> when copying an example from a paper?</h3>
+            <p>
+                As warned on the first page, <em>Eff</em> is a prototype language, so most likely the syntax changed since the paper was published. However, we try to keep interesting examples up to date, so check out the <a href="https://github.com/matijapretnar/eff/tree/master/examples">examples</a> directory and you will most likely find one corresponding to what you are looking at in the paper.
+            </p>
+            <h3>Where can I find <strong>older versions</strong> of <em>Eff</em>&nbsp;?</h3>
+            <p>
+                Versions from 3.0 onwards can be found on the <a href="https://github.com/matijapretnar/eff/releases">GitHub repository</a>. Version 2.0 was similar to version 3.0, except that it had a Python-like syntax. To our best recollection, version 1.0 resembled <a href="http://plzoo.andrej.com/language/levy.html">levy</a> from the <a href="http://plzoo.andrej.com/">The Programming Languages Zoo</a>.
+            </p>
+            <h3>Who should I ask if I have <strong>more questions</strong>?</h3>
+            <p>
+                The best place would be to <a href="https://github.com/matijapretnar/eff/issues">open an issue on GitHub</a>. If you want to do it privately, you can write an email to <a href="mail&#116;o&#58;&#37;6Da&#116;&#37;&#54;9ja&#46;%&#55;0&#114;etna%&#55;2&#64;&#37;66mf%2&#69;uni-l%6A&#46;s&#105;">Matija Pretnar</a>.
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>

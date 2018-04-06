@@ -1,14 +1,8 @@
-let less () = if !Config.ascii then "<=" else "\226\137\164"
-
 let handler_arrow () = if !Config.ascii then "=>" else "\226\159\185 "
-
-let arrow () = if !Config.ascii then "->" else "\226\159\182 "
 
 let short_arrow () = if !Config.ascii then "->" else "\226\134\146"
 
 let times () = if !Config.ascii then " * " else " \195\151 "
-
-let top () = if !Config.ascii then "T" else "\226\138\164"
 
 let subscript sub =
   match sub with
@@ -42,7 +36,3 @@ let param ascii_symbol utf8_symbol index poly ppf =
 
 
 let ty_param = param "ty" "\207\132"
-
-let dirt_param = param "drt" "\206\180"
-
-let region_param = param "rgn" "\207\129"

@@ -1,5 +1,7 @@
 (** OldUtils.definitions. *)
 
+(** Types shared by different modules *)
+
 (** effect symbols *)
 type effect = string
 
@@ -46,6 +48,11 @@ let lookup_default x =
   List.fold_right (fun (x', y) rest -> if x = x' then y else rest)
 
 
+let rec remove_assoc x = function
+  | [] -> []
+  | (k, v) :: ys -> if x = k then ys else (k, v) :: remove_assoc x ys
+
+
 let rec find p = function
   | [] -> None
   | x :: lst -> if p x then Some x else find p lst
@@ -87,6 +94,8 @@ let flatten_map f xs = List.flatten (List.map f xs)
 (** [option_map f] maps [None] to [None] and [Some x] to [Some (f x)]. *)
 let option_map f = function None -> None | Some x -> Some (f x)
 
+let map_default f x = function None -> x | Some y -> f y
+
 (** [repeat x n] creates a list with [x] repeated [n] times. *)
 let rec repeat x = function 0 -> [] | n -> x :: repeat x (n - 1)
 
@@ -97,16 +106,6 @@ let rec assoc_map f = function
       let y = f x in
       let ys = assoc_map f xs in
       (l, y) :: ys
-
-
-(** [fresh wrapper] creates a function that creates fresh instances and wraps
-    them with the [wrapper] function *)
-let fresh wrapper =
-  let counter = ref (-1) in
-  fun () ->
-    incr counter ;
-    assert (!counter >= 0) ;
-    wrapper !counter
 
 
 (** [uniq lst] returns [lst] with all duplicates removed, keeping the first
@@ -133,30 +132,6 @@ let split n lst =
 (** [diff lst1 lst2] returns [lst1] with all members of [lst2] removed *)
 let diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
 
-let assoc_flatten lst =
-  let add (k, v) lst =
-    match lookup k lst with
-    | None -> (k, ref [v]) :: lst
-    | Some vs ->
-        vs := v :: !vs ;
-        lst
-  in
-  let lst = List.fold_right add lst [] in
-  assoc_map ( ! )lst
-
-
-type ('a, 'b, 'c) trio = 'a list * 'b list * 'c list
-
-let trio_empty = ([], [], [])
-
-let trio_append (xs, ys, zs) (us, vs, ws) = (xs @ us, ys @ vs, zs @ ws)
-
-let trio_snds (xs, ys, zs) = (List.map snd xs, List.map snd ys, List.map snd zs)
-
-let trio_flatten_map f lst =
-  List.fold_left trio_append trio_empty (List.map f lst)
-
-
-let trio_diff (xs, ys, zs) (us, vs, ws) = (diff xs us, diff ys vs, diff zs ws)
-
-let trio_uniq (xs, ys, zs) = (uniq xs, uniq ys, uniq zs)
+let to_string print x =
+  print x Format.str_formatter ;
+  Format.flush_str_formatter ()

@@ -1,0 +1,42 @@
+(* Basic types *)
+3;;
+true;;
+"foo";;
+();;
+4.2;;
+
+(* Tuples *)
+(3,4);;
+([], "foo");;
+
+(* variants *)
+type ('a,'b) cow = Small of 'a | Large of 'b;;
+Small "brown";;
+Large "white";;
+(fun cow -> match cow with Small k -> Large (k + 3) | Large s -> Small ("foo"::s));;
+
+(* records *)
+type ('a,'b) bull = {small : 'a; large : 'b};;
+{small = 5; large = "foo"};;
+(fun {small=k} -> k + 2);;
+(fun {large=l} -> [] :: l);;
+
+(* effects *)
+effect Bark : string -> string
+effect Wag : unit -> int;;
+
+fun _ -> perform (Bark "tree");;
+fun _ -> perform Wag;;
+
+(* Polymorphism *)
+(fun x -> x);;
+(fun x -> x) (fun y -> y);;
+(fun x -> (x, x));;
+((fun x -> x), []);;
+((fun x -> x), (fun x -> x) (fun y -> y));;
+(fun x y -> x);;
+[[[]]];;
+(fun x y -> (fun a -> a) x);;
+
+let rec h x = x;;
+h;;

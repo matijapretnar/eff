@@ -1,0 +1,4 @@
+let h = (handler x -> x) ;;
+let g = (handler x -> x) ;;
+
+(1, 2, [h]) < (1, 2, [g]) ;; (* This breaks *)

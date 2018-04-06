@@ -1,5 +1,7 @@
 (** Configuration parameters *)
 
+let version = "5.0"
+
 type pervasives =
   | PervasivesNone
   | PervasivesDefault
@@ -16,3 +18,5 @@ let interactive_shell = ref true
 let wrapper = ref (Some ["rlwrap"; "ledit"])
 
 let verbosity = ref 3
+
+let output_formatter = ref Format.std_formatter

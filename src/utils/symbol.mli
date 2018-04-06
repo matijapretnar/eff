@@ -1,12 +1,19 @@
 module type Annotation = sig
   type t
 
-  val print : t -> int -> Format.formatter -> unit
+  val print : bool -> t -> int -> Format.formatter -> unit
 end
 
 module Anonymous : Annotation with type t = unit
 
 module String : Annotation with type t = string
+
+module Parameter (Param : sig
+  val ascii_symbol : string
+
+  val utf8_symbol : string
+end) :
+  Annotation with type t = unit
 
 module type S = sig
   type annot
@@ -17,7 +24,13 @@ module type S = sig
 
   val fresh : annot -> t
 
-  val print : t -> Format.formatter -> unit
+  val new_fresh : unit -> annot -> t
+
+  val refresh : t -> t
+
+  val print : ?safe:bool -> t -> Format.formatter -> unit
+
+  val fold : (annot -> int -> 'a) -> t -> 'a
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t
