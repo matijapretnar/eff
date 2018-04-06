@@ -45,6 +45,7 @@ let ty_of_const = function
   | Const.Float _ -> Type.float_ty
   | Const.Out_channel _ -> Type.out_channel_ty
   | Const.In_channel _ -> Type.in_channel_ty
+  | Const.Char _ -> Type.char_ty
 
 
 (* [infer_pattern cstr pp] infers the type of pattern [pp]. It returns the list of

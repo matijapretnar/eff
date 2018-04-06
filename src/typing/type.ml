@@ -29,6 +29,8 @@ let out_channel_ty = Basic "out_channel"
   
 let universal_ty = Basic "_"
 
+let char_ty = Basic "char"
+
 let int_ty = Basic "int"
 
 let string_ty = Basic "string"
