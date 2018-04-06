@@ -1,0 +1,17 @@
+let w_file = #Open_out "file.eff" ;;
+
+#Write_file (w_file, "Hello\n") ;;
+#Write_file (w_file, "Hi\n") ;;
+#Write_file (w_file, "How are you?\n") ;;
+#Write_file (w_file, "How are you?\n") ;;
+
+#Close_out w_file;;
+
+let r_file = #Open_in "file.eff" ;;
+#Print ( #Read_line r_file );;
+#Print ( #Read_line r_file );;
+#Print ( #Read_line r_file );;
+#Print ( #Read_line r_file );;
+
+#Close_in r_file;;
+

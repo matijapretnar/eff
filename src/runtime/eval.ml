@@ -175,6 +175,85 @@ let rec top_handle = function
       let str = read_line () in
       let str_v = V.Const (Const.of_string str) in
       top_handle (k str_v)
+	 
+	 
+  | V.Call ("Read_file", v, k) ->
+      let filename =  V.to_str v in
+ 	 let channel = open_in filename in
+ 	 let text = ref "" in
+ 	 (
+ 	 try
+ 	    while true do
+ 	      text := !text  ^ (input_line channel) ^ "\n"   (* Gather text into a single string. *)
+ 	    done; 
+ 	    close_in channel;
+ 	    top_handle (k (V.Const (Const.of_string !text)))   (* This is only for typechecking. *)
+ 	 with End_of_file ->
+ 	     close_in channel;
+ 	     top_handle (k (V.Const (Const.of_string !text)))
+ 	 )
+	  
+  (*  effect Open_in : string -> in_channel *)
+  | V.Call ("Open_in", v , k) ->
+      let filename =  V.to_str v in
+ 	 let channel = open_in filename in
+ 	 (
+	 try
+ 		top_handle (k (V.Const (Const.of_in_channel channel) ))
+ 	 with e ->                      (* some unexpected exception occurs *)
+ 		close_in channel;
+ 		top_handle (k (V.Const (Const.of_in_channel channel) ))
+ 	 )
+  (* effect effect Open_out : string -> out_channel *)
+  | V.Call ("Open_out", v , k) ->
+      let filename =  V.to_str v in
+ 	 let channel = open_out filename in
+ 	 (
+	 try
+ 		top_handle (k (V.Const (Const.of_out_channel channel) ))
+ 	 with e ->                      (* some unexpected exception occurs *)
+ 		close_out channel;
+ 		top_handle (k (V.Const (Const.of_out_channel channel) ))
+ 	 )
+	
+  (* effect  effect Close_in : in_channel -> unit *)
+  | V.Call ("Close_in", v , k) ->
+      let channel =  V.to_in_channel v in
+ 	 close_in channel;
+      top_handle (k V.unit_value)
+	
+  (*  effect Close_out : out_channel -> unit *)
+  | V.Call ("Close_out", v , k) ->
+      let channel =  V.to_out_channel v in
+ 	 close_out channel;
+      top_handle (k V.unit_value)
+	 
+  (* effect Write_file : (out_channel * string) -> unit *)
+  | V.Call ("Write_file", v , k) ->
+      let channel = V.to_out_channel (V.first v) in
+ 	 let text =  V.to_str (V.second v) in
+ 	 (
+	 try
+ 		output_string channel text;
+ 		flush channel;
+ 		top_handle (k V.unit_value)
+ 	 with End_of_file ->              (* some unexpected exception occurs *)
+ 		close_out channel;
+ 		top_handle (k V.unit_value)
+ 	 )
+  (* effect Read_line : in_channel -> string  *) 
+  | V.Call ("Read_line", v, k) ->
+      let channel =  V.to_in_channel v in
+ 	 let text = ref "" in
+ 	 (
+ 	 try
+ 	     text := !text  ^ (input_line channel) ^ "\n";   (* Gather text into a single string. *)
+ 	   	top_handle (k (V.Const (Const.of_string !text)))   (* This is only for typechecking. *)
+ 	 with End_of_file ->
+ 	     close_in channel;
+ 	     top_handle (k (V.Const (Const.of_string !text)))
+ 	 ) 
+
   | V.Call (eff, v, k) ->
       Error.runtime "uncaught effect %t %t." (Value.print_effect eff)
         (Value.print_value v)
