@@ -104,10 +104,12 @@ and contains_variable_comp var {term= c} = contains_variable_plain_comp var c
 
 and contains_variable_plain_comp var = function
   | Value e -> contains_variable_expression var e
-  | Let ([(pat, c1)], c2) ->
-      contains_variable_comp var c1 || contains_variable_comp var c2
-  | LetRec ([(v, abs)], c) ->
-      contains_variable_abs var abs || contains_variable_comp var c
+  | Let (defs, c) ->
+      List.exists (fun (_, c) -> contains_variable_comp var c) defs
+      || contains_variable_comp var c
+  | LetRec (defs, c) ->
+      List.exists (fun (_, abs) -> contains_variable_abs var abs) defs
+      || contains_variable_comp var c
   | Match (e, abs_list) ->
       contains_variable_expression var e
       || List.exists (contains_variable_abs var) abs_list
