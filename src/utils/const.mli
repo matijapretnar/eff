@@ -1,4 +1,5 @@
 type t = private
+  | Char of char
   | Integer of int
   | String of string
   | Boolean of bool
@@ -8,6 +9,8 @@ type t = private
 
 val of_in_channel : in_channel -> t
 val of_out_channel : out_channel -> t
+
+val of_char : char -> t
 
 val of_integer : int -> t
 

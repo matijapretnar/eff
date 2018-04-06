@@ -31,6 +31,10 @@ let to_out_channel = function
  | _ -> Error.runtime "A out_channel value expected."
 
 
+let to_char = function
+  | Const Const.Char b -> b
+  | _ -> Error.runtime "A char value expected."
+
 let to_bool = function
   | Const Const.Boolean b -> b
   | _ -> Error.runtime "A boolean value expected."

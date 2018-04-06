@@ -75,6 +75,10 @@ external ( ^ ) : string -> string -> string = "^"
 
 external string_length : string -> int = "string_length"
 
+external trim : string -> string = "trim"
+
+external split_on_char : char -> string -> string list = "split_on_char"
+
 external to_string : 'a -> string  = "to_string"
 
 type 'a option = None | Some of 'a

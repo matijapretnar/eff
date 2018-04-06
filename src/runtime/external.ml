@@ -1,5 +1,7 @@
 module V = Value
 
+let from_char c = V.Const (Const.of_char c)
+
 let from_bool b = V.Const (Const.of_boolean b)
 
 let from_int n = V.Const (Const.of_integer n)
@@ -9,6 +11,8 @@ let from_str s = V.Const (Const.of_string s)
 let from_float f = V.Const (Const.of_float f)
 
 let from_fun f = V.Closure f
+
+let value_list b = V.Value (Tuple b)
 
 let value_bool b = V.Value (from_bool b)
 
@@ -158,10 +162,19 @@ let arithmetic_operations =
   ; ("/.", float_float_to_float ( /. )) ]
 
 
+let string_string_to_list f =
+	let ff v1 v2 =  value_list (List.map from_str (f (V.to_char v1) (V.to_str v2))) in
+	binary_closure ff
+    
+    
 let string_operations =
   [ ("^", binary_closure (fun v1 v2 -> value_str (V.to_str v1 ^ V.to_str v2)))
-  ; ( "string_length"
-    , from_fun (fun v -> value_int (String.length (V.to_str v))) ) ]
+  ; ( "string_length", from_fun (fun v -> value_int (String.length (V.to_str v))) ) 
+  ; ( "trim", from_fun (fun v -> value_str (String.trim (V.to_str v))) ) 
+  ; ( "split_on_char", string_string_to_list String.split_on_char)
+  ]
+
+
 
 
 let conversion_functions =
