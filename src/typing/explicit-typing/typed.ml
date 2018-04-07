@@ -17,7 +17,7 @@ and plain_pattern =
   | PAs of pattern * variable
   | PTuple of pattern list
   | PRecord of (OldUtils.field, pattern) OldUtils.assoc
-  | PVariant of OldUtils.label * pattern option
+  | PVariant of OldUtils.label * pattern
   | PConst of Const.t
   | PNonbinding
 
@@ -27,8 +27,7 @@ let rec pattern_vars p =
   | PAs (p, x) -> x :: pattern_vars p
   | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
   | PRecord lst -> List.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
-  | PVariant (_, None) -> []
-  | PVariant (_, Some p) -> pattern_vars p
+  | PVariant (_, p) -> pattern_vars p
   | PConst _ -> []
   | PNonbinding -> []
 
@@ -80,7 +79,7 @@ and plain_expression =
   | Const of Const.t
   | Tuple of expression list
   | Record of (OldUtils.field, expression) OldUtils.assoc
-  | Variant of OldUtils.label * expression option
+  | Variant of OldUtils.label * expression
   | Lambda of abstraction_with_ty
   | Effect of effect
   | Handler of handler
@@ -197,11 +196,7 @@ let rec print_pattern ?max_level p ppf =
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
   | PRecord lst -> Print.record print_pattern lst ppf
-  | PVariant (lbl, None) when lbl = OldUtils.nil -> print "[]"
-  | PVariant (lbl, None) -> print "%s" lbl
-  | PVariant ("(::)", Some {term= PTuple [p1; p2]}) ->
-      print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
-  | PVariant (lbl, Some p) ->
+  | PVariant (lbl, p) ->
       print ~at_level:1 "(%s @[<hov>%t@])" lbl (print_pattern p)
   | PNonbinding -> print "_"
 
@@ -214,8 +209,7 @@ let rec print_expression ?max_level e ppf =
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record lst -> Print.record print_expression lst ppf
-  | Variant (lbl, None) -> print "%s" lbl
-  | Variant (lbl, Some e) -> print ~at_level:1 "%s %t" lbl (print_expression e)
+  | Variant (lbl, e) -> print ~at_level:1 "%s %t" lbl (print_expression e)
   | Lambda {term= x, t, c} ->
       print "fun (%t:%t) -> (%t)" (print_pattern x) (Types.print_target_ty t)
         (print_computation c)
@@ -455,10 +449,9 @@ and refresh_pattern' sbst = function
           flds (sbst, [])
       in
       (sbst, PRecord flds')
-  | PVariant (lbl, None) -> (sbst, PVariant (lbl, None))
-  | PVariant (lbl, Some p) ->
+  | PVariant (lbl, p) ->
       let sbst, p' = refresh_pattern sbst p in
-      (sbst, PVariant (lbl, Some p'))
+      (sbst, PVariant (lbl, p'))
   | (PConst _ | PNonbinding) as p -> (sbst, p)
 
 
@@ -474,7 +467,7 @@ and refresh_expr' sbst = function
   | Handler h -> Handler (refresh_handler sbst h)
   | Tuple es -> Tuple (List.map (refresh_expr sbst) es)
   | Record flds -> Record (OldUtils.assoc_map (refresh_expr sbst) flds)
-  | Variant (lbl, e) -> Variant (lbl, OldUtils.option_map (refresh_expr sbst) e)
+  | Variant (lbl, e) -> Variant (lbl, refresh_expr sbst e)
   | CastExp (e1, tyco) -> CastExp (refresh_expr sbst e1, tyco)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
   | BigLambdaTy (tyvar, sk, e) -> failwith __LOC__
@@ -556,7 +549,7 @@ and subst_expr' sbst = function
   | Handler h -> Handler (subst_handler sbst h)
   | Tuple es -> Tuple (List.map (subst_expr sbst) es)
   | Record flds -> Record (OldUtils.assoc_map (subst_expr sbst) flds)
-  | Variant (lbl, e) -> Variant (lbl, OldUtils.option_map (subst_expr sbst) e)
+  | Variant (lbl, e) -> Variant (lbl, subst_expr sbst e)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
   | CastExp (e, tyco) -> CastExp (subst_expr sbst e, tyco)
   | BigLambdaTy (tyvar, sk, e) -> BigLambdaTy (tyvar, sk, subst_expr sbst e)
@@ -649,8 +642,7 @@ and make_equal_pattern' eqvars p p' =
         ps ps' (Some eqvars)
   | PConst cst, PConst cst' when Const.equal cst cst' -> Some eqvars
   | PNonbinding, PNonbinding -> Some eqvars
-  | PVariant (lbl, None), PVariant (lbl', None) when lbl = lbl' -> Some eqvars
-  | PVariant (lbl, Some p), PVariant (lbl', Some p') when lbl = lbl' ->
+  | PVariant (lbl, p), PVariant (lbl', p') when lbl = lbl' ->
       make_equal_pattern eqvars p p'
   | _, _ -> None
 
@@ -668,8 +660,7 @@ and alphaeq_expr' eqvars e e' =
   | Handler h, Handler h' -> alphaeq_handler eqvars h h'
   | Tuple es, Tuple es' -> List.for_all2 (alphaeq_expr eqvars) es es'
   | Record flds, Record flds' -> assoc_equal (alphaeq_expr eqvars) flds flds'
-  | Variant (lbl, None), Variant (lbl', None) -> lbl = lbl'
-  | Variant (lbl, Some e), Variant (lbl', Some e') ->
+  | Variant (lbl, e), Variant (lbl', e') ->
       lbl = lbl' && alphaeq_expr eqvars e e'
   | BuiltIn (f, n), BuiltIn (f', n') -> f = f' && n = n'
   | Const cst, Const cst' -> Const.equal cst cst'
@@ -765,8 +756,7 @@ let pattern_match p e =
         try extend_record ps es sbst with Not_found ->
           Error.runtime ~loc:e.location "Incompatible records in substitution."
         )
-    | PVariant (lbl, None), Variant (lbl', None) when lbl = lbl' -> sbst
-    | PVariant (lbl, Some p), Variant (lbl', Some e) when lbl = lbl' ->
+    | PVariant (lbl, p), Variant (lbl', e) when lbl = lbl' ->
         extend_subst p e sbst
     | PConst c, Const c' when Const.equal c c' -> sbst
     | _, _ ->
@@ -813,8 +803,7 @@ and free_vars_expr e =
   | Lambda a -> free_vars_abs_with_ty a
   | Handler h -> free_vars_handler h
   | Record flds -> concat_vars (List.map (fun (_, e) -> free_vars_expr e) flds)
-  | Variant (_, None) -> ([], [])
-  | Variant (_, Some e) -> free_vars_expr e
+  | Variant (_, e) -> free_vars_expr e
   | CastExp (e', tyco) -> free_vars_expr e'
   | BuiltIn _ | Effect _ | Const _ -> ([], [])
   | BigLambdaTy _ -> failwith __LOC__

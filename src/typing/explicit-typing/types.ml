@@ -309,4 +309,14 @@ let rec source_to_target ty =
   | Type.Handler {value= dirty1; finally= dirty2} ->
       Handler (source_to_target_dirty dirty1, source_to_target_dirty dirty2)
 
+
 and source_to_target_dirty ty = (source_to_target ty, empty_dirt)
+
+let constructor_signature lbl =
+  match Tctx.infer_variant lbl with
+  | None -> assert false
+  | Some (ty_out, ty_in) ->
+      let ty_in =
+        match ty_in with Some ty_in -> ty_in | None -> Type.Tuple []
+      in
+      (source_to_target ty_in, source_to_target ty_out)

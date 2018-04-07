@@ -79,21 +79,19 @@ and type_plain_pattern' in_cons st pat ty =
   | Untyped.PTuple l -> failwith __LOC__
   | Untyped.PRecord r -> failwith __LOC__
   | Untyped.PVariant (lbl, p) -> (
-    match Tctx.infer_variant lbl with
-    | None -> assert false
-    | Some (ty', u) ->
-        (* How come we're throwing away _omega? What is the correct order of q? *)
-        let _omega, q = Typed.fresh_ty_coer (Types.source_to_target ty', ty) in
-        let cons' = q :: in_cons in
-        match (p, u) with
-        | None, Some _ -> assert false
-        | Some _, None -> assert false
-        | None, None -> (Typed.PVariant (lbl, None), st, cons')
-        | Some p, Some u ->
-            let p', st', cons'' =
-              type_pattern' cons' st p (Types.source_to_target u)
-            in
-            (Typed.PVariant (lbl, Some p'), st', cons') )
+      let ty_in, ty_out = Types.constructor_signature lbl in
+      (* How come we're throwing away _omega? What is the correct order of q? *)
+      let _omega, q = Typed.fresh_ty_coer (ty_out, ty) in
+      let cons' = q :: in_cons in
+      match p with
+      | None ->
+          ( Typed.PVariant
+              (lbl, Typed.annotate (Typed.PTuple []) Location.unknown)
+          , st
+          , cons' )
+      | Some p ->
+          let p', st', cons'' = type_pattern' cons' st p ty_in in
+          (Typed.PVariant (lbl, p'), st', cons') )
   | Untyped.PConst c ->
       let ty_c = Types.source_to_target (ty_of_const c) in
       let _omega, q = Typed.fresh_ty_coer (ty_c, ty) in
@@ -201,8 +199,7 @@ let rec free_dirt_vars_expression e =
   | Typed.Const _ -> []
   | Typed.Tuple es -> List.concat (List.map free_dirt_vars_expression es)
   | Typed.Record _ -> failwith __LOC__
-  | Typed.Variant (_, None) -> []
-  | Typed.Variant (_, Some e) -> free_dirt_vars_expression e
+  | Typed.Variant (_, e) -> free_dirt_vars_expression e
   | Typed.Lambda abs -> free_dirt_vars_abstraction_with_ty abs
   | Typed.Effect _ -> []
   | Typed.Handler h -> free_dirt_vars_abstraction_with_ty h.value_clause
@@ -627,31 +624,22 @@ and type_plain_expr in_cons st = function
   | Untyped.Record lst -> failwith __LOC__
   | Untyped.Variant (lbl, e) -> (
       let loc = Location.unknown in
-      match Tctx.infer_variant lbl with
-      | None -> Error.typing ~loc "Unbound constructor %s" lbl
-      | Some (ty, u) ->
-          let ty = Types.source_to_target ty in
-          match (e, u) with
-          | None, Some _ ->
-              Error.typing ~loc
-                "Constructor %s should be applied to an argument." lbl
-          | Some _, None ->
-              Error.typing ~loc
-                "Constructor %s cannot be applied to an argument." lbl
-          | None, None -> (Typed.Variant (lbl, None), ty, in_cons, [])
-          | Some e, Some u ->
-              let e', u', cons', subs = type_expr in_cons st e in
-              let omega, omega_cons =
-                Typed.fresh_ty_coer (u', Types.source_to_target u)
-              in
-              ( Typed.Variant
-                  ( lbl
-                  , Some
-                      (Typed.annotate (Typed.CastExp (e', omega))
-                         Location.unknown) )
-              , ty
-              , omega_cons :: cons'
-              , subs ) )
+      let ty_in, ty_out = Types.constructor_signature lbl in
+      match e with
+      | None ->
+          ( Typed.Variant
+              (lbl, Typed.annotate (Typed.Tuple []) Location.unknown)
+          , ty_out
+          , in_cons
+          , [] )
+      | Some e ->
+          let e', u', cons', subs = type_expr in_cons st e in
+          let omega, omega_cons = Typed.fresh_ty_coer (u', ty_in) in
+          ( Typed.Variant
+              (lbl, Typed.annotate (Typed.CastExp (e', omega)) Location.unknown)
+          , ty_out
+          , omega_cons :: cons'
+          , subs ) )
   | Untyped.Lambda a ->
       Print.debug "in infer lambda" ;
       let p, c = a in
