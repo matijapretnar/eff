@@ -271,16 +271,20 @@ and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
 
 
 let rec source_to_target ty =
+  let loc = Location.unknown in
   match ty with
-  | Type.Apply (ty_name, []) -> source_to_target (Basic ty_name)
+  | Type.Apply (ty_name, args) when Tctx.transparent ~loc ty_name -> (
+    match Tctx.lookup_tydef ~loc ty_name with
+    | [], Tctx.Inline ty -> source_to_target ty
+    | _, Tctx.Sum _ | _, Tctx.Record _ ->
+        assert false (* None of these are transparent *) )
   | Type.TyParam p -> TyParam p
   | Type.Basic s -> (
     match s with
     | "int" -> PrimTy IntTy
     | "string" -> PrimTy StringTy
     | "bool" -> PrimTy BoolTy
-    | "float" -> PrimTy FloatTy
-    | "unit" -> Tuple [] )
+    | "float" -> PrimTy FloatTy )
   | Type.Tuple l -> Tuple (List.map source_to_target l)
   | Type.Arrow (ty, dirty) ->
       Arrow (source_to_target ty, source_to_target_dirty dirty)
