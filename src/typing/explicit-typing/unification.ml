@@ -518,20 +518,16 @@ and ty_omega_step sub paused cons rest_queue omega =
         let sub1 = CoerTyParamToTyCoercion (omega, Typed.ReflTy x) in
         (sub @ [sub1], paused, rest_queue)
     (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
-    | Types.Arrow (a1, (aa1, d1)), Types.Arrow (a2, (aa2, d2)) ->
+    | Types.Arrow (a1, dirty1), Types.Arrow (a2, dirty2) ->
         let new_ty_coercion_var_coer, ty_cons = fresh_ty_coer (a2, a1)
-        and dirty_coercion_c, ty2_cons, dirt_cons =
-          fresh_dirty_coer ((aa1, d1), (aa2, d2))
-        in
+        and dirty_coercion_c, dirty_cons = fresh_dirty_coer (dirty1, dirty2) in
         let sub1 =
           CoerTyParamToTyCoercion
             ( omega
             , Typed.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
             )
         in
-        ( sub @ [sub1]
-        , paused
-        , List.append [ty_cons; ty2_cons; dirt_cons] rest_queue )
+        (sub @ [sub1], paused, List.append [ty_cons; dirty_cons] rest_queue)
     (* ω : A₁ x A₂ x ... <= B₁ x B₂ x ...  *)
     | Types.Tuple tys, Types.Tuple tys'
       when List.length tys = List.length tys' ->
@@ -564,15 +560,13 @@ and ty_omega_step sub paused cons rest_queue omega =
         (sub @ [sub1], paused, List.append conss rest_queue)
     (* ω : D₁ => C₁ <= D₂ => C₂ *)
     | Types.Handler (drty11, drty12), Types.Handler (drty21, drty22) ->
-        let drty_coer1, cons1, cons2 = fresh_dirty_coer (drty21, drty11)
-        and drty_coer2, cons3, cons4 = fresh_dirty_coer (drty12, drty22) in
+        let drty_coer1, drty_cons1 = fresh_dirty_coer (drty21, drty11)
+        and drty_coer2, drty_cons2 = fresh_dirty_coer (drty12, drty22) in
         let sub1 =
           CoerTyParamToTyCoercion
             (omega, Typed.HandlerCoercion (drty_coer1, drty_coer2))
         in
-        ( sub @ [sub1]
-        , paused
-        , List.append [cons1; cons2; cons3; cons4] rest_queue )
+        (sub @ [sub1], paused, List.append [drty_cons1; drty_cons2] rest_queue)
     (* ω : α <= A /  ω : A <= α *)
     | Types.TyParam tv, a
      |a, Types.TyParam tv ->
@@ -654,6 +648,16 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
   | _ -> (sub, cons :: paused, rest_queue)
 
 
+let dirty_omega_step sub paused cons rest_queue (omega1, omega2) drtycons =
+  let (ty1, drt1), (ty2, drt2) = drtycons in
+  let ty_cons = TyOmega (omega1, (ty1, ty2))
+  and dirt_cons = DirtOmega (omega2, (drt1, drt2)) in
+  let sub', paused', rest_queue' =
+    ty_omega_step sub paused ty_cons rest_queue omega1 (ty1, ty2)
+  in
+  dirt_omega_step sub' paused' dirt_cons rest_queue' omega2 (drt1, drt2)
+
+
 let rec unify (sub, paused, queue) =
   Print.debug "=============Start loop============" ;
   Print.debug "-----Subs-----" ;
@@ -681,6 +685,9 @@ let rec unify (sub, paused, queue) =
         (* ω : Δ₁ <= Δ₂ *)
         | Typed.DirtOmega (omega, dcons) ->
             dirt_omega_step sub paused cons rest_queue omega dcons
+        (* ω : A ! Δ₁ <= B ! Δ₂ *)
+        | Typed.DirtyOmega (omega, drtycons) ->
+            dirty_omega_step sub paused cons rest_queue omega drtycons
       in
       Print.debug "=========End loop============" ;
       unify new_state

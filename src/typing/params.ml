@@ -40,9 +40,3 @@ module DirtCoercion = Symbol.Make (Symbol.Parameter (struct
 
   let utf8_symbol = "dirtcoer"
 end))
-
-module DirtyCoercion = Symbol.Make (Symbol.Parameter (struct
-  let ascii_symbol = "dirtycoer"
-
-  let utf8_symbol = "dirtycoer"
-end))

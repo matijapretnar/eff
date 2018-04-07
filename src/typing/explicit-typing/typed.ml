@@ -133,6 +133,8 @@ let abstraction_with_ty_to_abstraction a_w_ty =
 type omega_ct =
   | TyOmega of (Params.TyCoercion.t * Types.ct_ty)
   | DirtOmega of (Params.DirtCoercion.t * Types.ct_dirt)
+  | DirtyOmega of
+      ((Params.TyCoercion.t * Params.DirtCoercion.t) * Types.ct_dirty)
   | SkelEq of skeleton * skeleton
   | TyParamHasSkel of (Params.Ty.t * skeleton)
 
@@ -886,10 +888,13 @@ let fresh_ty_coer cons =
   (TyCoercionVar param, TyOmega (param, cons))
 
 
-let fresh_dirty_coer ((ty1, drt1), (ty2, drt2)) =
-  let ty_coer, ty_cons = fresh_ty_coer (ty1, ty2)
-  and dirt_coer, dirt_cons = fresh_dirt_coer (drt1, drt2) in
-  (BangCoercion (ty_coer, dirt_coer), ty_cons, dirt_cons)
+let fresh_dirty_coer cons =
+  let ty_param = Params.TyCoercion.fresh () in
+  let dirt_param = Params.DirtCoercion.fresh () in
+  let coer =
+    BangCoercion (TyCoercionVar ty_param, DirtCoercionVar dirt_param)
+  in
+  (coer, DirtyOmega ((ty_param, dirt_param), cons))
 
 
 let constraint_free_ty_vars = function

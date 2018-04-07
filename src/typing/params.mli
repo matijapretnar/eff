@@ -13,5 +13,3 @@ module Skel : Symbol.S with type annot = unit
 module DirtCoercion : Symbol.S with type annot = unit
 
 module TyCoercion : Symbol.S with type annot = unit
-
-module DirtyCoercion : Symbol.S with type annot = unit
