@@ -5,9 +5,15 @@ module T = Type
 module Sugared = SugaredSyntax
 module Untyped = CoreSyntax
 
-type state = {context: (string, Untyped.variable) C.assoc}
+type constructor_kind = Variant of bool | Effect of bool
 
-let initial = {context= []}
+type state =
+  { context: (string, Untyped.variable) C.assoc
+  ; constructors: (string, constructor_kind) C.assoc }
+
+let initial =
+  {context= []; constructors= [(C.cons, Variant true); (C.nil, Variant false)]}
+
 
 (* ***** Desugaring of types. ***** *)
 (* Desugar a type, where only the given type, dirt and region parameters may appear.
@@ -53,21 +59,36 @@ let syntax_to_core_params ts =
 
 
 (** [tydef params d] desugars the type definition with parameters [params] and definition [d]. *)
-let tydef params d =
+let tydef st params d =
   let sbst = syntax_to_core_params params in
-  ( List.map snd sbst
-  , match d with
+  let st, def =
+    match d with
     | Sugared.TyRecord lst ->
-        Tctx.Record (List.map (fun (f, t) -> (f, ty sbst t)) lst)
+        (st, Tctx.Record (List.map (fun (f, t) -> (f, ty sbst t)) lst))
     | Sugared.TySum lst ->
-        Tctx.Sum
-          (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst)
-    | Sugared.TyInline t -> Tctx.Inline (ty sbst t) )
+        ( { st with
+            constructors=
+              C.assoc_map
+                (function None -> Variant false | Some _ -> Variant true)
+                lst
+              @ st.constructors }
+        , Tctx.Sum
+            (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst) )
+    | Sugared.TyInline t -> (st, Tctx.Inline (ty sbst t))
+  in
+  (st, (List.map snd sbst, def))
 
 
 (** [tydefs defs] desugars the simultaneous type definitions [defs]. *)
-let tydefs defs =
-  List.map (fun (tyname, (ts, def)) -> (tyname, tydef ts def)) defs
+let tydefs st defs =
+  let st, defs =
+    List.fold_left
+      (fun (st, defs) (tyname, (ts, def)) ->
+        let st, tydef = tydef st ts def in
+        (st, (tyname, tydef) :: defs) )
+      (st, []) defs
+  in
+  (st, List.rev defs)
 
 
 (* ***** Desugaring of expressions and computations. ***** *)
@@ -111,8 +132,19 @@ let pattern st ?(forbidden= []) (p, loc) =
       | Sugared.PTuple ps -> Untyped.PTuple (List.map (pattern st) ps)
       | Sugared.PRecord flds ->
           Untyped.PRecord (OldUtils.assoc_map (pattern st) flds)
-      | Sugared.PVariant (lbl, p) ->
-          Untyped.PVariant (lbl, OldUtils.option_map (pattern st) p)
+      | Sugared.PVariant (lbl, p) -> (
+        match C.lookup lbl st.constructors with
+        | None -> Error.typing ~loc "Unbound constructor %s" lbl
+        | Some Variant var ->
+          match (var, p) with
+          | true, Some p -> Untyped.PVariant (lbl, Some (pattern st p))
+          | false, None -> Untyped.PVariant (lbl, None)
+          | true, None ->
+              Error.typing ~loc
+                "Constructor %s should be applied to an argument." lbl
+          | false, Some _ ->
+              Error.typing ~loc
+                "Constructor %s cannot be applied to an argument." lbl )
       | Sugared.PConst c -> Untyped.PConst c
       | Sugared.PNonbinding -> Untyped.PNonbinding
     in
@@ -155,10 +187,21 @@ let rec expression st (t, loc) =
           Error.syntax ~loc "Fields in a record must be distinct" ;
         let w, es = record_expressions st ts in
         (w, Untyped.Record es)
-    | Sugared.Variant (lbl, None) -> ([], Untyped.Variant (lbl, None))
-    | Sugared.Variant (lbl, Some t) ->
-        let w, e = expression st t in
-        (w, Untyped.Variant (lbl, Some e))
+    | Sugared.Variant (lbl, t) -> (
+      match C.lookup lbl st.constructors with
+      | None -> Error.typing ~loc "Unbound constructor %s" lbl
+      | Some Variant var ->
+        match (var, t) with
+        | true, Some t ->
+            let w, e = expression st t in
+            (w, Untyped.Variant (lbl, Some e))
+        | false, None -> ([], Untyped.Variant (lbl, None))
+        | true, None ->
+            Error.typing ~loc
+              "Constructor %s should be applied to an argument." lbl
+        | false, Some _ ->
+            Error.typing ~loc
+              "Constructor %s cannot be applied to an argument." lbl )
     (* Terms that are desugared into computations. We list them explicitly in
        order to catch any future constructs. *)
     | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
@@ -467,7 +510,9 @@ let rec toplevel st (cmd, loc) =
   (st', {Untyped.term= cmd; Untyped.location= loc})
 
 and plain_toplevel st = function
-  | Sugared.Tydef defs -> (st, Untyped.Tydef (tydefs defs))
+  | Sugared.Tydef defs ->
+      let st, defs = tydefs st defs in
+      (st, Untyped.Tydef defs)
   | Sugared.TopLet defs ->
       let st, defs = top_let st defs in
       (st, Untyped.TopLet defs)
