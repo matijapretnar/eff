@@ -6,9 +6,12 @@ let help_text =
   ^ "#use \"<file>\";;  load commands from file\n"
 
 
-type state = {runtime: Eval.state; typing: SimpleInfer.t}
+type state =
+  {runtime: Eval.state; typing: SimpleInfer.t; desugaring: Desugar.state}
 
-let initial_state = {runtime= Eval.empty; typing= SimpleInfer.empty}
+let initial_state =
+  {runtime= Eval.empty; typing= SimpleInfer.empty; desugaring= Desugar.initial}
+
 
 (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
    It prints the result to [ppf] and returns the new state. *)
@@ -56,7 +59,7 @@ let rec exec_cmd ppf st cmd =
                 (Type.print_beautiful tysch)
                 (Value.print_value v) )
         vars ;
-      {typing; runtime}
+      {st with typing; runtime}
   | CoreSyntax.TopLetRec defs ->
       let vars, typing = SimpleInfer.infer_top_let_rec ~loc st.typing defs in
       let runtime = Eval.extend_let_rec st.runtime defs in
@@ -66,11 +69,12 @@ let rec exec_cmd ppf st cmd =
             (CoreSyntax.Variable.print x)
             (Type.print_beautiful tysch) )
         vars ;
-      {typing; runtime}
+      {st with typing; runtime}
   | CoreSyntax.External (x, ty, f) -> (
     match OldUtils.lookup f External.values with
     | Some v ->
-        { typing= SimpleCtx.extend st.typing x (Type.free_params ty, ty)
+        { st with
+          typing= SimpleCtx.extend st.typing x (Type.free_params ty, ty)
         ; runtime= Eval.update x v st.runtime }
     | None -> Error.runtime "unknown external symbol %s." f )
   | CoreSyntax.Tydef tydefs ->
@@ -78,7 +82,14 @@ let rec exec_cmd ppf st cmd =
       st
 
 and desugar_and_exec_cmds ppf env cmds =
-  cmds |> List.map Desugar.toplevel |> List.fold_left (exec_cmd ppf) env
+  let st, cmds =
+    List.fold_left
+      (fun (st, cmds) cmd ->
+        let desugar_st, cmd = Desugar.toplevel st.desugaring cmd in
+        ({st with desugaring= desugar_st}, cmd :: cmds) )
+      (env, []) cmds
+  in
+  List.fold_left (exec_cmd ppf) st (List.rev cmds)
 
 (* Parser wrapper *)
 and parse lex =
