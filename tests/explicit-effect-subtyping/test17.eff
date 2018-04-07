@@ -1,0 +1,11 @@
+type nat = Zero | Succ of nat
+
+;;
+
+let rec add m = function
+| Zero -> m
+| Succ n -> Succ (add m n)
+
+in
+
+add

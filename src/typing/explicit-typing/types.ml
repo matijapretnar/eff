@@ -45,37 +45,6 @@ and ct_dirt = (dirt * dirt)
 
 and ct_dirty = (target_dirty * target_dirty)
 
-let rec types_are_equal ty1 ty2 =
-  match (ty1, ty2) with
-  | TyParam tv1, TyParam tv2 -> tv1 = tv2
-  | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
-      types_are_equal ttya1 ttyb1 && dirty_types_are_equal dirtya1 dirtyb1
-  | Tuple tys1, Tuple tys2 -> List.for_all2 types_are_equal tys1 tys2
-  | Apply (ty_name1, tys1), Apply (ty_name2, tys2) ->
-      ty_name1 = ty_name2 && List.for_all2 types_are_equal tys1 tys2
-  | Handler (dirtya1, dirtya2), Handler (dirtyb1, dirtyb2) ->
-      dirty_types_are_equal dirtya1 dirtyb1
-      && dirty_types_are_equal dirtya2 dirtyb2
-  | PrimTy ptya, PrimTy ptyb -> ptya = ptyb
-  | QualTy (ctty1, ty1), QualTy (ctty2, ty2) -> failwith __LOC__
-  | QualDirt (ctd1, ty1), QualDirt (ctd2, ty2) ->
-      ctd1 = ctd2 && types_are_equal ty1 ty2
-  | TySchemeTy (tyvar1, sk1, ty1), TySchemeTy (tyvar2, sk2, ty2) ->
-      failwith __LOC__
-  | TySchemeDirt (dvar1, ty1), TySchemeDirt (dvar2, ty2) ->
-      dvar1 = dvar2 && types_are_equal ty1 ty2
-  | TySchemeSkel (skvar1, ty1), TySchemeSkel (skvar2, ty2) -> failwith __LOC__
-  | _ -> false
-
-
-and dirty_types_are_equal (ty1, d1) (ty2, d2) =
-  types_are_equal ty1 ty2 && dirts_are_equal d1 d2
-
-
-and dirts_are_equal d1 d2 =
-  EffectSet.equal d1.effect_set d2.effect_set && d1.row = d2.row
-
-
 let rec print_target_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
@@ -85,7 +54,15 @@ let rec print_target_ty ?max_level ty ppf =
         (print_target_ty ~max_level:4 t1)
         (print_target_dirt drt) (Symbols.short_arrow ())
         (print_target_ty ~max_level:5 t2)
+  | Apply (t, []) -> print "%s" t
+  | Apply (t, [s]) ->
+      print ~at_level:1 "%t %s" (print_target_ty ~max_level:1 s) t
+  | Apply (t, ts) ->
+      print ~at_level:1 "(%t) %s" (Print.sequence ", " print_target_ty ts) t
   | Tuple [] -> print "unit"
+  | Tuple tys ->
+      print ~at_level:2 "@[<hov>%t@]"
+        (Print.sequence (Symbols.times ()) (print_target_ty ~max_level:1) tys)
   | Tuple tys ->
       print ~at_level:2 "@[<hov>%t@]"
         (Print.sequence (Symbols.times ()) (print_target_ty ~max_level:1) tys)
@@ -163,6 +140,40 @@ and print_prim_ty pty ppf =
   | BoolTy -> print "bool"
   | StringTy -> print "string"
   | FloatTy -> print "float"
+
+
+let rec types_are_equal ty1 ty2 =
+  match (ty1, ty2) with
+  | TyParam tv1, TyParam tv2 -> tv1 = tv2
+  | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
+      types_are_equal ttya1 ttyb1 && dirty_types_are_equal dirtya1 dirtyb1
+  | Tuple tys1, Tuple tys2 -> List.for_all2 types_are_equal tys1 tys2
+  | Apply (ty_name1, tys1), Apply (ty_name2, tys2) ->
+      ty_name1 = ty_name2 && List.for_all2 types_are_equal tys1 tys2
+  | Handler (dirtya1, dirtya2), Handler (dirtyb1, dirtyb2) ->
+      dirty_types_are_equal dirtya1 dirtyb1
+      && dirty_types_are_equal dirtya2 dirtyb2
+  | PrimTy ptya, PrimTy ptyb -> ptya = ptyb
+  | QualTy (ctty1, ty1), QualTy (ctty2, ty2) -> failwith __LOC__
+  | QualDirt (ctd1, ty1), QualDirt (ctd2, ty2) ->
+      ctd1 = ctd2 && types_are_equal ty1 ty2
+  | TySchemeTy (tyvar1, sk1, ty1), TySchemeTy (tyvar2, sk2, ty2) ->
+      failwith __LOC__
+  | TySchemeDirt (dvar1, ty1), TySchemeDirt (dvar2, ty2) ->
+      dvar1 = dvar2 && types_are_equal ty1 ty2
+  | TySchemeSkel (skvar1, ty1), TySchemeSkel (skvar2, ty2) -> failwith __LOC__
+  | _ -> false
+
+
+(*       Error.typing ~loc:Location.unknown "%t <> %t" (print_target_ty ty1)
+        (print_target_ty ty2)
+ *)
+and dirty_types_are_equal (ty1, d1) (ty2, d2) =
+  types_are_equal ty1 ty2 && dirts_are_equal d1 d2
+
+
+and dirts_are_equal d1 d2 =
+  EffectSet.equal d1.effect_set d2.effect_set && d1.row = d2.row
 
 
 let no_effect_dirt dirt_param =

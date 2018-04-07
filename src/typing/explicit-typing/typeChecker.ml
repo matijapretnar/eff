@@ -76,6 +76,7 @@ let rec check_well_formed_ty st ty =
       check_well_formed_ty st tty1 ;
       check_well_formed_dirty_ty st tty2
   | Tuple ttyl -> List.iter (check_well_formed_ty st) ttyl
+  | Apply (_, []) -> ()
   | Handler (tty1, tty2) ->
       check_well_formed_dirty_ty st tty1 ;
       check_well_formed_dirty_ty st tty2
@@ -261,7 +262,23 @@ let rec extend_pattern_types st p ty =
       let ty_c = Types.source_to_target (ExplicitInfer.ty_of_const c) in
       assert (Types.types_are_equal ty_c ty) ;
       st
-  | _ -> failwith __LOC__
+  | PVariant (lbl, e) ->
+      let loc = Location.unknown in
+      match Tctx.infer_variant lbl with
+      | None -> Error.typing ~loc "Unbound constructor %s" lbl
+      | Some (ty', u) -> (
+          assert (Types.types_are_equal ty (Types.source_to_target ty')) ;
+          match (e, u) with
+          | None, Some _ ->
+              Error.typing ~loc
+                "Constructor %s should be applied to an argument." lbl
+          | Some _, None ->
+              Error.typing ~loc
+                "Constructor %s cannot be applied to an argument." lbl
+          | None, None -> st
+          | Some p, Some u ->
+              extend_pattern_types st p (Types.source_to_target u) )
+      | _ -> failwith __LOC__
 
 
 let type_of_const = function
@@ -283,6 +300,24 @@ let rec type_of_expression st e =
       Types.Arrow (ty1, c_ty)
   | Tuple es ->
       Types.Tuple (List.map (fun e -> type_of_expression st e.term) es)
+  | Variant (lbl, e) -> (
+      let loc = Location.unknown in
+      match Tctx.infer_variant lbl with
+      | None -> Error.typing ~loc "Unbound constructor %s" lbl
+      | Some (ty, u) ->
+          let ty = Types.source_to_target ty in
+          match (e, u) with
+          | None, Some _ ->
+              Error.typing ~loc
+                "Constructor %s should be applied to an argument." lbl
+          | Some _, None ->
+              Error.typing ~loc
+                "Constructor %s cannot be applied to an argument." lbl
+          | None, None -> ty
+          | Some e, Some u ->
+              let u' = type_of_expression st e.term in
+              assert (Types.types_are_equal u' (Types.source_to_target u)) ;
+              ty )
   | Effect (eff, (eff_in, eff_out)) ->
       Types.Arrow
         (eff_in, (eff_out, Types.closed_dirt (EffectSet.singleton eff)))
