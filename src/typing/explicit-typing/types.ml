@@ -13,12 +13,14 @@ type skeleton =
   | SkelParam of Params.Skel.t
   | PrimSkel of prim_ty
   | SkelArrow of skeleton * skeleton
+  | SkelApply of OldUtils.tyname * skeleton list
   | SkelHandler of skeleton * skeleton
   | SkelTuple of skeleton list
   | ForallSkel of Params.Skel.t * skeleton
 
 and target_ty =
   | TyParam of Params.Ty.t
+  | Apply of OldUtils.tyname * target_ty list
   | Arrow of target_ty * target_dirty
   | Tuple of target_ty list
   | Handler of target_dirty * target_dirty
@@ -49,6 +51,8 @@ let rec types_are_equal ty1 ty2 =
   | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
       types_are_equal ttya1 ttyb1 && dirty_types_are_equal dirtya1 dirtyb1
   | Tuple tys1, Tuple tys2 -> List.for_all2 types_are_equal tys1 tys2
+  | Apply (ty_name1, tys1), Apply (ty_name2, tys2) ->
+      ty_name1 = ty_name2 && List.for_all2 types_are_equal tys1 tys2
   | Handler (dirtya1, dirtya2), Handler (dirtyb1, dirtyb2) ->
       dirty_types_are_equal dirtya1 dirtyb1
       && dirty_types_are_equal dirtya2 dirtyb2
@@ -185,6 +189,7 @@ let rec free_skeleton sk =
   match sk with
   | SkelParam p -> [p]
   | PrimSkel _ -> []
+  | SkelApply (_, sks) -> List.concat (List.map free_skeleton sks)
   | SkelArrow (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
   | SkelHandler (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
   | SkelTuple sks -> List.concat (List.map free_skeleton sks)
@@ -278,6 +283,8 @@ let rec source_to_target ty =
     | [], Tctx.Inline ty -> source_to_target ty
     | _, Tctx.Sum _ | _, Tctx.Record _ ->
         assert false (* None of these are transparent *) )
+  | Type.Apply (ty_name, args) ->
+      Apply (ty_name, List.map source_to_target args)
   | Type.TyParam p -> TyParam p
   | Type.Basic s -> (
     match s with

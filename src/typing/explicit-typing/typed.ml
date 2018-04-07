@@ -41,6 +41,7 @@ type ty_coercion =
   | HandlerCoercion of dirty_coercion * dirty_coercion
   | TyCoercionVar of Params.TyCoercion.t
   | SequenceTyCoer of ty_coercion * ty_coercion
+  | ApplyCoercion of OldUtils.tyname * ty_coercion list
   | TupleCoercion of ty_coercion list
   | LeftArrow of ty_coercion
   | ForallTy of Params.Ty.t * ty_coercion

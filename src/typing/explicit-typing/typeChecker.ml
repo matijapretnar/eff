@@ -131,6 +131,15 @@ let rec type_of_ty_coercion st ty_coer =
           tycoers ([], [])
       in
       (Types.Tuple tys1, Types.Tuple tys2)
+  | ApplyCoercion (ty_name, tycoers) ->
+      let tys1, tys2 =
+        List.fold_right
+          (fun ty_coer (tys1, tys2) ->
+            let ty1, ty2 = type_of_ty_coercion st ty_coer in
+            (ty1 :: tys1, ty2 :: tys2) )
+          tycoers ([], [])
+      in
+      (Types.Apply (ty_name, tys1), Types.Apply (ty_name, tys2))
   | TyCoercionVar p -> (
     match OldUtils.lookup p st.ty_coer_types with
     | None -> assert false

@@ -72,6 +72,7 @@ let rec apply_sub_ty sub ty =
     | _ -> ty )
   | Arrow (tty1, tty2) ->
       Arrow (apply_sub_ty sub tty1, apply_sub_dirty_ty sub tty2)
+  | Apply (ty_name, tys) -> Apply (ty_name, List.map (apply_sub_ty sub) tys)
   | Tuple ttyl -> Tuple (List.map (fun x -> apply_sub_ty sub x) ttyl)
   | Handler (tydrty1, tydrty2) ->
       Handler (apply_sub_dirty_ty sub tydrty1, apply_sub_dirty_ty sub tydrty2)
@@ -117,6 +118,8 @@ let rec apply_sub_tycoer sub ty_coer =
         (apply_sub_tycoer sub ty_coer1, apply_sub_tycoer sub ty_coer2)
   | TupleCoercion tcl ->
       TupleCoercion (List.map (fun x -> apply_sub_tycoer sub x) tcl)
+  | ApplyCoercion (ty_name, tcl) ->
+      ApplyCoercion (ty_name, List.map (fun x -> apply_sub_tycoer sub x) tcl)
   | LeftArrow tc1 -> LeftArrow (apply_sub_tycoer sub tc1)
   | ForallTy (ty_param, ty_coer1) ->
       ForallTy (ty_param, apply_sub_tycoer sub ty_coer1)
@@ -388,6 +391,9 @@ let rec skeleton_of_target_ty tty conslist =
   | Arrow (a1, (a2, _)) ->
       SkelArrow
         (skeleton_of_target_ty a1 conslist, skeleton_of_target_ty a2 conslist)
+  | Apply (ty_name, tys) ->
+      SkelApply
+        (ty_name, List.map (fun ty -> skeleton_of_target_ty ty conslist) tys)
   | Tuple tup ->
       SkelTuple (List.map (fun ty -> skeleton_of_target_ty ty conslist) tup)
   | Handler ((a1, _), (a2, _)) ->
@@ -447,6 +453,17 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
       in
       let sub1 = TyParamToTy (tvar, Types.Tuple tvars) in
       (sub @ [sub1], [], conss @ apply_sub [sub1] (rest_queue @ paused))
+  (* α : ty_name (τ₁, τ₂, ...) *)
+  | SkelApply (ty_name, sks) ->
+      let tvars, conss =
+        List.fold_right
+          (fun sk (tvars, conss) ->
+            let tvar, cons = Typed.fresh_ty_with_skel sk in
+            (tvar :: tvars, cons :: conss) )
+          sks ([], [])
+      in
+      let sub1 = TyParamToTy (tvar, Types.Apply (ty_name, tvars)) in
+      (sub @ [sub1], [], conss @ apply_sub [sub1] (rest_queue @ paused))
   (* α : τ₁ => τ₂ *)
   | SkelHandler (sk1, sk2) ->
       let tvar1, cons1 = Typed.fresh_ty_with_skel sk1
@@ -484,65 +501,90 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
       ( sub
       , paused
       , [Typed.SkelEq (ska, skc); Typed.SkelEq (skb, skd)] @ rest_queue )
+  | SkelApply (ty_name1, sks1), SkelApply (ty_name2, sks2)
+    when ty_name1 = ty_name2 && List.length sks1 = List.length sks2 ->
+      ( sub
+      , paused
+      , List.map2 (fun sk1 sk2 -> Typed.SkelEq (sk1, sk2)) sks1 sks2
+        @ rest_queue )
   | _ -> failwith __LOC__
 
 
-and ty_omega_step sub paused cons rest_queue omega = function
-  (* ω : A <= A *)
-  | x, y when Types.types_are_equal x y ->
-      let sub1 = CoerTyParamToTyCoercion (omega, Typed.ReflTy x) in
-      (sub @ [sub1], paused, rest_queue)
-  (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
-  | Types.Arrow (a1, (aa1, d1)), Types.Arrow (a2, (aa2, d2)) ->
-      let new_ty_coercion_var_coer, ty_cons = fresh_ty_coer (a2, a1)
-      and dirty_coercion_c, ty2_cons, dirt_cons =
-        fresh_dirty_coer ((aa1, d1), (aa2, d2))
-      in
-      let sub1 =
-        CoerTyParamToTyCoercion
-          ( omega
-          , Typed.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c) )
-      in
-      ( sub @ [sub1]
-      , paused
-      , List.append [ty_cons; ty2_cons; dirt_cons] rest_queue )
-  (* ω : A₁ x A₂ x ... <= B₁ x B₂ x ...  *)
-  | Types.Tuple tys, Types.Tuple tys'
-    when List.length tys = List.length tys' ->
-      let coercions, conss =
-        List.fold_right2
-          (fun ty ty' (coercions, conss) ->
-            let coercion, ty_cons = fresh_ty_coer (ty, ty') in
-            (coercion :: coercions, ty_cons :: conss) )
-          tys tys' ([], [])
-      in
-      let sub1 =
-        CoerTyParamToTyCoercion (omega, Typed.TupleCoercion coercions)
-      in
-      (sub @ [sub1], paused, List.append conss rest_queue)
-  (* ω : D₁ => C₁ <= D₂ => C₂ *)
-  | Types.Handler (drty11, drty12), Types.Handler (drty21, drty22) ->
-      let drty_coer1, cons1, cons2 = fresh_dirty_coer (drty21, drty11)
-      and drty_coer2, cons3, cons4 = fresh_dirty_coer (drty12, drty22) in
-      let sub1 =
-        CoerTyParamToTyCoercion
-          (omega, Typed.HandlerCoercion (drty_coer1, drty_coer2))
-      in
-      ( sub @ [sub1]
-      , paused
-      , List.append [cons1; cons2; cons3; cons4] rest_queue )
-  (* ω : α <= A /  ω : A <= α *)
-  | Types.TyParam tv, a
-   |a, Types.TyParam tv ->
-      (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
-      let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in
-      let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
-      if skel_tv = skel_a then (sub, cons :: paused, rest_queue)
-      else (sub, cons :: paused, SkelEq (skel_tv, skel_a) :: rest_queue)
-  | a, b ->
-      Print.debug "can't solve subtyping for types: %t and %t"
-        (print_target_ty a) (print_target_ty b) ;
-      assert false
+and ty_omega_step sub paused cons rest_queue omega =
+  let loc = Location.unknown in
+  function
+    (* ω : A <= A *)
+    | x, y when Types.types_are_equal x y ->
+        let sub1 = CoerTyParamToTyCoercion (omega, Typed.ReflTy x) in
+        (sub @ [sub1], paused, rest_queue)
+    (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
+    | Types.Arrow (a1, (aa1, d1)), Types.Arrow (a2, (aa2, d2)) ->
+        let new_ty_coercion_var_coer, ty_cons = fresh_ty_coer (a2, a1)
+        and dirty_coercion_c, ty2_cons, dirt_cons =
+          fresh_dirty_coer ((aa1, d1), (aa2, d2))
+        in
+        let sub1 =
+          CoerTyParamToTyCoercion
+            ( omega
+            , Typed.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
+            )
+        in
+        ( sub @ [sub1]
+        , paused
+        , List.append [ty_cons; ty2_cons; dirt_cons] rest_queue )
+    (* ω : A₁ x A₂ x ... <= B₁ x B₂ x ...  *)
+    | Types.Tuple tys, Types.Tuple tys'
+      when List.length tys = List.length tys' ->
+        let coercions, conss =
+          List.fold_right2
+            (fun ty ty' (coercions, conss) ->
+              let coercion, ty_cons = fresh_ty_coer (ty, ty') in
+              (coercion :: coercions, ty_cons :: conss) )
+            tys tys' ([], [])
+        in
+        let sub1 =
+          CoerTyParamToTyCoercion (omega, Typed.TupleCoercion coercions)
+        in
+        (sub @ [sub1], paused, List.append conss rest_queue)
+    (* ω : ty (A₁,  A₂,  ...) <= ty (B₁,  B₂,  ...) *)
+    (* we assume that all type parameters are positive *)
+    | Types.Apply (ty_name1, tys1), Types.Apply (ty_name2, tys2)
+      when ty_name1 = ty_name2 && List.length tys1 = List.length tys2 ->
+        let coercions, conss =
+          List.fold_right2
+            (fun ty ty' (coercions, conss) ->
+              let coercion, ty_cons = fresh_ty_coer (ty, ty') in
+              (coercion :: coercions, ty_cons :: conss) )
+            tys1 tys2 ([], [])
+        in
+        let sub1 =
+          CoerTyParamToTyCoercion
+            (omega, Typed.ApplyCoercion (ty_name1, coercions))
+        in
+        (sub @ [sub1], paused, List.append conss rest_queue)
+    (* ω : D₁ => C₁ <= D₂ => C₂ *)
+    | Types.Handler (drty11, drty12), Types.Handler (drty21, drty22) ->
+        let drty_coer1, cons1, cons2 = fresh_dirty_coer (drty21, drty11)
+        and drty_coer2, cons3, cons4 = fresh_dirty_coer (drty12, drty22) in
+        let sub1 =
+          CoerTyParamToTyCoercion
+            (omega, Typed.HandlerCoercion (drty_coer1, drty_coer2))
+        in
+        ( sub @ [sub1]
+        , paused
+        , List.append [cons1; cons2; cons3; cons4] rest_queue )
+    (* ω : α <= A /  ω : A <= α *)
+    | Types.TyParam tv, a
+     |a, Types.TyParam tv ->
+        (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
+        let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in
+        let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
+        if skel_tv = skel_a then (sub, cons :: paused, rest_queue)
+        else (sub, cons :: paused, SkelEq (skel_tv, skel_a) :: rest_queue)
+    | a, b ->
+        Print.debug "can't solve subtyping for types: %t and %t"
+          (print_target_ty a) (print_target_ty b) ;
+        assert false
 
 
 and dirt_omega_step sub paused cons rest_queue omega dcons =

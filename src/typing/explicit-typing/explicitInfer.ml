@@ -130,7 +130,8 @@ let constraint_free_dirt_vars = function
 let rec free_ty_vars_ty = function
   | Types.TyParam x -> [x]
   | Types.Arrow (a, c) -> free_ty_vars_ty a @ free_ty_var_dirty c
-  | Types.Tuple tup -> List.flatten (List.map free_ty_vars_ty tup)
+  | Types.Apply (_, tys) -> List.flatten (List.map free_ty_vars_ty tys)
+  | Types.Tuple tys -> List.flatten (List.map free_ty_vars_ty tys)
   | Types.Handler (c1, c2) -> free_ty_var_dirty c1 @ free_ty_var_dirty c2
   | Types.PrimTy _ -> []
   | Types.QualTy (_, a) -> free_ty_vars_ty a
@@ -250,6 +251,8 @@ and free_dirt_vars_ty_coercion = function
   | Typed.SequenceTyCoer (tc1, tc2) ->
       free_dirt_vars_ty_coercion tc1 @ free_dirt_vars_ty_coercion tc2
   | Typed.TupleCoercion tcs ->
+      List.flatten (List.map free_dirt_vars_ty_coercion tcs)
+  | Typed.ApplyCoercion (_, tcs) ->
       List.flatten (List.map free_dirt_vars_ty_coercion tcs)
   | Typed.LeftArrow tc -> free_dirt_vars_ty_coercion tc
   | Typed.ForallTy (_, tc) -> free_dirt_vars_ty_coercion tc
@@ -436,6 +439,8 @@ let rec apply_sub_to_type ty_subs dirt_subs ty =
         , (apply_sub_to_type ty_subs dirt_subs c, apply_sub_to_dirt dirt_subs d)
         )
   | Types.PrimTy _ -> ty
+  | Types.Apply (ty_name, tys) ->
+      Types.Apply (ty_name, List.map (apply_sub_to_type ty_subs dirt_subs) tys)
   | _ -> failwith __LOC__
 
 
