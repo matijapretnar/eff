@@ -111,7 +111,7 @@ let rec exec_cmd ppf st cmd =
   | CoreSyntax.External (x, ty, f) -> (
     match OldUtils.lookup f External.values with
     | Some v ->
-        let new_ty = ExplicitInfer.source_to_target ty in
+        let new_ty = Types.source_to_target ty in
         { st with
           typing= SimpleCtx.extend st.typing x (Type.free_params ty, ty)
         ; explicit_typing=
@@ -202,7 +202,7 @@ let compile_file ppf filename st =
     | CoreSyntax.External (x, ty, f) -> (
       match OldUtils.lookup f External.values with
       | Some v ->
-          let new_ty = ExplicitInfer.source_to_target ty in
+          let new_ty = Types.source_to_target ty in
           Print.print out_ppf "let %t = ( %s )" (NewPrint.print_variable x) f ;
           Format.fprintf out_ppf "\n;;\n " ;
           { st with

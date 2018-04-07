@@ -245,6 +245,7 @@ let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
   | TySchemeTy (ty_param, _, a) -> failwith __LOC__
   | TySchemeDirt (dirt_param, a) -> failwith __LOC__
 
+
 and refresh_target_dirty (ty_sbst, dirt_sbst) (t, d) =
   let (t_ty_sbst, t_dirt_sbst), t' =
     refresh_target_ty (ty_sbst, dirt_sbst) t
@@ -256,6 +257,7 @@ and refresh_target_dirty (ty_sbst, dirt_sbst) (t, d) =
   in
   ((d_ty_sbst, d_dirt_sbst), (t', d'))
 
+
 and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
   match drt.row with
   | ParamRow x -> (
@@ -266,3 +268,23 @@ and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
         ((ty_sbst, OldUtils.update x y dirt_sbst), {drt with row= ParamRow y})
     )
   | EmptyRow -> ((ty_sbst, dirt_sbst), drt)
+
+
+let rec source_to_target ty =
+  match ty with
+  | Type.Apply (ty_name, []) -> source_to_target (Basic ty_name)
+  | Type.TyParam p -> TyParam p
+  | Type.Basic s -> (
+    match s with
+    | "int" -> PrimTy IntTy
+    | "string" -> PrimTy StringTy
+    | "bool" -> PrimTy BoolTy
+    | "float" -> PrimTy FloatTy
+    | "unit" -> Tuple [] )
+  | Type.Tuple l -> Tuple (List.map source_to_target l)
+  | Type.Arrow (ty, dirty) ->
+      Arrow (source_to_target ty, source_to_target_dirty dirty)
+  | Type.Handler {value= dirty1; finally= dirty2} ->
+      Handler (source_to_target_dirty dirty1, source_to_target_dirty dirty2)
+
+and source_to_target_dirty ty = (source_to_target ty, empty_dirt)

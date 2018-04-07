@@ -28,28 +28,6 @@ let apply_sub_to_env env sub =
   {env with context= TypingEnv.apply_sub env.context sub}
 
 
-let rec source_to_target ty =
-  match ty with
-  | T.Apply (ty_name, []) -> source_to_target (T.Basic ty_name)
-  | T.Apply (_, _) -> failwith __LOC__
-  | T.TyParam p -> Types.TyParam p
-  | T.Basic s -> (
-    match s with
-    | "int" -> Types.PrimTy IntTy
-    | "string" -> Types.PrimTy StringTy
-    | "bool" -> Types.PrimTy BoolTy
-    | "float" -> Types.PrimTy FloatTy
-    | "unit" -> Types.Tuple [] )
-  | T.Tuple l -> Types.Tuple (List.map source_to_target l)
-  | T.Arrow (ty, dirty) ->
-      Types.Arrow (source_to_target ty, source_to_target_dirty dirty)
-  | T.Handler {value= dirty1; finally= dirty2} ->
-      Types.Handler
-        (source_to_target_dirty dirty1, source_to_target_dirty dirty2)
-
-
-and source_to_target_dirty ty = (source_to_target ty, Types.empty_dirt)
-
 let rec type_pattern p =
   { Typed.term= type_plain_pattern p.Untyped.term
   ; Typed.location= p.Untyped.location }
@@ -101,7 +79,7 @@ and type_plain_pattern' in_cons st pat ty =
   | Untyped.PRecord r -> failwith __LOC__
   | Untyped.PVariant (l, p) -> failwith __LOC__
   | Untyped.PConst c ->
-      let ty_c = source_to_target (ty_of_const c) in
+      let ty_c = Types.source_to_target (ty_of_const c) in
       let _omega, q = Typed.fresh_ty_coer (ty_c, ty) in
       (Typed.PConst c, st, q :: in_cons)
 
@@ -1451,7 +1429,7 @@ let type_toplevel ~loc st c =
 
 let add_effect eff (ty1, ty2) st =
   Print.debug "%t ----> %t" (Type.print ([], ty1)) (Type.print ([], ty2)) ;
-  let target_ty1 = source_to_target ty1 in
-  let target_ty2 = source_to_target ty2 in
+  let target_ty1 = Types.source_to_target ty1 in
+  let target_ty2 = Types.source_to_target ty2 in
   let new_st = add_effect st eff (target_ty1, target_ty2) in
   new_st
