@@ -80,18 +80,14 @@ and type_plain_pattern' in_cons st pat ty =
   | Untyped.PRecord r -> failwith __LOC__
   | Untyped.PVariant (lbl, p) -> (
     match Tctx.infer_variant lbl with
-    | None -> Error.typing ~loc "Unbound constructor %s" lbl
+    | None -> assert false
     | Some (ty', u) ->
         (* How come we're throwing away _omega? What is the correct order of q? *)
         let _omega, q = Typed.fresh_ty_coer (Types.source_to_target ty', ty) in
         let cons' = q :: in_cons in
         match (p, u) with
-        | None, Some _ ->
-            Error.typing ~loc
-              "Constructor %s should be applied to an argument." lbl
-        | Some _, None ->
-            Error.typing ~loc
-              "Constructor %s cannot be applied to an argument." lbl
+        | None, Some _ -> assert false
+        | Some _, None -> assert false
         | None, None -> (Typed.PVariant (lbl, None), st, cons')
         | Some p, Some u ->
             let p', st', cons'' =

@@ -10,12 +10,14 @@ type state =
   { runtime: Eval.state
   ; explicit_typing: ExplicitInfer.state
   ; type_checker: TypeChecker.state
+  ; desugaring: Desugar.state
   ; typing: SimpleInfer.t }
 
 let initial_state =
   { runtime= Eval.empty
   ; explicit_typing= ExplicitInfer.empty
   ; type_checker= TypeChecker.initial_state
+  ; desugaring= Desugar.initial
   ; typing= SimpleInfer.empty }
 
 
@@ -127,7 +129,14 @@ let rec exec_cmd ppf st cmd =
 
 
 and desugar_and_exec_cmds ppf env cmds =
-  cmds |> List.map Desugar.toplevel |> List.fold_left (exec_cmd ppf) env
+  let st, cmds =
+    List.fold_left
+      (fun (st, cmds) cmd ->
+        let desugar_st, cmd = Desugar.toplevel st.desugaring cmd in
+        ({st with desugaring= desugar_st}, cmd :: cmds) )
+      (env, []) cmds
+  in
+  List.fold_left (exec_cmd ppf) st (List.rev cmds)
 
 
 (* Parser wrapper *)
@@ -216,8 +225,15 @@ let compile_file ppf filename st =
       | None -> Error.runtime "unknown external symbol %s." f )
     | _ -> st
   in
-  let cmds = Lexer.read_file parse filename |> List.map Desugar.toplevel in
-  let st = List.fold_left compile_cmd st cmds in
+  let cmds = Lexer.read_file parse filename in
+  let st, cmds =
+    List.fold_left
+      (fun (st, cmds) cmd ->
+        let desugar_st, cmd = Desugar.toplevel st.desugaring cmd in
+        ({st with desugaring= desugar_st}, cmd :: cmds) )
+      (st, []) cmds
+  in
+  let st = List.fold_left compile_cmd st (List.rev cmds) in
   Format.fprintf out_ppf "@? " ;
   flush out_channel ;
   close_out out_channel ;

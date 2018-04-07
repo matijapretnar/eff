@@ -1,10 +1,13 @@
 (** Overview of syntax *)
 
-(* Before we take a look at effects, let us see the rest of Eff.
-   If you have ever programmed in OCaml, Eff should be very familiar as it
-   closely follows OCaml in everything except in the approach to effects.
-   If you are not familiar with OCaml, you should try it out at
-      http://try.ocamlpro.com *)
+(** If you are familiar with OCaml, you will find Eff easy to read
+    and you can jump straight to examples of effects by choosing one
+    of the above tabs.
+
+    Eff syntax is close to that of OCaml, which we review
+    quickly in this file. An online OCaml tutorial is available at
+    http://try.ocamlpro.com.
+*)
 
 (* You can define variables. *)
 let x = 10 + 10

@@ -85,17 +85,13 @@ let infer_pattern cstr pp =
           ty )
     | Core.PVariant (lbl, p) ->
       match Tctx.infer_variant lbl with
-      | None -> Error.typing ~loc "Unbound constructor %s" lbl
+      | None -> assert false
       | Some (ty, u) ->
           ( match (p, u) with
           | None, None -> ()
           | Some p, Some u -> add_ty_constraint cstr loc (infer p) u
-          | None, Some _ ->
-              Error.typing ~loc
-                "Constructor %s should be applied to an argument." lbl
-          | Some _, None ->
-              Error.typing ~loc
-                "Constructor %s cannot be applied to an argument." lbl ) ;
+          | None, Some _ -> assert false
+          | Some _, None -> assert false ) ;
           ty
   in
   let t = infer pp in
@@ -245,15 +241,14 @@ and infer_expr ctx cstr e =
           ty )
   | Core.Variant (lbl, u) -> (
     match Tctx.infer_variant lbl with
-    | None -> Error.typing ~loc "Unbound constructor %s in a pattern" lbl
+    | None -> assert false
     | Some (ty, arg_type) ->
         ( match (arg_type, u) with
         | None, None -> ()
         | Some ty, Some u ->
             let ty' = infer_expr ctx cstr u in
             add_ty_constraint cstr loc ty ty'
-        | _, _ ->
-            Error.typing ~loc "Wrong number of arguments for label %s." lbl ) ;
+        | _, _ -> assert false ) ;
         ty )
   | Core.Lambda a ->
       let t1, t2 = infer_abstraction ctx cstr a in
