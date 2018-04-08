@@ -897,6 +897,16 @@ let fresh_dirty_coer cons =
   (coer, DirtyOmega ((ty_param, dirt_param), cons))
 
 
+let cast_expression e ty1 ty2 =
+  let omega, cons = fresh_ty_coer (ty1, ty2) in
+  (annotate (CastExp (e, omega)) e.location, cons)
+
+
+let cast_computation c dirty1 dirty2 =
+  let omega, cons = fresh_dirty_coer (dirty1, dirty2) in
+  (annotate (CastComp (c, omega)) c.location, cons)
+
+
 let constraint_free_ty_vars = function
   | TyOmega (_, (Types.TyParam a, Types.TyParam b)) -> TyParamSet.of_list [a; b]
   | TyOmega (_, (Types.TyParam a, _)) -> TyParamSet.singleton a

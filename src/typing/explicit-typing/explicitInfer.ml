@@ -634,12 +634,8 @@ and type_plain_expr in_cons st = function
           , [] )
       | Some e ->
           let e', u', cons', subs = type_expr in_cons st e in
-          let omega, omega_cons = Typed.fresh_ty_coer (u', ty_in) in
-          ( Typed.Variant
-              (lbl, Typed.annotate (Typed.CastExp (e', omega)) Location.unknown)
-          , ty_out
-          , omega_cons :: cons'
-          , subs ) )
+          let e'', cast_cons = cast_expression e' u' ty_in in
+          (Typed.Variant (lbl, e''), ty_out, cast_cons :: cons', subs) )
   | Untyped.Lambda a ->
       Print.debug "in infer lambda" ;
       let p, c = a in
@@ -736,18 +732,15 @@ and type_plain_expr in_cons st = function
       let cons_2 =
         (Unification.apply_substitution_dirt subs_n target_cr_dirt, out_dirt)
       in
-      let cons_6 =
-        (in_ty, Unification.apply_substitution_ty (target_cr_sub @ subs_n) r_ty)
-      in
       let omega_1, omega_cons_1 = Typed.fresh_ty_coer cons_1
-      and omega_2, omega_cons_2 = Typed.fresh_dirt_coer cons_2
-      and omega_6, omega_cons_6 = Typed.fresh_ty_coer cons_6 in
+      and omega_2, omega_cons_2 = Typed.fresh_dirt_coer cons_2 in
       let y_var_name = Typed.Variable.fresh "fresh_var" in
       let y = Typed.PVar y_var_name in
       let annot_y = Typed.annotate y Location.unknown in
       let exp_y = Typed.annotate (Typed.Var y_var_name) Location.unknown in
-      let coerced_y =
-        Typed.annotate (Typed.CastExp (exp_y, omega_6)) exp_y.location
+      let coerced_y, omega_cons_6 =
+        Typed.cast_expression exp_y in_ty
+          (Unification.apply_substitution_ty (target_cr_sub @ subs_n) r_ty)
       in
       let substituted_c_r =
         Typed.subst_comp [(x, coerced_y.term)]
@@ -778,16 +771,14 @@ and type_plain_expr in_cons st = function
             , ( Unification.apply_substitution_ty subs_n alpha_i
               , Unification.apply_substitution_dirt subs_n delta_i ) )
         in
-        let cons_5 = (cons_5a, cons_5b) in
         let omega_3, omega_cons_3 = Typed.fresh_ty_coer cons_3 in
         let omega_4, omega_cons_4 = Typed.fresh_dirt_coer cons_4 in
-        let omega_5, omega_cons_5 = Typed.fresh_ty_coer cons_5 in
         let l_var_name = Typed.Variable.fresh "fresh_var" in
         let l = Typed.PVar l_var_name in
         let annot_l = Typed.annotate l Location.unknown in
         let exp_l = Typed.annotate (Typed.Var l_var_name) Location.unknown in
-        let coerced_l =
-          Typed.annotate (Typed.CastExp (exp_l, omega_5)) Location.unknown
+        let coerced_l, omega_cons_5 =
+          Typed.cast_expression exp_l cons_5a cons_5b
         in
         let substituted_c_op =
           Typed.subst_comp [(k_var, coerced_l.term)]
@@ -919,30 +910,19 @@ and type_plain_comp in_cons st = function
       Print.debug "e2 apply type : %t" (Types.print_target_ty tt_2) ;
       let new_ty_var, cons1 = Typed.fresh_ty_with_fresh_skel () in
       let fresh_dirty_ty = Types.make_dirty new_ty_var in
-      let cons2 =
-        ( Unification.apply_substitution_ty subs_e2 tt_1
-        , Types.Arrow (tt_2, fresh_dirty_ty) )
-      in
-      let omega_1, omega_cons_1 = Typed.fresh_ty_coer cons2 in
-      let e1_coerced =
-        Typed.annotate
-          (Typed.CastExp
-             (Unification.apply_substitution_exp subs_e2 typed_e1, omega_1))
-          typed_e1.location
+      let e1_coerced, omega_cons_1 =
+        Typed.cast_expression
+          (Unification.apply_substitution_exp subs_e2 typed_e1)
+          (Unification.apply_substitution_ty subs_e2 tt_1)
+          (Types.Arrow (tt_2, fresh_dirty_ty))
       in
       ( Typed.Apply (e1_coerced, typed_e2)
       , fresh_dirty_ty
       , [cons1; omega_cons_1] @ constraints_2
       , subs_e2 @ subs_e1 )
   | Untyped.Handle (e, c) ->
-      let (alpha_1, delta_1), cons_skel_1 =
-        Typed.fresh_dirty_with_fresh_skel ()
-      in
-      let (alpha_2, delta_2), cons_skel_2 =
-        Typed.fresh_dirty_with_fresh_skel ()
-      in
-      let dirty_1 = (alpha_1, delta_1) in
-      let dirty_2 = (alpha_2, delta_2) in
+      let dirty_1, cons_skel_1 = Typed.fresh_dirty_with_fresh_skel () in
+      let dirty_2, cons_skel_2 = Typed.fresh_dirty_with_fresh_skel () in
       let typed_exp, exp_type, exp_constraints, sub_exp =
         type_expr in_cons st e
       in
@@ -950,27 +930,16 @@ and type_plain_comp in_cons st = function
       let typed_comp, comp_dirty_type, comp_constraints, sub_comp =
         type_comp exp_constraints st_subbed c
       in
-      let comp_type, comp_dirt = comp_dirty_type in
-      let cons1 =
-        ( Unification.apply_substitution_ty sub_comp exp_type
-        , Types.Handler (dirty_1, dirty_2) )
+      let coer_exp, omega_cons_1 =
+        Typed.cast_expression typed_exp
+          (Unification.apply_substitution_ty sub_comp exp_type)
+          (Types.Handler (dirty_1, dirty_2))
       in
-      let cons2 = (comp_type, alpha_1) in
-      let cons3 = (comp_dirt, delta_1) in
-      let coer1, omega_cons_1 = Typed.fresh_ty_coer cons1
-      and coer2, omega_cons_2 = Typed.fresh_ty_coer cons2
-      and coer3, omega_cons_3 = Typed.fresh_dirt_coer cons3 in
-      let coer_exp =
-        Typed.annotate (Typed.CastExp (typed_exp, coer1)) typed_exp.location
-      in
-      let coer_comp =
-        Typed.annotate
-          (Typed.CastComp (typed_comp, Typed.BangCoercion (coer2, coer3)))
-          typed_comp.location
+      let coer_comp, cons_comp =
+        Typed.cast_computation typed_comp comp_dirty_type dirty_1
       in
       let constraints =
-        [cons_skel_1; cons_skel_2; omega_cons_1; omega_cons_2; omega_cons_3]
-        @ comp_constraints
+        [cons_skel_1; cons_skel_2; omega_cons_1; cons_comp] @ comp_constraints
       in
       ( Typed.Handle (coer_exp, coer_comp)
       , dirty_2
@@ -1079,28 +1048,16 @@ and type_plain_comp in_cons st = function
                 type_comp cons_c1 new_st c_2
               in
               let new_dirt_var = Types.fresh_dirt () in
-              let cons1 =
-                ( Unification.apply_substitution_dirt subs_c1 dirt_c1
-                , new_dirt_var )
+              let ty_1 = Unification.apply_substitution_ty subs_c2 type_c1 in
+              let coer_c1, omega_cons_1 =
+                Typed.cast_computation
+                  (Unification.apply_substitution subs_c2 typed_c1)
+                  (ty_1, Unification.apply_substitution_dirt subs_c1 dirt_c1)
+                  (ty_1, new_dirt_var)
               in
-              let cons2 = (dirt_c2, new_dirt_var) in
-              let coer1, omega_cons_1 = Typed.fresh_dirt_coer cons1 in
-              let coer2, omega_cons_2 = Typed.fresh_dirt_coer cons2 in
-              let coer_c1 =
-                Typed.annotate
-                  (Typed.CastComp
-                     ( Unification.apply_substitution subs_c2 typed_c1
-                     , Typed.BangCoercion
-                         ( Typed.ReflTy
-                             (Unification.apply_substitution_ty subs_c2 type_c1)
-                         , coer1 ) )) typed_c1.location
-              in
-              let coer_c2 =
-                Typed.annotate
-                  (Typed.CastComp
-                     ( typed_c2
-                     , Typed.BangCoercion (Typed.ReflTy type_c2, coer2) ))
-                  typed_c2.location
+              let coer_c2, omega_cons_2 =
+                Typed.cast_computation typed_c2 (type_c2, dirt_c2)
+                  (type_c2, new_dirt_var)
               in
               let typed_pattern = type_pattern p_def in
               let abstraction =
@@ -1117,28 +1074,16 @@ and type_plain_comp in_cons st = function
                 type_comp cons_c1 new_st c_2
               in
               let new_dirt_var = Types.fresh_dirt () in
-              let cons1 =
-                ( Unification.apply_substitution_dirt subs_c1 dirt_c1
-                , new_dirt_var )
+              let ty_c1 = Unification.apply_substitution_ty subs_c2 type_c1 in
+              let coer_c1, omega_cons_1 =
+                Typed.cast_computation
+                  (Unification.apply_substitution subs_c2 typed_c1)
+                  (ty_c1, Unification.apply_substitution_dirt subs_c1 dirt_c1)
+                  (ty_c1, new_dirt_var)
               in
-              let cons2 = (dirt_c2, new_dirt_var) in
-              let coer1, omega_cons_1 = Typed.fresh_dirt_coer cons1 in
-              let coer2, omega_cons_2 = Typed.fresh_dirt_coer cons2 in
-              let coer_c1 =
-                Typed.annotate
-                  (Typed.CastComp
-                     ( Unification.apply_substitution subs_c2 typed_c1
-                     , Typed.BangCoercion
-                         ( Typed.ReflTy
-                             (Unification.apply_substitution_ty subs_c2 type_c1)
-                         , coer1 ) )) typed_c1.location
-              in
-              let coer_c2 =
-                Typed.annotate
-                  (Typed.CastComp
-                     ( typed_c2
-                     , Typed.BangCoercion (Typed.ReflTy type_c2, coer2) ))
-                  typed_c2.location
+              let coer_c2, omega_cons_2 =
+                Typed.cast_computation typed_c2 (type_c2, dirt_c2)
+                  (type_c2, new_dirt_var)
               in
               let typed_pattern = type_pattern p_def in
               let abstraction =
@@ -1337,14 +1282,9 @@ and type_case in_cons st case ty_in (ty_out, dirt_out) =
   let p, c = case in
   let p', st', cons1 = type_pattern' in_cons st p ty_in in
   let c', (ty_c, dirt_c), cons2, sublist = type_comp cons1 st' c in
-  let tyco, q1 = Typed.fresh_ty_coer (ty_c, ty_out) in
-  let dco, q2 = Typed.fresh_dirt_coer (dirt_c, dirt_out) in
-  let c'' =
-    { Typed.term= Typed.CastComp (c', BangCoercion (tyco, dco))
-    ; Typed.location= c'.Typed.location }
-  in
+  let c'', q = Typed.cast_computation c' (ty_c, dirt_c) (ty_out, dirt_out) in
   ( {Typed.term= (p', c''); Typed.location= c''.Typed.location}
-  , q1 :: q2 :: cons2
+  , q :: cons2
   , sublist )
 
 
