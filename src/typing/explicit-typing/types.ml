@@ -320,3 +320,55 @@ let constructor_signature lbl =
         match ty_in with Some ty_in -> ty_in | None -> Type.Tuple []
       in
       (source_to_target ty_in, source_to_target ty_out)
+
+
+let rec free_ty_vars_ty = function
+  | TyParam x -> [x]
+  | Arrow (a, c) -> free_ty_vars_ty a @ free_ty_var_dirty c
+  | Tuple tup -> List.flatten (List.map free_ty_vars_ty tup)
+  | Handler (c1, c2) -> free_ty_var_dirty c1 @ free_ty_var_dirty c2
+  | PrimTy _ -> []
+  | QualTy (_, a) -> free_ty_vars_ty a
+  | QualDirt (_, a) -> free_ty_vars_ty a
+  | TySchemeTy (ty_param, _, a) ->
+      let free_a = free_ty_vars_ty a in
+      List.filter (fun x -> not (List.mem x [ty_param])) free_a
+  | TySchemeDirt (dirt_param, a) -> free_ty_vars_ty a
+
+
+and free_ty_var_dirty (a, _) = free_ty_vars_ty a
+
+let constraint_free_row_vars = function
+  | ParamRow p -> DirtVarSet.singleton p
+  | EmptyRow -> DirtVarSet.empty
+
+
+let rec free_dirt_vars_ty = function
+  | Arrow (a, c) -> free_dirt_vars_ty a @ free_dirt_vars_dirty c
+  | Tuple tup -> List.flatten (List.map free_dirt_vars_ty tup)
+  | Handler (c1, c2) -> free_dirt_vars_dirty c1 @ free_dirt_vars_dirty c2
+  | QualTy (_, a) -> free_dirt_vars_ty a
+  | QualDirt (_, a) -> free_dirt_vars_ty a
+  | TySchemeTy (ty_param, _, a) -> free_dirt_vars_ty a
+  | TySchemeDirt (dirt_param, a) ->
+      let free_a = free_dirt_vars_ty a in
+      List.filter (fun x -> not (List.mem x [dirt_param])) free_a
+  | _ -> []
+
+
+and free_dirt_vars_dirty (a, d) = free_dirt_vars_dirt d
+
+and free_dirt_vars_dirt drt =
+  DirtVarSet.elements (constraint_free_row_vars drt.row)
+
+
+let rec state_free_ty_vars st =
+  List.fold_right
+    (fun (_, ty) acc -> List.append (free_ty_vars_ty ty) acc)
+    st []
+
+
+let rec state_free_dirt_vars st =
+  List.fold_right
+    (fun (_, ty) acc -> List.append (free_dirt_vars_ty ty) acc)
+    st []

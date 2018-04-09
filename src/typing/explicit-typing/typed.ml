@@ -914,63 +914,11 @@ let constraint_free_ty_vars = function
   | _ -> TyParamSet.empty
 
 
-let constraint_free_row_vars = function
-  | Types.ParamRow p -> DirtVarSet.singleton p
-  | Types.EmptyRow -> DirtVarSet.empty
-
-
 let constraint_free_dirt_vars = function
   | DirtOmega (_, (drt1, drt2)) ->
       DirtVarSet.union
         (constraint_free_row_vars drt1.Types.row)
         (constraint_free_row_vars drt2.Types.row)
-
-
-let rec free_ty_vars_ty = function
-  | Types.TyParam x -> [x]
-  | Types.Arrow (a, c) -> free_ty_vars_ty a @ free_ty_var_dirty c
-  | Types.Tuple tup -> List.flatten (List.map free_ty_vars_ty tup)
-  | Types.Handler (c1, c2) -> free_ty_var_dirty c1 @ free_ty_var_dirty c2
-  | Types.PrimTy _ -> []
-  | Types.QualTy (_, a) -> free_ty_vars_ty a
-  | Types.QualDirt (_, a) -> free_ty_vars_ty a
-  | Types.TySchemeTy (ty_param, _, a) ->
-      let free_a = free_ty_vars_ty a in
-      List.filter (fun x -> not (List.mem x [ty_param])) free_a
-  | Types.TySchemeDirt (dirt_param, a) -> free_ty_vars_ty a
-
-
-and free_ty_var_dirty (a, _) = free_ty_vars_ty a
-
-let rec free_dirt_vars_ty = function
-  | Types.Arrow (a, c) -> free_dirt_vars_ty a @ free_dirt_vars_dirty c
-  | Types.Tuple tup -> List.flatten (List.map free_dirt_vars_ty tup)
-  | Types.Handler (c1, c2) -> free_dirt_vars_dirty c1 @ free_dirt_vars_dirty c2
-  | Types.QualTy (_, a) -> free_dirt_vars_ty a
-  | Types.QualDirt (_, a) -> free_dirt_vars_ty a
-  | Types.TySchemeTy (ty_param, _, a) -> free_dirt_vars_ty a
-  | Types.TySchemeDirt (dirt_param, a) ->
-      let free_a = free_dirt_vars_ty a in
-      List.filter (fun x -> not (List.mem x [dirt_param])) free_a
-  | _ -> []
-
-
-and free_dirt_vars_dirty (a, d) = free_dirt_vars_dirt d
-
-and free_dirt_vars_dirt drt =
-  DirtVarSet.elements (constraint_free_row_vars drt.Types.row)
-
-
-let rec state_free_ty_vars st =
-  List.fold_right
-    (fun (_, ty) acc -> List.append (free_ty_vars_ty ty) acc)
-    st []
-
-
-let rec state_free_dirt_vars st =
-  List.fold_right
-    (fun (_, ty) acc -> List.append (free_dirt_vars_ty ty) acc)
-    st []
 
 
 (* free dirt variables in target terms *)
