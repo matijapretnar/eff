@@ -55,3 +55,5 @@ val explicit_subtyping : bool ref
 (** Should we use the new explicit subtyping effect system? *)
 
 val output_formatter : Format.formatter ref
+
+val error_formatter : Format.formatter ref

@@ -30,3 +30,5 @@ let pure_print = ref false
 let explicit_subtyping = ref false
 
 let output_formatter = ref Format.std_formatter
+
+let error_formatter = ref Format.err_formatter
