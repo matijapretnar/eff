@@ -20,3 +20,5 @@ let wrapper = ref (Some ["rlwrap"; "ledit"])
 let verbosity = ref 3
 
 let output_formatter = ref Format.std_formatter
+
+let error_formatter = ref Format.err_formatter
