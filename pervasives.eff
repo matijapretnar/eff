@@ -221,6 +221,7 @@ let print_endline v =
     perform (Print "\n")
 
 (* Basic Handlers *)
+(*
 effect Lookup: unit -> int
 effect Update: int -> unit
 
@@ -229,3 +230,4 @@ let state initial = handler
   | effect (Lookup ()) k -> (fun s -> continue k s s)
   | effect (Update s') k -> (fun _ -> continue k () s')
   | finally f -> f initial;;
+*)
