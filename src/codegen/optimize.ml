@@ -109,13 +109,12 @@ let is_atomic e =
 
 
 type inlinability =
-  | NotInlinable
   (* Pattern variables occur more than once or inside a binder *)
-  | NotPresent
+  | NotInlinable
   (* Pattern variables are not present in the body *)
+  | NotPresent
+  (* Pattern variables occur each at most once outside a binder *)
   | Inlinable
-
-(* Pattern variables occur each at most once outside a binder *)
 
 let applicable_pattern p vars =
   let rec check_variables = function

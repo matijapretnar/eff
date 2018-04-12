@@ -3,7 +3,8 @@
 let message ~verbosity ?loc ~header fmt =
   if verbosity <= !Config.verbosity then
     match loc with
-    | None -> Format.fprintf !Config.error_formatter ("%s: " ^^ fmt ^^ "@.") header
+    | None ->
+        Format.fprintf !Config.error_formatter ("%s: " ^^ fmt ^^ "@.") header
     | Some loc ->
         Format.fprintf !Config.error_formatter
           ("%s (%t):@," ^^ fmt ^^ "@.")

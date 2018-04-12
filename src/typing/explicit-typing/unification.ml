@@ -691,3 +691,36 @@ let rec unify (sub, paused, queue) =
       in
       Print.debug "=========End loop============" ;
       unify new_state
+
+
+let rec apply_sub_to_type ty_subs dirt_subs ty =
+  match ty with
+  | Types.TyParam p -> (
+    match OldUtils.lookup p ty_subs with
+    | Some p' -> Types.TyParam p'
+    | None -> ty )
+  | Types.Arrow (a, (b, d)) ->
+      Types.Arrow
+        ( apply_sub_to_type ty_subs dirt_subs a
+        , (apply_sub_to_type ty_subs dirt_subs b, apply_sub_to_dirt dirt_subs d)
+        )
+  | Types.Tuple ty_list ->
+      Types.Tuple
+        (List.map (fun x -> apply_sub_to_type ty_subs dirt_subs x) ty_list)
+  | Types.Handler ((a, b), (c, d)) ->
+      Types.Handler
+        ( (apply_sub_to_type ty_subs dirt_subs a, apply_sub_to_dirt dirt_subs b)
+        , (apply_sub_to_type ty_subs dirt_subs c, apply_sub_to_dirt dirt_subs d)
+        )
+  | Types.PrimTy _ -> ty
+  | Types.Apply (ty_name, tys) ->
+      Types.Apply (ty_name, List.map (apply_sub_to_type ty_subs dirt_subs) tys)
+  | _ -> failwith __LOC__
+
+and apply_sub_to_dirt dirt_subs drt =
+  match drt.row with
+  | Types.ParamRow p -> (
+    match OldUtils.lookup p dirt_subs with
+    | Some p' -> {drt with row= Types.ParamRow p'}
+    | None -> drt )
+  | Types.EmptyRow -> drt

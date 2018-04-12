@@ -259,7 +259,7 @@ let rec extend_pattern_types st p ty =
   | PVar x -> extend_var_types st x ty
   | PNonbinding -> st
   | PConst c ->
-      let ty_c = Types.source_to_target (ExplicitInfer.ty_of_const c) in
+      let ty_c = Types.type_const c in
       assert (Types.types_are_equal ty_c ty) ;
       st
   | PVariant (lbl, e) ->

@@ -142,6 +142,13 @@ and print_prim_ty pty ppf =
   | FloatTy -> print "float"
 
 
+let type_const = function
+  | Const.Integer _ -> PrimTy IntTy
+  | Const.String _ -> PrimTy StringTy
+  | Const.Boolean _ -> PrimTy BoolTy
+  | Const.Float _ -> PrimTy FloatTy
+
+
 let rec types_are_equal ty1 ty2 =
   match (ty1, ty2) with
   | TyParam tv1, TyParam tv2 -> tv1 = tv2

@@ -999,6 +999,7 @@ let rec free_dirt_vars_expression e =
   | ApplyDirtCoercion (e, dc) ->
       free_dirt_vars_expression e @ free_dirt_vars_dirt_coercion dc
 
+
 and free_dirt_vars_computation c =
   match c.term with
   | Value e -> free_dirt_vars_expression e
@@ -1023,7 +1024,80 @@ and free_dirt_vars_computation c =
   | CastComp_dirt (c, dc) ->
       free_dirt_vars_computation c @ free_dirt_vars_dirt_coercion dc
 
+
 and free_dirt_vars_abstraction {term= _, c} = free_dirt_vars_computation c
 
 and free_dirt_vars_abstraction_with_ty {term= _, ty, c} =
   free_dirt_vars_ty ty @ free_dirt_vars_computation c
+
+
+let rec get_skel_vars_from_constraints = function
+  | [] -> []
+  | (TyParamHasSkel (_, Types.SkelParam sv)) :: xs ->
+      sv :: get_skel_vars_from_constraints xs
+  | _ :: xs -> get_skel_vars_from_constraints xs
+
+
+let constraint_free_ty_vars = function
+  | TyOmega (_, (Types.TyParam a, Types.TyParam b)) ->
+      Types.TyParamSet.of_list [a; b]
+  | TyOmega (_, (Types.TyParam a, _)) -> Types.TyParamSet.singleton a
+  | TyOmega (_, (_, Types.TyParam a)) -> Types.TyParamSet.singleton a
+  | _ -> Types.TyParamSet.empty
+
+
+let constraint_free_dirt_vars = function
+  | DirtOmega
+      (_, ({Types.row= Types.ParamRow a}, {Types.row= Types.ParamRow b})) ->
+      Types.DirtVarSet.of_list [a; b]
+  | DirtOmega (_, ({Types.row= Types.ParamRow a}, {Types.row= Types.EmptyRow})) ->
+      Types.DirtVarSet.singleton a
+  | DirtOmega (_, ({Types.row= Types.EmptyRow}, {Types.row= Types.ParamRow b})) ->
+      Types.DirtVarSet.singleton b
+  | _ -> Types.DirtVarSet.empty
+
+
+let rec apply_sub_to_type ty_subs dirt_subs ty =
+  match ty with
+  | Types.TyParam p -> (
+    match OldUtils.lookup p ty_subs with
+    | Some p' -> Types.TyParam p'
+    | None -> ty )
+  | Types.Arrow (a, (b, d)) ->
+      Types.Arrow
+        ( apply_sub_to_type ty_subs dirt_subs a
+        , (apply_sub_to_type ty_subs dirt_subs b, apply_sub_to_dirt dirt_subs d)
+        )
+  | Types.Tuple ty_list ->
+      Types.Tuple
+        (List.map (fun x -> apply_sub_to_type ty_subs dirt_subs x) ty_list)
+  | Types.Handler ((a, b), (c, d)) ->
+      Types.Handler
+        ( (apply_sub_to_type ty_subs dirt_subs a, apply_sub_to_dirt dirt_subs b)
+        , (apply_sub_to_type ty_subs dirt_subs c, apply_sub_to_dirt dirt_subs d)
+        )
+  | Types.PrimTy _ -> ty
+  | Types.Apply (ty_name, tys) ->
+      Types.Apply (ty_name, List.map (apply_sub_to_type ty_subs dirt_subs) tys)
+  | _ -> failwith __LOC__
+
+
+and apply_sub_to_dirt dirt_subs drt =
+  match drt.row with
+  | Types.ParamRow p -> (
+    match OldUtils.lookup p dirt_subs with
+    | Some p' -> {drt with row= Types.ParamRow p'}
+    | None -> drt )
+  | Types.EmptyRow -> drt
+
+
+let rec state_free_ty_vars st =
+  List.fold_right
+    (fun (_, ty) acc -> List.append (Types.free_ty_vars_ty ty) acc)
+    st []
+
+
+let rec state_free_dirt_vars st =
+  List.fold_right
+    (fun (_, ty) acc -> List.append (Types.free_dirt_vars_ty ty) acc)
+    st []
