@@ -923,61 +923,7 @@ let constraint_free_dirt_vars = function
 
 (* free dirt variables in target terms *)
 
-let rec free_dirt_vars_expression e =
-  match e.term with
-  | Var _ -> []
-  | BuiltIn _ -> []
-  | Const _ -> []
-  | Tuple es -> List.concat (List.map free_dirt_vars_expression es)
-  | Record _ -> failwith __LOC__
-  | Variant _ -> failwith __LOC__
-  | Lambda abs -> free_dirt_vars_abstraction_with_ty abs
-  | Effect _ -> []
-  | Handler h -> free_dirt_vars_abstraction_with_ty h.value_clause
-  | BigLambdaTy (tp, sk, e) -> free_dirt_vars_expression e
-  | BigLambdaDirt (dp, e) ->
-      List.filter (fun x -> not (x == dp)) (free_dirt_vars_expression e)
-  | BigLambdaSkel (skp, e) -> free_dirt_vars_expression e
-  | CastExp (e, tc) ->
-      free_dirt_vars_expression e @ free_dirt_vars_ty_coercion tc
-  | ApplyTyExp (e, ty) -> free_dirt_vars_expression e @ free_dirt_vars_ty ty
-  | LambdaTyCoerVar (tcp, ctty, e) -> free_dirt_vars_expression e
-  | LambdaDirtCoerVar (dcp, ctd, e) -> free_dirt_vars_expression e
-  | ApplyDirtExp (e, d) -> free_dirt_vars_expression e @ free_dirt_vars_dirt d
-  | ApplySkelExp (e, sk) -> free_dirt_vars_expression e
-  | ApplyTyCoercion (e, tc) ->
-      free_dirt_vars_expression e @ free_dirt_vars_ty_coercion tc
-  | ApplyDirtCoercion (e, dc) ->
-      free_dirt_vars_expression e @ free_dirt_vars_dirt_coercion dc
-
-and free_dirt_vars_computation c =
-  match c.term with
-  | Value e -> free_dirt_vars_expression e
-  | LetVal (e, c) ->
-      free_dirt_vars_expression e @ free_dirt_vars_abstraction_with_ty c
-  | LetRec _ -> failwith __LOC__
-  | Match (e, cases) ->
-      free_dirt_vars_expression e
-      @ List.concat (List.map free_dirt_vars_abstraction cases)
-  | Apply (e1, e2) ->
-      free_dirt_vars_expression e1 @ free_dirt_vars_expression e2
-  | Handle (e, c) -> free_dirt_vars_expression e @ free_dirt_vars_computation c
-  | Call (_, e, awty) -> failwith __LOC__
-  | Op (_, e) -> free_dirt_vars_expression e
-  | Bind (c, a) -> free_dirt_vars_computation c @ free_dirt_vars_abstraction a
-  | CastComp (c, dc) ->
-      free_dirt_vars_computation c @ free_dirt_vars_dirty_coercion dc
-  | CastComp_ty (c, tc) ->
-      free_dirt_vars_computation c @ free_dirt_vars_ty_coercion tc
-  | CastComp_dirt (c, dc) ->
-      free_dirt_vars_computation c @ free_dirt_vars_dirt_coercion dc
-
-and free_dirt_vars_abstraction {term= _, c} = free_dirt_vars_computation c
-
-and free_dirt_vars_abstraction_with_ty {term= _, ty, c} =
-  free_dirt_vars_ty ty @ free_dirt_vars_computation c
-
-and free_dirt_vars_ty_coercion = function
+let rec free_dirt_vars_ty_coercion = function
   | ReflTy ty -> free_dirt_vars_ty ty
   | ArrowCoercion (tc, dc) ->
       free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirty_coercion dc
@@ -1005,6 +951,7 @@ and free_dirt_vars_ty_coercion = function
   | ForallSkel (skp, tc) -> free_dirt_vars_ty_coercion tc
   | ApplySkelCoer (tc, sk) -> free_dirt_vars_ty_coercion tc
 
+
 and free_dirt_vars_dirt_coercion = function
   | ReflDirt d -> free_dirt_vars_dirt d
   | DirtCoercionVar dcv -> []
@@ -1014,6 +961,7 @@ and free_dirt_vars_dirt_coercion = function
       free_dirt_vars_dirt_coercion dc1 @ free_dirt_vars_dirt_coercion dc2
   | DirtCoercion dc -> free_dirt_vars_dirty_coercion dc
 
+
 and free_dirt_vars_dirty_coercion = function
   | BangCoercion (tc, dc) ->
       free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirt_coercion dc
@@ -1022,3 +970,60 @@ and free_dirt_vars_dirty_coercion = function
   | LeftHandler tc -> free_dirt_vars_ty_coercion tc
   | SequenceDirtyCoer (dc1, dc2) ->
       free_dirt_vars_dirty_coercion dc1 @ free_dirt_vars_dirty_coercion dc2
+
+
+let rec free_dirt_vars_expression e =
+  match e.term with
+  | Var _ -> []
+  | BuiltIn _ -> []
+  | Const _ -> []
+  | Tuple es -> List.concat (List.map free_dirt_vars_expression es)
+  | Record _ -> failwith __LOC__
+  | Variant (_, e) -> free_dirt_vars_expression e
+  | Lambda abs -> free_dirt_vars_abstraction_with_ty abs
+  | Effect _ -> []
+  | Handler h -> free_dirt_vars_abstraction_with_ty h.value_clause
+  | BigLambdaTy (tp, sk, e) -> free_dirt_vars_expression e
+  | BigLambdaDirt (dp, e) ->
+      List.filter (fun x -> not (x == dp)) (free_dirt_vars_expression e)
+  | BigLambdaSkel (skp, e) -> free_dirt_vars_expression e
+  | CastExp (e, tc) ->
+      free_dirt_vars_expression e @ free_dirt_vars_ty_coercion tc
+  | ApplyTyExp (e, ty) -> free_dirt_vars_expression e @ free_dirt_vars_ty ty
+  | LambdaTyCoerVar (tcp, ctty, e) -> free_dirt_vars_expression e
+  | LambdaDirtCoerVar (dcp, ctd, e) -> free_dirt_vars_expression e
+  | ApplyDirtExp (e, d) -> free_dirt_vars_expression e @ free_dirt_vars_dirt d
+  | ApplySkelExp (e, sk) -> free_dirt_vars_expression e
+  | ApplyTyCoercion (e, tc) ->
+      free_dirt_vars_expression e @ free_dirt_vars_ty_coercion tc
+  | ApplyDirtCoercion (e, dc) ->
+      free_dirt_vars_expression e @ free_dirt_vars_dirt_coercion dc
+
+and free_dirt_vars_computation c =
+  match c.term with
+  | Value e -> free_dirt_vars_expression e
+  | LetVal (e, abs) ->
+      free_dirt_vars_expression e @ free_dirt_vars_abstraction_with_ty abs
+  | LetRec ([(var, ty, e)], c) ->
+      free_dirt_vars_ty ty @ free_dirt_vars_expression e
+      @ free_dirt_vars_computation c
+  | Match (e, cases) ->
+      free_dirt_vars_expression e
+      @ List.concat (List.map free_dirt_vars_abstraction cases)
+  | Apply (e1, e2) ->
+      free_dirt_vars_expression e1 @ free_dirt_vars_expression e2
+  | Handle (e, c) -> free_dirt_vars_expression e @ free_dirt_vars_computation c
+  | Call (_, e, awty) -> failwith __LOC__
+  | Op (_, e) -> free_dirt_vars_expression e
+  | Bind (c, a) -> free_dirt_vars_computation c @ free_dirt_vars_abstraction a
+  | CastComp (c, dc) ->
+      free_dirt_vars_computation c @ free_dirt_vars_dirty_coercion dc
+  | CastComp_ty (c, tc) ->
+      free_dirt_vars_computation c @ free_dirt_vars_ty_coercion tc
+  | CastComp_dirt (c, dc) ->
+      free_dirt_vars_computation c @ free_dirt_vars_dirt_coercion dc
+
+and free_dirt_vars_abstraction {term= _, c} = free_dirt_vars_computation c
+
+and free_dirt_vars_abstraction_with_ty {term= _, ty, c} =
+  free_dirt_vars_ty ty @ free_dirt_vars_computation c
