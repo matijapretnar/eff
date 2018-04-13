@@ -1,11 +1,6 @@
-type nat = Zero | Succ of nat
+type my_ty = Cons of my_ty
 
 ;;
 
-let rec add m = function
-| Zero -> m
-| Succ n -> Succ (add m n)
-
-in
-
-add
+function
+| Cons argmnt -> Cons argmnt
