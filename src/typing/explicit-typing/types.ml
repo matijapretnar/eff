@@ -92,6 +92,11 @@ and print_skeleton ?max_level sk ppf =
   | PrimSkel s -> print "prim_skel %t" (print_prim_ty s)
   | SkelArrow (sk1, sk2) ->
       print "%t -sk-> %t" (print_skeleton sk1) (print_skeleton sk2)
+  | SkelApply (t, []) -> print "%s" t
+  | SkelApply (t, [s]) ->
+      print ~at_level:1 "%t %s" (print_skeleton ~max_level:1 s) t
+  | SkelApply (t, ts) ->
+      print ~at_level:1 "(%t) %s" (Print.sequence ", " print_skeleton ts) t
   | SkelTuple [] -> print "unit"
   | SkelTuple sks ->
       print ~at_level:2 "@[<hov>%t@]"
@@ -333,6 +338,7 @@ let rec free_ty_vars_ty = function
   | TyParam x -> [x]
   | Arrow (a, c) -> free_ty_vars_ty a @ free_ty_var_dirty c
   | Tuple tup -> List.flatten (List.map free_ty_vars_ty tup)
+  | Apply (_, tup) -> List.flatten (List.map free_ty_vars_ty tup)
   | Handler (c1, c2) -> free_ty_var_dirty c1 @ free_ty_var_dirty c2
   | PrimTy _ -> []
   | QualTy (_, a) -> free_ty_vars_ty a

@@ -262,10 +262,14 @@ let rec extend_pattern_types st p ty =
       let ty_c = Types.type_const c in
       assert (Types.types_are_equal ty_c ty) ;
       st
-  | PVariant (lbl, e) ->
+  | PVariant (lbl, p) ->
       let ty_in, ty_out = Types.constructor_signature lbl in
       assert (Types.types_are_equal ty ty_out) ;
       extend_pattern_types st p ty_in
+  | PTuple ps -> (
+    match ty with
+    | Tuple tys -> List.fold_left2 extend_pattern_types st ps tys
+    | _ -> assert false )
   | _ -> failwith __LOC__
 
 

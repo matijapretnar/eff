@@ -362,6 +362,12 @@ and print_omega_ct ?max_level c ppf =
         (Params.DirtCoercion.print p)
         (Types.print_target_dirt ty1)
         (Types.print_target_dirt ty2)
+  | DirtyOmega ((p1, p2), (dirty1, dirty2)) ->
+      print "%t ! %t: (%t =< %t)"
+        (Params.TyCoercion.print p1)
+        (Params.DirtCoercion.print p2)
+        (Types.print_target_dirty dirty1)
+        (Types.print_target_dirty dirty2)
   | SkelEq (sk1, sk2) ->
       print "%t ~ %t" (Types.print_skeleton sk1) (Types.print_skeleton sk2)
   | TyParamHasSkel (tp, sk1) ->
