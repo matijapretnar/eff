@@ -8,11 +8,7 @@ type variable = Variable.t
 
 type effect = OldUtils.effect * (Types.target_ty * Types.target_ty)
 
-type 'term annotation = {term: 'term; location: Location.t}
-
-type pattern = plain_pattern annotation
-
-and plain_pattern =
+type pattern =
   | PVar of variable
   | PAs of pattern * variable
   | PTuple of pattern list
@@ -21,8 +17,7 @@ and plain_pattern =
   | PConst of Const.t
   | PNonbinding
 
-let rec pattern_vars p =
-  match p.term with
+let rec pattern_vars = function
   | PVar x -> [x]
   | PAs (p, x) -> x :: pattern_vars p
   | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
@@ -31,8 +26,6 @@ let rec pattern_vars p =
   | PConst _ -> []
   | PNonbinding -> []
 
-
-let annotate t loc = {term= t; location= loc}
 
 type ty_coercion =
   | ReflTy of Types.target_ty
@@ -71,9 +64,7 @@ and dirty_coercion =
   | SequenceDirtyCoer of (dirty_coercion * dirty_coercion)
 
 (** Pure expressions *)
-type expression = plain_expression annotation
-
-and plain_expression =
+type expression =
   | Var of variable
   | BuiltIn of string * int
   | Const of Const.t
@@ -96,9 +87,7 @@ and plain_expression =
   | ApplyDirtCoercion of expression * dirt_coercion
 
 (** Impure computations *)
-and computation = plain_computation annotation
-
-and plain_computation =
+and computation =
   | Value of expression
   | LetVal of expression * abstraction_with_ty
   | LetRec of (variable * Types.target_ty * expression) list * computation
@@ -118,17 +107,14 @@ and handler =
   ; value_clause: abstraction_with_ty }
 
 (** Abstractions that take one argument. *)
-and abstraction = (pattern * computation) annotation
+and abstraction = (pattern * computation)
 
-and abstraction_with_ty = (pattern * Types.target_ty * computation) annotation
+and abstraction_with_ty = (pattern * Types.target_ty * computation)
 
 (** Abstractions that take two arguments. *)
-and abstraction2 = (pattern * pattern * computation) annotation
+and abstraction2 = (pattern * pattern * computation)
 
-let abstraction_with_ty_to_abstraction a_w_ty =
-  let p, _, c = a_w_ty.term in
-  {term= (p, c); location= a_w_ty.location}
-
+let abstraction_with_ty_to_abstraction (p, _, c) = (p, c)
 
 type omega_ct =
   | TyOmega of (Params.TyCoercion.t * Types.ct_ty)
@@ -154,37 +140,11 @@ and plain_toplevel =
 
 (* | TypeOf of computation *)
 
-let var ?loc:(l = Location.unknown) v : expression = {term= Var v; location= l}
+let abstraction p c : abstraction = (p, c)
 
-let lambda ?loc abs : expression = {term= Lambda abs; location= abs.location}
+let abstraction_with_ty p ty c : abstraction_with_ty = (p, ty, c)
 
-let apply ?loc:(l = Location.unknown) e1 e2 : computation =
-  {term= Apply (e1, e2); location= l}
-
-
-let call ?loc eff e abs : computation =
-  {term= Call (eff, e, abs); location= e.location}
-
-
-let handle ?loc e c : computation = {term= Handle (e, c); location= c.location}
-
-let case ?loc:(l = Location.unknown) e branches : computation =
-  {term= Match (e, branches); location= l}
-
-
-let abstraction ?loc p c : abstraction = {term= (p, c); location= c.location}
-
-let abstraction_with_ty ?loc p tty c : abstraction_with_ty =
-  {term= (p, tty, c); location= c.location}
-
-
-let abstraction2 ?loc p1 p2 c : abstraction2 =
-  {term= (p1, p2, c); location= c.location}
-
-
-let pvar ?loc:(l = Location.unknown) var : pattern =
-  {term= PVar var; location= l}
-
+let abstraction2 p1 p2 c : abstraction2 = (p1, p2, c)
 
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
 
@@ -192,7 +152,7 @@ let print_variable = Variable.print ~safe:true
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match p.term with
+  match p with
   | PVar x -> print "%t" (print_variable x)
   | PAs (p, x) -> print "%t as %t" (print_pattern p) (print_variable x)
   | PConst c -> Const.print c ppf
@@ -205,14 +165,14 @@ let rec print_pattern ?max_level p ppf =
 
 let rec print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match e.term with
+  match e with
   | Var x -> print "%t" (print_variable x)
   | BuiltIn (s, _) -> print "%s" s
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record lst -> Print.record print_expression lst ppf
   | Variant (lbl, e) -> print ~at_level:1 "%s %t" lbl (print_expression e)
-  | Lambda {term= x, t, c} ->
+  | Lambda (x, t, c) ->
       print "fun (%t:%t) -> (%t)" (print_pattern x) (Types.print_target_ty t)
         (print_computation c)
   | Handler h ->
@@ -266,7 +226,7 @@ let rec print_expression ?max_level e ppf =
 
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c.term with
+  match c with
   | Apply (e1, e2) ->
       print ~at_level:1 "((%t)@ (%t))"
         (print_expression ~max_level:1 e1)
@@ -303,7 +263,7 @@ and print_computation ?max_level c ppf =
       print " ( (%t) |> [%t] )" (print_computation c1) (print_ty_coercion dc)
   | CastComp_dirt (c1, dc) ->
       print "( (%t) |> [%t])" (print_computation c1) (print_dirt_coercion dc)
-  | LetVal (e1, {term= p, ty, c1}) ->
+  | LetVal (e1, (p, ty, c1)) ->
       print "let (%t = (%t)) in (%t)" (print_pattern p) (print_expression e1)
         (print_computation c1)
 
@@ -384,22 +344,22 @@ and print_effect_clauses eff_clauses ppf =
         (print_effect_clauses cases)
 
 
-and print_abstraction {term= p, c} ppf =
+and print_abstraction (p, c) ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
 
 
-and print_abstraction_with_ty {term= p, tty, c} ppf =
+and print_abstraction_with_ty (p, tty, c) ppf =
   Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern p)
     (Types.print_target_ty tty)
     (print_computation c)
 
 
-and print_abstraction2 {term= p1, p2, c} ppf =
+and print_abstraction2 (p1, p2, c) ppf =
   Format.fprintf ppf "(fun %t %t -> %t)" (print_pattern p1) (print_pattern p2)
     (print_computation c)
 
 
-and print_pure_abstraction {term= p, e} ppf =
+and print_pure_abstraction (p, e) ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_expression e)
 
 
@@ -408,7 +368,7 @@ and print_let_abstraction (p, c) ppf =
 
 
 and print_top_let_abstraction (p, c) ppf =
-  match c.term with
+  match c with
   | Value e ->
       Format.fprintf ppf "%t = %t" (print_pattern p)
         (print_expression ~max_level:0 e)
@@ -426,12 +386,7 @@ let backup_location loc locs =
   match loc with None -> Location.union locs | Some loc -> loc
 
 
-let rec refresh_pattern sbst p =
-  let sbst', p' = refresh_pattern' sbst p.term in
-  (sbst', {p with term= p'})
-
-
-and refresh_pattern' sbst = function
+let rec refresh_pattern sbst = function
   | PVar x ->
       let x' = Variable.refresh x in
       (OldUtils.update x x' sbst, PVar x')
@@ -463,12 +418,7 @@ and refresh_pattern' sbst = function
   | (PConst _ | PNonbinding) as p -> (sbst, p)
 
 
-let rec refresh_expr sbst e =
-  let res = {e with term= refresh_expr' sbst e.term} in
-  Print.debug "refres_expr" ; res
-
-
-and refresh_expr' sbst = function
+let rec refresh_expr sbst = function
   | Var x as e -> (
     match OldUtils.lookup x sbst with Some x' -> Var x' | None -> e )
   | Lambda abs -> Lambda (refresh_abs_with_ty sbst abs)
@@ -495,9 +445,7 @@ and refresh_expr' sbst = function
   | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (refresh_expr sbst e, dco)
 
 
-and refresh_comp sbst c = {c with term= refresh_comp' sbst c.term}
-
-and refresh_comp' sbst = function
+and refresh_comp sbst = function
   | Bind (c1, c2) -> Bind (refresh_comp sbst c1, refresh_abs sbst c2)
   | LetRec (li, c1) ->
       let new_xs, sbst' =
@@ -528,29 +476,24 @@ and refresh_handler sbst h =
   ; value_clause= refresh_abs_with_ty sbst h.value_clause }
 
 
-and refresh_abs sbst a =
-  let p, c = a.term in
+and refresh_abs sbst (p, c) =
   let sbst, p' = refresh_pattern sbst p in
-  {a with term= (p', refresh_comp sbst c)}
+  (p', refresh_comp sbst c)
 
 
-and refresh_abs_with_ty sbst a =
-  let p, ty, c = a.term in
+and refresh_abs_with_ty sbst (p, ty, c) =
   let sbst, p' = refresh_pattern sbst p in
-  {a with term= (p', ty, refresh_comp sbst c)}
+  (p', ty, refresh_comp sbst c)
 
 
-and refresh_abs2 sbst a2 =
-  let p1, p2, c = a2.term in
+and refresh_abs2 sbst (p1, p2, c) =
   let sbst, p1' = refresh_pattern sbst p1 in
   let sbst, p2' = refresh_pattern sbst p2 in
   let c' = refresh_comp sbst c in
-  {a2 with term= (p1', p2', c')}
+  (p1', p2', c')
 
 
-let rec subst_expr sbst e = {e with term= subst_expr' sbst e.term}
-
-and subst_expr' sbst = function
+let rec subst_expr sbst = function
   | Var x as e -> (
     match OldUtils.lookup x sbst with Some e' -> e' | None -> e )
   | Lambda abs -> Lambda (subst_abs_with_ty sbst abs)
@@ -574,9 +517,7 @@ and subst_expr' sbst = function
   | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (subst_expr sbst e, dco)
 
 
-and subst_comp sbst c = {c with term= subst_comp' sbst c.term}
-
-and subst_comp' sbst = function
+and subst_comp sbst = function
   | Bind (c1, c2) -> Bind (subst_comp sbst c1, subst_abs sbst c2)
   | LetRec (li, c1) ->
       let li' =
@@ -600,23 +541,19 @@ and subst_handler sbst h =
   ; value_clause= subst_abs_with_ty sbst h.value_clause }
 
 
-and subst_abs sbst a =
-  let p, c = a.term in
+and subst_abs sbst (p, c) =
   (* XXX We should assert that p & sbst have disjoint variables *)
-  {a with term= (p, subst_comp sbst c)}
+  (p, subst_comp sbst c)
 
 
-and subst_abs_with_ty sbst a =
-  let p, t, c = a.term in
+and subst_abs_with_ty sbst (p, ty, c) =
   (* XXX We should assert that p & sbst have disjoint variables *)
-  {a with term= (p, t, subst_comp sbst c)}
+  (p, ty, subst_comp sbst c)
 
 
-and subst_abs2 sbst a2 =
-  (* a2a2 @@ subst_abs sbst @@ a22a @@ a2 *)
-  let p1, p2, c = a2.term in
+and subst_abs2 sbst (p1, p2, c) =
   (* XXX We should assert that p1, p2 & sbst have disjoint variables *)
-  {a2 with term= (p1, p2, subst_comp sbst c)}
+  (p1, p2, subst_comp sbst c)
 
 
 let assoc_equal eq flds flds' : bool =
@@ -632,10 +569,6 @@ let assoc_equal eq flds flds' : bool =
 
 
 let rec make_equal_pattern eqvars p p' =
-  make_equal_pattern' eqvars p.term p'.term
-
-
-and make_equal_pattern' eqvars p p' =
   match (p, p') with
   | PVar x, PVar x' -> Some ((x, x') :: eqvars)
   | PAs (p, x), PAs (p', x') ->
@@ -656,12 +589,6 @@ and make_equal_pattern' eqvars p p' =
 
 
 let rec alphaeq_expr eqvars e e' =
-  Print.debug "alphaeq_expr: %t vs %t" (print_expression e)
-    (print_expression e') ;
-  alphaeq_expr' eqvars e.term e'.term
-
-
-and alphaeq_expr' eqvars e e' =
   match (e, e') with
   | Var x, Var y -> List.mem (x, y) eqvars || Variable.compare x y = 0
   | Lambda a, Lambda a' -> alphaeq_abs_with_ty eqvars a a'
@@ -680,9 +607,7 @@ and alphaeq_expr' eqvars e e' =
   | _, _ -> false
 
 
-and alphaeq_comp eqvars c c' = alphaeq_comp' eqvars c.term c'.term
-
-and alphaeq_comp' eqvars c c' =
+and alphaeq_comp eqvars c c' =
   match (c, c') with
   | Bind (c1, c2), Bind (c1', c2') ->
       alphaeq_comp eqvars c1 c1' && alphaeq_abs eqvars c2 c2'
@@ -714,19 +639,19 @@ and alphaeq_handler eqvars h h' =
 
 (*   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
   alphaeq_abs eqvars h.value_clause h'.value_clause *)
-and alphaeq_abs eqvars {term= p, c} {term= p', c'} =
+and alphaeq_abs eqvars (p, c) (p', c') =
   match make_equal_pattern eqvars p p' with
   | Some eqvars' -> alphaeq_comp eqvars' c c'
   | None -> false
 
 
-and alphaeq_abs_with_ty eqvars {term= p, ty, c} {term= p', ty', c'} =
+and alphaeq_abs_with_ty eqvars (p, ty, c) (p', ty', c') =
   match make_equal_pattern eqvars p p' with
   | Some eqvars' -> alphaeq_comp eqvars' c c'
   | None -> false
 
 
-and alphaeq_abs2 eqvars {term= p1, p2, c} {term= p1', p2', c'} =
+and alphaeq_abs2 eqvars (p1, p2, c) (p1', p2', c') =
   (* alphaeq_abs eqvars (a22a a2) (a22a a2') *)
   match make_equal_pattern eqvars p1 p1' with
   | Some eqvars' -> (
@@ -746,14 +671,14 @@ let pattern_match p e =
   in
   ignore constraints; *)
   let rec extend_subst p e sbst =
-    match (p.term, e.term) with
+    match (p, e) with
     | PVar x, e -> OldUtils.update x e sbst
     | PAs (p, x), e' ->
         let sbst = extend_subst p e sbst in
         OldUtils.update x e' sbst
     | PNonbinding, _ -> sbst
     | PTuple ps, Tuple es -> List.fold_right2 extend_subst ps es sbst
-    | PRecord ps, Record es -> (
+    | PRecord ps, Record es ->
         let rec extend_record ps es sbst =
           match ps with
           | [] -> sbst
@@ -761,15 +686,11 @@ let pattern_match p e =
               let e = List.assoc f es in
               extend_record ps es (extend_subst p e sbst)
         in
-        try extend_record ps es sbst with Not_found ->
-          Error.runtime ~loc:e.location "Incompatible records in substitution."
-        )
+        extend_record ps es sbst
     | PVariant (lbl, p), Variant (lbl', e) when lbl = lbl' ->
         extend_subst p e sbst
     | PConst c, Const c' when Const.equal c c' -> sbst
-    | _, _ ->
-        Error.runtime ~loc:e.location
-          "Cannot substitute an expression in a pattern."
+    | _, _ -> assert false
   in
   extend_subst p e []
 
@@ -786,7 +707,7 @@ let ( --- ) (inside, outside) bound =
 let concat_vars vars = List.fold_right ( @@@ ) vars ([], [])
 
 let rec free_vars_comp c =
-  match c.term with
+  match c with
   | Value e -> free_vars_expr e
   | LetRec (li, c1) ->
       let xs, vars =
@@ -805,7 +726,7 @@ let rec free_vars_comp c =
 
 
 and free_vars_expr e =
-  match e.term with
+  match e with
   | Var v -> ([], [v])
   | Tuple es -> concat_vars (List.map free_vars_expr es)
   | Lambda a -> free_vars_abs_with_ty a
@@ -836,23 +757,17 @@ and free_vars_finally_handler (h, finally_clause) =
   free_vars_handler h @@@ free_vars_abs finally_clause
 
 
-and free_vars_abs a =
-  let p, c = a.term in
+and free_vars_abs (p, c) =
   let inside, outside = free_vars_comp c --- pattern_vars p in
   (inside @ outside, [])
 
 
-and free_vars_abs_with_ty a = free_vars_plain_abs_with_ty a.term
-
-and free_vars_plain_abs_with_ty p_a =
-  let p, _, c = p_a in
+and free_vars_abs_with_ty (p, _, c) =
   let inside, outside = free_vars_comp c --- pattern_vars p in
   (inside @ outside, [])
 
 
-and free_vars_abs2 a2 =
-  (* free_vars_abs @@ a22a @@ a2 *)
-  let p1, p2, c = a2.term in
+and free_vars_abs2 (p1, p2, c) =
   let inside, outside =
     free_vars_comp c --- pattern_vars p2 --- pattern_vars p1
   in
@@ -905,12 +820,12 @@ let fresh_dirty_coer cons =
 
 let cast_expression e ty1 ty2 =
   let omega, cons = fresh_ty_coer (ty1, ty2) in
-  (annotate (CastExp (e, omega)) e.location, cons)
+  (CastExp (e, omega), cons)
 
 
 let cast_computation c dirty1 dirty2 =
   let omega, cons = fresh_dirty_coer (dirty1, dirty2) in
-  (annotate (CastComp (c, omega)) c.location, cons)
+  (CastComp (c, omega), cons)
 
 
 let constraint_free_ty_vars = function
@@ -979,7 +894,7 @@ and free_dirt_vars_dirty_coercion = function
 
 
 let rec free_dirt_vars_expression e =
-  match e.term with
+  match e with
   | Var _ -> []
   | BuiltIn _ -> []
   | Const _ -> []
@@ -1007,7 +922,7 @@ let rec free_dirt_vars_expression e =
 
 
 and free_dirt_vars_computation c =
-  match c.term with
+  match c with
   | Value e -> free_dirt_vars_expression e
   | LetVal (e, abs) ->
       free_dirt_vars_expression e @ free_dirt_vars_abstraction_with_ty abs
@@ -1031,9 +946,9 @@ and free_dirt_vars_computation c =
       free_dirt_vars_computation c @ free_dirt_vars_dirt_coercion dc
 
 
-and free_dirt_vars_abstraction {term= _, c} = free_dirt_vars_computation c
+and free_dirt_vars_abstraction (_, c) = free_dirt_vars_computation c
 
-and free_dirt_vars_abstraction_with_ty {term= _, ty, c} =
+and free_dirt_vars_abstraction_with_ty (_, ty, c) =
   free_dirt_vars_ty ty @ free_dirt_vars_computation c
 
 

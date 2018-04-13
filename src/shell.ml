@@ -32,9 +32,7 @@ let rec exec_cmd ppf st cmd =
           ExplicitInfer.type_toplevel ~loc:c.CoreSyntax.location
             st.explicit_typing c
         in
-        let ty, drt =
-          TypeChecker.type_of_computation st.type_checker ct.Typed.term
-        in
+        let ty, drt = TypeChecker.type_of_computation st.type_checker ct in
         let v = Eval.run st.runtime c in
         Format.fprintf ppf "@[- : %t ! %t = %t@]@." (Types.print_target_ty ty)
           (Types.print_target_dirt drt)
@@ -52,9 +50,7 @@ let rec exec_cmd ppf st cmd =
           ExplicitInfer.type_toplevel ~loc:c.CoreSyntax.location
             st.explicit_typing c
         in
-        let ty, drt =
-          TypeChecker.type_of_computation st.type_checker ct.Typed.term
-        in
+        let ty, drt = TypeChecker.type_of_computation st.type_checker ct in
         Format.fprintf ppf "@[- : %t ! %t@]@." (Types.print_target_ty ty)
           (Types.print_target_dirt drt) ;
         {st with explicit_typing}
@@ -190,7 +186,7 @@ let compile_file ppf filename st =
           "-- After Optimization ------------------------------------------" ;
         Print.debug "%t" (Typed.print_computation ct) ;
         let ct_ty, ct_dirt =
-          TypeChecker.type_of_computation st.type_checker ct.term
+          TypeChecker.type_of_computation st.type_checker ct
         in
         Print.debug "Type from Type Checker : %t ! %t"
           (Types.print_target_ty ct_ty)

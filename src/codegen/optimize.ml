@@ -67,7 +67,7 @@ let refresh_abs2 a2 =
 
 
 let is_relatively_pure st c h =
-  match TypeChecker.type_of_computation st.tc_state c.term with
+  match TypeChecker.type_of_computation st.tc_state c with
   | ty, {Types.effect_set= ops; Types.row= Types.EmptyRow} ->
       let handled_ops =
         EffectSet.of_list
@@ -104,9 +104,7 @@ let is_relatively_pure st c h =
 
 (* var can be instantiated to anything *)
 
-let is_atomic e =
-  match e.term with Var _ -> true | Const _ -> true | _ -> false
-
+let is_atomic e = match e with Var _ -> true | Const _ -> true | _ -> false
 
 type inlinability =
   (* Pattern variables occur more than once or inside a binder *)
@@ -295,14 +293,14 @@ let rec substitute_pattern_comp st c p exp =
   optimize_comp st (Typed.subst_comp (Typed.pattern_match p exp) c)
 
 
-and beta_reduce st ({term= p, ty, c} as a) e =
+and beta_reduce st ((p, ty, c) as a) e =
   match applicable_pattern p (Typed.free_vars_comp c) with
   | Inlinable -> substitute_pattern_comp st c p e
   | NotPresent -> c
   | NotInlinable when is_atomic e ->
       Print.debug "beta_reduce not-inlinable is_atomc" ;
       substitute_pattern_comp st c p e
-  | NotInlinable -> {term= LetVal (e, a); location= a.location}
+  | NotInlinable -> LetVal (e, a)
 
 
 (*
@@ -321,14 +319,14 @@ and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
 
 and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
 
-and optimize_abs st ty {term= p, c; location= loc} =
+and optimize_abs st ty (p, c) =
   let st' = optimize_pattern st ty p in
-  {term= (p, optimize_comp st' c); location= loc}
+  (p, optimize_comp st' c)
 
 
 and optimize_sub_expr st e =
   let plain_e' =
-    match e.term with
+    match e with
     (*
           | Tuple of expression list
           | Record of (OldUtils.field, expression) OldUtils.assoc
@@ -365,15 +363,15 @@ and optimize_sub_expr st e =
     | Handler h -> Handler (optimize_sub_handler st h)
     | CastExp (e1, tyco1) ->
         CastExp (optimize_expr st e1, optimize_ty_coercion st tyco1)
-    | Handler h -> e.term
+    | Handler h -> e
     | Tuple es -> Tuple (List.map (optimize_expr st) es)
     (* TODO: implement *)
   in
-  {term= plain_e'; location= e.location}
+  plain_e'
 
 
 and match_recursive_function st e =
-  match e.term with
+  match e with
   | Var fvar -> (
     match OldUtils.lookup fvar st.recursive_functions with
     | None -> None
@@ -389,7 +387,7 @@ and match_recursive_function st e =
 and match_knot_function st e h = match_knot_function' st e e h
 
 and match_knot_function' st e e' h =
-  match e.term with
+  match e with
   | Var fvar -> (
     match OldUtils.lookup fvar st.knot_functions with
     | None -> None
@@ -412,23 +410,23 @@ and optimize_sub_handler st {effect_clauses= ecs; value_clause= vc} =
 
 
 and optimize_abstraction_with_ty st a_w_ty =
-  let plain_a_w_ty' = optimize_plain_abstraction_with_ty st a_w_ty.term in
-  {term= plain_a_w_ty'; location= a_w_ty.location}
+  let plain_a_w_ty' = optimize_plain_abstraction_with_ty st a_w_ty in
+  plain_a_w_ty'
 
 
 and optimize_plain_abstraction_with_ty st (p, ty, c) =
-  let PVar var = p.term in
+  let PVar var = p in
   (p, ty, optimize_comp (extend_var_type st var ty) c)
 
 
 and optimize_abstraction st ty a =
-  let p, c = a.term in
+  let p, c = a in
   let st' = optimize_pattern st ty p in
-  {a with term= (p, optimize_comp st' c)}
+  (p, optimize_comp st' c)
 
 
 and optimize_pattern st ty p =
-  match p.term with
+  match p with
   | PVar x -> extend_var_type st x ty
   | PNonbinding -> st
   | PConst c -> st
@@ -436,22 +434,21 @@ and optimize_pattern st ty p =
 
 and optimize_abstraction2 st dty (effect, a2) =
   let op, (in_op, out_op) = effect in
-  let p1, p2, c = a2.term in
-  let Typed.PVar v1 = p1.term in
-  let Typed.PVar v2 = p2.term in
+  let p1, p2, c = a2 in
+  let Typed.PVar v1 = p1 in
+  let Typed.PVar v2 = p2 in
   let st =
     extend_var_type
       (extend_var_type st v1 in_op)
       v2 (Types.Arrow (out_op, dty))
   in
-  (effect, {a2 with term= (p1, p2, optimize_comp st c)})
+  (effect, (p1, p2, optimize_comp st c))
 
 
 and optimize_sub_comp st c =
   Print.debug "optimize_sub_comp: %t" (Typed.print_computation c) ;
-  let loc = c.location in
   let plain_c' =
-    match c.term with
+    match c with
     | Value e1 -> Value (optimize_expr st e1)
     | LetVal (e1, abs) ->
         LetVal (optimize_expr st e1, optimize_abstraction_with_ty st abs)
@@ -460,7 +457,7 @@ and optimize_sub_comp st c =
         let st'' = extend_rec_fun st' var ty e1 in
         LetRec ([(var, ty, optimize_expr st' e1)], optimize_comp st'' c1)
     | Match (e1, abstractions) ->
-        let ty = TypeChecker.type_of_expression st.tc_state e1.term in
+        let ty = TypeChecker.type_of_expression st.tc_state e1 in
         Match
           ( optimize_expr st e1
           , List.map (optimize_abstraction st ty) abstractions )
@@ -472,7 +469,7 @@ and optimize_sub_comp st c =
         Print.debug "optimize_sub_comp Op" ;
         Op (op, optimize_expr st e1)
     | Bind (c1, abstraction) ->
-        let ty, _ = TypeChecker.type_of_computation st.tc_state c1.term in
+        let ty, _ = TypeChecker.type_of_computation st.tc_state c1 in
         Bind (optimize_comp st c1, optimize_abs st ty abstraction)
     | CastComp (c1, dirty_coercion) ->
         CastComp
@@ -480,12 +477,12 @@ and optimize_sub_comp st c =
     | CastComp_ty (c1, ty_coercion) -> failwith __LOC__
     | CastComp_dirt (c1, dirt_coercion) -> failwith __LOC__
   in
-  {term= plain_c'; location= loc}
+  plain_c'
 
 
 and reduce_expr st e =
   Print.debug "reduce_exp: %t" (Typed.print_expression e) ;
-  match e.term with
+  match e with
   (*
           | Var of variable
           | BuiltIn of string * int
@@ -505,23 +502,23 @@ and reduce_expr st e =
           | ApplyTyCoercion (e1,ty_co) ->
           *)
   | ApplySkelExp (e1, sk) -> (
-    match e1.term with
+    match e1 with
     | BigLambdaSkel (skvar, e11) ->
         Unification.apply_sub_exp (Unification.SkelParamToSkel (skvar, sk)) e11
     | _ -> e )
   | ApplyTyExp (e1, ty) -> (
-    match e1.term with
+    match e1 with
     | BigLambdaTy (tyvar, sk, e11) ->
         Unification.apply_sub_exp (Unification.TyParamToTy (tyvar, ty)) e11
     | _ -> e )
   | ApplyDirtCoercion (e1, dco) -> (
-    match e1.term with
+    match e1 with
     | LambdaDirtCoerVar (dcovar, ctd, e11) ->
         Unification.apply_sub_exp
           (Unification.CoerDirtVartoDirtCoercion (dcovar, dco)) e11
     | _ -> e )
   | ApplyDirtExp (e1, d) -> (
-    match e1.term with
+    match e1 with
     | BigLambdaDirt (dvar, e11) ->
         Unification.apply_sub_exp (Unification.DirtVarToDirt (dvar, d)) e11
     | _ -> e )
@@ -534,48 +531,39 @@ and reduce_expr st e =
 
 and reduce_comp st c =
   Print.debug "reduce_comp: %t" (Typed.print_computation c) ;
-  match c.term with
+  match c with
   | Value _ -> c
   | LetVal (e1, abs) -> beta_reduce st abs e1
   | LetRec (bindings, c1) -> c
   | Match (e1, abstractions) -> c
   | Apply (e1, e2) -> (
     match e1 with
-    | {term= Lambda abs} -> beta_reduce st abs e2
-    | {term= Effect op} ->
+    | Lambda abs -> beta_reduce st abs e2
+    | Effect op ->
         Print.debug "Op -> Call" ;
         let var = Typed.Variable.fresh "call_var" in
         let eff, (ty_in, ty_out) = op in
         let c_cont =
-          { term=
-              CastComp
-                ( { term= Value {term= Var var; location= c.location}
-                  ; location= c.location }
-                , BangCoercion
-                    ( ReflTy ty_out
-                    , Empty (Types.closed_dirt (EffectSet.singleton eff)) ) )
-          ; location= c.location }
+          CastComp
+            ( Value (Var var)
+            , BangCoercion
+                ( ReflTy ty_out
+                , Empty (Types.closed_dirt (EffectSet.singleton eff)) ) )
         in
-        let a_w_ty =
-          { term= ({term= PVar var; location= c.location}, ty_out, c_cont)
-          ; location= c.location }
-        in
-        {term= Call (op, e2, a_w_ty); location= c.location}
+        let a_w_ty = (PVar var, ty_out, c_cont) in
+        Call (op, e2, a_w_ty)
     | _ ->
         Print.debug "e1 is not a lambda" ;
         (* TODO: support case where it's a cast of a lambda *)
         c )
   | Handle (e1, c1) -> (
-    match e1.term with
+    match e1 with
     | CastExp (e11, tyco1) ->
-        let c1' =
-          {term= CastComp (c1, LeftHandler tyco1); location= c1.location}
-        in
-        let c' = {term= Handle (e11, c1'); location= c.location} in
-        optimize_comp st
-          {term= CastComp (c', RightHandler tyco1); location= c.location}
+        let c1' = CastComp (c1, LeftHandler tyco1) in
+        let c' = Handle (e11, c1') in
+        optimize_comp st (CastComp (c', RightHandler tyco1))
     | Handler h -> (
-      match c1.term with
+      match c1 with
       | Value e1 ->
           (* special case that happens when the handler has no effect clauses *)
           optimize_comp st (beta_reduce st h.value_clause e1)
@@ -583,48 +571,43 @@ and reduce_comp st c =
         match is_relatively_pure st c1' h with
         | Some dtyco ->
             optimize_comp st
-              { term=
-                  Bind
-                    ( {term= CastComp (c1', dtyco); location= c.location}
-                    , Typed.abstraction_with_ty_to_abstraction h.value_clause
-                    )
-              ; location= c.location }
+              (Bind
+                 ( CastComp (c1', dtyco)
+                 , Typed.abstraction_with_ty_to_abstraction h.value_clause ))
         | None -> c )
-      | Bind (({term= CastComp (c111, _)} as c11), a1) -> (
+      | Bind ((CastComp (c111, _) as c11), a1) -> (
         match (* TODO: Fix *)
               is_relatively_pure st c111 h with
         | Some dtyco ->
-            let p12, c12 = a1.term in
-            let PVar var12 = p12.term in
+            let p12, c12 = a1 in
+            let PVar var12 = p12 in
             optimize_comp st
-              { c with
-                term=
-                  Bind
-                    ( {c11 with term= CastComp (c111, dtyco)}
-                    , abstraction p12 (handle (refresh_expr e1) c12) ) }
+              (Bind
+                 ( CastComp (c111, dtyco)
+                 , abstraction p12 (Handle (refresh_expr e1, c12)) ))
         | None -> c )
       | Call (eff, e11, k_abs) -> (
           (* handle call(eff,e11,y:ty.c) with H@{eff xi ki -> ci}
              >-->
               ci [(fun y:ty -> handle c with H)/ki, e11 / xi]
            *)
-          let {term= k_pat, k_ty, k_c} as k_abs' = refresh_abs_with_ty k_abs in
-          let PVar k_var = k_pat.term in
+          let (k_pat, k_ty, k_c) as k_abs' = refresh_abs_with_ty k_abs in
+          let PVar k_var = k_pat in
           let handled_k =
             abstraction_with_ty k_pat k_ty
               (reduce_comp
                  (extend_var_type st k_var k_ty)
-                 (handle (refresh_expr e1) k_c))
+                 (Handle (refresh_expr e1, k_c)))
           in
           match OldUtils.lookup eff h.effect_clauses with
           | Some eff_clause ->
-              let {term= p1, p2, c} = refresh_abs2 eff_clause in
+              let p1, p2, c = refresh_abs2 eff_clause in
               (* Shouldn't we check for inlinability of p1 and p2 here? *)
               substitute_pattern_comp st
                 (Typed.subst_comp (Typed.pattern_match p1 e11) c)
-                p2 (lambda handled_k)
+                p2 (Lambda handled_k)
           | None ->
-              let res = call eff e11 k_abs' in
+              let res = Call (eff, e11, k_abs') in
               reduce_comp st res )
       | Apply (e11, e12) -> (
           Print.debug "Looking for recursive function name" ;
@@ -638,10 +621,8 @@ and reduce_comp st c =
                    in f' e12
                 *)
               Print.debug "Found recursive function call" ;
-              let dty_c = TypeChecker.type_of_computation st.tc_state c.term in
-              let ty_e12 =
-                TypeChecker.type_of_expression st.tc_state e12.term
-              in
+              let dty_c = TypeChecker.type_of_computation st.tc_state c in
+              let ty_e12 = TypeChecker.type_of_expression st.tc_state e12 in
               let fvar' = Variable.refresh fvar in
               let xvar = Variable.new_fresh () "__x_of_rec__" in
               let fty' = Arrow (ty_e12, dty_c) in
@@ -655,20 +636,19 @@ and reduce_comp st c =
               let st'' = extend_var_type st' fvar' fty' in
               let fbody' =
                 optimize_expr st''
-                  (lambda
-                     (abstraction_with_ty (pvar xvar) ty_e12
-                        (handle e1
-                           (apply
-                              (Typed.subst_expr
-                                 [(fvar, (refresh_expr fbody).term)] e11)
-                              (var xvar)))))
+                  (Lambda
+                     (abstraction_with_ty (PVar xvar) ty_e12
+                        (Handle
+                           ( e1
+                           , Apply
+                               ( Typed.subst_expr [(fvar, refresh_expr fbody)]
+                                   e11
+                               , Var xvar ) ))))
               in
-              { c with
-                term= LetRec ([(fvar', fty', fbody')], apply (var fvar') e12)
-              }
+              LetRec ([(fvar', fty', fbody')], Apply (Var fvar', e12))
           | None ->
             match match_knot_function st e11 h with
-            | Some fvar' -> apply (var fvar') e12
+            | Some fvar' -> Apply (Var fvar', e12)
             | None -> c )
       | Match (e, branches) ->
           (*
@@ -676,88 +656,70 @@ and reduce_comp st c =
              >-->
              match e with {pi -> handle ci with H}
            *)
-          let ty_e = TypeChecker.type_of_expression st.tc_state e.term in
-          case e
-            (List.map
-               (fun {term= pi, ci} ->
-                 optimize_abs st ty_e (abstraction pi (handle e1 ci)) )
-               branches)
+          let ty_e = TypeChecker.type_of_expression st.tc_state e in
+          Match
+            ( e
+            , List.map
+                (fun (pi, ci) ->
+                  optimize_abs st ty_e (abstraction pi (Handle (e1, ci))) )
+                branches )
       | _ -> c )
     | _ -> c )
   | Call (op, e1, a_w_ty) -> c
   | Op (op, e1) -> failwith __LOC__
   | Bind (c1, a2) -> (
-    match c1.term with
-    | Bind (c11, {term= p1, c12}) ->
-        let PVar var1 = p1.term in
-        let ty1, _ = TypeChecker.type_of_computation st.tc_state c11.term in
+    match c1 with
+    | Bind (c11, (p1, c12)) ->
+        let PVar var1 = p1 in
+        let ty1, _ = TypeChecker.type_of_computation st.tc_state c11 in
         let st' = extend_var_type st var1 ty1 in
-        let c2' =
-          reduce_comp st' {term= Bind (c12, a2); location= c12.location}
-        in
-        reduce_comp st
-          { term= Bind (c11, {term= (p1, c2'); location= c.location})
-          ; location= c.location }
+        let c2' = reduce_comp st' (Bind (c12, a2)) in
+        reduce_comp st (Bind (c11, (p1, c2')))
     | Value e11 ->
-        let ty11 = TypeChecker.type_of_expression st.tc_state e11.term in
-        let {term= p2, c2; location= location2} = a2 in
-        beta_reduce st {term= (p2, ty11, c2); location= location2} e11
-    | Call (op, e11, ({term= p12, ty12, c12} as a_w_ty)) ->
-        let PVar var12 = p12.term in
+        let ty11 = TypeChecker.type_of_expression st.tc_state e11 in
+        let p2, c2 = a2 in
+        beta_reduce st (p2, ty11, c2) e11
+    | Call (op, e11, ((p12, ty12, c12) as a_w_ty)) ->
+        let PVar var12 = p12 in
         let st' = extend_var_type st var12 ty12 in
-        let c12' =
-          reduce_comp st' {term= Bind (c12, a2); location= c12.location}
-        in
-        { term= Call (op, e11, {a_w_ty with term= (p12, ty12, c12')})
-        ; location= c.location }
+        let c12' = reduce_comp st' (Bind (c12, a2)) in
+        Call (op, e11, (p12, ty12, c12'))
     | CastComp (c11, dtyco) -> (
-      match c11.term with
+      match c11 with
       | Value e111 ->
           let p_e111' = CastExp (e111, PureCoercion dtyco) in
           let ty111 = TypeChecker.type_of_expression st.tc_state p_e111' in
-          let {term= p2, c2; location= location2} = a2 in
-          beta_reduce st {term= (p2, ty111, c2); location= location2}
-            {term= p_e111'; location= e111.location}
+          let p2, c2 = a2 in
+          beta_reduce st (p2, ty111, c2) p_e111'
       | Bind (c111, abs112) ->
-          let p112, c112 = abs112.term in
-          let PVar var112 = p112.term in
-          let ty111, _ =
-            TypeChecker.type_of_computation st.tc_state c111.term
-          in
-          let c112' = {c112 with term= CastComp (c112, dtyco)} in
+          let p112, c112 = abs112 in
+          let PVar var112 = p112 in
+          let ty111, _ = TypeChecker.type_of_computation st.tc_state c111 in
+          let c112' = CastComp (c112, dtyco) in
           let st' = extend_var_type st var112 ty111 in
-          let c2' = reduce_comp st' {c112 with term= Bind (c112', a2)} in
+          let c2' = reduce_comp st' (Bind (c112', a2)) in
           let dtyco' =
             optimize_dirty_coercion st
               (BangCoercion (ReflTy ty111, DirtCoercion dtyco))
           in
-          let c111' =
-            reduce_comp st {c111 with term= CastComp (c111, dtyco')}
-          in
-          reduce_comp st
-            {c with term= Bind (c111', {abs112 with term= (p112, c2')})}
+          let c111' = reduce_comp st (CastComp (c111, dtyco')) in
+          reduce_comp st (Bind (c111', (p112, c2')))
       | _ -> c )
     | _ -> c )
   | CastComp (c1, dtyco) ->
       let dty1, dty2 = TypeChecker.type_of_dirty_coercion st.tc_state dtyco in
-      match c1.term with
+      match c1 with
       | _ when Types.dirty_types_are_equal dty1 dty2 -> c1
       | CastComp (c11, dtyco12) ->
-          { c with
-            term=
-              CastComp
-                ( c11
-                , optimize_dirty_coercion st
-                    (SequenceDirtyCoer (dtyco12, dtyco)) ) }
-      | Call (op, e11, ({term= p12, ty12, c12} as a_w_ty)) ->
-          let PVar var12 = p12.term in
+          CastComp
+            ( c11
+            , optimize_dirty_coercion st (SequenceDirtyCoer (dtyco12, dtyco))
+            )
+      | Call (op, e11, ((p12, ty12, c12) as a_w_ty)) ->
+          let PVar var12 = p12 in
           let st' = extend_var_type st var12 ty12 in
-          let c12' =
-            reduce_comp st'
-              {term= CastComp (c12, dtyco); location= c12.location}
-          in
-          { term= Call (op, e11, {a_w_ty with term= (p12, ty12, c12')})
-          ; location= c.location }
+          let c12' = reduce_comp st' (CastComp (c12, dtyco)) in
+          Call (op, e11, (p12, ty12, c12'))
       | _ -> c
       | CastComp_ty (c1, ty_coercion) -> c
       | CastComp_dirt (c1, dirt_coercion) -> c
@@ -851,7 +813,7 @@ and reduce_comp st c =
 
   | Handle (e1, {term = Apply (ae1, ae2)}) ->
     useFuel st;
-    begin match ae1.term with
+    begin match ae1 with
       | Var v ->
             begin match (find_in_handlers_func_mem st v e1) with
              (*function exist,Same handler, same value clause*)
@@ -859,7 +821,7 @@ and reduce_comp st c =
                                 let res = apply new_f_exp ae2
                                 in reduce_comp st res
              | (true,Some special_f_exp, Some original_val_clause) ->
-                  let Handler h1 = e1.term in
+                  let Handler h1 = e1 in
                   let h1_v_clause = h1.value_clause in 
                   let orig_vc_lambda = optimize_expr st (lambda (h1_v_clause)) in 
                   let res = apply special_f_exp (tuple [ae2;orig_vc_lambda]) in 
@@ -871,9 +833,9 @@ and reduce_comp st c =
                 | Some abs -> 
                   st.optimization_function_specialization := !(st.optimization_function_specialization ) + 1;
                   st.optimization_total := !(st.optimization_total) + 1;
-                  let (let_rec_p,let_rec_c) = abs.term in
+                  let (let_rec_p,let_rec_c) = abs in
                   (* Print.debug "THE ABSTRACTION OF SAME HANDLER DIFF VALUE :- %t" (Typed.print_abstraction abs); *)
-                  let Handler ha = e1.term in 
+                  let Handler ha = e1 in 
                   (* Print.debug "THE VALUE CLAUSE :- %t" (Typed.print_abstraction ha.value_clause); *)
                   let ctx_val, (tyin_val , (tyout_val,drt_val)), cnstrs_val = ha.value_clause.scheme in
                   let continuation_var_scheme = (ctx_val, Type.Arrow(tyin_val , Type.fresh_dirty ()), cnstrs_val) in
@@ -886,15 +848,15 @@ and reduce_comp st c =
                       Type.Tuple [ty1 ; Type.Arrow(tyin_val , Type.fresh_dirty ())],
                       Constraints.union cnstrs_val cnstrs1
                     );
-                    location = ae1.location;
+                    location = ae1hh;
                   } in
                   let(newf_ctx,newf_ty,newf_const) = newf_input_tuple_pat.scheme in
                   let (f_ctx,ae1Ty,f_const) = ae1.scheme in
                   let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
-                  let newf_scheme = Scheme.clean_ty_scheme ~loc:c.location (newf_ctx , Type.Arrow (newf_ty, (tyout_val,drt_val)), newf_const) in
+                  let newf_scheme = Scheme.clean_ty_scheme ~loc:chh (newf_ctx , Type.Arrow (newf_ty, (tyout_val,drt_val)), newf_const) in
                   let newf_var, newf_pat = make_var "new_special_var"  newf_scheme in
-                  let Var newfvar = newf_var.term in
-                  let Handler hndlr = e1.term in 
+                  let Var newfvar = newf_var in
+                  let Handler hndlr = e1 in 
                   let vc_var_scheme = (ctx_val,tyin_val,cnstrs_val) in 
                   let vc_var, vc_pat = make_var "vcvar"  vc_var_scheme in
                   let new_value_clause = abstraction vc_pat (apply k_var vc_var) in
@@ -924,9 +886,9 @@ and reduce_comp st c =
                   let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
                   let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
                   let constraints = Constraints.list_union [h_const; f_const]
-                                    |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
+                                    |> Constraints.add_dirty_constraint ~loc:chh f_ty_out h_ty_in in
                   let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
-                  let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
+                  let function_scheme = Scheme.clean_ty_scheme ~loc:chh sch in 
                   let f_var, f_pat = refresh_var v function_scheme in
                   let f_def =
                     lambda @@
@@ -943,17 +905,17 @@ and reduce_comp st c =
                        | Some abs ->
                             st.optimization_function_specialization := !(st.optimization_function_specialization ) + 1;
                             st.optimization_total := !(st.optimization_total) + 1;
-                            let (let_rec_p,let_rec_c) = abs.term in
+                            let (let_rec_p,let_rec_c) = abs in
                             let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
                             let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
                             let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
                             let constraints = Constraints.list_union [h_const; f_const]
-                                  |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
+                                  |> Constraints.add_dirty_constraint ~loc:chh f_ty_out h_ty_in in
                             let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
-                            let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
+                            let function_scheme = Scheme.clean_ty_scheme ~loc:chh sch in 
                             let new_f_var, new_f_pat = refresh_var v function_scheme in
                             let new_handler_call = handle e1 let_rec_c in
-                            let Var newfvar = new_f_var.term in
+                            let Var newfvar = new_f_var in
                             let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
                             let st = {st with handlers_functions_mem = (e1,v,new_f_var) :: st.handlers_functions_mem} in
                             st.handlers_functions_ref_mem := (e1,v,new_f_var) :: !(st.handlers_functions_ref_mem) ;
@@ -1029,7 +991,7 @@ and reduce_comp st c =
   in 
   (*
   if c <> c' then
-   Print.debug ~loc:c.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
+   Print.debug ~loc:c.Typedhh "%t : %t@.~~~>@.%t : %t@.\n"
     (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme)
     (Typed.print_computation c') (Scheme.print_dirty_scheme c'.Typed.scheme);*)
   c'
@@ -1132,8 +1094,8 @@ let incr_specialized_count v =
  *)
 
 let alphaeq_handler_no_vc eqvars h h'=
-let (Handler ht) = h.term in
-let (Handler h't) = h'.term in 
+let (Handler ht) = h in
+let (Handler h't) = h' in 
  assoc_equal (alphaeq_abs2 eqvars) ht.effect_clauses h't.effect_clauses
 
 let is_pure c = false
@@ -1143,7 +1105,7 @@ let is_pure_for_handler c clauses = false
 (*   Scheme.is_surely_pure_for_handler c.Typed.scheme (List.map (fun ((eff, _), _) -> eff) clauses) *)
 
 let find_in_handlers_func_mem st f_name h_exp =
-  let loc = h_exp.location in 
+  let loc = h_exphh in 
   let findres_cont_list = List.filter
                   (fun (h,old_f,new_f) -> (f_name == old_f) ) (st.handlers_functions_cont_mem) in 
   let findres = List.filter
@@ -1152,7 +1114,7 @@ let find_in_handlers_func_mem st f_name h_exp =
   |(h,_,newf):: _ -> 
                 if (alphaeq_handler_no_vc [] h h_exp)
                 then begin
-                     let Handler hh = h.term in 
+                     let Handler hh = h in 
                      (true, Some newf, Some hh.value_clause)
                      end
                 else begin
@@ -1168,13 +1130,13 @@ let find_in_handlers_func_mem st f_name h_exp =
             else begin
               if (alphaeq_handler_no_vc [] h h_exp)
               then begin
-                (* Print.debug ~loc:h_exp.Typed.location"ONLY VALUE CLAUSE IS DIFFERENT !! %t" (Typed.print_expression h_exp); *)
-                let Handler hh = h.term in 
+                (* Print.debug ~loc:h_exp.Typedhh"ONLY VALUE CLAUSE IS DIFFERENT !! %t" (Typed.print_expression h_exp); *)
+                let Handler hh = h in 
                 (false,Some newf,Some hh.value_clause)
               end
               else 
                 begin 
-                (* Print.debug ~loc:h_exp.Typed.location"Conflicting specialization call on\n %t \n=====================================\n %t "  (Typed.print_expression h_exp) (Typed.print_expression h); *)
+                (* Print.debug ~loc:h_exp.Typedhh"Conflicting specialization call on\n %t \n=====================================\n %t "  (Typed.print_expression h_exp) (Typed.print_expression h); *)
                 (true,None,None)
                 end
             end
@@ -1189,12 +1151,12 @@ let different_branch_specialized defs st =
   let findresinlocal = fun f_name -> (
                   List.filter
                   (fun (h,old_f,new_f) -> 
-                      let Var vv = new_f.term in 
+                      let Var vv = new_f in 
                       (f_name == vv) )   (st.handlers_functions_mem)) in 
   let findresinglobal = fun f_name -> (
                   List.filter
                   (fun (h,old_f,new_f) -> 
-                      let Var vv = new_f.term in 
+                      let Var vv = new_f in 
                       (f_name == vv) )   !(st.handlers_functions_ref_mem)) in 
   let globalboollist = 
       (List.map (fun (var,abs) ->
@@ -1293,7 +1255,7 @@ let applicable_pattern p vars =
   check_variables (Typed.pattern_vars p)
 
 let is_atomic e =
-  match e.term with | Var _ -> true | Const _ -> true | _ -> false
+  match e with | Var _ -> true | Const _ -> true | _ -> false
 
 let unused x c =
   let vars = Typed.free_vars_comp  c in
@@ -1303,7 +1265,7 @@ let unused x c =
 let refresh_comp c = Typed.refresh_comp [] c
 let refresh_handler h = Typed.refresh_handler [] h
 
-let substitute_var_comp comp vr exp = Typed.subst_comp [(vr, exp.term)] comp
+let substitute_var_comp comp vr exp = Typed.subst_comp [(vr, exp)] comp
 
 let rec substitute_pattern_comp st c p exp =
   optimize_comp st (Typed.subst_comp (Typed.pattern_match p exp) c)
@@ -1334,8 +1296,8 @@ and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
 and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
 
 and optimize_sub_expr st e =
-  let loc = e.location in
-  match e.term with
+  let loc = ehh in
+  match e with
   | Record lst ->
     record ~loc (Common.assoc_map (optimize_expr st) lst)
   | Variant (lbl, e) ->
@@ -1351,8 +1313,8 @@ and optimize_sub_expr st e =
     }
   | (Var _ | Const _ | BuiltIn _ | Effect _) -> e
 and optimize_sub_comp st c =
-  let loc = c.location in
-  match c.term with
+  let loc = chh in
+  match c with
   | Value e ->
     value ~loc (optimize_expr st e)
   
@@ -1364,7 +1326,7 @@ and optimize_sub_comp st c =
       let findresinglobal = fun f_name -> (
                   List.filter
                   (fun (h,old_f,new_f) -> 
-                      let Var vv = new_f.term in 
+                      let Var vv = new_f in 
                       (f_name == vv) )   !(st.handlers_functions_ref_mem)) in 
       begin match findresinglobal var with 
       | [] -> let_rec' ~loc (Common.assoc_map (optimize_abs st) defs) (optimize_comp st c1)
@@ -1397,7 +1359,7 @@ and optimize_abs st {term = (p, c); location = loc} =
 and optimize_abs2 st a2 = a2a2 @@ optimize_abs st @@ a22a @@ a2
 
 and reduce_expr st e =
-  let e' = match e.term with
+  let e' = match e with
 
   | _ when outOfFuel st -> e
 
@@ -1423,14 +1385,14 @@ and reduce_expr st e =
   | _ -> e
   in
   (* if e <> e' then *)
-(*   Print.debug ~loc:e.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
+(*   Print.debug ~loc:e.Typedhh "%t : %t@.~~~>@.%t : %t@.\n"
     (Typed.print_expression e) (Scheme.print_ty_scheme e.Typed.scheme)
     (Typed.print_expression e') (Scheme.print_ty_scheme e'.Typed.scheme); *)
   e'
 
 
 and reduce_comp st c =
-  let c' = match c.term with
+  let c' = match c with
 
   | _ when outOfFuel st -> c
 
@@ -1575,7 +1537,7 @@ and reduce_comp st c =
 
   | Handle (e1, {term = Apply (ae1, ae2)}) ->
     useFuel st;
-    begin match ae1.term with
+    begin match ae1 with
       | Var v ->
             begin match (find_in_handlers_func_mem st v e1) with
              (*function exist,Same handler, same value clause*)
@@ -1583,7 +1545,7 @@ and reduce_comp st c =
                                 let res = apply new_f_exp ae2
                                 in reduce_comp st res
              | (true,Some special_f_exp, Some original_val_clause) ->
-                  let Handler h1 = e1.term in
+                  let Handler h1 = e1 in
                   let h1_v_clause = h1.value_clause in 
                   let orig_vc_lambda = optimize_expr st (lambda (h1_v_clause)) in 
                   let res = apply special_f_exp (tuple [ae2;orig_vc_lambda]) in 
@@ -1595,9 +1557,9 @@ and reduce_comp st c =
                 | Some abs -> 
                   st.optimization_function_specialization := !(st.optimization_function_specialization ) + 1;
                   st.optimization_total := !(st.optimization_total) + 1;
-                  let (let_rec_p,let_rec_c) = abs.term in
+                  let (let_rec_p,let_rec_c) = abs in
                   (* Print.debug "THE ABSTRACTION OF SAME HANDLER DIFF VALUE :- %t" (Typed.print_abstraction abs); *)
-                  let Handler ha = e1.term in 
+                  let Handler ha = e1 in 
                   (* Print.debug "THE VALUE CLAUSE :- %t" (Typed.print_abstraction ha.value_clause); *)
                   let ctx_val, (tyin_val , (tyout_val,drt_val)), cnstrs_val = ha.value_clause.scheme in
                   let continuation_var_scheme = (ctx_val, Type.Arrow(tyin_val , Type.fresh_dirty ()), cnstrs_val) in
@@ -1610,15 +1572,15 @@ and reduce_comp st c =
                       Type.Tuple [ty1 ; Type.Arrow(tyin_val , Type.fresh_dirty ())],
                       Constraints.union cnstrs_val cnstrs1
                     );
-                    location = ae1.location;
+                    location = ae1hh;
                   } in
                   let(newf_ctx,newf_ty,newf_const) = newf_input_tuple_pat.scheme in
                   let (f_ctx,ae1Ty,f_const) = ae1.scheme in
                   let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
-                  let newf_scheme = Scheme.clean_ty_scheme ~loc:c.location (newf_ctx , Type.Arrow (newf_ty, (tyout_val,drt_val)), newf_const) in
+                  let newf_scheme = Scheme.clean_ty_scheme ~loc:chh (newf_ctx , Type.Arrow (newf_ty, (tyout_val,drt_val)), newf_const) in
                   let newf_var, newf_pat = make_var "new_special_var"  newf_scheme in
-                  let Var newfvar = newf_var.term in
-                  let Handler hndlr = e1.term in 
+                  let Var newfvar = newf_var in
+                  let Handler hndlr = e1 in 
                   let vc_var_scheme = (ctx_val,tyin_val,cnstrs_val) in 
                   let vc_var, vc_pat = make_var "vcvar"  vc_var_scheme in
                   let new_value_clause = abstraction vc_pat (apply k_var vc_var) in
@@ -1648,9 +1610,9 @@ and reduce_comp st c =
                   let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
                   let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
                   let constraints = Constraints.list_union [h_const; f_const]
-                                    |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
+                                    |> Constraints.add_dirty_constraint ~loc:chh f_ty_out h_ty_in in
                   let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
-                  let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
+                  let function_scheme = Scheme.clean_ty_scheme ~loc:chh sch in 
                   let f_var, f_pat = refresh_var v function_scheme in
                   let f_def =
                     lambda @@
@@ -1667,17 +1629,17 @@ and reduce_comp st c =
                        | Some abs ->
                             st.optimization_function_specialization := !(st.optimization_function_specialization ) + 1;
                             st.optimization_total := !(st.optimization_total) + 1;
-                            let (let_rec_p,let_rec_c) = abs.term in
+                            let (let_rec_p,let_rec_c) = abs in
                             let (h_ctx,Type.Handler(h_ty_in, (ty_out, drt_out)),h_const) = e1.scheme in
                             let (f_ctx,ae1Ty,f_const) = ae1.scheme in 
                             let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
                             let constraints = Constraints.list_union [h_const; f_const]
-                                  |> Constraints.add_dirty_constraint ~loc:c.location f_ty_out h_ty_in in
+                                  |> Constraints.add_dirty_constraint ~loc:chh f_ty_out h_ty_in in
                             let sch = (h_ctx @ f_ctx, (Type.Arrow(f_ty_in,(ty_out,drt_out))), constraints) in
-                            let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
+                            let function_scheme = Scheme.clean_ty_scheme ~loc:chh sch in 
                             let new_f_var, new_f_pat = refresh_var v function_scheme in
                             let new_handler_call = handle e1 let_rec_c in
-                            let Var newfvar = new_f_var.term in
+                            let Var newfvar = new_f_var in
                             let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
                             let st = {st with handlers_functions_mem = (e1,v,new_f_var) :: st.handlers_functions_mem} in
                             st.handlers_functions_ref_mem := (e1,v,new_f_var) :: !(st.handlers_functions_ref_mem) ;
@@ -1775,7 +1737,7 @@ and reduce_comp st c =
   in 
   (*
   if c <> c' then
-   Print.debug ~loc:c.Typed.location "%t : %t@.~~~>@.%t : %t@.\n"
+   Print.debug ~loc:c.Typedhh "%t : %t@.~~~>@.%t : %t@.\n"
     (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme)
     (Typed.print_computation c') (Scheme.print_dirty_scheme c'.Typed.scheme);*)
   c'

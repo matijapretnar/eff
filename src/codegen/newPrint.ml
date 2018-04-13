@@ -61,7 +61,7 @@ let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match p.Erasure.term with
+  match p with
   | Erasure.PEVar x -> print "%t" (print_variable x)
   | Erasure.PEAs (p, x) ->
       print "%t as %t" (print_pattern p) (print_variable x)
@@ -70,7 +70,7 @@ let rec print_pattern ?max_level p ppf =
   | Erasure.PERecord lst -> Print.record print_pattern lst ppf
   | Erasure.PEVariant (lbl, None) when lbl = OldUtils.nil -> print "[]"
   | Erasure.PEVariant (lbl, None) -> print "%s" lbl
-  | Erasure.PEVariant ("(::)", Some {Erasure.term= Erasure.PETuple [p1; p2]}) ->
+  | Erasure.PEVariant ("(::)", Some Erasure.PETuple [p1; p2]) ->
       print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
   | Erasure.PEVariant (lbl, Some p) ->
       print ~at_level:1 "(%s %t)" lbl (print_pattern p)
@@ -83,7 +83,7 @@ let rec print_pattern ?max_level p ppf =
 
 let rec print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match e.Erasure.term with
+  match e with
   | Erasure.EVar x -> print "%t" (print_variable x)
   | Erasure.EBuiltIn (s, n) ->
       if n = 1 then print ~at_level:1 "lift_unary %s" s
@@ -95,7 +95,7 @@ let rec print_expression ?max_level e ppf =
   | Erasure.EVariant (lbl, None) -> print "%s" lbl
   | Erasure.EVariant (lbl, Some e) ->
       print ~at_level:1 "(%s %t)" lbl (print_expression e)
-  | Erasure.ELambda {term= x, _, c} ->
+  | Erasure.ELambda (x, _, c) ->
       print "fun (%t) -> %t" (print_pattern x) (print_computation c)
   | Erasure.EEffect eff -> print ~at_level:2 "effect %t" (print_effect eff)
   | Erasure.EHandler h ->
@@ -108,7 +108,7 @@ let rec print_expression ?max_level e ppf =
 
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c.Erasure.term with
+  match c with
   | Erasure.EValue e ->
       print ~at_level:1 "%t" (print_expression ~max_level:0 e)
   | Erasure.ELetVal (p, e, c) ->
@@ -126,7 +126,7 @@ and print_computation ?max_level c ppf =
       print ~at_level:1 "call %t %t (fun %t)" (print_effect eff)
         (print_expression ~max_level:0 e)
         (print_abstraction_with_ty a)
-  | Erasure.EBind (c1, {Erasure.term= p, c2}) ->
+  | Erasure.EBind (c1, (p, c2)) ->
       print ~at_level:2 "let %t = %t in %t" (print_pattern p)
         (print_computation c1) (print_computation c2)
   | Erasure.EMatch (e, alist) ->
@@ -141,7 +141,7 @@ and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match eff_clauses with
   | [] -> print "| eff' -> fun arg k -> Call (eff', arg, k)"
-  | (((eff_name, (t1, t2)) as eff), {Erasure.term= p1, p2, c}) :: cases ->
+  | (((eff_name, (t1, t2)) as eff), (p1, p2, c)) :: cases ->
       print ~at_level:1
         "| %t -> (fun (%t : %t) (%t : %t -> _ computation) -> %t) %t"
         (print_effect eff) (print_pattern p1) (Types.print_target_ty t1)
@@ -152,14 +152,14 @@ and print_cases cases ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match cases with
   | [] -> ()
-  | {term= p, c} :: cases ->
+  | (p, c) :: cases ->
       print ~at_level:1 "| %t -> %t %t" (print_pattern p) (print_computation c)
         (print_cases cases)
 
-and print_abstraction {Erasure.term= p, c} ppf =
+and print_abstraction (p, c) ppf =
   Format.fprintf ppf "%t -> %t" (print_pattern p) (print_computation c)
 
-and print_abstraction_with_ty {Erasure.term= p, _, c} ppf =
+and print_abstraction_with_ty (p, _, c) ppf =
   Format.fprintf ppf "%t -> %t" (print_pattern p) (print_computation c)
 
 (* and print_let_abstraction (p, c) ppf =

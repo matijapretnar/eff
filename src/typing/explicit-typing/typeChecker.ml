@@ -255,7 +255,7 @@ and type_of_dirt_coercion st dirt_coer =
 
 
 let rec extend_pattern_types st p ty =
-  match p.term with
+  match p with
   | PVar x -> extend_var_types st x ty
   | PNonbinding -> st
   | PConst c ->
@@ -290,12 +290,11 @@ let rec type_of_expression st e =
   | Lambda abs ->
       let ty1, c_ty = type_of_abstraction_with_ty st abs in
       Types.Arrow (ty1, c_ty)
-  | Tuple es ->
-      Types.Tuple (List.map (fun e -> type_of_expression st e.term) es)
+  | Tuple es -> Types.Tuple (List.map (fun e -> type_of_expression st e) es)
   | Variant (lbl, e) ->
       let loc = Location.unknown in
       let ty_in, ty_out = Types.constructor_signature lbl in
-      let u' = type_of_expression st e.term in
+      let u' = type_of_expression st e in
       assert (Types.types_are_equal u' ty_in) ;
       ty_out
   | Effect (eff, (eff_in, eff_out)) ->
@@ -304,37 +303,37 @@ let rec type_of_expression st e =
   | Handler h -> type_of_handler st h
   | BigLambdaTy (ty_param, skel, e1) ->
       let st' = extend_ty_param_skeletons st ty_param skel in
-      let e1_ty = type_of_expression st' e1.term in
+      let e1_ty = type_of_expression st' e1 in
       TySchemeTy (ty_param, skel, e1_ty)
   | BigLambdaSkel (skel_param, e1) ->
       let st' = extend_skel_params st skel_param in
-      let e1_ty = type_of_expression st' e1.term in
+      let e1_ty = type_of_expression st' e1 in
       TySchemeSkel (skel_param, e1_ty)
   | BigLambdaDirt (dirt_param, e1) ->
       let st' = extend_dirt_params st dirt_param in
-      let e1_ty = type_of_expression st' e1.term in
+      let e1_ty = type_of_expression st' e1 in
       TySchemeDirt (dirt_param, e1_ty)
   | CastExp (e1, tc1) ->
-      let e1_ty = type_of_expression st e1.term in
+      let e1_ty = type_of_expression st e1 in
       let tc1a, tc1b = type_of_ty_coercion st tc1 in
       assert (Types.types_are_equal tc1a e1_ty) ;
       tc1b
   | ApplyTyExp (e1, tty) -> (
-    match type_of_expression st e1.term with
+    match type_of_expression st e1 with
     | Types.TySchemeTy (p_e1, skel, ty_e1) ->
         check_well_formed_ty st tty ;
         let sub = Unification.TyParamToTy (p_e1, tty) in
         Unification.apply_sub_ty sub ty_e1
     | _ -> assert false )
   | ApplySkelExp (e1, sk) -> (
-    match type_of_expression st e1.term with
+    match type_of_expression st e1 with
     | Types.TySchemeSkel (p_e1, ty_e1) ->
         check_well_formed_skeleton st sk ;
         let sub = Unification.SkelParamToSkel (p_e1, sk) in
         Unification.apply_sub_ty sub ty_e1
     | _ -> assert false )
   | ApplyDirtExp (e1, d1) -> (
-    match type_of_expression st e1.term with
+    match type_of_expression st e1 with
     | Types.TySchemeDirt (p_e1, ty_e1) ->
         check_well_formed_dirt st d1 ;
         let sub = Unification.DirtVarToDirt (p_e1, d1) in
@@ -342,24 +341,24 @@ let rec type_of_expression st e =
     | _ -> assert false )
   | LambdaTyCoerVar (tcp1, ct_ty1, e1) ->
       let st' = extend_ty_coer_types st tcp1 ct_ty1 in
-      let e1_ty = type_of_expression st' e1.term in
+      let e1_ty = type_of_expression st' e1 in
       check_well_formed_ty_cons st ct_ty1 ;
       Types.QualTy (ct_ty1, e1_ty)
   | LambdaDirtCoerVar (dcp1, ct_dirt1, e1) ->
       let st' = extend_dirt_coer_types st dcp1 ct_dirt1 in
-      let e1_ty = type_of_expression st' e1.term in
+      let e1_ty = type_of_expression st' e1 in
       check_well_formed_dirt_cons st ct_dirt1 ;
       Types.QualDirt (ct_dirt1, e1_ty)
   | ApplyTyCoercion (e1, tc1) -> (
       let tc1' = type_of_ty_coercion st tc1 in
-      match type_of_expression st e1.term with
+      match type_of_expression st e1 with
       | QualTy (cons, e1_ty) ->
           assert (tc1' = cons) ;
           e1_ty
       | _ -> assert false )
   | ApplyDirtCoercion (e1, dc1) -> (
       let dc1' = type_of_dirt_coercion st dc1 in
-      match type_of_expression st e1.term with
+      match type_of_expression st e1 with
       | QualDirt (cons, e1_ty) ->
           assert (dc1' = cons) ;
           e1_ty
@@ -369,15 +368,15 @@ let rec type_of_expression st e =
 and type_of_computation st c =
   match c with
   | Value e ->
-      let ty1 = type_of_expression st e.term in
+      let ty1 = type_of_expression st e in
       (ty1, Types.empty_dirt)
   | LetVal (e1, abs) ->
-      let t_v = type_of_expression st e1.term
+      let t_v = type_of_expression st e1
       and ty_in, ty_out = type_of_abstraction_with_ty st abs in
       assert (Types.types_are_equal t_v ty_in) ;
       ty_out
   | Match (e, alist) -> (
-      let t_e = type_of_expression st e.term in
+      let t_e = type_of_expression st e in
       let ty_list = List.map (type_of_abstraction st t_e) alist in
       match ty_list with
       | [] -> assert false
@@ -385,53 +384,53 @@ and type_of_computation st c =
           assert (List.for_all (Types.dirty_types_are_equal dty) dtys) ;
           dty )
   | Apply (e1, e2) -> (
-    match type_of_expression st e1.term with
+    match type_of_expression st e1 with
     | Types.Arrow (ty1, dty1) ->
-        let ty_e2 = type_of_expression st e2.term in
+        let ty_e2 = type_of_expression st e2 in
         assert (Types.types_are_equal ty1 ty_e2) ;
         dty1
     | _ -> assert false )
   | Handle (e1, c1) -> (
-    match type_of_expression st e1.term with
+    match type_of_expression st e1 with
     | Types.Handler (dty1, dty2) ->
-        let ty_c1 = type_of_computation st c1.term in
+        let ty_c1 = type_of_computation st c1 in
         assert (Types.dirty_types_are_equal dty1 ty_c1) ;
         dty2
     | _ -> assert false )
   | Call ((eff, (eff_in, eff_out)), e2, abs) ->
-      let e2_ty = type_of_expression st e2.term in
+      let e2_ty = type_of_expression st e2 in
       assert (Types.types_are_equal e2_ty eff_in) ;
-      let p, ty_eff, c1 = abs.term in
+      let p, ty_eff, c1 = abs in
       let st' = extend_pattern_types st p eff_out in
-      let final_ty, final_dirt = type_of_computation st' c1.term in
+      let final_ty, final_dirt = type_of_computation st' c1 in
       assert (Types.EffectSet.mem eff final_dirt.Types.effect_set) ;
       (final_ty, final_dirt)
   | Bind (c1, a1) ->
-      let c1_ty, c1_drt = type_of_computation st c1.term in
-      let p, c2 = a1.term in
+      let c1_ty, c1_drt = type_of_computation st c1 in
+      let p, c2 = a1 in
       let st' = extend_pattern_types st p c1_ty in
-      let c2_ty, c2_drt = type_of_computation st' c2.term in
+      let c2_ty, c2_drt = type_of_computation st' c2 in
       assert (Types.dirts_are_equal c1_drt c2_drt) ;
       (c2_ty, c2_drt)
   | CastComp (c1, dc) ->
-      let c1_drty_ty = type_of_computation st c1.term in
+      let c1_drty_ty = type_of_computation st c1 in
       let dc11, dc2 = type_of_dirty_coercion st dc in
       assert (Types.dirty_types_are_equal c1_drty_ty dc11) ;
       dc2
   | LetRec ([(var, ty, e1)], c1) ->
       let st' = extend_var_types st var ty in
-      assert (Types.types_are_equal ty (type_of_expression st' e1.term)) ;
-      type_of_computation st' c1.term
+      assert (Types.types_are_equal ty (type_of_expression st' e1)) ;
+      type_of_computation st' c1
   | _ -> failwith __LOC__
 
 and type_of_handler st h =
   let tv, type_cv = type_of_abstraction_with_ty st h.value_clause in
   let mapper (effe, abs2) =
     let eff, (in_op_ty, out_op_ty) = effe in
-    let x, y, c_op = abs2.term in
+    let x, y, c_op = abs2 in
     let st' = extend_pattern_types st x in_op_ty in
     let st'' = extend_pattern_types st' y (Types.Arrow (out_op_ty, type_cv)) in
-    let ty_op = type_of_computation st'' c_op.term in
+    let ty_op = type_of_computation st'' c_op in
     assert (Types.dirty_types_are_equal type_cv ty_op) ;
     eff
   in
@@ -441,11 +440,11 @@ and type_of_handler st h =
   let input_dirt = Types.add_effects handlers_ops_set d_cv in
   Types.Handler ((tv, input_dirt), type_cv)
 
-and type_of_abstraction st ty {term= pv, cv} =
+and type_of_abstraction st ty (pv, cv) =
   let st' = extend_pattern_types st pv ty in
-  type_of_computation st' cv.term
+  type_of_computation st' cv
 
-and type_of_abstraction_with_ty st {term= pv, tv, cv} =
+and type_of_abstraction_with_ty st (pv, tv, cv) =
   check_well_formed_ty st tv ;
   let st' = extend_pattern_types st pv tv in
-  (tv, type_of_computation st' cv.term)
+  (tv, type_of_computation st' cv)

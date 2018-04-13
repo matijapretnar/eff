@@ -169,13 +169,7 @@ and apply_sub_dirtycoer sub dirty_coer =
 
 
 let rec apply_sub_comp sub c =
-  let c' = apply_sub_plain_comp sub c in
-  Print.debug "apply_sub_comp: %t %t" (print_sub sub) (print_computation c) ;
-  Typed.annotate c' c.location
-
-
-and apply_sub_plain_comp sub c =
-  match c.term with
+  match c with
   | Value e -> Value (apply_sub_exp sub e)
   | LetVal (e1, abs) ->
       LetVal (apply_sub_exp sub e1, apply_sub_abs_with_ty sub abs)
@@ -199,14 +193,8 @@ and apply_sub_plain_comp sub c =
       CastComp_dirt (apply_sub_comp sub c1, apply_sub_dirtcoer sub tc1)
 
 
-and apply_sub_exp sub exp =
-  let e' = apply_sub_plain_exp sub exp in
-  Print.debug "apply_sub_exp: %t %t" (print_sub sub) (print_expression exp) ;
-  Typed.annotate e' exp.location
-
-
-and apply_sub_plain_exp sub e =
-  match e.term with
+and apply_sub_exp sub e =
+  match e with
   | Var v -> Var v
   | BuiltIn (s, i) -> BuiltIn (s, i)
   | Const c -> Const c
@@ -245,20 +233,13 @@ and apply_sub_plain_exp sub e =
       ApplySkelExp (apply_sub_exp sub e1, apply_sub_skel sub s1)
 
 
-and apply_sub_abs sub abs =
-  let p, c = abs.term in
-  annotate (p, apply_sub_comp sub c) abs.location
+and apply_sub_abs sub (p, c) = (p, apply_sub_comp sub c)
+
+and apply_sub_abs_with_ty sub (p, t, c) =
+  (p, apply_sub_ty sub t, apply_sub_comp sub c)
 
 
-and apply_sub_abs_with_ty sub abs =
-  let p, t, c = abs.term in
-  annotate (p, apply_sub_ty sub t, apply_sub_comp sub c) abs.location
-
-
-and apply_sub_abs2 sub abs2 =
-  let p1, p2, c = abs2.term in
-  annotate (p1, p2, apply_sub_comp sub c) abs2.location
-
+and apply_sub_abs2 sub (p1, p2, c) = (p1, p2, apply_sub_comp sub c)
 
 and apply_sub_handler sub h =
   let eff_clauses = h.effect_clauses in

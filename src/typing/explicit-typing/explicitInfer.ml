@@ -40,10 +40,7 @@ let add_effect eff (ty1, ty2) st =
 
 (* INFERENCE *)
 
-let rec type_pattern p =
-  { Typed.term= type_plain_pattern p.Untyped.term
-  ; Typed.location= p.Untyped.location }
-
+let rec type_pattern p = type_plain_pattern p.Untyped.term
 
 and type_plain_pattern = function
   | Untyped.PVar x -> Typed.PVar x
@@ -74,14 +71,10 @@ and type_plain_pattern = function
 
  *)
 let rec type_typed_pattern in_cons st pat ty =
-  let pat', st', out_cons =
-    type_plain_typed_pattern in_cons st pat.Untyped.term ty
-  in
-  ({Typed.term= pat'; Typed.location= pat.Untyped.location}, st', out_cons)
+  type_plain_typed_pattern in_cons st pat.Untyped.term ty
 
 
 and type_plain_typed_pattern in_cons st pat ty =
-  let loc = Location.unknown in
   match pat with
   | Untyped.PVar x ->
       let st' = add_def st x ty in
@@ -96,11 +89,7 @@ and type_plain_typed_pattern in_cons st pat ty =
       let _omega, q = Typed.fresh_ty_coer (ty_out, ty) in
       let cons' = q :: in_cons in
       match p with
-      | None ->
-          ( Typed.PVariant
-              (lbl, Typed.annotate (Typed.PTuple []) Location.unknown)
-          , st
-          , cons' )
+      | None -> (Typed.PVariant (lbl, Typed.PTuple []), st, cons')
       | Some p ->
           let p', st', cons'' = type_typed_pattern cons' st p ty_in in
           (Typed.PVariant (lbl, p'), st', cons') )
@@ -284,47 +273,36 @@ let apply_types alphas_has_skels skel_subs ty_subs dirt_subs bind_tyco_subs
   in
   let skel_apps =
     List.fold_left
-      (fun a (_, b) ->
-        Typed.annotate (Typed.ApplySkelExp (a, Types.SkelParam b))
-          Location.unknown )
-      (Typed.annotate (Typed.Var var) Location.unknown)
-      skel_subs
+      (fun a (_, b) -> Typed.ApplySkelExp (a, Types.SkelParam b))
+      (Typed.Var var) skel_subs
   in
   let ty_apps =
     List.fold_left
-      (fun a (_, b) ->
-        Typed.annotate (Typed.ApplyTyExp (a, Types.TyParam b)) Location.unknown
-        )
+      (fun a (_, b) -> Typed.ApplyTyExp (a, Types.TyParam b))
       skel_apps ty_subs
   in
   let dirt_apps =
     List.fold_left
-      (fun a (_, b) ->
-        Typed.annotate (Typed.ApplyDirtExp (a, Types.no_effect_dirt b))
-          Location.unknown )
+      (fun a (_, b) -> Typed.ApplyDirtExp (a, Types.no_effect_dirt b))
       ty_apps dirt_subs
   in
   let ty_cons, dirt_cons = get_applied_cons_from_ty ty_subs dirt_subs ty_sch in
   let ty_cons_apps =
     List.fold_left
       (fun a (Typed.TyOmega (omega, _)) ->
-        Typed.annotate (Typed.ApplyTyCoercion (a, Typed.TyCoercionVar omega))
-          Location.unknown )
+        Typed.ApplyTyCoercion (a, Typed.TyCoercionVar omega) )
       dirt_apps ty_cons
   in
   let dirt_cons_apps =
     List.fold_left
       (fun a (Typed.DirtOmega (omega, _)) ->
-        Typed.annotate
-          (Typed.ApplyDirtCoercion (a, Typed.DirtCoercionVar omega))
-          Location.unknown )
+        Typed.ApplyDirtCoercion (a, Typed.DirtCoercionVar omega) )
       ty_cons_apps dirt_cons
   in
   (dirt_cons_apps, skel_constraints @ ty_cons @ dirt_cons)
 
 
-let rec type_expression in_cons st
-    ({Untyped.term= expr; Untyped.location= loc} as e) =
+let rec type_expression in_cons st ({Untyped.term= expr} as e) =
   Print.debug "type_expression: %t" (CoreSyntax.print_expression e) ;
   Print.debug "### Constraints Before ###" ;
   Unification.print_c_list in_cons ;
@@ -335,7 +313,7 @@ let rec type_expression in_cons st
   Print.debug "### Constraints After ####" ;
   Unification.print_c_list constraints ;
   Print.debug "##########################" ;
-  (Typed.annotate e loc, ttype, constraints, sub_list)
+  (e, ttype, constraints, sub_list)
 
 
 and type_plain_expression in_cons st = function
@@ -361,7 +339,7 @@ and type_plain_expression in_cons st = function
         Print.debug "original_type: %t" (Types.print_target_ty ty_schi) ;
         Print.debug "returned_type: %t"
           (Types.print_target_ty applied_basic_type) ;
-        (returned_x.term, applied_basic_type, returnd_cons @ in_cons, [])
+        (returned_x, applied_basic_type, returnd_cons @ in_cons, [])
     | None ->
         Print.debug "Variable not found: %t" (Typed.print_variable x) ;
         assert false )
@@ -390,15 +368,9 @@ and type_plain_expression in_cons st = function
       (target_terms, target_types, in_cons @ target_cons, target_sub)
   | Untyped.Record lst -> failwith __LOC__
   | Untyped.Variant (lbl, e) -> (
-      let loc = Location.unknown in
       let ty_in, ty_out = Types.constructor_signature lbl in
       match e with
-      | None ->
-          ( Typed.Variant
-              (lbl, Typed.annotate (Typed.Tuple []) Location.unknown)
-          , ty_out
-          , in_cons
-          , [] )
+      | None -> (Typed.Variant (lbl, Typed.Tuple []), ty_out, in_cons, [])
       | Some e ->
           let e', u', cons', subs = type_expression in_cons st e in
           let e'', cast_cons = cast_expression e' u' ty_in in
@@ -502,21 +474,18 @@ and type_plain_expression in_cons st = function
       and omega_2, omega_cons_2 = Typed.fresh_dirt_coer cons_2 in
       let y_var_name = Typed.Variable.fresh "fresh_var" in
       let y = Typed.PVar y_var_name in
-      let annot_y = Typed.annotate y Location.unknown in
-      let exp_y = Typed.annotate (Typed.Var y_var_name) Location.unknown in
+      let annot_y = y in
+      let exp_y = Typed.Var y_var_name in
       let coerced_y, omega_cons_6 =
         Typed.cast_expression exp_y in_ty
           (Unification.apply_substitution_ty (target_cr_sub @ subs_n) r_ty)
       in
       let substituted_c_r =
-        Typed.subst_comp [(x, coerced_y.term)]
+        Typed.subst_comp [(x, coerced_y)]
           (Unification.apply_substitution subs_n target_cr_term)
       in
       let coerced_substiuted_c_r =
-        Typed.annotate
-          (Typed.CastComp
-             (substituted_c_r, Typed.BangCoercion (omega_1, omega_2)))
-          Location.unknown
+        Typed.CastComp (substituted_c_r, Typed.BangCoercion (omega_1, omega_2))
       in
       let mapper (op_term, (op_term_ty, op_term_dirt), (alpha_i, delta_i))
           (eff, abs2) =
@@ -541,13 +510,13 @@ and type_plain_expression in_cons st = function
         let omega_4, omega_cons_4 = Typed.fresh_dirt_coer cons_4 in
         let l_var_name = Typed.Variable.fresh "fresh_var" in
         let l = Typed.PVar l_var_name in
-        let annot_l = Typed.annotate l Location.unknown in
-        let exp_l = Typed.annotate (Typed.Var l_var_name) Location.unknown in
+        let annot_l = l in
+        let exp_l = Typed.Var l_var_name in
         let coerced_l, omega_cons_5 =
           Typed.cast_expression exp_l cons_5a cons_5b
         in
         let substituted_c_op =
-          Typed.subst_comp [(k_var, coerced_l.term)]
+          Typed.subst_comp [(k_var, coerced_l)]
             (Unification.apply_substitution subs_n op_term)
         in
         Print.debug "substituted_c_op [%t/%t]: %t"
@@ -555,10 +524,8 @@ and type_plain_expression in_cons st = function
           (CoreSyntax.Variable.print ~safe:true k_var)
           (Typed.print_computation substituted_c_op) ;
         let coerced_substiuted_c_op =
-          Typed.annotate
-            (Typed.CastComp
-               (substituted_c_op, Typed.BangCoercion (omega_3, omega_4)))
-            Location.unknown
+          Typed.CastComp
+            (substituted_c_op, Typed.BangCoercion (omega_3, omega_4))
         in
         let target_effect = (eff, (in_op_ty, out_op_ty)) in
         ( ( target_effect
@@ -590,9 +557,7 @@ and type_plain_expression in_cons st = function
       let target_handler =
         {Typed.effect_clauses= new_op_clauses; value_clause= typed_value_clause}
       in
-      let typed_handler =
-        Typed.annotate (Typed.Handler target_handler) Location.unknown
-      in
+      let typed_handler = Typed.Handler target_handler in
       let for_set_handlers_ops =
         List.map (fun ((eff, (_, _)), _) -> eff) new_op_clauses
       in
@@ -632,11 +597,11 @@ and type_plain_expression in_cons st = function
       (coerced_handler, target_type, all_cons, subs_n @ target_cr_sub)
 
 
-and type_computation in_cons st {Untyped.term= comp; Untyped.location= loc} =
+and type_computation in_cons st {Untyped.term= comp} =
   let c, ttype, constraints, sub_list =
     type_plain_computation in_cons st comp
   in
-  (Typed.annotate c loc, ttype, constraints, sub_list)
+  (c, ttype, constraints, sub_list)
 
 
 and type_plain_computation in_cons st = function
@@ -770,43 +735,32 @@ and type_plain_computation in_cons st = function
             List.fold_right
               (fun cons acc ->
                 match cons with
-                | Typed.TyOmega (om, t) ->
-                    Typed.annotate (Typed.LambdaTyCoerVar (om, t, acc))
-                      typed_c2.location
+                | Typed.TyOmega (om, t) -> Typed.LambdaTyCoerVar (om, t, acc)
                 | Typed.DirtOmega (om, t) ->
-                    Typed.annotate (Typed.LambdaDirtCoerVar (om, t, acc))
-                      typed_c2.location )
+                    Typed.LambdaDirtCoerVar (om, t, acc) )
               split_cons1 typed_e1
           in
           let var_exp_dirt_lamda =
             List.fold_right
-              (fun cons acc ->
-                Typed.annotate (Typed.BigLambdaDirt (cons, acc))
-                  typed_c2.location )
+              (fun cons acc -> Typed.BigLambdaDirt (cons, acc))
               split_dirt_vars var_exp
           in
           let var_exp_ty_lambda =
             List.fold_right
               (fun cons acc ->
-                Typed.annotate
-                  (Typed.BigLambdaTy
-                     (cons, Unification.get_skel_of_tyvar cons cons_e1', acc))
-                  typed_c2.location )
+                Typed.BigLambdaTy
+                  (cons, Unification.get_skel_of_tyvar cons cons_e1', acc) )
               split_ty_vars var_exp_dirt_lamda
           in
           let var_exp_skel_lamda =
             List.fold_right
-              (fun cons acc ->
-                Typed.annotate (Typed.BigLambdaSkel (cons, acc))
-                  typed_c2.location )
+              (fun cons acc -> Typed.BigLambdaSkel (cons, acc))
               split_skel_vars var_exp_ty_lambda
           in
           let return_term =
             Typed.LetVal
               ( var_exp_skel_lamda
-              , Typed.abstraction_with_ty
-                  (Typed.annotate (Typed.PVar x) p_def.Untyped.location)
-                  ty_sc_skel typed_c2 )
+              , Typed.abstraction_with_ty (Typed.PVar x) ty_sc_skel typed_c2 )
           in
           (return_term, type_c2, cons_c2, subs_c2 @ sub_e1' @ sub_e1)
       | _ ->
@@ -832,9 +786,7 @@ and type_plain_computation in_cons st = function
                   (type_c2, new_dirt_var)
               in
               let typed_pattern = type_pattern p_def in
-              let abstraction =
-                Typed.annotate (typed_pattern, coer_c2) typed_c2.location
-              in
+              let abstraction = (typed_pattern, coer_c2) in
               let constraints = [omega_cons_1; omega_cons_2] @ cons_c2 in
               ( Typed.Bind (coer_c1, abstraction)
               , (type_c2, new_dirt_var)
@@ -858,9 +810,7 @@ and type_plain_computation in_cons st = function
                   (type_c2, new_dirt_var)
               in
               let typed_pattern = type_pattern p_def in
-              let abstraction =
-                Typed.annotate (typed_pattern, coer_c2) typed_c2.location
-              in
+              let abstraction = (typed_pattern, coer_c2) in
               let constraints = [omega_cons_1; omega_cons_2] @ cons_c2 in
               ( Typed.Bind (coer_c1, abstraction)
               , (type_c2, new_dirt_var)
@@ -935,29 +885,17 @@ and type_plain_computation in_cons st = function
               (fun e q ->
                 match q with
                 | Typed.TyOmega (tycovar, ct) ->
-                    Typed.annotate
-                      (Typed.ApplyTyCoercion (e, TyCoercionVar tycovar))
-                      Location.unknown
+                    Typed.ApplyTyCoercion (e, TyCoercionVar tycovar)
                 | Typed.DirtOmega (dcovar, ct) ->
-                    Typed.annotate
-                      (Typed.ApplyDirtCoercion (e, DirtCoercionVar dcovar))
-                      Location.unknown )
+                    Typed.ApplyDirtCoercion (e, DirtCoercionVar dcovar) )
               (List.fold_left
-                 (fun e dv ->
-                   Typed.annotate
-                     (Typed.ApplyDirtExp (e, Types.no_effect_dirt dv))
-                     Location.unknown )
+                 (fun e dv -> Typed.ApplyDirtExp (e, Types.no_effect_dirt dv))
                  (List.fold_left
-                    (fun e tv ->
-                      Typed.annotate (Typed.ApplyTyExp (e, Types.TyParam tv))
-                        Location.unknown )
+                    (fun e tv -> Typed.ApplyTyExp (e, Types.TyParam tv))
                     (List.fold_left
                        (fun e skv ->
-                         Typed.annotate
-                           (Typed.ApplySkelExp (e, Types.SkelParam skv))
-                           Location.unknown )
-                       (Typed.annotate (Typed.Var var) Location.unknown)
-                       skvars)
+                         Typed.ApplySkelExp (e, Types.SkelParam skv) )
+                       (Typed.Var var) skvars)
                     tyvars)
                  dirtvars)
               cons4
@@ -974,39 +912,28 @@ and type_plain_computation in_cons st = function
         (* σ₃(Λςs.Λ(αs:τs).Λδѕ.λ(ωs:πs).fun x : σ₃(σ₂(σ₁(α))) -> c₁'') *)
         Unification.apply_substitution_exp sub_s3
           (List.fold_right
-             (fun skvar e ->
-               Typed.annotate (Typed.BigLambdaSkel (skvar, e)) c1''.location )
+             (fun skvar e -> Typed.BigLambdaSkel (skvar, e))
              skvars
              (List.fold_right
                 (fun tyvar e ->
-                  Typed.annotate
-                    (Typed.BigLambdaTy
-                       (tyvar, Unification.get_skel_of_tyvar tyvar cons3, e))
-                    c1''.location )
+                  Typed.BigLambdaTy
+                    (tyvar, Unification.get_skel_of_tyvar tyvar cons3, e) )
                 tyvars
                 (List.fold_right
-                   (fun dirtvar e ->
-                     Typed.annotate (Typed.BigLambdaDirt (dirtvar, e))
-                       c1''.location )
+                   (fun dirtvar e -> Typed.BigLambdaDirt (dirtvar, e))
                    dirtvars
                    (List.fold_right
                       (fun q e ->
                         match q with
                         | Typed.TyOmega (tycovar, ct) ->
-                            Typed.annotate
-                              (Typed.LambdaTyCoerVar (tycovar, ct, e))
-                              c1''.location
+                            Typed.LambdaTyCoerVar (tycovar, ct, e)
                         | Typed.DirtOmega (dcovar, ct) ->
-                            Typed.annotate
-                              (Typed.LambdaDirtCoerVar (dcovar, ct, e))
-                              c1''.location )
+                            Typed.LambdaDirtCoerVar (dcovar, ct, e) )
                       cons4
-                      (Typed.annotate
-                         (Typed.Lambda
-                            (Typed.abstraction_with_ty pat'
-                               (Unification.apply_substitution_ty sub_s2 ty_a')
-                               c1''))
-                         c1''.location)))))
+                      (Typed.Lambda
+                         (Typed.abstraction_with_ty pat'
+                            (Unification.apply_substitution_ty sub_s2 ty_a')
+                            c1''))))))
       in
       ( Typed.LetRec ([(var, ty_f', e_f)], c2')
       , dty2
@@ -1055,9 +982,7 @@ and type_case in_cons st case ty_in (ty_out, dirt_out) =
   let p', st', cons1 = type_typed_pattern in_cons st p ty_in in
   let c', (ty_c, dirt_c), cons2, sublist = type_computation cons1 st' c in
   let c'', q = Typed.cast_computation c' (ty_c, dirt_c) (ty_out, dirt_out) in
-  ( {Typed.term= (p', c''); Typed.location= c''.Typed.location}
-  , q :: cons2
-  , sublist )
+  ((p', c''), q :: cons2, sublist)
 
 
 (* Finalize a list of constraints, setting all dirt variables to the empty set. *)
@@ -1125,19 +1050,19 @@ let type_toplevel ~loc st c =
     let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,Types.PrimSkel Types.IntTy,acc)) split_ty_vars ty_sc_dirt in  
     let var_exp = List.fold_right(fun cons acc -> 
                                           begin match cons with 
-                                          | Typed.TyOmega(om,t) -> Typed.annotate (Typed.LambdaTyCoerVar (om,t,acc)) Location.unknown
-                                          | Typed.DirtOmega(om,t) -> Typed.annotate(Typed.LambdaDirtCoerVar(om,t,acc)) Location.unknown
+                                          | Typed.TyOmega(om,t) ->  (Typed.LambdaTyCoerVar (om,t,acc)) 
+                                          | Typed.DirtOmega(om,t) -> (Typed.LambdaDirtCoerVar(om,t,acc)) 
                                           end 
                                       ) split_cons1 et' in 
     let var_exp_dirt_lamda = 
-      List.fold_right (fun cons acc -> Typed.annotate ( Typed.BigLambdaDirt (cons,acc) ) Location.unknown )  split_dirt_vars var_exp in
+      List.fold_right (fun cons acc ->  ( Typed.BigLambdaDirt (cons,acc) )  )  split_dirt_vars var_exp in
     let var_exp_ty_lambda = 
-      List.fold_right (fun cons acc -> Typed.annotate (Typed.BigLambdaTy (cons,acc) )Location.unknown ) split_ty_vars var_exp_dirt_lamda in
+      List.fold_right (fun cons acc ->  (Typed.BigLambdaTy (cons,acc) ) ) split_ty_vars var_exp_dirt_lamda in
     Print.debug "New Expr : %t" (Typed.print_expression var_exp_ty_lambda);
     Print.debug "New Expr ty : %t" (Types.print_target_ty ty_sc_ty);
     let tch_ty = TypeChecker.type_check_exp (TypeChecker.new_checker_state) var_exp_ty_lambda.term in
     Print.debug "Type from Type Checker : %t" (Types.print_target_ty tch_ty);
-    (Typed.annotate (Typed.Value var_exp_ty_lambda) Location.unknown), st *)
+    ( (Typed.Value var_exp_ty_lambda) ), st *)
   | _
   ->
     let ct, (ttype, dirt), constraints, sub_list = type_computation [] st c in
