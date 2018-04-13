@@ -211,8 +211,7 @@ and apply_sub_plain_exp sub e =
   | BuiltIn (s, i) -> BuiltIn (s, i)
   | Const c -> Const c
   | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
-  | Record r -> Record r
-  | Variant (lbl, e1) -> Variant (lbl, e1)
+  | Variant (lbl, e1) -> Variant (lbl, apply_sub_exp sub e1)
   | Lambda abs -> Lambda (apply_sub_abs_with_ty sub abs)
   | Effect eff -> Effect eff
   | Handler h -> Handler (apply_sub_handler sub h)
