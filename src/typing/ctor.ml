@@ -158,7 +158,7 @@ let letrecbinding ?loc defs c =
   ) in
   let term = Typed.LetRec (defs, c) in
   (* let defs, poly_tyschs, change = let_rec_defs ~loc defs in *)
-  let sch = c.Typed.scheme in
+  let sch = Scheme.letrecbinding ~loc c.Typed.scheme in
   Typed.annotate term sch loc
 
 let bind ?loc c1 c2 =

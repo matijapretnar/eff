@@ -25,6 +25,7 @@ let rec exec_cmd ppf st cmd =
   let loc = cmd.Untyped.location in
   match cmd.Untyped.term with
   | Untyped.Computation c ->
+      (* PrintUntyped.print_computation c ppf; *)
       let ct, typing = Infer.type_comp st.typing c in
       (* Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme ct.Typed.scheme); *)
       let v = Eval.run st.runtime c in

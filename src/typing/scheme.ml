@@ -97,10 +97,14 @@ let print_dirty_scheme ty_sch ppf =
 (******************)
 
 let solve_ty (ctx, ty, cnstrs) =
-  Unification.unify_ty ctx ty cnstrs
+  let (ctx, ty, cnstrs) = Unification.unify_ty ctx ty cnstrs in
+  let (ctx, ty) = Simplify.simplify_ty ctx ty in
+  (ctx, ty, cnstrs)
 
 let solve_dirty (ctx, ty, cnstrs) =
-  Unification.unify_dirty ctx ty cnstrs
+  let (ctx, ty, cnstrs) = Unification.unify_dirty ctx ty cnstrs in
+  let (ctx, ty) = Simplify.simplify_dirty ctx ty in
+  (ctx, ty, cnstrs)
 
 (*****************************)
 (* INTERFACE IMPLEMENTATIONS *)
@@ -273,6 +277,9 @@ let handle ~loc e c =
     |> Unification.add_ty_constraint ~loc ty_e (Type.Handler (drty_c, drty))
   in
   solve_dirty (ctx_e @ ctx_c, drty, constraints)
+
+let letrecbinding ~loc c =
+  solve_dirty c
 
 let letbinding ~loc c1 c2 =
   let ctx_c1, ty_c1, cnstrs_c1 = c1 in

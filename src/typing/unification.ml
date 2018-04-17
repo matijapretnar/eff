@@ -244,6 +244,22 @@ let decompose_ty_cnstr (ty1, ty2, loc) =
       let cnstr = List.fold_right2 (add_ty_constraint ~loc) tys1 tys2 empty in
       cnstr
 
+    | (Type.Apply (t1, (ty1, drt1)), Type.Apply (t2, (ty2, drt2))) when t1 = t2 && List.length ty1 = List.length ty2 ->
+        let cnstr = List.fold_right2 (add_ty_constraint ~loc) ty1 ty2 empty in
+        let cnstr = List.fold_right2 (add_dirt_constraint ~loc) drt1 drt2 cnstr in
+        cnstr
+
+    (* The following two cases cannot be merged into one, as the whole matching
+       fails if both types are Apply, but only the second one is transparent. *)
+    (* | Type.Apply (t1, lst1), t2
+      when Tctx.transparent ~loc t1 -> (
+      match Tctx.ty_apply ~loc t1 lst1 with
+      | Tctx.Inline t -> unify loc t2 t
+      | Tctx.Sum _ | Tctx.Record _ ->
+          assert false (* None of these are transparent *) ) *)
+
+    (* | t1, (Type.Apply _ as t2) -> unify loc t2 t1 *)
+
     (* A -> B ! a = C -> D ! b translates into: A=C, B=D, a=b *)
     | (Type.Arrow (ty1_in, dirty1_out), Type.Arrow (ty2_in, dirty2_out)) ->
       let cnstr = add_ty_constraint ~loc ty2_in ty1_in empty in

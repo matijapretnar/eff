@@ -109,6 +109,8 @@ val patmatch : loc:Location.t -> ty_scheme -> abstraction_scheme list -> dirty_s
 
 val handle : loc:Location.t -> ty_scheme -> dirty_scheme -> dirty_scheme
 
+val letrecbinding : loc:Location.t -> dirty_scheme -> dirty_scheme
+
 val letbinding : loc:Location.t -> dirty_scheme -> abstraction_scheme -> dirty_scheme
 
 (************************)

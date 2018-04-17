@@ -165,7 +165,7 @@ and let_rec_defs ~loc defs =
     poly_tys, ctx_a @ ctx, cnstr @ [Scheme.just cnstrs_a]
   in
   let poly_tys, ctx, cnstr = List.fold_right add_binding defs ([], [], []) in
-  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.make ctx ty cnstr) poly_tys in
+  let poly_tyschs = OldUtils.assoc_map (fun ty -> Scheme.solve_ty (Scheme.make ctx ty cnstr)) poly_tys in
   poly_tyschs
 
 and type_let_rec_defs ~loc st defs =

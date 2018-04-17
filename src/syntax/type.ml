@@ -226,7 +226,7 @@ let rec print_ty ?max_level ty ppf =
   | Apply (ty_name, ([], _)) ->
     print ".%s" ty_name
   | Apply (ty_name, ([ty], _)) ->
-    print ~at_level:1 "%t %s" (print_ty ~max_level:1 ty) ty_name
+    print ~at_level:1 "%t .%s" (print_ty ~max_level:1 ty) ty_name
   | Apply (ty_name, (tys, _)) ->
     print ~at_level:1 "(%t) %s" (Print.sequence ", " print_ty tys) ty_name
   | TyVar p -> Params.print_ty_param p ppf
