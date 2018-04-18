@@ -837,7 +837,7 @@ let constraint_free_ty_vars = function
 
 let constraint_free_dirt_vars = function
   | DirtOmega (_, (drt1, drt2)) ->
-      DirtVarSet.union
+      DirtParamSet.union
         (constraint_free_row_vars drt1.Types.row)
         (constraint_free_row_vars drt2.Types.row)
 
@@ -847,109 +847,169 @@ let constraint_free_dirt_vars = function
 let rec free_dirt_vars_ty_coercion = function
   | ReflTy ty -> free_dirt_vars_ty ty
   | ArrowCoercion (tc, dc) ->
-      free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirty_coercion dc
+      Types.DirtParamSet.union
+        (free_dirt_vars_ty_coercion tc)
+        (free_dirt_vars_dirty_coercion dc)
   | HandlerCoercion (dc1, dc2) ->
-      free_dirt_vars_dirty_coercion dc1 @ free_dirt_vars_dirty_coercion dc2
-  | TyCoercionVar tcp -> []
+      Types.DirtParamSet.union
+        (free_dirt_vars_dirty_coercion dc1)
+        (free_dirt_vars_dirty_coercion dc2)
+  | TyCoercionVar tcp -> DirtParamSet.empty
   | SequenceTyCoer (tc1, tc2) ->
-      free_dirt_vars_ty_coercion tc1 @ free_dirt_vars_ty_coercion tc2
-  | TupleCoercion tcs -> List.flatten (List.map free_dirt_vars_ty_coercion tcs)
+      Types.DirtParamSet.union
+        (free_dirt_vars_ty_coercion tc1)
+        (free_dirt_vars_ty_coercion tc2)
+  | TupleCoercion tcs ->
+      List.fold_left
+        (fun free tc ->
+          Types.DirtParamSet.union free (free_dirt_vars_ty_coercion tc) )
+        Types.DirtParamSet.empty tcs
   | LeftArrow tc -> free_dirt_vars_ty_coercion tc
   | ForallTy (_, tc) -> free_dirt_vars_ty_coercion tc
   | ApplyTyCoer (tc, ty) ->
-      free_dirt_vars_ty_coercion tc @ free_dirt_vars_ty ty
+      Types.DirtParamSet.union
+        (free_dirt_vars_ty_coercion tc)
+        (free_dirt_vars_ty ty)
   | ForallDirt (dp, tc) ->
-      List.filter (fun x -> not (x == dp)) (free_dirt_vars_ty_coercion tc)
+      Types.DirtParamSet.remove dp (free_dirt_vars_ty_coercion tc)
   | ApplyDirCoer (tc, d) ->
-      free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirt d
+      Types.DirtParamSet.union
+        (free_dirt_vars_ty_coercion tc)
+        (free_dirt_vars_dirt d)
   | PureCoercion dc -> free_dirt_vars_dirty_coercion dc
   | QualTyCoer (ctty, tc) -> free_dirt_vars_ty_coercion tc
   | QualDirtCoer (ctd, tc) -> free_dirt_vars_ty_coercion tc
   | ApplyQualTyCoer (tc1, tc2) ->
-      free_dirt_vars_ty_coercion tc1 @ free_dirt_vars_ty_coercion tc2
+      Types.DirtParamSet.union
+        (free_dirt_vars_ty_coercion tc1)
+        (free_dirt_vars_ty_coercion tc2)
   | ApplyQualDirtCoer (tc, dc) ->
-      free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirt_coercion dc
+      Types.DirtParamSet.union
+        (free_dirt_vars_ty_coercion tc)
+        (free_dirt_vars_dirt_coercion dc)
   | ForallSkel (skp, tc) -> free_dirt_vars_ty_coercion tc
   | ApplySkelCoer (tc, sk) -> free_dirt_vars_ty_coercion tc
 
 
 and free_dirt_vars_dirt_coercion = function
   | ReflDirt d -> free_dirt_vars_dirt d
-  | DirtCoercionVar dcv -> []
+  | DirtCoercionVar dcv -> Types.DirtParamSet.empty
   | Empty d -> free_dirt_vars_dirt d
   | UnionDirt (_, dc) -> free_dirt_vars_dirt_coercion dc
   | SequenceDirtCoer (dc1, dc2) ->
-      free_dirt_vars_dirt_coercion dc1 @ free_dirt_vars_dirt_coercion dc2
+      Types.DirtParamSet.union
+        (free_dirt_vars_dirt_coercion dc1)
+        (free_dirt_vars_dirt_coercion dc2)
   | DirtCoercion dc -> free_dirt_vars_dirty_coercion dc
 
 
 and free_dirt_vars_dirty_coercion = function
   | BangCoercion (tc, dc) ->
-      free_dirt_vars_ty_coercion tc @ free_dirt_vars_dirt_coercion dc
+      Types.DirtParamSet.union
+        (free_dirt_vars_ty_coercion tc)
+        (free_dirt_vars_dirt_coercion dc)
   | RightArrow tc -> free_dirt_vars_ty_coercion tc
   | RightHandler tc -> free_dirt_vars_ty_coercion tc
   | LeftHandler tc -> free_dirt_vars_ty_coercion tc
   | SequenceDirtyCoer (dc1, dc2) ->
-      free_dirt_vars_dirty_coercion dc1 @ free_dirt_vars_dirty_coercion dc2
+      Types.DirtParamSet.union
+        (free_dirt_vars_dirty_coercion dc1)
+        (free_dirt_vars_dirty_coercion dc2)
 
 
 let rec free_dirt_vars_expression e =
   match e with
-  | Var _ -> []
-  | BuiltIn _ -> []
-  | Const _ -> []
-  | Tuple es -> List.concat (List.map free_dirt_vars_expression es)
+  | Var _ -> DirtParamSet.empty
+  | BuiltIn _ -> DirtParamSet.empty
+  | Const _ -> DirtParamSet.empty
+  | Tuple es ->
+      List.fold_left
+        (fun free e -> DirtParamSet.union free (free_dirt_vars_expression e))
+        DirtParamSet.empty es
   | Record _ -> failwith __LOC__
   | Variant (_, e) -> free_dirt_vars_expression e
   | Lambda abs -> free_dirt_vars_abstraction_with_ty abs
-  | Effect _ -> []
+  | Effect _ -> DirtParamSet.empty
   | Handler h -> free_dirt_vars_abstraction_with_ty h.value_clause
   | BigLambdaTy (tp, sk, e) -> free_dirt_vars_expression e
   | BigLambdaDirt (dp, e) ->
-      List.filter (fun x -> not (x == dp)) (free_dirt_vars_expression e)
+      DirtParamSet.remove dp (free_dirt_vars_expression e)
   | BigLambdaSkel (skp, e) -> free_dirt_vars_expression e
   | CastExp (e, tc) ->
-      free_dirt_vars_expression e @ free_dirt_vars_ty_coercion tc
-  | ApplyTyExp (e, ty) -> free_dirt_vars_expression e @ free_dirt_vars_ty ty
+      Types.DirtParamSet.union
+        (free_dirt_vars_expression e)
+        (free_dirt_vars_ty_coercion tc)
+  | ApplyTyExp (e, ty) ->
+      Types.DirtParamSet.union
+        (free_dirt_vars_expression e)
+        (free_dirt_vars_ty ty)
   | LambdaTyCoerVar (tcp, ctty, e) -> free_dirt_vars_expression e
   | LambdaDirtCoerVar (dcp, ctd, e) -> free_dirt_vars_expression e
-  | ApplyDirtExp (e, d) -> free_dirt_vars_expression e @ free_dirt_vars_dirt d
+  | ApplyDirtExp (e, d) ->
+      Types.DirtParamSet.union
+        (free_dirt_vars_expression e)
+        (free_dirt_vars_dirt d)
   | ApplySkelExp (e, sk) -> free_dirt_vars_expression e
   | ApplyTyCoercion (e, tc) ->
-      free_dirt_vars_expression e @ free_dirt_vars_ty_coercion tc
+      Types.DirtParamSet.union
+        (free_dirt_vars_expression e)
+        (free_dirt_vars_ty_coercion tc)
   | ApplyDirtCoercion (e, dc) ->
-      free_dirt_vars_expression e @ free_dirt_vars_dirt_coercion dc
+      Types.DirtParamSet.union
+        (free_dirt_vars_expression e)
+        (free_dirt_vars_dirt_coercion dc)
 
 
 and free_dirt_vars_computation c =
   match c with
   | Value e -> free_dirt_vars_expression e
   | LetVal (e, abs) ->
-      free_dirt_vars_expression e @ free_dirt_vars_abstraction_with_ty abs
+      Types.DirtParamSet.union
+        (free_dirt_vars_expression e)
+        (free_dirt_vars_abstraction_with_ty abs)
   | LetRec ([(var, ty, e)], c) ->
-      free_dirt_vars_ty ty @ free_dirt_vars_expression e
-      @ free_dirt_vars_computation c
+      Types.DirtParamSet.union (free_dirt_vars_ty ty)
+        (free_dirt_vars_expression e)
+      |> Types.DirtParamSet.union (free_dirt_vars_computation c)
   | Match (e, cases) ->
-      free_dirt_vars_expression e
-      @ List.concat (List.map free_dirt_vars_abstraction cases)
+      List.fold_left
+        (fun free case ->
+          DirtParamSet.union free (free_dirt_vars_abstraction case) )
+        (free_dirt_vars_expression e)
+        cases
   | Apply (e1, e2) ->
-      free_dirt_vars_expression e1 @ free_dirt_vars_expression e2
-  | Handle (e, c) -> free_dirt_vars_expression e @ free_dirt_vars_computation c
+      Types.DirtParamSet.union
+        (free_dirt_vars_expression e1)
+        (free_dirt_vars_expression e2)
+  | Handle (e, c) ->
+      Types.DirtParamSet.union
+        (free_dirt_vars_expression e)
+        (free_dirt_vars_computation c)
   | Call (_, e, awty) -> failwith __LOC__
   | Op (_, e) -> free_dirt_vars_expression e
-  | Bind (c, a) -> free_dirt_vars_computation c @ free_dirt_vars_abstraction a
+  | Bind (c, a) ->
+      Types.DirtParamSet.union
+        (free_dirt_vars_computation c)
+        (free_dirt_vars_abstraction a)
   | CastComp (c, dc) ->
-      free_dirt_vars_computation c @ free_dirt_vars_dirty_coercion dc
+      Types.DirtParamSet.union
+        (free_dirt_vars_computation c)
+        (free_dirt_vars_dirty_coercion dc)
   | CastComp_ty (c, tc) ->
-      free_dirt_vars_computation c @ free_dirt_vars_ty_coercion tc
+      Types.DirtParamSet.union
+        (free_dirt_vars_computation c)
+        (free_dirt_vars_ty_coercion tc)
   | CastComp_dirt (c, dc) ->
-      free_dirt_vars_computation c @ free_dirt_vars_dirt_coercion dc
+      Types.DirtParamSet.union
+        (free_dirt_vars_computation c)
+        (free_dirt_vars_dirt_coercion dc)
 
 
 and free_dirt_vars_abstraction (_, c) = free_dirt_vars_computation c
 
 and free_dirt_vars_abstraction_with_ty (_, ty, c) =
-  free_dirt_vars_ty ty @ free_dirt_vars_computation c
+  Types.DirtParamSet.union (free_dirt_vars_ty ty)
+    (free_dirt_vars_computation c)
 
 
 let rec get_skel_vars_from_constraints = function
@@ -970,12 +1030,12 @@ let constraint_free_ty_vars = function
 let constraint_free_dirt_vars = function
   | DirtOmega
       (_, ({Types.row= Types.ParamRow a}, {Types.row= Types.ParamRow b})) ->
-      Types.DirtVarSet.of_list [a; b]
+      Types.DirtParamSet.of_list [a; b]
   | DirtOmega (_, ({Types.row= Types.ParamRow a}, {Types.row= Types.EmptyRow})) ->
-      Types.DirtVarSet.singleton a
+      Types.DirtParamSet.singleton a
   | DirtOmega (_, ({Types.row= Types.EmptyRow}, {Types.row= Types.ParamRow b})) ->
-      Types.DirtVarSet.singleton b
-  | _ -> Types.DirtVarSet.empty
+      Types.DirtParamSet.singleton b
+  | _ -> Types.DirtParamSet.empty
 
 
 let rec apply_sub_to_type ty_subs dirt_subs ty =
@@ -1002,7 +1062,6 @@ let rec apply_sub_to_type ty_subs dirt_subs ty =
       Types.Apply (ty_name, List.map (apply_sub_to_type ty_subs dirt_subs) tys)
   | _ -> failwith __LOC__
 
-
 and apply_sub_to_dirt dirt_subs drt =
   match drt.row with
   | Types.ParamRow p -> (
@@ -1010,15 +1069,3 @@ and apply_sub_to_dirt dirt_subs drt =
     | Some p' -> {drt with row= Types.ParamRow p'}
     | None -> drt )
   | Types.EmptyRow -> drt
-
-
-let rec state_free_ty_vars st =
-  List.fold_right
-    (fun (_, ty) acc -> List.append (Types.free_ty_vars_ty ty) acc)
-    st []
-
-
-let rec state_free_dirt_vars st =
-  List.fold_right
-    (fun (_, ty) acc -> List.append (Types.free_dirt_vars_ty ty) acc)
-    st []

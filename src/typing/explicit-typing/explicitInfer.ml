@@ -99,29 +99,39 @@ and type_plain_typed_pattern in_cons st pat ty =
 
 (* ... *)
 
+let rec state_free_ty_vars st =
+  List.fold_right
+    (fun (_, ty) acc -> Types.TyParamSet.union (Types.free_ty_vars_ty ty) acc)
+    st Types.TyParamSet.empty
+
+
+let rec state_free_dirt_vars st =
+  List.fold_right
+    (fun (_, ty) acc ->
+      Types.DirtParamSet.union (Types.free_dirt_vars_ty ty) acc )
+    st Types.DirtParamSet.empty
+
+
 let splitter st constraints simple_ty =
   let skel_list = OldUtils.uniq (get_skel_vars_from_constraints constraints) in
-  let state_freevars_ty = Types.TyParamSet.of_list (state_free_ty_vars st) in
-  let state_freevars_dirt =
-    Types.DirtVarSet.of_list (state_free_dirt_vars st)
-  in
+  let global_ty_vars = state_free_ty_vars st in
+  let global_dirt_vars = state_free_dirt_vars st in
   let local_constraints =
     List.filter
       (fun cons ->
         let cons_freevars_ty = constraint_free_ty_vars cons in
         let cons_freevars_dirt = constraint_free_dirt_vars cons in
         let is_sub_ty =
-          Types.TyParamSet.subset cons_freevars_ty state_freevars_ty
+          Types.TyParamSet.subset cons_freevars_ty global_ty_vars
         in
         let is_sub_dirt =
-          Types.DirtVarSet.subset cons_freevars_dirt state_freevars_dirt
+          Types.DirtParamSet.subset cons_freevars_dirt global_dirt_vars
         in
         not (is_sub_ty && is_sub_dirt) )
       constraints
   in
   let free_ty_params =
-    let simple_ty_freevars_ty =
-      Types.TyParamSet.of_list (Types.free_ty_vars_ty simple_ty)
+    let simple_ty_freevars_ty = Types.free_ty_vars_ty simple_ty
     and constraints_freevars_ty =
       List.fold_right
         (fun cons acc ->
@@ -130,20 +140,20 @@ let splitter st constraints simple_ty =
     in
     Types.TyParamSet.diff
       (Types.TyParamSet.union constraints_freevars_ty simple_ty_freevars_ty)
-      state_freevars_ty
+      global_ty_vars
   in
   let free_dirt_params =
-    let simple_ty_freevars_dirt =
-      Types.DirtVarSet.of_list (Types.free_dirt_vars_ty simple_ty)
+    let simple_ty_freevars_dirt = Types.free_dirt_vars_ty simple_ty
     and constraints_freevars_dirt =
       List.fold_right
         (fun cons acc ->
-          Types.DirtVarSet.union (constraint_free_dirt_vars cons) acc )
-        constraints Types.DirtVarSet.empty
+          Types.DirtParamSet.union (constraint_free_dirt_vars cons) acc )
+        constraints Types.DirtParamSet.empty
     in
-    Types.DirtVarSet.diff
-      (Types.DirtVarSet.union constraints_freevars_dirt simple_ty_freevars_dirt)
-      state_freevars_dirt
+    Types.DirtParamSet.diff
+      (Types.DirtParamSet.union constraints_freevars_dirt
+         simple_ty_freevars_dirt)
+      global_dirt_vars
   in
   let global_constraints =
     List.filter
@@ -156,7 +166,7 @@ let splitter st constraints simple_ty =
   let result =
     ( skel_list
     , Types.TyParamSet.elements free_ty_params
-    , Types.DirtVarSet.elements free_dirt_params
+    , Types.DirtParamSet.elements free_dirt_params
     , local_constraints
     , global_constraints )
   in
@@ -166,11 +176,11 @@ let splitter st constraints simple_ty =
   Print.debug "Splitter Env :" ;
   print_env st ;
   Print.debug "Simple type free vars: " ;
-  List.iter
+  Types.TyParamSet.iter
     (fun x -> Print.debug "%t" (Params.Ty.print x))
     (Types.free_ty_vars_ty simple_ty) ;
   Print.debug "state free vars: " ;
-  List.iter
+  Types.TyParamSet.iter
     (fun x -> Print.debug "%t" (Params.Ty.print x))
     (state_free_ty_vars st) ;
   Print.debug "Splitter output free_ty_vars: " ;
@@ -178,7 +188,7 @@ let splitter st constraints simple_ty =
     (fun x -> Print.debug "%t" (Params.Ty.print x))
     free_ty_params ;
   Print.debug "Splitter output free_dirt_vars: " ;
-  Types.DirtVarSet.iter
+  Types.DirtParamSet.iter
     (fun x -> Print.debug "%t" (Params.Dirt.print x))
     free_dirt_params ;
   Print.debug "Splitter global constraints list :" ;
@@ -1051,7 +1061,7 @@ let type_toplevel ~loc st c =
     let sub2 =
       List.map
         (fun dp -> Unification.DirtVarToDirt (dp, Types.empty_dirt))
-        (List.sort_uniq compare (free_dirt_vars_computation ct'))
+        (Types.DirtParamSet.elements (free_dirt_vars_computation ct'))
     in
     let ct2 = Unification.apply_substitution sub2 ct' in
     let sub3 = finalize_constraints (Unification.apply_sub sub2 final) in
