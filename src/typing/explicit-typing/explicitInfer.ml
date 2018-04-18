@@ -85,7 +85,6 @@ and type_plain_typed_pattern in_cons st pat ty =
   | Untyped.PRecord r -> failwith __LOC__
   | Untyped.PVariant (lbl, p) -> (
       let ty_in, ty_out = Types.constructor_signature lbl in
-      (* How come we're throwing away _omega? What is the correct order of q? *)
       let _omega, q = Typed.fresh_ty_coer (ty_out, ty) in
       let cons' = q :: in_cons in
       match p with
@@ -101,90 +100,124 @@ and type_plain_typed_pattern in_cons st pat ty =
 (* ... *)
 
 let splitter st constraints simple_ty =
-  Print.debug "Splitter Input Constraints: " ;
-  Unification.print_c_list constraints ;
-  Print.debug "Splitter Input Ty: %t" (Types.print_target_ty simple_ty) ;
-  Print.debug "Splitter Env :" ;
-  print_env st ;
   let skel_list = OldUtils.uniq (get_skel_vars_from_constraints constraints) in
-  let simple_ty_freevars_ty =
-    Types.TyParamSet.of_list (Types.free_ty_vars_ty simple_ty)
-  in
-  Print.debug "Simple type free vars: " ;
-  List.iter
-    (fun x -> Print.debug "%t" (Params.Ty.print x))
-    (Types.free_ty_vars_ty simple_ty) ;
-  let simple_ty_freevars_dirt =
-    Types.DirtVarSet.of_list (Types.free_dirt_vars_ty simple_ty)
-  in
   let state_freevars_ty = Types.TyParamSet.of_list (state_free_ty_vars st) in
-  Print.debug "state free vars: " ;
-  List.iter
-    (fun x -> Print.debug "%t" (Params.Ty.print x))
-    (state_free_ty_vars st) ;
   let state_freevars_dirt =
     Types.DirtVarSet.of_list (state_free_dirt_vars st)
   in
-  let local_cons =
+  let local_constraints =
     List.filter
       (fun cons ->
         let cons_freevars_ty = constraint_free_ty_vars cons in
         let cons_freevars_dirt = constraint_free_dirt_vars cons in
         let is_sub_ty =
           Types.TyParamSet.subset cons_freevars_ty state_freevars_ty
-          || Types.TyParamSet.equal cons_freevars_ty state_freevars_ty
         in
         let is_sub_dirt =
           Types.DirtVarSet.subset cons_freevars_dirt state_freevars_dirt
-          || Types.DirtVarSet.equal cons_freevars_dirt state_freevars_dirt
         in
         not (is_sub_ty && is_sub_dirt) )
       constraints
   in
-  let constraints_freevars_ty =
-    List.fold_right
-      (fun cons acc ->
-        Types.TyParamSet.union (constraint_free_ty_vars cons) acc )
-      constraints Types.TyParamSet.empty
+  let free_ty_params =
+    let simple_ty_freevars_ty =
+      Types.TyParamSet.of_list (Types.free_ty_vars_ty simple_ty)
+    and constraints_freevars_ty =
+      List.fold_right
+        (fun cons acc ->
+          Types.TyParamSet.union (constraint_free_ty_vars cons) acc )
+        constraints Types.TyParamSet.empty
+    in
+    Types.TyParamSet.diff
+      (Types.TyParamSet.union constraints_freevars_ty simple_ty_freevars_ty)
+      state_freevars_ty
   in
-  let constraints_freevars_dirt =
-    List.fold_right
-      (fun cons acc ->
-        Types.DirtVarSet.union (constraint_free_dirt_vars cons) acc )
-      constraints Types.DirtVarSet.empty
+  let free_dirt_params =
+    let simple_ty_freevars_dirt =
+      Types.DirtVarSet.of_list (Types.free_dirt_vars_ty simple_ty)
+    and constraints_freevars_dirt =
+      List.fold_right
+        (fun cons acc ->
+          Types.DirtVarSet.union (constraint_free_dirt_vars cons) acc )
+        constraints Types.DirtVarSet.empty
+    in
+    Types.DirtVarSet.diff
+      (Types.DirtVarSet.union constraints_freevars_dirt simple_ty_freevars_dirt)
+      state_freevars_dirt
   in
-  let alpha_list =
-    Types.TyParamSet.elements
-      (Types.TyParamSet.diff
-         (Types.TyParamSet.union constraints_freevars_ty simple_ty_freevars_ty)
-         state_freevars_ty)
-  in
-  let delta_list =
-    Types.DirtVarSet.elements
-      (Types.DirtVarSet.diff
-         (Types.DirtVarSet.union constraints_freevars_dirt
-            simple_ty_freevars_dirt)
-         state_freevars_dirt)
-  in
-  let global_cons' = OldUtils.diff constraints local_cons in
-  let global_cons =
+  let global_constraints =
     List.filter
-      (fun c ->
-        match c with
-        | Typed.TyParamHasSkel (tyvar, skvar) ->
-            not (List.mem tyvar alpha_list)
-        | _ -> true )
-      global_cons'
+      (function
+          | Typed.TyParamHasSkel (tyvar, skvar) ->
+              not (Types.TyParamSet.mem tyvar free_ty_params)
+          | cons -> not (List.mem cons local_constraints))
+      constraints
   in
+  let result =
+    ( skel_list
+    , Types.TyParamSet.elements free_ty_params
+    , Types.DirtVarSet.elements free_dirt_params
+    , local_constraints
+    , global_constraints )
+  in
+  Print.debug "Splitter Input Constraints: " ;
+  Unification.print_c_list constraints ;
+  Print.debug "Splitter Input Ty: %t" (Types.print_target_ty simple_ty) ;
+  Print.debug "Splitter Env :" ;
+  print_env st ;
+  Print.debug "Simple type free vars: " ;
+  List.iter
+    (fun x -> Print.debug "%t" (Params.Ty.print x))
+    (Types.free_ty_vars_ty simple_ty) ;
+  Print.debug "state free vars: " ;
+  List.iter
+    (fun x -> Print.debug "%t" (Params.Ty.print x))
+    (state_free_ty_vars st) ;
   Print.debug "Splitter output free_ty_vars: " ;
-  List.iter (fun x -> Print.debug "%t" (Params.Ty.print x)) alpha_list ;
+  Types.TyParamSet.iter
+    (fun x -> Print.debug "%t" (Params.Ty.print x))
+    free_ty_params ;
   Print.debug "Splitter output free_dirt_vars: " ;
-  List.iter (fun x -> Print.debug "%t" (Params.Dirt.print x)) delta_list ;
+  Types.DirtVarSet.iter
+    (fun x -> Print.debug "%t" (Params.Dirt.print x))
+    free_dirt_params ;
   Print.debug "Splitter global constraints list :" ;
-  Unification.print_c_list local_cons ;
+  Unification.print_c_list local_constraints ;
   Print.debug "Splitter global constraints list :" ;
-  Unification.print_c_list global_cons ;
-  (skel_list, alpha_list, delta_list, local_cons, global_cons)
+  Unification.print_c_list global_constraints ;
+  result
+
+
+let generalize_type st constraints simple_ty ty =
+  let free_skel_vars, free_ty_vars, free_dirt_vars, split_cons1, split_cons2 =
+    splitter st constraints simple_ty
+  in
+  let qual_ty =
+    List.fold_right
+      (fun cons acc ->
+        match cons with
+        | Typed.TyOmega (_, t) -> Types.QualTy (t, acc)
+        | Typed.DirtOmega (_, t) -> Types.QualDirt (t, acc) )
+      split_cons1 ty
+  in
+  let ty_sc_dirt =
+    List.fold_right
+      (fun cons acc -> Types.TySchemeDirt (cons, acc))
+      free_dirt_vars qual_ty
+  in
+  let ty_sc_ty =
+    List.fold_right
+      (fun cons acc ->
+        Types.TySchemeTy
+          (cons, Unification.get_skel_of_tyvar cons constraints, acc) )
+      free_ty_vars ty_sc_dirt
+  in
+  let ty_sc_skel =
+    List.fold_right
+      (fun cons acc -> Types.TySchemeSkel (cons, acc))
+      free_skel_vars ty_sc_ty
+  in
+  ty_sc_skel
 
 
 let rec get_sub_of_ty ty_sch =
@@ -261,8 +294,7 @@ let rec get_skel_constraints alphas_has_skels ty_subs skel_subs =
   | [] -> []
 
 
-let apply_types alphas_has_skels skel_subs ty_subs dirt_subs bind_tyco_subs
-    bind_dco_subs var ty_sch =
+let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
   let new_skel_subs =
     List.map
       (fun (a, b) -> Unification.SkelParamToSkel (a, Types.SkelParam b))
@@ -302,6 +334,28 @@ let apply_types alphas_has_skels skel_subs ty_subs dirt_subs bind_tyco_subs
   (dirt_cons_apps, skel_constraints @ ty_cons @ dirt_cons)
 
 
+let apply_polymorphic_variable x ty_schi =
+  let ( bind_skelvar_sub
+      , bind_tyvar_sub
+      , bind_dirtvar_sub
+      , bind_tyco_sub
+      , bind_dco_sub ) =
+    get_sub_of_ty ty_schi
+  in
+  let alphas_has_skels, basic_type = get_basic_type ty_schi in
+  let applied_basic_type =
+    apply_sub_to_type bind_tyvar_sub bind_dirtvar_sub basic_type
+  in
+  let returned_x, returned_cons =
+    apply_types alphas_has_skels bind_skelvar_sub bind_tyvar_sub
+      bind_dirtvar_sub x ty_schi
+  in
+  Print.debug "returned: %t" (Typed.print_expression returned_x) ;
+  Print.debug "original_type: %t" (Types.print_target_ty ty_schi) ;
+  Print.debug "returned_type: %t" (Types.print_target_ty applied_basic_type) ;
+  (returned_x, applied_basic_type, returned_cons)
+
+
 let rec type_expression in_cons st ({Untyped.term= expr} as e) =
   Print.debug "type_expression: %t" (CoreSyntax.print_expression e) ;
   Print.debug "### Constraints Before ###" ;
@@ -320,26 +374,10 @@ and type_plain_expression in_cons st = function
   | Untyped.Var x -> (
     match TypingEnv.lookup st.context x with
     | Some ty_schi ->
-        let ( bind_skelvar_sub
-            , bind_tyvar_sub
-            , bind_dirtvar_sub
-            , bind_tyco_sub
-            , bind_dco_sub ) =
-          get_sub_of_ty ty_schi
+        let returned_x, applied_basic_type, returned_cons =
+          apply_polymorphic_variable x ty_schi
         in
-        let alphas_has_skels, basic_type = get_basic_type ty_schi in
-        let applied_basic_type =
-          apply_sub_to_type bind_tyvar_sub bind_dirtvar_sub basic_type
-        in
-        let returned_x, returnd_cons =
-          apply_types alphas_has_skels bind_skelvar_sub bind_tyvar_sub
-            bind_dirtvar_sub bind_tyco_sub bind_dco_sub x ty_schi
-        in
-        Print.debug "returned: %t" (Typed.print_expression returned_x) ;
-        Print.debug "original_type: %t" (Types.print_target_ty ty_schi) ;
-        Print.debug "returned_type: %t"
-          (Types.print_target_ty applied_basic_type) ;
-        (returned_x, applied_basic_type, returnd_cons @ in_cons, [])
+        (returned_x, applied_basic_type, returned_cons @ in_cons, [])
     | None ->
         Print.debug "Variable not found: %t" (Typed.print_variable x) ;
         assert false )
@@ -377,29 +415,20 @@ and type_plain_expression in_cons st = function
           (Typed.Variant (lbl, e''), ty_out, cast_cons :: cons', subs) )
   | Untyped.Lambda a ->
       Print.debug "in infer lambda" ;
-      let p, c = a in
       let in_ty, in_ty_skel = Typed.fresh_ty_with_fresh_skel () in
-      let new_in_cons = in_ty_skel :: in_cons in
-      let Untyped.PVar x = p.Untyped.term in
-      let target_pattern = type_pattern p in
-      let new_st = add_def st x in_ty in
-      let target_comp_term, target_comp_ty, target_comp_cons, target_comp_sub =
-        type_computation new_in_cons new_st c
+      let (p, c), (ty, dty), cons, sub =
+        type_abstraction (in_ty_skel :: in_cons) st a in_ty
       in
-      let target_ty =
-        Types.Arrow
-          ( Unification.apply_substitution_ty target_comp_sub in_ty
-          , target_comp_ty )
-      in
+      let target_ty = Types.Arrow (ty, dty) in
       let target_lambda =
         Typed.Lambda
-          (abstraction_with_ty target_pattern
-             (Unification.apply_substitution_ty target_comp_sub in_ty)
-             target_comp_term)
+          (abstraction_with_ty p
+             (Unification.apply_substitution_ty sub in_ty)
+             c)
       in
-      Unification.print_c_list target_comp_cons ;
+      Unification.print_c_list cons ;
       Print.debug "lambda ty: %t" (Types.print_target_ty target_ty) ;
-      (target_lambda, target_ty, target_comp_cons, target_comp_sub)
+      (target_lambda, target_ty, cons, sub)
   | Untyped.Effect eff ->
       let in_ty, out_ty = Untyped.EffectMap.find eff st.effects in
       let s = Types.EffectSet.singleton eff in
@@ -690,46 +719,27 @@ and type_plain_computation in_cons st = function
           let sub_e1', cons_e1' = Unification.unify ([], [], cons_e1) in
           let typed_e1 = Unification.apply_substitution_exp sub_e1' typed_e1 in
           let st_subbed = apply_sub_to_env st (sub_e1' @ sub_e1) in
-          let ( split_skel_vars
-              , split_ty_vars
-              , split_dirt_vars
+          let ( free_skel_vars
+              , free_ty_vars
+              , free_dirt_vars
               , split_cons1
-              , split_cons2 ) =
+              , global_constraints ) =
             splitter
               (TypingEnv.return_context st_subbed.context)
               cons_e1'
               (Unification.apply_substitution_ty sub_e1' type_e1)
           in
-          let Untyped.PVar x = p_def.Untyped.term in
-          let qual_ty =
-            List.fold_right
-              (fun cons acc ->
-                match cons with
-                | Typed.TyOmega (_, t) -> Types.QualTy (t, acc)
-                | Typed.DirtOmega (_, t) -> Types.QualDirt (t, acc) )
-              split_cons1
+          let ty_sc_skel =
+            generalize_type
+              (TypingEnv.return_context st_subbed.context)
+              cons_e1'
+              (Unification.apply_substitution_ty sub_e1' type_e1)
               (Unification.apply_substitution_ty sub_e1' type_e1)
           in
-          let ty_sc_dirt =
-            List.fold_right
-              (fun cons acc -> Types.TySchemeDirt (cons, acc))
-              split_dirt_vars qual_ty
-          in
-          let ty_sc_ty =
-            List.fold_right
-              (fun cons acc ->
-                Types.TySchemeTy
-                  (cons, Unification.get_skel_of_tyvar cons cons_e1', acc) )
-              split_ty_vars ty_sc_dirt
-          in
-          let ty_sc_skel =
-            List.fold_right
-              (fun cons acc -> Types.TySchemeSkel (cons, acc))
-              split_skel_vars ty_sc_ty
-          in
+          let Untyped.PVar x = p_def.Untyped.term in
           let new_st = add_def st_subbed x ty_sc_skel in
           let typed_c2, type_c2, cons_c2, subs_c2 =
-            type_computation split_cons2 new_st c_2
+            type_computation global_constraints new_st c_2
           in
           let var_exp =
             List.fold_right
@@ -743,19 +753,19 @@ and type_plain_computation in_cons st = function
           let var_exp_dirt_lamda =
             List.fold_right
               (fun cons acc -> Typed.BigLambdaDirt (cons, acc))
-              split_dirt_vars var_exp
+              free_dirt_vars var_exp
           in
           let var_exp_ty_lambda =
             List.fold_right
               (fun cons acc ->
                 Typed.BigLambdaTy
                   (cons, Unification.get_skel_of_tyvar cons cons_e1', acc) )
-              split_ty_vars var_exp_dirt_lamda
+              free_ty_vars var_exp_dirt_lamda
           in
           let var_exp_skel_lamda =
             List.fold_right
               (fun cons acc -> Typed.BigLambdaSkel (cons, acc))
-              split_skel_vars var_exp_ty_lambda
+              free_skel_vars var_exp_ty_lambda
           in
           let return_term =
             Typed.LetVal
@@ -767,56 +777,32 @@ and type_plain_computation in_cons st = function
           let typed_c1, (type_c1, dirt_c1), cons_c1, subs_c1 =
             type_computation in_cons st c_1
           in
-          match p_def.Untyped.term with
-          | Untyped.PVar x ->
-              let new_st = add_def (apply_sub_to_env st subs_c1) x type_c1 in
-              let typed_c2, (type_c2, dirt_c2), cons_c2, subs_c2 =
-                type_computation cons_c1 new_st c_2
-              in
-              let new_dirt_var = Types.fresh_dirt () in
-              let ty_1 = Unification.apply_substitution_ty subs_c2 type_c1 in
-              let coer_c1, omega_cons_1 =
-                Typed.cast_computation
-                  (Unification.apply_substitution subs_c2 typed_c1)
-                  (ty_1, Unification.apply_substitution_dirt subs_c1 dirt_c1)
-                  (ty_1, new_dirt_var)
-              in
-              let coer_c2, omega_cons_2 =
-                Typed.cast_computation typed_c2 (type_c2, dirt_c2)
-                  (type_c2, new_dirt_var)
-              in
-              let typed_pattern = type_pattern p_def in
-              let abstraction = (typed_pattern, coer_c2) in
-              let constraints = [omega_cons_1; omega_cons_2] @ cons_c2 in
-              ( Typed.Bind (coer_c1, abstraction)
-              , (type_c2, new_dirt_var)
-              , constraints
-              , subs_c2 @ subs_c1 )
-          | Untyped.PNonbinding ->
-              let new_st = apply_sub_to_env st subs_c1 in
-              let typed_c2, (type_c2, dirt_c2), cons_c2, subs_c2 =
-                type_computation cons_c1 new_st c_2
-              in
-              let new_dirt_var = Types.fresh_dirt () in
-              let ty_c1 = Unification.apply_substitution_ty subs_c2 type_c1 in
-              let coer_c1, omega_cons_1 =
-                Typed.cast_computation
-                  (Unification.apply_substitution subs_c2 typed_c1)
-                  (ty_c1, Unification.apply_substitution_dirt subs_c1 dirt_c1)
-                  (ty_c1, new_dirt_var)
-              in
-              let coer_c2, omega_cons_2 =
-                Typed.cast_computation typed_c2 (type_c2, dirt_c2)
-                  (type_c2, new_dirt_var)
-              in
-              let typed_pattern = type_pattern p_def in
-              let abstraction = (typed_pattern, coer_c2) in
-              let constraints = [omega_cons_1; omega_cons_2] @ cons_c2 in
-              ( Typed.Bind (coer_c1, abstraction)
-              , (type_c2, new_dirt_var)
-              , constraints
-              , subs_c2 @ subs_c1 )
-          | pat -> failwith __LOC__ )
+          let typed_pattern, new_st, cons_c1 =
+            type_typed_pattern cons_c1
+              (apply_sub_to_env st subs_c1)
+              p_def type_c1
+          in
+          let typed_c2, (type_c2, dirt_c2), cons_c2, subs_c2 =
+            type_computation cons_c1 new_st c_2
+          in
+          let new_dirt_var = Types.fresh_dirt () in
+          let ty_c1 = Unification.apply_substitution_ty subs_c2 type_c1 in
+          let coer_c1, omega_cons_1 =
+            Typed.cast_computation
+              (Unification.apply_substitution subs_c2 typed_c1)
+              (ty_c1, Unification.apply_substitution_dirt subs_c1 dirt_c1)
+              (ty_c1, new_dirt_var)
+          in
+          let coer_c2, omega_cons_2 =
+            Typed.cast_computation typed_c2 (type_c2, dirt_c2)
+              (type_c2, new_dirt_var)
+          in
+          let abstraction = (typed_pattern, coer_c2) in
+          let constraints = [omega_cons_1; omega_cons_2] @ cons_c2 in
+          ( Typed.Bind (coer_c1, abstraction)
+          , (type_c2, new_dirt_var)
+          , constraints
+          , subs_c2 @ subs_c1 ) )
   | Untyped.LetRec ([(var, abs)], c2)
     when not (Untyped.contains_variable_abs var abs) ->
       failwith __LOC__
@@ -848,32 +834,15 @@ and type_plain_computation in_cons st = function
       let sub_s2, cons3 = Unification.unify ([], [], q_ty :: q_d :: cons2) in
       let st2 = apply_sub_to_env st (sub_s1 @ sub_s2) in
       let ty_A1' = Unification.apply_substitution_ty sub_s2 ty_A1 in
+      let arrow_type = Types.Arrow (ty_a', (ty_A1', dirt_D1)) in
       let skvars, tyvars, dirtvars, cons4, cons5 =
         splitter (TypingEnv.return_context st2.context) cons3 ty_A1'
       in
       let ty_f =
-        List.fold_right
-          (fun skvar ty -> Types.TySchemeSkel (skvar, ty))
-          skvars
-          (List.fold_right
-             (fun tyvar ty ->
-               Types.TySchemeTy
-                 (tyvar, Unification.get_skel_of_tyvar tyvar cons3, ty) )
-             tyvars
-             (List.fold_right
-                (fun dirtvar ty -> Types.TySchemeDirt (dirtvar, ty))
-                dirtvars
-                (List.fold_right
-                   (fun q ty ->
-                     match q with
-                     | Typed.TyOmega (_, ct) -> Types.QualTy (ct, ty)
-                     | Typed.DirtOmega (_, ct) -> Types.QualDirt (ct, ty) )
-                   cons4
-                   (Types.Arrow
-                      ( Unification.apply_substitution_ty sub_s2 ty_a'
-                      , ( ty_A1'
-                        , Unification.apply_substitution_dirt sub_s2 dirt_D1 )
-                      )))))
+        generalize_type
+          (TypingEnv.return_context st2.context)
+          cons3 ty_A1'
+          (Unification.apply_substitution_ty sub_s2 arrow_type)
       in
       let st3 = add_def st2 var ty_f in
       let c2', dty2, cons6, sub_s3 = type_computation cons5 st3 c2 in
@@ -1039,15 +1008,15 @@ let type_toplevel ~loc st c =
     let (sub,final) = Unification.unify ([],[],constraints) in
     let et' = Unification.apply_substitution_exp sub et in
     let ttype' = Unification.apply_substitution_ty sub ttype in
-    let (split_ty_vars, split_dirt_vars, split_cons1, split_cons2)= splitter (TypingEnv.return_context st.context) final ttype' in 
+    let (free_ty_vars, free_dirt_vars, split_cons1, split_cons2)= splitter (TypingEnv.return_context st.context) final ttype' in 
     let qual_ty = List.fold_right (fun cons acc -> 
                                           begin match cons with 
                                           | Typed.TyOmega(_,t) -> Types.QualTy (t,acc)
                                           | Typed.DirtOmega(_,t) -> Types.QualDirt(t,acc) 
                                           end 
                                       ) split_cons1 ttype' in 
-    let ty_sc_dirt = List.fold_right (fun cons acc -> Types.TySchemeDirt (cons,acc)) split_dirt_vars qual_ty in
-    let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,Types.PrimSkel Types.IntTy,acc)) split_ty_vars ty_sc_dirt in  
+    let ty_sc_dirt = List.fold_right (fun cons acc -> Types.TySchemeDirt (cons,acc)) free_dirt_vars qual_ty in
+    let ty_sc_ty = List.fold_right  (fun cons acc -> Types.TySchemeTy (cons,Types.PrimSkel Types.IntTy,acc)) free_ty_vars ty_sc_dirt in  
     let var_exp = List.fold_right(fun cons acc -> 
                                           begin match cons with 
                                           | Typed.TyOmega(om,t) ->  (Typed.LambdaTyCoerVar (om,t,acc)) 
@@ -1055,9 +1024,9 @@ let type_toplevel ~loc st c =
                                           end 
                                       ) split_cons1 et' in 
     let var_exp_dirt_lamda = 
-      List.fold_right (fun cons acc ->  ( Typed.BigLambdaDirt (cons,acc) )  )  split_dirt_vars var_exp in
+      List.fold_right (fun cons acc ->  ( Typed.BigLambdaDirt (cons,acc) )  )  free_dirt_vars var_exp in
     let var_exp_ty_lambda = 
-      List.fold_right (fun cons acc ->  (Typed.BigLambdaTy (cons,acc) ) ) split_ty_vars var_exp_dirt_lamda in
+      List.fold_right (fun cons acc ->  (Typed.BigLambdaTy (cons,acc) ) ) free_ty_vars var_exp_dirt_lamda in
     Print.debug "New Expr : %t" (Typed.print_expression var_exp_ty_lambda);
     Print.debug "New Expr ty : %t" (Types.print_target_ty ty_sc_ty);
     let tch_ty = TypeChecker.type_check_exp (TypeChecker.new_checker_state) var_exp_ty_lambda.term in
