@@ -8,7 +8,7 @@ effect Put : int -> unit ;;
 (let rec loop n =
   if 0 < n then perform (Put ((perform Get) + 1)); loop (n - 1) else ()
 in match (loop 10) with
-   | x -> (fun s -> x)
-   | effect (Get x) k -> (fun s -> k s s)
-   | effect (Put s) k -> (fun t -> k () s)
+   | x -> (fun _ -> x)
+   | effect (Get _) k -> (fun s -> k s s)
+   | effect (Put s) k -> (fun _ -> k () s)
 ) 0

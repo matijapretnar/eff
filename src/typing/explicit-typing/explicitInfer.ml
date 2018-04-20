@@ -530,7 +530,6 @@ and type_plain_expression in_cons st = function
           (eff, abs2) =
         let in_op_ty, out_op_ty = Untyped.EffectMap.find eff st.effects in
         let x, k, c_op = abs2 in
-        let Untyped.PVar x_var = x.Untyped.term in
         let Untyped.PVar k_var = k.Untyped.term in
         let cons_3 =
           (Unification.apply_substitution_ty subs_n op_term_ty, out_ty)
@@ -932,17 +931,14 @@ and type_abstraction in_cons st (pat, comp) ty_in =
 and type_effect_clause eff abs2 in_st in_cons in_sub =
   let in_op_ty, out_op_ty = Untyped.EffectMap.find eff in_st.effects in
   let x, k, c_op = abs2 in
-  let Untyped.PVar x_var = x.Untyped.term in
-  let Untyped.PVar k_var = k.Untyped.term in
-  let alpha_i_param = Params.Ty.fresh () in
+  let st_subbed = apply_sub_to_env in_st in_sub in
   let alpha_i, alpha_cons = Typed.fresh_ty_with_fresh_skel () in
   let alpha_dirty = Types.make_dirty alpha_i in
-  let st_subbed = apply_sub_to_env in_st in_sub in
-  let temp_st = add_def st_subbed x_var in_op_ty in
-  let new_st = add_def temp_st k_var (Types.Arrow (out_op_ty, alpha_dirty)) in
-  let cons = alpha_cons :: in_cons in
+  let x', st', cons' = type_typed_pattern in_cons st_subbed x in_op_ty in
+  let k', st'', cons'' = type_typed_pattern cons' st' k (Types.Arrow (out_op_ty, alpha_dirty)) in
+  let cons = alpha_cons :: cons'' in
   let typed_c_op, typed_co_op_ty, co_op_cons, c_op_sub =
-    type_computation cons new_st c_op
+    type_computation cons st'' c_op
   in
   (typed_c_op, typed_co_op_ty, st_subbed, co_op_cons, c_op_sub, alpha_dirty)
 
