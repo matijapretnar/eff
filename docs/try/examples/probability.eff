@@ -20,7 +20,7 @@ let rec uniform = function
 let random_value = handler
   | v -> v
   | effect (Toss p) k ->
-    let toss = perform (Random_float 1.) < p in
+    let toss = perform (RandomFloat 1.) < p in
     continue k toss
 ;;
 
