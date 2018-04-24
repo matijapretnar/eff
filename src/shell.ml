@@ -9,6 +9,8 @@ let help_text =
 type state =
   {runtime: Eval.state; typing: SimpleInfer.t; desugaring: Desugar.state}
 
+let _ = Random.self_init ()
+
 let initial_state =
   {runtime= Eval.empty; typing= SimpleInfer.empty; desugaring= Desugar.initial}
 

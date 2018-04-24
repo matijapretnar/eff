@@ -163,11 +163,11 @@ let rec top_handle = function
       Format.pp_print_flush !Config.output_formatter () ;
       top_handle (k V.unit_value)
   | V.Call ("Raise", v, k) -> Error.runtime "%t" (Value.print_value v)
-  | V.Call ("Random_int", v, k) ->
+  | V.Call ("RandomInt", v, k) ->
       let rnd_int = Random.int (Value.to_int v) in
       let rnd_int_v = V.Const (Const.of_integer rnd_int) in
       top_handle (k rnd_int_v)
-  | V.Call ("Random_float", v, k) ->
+  | V.Call ("RandomFloat", v, k) ->
       let rnd_float = Random.float (Value.to_float v) in
       let rnd_float_v = V.Const (Const.of_float rnd_float) in
       top_handle (k rnd_float_v)
