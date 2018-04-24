@@ -1,0 +1,214 @@
+(* An example of automatic threading. We build handlers, that model a memory
+   accessed via identifiers. If the data is not yet known when looking it up,
+   it automatically halts the thread and waits until the data is known. *)
+
+(* Types for memory. *)
+type id = string
+type 'a data = Unknown | Known of 'a
+
+(* Types for threads and thread builders. *)
+type thread = unit -> unit
+type 'a thread_builder = 'a -> thread
+
+
+(* Effects for memory (saves data and waiting threads). *)
+effect Update_data : id * int -> unit
+effect Lookup_data : id -> int data * int thread_builder list
+effect Bind_to_data : id * int thread_builder -> unit
+effect Unbind_all : id -> unit
+
+(* Effects for the queue of active threads (ideally they would run parallel). *)
+effect Enqueue : thread -> unit
+effect Dequeue : thread option
+
+(* Effects for spawnning and running threads. *)
+effect Spawn : thread -> unit
+effect Run_next : unit
+
+(* Effects used by the user to access the memory. *)
+effect Update : id * int -> unit
+effect Lookup : id -> int
+
+
+(* Auxilary functions for the association list used to model our memory.
+   Using trees or hash tables would be more efficient but we keep it simple.
+   Instead of saving waiting threads we save 'waiting thread builders'.
+   That way, when a value becomes known, we use the thread builders to
+   construct the threads that need to resume running. *)
+
+let rec mem_find id = function
+  | [] -> None
+  | (id', d', t_bs')::tl ->
+    if id = id' then Some (d', t_bs') else mem_find id tl
+
+let rec mem_update id d t_b = function
+  | [] -> [(id, d, t_b)]
+  | (id', d', t_b')::tl ->
+    if id = id' then
+      (id, d, t_b) :: tl
+    else
+      (id', d', t_b') :: (mem_update id d t_b tl)
+
+
+(* MEMORY HANDLER *)
+(* This is a slightly more advanced state handler. Instead of just updating
+   and looking up data we also have special effects used to bind and unbind
+   thread builders to and from data. *)
+
+let mem_handler = handler
+  | effect (Update_data (id, v)) k -> (fun mem ->
+      (continue k ()) (mem_update id (Known v) [] mem))
+  | effect (Lookup_data id) k -> (fun mem ->
+      (match mem_find id mem with
+      | Some d -> (continue k d) mem
+      | None -> (continue k (Unknown, [])) mem))
+  | effect (Bind_to_data (id, t_b)) k -> (fun mem ->
+      match mem_find id mem with
+      | None -> (continue k ()) (mem_update id (Unknown) [t_b] mem)
+      (* We bind thread builders to the end of the waiting list. *)
+      | Some (d, t_bs) -> (continue k ()) (mem_update id d (t_bs @ [t_b]) mem))
+  | effect (Unbind_all id) k -> (fun mem ->
+    match mem_find id mem with
+    | None -> (continue k ()) mem
+    | Some (d, _) -> (continue k ()) (mem_update id d [] mem))
+  (* The value clause returns the memory instead of the actual value.
+     Because threads have type unit -> unit it is unlikely that the returned
+     value will have any significance, however the data in memory might. *)
+  | x -> (fun mem ->  map (fun (id, d, _) -> (id, d)) mem)
+  | finally prog -> prog []
+
+
+(* THREAD QUEUE HANDLER *)
+(* Another state handler, this one being a simple queue. *)
+let thread_queue = handler
+  (* We have a 'first in first out' queue so we add to the end of list. *)
+  | effect (Enqueue t) k -> (fun q -> (continue k ()) (q @ [t]))
+  | effect Dequeue k -> (fun q ->
+    match q with
+    | [] -> (continue k None) []
+    | t::ts -> (continue k (Some t)) ts)
+  | x -> (fun _ -> x)
+  | finally prog -> prog []
+
+
+(* THREAD HANDLER *)
+(* This handler is responsible for spawnning and running threads. Ideally this
+   would run all the active threads in parallel, however Eff does not currently
+   support that, so we simply add the spawned threads to the thread queue and
+   run the next thread in the queue.
+   The handler must be defined recursively so that we can handle threads
+   that we run. *)
+let thread_handler =
+  let rec thread_handler_rec () = handler
+  | effect (Spawn t) k ->
+    (perform (Enqueue t); continue k ())
+  | effect Run_next k ->
+    match perform Dequeue with
+    | None -> ()
+    | Some t -> (with thread_handler_rec () handle t ())
+  in
+  thread_handler_rec ()
+
+
+(* SCHEDULER HANDLER *)
+(* This is the main handler used by the user. It takes care of updating the
+   main memory, halting and storing waiting threads and after a new data
+   is known, activates all the waiting threads and clears up a bit of the
+   memory.
+   Defined recursively for the same reason as the thread handler. *)
+let scheduler =
+  let rec continuation_tb k =
+    (* Constructs a thread builder from a continuation. The thread builder
+       passes the data value to the continuation and wraps it in the scheduler.
+       Ignore is used so that it builds a unit -> unit thread. *)
+    (fun v -> (fun () -> ignore (with scheduler_rec () handle continue k v)))
+  and scheduler_rec () = handler
+    | effect (Lookup id) k -> (
+      match perform (Lookup_data id) with
+      (* If the value is unknown, halt the thread, save it, run next one. *)
+      | (Unknown, _) -> (
+        perform (Bind_to_data (id, continuation_tb k));
+        perform Run_next;
+        absurd perform (Raise "This shouldn't happen!"))
+      | (Known v, _) -> continue k v)
+    | effect (Update (id, v)) k -> (
+      match perform (Lookup_data id) with
+      | (Known _, _) -> ( perform (Update_data (id, v)); continue k () )
+      (* If unknown data was updated, spawn all waiting threads by passing the
+         value to the saved thread builders. Unbind to free space. *)
+      | (Unknown, waiting) -> (
+        perform (Update_data (id, v));
+        perform (Unbind_all id);
+        iter (fun tb -> perform (Spawn (tb v))) waiting;
+        (* Adding k to the queue allows 'reawakened' threads to go first. *)
+        perform (Spawn (continue k));
+        perform Run_next))
+    (* We want all our threads to finish, so we run all unfinished ones after
+       a value is returned. *)
+    | () -> perform Run_next
+  (* Return the recursive handler. *)
+  in scheduler_rec ()
+
+
+(* AUXILARY FUNCTIONS *)
+(* These functions are used by the user to run different threads (we do not want
+   the user to use the above effects outside these functions). *)
+
+let lookup id = perform (Lookup id)
+
+let update id v = perform (Update (id, v))
+
+let run_threads ts =
+  let spawner t = (
+    let handled_t () =
+      with thread_handler handle
+      with scheduler handle
+      t ()
+    in
+    perform (Spawn handled_t))
+  in
+  iter spawner ts; perform Run_next
+
+
+(* TESTING *)
+(* This test attempts to multiply four matrices A, B, C and D. If we want to
+   observe the order of looking up and updating, we can use the functions
+   defined in this comment.
+
+   *)
+let lookup id = perform (Print ("\nlooking up "^id)); perform (Lookup id)
+
+let update id v = perform (Print ("\nupdating "^id)); perform (Update (id, v))
+
+
+let set_matrix m (a, b, c, d) () =
+update (m ^ "11") a;
+update (m ^ "12") b;
+update (m ^ "21") c;
+update (m ^ "22") d
+
+let multiply m1 m2 () =
+  let name = m1 ^ m2 in
+  update (name ^ "11")
+    ( (lookup (m1 ^ "11"))*(lookup (m2 ^ "11"))
+    + (lookup (m1 ^ "12"))*(lookup (m2 ^ "21")));
+  update (name ^ "12")
+    ( (lookup (m1 ^ "11"))*(lookup (m2 ^ "12"))
+    + (lookup (m1 ^ "12"))*(lookup (m2 ^ "22")));
+  update (name ^ "21")
+    ( (lookup (m1 ^ "21"))*(lookup (m2 ^ "11"))
+    + (lookup (m1 ^ "22"))*(lookup (m2 ^ "21")));
+  update (name ^ "22")
+    ( (lookup (m1 ^ "21"))*(lookup (m2 ^ "12"))
+    + (lookup (m1 ^ "22"))*(lookup (m2 ^ "22")))
+
+let test () =
+  with mem_handler handle
+  with thread_queue handle
+  with thread_handler handle
+  with scheduler handle
+  run_threads [
+    set_matrix "A" (1, 2, 3, 4); set_matrix "B" (0, 1, 0, 1);
+    set_matrix "C" (2, 2, 2, 2); set_matrix "D" (5, 0, -2, -1);
+    multiply "AB" "CD"; multiply "A" "B"; multiply "C" "D"
+    ]
