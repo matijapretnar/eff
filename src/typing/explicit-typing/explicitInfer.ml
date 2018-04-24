@@ -935,7 +935,9 @@ and type_effect_clause eff abs2 in_st in_cons in_sub =
   let alpha_i, alpha_cons = Typed.fresh_ty_with_fresh_skel () in
   let alpha_dirty = Types.make_dirty alpha_i in
   let x', st', cons' = type_typed_pattern in_cons st_subbed x in_op_ty in
-  let k', st'', cons'' = type_typed_pattern cons' st' k (Types.Arrow (out_op_ty, alpha_dirty)) in
+  let k', st'', cons'' =
+    type_typed_pattern cons' st' k (Types.Arrow (out_op_ty, alpha_dirty))
+  in
   let cons = alpha_cons :: cons'' in
   let typed_c_op, typed_co_op_ty, co_op_cons, c_op_sub =
     type_computation cons st'' c_op

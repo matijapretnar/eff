@@ -57,3 +57,7 @@ val explicit_subtyping : bool ref
 val output_formatter : Format.formatter ref
 
 val error_formatter : Format.formatter ref
+
+type backend = MulticoreOCaml | PlainOCaml
+
+val backend : backend ref

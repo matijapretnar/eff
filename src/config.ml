@@ -32,3 +32,7 @@ let explicit_subtyping = ref false
 let output_formatter = ref Format.std_formatter
 
 let error_formatter = ref Format.err_formatter
+
+type backend = MulticoreOCaml | PlainOCaml
+
+let backend = ref PlainOCaml

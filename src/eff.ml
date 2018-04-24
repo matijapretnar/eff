@@ -47,6 +47,9 @@ let options =
     ; ( "--compile"
       , Arg.String (fun str -> enqueue_file (Compile str))
       , "<file> Compile <file>" )
+    ; ( "--multicore"
+      , Arg.Unit (fun () -> Config.backend := Config.MulticoreOCaml)
+      , " Use the Multicore OCaml compilation backend" )
     ; ("-V", Arg.Set_int Config.verbosity, "<n> Set printing verbosity to <n>")
     ]
 

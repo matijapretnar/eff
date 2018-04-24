@@ -192,7 +192,11 @@ let compile_file ppf filename st =
           (Types.print_target_ty ct_ty)
           (Types.print_target_dirt ct_dirt) ;
         let erasure_ct = Erasure.typed_to_erasure_comp [] ct in
-        NewPrint.print_computation erasure_ct out_ppf ;
+        ( match !Config.backend with
+        | MulticoreOCaml ->
+            CodegenMulticoreOCaml.print_computation erasure_ct out_ppf
+        | PlainOCaml -> CodegenPlainOCaml.print_computation erasure_ct out_ppf
+        ) ;
         Format.fprintf out_ppf "\n;;\n " ;
         print_endline "ended found something!" ;
         {st with explicit_typing}
@@ -208,7 +212,9 @@ let compile_file ppf filename st =
       match OldUtils.lookup f External.values with
       | Some v ->
           let new_ty = Types.source_to_target ty in
-          Print.print out_ppf "let %t = ( %s )" (NewPrint.print_variable x) f ;
+          Print.print out_ppf "let %t = ( %s )"
+            (CodegenPlainOCaml.print_variable x)
+            f ;
           Format.fprintf out_ppf "\n;;\n " ;
           { st with
             typing= SimpleCtx.extend st.typing x (Type.free_params ty, ty)
