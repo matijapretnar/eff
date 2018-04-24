@@ -159,8 +159,13 @@ let compile_file ppf filename st =
   let out_channel = open_out (filename ^ ".ml") in
   let out_ppf = Format.formatter_of_out_channel out_channel in
   (* look for header.ml next to the executable  *)
+  let header_file_basename =
+    match !Config.backend with
+    | Config.MulticoreOCaml -> "backendHeaderMulticoreOCaml.ml"
+    | Config.PlainOCaml -> "backendHeaderPlainOCaml.ml"
+  in
   let header_file =
-    Filename.concat (Filename.dirname Sys.argv.(0)) "header.ml"
+    Filename.concat (Filename.dirname Sys.argv.(0)) header_file_basename
   in
   let header_channel = open_in header_file in
   let n = in_channel_length header_channel in
