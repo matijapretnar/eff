@@ -6,13 +6,13 @@ let continue x = x
 (* Top level effects. *)
 effect Print : string -> unit
 
-effect Read : unit -> string
+effect Read : string
 
 effect Raise : string -> empty
 
-effect Random_int : int -> int
+effect RandomInt : int -> int
 
-effect Random_float: float -> float
+effect RandomFloat: float -> float
 
 (* Integers and Floats *)
 external ( = ) : 'a -> 'a -> bool = "="
@@ -21,7 +21,7 @@ external ( < ) : 'a -> 'a -> bool = "<"
 
 let absurd void = match void with;;
 
-effect DivisionByZero : unit -> empty
+effect DivisionByZero : empty
 
 effect InvalidArgument : string -> empty
 
@@ -29,9 +29,9 @@ effect Failure : string -> empty
 
 let failwith msg = absurd (perform (Failure msg)) ;;
 
-effect AssertionFault : unit -> empty
+effect AssertionFault : empty
 
-let assert b = if b then () else absurd (perform (AssertionFault ())) ;;
+let assert b = if b then () else absurd (perform AssertionFault) ;;
 
 external ( ~- ) : int -> int = "~-"
 
@@ -43,7 +43,7 @@ external ( - ) : int -> int -> int = "-"
 
 external ( mod ) : int -> int -> int = "mod"
 let (mod) m n = match n with
-  | 0 -> absurd (perform (DivisionByZero ()))
+  | 0 -> absurd (perform DivisionByZero)
   | n -> m mod n
 
 external ( ~-. ) : float -> float = "~-."
@@ -60,7 +60,7 @@ external ( / ) : int -> int -> int = "/"
 external ( ** ) : int -> int -> int = "**"
 
 let ( / ) m n = match n with
-  | 0 -> absurd (perform (DivisionByZero ()))
+  | 0 -> absurd (perform DivisionByZero)
   | n -> (/) m n
 
 (* Strings *)
@@ -215,13 +215,11 @@ let print v =
 let print_string str =
   perform (Print str)
 
-let print_endline v =
-  let s = to_string v in
-    perform (Print s);
-    perform (Print "\n")
+let print_endline str =
+    perform (Print (str ^ "\n"))
 
 (* Basic Handlers *)
-effect Lookup: unit -> int
+effect Lookup: int
 effect Update: int -> unit
 
 let state initial = handler

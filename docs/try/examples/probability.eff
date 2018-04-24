@@ -2,7 +2,7 @@
 
 (* As seen in non-determinism examples, effects can be used to simulate choice.
    In order to use randomness we also need to use effects, for instance
-   Random_int and Random_float. We can also use handlers to compute some
+   RandomInt and RandomFloat. We can also use handlers to compute some
    properties, for instance the expected value of a discrete random variable. *)
 
 (* We define an operation Toss to use as a random coin toss. *)

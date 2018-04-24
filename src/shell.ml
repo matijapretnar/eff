@@ -13,6 +13,8 @@ type state =
   ; desugaring: Desugar.state
   ; typing: SimpleInfer.t }
 
+let _ = Random.self_init ()
+
 let initial_state =
   { runtime= Eval.empty
   ; explicit_typing= ExplicitInfer.empty
