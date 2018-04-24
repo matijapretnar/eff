@@ -1,4 +1,3 @@
 val h : 'a => 'a = <handler>
 val g : 'a => 'a = <handler>
-Runtime error (unknown location):
-invalid comparison with <
+Runtime error: invalid comparison with <
