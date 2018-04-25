@@ -11,7 +11,7 @@ let solve cstr =
         if Type.occurs_in_ty p t then
           let t1, t2 = Type.beautify2 t1 t2 in
           Error.typing ~loc
-            "This expression has a forbidden cylclic type %t = %t."
+            "This expression has a forbidden cyclic type %t = %t."
             (Type.print t1) (Type.print t2)
         else sbst := Type.compose_subst [(p, t)] !sbst
     | Type.Arrow (u1, v1), Type.Arrow (u2, v2) ->
