@@ -30,6 +30,11 @@ let int_int_to_int f =
   let int_f v1 v2 = value_int (f (V.to_int v1) (V.to_int v2)) in
   binary_closure int_f
 
+(** [float_to_float f] takes a unary float function f and transforms it into
+    a closure that takes two values and evaluates to a value. *)
+let float_to_float f =
+  from_fun (fun v -> value_float (f (V.to_float v)))
+
 
 (** [float_float_to_float f] takes a binary float function f and transforms it
     into a closure that takes two values and evaluates to a value. *)
@@ -155,7 +160,10 @@ let arithmetic_operations =
   ; ("+.", float_float_to_float ( +. ))
   ; ("-.", float_float_to_float ( -. ))
   ; ("*.", float_float_to_float ( *. ))
-  ; ("/.", float_float_to_float ( /. )) ]
+  ; ("/.", float_float_to_float ( /. ))
+  ; ("exp", float_to_float (exp))
+  ; ("log", float_to_float (log))
+  ]
 
 
 let string_operations =
