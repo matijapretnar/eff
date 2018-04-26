@@ -113,6 +113,8 @@ val letrecbinding : loc:Location.t -> dirty_scheme -> dirty_scheme
 
 val letbinding : loc:Location.t -> dirty_scheme -> abstraction_scheme -> dirty_scheme
 
+val dobinding : loc:Location.t -> dirty_scheme -> abstraction_scheme -> dirty_scheme
+
 (************************)
 (* PATTERN CONSTRUCTORS *)
 (************************)

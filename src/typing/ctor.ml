@@ -35,6 +35,11 @@ let abstraction2 ?loc p1 p2 c : Typed.abstraction2 =
 (* EXPRESSION SMART CONSTRUCTORS *)
 (*********************************)
 
+let built_in ?loc x n ty_sch =
+  let loc = backup_location loc [] in
+  let term = Typed.BuiltIn (x, n) in
+  Typed.annotate term ty_sch loc
+
 let lambdavar ?loc x ty =
   let loc = backup_location loc [] in
   let sch = Scheme.var ~loc x ty in
@@ -163,13 +168,18 @@ let letrecbinding ?loc defs c =
 
 let bind ?loc c1 c2 =
   let loc = backup_location loc [c1.Typed.location; c2.Typed.location] in
-  let sch = Scheme.letbinding ~loc c1.Typed.scheme c2.Typed.scheme in
+  let sch = Scheme.dobinding ~loc c1.Typed.scheme c2.Typed.scheme in
   let term = Typed.Bind (c1, c2) in
   Typed.annotate term sch loc
 
 let let_in ?loc e1 c2 =
-  let loc = backup_location loc [] in
-  bind ~loc (value ~loc e1) c2
+  (* let loc = backup_location loc [] in *)
+  (* bind ~loc (value ~loc e1) c2 *)
+  let loc = backup_location loc [e1.Typed.location; c2.Typed.location] in
+  let c1 = (value ~loc e1) in
+  let sch = Scheme.letbinding ~loc c1.Typed.scheme c2.Typed.scheme in
+  let term = Typed.Bind (c1, c2) in
+  Typed.annotate term sch loc
 
 let letbinding ?loc defs c =
   let loc = backup_location loc [] in
@@ -178,7 +188,7 @@ let letbinding ?loc defs c =
     | Typed.Value e_def -> let_in ~loc e_def (abstraction ~loc p_def binds)
     | _ ->  bind ~loc c_def (abstraction ~loc p_def binds)
   ) defs c
-
+  
 (******************************)
 (* PATTERN SMART CONSTRUCTORS *)
 (******************************)

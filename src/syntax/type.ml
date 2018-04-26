@@ -14,6 +14,7 @@ type ty =
   | RecType of Params.ty_param * ty
   | Union of ty * ty
   | Intersection of ty * ty
+  | XContext
 
 (* Primitive types *)
 and prim_ty =
@@ -30,8 +31,11 @@ and dirt =
   | Op of OldUtils.effect
   | DirtVar of Params.dirt_param
   | DirtBottom
+  | DirtTop
   | DirtUnion of dirt * dirt
   | DirtIntersection of dirt * dirt
+  | XContextDirt
+
 (* {
   ops: OldUtils.effect list;
   rest: Params.dirt_param

@@ -98,12 +98,12 @@ let print_dirty_scheme ty_sch ppf =
 
 let solve_ty (ctx, ty, cnstrs) =
   let (ctx, ty, cnstrs) = Unification.unify_ty ctx ty cnstrs in
-  let (ctx, ty) = Simplify.simplify_ty ctx ty in
+  (* let (ctx, ty) = Simplify.simplify_ty ctx ty in *)
   (ctx, ty, cnstrs)
 
 let solve_dirty (ctx, ty, cnstrs) =
   let (ctx, ty, cnstrs) = Unification.unify_dirty ctx ty cnstrs in
-  let (ctx, ty) = Simplify.simplify_dirty ctx ty in
+  (* let (ctx, ty) = Simplify.simplify_dirty ctx ty in *)
   (ctx, ty, cnstrs)
 
 (*****************************)
@@ -282,10 +282,29 @@ let letrecbinding ~loc c =
   solve_dirty c
 
 let letbinding ~loc c1 c2 =
-  let ctx_c1, ty_c1, cnstrs_c1 = c1 in
-  let ctx_c2, (ty_p, ty_c2), cnstrs_c2 = c2 in
-  solve_dirty (ctx_c1 @ ctx_c2, ty_c2, Unification.list_union [cnstrs_c1; cnstrs_c2])
+  let ctx_c1, (ty1, drt1), cnstrs_c1 = c1 in
+  let ctx_c2, (ty_p, (ty2, drt2)), cnstrs_c2 = c2 in
+  let constraints =
+    Unification.list_union [cnstrs_c1; cnstrs_c2]
+  in
+  solve_dirty (ctx_c1 @ ctx_c2, (ty2, drt2), constraints)
 
+let dobinding ~loc c1 c2 =
+  let ctx_c1, (ty1, drt1), cnstrs_c1 = c1 in
+  let ctx_c2, (ty_p, (ty2, drt2)), cnstrs_c2 = c2 in
+  begin match drt2 with
+    | Type.DirtBottom -> 
+      let constraints = Unification.list_union [cnstrs_c1; cnstrs_c2] in
+      solve_dirty (ctx_c1 @ ctx_c2, (ty2, drt1), constraints)
+    | _ -> 
+      let constraints = 
+        Unification.list_union [cnstrs_c1; cnstrs_c2]
+        |> Unification.add_dirt_constraint ~loc drt1 drt2
+      in
+      solve_dirty (ctx_c1 @ ctx_c2, (ty2, drt2), constraints)
+  end
+  
+  
 (************************)
 (* PATTERN CONSTRUCTORS *)
 (************************)

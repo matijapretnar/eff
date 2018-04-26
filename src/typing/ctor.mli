@@ -12,6 +12,8 @@ val abstraction2 : ?loc:Location.t -> Typed.pattern -> Typed.pattern -> Typed.co
 (* EXPRESSION CONSTRUCTORS *)
 (***************************)
 
+val built_in : ?loc:Location.t -> string -> int -> Scheme.ty_scheme -> Typed.expression
+
 (* smart constructor for the Var term : expression *)
 val lambdavar : ?loc:Location.t -> Typed.variable -> Type.ty -> Typed.expression
 

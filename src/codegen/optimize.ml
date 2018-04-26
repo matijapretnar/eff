@@ -5,17 +5,18 @@
 
 *)
 open Typed
+open Subst
 
-let x = Types.PrimTy BoolTy;;
+let x = Type.Prim BoolTy;;
 
 type state = {
-  inlinable : (Typed.variable, unit -> Typed.expression) Common.assoc;
-  stack : (Typed.variable, Typed.expression) Common.assoc;
-  letrec_memory : (Typed.variable, Typed.abstraction) Common.assoc;
+  inlinable : (Typed.variable, unit -> Typed.expression) OldUtils.assoc;
+  stack : (Typed.variable, Typed.expression) OldUtils.assoc;
+  letrec_memory : (Typed.variable, Typed.abstraction) OldUtils.assoc;
   handlers_functions_mem : (Typed.expression * Typed.variable * Typed.expression) list;
   handlers_functions_ref_mem : ((Typed.expression * Typed.variable * Typed.expression) list) ref;
   handlers_functions_cont_mem : ((Typed.expression * Typed.variable * Typed.expression) list);
-  impure_wrappers : (Typed.variable, Typed.expression) Common.assoc;
+  impure_wrappers : (Typed.variable, Typed.expression) OldUtils.assoc;
   fuel : int ref;
   optimization_total : int ref;
   optimization_App_Fun : int ref;
@@ -70,24 +71,24 @@ let useFuel st =
 (* -END OPTIMIZATION FUEL --------------------------------------------------- *)
 
 let find_inlinable st x =
-  match Common.lookup x st.inlinable with
+  match OldUtils.lookup x st.inlinable with
   | Some e -> Some (e ())
   | None -> None
 
-let find_in_stack st x = Common.lookup x st.stack
+let find_in_stack st x = OldUtils.lookup x st.stack
 
-let find_in_let_rec_mem st v = Common.lookup v st.letrec_memory
+let find_in_let_rec_mem st v = OldUtils.lookup v st.letrec_memory
 
 (*let specialized_counter = ref []
 
  let specialized_count v =
-  match Common.lookup v !specialized_counter with
+  match OldUtils.lookup v !specialized_counter with
   | Some n -> n
   | None -> 0
 
 let incr_specialized_count v =
   let n = specialized_count v in
-  specialized_counter := Common.update v (n + 1) !specialized_counter
+  specialized_counter := OldUtils.update v (n + 1) !specialized_counter
  *)
 
 let alphaeq_handler_no_vc eqvars h h'=
@@ -148,12 +149,12 @@ let different_branch_specialized defs st =
   let findresinlocal = fun f_name -> (
                   List.filter
                   (fun (h,old_f,new_f) -> 
-                      let Var vv = new_f.term in 
+                      let LetVar vv = new_f.term in 
                       (f_name == vv) )   (st.handlers_functions_mem)) in 
   let findresinglobal = fun f_name -> (
                   List.filter
                   (fun (h,old_f,new_f) -> 
-                      let Var vv = new_f.term in 
+                      let LetVar vv = new_f.term in 
                       (f_name == vv) )   !(st.handlers_functions_ref_mem)) in 
   let globalboollist = 
       (List.map (fun (var,abs) ->
@@ -179,11 +180,11 @@ let different_branch_specialized defs st =
 let inlinable_definitions =
   let unary_builtin f ty1 ty2 =
     let drt = Type.fresh_dirt () in
-    built_in f 1 (Scheme.simple (Type.Arrow (ty1, (ty2, drt))))
+    Ctor.built_in f 1 (Scheme.simple (Type.Arrow (ty1, (ty2, drt))))
   and binary_builtin f ty1 ty2 ty =
     let drt = Type.fresh_dirt ()
     and drt2 = Type.fresh_dirt () in
-    built_in f 2 (Scheme.simple (Type.Arrow (ty1, (Type.Arrow (ty2, (ty, drt)), drt2))))
+    Ctor.built_in f 2 (Scheme.simple (Type.Arrow (ty1, (Type.Arrow (ty2, (ty, drt)), drt2))))
   and polymorphic expr_of_ty = fun () -> expr_of_ty (Type.fresh_ty ())
   and monomorphic expr = fun () -> expr in
   [
@@ -213,7 +214,7 @@ let inlinable_definitions =
 
 let make_var ?(loc=Location.unknown) ann scheme =
   let x = Typed.Variable.fresh ann in
-  let x_var = var ~loc x scheme
+  let x_var = Ctor.letvar ~loc x scheme
   and x_pat = {
     term = Typed.PVar x;
     location = loc;
@@ -223,7 +224,7 @@ let make_var ?(loc=Location.unknown) ann scheme =
 
 let refresh_var ?(loc=Location.unknown) oldvar scheme =
   let x = Typed.Variable.refresh oldvar in
-  let x_var = var ~loc x scheme
+  let x_var = Ctor.letvar ~loc x scheme
   and x_pat = {
     term = Typed.PVar x;
     location = loc;
@@ -240,7 +241,7 @@ let applicable_pattern p vars =
   let rec check_variables = function
     | [] -> NotPresent
     | x :: xs ->
-      let inside_occ, outside_occ = Typed.occurrences x vars in
+      let inside_occ, outside_occ = Subst.occurrences x vars in
       if inside_occ > 0 || outside_occ > 1 then
         NotInlinable
       else
@@ -252,29 +253,29 @@ let applicable_pattern p vars =
   check_variables (Typed.pattern_vars p)
 
 let is_atomic e =
-  match e.term with | Var _ -> true | Const _ -> true | _ -> false
+  match e.term with | LetVar _ -> true | Const _ -> true | _ -> false
 
 let unused x c =
-  let vars = Typed.free_vars_comp  c in
-  let inside_occ, outside_occ = Typed.occurrences x vars in
+  let vars = Subst.free_vars_comp  c in
+  let inside_occ, outside_occ = Subst.occurrences x vars in
   inside_occ == 0 && outside_occ == 0
 
-let refresh_abs a = Typed.refresh_abs [] a
-let refresh_abs2 a2 = Typed.refresh_abs2 [] a2
-let refresh_expr e = Typed.refresh_expr [] e
-let refresh_comp c = Typed.refresh_comp [] c
-let refresh_handler h = Typed.refresh_handler [] h
+let refresh_abs a = Refresh.refresh_abs [] a
+let refresh_abs2 a2 = Refresh.refresh_abs2 [] a2
+let refresh_expr e = Refresh.refresh_expr [] e
+let refresh_comp c = Refresh.refresh_comp [] c
+let refresh_handler h = Refresh.refresh_handler [] h
 
-let substitute_var_comp comp vr exp = Typed.subst_comp [(vr, exp.term)] comp
+let substitute_var_comp comp vr exp = Subst.subst_comp [(vr, exp.term)] comp
 
 let rec substitute_pattern_comp st c p exp =
-  optimize_comp st (Typed.subst_comp (Typed.pattern_match p exp) c)
+  optimize_comp st (Subst.subst_comp (Subst.pattern_match p exp) c)
 and substitute_pattern_expr st e p exp =
-  optimize_expr st (Typed.subst_expr (Typed.pattern_match p exp) e)
+  optimize_expr st (Subst.subst_expr (Subst.pattern_match p exp) e)
 
 and beta_reduce st ({term = (p, c)} as a) e =
   (* Print.debug  "Inlining? %t[%t -> %t]" (Typed.print_computation c) (Typed.print_pattern p) (Typed.print_expression e) ; *)
-  match applicable_pattern p (Typed.free_vars_comp c) with
+  match applicable_pattern p (Subst.free_vars_comp c) with
   | NotInlinable when is_atomic e -> substitute_pattern_comp st c p e
   | Inlinable -> substitute_pattern_comp st c p e
   | NotPresent -> c
@@ -283,14 +284,14 @@ and beta_reduce st ({term = (p, c)} as a) e =
       begin match p with
         | {term = Typed.PVar x} ->
           (* Print.debug "Added to stack ==== %t" (Typed.print_variable x); *)
-          let st = {st with stack = Common.update x e st.stack} in
-          abstraction p (optimize_comp st c)
+          let st = {st with stack = OldUtils.update x e st.stack} in
+          Ctor.abstraction p (optimize_comp st c)
         | _ ->
           (* Print.debug "We are now in the let in 5 novar for %t" (Typed.print_pattern p); *)
           a
       end
     in
-    let_in e a
+    Ctor.let_in e a
 
 and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
 and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
@@ -299,24 +300,22 @@ and optimize_sub_expr st e =
   let loc = e.location in
   match e.term with
   | Record lst ->
-    record ~loc (Common.assoc_map (optimize_expr st) lst)
+    Ctor.record ~loc (OldUtils.assoc_map (optimize_expr st) lst)
   | Variant (lbl, e) ->
-    variant ~loc (lbl, (Common.option_map (optimize_expr st) e))
+    Ctor.variant ~loc (lbl, (OldUtils.option_map (optimize_expr st) e))
   | Tuple lst ->
-    tuple ~loc (List.map (optimize_expr st) lst)
+    Ctor.tuple ~loc (List.map (optimize_expr st) lst)
   | Lambda a ->
-    lambda ~loc (optimize_abs st a)
+      assert false
+    (* Ctor.lambda ~loc (optimize_abs st a) *)
   | Handler h ->
-    handler ~loc {
-      effect_clauses = Common.assoc_map (optimize_abs2 st) h.effect_clauses;
-      value_clause = optimize_abs st h.value_clause;
-    }
-  | (Var _ | Const _ | BuiltIn _ | Effect _) -> e
+    Ctor.handler ~loc (OldUtils.assoc_map (optimize_abs2 st) h.effect_clauses) (optimize_abs st h.value_clause)
+  | (LetVar _ | LambdaVar _ | Const _ | BuiltIn _ | Effect _) -> e
 and optimize_sub_comp st c =
   let loc = c.location in
   match c.term with
   | Value e ->
-    value ~loc (optimize_expr st e)
+    Ctor.value ~loc (optimize_expr st e)
   
   | LetRec (defs, c1) when different_branch_specialized defs st ->
     (* List.fold_right (fun (var,abs) st ->
@@ -326,15 +325,15 @@ and optimize_sub_comp st c =
       let findresinglobal = fun f_name -> (
                   List.filter
                   (fun (h,old_f,new_f) -> 
-                      let Var vv = new_f.term in 
+                      let LetVar vv = new_f.term in 
                       (f_name == vv) )   !(st.handlers_functions_ref_mem)) in 
       begin match findresinglobal var with 
-      | [] -> let_rec' ~loc (Common.assoc_map (optimize_abs st) defs) (optimize_comp st c1)
+      | [] -> Ctor.letrecbinding ~loc (OldUtils.assoc_map (optimize_abs st) defs) (optimize_comp st c1)
       | (h,old_f,new_f) :: _ -> 
       (* Print.debug "\nold st length %i\n" (List.length (st.handlers_functions_mem) ); *)
             let st = {st with handlers_functions_mem = (h,old_f,new_f) :: st.handlers_functions_mem} in
             (* Print.debug "\nnew st length %i\n" (List.length (st.handlers_functions_mem) );  *)
-            let_rec' ~loc (Common.assoc_map (optimize_abs st) defs) (optimize_comp st c1) 
+            Ctor.letrecbinding ~loc (OldUtils.assoc_map (optimize_abs st) defs) (optimize_comp st c1) 
       end
 
 
@@ -343,19 +342,20 @@ and optimize_sub_comp st c =
     (* Print.debug "dropping unused let-rec definition"; *)
     c1
   | LetRec (li, c1) ->
-    let_rec' ~loc (Common.assoc_map (optimize_abs st) li) (optimize_comp st c1)
+    Ctor.letrecbinding ~loc (OldUtils.assoc_map (optimize_abs st) li) (optimize_comp st c1)
   | Match (e, li) ->
-    match' ~loc (optimize_expr st e) (List.map (optimize_abs st) li)
+    Ctor.patmatch ~loc (optimize_expr st e) (List.map (optimize_abs st) li)
   | Apply (e1, e2) ->
-    apply ~loc (optimize_expr st e1) (optimize_expr st e2)
+    Ctor.apply ~loc (optimize_expr st e1) (optimize_expr st e2)
   | Handle (e, c1) ->
-    handle ~loc (optimize_expr st e) (optimize_comp st c1)
+    Ctor.handle ~loc (optimize_expr st e) (optimize_comp st c1)
   | Call (eff, e1, a1) ->
-    call ~loc eff (optimize_expr st e1) (optimize_abs st a1)
+      assert false
+    (* Ctor.call ~loc eff (optimize_expr st e1) (optimize_abs st a1) *)
   | Bind (c1, a1) ->
-    bind ~loc (optimize_comp st c1) (optimize_abs st a1)
+    Ctor.bind ~loc (optimize_comp st c1) (optimize_abs st a1)
 and optimize_abs st {term = (p, c); location = loc} =
-  abstraction ~loc p (optimize_comp st c)
+  Ctor.abstraction ~loc p (optimize_comp st c)
 and optimize_abs2 st a2 = a2a2 @@ optimize_abs st @@ a22a @@ a2
 
 and reduce_expr st e =
@@ -363,7 +363,7 @@ and reduce_expr st e =
 
   | _ when outOfFuel st -> e
 
-  | Var x ->
+  | LetVar x ->
     begin match find_inlinable st x with
       | Some ({term = Handler _} as d) -> reduce_expr st (refresh_expr d)
       | Some d -> reduce_expr st d
@@ -494,7 +494,7 @@ and reduce_comp st c =
       abstraction k_pat
         (reduce_comp st (handle (refresh_expr handler) k_body))
     in
-    begin match Common.lookup eff h.effect_clauses with
+    begin match OldUtils.lookup eff h.effect_clauses with
       | Some eff_clause ->
       st.optimization_handler_With_Handled_Op := !(st.optimization_handler_With_Handled_Op) + 1;
       st.optimization_total := !(st.optimization_total) + 1;
@@ -520,8 +520,8 @@ and reduce_comp st c =
     st.optimization_total := !(st.optimization_total) + 1;
     let_rec' defs (apply (pure c) e)
  *)
-(*   | Apply ({term = Var v}, e2) ->
-    begin match Common.lookup v st.impure_wrappers with
+(*   | Apply ({term = LetVar v}, e2) ->
+    begin match OldUtils.lookup v st.impure_wrappers with
       | Some f ->
         useFuel st;
         st.optimization_App_Fun := !(st.optimization_App_Fun ) + 1;
@@ -534,10 +534,11 @@ and reduce_comp st c =
     end
  *)
 
-  | Handle (e1, {term = Apply (ae1, ae2)}) ->
+    (* FUNCTION SPECIALISATION *)
+  (* | Handle (e1, {term = Apply (ae1, ae2)}) ->
     useFuel st;
     begin match ae1.term with
-      | Var v ->
+      | LetVar v ->
             begin match (find_in_handlers_func_mem st v e1) with
              (*function exist,Same handler, same value clause*)
              | (true,Some new_f_exp,None) ->
@@ -578,7 +579,7 @@ and reduce_comp st c =
                   let Type.Arrow(f_ty_in, f_ty_out ) = Constraints.expand_ty ae1Ty in
                   let newf_scheme = Scheme.clean_ty_scheme ~loc:c.location (newf_ctx , Type.Arrow (newf_ty, (tyout_val,drt_val)), newf_const) in
                   let newf_var, newf_pat = make_var "new_special_var"  newf_scheme in
-                  let Var newfvar = newf_var.term in
+                  let LetVar newfvar = newf_var.term in
                   let Handler hndlr = e1.term in 
                   let vc_var_scheme = (ctx_val,tyin_val,cnstrs_val) in 
                   let vc_var, vc_pat = make_var "vcvar"  vc_var_scheme in
@@ -638,7 +639,7 @@ and reduce_comp st c =
                             let function_scheme = Scheme.clean_ty_scheme ~loc:c.location sch in 
                             let new_f_var, new_f_pat = refresh_var v function_scheme in
                             let new_handler_call = handle e1 let_rec_c in
-                            let Var newfvar = new_f_var.term in
+                            let LetVar newfvar = new_f_var.term in
                             let defs = [(newfvar, (abstraction let_rec_p new_handler_call ))] in
                             let st = {st with handlers_functions_mem = (e1,v,new_f_var) :: st.handlers_functions_mem} in
                             st.handlers_functions_ref_mem := (e1,v,new_f_var) :: !(st.handlers_functions_ref_mem) ;
@@ -653,9 +654,9 @@ and reduce_comp st c =
                                     c
                        end
                end
-        end
+        end *)
 (*
-      | PureApply ({term = Var fname}, pae2)->
+      | PureApply ({term = LetVar fname}, pae2)->
         begin match find_in_stack st fname with
           | Some {term = PureLambda {term = (dp1, {term = Lambda ({term = (dp2,dc)})})}} ->
             let f_var, f_pat = make_var "newvar" ae1.scheme in
@@ -675,10 +676,10 @@ and reduce_comp st c =
             optimize_comp st res
           | _ -> c
         end
-*)
+
       | _ -> c
     end
-
+*)
 | Handle (e1, {term = Match (e2, cases)}) ->
     useFuel st;
     let push_handler = fun {term = (p, c)} ->
@@ -748,19 +749,19 @@ let optimize_command st =
   | Typed.Computation c ->
     st, Typed.Computation (optimize_comp st c)
   | Typed.TopLet (defs, vars) ->
-    let defs' = Common.assoc_map (optimize_comp st) defs in
+    let defs' = OldUtils.assoc_map (optimize_comp st) defs in
     let st' = begin match defs' with
       (* If we define a single simple handler, we inline it *)
       | [({ term = Typed.PVar x}, { term = Value ({ term = Handler _ } as e)})] ->
-        {st with inlinable = Common.update x (fun () -> (optimize_expr st e)) st.inlinable}
+        {st with inlinable = OldUtils.update x (fun () -> (optimize_expr st e)) st.inlinable}
       | [({ term = Typed.PVar x}, ({ term = Value ({term = Lambda _ } as e )} ))] ->
-        {st with stack = Common.update x e st.stack}
+        {st with stack = OldUtils.update x e st.stack}
       | _ -> st
     end
     in
     st', Typed.TopLet (defs', vars)
   | Typed.TopLetRec (defs, vars) ->
-    let defs' = Common.assoc_map (optimize_abs st) defs in
+    let defs' = OldUtils.assoc_map (optimize_abs st) defs in
     let st' = 
     List.fold_right (fun (var,abs) st ->
             (* Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs); *)
@@ -769,9 +770,9 @@ let optimize_command st =
 
   | Typed.External (x, _, f) as cmd ->
     let st' =
-      begin match Common.lookup f inlinable_definitions with
+      begin match OldUtils.lookup f inlinable_definitions with
         (* If the external function is one of the predefined inlinables, we inline it *)
-        | Some e -> {st with inlinable = Common.update x e st.inlinable}
+        | Some e -> {st with inlinable = OldUtils.update x e st.inlinable}
         | None -> st
       end
     in

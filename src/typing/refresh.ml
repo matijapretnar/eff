@@ -1,91 +1,96 @@
-
 (************************)
 (* REFRESHING FUNCTIONS *)
 (************************)
+module Variable = Symbol.Make(Symbol.String)
 
 let rec refresh_pattern sbst p =
-  let sbst', p' = refresh_pattern' sbst p.term in
-  sbst', {p with term = p'}
+  let sbst', p' = refresh_pattern' sbst p.Typed.term in
+  sbst', {p with Typed.term = p'}
 and refresh_pattern' sbst = function
-  | PVar x ->
+  | Typed.PVar x ->
     let x' = Variable.refresh x in
-    Common.update x x' sbst, PVar x'
-  | PAs (p, x) ->
+    OldUtils.update x x' sbst, Typed.PVar x'
+  | Typed.PAs (p, x) ->
     let x' = Variable.refresh x in
-    let sbst, p' = refresh_pattern (Common.update x x' sbst) p in
-    sbst, PAs (p', x')
-  | PTuple ps ->
+    let sbst, p' = refresh_pattern (OldUtils.update x x' sbst) p in
+    sbst, Typed.PAs (p', x')
+  | Typed.PTuple ps ->
     let sbst, ps' =
       List.fold_right (fun p (sbst, ps') ->
           let sbst, p' = refresh_pattern sbst p in
           sbst, p' :: ps'
         ) ps (sbst, []) in
-    sbst, PTuple ps'
-  | PRecord flds ->
+    sbst, Typed.PTuple ps'
+  | Typed.PRecord flds ->
     let sbst, flds' =
       List.fold_right (fun (lbl, p) (sbst, flds') ->
           let sbst, p' = refresh_pattern sbst p in
           sbst, (lbl, p') :: flds'
         ) flds (sbst, []) in
-    sbst, PRecord flds'
-  | PVariant (lbl, None) ->
-    sbst, PVariant (lbl, None)
-  | PVariant (lbl, Some p) ->
+    sbst, Typed.PRecord flds'
+  | Typed.PVariant (lbl, None) ->
+    sbst, Typed.PVariant (lbl, None)
+  | Typed.PVariant (lbl, Some p) ->
     let sbst, p' = refresh_pattern sbst p in
-    sbst, PVariant (lbl, Some p')
-  | (PConst _ | PNonbinding) as p -> sbst, p
+    sbst, Typed.PVariant (lbl, Some p')
+  | (Typed.PConst _ | Typed.PNonbinding) as p -> sbst, p
 
 let rec refresh_expr sbst e =
-  {e with term = refresh_expr' sbst e.term}
+  {e with Typed.term = refresh_expr' sbst e.Typed.term}
 and refresh_expr' sbst = function
-  | (Var x) as e ->
-    begin match Common.lookup x sbst with
-      | Some x' -> Var x'
+  | (Typed.LetVar x) as e ->
+    begin match OldUtils.lookup x sbst with
+      | Some x' -> Typed.LetVar x'
       | None -> e
     end
-   | Lambda a ->
+  | (Typed.LambdaVar x) as e ->
+    begin match OldUtils.lookup x sbst with
+      | Some x' -> Typed.LambdaVar x'
+      | None -> e
+    end
+   | Typed.Lambda a ->
     assert false
-  | Handler h ->
-    Handler (refresh_handler sbst h)
-  | Tuple es ->
-    Tuple (List.map (refresh_expr sbst) es)
-  | Record flds ->
-    Record (Common.assoc_map (refresh_expr sbst) flds)
-  | Variant (lbl, e) ->
-    Variant (lbl, Common.option_map (refresh_expr sbst) e)
-  | (BuiltIn _ | Const _ | Effect _) as e -> e
+  | Typed.Handler h ->
+    Typed.Handler (refresh_handler sbst h)
+  | Typed.Tuple es ->
+    Typed.Tuple (List.map (refresh_expr sbst) es)
+  | Typed.Record flds ->
+    Typed.Record (OldUtils.assoc_map (refresh_expr sbst) flds)
+  | Typed.Variant (lbl, e) ->
+    Typed.Variant (lbl, OldUtils.option_map (refresh_expr sbst) e)
+  | (Typed.BuiltIn _ | Typed.Const _ | Typed.Effect _) as e -> e
 and refresh_comp sbst c =
-  {c with term = refresh_comp' sbst c.term}
+  {c with Typed.term = refresh_comp' sbst c.Typed.term}
 and refresh_comp' sbst = function
-  | Bind (c1, c2) ->
-    Bind (refresh_comp sbst c1, refresh_abs sbst c2)
-  | LetRec (li, c1) ->
+  | Typed.Bind (c1, c2) ->
+    Typed.Bind (refresh_comp sbst c1, refresh_abs sbst c2)
+  | Typed.LetRec (li, c1) ->
     let new_xs, sbst' = List.fold_right (fun (x, _) (new_xs, sbst') ->
         let x' = Variable.refresh x in
-        x' :: new_xs, Common.update x x' sbst'
+        x' :: new_xs, OldUtils.update x x' sbst'
       ) li ([], sbst) in
     let li' =
       List.combine new_xs (List.map (fun (_, a) -> refresh_abs sbst' a) li)
     in
-    LetRec (li', refresh_comp sbst' c1)
-  | Match (e, li) ->
-    Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
-  | Apply (e1, e2) ->
-    Apply (refresh_expr sbst e1, refresh_expr sbst e2)
-  | Handle (e, c) ->
-    Handle (refresh_expr sbst e, refresh_comp sbst c)
-  | Call (eff, e, a) ->
-    Call (eff, refresh_expr sbst e, refresh_abs sbst a)
-  | Value e ->
-    Value (refresh_expr sbst e)
+    Typed.LetRec (li', refresh_comp sbst' c1)
+  | Typed.Match (e, li) ->
+    Typed.Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
+  | Typed.Apply (e1, e2) ->
+    Typed.Apply (refresh_expr sbst e1, refresh_expr sbst e2)
+  | Typed.Handle (e, c) ->
+    Typed.Handle (refresh_expr sbst e, refresh_comp sbst c)
+  | Typed.Call (eff, e, a) ->
+    Typed.Call (eff, refresh_expr sbst e, refresh_abs sbst a)
+  | Typed.Value e ->
+    Typed.Value (refresh_expr sbst e)
 and refresh_handler sbst h = {
-  effect_clauses = Common.assoc_map (refresh_abs2 sbst) h.effect_clauses;
+  effect_clauses = OldUtils.assoc_map (refresh_abs2 sbst) h.effect_clauses;
   value_clause = refresh_abs sbst h.value_clause;
 }
 and refresh_abs sbst a =
-  let (p, c) = a.term in
+  let (p, c) = a.Typed.term in
   let sbst, p' = refresh_pattern sbst p in
-  {a with term = (p', refresh_comp sbst c)}
+  {a with Typed.term = (p', refresh_comp sbst c)}
 and refresh_abs2 sbst a2 =
   (* a2a2 @@ refresh_abs sbst @@ a22a @@ a2 *)
   assert false

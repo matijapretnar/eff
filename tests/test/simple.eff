@@ -123,7 +123,7 @@ let rec check n =
 (* let id x = x;; *)
 
 let x = (fun f x -> f (f x));;
-x (fun x -> #Op ()) ;;
+(* x (fun x -> #Op ()) ;; *)
 
 (* (fun f x -> 
   let y = f x in 
@@ -200,3 +200,5 @@ val select : () |- ((τ₁ -(δ₁)→ bool) -(⊥)→
     let r = range (m + 1) n in
     m :: r
 ;; *)
+
+let id x = #Op ();x

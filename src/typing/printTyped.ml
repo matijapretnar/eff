@@ -44,8 +44,8 @@ let rec print_expression ?max_level e ppf =
     print "%s" lbl
   | Typed.Variant (lbl, Some e) ->
     print ~at_level:1 "%s %t" lbl (print_expression e)
-  | Typed.Lambda (_,_) ->
-    assert false (*Still needs to be done*)
+  | Typed.Lambda (p,c) ->
+    print "fun %t -> %t" (print_pattern p) (print_computation c)
   | Typed.Handler h ->
     print "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
              ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
