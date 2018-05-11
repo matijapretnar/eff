@@ -1,6 +1,6 @@
 type state
 
-val empty : state
+val initial_state : state
 
 val extend : CoreSyntax.pattern -> Value.value -> state -> state
 

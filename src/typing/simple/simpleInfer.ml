@@ -4,9 +4,9 @@ module Core = CoreSyntax
 module Ctx = SimpleCtx
 module Unify = SimpleUnify
 
-type t = Ctx.t
+type state = Ctx.t
 
-let empty = Ctx.empty
+let initial_state = Ctx.empty
 
 let warn_implicit_sequencing = ref false
 

@@ -6,7 +6,7 @@ module RuntimeEnv = Map.Make (CoreSyntax.Variable)
 
 type state = Value.value RuntimeEnv.t
 
-let empty = RuntimeEnv.empty
+let initial_state = RuntimeEnv.empty
 
 let update x = RuntimeEnv.add x
 

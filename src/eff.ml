@@ -157,6 +157,6 @@ let main =
       | Run filename -> Shell.execute_file Format.std_formatter filename env
       | Load filename -> Shell.execute_file ignore_all_formatter filename env
     in
-    let st = List.fold_left execute_file Shell.initial !file_queue in
+    let st = List.fold_left execute_file Shell.initial_state !file_queue in
     if !Config.interactive_shell then toplevel st
   with Error.Error err -> Error.print err ; exit 1

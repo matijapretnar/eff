@@ -11,7 +11,7 @@ type state =
   { context: (string, Untyped.variable) C.assoc
   ; constructors: (string, constructor_kind) C.assoc }
 
-let initial =
+let initial_state =
   {context= []; constructors= [(C.cons, Variant true); (C.nil, Variant false)]}
 
 

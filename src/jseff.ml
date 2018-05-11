@@ -19,7 +19,7 @@ Js.export "jseff"
        Config.output_formatter := output_formatter echo;
        Config.error_formatter := error_formatter echo;
        Tctx.reset ();
-       Shell.initial
+       Shell.initial_state
 
      method toplevel echo env cmd =
        let ppf = output_formatter echo in

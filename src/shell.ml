@@ -6,14 +6,21 @@ let help_text =
   ^ "#use \"<file>\";;  load commands from file\n"
 
 
+module TypeChecker = SimpleInfer
+module Runtime = Eval
+
 type state =
-  {runtime: Eval.state; typing: SimpleInfer.t; desugaring: Desugar.state}
+  { desugarer_state: Desugarer.state
+  ; typechecker_state: TypeChecker.state
+  ; runtime_state: Runtime.state }
+
+let initial_state =
+  { desugarer_state= Desugarer.initial_state
+  ; typechecker_state= TypeChecker.initial_state
+  ; runtime_state= Runtime.initial_state }
+
 
 let _ = Random.self_init ()
-
-let initial =
-  {runtime= Eval.empty; typing= SimpleInfer.empty; desugaring= Desugar.initial}
-
 
 (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
    It prints the result to [ppf] and returns the new state. *)
@@ -21,39 +28,47 @@ let rec exec_cmd ppf st cmd =
   let loc = cmd.CoreSyntax.location in
   match cmd.CoreSyntax.term with
   | CoreSyntax.Computation c ->
-      let typing, ty = SimpleInfer.infer_top_comp st.typing c in
-      let v = Eval.run st.runtime c in
+      let typechecker_state, ty =
+        TypeChecker.infer_top_comp st.typechecker_state c
+      in
+      let v = Runtime.run st.runtime_state c in
       Format.fprintf ppf "@[- : %t = %t@]@." (Type.print_beautiful ty)
         (Value.print_value v) ;
-      {st with typing}
+      {st with typechecker_state}
   | CoreSyntax.TypeOf c ->
-      let typing, ty = SimpleInfer.infer_top_comp st.typing c in
+      let typechecker_state, ty =
+        TypeChecker.infer_top_comp st.typechecker_state c
+      in
       Format.fprintf ppf "@[- : %t@]@." (Type.print_beautiful ty) ;
-      {st with typing}
+      {st with typechecker_state}
   | CoreSyntax.Reset ->
       Format.fprintf ppf "Environment reset." ;
       Tctx.reset () ;
-      initial
+      initial_state
   | CoreSyntax.Help ->
       Format.fprintf ppf "%s" help_text ;
       st
   | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
-      let typing = SimpleCtx.add_effect st.typing eff (ty1, ty2) in
-      {st with typing}
+      let typechecker_state =
+        SimpleCtx.add_effect st.typechecker_state eff (ty1, ty2)
+      in
+      {st with typechecker_state}
   | CoreSyntax.Quit -> exit 0
   | CoreSyntax.Use filename -> execute_file ppf filename st
   | CoreSyntax.TopLet defs ->
-      let vars, typing = SimpleInfer.infer_top_let ~loc st.typing defs in
-      let runtime =
+      let vars, typechecker_state =
+        TypeChecker.infer_top_let ~loc st.typechecker_state defs
+      in
+      let runtime_state =
         List.fold_right
           (fun (p, c) env ->
-            let v = Eval.run env c in
-            Eval.extend p v env )
-          defs st.runtime
+            let v = Runtime.run env c in
+            Runtime.extend p v env )
+          defs st.runtime_state
       in
       List.iter
         (fun (x, tysch) ->
-          match Eval.lookup x runtime with
+          match Runtime.lookup x runtime_state with
           | None -> assert false
           | Some v ->
               Format.fprintf ppf "@[val %t : %t = %t@]@."
@@ -61,33 +76,36 @@ let rec exec_cmd ppf st cmd =
                 (Type.print_beautiful tysch)
                 (Value.print_value v) )
         vars ;
-      {st with typing; runtime}
+      {st with typechecker_state; runtime_state}
   | CoreSyntax.TopLetRec defs ->
-      let vars, typing = SimpleInfer.infer_top_let_rec ~loc st.typing defs in
-      let runtime = Eval.extend_let_rec st.runtime defs in
+      let vars, typechecker_state =
+        TypeChecker.infer_top_let_rec ~loc st.typechecker_state defs
+      in
+      let runtime_state = Runtime.extend_let_rec st.runtime_state defs in
       List.iter
         (fun (x, tysch) ->
           Format.fprintf ppf "@[val %t : %t = <fun>@]@."
             (CoreSyntax.Variable.print x)
             (Type.print_beautiful tysch) )
         vars ;
-      {st with typing; runtime}
+      {st with typechecker_state; runtime_state}
   | CoreSyntax.External (x, ty, f) -> (
     match OldUtils.lookup f External.values with
     | Some v ->
         { st with
-          typing= SimpleCtx.extend st.typing x (Type.free_params ty, ty)
-        ; runtime= Eval.update x v st.runtime }
+          typechecker_state=
+            SimpleCtx.extend st.typechecker_state x (Type.free_params ty, ty)
+        ; runtime_state= Runtime.update x v st.runtime_state }
     | None -> Error.runtime "unknown external symbol %s." f )
   | CoreSyntax.Tydef tydefs ->
       Tctx.extend_tydefs ~loc tydefs ;
       st
 
 and desugar_and_exec_cmds ppf state cmds =
-  let desugar_state', untyped_cmds =
-    Desugar.desugar_commands state.desugaring cmds
+  let desugarer_state', untyped_cmds =
+    Desugarer.desugar_commands state.desugarer_state cmds
   in
-  let state' = {state with desugaring= desugar_state'} in
+  let state' = {state with desugarer_state= desugarer_state'} in
   CoreUtils.fold (exec_cmd ppf) state' untyped_cmds
 
 (* Parser wrapper *)

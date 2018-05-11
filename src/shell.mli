@@ -1,6 +1,6 @@
 type state
 
-val initial : state
+val initial_state : state
 
 val execute_file : Format.formatter -> string -> state -> state
 
