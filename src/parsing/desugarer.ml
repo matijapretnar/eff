@@ -1,6 +1,6 @@
 (** Desugaring of syntax into the core language. *)
 
-module C = OldUtils
+module Utils = OldUtils
 module T = Type
 module Sugared = SugaredSyntax
 module Untyped = CoreSyntax
@@ -8,11 +8,11 @@ module Untyped = CoreSyntax
 type constructor_kind = Variant of bool | Effect of bool
 
 type state =
-  { context: (string, Untyped.variable) C.assoc
-  ; constructors: (string, constructor_kind) C.assoc }
+  { context: (string, Untyped.variable) Utils.assoc
+  ; constructors: (string, constructor_kind) Utils.assoc }
 
 let initial_state =
-  {context= []; constructors= [(C.cons, Variant true); (C.nil, Variant false)]}
+  {context= []; constructors= [(Utils.cons, Variant true); (Utils.nil, Variant false)]}
 
 
 (* ***** Desugaring of types. ***** *)
@@ -24,71 +24,67 @@ let initial_state =
    an application applies to an effect type. So, it is prudent to call [fill_args] before
    calling [ty].
 *)
-let ty ts =
-  let rec ty (t, loc) =
+let desugar_type type_sbst =
+  let rec desugar_type (t, loc) =
     match t with
     | Sugared.TyApply (t, tys) ->
-        let tys = List.map ty tys in
-        T.Apply (t, tys)
+        let tys' = List.map desugar_type tys in
+        T.Apply (t, tys')
     | Sugared.TyParam t -> (
-      match C.lookup t ts with
+      match Utils.lookup t type_sbst with
       | None -> Error.syntax ~loc "Unbound type parameter '%s" t
       | Some p -> T.TyParam p )
-    | Sugared.TyArrow (t1, t2) -> T.Arrow (ty t1, ty t2)
-    | Sugared.TyTuple lst -> T.Tuple (List.map ty lst)
-    | Sugared.TyHandler (t1, t2) -> T.Handler {T.value= ty t1; T.finally= ty t2}
+    | Sugared.TyArrow (t1, t2) -> T.Arrow (desugar_type t1, desugar_type t2)
+    | Sugared.TyTuple lst -> T.Tuple (List.map desugar_type lst)
+    | Sugared.TyHandler (t1, t2) -> T.Handler {T.value= desugar_type t1; T.finally= desugar_type t2}
   in
-  ty
+  desugar_type
 
 
-(** [free_params t] returns a triple of all free type, dirt, and region params in [t]. *)
-let free_params t =
-  let rec ty (t, loc) =
+(** [free_type_params t] returns a triple of all free type, dirt, and region params in [t]. *)
+let free_type_params t =
+  let rec ty_params (t, loc) =
     match t with
-    | Sugared.TyApply (_, tys) -> OldUtils.flatten_map ty tys
+    | Sugared.TyApply (_, tys) -> OldUtils.flatten_map ty_params tys
     | Sugared.TyParam s -> [s]
-    | Sugared.TyArrow (t1, t2) -> ty t1 @ ty t2
-    | Sugared.TyTuple lst -> OldUtils.flatten_map ty lst
-    | Sugared.TyHandler (t1, t2) -> ty t1 @ ty t2
+    | Sugared.TyArrow (t1, t2) -> ty_params t1 @ ty_params t2
+    | Sugared.TyTuple lst -> OldUtils.flatten_map ty_params lst
+    | Sugared.TyHandler (t1, t2) -> ty_params t1 @ ty_params t2
   in
-  OldUtils.uniq (ty t)
+  OldUtils.uniq (ty_params t)
 
 
 let syntax_to_core_params ts =
   List.map (fun p -> (p, Type.fresh_ty_param ())) ts
 
 
-(** [tydef params d] desugars the type definition with parameters [params] and definition [d]. *)
-let tydef st params d =
-  let sbst = syntax_to_core_params params in
-  let st, def =
-    match d with
+(** [desugar_tydef state params def] desugars the type definition with parameters [params] and definition [def]. *)
+let desugar_tydef state params def =
+  let ty_sbst = syntax_to_core_params params in
+  let state', def' =
+    match def with
     | Sugared.TyRecord lst ->
-        (st, Tctx.Record (List.map (fun (f, t) -> (f, ty sbst t)) lst))
+        (state, Tctx.Record (List.map (fun (f, t) -> (f, desugar_type ty_sbst t)) lst))
     | Sugared.TySum lst ->
-        ( { st with
-            constructors=
-              C.assoc_map
-                (function None -> Variant false | Some _ -> Variant true)
-                lst
-              @ st.constructors }
-        , Tctx.Sum
-            (List.map (fun (lbl, t) -> (lbl, C.option_map (ty sbst) t)) lst) )
-    | Sugared.TyInline t -> (st, Tctx.Inline (ty sbst t))
+        let lbl_desugar (lbl, t) = (lbl, Utils.option_map (desugar_type ty_sbst) t) in
+        let new_constructors =
+          Utils.assoc_map (function None -> Variant false | Some _ -> Variant true) lst
+        in
+        ( { state with constructors= new_constructors @ state.constructors }
+        , Tctx.Sum (List.map lbl_desugar lst) )
+    | Sugared.TyInline t -> (state, Tctx.Inline (desugar_type ty_sbst t))
   in
-  (st, (List.map snd sbst, def))
+  (state', (List.map snd ty_sbst, def'))
 
 
-(** [tydefs defs] desugars the simultaneous type definitions [defs]. *)
-let tydefs st defs =
-  let st, defs =
-    List.fold_left
-      (fun (st, defs) (tyname, (ts, def)) ->
-        let st, tydef = tydef st ts def in
-        (st, (tyname, tydef) :: defs) )
-      (st, []) defs
+(** [desugar_tydefs defs] desugars the simultaneous type definitions [defs]. *)
+let desugar_tydefs state sugared_defs =
+  let desugar_fold (state, defs) (tyname, (params, def)) =
+    let state', tydef' = desugar_tydef state params def in
+    (state', (tyname, tydef') :: defs)
   in
-  (st, List.rev defs)
+  let state', defs' = List.fold_left desugar_fold (state, []) sugared_defs in
+  (state', List.rev defs')
 
 
 (* ***** Desugaring of expressions and computations. ***** *)
@@ -133,7 +129,7 @@ let pattern st ?(forbidden= []) (p, loc) =
       | Sugared.PRecord flds ->
           Untyped.PRecord (OldUtils.assoc_map (pattern st) flds)
       | Sugared.PVariant (lbl, p) -> (
-        match C.lookup lbl st.constructors with
+        match Utils.lookup lbl st.constructors with
         | None -> Error.typing ~loc "Unbound constructor %s" lbl
         | Some Variant var ->
           match (var, p) with
@@ -183,12 +179,12 @@ let rec expression st (t, loc) =
         let w, es = expressions st ts in
         (w, Untyped.Tuple es)
     | Sugared.Record ts ->
-        if not (C.injective fst ts) then
+        if not (Utils.injective fst ts) then
           Error.syntax ~loc "Fields in a record must be distinct" ;
         let w, es = record_expressions st ts in
         (w, Untyped.Record es)
     | Sugared.Variant (lbl, t) -> (
-      match C.lookup lbl st.constructors with
+      match Utils.lookup lbl st.constructors with
       | None -> Error.typing ~loc "Unbound constructor %s" lbl
       | Some Variant var ->
         match (var, t) with
@@ -501,8 +497,8 @@ let top_let_rec st defs =
 
 let external_ty st x t =
   let n = fresh_variable (Some x) in
-  let ts = syntax_to_core_params (free_params t) in
-  ({st with context= (x, n) :: st.context}, (n, ty ts t))
+  let ts = syntax_to_core_params (free_type_params t) in
+  ({st with context= (x, n) :: st.context}, (n, desugar_type ts t))
 
 
 let rec toplevel st (cmd, loc) =
@@ -512,7 +508,7 @@ let rec toplevel st (cmd, loc) =
 
 and plain_toplevel st = function
   | Sugared.Tydef defs ->
-      let st, defs = tydefs st defs in
+      let st, defs = desugar_tydefs st defs in
       (st, Untyped.Tydef defs)
   | Sugared.TopLet defs ->
       let st, defs = top_let st defs in
@@ -524,7 +520,7 @@ and plain_toplevel st = function
       let st, (x, ty) = external_ty st x ty in
       (st, Untyped.External (x, ty, y))
   | Sugared.DefEffect (eff, (ty1, ty2)) ->
-      (st, Untyped.DefEffect (eff, (ty [] ty1, ty [] ty2)))
+      (st, Untyped.DefEffect (eff, (desugar_type [] ty1, desugar_type [] ty2)))
   | Sugared.Term t ->
       let c = computation st t in
       (st, Untyped.Computation c)
