@@ -11,7 +11,7 @@ type state =
 
 let _ = Random.self_init ()
 
-let initial_state =
+let initial =
   {runtime= Eval.empty; typing= SimpleInfer.empty; desugaring= Desugar.initial}
 
 
@@ -33,7 +33,7 @@ let rec exec_cmd ppf st cmd =
   | CoreSyntax.Reset ->
       Format.fprintf ppf "Environment reset." ;
       Tctx.reset () ;
-      initial_state
+      initial
   | CoreSyntax.Help ->
       Format.fprintf ppf "%s" help_text ;
       st
@@ -41,7 +41,7 @@ let rec exec_cmd ppf st cmd =
       let typing = SimpleCtx.add_effect st.typing eff (ty1, ty2) in
       {st with typing}
   | CoreSyntax.Quit -> exit 0
-  | CoreSyntax.Use fn -> use_file ppf fn st
+  | CoreSyntax.Use filename -> execute_file ppf filename st
   | CoreSyntax.TopLet defs ->
       let vars, typing = SimpleInfer.infer_top_let ~loc st.typing defs in
       let runtime =
@@ -94,17 +94,14 @@ and desugar_and_exec_cmds ppf env cmds =
   List.fold_left (exec_cmd ppf) st (List.rev cmds)
 
 (* Parser wrapper *)
-and parse lex =
-  try Parser.commands Lexer.token lex with
-  | Parser.Error -> Error.syntax ~loc:(Location.of_lexeme lex) "parser error"
+and parse lexbuf =
+  try Parser.commands Lexer.token lexbuf with
+  | Parser.Error -> Error.syntax ~loc:(Location.of_lexeme lexbuf) "parser error"
   | Failure failmsg when failmsg = "lexing: empty token" ->
-      Error.syntax ~loc:(Location.of_lexeme lex) "unrecognised symbol."
+      Error.syntax ~loc:(Location.of_lexeme lexbuf) "unrecognised symbol."
 
-and use_file ppf filename env =
+and execute_file ppf filename env =
   Lexer.read_file parse filename |> desugar_and_exec_cmds ppf env
 
-and use_textfile ppf str env =
+and execute_source ppf str env =
   Lexer.read_string parse str |> desugar_and_exec_cmds ppf env
-
-and use_toplevel ppf env =
-  Lexer.read_toplevel parse () |> desugar_and_exec_cmds ppf env

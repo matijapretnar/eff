@@ -185,41 +185,4 @@ and escaped = parse
     Sys_error msg -> Error.fatal "%s" msg
 
 
-  let read_toplevel parser () =
-
-    let has_semisemi str =
-      let in_quote = ref false in
-      let last_backslash = ref false in
-      let last_semi = ref false in
-      let semisemi = ref false in
-      let i = ref 0 in
-      while !i < String.length str && not !semisemi do
-        begin
-          match str.[!i], !last_backslash, !in_quote, !last_semi with
-            | '\\', b, _, _ -> last_backslash := not b; last_semi := false
-            | '"', false, b, _ -> in_quote := not b; last_backslash := false; last_semi := false
-            | ';', false, false, b -> semisemi := b; last_semi := true
-            | _, _, _, _ -> last_backslash := false; last_semi := false
-        end;
-        incr i
-      done;
-      if !semisemi then
-        Some (String.sub str 0 !i)
-      else
-        None
-    in
-
-    let rec read_more prompt acc =
-      match has_semisemi acc with
-      | Some acc -> acc
-      | None ->
-          print_string prompt;
-          let str = read_line () in
-          read_more "  " (acc ^ "\n" ^ str)
-    in
-
-    let str = read_more "# " "" in
-    let lex = Lexing.from_string (str ^ "\n") in
-    let cmd = parser lex in
-    cmd
 }
