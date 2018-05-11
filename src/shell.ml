@@ -83,20 +83,18 @@ let rec exec_cmd ppf st cmd =
       Tctx.extend_tydefs ~loc tydefs ;
       st
 
-and desugar_and_exec_cmds ppf env cmds =
-  let st, cmds =
-    List.fold_left
-      (fun (st, cmds) cmd ->
-        let desugar_st, cmd = Desugar.toplevel st.desugaring cmd in
-        ({st with desugaring= desugar_st}, cmd :: cmds) )
-      (env, []) cmds
+and desugar_and_exec_cmds ppf state cmds =
+  let desugar_state', untyped_cmds =
+    Desugar.desugar_commands state.desugaring cmds
   in
-  List.fold_left (exec_cmd ppf) st (List.rev cmds)
+  let state' = {state with desugaring= desugar_state'} in
+  CoreUtils.fold (exec_cmd ppf) state' untyped_cmds
 
 (* Parser wrapper *)
 and parse lexbuf =
   try Parser.commands Lexer.token lexbuf with
-  | Parser.Error -> Error.syntax ~loc:(Location.of_lexeme lexbuf) "parser error"
+  | Parser.Error ->
+      Error.syntax ~loc:(Location.of_lexeme lexbuf) "parser error"
   | Failure failmsg when failmsg = "lexing: empty token" ->
       Error.syntax ~loc:(Location.of_lexeme lexbuf) "unrecognised symbol."
 

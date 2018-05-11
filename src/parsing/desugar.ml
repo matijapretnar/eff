@@ -509,6 +509,7 @@ let rec toplevel st (cmd, loc) =
   let st', cmd = plain_toplevel st cmd in
   (st', {Untyped.term= cmd; Untyped.location= loc})
 
+
 and plain_toplevel st = function
   | Sugared.Tydef defs ->
       let st, defs = tydefs st defs in
@@ -534,3 +535,7 @@ and plain_toplevel st = function
   | Sugared.TypeOf t ->
       let c = computation st t in
       (st, Untyped.TypeOf c)
+
+
+let desugar_commands state sugared_cmds =
+  CoreUtils.fold_map toplevel state sugared_cmds

@@ -98,3 +98,5 @@ and plain_command =
   | Help  (** [#help] *)
   | Quit  (** [#quit] *)
   | TypeOf of term  (** [#type t] *)
+
+type commands = command list

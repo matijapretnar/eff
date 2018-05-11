@@ -79,6 +79,8 @@ and plain_command =
   | Quit  (** [#quit] *)
   | TypeOf of computation  (** [#type t] *)
 
+type commands = command list
+
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p.term with
