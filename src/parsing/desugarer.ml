@@ -103,7 +103,7 @@ let id_abstraction loc =
   , add_loc (Untyped.Value (add_loc (Untyped.Var x) loc)) loc)
 
 
-let pvars_desugar_pattern state ?(initial_forbidden= []) (p, loc) =
+let desugar_pattern state ?(initial_forbidden= []) (p, loc) =
   let vars = ref [] in
   let forbidden = ref initial_forbidden in
   let new_var x =
@@ -258,7 +258,7 @@ and desugar_computation state (t, loc) =
             if List.mem x forbidden then
               Error.syntax ~loc:(snd p) "Several definitions of %s" x
           in
-          let p_vars, p' = pvars_desugar_pattern state p in
+          let p_vars, p' = desugar_pattern state p in
           List.iter check_forbidden p_vars ;
           let c' = desugar_computation state c in
           ( {state with context= p_vars @ fold_state.context}
@@ -302,48 +302,50 @@ and desugar_computation state (t, loc) =
   | _ :: _ -> add_loc (Untyped.Let (w, add_loc c loc)) loc
 
 
-and desugar_abstraction st (p, t) =
-  let vars, p = pvars_desugar_pattern st p in
-  (p, desugar_computation {st with context= vars @ st.context} t)
+and desugar_abstraction state (p, t) =
+  let vars, p' = desugar_pattern state p in
+  (p', desugar_computation {state with context= vars @ state.context} t)
 
 
-and abstraction2 st (p1, p2, t) =
-  let vars1, p1 = pvars_desugar_pattern st p1 in
-  let vars2, p2 = pvars_desugar_pattern st p2 in
-  (p1, p2, desugar_computation {st with context= vars1 @ vars2 @ st.context} t)
+and desugar_abstraction2 state (p1, p2, t) =
+  let vars1, p1' = desugar_pattern state p1 in
+  let vars2, p2' = desugar_pattern state p2 in
+  let t' =
+    desugar_computation {state with context= vars1 @ vars2 @ state.context} t
+  in
+  (p1', p2', t')
 
 
-and desugar_let_rec st (e, loc) =
-  match e with
-  | Sugared.Lambda a -> desugar_abstraction st a
+and desugar_let_rec state (exp, loc) =
+  match exp with
+  | Sugared.Lambda a -> desugar_abstraction state a
   | Sugared.Function cs ->
       let x = fresh_var (Some "$let_rec_function") in
-      let cs = List.map (desugar_abstraction st) cs in
-      ( Untyped.add_loc (Untyped.PVar x) loc
-      , Untyped.add_loc
-          (Untyped.Match (Untyped.add_loc (Untyped.Var x) loc, cs)) loc )
+      let cs = List.map (desugar_abstraction state) cs in
+      let new_match = Untyped.Match (add_loc (Untyped.Var x) loc, cs) in
+      (add_loc (Untyped.PVar x) loc, add_loc new_match loc)
   | _ ->
       Error.syntax ~loc
         "This kind of expression is not allowed in a recursive definition"
 
 
-and desugar_expressions st = function
+and desugar_expressions state = function
   | [] -> ([], [])
   | t :: ts ->
-      let w, e = desugar_expression st t in
-      let ws, es = desugar_expressions st ts in
+      let w, e = desugar_expression state t in
+      let ws, es = desugar_expressions state ts in
       (w @ ws, e :: es)
 
 
-and desugar_record_expressions st = function
+and desugar_record_expressions state = function
   | [] -> ([], [])
-  | (f, t) :: ts ->
-      let w, e = desugar_expression st t in
-      let ws, es = desugar_record_expressions st ts in
-      (w @ ws, (f, e) :: es)
+  | (field, t) :: ts ->
+      let w, e = desugar_expression state t in
+      let ws, es = desugar_record_expressions state ts in
+      (w @ ws, (field, e) :: es)
 
 
-and desugar_handler loc st
+and desugar_handler loc state
     { Sugared.effect_clauses= eff_cs
     ; Sugared.value_clause= val_cs
     ; Sugared.finally_clause= fin_cs } =
@@ -357,33 +359,22 @@ and desugar_handler loc st
   let rec construct_eff_clause (eff, eff_cs_lst) =
     match eff_cs_lst with
     | [] -> assert false
-    | [a2] -> (eff, abstraction2 st a2)
+    | [a2] -> (eff, desugar_abstraction2 state a2)
     | a2s ->
         let x = fresh_var (Some "$eff_param") in
-        let x_var = Untyped.add_loc (Untyped.Var x) loc in
         let k = fresh_var (Some "$continuation") in
-        let k_var = Untyped.add_loc (Untyped.Var k) loc in
-        let match_cs =
-          List.map
-            (fun (p1, p2, t) ->
-              let vars1, p1 = pvars_desugar_pattern st p1 in
-              let vars2, p2 = pvars_desugar_pattern st p2 in
-              let t =
-                desugar_computation {st with context= vars1 @ vars2 @ st.context} t
-              in
-              (Untyped.add_loc (Untyped.PTuple [p1; p2]) loc, t) )
-            a2s
+        let x_k_vars = (Untyped.Tuple
+          [add_loc (Untyped.Var x) loc; add_loc (Untyped.Var k) loc])
         in
         let match_term =
-          Untyped.add_loc
-            (Untyped.Match
-               (Untyped.add_loc (Untyped.Tuple [x_var; k_var]) loc, match_cs))
-            loc
+          let aux a2 =
+            let p1', p2', t' = desugar_abstraction2 state a2 in
+            (add_loc (Untyped.PTuple [p1'; p2']) loc, t')
+          in
+          add_loc (Untyped.Match (add_loc x_k_vars loc, List.map aux a2s)) loc
         in
-        ( eff
-        , ( Untyped.add_loc (Untyped.PVar x) loc
-          , Untyped.add_loc (Untyped.PVar k) loc
-          , match_term ) )
+        let p1, p2 = (Untyped.PVar x), (Untyped.PVar k) in
+        (eff, (add_loc p1 loc, add_loc p2 loc, match_term))
   in
   let collected_eff_cs = List.fold_right group_eff_cs eff_cs [] in
   let untyped_eff_cs = List.map construct_eff_clause collected_eff_cs in
@@ -392,20 +383,18 @@ and desugar_handler loc st
     | [] -> id_abstraction loc
     | cs ->
         let v = fresh_var (Some "$val_param") in
-        let v_var = Untyped.add_loc (Untyped.Var v) loc in
-        let cs = List.map (desugar_abstraction st) cs in
-        ( Untyped.add_loc (Untyped.PVar v) loc
-        , Untyped.add_loc (Untyped.Match (v_var, cs)) loc )
+        let v_var = add_loc (Untyped.Var v) loc in
+        let cs = List.map (desugar_abstraction state) cs in
+        (add_loc (Untyped.PVar v) loc, add_loc (Untyped.Match (v_var, cs)) loc)
   in
   let untyped_fin_a =
     match fin_cs with
     | [] -> id_abstraction loc
     | cs ->
         let fin = fresh_var (Some "$fin_param") in
-        let fin_var = Untyped.add_loc (Untyped.Var fin) loc in
-        let cs = List.map (desugar_abstraction st) cs in
-        ( Untyped.add_loc (Untyped.PVar fin) loc
-        , Untyped.add_loc (Untyped.Match (fin_var, cs)) loc )
+        let fin_var = add_loc (Untyped.Var fin) loc in
+        let cs = List.map (desugar_abstraction state) cs in
+        (add_loc (Untyped.PVar fin) loc, add_loc (Untyped.Match (fin_var, cs)) loc)
   in
   ( []
   , { Untyped.effect_clauses= untyped_eff_cs
@@ -454,7 +443,7 @@ let top_let st defs =
           if List.mem x forbidden then
             Error.syntax ~loc:(snd p) "Several definitions of %s" x
         in
-        let p_vars, p = pvars_desugar_pattern st p in
+        let p_vars, p = desugar_pattern st p in
         List.iter check_forbidden p_vars ;
         let c = desugar_computation st c in
         ( {st with context= p_vars @ st'.context}
