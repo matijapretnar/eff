@@ -253,7 +253,7 @@ and desugar_computation state (t, loc) =
         (w, if_then_else e c1 c2)
     | Sugared.Check t -> ([], Untyped.Check (desugar_computation state t))
     | Sugared.Let (defs, t) ->
-        let check_and_desugar (p, c) (fold_state, defs, forbidden) =
+        let aux_desugar (p, c) (fold_state, defs, forbidden) =
           let check_forbidden (x, _) =
             if List.mem x forbidden then
               Error.syntax ~loc:(snd p) "Several definitions of %s" x
@@ -266,12 +266,12 @@ and desugar_computation state (t, loc) =
           , List.map fst p_vars @ forbidden )
         in
         let state', defs', _ =
-          List.fold_right check_and_desugar defs (state, [], [])
+          List.fold_right aux_desugar defs (state, [], [])
         in
         let c = desugar_computation state' t in
         ([], Untyped.Let (defs', c))
     | Sugared.LetRec (defs, t) ->
-        let check_and_desugar (x, t) (fold_state, ns, forbidden) =
+        let aux_desugar (x, t) (fold_state, ns, forbidden) =
           if List.mem x forbidden then
             Error.syntax ~loc:(snd t) "Several definitions of %s" x ;
           let n = fresh_var (Some x) in
@@ -280,7 +280,7 @@ and desugar_computation state (t, loc) =
           , x :: forbidden )
         in
         let state', ns, _ =
-          List.fold_right check_and_desugar defs (state, [], [])
+          List.fold_right aux_desugar defs (state, [], [])
         in
         let desugar_defs (p, (_, c)) defs =
           let c = desugar_let_rec state' c in
@@ -435,81 +435,79 @@ and separate_match_cases cs =
   List.fold_right separator cs ([], [])
 
 
-let top_let st defs =
-  let st', defs, _ =
-    List.fold_right
-      (fun (p, c) (st', defs, forbidden) ->
-        let check_forbidden (x, _) =
-          if List.mem x forbidden then
-            Error.syntax ~loc:(snd p) "Several definitions of %s" x
-        in
-        let p_vars, p = desugar_pattern st p in
-        List.iter check_forbidden p_vars ;
-        let c = desugar_computation st c in
-        ( {st with context= p_vars @ st'.context}
-        , (p, c) :: defs
-        , List.map fst p_vars @ forbidden ) )
-      defs (st, [], [])
+let top_let state defs =
+  let aux_desugar (p, c) (fold_state, defs, forbidden) =
+    let check_forbidden (x, _) =
+      if List.mem x forbidden then
+        Error.syntax ~loc:(snd p) "Several definitions of %s" x
+    in
+    let p_vars, p' = desugar_pattern state p in
+    List.iter check_forbidden p_vars ;
+    let c' = desugar_computation state c in
+    ( {state with context= p_vars @ fold_state.context}
+    , (p', c') :: defs
+    , List.map fst p_vars @ forbidden )
   in
-  (st', defs)
+  let state', defs', _ = List.fold_right aux_desugar defs (state, [], []) in
+  (state', defs')
 
 
-let top_let_rec st defs =
-  let st', ns, _ =
-    List.fold_right
-      (fun (x, t) (st', ns, forbidden) ->
-        if List.mem x forbidden then
-          Error.syntax ~loc:(snd t) "Several definitions of %s" x ;
-        let n = fresh_var (Some x) in
-        ({st with context= (x, n) :: st'.context}, n :: ns, x :: forbidden) )
-      defs (st, [], [])
+let top_let_rec state defs =
+  let aux_desugar (x, t) (fold_state, ns, forbidden) =
+    if List.mem x forbidden then
+      Error.syntax ~loc:(snd t) "Several definitions of %s" x ;
+    let n = fresh_var (Some x) in
+    ( {state with context= (x, n) :: fold_state.context}
+    , n :: ns
+    , x :: forbidden )
   in
-  let defs =
-    List.fold_right
-      (fun (p, (_, c)) defs ->
-        let c = desugar_let_rec st' c in
-        (p, c) :: defs )
-      (List.combine ns defs) []
+  let state', ns, _ =
+    List.fold_right aux_desugar defs (state, [], [])
   in
-  (st', defs)
+  let desugar_defs (p, (_, c)) defs =
+    let c = desugar_let_rec state' c in
+    (p, c) :: defs
+  in
+  let defs' = List.fold_right desugar_defs (List.combine ns defs) [] in
+  (state', defs')
 
 
-let external_ty st x t =
+let external_ty state x t =
   let n = fresh_var (Some x) in
   let ts = syntax_to_core_params (free_type_params t) in
-  ({st with context= (x, n) :: st.context}, (n, desugar_type ts t))
+  ({state with context= (x, n) :: state.context}, (n, desugar_type ts t))
 
 
-let rec toplevel st (cmd, loc) =
-  let st', cmd = plain_toplevel st cmd in
-  (st', {Untyped.term= cmd; Untyped.location= loc})
+let rec toplevel state (cmd, loc) =
+  let state', cmd' = plain_toplevel state cmd in
+  (state', {Untyped.term= cmd'; Untyped.location= loc})
 
 
-and plain_toplevel st = function
+and plain_toplevel state = function
   | Sugared.Tydef defs ->
-      let st, defs = desugar_tydefs st defs in
-      (st, Untyped.Tydef defs)
+      let state', defs' = desugar_tydefs state defs in
+      (state', Untyped.Tydef defs')
   | Sugared.TopLet defs ->
-      let st, defs = top_let st defs in
-      (st, Untyped.TopLet defs)
+      let state', defs' = top_let state defs in
+      (state', Untyped.TopLet defs')
   | Sugared.TopLetRec defs ->
-      let st, defs = top_let_rec st defs in
-      (st, Untyped.TopLetRec defs)
+      let state', defs' = top_let_rec state defs in
+      (state', Untyped.TopLetRec defs')
   | Sugared.External (x, ty, y) ->
-      let st, (x, ty) = external_ty st x ty in
-      (st, Untyped.External (x, ty, y))
+      let state', (x', ty') = external_ty state x ty in
+      (state', Untyped.External (x', ty', y))
   | Sugared.DefEffect (eff, (ty1, ty2)) ->
-      (st, Untyped.DefEffect (eff, (desugar_type [] ty1, desugar_type [] ty2)))
+      (state, Untyped.DefEffect (eff, (desugar_type [] ty1, desugar_type [] ty2)))
   | Sugared.Term t ->
-      let c = desugar_computation st t in
-      (st, Untyped.Computation c)
-  | Sugared.Use filename -> (st, Untyped.Use filename)
-  | Sugared.Reset -> (st, Untyped.Reset)
-  | Sugared.Help -> (st, Untyped.Help)
-  | Sugared.Quit -> (st, Untyped.Quit)
+      let c = desugar_computation state t in
+      (state, Untyped.Computation c)
+  | Sugared.Use filename -> (state, Untyped.Use filename)
+  | Sugared.Reset -> (state, Untyped.Reset)
+  | Sugared.Help -> (state, Untyped.Help)
+  | Sugared.Quit -> (state, Untyped.Quit)
   | Sugared.TypeOf t ->
-      let c = desugar_computation st t in
-      (st, Untyped.TypeOf c)
+      let c = desugar_computation state t in
+      (state, Untyped.TypeOf c)
 
 
 let desugar_commands state sugared_cmds =
