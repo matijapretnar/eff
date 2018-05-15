@@ -30,7 +30,7 @@ let round_robin =
   let rec rr_handler () = handler (*Needs to be defined recursively.*)
     | effect Yield k -> enqueue k; dequeue ()
     | effect (Spawn t) k -> enqueue k; with rr_handler () handle t ()
-    | val () -> dequeue ()
+    | () -> dequeue ()
   in
   rr_handler ()
 ;;
