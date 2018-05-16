@@ -1,13 +1,13 @@
 type ty_scheme = Params.Ty.t list * Type.ty
 
 type t =
-  { variables: (CoreSyntax.variable, ty_scheme) OldUtils.assoc
+  { variables: (CoreSyntax.variable, ty_scheme) Assoc.t
   ; effects: (Type.ty * Type.ty) CoreSyntax.EffectMap.t }
 
 let empty = {variables= []; effects= CoreSyntax.EffectMap.empty}
 
 let lookup ~loc ctx x =
-  match OldUtils.lookup x ctx.variables with
+  match Assoc.lookup x ctx.variables with
   | Some (ps, t) -> snd (Type.refresh ps t)
   | None -> Error.typing ~loc "Unknown name %t" (CoreSyntax.Variable.print x)
 
@@ -23,7 +23,7 @@ let subst_ctx ctx sbst =
     assert (List.for_all (fun (p, _) -> not (List.mem p ps)) sbst) ;
     (ps, Type.subst_ty sbst ty)
   in
-  {ctx with variables= OldUtils.assoc_map subst_ty_scheme ctx.variables}
+  {ctx with variables= Assoc.map subst_ty_scheme ctx.variables}
 
 
 (** [free_params ctx] returns a list of all free type parameters in [ctx]. *)

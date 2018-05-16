@@ -138,7 +138,7 @@ and eval_handler env
     | V.Value v -> eval_closure env value v
     | V.Call (eff, v, k) ->
         let k' u = h (k u) in
-        match OldUtils.lookup eff ops with
+        match Assoc.lookup eff ops with
         | Some f -> f v k'
         | None -> V.Call (eff, v, k')
   in

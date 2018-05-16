@@ -42,7 +42,7 @@ let rec subst_ty sbst ty =
   let rec subst = function
     | Apply (ty_name, tys) -> Apply (ty_name, List.map subst tys)
     | TyParam p as ty -> (
-      match OldUtils.lookup p sbst with Some ty -> ty | None -> ty )
+      match Assoc.lookup p sbst with Some ty -> ty | None -> ty )
     | Basic _ as ty -> ty
     | Tuple tys -> Tuple (List.map subst tys)
     | Arrow (ty1, ty2) -> Arrow (subst ty1, subst_ty sbst ty2)
@@ -58,7 +58,7 @@ let identity_subst = []
 (** [compose_subst sbst1 sbst2] returns a substitution that first performs
     [sbst2] and then [sbst1]. *)
 let compose_subst sbst1 sbst2 =
-  sbst1 @ OldUtils.assoc_map (subst_ty sbst1) sbst2
+  sbst1 @ Assoc.map (subst_ty sbst1) sbst2
 
 
 (** [free_params ty] returns three lists of type parameters that occur in [ty].
@@ -86,7 +86,7 @@ let fresh_ty () = TyParam (fresh_ty_param ())
 
 let refreshing_subst ps =
   let ps' = List.map (fun p -> (p, fresh_ty_param ())) ps in
-  let sbst = OldUtils.assoc_map (fun p' -> TyParam p') ps' in
+  let sbst = Assoc.map (fun p' -> TyParam p') ps' in
   (List.map snd ps', sbst)
 
 
@@ -105,10 +105,10 @@ let beautify (ps, ty) =
   let xs_map = List.map (fun p -> (p, next_ty_param ())) xs in
   let subst ps ps_map =
     List.map
-      (fun p -> match OldUtils.lookup p ps_map with None -> p | Some p' -> p')
+      (fun p -> match Assoc.lookup p ps_map with None -> p | Some p' -> p')
       ps
   in
-  let sbst = OldUtils.assoc_map (fun p' -> TyParam p') xs_map in
+  let sbst = Assoc.map (fun p' -> TyParam p') xs_map in
   (subst ps xs_map, subst_ty sbst ty)
 
 

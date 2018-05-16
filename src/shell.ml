@@ -90,7 +90,7 @@ let rec exec_cmd ppf st cmd =
         vars ;
       {st with typechecker_state; runtime_state}
   | CoreSyntax.External (x, ty, f) -> (
-    match OldUtils.lookup f External.values with
+    match Assoc.lookup f External.values with
     | Some v ->
         { st with
           typechecker_state=

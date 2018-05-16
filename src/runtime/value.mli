@@ -1,7 +1,7 @@
 type value =
   | Const of Const.t
   | Tuple of value list
-  | Record of (OldUtils.field, value) OldUtils.assoc
+  | Record of (OldUtils.field, value) Assoc.t
   | Variant of OldUtils.label * value option
   | Closure of closure
   | Handler of (result -> result)

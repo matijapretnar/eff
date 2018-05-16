@@ -8,8 +8,8 @@ module Untyped = CoreSyntax
 type constructor_kind = Variant of bool | Effect of bool
 
 type state =
-  { context: (string, Untyped.variable) Utils.assoc
-  ; constructors: (string, constructor_kind) Utils.assoc }
+  { context: (string, Untyped.variable) Assoc.t
+  ; constructors: (string, constructor_kind) Assoc.t }
 
 let initial_state =
   { context= []
@@ -33,7 +33,7 @@ let desugar_type type_sbst =
         let tys' = List.map desugar_type tys in
         T.Apply (t, tys')
     | Sugared.TyParam t -> (
-      match Utils.lookup t type_sbst with
+      match Assoc.lookup t type_sbst with
       | None -> Error.syntax ~loc "Unbound type parameter '%s" t
       | Some p -> T.TyParam p )
     | Sugared.TyArrow (t1, t2) -> T.Arrow (desugar_type t1, desugar_type t2)
@@ -73,7 +73,7 @@ let desugar_tydef state params def =
           (lbl, Utils.option_map (desugar_type ty_sbst) t)
         in
         let new_constructors =
-          Utils.assoc_map
+          Assoc.map
             (function None -> Variant false | Some _ -> Variant true)
             lst
         in
@@ -128,9 +128,9 @@ let desugar_pattern state ?(initial_forbidden= []) (p, loc) =
       | Sugared.PTuple ps ->
           Untyped.PTuple (List.map (desugar_pattern state) ps)
       | Sugared.PRecord flds ->
-          Untyped.PRecord (OldUtils.assoc_map (desugar_pattern state) flds)
+          Untyped.PRecord (Assoc.map (desugar_pattern state) flds)
       | Sugared.PVariant (lbl, p) -> (
-        match Utils.lookup lbl state.constructors with
+        match Assoc.lookup lbl state.constructors with
         | None -> Error.typing ~loc "Unbound constructor %s" lbl
         | Some (Variant var) ->
           match (var, p) with
@@ -157,7 +157,7 @@ let rec desugar_expression state (t, loc) =
   let w, e =
     match t with
     | Sugared.Var x -> (
-      match OldUtils.lookup x state.context with
+      match Assoc.lookup x state.context with
       | Some n -> ([], Untyped.Var n)
       | None -> Error.typing ~loc "Unknown variable %s" x )
     | Sugared.Const k -> ([], Untyped.Const k)
@@ -184,7 +184,7 @@ let rec desugar_expression state (t, loc) =
         let w, es = desugar_record_expressions state ts in
         (w, Untyped.Record es)
     | Sugared.Variant (lbl, t) -> (
-      match Utils.lookup lbl state.constructors with
+      match Assoc.lookup lbl state.constructors with
       | None -> Error.typing ~loc "Unbound constructor %s" lbl
       | Some (Variant var) ->
         match (var, t) with

@@ -17,11 +17,11 @@ let disable_typing = ref false
    a reference to a type substitution, usually called [cstr], in which we
    collect the results of unification. That is, we perform unification as early
    as locssible (rather than collect all equations and then solve them), and
-   store the results in [cstr]. 
+   store the results in [cstr].
 
    The effect of carrying around the substitution is that we need to be careful
    about when to apply it:
-   
+
    1. we apply the substitution to types [t1] and [t2] before trying to solve
       the equation [t1 = t2].
 
@@ -75,7 +75,7 @@ let infer_pattern cstr pp =
       | None -> Error.typing ~loc "Unbound record field label %s" fld
       | Some (ty, (t, us)) ->
           let unify_record_pattern (fld, p) =
-            match C.lookup fld us with
+            match Assoc.lookup fld us with
             | None ->
                 Error.typing ~loc
                   "Unexpected field %s in a pattern of type %s." fld t
@@ -148,10 +148,10 @@ and infer_let ctx cstr loc defs =
               (Core.Variable.print x)
         | None ->
             let sbst = Unify.solve !cstr in
-            let ws = OldUtils.assoc_map (T.subst_ty sbst) ws in
+            let ws = Assoc.map (T.subst_ty sbst) ws in
             let ctx = Ctx.subst_ctx ctx sbst in
             let ws =
-              OldUtils.assoc_map
+              Assoc.map
                 (Ctx.generalize ctx (nonexpansive c.Core.term))
                 ws
             in
@@ -195,9 +195,9 @@ and infer_let_rec ctx cstr loc defs =
       add_ty_constraint cstr c.Core.location u2 tc )
     lst ;
   let sbst = Unify.solve !cstr in
-  let vars = OldUtils.assoc_map (T.subst_ty sbst) vars in
+  let vars = Assoc.map (T.subst_ty sbst) vars in
   let ctx = Ctx.subst_ctx ctx sbst in
-  let vars = OldUtils.assoc_map (Ctx.generalize ctx true) vars in
+  let vars = Assoc.map (Ctx.generalize ctx true) vars in
   let ctx =
     List.fold_right
       (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme)
@@ -229,9 +229,9 @@ and infer_expr ctx cstr e =
         if List.length lst <> List.length arg_types then
           Error.typing ~loc "malformed record of type %s" t_name
         else
-          let arg_types' = C.assoc_map (infer_expr ctx cstr) lst in
+          let arg_types' = Assoc.map (infer_expr ctx cstr) lst in
           let unify_record_arg (fld, t) =
-            match C.lookup fld arg_types with
+            match Assoc.lookup fld arg_types with
             | None ->
                 Error.typing ~loc
                   "Unexpected record field label %s in a pattern" fld

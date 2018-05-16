@@ -3,11 +3,11 @@ module C = OldUtils
 module T = Type
 
 type tydef =
-  | Record of (OldUtils.field, Type.ty) OldUtils.assoc
-  | Sum of (OldUtils.label, Type.ty option) OldUtils.assoc
+  | Record of (OldUtils.field, Type.ty) Assoc.t
+  | Sum of (OldUtils.label, Type.ty option) Assoc.t
   | Inline of Type.ty
 
-type tyctx = (OldUtils.tyname, Params.Ty.t list * tydef) OldUtils.assoc
+type tyctx = (OldUtils.tyname, Params.Ty.t list * tydef) Assoc.t
 
 let initial : tyctx =
   [ ("bool", ([], Inline T.bool_ty))
@@ -33,13 +33,13 @@ let reset () = global := initial
 let subst_tydef sbst =
   let subst = Type.subst_ty sbst in
   function
-    | Record tys -> Record (OldUtils.assoc_map subst tys)
-    | Sum tys -> Sum (OldUtils.assoc_map (OldUtils.option_map subst) tys)
+    | Record tys -> Record (Assoc.map subst tys)
+    | Sum tys -> Sum (Assoc.map (OldUtils.option_map subst) tys)
     | Inline ty -> Inline (subst ty)
 
 
 let lookup_tydef ~loc ty_name =
-  match OldUtils.lookup ty_name !global with
+  match Assoc.lookup ty_name !global with
   | None -> Error.typing ~loc "Unknown type %s" ty_name
   | Some (params, tydef) -> (params, tydef)
 
@@ -56,7 +56,7 @@ let find_variant lbl =
   let rec find = function
     | [] -> None
     | (ty_name, (ps, Sum vs)) :: lst -> (
-      match OldUtils.lookup lbl vs with
+      match Assoc.lookup lbl vs with
       | Some us -> Some (ty_name, ps, vs, us)
       | None -> find lst )
     | _ :: lst -> find lst
@@ -97,7 +97,7 @@ let infer_field fld =
   | None -> None
   | Some (ty_name, ps, us) ->
       let ps', fresh_subst = T.refreshing_subst ps in
-      let us' = C.assoc_map (T.subst_ty fresh_subst) us in
+      let us' = Assoc.map (T.subst_ty fresh_subst) us in
       Some (apply_to_params ty_name ps', (ty_name, us'))
 
 

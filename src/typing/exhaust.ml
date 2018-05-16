@@ -137,7 +137,7 @@ let specialize_vector ~loc con = function
     | Tuple _, Sugared.PTuple l -> Some (l @ lst)
     | Record all, Sugared.PRecord def ->
         let get_pattern defs lbl =
-          match C.lookup lbl defs with
+          match Assoc.lookup lbl defs with
           | Some p' -> p'
           | None -> (Sugared.PNonbinding, loc)
         in
@@ -236,7 +236,7 @@ let rec old_of_new_pattern p =
     | Untyped.PAs (p, x) -> Sugared.PAs (old_of_new_pattern p, x)
     | Untyped.PTuple lst -> Sugared.PTuple (List.map old_of_new_pattern lst)
     | Untyped.PRecord lst ->
-        Sugared.PRecord (OldUtils.assoc_map old_of_new_pattern lst)
+        Sugared.PRecord (Assoc.map old_of_new_pattern lst)
     | Untyped.PVariant (lbl, opt) ->
         Sugared.PVariant (lbl, OldUtils.option_map old_of_new_pattern opt)
     | Untyped.PConst c -> Sugared.PConst c
@@ -252,7 +252,7 @@ let rec new_of_old_pattern p =
     | Sugared.PAs (p, x) -> Untyped.PAs (new_of_old_pattern p, x)
     | Sugared.PTuple lst -> Untyped.PTuple (List.map new_of_old_pattern lst)
     | Sugared.PRecord lst ->
-        Untyped.PRecord (OldUtils.assoc_map new_of_old_pattern lst)
+        Untyped.PRecord (Assoc.map new_of_old_pattern lst)
     | Sugared.PVariant (lbl, opt) ->
         Untyped.PVariant (lbl, OldUtils.option_map new_of_old_pattern opt)
     | Sugared.PConst c -> Untyped.PConst c
@@ -306,7 +306,7 @@ let check_comp c =
         () (* Skip empty match to avoid an unwanted warning. *)
     | Untyped.Match (_, lst) ->
         check_patterns ~loc:c.Untyped.location
-          (List.map (OldUtils.compose old_of_new_pattern fst) lst) ;
+          (List.map (fun x -> old_of_new_pattern (fst x)) lst) ;
         List.iter (fun (_, c) -> check c) lst
     | Untyped.Apply _ -> ()
     | Untyped.Handle (_, c) -> check c
