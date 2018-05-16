@@ -85,12 +85,11 @@ let desugar_tydef state params def =
 
 (** [desugar_tydefs defs] desugars the simultaneous type definitions [defs]. *)
 let desugar_tydefs state sugared_defs =
-  let desugar_fold (state, defs) (tyname, (params, def)) =
+  let desugar_fold state (tyname, (params, def)) =
     let state', tydef' = desugar_tydef state params def in
-    (state', (tyname, tydef') :: defs)
+    (state', (tyname, tydef'))
   in
-  let state', defs' = List.fold_left desugar_fold (state, []) sugared_defs in
-  (state', List.rev defs')
+  CoreUtils.fold_map desugar_fold state sugared_defs
 
 (* ***** Desugaring of expressions and computations. ***** *)
 
@@ -117,7 +116,7 @@ let desugar_pattern state ?(initial_forbidden= []) (p, loc) =
       var
   in
   let rec desugar_pattern state (p, loc) =
-    let p =
+    let p' =
       match p with
       | Sugared.PVar x ->
           let x = new_var x in
@@ -147,10 +146,10 @@ let desugar_pattern state ?(initial_forbidden= []) (p, loc) =
       | Sugared.PConst c -> Untyped.PConst c
       | Sugared.PNonbinding -> Untyped.PNonbinding
     in
-    add_loc p loc
+    add_loc p' loc
   in
-  let p = desugar_pattern state (p, loc) in
-  (!vars, p)
+  let p' = desugar_pattern state (p, loc) in
+  (!vars, p')
 
 (* Desugaring functions below return a list of bindings and the desugared form. *)
 
