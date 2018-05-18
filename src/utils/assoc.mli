@@ -37,10 +37,10 @@ val remove : 'k -> ('k, 'v) t -> ('k, 'v) t
 val iter : (('k * 'v) -> unit) -> ('k, 'v) t -> unit
 
 (** [map f assoc] transforms each [(k, v)] in [assoc] into [(k, f v)]. *)
-val map : ('v -> 'new_v) -> ('k, 'v) t -> ('k, 'new_v) t
+val map : ('v -> 'w) -> ('k, 'v) t -> ('k, 'w) t
 
 (** [kmap f assoc] transforms each [(k, v)] in [assoc] into [f (k, v)]. *)
-val kmap : (('k * 'v) -> ('new_k * 'new_v)) -> ('k, 'v) t -> ('new_k, 'new_v) t
+val kmap : (('k * 'v) -> ('h * 'w)) -> ('k, 'v) t -> ('h, 'w) t
 
 (** [map_of_list f lst] transforms each element of [lst] in a pair [(k, v)]
     with the function [f] and builds an association list from it. *)
@@ -52,6 +52,8 @@ val fold_left : ('acc -> ('k * 'v) -> 'acc) -> 'acc -> ('k, 'v) t -> 'acc
 (** [fold_right f assoc acc] folds [f] over [assoc] from right to left. *)
 val fold_right : (('k * 'v) -> 'acc -> 'acc) -> ('k, 'v) t -> 'acc -> 'acc
 
+(** [fold_map f state assoc] folds from left to right and also maps at the same time. *)
+val fold_map : ('acc -> ('k * 'v) -> 'acc * ('h * 'w)) -> 'acc -> ('k, 'v) t -> 'acc * ('h, 'w) t
 
 
 (** [length assoc] returns the length of the association list. *)

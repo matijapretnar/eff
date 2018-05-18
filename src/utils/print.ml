@@ -40,5 +40,6 @@ let tuple pp lst ppf =
   | lst -> print ppf "(@[<hov>%t@])" (sequence ", " pp lst)
 
 
-let record pp lst ppf =
+let record pp assoc ppf =
+  let lst = Assoc.to_list assoc in
   print ppf "{@[<hov>%t@]}" (sequence "; " (field pp) lst)

@@ -1,7 +1,7 @@
 {
   open Parser
 
-  let reserved = [
+  let reserved = Assoc.of_list [
     ("and", AND);
     ("as", AS);
     ("asr", ASR);
@@ -37,7 +37,7 @@
     ("with", WITH)
   ]
 
-  let directives = [
+  let directives = Assoc.of_list [
     ("help", HELP);
     ("reset", RESET);
     ("quit", QUIT);

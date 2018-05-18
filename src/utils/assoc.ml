@@ -51,9 +51,13 @@ let rec map_of_list f = function
       let tl' = map_of_list f tl in
       (k, v) :: tl'
 
-let fold_left = List.fold_left
+let fold_left = CoreUtils.fold
 
 let fold_right = List.fold_right
+
+let fold_map = CoreUtils.fold_map
+
+
 
 (* Other useful stuff. *)
 let length assoc = List.length assoc

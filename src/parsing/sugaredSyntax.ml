@@ -11,7 +11,7 @@ and 'var plain_pattern =
   | PVar of 'var
   | PAs of 'var pattern * 'var
   | PTuple of 'var pattern list
-  | PRecord of (OldUtils.field * 'var pattern) list
+  | PRecord of (OldUtils.field, 'var pattern) Assoc.t
   | PVariant of OldUtils.label * 'var pattern option
   | PConst of Const.t
   | PNonbinding

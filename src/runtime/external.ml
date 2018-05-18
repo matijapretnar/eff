@@ -105,9 +105,11 @@ and compare_record lst1 lst2 =
     | [], _ :: _ -> OldUtils.Less
     | _ :: _, [] -> OldUtils.Greater
   in
+  let lst1' = Assoc.to_list lst1 in
+  let lst2' = Assoc.to_list lst2 in
   comp
-    ( List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst1
-    , List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst2
+    ( List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst1'
+    , List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst2'
     )
 
 
@@ -135,7 +137,7 @@ let less_than v1 v2 =
   | OldUtils.Invalid -> Error.runtime "invalid comparison with <"
 
 
-let comparison_functions =
+let comparison_functions = Assoc.of_list
   [ ("=", binary_closure (fun v1 v2 -> value_bool (equal v1 v2)))
   ; ("<", binary_closure (fun v1 v2 -> value_bool (less_than v1 v2))) ]
 
@@ -148,7 +150,7 @@ let rec pow a = function
       if n mod 2 = 0 then b * b else b * b * a
 
 
-let arithmetic_operations =
+let arithmetic_operations = Assoc.of_list
   [ ("~-", from_fun (fun v -> value_int (-V.to_int v)))
   ; ("+", int_int_to_int ( + ))
   ; ("-", int_int_to_int ( - ))
@@ -166,13 +168,13 @@ let arithmetic_operations =
   ]
 
 
-let string_operations =
+let string_operations = Assoc.of_list
   [ ("^", binary_closure (fun v1 v2 -> value_str (V.to_str v1 ^ V.to_str v2)))
   ; ( "string_length"
     , from_fun (fun v -> value_int (String.length (V.to_str v))) ) ]
 
 
-let conversion_functions =
+let conversion_functions = Assoc.of_list
   [ ( "to_string"
     , let to_string v =
         Value.print_value v Format.str_formatter ;
@@ -188,5 +190,7 @@ let conversion_functions =
     comparison functions, arithmetic operations, string operations, conversion
     functions, and effect instances. *)
 let values =
-  comparison_functions @ arithmetic_operations @ string_operations
-  @ conversion_functions
+  comparison_functions |>
+  Assoc.concat arithmetic_operations |>
+  Assoc.concat string_operations |>
+  Assoc.concat conversion_functions

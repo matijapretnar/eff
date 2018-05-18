@@ -45,13 +45,15 @@ let rec cons_of_pattern p =
   match fst p with
   | Sugared.PAs (p, _) -> cons_of_pattern p
   | Sugared.PTuple lst -> Tuple (List.length lst)
-  | Sugared.PRecord [] -> assert false
-  | Sugared.PRecord ((lbl, _) :: _) -> (
-    match Tctx.find_field lbl with
-    | None ->
-        Error.typing ~loc:(snd p) "Unbound record field label %s in a pattern"
-          lbl
-    | Some (_, _, flds) -> Record (List.map fst flds) )
+  | Sugared.PRecord flds -> (
+      match Assoc.pop flds with
+      | None, _ -> assert false
+      | Some (lbl, _), _ -> (
+        match Tctx.find_field lbl with
+        | None ->
+            Error.typing ~loc:(snd p) "Unbound record field label %s in a pattern"
+              lbl
+        | Some (_, _, flds) -> Record (Assoc.keys_of flds) ) )
   | Sugared.PVariant (lbl, opt) -> Variant (lbl, opt <> None)
   | Sugared.PConst c -> Const c
   | Sugared.PVar _ | Sugared.PNonbinding -> Wildcard
@@ -63,7 +65,7 @@ let pattern_of_cons ~loc c lst =
   let plain =
     match c with
     | Tuple n -> Sugared.PTuple lst
-    | Record flds -> Sugared.PRecord (List.combine flds lst)
+    | Record flds -> Sugared.PRecord (Assoc.of_list (List.combine flds lst))
     | Const const -> Sugared.PConst const
     | Variant (lbl, opt) ->
         Sugared.PVariant (lbl, if opt then Some (List.hd lst) else None)
@@ -119,7 +121,7 @@ let find_constructors lst =
         | None -> assert false (* We assume that everything is type-checked *)
         | Some (_, _, tags, _) ->
             let all =
-              List.map (fun (lbl, opt) -> Variant (lbl, opt <> None)) tags
+              List.map (fun (lbl, opt) -> Variant (lbl, opt <> None)) (Assoc.to_list tags)
             in
             C.diff all present )
       (* Only for completeness. *)
@@ -141,7 +143,7 @@ let specialize_vector ~loc con = function
           | Some p' -> p'
           | None -> (Sugared.PNonbinding, loc)
         in
-        Some (List.map (get_pattern def) all @ lst)
+        Some (List.map (get_pattern def)  all @ lst)
     | Variant (lbl, _), Sugared.PVariant (lbl', opt) when lbl = lbl' -> (
       match opt with Some p -> Some (p :: lst) | None -> Some lst )
     | Const c, Sugared.PConst c' when Const.equal c c' -> Some lst

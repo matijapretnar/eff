@@ -9,7 +9,7 @@ type tydef =
 
 type tyctx = (OldUtils.tyname, Params.Ty.t list * tydef) Assoc.t
 
-let initial : tyctx =
+let initial : tyctx = Assoc.of_list
   [ ("bool", ([], Inline T.bool_ty))
   ; ("unit", ([], Inline T.unit_ty))
   ; ("int", ([], Inline T.int_ty))
@@ -19,11 +19,12 @@ let initial : tyctx =
     , let a = Type.fresh_ty_param () in
       ( [a]
       , Sum
+          (Assoc.of_list
           [ (OldUtils.nil, None)
           ; ( OldUtils.cons
             , Some (T.Tuple [T.TyParam a; T.Apply ("list", [T.TyParam a])]) )
-          ] ) )
-  ; ("empty", ([], Sum [])) ]
+          ] ) ) )
+  ; ("empty", ([], Sum Assoc.empty)) ]
 
 
 let global = ref initial
@@ -53,27 +54,33 @@ let fresh_tydef ~loc ty_name =
 (** [find_variant lbl] returns the information about the variant type that defines the
     label [lbl]. *)
 let find_variant lbl =
-  let rec find = function
-    | [] -> None
-    | (ty_name, (ps, Sum vs)) :: lst -> (
-      match Assoc.lookup lbl vs with
-      | Some us -> Some (ty_name, ps, vs, us)
-      | None -> find lst )
-    | _ :: lst -> find lst
+  let construct = function
+    | (ty_name, (ps, Sum vs)) ->
+        (match Assoc.lookup lbl vs with
+        | Some us -> Some (ty_name, ps, vs, us)
+        | None -> None)
+    | _ -> None
   in
-  find !global
+  match Assoc.find_if (fun x -> construct x <> None) !global with
+  | Some x -> construct x
+  | None -> None
+
 
 
 (** [find_field fld] returns the information about the record type that defines the field
     [fld]. *)
+
 let find_field fld =
-  let rec find = function
-    | [] -> None
-    | (ty_name, (ps, Record flds)) :: lst ->
-        if List.mem_assoc fld flds then Some (ty_name, ps, flds) else find lst
-    | _ :: lst -> find lst
+  let construct = function
+    | (ty_name, (ps, Record flds)) ->
+        (match Assoc.lookup fld flds with
+        | Some _ -> Some (ty_name, ps, flds)
+        | None -> None)
+    | _ -> None
   in
-  find !global
+  match Assoc.find_if (fun x -> construct x <> None) !global with
+  | Some x -> construct x
+  | None -> None
 
 
 let apply_to_params t ps = Type.Apply (t, List.map (fun p -> Type.TyParam p) ps)
@@ -109,7 +116,8 @@ let transparent ~loc ty_name =
 (* [ty_apply pos t lst] applies the type constructor [t] to the given list of arguments. *)
 let ty_apply ~loc ty_name lst =
   let xs, ty = lookup_tydef ~loc ty_name in
-  try subst_tydef (List.combine xs lst) ty
+  let combined = Assoc.of_list (List.combine xs lst) in
+  try subst_tydef combined ty
   with Invalid_argument "List.combine" ->
     Error.typing ~loc "Type constructors %s should be applied to %d arguments"
       ty_name (List.length xs)
@@ -131,13 +139,13 @@ let check_well_formed ~loc tydef =
   in
   match tydef with
   | Record fields ->
-      if not (OldUtils.injective fst fields) then
+      if not (OldUtils.injective (fun x -> x) (Assoc.keys_of fields)) then
         Error.typing ~loc "Field labels in a record type must be distinct" ;
-      List.iter (fun (_, ty) -> check ty) fields
-  | Sum constuctors ->
-      if not (OldUtils.injective fst constuctors) then
+      Assoc.iter (fun (_, ty) -> check ty) fields
+  | Sum constructors ->
+      if not (OldUtils.injective (fun x -> x) (Assoc.keys_of constructors)) then
         Error.typing ~loc "Constructors of a sum type must be distinct" ;
-      List.iter (function _, None -> () | _, Some ty -> check ty) constuctors
+      Assoc.iter (function _, None -> () | _, Some ty -> check ty) constructors
   | Inline ty -> check ty
 
 
@@ -155,7 +163,7 @@ let check_noncyclic ~loc =
         check forbidden ty1 ; check forbidden ty2
   and check_tydef forbidden = function
     | Sum _ -> ()
-    | Record fields -> List.iter (fun (_, t) -> check forbidden t) fields
+    | Record fields -> Assoc.iter (fun (_, t) -> check forbidden t) fields
     | Inline ty -> check forbidden ty
   in
   check_tydef []
@@ -169,7 +177,7 @@ let check_noncyclic ~loc =
 *)
 let check_shadowing ~loc = function
   | Record lst ->
-      List.iter
+      Assoc.iter
         (fun (f, _) ->
           match find_field f with
           | Some (u, _, _) ->
@@ -178,7 +186,7 @@ let check_shadowing ~loc = function
           | None -> () )
         lst
   | Sum lst ->
-      List.iter
+      Assoc.iter
         (fun (lbl, _) ->
           match find_variant lbl with
           | Some (u, _, _, _) ->
@@ -196,12 +204,12 @@ let extend_tydefs ~loc tydefs =
   let global_orig = !global in
   let extend_tydef ((_, (_, ty)) as tydef) =
     check_shadowing ~loc ty ;
-    global := tydef :: !global
+    global := Assoc.update (fst tydef) (snd tydef) !global
   in
   try
-    List.iter extend_tydef tydefs ;
-    List.iter (fun (_, (_, ty)) -> check_well_formed ~loc ty) tydefs ;
-    List.iter (fun (_, (_, ty)) -> check_noncyclic ~loc ty) tydefs
+    Assoc.iter extend_tydef tydefs ;
+    Assoc.iter (fun (_, (_, ty)) -> check_well_formed ~loc ty) tydefs ;
+    Assoc.iter (fun (_, (_, ty)) -> check_noncyclic ~loc ty) tydefs
   with e ->
     global := global_orig ;
     raise e

@@ -141,7 +141,7 @@ and print_expression ?max_level e ppf =
   | Lambda a -> print "fun %t" (abstraction a)
   | Handler h ->
       print "{effect_clauses = %t; value_clause = (%t)}"
-        (Print.sequence " | " effect_clause h.effect_clauses)
+        (Print.sequence " | " effect_clause (Assoc.to_list h.effect_clauses))
         (abstraction h.value_clause)
   | Effect eff -> print "%s" eff
 
