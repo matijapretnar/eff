@@ -23,14 +23,12 @@ let rec extend_value p v env =
   | Core.PNonbinding, _ -> env
   | Core.PTuple ps, Value.Tuple vs -> List.fold_right2 extend_value ps vs env
   | Core.PRecord ps, Value.Record vs -> (
-      let rec extend_record ps vs env =
-        match ps with
-        | [] -> env
-        | (f, p) :: ps ->
-            let v = List.assoc f vs in
-            extend_record ps vs (extend_value p v env)
+      let extender env (f, p) =
+        match Assoc.lookup f vs with
+        | None -> raise Not_found
+        | Some v -> extend_value p v env
       in
-      try extend_record ps vs env with Not_found ->
+      try Assoc.fold_left extender env ps with Not_found ->
         raise (PatternMatch p.Core.location) )
   | Core.PVariant (lbl, None), Value.Variant (lbl', None) when lbl = lbl' ->
       env
@@ -78,7 +76,7 @@ let rec ceval env c =
       h r
   | Core.Let (lst, c) -> eval_let env lst c
   | Core.LetRec (defs, c) ->
-      let env = extend_let_rec env defs in
+      let env = extend_let_rec env (Assoc.of_list defs) in
       ceval env c
   | Core.Check c ->
       let r = ceval env c in
@@ -97,7 +95,7 @@ and eval_let env lst c =
 and extend_let_rec env defs =
   let env' = ref env in
   let env =
-    List.fold_right
+    Assoc.fold_right
       (fun (f, a) env ->
         let p, c = a in
         let g = V.Closure (fun v -> ceval (extend p v !env') c) in
@@ -116,7 +114,7 @@ and veval env e =
     | None -> Error.runtime "Name %t is not defined." (Core.Variable.print x) )
   | Core.Const c -> V.Const c
   | Core.Tuple es -> V.Tuple (List.map (veval env) es)
-  | Core.Record es -> V.Record (List.map (fun (f, e) -> (f, veval env e)) es)
+  | Core.Record es -> V.Record (Assoc.map (fun e -> veval env e) es)
   | Core.Variant (lbl, None) -> V.Variant (lbl, None)
   | Core.Variant (lbl, Some e) -> V.Variant (lbl, Some (veval env e))
   | Core.Lambda a -> V.Closure (eval_closure env a)
@@ -128,17 +126,17 @@ and eval_handler env
     { Core.effect_clauses= ops
     ; Core.value_clause= value
     ; Core.finally_clause= fin } =
-  let eval_op (op, a2) =
+  let eval_op a2 =
     let p, kvar, c = a2 in
     let f u k = eval_closure (extend kvar (V.Closure k) env) (p, c) u in
-    (op, f)
+    f
   in
-  let ops = List.map eval_op ops in
+  let ops = Assoc.map eval_op ops in
   let rec h = function
     | V.Value v -> eval_closure env value v
     | V.Call (eff, v, k) ->
         let k' u = h (k u) in
-        match OldUtils.lookup eff ops with
+        match Assoc.lookup eff ops with
         | Some f -> f v k'
         | None -> V.Call (eff, v, k')
   in

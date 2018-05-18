@@ -17,11 +17,11 @@ let disable_typing = ref false
    a reference to a type substitution, usually called [cstr], in which we
    collect the results of unification. That is, we perform unification as early
    as locssible (rather than collect all equations and then solve them), and
-   store the results in [cstr]. 
+   store the results in [cstr].
 
    The effect of carrying around the substitution is that we need to be careful
    about when to apply it:
-   
+
    1. we apply the substitution to types [t1] and [t2] before trying to solve
       the equation [t1 = t2].
 
@@ -69,20 +69,22 @@ let infer_pattern cstr pp =
     | Core.PNonbinding -> T.fresh_ty ()
     | Core.PConst const -> ty_of_const const
     | Core.PTuple ps -> T.Tuple (C.map infer ps)
-    | Core.PRecord [] -> assert false
-    | Core.PRecord ((fld, _) :: _ as lst) -> (
-      match Tctx.infer_field fld with
-      | None -> Error.typing ~loc "Unbound record field label %s" fld
-      | Some (ty, (t, us)) ->
-          let unify_record_pattern (fld, p) =
-            match C.lookup fld us with
-            | None ->
-                Error.typing ~loc
-                  "Unexpected field %s in a pattern of type %s." fld t
-            | Some u -> add_ty_constraint cstr loc (infer p) u
-          in
-          List.iter unify_record_pattern lst ;
-          ty )
+    | Core.PRecord flds -> (
+      match Assoc.pop flds with
+      | None, _ -> assert false
+      | Some (fld, _), _ -> (
+          match Tctx.infer_field fld with
+          | None -> Error.typing ~loc "Unbound record field label %s" fld
+          | Some (ty, (t, us)) ->
+              let unify_record_pattern (fld, p) =
+                match Assoc.lookup fld us with
+                | None ->
+                    Error.typing ~loc
+                      "Unexpected field %s in a pattern of type %s." fld t
+                | Some u -> add_ty_constraint cstr loc (infer p) u
+              in
+              Assoc.iter unify_record_pattern flds ;
+              ty ) )
     | Core.PVariant (lbl, p) ->
       match Tctx.infer_variant lbl with
       | None -> assert false
@@ -148,13 +150,14 @@ and infer_let ctx cstr loc defs =
               (Core.Variable.print x)
         | None ->
             let sbst = Unify.solve !cstr in
-            let ws = OldUtils.assoc_map (T.subst_ty sbst) ws in
+            let ws = Assoc.map (T.subst_ty sbst) (Assoc.of_list ws) in
             let ctx = Ctx.subst_ctx ctx sbst in
             let ws =
-              OldUtils.assoc_map
+              Assoc.map
                 (Ctx.generalize ctx (nonexpansive c.Core.term))
                 ws
             in
+            let ws = Assoc.to_list ws in
             let ctx' =
               List.fold_right
                 (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme)
@@ -195,9 +198,10 @@ and infer_let_rec ctx cstr loc defs =
       add_ty_constraint cstr c.Core.location u2 tc )
     lst ;
   let sbst = Unify.solve !cstr in
-  let vars = OldUtils.assoc_map (T.subst_ty sbst) vars in
+  let vars = Assoc.map (T.subst_ty sbst) (Assoc.of_list vars) in
   let ctx = Ctx.subst_ctx ctx sbst in
-  let vars = OldUtils.assoc_map (Ctx.generalize ctx true) vars in
+  let vars = Assoc.map (Ctx.generalize ctx true) vars in
+  let vars = Assoc.to_list vars in
   let ctx =
     List.fold_right
       (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme)
@@ -214,31 +218,32 @@ and infer_expr ctx cstr e =
   | Core.Var x -> Ctx.lookup ~loc ctx x
   | Core.Const const -> ty_of_const const
   | Core.Tuple es -> T.Tuple (C.map (infer_expr ctx cstr) es)
-  | Core.Record [] -> assert false
-  | Core.Record ((fld, _) :: _ as lst) -> (
-    match
-      (* XXX *)
-      (*       if not (Pattern.linear_record lst) then
-        Error.typing ~loc "Fields in a record must be distinct." ;
- *)
-      Tctx.infer_field fld
-    with
-    | None ->
-        Error.typing ~loc "Unbound record field label %s in a pattern" fld
-    | Some (ty, (t_name, arg_types)) ->
-        if List.length lst <> List.length arg_types then
-          Error.typing ~loc "malformed record of type %s" t_name
-        else
-          let arg_types' = C.assoc_map (infer_expr ctx cstr) lst in
-          let unify_record_arg (fld, t) =
-            match C.lookup fld arg_types with
-            | None ->
-                Error.typing ~loc
-                  "Unexpected record field label %s in a pattern" fld
-            | Some u -> add_ty_constraint cstr loc t u
-          in
-          List.iter unify_record_arg arg_types' ;
-          ty )
+  | Core.Record flds -> (
+    match Assoc.pop flds with
+    | None, _ -> assert false
+    | Some (fld, _), _ -> (
+      match
+        (* XXX *)
+        (*       if not (Pattern.linear_record flds') then
+          Error.typing ~loc "Fields in a record must be distinct." ;*)
+        Tctx.infer_field fld
+      with
+      | None ->
+          Error.typing ~loc "Unbound record field label %s in a pattern" fld
+      | Some (ty, (t_name, arg_types)) ->
+          if Assoc.length flds <> Assoc.length arg_types then
+            Error.typing ~loc "malformed record of type %s" t_name
+          else
+            let arg_types' = Assoc.map (infer_expr ctx cstr) flds in
+            let unify_record_arg (fld, t) =
+              match Assoc.lookup fld arg_types with
+              | None ->
+                  Error.typing ~loc
+                    "Unexpected record field label %s in a pattern" fld
+              | Some u -> add_ty_constraint cstr loc t u
+            in
+            Assoc.iter unify_record_arg arg_types' ;
+            ty ) )
   | Core.Variant (lbl, u) -> (
     match Tctx.infer_variant lbl with
     | None -> assert false
@@ -275,7 +280,7 @@ and infer_expr ctx cstr e =
             add_ty_constraint cstr loc tk (T.Arrow (t2, t_yield)) ;
             add_ty_constraint cstr loc t_yield u2
       in
-      List.iter unify_operation ops ;
+      Assoc.iter unify_operation ops ;
       let valt1, valt2 = infer_abstraction ctx cstr a_val in
       let fint1, fint2 = infer_abstraction ctx cstr a_fin in
       add_ty_constraint cstr loc valt1 t_value ;

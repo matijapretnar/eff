@@ -16,7 +16,7 @@
         ([], [], [])
         clauses
     in
-    { effect_clauses = List.rev eff_cs;
+    { effect_clauses = Assoc.of_list (List.rev eff_cs);
       value_clause = List.rev val_cs;
       finally_clause = List.rev fin_cs }
 
@@ -107,7 +107,7 @@ plain_topterm:
 topdef: mark_position(plain_topdef) { $1 }
 plain_topdef:
   | TYPE defs = separated_nonempty_list(AND, ty_def)
-    { Tydef defs }
+    { Tydef (Assoc.of_list defs) }
   | LET defs = separated_nonempty_list(AND, let_def)
     { TopLet defs }
   | LET REC defs = separated_nonempty_list(AND, let_rec_def)
@@ -241,7 +241,7 @@ plain_simple_term:
       fst (List.fold_right cons ts nil)
     }
   | LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, comma_term)) RBRACE
-    { Record flds }
+    { Record (Assoc.of_list flds) }
   | LPAREN RPAREN
     { Tuple [] }
   | LPAREN t = plain_term RPAREN
@@ -343,7 +343,7 @@ plain_simple_pattern:
   | cst = const_term
     { PConst cst }
   | LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, pattern)) RBRACE
-    { PRecord flds }
+    { PRecord (Assoc.of_list flds) }
   | LBRACK ts = separated_list(SEMI, pattern) RBRACK
     {
       let nil = (PVariant (OldUtils.nil, None), Location.make $endpos $endpos) in
@@ -467,9 +467,9 @@ ty_def:
 
 defined_ty:
   | LBRACE lst = separated_nonempty_list(SEMI, separated_pair(field, COLON, ty)) RBRACE
-    { TyRecord lst }
+    { TyRecord (Assoc.of_list lst) }
   | lst = cases(sum_case)
-    { TySum lst }
+    { TySum (Assoc.of_list lst) }
   | t = ty
     { TyInline t }
 

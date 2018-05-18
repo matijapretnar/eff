@@ -81,7 +81,8 @@ let rec exec_cmd ppf st cmd =
       let vars, typechecker_state =
         TypeChecker.infer_top_let_rec ~loc st.typechecker_state defs
       in
-      let runtime_state = Runtime.extend_let_rec st.runtime_state defs in
+      let defs' = Assoc.of_list defs in
+      let runtime_state = Runtime.extend_let_rec st.runtime_state defs' in
       List.iter
         (fun (x, tysch) ->
           Format.fprintf ppf "@[val %t : %t = <fun>@]@."
@@ -90,7 +91,7 @@ let rec exec_cmd ppf st cmd =
         vars ;
       {st with typechecker_state; runtime_state}
   | CoreSyntax.External (x, ty, f) -> (
-    match OldUtils.lookup f External.values with
+    match Assoc.lookup f External.values with
     | Some v ->
         { st with
           typechecker_state=

@@ -1,7 +1,7 @@
 {
   open Parser
 
-  let reserved = [
+  let reserved = Assoc.of_list [
     ("and", AND);
     ("as", AS);
     ("asr", ASR);
@@ -37,7 +37,7 @@
     ("with", WITH)
   ]
 
-  let directives = [
+  let directives = Assoc.of_list [
     ("help", HELP);
     ("reset", RESET);
     ("quit", QUIT);
@@ -97,10 +97,10 @@ rule token = parse
   | float               { FLOAT (float_of_string(Lexing.lexeme lexbuf)) }
   | '"'                 { STRING (string "" lexbuf) }
   | lname               { let s = Lexing.lexeme lexbuf in
-                            match OldUtils.lookup s reserved with
+                            match Assoc.lookup s reserved with
                               | Some t -> t
                               | None ->
-                                  begin match OldUtils.lookup s directives with
+                                  begin match Assoc.lookup s directives with
                                     | Some d -> d
                                     | None -> LNAME s
                                   end

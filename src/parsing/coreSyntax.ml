@@ -17,7 +17,7 @@ and plain_pattern =
   | PVar of variable
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (OldUtils.field, pattern) OldUtils.assoc
+  | PRecord of (OldUtils.field, pattern) Assoc.t
   | PVariant of OldUtils.label * pattern option
   | PConst of Const.t
   | PNonbinding
@@ -29,7 +29,7 @@ and plain_expression =
   | Var of variable
   | Const of Const.t
   | Tuple of expression list
-  | Record of (OldUtils.field, expression) OldUtils.assoc
+  | Record of (OldUtils.field, expression) Assoc.t
   | Variant of OldUtils.label * expression option
   | Lambda of abstraction
   | Effect of effect
@@ -49,7 +49,7 @@ and plain_computation =
 
 (** Handler definitions *)
 and handler =
-  { effect_clauses: (effect, abstraction2) OldUtils.assoc
+  { effect_clauses: (effect, abstraction2) Assoc.t
   ; value_clause: abstraction
   ; finally_clause: abstraction }
 
@@ -63,7 +63,7 @@ and abstraction2 = (pattern * pattern * computation)
 type command = plain_command annotation
 
 and plain_command =
-  | Tydef of (OldUtils.tyname, Params.Ty.t list * Tctx.tydef) OldUtils.assoc
+  | Tydef of (OldUtils.tyname, Params.Ty.t list * Tctx.tydef) Assoc.t
       (** [type t = tydef] *)
   | TopLet of (pattern * computation) list
       (** [let p1 = t1 and ... and pn = tn] *)
@@ -141,7 +141,7 @@ and print_expression ?max_level e ppf =
   | Lambda a -> print "fun %t" (abstraction a)
   | Handler h ->
       print "{effect_clauses = %t; value_clause = (%t)}"
-        (Print.sequence " | " effect_clause h.effect_clauses)
+        (Print.sequence " | " effect_clause (Assoc.to_list h.effect_clauses))
         (abstraction h.value_clause)
   | Effect eff -> print "%s" eff
 
