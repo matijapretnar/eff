@@ -1,4 +1,3 @@
-module C = OldUtils
 module Untyped = UntypedSyntax
 
 (* Pattern matching exhaustiveness checking as described by Maranget [1]. These
@@ -20,8 +19,8 @@ module Untyped = UntypedSyntax
 (* Types of constructors. *)
 type cons =
   | Tuple of int
-  | Record of C.field list
-  | Variant of C.label * bool
+  | Record of OldUtils.field list
+  | Variant of OldUtils.label * bool
   | Const of Const.t
   | Wildcard
 
@@ -77,7 +76,7 @@ let find_constructors lst =
   let present =
     List.filter
       (fun c -> c <> Wildcard)
-      (List.map cons_of_pattern (C.uniq lst))
+      (List.map cons_of_pattern (OldUtils.uniq lst))
   in
   let missing =
     match present with
@@ -122,7 +121,7 @@ let find_constructors lst =
                 (fun (lbl, opt) -> Variant (lbl, opt <> None))
                 (Assoc.to_list tags)
             in
-            C.diff all present )
+            OldUtils.diff all present )
       (* Only for completeness. *)
       | Wildcard -> []
   in
@@ -148,7 +147,10 @@ let specialize_vector ~loc con = function
     | Const c, Untyped.PConst c' when Const.equal c c' -> Some lst
     | _, (Untyped.PNonbinding | Untyped.PVar _) ->
         Some
-          (C.repeat (Untyped.add_loc Untyped.PNonbinding loc) (arity con) @ lst)
+          ( OldUtils.repeat
+              (Untyped.add_loc Untyped.PNonbinding loc)
+              (arity con)
+          @ lst )
     | _, _ -> None
 
 
@@ -217,7 +219,7 @@ let rec exhaustive ~loc p = function
             match exhaustive ~loc (specialize ~loc c p) (arity c + n - 1) with
             | None -> find cs
             | Some lst ->
-                let ps, rest = C.split (arity c) lst in
+                let ps, rest = OldUtils.split (arity c) lst in
                 Some (pattern_of_cons ~loc c ps :: rest)
         in
         find present
@@ -228,7 +230,9 @@ let rec exhaustive ~loc p = function
             let c = List.hd missing in
             Some
               ( pattern_of_cons ~loc c
-                  (C.repeat (Untyped.add_loc Untyped.PNonbinding loc) (arity c))
+                  (OldUtils.repeat
+                     (Untyped.add_loc Untyped.PNonbinding loc)
+                     (arity c))
               :: lst )
 
 

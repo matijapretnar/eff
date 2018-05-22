@@ -1,4 +1,3 @@
-module C = OldUtils
 module T = Type
 module Untyped = UntypedSyntax
 module Ctx = SimpleCtx
@@ -68,7 +67,7 @@ let infer_pattern cstr pp =
         t
     | Untyped.PNonbinding -> T.fresh_ty ()
     | Untyped.PConst const -> ty_of_const const
-    | Untyped.PTuple ps -> T.Tuple (C.map infer ps)
+    | Untyped.PTuple ps -> T.Tuple (OldUtils.map infer ps)
     | Untyped.PRecord flds -> (
       match Assoc.pop flds with
       | None, _ -> assert false
@@ -102,7 +101,7 @@ let infer_pattern cstr pp =
 
 let extend_with_pattern ?(forbidden_vars= []) ctx cstr p =
   let vars, t = infer_pattern cstr p in
-  match C.find (fun (x, _) -> List.mem_assoc x vars) forbidden_vars with
+  match OldUtils.find (fun (x, _) -> List.mem_assoc x vars) forbidden_vars with
   | Some (x, _) ->
       Error.typing ~loc:p.Untyped.location "Several definitions of %t."
         (Untyped.Variable.print x)
@@ -144,7 +143,7 @@ and infer_let ctx cstr loc defs =
         let tc = infer_comp ctx cstr c in
         let ws, tp = infer_pattern cstr p in
         add_ty_constraint cstr c.Untyped.location tc tp ;
-        match C.find_duplicate (List.map fst ws) (List.map fst vs) with
+        match OldUtils.find_duplicate (List.map fst ws) (List.map fst vs) with
         | Some x ->
             Error.typing ~loc "Several definitions of %t."
               (Untyped.Variable.print x)
@@ -215,7 +214,7 @@ and infer_expr ctx cstr e =
   match e.Untyped.term with
   | Untyped.Var x -> Ctx.lookup ~loc ctx x
   | Untyped.Const const -> ty_of_const const
-  | Untyped.Tuple es -> T.Tuple (C.map (infer_expr ctx cstr) es)
+  | Untyped.Tuple es -> T.Tuple (OldUtils.map (infer_expr ctx cstr) es)
   | Untyped.Record flds -> (
     match Assoc.pop flds with
     | None, _ -> assert false

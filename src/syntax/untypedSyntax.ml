@@ -11,6 +11,9 @@ type 'term annotation = {term: 'term; location: Location.t}
 
 let add_loc t loc = {term= t; location= loc}
 
+(* Changing the datatype [plain_pattern] will break [specialize_vector] in [exhaust.ml] because
+   of wildcard matches there. *)
+
 type pattern = plain_pattern annotation
 
 and plain_pattern =
