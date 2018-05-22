@@ -31,8 +31,8 @@ let disable_typing = ref false
    SML? In our case non-expansive simply means "is a value". *)
 let nonexpansive = function
   | Untyped.Value _ -> true
-  | Untyped.Apply _ | Untyped.Match _ | Untyped.Handle _ | Untyped.Let _ | Untyped.LetRec _
-   |Untyped.Check _ ->
+  | Untyped.Apply _ | Untyped.Match _ | Untyped.Handle _ | Untyped.Let _
+   |Untyped.LetRec _ | Untyped.Check _ ->
       false
 
 
@@ -72,19 +72,19 @@ let infer_pattern cstr pp =
     | Untyped.PRecord flds -> (
       match Assoc.pop flds with
       | None, _ -> assert false
-      | Some (fld, _), _ -> (
-          match Tctx.infer_field fld with
-          | None -> Error.typing ~loc "Unbound record field label %s" fld
-          | Some (ty, (t, us)) ->
-              let unify_record_pattern (fld, p) =
-                match Assoc.lookup fld us with
-                | None ->
-                    Error.typing ~loc
-                      "Unexpected field %s in a pattern of type %s." fld t
-                | Some u -> add_ty_constraint cstr loc (infer p) u
-              in
-              Assoc.iter unify_record_pattern flds ;
-              ty ) )
+      | Some (fld, _), _ ->
+        match Tctx.infer_field fld with
+        | None -> Error.typing ~loc "Unbound record field label %s" fld
+        | Some (ty, (t, us)) ->
+            let unify_record_pattern (fld, p) =
+              match Assoc.lookup fld us with
+              | None ->
+                  Error.typing ~loc
+                    "Unexpected field %s in a pattern of type %s." fld t
+              | Some u -> add_ty_constraint cstr loc (infer p) u
+            in
+            Assoc.iter unify_record_pattern flds ;
+            ty )
     | Untyped.PVariant (lbl, p) ->
       match Tctx.infer_variant lbl with
       | None -> assert false
@@ -153,9 +153,7 @@ and infer_let ctx cstr loc defs =
             let ws = Assoc.map (T.subst_ty sbst) (Assoc.of_list ws) in
             let ctx = Ctx.subst_ctx ctx sbst in
             let ws =
-              Assoc.map
-                (Ctx.generalize ctx (nonexpansive c.Untyped.term))
-                ws
+              Assoc.map (Ctx.generalize ctx (nonexpansive c.Untyped.term)) ws
             in
             let ws = Assoc.to_list ws in
             let ctx' =
@@ -221,7 +219,7 @@ and infer_expr ctx cstr e =
   | Untyped.Record flds -> (
     match Assoc.pop flds with
     | None, _ -> assert false
-    | Some (fld, _), _ -> (
+    | Some (fld, _), _ ->
       match
         (* XXX *)
         (*       if not (Pattern.linear_record flds') then
@@ -243,7 +241,7 @@ and infer_expr ctx cstr e =
               | Some u -> add_ty_constraint cstr loc t u
             in
             Assoc.iter unify_record_arg arg_types' ;
-            ty ) )
+            ty )
   | Untyped.Variant (lbl, u) -> (
     match Tctx.infer_variant lbl with
     | None -> assert false

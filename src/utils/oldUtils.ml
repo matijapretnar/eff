@@ -30,7 +30,6 @@ let cons = "$1cons"
 
 let nil = "$0nil"
 
-
 (* [injective f lst] returns [true] when [f] is injective on [lst]. *)
 let injective f lst =
   let rec check ys = function
@@ -71,6 +70,7 @@ let rec repeat x = function 0 -> [] | n -> x :: repeat x (n - 1)
 let rec find p = function
   | [] -> None
   | x :: lst -> if p x then Some x else find p lst
+
 
 (** [uniq lst] returns [lst] with all duplicates removed, keeping the first
     occurence of each element. *)

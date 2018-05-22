@@ -21,7 +21,8 @@ let rec extend_value p v env =
       let env = extend_value p v env in
       update x v env
   | Untyped.PNonbinding, _ -> env
-  | Untyped.PTuple ps, Value.Tuple vs -> List.fold_right2 extend_value ps vs env
+  | Untyped.PTuple ps, Value.Tuple vs ->
+      List.fold_right2 extend_value ps vs env
   | Untyped.PRecord ps, Value.Record vs -> (
       let extender env (f, p) =
         match Assoc.lookup f vs with
@@ -32,7 +33,8 @@ let rec extend_value p v env =
         raise (PatternMatch p.Untyped.location) )
   | Untyped.PVariant (lbl, None), Value.Variant (lbl', None) when lbl = lbl' ->
       env
-  | Untyped.PVariant (lbl, Some p), Value.Variant (lbl', Some v) when lbl = lbl' ->
+  | Untyped.PVariant (lbl, Some p), Value.Variant (lbl', Some v)
+    when lbl = lbl' ->
       extend_value p v env
   | Untyped.PConst c, Value.Const c' when Const.equal c c' -> env
   | _, _ -> raise (PatternMatch p.Untyped.location)
@@ -111,14 +113,16 @@ and veval env e =
   | Untyped.Var x -> (
     match lookup x env with
     | Some v -> v
-    | None -> Error.runtime "Name %t is not defined." (Untyped.Variable.print x) )
+    | None ->
+        Error.runtime "Name %t is not defined." (Untyped.Variable.print x) )
   | Untyped.Const c -> V.Const c
   | Untyped.Tuple es -> V.Tuple (List.map (veval env) es)
   | Untyped.Record es -> V.Record (Assoc.map (fun e -> veval env e) es)
   | Untyped.Variant (lbl, None) -> V.Variant (lbl, None)
   | Untyped.Variant (lbl, Some e) -> V.Variant (lbl, Some (veval env e))
   | Untyped.Lambda a -> V.Closure (eval_closure env a)
-  | Untyped.Effect eff -> V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
+  | Untyped.Effect eff ->
+      V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | Untyped.Handler h -> V.Handler (eval_handler env h)
 
 

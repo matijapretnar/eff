@@ -80,8 +80,8 @@ val tuple :
     a pretty-printer [pp] to the formatter [ppf]. *)
 
 val record :
-  ('a -> Format.formatter -> unit) -> (string, 'a) Assoc.t
-  -> Format.formatter -> unit
+  ('a -> Format.formatter -> unit) -> (string, 'a) Assoc.t -> Format.formatter
+  -> unit
 (** [record pp lst ppf] prints a record given by an associative list of elements
     [lst] using a pretty-printer [pp] (applied only to values) to the formatter
     [ppf]. *)

@@ -9,7 +9,8 @@ let empty = {variables= Assoc.empty; effects= UntypedSyntax.EffectMap.empty}
 let lookup ~loc ctx x =
   match Assoc.lookup x ctx.variables with
   | Some (ps, t) -> snd (Type.refresh ps t)
-  | None -> Error.typing ~loc "Unknown name %t" (UntypedSyntax.Variable.print x)
+  | None ->
+      Error.typing ~loc "Unknown name %t" (UntypedSyntax.Variable.print x)
 
 
 let extend ctx x ty_scheme =
@@ -41,7 +42,8 @@ let generalize ctx poly ty =
 
 
 let infer_effect env eff =
-  try Some (UntypedSyntax.EffectMap.find eff env.effects) with Not_found -> None
+  try Some (UntypedSyntax.EffectMap.find eff env.effects) with Not_found ->
+    None
 
 
 let add_effect env eff (ty1, ty2) =

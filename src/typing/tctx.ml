@@ -9,22 +9,24 @@ type tydef =
 
 type tyctx = (OldUtils.tyname, Params.Ty.t list * tydef) Assoc.t
 
-let initial : tyctx = Assoc.of_list
-  [ ("bool", ([], Inline T.bool_ty))
-  ; ("unit", ([], Inline T.unit_ty))
-  ; ("int", ([], Inline T.int_ty))
-  ; ("string", ([], Inline T.string_ty))
-  ; ("float", ([], Inline T.float_ty))
-  ; ( "list"
-    , let a = Type.fresh_ty_param () in
-      ( [a]
-      , Sum
-          (Assoc.of_list
-          [ (OldUtils.nil, None)
-          ; ( OldUtils.cons
-            , Some (T.Tuple [T.TyParam a; T.Apply ("list", [T.TyParam a])]) )
-          ] ) ) )
-  ; ("empty", ([], Sum Assoc.empty)) ]
+let initial : tyctx =
+  Assoc.of_list
+    [ ("bool", ([], Inline T.bool_ty))
+    ; ("unit", ([], Inline T.unit_ty))
+    ; ("int", ([], Inline T.int_ty))
+    ; ("string", ([], Inline T.string_ty))
+    ; ("float", ([], Inline T.float_ty))
+    ; ( "list"
+      , let a = Type.fresh_ty_param () in
+        ( [a]
+        , Sum
+            (Assoc.of_list
+               [ (OldUtils.nil, None)
+               ; ( OldUtils.cons
+                 , Some
+                     (T.Tuple [T.TyParam a; T.Apply ("list", [T.TyParam a])])
+                 ) ]) ) )
+    ; ("empty", ([], Sum Assoc.empty)) ]
 
 
 let global = ref initial
@@ -55,10 +57,10 @@ let fresh_tydef ~loc ty_name =
     label [lbl]. *)
 let find_variant lbl =
   let construct = function
-    | (ty_name, (ps, Sum vs)) ->
-        (match Assoc.lookup lbl vs with
-        | Some us -> Some (ty_name, ps, vs, us)
-        | None -> None)
+    | ty_name, (ps, Sum vs) -> (
+      match Assoc.lookup lbl vs with
+      | Some us -> Some (ty_name, ps, vs, us)
+      | None -> None )
     | _ -> None
   in
   match Assoc.find_if (fun x -> construct x <> None) !global with
@@ -66,16 +68,15 @@ let find_variant lbl =
   | None -> None
 
 
-
 (** [find_field fld] returns the information about the record type that defines the field
     [fld]. *)
 
 let find_field fld =
   let construct = function
-    | (ty_name, (ps, Record flds)) ->
-        (match Assoc.lookup fld flds with
-        | Some _ -> Some (ty_name, ps, flds)
-        | None -> None)
+    | ty_name, (ps, Record flds) -> (
+      match Assoc.lookup fld flds with
+      | Some _ -> Some (ty_name, ps, flds)
+      | None -> None )
     | _ -> None
   in
   match Assoc.find_if (fun x -> construct x <> None) !global with
@@ -117,8 +118,7 @@ let transparent ~loc ty_name =
 let ty_apply ~loc ty_name lst =
   let xs, ty = lookup_tydef ~loc ty_name in
   let combined = Assoc.of_list (List.combine xs lst) in
-  try subst_tydef combined ty
-  with Invalid_argument "List.combine" ->
+  try subst_tydef combined ty with Invalid_argument "List.combine" ->
     Error.typing ~loc "Type constructors %s should be applied to %d arguments"
       ty_name (List.length xs)
 
@@ -143,9 +143,11 @@ let check_well_formed ~loc tydef =
         Error.typing ~loc "Field labels in a record type must be distinct" ;
       Assoc.iter (fun (_, ty) -> check ty) fields
   | Sum constructors ->
-      if not (OldUtils.injective (fun x -> x) (Assoc.keys_of constructors)) then
-        Error.typing ~loc "Constructors of a sum type must be distinct" ;
-      Assoc.iter (function _, None -> () | _, Some ty -> check ty) constructors
+      if not (OldUtils.injective (fun x -> x) (Assoc.keys_of constructors))
+      then Error.typing ~loc "Constructors of a sum type must be distinct" ;
+      Assoc.iter
+        (function _, None -> () | _, Some ty -> check ty)
+        constructors
   | Inline ty -> check ty
 
 
