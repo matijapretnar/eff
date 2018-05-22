@@ -62,7 +62,7 @@
 %left  INFIXOP3 STAR MOD LAND LOR LXOR
 %right INFIXOP4 LSL LSR ASR
 
-%start <SugaredSyntax.command list> commands
+%start <Commands.t list> commands
 
 %%
 
@@ -101,39 +101,39 @@ commandline:
 topterm: mark_position(plain_topterm) { $1 }
 plain_topterm:
   | t = term
-    { Term t }
+    { Commands.Term t }
 
 (* Things that can be defined on toplevel. *)
 topdef: mark_position(plain_topdef) { $1 }
 plain_topdef:
   | TYPE defs = separated_nonempty_list(AND, ty_def)
-    { Tydef (Assoc.of_list defs) }
+    { Commands.Tydef (Assoc.of_list defs) }
   | LET defs = separated_nonempty_list(AND, let_def)
-    { TopLet defs }
+    { Commands.TopLet defs }
   | LET REC defs = separated_nonempty_list(AND, let_rec_def)
-    { TopLetRec defs }
+    { Commands.TopLetRec defs }
   | EXTERNAL x = ident COLON t = ty EQUAL n = STRING
-    { External (x, t, n) }
+    { Commands.External (x, t, n) }
   | EFFECT eff = effect COLON t1 = prod_ty ARROW t2 = ty
-    { DefEffect (eff, (t1, t2))}
+    { Commands.DefEffect (eff, (t1, t2))}
   | EFFECT eff = effect COLON t = prod_ty
     { let unit_loc = Location.make $startpos(t) $endpos(t) in
-      DefEffect (eff, ((TyTuple [], unit_loc), t))}
+      Commands.DefEffect (eff, ((TyTuple [], unit_loc), t))}
 
 (* Toplevel directive If you change these, make sure to update lname as well,
    or a directive might become a reserved word. *)
 topdirective: mark_position(plain_topdirective) { $1 }
 plain_topdirective:
   | HASH QUIT
-    { Quit }
+    { Commands.Quit }
   | HASH HELP
-    { Help }
+    { Commands.Help }
   | HASH RESET
-    { Reset }
+    { Commands.Reset }
   | HASH TYPE t = term
-    { TypeOf t }
+    { Commands.TypeOf t }
   | HASH USE fn = STRING
-    { Use fn }
+    { Commands.Use fn }
 
 (* Main syntax tree *)
 

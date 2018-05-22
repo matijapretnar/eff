@@ -59,28 +59,6 @@ and abstraction = (pattern * computation)
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * computation)
 
-(* Toplevel commands (the first four do not need to be separated by [;;]) *)
-type command = plain_command annotation
-
-and plain_command =
-  | Tydef of (OldUtils.tyname, Params.Ty.t list * Tctx.tydef) Assoc.t
-      (** [type t = tydef] *)
-  | TopLet of (pattern * computation) list
-      (** [let p1 = t1 and ... and pn = tn] *)
-  | TopLetRec of (variable * abstraction) list
-      (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)
-  | External of variable * Type.ty * string
-      (** [external x : t = "ext_val_name"] *)
-  | DefEffect of effect * (Type.ty * Type.ty)  (** [effect Eff : ty1 -> t2] *)
-  | Computation of computation
-  | Use of string  (** [#use "filename.eff"] *)
-  | Reset  (** [#reset] *)
-  | Help  (** [#help] *)
-  | Quit  (** [#quit] *)
-  | TypeOf of computation  (** [#type t] *)
-
-type commands = command list
-
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p.term with

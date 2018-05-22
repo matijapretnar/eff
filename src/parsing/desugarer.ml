@@ -441,7 +441,7 @@ and separate_match_cases cs =
   List.fold_right separator cs ([], [])
 
 
-let top_let state defs =
+let desugar_top_let state defs =
   let aux_desugar (p, c) (fold_state, defs, forbidden) =
     let check_forbidden (x, _) =
       if List.mem x forbidden then
@@ -458,7 +458,7 @@ let top_let state defs =
   (state', defs')
 
 
-let top_let_rec state defs =
+let desugar_top_let_rec state defs =
   let aux_desugar (x, t) (fold_state, ns, forbidden) =
     if List.mem x forbidden then
       Error.syntax ~loc:(snd t) "Several definitions of %s" x ;
@@ -476,46 +476,12 @@ let top_let_rec state defs =
   (state', defs')
 
 
-let external_ty state x t =
+let desugar_external state (x, t, f) =
   let n = fresh_var (Some x) in
   let ts = syntax_to_core_params (free_type_params t) in
-  ({state with context= Assoc.update x n state.context}, (n, desugar_type ts t))
+  ( {state with context= Assoc.update x n state.context}
+  , (n, desugar_type ts t, f) )
 
 
-let rec toplevel state (cmd, loc) =
-  let state', cmd' = plain_toplevel state cmd in
-  (state', {Untyped.term= cmd'; Untyped.location= loc})
-
-
-and plain_toplevel state = function
-  | Sugared.Tydef defs ->
-      let state', defs' = desugar_tydefs state defs in
-      (state', Untyped.Tydef defs')
-  | Sugared.TopLet defs ->
-      let state', defs' = top_let state defs in
-      (state', Untyped.TopLet defs')
-  | Sugared.TopLetRec defs ->
-      let state', defs' = top_let_rec state defs in
-      (state', Untyped.TopLetRec defs')
-  | Sugared.External (x, ty, y) ->
-      let state', (x', ty') = external_ty state x ty in
-      (state', Untyped.External (x', ty', y))
-  | Sugared.DefEffect (eff, (ty1, ty2)) ->
-      ( state
-      , Untyped.DefEffect
-          (eff, (desugar_type Assoc.empty ty1, desugar_type Assoc.empty ty2))
-      )
-  | Sugared.Term t ->
-      let c = desugar_computation state t in
-      (state, Untyped.Computation c)
-  | Sugared.Use filename -> (state, Untyped.Use filename)
-  | Sugared.Reset -> (state, Untyped.Reset)
-  | Sugared.Help -> (state, Untyped.Help)
-  | Sugared.Quit -> (state, Untyped.Quit)
-  | Sugared.TypeOf t ->
-      let c = desugar_computation state t in
-      (state, Untyped.TypeOf c)
-
-
-let desugar_commands state sugared_cmds =
-  CoreUtils.fold_map toplevel state sugared_cmds
+let desugar_def_effect state (eff, (ty1, ty2)) =
+  (eff, (desugar_type Assoc.empty ty1, desugar_type Assoc.empty ty2))

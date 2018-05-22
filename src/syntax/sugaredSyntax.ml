@@ -78,25 +78,3 @@ type tydef =
   | TySum of (OldUtils.label, ty option) Assoc.t
       (** [Label1 of ty1 | Label2 of ty2 | ... | Labeln of tyn | Label' | Label''] *)
   | TyInline of ty  (** [ty] *)
-
-(* Toplevel commands (the first four do not need to be separated by [;;]) *)
-type command = (plain_command * Location.t)
-
-and plain_command =
-  | Tydef of (OldUtils.tyname, OldUtils.typaram list * tydef) Assoc.t
-      (** [type t = tydef] *)
-  | TopLet of (variable pattern * term) list
-      (** [let p1 = t1 and ... and pn = tn] *)
-  | TopLetRec of (variable * term) list
-      (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)
-  | External of variable * ty * variable
-      (** [external x : t = "ext_val_name"] *)
-  | DefEffect of effect * (ty * ty)  (** [effect Eff : ty1 -> t2] *)
-  | Term of term
-  | Use of string  (** [#use "filename.eff"] *)
-  | Reset  (** [#reset] *)
-  | Help  (** [#help] *)
-  | Quit  (** [#quit] *)
-  | TypeOf of term  (** [#type t] *)
-
-type commands = command list
