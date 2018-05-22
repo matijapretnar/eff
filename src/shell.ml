@@ -25,9 +25,9 @@ let _ = Random.self_init ()
 (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
    It prints the result to [ppf] and returns the new state. *)
 let rec exec_cmd ppf st cmd =
-  let loc = cmd.CoreSyntax.location in
-  match cmd.CoreSyntax.term with
-  | CoreSyntax.Computation c ->
+  let loc = cmd.UntypedSyntax.location in
+  match cmd.UntypedSyntax.term with
+  | UntypedSyntax.Computation c ->
       let typechecker_state, ty =
         TypeChecker.infer_top_comp st.typechecker_state c
       in
@@ -35,27 +35,27 @@ let rec exec_cmd ppf st cmd =
       Format.fprintf ppf "@[- : %t = %t@]@." (Type.print_beautiful ty)
         (Value.print_value v) ;
       {st with typechecker_state}
-  | CoreSyntax.TypeOf c ->
+  | UntypedSyntax.TypeOf c ->
       let typechecker_state, ty =
         TypeChecker.infer_top_comp st.typechecker_state c
       in
       Format.fprintf ppf "@[- : %t@]@." (Type.print_beautiful ty) ;
       {st with typechecker_state}
-  | CoreSyntax.Reset ->
+  | UntypedSyntax.Reset ->
       Format.fprintf ppf "Environment reset." ;
       Tctx.reset () ;
       initial_state
-  | CoreSyntax.Help ->
+  | UntypedSyntax.Help ->
       Format.fprintf ppf "%s" help_text ;
       st
-  | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
+  | UntypedSyntax.DefEffect (eff, (ty1, ty2)) ->
       let typechecker_state =
         SimpleCtx.add_effect st.typechecker_state eff (ty1, ty2)
       in
       {st with typechecker_state}
-  | CoreSyntax.Quit -> exit 0
-  | CoreSyntax.Use filename -> execute_file ppf filename st
-  | CoreSyntax.TopLet defs ->
+  | UntypedSyntax.Quit -> exit 0
+  | UntypedSyntax.Use filename -> execute_file ppf filename st
+  | UntypedSyntax.TopLet defs ->
       let vars, typechecker_state =
         TypeChecker.infer_top_let ~loc st.typechecker_state defs
       in
@@ -72,12 +72,12 @@ let rec exec_cmd ppf st cmd =
           | None -> assert false
           | Some v ->
               Format.fprintf ppf "@[val %t : %t = %t@]@."
-                (CoreSyntax.Variable.print x)
+                (UntypedSyntax.Variable.print x)
                 (Type.print_beautiful tysch)
                 (Value.print_value v) )
         vars ;
       {st with typechecker_state; runtime_state}
-  | CoreSyntax.TopLetRec defs ->
+  | UntypedSyntax.TopLetRec defs ->
       let vars, typechecker_state =
         TypeChecker.infer_top_let_rec ~loc st.typechecker_state defs
       in
@@ -86,11 +86,11 @@ let rec exec_cmd ppf st cmd =
       List.iter
         (fun (x, tysch) ->
           Format.fprintf ppf "@[val %t : %t = <fun>@]@."
-            (CoreSyntax.Variable.print x)
+            (UntypedSyntax.Variable.print x)
             (Type.print_beautiful tysch) )
         vars ;
       {st with typechecker_state; runtime_state}
-  | CoreSyntax.External (x, ty, f) -> (
+  | UntypedSyntax.External (x, ty, f) -> (
     match Assoc.lookup f External.values with
     | Some v ->
         { st with
@@ -98,7 +98,7 @@ let rec exec_cmd ppf st cmd =
             SimpleCtx.extend st.typechecker_state x (Type.free_params ty, ty)
         ; runtime_state= Runtime.update x v st.runtime_state }
     | None -> Error.runtime "unknown external symbol %s." f )
-  | CoreSyntax.Tydef tydefs ->
+  | UntypedSyntax.Tydef tydefs ->
       Tctx.extend_tydefs ~loc tydefs ;
       st
 

@@ -3,7 +3,7 @@
 module Utils = OldUtils
 module T = Type
 module Sugared = SugaredSyntax
-module Untyped = CoreSyntax
+module Untyped = UntypedSyntax
 
 type constructor_kind = Variant of bool | Effect of bool
 

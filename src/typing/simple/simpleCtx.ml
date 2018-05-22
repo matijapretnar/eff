@@ -1,15 +1,15 @@
 type ty_scheme = Params.Ty.t list * Type.ty
 
 type t =
-  { variables: (CoreSyntax.variable, ty_scheme) Assoc.t
-  ; effects: (Type.ty * Type.ty) CoreSyntax.EffectMap.t }
+  { variables: (UntypedSyntax.variable, ty_scheme) Assoc.t
+  ; effects: (Type.ty * Type.ty) UntypedSyntax.EffectMap.t }
 
-let empty = {variables= Assoc.empty; effects= CoreSyntax.EffectMap.empty}
+let empty = {variables= Assoc.empty; effects= UntypedSyntax.EffectMap.empty}
 
 let lookup ~loc ctx x =
   match Assoc.lookup x ctx.variables with
   | Some (ps, t) -> snd (Type.refresh ps t)
-  | None -> Error.typing ~loc "Unknown name %t" (CoreSyntax.Variable.print x)
+  | None -> Error.typing ~loc "Unknown name %t" (UntypedSyntax.Variable.print x)
 
 
 let extend ctx x ty_scheme =
@@ -41,12 +41,12 @@ let generalize ctx poly ty =
 
 
 let infer_effect env eff =
-  try Some (CoreSyntax.EffectMap.find eff env.effects) with Not_found -> None
+  try Some (UntypedSyntax.EffectMap.find eff env.effects) with Not_found -> None
 
 
 let add_effect env eff (ty1, ty2) =
   match infer_effect env eff with
   | None ->
-      {env with effects= CoreSyntax.EffectMap.add eff (ty1, ty2) env.effects}
+      {env with effects= UntypedSyntax.EffectMap.add eff (ty1, ty2) env.effects}
   | Some _ ->
       Error.typing ~loc:Location.unknown "Effect %s already defined." eff
