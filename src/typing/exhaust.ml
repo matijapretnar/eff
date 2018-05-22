@@ -1,5 +1,4 @@
 module C = OldUtils
-module Sugared = SugaredSyntax
 module Untyped = UntypedSyntax
 
 (* Pattern matching exhaustiveness checking as described by Maranget [1]. These
@@ -35,28 +34,26 @@ let arity = function
 
 
 (* Removes the top-most [As] pattern wrappers, if present (e.g. [2 as x] -> [2]). *)
-let rec remove_as = function
-  | Sugared.PAs ((p', _), _) -> remove_as p'
-  | p -> p
+let rec remove_as {Untyped.term= p} =
+  match p with Untyped.PAs (p', _) -> remove_as p' | p -> p
 
 
-(* Reads constructor description from a pattern, discarding any [Sugared.PAs] layers. *)
-let rec cons_of_pattern p =
-  match fst p with
-  | Sugared.PAs (p, _) -> cons_of_pattern p
-  | Sugared.PTuple lst -> Tuple (List.length lst)
-  | Sugared.PRecord flds -> (
-      match Assoc.pop flds with
-      | None, _ -> assert false
-      | Some (lbl, _), _ -> (
-        match Tctx.find_field lbl with
-        | None ->
-            Error.typing ~loc:(snd p) "Unbound record field label %s in a pattern"
-              lbl
-        | Some (_, _, flds) -> Record (Assoc.keys_of flds) ) )
-  | Sugared.PVariant (lbl, opt) -> Variant (lbl, opt <> None)
-  | Sugared.PConst c -> Const c
-  | Sugared.PVar _ | Sugared.PNonbinding -> Wildcard
+(* Reads constructor description from a pattern, discarding any [Untyped.PAs] layers. *)
+let rec cons_of_pattern {Untyped.term= p; Untyped.location= loc} =
+  match p with
+  | Untyped.PAs (p, _) -> cons_of_pattern p
+  | Untyped.PTuple lst -> Tuple (List.length lst)
+  | Untyped.PRecord flds -> (
+    match Assoc.pop flds with
+    | None, _ -> assert false
+    | Some (lbl, _), _ ->
+      match Tctx.find_field lbl with
+      | None ->
+          Error.typing ~loc "Unbound record field label %s in a pattern" lbl
+      | Some (_, _, flds) -> Record (Assoc.keys_of flds) )
+  | Untyped.PVariant (lbl, opt) -> Variant (lbl, opt <> None)
+  | Untyped.PConst c -> Const c
+  | Untyped.PVar _ | Untyped.PNonbinding -> Wildcard
 
 
 (* Constructs a pattern from a constructor and a list of subpatterns, which must
@@ -64,14 +61,14 @@ let rec cons_of_pattern p =
 let pattern_of_cons ~loc c lst =
   let plain =
     match c with
-    | Tuple n -> Sugared.PTuple lst
-    | Record flds -> Sugared.PRecord (Assoc.of_list (List.combine flds lst))
-    | Const const -> Sugared.PConst const
+    | Tuple n -> Untyped.PTuple lst
+    | Record flds -> Untyped.PRecord (Assoc.of_list (List.combine flds lst))
+    | Const const -> Untyped.PConst const
     | Variant (lbl, opt) ->
-        Sugared.PVariant (lbl, if opt then Some (List.hd lst) else None)
-    | Wildcard -> Sugared.PNonbinding
+        Untyped.PVariant (lbl, if opt then Some (List.hd lst) else None)
+    | Wildcard -> Untyped.PNonbinding
   in
-  (plain, loc)
+  Untyped.add_loc plain loc
 
 
 (* Finds all distinct non-wildcard root pattern constructors in [lst], and at
@@ -121,7 +118,9 @@ let find_constructors lst =
         | None -> assert false (* We assume that everything is type-checked *)
         | Some (_, _, tags, _) ->
             let all =
-              List.map (fun (lbl, opt) -> Variant (lbl, opt <> None)) (Assoc.to_list tags)
+              List.map
+                (fun (lbl, opt) -> Variant (lbl, opt <> None))
+                (Assoc.to_list tags)
             in
             C.diff all present )
       (* Only for completeness. *)
@@ -134,21 +133,22 @@ let find_constructors lst =
    if the first pattern of input vector has an incompatible constructor. *)
 let specialize_vector ~loc con = function
   | [] -> None
-  | (p1, _) :: lst ->
+  | p1 :: lst ->
     match (con, remove_as p1) with
-    | Tuple _, Sugared.PTuple l -> Some (l @ lst)
-    | Record all, Sugared.PRecord def ->
+    | Tuple _, Untyped.PTuple l -> Some (l @ lst)
+    | Record all, Untyped.PRecord def ->
         let get_pattern defs lbl =
           match Assoc.lookup lbl defs with
           | Some p' -> p'
-          | None -> (Sugared.PNonbinding, loc)
+          | None -> Untyped.add_loc Untyped.PNonbinding loc
         in
-        Some (List.map (get_pattern def)  all @ lst)
-    | Variant (lbl, _), Sugared.PVariant (lbl', opt) when lbl = lbl' -> (
+        Some (List.map (get_pattern def) all @ lst)
+    | Variant (lbl, _), Untyped.PVariant (lbl', opt) when lbl = lbl' -> (
       match opt with Some p -> Some (p :: lst) | None -> Some lst )
-    | Const c, Sugared.PConst c' when Const.equal c c' -> Some lst
-    | _, (Sugared.PNonbinding | Sugared.PVar _) ->
-        Some (C.repeat (Sugared.PNonbinding, loc) (arity con) @ lst)
+    | Const c, Untyped.PConst c' when Const.equal c c' -> Some lst
+    | _, (Untyped.PNonbinding | Untyped.PVar _) ->
+        Some
+          (C.repeat (Untyped.add_loc Untyped.PNonbinding loc) (arity con) @ lst)
     | _, _ -> None
 
 
@@ -165,9 +165,9 @@ let rec specialize ~loc con = function
 let rec default = function
   | [] -> []
   | [] :: lst -> default lst (* Only for completeness. *)
-  | ((p, _) :: ps) :: lst ->
+  | (p :: ps) :: lst ->
     match remove_as p with
-    | Sugared.PNonbinding | Sugared.PVar _ -> ps :: default lst
+    | Untyped.PNonbinding | Untyped.PVar _ -> ps :: default lst
     | _ -> default lst
 
 
@@ -228,40 +228,8 @@ let rec exhaustive ~loc p = function
             let c = List.hd missing in
             Some
               ( pattern_of_cons ~loc c
-                  (C.repeat (Sugared.PNonbinding, loc) (arity c))
+                  (C.repeat (Untyped.add_loc Untyped.PNonbinding loc) (arity c))
               :: lst )
-
-
-let rec old_of_new_pattern p =
-  let old_p =
-    match p.Untyped.term with
-    | Untyped.PAs (p, x) -> Sugared.PAs (old_of_new_pattern p, x)
-    | Untyped.PTuple lst -> Sugared.PTuple (List.map old_of_new_pattern lst)
-    | Untyped.PRecord lst ->
-        Sugared.PRecord (Assoc.map old_of_new_pattern lst)
-    | Untyped.PVariant (lbl, opt) ->
-        Sugared.PVariant (lbl, OldUtils.option_map old_of_new_pattern opt)
-    | Untyped.PConst c -> Sugared.PConst c
-    | Untyped.PVar x -> Sugared.PVar x
-    | Untyped.PNonbinding -> Sugared.PNonbinding
-  in
-  (old_p, p.Untyped.location)
-
-
-let rec new_of_old_pattern p =
-  let new_p =
-    match fst p with
-    | Sugared.PAs (p, x) -> Untyped.PAs (new_of_old_pattern p, x)
-    | Sugared.PTuple lst -> Untyped.PTuple (List.map new_of_old_pattern lst)
-    | Sugared.PRecord lst ->
-        Untyped.PRecord (Assoc.map new_of_old_pattern lst)
-    | Sugared.PVariant (lbl, opt) ->
-        Untyped.PVariant (lbl, OldUtils.option_map new_of_old_pattern opt)
-    | Sugared.PConst c -> Untyped.PConst c
-    | Sugared.PVar x -> Untyped.PVar x
-    | Sugared.PNonbinding -> Untyped.PNonbinding
-  in
-  {Untyped.term= new_p; Untyped.location= snd p}
 
 
 (* Prints a warning if the list of patterns [pats] is not exhaustive or contains
@@ -275,9 +243,9 @@ let check_patterns ~loc pats =
       | Some ps ->
           Print.warning ~loc
             "@[This pattern-matching is not exhaustive.@.\n                                    Here is an example of a value that is not matched:@.  @[%t@]"
-            (Untyped.print_pattern (new_of_old_pattern (List.hd ps)))
+            (Untyped.print_pattern (List.hd ps))
       | None -> () )
-    | ((_, loc) as pat) :: pats ->
+    | pat :: pats ->
         if not (useful ~loc p [pat]) then (
           Print.warning ~loc "This match case is unused." ;
           check p pats )
@@ -288,10 +256,7 @@ let check_patterns ~loc pats =
 
 
 (* A pattern is irrefutable if it cannot fail during pattern matching. *)
-let is_irrefutable p =
-  let p = old_of_new_pattern p in
-  check_patterns ~loc:(snd p) [p]
-
+let is_irrefutable p = check_patterns ~loc:p.Untyped.location [p]
 
 (* Check for refutable patterns in let statements and non-exhaustive match
    statements. *)
@@ -307,8 +272,7 @@ let check_comp c =
     | Untyped.Match (_, []) ->
         () (* Skip empty match to avoid an unwanted warning. *)
     | Untyped.Match (_, lst) ->
-        check_patterns ~loc:c.Untyped.location
-          (List.map (fun x -> old_of_new_pattern (fst x)) lst) ;
+        check_patterns ~loc:c.Untyped.location (List.map fst lst) ;
         List.iter (fun (_, c) -> check c) lst
     | Untyped.Apply _ -> ()
     | Untyped.Handle (_, c) -> check c
