@@ -1,5 +1,4 @@
 open CoreUtils
-
 module C = OldUtils
 module T = Type
 module Untyped = UntypedSyntax
@@ -37,7 +36,6 @@ let nonexpansive = function
    |Untyped.LetRec _ | Untyped.Check _ ->
       false
 
-
 let empty_constraint = []
 
 let add_ty_constraint cstr loc t1 t2 = cstr := (t1, t2, loc) :: !cstr
@@ -47,7 +45,6 @@ let ty_of_const = function
   | Const.String _ -> Type.string_ty
   | Const.Boolean _ -> Type.bool_ty
   | Const.Float _ -> Type.float_ty
-
 
 (* [infer_pattern cstr pp] infers the type of pattern [pp]. It returns the list of
    pattern variables with their types, which are all guaranteed to be [Type.Meta]'s, together
@@ -100,7 +97,6 @@ let infer_pattern cstr pp =
   let t = infer pp in
   (!vars, t)
 
-
 let extend_with_pattern ?(forbidden_vars= []) ctx cstr p =
   let vars, t = infer_pattern cstr p in
   match OldUtils.find (fun (x, _) -> List.mem_assoc x vars) forbidden_vars with
@@ -112,12 +108,10 @@ let extend_with_pattern ?(forbidden_vars= []) ctx cstr p =
       , t
       , List.fold_right (fun (x, t) ctx -> Ctx.extend_ty ctx x t) vars ctx )
 
-
 let rec infer_abstraction ctx cstr (p, c) =
   let _, t1, ctx = extend_with_pattern ctx cstr p in
   let t2 = infer_comp ctx cstr c in
   (t1, t2)
-
 
 and infer_abstraction2 ctx cstr (p1, p2, c) =
   let vs, t1, ctx = extend_with_pattern ctx cstr p1 in
@@ -125,13 +119,11 @@ and infer_abstraction2 ctx cstr (p1, p2, c) =
   let t3 = infer_comp ctx cstr c in
   (t1, t2, t3)
 
-
 and infer_handler_case_abstraction ctx cstr (p, k, e) =
   let vs, t1, ctx = extend_with_pattern ctx cstr p in
   let _, tk, ctx = extend_with_pattern ~forbidden_vars:vs ctx cstr k in
   let t2 = infer_comp ctx cstr e in
   (tk, t1, t2)
-
 
 and infer_let ctx cstr loc defs =
   ( if !warn_implicit_sequencing && List.length defs >= 2 then
@@ -153,9 +145,7 @@ and infer_let ctx cstr loc defs =
             let sbst = Unify.solve !cstr in
             let ws = Assoc.map (T.subst_ty sbst) (Assoc.of_list ws) in
             let ctx = Ctx.subst_ctx ctx sbst in
-            let ws =
-              Assoc.map (Ctx.generalize ctx (nonexpansive c.it)) ws
-            in
+            let ws = Assoc.map (Ctx.generalize ctx (nonexpansive c.it)) ws in
             let ws = Assoc.to_list ws in
             let ctx' =
               List.fold_right
@@ -166,7 +156,6 @@ and infer_let ctx cstr loc defs =
       ([], ctx) defs
   in
   (vars, Ctx.subst_ctx ctx (Unify.solve !cstr))
-
 
 and infer_let_rec ctx cstr loc defs =
   if not (OldUtils.injective fst defs) then
@@ -207,7 +196,6 @@ and infer_let_rec ctx cstr loc defs =
       vars ctx
   in
   (vars, ctx)
-
 
 (* [infer_expr ctx cstr (e,loc)] infers the type of expression [e] in context
    [ctx]. It returns the inferred type of [e]. *)
@@ -287,7 +275,6 @@ and infer_expr ctx cstr {it= e; at= loc} =
       add_ty_constraint cstr loc fint1 t_yield ;
       T.Handler {T.value= t_value; T.finally= t_finally}
 
-
 (* [infer_comp ctx cstr (c,loc)] infers the type of computation [c] in context [ctx].
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp ctx cstr cp =
@@ -337,7 +324,6 @@ and infer_comp ctx cstr cp =
     let ty = infer ctx cp in
     ty
 
-
 let infer_top_comp ctx c =
   let cstr = ref [] in
   let ty = infer_comp ctx cstr c in
@@ -347,14 +333,12 @@ let infer_top_comp ctx c =
   let ty = Type.subst_ty sbst ty in
   (ctx, Ctx.generalize ctx (nonexpansive c.it) ty)
 
-
 let infer_top_let ~loc ctx defs =
   let vars, ctx = infer_let ctx (ref empty_constraint) Location.unknown defs in
   List.iter
     (fun (p, c) -> Exhaust.is_irrefutable p ; Exhaust.check_comp c)
     defs ;
   (vars, ctx)
-
 
 let infer_top_let_rec ~loc ctx defs =
   let vars, ctx =

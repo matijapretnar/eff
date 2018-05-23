@@ -1,6 +1,5 @@
 (** Syntax of the core language. *)
 open CoreUtils
-
 module Variable = Symbol.Make (Symbol.String)
 module EffectMap = Map.Make (String)
 
@@ -66,8 +65,7 @@ let rec print_pattern ?max_level p ppf =
   | PRecord lst -> Print.record print_pattern lst ppf
   | PVariant (lbl, None) when lbl = OldUtils.nil -> print "[]"
   | PVariant (lbl, None) -> print "%s" lbl
-  | PVariant (lbl, Some {it= PTuple [v1; v2]})
-    when lbl = OldUtils.cons ->
+  | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = OldUtils.cons ->
       print "[@[<hov>@[%t@]%t@]]" (print_pattern v1) (pattern_list v2)
   | PVariant (lbl, Some p) ->
       print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
@@ -76,8 +74,7 @@ let rec print_pattern ?max_level p ppf =
 and pattern_list ?(max_length= 299) p ppf =
   if max_length > 1 then
     match p.it with
-    | PVariant (lbl, Some {it= PTuple [v1; v2]})
-      when lbl = OldUtils.cons ->
+    | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = OldUtils.cons ->
         Format.fprintf ppf ",@ %t%t" (print_pattern v1)
           (pattern_list ~max_length:(max_length - 1) v2)
     | PVariant (lbl, None) when lbl = OldUtils.nil -> ()

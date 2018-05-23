@@ -1,7 +1,6 @@
 (** Desugaring of syntax into the core language. *)
 
 open CoreUtils
-
 module Utils = OldUtils
 module T = Type
 module Sugared = SugaredSyntax
@@ -107,8 +106,7 @@ let desugar_pattern state ?(initial_forbidden= []) p =
   let forbidden = ref initial_forbidden in
   let new_var x =
     if List.mem x !forbidden then
-      Error.syntax ~loc:p.at
-        "Variable %s occurs more than once in a pattern" x
+      Error.syntax ~loc:p.at "Variable %s occurs more than once in a pattern" x
     else
       let var = fresh_var (Some x) in
       vars := Assoc.update x var !vars ;
@@ -212,15 +210,14 @@ let rec desugar_expression state {it= t; at= loc} =
 
 and desugar_computation state {it= t; at= loc} =
   let if_then_else e c1 c2 =
-    let true_p = add_loc (Untyped.PConst Const.of_true) (c1.at) in
-    let false_p = add_loc (Untyped.PConst Const.of_false) (c2.at) in
+    let true_p = add_loc (Untyped.PConst Const.of_true) c1.at in
+    let false_p = add_loc (Untyped.PConst Const.of_false) c2.at in
     Untyped.Match (e, [(true_p, c1); (false_p, c2)])
   in
   let w, c =
     match t with
     | Sugared.Apply
-        ( { it= Sugared.Apply ({it= Sugared.Var "&&"; at= loc1}, t1)
-          ; at= loc2 }
+        ( {it= Sugared.Apply ({it= Sugared.Var "&&"; at= loc1}, t1); at= loc2}
         , t2 ) ->
         let w1, e1 = desugar_expression state t1 in
         let untyped_false loc = add_loc (Untyped.Const Const.of_false) loc in
@@ -228,8 +225,7 @@ and desugar_computation state {it= t; at= loc} =
         let c2 = add_loc (Untyped.Value (untyped_false loc2)) loc2 in
         (w1, if_then_else e1 c1 c2)
     | Sugared.Apply
-        ( { it= Sugared.Apply ({it= Sugared.Var "||"; at= loc1}, t1)
-          ; at= loc2 }
+        ( {it= Sugared.Apply ({it= Sugared.Var "||"; at= loc1}, t1); at= loc2}
         , t2 ) ->
         let w1, e1 = desugar_expression state t1 in
         let untyped_true loc = add_loc (Untyped.Const Const.of_true) loc in

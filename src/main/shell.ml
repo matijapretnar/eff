@@ -6,7 +6,6 @@ let help_text =
   ^ "#use \"<file>\";;  load commands from file\n"
 
 open CoreUtils
-
 module TypeSystem = SimpleInfer
 module Runtime = Eval
 
