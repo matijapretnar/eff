@@ -1,11 +1,12 @@
 (** Abstract syntax of eff terms, types, and toplevel commands. *)
+open CoreUtils
 
 (** Terms *)
 type variable = string
 
 type effect = OldUtils.effect
 
-type pattern = plain_pattern CoreUtils.located
+type pattern = plain_pattern located
 
 and plain_pattern =
   | PVar of variable
@@ -19,7 +20,7 @@ and plain_pattern =
 (* Changing the datatype [plain_pattern] will break [specialize_vector] in [exhaust.ml] because
    of wildcard matches there. *)
 
-type term = plain_term CoreUtils.located
+type term = plain_term located
 
 and plain_term =
   | Var of variable  (** variables *)
@@ -62,7 +63,7 @@ type dirt = DirtParam of OldUtils.dirtparam
 
 type region = RegionParam of OldUtils.regionparam
 
-type ty = plain_ty CoreUtils.located
+type ty = plain_ty located
 
 and plain_ty =
   | TyApply of OldUtils.tyname * ty list

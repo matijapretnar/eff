@@ -1,4 +1,5 @@
 (* Evaluation of the intermediate language, big step. *)
+open CoreUtils
 
 module V = Value
 module Untyped = UntypedSyntax
@@ -15,7 +16,7 @@ let lookup x env = try Some (RuntimeEnv.find x env) with Not_found -> None
 exception PatternMatch of Location.t
 
 let rec extend_value p v env =
-  match (p.CoreUtils.it, v) with
+  match (p.it, v) with
   | Untyped.PVar x, v -> update x v env
   | Untyped.PAs (p, x), v ->
       let env = extend_value p v env in
@@ -30,14 +31,14 @@ let rec extend_value p v env =
         | Some v -> extend_value p v env
       in
       try Assoc.fold_left extender env ps with Not_found ->
-        raise (PatternMatch p.CoreUtils.at) )
+        raise (PatternMatch p.at) )
   | Untyped.PVariant (lbl, None), Value.Variant (lbl', None) when lbl = lbl' ->
       env
   | Untyped.PVariant (lbl, Some p), Value.Variant (lbl', Some v)
     when lbl = lbl' ->
       extend_value p v env
   | Untyped.PConst c, Value.Const c' when Const.equal c c' -> env
-  | _, _ -> raise (PatternMatch p.CoreUtils.at)
+  | _, _ -> raise (PatternMatch p.at)
 
 let extend p v env =
   try extend_value p v env with PatternMatch loc ->
@@ -50,8 +51,8 @@ let rec sequence k = function
       V.Call (op, v, k'')
 
 let rec ceval env c =
-  let loc = c.CoreUtils.at in
-  match c.CoreUtils.it with
+  let loc = c.at in
+  match c.it with
   | Untyped.Apply (e1, e2) -> (
       let v1 = veval env e1 and v2 = veval env e2 in
       match v1 with
@@ -103,7 +104,7 @@ and extend_let_rec env defs =
   env
 
 and veval env e =
-  match e.CoreUtils.it with
+  match e.it with
   | Untyped.Var x -> (
     match lookup x env with
     | Some v -> v
@@ -144,7 +145,7 @@ and eval_closure env a v =
   ceval (extend p v env) c
 
 and eval_closure2 env a2 v1 v2 =
-  let p1, p2, c = a2.CoreUtils.it in
+  let p1, p2, c = a2.it in
   ceval (extend p2 v2 (extend p1 v1 env)) c
 
 let rec top_handle = function

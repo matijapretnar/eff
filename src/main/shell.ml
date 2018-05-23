@@ -5,6 +5,8 @@ let help_text =
   ^ "#help;;            print this help\n" ^ "#quit;;            exit eff\n"
   ^ "#use \"<file>\";;  load commands from file\n"
 
+open CoreUtils
+
 module TypeSystem = SimpleInfer
 module Runtime = Eval
 
@@ -22,7 +24,7 @@ let _ = Random.self_init ()
 
 (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
    It prints the result to [ppf] and returns the new state. *)
-let rec exec_cmd ppf st {CoreUtils.it= cmd; CoreUtils.at= loc} =
+let rec exec_cmd ppf st {it= cmd; at= loc} =
   match cmd with
   | Commands.Term t ->
       let c = Desugarer.desugar_computation st.desugarer_state t in
@@ -120,7 +122,7 @@ let rec exec_cmd ppf st {CoreUtils.it= cmd; CoreUtils.at= loc} =
       Tctx.extend_tydefs ~loc tydefs' ;
       {st with desugarer_state= desugarer_state'}
 
-and exec_cmds ppf state cmds = CoreUtils.fold (exec_cmd ppf) state cmds
+and exec_cmds ppf state cmds = fold (exec_cmd ppf) state cmds
 
 (* Parser wrapper *)
 and parse lexbuf =
