@@ -5,14 +5,14 @@ type variable = string
 
 type effect = OldUtils.effect
 
-type 'var pattern = 'var plain_pattern CoreUtils.located
+type pattern = plain_pattern CoreUtils.located
 
-and 'var plain_pattern =
-  | PVar of 'var
-  | PAs of 'var pattern * 'var
-  | PTuple of 'var pattern list
-  | PRecord of (OldUtils.field, 'var pattern) Assoc.t
-  | PVariant of OldUtils.label * 'var pattern option
+and plain_pattern =
+  | PVar of variable
+  | PAs of pattern * variable
+  | PTuple of pattern list
+  | PRecord of (OldUtils.field, pattern) Assoc.t
+  | PVariant of OldUtils.label * pattern option
   | PConst of Const.t
   | PNonbinding
 
@@ -33,7 +33,7 @@ and plain_term =
   | Effect of effect * term  (** [eff], where [eff] is an effect symbol. *)
   | Handler of handler
       (** [handler clauses], where [clauses] are described below. *)
-  | Let of (variable pattern * term) list * term
+  | Let of (pattern * term) list * term
       (** [let p1 = t1 and ... and pn = tn in t] *)
   | LetRec of (variable * term) list * term
       (** [let rec f1 p1 = t1 and ... and fn pn = tn in t] *)
@@ -54,9 +54,9 @@ and match_case =
   | Val_match of abstraction
   | Eff_match of (effect * abstraction2)
 
-and abstraction = (variable pattern * term)
+and abstraction = (pattern * term)
 
-and abstraction2 = (variable pattern * variable pattern * term)
+and abstraction2 = (pattern * pattern * term)
 
 type dirt = DirtParam of OldUtils.dirtparam
 

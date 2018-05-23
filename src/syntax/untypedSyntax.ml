@@ -13,6 +13,9 @@ let loc_of loc_t = loc_t.CoreUtils.at
 
 let term_of loc_t = loc_t.CoreUtils.it
 
+(* Changing the datatype [plain_pattern] will break [specialize_vector] in [exhaust.ml] because
+   of wildcard matches there. *)
+
 type pattern = plain_pattern CoreUtils.located
 
 and plain_pattern =

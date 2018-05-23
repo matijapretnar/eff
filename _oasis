@@ -30,6 +30,6 @@ PostCleanCommand:
 Executable eff
   Path:           src
   BuildTools:     ocamlbuild,menhir
-  MainIs:         eff.ml
+  MainIs:         main/eff.ml
   DataFiles:      ../pervasives.eff
   CompiledObject: best

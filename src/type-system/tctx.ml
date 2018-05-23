@@ -1,5 +1,4 @@
 (** Type inference contexts *)
-module C = OldUtils
 module T = Type
 
 type tydef =
@@ -94,7 +93,7 @@ let infer_variant lbl =
   | None -> None
   | Some (ty_name, ps, _, u) ->
       let ps', fresh_subst = T.refreshing_subst ps in
-      let u = C.option_map (T.subst_ty fresh_subst) u in
+      let u = OldUtils.option_map (T.subst_ty fresh_subst) u in
       Some (apply_to_params ty_name ps', u)
 
 

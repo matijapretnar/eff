@@ -6,7 +6,7 @@ type t = plain_command CoreUtils.located
 and plain_command =
   | Tydef of (OldUtils.tyname, OldUtils.typaram list * Sugared.tydef) Assoc.t
       (** [type t = tydef] *)
-  | TopLet of (Sugared.variable Sugared.pattern * Sugared.term) list
+  | TopLet of (Sugared.pattern * Sugared.term) list
       (** [let p1 = t1 and ... and pn = tn] *)
   | TopLetRec of (Sugared.variable * Sugared.term) list
       (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)
