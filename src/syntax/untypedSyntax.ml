@@ -7,11 +7,11 @@ type variable = Variable.t
 
 type effect = OldUtils.effect
 
-type 'term annotation = {term: 'term; location: Location.t}
+let add_loc t loc = {CoreUtils.it= t; CoreUtils.at= loc}
+let loc_of loc_t = loc_t.CoreUtils.at
+let term_of loc_t = loc_t.CoreUtils.it
 
-let add_loc t loc = {term= t; location= loc}
-
-type pattern = plain_pattern annotation
+type pattern = plain_pattern CoreUtils.located
 
 and plain_pattern =
   | PVar of variable
@@ -23,7 +23,7 @@ and plain_pattern =
   | PNonbinding
 
 (** Pure expressions *)
-type expression = plain_expression annotation
+type expression = plain_expression CoreUtils.located
 
 and plain_expression =
   | Var of variable
@@ -36,7 +36,7 @@ and plain_expression =
   | Handler of handler
 
 (** Impure computations *)
-and computation = plain_computation annotation
+and computation = plain_computation CoreUtils.located
 
 and plain_computation =
   | Value of expression
@@ -61,7 +61,7 @@ and abstraction2 = (pattern * pattern * computation)
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match p.term with
+  match term_of p with
   | PVar x -> print "%t" (Variable.print x)
   | PAs (p, x) -> print "%t as %t" (print_pattern p) (Variable.print x)
   | PConst c -> Const.print c ppf
@@ -69,7 +69,7 @@ let rec print_pattern ?max_level p ppf =
   | PRecord lst -> Print.record print_pattern lst ppf
   | PVariant (lbl, None) when lbl = OldUtils.nil -> print "[]"
   | PVariant (lbl, None) -> print "%s" lbl
-  | PVariant (lbl, Some {term= PTuple [v1; v2]}) when lbl = OldUtils.cons ->
+  | PVariant (lbl, Some {CoreUtils.it= PTuple [v1; v2]}) when lbl = OldUtils.cons ->
       print "[@[<hov>@[%t@]%t@]]" (print_pattern v1) (pattern_list v2)
   | PVariant (lbl, Some p) ->
       print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
@@ -78,8 +78,8 @@ let rec print_pattern ?max_level p ppf =
 
 and pattern_list ?(max_length= 299) p ppf =
   if max_length > 1 then
-    match p.term with
-    | PVariant (lbl, Some {term= PTuple [v1; v2]}) when lbl = OldUtils.cons ->
+    match term_of p with
+    | PVariant (lbl, Some {CoreUtils.it= PTuple [v1; v2]}) when lbl = OldUtils.cons ->
         Format.fprintf ppf ",@ %t%t" (print_pattern v1)
           (pattern_list ~max_length:(max_length - 1) v2)
     | PVariant (lbl, None) when lbl = OldUtils.nil -> ()
@@ -89,7 +89,7 @@ and pattern_list ?(max_length= 299) p ppf =
 
 let rec print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c.term with
+  match term_of c with
   | Apply (e1, e2) ->
       print ~at_level:1 "%t %t" (print_expression e1)
         (print_expression ~max_level:0 e2)
@@ -108,7 +108,7 @@ let rec print_computation ?max_level c ppf =
 
 and print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match e.term with
+  match term_of e with
   | Var x -> print "%t" (Variable.print x)
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf

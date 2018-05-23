@@ -34,12 +34,12 @@ let arity = function
 
 
 (* Removes the top-most [As] pattern wrappers, if present (e.g. [2 as x] -> [2]). *)
-let rec remove_as {Untyped.term= p} =
+let rec remove_as {CoreUtils.it= p} =
   match p with Untyped.PAs (p', _) -> remove_as p' | p -> p
 
 
 (* Reads constructor description from a pattern, discarding any [Untyped.PAs] layers. *)
-let rec cons_of_pattern {Untyped.term= p; Untyped.location= loc} =
+let rec cons_of_pattern {CoreUtils.it= p; CoreUtils.at= loc} =
   match p with
   | Untyped.PAs (p, _) -> cons_of_pattern p
   | Untyped.PTuple lst -> Tuple (List.length lst)
@@ -256,13 +256,13 @@ let check_patterns ~loc pats =
 
 
 (* A pattern is irrefutable if it cannot fail during pattern matching. *)
-let is_irrefutable p = check_patterns ~loc:p.Untyped.location [p]
+let is_irrefutable p = check_patterns ~loc:p.CoreUtils.at [p]
 
 (* Check for refutable patterns in let statements and non-exhaustive match
    statements. *)
 let check_comp c =
   let rec check c =
-    match c.Untyped.term with
+    match c.CoreUtils.it with
     | Untyped.Value _ -> ()
     | Untyped.Let (lst, c) ->
         List.iter (fun (p, c) -> is_irrefutable p ; check c) lst ;
@@ -272,7 +272,7 @@ let check_comp c =
     | Untyped.Match (_, []) ->
         () (* Skip empty match to avoid an unwanted warning. *)
     | Untyped.Match (_, lst) ->
-        check_patterns ~loc:c.Untyped.location (List.map fst lst) ;
+        check_patterns ~loc:c.CoreUtils.at (List.map fst lst) ;
         List.iter (fun (_, c) -> check c) lst
     | Untyped.Apply _ -> ()
     | Untyped.Handle (_, c) -> check c

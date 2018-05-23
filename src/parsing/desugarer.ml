@@ -219,9 +219,9 @@ let rec desugar_expression state (t, loc) =
 
 and desugar_computation state (t, loc) =
   let if_then_else e c1 c2 =
-    let true_p = add_loc (Untyped.PConst Const.of_true) c1.Untyped.location in
+    let true_p = add_loc (Untyped.PConst Const.of_true) c1.CoreUtils.at in
     let false_p =
-      add_loc (Untyped.PConst Const.of_false) c2.Untyped.location
+      add_loc (Untyped.PConst Const.of_false) c2.CoreUtils.at
     in
     Untyped.Match (e, [(true_p, c1); (false_p, c2)])
   in

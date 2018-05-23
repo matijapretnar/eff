@@ -56,8 +56,8 @@ let infer_pattern cstr pp =
     Error.typing ~loc:(snd pp) "Variables in a pattern must be distinct." ; *)
   let vars = ref [] in
   let rec infer p =
-    let loc = p.Untyped.location in
-    match p.Untyped.term with
+    let loc = p.CoreUtils.at in
+    match p.CoreUtils.it with
     | Untyped.PVar x ->
         let t = if !disable_typing then T.universal_ty else T.fresh_ty () in
         vars := (x, t) :: !vars ;
@@ -104,7 +104,7 @@ let extend_with_pattern ?(forbidden_vars= []) ctx cstr p =
   let vars, t = infer_pattern cstr p in
   match C.find (fun (x, _) -> List.mem_assoc x vars) forbidden_vars with
   | Some (x, _) ->
-      Error.typing ~loc:p.Untyped.location "Several definitions of %t."
+      Error.typing ~loc:p.CoreUtils.at "Several definitions of %t."
         (Untyped.Variable.print x)
   | None ->
       ( vars
@@ -134,7 +134,7 @@ and infer_handler_case_abstraction ctx cstr (p, k, e) =
 
 and infer_let ctx cstr loc defs =
   ( if !warn_implicit_sequencing && List.length defs >= 2 then
-      let locations = List.map (fun (_, c) -> c.Untyped.location) defs in
+      let locations = List.map (fun (_, c) -> c.CoreUtils.at) defs in
       Print.warning ~loc
         "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
         (Print.sequence "," Location.print locations) ) ;
@@ -143,7 +143,7 @@ and infer_let ctx cstr loc defs =
       (fun (vs, ctx') (p, c) ->
         let tc = infer_comp ctx cstr c in
         let ws, tp = infer_pattern cstr p in
-        add_ty_constraint cstr c.Untyped.location tc tp ;
+        add_ty_constraint cstr c.CoreUtils.at tc tp ;
         match C.find_duplicate (List.map fst ws) (List.map fst vs) with
         | Some x ->
             Error.typing ~loc "Several definitions of %t."
@@ -153,7 +153,7 @@ and infer_let ctx cstr loc defs =
             let ws = Assoc.map (T.subst_ty sbst) (Assoc.of_list ws) in
             let ctx = Ctx.subst_ctx ctx sbst in
             let ws =
-              Assoc.map (Ctx.generalize ctx (nonexpansive c.Untyped.term)) ws
+              Assoc.map (Ctx.generalize ctx (nonexpansive c.CoreUtils.it)) ws
             in
             let ws = Assoc.to_list ws in
             let ctx' =
@@ -192,8 +192,8 @@ and infer_let_rec ctx cstr loc defs =
     (fun (_, u1, u2, p, c) ->
       let _, tp, ctx' = extend_with_pattern ctx' cstr p in
       let tc = infer_comp ctx' cstr c in
-      add_ty_constraint cstr p.Untyped.location u1 tp ;
-      add_ty_constraint cstr c.Untyped.location u2 tc )
+      add_ty_constraint cstr p.CoreUtils.at u1 tp ;
+      add_ty_constraint cstr c.CoreUtils.at u2 tc )
     lst ;
   let sbst = Unify.solve !cstr in
   let vars = Assoc.map (T.subst_ty sbst) (Assoc.of_list vars) in
@@ -211,8 +211,8 @@ and infer_let_rec ctx cstr loc defs =
 (* [infer_expr ctx cstr (e,loc)] infers the type of expression [e] in context
    [ctx]. It returns the inferred type of [e]. *)
 and infer_expr ctx cstr e =
-  let loc = e.Untyped.location in
-  match e.Untyped.term with
+  let loc = e.CoreUtils.at in
+  match e.CoreUtils.it with
   | Untyped.Var x -> Ctx.lookup ~loc ctx x
   | Untyped.Const const -> ty_of_const const
   | Untyped.Tuple es -> T.Tuple (C.map (infer_expr ctx cstr) es)
@@ -295,8 +295,8 @@ and infer_comp ctx cstr cp =
   if !disable_typing then T.universal_ty
   else
     let rec infer ctx c =
-      let loc = c.Untyped.location in
-      match c.Untyped.term with
+      let loc = c.CoreUtils.at in
+      match c.CoreUtils.it with
       | Untyped.Apply (e1, e2) ->
           let t1 = infer_expr ctx cstr e1 in
           let t2 = infer_expr ctx cstr e2 in
@@ -314,8 +314,8 @@ and infer_comp ctx cstr cp =
           let t_out = T.fresh_ty () in
           let infer_case ((p, e') as a) =
             let t_in', t_out' = infer_abstraction ctx cstr a in
-            add_ty_constraint cstr e.Untyped.location t_in t_in' ;
-            add_ty_constraint cstr e'.Untyped.location t_out' t_out
+            add_ty_constraint cstr e.CoreUtils.at t_in t_in' ;
+            add_ty_constraint cstr e'.CoreUtils.at t_out' t_out
           in
           List.iter infer_case lst ; t_out
       | Untyped.Handle (e1, c2) ->
@@ -346,7 +346,7 @@ let infer_top_comp ctx c =
   Exhaust.check_comp c ;
   let ctx = Ctx.subst_ctx ctx sbst in
   let ty = Type.subst_ty sbst ty in
-  (ctx, Ctx.generalize ctx (nonexpansive c.Untyped.term) ty)
+  (ctx, Ctx.generalize ctx (nonexpansive c.CoreUtils.it) ty)
 
 
 let infer_top_let ~loc ctx defs =
