@@ -1,5 +1,6 @@
 (** Desugaring of syntax into the core language. *)
 
+module CU = CoreUtils
 module Utils = OldUtils
 module T = Type
 module Sugared = SugaredSyntax
@@ -15,8 +16,9 @@ let initial_state =
   let init_cons = [(Utils.cons, Variant true); (Utils.nil, Variant false)] in
   {context= Assoc.empty; constructors= Assoc.of_list init_cons}
 
-
-let add_loc = Untyped.add_loc
+let add_loc t loc = {CU.it= t; CU.at= loc}
+let loc_of loc_t = loc_t.CU.at
+let term_of loc_t = loc_t.CU.it
 
 (* ***** Desugaring of types. ***** *)
 (* Desugar a type, where only the given type, dirt and region parameters may appear.
@@ -28,7 +30,7 @@ let add_loc = Untyped.add_loc
    calling [ty].
 *)
 let desugar_type type_sbst =
-  let rec desugar_type (t, loc) =
+  let rec desugar_type {CU.it=t; CU.at=loc} =
     match t with
     | Sugared.TyApply (t, tys) ->
         let tys' = List.map desugar_type tys in
@@ -47,7 +49,7 @@ let desugar_type type_sbst =
 
 (** [free_type_params t] returns all free type params in [t]. *)
 let free_type_params t =
-  let rec ty_params (t, loc) =
+  let rec ty_params {CU.it=t; CU.at=loc} =
     match t with
     | Sugared.TyApply (_, tys) -> OldUtils.flatten_map ty_params tys
     | Sugared.TyParam s -> [s]
@@ -108,19 +110,19 @@ let id_abstraction loc =
   , add_loc (Untyped.Value (add_loc (Untyped.Var x) loc)) loc )
 
 
-let desugar_pattern state ?(initial_forbidden= []) (p, loc) =
+let desugar_pattern state ?(initial_forbidden= []) p =
   let vars = ref Assoc.empty in
   let forbidden = ref initial_forbidden in
   let new_var x =
     if List.mem x !forbidden then
-      Error.syntax ~loc "Variable %s occurs more than once in a pattern" x
+      Error.syntax ~loc:(loc_of p) "Variable %s occurs more than once in a pattern" x
     else
       let var = fresh_var (Some x) in
       vars := Assoc.update x var !vars ;
       forbidden := x :: !forbidden ;
       var
   in
-  let rec desugar_pattern state (p, loc) =
+  let rec desugar_pattern state {CU.it=p; CU.at=loc} =
     let p' =
       match p with
       | Sugared.PVar x ->
@@ -153,13 +155,13 @@ let desugar_pattern state ?(initial_forbidden= []) (p, loc) =
     in
     add_loc p' loc
   in
-  let p' = desugar_pattern state (p, loc) in
+  let p' = desugar_pattern state p in
   (!vars, p')
 
 
 (* Desugaring functions below return a list of bindings and the desugared form. *)
 
-let rec desugar_expression state (t, loc) =
+let rec desugar_expression state {CU.it=t; CU.at=loc} =
   let w, e =
     match t with
     | Sugared.Var x -> (
@@ -210,30 +212,30 @@ let rec desugar_expression state (t, loc) =
      |Sugared.Handle _ | Sugared.Conditional _ | Sugared.Check _
      |Sugared.Effect _ ->
         let x = fresh_var (Some "$bind") in
-        let c = desugar_computation state (t, loc) in
+        let c = desugar_computation state {CU.it=t; CU.at=loc} in
         let w = [(add_loc (Untyped.PVar x) loc, c)] in
         (w, Untyped.Var x)
   in
   (w, add_loc e loc)
 
 
-and desugar_computation state (t, loc) =
+and desugar_computation state {CU.it=t; CU.at=loc} =
   let if_then_else e c1 c2 =
-    let true_p = add_loc (Untyped.PConst Const.of_true) c1.CoreUtils.at in
+    let true_p = add_loc (Untyped.PConst Const.of_true) (loc_of c1) in
     let false_p =
-      add_loc (Untyped.PConst Const.of_false) c2.CoreUtils.at
+      add_loc (Untyped.PConst Const.of_false) (loc_of c2)
     in
     Untyped.Match (e, [(true_p, c1); (false_p, c2)])
   in
   let w, c =
     match t with
-    | Sugared.Apply ((Sugared.Apply ((Sugared.Var "&&", loc1), t1), loc2), t2) ->
+    | Sugared.Apply ({CU.it=Sugared.Apply ({CU.it=Sugared.Var "&&"; CU.at=loc1}, t1); CU.at=loc2}, t2) ->
         let w1, e1 = desugar_expression state t1 in
         let untyped_false loc = add_loc (Untyped.Const Const.of_false) loc in
         let c1 = desugar_computation state t2 in
         let c2 = add_loc (Untyped.Value (untyped_false loc2)) loc2 in
         (w1, if_then_else e1 c1 c2)
-    | Sugared.Apply ((Sugared.Apply ((Sugared.Var "||", loc1), t1), loc2), t2) ->
+    | Sugared.Apply ({CU.it=Sugared.Apply ({CU.it=Sugared.Var "||"; CU.at=loc1}, t1); CU.at=loc2}, t2) ->
         let w1, e1 = desugar_expression state t1 in
         let untyped_true loc = add_loc (Untyped.Const Const.of_true) loc in
         let c1 = add_loc (Untyped.Value (untyped_true loc2)) loc2 in
@@ -262,7 +264,7 @@ and desugar_computation state (t, loc) =
         let aux_desugar (p, c) (fold_state, defs, forbidden) =
           let check_forbidden (x, _) =
             if List.mem x forbidden then
-              Error.syntax ~loc:(snd p) "Several definitions of %s" x
+              Error.syntax ~loc:(loc_of p) "Several definitions of %s" x
           in
           let p_vars, p' = desugar_pattern state p in
           Assoc.iter check_forbidden p_vars ;
@@ -279,7 +281,7 @@ and desugar_computation state (t, loc) =
     | Sugared.LetRec (defs, t) ->
         let aux_desugar (x, t) (fold_state, ns, forbidden) =
           if List.mem x forbidden then
-            Error.syntax ~loc:(snd t) "Several definitions of %s" x ;
+            Error.syntax ~loc:(loc_of t) "Several definitions of %s" x ;
           let n = fresh_var (Some x) in
           ( {state with context= Assoc.update x n fold_state.context}
           , n :: ns
@@ -298,7 +300,7 @@ and desugar_computation state (t, loc) =
     | Sugared.Var _ | Sugared.Const _ | Sugared.Tuple _ | Sugared.Record _
      |Sugared.Variant _ | Sugared.Lambda _ | Sugared.Function _
      |Sugared.Handler _ ->
-        let w, e = desugar_expression state (t, loc) in
+        let w, e = desugar_expression state {CU.it=t; CU.at=loc} in
         (w, Untyped.Value e)
   in
   match w with
@@ -320,8 +322,9 @@ and desugar_abstraction2 state (p1, p2, t) =
   (p1', p2', t')
 
 
-and desugar_let_rec state (exp, loc) =
-  match exp with
+and desugar_let_rec state exp =
+  let loc = loc_of exp in
+  match term_of exp with
   | Sugared.Lambda a -> desugar_abstraction state a
   | Sugared.Function cs ->
       let x = fresh_var (Some "$let_rec_function") in
@@ -419,8 +422,8 @@ and match_constructor st loc t cs =
   | _ ->
       let val_cs = List.map (fun cs -> Sugared.Val_match cs) val_cs in
       let x = "$id_par" in
-      let value_match = (Sugared.Match ((Sugared.Var x, loc), val_cs), loc) in
-      let h_value_clause = ((Sugared.PVar x, loc), value_match) in
+      let value_match = add_loc (Sugared.Match (add_loc (Sugared.Var x) loc, val_cs)) loc in
+      let h_value_clause = (add_loc (Sugared.PVar x) loc, value_match) in
       let sugared_h =
         { Sugared.effect_clauses= Assoc.of_list eff_cs
         ; Sugared.value_clause= [h_value_clause]
@@ -445,7 +448,7 @@ let desugar_top_let state defs =
   let aux_desugar (p, c) (fold_state, defs, forbidden) =
     let check_forbidden (x, _) =
       if List.mem x forbidden then
-        Error.syntax ~loc:(snd p) "Several definitions of %s" x
+        Error.syntax ~loc:(loc_of p) "Several definitions of %s" x
     in
     let p_vars, p' = desugar_pattern state p in
     Assoc.iter check_forbidden p_vars ;
@@ -461,7 +464,7 @@ let desugar_top_let state defs =
 let desugar_top_let_rec state defs =
   let aux_desugar (x, t) (fold_state, ns, forbidden) =
     if List.mem x forbidden then
-      Error.syntax ~loc:(snd t) "Several definitions of %s" x ;
+      Error.syntax ~loc:(loc_of t) "Several definitions of %s" x ;
     let n = fresh_var (Some x) in
     ( {state with context= Assoc.update x n fold_state.context}
     , n :: ns

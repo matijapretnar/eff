@@ -5,7 +5,7 @@ type variable = string
 
 type effect = OldUtils.effect
 
-type 'var pattern = ('var plain_pattern * Location.t)
+type 'var pattern = ('var plain_pattern) CoreUtils.located
 
 and 'var plain_pattern =
   | PVar of 'var
@@ -19,7 +19,7 @@ and 'var plain_pattern =
 (* Changing the datatype [plain_pattern] will break [specialize_vector] in [exhaust.ml] because
    of wildcard matches there. *)
 
-type term = (plain_term * Location.t)
+type term = plain_term CoreUtils.located
 
 and plain_term =
   | Var of variable  (** variables *)
@@ -62,7 +62,7 @@ type dirt = DirtParam of OldUtils.dirtparam
 
 type region = RegionParam of OldUtils.regionparam
 
-type ty = (plain_ty * Location.t)
+type ty = plain_ty CoreUtils.located
 
 and plain_ty =
   | TyApply of OldUtils.tyname * ty list
