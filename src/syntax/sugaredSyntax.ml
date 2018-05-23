@@ -5,7 +5,7 @@ type variable = string
 
 type effect = OldUtils.effect
 
-type 'var pattern = ('var plain_pattern) CoreUtils.located
+type 'var pattern = 'var plain_pattern CoreUtils.located
 
 and 'var plain_pattern =
   | PVar of 'var

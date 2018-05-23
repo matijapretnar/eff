@@ -8,7 +8,9 @@ type variable = Variable.t
 type effect = OldUtils.effect
 
 let add_loc t loc = {CoreUtils.it= t; CoreUtils.at= loc}
+
 let loc_of loc_t = loc_t.CoreUtils.at
+
 let term_of loc_t = loc_t.CoreUtils.it
 
 type pattern = plain_pattern CoreUtils.located
@@ -69,23 +71,23 @@ let rec print_pattern ?max_level p ppf =
   | PRecord lst -> Print.record print_pattern lst ppf
   | PVariant (lbl, None) when lbl = OldUtils.nil -> print "[]"
   | PVariant (lbl, None) -> print "%s" lbl
-  | PVariant (lbl, Some {CoreUtils.it= PTuple [v1; v2]}) when lbl = OldUtils.cons ->
+  | PVariant (lbl, Some {CoreUtils.it= PTuple [v1; v2]})
+    when lbl = OldUtils.cons ->
       print "[@[<hov>@[%t@]%t@]]" (print_pattern v1) (pattern_list v2)
   | PVariant (lbl, Some p) ->
       print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
   | PNonbinding -> print "_"
 
-
 and pattern_list ?(max_length= 299) p ppf =
   if max_length > 1 then
     match term_of p with
-    | PVariant (lbl, Some {CoreUtils.it= PTuple [v1; v2]}) when lbl = OldUtils.cons ->
+    | PVariant (lbl, Some {CoreUtils.it= PTuple [v1; v2]})
+      when lbl = OldUtils.cons ->
         Format.fprintf ppf ",@ %t%t" (print_pattern v1)
           (pattern_list ~max_length:(max_length - 1) v2)
     | PVariant (lbl, None) when lbl = OldUtils.nil -> ()
     | _ -> Format.fprintf ppf "(??? %t ???)" (print_pattern p)
   else Format.fprintf ppf ",@ ..."
-
 
 let rec print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

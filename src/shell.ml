@@ -5,7 +5,6 @@ let help_text =
   ^ "#help;;            print this help\n" ^ "#quit;;            exit eff\n"
   ^ "#use \"<file>\";;  load commands from file\n"
 
-
 module TypeChecker = SimpleInfer
 module Runtime = Eval
 
@@ -19,12 +18,11 @@ let initial_state =
   ; typechecker_state= TypeChecker.initial_state
   ; runtime_state= Runtime.initial_state }
 
-
 let _ = Random.self_init ()
 
 (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
    It prints the result to [ppf] and returns the new state. *)
-let rec exec_cmd ppf st {CoreUtils.it=cmd; CoreUtils.at=loc} =
+let rec exec_cmd ppf st {CoreUtils.it= cmd; CoreUtils.at= loc} =
   match cmd with
   | Commands.Term t ->
       let c = Desugarer.desugar_computation st.desugarer_state t in

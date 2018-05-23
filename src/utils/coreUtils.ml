@@ -1,6 +1,5 @@
 type 'a located = {it: 'a; at: Location.t}
 
-
 let fold = List.fold_left
 
 let fold_map f s xs =

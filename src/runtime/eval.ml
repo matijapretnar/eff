@@ -39,18 +39,15 @@ let rec extend_value p v env =
   | Untyped.PConst c, Value.Const c' when Const.equal c c' -> env
   | _, _ -> raise (PatternMatch p.CoreUtils.at)
 
-
 let extend p v env =
   try extend_value p v env with PatternMatch loc ->
     Error.runtime "Pattern match failure."
-
 
 let rec sequence k = function
   | V.Value v -> k v
   | V.Call (op, v, k') ->
       let k'' u = sequence k (k' u) in
       V.Call (op, v, k'')
-
 
 let rec ceval env c =
   let loc = c.CoreUtils.at in
@@ -85,14 +82,12 @@ let rec ceval env c =
       Print.check ~loc "%t" (Value.print_result r) ;
       V.unit_result
 
-
 and eval_let env lst c =
   match lst with
   | [] -> ceval env c
   | (p, d) :: lst ->
       let r = ceval env d in
       sequence (fun v -> eval_let (extend p v env) lst c) r
-
 
 and extend_let_rec env defs =
   let env' = ref env in
@@ -106,7 +101,6 @@ and extend_let_rec env defs =
   in
   env' := env ;
   env
-
 
 and veval env e =
   match e.CoreUtils.it with
@@ -124,7 +118,6 @@ and veval env e =
   | Untyped.Effect eff ->
       V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | Untyped.Handler h -> V.Handler (eval_handler env h)
-
 
 and eval_handler env
     { Untyped.effect_clauses= ops
@@ -146,16 +139,13 @@ and eval_handler env
   in
   fun r -> sequence (eval_closure env fin) (h r)
 
-
 and eval_closure env a v =
   let p, c = a in
   ceval (extend p v env) c
 
-
 and eval_closure2 env a2 v1 v2 =
   let p1, p2, c = a2.CoreUtils.it in
   ceval (extend p2 v2 (extend p1 v1 env)) c
-
 
 let rec top_handle = function
   | V.Value v -> v
@@ -180,6 +170,5 @@ let rec top_handle = function
   | V.Call (eff, v, k) ->
       Error.runtime "uncaught effect %t %t." (Value.print_effect eff)
         (Value.print_value v)
-
 
 let run env c = top_handle (ceval env c)
