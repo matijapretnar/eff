@@ -1,15 +1,4 @@
-S src
-S src/runtime
-S src/utils
-S src/typing
-S src/typing/simple
-S src/parsing
-B _build/src
-B _build/src/runtime
-B _build/src/utils
-B _build/src/typing
-B _build/src/typing/simple
-B _build/src/parsing
+S src/**
+B _build/src/**
 PKG js_of_ocaml
 PKG js_of_ocaml-ppx
-

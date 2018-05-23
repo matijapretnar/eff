@@ -41,8 +41,8 @@ OCAMLBUILD ?= ocamlbuild
 JSFLAGS = -use-menhir -menhir "menhir --explain" -use-ocamlfind -plugin-tag "package(js_of_ocaml.ocamlbuild)"
 
 jseff:
-	$(OCAMLBUILD) $(JSFLAGS) src/jseff.js
-	cp _build/src/jseff.js docs/try
+	$(OCAMLBUILD) $(JSFLAGS) src/main/jseff.js
+	cp _build/src/main/jseff.js docs/try
 
 eff: setup.data
 	$(SETUP) -build $(BUILDFLAGS)
