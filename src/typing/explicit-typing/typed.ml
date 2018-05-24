@@ -12,7 +12,7 @@ type pattern =
   | PVar of variable
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (OldUtils.field, pattern) OldUtils.assoc
+  | PRecord of (OldUtils.field, pattern) Assoc.t
   | PVariant of OldUtils.label * pattern
   | PConst of Const.t
   | PNonbinding
@@ -21,7 +21,7 @@ let rec pattern_vars = function
   | PVar x -> [x]
   | PAs (p, x) -> x :: pattern_vars p
   | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
-  | PRecord lst -> List.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
+  | PRecord lst -> Assoc.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
   | PVariant (_, p) -> pattern_vars p
   | PConst _ -> []
   | PNonbinding -> []
@@ -69,7 +69,7 @@ type expression =
   | BuiltIn of string * int
   | Const of Const.t
   | Tuple of expression list
-  | Record of (OldUtils.field, expression) OldUtils.assoc
+  | Record of (OldUtils.field, expression) Assoc.t
   | Variant of OldUtils.label * expression
   | Lambda of abstraction_with_ty
   | Effect of effect
@@ -103,7 +103,7 @@ and computation =
 
 (** Handler definitions *)
 and handler =
-  { effect_clauses: (effect, abstraction2) OldUtils.assoc
+  { effect_clauses: (effect, abstraction2) Assoc.t
   ; value_clause: abstraction_with_ty }
 
 (** Abstractions that take one argument. *)
@@ -179,7 +179,7 @@ let rec print_expression ?max_level e ppf =
       print
         "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->\n             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
         (print_abstraction_with_ty h.value_clause)
-        (print_effect_clauses h.effect_clauses)
+        (print_effect_clauses (Assoc.to_list h.effect_clauses))
   | Effect eff -> print ~at_level:2 "effect %t" (print_effect eff)
   | CastExp (e1, tc) ->
       print "(%t) |> [%t]" (print_expression e1) (print_ty_coercion tc)
@@ -389,10 +389,10 @@ let backup_location loc locs =
 let rec refresh_pattern sbst = function
   | PVar x ->
       let x' = Variable.refresh x in
-      (OldUtils.update x x' sbst, PVar x')
+      (Assoc.update x x' sbst, PVar x')
   | PAs (p, x) ->
       let x' = Variable.refresh x in
-      let sbst, p' = refresh_pattern (OldUtils.update x x' sbst) p in
+      let sbst, p' = refresh_pattern (Assoc.update x x' sbst) p in
       (sbst, PAs (p', x'))
   | PTuple ps ->
       let sbst, ps' =
@@ -405,11 +405,11 @@ let rec refresh_pattern sbst = function
       (sbst, PTuple ps')
   | PRecord flds ->
       let sbst, flds' =
-        List.fold_right
+        Assoc.fold_right
           (fun (lbl, p) (sbst, flds') ->
             let sbst, p' = refresh_pattern sbst p in
-            (sbst, (lbl, p') :: flds') )
-          flds (sbst, [])
+            (sbst, Assoc.update lbl p' flds') )
+          flds (sbst, Assoc.empty)
       in
       (sbst, PRecord flds')
   | PVariant (lbl, p) ->
@@ -420,11 +420,11 @@ let rec refresh_pattern sbst = function
 
 let rec refresh_expr sbst = function
   | Var x as e -> (
-    match OldUtils.lookup x sbst with Some x' -> Var x' | None -> e )
+    match Assoc.lookup x sbst with Some x' -> Var x' | None -> e )
   | Lambda abs -> Lambda (refresh_abs_with_ty sbst abs)
   | Handler h -> Handler (refresh_handler sbst h)
   | Tuple es -> Tuple (List.map (refresh_expr sbst) es)
-  | Record flds -> Record (OldUtils.assoc_map (refresh_expr sbst) flds)
+  | Record flds -> Record (Assoc.map (refresh_expr sbst) flds)
   | Variant (lbl, e) -> Variant (lbl, refresh_expr sbst e)
   | CastExp (e1, tyco) -> CastExp (refresh_expr sbst e1, tyco)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
@@ -452,7 +452,7 @@ and refresh_comp sbst = function
         List.fold_right
           (fun (x, _, _) (new_xs, sbst') ->
             let x' = Variable.refresh x in
-            (x' :: new_xs, OldUtils.update x x' sbst') )
+            (x' :: new_xs, Assoc.update x x' sbst') )
           li ([], sbst)
       in
       let li' =
@@ -472,7 +472,7 @@ and refresh_comp sbst = function
 
 
 and refresh_handler sbst h =
-  { effect_clauses= OldUtils.assoc_map (refresh_abs2 sbst) h.effect_clauses
+  { effect_clauses= Assoc.map (refresh_abs2 sbst) h.effect_clauses
   ; value_clause= refresh_abs_with_ty sbst h.value_clause }
 
 
@@ -495,11 +495,11 @@ and refresh_abs2 sbst (p1, p2, c) =
 
 let rec subst_expr sbst = function
   | Var x as e -> (
-    match OldUtils.lookup x sbst with Some e' -> e' | None -> e )
+    match Assoc.lookup x sbst with Some e' -> e' | None -> e )
   | Lambda abs -> Lambda (subst_abs_with_ty sbst abs)
   | Handler h -> Handler (subst_handler sbst h)
   | Tuple es -> Tuple (List.map (subst_expr sbst) es)
-  | Record flds -> Record (OldUtils.assoc_map (subst_expr sbst) flds)
+  | Record flds -> Record (Assoc.map (subst_expr sbst) flds)
   | Variant (lbl, e) -> Variant (lbl, subst_expr sbst e)
   | (BuiltIn _ | Const _ | Effect _) as e -> e
   | CastExp (e, tyco) -> CastExp (subst_expr sbst e, tyco)
@@ -537,7 +537,7 @@ and subst_comp sbst = function
 
 
 and subst_handler sbst h =
-  { effect_clauses= OldUtils.assoc_map (subst_abs2 sbst) h.effect_clauses
+  { effect_clauses= Assoc.map (subst_abs2 sbst) h.effect_clauses
   ; value_clause= subst_abs_with_ty sbst h.value_clause }
 
 
@@ -561,11 +561,11 @@ let assoc_equal eq flds flds' : bool =
     match flds with
     | [] -> true
     | (f, x) :: flds ->
-      match OldUtils.lookup f flds' with
+      match Assoc.lookup f flds' with
       | Some x' when eq x x' -> equal_fields flds
       | _ -> false
   in
-  List.length flds = List.length flds' && equal_fields flds
+  Assoc.length flds = Assoc.length flds' && equal_fields (Assoc.to_list flds)
 
 
 let rec make_equal_pattern eqvars p p' =
@@ -628,13 +628,13 @@ and alphaeq_comp eqvars c c' =
 
 and alphaeq_handler eqvars h h' =
   alphaeq_abs_with_ty eqvars h.value_clause h'.value_clause
-  && List.length h.effect_clauses = List.length h'.effect_clauses
+  && Assoc.length h.effect_clauses = Assoc.length h'.effect_clauses
   && List.for_all
        (fun (effect, abs2) ->
-         match OldUtils.lookup effect h'.effect_clauses with
+         match Assoc.lookup effect h'.effect_clauses with
          | Some abs2' -> alphaeq_abs2 eqvars abs2 abs2'
          | None -> false )
-       h.effect_clauses
+       (Assoc.to_list h.effect_clauses)
 
 
 (*   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
@@ -672,10 +672,10 @@ let pattern_match p e =
   ignore constraints; *)
   let rec extend_subst p e sbst =
     match (p, e) with
-    | PVar x, e -> OldUtils.update x e sbst
+    | PVar x, e -> Assoc.update x e sbst
     | PAs (p, x), e' ->
         let sbst = extend_subst p e sbst in
-        OldUtils.update x e' sbst
+        Assoc.update x e' sbst
     | PNonbinding, _ -> sbst
     | PTuple ps, Tuple es -> List.fold_right2 extend_subst ps es sbst
     | PRecord ps, Record es ->
@@ -686,13 +686,13 @@ let pattern_match p e =
               let e = List.assoc f es in
               extend_record ps es (extend_subst p e sbst)
         in
-        extend_record ps es sbst
+        extend_record (Assoc.to_list ps) (Assoc.to_list es) sbst
     | PVariant (lbl, p), Variant (lbl', e) when lbl = lbl' ->
         extend_subst p e sbst
     | PConst c, Const c' when Const.equal c c' -> sbst
     | _, _ -> assert false
   in
-  extend_subst p e []
+  extend_subst p e Assoc.empty
 
 
 let ( @@@ ) (inside1, outside1) (inside2, outside2) =
@@ -731,7 +731,7 @@ and free_vars_expr e =
   | Tuple es -> concat_vars (List.map free_vars_expr es)
   | Lambda a -> free_vars_abs_with_ty a
   | Handler h -> free_vars_handler h
-  | Record flds -> concat_vars (List.map (fun (_, e) -> free_vars_expr e) flds)
+  | Record flds -> Assoc.values_of flds |> List.map free_vars_expr |> concat_vars
   | Variant (_, e) -> free_vars_expr e
   | CastExp (e', tyco) -> free_vars_expr e'
   | BuiltIn _ | Effect _ | Const _ -> ([], [])
@@ -749,8 +749,7 @@ and free_vars_expr e =
 
 and free_vars_handler h =
   free_vars_abs_with_ty h.value_clause
-  @@@ concat_vars
-        (List.map (fun (_, a2) -> free_vars_abs2 a2) h.effect_clauses)
+  @@@ (Assoc.values_of h.effect_clauses |> List.map free_vars_abs2 |> concat_vars)
 
 
 and free_vars_finally_handler (h, finally_clause) =
@@ -1041,7 +1040,7 @@ let constraint_free_dirt_vars = function
 let rec apply_sub_to_type ty_subs dirt_subs ty =
   match ty with
   | Types.TyParam p -> (
-    match OldUtils.lookup p ty_subs with
+    match Assoc.lookup p ty_subs with
     | Some p' -> Types.TyParam p'
     | None -> ty )
   | Types.Arrow (a, (b, d)) ->
@@ -1065,7 +1064,7 @@ let rec apply_sub_to_type ty_subs dirt_subs ty =
 and apply_sub_to_dirt dirt_subs drt =
   match drt.row with
   | Types.ParamRow p -> (
-    match OldUtils.lookup p dirt_subs with
+    match Assoc.lookup p dirt_subs with
     | Some p' -> {drt with row= Types.ParamRow p'}
     | None -> drt )
   | Types.EmptyRow -> drt

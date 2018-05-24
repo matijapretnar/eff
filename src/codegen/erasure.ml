@@ -11,7 +11,7 @@ type e_pattern =
   | PEVar of variable
   | PEAs of e_pattern * variable
   | PETuple of e_pattern list
-  | PERecord of (OldUtils.field, e_pattern) OldUtils.assoc
+  | PERecord of (OldUtils.field, e_pattern) Assoc.t
   | PEVariant of OldUtils.label * e_pattern option
   | PEConst of Const.t
   | PENonbinding
@@ -22,7 +22,7 @@ type e_expression =
   | EBuiltIn of string * int
   | EConst of Const.t
   | ETuple of e_expression list
-  | ERecord of (OldUtils.field, e_expression) OldUtils.assoc
+  | ERecord of (OldUtils.field, e_expression) Assoc.t
   | EVariant of OldUtils.label * e_expression option
   | ELambda of e_abstraction_with_ty
   | EEffect of effect
@@ -43,7 +43,7 @@ and e_computation =
 
 (** Handler definitions *)
 and e_handler =
-  { effect_clauses: (effect, e_abstraction2) OldUtils.assoc
+  { effect_clauses: (effect, e_abstraction2) Assoc.t
   ; value_clause: e_abstraction_with_ty }
 
 (** Abstractions that take one argument. *)
@@ -57,7 +57,7 @@ and e_abstraction2 = (e_pattern * e_pattern * e_computation)
 let rec typed_to_erasure_ty sub typed_ty =
   match typed_ty with
   | Types.TyParam p -> (
-    match OldUtils.lookup p sub with Some x' -> x' | None -> assert false )
+    match Assoc.lookup p sub with Some x' -> x' | None -> assert false )
   | Types.Arrow (t1, (t2, drt)) ->
       let t1' = typed_to_erasure_ty sub t1 in
       let t2' = typed_to_erasure_ty sub t2 in
@@ -71,7 +71,7 @@ let rec typed_to_erasure_ty sub typed_ty =
   | Types.QualTy (_, tty) -> typed_to_erasure_ty sub tty
   | Types.QualDirt (_, tty) -> typed_to_erasure_ty sub tty
   | Types.TySchemeTy (p, sk, tty) ->
-      let sub' = (p, sk) :: sub in
+      let sub' = Assoc.update p sk sub in
       typed_to_erasure_ty sub' tty
   | Types.TySchemeDirt (p, tty) -> typed_to_erasure_ty sub tty
   | Types.TySchemeSkel (p, tty) ->
@@ -92,7 +92,7 @@ let rec typed_to_erasure_exp sub tt =
       let op_c = h.effect_clauses in
       let new_vc = typed_to_erasure_abs_with_ty sub h.value_clause in
       let new_op_c =
-        OldUtils.map
+        Assoc.kmap
           (fun (eff, e_a2) ->
             let new_e_a2 = typed_to_erasure_abs_2 sub e_a2 in
             (eff, new_e_a2) )
@@ -101,7 +101,7 @@ let rec typed_to_erasure_exp sub tt =
       let new_h = {value_clause= new_vc; effect_clauses= new_op_c} in
       EHandler new_h
   | Typed.BigLambdaTy (tp, sk, e) ->
-      let sub1 = sub @ [(tp, sk)] in
+      let sub1 = Assoc.concat sub (Assoc.update tp sk Assoc.empty) in
       typed_to_erasure_exp sub1 e
   | BigLambdaDirt (_, e) -> typed_to_erasure_exp sub e
   | BigLambdaSkel (sk_p, e) -> EBigLambdaSkel (sk_p, typed_to_erasure_exp sub e)

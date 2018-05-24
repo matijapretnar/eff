@@ -1,5 +1,5 @@
 (** Syntax of the core language. *)
-
+open CoreUtils
 module Variable = Symbol.Make (Symbol.String)
 module EffectMap = Map.Make (String)
 
@@ -64,7 +64,7 @@ and abstraction = (pattern * computation)
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * computation)
 
-let rec contains_variable_expression var {term= e} =
+let rec contains_variable_expression var {it= e} =
   contains_variable_plain_expression var e
 
 
@@ -74,8 +74,8 @@ and contains_variable_plain_expression var = function
   | Tuple es -> List.exists (contains_variable_expression var) es
   | Record lab_e_assoc ->
       List.exists
-        (fun (lab, e) -> contains_variable_expression var e)
-        lab_e_assoc
+        (contains_variable_expression var)
+        (Assoc.values_of lab_e_assoc)
   | Variant (lab, e_option) ->
       OldUtils.map_default (contains_variable_expression var) false e_option
   | Lambda abs -> contains_variable_abs var abs
@@ -85,7 +85,7 @@ and contains_variable_plain_expression var = function
 
 and contains_variable_abs var (pat, c) = contains_variable_comp var c
 
-and contains_variable_comp var {term= c} = contains_variable_plain_comp var c
+and contains_variable_comp var {it= c} = contains_variable_plain_comp var c
 
 and contains_variable_plain_comp var = function
   | Value e -> contains_variable_expression var e
@@ -108,9 +108,7 @@ and contains_variable_plain_comp var = function
 
 and contains_variable_handler var
     {effect_clauses= eff_abs2_assoc; value_clause= abs1; finally_clause= abs2} =
-  List.exists
-    (fun (eff, abs2) -> contains_variable_abs2 var abs2)
-    eff_abs2_assoc
+  List.exists (contains_variable_abs2 var) (Assoc.values_of eff_abs2_assoc)
   || contains_variable_abs var abs1 || contains_variable_abs var abs2
 
 

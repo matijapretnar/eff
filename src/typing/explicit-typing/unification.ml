@@ -245,7 +245,7 @@ and apply_sub_handler sub h =
   let eff_clauses = h.effect_clauses in
   let new_value_clause = apply_sub_abs_with_ty sub h.value_clause in
   let new_eff_clauses =
-    OldUtils.assoc_map (fun abs2 -> apply_sub_abs2 sub abs2) eff_clauses
+    Assoc.map (fun abs2 -> apply_sub_abs2 sub abs2) eff_clauses
   in
   {effect_clauses= new_eff_clauses; value_clause= new_value_clause}
 
@@ -676,7 +676,7 @@ let rec unify (sub, paused, queue) =
 let rec apply_sub_to_type ty_subs dirt_subs ty =
   match ty with
   | Types.TyParam p -> (
-    match OldUtils.lookup p ty_subs with
+    match Assoc.lookup p ty_subs with
     | Some p' -> Types.TyParam p'
     | None -> ty )
   | Types.Arrow (a, (b, d)) ->
@@ -700,7 +700,7 @@ let rec apply_sub_to_type ty_subs dirt_subs ty =
 and apply_sub_to_dirt dirt_subs drt =
   match drt.row with
   | Types.ParamRow p -> (
-    match OldUtils.lookup p dirt_subs with
+    match Assoc.lookup p dirt_subs with
     | Some p' -> {drt with row= Types.ParamRow p'}
     | None -> drt )
   | Types.EmptyRow -> drt

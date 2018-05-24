@@ -1,4 +1,5 @@
-module Untyped = CoreSyntax
+open CoreUtils
+module Untyped = UntypedSyntax
 open Typed
 
 (* INFERENCE STATE *)
@@ -7,7 +8,7 @@ type state =
   { context: TypingEnv.t
   ; effects: (Types.target_ty * Types.target_ty) Untyped.EffectMap.t }
 
-let empty = {context= TypingEnv.empty; effects= CoreSyntax.EffectMap.empty}
+let empty = {context= TypingEnv.empty; effects= Untyped.EffectMap.empty}
 
 let add_def env x ty_sch =
   {env with context= TypingEnv.update env.context x ty_sch}
@@ -40,7 +41,7 @@ let add_effect eff (ty1, ty2) st =
 
 (* INFERENCE *)
 
-let rec type_pattern p = type_plain_pattern p.Untyped.term
+let rec type_pattern p = type_plain_pattern p.it
 
 and type_plain_pattern = function
   | Untyped.PVar x -> Typed.PVar x
@@ -48,8 +49,11 @@ and type_plain_pattern = function
   | Untyped.PNonbinding -> Typed.PNonbinding
   | Untyped.PConst const -> Typed.PConst const
   | Untyped.PTuple ps -> Typed.PTuple (List.map type_pattern ps)
-  | Untyped.PRecord [] -> assert false
-  | Untyped.PRecord ((fld, _) :: _ as lst) -> failwith __LOC__
+  | Untyped.PRecord flds -> begin
+      match Assoc.pop flds with
+      | None, _ -> assert false
+      | Some (fld, _), _ -> failwith __LOC__
+    end
   | Untyped.PVariant (lbl, p) -> failwith __LOC__
 
 
@@ -71,7 +75,7 @@ and type_plain_pattern = function
 
  *)
 let rec type_typed_pattern in_cons st pat ty =
-  type_plain_typed_pattern in_cons st pat.Untyped.term ty
+  type_plain_typed_pattern in_cons st pat.it ty
 
 
 and type_plain_typed_pattern in_cons st pat ty =
@@ -298,7 +302,7 @@ let rec get_skel_constraints alphas_has_skels ty_subs skel_subs =
   match alphas_has_skels with
   | (tvar, skel) :: ss ->
       let new_skel = Unification.apply_substitution_skel skel_subs skel in
-      let Some new_tyvar = OldUtils.lookup tvar ty_subs in
+      let Some new_tyvar = Assoc.lookup tvar ty_subs in
       Typed.TyParamHasSkel (new_tyvar, new_skel)
       :: get_skel_constraints ss ty_subs skel_subs
   | [] -> []
@@ -319,12 +323,12 @@ let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
       (Typed.Var var) skel_subs
   in
   let ty_apps =
-    List.fold_left
+    Assoc.fold_left
       (fun a (_, b) -> Typed.ApplyTyExp (a, Types.TyParam b))
       skel_apps ty_subs
   in
   let dirt_apps =
-    List.fold_left
+    Assoc.fold_left
       (fun a (_, b) -> Typed.ApplyDirtExp (a, Types.no_effect_dirt b))
       ty_apps dirt_subs
   in
@@ -366,8 +370,8 @@ let apply_polymorphic_variable x ty_schi =
   (returned_x, applied_basic_type, returned_cons)
 
 
-let rec type_expression in_cons st ({Untyped.term= expr} as e) =
-  Print.debug "type_expression: %t" (CoreSyntax.print_expression e) ;
+let rec type_expression in_cons st ({it= expr} as e) =
+  Print.debug "type_expression: %t" (Untyped.print_expression e) ;
   Print.debug "### Constraints Before ###" ;
   Unification.print_c_list in_cons ;
   Print.debug "##########################" ;
@@ -456,7 +460,7 @@ and type_plain_expression in_cons st = function
       let r_ty, r_ty_skel_cons = Typed.fresh_ty_with_fresh_skel () in
       let r_cons = r_ty_skel_cons :: in_cons in
       let pr, cr = h.value_clause in
-      let Untyped.PVar x = pr.Untyped.term in
+      let Untyped.PVar x = pr.it in
       let r_st = add_def st x r_ty in
       let ( target_cr_term
           , (target_cr_ty, target_cr_dirt)
@@ -478,7 +482,7 @@ and type_plain_expression in_cons st = function
             , co_op_cons
             , c_op_sub
             , (alpha_i, delta_i) ) =
-          Print.debug "type_effect_clause: %t" (CoreSyntax.abstraction2 abs2) ;
+          Print.debug "type_effect_clause: %t" (Untyped.abstraction2 abs2) ;
           type_effect_clause eff abs2 acc_st acc_cons acc_subs
         in
         ( typed_c_op :: acc_terms
@@ -530,7 +534,7 @@ and type_plain_expression in_cons st = function
           (eff, abs2) =
         let in_op_ty, out_op_ty = Untyped.EffectMap.find eff st.effects in
         let x, k, c_op = abs2 in
-        let Untyped.PVar k_var = k.Untyped.term in
+        let Untyped.PVar k_var = k.it in
         let cons_3 =
           (Unification.apply_substitution_ty subs_n op_term_ty, out_ty)
         in
@@ -558,8 +562,8 @@ and type_plain_expression in_cons st = function
             (Unification.apply_substitution subs_n op_term)
         in
         Print.debug "substituted_c_op [%t/%t]: %t"
-          (CoreSyntax.Variable.print ~safe:true l_var_name)
-          (CoreSyntax.Variable.print ~safe:true k_var)
+          (Untyped.Variable.print ~safe:true l_var_name)
+          (Untyped.Variable.print ~safe:true k_var)
           (Typed.print_computation substituted_c_op) ;
         let coerced_substiuted_c_op =
           Typed.CastComp
@@ -635,7 +639,7 @@ and type_plain_expression in_cons st = function
       (coerced_handler, target_type, all_cons, subs_n @ target_cr_sub)
 
 
-and type_computation in_cons st {Untyped.term= comp} =
+and type_computation in_cons st {it= comp} =
   let c, ttype, constraints, sub_list =
     type_plain_computation in_cons st comp
   in
@@ -745,7 +749,7 @@ and type_plain_computation in_cons st = function
               (Unification.apply_substitution_ty sub_e1' type_e1)
               (Unification.apply_substitution_ty sub_e1' type_e1)
           in
-          let Untyped.PVar x = p_def.Untyped.term in
+          let Untyped.PVar x = p_def.it in
           let new_st = add_def st_subbed x ty_sc_skel in
           let typed_c2, type_c2, cons_c2, subs_c2 =
             type_computation global_constraints new_st c_2
@@ -1004,7 +1008,7 @@ let finalize_constraints c_list = List.fold_left finalize_constraint [] c_list
 *)
 
 let type_toplevel ~loc st c =
-  let c' = c.Untyped.term in
+  let c' = c.it in
   match c'
   with
   (* | Untyped.Value e -> failwith __LOC__

@@ -241,17 +241,17 @@ and free_target_dirty (a, d) = free_target_ty a
 let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
   match t with
   | TyParam x -> (
-    match OldUtils.lookup x ty_sbst with
+    match Assoc.lookup x ty_sbst with
     | Some x' -> ((ty_sbst, dirt_sbst), TyParam x')
     | None ->
         let y = Params.Ty.fresh () in
-        ((OldUtils.update x y ty_sbst, dirt_sbst), TyParam y) )
+        ((Assoc.update x y ty_sbst, dirt_sbst), TyParam y) )
   | Arrow (a, c) ->
       let (a_ty_sbst, a_dirt_sbst), a' =
         refresh_target_ty (ty_sbst, dirt_sbst) a
       in
-      let temp_ty_sbst = a_ty_sbst @ ty_sbst in
-      let temp_dirt_sbst = a_dirt_sbst @ dirt_sbst in
+      let temp_ty_sbst = Assoc.concat a_ty_sbst ty_sbst in
+      let temp_dirt_sbst = Assoc.concat a_dirt_sbst dirt_sbst in
       let (c_ty_sbst, c_dirt_sbst), c' =
         refresh_target_dirty (temp_ty_sbst, temp_dirt_sbst) c
       in
@@ -261,8 +261,8 @@ let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
       let (c1_ty_sbst, c1_dirt_sbst), c1' =
         refresh_target_dirty (ty_sbst, dirt_sbst) c1
       in
-      let temp_ty_sbst = c1_ty_sbst @ ty_sbst in
-      let temp_dirt_sbst = c1_dirt_sbst @ dirt_sbst in
+      let temp_ty_sbst = Assoc.concat c1_ty_sbst ty_sbst in
+      let temp_dirt_sbst = Assoc.concat c1_dirt_sbst dirt_sbst in
       let (c2_ty_sbst, c2_dirt_sbst), c2' =
         refresh_target_dirty (temp_ty_sbst, temp_dirt_sbst) c2
       in
@@ -278,8 +278,8 @@ and refresh_target_dirty (ty_sbst, dirt_sbst) (t, d) =
   let (t_ty_sbst, t_dirt_sbst), t' =
     refresh_target_ty (ty_sbst, dirt_sbst) t
   in
-  let temp_ty_sbst = t_ty_sbst @ ty_sbst in
-  let temp_dirt_sbst = t_dirt_sbst @ dirt_sbst in
+  let temp_ty_sbst = Assoc.concat t_ty_sbst ty_sbst in
+  let temp_dirt_sbst = Assoc.concat t_dirt_sbst dirt_sbst in
   let (d_ty_sbst, d_dirt_sbst), d' =
     refresh_target_dirt (temp_ty_sbst, temp_dirt_sbst) d
   in
@@ -289,11 +289,11 @@ and refresh_target_dirty (ty_sbst, dirt_sbst) (t, d) =
 and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
   match drt.row with
   | ParamRow x -> (
-    match OldUtils.lookup x dirt_sbst with
+    match Assoc.lookup x dirt_sbst with
     | Some x' -> ((ty_sbst, dirt_sbst), {drt with row= ParamRow x'})
     | None ->
         let y = Params.Dirt.fresh () in
-        ((ty_sbst, OldUtils.update x y dirt_sbst), {drt with row= ParamRow y})
+        ((ty_sbst, Assoc.update x y dirt_sbst), {drt with row= ParamRow y})
     )
   | EmptyRow -> ((ty_sbst, dirt_sbst), drt)
 

@@ -41,7 +41,7 @@ let rec print_expression ?max_level e ppf =
       print ~at_level:2
         "fun c -> handler { value_clause = (fun %t); effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->\n             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) } c"
         (print_abstraction_with_ty h.Erasure.value_clause)
-        (print_effect_clauses h.Erasure.effect_clauses)
+        (print_effect_clauses (Assoc.to_list h.Erasure.effect_clauses))
   | EBigLambdaSkel (_, e) -> print "%t" (print_expression e)
   | EApplySkelExp (e, _) -> print "%t" (print_expression e)
 

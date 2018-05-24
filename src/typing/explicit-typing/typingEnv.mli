@@ -6,7 +6,7 @@
 *)
 
 (** The type of contexts. *)
-type t = (Typed.variable, Types.target_ty) OldUtils.assoc
+type t = (Typed.variable, Types.target_ty) Assoc.t
 
 val empty : t
 (** [empty] is the empty context. *)
