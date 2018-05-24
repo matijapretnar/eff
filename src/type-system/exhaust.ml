@@ -1,6 +1,5 @@
 open CoreUtils
 
-module C = OldUtils
 module Untyped = UntypedSyntax
 
 (* Pattern matching exhaustiveness checking as described by Maranget [1]. These
@@ -47,8 +46,8 @@ let rec cons_of_pattern {it= p; at= loc} =
   | Untyped.PTuple lst -> Tuple (List.length lst)
   | Untyped.PRecord flds -> (
     match Assoc.pop flds with
-    | None, _ -> assert false
-    | Some (lbl, _), _ ->
+    | None -> assert false
+    | Some ((lbl, _), _) ->
       match Tctx.find_field lbl with
       | None ->
           Error.typing ~loc "Unbound record field label %s in a pattern" lbl

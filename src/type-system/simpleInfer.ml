@@ -69,8 +69,8 @@ let infer_pattern cstr pp =
     | Untyped.PTuple ps -> T.Tuple (OldUtils.map infer ps)
     | Untyped.PRecord flds -> (
       match Assoc.pop flds with
-      | None, _ -> assert false
-      | Some (fld, _), _ ->
+      | None -> assert false
+      | Some ((fld, _), _) ->
         match Tctx.infer_field fld with
         | None -> Error.typing ~loc "Unbound record field label %s" fld
         | Some (ty, (t, us)) ->
@@ -206,8 +206,8 @@ and infer_expr ctx cstr {it= e; at= loc} =
   | Untyped.Tuple es -> T.Tuple (OldUtils.map (infer_expr ctx cstr) es)
   | Untyped.Record flds -> (
     match Assoc.pop flds with
-    | None, _ -> assert false
-    | Some (fld, _), _ ->
+    | None -> assert false
+    | Some ((fld, _), _) ->
       match
         (* XXX *)
         (*       if not (Pattern.linear_record flds') then

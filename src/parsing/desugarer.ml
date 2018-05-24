@@ -331,8 +331,8 @@ and desugar_expressions state = function
 
 and desugar_record_fields state flds =
   match Assoc.pop flds with
-  | None, _ -> ([], Assoc.empty)
-  | Some (fld, t), flds' ->
+  | None -> ([], Assoc.empty)
+  | Some ((fld, t), flds') ->
       let w, e = desugar_expression state t in
       let ws, es = desugar_record_fields state flds' in
       (w @ ws, Assoc.update fld e es)
