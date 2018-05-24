@@ -59,6 +59,9 @@ external ( / ) : int -> int -> int = "/"
 
 external ( ** ) : int -> int -> int = "**"
 
+external exp : float -> float = "exp"
+external log : float -> float = "log"
+
 let ( / ) m n = match n with
   | 0 -> absurd (perform DivisionByZero)
   | n -> (/) m n

@@ -69,6 +69,44 @@ let run_under_wrapper wrapper args =
   Unix.execvp wrapper args_with_wrapper
 
 
+let read_toplevel () =
+  let has_semisemi str =
+    let in_quote = ref false in
+    let last_backslash = ref false in
+    let last_semi = ref false in
+    let semisemi = ref false in
+    let i = ref 0 in
+    while !i < String.length str && not !semisemi do
+      ( match (str.[!i], !last_backslash, !in_quote, !last_semi) with
+      | '\\', b, _, _ ->
+          last_backslash := not b ;
+          last_semi := false
+      | '"', false, b, _ ->
+          in_quote := not b ;
+          last_backslash := false ;
+          last_semi := false
+      | ';', false, false, b ->
+          semisemi := b ;
+          last_semi := true
+      | _, _, _, _ ->
+          last_backslash := false ;
+          last_semi := false ) ;
+      incr i
+    done ;
+    if !semisemi then Some (String.sub str 0 !i) else None
+  in
+  let rec read_more prompt acc =
+    match has_semisemi acc with
+    | Some acc -> acc
+    | None ->
+        print_string prompt ;
+        let str = read_line () in
+        read_more "  " (acc ^ "\n" ^ str)
+  in
+  let str = read_more "# " "" in
+  str ^ "\n"
+
+
 (* Interactive toplevel *)
 let toplevel st =
   let eof =
@@ -83,7 +121,8 @@ let toplevel st =
     let st = ref st in
     Sys.catch_break true ;
     while true do
-      try st := Shell.use_toplevel Format.std_formatter !st with
+      let source = read_toplevel () in
+      try st := Shell.execute_source Format.std_formatter source !st with
       | Error.Error err -> Error.print err
       | Sys.Break -> prerr_endline "Interrupted."
     done
@@ -126,12 +165,12 @@ let main =
     let ignore_all_formatter =
       Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ())
     in
-    let use_file env = function
-      | Run filename -> Shell.use_file Format.std_formatter filename env
-      | Load filename -> Shell.use_file ignore_all_formatter filename env
+    let execute_file env = function
+      | Run filename -> Shell.execute_file Format.std_formatter filename env
+      | Load filename -> Shell.execute_file ignore_all_formatter filename env
       | Compile filename ->
           Shell.compile_file Format.std_formatter filename env
     in
-    let st = List.fold_left use_file Shell.initial_state !file_queue in
+    let st = List.fold_left execute_file Shell.initial_state !file_queue in
     if !Config.interactive_shell then toplevel st
   with Error.Error err -> Error.print err ; exit 1

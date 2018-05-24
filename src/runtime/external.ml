@@ -31,6 +31,10 @@ let int_int_to_int f =
   binary_closure int_f
 
 
+(** [float_to_float f] takes a unary float function f and transforms it into
+    a closure that takes two values and evaluates to a value. *)
+let float_to_float f = from_fun (fun v -> value_float (f (V.to_float v)))
+
 (** [float_float_to_float f] takes a binary float function f and transforms it
     into a closure that takes two values and evaluates to a value. *)
 let float_float_to_float f =
@@ -100,9 +104,11 @@ and compare_record lst1 lst2 =
     | [], _ :: _ -> OldUtils.Less
     | _ :: _, [] -> OldUtils.Greater
   in
+  let lst1' = Assoc.to_list lst1 in
+  let lst2' = Assoc.to_list lst2 in
   comp
-    ( List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst1
-    , List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst2
+    ( List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst1'
+    , List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst2'
     )
 
 
@@ -131,8 +137,9 @@ let less_than v1 v2 =
 
 
 let comparison_functions =
-  [ ("=", binary_closure (fun v1 v2 -> value_bool (equal v1 v2)))
-  ; ("<", binary_closure (fun v1 v2 -> value_bool (less_than v1 v2))) ]
+  Assoc.of_list
+    [ ("=", binary_closure (fun v1 v2 -> value_bool (equal v1 v2)))
+    ; ("<", binary_closure (fun v1 v2 -> value_bool (less_than v1 v2))) ]
 
 
 let rec pow a = function
@@ -144,41 +151,46 @@ let rec pow a = function
 
 
 let arithmetic_operations =
-  [ ("~-", from_fun (fun v -> value_int (-V.to_int v)))
-  ; ("+", int_int_to_int ( + ))
-  ; ("-", int_int_to_int ( - ))
-  ; ("*", int_int_to_int ( * ))
-  ; ("/", int_int_to_int ( / ))
-  ; ("mod", int_int_to_int ( mod ))
-  ; ("**", int_int_to_int pow)
-  ; ("~-.", from_fun (fun v -> value_float ~-.(V.to_float v)))
-  ; ("+.", float_float_to_float ( +. ))
-  ; ("-.", float_float_to_float ( -. ))
-  ; ("*.", float_float_to_float ( *. ))
-  ; ("/.", float_float_to_float ( /. )) ]
+  Assoc.of_list
+    [ ("~-", from_fun (fun v -> value_int (-V.to_int v)))
+    ; ("+", int_int_to_int ( + ))
+    ; ("-", int_int_to_int ( - ))
+    ; ("*", int_int_to_int ( * ))
+    ; ("/", int_int_to_int ( / ))
+    ; ("mod", int_int_to_int ( mod ))
+    ; ("**", int_int_to_int pow)
+    ; ("~-.", from_fun (fun v -> value_float ~-.(V.to_float v)))
+    ; ("+.", float_float_to_float ( +. ))
+    ; ("-.", float_float_to_float ( -. ))
+    ; ("*.", float_float_to_float ( *. ))
+    ; ("/.", float_float_to_float ( /. ))
+    ; ("exp", float_to_float exp)
+    ; ("log", float_to_float log) ]
 
 
 let string_operations =
-  [ ("^", binary_closure (fun v1 v2 -> value_str (V.to_str v1 ^ V.to_str v2)))
-  ; ( "string_length"
-    , from_fun (fun v -> value_int (String.length (V.to_str v))) ) ]
+  Assoc.of_list
+    [ ("^", binary_closure (fun v1 v2 -> value_str (V.to_str v1 ^ V.to_str v2)))
+    ; ( "string_length"
+      , from_fun (fun v -> value_int (String.length (V.to_str v))) ) ]
 
 
 let conversion_functions =
-  [ ( "to_string"
-    , let to_string v =
-        Value.print_value v Format.str_formatter ;
-        let s = Format.flush_str_formatter () in
-        value_str s
-      in
-      from_fun to_string )
-  ; ( "float_of_int"
-    , from_fun (fun v -> value_float (float_of_int (V.to_int v))) ) ]
+  Assoc.of_list
+    [ ( "to_string"
+      , let to_string v =
+          Value.print_value v Format.str_formatter ;
+          let s = Format.flush_str_formatter () in
+          value_str s
+        in
+        from_fun to_string )
+    ; ( "float_of_int"
+      , from_fun (fun v -> value_float (float_of_int (V.to_int v))) ) ]
 
 
 (** [values] is an association list of external names and values, consisting of
     comparison functions, arithmetic operations, string operations, conversion
     functions, and effect instances. *)
 let values =
-  comparison_functions @ arithmetic_operations @ string_operations
-  @ conversion_functions
+  comparison_functions |> Assoc.concat arithmetic_operations
+  |> Assoc.concat string_operations |> Assoc.concat conversion_functions

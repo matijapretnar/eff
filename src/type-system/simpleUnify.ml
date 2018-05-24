@@ -11,9 +11,9 @@ let solve cstr =
         if Type.occurs_in_ty p t then
           let t1, t2 = Type.beautify2 t1 t2 in
           Error.typing ~loc
-            "This expression has a forbidden cylclic type %t = %t."
+            "This expression has a forbidden cyclic type %t = %t."
             (Type.print t1) (Type.print t2)
-        else sbst := Type.compose_subst [(p, t)] !sbst
+        else sbst := Type.compose_subst (Assoc.update p t Assoc.empty) !sbst
     | Type.Arrow (u1, v1), Type.Arrow (u2, v2) ->
         unify loc v1 v2 ; unify loc u2 u1
     | Type.Tuple lst1, Type.Tuple lst2 when List.length lst1 = List.length lst2 ->

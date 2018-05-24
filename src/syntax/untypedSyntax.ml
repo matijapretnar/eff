@@ -7,36 +7,41 @@ type variable = Variable.t
 
 type effect = OldUtils.effect
 
-type 'term annotation = {term: 'term; location: Location.t}
+let add_loc t loc = {CoreUtils.it= t; CoreUtils.at= loc}
 
-let add_loc t loc = {term= t; location= loc}
+let loc_of loc_t = loc_t.CoreUtils.at
 
-type pattern = plain_pattern annotation
+let term_of loc_t = loc_t.CoreUtils.it
+
+(* Changing the datatype [plain_pattern] will break [specialize_vector] in [exhaust.ml] because
+   of wildcard matches there. *)
+
+type pattern = plain_pattern CoreUtils.located
 
 and plain_pattern =
   | PVar of variable
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (OldUtils.field, pattern) OldUtils.assoc
+  | PRecord of (OldUtils.field, pattern) Assoc.t
   | PVariant of OldUtils.label * pattern option
   | PConst of Const.t
   | PNonbinding
 
 (** Pure expressions *)
-type expression = plain_expression annotation
+type expression = plain_expression CoreUtils.located
 
 and plain_expression =
   | Var of variable
   | Const of Const.t
   | Tuple of expression list
-  | Record of (OldUtils.field, expression) OldUtils.assoc
+  | Record of (OldUtils.field, expression) Assoc.t
   | Variant of OldUtils.label * expression option
   | Lambda of abstraction
   | Effect of effect
   | Handler of handler
 
 (** Impure computations *)
-and computation = plain_computation annotation
+and computation = plain_computation CoreUtils.located
 
 and plain_computation =
   | Value of expression
@@ -49,7 +54,7 @@ and plain_computation =
 
 (** Handler definitions *)
 and handler =
-  { effect_clauses: (effect, abstraction2) OldUtils.assoc
+  { effect_clauses: (effect, abstraction2) Assoc.t
   ; value_clause: abstraction
   ; finally_clause: abstraction }
 
@@ -58,26 +63,6 @@ and abstraction = (pattern * computation)
 
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * computation)
-
-(* Toplevel commands (the first four do not need to be separated by [;;]) *)
-type command = plain_command annotation
-
-and plain_command =
-  | Tydef of (OldUtils.tyname, Params.Ty.t list * Tctx.tydef) OldUtils.assoc
-      (** [type t = tydef] *)
-  | TopLet of (pattern * computation) list
-      (** [let p1 = t1 and ... and pn = tn] *)
-  | TopLetRec of (variable * abstraction) list
-      (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)
-  | External of variable * Type.ty * string
-      (** [external x : t = "ext_val_name"] *)
-  | DefEffect of effect * (Type.ty * Type.ty)  (** [effect Eff : ty1 -> t2] *)
-  | Computation of computation
-  | Use of string  (** [#use "filename.eff"] *)
-  | Reset  (** [#reset] *)
-  | Help  (** [#help] *)
-  | Quit  (** [#quit] *)
-  | TypeOf of computation  (** [#type t] *)
 
 let rec contains_variable_expression var {term= e} =
   contains_variable_plain_expression var e
@@ -133,7 +118,7 @@ and contains_variable_abs2 var (pat1, pat2, c) = contains_variable_comp var c
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match p.term with
+  match term_of p with
   | PVar x -> print "%t" (Variable.print x)
   | PAs (p, x) -> print "%t as %t" (print_pattern p) (Variable.print x)
   | PConst c -> Const.print c ppf
@@ -141,7 +126,8 @@ let rec print_pattern ?max_level p ppf =
   | PRecord lst -> Print.record print_pattern lst ppf
   | PVariant (lbl, None) when lbl = OldUtils.nil -> print "[]"
   | PVariant (lbl, None) -> print "%s" lbl
-  | PVariant (lbl, Some {term= PTuple [v1; v2]}) when lbl = OldUtils.cons ->
+  | PVariant (lbl, Some {CoreUtils.it= PTuple [v1; v2]})
+    when lbl = OldUtils.cons ->
       print "[@[<hov>@[%t@]%t@]]" (print_pattern v1) (pattern_list v2)
   | PVariant (lbl, Some p) ->
       print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
@@ -150,8 +136,9 @@ let rec print_pattern ?max_level p ppf =
 
 and pattern_list ?(max_length= 299) p ppf =
   if max_length > 1 then
-    match p.term with
-    | PVariant (lbl, Some {term= PTuple [v1; v2]}) when lbl = OldUtils.cons ->
+    match term_of p with
+    | PVariant (lbl, Some {CoreUtils.it= PTuple [v1; v2]})
+      when lbl = OldUtils.cons ->
         Format.fprintf ppf ",@ %t%t" (print_pattern v1)
           (pattern_list ~max_length:(max_length - 1) v2)
     | PVariant (lbl, None) when lbl = OldUtils.nil -> ()
@@ -161,7 +148,7 @@ and pattern_list ?(max_length= 299) p ppf =
 
 let rec print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c.term with
+  match term_of c with
   | Apply (e1, e2) ->
       print ~at_level:1 "%t %t" (print_expression e1)
         (print_expression ~max_level:0 e2)
@@ -180,7 +167,7 @@ let rec print_computation ?max_level c ppf =
 
 and print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match e.term with
+  match term_of e with
   | Var x -> print "%t" (Variable.print x)
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
@@ -191,7 +178,7 @@ and print_expression ?max_level e ppf =
   | Lambda a -> print "fun %t" (abstraction a)
   | Handler h ->
       print "{effect_clauses = %t; value_clause = (%t)}"
-        (Print.sequence " | " effect_clause h.effect_clauses)
+        (Print.sequence " | " effect_clause (Assoc.to_list h.effect_clauses))
         (abstraction h.value_clause)
   | Effect eff -> print "%s" eff
 

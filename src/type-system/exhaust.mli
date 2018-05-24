@@ -5,8 +5,8 @@
    [1] http://pauillac.inria.fr/~maranget/papers/warn/index.html
 *)
 
-val is_irrefutable : CoreSyntax.pattern -> unit
+val is_irrefutable : UntypedSyntax.pattern -> unit
 (** Check that a pattern is irrefutable. *)
 
-val check_comp : CoreSyntax.computation -> unit
+val check_comp : UntypedSyntax.computation -> unit
 (** Check for refutable patterns in let statements and non-exhaustive match statements. *)

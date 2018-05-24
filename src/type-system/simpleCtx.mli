@@ -13,16 +13,16 @@ type t
 val empty : t
 (** [empty] is the empty context. *)
 
-val lookup : loc:Location.t -> t -> CoreSyntax.variable -> Type.ty
+val lookup : loc:Location.t -> t -> UntypedSyntax.variable -> Type.ty
 (** [lookup ~pos ctx x] returns a fresh instance of the type scheme assigned
     to the variable [x] in the context [ctx]. The optional position is used in
     error reporting when the variable is not bound in the context. *)
 
-val extend : t -> CoreSyntax.variable -> ty_scheme -> t
+val extend : t -> UntypedSyntax.variable -> ty_scheme -> t
 (** [extend x ty_scheme ctx] returns the context [ctx] extended with
     a variable [x] bound to the type scheme [ty_scheme]. *)
 
-val extend_ty : t -> CoreSyntax.variable -> Type.ty -> t
+val extend_ty : t -> UntypedSyntax.variable -> Type.ty -> t
 (** [extend_ty x ty ctx] returns the context [ctx] extended with a variable [x]
     bound to the type [ty]. The type is promoted to a type scheme with no
     generalized type parameters. *)
@@ -35,6 +35,6 @@ val generalize : t -> bool -> Type.ty -> ty_scheme
     type scheme. If [poly] is [true], all free type parameters in [ty] that do
     not appear in [ctx] are universally quantified. *)
 
-val infer_effect : t -> CoreSyntax.effect -> (Type.ty * Type.ty) option
+val infer_effect : t -> UntypedSyntax.effect -> (Type.ty * Type.ty) option
 
-val add_effect : t -> CoreSyntax.effect -> Type.ty * Type.ty -> t
+val add_effect : t -> UntypedSyntax.effect -> Type.ty * Type.ty -> t
