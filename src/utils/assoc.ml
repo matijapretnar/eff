@@ -14,7 +14,7 @@ let rec find_if p = function
   | hd :: tl -> if p hd then Some hd else find_if p tl
 
 
-let pop = function [] -> (None, []) | hd :: tl -> (Some hd, tl)
+let pop = function [] -> None | hd :: tl -> Some (hd, tl)
 
 (* Changing the list. *)
 let update k v assoc = (k, v) :: assoc

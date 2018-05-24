@@ -12,7 +12,7 @@ val find_if : ('k * 'v -> bool) -> ('k, 'v) t -> ('k * 'v) option
 (** [find_if p assoc] returns the first [(k, v)] for which [p] returns [true]
     if it exists. *)
 
-val pop : ('k, 'v) t -> ('k * 'v) option * ('k, 'v) t
+val pop : ('k, 'v) t -> (('k * 'v) * ('k, 'v) t) option 
 (** [pop assoc] returns the first element and the rest of [assoc]. *)
 
 val update : 'k -> 'v -> ('k, 'v) t -> ('k, 'v) t

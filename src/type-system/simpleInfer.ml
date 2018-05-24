@@ -1,5 +1,4 @@
 open CoreUtils
-module C = OldUtils
 module T = Type
 module Untyped = UntypedSyntax
 module Ctx = SimpleCtx
@@ -69,8 +68,8 @@ let infer_pattern cstr pp =
     | Untyped.PTuple ps -> T.Tuple (OldUtils.map infer ps)
     | Untyped.PRecord flds -> (
       match Assoc.pop flds with
-      | None, _ -> assert false
-      | Some (fld, _), _ ->
+      | None -> assert false
+      | Some ((fld, _), _) ->
         match Tctx.infer_field fld with
         | None -> Error.typing ~loc "Unbound record field label %s" fld
         | Some (ty, (t, us)) ->
@@ -104,25 +103,26 @@ let extend_with_pattern ?(forbidden_vars= []) ctx cstr p =
       Error.typing ~loc:p.at "Several definitions of %t."
         (Untyped.Variable.print x)
   | None ->
-      ( vars
-      , t
-      , List.fold_right (fun (x, t) ctx -> Ctx.extend_ty ctx x t) vars ctx )
+      let ctx' =
+        List.fold_right (fun (x, t) ctx -> Ctx.extend_ty ctx x t) vars ctx
+      in
+      (vars, t, ctx')
 
 let rec infer_abstraction ctx cstr (p, c) =
-  let _, t1, ctx = extend_with_pattern ctx cstr p in
-  let t2 = infer_comp ctx cstr c in
+  let _, t1, ctx' = extend_with_pattern ctx cstr p in
+  let t2 = infer_comp ctx' cstr c in
   (t1, t2)
 
 and infer_abstraction2 ctx cstr (p1, p2, c) =
-  let vs, t1, ctx = extend_with_pattern ctx cstr p1 in
-  let _, t2, ctx = extend_with_pattern ~forbidden_vars:vs ctx cstr p2 in
-  let t3 = infer_comp ctx cstr c in
+  let vs, t1, ctx' = extend_with_pattern ctx cstr p1 in
+  let _, t2, ctx'' = extend_with_pattern ~forbidden_vars:vs ctx' cstr p2 in
+  let t3 = infer_comp ctx'' cstr c in
   (t1, t2, t3)
 
 and infer_handler_case_abstraction ctx cstr (p, k, e) =
-  let vs, t1, ctx = extend_with_pattern ctx cstr p in
-  let _, tk, ctx = extend_with_pattern ~forbidden_vars:vs ctx cstr k in
-  let t2 = infer_comp ctx cstr e in
+  let vs, t1, ctx' = extend_with_pattern ctx cstr p in
+  let _, tk, ctx'' = extend_with_pattern ~forbidden_vars:vs ctx' cstr k in
+  let t2 = infer_comp ctx'' cstr e in
   (tk, t1, t2)
 
 and infer_let ctx cstr loc defs =
@@ -131,34 +131,32 @@ and infer_let ctx cstr loc defs =
       Print.warning ~loc
         "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
         (Print.sequence "," Location.print locations) ) ;
-  let vars, ctx =
-    List.fold_left
-      (fun (vs, ctx') (p, c) ->
-        let tc = infer_comp ctx cstr c in
-        let ws, tp = infer_pattern cstr p in
-        add_ty_constraint cstr c.at tc tp ;
-        match C.find_duplicate (List.map fst ws) (List.map fst vs) with
-        | Some x ->
-            Error.typing ~loc "Several definitions of %t."
-              (Untyped.Variable.print x)
-        | None ->
-            let sbst = Unify.solve !cstr in
-            let ws = Assoc.map (T.subst_ty sbst) (Assoc.of_list ws) in
-            let ctx = Ctx.subst_ctx ctx sbst in
-            let ws = Assoc.map (Ctx.generalize ctx (nonexpansive c.it)) ws in
-            let ws = Assoc.to_list ws in
-            let ctx' =
-              List.fold_right
-                (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme)
-                ws ctx'
-            in
-            (List.rev ws @ vs, ctx') )
-      ([], ctx) defs
+  let infer_fold_fun (vs, ctx') (p, c) =
+    let tc = infer_comp ctx cstr c in
+    let ws, tp = infer_pattern cstr p in
+    add_ty_constraint cstr c.at tc tp ;
+    match OldUtils.find_duplicate (List.map fst ws) (List.map fst vs) with
+    | Some x ->
+        Error.typing ~loc "Several definitions of %t."
+          (Untyped.Variable.print x)
+    | None ->
+        let sbst = Unify.solve !cstr in
+        let ws = Assoc.map (T.subst_ty sbst) (Assoc.of_list ws) in
+        let ctx = Ctx.subst_ctx ctx sbst in
+        let ws = Assoc.map (Ctx.generalize ctx (nonexpansive c.it)) ws in
+        let ws = Assoc.to_list ws in
+        let ctx' =
+          List.fold_right
+            (fun (x, ty_scheme) ctx -> Ctx.extend ctx x ty_scheme)
+            ws ctx'
+        in
+        (List.rev ws @ vs, ctx')
   in
-  (vars, Ctx.subst_ctx ctx (Unify.solve !cstr))
+  let vars, ctx' = List.fold_left infer_fold_fun ([], ctx) defs in
+  (vars, Ctx.subst_ctx ctx' (Unify.solve !cstr))
 
 and infer_let_rec ctx cstr loc defs =
-  if not (OldUtils.injective fst defs) then
+  if not (OldUtils.no_duplicates (List.map fst defs)) then
     Error.typing ~loc "Multiply defined recursive value." ;
   let lst =
     List.map
@@ -206,8 +204,8 @@ and infer_expr ctx cstr {it= e; at= loc} =
   | Untyped.Tuple es -> T.Tuple (OldUtils.map (infer_expr ctx cstr) es)
   | Untyped.Record flds -> (
     match Assoc.pop flds with
-    | None, _ -> assert false
-    | Some (fld, _), _ ->
+    | None -> assert false
+    | Some ((fld, _), _) ->
       match
         (* XXX *)
         (*       if not (Pattern.linear_record flds') then
@@ -344,7 +342,8 @@ let infer_top_let_rec ~loc ctx defs =
   let vars, ctx =
     infer_let_rec ctx (ref empty_constraint) Location.unknown defs
   in
-  List.iter
-    (fun (_, (p, c)) -> Exhaust.is_irrefutable p ; Exhaust.check_comp c)
-    defs ;
+  let exhaust_check (_, (p, c)) =
+    Exhaust.is_irrefutable p ; Exhaust.check_comp c
+  in
+  List.iter exhaust_check defs ;
   (vars, ctx)
