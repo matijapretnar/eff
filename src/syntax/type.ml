@@ -102,14 +102,10 @@ let refresh params ty =
 let beautify (ps, ty) =
   let next_ty_param = Params.Ty.new_fresh () in
   let xs = free_params ty in
-  let xs_map = Assoc.map_of_list (fun p -> (p, next_ty_param ())) xs in
-  let subst ps ps_map =
-    List.map
-      (fun p -> match Assoc.lookup p ps_map with None -> p | Some p' -> p')
-      ps
-  in
-  let sbst = Assoc.map (fun p' -> TyParam p') xs_map in
-  (subst ps xs_map, subst_ty sbst ty)
+  let xs_assoc = Assoc.map_of_list (fun p -> (p, next_ty_param ())) xs in
+  let sub p = match Assoc.lookup p xs_assoc with None -> p | Some p' -> p' in
+  let ty_sbst = Assoc.map (fun p' -> TyParam p') xs_assoc in
+  (List.map sub ps, subst_ty ty_sbst ty)
 
 
 let beautify2 ty1 ty2 =
