@@ -29,11 +29,11 @@ let rec exec_cmd ppf st cmd =
       (* PrintUntyped.print_computation c ppf; *)
       let ct, typing = Infer.type_comp st.typing c in
       (* let ct = Optimize.optimize_command ct in *)
-      (* Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme ct.Typed.scheme); *)
-      let v = Eval.run st.runtime c in
+      Format.fprintf ppf "@[- : %t@]@." (Scheme.print_dirty_scheme ct.Typed.scheme);
+      (* let v = Eval.run st.runtime c in
       Format.fprintf ppf "@[- : %t = %t@]@."
         (Scheme.print_dirty_scheme ct.Typed.scheme)
-        (Value.print_value v);
+        (Value.print_value v); *)
       st
   | Untyped.TypeOf c ->
       let c, _ = Infer.type_comp st.typing c in

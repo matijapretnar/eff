@@ -132,10 +132,6 @@ let rec replace_ty rpls polarity ty =
       Type.Intersection (ty1, ty2)
   end
 
-(* and replace_dirt rpls polarity drt =
-  let { Type.ops = new_ops; Type.rest = new_rest } = rpls.dirt_param_repl (drt.Type.rest, polarity) in
-  { Type.ops = new_ops @ drt.ops; Type.rest = new_rest } *)
-
 and replace_dirty rpls polarity (ty, drt) =
   let ty = replace_ty rpls polarity ty in
   let drt = replace_dirt rpls polarity drt in
@@ -178,8 +174,12 @@ let constructed ty =
 let atomic_ty cnstr =
   begin match cnstr with
     | (Type.TyVar a, Type.TyVar b, _) -> 
-      {
+      (* {
         ty_param_repl = (function (p, polarity) -> if (polarity == true && p == b) then Type.Union (Type.TyVar a, Type.TyVar b) else Type.TyVar p);
+        dirt_param_repl = id_drt;
+      } *)
+      {
+        ty_param_repl = (function (p, polarity) -> if (polarity == false && p == a) then Type.Intersection (Type.TyVar a, Type.TyVar b) else Type.TyVar p);
         dirt_param_repl = id_drt;
       }
     | (Type.TyVar a, ty, _) when constructed ty -> 
@@ -206,9 +206,13 @@ let is_atomic_ty el =
 let atomic_drt cnstr =
   begin match cnstr with
     | (Type.DirtVar a, Type.DirtVar b, _) -> 
-      {
+      (* {
         ty_param_repl = id_ty;
         dirt_param_repl = (function (p, polarity) -> if (polarity == true && p == b) then Type.DirtUnion (Type.DirtVar a, Type.DirtVar b) else Type.DirtVar p);
+      } *)
+      {
+        ty_param_repl = id_ty;
+        dirt_param_repl = (function (p, polarity) -> if (polarity == false && p == a) then Type.DirtIntersection (Type.DirtVar a, Type.DirtVar b) else Type.DirtVar p);
       }
     | (Type.DirtVar a, ty, _) -> 
       {
@@ -331,6 +335,9 @@ let decompose_drt_cnstr (drt1, drt2, loc) =
     | (Type.DirtVar a, Type.DirtVar b) when a = b -> empty
     | (Type.Op a, Type.Op b) when a = b -> empty
 
+    (* We can immediatly reduce Op <= Op2 *)
+    | (Type.Op a, Type.Op b) -> empty
+
     | (Type.DirtBottom, _) -> empty
     (* | (_, Type.Top) -> empty *)
 
@@ -339,9 +346,22 @@ let decompose_drt_cnstr (drt1, drt2, loc) =
       let cnstr = add_dirt_constraint ~loc drt_right drt2 cnstr in
       cnstr
     
-    | (drt1, Type.DirtUnion (_, _)) ->
+    (* | (drt1, Type.DirtUnion (_, _)) ->
       let is_satisfied = check_occurence drt1 drt2 in
-      if is_satisfied then empty else make_dirt_constraint drt1 drt2 loc
+      if is_satisfied then empty else make_dirt_constraint drt1 drt2 loc *)
+
+    (* 
+      Ops are implemented as abstractions (arrows)
+      According to the spec:
+        "Op v" has type (A ! Op)
+      Due to the abstraction implementation (and not having simplification):
+        "Op v" has type (A ! (Op U drt_var))
+        "Op v" has type (A ! (drt_var U Op))
+
+      Thus we need to handle those cases
+      *)
+    | (Type.Op a, Type.DirtUnion (Type.Op b, Type.DirtVar c)) -> empty
+    | (Type.Op a, Type.DirtUnion (Type.DirtVar b, Type.Op c)) -> empty
     
     | (drt1, Type.DirtIntersection (drt_left, drt_right)) ->
       let cnstr = add_dirt_constraint ~loc drt1 drt_left empty in

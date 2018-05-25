@@ -195,7 +195,7 @@ let tuple ~loc es =
 
 let effect ~loc ty_par ty_res eff_name =
   (* let drt = {Type.ops = [eff_name]; Type.rest = Params.fresh_dirt_param ()} in *)
-  let drt = Type.fresh_dirt_ops (Type.Op eff_name) in
+  let drt = Type.Op eff_name in
   let ty = Type.Arrow (ty_par, (ty_res, drt)) in
   solve_ty (simple ty)
 
@@ -219,8 +219,11 @@ let handler ~loc effect_clauses value_clause =
   let handle_effect_clause ((_, (ty_par, ty_ret)), abstr) (ctx, cnstr) =
     let (ctx_e, (ty_p_e, ty_k_e, drty_r_e), cnstr_e) = abstr in
     let ctx = ctx_e @ ctx in
-    let cnstr = Unification.add_ty_constraint ~loc ty_par ty_p_e cnstr in
+    (* let cnstr = Unification.add_ty_constraint ~loc ty_par ty_p_e cnstr in
     let cnstr = Unification.add_ty_constraint ~loc (Type.Arrow (ty_ret, ret)) ty_k_e cnstr in
+    let cnstr = Unification.add_dirty_constraint ~loc drty_r_e ret cnstr in *)
+    let cnstr = Unification.add_ty_constraint ~loc ty_par ty_p_e cnstr in
+    let cnstr = Unification.add_ty_constraint ~loc (Type.Arrow (ty_ret, drty_r_e)) ty_k_e cnstr in
     let cnstr = Unification.add_dirty_constraint ~loc drty_r_e ret cnstr in
     let cnstr = Unification.list_union [cnstr; cnstr_e] in
     (ctx, cnstr)
@@ -229,8 +232,8 @@ let handler ~loc effect_clauses value_clause =
 
   (* loop over all effect that can be handled, input and output contain these effects *)
   let effs = List.map (fun (eff, _) -> eff) (OldUtils.uniq (List.map fst effect_clauses)) in
-  let param_drt = Type.add_ops_list effs param_drt in
   let cnstr = Unification.add_dirt_constraint ~loc param_drt ret_drt cnstr in
+  let param_drt = Type.add_ops_list effs param_drt in
 
   (* result *)
   let ty = Type.Handler ((param_ty, param_drt), ret) in
@@ -299,9 +302,9 @@ let dobinding ~loc c1 c2 =
     | _ -> 
       let constraints = 
         Unification.list_union [cnstrs_c1; cnstrs_c2]
-        |> Unification.add_dirt_constraint ~loc drt1 drt2
+        (* |> Unification.add_dirt_constraint ~loc drt1 drt2 *)
       in
-      solve_dirty (ctx_c1 @ ctx_c2, (ty2, drt2), constraints)
+      solve_dirty (ctx_c1 @ ctx_c2, (ty2, Type.add_ops drt1 drt2), constraints)
   end
   
   

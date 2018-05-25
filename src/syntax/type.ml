@@ -66,12 +66,8 @@ let simple_dirt d = DirtVar d (* { ops = []; rest = d } *)
 let fresh_dirt () = simple_dirt (Params.fresh_dirt_param ())
 let fresh_dirty () = (fresh_ty (), fresh_dirt ())
 
-let add_ops ops d = DirtUnion (ops, d) (* { ops = OldUtils.uniq (ops @ d.ops); rest = d.rest } *)
-let fresh_dirt_ops ops = add_ops ops (fresh_dirt ())
-
-let make_dirt ops rest = DirtUnion (ops, rest) (*{ ops = ops; rest = rest }*)
-
-let add_ops_list ops d = List.fold_left (fun d1 d2 -> DirtUnion (d1, Op d2)) d ops
+let add_ops d1 d2 = DirtUnion (d1, d2)
+let add_ops_list ops d = List.fold_left (fun d1 d2 -> DirtIntersection (d1, Op d2)) d ops
 
 let rec get_var_internal drt = (* d.rest *)
   begin match drt with
@@ -99,7 +95,6 @@ let get_var drt =
    define it. *)
 let universal_ty = Prim UniTy (* Basic "_" *)
 let universal_dirty = (Prim UniTy, fresh_dirt ()) (* (Basic "_", fresh_dirt ()) *)
-
 
 type replacement = {
   ty_param_repl : Params.ty_param -> ty;
@@ -209,7 +204,7 @@ let rec print_dirt drt ppf =
       print_operation op ppf
     | DirtVar d -> Print.print ppf "%t" (Params.print_dirt_param d)
     | DirtBottom -> Print.print ppf "%s" (Symbols.bottom ())
-    | DirtUnion (d1, d2) -> (print_dirt d1 ppf); (Print.print ppf " %s " (Symbols.union ())); (print_dirt d2 ppf)
+    | DirtUnion (d1, d2) -> (Print.print ppf "["); (print_dirt d1 ppf); (Print.print ppf " %s " (Symbols.union ())); (print_dirt d2 ppf); (Print.print ppf "]")
     | DirtIntersection (d1, d2) -> (print_dirt d1 ppf); (Print.print ppf " %s " (Symbols.intersection ())); (print_dirt d2 ppf)
   end
   (* match drt.ops with

@@ -122,7 +122,7 @@ let rec check n =
 (* let t2 = (fun x -> x) 1;; *)
 (* let id x = x;; *)
 
-let x = (fun f x -> f (f x));;
+(* let x = (fun f x -> f (f x));; *)
 (* x (fun x -> #Op ()) ;; *)
 
 (* (fun f x -> 
@@ -188,7 +188,7 @@ val select : () |- ((τ₁ -(δ₁)→ bool) -(⊥)→
   if (p v) then 
     #Op ()
   else 
-    #Op2 ();;*)
+    #Op2 ();; *)
 
 (* fun p q -> if p then q else q *)
 
@@ -201,4 +201,41 @@ val select : () |- ((τ₁ -(δ₁)→ bool) -(⊥)→
     m :: r
 ;; *)
 
-let id x = #Op ();x
+(* let id x = #Op ();x;; *)
+
+(* handle 3 with
+  | #Op () k -> k 3
+  ;; *)
+
+(* let h2 = handler
+  | #Op () k ->  k 3
+  | #Op2 () k -> k true;; *)
+
+let h = handler
+  | #Op () k ->  k 3
+  | #Op2 () k ->  k true;;
+
+(* fun () -> with h handle (#Op3 (); #Op2 ());; *)
+
+handle (#Op ()) with
+  | #Op () k ->  k 3
+  | #Op2 () k ->  k true;;
+
+if true then
+    1
+else
+    2+1
+;;
+
+#Op2 (); #Op3 () (* doesnt work *)
+;;
+
+handle (#Op2 (); #Op3 ()) with
+  | #Op () k ->  k 3
+  | #Op2 () k ->  k true;;
+
+let x = (fun y -> with y handle (#Op2 ()));;
+
+x h;;
+
+with h handle (#Op2 ());;
