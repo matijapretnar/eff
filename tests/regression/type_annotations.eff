@@ -27,3 +27,7 @@ let f x : int =
 type ('a,'b) bull = {small : 'a; large : 'b};;
 
 let f {small= (x: int); large= y: int} = x;;
+
+
+(* other *)
+let x = ([] : int list);;

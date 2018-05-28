@@ -6,3 +6,4 @@ val f : int -> int = <fun>
 val f : (int, int) cow -> int = <fun>
 val f : ('a, int) cow -> int = <fun>
 val f : (int, int) bull -> int = <fun>
+val x : int list = []

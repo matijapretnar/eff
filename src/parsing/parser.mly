@@ -249,6 +249,8 @@ plain_simple_term:
     { Record (Assoc.of_list flds) }
   | LPAREN RPAREN
     { Tuple [] }
+  | LPAREN t = term COLON ty = ty RPAREN
+    { Annotated (t, ty) }
   | LPAREN t = plain_term RPAREN
     { t }
   | BEGIN t = plain_term END
@@ -282,10 +284,10 @@ match_case:
 lambdas0(SEP):
   | SEP t = term
     { t }
-  | COLON ty = ty SEP t = term
-    { {it= Annotated (t, ty); at= Location.make $startpos $endpos} }
   | p = simple_pattern t = lambdas0(SEP)
     { {it= Lambda (p, t); at= Location.make $startpos $endpos} }
+  | COLON ty = ty SEP t = term
+    { {it= Annotated (t, ty); at= Location.make $startpos $endpos} }
 
 lambdas1(SEP):
   | p = simple_pattern t = lambdas0(SEP)
@@ -294,6 +296,8 @@ lambdas1(SEP):
 let_def:
   | p = pattern EQUAL t = term
     { (p, t) }
+  | p = pattern COLON ty= ty EQUAL t = term
+    { (p, {it= Annotated(t, ty); at= Location.make $startpos $endpos}) }
   | x = mark_position(ident) t = lambdas1(EQUAL)
     { ({it= PVar x.it; at= x.at}, t) }
 
@@ -319,8 +323,6 @@ plain_pattern:
     { p.it }
   | p = pattern AS x = lname
     { PAs (p, x) }
-  | p = pattern COLON t = ty
-    { PAnnotated (p, t) }
 
 comma_pattern: mark_position(plain_comma_pattern) { $1 }
 plain_comma_pattern:
@@ -366,6 +368,8 @@ plain_simple_pattern:
     }
   | LPAREN RPAREN
     { PTuple [] }
+  | LPAREN p = pattern COLON t = ty RPAREN
+    { PAnnotated (p, t) }
   | LPAREN p = pattern RPAREN
     { p.it }
 

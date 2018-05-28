@@ -121,7 +121,8 @@ let desugar_pattern state ?(initial_forbidden= []) p =
           Untyped.PVar x
       | Sugared.PAnnotated (p, t) ->
           let p' = desugar_pattern state p in
-          let t' = desugar_type Assoc.empty t in
+          let ty_params = syntax_to_core_params (free_type_params t) in
+          let t' = desugar_type ty_params t in
           Untyped.PAnnotated (p', t')
       | Sugared.PAs (p, x) ->
           let x = new_var x in
@@ -165,8 +166,9 @@ let rec desugar_expression state {it= t; at= loc} =
     | Sugared.Const k -> ([], Untyped.Const k)
     | Sugared.Annotated (t, ty) ->
         let w, t' = desugar_expression state t in
-        let ty' = desugar_type Assoc.empty ty in
-        (w, Untyped.Annotated (t', ty'))       
+        let ty_params = syntax_to_core_params (free_type_params ty) in
+        let ty' = desugar_type ty_params ty in
+        (w, Untyped.Annotated (t', ty'))
     | Sugared.Lambda a ->
         let a = desugar_abstraction state a in
         ([], Untyped.Lambda a)
