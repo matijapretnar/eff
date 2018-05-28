@@ -1,0 +1,8 @@
+val f : int -> int = <fun>
+val f : int -> int = <fun>
+- : int -> (int -> bool -> int) -> int = <fun>
+val f : int -> int * int = <fun>
+val f : int -> int = <fun>
+val f : (int, int) cow -> int = <fun>
+val f : ('a, int) cow -> int = <fun>
+val f : (int, int) bull -> int = <fun>

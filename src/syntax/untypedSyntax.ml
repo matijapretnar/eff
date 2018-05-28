@@ -62,6 +62,7 @@ let rec print_pattern ?max_level p ppf =
   match p.it with
   | PVar x -> print "%t" (Variable.print x)
   | PAs (p, x) -> print "%t as %t" (print_pattern p) (Variable.print x)
+  | PAnnotated (p, ty) -> print_pattern ?max_level p ppf
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
   | PRecord lst -> Print.record print_pattern lst ppf
@@ -107,6 +108,7 @@ and print_expression ?max_level e ppf =
   match e.it with
   | Var x -> print "%t" (Variable.print x)
   | Const c -> print "%t" (Const.print c)
+  | Annotated (t, ty) -> print_expression ?max_level e ppf
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record lst -> Print.record print_expression lst ppf
   | Variant (lbl, None) -> print "%s" lbl
