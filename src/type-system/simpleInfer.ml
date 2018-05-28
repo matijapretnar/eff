@@ -59,6 +59,10 @@ let infer_pattern cstr pp =
         let t = if !disable_typing then T.universal_ty else T.fresh_ty () in
         vars := (x, t) :: !vars ;
         t
+    | Untyped.PAnnotated (p, t) ->
+        let p_t = infer p in
+        add_ty_constraint cstr loc p_t t;
+        t
     | Untyped.PAs (p, x) ->
         let t = infer p in
         vars := (x, t) :: !vars ;

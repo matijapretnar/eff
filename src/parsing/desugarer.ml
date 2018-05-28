@@ -119,6 +119,10 @@ let desugar_pattern state ?(initial_forbidden= []) p =
       | Sugared.PVar x ->
           let x = new_var x in
           Untyped.PVar x
+      | Sugared.PAnnotated (p, t) ->
+          let p' = desugar_pattern state p in
+          let t' = desugar_type Assoc.empty t in
+          Untyped.PAnnotated (p', t')
       | Sugared.PAs (p, x) ->
           let x = new_var x in
           let p' = desugar_pattern state p in

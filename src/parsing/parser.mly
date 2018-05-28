@@ -317,6 +317,8 @@ plain_pattern:
     { p.it }
   | p = pattern AS x = lname
     { PAs (p, x) }
+  | p = pattern COLON t = ty
+    { PAnnotated (p, t) }
 
 comma_pattern: mark_position(plain_comma_pattern) { $1 }
 plain_comma_pattern:

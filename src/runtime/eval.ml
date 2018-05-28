@@ -18,6 +18,7 @@ exception PatternMatch of Location.t
 let rec extend_value p v env =
   match (p.it, v) with
   | Untyped.PVar x, v -> update x v env
+  | Untyped.PAnnotated (p, t), v -> extend_value p v env
   | Untyped.PAs (p, x), v ->
       let env = extend_value p v env in
       update x v env

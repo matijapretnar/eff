@@ -11,6 +11,7 @@ type pattern = plain_pattern located
 
 and plain_pattern =
   | PVar of variable
+  | PAnnotated of pattern * Type.ty
   | PAs of pattern * variable
   | PTuple of pattern list
   | PRecord of (OldUtils.field, pattern) Assoc.t

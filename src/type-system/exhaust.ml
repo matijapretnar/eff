@@ -36,13 +36,17 @@ let arity = function
 
 (* Removes the top-most [As] pattern wrappers, if present (e.g. [2 as x] -> [2]). *)
 let rec remove_as {it= p} =
-  match p with Untyped.PAs (p', _) -> remove_as p' | p -> p
+  match p with
+  | Untyped.PAs (p', _) -> remove_as p'
+  | Untyped.PAnnotated (p', _) -> remove_as p'
+  | p -> p
 
 
 (* Reads constructor description from a pattern, discarding any [Untyped.PAs] layers. *)
 let rec cons_of_pattern {it= p; at= loc} =
   match p with
   | Untyped.PAs (p, _) -> cons_of_pattern p
+  | Untyped.PAnnotated (p, _) -> cons_of_pattern p
   | Untyped.PTuple lst -> Tuple (List.length lst)
   | Untyped.PRecord flds -> (
     match Assoc.pop flds with
