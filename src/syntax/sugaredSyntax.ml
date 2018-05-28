@@ -43,6 +43,7 @@ type term = plain_term located
 and plain_term =
   | Var of variable  (** variables *)
   | Const of Const.t  (** integers, strings, booleans, and floats *)
+  | Annotated of term * ty
   | Tuple of term list  (** [(t1, t2, ..., tn)] *)
   | Record of (OldUtils.field, term) Assoc.t
       (** [{field1 = t1; field2 = t2; ...; fieldn = tn}] *)

@@ -163,6 +163,10 @@ let rec desugar_expression state {it= t; at= loc} =
       | Some n -> ([], Untyped.Var n)
       | None -> Error.typing ~loc "Unknown variable %s" x )
     | Sugared.Const k -> ([], Untyped.Const k)
+    | Sugared.Annotated (t, ty) ->
+        let w, t' = desugar_expression state t in
+        let ty' = desugar_type Assoc.empty ty in
+        (w, Untyped.Annotated (t', ty'))       
     | Sugared.Lambda a ->
         let a = desugar_abstraction state a in
         ([], Untyped.Lambda a)
@@ -292,9 +296,9 @@ and desugar_computation state {it= t; at= loc} =
         ([], Untyped.LetRec (defs', c))
     (* The remaining cases are expressions, which we list explicitly to catch any
        future changes. *)
-    | Sugared.Var _ | Sugared.Const _ | Sugared.Tuple _ | Sugared.Record _
-     |Sugared.Variant _ | Sugared.Lambda _ | Sugared.Function _
-     |Sugared.Handler _ ->
+    | Sugared.Var _ | Sugared.Const _ | Sugared.Annotated _ | Sugared.Tuple _
+     | Sugared.Record _ |Sugared.Variant _ | Sugared.Lambda _
+     | Sugared.Function _ |Sugared.Handler _ ->
         let w, e = desugar_expression state {it= t; at= loc} in
         (w, Untyped.Value e)
   in

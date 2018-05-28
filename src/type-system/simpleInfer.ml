@@ -205,6 +205,10 @@ and infer_expr ctx cstr {it= e; at= loc} =
   match e with
   | Untyped.Var x -> Ctx.lookup ~loc ctx x
   | Untyped.Const const -> ty_of_const const
+  | Untyped.Annotated (t, ty) ->
+      let ty' = infer_expr ctx cstr t in
+      add_ty_constraint cstr loc ty ty';
+      ty
   | Untyped.Tuple es -> T.Tuple (OldUtils.map (infer_expr ctx cstr) es)
   | Untyped.Record flds -> (
     match Assoc.pop flds with

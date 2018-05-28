@@ -25,6 +25,7 @@ type expression = plain_expression located
 and plain_expression =
   | Var of variable
   | Const of Const.t
+  | Annotated of expression * Type.ty
   | Tuple of expression list
   | Record of (OldUtils.field, expression) Assoc.t
   | Variant of OldUtils.label * expression option

@@ -282,6 +282,8 @@ match_case:
 lambdas0(SEP):
   | SEP t = term
     { t }
+  | COLON ty = ty SEP t = term
+    { {it= Annotated (t, ty); at= Location.make $startpos $endpos} }
   | p = simple_pattern t = lambdas0(SEP)
     { {it= Lambda (p, t); at= Location.make $startpos $endpos} }
 
