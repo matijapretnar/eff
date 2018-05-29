@@ -4,7 +4,7 @@ let buffer = ref "" in
 Format.make_formatter
 (fun s p n -> buffer := !buffer ^ String.sub s p n)
 (fun () ->
-  (Js.Unsafe.fun_call echo [| Js.Unsafe.inject (Js.string ("[" ^ format ^ !buffer ^ "]")) |] : unit) ;
+  (Js.Unsafe.fun_call echo [| Js.Unsafe.inject (Js.string !buffer) |] : unit) ;
   buffer := "")
 
 let output_formatter echo = js_formatter "[;#00a8ff;#192a56]" echo
