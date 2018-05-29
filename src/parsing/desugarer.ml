@@ -10,11 +10,14 @@ type constructor_kind = Variant of bool | Effect of bool
 
 type state =
   { context: (string, Untyped.variable) Assoc.t
-  ; constructors: (string, constructor_kind) Assoc.t }
+  ; constructors: (string, constructor_kind) Assoc.t
+  ; local_type_annotations: (string, Params.Ty.t) Assoc.t}
 
 let initial_state =
   let init_cons = [(Utils.cons, Variant true); (Utils.nil, Variant false)] in
-  {context= Assoc.empty; constructors= Assoc.of_list init_cons}
+  { context= Assoc.empty;
+    constructors= Assoc.of_list init_cons;
+    local_type_annotations= Assoc.empty }
 
 let add_loc t loc = {it= t; at= loc}
 
@@ -135,7 +138,7 @@ let desugar_pattern state ?(initial_forbidden= []) p =
       | Sugared.PVariant (lbl, p) -> (
         match Assoc.lookup lbl state.constructors with
         | None -> Error.typing ~loc "Unbound constructor %s" lbl
-        | Some (Variant var) ->
+        | Some (Variant var) -> (
           match (var, p) with
           | true, Some p ->
               Untyped.PVariant (lbl, Some (desugar_pattern state p))
@@ -145,7 +148,10 @@ let desugar_pattern state ?(initial_forbidden= []) p =
                 "Constructor %s should be applied to an argument." lbl
           | false, Some _ ->
               Error.typing ~loc
-                "Constructor %s cannot be applied to an argument." lbl )
+                "Constructor %s cannot be applied to an argument." lbl)
+        | Some (Effect eff) ->
+              Error.typing ~loc
+                "Constructor %s should not be an effect constructor." lbl)
       | Sugared.PConst c -> Untyped.PConst c
       | Sugared.PNonbinding -> Untyped.PNonbinding
     in
@@ -194,7 +200,7 @@ let rec desugar_expression state {it= t; at= loc} =
     | Sugared.Variant (lbl, t) -> (
       match Assoc.lookup lbl state.constructors with
       | None -> Error.typing ~loc "Unbound constructor %s" lbl
-      | Some (Variant var) ->
+      | Some (Variant var) -> (
         match (var, t) with
         | true, Some t ->
             let w, e = desugar_expression state t in
@@ -205,7 +211,10 @@ let rec desugar_expression state {it= t; at= loc} =
               "Constructor %s should be applied to an argument." lbl
         | false, Some _ ->
             Error.typing ~loc
-              "Constructor %s cannot be applied to an argument." lbl )
+              "Constructor %s cannot be applied to an argument." lbl)
+      | Some (Effect eff) ->
+            Error.typing ~loc
+              "Constructor %s should not be an effect constructor." lbl )
     (* Terms that are desugared into computations. We list them explicitly in
        order to catch any future constructs. *)
     | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
@@ -404,13 +413,13 @@ and desugar_handler loc state
     ; Untyped.value_clause= untyped_val_a
     ; Untyped.finally_clause= untyped_fin_a } )
 
-and match_constructor st loc t cs =
+and match_constructor state loc t cs =
   (* Separate value and effect cases. *)
   let val_cs, eff_cs = separate_match_cases cs in
   match eff_cs with
   | [] ->
-      let val_cs = List.map (desugar_abstraction st) val_cs in
-      let w, e = desugar_expression st t in
+      let val_cs = List.map (desugar_abstraction state) val_cs in
+      let w, e = desugar_expression state t in
       (w, Untyped.Match (e, val_cs))
   | _ ->
       let val_cs = List.map (fun cs -> Sugared.Val_match cs) val_cs in
@@ -424,8 +433,8 @@ and match_constructor st loc t cs =
         ; Sugared.value_clause= [h_value_clause]
         ; Sugared.finally_clause= [] }
       in
-      let w, h = desugar_handler loc st sugared_h in
-      let c = desugar_computation st t in
+      let w, h = desugar_handler loc state sugared_h in
+      let c = desugar_computation state t in
       let loc_h = {it= Untyped.Handler h; at= loc} in
       (w, Untyped.Handle (loc_h, c))
 

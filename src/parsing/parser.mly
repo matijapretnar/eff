@@ -92,14 +92,6 @@ topdef_list:
   | def = topdef lst = topdef_list
      { def :: lst }
 
-commandline:
-  | def = topdef SEMISEMI
-    { def }
-  | t = topterm SEMISEMI
-    { t }
-  | dir = topdirective SEMISEMI
-    { dir }
-
 topterm: mark_position(plain_topterm) { $1 }
 plain_topterm:
   | t = term
