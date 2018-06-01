@@ -11,13 +11,15 @@ type constructor_kind = Variant of bool | Effect of bool
 type state =
   { context: (string, Untyped.variable) Assoc.t
   ; constructors: (string, constructor_kind) Assoc.t
-  ; local_type_annotations: (string, Params.Ty.t) Assoc.t}
+  ; local_type_annotations: (string, Params.Ty.t) Assoc.t
+  ; local_wrappers: (Untyped.pattern * Untyped.computation) list }
 
 let initial_state =
   let init_cons = [(Utils.cons, Variant true); (Utils.nil, Variant false)] in
-  { context= Assoc.empty;
-    constructors= Assoc.of_list init_cons;
-    local_type_annotations= Assoc.empty }
+  { context= Assoc.empty
+  ; constructors= Assoc.of_list init_cons
+  ; local_type_annotations= Assoc.empty
+  ; local_wrappers= [] }
 
 let add_loc t loc = {it= t; at= loc}
 
@@ -30,22 +32,29 @@ let add_loc t loc = {it= t; at= loc}
    an application applies to an effect type. So, it is prudent to call [fill_args] before
    calling [ty].
 *)
-let desugar_type type_sbst =
-  let rec desugar_type {it= t; at= loc} =
+let desugar_type type_sbst state =
+  let rec desugar_type state {it= t; at= loc} =
     match t with
     | Sugared.TyApply (t, tys) ->
-        let tys' = List.map desugar_type tys in
-        T.Apply (t, tys')
+        let state', tys' = fold_map desugar_type state tys in
+        state', T.Apply (t, tys')
     | Sugared.TyParam t -> (
       match Assoc.lookup t type_sbst with
       | None -> Error.syntax ~loc "Unbound type parameter '%s" t
-      | Some p -> T.TyParam p )
-    | Sugared.TyArrow (t1, t2) -> T.Arrow (desugar_type t1, desugar_type t2)
-    | Sugared.TyTuple lst -> T.Tuple (List.map desugar_type lst)
+      | Some p -> state, T.TyParam p )
+    | Sugared.TyArrow (t1, t2) ->
+        let state', t1' = desugar_type state t1 in
+        let state'', t2' = desugar_type state' t2 in
+        state'', T.Arrow (t1', t2')
+    | Sugared.TyTuple lst ->
+        let state', lst' = fold_map desugar_type state lst in
+        state', T.Tuple lst'
     | Sugared.TyHandler (t1, t2) ->
-        T.Handler {T.value= desugar_type t1; T.finally= desugar_type t2}
+        let state', t1' = desugar_type state t1 in
+        let state'', t2' = desugar_type state' t2 in
+        state'', T.Handler {T.value= t1'; T.finally= t2'}
   in
-  desugar_type
+  desugar_type state
 
 (** [free_type_params t] returns all free type params in [t]. *)
 let free_type_params t =
@@ -69,27 +78,32 @@ let desugar_tydef state params def =
   let state', def' =
     match def with
     | Sugared.TyRecord flds ->
-        (state, Tctx.Record (Assoc.map (fun t -> desugar_type ty_sbst t) flds))
+        let state', flds' = Assoc.fold_map (desugar_type ty_sbst) state flds in
+        state', Tctx.Record flds'
     | Sugared.TySum lst ->
-        let aux_desugar t = Utils.option_map (desugar_type ty_sbst) t in
-        let new_constructors =
-          Assoc.map
-            (function None -> Variant false | Some _ -> Variant true)
-            lst
+        let aux_desug st = function
+          | None -> (st, None)
+          | Some t -> let st', t' = desugar_type ty_sbst st t in (st', Some t')
         in
-        ( { state with
-            constructors= Assoc.concat new_constructors state.constructors }
-        , Tctx.Sum (Assoc.map aux_desugar lst) )
-    | Sugared.TyInline t -> (state, Tctx.Inline (desugar_type ty_sbst t))
+        let constructors =
+          let aux = function
+            | None -> Variant false
+            | Some _ -> Variant true
+          in
+          let new_cons = Assoc.map aux lst in
+          Assoc.concat new_cons state.constructors
+        in
+        let state', lst' = Assoc.fold_map aux_desug state lst in
+        {state' with constructors}, Tctx.Sum lst'
+    | Sugared.TyInline t ->
+        let state', t' = desugar_type ty_sbst state t in
+        state', Tctx.Inline t'
   in
-  (state', (Assoc.values_of ty_sbst, def'))
+  state', (Assoc.values_of ty_sbst, def')
 
 (** [desugar_tydefs defs] desugars the simultaneous type definitions [defs]. *)
 let desugar_tydefs state sugared_defs =
-  let desugar_fold state (tyname, (params, def)) =
-    let state', tydef' = desugar_tydef state params def in
-    (state', (tyname, tydef'))
-  in
+  let desugar_fold state (params, def) = desugar_tydef state params def in
   Assoc.fold_map desugar_fold state sugared_defs
 
 (* ***** Desugaring of expressions and computations. ***** *)
@@ -125,7 +139,7 @@ let desugar_pattern state ?(initial_forbidden= []) p =
       | Sugared.PAnnotated (p, t) ->
           let p' = desugar_pattern state p in
           let ty_params = syntax_to_core_params (free_type_params t) in
-          let t' = desugar_type ty_params t in
+          let state', t' = desugar_type ty_params state t in
           Untyped.PAnnotated (p', t')
       | Sugared.PAs (p, x) ->
           let x = new_var x in
@@ -173,7 +187,7 @@ let rec desugar_expression state {it= t; at= loc} =
     | Sugared.Annotated (t, ty) ->
         let w, t' = desugar_expression state t in
         let ty_params = syntax_to_core_params (free_type_params ty) in
-        let ty' = desugar_type ty_params ty in
+        let state', ty' = desugar_type ty_params state ty in
         (w, Untyped.Annotated (t', ty'))
     | Sugared.Lambda a ->
         let a = desugar_abstraction state a in
@@ -482,8 +496,10 @@ let desugar_top_let_rec state defs =
 let desugar_external state (x, t, f) =
   let n = fresh_var (Some x) in
   let ts = syntax_to_core_params (free_type_params t) in
-  ( {state with context= Assoc.update x n state.context}
-  , (n, desugar_type ts t, f) )
+  let state', t' = desugar_type ts state t in
+  ( {state with context= Assoc.update x n state.context}, (n, t', f) )
 
 let desugar_def_effect state (eff, (ty1, ty2)) =
-  (eff, (desugar_type Assoc.empty ty1, desugar_type Assoc.empty ty2))
+  let state', ty1' = desugar_type Assoc.empty state ty1 in
+  let state'', ty2' = desugar_type Assoc.empty state' ty2 in
+  (eff, (ty1', ty2'))
