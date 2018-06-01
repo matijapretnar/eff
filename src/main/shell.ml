@@ -26,7 +26,7 @@ let _ = Random.self_init ()
 let rec exec_cmd ppf state {it= cmd; at= loc} =
   match cmd with
   | Commands.Term t ->
-      let c = Desugarer.desugar_computation state.desugarer_state t in
+      let _, c = Desugarer.desugar_computation state.desugarer_state t in
       let type_system_state', ty =
         TypeSystem.infer_top_comp state.type_system_state c
       in
@@ -35,7 +35,7 @@ let rec exec_cmd ppf state {it= cmd; at= loc} =
         (Value.print_value v) ;
       {state with type_system_state= type_system_state'}
   | Commands.TypeOf t ->
-      let c = Desugarer.desugar_computation state.desugarer_state t in
+      let _, c = Desugarer.desugar_computation state.desugarer_state t in
       let type_system_state', ty =
         TypeSystem.infer_top_comp state.type_system_state c
       in

@@ -3,7 +3,7 @@ type state
 val initial_state : state
 
 val desugar_computation :
-  state -> SugaredSyntax.term -> UntypedSyntax.computation
+  state -> SugaredSyntax.term -> state * UntypedSyntax.computation
 
 val desugar_def_effect :
   state -> SugaredSyntax.effect * (SugaredSyntax.ty * SugaredSyntax.ty)

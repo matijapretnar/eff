@@ -239,55 +239,59 @@ let rec desugar_expression state {it= t; at= loc} =
      |Sugared.Handle _ | Sugared.Conditional _ | Sugared.Check _
      |Sugared.Effect _ ->
         let x = fresh_var (Some "$bind") in
-        let c = desugar_computation state {it= t; at= loc} in
-        let local_wrappers = state.local_wrappers @ [(add_loc (Untyped.PVar x) loc, c)] in
-        ({state with local_wrappers}, Untyped.Var x)
+        let state', c = desugar_computation state {it= t; at= loc} in
+        let local_wrappers = state'.local_wrappers @ [(add_loc (Untyped.PVar x) loc, c)] in
+        ({state' with local_wrappers}, Untyped.Var x)
   in
   (state', add_loc e' loc)
 
 and desugar_computation state {it= t; at= loc} =
+  let outer_wrappers = state.local_wrappers in
+  let state = {state with local_wrappers= []} in
   let if_then_else e c1 c2 =
     let true_p = add_loc (Untyped.PConst Const.of_true) c1.at in
     let false_p = add_loc (Untyped.PConst Const.of_false) c2.at in
     Untyped.Match (e, [(true_p, c1); (false_p, c2)])
   in
-  let w, c =
+  let state', c =
     match t with
     | Sugared.Apply
         ( {it= Sugared.Apply ({it= Sugared.Var "&&"; at= loc1}, t1); at= loc2}
         , t2 ) ->
         let state', e1 = desugar_expression state t1 in
         let untyped_false loc = add_loc (Untyped.Const Const.of_false) loc in
-        let c1 = desugar_computation state' t2 in
+        let state'', c1 = desugar_computation state' t2 in
         let c2 = add_loc (Untyped.Value (untyped_false loc2)) loc2 in
-        (state'.local_wrappers, if_then_else e1 c1 c2)
+        (state'', if_then_else e1 c1 c2)
     | Sugared.Apply
         ( {it= Sugared.Apply ({it= Sugared.Var "||"; at= loc1}, t1); at= loc2}
         , t2 ) ->
         let state', e1 = desugar_expression state t1 in
         let untyped_true loc = add_loc (Untyped.Const Const.of_true) loc in
         let c1 = add_loc (Untyped.Value (untyped_true loc2)) loc2 in
-        let c2 = desugar_computation state t2 in
-        (state'.local_wrappers, if_then_else e1 c1 c2)
+        let state'', c2 = desugar_computation state' t2 in
+        (state'', if_then_else e1 c1 c2)
     | Sugared.Apply (t1, t2) ->
         let state', e1 = desugar_expression state t1 in
         let state'', e2 = desugar_expression state' t2 in
-        (state''.local_wrappers, Untyped.Apply (e1, e2))
+        (state'', Untyped.Apply (e1, e2))
     | Sugared.Effect (eff, t) ->
         let state', e = desugar_expression state t in
         let loc_eff = add_loc (Untyped.Effect eff) loc in
-        (state'.local_wrappers, Untyped.Apply (loc_eff, e))
+        (state', Untyped.Apply (loc_eff, e))
     | Sugared.Match (t, cs) -> match_constructor state loc t cs
     | Sugared.Handle (t1, t2) ->
         let state', e1 = desugar_expression state t1 in
-        let c2 = desugar_computation state' t2 in
-        (state'.local_wrappers, Untyped.Handle (e1, c2))
+        let state'', c2 = desugar_computation state' t2 in
+        (state'', Untyped.Handle (e1, c2))
     | Sugared.Conditional (t, t1, t2) ->
         let state', e = desugar_expression state t in
-        let c1 = desugar_computation state' t1 in
-        let c2 = desugar_computation state' t2 in
-        (state'.local_wrappers, if_then_else e c1 c2)
-    | Sugared.Check t -> ([], Untyped.Check (desugar_computation state t))
+        let state'', c1 = desugar_computation state' t1 in
+        let state''', c2 = desugar_computation state'' t2 in
+        (state''', if_then_else e c1 c2)
+    | Sugared.Check t ->
+        let state', c = desugar_computation state t in
+        (state', Untyped.Check c)
     | Sugared.Let (defs, t) ->
         let aux_desugar (p, c) (fold_state, defs, forbidden) =
           let check_forbidden (x, _) =
@@ -296,7 +300,7 @@ and desugar_computation state {it= t; at= loc} =
           in
           let state', p_vars, p' = desugar_pattern state p in
           Assoc.iter check_forbidden p_vars ;
-          let c' = desugar_computation state' c in
+          let _, c' = desugar_computation state' c in
           ( {state with context= Assoc.concat p_vars fold_state.context}
           , (p', c') :: defs
           , Assoc.keys_of p_vars @ forbidden )
@@ -304,8 +308,8 @@ and desugar_computation state {it= t; at= loc} =
         let state', defs', _ =
           List.fold_right aux_desugar defs (state, [], [])
         in
-        let c = desugar_computation state' t in
-        ([], Untyped.Let (defs', c))
+        let _, c = desugar_computation state' t in
+        (state, Untyped.Let (defs', c))
     | Sugared.LetRec (defs, t) ->
         let aux_desugar (x, t) (fold_state, ns, forbidden) =
           if List.mem x forbidden then
@@ -317,45 +321,47 @@ and desugar_computation state {it= t; at= loc} =
         in
         let state', ns, _ = List.fold_right aux_desugar defs (state, [], []) in
         let desugar_defs (p, (_, c)) defs =
-          let c = desugar_let_rec state' c in
+          let _, c = desugar_let_rec state' c in
           (p, c) :: defs
         in
         let defs' = List.fold_right desugar_defs (List.combine ns defs) [] in
-        let c = desugar_computation state' t in
-        ([], Untyped.LetRec (defs', c))
+        let _, c = desugar_computation state' t in
+        (state, Untyped.LetRec (defs', c))
     (* The remaining cases are expressions, which we list explicitly to catch any
        future changes. *)
     | Sugared.Var _ | Sugared.Const _ | Sugared.Annotated _ | Sugared.Tuple _
      | Sugared.Record _ |Sugared.Variant _ | Sugared.Lambda _
      | Sugared.Function _ |Sugared.Handler _ ->
         let state', e = desugar_expression state {it= t; at= loc} in
-        (state'.local_wrappers, Untyped.Value e)
+        (state', Untyped.Value e)
   in
-  match w with
-  | [] -> add_loc c loc
-  | _ :: _ -> add_loc (Untyped.Let (w, add_loc c loc)) loc
+  match state'.local_wrappers with
+  | [] -> ({state' with local_wrappers= outer_wrappers}, add_loc c loc)
+  | w -> ({state' with local_wrappers= outer_wrappers}, add_loc (Untyped.Let (w, add_loc c loc)) loc)
 
 and desugar_abstraction state (p, t) =
+  let old_context = state.context in
   let state', p_vars, p' = desugar_pattern state p in
-  let context' = Assoc.concat p_vars state'.context in
-  state', (p', desugar_computation {state' with context= context'} t)
+  let new_context = Assoc.concat p_vars state'.context in
+  let state'', c = desugar_computation {state' with context= new_context} t in
+  {state'' with context= old_context}, (p', c)
 
 and desugar_abstraction2 state (p1, p2, t) =
+  let old_context = state.context in
   let state', p_vars1, p1' = desugar_pattern state p1 in
   let state'', p_vars2, p2' = desugar_pattern state' p2 in
-  let context' = Assoc.concat (Assoc.concat p_vars1 p_vars2) state''.context in
-  let t' = desugar_computation {state'' with context= context'} t in
-  state'', (p1', p2', t')
+  let new_context = Assoc.concat (Assoc.concat p_vars1 p_vars2) state''.context in
+  let state''', t' = desugar_computation {state'' with context= new_context} t in
+  {state''' with context= old_context}, (p1', p2', t')
 
 and desugar_let_rec state {it= exp; at= loc} =
   match exp with
-  | Sugared.Lambda a ->
-      let _, a' = desugar_abstraction state a in a'
+  | Sugared.Lambda a -> desugar_abstraction state a
   | Sugared.Function cs ->
       let x = fresh_var (Some "$let_rec_function") in
-      let _, cs = fold_map desugar_abstraction state cs in
+      let state', cs = fold_map desugar_abstraction state cs in
       let new_match = Untyped.Match (add_loc (Untyped.Var x) loc, cs) in
-      (add_loc (Untyped.PVar x) loc, add_loc new_match loc)
+      state', (add_loc (Untyped.PVar x) loc, add_loc new_match loc)
   | _ ->
       Error.syntax ~loc
         "This kind of expression is not allowed in a recursive definition"
@@ -444,9 +450,9 @@ and match_constructor state loc t cs =
   let val_cs, eff_cs = separate_match_cases cs in
   match eff_cs with
   | [] ->
-      let state', val_cs = fold_map desugar_abstraction state val_cs in
-      let state'', e = desugar_expression state' t in
-      (state''.local_wrappers, Untyped.Match (e, val_cs))
+      let state', e = desugar_expression state t in
+      let state'', val_cs' = fold_map desugar_abstraction state' val_cs in
+      (state'', Untyped.Match (e, val_cs'))
   | _ ->
       let val_cs = List.map (fun cs -> Sugared.Val_match cs) val_cs in
       let x = "$id_par" in
@@ -459,10 +465,10 @@ and match_constructor state loc t cs =
         ; Sugared.value_clause= [h_value_clause]
         ; Sugared.finally_clause= [] }
       in
-      let state', h = desugar_handler loc state sugared_h in
-      let c = desugar_computation state' t in
+      let state', c = desugar_computation state t in
+      let state'', h = desugar_handler loc state' sugared_h in
       let loc_h = {it= Untyped.Handler h; at= loc} in
-      (state'.local_wrappers, Untyped.Handle (loc_h, c))
+      (state'', Untyped.Handle (loc_h, c))
 
 and separate_match_cases cs =
   let separator case (val_cs, eff_cs) =
@@ -480,7 +486,7 @@ let desugar_top_let state defs =
     in
     let state', p_vars, p' = desugar_pattern state p in
     Assoc.iter check_forbidden p_vars ;
-    let c' = desugar_computation state' c in
+    let _, c' = desugar_computation state' c in
     ( {state with context= Assoc.concat p_vars fold_state.context}
     , (p', c') :: defs
     , Assoc.keys_of p_vars @ forbidden )
@@ -499,7 +505,7 @@ let desugar_top_let_rec state defs =
   in
   let state', ns, _ = List.fold_right aux_desugar defs (state, [], []) in
   let desugar_defs (p, (_, c)) defs =
-    let c = desugar_let_rec state' c in
+    let _, c = desugar_let_rec state' c in
     (p, c) :: defs
   in
   let defs' = List.fold_right desugar_defs (List.combine ns defs) [] in
