@@ -35,22 +35,22 @@ let desugar_type type_sbst state =
     match t with
     | Sugared.TyApply (t, tys) ->
         let state', tys' = fold_map desugar_type state tys in
-        state', T.Apply (t, tys')
+        (state', T.Apply (t, tys'))
     | Sugared.TyParam t -> (
       match Assoc.lookup t type_sbst with
       | None -> Error.syntax ~loc "Unbound type parameter '%s" t
-      | Some p -> state, T.TyParam p )
+      | Some p -> (state, T.TyParam p) )
     | Sugared.TyArrow (t1, t2) ->
         let state', t1' = desugar_type state t1 in
         let state'', t2' = desugar_type state' t2 in
-        state'', T.Arrow (t1', t2')
+        (state'', T.Arrow (t1', t2'))
     | Sugared.TyTuple lst ->
         let state', lst' = fold_map desugar_type state lst in
-        state', T.Tuple lst'
+        (state', T.Tuple lst')
     | Sugared.TyHandler (t1, t2) ->
         let state', t1' = desugar_type state t1 in
         let state'', t2' = desugar_type state' t2 in
-        state'', T.Handler {T.value= t1'; T.finally= t2'}
+        (state'', T.Handler {T.value= t1'; T.finally= t2'})
   in
   desugar_type state
 
@@ -77,11 +77,13 @@ let desugar_tydef state params def =
     match def with
     | Sugared.TyRecord flds ->
         let state', flds' = Assoc.fold_map (desugar_type ty_sbst) state flds in
-        state', Tctx.Record flds'
+        (state', Tctx.Record flds')
     | Sugared.TySum lst ->
         let aux_desug st = function
           | None -> (st, None)
-          | Some t -> let st', t' = desugar_type ty_sbst st t in (st', Some t')
+          | Some t ->
+              let st', t' = desugar_type ty_sbst st t in
+              (st', Some t')
         in
         let constructors =
           let aux = function
@@ -92,12 +94,12 @@ let desugar_tydef state params def =
           Assoc.concat new_cons state.constructors
         in
         let state', lst' = Assoc.fold_map aux_desug state lst in
-        {state' with constructors}, Tctx.Sum lst'
+        ({state' with constructors}, Tctx.Sum lst')
     | Sugared.TyInline t ->
         let state', t' = desugar_type ty_sbst state t in
-        state', Tctx.Inline t'
+        (state', Tctx.Inline t')
   in
-  state', (Assoc.values_of ty_sbst, def')
+  (state', (Assoc.values_of ty_sbst, def'))
 
 (** [desugar_tydefs defs] desugars the simultaneous type definitions [defs]. *)
 let desugar_tydefs state sugared_defs =
@@ -116,7 +118,6 @@ let id_abstraction loc =
   ( add_loc (Untyped.PVar x) loc
   , add_loc (Untyped.Value (add_loc (Untyped.Var x) loc)) loc )
 
-
 let desugar_pattern state ?(initial_forbidden= []) p =
   let vars = ref Assoc.empty in
   let forbidden = ref initial_forbidden in
@@ -134,7 +135,7 @@ let desugar_pattern state ?(initial_forbidden= []) p =
       match p with
       | Sugared.PVar x ->
           let x = new_var x in
-          state, Untyped.PVar x
+          (state, Untyped.PVar x)
       | Sugared.PAnnotated (p, t) ->
           let bind bound_ps p =
             match Assoc.lookup p bound_ps with
@@ -147,7 +148,7 @@ let desugar_pattern state ?(initial_forbidden= []) p =
           let state' = {state with local_type_annotations= bound_params'} in
           let state'', p' = desugar_pattern state' p in
           let state''', t' = desugar_type bound_params' state'' t in
-          state''', Untyped.PAnnotated (p', t')
+          (state''', Untyped.PAnnotated (p', t'))
       | Sugared.PAs (p, x) ->
           let x = new_var x in
           let state', p' = desugar_pattern state p in
@@ -206,7 +207,7 @@ let rec desugar_expression state {it= t; at= loc} =
         let state' = {state with local_type_annotations= bound_params'} in
         let state'', w, e = desugar_expression state' t in
         let state''', ty' = desugar_type bound_params' state'' ty in
-        state''', w, Untyped.Annotated (e, ty')
+        (state''', w, Untyped.Annotated (e, ty'))
     | Sugared.Lambda a ->
         let state', a' = desugar_abstraction state a in
         (state', [], Untyped.Lambda a')
@@ -244,10 +245,10 @@ let rec desugar_expression state {it= t; at= loc} =
               "Constructor %s should be applied to an argument." lbl
         | false, Some _ ->
             Error.typing ~loc
-              "Constructor %s cannot be applied to an argument." lbl)
+              "Constructor %s cannot be applied to an argument." lbl )
       | Some (Effect eff) ->
-            Error.typing ~loc
-              "Constructor %s should not be an effect constructor." lbl )
+          Error.typing ~loc
+            "Constructor %s should not be an effect constructor." lbl )
     (* Terms that are desugared into computations. We list them explicitly in
        order to catch any future constructs. *)
     | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
@@ -255,7 +256,7 @@ let rec desugar_expression state {it= t; at= loc} =
      |Sugared.Effect _ ->
         let x = fresh_var (Some "$bind") in
         let state', c = desugar_computation state {it= t; at= loc} in
-        let w = [(add_loc (Untyped.PVar x) loc, c)]  in
+        let w = [(add_loc (Untyped.PVar x) loc, c)] in
         (state', w, Untyped.Var x)
   in
   (state', w, add_loc e loc)
@@ -343,8 +344,8 @@ and desugar_computation state {it= t; at= loc} =
     (* The remaining cases are expressions, which we list explicitly to catch any
        future changes. *)
     | Sugared.Var _ | Sugared.Const _ | Sugared.Annotated _ | Sugared.Tuple _
-     | Sugared.Record _ |Sugared.Variant _ | Sugared.Lambda _
-     | Sugared.Function _ |Sugared.Handler _ ->
+     |Sugared.Record _ | Sugared.Variant _ | Sugared.Lambda _
+     |Sugared.Function _ | Sugared.Handler _ ->
         let state', w, e = desugar_expression state {it= t; at= loc} in
         (state', w, Untyped.Value e)
   in
@@ -357,15 +358,19 @@ and desugar_abstraction state (p, t) =
   let state', p_vars, p' = desugar_pattern state p in
   let new_context = Assoc.concat p_vars state'.context in
   let state'', c = desugar_computation {state' with context= new_context} t in
-  {state'' with context= old_context}, (p', c)
+  ({state'' with context= old_context}, (p', c))
 
 and desugar_abstraction2 state (p1, p2, t) =
   let old_context = state.context in
   let state', p_vars1, p1' = desugar_pattern state p1 in
   let state'', p_vars2, p2' = desugar_pattern state' p2 in
-  let new_context = Assoc.concat (Assoc.concat p_vars1 p_vars2) state''.context in
-  let state''', t' = desugar_computation {state'' with context= new_context} t in
-  {state''' with context= old_context}, (p1', p2', t')
+  let new_context =
+    Assoc.concat (Assoc.concat p_vars1 p_vars2) state''.context
+  in
+  let state''', t' =
+    desugar_computation {state'' with context= new_context} t
+  in
+  ({state''' with context= old_context}, (p1', p2', t'))
 
 and desugar_let_rec state {it= exp; at= loc} =
   match exp with
@@ -374,7 +379,7 @@ and desugar_let_rec state {it= exp; at= loc} =
       let x = fresh_var (Some "$let_rec_function") in
       let state', cs = fold_map desugar_abstraction state cs in
       let new_match = Untyped.Match (add_loc (Untyped.Var x) loc, cs) in
-      state', (add_loc (Untyped.PVar x) loc, add_loc new_match loc)
+      (state', (add_loc (Untyped.PVar x) loc, add_loc new_match loc))
   | _ ->
       Error.syntax ~loc
         "This kind of expression is not allowed in a recursive definition"
@@ -528,7 +533,7 @@ let desugar_external state (x, t, f) =
   let n = fresh_var (Some x) in
   let ts = syntax_to_core_params (free_type_params t) in
   let state', t' = desugar_type ts state t in
-  ( {state with context= Assoc.update x n state.context}, (n, t', f) )
+  ({state with context= Assoc.update x n state.context}, (n, t', f))
 
 let desugar_def_effect state (eff, (ty1, ty2)) =
   let state', ty1' = desugar_type Assoc.empty state ty1 in
