@@ -4,6 +4,11 @@ let f (x: int) : int = x;;
 let f (x: bool) (y: int) (z: int -> bool -> int) : int = z y x in f true;;
 let f x : int*int = (x, x);;
 
+let g (x: 'a) = x;;
+let g (x: 'a) : 'a = 12;;
+let g (x: 'a) y : 'a = y;;
+let g x : 'a*'b = (x, x);;
+
 let f = function
   | (x: int) -> x
 ;;
@@ -11,7 +16,7 @@ let f = function
 (* variants *)
 type ('a,'b) cow = Small of 'a | Large of 'b;;
 
-let f (x : (int, int) cow) : int =
+let f (x : ('a, 'b) cow) : int =
   match x with
   | Small x -> x
   | Large x -> 100

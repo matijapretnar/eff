@@ -138,10 +138,18 @@ let desugar_pattern state ?(initial_forbidden= []) p =
           let x = new_var x in
           state, Untyped.PVar x
       | Sugared.PAnnotated (p, t) ->
-          let state', p' = desugar_pattern state p in
-          let ty_params = syntax_to_core_params (free_type_params t) in
-          let state'', t' = desugar_type ty_params state t in
-          state'', Untyped.PAnnotated (p', t')
+          let bind bound_ps p =
+            match Assoc.lookup p bound_ps with
+            | Some ty_param -> bound_ps
+            | None -> Assoc.update p (Type.fresh_ty_param ()) bound_ps
+          in
+          let free_params = free_type_params t in
+          let bound_params = state.local_type_annotations in
+          let bound_params' = List.fold_left bind bound_params free_params in
+          let state' = {state with local_type_annotations= bound_params'} in
+          let state'', p' = desugar_pattern state' p in
+          let state''', t' = desugar_type bound_params' state'' t in
+          state''', Untyped.PAnnotated (p', t')
       | Sugared.PAs (p, x) ->
           let x = new_var x in
           let state', p' = desugar_pattern state p in
@@ -189,10 +197,18 @@ let rec desugar_expression state {it= t; at= loc} =
       | None -> Error.typing ~loc "Unknown variable %s" x )
     | Sugared.Const k -> (state, Untyped.Const k)
     | Sugared.Annotated (t, ty) ->
-        let state', t' = desugar_expression state t in
-        let ty_params = syntax_to_core_params (free_type_params ty) in
-        let state'', ty' = desugar_type ty_params state' ty in
-        (state'', Untyped.Annotated (t', ty'))
+        let bind bound_ps p =
+          match Assoc.lookup p bound_ps with
+          | Some ty_param -> bound_ps
+          | None -> Assoc.update p (Type.fresh_ty_param ()) bound_ps
+        in
+        let free_params = free_type_params ty in
+        let bound_params = state.local_type_annotations in
+        let bound_params' = List.fold_left bind bound_params free_params in
+        let state' = {state with local_type_annotations= bound_params'} in
+        let state'', e = desugar_expression state' t in
+        let state''', ty' = desugar_type bound_params' state'' ty in
+        state''', Untyped.Annotated (e, ty')
     | Sugared.Lambda a ->
         let state', a' = desugar_abstraction state a in
         (state', Untyped.Lambda a')
