@@ -39,5 +39,5 @@ let x = ([] : int list);;
 
 effect E : int -> string
 
-let h : int => int = handler
+let h : int => 'a = handler
   | effect (E (x : int)) (k : string -> int) -> k ""
