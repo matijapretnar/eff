@@ -11,3 +11,4 @@ val f : (int, 'a) cow -> int = <fun>
 val f : ('a, int) cow -> int = <fun>
 val f : (int, int) bull -> int = <fun>
 val x : int list = []
+val h : int => int = <handler>

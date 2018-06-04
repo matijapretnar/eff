@@ -36,3 +36,8 @@ let f {small= (x: int); large= (y: int)} = x;;
 
 (* other *)
 let x = ([] : int list);;
+
+effect E : int -> string
+
+let h : int => int = handler
+  | effect (E (x : int)) (k : string -> int) -> k ""
