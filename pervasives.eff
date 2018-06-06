@@ -94,10 +94,6 @@ let (!=) x y = not (x = y)
 (* Lists *)
 type 'a option = None | Some of 'a
 
-let rec test x = function
-  | [] -> None
-  | (y,z)::lst -> if true then Some z else test x lst
-
 let rec assoc x = function
   | [] -> None
   | (y,z)::lst -> if x = y then Some z else assoc x lst
