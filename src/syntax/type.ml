@@ -114,7 +114,7 @@ let beautify2 ty1 ty2 =
   | _ -> assert false
 
 
-let print ((ps as poly), t) ppf =
+let print (ps, t) ppf =
   let rec ty ?max_level t ppf =
     let print ?at_level = Print.print ?max_level ?at_level ppf in
     match t with

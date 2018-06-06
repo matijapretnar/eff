@@ -59,6 +59,10 @@ let infer_pattern cstr pp =
         let t = if !disable_typing then T.universal_ty else T.fresh_ty () in
         vars := (x, t) :: !vars ;
         t
+    | Untyped.PAnnotated (p, t) ->
+        let p_t = infer p in
+        add_ty_constraint cstr loc p_t t;
+        t
     | Untyped.PAs (p, x) ->
         let t = infer p in
         vars := (x, t) :: !vars ;
@@ -201,6 +205,10 @@ and infer_expr ctx cstr {it= e; at= loc} =
   match e with
   | Untyped.Var x -> Ctx.lookup ~loc ctx x
   | Untyped.Const const -> ty_of_const const
+  | Untyped.Annotated (t, ty) ->
+      let ty' = infer_expr ctx cstr t in
+      add_ty_constraint cstr loc ty ty';
+      ty
   | Untyped.Tuple es -> T.Tuple (OldUtils.map (infer_expr ctx cstr) es)
   | Untyped.Record flds -> (
     match Assoc.pop flds with

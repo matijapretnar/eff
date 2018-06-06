@@ -18,6 +18,7 @@ exception PatternMatch of Location.t
 let rec extend_value p v env =
   match (p.it, v) with
   | Untyped.PVar x, v -> update x v env
+  | Untyped.PAnnotated (p, t), v -> extend_value p v env
   | Untyped.PAs (p, x), v ->
       let env = extend_value p v env in
       update x v env
@@ -111,6 +112,7 @@ and veval env e =
     | None ->
         Error.runtime "Name %t is not defined." (Untyped.Variable.print x) )
   | Untyped.Const c -> V.Const c
+  | Untyped.Annotated (t, ty) -> veval env t
   | Untyped.Tuple es -> V.Tuple (List.map (veval env) es)
   | Untyped.Record es -> V.Record (Assoc.map (fun e -> veval env e) es)
   | Untyped.Variant (lbl, None) -> V.Variant (lbl, None)

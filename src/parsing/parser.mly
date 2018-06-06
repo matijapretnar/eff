@@ -92,14 +92,6 @@ topdef_list:
   | def = topdef lst = topdef_list
      { def :: lst }
 
-commandline:
-  | def = topdef SEMISEMI
-    { def }
-  | t = topterm SEMISEMI
-    { t }
-  | dir = topdirective SEMISEMI
-    { dir }
-
 topterm: mark_position(plain_topterm) { $1 }
 plain_topterm:
   | t = term
@@ -249,6 +241,8 @@ plain_simple_term:
     { Record (Assoc.of_list flds) }
   | LPAREN RPAREN
     { Tuple [] }
+  | LPAREN t = term COLON ty = ty RPAREN
+    { Annotated (t, ty) }
   | LPAREN t = plain_term RPAREN
     { t }
   | BEGIN t = plain_term END
@@ -284,6 +278,8 @@ lambdas0(SEP):
     { t }
   | p = simple_pattern t = lambdas0(SEP)
     { {it= Lambda (p, t); at= Location.make $startpos $endpos} }
+  | COLON ty = ty SEP t = term
+    { {it= Annotated (t, ty); at= Location.make $startpos $endpos} }
 
 lambdas1(SEP):
   | p = simple_pattern t = lambdas0(SEP)
@@ -292,6 +288,8 @@ lambdas1(SEP):
 let_def:
   | p = pattern EQUAL t = term
     { (p, t) }
+  | p = pattern COLON ty= ty EQUAL t = term
+    { (p, {it= Annotated(t, ty); at= Location.make $startpos $endpos}) }
   | x = mark_position(ident) t = lambdas1(EQUAL)
     { ({it= PVar x.it; at= x.at}, t) }
 
@@ -362,6 +360,8 @@ plain_simple_pattern:
     }
   | LPAREN RPAREN
     { PTuple [] }
+  | LPAREN p = pattern COLON t = ty RPAREN
+    { PAnnotated (p, t) }
   | LPAREN p = pattern RPAREN
     { p.it }
 

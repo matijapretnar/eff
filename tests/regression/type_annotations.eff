@@ -1,0 +1,43 @@
+(* functions *)
+let f (x: int) = x;;
+let f (x: int) : int = x;;
+let f (x: bool) (y: int) (z: int -> bool -> int) : int = z y x in f true;;
+let f x : int*int = (x, x);;
+
+let g (x: 'a) = x;;
+let g (x: 'a) : 'a = 12;;
+let g (x: 'a) y : 'a = y;;
+let g x : 'a*'b = (x, x);;
+
+let f = function
+  | (x: int) -> x
+;;
+
+(* variants *)
+type ('a,'b) cow = Small of 'a | Large of 'b;;
+
+let f (x : ('a, 'b) cow) : int =
+  match x with
+  | Small x -> x
+  | Large x -> 100
+;;
+
+let f x : int =
+  match x with
+  | Small s -> 100
+  | Large (l :int) -> 100
+;;
+
+(* records *)
+type ('a,'b) bull = {small : 'a; large : 'b};;
+
+let f {small= (x: int); large= (y: int)} = x;;
+
+
+(* other *)
+let x = ([] : int list);;
+
+effect E : int -> string
+
+let h : int => 'a = handler
+  | effect (E (x : int)) (k : string -> int) -> k ""

@@ -105,10 +105,12 @@ let transparent ~loc ty_name =
 (* [ty_apply pos t lst] applies the type constructor [t] to the given list of arguments. *)
 let ty_apply ~loc ty_name lst =
   let xs, ty = lookup_tydef ~loc ty_name in
-  let combined = Assoc.of_list (List.combine xs lst) in
-  try subst_tydef combined ty with Invalid_argument "List.combine" ->
+  if List.length xs <> List.length lst then
     Error.typing ~loc "Type constructors %s should be applied to %d arguments"
       ty_name (List.length xs)
+  else
+    let combined = Assoc.of_list (List.combine xs lst) in
+    subst_tydef combined ty
 
 (** [check_well_formed ~loc ty] checks that type [ty] is well-formed. *)
 let check_well_formed ~loc tydef =
