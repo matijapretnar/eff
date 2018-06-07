@@ -201,31 +201,36 @@ let effect ~loc ty_par ty_res eff_name =
 
 let handler ~loc effect_clauses value_clause =
   (* make the required elements for the handler *)
-  let param = Type.fresh_dirty () in
   let ret = Type.fresh_dirty () in
   let (ret_ty, ret_drt) = ret in
-  let (param_ty, param_drt) = param in
   let cnstr = Unification.empty in
   let ctx = [] in
+
+  (* let param = Type.fresh_dirty () in
+  let (param_ty, param_drt) = param in *)
 
   (* add constraints for the value clause *)
   let (ctx_v, (ty_p_v, drty_r_v), cnstr_v) = value_clause in
   let cnstr = Unification.add_dirty_constraint ~loc drty_r_v ret cnstr in
-  let cnstr = Unification.add_ty_constraint ~loc param_ty ty_p_v cnstr in
+  (* let cnstr = Unification.add_ty_constraint ~loc param_ty ty_p_v cnstr in *)
   let cnstr = Unification.list_union [cnstr; cnstr_v] in
   let ctx = ctx_v @ ctx in
 
+  let param_drt = Type.fresh_dirt () in 
+  (* let param_drt = ret_drt in  *)
+  let param_ty = ty_p_v in
+
   (* add constraints for the effect clause *)
-  let handle_effect_clause ((_, (ty_par, ty_ret)), abstr) (ctx, cnstr) =
+  let handle_effect_clause ((eff, (ty_par, ty_ret)), abstr) (ctx, cnstr) =
     let (ctx_e, (ty_p_e, ty_k_e, drty_r_e), cnstr_e) = abstr in
     let ctx = ctx_e @ ctx in
-    (* let cnstr = Unification.add_ty_constraint ~loc ty_par ty_p_e cnstr in
-    let cnstr = Unification.add_ty_constraint ~loc (Type.Arrow (ty_ret, ret)) ty_k_e cnstr in
-    let cnstr = Unification.add_dirty_constraint ~loc drty_r_e ret cnstr in *)
     let cnstr = Unification.add_ty_constraint ~loc ty_par ty_p_e cnstr in
-    let cnstr = Unification.add_ty_constraint ~loc (Type.Arrow (ty_ret, drty_r_e)) ty_k_e cnstr in
+    let cnstr = Unification.add_ty_constraint ~loc (Type.Arrow (ty_ret, ret)) ty_k_e cnstr in
+    (* let cnstr = Unification.add_ty_constraint ~loc (Type.Arrow (ty_ret, drty_r_e)) ty_k_e cnstr in *)
     let cnstr = Unification.add_dirty_constraint ~loc drty_r_e ret cnstr in
     let cnstr = Unification.list_union [cnstr; cnstr_e] in
+
+    let cnstr = Unification.add_dirt_constraint ~loc param_drt (Type.Op eff) cnstr in
     (ctx, cnstr)
   in
   let (ctx, cnstr) = List.fold_right handle_effect_clause effect_clauses (ctx, cnstr) in
@@ -233,8 +238,8 @@ let handler ~loc effect_clauses value_clause =
   (* loop over all effect that can be handled, input and output contain these effects *)
   let effs = List.map (fun (eff, _) -> eff) (OldUtils.uniq (List.map fst effect_clauses)) in
   let cnstr = Unification.add_dirt_constraint ~loc param_drt ret_drt cnstr in
-  let param_drt = Type.add_ops_list effs param_drt in
-
+  (* let param_drt = Type.add_ops_list effs param_drt in *)
+  
   (* result *)
   let ty = Type.Handler ((param_ty, param_drt), ret) in
   solve_ty (ctx, ty, cnstr)
@@ -295,6 +300,15 @@ let letbinding ~loc c1 c2 =
 let dobinding ~loc c1 c2 =
   let ctx_c1, (ty1, drt1), cnstrs_c1 = c1 in
   let ctx_c2, (ty_p, (ty2, drt2)), cnstrs_c2 = c2 in
+
+  let drt = Type.fresh_dirt () in
+  let constraints = 
+    Unification.list_union [cnstrs_c1; cnstrs_c2]
+    |> Unification.add_dirt_constraint ~loc drt1 drt
+    |> Unification.add_dirt_constraint ~loc drt2 drt
+  in
+  solve_dirty (ctx_c1 @ ctx_c2, (ty2, drt), constraints)
+(*   
   begin match drt2 with
     | Type.DirtBottom -> 
       let constraints = Unification.list_union [cnstrs_c1; cnstrs_c2] in
@@ -302,10 +316,9 @@ let dobinding ~loc c1 c2 =
     | _ -> 
       let constraints = 
         Unification.list_union [cnstrs_c1; cnstrs_c2]
-        (* |> Unification.add_dirt_constraint ~loc drt1 drt2 *)
       in
       solve_dirty (ctx_c1 @ ctx_c2, (ty2, Type.add_ops drt1 drt2), constraints)
-  end
+  end *)
   
   
 (************************)
