@@ -3,19 +3,18 @@ open Types
 open Unification
 
 type state =
-  { var_types: (Typed.variable, Types.target_ty) OldUtils.assoc
+  { var_types: (Typed.variable, Types.target_ty) Assoc.t
   ; ty_params: Params.Ty.t list
   ; dirt_params: Params.Dirt.t list
   ; skel_params: Params.Skel.t list
-  ; ty_param_skeletons: (Params.Ty.t, Types.skeleton) OldUtils.assoc
-  ; ty_coer_types: (Params.TyCoercion.t, Types.ct_ty) OldUtils.assoc
-  ; dirt_coer_types: (Params.DirtCoercion.t, Types.ct_dirt) OldUtils.assoc }
+  ; ty_param_skeletons: (Params.Ty.t, Types.skeleton) Assoc.t
+  ; ty_coer_types: (Params.TyCoercion.t, Types.ct_ty) Assoc.t
+  ; dirt_coer_types: (Params.DirtCoercion.t, Types.ct_dirt) Assoc.t }
 
 let extend_ty_params st ty_var = {st with ty_params= ty_var :: st.ty_params}
 
 let extend_var_types st t_var tty =
-  {st with var_types= (t_var, tty) :: st.var_types}
-
+  {st with var_types= Assoc.update t_var tty st.var_types}
 
 let extend_dirt_params st dirt_var =
   {st with dirt_params= dirt_var :: st.dirt_params}
@@ -26,25 +25,25 @@ let extend_skel_params st sk_var =
 
 
 let extend_ty_coer_types st tcp ctty =
-  {st with ty_coer_types= (tcp, ctty) :: st.ty_coer_types}
+  {st with ty_coer_types= Assoc.update tcp ctty st.ty_coer_types}
 
 
 let extend_dirt_coer_types st tcp ctdrt =
-  {st with dirt_coer_types= (tcp, ctdrt) :: st.dirt_coer_types}
+  {st with dirt_coer_types= Assoc.update tcp ctdrt st.dirt_coer_types}
 
 
 let extend_ty_param_skeletons st tv sk =
-  {st with ty_param_skeletons= (tv, sk) :: st.ty_param_skeletons}
+  {st with ty_param_skeletons= Assoc.update tv sk st.ty_param_skeletons}
 
 
 let initial_state =
-  { var_types= []
+  { var_types= Assoc.empty
   ; ty_params= []
   ; dirt_params= []
   ; skel_params= []
-  ; ty_param_skeletons= []
-  ; ty_coer_types= []
-  ; dirt_coer_types= [] }
+  ; ty_param_skeletons= Assoc.empty
+  ; ty_coer_types= Assoc.empty
+  ; dirt_coer_types= Assoc.empty }
 
 
 let rec check_well_formed_skeleton st = function
@@ -70,7 +69,7 @@ let check_well_formed_dirt st = function
 let rec check_well_formed_ty st ty =
   match ty with
   | TyParam typ ->
-      let ty_var_list = List.map (fun (x, y) -> x) st.ty_param_skeletons in
+      let ty_var_list = Assoc.keys_of st.ty_param_skeletons in
       assert (List.mem typ ty_var_list)
   | Arrow (tty1, tty2) ->
       check_well_formed_ty st tty1 ;
@@ -142,7 +141,7 @@ let rec type_of_ty_coercion st ty_coer =
       in
       (Types.Apply (ty_name, tys1), Types.Apply (ty_name, tys2))
   | TyCoercionVar p -> (
-    match OldUtils.lookup p st.ty_coer_types with
+    match Assoc.lookup p st.ty_coer_types with
     | None -> assert false
     | Some pi -> pi )
   | SequenceTyCoer (ty_coer1, ty_coer2) ->
@@ -236,7 +235,7 @@ and type_of_dirt_coercion st dirt_coer =
   match dirt_coer with
   | ReflDirt d -> (d, d)
   | DirtCoercionVar p -> (
-    match OldUtils.lookup p st.dirt_coer_types with
+    match Assoc.lookup p st.dirt_coer_types with
     | None -> assert false
     | Some pi -> pi )
   | Empty d ->
@@ -283,7 +282,7 @@ let type_of_const = function
 let rec type_of_expression st e =
   match e with
   | Var v -> (
-    match OldUtils.lookup v st.var_types with
+    match Assoc.lookup v st.var_types with
     | Some ty -> ty
     | _ -> assert false )
   | Const const -> type_of_const const
@@ -434,7 +433,7 @@ and type_of_handler st h =
     assert (Types.dirty_types_are_equal type_cv ty_op) ;
     eff
   in
-  let handlers_ops = OldUtils.map mapper h.effect_clauses in
+  let handlers_ops = OldUtils.map mapper (Assoc.to_list h.effect_clauses) in
   let handlers_ops_set = Types.EffectSet.of_list handlers_ops in
   let t_cv, d_cv = type_cv in
   let input_dirt = Types.add_effects handlers_ops_set d_cv in

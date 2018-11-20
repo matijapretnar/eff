@@ -5,19 +5,19 @@ type state =
   { fuel: int ref
   ; tc_state: TypeChecker.state
   ; recursive_functions:
-      (variable, Types.target_ty * expression) OldUtils.assoc
-  ; knot_functions: (variable, expression * handler * variable) OldUtils.assoc
+      (variable, Types.target_ty * expression) Assoc.t
+  ; knot_functions: (variable, expression * handler * variable) Assoc.t
   }
 
 let inititial_state =
   { fuel= ref !Config.optimization_fuel
   ; tc_state= TypeChecker.initial_state
-  ; recursive_functions= []
-  ; knot_functions= [] }
+  ; recursive_functions= Assoc.empty
+  ; knot_functions= Assoc.empty }
 
 
 let extend_rec_fun st f ty e =
-  {st with recursive_functions= (f, (ty, e)) :: st.recursive_functions}
+  {st with recursive_functions= Assoc.update f (ty, e) st.recursive_functions}
 
 
 let extend_var_type st t_var ty =
@@ -49,18 +49,18 @@ let extend_ty_param_skeletons st omega ct =
 
 
 let refresh_expr e =
-  let res = Typed.refresh_expr [] e in
+  let res = Typed.refresh_expr Assoc.empty e in
   Print.debug "refresh_expr  : %t" (Typed.print_expression e) ;
   Print.debug "refresh_expr'd: %t" (Typed.print_expression res) ;
   res
 
 
-let refresh_abs a = Typed.refresh_abs [] a
+let refresh_abs a = Typed.refresh_abs Assoc.empty a
 
-let refresh_abs_with_ty a = Typed.refresh_abs_with_ty [] a
+let refresh_abs_with_ty a = Typed.refresh_abs_with_ty Assoc.empty a
 
 let refresh_abs2 a2 =
-  let res = Typed.refresh_abs2 [] a2 in
+  let res = Typed.refresh_abs2 Assoc.empty a2 in
   Print.debug "refresh_abs2  : %t" (Typed.print_abstraction2 a2) ;
   Print.debug "refresh_abs2'd: %t" (Typed.print_abstraction2 res) ;
   res
@@ -71,7 +71,7 @@ let is_relatively_pure st c h =
   | ty, {Types.effect_set= ops; Types.row= Types.EmptyRow} ->
       let handled_ops =
         EffectSet.of_list
-          (List.map (fun ((eff, _), _) -> eff) h.effect_clauses)
+          (List.map (fun ((eff, _), _) -> eff) (Assoc.to_list h.effect_clauses))
       in
       Print.debug "is_relatively_pure: %t:  %t vs %t"
         (Typed.print_computation c)
@@ -373,7 +373,7 @@ and optimize_sub_expr st e =
 and match_recursive_function st e =
   match e with
   | Var fvar -> (
-    match OldUtils.lookup fvar st.recursive_functions with
+    match Assoc.lookup fvar st.recursive_functions with
     | None -> None
     | Some (fty, fbody) -> Some (fvar, fty, fbody) )
   | ApplyTyExp (e, ty) -> match_recursive_function st e
@@ -389,7 +389,7 @@ and match_knot_function st e h = match_knot_function' st e e h
 and match_knot_function' st e e' h =
   match e with
   | Var fvar -> (
-    match OldUtils.lookup fvar st.knot_functions with
+    match Assoc.lookup fvar st.knot_functions with
     | None -> None
     | Some (ef, hf, fvar') ->
         if alphaeq_expr [] e' ef && alphaeq_handler [] hf h then Some fvar'
@@ -405,7 +405,7 @@ and match_knot_function' st e e' h =
 and optimize_sub_handler st {effect_clauses= ecs; value_clause= vc} =
   let vc' = optimize_abstraction_with_ty st vc in
   let _, dty = TypeChecker.type_of_abstraction_with_ty st.tc_state vc in
-  let ecs' = List.map (optimize_abstraction2 st dty) ecs in
+  let ecs' = Assoc.kmap (optimize_abstraction2 st dty) ecs in
   {effect_clauses= ecs'; value_clause= vc'}
 
 
@@ -599,7 +599,7 @@ and reduce_comp st c =
                  (extend_var_type st k_var k_ty)
                  (Handle (refresh_expr e1, k_c)))
           in
-          match OldUtils.lookup eff h.effect_clauses with
+          match Assoc.lookup eff h.effect_clauses with
           | Some eff_clause ->
               let p1, p2, c = refresh_abs2 eff_clause in
               (* Shouldn't we check for inlinability of p1 and p2 here? *)
@@ -629,8 +629,8 @@ and reduce_comp st c =
               let st' =
                 { st with
                   recursive_functions=
-                    OldUtils.remove_assoc fvar st.recursive_functions
-                ; knot_functions= (fvar, (e11, h, fvar')) :: st.knot_functions
+                    Assoc.remove fvar st.recursive_functions
+                ; knot_functions= Assoc.update fvar (e11, h, fvar') st.knot_functions
                 }
               in
               let st'' = extend_var_type st' fvar' fty' in
@@ -641,7 +641,7 @@ and reduce_comp st c =
                         (Handle
                            ( e1
                            , Apply
-                               ( Typed.subst_expr [(fvar, refresh_expr fbody)]
+                               ( Typed.subst_expr (Assoc.of_list [(fvar, refresh_expr fbody)])
                                    e11
                                , Var xvar ) ))))
               in

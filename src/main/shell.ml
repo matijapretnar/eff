@@ -21,7 +21,7 @@ let initial_state =
   { desugarer_state= Desugarer.initial_state
   ; type_system_state= TypeSystem.initial_state
   ; effect_system_state= EffectSystem.initial_state
-  ; type_checker= TypeChecker.initial_state
+  ; type_checker_state= TypeChecker.initial_state
   ; runtime_state= Runtime.initial_state }
 
 
@@ -33,17 +33,17 @@ let rec exec_cmd ppf st {CoreUtils.it= cmd; CoreUtils.at= loc} =
   match cmd with
   | Commands.Term t ->
       let c = Desugarer.desugar_computation st.desugarer_state t in
-      let type_system_state', ty =
+      let type_system_state', ty_sch =
         TypeSystem.infer_top_comp st.type_system_state c
       in
       let c', effect_system_state' =
-        ExplicitInfer.type_toplevel ~loc:c.CoreSyntax.location
+        ExplicitInfer.type_toplevel ~loc:c.CoreUtils.at
           st.effect_system_state c
       in
-      let ty, drt = TypeChecker.type_of_computation st.type_checker_state ct in
+      let ty, drt = TypeChecker.type_of_computation st.type_checker_state c' in
       let v = Runtime.run st.runtime_state c in
-      Format.fprintf ppf "@[- : %t / %t ! %t = %t@]@."
-        (Type.print_beautiful ty) (Types.print_target_ty ty)
+      Format.fprintf ppf "@[- : %t ! %t = %t@]@."
+        (Types.print_target_ty ty)
         (Types.print_target_dirt drt)
         (Value.print_value v) ;
       { st with
@@ -51,15 +51,15 @@ let rec exec_cmd ppf st {CoreUtils.it= cmd; CoreUtils.at= loc} =
       ; effect_system_state= effect_system_state' }
   | Commands.TypeOf t ->
       let c = Desugarer.desugar_computation st.desugarer_state t in
-      let type_system_state', ty =
+      let type_system_state', ty_sch =
         TypeSystem.infer_top_comp st.type_system_state c
       in
       let c', effect_system_state' =
-        ExplicitInfer.type_toplevel ~loc:c.CoreSyntax.location
+        ExplicitInfer.type_toplevel ~loc:c.CoreUtils.at
           st.effect_system_state c
       in
-      let ty, drt = TypeChecker.type_of_computation st.type_checker_state ct in
-      Format.fprintf ppf "@[- : %t / %t ! %t@]@." (Type.print_beautiful ty)
+      let ty, drt = TypeChecker.type_of_computation st.type_checker_state c' in
+      Format.fprintf ppf "@[- : %t ! %t@]@."
         (Types.print_target_ty ty)
         (Types.print_target_dirt drt) ;
       { st with
@@ -111,9 +111,10 @@ let rec exec_cmd ppf st {CoreUtils.it= cmd; CoreUtils.at= loc} =
                 (Type.print_beautiful tysch)
                 (Value.print_value v) )
         vars ;
-      { desugarer_state= desugarer_state'
+      { st with 
+        desugarer_state= desugarer_state'
       ; type_system_state= type_system_state'
-      ; runtime_state= runtime_state' }
+      ; runtime_state= runtime_state'}
   | Commands.TopLetRec defs ->
       let desugarer_state', defs' =
         Desugarer.desugar_top_let_rec st.desugarer_state defs
@@ -129,7 +130,8 @@ let rec exec_cmd ppf st {CoreUtils.it= cmd; CoreUtils.at= loc} =
             (UntypedSyntax.Variable.print x)
             (Type.print_beautiful tysch) )
         vars ;
-      { desugarer_state= desugarer_state'
+      { st with
+        desugarer_state= desugarer_state'
       ; type_system_state= type_system_state'
       ; runtime_state= runtime_state' }
   | Commands.External ext_def -> (
@@ -138,7 +140,8 @@ let rec exec_cmd ppf st {CoreUtils.it= cmd; CoreUtils.at= loc} =
       in
       match Assoc.lookup f External.values with
       | Some v ->
-          { desugarer_state= desugarer_state'
+          { st with 
+            desugarer_state= desugarer_state'
           ; type_system_state=
               SimpleCtx.extend st.type_system_state x (Type.free_params ty, ty)
           ; runtime_state= Runtime.update x v st.runtime_state }
@@ -188,7 +191,7 @@ let compile_file ppf filename st =
   close_in header_channel ;
   Format.fprintf out_ppf "%s\n;;\n@." header ;
   let compile_cmd st cmd =
-    let loc = cmd.CoreSyntax.location in
+    let loc = cmd.CoreUtils.at in
     match cmd.CoreSyntax.term with
     | CoreSyntax.Computation c ->
         Print.debug "Compiling: %t" (CoreSyntax.print_computation c) ;
