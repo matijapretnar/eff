@@ -138,10 +138,6 @@ let rec place x qs =
   let y = choose (available x qs) in
   place (x + 1) ((x, y) :: qs)
 
-let backtrack = handler
-| effect Decide k ->
-    handle continue k true with
-    | effect Fail _ -> k false
 ;;
 
 with backtrack handle

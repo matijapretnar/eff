@@ -1,14 +1,33 @@
 (** Abstract syntax of eff terms, types, and toplevel commands. *)
+open CoreUtils
 
 (** Terms *)
 type variable = string
 
 type effect = OldUtils.effect
 
-type pattern = plain_pattern CoreUtils.located
+type ty = plain_ty located
+
+and plain_ty =
+  | TyApply of OldUtils.tyname * ty list
+      (** [(ty1, ty2, ..., tyn) type_name] *)
+  | TyParam of OldUtils.typaram  (** ['a] *)
+  | TyArrow of ty * ty  (** [ty1 -> ty2] *)
+  | TyTuple of ty list  (** [ty1 * ty2 * ... * tyn] *)
+  | TyHandler of ty * ty  (** [ty1 => ty2] *)
+
+type tydef =
+  | TyRecord of (OldUtils.field, ty) Assoc.t
+      (** [{ field1 : ty1; field2 : ty2; ...; fieldn : tyn }] *)
+  | TySum of (OldUtils.label, ty option) Assoc.t
+      (** [Label1 of ty1 | Label2 of ty2 | ... | Labeln of tyn | Label' | Label''] *)
+  | TyInline of ty  (** [ty] *)
+
+type pattern = plain_pattern located
 
 and plain_pattern =
   | PVar of variable
+  | PAnnotated of pattern * ty
   | PAs of pattern * variable
   | PTuple of pattern list
   | PRecord of (OldUtils.field, pattern) Assoc.t
@@ -19,11 +38,12 @@ and plain_pattern =
 (* Changing the datatype [plain_pattern] will break [specialize_vector] in [exhaust.ml] because
    of wildcard matches there. *)
 
-type term = plain_term CoreUtils.located
+type term = plain_term located
 
 and plain_term =
   | Var of variable  (** variables *)
   | Const of Const.t  (** integers, strings, booleans, and floats *)
+  | Annotated of term * ty
   | Tuple of term list  (** [(t1, t2, ..., tn)] *)
   | Record of (OldUtils.field, term) Assoc.t
       (** [{field1 = t1; field2 = t2; ...; fieldn = tn}] *)
@@ -61,20 +81,3 @@ and abstraction2 = (pattern * pattern * term)
 type dirt = DirtParam of OldUtils.dirtparam
 
 type region = RegionParam of OldUtils.regionparam
-
-type ty = plain_ty CoreUtils.located
-
-and plain_ty =
-  | TyApply of OldUtils.tyname * ty list
-      (** [(ty1, ty2, ..., tyn) type_name] *)
-  | TyParam of OldUtils.typaram  (** ['a] *)
-  | TyArrow of ty * ty  (** [ty1 -> ty2] *)
-  | TyTuple of ty list  (** [ty1 * ty2 * ... * tyn] *)
-  | TyHandler of ty * ty  (** [ty1 => ty2] *)
-
-type tydef =
-  | TyRecord of (OldUtils.field, ty) Assoc.t
-      (** [{ field1 : ty1; field2 : ty2; ...; fieldn : tyn }] *)
-  | TySum of (OldUtils.label, ty option) Assoc.t
-      (** [Label1 of ty1 | Label2 of ty2 | ... | Labeln of tyn | Label' | Label''] *)
-  | TyInline of ty  (** [ty] *)

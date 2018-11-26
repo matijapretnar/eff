@@ -53,8 +53,8 @@ and type_plain_pattern = function
   | Untyped.PTuple ps -> Typed.PTuple (List.map type_pattern ps)
   | Untyped.PRecord flds -> begin
       match Assoc.pop flds with
-      | None, _ -> assert false
-      | Some (fld, _), _ -> failwith __LOC__
+      | None -> assert false
+      | Some ((fld, _), _) -> failwith __LOC__
     end
   | Untyped.PVariant (lbl, p) -> failwith __LOC__
 

@@ -14,7 +14,7 @@ let rec find_if p = function
   | hd :: tl -> if p hd then Some hd else find_if p tl
 
 
-let pop = function [] -> (None, []) | hd :: tl -> (Some hd, tl)
+let pop = function [] -> None | hd :: tl -> Some (hd, tl)
 
 (* Changing the list. *)
 let update k v assoc = (k, v) :: assoc
@@ -61,7 +61,21 @@ let fold_left = CoreUtils.fold
 
 let fold_right = List.fold_right
 
-let fold_map = CoreUtils.fold_map
+let fold_map f st assoc =
+  let aux (st, reversed_assoc) (k, v) =
+    let st', v' = f st v in
+    (st', (k, v') :: reversed_assoc)
+  in
+  let st', reversed_assoc = fold_left aux (st, []) assoc in
+  (st', List.rev reversed_assoc)
+
+let kfold_map f st xs =
+  let aux (st, reversed_ys) x =
+    let st', y = f st x in
+    (st', y :: reversed_ys)
+  in
+  let st', reversed_ys = fold_left aux (st, []) xs in
+  (st', List.rev reversed_ys)
 
 (* Other useful stuff. *)
 let length assoc = List.length assoc

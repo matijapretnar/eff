@@ -1,7 +1,9 @@
+open CoreUtils
+
 module Sugared = SugaredSyntax
 
 (* Toplevel commands (the first four do not need to be separated by [;;]) *)
-type t = plain_command CoreUtils.located
+type t = plain_command located
 
 and plain_command =
   | Tydef of (OldUtils.tyname, OldUtils.typaram list * Sugared.tydef) Assoc.t

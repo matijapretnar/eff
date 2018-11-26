@@ -12,7 +12,7 @@ val find_if : ('k * 'v -> bool) -> ('k, 'v) t -> ('k * 'v) option
 (** [find_if p assoc] returns the first [(k, v)] for which [p] returns [true]
     if it exists. *)
 
-val pop : ('k, 'v) t -> ('k * 'v) option * ('k, 'v) t
+val pop : ('k, 'v) t -> (('k * 'v) * ('k, 'v) t) option
 (** [pop assoc] returns the first element and the rest of [assoc]. *)
 
 val update : 'k -> 'v -> ('k, 'v) t -> ('k, 'v) t
@@ -47,9 +47,15 @@ val fold_right : ('k * 'v -> 'acc -> 'acc) -> ('k, 'v) t -> 'acc -> 'acc
 (** [fold_right f assoc acc] folds [f] over [assoc] from right to left. *)
 
 val fold_map :
+  ('acc -> 'v -> 'acc * 'w) -> 'acc -> ('k, 'v) t -> 'acc * ('k, 'w) t
+(** [fold_map f state assoc] folds from left to right ON VALUES and also maps
+    at the same time. *)
+
+val kfold_map :
   ('acc -> 'k * 'v -> 'acc * ('h * 'w)) -> 'acc -> ('k, 'v) t
   -> 'acc * ('h, 'w) t
-(** [fold_map f state assoc] folds from left to right and also maps at the same time. *)
+(** [kfold_map f state assoc] folds from left to right and also maps at the same time. *)
+
 
 val length : ('k, 'v) t -> int
 (** [length assoc] returns the length of the association list. *)

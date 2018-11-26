@@ -17,16 +17,13 @@ let initial : tyctx =
     ; ("float", ([], Inline T.float_ty))
     ; ( "list"
       , let a = Type.fresh_ty_param () in
-        ( [a]
-        , Sum
-            (Assoc.of_list
-               [ (OldUtils.nil, None)
-               ; ( OldUtils.cons
-                 , Some
-                     (T.Tuple [T.TyParam a; T.Apply ("list", [T.TyParam a])])
-                 ) ]) ) )
+        let list_nil = (OldUtils.nil, None) in
+        let list_cons =
+          ( OldUtils.cons
+          , Some (T.Tuple [T.TyParam a; T.Apply ("list", [T.TyParam a])]) )
+        in
+        ([a], Sum (Assoc.of_list [list_nil; list_cons])) )
     ; ("empty", ([], Sum Assoc.empty)) ]
-
 
 let global = ref initial
 
@@ -39,18 +36,15 @@ let subst_tydef sbst =
     | Sum tys -> Sum (Assoc.map (OldUtils.option_map subst) tys)
     | Inline ty -> Inline (subst ty)
 
-
 let lookup_tydef ~loc ty_name =
   match Assoc.lookup ty_name !global with
   | None -> Error.typing ~loc "Unknown type %s" ty_name
   | Some (params, tydef) -> (params, tydef)
 
-
 let fresh_tydef ~loc ty_name =
   let params, tydef = lookup_tydef ~loc ty_name in
   let params', sbst = Type.refreshing_subst params in
   (params', subst_tydef sbst tydef)
-
 
 (** [find_variant lbl] returns the information about the variant type that defines the
     label [lbl]. *)
@@ -65,7 +59,6 @@ let find_variant lbl =
   match Assoc.find_if (fun x -> construct x <> None) !global with
   | Some x -> construct x
   | None -> None
-
 
 (** [find_field fld] returns the information about the record type that defines the field
     [fld]. *)
@@ -82,7 +75,6 @@ let find_field fld =
   | Some x -> construct x
   | None -> None
 
-
 let apply_to_params t ps = Type.Apply (t, List.map (fun p -> Type.TyParam p) ps)
 
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
@@ -96,7 +88,6 @@ let infer_variant lbl =
       let u = OldUtils.option_map (T.subst_ty fresh_subst) u in
       Some (apply_to_params ty_name ps', u)
 
-
 (** [infer_field fld] finds a record type that defines the field [fld] and returns it with
     refreshed type parameters and additional information needed for type inference. *)
 let infer_field fld =
@@ -107,20 +98,19 @@ let infer_field fld =
       let us' = Assoc.map (T.subst_ty fresh_subst) us in
       Some (apply_to_params ty_name ps', (ty_name, us'))
 
-
 let transparent ~loc ty_name =
   let _, ty = lookup_tydef ~loc ty_name in
   match ty with Sum _ | Record _ -> false | Inline _ -> true
 
-
 (* [ty_apply pos t lst] applies the type constructor [t] to the given list of arguments. *)
 let ty_apply ~loc ty_name lst =
   let xs, ty = lookup_tydef ~loc ty_name in
-  let combined = Assoc.of_list (List.combine xs lst) in
-  try subst_tydef combined ty with Invalid_argument "List.combine" ->
+  if List.length xs <> List.length lst then
     Error.typing ~loc "Type constructors %s should be applied to %d arguments"
       ty_name (List.length xs)
-
+  else
+    let combined = Assoc.of_list (List.combine xs lst) in
+    subst_tydef combined ty
 
 (** [check_well_formed ~loc ty] checks that type [ty] is well-formed. *)
 let check_well_formed ~loc tydef =
@@ -138,17 +128,15 @@ let check_well_formed ~loc tydef =
   in
   match tydef with
   | Record fields ->
-      if not (OldUtils.injective (fun x -> x) (Assoc.keys_of fields)) then
+      if not (OldUtils.no_duplicates (Assoc.keys_of fields)) then
         Error.typing ~loc "Field labels in a record type must be distinct" ;
       Assoc.iter (fun (_, ty) -> check ty) fields
   | Sum constructors ->
-      if not (OldUtils.injective (fun x -> x) (Assoc.keys_of constructors))
-      then Error.typing ~loc "Constructors of a sum type must be distinct" ;
-      Assoc.iter
-        (function _, None -> () | _, Some ty -> check ty)
-        constructors
+      if not (OldUtils.no_duplicates (Assoc.keys_of constructors)) then
+        Error.typing ~loc "Constructors of a sum type must be distinct" ;
+      let checker = function _, None -> () | _, Some ty -> check ty in
+      Assoc.iter checker constructors
   | Inline ty -> check ty
-
 
 (** [check_well_formed ~loc ty] checks that the definition of type [ty] is non-cyclic. *)
 let check_noncyclic ~loc =
@@ -169,7 +157,6 @@ let check_noncyclic ~loc =
   in
   check_tydef []
 
-
 (** [check_shadowing ~loc ty] checks that the definition of type [ty] does
     not shadow any field labels, constructors, or operations.
 
@@ -178,34 +165,32 @@ let check_noncyclic ~loc =
 *)
 let check_shadowing ~loc = function
   | Record lst ->
-      Assoc.iter
-        (fun (f, _) ->
-          match find_field f with
-          | Some (u, _, _) ->
-              Error.typing ~loc
-                "Record field label %s is already used in type %s" f u
-          | None -> () )
-        lst
+      let shadow_check_fld (f, _) =
+        match find_field f with
+        | Some (u, _, _) ->
+            Error.typing ~loc
+              "Record field label %s is already used in type %s" f u
+        | None -> ()
+      in
+      Assoc.iter shadow_check_fld lst
   | Sum lst ->
-      Assoc.iter
-        (fun (lbl, _) ->
-          match find_variant lbl with
-          | Some (u, _, _, _) ->
-              Error.typing ~loc "Constructor %s is already used in type %s" lbl
-                u
-          | None -> () )
-        lst
+      let shadow_check_sum (lbl, _) =
+        match find_variant lbl with
+        | Some (u, _, _, _) ->
+            Error.typing ~loc "Constructor %s is already used in type %s" lbl u
+        | None -> ()
+      in
+      Assoc.iter shadow_check_sum lst
   | Inline _ -> ()
-
 
 (** [extend_tydefs ~loc tydefs] checks that the simulatenous type definitions [tydefs] are
     well-formed and returns the extended context. *)
 let extend_tydefs ~loc tydefs =
   (* We wish we wrote this in eff, where we could have transactional memory. *)
   let global_orig = !global in
-  let extend_tydef ((_, (_, ty)) as tydef) =
+  let extend_tydef (name, (params, ty)) =
     check_shadowing ~loc ty ;
-    global := Assoc.update (fst tydef) (snd tydef) !global
+    global := Assoc.update name (params, ty) !global
   in
   try
     Assoc.iter extend_tydef tydefs ;

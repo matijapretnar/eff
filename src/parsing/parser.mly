@@ -1,9 +1,6 @@
 %{
   open SugaredSyntax
-
-  let add_loc t loc = {CoreUtils.it= t; CoreUtils.at= loc}
-  let loc_of loc_t = loc_t.CoreUtils.at
-  let term_of loc_t = loc_t.CoreUtils.it
+  open CoreUtils
 
   type handler_clause =
     | EffectClause of OldUtils.effect * abstraction2
@@ -14,7 +11,7 @@
     let (eff_cs, val_cs, fin_cs) =
       List.fold_left
         (fun (eff_cs, val_cs, fin_cs) clause ->
-          match term_of clause with
+          match clause.it with
           | EffectClause (eff, a2) ->  ((eff, a2) :: eff_cs, val_cs, fin_cs)
           | ReturnClause a -> (eff_cs, a :: val_cs, fin_cs)
           | FinallyClause a -> (eff_cs, val_cs, a :: fin_cs))
@@ -95,14 +92,6 @@ topdef_list:
   | def = topdef lst = topdef_list
      { def :: lst }
 
-commandline:
-  | def = topdef SEMISEMI
-    { def }
-  | t = topterm SEMISEMI
-    { t }
-  | dir = topdirective SEMISEMI
-    { dir }
-
 topterm: mark_position(plain_topterm) { $1 }
 plain_topterm:
   | t = term
@@ -123,7 +112,7 @@ plain_topdef:
     { Commands.DefEffect (eff, (t1, t2))}
   | EFFECT eff = effect COLON t = prod_ty
     { let unit_loc = Location.make $startpos(t) $endpos(t) in
-      Commands.DefEffect (eff, (add_loc (TyTuple []) unit_loc, t))}
+      Commands.DefEffect (eff, ({it= TyTuple []; at= unit_loc}, t))}
 
 (* Toplevel directive If you change these, make sure to update lname as well,
    or a directive might become a reserved word. *)
@@ -149,11 +138,11 @@ plain_term:
   | FUNCTION cases = cases(function_case) (* END *)
     { Function cases }
   | HANDLER h = handler (* END *)
-    { term_of h }
+    { h.it }
   | HANDLE t = term WITH h = handler (* END *)
     { Handle (h, t) }
   | FUN t = lambdas1(ARROW)
-    { term_of t }
+    { t.it }
   | LET defs = separated_nonempty_list(AND, let_def) IN t = term
     { Let (defs, t) }
   | LET REC defs = separated_nonempty_list(AND, let_rec_def) IN t = term
@@ -161,7 +150,7 @@ plain_term:
   | WITH h = term HANDLE t = term
     { Handle (h, t) }
   | t1 = term SEMI t2 = term
-    { Let ([add_loc PNonbinding (loc_of t1), t1], t2) }
+    { Let ([{it= PNonbinding; at= t1.at}, t1], t2) }
   | IF t_cond = comma_term THEN t_true = term ELSE t_false = term
     { Conditional (t_cond, t_true, t_false) }
   | t = plain_comma_term
@@ -179,12 +168,12 @@ plain_binop_term:
   | t1 = binop_term op = binop t2 = binop_term
     {
       let op_loc = Location.make $startpos(op) $endpos(op) in
-      let partial = Apply (add_loc (Var op) op_loc, t1) in
+      let partial = Apply ({it= Var op; at= op_loc}, t1) in
       let partial_pos = Location.make $startpos(t1) $endpos(op) in
-      Apply (add_loc partial partial_pos, t2)
+      Apply ({it= partial; at= partial_pos}, t2)
     }
   | t1 = binop_term CONS t2 = binop_term
-    { let tuple = add_loc (Tuple [t1; t2]) (Location.make $startpos $endpos) in
+    { let tuple = {it= Tuple [t1; t2]; at= Location.make $startpos $endpos} in
       Variant (OldUtils.cons, Some tuple) }
   | t = plain_uminus_term
     { t }
@@ -193,10 +182,10 @@ uminus_term: mark_position(plain_uminus_term) { $1 }
 plain_uminus_term:
   | MINUS t = uminus_term
     { let op_loc = Location.make $startpos($1) $endpos($1) in
-      Apply (add_loc (Var "~-") op_loc, t) }
+      Apply ({it= Var "~-"; at= op_loc}, t) }
   | MINUSDOT t = uminus_term
     { let op_loc = Location.make $startpos($1) $endpos($1) in
-      Apply (add_loc (Var "~-.") op_loc, t) }
+      Apply ({it= Var "~-."; at= op_loc}, t) }
   | t = plain_app_term
     { t }
 
@@ -205,12 +194,12 @@ plain_app_term:
     { Check t }
   | t = prefix_term ts = prefix_term+
     {
-      match term_of t, ts with
+      match t.it, ts with
       | Variant (lbl, None), [t] -> Variant (lbl, Some t)
-      | Variant (lbl, _), _ -> Error.syntax ~loc:(loc_of t) "Label %s applied to too many argument" lbl
+      | Variant (lbl, _), _ -> Error.syntax ~loc:(t.at) "Label %s applied to too many argument" lbl
       | _, _ ->
-        let apply t1 t2 = add_loc (Apply(t1, t2)) (Location.union [loc_of t1; loc_of t2]) in
-        term_of (List.fold_left apply t ts)
+        let apply t1 t2 = {it= Apply(t1, t2); at= Location.union [t1.at; t2.at]} in
+        (List.fold_left apply t ts).it
     }
   | t = plain_prefix_term
     { t }
@@ -220,7 +209,7 @@ plain_prefix_term:
   | op = prefixop t = simple_term
     {
       let op_loc = Location.make $startpos(op) $endpos(op) in
-      Apply (add_loc (Var op) op_loc, t)
+      Apply ({it= Var op; at= op_loc}, t)
     }
   | t = plain_simple_term
     { t }
@@ -237,21 +226,23 @@ plain_simple_term:
     { Effect (eff, t)}
   | PERFORM eff = effect
     { let unit_loc = Location.make $startpos(eff) $endpos(eff) in
-      Effect (eff, add_loc (Tuple []) unit_loc)}
+      Effect (eff, {it= Tuple []; at= unit_loc})}
   | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
-      let nil = add_loc (Variant (OldUtils.nil, None)) (Location.make $endpos $endpos) in
+      let nil = {it= Variant (OldUtils.nil, None); at= Location.make $endpos $endpos} in
       let cons t ts =
-        let loc = Location.union [loc_of t; loc_of ts] in
-        let tuple = add_loc (Tuple [t; ts]) loc in
-        add_loc (Variant (OldUtils.cons, Some tuple)) loc
+        let loc = Location.union [t.at; ts.at] in
+        let tuple = {it= Tuple [t; ts];at= loc} in
+        {it= Variant (OldUtils.cons, Some tuple); at= loc}
       in
-      term_of (List.fold_right cons ts nil)
+      (List.fold_right cons ts nil).it
     }
   | LBRACE flds = separated_nonempty_list(SEMI, separated_pair(field, EQUAL, comma_term)) RBRACE
     { Record (Assoc.of_list flds) }
   | LPAREN RPAREN
     { Tuple [] }
+  | LPAREN t = term COLON ty = ty RPAREN
+    { Annotated (t, ty) }
   | LPAREN t = plain_term RPAREN
     { t }
   | BEGIN t = plain_term END
@@ -280,23 +271,27 @@ match_case:
     { Eff_match (eff, (p, k, t)) }
   | EFFECT eff = effect k = simple_pattern ARROW t = term
     { let unit_loc = Location.make $startpos(eff) $endpos(eff) in
-      Eff_match (eff, (add_loc (PTuple []) unit_loc, k, t)) }
+      Eff_match (eff, ({it= PTuple []; at= unit_loc}, k, t)) }
 
 lambdas0(SEP):
   | SEP t = term
     { t }
   | p = simple_pattern t = lambdas0(SEP)
-    { add_loc (Lambda (p, t)) (Location.make $startpos $endpos) }
+    { {it= Lambda (p, t); at= Location.make $startpos $endpos} }
+  | COLON ty = ty SEP t = term
+    { {it= Annotated (t, ty); at= Location.make $startpos $endpos} }
 
 lambdas1(SEP):
   | p = simple_pattern t = lambdas0(SEP)
-    { add_loc (Lambda (p, t)) (Location.make $startpos $endpos) }
+    { {it= Lambda (p, t); at= Location.make $startpos $endpos} }
 
 let_def:
   | p = pattern EQUAL t = term
     { (p, t) }
+  | p = pattern COLON ty= ty EQUAL t = term
+    { (p, {it= Annotated(t, ty); at= Location.make $startpos $endpos}) }
   | x = mark_position(ident) t = lambdas1(EQUAL)
-    { (add_loc (PVar (term_of x)) (loc_of x), t) }
+    { ({it= PVar x.it; at= x.at}, t) }
 
 let_rec_def:
   | f = ident t = lambdas0(EQUAL)
@@ -308,7 +303,7 @@ plain_handler_clause:
     { EffectClause (eff, (p, k, t)) }
   | EFFECT eff = effect  k = simple_pattern ARROW t = term
     { let unit_loc = Location.make $startpos(eff) $endpos(eff) in
-      EffectClause (eff, (add_loc (PTuple []) unit_loc, k, t)) }
+      EffectClause (eff, ({it= PTuple []; at= unit_loc}, k, t)) }
   | c = function_case
     { ReturnClause c }
   | FINALLY c = function_case
@@ -317,21 +312,21 @@ plain_handler_clause:
 pattern: mark_position(plain_pattern) { $1 }
 plain_pattern:
   | p = comma_pattern
-    { term_of p }
+    { p.it }
   | p = pattern AS x = lname
     { PAs (p, x) }
 
 comma_pattern: mark_position(plain_comma_pattern) { $1 }
 plain_comma_pattern:
   | ps = separated_nonempty_list(COMMA, cons_pattern)
-    { match ps with [p] -> term_of p | ps -> PTuple ps }
+    { match ps with [p] -> p.it | ps -> PTuple ps }
 
 cons_pattern: mark_position(plain_cons_pattern) { $1 }
 plain_cons_pattern:
   | p = variant_pattern
-    { term_of p }
+    { p.it }
   | p1 = variant_pattern CONS p2 = cons_pattern
-    { let ptuple = add_loc (PTuple [p1; p2]) (Location.make $startpos $endpos) in
+    { let ptuple = {it= PTuple [p1; p2]; at= Location.make $startpos $endpos} in
       PVariant (OldUtils.cons, Some ptuple) }
 
 variant_pattern: mark_position(plain_variant_pattern) { $1 }
@@ -339,7 +334,7 @@ plain_variant_pattern:
   | lbl = UNAME p = simple_pattern
     { PVariant (lbl, Some p) }
   | p = simple_pattern
-    { term_of p }
+    { p.it }
 
 simple_pattern: mark_position(plain_simple_pattern) { $1 }
 plain_simple_pattern:
@@ -355,18 +350,20 @@ plain_simple_pattern:
     { PRecord (Assoc.of_list flds) }
   | LBRACK ts = separated_list(SEMI, pattern) RBRACK
     {
-      let nil = add_loc (PVariant (OldUtils.nil, None)) (Location.make $endpos $endpos) in
+      let nil = {it= PVariant (OldUtils.nil, None);at= Location.make $endpos $endpos} in
       let cons t ts =
-        let loc = Location.union [loc_of t; loc_of ts] in
-        let tuple = add_loc (PTuple [t; ts]) loc in
-        add_loc (PVariant (OldUtils.cons, Some tuple)) loc
+        let loc = Location.union [t.at; ts.at] in
+        let tuple = {it= PTuple [t; ts]; at= loc} in
+        {it= PVariant (OldUtils.cons, Some tuple); at= loc}
       in
-      term_of (List.fold_right cons ts nil)
+      (List.fold_right cons ts nil).it
     }
   | LPAREN RPAREN
     { PTuple [] }
+  | LPAREN p = pattern COLON t = ty RPAREN
+    { PAnnotated (p, t) }
   | LPAREN p = pattern RPAREN
-    { term_of p }
+    { p.it }
 
 handler: mark_position(plain_handler) { $1 }
 plain_handler:
@@ -461,7 +458,7 @@ cases(case):
 
 mark_position(X):
   x = X
-  { add_loc x (Location.make $startpos $endpos)}
+  { {it= x; at= Location.make $startpos $endpos}}
 
 params:
   |
@@ -498,7 +495,7 @@ plain_prod_ty:
     {
       match ts with
       | [] -> assert false
-      | [t] -> term_of t
+      | [t] -> t.it
       | _ -> TyTuple ts
      }
 
@@ -517,7 +514,7 @@ plain_simple_ty:
   | t = PARAM
     { TyParam t }
   | LPAREN t = ty RPAREN
-    { term_of t }
+    { t.it }
 
 sum_case:
   | lbl = UNAME
