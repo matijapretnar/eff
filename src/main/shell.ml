@@ -192,29 +192,30 @@ let compile_file ppf filename st =
   Format.fprintf out_ppf "%s\n;;\n@." header ;
   let compile_cmd st cmd =
     let loc = cmd.CoreUtils.at in
-    match cmd.CoreSyntax.term with
-    | CoreSyntax.Computation c ->
-        Print.debug "Compiling: %t" (CoreSyntax.print_computation c) ;
-        let ct, explicit_typing =
-          ExplicitInfer.type_toplevel ~loc st.explicit_typing c
+    match cmd.CoreUtils.it with
+    | Commands.Term t ->
+        let c = Desugarer.desugar_computation st.desugarer_state t in
+        Print.debug "Compiling: %t" (UntypedSyntax.print_computation c) ;
+        let ct, effect_system_state =
+          ExplicitInfer.type_toplevel ~loc st.effect_system_state c
         in
         Print.debug
           "-- After Type Inference ----------------------------------------" ;
         Print.debug "%t" (Typed.print_computation ct) ;
         let ct =
           if !Config.disable_optimization then ct
-          else Optimize.optimize_main_comp st.type_checker ct
+          else Optimize.optimize_main_comp st.type_checker_state ct
         in
         Print.debug
           "-- After Optimization ------------------------------------------" ;
         Print.debug "%t" (Typed.print_computation ct) ;
         let ct_ty, ct_dirt =
-          TypeChecker.type_of_computation st.type_checker ct
+          TypeChecker.type_of_computation st.type_checker_state ct
         in
         Print.debug "Type from Type Checker : %t ! %t"
           (Types.print_target_ty ct_ty)
           (Types.print_target_dirt ct_dirt) ;
-        let erasure_ct = Erasure.typed_to_erasure_comp [] ct in
+        let erasure_ct = Erasure.typed_to_erasure_comp Assoc.empty ct in
         ( match !Config.backend with
         | MulticoreOCaml ->
             CodegenMulticoreOCaml.print_computation erasure_ct out_ppf
@@ -222,17 +223,19 @@ let compile_file ppf filename st =
         ) ;
         Format.fprintf out_ppf "\n;;\n " ;
         print_endline "ended found something!" ;
-        {st with explicit_typing}
-    | CoreSyntax.DefEffect (eff, (ty1, ty2)) ->
-        let explicit_typing =
-          ExplicitInfer.add_effect eff (ty1, ty2) st.explicit_typing
+        {st with effect_system_state = effect_system_state}
+    | Commands.DefEffect tydef ->
+        let (eff, (ty1, ty2)) = Desugarer.desugar_def_effect st.desugarer_state tydef in
+        let effect_system_state =
+          ExplicitInfer.add_effect eff (ty1, ty2) st.effect_system_state
         in
         Print.print out_ppf
           "type (_, _) effect += Effect_%s : (int, int) effect" eff ;
         Format.fprintf out_ppf "\n;;\n " ;
-        {st with explicit_typing}
-    | CoreSyntax.External (x, ty, f) -> (
-      match OldUtils.lookup f External.values with
+        {st with effect_system_state}
+    | Commands.External ext -> (
+      let desugarer_state, (x, ty, f) = Desugarer.desugar_external st.desugarer_state ext in
+      match Assoc.lookup f External.values with
       | Some v ->
           let new_ty = Types.source_to_target ty in
           Print.print out_ppf "let %t = ( %s )"
@@ -240,24 +243,17 @@ let compile_file ppf filename st =
             f ;
           Format.fprintf out_ppf "\n;;\n " ;
           { st with
-            typing= SimpleCtx.extend st.typing x (Type.free_params ty, ty)
-          ; explicit_typing=
-              { st.explicit_typing with
+            type_system_state= SimpleCtx.extend st.type_system_state x (Type.free_params ty, ty)
+          ; effect_system_state=
+              { st.effect_system_state with
                 ExplicitInfer.context=
-                  TypingEnv.update st.explicit_typing.context x new_ty }
-          ; type_checker= TypeChecker.extend_var_types st.type_checker x new_ty
-          ; runtime= Eval.update x v st.runtime }
+                  TypingEnv.update st.effect_system_state.context x new_ty }
+          ; type_checker_state= TypeChecker.extend_var_types st.type_checker_state x new_ty
+          ; runtime_state = Eval.update x v st.runtime_state }
       | None -> Error.runtime "unknown external symbol %s." f )
     | _ -> st
   in
   let cmds = Lexer.read_file parse filename in
-  let st, cmds =
-    List.fold_left
-      (fun (st, cmds) cmd ->
-        let desugar_st, cmd = Desugar.toplevel st.desugaring cmd in
-        ({st with desugaring= desugar_st}, cmd :: cmds) )
-      (st, []) cmds
-  in
   let st = List.fold_left compile_cmd st (List.rev cmds) in
   Format.fprintf out_ppf "@? " ;
   flush out_channel ;
