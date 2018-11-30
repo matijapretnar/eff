@@ -8,6 +8,20 @@ type state =
   { context: TypingEnv.t
   ; effects: (Types.target_ty * Types.target_ty) Untyped.EffectMap.t }
 
+type computation_typing_result = 
+  { computation: Typed.computation
+  ; dtype: Types.target_dirty
+  ; constraints: Typed.omega_ct list
+  ; substitutions: Unification.substitution list  
+  }
+
+type expression_typing_result = 
+  { expression: Typed.expression
+  ; ttype: Types.target_ty
+  ; constraints: Typed.omega_ct list
+  ; substitutions: Unification.substitution list  
+  }
+
 let empty = {context= TypingEnv.empty; effects= Untyped.EffectMap.empty}
 
 let initial_state = empty
@@ -373,18 +387,18 @@ let apply_polymorphic_variable x ty_schi =
   (returned_x, applied_basic_type, returned_cons)
 
 
-let rec type_expression in_cons st ({it= expr} as e) =
+let rec type_expression in_cons st ({it= expr} as e)=
   Print.debug "type_expression: %t" (Untyped.print_expression e) ;
   Print.debug "### Constraints Before ###" ;
   Unification.print_c_list in_cons ;
   Print.debug "##########################" ;
-  let e, ttype, constraints, sub_list =
+  let {expression; ttype; constraints; substitutions} =
     type_plain_expression in_cons st expr
   in
   Print.debug "### Constraints After ####" ;
   Unification.print_c_list constraints ;
   Print.debug "##########################" ;
-  (e, ttype, constraints, sub_list)
+  {expression; ttype; constraints; substitutions}
 
 
 and type_plain_expression in_cons st = function
@@ -394,42 +408,42 @@ and type_plain_expression in_cons st = function
         let returned_x, applied_basic_type, returned_cons =
           apply_polymorphic_variable x ty_schi
         in
-        (returned_x, applied_basic_type, returned_cons @ in_cons, [])
+        {expression= returned_x; ttype= applied_basic_type; 
+         constraints= returned_cons @ in_cons; substitutions= []}
     | None ->
         Print.debug "Variable not found: %t" (Typed.print_variable x) ;
         assert false )
   | Untyped.Const const ->
-      (Typed.Const const, Types.type_const const, in_cons, [])
+      {expression= Typed.Const const; ttype= Types.type_const const; constraints= in_cons; substitutions= []}
   | Untyped.Tuple es ->
       let target_list = List.map (type_expression in_cons st) es in
       let target_terms =
-        Typed.Tuple
-          (List.fold_right (fun (x, _, _, _) xs -> x :: xs) target_list [])
+        Typed.Tuple (List.map (fun {expression}-> expression) target_list)
       in
       let target_types =
         Types.Tuple
-          (List.fold_right (fun (_, x, _, _) xs -> x :: xs) target_list [])
+          (List.map (fun {ttype}-> ttype) target_list)
       in
       let target_cons =
         List.fold_right
-          (fun (_, _, x, _) xs -> List.append x xs)
+          (fun {constraints} xs -> List.append constraints xs)
           target_list []
       in
       let target_sub =
         List.fold_right
-          (fun (_, _, _, x) xs -> List.append x xs)
+          (fun {substitutions} xs -> List.append substitutions xs)
           target_list []
       in
-      (target_terms, target_types, in_cons @ target_cons, target_sub)
+      {expression= target_terms; ttype= target_types; constraints= in_cons @ target_cons; substitutions= target_sub}
   | Untyped.Record lst -> failwith __LOC__
   | Untyped.Variant (lbl, e) -> (
       let ty_in, ty_out = Types.constructor_signature lbl in
       match e with
-      | None -> (Typed.Variant (lbl, Typed.Tuple []), ty_out, in_cons, [])
+      | None -> {expression= Typed.Variant (lbl, Typed.Tuple []); ttype= ty_out; constraints= in_cons; substitutions= []}
       | Some e ->
-          let e', u', cons', subs = type_expression in_cons st e in
+          let {expression=e'; ttype=u'; constraints=cons'; substitutions=subs} = type_expression in_cons st e in
           let e'', cast_cons = cast_expression e' u' ty_in in
-          (Typed.Variant (lbl, e''), ty_out, cast_cons :: cons', subs) )
+          {expression= Typed.Variant (lbl, e''); ttype= ty_out; constraints= cast_cons :: cons'; substitutions= subs} )
   | Untyped.Lambda a ->
       Print.debug "in infer lambda" ;
       let in_ty, in_ty_skel = Typed.fresh_ty_with_fresh_skel () in
@@ -445,14 +459,14 @@ and type_plain_expression in_cons st = function
       in
       Unification.print_c_list cons ;
       Print.debug "lambda ty: %t" (Types.print_target_ty target_ty) ;
-      (target_lambda, target_ty, cons, sub)
+      {expression= target_lambda; ttype= target_ty; constraints= cons; substitutions= sub}
   | Untyped.Effect eff ->
       let in_ty, out_ty = Untyped.EffectMap.find eff st.effects in
       let s = Types.EffectSet.singleton eff in
-      ( Typed.Effect (eff, (in_ty, out_ty))
-      , Types.Arrow (in_ty, (out_ty, Types.closed_dirt s))
-      , in_cons
-      , [] )
+      { expression= Typed.Effect (eff, (in_ty, out_ty))
+      ; ttype= Types.Arrow (in_ty, (out_ty, Types.closed_dirt s))
+      ; constraints= in_cons
+      ; substitutions= [] }
   | Untyped.Handler h ->
       let out_dirt_var = Params.Dirt.fresh () in
       let in_dirt = Types.fresh_dirt ()
@@ -465,10 +479,10 @@ and type_plain_expression in_cons st = function
       let pr, cr = h.value_clause in
       let Untyped.PVar x = pr.it in
       let r_st = add_def st x r_ty in
-      let ( target_cr_term
-          , (target_cr_ty, target_cr_dirt)
-          , target_cr_cons
-          , target_cr_sub ) =
+      let { computation= target_cr_term
+          ; dtype= (target_cr_ty, target_cr_dirt)
+          ; constraints= target_cr_cons
+          ; substitutions= target_cr_sub } =
         type_computation r_cons r_st cr
       in
       let r_subbed_st = apply_sub_to_env st target_cr_sub in
@@ -639,21 +653,21 @@ and type_plain_expression in_cons st = function
       Print.debug "### Constraints after Handler ###" ;
       Unification.print_c_list all_cons ;
       Print.debug "#################################" ;
-      (coerced_handler, target_type, all_cons, subs_n @ target_cr_sub)
+      {expression= coerced_handler; ttype= target_type; constraints= all_cons; substitutions= subs_n @ target_cr_sub}
   | _ -> failwith __LOC__
 
 and type_computation in_cons st {it= comp} =
-  let c, ttype, constraints, sub_list =
+  let {computation= c; dtype= ttype; constraints; substitutions= sub_list} =
     type_plain_computation in_cons st comp
   in
-  (c, ttype, constraints, sub_list)
+  {computation= c; dtype= ttype; constraints= constraints; substitutions= sub_list}
 
 
 and type_plain_computation in_cons st = function
   | Untyped.Value e ->
-      let typed_e, tt, constraints, subs_e = type_expression in_cons st e in
+      let {expression= typed_e; ttype= tt; constraints= constraints; substitutions= subs_e} = type_expression in_cons st e in
       let new_d_ty = (tt, Types.empty_dirt) in
-      (Typed.Value typed_e, new_d_ty, constraints, subs_e)
+      {computation= Typed.Value typed_e; dtype= new_d_ty; constraints; substitutions= subs_e}
   | Untyped.Match (e, cases) ->
       (*
            α,δ,ωi fresh
@@ -670,20 +684,20 @@ and type_plain_computation in_cons st = function
            Q;Γ ⊢ Match (e, cases) : σ^n(α ! δ) | σ^n(Q,Q₀,...,Qn) ~> Match (e', cases' |> ωi) 
       *)
       (* TODO: ignoring the substitutions for now *)
-      let e', ty_A, cons0, sigma0 = type_expression in_cons st e in
+      let {expression= e'; ttype= ty_A; constraints= cons0; substitutions= sigma0} = type_expression in_cons st e in
       let ty_alpha, q_alpha = Typed.fresh_ty_with_fresh_skel () in
       let dirt_delta = Types.fresh_dirt () in
       let cases', cons1, sigma1 =
         type_cases (q_alpha :: cons0) st cases ty_A (ty_alpha, dirt_delta)
       in
-      (Typed.Match (e', cases'), (ty_alpha, dirt_delta), cons1, sigma0 @ sigma1)
+      {computation= Typed.Match (e', cases'); dtype= (ty_alpha, dirt_delta); constraints= cons1; substitutions= sigma0 @ sigma1}
   | Untyped.Apply (e1, e2) ->
       Print.debug "in infer apply" ;
-      let typed_e1, tt_1, constraints_1, subs_e1 =
+      let {expression= typed_e1; ttype= tt_1; constraints= constraints_1; substitutions= subs_e1} =
         type_expression in_cons st e1
       in
       let st_subbed = apply_sub_to_env st subs_e1 in
-      let typed_e2, tt_2, constraints_2, subs_e2 =
+      let {expression= typed_e2; ttype= tt_2; constraints= constraints_2; substitutions= subs_e2} =
         type_expression constraints_1 st_subbed e2
       in
       Print.debug "e1 apply type : %t" (Types.print_target_ty tt_1) ;
@@ -696,18 +710,18 @@ and type_plain_computation in_cons st = function
           (Unification.apply_substitution_ty subs_e2 tt_1)
           (Types.Arrow (tt_2, fresh_dirty_ty))
       in
-      ( Typed.Apply (e1_coerced, typed_e2)
-      , fresh_dirty_ty
-      , [cons1; omega_cons_1] @ constraints_2
-      , subs_e2 @ subs_e1 )
+      { computation= Typed.Apply (e1_coerced, typed_e2)
+      ; dtype= fresh_dirty_ty
+      ; constraints= [cons1; omega_cons_1] @ constraints_2
+      ; substitutions= subs_e2 @ subs_e1 }
   | Untyped.Handle (e, c) ->
       let dirty_1, cons_skel_1 = Typed.fresh_dirty_with_fresh_skel () in
       let dirty_2, cons_skel_2 = Typed.fresh_dirty_with_fresh_skel () in
-      let typed_exp, exp_type, exp_constraints, sub_exp =
+      let {expression= typed_exp; ttype= exp_type; constraints= exp_constraints; substitutions= sub_exp} =
         type_expression in_cons st e
       in
       let st_subbed = apply_sub_to_env st sub_exp in
-      let typed_comp, comp_dirty_type, comp_constraints, sub_comp =
+      let {computation= typed_comp; dtype= comp_dirty_type; constraints= comp_constraints; substitutions= sub_comp} =
         type_computation exp_constraints st_subbed c
       in
       let coer_exp, omega_cons_1 =
@@ -721,15 +735,15 @@ and type_plain_computation in_cons st = function
       let constraints =
         [cons_skel_1; cons_skel_2; omega_cons_1; cons_comp] @ comp_constraints
       in
-      ( Typed.Handle (coer_exp, coer_comp)
-      , dirty_2
-      , constraints
-      , sub_comp @ sub_exp )
-  | Untyped.Let (defs, c_2) -> (
+      { computation= Typed.Handle (coer_exp, coer_comp)
+      ; dtype= dirty_2
+      ; constraints
+      ; substitutions= sub_comp @ sub_exp }
+  | Untyped.Let (defs, c_2) -> 
       let [(p_def, c_1)] = defs in
       match c_1.it with
       | Untyped.Value e_1 ->
-          let typed_e1, type_e1, cons_e1, sub_e1 =
+          let {expression= typed_e1; ttype= type_e1; constraints= cons_e1; substitutions= sub_e1} =
             type_expression in_cons st e_1
           in
           let sub_e1', cons_e1' = Unification.unify ([], [], cons_e1) in
@@ -754,7 +768,7 @@ and type_plain_computation in_cons st = function
           in
           let Untyped.PVar x = p_def.it in
           let new_st = add_def st_subbed x ty_sc_skel in
-          let typed_c2, type_c2, cons_c2, subs_c2 =
+          let {computation= typed_c2; dtype= type_c2; constraints= cons_c2; substitutions= subs_c2} =
             type_computation global_constraints new_st c_2
           in
           let var_exp =
@@ -788,9 +802,9 @@ and type_plain_computation in_cons st = function
               ( var_exp_skel_lamda
               , Typed.abstraction_with_ty (Typed.PVar x) ty_sc_skel typed_c2 )
           in
-          (return_term, type_c2, cons_c2, subs_c2 @ sub_e1' @ sub_e1)
+          {computation= return_term; dtype= type_c2; constraints= cons_c2; substitutions= subs_c2 @ sub_e1' @ sub_e1}
       | _ ->
-          let typed_c1, (type_c1, dirt_c1), cons_c1, subs_c1 =
+          let {computation= typed_c1; dtype= (type_c1, dirt_c1); constraints= cons_c1; substitutions= subs_c1} =
             type_computation in_cons st c_1
           in
           let typed_pattern, new_st, cons_c1 =
@@ -798,7 +812,7 @@ and type_plain_computation in_cons st = function
               (apply_sub_to_env st subs_c1)
               p_def type_c1
           in
-          let typed_c2, (type_c2, dirt_c2), cons_c2, subs_c2 =
+          let {computation= typed_c2; dtype= (type_c2, dirt_c2); constraints= cons_c2; substitutions= subs_c2} =
             type_computation cons_c1 new_st c_2
           in
           let new_dirt_var = Types.fresh_dirt () in
@@ -815,10 +829,10 @@ and type_plain_computation in_cons st = function
           in
           let abstraction = (typed_pattern, coer_c2) in
           let constraints = [omega_cons_1; omega_cons_2] @ cons_c2 in
-          ( Typed.Bind (coer_c1, abstraction)
-          , (type_c2, new_dirt_var)
-          , constraints
-          , subs_c2 @ subs_c1 ) )
+          { computation= Typed.Bind (coer_c1, abstraction)
+          ; dtype= (type_c2, new_dirt_var)
+          ; constraints
+          ; substitutions= subs_c2 @ subs_c1 }
           
   | Untyped.LetRec ([(var, abs)], c2)
     when not (Untyped.contains_variable_abs var abs) ->
@@ -862,7 +876,7 @@ and type_plain_computation in_cons st = function
           (Unification.apply_substitution_ty sub_s2 arrow_type)
       in
       let st3 = add_def st2 var ty_f in
-      let c2', dty2, cons6, sub_s3 = type_computation cons5 st3 c2 in
+      let {computation=c2'; dtype= dty2; constraints= cons6; substitutions= sub_s3} = type_computation cons5 st3 c2 in
       let ty_f' = Unification.apply_substitution_ty sub_s3 ty_f in
       let e_rec =
         (* f ςs αs δѕ ωs |> <α> -> ω₁ ! ω₂ *)
@@ -921,15 +935,15 @@ and type_plain_computation in_cons st = function
                             (Unification.apply_substitution_ty sub_s2 ty_a')
                             c1''))))))
       in
-      ( Typed.LetRec ([(var, ty_f', e_f)], c2')
-      , dty2
-      , cons6
-      , sub_s1 @ sub_s2 @ sub_s3 )
+      { computation= Typed.LetRec ([(var, ty_f', e_f)], c2')
+      ; dtype= dty2
+      ; constraints= cons6
+      ; substitutions= sub_s1 @ sub_s2 @ sub_s3 }
 
 
 and type_abstraction in_cons st (pat, comp) ty_in =
   let pat', st', cons1 = type_typed_pattern in_cons st pat ty_in in
-  let comp', dty, out_cons, sub_list = type_computation cons1 st' comp in
+  let {computation= comp'; dtype= dty; constraints= out_cons; substitutions= sub_list} = type_computation cons1 st' comp in
   ( (pat', comp')
   , (Unification.apply_substitution_ty sub_list ty_in, dty)
   , out_cons
@@ -947,7 +961,7 @@ and type_effect_clause eff abs2 in_st in_cons in_sub =
     type_typed_pattern cons' st' k (Types.Arrow (out_op_ty, alpha_dirty))
   in
   let cons = alpha_cons :: cons'' in
-  let typed_c_op, typed_co_op_ty, co_op_cons, c_op_sub =
+  let {computation= typed_c_op; dtype= typed_co_op_ty; constraints= co_op_cons; substitutions= c_op_sub} =
     type_computation cons st'' c_op
   in
   (typed_c_op, typed_co_op_ty, st_subbed, co_op_cons, c_op_sub, alpha_dirty)
@@ -965,7 +979,7 @@ and type_cases in_cons st cases ty_in dty_out =
 and type_case in_cons st case ty_in (ty_out, dirt_out) =
   let p, c = case in
   let p', st', cons1 = type_typed_pattern in_cons st p ty_in in
-  let c', (ty_c, dirt_c), cons2, sublist = type_computation cons1 st' c in
+  let {computation= c'; dtype= (ty_c, dirt_c); constraints= cons2; substitutions= sublist} = type_computation cons1 st' c in
   let c'', q = Typed.cast_computation c' (ty_c, dirt_c) (ty_out, dirt_out) in
   ((p', c''), q :: cons2, sublist)
 
@@ -1050,7 +1064,7 @@ let type_toplevel ~loc st c =
     ( (Typed.Value var_exp_ty_lambda) ), st *)
   | _
   ->
-    let ct, (ttype, dirt), constraints, sub_list = type_computation [] st c in
+    let {computation= ct; dtype= (ttype, dirt); constraints; substitutions= sub_list} = type_computation [] st c in
     (* let x::xs = constraints in 
     Print.debug "Single constraint : %t" (Typed.print_omega_ct x); *)
     Print.debug "Computation : %t" (Typed.print_computation ct) ;
