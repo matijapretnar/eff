@@ -4,6 +4,12 @@ open Types
 module Variable = Symbol.Make (Symbol.String)
 module EffectMap = Map.Make (String)
 
+let add_to_constraints con constraints = 
+  con :: constraints
+
+let add_list_to_constraints new_constraints old_constraints = 
+  new_constraints @ old_constraints
+
 type variable = Variable.t
 
 type effect = OldUtils.effect * (Types.target_ty * Types.target_ty)

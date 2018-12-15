@@ -5,16 +5,69 @@ module STyParams = Set.Make (Params.Ty)
 let set_of_list =
   List.fold_left (fun acc x -> STyParams.add x acc) STyParams.empty
 
+type substitutions = 
+  { type_param_to_type_coercions: (Params.TyCoercion.t, Typed.ty_coercion) Assoc.t
+  ; type_param_to_type: (Params.Ty.t, Types.target_ty) Assoc.t
+  ; dirt_var_to_dirt_coercions: (Params.DirtCoercion.t, Typed.dirt_coercion) Assoc.t
+  ; dirt_var_to_dirt: (Params.Dirt.t, Types.dirt) Assoc.t
+  ; skel_param_to_skel: (Params.Skel.t, Types.skeleton) Assoc.t
+  }
 
-type substitution =
+(*type substitution =
   | CoerTyParamToTyCoercion of (Params.TyCoercion.t * Typed.ty_coercion)
   | CoerDirtVartoDirtCoercion of (Params.DirtCoercion.t * Typed.dirt_coercion)
   | TyParamToTy of (Params.Ty.t * Types.target_ty)
   | DirtVarToDirt of (Params.Dirt.t * Types.dirt)
   | SkelParamToSkel of (Params.Skel.t * Types.skeleton)
+*)
+let subsEmpty = 
+  { type_param_to_type_coercions= Assoc.empty
+  ; dirt_var_to_dirt_coercions= Assoc.empty
+  ; type_param_to_type= Assoc.empty
+  ; dirt_var_to_dirt= Assoc.empty
+  ; skel_param_to_skel= Assoc.empty
+  }
+
+let a_to_e f a b = 
+  f a b subsEmpty
+
+let add_param_coercion param t_coercion subs = 
+  {subs with type_param_to_type_coercions= Assoc.update param t_coercion subs.type_param_to_type_coercions}
+
+let add_param_coercion_e = a_to_e add_param_coercion
+
+let add_type_sub param target_ty subs = 
+  {subs with type_param_to_type= Assoc.update param target_ty subs.type_param_to_type}
+
+let add_type_sub_e = a_to_e add_type_sub
+
+let add_var_coercion var d_coercion subs = 
+  {subs with dirt_var_to_dirt_coercions= Assoc.update var d_coercion subs.dirt_var_to_dirt_coercions}
+
+let add_var_coercion_e = a_to_e add_var_coercion
+
+let add_var_dirt_sub param t_coercion subs = 
+  {subs with dirt_var_to_dirt= Assoc.update param t_coercion subs.dirt_var_to_dirt}
+
+let add_var_dirt_sub_e = a_to_e add_var_dirt_sub
+
+let add_skel_sub param t_coercion subs = 
+  {subs with skel_param_to_skel= Assoc.update param t_coercion subs.skel_param_to_skel}
+
+let add_skel_sub_e = a_to_e add_skel_sub
+
+let merge_subs sub1 sub2 = 
+  { type_param_to_type_coercions= Assoc.concat sub1.type_param_to_type_coercions sub2.type_param_to_type_coercions
+  ; type_param_to_type= Assoc.concat sub1.type_param_to_type sub2.type_param_to_type
+  ; dirt_var_to_dirt_coercions= Assoc.concat sub1.dirt_var_to_dirt_coercions sub2.dirt_var_to_dirt_coercions
+  ; dirt_var_to_dirt= Assoc.concat sub1.dirt_var_to_dirt sub2.dirt_var_to_dirt
+  ; skel_param_to_skel= Assoc.concat sub1.skel_param_to_skel sub2.skel_param_to_skel
+  }
+
 
 let print_sub ?max_level c ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  Print.print ?max_level ppf "substitution"
+  (*let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with
   | CoerTyParamToTyCoercion (p, t) ->
       print "%t :-coertyTotyCoer-> %t"
@@ -33,29 +86,33 @@ let print_sub ?max_level c ppf =
   | SkelParamToSkel (p, s) ->
       print "%t :-skelvarToSkeleton-> %t" (Params.Skel.print p)
         (Types.print_skeleton s)
-
+*)
 
 let rec print_s_list = function
+
   | [] -> Print.debug "---------------------"
   | e :: l ->
       Print.debug "%t" (print_sub e) ;
       print_s_list l
 
 
-let apply_sub_dirt sub drt =
+let rec apply_sub_dirt sub drt =
   match drt.row with
   | ParamRow p -> (
-    match sub with
-    | DirtVarToDirt (p', drt2) when p = p' ->
-        Types.add_effects drt.effect_set drt2
-    | _ -> drt )
+    match Assoc.lookup p sub.dirt_var_to_dirt with
+    | Some drt2 ->
+        apply_sub_dirt sub (Types.add_effects drt.effect_set drt2)
+    | None -> drt )
   | EmptyRow -> drt
 
 
 let rec apply_sub_skel sub sk =
   match sk with
   | SkelParam p -> (
-    match sub with SkelParamToSkel (skv, sk1) when skv = p -> sk1 | _ -> sk )
+    match Assoc.lookup p sub.skel_param_to_skel with 
+      | Some sk1 -> apply_sub_skel sub sk1
+      | None -> sk
+  )
   | PrimSkel _ -> sk
   | SkelArrow (sk1, sk2) ->
       SkelArrow (apply_sub_skel sub sk1, apply_sub_skel sub sk2)
@@ -64,12 +121,12 @@ let rec apply_sub_skel sub sk =
   | ForallSkel (p, sk1) -> ForallSkel (p, apply_sub_skel sub sk1)
 
 
-let rec apply_sub_ty sub ty =
+let rec apply_sub_ty (sub: substitutions) ty =
   match ty with
   | TyParam typ1 -> (
-    match sub with
-    | TyParamToTy (typ2, ttype) when typ1 = typ2 -> ttype
-    | _ -> ty )
+    match Assoc.lookup typ1 sub.type_param_to_type with
+        | Some ttype -> apply_sub_ty sub ttype (* We don't assume that substitutions are fully expanded *)
+        | None -> ty )
   | Arrow (tty1, tty2) ->
       Arrow (apply_sub_ty sub tty1, apply_sub_dirty_ty sub tty2)
   | Apply (ty_name, tys) -> Apply (ty_name, List.map (apply_sub_ty sub) tys)
@@ -110,9 +167,10 @@ let rec apply_sub_tycoer sub ty_coer =
       HandlerCoercion
         (apply_sub_dirtycoer sub dirtycoer1, apply_sub_dirtycoer sub dirtycoer2)
   | TyCoercionVar p -> (
-    match sub with
-    | CoerTyParamToTyCoercion (p', t_coer) when p = p' -> t_coer
-    | _ -> TyCoercionVar p )
+    match Assoc.lookup p sub.type_param_to_type_coercions with
+      | Some t_coer -> apply_sub_tycoer sub t_coer
+      | None -> TyCoercionVar p
+  )
   | SequenceTyCoer (ty_coer1, ty_coer2) ->
       SequenceTyCoer
         (apply_sub_tycoer sub ty_coer1, apply_sub_tycoer sub ty_coer2)
@@ -141,8 +199,8 @@ and apply_sub_dirtcoer sub dirt_coer =
   match dirt_coer with
   | ReflDirt d -> ReflDirt (apply_sub_dirt sub d)
   | DirtCoercionVar p -> (
-    match sub with
-    | CoerDirtVartoDirtCoercion (p', dc) when p' = p -> dc
+    match Assoc.lookup p sub.dirt_var_to_dirt_coercions with
+    | Some dc -> apply_sub_dirtcoer sub dc
     | _ -> dirt_coer )
   | Empty d -> Empty (apply_sub_dirt sub d)
   | UnionDirt (es, dirt_coer1) ->
@@ -250,91 +308,32 @@ and apply_sub_handler sub h =
   {effect_clauses= new_eff_clauses; value_clause= new_value_clause}
 
 
-let rec apply_substitution s c =
-  List.fold_left (fun c s -> apply_sub_comp s c) c s
+let rec apply_substitution = apply_sub_comp
 
+and apply_substitution_exp = apply_sub_exp
 
-and apply_substitution_exp s ei =
-  List.fold_left (fun ei s -> apply_sub_exp s ei) ei s
+and apply_substitution_ty = apply_sub_ty
 
+and apply_substitution_dirt = apply_sub_dirt
 
-and apply_substitution_ty s ty1 =
-  List.fold_left (fun ty1 s -> apply_sub_ty s ty1) ty1 s
+and apply_substitution_skel = apply_sub_skel
 
+let rec apply_sub1 subs cons =
+  match cons with
+  | Typed.TyOmega (coer_p, (ty1, ty2)) -> (
+      Typed.TyOmega (coer_p, (apply_sub_ty subs ty1, apply_sub_ty subs ty2))
+  )
+  | Typed.DirtOmega (coer_p, (drt1, drt2)) -> (
+    Typed.DirtOmega (coer_p, (apply_sub_dirt subs drt1, apply_sub_dirt subs drt2))
+  )
+  | Typed.TyParamHasSkel (tv, Types.SkelParam sv) -> (
+    match Assoc.lookup sv subs.skel_param_to_skel with
+      | Some skel -> apply_sub1 subs (Typed.TyParamHasSkel (tv, skel))
+      | None -> cons
+  )
+  | _ -> cons
 
-and apply_substitution_dirt s drt =
-  List.fold_left (fun drt s -> apply_sub_dirt s drt) drt s
-
-
-and apply_substitution_skel s ty1 =
-  List.fold_left (fun ty1 s -> apply_sub_skel s ty1) ty1 s
-
-
-(* apply a single sub to a list of constraints *)
-let apply_sub1 c_list sub1 =
-  match sub1 with
-  | TyParamToTy (type_p, target_type) ->
-      let mapper cons =
-        match cons with
-        | Typed.TyOmega (coer_p, (ty1, ty2)) ->
-            Typed.TyOmega
-              (coer_p, (apply_sub_ty sub1 ty1, apply_sub_ty sub1 ty2))
-        (*
-       	                | Typed.TyOmega (coer_p, (TyParam tv,ty2)) when (type_p = tv) ->  
-       			   Typed.TyOmega (coer_p, (target_type,ty2)) 
-                        | Typed.TyOmega (coer_p, (ty2,TyParam tv)) when (type_p = tv) ->  
-       			   Typed.TyOmega (coer_p, (ty2,target_type)) 
- *)
-        | _ ->
-            cons
-      in
-      List.map mapper c_list
-  | DirtVarToDirt (type_p, target_dirt) ->
-      let mapper = function
-        | Typed.DirtOmega (coerp, (drt1, drt2)) ->
-            Typed.DirtOmega
-              (coerp, (apply_sub_dirt sub1 drt1, apply_sub_dirt sub1 drt2))
-        | Typed.TyOmega (coerp, (ty1, ty2)) ->
-            Typed.TyOmega
-              (coerp, (apply_sub_ty sub1 ty1, apply_sub_ty sub1 ty2))
-        | cons -> cons
-        (*
-                 function 
-                          Typed.DirtOmega (coer_p,(SetVar (s1,dv) , d2)) when (dv = type_p) ->
-                             begin match target_dirt with
-                             | SetVar (diff_set, new_var) ->
-                                let new_set =  EffectSet.union s1 diff_set in 
-                                Typed.DirtOmega(coer_p,(SetVar(new_set,new_var),d2))
-                             | SetEmpty diff_set ->
-                                let new_set =  EffectSet.union s1 diff_set in 
-                                Typed.DirtOmega(coer_p,(SetEmpty new_set,d2))
-                             end
-                        | Typed.DirtOmega (coer_p,(d2, SetVar (s1,dv) )) when (dv = type_p) ->
-                             begin match target_dirt with
-                             | SetVar (diff_set, new_var) ->
-                                let new_set =  EffectSet.union s1 diff_set in 
-                                Typed.DirtOmega(coer_p,(d2,SetVar(new_set,new_var)))
-                             | SetEmpty diff_set ->
-                                let new_set =  EffectSet.union s1 diff_set in 
-                                Typed.DirtOmega(coer_p,(d2,SetEmpty(new_set)))
-                             end
-                        | cons -> cons
- *)
-      in
-      List.map mapper c_list
-  | SkelParamToSkel (skel_var, skel) ->
-      let mapper cons =
-        match cons with
-        | Typed.TyParamHasSkel (tv, Types.SkelParam sv) when skel_var = sv ->
-            Typed.TyParamHasSkel (tv, skel)
-        | _ -> cons
-      in
-      List.map mapper c_list
-  | _ -> c_list
-
-
-(* apply substitution-list to a list of constraints *)
-let rec apply_sub sub c_list = List.fold_left apply_sub1 c_list sub
+let apply_sub subs c_list = List.map (apply_sub1 subs) c_list
 
 let rec print_c_list = function
   | [] -> Print.debug "---------------------"
@@ -408,20 +407,24 @@ let rec fix_union_find fixpoint c_list =
 let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
   match skel with
   (* α : ς *)
-  | SkelParam p -> (sub, paused @ [cons], rest_queue)
+  | SkelParam p -> (sub, Typed.add_to_constraints cons paused, rest_queue)
   (* α : int *)
   | PrimSkel ps ->
-      let sub1 = TyParamToTy (tvar, Types.PrimTy ps) in
-      (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
+      let k = tvar in
+      let v = Types.PrimTy ps in
+      let sub1 = add_type_sub_e k v in
+      (add_type_sub tvar (Types.PrimTy ps) sub, [], apply_sub sub1 (Typed.add_list_to_constraints paused rest_queue))
   (* α : τ₁ -> τ₂ *)
   | SkelArrow (sk1, sk2) ->
       let tvar1, cons1 = Typed.fresh_ty_with_skel sk1
       and tvar2, cons2 = Typed.fresh_ty_with_skel sk2
       and dvar1 = Types.fresh_dirt () in
-      let sub1 = TyParamToTy (tvar, Types.Arrow (tvar1, (tvar2, dvar1))) in
-      ( sub @ [sub1]
+      let k = tvar in
+      let v = Types.Arrow (tvar1, (tvar2, dvar1)) in
+      let sub1 = add_type_sub_e k v in
+      ( add_type_sub k v sub 
       , []
-      , [cons1; cons2] @ apply_sub [sub1] (rest_queue @ paused) )
+      , Typed.add_to_constraints cons1 (apply_sub sub1 (Typed.add_list_to_constraints paused rest_queue)) |> Typed.add_to_constraints cons2)
   (* α : τ₁ x τ₂ ... *)
   | SkelTuple sks ->
       let tvars, conss =
@@ -431,8 +434,11 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
             (tvar :: tvars, cons :: conss) )
           sks ([], [])
       in
-      let sub1 = TyParamToTy (tvar, Types.Tuple tvars) in
-      (sub @ [sub1], [], conss @ apply_sub [sub1] (rest_queue @ paused))
+      let k = tvar in
+      let v = Types.Tuple tvars in
+      let sub1 = add_type_sub_e k v in
+      (add_type_sub k v sub, [], 
+      add_list_to_constraints (apply_sub sub1 (add_list_to_constraints paused rest_queue) ) conss )
   (* α : ty_name (τ₁, τ₂, ...) *)
   | SkelApply (ty_name, sks) ->
       let tvars, conss =
@@ -442,20 +448,23 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
             (tvar :: tvars, cons :: conss) )
           sks ([], [])
       in
-      let sub1 = TyParamToTy (tvar, Types.Apply (ty_name, tvars)) in
-      (sub @ [sub1], [], conss @ apply_sub [sub1] (rest_queue @ paused))
+      let k = tvar in
+      let v = Types.Apply (ty_name, tvars) in
+      let sub1 = add_type_sub_e k v in
+      (add_type_sub k v sub, [], add_list_to_constraints (apply_sub sub1 (add_list_to_constraints paused rest_queue) ) conss)
   (* α : τ₁ => τ₂ *)
   | SkelHandler (sk1, sk2) ->
       let tvar1, cons1 = Typed.fresh_ty_with_skel sk1
       and tvar2, cons2 = Typed.fresh_ty_with_skel sk2
       and dvar1 = Types.fresh_dirt ()
       and dvar2 = Types.fresh_dirt () in
-      let sub1 =
-        TyParamToTy (tvar, Types.Handler ((tvar1, dvar1), (tvar2, dvar2)))
+      let k = tvar in
+      let v = Types.Handler ((tvar1, dvar1), (tvar2, dvar2)) in
+      let sub1 = add_type_sub_e k v
       in
-      ( sub @ [sub1]
+      ( add_type_sub k v sub
       , []
-      , [cons1; cons2] @ apply_sub [sub1] (rest_queue @ paused) )
+      , Typed.add_to_constraints cons1 (apply_sub sub1 (Typed.add_list_to_constraints paused rest_queue)) |> Typed.add_to_constraints cons2 )
   | ForallSkel (p, sk1) -> failwith __LOC__
 
 
@@ -467,26 +476,28 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
   | SkelParam sp1, sk2a
    |sk2a, SkelParam sp1
     when not (List.mem sp1 (free_skeleton sk2a)) ->
-      let sub1 = SkelParamToSkel (sp1, sk2a) in
-      (sub @ [sub1], [], apply_sub [sub1] (rest_queue @ paused))
+      let k = sp1 in
+      let v = sk2a in
+      let sub1 = add_skel_sub_e k v in
+      (add_skel_sub k v sub, [], apply_sub sub1 (add_list_to_constraints paused rest_queue)  )
   (* int = int *)
   | PrimSkel ps1, PrimSkel ps2 when ps1 = ps2 -> (sub, paused, rest_queue)
   (* τ₁₁ -> τ₁₂ = τ₂₁ -> τ₂₂ *)
   | SkelArrow (ska, skb), SkelArrow (skc, skd) ->
       ( sub
       , paused
-      , [Typed.SkelEq (ska, skc); Typed.SkelEq (skb, skd)] @ rest_queue )
+      , add_list_to_constraints [Typed.SkelEq (ska, skc); Typed.SkelEq (skb, skd)] rest_queue )
   (* τ₁₁ => τ₁₂ = τ₂₁ => τ₂₂ *)
   | SkelHandler (ska, skb), SkelHandler (skc, skd) ->
       ( sub
       , paused
-      , [Typed.SkelEq (ska, skc); Typed.SkelEq (skb, skd)] @ rest_queue )
+      , add_list_to_constraints [Typed.SkelEq (ska, skc); Typed.SkelEq (skb, skd)] rest_queue )
   | SkelApply (ty_name1, sks1), SkelApply (ty_name2, sks2)
     when ty_name1 = ty_name2 && List.length sks1 = List.length sks2 ->
       ( sub
       , paused
-      , List.map2 (fun sk1 sk2 -> Typed.SkelEq (sk1, sk2)) sks1 sks2
-        @ rest_queue )
+      , add_list_to_constraints (List.map2 (fun sk1 sk2 -> Typed.SkelEq (sk1, sk2)) sks1 sks2)
+        rest_queue )
   | _ -> failwith __LOC__
 
 
@@ -495,19 +506,17 @@ and ty_omega_step sub paused cons rest_queue omega =
   function
     (* ω : A <= A *)
     | x, y when Types.types_are_equal x y ->
-        let sub1 = CoerTyParamToTyCoercion (omega, Typed.ReflTy x) in
-        (sub @ [sub1], paused, rest_queue)
+        let k = omega in
+        let v = Typed.ReflTy x in
+        (add_param_coercion k v sub, paused, rest_queue)
     (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
     | Types.Arrow (a1, dirty1), Types.Arrow (a2, dirty2) ->
         let new_ty_coercion_var_coer, ty_cons = fresh_ty_coer (a2, a1)
         and dirty_coercion_c, dirty_cons = fresh_dirty_coer (dirty1, dirty2) in
-        let sub1 =
-          CoerTyParamToTyCoercion
-            ( omega
-            , Typed.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
-            )
+        let k = omega in
+        let v =  Typed.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
         in
-        (sub @ [sub1], paused, List.append [ty_cons; dirty_cons] rest_queue)
+        (add_param_coercion k v sub, paused, add_to_constraints ty_cons rest_queue |> add_to_constraints dirty_cons)
     (* ω : A₁ x A₂ x ... <= B₁ x B₂ x ...  *)
     | Types.Tuple tys, Types.Tuple tys'
       when List.length tys = List.length tys' ->
@@ -518,10 +527,10 @@ and ty_omega_step sub paused cons rest_queue omega =
               (coercion :: coercions, ty_cons :: conss) )
             tys tys' ([], [])
         in
-        let sub1 =
-          CoerTyParamToTyCoercion (omega, Typed.TupleCoercion coercions)
+        let k = omega in
+        let v = Typed.TupleCoercion coercions 
         in
-        (sub @ [sub1], paused, List.append conss rest_queue)
+        (add_param_coercion k v sub, paused, add_list_to_constraints conss rest_queue)
     (* ω : ty (A₁,  A₂,  ...) <= ty (B₁,  B₂,  ...) *)
     (* we assume that all type parameters are positive *)
     | Types.Apply (ty_name1, tys1), Types.Apply (ty_name2, tys2)
@@ -533,20 +542,18 @@ and ty_omega_step sub paused cons rest_queue omega =
               (coercion :: coercions, ty_cons :: conss) )
             tys1 tys2 ([], [])
         in
-        let sub1 =
-          CoerTyParamToTyCoercion
-            (omega, Typed.ApplyCoercion (ty_name1, coercions))
+        let k = omega in
+        let v = Typed.ApplyCoercion (ty_name1, coercions) 
         in
-        (sub @ [sub1], paused, List.append conss rest_queue)
+        (add_param_coercion k v sub, paused, add_list_to_constraints conss rest_queue)
     (* ω : D₁ => C₁ <= D₂ => C₂ *)
     | Types.Handler (drty11, drty12), Types.Handler (drty21, drty22) ->
         let drty_coer1, drty_cons1 = fresh_dirty_coer (drty21, drty11)
         and drty_coer2, drty_cons2 = fresh_dirty_coer (drty12, drty22) in
-        let sub1 =
-          CoerTyParamToTyCoercion
-            (omega, Typed.HandlerCoercion (drty_coer1, drty_coer2))
+        let k = omega in
+        let v = Typed.HandlerCoercion (drty_coer1, drty_coer2)
         in
-        (sub @ [sub1], paused, List.append [drty_cons1; drty_cons2] rest_queue)
+        (add_param_coercion k v sub, paused, add_to_constraints drty_cons1 rest_queue |> add_to_constraints drty_cons2)
     (* ω : α <= A /  ω : A <= α *)
     | Types.TyParam tv, a
      |a, Types.TyParam tv ->
@@ -554,7 +561,7 @@ and ty_omega_step sub paused cons rest_queue omega =
         let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in
         let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
         if skel_tv = skel_a then (sub, cons :: paused, rest_queue)
-        else (sub, cons :: paused, SkelEq (skel_tv, skel_a) :: rest_queue)
+        else (sub, add_to_constraints cons paused, add_to_constraints (SkelEq (skel_tv, skel_a)) rest_queue)
     | a, b ->
         Print.debug "can't solve subtyping for types: %t and %t"
           (print_target_ty a) (print_target_ty b) ;
@@ -570,13 +577,12 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
         let omega' = Params.DirtCoercion.fresh () in
         let diff_set = Types.EffectSet.diff s1 s2 in
         let union_set = Types.EffectSet.union s1 s2 in
-        let sub' =
-          [ DirtVarToDirt
-              ( v2
-              , let open Types in
-                {effect_set= diff_set; row= ParamRow (Params.Dirt.fresh ())} )
-          ; CoerDirtVartoDirtCoercion
-              (omega, Typed.UnionDirt (s1, DirtCoercionVar omega')) ]
+        let k0 = v2 in
+        let v0 = let open Types in
+                {effect_set= diff_set; row= ParamRow (Params.Dirt.fresh ())} in
+        let k1' = omega in
+        let v1' = Typed.UnionDirt (s1, DirtCoercionVar omega') in
+        let sub' = add_var_dirt_sub_e k0 v0 |> add_var_coercion k1' v1'
         in
         let new_cons =
           Typed.DirtOmega
@@ -584,47 +590,45 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
             , ( Types.{effect_set= Types.EffectSet.empty; row= ParamRow v1}
               , Types.{effect_set= union_set; row= ParamRow v2} ) )
         in
-        (sub @ sub', [], apply_sub sub' (new_cons :: paused @ rest_queue))
+        (merge_subs sub sub', [], apply_sub sub' (add_list_to_constraints paused rest_queue |> add_to_constraints new_cons))
   (* ω : Ø <= Δ₂ *)
   | {effect_set= s1; row= EmptyRow}, d
     when Types.EffectSet.is_empty s1 ->
-      let sub1 = CoerDirtVartoDirtCoercion (omega, Typed.Empty d) in
-      (sub @ [sub1], paused, rest_queue)
+      let k = omega in
+      let v = Typed.Empty d in
+      (add_var_coercion k v sub, paused, rest_queue)
   (* ω : δ₁ <= Ø *)
   | {effect_set= s1; row= ParamRow v1}, {effect_set= s2; row= EmptyRow}
     when Types.EffectSet.is_empty s1 && Types.EffectSet.is_empty s2 ->
-      let sub1 =
-        [ CoerDirtVartoDirtCoercion (omega, Typed.Empty Types.empty_dirt)
-        ; DirtVarToDirt (v1, Types.empty_dirt) ]
+      let k0 = omega in
+      let v0 = Typed.Empty Types.empty_dirt in
+      let k1' = v1 in
+      let v1' = Types.empty_dirt in
+      let sub1 = add_var_coercion_e k0 v0 |> add_var_dirt_sub k1' v1'
       in
-      (sub @ sub1, [], apply_sub sub1 (paused @ rest_queue))
+      (merge_subs sub sub1, [], apply_sub sub1 (add_list_to_constraints paused rest_queue))
   (* ω : O₁ <= O₂ *)
   | {effect_set= s1; row= EmptyRow}, {effect_set= s2; row= EmptyRow} ->
       assert (Types.EffectSet.subset s1 s2) ;
-      let sub1 =
-        CoerDirtVartoDirtCoercion
-          ( omega
-          , Typed.UnionDirt
+      let k = omega in
+      let v = Typed.UnionDirt
               (s2, Typed.Empty (Types.closed_dirt (Types.EffectSet.diff s2 s1)))
-          )
       in
-      (sub @ [sub1], paused, rest_queue)
+      (add_var_coercion k v sub, paused, rest_queue)
   (* ω : O₁ <= O₂ ∪ δ₂ *)
   | {effect_set= s1; row= EmptyRow}, {effect_set= s2; row= ParamRow v2} ->
       let v2' = Params.Dirt.fresh () in
-      let sub1 =
-        [ CoerDirtVartoDirtCoercion
-            ( omega
-            , Typed.UnionDirt
+      let k0 = omega in 
+      let v0 = Typed.UnionDirt
                 ( s1
                 , Typed.Empty
                     Types.{effect_set= EffectSet.diff s2 s1; row= ParamRow v2'}
-                ) )
-        ; DirtVarToDirt
-            (v2, Types.{effect_set= EffectSet.diff s1 s2; row= ParamRow v2'})
-        ]
+                )  in
+      let k1 = v2 in 
+      let v1 = Types.{effect_set= EffectSet.diff s1 s2; row= ParamRow v2'} in
+      let sub1 = add_var_coercion_e k0 v0 |> add_var_dirt_sub k1 v1
       in
-      (sub @ sub1, [], apply_sub sub1 (paused @ rest_queue))
+      (merge_subs sub sub1, [], apply_sub sub1 (add_list_to_constraints paused rest_queue))
   | _ -> (sub, cons :: paused, rest_queue)
 
 
@@ -638,10 +642,10 @@ let dirty_omega_step sub paused cons rest_queue (omega1, omega2) drtycons =
   dirt_omega_step sub' paused' dirt_cons rest_queue' omega2 (drt1, drt2)
 
 
-let rec unify (sub, paused, queue) =
+let rec unify ((sub: substitutions), paused, queue) =
   Print.debug "=============Start loop============" ;
   Print.debug "-----Subs-----" ;
-  print_s_list sub ;
+  (*print_s_list sub ; *)
   Print.debug "-----paused-----" ;
   print_c_list paused ;
   Print.debug "-----queue-----" ;
