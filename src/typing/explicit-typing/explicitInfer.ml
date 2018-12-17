@@ -502,7 +502,7 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
             , s_st
             , (alpha_i, delta_i) ) =
           Print.debug "type_effect_clause: %t" (Untyped.abstraction2 abs2) ;
-          type_effect_clause eff abs2 acc_st 
+          type_effect_clause eff abs2 acc_st
         in
         ( typed_c_op :: acc_terms
         , typed_co_op_ty :: acc_tys
@@ -957,7 +957,7 @@ and type_effect_clause eff abs2 st =
   let st_final,{computation= typed_c_op; dtype= typed_co_op_ty} =
     type_computation (add_constraint alpha_cons st'') c_op
   in
-  (typed_c_op, typed_co_op_ty, st_subbed, alpha_dirty)
+  (typed_c_op, typed_co_op_ty, st_final, alpha_dirty)
 
 
 and type_cases st cases ty_in dty_out =
