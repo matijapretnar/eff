@@ -428,10 +428,9 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
   | Untyped.Const const ->
       st, {expression= Typed.Const const; ttype= Types.type_const const}
   | Untyped.Tuple es ->
-      let target_list = List.map (type_expression st) es in
       let folder (st', terms, types) ex = 
         let (st_, {expression; ttype}) = type_expression st' ex in
-        (st', expression:: terms, ttype:: types )
+        (st_, expression:: terms, ttype:: types )
       in
       let (st'', terms_r, types_r) = List.fold_left folder (st, [], []) es (* FOLD LEFT VS FOLD RIGHT????*)
       in
@@ -831,8 +830,7 @@ and type_plain_computation (st: state) = function
           { computation= Typed.Bind (coer_c1, abstraction); dtype= (type_c2, new_dirt_var)}
   | Untyped.LetRec ([(var, abs)], c2)
     when not (Untyped.contains_variable_abs var abs) ->
-      failwith __LOC__
-  | Untyped.LetRec ([(var, abs)], c2) -> failwith __LOC__ (*
+      failwith __LOC__ (*
       (*
 
          α, β, δ, ς₁, ς₂ fresh
@@ -935,6 +933,8 @@ and type_plain_computation (st: state) = function
       ; constraints= cons6
       ; substitutions= sub_s1 @ sub_s2 @ sub_s3 }
     *)
+
+  | _ -> failwith __LOC__
 
 and type_abstraction st (pat, comp) ty_in =
   let pat', st' = type_typed_pattern st pat ty_in in
