@@ -127,7 +127,8 @@ let rec apply_sub_skel sub sk =
   | SkelHandler (sk1, sk2) ->
       SkelHandler (apply_sub_skel sub sk1, apply_sub_skel sub sk2)
   | ForallSkel (p, sk1) -> ForallSkel (p, apply_sub_skel sub sk1)
-
+  (* Really consider other cases *)
+  | SkelApply (t,l) -> SkelApply (t, List.map (apply_sub_skel sub) l)
 
 let rec apply_sub_ty (sub: substitutions) ty =
   match ty with
