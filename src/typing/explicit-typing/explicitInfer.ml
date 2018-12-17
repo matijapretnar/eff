@@ -11,7 +11,7 @@ type state =
   ; constraints: Typed.omega_ct list
   }
 
-
+let merge_substitutions subs state = {state with substitutions= Unification.merge_subs state.substitutions subs}
 
 let general_update_substitution updater k v st =
   {st with substitutions = updater k v st.substitutions}
@@ -737,16 +737,17 @@ and type_plain_computation (st: state) = function
       in
       st_cons,{ computation= Typed.Handle (coer_exp, coer_comp)
       ; dtype= dirty_2}
-  | Untyped.Let (defs, c_2) -> failwith __LOC__ (*
-      let [(p_def, c_1)] = defs in
+  | Untyped.Let (defs, c_2) -> 
+      let [(p_def, c_1)] = defs in 
       match c_1.it with
       | Untyped.Value e_1 ->
-          let {expression= typed_e1; ttype= type_e1; constraints= cons_e1; substitutions= sub_e1} =
-            type_expression in_cons st e_1
+          let st',{expression= typed_e1; ttype= type_e1} =
+            type_expression st e_1
           in
-          let sub_e1', cons_e1' = Unification.unify ([], [], cons_e1) in
+          let sub_e1', cons_e1' = Unification.unify (st'.substitutions, [], st'.constraints) in
+          let st'' = (add_constraints cons_e1' st') |> merge_substitutions sub_e1' in 
           let typed_e1 = Unification.apply_substitution_exp sub_e1' typed_e1 in
-          let st_subbed = apply_sub_to_env st (sub_e1' @ sub_e1) in
+          let st_subbed = apply_sub_to_env st'' st''.substitutions in
           let ( free_skel_vars
               , free_ty_vars
               , free_dirt_vars
@@ -766,8 +767,8 @@ and type_plain_computation (st: state) = function
           in
           let Untyped.PVar x = p_def.it in
           let new_st = add_def st_subbed x ty_sc_skel in
-          let {computation= typed_c2; dtype= type_c2; constraints= cons_c2; substitutions= subs_c2} =
-            type_computation global_constraints new_st c_2
+          let new_st',{computation= typed_c2; dtype= type_c2} =
+            type_computation new_st c_2
           in
           let var_exp =
             List.fold_right
@@ -800,7 +801,7 @@ and type_plain_computation (st: state) = function
               ( var_exp_skel_lamda
               , Typed.abstraction_with_ty (Typed.PVar x) ty_sc_skel typed_c2 )
           in
-          {computation= return_term; dtype= type_c2; constraints= cons_c2; substitutions= subs_c2 @ sub_e1' @ sub_e1}
+          new_st',{computation= return_term; dtype= type_c2}
       | _ ->
           let st',{computation= typed_c1; dtype= (type_c1, dirt_c1)} =
             type_computation st c_1
@@ -828,7 +829,6 @@ and type_plain_computation (st: state) = function
           let abstraction = (typed_pattern, coer_c2) in
           (add_constraint omega_cons_1 st'' |> add_constraint omega_cons_2),
           { computation= Typed.Bind (coer_c1, abstraction); dtype= (type_c2, new_dirt_var)}
-    *)
   | Untyped.LetRec ([(var, abs)], c2)
     when not (Untyped.contains_variable_abs var abs) ->
       failwith __LOC__
