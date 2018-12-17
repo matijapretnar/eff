@@ -326,10 +326,8 @@ let rec apply_sub1 subs cons =
   | Typed.DirtOmega (coer_p, (drt1, drt2)) -> (
     Typed.DirtOmega (coer_p, (apply_sub_dirt subs drt1, apply_sub_dirt subs drt2))
   )
-  | Typed.TyParamHasSkel (tv, Types.SkelParam sv) -> (
-    match Assoc.lookup sv subs.skel_param_to_skel with
-      | Some skel -> apply_sub1 subs (Typed.TyParamHasSkel (tv, skel))
-      | None -> cons
+  | Typed.TyParamHasSkel (tv, sp) -> (
+    Typed.TyParamHasSkel (tv, (apply_sub_skel subs sp))
   )
   | _ -> cons
 

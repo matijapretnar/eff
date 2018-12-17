@@ -68,9 +68,9 @@ let check_well_formed_dirt st = function
 
 let rec check_well_formed_ty st ty =
   match ty with
-  | TyParam typ ->
+  | TyParam typ -> 
       let ty_var_list = Assoc.keys_of st.ty_param_skeletons in
-      (*assert (List.mem typ ty_var_list)*)
+      assert (List.mem typ ty_var_list)
   | Arrow (tty1, tty2) ->
       check_well_formed_ty st tty1 ;
       check_well_formed_dirty_ty st tty2

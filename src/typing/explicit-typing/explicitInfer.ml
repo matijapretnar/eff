@@ -713,7 +713,7 @@ and type_plain_computation (st: state) = function
           (Types.Arrow (tt_2, fresh_dirty_ty))
       in
       let st_const = add_constraint cons1 st'' in
-      (add_constraint omega_cons_1 st),{ computation= Typed.Apply (e1_coerced, typed_e2)
+      (add_constraint omega_cons_1 st_const),{ computation= Typed.Apply (e1_coerced, typed_e2)
       ; dtype= fresh_dirty_ty}
   | Untyped.Handle (e, c) ->
       let dirty_1, cons_skel_1 = Typed.fresh_dirty_with_fresh_skel () in
@@ -1064,7 +1064,7 @@ let type_toplevel ~loc st c =
       (Types.print_target_dirt dirt) ;
     Print.debug "Starting Set of Constraints " ;
     Unification.print_c_list  st'.constraints;
-    let sub, final = Unification.unify (Unification.subsEmpty, [], st.constraints) in
+    let sub, final = Unification.unify (Unification.subsEmpty, [], st'.constraints) in
     Print.debug "Final Constraints:" ;
     Unification.print_c_list final ;
     let ct' = Unification.apply_substitution sub ct in
