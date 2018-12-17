@@ -733,7 +733,7 @@ and type_plain_computation (st: state) = function
       let coer_comp, cons_comp =
         Typed.cast_computation typed_comp comp_dirty_type dirty_1
       in
-      let st_cons = add_constraint cons_skel_1 st'' |> add_constraint cons_skel_2 |> add_constraint omega_cons_1
+      let st_cons = add_constraint cons_skel_1 st'' |> add_constraint cons_skel_2 |> add_constraint omega_cons_1 |> add_constraint cons_comp
       in
       st_cons,{ computation= Typed.Handle (coer_exp, coer_comp)
       ; dtype= dirty_2}
