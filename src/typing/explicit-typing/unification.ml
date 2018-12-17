@@ -64,37 +64,45 @@ let merge_subs sub1 sub2 =
   ; skel_param_to_skel= Assoc.concat sub1.skel_param_to_skel sub2.skel_param_to_skel
   }
 
+let printy ?at_level ppf = Print.print ?at_level ppf
 
-let print_sub ?max_level c ppf =
-  Print.print ?max_level ppf "substitution"
-  (*let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c with
-  | CoerTyParamToTyCoercion (p, t) ->
-      print "%t :-coertyTotyCoer-> %t"
-        (Params.TyCoercion.print p)
-        (Typed.print_ty_coercion t)
-  | CoerDirtVartoDirtCoercion (p, d) ->
-      print "%t :-coertyDirtoDirtCoer-> %t"
-        (Params.DirtCoercion.print p)
-        (Typed.print_dirt_coercion d)
-  | TyParamToTy (p, t) ->
-      print "%t :-tyvarToTargetty-> %t" (Params.Ty.print p)
-        (Types.print_target_ty t)
-  | DirtVarToDirt (p, d) ->
-      print "%t :-dirtvarToTargetdirt-> %t" (Params.Dirt.print p)
-        (Types.print_target_dirt d)
-  | SkelParamToSkel (p, s) ->
-      print "%t :-skelvarToSkeleton-> %t" (Params.Skel.print p)
-        (Types.print_skeleton s)
-*)
+let print_type_coercion p t ppf =
+  Print.print ppf "substitution: ";
+  printy ppf "%t :-coertyTotyCoer-> %t"
+    (Params.TyCoercion.print p)
+    (Typed.print_ty_coercion t)
 
-let rec print_s_list = function
+let print_type_param_to_type p t ppf =
+  Print.print ppf "substitution: ";
+  printy ppf "%t :-tyvarToTargetty-> %t" 
+    (Params.Ty.print p)
+    (Types.print_target_ty t)
 
-  | [] -> Print.debug "---------------------"
-  | e :: l ->
-      Print.debug "%t" (print_sub e) ;
-      print_s_list l
+let print_dirt_var_sub p t ppf =
+  Print.print ppf "substitution: ";
+  printy ppf "%t :-dirtvarToTargetdirt-> %t" (Params.Dirt.print p)
+        (Types.print_target_dirt t)
 
+let print_dirt_var_coercion p t ppf =
+  Print.print ppf "substitution: ";
+  printy ppf "%t :-coertyDirtoDirtCoer-> %t"
+    (Params.DirtCoercion.print p)
+    (Typed.print_dirt_coercion t)
+
+let print_skel_param_sub p t ppf =
+  Print.print ppf "substitution: ";
+  printy ppf "%t :-skelvarToSkeleton-> %t" (Params.Skel.print p)
+        (Types.print_skeleton t)
+
+let print_subs ?max_level (subs: substitutions)= 
+  List.map (fun (x,y) -> (Print.debug "%t" (print_type_coercion x y))) (Assoc.to_list subs.type_param_to_type_coercions);
+  List.map (fun (x,y) -> (Print.debug "%t" (print_type_param_to_type x y))) (Assoc.to_list subs.type_param_to_type);
+  List.map (fun (x,y) -> (Print.debug "%t" (print_dirt_var_sub x y))) (Assoc.to_list subs.dirt_var_to_dirt);
+  List.map (fun (x,y) -> (Print.debug "%t" (print_dirt_var_coercion x y))) (Assoc.to_list subs.dirt_var_to_dirt_coercions);
+  List.map (fun (x,y) -> (Print.debug "%t" (print_skel_param_sub x y))) (Assoc.to_list subs.skel_param_to_skel)
+
+let print_s_list subs = 
+  print_subs subs
 
 let rec apply_sub_dirt sub drt =
   match drt.row with
@@ -643,7 +651,7 @@ let dirty_omega_step sub paused cons rest_queue (omega1, omega2) drtycons =
 let rec unify ((sub: substitutions), paused, queue) =
   Print.debug "=============Start loop============" ;
   Print.debug "-----Subs-----" ;
-  (*print_s_list sub ; *)
+  print_s_list sub;
   Print.debug "-----paused-----" ;
   print_c_list paused ;
   Print.debug "-----queue-----" ;
