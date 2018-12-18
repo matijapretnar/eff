@@ -737,7 +737,7 @@ and type_plain_computation (st: state) = function
       st_cons,{ computation= Typed.Handle (coer_exp, coer_comp)
       ; dtype= dirty_2}
   | Untyped.Let (defs, c_2) -> 
-      let [(p_def, c_1)] = defs in 
+      let [(p_def, c_1)] = defs in (
       match c_1.it with
       | Untyped.Value e_1 ->
           let st',{expression= typed_e1; ttype= type_e1} =
@@ -828,6 +828,7 @@ and type_plain_computation (st: state) = function
           let abstraction = (typed_pattern, coer_c2) in
           (add_constraint omega_cons_1 st'' |> add_constraint omega_cons_2),
           { computation= Typed.Bind (coer_c1, abstraction); dtype= (type_c2, new_dirt_var)}
+        )
   | Untyped.LetRec ([(var, abs)], c2)
     when not (Untyped.contains_variable_abs var abs) ->
       failwith __LOC__ (*
