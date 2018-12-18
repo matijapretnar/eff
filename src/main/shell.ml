@@ -142,12 +142,20 @@ let rec exec_cmd ppf state {it= cmd; at= loc} =
       in
       match Assoc.lookup f External.values with
       | Some v ->
+          let ty' = Types.source_to_target ty in
           let type_system_state' =
             SimpleCtx.extend state.type_system_state x (Type.free_params ty, ty)
           in
-          { state with 
-            desugarer_state= desugarer_state'
+          let effect_system_state' =
+            EffectSystem.add_external state.effect_system_state x ty'
+          in
+          let type_checker_state' =
+            TypeChecker.add_external state.type_checker_state x ty'
+          in
+          { desugarer_state= desugarer_state'
           ; type_system_state= type_system_state'
+          ; effect_system_state= effect_system_state'
+          ; type_checker_state= type_checker_state'
           ; runtime_state= Runtime.update x v state.runtime_state }
       | None -> Error.runtime "unknown external symbol %s." f )
   | Commands.Tydef tydefs ->

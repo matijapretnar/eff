@@ -11,10 +11,13 @@ type state =
   ; ty_coer_types: (Params.TyCoercion.t, Types.ct_ty) Assoc.t
   ; dirt_coer_types: (Params.DirtCoercion.t, Types.ct_dirt) Assoc.t }
 
+
 let extend_ty_params st ty_var = {st with ty_params= ty_var :: st.ty_params}
 
 let extend_var_types st t_var tty =
   {st with var_types= Assoc.update t_var tty st.var_types}
+
+let add_external st x ty = extend_var_types st x ty
 
 let extend_dirt_params st dirt_var =
   {st with dirt_params= dirt_var :: st.dirt_params}

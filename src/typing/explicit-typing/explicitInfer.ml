@@ -1089,3 +1089,5 @@ let type_toplevel ~loc st c =
       (Types.print_target_dirt tch_dirt) ;
  *)
     (ct3, st)
+
+let add_external ctx x ty = { ctx with context = TypingEnv.update ctx.context x ty }
