@@ -504,23 +504,23 @@ and reduce_expr st e =
   | ApplySkelExp (e1, sk) -> (
     match e1 with
     | BigLambdaSkel (skvar, e11) ->
-        Unification.apply_sub_exp (Unification.add_skel_sub_e skvar sk) e11
+      Substitution.apply_substitutions_to_expression (Substitution.add_skel_param_substitution_e skvar sk) e11
     | _ -> e )
   | ApplyTyExp (e1, ty) -> (
     match e1 with
     | BigLambdaTy (tyvar, sk, e11) ->
-        Unification.apply_sub_exp (Unification.add_type_sub_e tyvar ty) e11
+      Substitution.apply_substitutions_to_expression (Substitution.add_type_substitution_e tyvar ty) e11
     | _ -> e )
   | ApplyDirtCoercion (e1, dco) -> (
     match e1 with
     | LambdaDirtCoerVar (dcovar, ctd, e11) ->
-        Unification.apply_sub_exp
-          (Unification.add_var_coercion_e dcovar dco) e11
+      Substitution.apply_substitutions_to_expression
+          (Substitution.add_dirt_var_coercion_e dcovar dco) e11
     | _ -> e )
   | ApplyDirtExp (e1, d) -> (
     match e1 with
     | BigLambdaDirt (dvar, e11) ->
-        Unification.apply_sub_exp (Unification.add_var_dirt_sub_e dvar d) e11
+      Substitution.apply_substitutions_to_expression (Substitution.add_dirt_substitution_e dvar d) e11
     | _ -> e )
   | Effect op -> e
   | CastExp (e1, ty_co) ->

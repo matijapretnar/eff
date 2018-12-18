@@ -164,9 +164,9 @@ let rec type_of_ty_coercion st ty_coer =
     match type_of_ty_coercion st ty_coer1 with
     | Types.TySchemeTy (ty_param1, _, t1), Types.TySchemeTy (ty_param2, _, t2) ->
         check_well_formed_ty st tty1 ;
-        let sub = Unification.add_type_sub_e ty_param1 tty1 in
+        let sub = Substitution.add_type_substitution_e ty_param1 tty1 in
         assert (ty_param1 = ty_param2) ;
-        (Unification.apply_sub_ty sub t1, Unification.apply_sub_ty sub t2)
+        (Substitution.apply_substitutions_to_type sub t1, Substitution.apply_substitutions_to_type sub t2)
     | _ -> assert false )
   | ForallDirt (dirt_param, ty_coer1) ->
       let new_st = extend_dirt_params st dirt_param in
@@ -176,9 +176,9 @@ let rec type_of_ty_coercion st ty_coer =
     match type_of_ty_coercion st ty_coer1 with
     | Types.TySchemeDirt (drt_param1, t1), Types.TySchemeDirt (drt_param2, t2) ->
         check_well_formed_dirt st drt ;
-        let sub = Unification.add_var_dirt_sub_e drt_param1 drt in
+        let sub = Substitution.add_dirt_substitution_e drt_param1 drt in
         assert (drt_param1 = drt_param2) ;
-        (Unification.apply_sub_ty sub t1, Unification.apply_sub_ty sub t2)
+        (Substitution.apply_substitutions_to_type sub t1, Substitution.apply_substitutions_to_type sub t2)
     | _ -> assert false )
   | PureCoercion dirty_coer1 ->
       let (t1, _), (t2, _) = type_of_dirty_coercion st dirty_coer1 in
@@ -324,22 +324,22 @@ let rec type_of_expression st e =
     match type_of_expression st e1 with
     | Types.TySchemeTy (p_e1, skel, ty_e1) ->
         check_well_formed_ty st tty ;
-        let sub = Unification.add_type_sub_e p_e1 tty in
-        Unification.apply_sub_ty sub ty_e1
+        let sub = Substitution.add_type_substitution_e p_e1 tty in
+        Substitution.apply_substitutions_to_type sub ty_e1
     | _ -> assert false )
   | ApplySkelExp (e1, sk) -> (
     match type_of_expression st e1 with
     | Types.TySchemeSkel (p_e1, ty_e1) ->
         check_well_formed_skeleton st sk ;
-        let sub = Unification.add_skel_sub_e p_e1 sk in
-        Unification.apply_sub_ty sub ty_e1
+        let sub = Substitution.add_skel_param_substitution_e p_e1 sk in
+        Substitution.apply_substitutions_to_type sub ty_e1
     | _ -> assert false )
   | ApplyDirtExp (e1, d1) -> (
     match type_of_expression st e1 with
     | Types.TySchemeDirt (p_e1, ty_e1) ->
         check_well_formed_dirt st d1 ;
-        let sub = Unification.add_var_dirt_sub_e p_e1 d1 in
-        Unification.apply_sub_ty sub ty_e1
+        let sub = Substitution.add_dirt_substitution_e p_e1 d1 in
+        Substitution.apply_substitutions_to_type sub ty_e1
     | _ -> assert false )
   | LambdaTyCoerVar (tcp1, ct_ty1, e1) ->
       let st' = extend_ty_coer_types st tcp1 ct_ty1 in
