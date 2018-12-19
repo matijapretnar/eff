@@ -73,6 +73,12 @@ let rec fix_union_find fixpoint c_list =
   if sort_new_fixpoint = fixpoint then sort_new_fixpoint
   else fix_union_find sort_new_fixpoint c_list
 
+let process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a = 
+  let k = sp1 in
+  let v = sk2a in
+  let sub1 = Substitution.add_skel_param_substitution_e k v in
+  let cons_subbed = Substitution.apply_substitutions_to_constraints sub1 (add_list_to_constraints paused rest_queue) in
+  (Substitution.add_skel_param_substitution k v sub, [], cons_subbed)
 
 let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
   match skel with
@@ -147,14 +153,12 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
   (* ς = ς *)
   | SkelParam sp1, SkelParam sp2 when sp1 = sp2 -> (sub, paused, rest_queue)
   (* ς₁ = τ₂ / τ₁ = ς₂ *)
-  | SkelParam sp1, sk2a
-   |sk2a, SkelParam sp1
+  | SkelParam sp1, sk2a 
     when not (List.mem sp1 (free_skeleton sk2a)) ->
-      let k = sp1 in
-      let v = sk2a in
-      let sub1 = Substitution.add_skel_param_substitution_e k v in
-      let cons_subbed = Substitution.apply_substitutions_to_constraints sub1 (add_list_to_constraints paused rest_queue) in
-      (Substitution.add_skel_param_substitution k v sub, [], cons_subbed )
+      process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a
+  | sk2a, SkelParam sp1
+    when not (List.mem sp1 (free_skeleton sk2a)) -> 
+      process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a
   (* int = int *)
   | PrimSkel ps1, PrimSkel ps2 when ps1 = ps2 -> (sub, paused, rest_queue)
   (* τ₁₁ -> τ₁₂ = τ₂₁ -> τ₂₂ *)
