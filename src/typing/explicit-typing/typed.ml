@@ -312,7 +312,6 @@ and print_dirt_coercion ?max_level c ppf =
   | DirtCoercion dtyco -> print "dirtOf(%t)" (print_dirty_coercion dtyco)
   | SequenceDirtCoer (dco1, dco2) ->
       print "(%t;%t)" (print_dirt_coercion dco1) (print_dirt_coercion dco2)
-  | _ -> failwith "Not yet implemented __LOC__"
 
 
 and print_omega_ct ?max_level c ppf =
@@ -443,7 +442,6 @@ let rec refresh_expr sbst = function
   | LambdaDirtCoerVar (dcovar, ct, e) ->
       (* TODO: refresh dco var *)
       LambdaDirtCoerVar (dcovar, ct, refresh_expr sbst e)
-  | CastExp (e, tyco) -> CastExp (refresh_expr sbst e, tyco)
   | ApplyTyExp (e, ty) -> ApplyTyExp (refresh_expr sbst e, ty)
   | ApplyDirtExp (e, d) -> ApplyDirtExp (refresh_expr sbst e, d)
   | ApplySkelExp (e, sk) -> ApplySkelExp (refresh_expr sbst e, sk)

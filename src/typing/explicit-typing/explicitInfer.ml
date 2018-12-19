@@ -58,7 +58,7 @@ let extend_env vars env =
 
 
 let print_env env =
-  List.map
+  List.iter
     (fun (x, ty_sch) ->
       Print.debug "%t : %t" (Typed.print_variable x)
         (Types.print_target_ty ty_sch) )

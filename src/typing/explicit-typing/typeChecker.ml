@@ -294,7 +294,6 @@ let rec type_of_expression st e =
       Types.Arrow (ty1, c_ty)
   | Tuple es -> Types.Tuple (List.map (fun e -> type_of_expression st e) es)
   | Variant (lbl, e) ->
-      let loc = Location.unknown in
       let ty_in, ty_out = Types.constructor_signature lbl in
       let u' = type_of_expression st e in
       assert (Types.types_are_equal u' ty_in) ;

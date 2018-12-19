@@ -181,7 +181,6 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
 
 
 and ty_omega_step sub paused cons rest_queue omega =
-  let loc = Location.unknown in
   function
     (* ω : A <= A *)
     | x, y when Types.types_are_equal x y ->
