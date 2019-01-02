@@ -86,6 +86,7 @@ let rec apply_sub_skel sub skeleton =
   | ForallSkel (p, sk1) -> ForallSkel (p, apply_sub_skel sub sk1)
   (* Really consider other cases *)
   | SkelApply (t,l) -> SkelApply (t, List.map (apply_sub_skel sub) l)
+  | SkelTuple skels -> SkelTuple (List.map (apply_sub_skel sub) skels )
 
 let rec apply_sub_ty sub ty =
   match ty with
