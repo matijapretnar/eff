@@ -831,8 +831,7 @@ and type_plain_computation (st: state) = function
           { computation= Typed.Bind (coer_c1, abstraction); dtype= (type_c2, new_dirt_var)}
         )
   | Untyped.LetRec ([(var, abs)], c2)
-    when not (Untyped.contains_variable_abs var abs) ->
-      failwith __LOC__ (*
+    (*when not (Untyped.contains_variable_abs var abs) *) ->
       (*
 
          α, β, δ, ς₁, ς₂ fresh
@@ -847,32 +846,42 @@ and type_plain_computation (st: state) = function
            ~> let rec f = σ₃(Λςs.Λ(αs:τs).Λδѕ.λ(ωs:πs).fun x : σ₃(σ₂(σ₁(α))) -> c₁'') in c₂'
 
        *)
+      Print.debug "Here: Pattern %t" (Untyped.print_pattern (fst abs));
+      Print.debug "Here: Computation: %t" (Untyped.print_computation (snd abs)) ;
+      (* Type abstraction *)
       let ty_a, q_a = fresh_ty_with_fresh_skel () in
       let ty_b, q_b = fresh_ty_with_fresh_skel () in
       let dirt_d = Types.fresh_dirt () in
-      let st1 = add_def st var (Types.Arrow (ty_a, (ty_b, dirt_d))) in
-      let cons1 = q_a :: q_b :: in_cons in
-      let (pat', c1'), (ty_a', (ty_A1, dirt_D1)), cons2, sub_s1 =
-        type_abstraction cons1 st1 abs ty_a
+      let df = (Types.Arrow (ty_a, (ty_b, dirt_d))) in
+      let st1 = add_def st var df
+                |> add_constraint q_a 
+                |> add_constraint q_b in
+      let (pat', c1'), (ty_a', (ty_A1, dirt_D1)), st' =
+        type_abstraction st1 abs ty_a
       in
       let tyco1, q_ty = fresh_ty_coer (ty_A1, ty_b) in
       let dco2, q_d = Typed.fresh_dirt_coer (dirt_D1, dirt_d) in
-      let sub_s2, cons3 = Unification.unify ([], [], q_ty :: q_d :: cons2) in
-      let st2 = apply_sub_to_env st (sub_s1 @ sub_s2) in
-      let ty_A1' = Unification.apply_substitution_ty sub_s2 ty_A1 in
-      let arrow_type = Types.Arrow (ty_a', (ty_A1', dirt_D1)) in
+      let st1' = st' |> add_constraint q_ty |> add_constraint q_d in 
+      let sub_s', cons_s' = Unification.unify (Substitution.empty, [], st1'.constraints) in
+      let st2 = apply_sub_to_env st sub_s' |> add_constraints cons_s' in
+      let ty_A1' = Substitution.apply_substitutions_to_type sub_s' ty_A1 in
+      let dirt_D1' = Substitution.apply_substitutions_to_dirt sub_s' dirt_D1 in (* Do we also need to substitute dirt? *)
+      let ty_a_s' = Substitution.apply_substitutions_to_type sub_s' ty_a' in
+      let arrow_type = Types.Arrow (ty_a_s', (ty_A1', dirt_D1')) in
       let skvars, tyvars, dirtvars, cons4, cons5 =
-        splitter (TypingEnv.return_context st2.context) cons3 ty_A1'
+        splitter (TypingEnv.return_context st2.context) st2.constraints ty_A1'
       in
       let ty_f =
         generalize_type
           (TypingEnv.return_context st2.context)
-          cons3 ty_A1'
-          (Unification.apply_substitution_ty sub_s2 arrow_type)
+          st2.constraints ty_A1'
+          (Substitution.apply_substitutions_to_type st2.substitutions arrow_type)
       in
-      let st3 = add_def st2 var ty_f in
-      let {computation=c2'; dtype= dty2; constraints= cons6; substitutions= sub_s3} = type_computation cons5 st3 c2 in
-      let ty_f' = Unification.apply_substitution_ty sub_s3 ty_f in
+      let st3 = add_def st2 var ty_f |> add_constraints cons5 |> add_constraints cons4 in
+      Print.debug "Calculating computation";
+      let st3',{computation=c2'; dtype= dty2} = type_computation st3 c2 in
+      let ty_f' = Substitution.apply_substitutions_to_type st3'.substitutions ty_f in
+      Print.debug "Starting here";
       let e_rec =
         (* f ςs αs δѕ ωs |> <α> -> ω₁ ! ω₂ *)
         Typed.CastExp
@@ -882,7 +891,9 @@ and type_plain_computation (st: state) = function
                 | Typed.TyOmega (tycovar, ct) ->
                     Typed.ApplyTyCoercion (e, TyCoercionVar tycovar)
                 | Typed.DirtOmega (dcovar, ct) ->
-                    Typed.ApplyDirtCoercion (e, DirtCoercionVar dcovar) )
+                    Typed.ApplyDirtCoercion (e, DirtCoercionVar dcovar) 
+                | _ -> failwith __LOC__
+              )
               (List.fold_left
                  (fun e dv -> Typed.ApplyDirtExp (e, Types.no_effect_dirt dv))
                  (List.fold_left
@@ -895,24 +906,24 @@ and type_plain_computation (st: state) = function
                  dirtvars)
               cons4
           , ArrowCoercion
-              ( ReflTy (Unification.apply_substitution_ty sub_s2 ty_a')
+              ( ReflTy ty_a_s'
               , BangCoercion (tyco1, dco2) ) )
       in
       let c1'' =
         (* c1'' = σ₂(σ₁([e_rec / f]c1')) *)
-        Unification.apply_substitution (sub_s1 @ sub_s2)
+        Substitution.apply_substitutions_to_computation st3'.substitutions
           (Typed.subst_comp (Assoc.of_list [(var, e_rec)]) c1')
       in
       let e_f =
         (* σ₃(Λςs.Λ(αs:τs).Λδѕ.λ(ωs:πs).fun x : σ₃(σ₂(σ₁(α))) -> c₁'') *)
-        Unification.apply_substitution_exp sub_s3
+        Substitution.apply_substitutions_to_expression st3'.substitutions
           (List.fold_right
              (fun skvar e -> Typed.BigLambdaSkel (skvar, e))
              skvars
              (List.fold_right
                 (fun tyvar e ->
                   Typed.BigLambdaTy
-                    (tyvar, Unification.get_skel_of_tyvar tyvar cons3, e) )
+                    (tyvar, Unification.get_skel_of_tyvar tyvar st3'.constraints, e) )
                 tyvars
                 (List.fold_right
                    (fun dirtvar e -> Typed.BigLambdaDirt (dirtvar, e))
@@ -927,14 +938,11 @@ and type_plain_computation (st: state) = function
                       cons4
                       (Typed.Lambda
                          (Typed.abstraction_with_ty pat'
-                            (Unification.apply_substitution_ty sub_s2 ty_a')
+                            (Substitution.apply_substitutions_to_type st3'.substitutions ty_a')
                             c1''))))))
       in
-      { computation= Typed.LetRec ([(var, ty_f', e_f)], c2')
-      ; dtype= dty2
-      ; constraints= cons6
-      ; substitutions= sub_s1 @ sub_s2 @ sub_s3 }
-    *)
+      st3',{ computation= Typed.LetRec ([(var, ty_f', e_f)], c2')
+      ; dtype= dty2}
 
   | _ -> failwith __LOC__
 
