@@ -481,8 +481,16 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
       let r_ty, r_ty_skel_cons = Typed.fresh_ty_with_fresh_skel () in
       let r_cons = r_ty_skel_cons :: st.constraints in
       let pr, cr = h.value_clause in
+      (*
       let Untyped.PVar x = pr.it in
       let r_st = add_def st x r_ty in
+      let st' = add_constraints r_cons r_st in
+      *)
+      let r_st = (match pr.it with 
+        | Untyped.PVar x -> add_def st x r_ty
+        | _ -> failwith __LOC__
+
+      ) in
       let st' = add_constraints r_cons r_st in
       (* Note to self: Should this also be added?, check article *)
       (* let st' = add_constraint skel_cons_in st' |> add_constraint skel_cons_out in *)
@@ -541,9 +549,12 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
         Typed.cast_expression exp_y in_ty
           (Substitution.apply_substitutions_to_type st'''.substitutions r_ty)
       in
-      let substituted_c_r =
-        Typed.subst_comp (Assoc.of_list [(x, coerced_y)])
+      Print.debug "In infer handler (%t)" (Untyped.print_pattern pr);
+      let substituted_c_r = (match pr.it with 
+        | Untyped.PVar x -> Typed.subst_comp (Assoc.of_list [(x, coerced_y)])
           (Substitution.apply_substitutions_to_computation st'''.substitutions target_cr_term)
+        | _ -> target_cr_term
+      )
       in
       let coerced_substiuted_c_r =
         Typed.CastComp (substituted_c_r, Typed.BangCoercion (omega_1, omega_2))
@@ -552,7 +563,6 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
           (eff, abs2) =
         let in_op_ty, out_op_ty = Untyped.EffectMap.find eff st.effects in
         let x, k, c_op = abs2 in
-        let Untyped.PVar k_var = k.it in
         let cons_3 =
           (Substitution.apply_substitutions_to_type st'''.substitutions op_term_ty, out_ty)
         in
@@ -575,14 +585,19 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
         let coerced_l, omega_cons_5 =
           Typed.cast_expression exp_l cons_5a cons_5b
         in
-        let substituted_c_op =
-          Typed.subst_comp (Assoc.of_list [(k_var, coerced_l)])
-            (Substitution.apply_substitutions_to_computation st'''.substitutions op_term)
-        in
-        Print.debug "substituted_c_op [%t/%t]: %t"
-          (Untyped.Variable.print ~safe:true l_var_name)
-          (Untyped.Variable.print ~safe:true k_var)
-          (Typed.print_computation substituted_c_op) ;
+        let substituted_c_op = (match k.it with
+          | Untyped.PVar k_var -> 
+            let s_c_op = Typed.subst_comp (Assoc.of_list [(k_var, coerced_l)])
+              (Substitution.apply_substitutions_to_computation st'''.substitutions op_term) in 
+            Print.debug "substituted_c_op [%t/%t]: %t"
+            (Untyped.Variable.print ~safe:true l_var_name)
+            (Untyped.Variable.print ~safe:true k_var)
+            (Typed.print_computation s_c_op);
+            s_c_op
+          | Untyped.PNonbinding -> op_term
+          | _ -> failwith __LOC__
+          
+        ) in
         let coerced_substiuted_c_op =
           Typed.CastComp
             (substituted_c_op, Typed.BangCoercion (omega_3, omega_4))
