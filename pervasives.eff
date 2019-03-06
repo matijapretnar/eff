@@ -77,6 +77,19 @@ external log : float -> float = "log"
 
 external log1p : float -> float = "log1p"
 
+external cos : float -> float = "cos"
+
+external sin : float -> float = "sin"
+
+external tan : float -> float = "tan"
+
+external acos : float -> float = "acos"
+
+external asin : float -> float = "asin"
+
+external atan : float -> float = "atan"
+
+
 (* Strings *)
 external float_of_int : int -> float = "float_of_int"
 

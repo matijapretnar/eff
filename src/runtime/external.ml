@@ -174,7 +174,13 @@ let arithmetic_operations =
     ; ("exp", float_to_float exp)
     ; ("expm1", float_to_float expm1)
     ; ("log", float_to_float log)
-    ; ("log1p", float_to_float log1p) ]
+    ; ("log1p", float_to_float log1p)
+    ; ("cos", float_to_float cos)
+    ; ("sin", float_to_float sin)
+    ; ("tan", float_to_float tan)
+    ; ("acos", float_to_float acos)
+    ; ("asin", float_to_float asin)
+    ; ("atan", float_to_float atan) ]
 
 
 let string_operations =
