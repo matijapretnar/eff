@@ -19,6 +19,12 @@ external ( = ) : 'a -> 'a -> bool = "="
 
 external ( < ) : 'a -> 'a -> bool = "<"
 
+external infinity : float = "infinity"
+
+external neg_infinity : float = "neg_infinity"
+
+external nan : float = "nan"
+
 let absurd void = match void with;;
 
 effect DivisionByZero : empty
@@ -55,16 +61,21 @@ external ( *. ) : float -> float -> float = "*."
 external ( -. ) : float -> float -> float = "-."
 
 external ( /. ) : float -> float -> float = "/."
-external ( / ) : int -> int -> int = "/"
 
 external ( ** ) : int -> int -> int = "**"
 
-external exp : float -> float = "exp"
-external log : float -> float = "log"
-
+external ( / ) : int -> int -> int = "/"
 let ( / ) m n = match n with
   | 0 -> absurd (perform DivisionByZero)
   | n -> (/) m n
+
+external exp : float -> float = "exp"
+
+external expm1 : float -> float = "expm1"
+
+external log : float -> float = "log"
+
+external log1p : float -> float = "log1p"
 
 (* Strings *)
 external float_of_int : int -> float = "float_of_int"
@@ -96,14 +107,13 @@ type 'a option = None | Some of 'a
 
 let rec assoc x = function
   | [] -> None
-  | (y,z)::lst -> if x = y then Some z else assoc x lst
+  | (key, v) :: lst -> if x = key then Some v else assoc x lst
 
 let rec range m n =
-  if m > n
-  then []
+  if m > n then
+    []
   else
-    let r = range in
-    m :: r (m + 1) n
+    m :: range (m + 1) n
 
 let reverse lst =
   let rec reverse_acc acc = function
@@ -117,7 +127,7 @@ let rec map f = function
   | x :: xs ->
     let y = f x in
     let ys = map f xs in
-      y :: ys;;
+    y :: ys
 
 let hd = function
   | [] ->  absurd (perform (InvalidArgument "head: empty list"))
@@ -130,18 +140,18 @@ let tl = function
 let take f k =
   let r = range 0 k in map f r
 
-let rec fold_left f a = function
-  | [] -> a
+let rec fold_left f acc = function
+  | [] -> acc
   | y :: ys ->
-    let a = f a y in
-    fold_left f a ys
+    let acc' = f acc y in
+    fold_left f acc' ys
 
-let rec fold_right f xs a =
+let rec fold_right f xs acc =
   match xs with
-    | [] -> a
+    | [] -> acc
     | x :: xs ->
-      let a = fold_right f xs a in
-      f x a
+      let acc' = fold_right f xs acc in
+      f x acc'
 
 let rec iter f = function
   | [] -> ()
@@ -172,6 +182,12 @@ let rec zip xs ys =
   | (x :: xs, y :: ys) -> (x, y) :: (zip xs ys)
   | (_, _) -> absurd (perform (InvalidArgument "zip: length mismatch"))
 
+let rec unzip = function
+  | [] -> ([], [])
+  | (x, y) :: xys ->
+    let xs, ys = unzip xys in
+    (x :: xs, y :: ys)
+
 let rec (@) xs ys =
   match xs with
   | [] -> ys
@@ -191,8 +207,7 @@ let max x y = if x < y then y else x
 let rec gcd m n =
   match n with
   | 0 -> m
-  | _ ->
-    let g = gcd n in g (m mod n)
+  | _ -> let g = gcd n in g (m mod n)
 
 let rec lcm m n =
   let d = gcd m n in (m * n) / d
@@ -204,6 +219,8 @@ let even x = (x mod 2 = 0)
 let id x = x
 
 let compose f g x = f (g x)
+
+let (|>) x f = f x
 
 let ignore _ = ()
 
@@ -219,7 +236,7 @@ let print_string str =
   perform (Print str)
 
 let print_endline str =
-    perform (Print (str ^ "\n"))
+  perform (Print (str ^ "\n"))
 
 (* Basic Handlers *)
 (*

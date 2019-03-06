@@ -142,6 +142,13 @@ let comparison_functions =
     ; ("<", binary_closure (fun v1 v2 -> value_bool (less_than v1 v2))) ]
 
 
+let constants =
+  Assoc.of_list
+  [ ("infinity", from_float infinity)
+  ; ("neg_infinity", from_float neg_infinity)
+  ; ("nan", from_float nan) ]
+
+
 let rec pow a = function
   | 0 -> 1
   | 1 -> a
@@ -165,7 +172,9 @@ let arithmetic_operations =
     ; ("*.", float_float_to_float ( *. ))
     ; ("/.", float_float_to_float ( /. ))
     ; ("exp", float_to_float exp)
-    ; ("log", float_to_float log) ]
+    ; ("expm1", float_to_float expm1)
+    ; ("log", float_to_float log)
+    ; ("log1p", float_to_float log1p) ]
 
 
 let string_operations =
@@ -192,5 +201,9 @@ let conversion_functions =
     comparison functions, arithmetic operations, string operations, conversion
     functions, and effect instances. *)
 let values =
-  comparison_functions |> Assoc.concat arithmetic_operations
-  |> Assoc.concat string_operations |> Assoc.concat conversion_functions
+  comparison_functions
+  |> Assoc.concat constants
+  |> Assoc.concat arithmetic_operations
+  |> Assoc.concat string_operations
+  |> Assoc.concat conversion_functions
+  
