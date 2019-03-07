@@ -2,7 +2,7 @@
 val fresh_ty_param : unit -> Params.Ty.t
 
 type ty =
-  | Apply of OldUtils.tyname * ty list
+  | Apply of CoreTypes.tyname * ty list
   | TyParam of Params.Ty.t
   | Basic of string
   | Tuple of ty list

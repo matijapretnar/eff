@@ -2,11 +2,11 @@
 module T = Type
 
 type tydef =
-  | Record of (OldUtils.field, Type.ty) Assoc.t
-  | Sum of (OldUtils.label, Type.ty option) Assoc.t
+  | Record of (CoreTypes.field, Type.ty) Assoc.t
+  | Sum of (CoreTypes.label, Type.ty option) Assoc.t
   | Inline of Type.ty
 
-type tyctx = (OldUtils.tyname, Params.Ty.t list * tydef) Assoc.t
+type tyctx = (CoreTypes.tyname, Params.Ty.t list * tydef) Assoc.t
 
 let initial : tyctx =
   Assoc.of_list

@@ -1,34 +1,9 @@
 (** OldUtils.definitions. *)
 
-(** Types shared by different modules *)
-
-(** effect symbols *)
-type effect = string
-
-(** variant labels *)
-type label = string
-
-(** record fields *)
-type field = string
-
-(** type names *)
-type tyname = string
-
-(** type parameters *)
-type typaram = string
-
-(** dirt parameters *)
-type dirtparam = int
-
-(** region parameters *)
-type regionparam = int
-
-type comparison = Less | Equal | Greater | Invalid
-
 (** Variants for the built-in list type *)
-let cons = "$1cons"
+let cons : CoreTypes.label = "$1cons"
 
-let nil = "$0nil"
+let nil : CoreTypes.label = "$0nil"
 
 
 let no_duplicates lst =

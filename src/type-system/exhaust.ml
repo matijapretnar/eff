@@ -21,8 +21,8 @@ module Untyped = UntypedSyntax
 (* Types of constructors. *)
 type cons =
   | Tuple of int
-  | Record of OldUtils.field list
-  | Variant of OldUtils.label * bool
+  | Record of CoreTypes.field list
+  | Variant of CoreTypes.label * bool
   | Const of Const.t
   | Wildcard
 

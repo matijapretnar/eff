@@ -5,7 +5,7 @@ module EffectMap : Map.S with type key = String.t
 
 type variable = Variable.t
 
-type effect = OldUtils.effect
+type effect = CoreTypes.effect
 
 type pattern = plain_pattern CoreUtils.located
 
@@ -14,8 +14,8 @@ and plain_pattern =
   | PAnnotated of pattern * Type.ty
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (OldUtils.field, pattern) Assoc.t
-  | PVariant of OldUtils.label * pattern option
+  | PRecord of (CoreTypes.field, pattern) Assoc.t
+  | PVariant of CoreTypes.label * pattern option
   | PConst of Const.t
   | PNonbinding
 
@@ -27,8 +27,8 @@ and plain_expression =
   | Const of Const.t
   | Annotated of expression * Type.ty
   | Tuple of expression list
-  | Record of (OldUtils.field, expression) Assoc.t
-  | Variant of OldUtils.label * expression option
+  | Record of (CoreTypes.field, expression) Assoc.t
+  | Variant of CoreTypes.label * expression option
   | Lambda of abstraction
   | Effect of effect
   | Handler of handler

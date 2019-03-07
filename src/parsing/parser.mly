@@ -3,7 +3,7 @@
   open CoreUtils
 
   type handler_clause =
-    | EffectClause of OldUtils.effect * abstraction2
+    | EffectClause of CoreTypes.effect * abstraction2
     | ReturnClause of abstraction
     | FinallyClause of abstraction
 
@@ -33,8 +33,8 @@
 %token <string> STRING
 %token <bool> BOOL
 %token <float> FLOAT
-%token <OldUtils.label> UNAME
-%token <OldUtils.typaram> PARAM
+%token <CoreTypes.label> UNAME
+%token <CoreTypes.typaram> PARAM
 %token TYPE ARROW HARROW OF EFFECT PERFORM
 %token EXTERNAL
 %token MATCH WITH FUNCTION HASH

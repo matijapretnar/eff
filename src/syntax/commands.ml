@@ -6,7 +6,7 @@ module Sugared = SugaredSyntax
 type t = plain_command located
 
 and plain_command =
-  | Tydef of (OldUtils.tyname, OldUtils.typaram list * Sugared.tydef) Assoc.t
+  | Tydef of (CoreTypes.tyname, CoreTypes.typaram list * Sugared.tydef) Assoc.t
       (** [type t = tydef] *)
   | TopLet of (Sugared.pattern * Sugared.term) list
       (** [let p1 = t1 and ... and pn = tn] *)

@@ -18,6 +18,6 @@ val of_false : t
 
 val print : t -> Format.formatter -> unit
 
-val compare : t -> t -> OldUtils.comparison
+val compare : t -> t -> CoreTypes.comparison
 
 val equal : t -> t -> bool
