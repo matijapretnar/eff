@@ -59,13 +59,6 @@ let flatten_map f xs = List.flatten (List.map f xs)
 (** [option_map f] maps [None] to [None] and [Some x] to [Some (f x)]. *)
 let option_map f = function None -> None | Some x -> Some (f x)
 
-(** [repeat x n] creates a list with [x] repeated [n] times. *)
-let rec repeat x = function 0 -> [] | n -> x :: repeat x (n - 1)
-
-let rec find p = function
-  | [] -> None
-  | x :: lst -> if p x then Some x else find p lst
-
 (** [uniq lst] returns [lst] with all duplicates removed, keeping the first
     occurence of each element. *)
 let uniq lst =

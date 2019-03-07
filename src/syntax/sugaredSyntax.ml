@@ -79,5 +79,3 @@ and abstraction = (pattern * term)
 and abstraction2 = (pattern * pattern * term)
 
 type dirt = DirtParam of OldUtils.dirtparam
-
-type region = RegionParam of OldUtils.regionparam

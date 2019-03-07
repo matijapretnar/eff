@@ -149,9 +149,7 @@ let specialize_vector ~loc con = function
     | Const c, Untyped.PConst c' when Const.equal c c' -> Some lst
     | _, (Untyped.PNonbinding | Untyped.PVar _) ->
         let nonbinds =
-          OldUtils.repeat
-            {it= Untyped.PNonbinding; at= loc}
-            (arity con)
+          List.init (arity con) (fun _ -> {it= Untyped.PNonbinding; at= loc})
         in
         Some (nonbinds @ lst)
     | _, _ -> None
@@ -232,9 +230,7 @@ let rec exhaustive ~loc p = function
         | Some lst ->
             let c = List.hd missing in
             let nonbinds =
-              OldUtils.repeat
-               {it= Untyped.PNonbinding; at= loc}
-               (arity c)
+              List.init (arity c) (fun _ -> {it= Untyped.PNonbinding; at= loc})
             in
             Some (pattern_of_cons ~loc c nonbinds :: lst)
 

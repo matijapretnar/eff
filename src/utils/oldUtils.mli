@@ -43,11 +43,6 @@ val flatten_map : ('a -> 'b list) -> 'a list -> 'b list
 (** [option_map f] maps [None] to [None] and [Some x] to [Some (f x)]. *)
 val option_map : ('a -> 'b) -> 'a option -> 'b option
 
-(** [repeat x n] creates a list with [x] repeated [n] times. *)
-val repeat : 'a -> int -> 'a list
-
-val find : ('a -> bool) -> 'a list -> 'a option
-
 (** [uniq lst] returns [lst] with all duplicates removed, keeping the first
     occurence of each element. *)
 

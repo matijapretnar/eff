@@ -102,7 +102,7 @@ let infer_pattern cstr pp =
 
 let extend_with_pattern ?(forbidden_vars= []) ctx cstr p =
   let vars, t = infer_pattern cstr p in
-  match OldUtils.find (fun (x, _) -> List.mem_assoc x vars) forbidden_vars with
+  match List.find_opt (fun (x, _) -> List.mem_assoc x vars) forbidden_vars with
   | Some (x, _) ->
       Error.typing ~loc:p.at "Several definitions of %t."
         (Untyped.Variable.print x)
