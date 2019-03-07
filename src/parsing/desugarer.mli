@@ -7,7 +7,7 @@ val desugar_computation :
 
 val desugar_def_effect :
   state -> SugaredSyntax.effect * (SugaredSyntax.ty * SugaredSyntax.ty)
-  -> SugaredSyntax.effect * (Type.ty * Type.ty)
+  -> UntypedSyntax.effect * (Type.ty * Type.ty)
 
 val desugar_external :
   state -> SugaredSyntax.variable * SugaredSyntax.ty * string

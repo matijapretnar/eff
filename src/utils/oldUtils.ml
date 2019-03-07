@@ -30,15 +30,6 @@ let cons = "$1cons"
 
 let nil = "$0nil"
 
-(* [injective f lst] returns [true] when [f] is injective on [lst]. *)
-let injective f lst =
-  let rec check ys = function
-    | [] -> true
-    | x :: xs ->
-        let y = f x in
-        not (List.mem y ys) && check (y :: ys) xs
-  in
-  check [] lst
 
 let no_duplicates lst =
   let rec check seen = function
