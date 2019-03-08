@@ -1,3 +1,4 @@
+open CoreUtils
 module V = Value
 
 let from_bool b = V.Const (Const.of_boolean b)
@@ -45,64 +46,64 @@ let float_float_to_float f =
 (* Comparison of values is a trickier business than you might think. *)
 let rec compare v1 v2 =
   match v1 with
-  | V.Closure _ | V.Handler _ -> CoreTypes.Invalid
+  | V.Closure _ | V.Handler _ -> Invalid
   | V.Const c -> (
     match v2 with
-    | V.Closure _ | V.Handler _ -> CoreTypes.Invalid
+    | V.Closure _ | V.Handler _ -> Invalid
     | V.Const c' -> Const.compare c c'
-    | V.Tuple _ | V.Record _ | V.Variant _ -> CoreTypes.Less )
+    | V.Tuple _ | V.Record _ | V.Variant _ -> Less )
   | V.Tuple lst -> (
     match v2 with
-    | V.Closure _ | V.Handler _ -> CoreTypes.Invalid
-    | V.Const _ -> CoreTypes.Greater
+    | V.Closure _ | V.Handler _ -> Invalid
+    | V.Const _ -> Greater
     | V.Tuple lst' -> compare_list lst lst'
-    | V.Record _ | V.Variant _ -> CoreTypes.Less )
+    | V.Record _ | V.Variant _ -> Less )
   | V.Record lst -> (
     match v2 with
-    | V.Closure _ | V.Handler _ -> CoreTypes.Invalid
-    | V.Const _ | V.Tuple _ -> CoreTypes.Greater
+    | V.Closure _ | V.Handler _ -> Invalid
+    | V.Const _ | V.Tuple _ -> Greater
     | V.Record lst' -> compare_record lst lst'
-    | V.Variant _ -> CoreTypes.Less )
+    | V.Variant _ -> Less )
   | V.Variant (lbl, u) ->
     match v2 with
-    | V.Closure _ | V.Handler _ -> CoreTypes.Invalid
-    | V.Const _ | V.Tuple _ | V.Record _ -> CoreTypes.Greater
+    | V.Closure _ | V.Handler _ -> Invalid
+    | V.Const _ | V.Tuple _ | V.Record _ -> Greater
     | V.Variant (lbl', u') ->
         let r = Pervasives.compare lbl lbl' in
-        if r < 0 then CoreTypes.Less
-        else if r > 0 then CoreTypes.Greater
+        if r < 0 then Less
+        else if r > 0 then Greater
         else compare_option u u'
 
 
 and compare_list lst1 lst2 =
   match (lst1, lst2) with
-  | [], [] -> CoreTypes.Equal
+  | [], [] -> Equal
   | u :: lst1, v :: lst2 -> (
     match compare u v with
-    | CoreTypes.Less -> CoreTypes.Less
-    | CoreTypes.Equal -> compare_list lst1 lst2
-    | CoreTypes.Greater -> CoreTypes.Greater
-    | CoreTypes.Invalid -> CoreTypes.Invalid )
-  | [], _ :: _ -> CoreTypes.Less
-  | _ :: _, [] -> CoreTypes.Greater
+    | Less -> Less
+    | Equal -> compare_list lst1 lst2
+    | Greater -> Greater
+    | Invalid -> Invalid )
+  | [], _ :: _ -> Less
+  | _ :: _, [] -> Greater
 
 
 and compare_record lst1 lst2 =
   (* Is is easiest to canonically sort the fields, then compare as lists. *)
   let rec comp = function
-    | [], [] -> CoreTypes.Equal
+    | [], [] -> Equal
     | (fld1, v1) :: lst1, (fld2, v2) :: lst2 -> (
         let r = Pervasives.compare fld1 fld2 in
-        if r < 0 then CoreTypes.Less
-        else if r > 0 then CoreTypes.Greater
+        if r < 0 then Less
+        else if r > 0 then Greater
         else
           match compare v1 v2 with
-          | CoreTypes.Less -> CoreTypes.Less
-          | CoreTypes.Equal -> comp (lst1, lst2)
-          | CoreTypes.Greater -> CoreTypes.Greater
-          | CoreTypes.Invalid -> CoreTypes.Invalid )
-    | [], _ :: _ -> CoreTypes.Less
-    | _ :: _, [] -> CoreTypes.Greater
+          | Less -> Less
+          | Equal -> comp (lst1, lst2)
+          | Greater -> Greater
+          | Invalid -> Invalid )
+    | [], _ :: _ -> Less
+    | _ :: _, [] -> Greater
   in
   let lst1' = Assoc.to_list lst1 in
   let lst2' = Assoc.to_list lst2 in
@@ -114,26 +115,26 @@ and compare_record lst1 lst2 =
 
 and compare_option o1 o2 =
   match (o1, o2) with
-  | None, None -> CoreTypes.Equal
+  | None, None -> Equal
   | Some v1, Some v2 -> compare v1 v2
-  | None, Some _ -> CoreTypes.Less
-  | Some _, None -> CoreTypes.Greater
+  | None, Some _ -> Less
+  | Some _, None -> Greater
 
 
 (* Now it is easy to get equality and less than, not to mention we
    can now easily add a builtin "compare". *)
 let equal v1 v2 =
   match compare v1 v2 with
-  | CoreTypes.Equal -> true
-  | CoreTypes.Less | CoreTypes.Greater -> false
-  | CoreTypes.Invalid -> Error.runtime "invalid comparison with ="
+  | Equal -> true
+  | Less | Greater -> false
+  | Invalid -> Error.runtime "invalid comparison with ="
 
 
 let less_than v1 v2 =
   match compare v1 v2 with
-  | CoreTypes.Less -> true
-  | CoreTypes.Greater | CoreTypes.Equal -> false
-  | CoreTypes.Invalid -> Error.runtime "invalid comparison with <"
+  | Less -> true
+  | Greater | Equal -> false
+  | Invalid -> Error.runtime "invalid comparison with <"
 
 
 let comparison_functions =

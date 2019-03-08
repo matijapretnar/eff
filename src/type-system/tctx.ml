@@ -17,9 +17,9 @@ let initial : tyctx =
     ; ("float", ([], Inline T.float_ty))
     ; ( "list"
       , let a = Type.fresh_ty_param () in
-        let list_nil = (OldUtils.nil, None) in
+        let list_nil = (CoreTypes.nil, None) in
         let list_cons =
-          ( OldUtils.cons
+          ( CoreTypes.cons
           , Some (T.Tuple [T.TyParam a; T.Apply ("list", [T.TyParam a])]) )
         in
         ([a], Sum (Assoc.of_list [list_nil; list_cons])) )
@@ -33,7 +33,8 @@ let subst_tydef sbst =
   let subst = Type.subst_ty sbst in
   function
     | Record tys -> Record (Assoc.map subst tys)
-    | Sum tys -> Sum (Assoc.map (OldUtils.option_map subst) tys)
+    | Sum tys -> 
+        Sum (Assoc.map (function None -> None | Some x -> Some (subst x)) tys)
     | Inline ty -> Inline (subst ty)
 
 let lookup_tydef ~loc ty_name =
@@ -85,8 +86,12 @@ let infer_variant lbl =
   | None -> None
   | Some (ty_name, ps, _, u) ->
       let ps', fresh_subst = T.refreshing_subst ps in
-      let u = OldUtils.option_map (T.subst_ty fresh_subst) u in
-      Some (apply_to_params ty_name ps', u)
+      let u' = 
+        match u with
+        | None -> None 
+        | Some x -> Some (T.subst_ty fresh_subst x)
+      in
+      Some (apply_to_params ty_name ps', u')
 
 (** [infer_field fld] finds a record type that defines the field [fld] and returns it with
     refreshed type parameters and additional information needed for type inference. *)
@@ -128,11 +133,11 @@ let check_well_formed ~loc tydef =
   in
   match tydef with
   | Record fields ->
-      if not (OldUtils.no_duplicates (Assoc.keys_of fields)) then
+      if not (CoreUtils.no_duplicates (Assoc.keys_of fields)) then
         Error.typing ~loc "Field labels in a record type must be distinct" ;
       Assoc.iter (fun (_, ty) -> check ty) fields
   | Sum constructors ->
-      if not (OldUtils.no_duplicates (Assoc.keys_of constructors)) then
+      if not (CoreUtils.no_duplicates (Assoc.keys_of constructors)) then
         Error.typing ~loc "Constructors of a sum type must be distinct" ;
       let checker = function _, None -> () | _, Some ty -> check ty in
       Assoc.iter checker constructors

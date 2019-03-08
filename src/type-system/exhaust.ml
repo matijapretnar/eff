@@ -79,7 +79,7 @@ let pattern_of_cons ~loc c lst =
 (* Finds all distinct non-wildcard root pattern constructors in [lst], and at
    least one constructor of their type not present in [lst] if it exists. *)
 let find_constructors lst =
-  let cons_lst = List.map cons_of_pattern (OldUtils.uniq lst) in
+  let cons_lst = List.map cons_of_pattern (unique_elements lst) in
   let present = List.filter (fun c -> c <> Wildcard) cons_lst in
   let missing =
     match present with
@@ -123,7 +123,7 @@ let find_constructors lst =
                 (fun (lbl, opt) -> Variant (lbl, opt <> None))
                 (Assoc.to_list tags)
             in
-            OldUtils.diff all present )
+            list_diff all present )
       (* Only for completeness. *)
       | Wildcard -> []
   in
@@ -209,6 +209,14 @@ let rec useful ~loc p q =
    columns is exhaustive (equivalent to calling [useful] on [p] with a vector
    of [n] wildcard patterns). Returns a list with at least one counterexample if
    [p] is not exhaustive. *)
+let split_at n lst =
+  let rec split_at' acc lst n =
+    match (lst, n) with
+    | [], _ | _, 0 -> (List.rev acc, lst)
+    | x :: xs, n -> split_at' (x :: acc) xs (n - 1)
+  in
+  split_at' [] lst n
+
 let rec exhaustive ~loc p = function
   | 0 -> if p = [] then Some [] else None
   | n ->
@@ -220,7 +228,7 @@ let rec exhaustive ~loc p = function
             match exhaustive ~loc (specialize ~loc c p) (arity c + n - 1) with
             | None -> find cs
             | Some lst ->
-                let ps, rest = OldUtils.split (arity c) lst in
+                let ps, rest = split_at (arity c) lst in
                 Some (pattern_of_cons ~loc c ps :: rest)
         in
         find present

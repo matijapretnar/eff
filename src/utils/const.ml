@@ -23,9 +23,9 @@ let print c ppf =
 let compare c1 c2 =
   let cmp x y =
     let r = Pervasives.compare x y in
-    if r < 0 then CoreTypes.Less
-    else if r > 0 then CoreTypes.Greater
-    else CoreTypes.Equal
+    if r < 0 then CoreUtils.Less
+    else if r > 0 then CoreUtils.Greater
+    else CoreUtils.Equal
   in
   match (c1, c2) with
   | Integer n1, Integer n2 -> cmp n1 n2
@@ -35,4 +35,4 @@ let compare c1 c2 =
   | _ -> Error.runtime "Incomparable constants %t and %t" (print c1) (print c2)
 
 
-let equal c1 c2 = compare c1 c2 = CoreTypes.Equal
+let equal c1 c2 = compare c1 c2 = CoreUtils.Equal

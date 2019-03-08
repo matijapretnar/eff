@@ -1,7 +1,6 @@
 (** Desugaring of syntax into the core language. *)
 
 open CoreUtils
-module Utils = OldUtils
 module T = Type
 module Sugared = SugaredSyntax
 module Untyped = UntypedSyntax
@@ -14,9 +13,10 @@ type state =
   ; local_type_annotations: (string, Params.Ty.t) Assoc.t }
 
 let initial_state =
-  let init_cons = [(Utils.cons, Variant true); (Utils.nil, Variant false)] in
+  let list_cons = (CoreTypes.cons, Variant true) in
+  let list_nil = (CoreTypes.nil, Variant false) in
   { context= Assoc.empty
-  ; constructors= Assoc.of_list init_cons
+  ; constructors= Assoc.of_list [list_cons; list_nil]
   ; local_type_annotations= Assoc.empty }
 
 let add_loc t loc = {it= t; at= loc}
@@ -58,13 +58,13 @@ let desugar_type type_sbst state =
 let free_type_params t =
   let rec ty_params {it= t; at= loc} =
     match t with
-    | Sugared.TyApply (_, tys) -> OldUtils.flatten_map ty_params tys
+    | Sugared.TyApply (_, tys) -> List.map ty_params tys |> List.flatten
     | Sugared.TyParam s -> [s]
     | Sugared.TyArrow (t1, t2) -> ty_params t1 @ ty_params t2
-    | Sugared.TyTuple lst -> OldUtils.flatten_map ty_params lst
+    | Sugared.TyTuple lst -> List.map ty_params lst |> List.flatten
     | Sugared.TyHandler (t1, t2) -> ty_params t1 @ ty_params t2
   in
-  OldUtils.uniq (ty_params t)
+  unique_elements (ty_params t)
 
 let syntax_to_core_params ts =
   Assoc.map_of_list (fun p -> (p, Type.fresh_ty_param ())) ts
@@ -227,7 +227,7 @@ let rec desugar_expression state {it= t; at= loc} =
         let state', w, es = desugar_expressions state ts in
         (state', w, Untyped.Tuple es)
     | Sugared.Record ts ->
-        if not (Utils.no_duplicates (Assoc.keys_of ts)) then
+        if not (CoreUtils.no_duplicates (Assoc.keys_of ts)) then
           Error.syntax ~loc "Fields in a record must be distinct" ;
         let state', w, es = desugar_record_fields state ts in
         (state', w, Untyped.Record es)

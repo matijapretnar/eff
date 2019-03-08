@@ -174,7 +174,7 @@ plain_binop_term:
     }
   | t1 = binop_term CONS t2 = binop_term
     { let tuple = {it= Tuple [t1; t2]; at= Location.make $startpos $endpos} in
-      Variant (OldUtils.cons, Some tuple) }
+      Variant (CoreTypes.cons, Some tuple) }
   | t = plain_uminus_term
     { t }
 
@@ -229,11 +229,11 @@ plain_simple_term:
       Effect (eff, {it= Tuple []; at= unit_loc})}
   | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
-      let nil = {it= Variant (OldUtils.nil, None); at= Location.make $endpos $endpos} in
+      let nil = {it= Variant (CoreTypes.nil, None); at= Location.make $endpos $endpos} in
       let cons t ts =
         let loc = Location.union [t.at; ts.at] in
         let tuple = {it= Tuple [t; ts];at= loc} in
-        {it= Variant (OldUtils.cons, Some tuple); at= loc}
+        {it= Variant (CoreTypes.cons, Some tuple); at= loc}
       in
       (List.fold_right cons ts nil).it
     }
@@ -327,7 +327,7 @@ plain_cons_pattern:
     { p.it }
   | p1 = variant_pattern CONS p2 = cons_pattern
     { let ptuple = {it= PTuple [p1; p2]; at= Location.make $startpos $endpos} in
-      PVariant (OldUtils.cons, Some ptuple) }
+      PVariant (CoreTypes.cons, Some ptuple) }
 
 variant_pattern: mark_position(plain_variant_pattern) { $1 }
 plain_variant_pattern:
@@ -350,11 +350,11 @@ plain_simple_pattern:
     { PRecord (Assoc.of_list flds) }
   | LBRACK ts = separated_list(SEMI, pattern) RBRACK
     {
-      let nil = {it= PVariant (OldUtils.nil, None);at= Location.make $endpos $endpos} in
+      let nil = {it= PVariant (CoreTypes.nil, None);at= Location.make $endpos $endpos} in
       let cons t ts =
         let loc = Location.union [t.at; ts.at] in
         let tuple = {it= PTuple [t; ts]; at= loc} in
-        {it= PVariant (OldUtils.cons, Some tuple); at= loc}
+        {it= PVariant (CoreTypes.cons, Some tuple); at= loc}
       in
       (List.fold_right cons ts nil).it
     }

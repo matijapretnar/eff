@@ -69,7 +69,7 @@ let infer_pattern cstr pp =
         t
     | Untyped.PNonbinding -> T.fresh_ty ()
     | Untyped.PConst const -> ty_of_const const
-    | Untyped.PTuple ps -> T.Tuple (OldUtils.map infer ps)
+    | Untyped.PTuple ps -> T.Tuple (left_to_right_map infer ps)
     | Untyped.PRecord flds -> (
       match Assoc.pop flds with
       | None -> assert false
@@ -135,11 +135,16 @@ and infer_let ctx cstr loc defs =
       Print.warning ~loc
         "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
         (Print.sequence "," Location.print locations) ) ;
+  let rec find_duplicate xs ys =
+    match xs with
+    | [] -> None
+    | x :: xs -> if List.mem x ys then Some x else find_duplicate xs ys
+  in
   let infer_fold_fun (vs, ctx') (p, c) =
     let tc = infer_comp ctx cstr c in
     let ws, tp = infer_pattern cstr p in
     add_ty_constraint cstr c.at tc tp ;
-    match OldUtils.find_duplicate (List.map fst ws) (List.map fst vs) with
+    match find_duplicate (List.map fst ws) (List.map fst vs) with
     | Some x ->
         Error.typing ~loc "Several definitions of %t."
           (Untyped.Variable.print x)
@@ -160,7 +165,7 @@ and infer_let ctx cstr loc defs =
   (vars, Ctx.subst_ctx ctx' (Unify.solve !cstr))
 
 and infer_let_rec ctx cstr loc defs =
-  if not (OldUtils.no_duplicates (List.map fst defs)) then
+  if not (no_duplicates (List.map fst defs)) then
     Error.typing ~loc "Multiply defined recursive value." ;
   let lst =
     List.map
@@ -209,7 +214,7 @@ and infer_expr ctx cstr {it= e; at= loc} =
       let ty' = infer_expr ctx cstr t in
       add_ty_constraint cstr loc ty ty';
       ty
-  | Untyped.Tuple es -> T.Tuple (OldUtils.map (infer_expr ctx cstr) es)
+  | Untyped.Tuple es -> T.Tuple (left_to_right_map (infer_expr ctx cstr) es)
   | Untyped.Record flds -> (
     match Assoc.pop flds with
     | None -> assert false

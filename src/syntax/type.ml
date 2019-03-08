@@ -74,7 +74,7 @@ let free_params ty =
     | Arrow (ty1, ty2) -> free_ty ty1 @ free_ty ty2
     | Handler {value= ty1; finally= ty2} -> free_ty ty1 @ free_ty ty2
   in
-  OldUtils.uniq (free_ty ty)
+  CoreUtils.unique_elements (free_ty ty)
 
 
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)

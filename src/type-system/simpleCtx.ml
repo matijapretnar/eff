@@ -27,15 +27,20 @@ let subst_ctx ctx sbst =
 
 (** [free_params ctx] returns list of all free type parameters in [ctx]. *)
 let free_params ctx =
-  let binding_params (_, (ps, ty)) = OldUtils.diff (Type.free_params ty) ps in
-  let xs = OldUtils.flatten_map binding_params (Assoc.to_list ctx) in
-  OldUtils.uniq xs
+  let binding_params (_, (ps, ty)) = 
+    CoreUtils.list_diff (Type.free_params ty) ps 
+  in
+  let xs = List.map binding_params (Assoc.to_list ctx) |> List.flatten in
+  CoreUtils.unique_elements xs
 
 let generalize ctx poly ty =
   if poly then
-    let ps = OldUtils.diff (Type.free_params ty) (free_params ctx.variables) in
+    let ps = 
+      CoreUtils.list_diff (Type.free_params ty) (free_params ctx.variables)
+    in
     (ps, ty)
-  else ([], ty)
+  else 
+    ([], ty)
 
 let infer_effect env eff =
   try Some (Untyped.EffectMap.find eff env.effects) with Not_found -> None
