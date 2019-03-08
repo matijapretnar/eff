@@ -4,7 +4,7 @@ open CoreUtils
 (** Terms *)
 type variable = string
 
-type effect = CoreTypes.effect
+type effect = string
 
 type ty = plain_ty located
 

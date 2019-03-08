@@ -1,11 +1,8 @@
 (** Syntax of the core language. *)
 open CoreUtils
 
-module EffectMap = Map.Make (String)
-
 type variable = CoreTypes.Variable.t
-
-type effect = CoreTypes.effect
+type effect = CoreTypes.Effect.t
 
 type pattern = plain_pattern located
 
@@ -120,7 +117,7 @@ and print_expression ?max_level e ppf =
       print "{effect_clauses = %t; value_clause = (%t)}"
         (Print.sequence " | " effect_clause (Assoc.to_list h.effect_clauses))
         (abstraction h.value_clause)
-  | Effect eff -> print "%s" eff
+  | Effect eff -> print "%t" (CoreTypes.Effect.print eff)
 
 and abstraction (p, c) ppf =
   Format.fprintf ppf "%t -> %t" (print_pattern p) (print_computation c)
@@ -131,7 +128,7 @@ and let_abstraction (p, c) ppf =
 and case a ppf = Format.fprintf ppf "%t" (abstraction a)
 
 and effect_clause (eff, a2) ppf =
-  Format.fprintf ppf "| %s -> %t" eff (abstraction2 a2)
+  Format.fprintf ppf "| %t -> %t" (CoreTypes.Effect.print eff) (abstraction2 a2)
 
 and abstraction2 (p1, p2, c) ppf =
   Format.fprintf ppf "%t %t -> %t" (print_pattern p1) (print_pattern p2)

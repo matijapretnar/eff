@@ -3,7 +3,7 @@
   open CoreUtils
 
   type handler_clause =
-    | EffectClause of CoreTypes.effect * abstraction2
+    | EffectClause of SugaredSyntax.effect * abstraction2
     | ReturnClause of abstraction
     | FinallyClause of abstraction
 

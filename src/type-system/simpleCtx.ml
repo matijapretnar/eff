@@ -1,12 +1,14 @@
 module Untyped = UntypedSyntax
 
+module EffectMap = Map.Make (CoreTypes.Effect)
+
 type ty_scheme = Params.Ty.t list * Type.ty
 
 type t =
-  { variables: (Untyped.variable, ty_scheme) Assoc.t
-  ; effects: (Type.ty * Type.ty) Untyped.EffectMap.t }
+  { variables: (CoreTypes.Variable.t, ty_scheme) Assoc.t
+  ; effects: (Type.ty * Type.ty) EffectMap.t }
 
-let empty = {variables= Assoc.empty; effects= Untyped.EffectMap.empty}
+let empty = {variables= Assoc.empty; effects= EffectMap.empty}
 
 let lookup ~loc ctx x =
   match Assoc.lookup x ctx.variables with
@@ -43,10 +45,11 @@ let generalize ctx poly ty =
     ([], ty)
 
 let infer_effect env eff =
-  try Some (Untyped.EffectMap.find eff env.effects) with Not_found -> None
+  try Some (EffectMap.find eff env.effects) with Not_found -> None
 
 let add_effect env eff (ty1, ty2) =
   match infer_effect env eff with
-  | None -> {env with effects= Untyped.EffectMap.add eff (ty1, ty2) env.effects}
+  | None -> {env with effects= EffectMap.add eff (ty1, ty2) env.effects}
   | Some _ ->
-      Error.typing ~loc:Location.unknown "Effect %s already defined." eff
+      Error.typing ~loc:Location.unknown 
+        "Effect %t already defined." (CoreTypes.Effect.print eff)

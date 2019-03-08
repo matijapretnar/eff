@@ -4,7 +4,7 @@
 module Variable = Symbol.Make (Symbol.String)
 
 (** effect symbols *)
-type effect = string
+module Effect = Symbol.Make (Symbol.String)
 
 (** variant labels *)
 type label = string

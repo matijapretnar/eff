@@ -1,9 +1,8 @@
 (** Syntax of the core language. *)
-module EffectMap : Map.S with type key = String.t
 
 type variable = CoreTypes.Variable.t
 
-type effect = CoreTypes.effect
+type effect = CoreTypes.Effect.t
 
 type pattern = plain_pattern CoreUtils.located
 

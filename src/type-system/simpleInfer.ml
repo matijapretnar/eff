@@ -257,7 +257,8 @@ and infer_expr ctx cstr {it= e; at= loc} =
       T.Arrow (t1, t2)
   | Untyped.Effect op -> (
     match Ctx.infer_effect ctx op with
-    | None -> Error.typing ~loc "Unbound operation %s" op
+    | None ->
+        Error.typing ~loc "Unbound operation %t" (CoreTypes.Effect.print op)
     | Some (t1, t2) -> T.Arrow (t1, t2) )
   | Untyped.Handler
       { Untyped.effect_clauses= ops
@@ -268,7 +269,9 @@ and infer_expr ctx cstr {it= e; at= loc} =
       let t_yield = T.fresh_ty () in
       let unify_operation (op, a2) =
         match Ctx.infer_effect ctx op with
-        | None -> Error.typing ~loc "Unbound operation %s in a handler" op
+        | None ->
+          Error.typing ~loc 
+            "Unbound operation %t in a handler" (CoreTypes.Effect.print op)
         | Some (t1, t2) ->
             let tk, u1, u2 = infer_handler_case_abstraction ctx cstr a2 in
             add_ty_constraint cstr loc t1 u1 ;

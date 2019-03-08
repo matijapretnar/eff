@@ -6,7 +6,7 @@ type value =
   | Closure of closure
   | Handler of (result -> result)
 
-and result = Value of value | Call of CoreTypes.effect * value * closure
+and result = Value of value | Call of CoreTypes.Effect.t * value * closure
 
 and closure = value -> result
 
@@ -26,6 +26,6 @@ val to_handler : value -> result -> result
 
 val print_value : ?max_level:int -> value -> Format.formatter -> unit
 
-val print_effect : CoreTypes.effect -> Format.formatter -> unit
+val print_effect : CoreTypes.Effect.t -> Format.formatter -> unit
 
 val print_result : result -> Format.formatter -> unit

@@ -6,7 +6,7 @@ type value =
   | Closure of closure
   | Handler of (result -> result)
 
-and result = Value of value | Call of CoreTypes.effect * value * closure
+and result = Value of value | Call of CoreTypes.Effect.t * value * closure
 
 and closure = (value -> result)
 
@@ -39,7 +39,7 @@ let to_handler = function
   | _ -> Error.runtime "A handler expected."
 
 
-let print_effect eff ppf = Format.fprintf ppf "%s" eff
+let print_effect eff ppf = Format.fprintf ppf "%t" (CoreTypes.Effect.print eff)
 
 let rec print_value ?max_level v ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -71,4 +71,5 @@ and list ?(max_length= 299) v ppf =
 let print_result r ppf =
   match r with
   | Value v -> print_value v ppf
-  | Call (eff, v, _) -> Format.fprintf ppf "Call %s %t" eff (print_value v)
+  | Call (eff, v, _) -> 
+    Format.fprintf ppf "Call %t %t" (print_effect eff) (print_value v)

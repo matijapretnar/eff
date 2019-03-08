@@ -150,28 +150,32 @@ and eval_closure2 env a2 v1 v2 =
   let p1, p2, c = a2.it in
   ceval (extend p2 v2 (extend p1 v1 env)) c
 
-let rec top_handle = function
+let rec top_handle op = 
+  match op with
   | V.Value v -> v
-  | V.Call ("Print", v, k) ->
-      let str = V.to_str v in
-      Format.pp_print_string !Config.output_formatter str ;
-      Format.pp_print_flush !Config.output_formatter () ;
-      top_handle (k V.unit_value)
-  | V.Call ("Raise", v, k) -> Error.runtime "%t" (Value.print_value v)
-  | V.Call ("RandomInt", v, k) ->
-      let rnd_int = Random.int (Value.to_int v) in
-      let rnd_int_v = V.Const (Const.of_integer rnd_int) in
-      top_handle (k rnd_int_v)
-  | V.Call ("RandomFloat", v, k) ->
-      let rnd_float = Random.float (Value.to_float v) in
-      let rnd_float_v = V.Const (Const.of_float rnd_float) in
-      top_handle (k rnd_float_v)
-  | V.Call ("Read", v, k) ->
-      let str = read_line () in
-      let str_v = V.Const (Const.of_string str) in
-      top_handle (k str_v)
   | V.Call (eff, v, k) ->
-      Error.runtime "uncaught effect %t %t." (Value.print_effect eff)
-        (Value.print_value v)
+      (match CoreTypes.Effect.fold (fun annot n -> annot) eff with
+      | "Print" ->
+          let str = V.to_str v in
+          Format.pp_print_string !Config.output_formatter str ;
+          Format.pp_print_flush !Config.output_formatter () ;
+          top_handle (k V.unit_value)
+      | "Raise" -> Error.runtime "%t" (Value.print_value v)
+      | "RandomInt" ->
+          let rnd_int = Random.int (Value.to_int v) in
+          let rnd_int_v = V.Const (Const.of_integer rnd_int) in
+          top_handle (k rnd_int_v)
+      | "RandomFloat" ->
+          let rnd_float = Random.float (Value.to_float v) in
+          let rnd_float_v = V.Const (Const.of_float rnd_float) in
+          top_handle (k rnd_float_v)
+      | "Read" ->
+          let str = read_line () in
+          let str_v = V.Const (Const.of_string str) in
+          top_handle (k str_v)
+      | eff_annot ->
+          Error.runtime "uncaught effect %t %t." (Value.print_effect eff)
+            (Value.print_value v)
+      )
 
 let run env c = top_handle (ceval env c)
