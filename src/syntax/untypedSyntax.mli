@@ -1,9 +1,7 @@
 (** Syntax of the core language. *)
-module Variable : Symbol.S with type annot = String.t
-
 module EffectMap : Map.S with type key = String.t
 
-type variable = Variable.t
+type variable = CoreTypes.Variable.t
 
 type effect = CoreTypes.effect
 

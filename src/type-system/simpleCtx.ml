@@ -11,7 +11,7 @@ let empty = {variables= Assoc.empty; effects= Untyped.EffectMap.empty}
 let lookup ~loc ctx x =
   match Assoc.lookup x ctx.variables with
   | Some (ps, t) -> snd (Type.refresh ps t)
-  | None -> Error.typing ~loc "Unknown name %t" (Untyped.Variable.print x)
+  | None -> Error.typing ~loc "Unknown name %t" (CoreTypes.Variable.print x)
 
 let extend ctx x ty_scheme =
   {ctx with variables= Assoc.update x ty_scheme ctx.variables}

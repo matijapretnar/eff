@@ -1,9 +1,9 @@
 (** Syntax of the core language. *)
 open CoreUtils
-module Variable = Symbol.Make (Symbol.String)
+
 module EffectMap = Map.Make (String)
 
-type variable = Variable.t
+type variable = CoreTypes.Variable.t
 
 type effect = CoreTypes.effect
 
@@ -60,8 +60,9 @@ and abstraction2 = (pattern * pattern * computation)
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p.it with
-  | PVar x -> print "%t" (Variable.print x)
-  | PAs (p, x) -> print "%t as %t" (print_pattern p) (Variable.print x)
+  | PVar x -> print "%t" (CoreTypes.Variable.print x)
+  | PAs (p, x) -> 
+      print "%t as %t" (print_pattern p) (CoreTypes.Variable.print x)
   | PAnnotated (p, ty) -> print_pattern ?max_level p ppf
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
@@ -106,7 +107,7 @@ let rec print_computation ?max_level c ppf =
 and print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match e.it with
-  | Var x -> print "%t" (Variable.print x)
+  | Var x -> print "%t" (CoreTypes.Variable.print x)
   | Const c -> print "%t" (Const.print c)
   | Annotated (t, ty) -> print_expression ?max_level e ppf
   | Tuple lst -> Print.tuple print_expression lst ppf

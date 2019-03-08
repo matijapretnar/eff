@@ -1,5 +1,8 @@
 (** Types shared by different modules *)
 
+(** variable symbols *)
+module Variable = Symbol.Make (Symbol.String)
+
 (** effect symbols *)
 type effect = string
 

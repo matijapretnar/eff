@@ -78,7 +78,7 @@ let rec exec_cmd ppf state {it= cmd; at= loc} =
           | None -> assert false
           | Some v ->
               Format.fprintf ppf "@[val %t : %t = %t@]@."
-                (UntypedSyntax.Variable.print x)
+                (CoreTypes.Variable.print x)
                 (Type.print_beautiful tysch)
                 (Value.print_value v) )
         vars ;
@@ -97,7 +97,7 @@ let rec exec_cmd ppf state {it= cmd; at= loc} =
       List.iter
         (fun (x, tysch) ->
           Format.fprintf ppf "@[val %t : %t = <fun>@]@."
-            (UntypedSyntax.Variable.print x)
+            (CoreTypes.Variable.print x)
             (Type.print_beautiful tysch) )
         vars ;
       { desugarer_state= desugarer_state'

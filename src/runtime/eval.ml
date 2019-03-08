@@ -3,7 +3,7 @@ open CoreUtils
 
 module V = Value
 module Untyped = UntypedSyntax
-module RuntimeEnv = Map.Make (UntypedSyntax.Variable)
+module RuntimeEnv = Map.Make (CoreTypes.Variable)
 
 type state = Value.value RuntimeEnv.t
 
@@ -110,7 +110,7 @@ and veval env e =
     match lookup x env with
     | Some v -> v
     | None ->
-        Error.runtime "Name %t is not defined." (Untyped.Variable.print x) )
+        Error.runtime "Name %t is not defined." (CoreTypes.Variable.print x) )
   | Untyped.Const c -> V.Const c
   | Untyped.Annotated (t, ty) -> veval env t
   | Untyped.Tuple es -> V.Tuple (List.map (veval env) es)

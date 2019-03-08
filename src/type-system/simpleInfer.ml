@@ -105,7 +105,7 @@ let extend_with_pattern ?(forbidden_vars= []) ctx cstr p =
   match List.find_opt (fun (x, _) -> List.mem_assoc x vars) forbidden_vars with
   | Some (x, _) ->
       Error.typing ~loc:p.at "Several definitions of %t."
-        (Untyped.Variable.print x)
+        (CoreTypes.Variable.print x)
   | None ->
       let ctx' =
         List.fold_right (fun (x, t) ctx -> Ctx.extend_ty ctx x t) vars ctx
@@ -147,7 +147,7 @@ and infer_let ctx cstr loc defs =
     match find_duplicate (List.map fst ws) (List.map fst vs) with
     | Some x ->
         Error.typing ~loc "Several definitions of %t."
-          (Untyped.Variable.print x)
+          (CoreTypes.Variable.print x)
     | None ->
         let sbst = Unify.solve !cstr in
         let ws = Assoc.map (T.subst_ty sbst) (Assoc.of_list ws) in
