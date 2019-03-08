@@ -2,7 +2,7 @@ type value =
   | Const of Const.t
   | Tuple of value list
   | Record of (CoreTypes.field, value) Assoc.t
-  | Variant of CoreTypes.label * value option
+  | Variant of CoreTypes.Label.t * value option
   | Closure of closure
   | Handler of (result -> result)
 

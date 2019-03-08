@@ -10,12 +10,12 @@ type constructor_kind = Variant of bool | Effect of bool
 type state =
   { context: (string, CoreTypes.Variable.t) Assoc.t
   ; effect_context: (string, CoreTypes.Effect.t) Assoc.t
-  ; constructors: (string, constructor_kind) Assoc.t
+  ; constructors: (string, (CoreTypes.Label.t * constructor_kind)) Assoc.t
   ; local_type_annotations: (string, Params.Ty.t) Assoc.t }
 
 let initial_state =
-  let list_cons = (CoreTypes.cons, Variant true) in
-  let list_nil = (CoreTypes.nil, Variant false) in
+  let list_cons = (CoreTypes.cons_annot, (CoreTypes.cons, Variant true)) in
+  let list_nil = (CoreTypes.nil_annot, (CoreTypes.nil, Variant false)) in
   { context= Assoc.empty
   ; effect_context = Assoc.empty
   ; constructors= Assoc.of_list [list_cons; list_nil]
@@ -80,23 +80,39 @@ let desugar_tydef state params def =
     | Sugared.TyRecord flds ->
         let state', flds' = Assoc.fold_map (desugar_type ty_sbst) state flds in
         (state', Tctx.Record flds')
-    | Sugared.TySum lst ->
-        let aux_desug st = function
-          | None -> (st, None)
+    | Sugared.TySum assoc ->
+        let aux_desug st (lbl, cons) =
+          let unsugared_lbl = 
+            match Assoc.lookup lbl st.constructors with
+            | None -> failwith "unreachable"
+            | Some (lbl', cons_kind) -> lbl'
+          in
+          match cons with
+          | None -> (st, (unsugared_lbl, None))
           | Some t ->
               let st', t' = desugar_type ty_sbst st t in
-              (st', Some t')
+              (st', (unsugared_lbl, Some t'))
         in
         let constructors =
-          let aux = function
-            | None -> Variant false
-            | Some _ -> Variant true
+          (* desugar constructor names to Symbol  and add to state *)
+          let aux (lbl, cons) =
+            let unsugared_lbl = 
+              match Assoc.lookup lbl state.constructors with
+              | None -> CoreTypes.Label.fresh lbl
+              | Some (lbl, _) -> lbl (* Caught by inference for better error *)
+            in
+            match cons with
+            | None -> (lbl, (unsugared_lbl, Variant false))
+            | Some _ -> (lbl, (unsugared_lbl, Variant true))
           in
-          let new_cons = Assoc.map aux lst in
+          let new_cons = Assoc.kmap aux assoc in
           Assoc.concat new_cons state.constructors
         in
-        let state', lst' = Assoc.fold_map aux_desug state lst in
-        ({state' with constructors}, Tctx.Sum lst')
+        (* desugar and rename constructors in type *)
+        let state', assoc' = 
+          Assoc.kfold_map aux_desug {state with constructors} assoc
+        in
+        (state', Tctx.Sum assoc')
     | Sugared.TyInline t ->
         let state', t' = desugar_type ty_sbst state t in
         (state', Tctx.Inline t')
@@ -164,19 +180,19 @@ let desugar_pattern state ?(initial_forbidden= []) p =
       | Sugared.PVariant (lbl, p) -> (
         match Assoc.lookup lbl state.constructors with
         | None -> Error.typing ~loc "Unbound constructor %s" lbl
-        | Some (Variant var) -> (
+        | Some (cons_lbl, Variant var) -> (
           match (var, p) with
           | true, Some p ->
               let state', p' = desugar_pattern state p in
-              (state', Untyped.PVariant (lbl, Some p'))
-          | false, None -> (state, Untyped.PVariant (lbl, None))
+              (state', Untyped.PVariant (cons_lbl, Some p'))
+          | false, None -> (state, Untyped.PVariant (cons_lbl, None))
           | true, None ->
               Error.typing ~loc
                 "Constructor %s should be applied to an argument." lbl
           | false, Some _ ->
               Error.typing ~loc
                 "Constructor %s cannot be applied to an argument." lbl )
-        | Some (Effect eff) ->
+        | Some (cons_lbl, Effect eff) ->
             Error.typing ~loc
               "Constructor %s should not be an effect constructor." lbl )
       | Sugared.PConst c -> (state, Untyped.PConst c)
@@ -236,19 +252,19 @@ let rec desugar_expression state {it= t; at= loc} =
     | Sugared.Variant (lbl, t) -> (
       match Assoc.lookup lbl state.constructors with
       | None -> Error.typing ~loc "Unbound constructor %s" lbl
-      | Some (Variant var) -> (
+      | Some (cons_lbl, Variant var) -> (
         match (var, t) with
         | true, Some t ->
             let state', w, e = desugar_expression state t in
-            (state', w, Untyped.Variant (lbl, Some e))
-        | false, None -> (state, [], Untyped.Variant (lbl, None))
+            (state', w, Untyped.Variant (cons_lbl, Some e))
+        | false, None -> (state, [], Untyped.Variant (cons_lbl, None))
         | true, None ->
             Error.typing ~loc
               "Constructor %s should be applied to an argument." lbl
         | false, Some _ ->
             Error.typing ~loc
               "Constructor %s cannot be applied to an argument." lbl )
-      | Some (Effect eff) ->
+      | Some (cons_lbl, Effect eff) ->
           Error.typing ~loc
             "Constructor %s should not be an effect constructor." lbl )
     (* Terms that are desugared into computations. We list them explicitly in

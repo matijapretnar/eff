@@ -12,7 +12,7 @@ and plain_pattern =
   | PAs of pattern * variable
   | PTuple of pattern list
   | PRecord of (CoreTypes.field, pattern) Assoc.t
-  | PVariant of CoreTypes.label * pattern option
+  | PVariant of CoreTypes.Label.t * pattern option
   | PConst of Const.t
   | PNonbinding
 
@@ -25,7 +25,7 @@ and plain_expression =
   | Annotated of expression * Type.ty
   | Tuple of expression list
   | Record of (CoreTypes.field, expression) Assoc.t
-  | Variant of CoreTypes.label * expression option
+  | Variant of CoreTypes.Label.t * expression option
   | Lambda of abstraction
   | Effect of effect
   | Handler of handler

@@ -3,7 +3,7 @@ module T = Type
 
 type tydef =
   | Record of (CoreTypes.field, Type.ty) Assoc.t
-  | Sum of (CoreTypes.label, Type.ty option) Assoc.t
+  | Sum of (CoreTypes.Label.t, Type.ty option) Assoc.t
   | Inline of Type.ty
 
 type tyctx = (CoreTypes.tyname, Params.Ty.t list * tydef) Assoc.t
@@ -182,7 +182,9 @@ let check_shadowing ~loc = function
       let shadow_check_sum (lbl, _) =
         match find_variant lbl with
         | Some (u, _, _, _) ->
-            Error.typing ~loc "Constructor %s is already used in type %s" lbl u
+            Error.typing ~loc 
+              "Constructor %t is already used in type %s"
+              (CoreTypes.Label.print lbl) u
         | None -> ()
       in
       Assoc.iter shadow_check_sum lst

@@ -3,6 +3,7 @@ open CoreUtils
 
 type variable = CoreTypes.Variable.t
 type effect = CoreTypes.Effect.t
+type label = CoreTypes.Label.t
 
 type pattern = plain_pattern located
 
@@ -12,7 +13,7 @@ and plain_pattern =
   | PAs of pattern * variable
   | PTuple of pattern list
   | PRecord of (CoreTypes.field, pattern) Assoc.t
-  | PVariant of CoreTypes.label * pattern option
+  | PVariant of label * pattern option
   | PConst of Const.t
   | PNonbinding
 
@@ -25,7 +26,7 @@ and plain_expression =
   | Annotated of expression * Type.ty
   | Tuple of expression list
   | Record of (CoreTypes.field, expression) Assoc.t
-  | Variant of CoreTypes.label * expression option
+  | Variant of label * expression option
   | Lambda of abstraction
   | Effect of effect
   | Handler of handler
@@ -65,11 +66,12 @@ let rec print_pattern ?max_level p ppf =
   | PTuple lst -> Print.tuple print_pattern lst ppf
   | PRecord lst -> Print.record print_pattern lst ppf
   | PVariant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
-  | PVariant (lbl, None) -> print "%s" lbl
+  | PVariant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
   | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = CoreTypes.cons ->
       print "[@[<hov>@[%t@]%t@]]" (print_pattern v1) (pattern_list v2)
   | PVariant (lbl, Some p) ->
-      print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
+      print ~at_level:1 "%t @[<hov>%t@]" 
+      (CoreTypes.Label.print lbl) (print_pattern p)
   | PNonbinding -> print "_"
 
 and pattern_list ?(max_length= 299) p ppf =
@@ -109,9 +111,10 @@ and print_expression ?max_level e ppf =
   | Annotated (t, ty) -> print_expression ?max_level e ppf
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record lst -> Print.record print_expression lst ppf
-  | Variant (lbl, None) -> print "%s" lbl
+  | Variant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
   | Variant (lbl, Some e) ->
-      print ~at_level:1 "%s @[<hov>%t@]" lbl (print_expression e)
+      print ~at_level:1 "%t @[<hov>%t@]" 
+      (CoreTypes.Label.print lbl) (print_expression e)
   | Lambda a -> print "fun %t" (abstraction a)
   | Handler h ->
       print "{effect_clauses = %t; value_clause = (%t)}"

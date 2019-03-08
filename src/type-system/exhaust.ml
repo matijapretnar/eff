@@ -22,7 +22,7 @@ module Untyped = UntypedSyntax
 type cons =
   | Tuple of int
   | Record of CoreTypes.field list
-  | Variant of CoreTypes.label * bool
+  | Variant of CoreTypes.Label.t * bool
   | Const of Const.t
   | Wildcard
 
