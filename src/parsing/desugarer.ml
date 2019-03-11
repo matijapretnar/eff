@@ -9,7 +9,7 @@ type constructor_kind = Variant of bool | Effect of bool
 
 type state =
   { context: (string, CoreTypes.Variable.t) Assoc.t
-  ; effect_context: (string, CoreTypes.Effect.t) Assoc.t
+  ; effect_symbols: (string, CoreTypes.Effect.t) Assoc.t
   ; constructors: (string, (CoreTypes.Label.t * constructor_kind)) Assoc.t
   ; local_type_annotations: (string, Params.Ty.t) Assoc.t }
 
@@ -17,11 +17,19 @@ let initial_state =
   let list_cons = (CoreTypes.cons_annot, (CoreTypes.cons, Variant true)) in
   let list_nil = (CoreTypes.nil_annot, (CoreTypes.nil, Variant false)) in
   { context= Assoc.empty
-  ; effect_context = Assoc.empty
+  ; effect_symbols = Assoc.empty
   ; constructors= Assoc.of_list [list_cons; list_nil]
   ; local_type_annotations= Assoc.empty }
 
 let add_loc t loc = {it= t; at= loc}
+
+let effect_to_symbol state name  =
+  match Assoc.lookup name state.effect_symbols with
+  | Some sym -> (state, sym)
+  | None ->
+      let sym = CoreTypes.Effect.fresh name in
+      let effect_symbols' = Assoc.update name sym state.effect_symbols in
+      ({state with effect_symbols=effect_symbols'}, sym)
 
 (* ***** Desugaring of types. ***** *)
 (* Desugar a type, where only the given type, dirt and region parameters may appear.
@@ -308,12 +316,12 @@ and desugar_computation state {it= t; at= loc} =
         let state'', w2, e2 = desugar_expression state' t2 in
         (state'', w1 @ w2, Untyped.Apply (e1, e2))
     | Sugared.Effect (eff, t) ->
-        (match Assoc.lookup eff state.effect_context with
+        (match Assoc.lookup eff state.effect_symbols with
         | Some eff' ->
             let state', w, e = desugar_expression state t in
             let loc_eff = add_loc (Untyped.Effect eff') loc in
             (state', w, Untyped.Apply (loc_eff, e))
-        | None -> Error.typing ~loc "Unknown effect %s" eff)
+        | None -> Error.typing ~loc "Unknown operation %s" eff)
     | Sugared.Match (t, cs) -> match_constructor state loc t cs
     | Sugared.Handle (t1, t2) ->
         let state', w1, e1 = desugar_expression state t1 in
@@ -430,19 +438,14 @@ and desugar_handler loc state
     | None -> Assoc.update eff [a2] assoc
     | Some a2s -> Assoc.replace eff (a2 :: a2s) assoc
   in
-  let rec unsugar_eff_name eff state =
-    match Assoc.lookup eff state.effect_context with
-    | Some eff' -> eff'
-    | None -> Error.typing ~loc "Unknown effect %s" eff
-  in
   let rec construct_eff_clause state (eff, eff_cs_lst) =
     (* transform string name to CoreTypes.Effect.t *)
-    let eff' = unsugar_eff_name eff state in
+    let state', eff' = effect_to_symbol state eff in
     match eff_cs_lst with
     | [] -> assert false
     | [a2] ->
-        let state', a2' = desugar_abstraction2 state a2 in
-        (state', (eff', a2'))
+        let state'', a2' = desugar_abstraction2 state' a2 in
+        (state'', (eff', a2'))
     | a2s ->
         let x = fresh_var (Some "$eff_param") in
         let k = fresh_var (Some "$continuation") in
@@ -459,9 +462,9 @@ and desugar_handler loc state
           (state', add_loc (Untyped.Match (add_loc x_k_vars loc, a2s')) loc)
         in
         let p1, p2 = (Untyped.PVar x, Untyped.PVar k) in
-        let state', match_term = match_term_fun state in
+        let state'', match_term = match_term_fun state' in
         let new_eff_cs = (eff', (add_loc p1 loc, add_loc p2 loc, match_term)) in
-        (state', new_eff_cs)
+        (state'', new_eff_cs)
   in
   (* group eff cases by effects into lumps to transform into matches *)
   let collected_eff_cs = Assoc.fold_right group_eff_cs eff_cs Assoc.empty in
@@ -571,10 +574,7 @@ let desugar_external state (x, t, f) =
   ({state with context= Assoc.update x n state.context}, (n, t', f))
 
 let desugar_def_effect state (eff, (ty1, ty2)) =
-  let eff' = CoreTypes.Effect.fresh eff in
-  let state' = 
-    {state with effect_context= Assoc.update eff eff' state.effect_context}
-  in
+  let state', eff' = effect_to_symbol state eff in
   let state'', ty1' = desugar_type Assoc.empty state' ty1 in
   let state''', ty2' = desugar_type Assoc.empty state'' ty2 in
   (state''', (eff', (ty1', ty2')))
