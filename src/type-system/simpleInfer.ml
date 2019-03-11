@@ -75,13 +75,16 @@ let infer_pattern cstr pp =
       | None -> assert false
       | Some ((fld, _), _) ->
         match Tctx.infer_field fld with
-        | None -> Error.typing ~loc "Unbound record field label %s" fld
+        | None -> 
+            Error.typing ~loc 
+              "Unbound record field label %t" (CoreTypes.Field.print fld)
         | Some (ty, (t, us)) ->
             let unify_record_pattern (fld, p) =
               match Assoc.lookup fld us with
               | None ->
-                  Error.typing ~loc
-                    "Unexpected field %s in a pattern of type %s." fld t
+                  Error.typing ~loc 
+                    "Unexpected field %t in a pattern of type %s." 
+                    (CoreTypes.Field.print fld) t
               | Some u -> add_ty_constraint cstr loc (infer p) u
             in
             Assoc.iter unify_record_pattern flds ;
@@ -226,7 +229,9 @@ and infer_expr ctx cstr {it= e; at= loc} =
         Tctx.infer_field fld
       with
       | None ->
-          Error.typing ~loc "Unbound record field label %s in a pattern" fld
+          Error.typing ~loc 
+            "Unbound record field label %t in a pattern" 
+            (CoreTypes.Field.print fld)
       | Some (ty, (t_name, arg_types)) ->
           if Assoc.length flds <> Assoc.length arg_types then
             Error.typing ~loc "malformed record of type %s" t_name
@@ -236,7 +241,8 @@ and infer_expr ctx cstr {it= e; at= loc} =
               match Assoc.lookup fld arg_types with
               | None ->
                   Error.typing ~loc
-                    "Unexpected record field label %s in a pattern" fld
+                    "Unexpected record field label %t in a pattern"
+                    (CoreTypes.Field.print fld)
               | Some u -> add_ty_constraint cstr loc t u
             in
             Assoc.iter unify_record_arg arg_types' ;

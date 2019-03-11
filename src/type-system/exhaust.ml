@@ -21,7 +21,7 @@ module Untyped = UntypedSyntax
 (* Types of constructors. *)
 type cons =
   | Tuple of int
-  | Record of CoreTypes.field list
+  | Record of CoreTypes.Field.t list
   | Variant of CoreTypes.Label.t * bool
   | Const of Const.t
   | Wildcard
@@ -54,7 +54,9 @@ let rec cons_of_pattern {it= p; at= loc} =
     | Some ((lbl, _), _) ->
       match Tctx.find_field lbl with
       | None ->
-          Error.typing ~loc "Unbound record field label %s in a pattern" lbl
+          Error.typing ~loc
+            "Unbound record field label %t in a pattern" 
+            (CoreTypes.Field.print lbl)
       | Some (_, _, flds) -> Record (Assoc.keys_of flds) )
   | Untyped.PVariant (lbl, opt) -> Variant (lbl, opt <> None)
   | Untyped.PConst c -> Const c

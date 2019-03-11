@@ -10,6 +10,7 @@ type constructor_kind = Variant of bool | Effect of bool
 type state =
   { context: (string, CoreTypes.Variable.t) Assoc.t
   ; effect_symbols: (string, CoreTypes.Effect.t) Assoc.t
+  ; field_symbols: (string, CoreTypes.Field.t) Assoc.t
   ; constructors: (string, (CoreTypes.Label.t * constructor_kind)) Assoc.t
   ; local_type_annotations: (string, Params.Ty.t) Assoc.t }
 
@@ -18,6 +19,7 @@ let initial_state =
   let list_nil = (CoreTypes.nil_annot, (CoreTypes.nil, Variant false)) in
   { context= Assoc.empty
   ; effect_symbols = Assoc.empty
+  ; field_symbols = Assoc.empty
   ; constructors= Assoc.of_list [list_cons; list_nil]
   ; local_type_annotations= Assoc.empty }
 
@@ -30,6 +32,14 @@ let effect_to_symbol state name  =
       let sym = CoreTypes.Effect.fresh name in
       let effect_symbols' = Assoc.update name sym state.effect_symbols in
       ({state with effect_symbols=effect_symbols'}, sym)
+
+let field_to_symbol state name  =
+  match Assoc.lookup name state.field_symbols with
+  | Some sym -> (state, sym)
+  | None ->
+      let sym = CoreTypes.Field.fresh name in
+      let field_symbols' = Assoc.update name sym state.field_symbols in
+      ({state with field_symbols=field_symbols'}, sym)
 
 (* ***** Desugaring of types. ***** *)
 (* Desugar a type, where only the given type, dirt and region parameters may appear.
@@ -86,7 +96,12 @@ let desugar_tydef state params def =
   let state', def' =
     match def with
     | Sugared.TyRecord flds ->
-        let state', flds' = Assoc.fold_map (desugar_type ty_sbst) state flds in
+        let field_desugar st (f, t) = 
+          let st', f' = field_to_symbol st f in
+          let st'', t' = desugar_type ty_sbst st' t in
+          (st'', (f', t'))
+        in
+        let state', flds' = Assoc.kfold_map field_desugar state flds in
         (state', Tctx.Record flds')
     | Sugared.TySum assoc ->
         let aux_desug st (lbl, cons) =
@@ -183,7 +198,12 @@ let desugar_pattern state ?(initial_forbidden= []) p =
           let state', ps' = fold_map desugar_pattern state ps in
           (state', Untyped.PTuple ps')
       | Sugared.PRecord flds ->
-          let state', flds' = Assoc.fold_map desugar_pattern state flds in
+          let field_desugar st (f, p) = 
+            let st', f' = field_to_symbol st f in
+            let st'', p' = desugar_pattern st' p in
+            (st'', (f', p'))
+          in
+          let state', flds' = Assoc.kfold_map field_desugar state flds in
           (state', Untyped.PRecord flds')
       | Sugared.PVariant (lbl, p) -> (
         match Assoc.lookup lbl state.constructors with
@@ -424,9 +444,10 @@ and desugar_record_fields state flds =
   match Assoc.pop flds with
   | None -> (state, [], Assoc.empty)
   | Some ((fld, t), flds') ->
-      let state', w, e = desugar_expression state t in
-      let state'', ws, es = desugar_record_fields state flds' in
-      (state'', w @ ws, Assoc.update fld e es)
+      let state', fld' = field_to_symbol state fld in
+      let state'', w, e = desugar_expression state' t in
+      let state''', ws, es = desugar_record_fields state'' flds' in
+      (state''', w @ ws, Assoc.update fld' e es)
 
 and desugar_handler loc state
     { Sugared.effect_clauses= eff_cs

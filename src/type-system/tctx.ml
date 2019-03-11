@@ -2,7 +2,7 @@
 module T = Type
 
 type tydef =
-  | Record of (CoreTypes.field, Type.ty) Assoc.t
+  | Record of (CoreTypes.Field.t, Type.ty) Assoc.t
   | Sum of (CoreTypes.Label.t, Type.ty option) Assoc.t
   | Inline of Type.ty
 
@@ -174,7 +174,8 @@ let check_shadowing ~loc = function
         match find_field f with
         | Some (u, _, _) ->
             Error.typing ~loc
-              "Record field label %s is already used in type %s" f u
+              "Record field label %t is already used in type %s" 
+                (CoreTypes.Field.print f) u
         | None -> ()
       in
       Assoc.iter shadow_check_fld lst

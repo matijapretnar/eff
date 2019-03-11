@@ -4,6 +4,7 @@ open CoreUtils
 type variable = CoreTypes.Variable.t
 type effect = CoreTypes.Effect.t
 type label = CoreTypes.Label.t
+type field = CoreTypes.Field.t
 
 type pattern = plain_pattern located
 
@@ -12,7 +13,7 @@ and plain_pattern =
   | PAnnotated of pattern * Type.ty
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (CoreTypes.field, pattern) Assoc.t
+  | PRecord of (field, pattern) Assoc.t
   | PVariant of label * pattern option
   | PConst of Const.t
   | PNonbinding
@@ -25,7 +26,7 @@ and plain_expression =
   | Const of Const.t
   | Annotated of expression * Type.ty
   | Tuple of expression list
-  | Record of (CoreTypes.field, expression) Assoc.t
+  | Record of (field, expression) Assoc.t
   | Variant of label * expression option
   | Lambda of abstraction
   | Effect of effect
@@ -64,7 +65,10 @@ let rec print_pattern ?max_level p ppf =
   | PAnnotated (p, ty) -> print_pattern ?max_level p ppf
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
-  | PRecord lst -> Print.record print_pattern lst ppf
+  | PRecord assoc -> 
+      let to_name (k, v) = (CoreTypes.Field.fold (fun a _ -> a) k, v) in
+      let names_assoc = Assoc.kmap to_name assoc in
+      Print.record print_pattern names_assoc ppf
   | PVariant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
   | PVariant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
   | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = CoreTypes.cons ->
@@ -110,7 +114,10 @@ and print_expression ?max_level e ppf =
   | Const c -> print "%t" (Const.print c)
   | Annotated (t, ty) -> print_expression ?max_level e ppf
   | Tuple lst -> Print.tuple print_expression lst ppf
-  | Record lst -> Print.record print_expression lst ppf
+  | Record assoc -> 
+      let to_name (k, v) = (CoreTypes.Field.fold (fun a _ -> a) k, v) in
+      let names_assoc = Assoc.kmap to_name assoc in
+      Print.record print_expression names_assoc ppf
   | Variant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
   | Variant (lbl, Some e) ->
       print ~at_level:1 "%t @[<hov>%t@]" 

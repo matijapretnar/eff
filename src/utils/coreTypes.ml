@@ -16,7 +16,7 @@ let cons_annot = "$1cons"
 let cons = Label.fresh cons_annot
 
 (** record fields *)
-type field = string
+module Field = Symbol.Make (Symbol.String)
 
 (** type names *)
 type tyname = string
