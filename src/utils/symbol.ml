@@ -43,6 +43,13 @@ module String : Annotation with type t = string = struct
     else Format.fprintf ppf "%s" desc
 end
 
+module Int : Annotation with type t = int = struct
+  type t = int
+
+  let print safe desc n ppf =
+    Format.fprintf ppf "%d" desc
+end
+
 module type S = sig
   type annot
 

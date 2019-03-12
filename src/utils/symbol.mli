@@ -8,6 +8,8 @@ module Anonymous : Annotation with type t = unit
 
 module String : Annotation with type t = string
 
+module Int : Annotation with type t = int
+
 module Parameter (Param : sig
   val ascii_symbol : string
 

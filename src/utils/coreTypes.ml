@@ -25,4 +25,4 @@ type tyname = string
 type typaram = string
 
 (** dirt parameters *)
-type dirtparam = int
+module DirtParam = Symbol.Make (Symbol.Int)
