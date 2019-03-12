@@ -1,9 +1,9 @@
 
-val fresh_ty_param : unit -> Params.Ty.t
+val fresh_ty_param : unit -> CoreTypes.TyParam.t
 
 type ty =
   | Apply of CoreTypes.TyName.t * ty list
-  | TyParam of Params.Ty.t
+  | TyParam of CoreTypes.TyParam.t
   | Basic of string
   | Tuple of ty list
   | Arrow of ty * ty
@@ -25,7 +25,7 @@ val unit_ty : ty
 
 val empty_ty : ty
 
-type substitution = (Params.Ty.t, ty) Assoc.t
+type substitution = (CoreTypes.TyParam.t, ty) Assoc.t
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 val subst_ty : substitution -> ty -> ty
@@ -42,30 +42,30 @@ val compose_subst : substitution -> substitution -> substitution
     Each parameter is listed only once and in order in which it occurs when
     [ty] is displayed. *)
 
-val free_params : ty -> Params.Ty.t list
+val free_params : ty -> CoreTypes.TyParam.t list
 
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
-val occurs_in_ty : Params.Ty.t -> ty -> bool
+val occurs_in_ty : CoreTypes.TyParam.t -> ty -> bool
 
 (** [fresh_ty ()] gives a type [TyParam p] where [p] is a new type parameter on
     each call. *)
 val fresh_ty : unit -> ty
 
-val refreshing_subst : Params.Ty.t list -> Params.Ty.t list * substitution
+val refreshing_subst : CoreTypes.TyParam.t list -> CoreTypes.TyParam.t list * substitution
 
 (** [refresh (ps,qs,rs) ty] replaces the polymorphic parameters [ps,qs,rs] in [ty] with fresh
     parameters. It returns the  *)
 
-val refresh : Params.Ty.t list -> ty -> Params.Ty.t list * ty
+val refresh : CoreTypes.TyParam.t list -> ty -> CoreTypes.TyParam.t list * ty
 
 
 (** [beautify ty] returns a sequential replacement of all type parameters in
     [ty] that can be used for its pretty printing. *)
 
-val beautify : Params.Ty.t list * ty -> Params.Ty.t list * ty
+val beautify : CoreTypes.TyParam.t list * ty -> CoreTypes.TyParam.t list * ty
 
-val beautify2 : ty -> ty -> (Params.Ty.t list * ty) * (Params.Ty.t list * ty)
+val beautify2 : ty -> ty -> (CoreTypes.TyParam.t list * ty) * (CoreTypes.TyParam.t list * ty)
 
-val print :  Params.Ty.t list * ty -> Format.formatter -> unit
+val print :  CoreTypes.TyParam.t list * ty -> Format.formatter -> unit
 
-val print_beautiful : Params.Ty.t list * ty -> Format.formatter -> unit
+val print_beautiful : CoreTypes.TyParam.t list * ty -> Format.formatter -> unit

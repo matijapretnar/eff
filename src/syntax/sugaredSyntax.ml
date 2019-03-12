@@ -7,6 +7,7 @@ type effect = string
 type label = string
 type field = string
 type tyname = string
+type typaram = string
 type dirtparam = int
 
 type ty = plain_ty located
@@ -14,7 +15,7 @@ type ty = plain_ty located
 and plain_ty =
   | TyApply of tyname * ty list
       (** [(ty1, ty2, ..., tyn) type_name] *)
-  | TyParam of CoreTypes.typaram  (** ['a] *)
+  | TyParam of typaram  (** ['a] *)
   | TyArrow of ty * ty  (** [ty1 -> ty2] *)
   | TyTuple of ty list  (** [ty1 * ty2 * ... * tyn] *)
   | TyHandler of ty * ty  (** [ty1 => ty2] *)

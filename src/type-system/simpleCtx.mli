@@ -6,7 +6,7 @@
 *)
 
 (** The types of contexts and type schemes. *)
-type ty_scheme = Params.Ty.t list * Type.ty
+type ty_scheme = CoreTypes.TyParam.t list * Type.ty
 
 type t
 

@@ -3,7 +3,7 @@
   open CoreUtils
 
   type handler_clause =
-    | EffectClause of SugaredSyntax.effect * abstraction2
+    | EffectClause of effect * abstraction2
     | ReturnClause of abstraction
     | FinallyClause of abstraction
 
@@ -34,7 +34,7 @@
 %token <bool> BOOL
 %token <float> FLOAT
 %token <SugaredSyntax.label> UNAME
-%token <CoreTypes.typaram> PARAM
+%token <SugaredSyntax.typaram> PARAM
 %token TYPE ARROW HARROW OF EFFECT PERFORM
 %token EXTERNAL
 %token MATCH WITH FUNCTION HASH

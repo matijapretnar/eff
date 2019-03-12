@@ -22,5 +22,5 @@ val desugar_top_let_rec :
   -> state * (CoreTypes.Variable.t * UntypedSyntax.abstraction) list
 
 val desugar_tydefs :
-  state -> (string, CoreTypes.typaram list * SugaredSyntax.tydef) Assoc.t
-  -> state * (CoreTypes.TyName.t, Params.Ty.t list * Tctx.tydef) Assoc.t
+  state -> (string, SugaredSyntax.typaram list * SugaredSyntax.tydef) Assoc.t
+  -> state * (CoreTypes.TyName.t, CoreTypes.TyParam.t list * Tctx.tydef) Assoc.t

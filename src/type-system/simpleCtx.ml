@@ -2,7 +2,7 @@ module Untyped = UntypedSyntax
 
 module EffectMap = Map.Make (CoreTypes.Effect)
 
-type ty_scheme = Params.Ty.t list * Type.ty
+type ty_scheme = CoreTypes.TyParam.t list * Type.ty
 
 type t =
   { variables: (CoreTypes.Variable.t, ty_scheme) Assoc.t

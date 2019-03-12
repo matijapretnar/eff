@@ -6,7 +6,7 @@ type tydef =
   | Sum of (CoreTypes.Label.t, Type.ty option) Assoc.t
   | Inline of Type.ty
 
-type tyctx = (CoreTypes.TyName.t, Params.Ty.t list * tydef) Assoc.t
+type tyctx = (CoreTypes.TyName.t, CoreTypes.TyParam.t list * tydef) Assoc.t
 
 let initial : tyctx =
   Assoc.of_list

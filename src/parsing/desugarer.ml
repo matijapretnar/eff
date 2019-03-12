@@ -13,7 +13,7 @@ type state =
   ; field_symbols: (string, CoreTypes.Field.t) Assoc.t
   ; tyname_symbols: (string, CoreTypes.TyName.t) Assoc.t
   ; constructors: (string, (CoreTypes.Label.t * constructor_kind)) Assoc.t
-  ; local_type_annotations: (string, Params.Ty.t) Assoc.t }
+  ; local_type_annotations: (string, CoreTypes.TyParam.t) Assoc.t }
 
 let initial_state =
   let list_cons = (CoreTypes.cons_annot, (CoreTypes.cons, Variant true)) in

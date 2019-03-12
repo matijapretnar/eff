@@ -2,11 +2,11 @@
    In order not to confuse them, we define separate types for them.
  *)
 
-let fresh_ty_param = Params.Ty.fresh
+let fresh_ty_param = CoreTypes.TyParam.fresh
 
 type ty =
   | Apply of CoreTypes.TyName.t * ty list
-  | TyParam of Params.Ty.t
+  | TyParam of CoreTypes.TyParam.t
   | Basic of string
   | Tuple of ty list
   | Arrow of ty * ty
@@ -35,7 +35,7 @@ let unit_ty = Tuple []
 
 let empty_ty = Apply (CoreTypes.empty_tyname, [])
 
-type substitution = (Params.Ty.t, ty) Assoc.t
+type substitution = (CoreTypes.TyParam.t, ty) Assoc.t
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
 let rec subst_ty sbst ty =
@@ -100,7 +100,7 @@ let refresh params ty =
 (** [beautify ty] returns a sequential replacement of all type parameters in
     [ty] that can be used for its pretty printing. *)
 let beautify (ps, ty) =
-  let next_ty_param = Params.Ty.new_fresh () in
+  let next_ty_param = CoreTypes.TyParam.new_fresh () in
   let xs = free_params ty in
   let xs_assoc = Assoc.map_of_list (fun p -> (p, next_ty_param ())) xs in
   let sub p = match Assoc.lookup p xs_assoc with None -> p | Some p' -> p' in
@@ -127,7 +127,7 @@ let print (ps, t) ppf =
     | Apply (t, ts) ->
         print ~at_level:1 "(%t) %t" 
           (Print.sequence ", " ty ts) (CoreTypes.TyName.print t)
-    | TyParam p -> print "%t" (Params.Ty.print_old ~poly:ps p)
+    | TyParam p -> print "%t" (CoreTypes.TyParam.print_old ~poly:ps p)
     | Tuple [] -> print "unit"
     | Tuple ts ->
         print ~at_level:2 "@[<hov>%t@]"
