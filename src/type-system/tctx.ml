@@ -6,24 +6,24 @@ type tydef =
   | Sum of (CoreTypes.Label.t, Type.ty option) Assoc.t
   | Inline of Type.ty
 
-type tyctx = (CoreTypes.tyname, Params.Ty.t list * tydef) Assoc.t
+type tyctx = (CoreTypes.TyName.t, Params.Ty.t list * tydef) Assoc.t
 
 let initial : tyctx =
   Assoc.of_list
-    [ ("bool", ([], Inline T.bool_ty))
-    ; ("unit", ([], Inline T.unit_ty))
-    ; ("int", ([], Inline T.int_ty))
-    ; ("string", ([], Inline T.string_ty))
-    ; ("float", ([], Inline T.float_ty))
-    ; ( "list"
+    [ (CoreTypes.bool_tyname, ([], Inline T.bool_ty))
+    ; (CoreTypes.unit_tyname, ([], Inline T.unit_ty))
+    ; (CoreTypes.int_tyname, ([], Inline T.int_ty))
+    ; (CoreTypes.string_tyname, ([], Inline T.string_ty))
+    ; (CoreTypes.float_tyname, ([], Inline T.float_ty))
+    ; (CoreTypes.list_tyname
       , let a = Type.fresh_ty_param () in
         let list_nil = (CoreTypes.nil, None) in
         let list_cons =
           ( CoreTypes.cons
-          , Some (T.Tuple [T.TyParam a; T.Apply ("list", [T.TyParam a])]) )
+          , Some (T.Tuple [T.TyParam a; T.Apply (CoreTypes.list_tyname, [T.TyParam a])]) )
         in
         ([a], Sum (Assoc.of_list [list_nil; list_cons])) )
-    ; ("empty", ([], Sum Assoc.empty)) ]
+    ; (CoreTypes.empty_tyname, ([], Sum Assoc.empty)) ]
 
 let global = ref initial
 
@@ -39,7 +39,7 @@ let subst_tydef sbst =
 
 let lookup_tydef ~loc ty_name =
   match Assoc.lookup ty_name !global with
-  | None -> Error.typing ~loc "Unknown type %s" ty_name
+  | None -> Error.typing ~loc "Unknown type %t" (CoreTypes.TyName.print ty_name)
   | Some (params, tydef) -> (params, tydef)
 
 let fresh_tydef ~loc ty_name =
@@ -111,8 +111,8 @@ let transparent ~loc ty_name =
 let ty_apply ~loc ty_name lst =
   let xs, ty = lookup_tydef ~loc ty_name in
   if List.length xs <> List.length lst then
-    Error.typing ~loc "Type constructors %s should be applied to %d arguments"
-      ty_name (List.length xs)
+    Error.typing ~loc "Type constructors %t should be applied to %d arguments"
+      (CoreTypes.TyName.print ty_name) (List.length xs)
   else
     let combined = Assoc.of_list (List.combine xs lst) in
     subst_tydef combined ty
@@ -125,8 +125,8 @@ let check_well_formed ~loc tydef =
         let params, _ = lookup_tydef ~loc ty_name in
         let n = List.length params in
         if List.length tys <> n then
-          Error.typing ~loc "The type constructor %s expects %d arguments"
-            ty_name n
+          Error.typing ~loc "The type constructor %t expects %d arguments"
+            (CoreTypes.TyName.print ty_name) n
     | T.Arrow (ty1, ty2) -> check ty1 ; check ty2
     | T.Tuple tys -> List.iter check tys
     | T.Handler {T.value= ty1; T.finally= ty2} -> check ty1 ; check ty2
@@ -149,7 +149,8 @@ let check_noncyclic ~loc =
     | T.Basic _ | T.TyParam _ -> ()
     | T.Apply (t, lst) ->
         if List.mem t forbidden then
-          Error.typing ~loc "Type definition %s is cyclic." t
+          Error.typing ~loc "Type definition %t is cyclic."
+            (CoreTypes.TyName.print t)
         else check_tydef (t :: forbidden) (ty_apply ~loc t lst)
     | T.Arrow (ty1, ty2) -> check forbidden ty1 ; check forbidden ty2
     | T.Tuple tys -> List.iter (check forbidden) tys
@@ -174,8 +175,8 @@ let check_shadowing ~loc = function
         match find_field f with
         | Some (u, _, _) ->
             Error.typing ~loc
-              "Record field label %t is already used in type %s" 
-                (CoreTypes.Field.print f) u
+              "Record field label %t is already used in type %t" 
+                (CoreTypes.Field.print f) (CoreTypes.TyName.print u)
         | None -> ()
       in
       Assoc.iter shadow_check_fld lst
@@ -184,8 +185,8 @@ let check_shadowing ~loc = function
         match find_variant lbl with
         | Some (u, _, _, _) ->
             Error.typing ~loc 
-              "Constructor %t is already used in type %s"
-              (CoreTypes.Label.print lbl) u
+              "Constructor %t is already used in type %t"
+              (CoreTypes.Label.print lbl) (CoreTypes.TyName.print u)
         | None -> ()
       in
       Assoc.iter shadow_check_sum lst

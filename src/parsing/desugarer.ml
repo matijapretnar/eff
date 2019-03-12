@@ -11,15 +11,26 @@ type state =
   { context: (string, CoreTypes.Variable.t) Assoc.t
   ; effect_symbols: (string, CoreTypes.Effect.t) Assoc.t
   ; field_symbols: (string, CoreTypes.Field.t) Assoc.t
+  ; tyname_symbols: (string, CoreTypes.TyName.t) Assoc.t
   ; constructors: (string, (CoreTypes.Label.t * constructor_kind)) Assoc.t
   ; local_type_annotations: (string, Params.Ty.t) Assoc.t }
 
 let initial_state =
   let list_cons = (CoreTypes.cons_annot, (CoreTypes.cons, Variant true)) in
   let list_nil = (CoreTypes.nil_annot, (CoreTypes.nil, Variant false)) in
+  let initial_types = Assoc.of_list 
+    [ ("bool", CoreTypes.bool_tyname) 
+    ; ("int", CoreTypes.int_tyname)
+    ; ("unit", CoreTypes.unit_tyname)
+    ; ("string", CoreTypes.string_tyname)
+    ; ("float", CoreTypes.float_tyname)
+    ; ("list", CoreTypes.list_tyname)
+    ; ("empty", CoreTypes.empty_tyname) ]
+  in
   { context= Assoc.empty
   ; effect_symbols = Assoc.empty
   ; field_symbols = Assoc.empty
+  ; tyname_symbols = initial_types
   ; constructors= Assoc.of_list [list_cons; list_nil]
   ; local_type_annotations= Assoc.empty }
 
@@ -41,6 +52,14 @@ let field_to_symbol state name  =
       let field_symbols' = Assoc.update name sym state.field_symbols in
       ({state with field_symbols=field_symbols'}, sym)
 
+let tyname_to_symbol state name  =
+  match Assoc.lookup name state.tyname_symbols with
+  | Some sym -> (state, sym)
+  | None ->
+      let sym = CoreTypes.TyName.fresh name in
+      let tyname_symbols' = Assoc.update name sym state.tyname_symbols in
+      ({state with tyname_symbols=tyname_symbols'}, sym)
+
 (* ***** Desugaring of types. ***** *)
 (* Desugar a type, where only the given type, dirt and region parameters may appear.
    If a type application with missing dirt and region parameters is encountered,
@@ -54,8 +73,9 @@ let desugar_type type_sbst state =
   let rec desugar_type state {it= t; at= loc} =
     match t with
     | Sugared.TyApply (t, tys) ->
-        let state', tys' = fold_map desugar_type state tys in
-        (state', T.Apply (t, tys'))
+        let state', t' = tyname_to_symbol state t in
+        let state'', tys' = fold_map desugar_type state' tys in
+        (state'', T.Apply (t', tys'))
     | Sugared.TyParam t -> (
       match Assoc.lookup t type_sbst with
       | None -> Error.syntax ~loc "Unbound type parameter '%s" t
@@ -144,8 +164,14 @@ let desugar_tydef state params def =
 
 (** [desugar_tydefs defs] desugars the simultaneous type definitions [defs]. *)
 let desugar_tydefs state sugared_defs =
-  let desugar_fold state (params, def) = desugar_tydef state params def in
-  Assoc.fold_map desugar_fold state sugared_defs
+  let desugar_fold st (name, (params, def)) = 
+    (* First desugar the type names *)
+    let st', sym = tyname_to_symbol st name in
+    (* Then the types themselves *)
+    let st'', (params', def') = desugar_tydef st' params def in
+    (st'', (sym, (params', def')))
+  in
+  Assoc.kfold_map desugar_fold state sugared_defs
 
 (* ***** Desugaring of expressions and computations. ***** *)
 

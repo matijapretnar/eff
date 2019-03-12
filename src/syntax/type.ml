@@ -5,7 +5,7 @@
 let fresh_ty_param = Params.Ty.fresh
 
 type ty =
-  | Apply of CoreTypes.tyname * ty list
+  | Apply of CoreTypes.TyName.t * ty list
   | TyParam of Params.Ty.t
   | Basic of string
   | Tuple of ty list
@@ -33,7 +33,7 @@ let float_ty = Basic "float"
 
 let unit_ty = Tuple []
 
-let empty_ty = Apply ("empty", [])
+let empty_ty = Apply (CoreTypes.empty_tyname, [])
 
 type substitution = (Params.Ty.t, ty) Assoc.t
 
@@ -121,10 +121,12 @@ let print (ps, t) ppf =
     | Arrow (t1, t2) ->
         print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2)
     | Basic b -> print "%s" b
-    | Apply (t, []) -> print "%s" t
-    | Apply (t, [s]) -> print ~at_level:1 "%t %s" (ty ~max_level:1 s) t
+    | Apply (t, []) -> print "%t" (CoreTypes.TyName.print t)
+    | Apply (t, [s]) -> 
+        print ~at_level:1 "%t %t" (ty ~max_level:1 s) (CoreTypes.TyName.print t)
     | Apply (t, ts) ->
-        print ~at_level:1 "(%t) %s" (Print.sequence ", " ty ts) t
+        print ~at_level:1 "(%t) %t" 
+          (Print.sequence ", " ty ts) (CoreTypes.TyName.print t)
     | TyParam p -> print "%t" (Params.Ty.print_old ~poly:ps p)
     | Tuple [] -> print "unit"
     | Tuple ts ->

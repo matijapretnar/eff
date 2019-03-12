@@ -19,7 +19,15 @@ let cons = Label.fresh cons_annot
 module Field = Symbol.Make (Symbol.String)
 
 (** type names *)
-type tyname = string
+module TyName = Symbol.Make (Symbol.String)
+
+let bool_tyname = TyName.fresh "bool"
+let int_tyname = TyName.fresh "int"
+let unit_tyname = TyName.fresh "unit"
+let string_tyname = TyName.fresh "string"
+let float_tyname = TyName.fresh "float"
+let list_tyname = TyName.fresh "list"
+let empty_tyname = TyName.fresh "empty"
 
 (** type parameters *)
 type typaram = string

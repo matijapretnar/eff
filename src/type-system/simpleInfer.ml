@@ -83,8 +83,8 @@ let infer_pattern cstr pp =
               match Assoc.lookup fld us with
               | None ->
                   Error.typing ~loc 
-                    "Unexpected field %t in a pattern of type %s." 
-                    (CoreTypes.Field.print fld) t
+                    "Unexpected field %t in a pattern of type %t." 
+                    (CoreTypes.Field.print fld) (CoreTypes.TyName.print t)
               | Some u -> add_ty_constraint cstr loc (infer p) u
             in
             Assoc.iter unify_record_pattern flds ;
@@ -234,7 +234,8 @@ and infer_expr ctx cstr {it= e; at= loc} =
             (CoreTypes.Field.print fld)
       | Some (ty, (t_name, arg_types)) ->
           if Assoc.length flds <> Assoc.length arg_types then
-            Error.typing ~loc "malformed record of type %s" t_name
+            Error.typing ~loc "malformed record of type %t" 
+              (CoreTypes.TyName.print t_name)
           else
             let arg_types' = Assoc.map (infer_expr ctx cstr) flds in
             let unify_record_arg (fld, t) =

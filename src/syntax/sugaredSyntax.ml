@@ -6,12 +6,13 @@ type variable = string
 type effect = string
 type label = string
 type field = string
+type tyname = string
 type dirtparam = int
 
 type ty = plain_ty located
 
 and plain_ty =
-  | TyApply of CoreTypes.tyname * ty list
+  | TyApply of tyname * ty list
       (** [(ty1, ty2, ..., tyn) type_name] *)
   | TyParam of CoreTypes.typaram  (** ['a] *)
   | TyArrow of ty * ty  (** [ty1 -> ty2] *)
