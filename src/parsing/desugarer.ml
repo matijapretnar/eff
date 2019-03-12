@@ -12,53 +12,54 @@ type state =
   ; effect_symbols: (string, CoreTypes.Effect.t) Assoc.t
   ; field_symbols: (string, CoreTypes.Field.t) Assoc.t
   ; tyname_symbols: (string, CoreTypes.TyName.t) Assoc.t
-  ; constructors: (string, (CoreTypes.Label.t * constructor_kind)) Assoc.t
+  ; constructors: (string, CoreTypes.Label.t * constructor_kind) Assoc.t
   ; local_type_annotations: (string, CoreTypes.TyParam.t) Assoc.t }
 
 let initial_state =
   let list_cons = (CoreTypes.cons_annot, (CoreTypes.cons, Variant true)) in
   let list_nil = (CoreTypes.nil_annot, (CoreTypes.nil, Variant false)) in
-  let initial_types = Assoc.of_list 
-    [ ("bool", CoreTypes.bool_tyname) 
-    ; ("int", CoreTypes.int_tyname)
-    ; ("unit", CoreTypes.unit_tyname)
-    ; ("string", CoreTypes.string_tyname)
-    ; ("float", CoreTypes.float_tyname)
-    ; ("list", CoreTypes.list_tyname)
-    ; ("empty", CoreTypes.empty_tyname) ]
+  let initial_types =
+    Assoc.of_list
+      [ ("bool", CoreTypes.bool_tyname)
+      ; ("int", CoreTypes.int_tyname)
+      ; ("unit", CoreTypes.unit_tyname)
+      ; ("string", CoreTypes.string_tyname)
+      ; ("float", CoreTypes.float_tyname)
+      ; ("list", CoreTypes.list_tyname)
+      ; ("empty", CoreTypes.empty_tyname) ]
   in
   { context= Assoc.empty
-  ; effect_symbols = Assoc.empty
-  ; field_symbols = Assoc.empty
-  ; tyname_symbols = initial_types
+  ; effect_symbols= Assoc.empty
+  ; field_symbols= Assoc.empty
+  ; tyname_symbols= initial_types
   ; constructors= Assoc.of_list [list_cons; list_nil]
   ; local_type_annotations= Assoc.empty }
 
 let add_loc t loc = {it= t; at= loc}
 
-let effect_to_symbol state name  =
+let effect_to_symbol state name =
   match Assoc.lookup name state.effect_symbols with
   | Some sym -> (state, sym)
   | None ->
       let sym = CoreTypes.Effect.fresh name in
       let effect_symbols' = Assoc.update name sym state.effect_symbols in
-      ({state with effect_symbols=effect_symbols'}, sym)
+      ({state with effect_symbols= effect_symbols'}, sym)
 
-let field_to_symbol state name  =
+let field_to_symbol state name =
   match Assoc.lookup name state.field_symbols with
   | Some sym -> (state, sym)
   | None ->
       let sym = CoreTypes.Field.fresh name in
       let field_symbols' = Assoc.update name sym state.field_symbols in
-      ({state with field_symbols=field_symbols'}, sym)
+      ({state with field_symbols= field_symbols'}, sym)
 
-let tyname_to_symbol state name  =
+let tyname_to_symbol state name =
   match Assoc.lookup name state.tyname_symbols with
   | Some sym -> (state, sym)
   | None ->
       let sym = CoreTypes.TyName.fresh name in
       let tyname_symbols' = Assoc.update name sym state.tyname_symbols in
-      ({state with tyname_symbols=tyname_symbols'}, sym)
+      ({state with tyname_symbols= tyname_symbols'}, sym)
 
 (* ***** Desugaring of types. ***** *)
 (* Desugar a type, where only the given type, dirt and region parameters may appear.
@@ -116,7 +117,7 @@ let desugar_tydef state params def =
   let state', def' =
     match def with
     | Sugared.TyRecord flds ->
-        let field_desugar st (f, t) = 
+        let field_desugar st (f, t) =
           let st', f' = field_to_symbol st f in
           let st'', t' = desugar_type ty_sbst st' t in
           (st'', (f', t'))
@@ -125,7 +126,7 @@ let desugar_tydef state params def =
         (state', Tctx.Record flds')
     | Sugared.TySum assoc ->
         let aux_desug st (lbl, cons) =
-          let unsugared_lbl = 
+          let unsugared_lbl =
             match Assoc.lookup lbl st.constructors with
             | None -> failwith "unreachable"
             | Some (lbl', cons_kind) -> lbl'
@@ -139,10 +140,11 @@ let desugar_tydef state params def =
         let constructors =
           (* desugar constructor names to Symbol  and add to state *)
           let aux (lbl, cons) =
-            let unsugared_lbl = 
+            let unsugared_lbl =
               match Assoc.lookup lbl state.constructors with
               | None -> CoreTypes.Label.fresh lbl
-              | Some (lbl, _) -> lbl (* Caught by inference for better error *)
+              | Some (lbl, _) -> lbl
+              (* Caught by inference for better error *)
             in
             match cons with
             | None -> (lbl, (unsugared_lbl, Variant false))
@@ -152,7 +154,7 @@ let desugar_tydef state params def =
           Assoc.concat new_cons state.constructors
         in
         (* desugar and rename constructors in type *)
-        let state', assoc' = 
+        let state', assoc' =
           Assoc.kfold_map aux_desug {state with constructors} assoc
         in
         (state', Tctx.Sum assoc')
@@ -164,7 +166,7 @@ let desugar_tydef state params def =
 
 (** [desugar_tydefs defs] desugars the simultaneous type definitions [defs]. *)
 let desugar_tydefs state sugared_defs =
-  let desugar_fold st (name, (params, def)) = 
+  let desugar_fold st (name, (params, def)) =
     (* First desugar the type names *)
     let st', sym = tyname_to_symbol st name in
     (* Then the types themselves *)
@@ -185,7 +187,7 @@ let id_abstraction loc =
   ( add_loc (Untyped.PVar x) loc
   , add_loc (Untyped.Value (add_loc (Untyped.Var x) loc)) loc )
 
-let desugar_pattern state ?(initial_forbidden= []) p =
+let desugar_pattern state ?(initial_forbidden = []) p =
   let vars = ref Assoc.empty in
   let forbidden = ref initial_forbidden in
   let new_var x =
@@ -224,7 +226,7 @@ let desugar_pattern state ?(initial_forbidden= []) p =
           let state', ps' = fold_map desugar_pattern state ps in
           (state', Untyped.PTuple ps')
       | Sugared.PRecord flds ->
-          let field_desugar st (f, p) = 
+          let field_desugar st (f, p) =
             let st', f' = field_to_symbol st f in
             let st'', p' = desugar_pattern st' p in
             (st'', (f', p'))
@@ -361,13 +363,13 @@ and desugar_computation state {it= t; at= loc} =
         let state', w1, e1 = desugar_expression state t1 in
         let state'', w2, e2 = desugar_expression state' t2 in
         (state'', w1 @ w2, Untyped.Apply (e1, e2))
-    | Sugared.Effect (eff, t) ->
-        (match Assoc.lookup eff state.effect_symbols with
-        | Some eff' ->
-            let state', w, e = desugar_expression state t in
-            let loc_eff = add_loc (Untyped.Effect eff') loc in
-            (state', w, Untyped.Apply (loc_eff, e))
-        | None -> Error.typing ~loc "Unknown operation %s" eff)
+    | Sugared.Effect (eff, t) -> (
+      match Assoc.lookup eff state.effect_symbols with
+      | Some eff' ->
+          let state', w, e = desugar_expression state t in
+          let loc_eff = add_loc (Untyped.Effect eff') loc in
+          (state', w, Untyped.Apply (loc_eff, e))
+      | None -> Error.typing ~loc "Unknown operation %s" eff )
     | Sugared.Match (t, cs) -> match_constructor state loc t cs
     | Sugared.Handle (t1, t2) ->
         let state', w1, e1 = desugar_expression state t1 in
@@ -510,7 +512,9 @@ and desugar_handler loc state
         in
         let p1, p2 = (Untyped.PVar x, Untyped.PVar k) in
         let state'', match_term = match_term_fun state' in
-        let new_eff_cs = (eff', (add_loc p1 loc, add_loc p2 loc, match_term)) in
+        let new_eff_cs =
+          (eff', (add_loc p1 loc, add_loc p2 loc, match_term))
+        in
         (state'', new_eff_cs)
   in
   (* group eff cases by effects into lumps to transform into matches *)

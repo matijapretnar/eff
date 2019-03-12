@@ -1,5 +1,4 @@
 module Untyped = UntypedSyntax
-
 module EffectMap = Map.Make (CoreTypes.Effect)
 
 type ty_scheme = CoreTypes.TyParam.t list * Type.ty
@@ -29,20 +28,19 @@ let subst_ctx ctx sbst =
 
 (** [free_params ctx] returns list of all free type parameters in [ctx]. *)
 let free_params ctx =
-  let binding_params (_, (ps, ty)) = 
-    CoreUtils.list_diff (Type.free_params ty) ps 
+  let binding_params (_, (ps, ty)) =
+    CoreUtils.list_diff (Type.free_params ty) ps
   in
   let xs = List.map binding_params (Assoc.to_list ctx) |> List.flatten in
   CoreUtils.unique_elements xs
 
 let generalize ctx poly ty =
   if poly then
-    let ps = 
+    let ps =
       CoreUtils.list_diff (Type.free_params ty) (free_params ctx.variables)
     in
     (ps, ty)
-  else 
-    ([], ty)
+  else ([], ty)
 
 let infer_effect env eff =
   try Some (EffectMap.find eff env.effects) with Not_found -> None
@@ -51,5 +49,5 @@ let add_effect env eff (ty1, ty2) =
   match infer_effect env eff with
   | None -> {env with effects= EffectMap.add eff (ty1, ty2) env.effects}
   | Some _ ->
-      Error.typing ~loc:Location.unknown 
-        "Effect %t already defined." (CoreTypes.Effect.print eff)
+      Error.typing ~loc:Location.unknown "Effect %t already defined."
+        (CoreTypes.Effect.print eff)

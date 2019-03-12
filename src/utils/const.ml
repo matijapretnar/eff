@@ -19,7 +19,6 @@ let print c ppf =
   | Boolean b -> Format.fprintf ppf "%B" b
   | Float f -> Format.fprintf ppf "%F" f
 
-
 let compare c1 c2 =
   let cmp x y =
     let r = Pervasives.compare x y in
@@ -33,6 +32,5 @@ let compare c1 c2 =
   | Boolean b1, Boolean b2 -> cmp b1 b2
   | Float x1, Float x2 -> cmp x1 x2
   | _ -> Error.runtime "Incomparable constants %t and %t" (print c1) (print c2)
-
 
 let equal c1 c2 = compare c1 c2 = CoreUtils.Equal

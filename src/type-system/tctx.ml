@@ -15,12 +15,15 @@ let initial : tyctx =
     ; (CoreTypes.int_tyname, ([], Inline T.int_ty))
     ; (CoreTypes.string_tyname, ([], Inline T.string_ty))
     ; (CoreTypes.float_tyname, ([], Inline T.float_ty))
-    ; (CoreTypes.list_tyname
+    ; ( CoreTypes.list_tyname
       , let a = Type.fresh_ty_param () in
         let list_nil = (CoreTypes.nil, None) in
         let list_cons =
           ( CoreTypes.cons
-          , Some (T.Tuple [T.TyParam a; T.Apply (CoreTypes.list_tyname, [T.TyParam a])]) )
+          , Some
+              (T.Tuple
+                 [T.TyParam a; T.Apply (CoreTypes.list_tyname, [T.TyParam a])])
+          )
         in
         ([a], Sum (Assoc.of_list [list_nil; list_cons])) )
     ; (CoreTypes.empty_tyname, ([], Sum Assoc.empty)) ]
@@ -32,14 +35,15 @@ let reset () = global := initial
 let subst_tydef sbst =
   let subst = Type.subst_ty sbst in
   function
-    | Record tys -> Record (Assoc.map subst tys)
-    | Sum tys -> 
-        Sum (Assoc.map (function None -> None | Some x -> Some (subst x)) tys)
-    | Inline ty -> Inline (subst ty)
+  | Record tys -> Record (Assoc.map subst tys)
+  | Sum tys ->
+      Sum (Assoc.map (function None -> None | Some x -> Some (subst x)) tys)
+  | Inline ty -> Inline (subst ty)
 
 let lookup_tydef ~loc ty_name =
   match Assoc.lookup ty_name !global with
-  | None -> Error.typing ~loc "Unknown type %t" (CoreTypes.TyName.print ty_name)
+  | None ->
+      Error.typing ~loc "Unknown type %t" (CoreTypes.TyName.print ty_name)
   | Some (params, tydef) -> (params, tydef)
 
 let fresh_tydef ~loc ty_name =
@@ -86,10 +90,8 @@ let infer_variant lbl =
   | None -> None
   | Some (ty_name, ps, _, u) ->
       let ps', fresh_subst = T.refreshing_subst ps in
-      let u' = 
-        match u with
-        | None -> None 
-        | Some x -> Some (T.subst_ty fresh_subst x)
+      let u' =
+        match u with None -> None | Some x -> Some (T.subst_ty fresh_subst x)
       in
       Some (apply_to_params ty_name ps', u')
 
@@ -112,7 +114,8 @@ let ty_apply ~loc ty_name lst =
   let xs, ty = lookup_tydef ~loc ty_name in
   if List.length xs <> List.length lst then
     Error.typing ~loc "Type constructors %t should be applied to %d arguments"
-      (CoreTypes.TyName.print ty_name) (List.length xs)
+      (CoreTypes.TyName.print ty_name)
+      (List.length xs)
   else
     let combined = Assoc.of_list (List.combine xs lst) in
     subst_tydef combined ty
@@ -126,7 +129,8 @@ let check_well_formed ~loc tydef =
         let n = List.length params in
         if List.length tys <> n then
           Error.typing ~loc "The type constructor %t expects %d arguments"
-            (CoreTypes.TyName.print ty_name) n
+            (CoreTypes.TyName.print ty_name)
+            n
     | T.Arrow (ty1, ty2) -> check ty1 ; check ty2
     | T.Tuple tys -> List.iter check tys
     | T.Handler {T.value= ty1; T.finally= ty2} -> check ty1 ; check ty2
@@ -175,8 +179,8 @@ let check_shadowing ~loc = function
         match find_field f with
         | Some (u, _, _) ->
             Error.typing ~loc
-              "Record field label %t is already used in type %t" 
-                (CoreTypes.Field.print f) (CoreTypes.TyName.print u)
+              "Record field label %t is already used in type %t"
+              (CoreTypes.Field.print f) (CoreTypes.TyName.print u)
         | None -> ()
       in
       Assoc.iter shadow_check_fld lst
@@ -184,9 +188,9 @@ let check_shadowing ~loc = function
       let shadow_check_sum (lbl, _) =
         match find_variant lbl with
         | Some (u, _, _, _) ->
-            Error.typing ~loc 
-              "Constructor %t is already used in type %t"
-              (CoreTypes.Label.print lbl) (CoreTypes.TyName.print u)
+            Error.typing ~loc "Constructor %t is already used in type %t"
+              (CoreTypes.Label.print lbl)
+              (CoreTypes.TyName.print u)
         | None -> ()
       in
       Assoc.iter shadow_check_sum lst

@@ -22,18 +22,16 @@ let rec left_to_right_map f = function
 let unique_elements lst =
   let rec unique_elements acc = function
     | [] -> List.rev acc
-    | x :: xs -> 
-      if List.mem x acc then 
-        unique_elements acc xs 
-      else
-       unique_elements (x :: acc) xs
+    | x :: xs ->
+        if List.mem x acc then unique_elements acc xs
+        else unique_elements (x :: acc) xs
   in
   unique_elements [] lst
 
 let no_duplicates lst =
   let rec check seen = function
     | [] -> true
-    | x :: xs -> not (List.mem x seen) && check (x :: seen) xs
+    | x :: xs -> (not (List.mem x seen)) && check (x :: seen) xs
   in
   check [] lst
 

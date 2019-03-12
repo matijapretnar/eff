@@ -3,18 +3,23 @@ open CoreUtils
 
 (** Terms *)
 type variable = string
+
 type effect = string
+
 type label = string
+
 type field = string
+
 type tyname = string
+
 type typaram = string
+
 type dirtparam = int
 
 type ty = plain_ty located
 
 and plain_ty =
-  | TyApply of tyname * ty list
-      (** [(ty1, ty2, ..., tyn) type_name] *)
+  | TyApply of tyname * ty list  (** [(ty1, ty2, ..., tyn) type_name] *)
   | TyParam of typaram  (** ['a] *)
   | TyArrow of ty * ty  (** [ty1 -> ty2] *)
   | TyTuple of ty list  (** [ty1 * ty2 * ... * tyn] *)
@@ -78,8 +83,8 @@ and match_case =
   | Val_match of abstraction
   | Eff_match of (effect * abstraction2)
 
-and abstraction = (pattern * term)
+and abstraction = pattern * term
 
-and abstraction2 = (pattern * pattern * term)
+and abstraction2 = pattern * pattern * term
 
 type dirt = DirtParam of dirtparam

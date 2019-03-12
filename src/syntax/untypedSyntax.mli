@@ -1,8 +1,11 @@
 (** Syntax of the core language. *)
 
 type variable = CoreTypes.Variable.t
+
 type effect = CoreTypes.Effect.t
+
 type label = CoreTypes.Label.t
+
 type field = CoreTypes.Field.t
 
 type pattern = plain_pattern CoreUtils.located
@@ -50,13 +53,14 @@ and handler =
   ; finally_clause: abstraction }
 
 (** Abstractions that take one argument. *)
-and abstraction = (pattern * computation)
+and abstraction = pattern * computation
 
 (** Abstractions that take two arguments. *)
-and abstraction2 = (pattern * pattern * computation)
+and abstraction2 = pattern * pattern * computation
 
-val print_pattern : ?max_level : int -> pattern -> Format.formatter -> unit
+val print_pattern : ?max_level:int -> pattern -> Format.formatter -> unit
 
-val print_computation : ?max_level : int -> computation -> Format.formatter -> unit
+val print_computation :
+  ?max_level:int -> computation -> Format.formatter -> unit
 
-val print_expression : ?max_level : int -> expression -> Format.formatter -> unit
+val print_expression : ?max_level:int -> expression -> Format.formatter -> unit

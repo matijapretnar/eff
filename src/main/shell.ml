@@ -55,9 +55,9 @@ let rec exec_cmd ppf state {it= cmd; at= loc} =
       let type_system_state' =
         SimpleCtx.add_effect state.type_system_state eff (ty1, ty2)
       in
-      {state with 
-        type_system_state= type_system_state';
-        desugarer_state= desugarer_state'}
+      { state with
+        type_system_state= type_system_state'
+      ; desugarer_state= desugarer_state' }
   | Commands.Quit -> exit 0
   | Commands.Use filename -> execute_file ppf filename state
   | Commands.TopLet defs ->

@@ -1,5 +1,4 @@
 open CoreUtils
-
 module Sugared = SugaredSyntax
 
 (* Toplevel commands (the first four do not need to be separated by [;;]) *)
