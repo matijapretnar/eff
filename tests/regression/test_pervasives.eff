@@ -16,6 +16,12 @@ let test_equal_float = (1.0 = 1.0);;
 
 assert ("a" = "a");;
 
+assert (1.0 /. 0.0 = infinity);;
+
+assert (-. 1.0 /. 0.0 = neg_infinity);;
+
+assert (0.0 /. 0.0 = nan);;
+
 let tilda_minus = (~-1);;
 
 let tilda_minus_dot2 = (~-. 3.14159);;
@@ -116,6 +122,8 @@ let test_zip1 = (zip [1;2;3] ["a"; "b"; "c"]);;
 
 check (zip [1;2;3;4;5;6] ["a"; "b"; "c"]);;
 
+let test_unzip = (unzip [(1, "a"); (2, "b"); (3, "c")]);;
+
 let test_reverse = reverse [1;2;3;4;5];;
 
 let test_at = ([1;2;3] @ [4;5;6]);;
@@ -150,11 +158,17 @@ let test_id_id = (id id);;
 
 let test_compose = (compose (fun k -> k * k) (fun j -> j +4) 10);;
 
+let test_rev_apply = 3 |> (fun x -> x) |> (+) 4;; 
+
 let test_fst = (fst ("foo", 4));;
 
 let test_snd = (snd ("foo", 4));;
 
 check (perform (Print "Does this work?"));;
+
+check (print "How about now?");;
+
+check (print 12);;
 
 check (perform Read);;
 

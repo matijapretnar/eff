@@ -1,12 +1,12 @@
 type value =
   | Const of Const.t
   | Tuple of value list
-  | Record of (OldUtils.field, value) Assoc.t
-  | Variant of OldUtils.label * value option
+  | Record of (CoreTypes.Field.t, value) Assoc.t
+  | Variant of CoreTypes.Label.t * value option
   | Closure of closure
   | Handler of (result -> result)
 
-and result = Value of value | Call of OldUtils.effect * value * closure
+and result = Value of value | Call of CoreTypes.Effect.t * value * closure
 
 and closure = value -> result
 
@@ -26,6 +26,6 @@ val to_handler : value -> result -> result
 
 val print_value : ?max_level:int -> value -> Format.formatter -> unit
 
-val print_effect : OldUtils.effect -> Format.formatter -> unit
+val print_effect : CoreTypes.Effect.t -> Format.formatter -> unit
 
 val print_result : result -> Format.formatter -> unit

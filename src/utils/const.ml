@@ -19,13 +19,12 @@ let print c ppf =
   | Boolean b -> Format.fprintf ppf "%B" b
   | Float f -> Format.fprintf ppf "%F" f
 
-
 let compare c1 c2 =
   let cmp x y =
     let r = Pervasives.compare x y in
-    if r < 0 then OldUtils.Less
-    else if r > 0 then OldUtils.Greater
-    else OldUtils.Equal
+    if r < 0 then CoreUtils.Less
+    else if r > 0 then CoreUtils.Greater
+    else CoreUtils.Equal
   in
   match (c1, c2) with
   | Integer n1, Integer n2 -> cmp n1 n2
@@ -34,5 +33,4 @@ let compare c1 c2 =
   | Float x1, Float x2 -> cmp x1 x2
   | _ -> Error.runtime "Incomparable constants %t and %t" (print c1) (print c2)
 
-
-let equal c1 c2 = compare c1 c2 = OldUtils.Equal
+let equal c1 c2 = compare c1 c2 = CoreUtils.Equal

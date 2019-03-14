@@ -8,11 +8,9 @@ let rec lookup x = function
   | [] -> None
   | (k, v) :: tl -> if x = k then Some v else lookup x tl
 
-
 let rec find_if p = function
   | [] -> None
   | hd :: tl -> if p hd then Some hd else find_if p tl
-
 
 let pop = function [] -> None | hd :: tl -> Some (hd, tl)
 
@@ -24,11 +22,9 @@ let rec replace k v = function
   | (k', v') :: tl ->
       if k = k' then (k, v) :: tl else (k', v') :: replace k v tl
 
-
 let rec remove x = function
   | [] -> []
   | (k, v) :: tl -> if x = k then tl else (k, v) :: remove x tl
-
 
 (* Iters, maps, folds. *)
 let rec iter = List.iter
@@ -40,7 +36,6 @@ let rec map f = function
       let tl' = map f tl in
       (k, v') :: tl'
 
-
 let rec kmap f = function
   | [] -> []
   | hd :: tl ->
@@ -48,14 +43,12 @@ let rec kmap f = function
       let tl' = kmap f tl in
       hd' :: tl'
 
-
 let rec map_of_list f = function
   | [] -> []
   | x :: tl ->
       let k, v = f x in
       let tl' = map_of_list f tl in
       (k, v) :: tl'
-
 
 let fold_left = CoreUtils.fold
 

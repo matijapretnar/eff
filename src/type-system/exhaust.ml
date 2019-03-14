@@ -1,5 +1,4 @@
 open CoreUtils
-
 module Untyped = UntypedSyntax
 
 (* Pattern matching exhaustiveness checking as described by Maranget [1]. These
@@ -21,8 +20,8 @@ module Untyped = UntypedSyntax
 (* Types of constructors. *)
 type cons =
   | Tuple of int
-  | Record of OldUtils.field list
-  | Variant of OldUtils.label * bool
+  | Record of CoreTypes.Field.t list
+  | Variant of CoreTypes.Label.t * bool
   | Const of Const.t
   | Wildcard
 
@@ -33,14 +32,12 @@ let arity = function
   | Record flds -> List.length flds
   | Variant (_, b) -> if b then 1 else 0
 
-
 (* Removes the top-most [As] pattern wrappers, if present (e.g. [2 as x] -> [2]). *)
 let rec remove_as {it= p} =
   match p with
   | Untyped.PAs (p', _) -> remove_as p'
   | Untyped.PAnnotated (p', _) -> remove_as p'
   | p -> p
-
 
 (* Reads constructor description from a pattern, discarding any [Untyped.PAs] layers. *)
 let rec cons_of_pattern {it= p; at= loc} =
@@ -51,15 +48,15 @@ let rec cons_of_pattern {it= p; at= loc} =
   | Untyped.PRecord flds -> (
     match Assoc.pop flds with
     | None -> assert false
-    | Some ((lbl, _), _) ->
+    | Some ((lbl, _), _) -> (
       match Tctx.find_field lbl with
       | None ->
-          Error.typing ~loc "Unbound record field label %s in a pattern" lbl
-      | Some (_, _, flds) -> Record (Assoc.keys_of flds) )
+          Error.typing ~loc "Unbound record field label %t in a pattern"
+            (CoreTypes.Field.print lbl)
+      | Some (_, _, flds) -> Record (Assoc.keys_of flds) ) )
   | Untyped.PVariant (lbl, opt) -> Variant (lbl, opt <> None)
   | Untyped.PConst c -> Const c
   | Untyped.PVar _ | Untyped.PNonbinding -> Wildcard
-
 
 (* Constructs a pattern from a constructor and a list of subpatterns, which must
    contain [arity c] elements. *)
@@ -75,16 +72,15 @@ let pattern_of_cons ~loc c lst =
   in
   {it= plain; at= loc}
 
-
 (* Finds all distinct non-wildcard root pattern constructors in [lst], and at
    least one constructor of their type not present in [lst] if it exists. *)
 let find_constructors lst =
-  let cons_lst = List.map cons_of_pattern (OldUtils.uniq lst) in
+  let cons_lst = List.map cons_of_pattern (unique_elements lst) in
   let present = List.filter (fun c -> c <> Wildcard) cons_lst in
   let missing =
     match present with
     | [] -> [Wildcard]
-    | cons :: _ ->
+    | cons :: _ -> (
       match cons with
       (* Tuples and records of any type have exactly one constructor. *)
       | Tuple _ | Record _ -> []
@@ -106,9 +102,10 @@ let find_constructors lst =
           let is_last = function Const.Boolean b -> b | _ -> false in
           let rec find c =
             if is_last c then []
-            else if List.exists
-                      (function Const c' -> Const.equal c c' | _ -> false)
-                      present
+            else if
+              List.exists
+                (function Const c' -> Const.equal c c' | _ -> false)
+                present
             then find (next c)
             else [Const c]
           in
@@ -123,18 +120,17 @@ let find_constructors lst =
                 (fun (lbl, opt) -> Variant (lbl, opt <> None))
                 (Assoc.to_list tags)
             in
-            OldUtils.diff all present )
+            list_diff all present )
       (* Only for completeness. *)
-      | Wildcard -> []
+      | Wildcard -> [] )
   in
   (present, missing)
-
 
 (* Specializes a pattern vector for the pattern constructor [con]. Returns None
    if the first pattern of input vector has an incompatible constructor. *)
 let specialize_vector ~loc con = function
   | [] -> None
-  | p1 :: lst ->
+  | p1 :: lst -> (
     match (con, remove_as p1) with
     | Tuple _, Untyped.PTuple l -> Some (l @ lst)
     | Record all, Untyped.PRecord def ->
@@ -149,32 +145,27 @@ let specialize_vector ~loc con = function
     | Const c, Untyped.PConst c' when Const.equal c c' -> Some lst
     | _, (Untyped.PNonbinding | Untyped.PVar _) ->
         let nonbinds =
-          OldUtils.repeat
-            {it= Untyped.PNonbinding; at= loc}
-            (arity con)
+          List.init (arity con) (fun _ -> {it= Untyped.PNonbinding; at= loc})
         in
         Some (nonbinds @ lst)
-    | _, _ -> None
-
+    | _, _ -> None )
 
 (* Specializes a pattern matrix for the pattern constructor [con]. *)
 let rec specialize ~loc con = function
   | [] -> []
-  | row :: lst ->
+  | row :: lst -> (
     match specialize_vector ~loc con row with
     | Some row' -> row' :: specialize ~loc con lst
-    | None -> specialize ~loc con lst
-
+    | None -> specialize ~loc con lst )
 
 (* Creates a default matrix from the input pattern matrix. *)
 let rec default = function
   | [] -> []
   | [] :: lst -> default lst (* Only for completeness. *)
-  | (p :: ps) :: lst ->
+  | (p :: ps) :: lst -> (
     match remove_as p with
     | Untyped.PNonbinding | Untyped.PVar _ -> ps :: default lst
-    | _ -> default lst
-
+    | _ -> default lst )
 
 (* Is the pattern vector [q] useful w.r.t. pattern matrix [p]? *)
 let rec useful ~loc p q =
@@ -182,7 +173,7 @@ let rec useful ~loc p q =
   (* Base case. *)
   | [] -> p = []
   (* Induction on the number of columns of [p] and [q]. *)
-  | q1 :: qs ->
+  | q1 :: qs -> (
       let cons = cons_of_pattern q1 in
       match cons with
       (* If the first pattern in [q] is constructed, check the matrix [p]
@@ -204,26 +195,33 @@ let rec useful ~loc p q =
                 | None -> false
                 | Some q' -> useful ~loc (specialize ~loc x p) q' )
               present
-          else useful ~loc (default p) qs
-
+          else useful ~loc (default p) qs )
 
 (* Specialized version of [useful] that checks if a pattern matrix [p] with [n]
    columns is exhaustive (equivalent to calling [useful] on [p] with a vector
    of [n] wildcard patterns). Returns a list with at least one counterexample if
    [p] is not exhaustive. *)
+let split_at n lst =
+  let rec split_at' acc lst n =
+    match (lst, n) with
+    | [], _ | _, 0 -> (List.rev acc, lst)
+    | x :: xs, n -> split_at' (x :: acc) xs (n - 1)
+  in
+  split_at' [] lst n
+
 let rec exhaustive ~loc p = function
   | 0 -> if p = [] then Some [] else None
-  | n ->
+  | n -> (
       let present, missing = find_constructors (List.map List.hd p) in
       if present <> [] && missing = [] then
         let rec find = function
           | [] -> None
-          | c :: cs ->
+          | c :: cs -> (
             match exhaustive ~loc (specialize ~loc c p) (arity c + n - 1) with
             | None -> find cs
             | Some lst ->
-                let ps, rest = OldUtils.split (arity c) lst in
-                Some (pattern_of_cons ~loc c ps :: rest)
+                let ps, rest = split_at (arity c) lst in
+                Some (pattern_of_cons ~loc c ps :: rest) )
         in
         find present
       else
@@ -232,12 +230,9 @@ let rec exhaustive ~loc p = function
         | Some lst ->
             let c = List.hd missing in
             let nonbinds =
-              OldUtils.repeat
-               {it= Untyped.PNonbinding; at= loc}
-               (arity c)
+              List.init (arity c) (fun _ -> {it= Untyped.PNonbinding; at= loc})
             in
-            Some (pattern_of_cons ~loc c nonbinds :: lst)
-
+            Some (pattern_of_cons ~loc c nonbinds :: lst) )
 
 (* Prints a warning if the list of patterns [pats] is not exhaustive or contains
    unused patterns. *)
@@ -249,7 +244,8 @@ let check_patterns ~loc patts =
       match exhaustive ~loc p 1 with
       | Some ps ->
           Print.warning ~loc
-            "@[This pattern-matching is not exhaustive.@.\n                                    Here is an example of a value that is not matched:@.  @[%t@]"
+            "@[This pattern-matching is not exhaustive.@.\n                                    \
+             Here is an example of a value that is not matched:@.  @[%t@]"
             (Untyped.print_pattern (List.hd ps))
       | None -> () )
     | patt :: patts ->
@@ -260,7 +256,6 @@ let check_patterns ~loc patts =
     (* Order of rows in [p] is not important. *)
   in
   check [] patts
-
 
 (* A pattern is irrefutable if it cannot fail during pattern matching. *)
 let is_irrefutable p = check_patterns ~loc:p.at [p]

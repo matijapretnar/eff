@@ -1,11 +1,13 @@
 (** Syntax of the core language. *)
 open CoreUtils
-module Variable = Symbol.Make (Symbol.String)
-module EffectMap = Map.Make (String)
 
-type variable = Variable.t
+type variable = CoreTypes.Variable.t
 
-type effect = OldUtils.effect
+type effect = CoreTypes.Effect.t
+
+type label = CoreTypes.Label.t
+
+type field = CoreTypes.Field.t
 
 type pattern = plain_pattern located
 
@@ -14,8 +16,8 @@ and plain_pattern =
   | PAnnotated of pattern * Type.ty
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (OldUtils.field, pattern) Assoc.t
-  | PVariant of OldUtils.label * pattern option
+  | PRecord of (field, pattern) Assoc.t
+  | PVariant of label * pattern option
   | PConst of Const.t
   | PNonbinding
 
@@ -27,8 +29,8 @@ and plain_expression =
   | Const of Const.t
   | Annotated of expression * Type.ty
   | Tuple of expression list
-  | Record of (OldUtils.field, expression) Assoc.t
-  | Variant of OldUtils.label * expression option
+  | Record of (field, expression) Assoc.t
+  | Variant of label * expression option
   | Lambda of abstraction
   | Effect of effect
   | Handler of handler
@@ -52,35 +54,41 @@ and handler =
   ; finally_clause: abstraction }
 
 (** Abstractions that take one argument. *)
-and abstraction = (pattern * computation)
+and abstraction = pattern * computation
 
 (** Abstractions that take two arguments. *)
-and abstraction2 = (pattern * pattern * computation)
+and abstraction2 = pattern * pattern * computation
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p.it with
-  | PVar x -> print "%t" (Variable.print x)
-  | PAs (p, x) -> print "%t as %t" (print_pattern p) (Variable.print x)
+  | PVar x -> print "%t" (CoreTypes.Variable.print x)
+  | PAs (p, x) ->
+      print "%t as %t" (print_pattern p) (CoreTypes.Variable.print x)
   | PAnnotated (p, ty) -> print_pattern ?max_level p ppf
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
-  | PRecord lst -> Print.record print_pattern lst ppf
-  | PVariant (lbl, None) when lbl = OldUtils.nil -> print "[]"
-  | PVariant (lbl, None) -> print "%s" lbl
-  | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = OldUtils.cons ->
+  | PRecord assoc ->
+      let to_name (k, v) = (CoreTypes.Field.fold (fun a _ -> a) k, v) in
+      let names_assoc = Assoc.kmap to_name assoc in
+      Print.record print_pattern names_assoc ppf
+  | PVariant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
+  | PVariant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
+  | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = CoreTypes.cons ->
       print "[@[<hov>@[%t@]%t@]]" (print_pattern v1) (pattern_list v2)
   | PVariant (lbl, Some p) ->
-      print ~at_level:1 "%s @[<hov>%t@]" lbl (print_pattern p)
+      print ~at_level:1 "%t @[<hov>%t@]"
+        (CoreTypes.Label.print lbl)
+        (print_pattern p)
   | PNonbinding -> print "_"
 
-and pattern_list ?(max_length= 299) p ppf =
+and pattern_list ?(max_length = 299) p ppf =
   if max_length > 1 then
     match p.it with
-    | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = OldUtils.cons ->
+    | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = CoreTypes.cons ->
         Format.fprintf ppf ",@ %t%t" (print_pattern v1)
           (pattern_list ~max_length:(max_length - 1) v2)
-    | PVariant (lbl, None) when lbl = OldUtils.nil -> ()
+    | PVariant (lbl, None) when lbl = CoreTypes.nil -> ()
     | _ -> Format.fprintf ppf "(??? %t ???)" (print_pattern p)
   else Format.fprintf ppf ",@ ..."
 
@@ -106,20 +114,25 @@ let rec print_computation ?max_level c ppf =
 and print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match e.it with
-  | Var x -> print "%t" (Variable.print x)
+  | Var x -> print "%t" (CoreTypes.Variable.print x)
   | Const c -> print "%t" (Const.print c)
   | Annotated (t, ty) -> print_expression ?max_level e ppf
   | Tuple lst -> Print.tuple print_expression lst ppf
-  | Record lst -> Print.record print_expression lst ppf
-  | Variant (lbl, None) -> print "%s" lbl
+  | Record assoc ->
+      let to_name (k, v) = (CoreTypes.Field.fold (fun a _ -> a) k, v) in
+      let names_assoc = Assoc.kmap to_name assoc in
+      Print.record print_expression names_assoc ppf
+  | Variant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
   | Variant (lbl, Some e) ->
-      print ~at_level:1 "%s @[<hov>%t@]" lbl (print_expression e)
+      print ~at_level:1 "%t @[<hov>%t@]"
+        (CoreTypes.Label.print lbl)
+        (print_expression e)
   | Lambda a -> print "fun %t" (abstraction a)
   | Handler h ->
       print "{effect_clauses = %t; value_clause = (%t)}"
         (Print.sequence " | " effect_clause (Assoc.to_list h.effect_clauses))
         (abstraction h.value_clause)
-  | Effect eff -> print "%s" eff
+  | Effect eff -> print "%t" (CoreTypes.Effect.print eff)
 
 and abstraction (p, c) ppf =
   Format.fprintf ppf "%t -> %t" (print_pattern p) (print_computation c)
@@ -130,7 +143,9 @@ and let_abstraction (p, c) ppf =
 and case a ppf = Format.fprintf ppf "%t" (abstraction a)
 
 and effect_clause (eff, a2) ppf =
-  Format.fprintf ppf "| %s -> %t" eff (abstraction2 a2)
+  Format.fprintf ppf "| %t -> %t"
+    (CoreTypes.Effect.print eff)
+    (abstraction2 a2)
 
 and abstraction2 (p1, p2, c) ppf =
   Format.fprintf ppf "%t %t -> %t" (print_pattern p1) (print_pattern p2)
