@@ -14,8 +14,11 @@ val debug : ?loc:Location.t -> ('a, Format.formatter, unit) format -> 'a
 (** Print a debug message to the standard error channel. *)
 
 val print :
-  ?at_level:int -> ?max_level:int -> Format.formatter
-  -> ('a, Format.formatter, unit) format -> 'a
+     ?at_level:int
+  -> ?max_level:int
+  -> Format.formatter
+  -> ('a, Format.formatter, unit) format
+  -> 'a
 (** Print a construct to a given formatter, possibly parenthesizing it.
 
     Each construct has a level [at_level] at which it is printed. The lower the
@@ -69,7 +72,10 @@ val print :
     by [.] and on the other side unlimited. *)
 
 val sequence :
-  string -> ('a -> Format.formatter -> unit) -> 'a list -> Format.formatter
+     string
+  -> ('a -> Format.formatter -> unit)
+  -> 'a list
+  -> Format.formatter
   -> unit
 (** [sequence sep pp lst ppf] uses pretty-printer [pp] to print elements of
     [lst] separated by [sep] to the formatter [ppf]. *)
@@ -80,7 +86,9 @@ val tuple :
     a pretty-printer [pp] to the formatter [ppf]. *)
 
 val record :
-  ('a -> Format.formatter -> unit) -> (string, 'a) Assoc.t -> Format.formatter
+     ('a -> Format.formatter -> unit)
+  -> (string, 'a) Assoc.t
+  -> Format.formatter
   -> unit
 (** [record pp lst ppf] prints a record given by an associative list of elements
     [lst] using a pretty-printer [pp] (applied only to values) to the formatter

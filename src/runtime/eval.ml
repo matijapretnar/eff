@@ -1,9 +1,8 @@
 (* Evaluation of the intermediate language, big step. *)
 open CoreUtils
-
 module V = Value
 module Untyped = UntypedSyntax
-module RuntimeEnv = Map.Make (UntypedSyntax.Variable)
+module RuntimeEnv = Map.Make (CoreTypes.Variable)
 
 type state = Value.value RuntimeEnv.t
 
@@ -64,10 +63,10 @@ let rec ceval env c =
       let v = veval env e in
       let rec eval_case = function
         | [] -> Error.runtime "No branches succeeded in a pattern match."
-        | a :: lst ->
+        | a :: lst -> (
             let p, c = a in
             try ceval (extend_value p v env) c with PatternMatch _ ->
-              eval_case lst
+              eval_case lst )
       in
       eval_case cases
   | Untyped.Handle (e, c) ->
@@ -110,7 +109,7 @@ and veval env e =
     match lookup x env with
     | Some v -> v
     | None ->
-        Error.runtime "Name %t is not defined." (Untyped.Variable.print x) )
+        Error.runtime "Name %t is not defined." (CoreTypes.Variable.print x) )
   | Untyped.Const c -> V.Const c
   | Untyped.Annotated (t, ty) -> veval env t
   | Untyped.Tuple es -> V.Tuple (List.map (veval env) es)
@@ -134,11 +133,11 @@ and eval_handler env
   let ops = Assoc.map eval_op ops in
   let rec h = function
     | V.Value v -> eval_closure env value v
-    | V.Call (eff, v, k) ->
+    | V.Call (eff, v, k) -> (
         let k' u = h (k u) in
         match Assoc.lookup eff ops with
         | Some f -> f v k'
-        | None -> V.Call (eff, v, k')
+        | None -> V.Call (eff, v, k') )
   in
   fun r -> sequence (eval_closure env fin) (h r)
 
@@ -150,28 +149,31 @@ and eval_closure2 env a2 v1 v2 =
   let p1, p2, c = a2.it in
   ceval (extend p2 v2 (extend p1 v1 env)) c
 
-let rec top_handle = function
+let rec top_handle op =
+  match op with
   | V.Value v -> v
-  | V.Call ("Print", v, k) ->
-      let str = V.to_str v in
-      Format.pp_print_string !Config.output_formatter str ;
-      Format.pp_print_flush !Config.output_formatter () ;
-      top_handle (k V.unit_value)
-  | V.Call ("Raise", v, k) -> Error.runtime "%t" (Value.print_value v)
-  | V.Call ("RandomInt", v, k) ->
-      let rnd_int = Random.int (Value.to_int v) in
-      let rnd_int_v = V.Const (Const.of_integer rnd_int) in
-      top_handle (k rnd_int_v)
-  | V.Call ("RandomFloat", v, k) ->
-      let rnd_float = Random.float (Value.to_float v) in
-      let rnd_float_v = V.Const (Const.of_float rnd_float) in
-      top_handle (k rnd_float_v)
-  | V.Call ("Read", v, k) ->
-      let str = read_line () in
-      let str_v = V.Const (Const.of_string str) in
-      top_handle (k str_v)
-  | V.Call (eff, v, k) ->
-      Error.runtime "uncaught effect %t %t." (Value.print_effect eff)
-        (Value.print_value v)
+  | V.Call (eff, v, k) -> (
+    match CoreTypes.Effect.fold (fun annot n -> annot) eff with
+    | "Print" ->
+        let str = V.to_str v in
+        Format.pp_print_string !Config.output_formatter str ;
+        Format.pp_print_flush !Config.output_formatter () ;
+        top_handle (k V.unit_value)
+    | "Raise" -> Error.runtime "%t" (Value.print_value v)
+    | "RandomInt" ->
+        let rnd_int = Random.int (Value.to_int v) in
+        let rnd_int_v = V.Const (Const.of_integer rnd_int) in
+        top_handle (k rnd_int_v)
+    | "RandomFloat" ->
+        let rnd_float = Random.float (Value.to_float v) in
+        let rnd_float_v = V.Const (Const.of_float rnd_float) in
+        top_handle (k rnd_float_v)
+    | "Read" ->
+        let str = read_line () in
+        let str_v = V.Const (Const.of_string str) in
+        top_handle (k str_v)
+    | eff_annot ->
+        Error.runtime "uncaught effect %t %t." (Value.print_effect eff)
+          (Value.print_value v) )
 
 let run env c = top_handle (ceval env c)

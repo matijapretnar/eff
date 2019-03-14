@@ -49,13 +49,15 @@ let rec exec_cmd ppf state {it= cmd; at= loc} =
       Format.fprintf ppf "%s" help_text ;
       state
   | Commands.DefEffect effect_def ->
-      let eff, (ty1, ty2) =
+      let desugarer_state', (eff, (ty1, ty2)) =
         Desugarer.desugar_def_effect state.desugarer_state effect_def
       in
       let type_system_state' =
         SimpleCtx.add_effect state.type_system_state eff (ty1, ty2)
       in
-      {state with type_system_state= type_system_state'}
+      { state with
+        type_system_state= type_system_state'
+      ; desugarer_state= desugarer_state' }
   | Commands.Quit -> exit 0
   | Commands.Use filename -> execute_file ppf filename state
   | Commands.TopLet defs ->
@@ -78,7 +80,7 @@ let rec exec_cmd ppf state {it= cmd; at= loc} =
           | None -> assert false
           | Some v ->
               Format.fprintf ppf "@[val %t : %t = %t@]@."
-                (UntypedSyntax.Variable.print x)
+                (CoreTypes.Variable.print x)
                 (Type.print_beautiful tysch)
                 (Value.print_value v) )
         vars ;
@@ -97,7 +99,7 @@ let rec exec_cmd ppf state {it= cmd; at= loc} =
       List.iter
         (fun (x, tysch) ->
           Format.fprintf ppf "@[val %t : %t = <fun>@]@."
-            (UntypedSyntax.Variable.print x)
+            (CoreTypes.Variable.print x)
             (Type.print_beautiful tysch) )
         vars ;
       { desugarer_state= desugarer_state'

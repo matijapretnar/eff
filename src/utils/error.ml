@@ -9,13 +9,12 @@ exception Error of t
 (** [error ~loc error_kind fmt] raises an [Error] of kind [error_kind] with a
     message [fmt] at a location [loc]. The [kfprintf] magic allows us to
     construct the [fmt] using a format string before raising the exception. *)
-let error ?(loc= Location.unknown) error_kind =
+let error ?(loc = Location.unknown) error_kind =
   let k _ =
     let msg = Format.flush_str_formatter () in
     raise (Error (loc, error_kind, msg))
   in
   fun fmt -> Format.kfprintf k Format.str_formatter ("@[" ^^ fmt ^^ "@]")
-
 
 let fatal ?loc fmt = error ?loc "Fatal error" fmt
 

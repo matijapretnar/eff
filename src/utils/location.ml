@@ -18,7 +18,6 @@ let print loc ppf =
           start_column
       else Format.fprintf ppf "line %d, char %d" (start_line - 1) start_column
 
-
 let unknown = Unknown
 
 (** Dismantles a lexing position into its filename, line and column. *)
@@ -30,7 +29,6 @@ let dismantle lexing_position =
   in
   (filename, line, column)
 
-
 let make start_lexing_position end_lexing_position =
   let start_filename, start_line, start_column =
     dismantle start_lexing_position
@@ -39,7 +37,6 @@ let make start_lexing_position end_lexing_position =
   Known
     {filename= start_filename; start_line; start_column; end_line; end_column}
 
-
 let merge loc1 loc2 =
   match (loc1, loc2) with
   | Known loc1, Known loc2 ->
@@ -47,14 +44,14 @@ let merge loc1 loc2 =
         failwith "Location.union: locations do not belong to the same file"
       else
         let start_line, start_column =
-          min (loc1.start_line, loc1.start_column)
+          min
+            (loc1.start_line, loc1.start_column)
             (loc2.start_line, loc2.start_column)
         and end_line, end_column =
           max (loc1.end_line, loc1.end_column) (loc2.end_line, loc2.end_column)
         in
         Known {loc1 with start_line; start_column; end_line; end_column}
   | loc, Unknown | Unknown, loc -> loc
-
 
 let union locs = List.fold_right merge locs Unknown
 
