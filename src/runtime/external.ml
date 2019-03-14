@@ -180,7 +180,9 @@ let arithmetic_operations =
     ; ("tan", float_to_float tan)
     ; ("acos", float_to_float acos)
     ; ("asin", float_to_float asin)
-    ; ("atan", float_to_float atan) ]
+    ; ("atan", float_to_float atan)
+    ; ("sqrt", float_to_float sqrt)
+    ]
 
 
 let string_operations =
