@@ -89,7 +89,8 @@ external asin : float -> float = "asin"
 
 external atan : float -> float = "atan"
 
-
+external sqrt : float -> float = "sqrt"
+                               
 (* Strings *)
 external float_of_int : int -> float = "float_of_int"
 
