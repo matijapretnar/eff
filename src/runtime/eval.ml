@@ -172,6 +172,20 @@ let rec top_handle op =
         let str = read_line () in
         let str_v = V.Const (Const.of_string str) in
         top_handle (k str_v)
+    | "Write" ->
+       (match v with
+        | V.Tuple vs -> 
+           let (file_name :: str :: _)  = List.map V.to_str vs in
+           let file_handle = open_out_gen
+                               [Open_wronly
+                               ;Open_append
+                               ;Open_creat
+                               ;Open_text
+                               ] 0o666 file_name in
+           Printf.fprintf file_handle "%s" str;
+           close_out file_handle;
+           top_handle (k V.unit_value)
+       )
     | eff_annot ->
         Error.runtime "uncaught effect %t %t." (Value.print_effect eff)
           (Value.print_value v) )
