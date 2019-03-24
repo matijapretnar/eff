@@ -577,17 +577,26 @@ and reduce_comp st c =
                  ( CastComp (c1', dtyco)
                  , Typed.abstraction_with_ty_to_abstraction h.value_clause ))
         | None -> c )
-      | Bind ((CastComp (c111, _) as c11), a1) -> (
-        match (* TODO: Fix *)
-              is_relatively_pure st c111 h with
-        | Some dtyco ->
-            let p12, c12 = a1 in
-            let PVar var12 = p12 in
-            optimize_comp st
-              (Bind
-                 ( CastComp (c111, dtyco)
-                 , abstraction p12 (Handle (refresh_expr e1, c12)) ))
-        | None -> c )
+      | Bind (c11, a1) -> (
+        match c11 with
+        | CastComp (c111, _) -> (
+          match (* TODO: Fix *)
+                is_relatively_pure st c111 h with
+          | Some dtyco ->
+              let p12, c12 = a1 in
+              let PVar var12 = p12 in
+              optimize_comp st
+                (Bind
+                   ( CastComp (c111, dtyco)
+                   , abstraction p12 (Handle (refresh_expr e1, c12)) ))
+          | None -> c )
+        | _ -> (
+          let Types.Handler ((tv,_),_) = TypeChecker.type_of_handler st.tc_state h in
+          let p12, c12 = a1 in
+          let c_r' = (p12, tv, (Handle (e1, c12))) in
+          let h' = { h with value_clause = c_r'} in
+          optimize_comp st
+            ( Handle (Handler h', c11) )))
       | Call (eff, e11, k_abs) -> (
           (* handle call(eff,e11,y:ty.c) with H@{eff xi ki -> ci}
              >-->
