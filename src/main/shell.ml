@@ -1,23 +1,17 @@
-let help_text =
-  "Toplevel commands:\n"
-  ^ "#type <expr>;;     print the type of <expr> without evaluating it\n"
-  ^ "#reset;;           forget all definitions (including pervasives)\n"
-  ^ "#help;;            print this help\n" ^ "#quit;;            exit eff\n"
-  ^ "#use \"<file>\";;  load commands from file\n"
-
 open CoreUtils
 module TypeSystem = SimpleInfer
-module Runtime = Eval
+
+module Backend = Eval.Backend
 
 type state =
   { desugarer_state: Desugarer.state
   ; type_system_state: TypeSystem.state
-  ; runtime_state: Runtime.state }
+  ; backend_state: Backend.state }
 
 let initial_state =
   { desugarer_state= Desugarer.initial_state
   ; type_system_state= TypeSystem.initial_state
-  ; runtime_state= Runtime.initial_state }
+  ; backend_state= Backend.initial_state }
 
 let _ = Random.self_init ()
 
@@ -30,24 +24,31 @@ let rec exec_cmd ppf state {it= cmd; at= loc} =
       let type_system_state', ty =
         TypeSystem.infer_top_comp state.type_system_state c
       in
-      let v = Runtime.run state.runtime_state c in
-      Format.fprintf ppf "@[- : %t = %t@]@." (Type.print_beautiful ty)
-        (Value.print_value v) ;
-      {state with type_system_state= type_system_state'}
+      let backend_state' = 
+        Backend.process_computation ppf state.backend_state c ty
+      in
+      { state with 
+        type_system_state= type_system_state'
+      ; backend_state= backend_state' }
   | Commands.TypeOf t ->
       let _, c = Desugarer.desugar_computation state.desugarer_state t in
       let type_system_state', ty =
         TypeSystem.infer_top_comp state.type_system_state c
       in
-      Format.fprintf ppf "@[- : %t@]@." (Type.print_beautiful ty) ;
-      {state with type_system_state= type_system_state'}
+      let backend_state' = 
+        Backend.process_type_of ppf state.backend_state c ty
+      in
+      { state with 
+        type_system_state= type_system_state';
+        backend_state= backend_state' }
   | Commands.Reset ->
-      Format.fprintf ppf "Environment reset." ;
       Tctx.reset () ;
-      initial_state
+      { desugarer_state= Desugarer.initial_state
+      ; type_system_state= TypeSystem.initial_state
+      ; backend_state= Backend.process_reset ppf state.backend_state }
   | Commands.Help ->
-      Format.fprintf ppf "%s" help_text ;
-      state
+      { state with 
+        backend_state= Backend.process_help ppf state.backend_state }
   | Commands.DefEffect effect_def ->
       let desugarer_state', (eff, (ty1, ty2)) =
         Desugarer.desugar_def_effect state.desugarer_state effect_def
@@ -55,9 +56,12 @@ let rec exec_cmd ppf state {it= cmd; at= loc} =
       let type_system_state' =
         SimpleCtx.add_effect state.type_system_state eff (ty1, ty2)
       in
-      { state with
-        type_system_state= type_system_state'
-      ; desugarer_state= desugarer_state' }
+      let backend_state' = 
+        Backend.process_def_effect ppf state.backend_state (eff, (ty1, ty2))
+      in
+      { type_system_state= type_system_state'
+      ; desugarer_state= desugarer_state' 
+      ; backend_state= backend_state' }
   | Commands.Quit -> exit 0
   | Commands.Use filename -> execute_file ppf filename state
   | Commands.TopLet defs ->
@@ -67,26 +71,12 @@ let rec exec_cmd ppf state {it= cmd; at= loc} =
       let vars, type_system_state' =
         TypeSystem.infer_top_let ~loc state.type_system_state defs'
       in
-      let runtime_state' =
-        List.fold_right
-          (fun (p, c) env ->
-            let v = Runtime.run env c in
-            Runtime.extend p v env )
-          defs' state.runtime_state
+      let backend_state' = 
+        Backend.process_top_let ppf state.backend_state defs' vars
       in
-      List.iter
-        (fun (x, tysch) ->
-          match Runtime.lookup x runtime_state' with
-          | None -> assert false
-          | Some v ->
-              Format.fprintf ppf "@[val %t : %t = %t@]@."
-                (CoreTypes.Variable.print x)
-                (Type.print_beautiful tysch)
-                (Value.print_value v) )
-        vars ;
       { desugarer_state= desugarer_state'
       ; type_system_state= type_system_state'
-      ; runtime_state= runtime_state' }
+      ; backend_state= backend_state' }
   | Commands.TopLetRec defs ->
       let desugarer_state', defs' =
         Desugarer.desugar_top_let_rec state.desugarer_state defs
@@ -95,35 +85,36 @@ let rec exec_cmd ppf state {it= cmd; at= loc} =
         TypeSystem.infer_top_let_rec ~loc state.type_system_state defs'
       in
       let defs'' = Assoc.of_list defs' in
-      let runtime_state' = Runtime.extend_let_rec state.runtime_state defs'' in
-      List.iter
-        (fun (x, tysch) ->
-          Format.fprintf ppf "@[val %t : %t = <fun>@]@."
-            (CoreTypes.Variable.print x)
-            (Type.print_beautiful tysch) )
-        vars ;
+      let backend_state' =
+        Backend.process_top_let_rec ppf state.backend_state defs'' vars
+      in
       { desugarer_state= desugarer_state'
       ; type_system_state= type_system_state'
-      ; runtime_state= runtime_state' }
-  | Commands.External ext_def -> (
+      ; backend_state= backend_state' }
+  | Commands.External ext_def ->
       let desugarer_state', (x, ty, f) =
         Desugarer.desugar_external state.desugarer_state ext_def
       in
-      match Assoc.lookup f External.values with
-      | Some v ->
-          let type_system_state' =
-            SimpleCtx.extend state.type_system_state x (Type.free_params ty, ty)
-          in
-          { desugarer_state= desugarer_state'
-          ; type_system_state= type_system_state'
-          ; runtime_state= Runtime.update x v state.runtime_state }
-      | None -> Error.runtime "unknown external symbol %s." f )
+      let type_system_state' =
+        SimpleCtx.extend state.type_system_state x (Type.free_params ty, ty)
+      in
+      let backend_state' =
+        Backend.process_external ppf state.backend_state (x, ty, f)
+      in
+      { desugarer_state= desugarer_state'
+      ; type_system_state= type_system_state'
+      ; backend_state= backend_state' }
   | Commands.Tydef tydefs ->
       let desugarer_state', tydefs' =
         Desugarer.desugar_tydefs state.desugarer_state tydefs
       in
       Tctx.extend_tydefs ~loc tydefs' ;
-      {state with desugarer_state= desugarer_state'}
+      let backend_state' = 
+        Backend.process_tydef ppf state.backend_state tydefs'
+      in
+      { state with
+        desugarer_state= desugarer_state'
+      ; backend_state= backend_state' }
 
 and exec_cmds ppf state cmds = fold (exec_cmd ppf) state cmds
 
