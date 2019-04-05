@@ -1,5 +1,5 @@
-module type OutputFormatter = sig
-  val ppf : Format.formatter
+module type Formatters = sig
+  val output : Format.formatter
 end 
 
-module Backend (OutF : OutputFormatter) : BackendSignature.T
+module Backend (F : Formatters) : BackendSignature.T

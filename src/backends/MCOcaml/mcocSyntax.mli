@@ -28,8 +28,8 @@ type term =
   | Variant of label * term option
   | Lambda of abstraction
   | Effect of effect
-  | Let of (pattern * computation) list * computation
-  | LetRec of (variable * abstraction) list * computation
+  | Let of (pattern * term) list * term
+  | LetRec of (variable * abstraction) list * term
   | Match of term * match_case list
   | Apply of term * term
 
@@ -38,10 +38,10 @@ and match_case =
   | EffectCase of effect * abstraction2
 
 (** Abstractions that take one argument. *)
-and abstraction = pattern * computation
+and abstraction = pattern * term
 
 (** Abstractions that take two arguments. *)
-and abstraction2 = pattern * pattern * computation
+and abstraction2 = pattern * pattern * term
 
 (** Types used by MCOcaml. *)
 type ty =
@@ -51,8 +51,15 @@ type ty =
   | Tuple of ty list
   | Arrow of ty * ty
 
-val translate_computation : CoreSyntax.computation -> McocSyntax.term
+type tydef =
+  | Record of (CoreTypes.Field.t, ty) Assoc.t
+  | Sum of (CoreTypes.Label.t, ty option) Assoc.t
+  | Inline of ty  
 
-val translate_pattern : CoreSyntax.pattern -> McocSyntax.pattern
+val of_computation : CoreSyntax.computation -> term
 
-val translate_type : Type.ty -> McocSyntax.ty
+val of_pattern : CoreSyntax.pattern -> pattern
+
+val of_type : Type.ty -> ty
+
+val of_tydef : Tctx.tydef -> tydef

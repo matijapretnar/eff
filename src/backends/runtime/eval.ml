@@ -12,14 +12,14 @@ let help_text =
   ^ "#help;;            print this help\n" ^ "#quit;;            exit eff\n"
   ^ "#use \"<file>\";;  load commands from file\n"
 
-module type OutputFormatter = sig
-    val ppf : Format.formatter
- end
+module type Formatters = sig
+  val output : Format.formatter
+end 
 
-module Backend (OutF : OutputFormatter) : BackendSignature.T = struct
+module Backend (F : Formatters) : BackendSignature.T = struct
   module RuntimeEnv = Map.Make (CoreTypes.Variable)
   
-  let ppf = OutF.ppf
+  let ppf = F.output
 
   (* prints tells us wheter or not to print, while mute depth makes sure that
   printing is muted in the case of nested #use *)
