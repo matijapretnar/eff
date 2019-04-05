@@ -188,8 +188,14 @@ let conversion_functions =
           value_str s
         in
         from_fun to_string )
+    ; ( "string_of_float"
+      , from_fun (fun v -> value_str (string_of_float (V.to_float v))) )
+    ; ( "string_of_int"
+      , from_fun (fun v -> value_str (string_of_int (V.to_int v))) )
     ; ( "float_of_int"
-      , from_fun (fun v -> value_float (float_of_int (V.to_int v))) ) ]
+      , from_fun (fun v -> value_float (float_of_int (V.to_int v))) )
+    ; ( "int_of_float"
+      , from_fun (fun v -> value_int (int_of_float (V.to_float v))) ) ]
 
 (** [values] is an association list of external names and values, consisting of
     comparison functions, arithmetic operations, string operations, conversion
