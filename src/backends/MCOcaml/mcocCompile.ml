@@ -26,7 +26,7 @@ module Backend (F : Formatters) : BackendSignature.T = struct
   let update state translation = state ^ translation
 
   let issue_warning txt = 
-    Format.fprintf warnings_ppf "Warning: %s" txt 
+    Format.fprintf warnings_ppf "Warning: %s\n" txt 
 
   let translation_of_term t = failwith "TODO"
 

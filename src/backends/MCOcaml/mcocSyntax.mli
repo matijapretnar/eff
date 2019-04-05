@@ -8,9 +8,23 @@ type label = CoreTypes.Label.t
 
 type field = CoreTypes.Field.t
 
+(** Types used by MCOcaml. *)
+type ty =
+  | TyApply of CoreTypes.TyName.t * ty list
+  | TyParam of CoreTypes.TyParam.t
+  | TyBasic of string
+  | TyTuple of ty list
+  | TyArrow of ty * ty
+
+type tydef =
+  | TyDefRecord of (CoreTypes.Field.t, ty) Assoc.t
+  | TyDefSum of (CoreTypes.Label.t, ty option) Assoc.t
+  | TyDefInline of ty   
+
+(** Patterns *)
 type pattern =
   | PVar of variable
-  | PAnnotated of pattern * Type.ty
+  | PAnnotated of pattern * ty
   | PAs of pattern * variable
   | PTuple of pattern list
   | PRecord of (field, pattern) Assoc.t
@@ -22,7 +36,7 @@ type pattern =
 type term = 
   | Var of variable
   | Const of Const.t
-  | Annotated of term * Type.ty
+  | Annotated of term * ty
   | Tuple of term list
   | Record of (field, term) Assoc.t
   | Variant of label * term option
@@ -34,27 +48,14 @@ type term =
   | Apply of term * term
 
 and match_case =
-  | ValueCase of variable * abstraction
-  | EffectCase of effect * abstraction2
+  | ValueCase of abstraction
+  | EffectCase of abstraction2
 
 (** Abstractions that take one argument. *)
 and abstraction = pattern * term
 
 (** Abstractions that take two arguments. *)
 and abstraction2 = pattern * pattern * term
-
-(** Types used by MCOcaml. *)
-type ty =
-  | Apply of CoreTypes.TyName.t * ty list
-  | TyParam of CoreTypes.TyParam.t
-  | Basic of string
-  | Tuple of ty list
-  | Arrow of ty * ty
-
-type tydef =
-  | Record of (CoreTypes.Field.t, ty) Assoc.t
-  | Sum of (CoreTypes.Label.t, ty option) Assoc.t
-  | Inline of ty  
 
 val of_computation : CoreSyntax.computation -> term
 

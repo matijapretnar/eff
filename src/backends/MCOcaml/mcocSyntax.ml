@@ -10,9 +10,23 @@ type label = CoreTypes.Label.t
 
 type field = CoreTypes.Field.t
 
+(** Types used by MCOcaml. *)
+type ty =
+  | TyApply of CoreTypes.TyName.t * ty list
+  | TyParam of CoreTypes.TyParam.t
+  | TyBasic of string
+  | TyTuple of ty list
+  | TyArrow of ty * ty
+
+type tydef =
+  | TyDefRecord of (CoreTypes.Field.t, ty) Assoc.t
+  | TyDefSum of (CoreTypes.Label.t, ty option) Assoc.t
+  | TyDefInline of ty  
+
+(** Patterns *)
 type pattern =
   | PVar of variable
-  | PAnnotated of pattern * Type.ty
+  | PAnnotated of pattern * ty
   | PAs of pattern * variable
   | PTuple of pattern list
   | PRecord of (field, pattern) Assoc.t
@@ -24,7 +38,7 @@ type pattern =
 type term = 
   | Var of variable
   | Const of Const.t
-  | Annotated of term * Type.ty
+  | Annotated of term * ty
   | Tuple of term list
   | Record of (field, term) Assoc.t
   | Variant of label * term option
@@ -36,8 +50,8 @@ type term =
   | Apply of term * term
 
 and match_case =
-  | ValueCase of variable * abstraction
-  | EffectCase of effect * abstraction2
+  | ValueCase of abstraction
+  | EffectCase of abstraction2
 
 (** Abstractions that take one argument. *)
 and abstraction = pattern * term
@@ -45,23 +59,73 @@ and abstraction = pattern * term
 (** Abstractions that take two arguments. *)
 and abstraction2 = pattern * pattern * term
 
-(** Types used by MCOcaml. *)
-type ty =
-  | Apply of CoreTypes.TyName.t * ty list
-  | TyParam of CoreTypes.TyParam.t
-  | Basic of string
-  | Tuple of ty list
-  | Arrow of ty * ty
+let rec of_abstraction (p, c) = (of_pattern p, of_computation c)
 
-type tydef =
-  | Record of (CoreTypes.Field.t, ty) Assoc.t
-  | Sum of (CoreTypes.Label.t, ty option) Assoc.t
-  | Inline of ty
+and of_abstraction2 (p1, p2, c) =
+  (of_pattern p1, of_pattern p2, of_computation c)
 
-let of_computation c = failwith "TODO"
+(** Conversion functions. *)
+and of_expression {it; at} =
+  match it with
+  | CoreSyntax.Var v -> Var v
+  | CoreSyntax.Const const -> Const const
+  | CoreSyntax.Annotated (e, ty) -> Annotated (of_expression e, of_type ty)
+  | CoreSyntax.Tuple es -> Tuple (List.map of_expression es) 
+  | CoreSyntax.Record assoc -> Record (Assoc.map of_expression assoc)
+  | CoreSyntax.Variant (lbl, e_opt) -> (
+      match e_opt with
+      | None -> Variant (lbl, None)
+      | Some e -> Variant (lbl , Some (of_expression e)) )
+  | CoreSyntax.Lambda abs -> Lambda (of_abstraction abs)
+  | CoreSyntax.Effect eff -> Effect eff
+  | CoreSyntax.Handler {effect_clauses; value_clause; finally_clause} ->
+      failwith "TODO"
 
-let of_pattern p = failwith "TODO"
+and of_computation {it; at} =
+  match it with
+  | CoreSyntax.Value e -> of_expression e
+  | CoreSyntax.Let (p_c_lst, c) ->
+      let converter (p, c) = (of_pattern p, of_computation c) in
+      Let (List.map converter p_c_lst, of_computation c)
+  | CoreSyntax.LetRec (var_abs_lst, c) ->
+      let converter (var, abs) = (var, of_abstraction abs) in
+      LetRec (List.map converter var_abs_lst, of_computation c)
+  | CoreSyntax.Match (e, abs_lst) ->
+      let converter abs = ValueCase (of_abstraction abs) in
+      Match (of_expression e, List.map converter abs_lst)
+  | CoreSyntax.Apply (e1, e2) -> Apply (of_expression e1, of_expression e2)
+  | CoreSyntax.Handle (e, c) -> failwith "TODO"
+  | CoreSyntax.Check _ -> failwith "TODO"
 
-let of_type ty = failwith "TODO"
+and of_pattern {it; at} =
+  match it with
+  | CoreSyntax.PVar var -> PVar var
+  | CoreSyntax.PAnnotated (p, ty) ->
+      PAnnotated (of_pattern p, of_type ty)
+  | CoreSyntax.PAs (p, var) -> PAs (of_pattern p, var)
+  | CoreSyntax.PTuple ps -> PTuple (List.map of_pattern ps)
+  | CoreSyntax.PRecord assoc -> PRecord (Assoc.map of_pattern assoc)
+  | CoreSyntax.PVariant (lbl, p_opt) -> (
+      match p_opt with
+      | None -> PVariant (lbl, None)
+      | Some p -> PVariant (lbl , Some (of_pattern p)) )
+  | CoreSyntax.PConst const -> PConst const
+  | CoreSyntax.PNonbinding -> PNonbinding
 
-let of_tydef tydef = failwith "TODO"
+and of_type = function
+  | Type.Apply (name, tys) -> TyApply (name, List.map of_type tys)
+  | Type.TyParam ty_param -> TyParam ty_param
+  | Type.Basic s -> TyBasic s
+  | Type.Tuple tys -> TyTuple (List.map of_type tys)
+  | Type.Arrow (ty1, ty2) -> TyArrow (of_type ty1, of_type ty2)
+  | Type.Handler {value; finally} -> failwith "TODO"
+
+and of_tydef = function
+  | Tctx.Record assoc -> TyDefRecord (Assoc.map of_type assoc)
+  | Tctx.Sum assoc ->
+      let converter = function
+      | None -> None
+      | Some ty -> Some (of_type ty)
+      in
+      TyDefSum (Assoc.map converter assoc)
+  | Tctx.Inline ty -> TyDefInline (of_type ty) 
