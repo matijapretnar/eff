@@ -1,5 +1,8 @@
 let usage = "Usage: eff [option] ... [file] ..."
 
+module Backend = Eval.Backend(struct let ppf = Format.std_formatter end)
+module Shell = Shell.Make(Backend)
+
 (* A list of files to be loaded and run. *)
 type use_file = Run of string | Load of string
 
@@ -110,7 +113,7 @@ let toplevel st =
     Sys.catch_break true ;
     while true do
       let source = read_toplevel () in
-      try st := Shell.execute_source Format.std_formatter source !st with
+      try st := Shell.execute_source source !st with
       | Error.Error err -> Error.print err
       | Sys.Break -> prerr_endline "Interrupted."
     done
@@ -150,12 +153,9 @@ let main =
       enqueue_file (Load f) ) ;
   try
     (* Run and load all the specified files. *)
-    let ignore_all_formatter =
-      Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ())
-    in
     let execute_file env = function
-      | Run filename -> Shell.execute_file Format.std_formatter filename env
-      | Load filename -> Shell.execute_file ignore_all_formatter filename env
+      | Run filename -> Shell.execute_file filename env
+      | Load filename -> Shell.load_file filename env
     in
     let st = List.fold_left execute_file Shell.initial_state !file_queue in
     if !Config.interactive_shell then toplevel st
