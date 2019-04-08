@@ -87,14 +87,16 @@ let is_relatively_pure st c h =
               (BangCoercion
                  ( ReflTy ty
                  , UnionDirt
-                     ( EffectSet.inter ops ops'
+                     (*( EffectSet.inter ops ops'*)
+                     ( ops
                      , Empty (Types.closed_dirt (EffectSet.diff ops' ops)) ) ))
         | {Types.effect_set= ops'; Types.row= Types.ParamRow var} ->
             Some
               (BangCoercion
                  ( ReflTy ty
                  , UnionDirt
-                     ( EffectSet.inter ops ops'
+                     (*( EffectSet.inter ops ops'*)
+                     ( ops
                      , Empty
                          { Types.effect_set= EffectSet.diff ops' ops
                          ; Types.row= Types.ParamRow var } ) ))
