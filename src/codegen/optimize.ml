@@ -607,7 +607,8 @@ and reduce_comp st c =
                 (Typed.subst_comp (Typed.pattern_match p1 e11) c)
                 p2 (Lambda handled_k)
           | None ->
-              let res = Call (eff, e11, k_abs') in
+              let k_abs'' = (k_pat, k_ty, Handle (e1, k_c)) in
+              let res = Call (eff, e11, k_abs'') in
               reduce_comp st res )
       | Apply (e11, e12) -> (
           Print.debug "Looking for recursive function name" ;
