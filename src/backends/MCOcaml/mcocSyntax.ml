@@ -48,10 +48,11 @@ type term =
   | LetRec of (variable * abstraction) list * term
   | Match of term * match_case list
   | Apply of term * term
+  | Check of term
 
 and match_case =
-  | ValueCase of abstraction
-  | EffectCase of abstraction2
+  | ValueClause of abstraction
+  | EffectClause of effect * abstraction2
 
 (** Abstractions that take one argument. *)
 and abstraction = pattern * term
@@ -79,7 +80,16 @@ and of_expression {it; at} =
   | CoreSyntax.Lambda abs -> Lambda (of_abstraction abs)
   | CoreSyntax.Effect eff -> Effect eff
   | CoreSyntax.Handler {effect_clauses; value_clause; finally_clause} ->
-      failwith "TODO"
+      (* Non-trivial case *)
+      let effect_clauses' =
+        List.map (fun (eff, abs) -> EffectClause (eff, of_abstraction2 abs)) 
+          (Assoc.to_list effect_clauses)
+      in
+      let value_clause' = ValueClause (of_abstraction value_clause) in
+      let finally_clause' = Lambda (of_abstraction finally_clause) in
+      let ghost_bind = CoreTypes.Variable.fresh "$handler_param" in
+      let match_handler = Match(Var ghost_bind, value_clause' :: effect_clauses') in 
+      Lambda(PVar ghost_bind, Apply(finally_clause', match_handler))
 
 and of_computation {it; at} =
   match it with
@@ -91,11 +101,15 @@ and of_computation {it; at} =
       let converter (var, abs) = (var, of_abstraction abs) in
       LetRec (List.map converter var_abs_lst, of_computation c)
   | CoreSyntax.Match (e, abs_lst) ->
-      let converter abs = ValueCase (of_abstraction abs) in
+      let converter abs = ValueClause (of_abstraction abs) in
       Match (of_expression e, List.map converter abs_lst)
   | CoreSyntax.Apply (e1, e2) -> Apply (of_expression e1, of_expression e2)
-  | CoreSyntax.Handle (e, c) -> failwith "TODO"
-  | CoreSyntax.Check _ -> failwith "TODO"
+  | CoreSyntax.Check c -> Check (of_computation c)
+  | CoreSyntax.Handle (e, c) -> 
+      (* Non-trivial case *)
+      let modified_handler = of_expression e in
+      let thunked_c = Lambda (PNonbinding, of_computation c) in
+      Apply (modified_handler, thunked_c)
 
 and of_pattern {it; at} =
   match it with
@@ -118,7 +132,9 @@ and of_type = function
   | Type.Basic s -> TyBasic s
   | Type.Tuple tys -> TyTuple (List.map of_type tys)
   | Type.Arrow (ty1, ty2) -> TyArrow (of_type ty1, of_type ty2)
-  | Type.Handler {value; finally} -> failwith "TODO"
+  | Type.Handler {value; finally} -> 
+      (* Non-trivial case *)
+      TyArrow (TyArrow (of_type Type.unit_ty, of_type value), of_type finally)
 
 and of_tydef = function
   | Tctx.Record assoc -> TyDefRecord (Assoc.map of_type assoc)

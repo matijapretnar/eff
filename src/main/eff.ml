@@ -1,16 +1,17 @@
 let usage = "Usage: eff [option] ... [file] ..."
 
 module Backend = Eval.Backend(struct let output = Format.std_formatter end)
-module Shell = Shell.Make(Backend)
 
 (* DELETE THIS, it is only here to typecheck backends in progress. *)
 module Backend_test = 
-  McocCompile.Backend(
-    struct 
-      let warnings = Format.std_formatter 
-      let output = Format.std_formatter  
-    end)
-
+McocCompile.Backend(
+  struct 
+    let warnings = Format.std_formatter 
+    let output = Format.std_formatter
+    let printing = true
+  end)
+    
+module Shell = Shell.Make(Backend_test)
 (* A list of files to be loaded and run. *)
 type use_file = Run of string | Load of string
 

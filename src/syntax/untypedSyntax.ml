@@ -116,7 +116,7 @@ and print_expression ?max_level e ppf =
   match e.it with
   | Var x -> print "%t" (CoreTypes.Variable.print x)
   | Const c -> print "%t" (Const.print c)
-  | Annotated (t, ty) -> print_expression ?max_level e ppf
+  | Annotated (t, ty) -> print_expression ?max_level t ppf
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record assoc ->
       let to_name (k, v) = (CoreTypes.Field.fold (fun a _ -> a) k, v) in

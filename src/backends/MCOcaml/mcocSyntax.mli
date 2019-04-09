@@ -46,10 +46,11 @@ type term =
   | LetRec of (variable * abstraction) list * term
   | Match of term * match_case list
   | Apply of term * term
+  | Check of term
 
 and match_case =
-  | ValueCase of abstraction
-  | EffectCase of abstraction2
+  | ValueClause of abstraction
+  | EffectClause of effect * abstraction2
 
 (** Abstractions that take one argument. *)
 and abstraction = pattern * term
