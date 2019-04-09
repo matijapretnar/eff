@@ -259,7 +259,7 @@ let compile_file ppf filename st =
     | _ -> state
   in
   let cmds = Lexer.read_file parse filename in
-  let st = List.fold_left compile_cmd st (List.rev cmds) in
+  let st = List.fold_left compile_cmd st cmds in
   Format.fprintf out_ppf "@? " ;
   flush out_channel ;
   close_out out_channel ;
