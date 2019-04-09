@@ -87,8 +87,10 @@ and of_expression {it; at} =
       in
       let value_clause' = ValueClause (of_abstraction value_clause) in
       let finally_clause' = Lambda (of_abstraction finally_clause) in
-      let ghost_bind = CoreTypes.Variable.fresh "$handler_param" in
-      let match_handler = Match(Var ghost_bind, value_clause' :: effect_clauses') in 
+      let ghost_bind = CoreTypes.Variable.fresh "$c_thunk" in
+      let match_handler =
+        Match(Apply(Var ghost_bind, Tuple []), value_clause' :: effect_clauses')
+      in 
       Lambda(PVar ghost_bind, Apply(finally_clause', match_handler))
 
 and of_computation {it; at} =

@@ -51,11 +51,11 @@ module Backend (F : Formatters) : BackendSignature.T = struct
       | [] -> ()
       | [v] -> (translator v ppf)
       | v :: vs ->
-          translate ppf "%t%s@,%t" 
+          translate ppf "%t@,%s%t" 
             (translator v) sep (sequence sep translator vs)
     in
     sequence
-  
+
   let translate_field translator (f, v) ppf =
     translate ppf "%t = %t" (CoreTypes.Field.print f) (translator v)
 
@@ -80,14 +80,15 @@ module Backend (F : Formatters) : BackendSignature.T = struct
       (translate_sequence "; " (translate_field_type translator) lst)
 
   let rec translate_abstraction (p, t) ppf =
-    translate ppf "%t -> %t" (translate_pattern p) (translate_term t)
+    translate ppf "%t ->@ %t" (translate_pattern p) (translate_term t)
 
   and translate_let (p, t) ppf =
-    translate ppf "%t = @,@[<hov>%t@]" (translate_pattern p) (translate_term t)
+    translate ppf "%t = @,%t" (translate_pattern p) (translate_term t)
 
   and translate_let_rec (name, (p, t)) ppf =
-    translate ppf "%t %t = @,@[<hov>%t@]"
-      (CoreTypes.Variable.print name) (translate_pattern p) (translate_term t)
+    translate ppf "%t %t = @,%t"
+      (CoreTypes.Variable.print ~safe:true name)
+      (translate_pattern p) (translate_term t)
 
   and translate_tydef (name, (params, tydef)) ppf =
     let translate_def tydef ppf =
@@ -118,15 +119,15 @@ module Backend (F : Formatters) : BackendSignature.T = struct
 
   and translate_case case ppf =
     match case with
-    | MCOC.ValueClause abs -> translate ppf "%t" (translate_abstraction abs)
+    | MCOC.ValueClause abs -> translate ppf "@[<hv 2>%t@]" (translate_abstraction abs)
     | MCOC.EffectClause (eff, (p1, p2, t)) ->
-        translate ppf "effect %t %t %t -> %t" 
+        translate ppf "@[<hv 2>effect (%t %t) %t ->@ %t@]" 
           (CoreTypes.Effect.print eff) (translate_pattern p1)
           (translate_pattern p2) (translate_term t)
     
   and translate_term t ppf =
     match t with
-    | MCOC.Var x -> translate ppf "%t" (CoreTypes.Variable.print x)
+    | MCOC.Var x -> translate ppf "%t" (CoreTypes.Variable.print ~safe:true x)
     | MCOC.Const c -> translate ppf "%t" (Const.print c)
     | MCOC.Annotated (t, ty) -> 
         translate ppf "(%t : %t)" (translate_term t) (translate_type ty)
@@ -141,30 +142,34 @@ module Backend (F : Formatters) : BackendSignature.T = struct
     | MCOC.Variant (lbl, Some t) ->
         translate ppf "%t @[<hov>%t@]" 
           (CoreTypes.Label.print lbl) (translate_term t)
-    | MCOC.Lambda a -> translate ppf "fun %t" (translate_abstraction a)
+    | MCOC.Lambda a -> translate ppf "@[<hv 2>fun %t@]" (translate_abstraction a)
     | MCOC.Effect eff -> translate ppf "%t" (CoreTypes.Effect.print eff)
     | MCOC.Let (lst, t) -> 
-        translate ppf "let @[<hov>%t@] in %t"
+        translate ppf "@[<hov>@[<hv 2>let %t@] @,in @,%t@]"
           (translate_sequence "@,and " translate_let lst)
           (translate_term t)
     | MCOC.LetRec (lst, t) ->
-        translate ppf "let rec @[<hov>%t@] in %t"
+        translate ppf "@[@[<hv 2>let let rec %t@] @,in@ @,%t@]"
           (translate_sequence "@,and " translate_let_rec lst)
           (translate_term t)
     | MCOC.Match (t, lst) ->
-        translate ppf "match %t with (@[<hov>%t@])"
+        translate ppf "@[<hv>match %t with @,(| %t)@]"
           (translate_term t) (translate_sequence " | " translate_case lst)
+    | MCOC.Apply (MCOC.Effect eff, t2) ->
+        translate ppf "perform (%t (%t))"
+          (CoreTypes.Effect.print eff) (translate_term t2)
     | MCOC.Apply (t1, t2) ->
-        translate ppf "%t %t" (translate_term t1) (translate_term t2)
+        translate ppf "@[<hov 2>(%t) @,(%t)@]" (translate_term t1) (translate_term t2)
     | MCOC.Check t -> 
         issue_warning 
           "[#check] commands are ignored when compiling to Multicore OCaml."
 
   and translate_pattern p ppf =
     match p with
-    | MCOC.PVar x -> translate ppf "%t" (CoreTypes.Variable.print x)
+    | MCOC.PVar x -> translate ppf "%t" (CoreTypes.Variable.print ~safe:true x)
     | MCOC.PAs (p, x) ->
-        translate ppf "%t as %t" (translate_pattern p) (CoreTypes.Variable.print x)
+        translate ppf "%t as %t"
+          (translate_pattern p) (CoreTypes.Variable.print ~safe:true x)
     | MCOC.PAnnotated (p, ty) -> 
         translate ppf "(%t : %t)" (translate_pattern p) (translate_type ty)
     | MCOC.PConst c -> translate ppf "%t" (Const.print c)
@@ -202,32 +207,33 @@ module Backend (F : Formatters) : BackendSignature.T = struct
         translate ppf "@[<hov>%t@]" (Print.sequence " * " translate_type ts)
 
   let translate_def_effect (eff, (ty1, ty2)) ppf =
-    translate ppf "@[effect %t : %t ->@ %t@]"
+    translate ppf "@[effect %t : %t ->@ %t@]@."
       (CoreTypes.Effect.print eff) (translate_type ty1) (translate_type ty2) 
 
   let translate_top_let defs ppf =
-    translate ppf "let @[<hov>%t@]@."
+    translate ppf "@[<hv 2>let %t@]@."
       (translate_sequence "@,and " translate_let defs)
 
   let translate_top_let_rec defs ppf = 
-    translate ppf "let rec @[<hov>%t@]@."
+    translate ppf "@[<hv 2>let rec %t@]@."
       (translate_sequence "@,and " translate_let_rec defs)
 
   let translate_external name symbol_name translation ppf =
     match translation with
     | McocExternal.Unknown ->
         translate ppf "let %t = failwith \"Unknown external symbol %s.\"@."
-          (CoreTypes.Variable.print name) symbol_name
+          (CoreTypes.Variable.print ~safe:true name) symbol_name
     | McocExternal.Exists t ->
-        translate ppf "let %t = %s@." (CoreTypes.Variable.print name) t
+        translate ppf "let %t = %s@."
+        (CoreTypes.Variable.print ~safe:true name) t
 
   let translate_tydefs tydefs ppf = 
-    translate ppf "%t" (translate_sequence " and " translate_tydef tydefs)
+    translate ppf "%t@." (translate_sequence " and " translate_tydef tydefs)
 
   (* Processing functions *)
   let process_computation state c ty = 
     let t = MCOC.of_computation c in
-    update state (translate_term t state_ppf)
+    update state (translate state_ppf "%t@." (translate_term t))
 
   let process_type_of state c ty = 
     issue_warning 
