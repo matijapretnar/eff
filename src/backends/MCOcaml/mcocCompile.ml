@@ -5,6 +5,7 @@ module MCOC = McocSyntax
 
 module type Formatters = sig
   val warnings : Format.formatter
+  val response : Format.formatter
   val output : Format.formatter
   val printing : bool
 end
@@ -13,22 +14,29 @@ module Backend (F : Formatters) : BackendSignature.T = struct
   
   let warnings_ppf = F.warnings
 
+  let response_ppf = F.response
+
   let output_ppf = F.output
 
-  type state = {printing: bool; prog: string}
+  type state = {printing: bool; mute_depth: int; prog: string}
 
-  let initial_state = {printing= F.printing; prog= ""}
+  let initial_state = {printing= F.printing; mute_depth= 0; prog= ""}
 
-  let load_mode state = state (* TODO *)
+  let load_mode state =
+    {state with printing= false; mute_depth= state.mute_depth + 1}
 
-  let execute_mode state = state (* TODO *)
+  let execute_mode state =
+    if state.mute_depth <= 1 then
+      {state with printing= F.printing; mute_depth = 0}
+    else
+      {state with mute_depth= state.mute_depth - 1}
 
   (* Auxiliary functions *)
   let update state translation =
     let actual_translation = Format.flush_str_formatter () in
     let _ = 
       if state.printing then
-        (Format.fprintf output_ppf "%s@." actual_translation)
+        (Format.fprintf response_ppf "%s@." actual_translation)
       else
         ()
     in
@@ -57,10 +65,10 @@ module Backend (F : Formatters) : BackendSignature.T = struct
     sequence
 
   let translate_field translator (f, v) ppf =
-    translate ppf "%t = %t" (CoreTypes.Field.print f) (translator v)
+    translate ppf "%t = %t" (McocSymbol.print_field f) (translator v)
 
   let translate_field_type translator (f, v) ppf =
-    translate ppf "%t : %t" (CoreTypes.Field.print f) (translator v)
+    translate ppf "%t : %t" (McocSymbol.print_field f) (translator v)
   
   let translate_tuple translator lst ppf =
     match lst with
@@ -87,7 +95,7 @@ module Backend (F : Formatters) : BackendSignature.T = struct
 
   and translate_let_rec (name, (p, t)) ppf =
     translate ppf "%t %t = @,%t"
-      (CoreTypes.Variable.print ~safe:true name)
+      (McocSymbol.print_variable name)
       (translate_pattern p) (translate_term t)
 
   and translate_tydef (name, (params, tydef)) ppf =
@@ -99,10 +107,10 @@ module Backend (F : Formatters) : BackendSignature.T = struct
           let lst = Assoc.to_list assoc in
           let cons_translator ty_opt ppf =
             match ty_opt with
-            | (lbl, None) -> translate ppf "%t" (CoreTypes.Label.print lbl)
+            | (lbl, None) -> translate ppf "%t" (McocSymbol.print_label lbl)
             | (lbl, Some ty) ->
                 translate ppf "%t of %t"
-                  (CoreTypes.Label.print lbl) (translate_type ty)
+                  (McocSymbol.print_label lbl) (translate_type ty)
           in
           translate ppf "@[<hov>%t@]"
             (translate_sequence " | " cons_translator lst)
@@ -111,23 +119,27 @@ module Backend (F : Formatters) : BackendSignature.T = struct
     match params with
     | [] ->
         translate ppf "@[type %t = %t@]@."
-          (CoreTypes.TyName.print name) (translate_def tydef)
+          (McocSymbol.print_tyname name) (translate_def tydef)
     | lst ->
         translate ppf "@[type (%t) %t = %t@]@."
-          (translate_sequence ", " CoreTypes.TyParam.print params)
-          (CoreTypes.TyName.print name) (translate_def tydef)
+          (translate_sequence ", " McocSymbol.print_typaram params)
+          (McocSymbol.print_tyname name) (translate_def tydef)
 
   and translate_case case ppf =
     match case with
-    | MCOC.ValueClause abs -> translate ppf "@[<hv 2>%t@]" (translate_abstraction abs)
+    | MCOC.ValueClause abs ->
+        translate ppf "@[<hv 2>%t@]" (translate_abstraction abs)
     | MCOC.EffectClause (eff, (p1, p2, t)) ->
-        translate ppf "@[<hv 2>effect (%t %t) %t ->@ %t@]" 
-          (CoreTypes.Effect.print eff) (translate_pattern p1)
+        translate ppf 
+          ( "@[<hv 2>effect (%t %t) %t ->@," ^^
+            "(let %t x = continue (Obj.clone_continuation %t) x in @,%t)@]" )
+          (McocSymbol.print_effect eff) (translate_pattern p1)
+          (translate_pattern p2) (translate_pattern p2)
           (translate_pattern p2) (translate_term t)
     
   and translate_term t ppf =
     match t with
-    | MCOC.Var x -> translate ppf "%t" (CoreTypes.Variable.print ~safe:true x)
+    | MCOC.Var x -> translate ppf "%t" (McocSymbol.print_variable x)
     | MCOC.Const c -> translate ppf "%t" (Const.print c)
     | MCOC.Annotated (t, ty) -> 
         translate ppf "(%t : %t)" (translate_term t) (translate_type ty)
@@ -135,29 +147,35 @@ module Backend (F : Formatters) : BackendSignature.T = struct
     | MCOC.Record assoc ->
         translate ppf "%t" (translate_record translate_term assoc)
     | MCOC.Variant (lbl, None) when lbl = CoreTypes.nil -> translate ppf "[]"
-    | MCOC.Variant (lbl, None) -> translate ppf "%t" (CoreTypes.Label.print lbl)
-    | MCOC.Variant (lbl, Some (MCOC.Tuple lst)) when lbl = CoreTypes.cons ->
-        translate ppf "[@[<hov>%t@]]"
-          (translate_sequence "; " translate_term lst)
+    | MCOC.Variant (lbl, None) -> translate ppf "%t" (McocSymbol.print_label lbl)
+    | MCOC.Variant (lbl, Some (MCOC.Tuple [hd; tl])) when lbl = CoreTypes.cons ->
+        translate ppf "@[<hov>(%t)::(%t)@]"
+          (translate_term hd) (translate_term tl)
     | MCOC.Variant (lbl, Some t) ->
         translate ppf "%t @[<hov>%t@]" 
-          (CoreTypes.Label.print lbl) (translate_term t)
+          (McocSymbol.print_label lbl) (translate_term t)
     | MCOC.Lambda a -> translate ppf "@[<hv 2>fun %t@]" (translate_abstraction a)
-    | MCOC.Effect eff -> translate ppf "%t" (CoreTypes.Effect.print eff)
+    | MCOC.Effect eff -> translate ppf "%t" (McocSymbol.print_effect eff)
     | MCOC.Let (lst, t) -> 
         translate ppf "@[<hov>@[<hv 2>let %t@] @,in @,%t@]"
           (translate_sequence "@,and " translate_let lst)
           (translate_term t)
     | MCOC.LetRec (lst, t) ->
-        translate ppf "@[@[<hv 2>let let rec %t@] @,in@ @,%t@]"
+        translate ppf "@[@[<hv 2>let rec %t@] @,in@ @,%t@]"
           (translate_sequence "@,and " translate_let_rec lst)
           (translate_term t)
+    | MCOC.Match (t, []) ->
+        (* Absurd case *)
+        translate ppf 
+          ("@[<hv>(match %t with | _ ->"
+           ^^ " failwith \"void successfully matched\")@]")
+          (translate_term t) 
     | MCOC.Match (t, lst) ->
-        translate ppf "@[<hv>match %t with @,(| %t)@]"
+        translate ppf "@[<hv>(match %t with@, | %t)@]"
           (translate_term t) (translate_sequence " | " translate_case lst)
     | MCOC.Apply (MCOC.Effect eff, t2) ->
         translate ppf "perform (%t (%t))"
-          (CoreTypes.Effect.print eff) (translate_term t2)
+          (McocSymbol.print_effect eff) (translate_term t2)
     | MCOC.Apply (t1, t2) ->
         translate ppf "@[<hov 2>(%t) @,(%t)@]" (translate_term t1) (translate_term t2)
     | MCOC.Check t -> 
@@ -166,10 +184,12 @@ module Backend (F : Formatters) : BackendSignature.T = struct
 
   and translate_pattern p ppf =
     match p with
-    | MCOC.PVar x -> translate ppf "%t" (CoreTypes.Variable.print ~safe:true x)
+    | MCOC.PVar x ->
+        translate ppf "%t"
+          (McocSymbol.print_variable ~warnings:(Some warnings_ppf) x)
     | MCOC.PAs (p, x) ->
         translate ppf "%t as %t"
-          (translate_pattern p) (CoreTypes.Variable.print ~safe:true x)
+          (translate_pattern p) (McocSymbol.print_variable x)
     | MCOC.PAnnotated (p, ty) -> 
         translate ppf "(%t : %t)" (translate_pattern p) (translate_type ty)
     | MCOC.PConst c -> translate ppf "%t" (Const.print c)
@@ -179,14 +199,14 @@ module Backend (F : Formatters) : BackendSignature.T = struct
         translate ppf "%t" (translate_record translate_pattern assoc)
     | MCOC.PVariant (lbl, None) when lbl = CoreTypes.nil -> translate ppf "[]"
     | MCOC.PVariant (lbl, None) -> 
-        translate ppf "%t" (CoreTypes.Label.print lbl)
+        translate ppf "%t" (McocSymbol.print_label lbl)
     | MCOC.PVariant (lbl, Some (MCOC.PTuple lst))
       when lbl = CoreTypes.cons ->
         translate ppf "[@[<hov>%t@]]"
           (translate_sequence "; " translate_pattern lst)
     | MCOC.PVariant (lbl, Some p) ->
         translate ppf "%t @[<hov>%t@]"
-          (CoreTypes.Label.print lbl) (translate_pattern p)
+          (McocSymbol.print_label lbl) (translate_pattern p)
     | MCOC.PNonbinding -> translate ppf "_"
 
   and translate_type ty ppf =
@@ -195,20 +215,22 @@ module Backend (F : Formatters) : BackendSignature.T = struct
         translate ppf "@[<h>%t ->@ %t@]"
           (translate_type t1) (translate_type t2)
     | MCOC.TyBasic b -> translate ppf "%s" b
-    | MCOC.TyApply (t, []) -> translate ppf "%t" (CoreTypes.TyName.print t)
+    | MCOC.TyApply (t, []) -> 
+        (* we warn when the empty type is translated *)    
+        translate ppf "%t" (McocSymbol.print_tyname ~warnings:(Some warnings_ppf) t)
     | MCOC.TyApply (t, [s]) ->
-        translate ppf "%t %t" (translate_type s) (CoreTypes.TyName.print t)
+        translate ppf "%t %t" (translate_type s) (McocSymbol.print_tyname t)
     | MCOC.TyApply (t, ts) ->
         translate ppf "(%t) %t"
-          (Print.sequence ", " translate_type ts) (CoreTypes.TyName.print t)
-    | MCOC.TyParam p -> translate ppf "%t" (CoreTypes.TyParam.print p)
+          (Print.sequence ", " translate_type ts) (McocSymbol.print_tyname t)
+    | MCOC.TyParam p -> translate ppf "%t" (McocSymbol.print_typaram p)
     | MCOC.TyTuple [] -> translate ppf "unit"
     | MCOC.TyTuple ts ->
         translate ppf "@[<hov>%t@]" (Print.sequence " * " translate_type ts)
 
   let translate_def_effect (eff, (ty1, ty2)) ppf =
     translate ppf "@[effect %t : %t ->@ %t@]@."
-      (CoreTypes.Effect.print eff) (translate_type ty1) (translate_type ty2) 
+      (McocSymbol.print_effect eff) (translate_type ty1) (translate_type ty2) 
 
   let translate_top_let defs ppf =
     translate ppf "@[<hv 2>let %t@]@."
@@ -222,10 +244,10 @@ module Backend (F : Formatters) : BackendSignature.T = struct
     match translation with
     | McocExternal.Unknown ->
         translate ppf "let %t = failwith \"Unknown external symbol %s.\"@."
-          (CoreTypes.Variable.print ~safe:true name) symbol_name
+          (McocSymbol.print_variable name) symbol_name
     | McocExternal.Exists t ->
         translate ppf "let %t = %s@."
-        (CoreTypes.Variable.print ~safe:true name) t
+        (McocSymbol.print_variable name) t
 
   let translate_tydefs tydefs ppf = 
     translate ppf "%t@." (translate_sequence " and " translate_tydef tydefs)

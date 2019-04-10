@@ -6,8 +6,9 @@ module Backend = Eval.Backend(struct let output = Format.std_formatter end)
 module Backend_test = 
 McocCompile.Backend(
   struct 
-    let warnings = Format.std_formatter 
-    let output = Format.std_formatter
+    let warnings = Format.std_formatter
+    let response = Format.std_formatter 
+    let output = Format.formatter_of_out_channel (open_out "test.ml")
     let printing = true
   end)
     

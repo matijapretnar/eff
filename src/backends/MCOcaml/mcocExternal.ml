@@ -3,7 +3,8 @@ module V = Value
 
 type translation = Exists of string | Unknown
 
-let comparison_functions = Assoc.of_list [("=", Exists "="); ("<", Exists "<")]
+let comparison_functions =
+  Assoc.of_list [("=", Exists "(=)"); ("<", Exists "(<)")]
 
 let constants =
   Assoc.of_list
@@ -16,14 +17,14 @@ let arithmetic_operations =
     [ ("~-", Exists "(~-)")
     ; ("+", Exists "(+)")
     ; ("-", Exists "(-)")
-    ; ("*", Exists "(*)")
+    ; ("*", Exists "( * )")
     ; ("/", Exists "(/)")
-    ; ("mod", Exists "mod")
-    ; ("**", Exists "(**)")
+    ; ("mod", Exists "(mod)")
+    ; ("**", Exists "( ** )")
     ; ("~-.", Exists "(~-.)")
     ; ("+.", Exists "(+.)")
     ; ("-.", Exists "(-.)")
-    ; ("*.", Exists "(*.)")
+    ; ("*.", Exists "( *. )")
     ; ("/.", Exists "(/.)")
     ; ("exp", Exists "exp")
     ; ("expm1", Exists "expm1")
@@ -39,7 +40,7 @@ let arithmetic_operations =
     ]
 
 let string_operations =
-  Assoc.of_list [("^", Exists "^"); ("string_length", Exists "String.length")]
+  Assoc.of_list [("^", Exists "(^)"); ("string_length", Exists "String.length")]
 
 let conversion_functions =
   Assoc.of_list

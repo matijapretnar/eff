@@ -9,6 +9,8 @@ module type Shell = sig
   val load_file : string -> state -> state
 
   val execute_source : string -> state -> state
+
+  val finalize : state -> unit
 end
 
 module Make (Backend : BackendSignature.T) : Shell

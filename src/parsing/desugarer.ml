@@ -179,7 +179,7 @@ let desugar_tydefs state sugared_defs =
 
 (** [fresh_var opt] creates a fresh variable on each call *)
 let fresh_var = function
-  | None -> CoreTypes.Variable.fresh "anon"
+  | None -> CoreTypes.Variable.fresh "$anon"
   | Some x -> CoreTypes.Variable.fresh x
 
 let id_abstraction loc =

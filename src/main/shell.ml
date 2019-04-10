@@ -11,6 +11,8 @@ module type Shell = sig
   val load_file : string -> state -> state
 
   val execute_source : string -> state -> state
+
+  val finalize : state -> unit
 end
 
 
@@ -75,7 +77,7 @@ module Make(Backend : BackendSignature.T) = struct
         { type_system_state= type_system_state'
         ; desugarer_state= desugarer_state' 
         ; backend_state= backend_state' }
-    | Commands.Quit -> exit 0
+    | Commands.Quit -> Backend.finalize state.backend_state; exit 0
     | Commands.Use filename ->
         let load_state =
           { state with backend_state= Backend.load_mode state.backend_state }
@@ -156,4 +158,6 @@ module Make(Backend : BackendSignature.T) = struct
 
   and execute_source str state =
     Lexer.read_string parse str |> exec_cmds state
+
+  and finalize state = Backend.finalize state.backend_state
 end
