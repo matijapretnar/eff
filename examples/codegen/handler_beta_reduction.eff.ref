@@ -1,6 +1,0 @@
-type (_,_) effect +=
-  | Effect_Eff: (int,int) effect 
-;;(binary_builtin Pervasives.(+))
-    ((run
-        ((binary_builtin Pervasives.(+))
-           ((run ((binary_builtin Pervasives.(+)) (1, 2))), 3))), 4)
