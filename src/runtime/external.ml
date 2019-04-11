@@ -25,6 +25,10 @@ let value_fun f = V.Value (from_fun f)
     nested closures. *)
 let binary_closure f = from_fun (fun v1 -> value_fun (fun v2 -> f v1 v2))
 
+(** [ternary_closure f] converts a function [f] that takes three values into three
+    nested closures. *)
+let ternary_closure f = from_fun (fun v1 -> value_fun (fun v2 -> value_fun (fun v3 -> f v1 v2 v3)))
+
 (** [int_int_to_int f] takes a binary integer function f and transforms it into
     a closure that takes two values and evaluates to a value. *)
 let int_int_to_int f =
@@ -177,7 +181,8 @@ let string_operations =
   Assoc.of_list
     [ ("^", binary_closure (fun v1 v2 -> value_str (V.to_str v1 ^ V.to_str v2)))
     ; ( "string_length"
-      , from_fun (fun v -> value_int (String.length (V.to_str v))) ) ]
+      , from_fun (fun v -> value_int (String.length (V.to_str v))) )
+    ; ( "sub", ternary_closure (fun v1 v2 v3 -> value_str (String.sub (V.to_str v1) (V.to_int v2) (V.to_int v3)))) ]
 
 let conversion_functions =
   Assoc.of_list

@@ -100,6 +100,8 @@ external ( ^ ) : string -> string -> string = "^"
 
 external string_length : string -> int = "string_length"
 
+external sub : string -> int -> int -> string = "sub"
+
 external to_string : 'a -> string  = "to_string"
 
 (* Booleans *)
