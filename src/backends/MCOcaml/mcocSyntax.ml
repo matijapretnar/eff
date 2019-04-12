@@ -43,6 +43,7 @@ type term =
   | Record of (field, term) Assoc.t
   | Variant of label * term option
   | Lambda of abstraction
+  | Function of match_case list
   | Effect of effect
   | Let of (pattern * term) list * term
   | LetRec of (variable * abstraction) list * term
@@ -59,6 +60,12 @@ and abstraction = pattern * term
 
 (** Abstractions that take two arguments. *)
 and abstraction2 = pattern * pattern * term
+
+let abstraction_is_id (p, c) =
+  (* Used to remove trivial finally clauses from handlers. *)
+  match p with
+  | PVar v -> CoreTypes.Variable.fold (fun desc _ -> desc = "$id_par") v
+  | _ -> false
 
 let rec of_abstraction (p, c) = (of_pattern p, of_computation c)
 
@@ -77,7 +84,21 @@ and of_expression {it; at} =
       match e_opt with
       | None -> Variant (lbl, None)
       | Some e -> Variant (lbl , Some (of_expression e)) )
-  | CoreSyntax.Lambda abs -> Lambda (of_abstraction abs)
+  | CoreSyntax.Lambda abs ->
+      (* Transform back to [function] keyword if possible *) 
+      (match abs with
+      | (p, {it=CoreSyntax.Match (e, abs_lst)}) ->
+          let p' = of_pattern p in
+          let e' = of_expression e in
+          (match p', e' with
+          | PVar v1, Var v2 
+            when v1 = v2 
+            && CoreTypes.Variable.fold (fun desc _ -> desc = "$function") v1
+            -> 
+              let converter abs = ValueClause (of_abstraction abs) in
+              Function (List.map converter abs_lst)
+          | _ -> Lambda (of_abstraction abs) )
+      | _ -> Lambda (of_abstraction abs) )
   | CoreSyntax.Effect eff -> Effect eff
   | CoreSyntax.Handler {effect_clauses; value_clause; finally_clause} ->
       (* Non-trivial case *)
@@ -86,12 +107,15 @@ and of_expression {it; at} =
           (Assoc.to_list effect_clauses)
       in
       let value_clause' = ValueClause (of_abstraction value_clause) in
-      let finally_clause' = Lambda (of_abstraction finally_clause) in
+      let finally_clause_abs = (of_abstraction finally_clause) in
       let ghost_bind = CoreTypes.Variable.fresh "$c_thunk" in
       let match_handler =
         Match(Apply(Var ghost_bind, Tuple []), value_clause' :: effect_clauses')
-      in 
-      Lambda(PVar ghost_bind, Apply(finally_clause', match_handler))
+      in
+      if abstraction_is_id finally_clause_abs then
+        Lambda(PVar ghost_bind, match_handler)
+      else
+        Lambda(PVar ghost_bind, Apply(Lambda finally_clause_abs, match_handler))
 
 and of_computation {it; at} =
   match it with

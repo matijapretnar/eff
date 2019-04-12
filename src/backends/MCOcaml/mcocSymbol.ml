@@ -5,10 +5,12 @@ let protected =
   ; "land"; "lazy"; "let"; "lor"; "lsl"; "lsr"; "lxor"; "match"; "method"
   ; "mod"; "module"; "mutable"; "new"; "nonrec"; "object"; "of"; "open"; "or"
   ; "private"; "rec"; "sig"; "struct"; "then"; "to"; "true"; "try"; "type"
-  ; "val"; "virtual"; "when"; "while"; "with" ]
+  ; "val"; "virtual"; "when"; "while"; "with"; "continue" ]
 
 let print_variable ?(warnings = None) var ppf =
   let printer desc n =
+    (* [mod] has privileges because otherwise it's stupid *)
+    if desc = "mod" then Format.fprintf ppf "_op_%d (* %s *)" n desc else
     let () =
       match warnings with
       | None -> ()

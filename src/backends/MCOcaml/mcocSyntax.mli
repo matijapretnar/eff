@@ -41,6 +41,7 @@ type term =
   | Record of (field, term) Assoc.t
   | Variant of label * term option
   | Lambda of abstraction
+  | Function of match_case list
   | Effect of effect
   | Let of (pattern * term) list * term
   | LetRec of (variable * abstraction) list * term
