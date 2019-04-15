@@ -78,12 +78,7 @@ module Make(Backend : BackendSignature.T) = struct
         ; desugarer_state= desugarer_state' 
         ; backend_state= backend_state' }
     | Commands.Quit -> Backend.finalize state.backend_state; exit 0
-    | Commands.Use filename ->
-        let load_state =
-          { state with backend_state= Backend.load_mode state.backend_state }
-        in
-        let state' = execute_file filename load_state in
-        { state' with backend_state= Backend.execute_mode state'.backend_state }
+    | Commands.Use filename -> execute_file filename state
     | Commands.TopLet defs ->
         let desugarer_state', defs' =
           Desugarer.desugar_top_let state.desugarer_state defs
@@ -150,11 +145,12 @@ module Make(Backend : BackendSignature.T) = struct
     Lexer.read_file parse filename |> exec_cmds state
 
   and load_file filename state =
-    let load_state =
-      { state with backend_state= Backend.load_mode state.backend_state }
-    in
-    let state' = Lexer.read_file parse filename |> exec_cmds load_state in
-    { state' with backend_state= Backend.execute_mode state'.backend_state }
+    let old_output_formatter = !Config.output_formatter in
+    Config.output_formatter := Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ());
+    let state' = Lexer.read_file parse filename |> exec_cmds state in
+    Config.output_formatter := old_output_formatter;
+    state'
+
 
   and execute_source str state =
     Lexer.read_string parse str |> exec_cmds state

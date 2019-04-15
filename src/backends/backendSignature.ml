@@ -6,10 +6,6 @@ module type T = sig
 
   val initial_state : state
 
-  val load_mode : state -> state
-
-  val execute_mode : state -> state
-
   val process_computation :
        state
     -> CoreSyntax.computation
