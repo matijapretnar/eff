@@ -14,8 +14,8 @@ effect Get : int
 effect Set : int -> unit
 
 let state initial = handler
-  | effect Get k -> (fun m -> continue k m m)
-  | effect (Set n) k -> (fun m -> continue k () n)
+  | effect Get k -> (fun m -> k m m)
+  | effect (Set n) k -> (fun m -> k () n)
   | x -> (fun _ -> x)
   | finally g -> g initial
 ;;
@@ -26,8 +26,8 @@ let unhandled_ref_mu f a =
      saves the largest i for which a lookup was made. *)
   let b i =
     let current = perform Get in
-    let new = max current i in
-    perform (Set new);
+    let new_i = max current i in
+    perform (Set new_i);
     a i
   in
   ignore (f b); perform Get
@@ -51,7 +51,7 @@ let sequence_transformer sequence = handler
     (fun i ->
        let j = max i n in
        (* Here j represents the largest seen lookup index. *)
-       continue k (sequence n) j)
+       k (sequence n) j)
   | x -> (fun n -> n) (* We want the final state, not the result. *)
   | finally g -> g 0
 ;;

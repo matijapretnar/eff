@@ -96,6 +96,9 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     | MCOC.Match (t, lst) ->
         translate ppf "@[<hv>(match %t with@, | %t)@]"
           (translate_term t) (translate_sequence "@, | " translate_case lst)
+    | MCOC.Apply (MCOC.Effect eff, (MCOC.Lambda _  as t2)) ->
+        translate ppf "perform (%t (%t))"
+          (McocSymbol.print_effect eff) (translate_term t2)
     | MCOC.Apply (MCOC.Effect eff, t2) ->
         translate ppf "perform (%t %t)"
           (McocSymbol.print_effect eff) (translate_term t2)
@@ -268,7 +271,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
   let process_computation state c ty = 
     let t = MCOC.of_computation c in
     update state (translate state_ppf
-      ";;@.@[<hv>(_ocaml_tophandler) (@,%t@,)@];;@."
+      "let _ = @.@[<hv>(_ocaml_tophandler) (fun _ -> @,%t@,)@];;@."
      (translate_term t))
 
   let process_type_of state c ty = 

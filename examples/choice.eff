@@ -23,14 +23,14 @@ handle
   let y = (if perform Decide then 0 else 5) in
     x - y
 with
-| effect Decide k -> continue k true;;
+| effect Decide k -> k true;;
 
 match
   let x = (if perform Decide then 10 else 20) in
   let y = (if perform Decide then 0 else 5) in
   Some (x - y)
 with
-| effect Decide k -> continue k true
+| effect Decide k -> k true
 | Some v -> v
 | None -> 0
 ;;
@@ -38,7 +38,7 @@ with
 (* This handler collects all results that we can get by making different choices. *)
 
 let choose_all = handler
-  | effect Decide k -> continue k true @ continue k false
+  | effect Decide k -> k true @ k false
   | x -> [x];;
 
 (* This returns a list of four possibilities [10; 5; 20; 15] *)
@@ -51,7 +51,7 @@ with choose_all handle
 effect Decide2 : bool;;
 
 let choose_all2 = handler
-  | effect Decide2 k -> continue k true @ continue k false
+  | effect Decide2 k -> k true @ k false
   | x -> [x];;
 
 (* We can create two instances and handle each one separately. The inner handler produces

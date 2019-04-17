@@ -57,20 +57,20 @@ let rec mem_update id d t_b = function
 
 let mem_handler = handler
   | effect (Update_data (id, v)) k -> (fun mem ->
-      (continue k ()) (mem_update id (Known v) [] mem))
+      ( k ()) (mem_update id (Known v) [] mem))
   | effect (Lookup_data id) k -> (fun mem ->
       (match mem_find id mem with
-      | Some d -> (continue k d) mem
-      | None -> (continue k (Unknown, [])) mem))
+      | Some d -> ( k d) mem
+      | None -> ( k (Unknown, [])) mem))
   | effect (Bind_to_data (id, t_b)) k -> (fun mem ->
       match mem_find id mem with
-      | None -> (continue k ()) (mem_update id (Unknown) [t_b] mem)
+      | None -> ( k ()) (mem_update id (Unknown) [t_b] mem)
       (* We bind thread builders to the end of the waiting list. *)
-      | Some (d, t_bs) -> (continue k ()) (mem_update id d (t_bs @ [t_b]) mem))
+      | Some (d, t_bs) -> ( k ()) (mem_update id d (t_bs @ [t_b]) mem))
   | effect (Unbind_all id) k -> (fun mem ->
     match mem_find id mem with
-    | None -> (continue k ()) mem
-    | Some (d, _) -> (continue k ()) (mem_update id d [] mem))
+    | None -> ( k ()) mem
+    | Some (d, _) -> ( k ()) (mem_update id d [] mem))
   (* The value clause returns the memory instead of the actual value.
      Because threads have type unit -> unit it is unlikely that the returned
      value will have any significance, however the data in memory might. *)
@@ -82,11 +82,11 @@ let mem_handler = handler
 (* Another state handler, this one being a simple queue. *)
 let thread_queue = handler
   (* We have a 'first in first out' queue so we add to the end of list. *)
-  | effect (Enqueue t) k -> (fun q -> (continue k ()) (q @ [t]))
+  | effect (Enqueue t) k -> (fun q -> ( k ()) (q @ [t]))
   | effect Dequeue k -> (fun q ->
     match q with
-    | [] -> (continue k None) []
-    | t::ts -> (continue k (Some t)) ts)
+    | [] -> ( k None) []
+    | t::ts -> ( k (Some t)) ts)
   | x -> (fun _ -> x)
   | finally prog -> prog []
 
@@ -101,7 +101,7 @@ let thread_queue = handler
 let thread_handler =
   let rec thread_handler_rec () = handler
   | effect (Spawn t) k ->
-    (perform (Enqueue t); continue k ())
+    (perform (Enqueue t);  k ())
   | effect Run_next k ->
     match perform Dequeue with
     | None -> ()
@@ -121,7 +121,7 @@ let scheduler =
     (* Constructs a thread builder from a continuation. The thread builder
        passes the data value to the continuation and wraps it in the scheduler.
        Ignore is used so that it builds a unit -> unit thread. *)
-    (fun v -> (fun () -> ignore (with scheduler_rec () handle continue k v)))
+    (fun v -> (fun () -> ignore (with scheduler_rec () handle  k v)))
   and scheduler_rec () = handler
     | effect (Lookup id) k -> (
       match perform (Lookup_data id) with
@@ -129,11 +129,11 @@ let scheduler =
       | (Unknown, _) -> (
         perform (Bind_to_data (id, continuation_tb k));
         perform Run_next;
-        absurd perform (Raise "This shouldn't happen!"))
-      | (Known v, _) -> continue k v)
+        (failwith "This shouldn't happen!"))
+      | (Known v, _) ->  k v)
     | effect (Update (id, v)) k -> (
       match perform (Lookup_data id) with
-      | (Known _, _) -> ( perform (Update_data (id, v)); continue k () )
+      | (Known _, _) -> ( perform (Update_data (id, v));  k () )
       (* If unknown data was updated, spawn all waiting threads by passing the
          value to the saved thread builders. Unbind to free space. *)
       | (Unknown, waiting) -> (
@@ -141,7 +141,7 @@ let scheduler =
         perform (Unbind_all id);
         iter (fun tb -> perform (Spawn (tb v))) waiting;
         (* Adding k to the queue allows 'reawakened' threads to go first. *)
-        perform (Spawn (continue k));
+        perform (Spawn ( k));
         perform Run_next))
     (* We want all our threads to finish, so we run all unfinished ones after
        a value is returned. *)

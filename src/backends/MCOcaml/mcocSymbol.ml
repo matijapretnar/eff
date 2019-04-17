@@ -11,7 +11,7 @@ let print_variable var ppf =
   let printer desc n =
     (* [mod] has privileges because otherwise it's stupid *)
     if desc = "mod" then Format.fprintf ppf "_op_%d (* %s *)" n desc else
-    if List.mem desc protected then
+    ( if List.mem desc protected then
       Print.warning "Warning: Protected keyword [%s]. Must be fixed by hand!@." desc;
     match desc.[0] with
     | 'a' .. 'z' | '_' -> Format.fprintf ppf "%s" desc
@@ -22,7 +22,7 @@ let print_variable var ppf =
         | "$anon" -> Format.fprintf ppf "_anon_%d" n
         | "$bind" -> Format.fprintf ppf "_b_%d" n
         | _ -> Format.fprintf ppf "_x_%d" n )
-    | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc
+    | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc )
   in
   CoreTypes.Variable.fold printer var
 
