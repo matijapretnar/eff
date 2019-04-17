@@ -66,12 +66,7 @@
         color: #0097e6;
     }
 
-    .uk-alert-danger, #resetButton {
-        background: #c23616;
-        color: rgba(255, 255, 255, 0.8);
-    }
-
-    #runButton {
+    #load-file-button {
         background: #0097e6;
         color: rgba(255, 255, 255, 0.8);
     }
@@ -138,15 +133,10 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
             });
             cmResize(editor, {resizableWidth: false});
             </script>
-<!--             <div class="uk-align-center" style="margin: 0 auto; width: 100%">
-                <button class="uk-button uk-button-primary uk-width-3-5" id="runButton">Run</button>
-                <button class="uk-button uk-button-danger uk-width-1-5" id="resetButton">Reset</button>
+            <!-- The terminal window -->
+            <div style="position: absolute; right: 0px">
+            <button style="position: relative; float: right; z-index:100000" id="load-file-button" class="uk-button uk-button-small uk-button-primary">LOAD FILE</button>
             </div>
- -->            <!-- The terminal window -->
-              <div style="position: absolute; right: 0px">
-                <button style="position: relative; float: right; z-index:100000" id="resetButton" class="uk-button uk-button-small uk-button-danger">RESET</button>
-                <button style="position: relative; float: right; z-index:100000" id="runButton" class="uk-button uk-button-small uk-button-primary">LOAD FILE</button>
-              </div>
             <div id="terminal" style="--size: 16px">
             </div>
             <!-- Code to setup the terminal and the buttons -->
@@ -154,7 +144,7 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
             var terminal =
                 $('#terminal').terminal(function(command, term) {
                     if (command !== '') {
-                        env = jseff.toplevel()(term.echo)(env)(command);
+                        state = jseff.executeSource()(state)(command);
                     }
                 }, {
                     greetings: '',
@@ -164,25 +154,17 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
                     prompt: '# '
                 });
 
-            var env = jseff.reset()(terminal.echo);
+            var state = jseff.initialize()(terminal.echo);
             jQuery.get('/try/pervasives.eff', function(data) {
-                env = jseff.usefile()(function() {})(env)(data);
+                state = jseff.loadSource()(state)(data);
             })
 
             jQuery.get('/try/examples/syntax.eff', function(data) {
                 editor.setValue(data);
             })
 
-            $('#runButton').click(function() {
-                env = jseff.usefile()(terminal.echo)(env)(editor.getValue());
-            });
-
-            $('#resetButton').click(function() {
-                terminal.clear();
-                env = jseff.reset()(terminal.echo);
-                jQuery.get('/try/pervasives.eff', function(data) {
-                    env = jseff.usefile()(function() {})(env)(data);
-                })
+            $('#load-file-button').click(function() {
+                state = jseff.executeSource()(state)(editor.getValue());
             });
 
             $('#syntaxLoad').click(function() {
