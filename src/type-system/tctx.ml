@@ -30,8 +30,6 @@ let initial : tyctx =
 
 let global = ref initial
 
-let reset () = global := initial
-
 let subst_tydef sbst =
   let subst = Type.subst_ty sbst in
   function

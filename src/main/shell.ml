@@ -57,12 +57,6 @@ module Make(Backend : BackendSignature.T) = struct
         { state with 
           type_system_state= type_system_state';
           backend_state= backend_state' }
-    | Commands.Reset ->
-        Format.fprintf !Config.output_formatter "Environment reset.";
-        Tctx.reset () ;
-        { desugarer_state= Desugarer.initial_state
-        ; type_system_state= TypeSystem.initial_state
-        ; backend_state= Backend.initial_state }
     | Commands.Help ->
         let help_text =
           "Toplevel commands:\n"

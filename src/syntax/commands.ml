@@ -17,7 +17,6 @@ and plain_command =
       (** [effect Eff : ty1 -> t2] *)
   | Term of Sugared.term
   | Use of string  (** [#use "filename.eff"] *)
-  | Reset  (** [#reset] *)
   | Help  (** [#help] *)
   | Quit  (** [#quit] *)
   | TypeOf of Sugared.term  (** [#type t] *)
