@@ -18,10 +18,6 @@ module type T = sig
     -> CoreTypes.TyParam.t list * Type.ty
     -> state
 
-  val process_reset : state -> state
-
-  val process_help : state -> state
-
   val process_def_effect :
     state -> CoreTypes.Effect.t * (Type.ty * Type.ty) -> state
 

@@ -5,13 +5,6 @@ module Untyped = UntypedSyntax
 
 exception PatternMatch of Location.t
 
-let help_text =
-  "Toplevel commands:\n"
-  ^ "#type <expr>;;     print the type of <expr> without evaluating it\n"
-  ^ "#reset;;           forget all definitions (including pervasives)\n"
-  ^ "#help;;            print this help\n" ^ "#quit;;            exit eff\n"
-  ^ "#use \"<file>\";;  load commands from file\n"
-
 module Backend : BackendSignature.T = struct
   module RuntimeEnv = Map.Make (CoreTypes.Variable)
   
@@ -30,14 +23,6 @@ module Backend : BackendSignature.T = struct
 
   let process_type_of state c ty =
     Format.fprintf !Config.output_formatter "@[- : %t@]@." (Type.print_beautiful ty);
-    state
-
-  let process_reset state =
-    Format.fprintf !Config.output_formatter "Environment reset.";
-    initial_state
-
-  let process_help state =
-    Format.fprintf !Config.output_formatter "%s" help_text;
     state
   
   let process_def_effect state (eff, (ty1, ty2)) = state

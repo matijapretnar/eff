@@ -4,13 +4,15 @@ module TypeSystem = SimpleInfer
 module type Shell = sig
   type state
 
-  val initial_state : state
+  val initialize : unit -> state
 
   val execute_file : string -> state -> state
 
   val load_file : string -> state -> state
 
   val execute_source : string -> state -> state
+
+  val load_source : string -> state -> state
 
   val finalize : state -> unit
 end
@@ -23,12 +25,11 @@ module Make(Backend : BackendSignature.T) = struct
     ; type_system_state: TypeSystem.state
     ; backend_state: Backend.state }
 
-  let initial_state =
+  let initialize () =
+    Random.self_init ();
     { desugarer_state= Desugarer.initial_state
     ; type_system_state= TypeSystem.initial_state
     ; backend_state= Backend.initial_state }
-
-  let _ = Random.self_init ()
 
   (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
     It prints the result to [ppf] and returns the new state. *)
@@ -57,13 +58,21 @@ module Make(Backend : BackendSignature.T) = struct
           type_system_state= type_system_state';
           backend_state= backend_state' }
     | Commands.Reset ->
+        Format.fprintf !Config.output_formatter "Environment reset.";
         Tctx.reset () ;
         { desugarer_state= Desugarer.initial_state
         ; type_system_state= TypeSystem.initial_state
-        ; backend_state= Backend.process_reset state.backend_state }
+        ; backend_state= Backend.initial_state }
     | Commands.Help ->
-        { state with 
-          backend_state= Backend.process_help state.backend_state }
+        let help_text =
+          "Toplevel commands:\n"
+          ^ "#type <expr>;;     print the type of <expr> without evaluating it\n"
+          ^ "#help;;            print this help\n"
+          ^ "#quit;;            exit eff\n"
+          ^ "#use \"<file>\";;  load commands from file\n"
+        in
+        Format.fprintf !Config.output_formatter "%s@." help_text;
+        state
     | Commands.DefEffect effect_def ->
         let desugarer_state', (eff, (ty1, ty2)) =
           Desugarer.desugar_def_effect state.desugarer_state effect_def
@@ -133,6 +142,13 @@ module Make(Backend : BackendSignature.T) = struct
 
   and exec_cmds state cmds = fold exec_cmd state cmds
 
+  and load_cmds state cmds =
+    let old_output_formatter = !Config.output_formatter in
+    Config.output_formatter := Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ());
+    let state' = exec_cmds state cmds in
+    Config.output_formatter := old_output_formatter;
+    state'
+
   (* Parser wrapper *)
   and parse lexbuf =
     try Parser.commands Lexer.token lexbuf with
@@ -145,15 +161,13 @@ module Make(Backend : BackendSignature.T) = struct
     Lexer.read_file parse filename |> exec_cmds state
 
   and load_file filename state =
-    let old_output_formatter = !Config.output_formatter in
-    Config.output_formatter := Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ());
-    let state' = Lexer.read_file parse filename |> exec_cmds state in
-    Config.output_formatter := old_output_formatter;
-    state'
-
+    Lexer.read_file parse filename |> load_cmds state
 
   and execute_source str state =
     Lexer.read_string parse str |> exec_cmds state
+
+  and load_source str state =
+    Lexer.read_string parse str |> load_cmds state
 
   and finalize state = Backend.finalize state.backend_state
 end

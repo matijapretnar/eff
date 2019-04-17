@@ -24,15 +24,6 @@ module Backend (F : Formatters) : BackendSignature.T = struct
 
   let initial_state = {printing= F.printing; mute_depth= 0; prog= ""}
 
-  let load_mode state =
-    {state with printing= false; mute_depth= state.mute_depth + 1}
-
-  let execute_mode state =
-    if state.mute_depth <= 1 then
-      {state with printing= F.printing; mute_depth = 0}
-    else
-      {state with mute_depth= state.mute_depth - 1}
-
   (* Auxiliary functions *)
   let update state translation =
     let actual_translation = Format.flush_str_formatter () in
@@ -312,12 +303,6 @@ module Backend (F : Formatters) : BackendSignature.T = struct
       "[#reset] commands are ignored when compiling to Multicore OCaml." ;
     state
 
-  let process_help state =
-    issue_warning 
-      ("[#help] commands are ignored when compiling to Multicore OCaml."
-      ^ " Not even gods can help you here.") ;
-    state
-  
   let process_def_effect state (eff, (ty1, ty2)) =
     let ty1' = MCOC.of_type ty1 in
     let ty2' = MCOC.of_type ty2 in

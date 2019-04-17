@@ -114,8 +114,8 @@ let toplevel st =
     | "Win32" -> "Ctrl-Z"
     | _ -> "EOF"
   in
-  print_endline ("eff " ^ Config.version) ;
-  print_endline ("[Type " ^ eof ^ " to exit or #help;; for help.]") ;
+  Format.fprintf !Config.output_formatter "eff %s@." Config.version;
+  Format.fprintf !Config.output_formatter "[Type %s to exit or #help;; for help.]@." eof;
   try
     let st = ref st in
     Sys.catch_break true ;
@@ -165,6 +165,7 @@ let main =
       | Run filename -> Shell.execute_file filename env
       | Load filename -> Shell.load_file filename env
     in
-    let st = List.fold_left execute_file Shell.initial_state !file_queue in
-    if !Config.interactive_shell then toplevel st
+    let state = Shell.initialize () in
+    let state = List.fold_left execute_file state !file_queue in
+    if !Config.interactive_shell then toplevel state
   with Error.Error err -> Error.print err ; exit 1
