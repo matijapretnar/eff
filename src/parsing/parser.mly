@@ -49,7 +49,7 @@
 %token LAND LOR LXOR
 %token <string> PREFIXOP INFIXOP0 INFIXOP1 INFIXOP2 INFIXOP3 INFIXOP4
 %token CHECK
-%token QUIT USE HELP RESET
+%token QUIT USE HELP
 %token EOF
 
 %nonassoc HANDLE ARROW IN
@@ -122,8 +122,6 @@ plain_topdirective:
     { Commands.Quit }
   | HASH HELP
     { Commands.Help }
-  | HASH RESET
-    { Commands.Reset }
   | HASH TYPE t = term
     { Commands.TypeOf t }
   | HASH USE fn = STRING
@@ -379,8 +377,6 @@ lname:
     { "help" }
   | USE
     { "use" }
-  | RESET
-    { "reset" }
 
 field:
   | f = lname

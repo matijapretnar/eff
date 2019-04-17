@@ -1,5 +1,5 @@
 let usage = "Usage: eff [option] ... [file] ..."
-
+    
 (* A list of files to be loaded and run. *)
 type use_file = Run of string | Load of string
 
@@ -24,6 +24,9 @@ let options =
     ; ( "--no-wrapper"
       , Arg.Unit (fun () -> Config.wrapper := None)
       , " Do not use a command-line wrapper" )
+    ; ( "--compile-multicore-ocaml"
+      , Arg.String (fun filename -> Config.backend := Mcoc filename)
+      , "<file> Compile the Eff code into a Multicore OCaml file <file>")
     ; ("--no-types", Arg.Set Config.disable_typing, " Disable typechecking")
     ; ("--ascii", Arg.Set Config.ascii, " Use ASCII output")
     ; ( "-v"
@@ -96,25 +99,26 @@ let read_toplevel () =
 
 
 (* Interactive toplevel *)
-let toplevel st =
+let toplevel execute_source state =
   let eof =
     match Sys.os_type with
     | "Unix" | "Cygwin" -> "Ctrl-D"
     | "Win32" -> "Ctrl-Z"
     | _ -> "EOF"
   in
-  print_endline ("eff " ^ Config.version) ;
-  print_endline ("[Type " ^ eof ^ " to exit or #help;; for help.]") ;
+  Format.fprintf !Config.output_formatter "eff %s@." Config.version;
+  Format.fprintf !Config.output_formatter "[Type %s to exit or #help;; for help.]@." eof;
+  let state = ref state in
+  Sys.catch_break true ;
   try
-    let st = ref st in
-    Sys.catch_break true ;
     while true do
       let source = read_toplevel () in
-      try st := Shell.execute_source Format.std_formatter source !st with
+      try state := execute_source source !state with
       | Error.Error err -> Error.print err
       | Sys.Break -> prerr_endline "Interrupted."
-    done
-  with End_of_file -> ()
+    done;
+    !state
+  with End_of_file -> !state
 
 
 (* Main program *)
@@ -149,14 +153,22 @@ let main =
       in
       enqueue_file (Load f) ) ;
   try
+    let (module Backend : BackendSignature.T) = 
+      match !Config.backend with
+      | Config.Runtime -> (module Runtime.Backend)
+      | Config.Mcoc output_file -> (module McocCompile.Backend(
+          struct 
+            let output_file = output_file
+          end))
+    in
+    let (module Shell) = (module Shell.Make(Backend) : Shell.Shell) in
     (* Run and load all the specified files. *)
-    let ignore_all_formatter =
-      Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ())
-    in
     let execute_file env = function
-      | Run filename -> Shell.execute_file Format.std_formatter filename env
-      | Load filename -> Shell.execute_file ignore_all_formatter filename env
+      | Run filename -> Shell.execute_file filename env
+      | Load filename -> Shell.load_file filename env
     in
-    let st = List.fold_left execute_file Shell.initial_state !file_queue in
-    if !Config.interactive_shell then toplevel st
+    let state = Shell.initialize () in
+    let state = List.fold_left execute_file state !file_queue in
+    let state = if !Config.interactive_shell then toplevel Shell.execute_source state else state in
+    Shell.finalize state
   with Error.Error err -> Error.print err ; exit 1

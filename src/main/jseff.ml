@@ -1,37 +1,36 @@
-(** Create a [Format.formatter] from a Javascript print callback. *)
 let js_formatter format echo =
-let buffer = ref "" in
-Format.make_formatter
-(fun s p n -> buffer := !buffer ^ String.sub s p n)
-(fun () ->
-  (Js.Unsafe.fun_call echo [| Js.Unsafe.inject (Js.string !buffer) |] : unit) ;
-  buffer := "")
+  let buffer = ref "" in
+  let out s p n = buffer := !buffer ^ String.sub s p n in
+  let flush () =
+    (Js.Unsafe.fun_call echo [| Js.Unsafe.inject (Js.string !buffer) |] : unit) ;
+    buffer := ""
+  in
+  Format.make_formatter out flush
 
-let output_formatter echo = js_formatter "[;#00a8ff;#192a56]" echo
-let error_formatter echo = js_formatter "[b;#e84118;#192a56]" echo
+module Shell = Shell.Make(Runtime.Backend)
 
 (* Export the interface to Javascript. *)
 let _ =
 Js.export "jseff"
   (object%js
 
-     method reset echo =
-       Config.output_formatter := output_formatter echo;
-       Config.error_formatter := error_formatter echo;
-       Tctx.reset ();
-       Shell.initial_state
+     method initialize echo =
+       Config.output_formatter := js_formatter "[;#00a8ff;#192a56]" echo;
+       Config.error_formatter := js_formatter "[b;#e84118;#192a56]" echo;
+       let state = Shell.initialize () in
+       Format.fprintf !Config.output_formatter "eff %s@." Config.version;
+       Format.fprintf !Config.output_formatter "[Type #help for help.]@.";
+       state
 
-     method toplevel echo env cmd =
-       let ppf = output_formatter echo in
+     method executeSource state source =
        try
-         Shell.execute_source ppf (Js.to_string cmd) env
+         Shell.execute_source (Js.to_string source) state
        with
-         Error.Error err -> Error.print err; env
+         Error.Error err -> Error.print err; state
 
-     method usefile echo env cmds =
-       let ppf = output_formatter echo in
+     method loadSource state source =
        try
-         Shell.execute_source ppf (Js.to_string cmds) env
+         Shell.load_source (Js.to_string source) state
        with
-         Error.Error err -> Error.print err; env
+         Error.Error err -> Error.print err; state
    end)

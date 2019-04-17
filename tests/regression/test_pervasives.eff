@@ -66,6 +66,16 @@ check (0 / 0);;
 
 let test_carron = ("cherry" ^ "pie");;
 
+let test_string_of_float1 = (string_of_float 12.);;
+
+let test_string_of_float2 = (string_of_float 12.0);;
+
+let test_string_of_float3 = (string_of_float (-12.000009));;
+
+let test_string_of_int1 = (string_of_int 0);;
+
+let test_string_of_int2 = (string_of_int (-18));;
+
 let test_to_string1 = (to_string 13);;
 
 let test_to_string2 = (to_string [1,2,3]);;
@@ -73,6 +83,10 @@ let test_to_string2 = (to_string [1,2,3]);;
 let test_to_string3 = (to_string (1,2,3));;
 
 let test_to_string4 = (to_string (fun x -> x));;
+
+let test_int_of_float1 = (int_of_float (-1.5));;
+
+let test_int_of_float2 = (int_of_float (12.0001));;
 
 let test_float_of_int = (float_of_int 42);;
 
