@@ -1,14 +1,4 @@
 let usage = "Usage: eff [option] ... [file] ..."
-  
-(* DELETE THIS, it is only here to typecheck backends in progress. *)
-module Backend_test = 
-McocCompile.Backend(
-  struct 
-    let warnings = Format.std_formatter
-    let response = Format.std_formatter 
-    let output = Format.formatter_of_out_channel (open_out "test.ml")
-    let printing = true
-  end)
     
 (* A list of files to be loaded and run. *)
 type use_file = Run of string | Load of string
@@ -118,16 +108,17 @@ let toplevel execute_source state =
   in
   Format.fprintf !Config.output_formatter "eff %s@." Config.version;
   Format.fprintf !Config.output_formatter "[Type %s to exit or #help;; for help.]@." eof;
+  let state = ref state in
+  Sys.catch_break true ;
   try
-    let state = ref state in
-    Sys.catch_break true ;
     while true do
       let source = read_toplevel () in
       try state := execute_source source !state with
       | Error.Error err -> Error.print err
       | Sys.Break -> prerr_endline "Interrupted."
-    done
-  with End_of_file -> ()
+    done;
+    !state
+  with End_of_file -> !state
 
 
 (* Main program *)
@@ -165,7 +156,10 @@ let main =
     let (module Backend : BackendSignature.T) = 
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
-      | _ -> failwith "Other backends not yet supported"
+      | Config.Mcoc output_file -> (module McocCompile.Backend(
+          struct 
+            let output_file = output_file
+          end))
     in
     let (module Shell) = (module Shell.Make(Backend) : Shell.Shell) in
     (* Run and load all the specified files. *)
@@ -175,5 +169,6 @@ let main =
     in
     let state = Shell.initialize () in
     let state = List.fold_left execute_file state !file_queue in
-    if !Config.interactive_shell then toplevel Shell.execute_source state
+    let state = if !Config.interactive_shell then toplevel Shell.execute_source state else state in
+    Shell.finalize state
   with Error.Error err -> Error.print err ; exit 1

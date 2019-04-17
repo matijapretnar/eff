@@ -1,8 +1,5 @@
-module type Formatters = sig
-  val warnings : Format.formatter
-  val response : Format.formatter
-  val output : Format.formatter
-  val printing : bool
-end 
+module type BackendParameters = sig
+  val output_file : string
+end
 
-module Backend (F : Formatters) : BackendSignature.T
+module Backend (P : BackendParameters) : BackendSignature.T

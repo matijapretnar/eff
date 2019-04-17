@@ -7,20 +7,12 @@ let protected =
   ; "private"; "rec"; "sig"; "struct"; "then"; "to"; "true"; "try"; "type"
   ; "val"; "virtual"; "when"; "while"; "with"; "continue" ]
 
-let print_variable ?(warnings = None) var ppf =
+let print_variable var ppf =
   let printer desc n =
     (* [mod] has privileges because otherwise it's stupid *)
     if desc = "mod" then Format.fprintf ppf "_op_%d (* %s *)" n desc else
-    let () =
-      match warnings with
-      | None -> ()
-      | Some warning_ppf -> 
-          if List.mem desc protected then
-            Format.fprintf warning_ppf
-             ("Warning: Protected keyword [%s]. Must be fixed by hand!@.")
-             desc
-          else ()
-    in
+    if List.mem desc protected then
+      Print.warning "Warning: Protected keyword [%s]. Must be fixed by hand!@." desc;
     match desc.[0] with
     | 'a' .. 'z' | '_' -> Format.fprintf ppf "%s" desc
     | '$' -> (
@@ -40,14 +32,11 @@ let print_label lbl ppf = CoreTypes.Label.print lbl ppf
 
 let print_field fld ppf = CoreTypes.Field.print fld ppf
 
-let print_tyname ?(warnings = None) tyname ppf = 
+let print_tyname tyname ppf = 
   let printer desc n =
-    match warnings, desc with
-      | Some warning_ppf, "empty" -> 
-          Format.fprintf warning_ppf
-           ("Warning: [empty] type encountered. Must be fixed by hand!@.") ;
-          Format.fprintf ppf "%s" desc
-      | _ -> Format.fprintf ppf "%s" desc
+    if desc = "empty" then
+      Print.warning "Warning: [empty] type encountered. Must be fixed by hand!@.";
+    Format.fprintf ppf "%s" desc
   in
   CoreTypes.TyName.fold printer tyname
 

@@ -3,40 +3,23 @@ open CoreUtils
 module Core = UntypedSyntax
 module MCOC = McocSyntax
 
-module type Formatters = sig
-  val warnings : Format.formatter
-  val response : Format.formatter
-  val output : Format.formatter
-  val printing : bool
+module type BackendParameters = sig
+  val output_file : string
 end
 
-module Backend (F : Formatters) : BackendSignature.T = struct
+module Backend (P : BackendParameters) : BackendSignature.T = struct
   
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
-  let warnings_ppf = F.warnings
+  type state = {prog: string}
 
-  let response_ppf = F.response
-
-  let output_ppf = F.output
-
-  type state = {printing: bool; mute_depth: int; prog: string}
-
-  let initial_state = {printing= F.printing; mute_depth= 0; prog= ""}
+  let initial_state = {prog= ""}
 
   (* Auxiliary functions *)
   let update state translation =
     let actual_translation = Format.flush_str_formatter () in
-    let _ = 
-      if state.printing then
-        (Format.fprintf response_ppf "%s@?" actual_translation)
-      else
-        ()
-    in
-    {state with prog = state.prog ^ actual_translation}
-
-  let issue_warning txt = 
-    Format.fprintf warnings_ppf "Warning: %s@." txt
+    Format.fprintf !Config.output_formatter "%s@?" actual_translation;
+    {prog = state.prog ^ actual_translation}
 
   let state_ppf = Format.str_formatter
 
@@ -118,15 +101,13 @@ module Backend (F : Formatters) : BackendSignature.T = struct
           (McocSymbol.print_effect eff) (translate_term t2)
     | MCOC.Apply (t1, t2) ->
         translate ppf "@[<hov 2>(%t) @,(%t)@]" (translate_term t1) (translate_term t2)
-    | MCOC.Check t -> 
-        issue_warning 
-          "[#check] commands are ignored when compiling to Multicore OCaml."
+    | MCOC.Check t ->
+        Print.warning "[#check] commands are ignored when compiling to Multicore OCaml."
 
   and translate_pattern p ppf =
     match p with
     | MCOC.PVar x ->
-        translate ppf "%t"
-          (McocSymbol.print_variable ~warnings:(Some warnings_ppf) x)
+        translate ppf "%t" (McocSymbol.print_variable x)
     | MCOC.PAs (p, x) ->
         translate ppf "%t as %t"
           (translate_pattern p) (McocSymbol.print_variable x)
@@ -155,10 +136,7 @@ module Backend (F : Formatters) : BackendSignature.T = struct
         translate ppf "@[<h>(%t ->@ %t)@]"
           (translate_type t1) (translate_type t2)
     | MCOC.TyBasic b -> translate ppf "%s" b
-    | MCOC.TyApply (t, []) -> 
-        translate ppf "%t"
-        (* we warn when the empty type is translated *)    
-        (McocSymbol.print_tyname ~warnings:(Some warnings_ppf) t)
+    | MCOC.TyApply (t, []) -> translate ppf "%t" (McocSymbol.print_tyname t)
     | MCOC.TyApply (t, ts) ->
         translate ppf "(%t) %t"
           (Print.sequence ", " translate_type ts) (McocSymbol.print_tyname t)
@@ -294,8 +272,7 @@ module Backend (F : Formatters) : BackendSignature.T = struct
      (translate_term t))
 
   let process_type_of state c ty = 
-    issue_warning 
-      "[#typeof] commands are ignored when compiling to Multicore OCaml." ;
+    Print.warning "[#typeof] commands are ignored when compiling to Multicore OCaml.";
     state
 
   let process_def_effect state (eff, (ty1, ty2)) =
@@ -320,12 +297,9 @@ module Backend (F : Formatters) : BackendSignature.T = struct
     match Assoc.lookup f McocExternal.values with
       | None -> Error.runtime "Unknown external symbol %s." f
       | Some (McocExternal.Unknown as unknown) ->
-          let warning_text = 
-            Printf.sprintf
-              ("External symbol %s cannot be compiled. It has been replaced "
-              ^^ "with [failwith \"Unknown external symbol %s.\"].") f f
-          in
-          issue_warning warning_text;
+          Print.warning 
+            ("External symbol %s cannot be compiled. It has been replaced "
+              ^^ "with [failwith \"Unknown external symbol %s.\"].") f f;
           let translation = translate_external x f unknown state_ppf in
           update state translation
       | Some ((McocExternal.Exists s) as known) ->
@@ -338,6 +312,10 @@ module Backend (F : Formatters) : BackendSignature.T = struct
     let translation = translate_tydefs tydefs' state_ppf in
     update state translation
 
-  let finalize state = Format.fprintf output_ppf "%s" state.prog
+  let finalize state =
+    let channel = open_out P.output_file in
+    let output_ppf = Format.formatter_of_out_channel channel in
+    Format.fprintf output_ppf "%s" state.prog;
+    close_out channel
 
 end
