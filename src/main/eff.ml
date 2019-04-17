@@ -10,7 +10,6 @@ McocCompile.Backend(
     let printing = true
   end)
     
-module Shell = Shell.Make(Runtime.Backend)
 (* A list of files to be loaded and run. *)
 type use_file = Run of string | Load of string
 
@@ -35,6 +34,9 @@ let options =
     ; ( "--no-wrapper"
       , Arg.Unit (fun () -> Config.wrapper := None)
       , " Do not use a command-line wrapper" )
+    ; ( "--compile-multicore-ocaml"
+      , Arg.String (fun filename -> Config.backend := Mcoc filename)
+      , "<file> Compile the Eff code into a Multicore OCaml file <file>")
     ; ("--no-types", Arg.Set Config.disable_typing, " Disable typechecking")
     ; ("--ascii", Arg.Set Config.ascii, " Use ASCII output")
     ; ( "-v"
@@ -107,7 +109,7 @@ let read_toplevel () =
 
 
 (* Interactive toplevel *)
-let toplevel st =
+let toplevel execute_source state =
   let eof =
     match Sys.os_type with
     | "Unix" | "Cygwin" -> "Ctrl-D"
@@ -117,11 +119,11 @@ let toplevel st =
   Format.fprintf !Config.output_formatter "eff %s@." Config.version;
   Format.fprintf !Config.output_formatter "[Type %s to exit or #help;; for help.]@." eof;
   try
-    let st = ref st in
+    let state = ref state in
     Sys.catch_break true ;
     while true do
       let source = read_toplevel () in
-      try st := Shell.execute_source source !st with
+      try state := execute_source source !state with
       | Error.Error err -> Error.print err
       | Sys.Break -> prerr_endline "Interrupted."
     done
@@ -160,6 +162,12 @@ let main =
       in
       enqueue_file (Load f) ) ;
   try
+    let (module Backend : BackendSignature.T) = 
+      match !Config.backend with
+      | Config.Runtime -> (module Runtime.Backend)
+      | _ -> failwith "Other backends not yet supported"
+    in
+    let (module Shell) = (module Shell.Make(Backend) : Shell.Shell) in
     (* Run and load all the specified files. *)
     let execute_file env = function
       | Run filename -> Shell.execute_file filename env
@@ -167,5 +175,5 @@ let main =
     in
     let state = Shell.initialize () in
     let state = List.fold_left execute_file state !file_queue in
-    if !Config.interactive_shell then toplevel state
+    if !Config.interactive_shell then toplevel Shell.execute_source state
   with Error.Error err -> Error.print err ; exit 1

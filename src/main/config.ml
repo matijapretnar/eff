@@ -9,6 +9,12 @@ type pervasives =
 
 let pervasives_file = ref PervasivesDefault
 
+type backend =
+  | Runtime
+  | Mcoc of string
+
+let backend = ref Runtime
+
 let disable_typing = ref false
 
 let ascii = ref false
