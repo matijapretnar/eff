@@ -298,11 +298,6 @@ module Backend (F : Formatters) : BackendSignature.T = struct
       "[#typeof] commands are ignored when compiling to Multicore OCaml." ;
     state
 
-  let process_reset state = 
-    issue_warning 
-      "[#reset] commands are ignored when compiling to Multicore OCaml." ;
-    state
-
   let process_def_effect state (eff, (ty1, ty2)) =
     let ty1' = MCOC.of_type ty1 in
     let ty2' = MCOC.of_type ty2 in
