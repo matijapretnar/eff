@@ -1,7 +1,7 @@
 (* Evaluation of the intermediate language, big step. *)
 open CoreUtils
 module Core = UntypedSyntax
-module MCOC = McocSyntax
+module Multicore = MulticoreSyntax
 
 module type BackendParameters = sig
   val output_file : string
@@ -42,7 +42,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     sequence
 
   let translate_field translator sep (f, v) ppf =
-    translate ppf "%t %s %t" (McocSymbol.print_field f) sep (translator v)
+    translate ppf "%t %s %t" (MulticoreSymbol.print_field f) sep (translator v)
   
   let translate_tuple translator lst ppf =
     match lst with
@@ -61,123 +61,123 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
 
   let rec translate_term t ppf =
     match t with
-    | MCOC.Var x -> translate ppf "%t" (McocSymbol.print_variable x)
-    | MCOC.Const c -> translate ppf "%t" (Const.print c)
-    | MCOC.Annotated (t, ty) -> 
+    | Multicore.Var x -> translate ppf "%t" (MulticoreSymbol.print_variable x)
+    | Multicore.Const c -> translate ppf "%t" (Const.print c)
+    | Multicore.Annotated (t, ty) -> 
         translate ppf "(%t : %t)" (translate_term t) (translate_type ty)
-    | MCOC.Tuple lst -> translate ppf "%t" (translate_tuple translate_term lst)
-    | MCOC.Record assoc ->
+    | Multicore.Tuple lst -> translate ppf "%t" (translate_tuple translate_term lst)
+    | Multicore.Record assoc ->
         translate ppf "%t" (translate_record translate_term "=" assoc)
-    | MCOC.Variant (lbl, None) when lbl = CoreTypes.nil -> translate ppf "[]"
-    | MCOC.Variant (lbl, None) -> translate ppf "%t" (McocSymbol.print_label lbl)
-    | MCOC.Variant (lbl, Some (MCOC.Tuple [hd; tl])) when lbl = CoreTypes.cons ->
+    | Multicore.Variant (lbl, None) when lbl = CoreTypes.nil -> translate ppf "[]"
+    | Multicore.Variant (lbl, None) -> translate ppf "%t" (MulticoreSymbol.print_label lbl)
+    | Multicore.Variant (lbl, Some (Multicore.Tuple [hd; tl])) when lbl = CoreTypes.cons ->
         translate ppf "@[<hov>(%t::%t)@]"
           (translate_term hd) (translate_term tl)
-    | MCOC.Variant (lbl, Some t) ->
+    | Multicore.Variant (lbl, Some t) ->
         translate ppf "(%t @[<hov>%t@])" 
-          (McocSymbol.print_label lbl) (translate_term t)
-    | MCOC.Lambda a -> translate ppf "@[<hv 2>fun %t@]" (translate_abstraction a)
-    | MCOC.Function lst ->
+          (MulticoreSymbol.print_label lbl) (translate_term t)
+    | Multicore.Lambda a -> translate ppf "@[<hv 2>fun %t@]" (translate_abstraction a)
+    | Multicore.Function lst ->
         translate ppf "@[<hv>(function @, | %t)@]"
           (translate_sequence "@, | " translate_case lst) 
-    | MCOC.Effect eff -> translate ppf "%t" (McocSymbol.print_effect eff)
-    | MCOC.Let (lst, t) ->
+    | Multicore.Effect eff -> translate ppf "%t" (MulticoreSymbol.print_effect eff)
+    | Multicore.Let (lst, t) ->
         translate ppf "@[<hv>@[<hv>%tin@] @,%t@]"
           (translate_let lst) (translate_term t)
-    | MCOC.LetRec (lst, t) ->
+    | Multicore.LetRec (lst, t) ->
         translate ppf "@[<hv>@[<hv>%tin@] @,%t@]"
           (translate_let_rec lst) (translate_term t)
-    | MCOC.Match (t, []) ->
+    | Multicore.Match (t, []) ->
         (* Absurd case *)
         translate ppf 
           ("@[<hv>(match %t with | _ ->"
           ^^ " failwith \"void successfully matched\")@]")
           (translate_term t) 
-    | MCOC.Match (t, lst) ->
+    | Multicore.Match (t, lst) ->
         translate ppf "@[<hv>(match %t with@, | %t)@]"
           (translate_term t) (translate_sequence "@, | " translate_case lst)
-    | MCOC.Apply (MCOC.Effect eff, (MCOC.Lambda _  as t2)) ->
+    | Multicore.Apply (Multicore.Effect eff, (Multicore.Lambda _  as t2)) ->
         translate ppf "perform (%t (%t))"
-          (McocSymbol.print_effect eff) (translate_term t2)
-    | MCOC.Apply (MCOC.Effect eff, t2) ->
+          (MulticoreSymbol.print_effect eff) (translate_term t2)
+    | Multicore.Apply (Multicore.Effect eff, t2) ->
         translate ppf "perform (%t %t)"
-          (McocSymbol.print_effect eff) (translate_term t2)
-    | MCOC.Apply (t1, t2) ->
+          (MulticoreSymbol.print_effect eff) (translate_term t2)
+    | Multicore.Apply (t1, t2) ->
         translate ppf "@[<hov 2>(%t) @,(%t)@]" (translate_term t1) (translate_term t2)
-    | MCOC.Check t ->
+    | Multicore.Check t ->
         Print.warning "[#check] commands are ignored when compiling to Multicore OCaml."
 
   and translate_pattern p ppf =
     match p with
-    | MCOC.PVar x ->
-        translate ppf "%t" (McocSymbol.print_variable x)
-    | MCOC.PAs (p, x) ->
+    | Multicore.PVar x ->
+        translate ppf "%t" (MulticoreSymbol.print_variable x)
+    | Multicore.PAs (p, x) ->
         translate ppf "%t as %t"
-          (translate_pattern p) (McocSymbol.print_variable x)
-    | MCOC.PAnnotated (p, ty) -> 
+          (translate_pattern p) (MulticoreSymbol.print_variable x)
+    | Multicore.PAnnotated (p, ty) -> 
         translate ppf "(%t : %t)" (translate_pattern p) (translate_type ty)
-    | MCOC.PConst c -> translate ppf "%t" (Const.print c)
-    | MCOC.PTuple lst -> 
+    | Multicore.PConst c -> translate ppf "%t" (Const.print c)
+    | Multicore.PTuple lst -> 
         translate ppf "%t" (translate_tuple translate_pattern lst)
-    | MCOC.PRecord assoc ->
+    | Multicore.PRecord assoc ->
         translate ppf "%t" (translate_record translate_pattern "=" assoc)
-    | MCOC.PVariant (lbl, None) when lbl = CoreTypes.nil -> translate ppf "[]"
-    | MCOC.PVariant (lbl, None) -> 
-        translate ppf "%t" (McocSymbol.print_label lbl)
-    | MCOC.PVariant (lbl, Some (MCOC.PTuple [hd; tl]))
+    | Multicore.PVariant (lbl, None) when lbl = CoreTypes.nil -> translate ppf "[]"
+    | Multicore.PVariant (lbl, None) -> 
+        translate ppf "%t" (MulticoreSymbol.print_label lbl)
+    | Multicore.PVariant (lbl, Some (Multicore.PTuple [hd; tl]))
       when lbl = CoreTypes.cons ->
       translate ppf "@[<hov>(%t::%t)@]"
         (translate_pattern hd) (translate_pattern tl)
-    | MCOC.PVariant (lbl, Some p) ->
+    | Multicore.PVariant (lbl, Some p) ->
         translate ppf "(%t @[<hov>%t@])"
-          (McocSymbol.print_label lbl) (translate_pattern p)
-    | MCOC.PNonbinding -> translate ppf "_"
+          (MulticoreSymbol.print_label lbl) (translate_pattern p)
+    | Multicore.PNonbinding -> translate ppf "_"
 
   and translate_type ty ppf =
     match ty with
-    | MCOC.TyArrow (t1, t2) ->
+    | Multicore.TyArrow (t1, t2) ->
         translate ppf "@[<h>(%t ->@ %t)@]"
           (translate_type t1) (translate_type t2)
-    | MCOC.TyBasic b -> translate ppf "%s" b
-    | MCOC.TyApply (t, []) -> translate ppf "%t" (McocSymbol.print_tyname t)
-    | MCOC.TyApply (t, ts) ->
+    | Multicore.TyBasic b -> translate ppf "%s" b
+    | Multicore.TyApply (t, []) -> translate ppf "%t" (MulticoreSymbol.print_tyname t)
+    | Multicore.TyApply (t, ts) ->
         translate ppf "(%t) %t"
-          (Print.sequence ", " translate_type ts) (McocSymbol.print_tyname t)
-    | MCOC.TyParam p -> translate ppf "%t" (McocSymbol.print_typaram p)
-    | MCOC.TyTuple [] -> translate ppf "unit"
-    | MCOC.TyTuple ts ->
+          (Print.sequence ", " translate_type ts) (MulticoreSymbol.print_tyname t)
+    | Multicore.TyParam p -> translate ppf "%t" (MulticoreSymbol.print_typaram p)
+    | Multicore.TyTuple [] -> translate ppf "unit"
+    | Multicore.TyTuple ts ->
         translate ppf "@[<hov>(%t)@]" (Print.sequence " * " translate_type ts)
 
   and translate_tydef (name, (params, tydef)) ppf =
     let translate_def tydef ppf =
       match tydef with
-      | MCOC.TyDefRecord assoc -> 
+      | Multicore.TyDefRecord assoc -> 
           translate ppf "%t" (translate_record translate_type ":" assoc)
-      | MCOC.TyDefSum assoc ->
+      | Multicore.TyDefSum assoc ->
           let lst = Assoc.to_list assoc in
           let cons_translator ty_opt ppf =
             match ty_opt with
-            | (lbl, None) -> translate ppf "%t" (McocSymbol.print_label lbl)
+            | (lbl, None) -> translate ppf "%t" (MulticoreSymbol.print_label lbl)
             | (lbl, Some ty) ->
                 translate ppf "%t of %t"
-                  (McocSymbol.print_label lbl) (translate_type ty)
+                  (MulticoreSymbol.print_label lbl) (translate_type ty)
           in
           translate ppf "@[<hov>%t@]"
             (translate_sequence "@, | " cons_translator lst)
-      | MCOC.TyDefInline ty -> translate ppf "%t" (translate_type ty)
+      | Multicore.TyDefInline ty -> translate ppf "%t" (translate_type ty)
     in
     match params with
     | [] ->
         translate ppf "@[type %t = %t@]@."
-          (McocSymbol.print_tyname name) (translate_def tydef)
+          (MulticoreSymbol.print_tyname name) (translate_def tydef)
     | lst ->
         translate ppf "@[type (%t) %t = %t@]@."
-          (translate_sequence ", " McocSymbol.print_typaram params)
-          (McocSymbol.print_tyname name) (translate_def tydef)
+          (translate_sequence ", " MulticoreSymbol.print_typaram params)
+          (MulticoreSymbol.print_tyname name) (translate_def tydef)
 
   and translate_def_effect (eff, (ty1, ty2)) ppf =
     translate ppf "@[effect %t : %t ->@ %t@]@."
-      (McocSymbol.print_effect eff) (translate_type ty1) (translate_type ty2) 
+      (MulticoreSymbol.print_effect eff) (translate_type ty1) (translate_type ty2) 
 
   and translate_top_let defs ppf =
     translate ppf "@[<hv>%t@]@." (translate_let defs)
@@ -187,12 +187,12 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
 
   and translate_external name symbol_name translation ppf =
     match translation with
-    | McocExternal.Unknown ->
+    | MulticoreExternal.Unknown ->
         translate ppf "let %t = failwith \"Unknown external symbol %s.\"@."
-          (McocSymbol.print_variable name) symbol_name
-    | McocExternal.Exists t ->
+          (MulticoreSymbol.print_variable name) symbol_name
+    | MulticoreExternal.Exists t ->
         translate ppf "let %t = %s@."
-        (McocSymbol.print_variable name) t
+        (MulticoreSymbol.print_variable name) t
 
   and translate_tydefs tydefs ppf = 
     translate ppf "%t@." (translate_sequence "@, and " translate_tydef tydefs)
@@ -226,7 +226,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
       | (name, abs) :: tl ->
           let (p_lst, t) = abs_to_multiarg_abs abs in
           translate ppf "@[<hv 2>and %t %t = @,%t@] @,%t"
-            (McocSymbol.print_variable name)
+            (MulticoreSymbol.print_variable name)
             (translate_sequence " " translate_pattern p_lst)
             (translate_term t) (sequence tl)
     in
@@ -236,32 +236,32 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
       | (name, abs) :: tl ->
           let (p_lst, t) = abs_to_multiarg_abs abs in
           translate ppf "@[<hv 2>let rec %t %t = @,%t@] @,%t"
-            (McocSymbol.print_variable name)
+            (MulticoreSymbol.print_variable name)
             (translate_sequence " " translate_pattern p_lst) 
             (translate_term t) (sequence tl)
 
   and abs_to_multiarg_abs (p, t) =
     match t with
-    | MCOC.Lambda abs -> 
+    | Multicore.Lambda abs -> 
         let p_list, t' = abs_to_multiarg_abs abs in
         (p :: p_list, t')
     | _ -> ([p], t)
 
   and translate_case case ppf =
     match case with
-    | MCOC.ValueClause abs ->
+    | Multicore.ValueClause abs ->
         translate ppf "@[<hv 2>%t@]" (translate_abstraction abs)
-    | MCOC.EffectClause (eff, (p1, p2, t)) ->
-        if p2 = MCOC.PNonbinding then
+    | Multicore.EffectClause (eff, (p1, p2, t)) ->
+        if p2 = Multicore.PNonbinding then
           translate ppf 
           ( "@[<hv 2>effect (%t %t) %t -> @,%t@]" )
-          (McocSymbol.print_effect eff) (translate_pattern p1)
+          (MulticoreSymbol.print_effect eff) (translate_pattern p1)
           (translate_pattern p2) (translate_term t)
         else
           translate ppf 
             ( "@[<hv 2>effect (%t %t) %t ->@," ^^
               "(let %t x = continue (Obj.clone_continuation %t) x in @,%t)@]" )
-            (McocSymbol.print_effect eff) (translate_pattern p1)
+            (MulticoreSymbol.print_effect eff) (translate_pattern p1)
             (translate_pattern p2) (translate_pattern p2)
             (translate_pattern p2) (translate_term t)
 
@@ -269,7 +269,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
   let process_computation state c ty = 
-    let t = MCOC.of_computation c in
+    let t = Multicore.of_computation c in
     update state (translate state_ppf
       "let _ = @.@[<hv>(_ocaml_tophandler) (fun _ -> @,%t@,)@];;@."
      (translate_term t))
@@ -279,38 +279,38 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     state
 
   let process_def_effect state (eff, (ty1, ty2)) =
-    let ty1' = MCOC.of_type ty1 in
-    let ty2' = MCOC.of_type ty2 in
+    let ty1' = Multicore.of_type ty1 in
+    let ty2' = Multicore.of_type ty2 in
     let translation = translate_def_effect (eff, (ty1', ty2')) state_ppf in
     update state translation
 
   let process_top_let state defs vars =
-    let converter (p, c) = (MCOC.of_pattern p, MCOC.of_computation c) in
+    let converter (p, c) = (Multicore.of_pattern p, Multicore.of_computation c) in
     let defs' = List.map converter defs in
     let translation = translate_top_let defs' state_ppf in
     update state translation
 
   let process_top_let_rec state defs vars =
-    let converter (p, c) = (MCOC.of_pattern p, MCOC.of_computation c) in
+    let converter (p, c) = (Multicore.of_pattern p, Multicore.of_computation c) in
     let defs' = Assoc.map converter defs |> Assoc.to_list in
     let translation = translate_top_let_rec defs' state_ppf in
     update state translation
 
   let process_external state (x, ty, f) =
-    match Assoc.lookup f McocExternal.values with
+    match Assoc.lookup f MulticoreExternal.values with
       | None -> Error.runtime "Unknown external symbol %s." f
-      | Some (McocExternal.Unknown as unknown) ->
+      | Some (MulticoreExternal.Unknown as unknown) ->
           Print.warning 
             ("External symbol %s cannot be compiled. It has been replaced "
               ^^ "with [failwith \"Unknown external symbol %s.\"].") f f;
           let translation = translate_external x f unknown state_ppf in
           update state translation
-      | Some ((McocExternal.Exists s) as known) ->
+      | Some ((MulticoreExternal.Exists s) as known) ->
           let translation = translate_external x f known state_ppf in
           update state translation
 
   let process_tydef state tydefs = 
-    let converter (ty_params, tydef) = (ty_params, MCOC.of_tydef tydef) in
+    let converter (ty_params, tydef) = (ty_params, Multicore.of_tydef tydef) in
     let tydefs' = Assoc.map converter tydefs |> Assoc.to_list in
     let translation = translate_tydefs tydefs' state_ppf in
     update state translation

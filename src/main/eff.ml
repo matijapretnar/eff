@@ -21,7 +21,7 @@ let options =
       , Arg.Unit (fun () -> Config.wrapper := None)
       , " Do not use a command-line wrapper" )
     ; ( "--compile-multicore-ocaml"
-      , Arg.String (fun filename -> Config.backend := Mcoc filename)
+      , Arg.String (fun filename -> Config.backend := Multicore filename)
       , "<file> Compile the Eff code into a Multicore OCaml file <file>")
     ; ("--ascii", Arg.Set Config.ascii, " Use ASCII output")
     ; ( "-v"
@@ -136,14 +136,15 @@ let main =
       let f =
         match !Config.backend with
         | Config.Runtime -> Filename.concat Local.effdir "pervasives.eff"
-        | Config.Mcoc _ -> Filename.concat Local.effdir "mcocPervasives.eff"
+        | Config.Multicore _ ->
+            Filename.concat Local.effdir "multicorePervasives.eff"
       in
       enqueue_file (Load f) ) ;
   try
     let (module Backend : BackendSignature.T) = 
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
-      | Config.Mcoc output_file -> (module McocCompile.Backend(
+      | Config.Multicore output_file -> (module MulticoreCompile.Backend(
           struct 
             let output_file = output_file
           end))

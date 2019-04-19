@@ -10,7 +10,7 @@ let pervasives_file = ref PervasivesDefault
 
 type backend =
   | Runtime
-  | Mcoc of string
+  | Multicore of string
 
 let backend = ref Runtime
 

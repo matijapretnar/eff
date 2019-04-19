@@ -8,7 +8,7 @@ type label = CoreTypes.Label.t
 
 type field = CoreTypes.Field.t
 
-(** Types used by MCOcaml. *)
+(** Types used by MulticoreOcaml. *)
 type ty =
   | TyApply of CoreTypes.TyName.t * ty list
   | TyParam of CoreTypes.TyParam.t

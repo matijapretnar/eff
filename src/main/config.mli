@@ -22,7 +22,7 @@ val pervasives_file : pervasives ref
 
 type backend =
   | Runtime
-  | Mcoc of string
+  | Multicore of string
 
 val backend : backend ref
 

@@ -31,5 +31,5 @@ Executable eff
   Path:           src
   BuildTools:     ocamlbuild,menhir
   MainIs:         main/eff.ml
-  DataFiles:      ../pervasives.eff, ../src/backends/MCOcaml/mcocPervasives.eff
+  DataFiles:      ../pervasives.eff, ../src/backends/multicore/multicorePervasives.eff
   CompiledObject: best
