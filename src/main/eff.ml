@@ -10,11 +10,7 @@ let enqueue_file filename = file_queue := filename :: !file_queue
 (* Command-line options *)
 let options =
   Arg.align
-    [ ( "--pervasives"
-      , Arg.String
-          (fun str -> Config.pervasives_file := Config.PervasivesFile str)
-      , " Specify the pervasives.eff file" )
-    ; ( "--no-pervasives"
+    [ ( "--no-pervasives"
       , Arg.Unit (fun () -> Config.pervasives_file := Config.PervasivesNone)
       , " Do not load pervasives.eff" )
     ; ( "--wrapper"
@@ -140,16 +136,11 @@ let main =
   (* Load the pervasives. *)
   ( match !Config.pervasives_file with
   | Config.PervasivesNone -> ()
-  | Config.PervasivesFile f -> enqueue_file (Load f)
   | Config.PervasivesDefault ->
-      (* look for pervasives next to the executable and in the installation
-      directory if they are not there *)
-      let pervasives_development =
-        Filename.concat (Filename.dirname Sys.argv.(0)) "pervasives.eff"
-      in
       let f =
-        if Sys.file_exists pervasives_development then pervasives_development
-        else Filename.concat Local.effdir "pervasives.eff"
+        match !Config.backend with
+        | Config.Runtime -> Filename.concat Local.effdir "pervasives.eff"
+        | Config.Mcoc _ -> Filename.concat Local.effdir "mcocPervasives.eff"
       in
       enqueue_file (Load f) ) ;
   try

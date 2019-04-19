@@ -16,8 +16,6 @@ type pervasives =
   (* do not use pervasives *)
   | PervasivesDefault
   (* look in the default locations *)
-  | PervasivesFile of string
-  (* look for pervasives in a specific location *)
 
 val pervasives_file : pervasives ref
 (** Location of the pervasives file *)

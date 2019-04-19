@@ -5,7 +5,6 @@ let version = "5.0"
 type pervasives =
   | PervasivesNone
   | PervasivesDefault
-  | PervasivesFile of string
 
 let pervasives_file = ref PervasivesDefault
 
