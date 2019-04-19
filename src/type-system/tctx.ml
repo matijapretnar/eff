@@ -202,8 +202,9 @@ let extend_tydefs ~loc tydefs =
   let extend_tydef (name, (params, ty)) =
     check_shadowing ~loc ty ;
     match Assoc.lookup name !global with
-    | Some _ -> Error.typing ~loc
-        "Type %t already defined." (CoreTypes.TyName.print name)
+    | Some _ ->
+        Error.typing ~loc "Type %t already defined."
+          (CoreTypes.TyName.print name)
     | None -> global := Assoc.update name (params, ty) !global
   in
   try

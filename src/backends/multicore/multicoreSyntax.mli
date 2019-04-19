@@ -19,7 +19,7 @@ type ty =
 type tydef =
   | TyDefRecord of (CoreTypes.Field.t, ty) Assoc.t
   | TyDefSum of (CoreTypes.Label.t, ty option) Assoc.t
-  | TyDefInline of ty   
+  | TyDefInline of ty
 
 (** Patterns *)
 type pattern =
@@ -33,7 +33,7 @@ type pattern =
   | PNonbinding
 
 (** Pure expressions *)
-type term = 
+type term =
   | Var of variable
   | Const of Const.t
   | Annotated of term * ty

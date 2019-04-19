@@ -15,14 +15,13 @@ type pervasives =
   | PervasivesNone
   (* do not use pervasives *)
   | PervasivesDefault
-  (* look in the default locations *)
+
+(* look in the default locations *)
 
 val pervasives_file : pervasives ref
 (** Location of the pervasives file *)
 
-type backend =
-  | Runtime
-  | Multicore of string
+type backend = Runtime | Multicore of string
 
 val backend : backend ref
 
