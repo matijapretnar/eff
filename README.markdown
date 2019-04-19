@@ -65,7 +65,7 @@ This is the easiest way to install Eff. Follow these steps:
 
 3. Run
 
-        opam pin add -k git eff git@github.com:matijapretnar/eff.git
+        opam pin add -k git eff https://github.com/matijapretnar/eff.git
 
    OPAM will download and build the necessary dependencies first, then download
    and build Eff itself.
@@ -74,7 +74,7 @@ This is the easiest way to install Eff. Follow these steps:
 
 To compile Eff manually, first clone the GitHub repository
 
-    git clone git@github.com:matijapretnar/eff.git
+    git clone https://github.com/matijapretnar/eff.git
     cd eff
 
 and run
