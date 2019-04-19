@@ -14,8 +14,6 @@ type backend =
 
 let backend = ref Runtime
 
-let disable_typing = ref false
-
 let ascii = ref false
 
 let interactive_shell = ref true

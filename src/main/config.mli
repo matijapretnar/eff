@@ -26,9 +26,6 @@ type backend =
 
 val backend : backend ref
 
-val disable_typing : bool ref
-(** Should type-checking be disabled? *)
-
 val ascii : bool ref
 (** Should we use ASCII instead of Unicode for printing out types? *)
 

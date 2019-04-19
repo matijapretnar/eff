@@ -23,7 +23,6 @@ let options =
     ; ( "--compile-multicore-ocaml"
       , Arg.String (fun filename -> Config.backend := Mcoc filename)
       , "<file> Compile the Eff code into a Multicore OCaml file <file>")
-    ; ("--no-types", Arg.Set Config.disable_typing, " Disable typechecking")
     ; ("--ascii", Arg.Set Config.ascii, " Use ASCII output")
     ; ( "-v"
       , Arg.Unit
@@ -31,9 +30,6 @@ let options =
             print_endline ("eff " ^ Config.version ^ "(" ^ Sys.os_type ^ ")") ;
             exit 0 )
       , " Print version information and exit" )
-    ; ( "-n"
-      , Arg.Clear Config.interactive_shell
-      , " Do not run the interactive toplevel" )
     ; ( "-l"
       , Arg.String (fun str -> enqueue_file (Load str))
       , "<file> Load <file> into the initial environment" )

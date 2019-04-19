@@ -10,8 +10,6 @@ type ty =
 
 and handler_ty = {value: ty; finally: ty}
 
-val universal_ty : ty
-
 val int_ty : ty
 
 val string_ty : ty
