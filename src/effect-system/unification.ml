@@ -1,6 +1,7 @@
+open CoreUtils
 open Types
 open Typed
-module STyParams = Set.Make (Params.Ty)
+module STyParams = Set.Make (CoreTypes.TyParam)
 
 let set_of_list =
   List.fold_left (fun acc x -> STyParams.add x acc) STyParams.empty
@@ -15,13 +16,13 @@ let rec print_c_list = function
 let rec print_var_list = function
   | [] -> Print.debug "---------------------"
   | e :: l ->
-      Print.debug "%t" (Params.Ty.print e) ;
+      Print.debug "%t" (CoreTypes.TyParam.print e) ;
       print_var_list l
 
 
 let rec get_skel_of_tyvar tyvar clist =
   Print.debug "getting skeleton of tyvar from list" ;
-  Print.debug " TyParam : %t" (Params.Ty.print tyvar) ;
+  Print.debug " TyParam : %t" (CoreTypes.TyParam.print tyvar) ;
   Print.debug "Constraint list :" ;
   print_c_list clist ;
   get_skel_of_tyvar_ tyvar clist
@@ -68,7 +69,7 @@ let rec fix_union_find fixpoint c_list =
       | _ -> [] )
     | _ -> []
   in
-  let new_fixpoint = fixpoint @ OldUtils.flatten_map mapper c_list in
+  let new_fixpoint = fixpoint @ concat_map mapper c_list in
   let sort_new_fixpoint = List.sort compare new_fixpoint in
   if sort_new_fixpoint = fixpoint then sort_new_fixpoint
   else fix_union_find sort_new_fixpoint c_list
@@ -252,12 +253,12 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
   | {effect_set= s1; row= ParamRow v1}, {effect_set= s2; row= ParamRow v2} ->
       if Types.EffectSet.is_empty s1 then (sub, cons :: paused, rest_queue)
       else
-        let omega' = Params.DirtCoercion.fresh () in
+        let omega' = CoreTypes.DirtCoercionParam.fresh () in
         let diff_set = Types.EffectSet.diff s1 s2 in
         let union_set = Types.EffectSet.union s1 s2 in
         let k0 = v2 in
         let v0 = let open Types in
-                {effect_set= diff_set; row= ParamRow (Params.Dirt.fresh ())} in
+                {effect_set= diff_set; row= ParamRow (CoreTypes.DirtParam.fresh ())} in
         let k1' = omega in
         let v1' = Typed.UnionDirt (s1, DirtCoercionVar omega') in
         let sub' = Substitution.add_dirt_substitution_e k0 v0 |> Substitution.add_dirt_var_coercion k1' v1'
@@ -295,7 +296,7 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
       (Substitution.add_dirt_var_coercion k v sub, paused, rest_queue)
   (* ω : O₁ <= O₂ ∪ δ₂ *)
   | {effect_set= s1; row= EmptyRow}, {effect_set= s2; row= ParamRow v2} ->
-      let v2' = Params.Dirt.fresh () in
+      let v2' = CoreTypes.DirtParam.fresh () in
       let k0 = omega in 
       let v0 = Typed.UnionDirt
                 ( s1

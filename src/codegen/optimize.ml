@@ -329,8 +329,8 @@ and optimize_sub_expr st e =
     match e with
     (*
           | Tuple of expression list
-          | Record of (OldUtils.field, expression) OldUtils.assoc
-          | Variant of OldUtils.label * expression option
+          | Record of (CoreTypes.field, expression) CoreTypes.assoc
+          | Variant of CoreTypes.label * expression option
           *)
     | BigLambdaTy (ty_var, sk, e) ->
         let st' =
@@ -488,15 +488,15 @@ and reduce_expr st e =
           | BuiltIn of string * int
           | Const of Const.t
           | Tuple of expression list
-          | Record of (OldUtils.field, expression) OldUtils.assoc
-          | Variant of OldUtils.label * expression option
+          | Record of (CoreTypes.field, expression) CoreTypes.assoc
+          | Variant of CoreTypes.label * expression option
           | Lambda of (pattern * Types.target_ty * computation)
           | Handler of handler
-          | BigLambdaTy of Params.Ty.t * skeleton * expression
-          | BigLambdaDirt of Params.Dirt.t * expression  
-          | BigLambdaSkel of Params.Skel.t * expression
-          | LambdaTyCoerVar of Params.TyCoercion.t * Types.ct_ty * expression 
-          | LambdaDirtCoerVar of Params.DirtCoercion.t * Types.ct_dirt * expression 
+          | BigLambdaTy of CoreTypes.TyParam.t * skeleton * expression
+          | BigLambdaDirt of CoreTypes.DirtParam.t * expression  
+          | BigLambdaSkel of CoreTypes.SkelParam.t * expression
+          | LambdaTyCoerVar of CoreTypes.TyCoercionParam.t * Types.ct_ty * expression 
+          | LambdaDirtCoerVar of CoreTypes.DirtCoercionParam.t * Types.ct_dirt * expression 
           | ApplySkelExp of expression * Types.skeleton
           | ApplyTyCoercion of expression * ty_coercion
           | ApplyTyCoercion (e1,ty_co) ->

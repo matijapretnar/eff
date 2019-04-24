@@ -1,11 +1,11 @@
 (** Substitution implementation *)
 
 type t =   
-  { type_param_to_type_coercions: (Params.TyCoercion.t, Typed.ty_coercion) Assoc.t
-  ; type_param_to_type_subs: (Params.Ty.t, Types.target_ty) Assoc.t
-  ; dirt_var_to_dirt_coercions: (Params.DirtCoercion.t, Typed.dirt_coercion) Assoc.t
-  ; dirt_var_to_dirt_subs: (Params.Dirt.t, Types.dirt) Assoc.t
-  ; skel_param_to_skel_subs: (Params.Skel.t, Types.skeleton) Assoc.t
+  { type_param_to_type_coercions: (CoreTypes.TyCoercionParam.t, Typed.ty_coercion) Assoc.t
+  ; type_param_to_type_subs: (CoreTypes.TyParam.t, Types.target_ty) Assoc.t
+  ; dirt_var_to_dirt_coercions: (CoreTypes.DirtCoercionParam.t, Typed.dirt_coercion) Assoc.t
+  ; dirt_var_to_dirt_subs: (CoreTypes.DirtParam.t, Types.dirt) Assoc.t
+  ; skel_param_to_skel_subs: (CoreTypes.SkelParam.t, Types.skeleton) Assoc.t
   }
 
   let empty = 
@@ -311,29 +311,29 @@ let printy ?at_level ppf = Print.print ?at_level ppf
 let print_type_coercion p t ppf =
   Print.print ppf "substitution: ";
   printy ppf "%t :-coertyTotyCoer-> %t"
-    (Params.TyCoercion.print p)
+    (CoreTypes.TyCoercionParam.print p)
     (Typed.print_ty_coercion t)
 
 let print_type_param_to_type p t ppf =
   Print.print ppf "substitution: ";
   printy ppf "%t :-tyvarToTargetty-> %t" 
-    (Params.Ty.print p)
+    (CoreTypes.TyParam.print p)
     (Types.print_target_ty t)
 
 let print_dirt_var_sub p t ppf =
   Print.print ppf "substitution: ";
-  printy ppf "%t :-dirtvarToTargetdirt-> %t" (Params.Dirt.print p)
+  printy ppf "%t :-dirtvarToTargetdirt-> %t" (CoreTypes.DirtParam.print p)
         (Types.print_target_dirt t)
 
 let print_dirt_var_coercion p t ppf =
   Print.print ppf "substitution: ";
   printy ppf "%t :-coertyDirtoDirtCoer-> %t"
-    (Params.DirtCoercion.print p)
+    (CoreTypes.DirtCoercionParam.print p)
     (Typed.print_dirt_coercion t)
 
 let print_skel_param_sub p t ppf =
   Print.print ppf "substitution: ";
-  printy ppf "%t :-skelvarToSkeleton-> %t" (Params.Skel.print p)
+  printy ppf "%t :-skelvarToSkeleton-> %t" (CoreTypes.SkelParam.print p)
         (Types.print_skeleton t)
 
 let print_sub_list ?max_level subs= 

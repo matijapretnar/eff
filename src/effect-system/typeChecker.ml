@@ -4,12 +4,12 @@ open Unification
 
 type state =
   { var_types: (Typed.variable, Types.target_ty) Assoc.t
-  ; ty_params: Params.Ty.t list
-  ; dirt_params: Params.Dirt.t list
-  ; skel_params: Params.Skel.t list
-  ; ty_param_skeletons: (Params.Ty.t, Types.skeleton) Assoc.t
-  ; ty_coer_types: (Params.TyCoercion.t, Types.ct_ty) Assoc.t
-  ; dirt_coer_types: (Params.DirtCoercion.t, Types.ct_dirt) Assoc.t }
+  ; ty_params: CoreTypes.TyParam.t list
+  ; dirt_params: CoreTypes.DirtParam.t list
+  ; skel_params: CoreTypes.SkelParam.t list
+  ; ty_param_skeletons: (CoreTypes.TyParam.t, Types.skeleton) Assoc.t
+  ; ty_coer_types: (CoreTypes.TyCoercionParam.t, Types.ct_ty) Assoc.t
+  ; dirt_coer_types: (CoreTypes.DirtCoercionParam.t, Types.ct_dirt) Assoc.t }
 
 
 let extend_ty_params st ty_var = {st with ty_params= ty_var :: st.ty_params}
@@ -435,7 +435,7 @@ and type_of_handler st h =
     assert (Types.dirty_types_are_equal type_cv ty_op) ;
     eff
   in
-  let handlers_ops = OldUtils.map mapper (Assoc.to_list h.effect_clauses) in
+  let handlers_ops = List.map mapper (Assoc.to_list h.effect_clauses) in
   let handlers_ops_set = Types.EffectSet.of_list handlers_ops in
   let t_cv, d_cv = type_cv in
   let input_dirt = Types.add_effects handlers_ops_set d_cv in

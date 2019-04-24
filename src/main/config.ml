@@ -9,6 +9,13 @@ type pervasives =
 
 let pervasives_file = ref PervasivesDefault
 
+type backend =
+  | Runtime
+  | Ocaml of string
+  | Mcoc of string
+
+let backend = ref Runtime
+
 let disable_typing = ref false
 
 let disable_optimization = ref false
@@ -32,7 +39,3 @@ let explicit_subtyping = ref false
 let output_formatter = ref Format.std_formatter
 
 let error_formatter = ref Format.err_formatter
-
-type backend = MulticoreOCaml | PlainOCaml
-
-let backend = ref PlainOCaml

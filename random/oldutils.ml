@@ -1,4 +1,4 @@
-(** OldUtils.definitions. *)
+(** CoreTypes.definitions. *)
 
 (** Types shared by different modules *)
 
@@ -62,8 +62,6 @@ let rec map f = function
       let y = f x in
       let ys = map f xs in
       y :: ys
-
-let flatten_map f xs = List.flatten (List.map f xs)
 
 (** [option_map f] maps [None] to [None] and [Some x] to [Some (f x)]. *)
 let option_map f = function None -> None | Some x -> Some (f x)

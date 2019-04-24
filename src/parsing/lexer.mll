@@ -39,7 +39,6 @@
 
   let directives = Assoc.of_list [
     ("help", HELP);
-    ("reset", RESET);
     ("quit", QUIT);
     ("use", USE);
   ]

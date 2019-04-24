@@ -48,7 +48,7 @@ let distribution = handler
       (* Distribution of only one value. *)
   | v -> [(v, 1.0)]
       (* Combine possible distributions. *)
-  | effect (Pick p) k -> combine p (continue k true) (continue k false)
+  | effect (Pick p) k -> combine p (k true) (k false)
 ;;
 
 (* The handler computing the expected value of a probabilistic computation
@@ -56,7 +56,7 @@ let distribution = handler
 let expectation = handler
   | v -> v
   | effect (Pick p) k ->
-    p *. (continue k true) +. (1.0 -. p) *. (continue k false)
+    p *. (k true) +. (1.0 -. p) *. (k false)
 ;;
 
 (* Examples. *)
@@ -70,8 +70,8 @@ effect Set: float -> unit
 
 let state = handler
   | y -> (fun _ -> y)
-  | effect Get k -> (fun s -> (continue k s) s)
-  | effect (Set s') k -> (fun _ -> (continue k ()) s')
+  | effect Get k -> (fun s -> (k s) s)
+  | effect (Set s') k -> (fun _ -> (k ()) s')
   | finally g -> g 0.
 ;;
 

@@ -4,22 +4,31 @@ open CoreUtils
 (** Terms *)
 type variable = string
 
-type effect = OldUtils.effect
+type effect = string
+
+type label = string
+
+type field = string
+
+type tyname = string
+
+type typaram = string
+
+type dirtparam = int
 
 type ty = plain_ty located
 
 and plain_ty =
-  | TyApply of OldUtils.tyname * ty list
-      (** [(ty1, ty2, ..., tyn) type_name] *)
-  | TyParam of OldUtils.typaram  (** ['a] *)
+  | TyApply of tyname * ty list  (** [(ty1, ty2, ..., tyn) type_name] *)
+  | TyParam of typaram  (** ['a] *)
   | TyArrow of ty * ty  (** [ty1 -> ty2] *)
   | TyTuple of ty list  (** [ty1 * ty2 * ... * tyn] *)
   | TyHandler of ty * ty  (** [ty1 => ty2] *)
 
 type tydef =
-  | TyRecord of (OldUtils.field, ty) Assoc.t
+  | TyRecord of (field, ty) Assoc.t
       (** [{ field1 : ty1; field2 : ty2; ...; fieldn : tyn }] *)
-  | TySum of (OldUtils.label, ty option) Assoc.t
+  | TySum of (label, ty option) Assoc.t
       (** [Label1 of ty1 | Label2 of ty2 | ... | Labeln of tyn | Label' | Label''] *)
   | TyInline of ty  (** [ty] *)
 
@@ -30,8 +39,8 @@ and plain_pattern =
   | PAnnotated of pattern * ty
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (OldUtils.field, pattern) Assoc.t
-  | PVariant of OldUtils.label * pattern option
+  | PRecord of (field, pattern) Assoc.t
+  | PVariant of label * pattern option
   | PConst of Const.t
   | PNonbinding
 
@@ -45,9 +54,9 @@ and plain_term =
   | Const of Const.t  (** integers, strings, booleans, and floats *)
   | Annotated of term * ty
   | Tuple of term list  (** [(t1, t2, ..., tn)] *)
-  | Record of (OldUtils.field, term) Assoc.t
+  | Record of (field, term) Assoc.t
       (** [{field1 = t1; field2 = t2; ...; fieldn = tn}] *)
-  | Variant of OldUtils.label * term option  (** [Label] or [Label t] *)
+  | Variant of label * term option  (** [Label] or [Label t] *)
   | Lambda of abstraction  (** [fun p1 p2 ... pn -> t] *)
   | Function of abstraction list  (** [function p1 -> t1 | ... | pn -> tn] *)
   | Effect of effect * term  (** [eff], where [eff] is an effect symbol. *)
@@ -74,10 +83,8 @@ and match_case =
   | Val_match of abstraction
   | Eff_match of (effect * abstraction2)
 
-and abstraction = (pattern * term)
+and abstraction = pattern * term
 
-and abstraction2 = (pattern * pattern * term)
+and abstraction2 = pattern * pattern * term
 
-type dirt = DirtParam of OldUtils.dirtparam
-
-type region = RegionParam of OldUtils.regionparam
+type dirt = DirtParam of dirtparam

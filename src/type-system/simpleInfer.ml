@@ -56,12 +56,12 @@ let infer_pattern cstr pp =
   let rec infer {it= p; at= loc} =
     match p with
     | Untyped.PVar x ->
-        let t = if !disable_typing then T.universal_ty else T.fresh_ty () in
+        let t = T.fresh_ty () in
         vars := (x, t) :: !vars ;
         t
     | Untyped.PAnnotated (p, t) ->
         let p_t = infer p in
-        add_ty_constraint cstr loc p_t t;
+        add_ty_constraint cstr loc p_t t ;
         t
     | Untyped.PAs (p, x) ->
         let t = infer p in
@@ -69,24 +69,28 @@ let infer_pattern cstr pp =
         t
     | Untyped.PNonbinding -> T.fresh_ty ()
     | Untyped.PConst const -> ty_of_const const
-    | Untyped.PTuple ps -> T.Tuple (OldUtils.map infer ps)
+    | Untyped.PTuple ps -> T.Tuple (left_to_right_map infer ps)
     | Untyped.PRecord flds -> (
       match Assoc.pop flds with
       | None -> assert false
-      | Some ((fld, _), _) ->
+      | Some ((fld, _), _) -> (
         match Tctx.infer_field fld with
-        | None -> Error.typing ~loc "Unbound record field label %s" fld
+        | None ->
+            Error.typing ~loc "Unbound record field label %t"
+              (CoreTypes.Field.print fld)
         | Some (ty, (t, us)) ->
             let unify_record_pattern (fld, p) =
               match Assoc.lookup fld us with
               | None ->
                   Error.typing ~loc
-                    "Unexpected field %s in a pattern of type %s." fld t
+                    "Unexpected field %t in a pattern of type %t."
+                    (CoreTypes.Field.print fld)
+                    (CoreTypes.TyName.print t)
               | Some u -> add_ty_constraint cstr loc (infer p) u
             in
             Assoc.iter unify_record_pattern flds ;
-            ty )
-    | Untyped.PVariant (lbl, p) ->
+            ty ) )
+    | Untyped.PVariant (lbl, p) -> (
       match Tctx.infer_variant lbl with
       | None -> assert false
       | Some (ty, u) ->
@@ -95,17 +99,17 @@ let infer_pattern cstr pp =
           | Some p, Some u -> add_ty_constraint cstr loc (infer p) u
           | None, Some _ -> assert false
           | Some _, None -> assert false ) ;
-          ty
+          ty )
   in
   let t = infer pp in
   (!vars, t)
 
-let extend_with_pattern ?(forbidden_vars= []) ctx cstr p =
+let extend_with_pattern ?(forbidden_vars = []) ctx cstr p =
   let vars, t = infer_pattern cstr p in
-  match OldUtils.find (fun (x, _) -> List.mem_assoc x vars) forbidden_vars with
+  match List.find_opt (fun (x, _) -> List.mem_assoc x vars) forbidden_vars with
   | Some (x, _) ->
       Error.typing ~loc:p.at "Several definitions of %t."
-        (Untyped.Variable.print x)
+        (CoreTypes.Variable.print x)
   | None ->
       let ctx' =
         List.fold_right (fun (x, t) ctx -> Ctx.extend_ty ctx x t) vars ctx
@@ -131,18 +135,23 @@ and infer_handler_case_abstraction ctx cstr (p, k, e) =
 
 and infer_let ctx cstr loc defs =
   ( if !warn_implicit_sequencing && List.length defs >= 2 then
-      let locations = List.map (fun (_, c) -> c.at) defs in
-      Print.warning ~loc
-        "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
-        (Print.sequence "," Location.print locations) ) ;
+    let locations = List.map (fun (_, c) -> c.at) defs in
+    Print.warning ~loc
+      "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
+      (Print.sequence "," Location.print locations) ) ;
+  let rec find_duplicate xs ys =
+    match xs with
+    | [] -> None
+    | x :: xs -> if List.mem x ys then Some x else find_duplicate xs ys
+  in
   let infer_fold_fun (vs, ctx') (p, c) =
     let tc = infer_comp ctx cstr c in
     let ws, tp = infer_pattern cstr p in
     add_ty_constraint cstr c.at tc tp ;
-    match OldUtils.find_duplicate (List.map fst ws) (List.map fst vs) with
+    match find_duplicate (List.map fst ws) (List.map fst vs) with
     | Some x ->
         Error.typing ~loc "Several definitions of %t."
-          (Untyped.Variable.print x)
+          (CoreTypes.Variable.print x)
     | None ->
         let sbst = Unify.solve !cstr in
         let ws = Assoc.map (T.subst_ty sbst) (Assoc.of_list ws) in
@@ -160,7 +169,7 @@ and infer_let ctx cstr loc defs =
   (vars, Ctx.subst_ctx ctx' (Unify.solve !cstr))
 
 and infer_let_rec ctx cstr loc defs =
-  if not (OldUtils.no_duplicates (List.map fst defs)) then
+  if not (no_duplicates (List.map fst defs)) then
     Error.typing ~loc "Multiply defined recursive value." ;
   let lst =
     List.map
@@ -207,35 +216,36 @@ and infer_expr ctx cstr {it= e; at= loc} =
   | Untyped.Const const -> ty_of_const const
   | Untyped.Annotated (t, ty) ->
       let ty' = infer_expr ctx cstr t in
-      add_ty_constraint cstr loc ty ty';
+      add_ty_constraint cstr loc ty ty' ;
       ty
-  | Untyped.Tuple es -> T.Tuple (OldUtils.map (infer_expr ctx cstr) es)
+  | Untyped.Tuple es -> T.Tuple (left_to_right_map (infer_expr ctx cstr) es)
   | Untyped.Record flds -> (
     match Assoc.pop flds with
     | None -> assert false
-    | Some ((fld, _), _) ->
-      match
-        (* XXX *)
-        (*       if not (Pattern.linear_record flds') then
+    | Some ((fld, _), _) -> (
+      (* XXX *)
+      (*       if not (Pattern.linear_record flds') then
           Error.typing ~loc "Fields in a record must be distinct." ;*)
-        Tctx.infer_field fld
-      with
+      match Tctx.infer_field fld with
       | None ->
-          Error.typing ~loc "Unbound record field label %s in a pattern" fld
+          Error.typing ~loc "Unbound record field label %t in a pattern"
+            (CoreTypes.Field.print fld)
       | Some (ty, (t_name, arg_types)) ->
           if Assoc.length flds <> Assoc.length arg_types then
-            Error.typing ~loc "malformed record of type %s" t_name
+            Error.typing ~loc "malformed record of type %t"
+              (CoreTypes.TyName.print t_name)
           else
             let arg_types' = Assoc.map (infer_expr ctx cstr) flds in
             let unify_record_arg (fld, t) =
               match Assoc.lookup fld arg_types with
               | None ->
                   Error.typing ~loc
-                    "Unexpected record field label %s in a pattern" fld
+                    "Unexpected record field label %t in a pattern"
+                    (CoreTypes.Field.print fld)
               | Some u -> add_ty_constraint cstr loc t u
             in
             Assoc.iter unify_record_arg arg_types' ;
-            ty )
+            ty ) )
   | Untyped.Variant (lbl, u) -> (
     match Tctx.infer_variant lbl with
     | None -> assert false
@@ -252,7 +262,8 @@ and infer_expr ctx cstr {it= e; at= loc} =
       T.Arrow (t1, t2)
   | Untyped.Effect op -> (
     match Ctx.infer_effect ctx op with
-    | None -> Error.typing ~loc "Unbound operation %s" op
+    | None ->
+        Error.typing ~loc "Unbound operation %t" (CoreTypes.Effect.print op)
     | Some (t1, t2) -> T.Arrow (t1, t2) )
   | Untyped.Handler
       { Untyped.effect_clauses= ops
@@ -263,7 +274,9 @@ and infer_expr ctx cstr {it= e; at= loc} =
       let t_yield = T.fresh_ty () in
       let unify_operation (op, a2) =
         match Ctx.infer_effect ctx op with
-        | None -> Error.typing ~loc "Unbound operation %s in a handler" op
+        | None ->
+            Error.typing ~loc "Unbound operation %t in a handler"
+              (CoreTypes.Effect.print op)
         | Some (t1, t2) ->
             let tk, u1, u2 = infer_handler_case_abstraction ctx cstr a2 in
             add_ty_constraint cstr loc t1 u1 ;
@@ -284,9 +297,6 @@ and infer_expr ctx cstr {it= e; at= loc} =
 (* [infer_comp ctx cstr (c,loc)] infers the type of computation [c] in context [ctx].
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp ctx cstr cp =
-  (* XXX Why isn't it better to just not call type inference when type checking is disabled? *)
-  if !disable_typing then T.universal_ty
-  else
     let rec infer ctx {it= c; at= loc} =
       match c with
       | Untyped.Apply (e1, e2) ->

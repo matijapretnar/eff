@@ -17,26 +17,3 @@ module Ty = struct
       k
 end
 
-module Dirt = Symbol.Make (Symbol.Parameter (struct
-  let ascii_symbol = "drt"
-
-  let utf8_symbol = "\206\180"
-end))
-
-module Skel = Symbol.Make (Symbol.Parameter (struct
-  let ascii_symbol = "skl"
-
-  let utf8_symbol = "s"
-end))
-
-module TyCoercion = Symbol.Make (Symbol.Parameter (struct
-  let ascii_symbol = "tycoer"
-
-  let utf8_symbol = "\207\132ycoer"
-end))
-
-module DirtCoercion = Symbol.Make (Symbol.Parameter (struct
-  let ascii_symbol = "dirtcoer"
-
-  let utf8_symbol = "dirtcoer"
-end))

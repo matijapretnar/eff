@@ -20,9 +20,7 @@ module Parameter (Param : sig
   val ascii_symbol : string
 
   val utf8_symbol : string
-end) :
-  Annotation with type t = unit =
-struct
+end) : Annotation with type t = unit = struct
   type t = unit
 
   let print _ _ n ppf =
@@ -38,9 +36,16 @@ module String : Annotation with type t = string = struct
   let print safe desc n ppf =
     if safe then
       match desc.[0] with
-      | 'a'..'z' | '_' -> Format.fprintf ppf "_%s_%d" desc n
+      | 'a' .. 'z' | '_' -> Format.fprintf ppf "%s" desc
+      | '$' -> Format.fprintf ppf "_var_%d" n
       | _ -> Format.fprintf ppf "_var_%d (* %s *)" n desc
     else Format.fprintf ppf "%s" desc
+end
+
+module Int : Annotation with type t = int = struct
+  type t = int
+
+  let print safe desc n ppf = Format.fprintf ppf "%d" desc
 end
 
 module type S = sig
@@ -73,12 +78,11 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
     let fresh ann = incr count ; (!count, ann) in
     fresh
 
-
   let fresh = new_fresh ()
 
   let refresh (_, ann) = fresh ann
 
-  let print ?(safe= false) (n, ann) ppf = Annot.print safe ann n ppf
+  let print ?(safe = false) (n, ann) ppf = Annot.print safe ann n ppf
 
   let fold f (n, ann) = f ann n
 end

@@ -13,9 +13,9 @@ effect Add_to_queue : (unit -> unit) -> unit
 let queue initial = handler
   | effect Get_next k ->
     ( fun queue -> match queue with
-        | [] -> (continue k None) []
-        | hd::tl -> (continue k (Some hd)) tl )
-  | effect (Add_to_queue y) k -> ( fun queue -> (continue k ()) (queue @ [y]))
+        | [] -> (k None) []
+        | hd::tl -> (k (Some hd)) tl )
+  | effect (Add_to_queue y) k -> ( fun queue -> (k ()) (queue @ [y]))
   | x -> ( fun _ -> x)
   | finally x -> x initial
 ;;
@@ -59,7 +59,7 @@ let rec fractions d e =
   let rec find_fractions n =
     (* If the fraction is reduced, print it and yield *)
     if gcd n d = 1 then
-      perform (Print (to_string n ^ "/" ^ to_string d ^ ", ")); perform Yield
+      perform (Print (string_of_int n ^ "/" ^ string_of_int d ^ ", ")); perform Yield
     else ();
     if d > n then
       find_fractions (n+1)
