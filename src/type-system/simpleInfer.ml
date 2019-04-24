@@ -10,8 +10,6 @@ let initial_state = Ctx.empty
 
 let warn_implicit_sequencing = ref false
 
-let disable_typing = ref false
-
 (* We perform type inference int the style of Standard ML 97, i.e.,
    Hindley-Milner polymorphism with value restriction. Throughout, we work with
    a reference to a type substitution, usually called [cstr], in which we
@@ -297,48 +295,48 @@ and infer_expr ctx cstr {it= e; at= loc} =
 (* [infer_comp ctx cstr (c,loc)] infers the type of computation [c] in context [ctx].
    It returns the list of newly introduced meta-variables and the inferred type. *)
 and infer_comp ctx cstr cp =
-    let rec infer ctx {it= c; at= loc} =
-      match c with
-      | Untyped.Apply (e1, e2) ->
-          let t1 = infer_expr ctx cstr e1 in
-          let t2 = infer_expr ctx cstr e2 in
-          let t = T.fresh_ty () in
-          add_ty_constraint cstr loc t1 (T.Arrow (t2, t)) ;
-          t
-      | Untyped.Value e -> infer_expr ctx cstr e
-      | Untyped.Match (e, []) ->
-          let t_in = infer_expr ctx cstr e in
-          let t_out = T.fresh_ty () in
-          add_ty_constraint cstr loc t_in T.empty_ty ;
-          t_out
-      | Untyped.Match (e, lst) ->
-          let t_in = infer_expr ctx cstr e in
-          let t_out = T.fresh_ty () in
-          let infer_case ((p, e') as a) =
-            let t_in', t_out' = infer_abstraction ctx cstr a in
-            add_ty_constraint cstr e.at t_in t_in' ;
-            add_ty_constraint cstr e'.at t_out' t_out
-          in
-          List.iter infer_case lst ; t_out
-      | Untyped.Handle (e1, c2) ->
-          let t1 = infer_expr ctx cstr e1 in
-          let t2 = infer ctx c2 in
-          let t3 = T.fresh_ty () in
-          let t1' = T.Handler {T.value= t2; T.finally= t3} in
-          add_ty_constraint cstr loc t1' t1 ;
-          t3
-      | Untyped.Let (defs, c) ->
-          let _, ctx = infer_let ctx cstr loc defs in
-          infer ctx c
-      | Untyped.LetRec (defs, c) ->
-          let _, ctx = infer_let_rec ctx cstr loc defs in
-          infer ctx c
-      | Untyped.Check c ->
-          ignore (infer ctx c) ;
-          T.unit_ty
-    in
-    let ty = infer ctx cp in
-    ty
+  let rec infer ctx {it= c; at= loc} =
+    match c with
+    | Untyped.Apply (e1, e2) ->
+        let t1 = infer_expr ctx cstr e1 in
+        let t2 = infer_expr ctx cstr e2 in
+        let t = T.fresh_ty () in
+        add_ty_constraint cstr loc t1 (T.Arrow (t2, t)) ;
+        t
+    | Untyped.Value e -> infer_expr ctx cstr e
+    | Untyped.Match (e, []) ->
+        let t_in = infer_expr ctx cstr e in
+        let t_out = T.fresh_ty () in
+        add_ty_constraint cstr loc t_in T.empty_ty ;
+        t_out
+    | Untyped.Match (e, lst) ->
+        let t_in = infer_expr ctx cstr e in
+        let t_out = T.fresh_ty () in
+        let infer_case ((p, e') as a) =
+          let t_in', t_out' = infer_abstraction ctx cstr a in
+          add_ty_constraint cstr e.at t_in t_in' ;
+          add_ty_constraint cstr e'.at t_out' t_out
+        in
+        List.iter infer_case lst ; t_out
+    | Untyped.Handle (e1, c2) ->
+        let t1 = infer_expr ctx cstr e1 in
+        let t2 = infer ctx c2 in
+        let t3 = T.fresh_ty () in
+        let t1' = T.Handler {T.value= t2; T.finally= t3} in
+        add_ty_constraint cstr loc t1' t1 ;
+        t3
+    | Untyped.Let (defs, c) ->
+        let _, ctx = infer_let ctx cstr loc defs in
+        infer ctx c
+    | Untyped.LetRec (defs, c) ->
+        let _, ctx = infer_let_rec ctx cstr loc defs in
+        infer ctx c
+    | Untyped.Check c ->
+        ignore (infer ctx c) ;
+        T.unit_ty
+  in
+  let ty = infer ctx cp in
+  ty
 
 let infer_top_comp ctx c =
   let cstr = ref [] in

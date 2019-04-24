@@ -1,7 +1,7 @@
 (** External values.
 
     Here, we define values that cannot be defined in Eff itself.
-    We need to give them the correct MCOcaml name.
+    We need to give them the correct MulticoreOcaml name.
     For instance [string_length] is replaced by [String.length].
 *)
 

@@ -170,8 +170,7 @@ let arithmetic_operations =
     ; ("acos", float_to_float acos)
     ; ("asin", float_to_float asin)
     ; ("atan", float_to_float atan)
-    ; ("sqrt", float_to_float sqrt)
-    ]
+    ; ("sqrt", float_to_float sqrt) ]
 
 let string_operations =
   Assoc.of_list

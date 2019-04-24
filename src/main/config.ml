@@ -2,21 +2,16 @@
 
 let version = "5.1"
 
-type pervasives =
-  | PervasivesNone
-  | PervasivesDefault
-  | PervasivesFile of string
+type pervasives = PervasivesNone | PervasivesDefault
 
 let pervasives_file = ref PervasivesDefault
 
 type backend =
   | Runtime
   | Ocaml of string
-  | Mcoc of string
+  | Multicore of string
 
 let backend = ref Runtime
-
-let disable_typing = ref false
 
 let disable_optimization = ref false
 
