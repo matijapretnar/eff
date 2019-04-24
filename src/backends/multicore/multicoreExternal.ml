@@ -36,8 +36,7 @@ let arithmetic_operations =
     ; ("acos", Exists "acos")
     ; ("asin", Exists "asin")
     ; ("atan", Exists "atan")
-    ; ("sqrt", Exists "sqrt")
-    ]
+    ; ("sqrt", Exists "sqrt") ]
 
 let string_operations =
   Assoc.of_list [("^", Exists "(^)"); ("string_length", Exists "String.length")]
@@ -47,17 +46,15 @@ let conversion_functions =
     [ ("to_string", Unknown)
     ; ("string_of_float", Exists "string_of_float")
     ; ("string_of_int", Exists "string_of_int")
-    ; ("float_of_int", Exists "float_of_int")    
+    ; ("float_of_int", Exists "float_of_int")
     ; ("int_of_float", Exists "int_of_float") ]
 
 let top_handler =
-    "(fun c ->"
-  ^ "  match c () with\n"
+  "(fun c ->" ^ "  match c () with\n"
   ^ "  | effect (Print s) k -> (print_string s; continue k ())\n"
   ^ "  | effect (RandomInt i) k -> continue k (Random.int i)\n"
   ^ "  | effect (RandomFloat f) k -> continue k (Random.float f)\n"
-  ^ "  | effect (Read ()) k -> continue k (read_line ())\n"
-  ^ "  | x -> x )\n"
+  ^ "  | effect (Read ()) k -> continue k (read_line ())\n" ^ "  | x -> x )\n"
 
 let other =
   Assoc.of_list

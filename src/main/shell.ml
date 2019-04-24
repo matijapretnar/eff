@@ -17,16 +17,14 @@ module type Shell = sig
   val finalize : state -> unit
 end
 
-
-module Make(Backend : BackendSignature.T) = struct
-
+module Make (Backend : BackendSignature.T) = struct
   type state =
     { desugarer_state: Desugarer.state
     ; type_system_state: TypeSystem.state
     ; backend_state: Backend.state }
 
   let initialize () =
-    Random.self_init ();
+    Random.self_init () ;
     { desugarer_state= Desugarer.initial_state
     ; type_system_state= TypeSystem.initial_state
     ; backend_state= Backend.initial_state }
@@ -40,23 +38,23 @@ module Make(Backend : BackendSignature.T) = struct
         let type_system_state', ty =
           TypeSystem.infer_top_comp state.type_system_state c
         in
-        let backend_state' = 
+        let backend_state' =
           Backend.process_computation state.backend_state c ty
         in
-        { state with 
-          type_system_state= type_system_state'
-        ; backend_state= backend_state' }
+        { state with
+          type_system_state= type_system_state'; backend_state= backend_state'
+        }
     | Commands.TypeOf t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
         let type_system_state', ty =
           TypeSystem.infer_top_comp state.type_system_state c
         in
-        let backend_state' = 
+        let backend_state' =
           Backend.process_type_of state.backend_state c ty
         in
-        { state with 
-          type_system_state= type_system_state';
-          backend_state= backend_state' }
+        { state with
+          type_system_state= type_system_state'; backend_state= backend_state'
+        }
     | Commands.Help ->
         let help_text =
           "Toplevel commands:\n"
@@ -65,7 +63,7 @@ module Make(Backend : BackendSignature.T) = struct
           ^ "#quit;;            exit eff\n"
           ^ "#use \"<file>\";;  load commands from file\n"
         in
-        Format.fprintf !Config.output_formatter "%s@." help_text;
+        Format.fprintf !Config.output_formatter "%s@." help_text ;
         state
     | Commands.DefEffect effect_def ->
         let desugarer_state', (eff, (ty1, ty2)) =
@@ -74,13 +72,15 @@ module Make(Backend : BackendSignature.T) = struct
         let type_system_state' =
           SimpleCtx.add_effect state.type_system_state eff (ty1, ty2)
         in
-        let backend_state' = 
+        let backend_state' =
           Backend.process_def_effect state.backend_state (eff, (ty1, ty2))
         in
         { type_system_state= type_system_state'
-        ; desugarer_state= desugarer_state' 
+        ; desugarer_state= desugarer_state'
         ; backend_state= backend_state' }
-    | Commands.Quit -> Backend.finalize state.backend_state; exit 0
+    | Commands.Quit ->
+        Backend.finalize state.backend_state ;
+        exit 0
     | Commands.Use filename -> execute_file filename state
     | Commands.TopLet defs ->
         let desugarer_state', defs' =
@@ -89,7 +89,7 @@ module Make(Backend : BackendSignature.T) = struct
         let vars, type_system_state' =
           TypeSystem.infer_top_let ~loc state.type_system_state defs'
         in
-        let backend_state' = 
+        let backend_state' =
           Backend.process_top_let state.backend_state defs' vars
         in
         { desugarer_state= desugarer_state'
@@ -127,20 +127,20 @@ module Make(Backend : BackendSignature.T) = struct
           Desugarer.desugar_tydefs state.desugarer_state tydefs
         in
         Tctx.extend_tydefs ~loc tydefs' ;
-        let backend_state' = 
+        let backend_state' =
           Backend.process_tydef state.backend_state tydefs'
         in
         { state with
-          desugarer_state= desugarer_state'
-        ; backend_state= backend_state' }
+          desugarer_state= desugarer_state'; backend_state= backend_state' }
 
   and exec_cmds state cmds = fold exec_cmd state cmds
 
   and load_cmds state cmds =
     let old_output_formatter = !Config.output_formatter in
-    Config.output_formatter := Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ());
+    Config.output_formatter :=
+      Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ()) ;
     let state' = exec_cmds state cmds in
-    Config.output_formatter := old_output_formatter;
+    Config.output_formatter := old_output_formatter ;
     state'
 
   (* Parser wrapper *)
@@ -157,11 +157,9 @@ module Make(Backend : BackendSignature.T) = struct
   and load_file filename state =
     Lexer.read_file parse filename |> load_cmds state
 
-  and execute_source str state =
-    Lexer.read_string parse str |> exec_cmds state
+  and execute_source str state = Lexer.read_string parse str |> exec_cmds state
 
-  and load_source str state =
-    Lexer.read_string parse str |> load_cmds state
+  and load_source str state = Lexer.read_string parse str |> load_cmds state
 
   and finalize state = Backend.finalize state.backend_state
 end

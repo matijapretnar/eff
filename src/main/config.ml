@@ -2,20 +2,13 @@
 
 let version = "5.0"
 
-type pervasives =
-  | PervasivesNone
-  | PervasivesDefault
-  | PervasivesFile of string
+type pervasives = PervasivesNone | PervasivesDefault
 
 let pervasives_file = ref PervasivesDefault
 
-type backend =
-  | Runtime
-  | Mcoc of string
+type backend = Runtime | Multicore of string
 
 let backend = ref Runtime
-
-let disable_typing = ref false
 
 let ascii = ref false
 

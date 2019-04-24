@@ -15,21 +15,15 @@ type pervasives =
   | PervasivesNone
   (* do not use pervasives *)
   | PervasivesDefault
-  (* look in the default locations *)
-  | PervasivesFile of string
-  (* look for pervasives in a specific location *)
+
+(* look in the default locations *)
 
 val pervasives_file : pervasives ref
 (** Location of the pervasives file *)
 
-type backend =
-  | Runtime
-  | Mcoc of string
+type backend = Runtime | Multicore of string
 
 val backend : backend ref
-
-val disable_typing : bool ref
-(** Should type-checking be disabled? *)
 
 val ascii : bool ref
 (** Should we use ASCII instead of Unicode for printing out types? *)

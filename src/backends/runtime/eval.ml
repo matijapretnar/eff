@@ -10,7 +10,8 @@ let initial_state = RuntimeEnv.empty
 
 let update x = RuntimeEnv.add x
 
-let lookup x state = try Some (RuntimeEnv.find x state) with Not_found -> None
+let lookup x state =
+  try Some (RuntimeEnv.find x state) with Not_found -> None
 
 exception PatternMatch of Location.t
 

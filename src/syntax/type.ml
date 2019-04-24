@@ -21,8 +21,6 @@ and handler_ty =
 (* This type is used when type checking is turned off. Its name
    is syntactically incorrect so that the programmer cannot accidentally
    define it. *)
-let universal_ty = Basic "_"
-
 let int_ty = Basic "int"
 
 let string_ty = Basic "string"
