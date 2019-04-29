@@ -1,0 +1,11 @@
+
+
+effect Op1 : int -> unit;;
+effect Op2 : int -> unit;;
+
+handle 
+  perform (Op1 1)
+with 
+  | effect (Op2 n) k -> 
+      k () 
+  | x -> x
