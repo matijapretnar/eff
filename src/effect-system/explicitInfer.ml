@@ -6,21 +6,21 @@ open Typed
 
 type state =
   { context: TypingEnv.t
-  ; effects: (Types.target_ty * Types.target_ty) Untyped.EffectMap.t
-  ; substitutions: Unification.substitutions
+  ; effects: (Types.target_ty * Types.target_ty) Typed.EffectMap.t
+  ; substitutions: Substitution.t
   ; constraints: Typed.omega_ct list
   }
 
-let merge_substitutions subs state = {state with substitutions= Unification.merge_subs state.substitutions subs}
+let merge_substitutions subs state = {state with substitutions= Substitution.merge state.substitutions subs}
 
 let general_update_substitution updater k v st =
   {st with substitutions = updater k v st.substitutions}
 
-let add_param_coercion = general_update_substitution Unification.add_param_coercion
-let add_type_sub = general_update_substitution Unification.add_type_sub
-let add_var_coercion = general_update_substitution Unification.add_var_coercion
-let add_var_dirt_sub = general_update_substitution Unification.add_var_dirt_sub
-let add_skel_sub = general_update_substitution Unification.add_skel_sub
+let add_param_coercion = general_update_substitution Substitution.add_type_coercion
+let add_type_sub = general_update_substitution Substitution.add_type_substitution
+let add_var_coercion = general_update_substitution Substitution.add_dirt_var_coercion
+let add_var_dirt_sub = general_update_substitution Substitution.add_dirt_substitution
+let add_skel_sub = general_update_substitution Substitution.add_skel_param_substitution
 
 let add_constraint cons st =
   {st with constraints= cons :: st.constraints}
@@ -38,7 +38,7 @@ type expression_typing_result =
   ; ttype: Types.target_ty
   }
 
-let empty = {context= TypingEnv.empty; effects= Untyped.EffectMap.empty; constraints=[]; substitutions= Unification.subsEmpty}
+let empty = {context= TypingEnv.empty; effects= Typed.EffectMap.empty; constraints=[]; substitutions= Substitution.empty}
 
 let initial_state = empty
 
@@ -58,7 +58,7 @@ let extend_env vars env =
 
 
 let print_env env =
-  List.map
+  List.iter
     (fun (x, ty_sch) ->
       Print.debug "%t : %t" (Typed.print_variable x)
         (Types.print_target_ty ty_sch) )
@@ -150,7 +150,7 @@ let rec state_free_dirt_vars st =
 
 
 let splitter st constraints simple_ty =
-  let skel_list = OldUtils.uniq (get_skel_vars_from_constraints constraints) in
+  let skel_list = unique_elements (get_skel_vars_from_constraints constraints) in
   let global_ty_vars = state_free_ty_vars st in
   let global_dirt_vars = state_free_dirt_vars st in
   let local_constraints =
@@ -214,19 +214,19 @@ let splitter st constraints simple_ty =
   print_env st ;
   Print.debug "Simple type free vars: " ;
   Types.TyParamSet.iter
-    (fun x -> Print.debug "%t" (Params.Ty.print x))
+    (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
     (Types.free_ty_vars_ty simple_ty) ;
   Print.debug "state free vars: " ;
   Types.TyParamSet.iter
-    (fun x -> Print.debug "%t" (Params.Ty.print x))
+    (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
     (state_free_ty_vars st) ;
   Print.debug "Splitter output free_ty_vars: " ;
   Types.TyParamSet.iter
-    (fun x -> Print.debug "%t" (Params.Ty.print x))
+    (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
     free_ty_params ;
   Print.debug "Splitter output free_dirt_vars: " ;
   Types.DirtParamSet.iter
-    (fun x -> Print.debug "%t" (Params.Dirt.print x))
+    (fun x -> Print.debug "%t" (CoreTypes.DirtParam.print x))
     free_dirt_params ;
   Print.debug "Splitter global constraints list :" ;
   Unification.print_c_list local_constraints ;
@@ -270,23 +270,23 @@ let generalize_type st constraints simple_ty ty =
 let rec get_sub_of_ty ty_sch =
   match ty_sch with
   | Types.TySchemeSkel (s, t) ->
-      let new_s = Params.Skel.fresh () in
+      let new_s = CoreTypes.SkelParam.fresh () in
       let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
       ( Assoc.update s new_s skels, tys, dirts, tycos, dcos)
   | Types.TySchemeTy (p, _, t) ->
-      let new_p = Params.Ty.fresh () in
+      let new_p = CoreTypes.TyParam.fresh () in
       let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
       (skels, Assoc.update p new_p tys, dirts, tycos, dcos)
   | Types.TySchemeDirt (p, t) ->
-      let new_p = Params.Dirt.fresh () in
+      let new_p = CoreTypes.DirtParam.fresh () in
       let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
       (skels, tys, Assoc.update p new_p dirts, tycos, dcos)
   | Types.QualTy ((p, ct), t) ->
-      let new_p = Params.TyCoercion.fresh () in
+      let new_p = CoreTypes.TyCoercionParam.fresh () in
       let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
       (skels, tys, dirts, Assoc.update p new_p tycos, dcos)
   | Types.QualDirt ((p, ct), t) ->
-      let new_p = Params.DirtCoercion.fresh () in
+      let new_p = CoreTypes.DirtCoercionParam.fresh () in
       let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
       (skels, tys, dirts, tycos, Assoc.update p new_p dcos)
   | _ -> (Assoc.empty, Assoc.empty, Assoc.empty, Assoc.empty, Assoc.empty)
@@ -316,7 +316,7 @@ let rec get_applied_cons_from_ty ty_subs dirt_subs ty =
         ( apply_sub_to_type ty_subs dirt_subs ty1
         , apply_sub_to_type ty_subs dirt_subs ty2 )
       in
-      let new_omega = Params.TyCoercion.fresh () in
+      let new_omega = CoreTypes.TyCoercionParam.fresh () in
       let new_cons = Typed.TyOmega (new_omega, (newty1, newty2)) in
       (new_cons :: c1, c2)
   | Types.QualDirt (cons, t) ->
@@ -325,7 +325,7 @@ let rec get_applied_cons_from_ty ty_subs dirt_subs ty =
       let newty1, newty2 =
         (apply_sub_to_dirt dirt_subs ty1, apply_sub_to_dirt dirt_subs ty2)
       in
-      let new_omega = Params.DirtCoercion.fresh () in
+      let new_omega = CoreTypes.DirtCoercionParam.fresh () in
       let new_cons = Typed.DirtOmega (new_omega, (newty1, newty2)) in
       (c1, new_cons :: c2)
   | _ -> ([], [])
@@ -334,16 +334,17 @@ let rec get_applied_cons_from_ty ty_subs dirt_subs ty =
 let rec get_skel_constraints alphas_has_skels ty_subs skel_subs =
   match alphas_has_skels with
   | (tvar, skel) :: ss ->
-      let new_skel = Unification.apply_substitution_skel skel_subs skel in
+      let new_skel = Substitution.apply_substitutions_to_skeleton skel_subs skel in
       let Some new_tyvar = Assoc.lookup tvar ty_subs in
       Typed.TyParamHasSkel (new_tyvar, new_skel)
       :: get_skel_constraints ss ty_subs skel_subs
   | [] -> []
+
 let get_skel_constraints' alphas_has_skels ty_subs skel_subs =
   get_skel_constraints (Assoc.to_list alphas_has_skels) ty_subs skel_subs
 
 let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
-  let new_skel_subs = List.fold_left (fun old_subs (a,b) -> (Unification.add_skel_sub a (Types.SkelParam b) old_subs)) Unification.subsEmpty (Assoc.to_list skel_subs) in
+  let new_skel_subs = List.fold_left (fun old_subs (a,b) -> (Substitution.add_skel_param_substitution a (Types.SkelParam b) old_subs)) Substitution.empty (Assoc.to_list skel_subs) in
   let skel_constraints =
     get_skel_constraints' alphas_has_skels ty_subs new_skel_subs
   in
@@ -457,21 +458,21 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
       let target_lambda =
         Typed.Lambda
           (abstraction_with_ty p
-             (Unification.apply_substitution_ty st''.substitutions in_ty)
+             (Substitution.apply_substitutions_to_type st''.substitutions in_ty)
              c)
       in
       Unification.print_c_list st''.constraints ;
       Print.debug "lambda ty: %t" (Types.print_target_ty target_ty) ;
       st'', {expression= target_lambda; ttype= target_ty}
   | Untyped.Effect eff ->
-      let in_ty, out_ty = Untyped.EffectMap.find eff st.effects in
+      let in_ty, out_ty = Typed.EffectMap.find eff st.effects in
       let s = Types.EffectSet.singleton eff in
       st,
       { expression= Typed.Effect (eff, (in_ty, out_ty))
       ; ttype= Types.Arrow (in_ty, (out_ty, Types.closed_dirt s))
       }
   | Untyped.Handler h ->
-      let out_dirt_var = Params.Dirt.fresh () in
+      let out_dirt_var = CoreTypes.DirtParam.fresh () in
       let in_dirt = Types.fresh_dirt ()
       and out_dirt = Types.no_effect_dirt out_dirt_var
       and in_ty, skel_cons_in = Typed.fresh_ty_with_fresh_skel ()
@@ -480,8 +481,16 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
       let r_ty, r_ty_skel_cons = Typed.fresh_ty_with_fresh_skel () in
       let r_cons = r_ty_skel_cons :: st.constraints in
       let pr, cr = h.value_clause in
+      (*
       let Untyped.PVar x = pr.it in
       let r_st = add_def st x r_ty in
+      let st' = add_constraints r_cons r_st in
+      *)
+      let r_st = (match pr.it with 
+        | Untyped.PVar x -> add_def st x r_ty
+        | _ -> failwith __LOC__
+
+      ) in
       let st' = add_constraints r_cons r_st in
       (* Note to self: Should this also be added?, check article *)
       (* let st' = add_constraint skel_cons_in st' |> add_constraint skel_cons_out in *)
@@ -501,7 +510,7 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
             , typed_co_op_ty
             , s_st
             , (alpha_i, delta_i) ) =
-          Print.debug "type_effect_clause: %t" (Untyped.abstraction2 abs2) ;
+          (* Print.debug "type_effect_clause: %t" (Untyped.abstraction2 abs2) ; *)
           type_effect_clause eff abs2 acc_st
         in
         ( typed_c_op :: acc_terms
@@ -523,65 +532,72 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
         folder_function
       in
       let cons_1 =
-        ( Unification.apply_substitution_ty st'''.substitutions
+        ( Substitution.apply_substitutions_to_type st'''.substitutions
             target_cr_ty
         , out_ty )
       in
       let cons_2 =
-        (Unification.apply_substitution_dirt st'''.substitutions target_cr_dirt, out_dirt)
+        (Substitution.apply_substitutions_to_dirt st'''.substitutions target_cr_dirt, out_dirt)
       in
       let omega_1, omega_cons_1 = Typed.fresh_ty_coer cons_1
       and omega_2, omega_cons_2 = Typed.fresh_dirt_coer cons_2 in
-      let y_var_name = Typed.Variable.fresh "fresh_var" in
+      let y_var_name = CoreTypes.Variable.fresh "fresh_var" in
       let y = Typed.PVar y_var_name in
       let annot_y = y in
       let exp_y = Typed.Var y_var_name in
       let coerced_y, omega_cons_6 =
         Typed.cast_expression exp_y in_ty
-          (Unification.apply_substitution_ty st'''.substitutions r_ty)
+          (Substitution.apply_substitutions_to_type st'''.substitutions r_ty)
       in
-      let substituted_c_r =
-        Typed.subst_comp (Assoc.of_list [(x, coerced_y)])
-          (Unification.apply_substitution st'''.substitutions target_cr_term)
+      Print.debug "In infer handler (%t)" (Untyped.print_pattern pr);
+      let substituted_c_r = (match pr.it with 
+        | Untyped.PVar x -> Typed.subst_comp (Assoc.of_list [(x, coerced_y)])
+          (Substitution.apply_substitutions_to_computation st'''.substitutions target_cr_term)
+        | _ -> target_cr_term
+      )
       in
       let coerced_substiuted_c_r =
         Typed.CastComp (substituted_c_r, Typed.BangCoercion (omega_1, omega_2))
       in
       let mapper (op_term, (op_term_ty, op_term_dirt), (alpha_i, delta_i))
           (eff, abs2) =
-        let in_op_ty, out_op_ty = Untyped.EffectMap.find eff st.effects in
+        let in_op_ty, out_op_ty = Typed.EffectMap.find eff st.effects in
         let x, k, c_op = abs2 in
-        let Untyped.PVar k_var = k.it in
         let cons_3 =
-          (Unification.apply_substitution_ty st'''.substitutions op_term_ty, out_ty)
+          (Substitution.apply_substitutions_to_type st'''.substitutions op_term_ty, out_ty)
         in
         let cons_4 =
-          (Unification.apply_substitution_dirt st'''.substitutions op_term_dirt, out_dirt)
+          (Substitution.apply_substitutions_to_dirt st'''.substitutions op_term_dirt, out_dirt)
         in
         let cons_5a = Types.Arrow (out_op_ty, (out_ty, out_dirt)) in
         let cons_5b =
           Types.Arrow
             ( out_op_ty
-            , ( Unification.apply_substitution_ty st'''.substitutions alpha_i
-              , Unification.apply_substitution_dirt st'''.substitutions delta_i ) )
+            , ( Substitution.apply_substitutions_to_type st'''.substitutions alpha_i
+              , Substitution.apply_substitutions_to_dirt st'''.substitutions delta_i ) )
         in
         let omega_3, omega_cons_3 = Typed.fresh_ty_coer cons_3 in
         let omega_4, omega_cons_4 = Typed.fresh_dirt_coer cons_4 in
-        let l_var_name = Typed.Variable.fresh "fresh_var" in
+        let l_var_name = CoreTypes.Variable.fresh "fresh_var" in
         let l = Typed.PVar l_var_name in
         let annot_l = l in
         let exp_l = Typed.Var l_var_name in
         let coerced_l, omega_cons_5 =
           Typed.cast_expression exp_l cons_5a cons_5b
         in
-        let substituted_c_op =
-          Typed.subst_comp (Assoc.of_list [(k_var, coerced_l)])
-            (Unification.apply_substitution st'''.substitutions op_term)
-        in
-        Print.debug "substituted_c_op [%t/%t]: %t"
-          (Untyped.Variable.print ~safe:true l_var_name)
-          (Untyped.Variable.print ~safe:true k_var)
-          (Typed.print_computation substituted_c_op) ;
+        let substituted_c_op = (match k.it with
+          | Untyped.PVar k_var -> 
+            let s_c_op = Typed.subst_comp (Assoc.of_list [(k_var, coerced_l)])
+              (Substitution.apply_substitutions_to_computation st'''.substitutions op_term) in 
+            Print.debug "substituted_c_op [%t/%t]: %t"
+            (CoreTypes.Variable.print ~safe:true l_var_name)
+            (CoreTypes.Variable.print ~safe:true k_var)
+            (Typed.print_computation s_c_op);
+            s_c_op
+          | Untyped.PNonbinding -> op_term
+          | _ -> failwith __LOC__
+          
+        ) in
         let coerced_substiuted_c_op =
           Typed.CastComp
             (substituted_c_op, Typed.BangCoercion (omega_3, omega_4))
@@ -605,10 +621,10 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
         List.map (fun (x, y) -> x) new_op_clauses_with_cons
       in
       let ops_cons =
-        OldUtils.flatten_map (fun (x, y) -> y) new_op_clauses_with_cons
+        concat_map (fun (x, y) -> y) new_op_clauses_with_cons
       in
       let y_type =
-        Unification.apply_substitution_ty st'''.substitutions r_ty
+        Substitution.apply_substitutions_to_type st'''.substitutions r_ty
       in
       let typed_value_clause =
         Typed.abstraction_with_ty annot_y y_type coerced_substiuted_c_r
@@ -707,8 +723,8 @@ and type_plain_computation (st: state) = function
       let fresh_dirty_ty = Types.make_dirty new_ty_var in
       let e1_coerced, omega_cons_1 =
         Typed.cast_expression
-          (Unification.apply_substitution_exp st''.substitutions typed_e1)
-          (Unification.apply_substitution_ty st''.substitutions tt_1)
+          (Substitution.apply_substitutions_to_expression st''.substitutions typed_e1)
+          (Substitution.apply_substitutions_to_type st''.substitutions tt_1)
           (Types.Arrow (tt_2, fresh_dirty_ty))
       in
       let st_const = add_constraint cons1 st'' in
@@ -726,7 +742,7 @@ and type_plain_computation (st: state) = function
       in
       let coer_exp, omega_cons_1 =
         Typed.cast_expression typed_exp
-          (Unification.apply_substitution_ty st''.substitutions exp_type)
+          (Substitution.apply_substitutions_to_type st''.substitutions exp_type)
           (Types.Handler (dirty_1, dirty_2))
       in
       let coer_comp, cons_comp =
@@ -737,7 +753,7 @@ and type_plain_computation (st: state) = function
       st_cons,{ computation= Typed.Handle (coer_exp, coer_comp)
       ; dtype= dirty_2}
   | Untyped.Let (defs, c_2) -> 
-      let [(p_def, c_1)] = defs in 
+      let [(p_def, c_1)] = defs in (
       match c_1.it with
       | Untyped.Value e_1 ->
           let st',{expression= typed_e1; ttype= type_e1} =
@@ -745,7 +761,7 @@ and type_plain_computation (st: state) = function
           in
           let sub_e1', cons_e1' = Unification.unify (st'.substitutions, [], st'.constraints) in
           let st'' = (add_constraints cons_e1' st') |> merge_substitutions sub_e1' in 
-          let typed_e1 = Unification.apply_substitution_exp sub_e1' typed_e1 in
+          let typed_e1 = Substitution.apply_substitutions_to_expression sub_e1' typed_e1 in
           let st_subbed = apply_sub_to_env st'' st''.substitutions in
           let ( free_skel_vars
               , free_ty_vars
@@ -755,14 +771,14 @@ and type_plain_computation (st: state) = function
             splitter
               (TypingEnv.return_context st_subbed.context)
               cons_e1'
-              (Unification.apply_substitution_ty sub_e1' type_e1)
+              (Substitution.apply_substitutions_to_type sub_e1' type_e1)
           in
           let ty_sc_skel =
             generalize_type
               (TypingEnv.return_context st_subbed.context)
               cons_e1'
-              (Unification.apply_substitution_ty sub_e1' type_e1)
-              (Unification.apply_substitution_ty sub_e1' type_e1)
+              (Substitution.apply_substitutions_to_type sub_e1' type_e1)
+              (Substitution.apply_substitutions_to_type sub_e1' type_e1)
           in
           let Untyped.PVar x = p_def.it in
           let new_st = add_def st_subbed x ty_sc_skel in
@@ -814,11 +830,11 @@ and type_plain_computation (st: state) = function
             type_computation new_st c_2
           in
           let new_dirt_var = Types.fresh_dirt () in
-          let ty_c1 = Unification.apply_substitution_ty st''.substitutions type_c1 in
+          let ty_c1 = Substitution.apply_substitutions_to_type st''.substitutions type_c1 in
           let coer_c1, omega_cons_1 =
             Typed.cast_computation
-              (Unification.apply_substitution st''.substitutions typed_c1)
-              (ty_c1, Unification.apply_substitution_dirt st''.substitutions dirt_c1)
+              (Substitution.apply_substitutions_to_computation st''.substitutions typed_c1)
+              (ty_c1, Substitution.apply_substitutions_to_dirt st''.substitutions dirt_c1)
               (ty_c1, new_dirt_var)
           in
           let coer_c2, omega_cons_2 =
@@ -828,9 +844,9 @@ and type_plain_computation (st: state) = function
           let abstraction = (typed_pattern, coer_c2) in
           (add_constraint omega_cons_1 st'' |> add_constraint omega_cons_2),
           { computation= Typed.Bind (coer_c1, abstraction); dtype= (type_c2, new_dirt_var)}
+        )
   | Untyped.LetRec ([(var, abs)], c2)
-    when not (Untyped.contains_variable_abs var abs) ->
-      failwith __LOC__ (*
+    (*when not (Untyped.contains_variable_abs var abs) *) ->
       (*
 
          α, β, δ, ς₁, ς₂ fresh
@@ -845,32 +861,43 @@ and type_plain_computation (st: state) = function
            ~> let rec f = σ₃(Λςs.Λ(αs:τs).Λδѕ.λ(ωs:πs).fun x : σ₃(σ₂(σ₁(α))) -> c₁'') in c₂'
 
        *)
+      Print.debug "Here: Pattern %t" (Untyped.print_pattern (fst abs));
+      Print.debug "Here: Computation: %t" (Untyped.print_computation (snd abs)) ;
+      (* Type abstraction *)
       let ty_a, q_a = fresh_ty_with_fresh_skel () in
       let ty_b, q_b = fresh_ty_with_fresh_skel () in
       let dirt_d = Types.fresh_dirt () in
-      let st1 = add_def st var (Types.Arrow (ty_a, (ty_b, dirt_d))) in
-      let cons1 = q_a :: q_b :: in_cons in
-      let (pat', c1'), (ty_a', (ty_A1, dirt_D1)), cons2, sub_s1 =
-        type_abstraction cons1 st1 abs ty_a
+      let df = (Types.Arrow (ty_a, (ty_b, dirt_d))) in
+      let st1 = add_def st var df
+                |> add_constraint q_a 
+                |> add_constraint q_b in
+      let (pat', c1'), (ty_a', (ty_A1, dirt_D1)), st' =
+        type_abstraction st1 abs ty_a
       in
       let tyco1, q_ty = fresh_ty_coer (ty_A1, ty_b) in
       let dco2, q_d = Typed.fresh_dirt_coer (dirt_D1, dirt_d) in
-      let sub_s2, cons3 = Unification.unify ([], [], q_ty :: q_d :: cons2) in
-      let st2 = apply_sub_to_env st (sub_s1 @ sub_s2) in
-      let ty_A1' = Unification.apply_substitution_ty sub_s2 ty_A1 in
-      let arrow_type = Types.Arrow (ty_a', (ty_A1', dirt_D1)) in
+      let st1' = st' |> add_constraint q_ty |> add_constraint q_d in 
+      let sub_s', cons_s' = Unification.unify (Substitution.empty, [], st1'.constraints) in
+      let st = merge_substitutions sub_s' st in
+      let st2 = apply_sub_to_env st sub_s' |> add_constraints cons_s' in
+      let ty_A1' = Substitution.apply_substitutions_to_type sub_s' ty_A1 in
+      let dirt_D1' = Substitution.apply_substitutions_to_dirt sub_s' dirt_D1 in (* Do we also need to substitute dirt? *)
+      let ty_a_s' = Substitution.apply_substitutions_to_type sub_s' ty_a' in
+      let arrow_type = Types.Arrow (ty_a_s', (ty_A1', dirt_D1')) in
       let skvars, tyvars, dirtvars, cons4, cons5 =
-        splitter (TypingEnv.return_context st2.context) cons3 ty_A1'
+        splitter (TypingEnv.return_context st2.context) st2.constraints ty_A1'
       in
       let ty_f =
         generalize_type
           (TypingEnv.return_context st2.context)
-          cons3 ty_A1'
-          (Unification.apply_substitution_ty sub_s2 arrow_type)
+          st2.constraints ty_A1'
+          (Substitution.apply_substitutions_to_type st2.substitutions arrow_type)
       in
-      let st3 = add_def st2 var ty_f in
-      let {computation=c2'; dtype= dty2; constraints= cons6; substitutions= sub_s3} = type_computation cons5 st3 c2 in
-      let ty_f' = Unification.apply_substitution_ty sub_s3 ty_f in
+      let st3 = add_def st2 var ty_f |> add_constraints cons5 |> add_constraints cons4 in
+      Print.debug "Calculating computation";
+      let st3',{computation=c2'; dtype= dty2} = type_computation st3 c2 in
+      let ty_f' = Substitution.apply_substitutions_to_type st3'.substitutions ty_f in
+      Print.debug "Starting here";
       let e_rec =
         (* f ςs αs δѕ ωs |> <α> -> ω₁ ! ω₂ *)
         Typed.CastExp
@@ -880,7 +907,9 @@ and type_plain_computation (st: state) = function
                 | Typed.TyOmega (tycovar, ct) ->
                     Typed.ApplyTyCoercion (e, TyCoercionVar tycovar)
                 | Typed.DirtOmega (dcovar, ct) ->
-                    Typed.ApplyDirtCoercion (e, DirtCoercionVar dcovar) )
+                    Typed.ApplyDirtCoercion (e, DirtCoercionVar dcovar) 
+                | _ -> failwith __LOC__
+              )
               (List.fold_left
                  (fun e dv -> Typed.ApplyDirtExp (e, Types.no_effect_dirt dv))
                  (List.fold_left
@@ -893,24 +922,24 @@ and type_plain_computation (st: state) = function
                  dirtvars)
               cons4
           , ArrowCoercion
-              ( ReflTy (Unification.apply_substitution_ty sub_s2 ty_a')
+              ( ReflTy ty_a_s'
               , BangCoercion (tyco1, dco2) ) )
       in
       let c1'' =
         (* c1'' = σ₂(σ₁([e_rec / f]c1')) *)
-        Unification.apply_substitution (sub_s1 @ sub_s2)
+        Substitution.apply_substitutions_to_computation st3'.substitutions
           (Typed.subst_comp (Assoc.of_list [(var, e_rec)]) c1')
       in
       let e_f =
         (* σ₃(Λςs.Λ(αs:τs).Λδѕ.λ(ωs:πs).fun x : σ₃(σ₂(σ₁(α))) -> c₁'') *)
-        Unification.apply_substitution_exp sub_s3
+        Substitution.apply_substitutions_to_expression st3'.substitutions
           (List.fold_right
              (fun skvar e -> Typed.BigLambdaSkel (skvar, e))
              skvars
              (List.fold_right
                 (fun tyvar e ->
                   Typed.BigLambdaTy
-                    (tyvar, Unification.get_skel_of_tyvar tyvar cons3, e) )
+                    (tyvar, Unification.get_skel_of_tyvar tyvar st3'.constraints, e) )
                 tyvars
                 (List.fold_right
                    (fun dirtvar e -> Typed.BigLambdaDirt (dirtvar, e))
@@ -925,14 +954,11 @@ and type_plain_computation (st: state) = function
                       cons4
                       (Typed.Lambda
                          (Typed.abstraction_with_ty pat'
-                            (Unification.apply_substitution_ty sub_s2 ty_a')
+                            (Substitution.apply_substitutions_to_type st3'.substitutions ty_a')
                             c1''))))))
       in
-      { computation= Typed.LetRec ([(var, ty_f', e_f)], c2')
-      ; dtype= dty2
-      ; constraints= cons6
-      ; substitutions= sub_s1 @ sub_s2 @ sub_s3 }
-    *)
+      st3',{ computation= Typed.LetRec ([(var, ty_f', e_f)], c2')
+      ; dtype= dty2}
 
   | _ -> failwith __LOC__
 
@@ -940,12 +966,12 @@ and type_abstraction st (pat, comp) ty_in =
   let pat', st' = type_typed_pattern st pat ty_in in
   let st'',{computation= comp'; dtype= dty} = type_computation st' comp in
   ( (pat', comp')
-  , (Unification.apply_substitution_ty st'.substitutions ty_in, dty)
+  , (Substitution.apply_substitutions_to_type st'.substitutions ty_in, dty)
   , st'' )
 
 
 and type_effect_clause eff abs2 st =
-  let in_op_ty, out_op_ty = Untyped.EffectMap.find eff st.effects in
+  let in_op_ty, out_op_ty = Typed.EffectMap.find eff st.effects in
   let x, k, c_op = abs2 in
   let st_subbed = apply_sub_to_env st st.substitutions in
   let alpha_i, alpha_cons = Typed.fresh_ty_with_fresh_skel () in
@@ -990,17 +1016,17 @@ let finalize_constraint sub ct =
       , ( {Types.effect_set= s1; Types.row= row1}
         , {Types.effect_set= s2; Types.row= row2} ) ) ->
       assert (Types.EffectSet.subset s1 s2) ;
-      let sub' = Unification.add_var_coercion dcp (Typed.UnionDirt
+      let sub' = Substitution.add_dirt_var_coercion dcp (Typed.UnionDirt
               (s1, Typed.Empty (Types.closed_dirt (Types.EffectSet.diff s2 s1)))) sub in 
       let subs'' =
         match (row1, row2) with
         | Types.EmptyRow, Types.ParamRow dv2 ->
-            Unification.add_var_dirt_sub dv2 Types.empty_dirt sub'
+            Substitution.add_dirt_substitution dv2 Types.empty_dirt sub'
         | Types.ParamRow dv1, Types.EmptyRow ->
-            Unification.add_var_dirt_sub dv1 Types.empty_dirt sub'
+            Substitution.add_dirt_substitution dv1 Types.empty_dirt sub'
         | Types.ParamRow dv1, Types.ParamRow dv2 ->
-            Unification.add_var_dirt_sub dv1 Types.empty_dirt sub' |>
-            Unification.add_var_dirt_sub dv2 Types.empty_dirt 
+            Substitution.add_dirt_substitution dv1 Types.empty_dirt sub' |>
+            Substitution.add_dirt_substitution dv2 Types.empty_dirt 
         | Types.EmptyRow, Types.EmptyRow -> sub'
       in 
       subs''
@@ -1008,7 +1034,7 @@ let finalize_constraint sub ct =
   | Typed.TyParamHasSkel (tp, sk) -> failwith __LOC__
 
 
-let finalize_constraints c_list = List.fold_left (fun subs ct -> finalize_constraint subs ct) Unification.subsEmpty c_list
+let finalize_constraints c_list = List.fold_left (fun subs ct -> finalize_constraint subs ct) Substitution.empty c_list
 
 (* Typing top-level
 
@@ -1054,7 +1080,7 @@ let type_toplevel ~loc st c =
     ( (Typed.Value var_exp_ty_lambda) ), st *)
   | _
   ->
-    let fresh_st = {st with substitutions = Unification.subsEmpty} in
+    let fresh_st = {st with substitutions = Substitution.empty} in
     let st',{computation= ct; dtype= (ttype, dirt)} = type_computation fresh_st c in
     (* let x::xs = constraints in
     Print.debug "Single constraint : %t" (Typed.print_omega_ct x); *)
@@ -1064,23 +1090,23 @@ let type_toplevel ~loc st c =
       (Types.print_target_dirt dirt) ;
     Print.debug "Starting Set of Constraints " ;
     Unification.print_c_list  st'.constraints;
-    let sub, final = Unification.unify (Unification.subsEmpty, [], st'.constraints) in
+    let sub, final = Unification.unify (Substitution.empty, [], st'.constraints) in
     Print.debug "Final Constraints:" ;
     Unification.print_c_list final ;
-    let ct' = Unification.apply_substitution sub ct in
+    let ct' = Substitution.apply_substitutions_to_computation sub ct in
     Print.debug "New Computation : %t" (Typed.print_computation ct') ;
     let sub2 = 
       List.fold_left
-        (fun subs dp -> Unification.add_var_dirt_sub dp Types.empty_dirt subs) 
-        Unification.subsEmpty
+        (fun subs dp -> Substitution.add_dirt_substitution dp Types.empty_dirt subs) 
+        Substitution.empty
         (Types.DirtParamSet.elements (free_dirt_vars_computation ct'))
     in
-    let ct2 = Unification.apply_substitution sub2 ct' in
-    let sub3 = finalize_constraints (Unification.apply_sub sub2 final) in
-    let ct3 = Unification.apply_substitution sub3 ct2 in
+    let ct2 = Substitution.apply_substitutions_to_computation sub2 ct' in
+    let sub3 = finalize_constraints (Substitution.apply_substitutions_to_constraints sub2 final) in
+    let ct3 = Substitution.apply_substitutions_to_computation sub3 ct2 in
     Print.debug "New Computation : %t" (Typed.print_computation ct3) ;
     (* Print.debug "Remaining dirt variables "; *)
-    (* List.iter (fun dp -> Print.debug "%t" (Params.Dirt.print dp)) (List.sort_uniq compare (free_dirt_vars_computation ct')); *)
+    (* List.iter (fun dp -> Print.debug "%t" (CoreTypes.DirtParam.print dp)) (List.sort_uniq compare (free_dirt_vars_computation ct')); *)
     (*     let tch_ty, tch_dirt =
       TypeChecker.type_check_comp TypeChecker.new_checker_state ct3.term
     in

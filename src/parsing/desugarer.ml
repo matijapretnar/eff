@@ -1,7 +1,6 @@
 (** Desugaring of syntax into the core language. *)
 
 open CoreUtils
-module Utils = OldUtils
 module T = Type
 module Sugared = SugaredSyntax
 module Untyped = UntypedSyntax
@@ -9,17 +8,58 @@ module Untyped = UntypedSyntax
 type constructor_kind = Variant of bool | Effect of bool
 
 type state =
-  { context: (string, Untyped.variable) Assoc.t
-  ; constructors: (string, constructor_kind) Assoc.t
-  ; local_type_annotations: (string, Params.Ty.t) Assoc.t }
+  { context: (string, CoreTypes.Variable.t) Assoc.t
+  ; effect_symbols: (string, CoreTypes.Effect.t) Assoc.t
+  ; field_symbols: (string, CoreTypes.Field.t) Assoc.t
+  ; tyname_symbols: (string, CoreTypes.TyName.t) Assoc.t
+  ; constructors: (string, CoreTypes.Label.t * constructor_kind) Assoc.t
+  ; local_type_annotations: (string, CoreTypes.TyParam.t) Assoc.t }
 
 let initial_state =
-  let init_cons = [(Utils.cons, Variant true); (Utils.nil, Variant false)] in
+  let list_cons = (CoreTypes.cons_annot, (CoreTypes.cons, Variant true)) in
+  let list_nil = (CoreTypes.nil_annot, (CoreTypes.nil, Variant false)) in
+  let initial_types =
+    Assoc.of_list
+      [ ("bool", CoreTypes.bool_tyname)
+      ; ("int", CoreTypes.int_tyname)
+      ; ("unit", CoreTypes.unit_tyname)
+      ; ("string", CoreTypes.string_tyname)
+      ; ("float", CoreTypes.float_tyname)
+      ; ("list", CoreTypes.list_tyname)
+      ; ("empty", CoreTypes.empty_tyname) ]
+  in
   { context= Assoc.empty
-  ; constructors= Assoc.of_list init_cons
+  ; effect_symbols= Assoc.empty
+  ; field_symbols= Assoc.empty
+  ; tyname_symbols= initial_types
+  ; constructors= Assoc.of_list [list_cons; list_nil]
   ; local_type_annotations= Assoc.empty }
 
 let add_loc t loc = {it= t; at= loc}
+
+let effect_to_symbol state name =
+  match Assoc.lookup name state.effect_symbols with
+  | Some sym -> (state, sym)
+  | None ->
+      let sym = CoreTypes.Effect.fresh name in
+      let effect_symbols' = Assoc.update name sym state.effect_symbols in
+      ({state with effect_symbols= effect_symbols'}, sym)
+
+let field_to_symbol state name =
+  match Assoc.lookup name state.field_symbols with
+  | Some sym -> (state, sym)
+  | None ->
+      let sym = CoreTypes.Field.fresh name in
+      let field_symbols' = Assoc.update name sym state.field_symbols in
+      ({state with field_symbols= field_symbols'}, sym)
+
+let tyname_to_symbol state name =
+  match Assoc.lookup name state.tyname_symbols with
+  | Some sym -> (state, sym)
+  | None ->
+      let sym = CoreTypes.TyName.fresh name in
+      let tyname_symbols' = Assoc.update name sym state.tyname_symbols in
+      ({state with tyname_symbols= tyname_symbols'}, sym)
 
 (* ***** Desugaring of types. ***** *)
 (* Desugar a type, where only the given type, dirt and region parameters may appear.
@@ -34,8 +74,9 @@ let desugar_type type_sbst state =
   let rec desugar_type state {it= t; at= loc} =
     match t with
     | Sugared.TyApply (t, tys) ->
-        let state', tys' = fold_map desugar_type state tys in
-        (state', T.Apply (t, tys'))
+        let state', t' = tyname_to_symbol state t in
+        let state'', tys' = fold_map desugar_type state' tys in
+        (state'', T.Apply (t', tys'))
     | Sugared.TyParam t -> (
       match Assoc.lookup t type_sbst with
       | None -> Error.syntax ~loc "Unbound type parameter '%s" t
@@ -59,13 +100,13 @@ let desugar_type type_sbst state =
 let free_type_params t =
   let rec ty_params {it= t; at= loc} =
     match t with
-    | Sugared.TyApply (_, tys) -> OldUtils.flatten_map ty_params tys
+    | Sugared.TyApply (_, tys) -> List.map ty_params tys |> List.flatten
     | Sugared.TyParam s -> [s]
     | Sugared.TyArrow (t1, t2) -> ty_params t1 @ ty_params t2
-    | Sugared.TyTuple lst -> OldUtils.flatten_map ty_params lst
+    | Sugared.TyTuple lst -> List.map ty_params lst |> List.flatten
     | Sugared.TyHandler (t1, t2) -> ty_params t1 @ ty_params t2
   in
-  OldUtils.uniq (ty_params t)
+  unique_elements (ty_params t)
 
 
 let syntax_to_core_params ts =
@@ -79,25 +120,47 @@ let desugar_tydef state params def =
   let state', def' =
     match def with
     | Sugared.TyRecord flds ->
-        let state', flds' = Assoc.fold_map (desugar_type ty_sbst) state flds in
+        let field_desugar st (f, t) =
+          let st', f' = field_to_symbol st f in
+          let st'', t' = desugar_type ty_sbst st' t in
+          (st'', (f', t'))
+        in
+        let state', flds' = Assoc.kfold_map field_desugar state flds in
         (state', Tctx.Record flds')
-    | Sugared.TySum lst ->
-        let aux_desug st = function
-          | None -> (st, None)
+    | Sugared.TySum assoc ->
+        let aux_desug st (lbl, cons) =
+          let unsugared_lbl =
+            match Assoc.lookup lbl st.constructors with
+            | None -> failwith "unreachable"
+            | Some (lbl', cons_kind) -> lbl'
+          in
+          match cons with
+          | None -> (st, (unsugared_lbl, None))
           | Some t ->
               let st', t' = desugar_type ty_sbst st t in
-              (st', Some t')
+              (st', (unsugared_lbl, Some t'))
         in
         let constructors =
-          let aux = function
-            | None -> Variant false
-            | Some _ -> Variant true
+          (* desugar constructor names to Symbol  and add to state *)
+          let aux (lbl, cons) =
+            let unsugared_lbl =
+              match Assoc.lookup lbl state.constructors with
+              | None -> CoreTypes.Label.fresh lbl
+              | Some (lbl, _) -> lbl
+              (* Caught by inference for better error *)
+            in
+            match cons with
+            | None -> (lbl, (unsugared_lbl, Variant false))
+            | Some _ -> (lbl, (unsugared_lbl, Variant true))
           in
-          let new_cons = Assoc.map aux lst in
+          let new_cons = Assoc.kmap aux assoc in
           Assoc.concat new_cons state.constructors
         in
-        let state', lst' = Assoc.fold_map aux_desug state lst in
-        ({state' with constructors}, Tctx.Sum lst')
+        (* desugar and rename constructors in type *)
+        let state', assoc' =
+          Assoc.kfold_map aux_desug {state with constructors} assoc
+        in
+        (state', Tctx.Sum assoc')
     | Sugared.TyInline t ->
         let state', t' = desugar_type ty_sbst state t in
         (state', Tctx.Inline t')
@@ -107,16 +170,22 @@ let desugar_tydef state params def =
 
 (** [desugar_tydefs defs] desugars the simultaneous type definitions [defs]. *)
 let desugar_tydefs state sugared_defs =
-  let desugar_fold state (params, def) = desugar_tydef state params def in
-  Assoc.fold_map desugar_fold state sugared_defs
+  let desugar_fold st (name, (params, def)) =
+    (* First desugar the type names *)
+    let st', sym = tyname_to_symbol st name in
+    (* Then the types themselves *)
+    let st'', (params', def') = desugar_tydef st' params def in
+    (st'', (sym, (params', def')))
+  in
+  Assoc.kfold_map desugar_fold state sugared_defs
 
 
 (* ***** Desugaring of expressions and computations. ***** *)
 
 (** [fresh_var opt] creates a fresh variable on each call *)
 let fresh_var = function
-  | None -> Untyped.Variable.fresh "anon"
-  | Some x -> Untyped.Variable.fresh x
+  | None -> CoreTypes.Variable.fresh "$anon"
+  | Some x -> CoreTypes.Variable.fresh x
 
 
 let id_abstraction loc =
@@ -164,24 +233,29 @@ let desugar_pattern state ?(initial_forbidden= []) p =
           let state', ps' = fold_map desugar_pattern state ps in
           (state', Untyped.PTuple ps')
       | Sugared.PRecord flds ->
-          let state', flds' = Assoc.fold_map desugar_pattern state flds in
+          let field_desugar st (f, p) =
+            let st', f' = field_to_symbol st f in
+            let st'', p' = desugar_pattern st' p in
+            (st'', (f', p'))
+          in
+          let state', flds' = Assoc.kfold_map field_desugar state flds in
           (state', Untyped.PRecord flds')
       | Sugared.PVariant (lbl, p) -> (
         match Assoc.lookup lbl state.constructors with
         | None -> Error.typing ~loc "Unbound constructor %s" lbl
-        | Some (Variant var) -> (
+        | Some (cons_lbl, Variant var) -> (
           match (var, p) with
           | true, Some p ->
               let state', p' = desugar_pattern state p in
-              (state', Untyped.PVariant (lbl, Some p'))
-          | false, None -> (state, Untyped.PVariant (lbl, None))
+              (state', Untyped.PVariant (cons_lbl, Some p'))
+          | false, None -> (state, Untyped.PVariant (cons_lbl, None))
           | true, None ->
               Error.typing ~loc
                 "Constructor %s should be applied to an argument." lbl
           | false, Some _ ->
               Error.typing ~loc
                 "Constructor %s cannot be applied to an argument." lbl )
-        | Some (Effect eff) ->
+        | Some (cons_lbl, Effect eff) ->
             Error.typing ~loc
               "Constructor %s should not be an effect constructor." lbl )
       | Sugared.PConst c -> (state, Untyped.PConst c)
@@ -235,26 +309,26 @@ let rec desugar_expression state {it= t; at= loc} =
         let state', w, es = desugar_expressions state ts in
         (state', w, Untyped.Tuple es)
     | Sugared.Record ts ->
-        if not (Utils.no_duplicates (Assoc.keys_of ts)) then
+        if not (no_duplicates (Assoc.keys_of ts)) then
           Error.syntax ~loc "Fields in a record must be distinct" ;
         let state', w, es = desugar_record_fields state ts in
         (state', w, Untyped.Record es)
     | Sugared.Variant (lbl, t) -> (
       match Assoc.lookup lbl state.constructors with
       | None -> Error.typing ~loc "Unbound constructor %s" lbl
-      | Some (Variant var) -> (
+      | Some (cons_lbl, Variant var) -> (
         match (var, t) with
         | true, Some t ->
             let state', w, e = desugar_expression state t in
-            (state', w, Untyped.Variant (lbl, Some e))
-        | false, None -> (state, [], Untyped.Variant (lbl, None))
+            (state', w, Untyped.Variant (cons_lbl, Some e))
+        | false, None -> (state, [], Untyped.Variant (cons_lbl, None))
         | true, None ->
             Error.typing ~loc
               "Constructor %s should be applied to an argument." lbl
         | false, Some _ ->
             Error.typing ~loc
               "Constructor %s cannot be applied to an argument." lbl )
-      | Some (Effect eff) ->
+      | Some (cons_lbl, Effect eff) ->
           Error.typing ~loc
             "Constructor %s should not be an effect constructor." lbl )
     (* Terms that are desugared into computations. We list them explicitly in
@@ -297,10 +371,13 @@ and desugar_computation state {it= t; at= loc} =
         let state', w1, e1 = desugar_expression state t1 in
         let state'', w2, e2 = desugar_expression state' t2 in
         (state'', w1 @ w2, Untyped.Apply (e1, e2))
-    | Sugared.Effect (eff, t) ->
-        let state', w, e = desugar_expression state t in
-        let loc_eff = add_loc (Untyped.Effect eff) loc in
-        (state', w, Untyped.Apply (loc_eff, e))
+    | Sugared.Effect (eff, t) -> (
+      match Assoc.lookup eff state.effect_symbols with
+      | Some eff' ->
+          let state', w, e = desugar_expression state t in
+          let loc_eff = add_loc (Untyped.Effect eff') loc in
+          (state', w, Untyped.Apply (loc_eff, e))
+      | None -> Error.typing ~loc "Unknown operation %s" eff )
     | Sugared.Match (t, cs) -> match_constructor state loc t cs
     | Sugared.Handle (t1, t2) ->
         let state', w1, e1 = desugar_expression state t1 in
@@ -408,9 +485,10 @@ and desugar_record_fields state flds =
   match Assoc.pop flds with
   | None -> (state, [], Assoc.empty)
   | Some ((fld, t), flds') ->
-      let state', w, e = desugar_expression state t in
-      let state'', ws, es = desugar_record_fields state flds' in
-      (state'', w @ ws, Assoc.update fld e es)
+      let state', fld' = field_to_symbol state fld in
+      let state'', w, e = desugar_expression state' t in
+      let state''', ws, es = desugar_record_fields state'' flds' in
+      (state''', w @ ws, Assoc.update fld' e es)
 
 
 and desugar_handler loc state
@@ -423,10 +501,14 @@ and desugar_handler loc state
     | None -> Assoc.update eff [a2] assoc
     | Some a2s -> Assoc.replace eff (a2 :: a2s) assoc
   in
-  let rec construct_eff_clause state eff_cs_lst =
+  let rec construct_eff_clause state (eff, eff_cs_lst) =
+    (* transform string name to CoreTypes.Effect.t *)
+    let state', eff' = effect_to_symbol state eff in
     match eff_cs_lst with
     | [] -> assert false
-    | [a2] -> desugar_abstraction2 state a2
+    | [a2] ->
+        let state'', a2' = desugar_abstraction2 state' a2 in
+        (state'', (eff', a2'))
     | a2s ->
         let x = fresh_var (Some "$eff_param") in
         let k = fresh_var (Some "$continuation") in
@@ -443,13 +525,19 @@ and desugar_handler loc state
           (state', add_loc (Untyped.Match (add_loc x_k_vars loc, a2s')) loc)
         in
         let p1, p2 = (Untyped.PVar x, Untyped.PVar k) in
-        let state', match_term = match_term_fun state in
-        (state', (add_loc p1 loc, add_loc p2 loc, match_term))
+        let state'', match_term = match_term_fun state' in
+        let new_eff_cs =
+          (eff', (add_loc p1 loc, add_loc p2 loc, match_term))
+        in
+        (state'', new_eff_cs)
   in
+  (* group eff cases by effects into lumps to transform into matches *)
   let collected_eff_cs = Assoc.fold_right group_eff_cs eff_cs Assoc.empty in
+  (* construct match cases for effects with more than one pattern *)
   let state', untyped_eff_cs =
-    Assoc.fold_map construct_eff_clause state collected_eff_cs
+    Assoc.kfold_map construct_eff_clause state collected_eff_cs
   in
+  (* construct match case for value *)
   let state'', untyped_val_a =
     match val_cs with
     | [] -> (state', id_abstraction loc)
@@ -461,6 +549,7 @@ and desugar_handler loc state
         , ( add_loc (Untyped.PVar v) loc
           , add_loc (Untyped.Match (v_var, cs)) loc ) )
   in
+  (* construct match case for finally clause *)
   let state''', untyped_fin_a =
     match fin_cs with
     | [] -> (state'', id_abstraction loc)
@@ -556,6 +645,7 @@ let desugar_external state (x, t, f) =
 
 
 let desugar_def_effect state (eff, (ty1, ty2)) =
-  let state', ty1' = desugar_type Assoc.empty state ty1 in
-  let state'', ty2' = desugar_type Assoc.empty state' ty2 in
-  (eff, (ty1', ty2'))
+  let state', eff' = effect_to_symbol state eff in
+  let state'', ty1' = desugar_type Assoc.empty state' ty1 in
+  let state''', ty2' = desugar_type Assoc.empty state'' ty2 in
+  (state''', (eff', (ty1', ty2')))

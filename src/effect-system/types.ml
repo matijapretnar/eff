@@ -1,41 +1,36 @@
-module EffectSet = Set.Make (struct
-  type t = OldUtils.effect
-
-  let compare = compare
-end)
-
-module TyParamSet = Set.Make (Params.Ty)
-module DirtParamSet = Set.Make (Params.Dirt)
+module EffectSet = Set.Make (CoreTypes.Effect)
+module TyParamSet = Set.Make (CoreTypes.TyParam)
+module DirtParamSet = Set.Make (CoreTypes.DirtParam)
 
 type effect_set = EffectSet.t
 
 type skeleton =
-  | SkelParam of Params.Skel.t
+  | SkelParam of CoreTypes.SkelParam.t
   | PrimSkel of prim_ty
   | SkelArrow of skeleton * skeleton
-  | SkelApply of OldUtils.tyname * skeleton list
+  | SkelApply of CoreTypes.TyName.t * skeleton list
   | SkelHandler of skeleton * skeleton
   | SkelTuple of skeleton list
-  | ForallSkel of Params.Skel.t * skeleton
+  | ForallSkel of CoreTypes.SkelParam.t * skeleton
 
 and target_ty =
-  | TyParam of Params.Ty.t
-  | Apply of OldUtils.tyname * target_ty list
+  | TyParam of CoreTypes.TyParam.t
+  | Apply of CoreTypes.TyName.t * target_ty list
   | Arrow of target_ty * target_dirty
   | Tuple of target_ty list
   | Handler of target_dirty * target_dirty
   | PrimTy of prim_ty
   | QualTy of ct_ty * target_ty
   | QualDirt of ct_dirt * target_ty
-  | TySchemeTy of Params.Ty.t * skeleton * target_ty
-  | TySchemeDirt of Params.Dirt.t * target_ty
-  | TySchemeSkel of Params.Skel.t * target_ty
+  | TySchemeTy of CoreTypes.TyParam.t * skeleton * target_ty
+  | TySchemeDirt of CoreTypes.DirtParam.t * target_ty
+  | TySchemeSkel of CoreTypes.SkelParam.t * target_ty
 
 and target_dirty = (target_ty * dirt)
 
 and dirt = {effect_set: effect_set; row: row}
 
-and row = ParamRow of Params.Dirt.t | EmptyRow
+and row = ParamRow of CoreTypes.DirtParam.t | EmptyRow
 
 and prim_ty = IntTy | BoolTy | StringTy | FloatTy
 
@@ -48,17 +43,17 @@ and ct_dirty = (target_dirty * target_dirty)
 let rec print_target_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
-  | TyParam p -> Params.Ty.print p ppf
+  | TyParam p -> CoreTypes.TyParam.print p ppf
   | Arrow (t1, (t2, drt)) ->
       print ~at_level:5 "@[%t -%t%s@ %t@]"
         (print_target_ty ~max_level:4 t1)
         (print_target_dirt drt) (Symbols.short_arrow ())
         (print_target_ty ~max_level:5 t2)
-  | Apply (t, []) -> print "%s" t
+  | Apply (t, []) -> print "%t" (CoreTypes.TyName.print t)
   | Apply (t, [s]) ->
-      print ~at_level:1 "%t %s" (print_target_ty ~max_level:1 s) t
+      print ~at_level:1 "%t %t" (print_target_ty ~max_level:1 s) (CoreTypes.TyName.print t)
   | Apply (t, ts) ->
-      print ~at_level:1 "(%t) %s" (Print.sequence ", " print_target_ty ts) t
+      print ~at_level:1 "(%t) %t" (Print.sequence ", " print_target_ty ts) (CoreTypes.TyName.print t)
   | Tuple [] -> print "unit"
   | Tuple tys ->
       print ~at_level:2 "@[<hov>%t@]"
@@ -77,26 +72,26 @@ let rec print_target_ty ?max_level ty ppf =
   | QualDirt (c, tty) ->
       print "%t => %t" (print_ct_dirt c) (print_target_ty tty)
   | TySchemeTy (p, sk, tty) ->
-      print "ForallTy (%t:%t). %t" (Params.Ty.print p) (print_skeleton sk)
+      print "ForallTy (%t:%t). %t" (CoreTypes.TyParam.print p) (print_skeleton sk)
         (print_target_ty tty)
   | TySchemeDirt (p, tty) ->
-      print "ForallDirt %t. %t" (Params.Dirt.print p) (print_target_ty tty)
+      print "ForallDirt %t. %t" (CoreTypes.DirtParam.print p) (print_target_ty tty)
   | TySchemeSkel (p, tty) ->
-      print "ForallSkel %t. %t" (Params.Skel.print p) (print_target_ty tty)
+      print "ForallSkel %t. %t" (CoreTypes.SkelParam.print p) (print_target_ty tty)
 
 
 and print_skeleton ?max_level sk ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match sk with
-  | SkelParam p -> Params.Skel.print p ppf
+  | SkelParam p -> CoreTypes.SkelParam.print p ppf
   | PrimSkel s -> print "prim_skel %t" (print_prim_ty s)
   | SkelArrow (sk1, sk2) ->
       print "%t -sk-> %t" (print_skeleton sk1) (print_skeleton sk2)
-  | SkelApply (t, []) -> print "%s" t
+  | SkelApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
   | SkelApply (t, [s]) ->
-      print ~at_level:1 "%t %s" (print_skeleton ~max_level:1 s) t
+      print ~at_level:1 "%t %t" (print_skeleton ~max_level:1 s) (CoreTypes.TyName.print t)
   | SkelApply (t, ts) ->
-      print ~at_level:1 "(%t) %s" (Print.sequence ", " print_skeleton ts) t
+      print ~at_level:1 "(%t) %t" (Print.sequence ", " print_skeleton ts) (CoreTypes.TyName.print t)
   | SkelTuple [] -> print "unit"
   | SkelTuple sks ->
       print ~at_level:2 "@[<hov>%t@]"
@@ -104,7 +99,7 @@ and print_skeleton ?max_level sk ppf =
   | SkelHandler (sk1, sk2) ->
       print "%t =sk=> %t" (print_skeleton sk1) (print_skeleton sk2)
   | ForallSkel (p, sk1) ->
-      print "ForallSkelSkel %t. %t" (Params.Skel.print p) (print_skeleton sk1)
+      print "ForallSkelSkel %t. %t" (CoreTypes.SkelParam.print p) (print_skeleton sk1)
 
 
 and print_target_dirt drt ppf =
@@ -112,15 +107,13 @@ and print_target_dirt drt ppf =
   match (drt.effect_set, drt.row) with
   | effect_set, EmptyRow -> print "{%t}" (print_effect_set effect_set)
   | effect_set, ParamRow p when EffectSet.is_empty effect_set ->
-      print "%t" (Params.Dirt.print p)
+      print "%t" (CoreTypes.DirtParam.print p)
   | effect_set, ParamRow p ->
-      print "{%t} U %t" (print_effect_set effect_set) (Params.Dirt.print p)
+      print "{%t} U %t" (print_effect_set effect_set) (CoreTypes.DirtParam.print p)
 
 
 and print_effect_set effect_set =
-  Print.sequence ","
-    (fun str ppf -> Format.pp_print_string ppf str)
-    (EffectSet.elements effect_set)
+  Print.sequence "," CoreTypes.Effect.print (EffectSet.elements effect_set)
 
 
 and print_target_dirty (t1, drt1) ppf =
@@ -192,7 +185,7 @@ let no_effect_dirt dirt_param =
   {effect_set= EffectSet.empty; row= ParamRow dirt_param}
 
 
-let fresh_dirt () = no_effect_dirt (Params.Dirt.fresh ())
+let fresh_dirt () = no_effect_dirt (CoreTypes.DirtParam.fresh ())
 
 let closed_dirt effect_set = {effect_set; row= EmptyRow}
 
@@ -244,7 +237,7 @@ let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
     match Assoc.lookup x ty_sbst with
     | Some x' -> ((ty_sbst, dirt_sbst), TyParam x')
     | None ->
-        let y = Params.Ty.fresh () in
+        let y = CoreTypes.TyParam.fresh () in
         ((Assoc.update x y ty_sbst, dirt_sbst), TyParam y) )
   | Arrow (a, c) ->
       let (a_ty_sbst, a_dirt_sbst), a' =
@@ -292,7 +285,7 @@ and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
     match Assoc.lookup x dirt_sbst with
     | Some x' -> ((ty_sbst, dirt_sbst), {drt with row= ParamRow x'})
     | None ->
-        let y = Params.Dirt.fresh () in
+        let y = CoreTypes.DirtParam.fresh () in
         ((ty_sbst, Assoc.update x y dirt_sbst), {drt with row= ParamRow y})
     )
   | EmptyRow -> ((ty_sbst, dirt_sbst), drt)

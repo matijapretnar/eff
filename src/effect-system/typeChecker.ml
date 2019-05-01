@@ -4,12 +4,12 @@ open Unification
 
 type state =
   { var_types: (Typed.variable, Types.target_ty) Assoc.t
-  ; ty_params: Params.Ty.t list
-  ; dirt_params: Params.Dirt.t list
-  ; skel_params: Params.Skel.t list
-  ; ty_param_skeletons: (Params.Ty.t, Types.skeleton) Assoc.t
-  ; ty_coer_types: (Params.TyCoercion.t, Types.ct_ty) Assoc.t
-  ; dirt_coer_types: (Params.DirtCoercion.t, Types.ct_dirt) Assoc.t }
+  ; ty_params: CoreTypes.TyParam.t list
+  ; dirt_params: CoreTypes.DirtParam.t list
+  ; skel_params: CoreTypes.SkelParam.t list
+  ; ty_param_skeletons: (CoreTypes.TyParam.t, Types.skeleton) Assoc.t
+  ; ty_coer_types: (CoreTypes.TyCoercionParam.t, Types.ct_ty) Assoc.t
+  ; dirt_coer_types: (CoreTypes.DirtCoercionParam.t, Types.ct_dirt) Assoc.t }
 
 
 let extend_ty_params st ty_var = {st with ty_params= ty_var :: st.ty_params}
@@ -164,9 +164,9 @@ let rec type_of_ty_coercion st ty_coer =
     match type_of_ty_coercion st ty_coer1 with
     | Types.TySchemeTy (ty_param1, _, t1), Types.TySchemeTy (ty_param2, _, t2) ->
         check_well_formed_ty st tty1 ;
-        let sub = Unification.add_type_sub_e ty_param1 tty1 in
+        let sub = Substitution.add_type_substitution_e ty_param1 tty1 in
         assert (ty_param1 = ty_param2) ;
-        (Unification.apply_sub_ty sub t1, Unification.apply_sub_ty sub t2)
+        (Substitution.apply_substitutions_to_type sub t1, Substitution.apply_substitutions_to_type sub t2)
     | _ -> assert false )
   | ForallDirt (dirt_param, ty_coer1) ->
       let new_st = extend_dirt_params st dirt_param in
@@ -176,9 +176,9 @@ let rec type_of_ty_coercion st ty_coer =
     match type_of_ty_coercion st ty_coer1 with
     | Types.TySchemeDirt (drt_param1, t1), Types.TySchemeDirt (drt_param2, t2) ->
         check_well_formed_dirt st drt ;
-        let sub = Unification.add_var_dirt_sub_e drt_param1 drt in
+        let sub = Substitution.add_dirt_substitution_e drt_param1 drt in
         assert (drt_param1 = drt_param2) ;
-        (Unification.apply_sub_ty sub t1, Unification.apply_sub_ty sub t2)
+        (Substitution.apply_substitutions_to_type sub t1, Substitution.apply_substitutions_to_type sub t2)
     | _ -> assert false )
   | PureCoercion dirty_coer1 ->
       let (t1, _), (t2, _) = type_of_dirty_coercion st dirty_coer1 in
@@ -294,7 +294,6 @@ let rec type_of_expression st e =
       Types.Arrow (ty1, c_ty)
   | Tuple es -> Types.Tuple (List.map (fun e -> type_of_expression st e) es)
   | Variant (lbl, e) ->
-      let loc = Location.unknown in
       let ty_in, ty_out = Types.constructor_signature lbl in
       let u' = type_of_expression st e in
       assert (Types.types_are_equal u' ty_in) ;
@@ -324,22 +323,22 @@ let rec type_of_expression st e =
     match type_of_expression st e1 with
     | Types.TySchemeTy (p_e1, skel, ty_e1) ->
         check_well_formed_ty st tty ;
-        let sub = Unification.add_type_sub_e p_e1 tty in
-        Unification.apply_sub_ty sub ty_e1
+        let sub = Substitution.add_type_substitution_e p_e1 tty in
+        Substitution.apply_substitutions_to_type sub ty_e1
     | _ -> assert false )
   | ApplySkelExp (e1, sk) -> (
     match type_of_expression st e1 with
     | Types.TySchemeSkel (p_e1, ty_e1) ->
         check_well_formed_skeleton st sk ;
-        let sub = Unification.add_skel_sub_e p_e1 sk in
-        Unification.apply_sub_ty sub ty_e1
+        let sub = Substitution.add_skel_param_substitution_e p_e1 sk in
+        Substitution.apply_substitutions_to_type sub ty_e1
     | _ -> assert false )
   | ApplyDirtExp (e1, d1) -> (
     match type_of_expression st e1 with
     | Types.TySchemeDirt (p_e1, ty_e1) ->
         check_well_formed_dirt st d1 ;
-        let sub = Unification.add_var_dirt_sub_e p_e1 d1 in
-        Unification.apply_sub_ty sub ty_e1
+        let sub = Substitution.add_dirt_substitution_e p_e1 d1 in
+        Substitution.apply_substitutions_to_type sub ty_e1
     | _ -> assert false )
   | LambdaTyCoerVar (tcp1, ct_ty1, e1) ->
       let st' = extend_ty_coer_types st tcp1 ct_ty1 in
@@ -436,7 +435,7 @@ and type_of_handler st h =
     assert (Types.dirty_types_are_equal type_cv ty_op) ;
     eff
   in
-  let handlers_ops = OldUtils.map mapper (Assoc.to_list h.effect_clauses) in
+  let handlers_ops = List.map mapper (Assoc.to_list h.effect_clauses) in
   let handlers_ops_set = Types.EffectSet.of_list handlers_ops in
   let t_cv, d_cv = type_cv in
   let input_dirt = Types.add_effects handlers_ops_set d_cv in

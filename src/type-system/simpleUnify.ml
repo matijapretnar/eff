@@ -16,15 +16,15 @@ let solve cstr =
         else sbst := Type.compose_subst (Assoc.update p t Assoc.empty) !sbst
     | Type.Arrow (u1, v1), Type.Arrow (u2, v2) ->
         unify loc v1 v2 ; unify loc u2 u1
-    | Type.Tuple lst1, Type.Tuple lst2 when List.length lst1 = List.length lst2 ->
+    | Type.Tuple lst1, Type.Tuple lst2 when List.length lst1 = List.length lst2
+      ->
         List.iter2 (unify loc) lst1 lst2
     | Type.Apply (t1, lst1), Type.Apply (t2, lst2)
       when t1 = t2 && List.length lst1 = List.length lst2 ->
         List.iter2 (unify loc) lst1 lst2
     (* The following two cases cannot be merged into one, as the whole matching
        fails if both types are Apply, but only the second one is transparent. *)
-    | Type.Apply (t1, lst1), t2
-      when Tctx.transparent ~loc t1 -> (
+    | Type.Apply (t1, lst1), t2 when Tctx.transparent ~loc t1 -> (
       match Tctx.ty_apply ~loc t1 lst1 with
       | Tctx.Inline t -> unify loc t2 t
       | Tctx.Sum _ | Tctx.Record _ ->

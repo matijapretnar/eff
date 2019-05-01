@@ -15,16 +15,18 @@ type pervasives =
   | PervasivesNone
   (* do not use pervasives *)
   | PervasivesDefault
-  (* look in the default locations *)
-  | PervasivesFile of string
 
-(* look for pervasives in a specific location *)
+(* look in the default locations *)
 
 val pervasives_file : pervasives ref
 (** Location of the pervasives file *)
 
-val disable_typing : bool ref
-(** Should type-checking be disabled? *)
+type backend =
+  | Runtime
+  | Ocaml of string
+  | Multicore of string
+
+val backend : backend ref
 
 val disable_optimization : bool ref
 (** Should compiled computations be optimized? *)
@@ -57,7 +59,3 @@ val explicit_subtyping : bool ref
 val output_formatter : Format.formatter ref
 
 val error_formatter : Format.formatter ref
-
-type backend = MulticoreOCaml | PlainOCaml
-
-val backend : backend ref

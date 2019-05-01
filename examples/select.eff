@@ -17,16 +17,16 @@ let selection_collector desired_outcome = handler
   | effect (Select_int (name, choices)) k -> (fun selected ->
     (* Check association list if variable already chosen. *)
     (match assoc name selected with
-     | Some y -> (continue k y) selected
+     | Some y -> (k y) selected
      | None ->
        (* Select a value and try to get desired outcome. *)
-         let rec try = function
+         let rec try_choice = function
            | [] -> Failure
            | y::ys ->
-               (match (continue k y) ((name,y)::selected) with
+               (match (k y) ((name,y)::selected) with
                   | Success lst -> Success lst
-                  | Failure -> try ys)
-         in try choices))
+                  | Failure -> try_choice ys)
+         in try_choice choices))
   | outcome -> (fun selected ->
     (* Check if outcome is the desired one. *)
     if outcome = desired_outcome then Success selected else Failure)
@@ -49,15 +49,15 @@ effect Select_bool: int * bool list -> bool
 let selection_collector desired_outcome = handler
   | effect (Select_bool (name, choices)) k -> (fun selected ->
     (match assoc name selected with
-     | Some y -> (continue k y) selected
+     | Some y -> (k y) selected
      | None ->
-         let rec try = function
+         let rec try_choice = function
            | [] -> Failure
            | y::ys ->
-               (match (continue k y) ((name,y)::selected) with
+               (match (k y) ((name,y)::selected) with
                   | Success lst -> Success lst
-                  | Failure -> try ys)
-         in try choices))
+                  | Failure -> try_choice ys)
+         in try_choice choices))
   | outcome -> (fun selected ->
     if outcome = desired_outcome then Success selected else Failure)
   | finally f -> f [];;

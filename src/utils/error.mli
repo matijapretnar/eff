@@ -14,7 +14,8 @@ type t
 val print : t -> unit
 (** Print an error. *)
 
-exception Error of t  (** Exception representing all possible Eff errors. *)
+(** Exception representing all possible Eff errors. *)
+exception Error of t
 
 val fatal : ?loc:Location.t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 (** Fatal errors are errors over which Eff has no control, for example when

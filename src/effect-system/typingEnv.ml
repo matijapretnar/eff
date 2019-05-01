@@ -10,5 +10,5 @@ let return_context ctx = Assoc.to_list ctx
 
 let apply_sub ctx sub =
   Assoc.kmap
-    (fun (var, ty) -> (var, Unification.apply_substitution_ty sub ty))
+    (fun (var, ty) -> (var, Substitution.apply_substitutions_to_type sub ty))
     ctx

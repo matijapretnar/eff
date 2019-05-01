@@ -11,7 +11,7 @@ let rec print_pattern ?max_level p ppf =
   | Erasure.PEConst c -> Const.print c ppf
   | Erasure.PETuple lst -> Print.tuple print_pattern lst ppf
   | Erasure.PERecord lst -> Print.record print_pattern lst ppf
-  | Erasure.PEVariant (lbl, None) when lbl = OldUtils.nil -> print "[]"
+  | Erasure.PEVariant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
   | Erasure.PEVariant (lbl, None) -> print "%s" lbl
   | Erasure.PEVariant ("(::)", Some Erasure.PETuple [p1; p2]) ->
       print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)

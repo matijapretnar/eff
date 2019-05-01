@@ -22,17 +22,16 @@ let subscript sub =
               ; "\226\130\134"
               ; "\226\130\135"
               ; "\226\130\136"
-              ; "\226\130\137" ] (i mod 10)
+              ; "\226\130\137" ]
+              (i mod 10)
           in
           if i < 10 then last else sub (i / 10) ^ last
         in
         sub i
 
-
 let param ascii_symbol utf8_symbol index poly ppf =
   let prefix = if poly then "_" else ""
   and symbol = if !Config.ascii then ascii_symbol else utf8_symbol in
   Print.print ppf "%s%s%s" prefix symbol (subscript (Some (index + 1)))
-
 
 let ty_param = param "ty" "\207\132"

@@ -2,14 +2,16 @@
 
 let version = "5.1"
 
-type pervasives =
-  | PervasivesNone
-  | PervasivesDefault
-  | PervasivesFile of string
+type pervasives = PervasivesNone | PervasivesDefault
 
 let pervasives_file = ref PervasivesDefault
 
-let disable_typing = ref false
+type backend =
+  | Runtime
+  | Ocaml of string
+  | Multicore of string
+
+let backend = ref Runtime
 
 let disable_optimization = ref false
 
@@ -32,7 +34,3 @@ let explicit_subtyping = ref false
 let output_formatter = ref Format.std_formatter
 
 let error_formatter = ref Format.err_formatter
-
-type backend = MulticoreOCaml | PlainOCaml
-
-let backend = ref PlainOCaml

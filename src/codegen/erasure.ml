@@ -5,14 +5,14 @@ module EffectMap = Map.Make (String)
 
 type variable = Variable.t
 
-type effect = OldUtils.effect * (Types.target_ty * Types.target_ty)
+type effect = CoreTypes.Effect.t * (Types.target_ty * Types.target_ty)
 
 type e_pattern =
   | PEVar of variable
   | PEAs of e_pattern * variable
   | PETuple of e_pattern list
-  | PERecord of (OldUtils.field, e_pattern) Assoc.t
-  | PEVariant of OldUtils.label * e_pattern option
+  | PERecord of (CoreTypes.field, e_pattern) Assoc.t
+  | PEVariant of CoreTypes.label * e_pattern option
   | PEConst of Const.t
   | PENonbinding
 
@@ -22,12 +22,12 @@ type e_expression =
   | EBuiltIn of string * int
   | EConst of Const.t
   | ETuple of e_expression list
-  | ERecord of (OldUtils.field, e_expression) Assoc.t
-  | EVariant of OldUtils.label * e_expression option
+  | ERecord of (CoreTypes.field, e_expression) Assoc.t
+  | EVariant of CoreTypes.label * e_expression option
   | ELambda of e_abstraction_with_ty
   | EEffect of effect
   | EHandler of e_handler
-  | EBigLambdaSkel of Params.Skel.t * e_expression
+  | EBigLambdaSkel of CoreTypes.SkelParam.t * e_expression
   | EApplySkelExp of e_expression * Types.skeleton
 
 (** Impure computations *)
