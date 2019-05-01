@@ -878,6 +878,7 @@ and type_plain_computation (st: state) = function
       let dco2, q_d = Typed.fresh_dirt_coer (dirt_D1, dirt_d) in
       let st1' = st' |> add_constraint q_ty |> add_constraint q_d in 
       let sub_s', cons_s' = Unification.unify (Substitution.empty, [], st1'.constraints) in
+      let st = merge_substitutions sub_s' st in
       let st2 = apply_sub_to_env st sub_s' |> add_constraints cons_s' in
       let ty_A1' = Substitution.apply_substitutions_to_type sub_s' ty_A1 in
       let dirt_D1' = Substitution.apply_substitutions_to_dirt sub_s' dirt_D1 in (* Do we also need to substitute dirt? *)
