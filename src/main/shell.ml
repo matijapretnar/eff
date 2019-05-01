@@ -235,15 +235,17 @@ let compile_file ppf filename st =
         Format.fprintf out_ppf "\n;;\n " ;
         print_endline "ended found something!" ;
         {state with desugarer_state = desugarer_state'; effect_system_state = effect_system_state}
-    | Commands.DefEffect tydef ->
-        let (eff, (ty1, ty2)) = Desugarer.desugar_def_effect state.desugarer_state tydef in
+    | Commands.DefEffect effect_def ->
+        let eff, (ty1, ty2) =
+          Desugarer.desugar_def_effect state.desugarer_state effect_def
+        in
         let effect_system_state =
           ExplicitInfer.add_effect eff (ty1, ty2) state.effect_system_state
         in
         Print.print out_ppf
           "type (_, _) effect += Effect_%s : (int, int) effect" eff ;
         Format.fprintf out_ppf "\n;;\n " ;
-        {st with effect_system_state}
+        {state with effect_system_state}
     | Commands.External ext -> (
       let desugarer_state, (x, ty, f) = Desugarer.desugar_external state.desugarer_state ext in
       match Assoc.lookup f External.values with
@@ -253,7 +255,7 @@ let compile_file ppf filename st =
             (CodegenPlainOCaml.print_variable x)
             f ;
           Format.fprintf out_ppf "\n;;\n " ;
-          { st with
+          { state with
             type_system_state= SimpleCtx.extend state.type_system_state x (Type.free_params ty, ty)
           ; effect_system_state=
               { state.effect_system_state with
@@ -262,10 +264,10 @@ let compile_file ppf filename st =
           ; type_checker_state= TypeChecker.extend_var_types state.type_checker_state x new_ty
           ; runtime_state = Eval.update x v state.runtime_state }
       | None -> Error.runtime "unknown external symbol %s." f )
-    | _ -> st
+    | _ -> state
   in
   let cmds = Lexer.read_file parse filename in
-  let st = List.fold_left compile_cmd st (List.rev cmds) in
+  let st = List.fold_left compile_cmd st cmds in
   Format.fprintf out_ppf "@? " ;
   flush out_channel ;
   close_out out_channel ;
