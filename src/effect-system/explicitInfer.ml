@@ -2,31 +2,70 @@ open CoreUtils
 module Untyped = UntypedSyntax
 open Typed
 
-(* INFERENCE STATE *)
+type label = CoreTypes.Label.t
+type field = CoreTypes.Field.t
+
+(* [READER] LOCAL ENVIRONMENT *)
+
+let initial_lcl_ty_env = TypingEnv.empty
+
+(* Add a single term binding to the local typing environment *)
+let extendLclCtxt env x scheme = TypingEnv.update env x scheme
+
+(*
+let add_def env x ty_sch =
+  {env with context = TypingEnv.update env.context x ty_sch}
+
+let apply_sub_to_env env sub =
+  {env with context = TypingEnv.apply_sub env.context sub}
+
+let extend_env vars env =
+  List.fold_right
+    (fun (x, ty_sch) env ->
+      {env with context = TypingEnv.update env.context x ty_sch} )
+    vars env
+*)
+
+(* [WRITER] SUBSTITUTION *)
+
+(* Extend the generated substitution *)
+let extendGenSub acc sub = Substitution.merge acc sub (* GEORGE: I hope to God for the order to be correct here *)
+
+(* [STATE] INFERENCE STATE *)
 
 type state =
-  { context: TypingEnv.t
-  ; effects: (Types.target_ty * Types.target_ty) Typed.EffectMap.t
-  ; substitutions: Substitution.t
-  ; constraints: Typed.omega_ct list
+  { gblCtxt: TypingEnv.t                                            (* Global Typing Environment *)
+  ; effects: (Types.target_ty * Types.target_ty) Typed.EffectMap.t  (* Valid Effects             *)
+  ; substitutions: Substitution.t                                   (* Accumulated Substitution  *)
+  ; constraints: Typed.omega_ct list                                (* Type Constraints          *)
   }
 
-let merge_substitutions subs state = {state with substitutions= Substitution.merge state.substitutions subs}
+(* Extend the substitution (NOTE: GLOBAL) with another substitution (compose) *)
+let merge_substitutions subs state =
+  {state with substitutions = Substitution.merge state.substitutions subs}
 
-let general_update_substitution updater k v st =
-  {st with substitutions = updater k v st.substitutions}
-
-let add_param_coercion = general_update_substitution Substitution.add_type_coercion
-let add_type_sub = general_update_substitution Substitution.add_type_substitution
-let add_var_coercion = general_update_substitution Substitution.add_dirt_var_coercion
-let add_var_dirt_sub = general_update_substitution Substitution.add_dirt_substitution
-let add_skel_sub = general_update_substitution Substitution.add_skel_param_substitution
-
+(* Add a single constraint to the state *)
 let add_constraint cons st =
-  {st with constraints= cons :: st.constraints}
+  {st with constraints = cons :: st.constraints}
 
+(* Add a batch of constraints to the state *)
 let add_constraints const st =
-  List.fold_left (fun st' x-> add_constraint x st') st const
+  List.fold_left (fun st' x -> add_constraint x st') st const
+
+(* Add a single term binding to the global typing environment *)
+let add_gbl_def env x ty_sch =
+  {env with gblCtxt = TypingEnv.update env.gblCtxt x ty_sch}
+
+(* Apply a substitution to the global typing environment *)
+let apply_sub_to_gblCtxt env sub =
+  {env with gblCtxt = TypingEnv.apply_sub env.gblCtxt sub}
+
+(* Extend the global typing environment with multiple term bindings *)
+let extend_env vars env =
+  List.fold_right
+    (fun (x, ty_sch) env ->
+      {env with gblCtxt = TypingEnv.update env.gblCtxt x ty_sch} )
+    vars env
 
 type computation_typing_result =
   { computation: Typed.computation
@@ -38,24 +77,13 @@ type expression_typing_result =
   ; ttype: Types.target_ty
   }
 
-let empty = {context= TypingEnv.empty; effects= Typed.EffectMap.empty; constraints=[]; substitutions= Substitution.empty}
-
-let initial_state = empty
-
-let add_def env x ty_sch =
-  {env with context= TypingEnv.update env.context x ty_sch}
-
-
-let apply_sub_to_env env sub =
-  {env with context= TypingEnv.apply_sub env.context sub}
-
-
-let extend_env vars env =
-  List.fold_right
-    (fun (x, ty_sch) env ->
-      {env with context= TypingEnv.update env.context x ty_sch} )
-    vars env
-
+(* Initial type inference state: everything is empty *)
+let initial_state : state
+                  = { gblCtxt       = TypingEnv.empty
+                    ; effects       = Typed.EffectMap.empty
+                    ; constraints   = []
+                    ; substitutions = Substitution.empty
+                    }
 
 let print_env env =
   List.iter
@@ -113,7 +141,7 @@ let rec type_typed_pattern st pat ty =
 and type_plain_typed_pattern st pat ty =
   match pat with
   | Untyped.PVar x ->
-      let st' = add_def st x ty in
+      let st' = add_gbl_def st x ty in
       (Typed.PVar x, st')
   | Untyped.PNonbinding -> (Typed.PNonbinding, st)
   | Untyped.PAs (p, v) -> failwith __LOC__
@@ -379,7 +407,7 @@ let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
   (dirt_cons_apps, skel_constraints @ ty_cons @ dirt_cons)
 
 
-let apply_polymorphic_variable x ty_schi =
+let instantiateVariable x ty_schi =
   let ( bind_skelvar_sub
       , bind_tyvar_sub
       , bind_dirtvar_sub
@@ -400,6 +428,233 @@ let apply_polymorphic_variable x ty_schi =
   Print.debug "returned_type: %t" (Types.print_target_ty applied_basic_type) ;
   (returned_x, applied_basic_type, returned_cons)
 
+(* ************************************************************************* *)
+(*                            SUBSTITUTIONS                                  *)
+(* ************************************************************************* *)
+
+(* Shorter names for substituting *)
+let subInExp sub exp = Substitution.apply_substitutions_to_expression sub exp (* Substitute in target expressions *)
+let subInTyp sub ty  = Substitution.apply_substitutions_to_type sub ty        (* Substitute in target types *)
+let subInEnv sub env = TypingEnv.apply_sub env sub                            (* Substitute in typing environments *)
+
+(* ************************************************************************* *)
+(*                           BASIC DEFINITIONS                               *)
+(* ************************************************************************* *)
+
+(* Inference rule inputs: constraint state & typing environment/context *)
+(* GEORGE: Unused at the moment *)
+type tcInputs =
+  { inState : state
+  ; lclCtx  : TypingEnv.t
+  }
+
+(* Inference rule outputs: constraint state & substitution *)
+type ('exp, 'ty) tcOutputs =
+  { outExpr  : 'exp
+  ; outType  : 'ty
+  ; outState : state (* GEORGE: Leave only (a) constraints, and (b) global tyenv in here *)
+  ; outSubst : Substitution.t
+  }
+
+(* Value typing output *)
+type tcValOutput = (Typed.expression, Types.target_ty) tcOutputs
+
+(* Computation typing output *)
+type tcCmpOutput = (Typed.computation, Types.target_dirty) tcOutputs
+
+(* Typecheck a list of values *)
+let rec tcManyVal (inState : state)
+                  (lclCtxt : TypingEnv.t)
+                  (xss : Untyped.expression list)
+                  (tc : state -> TypingEnv.t -> Untyped.expression -> tcValOutput)
+    : (Typed.expression list, Types.target_ty list) tcOutputs =
+  match xss with
+  | []      -> { outExpr  = []
+               ; outType  = []
+               ; outState = inState (* Unchanged *)
+               ; outSubst = Substitution.empty
+               }
+  | x :: xs -> let xres  = tc inState lclCtxt x in
+               let xsres = tcManyVal xres.outState (subInEnv xres.outSubst lclCtxt) xs tc in
+               { outExpr  = (subInExp xsres.outSubst xres.outExpr) :: xsres.outExpr
+               ; outType  = (subInTyp xsres.outSubst xres.outType) :: xsres.outType
+               ; outState = xsres.outState                            (* Keep only the final state *)
+               ; outSubst = extendGenSub xres.outSubst xsres.outSubst (* Compose the substitutions *)
+               }
+
+
+
+(*
+          (Substitution.apply_substitutions_to_expression st''.substitutions typed_e1)
+          (Substitution.apply_substitutions_to_type st''.substitutions tt_1)
+          (Types.Arrow (tt_2, fresh_dirty_ty))
+*)
+
+(* GEORGE TODO: Remove the substitutions from the state *)
+
+(* ************************************************************************* *)
+(*                            PATTERN TYPING                                 *)
+(* ************************************************************************* *)
+
+(* Typecheck a located pattern *)
+let rec tcLocatedTypedPat (inState : state) (lclCtxt : TypingEnv.t) pat ty
+  = tcTypedPat inState lclCtxt pat.it ty
+
+(* Typecheck a pattern : the bindings introduced by the pattern are included in
+ * the output context: Gout = Gin, xs. Any inequalities implied by constants or
+ * variants are included in the output state. *)
+and tcTypedPat (inState : state) (lclCtxt : TypingEnv.t) pat pat_ty =
+(*  failwith __LOC__ *)
+  match pat with
+  | Untyped.PVar x             -> (Typed.PVar x     , inState, extendLclCtxt lclCtxt x pat_ty)
+  | Untyped.PNonbinding        -> (Typed.PNonbinding, inState, lclCtxt)
+  | Untyped.PAs (p, v)         -> failwith __LOC__ (* GEORGE: Not implemented yet *)
+  | Untyped.PTuple l           -> failwith __LOC__ (* GEORGE: Not implemented yet *)
+  | Untyped.PRecord r          -> failwith __LOC__ (* GEORGE: Not implemented yet *)
+  | Untyped.PAnnotated (p, ty) -> failwith __LOC__ (* GEORGE: Not implemented yet *)
+  (* GEORGE: The original seemed wrong to me, we compute the midState but we do
+   * not use it in the first case. We return inState instead. Here I do it the
+   * right way I hope. *)
+  | Untyped.PVariant (lbl, p) -> (
+      let ty_in, ty_out = Types.constructor_signature lbl in
+      let q = snd (Typed.fresh_ty_coer (ty_out, pat_ty)) in
+      let midState = add_constraint q inState in
+      match p with
+      | None   -> (Typed.PVariant (lbl, Typed.PTuple []), midState, lclCtxt)
+      | Some p -> let p', outState, lclOutCtxt = tcLocatedTypedPat midState lclCtxt p ty_in
+                  in  (Typed.PVariant (lbl, p'), outState, lclOutCtxt)
+      )
+  | Untyped.PConst c ->
+      let q = snd (Typed.fresh_ty_coer (Types.type_const c, pat_ty)) in
+      (Typed.PConst c, add_constraint q inState, lclCtxt)
+
+(* ************************************************************************* *)
+(*                             VALUE TYPING                                  *)
+(* ************************************************************************* *)
+
+(* Lookup the type of a term variable in the local and the global contexts
+ * (local first, global after). George: I wish we had monads.. *)
+let lookupTmVar (inState : state) (lclCtxt : TypingEnv.t) x =
+  match TypingEnv.lookup lclCtxt x with
+  | Some scheme -> Some scheme
+  | None        -> match TypingEnv.lookup inState.gblCtxt x with
+                   | Some scheme -> Some scheme
+                   | None        -> None
+
+(* Term Variables *)
+let rec tcVar (inState : state) (lclCtxt : TypingEnv.t) (x : variable) : tcValOutput =
+  match lookupTmVar inState lclCtxt x with
+  | Some scheme -> let target_x, x_monotype, constraints = instantiateVariable x scheme
+                   in  { outExpr  = target_x
+                       ; outType  = x_monotype
+                       ; outState = add_constraints constraints inState
+                       ; outSubst = Substitution.empty
+                       }
+  | None -> Print.debug "Variable not found: %t" (Typed.print_variable x) ;
+            assert false
+
+(* Constants *)
+and tcConst (inState : state) (lclCtxt : TypingEnv.t) (c : Const.t) : tcValOutput =
+  { outExpr  = Typed.Const c
+  ; outType  = Types.type_const c
+  ; outState = inState            (* Leave as is *)
+  ; outSubst = Substitution.empty (* Empty subst *)
+  }
+
+(* Type-annotated Expressions *)
+and tcAnnotated (inState : state) (lclCtxt : TypingEnv.t) ((e,ty) : Untyped.expression * Type.ty) : tcValOutput =
+  failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
+
+(* Tuples *)
+and tcTuple (inState : state) (lclCtxt : TypingEnv.t) (es : Untyped.expression list): tcValOutput =
+  let res = tcManyVal inState lclCtxt es tcLocatedVal in
+  { outExpr  = Typed.Tuple res.outExpr
+  ; outType  = Types.Tuple res.outType
+  ; outState = res.outState
+  ; outSubst = res.outSubst
+  }
+
+(* Records *)
+and tcRecord (inState : state) (lclCtx : TypingEnv.t) (lst : (field, Untyped.expression) Assoc.t) : tcValOutput =
+  failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
+(* Variants *)
+and tcVariant (inState : state) (lclCtx : TypingEnv.t) ((lbl,e) : label * Untyped.expression option) : tcValOutput =
+  assert false
+(*
+  | Untyped.Variant (lbl, e) -> (
+      let ty_in, ty_out = Types.constructor_signature lbl in
+      match e with
+      | None -> st, {expression= Typed.Variant (lbl, Typed.Tuple []); ttype= ty_out}
+      | Some e ->
+          let st',{expression=e'; ttype=u'} = type_expression st e in
+          let e'', cast_cons = cast_expression e' u' ty_in in
+          (* !! TODO: CHECK ORDER OF CONSTRAINT ADDING !!*)
+          let st'' = (add_constraint cast_cons st') in
+          st'',{expression= Typed.Variant (lbl, e''); ttype= ty_out} )
+*)
+
+(* Lambda Abstractions *)
+and tcLambda (inState : state) (lclCtx : TypingEnv.t) (abs : Untyped.abstraction) : tcValOutput =
+  assert false
+(*
+  | Untyped.Lambda a ->
+      Print.debug "in infer lambda" ;
+      let in_ty, in_ty_skel = Typed.fresh_ty_with_fresh_skel () in
+      let st' = add_constraint in_ty_skel st in
+      let (p, c), (ty, dty), st'' =
+        type_abstraction st' a in_ty
+      in
+      let target_ty = Types.Arrow (ty, dty) in
+      let target_lambda =
+        Typed.Lambda
+          (abstraction_with_ty p
+             (Substitution.apply_substitutions_to_type st''.substitutions in_ty)
+             c)
+      in
+      Unification.print_c_list st''.constraints ;
+      Print.debug "lambda ty: %t" (Types.print_target_ty target_ty) ;
+      st'', {expression= target_lambda; ttype= target_ty}
+*)
+
+(* Effects (GEORGE: Isn't this supposed to be in computations? *)
+and tcEffect (inState : state) (lclCtx : TypingEnv.t) (eff : Untyped.effect) : tcValOutput =
+  assert false
+(*
+  | Untyped.Effect eff ->
+      let in_ty, out_ty = Typed.EffectMap.find eff st.effects in
+      let s = Types.EffectSet.singleton eff in
+      st,
+      { expression= Typed.Effect (eff, (in_ty, out_ty))
+      ; ttype= Types.Arrow (in_ty, (out_ty, Types.closed_dirt s))
+      }
+*)
+
+(* Handlers *)
+and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : tcValOutput =
+  assert false (* GEORGE: THIS IS ___MASSIVE___ *)
+
+(*
+GEORGE: At the end it goes with failwith __LOC__.
+I think I will do the same, but without the catch-all pattern.
+*)
+
+(* Dispatch: Type inference for a plain value (expression) *)
+and tcVal (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_expression -> tcValOutput = function
+  | Untyped.Var x              -> tcVar       inState lclCtx x
+  | Untyped.Const c            -> tcConst     inState lclCtx c
+  | Untyped.Annotated (e,ty)   -> tcAnnotated inState lclCtx (e,ty)
+  | Untyped.Tuple es           -> tcTuple     inState lclCtx es
+  | Untyped.Record lst         -> tcRecord    inState lclCtx lst
+  | Untyped.Variant (lbl,mbe)  -> tcVariant   inState lclCtx (lbl,mbe)
+  | Untyped.Lambda abs         -> tcLambda    inState lclCtx abs
+  | Untyped.Effect eff         -> tcEffect    inState lclCtx eff
+  | Untyped.Handler hand       -> tcHandler   inState lclCtx hand
+
+(* Type inference for a located value (expression) *)
+and tcLocatedVal (inState : state) (lclCtx : TypingEnv.t) (e : Untyped.expression) : tcValOutput
+  = tcVal inState lclCtx e.it
+
+
 
 let rec type_expression st ({it= expr} as e)=
   Print.debug "type_expression: %t" (Untyped.print_expression e) ;
@@ -417,10 +672,10 @@ let rec type_expression st ({it= expr} as e)=
 
 and type_plain_expression (st: state): (Untyped.plain_expression ->  state * expression_typing_result) = function
   | Untyped.Var x -> (
-    match TypingEnv.lookup st.context x with
+    match TypingEnv.lookup st.gblCtxt x with
     | Some ty_schi ->
         let returned_x, applied_basic_type, returned_cons =
-          apply_polymorphic_variable x ty_schi
+          instantiateVariable x ty_schi
         in
         ((add_constraints returned_cons st),{expression= returned_x; ttype= applied_basic_type})
     | None ->
@@ -429,7 +684,7 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
   | Untyped.Const const ->
       st, {expression= Typed.Const const; ttype= Types.type_const const}
   | Untyped.Tuple es ->
-      let folder (st', terms, types) ex = 
+      let folder (st', terms, types) ex =
         let (st_, {expression; ttype}) = type_expression st' ex in
         (st_, expression:: terms, ttype:: types )
       in
@@ -483,11 +738,11 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
       let pr, cr = h.value_clause in
       (*
       let Untyped.PVar x = pr.it in
-      let r_st = add_def st x r_ty in
+      let r_st = add_gbl_def st x r_ty in
       let st' = add_constraints r_cons r_st in
       *)
-      let r_st = (match pr.it with 
-        | Untyped.PVar x -> add_def st x r_ty
+      let r_st = (match pr.it with
+        | Untyped.PVar x -> add_gbl_def st x r_ty
         | _ -> failwith __LOC__
 
       ) in
@@ -550,7 +805,7 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
           (Substitution.apply_substitutions_to_type st'''.substitutions r_ty)
       in
       Print.debug "In infer handler (%t)" (Untyped.print_pattern pr);
-      let substituted_c_r = (match pr.it with 
+      let substituted_c_r = (match pr.it with
         | Untyped.PVar x -> Typed.subst_comp (Assoc.of_list [(x, coerced_y)])
           (Substitution.apply_substitutions_to_computation st'''.substitutions target_cr_term)
         | _ -> target_cr_term
@@ -586,9 +841,9 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
           Typed.cast_expression exp_l cons_5a cons_5b
         in
         let substituted_c_op = (match k.it with
-          | Untyped.PVar k_var -> 
+          | Untyped.PVar k_var ->
             let s_c_op = Typed.subst_comp (Assoc.of_list [(k_var, coerced_l)])
-              (Substitution.apply_substitutions_to_computation st'''.substitutions op_term) in 
+              (Substitution.apply_substitutions_to_computation st'''.substitutions op_term) in
             Print.debug "substituted_c_op [%t/%t]: %t"
             (CoreTypes.Variable.print ~safe:true l_var_name)
             (CoreTypes.Variable.print ~safe:true k_var)
@@ -596,7 +851,7 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
             s_c_op
           | Untyped.PNonbinding -> op_term
           | _ -> failwith __LOC__
-          
+
         ) in
         let coerced_substiuted_c_op =
           Typed.CastComp
@@ -694,11 +949,11 @@ and type_plain_computation (st: state) = function
            forall i in 1..n:
 
              Qi₋₁;σi₋₁(Γ) ⊢ casei : A -> Bi ! Δi | Qi ; σi ~> casei'
- 
-             ωi : σ^n(Bi ! Δi) <:  (α ! δ)          
- 
+
+             ωi : σ^n(Bi ! Δi) <:  (α ! δ)
+
            -----------------------------------------------------------------
-           Q;Γ ⊢ Match (e, cases) : σ^n(α ! δ) | σ^n(Q,Q₀,...,Qn) ~> Match (e', cases' |> ωi) 
+           Q;Γ ⊢ Match (e, cases) : σ^n(α ! δ) | σ^n(Q,Q₀,...,Qn) ~> Match (e', cases' |> ωi)
       *)
       (* TODO: ignoring the substitutions for now *)
       let st',{expression= e'; ttype= ty_A} = type_expression st e in
@@ -736,7 +991,7 @@ and type_plain_computation (st: state) = function
       let st',{expression= typed_exp; ttype= exp_type} =
         type_expression st e
       in
-      let st_subbed = apply_sub_to_env st' st'.substitutions in
+      let st_subbed = apply_sub_to_gblCtxt st' st'.substitutions in
       let st'', {computation= typed_comp; dtype= comp_dirty_type} =
         type_computation st_subbed c
       in
@@ -752,7 +1007,7 @@ and type_plain_computation (st: state) = function
       in
       st_cons,{ computation= Typed.Handle (coer_exp, coer_comp)
       ; dtype= dirty_2}
-  | Untyped.Let (defs, c_2) -> 
+  | Untyped.Let (defs, c_2) ->
       let [(p_def, c_1)] = defs in (
       match c_1.it with
       | Untyped.Value e_1 ->
@@ -760,28 +1015,28 @@ and type_plain_computation (st: state) = function
             type_expression st e_1
           in
           let sub_e1', cons_e1' = Unification.unify (st'.substitutions, [], st'.constraints) in
-          let st'' = (add_constraints cons_e1' st') |> merge_substitutions sub_e1' in 
+          let st'' = (add_constraints cons_e1' st') |> merge_substitutions sub_e1' in
           let typed_e1 = Substitution.apply_substitutions_to_expression sub_e1' typed_e1 in
-          let st_subbed = apply_sub_to_env st'' st''.substitutions in
+          let st_subbed = apply_sub_to_gblCtxt st'' st''.substitutions in
           let ( free_skel_vars
               , free_ty_vars
               , free_dirt_vars
               , split_cons1
               , global_constraints ) =
             splitter
-              (TypingEnv.return_context st_subbed.context)
+              (TypingEnv.return_context st_subbed.gblCtxt)
               cons_e1'
               (Substitution.apply_substitutions_to_type sub_e1' type_e1)
           in
           let ty_sc_skel =
             generalize_type
-              (TypingEnv.return_context st_subbed.context)
+              (TypingEnv.return_context st_subbed.gblCtxt)
               cons_e1'
               (Substitution.apply_substitutions_to_type sub_e1' type_e1)
               (Substitution.apply_substitutions_to_type sub_e1' type_e1)
           in
           let Untyped.PVar x = p_def.it in
-          let new_st = add_def st_subbed x ty_sc_skel in
+          let new_st = add_gbl_def st_subbed x ty_sc_skel in
           let new_st',{computation= typed_c2; dtype= type_c2} =
             type_computation new_st c_2
           in
@@ -823,7 +1078,7 @@ and type_plain_computation (st: state) = function
           in
           let typed_pattern, new_st =
             type_typed_pattern
-              (apply_sub_to_env st' st'.substitutions)
+              (apply_sub_to_gblCtxt st' st'.substitutions)
               p_def type_c1
           in
           let st'',{computation= typed_c2; dtype= (type_c2, dirt_c2)} =
@@ -868,32 +1123,32 @@ and type_plain_computation (st: state) = function
       let ty_b, q_b = fresh_ty_with_fresh_skel () in
       let dirt_d = Types.fresh_dirt () in
       let df = (Types.Arrow (ty_a, (ty_b, dirt_d))) in
-      let st1 = add_def st var df
-                |> add_constraint q_a 
+      let st1 = add_gbl_def st var df
+                |> add_constraint q_a
                 |> add_constraint q_b in
       let (pat', c1'), (ty_a', (ty_A1, dirt_D1)), st' =
         type_abstraction st1 abs ty_a
       in
       let tyco1, q_ty = fresh_ty_coer (ty_A1, ty_b) in
       let dco2, q_d = Typed.fresh_dirt_coer (dirt_D1, dirt_d) in
-      let st1' = st' |> add_constraint q_ty |> add_constraint q_d in 
+      let st1' = st' |> add_constraint q_ty |> add_constraint q_d in
       let sub_s', cons_s' = Unification.unify (Substitution.empty, [], st1'.constraints) in
       let st = merge_substitutions sub_s' st in
-      let st2 = apply_sub_to_env st sub_s' |> add_constraints cons_s' in
+      let st2 = apply_sub_to_gblCtxt st sub_s' |> add_constraints cons_s' in
       let ty_A1' = Substitution.apply_substitutions_to_type sub_s' ty_A1 in
       let dirt_D1' = Substitution.apply_substitutions_to_dirt sub_s' dirt_D1 in (* Do we also need to substitute dirt? *)
       let ty_a_s' = Substitution.apply_substitutions_to_type sub_s' ty_a' in
       let arrow_type = Types.Arrow (ty_a_s', (ty_A1', dirt_D1')) in
       let skvars, tyvars, dirtvars, cons4, cons5 =
-        splitter (TypingEnv.return_context st2.context) st2.constraints ty_A1'
+        splitter (TypingEnv.return_context st2.gblCtxt) st2.constraints ty_A1'
       in
       let ty_f =
         generalize_type
-          (TypingEnv.return_context st2.context)
+          (TypingEnv.return_context st2.gblCtxt)
           st2.constraints ty_A1'
           (Substitution.apply_substitutions_to_type st2.substitutions arrow_type)
       in
-      let st3 = add_def st2 var ty_f |> add_constraints cons5 |> add_constraints cons4 in
+      let st3 = add_gbl_def st2 var ty_f |> add_constraints cons5 |> add_constraints cons4 in
       Print.debug "Calculating computation";
       let st3',{computation=c2'; dtype= dty2} = type_computation st3 c2 in
       let ty_f' = Substitution.apply_substitutions_to_type st3'.substitutions ty_f in
@@ -907,7 +1162,7 @@ and type_plain_computation (st: state) = function
                 | Typed.TyOmega (tycovar, ct) ->
                     Typed.ApplyTyCoercion (e, TyCoercionVar tycovar)
                 | Typed.DirtOmega (dcovar, ct) ->
-                    Typed.ApplyDirtCoercion (e, DirtCoercionVar dcovar) 
+                    Typed.ApplyDirtCoercion (e, DirtCoercionVar dcovar)
                 | _ -> failwith __LOC__
               )
               (List.fold_left
@@ -973,7 +1228,7 @@ and type_abstraction st (pat, comp) ty_in =
 and type_effect_clause eff abs2 st =
   let in_op_ty, out_op_ty = Typed.EffectMap.find eff st.effects in
   let x, k, c_op = abs2 in
-  let st_subbed = apply_sub_to_env st st.substitutions in
+  let st_subbed = apply_sub_to_gblCtxt st st.substitutions in
   let alpha_i, alpha_cons = Typed.fresh_ty_with_fresh_skel () in
   let alpha_dirty = Types.make_dirty alpha_i in
   let x', st' = type_typed_pattern st_subbed x in_op_ty in
@@ -1005,7 +1260,7 @@ and type_case st case ty_in (ty_out, dirt_out) =
 
 (* Finalize a list of constraints, setting all dirt variables to the empty set. *)
 
-let finalize_constraint sub ct = 
+let finalize_constraint sub ct =
   match ct with
   | Typed.TyOmega (tcp, ctty) ->
       Error.typing ~loc:Location.unknown
@@ -1017,7 +1272,7 @@ let finalize_constraint sub ct =
         , {Types.effect_set= s2; Types.row= row2} ) ) ->
       assert (Types.EffectSet.subset s1 s2) ;
       let sub' = Substitution.add_dirt_var_coercion dcp (Typed.UnionDirt
-              (s1, Typed.Empty (Types.closed_dirt (Types.EffectSet.diff s2 s1)))) sub in 
+              (s1, Typed.Empty (Types.closed_dirt (Types.EffectSet.diff s2 s1)))) sub in
       let subs'' =
         match (row1, row2) with
         | Types.EmptyRow, Types.ParamRow dv2 ->
@@ -1026,9 +1281,9 @@ let finalize_constraint sub ct =
             Substitution.add_dirt_substitution dv1 Types.empty_dirt sub'
         | Types.ParamRow dv1, Types.ParamRow dv2 ->
             Substitution.add_dirt_substitution dv1 Types.empty_dirt sub' |>
-            Substitution.add_dirt_substitution dv2 Types.empty_dirt 
+            Substitution.add_dirt_substitution dv2 Types.empty_dirt
         | Types.EmptyRow, Types.EmptyRow -> sub'
-      in 
+      in
       subs''
   | Typed.SkelEq (sk1, sk2) -> failwith __LOC__
   | Typed.TyParamHasSkel (tp, sk) -> failwith __LOC__
@@ -1054,7 +1309,7 @@ let type_toplevel ~loc st c =
     let (sub,final) = Unification.unify ([],[],constraints) in
     let et' = Unification.apply_substitution_exp sub et in
     let ttype' = Unification.apply_substitution_ty sub ttype in
-    let (free_ty_vars, free_dirt_vars, split_cons1, split_cons2)= splitter (TypingEnv.return_context st.context) final ttype' in
+    let (free_ty_vars, free_dirt_vars, split_cons1, split_cons2)= splitter (TypingEnv.return_context st.gblCtxt) final ttype' in
     let qual_ty = List.fold_right (fun cons acc ->
                                           begin match cons with
                                           | Typed.TyOmega(_,t) -> Types.QualTy (t,acc)
@@ -1095,9 +1350,9 @@ let type_toplevel ~loc st c =
     Unification.print_c_list final ;
     let ct' = Substitution.apply_substitutions_to_computation sub ct in
     Print.debug "New Computation : %t" (Typed.print_computation ct') ;
-    let sub2 = 
+    let sub2 =
       List.fold_left
-        (fun subs dp -> Substitution.add_dirt_substitution dp Types.empty_dirt subs) 
+        (fun subs dp -> Substitution.add_dirt_substitution dp Types.empty_dirt subs)
         Substitution.empty
         (Types.DirtParamSet.elements (free_dirt_vars_computation ct'))
     in
@@ -1116,4 +1371,4 @@ let type_toplevel ~loc st c =
  *)
     (ct3, st)
 
-let add_external ctx x ty = { ctx with context = TypingEnv.update ctx.context x ty }
+let add_external ctx x ty = { ctx with gblCtxt = TypingEnv.update ctx.gblCtxt x ty }
