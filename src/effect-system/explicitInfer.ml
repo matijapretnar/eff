@@ -2,6 +2,11 @@ open CoreUtils
 module Untyped = UntypedSyntax
 open Typed
 
+(* GEORGE: TODO:
+     1. Remove the substitutions from the state
+ *)
+
+
 type label = CoreTypes.Label.t
 type field = CoreTypes.Field.t
 
@@ -432,10 +437,17 @@ let instantiateVariable x ty_schi =
 (*                            SUBSTITUTIONS                                  *)
 (* ************************************************************************* *)
 
-(* Shorter names for substituting *)
-let subInExp sub exp = Substitution.apply_substitutions_to_expression sub exp (* Substitute in target expressions *)
-let subInTyp sub ty  = Substitution.apply_substitutions_to_type sub ty        (* Substitute in target types *)
-let subInEnv sub env = TypingEnv.apply_sub env sub                            (* Substitute in typing environments *)
+(* Substitute in typing environments *)
+let subInEnv sub env = TypingEnv.apply_sub env sub
+
+(* Substitute in target values and computations *)
+let subInCmp sub cmp = Substitution.apply_substitutions_to_computation sub cmp
+let subInExp sub exp = Substitution.apply_substitutions_to_expression sub exp
+
+(* Substitute in target value types, computation types, and dirts *)
+let subInValTy sub ty        = Substitution.apply_substitutions_to_type sub ty
+let subInDirt  sub dirt      = Substitution.apply_substitutions_to_dirt sub dirt
+let subInCmpTy sub (ty,dirt) = (subInValTy sub ty, subInDirt sub dirt)
 
 (* ************************************************************************* *)
 (*                           BASIC DEFINITIONS                               *)
@@ -477,20 +489,31 @@ let rec tcManyVal (inState : state)
   | x :: xs -> let xres  = tc inState lclCtxt x in
                let xsres = tcManyVal xres.outState (subInEnv xres.outSubst lclCtxt) xs tc in
                { outExpr  = (subInExp xsres.outSubst xres.outExpr) :: xsres.outExpr
-               ; outType  = (subInTyp xsres.outSubst xres.outType) :: xsres.outType
+               ; outType  = (subInValTy xsres.outSubst xres.outType) :: xsres.outType
                ; outState = xsres.outState                            (* Keep only the final state *)
                ; outSubst = extendGenSub xres.outSubst xsres.outSubst (* Compose the substitutions *)
                }
 
-
-
-(*
-          (Substitution.apply_substitutions_to_expression st''.substitutions typed_e1)
-          (Substitution.apply_substitutions_to_type st''.substitutions tt_1)
-          (Types.Arrow (tt_2, fresh_dirty_ty))
-*)
-
-(* GEORGE TODO: Remove the substitutions from the state *)
+(* Typecheck a list of computations *)
+let rec tcManyCmp (inState : state)
+                  (lclCtxt : TypingEnv.t)
+                  (xss : Untyped.computation list)
+                  (tc : state -> TypingEnv.t -> Untyped.computation -> tcCmpOutput)
+    : (Typed.computation list, Types.target_dirty list) tcOutputs =
+  match xss with
+  | []      -> { outExpr  = []
+               ; outType  = []
+               ; outState = inState (* Unchanged *)
+               ; outSubst = Substitution.empty
+               }
+  | x :: xs -> let xres  = tc inState lclCtxt x in
+               let xsres = tcManyCmp xres.outState (subInEnv xres.outSubst lclCtxt) xs tc in
+               { outExpr  = (subInCmp xsres.outSubst xres.outExpr) :: xsres.outExpr
+               ; outType  = (subInCmpTy xsres.outSubst xres.outType) :: xsres.outType
+               ; outState = xsres.outState                            (* Keep only the final state *)
+               ; outSubst = extendGenSub xres.outSubst xsres.outSubst (* Compose the substitutions *)
+               }
+  (* GEORGE: I'd kill for some abstraction, having both tcManyVal and tcManyCmp is nasty. *)
 
 (* ************************************************************************* *)
 (*                            PATTERN TYPING                                 *)
