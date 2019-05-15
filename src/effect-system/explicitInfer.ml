@@ -522,7 +522,7 @@ let rec tcManyCmp (inState : state)
 (*                            PATTERN TYPING                                 *)
 (* ************************************************************************* *)
 
-(* Typecheck a located pattern *)
+(* Typecheck a located pattern given the expected type *)
 let rec tcLocatedTypedPat (inState : state) (lclCtxt : TypingEnv.t) pat ty
   = tcTypedPat inState lclCtxt pat.it ty
 
@@ -530,10 +530,9 @@ let rec tcLocatedTypedPat (inState : state) (lclCtxt : TypingEnv.t) pat ty
  * the output context: Gout = Gin, xs. Any inequalities implied by constants or
  * variants are included in the output state. *)
 and tcTypedPat (inState : state) (lclCtxt : TypingEnv.t) pat pat_ty =
-(*  failwith __LOC__ *)
   match pat with
-  | Untyped.PVar x             -> (Typed.PVar x     , inState, extendLclCtxt lclCtxt x pat_ty)
-  | Untyped.PNonbinding        -> (Typed.PNonbinding, inState, lclCtxt)
+  | Untyped.PVar x             -> (Typed.PVar x     , pat_ty, inState, extendLclCtxt lclCtxt x pat_ty)
+  | Untyped.PNonbinding        -> (Typed.PNonbinding, pat_ty, inState, lclCtxt)
   | Untyped.PAs (p, v)         -> failwith __LOC__ (* GEORGE: Not implemented yet *)
   | Untyped.PTuple l           -> failwith __LOC__ (* GEORGE: Not implemented yet *)
   | Untyped.PRecord r          -> failwith __LOC__ (* GEORGE: Not implemented yet *)
@@ -546,13 +545,22 @@ and tcTypedPat (inState : state) (lclCtxt : TypingEnv.t) pat pat_ty =
       let q = snd (Typed.fresh_ty_coer (ty_out, pat_ty)) in
       let midState = add_constraint q inState in
       match p with
-      | None   -> (Typed.PVariant (lbl, Typed.PTuple []), midState, lclCtxt)
-      | Some p -> let p', outState, lclOutCtxt = tcLocatedTypedPat midState lclCtxt p ty_in
-                  in  (Typed.PVariant (lbl, p'), outState, lclOutCtxt)
+      | None   -> (Typed.PVariant (lbl, Typed.PTuple []), pat_ty, midState, lclCtxt)
+      | Some p -> let p', _, outState, lclOutCtxt = tcLocatedTypedPat midState lclCtxt p ty_in
+                  in  (Typed.PVariant (lbl, p'), pat_ty, outState, lclOutCtxt)
       )
   | Untyped.PConst c ->
       let q = snd (Typed.fresh_ty_coer (Types.type_const c, pat_ty)) in
-      (Typed.PConst c, add_constraint q inState, lclCtxt)
+      (Typed.PConst c, pat_ty, add_constraint q inState, lclCtxt)
+
+(* Typecheck a located pattern without a given type *)
+and tcLocatedPat (inState : state) (lclCtxt : TypingEnv.t) pat
+  = tcPat inState lclCtxt pat.it
+
+(* Typecheck a pattern without a given type *)
+and tcPat (inState : state) (lclCtxt : TypingEnv.t) pat
+  = let tyvar, tyvar_skel = Typed.fresh_ty_with_fresh_skel () in
+    tcTypedPat (add_constraint tyvar_skel inState) lclCtxt pat tyvar
 
 (* ************************************************************************* *)
 (*                             VALUE TYPING                                  *)
@@ -626,14 +634,11 @@ and tcVariant (inState : state) (lclCtx : TypingEnv.t) ((lbl,mbe) : label * Unty
 
 (* Lambda Abstractions *)
 and tcLambda (inState : state) (lclCtx : TypingEnv.t) (abs : Untyped.abstraction) : tcValOutput =
-  (* GEORGE: This can be problematic; see note below *)
-  let in_ty, in_ty_skel = Typed.fresh_ty_with_fresh_skel () in
-  let res = tcAbstraction (add_constraint in_ty_skel inState) lclCtx abs in_ty in
+  let res = tcAbstraction inState lclCtx abs in
   let (trgPat,trgCmp) = res.outExpr in
-  let (left,right)    = res.outType in
-  { outExpr  = Typed.Lambda
-                 (abstraction_with_ty trgPat (subInValTy res.outSubst in_ty) trgCmp)
-  ; outType  = Types.Arrow (left,right) (* GEORGE: Substitution has happened already.. (UGLY) *)
+  let (patTy,cmpTy)   = res.outType in
+  { outExpr  = Typed.Lambda (abstraction_with_ty trgPat patTy trgCmp)
+  ; outType  = Types.Arrow (patTy,cmpTy)
   ; outState = res.outState
   ; outSubst = res.outSubst }
 
@@ -886,17 +891,22 @@ and tcLocatedCmp (inState : state) (lclCtx : TypingEnv.t) (c : Untyped.computati
 (* ************************************************************************* *)
 
 (* Type any kind of binding structure (e.g. \x. c) *)
-(* GEORGE: TODO: Assign all the types and cleanup. This is "equivalent" of "type_abstraction" *)
-and tcAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) ty_in =
+(* GEORGE: This is "equivalent" of "type_abstraction" *)
+and tcAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) =
   (* Typecheck the pattern *)
-  let trgPat,midState,midLclCtx = tcLocatedTypedPat inState lclCtx pat ty_in in
+  let trgPat, patTy, midState, midLclCtx = tcLocatedPat inState lclCtx pat in
   (* Typecheck the computation in the extended environment *)
   let res = tcLocatedCmp midState midLclCtx cmp in
-  { outExpr  = (trgPat,res.outExpr)
-  ; outType  = (subInValTy res.outSubst ty_in, res.outType)
+  { outExpr  = (trgPat, res.outExpr)
+  ; outType  = (subInValTy res.outSubst patTy, res.outType)
   ; outState = res.outState
   ; outSubst = res.outSubst
   }
+
+(*
+  let in_ty, in_ty_skel = Typed.fresh_ty_with_fresh_skel () in
+  let res = tcAbstraction (add_constraint in_ty_skel inState) lclCtx abs in_ty in
+*)
 
 (* GEORGE: TODO: Pattern typing seems to be wrong. In the general case where
  * multiple variables are bound within a pattern, pattern typing should care of
