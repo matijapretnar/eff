@@ -880,11 +880,47 @@ and tcLocatedVal (inState : state) (lclCtx : TypingEnv.t) (e : Untyped.expressio
 
 (* Dispatch: Type inference for a plan computation *)
 and tcCmp (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_computation -> tcCmpOutput = function
-  | _ -> failwith __LOC__ (* GEORGE: TODO: IMPLEMENT ME *)
+  | Value exp                -> tcValue  inState lclCtx exp
+  | Let ([(p_def, c_1)],c_2) -> tcLet    inState lclCtx p_def c_1 c_2
+  | Let (_,_)                -> failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
+  | LetRec ([(var, abs)],c2) -> tcLetRec inState lclCtx var abs c2
+  | LetRec (_,_)             -> failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
+  | Match (scr, cases)       -> tcMatch  inState lclCtx scr cases
+  | Apply (val1, val2)       -> tcApply  inState lclCtx val1 val2
+  | Handle (hand, cmp)       -> tcHandle inState lclCtx hand cmp
+  | Check cmp                -> tcCheck  inState lclCtx cmp
 
 (* Type inference for a located computation *)
 and tcLocatedCmp (inState : state) (lclCtx : TypingEnv.t) (c : Untyped.computation) : tcCmpOutput
   = tcCmp inState lclCtx c.it
+
+(* Typecheck a value wrapped in a return *)
+and tcValue (inState : state) (lclCtxt : TypingEnv.t) (exp : Untyped.expression) : tcCmpOutput =
+  failwith __LOC__ (* GEORGE: TODO: Implement me *)
+
+(* Typecheck a non-recursive let *)
+and tcLet (inState : state) (lclCtxt : TypingEnv.t) (p_def : Untyped.pattern) (c_1 : Untyped.computation) (c_2 : Untyped.computation) : tcCmpOutput =
+  failwith __LOC__ (* GEORGE: TODO: Implement me *)
+
+(* Typecheck a (potentially) recursive let *)
+and tcLetRec (inState : state) (lclCtxt : TypingEnv.t) (var : Untyped.variable) (abs : Untyped.abstraction) (c2 : Untyped.computation) : tcCmpOutput =
+  failwith __LOC__ (* GEORGE: TODO: Implement me *)
+
+(* Typecheck a case expression *)
+and tcMatch (inState : state) (lclCtxt : TypingEnv.t) (scr : Untyped.expression) (cases : Untyped.abstraction list) : tcCmpOutput =
+  failwith __LOC__ (* GEORGE: TODO: Implement me *)
+
+(* Typecheck a function application *)
+and tcApply (inState : state) (lclCtxt : TypingEnv.t) (val1 : Untyped.expression) (val2 : Untyped.expression) : tcCmpOutput =
+  failwith __LOC__ (* GEORGE: TODO: Implement me *)
+
+(* Typecheck a handle-computation *)
+and tcHandle (inState : state) (lclCtxt : TypingEnv.t) (hand : Untyped.expression) (cmp : Untyped.computation) :tcCmpOutput =
+  failwith __LOC__ (* GEORGE: TODO: Implement me *)
+
+(* Typecheck a "Check" expression (GEORGE does not know what this means yet *)
+and tcCheck (inState : state) (lclCtxt : TypingEnv.t) (cmp : Untyped.computation) : tcCmpOutput =
+  failwith __LOC__ (* GEORGE: TODO: Implement me *)
 
 (* ************************************************************************* *)
 (*                               UTILITIES                                   *)
@@ -902,11 +938,6 @@ and tcAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) =
   ; outState = res.outState
   ; outSubst = res.outSubst
   }
-
-(*
-  let in_ty, in_ty_skel = Typed.fresh_ty_with_fresh_skel () in
-  let res = tcAbstraction (add_constraint in_ty_skel inState) lclCtx abs in_ty in
-*)
 
 (* GEORGE: TODO: Pattern typing seems to be wrong. In the general case where
  * multiple variables are bound within a pattern, pattern typing should care of
