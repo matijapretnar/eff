@@ -9,6 +9,7 @@ open Typed
      4. Understand how variants are implemented
  *)
 
+let georgeTODO = failwith __LOC__
 
 type label = CoreTypes.Label.t
 type field = CoreTypes.Field.t
@@ -634,7 +635,7 @@ and tcVariant (inState : state) (lclCtx : TypingEnv.t) ((lbl,mbe) : label * Unty
 
 (* Lambda Abstractions *)
 and tcLambda (inState : state) (lclCtx : TypingEnv.t) (abs : Untyped.abstraction) : tcValOutput =
-  let res = tcAbstraction inState lclCtx abs in
+  let res = tcUntypedAbstraction inState lclCtx abs in
   let (trgPat,trgCmp) = res.outExpr in
   let (patTy,cmpTy)   = res.outType in
   { outExpr  = Typed.Lambda (abstraction_with_ty trgPat patTy trgCmp)
@@ -654,7 +655,7 @@ and tcEffect (inState : state) (lclCtx : TypingEnv.t) (eff : Untyped.effect) : t
 
 (* Handlers *)
 and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : tcValOutput =
-  assert false (* GEORGE: THIS IS ___MASSIVE___ *)
+  georgeTODO
 (*
   | Untyped.Handler h ->
       let out_dirt_var = CoreTypes.DirtParam.fresh () in
@@ -904,41 +905,15 @@ and tcValue (inState : state) (lclCtxt : TypingEnv.t) (exp : Untyped.expression)
 
 (* Typecheck a non-recursive let *)
 and tcLet (inState : state) (lclCtxt : TypingEnv.t) (p_def : Untyped.pattern) (c_1 : Untyped.computation) (c_2 : Untyped.computation) : tcCmpOutput =
-  failwith __LOC__ (* GEORGE: TODO: Implement me *)
+  georgeTODO
 
 (* Typecheck a (potentially) recursive let *)
 and tcLetRec (inState : state) (lclCtxt : TypingEnv.t) (var : Untyped.variable) (abs : Untyped.abstraction) (c2 : Untyped.computation) : tcCmpOutput =
-  failwith __LOC__ (* GEORGE: TODO: Implement me *)
+  georgeTODO
 
 (* Typecheck a case expression *)
 and tcMatch (inState : state) (lclCtxt : TypingEnv.t) (scr : Untyped.expression) (cases : Untyped.abstraction list) : tcCmpOutput =
-  failwith __LOC__ (* GEORGE: TODO: Implement me *)
-(*
-  | Untyped.Match (e, cases) ->
-      (*
-           α,δ,ωi fresh
-
-           Q;Γ ⊢ e : A | Q₀; σ₀ ~> e'
-
-           forall i in 1..n:
-
-             Qi₋₁;σi₋₁(Γ) ⊢ casei : A -> Bi ! Δi | Qi ; σi ~> casei'
-
-             ωi : σ^n(Bi ! Δi) <:  (α ! δ)
-
-           -----------------------------------------------------------------
-           Q;Γ ⊢ Match (e, cases) : σ^n(α ! δ) | σ^n(Q,Q₀,...,Qn) ~> Match (e', cases' |> ωi)
-      *)
-      (* TODO: ignoring the substitutions for now *)
-      let st',{expression= e'; ttype= ty_A} = type_expression st e in
-      let ty_alpha, q_alpha = Typed.fresh_ty_with_fresh_skel () in
-      let dirt_delta = Types.fresh_dirt () in
-      let cases', st'' =
-        (* Much larger list than before*)
-        type_cases (add_constraint q_alpha st') cases ty_A (ty_alpha, dirt_delta)
-      in
-      st'', {computation= Typed.Match (e', cases'); dtype= (ty_alpha, dirt_delta)}
-*)
+  georgeTODO
 
 (* Typecheck a function application *)
 and tcApply (inState : state) (lclCtxt : TypingEnv.t) (val1 : Untyped.expression) (val2 : Untyped.expression) : tcCmpOutput =
@@ -964,12 +939,35 @@ and tcApply (inState : state) (lclCtxt : TypingEnv.t) (val1 : Untyped.expression
   }
 
 (* Typecheck a handle-computation *)
-and tcHandle (inState : state) (lclCtxt : TypingEnv.t) (hand : Untyped.expression) (cmp : Untyped.computation) :tcCmpOutput =
-  failwith __LOC__ (* GEORGE: TODO: Implement me *)
+and tcHandle (inState : state) (lclCtxt : TypingEnv.t) (hand : Untyped.expression) (cmp : Untyped.computation) : tcCmpOutput =
+
+  let res1 = tcLocatedVal inState lclCtxt hand in                                (* Typecheck the handler *)
+  let res2 = tcLocatedCmp res1.outState (subInEnv res1.outSubst lclCtxt) cmp in  (* Typecheck the computation *)
+
+  let dirty_1, cons_skel_1 = Typed.fresh_dirty_with_fresh_skel () in
+  let dirty_2, cons_skel_2 = Typed.fresh_dirty_with_fresh_skel () in
+
+  let castHand, omega_cons_1 =
+    Typed.cast_expression
+      (subInExp   res2.outSubst res1.outExpr)
+      (subInValTy res2.outSubst res1.outType)
+      (Types.Handler (dirty_1, dirty_2)) in
+
+  let castComp, omega_cons_23 =
+     Typed.cast_computation res2.outExpr res2.outType dirty_1 in
+
+  { outExpr  = Typed.Handle (castHand, castComp)
+  ; outType  = dirty_2
+  ; outState = res2.outState
+               |> add_constraint cons_skel_1
+               |> add_constraint cons_skel_2
+               |> add_constraint omega_cons_1
+               |> add_constraint omega_cons_23
+  ; outSubst = extendGenSub res1.outSubst res2.outSubst }
 
 (* Typecheck a "Check" expression (GEORGE does not know what this means yet *)
 and tcCheck (inState : state) (lclCtxt : TypingEnv.t) (cmp : Untyped.computation) : tcCmpOutput =
-  failwith __LOC__ (* GEORGE: TODO: Implement me *)
+  failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
 
 (* ************************************************************************* *)
 (*                               UTILITIES                                   *)
@@ -977,7 +975,7 @@ and tcCheck (inState : state) (lclCtxt : TypingEnv.t) (cmp : Untyped.computation
 
 (* Type any kind of binding structure (e.g. \x. c) *)
 (* GEORGE: This is "equivalent" of "type_abstraction" *)
-and tcAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) =
+and tcUntypedAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) =
   (* Typecheck the pattern *)
   let trgPat, patTy, midState, midLclCtx = tcLocatedPat inState lclCtx pat in
   (* Typecheck the computation in the extended environment *)
@@ -988,11 +986,16 @@ and tcAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) =
   ; outSubst = res.outSubst
   }
 
-(* GEORGE: TODO: Pattern typing seems to be wrong. In the general case where
- * multiple variables are bound within a pattern, pattern typing should care of
- * extending the constraint set with skeleton annotations. Currently it seems
- * that tcLambda takes care of it which is not nice. Alternatively, we should
- * extend the state everytime we typecheck a pattern BEFORE. *)
+and tcTypedAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) patTy =
+  (* Typecheck the pattern *)
+  let trgPat, _, midState, midLclCtx = tcLocatedTypedPat inState lclCtx pat patTy in
+  (* Typecheck the computation in the extended environment *)
+  let res = tcLocatedCmp midState midLclCtx cmp in
+  { outExpr  = (trgPat, res.outExpr)
+  ; outType  = (subInValTy res.outSubst patTy, res.outType)
+  ; outState = res.outState
+  ; outSubst = res.outSubst
+  }
 
 (* ************************************************************************* *)
 (* ************************************************************************* *)
@@ -1344,7 +1347,7 @@ and type_plain_computation (st: state) = function
       let coer_comp, cons_comp =
         Typed.cast_computation typed_comp comp_dirty_type dirty_1
       in
-      let st_cons = add_constraint cons_skel_1 st'' |> add_constraint cons_skel_2 |> add_constraint omega_cons_1 |> add_constraint cons_comp
+      let st_cons = st'' |> add_constraint cons_skel_1 |> add_constraint cons_skel_2 |> add_constraint omega_cons_1 |> add_constraint cons_comp
       in
       st_cons,{ computation= Typed.Handle (coer_exp, coer_comp)
       ; dtype= dirty_2}
