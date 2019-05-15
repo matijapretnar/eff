@@ -4,6 +4,9 @@ open Typed
 
 (* GEORGE: TODO:
      1. Remove the substitutions from the state
+     2. Add debugging output to the new code snippets
+     3. Figure out what is wrong with pattern typing (untyped & typed version)
+     4. Understand how variants are implemented
  *)
 
 
@@ -598,67 +601,256 @@ and tcTuple (inState : state) (lclCtxt : TypingEnv.t) (es : Untyped.expression l
   }
 
 (* Records *)
-and tcRecord (inState : state) (lclCtx : TypingEnv.t) (lst : (field, Untyped.expression) Assoc.t) : tcValOutput =
+and tcRecord (inState : state) (lclCtx : TypingEnv.t) (lst : (field, Untyped.expression) Assoc.t)
+      : tcValOutput =
   failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
+
 (* Variants *)
-and tcVariant (inState : state) (lclCtx : TypingEnv.t) ((lbl,e) : label * Untyped.expression option) : tcValOutput =
-  assert false
-(*
-  | Untyped.Variant (lbl, e) -> (
-      let ty_in, ty_out = Types.constructor_signature lbl in
-      match e with
-      | None -> st, {expression= Typed.Variant (lbl, Typed.Tuple []); ttype= ty_out}
-      | Some e ->
-          let st',{expression=e'; ttype=u'} = type_expression st e in
-          let e'', cast_cons = cast_expression e' u' ty_in in
-          (* !! TODO: CHECK ORDER OF CONSTRAINT ADDING !!*)
-          let st'' = (add_constraint cast_cons st') in
-          st'',{expression= Typed.Variant (lbl, e''); ttype= ty_out} )
-*)
+and tcVariant (inState : state) (lclCtx : TypingEnv.t) ((lbl,mbe) : label * Untyped.expression option)
+      : tcValOutput =
+  let ty_in, ty_out = Types.constructor_signature lbl in
+  match mbe with
+  | None -> { outExpr  = Typed.Variant (lbl, Typed.Tuple [])
+            ; outType  = ty_out
+            ; outState = inState
+            ; outSubst = Substitution.empty }
+  | Some e ->
+      let res = tcLocatedVal inState lclCtx e in
+      (* GEORGE: Investigate how cast_expression works *)
+      let castExp, castCt = cast_expression res.outExpr res.outType ty_in in
+      { outExpr  = Typed.Variant (lbl, castExp)
+      ; outType  = ty_out
+      ; outState = add_constraint castCt res.outState
+      ; outSubst = res.outSubst
+      }
 
 (* Lambda Abstractions *)
 and tcLambda (inState : state) (lclCtx : TypingEnv.t) (abs : Untyped.abstraction) : tcValOutput =
-  assert false
-(*
-  | Untyped.Lambda a ->
-      Print.debug "in infer lambda" ;
-      let in_ty, in_ty_skel = Typed.fresh_ty_with_fresh_skel () in
-      let st' = add_constraint in_ty_skel st in
-      let (p, c), (ty, dty), st'' =
-        type_abstraction st' a in_ty
-      in
-      let target_ty = Types.Arrow (ty, dty) in
-      let target_lambda =
-        Typed.Lambda
-          (abstraction_with_ty p
-             (Substitution.apply_substitutions_to_type st''.substitutions in_ty)
-             c)
-      in
-      Unification.print_c_list st''.constraints ;
-      Print.debug "lambda ty: %t" (Types.print_target_ty target_ty) ;
-      st'', {expression= target_lambda; ttype= target_ty}
-*)
+  (* GEORGE: This can be problematic; see note below *)
+  let in_ty, in_ty_skel = Typed.fresh_ty_with_fresh_skel () in
+  let res = tcAbstraction (add_constraint in_ty_skel inState) lclCtx abs in_ty in
+  let (trgPat,trgCmp) = res.outExpr in
+  let (left,right)    = res.outType in
+  { outExpr  = Typed.Lambda
+                 (abstraction_with_ty trgPat (subInValTy res.outSubst in_ty) trgCmp)
+  ; outType  = Types.Arrow (left,right) (* GEORGE: Substitution has happened already.. (UGLY) *)
+  ; outState = res.outState
+  ; outSubst = res.outSubst }
 
 (* Effects (GEORGE: Isn't this supposed to be in computations? *)
 and tcEffect (inState : state) (lclCtx : TypingEnv.t) (eff : Untyped.effect) : tcValOutput =
-  assert false
-(*
-  | Untyped.Effect eff ->
-      let in_ty, out_ty = Typed.EffectMap.find eff st.effects in
-      let s = Types.EffectSet.singleton eff in
-      st,
-      { expression= Typed.Effect (eff, (in_ty, out_ty))
-      ; ttype= Types.Arrow (in_ty, (out_ty, Types.closed_dirt s))
-      }
-*)
+  (* GEORGE: NOTE: This is verbatim copied from the previous implementation *)
+  let in_ty, out_ty = Typed.EffectMap.find eff inState.effects in
+  let s = Types.EffectSet.singleton eff in
+  { outExpr  = Typed.Effect (eff, (in_ty, out_ty))
+  ; outType  = Types.Arrow (in_ty, (out_ty, Types.closed_dirt s))
+  ; outState = inState
+  ; outSubst = Substitution.empty }
 
 (* Handlers *)
 and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : tcValOutput =
   assert false (* GEORGE: THIS IS ___MASSIVE___ *)
-
 (*
-GEORGE: At the end it goes with failwith __LOC__.
-I think I will do the same, but without the catch-all pattern.
+  | Untyped.Handler h ->
+      let out_dirt_var = CoreTypes.DirtParam.fresh () in
+      let in_dirt = Types.fresh_dirt ()
+      and out_dirt = Types.no_effect_dirt out_dirt_var
+      and in_ty, skel_cons_in = Typed.fresh_ty_with_fresh_skel ()
+      and out_ty, skel_cons_out = Typed.fresh_ty_with_fresh_skel () in
+      let target_type = Types.Handler ((in_ty, in_dirt), (out_ty, out_dirt)) in
+      let r_ty, r_ty_skel_cons = Typed.fresh_ty_with_fresh_skel () in
+      let r_cons = r_ty_skel_cons :: st.constraints in
+      let pr, cr = h.value_clause in
+      (*
+      let Untyped.PVar x = pr.it in
+      let r_st = add_gbl_def st x r_ty in
+      let st' = add_constraints r_cons r_st in
+      *)
+      let r_st = (match pr.it with
+        | Untyped.PVar x -> add_gbl_def st x r_ty
+        | _ -> failwith __LOC__
+
+      ) in
+      let st' = add_constraints r_cons r_st in
+      (* Note to self: Should this also be added?, check article *)
+      (* let st' = add_constraint skel_cons_in st' |> add_constraint skel_cons_out in *)
+      let st'',{ computation= target_cr_term
+          ; dtype= (target_cr_ty, target_cr_dirt)} =
+        type_computation st' cr
+      in
+      let r_subbed_st = st'' in
+      let folder
+          (*
+          (acc_terms, acc_tys, acc_st, acc_cons, acc_subs, acc_alpha_delta_i)
+          (eff, abs2) =
+          *)
+          (eff, abs2)
+          (acc_terms, acc_tys, acc_st, acc_alpha_delta_i) =
+        let ( typed_c_op
+            , typed_co_op_ty
+            , s_st
+            , (alpha_i, delta_i) ) =
+          (* Print.debug "type_effect_clause: %t" (Untyped.abstraction2 abs2) ; *)
+          type_effect_clause eff abs2 acc_st
+        in
+        ( typed_c_op :: acc_terms
+        , typed_co_op_ty :: acc_tys
+        , s_st
+        , (alpha_i, delta_i) :: acc_alpha_delta_i )
+      in
+      (*
+      let folder_function =
+        List.fold_left folder ([], [], r_subbed_st, target_cr_cons, [], [])
+          h.effect_clauses
+      in
+      *)
+      let folder_function =
+        List.fold_right folder (Assoc.to_list h.effect_clauses)
+          ([], [], r_subbed_st, [])
+      in
+      let typed_op_terms, typed_op_terms_ty, st''', alpha_delta_i_s =
+        folder_function
+      in
+      let cons_1 =
+        ( Substitution.apply_substitutions_to_type st'''.substitutions
+            target_cr_ty
+        , out_ty )
+      in
+      let cons_2 =
+        (Substitution.apply_substitutions_to_dirt st'''.substitutions target_cr_dirt, out_dirt)
+      in
+      let omega_1, omega_cons_1 = Typed.fresh_ty_coer cons_1
+      and omega_2, omega_cons_2 = Typed.fresh_dirt_coer cons_2 in
+      let y_var_name = CoreTypes.Variable.fresh "fresh_var" in
+      let y = Typed.PVar y_var_name in
+      let annot_y = y in
+      let exp_y = Typed.Var y_var_name in
+      let coerced_y, omega_cons_6 =
+        Typed.cast_expression exp_y in_ty
+          (Substitution.apply_substitutions_to_type st'''.substitutions r_ty)
+      in
+      Print.debug "In infer handler (%t)" (Untyped.print_pattern pr);
+      let substituted_c_r = (match pr.it with
+        | Untyped.PVar x -> Typed.subst_comp (Assoc.of_list [(x, coerced_y)])
+          (Substitution.apply_substitutions_to_computation st'''.substitutions target_cr_term)
+        | _ -> target_cr_term
+      )
+      in
+      let coerced_substiuted_c_r =
+        Typed.CastComp (substituted_c_r, Typed.BangCoercion (omega_1, omega_2))
+      in
+      let mapper (op_term, (op_term_ty, op_term_dirt), (alpha_i, delta_i))
+          (eff, abs2) =
+        let in_op_ty, out_op_ty = Typed.EffectMap.find eff st.effects in
+        let x, k, c_op = abs2 in
+        let cons_3 =
+          (Substitution.apply_substitutions_to_type st'''.substitutions op_term_ty, out_ty)
+        in
+        let cons_4 =
+          (Substitution.apply_substitutions_to_dirt st'''.substitutions op_term_dirt, out_dirt)
+        in
+        let cons_5a = Types.Arrow (out_op_ty, (out_ty, out_dirt)) in
+        let cons_5b =
+          Types.Arrow
+            ( out_op_ty
+            , ( Substitution.apply_substitutions_to_type st'''.substitutions alpha_i
+              , Substitution.apply_substitutions_to_dirt st'''.substitutions delta_i ) )
+        in
+        let omega_3, omega_cons_3 = Typed.fresh_ty_coer cons_3 in
+        let omega_4, omega_cons_4 = Typed.fresh_dirt_coer cons_4 in
+        let l_var_name = CoreTypes.Variable.fresh "fresh_var" in
+        let l = Typed.PVar l_var_name in
+        let annot_l = l in
+        let exp_l = Typed.Var l_var_name in
+        let coerced_l, omega_cons_5 =
+          Typed.cast_expression exp_l cons_5a cons_5b
+        in
+        let substituted_c_op = (match k.it with
+          | Untyped.PVar k_var ->
+            let s_c_op = Typed.subst_comp (Assoc.of_list [(k_var, coerced_l)])
+              (Substitution.apply_substitutions_to_computation st'''.substitutions op_term) in
+            Print.debug "substituted_c_op [%t/%t]: %t"
+            (CoreTypes.Variable.print ~safe:true l_var_name)
+            (CoreTypes.Variable.print ~safe:true k_var)
+            (Typed.print_computation s_c_op);
+            s_c_op
+          | Untyped.PNonbinding -> op_term
+          | _ -> failwith __LOC__
+
+        ) in
+        let coerced_substiuted_c_op =
+          Typed.CastComp
+            (substituted_c_op, Typed.BangCoercion (omega_3, omega_4))
+        in
+        let target_effect = (eff, (in_op_ty, out_op_ty)) in
+        ( ( target_effect
+          , Typed.abstraction2 (type_pattern x) annot_l coerced_substiuted_c_op
+          )
+        , [omega_cons_3; omega_cons_4; omega_cons_5] )
+      in
+      let mapper_input_a =
+        List.map2 (fun a b -> (a, b)) typed_op_terms typed_op_terms_ty
+      in
+      let mapper_input =
+        List.map2 (fun (a, b) c -> (a, b, c)) mapper_input_a alpha_delta_i_s
+      in
+      let new_op_clauses_with_cons =
+        List.map2 mapper mapper_input (Assoc.to_list h.effect_clauses)
+      in
+      let new_op_clauses =
+        List.map (fun (x, y) -> x) new_op_clauses_with_cons
+      in
+      let ops_cons =
+        concat_map (fun (x, y) -> y) new_op_clauses_with_cons
+      in
+      let y_type =
+        Substitution.apply_substitutions_to_type st'''.substitutions r_ty
+      in
+      let typed_value_clause =
+        Typed.abstraction_with_ty annot_y y_type coerced_substiuted_c_r
+      in
+      let target_handler =
+        {Typed.effect_clauses= (Assoc.of_list new_op_clauses); value_clause= typed_value_clause}
+      in
+      let typed_handler = Typed.Handler target_handler in
+      let for_set_handlers_ops =
+        List.map (fun ((eff, (_, _)), _) -> eff) new_op_clauses
+      in
+      let ops_set = Types.EffectSet.of_list for_set_handlers_ops in
+      let handlers_ops =
+        Types.{effect_set= ops_set; row= ParamRow out_dirt_var}
+      in
+      let cons_7 = (in_dirt, handlers_ops) in
+      let omega_7, omega_cons_7 = Typed.fresh_dirt_coer cons_7 in
+      let handler_in_bang = Typed.BangCoercion (Typed.ReflTy in_ty, omega_7) in
+      let handler_out_bang =
+        Typed.BangCoercion (Typed.ReflTy out_ty, Typed.ReflDirt out_dirt)
+      in
+      let handler_coercion =
+        Typed.HandlerCoercion (handler_in_bang, handler_out_bang)
+      in
+      let coerced_handler = Typed.CastExp (typed_handler, handler_coercion) in
+      let all_cons =
+        [ skel_cons_in
+        ; skel_cons_out
+        ; omega_cons_1
+        ; omega_cons_2
+        ; omega_cons_6
+        ; omega_cons_7 ]
+        @ ops_cons @ r_cons
+      in
+      Print.debug "### Handler r_cons             ###" ;
+      Unification.print_c_list r_cons ;
+      Print.debug "### Handler cons_n             ###" ;
+      Print.debug "-> Unavailable <-";
+      (*Unification.print_c_list cons_n ; *)
+      Print.debug "### Constraints before Handler ###" ;
+      Unification.print_c_list st.constraints ;
+      Print.debug "#################################" ;
+      Print.debug "### Constraints after Handler ###" ;
+      Unification.print_c_list all_cons ;
+      Print.debug "#################################" ;
+      (add_constraints all_cons st'''),{expression= coerced_handler; ttype= target_type}
 *)
 
 (* Dispatch: Type inference for a plain value (expression) *)
@@ -677,7 +869,43 @@ and tcVal (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_expression ->
 and tcLocatedVal (inState : state) (lclCtx : TypingEnv.t) (e : Untyped.expression) : tcValOutput
   = tcVal inState lclCtx e.it
 
+(* ************************************************************************* *)
+(*                          COMPUTATION TYPING                               *)
+(* ************************************************************************* *)
 
+(* Dispatch: Type inference for a plan computation *)
+and tcCmp (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_computation -> tcCmpOutput = function
+  | _ -> failwith __LOC__ (* GEORGE: TODO: IMPLEMENT ME *)
+
+(* Type inference for a located computation *)
+and tcLocatedCmp (inState : state) (lclCtx : TypingEnv.t) (c : Untyped.computation) : tcCmpOutput
+  = tcCmp inState lclCtx c.it
+
+(* ************************************************************************* *)
+(*                               UTILITIES                                   *)
+(* ************************************************************************* *)
+
+(* Type any kind of binding structure (e.g. \x. c) *)
+(* GEORGE: TODO: Assign all the types and cleanup. This is "equivalent" of "type_abstraction" *)
+and tcAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) ty_in =
+  (* Typecheck the pattern *)
+  let trgPat,midState,midLclCtx = tcLocatedTypedPat inState lclCtx pat ty_in in
+  (* Typecheck the computation in the extended environment *)
+  let res = tcLocatedCmp midState midLclCtx cmp in
+  { outExpr  = (trgPat,res.outExpr)
+  ; outType  = (subInValTy res.outSubst ty_in, res.outType)
+  ; outState = res.outState
+  ; outSubst = res.outSubst
+  }
+
+(* GEORGE: TODO: Pattern typing seems to be wrong. In the general case where
+ * multiple variables are bound within a pattern, pattern typing should care of
+ * extending the constraint set with skeleton annotations. Currently it seems
+ * that tcLambda takes care of it which is not nice. Alternatively, we should
+ * extend the state everytime we typecheck a pattern BEFORE. *)
+
+(* ************************************************************************* *)
+(* ************************************************************************* *)
 
 let rec type_expression st ({it= expr} as e)=
   Print.debug "type_expression: %t" (Untyped.print_expression e) ;
