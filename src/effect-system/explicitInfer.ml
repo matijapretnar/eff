@@ -896,7 +896,11 @@ and tcLocatedCmp (inState : state) (lclCtx : TypingEnv.t) (c : Untyped.computati
 
 (* Typecheck a value wrapped in a return *)
 and tcValue (inState : state) (lclCtxt : TypingEnv.t) (exp : Untyped.expression) : tcCmpOutput =
-  failwith __LOC__ (* GEORGE: TODO: Implement me *)
+  let res = tcLocatedVal inState lclCtxt exp in
+  { outExpr  = Typed.Value res.outExpr
+  ; outType  = (res.outType, Types.empty_dirt)
+  ; outState = res.outState
+  ; outSubst = res.outSubst }
 
 (* Typecheck a non-recursive let *)
 and tcLet (inState : state) (lclCtxt : TypingEnv.t) (p_def : Untyped.pattern) (c_1 : Untyped.computation) (c_2 : Untyped.computation) : tcCmpOutput =
@@ -909,10 +913,55 @@ and tcLetRec (inState : state) (lclCtxt : TypingEnv.t) (var : Untyped.variable) 
 (* Typecheck a case expression *)
 and tcMatch (inState : state) (lclCtxt : TypingEnv.t) (scr : Untyped.expression) (cases : Untyped.abstraction list) : tcCmpOutput =
   failwith __LOC__ (* GEORGE: TODO: Implement me *)
+(*
+  | Untyped.Match (e, cases) ->
+      (*
+           α,δ,ωi fresh
+
+           Q;Γ ⊢ e : A | Q₀; σ₀ ~> e'
+
+           forall i in 1..n:
+
+             Qi₋₁;σi₋₁(Γ) ⊢ casei : A -> Bi ! Δi | Qi ; σi ~> casei'
+
+             ωi : σ^n(Bi ! Δi) <:  (α ! δ)
+
+           -----------------------------------------------------------------
+           Q;Γ ⊢ Match (e, cases) : σ^n(α ! δ) | σ^n(Q,Q₀,...,Qn) ~> Match (e', cases' |> ωi)
+      *)
+      (* TODO: ignoring the substitutions for now *)
+      let st',{expression= e'; ttype= ty_A} = type_expression st e in
+      let ty_alpha, q_alpha = Typed.fresh_ty_with_fresh_skel () in
+      let dirt_delta = Types.fresh_dirt () in
+      let cases', st'' =
+        (* Much larger list than before*)
+        type_cases (add_constraint q_alpha st') cases ty_A (ty_alpha, dirt_delta)
+      in
+      st'', {computation= Typed.Match (e', cases'); dtype= (ty_alpha, dirt_delta)}
+*)
 
 (* Typecheck a function application *)
 and tcApply (inState : state) (lclCtxt : TypingEnv.t) (val1 : Untyped.expression) (val2 : Untyped.expression) : tcCmpOutput =
-  failwith __LOC__ (* GEORGE: TODO: Implement me *)
+  (* Infer the types of val1 and val2 *)
+  let res1 = tcLocatedVal inState lclCtxt val1 in
+  let res2 = tcLocatedVal res1.outState (subInEnv res1.outSubst lclCtxt) val2 in
+
+  (* Generate fresh variables for the result *)
+  let alpha, alpha_skel = Typed.fresh_ty_with_fresh_skel () in
+  let delta = Types.fresh_dirt () in
+
+  (* Create the constraint and the cast elaborated expression *)
+  let castVal1, omega =
+     Typed.cast_expression
+       (subInExp res2.outSubst res1.outExpr)
+       (subInValTy res2.outSubst res1.outType)
+       (Types.Arrow (res2.outType, (alpha,delta))) in
+
+  { outExpr  = Typed.Apply (castVal1, res2.outExpr)
+  ; outType  = (alpha, delta)
+  ; outState = add_constraint omega (add_constraint alpha_skel res2.outState)
+  ; outSubst = extendGenSub res1.outSubst res2.outSubst
+  }
 
 (* Typecheck a handle-computation *)
 and tcHandle (inState : state) (lclCtxt : TypingEnv.t) (hand : Untyped.expression) (cmp : Untyped.computation) :tcCmpOutput =
