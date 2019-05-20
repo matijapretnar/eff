@@ -5,6 +5,12 @@ type ('key, 'value) t = ('key * 'value) list
 
 let rec empty = []
 
+(* View from the left *)
+let rec isCons (xs : ('key, 'value) t) : (('key * 'value) * ('key, 'value) t) option
+  = match xs with
+  | []      -> None
+  | x :: xs -> Some (x,xs)
+
 (* Finding elements. *)
 let rec lookup x = function
   | [] -> None
