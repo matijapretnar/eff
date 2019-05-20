@@ -821,9 +821,119 @@ and tcValue (inState : state) (lclCtxt : TypingEnv.t) (exp : Untyped.expression)
   ; outState = res.outState
   ; outSubst = res.outSubst }
 
-(* Typecheck a non-recursive let *)
-and tcLet (inState : state) (lclCtxt : TypingEnv.t) (p_def : Untyped.pattern) (c_1 : Untyped.computation) (c_2 : Untyped.computation) : tcCmpOutput =
+(* Typecheck a let as in the paper, where c1 is a value *)
+and tcLetVal (inState : state) (lclCtxt : TypingEnv.t) (p_def : Untyped.pattern) (e_1 : Untyped.expression) (c_2 : Untyped.computation) : tcCmpOutput =
+(*
+  | Untyped.Let (defs, c_2) ->
+      let [(p_def, c_1)] = defs in (
+      match c_1.it with
+      | Untyped.Value e_1 ->
+          let st',{expression= typed_e1; ttype= type_e1} =
+            type_expression st e_1
+          in
+          let sub_e1', cons_e1' = Unification.unify (st'.substitutions, [], st'.constraints) in
+          let st'' = (add_constraints cons_e1' st') |> merge_substitutions sub_e1' in
+          let typed_e1 = Substitution.apply_substitutions_to_expression sub_e1' typed_e1 in
+          let st_subbed = apply_sub_to_gblCtxt st'' st''.substitutions in
+          let ( free_skel_vars
+              , free_ty_vars
+              , free_dirt_vars
+              , split_cons1
+              , global_constraints ) =
+            splitter
+              (TypingEnv.return_context st_subbed.gblCtxt)
+              cons_e1'
+              (Substitution.apply_substitutions_to_type sub_e1' type_e1)
+          in
+          let ty_sc_skel =
+            generalize_type
+              (TypingEnv.return_context st_subbed.gblCtxt)
+              cons_e1'
+              (Substitution.apply_substitutions_to_type sub_e1' type_e1)
+              (Substitution.apply_substitutions_to_type sub_e1' type_e1)
+          in
+          let Untyped.PVar x = p_def.it in
+          let new_st = add_gbl_def st_subbed x ty_sc_skel in
+          let new_st',{computation= typed_c2; dtype= type_c2} =
+            type_computation new_st c_2
+          in
+          let var_exp =
+            List.fold_right
+              (fun cons acc ->
+                match cons with
+                | Typed.TyOmega (om, t) -> Typed.LambdaTyCoerVar (om, t, acc)
+                | Typed.DirtOmega (om, t) ->
+                    Typed.LambdaDirtCoerVar (om, t, acc) )
+              split_cons1 typed_e1
+          in
+          let var_exp_dirt_lamda =
+            List.fold_right
+              (fun cons acc -> Typed.BigLambdaDirt (cons, acc))
+              free_dirt_vars var_exp
+          in
+          let var_exp_ty_lambda =
+            List.fold_right
+              (fun cons acc ->
+                Typed.BigLambdaTy
+                  (cons, Unification.get_skel_of_tyvar cons cons_e1', acc) )
+              free_ty_vars var_exp_dirt_lamda
+          in
+          let var_exp_skel_lamda =
+            List.fold_right
+              (fun cons acc -> Typed.BigLambdaSkel (cons, acc))
+              free_skel_vars var_exp_ty_lambda
+          in
+          let return_term =
+            Typed.LetVal
+              ( var_exp_skel_lamda
+              , Typed.abstraction_with_ty (Typed.PVar x) ty_sc_skel typed_c2 )
+          in
+          new_st',{computation= return_term; dtype= type_c2}
+        )
+*)
   georgeTODO
+
+(* Typecheck a let when c1 is a computation (== do binding) *)
+and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pdef : Untyped.pattern) (c1 : Untyped.computation) (c2 : Untyped.computation) : tcCmpOutput =
+  let c1res = tcLocatedCmp inState lclCtxt c1 in (* typecheck c1 *)
+  (* {outExpr = c1'; outType = (A1,D1); outState = state1; outSubst = sigma1} *)
+  let c2res = tcTypedAbstraction c1res.outState (subInEnv c1res.outSubst lclCtxt) (pdef, c2) (fst c1res.outType) in
+  (* {outExpr = (pat',c2'); outType = (s2(A1),(A2,D2)); outState = state2; outSubst = sigma2} *)
+
+  let delta = Types.fresh_dirt () in
+  let omega1, omegaCt1 = Typed.fresh_dirt_coer (subInDirt c2res.outSubst (snd c1res.outType), delta) in (* s2(D1) <= delta *)
+  let omega2, omegaCt2 = Typed.fresh_dirt_coer (snd (snd c2res.outType), delta)                      in (*    D2  <= delta *)
+
+  let cresC1 = CastComp
+                 ( (subInCmp c2res.outSubst c1res.outExpr)
+                 , Typed.BangCoercion
+                     ( Typed.ReflTy (subInValTy c2res.outSubst (fst c1res.outType))
+                     , omega1
+                     )
+                 ) in
+
+  let cresAbs = ( fst c2res.outExpr
+                , CastComp
+                    ( snd c2res.outExpr
+                    , Typed.BangCoercion
+                        ( Typed.ReflTy (fst c2res.outType)
+                        , omega2
+                        )
+                    )
+                 ) in
+
+  { outExpr  = Typed.Bind (cresC1, cresAbs)
+  ; outType  = (fst c2res.outType,delta)
+  ; outState = c2res.outState
+                 |> add_constraint omegaCt1
+                 |> add_constraint omegaCt2
+  ; outSubst = extendGenSub c1res.outSubst c2res.outSubst }
+
+(* Typecheck a non-recursive let *)
+and tcLet (inState : state) (lclCtxt : TypingEnv.t) (pdef : Untyped.pattern) (c1 : Untyped.computation) (c2 : Untyped.computation) : tcCmpOutput =
+  match c1.it with
+  | Untyped.Value e1   -> tcLetVal inState lclCtxt pdef e1 c2
+  | _other_computation -> tcLetCmp inState lclCtxt pdef c1 c2
 
 (* Typecheck a (potentially) recursive let *)
 and tcLetRec (inState : state) (lclCtxt : TypingEnv.t) (var : Untyped.variable) (abs : Untyped.abstraction) (c2 : Untyped.computation) : tcCmpOutput =
