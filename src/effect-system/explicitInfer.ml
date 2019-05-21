@@ -363,6 +363,32 @@ let splitter st constraints simple_ty =
   Unification.print_c_list global_constraints ;
   result
 
+(* Apply a generalized term to all arguments returned by "split" (cf. LetRec). *)
+let mkGroundTerm freeSkelVars annFreeTyVars freeDirtVars cs exp : Typed.expression =
+  let foldLeft f xs x0 = List.fold_left f x0 xs in (* GEORGE: Just for convenience *)
+  exp
+  |> (* 1: Apply to the skeleton variables *)
+     foldLeft
+       (fun e s -> Typed.ApplySkelExp (e, Types.SkelParam s))
+       freeSkelVars
+  |> (* 2: Apply to the type variables *)
+     foldLeft
+       (fun e (a,_) -> Typed.ApplyTyExp (e, Types.TyParam a))
+       annFreeTyVars
+  |> (* 3: Apply to the dirt variables *)
+     foldLeft
+       (fun e d -> Typed.ApplyDirtExp (e, Types.no_effect_dirt d))
+       freeDirtVars
+  |> (* 4: Apply to the coercion variables *)
+     foldLeft
+       (fun e ct ->
+          match ct with
+          | Typed.TyOmega (tycovar, _ct)  -> Typed.ApplyTyCoercion (e, TyCoercionVar tycovar)
+          | Typed.DirtOmega (dcovar, _ct) -> Typed.ApplyDirtCoercion (e, DirtCoercionVar dcovar)
+          (* GEORGE:TODO: What about DirtyOmega or whatever was it called?? *)
+          | _ -> failwith __LOC__ ) (* GEORGE: TODO: Why the other forms? *)
+       cs
+
 (* Create a generalized type from parts (as delivered from "splitter"). *)
 let mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars cs monotype : Types.target_ty =
   monotype
@@ -593,6 +619,11 @@ let subInExp sub exp = Substitution.apply_substitutions_to_expression sub exp
 let subInValTy sub ty        = Substitution.apply_substitutions_to_type sub ty
 let subInDirt  sub dirt      = Substitution.apply_substitutions_to_dirt sub dirt
 let subInCmpTy sub (ty,dirt) = (subInValTy sub ty, subInDirt sub dirt)
+
+(* Substitute in value, dirt, and computation coercions *)
+let subInValCo  sub co = Substitution.apply_sub_tycoer sub co
+let subInDirtCo sub co = Substitution.apply_sub_dirtcoer sub co
+let subInCmpCo  sub co = Substitution.apply_sub_dirtycoer sub co
 
 (* ************************************************************************* *)
 (*                           BASIC DEFINITIONS                               *)
@@ -1050,8 +1081,115 @@ and tcLet (inState : state) (lclCtxt : TypingEnv.t) (pdef : Untyped.pattern) (c1
   | _other_computation -> tcLetCmp inState lclCtxt pdef c1 c2
 
 (* Typecheck a (potentially) recursive let *)
-and tcLetRec (inState : state) (lclCtxt : TypingEnv.t) (var : Untyped.variable) (abs : Untyped.abstraction) (c2 : Untyped.computation) : tcCmpOutput =
-  georgeTODO
+(*
+   α, β, δ, ς₁, ς₂ fresh
+
+   Q₁, α:ς₁, β:ς₂; Γ, (f : α -> β ! δ), (x : α) |- c₁ : A₁ ! Δ₁ | Q₂; σ₁ ~> c₁'
+
+   (σ₂,Q₃) = solve(●;●;Q₂,ω₁:A₁<=β,ω₂:Δ₁<=δ)
+   (ςs,αs:τs,δѕ,ωs:πs,Q₅) = split(σ₂(σ₁(Γ)), Q₃, σ₂(A₁))
+   c1'' = σ₂(σ₁([f ςs αs δѕ ωs |> <α> -> ω₁ ! ω₂ / f]c1'))
+   Q₅; σ₂(σ₁(Γ)), (f : ∀ςs.∀(αs:τs).∀δѕ.πs=>σ₂(σ₁(α))->σ₂(A₁!Δ₁) |- c₂: A₂ ! Δ₂ | Q₆; σ₃ ~> c₂'
+   -------------------------------------------------------------------------------------------
+   Q₁; Γ |- let rec f x = c₁ in c₂ : A₂ ! Δ₂ | Q₆; σ₃.σ₂.σ₁
+     ~> let rec f = σ₃(Λςs.Λ(αs:τs).Λδѕ.λ(ωs:πs).fun x : σ₃(σ₂(σ₁(α))) -> c₁'') in c₂'
+*)
+(* GEORGE:TODO: Update the rule in the comment to reflect what you have on
+ * paper (and consequently, what you have implemented). *)
+
+and tcLetRec (inState : state) (lclCtxt : TypingEnv.t)
+      (var : Untyped.variable)
+      (abs : Untyped.abstraction)
+      (c2 : Untyped.computation) : tcCmpOutput =
+
+  (* 1: Generate fresh variables for everything *)
+  let alpha, alphaSkel = fresh_ty_with_fresh_skel () in
+  let beta , betaSkel  = fresh_ty_with_fresh_skel () in
+  let delta = Types.fresh_dirt () in
+
+  (* 2: Typecheck the abstraction *)
+  let { outExpr  = (trgPat, trgC1)
+      ; outType  = (trgPatTy,(tyA1, dirtD1))
+      ; outState = state1
+      ; outSubst = sigma1
+      } = tcTypedAbstraction
+            (inState |> add_constraint alphaSkel |> add_constraint betaSkel)
+            (extendLclCtxt lclCtxt var (Types.Arrow (alpha, (beta, delta))))
+            abs alpha in
+
+  (* 3: The assumed type should be at least as general as the inferred one *)
+  let omega1, omegaCt1 = Typed.fresh_ty_coer (tyA1, subInValTy sigma1 beta) in
+  let omega2, omegaCt2 = Typed.fresh_dirt_coer (dirtD1, subInDirt sigma1 delta) in
+
+  (* 4: Solve the constraints *)
+  let sigma1', csQ1' = Unification.unify ( Substitution.empty
+                                       , []
+                                       , (state1 |> add_constraint omegaCt1 |> add_constraint omegaCt2).constraints
+                                       ) in
+
+  (* 5: Partition the constraints *)
+  let (freeSkelVars, annFreeTyVars, freeDirtVars, csLcl, csGbl) =
+    split
+      (subInEnv sigma1' (subInEnv sigma1 lclCtxt)) (* sigma1'(sigma1(Gamma)) *)
+      csQ1'
+      (subInValTy sigma1' (Types.Arrow (subInValTy sigma1 alpha, (tyA1,dirtD1))))
+  in
+
+  (* 6: Create the (complicated) c1''. *)
+  let c1'' = (
+    let ground_f   = mkGroundTerm freeSkelVars annFreeTyVars freeDirtVars csLcl (Typed.Var var) in
+    let f_coercion = Typed.ArrowCoercion
+                       ( Typed.ReflTy (subInValTy sigma1' (subInValTy sigma1 alpha))
+                       , subInCmpCo sigma1' (Typed.BangCoercion (omega1, omega2))
+                       ) in
+    let subst_fn   = Typed.subst_comp (Assoc.of_list [(var, Typed.CastExp(ground_f, f_coercion))]) in
+    subst_fn (subInCmp sigma1' trgC1)
+  ) in
+
+
+  (* 7: Typecheck c2 *)
+  let ftype1 = mkGeneralizedType
+                 freeSkelVars annFreeTyVars freeDirtVars csLcl
+                 (Types.Arrow ( subInValTy sigma1' (subInValTy sigma1 alpha)
+                              , subInCmpTy sigma1' (tyA1, dirtD1)
+                              )
+                 ) in
+  let c2res =
+    tcLocatedCmp
+      ({ state1 with constraints = csGbl })
+      (extendLclCtxt (lclCtxt |> subInEnv sigma1 |> subInEnv sigma1') var ftype1)
+      c2
+  in
+
+  (* 8: Create the generated term *)
+  let genTerm = (
+    (* The final definition of f *)
+    let fdef = subInExp c2res.outSubst
+                 (mkGeneralizedTerm
+                    freeSkelVars annFreeTyVars freeDirtVars csLcl
+                    (Typed.Lambda
+                       (Typed.abstraction_with_ty
+                          trgPat (* GEORGE: I assume it has no types in it.
+                                  * If it does, we need sigma1'(trgPat) instead *)
+                          (subInValTy sigma1' trgPatTy)
+                          c1''
+                       )
+                    )
+                 )
+    in
+
+    (* The final type of f *)
+    let ftype = subInValTy c2res.outSubst ftype1 in
+
+    Typed.LetRec ([(var, ftype, fdef)], c2res.outExpr)
+  ) in
+
+  (* 9: Combine the results *)
+  { outExpr  = genTerm
+  ; outType  = c2res.outType
+  ; outState = c2res.outState
+  ; outSubst = extendGenSub (extendGenSub sigma1 sigma1') c2res.outSubst
+  }
 
 (* Typecheck a case expression *)
 and tcMatch (inState : state) (lclCtxt : TypingEnv.t) (scr : Untyped.expression) (cases : Untyped.abstraction list) : tcCmpOutput =
