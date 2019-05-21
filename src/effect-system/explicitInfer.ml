@@ -364,14 +364,15 @@ let splitter st constraints simple_ty =
   result
 
 (* Create a generalized type from parts (as delivered from "splitter"). *)
-let rec mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars cs monotype : Types.target_ty =
+let mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars cs monotype : Types.target_ty =
   monotype
   |> (* 1: Add the constraint abstractions *)
      List.fold_right
        (fun ct qual ->
          match ct with
-         | Typed.TyOmega (_, t)   -> Types.QualTy (t, qual)
-         | Typed.DirtOmega (_, t) -> Types.QualDirt (t, qual)
+         | Typed.TyOmega (_, pi)   -> Types.QualTy (pi, qual)
+         | Typed.DirtOmega (_, pi) -> Types.QualDirt (pi, qual)
+         (* GEORGE:TODO: What about DirtyOmega or whatever was it called?? *)
          | _                      -> failwith __LOC__) (* GEORGE: TODO: Why the other forms? *)
        cs
   |> (* 2: Add the dirt variable abstractions *)
@@ -380,11 +381,36 @@ let rec mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars cs monotype : 
        freeDirtVars
   |> (* 3: Add the type variable abstractions *)
      List.fold_right
-       (fun a_s scheme -> Types.TySchemeTy (fst a_s, snd a_s, scheme))
+       (fun (a,s) scheme -> Types.TySchemeTy (a, s, scheme))
        annFreeTyVars
   |> (* 4: Add the skeleton abstractions *)
      List.fold_right
        (fun skel scheme -> Types.TySchemeSkel (skel, scheme))
+       freeSkelVars
+
+(* Create a generalized term from parts (as delivered from "splitter"). *)
+let mkGeneralizedTerm freeSkelVars annFreeTyVars freeDirtVars cs exp : Typed.expression =
+  exp
+  |> (* 1: Add the constraint abstractions *)
+     List.fold_right
+       (fun ct qual ->
+        match ct with
+        | Typed.TyOmega (omega, pi)   -> Typed.LambdaTyCoerVar (omega, pi, qual)
+        | Typed.DirtOmega (omega, pi) -> Typed.LambdaDirtCoerVar (omega, pi, qual)
+        (* GEORGE:TODO: What about DirtyOmega or whatever was it called?? *)
+        | _                      -> failwith __LOC__) (* GEORGE: TODO: Why the other forms? *)
+       cs
+  |> (* 2: Add the dirt variable abstractions *)
+     List.fold_right
+       (fun delta e -> Typed.BigLambdaDirt (delta, e))
+       freeDirtVars
+  |> (* 3: Add the type variable abstractions *)
+     List.fold_right
+       (fun (a,s) e -> Typed.BigLambdaTy (a, s, e))
+       annFreeTyVars
+  |> (* 4: Add the skeleton abstractions *)
+     List.fold_right
+       (fun skel e -> Typed.BigLambdaSkel (skel, e))
        freeSkelVars
 
 let generalize_type st constraints simple_ty ty =
@@ -958,76 +984,28 @@ and tcLetVal (inState : state) (lclCtxt : TypingEnv.t)
   (* 4: Construct the generalized type of x *)
   let xType = mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars csLcl (subInValTy sigma1' e1res.outType) in
 
+  (* 5: Typecheck c2 *)
+  let Untyped.PVar x = patIn.it in (* GEORGE: TODO: Deliberately fail at the moment. *)
+  let c2res = tcLocatedCmp
+                ({ e1res.outState with constraints = csGbl })
+                (extendLclCtxt (lclCtxt |> subInEnv e1res.outSubst |> subInEnv sigma1') x xType)
+                c2 in
 
-(*
-  | Untyped.Let (defs, c_2) ->
-      let [(p_def, c_1)] = defs in (
-      match c_1.it with
-      | Untyped.Value e_1 ->
-          let st',{expression= typed_e1; ttype= type_e1} =
-            type_expression st e_1
-          in
-          let sub_e1', cons_e1' = Unification.unify (st'.substitutions, [], st'.constraints) in
-          let st'' = (add_constraints cons_e1' st') |> merge_substitutions sub_e1' in
-          let typed_e1 = Substitution.apply_substitutions_to_expression sub_e1' typed_e1 in
-          let st_subbed = apply_sub_to_gblCtxt st'' st''.substitutions in
-          let ( free_skel_vars
-              , free_ty_vars
-              , free_dirt_vars
-              , split_cons1
-              , global_constraints ) =
-            splitter
-              (TypingEnv.return_context st_subbed.gblCtxt)
-              cons_e1'
-              (Substitution.apply_substitutions_to_type sub_e1' type_e1)
-          in
-          let ty_sc_skel =
-            generalize_type
-              (TypingEnv.return_context st_subbed.gblCtxt)
-              cons_e1'
-              (Substitution.apply_substitutions_to_type sub_e1' type_e1)
-              (Substitution.apply_substitutions_to_type sub_e1' type_e1)
-          in
-          let Untyped.PVar x = p_def.it in
-          let new_st = add_gbl_def st_subbed x ty_sc_skel in
-          let new_st',{computation= typed_c2; dtype= type_c2} =
-            type_computation new_st c_2
-          in
-          let var_exp =
-            List.fold_right
-              (fun cons acc ->
-                match cons with
-                | Typed.TyOmega (om, t) -> Typed.LambdaTyCoerVar (om, t, acc)
-                | Typed.DirtOmega (om, t) ->
-                    Typed.LambdaDirtCoerVar (om, t, acc) )
-              split_cons1 typed_e1
-          in
-          let var_exp_dirt_lamda =
-            List.fold_right
-              (fun cons acc -> Typed.BigLambdaDirt (cons, acc))
-              free_dirt_vars var_exp
-          in
-          let var_exp_ty_lambda =
-            List.fold_right
-              (fun cons acc ->
-                Typed.BigLambdaTy
-                  (cons, Unification.get_skel_of_tyvar cons cons_e1', acc) )
-              free_ty_vars var_exp_dirt_lamda
-          in
-          let var_exp_skel_lamda =
-            List.fold_right
-              (fun cons acc -> Typed.BigLambdaSkel (cons, acc))
-              free_skel_vars var_exp_ty_lambda
-          in
-          let return_term =
-            Typed.LetVal
-              ( var_exp_skel_lamda
-              , Typed.abstraction_with_ty (Typed.PVar x) ty_sc_skel typed_c2 )
-          in
-          new_st',{computation= return_term; dtype= type_c2}
-        )
-*)
-  georgeTODO
+  let genTerm = subInExp
+                  c2res.outSubst
+                  (mkGeneralizedTerm
+                    freeSkelVars annFreeTyVars freeDirtVars csLcl
+                    (subInExp sigma1' e1res.outExpr)
+                  ) in
+
+  (* 6: Combine the results *)
+  { outExpr  = Typed.LetVal
+                 ( genTerm
+                 , Typed.abstraction_with_ty (Typed.PVar x) (subInValTy c2res.outSubst xType) c2res.outExpr )
+  ; outType  = c2res.outType
+  ; outState = c2res.outState
+  ; outSubst = extendGenSub (extendGenSub e1res.outSubst sigma1') c2res.outSubst
+  }
 
 (* Typecheck a let when c1 is a computation (== do binding) *)
 and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pdef : Untyped.pattern) (c1 : Untyped.computation) (c2 : Untyped.computation) : tcCmpOutput =
