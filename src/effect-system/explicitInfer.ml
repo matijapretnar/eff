@@ -185,6 +185,98 @@ let rec state_free_dirt_vars st =
       Types.DirtParamSet.union (Types.free_dirt_vars_ty ty) acc )
     st Types.DirtParamSet.empty
 
+(* Check whether a constraint is a coercion variable annotated inequality *)
+let isOmegaCt (ct : Typed.omega_ct) =
+  match ct with
+  | TyOmega (_,_)        -> true
+  | DirtOmega (_,_)      -> true
+  | DirtyOmega (_,_)     -> true
+  | SkelEq (_,_)         -> false
+  | TyParamHasSkel (_,_) -> false
+
+(* Partition a set of constraints for let generalization (cf. Explicit Effect Subtyping) *)
+let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_ty) =
+  let (tyEnv : (Typed.variable * Types.target_ty) list) = TypingEnv.return_context ctx in
+
+  (* 1: Compute the alphas (as a Types.TyParamSet) *)
+  let alphas = (
+    let ctTyVars  = List.fold_right                (* fv(Q) *)
+                      (fun ct tvs -> Types.TyParamSet.union (constraint_free_ty_vars ct) tvs)
+                      cs Types.TyParamSet.empty in
+    let tyTyVars  = Types.free_ty_vars_ty valTy in (* fv(A) *)
+    let envTyVars = state_free_ty_vars tyEnv    in (* fv(G) *)
+    Types.TyParamSet.diff                          (* (fv(Q) \/ fv(A)) - fv(G) *)
+      (Types.TyParamSet.union ctTyVars tyTyVars)
+      envTyVars
+  ) in
+
+  (* 2: Compute the deltas (as a Types.DirtParamSet) *)
+  let deltas = (
+    let ctDirtVars  = List.fold_right                  (* fv(Q) *)
+                        (fun ct dvs -> Types.DirtParamSet.union (constraint_free_dirt_vars ct) dvs)
+                        cs Types.DirtParamSet.empty in
+    let tyDirtVars  = Types.free_dirt_vars_ty valTy in (* fv(A) *)
+    let envDirtVars = state_free_dirt_vars tyEnv    in (* fv(G) *)
+    Types.DirtParamSet.diff                            (* (fv(Q) \/ fv(A)) - fv(G) *)
+      (Types.DirtParamSet.union ctDirtVars tyDirtVars)
+      envDirtVars
+  ) in
+
+  (* 3: Compute the sigmas *)
+  let sigmas = (
+    (* Keep only constraints of the form (alpha1 : sigma1) *)
+    let allSkelVarAnnotations = getSkelVarAnnotationsFromCs cs in
+    (* Predicate: whether a skeleton variable is non-local *)
+    let isGblSkelVar s = List.exists
+                           (fun (tyVar,skelVar) ->
+                              (s = skelVar) &&
+                              not (Types.TyParamSet.mem tyVar alphas))
+                           allSkelVarAnnotations
+    (* Keep only the skeleton variables that can be local *)
+    in allSkelVarAnnotations
+         |> List.filter (fun (_,s) -> not (isGblSkelVar s))
+         |> List.map snd
+  ) in
+
+  (* 4: Compute all the local (pi) constraints *)
+  let (localCs : Typed.omega_ct list) = (
+    let envTyVars   = state_free_ty_vars tyEnv   in (* fva(G) *)
+    let envDirtVars = state_free_dirt_vars tyEnv in (* fvd(G) *)
+    cs |> List.filter
+            (fun ct ->
+               isOmegaCt ct
+               && let ctTyVars   = constraint_free_ty_vars   ct in (* fva(pi) *)
+                  let ctDirtVars = constraint_free_dirt_vars ct in (* fvd(pi) *)
+                  not ((Types.TyParamSet.subset ctTyVars envTyVars) &&
+                       (Types.DirtParamSet.subset ctDirtVars envDirtVars))
+            )
+  ) in
+
+  (* 5: Find all skeleton annotations for the alphas. *)
+  (*    Return as a list of tuples (CoreTypes.TyParam.t, skeleton) *)
+  let annotatedAlphas = (
+    let allAnnotations = getSkelAnnotationsFromCs cs (* GEORGE:TODO: Why recompute? *)
+    in  List.map
+          (fun alpha -> (alpha, List.assoc alpha allAnnotations))
+          (Types.TyParamSet.elements alphas)
+  ) in
+
+  (* 6: Compute all the global constraints *)
+  let (globalCs : Typed.omega_ct list) = (
+    let annAlphasAsCs = List.map (fun (a,s) -> TyParamHasSkel (a,s)) annotatedAlphas in
+    List.filter
+      (fun ct -> not ((List.mem ct localCs) || (List.mem ct annAlphasAsCs)))
+      cs
+  ) in
+
+  (* 7: Return the whole lot. *)
+  ( sigmas
+  , annotatedAlphas
+  , Types.DirtParamSet.elements deltas  (* as a list *)
+  , localCs
+  , globalCs
+  )
+
 
 let splitter st constraints simple_ty =
   let skel_list = unique_elements (get_skel_vars_from_constraints constraints) in
@@ -271,9 +363,32 @@ let splitter st constraints simple_ty =
   Unification.print_c_list global_constraints ;
   result
 
+(* Create a generalized type from parts (as delivered from "splitter"). *)
+let rec mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars cs monotype : Types.target_ty =
+  monotype
+  |> (* 1: Add the constraint abstractions *)
+     List.fold_right
+       (fun ct qual ->
+         match ct with
+         | Typed.TyOmega (_, t)   -> Types.QualTy (t, qual)
+         | Typed.DirtOmega (_, t) -> Types.QualDirt (t, qual)
+         | _                      -> failwith __LOC__) (* GEORGE: TODO: Why the other forms? *)
+       cs
+  |> (* 2: Add the dirt variable abstractions *)
+     List.fold_right
+       (fun delta scheme -> Types.TySchemeDirt (delta, scheme))
+       freeDirtVars
+  |> (* 3: Add the type variable abstractions *)
+     List.fold_right
+       (fun a_s scheme -> Types.TySchemeTy (fst a_s, snd a_s, scheme))
+       annFreeTyVars
+  |> (* 4: Add the skeleton abstractions *)
+     List.fold_right
+       (fun skel scheme -> Types.TySchemeSkel (skel, scheme))
+       freeSkelVars
 
 let generalize_type st constraints simple_ty ty =
-  let free_skel_vars, free_ty_vars, free_dirt_vars, split_cons1, split_cons2 =
+  let free_skel_vars, free_ty_vars, free_dirt_vars, split_cons1, _split_cons2 =
     splitter st constraints simple_ty
   in
   let qual_ty =
@@ -822,7 +937,28 @@ and tcValue (inState : state) (lclCtxt : TypingEnv.t) (exp : Untyped.expression)
   ; outSubst = res.outSubst }
 
 (* Typecheck a let as in the paper, where c1 is a value *)
-and tcLetVal (inState : state) (lclCtxt : TypingEnv.t) (p_def : Untyped.pattern) (e_1 : Untyped.expression) (c_2 : Untyped.computation) : tcCmpOutput =
+and tcLetVal (inState : state) (lclCtxt : TypingEnv.t)
+      (patIn : Untyped.pattern)
+      (e1 : Untyped.expression)
+      (c2 : Untyped.computation) : tcCmpOutput =
+  (* 1: Typecheck e1 *)
+  let e1res = tcLocatedVal inState lclCtxt e1 in (* (v',A, Qv, Sigma1) *)
+
+  (* 2: Solve the constraints *)
+  let sigma1', qv' = Unification.unify (Substitution.empty, [], e1res.outState.constraints) in
+
+  (* 3: Partition the constraints *)
+  let (freeSkelVars, annFreeTyVars, freeDirtVars, csLcl, csGbl) =
+    split
+      (subInEnv sigma1' (subInEnv e1res.outSubst lclCtxt)) (* sigma1'(sigma1(Gamma)) *)
+      qv'
+      (subInValTy sigma1' e1res.outType)
+  in
+
+  (* 4: Construct the generalized type of x *)
+  let xType = mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars csLcl (subInValTy sigma1' e1res.outType) in
+
+
 (*
   | Untyped.Let (defs, c_2) ->
       let [(p_def, c_1)] = defs in (

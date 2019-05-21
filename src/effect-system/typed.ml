@@ -3,10 +3,10 @@ open CoreUtils
 open Types
 module EffectMap = Map.Make (CoreTypes.Effect)
 
-let add_to_constraints con constraints = 
+let add_to_constraints con constraints =
   con :: constraints
 
-let add_list_to_constraints new_constraints old_constraints = 
+let add_list_to_constraints new_constraints old_constraints =
   new_constraints @ old_constraints
 
 type variable = CoreTypes.Variable.t
@@ -829,7 +829,7 @@ let cast_computation c dirty1 dirty2 =
   let omega, cons = fresh_dirty_coer (dirty1, dirty2) in
   (CastComp (c, omega), cons)
 
-
+(* GEORGE:TODO: This looks utterly wrong to me. Why should they be only variables?? *)
 let constraint_free_ty_vars = function
   | TyOmega (_, (Types.TyParam a, Types.TyParam b)) -> TyParamSet.of_list [a; b]
   | TyOmega (_, (Types.TyParam a, _)) -> TyParamSet.singleton a
@@ -842,7 +842,7 @@ let constraint_free_dirt_vars = function
       DirtParamSet.union
         (constraint_free_row_vars drt1.Types.row)
         (constraint_free_row_vars drt2.Types.row)
-
+  (* GEORGE:TODO: What about the other forms??? *)
 
 (* free dirt variables in target terms *)
 
@@ -1020,6 +1020,21 @@ let rec get_skel_vars_from_constraints = function
       sv :: get_skel_vars_from_constraints xs
   | _ :: xs -> get_skel_vars_from_constraints xs
 
+(* Get all constraints of the form (alpha : skelvar) from a bag of constraints *)
+(* (CoreTypes.TyParam.t, CoreTypes.SkelParam.t) *)
+let rec getSkelVarAnnotationsFromCs = function
+  | [] -> []
+  | TyParamHasSkel (alpha, Types.SkelParam sv) :: cs ->
+      (alpha, sv) :: getSkelVarAnnotationsFromCs cs
+  | _ :: cs -> getSkelVarAnnotationsFromCs cs
+
+(* Get all constraints of the form (alpha : skeleton) from a bag of constraints *)
+(* (CoreTypes.TyParam.t, skeleton) *)
+let rec getSkelAnnotationsFromCs = function
+  | [] -> []
+  | TyParamHasSkel (alpha, skeleton) :: cs ->
+      (alpha, skeleton) :: getSkelAnnotationsFromCs cs
+  | _ :: cs -> getSkelAnnotationsFromCs cs
 
 let constraint_free_ty_vars = function
   | TyOmega (_, (Types.TyParam a, Types.TyParam b)) ->
