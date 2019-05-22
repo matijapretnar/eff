@@ -717,6 +717,8 @@ and tcTypedPat (inState : state) (lclCtxt : TypingEnv.t) pat pat_ty =
    * right way I hope. *)
   | Untyped.PVariant (lbl, p) -> (
       let ty_in, ty_out = Types.constructor_signature lbl in
+      (* GEORGE: TODO: Still, we drop the coercion variable. This is not
+       * correct (the types might still be different) *)
       let q = snd (Typed.fresh_ty_coer (ty_out, pat_ty)) in
       let midState = add_constraint q inState in
       match p with
