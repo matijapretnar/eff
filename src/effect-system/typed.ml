@@ -829,12 +829,25 @@ let cast_computation c dirty1 dirty2 =
   let omega, cons = fresh_dirty_coer (dirty1, dirty2) in
   (CastComp (c, omega), cons)
 
-(* GEORGE:TODO: This looks utterly wrong to me. Why should they be only variables?? *)
-let constraint_free_ty_vars = function
-  | TyOmega (_, (Types.TyParam a, Types.TyParam b)) -> TyParamSet.of_list [a; b]
-  | TyOmega (_, (Types.TyParam a, _)) -> TyParamSet.singleton a
-  | TyOmega (_, (_, Types.TyParam a)) -> TyParamSet.singleton a
-  | _ -> TyParamSet.empty
+(* ************************************************************************* *)
+(*                         FREE VARIABLE COMPUTATION                         *)
+(* ************************************************************************* *)
+
+(* Compute the free type variables of a constraint *)
+let ftvsOfOmegaCt : omega_ct -> TyParamSet.t = function
+  | TyOmega (_, ct)        -> ftvsOfValTyCt ct
+  | DirtOmega (_, _)       -> TyParamSet.empty
+  | DirtyOmega ((_,_), ct) -> ftvsOfCmpTyCt ct (* GEORGE: Is anyone using "DirtyOmega"? *)
+  | SkelEq (_,_)           -> TyParamSet.empty
+  | TyParamHasSkel (a,_)   -> TyParamSet. singleton a (* GEORGE: This is up to debate *)
+
+(* Compute the free dirt variables of a constraint *)
+let fdvsOfOmegaCt : omega_ct -> DirtParamSet.t = function
+  | TyOmega (_, ct)        -> fdvsOfValTyCt ct
+  | DirtOmega (_, ct)      -> fdvsOfDirtCt  ct
+  | DirtyOmega ((_,_), ct) -> fdvsOfCmpTyCt ct (* GEORGE: Is anyone using "DirtyOmega"? *)
+  | SkelEq (_,_)           -> DirtParamSet.empty
+  | TyParamHasSkel (_,_)   -> DirtParamSet.empty
 
 (*
 type omega_ct =
@@ -846,6 +859,13 @@ type omega_ct =
   | TyParamHasSkel of (CoreTypes.TyParam.t * skeleton)
 *)
 
+
+(* GEORGE:TODO: This looks utterly wrong to me. Why should they be only variables?? *)
+let constraint_free_ty_vars = function
+  | TyOmega (_, (Types.TyParam a, Types.TyParam b)) -> TyParamSet.of_list [a; b]
+  | TyOmega (_, (Types.TyParam a, _)) -> TyParamSet.singleton a
+  | TyOmega (_, (_, Types.TyParam a)) -> TyParamSet.singleton a
+  | _ -> TyParamSet.empty
 
 let constraint_free_dirt_vars = function
   | DirtOmega (_, (drt1, drt2)) ->

@@ -249,6 +249,10 @@ and fdvsOfTargetCmpTys : target_dirty list -> DirtParamSet.t = function
 and fdvsOfValTyCt : ct_ty -> DirtParamSet.t = function
   | (vty1,vty2) -> DirtParamSet.union (fdvsOfTargetValTy vty1) (fdvsOfTargetValTy vty2)
 
+(* Compute the free dirt variables of a computation type inequality *)
+and fdvsOfCmpTyCt : ct_dirty -> DirtParamSet.t = function
+  | (cty1,cty2) -> DirtParamSet.union (fdvsOfTargetCmpTy cty1) (fdvsOfTargetCmpTy cty2)
+
 (* Compute the free dirt variables of a dirt inequality *)
 and fdvsOfDirtCt : ct_dirt -> DirtParamSet.t = function
   | (dirt1,dirt2) -> DirtParamSet.union (fdvsOfDirt dirt1) (fdvsOfDirt dirt2)
@@ -294,6 +298,10 @@ and ftvsOfTargetCmpTys : target_dirty list -> TyParamSet.t = function
 (* Compute the free type variables of a value type inequality *)
 and ftvsOfValTyCt : ct_ty -> TyParamSet.t = function
   | (vty1,vty2) -> TyParamSet.union (ftvsOfTargetValTy vty1) (ftvsOfTargetValTy vty2)
+
+(* Compute the free type variables of a computation type inequality *)
+and ftvsOfCmpTyCt : ct_dirty -> TyParamSet.t = function
+  | (cty1,cty2) -> TyParamSet.union (ftvsOfTargetCmpTy cty1) (ftvsOfTargetCmpTy cty2)
 
 (* ************************************************************************* *)
 
