@@ -849,30 +849,7 @@ let fdvsOfOmegaCt : omega_ct -> DirtParamSet.t = function
   | SkelEq (_,_)           -> DirtParamSet.empty
   | TyParamHasSkel (_,_)   -> DirtParamSet.empty
 
-(*
-type omega_ct =
-  | TyOmega of (CoreTypes.TyCoercionParam.t * Types.ct_ty)
-  | DirtOmega of (CoreTypes.DirtCoercionParam.t * Types.ct_dirt)
-  | DirtyOmega of
-      ((CoreTypes.TyCoercionParam.t * CoreTypes.DirtCoercionParam.t) * Types.ct_dirty)
-  | SkelEq of skeleton * skeleton
-  | TyParamHasSkel of (CoreTypes.TyParam.t * skeleton)
-*)
-
-
-(* GEORGE:TODO: This looks utterly wrong to me. Why should they be only variables?? *)
-let constraint_free_ty_vars = function
-  | TyOmega (_, (Types.TyParam a, Types.TyParam b)) -> TyParamSet.of_list [a; b]
-  | TyOmega (_, (Types.TyParam a, _)) -> TyParamSet.singleton a
-  | TyOmega (_, (_, Types.TyParam a)) -> TyParamSet.singleton a
-  | _ -> TyParamSet.empty
-
-let constraint_free_dirt_vars = function
-  | DirtOmega (_, (drt1, drt2)) ->
-      DirtParamSet.union
-        (constraint_free_row_vars drt1.Types.row)
-        (constraint_free_row_vars drt2.Types.row)
-  (* GEORGE:TODO: What about the other forms??? *)
+(* ************************************************************************* *)
 
 (* free dirt variables in target terms *)
 
@@ -1065,24 +1042,6 @@ let rec getSkelAnnotationsFromCs = function
   | TyParamHasSkel (alpha, skeleton) :: cs ->
       (alpha, skeleton) :: getSkelAnnotationsFromCs cs
   | _ :: cs -> getSkelAnnotationsFromCs cs
-
-let constraint_free_ty_vars = function
-  | TyOmega (_, (Types.TyParam a, Types.TyParam b)) ->
-      Types.TyParamSet.of_list [a; b]
-  | TyOmega (_, (Types.TyParam a, _)) -> Types.TyParamSet.singleton a
-  | TyOmega (_, (_, Types.TyParam a)) -> Types.TyParamSet.singleton a
-  | _ -> Types.TyParamSet.empty
-
-
-let constraint_free_dirt_vars = function
-  | DirtOmega
-      (_, ({Types.row= Types.ParamRow a}, {Types.row= Types.ParamRow b})) ->
-      Types.DirtParamSet.of_list [a; b]
-  | DirtOmega (_, ({Types.row= Types.ParamRow a}, {Types.row= Types.EmptyRow})) ->
-      Types.DirtParamSet.singleton a
-  | DirtOmega (_, ({Types.row= Types.EmptyRow}, {Types.row= Types.ParamRow b})) ->
-      Types.DirtParamSet.singleton b
-  | _ -> Types.DirtParamSet.empty
 
 
 let rec apply_sub_to_type ty_subs dirt_subs ty =

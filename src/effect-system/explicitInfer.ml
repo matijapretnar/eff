@@ -201,7 +201,7 @@ let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_t
   (* 1: Compute the alphas (as a Types.TyParamSet) *)
   let alphas = (
     let ctTyVars  = List.fold_right                (* fv(Q) *)
-                      (fun ct tvs -> Types.TyParamSet.union (constraint_free_ty_vars ct) tvs)
+                      (fun ct tvs -> Types.TyParamSet.union (ftvsOfOmegaCt ct) tvs)
                       cs Types.TyParamSet.empty in
     let tyTyVars  = Types.free_ty_vars_ty valTy in (* fv(A) *)
     let envTyVars = state_free_ty_vars tyEnv    in (* fv(G) *)
@@ -213,7 +213,7 @@ let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_t
   (* 2: Compute the deltas (as a Types.DirtParamSet) *)
   let deltas = (
     let ctDirtVars  = List.fold_right                  (* fv(Q) *)
-                        (fun ct dvs -> Types.DirtParamSet.union (constraint_free_dirt_vars ct) dvs)
+                        (fun ct dvs -> Types.DirtParamSet.union (fdvsOfOmegaCt ct) dvs)
                         cs Types.DirtParamSet.empty in
     let tyDirtVars  = Types.free_dirt_vars_ty valTy in (* fv(A) *)
     let envDirtVars = state_free_dirt_vars tyEnv    in (* fv(G) *)
@@ -247,8 +247,8 @@ let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_t
     cs |> List.filter
             (fun ct ->
                isOmegaCt ct
-               && let ctTyVars   = constraint_free_ty_vars   ct in (* fva(pi) *)
-                  let ctDirtVars = constraint_free_dirt_vars ct in (* fvd(pi) *)
+               && let ctTyVars   = ftvsOfOmegaCt   ct in (* fva(pi) *)
+                  let ctDirtVars = fdvsOfOmegaCt ct in (* fvd(pi) *)
                   not ((Types.TyParamSet.subset ctTyVars envTyVars) &&
                        (Types.DirtParamSet.subset ctDirtVars envDirtVars))
             )
@@ -287,8 +287,8 @@ let splitter st constraints simple_ty =
   let local_constraints =
     List.filter
       (fun cons ->
-        let cons_freevars_ty = constraint_free_ty_vars cons in
-        let cons_freevars_dirt = constraint_free_dirt_vars cons in
+        let cons_freevars_ty = ftvsOfOmegaCt cons in
+        let cons_freevars_dirt = fdvsOfOmegaCt cons in
         let is_sub_ty =
           Types.TyParamSet.subset cons_freevars_ty global_ty_vars
         in
@@ -303,7 +303,7 @@ let splitter st constraints simple_ty =
     and constraints_freevars_ty =
       List.fold_right
         (fun cons acc ->
-          Types.TyParamSet.union (constraint_free_ty_vars cons) acc )
+          Types.TyParamSet.union (ftvsOfOmegaCt cons) acc )
         constraints Types.TyParamSet.empty
     in
     Types.TyParamSet.diff
@@ -315,7 +315,7 @@ let splitter st constraints simple_ty =
     and constraints_freevars_dirt =
       List.fold_right
         (fun cons acc ->
-          Types.DirtParamSet.union (constraint_free_dirt_vars cons) acc )
+          Types.DirtParamSet.union (fdvsOfOmegaCt cons) acc )
         constraints Types.DirtParamSet.empty
     in
     Types.DirtParamSet.diff
