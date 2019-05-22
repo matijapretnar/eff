@@ -836,6 +836,16 @@ let constraint_free_ty_vars = function
   | TyOmega (_, (_, Types.TyParam a)) -> TyParamSet.singleton a
   | _ -> TyParamSet.empty
 
+(*
+type omega_ct =
+  | TyOmega of (CoreTypes.TyCoercionParam.t * Types.ct_ty)
+  | DirtOmega of (CoreTypes.DirtCoercionParam.t * Types.ct_dirt)
+  | DirtyOmega of
+      ((CoreTypes.TyCoercionParam.t * CoreTypes.DirtCoercionParam.t) * Types.ct_dirty)
+  | SkelEq of skeleton * skeleton
+  | TyParamHasSkel of (CoreTypes.TyParam.t * skeleton)
+*)
+
 
 let constraint_free_dirt_vars = function
   | DirtOmega (_, (drt1, drt2)) ->

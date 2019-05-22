@@ -213,7 +213,91 @@ let rec free_skeleton sk =
       let free_a = free_skeleton sk1 in
       List.filter (fun x -> not (List.mem x [p])) free_a
 
+(* ************************************************************************* *)
+(*                      FREE DIRT VARIABLE COMPUTATION                       *)
+(* ************************************************************************* *)
 
+(* Compute the free dirt variables of a target value type *)
+let rec fdvsOfTargetValTy : target_ty -> DirtParamSet.t = function
+  | TyParam a              -> DirtParamSet.empty
+  | Arrow (vty,cty)        -> DirtParamSet.union (fdvsOfTargetValTy vty) (fdvsOfTargetCmpTy cty)
+  | Tuple vtys             -> fdvsOfTargetValTys vtys
+  | Handler (cty1, cty2)   -> DirtParamSet.union (fdvsOfTargetCmpTy cty1) (fdvsOfTargetCmpTy cty2)
+  | PrimTy _prim_ty        -> DirtParamSet.empty
+  | Apply (_, vtys)        -> fdvsOfTargetValTys vtys
+  | QualTy (ct, vty)       -> DirtParamSet.union (fdvsOfValTyCt ct) (fdvsOfTargetValTy vty)
+  | QualDirt (ct, vty)     -> DirtParamSet.union (fdvsOfDirtCt  ct) (fdvsOfTargetValTy vty)
+  | TySchemeTy (_, _, vty) -> fdvsOfTargetValTy vty
+  | TySchemeDirt (d, vty)  -> DirtParamSet.remove d (fdvsOfTargetValTy vty)
+  | TySchemeSkel (_, vty)  -> fdvsOfTargetValTy vty
+
+(* Compute the free dirt variables of a list of target value types *)
+and fdvsOfTargetValTys : target_ty list -> DirtParamSet.t = function
+  | []          -> DirtParamSet.empty
+  | vty :: vtys -> DirtParamSet.union (fdvsOfTargetValTy vty) (fdvsOfTargetValTys vtys)
+
+(* Compute the free dirt variables of a target computation type *)
+and fdvsOfTargetCmpTy : target_dirty -> DirtParamSet.t = function
+  | (vty,dirt) -> DirtParamSet.union (fdvsOfTargetValTy vty) (fdvsOfDirt dirt)
+
+(* Compute the free dirt variables of a list of computation value types *)
+and fdvsOfTargetCmpTys : target_dirty list -> DirtParamSet.t = function
+  | []          -> DirtParamSet.empty
+  | cty :: ctys -> DirtParamSet.union (fdvsOfTargetCmpTy cty) (fdvsOfTargetCmpTys ctys)
+
+(* Compute the free dirt variables of a value type inequality *)
+and fdvsOfValTyCt : ct_ty -> DirtParamSet.t = function
+  | (vty1,vty2) -> DirtParamSet.union (fdvsOfTargetValTy vty1) (fdvsOfTargetValTy vty2)
+
+(* Compute the free dirt variables of a dirt inequality *)
+and fdvsOfDirtCt : ct_dirt -> DirtParamSet.t = function
+  | (dirt1,dirt2) -> DirtParamSet.union (fdvsOfDirt dirt1) (fdvsOfDirt dirt2)
+
+(* Compute the free dirt variables of a dirt *)
+and fdvsOfDirt (dirt : dirt) : DirtParamSet.t =
+  match dirt.row with
+  | ParamRow p -> DirtParamSet.singleton p
+  | EmptyRow   -> DirtParamSet.empty
+
+(* ************************************************************************* *)
+(*                      FREE TYPE VARIABLE COMPUTATION                       *)
+(* ************************************************************************* *)
+
+(* Compute the free type variables of a target value type *)
+let rec ftvsOfTargetValTy : target_ty -> TyParamSet.t = function
+  | TyParam a              -> TyParamSet.singleton a
+  | Arrow (vty,cty)        -> TyParamSet.union (ftvsOfTargetValTy vty) (ftvsOfTargetCmpTy cty)
+  | Tuple vtys             -> ftvsOfTargetValTys vtys
+  | Handler (cty1, cty2)   -> TyParamSet.union (ftvsOfTargetCmpTy cty1) (ftvsOfTargetCmpTy cty2)
+  | PrimTy _prim_ty        -> TyParamSet.empty
+  | Apply (_, vtys)        -> ftvsOfTargetValTys vtys
+  | QualTy (ct, vty)       -> TyParamSet.union (ftvsOfValTyCt ct) (ftvsOfTargetValTy vty)
+  | QualDirt (_, vty)      -> ftvsOfTargetValTy vty
+  | TySchemeTy (a, _, vty) -> TyParamSet.remove a (ftvsOfTargetValTy vty)
+  | TySchemeDirt (_, vty)  -> ftvsOfTargetValTy vty
+  | TySchemeSkel (_, vty)  -> ftvsOfTargetValTy vty
+
+(* Compute the free type variables of a list of target value types *)
+and ftvsOfTargetValTys : target_ty list -> TyParamSet.t = function
+  | []          -> TyParamSet.empty
+  | vty :: vtys -> TyParamSet.union (ftvsOfTargetValTy vty) (ftvsOfTargetValTys vtys)
+
+(* Compute the free type variables of a target computation type *)
+and ftvsOfTargetCmpTy : target_dirty -> TyParamSet.t = function
+  | (ty,_dirt) -> ftvsOfTargetValTy ty
+
+(* Compute the free type variables of a list of computation value types *)
+and ftvsOfTargetCmpTys : target_dirty list -> TyParamSet.t = function
+  | []          -> TyParamSet.empty
+  | cty :: ctys -> TyParamSet.union (ftvsOfTargetCmpTy cty) (ftvsOfTargetCmpTys ctys)
+
+(* Compute the free type variables of a value type inequality *)
+and ftvsOfValTyCt : ct_ty -> TyParamSet.t = function
+  | (vty1,vty2) -> TyParamSet.union (ftvsOfTargetValTy vty1) (ftvsOfTargetValTy vty2)
+
+(* ************************************************************************* *)
+
+(* GEORGE: TODO: Drop me. Use "ftvsOfTargetValTy" instead *)
 let rec free_target_ty t =
   match t with
   | TyParam x -> [x]
@@ -228,7 +312,7 @@ let rec free_target_ty t =
       List.filter (fun x -> not (List.mem x [ty_param])) free_a
   | TySchemeDirt (dirt_param, a) -> free_target_ty a
 
-
+(* GEORGE: TODO: Drop me. Use "ftvsOfTargetCmpTy" instead *)
 and free_target_dirty (a, d) = free_target_ty a
 
 let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
@@ -327,6 +411,7 @@ let constructor_signature lbl =
       (source_to_target ty_in, source_to_target ty_out)
 
 
+(* GEORGE: TODO: Drop me. Use "ftvsOfTargetValTy" instead *)
 let rec free_ty_vars_ty = function
   | TyParam x -> TyParamSet.singleton x
   | Arrow (a, c) -> TyParamSet.union (free_ty_vars_ty a) (free_ty_var_dirty c)
@@ -349,6 +434,7 @@ let rec free_ty_vars_ty = function
   | TySchemeDirt (dirt_param, a) -> free_ty_vars_ty a
 
 
+(* GEORGE: TODO: Drop me. Use "ftvsOfTargetCmpTy" instead *)
 and free_ty_var_dirty (a, _) = free_ty_vars_ty a
 
 let constraint_free_row_vars = function
@@ -356,6 +442,7 @@ let constraint_free_row_vars = function
   | EmptyRow -> DirtParamSet.empty
 
 
+(* GEORGE: TODO: Drop me. Use "fdvsOfTargetValTy" instead *)
 let rec free_dirt_vars_ty = function
   | Arrow (a, c) ->
       DirtParamSet.union (free_dirt_vars_ty a) (free_dirt_vars_dirty c)
@@ -377,6 +464,8 @@ let rec free_dirt_vars_ty = function
       DirtParamSet.remove dirt_param free_a
   | _ -> DirtParamSet.empty
 
+(* GEORGE: TODO: Drop me. Use "fdvsOfTargetCmpTy" instead *)
 and free_dirt_vars_dirty (a, d) = free_dirt_vars_dirt d
 
+(* GEORGE: TODO: Drop me. Use "fdvsOfDirt" instead *)
 and free_dirt_vars_dirt drt = constraint_free_row_vars drt.row

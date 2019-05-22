@@ -236,7 +236,8 @@ let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_t
     in allSkelVarAnnotations
          |> List.filter (fun (_,s) -> not (isGblSkelVar s))
          |> List.map snd
-         |> unique_elements
+         |> unique_elements (* GEORGE: TODO: Actually, this should be redundant.
+                             * Add assertions or warnings in here maybe instead? *)
   ) in
 
   (* 4: Compute all the local (pi) constraints *)
