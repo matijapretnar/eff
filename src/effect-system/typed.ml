@@ -854,7 +854,7 @@ let fdvsOfOmegaCt : omega_ct -> DirtParamSet.t = function
 (* free dirt variables in target terms *)
 
 let rec free_dirt_vars_ty_coercion = function
-  | ReflTy ty -> free_dirt_vars_ty ty
+  | ReflTy ty -> fdvsOfTargetValTy ty
   | ArrowCoercion (tc, dc) ->
       Types.DirtParamSet.union
         (free_dirt_vars_ty_coercion tc)
@@ -878,13 +878,13 @@ let rec free_dirt_vars_ty_coercion = function
   | ApplyTyCoer (tc, ty) ->
       Types.DirtParamSet.union
         (free_dirt_vars_ty_coercion tc)
-        (free_dirt_vars_ty ty)
+        (fdvsOfTargetValTy ty)
   | ForallDirt (dp, tc) ->
       Types.DirtParamSet.remove dp (free_dirt_vars_ty_coercion tc)
   | ApplyDirCoer (tc, d) ->
       Types.DirtParamSet.union
         (free_dirt_vars_ty_coercion tc)
-        (free_dirt_vars_dirt d)
+        (fdvsOfDirt d)
   | PureCoercion dc -> free_dirt_vars_dirty_coercion dc
   | QualTyCoer (ctty, tc) -> free_dirt_vars_ty_coercion tc
   | QualDirtCoer (ctd, tc) -> free_dirt_vars_ty_coercion tc
@@ -901,9 +901,9 @@ let rec free_dirt_vars_ty_coercion = function
 
 
 and free_dirt_vars_dirt_coercion = function
-  | ReflDirt d -> free_dirt_vars_dirt d
+  | ReflDirt d -> fdvsOfDirt d
   | DirtCoercionVar dcv -> Types.DirtParamSet.empty
-  | Empty d -> free_dirt_vars_dirt d
+  | Empty d -> fdvsOfDirt d
   | UnionDirt (_, dc) -> free_dirt_vars_dirt_coercion dc
   | SequenceDirtCoer (dc1, dc2) ->
       Types.DirtParamSet.union
@@ -951,13 +951,13 @@ let rec free_dirt_vars_expression e =
   | ApplyTyExp (e, ty) ->
       Types.DirtParamSet.union
         (free_dirt_vars_expression e)
-        (free_dirt_vars_ty ty)
+        (fdvsOfTargetValTy ty)
   | LambdaTyCoerVar (tcp, ctty, e) -> free_dirt_vars_expression e
   | LambdaDirtCoerVar (dcp, ctd, e) -> free_dirt_vars_expression e
   | ApplyDirtExp (e, d) ->
       Types.DirtParamSet.union
         (free_dirt_vars_expression e)
-        (free_dirt_vars_dirt d)
+        (fdvsOfDirt d)
   | ApplySkelExp (e, sk) -> free_dirt_vars_expression e
   | ApplyTyCoercion (e, tc) ->
       Types.DirtParamSet.union
@@ -977,7 +977,7 @@ and free_dirt_vars_computation c =
         (free_dirt_vars_expression e)
         (free_dirt_vars_abstraction_with_ty abs)
   | LetRec ([(var, ty, e)], c) ->
-      Types.DirtParamSet.union (free_dirt_vars_ty ty)
+      Types.DirtParamSet.union (fdvsOfTargetValTy ty)
         (free_dirt_vars_expression e)
       |> Types.DirtParamSet.union (free_dirt_vars_computation c)
   | Match (e, cases) ->
@@ -1017,7 +1017,7 @@ and free_dirt_vars_computation c =
 and free_dirt_vars_abstraction (_, c) = free_dirt_vars_computation c
 
 and free_dirt_vars_abstraction_with_ty (_, ty, c) =
-  Types.DirtParamSet.union (free_dirt_vars_ty ty)
+  Types.DirtParamSet.union (fdvsOfTargetValTy ty)
     (free_dirt_vars_computation c)
 
 

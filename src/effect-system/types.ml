@@ -305,24 +305,6 @@ and ftvsOfCmpTyCt : ct_dirty -> TyParamSet.t = function
 
 (* ************************************************************************* *)
 
-(* GEORGE: TODO: Drop me. Use "ftvsOfTargetValTy" instead *)
-let rec free_target_ty t =
-  match t with
-  | TyParam x -> [x]
-  | Arrow (a, c) -> free_target_ty a @ free_target_dirty c
-  | Tuple tup -> List.flatten (List.map free_target_ty tup)
-  | Handler (c1, c2) -> free_target_dirty c1 @ free_target_dirty c2
-  | PrimTy _ -> []
-  | QualTy (_, a) -> failwith __LOC__
-  | QualDirt (_, a) -> failwith __LOC__
-  | TySchemeTy (ty_param, _, a) ->
-      let free_a = free_target_ty a in
-      List.filter (fun x -> not (List.mem x [ty_param])) free_a
-  | TySchemeDirt (dirt_param, a) -> free_target_ty a
-
-(* GEORGE: TODO: Drop me. Use "ftvsOfTargetCmpTy" instead *)
-and free_target_dirty (a, d) = free_target_ty a
-
 let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
   match t with
   | TyParam x -> (
@@ -418,62 +400,3 @@ let constructor_signature lbl =
       in
       (source_to_target ty_in, source_to_target ty_out)
 
-
-(* GEORGE: TODO: Drop me. Use "ftvsOfTargetValTy" instead *)
-let rec free_ty_vars_ty = function
-  | TyParam x -> TyParamSet.singleton x
-  | Arrow (a, c) -> TyParamSet.union (free_ty_vars_ty a) (free_ty_var_dirty c)
-  | Tuple tup ->
-      List.fold_left
-        (fun free ty -> TyParamSet.union free (free_ty_vars_ty ty))
-        TyParamSet.empty tup
-  | Apply (_, tup) ->
-      List.fold_left
-        (fun free ty -> TyParamSet.union free (free_ty_vars_ty ty))
-        TyParamSet.empty tup
-  | Handler (c1, c2) ->
-      TyParamSet.union (free_ty_var_dirty c1) (free_ty_var_dirty c2)
-  | PrimTy _ -> TyParamSet.empty
-  | QualTy (_, a) -> free_ty_vars_ty a
-  | QualDirt (_, a) -> free_ty_vars_ty a
-  | TySchemeTy (ty_param, _, a) ->
-      let free_a = free_ty_vars_ty a in
-      TyParamSet.remove ty_param free_a
-  | TySchemeDirt (dirt_param, a) -> free_ty_vars_ty a
-
-
-(* GEORGE: TODO: Drop me. Use "ftvsOfTargetCmpTy" instead *)
-and free_ty_var_dirty (a, _) = free_ty_vars_ty a
-
-let constraint_free_row_vars = function
-  | ParamRow p -> DirtParamSet.singleton p
-  | EmptyRow -> DirtParamSet.empty
-
-
-(* GEORGE: TODO: Drop me. Use "fdvsOfTargetValTy" instead *)
-let rec free_dirt_vars_ty = function
-  | Arrow (a, c) ->
-      DirtParamSet.union (free_dirt_vars_ty a) (free_dirt_vars_dirty c)
-  | Tuple tup ->
-      List.fold_left
-        (fun free ty -> DirtParamSet.union free (free_dirt_vars_ty ty))
-        DirtParamSet.empty tup
-  | Apply (_, tup) ->
-      List.fold_left
-        (fun free ty -> DirtParamSet.union free (free_dirt_vars_ty ty))
-        DirtParamSet.empty tup
-  | Handler (c1, c2) ->
-      DirtParamSet.union (free_dirt_vars_dirty c1) (free_dirt_vars_dirty c2)
-  | QualTy (_, a) -> free_dirt_vars_ty a
-  | QualDirt (_, a) -> free_dirt_vars_ty a
-  | TySchemeTy (ty_param, _, a) -> free_dirt_vars_ty a
-  | TySchemeDirt (dirt_param, a) ->
-      let free_a = free_dirt_vars_ty a in
-      DirtParamSet.remove dirt_param free_a
-  | _ -> DirtParamSet.empty
-
-(* GEORGE: TODO: Drop me. Use "fdvsOfTargetCmpTy" instead *)
-and free_dirt_vars_dirty (a, d) = free_dirt_vars_dirt d
-
-(* GEORGE: TODO: Drop me. Use "fdvsOfDirt" instead *)
-and free_dirt_vars_dirt drt = constraint_free_row_vars drt.row

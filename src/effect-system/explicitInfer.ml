@@ -175,14 +175,14 @@ and type_plain_typed_pattern st pat ty =
 
 let rec state_free_ty_vars st =
   List.fold_right
-    (fun (_, ty) acc -> Types.TyParamSet.union (Types.free_ty_vars_ty ty) acc)
+    (fun (_, ty) acc -> Types.TyParamSet.union (Types.ftvsOfTargetValTy ty) acc)
     st Types.TyParamSet.empty
 
 
 let rec state_free_dirt_vars st =
   List.fold_right
     (fun (_, ty) acc ->
-      Types.DirtParamSet.union (Types.free_dirt_vars_ty ty) acc )
+      Types.DirtParamSet.union (Types.fdvsOfTargetValTy ty) acc )
     st Types.DirtParamSet.empty
 
 (* Check whether a constraint is a coercion variable annotated inequality *)
@@ -203,7 +203,7 @@ let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_t
     let ctTyVars  = List.fold_right                (* fv(Q) *)
                       (fun ct tvs -> Types.TyParamSet.union (ftvsOfOmegaCt ct) tvs)
                       cs Types.TyParamSet.empty in
-    let tyTyVars  = Types.free_ty_vars_ty valTy in (* fv(A) *)
+    let tyTyVars  = Types.ftvsOfTargetValTy valTy in (* fv(A) *)
     let envTyVars = state_free_ty_vars tyEnv    in (* fv(G) *)
     Types.TyParamSet.diff                          (* (fv(Q) \/ fv(A)) - fv(G) *)
       (Types.TyParamSet.union ctTyVars tyTyVars)
@@ -215,7 +215,7 @@ let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_t
     let ctDirtVars  = List.fold_right                  (* fv(Q) *)
                         (fun ct dvs -> Types.DirtParamSet.union (fdvsOfOmegaCt ct) dvs)
                         cs Types.DirtParamSet.empty in
-    let tyDirtVars  = Types.free_dirt_vars_ty valTy in (* fv(A) *)
+    let tyDirtVars  = Types.fdvsOfTargetValTy valTy in (* fv(A) *)
     let envDirtVars = state_free_dirt_vars tyEnv    in (* fv(G) *)
     Types.DirtParamSet.diff                            (* (fv(Q) \/ fv(A)) - fv(G) *)
       (Types.DirtParamSet.union ctDirtVars tyDirtVars)
@@ -299,7 +299,7 @@ let splitter st constraints simple_ty =
       constraints
   in
   let free_ty_params =
-    let simple_ty_freevars_ty = Types.free_ty_vars_ty simple_ty
+    let simple_ty_freevars_ty = Types.ftvsOfTargetValTy simple_ty
     and constraints_freevars_ty =
       List.fold_right
         (fun cons acc ->
@@ -311,7 +311,7 @@ let splitter st constraints simple_ty =
       global_ty_vars
   in
   let free_dirt_params =
-    let simple_ty_freevars_dirt = Types.free_dirt_vars_ty simple_ty
+    let simple_ty_freevars_dirt = Types.fdvsOfTargetValTy simple_ty
     and constraints_freevars_dirt =
       List.fold_right
         (fun cons acc ->
@@ -346,7 +346,7 @@ let splitter st constraints simple_ty =
   Print.debug "Simple type free vars: " ;
   Types.TyParamSet.iter
     (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
-    (Types.free_ty_vars_ty simple_ty) ;
+    (Types.ftvsOfTargetValTy simple_ty) ;
   Print.debug "state free vars: " ;
   Types.TyParamSet.iter
     (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
