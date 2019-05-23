@@ -942,7 +942,10 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
           ; outType  = (alphaR, (betaR,deltaR))
           ; outState = state0
           ; outSubst = substR } = tcUntypedAbstraction tmpState tmpCtx ret_case in
-      { outExpr  = (let PVar x = xR in (* GEORGE: Intentionally partial; we do not support anything else at the moment *)
+      { outExpr  = ((* GEORGE: we do not support anything else at the moment *)
+                    let x = (match xR with
+                             | PVar x -> x
+                             | _ -> failwith "processReturnClause: only varpats allowed") in
                     fun sub ->
                       let omega1, omegaCt1 = Typed.fresh_ty_coer (subInValTy sub betaR, alphaOut) in
                       let omega2, omegaCt2 = Typed.fresh_dirt_coer (subInDirt sub deltaR, deltaOut) in
@@ -994,7 +997,10 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
           let omega4i, omegaCt4i = Typed.fresh_dirt_coer (subInDirt xsres.outSubst deltaOpi, deltaOut) in
           let omega5i, omegaCt5i = Typed.fresh_ty_coer (Types.Arrow (bi, (alphaOut,deltaOut)), subInValTy xsres.outSubst kTy) in
 
-          let PVar k = kop in (* GEORGE: Intentionally partial; we do not support anything else at the moment *)
+          (* GEORGE: we do not support anything else at the moment *)
+          let k = (match kop with
+                   | PVar k -> k
+                   | _ -> failwith "processOpClauses: only varpats allowed") in
           let lvar = CoreTypes.Variable.fresh "l" in
           let lsub = Typed.subst_comp (Assoc.of_list [(k, CastExp (Var lvar, omega5i))]) in
 
@@ -1019,9 +1025,13 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
   let omega7, omegaCt7 =
     let allOps = Types.EffectSet.of_list (List.map (fun ((eff, _), _) -> eff) clsRes.outExpr) in
 
-    (* Unsafely match against deltaOut to get a representation as a dirt variable *)
-    (* GEORGE: TODO: Rewrite this at some point *)
-    let Types.{effect_set=_;row=ParamRow deltaOutVar} = deltaOut in
+    (* GEORGE: Unsafely match against deltaOut to get a representation as a dirt variable *)
+    let deltaOutVar = (match deltaOut with
+                       | Types.{effect_set=_;row=ParamRow deltaOutVar} ->
+                           deltaOutVar
+                       | Types.{effect_set=_;row=EmptyRow} ->
+                           failwith "deltaOut: IMPOSSIBLE") in
+
     Typed.fresh_dirt_coer (deltaIn, Types.{effect_set = allOps; row= ParamRow deltaOutVar})
   in
 
@@ -1108,7 +1118,11 @@ and tcLetVal (inState : state) (lclCtxt : TypingEnv.t)
   let xType = mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars csLcl (subInValTy sigma1' e1res.outType) in
 
   (* 5: Typecheck c2 *)
-  let Untyped.PVar x = patIn.it in (* GEORGE: TODO: Deliberately fail at the moment. *)
+  (* GEORGE: we do not support anything else at the moment *)
+  let x = (match patIn.it with
+           | Untyped.PVar x -> x
+           | _ -> failwith "tcLetVal: only varpats allowed") in
+
   let c2res = tcLocatedCmp
                 ({ e1res.outState with constraints = csGbl })
                 (extendLclCtxt (lclCtxt |> subInEnv e1res.outSubst |> subInEnv sigma1') x xType)
@@ -1737,7 +1751,9 @@ and type_plain_computation (st: state) = function
       st_cons,{ computation= Typed.Handle (coer_exp, coer_comp)
       ; dtype= dirty_2}
   | Untyped.Let (defs, c_2) ->
-      let [(p_def, c_1)] = defs in (
+      let p_def, c_1 = (match defs with
+                        | [(p_def, c_1)] -> (p_def, c_1)
+                        | _ -> failwith __LOC__) in (
       match c_1.it with
       | Untyped.Value e_1 ->
           let st',{expression= typed_e1; ttype= type_e1} =
@@ -1764,7 +1780,9 @@ and type_plain_computation (st: state) = function
               (Substitution.apply_substitutions_to_type sub_e1' type_e1)
               (Substitution.apply_substitutions_to_type sub_e1' type_e1)
           in
-          let Untyped.PVar x = p_def.it in
+          let x = (match p_def.it with
+                   | Untyped.PVar x -> x
+                   | _ -> failwith __LOC__) in
           let new_st = add_gbl_def st_subbed x ty_sc_skel in
           let new_st',{computation= typed_c2; dtype= type_c2} =
             type_computation new_st c_2
@@ -1775,7 +1793,8 @@ and type_plain_computation (st: state) = function
                 match cons with
                 | Typed.TyOmega (om, t) -> Typed.LambdaTyCoerVar (om, t, acc)
                 | Typed.DirtOmega (om, t) ->
-                    Typed.LambdaDirtCoerVar (om, t, acc) )
+                    Typed.LambdaDirtCoerVar (om, t, acc)
+                | _ -> failwith __LOC__)
               split_cons1 typed_e1
           in
           let var_exp_dirt_lamda =
@@ -1934,7 +1953,9 @@ and type_plain_computation (st: state) = function
                         | Typed.TyOmega (tycovar, ct) ->
                             Typed.LambdaTyCoerVar (tycovar, ct, e)
                         | Typed.DirtOmega (dcovar, ct) ->
-                            Typed.LambdaDirtCoerVar (dcovar, ct, e) )
+                            Typed.LambdaDirtCoerVar (dcovar, ct, e)
+                        | _ ->
+                            failwith __LOC__ )
                       cons4
                       (Typed.Lambda
                          (Typed.abstraction_with_ty pat'
@@ -2016,7 +2037,7 @@ let finalize_constraint sub ct =
       subs''
   | Typed.SkelEq (sk1, sk2) -> failwith __LOC__
   | Typed.TyParamHasSkel (tp, sk) -> failwith __LOC__
-
+  | Typed.DirtyOmega ((_,_),_) -> failwith __LOC__ (* GEORGE: I think this is unused *)
 
 let finalize_constraints c_list = List.fold_left (fun subs ct -> finalize_constraint subs ct) Substitution.empty c_list
 
