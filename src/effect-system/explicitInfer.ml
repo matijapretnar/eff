@@ -694,6 +694,94 @@ let rec tcManyCmp (inState : state)
   (* GEORGE: I'd kill for some abstraction, having both tcManyVal and tcManyCmp is nasty. *)
 
 (* ************************************************************************* *)
+(*                       PATTERN TYPING (REVISED)                            *)
+(* ************************************************************************* *)
+
+(** CHECK the type of a (located) pattern. Return the extended typing
+ * environment with the additional term bindings. *)
+let rec checkLocatedPatTy (lclCtxt : TypingEnv.t) pat patTy
+  = checkPatTy lclCtxt pat.it patTy
+
+(** CHECK the type of a pattern. Return the extended typing environment with
+ * the additional term bindings. *)
+and checkPatTy (lclCtxt : TypingEnv.t) pat patTy =
+  match pat with
+  (* Variable Case *)
+  | Untyped.PVar x             -> (Typed.PVar x, extendLclCtxt lclCtxt x patTy)
+  (* Wildcard Case *)
+  | Untyped.PNonbinding        -> (Typed.PNonbinding, lclCtxt)
+  (* Nullary Constructor Case *)
+  | Untyped.PVariant (lbl, None) ->
+      let ty_in, ty_out = Types.constructor_signature lbl in
+      if (ty_in = Types.Tuple [] && patTy = ty_out)
+        then (Typed.PVariant (lbl, Typed.PTuple []), lclCtxt)
+        else failwith "checkPatTy: PVariant(None)"
+  (* Unary Constructor Case *)
+  | Untyped.PVariant (lbl, Some p) ->
+      let ty_in, ty_out = Types.constructor_signature lbl in
+      if (patTy = ty_out)
+        then let p', midCtxt = checkLocatedPatTy lclCtxt p ty_in in
+             (Typed.PVariant (lbl, p'), midCtxt)
+        else failwith "checkPatTy: PVariant(Some)"
+  (* Constant Case *)
+  | Untyped.PConst c ->
+      if (patTy = Types.type_const c)
+        then (Typed.PConst c, lclCtxt)
+        else failwith "checkPatTy: PConst"
+  (* GEORGE: Not implemented yet cases *)
+  | Untyped.PAs (p, v)         -> failwith __LOC__
+  | Untyped.PTuple l           -> failwith __LOC__
+  | Untyped.PRecord r          -> failwith __LOC__
+  | Untyped.PAnnotated (p, ty) -> failwith __LOC__
+
+(** INFER the type of a (located) pattern. Return the extended typing
+ * environment with the additional term bindings. Return also the extended
+ * constraint set, in case we had to create fresh type variables and skeletons
+ * (No other constraints are added). *)
+let rec inferLocatedPatTy (inState : state) (lclCtxt : TypingEnv.t) pat
+  = inferPatTy inState lclCtxt pat.it
+
+(** INFER the type of a pattern. Return the extended typing environment with the
+ * additional term bindings. Return also the extended constraint set, in case
+ * we had to create fresh type variables and skeletons (No other constraints
+ * are added). *)
+and inferPatTy (inState : state) (lclCtxt : TypingEnv.t) pat =
+  match pat with
+  (* Variable Case *)
+  | Untyped.PVar x ->
+      let tyVar, tyVarHasSkel = Typed.fresh_ty_with_fresh_skel () in
+      ( Typed.PVar x
+      , tyVar
+      , inState |> add_constraint tyVarHasSkel
+      , extendLclCtxt lclCtxt x tyVar )
+  (* Wildcard Case *)
+  | Untyped.PNonbinding ->
+      let tyVar, tyVarHasSkel = Typed.fresh_ty_with_fresh_skel () in
+      ( Typed.PNonbinding
+      , tyVar
+      , inState |> add_constraint tyVarHasSkel
+      , lclCtxt )
+  (* Nullary Constructor Case *)
+  | Untyped.PVariant (lbl, None) ->
+      let ty_in, ty_out = Types.constructor_signature lbl in
+      if (ty_in = Types.Tuple [])
+        then (Typed.PVariant (lbl, Typed.PTuple []), ty_out, inState, lclCtxt)
+        else failwith "inferPatTy: PVariant(None)"
+  (* Unary Constructor Case *)
+  | Untyped.PVariant (lbl, Some p) ->
+      let ty_in, ty_out = Types.constructor_signature lbl in
+      let p', midCtxt = checkLocatedPatTy lclCtxt p ty_in in
+      (Typed.PVariant (lbl, p'), ty_out, inState, midCtxt)
+  (* Constant Case *)
+  | Untyped.PConst c -> (Typed.PConst c, Types.type_const c, inState, lclCtxt)
+  (* GEORGE: Not implemented yet cases *)
+  | Untyped.PAs (p, v)         -> failwith __LOC__
+  | Untyped.PTuple l           -> failwith __LOC__
+  | Untyped.PRecord r          -> failwith __LOC__
+  | Untyped.PAnnotated (p, ty) -> failwith __LOC__
+
+
+(* ************************************************************************* *)
 (*                            PATTERN TYPING                                 *)
 (* ************************************************************************* *)
 
