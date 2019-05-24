@@ -44,14 +44,14 @@ module Make (Backend : BackendSignature.T) = struct
           TypeSystem.infer_top_comp state.type_system_state c
         in
         let c', effect_system_state' =
-          ExplicitInfer.type_toplevel ~loc:c.at
+          ExplicitInfer.tcTopLevel ~loc:c.at
             state.effect_system_state c
         in
         let drty = TypeChecker.type_of_computation state.type_checker_state c' in
-        let backend_state' = 
+        let backend_state' =
           Backend.process_computation state.backend_state c drty
         in
-        { state with 
+        { state with
           type_system_state= type_system_state'
         ; effect_system_state= effect_system_state'
         ; backend_state= backend_state' }
@@ -61,14 +61,14 @@ module Make (Backend : BackendSignature.T) = struct
           TypeSystem.infer_top_comp state.type_system_state c
         in
         let c', effect_system_state' =
-          ExplicitInfer.type_toplevel ~loc:c.at
+          ExplicitInfer.tcTopLevel ~loc:c.at
             state.effect_system_state c
         in
         let drty = TypeChecker.type_of_computation state.type_checker_state c' in
-        let backend_state' = 
+        let backend_state' =
           Backend.process_type_of state.backend_state c drty
         in
-        { state with 
+        { state with
           type_system_state= type_system_state'
         ; effect_system_state= effect_system_state'
         ; backend_state= backend_state' }
@@ -92,11 +92,11 @@ module Make (Backend : BackendSignature.T) = struct
         let effect_system_state' =
           ExplicitInfer.add_effect eff (ty1, ty2) state.effect_system_state
         in
-        let backend_state' = 
+        let backend_state' =
           Backend.process_def_effect state.backend_state (eff, (ty1, ty2))
         in
         { state with
-          desugarer_state= desugarer_state' 
+          desugarer_state= desugarer_state'
         ; type_system_state= type_system_state'
         ; effect_system_state= effect_system_state'
         ; backend_state= backend_state' }
@@ -142,10 +142,10 @@ module Make (Backend : BackendSignature.T) = struct
         in
         let ty' = Types.source_to_target ty in
         let effect_system_state' =
-          EffectSystem.add_external state.effect_system_state x ty'
+          EffectSystem.addExternal state.effect_system_state x ty'
         in
         let type_checker_state' =
-          TypeChecker.add_external state.type_checker_state x ty'
+          TypeChecker.addExternal state.type_checker_state x ty'
         in
         let backend_state' =
           Backend.process_external state.backend_state (x, ty, f)

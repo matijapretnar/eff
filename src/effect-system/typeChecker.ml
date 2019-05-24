@@ -17,7 +17,7 @@ let extend_ty_params st ty_var = {st with ty_params= ty_var :: st.ty_params}
 let extend_var_types st t_var tty =
   {st with var_types= Assoc.update t_var tty st.var_types}
 
-let add_external st x ty = extend_var_types st x ty
+let addExternal st x ty = extend_var_types st x ty
 
 let extend_dirt_params st dirt_var =
   {st with dirt_params= dirt_var :: st.dirt_params}
@@ -71,7 +71,7 @@ let check_well_formed_dirt st = function
 
 let rec check_well_formed_ty st ty =
   match ty with
-  | TyParam typ -> 
+  | TyParam typ ->
       let ty_var_list = Assoc.keys_of st.ty_param_skeletons in
       assert (List.mem typ ty_var_list)
   | Arrow (tty1, tty2) ->
