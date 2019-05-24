@@ -117,7 +117,33 @@ and type_plain_typed_pattern st pat ty =
       (Typed.PVar x, st')
   | Untyped.PNonbinding -> (Typed.PNonbinding, st)
   | Untyped.PAs (p, v) -> failwith __LOC__
-  | Untyped.PTuple l -> failwith __LOC__
+  | Untyped.PTuple l -> (
+    match ty with
+      | Types.Tuple tl -> 
+        let (typed, st''') = List.fold_right
+        (fun (pat,typ) (types, st') -> 
+          let (t, st'') = type_typed_pattern st' pat typ in
+          (t::types, st'')
+        )
+        (List.combine l tl)
+        ([], st)
+        in 
+        (Typed.PTuple typed, st''')
+     | Types.TyParam t -> (
+        (* Generate fresh types and constraints *)
+        Print.debug "General: %t" (Types.print_target_ty ty);
+        let (tl',st'') = List.fold_right
+        (fun pat (tl, st') -> 
+          let tvar, cons = Typed.fresh_ty_with_fresh_skel () in
+          (tvar::tl, st' |> add_constraint cons) ) 
+        l
+        ([], st) in
+        let _, coer = Typed.fresh_ty_coer (Types.Tuple tl', ty) in
+        let st'' = add_constraint coer st'' in (* subtype constraint for general type *)
+        type_plain_typed_pattern st'' (Untyped.PTuple l) (Types.Tuple tl')
+        )
+     | _ -> failwith "Invalid type"
+    )
   | Untyped.PRecord r -> failwith __LOC__
   | Untyped.PVariant (lbl, p) -> (
       let ty_in, ty_out = Types.constructor_signature lbl in
@@ -132,7 +158,7 @@ and type_plain_typed_pattern st pat ty =
       let _omega, q = Typed.fresh_ty_coer (Types.type_const c, ty) in
       let st' = add_constraint q st in
       (Typed.PConst c, st')
-
+  | Untyped.PAnnotated _ -> failwith __LOC__
 
 (* ... *)
 

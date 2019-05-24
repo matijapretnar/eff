@@ -285,8 +285,12 @@ and print_ty_coercion ?max_level c ppf =
   | SequenceTyCoer (tc1, tc2) ->
       print "%t ; %t" (print_ty_coercion tc1) (print_ty_coercion tc2)
   | PureCoercion dtyco -> print "pure(%t)" (print_dirty_coercion dtyco)
-  | _ -> failwith "Not yet implemented __LOC__"
-
+  | TupleCoercion [] -> print "unit -> unit"
+  | TupleCoercion tlist -> 
+    print "@[<hov>%t@]"
+     (Print.sequence 
+      (Symbols.times ()) (print_ty_coercion) tlist);
+  | _ -> failwith __LOC__
 
 and print_dirty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

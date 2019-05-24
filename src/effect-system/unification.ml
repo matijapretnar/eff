@@ -50,7 +50,7 @@ let rec skeleton_of_target_ty tty conslist =
       SkelHandler
         (skeleton_of_target_ty a1 conslist, skeleton_of_target_ty a2 conslist)
   | PrimTy pt -> PrimSkel pt
-
+  | Tuple t -> SkelTuple (List.map (fun ty -> skeleton_of_target_ty ty conslist) t)
 
 let rec fix_union_find fixpoint c_list =
   Print.debug "--------------start list-------" ;
@@ -81,7 +81,7 @@ let process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a =
   let cons_subbed = Substitution.apply_substitutions_to_constraints sub1 (add_list_to_constraints paused rest_queue) in
   (Substitution.add_skel_param_substitution k v sub, [], cons_subbed)
 
-let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
+let rec ty_param_has_skel_step sub paused cons rest_queue tvar skel =
   match skel with
   (* α : ς *)
   | SkelParam p -> (sub, Typed.add_to_constraints cons paused, rest_queue)
@@ -178,8 +178,16 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
       , paused
       , add_list_to_constraints (List.map2 (fun sk1 sk2 -> Typed.SkelEq (sk1, sk2)) sks1 sks2)
         rest_queue )
+  | SkelTuple t1, SkelTuple t2 when t1 = t2 ->
+    (sub, paused, rest_queue)
+  | SkelTuple t1, SkelTuple t2 -> 
+      List.fold_right 
+      (fun (s1, s2) (sub', paused', rest') -> skel_eq_step sub' paused' cons rest' s1 s2)
+      (List.combine t1 t2)
+      (sub, paused, rest_queue)
+  | SkelTuple _, _ 
+  | _, SkelTuple _ -> failwith "Invalid constraint"
   | _ -> failwith __LOC__
-
 
 and ty_omega_step sub paused cons rest_queue omega =
   function
