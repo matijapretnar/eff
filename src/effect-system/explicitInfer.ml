@@ -699,87 +699,90 @@ let rec tcManyCmp (inState : state)
 
 (** CHECK the type of a (located) pattern. Return the extended typing
  * environment with the additional term bindings. *)
-let rec checkLocatedPatTy (lclCtxt : TypingEnv.t) pat patTy
+let rec checkLocatedPatTy (lclCtxt : TypingEnv.t) (pat : Untyped.pattern) (patTy : Types.target_ty)
+  : (Typed.pattern * TypingEnv.t)
   = checkPatTy lclCtxt pat.it patTy
 
 (** CHECK the type of a pattern. Return the extended typing environment with
  * the additional term bindings. *)
-and checkPatTy (lclCtxt : TypingEnv.t) pat patTy =
-  match pat with
-  (* Variable Case *)
-  | Untyped.PVar x             -> (Typed.PVar x, extendLclCtxt lclCtxt x patTy)
-  (* Wildcard Case *)
-  | Untyped.PNonbinding        -> (Typed.PNonbinding, lclCtxt)
-  (* Nullary Constructor Case *)
-  | Untyped.PVariant (lbl, None) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
-      if (ty_in = Types.Tuple [] && patTy = ty_out)
-        then (Typed.PVariant (lbl, Typed.PTuple []), lclCtxt)
-        else failwith "checkPatTy: PVariant(None)"
-  (* Unary Constructor Case *)
-  | Untyped.PVariant (lbl, Some p) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
-      if (patTy = ty_out)
-        then let p', midCtxt = checkLocatedPatTy lclCtxt p ty_in in
-             (Typed.PVariant (lbl, p'), midCtxt)
-        else failwith "checkPatTy: PVariant(Some)"
-  (* Constant Case *)
-  | Untyped.PConst c ->
-      if (patTy = Types.type_const c)
-        then (Typed.PConst c, lclCtxt)
-        else failwith "checkPatTy: PConst"
-  (* GEORGE: Not implemented yet cases *)
-  | Untyped.PAs (p, v)         -> failwith __LOC__
-  | Untyped.PTuple l           -> failwith __LOC__
-  | Untyped.PRecord r          -> failwith __LOC__
-  | Untyped.PAnnotated (p, ty) -> failwith __LOC__
+and checkPatTy (lclCtxt : TypingEnv.t) (pat : Untyped.plain_pattern) (patTy : Types.target_ty)
+  : (Typed.pattern * TypingEnv.t)
+  = match pat with
+    (* Variable Case *)
+    | Untyped.PVar x             -> (Typed.PVar x, extendLclCtxt lclCtxt x patTy)
+    (* Wildcard Case *)
+    | Untyped.PNonbinding        -> (Typed.PNonbinding, lclCtxt)
+    (* Nullary Constructor Case *)
+    | Untyped.PVariant (lbl, None) ->
+        let ty_in, ty_out = Types.constructor_signature lbl in
+        if (ty_in = Types.Tuple [] && patTy = ty_out)
+          then (Typed.PVariant (lbl, Typed.PTuple []), lclCtxt)
+          else failwith "checkPatTy: PVariant(None)"
+    (* Unary Constructor Case *)
+    | Untyped.PVariant (lbl, Some p) ->
+        let ty_in, ty_out = Types.constructor_signature lbl in
+        if (patTy = ty_out)
+          then let p', midCtxt = checkLocatedPatTy lclCtxt p ty_in in
+               (Typed.PVariant (lbl, p'), midCtxt)
+          else failwith "checkPatTy: PVariant(Some)"
+    (* Constant Case *)
+    | Untyped.PConst c ->
+        if (patTy = Types.type_const c)
+          then (Typed.PConst c, lclCtxt)
+          else failwith "checkPatTy: PConst"
+    (* GEORGE: Not implemented yet cases *)
+    | Untyped.PAs (p, v)         -> failwith __LOC__
+    | Untyped.PTuple l           -> failwith __LOC__
+    | Untyped.PRecord r          -> failwith __LOC__
+    | Untyped.PAnnotated (p, ty) -> failwith __LOC__
 
 (** INFER the type of a (located) pattern. Return the extended typing
  * environment with the additional term bindings. Return also the extended
  * constraint set, in case we had to create fresh type variables and skeletons
  * (No other constraints are added). *)
-let rec inferLocatedPatTy (inState : state) (lclCtxt : TypingEnv.t) pat
+let rec inferLocatedPatTy (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.pattern)
+  : (Typed.pattern * Types.target_ty * state * TypingEnv.t)
   = inferPatTy inState lclCtxt pat.it
 
 (** INFER the type of a pattern. Return the extended typing environment with the
  * additional term bindings. Return also the extended constraint set, in case
  * we had to create fresh type variables and skeletons (No other constraints
  * are added). *)
-and inferPatTy (inState : state) (lclCtxt : TypingEnv.t) pat =
-  match pat with
-  (* Variable Case *)
-  | Untyped.PVar x ->
-      let tyVar, tyVarHasSkel = Typed.fresh_ty_with_fresh_skel () in
-      ( Typed.PVar x
-      , tyVar
-      , inState |> add_constraint tyVarHasSkel
-      , extendLclCtxt lclCtxt x tyVar )
-  (* Wildcard Case *)
-  | Untyped.PNonbinding ->
-      let tyVar, tyVarHasSkel = Typed.fresh_ty_with_fresh_skel () in
-      ( Typed.PNonbinding
-      , tyVar
-      , inState |> add_constraint tyVarHasSkel
-      , lclCtxt )
-  (* Nullary Constructor Case *)
-  | Untyped.PVariant (lbl, None) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
-      if (ty_in = Types.Tuple [])
-        then (Typed.PVariant (lbl, Typed.PTuple []), ty_out, inState, lclCtxt)
-        else failwith "inferPatTy: PVariant(None)"
-  (* Unary Constructor Case *)
-  | Untyped.PVariant (lbl, Some p) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
-      let p', midCtxt = checkLocatedPatTy lclCtxt p ty_in in
-      (Typed.PVariant (lbl, p'), ty_out, inState, midCtxt)
-  (* Constant Case *)
-  | Untyped.PConst c -> (Typed.PConst c, Types.type_const c, inState, lclCtxt)
-  (* GEORGE: Not implemented yet cases *)
-  | Untyped.PAs (p, v)         -> failwith __LOC__
-  | Untyped.PTuple l           -> failwith __LOC__
-  | Untyped.PRecord r          -> failwith __LOC__
-  | Untyped.PAnnotated (p, ty) -> failwith __LOC__
-
+and inferPatTy (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.plain_pattern)
+  : (Typed.pattern * Types.target_ty * state * TypingEnv.t)
+  = match pat with
+    (* Variable Case *)
+    | Untyped.PVar x ->
+        let tyVar, tyVarHasSkel = Typed.fresh_ty_with_fresh_skel () in
+        ( Typed.PVar x
+        , tyVar
+        , inState |> add_constraint tyVarHasSkel
+        , extendLclCtxt lclCtxt x tyVar )
+    (* Wildcard Case *)
+    | Untyped.PNonbinding ->
+        let tyVar, tyVarHasSkel = Typed.fresh_ty_with_fresh_skel () in
+        ( Typed.PNonbinding
+        , tyVar
+        , inState |> add_constraint tyVarHasSkel
+        , lclCtxt )
+    (* Nullary Constructor Case *)
+    | Untyped.PVariant (lbl, None) ->
+        let ty_in, ty_out = Types.constructor_signature lbl in
+        if (ty_in = Types.Tuple [])
+          then (Typed.PVariant (lbl, Typed.PTuple []), ty_out, inState, lclCtxt)
+          else failwith "inferPatTy: PVariant(None)"
+    (* Unary Constructor Case *)
+    | Untyped.PVariant (lbl, Some p) ->
+        let ty_in, ty_out = Types.constructor_signature lbl in
+        let p', midCtxt = checkLocatedPatTy lclCtxt p ty_in in
+        (Typed.PVariant (lbl, p'), ty_out, inState, midCtxt)
+    (* Constant Case *)
+    | Untyped.PConst c -> (Typed.PConst c, Types.type_const c, inState, lclCtxt)
+    (* GEORGE: Not implemented yet cases *)
+    | Untyped.PAs (p, v)         -> failwith __LOC__
+    | Untyped.PTuple l           -> failwith __LOC__
+    | Untyped.PRecord r          -> failwith __LOC__
+    | Untyped.PAnnotated (p, ty) -> failwith __LOC__
 
 (* ************************************************************************* *)
 (*                            PATTERN TYPING                                 *)
@@ -1298,8 +1301,88 @@ and tcLetRec (inState : state) (lclCtxt : TypingEnv.t)
   }
 
 (* Typecheck a case expression *)
+(* GEORGE: There are multiple ways to typecheck a case expression, depending on
+ * what semantics one wants. We choose this for now cause it is easier to
+ * implement *)
 and tcMatch (inState : state) (lclCtxt : TypingEnv.t) (scr : Untyped.expression) (cases : Untyped.abstraction list) : tcCmpOutput =
-  georgeTODO
+  (* 1: Typecheck the scrutinee *)
+  let resScr = tcLocatedVal inState lclCtxt scr in
+
+  (* 2: Generate fresh variables for the result *)
+  let alphaOut, alphaOutSkel = fresh_ty_with_fresh_skel () in
+  let deltaOut = Types.fresh_dirt () in
+
+  (* 3: How to typecheck the clauses *)
+  let rec tcMatchCases (tmpState : state) (tmpCtxt : TypingEnv.t) (clauses : Untyped.abstraction list) = (
+    match clauses with
+    | [] -> { outExpr  = None
+            ; outType  = () (* () *)
+            ; outState = tmpState
+            ; outSubst = Substitution.empty
+            }
+    | (pat,rhs) :: clauses ->
+        (* Infer a type for the pattern *)
+        let trgPat,patTy,extState,extCtxt = inferLocatedPatTy tmpState tmpCtxt pat in
+        (* Typecheck the right-hand side *)
+        let resRhs = tcLocatedCmp extState extCtxt rhs in
+        (* Typecheck the rest of the clauses *)
+        let resRest = tcMatchCases resRhs.outState (subInEnv resRhs.outSubst tmpCtxt) clauses in
+
+        (* Create the target clause *)
+        let tyBi, dirtDi = resRhs.outType in
+
+        let omegaOutLeft, omegaOutLeftCt = Typed.fresh_ty_coer (subInValTy resRest.outSubst tyBi, alphaOut) in
+        let omegaOutRight, omegaOutRightCt = Typed.fresh_dirt_coer (subInDirt resRest.outSubst dirtDi, deltaOut) in
+        let omegaIn, omegaInCt = Typed.fresh_ty_coer
+                                   ( subInValTy resRest.outSubst
+                                       (subInValTy resRhs.outSubst resScr.outType)
+                                   , subInValTy resRest.outSubst patTy) in
+
+        let trgClause = (
+          let scrutinee = Typed.CastExp
+                            ( resScr.outExpr
+                                |> subInExp resRhs.outSubst
+                                |> subInExp resRest.outSubst
+                            , omegaIn
+                            ) in
+
+          let firstClause = ( trgPat
+                            , Typed.CastComp ( subInCmp resRest.outSubst resRhs.outExpr
+                                             , Typed.BangCoercion (omegaOutLeft, omegaOutRight)
+                                             )
+                            ) in
+
+          let nextClauses = (match resRest.outExpr with
+                             | None   -> []
+                             | Some c -> [(Typed.PNonbinding, c)]
+                            ) in
+
+          Typed.Match (scrutinee, firstClause :: nextClauses)
+        ) in
+
+        (* Combine the results *)
+        { outExpr  = Some trgClause
+        ; outType  = () (* () : GEORGE's BAD MODELLING *)
+        ; outState = resRest.outState
+                       |> add_constraint omegaOutLeftCt
+                       |> add_constraint omegaOutRightCt
+                       |> add_constraint omegaInCt
+        ; outSubst = extendGenSub resRhs.outSubst resRest.outSubst (* Compose the substitutions *)
+        }
+  ) in
+
+  (* 4: Actually typecheck the clauses (GEORGE: Awful name; change it) *)
+  let almostThere = tcMatchCases resScr.outState (subInEnv resScr.outSubst lclCtxt) cases in
+
+  let finalComputation = (match almostThere.outExpr with
+       | None -> Typed.Match (resScr.outExpr, []) (* Only if alternative list is empty *)
+       | Some c -> c ) in
+
+  { outExpr  = finalComputation
+  ; outType  = (alphaOut, deltaOut)
+  ; outState = almostThere.outState |> add_constraint alphaOutSkel
+  ; outSubst = extendGenSub resScr.outSubst almostThere.outSubst
+  }
 
 (* Typecheck a function application *)
 and tcApply (inState : state) (lclCtxt : TypingEnv.t) (val1 : Untyped.expression) (val2 : Untyped.expression) : tcCmpOutput =
