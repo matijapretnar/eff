@@ -144,7 +144,37 @@ and type_plain_typed_pattern st pat ty =
         )
      | _ -> failwith "Invalid type"
     )
-  | Untyped.PRecord r -> failwith __LOC__
+  | Untyped.PRecord r -> (
+    match ty with
+      | Types.Record rt -> (
+        match Assoc.combine r rt with 
+        | None -> failwith "Invalid type"
+        | Some comb -> 
+          let (st''', typed) = Assoc.fold_map 
+            (fun st' (pat, typ) ->
+              let (t, st'') = type_typed_pattern st' pat typ in
+              (st'', t)
+            )
+            st
+            comb
+            in
+        (Typed.PRecord typed, st''')
+      )
+      | Types.TyParam t -> 
+        let st'', tr = Assoc.fold_map
+        (fun st' _ -> 
+          let tvar, cons = Typed.fresh_ty_with_fresh_skel () in 
+          (st' |> add_constraint cons, tvar) 
+        )
+        st 
+        r
+        in 
+        let _, coer = Typed.fresh_ty_coer (Types.Record tr, ty) in 
+        let st''' = add_constraint coer st'' in 
+        type_plain_typed_pattern st''' (Untyped.PRecord r) (Types.Record tr)
+
+      | _ -> failwith "Invalid type"
+  )
   | Untyped.PVariant (lbl, p) -> (
       let ty_in, ty_out = Types.constructor_signature lbl in
       let _omega, q = Typed.fresh_ty_coer (ty_out, ty) in
@@ -462,7 +492,17 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
       let (st'', terms_r, types_r) = List.fold_left folder (st, [], []) es (* FOLD LEFT VS FOLD RIGHT????*)
       in
       st'',{expression= Typed.Tuple (List.rev terms_r); ttype= Types.Tuple (List.rev types_r)}
-  | Untyped.Record lst -> failwith __LOC__
+  | Untyped.Record lst -> 
+    let folder st' ex = 
+        let (st_, {expression; ttype}) = type_expression st' ex in
+        (st_, (expression, ttype) )
+      in
+      let (st'', lst') = 
+        Assoc.fold_map folder st lst
+      in
+      let typed = Assoc.map fst lst' in
+      let typs = Assoc.map snd lst' in
+      st'',{expression= Typed.Record typed; ttype= Types.Record typs}
   | Untyped.Variant (lbl, e) -> (
       let ty_in, ty_out = Types.constructor_signature lbl in
       match e with

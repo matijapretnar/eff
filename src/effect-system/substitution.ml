@@ -87,6 +87,7 @@ let rec apply_sub_skel sub skeleton =
   (* Really consider other cases *)
   | SkelApply (t,l) -> SkelApply (t, List.map (apply_sub_skel sub) l)
   | SkelTuple skels -> SkelTuple (List.map (apply_sub_skel sub) skels )
+  | SkelRecord skels -> SkelRecord (Assoc.map (apply_sub_skel sub) skels)
 
 let rec apply_sub_ty sub ty =
   match ty with
@@ -98,6 +99,7 @@ let rec apply_sub_ty sub ty =
       Arrow (apply_sub_ty sub tty1, apply_sub_dirty_ty sub tty2)
   | Apply (ty_name, tys) -> Apply (ty_name, List.map (apply_sub_ty sub) tys)
   | Tuple ttyl -> Tuple (List.map (fun x -> apply_sub_ty sub x) ttyl)
+  | Record ttmap -> Record (Assoc.map (apply_sub_ty sub) ttmap)
   | Handler (tydrty1, tydrty2) ->
       Handler (apply_sub_dirty_ty sub tydrty1, apply_sub_dirty_ty sub tydrty2)
   | PrimTy _ -> ty
@@ -143,6 +145,8 @@ let rec apply_sub_tycoer sub ty_coer =
         (apply_sub_tycoer sub ty_coer1, apply_sub_tycoer sub ty_coer2)
   | TupleCoercion tcl ->
       TupleCoercion (List.map (fun x -> apply_sub_tycoer sub x) tcl)
+  | RecordCoercion rc -> 
+      RecordCoercion (Assoc.map (apply_sub_tycoer sub) rc)
   | ApplyCoercion (ty_name, tcl) ->
       ApplyCoercion (ty_name, List.map (fun x -> apply_sub_tycoer sub x) tcl)
   | LeftArrow tc1 -> LeftArrow (apply_sub_tycoer sub tc1)
@@ -224,6 +228,7 @@ and apply_sub_exp sub expression =
   | BuiltIn (s, i) -> BuiltIn (s, i)
   | Const c -> Const c
   | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
+  | Record emap -> Record (Assoc.map (apply_sub_exp sub) emap)
   | Variant (lbl, e1) -> Variant (lbl, apply_sub_exp sub e1)
   | Lambda abs -> Lambda (apply_sub_abs_with_ty sub abs)
   | Effect eff -> Effect eff

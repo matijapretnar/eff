@@ -4,6 +4,8 @@ let short_arrow () = if !Config.ascii then "->" else "\226\134\146"
 
 let times () = if !Config.ascii then " * " else " \195\151 "
 
+let semicolon () = "; "
+
 let subscript sub =
   match sub with
   | None -> ""

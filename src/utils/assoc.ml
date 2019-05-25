@@ -87,3 +87,46 @@ let concat assoc1 assoc2 = assoc1 @ assoc2
 let of_list lst = lst
 
 let to_list assoc = assoc
+
+(* Very inefficient implementations*)
+
+let rec combine' a1 = function  
+  | [] -> Some []
+  | (k,v')::a2 -> 
+    match lookup k a1 with 
+      | Some v -> (match combine' a1 a2 with
+        | Some rest -> Some ((k, (v, v'))::rest)
+        | None -> None
+      )
+      | None -> None
+
+(* Assumes, that the keys are unique *)
+let combine a1 a2 = 
+  if List.length a1 != List.length a2 then None else combine' a1 a2
+
+let rec combine_optional a1 a2 =
+  match a1 with 
+    |  [] -> []
+    | (k,v)::rest -> 
+      (k, (v, lookup k a2)):: (combine_optional rest a2)
+    
+(* Works without any assumption on lists, further implementing assoc as trees will 
+enable this to be much more efficient O(n), while currently it is O(n^2) *)
+let rec keys_equals a1 a2 = 
+  match (a1, a2) with
+    | ([], []) -> true
+    | ([], _) -> false
+    | ((k,v)::rest, a) -> 
+      match lookup k a with
+        | Some v' -> keys_equals rest (remove k a)
+        | _ -> false
+
+let rec equals a1 a2 =
+  match (a1, a2) with
+    | ([], []) -> true
+    | ([], _) -> false
+    | ((k,v)::rest, a) -> 
+      match lookup k a with
+        | Some v' when v = v' -> equals rest (remove k a)
+        | _ -> false
+
