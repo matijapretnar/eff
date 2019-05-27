@@ -9,6 +9,9 @@ open Typed
      4. Understand how variants are implemented
  *)
 
+(* GEORGE: By convention, in types, type inequalities are qualified over first,
+and then dirt inequalities *)
+
 type label = CoreTypes.Label.t
 type field = CoreTypes.Field.t
 
@@ -18,6 +21,8 @@ let initial_lcl_ty_env = TypingEnv.empty
 
 (* Add a single term binding to the local typing environment *)
 let extendLclCtxt env x scheme = TypingEnv.update env x scheme
+
+let georgeTODO () = failwith __LOC__
 
 (*
 let add_def env x ty_sch =
@@ -122,6 +127,46 @@ let isOmegaCt (ct : Typed.omega_ct) =
   | SkelEq (_,_)         -> false
   | TyParamHasSkel (_,_) -> false
 
+(* Check whether a coercion variable-annotated constraint is a type inequality *)
+let isTyOmega : Typed.omega_ct -> bool = function
+  | Typed.TyOmega (_,_) -> true
+  | _other_type         -> false
+
+(* Check whether a coercion variable-annotated constraint is a dirt inequality *)
+let isDirtOmega : Typed.omega_ct -> bool = function
+  | Typed.DirtOmega (_,_) -> true
+  | _other_type           -> false
+
+(* ************************************************************************* *)
+(*                            SUBSTITUTIONS                                  *)
+(* ************************************************************************* *)
+
+(* Substitute in typing environments *)
+let subInEnv sub env = TypingEnv.apply_sub env sub
+
+(* Substitute in target values and computations *)
+let subInCmp sub cmp = Substitution.apply_substitutions_to_computation sub cmp
+let subInExp sub exp = Substitution.apply_substitutions_to_expression sub exp
+
+(* Substitute in target value types, computation types, and dirts *)
+let subInValTy sub ty        = Substitution.apply_substitutions_to_type sub ty
+let subInDirt  sub dirt      = Substitution.apply_substitutions_to_dirt sub dirt
+let subInCmpTy sub (ty,dirt) = (subInValTy sub ty, subInDirt sub dirt)
+
+(* Substitute in value, dirt, and computation coercions *)
+let subInValCo  sub co = Substitution.apply_sub_tycoer sub co
+let subInDirtCo sub co = Substitution.apply_sub_dirtcoer sub co
+let subInCmpCo  sub co = Substitution.apply_sub_dirtycoer sub co
+
+(* Substitute in skeletons *)
+let subInSkel sub skel = Substitution.apply_substitutions_to_skeleton sub skel
+
+(* Substitute in type and dirt inequalities *)
+let subInTyCt sub (ty1,ty2) = (subInValTy sub ty1, subInValTy sub ty2)
+let subInDirtCt sub (d1,d2) = (subInDirt sub d1, subInDirt sub d2)
+
+(* ************************************************************************* *)
+
 (* Partition a set of constraints for let generalization (cf. Explicit Effect Subtyping) *)
 let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_ty) =
   let (tyEnv : (Typed.variable * Types.target_ty) list) = TypingEnv.return_context ctx in
@@ -199,243 +244,293 @@ let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_t
       cs
   ) in
 
-  (* 7: Return the whole lot. *)
+  (* 7: Partition the local constraints into type and dirt inequalities *)
+  let lclTyCs, lclDirtCs = (
+    let rec aux = function
+      | [] -> ([], [])
+      | Typed.TyOmega (omega, pi) :: rest ->
+          let tyCs, dirtCs = aux rest
+          in  ((omega, pi) :: tyCs, dirtCs)
+      | Typed.DirtOmega (omega, pi) :: rest ->
+          let tyCs, dirtCs = aux rest
+          in  (tyCs, (omega, pi) :: dirtCs)
+      | Typed.DirtyOmega ((_,_),_) :: rest -> failwith __LOC__ (* Shouldn't be possible *)
+      | Typed.SkelEq (_,_)         :: rest -> failwith __LOC__ (* Shouldn't be possible *)
+      | Typed.TyParamHasSkel (_,_) :: rest -> failwith __LOC__ (* Shouldn't be possible *)
+    in  aux localCs
+  ) in
+
+  (* 8: Return the whole lot. *)
   ( sigmas
   , annotatedAlphas
   , Types.DirtParamSet.elements deltas  (* as a list *)
-  , localCs
+  , lclTyCs   (* lclTyCs   : (CoreTypes.TyCoercionParam.t * Types.ct_ty) list *)
+  , lclDirtCs (* lclDirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list *)
   , globalCs
   )
 
-(* Apply a generalized term to all arguments returned by "split" (cf. LetRec). *)
-let mkGroundTerm freeSkelVars annFreeTyVars freeDirtVars cs exp : Typed.expression =
+(* Apply a term to all possible arguments *)
+let applyTerm skeletons types dirts tyCoercions dirtCoercions exp : Typed.expression =
   let foldLeft f xs x0 = List.fold_left f x0 xs in (* GEORGE: Just for convenience *)
   exp
-  |> (* 1: Apply to the skeleton variables *)
-     foldLeft
-       (fun e s -> Typed.ApplySkelExp (e, Types.SkelParam s))
-       freeSkelVars
-  |> (* 2: Apply to the type variables *)
-     foldLeft
-       (fun e (a,_) -> Typed.ApplyTyExp (e, Types.TyParam a))
-       annFreeTyVars
-  |> (* 3: Apply to the dirt variables *)
-     foldLeft
-       (fun e d -> Typed.ApplyDirtExp (e, Types.no_effect_dirt d))
-       freeDirtVars
-  |> (* 4: Apply to the coercion variables *)
-     foldLeft
-       (fun e ct ->
-          match ct with
-          | Typed.TyOmega (tycovar, _ct)  -> Typed.ApplyTyCoercion (e, TyCoercionVar tycovar)
-          | Typed.DirtOmega (dcovar, _ct) -> Typed.ApplyDirtCoercion (e, DirtCoercionVar dcovar)
-          (* GEORGE:TODO: What about DirtyOmega or whatever was it called?? *)
-          | _ -> failwith __LOC__ ) (* GEORGE: TODO: Why the other forms? *)
-       cs
+  |> (* 1: Apply to the skeletons *)
+     foldLeft (fun e s -> Typed.ApplySkelExp (e, s)) skeletons
+  |> (* 2: Apply to the types *)
+     foldLeft (fun e a -> Typed.ApplyTyExp (e, a)) types
+  |> (* 3: Apply to the dirts *)
+     foldLeft (fun e d -> Typed.ApplyDirtExp (e, d)) dirts
+  |> (* 4: Apply to the type coercions *)
+     foldLeft (fun e c -> Typed.ApplyTyCoercion (e, c)) tyCoercions
+  |> (* 5: Apply to the dirt coercions *)
+     foldLeft (fun e c -> Typed.ApplyDirtCoercion (e, c)) dirtCoercions
+
+(* Apply a generalized term to all arguments returned by "split" (cf. LetRec). *)
+let mkGroundTerm freeSkelVars annFreeTyVars freeDirtVars tyCs dirtCs exp : Typed.expression =
+  applyTerm
+    (List.map (fun s -> Types.SkelParam s) freeSkelVars)
+    (List.map (fun (a,_) -> Types.TyParam a) annFreeTyVars)
+    (List.map (fun d -> Types.no_effect_dirt d) freeDirtVars)
+    (List.map (fun (o,_) -> Typed.TyCoercionVar o) tyCs)
+    (List.map (fun (o,_) -> Typed.DirtCoercionVar o) dirtCs)
+    exp
 
 (* Create a generalized type from parts (as delivered from "splitter"). *)
-let mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars cs monotype : Types.target_ty =
+let mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars tyCs dirtCs monotype : Types.target_ty =
   monotype
-  |> (* 1: Add the constraint abstractions *)
+  |> (* 1: Add the constraint abstractions (dirt) *)
      List.fold_right
-       (fun ct qual ->
-         match ct with
-         | Typed.TyOmega (_, pi)   -> Types.QualTy (pi, qual)
-         | Typed.DirtOmega (_, pi) -> Types.QualDirt (pi, qual)
-         (* GEORGE:TODO: What about DirtyOmega or whatever was it called?? *)
-         | _                      -> failwith __LOC__) (* GEORGE: TODO: Why the other forms? *)
-       cs
-  |> (* 2: Add the dirt variable abstractions *)
+       (fun (_,pi) qual -> Types.QualDirt (pi, qual))
+       dirtCs
+  |> (* 2: Add the constraint abstractions (type) *)
+     List.fold_right
+       (fun (_,pi) qual -> Types.QualTy (pi, qual))
+       tyCs
+  |> (* 3: Add the dirt variable abstractions *)
      List.fold_right
        (fun delta scheme -> Types.TySchemeDirt (delta, scheme))
        freeDirtVars
-  |> (* 3: Add the type variable abstractions *)
+  |> (* 4: Add the type variable abstractions *)
      List.fold_right
        (fun (a,s) scheme -> Types.TySchemeTy (a, s, scheme))
        annFreeTyVars
-  |> (* 4: Add the skeleton abstractions *)
+  |> (* 5: Add the skeleton abstractions *)
      List.fold_right
        (fun skel scheme -> Types.TySchemeSkel (skel, scheme))
        freeSkelVars
 
 (* Create a generalized term from parts (as delivered from "splitter"). *)
-let mkGeneralizedTerm freeSkelVars annFreeTyVars freeDirtVars cs exp : Typed.expression =
+let mkGeneralizedTerm freeSkelVars annFreeTyVars freeDirtVars tyCs dirtCs exp : Typed.expression =
   exp
-  |> (* 1: Add the constraint abstractions *)
+  |> (* 1: Add the constraint abstractions (dirt) *)
      List.fold_right
-       (fun ct qual ->
-        match ct with
-        | Typed.TyOmega (omega, pi)   -> Typed.LambdaTyCoerVar (omega, pi, qual)
-        | Typed.DirtOmega (omega, pi) -> Typed.LambdaDirtCoerVar (omega, pi, qual)
-        (* GEORGE:TODO: What about DirtyOmega or whatever was it called?? *)
-        | _                      -> failwith __LOC__) (* GEORGE: TODO: Why the other forms? *)
-       cs
-  |> (* 2: Add the dirt variable abstractions *)
+       (fun (omega,pi) qual -> Typed.LambdaDirtCoerVar (omega, pi, qual))
+       dirtCs
+  |> (* 2: Add the constraint abstractions (type) *)
+     List.fold_right
+       (fun (omega,pi) qual -> Typed.LambdaTyCoerVar (omega, pi, qual))
+       tyCs
+  |> (* 3: Add the dirt variable abstractions *)
      List.fold_right
        (fun delta e -> Typed.BigLambdaDirt (delta, e))
        freeDirtVars
-  |> (* 3: Add the type variable abstractions *)
+  |> (* 4: Add the type variable abstractions *)
      List.fold_right
        (fun (a,s) e -> Typed.BigLambdaTy (a, s, e))
        annFreeTyVars
-  |> (* 4: Add the skeleton abstractions *)
+  |> (* 5: Add the skeleton abstractions *)
      List.fold_right
        (fun skel e -> Typed.BigLambdaSkel (skel, e))
        freeSkelVars
 
-let rec get_sub_of_ty ty_sch =
-  match ty_sch with
-  | Types.TySchemeSkel (s, t) ->
-      let new_s = CoreTypes.SkelParam.fresh () in
-      let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
-      ( Assoc.update s new_s skels, tys, dirts, tycos, dcos)
-  | Types.TySchemeTy (p, _, t) ->
-      let new_p = CoreTypes.TyParam.fresh () in
-      let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
-      (skels, Assoc.update p new_p tys, dirts, tycos, dcos)
-  | Types.TySchemeDirt (p, t) ->
-      let new_p = CoreTypes.DirtParam.fresh () in
-      let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
-      (skels, tys, Assoc.update p new_p dirts, tycos, dcos)
-  | Types.QualTy ((p, ct), t) ->
-      let new_p = CoreTypes.TyCoercionParam.fresh () in
-      let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
-      (skels, tys, dirts, Assoc.update p new_p tycos, dcos)
-  | Types.QualDirt ((p, ct), t) ->
-      let new_p = CoreTypes.DirtCoercionParam.fresh () in
-      let skels, tys, dirts, tycos, dcos = get_sub_of_ty t in
-      (skels, tys, dirts, tycos, Assoc.update p new_p dcos)
-  | _ -> (Assoc.empty, Assoc.empty, Assoc.empty, Assoc.empty, Assoc.empty)
-
-
-let rec get_basic_type ty_sch =
-  match ty_sch with
-  | Types.TySchemeSkel (_, t) -> get_basic_type t
-  | Types.TySchemeTy (typ, sk, t) ->
-      let a, b = get_basic_type t in
-      (Assoc.update typ sk a, b)
-  | Types.TySchemeDirt (_, t) -> get_basic_type t
-  | Types.QualTy (_, t) -> get_basic_type t
-  | Types.QualDirt (_, t) -> get_basic_type t
-  | t -> (Assoc.empty, t)
-
-
-let rec get_applied_cons_from_ty ty_subs dirt_subs ty =
-  match ty with
-  | Types.TySchemeSkel (_, t) -> get_applied_cons_from_ty ty_subs dirt_subs t
-  | Types.TySchemeTy (_, _, t) -> get_applied_cons_from_ty ty_subs dirt_subs t
-  | Types.TySchemeDirt (_, t) -> get_applied_cons_from_ty ty_subs dirt_subs t
-  | Types.QualTy (cons, t) ->
-      let c1, c2 = get_applied_cons_from_ty ty_subs dirt_subs t in
-      let ty1, ty2 = cons in
-      let newty1, newty2 =
-        ( apply_sub_to_type ty_subs dirt_subs ty1
-        , apply_sub_to_type ty_subs dirt_subs ty2 )
-      in
-      let new_omega = CoreTypes.TyCoercionParam.fresh () in
-      let new_cons = Typed.TyOmega (new_omega, (newty1, newty2)) in
-      (new_cons :: c1, c2)
-  | Types.QualDirt (cons, t) ->
-      let c1, c2 = get_applied_cons_from_ty ty_subs dirt_subs t in
-      let ty1, ty2 = cons in
-      let newty1, newty2 =
-        (apply_sub_to_dirt dirt_subs ty1, apply_sub_to_dirt dirt_subs ty2)
-      in
-      let new_omega = CoreTypes.DirtCoercionParam.fresh () in
-      let new_cons = Typed.DirtOmega (new_omega, (newty1, newty2)) in
-      (c1, new_cons :: c2)
-  | _ -> ([], [])
-
-
-let rec get_skel_constraints alphas_has_skels ty_subs skel_subs =
-  match alphas_has_skels with
-  | (tvar, skel) :: ss ->
-      let new_skel = Substitution.apply_substitutions_to_skeleton skel_subs skel in
-      let Some new_tyvar = Assoc.lookup tvar ty_subs in
-      Typed.TyParamHasSkel (new_tyvar, new_skel)
-      :: get_skel_constraints ss ty_subs skel_subs
-  | [] -> []
-
-let get_skel_constraints' alphas_has_skels ty_subs skel_subs =
-  get_skel_constraints (Assoc.to_list alphas_has_skels) ty_subs skel_subs
-
-let apply_types alphas_has_skels skel_subs ty_subs dirt_subs var ty_sch =
-  let new_skel_subs = List.fold_left (fun old_subs (a,b) -> (Substitution.add_skel_param_substitution a (Types.SkelParam b) old_subs)) Substitution.empty (Assoc.to_list skel_subs) in
-  let skel_constraints =
-    get_skel_constraints' alphas_has_skels ty_subs new_skel_subs
-  in
-  let skel_apps =
-    Assoc.fold_left
-      (fun a (_, b) -> Typed.ApplySkelExp (a, Types.SkelParam b))
-      (Typed.Var var) skel_subs
-  in
-  let ty_apps =
-    Assoc.fold_left
-      (fun a (_, b) -> Typed.ApplyTyExp (a, Types.TyParam b))
-      skel_apps ty_subs
-  in
-  let dirt_apps =
-    Assoc.fold_left
-      (fun a (_, b) -> Typed.ApplyDirtExp (a, Types.no_effect_dirt b))
-      ty_apps dirt_subs
-  in
-  let ty_cons, dirt_cons = get_applied_cons_from_ty ty_subs dirt_subs ty_sch in
-  let ty_cons_apps =
-    List.fold_left
-      (fun a (Typed.TyOmega (omega, _)) ->
-        Typed.ApplyTyCoercion (a, Typed.TyCoercionVar omega) )
-      dirt_apps ty_cons
-  in
-  let dirt_cons_apps =
-    List.fold_left
-      (fun a (Typed.DirtOmega (omega, _)) ->
-        Typed.ApplyDirtCoercion (a, Typed.DirtCoercionVar omega) )
-      ty_cons_apps dirt_cons
-  in
-  (dirt_cons_apps, skel_constraints @ ty_cons @ dirt_cons)
-
-
-let instantiateVariable x ty_schi =
-  let ( bind_skelvar_sub
-      , bind_tyvar_sub
-      , bind_dirtvar_sub
-      , bind_tyco_sub
-      , bind_dco_sub ) =
-    get_sub_of_ty ty_schi
-  in
-  let alphas_has_skels, basic_type = get_basic_type ty_schi in
-  let applied_basic_type =
-    apply_sub_to_type bind_tyvar_sub bind_dirtvar_sub basic_type
-  in
-  let returned_x, returned_cons =
-    apply_types alphas_has_skels bind_skelvar_sub bind_tyvar_sub
-      bind_dirtvar_sub x ty_schi
-  in
-  Print.debug "returned: %t" (Typed.print_expression returned_x) ;
-  Print.debug "original_type: %t" (Types.print_target_ty ty_schi) ;
-  Print.debug "returned_type: %t" (Types.print_target_ty applied_basic_type) ;
-  (returned_x, applied_basic_type, returned_cons)
-
 (* ************************************************************************* *)
-(*                            SUBSTITUTIONS                                  *)
+(*                    PREDICATES ON Types.target_ty                          *)
 (* ************************************************************************* *)
 
-(* Substitute in typing environments *)
-let subInEnv sub env = TypingEnv.apply_sub env sub
+(* GEORGE:TODO: Move these where they belong? (in types.ml). Also, I would
+ * delete them, but we might need them for assertions here and there. We'll
+ * see. *)
 
-(* Substitute in target values and computations *)
-let subInCmp sub cmp = Substitution.apply_substitutions_to_computation sub cmp
-let subInExp sub exp = Substitution.apply_substitutions_to_expression sub exp
+let isTyParamTy : Types.target_ty -> bool = function
+  | Types.TyParam _ -> true
+  | _other_type     -> false
 
-(* Substitute in target value types, computation types, and dirts *)
-let subInValTy sub ty        = Substitution.apply_substitutions_to_type sub ty
-let subInDirt  sub dirt      = Substitution.apply_substitutions_to_dirt sub dirt
-let subInCmpTy sub (ty,dirt) = (subInValTy sub ty, subInDirt sub dirt)
+let isApplyTy : Types.target_ty -> bool = function
+  | Types.Apply (_,_) -> true
+  | _other_type       -> false
 
-(* Substitute in value, dirt, and computation coercions *)
-let subInValCo  sub co = Substitution.apply_sub_tycoer sub co
-let subInDirtCo sub co = Substitution.apply_sub_dirtcoer sub co
-let subInCmpCo  sub co = Substitution.apply_sub_dirtycoer sub co
+let isArrowTy : Types.target_ty -> bool = function
+  | Types.Arrow (_,_) -> true
+  | _other_type       -> false
+
+let isTupleTy : Types.target_ty -> bool = function
+  | Types.Tuple _ -> true
+  | _other_type   -> false
+
+let isHandlerTy : Types.target_ty -> bool = function
+  | Types.Handler (_,_) -> true
+  | _other_type         -> false
+
+let isPrimTy : Types.target_ty -> bool = function
+  | Types.PrimTy _ -> true
+  | _other_type    -> false
+
+let isQualTyTy : Types.target_ty -> bool = function
+  | Types.QualTy (_,_) -> true
+  | _other_type        -> false
+
+let isQualDirtTy : Types.target_ty -> bool = function
+  | Types.QualDirt (_,_) -> true
+  | _other_type          -> false
+
+let isTySchemeTy : Types.target_ty -> bool = function
+  | Types.TySchemeTy (_,_,_) -> true
+  | _other_type              -> false
+
+let isTySchemeDirtTy : Types.target_ty -> bool = function
+  | Types.TySchemeDirt (_,_) -> true
+  | _other_type              -> false
+
+let isTySchemeSkelTy : Types.target_ty -> bool = function
+  | Types.TySchemeSkel (_,_) -> true
+  | _other_type              -> false
+
+(* Check if a target type is a monotype. That is, no universal quantification
+ * and no qualified constraints, at the top-level or in nested positions. *)
+let rec isMonoTy : Types.target_ty -> bool = function
+  | Types.TyParam _                 -> true
+  | Types.Apply (tyCon,tys)         -> List.for_all isMonoTy tys
+  | Types.Arrow (ty1,(ty2,_))       -> isMonoTy ty1 && isMonoTy ty2
+  | Types.Tuple tys                 -> List.for_all isMonoTy tys
+  | Types.Handler ((ty1,_),(ty2,_)) -> isMonoTy ty1 && isMonoTy ty2
+  | Types.PrimTy _                  -> true
+  | Types.QualTy (_,_)              -> false (* no qualification *)
+  | Types.QualDirt (_,_)            -> false (* no qualification *)
+  | Types.TySchemeTy (_,_,_)        -> false (* no quantification *)
+  | Types.TySchemeDirt (_,_)        -> false (* no quantification *)
+  | Types.TySchemeSkel (_,_)        -> false (* no quantification *)
+
+(* ************************************************************************* *)
+(*                           PARTITION TYPES                                 *)
+(* ************************************************************************* *)
+
+(* Partition a HM-like type into its corresponding abstractions. We follow the
+ * original publication and expect the abstractions in this strict order:
+ * skeleton variables, type variables, dirt variables, type inequalities, and
+ * dirt inequalities. At the end, there should be a HM-monotype (that is, no
+ * qualification or quantification in nested positions). If the type is not in
+ * that exact form, [stripHindleyMilnerLikeTy] will return [None]. *)
+let stripHindleyMilnerLikeTy : Types.target_ty ->
+    ( CoreTypes.SkelParam.t list                  (* Skeleton variables *)
+    * (CoreTypes.TyParam.t * Types.skeleton) list (* Skeleton-annotated type variables *)
+    * CoreTypes.DirtParam.t list                  (* Dirt variables *)
+    * Types.ct_ty list                            (* Type inequalities *)
+    * Types.ct_dirt list                          (* Dirt inequalities *)
+    * Types.target_ty ) option =                  (* Remaining monotype *)
+  let rec stripSkelAbs = function
+    | Types.TySchemeSkel (s,ty) ->
+        let skels, rem = stripSkelAbs ty in (s :: skels, rem)
+    | other_type -> ([], other_type) in
+  let rec stripTyAbs = function
+    | Types.TySchemeTy (a,s,ty) ->
+        let alphaSkels, rem = stripTyAbs ty in ((a,s) :: alphaSkels, rem)
+    | other_type -> ([], other_type) in
+  let rec stripDirtAbs = function
+    | Types.TySchemeDirt (d, ty) ->
+        let ds, rem = stripDirtAbs ty in (d :: ds, rem)
+    | other_type -> ([], other_type) in
+  let rec stripTyQual = function
+    | Types.QualTy (ct, ty) ->
+        let cs, rem = stripTyQual ty in (ct :: cs, rem)
+    | other_type -> ([], other_type) in
+  let rec stripDirtQual = function
+    | Types.QualDirt (ct, ty) ->
+        let cs, rem = stripDirtQual ty in (ct :: cs, rem)
+    | other_type -> ([], other_type) in
+  function inTy ->
+    let allSkelVars, ty1 = stripSkelAbs  inTy in  (* 1: Strip off the skeleton abstractions *)
+    let allTyVars  , ty2 = stripTyAbs    ty1  in  (* 2: Strip off the type abstractions *)
+    let allDirtVars, ty3 = stripDirtAbs  ty2  in  (* 3: Strip off the dirt abstractions *)
+    let allTyCs    , ty4 = stripTyQual   ty3  in  (* 4: Strip off the type inequality qualification *)
+    let allDirtCs  , ty5 = stripDirtQual ty4  in  (* 5: Strip off the dirt inequality qualification *)
+    if isMonoTy ty5                               (* 6: Ensure the remainder is a monotype *)
+      then Some (allSkelVars,allTyVars,allDirtVars,allTyCs,allDirtCs,ty5)
+      else None
+
+(* Check whether a type has a valid form (cf. [stripHindleyMilnerLikeTy]). *)
+let isTypeValid (ty : Types.target_ty) bool =
+  match stripHindleyMilnerLikeTy ty with
+  | Some (_,_,_,_,_,_) -> true
+  | None               -> false
+
+(* ************************************************************************* *)
+(*                       VARIABLE INSTANTIATION                              *)
+(* ************************************************************************* *)
+
+let instantiateVariable (x : variable) (scheme : Types.target_ty)
+  : (Typed.expression * Types.target_ty * Typed.omega_ct list) =
+  (* 1: Take the type signature apart *)
+  let skelVars, tyVarsWithSkels, dirtVars, tyCs, dirtCs, monotype =
+    (match stripHindleyMilnerLikeTy scheme with
+     | Some (a,b,c,d,e,f) -> (a,b,c,d,e,f)
+     | None -> failwith "instantiateVariable: Non-HM type in the environment!") in
+
+  (* 2: Generate fresh skeleton, type, and dirt variables *)
+  let newSkelVars = List.map (fun _ -> CoreTypes.SkelParam.fresh ()) skelVars in
+  let newTyVars   = List.map (fun _ -> CoreTypes.TyParam.fresh ()) tyVarsWithSkels in
+  let newDirtVars = List.map (fun _ -> Types.fresh_dirt ()) dirtVars in
+
+  (* 3: Generate the freshening substitution *)
+  let foldLeft f xs x0 = List.fold_left f x0 xs in (* GEORGE: Just for convenience *)
+  let sub = Substitution.empty
+            |> (* Substitute the old skeleton variables for the fresh ones *)
+               foldLeft
+                 (fun sub (oldS, newSkelVar) ->
+                    let newS = Types.SkelParam newSkelVar in
+                    sub |> Substitution.add_skel_param_substitution oldS newS)
+                 (List.combine skelVars newSkelVars)
+            |> (* Substitute the old type variables for the fresh ones *)
+               foldLeft
+                 (fun sub (oldA, newTyVar) ->
+                    let newA = Types.TyParam newTyVar in
+                    sub |> Substitution.add_type_substitution oldA newA)
+                 (List.combine (List.map fst tyVarsWithSkels) newTyVars)
+            |> (* Substitute the old dirt variables for the fresh ones *)
+               foldLeft
+                 (fun sub (oldD, newD) ->
+                    sub |> Substitution.add_dirt_substitution oldD newD)
+                 (List.combine dirtVars newDirtVars)
+  in
+
+  (* 4: Generate the wanted skeleton constraints *)
+  let wantedSkelCs = List.map (* a' : sigma(tau) *)
+                       (fun (a,s) -> Typed.TyParamHasSkel (a, subInSkel sub s))
+                       (List.combine newTyVars (List.map snd tyVarsWithSkels)) in
+
+  (* 5: Generate the wanted type inequality constraints *)
+  let tyOmegas, wantedTyCs =
+    tyCs |> List.map (fun ct -> fresh_ty_coer (subInTyCt sub ct))
+         |> List.split in
+
+  (* 5: Generate the wanted dirt inequality constraints *)
+  let dirtOmegas, wantedDirtCs =
+    dirtCs |> List.map (fun ct -> fresh_dirt_coer (subInDirtCt sub ct))
+           |> List.split in
+
+  (* 6: Apply x to all its fresh arguments *)
+  let targetX = applyTerm
+                  (List.map (fun s -> Types.SkelParam s) newSkelVars)
+                  (List.map (fun a -> Types.TyParam a) newTyVars)
+                  newDirtVars
+                  tyOmegas
+                  dirtOmegas
+                  (Typed.Var x)
+
+  in
+  (* 7: Combine the results *)
+  ( targetX
+  , subInValTy sub monotype
+  , wantedSkelCs @ wantedTyCs @ wantedDirtCs
+  )
 
 (* ************************************************************************* *)
 (*                           BASIC DEFINITIONS                               *)
@@ -920,7 +1015,7 @@ and tcLetVal (inState : state) (lclCtxt : TypingEnv.t)
   let sigma1', qv' = Unification.unify (Substitution.empty, [], e1res.outState.constraints) in
 
   (* 3: Partition the constraints *)
-  let (freeSkelVars, annFreeTyVars, freeDirtVars, csLcl, csGbl) =
+  let (freeSkelVars, annFreeTyVars, freeDirtVars, csTyLcl, csDirtLcl, csGbl) =
     split
       (subInEnv sigma1' (subInEnv e1res.outSubst lclCtxt)) (* sigma1'(sigma1(Gamma)) *)
       qv'
@@ -928,7 +1023,7 @@ and tcLetVal (inState : state) (lclCtxt : TypingEnv.t)
   in
 
   (* 4: Construct the generalized type of x *)
-  let xType = mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars csLcl (subInValTy sigma1' e1res.outType) in
+  let xType = mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars csTyLcl csDirtLcl (subInValTy sigma1' e1res.outType) in
 
   (* 5: Typecheck c2 *)
   (* GEORGE: we do not support anything else at the moment *)
@@ -944,7 +1039,7 @@ and tcLetVal (inState : state) (lclCtxt : TypingEnv.t)
   let genTerm = subInExp
                   c2res.outSubst
                   (mkGeneralizedTerm
-                    freeSkelVars annFreeTyVars freeDirtVars csLcl
+                    freeSkelVars annFreeTyVars freeDirtVars csTyLcl csDirtLcl
                     (subInExp sigma1' e1res.outExpr)
                   ) in
 
@@ -1047,7 +1142,7 @@ and tcLetRec (inState : state) (lclCtxt : TypingEnv.t)
                                        ) in
 
   (* 5: Partition the constraints *)
-  let (freeSkelVars, annFreeTyVars, freeDirtVars, csLcl, csGbl) =
+  let (freeSkelVars, annFreeTyVars, freeDirtVars, csTyLcl, csDirtLcl, csGbl) =
     split
       (subInEnv sigma1' (subInEnv sigma1 lclCtxt)) (* sigma1'(sigma1(Gamma)) *)
       csQ1'
@@ -1056,7 +1151,7 @@ and tcLetRec (inState : state) (lclCtxt : TypingEnv.t)
 
   (* 6: Create the (complicated) c1''. *)
   let c1'' = (
-    let ground_f   = mkGroundTerm freeSkelVars annFreeTyVars freeDirtVars csLcl (Typed.Var var) in
+    let ground_f   = mkGroundTerm freeSkelVars annFreeTyVars freeDirtVars csTyLcl csDirtLcl (Typed.Var var) in
     let f_coercion = Typed.ArrowCoercion
                        ( Typed.ReflTy (subInValTy sigma1' (subInValTy sigma1 alpha))
                        , subInCmpCo sigma1' (Typed.BangCoercion (omega1, omega2))
@@ -1068,7 +1163,7 @@ and tcLetRec (inState : state) (lclCtxt : TypingEnv.t)
 
   (* 7: Typecheck c2 *)
   let ftype1 = mkGeneralizedType
-                 freeSkelVars annFreeTyVars freeDirtVars csLcl
+                 freeSkelVars annFreeTyVars freeDirtVars csTyLcl csDirtLcl
                  (Types.Arrow ( subInValTy sigma1' (subInValTy sigma1 alpha)
                               , subInCmpTy sigma1' (tyA1, dirtD1)
                               )
@@ -1085,7 +1180,7 @@ and tcLetRec (inState : state) (lclCtxt : TypingEnv.t)
     (* The final definition of f *)
     let fdef = subInExp c2res.outSubst
                  (mkGeneralizedTerm
-                    freeSkelVars annFreeTyVars freeDirtVars csLcl
+                    freeSkelVars annFreeTyVars freeDirtVars csTyLcl csDirtLcl
                     (Typed.Lambda
                        (Typed.abstraction_with_ty
                           trgPat (* GEORGE: I assume it has no types in it.
