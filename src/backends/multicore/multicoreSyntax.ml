@@ -62,6 +62,14 @@ and abstraction = pattern * term
 (** Abstractions that take two arguments. *)
 and abstraction2 = pattern * pattern * term
 
+type cmd = 
+  | Term of term
+  | DefEffect of effect * (ty * ty)
+  | TopLet of (pattern * term) list
+  | TopLetRec of (variable * abstraction) list
+  | External of (variable * Type.ty * string)
+  | TyDef of (label * (CoreTypes.TyParam.t list * tydef)) list
+
 let abstraction_is_id (p, c) =
   (* Used to remove trivial finally clauses from handlers. *)
   match p with
