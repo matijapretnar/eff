@@ -256,30 +256,6 @@ and rnDirtVarInDirtCt (oldD : CoreTypes.DirtParam.t) (newD : CoreTypes.DirtParam
 
 (* ************************************************************************* *)
 
-(*
-type skeleton =
-  | SkelParam of CoreTypes.SkelParam.t
-  | PrimSkel of prim_ty
-  | SkelArrow of skeleton * skeleton
-  | SkelApply of CoreTypes.TyName.t * skeleton list
-  | SkelHandler of skeleton * skeleton
-  | SkelTuple of skeleton list
-  | ForallSkel of CoreTypes.SkelParam.t * skeleton
-
-and target_ty =
-  | TyParam of CoreTypes.TyParam.t
-  | Apply of CoreTypes.TyName.t * target_ty list
-  | Arrow of target_ty * target_dirty
-  | Tuple of target_ty list
-  | Handler of target_dirty * target_dirty
-  | PrimTy of prim_ty
-  | QualTy of ct_ty * target_ty
-  | QualDirt of ct_dirt * target_ty
-  | TySchemeTy of CoreTypes.TyParam.t * skeleton * target_ty
-  | TySchemeDirt of CoreTypes.DirtParam.t * target_ty
-  | TySchemeSkel of CoreTypes.SkelParam.t * target_ty
-*)
-
 let rec types_are_equal ty1 ty2 =
   match (ty1, ty2) with
   | TyParam tv1, TyParam tv2 -> tv1 = tv2
@@ -298,21 +274,20 @@ let rec types_are_equal ty1 ty2 =
       dirt_cts_are_equal ctd1 ctd2 && types_are_equal ty1 ty2
   | TySchemeTy (tyvar1, sk1, ty1), TySchemeTy (tyvar2, sk2, ty2) ->
       let tyvar = CoreTypes.TyParam.fresh () in (* Fresh type variable *)
-      sk1 = sk2 && (* The skeletons must be the same *)
-      failwith __LOC__
-
-(*
-    let subst_fn   = Typed.subst_comp (Assoc.of_list [(var, Typed.CastExp(ground_f, f_coercion))]) in
-
-  let newSkelVars = List.map (fun _ -> CoreTypes.SkelParam.fresh ()) skelVars in
-  let newTyVars   = List.map (fun _ -> CoreTypes.TyParam.fresh ()) tyVarsWithSkels in
-  let newDirtVars = List.map (fun _ -> Types.fresh_dirt ()) dirtVars in
-*)
-
-
+      let ty1new = rnTyVarInValTy tyvar1 tyvar ty1 in
+      let ty2new = rnTyVarInValTy tyvar2 tyvar ty2 in
+      sk1 = sk2 && (* The skeletons must be identical *)
+      types_are_equal ty1new ty2new
   | TySchemeDirt (dvar1, ty1), TySchemeDirt (dvar2, ty2) ->
-      dvar1 = dvar2 && types_are_equal ty1 ty2
-  | TySchemeSkel (skvar1, ty1), TySchemeSkel (skvar2, ty2) -> failwith __LOC__
+      let dvar = CoreTypes.DirtParam.fresh () in (* Fresh dirt variable *)
+      let ty1new = rnDirtVarInValTy dvar1 dvar ty1 in
+      let ty2new = rnDirtVarInValTy dvar2 dvar ty2 in
+      types_are_equal ty1new ty2new
+  | TySchemeSkel (skvar1, ty1), TySchemeSkel (skvar2, ty2) ->
+      let svar = CoreTypes.SkelParam.fresh () in (* Fresh skeleton variable *)
+      let ty1new = rnSkelVarInValTy skvar1 svar ty1 in
+      let ty2new = rnSkelVarInValTy skvar2 svar ty2 in
+      types_are_equal ty1new ty2new
   | _ -> false
 
 
