@@ -138,6 +138,18 @@ let isDirtOmega : Typed.omega_ct -> bool = function
   | _other_type           -> false
 
 (* ************************************************************************* *)
+(*                              DEBUGGING                                    *)
+(* ************************************************************************* *)
+
+let showInputEnv (rule : string) (ctx : TypingEnv.t)
+  = Print.debug "Rule [%s]: Input Env:" rule
+  ; print_env (TypingEnv.return_context ctx)
+
+let showInputCs (rule : string) (inState : state)
+  = Print.debug "Rule [%s]: Input State:" rule
+  ; Unification.print_c_list inState.constraints
+
+(* ************************************************************************* *)
 (*                            SUBSTITUTIONS                                  *)
 (* ************************************************************************* *)
 
@@ -169,6 +181,22 @@ let subInDirtCt sub (d1,d2) = (subInDirt sub d1, subInDirt sub d2)
 
 (* Partition a set of constraints for let generalization (cf. Explicit Effect Subtyping) *)
 let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_ty) =
+  (* *********************************************************************** *)
+  Print.debug "Splitter Input Constraints (%d): " (List.length cs);  Unification.print_c_list cs;
+  Print.debug "Splitter Input Ty: %t" (Types.print_target_ty valTy);
+  Print.debug "Splitter Env :"; print_env (TypingEnv.return_context ctx);
+  Print.debug "Simple type free vars: " ;
+  Types.TyParamSet.iter
+    (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
+    (Types.ftvsOfTargetValTy valTy) ;
+  Print.debug "state free vars: " ;
+  Types.TyParamSet.iter
+    (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
+    (state_free_ty_vars (Assoc.to_list ctx)) ;
+
+
+  (* *********************************************************************** *)
+
   let (tyEnv : (Typed.variable * Types.target_ty) list) = TypingEnv.return_context ctx in
 
   (* 1: Compute the alphas (as a Types.TyParamSet) *)
@@ -259,6 +287,28 @@ let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_t
       | Typed.TyParamHasSkel (_,_) :: rest -> failwith __LOC__ (* Shouldn't be possible *)
     in  aux localCs
   ) in
+
+  (* *********************************************************************** *)
+
+(*
+-  Print.debug "Splitter output free_ty_vars: " ;
+-  Types.TyParamSet.iter
+-    (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
+-    free_ty_params ;
+-  Print.debug "Splitter output free_dirt_vars: " ;
+-  Types.DirtParamSet.iter
+-    (fun x -> Print.debug "%t" (CoreTypes.DirtParam.print x))
+-    free_dirt_params ;
+*)
+  Print.debug "Splitter local type inequality list: " ;
+  Unification.print_c_list (List.map (fun (o,p) -> Typed.TyOmega (o,p)) lclTyCs) ;
+  Print.debug "Splitter local dirt inequality list: " ;
+  Unification.print_c_list (List.map (fun (o,p) -> Typed.DirtOmega (o,p)) lclDirtCs) ;
+  Print.debug "Splitter global constraints list: " ;
+  Unification.print_c_list globalCs ;
+
+  (* *********************************************************************** *)
+
 
   (* 8: Return the whole lot. *)
   ( sigmas
@@ -961,15 +1011,15 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
 
 (* Dispatch: Type inference for a plain value (expression) *)
 and tcVal (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_expression -> tcValOutput = function
-  | Untyped.Var x              -> tcVar       inState lclCtx x
-  | Untyped.Const c            -> tcConst     inState lclCtx c
-  | Untyped.Annotated (e,ty)   -> tcAnnotated inState lclCtx (e,ty)
-  | Untyped.Tuple es           -> tcTuple     inState lclCtx es
-  | Untyped.Record lst         -> tcRecord    inState lclCtx lst
-  | Untyped.Variant (lbl,mbe)  -> tcVariant   inState lclCtx (lbl,mbe)
-  | Untyped.Lambda abs         -> tcLambda    inState lclCtx abs
-  | Untyped.Effect eff         -> tcEffect    inState lclCtx eff
-  | Untyped.Handler hand       -> tcHandler   inState lclCtx hand
+  | Untyped.Var x              -> showInputEnv "Var" lclCtx; showInputCs "Var" inState; tcVar       inState lclCtx x
+  | Untyped.Const c            -> showInputEnv "Const" lclCtx; showInputCs "Const" inState; tcConst     inState lclCtx c
+  | Untyped.Annotated (e,ty)   -> showInputEnv "Annotated" lclCtx; showInputCs "Annotated" inState; tcAnnotated inState lclCtx (e,ty)
+  | Untyped.Tuple es           -> showInputEnv "Tuple" lclCtx; showInputCs "Tuple" inState; tcTuple     inState lclCtx es
+  | Untyped.Record lst         -> showInputEnv "Record" lclCtx; showInputCs "Record" inState; tcRecord    inState lclCtx lst
+  | Untyped.Variant (lbl,mbe)  -> showInputEnv "Variant" lclCtx; showInputCs "Variant" inState; tcVariant   inState lclCtx (lbl,mbe)
+  | Untyped.Lambda abs         -> showInputEnv "Lambda" lclCtx; showInputCs "Lambda" inState; tcLambda    inState lclCtx abs
+  | Untyped.Effect eff         -> showInputEnv "Effect" lclCtx; showInputCs "Effect" inState; tcEffect    inState lclCtx eff
+  | Untyped.Handler hand       -> showInputEnv "Handler" lclCtx; showInputCs "Handler" inState; tcHandler   inState lclCtx hand
 
 (* Type inference for a located value (expression) *)
 and tcLocatedVal (inState : state) (lclCtx : TypingEnv.t) (e : Untyped.expression) : tcValOutput
@@ -1435,6 +1485,8 @@ let tcTopLevel ~loc inState cmp =
       ; outState = tmpState
       ; outSubst = tmpSubst } = tcLocatedCmp inState initial_lcl_ty_env cmp in
 
+  Print.debug "INFERRED (BEFORE SUBST): %t" (Types.print_target_dirty (ttype,dirt)) ;
+
   (* 2: Constraint solving *)
   let solverSigma, residualCs =
     Unification.unify (Substitution.empty, [], tmpState.constraints) in
@@ -1449,10 +1501,15 @@ let tcTopLevel ~loc inState cmp =
   let sub3 = Substitution.apply_substitutions_to_constraints dirtZonker residualCs
                |> finalize_constraints in
 
-  ( trgCmp
+  let targetComputation =
+    trgCmp
       |> subInCmp solverSigma (* Solver's result *)
       |> subInCmp dirtZonker  (* Dirt-zonker's result *)
-      |> subInCmp sub3        (* georgeTODO *)
+      |> subInCmp sub3 in     (* georgeTODO *)
+
+  Print.debug "ELABORATED COMP (COMPLETE): %t" (Typed.print_computation targetComputation) ;
+
+  ( targetComputation
   , inState (* Untouched! *)
   )
 
