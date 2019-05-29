@@ -146,6 +146,139 @@ let type_const = function
   | Const.Boolean _ -> PrimTy BoolTy
   | Const.Float _ -> PrimTy FloatTy
 
+(* ************************************************************************* *)
+(*                             VARIABLE RENAMING                             *)
+(* ************************************************************************* *)
+let rec rnSkelVarInSkel (oldS : CoreTypes.SkelParam.t) (newS : CoreTypes.SkelParam.t)
+  : skeleton -> skeleton = function
+  | SkelParam v         -> if v = oldS then SkelParam newS else SkelParam v
+  | PrimSkel ty         -> PrimSkel ty
+  | SkelArrow (s1,s2)   -> SkelArrow (rnSkelVarInSkel oldS newS s1, rnSkelVarInSkel oldS newS s2)
+  | SkelApply (tc,ss)   -> SkelApply (tc, List.map (rnSkelVarInSkel oldS newS) ss)
+  | SkelHandler (s1,s2) -> SkelHandler (rnSkelVarInSkel oldS newS s1, rnSkelVarInSkel oldS newS s2)
+  | SkelTuple ss        -> SkelTuple (List.map (rnSkelVarInSkel oldS newS) ss)
+  | ForallSkel (v,s)    -> if v = oldS
+                             then ( Print.debug "rnSkelVarInSkel: not fresh enough"
+                                  ; failwith __LOC__ )
+                             else ForallSkel (v, rnSkelVarInSkel oldS newS s)
+
+let rec rnSkelVarInValTy (oldS : CoreTypes.SkelParam.t) (newS : CoreTypes.SkelParam.t)
+  : target_ty -> target_ty = function
+  | TyParam x           -> TyParam x
+  | Apply (tc, tys)     -> Apply (tc, List.map (rnSkelVarInValTy oldS newS) tys)
+  | Arrow (tyA,tyB)     -> Arrow (rnSkelVarInValTy oldS newS tyA, rnSkelVarInCmpTy oldS newS tyB)
+  | Tuple tys           -> Tuple (List.map (rnSkelVarInValTy oldS newS) tys)
+  | Handler (tyA,tyB)   -> Handler (rnSkelVarInCmpTy oldS newS tyA, rnSkelVarInCmpTy oldS newS tyB)
+  | PrimTy ty           -> PrimTy ty
+  | QualTy (ct,ty)      -> QualTy (rnSkelVarInTyCt oldS newS ct, rnSkelVarInValTy oldS newS ty)
+  | QualDirt (ct,ty)    -> QualDirt (ct, rnSkelVarInValTy oldS newS ty) (* GEORGE: No skeletons in dirts! :) *)
+  | TySchemeTy (a,s,ty) -> TySchemeTy (a, rnSkelVarInSkel oldS newS s, rnSkelVarInValTy oldS newS ty)
+  | TySchemeDirt (d,ty) -> TySchemeDirt (d, rnSkelVarInValTy oldS newS ty)
+  | TySchemeSkel (v,ty) -> if v = oldS
+                             then ( Print.debug "rnSkelVarInValTy: not fresh enough"
+                                  ; failwith __LOC__ )
+                             else TySchemeSkel (v, rnSkelVarInValTy oldS newS ty)
+
+and rnSkelVarInCmpTy (oldS : CoreTypes.SkelParam.t) (newS : CoreTypes.SkelParam.t)
+  : target_dirty -> target_dirty = function
+  (ty,drt) -> (rnSkelVarInValTy oldS newS ty, drt) (* GEORGE: No skeletons in dirts! :) *)
+
+and rnSkelVarInTyCt (oldS : CoreTypes.SkelParam.t) (newS : CoreTypes.SkelParam.t)
+  : ct_ty -> ct_ty = function
+  (ty1,ty2) -> (rnSkelVarInValTy oldS newS ty1, rnSkelVarInValTy oldS newS ty2)
+
+(* ************************************************************************* *)
+(*                             VARIABLE RENAMING                             *)
+(* ************************************************************************* *)
+let rec rnTyVarInValTy (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t)
+  : target_ty -> target_ty = function
+  | TyParam a           -> if a = oldA then TyParam newA else TyParam a
+  | Apply (tc, tys)     -> Apply (tc, List.map (rnTyVarInValTy oldA newA) tys)
+  | Arrow (tyA,tyB)     -> Arrow (rnTyVarInValTy oldA newA tyA, rnTyVarInCmpTy oldA newA tyB)
+  | Tuple tys           -> Tuple (List.map (rnTyVarInValTy oldA newA) tys)
+  | Handler (tyA,tyB)   -> Handler (rnTyVarInCmpTy oldA newA tyA, rnTyVarInCmpTy oldA newA tyB)
+  | PrimTy ty           -> PrimTy ty
+  | QualTy (ct, ty)     -> QualTy (rnTyVarInTyCt oldA newA ct, rnTyVarInValTy oldA newA ty)
+  | QualDirt (ct, ty)   -> QualDirt (ct, rnTyVarInValTy oldA newA ty) (* GEORGE: No skeletonsin dirts! :) *)
+  | TySchemeTy (a,s,ty) -> if a = oldA
+                             then ( Print.debug "rnTyVarInValTy: not fresh enough"
+                                  ; failwith __LOC__ )
+                             else TySchemeTy (a,s,rnTyVarInValTy oldA newA ty)
+  | TySchemeDirt (d,ty) -> TySchemeDirt (d, rnTyVarInValTy oldA newA ty)
+  | TySchemeSkel (v,ty) -> TySchemeSkel (v, rnTyVarInValTy oldA newA ty)
+
+and rnTyVarInCmpTy (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t)
+  : target_dirty -> target_dirty = function
+  (ty,drt) -> (rnTyVarInValTy oldA newA ty, drt) (* GEORGE: No skeletons in dirts! :) *)
+
+and rnTyVarInTyCt (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t)
+  : ct_ty -> ct_ty = function
+  (ty1,ty2) -> (rnTyVarInValTy oldA newA ty1, rnTyVarInValTy oldA newA ty2)
+
+(* ************************************************************************* *)
+(*                             VARIABLE RENAMING                             *)
+(* ************************************************************************* *)
+let rec rnDirtVarInValTy (oldD : CoreTypes.DirtParam.t) (newD : CoreTypes.DirtParam.t)
+  : target_ty -> target_ty = function
+  | TyParam a           -> TyParam a
+  | Apply (tc,tys)      -> Apply (tc, List.map (rnDirtVarInValTy oldD newD) tys)
+  | Arrow (tyA,tyB)     -> Arrow (rnDirtVarInValTy oldD newD tyA, rnDirtVarInCmpTy oldD newD tyB)
+  | Tuple tys           -> Tuple (List.map (rnDirtVarInValTy oldD newD) tys)
+  | Handler (tyA,tyB)   -> Handler (rnDirtVarInCmpTy oldD newD tyA, rnDirtVarInCmpTy oldD newD tyB)
+  | PrimTy ty           -> PrimTy ty
+  | QualTy (ct,ty)      -> QualTy (rnDirtVarInTyCt oldD newD ct, rnDirtVarInValTy oldD newD ty)
+  | QualDirt (ct,ty)    -> QualDirt (rnDirtVarInDirtCt oldD newD ct, rnDirtVarInValTy oldD newD ty)
+  | TySchemeTy (a,s,ty) -> TySchemeTy (a,s,rnDirtVarInValTy oldD newD ty)
+  | TySchemeDirt (d,ty) -> if d = oldD
+                             then ( Print.debug "rnDirtVarInValTy: not fresh enough"
+                                  ; failwith __LOC__ )
+                             else TySchemeDirt (d, rnDirtVarInValTy oldD newD ty)
+  | TySchemeSkel (v,ty) -> TySchemeSkel (v, rnDirtVarInValTy oldD newD ty)
+
+and rnDirtVarInCmpTy (oldD : CoreTypes.DirtParam.t) (newD : CoreTypes.DirtParam.t)
+  : target_dirty -> target_dirty = function
+  (ty,drt) -> (rnDirtVarInValTy oldD newD ty, rnDirtVarInDirt oldD newD drt)
+
+and rnDirtVarInDirt (oldD : CoreTypes.DirtParam.t) (newD : CoreTypes.DirtParam.t)
+  : dirt -> dirt = function
+  | {effect_set = eff; row = EmptyRow  } -> {effect_set=eff;row=EmptyRow}
+  | {effect_set = eff; row = ParamRow d} -> if d = oldD
+                                              then {effect_set = eff; row = ParamRow newD}
+                                              else {effect_set = eff; row = ParamRow d}
+
+and rnDirtVarInTyCt (oldD : CoreTypes.DirtParam.t) (newD : CoreTypes.DirtParam.t)
+  : ct_ty -> ct_ty = function
+  (ty1,ty2) -> (rnDirtVarInValTy oldD newD ty1, rnDirtVarInValTy oldD newD ty2)
+
+and rnDirtVarInDirtCt (oldD : CoreTypes.DirtParam.t) (newD : CoreTypes.DirtParam.t)
+  : ct_dirt -> ct_dirt = function
+  (d1,d2) -> (rnDirtVarInDirt oldD newD d1, rnDirtVarInDirt oldD newD d2)
+
+(* ************************************************************************* *)
+
+(*
+type skeleton =
+  | SkelParam of CoreTypes.SkelParam.t
+  | PrimSkel of prim_ty
+  | SkelArrow of skeleton * skeleton
+  | SkelApply of CoreTypes.TyName.t * skeleton list
+  | SkelHandler of skeleton * skeleton
+  | SkelTuple of skeleton list
+  | ForallSkel of CoreTypes.SkelParam.t * skeleton
+
+and target_ty =
+  | TyParam of CoreTypes.TyParam.t
+  | Apply of CoreTypes.TyName.t * target_ty list
+  | Arrow of target_ty * target_dirty
+  | Tuple of target_ty list
+  | Handler of target_dirty * target_dirty
+  | PrimTy of prim_ty
+  | QualTy of ct_ty * target_ty
+  | QualDirt of ct_dirt * target_ty
+  | TySchemeTy of CoreTypes.TyParam.t * skeleton * target_ty
+  | TySchemeDirt of CoreTypes.DirtParam.t * target_ty
+  | TySchemeSkel of CoreTypes.SkelParam.t * target_ty
+*)
 
 let rec types_are_equal ty1 ty2 =
   match (ty1, ty2) with
@@ -159,11 +292,24 @@ let rec types_are_equal ty1 ty2 =
       dirty_types_are_equal dirtya1 dirtyb1
       && dirty_types_are_equal dirtya2 dirtyb2
   | PrimTy ptya, PrimTy ptyb -> ptya = ptyb
-  | QualTy (ctty1, ty1), QualTy (ctty2, ty2) -> failwith __LOC__
+  | QualTy (ctty1, ty1), QualTy (ctty2, ty2) ->
+      ty_cts_are_equal ctty1 ctty2 && types_are_equal ty1 ty2
   | QualDirt (ctd1, ty1), QualDirt (ctd2, ty2) ->
-      ctd1 = ctd2 && types_are_equal ty1 ty2
+      dirt_cts_are_equal ctd1 ctd2 && types_are_equal ty1 ty2
   | TySchemeTy (tyvar1, sk1, ty1), TySchemeTy (tyvar2, sk2, ty2) ->
+      let tyvar = CoreTypes.TyParam.fresh () in (* Fresh type variable *)
+      sk1 = sk2 && (* The skeletons must be the same *)
       failwith __LOC__
+
+(*
+    let subst_fn   = Typed.subst_comp (Assoc.of_list [(var, Typed.CastExp(ground_f, f_coercion))]) in
+
+  let newSkelVars = List.map (fun _ -> CoreTypes.SkelParam.fresh ()) skelVars in
+  let newTyVars   = List.map (fun _ -> CoreTypes.TyParam.fresh ()) tyVarsWithSkels in
+  let newDirtVars = List.map (fun _ -> Types.fresh_dirt ()) dirtVars in
+*)
+
+
   | TySchemeDirt (dvar1, ty1), TySchemeDirt (dvar2, ty2) ->
       dvar1 = dvar2 && types_are_equal ty1 ty2
   | TySchemeSkel (skvar1, ty1), TySchemeSkel (skvar2, ty2) -> failwith __LOC__
@@ -180,6 +326,11 @@ and dirty_types_are_equal (ty1, d1) (ty2, d2) =
 and dirts_are_equal d1 d2 =
   EffectSet.equal d1.effect_set d2.effect_set && d1.row = d2.row
 
+and ty_cts_are_equal (ty1,ty2) (ty3,ty4) =
+  types_are_equal ty1 ty3 && types_are_equal ty2 ty4
+
+and dirt_cts_are_equal (d1,d2) (d3,d4) =
+  dirts_are_equal d1 d3 && dirts_are_equal d2 d4
 
 let no_effect_dirt dirt_param =
   {effect_set= EffectSet.empty; row= ParamRow dirt_param}
