@@ -81,7 +81,7 @@ let process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a =
   let cons_subbed = Substitution.apply_substitutions_to_constraints sub1 (add_list_to_constraints paused rest_queue) in
   (Substitution.add_skel_param_substitution k v sub, [], cons_subbed)
 
-let rec ty_param_has_skel_step sub paused cons rest_queue tvar skel =
+let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
   match skel with
   (* α : ς *)
   | SkelParam p -> (sub, Typed.add_to_constraints cons paused, rest_queue)
@@ -167,6 +167,7 @@ let rec ty_param_has_skel_step sub paused cons rest_queue tvar skel =
 
 and skel_eq_step sub paused cons rest_queue sk1 sk2 =
   match (sk1, sk2) with
+  | s1, s2 when s1 = s2 -> (sub, paused, rest_queue)
   (* ς = ς *)
   | SkelParam sp1, SkelParam sp2 when sp1 = sp2 -> (sub, paused, rest_queue)
   (* ς₁ = τ₂ / τ₁ = ς₂ *)
@@ -194,25 +195,23 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
       , paused
       , add_list_to_constraints (List.map2 (fun sk1 sk2 -> Typed.SkelEq (sk1, sk2)) sks1 sks2)
         rest_queue )
-  | SkelTuple t1, SkelTuple t2 when t1 = t2 ->
-    (sub, paused, rest_queue)
   | SkelTuple t1, SkelTuple t2 -> 
-      List.fold_right 
-      (fun (s1, s2) (sub', paused', rest') -> skel_eq_step sub' paused' cons rest' s1 s2)
+      let new_constraints = List.map
+      (fun (s1,s2) -> Typed.SkelEq (s1,s2))
       (List.combine t1 t2)
-      (sub, paused, rest_queue)
+      in
+      (sub, paused, add_list_to_constraints new_constraints rest_queue)
   | SkelTuple _, _ 
   | _, SkelTuple _ -> failwith "Invalid constraint"
-  | SkelRecord t1, SkelRecord t2 when t1 = t2 ->
-    (sub, paused, rest_queue)
   | SkelRecord t1, SkelRecord t2 -> (
       match Assoc.combine t1 t2 with
-       | None -> failwith "Incompatible records"
+       | None -> failwith "Incompatible records" (* Or should we consider subset*)
        | Some combined -> 
-        List.fold_right 
-        (fun (s1, s2) (sub', paused', rest') -> skel_eq_step sub' paused' cons rest' s1 s2)
-        (Assoc.values_of combined )
-        (sub, paused, rest_queue)
+        let new_constraints = List.map
+        (fun (s1,s2) -> Typed.SkelEq (s1,s2))
+        (Assoc.values_of combined)
+        in
+        (sub, paused, add_list_to_constraints new_constraints rest_queue)
     )
   | SkelRecord _, _ 
   | _, SkelRecord _ -> failwith "Invalid constraint"
