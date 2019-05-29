@@ -74,7 +74,7 @@ let rec fix_union_find fixpoint c_list =
   if sort_new_fixpoint = fixpoint then sort_new_fixpoint
   else fix_union_find sort_new_fixpoint c_list
 
-let process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a = 
+let process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a =
   let k = sp1 in
   let v = sk2a in
   let sub1 = Substitution.add_skel_param_substitution_e k v in
@@ -116,7 +116,7 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
       let v = Types.Tuple tvars in
       let sub1 = Substitution.add_type_substitution_e k v in
       let cons_subbed = Substitution.apply_substitutions_to_constraints sub1 (add_list_to_constraints paused rest_queue) in
-      (Substitution.add_type_substitution k v sub, [], 
+      (Substitution.add_type_substitution k v sub, [],
       add_list_to_constraints cons_subbed conss )
   (* α : ty_name (τ₁, τ₂, ...) *)
   | SkelApply (ty_name, sks) ->
@@ -154,11 +154,11 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
   (* ς = ς *)
   | SkelParam sp1, SkelParam sp2 when sp1 = sp2 -> (sub, paused, rest_queue)
   (* ς₁ = τ₂ / τ₁ = ς₂ *)
-  | SkelParam sp1, sk2a 
+  | SkelParam sp1, sk2a
     when not (List.mem sp1 (free_skeleton sk2a)) ->
       process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a
   | sk2a, SkelParam sp1
-    when not (List.mem sp1 (free_skeleton sk2a)) -> 
+    when not (List.mem sp1 (free_skeleton sk2a)) ->
       process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a
   (* int = int *)
   | PrimSkel ps1, PrimSkel ps2 when ps1 = ps2 -> (sub, paused, rest_queue)
@@ -178,7 +178,8 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
       , paused
       , add_list_to_constraints (List.map2 (fun sk1 sk2 -> Typed.SkelEq (sk1, sk2)) sks1 sks2)
         rest_queue )
-  | _ -> failwith __LOC__
+  | _ -> ( Print.debug "skel_eq_step failure: (%t)" (Typed.print_omega_ct (Typed.SkelEq (sk1,sk2)))
+         ; failwith __LOC__ )
 
 
 and ty_omega_step sub paused cons rest_queue omega =
@@ -207,7 +208,7 @@ and ty_omega_step sub paused cons rest_queue omega =
             tys tys' ([], [])
         in
         let k = omega in
-        let v = Typed.TupleCoercion coercions 
+        let v = Typed.TupleCoercion coercions
         in
         (Substitution.add_type_coercion k v sub, paused, add_list_to_constraints conss rest_queue)
     (* ω : ty (A₁,  A₂,  ...) <= ty (B₁,  B₂,  ...) *)
@@ -222,7 +223,7 @@ and ty_omega_step sub paused cons rest_queue omega =
             tys1 tys2 ([], [])
         in
         let k = omega in
-        let v = Typed.ApplyCoercion (ty_name1, coercions) 
+        let v = Typed.ApplyCoercion (ty_name1, coercions)
         in
         (Substitution.add_type_coercion k v sub, paused, add_list_to_constraints conss rest_queue)
     (* ω : D₁ => C₁ <= D₂ => C₂ *)
@@ -297,13 +298,13 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
   (* ω : O₁ <= O₂ ∪ δ₂ *)
   | {effect_set= s1; row= EmptyRow}, {effect_set= s2; row= ParamRow v2} ->
       let v2' = CoreTypes.DirtParam.fresh () in
-      let k0 = omega in 
+      let k0 = omega in
       let v0 = Typed.UnionDirt
                 ( s1
                 , Typed.Empty
                     Types.{effect_set= EffectSet.diff s2 s1; row= ParamRow v2'}
                 )  in
-      let k1 = v2 in 
+      let k1 = v2 in
       let v1 = Types.{effect_set= EffectSet.diff s1 s2; row= ParamRow v2'} in
       let sub1 = Substitution.add_dirt_var_coercion_e k0 v0 |> Substitution.add_dirt_substitution k1 v1
       in
