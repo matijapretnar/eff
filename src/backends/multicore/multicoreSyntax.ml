@@ -15,7 +15,7 @@ type field = CoreTypes.Field.t
 type ty =
   | TyApply of CoreTypes.TyName.t * ty list
   | TyParam of CoreTypes.TyParam.t
-  | TyBasic of string
+  | TyBasic of Const.ty
   | TyTuple of ty list
   | TyArrow of ty * ty
 
