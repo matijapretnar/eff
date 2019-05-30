@@ -158,8 +158,8 @@ let rec type_of_ty_coercion st ty_coer =
   | ForallTy (ty_param, ty_coer1) ->
       let new_st = extend_ty_params st ty_param in
       let t1, t2 = type_of_ty_coercion new_st ty_coer1 in
-      ( Types.TySchemeTy (ty_param, Types.PrimSkel Types.IntTy, t1)
-      , Types.TySchemeTy (ty_param, Types.PrimSkel Types.IntTy, t2) )
+      ( Types.TySchemeTy (ty_param, Types.PrimSkel Const.IntegerTy, t1)
+      , Types.TySchemeTy (ty_param, Types.PrimSkel Const.IntegerTy, t2) )
   | ApplyTyCoer (ty_coer1, tty1) -> (
     match type_of_ty_coercion st ty_coer1 with
     | Types.TySchemeTy (ty_param1, _, t1), Types.TySchemeTy (ty_param2, _, t2) ->
@@ -275,20 +275,13 @@ let rec extend_pattern_types st p ty =
   | _ -> failwith __LOC__
 
 
-let type_of_const = function
-  | Const.Integer _ -> Types.PrimTy IntTy
-  | Const.String _ -> Types.PrimTy StringTy
-  | Const.Boolean _ -> Types.PrimTy BoolTy
-  | Const.Float _ -> Types.PrimTy FloatTy
-
-
 let rec type_of_expression st e =
   match e with
   | Var v -> (
     match Assoc.lookup v st.var_types with
     | Some ty -> ty
     | _ -> assert false )
-  | Const const -> type_of_const const
+  | Const const -> Types.type_const const
   | Lambda abs ->
       let ty1, c_ty = type_of_abstraction_with_ty st abs in
       Types.Arrow (ty1, c_ty)

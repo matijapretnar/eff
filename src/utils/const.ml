@@ -2,6 +2,8 @@ open CoreUtils
 
 type t = Integer of int | String of string | Boolean of bool | Float of float
 
+type ty = IntegerTy | StringTy | BooleanTy | FloatTy
+
 let of_integer n = Integer n
 
 let of_string s = String s
@@ -20,6 +22,19 @@ let print c ppf =
   | String s -> Format.fprintf ppf "%S" s
   | Boolean b -> Format.fprintf ppf "%B" b
   | Float f -> Format.fprintf ppf "%F" f
+
+let print_ty c ppf =
+  match c with
+  | IntegerTy -> Format.fprintf ppf "int"
+  | StringTy -> Format.fprintf ppf "string"
+  | BooleanTy -> Format.fprintf ppf "bool"
+  | FloatTy -> Format.fprintf ppf "float"
+
+let infer_ty = function
+  | Integer _ -> IntegerTy
+  | String _ -> StringTy
+  | Boolean _ -> BooleanTy
+  | Float _ -> FloatTy
 
 let compare c1 c2 =
   let cmp x y =

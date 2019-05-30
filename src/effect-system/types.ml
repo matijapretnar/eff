@@ -6,7 +6,7 @@ type effect_set = EffectSet.t
 
 type skeleton =
   | SkelParam of CoreTypes.SkelParam.t
-  | PrimSkel of prim_ty
+  | PrimSkel of Const.ty
   | SkelArrow of skeleton * skeleton
   | SkelApply of CoreTypes.TyName.t * skeleton list
   | SkelHandler of skeleton * skeleton
@@ -19,7 +19,7 @@ and target_ty =
   | Arrow of target_ty * target_dirty
   | Tuple of target_ty list
   | Handler of target_dirty * target_dirty
-  | PrimTy of prim_ty
+  | PrimTy of Const.ty
   | QualTy of ct_ty * target_ty
   | QualDirt of ct_dirt * target_ty
   | TySchemeTy of CoreTypes.TyParam.t * skeleton * target_ty
@@ -31,8 +31,6 @@ and target_dirty = (target_ty * dirt)
 and dirt = {effect_set: effect_set; row: row}
 
 and row = ParamRow of CoreTypes.DirtParam.t | EmptyRow
-
-and prim_ty = IntTy | BoolTy | StringTy | FloatTy
 
 and ct_ty = (target_ty * target_ty)
 
@@ -67,7 +65,7 @@ let rec print_target_ty ?max_level ty ppf =
         (print_target_dirt drt1) (Symbols.handler_arrow ())
         (print_target_ty ~max_level:4 t2)
         (print_target_dirt drt2)
-  | PrimTy p -> print_prim_ty p ppf
+  | PrimTy p -> print "%t" (Const.print_ty p)
   | QualTy (c, tty) -> print "%t => %t" (print_ct_ty c) (print_target_ty tty)
   | QualDirt (c, tty) ->
       print "%t => %t" (print_ct_dirt c) (print_target_ty tty)
@@ -84,7 +82,7 @@ and print_skeleton ?max_level sk ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match sk with
   | SkelParam p -> CoreTypes.SkelParam.print p ppf
-  | PrimSkel s -> print "prim_skel %t" (print_prim_ty s)
+  | PrimSkel s -> print "prim_skel %t" (Const.print_ty s)
   | SkelArrow (sk1, sk2) ->
       print "%t -sk-> %t" (print_skeleton sk1) (print_skeleton sk2)
   | SkelApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
@@ -130,24 +128,9 @@ and print_ct_dirt (ty1, ty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
   print "%t <= %t" (print_target_dirt ty1) (print_target_dirt ty2)
 
+let type_const c = PrimTy (Const.infer_ty c)
 
-and print_prim_ty pty ppf =
-  let print ?at_level = Print.print ?at_level ppf in
-  match pty with
-  | IntTy -> print "int"
-  | BoolTy -> print "bool"
-  | StringTy -> print "string"
-  | FloatTy -> print "float"
-
-
-let type_const = function
-  | Const.Integer _ -> PrimTy IntTy
-  | Const.String _ -> PrimTy StringTy
-  | Const.Boolean _ -> PrimTy BoolTy
-  | Const.Float _ -> PrimTy FloatTy
-
-
-let rec types_are_equal ty1 ty2 =
+  let rec types_are_equal ty1 ty2 =
   match (ty1, ty2) with
   | TyParam tv1, TyParam tv2 -> tv1 = tv2
   | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
@@ -302,12 +285,7 @@ let rec source_to_target ty =
   | Type.Apply (ty_name, args) ->
       Apply (ty_name, List.map source_to_target args)
   | Type.TyParam p -> TyParam p
-  | Type.Basic s -> (
-    match s with
-    | "int" -> PrimTy IntTy
-    | "string" -> PrimTy StringTy
-    | "bool" -> PrimTy BoolTy
-    | "float" -> PrimTy FloatTy )
+  | Type.Basic b -> PrimTy b
   | Type.Tuple l -> Tuple (List.map source_to_target l)
   | Type.Arrow (ty, dirty) ->
       Arrow (source_to_target ty, source_to_target_dirty dirty)
