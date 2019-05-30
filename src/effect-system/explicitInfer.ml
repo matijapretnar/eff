@@ -223,9 +223,11 @@ let splitter st constraints simple_ty =
           | cons -> not (List.mem cons local_constraints))
       constraints
   in
+  let ty_params = Types.TyParamSet.elements free_ty_params in
+  let add_skeleton ty_var = (ty_var, Unification.get_skel_of_tyvar ty_var constraints) in
   let result =
     ( skel_list
-    , Types.TyParamSet.elements free_ty_params
+    , List.map add_skeleton ty_params
     , Types.DirtParamSet.elements free_dirt_params
     , local_constraints
     , global_constraints )
@@ -258,36 +260,47 @@ let splitter st constraints simple_ty =
   result
 
 
-let generalize_type st constraints simple_ty ty =
-  let free_skel_vars, free_ty_vars, free_dirt_vars, split_cons1, split_cons2 =
-    splitter st constraints simple_ty
-  in
-  let qual_ty =
-    List.fold_right
-      (fun cons acc ->
+let generalize_type free_skel_vars free_ty_vars free_dirt_vars constraints ty =
+  ty
+  |> List.fold_right
+      (fun cons ty ->
         match cons with
-        | Typed.TyOmega (_, t) -> Types.QualTy (t, acc)
-        | Typed.DirtOmega (_, t) -> Types.QualDirt (t, acc) )
-      split_cons1 ty
-  in
-  let ty_sc_dirt =
-    List.fold_right
-      (fun cons acc -> Types.TySchemeDirt (cons, acc))
-      free_dirt_vars qual_ty
-  in
-  let ty_sc_ty =
-    List.fold_right
-      (fun cons acc ->
+        | Typed.TyOmega (_, t) -> Types.QualTy (t, ty)
+        | Typed.DirtOmega (_, t) -> Types.QualDirt (t, ty) )
+      constraints
+  |> List.fold_right
+      (fun dirt_var ty -> Types.TySchemeDirt (dirt_var, ty))
+      free_dirt_vars
+  |> List.fold_right
+      (fun (ty_var, skel) ty ->
         Types.TySchemeTy
-          (cons, Unification.get_skel_of_tyvar cons constraints, acc) )
-      free_ty_vars ty_sc_dirt
-  in
-  let ty_sc_skel =
-    List.fold_right
-      (fun cons acc -> Types.TySchemeSkel (cons, acc))
-      free_skel_vars ty_sc_ty
-  in
-  ty_sc_skel
+          (ty_var, skel, ty) )
+      free_ty_vars
+  |> List.fold_right
+      (fun skel_var ty -> Types.TySchemeSkel (skel_var, ty))
+      free_skel_vars
+
+
+let generalize_expr free_skel_vars free_ty_vars free_dirt_vars constraints expr =
+  expr
+  |> List.fold_right
+      (fun cons expr ->
+        match cons with
+        | Typed.TyOmega (om, t) -> Typed.LambdaTyCoerVar (om, t, expr)
+        | Typed.DirtOmega (om, t) ->
+            Typed.LambdaDirtCoerVar (om, t, expr) )
+      constraints
+  |> List.fold_right
+      (fun dirt_var expr -> Typed.BigLambdaDirt (dirt_var, expr))
+      free_dirt_vars
+  |> List.fold_right
+      (fun (ty_var, skel) expr ->
+                Typed.BigLambdaTy
+                  (ty_var, skel, expr) )
+      free_ty_vars
+  |> List.fold_right
+      (fun skel_var expr -> Typed.BigLambdaSkel (skel_var, expr))
+      free_skel_vars
 
 
 let rec get_sub_of_ty ty_sch =
@@ -794,59 +807,31 @@ and type_plain_computation (st: state) = function
           in
           let sub_e1', cons_e1' = Unification.unify (st'.substitutions, [], st'.constraints) in
           let st'' = (add_constraints cons_e1' st') |> merge_substitutions sub_e1' in 
-          let typed_e1 = Substitution.apply_substitutions_to_expression sub_e1' typed_e1 in
-          let st_subbed = apply_sub_to_env st'' st''.substitutions in
+          let type_e1 = Substitution.apply_substitutions_to_type sub_e1' type_e1 in
           let ( free_skel_vars
               , free_ty_vars
               , free_dirt_vars
               , split_cons1
               , global_constraints ) =
             splitter
-              (TypingEnv.return_context st_subbed.context)
+              (TypingEnv.return_context st''.context)
               cons_e1'
-              (Substitution.apply_substitutions_to_type sub_e1' type_e1)
+              type_e1
           in
           let ty_sc_skel =
-            generalize_type
-              (TypingEnv.return_context st_subbed.context)
-              cons_e1'
-              (Substitution.apply_substitutions_to_type sub_e1' type_e1)
-              (Substitution.apply_substitutions_to_type sub_e1' type_e1)
+            generalize_type free_skel_vars free_ty_vars free_dirt_vars split_cons1 type_e1
           in
           let Untyped.PVar x = p_def.it in
-          let new_st = add_def st_subbed x ty_sc_skel in
+          let new_st = add_def st'' x ty_sc_skel in
           let new_st',{computation= typed_c2; dtype= type_c2} =
             type_computation new_st c_2
           in
           let var_exp =
-            List.fold_right
-              (fun cons acc ->
-                match cons with
-                | Typed.TyOmega (om, t) -> Typed.LambdaTyCoerVar (om, t, acc)
-                | Typed.DirtOmega (om, t) ->
-                    Typed.LambdaDirtCoerVar (om, t, acc) )
-              split_cons1 typed_e1
-          in
-          let var_exp_dirt_lamda =
-            List.fold_right
-              (fun cons acc -> Typed.BigLambdaDirt (cons, acc))
-              free_dirt_vars var_exp
-          in
-          let var_exp_ty_lambda =
-            List.fold_right
-              (fun cons acc ->
-                Typed.BigLambdaTy
-                  (cons, Unification.get_skel_of_tyvar cons cons_e1', acc) )
-              free_ty_vars var_exp_dirt_lamda
-          in
-          let var_exp_skel_lamda =
-            List.fold_right
-              (fun cons acc -> Typed.BigLambdaSkel (cons, acc))
-              free_skel_vars var_exp_ty_lambda
+            generalize_expr free_skel_vars free_ty_vars free_dirt_vars split_cons1 typed_e1
           in
           let return_term =
             Typed.LetVal
-              ( var_exp_skel_lamda
+              ( var_exp
               , Typed.abstraction_with_ty (Typed.PVar x) ty_sc_skel typed_c2 )
           in
           new_st',{computation= return_term; dtype= type_c2}
@@ -921,10 +906,7 @@ and type_plain_computation (st: state) = function
         splitter (TypingEnv.return_context st2.context) st2.constraints ty_A1'
       in
       let ty_f =
-        generalize_type
-          (TypingEnv.return_context st2.context)
-          st2.constraints ty_A1'
-          (Substitution.apply_substitutions_to_type st2.substitutions arrow_type)
+        generalize_type skvars tyvars dirtvars cons4 (Substitution.apply_substitutions_to_type st2.substitutions arrow_type)
       in
       let st3 = add_def st2 var ty_f |> add_constraints cons5 |> add_constraints cons4 in
       Print.debug "Calculating computation";
@@ -946,7 +928,7 @@ and type_plain_computation (st: state) = function
               (List.fold_left
                  (fun e dv -> Typed.ApplyDirtExp (e, Types.no_effect_dirt dv))
                  (List.fold_left
-                    (fun e tv -> Typed.ApplyTyExp (e, Types.TyParam tv))
+                    (fun e (tv, _) -> Typed.ApplyTyExp (e, Types.TyParam tv))
                     (List.fold_left
                        (fun e skv ->
                          Typed.ApplySkelExp (e, Types.SkelParam skv) )
@@ -966,29 +948,11 @@ and type_plain_computation (st: state) = function
       let e_f =
         (* σ₃(Λςs.Λ(αs:τs).Λδѕ.λ(ωs:πs).fun x : σ₃(σ₂(σ₁(α))) -> c₁'') *)
         Substitution.apply_substitutions_to_expression st3'.substitutions
-          (List.fold_right
-             (fun skvar e -> Typed.BigLambdaSkel (skvar, e))
-             skvars
-             (List.fold_right
-                (fun tyvar e ->
-                  Typed.BigLambdaTy
-                    (tyvar, Unification.get_skel_of_tyvar tyvar st3'.constraints, e) )
-                tyvars
-                (List.fold_right
-                   (fun dirtvar e -> Typed.BigLambdaDirt (dirtvar, e))
-                   dirtvars
-                   (List.fold_right
-                      (fun q e ->
-                        match q with
-                        | Typed.TyOmega (tycovar, ct) ->
-                            Typed.LambdaTyCoerVar (tycovar, ct, e)
-                        | Typed.DirtOmega (dcovar, ct) ->
-                            Typed.LambdaDirtCoerVar (dcovar, ct, e) )
-                      cons4
+          (generalize_expr skvars tyvars dirtvars cons4
                       (Typed.Lambda
                          (Typed.abstraction_with_ty pat'
                             (Substitution.apply_substitutions_to_type st3'.substitutions ty_a')
-                            c1''))))))
+                            c1'')))
       in
       st3',{ computation= Typed.LetRec ([(var, ty_f', e_f)], c2')
       ; dtype= dty2}
