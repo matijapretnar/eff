@@ -578,12 +578,11 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
         folder_function
       in
       let cons_1 =
-        ( Substitution.apply_substitutions_to_type st'''.substitutions
-            target_cr_ty
+        ( target_cr_ty
         , out_ty )
       in
       let cons_2 =
-        (Substitution.apply_substitutions_to_dirt st'''.substitutions target_cr_dirt, out_dirt)
+        (target_cr_dirt, out_dirt)
       in
       let omega_1, omega_cons_1 = Typed.fresh_ty_coer cons_1
       and omega_2, omega_cons_2 = Typed.fresh_dirt_coer cons_2 in
@@ -593,12 +592,12 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
       let exp_y = Typed.Var y_var_name in
       let coerced_y, omega_cons_6 =
         Typed.cast_expression exp_y in_ty
-          (Substitution.apply_substitutions_to_type st'''.substitutions r_ty)
+          r_ty
       in
       Print.debug "In infer handler (%t)" (Untyped.print_pattern pr);
       let substituted_c_r = (match pr.it with 
         | Untyped.PVar x -> Typed.subst_comp (Assoc.of_list [(x, coerced_y)])
-          (Substitution.apply_substitutions_to_computation st'''.substitutions target_cr_term)
+          (target_cr_term)
         | _ -> target_cr_term
       )
       in
@@ -610,17 +609,17 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
         let in_op_ty, out_op_ty = Typed.EffectMap.find eff st.effects in
         let x, k, c_op = abs2 in
         let cons_3 =
-          (Substitution.apply_substitutions_to_type st'''.substitutions op_term_ty, out_ty)
+          (op_term_ty, out_ty)
         in
         let cons_4 =
-          (Substitution.apply_substitutions_to_dirt st'''.substitutions op_term_dirt, out_dirt)
+          (op_term_dirt, out_dirt)
         in
         let cons_5a = Types.Arrow (out_op_ty, (out_ty, out_dirt)) in
         let cons_5b =
           Types.Arrow
             ( out_op_ty
-            , ( Substitution.apply_substitutions_to_type st'''.substitutions alpha_i
-              , Substitution.apply_substitutions_to_dirt st'''.substitutions delta_i ) )
+            , ( alpha_i
+              , delta_i ) )
         in
         let omega_3, omega_cons_3 = Typed.fresh_ty_coer cons_3 in
         let omega_4, omega_cons_4 = Typed.fresh_dirt_coer cons_4 in
@@ -634,7 +633,7 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
         let substituted_c_op = (match k.it with
           | Untyped.PVar k_var -> 
             let s_c_op = Typed.subst_comp (Assoc.of_list [(k_var, coerced_l)])
-              (Substitution.apply_substitutions_to_computation st'''.substitutions op_term) in 
+              op_term in 
             Print.debug "substituted_c_op [%t/%t]: %t"
             (CoreTypes.Variable.print ~safe:true l_var_name)
             (CoreTypes.Variable.print ~safe:true k_var)
@@ -669,11 +668,8 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
       let ops_cons =
         concat_map (fun (x, y) -> y) new_op_clauses_with_cons
       in
-      let y_type =
-        Substitution.apply_substitutions_to_type st'''.substitutions r_ty
-      in
       let typed_value_clause =
-        Typed.abstraction_with_ty annot_y y_type coerced_substiuted_c_r
+        Typed.abstraction_with_ty annot_y r_ty coerced_substiuted_c_r
       in
       let target_handler =
         {Typed.effect_clauses= (Assoc.of_list new_op_clauses); value_clause= typed_value_clause}
@@ -839,20 +835,17 @@ and type_plain_computation (st: state) = function
           let st',{computation= typed_c1; dtype= (type_c1, dirt_c1)} =
             type_computation st c_1
           in
-          let typed_pattern, new_st =
-            type_typed_pattern
-              (apply_sub_to_env st' st'.substitutions)
-              p_def type_c1
+          let typed_pattern, new_st = type_typed_pattern st' p_def type_c1
           in
           let st'',{computation= typed_c2; dtype= (type_c2, dirt_c2)} =
             type_computation new_st c_2
           in
           let new_dirt_var = Types.fresh_dirt () in
-          let ty_c1 = Substitution.apply_substitutions_to_type st''.substitutions type_c1 in
+          let ty_c1 = type_c1 in
           let coer_c1, omega_cons_1 =
             Typed.cast_computation
-              (Substitution.apply_substitutions_to_computation st''.substitutions typed_c1)
-              (ty_c1, Substitution.apply_substitutions_to_dirt st''.substitutions dirt_c1)
+              (typed_c1)
+              (ty_c1, dirt_c1)
               (ty_c1, new_dirt_var)
           in
           let coer_c2, omega_cons_2 =
@@ -962,18 +955,15 @@ and type_plain_computation (st: state) = function
 and type_abstraction st (pat, comp) ty_in =
   let pat', st' = type_typed_pattern st pat ty_in in
   let st'',{computation= comp'; dtype= dty} = type_computation st' comp in
-  ( (pat', comp')
-  , (Substitution.apply_substitutions_to_type st'.substitutions ty_in, dty)
-  , st'' )
+  ( (pat', comp') , (ty_in, dty) , st'' )
 
 
 and type_effect_clause eff abs2 st =
   let in_op_ty, out_op_ty = Typed.EffectMap.find eff st.effects in
   let x, k, c_op = abs2 in
-  let st_subbed = apply_sub_to_env st st.substitutions in
   let alpha_i, alpha_cons = Typed.fresh_ty_with_fresh_skel () in
   let alpha_dirty = Types.make_dirty alpha_i in
-  let x', st' = type_typed_pattern st_subbed x in_op_ty in
+  let x', st' = type_typed_pattern st x in_op_ty in
   let k', st'' =
     type_typed_pattern st' k (Types.Arrow (out_op_ty, alpha_dirty))
   in
