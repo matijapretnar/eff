@@ -40,7 +40,6 @@ type ty_coercion =
   | SequenceTyCoer of ty_coercion * ty_coercion
   | ApplyCoercion of CoreTypes.TyName.t * ty_coercion list
   | TupleCoercion of ty_coercion list
-  | RecordCoercion of (CoreTypes.Field.t, ty_coercion) Assoc.t
   | LeftArrow of ty_coercion
   | ForallTy of CoreTypes.TyParam.t * ty_coercion
   | ApplyTyCoer of ty_coercion * target_ty
@@ -291,14 +290,7 @@ and print_ty_coercion ?max_level c ppf =
     print "@[<hov>%t@]"
      (Print.sequence 
       (Symbols.times ()) (print_ty_coercion) tlist);
-  | RecordCoercion tmap -> 
-    print ~at_level:2 "{@[<hov>%t@]}"
-        (Print.sequence (Symbols.semicolon ()) 
-          (fun (field, typ) ->  CoreTypes.Field.print field ppf;print ": ";print_ty_coercion ~max_level:1 typ) 
-          (Assoc.to_list tmap)
-          )
   | _ -> failwith __LOC__
-
 
 and print_dirty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -878,11 +870,6 @@ let rec free_dirt_vars_ty_coercion = function
         (fun free tc ->
           Types.DirtParamSet.union free (free_dirt_vars_ty_coercion tc) )
         Types.DirtParamSet.empty tcs
-  | RecordCoercion rc ->
-      List.fold_left
-        (fun free tc ->
-          Types.DirtParamSet.union free (free_dirt_vars_ty_coercion tc) )
-        Types.DirtParamSet.empty (Assoc.values_of rc)
   | LeftArrow tc -> free_dirt_vars_ty_coercion tc
   | ForallTy (_, tc) -> free_dirt_vars_ty_coercion tc
   | ApplyTyCoer (tc, ty) ->
@@ -945,10 +932,7 @@ let rec free_dirt_vars_expression e =
       List.fold_left
         (fun free e -> DirtParamSet.union free (free_dirt_vars_expression e))
         DirtParamSet.empty es
-  | Record em -> 
-      Assoc.fold_left
-        (fun free (_,e) -> DirtParamSet.union free (free_dirt_vars_expression e))
-        DirtParamSet.empty em
+  | Record _ -> failwith __LOC__
   | Variant (_, e) -> free_dirt_vars_expression e
   | Lambda abs -> free_dirt_vars_abstraction_with_ty abs
   | Effect _ -> DirtParamSet.empty
@@ -1074,9 +1058,6 @@ let rec apply_sub_to_type ty_subs dirt_subs ty =
   | Types.Tuple ty_list ->
       Types.Tuple
         (List.map (fun x -> apply_sub_to_type ty_subs dirt_subs x) ty_list)
-  | Types.Record ty_map ->
-      Types.Record
-         (Assoc.map (apply_sub_to_type ty_subs dirt_subs) ty_map)
   | Types.Handler ((a, b), (c, d)) ->
       Types.Handler
         ( (apply_sub_to_type ty_subs dirt_subs a, apply_sub_to_dirt dirt_subs b)

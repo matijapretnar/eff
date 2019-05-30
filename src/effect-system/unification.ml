@@ -46,11 +46,11 @@ let rec skeleton_of_target_ty tty conslist =
         (ty_name, List.map (fun ty -> skeleton_of_target_ty ty conslist) tys)
   | Tuple tup ->
       SkelTuple (List.map (fun ty -> skeleton_of_target_ty ty conslist) tup)
-  | Record tm -> SkelRecord (Assoc.map (fun ty -> skeleton_of_target_ty ty conslist) tm)
   | Handler ((a1, _), (a2, _)) ->
       SkelHandler
         (skeleton_of_target_ty a1 conslist, skeleton_of_target_ty a2 conslist)
   | PrimTy pt -> PrimSkel pt
+  | Tuple t -> SkelTuple (List.map (fun ty -> skeleton_of_target_ty ty conslist) t)
 
 let rec fix_union_find fixpoint c_list =
   Print.debug "--------------start list-------" ;
@@ -114,22 +114,6 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
       in
       let k = tvar in
       let v = Types.Tuple tvars in
-      let sub1 = Substitution.add_type_substitution_e k v in
-      let cons_subbed = Substitution.apply_substitutions_to_constraints sub1 (add_list_to_constraints paused rest_queue) in
-      (Substitution.add_type_substitution k v sub, [], 
-      add_list_to_constraints cons_subbed conss )
-  | SkelRecord sks -> (** TODO: Recheck me *)
-    let conss, tvars =
-        Assoc.fold_map
-          (fun conss sk ->
-            let tvar, cons = Typed.fresh_ty_with_skel sk in
-            (cons :: conss, tvar) 
-            )
-          []
-          sks
-      in
-      let k = tvar in
-      let v = Types.Record tvars in
       let sub1 = Substitution.add_type_substitution_e k v in
       let cons_subbed = Substitution.apply_substitutions_to_constraints sub1 (add_list_to_constraints paused rest_queue) in
       (Substitution.add_type_substitution k v sub, [], 
@@ -203,18 +187,6 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
       (sub, paused, add_list_to_constraints new_constraints rest_queue)
   | SkelTuple _, _ 
   | _, SkelTuple _ -> failwith "Invalid constraint"
-  | SkelRecord t1, SkelRecord t2 -> (
-      match Assoc.combine t1 t2 with
-       | None -> failwith "Incompatible records" (* Or should we consider subset*)
-       | Some combined -> 
-        let new_constraints = List.map
-        (fun (s1,s2) -> Typed.SkelEq (s1,s2))
-        (Assoc.values_of combined)
-        in
-        (sub, paused, add_list_to_constraints new_constraints rest_queue)
-    )
-  | SkelRecord _, _ 
-  | _, SkelRecord _ -> failwith "Invalid constraint"
   | _ -> Print.debug "%t" (Types.print_skeleton sk1); 
          Print.debug "%t" (Types.print_skeleton sk2); failwith __LOC__
 
@@ -247,26 +219,6 @@ and ty_omega_step sub paused cons rest_queue omega =
         let v = Typed.TupleCoercion coercions 
         in
         (Substitution.add_type_coercion k v sub, paused, add_list_to_constraints conss rest_queue)
-    | Types.Record tys, Types.Record tys'
-      when Assoc.length tys = Assoc.length tys' ->(
-        match Assoc.combine tys tys' with 
-          | None -> Print.debug "can't solve subtyping for types: %t and %t"
-            (print_target_ty (Types.Record tys)) (print_target_ty (Types.Record tys')) ;
-            assert false
-          | Some combined -> 
-              let conss, coercions = Assoc.fold_map 
-              (fun cons (t1, t2) -> 
-                let coercion, ty_cons = fresh_ty_coer (t1, t2) in 
-                (ty_cons:: cons, coercion)
-              )
-              []
-              combined
-              in 
-              let k = omega in
-              let v = Typed.RecordCoercion coercions 
-              in
-              (Substitution.add_type_coercion k v sub, paused, add_list_to_constraints conss rest_queue)
-    )
     (* ω : ty (A₁,  A₂,  ...) <= ty (B₁,  B₂,  ...) *)
     (* we assume that all type parameters are positive *)
     | Types.Apply (ty_name1, tys1), Types.Apply (ty_name2, tys2)
