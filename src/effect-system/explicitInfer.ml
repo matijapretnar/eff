@@ -797,13 +797,18 @@ and type_plain_computation (st: state) = function
   | Untyped.Let (defs, c_2) -> 
       let [(p_def, c_1)] = defs in (
       match c_1.it with
-      | Untyped.Value e_1 ->
-          let st',{expression= typed_e1; ttype= type_e1} =
-            type_expression st e_1
+      | Untyped.Value e1 ->
+          let st', {expression= typed_e1; ttype= type_e1} =
+            type_expression st e1
           in
           let sub_e1', cons_e1' = Unification.unify (st'.substitutions, [], st'.constraints) in
-          let st'' = (add_constraints cons_e1' st') |> merge_substitutions sub_e1' in 
+          let st'' =
+            st'
+            |> add_constraints cons_e1'
+            |> merge_substitutions sub_e1'
+          in 
           let type_e1 = Substitution.apply_substitutions_to_type sub_e1' type_e1 in
+          let typed_e1 = Substitution.apply_substitutions_to_expression sub_e1' typed_e1 in
           let ( free_skel_vars
               , free_ty_vars
               , free_dirt_vars
@@ -817,8 +822,8 @@ and type_plain_computation (st: state) = function
           let ty_sc_skel =
             generalize_type free_skel_vars free_ty_vars free_dirt_vars split_cons1 type_e1
           in
-          let Untyped.PVar x = p_def.it in
-          let new_st = add_def st'' x ty_sc_skel in
+          let st'' = {st'' with constraints = global_constraints} in
+          let typed_pat, new_st = type_typed_pattern st'' p_def ty_sc_skel in
           let new_st',{computation= typed_c2; dtype= type_c2} =
             type_computation new_st c_2
           in
@@ -828,7 +833,7 @@ and type_plain_computation (st: state) = function
           let return_term =
             Typed.LetVal
               ( var_exp
-              , Typed.abstraction_with_ty (Typed.PVar x) ty_sc_skel typed_c2 )
+              , Typed.abstraction_with_ty typed_pat ty_sc_skel typed_c2 )
           in
           new_st',{computation= return_term; dtype= type_c2}
       | _ ->
