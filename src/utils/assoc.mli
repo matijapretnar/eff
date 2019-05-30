@@ -80,3 +80,15 @@ val of_list : ('k * 'v) list -> ('k, 'v) t
 (** Switch to lists and back. *)
 
 val to_list : ('k, 'v) t -> ('k * 'v) list
+
+(* For type checking *)
+val equals: ('k, 'v) t -> ('k, 'v) t -> bool
+
+val keys_equals: ('k, 'v1) t -> ('k, 'v2) t -> bool
+
+
+val combine: ('k, 'v1) t -> ('k, 'v2) t -> (('k, ('v1 * 'v2)) t ) option
+(** Combines two associative containers and joins values with same keys, if any pair of keys don't match, the result is None *)
+
+val combine_optional : ('k, 'v1) t -> ('k, 'v2) t -> ('k, ('v1 * ('v2 option))) t
+(** Combines elements from first associative container with values in second (if they exist) *)

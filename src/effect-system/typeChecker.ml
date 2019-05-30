@@ -78,6 +78,7 @@ let rec check_well_formed_ty st ty =
       check_well_formed_ty st tty1 ;
       check_well_formed_dirty_ty st tty2
   | Tuple ttyl -> List.iter (check_well_formed_ty st) ttyl
+  | Record ttmap -> Assoc.iter (fun (_,typ)-> check_well_formed_ty st typ) ttmap
   | Apply (_, []) -> ()
   | Handler (tty1, tty2) ->
       check_well_formed_dirty_ty st tty1 ;
@@ -134,6 +135,9 @@ let rec type_of_ty_coercion st ty_coer =
           tycoers ([], [])
       in
       (Types.Tuple tys1, Types.Tuple tys2)
+  | RecordCoercion rcoer -> 
+      let unpacked = Assoc.map (type_of_ty_coercion st) rcoer in
+      (Types.Record (Assoc.map fst unpacked), Types.Record (Assoc.map snd unpacked))
   | ApplyCoercion (ty_name, tycoers) ->
       let tys1, tys2 =
         List.fold_right
@@ -272,6 +276,20 @@ let rec extend_pattern_types st p ty =
     match ty with
     | Tuple tys -> List.fold_left2 extend_pattern_types st ps tys
     | _ -> assert false )
+  | PRecord r -> ( 
+    match ty with 
+      | Record rs -> (
+        match (Assoc.combine r rs) with
+        | None -> assert false
+        | Some combined -> 
+          Assoc.fold_left 
+          (fun st' (_,(pt, ty)) -> 
+            extend_pattern_types st' pt ty
+          )
+          st
+          combined
+        ) 
+      | _ -> assert false )
   | _ -> failwith __LOC__
 
 
@@ -286,6 +304,7 @@ let rec type_of_expression st e =
       let ty1, c_ty = type_of_abstraction_with_ty st abs in
       Types.Arrow (ty1, c_ty)
   | Tuple es -> Types.Tuple (List.map (fun e -> type_of_expression st e) es)
+  | Record em -> Types.Record (Assoc.map (type_of_expression st) em)
   | Variant (lbl, e) ->
       let ty_in, ty_out = Types.constructor_signature lbl in
       let u' = type_of_expression st e in

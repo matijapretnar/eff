@@ -1,0 +1,2 @@
+- : {res: int; val: nat} -{}→
+    {sn: int; fs: nat} -{}→ {zero: bool; val: nat; res: int} ! {} = <fun>

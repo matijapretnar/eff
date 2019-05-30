@@ -117,8 +117,31 @@ and type_plain_typed_pattern st pat ty =
       (Typed.PVar x, st')
   | Untyped.PNonbinding -> (Typed.PNonbinding, st)
   | Untyped.PAs (p, v) -> failwith __LOC__
-  | Untyped.PTuple l -> failwith __LOC__
-  | Untyped.PRecord r -> failwith __LOC__
+  | Untyped.PTuple l -> 
+    let (tl', pats, st'') = List.fold_right
+    (fun pat (tl, pats, st') -> 
+      let tvar, cons = Typed.fresh_ty_with_fresh_skel () in
+      let tpat, st''' = type_typed_pattern (add_constraint cons st') pat tvar in
+      (tvar::tl, tpat::pats, st''')
+    ) 
+    l
+    ([], [], st) in
+    let _, coer = Typed.fresh_ty_coer (Types.Tuple tl', ty) in
+    let st''' = add_constraint coer st'' in (* subtype constraint for general type *)
+    (Typed.PTuple pats, st''')
+  | Untyped.PRecord r -> 
+    let st'', tr = Assoc.fold_map
+    (fun st' pat -> 
+      let tvar, cons = Typed.fresh_ty_with_fresh_skel () in 
+      let tpat, st'' = type_typed_pattern (add_constraint cons st') pat tvar in
+      (st'', (tvar, tpat)) 
+    )
+    st 
+    r
+    in 
+    let _, coer = Typed.fresh_ty_coer (Types.Record (Assoc.map fst tr), ty) in 
+    let st''' = add_constraint coer st'' in 
+    (Typed.PRecord (Assoc.map snd tr),st''')
   | Untyped.PVariant (lbl, p) -> (
       let ty_in, ty_out = Types.constructor_signature lbl in
       let _omega, q = Typed.fresh_ty_coer (ty_out, ty) in
@@ -132,7 +155,7 @@ and type_plain_typed_pattern st pat ty =
       let _omega, q = Typed.fresh_ty_coer (Types.type_const c, ty) in
       let st' = add_constraint q st in
       (Typed.PConst c, st')
-
+  | Untyped.PAnnotated _ -> failwith __LOC__
 
 (* ... *)
 
@@ -436,7 +459,17 @@ and type_plain_expression (st: state): (Untyped.plain_expression ->  state * exp
       let (st'', terms_r, types_r) = List.fold_left folder (st, [], []) es (* FOLD LEFT VS FOLD RIGHT????*)
       in
       st'',{expression= Typed.Tuple (List.rev terms_r); ttype= Types.Tuple (List.rev types_r)}
-  | Untyped.Record lst -> failwith __LOC__
+  | Untyped.Record lst -> 
+    let folder st' ex = 
+        let (st_, {expression; ttype}) = type_expression st' ex in
+        (st_, (expression, ttype) )
+      in
+      let (st'', lst') = 
+        Assoc.fold_map folder st lst
+      in
+      let typed = Assoc.map fst lst' in
+      let typs = Assoc.map snd lst' in
+      st'',{expression= Typed.Record typed; ttype= Types.Record typs}
   | Untyped.Variant (lbl, e) -> (
       let ty_in, ty_out = Types.constructor_signature lbl in
       match e with

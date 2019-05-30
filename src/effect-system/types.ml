@@ -11,6 +11,7 @@ type skeleton =
   | SkelApply of CoreTypes.TyName.t * skeleton list
   | SkelHandler of skeleton * skeleton
   | SkelTuple of skeleton list
+  | SkelRecord of (CoreTypes.Field.t, skeleton) Assoc.t 
   | ForallSkel of CoreTypes.SkelParam.t * skeleton
 
 and target_ty =
@@ -18,6 +19,7 @@ and target_ty =
   | Apply of CoreTypes.TyName.t * target_ty list
   | Arrow of target_ty * target_dirty
   | Tuple of target_ty list
+  | Record of (CoreTypes.Field.t, target_ty) Assoc.t 
   | Handler of target_dirty * target_dirty
   | PrimTy of Const.ty
   | QualTy of ct_ty * target_ty
@@ -76,7 +78,12 @@ let rec print_target_ty ?max_level ty ppf =
       print "ForallDirt %t. %t" (CoreTypes.DirtParam.print p) (print_target_ty tty)
   | TySchemeSkel (p, tty) ->
       print "ForallSkel %t. %t" (CoreTypes.SkelParam.print p) (print_target_ty tty)
-
+  | Record tmap -> 
+      print ~at_level:2 "{@[<hov>%t@]}"
+        (Print.sequence (Symbols.semicolon ()) 
+          (fun (field, typ) ->  CoreTypes.Field.print field ppf;print ": ";print_target_ty ~max_level:1 typ) 
+          (Assoc.to_list tmap)
+          )
 
 and print_skeleton ?max_level sk ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -94,6 +101,12 @@ and print_skeleton ?max_level sk ppf =
   | SkelTuple sks ->
       print ~at_level:2 "@[<hov>%t@]"
         (Print.sequence (Symbols.times ()) (print_skeleton ~max_level:1) sks)
+  | SkelRecord sks ->
+      print ~at_level:2 "{@[<hov>%t@]}"
+        (Print.sequence (Symbols.semicolon ()) 
+          (fun (field, typ) ->  CoreTypes.Field.print field ppf;print ": ";print_skeleton ~max_level:1 typ) 
+          (Assoc.to_list sks)
+          )
   | SkelHandler (sk1, sk2) ->
       print "%t =sk=> %t" (print_skeleton sk1) (print_skeleton sk2)
   | ForallSkel (p, sk1) ->
@@ -150,8 +163,9 @@ let type_const c = PrimTy (Const.infer_ty c)
   | TySchemeDirt (dvar1, ty1), TySchemeDirt (dvar2, ty2) ->
       dvar1 = dvar2 && types_are_equal ty1 ty2
   | TySchemeSkel (skvar1, ty1), TySchemeSkel (skvar2, ty2) -> failwith __LOC__
+  | Record r1, Record r2 -> 
+    Assoc.equals r1 r2
   | _ -> false
-
 
 (*       Error.typing ~loc:Location.unknown "%t <> %t" (print_target_ty ty1)
         (print_target_ty ty2)
@@ -192,6 +206,8 @@ let rec free_skeleton sk =
   | SkelArrow (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
   | SkelHandler (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
   | SkelTuple sks -> List.concat (List.map free_skeleton sks)
+  | SkelRecord sks -> 
+      List.concat (Assoc.values_of (Assoc.map free_skeleton sks))
   | ForallSkel (p, sk1) ->
       let free_a = free_skeleton sk1 in
       List.filter (fun x -> not (List.mem x [p])) free_a
@@ -202,6 +218,7 @@ let rec free_target_ty t =
   | TyParam x -> [x]
   | Arrow (a, c) -> free_target_ty a @ free_target_dirty c
   | Tuple tup -> List.flatten (List.map free_target_ty tup)
+  | Record rc -> List.flatten (Assoc.values_of (Assoc.map free_target_ty rc))
   | Handler (c1, c2) -> free_target_dirty c1 @ free_target_dirty c2
   | PrimTy _ -> []
   | QualTy (_, a) -> failwith __LOC__
@@ -312,6 +329,10 @@ let rec free_ty_vars_ty = function
       List.fold_left
         (fun free ty -> TyParamSet.union free (free_ty_vars_ty ty))
         TyParamSet.empty tup
+  | Record tmap -> 
+      Assoc.fold_left 
+      (fun free (_,ty) -> TyParamSet.union free (free_ty_vars_ty ty))
+      TyParamSet.empty tmap
   | Apply (_, tup) ->
       List.fold_left
         (fun free ty -> TyParamSet.union free (free_ty_vars_ty ty))
