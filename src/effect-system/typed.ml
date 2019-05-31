@@ -3,6 +3,7 @@ open CoreUtils
 
 open Types
 module EffectMap = Map.Make (CoreTypes.Effect)
+module VariableMap = Map.Make (CoreTypes.Variable)
 
 let add_to_constraints con constraints = con :: constraints
 

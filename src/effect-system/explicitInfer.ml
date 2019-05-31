@@ -5,7 +5,7 @@ open Typed
 (* INFERENCE STATE *)
 
 type state =
-  { context: TypingEnv.t
+  { context: Types.target_ty Typed.VariableMap.t
   ; effects: (Types.target_ty * Types.target_ty) Typed.EffectMap.t
   ; substitutions: Substitution.t
   ; constraints: Typed.omega_ct list }
@@ -43,7 +43,7 @@ type expression_typing_result =
   {expression: Typed.expression; ttype: Types.target_ty}
 
 let empty =
-  { context= TypingEnv.empty
+  { context= Typed.VariableMap.empty
   ; effects= Typed.EffectMap.empty
   ; constraints= []
   ; substitutions= Substitution.empty }
@@ -51,16 +51,10 @@ let empty =
 let initial_state = empty
 
 let add_def env x ty_sch =
-  {env with context= TypingEnv.update env.context x ty_sch}
-
-let apply_sub_to_env env sub =
-  {env with context= TypingEnv.apply_sub env.context sub}
+  {env with context= Typed.VariableMap.add x ty_sch env.context}
 
 let extend_env vars env =
-  List.fold_right
-    (fun (x, ty_sch) env ->
-      {env with context= TypingEnv.update env.context x ty_sch} )
-    vars env
+  List.fold_right (fun (x, ty_sch) env -> add_def env x ty_sch) vars env
 
 let print_env env =
   List.iter
@@ -160,7 +154,10 @@ let rec state_free_dirt_vars st =
       Types.DirtParamSet.union (Types.free_dirt_vars_ty ty) acc )
     st Types.DirtParamSet.empty
 
-let splitter st constraints simple_ty =
+let splitter context constraints simple_ty =
+  let st =
+    Typed.VariableMap.fold (fun x ty acc -> (x, ty) :: acc) context []
+  in
   let skel_list =
     unique_elements (get_skel_vars_from_constraints constraints)
   in
@@ -439,7 +436,7 @@ let rec type_expression st ({it= expr} as e) =
 and type_plain_expression (st : state) :
     Untyped.plain_expression -> state * expression_typing_result = function
   | Untyped.Var x -> (
-    match TypingEnv.lookup st.context x with
+    match Typed.VariableMap.find_opt x st.context with
     | Some ty_schi ->
         let returned_x, applied_basic_type, returned_cons =
           apply_polymorphic_variable x ty_schi
@@ -738,7 +735,7 @@ and type_plain_computation (st : state) = function
       let st', {expression= typed_exp; ttype= exp_type} =
         type_expression st e
       in
-      let st_subbed = apply_sub_to_env st' st'.substitutions in
+      let st_subbed = st' in
       let st'', {computation= typed_comp; dtype= comp_dirty_type} =
         type_computation st_subbed c
       in
@@ -782,7 +779,7 @@ and type_plain_computation (st : state) = function
               , free_dirt_vars
               , split_cons1
               , global_constraints ) =
-            splitter (TypingEnv.return_context st''.context) cons_e1' type_e1
+            splitter st''.context cons_e1' type_e1
           in
           let ty_sc_skel =
             generalize_type free_skel_vars free_ty_vars free_dirt_vars
@@ -860,14 +857,14 @@ and type_plain_computation (st : state) = function
         Unification.unify (Substitution.empty, [], st1'.constraints)
       in
       let st = merge_substitutions sub_s' st in
-      let st2 = apply_sub_to_env st sub_s' |> add_constraints cons_s' in
+      let st2 = add_constraints cons_s' st in
       let ty_A1' = Substitution.apply_substitutions_to_type sub_s' ty_A1 in
       let dirt_D1' = Substitution.apply_substitutions_to_dirt sub_s' dirt_D1 in
       (* Do we also need to substitute dirt? *)
       let ty_a_s' = Substitution.apply_substitutions_to_type sub_s' ty_a' in
       let arrow_type = Types.Arrow (ty_a_s', (ty_A1', dirt_D1')) in
       let skvars, tyvars, dirtvars, cons4, cons5 =
-        splitter (TypingEnv.return_context st2.context) st2.constraints ty_A1'
+        splitter st2.context st2.constraints ty_A1'
       in
       let ty_f =
         generalize_type skvars tyvars dirtvars cons4
@@ -1088,4 +1085,4 @@ let type_toplevel ~loc st c =
     (ct3, st)
 
 let add_external ctx x ty =
-  {ctx with context= TypingEnv.update ctx.context x ty}
+  {ctx with context= Typed.VariableMap.add x ty ctx.context}
