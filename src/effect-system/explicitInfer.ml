@@ -53,9 +53,6 @@ let initial_state = empty
 let add_def env x ty_sch =
   {env with context= Typed.VariableMap.add x ty_sch env.context}
 
-let extend_env vars env =
-  List.fold_right (fun (x, ty_sch) env -> add_def env x ty_sch) vars env
-
 let print_env env =
   List.iter
     (fun (x, ty_sch) ->
@@ -143,110 +140,76 @@ and type_plain_typed_pattern st pat ty =
 
 (* ... *)
 
-let rec state_free_ty_vars st =
-  List.fold_right
-    (fun (_, ty) acc -> Types.TyParamSet.union (Types.free_ty_vars_ty ty) acc)
-    st Types.TyParamSet.empty
+let rec free_ty_vars_in_context context =
+  Typed.VariableMap.fold
+    (fun _ ty vars -> Types.TyParamSet.union (Types.free_ty_vars_ty ty) vars)
+    context Types.TyParamSet.empty
 
-let rec state_free_dirt_vars st =
-  List.fold_right
-    (fun (_, ty) acc ->
-      Types.DirtParamSet.union (Types.free_dirt_vars_ty ty) acc )
-    st Types.DirtParamSet.empty
+let rec free_dirt_vars_in_context context =
+  Typed.VariableMap.fold
+    (fun _ ty vars -> Types.DirtParamSet.union (Types.free_dirt_vars_ty ty) vars)
+    context Types.DirtParamSet.empty
 
-let splitter context constraints simple_ty =
-  let st =
-    Typed.VariableMap.fold (fun x ty acc -> (x, ty) :: acc) context []
+let splitter context constraints ty =
+  let shared_ty_vars = free_ty_vars_in_context context
+  and shared_dirt_vars = free_dirt_vars_in_context context in
+  let local_ty_vars =
+    Types.TyParamSet.(
+      let vars_in_ty = Types.free_ty_vars_ty ty
+      and vars_in_constraints =
+        List.fold_right
+          (fun cons vars ->
+            union (constraint_free_ty_vars cons) vars )
+          constraints empty
+      in
+      diff
+        (union vars_in_constraints vars_in_ty)
+        shared_ty_vars
+    )
+  and local_dirt_vars =
+    Types.DirtParamSet.(
+      let vars_in_ty = Types.free_dirt_vars_ty ty
+      and vars_in_constraints =
+        List.fold_right
+          (fun cons vars ->
+            union (constraint_free_dirt_vars cons) vars )
+          constraints empty
+      in
+      diff
+        (union vars_in_constraints vars_in_ty)
+        shared_dirt_vars
+    )
   in
-  let skel_list =
-    unique_elements (get_skel_vars_from_constraints constraints)
-  in
-  let global_ty_vars = state_free_ty_vars st in
-  let global_dirt_vars = state_free_dirt_vars st in
-  let local_constraints =
-    List.filter
-      (fun cons ->
-        let cons_freevars_ty = constraint_free_ty_vars cons in
-        let cons_freevars_dirt = constraint_free_dirt_vars cons in
+  let local_constraint = function
+    | Typed.TyParamHasSkel (tyvar, skvar) ->
+        Types.TyParamSet.mem tyvar local_ty_vars
+    | cons ->
+        let ty_vars = constraint_free_ty_vars cons in
+        let dirt_vars = constraint_free_dirt_vars cons in
         let is_sub_ty =
-          Types.TyParamSet.subset cons_freevars_ty global_ty_vars
+          Types.TyParamSet.subset ty_vars shared_ty_vars
         in
         let is_sub_dirt =
-          Types.DirtParamSet.subset cons_freevars_dirt global_dirt_vars
+          Types.DirtParamSet.subset dirt_vars shared_dirt_vars
         in
-        not (is_sub_ty && is_sub_dirt) )
-      constraints
+        not (is_sub_ty && is_sub_dirt)
   in
-  let free_ty_params =
-    let simple_ty_freevars_ty = Types.free_ty_vars_ty simple_ty
-    and constraints_freevars_ty =
-      List.fold_right
-        (fun cons acc ->
-          Types.TyParamSet.union (constraint_free_ty_vars cons) acc )
-        constraints Types.TyParamSet.empty
-    in
-    Types.TyParamSet.diff
-      (Types.TyParamSet.union constraints_freevars_ty simple_ty_freevars_ty)
-      global_ty_vars
+  let local_constraints, global_constraints =
+    List.partition local_constraint constraints
   in
-  let free_dirt_params =
-    let simple_ty_freevars_dirt = Types.free_dirt_vars_ty simple_ty
-    and constraints_freevars_dirt =
-      List.fold_right
-        (fun cons acc ->
-          Types.DirtParamSet.union (constraint_free_dirt_vars cons) acc )
-        constraints Types.DirtParamSet.empty
-    in
-    Types.DirtParamSet.diff
-      (Types.DirtParamSet.union constraints_freevars_dirt
-         simple_ty_freevars_dirt)
-      global_dirt_vars
+  let free_skeleton_vars =
+    Types.SkelParamSet.diff
+      (get_skel_vars_from_constraints local_constraints)
+      (get_skel_vars_from_constraints global_constraints)
   in
-  let global_constraints =
-    List.filter
-      (function
-        | Typed.TyParamHasSkel (tyvar, skvar) ->
-            not (Types.TyParamSet.mem tyvar free_ty_params)
-        | cons -> not (List.mem cons local_constraints))
-      constraints
-  in
-  let ty_params = Types.TyParamSet.elements free_ty_params in
   let add_skeleton ty_var =
     (ty_var, Unification.get_skel_of_tyvar ty_var constraints)
   in
-  let result =
-    ( skel_list
-    , List.map add_skeleton ty_params
-    , Types.DirtParamSet.elements free_dirt_params
-    , local_constraints
-    , global_constraints )
-  in
-  Print.debug "Splitter Input Constraints: " ;
-  Unification.print_c_list constraints ;
-  Print.debug "Splitter Input Ty: %t" (Types.print_target_ty simple_ty) ;
-  Print.debug "Splitter Env :" ;
-  print_env st ;
-  Print.debug "Simple type free vars: " ;
-  Types.TyParamSet.iter
-    (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
-    (Types.free_ty_vars_ty simple_ty) ;
-  Print.debug "state free vars: " ;
-  Types.TyParamSet.iter
-    (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
-    (state_free_ty_vars st) ;
-  Print.debug "Splitter output free_ty_vars: " ;
-  Types.TyParamSet.iter
-    (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
-    free_ty_params ;
-  Print.debug "Splitter output free_dirt_vars: " ;
-  Types.DirtParamSet.iter
-    (fun x -> Print.debug "%t" (CoreTypes.DirtParam.print x))
-    free_dirt_params ;
-  Print.debug "Splitter global constraints list :" ;
-  Unification.print_c_list local_constraints ;
-  Print.debug "Splitter global constraints list :" ;
-  Unification.print_c_list global_constraints ;
-  result
+  ( Types.SkelParamSet.elements free_skeleton_vars
+  , Types.TyParamSet.elements local_ty_vars |> List.map add_skeleton
+  , Types.DirtParamSet.elements local_dirt_vars
+  , local_constraints
+  , global_constraints )
 
 let generalize_type free_skel_vars free_ty_vars free_dirt_vars constraints ty =
   ty

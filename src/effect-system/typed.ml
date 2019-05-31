@@ -806,6 +806,7 @@ let constraint_free_dirt_vars = function
       DirtParamSet.union
         (constraint_free_row_vars drt1.Types.row)
         (constraint_free_row_vars drt2.Types.row)
+  | _ -> Types.DirtParamSet.empty
 
 (* free dirt variables in target terms *)
 
@@ -971,30 +972,13 @@ and free_dirt_vars_abstraction_with_ty (_, ty, c) =
   Types.DirtParamSet.union (free_dirt_vars_ty ty)
     (free_dirt_vars_computation c)
 
-let rec get_skel_vars_from_constraints = function
-  | [] -> []
-  | TyParamHasSkel (_, Types.SkelParam sv) :: xs ->
-      sv :: get_skel_vars_from_constraints xs
-  | _ :: xs -> get_skel_vars_from_constraints xs
-
-let constraint_free_ty_vars = function
-  | TyOmega (_, (Types.TyParam a, Types.TyParam b)) ->
-      Types.TyParamSet.of_list [a; b]
-  | TyOmega (_, (Types.TyParam a, _)) -> Types.TyParamSet.singleton a
-  | TyOmega (_, (_, Types.TyParam a)) -> Types.TyParamSet.singleton a
-  | _ -> Types.TyParamSet.empty
-
-let constraint_free_dirt_vars = function
-  | DirtOmega
-      (_, ({Types.row= Types.ParamRow a}, {Types.row= Types.ParamRow b})) ->
-      Types.DirtParamSet.of_list [a; b]
-  | DirtOmega (_, ({Types.row= Types.ParamRow a}, {Types.row= Types.EmptyRow}))
-    ->
-      Types.DirtParamSet.singleton a
-  | DirtOmega (_, ({Types.row= Types.EmptyRow}, {Types.row= Types.ParamRow b}))
-    ->
-      Types.DirtParamSet.singleton b
-  | _ -> Types.DirtParamSet.empty
+let get_skel_vars_from_constraints constraints =
+  let fold skel_vars = function
+    | TyParamHasSkel (_, Types.SkelParam skel_var) ->
+        Types.SkelParamSet.add skel_var skel_vars
+    | _ -> skel_vars
+  in
+  List.fold_left fold Types.SkelParamSet.empty constraints
 
 let rec apply_sub_to_type ty_subs dirt_subs ty =
   match ty with
