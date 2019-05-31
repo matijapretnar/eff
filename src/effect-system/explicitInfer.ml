@@ -1597,6 +1597,8 @@ let tcTopLevel ~loc inState cmp =
   let solverSigma, residualCs =
     Unification.unify (Substitution.empty, [], tmpState.constraints) in
 
+  Print.debug "INFERRED (AFTER  SUBST): %t" (Types.print_target_dirty (subInCmpTy solverSigma (ttype,dirt))) ;
+
   (* 3: Substitute back into the elaborated expression *)
   let ct' = subInCmp solverSigma trgCmp in
 
