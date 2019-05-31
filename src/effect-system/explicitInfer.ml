@@ -24,6 +24,10 @@ let extendLclCtxt env x scheme = TypingEnv.update env x scheme
 
 let georgeTODO () = failwith __LOC__
 
+let warnAddConstraints s cs =
+  Print.debug "%s: Added %d constraints: " s (List.length cs);
+  Unification.print_c_list cs
+
 (*
 let add_def env x ty_sch =
   {env with context = TypingEnv.update env.context x ty_sch}
@@ -42,6 +46,7 @@ let extend_env vars env =
 
 (* Extend the generated substitution *)
 let extendGenSub acc sub = Substitution.merge acc sub (* GEORGE: I hope to God for the order to be correct here *)
+let flippedExtendGenSub sub acc = extendGenSub acc sub
 
 (* [STATE] INFERENCE STATE *)
 
@@ -709,6 +714,7 @@ and inferPatTy (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.plain_pa
     (* Variable Case *)
     | Untyped.PVar x ->
         let tyVar, tyVarHasSkel = Typed.fresh_ty_with_fresh_skel () in
+        warnAddConstraints "inferPatTy" [tyVarHasSkel];
         ( Typed.PVar x
         , tyVar
         , inState |> add_constraint tyVarHasSkel
@@ -716,6 +722,7 @@ and inferPatTy (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.plain_pa
     (* Wildcard Case *)
     | Untyped.PNonbinding ->
         let tyVar, tyVarHasSkel = Typed.fresh_ty_with_fresh_skel () in
+        warnAddConstraints "inferPatTy" [tyVarHasSkel];
         ( Typed.PNonbinding
         , tyVar
         , inState |> add_constraint tyVarHasSkel
@@ -758,6 +765,10 @@ and tcTypedPat (inState : state) (lclCtxt : TypingEnv.t) pat pat_ty =
   | Untyped.PTuple l           -> failwith __LOC__ (* GEORGE: Not implemented yet *)
   | Untyped.PRecord r          -> failwith __LOC__ (* GEORGE: Not implemented yet *)
   | Untyped.PAnnotated (p, ty) -> failwith __LOC__ (* GEORGE: Not implemented yet *)
+
+  | Untyped.PVariant (_,_) -> failwith __LOC__
+  | Untyped.PConst _       -> failwith __LOC__
+(*
   (* GEORGE: The original seemed wrong to me, we compute the midState but we do
    * not use it in the first case. We return inState instead. Here I do it the
    * right way I hope. *)
@@ -775,6 +786,7 @@ and tcTypedPat (inState : state) (lclCtxt : TypingEnv.t) pat pat_ty =
   | Untyped.PConst c ->
       let q = snd (Typed.fresh_ty_coer (Types.type_const c, pat_ty)) in
       (Typed.PConst c, pat_ty, add_constraint q inState, lclCtxt)
+*)
 
 (* Typecheck a located pattern without a given type *)
 and tcLocatedPat (inState : state) (lclCtxt : TypingEnv.t) pat
@@ -802,7 +814,8 @@ let lookupTmVar (inState : state) (lclCtxt : TypingEnv.t) x =
 let rec tcVar (inState : state) (lclCtxt : TypingEnv.t) (x : variable) : tcValOutput =
   match lookupTmVar inState lclCtxt x with
   | Some scheme -> let target_x, x_monotype, constraints = instantiateVariable x scheme
-                   in  { outExpr  = target_x
+                   in  warnAddConstraints "tcVar" constraints;
+                       { outExpr  = target_x
                        ; outType  = x_monotype
                        ; outState = add_constraints constraints inState
                        ; outSubst = Substitution.empty
@@ -849,6 +862,7 @@ and tcVariant (inState : state) (lclCtx : TypingEnv.t) ((lbl,mbe) : label * Unty
       let res = tcLocatedVal inState lclCtx e in
       (* GEORGE: Investigate how cast_expression works *)
       let castExp, castCt = cast_expression res.outExpr res.outType ty_in in
+      warnAddConstraints "tcVariant" [castCt];
       { outExpr  = Typed.Variant (lbl, castExp)
       ; outType  = ty_out
       ; outState = add_constraint castCt res.outState
@@ -1011,15 +1025,24 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
 
 (* Dispatch: Type inference for a plain value (expression) *)
 and tcVal (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_expression -> tcValOutput = function
-  | Untyped.Var x              -> showInputEnv "Var" lclCtx; showInputCs "Var" inState; tcVar       inState lclCtx x
-  | Untyped.Const c            -> showInputEnv "Const" lclCtx; showInputCs "Const" inState; tcConst     inState lclCtx c
-  | Untyped.Annotated (e,ty)   -> showInputEnv "Annotated" lclCtx; showInputCs "Annotated" inState; tcAnnotated inState lclCtx (e,ty)
-  | Untyped.Tuple es           -> showInputEnv "Tuple" lclCtx; showInputCs "Tuple" inState; tcTuple     inState lclCtx es
-  | Untyped.Record lst         -> showInputEnv "Record" lclCtx; showInputCs "Record" inState; tcRecord    inState lclCtx lst
-  | Untyped.Variant (lbl,mbe)  -> showInputEnv "Variant" lclCtx; showInputCs "Variant" inState; tcVariant   inState lclCtx (lbl,mbe)
-  | Untyped.Lambda abs         -> showInputEnv "Lambda" lclCtx; showInputCs "Lambda" inState; tcLambda    inState lclCtx abs
-  | Untyped.Effect eff         -> showInputEnv "Effect" lclCtx; showInputCs "Effect" inState; tcEffect    inState lclCtx eff
-  | Untyped.Handler hand       -> showInputEnv "Handler" lclCtx; showInputCs "Handler" inState; tcHandler   inState lclCtx hand
+  | Untyped.Var x              -> (* showInputEnv "Var" lclCtx; showInputCs "Var" inState; *)
+                                  tcVar       inState lclCtx x
+  | Untyped.Const c            -> (* showInputEnv "Const" lclCtx; showInputCs "Const" inState; *)
+                                  tcConst     inState lclCtx c
+  | Untyped.Annotated (e,ty)   -> (* showInputEnv "Annotated" lclCtx; showInputCs "Annotated" inState; *)
+                                  tcAnnotated inState lclCtx (e,ty)
+  | Untyped.Tuple es           -> (* showInputEnv "Tuple" lclCtx; showInputCs "Tuple" inState; *)
+                                  tcTuple     inState lclCtx es
+  | Untyped.Record lst         -> (* showInputEnv "Record" lclCtx; showInputCs "Record" inState; *)
+                                  tcRecord    inState lclCtx lst
+  | Untyped.Variant (lbl,mbe)  -> (* showInputEnv "Variant" lclCtx; showInputCs "Variant" inState; *)
+                                  tcVariant   inState lclCtx (lbl,mbe)
+  | Untyped.Lambda abs         -> (* showInputEnv "Lambda" lclCtx; showInputCs "Lambda" inState; *)
+                                  tcLambda    inState lclCtx abs
+  | Untyped.Effect eff         -> (* showInputEnv "Effect" lclCtx; showInputCs "Effect" inState; *)
+                                  tcEffect    inState lclCtx eff
+  | Untyped.Handler hand       -> (* showInputEnv "Handler" lclCtx; showInputCs "Handler" inState; *)
+                                  tcHandler   inState lclCtx hand
 
 (* Type inference for a located value (expression) *)
 and tcLocatedVal (inState : state) (lclCtx : TypingEnv.t) (e : Untyped.expression) : tcValOutput
@@ -1036,7 +1059,11 @@ and tcCmp (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_computation -
   | Let (_,_)                -> failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
   | LetRec ([(var, abs)],c2) -> tcLetRec inState lclCtx var abs c2
   | LetRec (_,_)             -> failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
-  | Match (scr, cases)       -> tcMatch  inState lclCtx scr cases
+  | Match (scr, [ ({it = Untyped.PConst (Boolean true )}, c1)
+                ; ({it = Untyped.PConst (Boolean false)}, c2) ] )
+      -> tcIfThenElse inState lclCtx scr c1 c2
+  | Match (scr, cases)       -> failwith __LOC__
+                                (* tcMatch  inState lclCtx scr cases (* GEORGE: TODO: Bogus right now? *) *)
   | Apply (val1, val2)       -> tcApply  inState lclCtx val1 val2
   | Handle (hand, cmp)       -> tcHandle inState lclCtx hand cmp
   | Check cmp                -> tcCheck  inState lclCtx cmp
@@ -1062,6 +1089,7 @@ and tcLetVal (inState : state) (lclCtxt : TypingEnv.t)
   let e1res = tcLocatedVal inState lclCtxt e1 in (* (v',A, Qv, Sigma1) *)
 
   (* 2: Solve the constraints *)
+  Print.debug "tcLetVal: Calling unify with (%d): " (List.length e1res.outState.constraints);  Unification.print_c_list e1res.outState.constraints;
   let sigma1', qv' = Unification.unify (Substitution.empty, [], e1res.outState.constraints) in
 
   (* 3: Partition the constraints *)
@@ -1131,6 +1159,8 @@ and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pdef : Untyped.pattern) 
                     )
                  ) in
 
+  warnAddConstraints "tcLetCmp" [omegaCt1;omegaCt2];
+
   { outExpr  = Typed.Bind (cresC1, cresAbs)
   ; outType  = (fst c2res.outType,delta)
   ; outState = c2res.outState
@@ -1180,15 +1210,32 @@ and tcLetRec (inState : state) (lclCtxt : TypingEnv.t)
             (inState |> add_constraint alphaSkel |> add_constraint betaSkel)
             (extendLclCtxt lclCtxt var (Types.Arrow (alpha, (beta, delta))))
             abs alpha in
+(*
+  (
+    let ({it = Untyped.PVar x}, c1) = abs in (* Only variable patterns allowed *)
+    let bigGamma = extendLclCtxt
+                     (extendLclCtxt lclCtxt var (Types.Arrow (alpha, (beta, delta))))
+                     x alpha in
+    let bigState = inState |> add_constraint alphaSkel |> add_constraint betaSkel in
+    let c1' = tcLocatedCmp bigState bigGamma c1 in
+    { outExpr  = (Typed.PVar x, c1'.outExpr)
+    ; outType  = (subInValTy c1'.outSubst alpha, c1'.outType)
+    ; outState = c1'.outState
+    ; outSubst = c1'.outSubst
+    }
+  ) in
+*)
 
   (* 3: The assumed type should be at least as general as the inferred one *)
   let omega1, omegaCt1 = Typed.fresh_ty_coer (tyA1, subInValTy sigma1 beta) in
   let omega2, omegaCt2 = Typed.fresh_dirt_coer (dirtD1, subInDirt sigma1 delta) in
 
   (* 4: Solve the constraints *)
+  let inputConstraints = (state1 |> add_constraint omegaCt1 |> add_constraint omegaCt2).constraints in
+  Print.debug "tcLetRec: Calling unify with (%d): " (List.length inputConstraints);  Unification.print_c_list inputConstraints;
   let sigma1', csQ1' = Unification.unify ( Substitution.empty
                                        , []
-                                       , (state1 |> add_constraint omegaCt1 |> add_constraint omegaCt2).constraints
+                                       , inputConstraints
                                        ) in
 
   (* 5: Partition the constraints *)
@@ -1253,6 +1300,66 @@ and tcLetRec (inState : state) (lclCtxt : TypingEnv.t)
   ; outType  = c2res.outType
   ; outState = c2res.outState
   ; outSubst = extendGenSub (extendGenSub sigma1 sigma1') c2res.outSubst
+  }
+
+and tcIfThenElse (inState : state) (lclCtxt : TypingEnv.t)
+      (scr : Untyped.expression)
+      (trueC  : Untyped.computation)
+      (falseC : Untyped.computation) : tcCmpOutput =
+
+  (* 1: Generate fresh variables for the result *)
+  let alphaOut, alphaOutSkel = fresh_ty_with_fresh_skel () in
+  let deltaOut = Types.fresh_dirt () in
+
+  (* 2: Typecheck everything *)
+  let scrRes = tcLocatedVal inState lclCtxt scr in
+  let truRes = tcLocatedCmp scrRes.outState (subInEnv scrRes.outSubst lclCtxt) trueC in
+  let flsRes = tcLocatedCmp truRes.outState (subInEnv truRes.outSubst (subInEnv scrRes.outSubst lclCtxt)) falseC in
+
+  (* 3: Create the new constraints *)
+  let tyAtru,dirtDtru = truRes.outType in
+  let tyAfls,dirtDfls = flsRes.outType in
+  let omega1, omegaCt1 = Typed.fresh_ty_coer (subInValTy flsRes.outSubst tyAtru, alphaOut) in
+  let omega2, omegaCt2 = Typed.fresh_dirt_coer (subInDirt flsRes.outSubst dirtDtru, deltaOut) in
+  let omega3, omegaCt3 = Typed.fresh_ty_coer (fst flsRes.outType, alphaOut) in
+  let omega4, omegaCt4 = Typed.fresh_dirt_coer (snd flsRes.outType, deltaOut) in
+  let omega0, omegaCt0 = Typed.fresh_ty_coer ( subInValTy flsRes.outSubst
+                                                 (subInValTy truRes.outSubst scrRes.outType)
+                                             , Types.type_const Const.of_true ) in (* Bool *)
+
+  (* 4: Create the resulting expression *)
+  let trgCmp = (
+    let trgScr = Typed.CastExp ( scrRes.outExpr
+                                 |> subInExp truRes.outSubst
+                                 |> subInExp flsRes.outSubst
+                               , omega0 ) in
+    let trgTruRhs = Typed.CastComp ( subInCmp flsRes.outSubst truRes.outExpr
+                                   , Typed.BangCoercion (omega1, omega2) ) in
+    let trgFlsRhs = Typed.CastComp ( flsRes.outExpr
+                                   , Typed.BangCoercion (omega3, omega4) ) in
+    Typed.Match
+      ( trgScr
+      , [ (Typed.PConst Const.of_true , trgTruRhs)
+        ; (Typed.PConst Const.of_false, trgFlsRhs)
+        ]
+      )
+  ) in
+
+  warnAddConstraints "tcIfThenElse" [alphaOutSkel; omegaCt1; omegaCt2; omegaCt3; omegaCt4; omegaCt0];
+
+  (* 5: Combine the results *)
+  { outExpr  = trgCmp
+  ; outType  = (alphaOut, deltaOut)
+  ; outState = flsRes.outState
+               |> add_constraint alphaOutSkel
+               |> add_constraint omegaCt1
+               |> add_constraint omegaCt2
+               |> add_constraint omegaCt3
+               |> add_constraint omegaCt4
+               |> add_constraint omegaCt0
+  ; outSubst = extendGenSub
+                 (extendGenSub scrRes.outSubst truRes.outSubst)
+                 flsRes.outSubst
   }
 
 (* Typecheck a case expression *)
@@ -1350,15 +1457,14 @@ and tcApply (inState : state) (lclCtxt : TypingEnv.t) (val1 : Untyped.expression
   let delta = Types.fresh_dirt () in
 
   (* Create the constraint and the cast elaborated expression *)
-  let castVal1, omega =
-     Typed.cast_expression
-       (subInExp res2.outSubst res1.outExpr)
-       (subInValTy res2.outSubst res1.outType)
-       (Types.Arrow (res2.outType, (alpha,delta))) in
+  let omega, omegaCt = Typed.fresh_ty_coer ( subInValTy res2.outSubst res1.outType
+                                           , Types.Arrow (res2.outType, (alpha,delta)) ) in
+  let castVal1 = Typed.CastExp (subInExp res2.outSubst res1.outExpr, omega) in
 
+  warnAddConstraints "tcApply" [alpha_skel; omegaCt];
   { outExpr  = Typed.Apply (castVal1, res2.outExpr)
   ; outType  = (alpha, delta)
-  ; outState = add_constraint omega (add_constraint alpha_skel res2.outState)
+  ; outState = res2.outState |> add_constraint alpha_skel |> add_constraint omegaCt
   ; outSubst = extendGenSub res1.outSubst res2.outSubst
   }
 

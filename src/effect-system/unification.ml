@@ -21,10 +21,12 @@ let rec print_var_list = function
 
 
 let rec get_skel_of_tyvar tyvar clist =
+(*
   Print.debug "getting skeleton of tyvar from list" ;
   Print.debug " TyParam : %t" (CoreTypes.TyParam.print tyvar) ;
   Print.debug "Constraint list :" ;
   print_c_list clist ;
+*)
   get_skel_of_tyvar_ tyvar clist
 
 
@@ -53,9 +55,11 @@ let rec skeleton_of_target_ty tty conslist =
 
 
 let rec fix_union_find fixpoint c_list =
+(*
   Print.debug "--------------start list-------" ;
   print_var_list fixpoint ;
   Print.debug "---------------end list-------" ;
+*)
   let mapper x =
     match x with
     | Typed.TyOmega (_, tycons) -> (
@@ -323,13 +327,14 @@ let dirty_omega_step sub paused cons rest_queue (omega1, omega2) drtycons =
 
 
 let rec unify (sub, paused, queue) =
-  Print.debug "=============Start loop============" ;
+(*  Print.debug "=============Start loop============" ;
   Print.debug "-----Subs-----" ;
   Substitution.print_substitutions sub;
   Print.debug "-----paused-----" ;
   print_c_list paused ;
   Print.debug "-----queue-----" ;
   print_c_list queue ;
+*)
   match queue with
   | [] ->
       Print.debug "=============FINAL LOOP Result============" ;
@@ -353,5 +358,5 @@ let rec unify (sub, paused, queue) =
         | Typed.DirtyOmega (omega, drtycons) ->
             dirty_omega_step sub paused cons rest_queue omega drtycons
       in
-      Print.debug "=========End loop============" ;
+      (* Print.debug "=========End loop============" ; *)
       unify new_state
