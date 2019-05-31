@@ -62,7 +62,6 @@ and abstraction2 = pattern * pattern * computation
 let rec contains_variable_expression var {it= e} =
   contains_variable_plain_expression var e
 
-
 and contains_variable_plain_expression var = function
   | Var var' -> var = var'
   | Const _ -> false
@@ -76,7 +75,6 @@ and contains_variable_plain_expression var = function
   | Lambda abs -> contains_variable_abs var abs
   | Effect _ -> false
   | Handler h -> contains_variable_handler var h
-
 
 and contains_variable_abs var (pat, c) = contains_variable_comp var c
 
@@ -100,12 +98,12 @@ and contains_variable_plain_comp var = function
       contains_variable_expression var e || contains_variable_comp var c
   | Check c -> contains_variable_comp var c
 
-
 and contains_variable_handler var
-    {effect_clauses= eff_abs2_assoc; value_clause= abs1; finally_clause= abs2} =
+    {effect_clauses= eff_abs2_assoc; value_clause= abs1; finally_clause= abs2}
+    =
   List.exists (contains_variable_abs2 var) (Assoc.values_of eff_abs2_assoc)
-  || contains_variable_abs var abs1 || contains_variable_abs var abs2
-
+  || contains_variable_abs var abs1
+  || contains_variable_abs var abs2
 
 and contains_variable_abs2 var (pat1, pat2, c) = contains_variable_comp var c
 
@@ -118,8 +116,7 @@ let rec print_pattern ?max_level p ppf =
   | PAnnotated (p, ty) -> print_pattern ?max_level p ppf
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
-  | PRecord assoc ->
-      Print.record CoreTypes.Field.print print_pattern assoc ppf
+  | PRecord assoc -> Print.record CoreTypes.Field.print print_pattern assoc ppf
   | PVariant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
   | PVariant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
   | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = CoreTypes.cons ->
@@ -139,7 +136,6 @@ and pattern_list ?(max_length = 299) p ppf =
     | PVariant (lbl, None) when lbl = CoreTypes.nil -> ()
     | _ -> Format.fprintf ppf "(??? %t ???)" (print_pattern p)
   else Format.fprintf ppf ",@ ..."
-
 
 let rec print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

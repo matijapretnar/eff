@@ -13,12 +13,11 @@ let rec print_pattern ?max_level p ppf =
   | Erasure.PERecord lst -> Print.record print_pattern lst ppf
   | Erasure.PEVariant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
   | Erasure.PEVariant (lbl, None) -> print "%s" lbl
-  | Erasure.PEVariant ("(::)", Some Erasure.PETuple [p1; p2]) ->
+  | Erasure.PEVariant ("(::)", Some (Erasure.PETuple [p1; p2])) ->
       print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
   | Erasure.PEVariant (lbl, Some p) ->
       print ~at_level:1 "(%s @[<hov>%t@])" lbl (print_pattern p)
   | Erasure.PENonbinding -> print "_"
-
 
 let rec print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -39,7 +38,10 @@ let rec print_expression ?max_level e ppf =
   | Erasure.EEffect eff -> print ~at_level:2 "effect %t" (print_effect eff)
   | Erasure.EHandler h ->
       print ~at_level:2
-        "fun c -> handler {@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->\n             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]} c"
+        "fun c -> handler {@[<hov> value_clause = (@[fun %t@]);@ \
+         effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->\n             \
+         ((match x with %t) : a -> (b -> _ computation) -> _ computation)) \
+         @]} c"
         (print_abstraction_with_ty h.Erasure.value_clause)
         (print_effect_clauses (Assoc.to_list h.Erasure.effect_clauses))
   | EBigLambdaSkel (_, e) -> print "%t" (print_expression e)

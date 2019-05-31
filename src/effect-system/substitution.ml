@@ -1,60 +1,76 @@
 (** Substitution implementation *)
 
-type t =   
-  { type_param_to_type_coercions: (CoreTypes.TyCoercionParam.t, Typed.ty_coercion) Assoc.t
+type t =
+  { type_param_to_type_coercions:
+      (CoreTypes.TyCoercionParam.t, Typed.ty_coercion) Assoc.t
   ; type_param_to_type_subs: (CoreTypes.TyParam.t, Types.target_ty) Assoc.t
-  ; dirt_var_to_dirt_coercions: (CoreTypes.DirtCoercionParam.t, Typed.dirt_coercion) Assoc.t
+  ; dirt_var_to_dirt_coercions:
+      (CoreTypes.DirtCoercionParam.t, Typed.dirt_coercion) Assoc.t
   ; dirt_var_to_dirt_subs: (CoreTypes.DirtParam.t, Types.dirt) Assoc.t
-  ; skel_param_to_skel_subs: (CoreTypes.SkelParam.t, Types.skeleton) Assoc.t
-  }
+  ; skel_param_to_skel_subs: (CoreTypes.SkelParam.t, Types.skeleton) Assoc.t }
 
-  let empty = 
+let empty =
   { type_param_to_type_coercions= Assoc.empty
   ; dirt_var_to_dirt_coercions= Assoc.empty
   ; type_param_to_type_subs= Assoc.empty
   ; dirt_var_to_dirt_subs= Assoc.empty
-  ; skel_param_to_skel_subs= Assoc.empty
-  }
+  ; skel_param_to_skel_subs= Assoc.empty }
 
-let add_to_empty f a b = 
-  f a b empty
+let add_to_empty f a b = f a b empty
 
-let add_type_coercion parameter t_coercion sub = 
-  {sub with type_param_to_type_coercions= Assoc.update parameter t_coercion sub.type_param_to_type_coercions}
+let add_type_coercion parameter t_coercion sub =
+  { sub with
+    type_param_to_type_coercions=
+      Assoc.update parameter t_coercion sub.type_param_to_type_coercions }
 
-let add_type_coercion_e parameter t_coercion = 
+let add_type_coercion_e parameter t_coercion =
   add_to_empty add_type_coercion parameter t_coercion
 
-let add_type_substitution parameter target_type sub = 
-  {sub with type_param_to_type_subs= Assoc.update parameter target_type sub.type_param_to_type_subs}
+let add_type_substitution parameter target_type sub =
+  { sub with
+    type_param_to_type_subs=
+      Assoc.update parameter target_type sub.type_param_to_type_subs }
 
-let add_type_substitution_e parameter target_type = 
+let add_type_substitution_e parameter target_type =
   add_to_empty add_type_substitution parameter target_type
 
-let add_dirt_var_coercion dirt_var target_dc sub = 
-  {sub with dirt_var_to_dirt_coercions= Assoc.update dirt_var target_dc sub.dirt_var_to_dirt_coercions}
+let add_dirt_var_coercion dirt_var target_dc sub =
+  { sub with
+    dirt_var_to_dirt_coercions=
+      Assoc.update dirt_var target_dc sub.dirt_var_to_dirt_coercions }
 
-let add_dirt_var_coercion_e dirt_var target_dc = 
+let add_dirt_var_coercion_e dirt_var target_dc =
   add_to_empty add_dirt_var_coercion dirt_var target_dc
 
-let add_dirt_substitution dirt_var t_coercion sub = 
-  {sub with dirt_var_to_dirt_subs= Assoc.update dirt_var t_coercion sub.dirt_var_to_dirt_subs}
+let add_dirt_substitution dirt_var t_coercion sub =
+  { sub with
+    dirt_var_to_dirt_subs=
+      Assoc.update dirt_var t_coercion sub.dirt_var_to_dirt_subs }
 
 let add_dirt_substitution_e dirt_var t_coercion =
   add_to_empty add_dirt_substitution dirt_var t_coercion
 
-let add_skel_param_substitution param target_skel sub = 
-  {sub with skel_param_to_skel_subs= Assoc.update param target_skel sub.skel_param_to_skel_subs}
+let add_skel_param_substitution param target_skel sub =
+  { sub with
+    skel_param_to_skel_subs=
+      Assoc.update param target_skel sub.skel_param_to_skel_subs }
 
-let add_skel_param_substitution_e param target_skel = 
+let add_skel_param_substitution_e param target_skel =
   add_to_empty add_skel_param_substitution param target_skel
 
-let merge subs1 subs2 = 
-  { type_param_to_type_coercions= Assoc.concat subs1.type_param_to_type_coercions subs2.type_param_to_type_coercions
-  ; type_param_to_type_subs= Assoc.concat subs1.type_param_to_type_subs subs2.type_param_to_type_subs
-  ; dirt_var_to_dirt_coercions= Assoc.concat subs1.dirt_var_to_dirt_coercions subs2.dirt_var_to_dirt_coercions
-  ; dirt_var_to_dirt_subs= Assoc.concat subs1.dirt_var_to_dirt_subs subs2.dirt_var_to_dirt_subs
-  ; skel_param_to_skel_subs= Assoc.concat subs1.skel_param_to_skel_subs subs2.skel_param_to_skel_subs
+let merge subs1 subs2 =
+  { type_param_to_type_coercions=
+      Assoc.concat subs1.type_param_to_type_coercions
+        subs2.type_param_to_type_coercions
+  ; type_param_to_type_subs=
+      Assoc.concat subs1.type_param_to_type_subs subs2.type_param_to_type_subs
+  ; dirt_var_to_dirt_coercions=
+      Assoc.concat subs1.dirt_var_to_dirt_coercions
+        subs2.dirt_var_to_dirt_coercions
+  ; dirt_var_to_dirt_subs=
+      Assoc.concat subs1.dirt_var_to_dirt_subs subs2.dirt_var_to_dirt_subs
+  ; skel_param_to_skel_subs=
+      Assoc.concat subs1.skel_param_to_skel_subs subs2.skel_param_to_skel_subs
   }
 
 (* Substitution application *)
@@ -65,19 +81,16 @@ let rec apply_sub_dirt sub dirt =
   match dirt.row with
   | ParamRow p -> (
     match Assoc.lookup p sub.dirt_var_to_dirt_subs with
-    | Some drt2 ->
-        apply_sub_dirt sub (Types.add_effects dirt.effect_set drt2)
+    | Some drt2 -> apply_sub_dirt sub (Types.add_effects dirt.effect_set drt2)
     | None -> dirt )
   | EmptyRow -> dirt
-
 
 let rec apply_sub_skel sub skeleton =
   match skeleton with
   | SkelParam p -> (
-    match Assoc.lookup p sub.skel_param_to_skel_subs with 
-      | Some sk1 -> apply_sub_skel sub sk1
-      | None -> skeleton
-  )
+    match Assoc.lookup p sub.skel_param_to_skel_subs with
+    | Some sk1 -> apply_sub_skel sub sk1
+    | None -> skeleton )
   | PrimSkel _ -> skeleton
   | SkelArrow (sk1, sk2) ->
       SkelArrow (apply_sub_skel sub sk1, apply_sub_skel sub sk2)
@@ -85,15 +98,17 @@ let rec apply_sub_skel sub skeleton =
       SkelHandler (apply_sub_skel sub sk1, apply_sub_skel sub sk2)
   | ForallSkel (p, sk1) -> ForallSkel (p, apply_sub_skel sub sk1)
   (* Really consider other cases *)
-  | SkelApply (t,l) -> SkelApply (t, List.map (apply_sub_skel sub) l)
-  | SkelTuple skels -> SkelTuple (List.map (apply_sub_skel sub) skels )
+  | SkelApply (t, l) -> SkelApply (t, List.map (apply_sub_skel sub) l)
+  | SkelTuple skels -> SkelTuple (List.map (apply_sub_skel sub) skels)
 
 let rec apply_sub_ty sub ty =
   match ty with
   | TyParam typ1 -> (
     match Assoc.lookup typ1 sub.type_param_to_type_subs with
-        | Some ttype -> apply_sub_ty sub ttype (* We don't assume that substitutions are fully expanded *)
-        | None -> ty )
+    | Some ttype ->
+        apply_sub_ty sub ttype
+        (* We don't assume that substitutions are fully expanded *)
+    | None -> ty )
   | Arrow (tty1, tty2) ->
       Arrow (apply_sub_ty sub tty1, apply_sub_dirty_ty sub tty2)
   | Apply (ty_name, tys) -> Apply (ty_name, List.map (apply_sub_ty sub) tys)
@@ -111,18 +126,14 @@ let rec apply_sub_ty sub ty =
       TySchemeDirt (dirt_param, apply_sub_ty sub tty1)
   | TySchemeSkel (skvar, ty) -> TySchemeSkel (skvar, apply_sub_ty sub ty)
 
-
 and apply_sub_dirty_ty sub (ty, drt) =
   (apply_sub_ty sub ty, apply_sub_dirt sub drt)
-
 
 and apply_sub_ct_ty sub (ty1, ty2) =
   (apply_sub_ty sub ty1, apply_sub_ty sub ty2)
 
-
 and apply_sub_ct_dirt sub (drt1, drt2) =
   (apply_sub_dirt sub drt1, apply_sub_dirt sub drt2)
-
 
 let rec apply_sub_tycoer sub ty_coer =
   match ty_coer with
@@ -135,9 +146,8 @@ let rec apply_sub_tycoer sub ty_coer =
         (apply_sub_dirtycoer sub dirtycoer1, apply_sub_dirtycoer sub dirtycoer2)
   | TyCoercionVar p -> (
     match Assoc.lookup p sub.type_param_to_type_coercions with
-      | Some t_coer -> apply_sub_tycoer sub t_coer
-      | None -> TyCoercionVar p
-  )
+    | Some t_coer -> apply_sub_tycoer sub t_coer
+    | None -> TyCoercionVar p )
   | SequenceTyCoer (ty_coer1, ty_coer2) ->
       SequenceTyCoer
         (apply_sub_tycoer sub ty_coer1, apply_sub_tycoer sub ty_coer2)
@@ -161,7 +171,6 @@ let rec apply_sub_tycoer sub ty_coer =
   | ApplySkelCoer (ty_coer1, sk1) ->
       ApplySkelCoer (apply_sub_tycoer sub ty_coer1, apply_sub_skel sub sk1)
 
-
 and apply_sub_dirtcoer sub dirt_coer =
   match dirt_coer with
   | ReflDirt d -> ReflDirt (apply_sub_dirt sub d)
@@ -178,7 +187,6 @@ and apply_sub_dirtcoer sub dirt_coer =
   | DirtCoercion dirty_coer1 ->
       DirtCoercion (apply_sub_dirtycoer sub dirty_coer1)
 
-
 and apply_sub_dirtycoer sub dirty_coer =
   match dirty_coer with
   | BangCoercion (ty_coer, dirt_coer) ->
@@ -191,7 +199,6 @@ and apply_sub_dirtycoer sub dirty_coer =
       SequenceDirtyCoer
         ( apply_sub_dirtycoer sub dirty_coer1
         , apply_sub_dirtycoer sub dirty_coer2 )
-
 
 let rec apply_sub_comp sub computation =
   match computation with
@@ -216,7 +223,6 @@ let rec apply_sub_comp sub computation =
       CastComp_ty (apply_sub_comp sub c1, apply_sub_tycoer sub tc1)
   | CastComp_dirt (c1, tc1) ->
       CastComp_dirt (apply_sub_comp sub c1, apply_sub_dirtcoer sub tc1)
-
 
 and apply_sub_exp sub expression =
   match expression with
@@ -257,12 +263,10 @@ and apply_sub_exp sub expression =
   | ApplySkelExp (e1, s1) ->
       ApplySkelExp (apply_sub_exp sub e1, apply_sub_skel sub s1)
 
-
 and apply_sub_abs sub (p, c) = (p, apply_sub_comp sub c)
 
 and apply_sub_abs_with_ty sub (p, t, c) =
   (p, apply_sub_ty sub t, apply_sub_comp sub c)
-
 
 and apply_sub_abs2 sub (p1, p2, c) = (p1, p2, apply_sub_comp sub c)
 
@@ -273,7 +277,6 @@ and apply_sub_handler sub h =
     Assoc.map (fun abs2 -> apply_sub_abs2 sub abs2) eff_clauses
   in
   {effect_clauses= new_eff_clauses; value_clause= new_value_clause}
-
 
 let apply_substitutions_to_computation = apply_sub_comp
 
@@ -287,20 +290,17 @@ let apply_substitutions_to_skeleton = apply_sub_skel
 
 let rec apply_sub1 subs cons =
   match cons with
-  | Typed.TyOmega (coer_p, (ty1, ty2)) -> (
+  | Typed.TyOmega (coer_p, (ty1, ty2)) ->
       Typed.TyOmega (coer_p, (apply_sub_ty subs ty1, apply_sub_ty subs ty2))
-  )
-  | Typed.DirtOmega (coer_p, (drt1, drt2)) -> (
-    Typed.DirtOmega (coer_p, (apply_sub_dirt subs drt1, apply_sub_dirt subs drt2))
-  )
-  | Typed.TyParamHasSkel (tv, sp) -> (
-    Typed.TyParamHasSkel (tv, (apply_sub_skel subs sp))
-  )
+  | Typed.DirtOmega (coer_p, (drt1, drt2)) ->
+      Typed.DirtOmega
+        (coer_p, (apply_sub_dirt subs drt1, apply_sub_dirt subs drt2))
+  | Typed.TyParamHasSkel (tv, sp) ->
+      Typed.TyParamHasSkel (tv, apply_sub_skel subs sp)
   | _ -> cons
 
-let apply_substitutions_to_constraints subs c_list = 
-    List.map (apply_sub1 subs) c_list
-
+let apply_substitutions_to_constraints subs c_list =
+  List.map (apply_sub1 subs) c_list
 
 (* Other type information *)
 
@@ -309,39 +309,50 @@ let apply_substitutions_to_constraints subs c_list =
 let printy ?at_level ppf = Print.print ?at_level ppf
 
 let print_type_coercion p t ppf =
-  Print.print ppf "substitution: ";
+  Print.print ppf "substitution: " ;
   printy ppf "%t :-coertyTotyCoer-> %t"
     (CoreTypes.TyCoercionParam.print p)
     (Typed.print_ty_coercion t)
 
 let print_type_param_to_type p t ppf =
-  Print.print ppf "substitution: ";
-  printy ppf "%t :-tyvarToTargetty-> %t" 
+  Print.print ppf "substitution: " ;
+  printy ppf "%t :-tyvarToTargetty-> %t"
     (CoreTypes.TyParam.print p)
     (Types.print_target_ty t)
 
 let print_dirt_var_sub p t ppf =
-  Print.print ppf "substitution: ";
-  printy ppf "%t :-dirtvarToTargetdirt-> %t" (CoreTypes.DirtParam.print p)
-        (Types.print_target_dirt t)
+  Print.print ppf "substitution: " ;
+  printy ppf "%t :-dirtvarToTargetdirt-> %t"
+    (CoreTypes.DirtParam.print p)
+    (Types.print_target_dirt t)
 
 let print_dirt_var_coercion p t ppf =
-  Print.print ppf "substitution: ";
+  Print.print ppf "substitution: " ;
   printy ppf "%t :-coertyDirtoDirtCoer-> %t"
     (CoreTypes.DirtCoercionParam.print p)
     (Typed.print_dirt_coercion t)
 
 let print_skel_param_sub p t ppf =
-  Print.print ppf "substitution: ";
-  printy ppf "%t :-skelvarToSkeleton-> %t" (CoreTypes.SkelParam.print p)
-        (Types.print_skeleton t)
+  Print.print ppf "substitution: " ;
+  printy ppf "%t :-skelvarToSkeleton-> %t"
+    (CoreTypes.SkelParam.print p)
+    (Types.print_skeleton t)
 
-let print_sub_list ?max_level subs= 
-  List.iter (fun (x,y) -> (Print.debug "%t" (print_type_coercion x y))) (Assoc.to_list subs.type_param_to_type_coercions);
-  List.iter (fun (x,y) -> (Print.debug "%t" (print_type_param_to_type x y))) (Assoc.to_list subs.type_param_to_type_subs);
-  List.iter (fun (x,y) -> (Print.debug "%t" (print_dirt_var_sub x y))) (Assoc.to_list subs.dirt_var_to_dirt_subs);
-  List.iter (fun (x,y) -> (Print.debug "%t" (print_dirt_var_coercion x y))) (Assoc.to_list subs.dirt_var_to_dirt_coercions);
-  List.iter (fun (x,y) -> (Print.debug "%t" (print_skel_param_sub x y))) (Assoc.to_list subs.skel_param_to_skel_subs)
+let print_sub_list ?max_level subs =
+  List.iter
+    (fun (x, y) -> Print.debug "%t" (print_type_coercion x y))
+    (Assoc.to_list subs.type_param_to_type_coercions) ;
+  List.iter
+    (fun (x, y) -> Print.debug "%t" (print_type_param_to_type x y))
+    (Assoc.to_list subs.type_param_to_type_subs) ;
+  List.iter
+    (fun (x, y) -> Print.debug "%t" (print_dirt_var_sub x y))
+    (Assoc.to_list subs.dirt_var_to_dirt_subs) ;
+  List.iter
+    (fun (x, y) -> Print.debug "%t" (print_dirt_var_coercion x y))
+    (Assoc.to_list subs.dirt_var_to_dirt_coercions) ;
+  List.iter
+    (fun (x, y) -> Print.debug "%t" (print_skel_param_sub x y))
+    (Assoc.to_list subs.skel_param_to_skel_subs)
 
-let print_substitutions subs = 
-    print_sub_list subs
+let print_substitutions subs = print_sub_list subs

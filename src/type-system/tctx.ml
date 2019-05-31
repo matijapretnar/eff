@@ -1,5 +1,6 @@
 (** Type inference contexts *)
 open CoreUtils
+
 module T = Type
 
 type tydef =

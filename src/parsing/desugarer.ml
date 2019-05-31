@@ -95,7 +95,6 @@ let desugar_type type_sbst state =
   in
   desugar_type state
 
-
 (** [free_type_params t] returns all free type params in [t]. *)
 let free_type_params t =
   let rec ty_params {it= t; at= loc} =
@@ -108,10 +107,8 @@ let free_type_params t =
   in
   unique_elements (ty_params t)
 
-
 let syntax_to_core_params ts =
   Assoc.map_of_list (fun p -> (p, Type.fresh_ty_param ())) ts
-
 
 (** [desugar_tydef state params def] desugars the type definition with parameters
     [params] and definition [def]. *)
@@ -167,7 +164,6 @@ let desugar_tydef state params def =
   in
   (state', (Assoc.values_of ty_sbst, def'))
 
-
 (** [desugar_tydefs defs] desugars the simultaneous type definitions [defs]. *)
 let desugar_tydefs state sugared_defs =
   let desugar_fold st (name, (params, def)) =
@@ -179,7 +175,6 @@ let desugar_tydefs state sugared_defs =
   in
   Assoc.kfold_map desugar_fold state sugared_defs
 
-
 (* ***** Desugaring of expressions and computations. ***** *)
 
 (** [fresh_var opt] creates a fresh variable on each call *)
@@ -187,14 +182,12 @@ let fresh_var = function
   | None -> CoreTypes.Variable.fresh "$anon"
   | Some x -> CoreTypes.Variable.fresh x
 
-
 let id_abstraction loc =
   let x = fresh_var (Some "$id_par") in
   ( add_loc (Untyped.PVar x) loc
   , add_loc (Untyped.Value (add_loc (Untyped.Var x) loc)) loc )
 
-
-let desugar_pattern state ?(initial_forbidden= []) p =
+let desugar_pattern state ?(initial_forbidden = []) p =
   let vars = ref Assoc.empty in
   let forbidden = ref initial_forbidden in
   let new_var x =
@@ -265,7 +258,6 @@ let desugar_pattern state ?(initial_forbidden= []) p =
   in
   let state', p' = desugar_pattern state p in
   (state', !vars, p')
-
 
 (* Desugaring functions below return a list of bindings and the desugared form. *)
 
@@ -438,14 +430,12 @@ and desugar_computation state {it= t; at= loc} =
   | [] -> (state', add_loc c loc)
   | _ :: _ -> (state', add_loc (Untyped.Let (w, add_loc c loc)) loc)
 
-
 and desugar_abstraction state (p, t) =
   let old_context = state.context in
   let state', p_vars, p' = desugar_pattern state p in
   let new_context = Assoc.concat p_vars state'.context in
   let state'', c = desugar_computation {state' with context= new_context} t in
   ({state'' with context= old_context}, (p', c))
-
 
 and desugar_abstraction2 state (p1, p2, t) =
   let old_context = state.context in
@@ -459,7 +449,6 @@ and desugar_abstraction2 state (p1, p2, t) =
   in
   ({state''' with context= old_context}, (p1', p2', t'))
 
-
 and desugar_let_rec state {it= exp; at= loc} =
   match exp with
   | Sugared.Lambda a -> desugar_abstraction state a
@@ -472,14 +461,12 @@ and desugar_let_rec state {it= exp; at= loc} =
       Error.syntax ~loc
         "This kind of expression is not allowed in a recursive definition"
 
-
 and desugar_expressions state = function
   | [] -> (state, [], [])
   | t :: ts ->
       let state', w, e = desugar_expression state t in
       let state'', ws, es = desugar_expressions state' ts in
       (state'', w @ ws, e :: es)
-
 
 and desugar_record_fields state flds =
   match Assoc.pop flds with
@@ -489,7 +476,6 @@ and desugar_record_fields state flds =
       let state'', w, e = desugar_expression state' t in
       let state''', ws, es = desugar_record_fields state'' flds' in
       (state''', w @ ws, Assoc.update fld' e es)
-
 
 and desugar_handler loc state
     { Sugared.effect_clauses= eff_cs
@@ -566,7 +552,6 @@ and desugar_handler loc state
     ; Untyped.value_clause= untyped_val_a
     ; Untyped.finally_clause= untyped_fin_a } )
 
-
 and match_constructor state loc t cs =
   (* Separate value and effect cases. *)
   let val_cs, eff_cs = separate_match_cases cs in
@@ -592,7 +577,6 @@ and match_constructor state loc t cs =
       let loc_h = {it= Untyped.Handler h; at= loc} in
       (state'', [], Untyped.Handle (loc_h, c))
 
-
 and separate_match_cases cs =
   let separator case (val_cs, eff_cs) =
     match case with
@@ -600,7 +584,6 @@ and separate_match_cases cs =
     | Sugared.Eff_match e_cs -> (val_cs, e_cs :: eff_cs)
   in
   List.fold_right separator cs ([], [])
-
 
 let desugar_top_let state defs =
   let aux_desugar (p, c) (fold_state, defs, forbidden) =
@@ -617,7 +600,6 @@ let desugar_top_let state defs =
   in
   let state', defs', _ = List.fold_right aux_desugar defs (state, [], []) in
   (state', defs')
-
 
 let desugar_top_let_rec state defs =
   let aux_desugar (x, t) (fold_state, ns, forbidden) =
@@ -636,13 +618,11 @@ let desugar_top_let_rec state defs =
   let defs' = List.fold_right desugar_defs (List.combine ns defs) [] in
   (state', defs')
 
-
 let desugar_external state (x, t, f) =
   let n = fresh_var (Some x) in
   let ts = syntax_to_core_params (free_type_params t) in
   let state', t' = desugar_type ts state t in
   ({state with context= Assoc.update x n state.context}, (n, t', f))
-
 
 let desugar_def_effect state (eff, (ty1, ty2)) =
   let state', eff' = effect_to_symbol state eff in

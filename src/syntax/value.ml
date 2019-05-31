@@ -41,8 +41,7 @@ let rec print_value ?max_level v ppf =
   match v with
   | Const c -> Const.print c ppf
   | Tuple lst -> Print.tuple print_value lst ppf
-  | Record assoc ->
-      Print.record CoreTypes.Field.print print_value assoc ppf
+  | Record assoc -> Print.record CoreTypes.Field.print print_value assoc ppf
   | Variant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
   | Variant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
   | Variant (lbl, Some (Tuple [v1; v2])) when lbl = CoreTypes.cons ->

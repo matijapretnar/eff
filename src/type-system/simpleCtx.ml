@@ -1,5 +1,4 @@
 open CoreUtils
-
 module Untyped = UntypedSyntax
 module EffectMap = Map.Make (CoreTypes.Effect)
 
@@ -30,17 +29,13 @@ let subst_ctx ctx sbst =
 
 (** [free_params ctx] returns list of all free type parameters in [ctx]. *)
 let free_params ctx =
-  let binding_params (_, (ps, ty)) =
-    list_diff (Type.free_params ty) ps
-  in
+  let binding_params (_, (ps, ty)) = list_diff (Type.free_params ty) ps in
   let xs = List.map binding_params (Assoc.to_list ctx) |> List.flatten in
   unique_elements xs
 
 let generalize ctx poly ty =
   if poly then
-    let ps =
-      list_diff (Type.free_params ty) (free_params ctx.variables)
-    in
+    let ps = list_diff (Type.free_params ty) (free_params ctx.variables) in
     (ps, ty)
   else ([], ty)
 

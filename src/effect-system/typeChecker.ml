@@ -11,7 +11,6 @@ type state =
   ; ty_coer_types: (CoreTypes.TyCoercionParam.t, Types.ct_ty) Assoc.t
   ; dirt_coer_types: (CoreTypes.DirtCoercionParam.t, Types.ct_dirt) Assoc.t }
 
-
 let extend_ty_params st ty_var = {st with ty_params= ty_var :: st.ty_params}
 
 let extend_var_types st t_var tty =
@@ -22,22 +21,17 @@ let add_external st x ty = extend_var_types st x ty
 let extend_dirt_params st dirt_var =
   {st with dirt_params= dirt_var :: st.dirt_params}
 
-
 let extend_skel_params st sk_var =
   {st with skel_params= sk_var :: st.skel_params}
-
 
 let extend_ty_coer_types st tcp ctty =
   {st with ty_coer_types= Assoc.update tcp ctty st.ty_coer_types}
 
-
 let extend_dirt_coer_types st tcp ctdrt =
   {st with dirt_coer_types= Assoc.update tcp ctdrt st.dirt_coer_types}
 
-
 let extend_ty_param_skeletons st tv sk =
   {st with ty_param_skeletons= Assoc.update tv sk st.ty_param_skeletons}
-
 
 let initial_state =
   { var_types= Assoc.empty
@@ -47,7 +41,6 @@ let initial_state =
   ; ty_param_skeletons= Assoc.empty
   ; ty_coer_types= Assoc.empty
   ; dirt_coer_types= Assoc.empty }
-
 
 let rec check_well_formed_skeleton st = function
   | SkelParam skel_param -> assert (List.mem skel_param st.skel_params)
@@ -63,15 +56,13 @@ let rec check_well_formed_skeleton st = function
       check_well_formed_skeleton st' sk1
   | _ -> failwith __LOC__
 
-
 let check_well_formed_dirt st = function
   | {Types.row= Types.EmptyRow} -> ()
   | {Types.row= Types.ParamRow v} -> assert (List.mem v st.dirt_params)
 
-
 let rec check_well_formed_ty st ty =
   match ty with
-  | TyParam typ -> 
+  | TyParam typ ->
       let ty_var_list = Assoc.keys_of st.ty_param_skeletons in
       assert (List.mem typ ty_var_list)
   | Arrow (tty1, tty2) ->
@@ -99,20 +90,16 @@ let rec check_well_formed_ty st ty =
       let st' = extend_skel_params st skel_param in
       check_well_formed_ty st' tty1
 
-
 and check_well_formed_dirty_ty st (ty, drt) =
   check_well_formed_ty st ty ;
   check_well_formed_dirt st drt
 
-
 and check_well_formed_ty_cons st (t1, t2) =
   check_well_formed_ty st t1 ; check_well_formed_ty st t2
-
 
 and check_well_formed_dirt_cons st (d1, d2) =
   check_well_formed_dirt st d1 ;
   check_well_formed_dirt st d2
-
 
 let rec type_of_ty_coercion st ty_coer =
   match ty_coer with
@@ -162,11 +149,13 @@ let rec type_of_ty_coercion st ty_coer =
       , Types.TySchemeTy (ty_param, Types.PrimSkel Const.IntegerTy, t2) )
   | ApplyTyCoer (ty_coer1, tty1) -> (
     match type_of_ty_coercion st ty_coer1 with
-    | Types.TySchemeTy (ty_param1, _, t1), Types.TySchemeTy (ty_param2, _, t2) ->
+    | Types.TySchemeTy (ty_param1, _, t1), Types.TySchemeTy (ty_param2, _, t2)
+      ->
         check_well_formed_ty st tty1 ;
         let sub = Substitution.add_type_substitution_e ty_param1 tty1 in
         assert (ty_param1 = ty_param2) ;
-        (Substitution.apply_substitutions_to_type sub t1, Substitution.apply_substitutions_to_type sub t2)
+        ( Substitution.apply_substitutions_to_type sub t1
+        , Substitution.apply_substitutions_to_type sub t2 )
     | _ -> assert false )
   | ForallDirt (dirt_param, ty_coer1) ->
       let new_st = extend_dirt_params st dirt_param in
@@ -174,11 +163,13 @@ let rec type_of_ty_coercion st ty_coer =
       (Types.TySchemeDirt (dirt_param, t1), Types.TySchemeDirt (dirt_param, t2))
   | ApplyDirCoer (ty_coer1, drt) -> (
     match type_of_ty_coercion st ty_coer1 with
-    | Types.TySchemeDirt (drt_param1, t1), Types.TySchemeDirt (drt_param2, t2) ->
+    | Types.TySchemeDirt (drt_param1, t1), Types.TySchemeDirt (drt_param2, t2)
+      ->
         check_well_formed_dirt st drt ;
         let sub = Substitution.add_dirt_substitution_e drt_param1 drt in
         assert (drt_param1 = drt_param2) ;
-        (Substitution.apply_substitutions_to_type sub t1, Substitution.apply_substitutions_to_type sub t2)
+        ( Substitution.apply_substitutions_to_type sub t1
+        , Substitution.apply_substitutions_to_type sub t2 )
     | _ -> assert false )
   | PureCoercion dirty_coer1 ->
       let (t1, _), (t2, _) = type_of_dirty_coercion st dirty_coer1 in
@@ -209,7 +200,6 @@ let rec type_of_ty_coercion st ty_coer =
       | _ -> assert false )
   | _ -> failwith __LOC__
 
-
 and type_of_dirty_coercion st dirty_coer =
   match dirty_coer with
   | BangCoercion (tc, dc) ->
@@ -233,7 +223,6 @@ and type_of_dirty_coercion st dirty_coer =
       let t2, t3 = type_of_dirty_coercion st dc2 in
       (t1, t3)
 
-
 and type_of_dirt_coercion st dirt_coer =
   match dirt_coer with
   | ReflDirt d -> (d, d)
@@ -255,7 +244,6 @@ and type_of_dirt_coercion st dirt_coer =
       let (_, t1), (_, t2) = type_of_dirty_coercion st dirty_coer1 in
       (t1, t2)
 
-
 let rec extend_pattern_types st p ty =
   match p with
   | PVar x -> extend_var_types st x ty
@@ -274,13 +262,10 @@ let rec extend_pattern_types st p ty =
     | _ -> assert false )
   | _ -> failwith __LOC__
 
-
 let rec type_of_expression st e =
   match e with
   | Var v -> (
-    match Assoc.lookup v st.var_types with
-    | Some ty -> ty
-    | _ -> assert false )
+    match Assoc.lookup v st.var_types with Some ty -> ty | _ -> assert false )
   | Const const -> Types.type_const const
   | Lambda abs ->
       let ty1, c_ty = type_of_abstraction_with_ty st abs in
