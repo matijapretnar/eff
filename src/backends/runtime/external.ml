@@ -200,7 +200,8 @@ let conversion_functions =
     comparison functions, arithmetic operations, string operations, conversion
     functions, and effect instances. *)
 let values =
-  comparison_functions |> Assoc.concat constants
+  comparison_functions
+  |> Assoc.concat constants
   |> Assoc.concat arithmetic_operations
   |> Assoc.concat string_operations
   |> Assoc.concat conversion_functions

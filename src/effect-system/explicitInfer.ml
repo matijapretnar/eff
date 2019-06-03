@@ -813,7 +813,11 @@ let lookupTmVar (inState : state) (lclCtxt : TypingEnv.t) x =
 (* Term Variables *)
 let rec tcVar (inState : state) (lclCtxt : TypingEnv.t) (x : variable) : tcValOutput =
   match lookupTmVar inState lclCtxt x with
-  | Some scheme -> let target_x, x_monotype, constraints = instantiateVariable x scheme
+  | Some scheme -> Print.debug
+                     "tcVar: Just found that variable %t has type %t, Yay!"
+                     (Typed.print_variable x)
+                     (Types.print_target_ty scheme) ;
+                   let target_x, x_monotype, constraints = instantiateVariable x scheme
                    in  warnAddConstraints "tcVar" constraints;
                        { outExpr  = target_x
                        ; outType  = x_monotype

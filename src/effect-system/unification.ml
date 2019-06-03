@@ -32,7 +32,8 @@ let rec get_skel_of_tyvar tyvar clist =
 
 and get_skel_of_tyvar_ tyvar clist =
   match clist with
-  | [] -> assert false
+  | [] -> Print.debug "get_skel_of_tyvar_: Failed to retrieve skeleton of %t" (CoreTypes.TyParam.print tyvar) ;
+          failwith __LOC__
   | (TyParamHasSkel (tv, skel)) :: _ when tyvar = tv -> skel
   | _ :: xs -> get_skel_of_tyvar_ tyvar xs
 
