@@ -1595,15 +1595,15 @@ let tcTopLevel ~loc inState cmp =
       ; outState = tmpState
       ; outSubst = tmpSubst } = tcLocatedCmp inState initial_lcl_ty_env cmp in
 
-  Print.debug "INFERRED (BEFORE SUBST): %t" (Types.print_target_dirty (ttype,dirt)) ;
+  Print.debug "tcTopLevel [1]: INFERRED (BEFORE SUBST): %t" (Types.print_target_dirty (ttype,dirt)) ;
 
-  Print.debug "ELABORATED COMP (BEFORE SUBST): %t" (Typed.print_computation trgCmp) ;
+  Print.debug "tcTopLevel [1]: ELABORATED COMP (BEFORE SUBST): %t" (Typed.print_computation trgCmp) ;
 
   (* 2: Constraint solving *)
   let solverSigma, residualCs =
     Unification.unify (Substitution.empty, [], tmpState.constraints) in
 
-  Print.debug "INFERRED (AFTER  SUBST): %t" (Types.print_target_dirty (subInCmpTy solverSigma (ttype,dirt))) ;
+  Print.debug "tcTopLevel [2]: INFERRED (AFTER  SUBST): %t" (Types.print_target_dirty (subInCmpTy solverSigma (ttype,dirt))) ;
 
   (* 3: Substitute back into the elaborated expression *)
   let ct' = subInCmp solverSigma trgCmp in
