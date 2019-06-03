@@ -1153,7 +1153,7 @@ and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pdef : Untyped.pattern) 
                 , CastComp
                     ( snd c2res.outExpr
                     , Typed.BangCoercion
-                        ( Typed.ReflTy (fst c2res.outType)
+                        ( Typed.ReflTy (fst (snd c2res.outType))
                         , omega2
                         )
                     )
@@ -1162,7 +1162,7 @@ and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pdef : Untyped.pattern) 
   warnAddConstraints "tcLetCmp" [omegaCt1;omegaCt2];
 
   { outExpr  = Typed.Bind (cresC1, cresAbs)
-  ; outType  = (fst c2res.outType,delta)
+  ; outType  = (fst (snd c2res.outType),delta)
   ; outState = c2res.outState
                  |> add_constraint omegaCt1
                  |> add_constraint omegaCt2
@@ -1592,6 +1592,8 @@ let tcTopLevel ~loc inState cmp =
       ; outSubst = tmpSubst } = tcLocatedCmp inState initial_lcl_ty_env cmp in
 
   Print.debug "INFERRED (BEFORE SUBST): %t" (Types.print_target_dirty (ttype,dirt)) ;
+
+  Print.debug "ELABORATED COMP (BEFORE SUBST): %t" (Typed.print_computation trgCmp) ;
 
   (* 2: Constraint solving *)
   let solverSigma, residualCs =

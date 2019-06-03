@@ -13,6 +13,15 @@ let rec loop n = case ((=) n) 0 of
                    False -> loop (((-) n) 1)
 in loop 10
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+let rec loop n = do n_is_eq_to <- (=) n
+                    x_is_0     <- f1 0
+                    case x_is_0 of
+                      True  -> VALUE 0
+                      False -> do n_minus   <- (-) n
+                                  n_minus_1 <- n_minus 1
+                                  loop n_minus_1
+in  loop 10
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 tcVar: Added 0 constraints:
 ---------------------
 tcVar: Added 0 constraints:

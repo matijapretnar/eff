@@ -416,8 +416,15 @@ and type_of_computation st c =
   | CastComp (c1, dc) ->
       let c1_drty_ty = type_of_computation st c1 in
       let dc11, dc2 = type_of_dirty_coercion st dc in
-      assert (Types.dirty_types_are_equal c1_drty_ty dc11) ;
-      dc2
+      if Types.dirty_types_are_equal c1_drty_ty dc11
+        then dc2
+        else ( Print.debug "type_of_computation(CastComp): %t ~/~ %t"
+                 (Types.print_target_dirty c1_drty_ty)
+                 (Types.print_target_dirty dc11)
+             ; Print.debug "coercion(CastComp): %t" (Typed.print_dirty_coercion dc)
+             ; assert (Types.dirty_types_are_equal c1_drty_ty dc11)
+             ; failwith "canthappen"
+             )
   | LetRec ([(var, ty, e1)], c1) ->
       let st' = extend_var_types st var ty in
       assert (Types.types_are_equal ty (type_of_expression st' e1)) ;
