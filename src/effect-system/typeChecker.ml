@@ -69,8 +69,8 @@ let check_well_formed_dirt st = function
   | {Types.row= Types.ParamRow v} -> assert (List.mem v st.dirt_params)
 
 
-let rec check_well_formed_ty st ty =
-  match ty with
+let rec check_well_formed_ty st inputTy =
+  match inputTy with
   | TyParam typ ->
       let ty_var_list = Assoc.keys_of st.ty_param_skeletons in
       assert (List.mem typ ty_var_list)
@@ -115,6 +115,7 @@ and check_well_formed_dirt_cons st (d1, d2) =
 
 
 let rec type_of_ty_coercion st ty_coer =
+  Print.debug "into type_of_ty_coercion";
   match ty_coer with
   | ReflTy tty -> (tty, tty)
   | ArrowCoercion (tycoer1, dirtycoer) ->
@@ -211,6 +212,7 @@ let rec type_of_ty_coercion st ty_coer =
 
 
 and type_of_dirty_coercion st dirty_coer =
+  Print.debug "into type_of_dirty_coercion";
   match dirty_coer with
   | BangCoercion (tc, dc) ->
       let t1, t2 = type_of_ty_coercion st tc in
@@ -235,6 +237,7 @@ and type_of_dirty_coercion st dirty_coer =
 
 
 and type_of_dirt_coercion st dirt_coer =
+  Print.debug "into type_of_dirt_coercion";
   match dirt_coer with
   | ReflDirt d -> (d, d)
   | DirtCoercionVar p -> (
@@ -275,18 +278,20 @@ let rec extend_pattern_types st p ty =
   | _ -> failwith __LOC__
 
 
-let type_of_const = function
+let type_of_const =   Print.debug "into type_of_const"; function
   | Const.Integer _ -> Types.PrimTy IntTy
   | Const.String _ -> Types.PrimTy StringTy
   | Const.Boolean _ -> Types.PrimTy BoolTy
   | Const.Float _ -> Types.PrimTy FloatTy
 
 
-let rec type_of_expression st e =
-  match e with
+let rec type_of_expression st inputExpression =
+  Print.debug "into type_of_expression"; (*  (%t) (Typed.print_expression inputExpression); *)
+  match inputExpression with
   | Var v -> (
+    Print.debug "right before the lookup";
     match Assoc.lookup v st.var_types with
-    | Some ty -> ty
+    | Some ty -> Print.debug "right after the lookup (%t)" (Types.print_target_ty ty); ty
     | _ -> assert false )
   | Const const -> type_of_const const
   | Lambda abs ->
@@ -366,8 +371,9 @@ let rec type_of_expression st e =
       | _ -> assert false )
   | _ -> failwith __LOC__
 
-and type_of_computation st c =
-  match c with
+and type_of_computation st inputComputation =
+  Print.debug "into type_of_computation";
+  match inputComputation with
   | Value e ->
       let ty1 = type_of_expression st e in
       (ty1, Types.empty_dirt)
@@ -427,11 +433,16 @@ and type_of_computation st c =
              )
   | LetRec ([(var, ty, e1)], c1) ->
       let st' = extend_var_types st var ty in
-      assert (Types.types_are_equal ty (type_of_expression st' e1)) ;
+      Print.debug "type_of_computation(LetRec): before c1 tc: %t" (Typed.print_expression e1);
+      let tempTy = type_of_expression st' e1 in
+      Print.debug "type_of_computation(LetRec): before assertion";
+      assert (Types.types_are_equal ty tempTy);
+      Print.debug "type_of_computation(LetRec): after assertion";
       type_of_computation st' c1
   | _ -> failwith __LOC__
 
 and type_of_handler st h =
+  Print.debug "into type_of_handler";
   let tv, type_cv = type_of_abstraction_with_ty st h.value_clause in
   let mapper (effe, abs2) =
     let eff, (in_op_ty, out_op_ty) = effe in
@@ -449,10 +460,12 @@ and type_of_handler st h =
   Types.Handler ((tv, input_dirt), type_cv)
 
 and type_of_abstraction st ty (pv, cv) =
+  Print.debug "into type_of_abstraction";
   let st' = extend_pattern_types st pv ty in
   type_of_computation st' cv
 
 and type_of_abstraction_with_ty st (pv, tv, cv) =
+  Print.debug "into type_of_abstraction_with_ty";
   check_well_formed_ty st tv ;
   let st' = extend_pattern_types st pv tv in
   (tv, type_of_computation st' cv)

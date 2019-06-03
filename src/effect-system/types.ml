@@ -256,8 +256,8 @@ and rnDirtVarInDirtCt (oldD : CoreTypes.DirtParam.t) (newD : CoreTypes.DirtParam
 
 (* ************************************************************************* *)
 
-let rec types_are_equal ty1 ty2 =
-  match (ty1, ty2) with
+let rec types_are_equal type1 type2 =
+  match (type1, type2) with
   | TyParam tv1, TyParam tv2 -> tv1 = tv2
   | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
       types_are_equal ttya1 ttyb1 && dirty_types_are_equal dirtya1 dirtyb1
