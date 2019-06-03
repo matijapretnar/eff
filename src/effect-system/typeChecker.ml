@@ -69,8 +69,7 @@ let check_well_formed_dirt st = function
   | {Types.row= Types.ParamRow v} -> assert (List.mem v st.dirt_params)
 
 
-let rec check_well_formed_ty st inputTy =
-  match inputTy with
+let rec check_well_formed_ty st = function
   | TyParam typ ->
       let ty_var_list = Assoc.keys_of st.ty_param_skeletons in
       assert (List.mem typ ty_var_list)
@@ -114,9 +113,8 @@ and check_well_formed_dirt_cons st (d1, d2) =
   check_well_formed_dirt st d2
 
 
-let rec type_of_ty_coercion st ty_coer =
-  Print.debug "into type_of_ty_coercion";
-  match ty_coer with
+let rec type_of_ty_coercion st =
+  Print.debug "into type_of_ty_coercion"; function
   | ReflTy tty -> (tty, tty)
   | ArrowCoercion (tycoer1, dirtycoer) ->
       let t2, t1 = type_of_ty_coercion st tycoer1 in
@@ -149,8 +147,9 @@ let rec type_of_ty_coercion st ty_coer =
     | None -> assert false
     | Some pi -> pi )
   | SequenceTyCoer (ty_coer1, ty_coer2) ->
-      let t1, t2 = type_of_ty_coercion st ty_coer1 in
-      let t2, t3 = type_of_ty_coercion st ty_coer2 in
+      let t1 , t2 = type_of_ty_coercion st ty_coer1 in
+      let t2', t3 = type_of_ty_coercion st ty_coer2 in
+      assert (Types.types_are_equal t2 t2');
       (t1, t3)
   | LeftArrow tc1 -> (
     match type_of_ty_coercion st tc1 with
@@ -159,8 +158,8 @@ let rec type_of_ty_coercion st ty_coer =
   | ForallTy (ty_param, ty_coer1) ->
       let new_st = extend_ty_params st ty_param in
       let t1, t2 = type_of_ty_coercion new_st ty_coer1 in
-      ( Types.TySchemeTy (ty_param, Types.PrimSkel Types.IntTy, t1)
-      , Types.TySchemeTy (ty_param, Types.PrimSkel Types.IntTy, t2) )
+      ( Types.TySchemeTy (ty_param, Types.PrimSkel Types.IntTy, t1)   (* WHY int SKEL???? *)
+      , Types.TySchemeTy (ty_param, Types.PrimSkel Types.IntTy, t2) ) (* WHY int SKEL???? *)
   | ApplyTyCoer (ty_coer1, tty1) -> (
     match type_of_ty_coercion st ty_coer1 with
     | Types.TySchemeTy (ty_param1, _, t1), Types.TySchemeTy (ty_param2, _, t2) ->
@@ -211,9 +210,8 @@ let rec type_of_ty_coercion st ty_coer =
   | _ -> failwith __LOC__
 
 
-and type_of_dirty_coercion st dirty_coer =
-  Print.debug "into type_of_dirty_coercion";
-  match dirty_coer with
+and type_of_dirty_coercion st =
+  Print.debug "into type_of_dirty_coercion"; function
   | BangCoercion (tc, dc) ->
       let t1, t2 = type_of_ty_coercion st tc in
       let d1, d2 = type_of_dirt_coercion st dc in
@@ -236,9 +234,8 @@ and type_of_dirty_coercion st dirty_coer =
       (t1, t3)
 
 
-and type_of_dirt_coercion st dirt_coer =
-  Print.debug "into type_of_dirt_coercion";
-  match dirt_coer with
+and type_of_dirt_coercion st =
+  Print.debug "into type_of_dirt_coercion"; function
   | ReflDirt d -> (d, d)
   | DirtCoercionVar p -> (
     match Assoc.lookup p st.dirt_coer_types with
@@ -285,9 +282,8 @@ let type_of_const =   Print.debug "into type_of_const"; function
   | Const.Float _ -> Types.PrimTy FloatTy
 
 
-let rec type_of_expression st inputExpression =
-  Print.debug "into type_of_expression"; (*  (%t) (Typed.print_expression inputExpression); *)
-  match inputExpression with
+let rec type_of_expression st =
+  Print.debug "into type_of_expression"; function (*  (%t) (Typed.print_expression inputExpression); *)
   | Var v -> (
     Print.debug "right before the lookup";
     match Assoc.lookup v st.var_types with
@@ -321,7 +317,9 @@ let rec type_of_expression st inputExpression =
       TySchemeDirt (dirt_param, e1_ty)
   | CastExp (e1, tc1) ->
       let e1_ty = type_of_expression st e1 in
+      Print.debug "CastExp: before type_of_ty_coercion";
       let tc1a, tc1b = type_of_ty_coercion st tc1 in
+      Print.debug "CastExp: after  type_of_ty_coercion";
       assert (Types.types_are_equal tc1a e1_ty) ;
       tc1b
   | ApplyTyExp (e1, tty) -> (
@@ -371,9 +369,8 @@ let rec type_of_expression st inputExpression =
       | _ -> assert false )
   | _ -> failwith __LOC__
 
-and type_of_computation st inputComputation =
-  Print.debug "into type_of_computation";
-  match inputComputation with
+and type_of_computation st =
+  Print.debug "into type_of_computation"; function
   | Value e ->
       let ty1 = type_of_expression st e in
       (ty1, Types.empty_dirt)
@@ -421,7 +418,9 @@ and type_of_computation st inputComputation =
       (c2_ty, c2_drt)
   | CastComp (c1, dc) ->
       let c1_drty_ty = type_of_computation st c1 in
+      Print.debug "CastComp: before type_of_dirty_coercion";
       let dc11, dc2 = type_of_dirty_coercion st dc in
+      Print.debug "CastComp: after  type_of_dirty_coercion";
       if Types.dirty_types_are_equal c1_drty_ty dc11
         then dc2
         else ( Print.debug "type_of_computation(CastComp): %t ~/~ %t"
