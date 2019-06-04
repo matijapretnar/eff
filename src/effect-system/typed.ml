@@ -189,22 +189,22 @@ let rec print_expression ?max_level e ppf =
   | CastExp (e1, tc) ->
       print "(%t) |> [%t]" (print_expression e1) (print_ty_coercion tc)
   | BigLambdaTy (p, s, e) ->
-      print "BigLambda_ty_%t:%t. %t " (CoreTypes.TyParam.print p) (print_skeleton s)
+      print "/\\%t:%t. %t " (CoreTypes.TyParam.print p) (print_skeleton s)
         (print_expression e)
   | BigLambdaDirt (p, e) ->
-      print "BigLambda_dirt_%t. %t " (CoreTypes.DirtParam.print p) (print_expression e)
+      print "/\\%t. %t " (CoreTypes.DirtParam.print p) (print_expression e)
   | ApplyTyExp (e, tty) ->
       print ~at_level:1 "%t@ %t"
         (print_expression ~max_level:1 e)
         (Types.print_target_ty tty)
   | LambdaTyCoerVar (p, (tty1, tty2), e) ->
-      print "BigLambda_tyCoer_(%t:%t<=%t).( %t ) "
+      print "/\\(%t:%t<=%t).( %t ) "
         (CoreTypes.TyCoercionParam.print p)
         (Types.print_target_ty tty1)
         (Types.print_target_ty tty2)
         (print_expression e)
   | LambdaDirtCoerVar (p, (tty1, tty2), e) ->
-      print "BigLambda_DirtCoer_(%t:%t<=%t).( %t )"
+      print "/\\(%t:%t<=%t).( %t )"
         (CoreTypes.DirtCoercionParam.print p)
         (Types.print_target_dirt tty1)
         (Types.print_target_dirt tty2)

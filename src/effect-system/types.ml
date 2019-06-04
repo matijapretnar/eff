@@ -72,12 +72,12 @@ let rec print_target_ty ?max_level ty ppf =
   | QualDirt (c, tty) ->
       print "%t => %t" (print_ct_dirt c) (print_target_ty tty)
   | TySchemeTy (p, sk, tty) ->
-      print "ForallTy (%t:%t). %t" (CoreTypes.TyParam.print p) (print_skeleton sk)
+      print "\\/(%t:%t). %t" (CoreTypes.TyParam.print p) (print_skeleton sk)
         (print_target_ty tty)
   | TySchemeDirt (p, tty) ->
-      print "ForallDirt %t. %t" (CoreTypes.DirtParam.print p) (print_target_ty tty)
+      print "\\/%t. %t" (CoreTypes.DirtParam.print p) (print_target_ty tty)
   | TySchemeSkel (p, tty) ->
-      print "ForallSkel %t. %t" (CoreTypes.SkelParam.print p) (print_target_ty tty)
+      print "\\/%t. %t" (CoreTypes.SkelParam.print p) (print_target_ty tty)
 
 
 and print_skeleton ?max_level sk ppf =

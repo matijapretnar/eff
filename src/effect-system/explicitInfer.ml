@@ -762,6 +762,9 @@ and tcTypedPat (inState : state) (lclCtxt : TypingEnv.t) pat pat_ty =
   | Untyped.PVar x             -> (Typed.PVar x     , pat_ty, inState, extendLclCtxt lclCtxt x pat_ty)
   | Untyped.PNonbinding        -> (Typed.PNonbinding, pat_ty, inState, lclCtxt)
   | Untyped.PAs (p, v)         -> failwith __LOC__ (* GEORGE: Not implemented yet *)
+  | Untyped.PTuple []          -> if Types.types_are_equal (Types.Tuple []) pat_ty
+                                    then (Typed.PTuple [], pat_ty, inState, lclCtxt)
+                                    else failwith __LOC__ (* GEORGE: Not implemented yet *)
   | Untyped.PTuple l           -> failwith __LOC__ (* GEORGE: Not implemented yet *)
   | Untyped.PRecord r          -> failwith __LOC__ (* GEORGE: Not implemented yet *)
   | Untyped.PAnnotated (p, ty) -> failwith __LOC__ (* GEORGE: Not implemented yet *)
