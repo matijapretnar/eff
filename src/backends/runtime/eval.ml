@@ -52,7 +52,6 @@ let rec sequence k = function
       V.Call (op, v, k'')
 
 let rec ceval state c =
-  Print.debug "ceval sucks 0" ;
   let loc = c.at in
   match c.it with
   | Untyped.Apply (e1, e2) -> (
@@ -78,9 +77,7 @@ let rec ceval state c =
       h r
   | Untyped.Let (lst, c) -> eval_let state lst c
   | Untyped.LetRec (defs, c) ->
-      Print.debug "ceval sucks 1" ;
       let state = extend_let_rec state (Assoc.of_list defs) in
-      Print.debug "ceval sucks 2" ;
       ceval state c
   | Untyped.Check c ->
       let r = ceval state c in

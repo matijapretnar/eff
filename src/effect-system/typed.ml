@@ -222,7 +222,7 @@ let rec print_expression ?max_level e ppf =
         (print_expression ~max_level:1 e)
         (print_dirt_coercion tty)
   | BigLambdaSkel (p, e) ->
-      print "BigLambda_skel_%t. %t " (CoreTypes.SkelParam.print p) (print_expression e)
+      print "/\\%t. %t " (CoreTypes.SkelParam.print p) (print_expression e)
   | ApplySkelExp (e, sk) ->
       print ~at_level:1 "%t@ %t"
         (print_expression ~max_level:1 e)
