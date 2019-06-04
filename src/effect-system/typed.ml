@@ -143,6 +143,119 @@ and plain_toplevel =
   | Help
   | Quit
 
+
+(* ************************************************************************* *)
+(*                         COERCION VARIABLES OF                             *)
+(* ************************************************************************* *)
+
+module TyCoercionParamSet   = Set.Make (CoreTypes.TyCoercionParam)
+module DirtCoercionParamSet = Set.Make (CoreTypes.DirtCoercionParam)
+
+let rec tyCoVarsOfExpression : expression -> TyCoercionParamSet.t = function
+(*
+type expression =
+  | Var of variable
+  | BuiltIn of string * int
+  | Const of Const.t
+  | Tuple of expression list
+  | Record of (CoreTypes.Field.t, expression) Assoc.t
+  | Variant of CoreTypes.Label.t * expression
+  | Lambda of abstraction_with_ty
+  | Effect of effect
+  | Handler of handler
+  | BigLambdaTy of CoreTypes.TyParam.t * skeleton * expression
+  | BigLambdaDirt of CoreTypes.DirtParam.t * expression
+  | BigLambdaSkel of CoreTypes.SkelParam.t * expression
+  | CastExp of expression * ty_coercion
+  | ApplyTyExp of expression * Types.target_ty
+  | LambdaTyCoerVar of CoreTypes.TyCoercionParam.t * Types.ct_ty * expression
+  | LambdaDirtCoerVar of CoreTypes.DirtCoercionParam.t * Types.ct_dirt * expression
+  | ApplyDirtExp of expression * Types.dirt
+  | ApplySkelExp of expression * Types.skeleton
+  | ApplyTyCoercion of expression * ty_coercion
+  | ApplyDirtCoercion of expression * dirt_coercion
+*)
+  _ -> failwith __LOC__
+
+and dirtCoVarsOfExpression : expression -> DirtCoercionParamSet.t = function
+(*
+type expression =
+  | Var of variable
+  | BuiltIn of string * int
+  | Const of Const.t
+  | Tuple of expression list
+  | Record of (CoreTypes.Field.t, expression) Assoc.t
+  | Variant of CoreTypes.Label.t * expression
+  | Lambda of abstraction_with_ty
+  | Effect of effect
+  | Handler of handler
+  | BigLambdaTy of CoreTypes.TyParam.t * skeleton * expression
+  | BigLambdaDirt of CoreTypes.DirtParam.t * expression
+  | BigLambdaSkel of CoreTypes.SkelParam.t * expression
+  | CastExp of expression * ty_coercion
+  | ApplyTyExp of expression * Types.target_ty
+  | LambdaTyCoerVar of CoreTypes.TyCoercionParam.t * Types.ct_ty * expression
+  | LambdaDirtCoerVar of CoreTypes.DirtCoercionParam.t * Types.ct_dirt * expression
+  | ApplyDirtExp of expression * Types.dirt
+  | ApplySkelExp of expression * Types.skeleton
+  | ApplyTyCoercion of expression * ty_coercion
+  | ApplyDirtCoercion of expression * dirt_coercion
+*)
+  _ -> failwith __LOC__
+
+and tyCoVarsOfComputation : computation -> TyCoercionParamSet.t = function
+(*
+and computation =
+  | Value of expression
+  | LetVal of expression * abstraction_with_ty
+  | LetRec of (variable * Types.target_ty * expression) list * computation
+  | Match of expression * abstraction list
+  | Apply of expression * expression
+  | Handle of expression * computation
+  | Call of effect * expression * abstraction_with_ty
+  | Op of effect * expression
+  | Bind of computation * abstraction
+  | CastComp of computation * dirty_coercion
+  | CastComp_ty of computation * ty_coercion
+  | CastComp_dirt of computation * dirt_coercion
+*)
+  _ -> failwith __LOC__
+
+and dirtCoVarsOfComputation : computation -> DirtCoercionParamSet.t = function
+(*
+and computation =
+  | Value of expression
+  | LetVal of expression * abstraction_with_ty
+  | LetRec of (variable * Types.target_ty * expression) list * computation
+  | Match of expression * abstraction list
+  | Apply of expression * expression
+  | Handle of expression * computation
+  | Call of effect * expression * abstraction_with_ty
+  | Op of effect * expression
+  | Bind of computation * abstraction
+  | CastComp of computation * dirty_coercion
+  | CastComp_ty of computation * ty_coercion
+  | CastComp_dirt of computation * dirt_coercion
+*)
+  _ -> failwith __LOC__
+
+
+
+(*
+let rec state_free_dirt_vars st =
+  List.fold_right
+    (fun (_, ty) acc ->
+      Types.DirtParamSet.union (Types.fdvsOfTargetValTy ty) acc )
+    st Types.DirtParamSet.empty
+
+
+  | TyOmega of (CoreTypes.TyCoercionParam.t * Types.ct_ty)
+  | DirtOmega of (CoreTypes.DirtCoercionParam.t * Types.ct_dirt)
+*)
+
+(* ************************************************************************* *)
+(* ************************************************************************* *)
+
 (* | TypeOf of computation *)
 
 let abstraction p c : abstraction = (p, c)
