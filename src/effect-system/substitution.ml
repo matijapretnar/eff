@@ -88,19 +88,18 @@ let rec apply_sub_skel sub skeleton =
   | SkelApply (t,l) -> SkelApply (t, List.map (apply_sub_skel sub) l)
   | SkelTuple skels -> SkelTuple (List.map (apply_sub_skel sub) skels )
 
-let rec apply_sub_ty sub ty =
-  match ty with
+let rec apply_sub_ty sub = function
   | TyParam typ1 -> (
     match Assoc.lookup typ1 sub.type_param_to_type_subs with
         | Some ttype -> apply_sub_ty sub ttype (* We don't assume that substitutions are fully expanded *)
-        | None -> ty )
+        | None -> TyParam typ1 )
   | Arrow (tty1, tty2) ->
       Arrow (apply_sub_ty sub tty1, apply_sub_dirty_ty sub tty2)
   | Apply (ty_name, tys) -> Apply (ty_name, List.map (apply_sub_ty sub) tys)
   | Tuple ttyl -> Tuple (List.map (fun x -> apply_sub_ty sub x) ttyl)
   | Handler (tydrty1, tydrty2) ->
       Handler (apply_sub_dirty_ty sub tydrty1, apply_sub_dirty_ty sub tydrty2)
-  | PrimTy _ -> ty
+  | PrimTy p -> PrimTy p
   | QualTy (ct_ty1, tty1) ->
       QualTy (apply_sub_ct_ty sub ct_ty1, apply_sub_ty sub tty1)
   | QualDirt (ct_drt1, tty1) ->

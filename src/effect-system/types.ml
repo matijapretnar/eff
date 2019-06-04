@@ -328,16 +328,25 @@ let remove_effects effect_set drt =
 
 
 let rec free_skeleton sk =
-  match sk with
-  | SkelParam p -> [p]
-  | PrimSkel _ -> []
-  | SkelApply (_, sks) -> List.concat (List.map free_skeleton sks)
-  | SkelArrow (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
-  | SkelHandler (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
-  | SkelTuple sks -> List.concat (List.map free_skeleton sks)
-  | ForallSkel (p, sk1) ->
-      let free_a = free_skeleton sk1 in
-      List.filter (fun x -> not (List.mem x [p])) free_a
+  let rec go = function
+    | SkelParam p -> [p]
+    | PrimSkel _ -> []
+    | SkelApply (_, sks) -> List.concat (List.map free_skeleton sks)
+    | SkelArrow (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
+    | SkelHandler (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
+    | SkelTuple sks -> List.concat (List.map free_skeleton sks)
+    | ForallSkel (p, sk1) ->
+        let free_a = free_skeleton sk1 in
+        List.filter (fun x -> not (List.mem x [p])) free_a
+  in
+  let rec nub = function
+            | []  -> []
+            | [x] -> [x]
+            | x :: xs -> let rest   = List.filter (fun y -> y <> x) xs in
+                         let others = nub xs in
+                         (x :: others)
+  in nub (go sk)
+
 
 (* ************************************************************************* *)
 (*                      FREE DIRT VARIABLE COMPUTATION                       *)

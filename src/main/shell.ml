@@ -48,7 +48,7 @@ module Make (Backend : BackendSignature.T) = struct
             state.effect_system_state c
         in
         Print.debug "exec_cmd: before backend typechecking";
-        let drty = TypeChecker.type_of_computation state.type_checker_state c' in
+        let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
         Print.debug "exec_cmd: after backend typechecking";
 
         let backend_state' =
@@ -67,7 +67,7 @@ module Make (Backend : BackendSignature.T) = struct
           ExplicitInfer.tcTopLevel ~loc:c.at
             state.effect_system_state c
         in
-        let drty = TypeChecker.type_of_computation state.type_checker_state c' in
+        let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
         let backend_state' =
           Backend.process_type_of state.backend_state c drty
         in
