@@ -1,0 +1,5 @@
+
+effect Decide : bool;;
+
+handle (let rec f x = if perform (Decide ()) then 0 else f (x - 1) in f 0) with | effect Decide k -> k true;;
+
