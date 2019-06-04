@@ -363,10 +363,19 @@ let rec typeOfExpressionTemp st = function (*  (%t) (Typed.print_expression inpu
         Print.debug "ApplyDirtExp 1";
         checkWellFormedDirt st d1 ;
         Print.debug "ApplyDirtExp 2";
+        (* Avoid capture *)
+        let freshDVar   = CoreTypes.DirtParam.fresh () in
+        let renamedType = Types.rnDirtVarInValTy p_e1 freshDVar ty_e1 in
+        let sub = Substitution.add_dirt_substitution_e freshDVar d1 in
+(*
         let sub = Substitution.add_dirt_substitution_e p_e1 d1 in
+*)
         Print.debug "ApplyDirtExp 3";
         Substitution.print_substitutions sub;
+        let res = Substitution.apply_substitutions_to_type sub renamedType in
+(*
         let res = Substitution.apply_substitutions_to_type sub ty_e1 in
+*)
         Print.debug "ApplyDirtExp 4";
         res
     | _ -> assert false )
