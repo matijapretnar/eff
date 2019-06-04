@@ -1589,6 +1589,7 @@ let mkCmpDirtZonkSubst cmp =
 
 (* Typecheck a top-level expression *)
 let tcTopLevel ~loc inState cmp =
+  Print.debug "tcTopLevel [0]: %t" (Untyped.print_computation cmp) ;
   (* 1: Constraint generation *)
   let { outExpr  = trgCmp
       ; outType  = (ttype,dirt)
