@@ -189,7 +189,7 @@ let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_t
   (* *********************************************************************** *)
   Print.debug "Splitter Input Constraints (%d): " (List.length cs);  Unification.print_c_list cs;
   Print.debug "Splitter Input Ty: %t" (Types.print_target_ty valTy);
-  Print.debug "Splitter Env :"; print_env (TypingEnv.return_context ctx);
+  Print.debug "Splitter Input Env :"; print_env (TypingEnv.return_context ctx);
   Print.debug "Simple type free vars: " ;
   Types.TyParamSet.iter
     (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
@@ -305,10 +305,36 @@ let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_t
 -    (fun x -> Print.debug "%t" (CoreTypes.DirtParam.print x))
 -    free_dirt_params ;
 *)
+  Print.debug "Splitter local skeleton list (%d): " (List.length sigmas);
+  let rec print_skeleton_list = function
+    | [] -> Print.debug "---------------------"
+    | s :: ss ->
+        Print.debug "%t" (CoreTypes.SkelParam.print s) ;
+        print_skeleton_list ss
+  in print_skeleton_list sigmas;
+
+  Print.debug "Splitter local type variable list (%d): " (List.length annotatedAlphas);
+  let rec print_annotated_alpha_list = function
+    | [] -> Print.debug "---------------------"
+    | (a,s) :: ss ->
+        Print.debug "%t" (Typed.print_omega_ct (Typed.TyParamHasSkel (a,s))) ;
+        print_annotated_alpha_list ss
+  in print_annotated_alpha_list annotatedAlphas ;
+
+  Print.debug "Splitter local dirt variable list (%d): " (List.length (Types.DirtParamSet.elements deltas));
+  let rec print_deltas = function
+    | [] -> Print.debug "---------------------"
+    | d :: ds ->
+        Print.debug "%t" (Types.print_target_dirt (Types.no_effect_dirt d)) ;
+        print_deltas ds
+  in print_deltas (Types.DirtParamSet.elements deltas) ;
+
   Print.debug "Splitter local type inequality list: " ;
   Unification.print_c_list (List.map (fun (o,p) -> Typed.TyOmega (o,p)) lclTyCs) ;
+
   Print.debug "Splitter local dirt inequality list: " ;
   Unification.print_c_list (List.map (fun (o,p) -> Typed.DirtOmega (o,p)) lclDirtCs) ;
+
   Print.debug "Splitter global constraints list: " ;
   Unification.print_c_list globalCs ;
 
@@ -934,9 +960,11 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
                         let ysub = Typed.subst_comp (Assoc.of_list [(x, CastExp (Var yvar, omega6))]) in
                         (PVar yvar, subInValTy sub alphaR, Typed.CastComp (ysub (subInCmp sub cR), Typed.BangCoercion (omega1, omega2)))
                         (* 2: the constraints to add to the state *)
-                      , fun st -> st |> add_constraint omegaCt1
-                                     |> add_constraint omegaCt2
-                                     |> add_constraint omegaCt6
+                      , ( warnAddConstraints "tcHandler[Ret]" [omegaCt1;omegaCt2;omegaCt6]
+                        ; fun st -> st |> add_constraint omegaCt1
+                                       |> add_constraint omegaCt2
+                                       |> add_constraint omegaCt6
+                        )
                       )
                    )
       ; outType  = ()
@@ -989,10 +1017,12 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
 
           { outExpr  = trgClause :: xsres.outExpr
           ; outType  = ()
-          ; outState = xsres.outState
-                         |> add_constraint omegaCt3i
-                         |> add_constraint omegaCt4i
-                         |> add_constraint omegaCt5i
+          ; outState = ( warnAddConstraints "tcHandler[Op]" [omegaCt3i;omegaCt4i;omegaCt5i]
+                       ; xsres.outState
+                           |> add_constraint omegaCt3i
+                           |> add_constraint omegaCt4i
+                           |> add_constraint omegaCt5i
+                       )
           ; outSubst = extendGenSub substi xsres.outSubst (* Compose the substitutions *)
           }
   in
@@ -1014,10 +1044,13 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
     Typed.fresh_dirt_coer (deltaIn, Types.{effect_set = allOps; row= ParamRow deltaOutVar})
   in
 
+  warnAddConstraints "tcHandler[7,in,out]" [omegaCt7;alphaInSkel;alphaOutSkel];
+
   let retClause,state_fn = retRes.outExpr clsRes.outSubst in
 
   let handlerCo = Typed.HandlerCoercion ( Typed.BangCoercion (Typed.ReflTy alphaIn, omega7)
                                         , Typed.BangCoercion (Typed.ReflTy alphaOut, Typed.ReflDirt deltaOut) ) in
+  Print.debug "I am the HandlerCo : %t" (Typed.print_ty_coercion handlerCo) ;
 
   { outExpr  = CastExp ( Handler ({ effect_clauses = Assoc.of_list clsRes.outExpr
                                   ; value_clause   = retClause  })
