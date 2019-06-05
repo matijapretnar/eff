@@ -1096,14 +1096,20 @@ and tcLocatedVal (inState : state) (lclCtx : TypingEnv.t) (e : Untyped.expressio
 and tcCmp (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_computation -> tcCmpOutput = function
   | Value exp                -> tcValue  inState lclCtx exp
   | Let ([(p_def, c_1)],c_2) -> tcLet    inState lclCtx p_def c_1 c_2
-  | Let (_,_)                -> failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
+  | Let (_,c2) as exp      -> Print.debug "failing for: %t" (Untyped.print_computation ({it = exp; at = c2.at})); failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
   | LetRec ([(var, abs)],c2) -> tcLetRecNoGen inState lclCtx var abs c2
-  | LetRec (_,_)             -> failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
+  | LetRec (_,_)      -> failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
   | Match (scr, [ ({it = Untyped.PConst (Boolean true )}, c1)
                 ; ({it = Untyped.PConst (Boolean false)}, c2) ] )
       -> tcIfThenElse inState lclCtx scr c1 c2
+  | Match (scr, [(p,c)]) -> let tmp = { it = Untyped.Value scr ; at = p.at } (* { it = Untyped.Value scr.it ; at = scr.at } *)
+                            in  tcCmp inState lclCtx (Untyped.Let ([(p,tmp)],c))
+
   | Match (scr, cases)       -> failwith __LOC__
                                 (* tcMatch  inState lclCtx scr cases (* GEORGE: TODO: Bogus right now? *) *)
+
+
+
   | Apply (val1, val2)       -> tcApply  inState lclCtx val1 val2
   | Handle (hand, cmp)       -> tcHandle inState lclCtx hand cmp
   | Check cmp                -> tcCheck  inState lclCtx cmp
