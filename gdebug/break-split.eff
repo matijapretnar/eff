@@ -1,5 +1,20 @@
 
 effect Decide : bool;;
 
-handle (let rec f x = if perform (Decide ()) then 0 else f (x - 1) in f 0) with | effect Decide k -> k true;;
+(* handle (let rec f x = if perform (Decide ()) then 0 else f (x - 1) in f 0) with | effect Decide k -> k true;; *)
+
+
+
+(* This handler collects all results that we can get by making different choices. *)
+
+
+(* This returns a list of four possibilities [10; 5; 20; 15] *)
+
+with
+  (handler
+    | effect Decide k -> k true @ k false
+    | x -> [x]
+  )
+handle
+  let rec f x = if perform (Decide ()) then 0 else 1 in f ()
 

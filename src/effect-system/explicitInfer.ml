@@ -1097,7 +1097,7 @@ and tcCmp (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_computation -
   | Value exp                -> tcValue  inState lclCtx exp
   | Let ([(p_def, c_1)],c_2) -> tcLet    inState lclCtx p_def c_1 c_2
   | Let (_,_)                -> failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
-  | LetRec ([(var, abs)],c2) -> tcLetRec inState lclCtx var abs c2
+  | LetRec ([(var, abs)],c2) -> tcLetRecNoGen inState lclCtx var abs c2
   | LetRec (_,_)             -> failwith __LOC__ (* GEORGE: Planned TODO for the future I guess?? *)
   | Match (scr, [ ({it = Untyped.PConst (Boolean true )}, c1)
                 ; ({it = Untyped.PConst (Boolean false)}, c2) ] )
@@ -1340,6 +1340,71 @@ and tcLetRec (inState : state) (lclCtxt : TypingEnv.t)
   ; outType  = c2res.outType
   ; outState = c2res.outState
   ; outSubst = extendGenSub (extendGenSub sigma1 sigma1') c2res.outSubst
+  }
+
+
+and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
+      (var : Untyped.variable)
+      (abs : Untyped.abstraction)
+      (c2 : Untyped.computation) : tcCmpOutput =
+
+  (* 1: Generate fresh variables for everything *)
+  let alpha, alphaSkel = fresh_ty_with_fresh_skel () in
+  let beta , betaSkel  = fresh_ty_with_fresh_skel () in
+  let delta = Types.fresh_dirt () in
+
+  (* 2: Typecheck the abstraction *)
+  let { outExpr  = (trgPat, trgC1)
+      ; outType  = (trgPatTy,(tyA1, dirtD1))
+      ; outState = state1
+      ; outSubst = sigma1
+      } = tcTypedAbstraction
+            (inState |> add_constraint alphaSkel |> add_constraint betaSkel)
+            (extendLclCtxt lclCtxt var (Types.Arrow (alpha, (beta, delta))))
+            abs alpha in
+
+  (* 3: Typecheck c2 *)
+  let { outExpr  = trgC2
+      ; outType  = (tyA2, dirtD2)
+      ; outState = state2
+      ; outSubst = sigma2
+      } = tcLocatedCmp
+            state1
+            (extendLclCtxt (lclCtxt |> subInEnv sigma1) var (Types.Arrow (subInValTy sigma1 alpha, (tyA1,dirtD1))))
+            c2
+  in
+
+  (* 3: The assumed type should be at least as general as the inferred one *)
+  let omega1, omegaCt1 = Typed.fresh_ty_coer (subInValTy sigma2 tyA1, subInValTy sigma2 (subInValTy sigma1 beta)) in
+  let omega2, omegaCt2 = Typed.fresh_dirt_coer (subInDirt sigma2 dirtD1, subInDirt sigma2 (subInDirt sigma1 delta)) in
+
+  (* 4: Create the (complicated) c1''. *)
+  let c1'' = (
+    let f_coercion = Typed.ArrowCoercion
+                       ( Typed.ReflTy (subInValTy sigma2 (subInValTy sigma1 alpha))
+                       , Typed.BangCoercion (omega1, omega2)
+                       ) in
+    let subst_fn   = Typed.subst_comp (Assoc.of_list [(var, Typed.CastExp(Typed.Var var, f_coercion))]) in
+
+    subst_fn (subInCmp sigma2 trgC1)
+  ) in
+
+  (* 5: Create the (monomorphic) type of f *)
+  let ftype = subInValTy sigma2 (Types.Arrow (subInValTy sigma1 alpha, (tyA1, dirtD1))) in
+
+  (* 6: Create the generated term *)
+  let genTerm = Typed.Lambda
+                  (Typed.abstraction_with_ty
+                     trgPat
+                     (subInValTy sigma2 (subInValTy sigma1 trgPatTy))
+                     c1''
+                  ) in
+
+  (* 7: Combine the results *)
+  { outExpr  = Typed.LetRec ([(var, ftype, genTerm)], trgC2)
+  ; outType  = (tyA2, dirtD2)
+  ; outState = state2 |> add_constraint omegaCt1 |> add_constraint omegaCt2
+  ; outSubst = extendGenSub sigma1 sigma2
   }
 
 and tcIfThenElse (inState : state) (lclCtxt : TypingEnv.t)
@@ -1617,7 +1682,7 @@ let finalize_constraint sub ct =
 let finalize_constraints c_list = List.fold_left (fun subs ct -> finalize_constraint subs ct) Substitution.empty c_list
 
 (* GEORGE: Document *)
-let mkCmpDirtZonkSubst cmp =
+let mkCmpDirtGroundSubst cmp =
   List.fold_left
     (fun subs dp -> Substitution.add_dirt_substitution dp Types.empty_dirt subs)
     Substitution.empty
@@ -1646,7 +1711,7 @@ let tcTopLevel ~loc inState cmp =
   let ct' = subInCmp solverSigma trgCmp in
 
   (* 4: Create the dirt-zonking substitution *)
-  let dirtZonker = mkCmpDirtZonkSubst (subInCmp solverSigma trgCmp) in
+  let dirtZonker = mkCmpDirtGroundSubst (subInCmp solverSigma trgCmp) in
 
   (* 5: Zonk and finalize the residual constraints *)
   let sub3 = Substitution.apply_substitutions_to_constraints dirtZonker residualCs
