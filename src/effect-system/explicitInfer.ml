@@ -1183,6 +1183,40 @@ and tcLetVal (inState : state) (lclCtxt : TypingEnv.t)
   ; outSubst = extendGenSub (extendGenSub e1res.outSubst sigma1') c2res.outSubst
   }
 
+(* Typecheck a let as in the paper, where c1 is a value *)
+and tcLetValNoGen (inState : state) (lclCtxt : TypingEnv.t)
+      (patIn : Untyped.pattern)
+      (e1 : Untyped.expression)
+      (c2 : Untyped.computation) : tcCmpOutput =
+  (* 1: Typecheck e1 *)
+  let { outExpr  = trgE1
+      ; outType  = tyA1
+      ; outState = state1
+      ; outSubst = sigma1
+      } = tcLocatedVal inState lclCtxt e1 in (* (v',A, Qv, Sigma1) *)
+
+  (* 2: Typecheck c2 *)
+  let x = (match patIn.it with
+           | Untyped.PVar x -> x (* GEORGE: Support nothing else at the moment *)
+           | _ -> failwith "tcLetValNoGen: only varpats allowed") in
+  let { outExpr  = trgC2
+      ; outType  = (tyB2,dirtD2)
+      ; outState = state2
+      ; outSubst = sigma2
+      } = tcLocatedCmp
+            state1
+            (extendLclCtxt (subInEnv sigma1 lclCtxt) x tyA1)
+            c2 in
+
+  (* 3: Combine the results *)
+  { outExpr  = Typed.LetVal
+                 ( subInExp sigma2 trgE1
+                 , Typed.abstraction_with_ty (Typed.PVar x) (subInValTy sigma2 tyA1) trgC2 )
+  ; outType  = (tyB2,dirtD2)
+  ; outState = state2
+  ; outSubst = extendGenSub sigma1 sigma2
+  }
+
 (* Typecheck a let when c1 is a computation (== do binding) *)
 and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pdef : Untyped.pattern) (c1 : Untyped.computation) (c2 : Untyped.computation) : tcCmpOutput =
   let c1res = tcLocatedCmp inState lclCtxt c1 in (* typecheck c1 *)
@@ -1224,7 +1258,7 @@ and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pdef : Untyped.pattern) 
 (* Typecheck a non-recursive let *)
 and tcLet (inState : state) (lclCtxt : TypingEnv.t) (pdef : Untyped.pattern) (c1 : Untyped.computation) (c2 : Untyped.computation) : tcCmpOutput =
   match c1.it with
-  | Untyped.Value e1   -> tcLetVal inState lclCtxt pdef e1 c2
+  | Untyped.Value e1   -> tcLetValNoGen inState lclCtxt pdef e1 c2
   | _other_computation -> tcLetCmp inState lclCtxt pdef c1 c2
 
 (* Typecheck a (potentially) recursive let *)
@@ -1689,7 +1723,10 @@ let finalize_constraint sub ct =
       in
       subs''
   | Typed.SkelEq (sk1, sk2) -> failwith __LOC__
-  | Typed.TyParamHasSkel (tp, sk) -> failwith __LOC__
+  | Typed.TyParamHasSkel (tp, sk) ->
+      Error.typing ~loc:Location.unknown
+        "Unsolved param-has-skel constraint in top-level computation: %t"
+        (Typed.print_omega_ct (Typed.TyParamHasSkel (tp, sk)))
   | Typed.DirtyOmega ((_,_),_) -> failwith __LOC__ (* GEORGE: I think this is unused *)
 
 let finalize_constraints c_list = List.fold_left (fun subs ct -> finalize_constraint subs ct) Substitution.empty c_list
