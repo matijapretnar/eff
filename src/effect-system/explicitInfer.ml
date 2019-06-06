@@ -1752,10 +1752,29 @@ let tcTopLevel ~loc inState cmp =
   Print.debug "tcTopLevel [1]: ELABORATED COMP (BEFORE SUBST): %t" (Typed.print_computation trgCmp) ;
 
   (* 2: Constraint solving *)
-  let solverSigma, residualCs =
-    Unification.unify (Substitution.empty, [], tmpState.constraints) in
+  let solverSigma, residualCs = (
+    (* A: Solve the constraints as they are *)
+    let initialSigma, initialResiduals = Unification.unify (Substitution.empty, [], tmpState.constraints) in
+    (* B: Ground the free skeleton variables *)
+    let skelGroundResiduals = List.map
+                                (function
+                                 | TyParamHasSkel (tyvar,Types.SkelParam s) ->
+                                     TyParamHasSkel (tyvar,Types.SkelTuple [])
+                                 | TyParamHasSkel (tyvar,skel) ->
+                                     Error.typing ~loc:Location.unknown
+                                       "[1] Unsolved param-has-skel constraint in top-level computation: %t"
+                                       (Typed.print_omega_ct (Typed.TyParamHasSkel (tyvar, skel)))
+                                 | ct -> ct
+                                ) initialResiduals in
+    (* C: Solve again *)
+    let secondSigma, secondResiduals = Unification.unify (Substitution.empty, [], skelGroundResiduals) in
+    (* Combine the results *)
+    (extendGenSub initialSigma secondSigma, secondResiduals)
+  ) in
 
   Print.debug "tcTopLevel [2]: INFERRED (AFTER  SUBST): %t" (Types.print_target_dirty (subInCmpTy solverSigma (ttype,dirt))) ;
+
+  Print.debug "tcTopLevel [2]: RESIDUAL CONSTRAINTS:"; Unification.print_c_list residualCs ;
 
   (* 3: Substitute back into the elaborated expression *)
   let ct' = subInCmp solverSigma trgCmp in
