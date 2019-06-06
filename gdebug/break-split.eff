@@ -12,9 +12,9 @@ effect Decide : bool;;
 
 with
   (handler
-    | effect Decide k -> k true @ k false
-    | x -> [x]
+    | effect Decide k -> k true + k false
+    | x -> x
   )
 handle
-  let rec f x = if perform (Decide ()) then 0 else 1 in f ()
+  let rec f x = if perform (Decide ()) then 2 else 3 in f ()
 

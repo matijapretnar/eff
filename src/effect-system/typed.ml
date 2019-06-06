@@ -635,6 +635,9 @@ let rec subst_expr sbst = function
 
 and subst_comp sbst = function
   | Bind (c1, c2) -> Bind (subst_comp sbst c1, subst_abs sbst c2)
+  | LetVal (e1, (x,ty,c1)) -> (* XXX Should we check that x does not appear in sbst? *)
+                              LetVal ( subst_expr sbst e1
+                                     , (x, ty, subst_comp sbst c1) )
   | LetRec (li, c1) ->
       let li' =
         List.map
@@ -650,7 +653,8 @@ and subst_comp sbst = function
   | Call (eff, e, a) -> Call (eff, subst_expr sbst e, subst_abs_with_ty sbst a)
   | Value e -> Value (subst_expr sbst e)
   | CastComp (c, dtyco) -> CastComp (subst_comp sbst c, dtyco)
-
+  | other -> ( Print.debug "About to fail (subst_comp): %t" (print_computation other)
+             ; failwith __LOC__ )
 
 and subst_handler sbst h =
   { effect_clauses= Assoc.map (subst_abs2 sbst) h.effect_clauses
