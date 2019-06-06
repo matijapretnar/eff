@@ -147,6 +147,25 @@ let type_const = function
   | Const.Float _ -> PrimTy FloatTy
 
 (* ************************************************************************* *)
+(*                       PREDICATES ON target_ty                             *)
+(* ************************************************************************* *)
+
+(* Check if a target type is a monotype. That is, no universal quantification
+ * and no qualified constraints, at the top-level or in nested positions. *)
+let rec isMonoTy : target_ty -> bool = function
+  | TyParam _                 -> true
+  | Apply (tyCon,tys)         -> List.for_all isMonoTy tys
+  | Arrow (ty1,(ty2,_))       -> isMonoTy ty1 && isMonoTy ty2
+  | Tuple tys                 -> List.for_all isMonoTy tys
+  | Handler ((ty1,_),(ty2,_)) -> isMonoTy ty1 && isMonoTy ty2
+  | PrimTy _                  -> true
+  | QualTy (_,_)              -> false (* no qualification *)
+  | QualDirt (_,_)            -> false (* no qualification *)
+  | TySchemeTy (_,_,_)        -> false (* no quantification *)
+  | TySchemeDirt (_,_)        -> false (* no quantification *)
+  | TySchemeSkel (_,_)        -> false (* no quantification *)
+
+(* ************************************************************************* *)
 (*                             VARIABLE RENAMING                             *)
 (* ************************************************************************* *)
 let rec rnSkelVarInSkel (oldS : CoreTypes.SkelParam.t) (newS : CoreTypes.SkelParam.t)

@@ -3,10 +3,9 @@ module Untyped = UntypedSyntax
 open Typed
 
 (* GEORGE: TODO:
-     1. Remove the substitutions from the state
-     2. Add debugging output to the new code snippets
-     3. Figure out what is wrong with pattern typing (untyped & typed version)
-     4. Understand how variants are implemented
+     1. Add debugging output to the new code snippets
+     2. Figure out what is wrong with pattern typing (untyped & typed version)
+     3. Understand how variants are implemented
  *)
 
 (* GEORGE: By convention, in types, type inequalities are qualified over first,
@@ -27,20 +26,6 @@ let georgeTODO () = failwith __LOC__
 let warnAddConstraints s cs =
   Print.debug "%s: Added %d constraints: " s (List.length cs);
   Unification.print_c_list cs
-
-(*
-let add_def env x ty_sch =
-  {env with context = TypingEnv.update env.context x ty_sch}
-
-let apply_sub_to_env env sub =
-  {env with context = TypingEnv.apply_sub env.context sub}
-
-let extend_env vars env =
-  List.fold_right
-    (fun (x, ty_sch) env ->
-      {env with context = TypingEnv.update env.context x ty_sch} )
-    vars env
-*)
 
 (* [WRITER] SUBSTITUTION *)
 
@@ -123,25 +108,6 @@ let rec state_free_dirt_vars st =
       Types.DirtParamSet.union (Types.fdvsOfTargetValTy ty) acc )
     st Types.DirtParamSet.empty
 
-(* Check whether a constraint is a coercion variable annotated inequality *)
-let isOmegaCt (ct : Typed.omega_ct) =
-  match ct with
-  | TyOmega (_,_)        -> true
-  | DirtOmega (_,_)      -> true
-  | DirtyOmega (_,_)     -> true
-  | SkelEq (_,_)         -> false
-  | TyParamHasSkel (_,_) -> false
-
-(* Check whether a coercion variable-annotated constraint is a type inequality *)
-let isTyOmega : Typed.omega_ct -> bool = function
-  | Typed.TyOmega (_,_) -> true
-  | _other_type         -> false
-
-(* Check whether a coercion variable-annotated constraint is a dirt inequality *)
-let isDirtOmega : Typed.omega_ct -> bool = function
-  | Typed.DirtOmega (_,_) -> true
-  | _other_type           -> false
-
 (* ************************************************************************* *)
 (*                              DEBUGGING                                    *)
 (* ************************************************************************* *)
@@ -184,172 +150,6 @@ let subInDirtCt sub (d1,d2) = (subInDirt sub d1, subInDirt sub d2)
 
 (* ************************************************************************* *)
 
-(* Partition a set of constraints for let generalization (cf. Explicit Effect Subtyping) *)
-let split (ctx : TypingEnv.t) (cs : Typed.omega_ct list) (valTy : Types.target_ty) =
-  (* *********************************************************************** *)
-  Print.debug "Splitter Input Constraints (%d): " (List.length cs);  Unification.print_c_list cs;
-  Print.debug "Splitter Input Ty: %t" (Types.print_target_ty valTy);
-  Print.debug "Splitter Input Env :"; print_env (TypingEnv.return_context ctx);
-  Print.debug "Simple type free vars: " ;
-  Types.TyParamSet.iter
-    (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
-    (Types.ftvsOfTargetValTy valTy) ;
-  Print.debug "state free vars: " ;
-  Types.TyParamSet.iter
-    (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
-    (state_free_ty_vars (Assoc.to_list ctx)) ;
-
-
-  (* *********************************************************************** *)
-
-  let (tyEnv : (Typed.variable * Types.target_ty) list) = TypingEnv.return_context ctx in
-
-  (* 1: Compute the alphas (as a Types.TyParamSet) *)
-  let alphas = (
-    let ctTyVars  = List.fold_right                (* fv(Q) *)
-                      (fun ct tvs -> Types.TyParamSet.union (ftvsOfOmegaCt ct) tvs)
-                      cs Types.TyParamSet.empty in
-    let tyTyVars  = Types.ftvsOfTargetValTy valTy in (* fv(A) *)
-    let envTyVars = state_free_ty_vars tyEnv    in (* fv(G) *)
-    Types.TyParamSet.diff                          (* (fv(Q) \/ fv(A)) - fv(G) *)
-      (Types.TyParamSet.union ctTyVars tyTyVars)
-      envTyVars
-  ) in
-
-  (* 2: Compute the deltas (as a Types.DirtParamSet) *)
-  let deltas = (
-    let ctDirtVars  = List.fold_right                  (* fv(Q) *)
-                        (fun ct dvs -> Types.DirtParamSet.union (fdvsOfOmegaCt ct) dvs)
-                        cs Types.DirtParamSet.empty in
-    let tyDirtVars  = Types.fdvsOfTargetValTy valTy in (* fv(A) *)
-    let envDirtVars = state_free_dirt_vars tyEnv    in (* fv(G) *)
-    Types.DirtParamSet.diff                            (* (fv(Q) \/ fv(A)) - fv(G) *)
-      (Types.DirtParamSet.union ctDirtVars tyDirtVars)
-      envDirtVars
-  ) in
-
-  (* 3: Compute the sigmas *)
-  let sigmas = (
-    (* Keep only constraints of the form (alpha1 : sigma1) *)
-    let allSkelVarAnnotations = getSkelVarAnnotationsFromCs cs in
-    (* Predicate: whether a skeleton variable is non-local *)
-    let isGblSkelVar s = List.exists
-                           (fun (tyVar,skelVar) ->
-                              (s = skelVar) &&
-                              not (Types.TyParamSet.mem tyVar alphas))
-                           allSkelVarAnnotations
-    (* Keep only the skeleton variables that can be local *)
-    in allSkelVarAnnotations
-         |> List.filter (fun (_,s) -> not (isGblSkelVar s))
-         |> List.map snd
-         |> unique_elements (* GEORGE: TODO: Actually, this should be redundant.
-                             * Add assertions or warnings in here maybe instead? *)
-  ) in
-
-  (* 4: Compute all the local (pi) constraints *)
-  let (localCs : Typed.omega_ct list) = (
-    let envTyVars   = state_free_ty_vars tyEnv   in (* fva(G) *)
-    let envDirtVars = state_free_dirt_vars tyEnv in (* fvd(G) *)
-    cs |> List.filter
-            (fun ct ->
-               isOmegaCt ct
-               && let ctTyVars   = ftvsOfOmegaCt   ct in (* fva(pi) *)
-                  let ctDirtVars = fdvsOfOmegaCt ct in (* fvd(pi) *)
-                  not ((Types.TyParamSet.subset ctTyVars envTyVars) &&
-                       (Types.DirtParamSet.subset ctDirtVars envDirtVars))
-            )
-  ) in
-
-  (* 5: Find all skeleton annotations for the alphas. *)
-  (*    Return as a list of tuples (CoreTypes.TyParam.t, skeleton) *)
-  let annotatedAlphas = (
-    let allAnnotations = getSkelAnnotationsFromCs cs (* GEORGE:TODO: Why recompute? *)
-    in  List.map
-          (fun alpha -> (alpha, List.assoc alpha allAnnotations))
-          (Types.TyParamSet.elements alphas)
-  ) in
-
-  (* 6: Compute all the global constraints *)
-  let (globalCs : Typed.omega_ct list) = (
-    let annAlphasAsCs = List.map (fun (a,s) -> TyParamHasSkel (a,s)) annotatedAlphas in
-    List.filter
-      (fun ct -> not ((List.mem ct localCs) || (List.mem ct annAlphasAsCs)))
-      cs
-  ) in
-
-  (* 7: Partition the local constraints into type and dirt inequalities *)
-  let lclTyCs, lclDirtCs = (
-    let rec aux = function
-      | [] -> ([], [])
-      | Typed.TyOmega (omega, pi) :: rest ->
-          let tyCs, dirtCs = aux rest
-          in  ((omega, pi) :: tyCs, dirtCs)
-      | Typed.DirtOmega (omega, pi) :: rest ->
-          let tyCs, dirtCs = aux rest
-          in  (tyCs, (omega, pi) :: dirtCs)
-      | Typed.DirtyOmega ((_,_),_) :: rest -> failwith __LOC__ (* Shouldn't be possible *)
-      | Typed.SkelEq (_,_)         :: rest -> failwith __LOC__ (* Shouldn't be possible *)
-      | Typed.TyParamHasSkel (_,_) :: rest -> failwith __LOC__ (* Shouldn't be possible *)
-    in  aux localCs
-  ) in
-
-  (* *********************************************************************** *)
-
-(*
--  Print.debug "Splitter output free_ty_vars: " ;
--  Types.TyParamSet.iter
--    (fun x -> Print.debug "%t" (CoreTypes.TyParam.print x))
--    free_ty_params ;
--  Print.debug "Splitter output free_dirt_vars: " ;
--  Types.DirtParamSet.iter
--    (fun x -> Print.debug "%t" (CoreTypes.DirtParam.print x))
--    free_dirt_params ;
-*)
-  Print.debug "Splitter local skeleton list (%d): " (List.length sigmas);
-  let rec print_skeleton_list = function
-    | [] -> Print.debug "---------------------"
-    | s :: ss ->
-        Print.debug "%t" (CoreTypes.SkelParam.print s) ;
-        print_skeleton_list ss
-  in print_skeleton_list sigmas;
-
-  Print.debug "Splitter local type variable list (%d): " (List.length annotatedAlphas);
-  let rec print_annotated_alpha_list = function
-    | [] -> Print.debug "---------------------"
-    | (a,s) :: ss ->
-        Print.debug "%t" (Typed.print_omega_ct (Typed.TyParamHasSkel (a,s))) ;
-        print_annotated_alpha_list ss
-  in print_annotated_alpha_list annotatedAlphas ;
-
-  Print.debug "Splitter local dirt variable list (%d): " (List.length (Types.DirtParamSet.elements deltas));
-  let rec print_deltas = function
-    | [] -> Print.debug "---------------------"
-    | d :: ds ->
-        Print.debug "%t" (Types.print_target_dirt (Types.no_effect_dirt d)) ;
-        print_deltas ds
-  in print_deltas (Types.DirtParamSet.elements deltas) ;
-
-  Print.debug "Splitter local type inequality list: " ;
-  Unification.print_c_list (List.map (fun (o,p) -> Typed.TyOmega (o,p)) lclTyCs) ;
-
-  Print.debug "Splitter local dirt inequality list: " ;
-  Unification.print_c_list (List.map (fun (o,p) -> Typed.DirtOmega (o,p)) lclDirtCs) ;
-
-  Print.debug "Splitter global constraints list: " ;
-  Unification.print_c_list globalCs ;
-
-  (* *********************************************************************** *)
-
-
-  (* 8: Return the whole lot. *)
-  ( sigmas
-  , annotatedAlphas
-  , Types.DirtParamSet.elements deltas  (* as a list *)
-  , lclTyCs   (* lclTyCs   : (CoreTypes.TyCoercionParam.t * Types.ct_ty) list *)
-  , lclDirtCs (* lclDirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list *)
-  , globalCs
-  )
-
 (* Apply a term to all possible arguments *)
 let applyTerm skeletons types dirts tyCoercions dirtCoercions exp : Typed.expression =
   let foldLeft f xs x0 = List.fold_left f x0 xs in (* GEORGE: Just for convenience *)
@@ -364,131 +164,6 @@ let applyTerm skeletons types dirts tyCoercions dirtCoercions exp : Typed.expres
      foldLeft (fun e c -> Typed.ApplyTyCoercion (e, c)) tyCoercions
   |> (* 5: Apply to the dirt coercions *)
      foldLeft (fun e c -> Typed.ApplyDirtCoercion (e, c)) dirtCoercions
-
-(* Apply a generalized term to all arguments returned by "split" (cf. LetRec). *)
-let mkGroundTerm freeSkelVars annFreeTyVars freeDirtVars tyCs dirtCs exp : Typed.expression =
-  applyTerm
-    (List.map (fun s -> Types.SkelParam s) freeSkelVars)
-    (List.map (fun (a,_) -> Types.TyParam a) annFreeTyVars)
-    (List.map (fun d -> Types.no_effect_dirt d) freeDirtVars)
-    (List.map (fun (o,_) -> Typed.TyCoercionVar o) tyCs)
-    (List.map (fun (o,_) -> Typed.DirtCoercionVar o) dirtCs)
-    exp
-
-(* Create a generalized type from parts (as delivered from "splitter"). *)
-let mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars tyCs dirtCs monotype : Types.target_ty =
-  monotype
-  |> (* 1: Add the constraint abstractions (dirt) *)
-     List.fold_right
-       (fun (_,pi) qual -> Types.QualDirt (pi, qual))
-       dirtCs
-  |> (* 2: Add the constraint abstractions (type) *)
-     List.fold_right
-       (fun (_,pi) qual -> Types.QualTy (pi, qual))
-       tyCs
-  |> (* 3: Add the dirt variable abstractions *)
-     List.fold_right
-       (fun delta scheme -> Types.TySchemeDirt (delta, scheme))
-       freeDirtVars
-  |> (* 4: Add the type variable abstractions *)
-     List.fold_right
-       (fun (a,s) scheme -> Types.TySchemeTy (a, s, scheme))
-       annFreeTyVars
-  |> (* 5: Add the skeleton abstractions *)
-     List.fold_right
-       (fun skel scheme -> Types.TySchemeSkel (skel, scheme))
-       freeSkelVars
-
-(* Create a generalized term from parts (as delivered from "splitter"). *)
-let mkGeneralizedTerm freeSkelVars annFreeTyVars freeDirtVars tyCs dirtCs exp : Typed.expression =
-  exp
-  |> (* 1: Add the constraint abstractions (dirt) *)
-     List.fold_right
-       (fun (omega,pi) qual -> Typed.LambdaDirtCoerVar (omega, pi, qual))
-       dirtCs
-  |> (* 2: Add the constraint abstractions (type) *)
-     List.fold_right
-       (fun (omega,pi) qual -> Typed.LambdaTyCoerVar (omega, pi, qual))
-       tyCs
-  |> (* 3: Add the dirt variable abstractions *)
-     List.fold_right
-       (fun delta e -> Typed.BigLambdaDirt (delta, e))
-       freeDirtVars
-  |> (* 4: Add the type variable abstractions *)
-     List.fold_right
-       (fun (a,s) e -> Typed.BigLambdaTy (a, s, e))
-       annFreeTyVars
-  |> (* 5: Add the skeleton abstractions *)
-     List.fold_right
-       (fun skel e -> Typed.BigLambdaSkel (skel, e))
-       freeSkelVars
-
-(* ************************************************************************* *)
-(*                    PREDICATES ON Types.target_ty                          *)
-(* ************************************************************************* *)
-
-(* GEORGE:TODO: Move these where they belong? (in types.ml). Also, I would
- * delete them, but we might need them for assertions here and there. We'll
- * see. *)
-
-let isTyParamTy : Types.target_ty -> bool = function
-  | Types.TyParam _ -> true
-  | _other_type     -> false
-
-let isApplyTy : Types.target_ty -> bool = function
-  | Types.Apply (_,_) -> true
-  | _other_type       -> false
-
-let isArrowTy : Types.target_ty -> bool = function
-  | Types.Arrow (_,_) -> true
-  | _other_type       -> false
-
-let isTupleTy : Types.target_ty -> bool = function
-  | Types.Tuple _ -> true
-  | _other_type   -> false
-
-let isHandlerTy : Types.target_ty -> bool = function
-  | Types.Handler (_,_) -> true
-  | _other_type         -> false
-
-let isPrimTy : Types.target_ty -> bool = function
-  | Types.PrimTy _ -> true
-  | _other_type    -> false
-
-let isQualTyTy : Types.target_ty -> bool = function
-  | Types.QualTy (_,_) -> true
-  | _other_type        -> false
-
-let isQualDirtTy : Types.target_ty -> bool = function
-  | Types.QualDirt (_,_) -> true
-  | _other_type          -> false
-
-let isTySchemeTy : Types.target_ty -> bool = function
-  | Types.TySchemeTy (_,_,_) -> true
-  | _other_type              -> false
-
-let isTySchemeDirtTy : Types.target_ty -> bool = function
-  | Types.TySchemeDirt (_,_) -> true
-  | _other_type              -> false
-
-let isTySchemeSkelTy : Types.target_ty -> bool = function
-  | Types.TySchemeSkel (_,_) -> true
-  | _other_type              -> false
-
-(* Check if a target type is a monotype. That is, no universal quantification
- * and no qualified constraints, at the top-level or in nested positions. *)
-let rec isMonoTy : Types.target_ty -> bool = function
-  | Types.TyParam _                 -> true
-  | Types.Apply (tyCon,tys)         -> List.for_all isMonoTy tys
-  | Types.Arrow (ty1,(ty2,_))       -> isMonoTy ty1 && isMonoTy ty2
-  | Types.Tuple tys                 -> List.for_all isMonoTy tys
-  | Types.Handler ((ty1,_),(ty2,_)) -> isMonoTy ty1 && isMonoTy ty2
-  | Types.PrimTy _                  -> true
-  | Types.QualTy (_,_)              -> false (* no qualification *)
-  | Types.QualDirt (_,_)            -> false (* no qualification *)
-  | Types.TySchemeTy (_,_,_)        -> false (* no quantification *)
-  | Types.TySchemeDirt (_,_)        -> false (* no quantification *)
-  | Types.TySchemeSkel (_,_)        -> false (* no quantification *)
 
 (* ************************************************************************* *)
 (*                           PARTITION TYPES                                 *)
@@ -533,15 +208,9 @@ let stripHindleyMilnerLikeTy : Types.target_ty ->
     let allDirtVars, ty3 = stripDirtAbs  ty2  in  (* 3: Strip off the dirt abstractions *)
     let allTyCs    , ty4 = stripTyQual   ty3  in  (* 4: Strip off the type inequality qualification *)
     let allDirtCs  , ty5 = stripDirtQual ty4  in  (* 5: Strip off the dirt inequality qualification *)
-    if isMonoTy ty5                               (* 6: Ensure the remainder is a monotype *)
+    if Types.isMonoTy ty5                         (* 6: Ensure the remainder is a monotype *)
       then Some (allSkelVars,allTyVars,allDirtVars,allTyCs,allDirtCs,ty5)
       else None
-
-(* Check whether a type has a valid form (cf. [stripHindleyMilnerLikeTy]). *)
-let isTypeValid (ty : Types.target_ty) bool =
-  match stripHindleyMilnerLikeTy ty with
-  | Some (_,_,_,_,_,_) -> true
-  | None               -> false
 
 (* ************************************************************************* *)
 (*                       VARIABLE INSTANTIATION                              *)
@@ -1133,57 +802,7 @@ and tcValue (inState : state) (lclCtxt : TypingEnv.t) (exp : Untyped.expression)
   ; outState = res.outState
   ; outSubst = res.outSubst }
 
-(* Typecheck a let as in the paper, where c1 is a value *)
-and tcLetVal (inState : state) (lclCtxt : TypingEnv.t)
-      (patIn : Untyped.pattern)
-      (e1 : Untyped.expression)
-      (c2 : Untyped.computation) : tcCmpOutput =
-  (* 1: Typecheck e1 *)
-  let e1res = tcLocatedVal inState lclCtxt e1 in (* (v',A, Qv, Sigma1) *)
-
-  (* 2: Solve the constraints *)
-  Print.debug "tcLetVal: Calling unify with (%d): " (List.length e1res.outState.constraints);  Unification.print_c_list e1res.outState.constraints;
-  let sigma1', qv' = Unification.unify (Substitution.empty, [], e1res.outState.constraints) in
-
-  (* 3: Partition the constraints *)
-  let (freeSkelVars, annFreeTyVars, freeDirtVars, csTyLcl, csDirtLcl, csGbl) =
-    split
-      (subInEnv sigma1' (subInEnv e1res.outSubst lclCtxt)) (* sigma1'(sigma1(Gamma)) *)
-      qv'
-      (subInValTy sigma1' e1res.outType)
-  in
-
-  (* 4: Construct the generalized type of x *)
-  let xType = mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars csTyLcl csDirtLcl (subInValTy sigma1' e1res.outType) in
-
-  (* 5: Typecheck c2 *)
-  (* GEORGE: we do not support anything else at the moment *)
-  let x = (match patIn.it with
-           | Untyped.PVar x -> x
-           | _ -> failwith "tcLetVal: only varpats allowed") in
-
-  let c2res = tcLocatedCmp
-                ({ e1res.outState with constraints = csGbl })
-                (extendLclCtxt (lclCtxt |> subInEnv e1res.outSubst |> subInEnv sigma1') x xType)
-                c2 in
-
-  let genTerm = subInExp
-                  c2res.outSubst
-                  (mkGeneralizedTerm
-                    freeSkelVars annFreeTyVars freeDirtVars csTyLcl csDirtLcl
-                    (subInExp sigma1' e1res.outExpr)
-                  ) in
-
-  (* 6: Combine the results *)
-  { outExpr  = Typed.LetVal
-                 ( genTerm
-                 , Typed.abstraction_with_ty (Typed.PVar x) (subInValTy c2res.outSubst xType) c2res.outExpr )
-  ; outType  = c2res.outType
-  ; outState = c2res.outState
-  ; outSubst = extendGenSub (extendGenSub e1res.outSubst sigma1') c2res.outSubst
-  }
-
-(* Typecheck a let as in the paper, where c1 is a value *)
+(* Typecheck a let where c1 is a value *)
 and tcLetValNoGen (inState : state) (lclCtxt : TypingEnv.t)
       (patIn : Untyped.pattern)
       (e1 : Untyped.expression)
@@ -1262,134 +881,6 @@ and tcLet (inState : state) (lclCtxt : TypingEnv.t) (pdef : Untyped.pattern) (c1
   | _other_computation -> tcLetCmp inState lclCtxt pdef c1 c2
 
 (* Typecheck a (potentially) recursive let *)
-(*
-   α, β, δ, ς₁, ς₂ fresh
-
-   Q₁, α:ς₁, β:ς₂; Γ, (f : α -> β ! δ), (x : α) |- c₁ : A₁ ! Δ₁ | Q₂; σ₁ ~> c₁'
-
-   (σ₂,Q₃) = solve(●;●;Q₂,ω₁:A₁<=β,ω₂:Δ₁<=δ)
-   (ςs,αs:τs,δѕ,ωs:πs,Q₅) = split(σ₂(σ₁(Γ)), Q₃, σ₂(A₁))
-   c1'' = σ₂(σ₁([f ςs αs δѕ ωs |> <α> -> ω₁ ! ω₂ / f]c1'))
-   Q₅; σ₂(σ₁(Γ)), (f : ∀ςs.∀(αs:τs).∀δѕ.πs=>σ₂(σ₁(α))->σ₂(A₁!Δ₁) |- c₂: A₂ ! Δ₂ | Q₆; σ₃ ~> c₂'
-   -------------------------------------------------------------------------------------------
-   Q₁; Γ |- let rec f x = c₁ in c₂ : A₂ ! Δ₂ | Q₆; σ₃.σ₂.σ₁
-     ~> let rec f = σ₃(Λςs.Λ(αs:τs).Λδѕ.λ(ωs:πs).fun x : σ₃(σ₂(σ₁(α))) -> c₁'') in c₂'
-*)
-(* GEORGE:TODO: Update the rule in the comment to reflect what you have on
- * paper (and consequently, what you have implemented). *)
-
-and tcLetRec (inState : state) (lclCtxt : TypingEnv.t)
-      (var : Untyped.variable)
-      (abs : Untyped.abstraction)
-      (c2 : Untyped.computation) : tcCmpOutput =
-
-  (* 1: Generate fresh variables for everything *)
-  let alpha, alphaSkel = fresh_ty_with_fresh_skel () in
-  let beta , betaSkel  = fresh_ty_with_fresh_skel () in
-  let delta = Types.fresh_dirt () in
-
-  (* 2: Typecheck the abstraction *)
-  let { outExpr  = (trgPat, trgC1)
-      ; outType  = (trgPatTy,(tyA1, dirtD1))
-      ; outState = state1
-      ; outSubst = sigma1
-      } = tcTypedAbstraction
-            (inState |> add_constraint alphaSkel |> add_constraint betaSkel)
-            (extendLclCtxt lclCtxt var (Types.Arrow (alpha, (beta, delta))))
-            abs alpha in
-(*
-  (
-    let ({it = Untyped.PVar x}, c1) = abs in (* Only variable patterns allowed *)
-    let bigGamma = extendLclCtxt
-                     (extendLclCtxt lclCtxt var (Types.Arrow (alpha, (beta, delta))))
-                     x alpha in
-    let bigState = inState |> add_constraint alphaSkel |> add_constraint betaSkel in
-    let c1' = tcLocatedCmp bigState bigGamma c1 in
-    { outExpr  = (Typed.PVar x, c1'.outExpr)
-    ; outType  = (subInValTy c1'.outSubst alpha, c1'.outType)
-    ; outState = c1'.outState
-    ; outSubst = c1'.outSubst
-    }
-  ) in
-*)
-
-  (* 3: The assumed type should be at least as general as the inferred one *)
-  let omega1, omegaCt1 = Typed.fresh_ty_coer (tyA1, subInValTy sigma1 beta) in
-  let omega2, omegaCt2 = Typed.fresh_dirt_coer (dirtD1, subInDirt sigma1 delta) in
-
-  (* 4: Solve the constraints *)
-  let inputConstraints = (state1 |> add_constraint omegaCt1 |> add_constraint omegaCt2).constraints in
-  Print.debug "tcLetRec: Calling unify with (%d): " (List.length inputConstraints);  Unification.print_c_list inputConstraints;
-  let sigma1', csQ1' = Unification.unify ( Substitution.empty
-                                       , []
-                                       , inputConstraints
-                                       ) in
-
-  (* 5: Partition the constraints *)
-  let (freeSkelVars, annFreeTyVars, freeDirtVars, csTyLcl, csDirtLcl, csGbl) =
-    split
-      (subInEnv sigma1' (subInEnv sigma1 lclCtxt)) (* sigma1'(sigma1(Gamma)) *)
-      csQ1'
-      (subInValTy sigma1' (Types.Arrow (subInValTy sigma1 alpha, (tyA1,dirtD1))))
-  in
-
-  (* 6: Create the (complicated) c1''. *)
-  let c1'' = (
-    let ground_f   = mkGroundTerm freeSkelVars annFreeTyVars freeDirtVars csTyLcl csDirtLcl (Typed.Var var) in
-    let f_coercion = Typed.ArrowCoercion
-                       ( Typed.ReflTy (subInValTy sigma1' (subInValTy sigma1 alpha))
-                       , subInCmpCo sigma1' (Typed.BangCoercion (omega1, omega2))
-                       ) in
-    let subst_fn   = Typed.subst_comp (Assoc.of_list [(var, Typed.CastExp(ground_f, f_coercion))]) in
-    subst_fn (subInCmp sigma1' trgC1)
-  ) in
-
-
-  (* 7: Typecheck c2 *)
-  let ftype1 = mkGeneralizedType
-                 freeSkelVars annFreeTyVars freeDirtVars csTyLcl csDirtLcl
-                 (Types.Arrow ( subInValTy sigma1' (subInValTy sigma1 alpha)
-                              , subInCmpTy sigma1' (tyA1, dirtD1)
-                              )
-                 ) in
-  let c2res =
-    tcLocatedCmp
-      ({ state1 with constraints = csGbl })
-      (extendLclCtxt (lclCtxt |> subInEnv sigma1 |> subInEnv sigma1') var ftype1)
-      c2
-  in
-
-  (* 8: Create the generated term *)
-  let genTerm = (
-    (* The final definition of f *)
-    let fdef = subInExp c2res.outSubst
-                 (mkGeneralizedTerm
-                    freeSkelVars annFreeTyVars freeDirtVars csTyLcl csDirtLcl
-                    (Typed.Lambda
-                       (Typed.abstraction_with_ty
-                          trgPat (* GEORGE: I assume it has no types in it.
-                                  * If it does, we need sigma1'(trgPat) instead *)
-                          (subInValTy sigma1' trgPatTy)
-                          c1''
-                       )
-                    )
-                 )
-    in
-
-    (* The final type of f *)
-    let ftype = subInValTy c2res.outSubst ftype1 in
-
-    Typed.LetRec ([(var, ftype, fdef)], c2res.outExpr)
-  ) in
-
-  (* 9: Combine the results *)
-  { outExpr  = genTerm
-  ; outType  = c2res.outType
-  ; outState = c2res.outState
-  ; outSubst = extendGenSub (extendGenSub sigma1 sigma1') c2res.outSubst
-  }
-
-
 and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
       (var : Untyped.variable)
       (abs : Untyped.abstraction)
