@@ -150,7 +150,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     | Multicore.TyArrow (t1, t2) ->
         translate ppf "@[<h>(%t ->@ %t)@]" (translate_type t1)
           (translate_type t2)
-    | Multicore.TyBasic b -> translate ppf "%s" b
+    | Multicore.TyBasic b -> translate ppf "%t" (Const.print_ty b)
     | Multicore.TyApply (t, []) ->
         translate ppf "%t" (MulticoreSymbol.print_tyname t)
     | Multicore.TyApply (t, ts) ->

@@ -2,6 +2,8 @@ open CoreUtils
 
 type t = Integer of int | String of string | Boolean of bool | Float of float
 
+type ty = IntegerTy | StringTy | BooleanTy | FloatTy
+
 let of_integer n = Integer n
 
 let of_string s = String s
@@ -21,12 +23,23 @@ let print c ppf =
   | Boolean b -> Format.fprintf ppf "%B" b
   | Float f -> Format.fprintf ppf "%F" f
 
+let print_ty c ppf =
+  match c with
+  | IntegerTy -> Format.fprintf ppf "int"
+  | StringTy -> Format.fprintf ppf "string"
+  | BooleanTy -> Format.fprintf ppf "bool"
+  | FloatTy -> Format.fprintf ppf "float"
+
+let infer_ty = function
+  | Integer _ -> IntegerTy
+  | String _ -> StringTy
+  | Boolean _ -> BooleanTy
+  | Float _ -> FloatTy
+
 let compare c1 c2 =
   let cmp x y =
     let r = Pervasives.compare x y in
-    if r < 0 then Less
-    else if r > 0 then Greater
-    else Equal
+    if r < 0 then Less else if r > 0 then Greater else Equal
   in
   match (c1, c2) with
   | Integer n1, Integer n2 -> cmp n1 n2

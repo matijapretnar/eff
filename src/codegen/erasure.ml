@@ -47,12 +47,12 @@ and e_handler =
   ; value_clause: e_abstraction_with_ty }
 
 (** Abstractions that take one argument. *)
-and e_abstraction = (e_pattern * e_computation)
+and e_abstraction = e_pattern * e_computation
 
-and e_abstraction_with_ty = (e_pattern * Types.skeleton * e_computation)
+and e_abstraction_with_ty = e_pattern * Types.skeleton * e_computation
 
 (** Abstractions that take two arguments. *)
-and e_abstraction2 = (e_pattern * e_pattern * e_computation)
+and e_abstraction2 = e_pattern * e_pattern * e_computation
 
 let rec typed_to_erasure_ty sub typed_ty =
   match typed_ty with
@@ -76,7 +76,6 @@ let rec typed_to_erasure_ty sub typed_ty =
   | Types.TySchemeDirt (p, tty) -> typed_to_erasure_ty sub tty
   | Types.TySchemeSkel (p, tty) ->
       Types.ForallSkel (p, typed_to_erasure_ty sub tty)
-
 
 let rec typed_to_erasure_exp sub tt =
   match tt with
