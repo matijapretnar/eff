@@ -1723,7 +1723,7 @@ let tcTopLevel ~loc inState cmp =
   (* 3: Substitute back into the elaborated expression *)
   let ct' = subInCmp solverSigma trgCmp in
 
-  (* 4: Create the dirt-zonking substitution *)
+  (* 4: Create the dirt-grounding substitution *)
   let dirtZonker = mkCmpDirtGroundSubst (subInCmp solverSigma trgCmp) in
 
   (* 5: Zonk and finalize the residual constraints *)
