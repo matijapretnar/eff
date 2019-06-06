@@ -734,24 +734,15 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
 
 (* Dispatch: Type inference for a plain value (expression) *)
 and tcVal (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_expression -> tcValOutput = function
-  | Untyped.Var x              -> (* showInputEnv "Var" lclCtx; showInputCs "Var" inState; *)
-                                  tcVar       inState lclCtx x
-  | Untyped.Const c            -> (* showInputEnv "Const" lclCtx; showInputCs "Const" inState; *)
-                                  tcConst     inState lclCtx c
-  | Untyped.Annotated (e,ty)   -> (* showInputEnv "Annotated" lclCtx; showInputCs "Annotated" inState; *)
-                                  tcAnnotated inState lclCtx (e,ty)
-  | Untyped.Tuple es           -> (* showInputEnv "Tuple" lclCtx; showInputCs "Tuple" inState; *)
-                                  tcTuple     inState lclCtx es
-  | Untyped.Record lst         -> (* showInputEnv "Record" lclCtx; showInputCs "Record" inState; *)
-                                  tcRecord    inState lclCtx lst
-  | Untyped.Variant (lbl,mbe)  -> (* showInputEnv "Variant" lclCtx; showInputCs "Variant" inState; *)
-                                  tcVariant   inState lclCtx (lbl,mbe)
-  | Untyped.Lambda abs         -> (* showInputEnv "Lambda" lclCtx; showInputCs "Lambda" inState; *)
-                                  tcLambda    inState lclCtx abs
-  | Untyped.Effect eff         -> (* showInputEnv "Effect" lclCtx; showInputCs "Effect" inState; *)
-                                  tcEffect    inState lclCtx eff
-  | Untyped.Handler hand       -> (* showInputEnv "Handler" lclCtx; showInputCs "Handler" inState; *)
-                                  tcHandler   inState lclCtx hand
+  | Untyped.Var x              -> tcVar       inState lclCtx x
+  | Untyped.Const c            -> tcConst     inState lclCtx c
+  | Untyped.Annotated (e,ty)   -> tcAnnotated inState lclCtx (e,ty)
+  | Untyped.Tuple es           -> tcTuple     inState lclCtx es
+  | Untyped.Record lst         -> tcRecord    inState lclCtx lst
+  | Untyped.Variant (lbl,mbe)  -> tcVariant   inState lclCtx (lbl,mbe)
+  | Untyped.Lambda abs         -> tcLambda    inState lclCtx abs
+  | Untyped.Effect eff         -> tcEffect    inState lclCtx eff
+  | Untyped.Handler hand       -> tcHandler   inState lclCtx hand
 
 (* Type inference for a located value (expression) *)
 and tcLocatedVal (inState : state) (lclCtx : TypingEnv.t) (e : Untyped.expression) : tcValOutput
@@ -1003,90 +994,6 @@ and tcIfThenElse (inState : state) (lclCtxt : TypingEnv.t)
   ; outSubst = extendGenSub
                  (extendGenSub scrRes.outSubst truRes.outSubst)
                  flsRes.outSubst
-  }
-
-(* Typecheck a case expression *)
-(* GEORGE: There are multiple ways to typecheck a case expression, depending on
- * what semantics one wants. We choose this for now cause it is easier to
- * implement *)
-and tcMatch (inState : state) (lclCtxt : TypingEnv.t) (scr : Untyped.expression) (cases : Untyped.abstraction list) : tcCmpOutput =
-  (* 1: Typecheck the scrutinee *)
-  let resScr = tcLocatedVal inState lclCtxt scr in
-
-  (* 2: Generate fresh variables for the result *)
-  let alphaOut, alphaOutSkel = fresh_ty_with_fresh_skel () in
-  let deltaOut = Types.fresh_dirt () in
-
-  (* 3: How to typecheck the clauses *)
-  let rec tcMatchCases (tmpState : state) (tmpCtxt : TypingEnv.t) (clauses : Untyped.abstraction list) = (
-    match clauses with
-    | [] -> { outExpr  = None
-            ; outType  = () (* () *)
-            ; outState = tmpState
-            ; outSubst = Substitution.empty
-            }
-    | (pat,rhs) :: clauses ->
-        (* Infer a type for the pattern *)
-        let trgPat,patTy,extState,extCtxt = inferLocatedPatTy tmpState tmpCtxt pat in
-        (* Typecheck the right-hand side *)
-        let resRhs = tcLocatedCmp extState extCtxt rhs in
-        (* Typecheck the rest of the clauses *)
-        let resRest = tcMatchCases resRhs.outState (subInEnv resRhs.outSubst tmpCtxt) clauses in
-
-        (* Create the target clause *)
-        let tyBi, dirtDi = resRhs.outType in
-
-        let omegaOutLeft, omegaOutLeftCt = Typed.fresh_ty_coer (subInValTy resRest.outSubst tyBi, alphaOut) in
-        let omegaOutRight, omegaOutRightCt = Typed.fresh_dirt_coer (subInDirt resRest.outSubst dirtDi, deltaOut) in
-        let omegaIn, omegaInCt = Typed.fresh_ty_coer
-                                   ( subInValTy resRest.outSubst
-                                       (subInValTy resRhs.outSubst resScr.outType)
-                                   , subInValTy resRest.outSubst patTy) in
-
-        let trgClause = (
-          let scrutinee = Typed.CastExp
-                            ( resScr.outExpr
-                                |> subInExp resRhs.outSubst
-                                |> subInExp resRest.outSubst
-                            , omegaIn
-                            ) in
-
-          let firstClause = ( trgPat
-                            , Typed.CastComp ( subInCmp resRest.outSubst resRhs.outExpr
-                                             , Typed.BangCoercion (omegaOutLeft, omegaOutRight)
-                                             )
-                            ) in
-
-          let nextClauses = (match resRest.outExpr with
-                             | None   -> []
-                             | Some c -> [(Typed.PNonbinding, c)]
-                            ) in
-
-          Typed.Match (scrutinee, firstClause :: nextClauses)
-        ) in
-
-        (* Combine the results *)
-        { outExpr  = Some trgClause
-        ; outType  = () (* () : GEORGE's BAD MODELLING *)
-        ; outState = resRest.outState
-                       |> add_constraint omegaOutLeftCt
-                       |> add_constraint omegaOutRightCt
-                       |> add_constraint omegaInCt
-        ; outSubst = extendGenSub resRhs.outSubst resRest.outSubst (* Compose the substitutions *)
-        }
-  ) in
-
-  (* 4: Actually typecheck the clauses (GEORGE: Awful name; change it) *)
-  let almostThere = tcMatchCases resScr.outState (subInEnv resScr.outSubst lclCtxt) cases in
-
-  let finalComputation = (match almostThere.outExpr with
-       | None -> Typed.Match (resScr.outExpr, []) (* Only if alternative list is empty *)
-       | Some c -> c ) in
-
-  { outExpr  = finalComputation
-  ; outType  = (alphaOut, deltaOut)
-  ; outState = almostThere.outState |> add_constraint alphaOutSkel
-  ; outSubst = extendGenSub resScr.outSubst almostThere.outSubst
   }
 
 (* Typecheck a function application *)
