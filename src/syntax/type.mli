@@ -3,7 +3,7 @@ val fresh_ty_param : unit -> CoreTypes.TyParam.t
 type ty =
   | Apply of CoreTypes.TyName.t * ty list
   | TyParam of CoreTypes.TyParam.t
-  | Basic of string
+  | Basic of Const.ty
   | Tuple of ty list
   | Arrow of ty * ty
   | Handler of handler_ty

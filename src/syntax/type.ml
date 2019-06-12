@@ -7,7 +7,7 @@ let fresh_ty_param = CoreTypes.TyParam.fresh
 type ty =
   | Apply of CoreTypes.TyName.t * ty list
   | TyParam of CoreTypes.TyParam.t
-  | Basic of string
+  | Basic of Const.ty
   | Tuple of ty list
   | Arrow of ty * ty
   | Handler of handler_ty
@@ -21,13 +21,13 @@ and handler_ty =
 (* This type is used when type checking is turned off. Its name
    is syntactically incorrect so that the programmer cannot accidentally
    define it. *)
-let int_ty = Basic "int"
+let int_ty = Basic Const.IntegerTy
 
-let string_ty = Basic "string"
+let string_ty = Basic Const.StringTy
 
-let bool_ty = Basic "bool"
+let bool_ty = Basic Const.BooleanTy
 
-let float_ty = Basic "float"
+let float_ty = Basic Const.FloatTy
 
 let unit_ty = Tuple []
 
@@ -111,7 +111,7 @@ let print (ps, t) ppf =
     match t with
     | Arrow (t1, t2) ->
         print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2)
-    | Basic b -> print "%s" b
+    | Basic b -> print "%t" (Const.print_ty b)
     | Apply (t, []) -> print "%t" (CoreTypes.TyName.print t)
     | Apply (t, [s]) ->
         print ~at_level:1 "%t %t" (ty ~max_level:1 s)
