@@ -265,30 +265,28 @@ and translate_case case ppf =
           (translate_pattern p1) (translate_pattern p2)
           (translate_pattern p2) (translate_pattern p2) (translate_term t)
 
-let rec translate_prog cmds = 
-  List.iter translate_cmd cmds; Format.flush_str_formatter ()
-and
-  translate_cmd cmd =
-    match cmd with
-    | Multicore.Term t ->  translate state_ppf "let _ = @.@[<hv>(_ocaml_tophandler) (fun _ -> @,%t@,)@];;@." (translate_term t)
-    | Multicore.DefEffect (eff, (ty1, ty2)) -> translate_def_effect (eff, (ty1, ty2)) state_ppf
-    | Multicore.TopLet defs -> translate_top_let defs state_ppf
-    | Multicore.TopLetRec defs ->  translate_top_let_rec defs state_ppf
-    | Multicore.TyDef tydefs -> translate_tydefs tydefs state_ppf
-    | Multicore.External (x, ty, f) -> 
-       match Assoc.lookup f MulticoreExternal.values with
-      | None -> Error.runtime "Unknown external symbol %s." f
-      | Some (MulticoreExternal.Unknown as unknown) ->
-          Print.warning
-            ( "External symbol %s cannot be compiled. It has been replaced "
-            ^^ "with [failwith \"Unknown external symbol %s.\"]." )
-            f f ;
-          translate_external x f unknown state_ppf
-      | Some (MulticoreExternal.Exists s as known) ->
-          translate_external x f known state_ppf
+let translate_cmd ppf = function
+  | Multicore.Term t -> translate ppf "let _ = @.@[<hv>(_ocaml_tophandler) (fun _ -> @,%t@,)@];;@." (translate_term t)
+  | Multicore.DefEffect (eff, (ty1, ty2)) -> translate_def_effect (eff, (ty1, ty2)) ppf
+  | Multicore.TopLet defs -> translate_top_let defs ppf
+  | Multicore.TopLetRec defs ->  translate_top_let_rec defs ppf
+  | Multicore.TyDef tydefs -> translate_tydefs tydefs ppf
+  | Multicore.External (x, ty, f) -> 
+      match Assoc.lookup f MulticoreExternal.values with
+    | None -> Error.runtime "Unknown external symbol %s." f
+    | Some (MulticoreExternal.Unknown as unknown) ->
+        Print.warning
+          ( "External symbol %s cannot be compiled. It has been replaced "
+          ^^ "with [failwith \"Unknown external symbol %s.\"]." )
+          f f ;
+        translate_external x f unknown ppf
+    | Some (MulticoreExternal.Exists s as known) ->
+        translate_external x f known ppf
 
 let write_to_file file_name cmds = 
   let channel = open_out file_name in
   let output_ppf = Format.formatter_of_out_channel channel in
-    Format.fprintf output_ppf "%s" (translate_prog cmds) ;
-    close_out channel
+  List.iter (translate_cmd state_ppf) cmds;
+  Format.fprintf output_ppf "%s" (Format.flush_str_formatter ());
+  close_out channel
+  
