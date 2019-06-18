@@ -1,292 +1,116 @@
 open CoreUtils
-module Multicore = MulticoreSyntax
-
-let state_ppf = Format.str_formatter
-
-let translate = Format.fprintf
-
-(* ------------------------------------------------------------------------ *)
-(* Auxiliary translations *)
-
-let translate_sequence (type a) =
-  (* This trick is needed to make it strongly polymorphic.
-      Thanks Jane Street Tech Blog. *)
-  let rec sequence sep (translator : a -> Format.formatter -> unit) vs ppf =
-    match vs with
-    | [] -> ()
-    | [v] -> translator v ppf
-    | v :: vs ->
-        translate ppf
-          ("%t" ^^ sep ^^ "%t")
-          (translator v)
-          (sequence sep translator vs)
-  in
-  sequence
-
-let translate_field translator sep (f, v) ppf =
-  translate ppf "%t %s %t" (MulticoreSymbol.print_field f) sep (translator v)
-
-let translate_tuple translator lst ppf =
-  match lst with
-  | [] -> translate ppf "()"
-  | lst ->
-      translate ppf "(@[<hov>%t@])" (translate_sequence ", " translator lst)
-
-let translate_record translator sep assoc ppf =
-  let lst = Assoc.to_list assoc in
-  translate ppf "{@[<hov>%t@]}"
-    (translate_sequence "; " (translate_field translator sep) lst)
+open MulticoreSyntax
+module CoreSyntax = UntypedSyntax
 
 (* ------------------------------------------------------------------------ *)
 (* Translations *)
 
-let rec translate_term t ppf =
-  match t with
-  | Multicore.Var x -> translate ppf "%t" (MulticoreSymbol.print_variable x)
-  | Multicore.Const c -> translate ppf "%t" (Const.print c)
-  | Multicore.Annotated (t, ty) ->
-      translate ppf "(%t : %t)" (translate_term t) (translate_type ty)
-  | Multicore.Tuple lst ->
-      translate ppf "%t" (translate_tuple translate_term lst)
-  | Multicore.Record assoc ->
-      translate ppf "%t" (translate_record translate_term "=" assoc)
-  | Multicore.Variant (lbl, None) when lbl = CoreTypes.nil ->
-      translate ppf "[]"
-  | Multicore.Variant (lbl, None) ->
-      translate ppf "%t" (MulticoreSymbol.print_label lbl)
-  | Multicore.Variant (lbl, Some (Multicore.Tuple [hd; tl]))
-    when lbl = CoreTypes.cons ->
-      translate ppf "@[<hov>(%t::%t)@]" (translate_term hd)
-        (translate_term tl)
-  | Multicore.Variant (lbl, Some t) ->
-      translate ppf "(%t @[<hov>%t@])"
-        (MulticoreSymbol.print_label lbl)
-        (translate_term t)
-  | Multicore.Lambda a ->
-      translate ppf "@[<hv 2>fun %t@]" (translate_abstraction a)
-  | Multicore.Function lst ->
-      translate ppf "@[<hv>(function @, | %t)@]"
-        (translate_sequence "@, | " translate_case lst)
-  | Multicore.Effect eff ->
-      translate ppf "%t" (MulticoreSymbol.print_effect eff)
-  | Multicore.Let (lst, t) ->
-      translate ppf "@[<hv>@[<hv>%tin@] @,%t@]" (translate_let lst)
-        (translate_term t)
-  | Multicore.LetRec (lst, t) ->
-      translate ppf "@[<hv>@[<hv>%tin@] @,%t@]" (translate_let_rec lst)
-        (translate_term t)
-  | Multicore.Match (t, []) ->
-      (* Absurd case *)
-      translate ppf
-        ( "@[<hv>(match %t with | _ ->"
-        ^^ " failwith \"void successfully matched\")@]" )
-        (translate_term t)
-  | Multicore.Match (t, lst) ->
-      translate ppf "@[<hv>(match %t with@, | %t)@]" (translate_term t)
-        (translate_sequence "@, | " translate_case lst)
-  | Multicore.Apply (Multicore.Effect eff, (Multicore.Lambda _ as t2)) ->
-      translate ppf "perform (%t (%t))"
-        (MulticoreSymbol.print_effect eff)
-        (translate_term t2)
-  | Multicore.Apply (Multicore.Effect eff, t2) ->
-      translate ppf "perform (%t %t)"
-        (MulticoreSymbol.print_effect eff)
-        (translate_term t2)
-  | Multicore.Apply (t1, t2) ->
-      translate ppf "@[<hov 2>(%t) @,(%t)@]" (translate_term t1)
-        (translate_term t2)
-  | Multicore.Check t ->
-      Print.warning
-        "[#check] commands are ignored when compiling to Multicore OCaml."
-
-and translate_pattern p ppf =
+let abstraction_is_id (p, c) =
+  (* Used to remove trivial finally clauses from handlers. *)
   match p with
-  | Multicore.PVar x -> translate ppf "%t" (MulticoreSymbol.print_variable x)
-  | Multicore.PAs (p, x) ->
-      translate ppf "%t as %t" (translate_pattern p)
-        (MulticoreSymbol.print_variable x)
-  | Multicore.PAnnotated (p, ty) ->
-      translate ppf "(%t : %t)" (translate_pattern p) (translate_type ty)
-  | Multicore.PConst c -> translate ppf "%t" (Const.print c)
-  | Multicore.PTuple lst ->
-      translate ppf "%t" (translate_tuple translate_pattern lst)
-  | Multicore.PRecord assoc ->
-      translate ppf "%t" (translate_record translate_pattern "=" assoc)
-  | Multicore.PVariant (lbl, None) when lbl = CoreTypes.nil ->
-      translate ppf "[]"
-  | Multicore.PVariant (lbl, None) ->
-      translate ppf "%t" (MulticoreSymbol.print_label lbl)
-  | Multicore.PVariant (lbl, Some (Multicore.PTuple [hd; tl]))
-    when lbl = CoreTypes.cons ->
-      translate ppf "@[<hov>(%t::%t)@]" (translate_pattern hd)
-        (translate_pattern tl)
-  | Multicore.PVariant (lbl, Some p) ->
-      translate ppf "(%t @[<hov>%t@])"
-        (MulticoreSymbol.print_label lbl)
-        (translate_pattern p)
-  | Multicore.PNonbinding -> translate ppf "_"
+  | PVar v -> CoreTypes.Variable.fold (fun desc _ -> desc = "$id_par") v
+  | _ -> false
 
-and translate_type ty ppf =
-  match ty with
-  | Multicore.TyArrow (t1, t2) ->
-      translate ppf "@[<h>(%t ->@ %t)@]" (translate_type t1)
-        (translate_type t2)
-  | Multicore.TyBasic b -> translate ppf "%t" (Const.print_ty b)
-  | Multicore.TyApply (t, []) ->
-      translate ppf "%t" (MulticoreSymbol.print_tyname t)
-  | Multicore.TyApply (t, ts) ->
-      translate ppf "(%t) %t"
-        (Print.sequence ", " translate_type ts)
-        (MulticoreSymbol.print_tyname t)
-  | Multicore.TyParam p ->
-      translate ppf "%t" (MulticoreSymbol.print_typaram p)
-  | Multicore.TyTuple [] -> translate ppf "unit"
-  | Multicore.TyTuple ts ->
-      translate ppf "@[<hov>(%t)@]" (Print.sequence " * " translate_type ts)
+let rec of_abstraction (p, c) = (of_pattern p, of_computation c)
 
-and translate_tydef (name, (params, tydef)) ppf =
-  let translate_def tydef ppf =
-    match tydef with
-    | Multicore.TyDefRecord assoc ->
-        translate ppf "%t" (translate_record translate_type ":" assoc)
-    | Multicore.TyDefSum assoc ->
-        let lst = Assoc.to_list assoc in
-        let cons_translator ty_opt ppf =
-          match ty_opt with
-          | lbl, None -> translate ppf "%t" (MulticoreSymbol.print_label lbl)
-          | lbl, Some ty ->
-              translate ppf "%t of %t"
-                (MulticoreSymbol.print_label lbl)
-                (translate_type ty)
-        in
-        translate ppf "@[<hov>%t@]"
-          (translate_sequence "@, | " cons_translator lst)
-    | Multicore.TyDefInline ty -> translate ppf "%t" (translate_type ty)
-  in
-  match params with
-  | [] ->
-      translate ppf "@[type %t = %t@]@."
-        (MulticoreSymbol.print_tyname name)
-        (translate_def tydef)
-  | lst ->
-      translate ppf "@[type (%t) %t = %t@]@."
-        (translate_sequence ", " MulticoreSymbol.print_typaram params)
-        (MulticoreSymbol.print_tyname name)
-        (translate_def tydef)
+and of_abstraction2 (p1, p2, c) =
+  (of_pattern p1, of_pattern p2, of_computation c)
 
-and translate_def_effect (eff, (ty1, ty2)) ppf =
-  translate ppf "@[effect %t : %t ->@ %t@]@."
-    (MulticoreSymbol.print_effect eff)
-    (translate_type ty1) (translate_type ty2)
-
-and translate_top_let defs ppf =
-  translate ppf "@[<hv>%t@]@." (translate_let defs)
-
-and translate_top_let_rec defs ppf =
-  translate ppf "@[<hv>%t@]@." (translate_let_rec defs)
-
-and translate_external name symbol_name translation ppf =
-  match translation with
-  | MulticoreExternal.Unknown ->
-      translate ppf "let %t = failwith \"Unknown external symbol %s.\"@."
-        (MulticoreSymbol.print_variable name)
-        symbol_name
-  | MulticoreExternal.Exists t ->
-      translate ppf "let %t = %s@." (MulticoreSymbol.print_variable name) t
-
-and translate_tydefs tydefs ppf =
-  translate ppf "%t@." (translate_sequence "@, and " translate_tydef tydefs)
-
-and translate_abstraction (p, t) ppf =
-  translate ppf "%t ->@ %t" (translate_pattern p) (translate_term t)
-
-and translate_let lst ppf =
-  let rec sequence lst ppf =
-    match lst with
-    | [] -> ()
-    | abs :: tl ->
-        let p_lst, t = abs_to_multiarg_abs abs in
-        translate ppf "@[<hv 2>and %t = @,%t@] @,%t"
-          (translate_sequence " " translate_pattern p_lst)
-          (translate_term t) (sequence tl)
-  in
-  (* First one *)
-  match lst with
-  | [] -> ()
-  | abs :: tl ->
-      let p_lst, t = abs_to_multiarg_abs abs in
-      translate ppf "@[<hv 2>let %t = @,%t@] @,%t"
-        (translate_sequence " " translate_pattern p_lst)
-        (translate_term t) (sequence tl)
-
-and translate_let_rec lst ppf =
-  let rec sequence lst ppf =
-    match lst with
-    | [] -> ()
-    | (name, abs) :: tl ->
-        let p_lst, t = abs_to_multiarg_abs abs in
-        translate ppf "@[<hv 2>and %t %t = @,%t@] @,%t"
-          (MulticoreSymbol.print_variable name)
-          (translate_sequence " " translate_pattern p_lst)
-          (translate_term t) (sequence tl)
-  in
-  (* First one *)
-  match lst with
-  | [] -> ()
-  | (name, abs) :: tl ->
-      let p_lst, t = abs_to_multiarg_abs abs in
-      translate ppf "@[<hv 2>let rec %t %t = @,%t@] @,%t"
-        (MulticoreSymbol.print_variable name)
-        (translate_sequence " " translate_pattern p_lst)
-        (translate_term t) (sequence tl)
-
-and abs_to_multiarg_abs (p, t) =
-  match t with
-  | Multicore.Lambda abs ->
-      let p_list, t' = abs_to_multiarg_abs abs in
-      (p :: p_list, t')
-  | _ -> ([p], t)
-
-and translate_case case ppf =
-  match case with
-  | Multicore.ValueClause abs ->
-      translate ppf "@[<hv 2>%t@]" (translate_abstraction abs)
-  | Multicore.EffectClause (eff, (p1, p2, t)) ->
-      if p2 = Multicore.PNonbinding then
-        translate ppf "@[<hv 2>effect (%t %t) %t -> @,%t@]"
-          (MulticoreSymbol.print_effect eff)
-          (translate_pattern p1) (translate_pattern p2) (translate_term t)
+(** Conversion functions. *)
+and of_expression {it; at} =
+  match it with
+  | CoreSyntax.Var v -> Var v
+  | CoreSyntax.Const const -> Const const
+  | CoreSyntax.Annotated (e, ty) -> Annotated (of_expression e, of_type ty)
+  | CoreSyntax.Tuple es -> Tuple (List.map of_expression es)
+  | CoreSyntax.Record assoc -> Record (Assoc.map of_expression assoc)
+  | CoreSyntax.Variant (lbl, e_opt) -> (
+    match e_opt with
+    | None -> Variant (lbl, None)
+    | Some e -> Variant (lbl, Some (of_expression e)) )
+  | CoreSyntax.Lambda abs -> (
+    (* Transform back to [function] keyword if possible *)
+    match abs with
+    | p, {it= CoreSyntax.Match (e, abs_lst)} -> (
+        let p' = of_pattern p in
+        let e' = of_expression e in
+        match (p', e') with
+        | PVar v1, Var v2
+          when v1 = v2
+               && CoreTypes.Variable.fold (fun desc _ -> desc = "$function") v1
+          ->
+            let converter abs = ValueClause (of_abstraction abs) in
+            Function (List.map converter abs_lst)
+        | _ -> Lambda (of_abstraction abs) )
+    | _ -> Lambda (of_abstraction abs) )
+  | CoreSyntax.Effect eff -> Effect eff
+  | CoreSyntax.Handler {effect_clauses; value_clause; finally_clause} ->
+      (* Non-trivial case *)
+      let effect_clauses' =
+        List.map
+          (fun (eff, abs) -> EffectClause (eff, of_abstraction2 abs))
+          (Assoc.to_list effect_clauses)
+      in
+      let value_clause' = ValueClause (of_abstraction value_clause) in
+      let finally_clause_abs = of_abstraction finally_clause in
+      let ghost_bind = CoreTypes.Variable.fresh "$c_thunk" in
+      let match_handler =
+        Match
+          (Apply (Var ghost_bind, Tuple []), value_clause' :: effect_clauses')
+      in
+      if abstraction_is_id finally_clause_abs then
+        Lambda (PVar ghost_bind, match_handler)
       else
-        translate ppf
-          ( "@[<hv 2>effect (%t %t) %t ->@,"
-          ^^ "(let %t x = continue (Obj.clone_continuation %t) x in @,%t)@]"
-          )
-          (MulticoreSymbol.print_effect eff)
-          (translate_pattern p1) (translate_pattern p2)
-          (translate_pattern p2) (translate_pattern p2) (translate_term t)
+        Lambda
+          (PVar ghost_bind, Apply (Lambda finally_clause_abs, match_handler))
 
-let translate_cmd ppf = function
-  | Multicore.Term t -> translate ppf "let _ = @.@[<hv>(_ocaml_tophandler) (fun _ -> @,%t@,)@];;@." (translate_term t)
-  | Multicore.DefEffect (eff, (ty1, ty2)) -> translate_def_effect (eff, (ty1, ty2)) ppf
-  | Multicore.TopLet defs -> translate_top_let defs ppf
-  | Multicore.TopLetRec defs ->  translate_top_let_rec defs ppf
-  | Multicore.TyDef tydefs -> translate_tydefs tydefs ppf
-  | Multicore.External (x, ty, f) -> 
-      match Assoc.lookup f MulticoreExternal.values with
-    | None -> Error.runtime "Unknown external symbol %s." f
-    | Some (MulticoreExternal.Unknown as unknown) ->
-        Print.warning
-          ( "External symbol %s cannot be compiled. It has been replaced "
-          ^^ "with [failwith \"Unknown external symbol %s.\"]." )
-          f f ;
-        translate_external x f unknown ppf
-    | Some (MulticoreExternal.Exists s as known) ->
-        translate_external x f known ppf
+and of_computation {it; at} =
+  match it with
+  | CoreSyntax.Value e -> of_expression e
+  | CoreSyntax.Let (p_c_lst, c) ->
+      let converter (p, c) = (of_pattern p, of_computation c) in
+      Let (List.map converter p_c_lst, of_computation c)
+  | CoreSyntax.LetRec (var_abs_lst, c) ->
+      let converter (var, abs) = (var, of_abstraction abs) in
+      LetRec (List.map converter var_abs_lst, of_computation c)
+  | CoreSyntax.Match (e, abs_lst) ->
+      let converter abs = ValueClause (of_abstraction abs) in
+      Match (of_expression e, List.map converter abs_lst)
+  | CoreSyntax.Apply (e1, e2) -> Apply (of_expression e1, of_expression e2)
+  | CoreSyntax.Check c -> Check (of_computation c)
+  | CoreSyntax.Handle (e, c) ->
+      (* Non-trivial case *)
+      let modified_handler = of_expression e in
+      let thunked_c = Lambda (PNonbinding, of_computation c) in
+      Apply (modified_handler, thunked_c)
 
-let write_to_file file_name cmds = 
-  let channel = open_out file_name in
-  let output_ppf = Format.formatter_of_out_channel channel in
-  List.iter (translate_cmd state_ppf) cmds;
-  Format.fprintf output_ppf "%s" (Format.flush_str_formatter ());
-  close_out channel
-  
+and of_pattern {it; at} =
+  match it with
+  | CoreSyntax.PVar var -> PVar var
+  | CoreSyntax.PAnnotated (p, ty) -> PAnnotated (of_pattern p, of_type ty)
+  | CoreSyntax.PAs (p, var) -> PAs (of_pattern p, var)
+  | CoreSyntax.PTuple ps -> PTuple (List.map of_pattern ps)
+  | CoreSyntax.PRecord assoc -> PRecord (Assoc.map of_pattern assoc)
+  | CoreSyntax.PVariant (lbl, p_opt) -> (
+    match p_opt with
+    | None -> PVariant (lbl, None)
+    | Some p -> PVariant (lbl, Some (of_pattern p)) )
+  | CoreSyntax.PConst const -> PConst const
+  | CoreSyntax.PNonbinding -> PNonbinding
+
+and of_type = function
+  | Type.Apply (name, tys) -> TyApply (name, List.map of_type tys)
+  | Type.TyParam ty_param -> TyParam ty_param
+  | Type.Basic s -> TyBasic s
+  | Type.Tuple tys -> TyTuple (List.map of_type tys)
+  | Type.Arrow (ty1, ty2) -> TyArrow (of_type ty1, of_type ty2)
+  | Type.Handler {value; finally} ->
+      (* Non-trivial case *)
+      TyArrow (TyArrow (of_type Type.unit_ty, of_type value), of_type finally)
+
+and of_tydef = function
+  | Tctx.Record assoc -> TyDefRecord (Assoc.map of_type assoc)
+  | Tctx.Sum assoc ->
+      let converter = function None -> None | Some ty -> Some (of_type ty) in
+      TyDefSum (Assoc.map converter assoc)
+  | Tctx.Inline ty -> TyDefInline (of_type ty)

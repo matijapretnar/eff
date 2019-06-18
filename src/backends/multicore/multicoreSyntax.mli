@@ -1,5 +1,3 @@
-module CoreSyntax = UntypedSyntax
-
 type variable = CoreTypes.Variable.t
 
 type effect = CoreTypes.Effect.t
@@ -59,7 +57,7 @@ and abstraction = pattern * term
 (** Abstractions that take two arguments. *)
 and abstraction2 = pattern * pattern * term
 
-type cmd = 
+type cmd =
   | Term of term
   | DefEffect of effect * (ty * ty)
   | TopLet of (pattern * term) list
@@ -67,10 +65,4 @@ type cmd =
   | External of (variable * Type.ty * string)
   | TyDef of (label * (CoreTypes.TyParam.t list * tydef)) list
 
-val of_computation : CoreSyntax.computation -> term
-
-val of_pattern : CoreSyntax.pattern -> pattern
-
-val of_type : Type.ty -> ty
-
-val of_tydef : Tctx.tydef -> tydef
+val print_cmd : cmd -> Format.formatter -> unit
