@@ -43,9 +43,8 @@ module Make (Backend : BackendSignature.T) = struct
         let type_system_state', _ =
           TypeSystem.infer_top_comp state.type_system_state c
         in
-        let c', effect_system_state' =
-          ExplicitInfer.tcTopLevel ~loc:c.at
-            state.effect_system_state c
+        let c' = ExplicitInfer.tcTopLevel ~loc:c.at
+                   state.effect_system_state c
         in
         Print.debug "exec_cmd: before backend typechecking";
         let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
@@ -56,16 +55,14 @@ module Make (Backend : BackendSignature.T) = struct
         in
         { state with
           type_system_state= type_system_state'
-        ; effect_system_state= effect_system_state'
         ; backend_state= backend_state' }
     | Commands.TypeOf t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
         let type_system_state', _ =
           TypeSystem.infer_top_comp state.type_system_state c
         in
-        let c', effect_system_state' =
-          ExplicitInfer.tcTopLevel ~loc:c.at
-            state.effect_system_state c
+        let c' = ExplicitInfer.tcTopLevel ~loc:c.at
+                   state.effect_system_state c
         in
         let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
         let backend_state' =
@@ -73,7 +70,6 @@ module Make (Backend : BackendSignature.T) = struct
         in
         { state with
           type_system_state= type_system_state'
-        ; effect_system_state= effect_system_state'
         ; backend_state= backend_state' }
     | Commands.Help ->
         let help_text =

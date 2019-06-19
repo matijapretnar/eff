@@ -1155,9 +1155,8 @@ let tcTopLevel ~loc inState cmp =
 
   Print.debug "ELABORATED COMP (COMPLETE): %t" (Typed.print_computation targetComputation) ;
 
-  ( targetComputation
-  , inState (* Untouched! *)
-  )
+  (* 6: Return the ExEff computation *)
+  targetComputation
 
 (* Add an external binding to the typing environment *)
 let addExternal ctx x ty = { ctx with gblCtxt = TypingEnv.update ctx.gblCtxt x ty }

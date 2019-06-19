@@ -21,8 +21,7 @@ let compile_file ppf filename st =
     | Commands.Term t ->
         let desugarer_state', c = Desugarer.desugar_computation state.desugarer_state t in
         Print.debug "Compiling: %t" (UntypedSyntax.print_computation c) ;
-        let ct, effect_system_state =
-          ExplicitInfer.tcTopLevel ~loc state.effect_system_state c
+        let ct = ExplicitInfer.tcTopLevel ~loc state.effect_system_state c
         in
         Print.debug
           "-- After Type Inference ----------------------------------------" ;
