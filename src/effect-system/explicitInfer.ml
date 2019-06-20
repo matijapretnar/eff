@@ -31,7 +31,6 @@ let warnAddConstraints s cs =
 
 (* Extend the generated substitution *)
 let extendGenSub acc sub = Substitution.merge acc sub (* GEORGE: I hope to God for the order to be correct here *)
-let flippedExtendGenSub sub acc = extendGenSub acc sub
 
 (* [STATE] INFERENCE STATE *)
 
