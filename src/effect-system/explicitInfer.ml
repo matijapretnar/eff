@@ -539,35 +539,38 @@ and tcTypedPat (inState : state) (lclCtxt : TypingEnv.t) pat pat_ty =
   match pat with
   | Untyped.PVar x             -> (Typed.PVar x     , pat_ty, [], extendLclCtxt lclCtxt x pat_ty)
   | Untyped.PNonbinding        -> (Typed.PNonbinding, pat_ty, [], lclCtxt)
+  | Untyped.PTuple pats ->
+      (match pat_ty with
+       | Types.Tuple tys -> let (newPats, newTys, newCs, newEnv) = tcTypedPats inState lclCtxt pats tys in
+                            (Typed.PTuple newPats, Types.Tuple newTys, newCs, newEnv)
+      )
+  | Untyped.PVariant (lbl, None) ->
+      let ty_in, ty_out = Types.constructor_signature lbl in
+      if (ty_in = Types.Tuple [] && pat_ty = ty_out)
+        then (Typed.PVariant (lbl, Typed.PTuple []), pat_ty, [], lclCtxt)
+        else failwith "tcTypedPat: PVariant(None)"
+    | Untyped.PVariant (lbl, Some p) ->
+        let ty_in, ty_out = Types.constructor_signature lbl in
+        if (pat_ty = ty_out)
+          then let p', pty, cs, midCtxt = tcTypedPat inState lclCtxt p.it ty_in in
+               (Typed.PVariant (lbl, p'), pat_ty, cs, midCtxt)
+          else failwith "tcTypedPat: PVariant(Some)"
+  | Untyped.PConst c       -> if (pat_ty = Types.type_const c)
+                                then (Typed.PConst c, pat_ty, [], lclCtxt)
+                                else failwith "tcTypedPat: PConst"
+  (* GEORGE:TODO: Unhandled cases *)
   | Untyped.PAs (p, v)         -> failwith __LOC__ (* GEORGE: Not implemented yet *)
-  | Untyped.PTuple []          -> if Types.types_are_equal (Types.Tuple []) pat_ty
-                                    then (Typed.PTuple [], pat_ty, [], lclCtxt)
-                                    else failwith __LOC__ (* GEORGE: Not implemented yet *)
-  | Untyped.PTuple l           -> failwith __LOC__ (* GEORGE: Not implemented yet *)
   | Untyped.PRecord r          -> failwith __LOC__ (* GEORGE: Not implemented yet *)
   | Untyped.PAnnotated (p, ty) -> failwith __LOC__ (* GEORGE: Not implemented yet *)
 
-  | Untyped.PVariant (_,_) -> failwith __LOC__
-  | Untyped.PConst _       -> failwith __LOC__
-(*
-  (* GEORGE: The original seemed wrong to me, we compute the midState but we do
-   * not use it in the first case. We return inState instead. Here I do it the
-   * right way I hope. *)
-  | Untyped.PVariant (lbl, p) -> (
-      let ty_in, ty_out = Types.constructor_signature lbl in
-      (* GEORGE: TODO: Still, we drop the coercion variable. This is not
-       * correct (the types might still be different) *)
-      let q = snd (Typed.fresh_ty_coer (ty_out, pat_ty)) in
-      let midState = add_constraint q inState in
-      match p with
-      | None   -> (Typed.PVariant (lbl, Typed.PTuple []), pat_ty, midState, lclCtxt)
-      | Some p -> let p', _, outState, lclOutCtxt = tcLocatedTypedPat midState lclCtxt p ty_in
-                  in  (Typed.PVariant (lbl, p'), pat_ty, outState, lclOutCtxt)
-      )
-  | Untyped.PConst c ->
-      let q = snd (Typed.fresh_ty_coer (Types.type_const c, pat_ty)) in
-      (Typed.PConst c, pat_ty, add_constraint q inState, lclCtxt)
-*)
+and tcTypedPats (inState : state) (lclCtxt : TypingEnv.t) pats tys
+  = match pats, tys with
+    | [], [] -> ([],[],[],lclCtxt)
+    | pat :: pats, ty :: tys ->
+        let (trgPat , patTy , cs1, lclCtxt1) = tcTypedPat  inState lclCtxt  pat.it ty  in
+        let (trgPats, patTys, cs2, lclCtxt2) = tcTypedPats inState lclCtxt1 pats   tys in
+        (trgPat :: trgPats, patTy :: patTys, cs1 @ cs2, lclCtxt2)
+    | _ , _ -> failwith "tcTypedPats: unequal lengths"
 
 (* Typecheck a located pattern without a given type *)
 and tcLocatedPat (inState : state) (lclCtxt : TypingEnv.t) pat
