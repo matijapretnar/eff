@@ -833,7 +833,7 @@ and tcCmp (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_computation -
   | Match (scr, [(p,c)]) -> let tmp = { it = Untyped.Value scr ; at = p.at } (* { it = Untyped.Value scr.it ; at = scr.at } *)
                             in  tcCmp inState lclCtx (Untyped.Let ([(p,tmp)],c))
   (* Pattern Matching: General Case: Monomorphic patterns *)
-  | Match (scr, cases)       -> tcMatch inState lclCtx scr cases
+  | Match (scr, cases)       -> tcMatch  inState lclCtx scr cases
   | Apply (val1, val2)       -> tcApply  inState lclCtx val1 val2
   | Handle (hand, cmp)       -> tcHandle inState lclCtx hand cmp
   | Check cmp                -> tcCheck  inState lclCtx cmp
@@ -1003,7 +1003,7 @@ and tcMatch (inState : state) (lclCtxt : TypingEnv.t)
       let omegaRi, omegaCtRi = Typed.fresh_dirt_coer (dirtDi, deltaOut) in
       { outExpr = (trgPati, Typed.CastComp (cmpi, Typed.BangCoercion (omegaLi, omegaRi)))
       ; outType = ()
-      ; outCs   = omegaCtLi :: omegaCtRi :: csi
+      ; outCs   = alphaOutSkel :: omegaCtLi :: omegaCtRi :: csi
       }
   in
 
