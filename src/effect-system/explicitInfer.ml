@@ -281,6 +281,17 @@ type ('exp, 'ty) tcOutputs =
   ; outCs   : constraints (* GEORGE: Leave only (a) constraints, and (b) global tyenv in here *)
   }
 
+let rec mapAndUnzipTcOutputs (f : 'a -> ('exp,'ty) tcOutputs)
+  : 'a list -> ('exp list, 'ty list) tcOutputs = function
+  | []      -> { outExpr = []
+               ; outType = []
+               ; outCs   = [] }
+  | x :: xs -> let xres = f x in
+               let xsres = mapAndUnzipTcOutputs f xs in
+               { outExpr = xres.outExpr :: xsres.outExpr
+               ; outType = xres.outType :: xsres.outType
+               ; outCs   = xres.outCs   @  xsres.outCs }
+
 (* Value typing output *)
 type tcValOutput = (Typed.expression, Types.target_ty) tcOutputs
 
@@ -421,10 +432,15 @@ and inferPatTy (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.plain_pa
 (*                            PATTERN TYPING                                 *)
 (* ************************************************************************* *)
 
+(* mapAndUnzip :: (a -> (b, c)) -> [a] -> ([b], [c]) *)
+
 let optionBind (x : 'a option) (f : 'a -> 'b option) : 'b option
   = match x with
     | None    -> None
     | Some x' -> f x'
+
+let optionBind_ (x : 'a option) (y : 'b option) : 'b option
+  = optionBind x (fun _ -> y)
 
 let rec optionMapM (f : 'a -> 'b option) : 'a list -> ('b list) option = function
   | []      -> Some []
@@ -488,6 +504,25 @@ and checkClosedPatTy (inpat : Untyped.plain_pattern) (patTy : Types.target_ty) :
          | _               -> failwith "checkClosedPatTy: PTuple")
     | Untyped.PRecord r          -> failwith __LOC__ (* TODO: Not implemented yet *)
     | Untyped.PAnnotated (p, ty) -> failwith __LOC__ (* TODO: Not implemented yet *)
+
+let rec inferCheckLocatedClosedPatTys (pats : Untyped.pattern list)
+  : Types.target_ty option
+  = inferCheckClosedPatTys (List.map (fun p -> p.it) pats)
+
+and inferCheckClosedPatTys (pats : Untyped.plain_pattern list)
+  : Types.target_ty option
+  = let rec filterMap f = (function
+      | [] -> []
+      | x :: xs -> match f x with
+                   | None   -> filterMap f xs
+                   | Some y -> y :: filterMap f xs
+    ) in
+    match filterMap inferClosedPatTy pats with
+    (* Case 1: We cannot infer a ground type for any of the patterns *)
+    | []      -> None
+    (* Case 2: We can infer a type for at least a pattern. Verify that all
+     * other patterns can be typed against this type and return it *)
+    | ty :: _ -> List.iter (fun p -> checkClosedPatTy p ty) pats; Some ty
 
 (* ************************************************************************* *)
 (*                            PATTERN TYPING                                 *)
@@ -787,15 +822,15 @@ and tcCmp (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_computation -
   | LetRec ((var,abs) :: rest,c2) -> let subCmp = {it = Untyped.LetRec (rest,c2); at = c2.at} in
                                      tcCmp inState lclCtx (Untyped.LetRec ([(var,abs)], subCmp))
 
-  (* GEORGE:TODO: Deal with pattern matching properly *)
+  (* Pattern Matching: Special Case 1: If-then-else *)
   | Match (scr, [ ({it = Untyped.PConst (Boolean true )}, c1)
                 ; ({it = Untyped.PConst (Boolean false)}, c2) ] )
       -> tcIfThenElse inState lclCtx scr c1 c2
+  (* Pattern Matching: Special Case 2: Variable-binding *) (*GEORGE:TODO: Specialize to variables ONLY *)
   | Match (scr, [(p,c)]) -> let tmp = { it = Untyped.Value scr ; at = p.at } (* { it = Untyped.Value scr.it ; at = scr.at } *)
                             in  tcCmp inState lclCtx (Untyped.Let ([(p,tmp)],c))
-  | Match (scr, cases)       -> failwith __LOC__
-                                (* tcMatch  inState lclCtx scr cases (* GEORGE: TODO: Bogus right now? *) *)
-
+  (* Pattern Matching: General Case: Monomorphic patterns *)
+  | Match (scr, cases)       -> tcMatch inState lclCtx scr cases
   | Apply (val1, val2)       -> tcApply  inState lclCtx val1 val2
   | Handle (hand, cmp)       -> tcHandle inState lclCtx hand cmp
   | Check cmp                -> tcCheck  inState lclCtx cmp
@@ -940,6 +975,49 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
   { outExpr = Typed.LetRec ([(var, ftype, genTerm)], trgC2)
   ; outType = (tyA2, dirtD2)
   ; outCs   = alphaSkel :: betaSkel :: omegaCt1 :: omegaCt2 :: cs1 @ cs2
+  }
+
+and tcMatch (inState : state) (lclCtxt : TypingEnv.t)
+      (scr : Untyped.expression)
+      (alts : Untyped.abstraction list) : tcCmpOutput =
+  (* 1: Generate fresh variables for the result *)
+  let alphaOut, alphaOutSkel = fresh_ty_with_fresh_skel () in
+  let deltaOut = Types.fresh_dirt () in
+
+  (* 2: Infer a type for the patterns *)
+  let patTy = (match inferCheckLocatedClosedPatTys (List.map fst alts) with
+    | None   -> failwith "tcMatch: Could not infer the type of the patterns"
+    | Some t -> t
+  ) in
+
+  (* 3: How to typecheck a single alternative *)
+  let tcAlt ((pat,cmp) : Untyped.abstraction)
+    : (Typed.abstraction, unit) tcOutputs (* GEORGE:TODO: Bad modeling; fixme *)
+    = let { outExpr = (trgPati,cmpi)
+          ; outType = (_,(tyAi,dirtDi))
+          ; outCs   = csi } = tcTypedAbstraction inState lclCtxt (pat,cmp) patTy in
+      let omegaLi, omegaCtLi = Typed.fresh_ty_coer (tyAi, alphaOut) in
+      let omegaRi, omegaCtRi = Typed.fresh_dirt_coer (dirtDi, deltaOut) in
+      { outExpr = (trgPati, Typed.CastComp (cmpi, Typed.BangCoercion (omegaLi, omegaRi)))
+      ; outType = ()
+      ; outCs   = omegaCtLi :: omegaCtRi :: csi
+      }
+  in
+
+  (* 4: Typecheck the scrutinee and the alternatives *)
+  let scrRes = tcLocatedVal inState lclCtxt scr in
+  let altRes = mapAndUnzipTcOutputs tcAlt alts in
+
+  (* 5: Generate the coercion for casting the scrutinee *)
+  (* NOTE: The others should be already included in 'altRes' *)
+  let omegaScr, omegaCtScr = Typed.fresh_ty_coer (scrRes.outType, patTy) in
+
+  (* 6: Combine the results *)
+  { outExpr = Typed.Match
+                ( Typed.CastExp (scrRes.outExpr, omegaScr)
+                , altRes.outExpr )
+  ; outType = (alphaOut, deltaOut)
+  ; outCs   = omegaCtScr :: scrRes.outCs @ altRes.outCs
   }
 
 and tcIfThenElse (inState : state) (lclCtxt : TypingEnv.t)
