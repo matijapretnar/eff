@@ -165,6 +165,32 @@ let rec isMonoTy : target_ty -> bool = function
   | TySchemeDirt (_,_)        -> false (* no quantification *)
   | TySchemeSkel (_,_)        -> false (* no quantification *)
 
+(* Check if a target type is a closed monotype. That is, no type variables, no
+ * universal quantification and no qualified constraints, at the top-level or
+ * in nested positions. *)
+let rec isClosedMonoTy : target_ty -> bool = function
+  | TyParam _           -> false
+  | Apply (tyCon,tys)   -> List.for_all isClosedMonoTy tys
+  | Arrow (vty,cty)     -> isClosedMonoTy vty && isClosedDirtyTy cty
+  | Tuple tys           -> List.for_all isClosedMonoTy tys
+  | Handler (cty1,cty2) -> isClosedDirtyTy cty1 && isClosedDirtyTy cty2
+  | PrimTy _            -> true
+  | QualTy (_,_)        -> false (* no qualification *)
+  | QualDirt (_,_)      -> false (* no qualification *)
+  | TySchemeTy (_,_,_)  -> false (* no quantification *)
+  | TySchemeDirt (_,_)  -> false (* no quantification *)
+  | TySchemeSkel (_,_)  -> false (* no quantification *)
+
+(* Check if a dirt is closed. That is, no dirt variables in it. *)
+and isClosedDirt (d : dirt) : bool = match d.row with
+  | EmptyRow   -> true
+  | ParamRow _ -> false
+
+(* Check if a dirty type is closed. That is, if both the dirt and the value
+ * type are closed. *)
+and isClosedDirtyTy : target_dirty -> bool = function
+  | (ty, drt) -> isClosedMonoTy ty && isClosedDirt drt
+
 (* ************************************************************************* *)
 (*                             VARIABLE RENAMING                             *)
 (* ************************************************************************* *)

@@ -421,6 +421,78 @@ and inferPatTy (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.plain_pa
 (*                            PATTERN TYPING                                 *)
 (* ************************************************************************* *)
 
+let optionBind (x : 'a option) (f : 'a -> 'b option) : 'b option
+  = match x with
+    | None    -> None
+    | Some x' -> f x'
+
+let rec optionMapM (f : 'a -> 'b option) : 'a list -> ('b list) option = function
+  | []      -> Some []
+  | x :: xs -> optionBind (f x)             (fun y  ->
+               optionBind (optionMapM f xs) (fun ys ->
+               Some (y :: ys) ))
+
+(* Infer a ground monotype for a pattern, if possible. *)
+let rec inferClosedPatTy : Untyped.plain_pattern -> Types.target_ty option = function
+  | Untyped.PVar _      -> None
+  | Untyped.PNonbinding -> None
+  | Untyped.PVariant (lbl, None) ->
+      let ty_in, ty_out = Types.constructor_signature lbl in
+      if (ty_in = Types.Tuple [] && Types.isClosedMonoTy ty_out)
+        then (assert (Types.isClosedMonoTy ty_out); Some ty_out)
+        else failwith "inferClosedPatTy: PVariant(None)"
+  | Untyped.PVariant (lbl, Some p) ->
+      let ty_in, ty_out = Types.constructor_signature lbl in
+      checkLocatedClosedPatTy p ty_in ; assert (Types.isClosedMonoTy ty_out) ;
+      Some ty_out
+  | Untyped.PConst c           -> Some (Types.type_const c)
+  | Untyped.PAs (p, _)         -> inferLocatedClosedPatTy p
+  | Untyped.PTuple l           -> optionBind
+                                    (optionMapM inferLocatedClosedPatTy l)
+                                    (fun tys -> Some (Types.Tuple tys))
+  | Untyped.PRecord r          -> None (* TODO: Not implemented yet *)
+  | Untyped.PAnnotated (p, ty) -> failwith __LOC__ (* TODO: Not implemented yet *)
+                                  (* if Types.isClosedMonoTy ty (* TODO: This is not an elaborated type *)
+                                   *  then checkClosedPatTy p ty
+                                   *  else None
+                                   *)
+
+and inferLocatedClosedPatTy (inpat : Untyped.pattern) : Types.target_ty option
+  = inferClosedPatTy inpat.it
+
+and checkLocatedClosedPatTy (inpat : Untyped.pattern) (patTy : Types.target_ty) : unit
+  = checkClosedPatTy inpat.it patTy
+
+(* Check a pattern against a ground monotype. Fail if not possible. *)
+and checkClosedPatTy (inpat : Untyped.plain_pattern) (patTy : Types.target_ty) : unit
+  = match inpat with
+    | Untyped.PVar _      -> () (* Always possible *)
+    | Untyped.PNonbinding -> () (* Always possible *)
+    | Untyped.PVariant (lbl, None) ->
+        let ty_in, ty_out = Types.constructor_signature lbl in
+        if (ty_in = Types.Tuple [] && patTy = ty_out)
+          then ()
+          else failwith "checkClosedPatTy: PVariant(None)"
+    | Untyped.PVariant (lbl, Some p) ->
+        let ty_in, ty_out = Types.constructor_signature lbl in
+        if (patTy = ty_out)
+          then checkLocatedClosedPatTy p ty_in
+          else failwith "checkClosedPatTy: PVariant(Some)"
+    | Untyped.PConst c    -> if (patTy = Types.type_const c)
+                               then ()
+                               else failwith "checkClosedPatTy: PConst"
+    | Untyped.PAs (p, v)  -> checkLocatedClosedPatTy p patTy
+    | Untyped.PTuple pats ->
+        (match patTy with
+         | Types.Tuple tys -> List.iter2 checkLocatedClosedPatTy pats tys
+         | _               -> failwith "checkClosedPatTy: PTuple")
+    | Untyped.PRecord r          -> failwith __LOC__ (* TODO: Not implemented yet *)
+    | Untyped.PAnnotated (p, ty) -> failwith __LOC__ (* TODO: Not implemented yet *)
+
+(* ************************************************************************* *)
+(*                            PATTERN TYPING                                 *)
+(* ************************************************************************* *)
+
 (* Typecheck a located pattern given the expected type *)
 let rec tcLocatedTypedPat (inState : state) (lclCtxt : TypingEnv.t) pat ty
   = tcTypedPat inState lclCtxt pat.it ty
