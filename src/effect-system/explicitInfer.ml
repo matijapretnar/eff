@@ -273,66 +273,31 @@ type tcInputs =
   ; lclCtx  : TypingEnv.t
   }
 
-(* Inference rule outputs: constraint state & substitution *)
-type ('exp, 'ty) tcOutputs =
-  { outExpr : 'exp
-  ; outType : 'ty
-  ; outCs   : constraints (* GEORGE: Leave only (a) constraints, and (b) global tyenv in here *)
-  }
+(* Constraint generation output *)
+type 'a tcOutput = ('a * constraints)
 
-let rec mapAndUnzipTcOutputs (f : 'a -> ('exp,'ty) tcOutputs)
-  : 'a list -> ('exp list, 'ty list) tcOutputs = function
-  | []      -> { outExpr = []
-               ; outType = []
-               ; outCs   = [] }
-  | x :: xs -> let xres = f x in
-               let xsres = mapAndUnzipTcOutputs f xs in
-               { outExpr = xres.outExpr :: xsres.outExpr
-               ; outType = xres.outType :: xsres.outType
-               ; outCs   = xres.outCs   @  xsres.outCs }
+let rec mapAndUnzipTcOutputs (f : 'a -> 'b tcOutput)
+  : 'a list -> ('b list) tcOutput = function
+  | []      -> ([],[])
+  | x :: xs -> let (y , cs1) = f x in
+               let (ys, cs2) = mapAndUnzipTcOutputs f xs in
+               (y :: ys, cs1 @ cs2)
 
 (* Value typing output *)
-type tcValOutput = (Typed.expression, Types.target_ty) tcOutputs
+type tcValOutput = (Typed.expression * Types.target_ty) tcOutput
 
 (* Computation typing output *)
-type tcCmpOutput = (Typed.computation, Types.target_dirty) tcOutputs
+type tcCmpOutput = (Typed.computation * Types.target_dirty) tcOutput
 
-(* Typecheck a list of values *)
-let rec tcManyVal (inState : state)
-                  (lclCtxt : TypingEnv.t)
-                  (xss : Untyped.expression list)
-                  (tc : state -> TypingEnv.t -> Untyped.expression -> tcValOutput)
-    : (Typed.expression list, Types.target_ty list) tcOutputs =
+(* Typecheck a list of things *)
+let rec tcMany (inState : state) (lclCtxt : TypingEnv.t)
+  (xss : 'a list) (tc : state -> TypingEnv.t -> 'a -> ('b * 'c) tcOutput)
+  : ('b list * 'c list) tcOutput =
   match xss with
-  | []      -> { outExpr = []
-               ; outType = []
-               ; outCs   = []
-               }
-  | x :: xs -> let xres  = tc inState lclCtxt x in
-               let xsres = tcManyVal inState lclCtxt xs tc in
-               { outExpr = xres.outExpr :: xsres.outExpr
-               ; outType = xres.outType :: xsres.outType
-               ; outCs   = xres.outCs @ xsres.outCs
-               }
-
-(* Typecheck a list of computations *)
-let rec tcManyCmp (inState : state)
-                  (lclCtxt : TypingEnv.t)
-                  (xss : Untyped.computation list)
-                  (tc : state -> TypingEnv.t -> Untyped.computation -> tcCmpOutput)
-    : (Typed.computation list, Types.target_dirty list) tcOutputs =
-  match xss with
-  | []      -> { outExpr = []
-               ; outType = []
-               ; outCs   = []
-               }
-  | x :: xs -> let xres  = tc inState lclCtxt x in
-               let xsres = tcManyCmp inState lclCtxt xs tc in
-               { outExpr  = xres.outExpr :: xsres.outExpr
-               ; outType  = xres.outType :: xsres.outType
-               ; outCs    = xres.outCs @ xsres.outCs
-               }
-  (* GEORGE: I'd kill for some abstraction, having both tcManyVal and tcManyCmp is nasty. *)
+  | []      -> (([],[]),[])
+  | x :: xs -> let ((y ,ty ),cs1) = tc inState lclCtxt x in
+               let ((ys,tys),cs2) = tcMany inState lclCtxt xs tc in
+               ((y :: ys, ty :: tys), cs1 @ cs2)
 
 (* ************************************************************************* *)
 (*                       PATTERN TYPING (REVISED)                            *)
@@ -523,6 +488,11 @@ and inferCheckClosedPatTys (pats : Untyped.plain_pattern list)
      * other patterns can be typed against this type and return it *)
     | ty :: _ -> List.iter (fun p -> checkClosedPatTy p ty) pats; Some ty
 
+and inferCheckLocatedClosedPatAlts alts
+  = match inferCheckLocatedClosedPatTys (List.map fst alts) with
+    | None   -> failwith "inferCheckLocatedClosedPatAlts: Could not infer the type of the patterns"
+    | Some t -> t
+
 (* ************************************************************************* *)
 (*                            PATTERN TYPING                                 *)
 (* ************************************************************************* *)
@@ -599,6 +569,22 @@ let tcLocatedUntypedVarPat (lclCtxt : TypingEnv.t) (pat : Untyped.pattern)
   : (Typed.pattern * Types.target_ty * TypingEnv.t * constraints)
   = tcUntypedVarPat lclCtxt pat.it
 
+let tcTypedVarPat (lclCtxt : TypingEnv.t)
+      (pat : Untyped.plain_pattern)
+      (patTy : Types.target_ty)
+  : (Typed.pattern * TypingEnv.t)
+  = match pat with
+    | Untyped.PVar x      -> (Typed.PVar x, extendLclCtxt lclCtxt x patTy)
+    | Untyped.PNonbinding -> (Typed.PNonbinding, lclCtxt)
+    (* GEORGE: TODO: Unhandled cases *)
+    | _other_pattern      -> failwith "tcTypedVarPat: Please no pattern matching in lambda abstractions!"
+
+let tcLocatedTypedVarPat (lclCtxt : TypingEnv.t)
+      (pat : Untyped.pattern)
+      (patTy : Types.target_ty)
+  : (Typed.pattern * TypingEnv.t)
+  = tcTypedVarPat lclCtxt pat.it patTy
+
 let isLocatedVarPat (pat : Untyped.pattern) : bool
   = match pat.it with
     | Untyped.PVar _ -> true
@@ -630,19 +616,13 @@ let rec tcVar (inState : state) (lclCtxt : TypingEnv.t) (x : variable) : tcValOu
                      (Types.print_target_ty scheme) ;
                    let target_x, x_monotype, constraints = instantiateVariable x scheme
                    in  warnAddConstraints "tcVar" constraints;
-                       { outExpr = target_x
-                       ; outType = x_monotype
-                       ; outCs   = constraints
-                       }
+                       ((target_x, x_monotype), constraints)
   | None -> Print.debug "Variable not found: %t" (Typed.print_variable x) ;
             assert false
 
 (* Constants *)
 and tcConst (inState : state) (lclCtxt : TypingEnv.t) (c : Const.t) : tcValOutput =
-  { outExpr = Typed.Const c
-  ; outType = Types.type_const c
-  ; outCs   = []
-  }
+  ((Typed.Const c, Types.type_const c), [])
 
 (* Type-annotated Expressions *)
 and tcAnnotated (inState : state) (lclCtxt : TypingEnv.t) ((e,ty) : Untyped.expression * Type.ty) : tcValOutput =
@@ -650,11 +630,8 @@ and tcAnnotated (inState : state) (lclCtxt : TypingEnv.t) ((e,ty) : Untyped.expr
 
 (* Tuples *)
 and tcTuple (inState : state) (lclCtxt : TypingEnv.t) (es : Untyped.expression list): tcValOutput =
-  let res = tcManyVal inState lclCtxt es tcLocatedVal in
-  { outExpr = Typed.Tuple res.outExpr
-  ; outType = Types.Tuple res.outType
-  ; outCs   = res.outCs
-  }
+  let ((es, tys), cs) = tcMany inState lclCtxt es tcLocatedVal in
+  ((Typed.Tuple es, Types.Tuple tys), cs)
 
 (* Records *)
 and tcRecord (inState : state) (lclCtx : TypingEnv.t) (lst : (field, Untyped.expression) Assoc.t)
@@ -666,37 +643,30 @@ and tcVariant (inState : state) (lclCtx : TypingEnv.t) ((lbl,mbe) : label * Unty
       : tcValOutput =
   let ty_in, ty_out = Types.constructor_signature lbl in
   match mbe with
-  | None -> { outExpr = Typed.Variant (lbl, Typed.Tuple [])
-            ; outType = ty_out
-            ; outCs   = [] }
+  | None   -> ((Typed.Variant (lbl, Typed.Tuple []), ty_out), [])
   | Some e ->
-      let res = tcLocatedVal inState lclCtx e in
+      let (e',ety),cs1 = tcLocatedVal inState lclCtx e in
       (* GEORGE: Investigate how cast_expression works *)
-      let castExp, castCt = cast_expression res.outExpr res.outType ty_in in
+      let castExp, castCt = cast_expression e' ety ty_in in
       warnAddConstraints "tcVariant" [castCt];
-      { outExpr = Typed.Variant (lbl, castExp)
-      ; outType = ty_out
-      ; outCs   = castCt :: res.outCs
-      }
+      ((Typed.Variant (lbl, castExp), ty_out), castCt :: cs1)
 
 (* Lambda Abstractions *)
 and tcLambda (inState : state) (lclCtx : TypingEnv.t) ((pat,cmp) : Untyped.abstraction) : tcValOutput =
   let trgPat, patTy, midCtx, cs1 = tcLocatedUntypedVarPat lclCtx pat in
-  let resCmp = tcLocatedCmp inState midCtx cmp in
-  { outExpr = Typed.Lambda (abstraction_with_ty trgPat patTy resCmp.outExpr)
-  ; outType = Types.Arrow (patTy, resCmp.outType)
-  ; outCs   = cs1 @ resCmp.outCs
-  }
+  let (trgCmp,cmpTy),        cs2 = tcLocatedCmp inState midCtx cmp in
+  let outVal  = Typed.Lambda (abstraction_with_ty trgPat patTy trgCmp) in
+  let outType = Types.Arrow (patTy, cmpTy) in
+  ((outVal, outType), cs1 @ cs2)
 
 (* Effects (GEORGE: Isn't this supposed to be in computations? *)
 and tcEffect (inState : state) (lclCtx : TypingEnv.t) (eff : Untyped.effect) : tcValOutput =
   (* GEORGE: NOTE: This is verbatim copied from the previous implementation *)
   let in_ty, out_ty = Typed.EffectMap.find eff inState.effects in
   let s = Types.EffectSet.singleton eff in
-  { outExpr = Typed.Effect (eff, (in_ty, out_ty))
-  ; outType = Types.Arrow (in_ty, (out_ty, Types.closed_dirt s))
-  ; outCs   = []
-  }
+  let outVal  = Typed.Effect (eff, (in_ty, out_ty)) in
+  let outType = Types.Arrow (in_ty, (out_ty, Types.closed_dirt s)) in
+  ((outVal, outType), [])
 
 (* Handlers *)
 and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : tcValOutput =
@@ -714,11 +684,9 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
 
   (* How to process the return clause *)
   let rec processReturnClause (tmpState : state) (tmpCtx : TypingEnv.t) ((pat,cmp) : Untyped.abstraction)
-       : (abstraction_with_ty, unit) tcOutputs (* Bad abstraction on my part *)
+       : abstraction_with_ty tcOutput
     = let trgPat, alphaR, midCtx, cs1 = tcLocatedUntypedVarPat tmpCtx pat in
-      let { outExpr = cR
-          ; outType = (betaR, deltaR)
-          ; outCs   = cs2 } = tcLocatedCmp inState midCtx cmp in
+      let (cR, (betaR, deltaR)), cs2 = tcLocatedCmp inState midCtx cmp in
 
       (* GEORGE: we do not support anything else at the moment *)
       let x = (match trgPat with
@@ -732,9 +700,8 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
       let yvar = CoreTypes.Variable.fresh "y" in
       let ysub = Typed.subst_comp (Assoc.of_list [(x, CastExp (Var yvar, omega6))]) in
 
-      { outExpr = (PVar yvar, alphaR, Typed.CastComp (ysub cR, Typed.BangCoercion (omega1, omega2)))
-      ; outType = ()
-      ; outCs   = omegaCt1 :: omegaCt2 :: omegaCt6 :: cs1 @ cs2 }
+      let outExpr = (PVar yvar, alphaR, Typed.CastComp (ysub cR, Typed.BangCoercion (omega1, omega2))) in
+      (outExpr, omegaCt1 :: omegaCt2 :: omegaCt6 :: cs1 @ cs2)
   in
 
   (* How to process effect clauses *)
@@ -743,10 +710,7 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
             (tmpCtx : TypingEnv.t)  (* sigmai-1 .. sigma0 (Gamma) *)
             (eclauses : (Untyped.effect, Untyped.abstraction2) Assoc.t) (* clauses... *)
     = match Assoc.isCons eclauses with
-      | None -> { outExpr = []
-                ; outType = () (* unit, useless field ==> we need a better representation (that's on me) *)
-                ; outCs   = []
-                }
+      | None -> ([],[])
       | Some ((eff,abs2),clauses) ->
           (* Lookup the type of Opi *)
           let ai, bi = Typed.EffectMap.find eff tmpState.effects in
@@ -755,13 +719,12 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
           let alphai, alphaiSkel = Typed.fresh_ty_with_fresh_skel () in
           let deltai = Types.fresh_dirt () in
 
-          (* Typecheck the clause *)
-          let { outExpr = (xop,kop,trgCop)
-              ; outType = (xTy,kTy,(bOpi,deltaOpi))
-              ; outCs   = csi } = tcTypedAbstraction2 tmpState tmpCtx abs2 ai (Types.Arrow (bi, (alphai,deltai))) in
+          (* Typecheck the clause *) (* GEORGE:TODO: FIXME *)
+          let ((xop,kop,trgCop),(xTy,kTy,(bOpi,deltaOpi))), csi
+            = tcTypedAbstraction2 tmpState tmpCtx abs2 ai (Types.Arrow (bi, (alphai,deltai))) in
 
           (* Process the rest recursively *)
-          let xsres = processOpClauses tmpState tmpCtx clauses in
+          let trgClauses,csRest = processOpClauses tmpState tmpCtx clauses in
 
           (* Create the target clause *)
           let omega3i, omegaCt3i = Typed.fresh_ty_coer   (bOpi, alphaOut) in
@@ -779,18 +742,17 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
                           , (xop, PVar lvar, CastComp (lsub trgCop, Typed.BangCoercion (omega3i,omega4i)))
                           ) in
 
-          { outExpr  = trgClause :: xsres.outExpr
-          ; outType  = ()
-          ; outCs   = omegaCt3i :: omegaCt4i :: omegaCt5i :: alphaiSkel :: csi @ xsres.outCs
-          }
+          ( trgClause :: trgClauses
+          , omegaCt3i :: omegaCt4i :: omegaCt5i :: alphaiSkel :: csi @ csRest
+          )
   in
 
   (* Process all the clauses *)
-  let retRes = processReturnClause inState lclCtx h.value_clause in
-  let clsRes = processOpClauses    inState lclCtx h.effect_clauses in
+  let trgRet, cs1 = processReturnClause inState lclCtx h.value_clause in
+  let trgCls, cs2 = processOpClauses    inState lclCtx h.effect_clauses in
 
   let omega7, omegaCt7 =
-    let allOps = Types.EffectSet.of_list (List.map (fun ((eff, _), _) -> eff) clsRes.outExpr) in
+    let allOps = Types.EffectSet.of_list (List.map (fun ((eff, _), _) -> eff) trgCls) in
 
     (* GEORGE: Unsafely match against deltaOut to get a representation as a dirt variable *)
     let deltaOutVar = (match deltaOut with
@@ -808,13 +770,12 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
                                         , Typed.BangCoercion (Typed.ReflTy alphaOut, Typed.ReflDirt deltaOut) ) in
   Print.debug "I am the HandlerCo : %t" (Typed.print_ty_coercion handlerCo) ;
 
-  { outExpr = CastExp ( Handler ({ effect_clauses = Assoc.of_list clsRes.outExpr
-                                 ; value_clause   = retRes.outExpr })
-                      , handlerCo )
-  ; outType = Types.Handler ((alphaIn, deltaIn), (alphaOut, deltaOut))
-  ; outCs   = omegaCt7 :: alphaInSkel :: alphaOutSkel :: retRes.outCs @ clsRes.outCs
-               (* 7, ain : skelin, aout : skelout && 1, 2, 6 && 3i, 4i, 5i *)
-  }
+  let outExpr = CastExp ( Handler ({ effect_clauses = Assoc.of_list trgCls
+                                   ; value_clause   = trgRet })
+                        , handlerCo ) in
+  let outType = Types.Handler ((alphaIn, deltaIn), (alphaOut, deltaOut)) in
+  let outCs   = omegaCt7 :: alphaInSkel :: alphaOutSkel :: cs1 @ cs2 in (* 7, ain : skelin, aout : skelout && 1, 2, 6 && 3i, 4i, 5i *)
+  ((outExpr, outType), outCs)
 
 (* Dispatch: Type inference for a plain value (expression) *)
 and tcVal (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_expression -> tcValOutput = function
@@ -872,11 +833,8 @@ and tcLocatedCmp (inState : state) (lclCtx : TypingEnv.t) (c : Untyped.computati
 
 (* Typecheck a value wrapped in a return *)
 and tcValue (inState : state) (lclCtxt : TypingEnv.t) (exp : Untyped.expression) : tcCmpOutput =
-  let res = tcLocatedVal inState lclCtxt exp in
-  { outExpr = Typed.Value res.outExpr
-  ; outType = (res.outType, Types.empty_dirt)
-  ; outCs   = res.outCs
-  }
+  let ((outExpr, outType), outCs) = tcLocatedVal inState lclCtxt exp in
+  ((Typed.Value outExpr, (outType, Types.empty_dirt)), outCs)
 
 (* Typecheck a let where c1 is a value *)
 and tcLetValNoGen (inState : state) (lclCtxt : TypingEnv.t)
@@ -884,61 +842,56 @@ and tcLetValNoGen (inState : state) (lclCtxt : TypingEnv.t)
       (e1 : Untyped.expression)
       (c2 : Untyped.computation) : tcCmpOutput =
   (* 1: Typecheck e1 *)
-  let { outExpr = trgE1
-      ; outType = tyA1
-      ; outCs   = cs1
-      } = tcLocatedVal inState lclCtxt e1 in (* (v',A, Qv, Sigma1) *)
+  let (trgE1,tyA1), cs1 = tcLocatedVal inState lclCtxt e1 in (* (v',A, Qv, Sigma1) *)
 
   (* 2: Typecheck c2 *)
   let x = (match patIn.it with
            | Untyped.PVar x -> x (* GEORGE: Support nothing else at the moment *)
            | _ -> failwith "tcLetValNoGen: only varpats allowed") in
-  let { outExpr = trgC2
-      ; outType = (tyB2,dirtD2)
-      ; outCs   = cs2
-      } = tcLocatedCmp inState (extendLclCtxt lclCtxt x tyA1) c2 in
+  let (trgC2, (tyB2,dirtD2)), cs2 = tcLocatedCmp inState (extendLclCtxt lclCtxt x tyA1) c2 in
 
   (* 3: Combine the results *)
-  { outExpr = Typed.LetVal
-                ( trgE1
-                , Typed.abstraction_with_ty (Typed.PVar x) tyA1 trgC2 )
-  ; outType = (tyB2,dirtD2)
-  ; outCs   = cs1 @ cs2
-  }
+  let outExpr = Typed.LetVal
+                  ( trgE1
+                  , Typed.abstraction_with_ty (Typed.PVar x) tyA1 trgC2 ) in
+  let outType = (tyB2,dirtD2) in
+  let outCs   = cs1 @ cs2 in
+  ((outExpr, outType), outCs)
 
 (* Typecheck a let when c1 is a computation (== do binding) *)
-and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pdef : Untyped.pattern) (c1 : Untyped.computation) (c2 : Untyped.computation) : tcCmpOutput =
-  let c1res = tcLocatedCmp inState lclCtxt c1 in (* typecheck c1 *)
-  let c2res = tcTypedAbstraction inState lclCtxt (pdef, c2) (fst c1res.outType) in
+and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.pattern) (c1 : Untyped.computation) (c2 : Untyped.computation) : tcCmpOutput =
+  (* 1: Typecheck c1, the pattern, and c2 *)
+  let (trgC1, (tyA1, dirtD1)), cs1 = tcLocatedCmp inState lclCtxt c1 in
+  let trgPat, midCtx = tcLocatedTypedVarPat lclCtxt pat tyA1 in
+  let (trgC2, (tyA2, dirtD2)), cs2 = tcLocatedCmp inState midCtx c2 in
 
+  (* 2: Generate a fresh dirt variable for the result *)
   let delta = Types.fresh_dirt () in
-  let omega1, omegaCt1 = Typed.fresh_dirt_coer (snd c1res.outType, delta) in (* s2(D1) <= delta *)
-  let omega2, omegaCt2 = Typed.fresh_dirt_coer (snd (snd c2res.outType), delta)                      in (*    D2  <= delta *)
+
+  (* 3: Generate the coercions for the dirts *)
+  let omega1, omegaCt1 = Typed.fresh_dirt_coer (dirtD1, delta) in (* s2(D1) <= delta *)
+  let omega2, omegaCt2 = Typed.fresh_dirt_coer (dirtD2, delta) in (*    D2  <= delta *)
 
   let cresC1 = CastComp
-                 ( c1res.outExpr
-                 , Typed.BangCoercion
-                     ( Typed.ReflTy (fst c1res.outType)
-                     , omega1
-                     )
+                 ( trgC1
+                 , Typed.BangCoercion (Typed.ReflTy tyA1, omega1)
                  ) in
 
-  let cresAbs = ( fst c2res.outExpr
-                , CastComp
-                    ( snd c2res.outExpr
-                    , Typed.BangCoercion
-                        ( Typed.ReflTy (fst (snd c2res.outType))
-                        , omega2
-                        )
-                    )
+  let cresC2 = CastComp
+                 ( trgC2
+                 , Typed.BangCoercion (Typed.ReflTy tyA2, omega2)
                  ) in
+
+  let outExpr = Typed.Bind
+                  ( cresC1
+                  , ( trgPat
+                    , cresC2 )
+                  ) in
+  let outType = (tyA2, delta) in
+  let outCs   = omegaCt1 :: omegaCt2 :: cs1 @ cs2 in
 
   warnAddConstraints "tcLetCmp" [omegaCt1;omegaCt2];
-
-  { outExpr = Typed.Bind (cresC1, cresAbs)
-  ; outType = (fst (snd c2res.outType),delta)
-  ; outCs   = omegaCt1 :: omegaCt2 :: c1res.outCs @ c2res.outCs
-  }
+  ((outExpr,outType), outCs)
 
 (* Typecheck a non-recursive let *)
 and tcLet (inState : state) (lclCtxt : TypingEnv.t) (pdef : Untyped.pattern) (c1 : Untyped.computation) (c2 : Untyped.computation) : tcCmpOutput =
@@ -958,22 +911,18 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
   let delta = Types.fresh_dirt () in
 
   (* 2: Typecheck the abstraction *)
-  let { outExpr = (trgPat, trgC1)
-      ; outType = (trgPatTy,(tyA1, dirtD1))
-      ; outCs   = cs1
-      } = tcTypedAbstraction
-            inState
-            (extendLclCtxt lclCtxt var (Types.Arrow (alpha, (beta, delta))))
-            abs alpha in
+  let ((trgPat, trgC1), (trgPatTy,(tyA1, dirtD1))), cs1
+    = tcTypedAbstraction
+        inState
+        (extendLclCtxt lclCtxt var (Types.Arrow (alpha, (beta, delta))))
+        abs alpha in
 
   (* 3: Typecheck c2 *)
-  let { outExpr = trgC2
-      ; outType = (tyA2, dirtD2)
-      ; outCs   = cs2
-      } = tcLocatedCmp
-            inState
-            (extendLclCtxt lclCtxt var (Types.Arrow (alpha, (tyA1,dirtD1))))
-            c2
+  let (trgC2, (tyA2, dirtD2)), cs2
+    = tcLocatedCmp
+        inState
+        (extendLclCtxt lclCtxt var (Types.Arrow (alpha, (tyA1,dirtD1))))
+        c2
   in
 
   (* 3: The assumed type should be at least as general as the inferred one *)
@@ -1003,10 +952,10 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
                   ) in
 
   (* 7: Combine the results *)
-  { outExpr = Typed.LetRec ([(var, ftype, genTerm)], trgC2)
-  ; outType = (tyA2, dirtD2)
-  ; outCs   = alphaSkel :: betaSkel :: omegaCt1 :: omegaCt2 :: cs1 @ cs2
-  }
+  let outExpr = Typed.LetRec ([(var, ftype, genTerm)], trgC2) in
+  let outType = (tyA2, dirtD2) in
+  let outCs   = alphaSkel :: betaSkel :: omegaCt1 :: omegaCt2 :: cs1 @ cs2 in
+  ((outExpr, outType), outCs)
 
 and tcMatch (inState : state) (lclCtxt : TypingEnv.t)
       (scr : Untyped.expression)
@@ -1016,40 +965,23 @@ and tcMatch (inState : state) (lclCtxt : TypingEnv.t)
   let deltaOut = Types.fresh_dirt () in
 
   (* 2: Infer a type for the patterns *)
-  let patTy = (match inferCheckLocatedClosedPatTys (List.map fst alts) with
-    | None   -> failwith "tcMatch: Could not infer the type of the patterns"
-    | Some t -> t
-  ) in
-
-  (* 3: How to typecheck a single alternative *)
-  let tcAlt ((pat,cmp) : Untyped.abstraction)
-    : (Typed.abstraction, unit) tcOutputs (* GEORGE:TODO: Bad modeling; fixme *)
-    = let { outExpr = (trgPati,cmpi)
-          ; outType = (_,(tyAi,dirtDi))
-          ; outCs   = csi } = tcTypedAbstraction inState lclCtxt (pat,cmp) patTy in
-      let omegaLi, omegaCtLi = Typed.fresh_ty_coer (tyAi, alphaOut) in
-      let omegaRi, omegaCtRi = Typed.fresh_dirt_coer (dirtDi, deltaOut) in
-      { outExpr = (trgPati, Typed.CastComp (cmpi, Typed.BangCoercion (omegaLi, omegaRi)))
-      ; outType = ()
-      ; outCs   = alphaOutSkel :: omegaCtLi :: omegaCtRi :: csi
-      }
-  in
+  let patTy = inferCheckLocatedClosedPatAlts alts in
 
   (* 4: Typecheck the scrutinee and the alternatives *)
-  let scrRes = tcLocatedVal inState lclCtxt scr in
-  let altRes = mapAndUnzipTcOutputs tcAlt alts in
+  let (trgScr, scrTy), cs1 = tcLocatedVal inState lclCtxt scr in
+  let trgAlts, cs2 = mapAndUnzipTcOutputs
+                       (fun alt -> tcAlternative inState lclCtxt patTy alt (alphaOut, deltaOut))
+                       alts in
 
   (* 5: Generate the coercion for casting the scrutinee *)
   (* NOTE: The others should be already included in 'altRes' *)
-  let omegaScr, omegaCtScr = Typed.fresh_ty_coer (scrRes.outType, patTy) in
+  let omegaScr, omegaCtScr = Typed.fresh_ty_coer (scrTy, patTy) in
 
   (* 6: Combine the results *)
-  { outExpr = Typed.Match
-                ( Typed.CastExp (scrRes.outExpr, omegaScr)
-                , altRes.outExpr )
-  ; outType = (alphaOut, deltaOut)
-  ; outCs   = omegaCtScr :: scrRes.outCs @ altRes.outCs
-  }
+  let outExpr = Typed.Match (Typed.CastExp (trgScr, omegaScr), trgAlts) in
+  let outType = (alphaOut, deltaOut) in
+  let outCs   = alphaOutSkel :: omegaCtScr :: cs1 @ cs2 in
+  ((outExpr, outType), outCs)
 
 (*
 and tcIfThenElse (inState : state) (lclCtxt : TypingEnv.t)
@@ -1103,46 +1035,52 @@ and tcIfThenElse (inState : state) (lclCtxt : TypingEnv.t)
 (* Typecheck a function application *)
 and tcApply (inState : state) (lclCtxt : TypingEnv.t) (val1 : Untyped.expression) (val2 : Untyped.expression) : tcCmpOutput =
   (* Infer the types of val1 and val2 *)
-  let res1 = tcLocatedVal inState lclCtxt val1 in
-  let res2 = tcLocatedVal inState lclCtxt val2 in
+  let (trgVal1, valTy1), cs1 = tcLocatedVal inState lclCtxt val1 in
+  let (trgVal2, valTy2), cs2 = tcLocatedVal inState lclCtxt val2 in
 
   (* Generate fresh variables for the result *)
-  let alpha, alpha_skel = Typed.fresh_ty_with_fresh_skel () in
+  let alpha, alphaSkel = Typed.fresh_ty_with_fresh_skel () in
   let delta = Types.fresh_dirt () in
 
   (* Create the constraint and the cast elaborated expression *)
-  let omega, omegaCt = Typed.fresh_ty_coer ( res1.outType
-                                           , Types.Arrow (res2.outType, (alpha,delta)) ) in
-  let castVal1 = Typed.CastExp (res1.outExpr, omega) in
+  let omega, omegaCt = Typed.fresh_ty_coer ( valTy1
+                                           , Types.Arrow (valTy2, (alpha,delta)) ) in
+  let castVal1 = Typed.CastExp (trgVal1, omega) in
 
-  warnAddConstraints "tcApply" [alpha_skel; omegaCt];
-  { outExpr = Typed.Apply (castVal1, res2.outExpr)
-  ; outType = (alpha, delta)
-  ; outCs   = alpha_skel :: omegaCt :: res1.outCs @ res2.outCs
-  }
+  warnAddConstraints "tcApply" [alphaSkel; omegaCt];
+  let outExpr = Typed.Apply (castVal1, trgVal2) in
+  let outType = (alpha, delta) in
+  let outCs   = alphaSkel :: omegaCt :: cs1 @ cs2 in
+  ((outExpr, outType), outCs)
 
 (* Typecheck a handle-computation *)
 and tcHandle (inState : state) (lclCtxt : TypingEnv.t) (hand : Untyped.expression) (cmp : Untyped.computation) : tcCmpOutput =
-  let res1 = tcLocatedVal inState lclCtxt hand in  (* Typecheck the handler *)
-  let res2 = tcLocatedCmp inState lclCtxt cmp  in  (* Typecheck the computation *)
+  (* Typecheck the handler and the computation *)
+  let (trgHand, tyA1), cs1 = tcLocatedVal inState lclCtxt hand in (* Typecheck the handler *)
+  let (trgCmp, (tyA2, dirtD2)), cs2 = tcLocatedCmp inState lclCtxt cmp in (* Typecheck the computation *)
 
-  let dirty_1, cons_skel_1 = Typed.fresh_dirty_with_fresh_skel () in
-  let dirty_2, cons_skel_2 = Typed.fresh_dirty_with_fresh_skel () in
+  (* Generate fresh variables *)
+  let alpha1, alphaSkel1 = Typed.fresh_ty_with_fresh_skel () in
+  let delta1 = Types.fresh_dirt () in
+  let alpha2, alphaSkel2 = Typed.fresh_ty_with_fresh_skel () in
+  let delta2 = Types.fresh_dirt () in
 
-  let castHand, omega_cons_1 =
-    Typed.cast_expression
-      res1.outExpr
-      res1.outType
-      (Types.Handler (dirty_1, dirty_2)) in
+  (* Create all constraints *)
+  let omega1, omegaCt1 = Typed.fresh_ty_coer (tyA1, Types.Handler ((alpha1, delta1), (alpha2, delta2))) in
+  let omega2, omegaCt2 = Typed.fresh_ty_coer (tyA2, alpha1) in
+  let omega3, omegaCt3 = Typed.fresh_dirt_coer (dirtD2, delta1) in
 
-  let castComp, omega_cons_23 =
-     Typed.cast_computation res2.outExpr res2.outType dirty_1 in
-
-  { outExpr = Typed.Handle (castHand, castComp)
-  ; outType = dirty_2
-  ; outCs   = cons_skel_1 :: cons_skel_2 :: omega_cons_1 :: omega_cons_23
-              :: res1.outCs @ res2.outCs
-  }
+  (* Combine all the outputs *)
+  let outExpr = (
+    let castHand = Typed.CastExp (trgHand, omega1) in
+    let castCmp  = Typed.CastComp (trgCmp, Typed.BangCoercion (omega2, omega3)) in
+    Typed.Handle (castHand, castCmp)
+  ) in
+  let outType = (alpha2, dirtD2) in
+  let outCs   =  alphaSkel1 :: alphaSkel2
+              :: omegaCt1 :: omegaCt2 :: omegaCt3
+              :: cs1 @ cs2 in
+  ((outExpr, outType), outCs)
 
 (* Typecheck a "Check" expression (GEORGE does not know what this means yet *)
 and tcCheck (inState : state) (lclCtxt : TypingEnv.t) (cmp : Untyped.computation) : tcCmpOutput =
@@ -1152,6 +1090,25 @@ and tcCheck (inState : state) (lclCtxt : TypingEnv.t) (cmp : Untyped.computation
 (*                               UTILITIES                                   *)
 (* ************************************************************************* *)
 
+(* Given the expected type of the pattern and the expected result type,
+ * typecheck a single case alternative. *)
+and tcAlternative (inState : state) (lclCtx : TypingEnv.t)
+  (patTy : Types.target_ty)                 (* Expected pattern type *)
+  ((pat,cmp) : Untyped.abstraction)         (* Case alternative *)
+  ((tyAout, dirtDout) : Types.target_dirty) (* Expected output type *)
+  : Typed.abstraction tcOutput
+  = (* Typecheck the pattern and the right-hand side *)
+    let trgPat, midCtxt = checkLocatedPatTy lclCtx pat patTy in
+    let (trgCmp,(tyA, dirtD)), cs = tcLocatedCmp inState midCtxt cmp in
+    (* Generate coercions to cast the RHS *)
+    let omegaL, omegaCtL = Typed.fresh_ty_coer (tyA, tyAout) in
+    let omegaR, omegaCtR = Typed.fresh_dirt_coer (dirtD, dirtDout) in
+    (* Combine the results *)
+    let outExpr = (trgPat, Typed.CastComp (trgCmp, Typed.BangCoercion (omegaL, omegaR))) in
+    let outCs   = omegaCtL :: omegaCtR :: cs in
+    (outExpr, outCs)
+
+(*
 and tcTypedAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) patTy =
   (* Typecheck the pattern *)
   let trgPat, _, cs, midLclCtx = tcLocatedTypedPat inState lclCtx pat patTy in
@@ -1161,7 +1118,18 @@ and tcTypedAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) patTy 
   ; outType = (patTy, res.outType)
   ; outCs   = cs @ res.outCs
   }
+*)
 
+(* Typecheck an abstraction where we *know* the type of the pattern. By *know*
+ * we mean that we have inferred "some" type (could be instantiated later).
+ * Hence, we conservatively ask for the pattern to be a variable pattern (cf.
+ * tcTypedVarPat) *)
+and tcTypedAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) patTy =
+  let trgPat, midLclCtx   = tcLocatedTypedVarPat lclCtx pat patTy in
+  let (trgCmp, cmpTy), cs = tcLocatedCmp inState midLclCtx cmp in
+  (((trgPat, trgCmp), (patTy, cmpTy)), cs)
+
+(*
 and tcTypedAbstraction2 (inState : state) (lclCtx : TypingEnv.t) (pat1,pat2,cmp) patTy1 patTy2 =
   (* Typecheck the first pattern *)
   let trgPat1, _, cs1, midLclCtx1 = tcLocatedTypedPat inState lclCtx pat1 patTy1 in
@@ -1173,6 +1141,17 @@ and tcTypedAbstraction2 (inState : state) (lclCtx : TypingEnv.t) (pat1,pat2,cmp)
   ; outType = (patTy1, patTy2, res.outType)
   ; outCs   = cs1 @ cs2 @ res.outCs
   }
+*)
+
+(* Typecheck an abstraction where we *know* the type of the pattern. By *know*
+ * we mean that we have inferred "some" type (could be instantiated later).
+ * Hence, we conservatively ask for the pattern to be a variable pattern (cf.
+ * tcTypedVarPat) *)
+and tcTypedAbstraction2 (inState : state) (lclCtx : TypingEnv.t) (pat1,pat2,cmp) patTy1 patTy2 =
+  let trgPat1, midCtx1    = tcLocatedTypedVarPat lclCtx  pat1 patTy1 in
+  let trgPat2, midCtx2    = tcLocatedTypedVarPat midCtx1 pat2 patTy2 in
+  let (trgCmp, cmpTy), cs = tcLocatedCmp inState midCtx2 cmp in
+  (((trgPat1, trgPat2, trgCmp), (patTy1, patTy2, cmpTy)), cs)
 
 (* ************************************************************************* *)
 (* ************************************************************************* *)
@@ -1224,10 +1203,8 @@ let mkCmpDirtGroundSubst cmp =
 let tcTopLevel ~loc inState cmp =
   Print.debug "tcTopLevel [0]: %t" (Untyped.print_computation cmp) ;
   (* 1: Constraint generation *)
-  let { outExpr = trgCmp
-      ; outType = (ttype,dirt)
-      ; outCs   = generatedCs
-      } = tcLocatedCmp inState initial_lcl_ty_env cmp in
+  let (trgCmp, (ttype, dirt)), generatedCs
+    = tcLocatedCmp inState initial_lcl_ty_env cmp in
 
   Print.debug "tcTopLevel [1]: INFERRED (BEFORE SUBST): %t" (Types.print_target_dirty (ttype,dirt)) ;
 
