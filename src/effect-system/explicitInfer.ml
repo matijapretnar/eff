@@ -69,8 +69,8 @@ type expression_typing_result =
 
 (* Initial type inference state: everything is empty *)
 let initial_state : state
-                  = { gblCtxt       = TypingEnv.empty
-                    ; effects       = Typed.EffectMap.empty
+                  = { gblCtxt = TypingEnv.empty
+                    ; effects = Typed.EffectMap.empty
                     }
 
 let print_env env =
@@ -598,6 +598,12 @@ let tcUntypedVarPat (lclCtxt : TypingEnv.t)
 let tcLocatedUntypedVarPat (lclCtxt : TypingEnv.t) (pat : Untyped.pattern)
   : (Typed.pattern * Types.target_ty * TypingEnv.t * constraints)
   = tcUntypedVarPat lclCtxt pat.it
+
+let isLocatedVarPat (pat : Untyped.pattern) : bool
+  = match pat.it with
+    | Untyped.PVar _ -> true
+    | _other_pattern -> false
+
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 (* ************************************************************************* *)
@@ -845,14 +851,15 @@ and tcCmp (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_computation -
   | LetRec ([(var,abs)],c2)       -> tcLetRecNoGen inState lclCtx var abs c2
   | LetRec ((var,abs) :: rest,c2) -> let subCmp = {it = Untyped.LetRec (rest,c2); at = c2.at} in
                                      tcCmp inState lclCtx (Untyped.LetRec ([(var,abs)], subCmp))
-
+(*
   (* Pattern Matching: Special Case 1: If-then-else *)
   | Match (scr, [ ({it = Untyped.PConst (Boolean true )}, c1)
                 ; ({it = Untyped.PConst (Boolean false)}, c2) ] )
       -> tcIfThenElse inState lclCtx scr c1 c2
-  (* Pattern Matching: Special Case 2: Variable-binding *) (*GEORGE:TODO: Specialize to variables ONLY *)
-  | Match (scr, [(p,c)]) -> let tmp = { it = Untyped.Value scr ; at = p.at } (* { it = Untyped.Value scr.it ; at = scr.at } *)
-                            in  tcCmp inState lclCtx (Untyped.Let ([(p,tmp)],c))
+*)
+  (* Pattern Matching: Special Case 2: Variable-binding *)
+  | Match (scr, [(p,c)]) when isLocatedVarPat p ->
+      tcCmp inState lclCtx (Untyped.Let ([(p, {it = Untyped.Value scr; at = p.at})],c))
   (* Pattern Matching: General Case: Monomorphic patterns *)
   | Match (scr, cases)       -> tcMatch  inState lclCtx scr cases
   | Apply (val1, val2)       -> tcApply  inState lclCtx val1 val2
@@ -1044,6 +1051,7 @@ and tcMatch (inState : state) (lclCtxt : TypingEnv.t)
   ; outCs   = omegaCtScr :: scrRes.outCs @ altRes.outCs
   }
 
+(*
 and tcIfThenElse (inState : state) (lclCtxt : TypingEnv.t)
       (scr : Untyped.expression)
       (trueC  : Untyped.computation)
@@ -1090,6 +1098,7 @@ and tcIfThenElse (inState : state) (lclCtxt : TypingEnv.t)
               :: omegaCt1 :: omegaCt2 :: omegaCt3 :: omegaCt4 :: omegaCt0
               :: scrRes.outCs @ truRes.outCs @ flsRes.outCs
   }
+*)
 
 (* Typecheck a function application *)
 and tcApply (inState : state) (lclCtxt : TypingEnv.t) (val1 : Untyped.expression) (val2 : Untyped.expression) : tcCmpOutput =
