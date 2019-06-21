@@ -336,11 +336,27 @@ and checkPatTy (lclCtxt : TypingEnv.t) (pat : Untyped.plain_pattern) (patTy : Ty
         if (patTy = Types.type_const c)
           then (Typed.PConst c, lclCtxt)
           else failwith "checkPatTy: PConst"
+    (* Tuple Case *)
+    | Untyped.PTuple pats ->
+        (match patTy with
+         | Types.Tuple tys -> let outPats, outCtxt = checkLocatedPatTys lclCtxt pats tys in
+                              (Typed.PTuple outPats, outCtxt)
+         | _ -> failwith "checkPatTy: PTuple")
+
     (* GEORGE: Not implemented yet cases *)
     | Untyped.PAs (p, v)         -> failwith __LOC__
-    | Untyped.PTuple l           -> failwith __LOC__
     | Untyped.PRecord r          -> failwith __LOC__
     | Untyped.PAnnotated (p, ty) -> failwith __LOC__
+
+and checkLocatedPatTys (lclCtxt : TypingEnv.t) (pats : Untyped.pattern list) (patTys : Types.target_ty list)
+  : (Typed.pattern list * TypingEnv.t)
+  = match pats, patTys with
+    | [], [] -> ([], lclCtxt)
+    | pat :: pats, ty :: tys ->
+        let newPat , newCtxt = checkLocatedPatTy  lclCtxt pat  ty  in
+        let newPats, outCtxt = checkLocatedPatTys newCtxt pats tys in
+        (newPat :: newPats, outCtxt)
+   | _, _ -> failwith "checkLocatedPatTys: length mismatch"
 
 (** INFER the type of a (located) pattern. Return the extended typing
  * environment with the additional term bindings. Return also the extended
