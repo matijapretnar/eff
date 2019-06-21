@@ -18,8 +18,8 @@ type intlist =
 
 with
   (let rec concat xs = (match xs with
-                        | IntNil         -> fun xs -> xs
-                        | IntCons (y,ys) -> fun xs -> IntCons (y, concat ys xs)) in
+                        | IntNil         -> fun ys -> ys
+                        | IntCons (z,zs) -> fun ys -> IntCons (z, concat zs ys)) in
    handler
     | effect Decide k -> concat (k true) (k false)
     | x -> IntCons (x,IntNil)

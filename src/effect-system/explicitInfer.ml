@@ -788,15 +788,8 @@ and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.pattern) (
   let omega1, omegaCt1 = Typed.fresh_dirt_coer (dirtD1, delta) in (* s2(D1) <= delta *)
   let omega2, omegaCt2 = Typed.fresh_dirt_coer (dirtD2, delta) in (*    D2  <= delta *)
 
-  let cresC1 = CastComp
-                 ( trgC1
-                 , Typed.BangCoercion (Typed.ReflTy tyA1, omega1)
-                 ) in
-
-  let cresC2 = CastComp
-                 ( trgC2
-                 , Typed.BangCoercion (Typed.ReflTy tyA2, omega2)
-                 ) in
+  let cresC1 = CastComp (trgC1, Typed.BangCoercion (Typed.ReflTy tyA1, omega1)) in
+  let cresC2 = CastComp (trgC2, Typed.BangCoercion (Typed.ReflTy tyA2, omega2)) in
 
   let outExpr = Typed.Bind
                   ( cresC1
