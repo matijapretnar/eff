@@ -398,8 +398,36 @@ and print_ty_coercion ?max_level c ppf =
   | SequenceTyCoer (tc1, tc2) ->
       print "%t ; %t" (print_ty_coercion tc1) (print_ty_coercion tc2)
   | PureCoercion dtyco -> print "pure(%t)" (print_dirty_coercion dtyco)
+  | ApplyCoercion (t, [])  ->
+      print "%t" (CoreTypes.TyName.print t)
+  | ApplyCoercion (t, [c]) ->
+      print ~at_level:1 "%t %t" (print_ty_coercion ~max_level:1 c) (CoreTypes.TyName.print t)
+  | ApplyCoercion (t, cs)  ->
+      print ~at_level:1 "(%t) %t" (Print.sequence ", " print_ty_coercion cs) (CoreTypes.TyName.print t)
+  | TupleCoercion []  ->
+      print "unit"
+  | TupleCoercion cos ->
+      print ~at_level:2 "@[<hov>%t@]"
+        (Print.sequence (Symbols.times ()) (print_ty_coercion ~max_level:1) cos)
+  | LeftArrow co            -> print "fst(%t)" (print_ty_coercion co)
   | _ -> failwith "Not yet implemented __LOC__"
+(* THE FOLLOWING ARE UNEXPECTED. SOMETHING MUST BE WRONG TO GET THEM.
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  | ForallTy of CoreTypes.TyParam.t * ty_coercion
+  | ApplyTyCoer of ty_coercion * target_ty
 
+  | ForallDirt of CoreTypes.DirtParam.t * ty_coercion
+  | ApplyDirCoer of ty_coercion * dirt
+
+  | QualTyCoer of ct_ty * ty_coercion
+  | ApplyQualTyCoer of ty_coercion * ty_coercion
+
+  | QualDirtCoer of ct_dirt * ty_coercion
+  | ApplyQualDirtCoer of ty_coercion * dirt_coercion
+
+  | ForallSkel of CoreTypes.SkelParam.t * ty_coercion
+  | ApplySkelCoer of ty_coercion * skeleton
+*)
 
 and print_dirty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
