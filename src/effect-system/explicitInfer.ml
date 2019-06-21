@@ -582,6 +582,27 @@ and tcPat (inState : state) (lclCtxt : TypingEnv.t) pat
     (newPat, newPatTy, tyvar_skel :: newCs, newCtxt)
 
 (* ************************************************************************* *)
+(* ************************************************************************* *)
+(* ************************************************************************* *)
+let tcUntypedVarPat (lclCtxt : TypingEnv.t)
+  : Untyped.plain_pattern -> (Typed.pattern * Types.target_ty * TypingEnv.t * constraints)
+  = function
+  | Untyped.PVar x      -> let alpha, alphaSkel = Typed.fresh_ty_with_fresh_skel ()
+                           in  (Typed.PVar x, alpha, extendLclCtxt lclCtxt x alpha, [alphaSkel])
+  | Untyped.PNonbinding -> let alpha, alphaSkel = Typed.fresh_ty_with_fresh_skel ()
+                           in  (Typed.PNonbinding, alpha, lclCtxt, [alphaSkel])
+  | Untyped.PConst c    -> (Typed.PConst c, Types.type_const c, lclCtxt, [])
+  (* GEORGE: TODO: Unhandled cases *)
+  | _other_pattern      -> failwith "tcUntypedVarPat: Please no pattern matching in lambda abstractions!"
+
+let tcLocatedUntypedVarPat (lclCtxt : TypingEnv.t) (pat : Untyped.pattern)
+  : (Typed.pattern * Types.target_ty * TypingEnv.t * constraints)
+  = tcUntypedVarPat lclCtxt pat.it
+(* ************************************************************************* *)
+(* ************************************************************************* *)
+(* ************************************************************************* *)
+
+(* ************************************************************************* *)
 (*                             VALUE TYPING                                  *)
 (* ************************************************************************* *)
 
@@ -653,13 +674,12 @@ and tcVariant (inState : state) (lclCtx : TypingEnv.t) ((lbl,mbe) : label * Unty
       }
 
 (* Lambda Abstractions *)
-and tcLambda (inState : state) (lclCtx : TypingEnv.t) (abs : Untyped.abstraction) : tcValOutput =
-  let res = tcUntypedAbstraction inState lclCtx abs in
-  let (trgPat,trgCmp) = res.outExpr in
-  let (patTy,cmpTy)   = res.outType in
-  { outExpr = Typed.Lambda (abstraction_with_ty trgPat patTy trgCmp)
-  ; outType = Types.Arrow (patTy,cmpTy)
-  ; outCs   = res.outCs
+and tcLambda (inState : state) (lclCtx : TypingEnv.t) ((pat,cmp) : Untyped.abstraction) : tcValOutput =
+  let trgPat, patTy, midCtx, cs1 = tcLocatedUntypedVarPat lclCtx pat in
+  let resCmp = tcLocatedCmp inState midCtx cmp in
+  { outExpr = Typed.Lambda (abstraction_with_ty trgPat patTy resCmp.outExpr)
+  ; outType = Types.Arrow (patTy, resCmp.outType)
+  ; outCs   = cs1 @ resCmp.outCs
   }
 
 (* Effects (GEORGE: Isn't this supposed to be in computations? *)
@@ -687,13 +707,15 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
   let deltaOut = Types.fresh_dirt () in
 
   (* How to process the return clause *)
-  let rec processReturnClause (tmpState : state) (tmpCtx : TypingEnv.t) (ret_case : Untyped.abstraction)
+  let rec processReturnClause (tmpState : state) (tmpCtx : TypingEnv.t) ((pat,cmp) : Untyped.abstraction)
        : (abstraction_with_ty, unit) tcOutputs (* Bad abstraction on my part *)
-    = let { outExpr = (xR,cR)
-          ; outType = (alphaR, (betaR,deltaR))
-          ; outCs   = csR } = tcUntypedAbstraction tmpState tmpCtx ret_case in
+    = let trgPat, alphaR, midCtx, cs1 = tcLocatedUntypedVarPat tmpCtx pat in
+      let { outExpr = cR
+          ; outType = (betaR, deltaR)
+          ; outCs   = cs2 } = tcLocatedCmp inState midCtx cmp in
+
       (* GEORGE: we do not support anything else at the moment *)
-      let x = (match xR with
+      let x = (match trgPat with
                | PVar x -> x
                | _ -> failwith "processReturnClause: only varpats allowed") in
 
@@ -706,7 +728,7 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
 
       { outExpr = (PVar yvar, alphaR, Typed.CastComp (ysub cR, Typed.BangCoercion (omega1, omega2)))
       ; outType = ()
-      ; outCs   = omegaCt1 :: omegaCt2 :: omegaCt6 :: csR }
+      ; outCs   = omegaCt1 :: omegaCt2 :: omegaCt6 :: cs1 @ cs2 }
   in
 
   (* How to process effect clauses *)
@@ -1120,18 +1142,6 @@ and tcCheck (inState : state) (lclCtxt : TypingEnv.t) (cmp : Untyped.computation
 (* ************************************************************************* *)
 (*                               UTILITIES                                   *)
 (* ************************************************************************* *)
-
-(* Type any kind of binding structure (e.g. \x. c) *)
-(* GEORGE: This is "equivalent" of "type_abstraction" *)
-and tcUntypedAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) =
-  (* Typecheck the pattern *)
-  let trgPat, patTy, cs, midLclCtx = tcLocatedPat inState lclCtx pat in
-  (* Typecheck the computation in the extended environment *)
-  let res = tcLocatedCmp inState midLclCtx cmp in
-  { outExpr = (trgPat, res.outExpr)
-  ; outType = (patTy, res.outType)
-  ; outCs   = cs @ res.outCs
-  }
 
 and tcTypedAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) patTy =
   (* Typecheck the pattern *)
