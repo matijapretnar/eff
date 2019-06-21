@@ -466,6 +466,8 @@ and typeOfComputationTemp st = function
         else ( Print.debug "typeOfComputation(CastComp): %t ~/~ %t"
                  (Types.print_target_dirty c1_drty_ty)
                  (Types.print_target_dirty dc11)
+             ; Print.debug "typeOfComputation(CastComp): %t"
+                 (Typed.print_computation c1)
              ; Print.debug "coercion(CastComp): %t" (Typed.print_dirty_coercion dc)
              ; assert (Types.dirty_types_are_equal c1_drty_ty dc11)
              ; failwith "canthappen"
