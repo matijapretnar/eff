@@ -589,98 +589,139 @@ and tcEffect (inState : state) (lclCtx : TypingEnv.t) (eff : Untyped.effect) : t
   let outType = Types.Arrow (in_ty, (out_ty, Types.closed_dirt s)) in
   ((outVal, outType), [])
 
+(*
+SOURCE
+
+  { effect_clauses: (effect, abstraction2) Assoc.t
+  ; value_clause: abstraction
+
+TARGET
+
+(** Handler definitions *)
+and handler =
+  { effect_clauses: (effect, abstraction2) Assoc.t
+  ; value_clause: abstraction_with_ty }
+
+(** Abstractions that take one argument. *)
+and abstraction = (pattern * computation)
+
+and abstraction_with_ty = (pattern * Types.target_ty * computation)
+
+*)
+
+(* Handlers(Return Case) *)
+and tcReturnCase (inState : state) (lclCtx : TypingEnv.t)
+      ((pat, cmp) : Untyped.abstraction) (* Return clause *)
+      (tyIn : Types.target_ty)           (* Expected input value type *)
+      (tyOut : Types.target_ty)          (* Expected output value type *)
+      (dirtOut : Types.dirt)             (* Expected output dirt *)
+  : Typed.abstraction_with_ty tcOutput
+  = (* 1: Typecheck the pattern and the body of the return clause *)
+    let trgPat, patTy, midCtx, cs1 = tcLocatedUntypedVarPat lclCtx pat in
+    let (trgCmp, (tyB,dirtD)), cs2 = tcLocatedCmp inState midCtx cmp in
+
+    (* 2: Make sure that the pattern is a variable one.
+     *    We do not support anything else at the moment *)
+    let x = (match trgPat with
+             | PVar x -> x
+             | _      -> failwith "tcReturnCase: only varpats allowed") in
+
+    (* 3: Generate all wanted constraints *)
+    let omega1, omegaCt1 = Typed.fresh_ty_coer (tyB, tyOut) in
+    let omega2, omegaCt2 = Typed.fresh_dirt_coer (dirtD, dirtOut) in
+    let omega6, omegaCt6 = Typed.fresh_ty_coer (tyIn, patTy) in
+
+    (* 4: Create the elaborated clause *)
+    let yvar = CoreTypes.Variable.fresh "y" in
+    let ysub = Typed.subst_comp (Assoc.of_list [(x, CastExp (Var yvar, omega6))]) in
+    let outExpr = (PVar yvar, patTy, Typed.CastComp (ysub trgCmp, Typed.BangCoercion (omega1, omega2))) in
+
+    (* 5: Combine the results *)
+    (* NOTE: cs1 includes the skeleton annotation of the paper *)
+    (outExpr, omegaCt1 :: omegaCt2 :: omegaCt6 :: cs1 @ cs2)
+
+(* Handlers(Op Cases) *)
+and tcOpCases (inState : state) (lclCtx : TypingEnv.t)
+      (eclauses : (Untyped.effect, Untyped.abstraction2) Assoc.t)
+      (tyOut : Types.target_ty) (dirtOut : Types.dirt)
+  : ((Typed.effect, Typed.abstraction2) Assoc.t) tcOutput
+  = let rec go cs
+      = (match Assoc.isCons cs with
+         | None        -> ([], [])
+         | Some (c,cs) -> let y,  cs1 = tcOpCase inState lclCtx c tyOut dirtOut in
+                          let ys, cs2 = go cs in
+                          (y :: ys, cs1 @ cs2)
+        ) in
+    let allClauses, allCs = go eclauses in
+    (Assoc.of_list allClauses, allCs)
+
+(* Handlers(Op Case) *)
+and tcOpCase (inState : state) (lclCtx : TypingEnv.t)
+      ((eff,abs2) : Untyped.effect * Untyped.abstraction2) (* Op clause *)
+      (tyOut : Types.target_ty)                   (* Expected output value type *)
+      (dirtOut : Types.dirt)                      (* Expected output dirt *)
+  : (Typed.effect * Typed.abstraction2) tcOutput
+  = (* 1: Lookup the type of Opi *)
+    let tyAi, tyBi = Typed.EffectMap.find eff inState.effects in
+
+    (* 2: Generate fresh variables for the type of the codomain of the continuation *)
+    let alphai, alphaiSkel = Typed.fresh_ty_with_fresh_skel () in
+    let deltai = Types.fresh_dirt () in
+
+    (* 3: Typecheck the clause *)
+    let ((xop,kop,trgCop),(_,_,(tyBOpi,dirtDOpi))), csi (* GEORGE: I don't like the unused types *)
+      = tcTypedAbstraction2 inState lclCtx abs2 tyAi (Types.Arrow (tyBi, (alphai,deltai))) in
+
+    (* 4: Make sure that the pattern for k is a variable one.
+     *    We do not support anything else at the moment *)
+    let k = (match kop with
+             | PVar k -> k
+             | _ -> failwith "tcOpCase: only varpats allowed") in
+
+    (* 5: Generate all the needed constraints *)
+    let omega3i, omegaCt3i = Typed.fresh_ty_coer   (tyBOpi, tyOut) in
+    let omega4i, omegaCt4i = Typed.fresh_dirt_coer (dirtDOpi, dirtOut) in
+    let omega5i, omegaCt5i = (let leftty  = Types.Arrow (tyBi,(tyOut,dirtOut)) in
+                              let rightty = Types.Arrow (tyBi,(alphai,deltai)) in
+                              Typed.fresh_ty_coer (leftty, rightty)) in
+
+    (* 6: Create the elaborated clause *)
+    let lvar = CoreTypes.Variable.fresh "l" in
+    let lsub = Typed.subst_comp (Assoc.of_list [(k, CastExp (Var lvar, omega5i))]) in
+    let outExpr = ( ((eff,(tyAi,tyBi)) : Typed.effect) (* Opi *)
+                  , (xop, PVar lvar, CastComp (lsub trgCop, Typed.BangCoercion (omega3i,omega4i)))
+                  ) in
+
+    (* 7: Combine the results *)
+    let outCs = alphaiSkel :: omegaCt3i :: omegaCt4i :: omegaCt5i :: csi in
+    (outExpr, outCs)
+
 (* Handlers *)
 and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : tcValOutput =
   (* 0: Warn about the current state of the implementation *)
   Print.debug "Ignoring the finally_clause" ;
 
-  (* 2: Generate fresh variables for the input and output types *)
-  (* NOTE: We do pass these type variables inside when checking the clauses but
-   * that is merely for ease of constraint construction; these variables are
-   * not to be added to Q just yet (and so cannot be unified yet). *)
+  (* 1: Generate fresh variables for the input and output types *)
   let alphaIn, alphaInSkel = Typed.fresh_ty_with_fresh_skel () in
   let deltaIn = Types.fresh_dirt () in
   let alphaOut, alphaOutSkel = Typed.fresh_ty_with_fresh_skel () in
   let deltaOut = Types.fresh_dirt () in
 
-  (* How to process the return clause *)
-  let rec processReturnClause (tmpState : state) (tmpCtx : TypingEnv.t) ((pat,cmp) : Untyped.abstraction)
-       : abstraction_with_ty tcOutput
-    = let trgPat, alphaR, midCtx, cs1 = tcLocatedUntypedVarPat tmpCtx pat in
-      let (cR, (betaR, deltaR)), cs2 = tcLocatedCmp inState midCtx cmp in
+  (* 2: Process the return and the operation clauses *)
+  let trgRet, cs1 = tcReturnCase inState lclCtx h.value_clause alphaIn alphaOut deltaOut in
+  let trgCls, cs2 = tcOpCases inState lclCtx h.effect_clauses alphaOut deltaOut in
 
-      (* GEORGE: we do not support anything else at the moment *)
-      let x = (match trgPat with
-               | PVar x -> x
-               | _ -> failwith "processReturnClause: only varpats allowed") in
-
-      let omega1, omegaCt1 = Typed.fresh_ty_coer (betaR, alphaOut) in
-      let omega2, omegaCt2 = Typed.fresh_dirt_coer (deltaR, deltaOut) in
-      let omega6, omegaCt6 = Typed.fresh_ty_coer (alphaIn, alphaR) in
-
-      let yvar = CoreTypes.Variable.fresh "y" in
-      let ysub = Typed.subst_comp (Assoc.of_list [(x, CastExp (Var yvar, omega6))]) in
-
-      let outExpr = (PVar yvar, alphaR, Typed.CastComp (ysub cR, Typed.BangCoercion (omega1, omega2))) in
-      (outExpr, omegaCt1 :: omegaCt2 :: omegaCt6 :: cs1 @ cs2)
-  in
-
-  (* How to process effect clauses *)
-  let rec processOpClauses
-            (tmpState : state)      (* Qi-1 *)
-            (tmpCtx : TypingEnv.t)  (* sigmai-1 .. sigma0 (Gamma) *)
-            (eclauses : (Untyped.effect, Untyped.abstraction2) Assoc.t) (* clauses... *)
-    = match Assoc.isCons eclauses with
-      | None -> ([],[])
-      | Some ((eff,abs2),clauses) ->
-          (* Lookup the type of Opi *)
-          let ai, bi = Typed.EffectMap.find eff tmpState.effects in
-
-          (* Generate fresh variables for the typed of the codomain of the continuation *)
-          let alphai, alphaiSkel = Typed.fresh_ty_with_fresh_skel () in
-          let deltai = Types.fresh_dirt () in
-
-          (* Typecheck the clause *) (* GEORGE:TODO: FIXME *)
-          let ((xop,kop,trgCop),(xTy,kTy,(bOpi,deltaOpi))), csi
-            = tcTypedAbstraction2 tmpState tmpCtx abs2 ai (Types.Arrow (bi, (alphai,deltai))) in
-
-          (* Process the rest recursively *)
-          let trgClauses,csRest = processOpClauses tmpState tmpCtx clauses in
-
-          (* Create the target clause *)
-          let omega3i, omegaCt3i = Typed.fresh_ty_coer   (bOpi, alphaOut) in
-          let omega4i, omegaCt4i = Typed.fresh_dirt_coer (deltaOpi, deltaOut) in
-          let omega5i, omegaCt5i = Typed.fresh_ty_coer (Types.Arrow (bi, (alphaOut,deltaOut)), kTy) in
-
-          (* GEORGE: we do not support anything else at the moment *)
-          let k = (match kop with
-                   | PVar k -> k
-                   | _ -> failwith "processOpClauses: only varpats allowed") in
-          let lvar = CoreTypes.Variable.fresh "l" in
-          let lsub = Typed.subst_comp (Assoc.of_list [(k, CastExp (Var lvar, omega5i))]) in
-
-          let trgClause = ( ((eff,(ai,bi)) : Typed.effect) (* Opi *)
-                          , (xop, PVar lvar, CastComp (lsub trgCop, Typed.BangCoercion (omega3i,omega4i)))
-                          ) in
-
-          ( trgClause :: trgClauses
-          , omegaCt3i :: omegaCt4i :: omegaCt5i :: alphaiSkel :: csi @ csRest
-          )
-  in
-
-  (* Process all the clauses *)
-  let trgRet, cs1 = processReturnClause inState lclCtx h.value_clause in
-  let trgCls, cs2 = processOpClauses    inState lclCtx h.effect_clauses in
-
+  (* 3: Create the omega7 coercion (cast the whole handler) *)
   let omega7, omegaCt7 =
-    let allOps = Types.EffectSet.of_list (List.map (fun ((eff, _), _) -> eff) trgCls) in
+    let allOps = trgCls
+                 |> Assoc.to_list
+                 |> List.map (fun ((eff, _), _) -> eff)
+                 |> Types.EffectSet.of_list in
 
-    (* GEORGE: Unsafely match against deltaOut to get a representation as a dirt variable *)
-    let deltaOutVar = (match deltaOut with
-                       | Types.{effect_set=_;row=ParamRow deltaOutVar} ->
-                           deltaOutVar
-                       | Types.{effect_set=_;row=EmptyRow} ->
-                           failwith "deltaOut: IMPOSSIBLE") in
+    (* GEORGE: This should be done in a cleaner way but let's leave it for later *)
+    let deltaOutVar = (match deltaOut.row with
+                       | ParamRow deltaOutVar -> deltaOutVar
+                       | EmptyRow -> failwith "deltaOut: IMPOSSIBLE") in
 
     Typed.fresh_dirt_coer (deltaIn, Types.{effect_set = allOps; row= ParamRow deltaOutVar})
   in
@@ -691,7 +732,7 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) : t
                                         , Typed.BangCoercion (Typed.ReflTy alphaOut, Typed.ReflDirt deltaOut) ) in
   Print.debug "I am the HandlerCo : %t" (Typed.print_ty_coercion handlerCo) ;
 
-  let outExpr = CastExp ( Handler ({ effect_clauses = Assoc.of_list trgCls
+  let outExpr = CastExp ( Handler ({ effect_clauses = trgCls
                                    ; value_clause   = trgRet })
                         , handlerCo ) in
   let outType = Types.Handler ((alphaIn, deltaIn), (alphaOut, deltaOut)) in
