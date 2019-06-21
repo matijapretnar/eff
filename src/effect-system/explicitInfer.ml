@@ -562,6 +562,7 @@ let tcUntypedVarPat (lclCtxt : TypingEnv.t)
   | Untyped.PNonbinding -> let alpha, alphaSkel = Typed.fresh_ty_with_fresh_skel ()
                            in  (Typed.PNonbinding, alpha, lclCtxt, [alphaSkel])
   | Untyped.PConst c    -> (Typed.PConst c, Types.type_const c, lclCtxt, [])
+  | Untyped.PTuple []   -> (Typed.PTuple [], Types.Tuple [], lclCtxt, [])
   (* GEORGE: TODO: Unhandled cases *)
   | _other_pattern      -> failwith "tcUntypedVarPat: Please no pattern matching in lambda abstractions!"
 
@@ -569,20 +570,32 @@ let tcLocatedUntypedVarPat (lclCtxt : TypingEnv.t) (pat : Untyped.pattern)
   : (Typed.pattern * Types.target_ty * TypingEnv.t * constraints)
   = tcUntypedVarPat lclCtxt pat.it
 
+(* NOTE: We do not really want to return ANY constraints but given the current
+ * elaboration strategy we do not want to fail when matching against a literal
+ * or unit or something. Feels hacky but one does what one can. *)
 let tcTypedVarPat (lclCtxt : TypingEnv.t)
       (pat : Untyped.plain_pattern)
       (patTy : Types.target_ty)
-  : (Typed.pattern * TypingEnv.t)
+  : (Typed.pattern * TypingEnv.t * constraints)
   = match pat with
-    | Untyped.PVar x      -> (Typed.PVar x, extendLclCtxt lclCtxt x patTy)
-    | Untyped.PNonbinding -> (Typed.PNonbinding, lclCtxt)
+    | Untyped.PVar x      -> (Typed.PVar x, extendLclCtxt lclCtxt x patTy, [])
+    | Untyped.PNonbinding -> (Typed.PNonbinding, lclCtxt, [])
+    | Untyped.PConst c    -> let _, omegaCt = Typed.fresh_ty_coer (patTy, Types.type_const c) in
+                             (Typed.PConst c, lclCtxt, [omegaCt])
+    | Untyped.PTuple []   -> let _, omegaCt = Typed.fresh_ty_coer (patTy, Types.Tuple []) in
+                             (Typed.PTuple [], lclCtxt, [omegaCt])
+    (* Do not worry about the coercion variable not being used in this case;
+     * the shape of the constraint will turn this into unification *)
     (* GEORGE: TODO: Unhandled cases *)
     | _other_pattern      -> failwith "tcTypedVarPat: Please no pattern matching in lambda abstractions!"
 
+(* NOTE: We do not really want to return ANY constraints but given the current
+ * elaboration strategy we do not want to fail when matching against a literal
+ * or unit or something. Feels hacky but one does what one can. *)
 let tcLocatedTypedVarPat (lclCtxt : TypingEnv.t)
       (pat : Untyped.pattern)
       (patTy : Types.target_ty)
-  : (Typed.pattern * TypingEnv.t)
+  : (Typed.pattern * TypingEnv.t * constraints)
   = tcTypedVarPat lclCtxt pat.it patTy
 
 let isLocatedVarPat (pat : Untyped.pattern) : bool
@@ -862,7 +875,7 @@ and tcLetValNoGen (inState : state) (lclCtxt : TypingEnv.t)
 and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.pattern) (c1 : Untyped.computation) (c2 : Untyped.computation) : tcCmpOutput =
   (* 1: Typecheck c1, the pattern, and c2 *)
   let (trgC1, (tyA1, dirtD1)), cs1 = tcLocatedCmp inState lclCtxt c1 in
-  let trgPat, midCtx = tcLocatedTypedVarPat lclCtxt pat tyA1 in
+  let trgPat, midCtx, hack = tcLocatedTypedVarPat lclCtxt pat tyA1 in
   let (trgC2, (tyA2, dirtD2)), cs2 = tcLocatedCmp inState midCtx c2 in
 
   (* 2: Generate a fresh dirt variable for the result *)
@@ -888,7 +901,7 @@ and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.pattern) (
                     , cresC2 )
                   ) in
   let outType = (tyA2, delta) in
-  let outCs   = omegaCt1 :: omegaCt2 :: cs1 @ cs2 in
+  let outCs   = hack @ (omegaCt1 :: omegaCt2 :: cs1 @ cs2) in
 
   warnAddConstraints "tcLetCmp" [omegaCt1;omegaCt2];
   ((outExpr,outType), outCs)
@@ -1125,9 +1138,9 @@ and tcTypedAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) patTy 
  * Hence, we conservatively ask for the pattern to be a variable pattern (cf.
  * tcTypedVarPat) *)
 and tcTypedAbstraction (inState : state) (lclCtx : TypingEnv.t) (pat,cmp) patTy =
-  let trgPat, midLclCtx   = tcLocatedTypedVarPat lclCtx pat patTy in
-  let (trgCmp, cmpTy), cs = tcLocatedCmp inState midLclCtx cmp in
-  (((trgPat, trgCmp), (patTy, cmpTy)), cs)
+  let trgPat, midLclCtx,hack = tcLocatedTypedVarPat lclCtx pat patTy in
+  let (trgCmp, cmpTy), cs    = tcLocatedCmp inState midLclCtx cmp in
+  (((trgPat, trgCmp), (patTy, cmpTy)), hack @ cs)
 
 (*
 and tcTypedAbstraction2 (inState : state) (lclCtx : TypingEnv.t) (pat1,pat2,cmp) patTy1 patTy2 =
@@ -1148,10 +1161,10 @@ and tcTypedAbstraction2 (inState : state) (lclCtx : TypingEnv.t) (pat1,pat2,cmp)
  * Hence, we conservatively ask for the pattern to be a variable pattern (cf.
  * tcTypedVarPat) *)
 and tcTypedAbstraction2 (inState : state) (lclCtx : TypingEnv.t) (pat1,pat2,cmp) patTy1 patTy2 =
-  let trgPat1, midCtx1    = tcLocatedTypedVarPat lclCtx  pat1 patTy1 in
-  let trgPat2, midCtx2    = tcLocatedTypedVarPat midCtx1 pat2 patTy2 in
-  let (trgCmp, cmpTy), cs = tcLocatedCmp inState midCtx2 cmp in
-  (((trgPat1, trgPat2, trgCmp), (patTy1, patTy2, cmpTy)), cs)
+  let trgPat1, midCtx1, hack1 = tcLocatedTypedVarPat lclCtx  pat1 patTy1 in
+  let trgPat2, midCtx2, hack2 = tcLocatedTypedVarPat midCtx1 pat2 patTy2 in
+  let (trgCmp, cmpTy), cs     = tcLocatedCmp inState midCtx2 cmp in
+  (((trgPat1, trgPat2, trgCmp), (patTy1, patTy2, cmpTy)), hack1 @ hack2 @ cs)
 
 (* ************************************************************************* *)
 (* ************************************************************************* *)
