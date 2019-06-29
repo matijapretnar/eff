@@ -1,12 +1,13 @@
 
 type ty =
   | TyVar of CoreTypes.TyParam.t
-  | Unit
-  | Arrow of ty * ty
-  | Handler of ty * ty
-  | ForAll of CoreTypes.TyParam.t * ty
-  | Qualification of ty_coercion * ty
-  | Computation of ty
+  | TyTuple of ty list
+  | TyBasic of Const.ty
+  | TyArrow of ty * ty
+  | TyHandler of ty * ty
+  | TyForAll of CoreTypes.TyParam.t * ty
+  | TyQualification of ty_coercion * ty
+  | TyComputation of ty
 
 and ty_coercion = 
   | TyCoercion of ty * ty
@@ -38,7 +39,7 @@ type term =
   | Handler of handler
   | Let of variable * term * term
   | Call of effect * term * abstraction_with_ty
-  | Do of CoreTypes.Variable.t * term * term
+  | Do of variable * term * term
   | Handle of term * term
 
 and handler = 
