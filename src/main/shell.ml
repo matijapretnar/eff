@@ -66,10 +66,15 @@ module Make (Backend : BackendSignature.T) = struct
         let c''= Optimize.optimize_main_comp state.type_checker_state c' in
         Print.debug "exec_cmd: after optimization";
 
+        (* Erase ExEff back to ImpEff *)
+        Print.debug "exec_cmd: before erasure";
+        let c'''= ErasureUntyped.typed_to_untyped_comp c'' in
+        Print.debug "exec_cmd: after erasure";
+
         (* Compile / Interpret ImpEff *)
         Print.debug "exec_cmd: begin processing by backend";
         let backend_state' =
-          Backend.process_computation state.backend_state c drty
+          Backend.process_computation state.backend_state c''' drty
         in
         { state with
           type_system_state= type_system_state'
