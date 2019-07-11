@@ -62,9 +62,9 @@ module Make (Backend : BackendSignature.T) = struct
         Print.debug "exec_cmd: after backend typechecking";
 
         (* Optimize ExEff *)
-        (* Print.debug "exec_cmd: before optimization"; *)
-        (* let c''= Optimize.optimize_main_comp state.type_checker_state c' in *)
-        (* Print.debug "exec_cmd: after optimization"; *)
+        Print.debug "exec_cmd: before optimization";
+        let c''= Optimize.optimize_main_comp state.type_checker_state c' in
+        Print.debug "exec_cmd: after optimization";
 
         (* Compile / Interpret ImpEff *)
         Print.debug "exec_cmd: begin processing by backend";
