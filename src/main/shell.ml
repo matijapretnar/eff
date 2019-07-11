@@ -39,17 +39,35 @@ module Make (Backend : BackendSignature.T) = struct
   let rec exec_cmd state {it= cmd; at= loc} =
     match cmd with
     | Commands.Term t ->
+        (* Desugar to ImpEff *)
+        Print.debug "exec_cmd: before desugaring";
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
         let type_system_state', _ =
           TypeSystem.infer_top_comp state.type_system_state c
         in
+        Print.debug "exec_cmd: after desugaring";
+
+        (* Elaborate to ExEff *)
+        Print.debug "exec_cmd: before elaboration";
         let c', inferredExEffType =
           ExplicitInfer.tcTopLevelMono ~loc:c.at state.effect_system_state c
+        (* let c' = ExplicitInfer.tcTopLevel ~loc:c.at
+         *            state.effect_system_state c *)
         in
+        Print.debug "exec_cmd: after elaboration";
+
+        (* Typecheck ExEff *)
         Print.debug "exec_cmd: before backend typechecking";
         let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
         Print.debug "exec_cmd: after backend typechecking";
 
+        (* Optimize ExEff *)
+        (* Print.debug "exec_cmd: before optimization"; *)
+        (* let c''= Optimize.optimize_main_comp state.type_checker_state c' in *)
+        (* Print.debug "exec_cmd: after optimization"; *)
+
+        (* Compile / Interpret ImpEff *)
+        Print.debug "exec_cmd: begin processing by backend";
         let backend_state' =
           Backend.process_computation state.backend_state c drty
         in
