@@ -1067,14 +1067,14 @@ let mkCmpDirtGroundSubst cmp =
     (Types.DirtParamSet.elements (free_dirt_vars_computation cmp))
 
 (* Typecheck a top-level expression *)
-let tcTopLevel ~loc inState cmp =
-  Print.debug "tcTopLevel [0]: %t" (Untyped.print_computation cmp) ;
+let tcTopLevelMono ~loc inState cmp =
+  Print.debug "tcTopLevelMono [0]: %t" (Untyped.print_computation cmp) ;
   (* 1: Constraint generation *)
   let (trgCmp, (ttype, dirt)), generatedCs
     = tcLocatedCmp inState initial_lcl_ty_env cmp in
 
-  Print.debug "tcTopLevel [1]: INFERRED (BEFORE SUBST): %t" (Types.print_target_dirty (ttype,dirt)) ;
-  Print.debug "tcTopLevel [1]: ELABORATED COMP (BEFORE SUBST): %t" (Typed.print_computation trgCmp) ;
+  Print.debug "tcTopLevelMono [1]: INFERRED (BEFORE SUBST): %t" (Types.print_target_dirty (ttype,dirt)) ;
+  Print.debug "tcTopLevelMono [1]: ELABORATED COMP (BEFORE SUBST): %t" (Typed.print_computation trgCmp) ;
 
   (* 2: Constraint solving *)
   let solverSigma, residualCs = (
@@ -1097,8 +1097,8 @@ let tcTopLevel ~loc inState cmp =
     (extendGenSub initialSigma secondSigma, secondResiduals)
   ) in
 
-  Print.debug "tcTopLevel [2]: INFERRED (AFTER  SUBST): %t" (Types.print_target_dirty (subInCmpTy solverSigma (ttype,dirt))) ;
-  Print.debug "tcTopLevel [2]: RESIDUAL CONSTRAINTS:"; Unification.print_c_list residualCs ;
+  Print.debug "tcTopLevelMono [2]: INFERRED (AFTER  SUBST): %t" (Types.print_target_dirty (subInCmpTy solverSigma (ttype,dirt))) ;
+  Print.debug "tcTopLevelMono [2]: RESIDUAL CONSTRAINTS:"; Unification.print_c_list residualCs ;
 
   (* 4: Create the dirt-grounding substitution *)
   let dirtZonker = mkCmpDirtGroundSubst (subInCmp solverSigma trgCmp) in
