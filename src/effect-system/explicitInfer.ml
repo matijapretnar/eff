@@ -1113,10 +1113,16 @@ let tcTopLevelMono ~loc inState cmp =
       |> subInCmp dirtZonker  (* Dirt-zonker's result *)
       |> subInCmp sub3 in     (* georgeTODO *)
 
+  let targetType =
+    (ttype, dirt)
+      |> subInCmpTy solverSigma
+      |> subInCmpTy dirtZonker
+      |> subInCmpTy sub3 in
+
   Print.debug "ELABORATED COMP (COMPLETE): %t" (Typed.print_computation targetComputation) ;
 
   (* 6: Return the ExEff computation *)
-  targetComputation
+  (targetComputation, targetType)
 
 (* Add an external binding to the typing environment *)
 let addExternal ctx x ty = { ctx with gblCtxt = TypingEnv.update ctx.gblCtxt x ty }
