@@ -266,13 +266,6 @@ let instantiateVariable (x : variable) (scheme : Types.target_ty)
 (*                           BASIC DEFINITIONS                               *)
 (* ************************************************************************* *)
 
-(* Inference rule inputs: constraint state & typing environment/context *)
-(* GEORGE: Unused at the moment *)
-type tcInputs =
-  { inState : state
-  ; lclCtx  : TypingEnv.t
-  }
-
 (* Constraint generation output *)
 type 'a tcOutput = ('a * constraints)
 
