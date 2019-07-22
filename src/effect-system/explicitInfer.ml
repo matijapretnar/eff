@@ -582,26 +582,6 @@ and tcEffect (inState : state) (lclCtx : TypingEnv.t) (eff : Untyped.effect) : t
   let outType = Types.Arrow (in_ty, (out_ty, Types.closed_dirt s)) in
   ((outVal, outType), [])
 
-(*
-SOURCE
-
-  { effect_clauses: (effect, abstraction2) Assoc.t
-  ; value_clause: abstraction
-
-TARGET
-
-(** Handler definitions *)
-and handler =
-  { effect_clauses: (effect, abstraction2) Assoc.t
-  ; value_clause: abstraction_with_ty }
-
-(** Abstractions that take one argument. *)
-and abstraction = (pattern * computation)
-
-and abstraction_with_ty = (pattern * Types.target_ty * computation)
-
-*)
-
 (* Handlers(Return Case) *)
 and tcReturnCase (inState : state) (lclCtx : TypingEnv.t)
       ((pat, cmp) : Untyped.abstraction) (* Return clause *)
@@ -630,8 +610,7 @@ and tcReturnCase (inState : state) (lclCtx : TypingEnv.t)
     let outExpr = (PVar yvar, patTy, Typed.CastComp (ysub trgCmp, Typed.BangCoercion (omega1, omega2))) in
 
     (* 5: Combine the results *)
-    (* NOTE: cs1 includes the skeleton annotation of the paper *)
-    (outExpr, omegaCt1 :: omegaCt2 :: omegaCt6 :: cs1 @ cs2)
+    (outExpr, omegaCt1 :: omegaCt2 :: omegaCt6 :: cs1 @ cs2) (* NOTE: (a_r : skel_r) \in cs1 *)
 
 (* Handlers(Op Cases) *)
 and tcOpCases (inState : state) (lclCtx : TypingEnv.t)
@@ -970,7 +949,7 @@ and tcHandle (inState : state) (lclCtxt : TypingEnv.t) (hand : Untyped.expressio
     let castCmp  = Typed.CastComp (trgCmp, Typed.BangCoercion (omega2, omega3)) in
     Typed.Handle (castHand, castCmp)
   ) in
-  let outType = (alpha2, dirtD2) in
+  let outType = (alpha2, delta2) in
   let outCs   =  alphaSkel1 :: alphaSkel2
               :: omegaCt1 :: omegaCt2 :: omegaCt3
               :: cs1 @ cs2 in
