@@ -68,7 +68,8 @@ module Make (Backend : BackendSignature.T) = struct
 
         (* Erase ExEff back to ImpEff *)
         Print.debug "exec_cmd: before erasure";
-        let c'''= ErasureUntyped.typed_to_untyped_comp (failwith __LOC__) c'' in
+        (* let c'''= ErasureUntyped.typed_to_untyped_comp (failwith __LOC__) c'' in *)
+        let c'''= ErasureUntyped.typed_to_untyped_comp (Assoc.empty) c'' in
         Print.debug "exec_cmd: after erasure";
 
         (* Compile / Interpret ImpEff *)
