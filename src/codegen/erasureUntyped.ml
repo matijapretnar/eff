@@ -1,6 +1,6 @@
 open UntypedSyntax
 
-let rec typed_to_untyped_ty sub typed_ty =
+let rec typed_to_untyped_ty sub (typed_ty : Types.target_ty) =
   match typed_ty with
     | Types.TyParam _ -> failwith __LOC__
     | Types.Apply _ -> failwith __LOC__
@@ -16,12 +16,12 @@ let rec typed_to_untyped_ty sub typed_ty =
     | Types.TySchemeDirt _ -> failwith __LOC__
     | Types.TySchemeSkel _ -> failwith __LOC__
 
-and typed_to_untyped_exp sub typed_exp : UntypedSyntax.expression =
+and typed_to_untyped_exp sub (typed_exp : Typed.expression) : UntypedSyntax.expression =
   let res = typed_to_untyped_exp_sub sub typed_exp
   in {it=res; at=Location.unknown}
-  
-                                              
-and typed_to_untyped_exp_sub sub typed_exp : UntypedSyntax.plain_expression =
+
+
+and typed_to_untyped_exp_sub sub (typed_exp : Typed.expression) : UntypedSyntax.plain_expression =
   match typed_exp with
   | Typed.Var v -> UntypedSyntax.Var v
   | Typed.BuiltIn _ -> failwith __LOC__
@@ -44,17 +44,25 @@ and typed_to_untyped_exp_sub sub typed_exp : UntypedSyntax.plain_expression =
   | Typed.ApplyTyCoercion (e,_) -> typed_to_untyped_exp_sub sub e
   | Typed.ApplyDirtCoercion (e,_) -> typed_to_untyped_exp_sub sub e
 
-and typed_to_untyped_comp sub typed_comp : UntypedSyntax.computation =
+and typed_to_untyped_comp sub (typed_comp : Typed.computation) : UntypedSyntax.computation =
   let res = typed_to_untyped_comp_sub sub typed_comp
   in {it=res; at=Location.unknown}
 
-and typed_to_untyped_comp_sub sub typed_comp : UntypedSyntax.plain_computation =
+and typed_to_untyped_comp_sub sub (typed_comp : Typed.computation) : UntypedSyntax.plain_computation =
   match typed_comp with
   | Typed.Value v -> UntypedSyntax.Value (typed_to_untyped_exp sub v)
   | Typed.LetVal (e,abs) ->
     UntypedSyntax.Let ([typed_to_untyped_abs_with_ty sub abs]
                       ,typed_to_untyped_comp sub (Typed.Value e))
-  | Typed.LetRec _ -> failwith __LOC__
+  | Typed.LetRec (lrs,c) ->
+    UntypedSyntax.LetRec
+      (List.map
+         (fun (v,ty,e) ->
+            (v,
+             (typed_to_untyped_pattern Typed.PNonbinding
+             ,typed_to_untyped_comp sub (Typed.Value e))))
+         lrs
+      ,typed_to_untyped_comp sub c)
   | Typed.Match (e,alst) ->
     UntypedSyntax.Match (typed_to_untyped_exp sub e
                         ,List.map (fun abs -> typed_to_untyped_abs sub abs) alst)
@@ -62,24 +70,24 @@ and typed_to_untyped_comp_sub sub typed_comp : UntypedSyntax.plain_computation =
   | Typed.Handle (e,c) -> UntypedSyntax.Handle (typed_to_untyped_exp sub e,typed_to_untyped_comp sub c)
   | Typed.Call _ -> failwith __LOC__
   | Typed.Op _ -> failwith __LOC__
-  | Typed.Bind _ -> failwith __LOC__
+  | Typed.Bind (c1,abs) -> UntypedSyntax.Let ([typed_to_untyped_abs sub abs], typed_to_untyped_comp sub c1)
   | Typed.CastComp (c,_) -> typed_to_untyped_comp_sub sub c
   | Typed.CastComp_ty (c,_) -> typed_to_untyped_comp_sub sub c
   | Typed.CastComp_dirt (c,_) -> typed_to_untyped_comp_sub sub c
 
-and typed_to_untyped_abs_with_ty sub (e_p, e_ty, e_c) : UntypedSyntax.abstraction =
+and typed_to_untyped_abs_with_ty sub ((e_p, e_ty, e_c) : Typed.abstraction_with_ty) : UntypedSyntax.abstraction =
   ( typed_to_untyped_pattern e_p
   , typed_to_untyped_comp sub e_c )
 
-and typed_to_untyped_abs sub (e_p, e_c) : UntypedSyntax.abstraction =
+and typed_to_untyped_abs sub ((e_p, e_c) : Typed.abstraction) : UntypedSyntax.abstraction =
   (typed_to_untyped_pattern e_p, typed_to_untyped_comp sub e_c)
 
-and typed_to_untyped_abs_2 sub (e_p1, e_p2, e_c) : UntypedSyntax.abstraction2 =
+and typed_to_untyped_abs_2 sub ((e_p1, e_p2, e_c) : Typed.abstraction2) : UntypedSyntax.abstraction2 =
   ( typed_to_untyped_pattern e_p1
   , typed_to_untyped_pattern e_p2
   , typed_to_untyped_comp sub e_c )
 
-and typed_to_untyped_pattern ty : UntypedSyntax.pattern =
+and typed_to_untyped_pattern (ty : Typed.pattern) : UntypedSyntax.pattern =
   let res =
     match ty with
     | Typed.PVar x -> UntypedSyntax.PVar x
