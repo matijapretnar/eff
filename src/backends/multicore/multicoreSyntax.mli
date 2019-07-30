@@ -1,4 +1,5 @@
-module CoreSyntax = UntypedSyntax
+(** Syntax of the core language. *)
+open CoreUtils
 
 type variable = CoreTypes.Variable.t
 
@@ -58,11 +59,3 @@ and abstraction = pattern * term
 
 (** Abstractions that take two arguments. *)
 and abstraction2 = pattern * pattern * term
-
-val of_computation : CoreSyntax.computation -> term
-
-val of_pattern : CoreSyntax.pattern -> pattern
-
-val of_type : Type.ty -> ty
-
-val of_tydef : Tctx.tydef -> tydef
