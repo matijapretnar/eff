@@ -46,6 +46,8 @@ module Make (Backend : BackendSignature.T) = struct
           TypeSystem.infer_top_comp state.type_system_state c
         in
         Print.debug "exec_cmd: after desugaring";
+        Format.fprintf !Config.error_formatter "%t\n"
+          (UntypedSyntax.print_computation c);
 
         (* Elaborate to ExEff *)
         Print.debug "exec_cmd: before elaboration";
@@ -55,6 +57,8 @@ module Make (Backend : BackendSignature.T) = struct
          *            state.effect_system_state c *)
         in
         Print.debug "exec_cmd: after elaboration";
+        Format.fprintf !Config.error_formatter "%t\n"
+          (Typed.print_computation c');
 
         (* Typecheck ExEff *)
         Print.debug "exec_cmd: before backend typechecking";
@@ -63,14 +67,18 @@ module Make (Backend : BackendSignature.T) = struct
 
         (* Optimize ExEff *)
         Print.debug "exec_cmd: before optimization";
-        let c''= Optimize.optimize_main_comp state.type_checker_state c' in
+        let c'' = Optimize.optimize_main_comp state.type_checker_state c' in
+        (* let c'' = c' in *)
         Print.debug "exec_cmd: after optimization";
+        Format.fprintf !Config.error_formatter "%t\n"
+          (Typed.print_computation c'');
 
         (* Erase ExEff back to ImpEff *)
         Print.debug "exec_cmd: before erasure";
-        (* let c'''= ErasureUntyped.typed_to_untyped_comp (failwith __LOC__) c'' in *)
         let c'''= ErasureUntyped.typed_to_untyped_comp (Assoc.empty) c'' in
         Print.debug "exec_cmd: after erasure";
+        Format.fprintf !Config.error_formatter "%t\n"
+          (UntypedSyntax.print_computation c''');
 
         (* Compile / Interpret ImpEff *)
         Print.debug "exec_cmd: begin processing by backend";
