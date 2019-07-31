@@ -1,31 +1,5 @@
 
-let rec typed_to_untyped_ty sub (typed_ty : Types.target_ty) =
-  match typed_ty with
-    | Types.TyParam t -> Type.TyParam t
-    | Types.Apply (t,tys) ->
-      Type.Apply (t
-                 ,List.map (fun ty -> typed_to_untyped_ty sub ty) tys
-                 )
-    | Types.Arrow (t1,(t2,_)) -> Type.Arrow
-                                   (typed_to_untyped_ty sub t1
-                                   , typed_to_untyped_ty sub t2)
-    | Types.Tuple tys ->
-      Type.Tuple (List.map (fun ty -> typed_to_untyped_ty sub ty) tys)
-    | Types.Handler ((ty1,_),(ty2,_)) ->
-      Type.Handler { value = typed_to_untyped_ty sub ty1
-                   ; finally = typed_to_untyped_ty sub ty2}
-    | Types.PrimTy ty -> (match ty with
-      | Types.IntTy -> Type.int_ty
-      | Types.BoolTy -> Type.bool_ty
-      | Types.StringTy -> Type.string_ty
-      | Types.FloatTy -> Type.float_ty)
-    | Types.QualTy (_,ty) -> typed_to_untyped_ty sub ty
-    | Types.QualDirt (_,ty) -> typed_to_untyped_ty sub ty
-    | Types.TySchemeTy (_,_,ty) -> typed_to_untyped_ty sub ty
-    | Types.TySchemeDirt (_,ty) -> typed_to_untyped_ty sub ty
-    | Types.TySchemeSkel (_,ty) -> typed_to_untyped_ty sub ty
-
-and typed_to_untyped_exp sub (typed_exp : Typed.expression) : UntypedSyntax.expression =
+let rec typed_to_untyped_exp sub (typed_exp : Typed.expression) : UntypedSyntax.expression =
   let res = typed_to_untyped_exp_sub sub typed_exp
   in {it=res; at=Location.unknown}
 
