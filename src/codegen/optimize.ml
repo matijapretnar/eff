@@ -412,13 +412,13 @@ and optimize_sub_handler st {effect_clauses= ecs; value_clause= vc} =
 
 
 and optimize_abstraction_with_ty st a_w_ty =
-  let plain_a_w_ty' = optimize_plain_abstraction_with_ty st a_w_ty in
-  plain_a_w_ty'
+  optimize_plain_abstraction_with_ty st a_w_ty
 
 
 and optimize_plain_abstraction_with_ty st (p, ty, c) =
-  let PVar var = p in
-  (p, ty, optimize_comp (extend_var_type st var ty) c)
+  match p with
+  | PVar var -> (p, ty, optimize_comp (extend_var_type st var ty) c)
+  | _ -> failwith __LOC__
 
 
 and optimize_abstraction st ty a =
@@ -428,23 +428,34 @@ and optimize_abstraction st ty a =
 
 
 and optimize_pattern st ty p =
+  extend_pat_type st p ty
+
+and extend_pat_type st p ty =
   match p with
   | PVar x -> extend_var_type st x ty
+  | PAs (p1,x) ->
+    let st' = extend_var_type st x ty in
+    extend_pat_type st' p1 ty
+  | PTuple ps -> (
+    match ty with
+    | Tuple tys ->
+      List.fold_left2
+        (fun st1 p1 ty1 -> extend_pat_type st1 p1 ty1)
+        st ps tys
+    | _ -> failwith ("PTuple pattern does not have Tuple type at " ^ __LOC__)
+  )
+  | PRecord _r -> failwith __LOC__
+  | PVariant (_l,_p) -> failwith __LOC__
+  | PConst _c -> st
   | PNonbinding -> st
-  | PConst c -> st
 
 
-and optimize_abstraction2 st dty (effect, a2) =
-  let op, (in_op, out_op) = effect in
+and optimize_abstraction2 st (dty:target_dirty) (effect, a2) =
+  let op, (op_ty_in, op_ty_out) = effect in
   let p1, p2, c = a2 in
-  let Typed.PVar v1 = p1 in
-  let Typed.PVar v2 = p2 in
-  let st =
-    extend_var_type
-      (extend_var_type st v1 in_op)
-      v2 (Types.Arrow (out_op, dty))
-  in
-  (effect, (p1, p2, optimize_comp st c))
+  let st' = extend_pat_type st p1 op_ty_in in
+  let st'' = extend_pat_type st' p2 (Types.Arrow (op_ty_out, dty)) in
+  (effect, (p1, p2, optimize_comp st'' c))
 
 
 and optimize_sub_comp st c =
