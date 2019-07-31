@@ -266,6 +266,27 @@ let instantiateVariable (x : variable) (scheme : Types.target_ty)
 (*                     LET-GENERALIZATION UTILITIES                          *)
 (* ************************************************************************* *)
 
+(* GEORGE: Shall we use filter_map? That would bump the requirements for
+ * installation (OCaml 4.08.0). Also, I would suggest adding more checks here;
+ * only a few kinds of constraints are expected after constraint solving. *)
+let partitionResidualCs : Typed.omega_ct list
+                        -> ( (CoreTypes.TyParam.t * CoreTypes.SkelParam.t) list
+                           * (CoreTypes.TyCoercionParam.t * Types.ct_ty) list
+                           * (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list )
+   = let rec aux = function
+       | [] -> ([],[],[])
+       | (Typed.TyParamHasSkel (a,Types.SkelParam s)) :: rest ->
+           let alphaSkels, tyCs, dirtCs = aux rest
+           in  ((a,s) :: alphaSkels, tyCs, dirtCs)
+       | (TyOmega (o,ct)) :: rest ->
+           let alphaSkels, tyCs, dirtCs = aux rest
+           in  (alphaSkels, (o,ct) :: tyCs, dirtCs)
+       | (DirtOmega (o,ct)) :: rest ->
+           let alphaSkels, tyCs, dirtCs = aux rest
+           in  (alphaSkels, tyCs, (o,ct) :: dirtCs)
+       | cs -> failwith "partitionResidualCs: malformed"
+     in aux
+
 (* Detect the components to abstract over from the residual constraints. To be
  * used in let-generalization. *)
 (* GEORGE NOTE: We might have "dangling" dirt variables at the end. In the end
@@ -277,12 +298,19 @@ let mkGenParts (cs : Typed.omega_ct list)
     * CoreTypes.DirtParam.t list
     * (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list
     * (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
-  = failwith __LOC__
-  (* Skeleton variables *)
-  (* Skeleton-annotated type variables *)
-  (* Dirt-variables *)
-  (* Coercion-variable-annotated type inequalities *)
-  (* Coercion-variable-annotated dirt inequalities *)
+  = let alphasSkelVars, tyCs, dirtCs = partitionResidualCs cs in
+    let skelVars = alphasSkelVars
+                   |> List.map snd                   (* Keep only the skeleton variables *)
+                   |> Types.SkelParamSet.of_list     (* Convert to a set *)
+                   |> Types.SkelParamSet.elements in (* Convert back to a list *)
+
+    let alphaSkels = List.map (fun (a,s) -> (a, Types.SkelParam s)) alphasSkelVars in
+    let dirtVars   = List.fold_right
+                       (fun ct dvs -> Types.DirtParamSet.union (fdvsOfOmegaCt ct) dvs)
+                       cs Types.DirtParamSet.empty
+                     |> Types.DirtParamSet.elements in
+    (*let tyDirtVars  = Types.fdvsOfTargetValTy valTy in (* fv(A) *) *)
+    (skelVars, alphaSkels, dirtVars, tyCs, dirtCs)
 
 (* Create a generalized type from parts (as delivered from "mkGenParts"). *)
 let mkGeneralizedType

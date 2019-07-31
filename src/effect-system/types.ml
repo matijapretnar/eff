@@ -1,4 +1,5 @@
 module EffectSet = Set.Make (CoreTypes.Effect)
+module SkelParamSet = Set.Make (CoreTypes.SkelParam)
 module TyParamSet = Set.Make (CoreTypes.TyParam)
 module DirtParamSet = Set.Make (CoreTypes.DirtParam)
 
