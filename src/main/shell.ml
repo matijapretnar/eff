@@ -39,19 +39,51 @@ module Make (Backend : BackendSignature.T) = struct
   let rec exec_cmd state {it= cmd; at= loc} =
     match cmd with
     | Commands.Term t ->
+        (* Desugar to ImpEff *)
+        Print.debug "exec_cmd: before desugaring";
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
         let type_system_state', _ =
           TypeSystem.infer_top_comp state.type_system_state c
         in
+        Print.debug "exec_cmd: after desugaring";
+        Format.fprintf !Config.error_formatter "%t\n"
+          (UntypedSyntax.print_computation c);
+
+        (* Elaborate to ExEff *)
+        Print.debug "exec_cmd: before elaboration";
         let c', inferredExEffType =
           ExplicitInfer.tcTopLevelMono ~loc:c.at state.effect_system_state c
+        (* let c' = ExplicitInfer.tcTopLevel ~loc:c.at
+         *            state.effect_system_state c *)
         in
+        Print.debug "exec_cmd: after elaboration";
+        Format.fprintf !Config.error_formatter "%t\n"
+          (Typed.print_computation c');
+
+        (* Typecheck ExEff *)
         Print.debug "exec_cmd: before backend typechecking";
         let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
         Print.debug "exec_cmd: after backend typechecking";
 
+        (* Optimize ExEff *)
+        Print.debug "exec_cmd: before optimization";
+        let c'' = Optimize.optimize_main_comp state.type_checker_state c' in
+        (* let c'' = c' in *)
+        Print.debug "exec_cmd: after optimization";
+        Format.fprintf !Config.error_formatter "%t\n"
+          (Typed.print_computation c'');
+
+        (* Erase ExEff back to ImpEff *)
+        Print.debug "exec_cmd: before erasure";
+        let c'''= ErasureUntyped.typed_to_untyped_comp (Assoc.empty) c'' in
+        Print.debug "exec_cmd: after erasure";
+        Format.fprintf !Config.error_formatter "%t\n"
+          (UntypedSyntax.print_computation c''');
+
+        (* Compile / Interpret ImpEff *)
+        Print.debug "exec_cmd: begin processing by backend";
         let backend_state' =
-          Backend.process_computation state.backend_state c drty
+          Backend.process_computation state.backend_state c''' drty
         in
         { state with
           type_system_state= type_system_state'
