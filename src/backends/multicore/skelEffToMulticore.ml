@@ -26,7 +26,7 @@ and of_pattern = function
   | SkelEff.PEConst c -> Multicore.PConst c
   | SkelEff.PENonbinding -> Multicore.PNonbinding
 
-(* Expressions *)
+(* Expressions (-> Terms in the Multicore syntax) *)
 and of_expression = function
   | SkelEff.EVar v -> Multicore.Var v
   | SkelEff.EConst c -> Multicore.Const c
@@ -45,11 +45,28 @@ and of_expression = function
           (fun ((eff, _), abs) -> Multicore.EffectClause (eff, of_abstraction2 abs))
           (Assoc.to_list effect_clauses)
       in
-      let value_clause' = Multicore.ValueClause (of_abstraction_with_ty)
-      let ghost_bind = CoreTypes.Variable.fresh "$c_thunk" in
+      let value_clause' = Multicore.ValueClause (of_abstraction_with_ty value_clause)
       let match_handler =
         Multicore.Match
-          (Multicore.Apply (Multicore.Var ghost_bind, Multicore.Tuple []), value_clause' :: effect_clauses')
-      in Multicore.Lambda (Multicore.PVar ghost_bind, match_handler)
+          (Multicore.Apply (Multicore.PNonbinding, Multicore.Tuple []), value_clause' :: effect_clauses')
+      in Multicore.Lambda (Multicore.PNonbinding, match_handler)
   | SkellEff.EBigLambdaSkel (_, e) = of_expression e
   | SkelEff.ApplySkelExp (e, _) = of_expression e
+
+(* Computations (-> Terms in the Multicore syntax) *)
+and of_computation = function
+  | SkelEff.EValue e -> of_expression e
+  | SkelEff.ELetVal (p, e, c) -> Multicore.Let ([(of_pattern p, of_expression e)], of_computation c)
+  | SkelEff.EApply (e1, e2) -> Multicore.Apply (of_expression e1, of_expression e2)
+  | SkelEff.EHandle (e, c) ->
+      let handler' = of_expression e in
+      let abs = Multicore.Lambda (Multicore.PNonbinding, of_computation c) in
+      Multicore.Apply (handler', abs)
+  | SkelEff.ECall (eff, exp, abs) -> failwith "SkelEff call"
+  | SkelEff.EBind (c, abs) -> Multicore.Apply (of_abstraction abs, of_computation c) (* Meh? *)
+  | SkelEff.Match (e, abs_list) ->
+      let converter abs = Multicore.ValueClause (of_abstraction abs) in
+      Multicore.Match (of_expression e, List.map converter abs_list)
+  | SkelEff.ELetRec (es, c) ->
+      let converter (v, _, e) = (v, of_expression e) in
+      Multicore.LetRec (List.map converter es, of_computation c)
