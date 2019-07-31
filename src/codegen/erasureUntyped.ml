@@ -104,8 +104,8 @@ and typed_to_untyped_comp_sub sub (typed_comp : Typed.computation) : UntypedSynt
     UntypedSyntax.Match (e', alst')
   | Typed.Apply (e1,e2) -> UntypedSyntax.Apply (typed_to_untyped_exp sub e1,typed_to_untyped_exp sub e2)
   | Typed.Handle (e,c) -> UntypedSyntax.Handle (typed_to_untyped_exp sub e,typed_to_untyped_comp sub c)
-  | Typed.Call _ -> failwith __LOC__
-  | Typed.Op _ -> failwith __LOC__
+  | Typed.Call (eff,e,absty) -> failwith __LOC__
+  | Typed.Op (eff,e) -> failwith __LOC__
   | Typed.Bind (c1,(p,c2)) ->
     UntypedSyntax.Let
       ([(typed_to_untyped_pattern p
