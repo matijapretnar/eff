@@ -263,6 +263,59 @@ let instantiateVariable (x : variable) (scheme : Types.target_ty)
   )
 
 (* ************************************************************************* *)
+(*                     LET-GENERALIZATION UTILITIES                          *)
+(* ************************************************************************* *)
+
+(* Detect the components to abstract over from the residual constraints. To be
+ * used in let-generalization. *)
+(* GEORGE NOTE: We might have "dangling" dirt variables at the end. In the end
+ * check whether this is the case and if it is compute the dirt variables from
+ * the elaborated expression and pass them in. *)
+let mkGenParts (cs : Typed.omega_ct list)
+  : ( CoreTypes.SkelParam.t list
+    * (CoreTypes.TyParam.t * Types.skeleton) list
+    * CoreTypes.DirtParam.t list
+    * (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list
+    * (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+  = failwith __LOC__
+  (* Skeleton variables *)
+  (* Skeleton-annotated type variables *)
+  (* Dirt-variables *)
+  (* Coercion-variable-annotated type inequalities *)
+  (* Coercion-variable-annotated dirt inequalities *)
+
+(* Create a generalized type from parts (as delivered from "mkGenParts"). *)
+let mkGeneralizedType
+    (freeSkelVars  : CoreTypes.SkelParam.t list)
+    (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
+    (freeDirtVars  : CoreTypes.DirtParam.t list)
+    (tyCs   : (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list)
+    (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+    (monotype : Types.target_ty) (* expected to be a monotype! *)
+  : Types.target_ty =
+  monotype
+  |> (* 1: Add the constraint abstractions (dirt) *)
+     List.fold_right
+       (fun (_,pi) qual -> Types.QualDirt (pi, qual))
+       dirtCs
+  |> (* 2: Add the constraint abstractions (type) *)
+     List.fold_right
+       (fun (_,pi) qual -> Types.QualTy (pi, qual))
+       tyCs
+  |> (* 3: Add the dirt variable abstractions *)
+     List.fold_right
+       (fun delta scheme -> Types.TySchemeDirt (delta, scheme))
+       freeDirtVars
+  |> (* 4: Add the type variable abstractions *)
+     List.fold_right
+       (fun (a,s) scheme -> Types.TySchemeTy (a, s, scheme))
+       annFreeTyVars
+  |> (* 5: Add the skeleton abstractions *)
+     List.fold_right
+       (fun skel scheme -> Types.TySchemeSkel (skel, scheme))
+       freeSkelVars
+
+(* ************************************************************************* *)
 (*                           BASIC DEFINITIONS                               *)
 (* ************************************************************************* *)
 
