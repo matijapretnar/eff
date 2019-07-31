@@ -2,6 +2,12 @@ open CoreUtils
 module TypeSystem = SimpleInfer
 module EffectSystem = ExplicitInfer
 
+(* GEORGE: IMPORT JUST TO FORCE COMPILATION *)
+module TestD = Erasure
+module TestA = SkelEffToMulticore
+module TestB = UntypedToMulticore
+module TestC = SkelEffSyntax
+
 module type Shell = sig
   type state
 

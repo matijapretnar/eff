@@ -11,8 +11,8 @@ type e_pattern =
   | PEVar of variable
   | PEAs of e_pattern * variable
   | PETuple of e_pattern list
-  | PERecord of (CoreTypes.field, e_pattern) Assoc.t
-  | PEVariant of CoreTypes.label * e_pattern option
+  | PERecord of (CoreTypes.Field.t, e_pattern) Assoc.t
+  | PEVariant of CoreTypes.Label.t * e_pattern option
   | PEConst of Const.t
   | PENonbinding
 
@@ -22,8 +22,8 @@ type e_expression =
   | EBuiltIn of string * int
   | EConst of Const.t
   | ETuple of e_expression list
-  | ERecord of (CoreTypes.field, e_expression) Assoc.t
-  | EVariant of CoreTypes.label * e_expression option
+  | ERecord of (CoreTypes.Field.t, e_expression) Assoc.t
+  | EVariant of CoreTypes.Label.t * e_expression option
   | ELambda of e_abstraction_with_ty
   | EEffect of effect
   | EHandler of e_handler

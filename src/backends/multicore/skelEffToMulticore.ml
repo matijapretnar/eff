@@ -13,11 +13,11 @@ and of_abstraction_with_ty (p, _, c) =
   of_abstraction (p, c)
 
 (* Patterns *)
-and of_pattern = function
+and of_pattern : (SkelEff.e_pattern -> Multicore.pattern) = function
   | SkelEff.PEVar v -> Multicore.PVar v
   | SkelEff.PEAs (p, v) -> Multicore.PAs (of_pattern p, v)
   | SkelEff.PETuple ps -> Multicore.PTuple (List.map of_pattern ps)
-  | SkelEff.PERecord ass -> Multicore.PRecord (Assoc.map of_pattern assoc)
+  | SkelEff.PERecord ass -> Multicore.PRecord (Assoc.map of_pattern ass)
   | SkelEff.PEVariant (l, p) -> (
     match p with
     | None -> Multicore.PVariant (l, None)
@@ -27,7 +27,7 @@ and of_pattern = function
   | SkelEff.PENonbinding -> Multicore.PNonbinding
 
 (* Expressions (-> Terms in the Multicore syntax) *)
-and of_expression = function
+and of_expression : (SkelEff.e_expression -> Multicore.term) = function
   | SkelEff.EVar v -> Multicore.Var v
   | SkelEff.EConst c -> Multicore.Const c
   | SkelEff.ETuple es -> Multicore.Tuple (List.map of_expression es)
@@ -45,16 +45,18 @@ and of_expression = function
           (fun ((eff, _), abs) -> Multicore.EffectClause (eff, of_abstraction2 abs))
           (Assoc.to_list effect_clauses)
       in
-      let value_clause' = Multicore.ValueClause (of_abstraction_with_ty value_clause)
+      let value_clause' = Multicore.ValueClause (of_abstraction_with_ty value_clause) in
+      let ghost_bind = CoreTypes.Variable.fresh "$c_thunk" in
       let match_handler =
         Multicore.Match
-          (Multicore.Apply (Multicore.PNonbinding, Multicore.Tuple []), value_clause' :: effect_clauses')
-      in Multicore.Lambda (Multicore.PNonbinding, match_handler)
-  | SkellEff.EBigLambdaSkel (_, e) = of_expression e
-  | SkelEff.ApplySkelExp (e, _) = of_expression e
+          (Multicore.Apply (Multicore.Var ghost_bind, Multicore.Tuple []), value_clause' :: effect_clauses')
+      in
+      Multicore.Lambda (Multicore.PVar ghost_bind, match_handler)
+  | SkelEff.EBigLambdaSkel (_, e) -> of_expression e
+  | SkelEff.EApplySkelExp (e, _) -> of_expression e
 
 (* Computations (-> Terms in the Multicore syntax) *)
-and of_computation = function
+and of_computation : (SkelEff.e_computation -> Multicore.term) = function
   | SkelEff.EValue e -> of_expression e
   | SkelEff.ELetVal (p, e, c) -> Multicore.Let ([(of_pattern p, of_expression e)], of_computation c)
   | SkelEff.EApply (e1, e2) -> Multicore.Apply (of_expression e1, of_expression e2)
@@ -63,10 +65,8 @@ and of_computation = function
       let abs = Multicore.Lambda (Multicore.PNonbinding, of_computation c) in
       Multicore.Apply (handler', abs)
   | SkelEff.ECall (eff, exp, abs) -> failwith "SkelEff call"
-  | SkelEff.EBind (c, abs) -> Multicore.Apply (of_abstraction abs, of_computation c) (* Meh? *)
-  | SkelEff.Match (e, abs_list) ->
+  | SkelEff.EBind (c, abs) -> Multicore.Apply (Multicore.Lambda (of_abstraction abs), of_computation c) (* Meh? *)
+  | SkelEff.EMatch (e, abs_list) ->
       let converter abs = Multicore.ValueClause (of_abstraction abs) in
       Multicore.Match (of_expression e, List.map converter abs_list)
-  | SkelEff.ELetRec (es, c) ->
-      let converter (v, _, e) = (v, of_expression e) in
-      Multicore.LetRec (List.map converter es, of_computation c)
+  | SkelEff.ELetRec (es, c) -> failwith "Need to fix this in the ExplicitInfer step, so ExEff and SkelEff use absstractions instead of expressions"
