@@ -533,18 +533,22 @@ and reduce_comp st c =
     match e1 with
     | Lambda abs -> beta_reduce st abs e2
     | Effect op ->
-        Print.debug "Op -> Call" ;
-        let var = CoreTypes.Variable.fresh "call_var" in
-        let eff, (ty_in, ty_out) = op in
-        let c_cont =
-          CastComp
-            ( Value (Var var)
-            , BangCoercion
-                ( ReflTy ty_out
-                , Empty (Types.closed_dirt (EffectSet.singleton eff)) ) )
-        in
-        let a_w_ty = (PVar var, ty_out, c_cont) in
-        Call (op, e2, a_w_ty)
+      c
+        (* BRECHT: Removing opts that create Calls for use with erasureUntyped
+         * as UntypedSyntax cannot represent them. Maybe they can be
+         * reintroduced with the SkelEff backend.
+         * Print.debug "Op -> Call" ;
+         * let var = CoreTypes.Variable.fresh "call_var" in
+         * let eff, (ty_in, ty_out) = op in
+         * let c_cont =
+         *   CastComp
+         *     ( Value (Var var)
+         *     , BangCoercion
+         *         ( ReflTy ty_out
+         *         , Empty (Types.closed_dirt (EffectSet.singleton eff)) ) )
+         * in
+         * let a_w_ty = (PVar var, ty_out, c_cont) in
+         * Call (op, e2, a_w_ty) *)
     | _ ->
         Print.debug "e1 is not a lambda" ;
         (* TODO: support case where it's a cast of a lambda *)
@@ -600,9 +604,13 @@ and reduce_comp st c =
                 (Typed.subst_comp (Typed.pattern_match p1 e11) c)
                 p2 (Lambda handled_k)
           | None ->
-              let k_abs'' = (k_pat, k_ty, Handle (e1, k_c)) in
-              let res = Call (eff, e11, k_abs'') in
-              reduce_comp st res )
+            c)
+              (* BRECHT: Removing opts that create Calls for use with erasureUntyped
+               * as UntypedSyntax cannot represent them. Maybe they can be
+               * reintroduced with the SkelEff backend.
+               * let k_abs'' = (k_pat, k_ty, Handle (e1, k_c)) in
+               * let res = Call (eff, e11, k_abs'') in
+               * reduce_comp st res ) *)
       | Apply (e11, e12) -> (
           Print.debug "Looking for recursive function name" ;
           match match_recursive_function st e11 with
