@@ -1,3 +1,5 @@
+open SkelEffSyntax
+
 module SkelEff = SkelEffSyntax
 
 let rec typed_to_erasure_ty sub typed_ty =
@@ -44,7 +46,7 @@ let rec typed_to_erasure_exp sub tt =
             (eff, new_e_a2) )
           op_c
       in
-      let new_h = {value_clause= new_vc; effect_clauses= new_op_c} in
+      let new_h = {effect_clauses= new_op_c; value_clause= new_vc} in
       SkelEff.EHandler new_h
   | Typed.BigLambdaTy (tp, sk, e) ->
       let sub1 = Assoc.concat sub (Assoc.update tp sk Assoc.empty) in
