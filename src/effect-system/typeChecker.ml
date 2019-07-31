@@ -275,6 +275,9 @@ and tcDirtCo st co =
 let rec extendPatternTypesTemp st p ty =
   match p with
   | PVar x -> extend_var_types st x ty
+  | PAs (p1,x) ->
+    let st' = extend_var_types st x ty in
+    extendPatternTypes st' p1 ty
   | PNonbinding -> st
   | PConst c ->
       let ty_c = Types.type_const c in

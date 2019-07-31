@@ -24,6 +24,10 @@ let extend_var_type st t_var ty =
   {st with tc_state= TypeChecker.extend_var_types st.tc_state t_var ty}
 
 
+and extend_pat_type st p ty =
+  {st with tc_state=TypeChecker.extendPatternTypes st.tc_state p ty}
+
+
 let extend_ty_params st ty_var =
   {st with tc_state= TypeChecker.extend_ty_params st.tc_state ty_var}
 
@@ -329,11 +333,16 @@ and optimize_abs st ty (p, c) =
 and optimize_sub_expr st e =
   let plain_e' =
     match e with
-    (*
-          | Tuple of expression list
-          | Record of (CoreTypes.field, expression) CoreTypes.assoc
-          | Variant of CoreTypes.label * expression option
-          *)
+    | Var v -> Var v
+    | BuiltIn (s, i) -> BuiltIn (s, i)
+    | Const c -> Const c
+    | Tuple es -> Tuple (List.map (optimize_expr st) es)
+    | Record _r -> failwith __LOC__
+    | Variant (l,e1) -> Variant (l,optimize_expr st e1)
+    | Lambda plain_a_w_ty ->
+      Lambda (optimize_abstraction_with_ty st plain_a_w_ty)
+    | Effect op -> Effect op
+    | Handler h -> Handler (optimize_sub_handler st h)
     | BigLambdaTy (ty_var, sk, e) ->
         let st' =
           extend_ty_param_skeletons (extend_ty_params st ty_var) ty_var sk
@@ -345,29 +354,19 @@ and optimize_sub_expr st e =
     | BigLambdaSkel (sk_var, e) ->
         let st' = extend_skel_params st sk_var in
         BigLambdaSkel (sk_var, optimize_expr st' e)
+    | CastExp (e1, tyco1) ->
+      CastExp (optimize_expr st e1, optimize_ty_coercion st tyco1)
+    | ApplyTyExp (e, ty) -> ApplyTyExp (optimize_expr st e, ty)
     | LambdaTyCoerVar (tyco_var, ct_ty, e) ->
         let st' = extend_ty_coer_types st tyco_var ct_ty in
         LambdaTyCoerVar (tyco_var, ct_ty, optimize_expr st' e)
     | LambdaDirtCoerVar (dco_var, ct_dirt, e) ->
         let st' = extend_dirt_coer_types st dco_var ct_dirt in
         LambdaDirtCoerVar (dco_var, ct_dirt, optimize_expr st' e)
-    | ApplyTyExp (e, ty) -> ApplyTyExp (optimize_expr st e, ty)
     | ApplyDirtExp (e, dirt) -> ApplyDirtExp (optimize_expr st e, dirt)
     | ApplySkelExp (e, sk) -> ApplySkelExp (optimize_expr st e, sk)
-    | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (optimize_expr st e, dco)
     | ApplyTyCoercion (e, tyco) -> ApplyTyCoercion (optimize_expr st e, tyco)
-    | Var v -> Var v
-    | BuiltIn (s, i) -> BuiltIn (s, i)
-    | Const c -> Const c
-    | Lambda plain_a_w_ty ->
-        Lambda (optimize_abstraction_with_ty st plain_a_w_ty)
-    | Effect op -> Effect op
-    | Handler h -> Handler (optimize_sub_handler st h)
-    | CastExp (e1, tyco1) ->
-        CastExp (optimize_expr st e1, optimize_ty_coercion st tyco1)
-    | Handler h -> e
-    | Tuple es -> Tuple (List.map (optimize_expr st) es)
-    (* TODO: implement *)
+    | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (optimize_expr st e, dco)
   in
   plain_e'
 
@@ -429,25 +428,6 @@ and optimize_abstraction st ty a =
 
 and optimize_pattern st ty p =
   extend_pat_type st p ty
-
-and extend_pat_type st p ty =
-  match p with
-  | PVar x -> extend_var_type st x ty
-  | PAs (p1,x) ->
-    let st' = extend_var_type st x ty in
-    extend_pat_type st' p1 ty
-  | PTuple ps -> (
-    match ty with
-    | Tuple tys ->
-      List.fold_left2
-        (fun st1 p1 ty1 -> extend_pat_type st1 p1 ty1)
-        st ps tys
-    | _ -> failwith ("PTuple pattern does not have Tuple type at " ^ __LOC__)
-  )
-  | PRecord _r -> failwith __LOC__
-  | PVariant (_l,_p) -> failwith __LOC__
-  | PConst _c -> st
-  | PNonbinding -> st
 
 
 and optimize_abstraction2 st (dty:target_dirty) (effect, a2) =
