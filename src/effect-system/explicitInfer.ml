@@ -315,6 +315,40 @@ let mkGeneralizedType
        (fun skel scheme -> Types.TySchemeSkel (skel, scheme))
        freeSkelVars
 
+(* Create a generalized term from parts (as delivered from "mkGenParts"). *)
+(* GEORGE NOTE: We might have "dangling" dirt variables at the end. In the end
+ * check whether this is the case and if it is compute the dirt variables from
+ * the elaborated expression and pass them in. *)
+let mkGeneralizedTerm
+    (freeSkelVars  : CoreTypes.SkelParam.t list)
+    (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
+    (freeDirtVars  : CoreTypes.DirtParam.t list)
+    (tyCs   : (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list)
+    (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+    (exp : Typed.expression)
+  : Typed.expression =
+  exp
+  |> (* 1: Add the constraint abstractions (dirt) *)
+     List.fold_right
+       (fun (omega,pi) qual -> Typed.LambdaDirtCoerVar (omega, pi, qual))
+       dirtCs
+  |> (* 2: Add the constraint abstractions (type) *)
+     List.fold_right
+       (fun (omega,pi) qual -> Typed.LambdaTyCoerVar (omega, pi, qual))
+       tyCs
+  |> (* 3: Add the dirt variable abstractions *)
+     List.fold_right
+       (fun delta e -> Typed.BigLambdaDirt (delta, e))
+       freeDirtVars
+  |> (* 4: Add the type variable abstractions *)
+     List.fold_right
+       (fun (a,s) e -> Typed.BigLambdaTy (a, s, e))
+       annFreeTyVars
+  |> (* 5: Add the skeleton abstractions *)
+     List.fold_right
+       (fun skel e -> Typed.BigLambdaSkel (skel, e))
+       freeSkelVars
+
 (* ************************************************************************* *)
 (*                           BASIC DEFINITIONS                               *)
 (* ************************************************************************* *)
