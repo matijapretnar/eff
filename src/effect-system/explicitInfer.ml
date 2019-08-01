@@ -263,6 +263,121 @@ let instantiateVariable (x : variable) (scheme : Types.target_ty)
   )
 
 (* ************************************************************************* *)
+(*                     LET-GENERALIZATION UTILITIES                          *)
+(* ************************************************************************* *)
+
+(* GEORGE: Shall we use filter_map? That would bump the requirements for
+ * installation (OCaml 4.08.0). Also, I would suggest adding more checks here;
+ * only a few kinds of constraints are expected after constraint solving. *)
+let partitionResidualCs : Typed.omega_ct list
+                        -> ( (CoreTypes.TyParam.t * CoreTypes.SkelParam.t) list
+                           * (CoreTypes.TyCoercionParam.t * Types.ct_ty) list
+                           * (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list )
+   = let rec aux = function
+       | [] -> ([],[],[])
+       | (Typed.TyParamHasSkel (a,Types.SkelParam s)) :: rest ->
+           let alphaSkels, tyCs, dirtCs = aux rest
+           in  ((a,s) :: alphaSkels, tyCs, dirtCs)
+       | (TyOmega (o,ct)) :: rest ->
+           let alphaSkels, tyCs, dirtCs = aux rest
+           in  (alphaSkels, (o,ct) :: tyCs, dirtCs)
+       | (DirtOmega (o,ct)) :: rest ->
+           let alphaSkels, tyCs, dirtCs = aux rest
+           in  (alphaSkels, tyCs, (o,ct) :: dirtCs)
+       | cs -> failwith "partitionResidualCs: malformed"
+     in aux
+
+(* Detect the components to abstract over from the residual constraints. To be
+ * used in let-generalization. *)
+(* GEORGE NOTE: We might have "dangling" dirt variables at the end. In the end
+ * check whether this is the case and if it is compute the dirt variables from
+ * the elaborated expression and pass them in. *)
+let mkGenParts (cs : Typed.omega_ct list)
+  : ( CoreTypes.SkelParam.t list
+    * (CoreTypes.TyParam.t * Types.skeleton) list
+    * CoreTypes.DirtParam.t list
+    * (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list
+    * (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+  = let alphasSkelVars, tyCs, dirtCs = partitionResidualCs cs in
+    let skelVars = alphasSkelVars
+                   |> List.map snd                   (* Keep only the skeleton variables *)
+                   |> Types.SkelParamSet.of_list     (* Convert to a set *)
+                   |> Types.SkelParamSet.elements in (* Convert back to a list *)
+
+    let alphaSkels = List.map (fun (a,s) -> (a, Types.SkelParam s)) alphasSkelVars in
+    let dirtVars   = List.fold_right
+                       (fun ct dvs -> Types.DirtParamSet.union (fdvsOfOmegaCt ct) dvs)
+                       cs Types.DirtParamSet.empty
+                     |> Types.DirtParamSet.elements in
+    (*let tyDirtVars  = Types.fdvsOfTargetValTy valTy in (* fv(A) *) *)
+    (skelVars, alphaSkels, dirtVars, tyCs, dirtCs)
+
+(* Create a generalized type from parts (as delivered from "mkGenParts"). *)
+let mkGeneralizedType
+    (freeSkelVars  : CoreTypes.SkelParam.t list)
+    (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
+    (freeDirtVars  : CoreTypes.DirtParam.t list)
+    (tyCs   : (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list)
+    (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+    (monotype : Types.target_ty) (* expected to be a monotype! *)
+  : Types.target_ty =
+  monotype
+  |> (* 1: Add the constraint abstractions (dirt) *)
+     List.fold_right
+       (fun (_,pi) qual -> Types.QualDirt (pi, qual))
+       dirtCs
+  |> (* 2: Add the constraint abstractions (type) *)
+     List.fold_right
+       (fun (_,pi) qual -> Types.QualTy (pi, qual))
+       tyCs
+  |> (* 3: Add the dirt variable abstractions *)
+     List.fold_right
+       (fun delta scheme -> Types.TySchemeDirt (delta, scheme))
+       freeDirtVars
+  |> (* 4: Add the type variable abstractions *)
+     List.fold_right
+       (fun (a,s) scheme -> Types.TySchemeTy (a, s, scheme))
+       annFreeTyVars
+  |> (* 5: Add the skeleton abstractions *)
+     List.fold_right
+       (fun skel scheme -> Types.TySchemeSkel (skel, scheme))
+       freeSkelVars
+
+(* Create a generalized term from parts (as delivered from "mkGenParts"). *)
+(* GEORGE NOTE: We might have "dangling" dirt variables at the end. In the end
+ * check whether this is the case and if it is compute the dirt variables from
+ * the elaborated expression and pass them in. *)
+let mkGeneralizedTerm
+    (freeSkelVars  : CoreTypes.SkelParam.t list)
+    (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
+    (freeDirtVars  : CoreTypes.DirtParam.t list)
+    (tyCs   : (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list)
+    (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+    (exp : Typed.expression)
+  : Typed.expression =
+  exp
+  |> (* 1: Add the constraint abstractions (dirt) *)
+     List.fold_right
+       (fun (omega,pi) qual -> Typed.LambdaDirtCoerVar (omega, pi, qual))
+       dirtCs
+  |> (* 2: Add the constraint abstractions (type) *)
+     List.fold_right
+       (fun (omega,pi) qual -> Typed.LambdaTyCoerVar (omega, pi, qual))
+       tyCs
+  |> (* 3: Add the dirt variable abstractions *)
+     List.fold_right
+       (fun delta e -> Typed.BigLambdaDirt (delta, e))
+       freeDirtVars
+  |> (* 4: Add the type variable abstractions *)
+     List.fold_right
+       (fun (a,s) e -> Typed.BigLambdaTy (a, s, e))
+       annFreeTyVars
+  |> (* 5: Add the skeleton abstractions *)
+     List.fold_right
+       (fun skel e -> Typed.BigLambdaSkel (skel, e))
+       freeSkelVars
+
+(* ************************************************************************* *)
 (*                           BASIC DEFINITIONS                               *)
 (* ************************************************************************* *)
 
@@ -741,7 +856,7 @@ and tcCmp (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_computation -
   | Let ((pat,c1) :: rest,c2) -> let subCmp = {it = Untyped.Let (rest, c2); at = c2.at} in
                                  tcCmp inState lclCtx (Untyped.Let ([(pat, c1)], subCmp))
 
-  (* Nest a list of letrec-bindings; mutual recursion not allowed *)
+  (* Nest a list of letrec-bindings; MUTUAL RECURSION NOT ALLOWED AT THE MOMENT *)
   | LetRec ([],c2)                -> tcLocatedCmp inState lclCtx c2
   | LetRec ([(var,abs)],c2)       -> tcLetRecNoGen inState lclCtx var abs c2
   | LetRec ((var,abs) :: rest,c2) -> let subCmp = {it = Untyped.LetRec (rest,c2); at = c2.at} in
@@ -862,19 +977,9 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
     subst_fn trgC1
   ) in
 
-  (* 5: Create the (monomorphic) type of f *)
-  let ftype = Types.Arrow (alpha, (tyA1, dirtD1)) in
+  (* 5: Combine the results *)
+  let outExpr = Typed.LetRec ([(var, trgPatTy, (tyA1, dirtD1), (trgPat,c1''))], trgC2) in
 
-  (* 6: Create the generated term *)
-  let genTerm = Typed.Lambda
-                  (Typed.abstraction_with_ty
-                     trgPat
-                     trgPatTy
-                     c1''
-                  ) in
-
-  (* 7: Combine the results *)
-  let outExpr = Typed.LetRec ([(var, ftype, genTerm)], trgC2) in
   let outType = (tyA2, dirtD2) in
   let outCs   = alphaSkel :: betaSkel :: omegaCt1 :: omegaCt2 :: cs1 @ cs2 in
   ((outExpr, outType), outCs)

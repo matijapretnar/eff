@@ -95,7 +95,15 @@ type expression =
 and computation =
   | Value of expression
   | LetVal of expression * abstraction_with_ty
-  | LetRec of (variable * Types.target_ty * expression) list * computation
+  | LetRec of letrec_abstraction list * computation
+  (* Historical note: Previously LetRec looked like this:
+
+       LetRec of (variable * Types.target_ty * expression) list * computation
+
+     Unfortunately this shape forgets the source structure (where the
+     abstraction is explicit) and thus makes translation to MulticoreOcaml
+     impossible in the general case.
+  *)
   | Match of expression * abstraction list
   | Apply of expression * expression
   | Handle of expression * computation
@@ -115,6 +123,10 @@ and handler =
 and abstraction = (pattern * computation)
 
 and abstraction_with_ty = (pattern * Types.target_ty * computation)
+
+(** LetRec Abstractions: function name, argument type, result type, pattern,
+    and right-hand side *)
+and letrec_abstraction = (variable * Types.target_ty * Types.target_dirty * abstraction)
 
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * computation)
@@ -522,10 +534,9 @@ and print_top_let_abstraction (p, c) ppf =
         (print_computation ~max_level:0 c)
 
 
-and print_let_rec_abstraction (x, ty, e) ppf =
-  Format.fprintf ppf "%t : %t = %t" (print_variable x) (print_target_ty ty)
-    (print_expression e)
-
+and print_let_rec_abstraction (f, arg_ty, res_ty, abs) ppf =
+  Format.fprintf ppf "(%t : %t) %t"
+    (print_variable f) (print_target_ty (Types.Arrow (arg_ty,res_ty))) (print_let_abstraction abs)
 
 let backup_location loc locs =
   match loc with None -> Location.union locs | Some loc -> loc
@@ -594,18 +605,19 @@ and refresh_comp sbst = function
   | LetRec (li, c1) ->
       let new_xs, sbst' =
         List.fold_right
-          (fun (x, _, _) (new_xs, sbst') ->
+          (fun (x, _, _, _) (new_xs, sbst') ->
             let x' = CoreTypes.Variable.refresh x in
             (x' :: new_xs, Assoc.update x x' sbst') )
           li ([], sbst)
       in
       let li' =
         List.map
-          (fun (x', (ty, e)) -> (x', ty, e))
+          (fun (x', (argTy, resTy, abs)) -> (x', argTy, resTy, abs))
           (List.combine new_xs
-             (List.map (fun (_, ty, e) -> (ty, refresh_expr sbst' e)) li))
+             (List.map (fun (_, argTy, resTy, abs) -> (argTy, resTy, refresh_abs sbst' abs)) li))
       in
       LetRec (li', refresh_comp sbst' c1)
+
   | Match (e, li) -> Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
   | Apply (e1, e2) -> Apply (refresh_expr sbst e1, refresh_expr sbst e2)
   | Handle (e, c) -> Handle (refresh_expr sbst e, refresh_comp sbst c)
@@ -669,9 +681,9 @@ and subst_comp sbst = function
   | LetRec (li, c1) ->
       let li' =
         List.map
-          (fun (x, ty, e) ->
+          (fun (x, argTy, resTy, abs) ->
             (* XXX Should we check that x does not appear in sbst? *)
-            (x, ty, subst_expr sbst e) )
+            (x, argTy, resTy, subst_abs sbst abs) )
           li
       in
       LetRec (li', subst_comp sbst c1)
@@ -860,7 +872,7 @@ let rec free_vars_comp c =
   | LetRec (li, c1) ->
       let xs, vars =
         List.fold_right
-          (fun (x, ty, e) (xs, vars) -> (x :: xs, free_vars_expr e @@@ vars))
+          (fun (x, argTy, resTy, abs) (xs, vars) -> (x :: xs, free_vars_abs abs @@@ vars))
           li ([], free_vars_comp c1)
       in
       vars --- xs
@@ -1121,9 +1133,12 @@ and free_dirt_vars_computation c =
       Types.DirtParamSet.union
         (free_dirt_vars_expression e)
         (free_dirt_vars_abstraction_with_ty abs)
-  | LetRec ([(var, ty, e)], c) ->
-      Types.DirtParamSet.union (fdvsOfTargetValTy ty)
-        (free_dirt_vars_expression e)
+  | LetRec ([(f, argTy, resTy, abs)], c) ->
+      Types.DirtParamSet.union
+        (Types.DirtParamSet.union
+          (fdvsOfTargetValTy argTy)
+          (fdvsOfTargetCmpTy resTy))
+        (free_dirt_vars_abstraction abs)
       |> Types.DirtParamSet.union (free_dirt_vars_computation c)
   | Match (e, cases) ->
       List.fold_left

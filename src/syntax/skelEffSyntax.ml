@@ -39,12 +39,16 @@ and e_computation =
   | ECall of effect * e_expression * e_abstraction_with_ty
   | EBind of e_computation * e_abstraction
   | EMatch of e_expression * e_abstraction list
-  | ELetRec of (variable * Types.skeleton * e_expression) list * e_computation
+  | ELetRec of e_letrec_abstraction list * e_computation
 
 (** Handler definitions *)
 and e_handler =
   { effect_clauses: (effect, e_abstraction2) Assoc.t
   ; value_clause: e_abstraction_with_ty }
+
+(** LetRec Abstractions: function name, argument type, result type, pattern,
+    and right-hand side *)
+and e_letrec_abstraction = (variable * Types.skeleton * Types.skeleton * e_abstraction)
 
 (** Abstractions that take one argument. *)
 and e_abstraction = (e_pattern * e_computation)
