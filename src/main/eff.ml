@@ -145,7 +145,8 @@ let main =
   try
     let (module Backend : BackendSignature.T) =
       match !Config.backend with
-      | Config.Runtime -> (module Runtime.Backend)
+      (* STIEN: Put | Config.Runtime -> (module Runtime.Backend) when Runtime supports SkelEff *)
+      | Config.Runtime -> failwith "STIEN: Runtime does not support SkelEff yet"
       | Config.Multicore output_file ->
           ( module MulticoreCompile.Backend (struct
             let output_file = output_file

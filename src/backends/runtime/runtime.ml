@@ -5,7 +5,7 @@ module Untyped = UntypedSyntax
 
 exception PatternMatch of Location.t
 
-module Backend : BackendSignature.T = struct
+module Backend : BackendSignature_FromImpEff.T = struct
   module RuntimeEnv = Map.Make (CoreTypes.Variable)
 
   (* prints tells us wheter or not to print, while mute depth makes sure that

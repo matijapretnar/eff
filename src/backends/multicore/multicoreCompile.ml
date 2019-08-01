@@ -2,6 +2,8 @@
 open CoreUtils
 module Core = UntypedSyntax
 module Multicore = MulticoreSyntax
+module FromSkelEff = SkelEffToMulticore
+(* STIEN: Supposed to eventually not use this anymore *)
 module FromUntyped = UntypedToMulticore
 
 module type BackendParameters = sig
@@ -288,7 +290,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
   let process_computation state c ty =
-    let t = FromUntyped.of_computation c in
+    let t = FromSkelEff.of_computation c in
     update state
       (translate state_ppf
          "let _ = @.@[<hv>(_ocaml_tophandler) (fun _ -> @,%t@,)@];;@."

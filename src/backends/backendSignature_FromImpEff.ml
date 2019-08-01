@@ -1,7 +1,7 @@
-module SkelEff = SkelEffSyntax
-module TypeSystem = SimpleInfer
-(* STIEN: Supposed to eventually not use this anymore *)
+(* STIEN: This exists just for the sake of the whole compiler type-checking until the interpreter (Runtime backend) supports SkelEff *)
+
 module CoreSyntax = UntypedSyntax
+module TypeSystem = SimpleInfer
 
 module type T = sig
   type state
@@ -10,13 +10,13 @@ module type T = sig
 
   val process_computation :
        state
-    -> SkelEff.e_computation
+    -> CoreSyntax.computation
     -> Types.target_dirty
     -> state
 
   val process_type_of :
        state
-    -> SkelEff.e_computation
+    -> CoreSyntax.computation
     -> Types.target_dirty
     -> state
 

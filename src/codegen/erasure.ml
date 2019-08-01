@@ -115,5 +115,8 @@ and typed_to_erasure_abs_2 sub (e_p1, e_p2, e_c) =
 and typed_to_erasure_pattern = function
   | Typed.PVar x -> SkelEff.PEVar x
   | Typed.PAs (p, x) -> SkelEff.PEAs (typed_to_erasure_pattern p, x)
-  | Typed.PNonbinding -> SkelEff.PENonbinding
+  | Typed.PTuple ps -> SkelEff.PETuple (List.map typed_to_erasure_pattern ps)
+  | Typed.PRecord ass -> SkelEff.PERecord (Assoc.map typed_to_erasure_pattern ass)
+  | Typed.PVariant (lbl, p) -> SkelEff.PEVariant (lbl, Some (typed_to_erasure_pattern p))
   | Typed.PConst const -> SkelEff.PEConst const
+  | Typed.PNonbinding -> SkelEff.PENonbinding
