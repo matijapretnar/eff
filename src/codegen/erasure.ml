@@ -25,6 +25,8 @@ let rec typed_to_erasure_ty sub typed_ty =
   | Types.TySchemeSkel (p, tty) ->
       Types.ForallSkel (p, typed_to_erasure_ty sub tty)
 
+and typed_to_erasure_cmp_ty sub (ty, _drt) =
+  typed_to_erasure_ty sub ty
 
 let rec typed_to_erasure_exp sub tt =
   match tt with
@@ -94,9 +96,12 @@ and typed_to_erasure_comp sub tt =
   | Typed.CastComp (c, _) -> typed_to_erasure_comp sub c
   | Typed.CastComp_ty (c, _) -> typed_to_erasure_comp sub c
   | Typed.CastComp_dirt (c, _) -> typed_to_erasure_comp sub c
-  | Typed.LetRec ([(var, ty, e1)], c1) ->
+  | Typed.LetRec ([(var, argTy, resTy, abs)], c1) ->
       SkelEff.ELetRec
-        ( [(var, typed_to_erasure_ty sub ty, typed_to_erasure_exp sub e1)]
+        ( [( var
+           , typed_to_erasure_ty sub argTy
+           , typed_to_erasure_cmp_ty sub resTy
+           , typed_to_erasure_abs sub abs)]
         , typed_to_erasure_comp sub c1 )
 
 and typed_to_erasure_abs_with_ty sub (e_p, e_ty, e_c) =
