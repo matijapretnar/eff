@@ -65,13 +65,10 @@ and typed_to_untyped_comp_sub sub (typed_comp : Typed.computation) : UntypedSynt
      *     ) lrs)
      * in UntypedSyntax.LetRec (lrs' ,typed_to_untyped_comp sub c) *)
       UntypedSyntax.LetRec
-      (List.map
-         (fun (v,ty,e) ->
-            (v,
-             (typed_to_untyped_pattern Typed.PNonbinding
-             ,typed_to_untyped_comp sub (Typed.Value e))))
-         lrs
-      ,typed_to_untyped_comp sub c)
+        (List.map
+           (fun (f, _argTy, _resTy, abs) -> (f, typed_to_untyped_abs sub abs))
+           lrs
+        ,typed_to_untyped_comp sub c)
   | Typed.Match (e,alst) ->
     let e' = typed_to_untyped_exp sub e in
     let alst' = List.map (fun (a:Typed.abstraction) -> typed_to_untyped_abs sub a) alst in

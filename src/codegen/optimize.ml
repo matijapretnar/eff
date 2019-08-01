@@ -445,10 +445,11 @@ and optimize_sub_comp st c =
     | Value e1 -> Value (optimize_expr st e1)
     | LetVal (e1, abs) ->
         LetVal (optimize_expr st e1, optimize_abstraction_with_ty st abs)
-    | LetRec ([(var, ty, e1)], c1) ->
-        let st' = extend_var_type st var ty in
-        let st'' = extend_rec_fun st' var ty e1 in
-        LetRec ([(var, ty, optimize_expr st' e1)], optimize_comp st'' c1)
+    | LetRec ([(var, argTy, resTy, (p,rhs))], c) ->
+        let st' = extend_var_type st var (Types.Arrow (argTy, resTy)) in
+        let e1  = Lambda (p,argTy,rhs) in
+        let st'' = extend_rec_fun st' var (Types.Arrow (argTy, resTy)) e1 in
+        LetRec ([(var, argTy, resTy, optimize_abstraction st' argTy (p,rhs))], optimize_comp st'' c)
     | Match (e1, abstractions) ->
         let ty = TypeChecker.typeOfExpression st.tc_state e1 in
         Match
@@ -637,17 +638,17 @@ and reduce_comp st c =
               in
               let st'' = extend_var_type st' fvar' fty' in
               let fbody' =
-                optimize_expr st''
-                  (Lambda
-                     (abstraction_with_ty (PVar xvar) ty_e12
-                        (Handle
-                           ( e1
-                           , Apply
-                               ( Typed.subst_expr (Assoc.of_list [(fvar, refresh_expr fbody)])
-                                   e11
-                               , Var xvar ) ))))
+                optimize_abstraction st'' ty_e12
+                  ( PVar xvar
+                  , Handle
+                      ( e1
+                      , Apply
+                          ( Typed.subst_expr (Assoc.of_list [(fvar, refresh_expr fbody)])
+                              e11
+                          , Var xvar ) )
+                  )
               in
-              LetRec ([(fvar', fty', fbody')], Apply (Var fvar', e12))
+              LetRec ([(fvar', ty_e12, dty_c, fbody')], Apply (Var fvar', e12))
           | None ->
             match match_knot_function st e11 h with
             | Some fvar' -> Apply (Var fvar', e12)
