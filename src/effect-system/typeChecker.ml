@@ -472,14 +472,14 @@ and typeOfComputationTemp st = function
              ; assert (Types.dirty_types_are_equal c1_drty_ty dc11)
              ; failwith "canthappen"
              )
-  | LetRec ([(var, ty, e1)], c1) ->
-      let st' = extend_var_types st var ty in
-      Print.debug "typeOfComputation(LetRec): before c1 tc: %t" (Typed.print_expression e1);
-      let tempTy = typeOfExpression st' e1 in
-      Print.debug "typeOfComputation(LetRec): before assertion";
-      assert (Types.types_are_equal ty tempTy);
-      Print.debug "typeOfComputation(LetRec): after assertion";
-      typeOfComputation st' c1
+  | LetRec ([(f, argTy, resTy, (pat, rhs))], c) ->
+      checkWellFormedValTy st argTy ;
+      checkWellFormedCmpTy st resTy ;
+      let st'  = extend_var_types st f (Types.Arrow (argTy,resTy)) in
+      let st'' = extendPatternTypes st' pat argTy in
+      let tempTy = typeOfComputation st'' rhs in
+      assert (Types.dirty_types_are_equal resTy tempTy) ;
+      typeOfComputation st' c (* NOTE: Do not use the pattern bindings! :-) *)
   | _ -> failwith __LOC__
 
 and typeOfComputation st c =

@@ -856,7 +856,7 @@ and tcCmp (inState : state) (lclCtx : TypingEnv.t) : Untyped.plain_computation -
   | Let ((pat,c1) :: rest,c2) -> let subCmp = {it = Untyped.Let (rest, c2); at = c2.at} in
                                  tcCmp inState lclCtx (Untyped.Let ([(pat, c1)], subCmp))
 
-  (* Nest a list of letrec-bindings; mutual recursion not allowed *)
+  (* Nest a list of letrec-bindings; MUTUAL RECURSION NOT ALLOWED AT THE MOMENT *)
   | LetRec ([],c2)                -> tcLocatedCmp inState lclCtx c2
   | LetRec ([(var,abs)],c2)       -> tcLetRecNoGen inState lclCtx var abs c2
   | LetRec ((var,abs) :: rest,c2) -> let subCmp = {it = Untyped.LetRec (rest,c2); at = c2.at} in
@@ -977,19 +977,9 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
     subst_fn trgC1
   ) in
 
-  (* 5: Create the (monomorphic) type of f *)
-  let ftype = Types.Arrow (alpha, (tyA1, dirtD1)) in
+  (* 5: Combine the results *)
+  let outExpr = Typed.LetRec ([(var, trgPatTy, (tyA1, dirtD1), (trgPat,c1''))], trgC2) in
 
-  (* 6: Create the generated term *)
-  let genTerm = Typed.Lambda
-                  (Typed.abstraction_with_ty
-                     trgPat
-                     trgPatTy
-                     c1''
-                  ) in
-
-  (* 7: Combine the results *)
-  let outExpr = Typed.LetRec ([(var, ftype, genTerm)], trgC2) in
   let outType = (tyA2, dirtD2) in
   let outCs   = alphaSkel :: betaSkel :: omegaCt1 :: omegaCt2 :: cs1 @ cs2 in
   ((outExpr, outType), outCs)
