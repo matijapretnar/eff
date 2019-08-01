@@ -24,6 +24,10 @@ let extend_var_type st t_var ty =
   {st with tc_state= TypeChecker.extend_var_types st.tc_state t_var ty}
 
 
+and extend_pat_type st p ty =
+  {st with tc_state=TypeChecker.extendPatternTypes st.tc_state p ty}
+
+
 let extend_ty_params st ty_var =
   {st with tc_state= TypeChecker.extend_ty_params st.tc_state ty_var}
 
@@ -329,11 +333,16 @@ and optimize_abs st ty (p, c) =
 and optimize_sub_expr st e =
   let plain_e' =
     match e with
-    (*
-          | Tuple of expression list
-          | Record of (CoreTypes.field, expression) CoreTypes.assoc
-          | Variant of CoreTypes.label * expression option
-          *)
+    | Var v -> Var v
+    | BuiltIn (s, i) -> BuiltIn (s, i)
+    | Const c -> Const c
+    | Tuple es -> Tuple (List.map (optimize_expr st) es)
+    | Record _r -> failwith __LOC__
+    | Variant (l,e1) -> Variant (l,optimize_expr st e1)
+    | Lambda plain_a_w_ty ->
+      Lambda (optimize_abstraction_with_ty st plain_a_w_ty)
+    | Effect op -> Effect op
+    | Handler h -> Handler (optimize_sub_handler st h)
     | BigLambdaTy (ty_var, sk, e) ->
         let st' =
           extend_ty_param_skeletons (extend_ty_params st ty_var) ty_var sk
@@ -345,29 +354,19 @@ and optimize_sub_expr st e =
     | BigLambdaSkel (sk_var, e) ->
         let st' = extend_skel_params st sk_var in
         BigLambdaSkel (sk_var, optimize_expr st' e)
+    | CastExp (e1, tyco1) ->
+      CastExp (optimize_expr st e1, optimize_ty_coercion st tyco1)
+    | ApplyTyExp (e, ty) -> ApplyTyExp (optimize_expr st e, ty)
     | LambdaTyCoerVar (tyco_var, ct_ty, e) ->
         let st' = extend_ty_coer_types st tyco_var ct_ty in
         LambdaTyCoerVar (tyco_var, ct_ty, optimize_expr st' e)
     | LambdaDirtCoerVar (dco_var, ct_dirt, e) ->
         let st' = extend_dirt_coer_types st dco_var ct_dirt in
         LambdaDirtCoerVar (dco_var, ct_dirt, optimize_expr st' e)
-    | ApplyTyExp (e, ty) -> ApplyTyExp (optimize_expr st e, ty)
     | ApplyDirtExp (e, dirt) -> ApplyDirtExp (optimize_expr st e, dirt)
     | ApplySkelExp (e, sk) -> ApplySkelExp (optimize_expr st e, sk)
-    | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (optimize_expr st e, dco)
     | ApplyTyCoercion (e, tyco) -> ApplyTyCoercion (optimize_expr st e, tyco)
-    | Var v -> Var v
-    | BuiltIn (s, i) -> BuiltIn (s, i)
-    | Const c -> Const c
-    | Lambda plain_a_w_ty ->
-        Lambda (optimize_abstraction_with_ty st plain_a_w_ty)
-    | Effect op -> Effect op
-    | Handler h -> Handler (optimize_sub_handler st h)
-    | CastExp (e1, tyco1) ->
-        CastExp (optimize_expr st e1, optimize_ty_coercion st tyco1)
-    | Handler h -> e
-    | Tuple es -> Tuple (List.map (optimize_expr st) es)
-    (* TODO: implement *)
+    | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (optimize_expr st e, dco)
   in
   plain_e'
 
@@ -412,13 +411,13 @@ and optimize_sub_handler st {effect_clauses= ecs; value_clause= vc} =
 
 
 and optimize_abstraction_with_ty st a_w_ty =
-  let plain_a_w_ty' = optimize_plain_abstraction_with_ty st a_w_ty in
-  plain_a_w_ty'
+  optimize_plain_abstraction_with_ty st a_w_ty
 
 
 and optimize_plain_abstraction_with_ty st (p, ty, c) =
-  let PVar var = p in
-  (p, ty, optimize_comp (extend_var_type st var ty) c)
+  match p with
+  | PVar var -> (p, ty, optimize_comp (extend_var_type st var ty) c)
+  | _ -> failwith __LOC__
 
 
 and optimize_abstraction st ty a =
@@ -428,23 +427,15 @@ and optimize_abstraction st ty a =
 
 
 and optimize_pattern st ty p =
-  match p with
-  | PVar x -> extend_var_type st x ty
-  | PNonbinding -> st
-  | PConst c -> st
+  extend_pat_type st p ty
 
 
-and optimize_abstraction2 st dty (effect, a2) =
-  let op, (in_op, out_op) = effect in
+and optimize_abstraction2 st (dty:target_dirty) (effect, a2) =
+  let op, (op_ty_in, op_ty_out) = effect in
   let p1, p2, c = a2 in
-  let Typed.PVar v1 = p1 in
-  let Typed.PVar v2 = p2 in
-  let st =
-    extend_var_type
-      (extend_var_type st v1 in_op)
-      v2 (Types.Arrow (out_op, dty))
-  in
-  (effect, (p1, p2, optimize_comp st c))
+  let st' = extend_pat_type st p1 op_ty_in in
+  let st'' = extend_pat_type st' p2 (Types.Arrow (op_ty_out, dty)) in
+  (effect, (p1, p2, optimize_comp st'' c))
 
 
 and optimize_sub_comp st c =
@@ -542,18 +533,22 @@ and reduce_comp st c =
     match e1 with
     | Lambda abs -> beta_reduce st abs e2
     | Effect op ->
-        Print.debug "Op -> Call" ;
-        let var = CoreTypes.Variable.fresh "call_var" in
-        let eff, (ty_in, ty_out) = op in
-        let c_cont =
-          CastComp
-            ( Value (Var var)
-            , BangCoercion
-                ( ReflTy ty_out
-                , Empty (Types.closed_dirt (EffectSet.singleton eff)) ) )
-        in
-        let a_w_ty = (PVar var, ty_out, c_cont) in
-        Call (op, e2, a_w_ty)
+      c
+        (* BRECHT: Removing opts that create Calls for use with erasureUntyped
+         * as UntypedSyntax cannot represent them. Maybe they can be
+         * reintroduced with the SkelEff backend.
+         * Print.debug "Op -> Call" ;
+         * let var = CoreTypes.Variable.fresh "call_var" in
+         * let eff, (ty_in, ty_out) = op in
+         * let c_cont =
+         *   CastComp
+         *     ( Value (Var var)
+         *     , BangCoercion
+         *         ( ReflTy ty_out
+         *         , Empty (Types.closed_dirt (EffectSet.singleton eff)) ) )
+         * in
+         * let a_w_ty = (PVar var, ty_out, c_cont) in
+         * Call (op, e2, a_w_ty) *)
     | _ ->
         Print.debug "e1 is not a lambda" ;
         (* TODO: support case where it's a cast of a lambda *)
@@ -609,9 +604,13 @@ and reduce_comp st c =
                 (Typed.subst_comp (Typed.pattern_match p1 e11) c)
                 p2 (Lambda handled_k)
           | None ->
-              let k_abs'' = (k_pat, k_ty, Handle (e1, k_c)) in
-              let res = Call (eff, e11, k_abs'') in
-              reduce_comp st res )
+            c)
+              (* BRECHT: Removing opts that create Calls for use with erasureUntyped
+               * as UntypedSyntax cannot represent them. Maybe they can be
+               * reintroduced with the SkelEff backend.
+               * let k_abs'' = (k_pat, k_ty, Handle (e1, k_c)) in
+               * let res = Call (eff, e11, k_abs'') in
+               * reduce_comp st res ) *)
       | Apply (e11, e12) -> (
           Print.debug "Looking for recursive function name" ;
           match match_recursive_function st e11 with
