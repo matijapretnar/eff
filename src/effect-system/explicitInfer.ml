@@ -1106,6 +1106,81 @@ and tcTypedAbstraction2 (inState : state) (lclCtx : TypingEnv.t) (pat1,pat2,cmp)
   (((trgPat1, trgPat2, trgCmp), (patTy1, patTy2, cmpTy)), hack1 @ hack2 @ cs)
 
 (* ************************************************************************* *)
+(*                         LET-REC-GENERALIZATION                            *)
+(* ************************************************************************* *)
+
+let tcTopLetRec
+      (inState : state)
+      (var : Untyped.variable)
+      (pat : Untyped.pattern)
+      (cmp : Untyped.computation)
+  = (* 1: Generate fresh variables for everything *)
+    let alpha, alphaSkel = fresh_ty_with_fresh_skel () in
+    let beta , betaSkel  = fresh_ty_with_fresh_skel () in
+    let delta = Types.fresh_dirt () in
+
+    (* 2: Typecheck the abstraction *)
+    let ((trgPat, trgC1), (trgPatTy,(tyA1, dirtD1))), cs
+      = tcTypedAbstraction
+          inState
+          (extendLclCtxt initial_lcl_ty_env var (Types.Arrow (alpha, (beta, delta))))
+          (pat, cmp) alpha in
+
+    (* 3: The assumed type should be at least as general as the inferred one *)
+    let omega1, omegaCt1 = Typed.fresh_ty_coer (tyA1, beta) in
+    let omega2, omegaCt2 = Typed.fresh_dirt_coer (dirtD1, delta) in
+
+    (* 4: Create the (complicated) c1''. *)
+    let c1'' = (
+      let f_coercion = Typed.ArrowCoercion
+                         ( Typed.ReflTy alpha
+                         , Typed.BangCoercion (omega1, omega2)
+                         ) in
+      Typed.subst_comp
+        (Assoc.of_list [(var, Typed.CastExp(Typed.Var var, f_coercion))])
+        trgC1
+    ) in
+
+    (* 5: Solve (simplify, actually) the generated constraints *)
+    let subst, residuals = (
+      let cs = alphaSkel :: betaSkel :: omegaCt1 :: omegaCt2 :: cs in
+      Unification.unify (Substitution.empty, [], cs)
+    ) in
+
+    (* 6: Substitute back into everything *)
+    let trgPatTy = subInValTy subst trgPatTy in
+    let tyA1     = subInValTy subst tyA1 in
+    let dirtD1   = subInDirt subst dirtD1 in
+    (* trgPat needs not a substitution *)
+    let trgC1    = subInCmp subst c1'' in
+
+    (* 7: Partition the residual constraints and abstract over them *)
+    let freeSkelVars, annFreeTyVars, freeDirtVars, tyVs, dirtCs = mkGenParts residuals in
+    (* GEORGE STOPPED HERE *)
+
+(*
+let outExpr = Typed.LetRec ([(var, trgPatTy, (tyA1, dirtD1), (trgPat,c1''))], trgC2) in
+
+let mkGeneralizedType
+    (freeSkelVars  : CoreTypes.SkelParam.t list)
+    (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
+    (freeDirtVars  : CoreTypes.DirtParam.t list)
+    (tyCs   : (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list)
+    (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+    (monotype : Types.target_ty) (* expected to be a monotype! *)
+  : Types.target_ty
+let mkGeneralizedTerm
+    (freeSkelVars  : CoreTypes.SkelParam.t list)
+    (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
+    (freeDirtVars  : CoreTypes.DirtParam.t list)
+    (tyCs   : (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list)
+    (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+    (exp : Typed.expression)
+  : Typed.expression =
+*)
+    failwith __LOC__ (* GEORGE TODO: Decide what do we return *)
+
+(* ************************************************************************* *)
 (* ************************************************************************* *)
 
 (* Finalize a list of constraints, setting all dirt variables to the empty set. *)
