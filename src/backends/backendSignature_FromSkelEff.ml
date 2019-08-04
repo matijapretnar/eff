@@ -1,5 +1,4 @@
 module SkelEff = SkelEffSyntax
-module ExEff = Typed
 module TypeSystem = SimpleInfer
 (* STIEN: Supposed to eventually not use this anymore *)
 module CoreSyntax = UntypedSyntax
