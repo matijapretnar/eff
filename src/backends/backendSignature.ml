@@ -1,7 +1,6 @@
-module SkelEff = SkelEffSyntax
 module ExEff = Typed
 module TypeSystem = SimpleInfer
-(* STIEN: Supposed to eventually not use this anymore *)
+(* STIEN: Supposed to eventually not use this anymore, now used for top let (rec) *)
 module CoreSyntax = UntypedSyntax
 
 module type T = sig
@@ -11,13 +10,13 @@ module type T = sig
 
   val process_computation :
        state
-    -> SkelEff.e_computation
+    -> ExEff.computation
     -> Types.target_dirty
     -> state
 
   val process_type_of :
        state
-    -> SkelEff.e_computation
+    -> ExEff.computation
     -> Types.target_dirty
     -> state
 

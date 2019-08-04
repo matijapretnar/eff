@@ -290,7 +290,9 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
   let process_computation state c ty =
-    let t = FromSkelEff.of_computation c in
+    (* Erasure ExEff -> SkelEff *)
+    let c' = Erasure.typed_to_erasure_comp Assoc.empty c in
+    let t = FromSkelEff.of_computation c' in
     update state
       (translate state_ppf
          "let _ = @.@[<hv>(_ocaml_tophandler) (fun _ -> @,%t@,)@];;@."

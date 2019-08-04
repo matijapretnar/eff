@@ -1,7 +1,6 @@
 open CoreUtils
 module TypeSystem = SimpleInfer
 module EffectSystem = ExplicitInfer
-module Erasure = Erasure
 
 (* GEORGE: IMPORT JUST TO FORCE COMPILATION *)
 module TestA = SkelEffToMulticore
@@ -56,11 +55,8 @@ module Make (Backend : BackendSignature.T) = struct
         let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
         Print.debug "exec_cmd: after backend typechecking";
 
-        (* Erasure ExEff -> SkelEff *)
-        let c'' = Erasure.typed_to_erasure_comp Assoc.empty c' in
-
         let backend_state' =
-          Backend.process_computation state.backend_state c'' drty
+          Backend.process_computation state.backend_state c' drty
         in
         { state with
           type_system_state= type_system_state'
@@ -75,11 +71,8 @@ module Make (Backend : BackendSignature.T) = struct
         in
         let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
 
-        (* Erasure ExEff -> SkelEff *)
-        let c'' = Erasure.typed_to_erasure_comp Assoc.empty c' in
-
         let backend_state' =
-          Backend.process_type_of state.backend_state c'' drty
+          Backend.process_type_of state.backend_state c' drty
         in
         { state with
           type_system_state= type_system_state'
