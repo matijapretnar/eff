@@ -199,8 +199,11 @@ let rec apply_sub_comp sub computation =
       LetVal (apply_sub_exp sub e1, apply_sub_abs_with_ty sub abs)
   | LetRec ([letrec], c1) ->
       LetRec ([apply_sub_letrec_abs sub letrec], apply_sub_comp sub c1)
-  | Match (e, alist) ->
-      Match (apply_sub_exp sub e, List.map (apply_sub_abs sub) alist)
+  | Match (e, resTy, alist) ->
+      Match
+        ( apply_sub_exp sub e
+        , apply_sub_dirty_ty sub resTy
+        , List.map (apply_sub_abs sub) alist )
   | Apply (e1, e2) -> Apply (apply_sub_exp sub e1, apply_sub_exp sub e2)
   | Handle (e1, c1) -> Handle (apply_sub_exp sub e1, apply_sub_comp sub c1)
   | Call (effect, e1, abs) ->

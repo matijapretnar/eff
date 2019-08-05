@@ -984,9 +984,20 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
   let outCs   = alphaSkel :: betaSkel :: omegaCt1 :: omegaCt2 :: cs1 @ cs2 in
   ((outExpr, outType), outCs)
 
+(* Typecheck a case expression *)
 and tcMatch (inState : state) (lclCtxt : TypingEnv.t)
+    (scr : Untyped.expression) (alts : Untyped.abstraction list)
+  : tcCmpOutput = if List.length alts > 0
+                    then tcNonEmptyMatch inState lclCtxt scr alts
+                    else tcEmptyMatch inState lclCtxt scr
+
+(* Typecheck a non-empty case expression *)
+and tcNonEmptyMatch (inState : state) (lclCtxt : TypingEnv.t)
       (scr : Untyped.expression)
       (alts : Untyped.abstraction list) : tcCmpOutput =
+  (* 0: Make sure that we have at least one alternative *)
+  assert (List.length alts > 0);
+
   (* 1: Generate fresh variables for the result *)
   let alphaOut, alphaOutSkel = fresh_ty_with_fresh_skel () in
   let deltaOut = Types.fresh_dirt () in
@@ -1005,9 +1016,25 @@ and tcMatch (inState : state) (lclCtxt : TypingEnv.t)
   let omegaScr, omegaCtScr = Typed.fresh_ty_coer (scrTy, patTy) in
 
   (* 6: Combine the results *)
-  let outExpr = Typed.Match (Typed.CastExp (trgScr, omegaScr), trgAlts) in
   let outType = (alphaOut, deltaOut) in
+  let outExpr = Typed.Match (Typed.CastExp (trgScr, omegaScr), outType, trgAlts) in
   let outCs   = alphaOutSkel :: omegaCtScr :: cs1 @ cs2 in
+  ((outExpr, outType), outCs)
+
+(* Typecheck an empty case expression *)
+and tcEmptyMatch (inState : state) (lclCtxt : TypingEnv.t)
+      (scr : Untyped.expression) : tcCmpOutput =
+  (* 1: Generate fresh variables for the result *)
+  let alphaOut, alphaOutSkel = fresh_ty_with_fresh_skel () in
+  let deltaOut = Types.fresh_dirt () in
+
+  (* 2: Typecheck the scrutinee *)
+  let (trgScr, scrTy), cs1 = tcLocatedVal inState lclCtxt scr in
+
+  (* 3: Combine the results *)
+  let outType = (alphaOut, deltaOut) in
+  let outExpr = Typed.Match (trgScr, outType, []) in
+  let outCs   = alphaOutSkel :: cs1 in
   ((outExpr, outType), outCs)
 
 (* Typecheck a function application *)
