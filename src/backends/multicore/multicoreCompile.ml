@@ -304,8 +304,8 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     state
 
   let process_def_effect state (eff, (ty1, ty2)) =
-    let ty1' = FromUntyped.of_type ty1 in
-    let ty2' = FromUntyped.of_type ty2 in
+    let ty1' = FromSkelEff.of_type ty1 in
+    let ty2' = FromSkelEff.of_type ty2 in
     let translation = translate_def_effect (eff, (ty1', ty2')) state_ppf in
     update state translation
 
@@ -340,7 +340,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
         update state translation
 
   let process_tydef state tydefs =
-    let converter (ty_params, tydef) = (ty_params, FromUntyped.of_tydef tydef) in
+    let converter (ty_params, tydef) = (ty_params, FromSkelEff.of_tydef tydef) in
     let tydefs' = Assoc.map converter tydefs |> Assoc.to_list in
     let translation = translate_tydefs tydefs' state_ppf in
     update state translation
