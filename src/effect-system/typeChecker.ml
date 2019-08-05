@@ -420,14 +420,12 @@ and typeOfComputationTemp st = function
       and ty_in, ty_out = type_of_abstraction_with_ty st abs in
       assert (Types.types_are_equal t_v ty_in) ;
       ty_out
-  | Match (e, alist, _) -> (
+  | Match (e, resTy, alist, _) -> (
       let t_e = typeOfExpression st e in
       let ty_list = List.map (type_of_abstraction st t_e) alist in
-      match ty_list with
-      | [] -> assert false
-      | dty :: dtys ->
-          assert (List.for_all (Types.dirty_types_are_equal dty) dtys) ;
-          dty )
+      checkWellFormedCmpTy st resTy ;
+      assert (List.for_all (Types.dirty_types_are_equal resTy) ty_list) ;
+      resTy )
   | Apply (e1, e2) -> (
     match typeOfExpression st e1 with
     | Types.Arrow (ty1, dty1) ->

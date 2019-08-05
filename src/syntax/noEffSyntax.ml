@@ -27,7 +27,7 @@ and n_term =
   | NEffect of n_effect
   | NNonBinding
   | NLetRec of n_letrec_abstraction list * n_term
-  | NMatch of n_term * n_abstraction list * Location.t
+  | NMatch of n_term * n_type * n_abstraction list * Location.t
   | NOp of n_effect * n_term
   | NRecord of (CoreTypes.Field.t, n_term) Assoc.t
   | NVariant of CoreTypes.Label.t * n_term
@@ -140,7 +140,7 @@ let rec print_term ?max_level t ppf =
         print ~at_level:2 "let rec @[<hov>%t@] in %t"
         (Print.sequence " and " print_let_rec_abstraction lst)
         (print_term t)
-  | NMatch (t, lst, _) ->
+  | NMatch (t, _, lst, _) ->
         print ~at_level:2 "(match %t with @[<v>| %t@])" (print_term t)
         (Print.cases print_abstraction lst)
   | NOp (eff, t) -> print "Op %t %t" (print_effect eff) (print_term t)

@@ -58,7 +58,7 @@ let rec ceval state c =
       | V.Closure f -> f v2
       | _ -> Error.runtime "Only functions can be applied." )
   | ExEff.Value e -> V.Value (veval state e)
-  | ExEff.Match (e, cases, loc) ->
+  | ExEff.Match (e, ty, cases, loc) ->
       let v = veval state e in
       let rec eval_case = function
         | [] -> raise (ExhaustivenessCheck loc)

@@ -38,7 +38,7 @@ and e_computation =
   | EHandle of e_expression * e_computation
   | ECall of effect * e_expression * e_abstraction_with_ty
   | EBind of e_computation * e_abstraction
-  | EMatch of e_expression * e_abstraction list * Location.t
+  | EMatch of e_expression * Types.skeleton * e_abstraction list * Location.t
   | ELetRec of e_letrec_abstraction list * e_computation
 
 (** Handler definitions *)

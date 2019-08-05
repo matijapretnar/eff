@@ -514,17 +514,18 @@ and comp_elab state env c =
             ( (var, t1, t2, (pattern_elab p, elabc)) ) ) in
     let (tycomp, elabcomp) = comp_elab state (extend_env env abs_list) comp in
     ( tycomp, NoEff.NLetRec (List.map (elab_letrec_abs) abs_list, elabcomp) )
-  | ExEff.Match (value, abs_lst, loc) ->
+  | ExEff.Match (value, ty, abs_lst, loc) ->
     let (tyv, elabv) = value_elab state env value in
+    let (tyskel, tyelab) = dirty_elab state env ty in
     let elab_abs vty cty (pat, comp) = 
             ( let env' = extend_pattern_type env pat vty in
               let (tyc, elabc) = comp_elab state env' comp in  
               if (tyc = cty) then (pattern_elab pat, elabc) else (typefail "Ill-typed match branch")) in
     ( if ( (List.length abs_lst) = 0)
-    then ( failwith "TODO: Empty match statement" )
+    then ( (ty, NoEff.NMatch (elabv, tyelab, [], loc)) )
     else ( let ((p1,c1) :: _ ) = abs_lst in
            let (tyc, elabc) = comp_elab state env c1 in 
-           (tyc, NoEff.NMatch (elabv, List.map (elab_abs tyv tyc) abs_lst, loc)) ) )
+           (tyc, NoEff.NMatch (elabv, tyelab, List.map (elab_abs tyv tyc) abs_lst, loc)) ) )
   | ExEff.Apply (v1, v2) -> 
     let (ty1, elab1) = value_elab state env v1 in
     ( match ty1 with
