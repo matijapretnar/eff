@@ -25,13 +25,13 @@ module type T = sig
 
   val process_top_let :
        state
-    -> (CoreSyntax.pattern * CoreSyntax.computation) list
+    -> (ExEff.pattern * ExEff.computation) list
     -> (CoreTypes.Variable.t * TypeSystem.Ctx.ty_scheme) list
     -> state
 
   val process_top_let_rec :
        state
-    -> (CoreSyntax.variable, CoreSyntax.abstraction) Assoc.t
+    -> (ExEff.variable, ExEff.abstraction) Assoc.t
     -> (CoreTypes.Variable.t * TypeSystem.Ctx.ty_scheme) list
     -> state
 

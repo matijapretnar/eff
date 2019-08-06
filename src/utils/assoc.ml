@@ -34,6 +34,10 @@ let rec remove x = function
   | [] -> []
   | (k, v) :: tl -> if x = k then tl else (k, v) :: remove x tl
 
+let rec filter f = function
+  | [] -> []
+  | (k, v) :: tl -> if f k then (k, v) :: (filter f tl) else filter f tl
+
 (* Iters, maps, folds. *)
 let rec iter = List.iter
 

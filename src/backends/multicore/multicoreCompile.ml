@@ -311,7 +311,8 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
 
   let process_top_let state defs vars =
     let converter (p, c) =
-      (FromUntyped.of_pattern p, FromUntyped.of_computation c)
+      (FromSkelEff.of_pattern (Erasure.typed_to_erasure_pattern p),
+        FromSkelEff.of_computation (Erasure.typed_to_erasure_comp Assoc.empty c))
     in
     let defs' = List.map converter defs in
     let translation = translate_top_let defs' state_ppf in
@@ -319,7 +320,8 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
 
   let process_top_let_rec state defs vars =
     let converter (p, c) =
-      (FromUntyped.of_pattern p, FromUntyped.of_computation c)
+      (FromSkelEff.of_pattern (Erasure.typed_to_erasure_pattern p),
+        FromSkelEff.of_computation (Erasure.typed_to_erasure_comp Assoc.empty c))
     in
     let defs' = Assoc.map converter defs |> Assoc.to_list in
     let translation = translate_top_let_rec defs' state_ppf in

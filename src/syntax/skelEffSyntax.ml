@@ -12,7 +12,7 @@ type e_pattern =
   | PEAs of e_pattern * variable
   | PETuple of e_pattern list
   | PERecord of (CoreTypes.Field.t, e_pattern) Assoc.t
-  | PEVariant of CoreTypes.Label.t * e_pattern option
+  | PEVariant of CoreTypes.Label.t * e_pattern
   | PEConst of Const.t
   | PENonbinding
 

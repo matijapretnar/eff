@@ -18,11 +18,7 @@ and of_pattern : (SkelEff.e_pattern -> Multicore.pattern) = function
   | SkelEff.PEAs (p, v) -> Multicore.PAs (of_pattern p, v)
   | SkelEff.PETuple ps -> Multicore.PTuple (List.map of_pattern ps)
   | SkelEff.PERecord ass -> Multicore.PRecord (Assoc.map of_pattern ass)
-  | SkelEff.PEVariant (l, p) -> (
-    match p with
-    | None -> Multicore.PVariant (l, None)
-    | Some p -> Multicore.PVariant (l, Some (of_pattern p))
-    )
+  | SkelEff.PEVariant (l, p) -> Multicore.PVariant (l, Some (of_pattern p))
   | SkelEff.PEConst c -> Multicore.PConst c
   | SkelEff.PENonbinding -> Multicore.PNonbinding
 

@@ -122,6 +122,6 @@ and typed_to_erasure_pattern = function
   | Typed.PAs (p, x) -> SkelEff.PEAs (typed_to_erasure_pattern p, x)
   | Typed.PTuple ps -> SkelEff.PETuple (List.map typed_to_erasure_pattern ps)
   | Typed.PRecord ass -> SkelEff.PERecord (Assoc.map typed_to_erasure_pattern ass)
-  | Typed.PVariant (lbl, p) -> SkelEff.PEVariant (lbl, Some (typed_to_erasure_pattern p))
+  | Typed.PVariant (lbl, p) -> SkelEff.PEVariant (lbl, typed_to_erasure_pattern p)
   | Typed.PConst const -> SkelEff.PEConst const
   | Typed.PNonbinding -> SkelEff.PENonbinding

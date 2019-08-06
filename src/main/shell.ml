@@ -109,7 +109,8 @@ module Make (Backend : BackendSignature.T) = struct
         Backend.finalize state.backend_state ;
         exit 0
     | Commands.Use filename -> execute_file filename state
-    | Commands.TopLet defs ->
+    | Commands.TopLet defs -> Print.debug "ignoring top let binding"; state
+        (*
         let desugarer_state', defs' =
           Desugarer.desugar_top_let state.desugarer_state defs
         in
@@ -122,8 +123,9 @@ module Make (Backend : BackendSignature.T) = struct
         { state with
           desugarer_state= desugarer_state'
         ; type_system_state= type_system_state'
-        ; backend_state= backend_state' }
-    | Commands.TopLetRec defs ->
+        ; backend_state= backend_state' } *)
+    | Commands.TopLetRec defs -> Print.debug "ignoring top let rec binding"; state
+        (*
         let desugarer_state', defs' =
           Desugarer.desugar_top_let_rec state.desugarer_state defs
         in
@@ -137,7 +139,7 @@ module Make (Backend : BackendSignature.T) = struct
         { state with
           desugarer_state= desugarer_state'
         ; type_system_state= type_system_state'
-        ; backend_state= backend_state' }
+        ; backend_state= backend_state' } *)
     | Commands.External ext_def ->
         let desugarer_state', (x, ty, f) =
           Desugarer.desugar_external state.desugarer_state ext_def
