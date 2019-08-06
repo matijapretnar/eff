@@ -184,6 +184,7 @@ and optimize_sub_ty_coercion st tyco =
   | ForallSkel (sv, tyco1) -> ForallSkel (sv, optimize_ty_coercion st tyco1)
   | ApplySkelCoer (tyco1, sk) ->
       ApplySkelCoer (optimize_ty_coercion st tyco1, sk)
+  | _ -> tyco
 
 
 and optimize_sub_dirty_coercion st dtyco =
@@ -244,6 +245,7 @@ and reduce_ty_coercion st tyco =
   | ApplyQualDirtCoer (tyco1, dco) -> tyco
   | ForallSkel (sv, tyco1) -> tyco
   | ApplySkelCoer (tyco1, sk) -> tyco
+  | _ -> tyco
 
 
 and reduce_dirty_coercion st dtyco =
@@ -415,9 +417,7 @@ and optimize_abstraction_with_ty st a_w_ty =
 
 
 and optimize_plain_abstraction_with_ty st (p, ty, c) =
-  match p with
-  | PVar var -> (p, ty, optimize_comp (extend_var_type st var ty) c)
-  | _ -> failwith __LOC__
+  (p, ty, optimize_comp (extend_pat_type st p ty) c)
 
 
 and optimize_abstraction st ty a =
@@ -578,7 +578,6 @@ and reduce_comp st c =
               is_relatively_pure st c111 h with
         | Some dtyco ->
             let p12, c12 = a1 in
-            let PVar var12 = p12 in
             optimize_comp st
               (Bind
                  ( CastComp (c111, dtyco)
@@ -590,11 +589,10 @@ and reduce_comp st c =
               ci [(fun y:ty -> handle c with H)/ki, e11 / xi]
            *)
           let (k_pat, k_ty, k_c) as k_abs' = refresh_abs_with_ty k_abs in
-          let PVar k_var = k_pat in
           let handled_k =
             abstraction_with_ty k_pat k_ty
               (reduce_comp
-                 (extend_var_type st k_var k_ty)
+                 (extend_pat_type st k_pat k_ty)
                  (Handle (refresh_expr e1, k_c)))
           in
           match Assoc.lookup eff h.effect_clauses with
@@ -605,13 +603,9 @@ and reduce_comp st c =
                 (Typed.subst_comp (Typed.pattern_match p1 e11) c)
                 p2 (Lambda handled_k)
           | None ->
-            c)
-              (* BRECHT: Removing opts that create Calls for use with erasureUntyped
-               * as UntypedSyntax cannot represent them. Maybe they can be
-               * reintroduced with the SkelEff backend.
-               * let k_abs'' = (k_pat, k_ty, Handle (e1, k_c)) in
-               * let res = Call (eff, e11, k_abs'') in
-               * reduce_comp st res ) *)
+              let k_abs'' = (k_pat, k_ty, Handle (e1, k_c)) in
+              let res = Call (eff, e11, k_abs'') in
+              reduce_comp st res )
       | Apply (e11, e12) -> (
           Print.debug "Looking for recursive function name" ;
           match match_recursive_function st e11 with
@@ -673,18 +667,16 @@ and reduce_comp st c =
   | Bind (c1, a2) -> (
     match c1 with
     | Bind (c11, (p1, c12)) ->
-        let PVar var1 = p1 in
         let ty1, _ = TypeChecker.typeOfComputation st.tc_state c11 in
-        let st' = extend_var_type st var1 ty1 in
+        let st' = extend_pat_type st p1 ty1 in
         let c2' = reduce_comp st' (Bind (c12, a2)) in
         reduce_comp st (Bind (c11, (p1, c2')))
     | Value e11 ->
         let ty11 = TypeChecker.typeOfExpression st.tc_state e11 in
         let p2, c2 = a2 in
         beta_reduce st (p2, ty11, c2) e11
-    | Call (op, e11, ((p12, ty12, c12) as a_w_ty)) ->
-        let PVar var12 = p12 in
-        let st' = extend_var_type st var12 ty12 in
+    | Call (op, e11, (p12, ty12, c12)) ->
+        let st' = extend_pat_type st p12 ty12 in
         let c12' = reduce_comp st' (Bind (c12, a2)) in
         Call (op, e11, (p12, ty12, c12'))
     | CastComp (c11, dtyco) -> (
@@ -696,10 +688,9 @@ and reduce_comp st c =
           beta_reduce st (p2, ty111, c2) p_e111'
       | Bind (c111, abs112) ->
           let p112, c112 = abs112 in
-          let PVar var112 = p112 in
           let ty111, _ = TypeChecker.typeOfComputation st.tc_state c111 in
           let c112' = CastComp (c112, dtyco) in
-          let st' = extend_var_type st var112 ty111 in
+          let st' = extend_pat_type st p112 ty111 in
           let c2' = reduce_comp st' (Bind (c112', a2)) in
           let dtyco' =
             optimize_dirty_coercion st
@@ -709,7 +700,7 @@ and reduce_comp st c =
           reduce_comp st (Bind (c111', (p112, c2')))
       | _ -> c )
     | _ -> c )
-  | CastComp (c1, dtyco) ->
+  | CastComp (c1, dtyco) -> (
       let dty1, dty2 = TypeChecker.tcCmpTyCo st.tc_state dtyco in
       match c1 with
       | _ when (Print.debug "HERE2"; Types.dirty_types_are_equal dty1 dty2) -> c1
@@ -718,14 +709,15 @@ and reduce_comp st c =
             ( c11
             , optimize_dirty_coercion st (SequenceDirtyCoer (dtyco12, dtyco))
             )
-      | Call (op, e11, ((p12, ty12, c12) as a_w_ty)) ->
-          let PVar var12 = p12 in
-          let st' = extend_var_type st var12 ty12 in
+      | Call (op, e11, (p12, ty12, c12)) ->
+          let st' = extend_pat_type st p12 ty12 in
           let c12' = reduce_comp st' (CastComp (c12, dtyco)) in
           Call (op, e11, (p12, ty12, c12'))
-      | _ -> c
       | CastComp_ty (c1, ty_coercion) -> c
       | CastComp_dirt (c1, dirt_coercion) -> c
+      | _ -> c
+    )
+  | _ -> c
 
 
 (*
