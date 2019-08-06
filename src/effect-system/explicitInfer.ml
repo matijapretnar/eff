@@ -984,9 +984,20 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
   let outCs   = alphaSkel :: betaSkel :: omegaCt1 :: omegaCt2 :: cs1 @ cs2 in
   ((outExpr, outType), outCs)
 
+(* Typecheck a case expression *)
 and tcMatch (inState : state) (lclCtxt : TypingEnv.t)
+    (scr : Untyped.expression) (alts : Untyped.abstraction list)
+  : tcCmpOutput = if List.length alts > 0
+                    then tcNonEmptyMatch inState lclCtxt scr alts
+                    else tcEmptyMatch inState lclCtxt scr
+
+(* Typecheck a non-empty case expression *)
+and tcNonEmptyMatch (inState : state) (lclCtxt : TypingEnv.t)
       (scr : Untyped.expression)
       (alts : Untyped.abstraction list) : tcCmpOutput =
+  (* 0: Make sure that we have at least one alternative *)
+  assert (List.length alts > 0);
+
   (* 1: Generate fresh variables for the result *)
   let alphaOut, alphaOutSkel = fresh_ty_with_fresh_skel () in
   let deltaOut = Types.fresh_dirt () in
@@ -1005,9 +1016,25 @@ and tcMatch (inState : state) (lclCtxt : TypingEnv.t)
   let omegaScr, omegaCtScr = Typed.fresh_ty_coer (scrTy, patTy) in
 
   (* 6: Combine the results *)
-  let outExpr = Typed.Match (Typed.CastExp (trgScr, omegaScr), trgAlts) in
   let outType = (alphaOut, deltaOut) in
+  let outExpr = Typed.Match (Typed.CastExp (trgScr, omegaScr), outType, trgAlts) in
   let outCs   = alphaOutSkel :: omegaCtScr :: cs1 @ cs2 in
+  ((outExpr, outType), outCs)
+
+(* Typecheck an empty case expression *)
+and tcEmptyMatch (inState : state) (lclCtxt : TypingEnv.t)
+      (scr : Untyped.expression) : tcCmpOutput =
+  (* 1: Generate fresh variables for the result *)
+  let alphaOut, alphaOutSkel = fresh_ty_with_fresh_skel () in
+  let deltaOut = Types.fresh_dirt () in
+
+  (* 2: Typecheck the scrutinee *)
+  let (trgScr, scrTy), cs1 = tcLocatedVal inState lclCtxt scr in
+
+  (* 3: Combine the results *)
+  let outType = (alphaOut, deltaOut) in
+  let outExpr = Typed.Match (trgScr, outType, []) in
+  let outCs   = alphaOutSkel :: cs1 in
   ((outExpr, outType), outCs)
 
 (* Typecheck a function application *)
@@ -1104,6 +1131,81 @@ and tcTypedAbstraction2 (inState : state) (lclCtx : TypingEnv.t) (pat1,pat2,cmp)
   let trgPat2, midCtx2, hack2 = tcLocatedTypedVarPat midCtx1 pat2 patTy2 in
   let (trgCmp, cmpTy), cs     = tcLocatedCmp inState midCtx2 cmp in
   (((trgPat1, trgPat2, trgCmp), (patTy1, patTy2, cmpTy)), hack1 @ hack2 @ cs)
+
+(* ************************************************************************* *)
+(*                         LET-REC-GENERALIZATION                            *)
+(* ************************************************************************* *)
+
+let tcTopLetRec
+      (inState : state)
+      (var : Untyped.variable)
+      (pat : Untyped.pattern)
+      (cmp : Untyped.computation)
+  = (* 1: Generate fresh variables for everything *)
+    let alpha, alphaSkel = fresh_ty_with_fresh_skel () in
+    let beta , betaSkel  = fresh_ty_with_fresh_skel () in
+    let delta = Types.fresh_dirt () in
+
+    (* 2: Typecheck the abstraction *)
+    let ((trgPat, trgC1), (trgPatTy,(tyA1, dirtD1))), cs
+      = tcTypedAbstraction
+          inState
+          (extendLclCtxt initial_lcl_ty_env var (Types.Arrow (alpha, (beta, delta))))
+          (pat, cmp) alpha in
+
+    (* 3: The assumed type should be at least as general as the inferred one *)
+    let omega1, omegaCt1 = Typed.fresh_ty_coer (tyA1, beta) in
+    let omega2, omegaCt2 = Typed.fresh_dirt_coer (dirtD1, delta) in
+
+    (* 4: Create the (complicated) c1''. *)
+    let c1'' = (
+      let f_coercion = Typed.ArrowCoercion
+                         ( Typed.ReflTy alpha
+                         , Typed.BangCoercion (omega1, omega2)
+                         ) in
+      Typed.subst_comp
+        (Assoc.of_list [(var, Typed.CastExp(Typed.Var var, f_coercion))])
+        trgC1
+    ) in
+
+    (* 5: Solve (simplify, actually) the generated constraints *)
+    let subst, residuals = (
+      let cs = alphaSkel :: betaSkel :: omegaCt1 :: omegaCt2 :: cs in
+      Unification.unify (Substitution.empty, [], cs)
+    ) in
+
+    (* 6: Substitute back into everything *)
+    let trgPatTy = subInValTy subst trgPatTy in
+    let tyA1     = subInValTy subst tyA1 in
+    let dirtD1   = subInDirt subst dirtD1 in
+    (* trgPat needs not a substitution *)
+    let trgC1    = subInCmp subst c1'' in
+
+    (* 7: Partition the residual constraints and abstract over them *)
+    let freeSkelVars, annFreeTyVars, freeDirtVars, tyVs, dirtCs = mkGenParts residuals in
+    (* GEORGE STOPPED HERE *)
+
+(*
+let outExpr = Typed.LetRec ([(var, trgPatTy, (tyA1, dirtD1), (trgPat,c1''))], trgC2) in
+
+let mkGeneralizedType
+    (freeSkelVars  : CoreTypes.SkelParam.t list)
+    (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
+    (freeDirtVars  : CoreTypes.DirtParam.t list)
+    (tyCs   : (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list)
+    (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+    (monotype : Types.target_ty) (* expected to be a monotype! *)
+  : Types.target_ty
+let mkGeneralizedTerm
+    (freeSkelVars  : CoreTypes.SkelParam.t list)
+    (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
+    (freeDirtVars  : CoreTypes.DirtParam.t list)
+    (tyCs   : (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list)
+    (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+    (exp : Typed.expression)
+  : Typed.expression =
+*)
+    failwith __LOC__ (* GEORGE TODO: Decide what do we return *)
 
 (* ************************************************************************* *)
 (* ************************************************************************* *)
