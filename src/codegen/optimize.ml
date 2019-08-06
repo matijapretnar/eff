@@ -450,10 +450,11 @@ and optimize_sub_comp st c =
         let e1  = Lambda (p,argTy,rhs) in
         let st'' = extend_rec_fun st' var (Types.Arrow (argTy, resTy)) e1 in
         LetRec ([(var, argTy, resTy, optimize_abstraction st' argTy (p,rhs))], optimize_comp st'' c)
-    | Match (e1, abstractions) ->
+    | Match (e1, resTy, abstractions) ->
         let ty = TypeChecker.typeOfExpression st.tc_state e1 in
         Match
           ( optimize_expr st e1
+          , resTy
           , List.map (optimize_abstraction st ty) abstractions )
     | Apply (e1, e2) -> Apply (optimize_expr st e1, optimize_expr st e2)
     | Handle (e1, c1) -> Handle (optimize_expr st e1, optimize_comp st c1)
@@ -529,7 +530,7 @@ and reduce_comp st c =
   | Value _ -> c
   | LetVal (e1, abs) -> beta_reduce st abs e1
   | LetRec (bindings, c1) -> c
-  | Match (e1, abstractions) -> c
+  | Match (e1, resTy, abstractions) -> c
   | Apply (e1, e2) -> (
     match e1 with
     | Lambda abs -> beta_reduce st abs e2
@@ -647,15 +648,20 @@ and reduce_comp st c =
             match match_knot_function st e11 h with
             | Some fvar' -> Apply (Var fvar', e12)
             | None -> c )
-      | Match (e, branches) ->
+      | Match (e, _resTy, branches) ->
           (*
              handle (match e with {pi -> ci} ) with H
              >-->
              match e with {pi -> handle ci with H}
            *)
           let ty_e = TypeChecker.typeOfExpression st.tc_state e in
+          let handResTy = (match TypeChecker.typeOfExpression st.tc_state e1 with
+                           | Handler (_,handResTy) -> handResTy
+                           | _other -> failwith __LOC__ (* impossible *)
+                          ) in
           Match
             ( e
+            , handResTy
             , List.map
                 (fun (pi, ci) ->
                   optimize_abs st ty_e (abstraction pi (Handle (e1, ci))) )

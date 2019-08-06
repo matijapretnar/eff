@@ -69,7 +69,7 @@ and typed_to_untyped_comp_sub sub (typed_comp : Typed.computation) : UntypedSynt
            (fun (f, _argTy, _resTy, abs) -> (f, typed_to_untyped_abs sub abs))
            lrs
         ,typed_to_untyped_comp sub c)
-  | Typed.Match (e,alst) ->
+  | Typed.Match (e, _resTy, alst) ->
     let e' = typed_to_untyped_exp sub e in
     let alst' = List.map (fun (a:Typed.abstraction) -> typed_to_untyped_abs sub a) alst in
     UntypedSyntax.Match (e', alst')
