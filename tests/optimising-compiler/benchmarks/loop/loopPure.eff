@@ -1,0 +1,13 @@
+external ( = ) : int -> int -> bool = "="
+external ( - ) : int -> int -> int = "-";;
+
+(******************************************************************************)
+
+let test_pure n =
+  let rec loop_pure n =
+      if n = 0 then
+          ()
+      else
+          loop_pure (n - 1)
+  in loop_pure n
+in test_pure 100

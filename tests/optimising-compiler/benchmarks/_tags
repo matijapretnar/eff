@@ -1,0 +1,6 @@
+<loop/**>: include
+<queens/**>: include
+<interp/**>: include
+<range/**>: include
+true:package(core, core_bench)
+true:thread
