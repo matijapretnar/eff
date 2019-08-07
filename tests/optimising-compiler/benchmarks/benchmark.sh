@@ -159,6 +159,11 @@ function benchmark_eff() {
     fi
 }
 
+if [ $# -eq 3 ]; then
+    NUMBER_OF_LOOPS="$1"
+    NUMBER_OF_QUEENS="$2"
+    NUMBER_OF_RANGE="$3"
+fi
 
 # Run both benchmarks, send output to a file
 print_config > "$RESULTS_FILE"
