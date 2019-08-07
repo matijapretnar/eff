@@ -1,8 +1,6 @@
 (* Evaluation of the intermediate language, big step. *)
 open CoreUtils
 module V = Value
-(* STIEN: Supposed to eventually not use this anymore *)
-module Untyped = UntypedSyntax
 module RuntimeEnv = Map.Make (CoreTypes.Variable)
 module ExEff = Typed
 
@@ -20,7 +18,6 @@ exception PatternMatch
 let rec extend_value p v state =
   match (p, v) with
   | ExEff.PVar x, v -> update x v state
-  (* | Untyped.PAnnotated (p, t), v -> extend_value p v state -> In original Runtime taking ImpEff*)
   | ExEff.PAs (p, x), v ->
       let state = extend_value p v state in
       update x v state
@@ -83,12 +80,13 @@ let rec ceval state c =
       let r = ceval state c in
       Print.check ~loc "%t" (Value.print_result r) ;
       V.unit_result *)
-  | ExEff.Call (eff, exp, abs) -> failwith "ExEff call"
+  | ExEff.Call ((eff, (_, _)), exp, (p, _, c)) ->
+      V.Call (eff, veval state exp, eval_closure state (p, c))
   | ExEff.Op (eff, exp) -> failwith "ExEff op"
   | ExEff.Bind (c, a) -> (
       match (ceval state c) with
       | V.Value v -> eval_closure state a v
-      | _ -> failwith "STIEN: I assume this never happens"
+      | V.Call (eff, v, clo) -> sequence (eval_closure state a) (V.Call (eff, v, clo))
       )
   | ExEff.CastComp (c, _) -> ceval state c
   | ExEff.CastComp_ty (c, _) -> ceval state c
