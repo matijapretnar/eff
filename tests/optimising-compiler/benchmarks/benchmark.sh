@@ -3,7 +3,7 @@
 
 
 # Configuration
-EFF=/home/brecht/projects/eff-bs/eff.native
+EFF=../../../eff.native
 # RESULTS_FILE=results.txt
 RESULTS_FILE=/dev/stdout
 QUOTA=1
