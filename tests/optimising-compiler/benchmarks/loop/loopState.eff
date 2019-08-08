@@ -23,5 +23,5 @@ let test_state n =
   | effect (Put s') k -> (fun _s -> k () s')
   in
     (with state_handler
-     handle loop_state n) 0
-in test_state 10
+     handle (loop_state n)) 0
+in test_state 10000

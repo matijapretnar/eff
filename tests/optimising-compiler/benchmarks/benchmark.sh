@@ -8,18 +8,15 @@ EFF=../../../eff.native
 RESULTS_FILE=/dev/stdout
 QUOTA=1
 
-NUMBER_OF_LOOPS=100
-NUMBER_OF_QUEENS=5
+NUMBER_OF_LOOPS=10000
+NUMBER_OF_QUEENS=8
 NUMBER_OF_RANGE=100
-# NUMBER_OF_LOOPS=69
-# NUMBER_OF_QUEENS=69
-# NUMBER_OF_RANGE=69
 
 RUN_LOOP_PURE=true
 RUN_LOOP_LATENT=true
-RUN_LOOP_INCR=false
-RUN_LOOP_INCR2=false
-RUN_LOOP_STATE=false
+RUN_LOOP_INCR=true
+RUN_LOOP_INCR2=true
+RUN_LOOP_STATE=true
 RUN_QUEENS_ONE=true
 RUN_QUEENS_ALL=false
 RUN_INTERP=false
@@ -72,7 +69,7 @@ function effcompile() {
     esac
 
     echo "LOG: running [$1 -> $2] with file '$file'"
-    "$EFF" --explicit-subtyping --no-pervasives $opts --profile "$file" \
+    "$EFF" --explicit-subtyping $opts --profile "$file" \
         | grep time \
         | while read -r line
     do

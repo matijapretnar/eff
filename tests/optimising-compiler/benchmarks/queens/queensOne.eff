@@ -109,5 +109,5 @@ let test_queens n =
 (*    with choose_all handle queens number_of_queens *)
 (*  in *)
   queens_one_cps n
-in test_queens 5
+in test_queens 8
 

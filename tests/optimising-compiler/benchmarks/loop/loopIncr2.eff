@@ -23,4 +23,4 @@ let test_incr' n =
   in
     (with incr_handler
      handle loop_incr' n) 0
-in test_incr' 10
+in test_incr' 10000

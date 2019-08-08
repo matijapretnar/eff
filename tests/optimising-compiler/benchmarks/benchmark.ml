@@ -1,15 +1,15 @@
 open Core
 open Core_bench.Std
 
-let number_of_loops = 100
-and number_of_queens = 5
+let number_of_loops = 10000
+and number_of_queens = 8
 and number_of_range = 100
 
 let run_loop_pure = true
 and run_loop_latent = true
-and run_loop_incr = false
-and run_loop_incr' = false
-and run_loop_state = false
+and run_loop_incr = true
+and run_loop_incr' = true
+and run_loop_state = true
 and run_queens_one = true
 and run_queens_all = false
 and run_interp = false

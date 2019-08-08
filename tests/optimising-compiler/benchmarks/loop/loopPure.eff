@@ -10,4 +10,4 @@ let test_pure n =
       else
           loop_pure (n - 1)
   in loop_pure n
-in test_pure 100
+in test_pure 10000

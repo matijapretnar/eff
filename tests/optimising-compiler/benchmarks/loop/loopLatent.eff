@@ -15,4 +15,4 @@ let test_latent n =
         then (match perform (Fail ()) with)
         else loop_latent (n - 1)
   in loop_latent n
-in test_latent 100
+in test_latent 10000
