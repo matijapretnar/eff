@@ -1,10 +1,7 @@
-(* Evaluation of the intermediate language, big step. *)
+(* Evaluation of ExEff, big step via SkelEff. *)
 open CoreUtils
-module Core = UntypedSyntax
 module Multicore = MulticoreSyntax
 module FromSkelEff = SkelEffToMulticore
-(* STIEN: Supposed to eventually not use this anymore *)
-module FromUntyped = UntypedToMulticore
 
 module type BackendParameters = sig
   val output_file : string

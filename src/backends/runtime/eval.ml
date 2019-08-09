@@ -1,4 +1,4 @@
-(* Evaluation of the intermediate language, big step. *)
+(* Evaluation of ExEff, big step without intermediate SkelEff step. *)
 open CoreUtils
 module V = Value
 module RuntimeEnv = Map.Make (CoreTypes.Variable)
@@ -76,10 +76,6 @@ let rec ceval state c =
       let converter (var, _, _, c) = (var, c) in
       let state = extend_let_rec state (Assoc.of_list (List.map converter defs)) in
       ceval state c
-  (* | Untyped.Check c ->
-      let r = ceval state c in
-      Print.check ~loc "%t" (Value.print_result r) ;
-      V.unit_result *)
   | ExEff.Call ((eff, (_, _)), exp, (p, _, c)) ->
       V.Call (eff, veval state exp, eval_closure state (p, c))
   | ExEff.Op (eff, exp) -> failwith "ExEff op"
@@ -119,7 +115,6 @@ and veval state e =
         Error.runtime "Name %t is not defined." (CoreTypes.Variable.print x) )
   | ExEff.BuiltIn (_, _) -> failwith "Builtin not supported"
   | ExEff.Const c -> V.Const c
-  (* | Untyped.Annotated (t, ty) -> veval state t *)
   | ExEff.Tuple es -> V.Tuple (List.map (veval state) es)
   | ExEff.Record es -> V.Record (Assoc.map (fun e -> veval state e) es)
   | ExEff.Variant (lbl, e) -> V.Variant (lbl, Some (veval state e))
