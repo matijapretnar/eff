@@ -1,5 +1,5 @@
-(** 
-Substitutions 
+(**
+Substitutions
 
 Holds substitutions
 *)
@@ -18,28 +18,28 @@ val add_type_coercion_e : CoreTypes.TyCoercionParam.t -> Typed.ty_coercion -> t
 (** [add_type_coercion_e parameter t_coercion] Add type [parameter] [t_coercion] to empty substitution. *)
 
 val add_type_substitution : CoreTypes.TyParam.t -> Types.target_ty -> t -> t
-(** [add_type_substitution parameter target_type sub] Add type [parameter] to [target_type] substitution to [sub] *) 
+(** [add_type_substitution parameter target_type sub] Add type [parameter] to [target_type] substitution to [sub] *)
 
 val add_type_substitution_e : CoreTypes.TyParam.t -> Types.target_ty -> t
-(** [add_type_substitution_e parameter target_type] Add type [parameter] to [target_type] substitution to empty substitution *) 
+(** [add_type_substitution_e parameter target_type] Add type [parameter] to [target_type] substitution to empty substitution *)
 
 val add_dirt_var_coercion : CoreTypes.DirtCoercionParam.t -> Typed.dirt_coercion -> t -> t
-(** [add_dirt_var_coercion dirt_var target_dc sub] Add [dirt_var] to target dirt coercion ([target_dc]) to [sub] *) 
+(** [add_dirt_var_coercion dirt_var target_dc sub] Add [dirt_var] to target dirt coercion ([target_dc]) to [sub] *)
 
 val add_dirt_var_coercion_e : CoreTypes.DirtCoercionParam.t -> Typed.dirt_coercion -> t
-(** [add_dirt_var_coercion dirt_var target_dc] Add [dirt_var] to target dirt coercion ([target_dc]) to empty substitution *) 
+(** [add_dirt_var_coercion dirt_var target_dc] Add [dirt_var] to target dirt coercion ([target_dc]) to empty substitution *)
 
 val add_dirt_substitution : CoreTypes.DirtParam.t -> Types.dirt -> t -> t
-(** [add_dirt_substitution var target_dirt sub] Add dirt variable ([dirt_var]) to [target_dirt] substitution to [sub] *) 
+(** [add_dirt_substitution var target_dirt sub] Add dirt variable ([dirt_var]) to [target_dirt] substitution to [sub] *)
 
 val add_dirt_substitution_e : CoreTypes.DirtParam.t -> Types.dirt -> t
-(** [add_dirt_substitution var target_dirt] Add dirt variable ([dirt_var]) to [target_dirt] substitution to empty substitution *) 
+(** [add_dirt_substitution var target_dirt] Add dirt variable ([dirt_var]) to [target_dirt] substitution to empty substitution *)
 
 val add_skel_param_substitution : CoreTypes.SkelParam.t -> Types.skeleton -> t -> t
-(** [add_type_substitution parameter target_skel sub] Add skeleton [parameter] to [target_skel] substitution to [sub] *) 
+(** [add_type_substitution parameter target_skel sub] Add skeleton [parameter] to [target_skel] substitution to [sub] *)
 
 val add_skel_param_substitution_e : CoreTypes.SkelParam.t -> Types.skeleton -> t
-(** [add_type_substitution parameter target_skel sub] Add skeleton [parameter] to [target_skel] substitution to empty substitution *) 
+(** [add_type_substitution parameter target_skel sub] Add skeleton [parameter] to [target_skel] substitution to empty substitution *)
 
 
 val merge : t -> t -> t
@@ -64,6 +64,15 @@ val apply_substitutions_to_dirt : t -> Types.dirt -> Types.dirt
 
 val apply_substitutions_to_skeleton : t -> Types.skeleton -> Types.skeleton
 (** [apply_substitutions_to_skeleton subs skeleton] Applies all substitutions from [subs] to [skeleton] *)
+
+val apply_sub_tycoer : t -> Typed.ty_coercion -> Typed.ty_coercion
+(** [apply_sub_tycoer subs co] Applies all substitutions from [subs] to [co] *)
+
+val apply_sub_dirtcoer : t -> Typed.dirt_coercion -> Typed.dirt_coercion
+(** [apply_sub_dirtcoer subs co] Applies all substitutions from [subs] to [co] *)
+
+val apply_sub_dirtycoer : t -> Typed.dirty_coercion -> Typed.dirty_coercion
+(** [apply_sub_dirtycoer subs co] Applies all substitutions from [subs] to [co] *)
 
 (* Other type information *)
 

@@ -39,38 +39,82 @@ module Make (Backend : BackendSignature.T) = struct
   let rec exec_cmd state {it= cmd; at= loc} =
     match cmd with
     | Commands.Term t ->
+        let t_start = Sys.time() in
+        (* Desugar to ImpEff *)
+        Print.debug "exec_cmd: before desugaring";
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
         let type_system_state', _ =
           TypeSystem.infer_top_comp state.type_system_state c
         in
-        let c', effect_system_state' =
-          ExplicitInfer.type_toplevel ~loc:c.at
-            state.effect_system_state c
+        Print.debug "exec_cmd: after desugaring";
+        (* Format.fprintf !Config.error_formatter "%t\n"
+         *   (UntypedSyntax.print_computation c); *)
+
+        (* Elaborate to ExEff *)
+        Print.debug "exec_cmd: before elaboration";
+        let c', inferredExEffType =
+          ExplicitInfer.tcTopLevelMono ~loc:c.at state.effect_system_state c
+        (* let c' = ExplicitInfer.tcTopLevel ~loc:c.at
+         *            state.effect_system_state c *)
         in
-        let drty = TypeChecker.type_of_computation state.type_checker_state c' in
-        let backend_state' = 
-          Backend.process_computation state.backend_state c drty
+        Print.debug "exec_cmd: after elaboration";
+        (* Format.fprintf !Config.error_formatter "%t\n"
+         *   (Typed.print_computation c'); *)
+
+        (* Typecheck ExEff *)
+        Print.debug "exec_cmd: before backend typechecking";
+        let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
+        Print.debug "exec_cmd: after backend typechecking";
+
+        (* Optimize ExEff *)
+        let c'' =
+          if !Config.disable_optimization
+          then c'
+          else (
+            Print.debug "exec_cmd: before optimization";
+            let c_opt = Optimize.optimize_main_comp state.type_checker_state c' in
+            Print.debug "exec_cmd: after optimization";
+            (* Format.fprintf !Config.error_formatter "%t\n"
+             *   (Typed.print_computation c_opt); *)
+              c_opt
+            )
         in
-        { state with 
+
+        (* Erase ExEff back to ImpEff *)
+        Print.debug "exec_cmd: before erasure";
+        let c'''= ErasureUntyped.typed_to_untyped_comp (Assoc.empty) c'' in
+        Print.debug "exec_cmd: after erasure";
+        (* Format.fprintf !Config.error_formatter "%t\n"
+         *   (UntypedSyntax.print_computation c'''); *)
+
+        (* Compile / Interpret ImpEff *)
+        Print.debug "exec_cmd: begin processing by backend";
+        let t1 = Sys.time() in
+        let t_compile = t1 -. t_start in
+        let backend_state' =
+          Backend.process_computation state.backend_state c''' drty
+        in
+        let t2 = Sys.time() in
+        let t_process = t2 -. t1 in
+        if !Config.profiling then
+          print_profiling t_compile t_process;
+        { state with
           type_system_state= type_system_state'
-        ; effect_system_state= effect_system_state'
         ; backend_state= backend_state' }
     | Commands.TypeOf t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
         let type_system_state', _ =
           TypeSystem.infer_top_comp state.type_system_state c
         in
-        let c', effect_system_state' =
-          ExplicitInfer.type_toplevel ~loc:c.at
-            state.effect_system_state c
+        let c', inferredExEffType =
+          ExplicitInfer.tcTopLevelMono ~loc:c.at state.effect_system_state c
         in
-        let drty = TypeChecker.type_of_computation state.type_checker_state c' in
-        let backend_state' = 
+        let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
+        let backend_state' =
           Backend.process_type_of state.backend_state c drty
         in
-        { state with 
+        { state with
           type_system_state= type_system_state'
-        ; effect_system_state= effect_system_state'
         ; backend_state= backend_state' }
     | Commands.Help ->
         let help_text =
@@ -92,11 +136,11 @@ module Make (Backend : BackendSignature.T) = struct
         let effect_system_state' =
           ExplicitInfer.add_effect eff (ty1, ty2) state.effect_system_state
         in
-        let backend_state' = 
+        let backend_state' =
           Backend.process_def_effect state.backend_state (eff, (ty1, ty2))
         in
         { state with
-          desugarer_state= desugarer_state' 
+          desugarer_state= desugarer_state'
         ; type_system_state= type_system_state'
         ; effect_system_state= effect_system_state'
         ; backend_state= backend_state' }
@@ -142,10 +186,10 @@ module Make (Backend : BackendSignature.T) = struct
         in
         let ty' = Types.source_to_target ty in
         let effect_system_state' =
-          EffectSystem.add_external state.effect_system_state x ty'
+          EffectSystem.addExternal state.effect_system_state x ty'
         in
         let type_checker_state' =
-          TypeChecker.add_external state.type_checker_state x ty'
+          TypeChecker.addExternal state.type_checker_state x ty'
         in
         let backend_state' =
           Backend.process_external state.backend_state (x, ty, f)
@@ -170,8 +214,8 @@ module Make (Backend : BackendSignature.T) = struct
 
   and load_cmds state cmds =
     let old_output_formatter = !Config.output_formatter in
-    Config.output_formatter :=
-      Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ()) ;
+    (* Config.output_formatter :=
+     *   Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ()) ; *)
     let state' = exec_cmds state cmds in
     Config.output_formatter := old_output_formatter ;
     state'
@@ -195,4 +239,9 @@ module Make (Backend : BackendSignature.T) = struct
   and load_source str state = Lexer.read_string parse str |> load_cmds state
 
   and finalize state = Backend.finalize state.backend_state
+
+  and print_profiling t_comp t_process =
+    Format.fprintf !Config.output_formatter "Compile time: %f\n" t_comp;
+    Format.fprintf !Config.output_formatter "Process time: %f\n" t_process;
+      ()
 end

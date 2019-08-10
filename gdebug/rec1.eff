@@ -1,0 +1,8 @@
+
+let rec f x = ()
+in f 1
+
+(* We fail with:
+
+     Fatal error: exception Failure("File \"src/effect-system/types.ml\", line 169, characters 71-78")
+*)
