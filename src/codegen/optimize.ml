@@ -419,6 +419,27 @@ and specialize
   (* Prefix the new specializations as let-bindings for cont. *)
   Assoc.fold_left subst_spec cont' !assoc
 
+(* Drop unused bindings *)
+let letrec_drop_unused_bindings (c:computation) : computation =
+  match c with
+  | LetRec (bindings,c1) -> (
+      (* Get the free variables (function defs are the first part of the tuple)*)
+      let (free_vars_c1,_) = Typed.free_vars_comp c1 in
+      let free_vars_bindings = List.map (fun (_,_,_,a) -> fst (free_vars_abs a)) bindings in
+      let free_vars = List.flatten (free_vars_c1 :: free_vars_bindings) in
+      let used_bindings = List.filter (fun (var,_,_,_) -> List.mem var free_vars) bindings
+      in
+      (* if no bindings used, leave this LetRec out *)
+      match used_bindings with
+      | [] ->
+        Print.debug "Dropping letrec bindings";
+        c1
+      | _  -> LetRec (used_bindings, c1)
+    )
+  | _ -> (
+      Print.debug "This function can only be applied on LetRecs";
+      failwith __LOC__
+    )
 
 
 let rec optimize_ty_coercion st tyco =
@@ -818,36 +839,7 @@ and reduce_comp st c =
   | LetVal (e1, abs) -> beta_reduce st abs e1
   | LetRec (bs, cont) ->
     let cont' = List.fold_left specialize_letrec cont bs in
-    LetRec (bs, cont')
-  (*
-    (* Don't specialize *)
-      (* Drop unused bindings *)
-      Print.debug "drop unused bindings" ;
-      (* We'll check if a binding occurs in the computation OR in one of the other bindings *)
-      (* Get the free variables of the computation (function defs are the first part of the tuple)*)
-      let (free_vars_c1,_) = Typed.free_vars_comp c1 in
-      (* Define a function that recursively searches the dependency bindings *)
-      let rec search_occurs free bs =
-        (* split bindings between bindings that depend on some free variables *)
-        let (ys,ns) = List.partition (fun (var,_,_) -> List.mem var free) bs in
-        match (ys,ns) with
-        | ([],_ ) -> (ys,ns) (* no new dependent bindings found *)
-        | (_ ,[]) -> (ys,ns) (* all bindings were dependent *)
-        | (_ ,_ ) -> 
-            (* calculate new free variables *)
-            let free' = List.concat (List.map (fun (_,_,e) -> let (fs,_) = free_vars_expr e in fs) ys) in
-            (* recurse *)
-            let (ys', ns') = search_occurs free' ns in
-            (ys @ ys',ns')
-      in
-      (* used = bindings that occur in comp or in other used bindings *)
-      let (used,_) = search_occurs free_vars_c1 bindings in
-      (* if no bindings used, leave this LetRec out *)
-      match used with
-      | [] -> c1
-      | _  -> LetRec (used, c1)
-      )
-    )*)
+    letrec_drop_unused_bindings (LetRec (bs, cont'))
   | Match (e1, resTy, abstractions) -> c
   | Apply (e1, e2) -> (
     match e1 with
