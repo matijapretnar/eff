@@ -160,9 +160,9 @@ let rec specialize_letrec
       | ((TySchemeSkel _), (BigLambdaSkel _))     -> specialize fvar fbody resty cont
       | ((QualTy _)      , (LambdaTyCoerVar _))   -> specialize fvar fbody resty cont
       | ((QualDirt _)    , (LambdaDirtCoerVar _)) -> specialize fvar fbody resty cont
-      | _ -> fbody_c
+      | _ -> Print.debug "SPEC: letrec body is not an abstraction"; cont
     )
-  | _ -> fbody_c
+  | _ -> Print.debug "SPEC: letrec body is not a value"; cont
 
 and specialize
   (fvar: Typed.variable)
@@ -414,6 +414,7 @@ and specialize
       failwith __LOC__
   in
   (* Gather and substitute specializations *)
+  Print.debug "SPEC: specializing a letrec";
   let cont' = specialize_comp cont in
   (* Prefix the new specializations as let-bindings for cont. *)
   Assoc.fold_left subst_spec cont' !assoc
@@ -818,42 +819,6 @@ and reduce_comp st c =
   | LetRec (bs, cont) ->
     let cont' = List.fold_left specialize_letrec cont bs in
     LetRec (bs, cont')
-  (* | LetRec ([(fvar,argty,(absty,resdty),(p,(Value abs)))] as bindings, c1) -> (
-   *     match (absty,abs) with
-   *     (\* Specialize letrec with type variable *\)
-   *     (\* Type abstractions *\)
-   *     | ((TySchemeTy _) ,(BigLambdaTy _)) -> (
-   *         match specialize_abs fvar abs absty c1 with
-   *         | None -> c
-   *         | Some c1' -> optimize_comp st (LetRec (bindings,c1'))
-   *     )
-   *     (\* Dirt abstractions *\)
-   *     | ((TySchemeDirt _),(BigLambdaDirt _)) -> (
-   *         match specialize_abs fvar abs absty c1 with
-   *         | None -> c
-   *         | Some c1' -> optimize_comp st (LetRec (bindings,c1'))
-   *     )
-   *     (\* Skeleton abstractions *\)
-   *     | ((TySchemeSkel _),(BigLambdaSkel _)) -> (
-   *         match specialize_abs fvar abs absty c1 with
-   *         | None -> c
-   *         | Some c1' -> optimize_comp st (LetRec (bindings,c1'))
-   *     )
-   *     (\* Value type coercion abstractions *\)
-   *     | ((QualTy _),(LambdaTyCoerVar _)) -> (
-   *         match specialize_abs fvar abs absty c1 with
-   *         | None -> c
-   *         | Some c1' -> optimize_comp st (LetRec (bindings,c1'))
-   *     )
-   *     (\* Dirt coercion abstractions *\)
-   *     | ((QualDirt _),(LambdaDirtCoerVar _)) -> (
-   *         match specialize_abs fvar abs absty c1 with
-   *         | None -> c
-   *         | Some c1' -> optimize_comp st (LetRec (bindings,c1'))
-   *     )
-   *   | _ -> c
-   * )
-   * | LetRec (bs, c1) -> LetRec (bs, optimize_comp st c1) *)
   (*
     (* Don't specialize *)
       (* Drop unused bindings *)
