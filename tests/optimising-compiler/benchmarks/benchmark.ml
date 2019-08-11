@@ -3,7 +3,6 @@ open Core_bench.Std
 
 let number_of_loops = 10000
 and number_of_queens = 8
-and number_of_range = 100
 
 let run_loop_pure = true
 and run_loop_latent = true
@@ -12,8 +11,6 @@ and run_loop_incr' = true
 and run_loop_state = true
 and run_queens_one = true
 and run_queens_all = false
-and run_interp = false
-and run_range = false
 
 let () =
   if run_loop_pure then begin
@@ -69,20 +66,6 @@ let () =
   Command.run (Bench.make_command [
       Bench.Test.create ~name:"handwritten" (fun () -> QueensHandWritten.queens_all number_of_queens);
       Bench.Test.create ~name:"native" (fun () -> QueensNative.queens_all number_of_queens);
-    ]);
-  Printf.printf "\n\n"
-  end;
-  if run_interp then begin
-  Printf.printf "interp:\n";
-  Command.run (Bench.make_command [
-      Bench.Test.create ~name:"native" (fun () -> InterpNative.bigTest ());
-    ]);
-  Printf.printf "\n\n"
-  end;
-  if run_range then begin
-  Printf.printf "range:\n";
-  Command.run (Bench.make_command [
-      (* Bench.Test.create ~name:"Native" (fun () -> FlatNative.bigTest ()); *)
     ]);
   Printf.printf "\n\n"
   end;

@@ -214,8 +214,8 @@ module Make (Backend : BackendSignature.T) = struct
 
   and load_cmds state cmds =
     let old_output_formatter = !Config.output_formatter in
-    (* Config.output_formatter :=
-     *   Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ()) ; *)
+    Config.output_formatter :=
+      Format.make_formatter (fun _ _ _ -> ()) (fun _ -> ()) ;
     let state' = exec_cmds state cmds in
     Config.output_formatter := old_output_formatter ;
     state'

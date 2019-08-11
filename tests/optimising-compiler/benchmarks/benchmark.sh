@@ -10,7 +10,6 @@ QUOTA=1
 
 NUMBER_OF_LOOPS=10000
 NUMBER_OF_QUEENS=8
-NUMBER_OF_RANGE=100
 
 RUN_LOOP_PURE=true
 RUN_LOOP_LATENT=true
@@ -19,8 +18,6 @@ RUN_LOOP_INCR2=true
 RUN_LOOP_STATE=true
 RUN_QUEENS_ONE=true
 RUN_QUEENS_ALL=false
-RUN_INTERP=false
-RUN_RANGE=false
 
 
 
@@ -36,7 +33,6 @@ QUOTA = $QUOTA
 
 NUMBER_OF_LOOPS = $NUMBER_OF_LOOPS
 NUMBER_OF_QUEENS = $NUMBER_OF_QUEENS
-NUMBER_OF_RANGE = $NUMBER_OF_RANGE
 
 RUN_LOOP_PURE = $RUN_LOOP_PURE
 RUN_LOOP_LATENT = $RUN_LOOP_LATENT
@@ -45,8 +41,6 @@ RUN_LOOP_INCR2 = $RUN_LOOP_INCR2
 RUN_LOOP_STATE = $RUN_LOOP_STATE
 RUN_QUEENS_ONE = $RUN_QUEENS_ONE
 RUN_QUEENS_ALL = $RUN_QUEENS_ALL
-RUN_INTERP = $RUN_INTERP
-RUN_RANGE = $RUN_RANGE
 EOF
 }
 
@@ -92,8 +86,6 @@ function benchmark_ocaml() {
         -re "s/^(.*run_loop_state\s*=\s*).*/\1$RUN_LOOP_STATE/g" \
         -re "s/^(.*run_queens_one\s*=\s*).*/\1$RUN_QUEENS_ONE/g" \
         -re "s/^(.*run_queens_all\s*=\s*).*/\1$RUN_QUEENS_ALL/g" \
-        -re "s/^(.*run_interp\s*=\s*).*/\1$RUN_INTERP/g" \
-        -re "s/^(.*run_range\s*=\s*).*/\1$RUN_RANGE/g" \
         benchmark.ml
     # Build benchmark.native from benchmark.ml
     echo "Building benchmark.native"
@@ -142,24 +134,11 @@ function benchmark_eff() {
         effcompile queens_all noopt queens/queensAll.eff
         effcompile queens_all opt queens/queensAll.eff
     fi
-
-    if [ $RUN_INTERP = "true" ]; then
-        # sed -re "s/^(in.*test_pure\s*).*/\1$NUMBER_OF_LOOPS/g" interp/interp.eff
-        effcompile interp noopt interp/interp.eff
-        effcompile interp opt interp/interp.eff
-    fi
-
-    if [ $RUN_RANGE = "true" ]; then
-        # sed -re "s/^(.*test_pure\s*).*/\1$NUMBER_OF_RANGE/g" range/range.eff
-        effcompile range noopt range/range.eff
-        effcompile range opt range/range.eff
-    fi
 }
 
 if [ $# -eq 3 ]; then
     NUMBER_OF_LOOPS="$1"
     NUMBER_OF_QUEENS="$2"
-    NUMBER_OF_RANGE="$3"
 fi
 
 # Run both benchmarks, send output to a file
