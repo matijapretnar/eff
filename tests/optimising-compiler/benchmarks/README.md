@@ -30,7 +30,7 @@ We compare:
 
 * a hand-written solution that uses our library (marked with `handwritten`)
 * a natural solution one would write without handlers (marked with `native - /variant/`)
-* the automatically generated code (marked with ``RESULT - Process time`)
+* the automatically generated code (marked with `RESULT - Process time`)
 
 Currently the benchmarks use different formats for the ones written in OCaml (handwritten, native) and the ones interpreted in Eff, because compilation to OCaml does not work.
 The comparison between optimized and non-optimized Eff code is thus the most informative.
