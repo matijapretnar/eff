@@ -870,6 +870,7 @@ let concat_vars vars = List.fold_right ( @@@ ) vars ([], [])
 let rec free_vars_comp c =
   match c with
   | Value e -> free_vars_expr e
+  | LetVal (e, abs) -> free_vars_expr e @@@ free_vars_abs_with_ty abs
   | LetRec (li, c1) ->
       let xs, vars =
         List.fold_right
@@ -882,8 +883,11 @@ let rec free_vars_comp c =
   | Apply (e1, e2) -> free_vars_expr e1 @@@ free_vars_expr e2
   | Handle (e, c1) -> free_vars_expr e @@@ free_vars_comp c1
   | Call (_, e1, a1) -> free_vars_expr e1 @@@ free_vars_abs_with_ty a1
+  | Op (_,e) -> free_vars_expr e
   | Bind (c1, a1) -> free_vars_comp c1 @@@ free_vars_abs a1
   | CastComp (c1, dtyco) -> free_vars_comp c1
+  | CastComp_ty (c1,_) -> free_vars_comp c1
+  | CastComp_dirt (c1,_) -> free_vars_comp c1
 
 
 and free_vars_expr e =

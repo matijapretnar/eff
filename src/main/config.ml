@@ -15,6 +15,8 @@ let backend = ref Runtime
 
 let disable_optimization = ref false
 
+let profiling = ref false
+
 let optimization_fuel = ref 100
 
 let ascii = ref false
