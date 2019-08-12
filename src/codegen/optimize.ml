@@ -134,6 +134,314 @@ let applicable_pattern p vars =
   check_variables (Typed.pattern_vars p)
 
 
+
+(* Try to specialize a recursive function f with continuation cont.
+ * If the body is an abstraction, substitute all applications f v of f in cont with
+ * a new variable f'. Then prefix let-bindings f' = f v to cont for all
+ * substitutions.
+ * `specialize_letrec` first checks if the LetRec has the right form to be
+ * specialized. The actual specialization is done in `specialize`.
+ * The specialize_comp/expr/abs functions traverse the syntax tree, searching
+ * for abstractions and applications. They create the specializations, add them
+ * to the assoc and substitute a fresh variable. *)
+let rec specialize_letrec
+    ( cont : Typed.computation )
+    ( (fvar : Typed.variable)
+    , (argty : Types.target_ty)
+    , ((resty, resdt) : Types.target_dirty)
+    , ((p,fbody_c) : Typed.abstraction)
+    )
+  : Typed.computation =
+  match fbody_c with
+  | Value fbody -> (
+      match (resty,fbody) with
+      | ((TySchemeTy _)  , (BigLambdaTy _))       -> specialize fvar fbody resty cont
+      | ((TySchemeDirt _), (BigLambdaDirt _))     -> specialize fvar fbody resty cont
+      | ((TySchemeSkel _), (BigLambdaSkel _))     -> specialize fvar fbody resty cont
+      | ((QualTy _)      , (LambdaTyCoerVar _))   -> specialize fvar fbody resty cont
+      | ((QualDirt _)    , (LambdaDirtCoerVar _)) -> specialize fvar fbody resty cont
+      | _ -> Print.debug "SPEC: letrec body is not an abstraction"; cont
+    )
+  | _ -> Print.debug "SPEC: letrec body is not a value"; cont
+
+and specialize
+  (fvar: Typed.variable)
+  (fbody : Typed.expression)
+  (resty : Types.target_ty)
+  ( cont : Typed.computation )
+  : Typed.computation =
+  (* Define a referenced map that holds the substitutions. *)
+  let assoc = ref Assoc.empty in
+
+  let specialize_app (e:Typed.expression) : Typed.variable =
+    (* check if the specialized version already exists *)
+    match Assoc.lookup e !assoc with
+    | Some f' -> f'            (* already exists, substituting *)
+    | None -> (                     (* creating new specialization *)
+      (* create a new variable name fv' *)
+      let f' = CoreTypes.Variable.refresh fvar in
+      (* add it to mapping *)
+      assoc := Assoc.update e f' !assoc;
+      f')
+  in
+
+  (* The following are tree traversal functions that look for the specializations *)
+  (* Specialize computations. *)
+  let rec specialize_comp c = 
+    match c with 
+    | Value e1 -> 
+        let e1' = specialize_expr e1 in
+        Value e1'
+    | LetVal (e1,a1) ->
+        let e1' = specialize_expr e1 in
+        let a1' = specialize_abs_with_ty a1 in
+        LetVal (e1',a1')
+    | LetRec (bs1,c1) ->
+        let bs1' = List.map (fun (p,ty,dty,a1) -> (p,ty,dty,specialize_abs a1)) bs1 in
+        let c1' = specialize_comp c1 in
+        LetRec (bs1',c1')
+    | Match (e1,dty,abs1) ->
+        let e1' = specialize_expr e1 in
+        let abs1' = List.map (specialize_abs ) abs1 in 
+        Match (e1',dty,abs1')
+    | Apply (e1,e2) ->
+        let e1' = specialize_expr e1 in
+        let e2' = specialize_expr e2 in
+        Apply (e1',e2')
+    | Handle (e1,c1) ->
+        let e1' = specialize_expr e1 in
+        let c1' = specialize_comp c1 in
+        Handle (e1',c1')
+    | Call (eff,e1,a1) ->
+        let e1' = specialize_expr e1 in
+        let a1' = specialize_abs_with_ty a1 in
+        Call (eff,e1',a1')
+    | Op (eff,e1) -> 
+        let e1' = specialize_expr e1 in
+        Op (eff,e1') 
+    | Bind (c1,a1) -> 
+        let c1' = specialize_comp c1 in
+        let a1' = specialize_abs a1 in
+        Bind (c1',a1') 
+    | CastComp (c1,dtyco) -> 
+        let c1' = specialize_comp c1 in
+        CastComp (c1',dtyco) 
+    | CastComp_ty (c1,tyco) -> 
+        let c1'  = specialize_comp c1  in
+        CastComp_ty (c1',tyco) 
+    | CastComp_dirt (c1,dco) -> 
+        let c1' = specialize_comp c1 in
+        CastComp_dirt (c1',dco) 
+
+  and specialize_expr (e:expression) : expression = 
+    match e with
+    | Var _ -> e
+    | BuiltIn _ -> e
+    | Const _ -> e
+    | Tuple es -> 
+        let es' = List.map specialize_expr es in
+        Tuple es'
+    | Record _ -> failwith __LOC__
+    | Variant (lab,e1) ->
+        let e1' = specialize_expr e1 in
+        Variant (lab,e1')
+    | Lambda abs -> 
+        let abs' = specialize_abs_with_ty abs in
+        Lambda abs'
+    | Effect _ -> e
+    | Handler _ -> e
+    | BigLambdaTy (tvar,sk,e1) -> 
+        let e1' = specialize_expr e1 in
+        BigLambdaTy (tvar,sk,e1') 
+    | BigLambdaDirt (dvar,e1) -> 
+        let e1' = specialize_expr e1 in
+        BigLambdaDirt (dvar,e1') 
+    | BigLambdaSkel (evar,e1) -> 
+        let e1' = specialize_expr e1 in
+        BigLambdaSkel (evar,e1') 
+    | CastExp (e1,tyco) -> 
+        let e1' = specialize_expr e1 in
+        CastExp (e1',tyco) 
+    | ApplyTyExp (e1,ty1) ->(
+        match ty1 with
+          | TyParam _ -> (
+              (* Don't specialize with typarams *)
+              let e1' = specialize_expr e1 in
+              ApplyTyExp (e1',ty1))
+          | _ -> (
+              match (e1, fbody) with
+              | (Var g, BigLambdaTy (tyvar,evar,v)) when g = fvar ->
+                  Var (specialize_app e)
+              | _ -> (
+                  let e1' = specialize_expr e1 in
+                  ApplyTyExp (e1',ty1)
+                )
+            )
+      )
+    | LambdaTyCoerVar (ctvar,ctty,e1) -> 
+        let e1' = specialize_expr e1 in
+        LambdaTyCoerVar (ctvar,ctty,e1') 
+    | LambdaDirtCoerVar (ctvar,ctty,e1) -> 
+        let e1' = specialize_expr e1 in
+        LambdaDirtCoerVar (ctvar,ctty,e1') 
+    | ApplyDirtExp (e1,d) -> (
+        match d.row with
+        | ParamRow _ -> (
+            (* Don't specialize with params *)
+            let e1' = specialize_expr e1 in
+            ApplyDirtExp (e1',d))
+        | _ -> (
+            match (e1, fbody) with
+            | (Var g, BigLambdaDirt (dvar,v)) when g = fvar ->
+                Var (specialize_app e)
+            | _ -> (
+                let e1' = specialize_expr e1 in
+                ApplyDirtExp (e1',d)
+              )
+          )
+      )
+    | ApplySkelExp (e1,sk) -> (
+        match sk with
+        | SkelParam _ -> (
+            (* Don't specialize with params *)
+            let e1' = specialize_expr e1 in
+            ApplySkelExp (e1',sk))
+        | _ -> (
+            match (e1, fbody) with
+            | (Var g, BigLambdaSkel (evar,v)) when g = fvar ->
+              Var (specialize_app e)
+            | _ -> (
+                let e1' = specialize_expr e1 in
+                ApplySkelExp (e1',sk)
+              )
+          )
+      )
+    | ApplyTyCoercion (e1,tyco) -> (
+        match tyco with
+        | TyCoercionVar _ -> (
+            (* Don't specialize with params *)
+            let e1' = specialize_expr e1 in
+            ApplyTyCoercion (e1',tyco))
+        | _ -> (
+            match (e1, fbody) with
+            | (Var g, LambdaTyCoerVar (ctvar,_,v)) when g = fvar ->
+              Var (specialize_app e)
+            | _ -> (
+                let e1' = specialize_expr e1 in
+                ApplyTyCoercion (e1',tyco)
+              )
+          )
+      )
+    | ApplyDirtCoercion (e1,dco) -> (
+        match dco with
+        | DirtCoercionVar _ -> (
+            (* Don't specialize with params *)
+            let e1' = specialize_expr e1 in
+            ApplyDirtCoercion (e1',dco))
+        | _ -> (
+            match (e1, fbody) with
+            | (Var g, LambdaDirtCoerVar (ctvar,_,v)) when g = fvar ->
+              Var (specialize_app e)
+            | _ -> (
+                let e1' = specialize_expr e1 in
+                ApplyDirtCoercion (e1',dco)
+              )
+          )
+      )
+
+  and specialize_abs (p,c) = 
+    (p,specialize_comp c)
+
+  and specialize_abs_with_ty (p,ty,c) =
+    (p,ty,specialize_comp c)
+  in 
+  (* End of the tree traversal functions *)
+
+  (* This function prefixes the specializations in cont, and applies some necessary substitutions. *)
+  let subst_spec
+      (cont:Typed.computation)
+      ((app:Typed.expression),(fvar':Typed.variable))
+    : Typed.computation =
+    match (fbody,resty,app) with
+    | (BigLambdaTy (typaram,_sk,v), TySchemeTy (typaram',_sk',ty1), ApplyTyExp (_var,ty2)) ->
+      assert (typaram = typaram');
+      assert (_sk = _sk');
+      Print.debug "BigLambdaTy: replacing %t by %t" (CoreTypes.TyParam.print typaram) (Types.print_target_ty ty2);
+      let sub = Substitution.add_type_substitution_e typaram ty2 in
+      (* v' = [T2/a]v *)
+      let v' = Substitution.apply_substitutions_to_expression sub v in
+      (* T1' = [T2/a]T1 *)
+      let ty1' = Substitution.apply_substitutions_to_type sub ty1 in
+      LetVal (v',(PVar fvar',ty1',cont))
+    | (BigLambdaDirt (dirtparam,v), TySchemeDirt (dirtparam',ty), ApplyDirtExp (_var,dirt)) ->
+      assert (dirtparam = dirtparam');
+      Print.debug "BigLambdaDirt: replacing %t by %t" (CoreTypes.DirtParam.print dirtparam) (Types.print_target_dirt dirt);
+      let sub = Substitution.add_dirt_substitution_e dirtparam dirt in
+      (* v' = [D/d]v *)
+      let v' = Substitution.apply_substitutions_to_expression sub v in
+      (* T' = [D/d]T *)
+      let ty' = Substitution.apply_substitutions_to_type sub ty in
+      LetVal (v',(PVar fvar',ty',cont))
+    | (BigLambdaSkel (skparam,v), TySchemeSkel (skparam',ty), ApplySkelExp (_var,sk)) ->
+      assert (skparam = skparam');
+      Print.debug "BigLambdaSkel: replacing %t by %t" (CoreTypes.SkelParam.print skparam) (Types.print_skeleton sk);
+      let sub = Substitution.add_skel_param_substitution_e skparam sk in
+      (* v' = [t/s]v *)
+      let v' = Substitution.apply_substitutions_to_expression sub v in
+      (* T' = [t/s]T *)
+      let ty' = Substitution.apply_substitutions_to_type sub ty in
+      LetVal (v',(PVar fvar',ty',cont))
+    | (LambdaTyCoerVar (coparam,_ct_ty,v), QualTy (_ct_ty',ty), ApplyTyCoercion (_var,tyco)) ->
+      assert (_ct_ty = _ct_ty');
+      Print.debug "LambdaTyCoerVar: replacing %t by %t" (CoreTypes.TyCoercionParam.print coparam) (Typed.print_ty_coercion tyco);
+      let sub = Substitution.add_type_coercion_e coparam tyco in
+      (* v' = [y/w]v *)
+      let v' = Substitution.apply_substitutions_to_expression sub v in
+      (* T' = [y/w]T *)
+      let ty' = Substitution.apply_substitutions_to_type sub ty in
+      LetVal (v',(PVar fvar',ty',cont))
+    | (LambdaDirtCoerVar (coparam,_ct_dirt,v), QualDirt (_ct_dirt',ty), ApplyDirtCoercion (_var,dco)) ->
+      assert (_ct_dirt = _ct_dirt');
+      Print.debug "LambdaDirtCoerVar: replacing %t by %t" (CoreTypes.DirtCoercionParam.print coparam) (Typed.print_dirt_coercion dco);
+      let sub = Substitution.add_dirt_var_coercion_e coparam dco in
+      (* v' = [y/w]v *)
+      let v' = Substitution.apply_substitutions_to_expression sub v in
+      (* T' = [y/w]T *)
+      let ty' = Substitution.apply_substitutions_to_type sub ty in
+      LetVal (v',(PVar fvar',ty',cont))
+    | _ -> 
+      (* This should not happen, it should be handled by the match in `specialize_letrec`. *)
+      failwith __LOC__
+  in
+  (* Gather and substitute specializations *)
+  Print.debug "SPEC: specializing a letrec";
+  let cont' = specialize_comp cont in
+  (* Prefix the new specializations as let-bindings for cont. *)
+  Assoc.fold_left subst_spec cont' !assoc
+
+(* Drop unused bindings *)
+let letrec_drop_unused_bindings (c:computation) : computation =
+  match c with
+  | LetRec (bindings,c1) -> (
+      (* Get the free variables (function defs are the first part of the tuple)*)
+      let (free_vars_c1,_) = Typed.free_vars_comp c1 in
+      let free_vars_bindings = List.map (fun (_,_,_,a) -> fst (free_vars_abs a)) bindings in
+      let free_vars = List.flatten (free_vars_c1 :: free_vars_bindings) in
+      let used_bindings = List.filter (fun (var,_,_,_) -> List.mem var free_vars) bindings
+      in
+      (* if no bindings used, leave this LetRec out *)
+      match used_bindings with
+      | [] ->
+        Print.debug "Dropping letrec bindings";
+        c1
+      | _  -> LetRec (used_bindings, c1)
+    )
+  | _ -> (
+      Print.debug "This function can only be applied on LetRecs";
+      failwith __LOC__
+    )
+
+
 let rec optimize_ty_coercion st tyco =
   reduce_ty_coercion st (optimize_sub_ty_coercion st tyco)
 
@@ -529,7 +837,9 @@ and reduce_comp st c =
   match c with
   | Value _ -> c
   | LetVal (e1, abs) -> beta_reduce st abs e1
-  | LetRec (bindings, c1) -> c
+  | LetRec (bs, cont) ->
+    let cont' = List.fold_left specialize_letrec cont bs in
+    letrec_drop_unused_bindings (LetRec (bs, cont'))
   | Match (e1, resTy, abstractions) -> c
   | Apply (e1, e2) -> (
     match e1 with
