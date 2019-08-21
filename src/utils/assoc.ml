@@ -3,7 +3,12 @@ open CoreUtils
 (** Association lists *)
 type ('key, 'value) t = ('key * 'value) list
 
-let rec empty = []
+let empty = []
+
+let is_empty = function
+  | [] -> true
+  | _ :: _ -> false
+
 
 (* Finding elements. *)
 let rec lookup x = function

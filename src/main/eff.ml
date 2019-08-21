@@ -6,6 +6,10 @@ let usage = "Usage: eff [option] ... [file] ..."
 
 type use_file = Run of string | Load of string | Compile of string
 
+module M = NoEffSyntax
+
+module Cmp = NoEffCompile
+
 let file_queue = ref []
 
 let enqueue_file filename = file_queue := filename :: !file_queue

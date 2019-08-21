@@ -1,6 +1,7 @@
 
 type ty =
   | TyVar of CoreTypes.TyParam.t
+  | TyApply of CoreTypes.TyName.t * ty list
   | TyTuple of ty list
   | TyBasic of Const.ty
   | TyArrow of ty * ty
@@ -28,7 +29,13 @@ type pattern =
 type term = 
   | Var of variable
   | Unit
+  | BuiltIn of string * int
+  | Const of Const.t
+  | Tuple of term list
+  | Record of (CoreTypes.Field.t, term) Assoc.t
+  | Variant of CoreTypes.Label.t * term
   | Lambda of abstraction_with_ty
+  | Effect of effect
   | Apply of term * term
   | BigLambdaTy of CoreTypes.TyParam.t * term
   | ApplyTy of term * ty
@@ -39,6 +46,7 @@ type term =
   | Handler of handler
   | Let of variable * term * term
   | Call of effect * term * abstraction_with_ty
+  | Op of effect * term
   | Do of variable * term * term
   | Handle of term * term
 

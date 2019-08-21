@@ -4,6 +4,8 @@ type ('key, 'v) t
 val empty : ('k, 'v) t
 (** The empty association list. *)
 
+val is_empty : ('k, 'v) t -> bool
+
 val lookup : 'k -> ('k, 'v) t -> 'v option
 (** [lookup k assoc] returns the most recent value associated with [k] in
     [assoc] if it exists. *)
