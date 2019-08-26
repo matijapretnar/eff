@@ -1005,7 +1005,8 @@ and tcMatch (inState : state) (lclCtxt : TypingEnv.t)
   let omegaScr, omegaCtScr = Typed.fresh_ty_coer (scrTy, patTy) in
 
   (* 6: Combine the results *)
-  let outExpr = Typed.Match (Typed.CastExp (trgScr, omegaScr), trgAlts, Location.unknown) in
+  (* STIEN: using the scr location here is a bit of a hack *)
+  let outExpr = Typed.Match (Typed.CastExp (trgScr, omegaScr), trgAlts, scr.at) in
   let outType = (alphaOut, deltaOut) in
   let outCs   = alphaOutSkel :: omegaCtScr :: cs1 @ cs2 in
   ((outExpr, outType), outCs)
