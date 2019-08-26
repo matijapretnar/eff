@@ -15,6 +15,8 @@ let lookup x state =
 
 exception PatternMatch
 
+exception ExhaustivenessCheck of Location.t
+
 let rec extend_value p v state =
   match (p, v) with
   | ExEff.PVar x, v -> update x v state
@@ -56,10 +58,10 @@ let rec ceval state c =
       | V.Closure f -> f v2
       | _ -> Error.runtime "Only functions can be applied." )
   | ExEff.Value e -> V.Value (veval state e)
-  | Typed.Match (e, cases) ->
+  | ExEff.Match (e, cases, loc) ->
       let v = veval state e in
       let rec eval_case = function
-        | [] -> Error.runtime "No branches succeeded in a pattern match."
+        | [] -> raise (ExhaustivenessCheck loc)
         | a :: lst -> (
             let p, c = a in
             try ceval (extend_value p v state) c with PatternMatch ->

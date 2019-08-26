@@ -420,7 +420,7 @@ and typeOfComputationTemp st = function
       and ty_in, ty_out = type_of_abstraction_with_ty st abs in
       assert (Types.types_are_equal t_v ty_in) ;
       ty_out
-  | Match (e, alist) -> (
+  | Match (e, alist, _) -> (
       let t_e = typeOfExpression st e in
       let ty_list = List.map (type_of_abstraction st t_e) alist in
       match ty_list with

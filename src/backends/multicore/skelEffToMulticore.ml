@@ -62,7 +62,7 @@ and of_computation : (SkelEff.e_computation -> Multicore.term) = function
       Multicore.Apply (handler', abs)
   | SkelEff.ECall (eff, exp, abs) -> failwith "SkelEff call"
   | SkelEff.EBind (c, abs) -> Multicore.Apply (Multicore.Lambda (of_abstraction abs), of_computation c) (* Meh? *)
-  | SkelEff.EMatch (e, abs_list) ->
+  | SkelEff.EMatch (e, abs_list, loc) ->
       let converter abs = Multicore.ValueClause (of_abstraction abs) in
       Multicore.Match (of_expression e, List.map converter abs_list)
   | SkelEff.ELetRec (abs_list, c) ->

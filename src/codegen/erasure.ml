@@ -89,10 +89,10 @@ and typed_to_erasure_comp sub tt =
       let c' = typed_to_erasure_comp sub c in
       let a' = typed_to_erasure_abs sub a in
       SkelEff.EBind (c', a')
-  | Typed.Match (e, alist) ->
+  | Typed.Match (e, alist, loc) ->
       let e' = typed_to_erasure_exp sub e in
       let alist' = List.map (typed_to_erasure_abs sub) alist in
-      SkelEff.EMatch (e', alist')
+      SkelEff.EMatch (e', alist', loc)
   | Typed.CastComp (c, _) -> typed_to_erasure_comp sub c
   | Typed.CastComp_ty (c, _) -> typed_to_erasure_comp sub c
   | Typed.CastComp_dirt (c, _) -> typed_to_erasure_comp sub c
