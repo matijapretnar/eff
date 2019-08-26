@@ -31,6 +31,8 @@ val replace : 'k -> 'v -> ('k, 'v) t -> ('k, 'v) t
 val remove : 'k -> ('k, 'v) t -> ('k, 'v) t
 (** [remove k assoc] removes the most recent association with [k]. *)
 
+val filter : ('k -> bool) -> ('k, 'v) t -> ('k, 'v) t
+
 val iter : ('k * 'v -> unit) -> ('k, 'v) t -> unit
 (** [iter f assoc] iterates the function [f] over all elements of [assoc]. *)
 

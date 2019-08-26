@@ -1,8 +1,8 @@
-(* Evaluation of the intermediate language, big step. *)
+(* Evaluation of ExEff, big step without intermediate SkelEff step. *)
 open CoreUtils
 module V = Value
-module Untyped = UntypedSyntax
 module RuntimeEnv = Map.Make (CoreTypes.Variable)
+module ExEff = Typed
 
 type state = Value.value RuntimeEnv.t
 
@@ -13,36 +13,35 @@ let update x = RuntimeEnv.add x
 let lookup x state =
   try Some (RuntimeEnv.find x state) with Not_found -> None
 
-exception PatternMatch of Location.t
+exception PatternMatch
+
+exception ExhaustivenessCheck of Location.t
 
 let rec extend_value p v state =
-  match (p.it, v) with
-  | Untyped.PVar x, v -> update x v state
-  | Untyped.PAnnotated (p, t), v -> extend_value p v state
-  | Untyped.PAs (p, x), v ->
+  match (p, v) with
+  | ExEff.PVar x, v -> update x v state
+  | ExEff.PAs (p, x), v ->
       let state = extend_value p v state in
       update x v state
-  | Untyped.PNonbinding, _ -> state
-  | Untyped.PTuple ps, Value.Tuple vs ->
+  | ExEff.PNonbinding, _ -> state
+  | ExEff.PTuple ps, Value.Tuple vs ->
       List.fold_right2 extend_value ps vs state
-  | Untyped.PRecord ps, Value.Record vs -> (
+  | ExEff.PRecord ps, Value.Record vs -> (
       let extender state (f, p) =
         match Assoc.lookup f vs with
         | None -> raise Not_found
         | Some v -> extend_value p v state
       in
       try Assoc.fold_left extender state ps with Not_found ->
-        raise (PatternMatch p.at) )
-  | Untyped.PVariant (lbl, None), Value.Variant (lbl', None) when lbl = lbl' ->
-      state
-  | Untyped.PVariant (lbl, Some p), Value.Variant (lbl', Some v)
+        raise (PatternMatch) )
+  | ExEff.PVariant (lbl, p), Value.Variant (lbl', Some v)
     when lbl = lbl' ->
       extend_value p v state
-  | Untyped.PConst c, Value.Const c' when Const.equal c c' -> state
-  | _, _ -> raise (PatternMatch p.at)
+  | ExEff.PConst c, Value.Const c' when Const.equal c c' -> state
+  | _, _ -> raise (PatternMatch)
 
 let extend p v state =
-  try extend_value p v state with PatternMatch loc ->
+  try extend_value p v state with PatternMatch ->
     Error.runtime "Pattern match failure."
 
 let rec sequence k = function
@@ -52,44 +51,49 @@ let rec sequence k = function
       V.Call (op, v, k'')
 
 let rec ceval state c =
-  let loc = c.at in
-  match c.it with
-  | Untyped.Apply (e1, e2) -> (
+  match c with
+  | ExEff.Apply (e1, e2) -> (
       let v1 = veval state e1 and v2 = veval state e2 in
       match v1 with
       | V.Closure f -> f v2
       | _ -> Error.runtime "Only functions can be applied." )
-  | Untyped.Value e -> V.Value (veval state e)
-  | Untyped.Match (e, cases) ->
+  | ExEff.Value e -> V.Value (veval state e)
+  | ExEff.Match (e, cases, loc) ->
       let v = veval state e in
       let rec eval_case = function
-        | [] -> Error.runtime "No branches succeeded in a pattern match."
+        | [] -> raise (ExhaustivenessCheck loc)
         | a :: lst -> (
             let p, c = a in
-            try ceval (extend_value p v state) c with PatternMatch _ ->
+            try ceval (extend_value p v state) c with PatternMatch ->
               eval_case lst )
       in
       eval_case cases
-  | Untyped.Handle (e, c) ->
+  | ExEff.Handle (e, c) ->
       let v = veval state e in
       let r = ceval state c in
       let h = V.to_handler v in
       h r
-  | Untyped.Let (lst, c) -> eval_let state lst c
-  | Untyped.LetRec (defs, c) ->
-      let state = extend_let_rec state (Assoc.of_list defs) in
+  | ExEff.LetVal (e, abs) -> eval_let state e abs
+  | ExEff.LetRec (defs, c) ->
+      let converter (var, _, _, c) = (var, c) in
+      let state = extend_let_rec state (Assoc.of_list (List.map converter defs)) in
       ceval state c
-  | Untyped.Check c ->
-      let r = ceval state c in
-      Print.check ~loc "%t" (Value.print_result r) ;
-      V.unit_result
+  | ExEff.Call ((eff, (_, _)), exp, (p, _, c)) ->
+      V.Call (eff, veval state exp, eval_closure state (p, c))
+  | ExEff.Op (eff, exp) -> failwith "ExEff op"
+  | ExEff.Bind (c, a) -> (
+      match (ceval state c) with
+      | V.Value v -> eval_closure state a v
+      | V.Call (eff, v, clo) -> sequence (eval_closure state a) (V.Call (eff, v, clo))
+      )
+  | ExEff.CastComp (c, _) -> ceval state c
+  | ExEff.CastComp_ty (c, _) -> ceval state c
+  | ExEff.CastComp_dirt (c, _) -> ceval state c
 
-and eval_let state lst c =
-  match lst with
-  | [] -> ceval state c
-  | (p, d) :: lst ->
-      let r = ceval state d in
-      sequence (fun v -> eval_let (extend p v state) lst c) r
+and eval_let state e (p, _, c) =
+  let v = veval state e in
+  let state' = extend p v state in
+  ceval state' c
 
 and extend_let_rec state defs =
   let state' = ref state in
@@ -105,42 +109,52 @@ and extend_let_rec state defs =
   state
 
 and veval state e =
-  match e.it with
-  | Untyped.Var x -> (
+  match e with
+  | ExEff.Var x -> (
     match lookup x state with
     | Some v -> v
     | None ->
         Error.runtime "Name %t is not defined." (CoreTypes.Variable.print x) )
-  | Untyped.Const c -> V.Const c
-  | Untyped.Annotated (t, ty) -> veval state t
-  | Untyped.Tuple es -> V.Tuple (List.map (veval state) es)
-  | Untyped.Record es -> V.Record (Assoc.map (fun e -> veval state e) es)
-  | Untyped.Variant (lbl, None) -> V.Variant (lbl, None)
-  | Untyped.Variant (lbl, Some e) -> V.Variant (lbl, Some (veval state e))
-  | Untyped.Lambda a -> V.Closure (eval_closure state a)
-  | Untyped.Effect eff ->
+  | ExEff.BuiltIn (_, _) -> failwith "Builtin not supported"
+  | ExEff.Const c -> V.Const c
+  | ExEff.Tuple es -> V.Tuple (List.map (veval state) es)
+  | ExEff.Record es -> V.Record (Assoc.map (fun e -> veval state e) es)
+  | ExEff.Variant (lbl, e) -> V.Variant (lbl, Some (veval state e))
+  | ExEff.Lambda (p, _, c) -> V.Closure (eval_closure state (p, c))
+  | ExEff.Effect (eff, (_, _)) ->
       V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
-  | Untyped.Handler h -> V.Handler (eval_handler state h)
+  | ExEff.Handler h -> V.Handler (eval_handler state h)
+  | ExEff.BigLambdaTy (_, _, e) -> veval state e
+  | ExEff.BigLambdaDirt (_, e) -> veval state e
+  | ExEff.BigLambdaSkel (_, e) -> veval state e
+  | ExEff.CastExp (e, _) -> veval state e
+  | ExEff.ApplyTyExp (e, _) -> veval state e
+  | ExEff.LambdaTyCoerVar (_, _, e) -> veval state e
+  | ExEff.LambdaDirtCoerVar (_, _, e) -> veval state e
+  | ExEff.ApplyDirtExp (e, _) -> veval state e
+  | ExEff.ApplySkelExp (e, _) -> veval state e
+  | ExEff.ApplyTyCoercion (e, _) -> veval state e
+  | ExEff.ApplyDirtCoercion (e, _) -> veval state e
 
 and eval_handler state
-    { Untyped.effect_clauses= ops
-    ; Untyped.value_clause= value
-    ; Untyped.finally_clause= fin } =
+    { ExEff.effect_clauses= ops
+    ; ExEff.value_clause= (pat, _, com) } =
   let eval_op a2 =
     let p, kvar, c = a2 in
     let f u k = eval_closure (extend kvar (V.Closure k) state) (p, c) u in
     f
   in
   let ops = Assoc.map eval_op ops in
+  let check_effect x = function (e, (_, _)) -> e = x in
   let rec h = function
-    | V.Value v -> eval_closure state value v
+    | V.Value v -> eval_closure state (pat, com) v
     | V.Call (eff, v, k) -> (
         let k' u = h (k u) in
-        match Assoc.lookup eff ops with
-        | Some f -> f v k'
-        | None -> V.Call (eff, v, k') )
+        match Assoc.to_list (Assoc.filter (check_effect eff) ops) with
+        | (_, f) :: rest -> f v k'
+        | [] -> V.Call (eff, v, k') )
   in
-  fun r -> sequence (eval_closure state fin) (h r)
+  h
 
 and eval_closure state a v =
   let p, c = a in

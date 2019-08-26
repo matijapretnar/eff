@@ -1,8 +1,7 @@
-(* Evaluation of the intermediate language, big step. *)
+(* Evaluation of ExEff, big step via SkelEff. *)
 open CoreUtils
-module Core = UntypedSyntax
 module Multicore = MulticoreSyntax
-module FromUntyped = UntypedToMulticore
+module FromSkelEff = SkelEffToMulticore
 
 module type BackendParameters = sig
   val output_file : string
@@ -288,7 +287,9 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
   let process_computation state c ty =
-    let t = FromUntyped.of_computation c in
+    (* Erasure ExEff -> SkelEff *)
+    let c' = Erasure.typed_to_erasure_comp Assoc.empty c in
+    let t = FromSkelEff.of_computation c' in
     update state
       (translate state_ppf
          "let _ = @.@[<hv>(_ocaml_tophandler) (fun _ -> @,%t@,)@];;@."
@@ -300,14 +301,15 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     state
 
   let process_def_effect state (eff, (ty1, ty2)) =
-    let ty1' = FromUntyped.of_type ty1 in
-    let ty2' = FromUntyped.of_type ty2 in
+    let ty1' = FromSkelEff.of_type ty1 in
+    let ty2' = FromSkelEff.of_type ty2 in
     let translation = translate_def_effect (eff, (ty1', ty2')) state_ppf in
     update state translation
 
   let process_top_let state defs vars =
     let converter (p, c) =
-      (FromUntyped.of_pattern p, FromUntyped.of_computation c)
+      (FromSkelEff.of_pattern (Erasure.typed_to_erasure_pattern p),
+        FromSkelEff.of_computation (Erasure.typed_to_erasure_comp Assoc.empty c))
     in
     let defs' = List.map converter defs in
     let translation = translate_top_let defs' state_ppf in
@@ -315,7 +317,8 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
 
   let process_top_let_rec state defs vars =
     let converter (p, c) =
-      (FromUntyped.of_pattern p, FromUntyped.of_computation c)
+      (FromSkelEff.of_pattern (Erasure.typed_to_erasure_pattern p),
+        FromSkelEff.of_computation (Erasure.typed_to_erasure_comp Assoc.empty c))
     in
     let defs' = Assoc.map converter defs |> Assoc.to_list in
     let translation = translate_top_let_rec defs' state_ppf in
@@ -336,7 +339,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
         update state translation
 
   let process_tydef state tydefs =
-    let converter (ty_params, tydef) = (ty_params, FromUntyped.of_tydef tydef) in
+    let converter (ty_params, tydef) = (ty_params, FromSkelEff.of_tydef tydef) in
     let tydefs' = Assoc.map converter tydefs |> Assoc.to_list in
     let translation = translate_tydefs tydefs' state_ppf in
     update state translation

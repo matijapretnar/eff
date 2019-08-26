@@ -89,10 +89,10 @@ and typed_to_erasure_comp sub tt =
       let c' = typed_to_erasure_comp sub c in
       let a' = typed_to_erasure_abs sub a in
       SkelEff.EBind (c', a')
-  | Typed.Match (e, alist) ->
+  | Typed.Match (e, alist, loc) ->
       let e' = typed_to_erasure_exp sub e in
       let alist' = List.map (typed_to_erasure_abs sub) alist in
-      SkelEff.EMatch (e', alist')
+      SkelEff.EMatch (e', alist', loc)
   | Typed.CastComp (c, _) -> typed_to_erasure_comp sub c
   | Typed.CastComp_ty (c, _) -> typed_to_erasure_comp sub c
   | Typed.CastComp_dirt (c, _) -> typed_to_erasure_comp sub c
@@ -120,5 +120,8 @@ and typed_to_erasure_abs_2 sub (e_p1, e_p2, e_c) =
 and typed_to_erasure_pattern = function
   | Typed.PVar x -> SkelEff.PEVar x
   | Typed.PAs (p, x) -> SkelEff.PEAs (typed_to_erasure_pattern p, x)
-  | Typed.PNonbinding -> SkelEff.PENonbinding
+  | Typed.PTuple ps -> SkelEff.PETuple (List.map typed_to_erasure_pattern ps)
+  | Typed.PRecord ass -> SkelEff.PERecord (Assoc.map typed_to_erasure_pattern ass)
+  | Typed.PVariant (lbl, p) -> SkelEff.PEVariant (lbl, typed_to_erasure_pattern p)
   | Typed.PConst const -> SkelEff.PEConst const
+  | Typed.PNonbinding -> SkelEff.PENonbinding

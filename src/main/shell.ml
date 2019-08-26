@@ -3,7 +3,6 @@ module TypeSystem = SimpleInfer
 module EffectSystem = ExplicitInfer
 
 (* GEORGE: IMPORT JUST TO FORCE COMPILATION *)
-module TestD = Erasure
 module TestA = SkelEffToMulticore
 module TestB = UntypedToMulticore
 module TestC = SkelEffSyntax
@@ -57,7 +56,7 @@ module Make (Backend : BackendSignature.T) = struct
         Print.debug "exec_cmd: after backend typechecking";
 
         let backend_state' =
-          Backend.process_computation state.backend_state c drty
+          Backend.process_computation state.backend_state c' drty
         in
         { state with
           type_system_state= type_system_state'
@@ -71,8 +70,9 @@ module Make (Backend : BackendSignature.T) = struct
           ExplicitInfer.tcTopLevelMono ~loc:c.at state.effect_system_state c
         in
         let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
+
         let backend_state' =
-          Backend.process_type_of state.backend_state c drty
+          Backend.process_type_of state.backend_state c' drty
         in
         { state with
           type_system_state= type_system_state'
@@ -109,7 +109,8 @@ module Make (Backend : BackendSignature.T) = struct
         Backend.finalize state.backend_state ;
         exit 0
     | Commands.Use filename -> execute_file filename state
-    | Commands.TopLet defs ->
+    | Commands.TopLet defs -> Print.debug "ignoring top let binding"; state
+        (*
         let desugarer_state', defs' =
           Desugarer.desugar_top_let state.desugarer_state defs
         in
@@ -122,8 +123,9 @@ module Make (Backend : BackendSignature.T) = struct
         { state with
           desugarer_state= desugarer_state'
         ; type_system_state= type_system_state'
-        ; backend_state= backend_state' }
-    | Commands.TopLetRec defs ->
+        ; backend_state= backend_state' } *)
+    | Commands.TopLetRec defs -> Print.debug "ignoring top let rec binding"; state
+        (*
         let desugarer_state', defs' =
           Desugarer.desugar_top_let_rec state.desugarer_state defs
         in
@@ -137,7 +139,7 @@ module Make (Backend : BackendSignature.T) = struct
         { state with
           desugarer_state= desugarer_state'
         ; type_system_state= type_system_state'
-        ; backend_state= backend_state' }
+        ; backend_state= backend_state' } *)
     | Commands.External ext_def ->
         let desugarer_state', (x, ty, f) =
           Desugarer.desugar_external state.desugarer_state ext_def

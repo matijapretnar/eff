@@ -18,11 +18,7 @@ and of_pattern : (SkelEff.e_pattern -> Multicore.pattern) = function
   | SkelEff.PEAs (p, v) -> Multicore.PAs (of_pattern p, v)
   | SkelEff.PETuple ps -> Multicore.PTuple (List.map of_pattern ps)
   | SkelEff.PERecord ass -> Multicore.PRecord (Assoc.map of_pattern ass)
-  | SkelEff.PEVariant (l, p) -> (
-    match p with
-    | None -> Multicore.PVariant (l, None)
-    | Some p -> Multicore.PVariant (l, Some (of_pattern p))
-    )
+  | SkelEff.PEVariant (l, p) -> Multicore.PVariant (l, Some (of_pattern p))
   | SkelEff.PEConst c -> Multicore.PConst c
   | SkelEff.PENonbinding -> Multicore.PNonbinding
 
@@ -66,7 +62,28 @@ and of_computation : (SkelEff.e_computation -> Multicore.term) = function
       Multicore.Apply (handler', abs)
   | SkelEff.ECall (eff, exp, abs) -> failwith "SkelEff call"
   | SkelEff.EBind (c, abs) -> Multicore.Apply (Multicore.Lambda (of_abstraction abs), of_computation c) (* Meh? *)
-  | SkelEff.EMatch (e, abs_list) ->
+  | SkelEff.EMatch (e, abs_list, loc) ->
       let converter abs = Multicore.ValueClause (of_abstraction abs) in
       Multicore.Match (of_expression e, List.map converter abs_list)
-  | SkelEff.ELetRec (es, c) -> failwith "Need to fix this in the ExplicitInfer step, so ExEff and SkelEff use absstractions instead of expressions"
+  | SkelEff.ELetRec (abs_list, c) ->
+      let converter (var, _, _, abs) = (var, of_abstraction abs) in
+      Multicore.LetRec (List.map converter abs_list, of_computation c)
+
+(* Types *)
+and of_type = function
+  | Type.Apply (name, tys) -> Multicore.TyApply (name, List.map of_type tys)
+  | Type.TyParam ty_param -> Multicore.TyParam ty_param
+  | Type.Basic s -> Multicore.TyBasic s
+  | Type.Tuple tys -> Multicore.TyTuple (List.map of_type tys)
+  | Type.Arrow (ty1, ty2) -> Multicore.TyArrow (of_type ty1, of_type ty2)
+  | Type.Handler {value; finally} ->
+      (* Non-trivial case *)
+      Multicore.TyArrow (Multicore.TyArrow (of_type Type.unit_ty, of_type value), of_type finally)
+
+(* Type definitions *)
+and of_tydef = function
+  | Tctx.Record assoc -> Multicore.TyDefRecord (Assoc.map of_type assoc)
+  | Tctx.Sum assoc ->
+      let converter = function None -> None | Some ty -> Some (of_type ty) in
+      Multicore.TyDefSum (Assoc.map converter assoc)
+  | Tctx.Inline ty -> Multicore.TyDefInline (of_type ty)

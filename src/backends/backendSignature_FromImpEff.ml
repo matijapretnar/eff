@@ -1,7 +1,7 @@
-module ExEff = Typed
-module TypeSystem = SimpleInfer
-(* STIEN: Supposed to eventually not use this anymore, now used for top let (rec) *)
+(* STIEN: This exists just for the sake of the whole compiler type-checking until the interpreter (Runtime backend) supports SkelEff *)
+
 module CoreSyntax = UntypedSyntax
+module TypeSystem = SimpleInfer
 
 module type T = sig
   type state
@@ -10,13 +10,13 @@ module type T = sig
 
   val process_computation :
        state
-    -> ExEff.computation
+    -> CoreSyntax.computation
     -> Types.target_dirty
     -> state
 
   val process_type_of :
        state
-    -> ExEff.computation
+    -> CoreSyntax.computation
     -> Types.target_dirty
     -> state
 
@@ -25,13 +25,13 @@ module type T = sig
 
   val process_top_let :
        state
-    -> (ExEff.pattern * ExEff.computation) list
+    -> (CoreSyntax.pattern * CoreSyntax.computation) list
     -> (CoreTypes.Variable.t * TypeSystem.Ctx.ty_scheme) list
     -> state
 
   val process_top_let_rec :
        state
-    -> (ExEff.variable, ExEff.abstraction) Assoc.t
+    -> (CoreSyntax.variable, CoreSyntax.abstraction) Assoc.t
     -> (CoreTypes.Variable.t * TypeSystem.Ctx.ty_scheme) list
     -> state
 

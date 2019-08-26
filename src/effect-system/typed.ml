@@ -104,7 +104,7 @@ and computation =
      abstraction is explicit) and thus makes translation to MulticoreOcaml
      impossible in the general case.
   *)
-  | Match of expression * abstraction list
+  | Match of (expression * abstraction list * Location.t)
   | Apply of expression * expression
   | Handle of expression * computation
   | Call of effect * expression * abstraction_with_ty
@@ -362,10 +362,10 @@ and print_computation ?max_level c ppf =
         (print_expression ~max_level:1 e1)
         (print_expression ~max_level:0 e2)
   | Value e -> print ~at_level:1 "value (%t)" (print_expression ~max_level:0 e)
-  | Match (e, []) ->
+  | Match (e, [], _) ->
       print ~at_level:2 "(match %t with _ -> assert false)"
         (print_expression e)
-  | Match (e, lst) ->
+  | Match (e, lst, _) ->
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e)
         (Print.cases print_abstraction lst)
   | Handle (e, c) ->
@@ -618,7 +618,7 @@ and refresh_comp sbst = function
       in
       LetRec (li', refresh_comp sbst' c1)
 
-  | Match (e, li) -> Match (refresh_expr sbst e, List.map (refresh_abs sbst) li)
+  | Match (e, li, loc) -> Match (refresh_expr sbst e, List.map (refresh_abs sbst) li, loc)
   | Apply (e1, e2) -> Apply (refresh_expr sbst e1, refresh_expr sbst e2)
   | Handle (e, c) -> Handle (refresh_expr sbst e, refresh_comp sbst c)
   | Call (eff, e, a) ->
@@ -687,7 +687,7 @@ and subst_comp sbst = function
           li
       in
       LetRec (li', subst_comp sbst c1)
-  | Match (e, li) -> Match (subst_expr sbst e, List.map (subst_abs sbst) li)
+  | Match (e, li, loc) -> Match (subst_expr sbst e, List.map (subst_abs sbst) li, loc)
   | Apply (e1, e2) -> Apply (subst_expr sbst e1, subst_expr sbst e2)
   | Handle (e, c) -> Handle (subst_expr sbst e, subst_comp sbst c)
   | Call (eff, e, a) -> Call (eff, subst_expr sbst e, subst_abs_with_ty sbst a)
@@ -773,7 +773,7 @@ and alphaeq_comp eqvars c c' =
       alphaeq_comp eqvars c1 c1' && alphaeq_abs eqvars c2 c2'
   | LetRec (li, c1), LetRec (li', c1') -> (* XXX Not yet implemented *)
                                           false
-  | Match (e, li), Match (e', li') ->
+  | Match (e, li, loc), Match (e', li', loc') ->
       alphaeq_expr eqvars e e' && List.for_all2 (alphaeq_abs eqvars) li li'
   | Apply (e1, e2), Apply (e1', e2') ->
       alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2'
@@ -876,7 +876,7 @@ let rec free_vars_comp c =
           li ([], free_vars_comp c1)
       in
       vars --- xs
-  | Match (e, li) ->
+  | Match (e, li, loc) ->
       free_vars_expr e @@@ concat_vars (List.map free_vars_abs li)
   | Apply (e1, e2) -> free_vars_expr e1 @@@ free_vars_expr e2
   | Handle (e, c1) -> free_vars_expr e @@@ free_vars_comp c1
@@ -1140,7 +1140,7 @@ and free_dirt_vars_computation c =
           (fdvsOfTargetCmpTy resTy))
         (free_dirt_vars_abstraction abs)
       |> Types.DirtParamSet.union (free_dirt_vars_computation c)
-  | Match (e, cases) ->
+  | Match (e, cases, loc) ->
       List.fold_left
         (fun free case ->
           DirtParamSet.union free (free_dirt_vars_abstraction case) )
