@@ -22,6 +22,9 @@ type n_term =
   | NCall of n_effect * n_term * n_abstraction_with_type
   | NBind of n_term * n_abstraction
   | NHandle of n_term * n_term
+  | NBuiltIn of string * int
+  | NConst of Const.t
+  | NEffect of n_effect
 
 and n_handler = 
   { effect_clauses: (n_effect, n_abstraction_2_args) Assoc.t
