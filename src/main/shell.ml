@@ -6,6 +6,7 @@ module EffectSystem = ExplicitInfer
 module TestA = SkelEffToMulticore
 module TestB = UntypedToMulticore
 module TestC = SkelEffSyntax
+module TestD = NoEffSyntax
 
 module type Shell = sig
   type state
