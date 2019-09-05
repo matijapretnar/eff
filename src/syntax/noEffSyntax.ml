@@ -35,6 +35,10 @@ and n_type =
   | NTyQual of n_coerty * n_type
   | NTyComp of n_type
   | NTyForall of CoreTypes.TyParam.t * n_type
+  | NTyApply of CoreTypes.TyName.t * n_type list
+  | NTyPrim of prim_ty
+
+and prim_ty = NInt | NBool | NString | NFloat
 
 and n_abstraction = (n_term * n_term)
 and n_abstraction_with_type = (n_term * n_type * n_term)
