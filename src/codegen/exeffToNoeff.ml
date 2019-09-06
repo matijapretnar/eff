@@ -52,11 +52,26 @@ and value_elab v =
   | ExEff.Const c -> NoEff.NConst c
   | ExEff.Tuple vs -> NoEff.NTuple (List.map value_elab vs)
   | ExEff.Lambda (p, t, c) -> NoEff.NFun (pattern_elab p, type_elab t, comp_elab c)
-  | ExEff.Effect (e, _) -> NoEff.NEffect e
+  | ExEff.Effect (e, (t1, t2)) -> NoEff.NEffect (e, (type_elab t1, type_elab t2))
+  (* STIEN This does not correspond the paper yet *)
   | ExEff.Handler h ->
-      let (p, t, c) = h.value_clause in
-      let elab_effect_clause ((eff, _), (p1, p2, comp)) = (eff, (pattern_elab p1, pattern_elab p2, comp_elab comp)) in
-      {return_clause= (pattern_elab p, type_elab t, comp_elab c);
-	effect_clauses= List.map elab_effect_clause h.effect_clauses}
+    let (p, t, c) = h.value_clause in
+    let elab_effect_clause ((eff, (ty1, ty2)), (p1, p2, comp)) = ((eff, (type_elab ty1, type_elab ty2)), (pattern_elab p1, pattern_elab p2, comp_elab comp)) in
+    NHandler {return_clause= (pattern_elab p, type_elab t, comp_elab c);
+	effect_clauses= (Assoc.map_of_list elab_effect_clause (Assoc.to_list h.effect_clauses))}
+  | ExEff.BigLambdaTy (par, skel, value) -> NoEff.NBigLambdaTy (par, value_elab value)
+  | ExEff.BigLambdaDirt (par, value) -> value_elab value
+  | ExEff.BigLambdaSkel (par, value) -> value_elab value
+  | ExEff.CastExp (value, coer) -> NoEff.NCast (value_elab value, coercion_elab coer)
+  | ExEff.ApplyTyExp (value, ty) -> NoEff.NTyAppl (value_elab value, type_elab ty)
+  | ExEff.LambdaTyCoerVar (par, (ty1, ty2), value) -> 
+    NoEff.NBigLambdaCoer (par, (type_elab ty1, type_elab ty2), value_elab value)
+  | ExEff.LambdaDirtCoerVar (_, _, value) -> value_elab value
+  | ExEff.ApplyDirtExp (value, dirt) -> failwith "STIEN: Need dirt instantiation for this"
+  | ExEff.ApplySkelExp (value, skel) -> value_elab value
+  | ExEff.ApplyTyCoercion (value, coer) -> NoEff.NApplyCoer (value_elab value, coercion_elab coer)
+  | ExEff.ApplyDirtCoercion (value, _) -> value_elab value
 
+and coercion_elab = failwith "TODO"
+ 
 and comp_elab c = failwith "TODO"

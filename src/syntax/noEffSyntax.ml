@@ -4,9 +4,9 @@ module Variable = Symbol.Make (Symbol.String)
 
 type variable = Variable.t
 
-type n_effect = CoreTypes.Effect.t
+type n_effect = CoreTypes.Effect.t * (n_type * n_type)
 
-type n_term =
+and n_term =
   | NVar of variable
   | NAs of n_term * variable
   | NTuple of n_term list
@@ -169,7 +169,7 @@ and print_effect_clauses eff_clauses ppf =
         (print_abstraction2 a2)
         (print_effect_clauses cases)
 
-and print_effect eff ppf =
+and print_effect (eff, _) ppf =
   Print.print ppf "Effect_%t" (CoreTypes.Effect.print eff)
 
 and print_abstraction (t1, t2) ppf =
