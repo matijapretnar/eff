@@ -41,6 +41,8 @@ and ct_dirt = (dirt * dirt)
 
 and ct_dirty = (target_dirty * target_dirty)
 
+let is_empty_dirt dirt = EffectSet.is_empty dirt.effect_set && dirt.row = EmptyRow
+
 let rec print_target_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with

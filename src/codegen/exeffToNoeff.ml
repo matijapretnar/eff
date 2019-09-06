@@ -92,7 +92,9 @@ and comp_elab c =
   | ExEff.Call ((eff, (ty1, ty2)), value, (p, ty, comp)) ->
     NoEff.NCall ((eff, (type_elab ty1, type_elab ty2)), value_elab value, (pattern_elab p, type_elab ty, comp_elab comp))
   | ExEff.Op ((eff, (ty1, ty2)), value) -> NoEff.NOp ((eff, (type_elab ty1, type_elab ty2)), value_elab value)
-  | ExEff.Bind (c1, (p, c2)) -> failwith "TODO"
+  (* STIEN: This does not correspond to the paper either *)
+  | ExEff.Bind (c1, (p, c2)) ->
+    NoEff.NBind (comp_elab c1, (pattern_elab p, comp_elab c2))
   | ExEff.CastComp (comp, coer) -> NoEff.NCast (comp_elab comp, coercion_elab_dirty coer)
   | ExEff.CastComp_ty (comp, coer) -> NoEff.NCast (comp_elab comp, coercion_elab_ty coer)
   | ExEff.CastComp_dirt (comp, _) -> comp_elab comp

@@ -85,6 +85,7 @@ let rec print_term ?max_level t ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match t with
   | NVar x -> print "%t" (print_variable x)
+  | NAs (t, var) -> print "As %t = %t" (print_variable var) (print_term t)
   | NTuple ts -> Print.tuple print_term ts ppf
   | NFun abs -> print_abstraction_with_type abs ppf
   | NApplyTerm (t1, t2) -> print ~at_level:1 "((%t)@ (%t))"
@@ -125,6 +126,25 @@ let rec print_term ?max_level t ppf =
         print ~at_level:1 "handle %t %t"
         (print_term ~max_level:0 t)
         (print_term ~max_level:0 h)
+  | NBuiltIn (s, i) -> print "%s %i" s i 
+  | NConst c -> Const.print c ppf
+  | NEffect (eff, (ty1, ty2)) -> print "Effect %t : %t %t" (CoreTypes.Effect.print eff) (print_type ty1) (print_type ty2)
+  | NNonBinding -> print "_"
+  | NLetRec (lst, t) ->
+        print ~at_level:2 "let rec @[<hov>%t@] in %t"
+        (Print.sequence " and " print_let_rec_abstraction lst)
+        (print_term t)
+  | NMatch (t, lst, _) ->
+        print ~at_level:2 "(match %t with @[<v>| %t@])" (print_term t)
+        (Print.cases print_abstraction lst)
+  | NOp (eff, t) -> print "Op %t %t" (print_effect eff) (print_term t)
+
+and print_let_rec_abstraction (f, arg_ty, res_ty, abs) ppf =
+  Format.fprintf ppf "(%t : %t) %t"
+    (print_variable f) (print_type (NTyArrow (arg_ty,res_ty))) (print_let_abstraction abs)
+
+and print_let_abstraction (t1, t2) ppf =
+  Format.fprintf ppf "%t = %t" (print_term t1) (print_term t2)
 
 and print_coercion ?max_level coer ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -159,6 +179,17 @@ and print_type ?max_level ty ppf =
   | NTyQual (coerty, t) -> print "%t => %t" (print_coerty coerty) (print_type t)
   | NTyComp t -> print "Comp %t" (print_type t)
   | NTyForall (x, t) -> print "forall %t. %t" (CoreTypes.TyParam.print x) (print_type t)
+  | NTyApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
+  | NTyApply (t, [s]) ->
+      print ~at_level:1 "%t %t" (print_type ~max_level:1 s) (CoreTypes.TyName.print t)
+  | NTyApply (t, ts) ->
+      print ~at_level:1 "(%t) %t" (Print.sequence ", " print_type ts) (CoreTypes.TyName.print t)
+  | NTyPrim t ->
+    match t with
+    | NInt -> print "Int"
+    | NBool -> print "Bool"
+    | NString -> print "String"
+    | NFloat -> print "Float"
 
 and print_coerty ?max_level (t1, t2) ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
