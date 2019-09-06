@@ -8,8 +8,9 @@ type n_effect = CoreTypes.Effect.t
 
 type n_term =
   | NVar of variable
+  | NAs of n_term * variable
   | NTuple of n_term list
-  | NFun of n_abstraction_with_type 
+  | NFun of n_abstraction_with_type
   | NApplyTerm of n_term * n_term
   | NBigLambdaTy of CoreTypes.TyParam.t * n_term
   | NTyAppl of n_term * n_type
@@ -25,12 +26,13 @@ type n_term =
   | NBuiltIn of string * int
   | NConst of Const.t
   | NEffect of n_effect
+  | NNonBinding
 
-and n_handler = 
+and n_handler =
   { effect_clauses: (n_effect, n_abstraction_2_args) Assoc.t
   ; return_clause: n_abstraction_with_type }
 
-and n_type = 
+and n_type =
   | NTyParam of CoreTypes.TyParam.t
   | NTyTuple of n_type list
   | NTyArrow of n_type * n_type
@@ -89,8 +91,8 @@ let rec print_term ?max_level t ppf =
   | NTyAppl (t, ty) -> print ~at_level:1 "((%t)@ (%t))"
         (print_term ~max_level:1 t)
         (print_type ~max_level:0 ty)
-  | NBigLambdaCoer (x, coerty, t) -> 
-        print "/\\%t : %t. %t " (CoreTypes.TyCoercionParam.print x) 
+  | NBigLambdaCoer (x, coerty, t) ->
+        print "/\\%t : %t. %t " (CoreTypes.TyCoercionParam.print x)
           (print_coerty coerty)
           (print_term t)
   | NApplyCoer (t, coer) -> print ~at_level:1 "((%t)@ (%t))"
@@ -143,7 +145,7 @@ and print_coercion ?max_level coer ppf =
   | NCoerRightHandler c -> print "right %t" (print_coercion c)
   | NCoerPure c -> print "pure %t" (print_coercion c)
 
-and print_type ?max_level ty ppf = 
+and print_type ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
   | NTyParam x -> CoreTypes.TyParam.print x ppf
@@ -154,7 +156,7 @@ and print_type ?max_level ty ppf =
   | NTyComp t -> print "Comp %t" (print_type t)
   | NTyForall (x, t) -> print "forall %t. %t" (CoreTypes.TyParam.print x) (print_type t)
 
-and print_coerty ?max_level (t1, t2) ppf = 
+and print_coerty ?max_level (t1, t2) ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   print "%t <= %t" (print_type t1) (print_type t2)
 
@@ -167,7 +169,7 @@ and print_effect_clauses eff_clauses ppf =
         (print_abstraction2 a2)
         (print_effect_clauses cases)
 
-and print_effect eff ppf = 
+and print_effect eff ppf =
   Print.print ppf "Effect_%t" (CoreTypes.Effect.print eff)
 
 and print_abstraction (t1, t2) ppf =
@@ -182,5 +184,3 @@ and print_abstraction_with_type (t1, ty, t2) ppf =
   Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_term t1)
     (print_type ty)
     (print_term t2)
-
-
