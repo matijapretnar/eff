@@ -19,7 +19,7 @@ and n_term =
   | NCast of n_term * n_coercion
   | NReturn of n_term
   | NHandler of n_handler
-  | NLet of n_term * n_term * n_term
+  | NLet of n_term * n_abstraction_with_type
   | NCall of n_effect * n_term * n_abstraction_with_type
   | NBind of n_term * n_abstraction
   | NHandle of n_term * n_term
@@ -27,6 +27,9 @@ and n_term =
   | NConst of Const.t
   | NEffect of n_effect
   | NNonBinding
+  | NLetRec of n_letrec_abstraction list * n_term
+  | NMatch of n_term * n_abstraction list * Location.t
+  | NOp of n_effect * n_term
 
 and n_handler =
   { effect_clauses: (n_effect, n_abstraction_2_args) Assoc.t
@@ -48,6 +51,7 @@ and prim_ty = NInt | NBool | NString | NFloat
 and n_abstraction = (n_term * n_term)
 and n_abstraction_with_type = (n_term * n_type * n_term)
 and n_abstraction_2_args = (n_term * n_term * n_term)
+and n_letrec_abstraction = (variable * n_type * n_type * n_abstraction)
 
 and n_coerty = n_type * n_type
 
@@ -106,8 +110,8 @@ let rec print_term ?max_level t ppf =
         "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->\n             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
         (print_abstraction_with_type h.return_clause)
         (print_effect_clauses (Assoc.to_list h.effect_clauses))
-  | NLet (t1, t2, t3) ->
-        print "let (%t = (%t)) in (%t)" (print_term t1) (print_term t2)
+  | NLet (t1, (t2, _, t3)) ->
+        print "let (%t = (%t)) in (%t)" (print_term t2) (print_term t1)
         (print_term t3)
   | NCall (eff, t, abs) ->
         print ~at_level:1 "call (%t) (%t) ((@[fun %t@]))" (print_effect eff)

@@ -62,16 +62,37 @@ and value_elab v =
   | ExEff.BigLambdaTy (par, skel, value) -> NoEff.NBigLambdaTy (par, value_elab value)
   | ExEff.BigLambdaDirt (par, value) -> value_elab value
   | ExEff.BigLambdaSkel (par, value) -> value_elab value
-  | ExEff.CastExp (value, coer) -> NoEff.NCast (value_elab value, coercion_elab coer)
+  | ExEff.CastExp (value, coer) -> NoEff.NCast (value_elab value, coercion_elab_ty coer)
   | ExEff.ApplyTyExp (value, ty) -> NoEff.NTyAppl (value_elab value, type_elab ty)
   | ExEff.LambdaTyCoerVar (par, (ty1, ty2), value) -> 
     NoEff.NBigLambdaCoer (par, (type_elab ty1, type_elab ty2), value_elab value)
   | ExEff.LambdaDirtCoerVar (_, _, value) -> value_elab value
   | ExEff.ApplyDirtExp (value, dirt) -> failwith "STIEN: Need dirt instantiation for this"
   | ExEff.ApplySkelExp (value, skel) -> value_elab value
-  | ExEff.ApplyTyCoercion (value, coer) -> NoEff.NApplyCoer (value_elab value, coercion_elab coer)
+  | ExEff.ApplyTyCoercion (value, coer) -> NoEff.NApplyCoer (value_elab value, coercion_elab_ty coer)
   | ExEff.ApplyDirtCoercion (value, _) -> value_elab value
 
-and coercion_elab = failwith "TODO"
+and coercion_elab_ty = failwith "TODO"
+
+and coercion_elab_dirty = failwith "TODO"
  
-and comp_elab c = failwith "TODO"
+and comp_elab c = 
+  match c with 
+  | ExEff.Value value -> value_elab value
+  | ExEff.LetVal (value, (pat, ty, comp)) -> NLet (value_elab value, (pattern_elab pat, type_elab ty, comp_elab comp))
+  | ExEff.LetRec (abs_list, comp) ->
+    let letrec_elab (var, ty1, ty2, (p, cc)) = (var, type_elab ty1, dirty_elab ty2, (pattern_elab p, comp_elab cc)) in
+    NoEff.NLetRec (List.map letrec_elab abs_list, comp_elab comp)
+  | ExEff.Match (value, abs_lst, loc) ->
+    let elab_abs (p, c) = (pattern_elab p, comp_elab c) in
+    NoEff.NMatch (value_elab value, List.map elab_abs abs_lst, loc)
+  | ExEff.Apply (v1, v2) -> NoEff.NApplyTerm (value_elab v1, value_elab v2)
+  (* STIEN: This does also not follow the paper yet *)
+  | ExEff.Handle (value, comp) -> NoEff.NHandle (comp_elab comp, value_elab value)
+  | ExEff.Call ((eff, (ty1, ty2)), value, (p, ty, comp)) ->
+    NoEff.NCall ((eff, (type_elab ty1, type_elab ty2)), value_elab value, (pattern_elab p, type_elab ty, comp_elab comp))
+  | ExEff.Op ((eff, (ty1, ty2)), value) -> NoEff.NOp ((eff, (type_elab ty1, type_elab ty2)), value_elab value)
+  | ExEff.Bind (c1, (p, c2)) -> failwith "TODO"
+  | ExEff.CastComp (comp, coer) -> NoEff.NCast (comp_elab comp, coercion_elab_dirty coer)
+  | ExEff.CastComp_ty (comp, coer) -> NoEff.NCast (comp_elab comp, coercion_elab_ty coer)
+  | ExEff.CastComp_dirt (comp, _) -> comp_elab comp
