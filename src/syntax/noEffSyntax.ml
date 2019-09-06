@@ -19,7 +19,7 @@ and n_term =
   | NCast of n_term * n_coercion
   | NReturn of n_term
   | NHandler of n_handler
-  | NLet of n_term * n_abstraction_with_type
+  | NLet of n_term * n_abstraction
   | NCall of n_effect * n_term * n_abstraction_with_type
   | NBind of n_term * n_abstraction
   | NHandle of n_term * n_term
@@ -111,7 +111,7 @@ let rec print_term ?max_level t ppf =
         "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->\n             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
         (print_abstraction_with_type h.return_clause)
         (print_effect_clauses (Assoc.to_list h.effect_clauses))
-  | NLet (t1, (t2, _, t3)) ->
+  | NLet (t1, (t2, t3)) ->
         print "let (%t = (%t)) in (%t)" (print_term t2) (print_term t1)
         (print_term t3)
   | NCall (eff, t, abs) ->

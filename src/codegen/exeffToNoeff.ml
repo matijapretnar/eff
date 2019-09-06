@@ -2,6 +2,7 @@ open NoEffSyntax
 open Types
 open Typed
 
+module TypeCheck = TypeChecker
 module NoEff = NoEffSyntax
 module ExEffTypes = Types
 module ExEff = Typed
@@ -79,7 +80,7 @@ and coercion_elab_dirty = failwith "TODO"
 and comp_elab c = 
   match c with 
   | ExEff.Value value -> value_elab value
-  | ExEff.LetVal (value, (pat, ty, comp)) -> NLet (value_elab value, (pattern_elab pat, type_elab ty, comp_elab comp))
+  | ExEff.LetVal (value, (pat, _, comp)) -> NLet (value_elab value, (pattern_elab pat, comp_elab comp))
   | ExEff.LetRec (abs_list, comp) ->
     let letrec_elab (var, ty1, ty2, (p, cc)) = (var, type_elab ty1, dirty_elab ty2, (pattern_elab p, comp_elab cc)) in
     NoEff.NLetRec (List.map letrec_elab abs_list, comp_elab comp)
@@ -92,9 +93,12 @@ and comp_elab c =
   | ExEff.Call ((eff, (ty1, ty2)), value, (p, ty, comp)) ->
     NoEff.NCall ((eff, (type_elab ty1, type_elab ty2)), value_elab value, (pattern_elab p, type_elab ty, comp_elab comp))
   | ExEff.Op ((eff, (ty1, ty2)), value) -> NoEff.NOp ((eff, (type_elab ty1, type_elab ty2)), value_elab value)
-  (* STIEN: This does not correspond to the paper either *)
   | ExEff.Bind (c1, (p, c2)) ->
-    NoEff.NBind (comp_elab c1, (pattern_elab p, comp_elab c2))
+    let (ty1, dirt1) = TypeCheck.typeOfComputation TypeCheck.initial_state c1 in
+    let (ty2, dirt2) = TypeCheck.typeOfComputation TypeCheck.initial_state c2 in
+    if (Types.is_empty_dirt dirt1 && Types.is_empty_dirt dirt2)
+    then NoEff.NLet (comp_elab c1, (pattern_elab p, comp_elab c2))
+    else NoEff.NBind (comp_elab c1, (pattern_elab p, comp_elab c2))
   | ExEff.CastComp (comp, coer) -> NoEff.NCast (comp_elab comp, coercion_elab_dirty coer)
   | ExEff.CastComp_ty (comp, coer) -> NoEff.NCast (comp_elab comp, coercion_elab_ty coer)
   | ExEff.CastComp_dirt (comp, _) -> comp_elab comp
