@@ -16,7 +16,7 @@ let rec compile_type exeff_ty =
     | Types.TySchemeSkel (_, ty) -> compile_type ty
 
 and compile_dirty_type (ty, dirt) =
-   if (Types.EffectSet.is_empty dirt.effect_set) (* dirt is empty?*)
+   if (Types.EffectSet.is_empty dirt.effect_set)  (* if dirt is empty *)
    then compile_type ty
    else NoEffSyntax.TyComputation (compile_type ty)
 
@@ -43,14 +43,19 @@ let rec compile_expr exeff_expr =
     | Typed.Variant (label, expr) -> NoEffSyntax.Variant (label, compile_expr expr)
     | Typed.Lambda (pat, ty, comp) -> NoEffSyntax.Lambda (compile_pattern pat, compile_type ty, compile_comp comp)
     | Typed.Effect  (eff, (ty1, ty2)) -> NoEffSyntax.Effect (eff, (compile_type ty1, compile_type ty2))
-    | Typed.Handler {effect_clauses = eff_cls; value_clause = (pat, ty, comp)} -> 
+    | Typed.Handler {effect_clauses = eff_cls; value_clause = val_cl} -> 
         if Assoc.is_empty eff_cls
-        then NoEffSyntax.Lambda (compile_pattern pat, compile_type ty, compile_comp comp)
-        else failwith __LOC__
+        then NoEffSyntax.Lambda (compile_value_clause val_cl)
+        else (match TypeChecker.type_of_handler TypeChecker.initial_state {effect_clauses = eff_cls; value_clause = val_cl} with
+          | Types.Handler (_, (ty, drt)) -> 
+              if (Types.EffectSet.is_empty drt.effect_set) 
+              then failwith __LOC__ 
+              else NoEffSyntax.Handler {effect_clauses = (compile_effect_clauses eff_cls); value_clause = (compile_value_clause val_cl)}
+          | _ -> failwith __LOC__) (* Fail if wrong type *)
     | Typed.BigLambdaTy (ty_par, skel, expr) -> NoEffSyntax.BigLambdaTy (ty_par, compile_expr expr)
     | Typed.BigLambdaDirt (_, expr) -> compile_expr expr
     | Typed.BigLambdaSkel (_, expr) -> compile_expr expr
-    | Typed.CastExp (expr, coer_ty) -> NoEffSyntax.Cast (compile_expr expr, compile_ty_coercion coer_ty)
+    | Typed.CastExp (expr, coer_ty) -> NoEffSyntax.Cast (compile_expr expr, compile_coercion coer_ty)
     | Typed.ApplyTyExp (expr, ty) -> NoEffSyntax.ApplyTy (compile_expr expr, compile_type ty)
     | Typed.LambdaTyCoerVar (coer_param_ty, pi, expr) -> 
         NoEffSyntax.BigLambdaCoerVar (
@@ -58,14 +63,21 @@ let rec compile_expr exeff_expr =
           compile_coercion_type pi, 
           compile_expr expr)
     | Typed.LambdaDirtCoerVar (dirt_coer_param, ct_dirt, expr) -> compile_expr expr
-    | Typed.ApplyDirtExp (expr, drt) -> failwith __LOC__
+    | Typed.ApplyDirtExp (expr, drt) -> let exeff_ty = TypeChecker.type_of_expression TypeChecker.initial_state expr in 
+        (match exeff_ty with 
+          | Types.TySchemeDirt (drt_param, _) -> NoEffSyntax.Cast (compile_expr expr, compile_ty_coercion_dirt drt_param drt exeff_ty)
+          | _ -> failwith __LOC__)  (* Fail if wrong type *)
     | Typed.ApplySkelExp (expr, skel) -> compile_expr expr
-    | Typed.ApplyTyCoercion (expr, ty_coer) -> NoEffSyntax.ApplyCoercion (compile_expr expr, compile_ty_coercion ty_coer)
+    | Typed.ApplyTyCoercion (expr, ty_coer) -> NoEffSyntax.ApplyCoercion (compile_expr expr, compile_coercion ty_coer)
     | Typed.ApplyDirtCoercion (expr, drt_coer) -> compile_expr expr
 
-and compile_ty_coercion exeff_ty_coer = 
+and compile_effect_clauses eff_cls = failwith __LOC__
+
+and compile_value_clause (pat, ty, comp) = (compile_pattern pat, compile_type ty, compile_comp comp)
+
+and compile_coercion exeff_ty_coer = 
   match exeff_ty_coer with
-  | Typed.ReflTy ty -> failwith __LOC__
+  | Typed.ReflTy ty -> NoEffSyntax.ReflTy (compile_type ty)
   | Typed.ArrowCoercion (ty_coer, drt_coer) -> failwith __LOC__
   | Typed.HandlerCoercion (drt_coer1, drt_coer2) -> failwith __LOC__
   | Typed.TyCoercionVar ty_coer_param -> failwith __LOC__
@@ -84,6 +96,20 @@ and compile_ty_coercion exeff_ty_coer =
   | Typed.ApplyQualDirtCoer (ty_coer, drt_coer) -> failwith __LOC__
   | Typed.ForallSkel (skel_param, ty_coer) -> failwith __LOC__
   | Typed.ApplySkelCoer (ty_coer, skel) -> failwith __LOC__
+
+and compile_ty_coercion_dirt dirt_param dirt exeff_ty = 
+  match exeff_ty with
+    | Types.TyParam ty_param -> failwith __LOC__
+    | Types.Apply (ty_name, tys) -> failwith __LOC__
+    | Types.Arrow (ty1, drty2) -> failwith __LOC__
+    | Types.Tuple tys -> failwith __LOC__
+    | Types.Handler (tyd1, tyd2) -> failwith __LOC__
+    | Types.PrimTy ty_const -> failwith __LOC__
+    | Types.QualTy (pi, ty) -> failwith __LOC__
+    | Types.QualDirt (ct_dirt, ty) -> failwith __LOC__
+    | Types.TySchemeTy (ty_param, _, ty) -> failwith __LOC__
+    | Types.TySchemeDirt (dirt_param, ty) -> failwith __LOC__
+    | Types.TySchemeSkel (skel_param, ty) -> failwith __LOC__
 
 and compile_comp exeff_comp = 
   match exeff_comp with

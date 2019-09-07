@@ -28,7 +28,6 @@ type pattern =
 
 type term = 
   | Var of variable
-  | Unit
   | BuiltIn of string * int
   | Const of Const.t
   | Tuple of term list
@@ -61,7 +60,7 @@ and abstraction2 = (pattern * pattern * term)
 
 and coercion = 
   | CoerVar of CoreTypes.TyCoercionParam.t
-  | ReflUnit
+  | ReflTy of ty
   | ReflVar of CoreTypes.TyParam.t
   | CoerArrow of coercion * coercion
   | CoerHandler of coercion * coercion
