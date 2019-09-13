@@ -42,16 +42,11 @@ let rec compile_expr exeff_expr =
     | Typed.Record rcd -> NoEffSyntax.Record (Assoc.map compile_expr rcd)
     | Typed.Variant (label, expr) -> NoEffSyntax.Variant (label, compile_expr expr)
     | Typed.Lambda (pat, ty, comp) -> NoEffSyntax.Lambda (compile_pattern pat, compile_type ty, compile_comp comp)
-    | Typed.Effect  (eff, (ty1, ty2)) -> NoEffSyntax.Effect (eff, (compile_type ty1, compile_type ty2))
-    | Typed.Handler {effect_clauses = eff_cls; value_clause = val_cl} -> 
-        if Assoc.is_empty eff_cls
-        then NoEffSyntax.Lambda (compile_value_clause val_cl)
-        else (match TypeChecker.type_of_handler TypeChecker.initial_state {effect_clauses = eff_cls; value_clause = val_cl} with
-          | Types.Handler (_, (ty, drt)) -> 
-              if (Types.EffectSet.is_empty drt.effect_set) 
-              then failwith __LOC__ 
-              else NoEffSyntax.Handler {effect_clauses = (compile_effect_clauses eff_cls); value_clause = (compile_value_clause val_cl)}
-          | _ -> failwith __LOC__) (* Fail if wrong type *)
+    | Typed.Effect (eff, (ty1, ty2)) -> NoEffSyntax.Effect (eff, (compile_type ty1, compile_type ty2))
+    | Typed.Handler handler -> 
+        if Assoc.is_empty handler.effect_clauses
+        then NoEffSyntax.Lambda (compile_value_clause handler.value_clause)
+        else compile_handler_with_effects handler
     | Typed.BigLambdaTy (ty_par, skel, expr) -> NoEffSyntax.BigLambdaTy (ty_par, compile_expr expr)
     | Typed.BigLambdaDirt (_, expr) -> compile_expr expr
     | Typed.BigLambdaSkel (_, expr) -> compile_expr expr
@@ -71,9 +66,69 @@ let rec compile_expr exeff_expr =
     | Typed.ApplyTyCoercion (expr, ty_coer) -> NoEffSyntax.ApplyCoercion (compile_expr expr, compile_coercion ty_coer)
     | Typed.ApplyDirtCoercion (expr, drt_coer) -> compile_expr expr
 
-and compile_effect_clauses eff_cls = failwith __LOC__
+and compile_effect (ef, (ty1, ty2)) = (ef, (compile_type ty1, compile_type ty2))
+
+and compile_effect_clauses eff_cls = 
+  Assoc.kmap 
+    (fun ((ef, (ty1, ty2)), (pat1, pat2, comp)) -> 
+      ((ef, (compile_type ty1, compile_type ty2)), 
+      (compile_pattern pat1, compile_pattern pat2, compile_comp comp))) 
+    eff_cls
+
+and replace_var_with var replacement_term term = 
+  match term with
+  | NoEffSyntax.Var v -> if (v = var) then replacement_term else NoEffSyntax.Var v
+  | NoEffSyntax.BuiltIn (s, i) -> NoEffSyntax.BuiltIn (s, i)
+  | NoEffSyntax.Const t -> NoEffSyntax.Const t
+  | NoEffSyntax.Tuple ts -> NoEffSyntax.Tuple (List.map (replace_var_with var replacement_term) ts)
+  | NoEffSyntax.Record rcrd -> NoEffSyntax.Record (Assoc.map (replace_var_with var replacement_term) rcrd)
+  | NoEffSyntax.Variant (l, t) -> NoEffSyntax.Variant (l, replace_var_with var replacement_term t)
+  | NoEffSyntax.Lambda (p, ty, t) -> NoEffSyntax.Lambda (p, ty, replace_var_with var replacement_term t)
+  | NoEffSyntax.Effect e -> NoEffSyntax.Effect e
+  | NoEffSyntax.Apply (t1, t2) -> NoEffSyntax.Apply (replace_var_with var replacement_term t1, replace_var_with var replacement_term t2)
+  | NoEffSyntax.BigLambdaTy (p, t) -> NoEffSyntax.BigLambdaTy (p, replace_var_with var replacement_term t)
+  | NoEffSyntax.ApplyTy (t, ty) -> NoEffSyntax.ApplyTy (replace_var_with var replacement_term t, ty)
+  | NoEffSyntax.BigLambdaCoerVar (p, tyc, t) -> NoEffSyntax.BigLambdaCoerVar (p, tyc, replace_var_with var replacement_term t)
+  | NoEffSyntax.ApplyCoercion (t, c) -> NoEffSyntax.ApplyCoercion (replace_var_with var replacement_term t, c)
+  | NoEffSyntax.Cast (t, c) -> NoEffSyntax.Cast (replace_var_with var replacement_term t, c)
+  | NoEffSyntax.Return t -> NoEffSyntax.Return (replace_var_with var replacement_term t)
+  | NoEffSyntax.Handler {effect_clauses=efc; value_clause=(p,ty,t)} -> 
+      NoEffSyntax.Handler {effect_clauses=(Assoc.map (fun (p1, p2, t) -> (p1, p2, replace_var_with var replacement_term t)) efc); 
+                           value_clause=(p,ty, replace_var_with var replacement_term t)}
+  | NoEffSyntax.Let (v, t1, t2) -> NoEffSyntax.Let (v, replace_var_with var replacement_term t1, replace_var_with var replacement_term t2)
+  | NoEffSyntax.Call (e, t1, (p, ty, t2)) -> NoEffSyntax.Call (e, replace_var_with var replacement_term t1, (p, ty, replace_var_with var replacement_term t2))
+  | NoEffSyntax.Op (e, t) -> NoEffSyntax.Op (e, replace_var_with var replacement_term t)
+  | NoEffSyntax.Do (v, t1, t2) -> NoEffSyntax.Do (v, replace_var_with var replacement_term t1, replace_var_with var replacement_term t2)
+  | NoEffSyntax.Handle (t1, t2) -> NoEffSyntax.Handle (replace_var_with var replacement_term t1, replace_var_with var replacement_term t2)
+
+and compile_effect_clauses_return eff_cls = 
+  Assoc.kmap 
+    (fun ((ef, (ty1, ty2)), (pat1, pat2, comp)) -> (match pat2 with
+      | Typed.PVar var -> 
+        let noEffTy1 = compile_type ty1 in (
+        let noEffTy2 = compile_type ty2 in 
+          ((ef, (noEffTy1, noEffTy2)), 
+          (compile_pattern pat1, 
+           compile_pattern pat2, 
+           NoEffSyntax.Return (replace_var_with var 
+             (NoEffSyntax.Cast (Var var, NoEffSyntax.CoerArrow (ReflTy noEffTy1, Unsafe (ReflTy noEffTy2))))
+             (compile_comp comp)))))
+      | _ -> failwith __LOC__)) (* Fail if wrong pattern *)
+    eff_cls
 
 and compile_value_clause (pat, ty, comp) = (compile_pattern pat, compile_type ty, compile_comp comp)
+
+and compile_value_clause_return (pat, ty, comp) = (compile_pattern pat, compile_type ty, NoEffSyntax.Return (compile_comp comp))
+
+and compile_handler_with_effects {effect_clauses = eff_cls; value_clause = val_cl} = 
+  match TypeChecker.type_of_handler TypeChecker.initial_state {effect_clauses = eff_cls; value_clause = val_cl} with
+    | Types.Handler (_, (ty, drt)) -> 
+      if (Types.EffectSet.is_empty drt.effect_set) 
+      then NoEffSyntax.Handler {
+        effect_clauses = (compile_effect_clauses_return eff_cls); 
+        value_clause = (compile_value_clause_return val_cl)}
+      else NoEffSyntax.Handler {effect_clauses = (compile_effect_clauses eff_cls); value_clause = (compile_value_clause val_cl)}
+    | _ -> failwith __LOC__ (* Fail if wrong type *)
 
 and compile_coercion exeff_ty_coer = 
   match exeff_ty_coer with
