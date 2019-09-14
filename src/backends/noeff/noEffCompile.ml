@@ -133,9 +133,16 @@ and compile_handler_with_effects {effect_clauses = eff_cls; value_clause = val_c
 and compile_coercion exeff_ty_coer = 
   match exeff_ty_coer with
   | Typed.ReflTy ty -> NoEffSyntax.ReflTy (compile_type ty)
-  | Typed.ArrowCoercion (ty_coer, drt_coer) -> failwith __LOC__
-  | Typed.HandlerCoercion (drt_coer1, drt_coer2) -> failwith __LOC__
-  | Typed.TyCoercionVar ty_coer_param -> failwith __LOC__
+  | Typed.ArrowCoercion (ty_coer, drt_coer) -> NoEffSyntax.CoerArrow (compile_coercion ty_coer, compile_dirty_coercion drt_coer)
+  | Typed.HandlerCoercion (drt_coer1, drt_coer2) -> 
+      let ((ty1_dc1, dr1_dc1), (ty2_dc1, dr2_dc1)) = TypeChecker.type_of_dirty_coercion TypeChecker.initial_state drt_coer1 in 
+      if Types.EffectSet.is_empty dr2_dc1.effect_set
+      then NoEffSyntax.CoerArrow (compile_dirty_coercion drt_coer1, compile_dirty_coercion drt_coer2)
+      else (let ((ty1_dc2, dr1_dc2), (ty2_dc2, dr2_dc2)) = TypeChecker.type_of_dirty_coercion TypeChecker.initial_state drt_coer2 in 
+        if Types.EffectSet.is_empty dr1_dc2.effect_set 
+        then failwith __LOC__ (* third and fourth coercion elaboration rule -- delta1 non-empty, delta2 empty *)
+        else failwith __LOC__ (* second coercion elaboration rule -- delta1 & delta2 non-empty *) )
+  | Typed.TyCoercionVar ty_coer_param -> NoEffSyntax.CoerVar ty_coer_param
   | Typed.SequenceTyCoer (ty_coer1, ty_coer2) -> failwith __LOC__
   | Typed.ApplyCoercion (ty_name, ty_coers) -> failwith __LOC__
   | Typed.TupleCoercion (ty_coers) -> failwith __LOC__
@@ -151,6 +158,14 @@ and compile_coercion exeff_ty_coer =
   | Typed.ApplyQualDirtCoer (ty_coer, drt_coer) -> failwith __LOC__
   | Typed.ForallSkel (skel_param, ty_coer) -> failwith __LOC__
   | Typed.ApplySkelCoer (ty_coer, skel) -> failwith __LOC__
+
+and compile_dirty_coercion exeff_dirty_coer = 
+  match exeff_dirty_coer with
+  | Typed.BangCoercion (ty_coer, drt_coer) -> failwith __LOC__
+  | Typed.RightArrow ty_coer -> failwith __LOC__
+  | Typed.RightHandler ty_coer -> failwith __LOC__
+  | Typed.LeftHandler ty_coer -> failwith __LOC__
+  | Typed.SequenceDirtyCoer (drt_coer1, drt_coer2) -> failwith __LOC__
 
 and compile_ty_coercion_dirt dirt_param dirt exeff_ty = 
   match exeff_ty with
