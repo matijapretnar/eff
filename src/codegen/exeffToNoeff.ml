@@ -54,12 +54,32 @@ and value_elab v =
   | ExEff.Tuple vs -> NoEff.NTuple (List.map value_elab vs)
   | ExEff.Lambda (p, t, c) -> NoEff.NFun (pattern_elab p, type_elab t, comp_elab c)
   | ExEff.Effect (e, (t1, t2)) -> NoEff.NEffect (e, (type_elab t1, type_elab t2))
-  (* STIEN This does not correspond the paper yet *)
   | ExEff.Handler h ->
     let (p, t, c) = h.value_clause in
-    let elab_effect_clause ((eff, (ty1, ty2)), (p1, p2, comp)) = ((eff, (type_elab ty1, type_elab ty2)), (pattern_elab p1, pattern_elab p2, comp_elab comp)) in
-    NHandler {return_clause= (pattern_elab p, type_elab t, comp_elab c);
-	effect_clauses= (Assoc.map_of_list elab_effect_clause (Assoc.to_list h.effect_clauses))}
+    if (Assoc.length h.effect_clauses = 0)
+    (* Handler - Case 1 *)
+    then (comp_elab c)
+    else (
+      let (ty, dirt) = TypeCheck.typeOfComputation TypeCheck.initial_state c in
+      if (Types.is_empty_dirt dirt)
+      (* Handler - Case 2 *)
+      then (
+        let subst_cont_effect ((eff, (ty1, ty2)), (t1, t2, comp)) = 
+          ((eff, (type_elab ty1, type_elab ty2)), (pattern_elab t1, NoEff.NCast ((pattern_elab t2), 
+            (NoEff.NCoerArrow (NoEff.NCoerRefl (type_elab ty1),
+                                NoEff.NCoerUnsafe (NoEff.NCoerRefl (type_elab ty2))))), comp_elab comp)) in
+        NoEff.NHandler 
+          {return_clause= (pattern_elab p, type_elab t, NoEff.NReturn (comp_elab c));
+           effect_clauses= Assoc.map_of_list subst_cont_effect (Assoc.to_list h.effect_clauses)}
+      )
+      (* Handler - Case 3 *)
+      else (
+        let elab_effect_clause ((eff, (ty1, ty2)), (p1, p2, comp)) = 
+          ((eff, (type_elab ty1, type_elab ty2)), (pattern_elab p1, pattern_elab p2, comp_elab comp)) in
+        NoEff.NHandler {return_clause= (pattern_elab p, type_elab t, comp_elab c);
+          effect_clauses= (Assoc.map_of_list elab_effect_clause (Assoc.to_list h.effect_clauses))}    
+      )
+    )
   | ExEff.BigLambdaTy (par, skel, value) -> NoEff.NBigLambdaTy (par, value_elab value)
   | ExEff.BigLambdaDirt (par, value) -> value_elab value
   | ExEff.BigLambdaSkel (par, value) -> value_elab value
@@ -68,7 +88,7 @@ and value_elab v =
   | ExEff.LambdaTyCoerVar (par, (ty1, ty2), value) -> 
     NoEff.NBigLambdaCoer (par, (type_elab ty1, type_elab ty2), value_elab value)
   | ExEff.LambdaDirtCoerVar (_, _, value) -> value_elab value
-  | ExEff.ApplyDirtExp (value, dirt) -> failwith "STIEN: Need dirt instantiation for this"
+  | ExEff.ApplyDirtExp (value, dirt) -> failwith "STIEN: This should not be needed"
   | ExEff.ApplySkelExp (value, skel) -> value_elab value
   | ExEff.ApplyTyCoercion (value, coer) -> NoEff.NApplyCoer (value_elab value, coercion_elab_ty coer)
   | ExEff.ApplyDirtCoercion (value, _) -> value_elab value
@@ -88,8 +108,25 @@ and comp_elab c =
     let elab_abs (p, c) = (pattern_elab p, comp_elab c) in
     NoEff.NMatch (value_elab value, List.map elab_abs abs_lst, loc)
   | ExEff.Apply (v1, v2) -> NoEff.NApplyTerm (value_elab v1, value_elab v2)
-  (* STIEN: This does also not follow the paper yet *)
-  | ExEff.Handle (value, comp) -> NoEff.NHandle (comp_elab comp, value_elab value)
+  | ExEff.Handle (value, comp) -> 
+    let (ctype, cdirt) = TypeCheck.typeOfComputation TypeCheck.initial_state comp in 
+    let (Types.Handler ((vty1, vdirt1), (vty2, vdirt2))) = 
+            TypeCheck.typeOfExpression TypeCheck.initial_state value in
+    if (vty1 = ctype && vdirt1 = cdirt) then (
+      if (Types.is_empty_dirt cdirt)
+      (* Handle - Case 1 *)
+      then (NoEff.NApplyTerm (value_elab value, comp_elab comp)) 
+      else (
+              if (Types.is_empty_dirt vdirt2)
+              (* Handle - Case 2 *)
+              then (NoEff.NCast 
+                (NoEff.NHandle (comp_elab comp, value_elab value), 
+                NoEff.NCoerUnsafe (NoEff.NCoerRefl (type_elab vty2))))
+              (* Handle - Case 3 *)
+              else (NoEff.NHandle (comp_elab comp, value_elab value))
+           )
+    )
+    else failwith "Handler source type and handled computation type do not match"
   | ExEff.Call ((eff, (ty1, ty2)), value, (p, ty, comp)) ->
     NoEff.NCall ((eff, (type_elab ty1, type_elab ty2)), value_elab value, (pattern_elab p, type_elab ty, comp_elab comp))
   | ExEff.Op ((eff, (ty1, ty2)), value) -> NoEff.NOp ((eff, (type_elab ty1, type_elab ty2)), value_elab value)
