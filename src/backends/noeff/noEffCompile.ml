@@ -139,8 +139,12 @@ and compile_coercion exeff_ty_coer =
       if Types.EffectSet.is_empty dr2_dc1.effect_set
       then NoEffSyntax.CoerArrow (compile_dirty_coercion drt_coer1, compile_dirty_coercion drt_coer2)
       else (let ((ty1_dc2, dr1_dc2), (ty2_dc2, dr2_dc2)) = TypeChecker.type_of_dirty_coercion TypeChecker.initial_state drt_coer2 in 
-        if Types.EffectSet.is_empty dr1_dc2.effect_set 
-        then failwith __LOC__ (* third and fourth coercion elaboration rule -- delta1 non-empty, delta2 empty *)
+        if Types.EffectSet.is_empty dr1_dc1.effect_set 
+        then (
+          if Types.EffectSet.is_empty dr1_dc2.effect_set
+          then failwith __LOC__ (*NoEffSyntax.HandToFun*) 
+          else failwith __LOC__
+        ) (* third and fourth coercion elaboration rule -- delta1 non-empty, delta2 empty *)
         else failwith __LOC__ (* second coercion elaboration rule -- delta1 & delta2 non-empty *) )
   | Typed.TyCoercionVar ty_coer_param -> NoEffSyntax.CoerVar ty_coer_param
   | Typed.SequenceTyCoer (ty_coer1, ty_coer2) -> failwith __LOC__
@@ -161,11 +165,28 @@ and compile_coercion exeff_ty_coer =
 
 and compile_dirty_coercion exeff_dirty_coer = 
   match exeff_dirty_coer with
-  | Typed.BangCoercion (ty_coer, drt_coer) -> failwith __LOC__
-  | Typed.RightArrow ty_coer -> failwith __LOC__
-  | Typed.RightHandler ty_coer -> failwith __LOC__
-  | Typed.LeftHandler ty_coer -> failwith __LOC__
-  | Typed.SequenceDirtyCoer (drt_coer1, drt_coer2) -> failwith __LOC__
+  | Typed.BangCoercion (ty_coer, drt_coer) -> 
+      let compiled_ty_coer = compile_coercion ty_coer in
+      let (d1, d2) = TypeChecker.type_of_dirt_coercion TypeChecker.initial_state drt_coer in 
+      if Types.EffectSet.is_empty d2.effect_set 
+      then compiled_ty_coer
+      else (
+        if Types.EffectSet.is_empty d1.effect_set
+        then NoEffSyntax.CoerReturn compiled_ty_coer
+        else NoEffSyntax.CoerComputation compiled_ty_coer)
+  | Typed.RightArrow ty_coer -> (match ty_coer with
+      | Typed.ArrowCoercion (_, dirty_coer1) -> compile_dirty_coercion dirty_coer1 (* je to ok? *)
+      | _ -> assert false)
+  | Typed.RightHandler ty_coer -> (match ty_coer with
+      | Typed.HandlerCoercion (_, dirty_coer2) -> compile_dirty_coercion dirty_coer2 (* je to ok? *)
+      | _ -> assert false)
+  | Typed.LeftHandler ty_coer -> (match ty_coer with
+      | Typed.HandlerCoercion (dirty_coer1, _) -> compile_dirty_coercion dirty_coer1 (* je to ok? *)
+      | _ -> assert false)
+  | Typed.SequenceDirtyCoer (drt_coer1, drt_coer2) ->
+      let t1, t2 = TypeChecker.type_of_dirty_coercion TypeChecker.initial_state drt_coer1 in 
+      let t2, t3 = TypeChecker.type_of_dirty_coercion TypeChecker.initial_state drt_coer2 in 
+      failwith __LOC__
 
 and compile_ty_coercion_dirt dirt_param dirt exeff_ty = 
   match exeff_ty with
