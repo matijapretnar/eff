@@ -71,3 +71,4 @@ and coercion =
   | CoerComputation of coercion
   | CoerReturn of coercion
   | Unsafe of coercion
+  | SequenceCoercion of coercion * coercion
