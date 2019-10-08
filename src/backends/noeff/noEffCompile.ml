@@ -1,11 +1,15 @@
+let is_dirt_empty (dirt : Types.dirt) = match dirt.row with 
+  | Types.EmptyRow -> Types.EffectSet.is_empty dirt.effect_set
+  | Types.ParamRow _ -> false
+
 let rec compile_type exeff_ty = 
   match exeff_ty with
     | Types.TyParam ty_param -> NoEffSyntax.TyVar ty_param
     | Types.Apply (ty_name, tys) -> NoEffSyntax.TyApply (ty_name, List.map compile_type tys)
     | Types.Arrow (ty1, drty2) -> NoEffSyntax.TyArrow (compile_type ty1, compile_dirty_type drty2)
     | Types.Tuple tys -> NoEffSyntax.TyTuple (List.map compile_type tys)
-    | Types.Handler ((ty1, {effect_set=eff_set; row=row}), (ty2, ty_dirt2)) -> 
-        if (Types.EffectSet.is_empty eff_set) 
+    | Types.Handler ((ty1, ty_dirt1), (ty2, ty_dirt2)) -> 
+        if is_dirt_empty ty_dirt1
         then NoEffSyntax.TyArrow (compile_type ty1, compile_type ty2) 
         else NoEffSyntax.TyHandler (compile_type ty1, compile_type ty2) 
     | Types.PrimTy ty_const -> NoEffSyntax.TyBasic ty_const
@@ -16,7 +20,7 @@ let rec compile_type exeff_ty =
     | Types.TySchemeSkel (_, ty) -> compile_type ty
 
 and compile_dirty_type (ty, dirt) =
-   if (Types.EffectSet.is_empty dirt.effect_set)  (* if dirt is empty *)
+   if is_dirt_empty dirt
    then compile_type ty
    else NoEffSyntax.TyComputation (compile_type ty)
 
@@ -143,7 +147,7 @@ and compile_value_clause_return (pat, ty, comp) = (compile_pattern pat, compile_
 and compile_handler_with_effects {effect_clauses = eff_cls; value_clause = val_cl} = 
   match TypeChecker.type_of_handler TypeChecker.initial_state {effect_clauses = eff_cls; value_clause = val_cl} with
     | Types.Handler (_, (ty, drt)) -> 
-      if (Types.EffectSet.is_empty drt.effect_set) 
+      if is_dirt_empty drt
       then NoEffSyntax.Handler {
         effect_clauses = (compile_effect_clauses_return eff_cls); 
         value_clause = (compile_value_clause_return val_cl)}
@@ -156,13 +160,13 @@ and compile_coercion exeff_ty_coer =
   | Typed.ArrowCoercion (ty_coer, drt_coer) -> NoEffSyntax.CoerArrow (compile_coercion ty_coer, compile_dirty_coercion drt_coer)
   | Typed.HandlerCoercion (drt_coer1, drt_coer2) -> 
       let ((ty1_dc1, dr1_dc1), (ty2_dc1, dr2_dc1)) = TypeChecker.type_of_dirty_coercion TypeChecker.initial_state drt_coer1 in 
-      if Types.EffectSet.is_empty dr2_dc1.effect_set
+      if is_dirt_empty dr2_dc1
       (* first rule *)
       then NoEffSyntax.CoerArrow (compile_dirty_coercion drt_coer1, compile_dirty_coercion drt_coer2)
       else (let ((ty1_dc2, dr1_dc2), (ty2_dc2, dr2_dc2)) = TypeChecker.type_of_dirty_coercion TypeChecker.initial_state drt_coer2 in 
-        if Types.EffectSet.is_empty dr1_dc1.effect_set 
+        if is_dirt_empty dr1_dc1
         then (
-          if Types.EffectSet.is_empty dr1_dc2.effect_set (* third and fourth coercion elaboration rule -- delta1 non-empty, delta2 empty *)
+          if is_dirt_empty dr1_dc2 (* third and fourth coercion elaboration rule -- delta1 non-empty, delta2 empty *)
           (* third rule *)
           then NoEffSyntax.HandToFun (compile_ty_coer_from_dirty_coer drt_coer1, NoEffSyntax.Unsafe (compile_dirty_coercion drt_coer2))
           (* fourth rule *)
@@ -194,10 +198,10 @@ and compile_dirty_coercion exeff_dirty_coer = fun_apply_dirty_coercion
   (fun ty_coer drt_coer ->
     let compiled_ty_coer = compile_coercion ty_coer in
     let (d1, d2) = TypeChecker.type_of_dirt_coercion TypeChecker.initial_state drt_coer in 
-      if Types.EffectSet.is_empty d2.effect_set 
+      if is_dirt_empty d2
       then compiled_ty_coer
       else (
-        if Types.EffectSet.is_empty d1.effect_set
+        if is_dirt_empty d1
         then NoEffSyntax.CoerReturn compiled_ty_coer
         else NoEffSyntax.CoerComputation compiled_ty_coer)) 
   (fun drt_coer1 drt_coer2 -> NoEffSyntax.SequenceCoercion (compile_dirty_coercion drt_coer1, compile_dirty_coercion drt_coer2))
@@ -237,7 +241,7 @@ and compile_dirt_computation_ty_coercion dirt_param dirt (ty1, d1) =
     let noeff_coer = compile_dirt_value_ty_coercion dirt_param dirt ty1 in
     match d1.row with
     | Types.ParamRow d_param -> (
-        if Types.EffectSet.is_empty dirt.effect_set
+        if is_dirt_empty dirt
         then NoEffSyntax.Unsafe noeff_coer 
         else NoEffSyntax.CoerComputation noeff_coer)
     | Types.EmptyRow -> noeff_coer
@@ -253,10 +257,10 @@ and compile_comp exeff_comp =
     | Typed.Apply (expr1, expr2) -> NoEffSyntax.Apply (compile_expr expr1, compile_expr expr2)
     | Typed.Handle (expr, comp) -> (match TypeChecker.type_of_expression TypeChecker.initial_state expr with
         | Types.Handler ((ty1, drt1), (ty2, drt2)) -> 
-          if Types.EffectSet.is_empty drt1.effect_set
+          if is_dirt_empty drt1
           then NoEffSyntax.Apply (compile_expr expr, compile_comp comp)
           else (let compiled_handle = NoEffSyntax.Handle (compile_expr expr, compile_comp comp) in
-            if Types.EffectSet.is_empty drt2.effect_set
+            if is_dirt_empty drt2
             then NoEffSyntax.Cast (compiled_handle, NoEffSyntax.Unsafe (NoEffSyntax.ReflTy (compile_type ty2)))
             else compiled_handle)
         | _ -> assert false)
