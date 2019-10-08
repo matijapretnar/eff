@@ -39,13 +39,16 @@ type term =
   | BigLambdaTy of CoreTypes.TyParam.t * term
   | ApplyTy of term * ty
   | BigLambdaCoerVar of CoreTypes.TyCoercionParam.t * ty_coercion * term
-  | ApplyCoercion of term * coercion
+  | ApplyTyCoercion of term * coercion
   | Cast of term * coercion
   | Return of term
   | Handler of handler
-  | Let of variable * term * term
+  | LetVal of term * abstraction_with_ty
+  | LetRec of (variable * ty * term) list * term
+  | Match of term * abstraction list
   | Call of effect * term * abstraction_with_ty
   | Op of effect * term
+  | Bind of term * abstraction
   | Do of CoreTypes.Variable.t * term * term
   | Handle of term * term
 
@@ -54,6 +57,9 @@ and handler =
   ; value_clause: abstraction_with_ty }
 
 and abstraction_with_ty = pattern * ty * term
+
+(** Abstractions that take one argument. *)
+and abstraction = pattern * term
 
 (** Abstractions that take two arguments. *)
 and abstraction2 = (pattern * pattern * term)
@@ -72,3 +78,6 @@ and coercion =
   | CoerReturn of coercion
   | Unsafe of coercion
   | SequenceCoercion of coercion * coercion
+  | TupleCoercion of coercion list
+  | ApplyCoercion of CoreTypes.TyName.t * coercion list
+  | ApplyTyCoer of coercion * ty
