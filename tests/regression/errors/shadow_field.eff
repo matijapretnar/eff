@@ -1,2 +1,0 @@
-type cow = {horn : int}
-type bull = {tail : int; horn : string}

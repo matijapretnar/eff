@@ -469,8 +469,6 @@ ty_def:
     { (t, (ps, x)) }
 
 defined_ty:
-  | LBRACE lst = separated_nonempty_list(SEMI, separated_pair(field, COLON, ty)) RBRACE
-    { TyRecord (Assoc.of_list lst) }
   | lst = cases(sum_case)
     { TySum (Assoc.of_list lst) }
   | t = ty
@@ -509,6 +507,8 @@ plain_simple_ty:
     { TyApply (t, []) }
   | t = PARAM
     { TyParam t }
+  | LBRACE lst = separated_nonempty_list(SEMI, separated_pair(field, COLON, ty)) RBRACE
+    { TyRecord (Assoc.of_list lst) }
   | LPAREN t = ty RPAREN
     { t.it }
 

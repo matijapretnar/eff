@@ -5,6 +5,7 @@ type ty =
   | TyParam of CoreTypes.TyParam.t
   | Basic of Const.ty
   | Tuple of ty list
+  | Record of (CoreTypes.Field.t, ty) Assoc.t
   | Arrow of ty * ty
   | Handler of handler_ty
 

@@ -19,6 +19,16 @@ let solve cstr =
     | Type.Tuple lst1, Type.Tuple lst2 when List.length lst1 = List.length lst2
       ->
         List.iter2 (unify loc) lst1 lst2
+    | Type.Record flds1, Type.Record flds2 when Assoc.length flds1 = Assoc.length flds2
+      ->
+        let unify (fld1, fld_ty1) =
+          match Assoc.lookup fld1 flds2 with
+          | None ->
+              let t2 = Type.beautify ([], t2) in
+              Error.typing ~loc "Missing field %t in %t." (CoreTypes.Field.print fld1) (Type.print t2)
+          | Some fld_ty2 -> unify loc fld_ty1 fld_ty2
+        in
+        Assoc.iter unify flds1
     | Type.Apply (t1, lst1), Type.Apply (t2, lst2)
       when t1 = t2 && List.length lst1 = List.length lst2 ->
         List.iter2 (unify loc) lst1 lst2
@@ -27,8 +37,7 @@ let solve cstr =
     | Type.Apply (t1, lst1), t2 when Tctx.transparent ~loc t1 -> (
       match Tctx.ty_apply ~loc t1 lst1 with
       | Tctx.Inline t -> unify loc t2 t
-      | Tctx.Sum _ | Tctx.Record _ ->
-          assert false (* None of these are transparent *) )
+      | Tctx.Sum _ -> assert false (* None of these are transparent *) )
     | t1, (Type.Apply _ as t2) -> unify loc t2 t1
     | Type.Handler h1, Type.Handler h2 ->
         unify loc h2.Type.value h1.Type.value ;

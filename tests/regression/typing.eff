@@ -16,10 +16,10 @@ Large "white";;
 (fun cow -> match cow with Small k -> Large (k + 3) | Large s -> Small ("foo"::s));;
 
 (* records *)
-type ('a,'b) bull = {small : 'a; large : 'b};;
-{small = 5; large = "foo"};;
-(fun {small=k} -> k + 2);;
-(fun {large=l} -> [] :: l);;
+type ('a,'b) bull = Bull of {small : 'a; large : 'b};;
+(Bull {small = 5; large = "foo"});;
+(fun (Bull {small=k; large=_}) -> k + 2);;
+(fun (Bull {large=l; small=_}) -> [] :: l);;
 
 (* effects *)
 effect Bark : string -> string

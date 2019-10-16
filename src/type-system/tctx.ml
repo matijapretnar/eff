@@ -2,7 +2,6 @@
 module T = Type
 
 type tydef =
-  | Record of (CoreTypes.Field.t, Type.ty) Assoc.t
   | Sum of (CoreTypes.Label.t, Type.ty option) Assoc.t
   | Inline of Type.ty
 
@@ -33,7 +32,6 @@ let global = ref initial
 let subst_tydef sbst =
   let subst = Type.subst_ty sbst in
   function
-  | Record tys -> Record (Assoc.map subst tys)
   | Sum tys ->
       Sum (Assoc.map (function None -> None | Some x -> Some (subst x)) tys)
   | Inline ty -> Inline (subst ty)
@@ -63,21 +61,6 @@ let find_variant lbl =
   | Some x -> construct x
   | None -> None
 
-(** [find_field fld] returns the information about the record type that defines the field
-    [fld]. *)
-
-let find_field fld =
-  let construct = function
-    | ty_name, (ps, Record flds) -> (
-      match Assoc.lookup fld flds with
-      | Some _ -> Some (ty_name, ps, flds)
-      | None -> None )
-    | _ -> None
-  in
-  match Assoc.find_if (fun x -> construct x <> None) !global with
-  | Some x -> construct x
-  | None -> None
-
 let apply_to_params t ps = Type.Apply (t, List.map (fun p -> Type.TyParam p) ps)
 
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
@@ -93,19 +76,9 @@ let infer_variant lbl =
       in
       Some (apply_to_params ty_name ps', u')
 
-(** [infer_field fld] finds a record type that defines the field [fld] and returns it with
-    refreshed type parameters and additional information needed for type inference. *)
-let infer_field fld =
-  match find_field fld with
-  | None -> None
-  | Some (ty_name, ps, us) ->
-      let ps', fresh_subst = T.refreshing_subst ps in
-      let us' = Assoc.map (T.subst_ty fresh_subst) us in
-      Some (apply_to_params ty_name ps', (ty_name, us'))
-
 let transparent ~loc ty_name =
   let _, ty = lookup_tydef ~loc ty_name in
-  match ty with Sum _ | Record _ -> false | Inline _ -> true
+  match ty with Sum _ -> false | Inline _ -> true
 
 (* [ty_apply pos t lst] applies the type constructor [t] to the given list of arguments. *)
 let ty_apply ~loc ty_name lst =
@@ -131,13 +104,13 @@ let check_well_formed ~loc tydef =
             n
     | T.Arrow (ty1, ty2) -> check ty1 ; check ty2
     | T.Tuple tys -> List.iter check tys
+    | T.Record fields ->
+        if not (CoreUtils.no_duplicates (Assoc.keys_of fields)) then
+          Error.typing ~loc "Field labels in a record type must be distinct" ;
+        Assoc.iter (fun (_, ty) -> check ty) fields
     | T.Handler {T.value= ty1; T.finally= ty2} -> check ty1 ; check ty2
   in
   match tydef with
-  | Record fields ->
-      if not (CoreUtils.no_duplicates (Assoc.keys_of fields)) then
-        Error.typing ~loc "Field labels in a record type must be distinct" ;
-      Assoc.iter (fun (_, ty) -> check ty) fields
   | Sum constructors ->
       if not (CoreUtils.no_duplicates (Assoc.keys_of constructors)) then
         Error.typing ~loc "Constructors of a sum type must be distinct" ;
@@ -156,11 +129,11 @@ let check_noncyclic ~loc =
         else check_tydef (t :: forbidden) (ty_apply ~loc t lst)
     | T.Arrow (ty1, ty2) -> check forbidden ty1 ; check forbidden ty2
     | T.Tuple tys -> List.iter (check forbidden) tys
+    | T.Record fields -> Assoc.iter (fun (_, t) -> check forbidden t) fields
     | T.Handler {T.value= ty1; T.finally= ty2} ->
         check forbidden ty1 ; check forbidden ty2
   and check_tydef forbidden = function
     | Sum _ -> ()
-    | Record fields -> Assoc.iter (fun (_, t) -> check forbidden t) fields
     | Inline ty -> check forbidden ty
   in
   check_tydef []
@@ -172,16 +145,6 @@ let check_noncyclic ~loc =
     field names and label, hence shadowing breaks type safety!
 *)
 let check_shadowing ~loc = function
-  | Record lst ->
-      let shadow_check_fld (f, _) =
-        match find_field f with
-        | Some (u, _, _) ->
-            Error.typing ~loc
-              "Record field label %t is already used in type %t"
-              (CoreTypes.Field.print f) (CoreTypes.TyName.print u)
-        | None -> ()
-      in
-      Assoc.iter shadow_check_fld lst
   | Sum lst ->
       let shadow_check_sum (lbl, _) =
         match find_variant lbl with

@@ -23,11 +23,10 @@ and plain_ty =
   | TyParam of typaram  (** ['a] *)
   | TyArrow of ty * ty  (** [ty1 -> ty2] *)
   | TyTuple of ty list  (** [ty1 * ty2 * ... * tyn] *)
+  | TyRecord of (field, ty) Assoc.t (** [{ field1 : ty1; field2 : ty2; ...; fieldn : tyn }] *)
   | TyHandler of ty * ty  (** [ty1 => ty2] *)
 
 type tydef =
-  | TyRecord of (field, ty) Assoc.t
-      (** [{ field1 : ty1; field2 : ty2; ...; fieldn : tyn }] *)
   | TySum of (label, ty option) Assoc.t
       (** [Label1 of ty1 | Label2 of ty2 | ... | Labeln of tyn | Label' | Label''] *)
   | TyInline of ty  (** [ty] *)

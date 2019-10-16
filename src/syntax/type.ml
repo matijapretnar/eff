@@ -9,6 +9,7 @@ type ty =
   | TyParam of CoreTypes.TyParam.t
   | Basic of Const.ty
   | Tuple of ty list
+  | Record of (CoreTypes.Field.t, ty) Assoc.t
   | Arrow of ty * ty
   | Handler of handler_ty
 
@@ -43,6 +44,7 @@ let rec subst_ty sbst ty =
       match Assoc.lookup p sbst with Some ty -> ty | None -> ty )
     | Basic _ as ty -> ty
     | Tuple tys -> Tuple (List.map subst tys)
+    | Record tys -> Record (Assoc.map subst tys)
     | Arrow (ty1, ty2) -> Arrow (subst ty1, subst_ty sbst ty2)
     | Handler {value= ty1; finally= ty2} ->
         Handler {value= subst ty1; finally= subst ty2}
@@ -67,6 +69,7 @@ let free_params ty =
     | TyParam p -> [p]
     | Basic _ -> []
     | Tuple tys -> flatten_map free_ty tys
+    | Record tys -> flatten_map free_ty (Assoc.values_of tys)
     | Arrow (ty1, ty2) -> free_ty ty1 @ free_ty ty2
     | Handler {value= ty1; finally= ty2} -> free_ty ty1 @ free_ty ty2
   in
@@ -125,6 +128,7 @@ let print (ps, t) ppf =
     | Tuple ts ->
         print ~at_level:2 "@[<hov>%t@]"
           (Print.sequence " * " (ty ~max_level:1) ts)
+    | Record flds -> print "%t" (Print.record CoreTypes.Field.print ty flds)
     | Handler {value= t1; finally= t2} ->
         print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
   in

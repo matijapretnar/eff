@@ -45,15 +45,7 @@ let rec cons_of_pattern {it= p; at= loc} =
   | Untyped.PAs (p, _) -> cons_of_pattern p
   | Untyped.PAnnotated (p, _) -> cons_of_pattern p
   | Untyped.PTuple lst -> Tuple (List.length lst)
-  | Untyped.PRecord flds -> (
-    match Assoc.pop flds with
-    | None -> assert false
-    | Some ((lbl, _), _) -> (
-      match Tctx.find_field lbl with
-      | None ->
-          Error.typing ~loc "Unbound record field label %t in a pattern"
-            (CoreTypes.Field.print lbl)
-      | Some (_, _, flds) -> Record (Assoc.keys_of flds) ) )
+  | Untyped.PRecord flds -> Record (Assoc.keys_of flds)
   | Untyped.PVariant (lbl, opt) -> Variant (lbl, opt <> None)
   | Untyped.PConst c -> Const c
   | Untyped.PVar _ | Untyped.PNonbinding -> Wildcard

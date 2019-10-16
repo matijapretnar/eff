@@ -29,9 +29,9 @@ let f x : int =
 ;;
 
 (* records *)
-type ('a,'b) bull = {small : 'a; large : 'b};;
+type ('a,'b) bull = Bull of {small : 'a; large : 'b};;
 
-let f {small= (x: int); large= (y: int)} = x;;
+let f (Bull {small= (x: int); large= (y: int)}) = x;;
 
 
 (* other *)

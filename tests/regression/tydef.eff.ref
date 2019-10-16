@@ -1,4 +1,4 @@
 - : bull = Tail
-- : complex = {re = 1.2; im = 2.4}
+- : {re = float; im = float} = {re = 1.2; im = 2.4}
 - : int tree = Node (10, Empty, Node (20, Empty, Empty))
 - : bull = Horns <fun>

@@ -8,7 +8,7 @@
 - : (string, 'a) cow = Small "brown"
 - : ('a, string) cow = Large "white"
 - : (int, string list) cow -> (string list, int) cow = <fun>
-- : (int, string) bull = {small = 5; large = "foo"}
+- : (int, string) bull = Bull {small = 5; large = "foo"}
 - : (int, 'a) bull -> int = <fun>
 - : ('a, 'b list list) bull -> 'b list list = <fun>
 - : 'a -> string = <fun>

@@ -62,26 +62,7 @@ let infer_pattern cstr pp =
     | Untyped.PNonbinding -> T.fresh_ty ()
     | Untyped.PConst const -> T.Basic (Const.infer_ty const)
     | Untyped.PTuple ps -> T.Tuple (left_to_right_map infer ps)
-    | Untyped.PRecord flds -> (
-      match Assoc.pop flds with
-      | None -> assert false
-      | Some ((fld, _), _) -> (
-        match Tctx.infer_field fld with
-        | None ->
-            Error.typing ~loc "Unbound record field label %t"
-              (CoreTypes.Field.print fld)
-        | Some (ty, (t, us)) ->
-            let unify_record_pattern (fld, p) =
-              match Assoc.lookup fld us with
-              | None ->
-                  Error.typing ~loc
-                    "Unexpected field %t in a pattern of type %t."
-                    (CoreTypes.Field.print fld)
-                    (CoreTypes.TyName.print t)
-              | Some u -> add_ty_constraint cstr loc (infer p) u
-            in
-            Assoc.iter unify_record_pattern flds ;
-            ty ) )
+    | Untyped.PRecord flds -> T.Record (Assoc.map infer flds)
     | Untyped.PVariant (lbl, p) -> (
       match Tctx.infer_variant lbl with
       | None -> assert false
@@ -211,33 +192,7 @@ and infer_expr ctx cstr {it= e; at= loc} =
       add_ty_constraint cstr loc ty ty' ;
       ty
   | Untyped.Tuple es -> T.Tuple (left_to_right_map (infer_expr ctx cstr) es)
-  | Untyped.Record flds -> (
-    match Assoc.pop flds with
-    | None -> assert false
-    | Some ((fld, _), _) -> (
-      (* XXX *)
-      (*       if not (Pattern.linear_record flds') then
-          Error.typing ~loc "Fields in a record must be distinct." ;*)
-      match Tctx.infer_field fld with
-      | None ->
-          Error.typing ~loc "Unbound record field label %t in a pattern"
-            (CoreTypes.Field.print fld)
-      | Some (ty, (t_name, arg_types)) ->
-          if Assoc.length flds <> Assoc.length arg_types then
-            Error.typing ~loc "malformed record of type %t"
-              (CoreTypes.TyName.print t_name)
-          else
-            let arg_types' = Assoc.map (infer_expr ctx cstr) flds in
-            let unify_record_arg (fld, t) =
-              match Assoc.lookup fld arg_types with
-              | None ->
-                  Error.typing ~loc
-                    "Unexpected record field label %t in a pattern"
-                    (CoreTypes.Field.print fld)
-              | Some u -> add_ty_constraint cstr loc t u
-            in
-            Assoc.iter unify_record_arg arg_types' ;
-            ty ) )
+  | Untyped.Record flds -> T.Record (Assoc.map (infer_expr ctx cstr) flds)
   | Untyped.Variant (lbl, u) -> (
     match Tctx.infer_variant lbl with
     | None -> assert false

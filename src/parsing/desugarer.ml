@@ -88,6 +88,14 @@ let desugar_type type_sbst state =
     | Sugared.TyTuple lst ->
         let state', lst' = fold_map desugar_type state lst in
         (state', T.Tuple lst')
+    | Sugared.TyRecord flds ->
+        let field_desugar st (f, t) =
+          let st', f' = field_to_symbol st f in
+          let st'', t' = desugar_type st' t in
+          (st'', (f', t'))
+        in
+        let state', flds' = Assoc.kfold_map field_desugar state flds in
+        (state', T.Record flds')
     | Sugared.TyHandler (t1, t2) ->
         let state', t1' = desugar_type state t1 in
         let state'', t2' = desugar_type state' t2 in
@@ -103,6 +111,7 @@ let free_type_params t =
     | Sugared.TyParam s -> [s]
     | Sugared.TyArrow (t1, t2) -> ty_params t1 @ ty_params t2
     | Sugared.TyTuple lst -> List.map ty_params lst |> List.flatten
+    | Sugared.TyRecord lst -> Assoc.values_of lst |> List.map ty_params |> List.flatten
     | Sugared.TyHandler (t1, t2) -> ty_params t1 @ ty_params t2
   in
   unique_elements (ty_params t)
@@ -116,14 +125,6 @@ let desugar_tydef state params def =
   let ty_sbst = syntax_to_core_params params in
   let state', def' =
     match def with
-    | Sugared.TyRecord flds ->
-        let field_desugar st (f, t) =
-          let st', f' = field_to_symbol st f in
-          let st'', t' = desugar_type ty_sbst st' t in
-          (st'', (f', t'))
-        in
-        let state', flds' = Assoc.kfold_map field_desugar state flds in
-        (state', Tctx.Record flds')
     | Sugared.TySum assoc ->
         let aux_desug st (lbl, cons) =
           let unsugared_lbl =
