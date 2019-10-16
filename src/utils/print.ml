@@ -29,13 +29,13 @@ let rec sequence sep pp vs ppf =
   | [v] -> pp v ppf
   | v :: vs -> Format.fprintf ppf "%t%s@,%t" (pp v) sep (sequence sep pp vs)
 
-let field pp (f, v) ppf = print ppf "%s = %t" f (pp v)
+let field fpp vpp (f, v) ppf = print ppf "%t = %t" (fpp f) (vpp v)
 
 let tuple pp lst ppf =
   match lst with
   | [] -> print ppf "()"
   | lst -> print ppf "(@[<hov>%t@])" (sequence ", " pp lst)
 
-let record pp assoc ppf =
+let record fpp vpp assoc ppf =
   let lst = Assoc.to_list assoc in
-  print ppf "{@[<hov>%t@]}" (sequence "; " (field pp) lst)
+  print ppf "{@[<hov>%t@]}" (sequence "; " (field fpp vpp) lst)

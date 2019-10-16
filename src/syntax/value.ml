@@ -42,9 +42,7 @@ let rec print_value ?max_level v ppf =
   | Const c -> Const.print c ppf
   | Tuple lst -> Print.tuple print_value lst ppf
   | Record assoc ->
-      let to_name (k, v) = (CoreTypes.Field.fold (fun a _ -> a) k, v) in
-      let names_assoc = Assoc.kmap to_name assoc in
-      Print.record print_value names_assoc ppf
+      Print.record CoreTypes.Field.print print_value assoc ppf
   | Variant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
   | Variant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
   | Variant (lbl, Some (Tuple [v1; v2])) when lbl = CoreTypes.cons ->

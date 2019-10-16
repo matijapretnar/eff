@@ -68,10 +68,7 @@ let rec print_pattern ?max_level p ppf =
   | PAnnotated (p, ty) -> print_pattern ?max_level p ppf
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
-  | PRecord assoc ->
-      let to_name (k, v) = (CoreTypes.Field.fold (fun a _ -> a) k, v) in
-      let names_assoc = Assoc.kmap to_name assoc in
-      Print.record print_pattern names_assoc ppf
+  | PRecord assoc -> Print.record CoreTypes.Field.print print_pattern assoc ppf
   | PVariant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
   | PVariant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
   | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = CoreTypes.cons ->
@@ -118,10 +115,7 @@ and print_expression ?max_level e ppf =
   | Const c -> print "%t" (Const.print c)
   | Annotated (t, ty) -> print_expression ?max_level t ppf
   | Tuple lst -> Print.tuple print_expression lst ppf
-  | Record assoc ->
-      let to_name (k, v) = (CoreTypes.Field.fold (fun a _ -> a) k, v) in
-      let names_assoc = Assoc.kmap to_name assoc in
-      Print.record print_expression names_assoc ppf
+  | Record assoc -> Print.record CoreTypes.Field.print print_expression assoc ppf
   | Variant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
   | Variant (lbl, Some e) ->
       print ~at_level:1 "%t @[<hov>%t@]"
