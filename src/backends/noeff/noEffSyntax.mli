@@ -13,6 +13,8 @@ type ty =
 and ty_coercion = 
   | TyCoercion of ty * ty
 
+(* TODO: commands *)
+
 type effect = CoreTypes.Effect.t * (ty * ty)
 
 type variable = CoreTypes.Variable.t
@@ -81,3 +83,5 @@ and coercion =
   | TupleCoercion of coercion list
   | ApplyCoercion of CoreTypes.TyName.t * coercion list
   | ApplyTyCoer of coercion * ty
+  | ApplyQualTyCoer of coercion * coercion
+  | LeftArrow of coercion

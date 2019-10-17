@@ -81,3 +81,5 @@ and coercion =
   | TupleCoercion of coercion list
   | ApplyCoercion of CoreTypes.TyName.t * coercion list
   | ApplyTyCoer of coercion * ty
+  | ApplyQualTyCoer of coercion * coercion
+  | LeftArrow of coercion
