@@ -65,6 +65,9 @@ val apply_substitutions_to_dirt : t -> Types.dirt -> Types.dirt
 val apply_substitutions_to_skeleton : t -> Types.skeleton -> Types.skeleton
 (** [apply_substitutions_to_skeleton subs skeleton] Applies all substitutions from [subs] to [skeleton] *)
 
+val apply_substitutions_to_tycoer : t -> Typed.ty_coercion -> Typed.ty_coercion
+(** [apply_substitutions_to_tycoer sub ty_coer] Applies all substitutions from [subs] to [ty_coer] *)
+
 (* Other type information *)
 
 (* Printing and other debug helpers *)
