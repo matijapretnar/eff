@@ -2,41 +2,75 @@ open NoEffSyntax
 
 let print = Format.fprintf
 
-let print_type formatter noEff_ty = 
-  match noEff_ty with
-    | TyVar t -> print formatter ""
-    | TyApply (tyName, tys) -> print formatter ""
-    | TyTuple tys -> print formatter ""
-    | TyBasic t -> print formatter ""
-    | TyArrow (ty1, ty2) -> print formatter ""
-    | TyHandler (ty1, ty2) -> print formatter ""
-    | TyForAll (t, ty) -> print formatter ""
-    | TyQualification (tyc, ty) -> print formatter ""
-    | TyComputation ty -> print formatter ""
+let rec pp_sequence sep pp xs ppf =
+  match xs with
+    | [] -> ()
+    | [x] -> pp x ppf
+    | x :: xs -> print ppf ("%t" ^^ sep ^^ "%t") (pp x) (pp_sequence sep pp xs)
 
-let rec print_term formatter noEff_term =
+let pp_label label ppf = failwith __LOC__
+
+let pp_tyname ty_name ppf = failwith __LOC__
+
+let pp_typaram ty_param ppf = failwith __LOC__
+
+let pp_variable var ppf = failwith __LOC__
+
+let rec pp_type noEff_ty ppf = 
+  match noEff_ty with
+    | TyVar p -> print ppf "%t" (pp_typaram p)
+    | TyApply (tyName, []) -> print ppf "%t" (pp_tyname tyName)
+    | TyApply (tyName, tys) -> print ppf "(%t) %t" (Print.sequence ", " pp_type tys) (pp_tyname tyName)
+    | TyTuple [] -> print ppf "unit"
+    | TyTuple tys -> print ppf "@[<hov>(%t)@]" (Print.sequence " * " pp_type tys)
+    | TyBasic t -> print ppf "%t" (Const.print_ty t)
+    | TyArrow (ty1, ty2) -> print ppf "@[<h>(%t ->@ %t)@]" (pp_type ty1) (pp_type ty2)
+    | TyHandler (ty1, ty2) -> failwith __LOC__
+    | TyForAll (t, ty) -> failwith __LOC__
+    | TyQualification (tyc, ty) -> failwith __LOC__
+    | TyComputation ty -> failwith __LOC__
+
+let pp_field pp sep (field, value) ppf =
+  print ppf "%t %s %t" (CoreTypes.Field.print field) sep (pp value)
+
+let pp_tuple pp tpl ppf = 
+  match tpl with
+    | [] -> print ppf "()"
+    | xs -> print ppf "(@[<hov>%t@])" (pp_sequence ", " pp xs)
+
+let pp_record pp sep assoc ppf =
+  let lst = Assoc.to_list assoc in
+  print ppf "{@[<hov>%t@]}" (pp_sequence "; " (pp_field pp sep) lst)
+
+let pp_abs_with_ty awty ppf = failwith __LOC__
+
+let pp_effect eff ppf = failwith __LOC__
+
+let rec pp_term noEff_term ppf =
   match noEff_term with
-    | Var v -> formatter ""
-    | BuiltIn (s, i) -> formatter ""
-    | Const c -> formatter ""
-    | Tuple ts -> formatter ""
-    | Record rcd -> formatter ""
-    | Variant (l, t1) -> formatter ""
-    | Lambda awty -> formatter ""
-    | Effect e -> formatter ""
-    | Apply (t1, t2) -> (print_term formatter t1) @ (print_term formatter t2)
-    | BigLambdaTy (typ, t) -> formatter ""
-    | ApplyTy (t, ty) -> formatter ""
-    | BigLambdaCoerVar (tycp, tyc, t) -> formatter ""
-    | ApplyTyCoercion (t, c) -> formatter ""
-    | Cast (t, c) -> formatter ""
-    | Return t -> formatter ""
-    | Handler h -> formatter ""
-    | LetVal (t1, abs_ty) -> formatter ""
-    | LetRec (vs_tys_ts, t2) -> formatter ""
-    | Match (t, abs) -> formatter ""
-    | Call (e, t, awty) -> formatter ""
-    | Op (e, t) -> formatter ""
-    | Bind (t, abs) -> formatter ""
-    | Do (v, t1, t2) -> formatter ""
-    | Handle (t1, t2) -> formatter ""
+    | Var v -> print ppf "%t" (pp_variable v)
+    | BuiltIn (s, i) -> failwith __LOC__
+    | Const c -> print ppf "%t" (Const.print c)
+    | Tuple ts -> print ppf "%t" (pp_tuple pp_term ts)
+    | Record rcd -> print ppf "%t" (pp_record pp_term "=" rcd)
+    | Variant (l, Tuple [hd; tl]) when l = CoreTypes.cons ->
+        print ppf "@[<hov>(%t::%t)@]" (pp_term hd) (pp_term tl)
+    | Variant (l, t1) -> print ppf "(%t @[<hov>%t@])" (pp_label l) (pp_term t1)
+    | Lambda awty -> print ppf "@[<hv 2>fun %t@]" (pp_abs_with_ty awty)
+    | Effect e -> print ppf "%t" (pp_effect e)
+    | Apply (t1, t2) -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2)
+    | BigLambdaTy (typ, t) -> failwith __LOC__
+    | ApplyTy (t, ty) -> failwith __LOC__
+    | BigLambdaCoerVar (tycp, tyc, t) -> failwith __LOC__
+    | ApplyTyCoercion (t, c) -> failwith __LOC__
+    | Cast (t, c) -> failwith __LOC__
+    | Return t -> failwith __LOC__
+    | Handler h -> failwith __LOC__
+    | LetVal (t1, abs_ty) -> failwith __LOC__
+    | LetRec (vs_tys_ts, t2) -> failwith __LOC__
+    | Match (t, abs) -> failwith __LOC__
+    | Call (e, t, awty) -> failwith __LOC__
+    | Op (e, t) -> failwith __LOC__
+    | Bind (t, abs) -> failwith __LOC__
+    | Do (v, t1, t2) -> failwith __LOC__
+    | Handle (t1, t2) -> failwith __LOC__
