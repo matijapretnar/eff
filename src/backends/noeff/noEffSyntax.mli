@@ -13,8 +13,6 @@ type ty =
 and ty_coercion = 
   | TyCoercion of ty * ty
 
-(* TODO: commands *)
-
 type effect = CoreTypes.Effect.t * (ty * ty)
 
 type variable = CoreTypes.Variable.t
@@ -85,3 +83,16 @@ and coercion =
   | ApplyTyCoer of coercion * ty
   | ApplyQualTyCoer of coercion * coercion
   | LeftArrow of coercion
+
+type tydef =
+  | TyDefRecord of (CoreTypes.Field.t, ty) Assoc.t
+  | TyDefSum of (CoreTypes.Label.t, ty option) Assoc.t
+  | TyDefInline of ty
+
+type cmd = 
+  | Term of term
+  | DefEffect of effect * (ty * ty)
+  | TopLet of (pattern * term) list
+  | TopLetRec of (variable * abstraction) list
+  (* | External .. ?*)
+  | TyDef of (CoreTypes.Label.t * (CoreTypes.TyParam.t list * tydef)) list
