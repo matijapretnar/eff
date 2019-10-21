@@ -23,7 +23,6 @@ and n_term =
   | NCall of n_effect * n_term * n_abstraction_with_type
   | NBind of n_term * n_abstraction
   | NHandle of n_term * n_term
-  | NBuiltIn of string * int
   | NConst of Const.t
   | NEffect of n_effect
   | NNonBinding
@@ -36,12 +35,14 @@ and n_handler =
   ; return_clause: n_abstraction_with_type }
 
 and n_type =
+  (* Might remove this later to drop all polymorphism *)
   | NTyParam of CoreTypes.TyParam.t
   | NTyTuple of n_type list
   | NTyArrow of n_type * n_type
   | NTyHandler of n_type * n_type
   | NTyQual of n_coerty * n_type
   | NTyComp of n_type
+  (* Might remove this later to drop all polymorphism *)
   | NTyForall of CoreTypes.TyParam.t * n_type
   | NTyApply of CoreTypes.TyName.t * n_type list
   | NTyPrim of prim_ty
@@ -62,12 +63,14 @@ and n_coercion =
   | NCoerHandler of n_coercion * n_coercion
   | NCoerHandToFun of n_coercion * n_coercion
   | NCoerFunToHand of n_coercion * n_coercion
+  (* Might remove this later to drop all polymorphism *)
   | NCoerForall of CoreTypes.TyParam.t * n_coercion
   | NCoerQual of n_coerty * n_coercion
   | NCoerComp of n_coercion
   | NCoerReturn of n_coercion
   | NCoerUnsafe of n_coercion
   | NCoerApp of n_coercion * n_coercion
+  (* Might remove this later to drop all polymorphism *)
   | NCoerInst of n_coercion * n_type
   | NCoerTrans of n_coercion * n_coercion
   (* STIEN: Might have to add more left-cases here later *)
@@ -125,8 +128,7 @@ let rec print_term ?max_level t ppf =
   | NHandle (t, h) ->
         print ~at_level:1 "handle %t %t"
         (print_term ~max_level:0 t)
-        (print_term ~max_level:0 h)
-  | NBuiltIn (s, i) -> print "%s %i" s i 
+        (print_term ~max_level:0 h) 
   | NConst c -> Const.print c ppf
   | NEffect (eff, (ty1, ty2)) -> print "Effect %t : %t %t" (CoreTypes.Effect.print eff) (print_type ty1) (print_type ty2)
   | NNonBinding -> print "_"
@@ -150,24 +152,24 @@ and print_coercion ?max_level coer ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match coer with
   | NCoerVar x -> CoreTypes.TyCoercionParam.print x ppf
-  | NCoerRefl t -> print "< %t >" (print_type t)
-  | NCoerArrow (c1, c2) -> print "%t -> %t" (print_coercion c1) (print_coercion c2)
-  | NCoerHandler (c1, c2) -> print "%t ==> %t" (print_coercion c1) (print_coercion c2)
-  | NCoerHandToFun (c1, c2) -> print "handToFun %t %t" (print_coercion c1) (print_coercion c2)
-  | NCoerFunToHand (c1, c2) -> print "funToHand %t %t" (print_coercion c1) (print_coercion c2)
-  | NCoerForall (x, c) -> print "forall %t. %t" (CoreTypes.TyParam.print x) (print_coercion c)
-  | NCoerQual (ty, c) -> print "%t => %t" (print_coerty ty) (print_coercion c)
-  | NCoerComp c -> print "Comp %t" (print_coercion c)
-  | NCoerReturn c -> print "return %t" (print_coercion c)
-  | NCoerUnsafe c -> print "unsafe %t" (print_coercion c)
-  | NCoerApp (c1, c2) -> print "%t @ %t" (print_coercion c1) (print_coercion c2)
-  | NCoerInst (c, t) -> print "%t [%t]" (print_coercion c) (print_type t)
-  | NCoerTrans (c1, c2) -> print "%t >> %t" (print_coercion c1) (print_coercion c2)
-  | NCoerLeftArrow c -> print "left %t" (print_coercion c)
-  | NCoerRightArrow c -> print "right %t" (print_coercion c)
-  | NCoerLeftHandler c -> print "left %t" (print_coercion c)
-  | NCoerRightHandler c -> print "right %t" (print_coercion c)
-  | NCoerPure c -> print "pure %t" (print_coercion c)
+  | NCoerRefl t -> print "(< %t >)" (print_type t)
+  | NCoerArrow (c1, c2) -> print "(%t -> %t)" (print_coercion c1) (print_coercion c2)
+  | NCoerHandler (c1, c2) -> print "(%t ==> %t)" (print_coercion c1) (print_coercion c2)
+  | NCoerHandToFun (c1, c2) -> print "(handToFun %t %t)" (print_coercion c1) (print_coercion c2)
+  | NCoerFunToHand (c1, c2) -> print "(funToHand %t %t)" (print_coercion c1) (print_coercion c2)
+  | NCoerForall (x, c) -> print "(forall %t. %t)" (CoreTypes.TyParam.print x) (print_coercion c)
+  | NCoerQual (ty, c) -> print "(%t => %t)" (print_coerty ty) (print_coercion c)
+  | NCoerComp c -> print "(Comp %t)" (print_coercion c)
+  | NCoerReturn c -> print "(return %t)" (print_coercion c)
+  | NCoerUnsafe c -> print "(unsafe %t)" (print_coercion c)
+  | NCoerApp (c1, c2) -> print "(%t @ %t)" (print_coercion c1) (print_coercion c2)
+  | NCoerInst (c, t) -> print "(%t [%t])" (print_coercion c) (print_type t)
+  | NCoerTrans (c1, c2) -> print "(%t >> %t)" (print_coercion c1) (print_coercion c2)
+  | NCoerLeftArrow c -> print "(leftA %t)" (print_coercion c)
+  | NCoerRightArrow c -> print "(rightA %t)" (print_coercion c)
+  | NCoerLeftHandler c -> print "(leftH %t)" (print_coercion c)
+  | NCoerRightHandler c -> print "(rightH %t)" (print_coercion c)
+  | NCoerPure c -> print "(pure %t)" (print_coercion c)
 
 and print_type ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

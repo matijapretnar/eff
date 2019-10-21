@@ -115,7 +115,6 @@ and veval state e =
     | Some v -> v
     | None ->
         Error.runtime "Name %t is not defined." (CoreTypes.Variable.print x) )
-  | ExEff.BuiltIn (_, _) -> failwith "Builtin not supported"
   | ExEff.Const c -> V.Const c
   | ExEff.Tuple es -> V.Tuple (List.map (veval state) es)
   | ExEff.Record es -> V.Record (Assoc.map (fun e -> veval state e) es)

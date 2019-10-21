@@ -218,7 +218,6 @@ let rec apply_sub_comp sub computation =
 and apply_sub_exp sub expression =
   match expression with
   | Var v -> Var v
-  | BuiltIn (s, i) -> BuiltIn (s, i)
   | Const c -> Const c
   | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
   | Variant (lbl, e1) -> Variant (lbl, apply_sub_exp sub e1)
