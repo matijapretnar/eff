@@ -71,18 +71,18 @@ let rec fun_apply_dirty_coercion bang_fun sequence_fun exeff_dirty_coer =
   match exeff_dirty_coer with
   | Typed.BangCoercion (ty_coer, drt_coer) -> bang_fun ty_coer drt_coer
   | Typed.RightArrow ty_coer -> (match ty_coer with
-      | Typed.ArrowCoercion (_, dirty_coer1) -> fun_apply_dirty_coercion bang_fun sequence_fun dirty_coer1 (* is this ok? *)
+      | Typed.ArrowCoercion (_, dirty_coer1) -> fun_apply_dirty_coercion bang_fun sequence_fun dirty_coer1
       | _ -> assert false)
   | Typed.RightHandler ty_coer -> (match ty_coer with
-      | Typed.HandlerCoercion (_, dirty_coer2) -> fun_apply_dirty_coercion bang_fun sequence_fun dirty_coer2 (* is this ok? *)
+      | Typed.HandlerCoercion (_, dirty_coer2) -> fun_apply_dirty_coercion bang_fun sequence_fun dirty_coer2
       | _ -> assert false)
   | Typed.LeftHandler ty_coer -> (match ty_coer with
-      | Typed.HandlerCoercion (dirty_coer1, _) -> fun_apply_dirty_coercion bang_fun sequence_fun dirty_coer1 (* is this ok? *)
+      | Typed.HandlerCoercion (dirty_coer1, _) -> fun_apply_dirty_coercion bang_fun sequence_fun dirty_coer1
       | _ -> assert false)
   | Typed.SequenceDirtyCoer (drt_coer1, drt_coer2) ->
       let t1, t2 = TypeChecker.type_of_dirty_coercion TypeChecker.initial_state drt_coer1 in 
       let t3, t4 = TypeChecker.type_of_dirty_coercion TypeChecker.initial_state drt_coer2 in 
-      assert (t2 = t3); (* is this ok? *)
+      assert (t2 = t3);
       sequence_fun drt_coer1 drt_coer2
 
 let compile_effect (ef, (ty1, ty2)) = (ef, (compile_type ty1, compile_type ty2))
@@ -125,9 +125,9 @@ let rec compile_coercion exeff_ty_coer =
         | _ -> assert false)   
   | Typed.PureCoercion drt_coer -> compile_ty_coer_from_dirty_coer drt_coer
   | Typed.QualTyCoer (ct_ty, ty_coer) -> NoEffSyntax.CoerQualification (compile_coercion_type ct_ty, compile_coercion ty_coer)
-  | Typed.QualDirtCoer (ct_drt, ty_coer) -> compile_coercion ty_coer (* ni pravila za computation? *)
+  | Typed.QualDirtCoer (ct_drt, ty_coer) -> compile_coercion ty_coer
   | Typed.ApplyQualTyCoer (ty_coer1, ty_coer2) -> NoEffSyntax.ApplyQualTyCoer (compile_coercion ty_coer1, compile_coercion ty_coer2)
-  | Typed.ApplyQualDirtCoer (ty_coer, drt_coer) -> failwith __LOC__ (* kaj tukaj? compile_coercion ty_coer? *)
+  | Typed.ApplyQualDirtCoer (ty_coer, drt_coer) -> compile_coercion ty_coer (* Since QualDirtCoer ignores dirt, is this ok? *)
   | Typed.ForallSkel (skel_param, ty_coer) -> compile_coercion ty_coer
   | Typed.ApplySkelCoer (ty_coer1, skel) ->
       (match ty_coer1 with
@@ -336,7 +336,7 @@ and compile_comp exeff_comp =
     | Typed.Bind (comp1, abs) -> NoEffSyntax.Bind (compile_comp comp1, compile_abstracion abs)
     | Typed.CastComp (comp, drty_coer) -> NoEffSyntax.Cast (compile_comp comp, compile_dirty_coercion drty_coer)
     | Typed.CastComp_ty (comp, ty_coer) -> NoEffSyntax.Cast (compile_comp comp, compile_coercion ty_coer)
-    | Typed.CastComp_dirt (comp, drt_coer) -> compile_comp comp (* je to ok? *)
+    | Typed.CastComp_dirt (comp, drt_coer) -> compile_comp comp (* Should this handle cases where drt_coer makes comp without effects or is this okay? *)
 
 and compile_abstraction_with_ty (pat, ty, comp) = (compile_pattern pat, compile_type ty, compile_comp comp)
 
