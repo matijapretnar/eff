@@ -1,3 +1,5 @@
-val pp_type : Format.formatter -> NoEffSyntax.ty -> unit
+val pp_type : NoEffSyntax.ty -> Format.formatter -> unit
 
-val pp_term : Format.formatter -> NoEffSyntax.term -> unit
+val pp_term : NoEffSyntax.term -> Format.formatter -> unit
+
+val pp_cmd : NoEffSyntax.cmd -> Format.formatter -> unit

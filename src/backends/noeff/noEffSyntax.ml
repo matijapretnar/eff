@@ -49,7 +49,6 @@ type term =
   | Call of effect * term * abstraction_with_ty
   | Op of effect * term
   | Bind of term * abstraction
-  | Do of variable * term * term
   | Handle of term * term
 
 and handler = 
@@ -91,8 +90,8 @@ type tydef =
 
 type cmd = 
   | Term of term
-  | DefEffect of effect * (ty * ty)
+  | DefEffect of effect
   | TopLet of (pattern * term) list
   | TopLetRec of (variable * abstraction) list
-  (* | External .. ?*)
+  | External of (variable * ty * string)
   | TyDef of (CoreTypes.Label.t * (CoreTypes.TyParam.t list * tydef)) list

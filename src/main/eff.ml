@@ -10,6 +10,8 @@ module M = NoEffSyntax
 
 module Cmp = NoEffCompile
 
+module Prt = NoEffPrint
+
 let file_queue = ref []
 
 let enqueue_file filename = file_queue := filename :: !file_queue
@@ -33,6 +35,9 @@ let options =
     ; ( "--compile-multicore-ocaml"
       , Arg.String (fun filename -> Config.backend := Multicore filename)
       , "<file> Compile the Eff code into a Multicore OCaml file <file>" )
+    ; ( "--compile-ocaml"
+      , Arg.String (fun filename -> Config.backend := Ocaml filename)
+      , "<file> Compile the Eff code into a OCaml file <file>" )
     ; ("--ascii", Arg.Set Config.ascii, " Use ASCII output")
     ; ( "-v"
       , Arg.Unit
@@ -152,6 +157,10 @@ let main =
       | Config.Runtime -> (module Runtime.Backend)
       | Config.Multicore output_file ->
           ( module MulticoreCompile.Backend (struct
+            let output_file = output_file
+          end) )
+      | Config.Ocaml output_file ->
+          ( module NoEffBackend.Backend (struct
             let output_file = output_file
           end) )
     in

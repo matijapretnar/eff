@@ -29,7 +29,6 @@ let rec substitute_var_in_term var replacement_term term =
   | NoEffSyntax.Call (e, t1, (p, ty, t2)) -> NoEffSyntax.Call (e, substitute_var_in_term var replacement_term t1, (p, ty, substitute_var_in_term var replacement_term t2))
   | NoEffSyntax.Op (e, t) -> NoEffSyntax.Op (e, substitute_var_in_term var replacement_term t)
   | NoEffSyntax.Bind (t1, (pat, t2)) -> NoEffSyntax.Bind (substitute_var_in_term var replacement_term t1, (pat, substitute_var_in_term var replacement_term t2))
-  | NoEffSyntax.Do (v, t1, t2) -> NoEffSyntax.Do (v, substitute_var_in_term var replacement_term t1, substitute_var_in_term var replacement_term t2)
   | NoEffSyntax.Handle (t1, t2) -> NoEffSyntax.Handle (substitute_var_in_term var replacement_term t1, substitute_var_in_term var replacement_term t2)
 
 let rec compile_type exeff_ty = 
@@ -255,7 +254,7 @@ and computation_coercion_to_impure_dirt dirt dirt_param (ty1, d1) =
 let rec compile_expr exeff_expr = 
   match exeff_expr with
     | Typed.Var v -> NoEffSyntax.Var v
-    | Typed.BuiltIn (s, i) -> NoEffSyntax.BuiltIn (s,i)
+    | Typed.BuiltIn (s, i) -> NoEffSyntax.BuiltIn (s, i)
     | Typed.Const ct -> NoEffSyntax.Const ct
     | Typed.Tuple lst -> NoEffSyntax.Tuple (List.map compile_expr lst)
     | Typed.Record rcd -> NoEffSyntax.Record (Assoc.map compile_expr rcd)
