@@ -91,7 +91,7 @@ type tydef =
 type cmd = 
   | Term of term
   | DefEffect of effect
-  | TopLet of (pattern * term) list
-  | TopLetRec of (variable * abstraction) list
+  | TopLet of abstraction_with_ty list
+  | TopLetRec of (variable * ty * term) list
   | External of (variable * ty * string)
   | TyDef of (CoreTypes.Label.t * (CoreTypes.TyParam.t list * tydef)) list
