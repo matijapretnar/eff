@@ -159,7 +159,7 @@ let pp_let t ppf = failwith __LOC__
 
 let pp_cmd cmd ppf = 
   match cmd with
-    | Term t -> pp_term t ppf  (* TODO check if ok *)
+    | Term t -> print ppf "%t@." (pp_term t)  (* TODO check if ok *)
     | DefEffect (e, (ty1, ty2)) -> pp_def_effect (e, (ty1, ty2)) ppf
     | TopLet defs -> print ppf "@[<hv>%t@]@." (pp_let defs)
     | TopLetRec defs -> print ppf "@[<hv>%t@]@." (pp_let_rec defs)
