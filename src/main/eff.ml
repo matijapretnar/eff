@@ -12,6 +12,8 @@ module Cmp = NoEffCompile
 
 module Prt = NoEffPrint
 
+module ExtNoEff = NoEffExternal
+
 let file_queue = ref []
 
 let enqueue_file filename = file_queue := filename :: !file_queue
@@ -149,6 +151,8 @@ let main =
         | Config.Runtime -> Filename.concat Local.effdir "pervasives.eff"
         | Config.Multicore _ ->
             Filename.concat Local.effdir "multicorePervasives.eff"
+        | Config.Ocaml _ ->
+            Filename.concat Local.effdir "noEffPervasives.eff"
       in
       enqueue_file (Load f) ) ;
   try

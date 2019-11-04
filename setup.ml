@@ -7030,6 +7030,8 @@ let setup_t =
                         [
                            ("../pervasives.eff", None);
                            ("../src/backends/multicore/multicorePervasives.eff",
+                             None);
+                           ("../src/backends/noeff/noEffPervasives.eff",
                              None)
                         ];
                       bs_findlib_extra_files = [];

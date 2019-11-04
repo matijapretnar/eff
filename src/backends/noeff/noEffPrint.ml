@@ -33,7 +33,7 @@ let rec handler (h : ('a, 'b) handler_clauses) : 'a computation -> 'b =
 let print = Format.fprintf
 
 let pp_header ppf = print ppf 
-  "BEGIN"
+  "let reflTy"
 
 let rec pp_sequence sep pp xs ppf =
   match xs with
@@ -137,7 +137,7 @@ let rec pp_term noEff_term ppf =
     | Handler {effect_clauses = eff_cls; value_clause = val_cl} ->
         print ppf "handler {@[<hov>value_clause = %t;@] @[<hov>effect_claueses = %t;@] }" 
         (pp_abs_with_ty val_cl) (pp_effect_cls eff_cls)
-    | LetVal (t1, abs_ty) -> print ppf "@[<hv>@[<hv>%tin@] @,%t@]" (pp_term t1) (pp_abs_with_ty abs_ty)
+    | LetVal (t1, (pat, ty, t2)) -> print ppf "@[<hv>@[<hv>let %t = %t in@] @,%t@]" (pp_pattern pat) (pp_term t1) (pp_term t2)
     | LetRec (defs, t2) -> print ppf "@[<hv>@[<hv>%tin@] @,%t@]" (pp_let_rec defs) (pp_term t2)
     | Match (t, cases) -> print ppf "@[<hv>(match %t with@, | %t)@]" (pp_term t)
         (pp_sequence "@, | " pp_abs cases)
@@ -157,11 +157,30 @@ let pp_def_effect (eff, (ty1, ty2)) ppf =
 
 let pp_let t ppf = failwith __LOC__
 
+let pp_external name symbol_name translation ppf =
+  match translation with
+  | NoEffExternal.Unknown ->
+      print ppf "let %t = failwith \"Unknown external symbol %s.\"@."
+        (pp_variable name)
+        symbol_name
+  | NoEffExternal.Exists t ->
+      print ppf "let %t = %s@." (pp_variable name) t
+
 let pp_cmd cmd ppf = 
   match cmd with
     | Term t -> print ppf "%t@." (pp_term t)  (* TODO check if ok *)
     | DefEffect (e, (ty1, ty2)) -> pp_def_effect (e, (ty1, ty2)) ppf
     | TopLet defs -> print ppf "@[<hv>%t@]@." (pp_let defs)
     | TopLetRec defs -> print ppf "@[<hv>%t@]@." (pp_let_rec defs)
-    | External (v, ty, s) -> failwith __LOC__
+    | External (x, ty, f) -> (
+        match Assoc.lookup f NoEffExternal.values with
+          | None -> Error.runtime "Unknown external symbol %s." f
+          | Some (NoEffExternal.Unknown as unknown) ->
+              Print.warning
+                ( "External symbol %s cannot be compiled. It has been replaced "
+                 ^^ "with [failwith \"Unknown external symbol %s.\"]." )
+                f f ;
+                pp_external x f unknown ppf
+          | Some (NoEffExternal.Exists s as known) ->
+              pp_external x f known ppf )
     | TyDef defs -> failwith __LOC__
