@@ -2,35 +2,6 @@ let is_dirt_empty (dirt : Types.dirt) = match dirt.row with
   | Types.EmptyRow -> Types.EffectSet.is_empty dirt.effect_set
   | Types.ParamRow _ -> false
 
-let rec substitute_var_in_term var replacement_term term = 
-  match term with
-  | NoEffSyntax.Var v -> if (v = var) then replacement_term else NoEffSyntax.Var v
-  | NoEffSyntax.BuiltIn (s, i) -> NoEffSyntax.BuiltIn (s, i)
-  | NoEffSyntax.Const t -> NoEffSyntax.Const t
-  | NoEffSyntax.Tuple ts -> NoEffSyntax.Tuple (List.map (substitute_var_in_term var replacement_term) ts)
-  | NoEffSyntax.Record rcrd -> NoEffSyntax.Record (Assoc.map (substitute_var_in_term var replacement_term) rcrd)
-  | NoEffSyntax.Variant (l, t) -> NoEffSyntax.Variant (l, substitute_var_in_term var replacement_term t)
-  | NoEffSyntax.Lambda (p, ty, t) -> NoEffSyntax.Lambda (p, ty, substitute_var_in_term var replacement_term t)
-  | NoEffSyntax.Effect e -> NoEffSyntax.Effect e
-  | NoEffSyntax.Apply (t1, t2) -> NoEffSyntax.Apply (substitute_var_in_term var replacement_term t1, substitute_var_in_term var replacement_term t2)
-  | NoEffSyntax.BigLambdaTy (p, t) -> NoEffSyntax.BigLambdaTy (p, substitute_var_in_term var replacement_term t)
-  | NoEffSyntax.ApplyTy (t, ty) -> NoEffSyntax.ApplyTy (substitute_var_in_term var replacement_term t, ty)
-  | NoEffSyntax.BigLambdaCoerVar (p, tyc, t) -> NoEffSyntax.BigLambdaCoerVar (p, tyc, substitute_var_in_term var replacement_term t)
-  | NoEffSyntax.ApplyTyCoercion (t, c) -> NoEffSyntax.ApplyTyCoercion (substitute_var_in_term var replacement_term t, c)
-  | NoEffSyntax.Cast (t, c) -> NoEffSyntax.Cast (substitute_var_in_term var replacement_term t, c)
-  | NoEffSyntax.Return t -> NoEffSyntax.Return (substitute_var_in_term var replacement_term t)
-  | NoEffSyntax.Handler {effect_clauses=efc; value_clause=(p,ty,t)} -> 
-      NoEffSyntax.Handler {effect_clauses=(Assoc.map (fun (p1, p2, t) -> (p1, p2, substitute_var_in_term var replacement_term t)) efc); 
-                           value_clause=(p,ty, substitute_var_in_term var replacement_term t)}
-  | NoEffSyntax.LetVal (t1, (pat, ty, t2)) -> NoEffSyntax.LetVal (substitute_var_in_term var replacement_term t1, (pat, ty, substitute_var_in_term var replacement_term t2))
-  | NoEffSyntax.LetRec (var_ty_term_list, t2) -> 
-      NoEffSyntax.LetRec (List.map (fun (var, ty, t1) -> (var, ty, substitute_var_in_term var replacement_term t1)) var_ty_term_list, substitute_var_in_term var replacement_term t2)
-  | NoEffSyntax.Match (t1, abs_lst) -> NoEffSyntax.Match (substitute_var_in_term var replacement_term t1, (List.map (fun (pat, t2) -> (pat, substitute_var_in_term var replacement_term t2))  abs_lst))
-  | NoEffSyntax.Call (e, t1, (p, ty, t2)) -> NoEffSyntax.Call (e, substitute_var_in_term var replacement_term t1, (p, ty, substitute_var_in_term var replacement_term t2))
-  | NoEffSyntax.Op (e, t) -> NoEffSyntax.Op (e, substitute_var_in_term var replacement_term t)
-  | NoEffSyntax.Bind (t1, (pat, t2)) -> NoEffSyntax.Bind (substitute_var_in_term var replacement_term t1, (pat, substitute_var_in_term var replacement_term t2))
-  | NoEffSyntax.Handle (t1, t2) -> NoEffSyntax.Handle (substitute_var_in_term var replacement_term t1, substitute_var_in_term var replacement_term t2)
-
 let rec compile_type exeff_ty = 
   match exeff_ty with
     | Types.TyParam ty_param -> NoEffSyntax.TyVar ty_param
@@ -307,7 +278,7 @@ and compile_effect_clauses_return eff_cls =
           ((ef, (noEffTy1, noEffTy2)), 
           (compile_pattern pat1, 
            compile_pattern pat2, 
-           NoEffSyntax.Return (substitute_var_in_term var 
+           NoEffSyntax.Return (NoEffSubstitute.substitute_var_in_term var 
              (NoEffSyntax.Cast (Var var, NoEffSyntax.CoerArrow (ReflTy noEffTy1, Unsafe (ReflTy noEffTy2))))
              (compile_comp comp)))))
       | _ -> assert false)) (* Fail if wrong pattern *)

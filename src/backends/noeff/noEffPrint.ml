@@ -2,7 +2,13 @@ open NoEffSyntax
 
 (* print header ? *)
 (* ------------------------------- *)
-type ('eff_arg, 'eff_res) effect = ..
+
+(* ------------------------------- *)
+
+let print = Format.fprintf
+
+let pp_header ppf = print ppf 
+"type ('eff_arg, 'eff_res) effect = ..
 
 type 'a computation = 
   | Value : 'a -> 'a computation
@@ -28,12 +34,17 @@ let rec handler (h : ('a, 'b) handler_clauses) : 'a computation -> 'b =
   in
   handler
 
-(* ------------------------------- *)
+let coer_refl_ty term = term
 
-let print = Format.fprintf
+let rec coer_computation coer comp = 
+  match comp with
+    | Value t -> Value (coer t)
+    | Call (eff, arg, k) -> Call (eff, arg, fun x -> coer_computation coer (k x)) 
+      
+let coer_return coer term = Value (coer term)
 
-let pp_header ppf = print ppf 
-  "let reflTy"
+let coer_unsafe coer (Value v) = coer v
+"
 
 let rec pp_sequence sep pp xs ppf =
   match xs with
@@ -120,26 +131,28 @@ let pp_tuple pp tpl ppf =
 
 let pp_effect (e, (ty1, ty2)) ppf = CoreTypes.Effect.print e ppf
 
-let pp_coercion coer ppf =
+let rec pp_coercion coer ppf =
+  (* The cases not matched here should be handled in pp_term *)
   match coer with
-    | CoerVar v -> failwith __LOC__
-    | ReflTy _ -> print ppf "ReflTyIzHeaderja"
-    | ReflVar t -> failwith __LOC__
-    | CoerArrow (c1, c2) -> failwith __LOC__
-    | CoerHandler (c1, c2) -> failwith __LOC__
-    | HandToFun (c1, c2) -> failwith __LOC__
-    | FunToHand (c1, c2) -> failwith __LOC__
-    | Forall (t, c) -> failwith __LOC__
-    | CoerQualification (tyc, c) -> failwith __LOC__
-    | CoerComputation c -> failwith __LOC__
-    | CoerReturn c -> failwith __LOC__
-    | Unsafe c -> failwith __LOC__
-    | SequenceCoercion (c1, c2) -> failwith __LOC__
-    | TupleCoercion cs -> failwith __LOC__
-    | ApplyCoercion (t, cs) -> failwith __LOC__
-    | ApplyTyCoer (c, ty) -> failwith __LOC__
-    | ApplyQualTyCoer (c1, c2) -> failwith __LOC__
-    | LeftArrow c -> failwith __LOC__
+    (* | CoerVar v -> failwith __LOC__ *)
+    | ReflTy _ -> print ppf "coer_refl_ty"
+    (* | ReflVar t -> failwith __LOC__ *)
+    (* | CoerArrow (c1, c2) -> failwith __LOC__ *)
+    (* | CoerHandler (c1, c2) -> failwith __LOC__ *)
+    (* | HandToFun (c1, c2) -> failwith __LOC__ *)
+    (* | FunToHand (c1, c2) -> failwith __LOC__ *)
+    (* | Forall (t, c) -> failwith __LOC__ *)
+    (* | CoerQualification (tyc, c) -> failwith __LOC__ *)
+    | CoerComputation c -> print ppf "coer_computation (%t)" (pp_coercion c)
+    | CoerReturn c -> print ppf "coer_return"
+    | Unsafe c -> print ppf "coer_unsafe"
+    (* | SequenceCoercion (c1, c2) -> failwith __LOC__ *)
+    (* | TupleCoercion cs -> failwith __LOC__ *)
+    (* | ApplyCoercion (t, cs) -> failwith __LOC__ *)
+    (* | ApplyTyCoer (c, ty) -> failwith __LOC__ *)
+    (* | ApplyQualTyCoer (c1, c2) -> failwith __LOC__ *)
+    (* | LeftArrow c -> failwith __LOC__ *)
+    | _ -> assert false
 
 let rec pp_effect_cls eff_cls ppf = failwith __LOC__
 
@@ -155,13 +168,21 @@ let rec pp_term noEff_term ppf =
     | Variant (l, t1) -> print ppf "(%t @[<hov>%t@])" (pp_label l) (pp_term t1)
     | Lambda abs_ty -> print ppf "@[<hv 2>fun %t@]" (pp_abs_with_ty abs_ty)
     | Effect (et, _) -> CoreTypes.Effect.print et ppf
-    | Apply (t1, t2) -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2)
+    | Apply (t1, t2) -> (
+        match t1 with 
+          | Cast (t, CoerArrow (c1, c2)) -> print ppf "%t" (pp_term (Cast (Apply (t, Cast (t2, c1)), c2)))
+          | Cast (t, HandToFun (c1, c2)) -> print ppf "%t" (pp_term (Cast (Handle (Return (Cast (t2, c1)), t), c2)))
+          | _ -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2))
     | BigLambdaTy (_, t) -> pp_term t ppf
+    | ApplyTy (Cast (t, Forall (a, c)), ty) -> print ppf "%t" 
+        (pp_term (Cast (ApplyTy (t, ty), NoEffSubstitute.substitute_tyvar_in_coercion a ty c)))
     | ApplyTy (t, _) -> pp_term t ppf
-    | BigLambdaCoerVar (tycp, tyc, t) -> pp_term t ppf
-    | ApplyTyCoercion (t, c) -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_coercion c) (pp_term t)
+    | BigLambdaCoerVar (tycp, tyc, t) -> print ppf "%t" (pp_term t)
+    | ApplyTyCoercion (BigLambdaCoerVar (cp, pi, t), c1) -> print ppf "%t" (pp_term (NoEffSubstitute.substitute_coer_var_in_term cp c1 t))
+    | ApplyTyCoercion (Cast (t, CoerQualification (pi, c1)), c2) -> print ppf "%t" (pp_term (Cast (ApplyTyCoercion (t, c2), c1)))
+    | ApplyTyCoercion (t, c) -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t) (pp_coercion c) 
     | Cast (t, c) -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_coercion c) (pp_term t) 
-    | Return t -> print ppf "value %t" (pp_term t)
+    | Return t -> print ppf "Value %t" (pp_term t)
     | Handler {effect_clauses = eff_cls; value_clause = val_cl} ->
         print ppf "handler {@[<hov>value_clause = %t;@] @[<hov>effect_claueses = %t;@] }" 
         (pp_abs_with_ty val_cl) (pp_effect_cls eff_cls)
@@ -172,7 +193,13 @@ let rec pp_term noEff_term ppf =
     | Call (e, t, abs_ty) -> print ppf "@[<hov 2> call (%t) @,(%t) @,(%t)@]" (pp_effect e) (pp_term t) (pp_abs_with_ty abs_ty)
     | Op (e, t) -> print ppf "@[<hov 2> call (%t) @,(%t) @,(%s)@]" (pp_effect e) (pp_term t) "(fun x -> x)"
     | Bind (t, abs) -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t) (pp_abs abs)
-    | Handle (t1, t2) -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2)
+    | Handle (NoEffSyntax.Call (e, t1, (pat, ty, t)), Cast (t2, FunToHand (c1, c2))) -> print ppf "%t"
+        (pp_term (NoEffSyntax.Call (e, t1, (pat, ty, Handle (t, Cast (t2, FunToHand (c1, c2)))))))
+    | Handle (Return t1, Cast (t2, FunToHand (c1, c2))) -> print ppf "%t" (pp_term (Cast (Apply (t2, Cast (t1, c1)), c2)))
+    | Handle (t1, t2) -> (
+        match t2 with 
+          | Cast (t, CoerHandler (c1, c2)) -> print ppf "%t" (pp_term (Cast (Handle (Cast (t1, c1), t) , c2)))
+          | _ -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2))
 
 and pp_abs (p, t) ppf = print ppf "@[<h>(%t ->@ %t)@]" (pp_pattern p) (pp_term t)
 
