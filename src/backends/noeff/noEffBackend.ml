@@ -28,13 +28,19 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
   let process_type_of state c ty = failwith __LOC__  (* not implemented *)
 
   let process_def_effect state (eff, (ty1, ty2)) = 
-    update state (NoEffSyntax.DefEffect (eff, (process_type ty1, process_type ty2))) state.typing
+    update state (NoEffSyntax.DefEffect (eff, (process_type ty1, process_type ty2)))
+    (ExplicitInfer.add_effect eff (ty1, ty2) state.typing)
 
   let process_top_let state defs vars = failwith __LOC__ (* not implemented *)
 
   let process_top_let_rec state defs vars = failwith __LOC__ (* not implemented *)
 
-  let process_external state (x, ty, f) = update state (NoEffSyntax.External (x, process_type ty, f)) state.typing
+  let process_external state (x, ty, f) =
+    let ty' = Types.source_to_target ty in
+    let typing_state' =
+      ExplicitInfer.add_external state.typing x ty'
+    in
+    update state (NoEffSyntax.External (x, process_type ty, f)) typing_state'
 
   let process_tydef state tydefs = failwith __LOC__ (* not implemented *)
 
