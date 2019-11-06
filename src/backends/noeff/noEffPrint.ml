@@ -134,27 +134,24 @@ let pp_effect (e, (ty1, ty2)) ppf = CoreTypes.Effect.print e ppf
 let rec pp_coercion coer ppf =
   (* The cases not matched here should be handled in pp_term *)
   match coer with
-    (* | CoerVar v -> failwith __LOC__ *)
+    | CoerVar v -> print ppf "CoerVar %t" (CoreTypes.TyCoercionParam.print v)
     | ReflTy _ -> print ppf "coer_refl_ty"
-    (* | ReflVar t -> failwith __LOC__ *)
-    (* | CoerArrow (c1, c2) -> failwith __LOC__ *)
-    (* | CoerHandler (c1, c2) -> failwith __LOC__ *)
-    (* | HandToFun (c1, c2) -> failwith __LOC__ *)
-    (* | FunToHand (c1, c2) -> failwith __LOC__ *)
-    (* | Forall (t, c) -> failwith __LOC__ *)
-    (* | CoerQualification (tyc, c) -> failwith __LOC__ *)
+    | ReflVar t -> print ppf "ReflVar"
+    | CoerArrow (c1, c2) -> print ppf "CoerArrow"
+    | CoerHandler (c1, c2) -> print ppf "CoerHandler"
+    | HandToFun (c1, c2) -> print ppf "HandToFun"
+    | FunToHand (c1, c2) -> print ppf "FunToHand"
+    | Forall (t, c) -> print ppf "Forall"
+    | CoerQualification (tyc, c) -> print ppf "CoerQualification"
     | CoerComputation c -> print ppf "coer_computation (%t)" (pp_coercion c)
     | CoerReturn c -> print ppf "coer_return"
     | Unsafe c -> print ppf "coer_unsafe"
-    (* | SequenceCoercion (c1, c2) -> failwith __LOC__ *)
-    (* | TupleCoercion cs -> failwith __LOC__ *)
-    (* | ApplyCoercion (t, cs) -> failwith __LOC__ *)
-    (* | ApplyTyCoer (c, ty) -> failwith __LOC__ *)
-    (* | ApplyQualTyCoer (c1, c2) -> failwith __LOC__ *)
-    (* | LeftArrow c -> failwith __LOC__ *)
-    | _ -> assert false
-
-let rec pp_effect_cls eff_cls ppf = failwith __LOC__
+    | SequenceCoercion (c1, c2) -> print ppf "SequenceCoercion"
+    | TupleCoercion cs -> print ppf "TupleCoercion"
+    | ApplyCoercion (t, cs) -> print ppf "ApplyCoercion"
+    | ApplyTyCoer (c, ty) -> print ppf "ApplyTyCoer"
+    | ApplyQualTyCoer (c1, c2) -> print ppf "ApplyQualTyCoer"
+    | LeftArrow c -> print ppf "LeftArrow"
 
 let rec pp_term noEff_term ppf =
   match noEff_term with
@@ -205,12 +202,32 @@ and pp_abs (p, t) ppf = print ppf "@[<h>(%t ->@ %t)@]" (pp_pattern p) (pp_term t
 
 and pp_abs_with_ty (p, ty, t) ppf = print ppf "@[<h>((%t : %t) ->@ %t)@]"  (pp_pattern p) (pp_type ty) (pp_term t)
 
-and pp_let_rec lst ppf = failwith __LOC__
+and pp_let_rec lst ppf = 
+  let pp_var_ty_term (v, ty, t) ppf = print ppf "@[<hv 2>and (%t : %t) = @,%t@]" (pp_variable v) (pp_type ty) (pp_term t) in
+  match lst with
+    | [] -> ()
+    | (v, ty, t) :: tl -> print ppf "@[<hv 2>let rec (%t : %t) = @,%t@] @,%t" 
+        (pp_variable v) (pp_type ty) (pp_term t) (pp_sequence " " pp_var_ty_term tl)
+
+and pp_effect_cls eff_cls ppf = 
+  let pp_effect_abs2 (eff, (pat1, pat2, t)) ppf = print ppf "@[<hv 2>| %t -> fun %t %t -> %t @]"
+    (pp_effect eff) (pp_pattern pat1) (pp_pattern pat2) (pp_term t) in
+  print ppf 
+  "@[<h>(fun (type a) (type b) (eff : (a, b) effect) -> 
+  (match eff with
+    %t  
+  ) @)@]" 
+  (pp_sequence " " pp_effect_abs2 (Assoc.to_list eff_cls))
 
 let pp_def_effect (eff, (ty1, ty2)) ppf = 
   print ppf "@[effect %t : %t ->@ %t@]@." (CoreTypes.Effect.print eff) (pp_type ty1) (pp_type ty2)
 
-let pp_let t ppf = failwith __LOC__
+let pp_lets lst ppf = 
+   let pp_one_let (p, ty, t) ppf = print ppf "@[<hv 2>and (%t : %t) = @,%t@]" (pp_pattern p) (pp_type ty) (pp_term t) in
+  match lst with
+    | [] -> ()
+    | (p, ty, t) :: tl -> print ppf "@[<hv 2>let rec (%t : %t) = @,%t@] @,%t" 
+        (pp_pattern p) (pp_type ty) (pp_term t) (pp_sequence " " pp_one_let tl)
 
 let pp_external name symbol_name translation ppf =
   match translation with
@@ -221,11 +238,39 @@ let pp_external name symbol_name translation ppf =
   | NoEffExternal.Exists t ->
       print ppf "let %t = %s@." (pp_variable name) t
 
+let pp_tydef (name, (params, tydef)) ppf =
+  let pp_def tydef ppf =
+    match tydef with
+    | TyDefRecord assoc -> print ppf "%t" (pp_record pp_type ":" assoc)
+    | TyDefSum assoc ->
+        let lst = Assoc.to_list assoc in
+        let print_cons ty_opt ppf =
+          match ty_opt with
+          | lbl, None -> print ppf "%t" (MulticoreSymbol.print_label lbl)
+          | lbl, Some ty ->
+              print ppf "%t of %t"
+                (MulticoreSymbol.print_label lbl)
+                (pp_type ty)
+        in
+        print ppf "@[<hov>%t@]" (pp_sequence "@, | " print_cons lst)
+    | TyDefInline ty -> print ppf "%t" (pp_type ty)
+  in
+  match params with
+  | [] ->
+      print ppf "@[type %t = %t@]@."
+        (MulticoreSymbol.print_tyname name)
+        (pp_def tydef)
+  | lst ->
+      print ppf "@[type (%t) %t = %t@]@."
+        (pp_sequence ", " MulticoreSymbol.print_typaram params)
+        (MulticoreSymbol.print_tyname name)
+        (pp_def tydef)
+
 let pp_cmd cmd ppf = 
   match cmd with
     | Term t -> print ppf "%t@." (pp_term t)  (* TODO check if ok *)
     | DefEffect (e, (ty1, ty2)) -> pp_def_effect (e, (ty1, ty2)) ppf
-    | TopLet defs -> print ppf "@[<hv>%t@]@." (pp_let defs)
+    | TopLet defs -> print ppf "@[<hv>%t@]@." (pp_lets defs)
     | TopLetRec defs -> print ppf "@[<hv>%t@]@." (pp_let_rec defs)
     | External (x, ty, f) -> (
         match Assoc.lookup f NoEffExternal.values with
@@ -238,4 +283,4 @@ let pp_cmd cmd ppf =
                 pp_external x f unknown ppf
           | Some (NoEffExternal.Exists s as known) ->
               pp_external x f known ppf )
-    | TyDef defs -> failwith __LOC__
+    | TyDef defs -> print ppf "%t@." (pp_sequence "@, and " pp_tydef defs)
