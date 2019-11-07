@@ -1,23 +1,80 @@
 open CoreUtils
 module T = Type
 module Untyped = UntypedSyntax
-module Ctx = SimpleCtx
 module Unify = SimpleUnify
 module EffectMap = Map.Make (CoreTypes.Effect)
+module VariableMap = Map.Make (CoreTypes.Variable)
+
+type ty_scheme = CoreTypes.TyParam.t list * Type.ty
 
 type state =
-  { context: Ctx.t
+  { context: ty_scheme VariableMap.t
   ; effects: (Type.ty * Type.ty) EffectMap.t
   ; constraints: (T.ty * Tctx.T.ty * Location.t) list }
 
+let warn_implicit_sequencing = ref false
+
 let empty_constraints = []
 
+let empty_ctx = VariableMap.empty
+
 let initial_state =
-  {context= Ctx.empty; effects= EffectMap.empty; constraints= []}
+  {context= empty_ctx; effects= EffectMap.empty; constraints= empty_constraints}
 
 let replace_ctx st ctx = {st with context= ctx}
 
-let warn_implicit_sequencing = ref false
+let clear_constraints st = {st with constraints= empty_constraints}
+
+let add_ty_constraint loc t1 t2 st =
+  {st with constraints= (t1, t2, loc) :: st.constraints}
+
+let extend st x ty_scheme =
+  {st with context= VariableMap.add x ty_scheme st.context}
+
+let extend_ty st x ty = extend st x ([], ty)
+
+let subst_ctx st sbst =
+  let subst_ty_scheme (ps, ty) =
+    assert (List.for_all (fun p -> not (List.mem p ps)) (Assoc.keys_of sbst)) ;
+    (ps, Type.subst_ty sbst ty)
+  in
+  {st with context= VariableMap.map subst_ty_scheme st.context}
+
+(** [free_params ctx] returns list of all free type parameters in [ctx]. *)
+let free_params ctx =
+  let binding_params (_, (ps, ty)) =
+    CoreUtils.list_diff (Type.free_params ty) ps
+  in
+  let xs =
+    List.map binding_params (VariableMap.bindings ctx) |> List.flatten
+  in
+  CoreUtils.unique_elements xs
+
+let generalize st poly ty =
+  if poly then
+    let ps =
+      CoreUtils.list_diff (Type.free_params ty) (free_params st.context)
+    in
+    (ps, ty)
+  else ([], ty)
+
+let ctx_lookup ~loc st x =
+  match VariableMap.find_opt x st.context with
+  | Some (ps, t) ->
+      snd (Type.refresh ps t)
+  | None ->
+      Error.typing ~loc "Unknown name %t" (CoreTypes.Variable.print x)
+
+let infer_effect st eff =
+  try Some (EffectMap.find eff st.effects) with Not_found -> None
+
+let add_effect st eff (ty1, ty2) =
+  match infer_effect st eff with
+  | None ->
+      {st with effects= EffectMap.add eff (ty1, ty2) st.effects}
+  | Some _ ->
+      Error.typing ~loc:Location.unknown "Effect %t already defined."
+        (CoreTypes.Effect.print eff)
 
 (* We perform type inference int the style of Standard ML 97, i.e.,
    Hindley-Milner polymorphism with value restriction. Throughout, we work with
@@ -46,32 +103,6 @@ let nonexpansive = function
   | Untyped.LetRec _
   | Untyped.Check _ ->
       false
-
-let clear_constraints st = {st with constraints= empty_constraints}
-
-let add_ty_constraint loc t1 t2 st =
-  {st with constraints= (t1, t2, loc) :: st.constraints}
-
-let extend_ty st x t = {st with context= Ctx.extend_ty st.context x t}
-
-let extend st x ty_scheme = {st with context= Ctx.extend st.context x ty_scheme}
-
-let subst_ctx st sbst = {st with context= Ctx.subst_ctx st.context sbst}
-
-let generalize st = Ctx.generalize st.context
-
-let ctx_lookup st = Ctx.lookup st.context
-
-let infer_effect st eff =
-  try Some (EffectMap.find eff st.effects) with Not_found -> None
-
-let add_effect st eff (ty1, ty2) =
-  match infer_effect st eff with
-  | None ->
-      {st with effects= EffectMap.add eff (ty1, ty2) st.effects}
-  | Some _ ->
-      Error.typing ~loc:Location.unknown "Effect %t already defined."
-        (CoreTypes.Effect.print eff)
 
 (* [infer_pattern st pp] infers the type of pattern [pp]. It returns the list of
    pattern variables with their types, which are all guaranteed to be [Type.Meta]'s, together
