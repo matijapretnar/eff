@@ -32,6 +32,7 @@ module Make (Backend : BackendSignature.T) = struct
   (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
     It prints the result to [ppf] and returns the new state. *)
   let rec exec_cmd state {it= cmd; at= loc} =
+    Print.debug "Executing: %t" (Location.print loc);
     match cmd with
     | Commands.Term t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
@@ -70,7 +71,7 @@ module Make (Backend : BackendSignature.T) = struct
           Desugarer.desugar_def_effect state.desugarer_state effect_def
         in
         let type_system_state' =
-          SimpleCtx.add_effect state.type_system_state eff (ty1, ty2)
+          TypeSystem.add_effect state.type_system_state eff (ty1, ty2)
         in
         let backend_state' =
           Backend.process_def_effect state.backend_state (eff, (ty1, ty2))
@@ -114,7 +115,7 @@ module Make (Backend : BackendSignature.T) = struct
           Desugarer.desugar_external state.desugarer_state ext_def
         in
         let type_system_state' =
-          SimpleCtx.extend state.type_system_state x (Type.free_params ty, ty)
+          TypeSystem.extend state.type_system_state x (Type.free_params ty, ty)
         in
         let backend_state' =
           Backend.process_external state.backend_state (x, ty, f)
