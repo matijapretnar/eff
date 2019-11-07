@@ -3,12 +3,17 @@ module T = Type
 module Untyped = UntypedSyntax
 module Ctx = SimpleCtx
 module Unify = SimpleUnify
+module EffectMap = Map.Make (CoreTypes.Effect)
 
-type state = {context: Ctx.t; constraints: (T.ty * Tctx.T.ty * Location.t) list}
+type state =
+  { context: Ctx.t
+  ; effects: (Type.ty * Type.ty) EffectMap.t
+  ; constraints: (T.ty * Tctx.T.ty * Location.t) list }
 
 let empty_constraints = []
 
-let initial_state = {context= Ctx.empty; constraints= []}
+let initial_state =
+  {context= Ctx.empty; effects= EffectMap.empty; constraints= []}
 
 let replace_ctx st ctx = {st with context= ctx}
 
@@ -57,10 +62,16 @@ let generalize st = Ctx.generalize st.context
 
 let ctx_lookup st = Ctx.lookup st.context
 
-let infer_effect st = Ctx.infer_effect st.context
+let infer_effect st eff =
+  try Some (EffectMap.find eff st.effects) with Not_found -> None
 
 let add_effect st eff (ty1, ty2) =
-  {st with context= Ctx.add_effect st.context eff (ty1, ty2)}
+  match infer_effect st eff with
+  | None ->
+      {st with effects= EffectMap.add eff (ty1, ty2) st.effects}
+  | Some _ ->
+      Error.typing ~loc:Location.unknown "Effect %t already defined."
+        (CoreTypes.Effect.print eff)
 
 (* [infer_pattern st pp] infers the type of pattern [pp]. It returns the list of
    pattern variables with their types, which are all guaranteed to be [Type.Meta]'s, together

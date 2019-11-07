@@ -34,7 +34,3 @@ val generalize : t -> bool -> Type.ty -> ty_scheme
 (** [generalize ctx poly ty] generalizes the type [ty] in context [ctx] to a
     type scheme. If [poly] is [true], all free type parameters in [ty] that do
     not appear in [ctx] are universally quantified. *)
-
-val infer_effect : t -> UntypedSyntax.effect -> (Type.ty * Type.ty) option
-
-val add_effect : t -> UntypedSyntax.effect -> Type.ty * Type.ty -> t
