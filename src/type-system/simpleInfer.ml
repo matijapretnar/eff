@@ -18,8 +18,10 @@ let empty_constraints = []
 
 let empty_ctx = VariableMap.empty
 
+let empty_effects = EffectMap.empty
+
 let initial_state =
-  {context= empty_ctx; effects= EffectMap.empty; constraints= empty_constraints}
+  {context= empty_ctx; effects= empty_effects; constraints= empty_constraints}
 
 let replace_ctx st ctx = {st with context= ctx}
 
