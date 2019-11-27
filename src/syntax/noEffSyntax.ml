@@ -29,6 +29,8 @@ and n_term =
   | NLetRec of n_letrec_abstraction list * n_term
   | NMatch of n_term * n_abstraction list * Location.t
   | NOp of n_effect * n_term
+  | NRecord of (CoreTypes.Field.t, n_term) Assoc.t
+  | NVariant of CoreTypes.Label.t * n_term
 
 and n_handler =
   { effect_clauses: (n_effect, n_abstraction_2_args) Assoc.t
@@ -79,6 +81,8 @@ and n_coercion =
   | NCoerRightArrow of n_coercion
   | NCoerRightHandler of n_coercion
   | NCoerPure of n_coercion
+  | NCoerApply of CoreTypes.TyName.t * n_coercion list
+  | NCoerTuple of n_coercion list
 
 (********************** PRINT FUNCTIONS **********************)
 
@@ -140,6 +144,9 @@ let rec print_term ?max_level t ppf =
         print ~at_level:2 "(match %t with @[<v>| %t@])" (print_term t)
         (Print.cases print_abstraction lst)
   | NOp (eff, t) -> print "Op %t %t" (print_effect eff) (print_term t)
+  | NRecord recs -> Print.record CoreTypes.Field.print print_term recs ppf
+  | NVariant (l, t) -> 
+        print "Variant %t %t" (CoreTypes.Label.print l) (print_term t)
 
 and print_let_rec_abstraction (f, arg_ty, res_ty, abs) ppf =
   Format.fprintf ppf "(%t : %t) %t"

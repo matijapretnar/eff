@@ -160,7 +160,7 @@ let rec tcValTyCoTemp st = function
       let new_st = extend_dirt_params st dirt_param in
       let t1, t2 = tcValTyCo new_st ty_coer1 in
       (Types.TySchemeDirt (dirt_param, t1), Types.TySchemeDirt (dirt_param, t2))
-  | ApplyDirCoer (ty_coer1, drt) -> (
+  | ApplyDirtCoer (ty_coer1, drt) -> (
     match tcValTyCo st ty_coer1 with
     | Types.TySchemeDirt (drt_param1, t1), Types.TySchemeDirt (drt_param2, t2) ->
         checkWellFormedDirt st drt ;

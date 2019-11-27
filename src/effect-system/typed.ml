@@ -44,7 +44,7 @@ type ty_coercion =
   | ForallTy of CoreTypes.TyParam.t * ty_coercion
   | ApplyTyCoer of ty_coercion * target_ty
   | ForallDirt of CoreTypes.DirtParam.t * ty_coercion
-  | ApplyDirCoer of ty_coercion * dirt
+  | ApplyDirtCoer of ty_coercion * dirt
   | PureCoercion of dirty_coercion
   | QualTyCoer of ct_ty * ty_coercion
   | QualDirtCoer of ct_dirt * ty_coercion
@@ -1035,7 +1035,7 @@ let rec free_dirt_vars_ty_coercion = function
         (fdvsOfTargetValTy ty)
   | ForallDirt (dp, tc) ->
       Types.DirtParamSet.remove dp (free_dirt_vars_ty_coercion tc)
-  | ApplyDirCoer (tc, d) ->
+  | ApplyDirtCoer (tc, d) ->
       Types.DirtParamSet.union
         (free_dirt_vars_ty_coercion tc)
         (fdvsOfDirt d)
