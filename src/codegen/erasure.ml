@@ -31,7 +31,6 @@ and typed_to_erasure_cmp_ty sub (ty, _drt) =
 let rec typed_to_erasure_exp sub tt =
   match tt with
   | Typed.Var v -> SkelEff.EVar v
-  | Typed.BuiltIn (s, i) -> failwith __LOC__
   | Typed.Const c -> SkelEff.EConst c
   | Typed.Tuple elist ->
       SkelEff.ETuple (List.map (fun x -> typed_to_erasure_exp sub x) elist)

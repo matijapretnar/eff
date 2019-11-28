@@ -151,8 +151,8 @@ let rec apply_sub_tycoer sub ty_coer =
       ApplyTyCoer (apply_sub_tycoer sub ty_coer1, apply_sub_ty sub tty1)
   | ForallDirt (dirt_param, ty_coer1) ->
       ForallDirt (dirt_param, apply_sub_tycoer sub ty_coer1)
-  | ApplyDirCoer (ty_coer1, drt) ->
-      ApplyDirCoer (apply_sub_tycoer sub ty_coer1, apply_sub_dirt sub drt)
+  | ApplyDirtCoer (ty_coer1, drt) ->
+      ApplyDirtCoer (apply_sub_tycoer sub ty_coer1, apply_sub_dirt sub drt)
   | PureCoercion dirty_coer1 ->
       PureCoercion (apply_sub_dirtycoer sub dirty_coer1)
   | ForallSkel (ty_param, ty_coer1) ->
@@ -218,7 +218,6 @@ let rec apply_sub_comp sub computation =
 and apply_sub_exp sub expression =
   match expression with
   | Var v -> Var v
-  | BuiltIn (s, i) -> BuiltIn (s, i)
   | Const c -> Const c
   | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
   | Variant (lbl, e1) -> Variant (lbl, apply_sub_exp sub e1)

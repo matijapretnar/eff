@@ -44,7 +44,7 @@ type ty_coercion =
   | ForallTy of CoreTypes.TyParam.t * ty_coercion
   | ApplyTyCoer of ty_coercion * target_ty
   | ForallDirt of CoreTypes.DirtParam.t * ty_coercion
-  | ApplyDirCoer of ty_coercion * dirt
+  | ApplyDirtCoer of ty_coercion * dirt
   | PureCoercion of dirty_coercion
   | QualTyCoer of ct_ty * ty_coercion
   | QualDirtCoer of ct_dirt * ty_coercion
@@ -71,7 +71,6 @@ and dirty_coercion =
 (** Pure expressions *)
 type expression =
   | Var of variable
-  | BuiltIn of string * int
   | Const of Const.t
   | Tuple of expression list
   | Record of (CoreTypes.Field.t, expression) Assoc.t
@@ -297,7 +296,6 @@ let rec print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match e with
   | Var x -> print "%t" (print_variable x)
-  | BuiltIn (s, _) -> print "%s" s
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record lst -> Print.record CoreTypes.Field.print print_expression lst ppf
@@ -583,7 +581,7 @@ let rec refresh_expr sbst = function
   | Record flds -> Record (Assoc.map (refresh_expr sbst) flds)
   | Variant (lbl, e) -> Variant (lbl, refresh_expr sbst e)
   | CastExp (e1, tyco) -> CastExp (refresh_expr sbst e1, tyco)
-  | (BuiltIn _ | Const _ | Effect _) as e -> e
+  | (Const _ | Effect _) as e -> e
   | BigLambdaTy (tyvar, sk, e) -> failwith __LOC__
   | BigLambdaDirt (dvar, e) ->
       (* TODO: refresh dirt var *)
@@ -657,7 +655,7 @@ let rec subst_expr sbst = function
   | Tuple es -> Tuple (List.map (subst_expr sbst) es)
   | Record flds -> Record (Assoc.map (subst_expr sbst) flds)
   | Variant (lbl, e) -> Variant (lbl, subst_expr sbst e)
-  | (BuiltIn _ | Const _ | Effect _) as e -> e
+  | (Const _ | Effect _) as e -> e
   | CastExp (e, tyco) -> CastExp (subst_expr sbst e, tyco)
   | BigLambdaTy (tyvar, sk, e) -> BigLambdaTy (tyvar, sk, subst_expr sbst e)
   | BigLambdaDirt (dvar, e) -> BigLambdaDirt (dvar, subst_expr sbst e)
@@ -757,7 +755,6 @@ let rec alphaeq_expr eqvars e e' =
   | Record flds, Record flds' -> assoc_equal (alphaeq_expr eqvars) flds flds'
   | Variant (lbl, e), Variant (lbl', e') ->
       lbl = lbl' && alphaeq_expr eqvars e e'
-  | BuiltIn (f, n), BuiltIn (f', n') -> f = f' && n = n'
   | Const cst, Const cst' -> Const.equal cst cst'
   | Effect eff, Effect eff' -> eff = eff'
   | ApplyDirtCoercion (e, dco), ApplyDirtCoercion (e', dco') ->
@@ -894,7 +891,7 @@ and free_vars_expr e =
   | Record flds -> Assoc.values_of flds |> List.map free_vars_expr |> concat_vars
   | Variant (_, e) -> free_vars_expr e
   | CastExp (e', tyco) -> free_vars_expr e'
-  | BuiltIn _ | Effect _ | Const _ -> ([], [])
+  | Effect _ | Const _ -> ([], [])
   | BigLambdaTy _ -> failwith __LOC__
   | BigLambdaDirt _ -> failwith __LOC__
   | BigLambdaSkel _ -> failwith __LOC__
@@ -1038,7 +1035,7 @@ let rec free_dirt_vars_ty_coercion = function
         (fdvsOfTargetValTy ty)
   | ForallDirt (dp, tc) ->
       Types.DirtParamSet.remove dp (free_dirt_vars_ty_coercion tc)
-  | ApplyDirCoer (tc, d) ->
+  | ApplyDirtCoer (tc, d) ->
       Types.DirtParamSet.union
         (free_dirt_vars_ty_coercion tc)
         (fdvsOfDirt d)
@@ -1086,7 +1083,6 @@ and free_dirt_vars_dirty_coercion = function
 let rec free_dirt_vars_expression e =
   match e with
   | Var _ -> DirtParamSet.empty
-  | BuiltIn _ -> DirtParamSet.empty
   | Const _ -> DirtParamSet.empty
   | Tuple es ->
       List.fold_left
