@@ -23,7 +23,6 @@ and target_ty =
   | PrimTy of prim_ty
   | QualTy of ct_ty * target_ty
   | QualDirt of ct_dirt * target_ty
-  | TySchemeTy of CoreTypes.TyParam.t * skeleton * target_ty
   | TySchemeDirt of CoreTypes.DirtParam.t * target_ty
   | TySchemeSkel of CoreTypes.SkelParam.t * target_ty
 
@@ -61,9 +60,6 @@ let rec print_target_ty ?max_level ty ppf =
   | Tuple tys ->
       print ~at_level:2 "@[<hov>%t@]"
         (Print.sequence (Symbols.times ()) (print_target_ty ~max_level:1) tys)
-  | Tuple tys ->
-      print ~at_level:2 "@[<hov>%t@]"
-        (Print.sequence (Symbols.times ()) (print_target_ty ~max_level:1) tys)
   | Handler ((t1, drt1), (t2, drt2)) ->
       print ~at_level:6 "%t ! %t %s@ %t ! %t"
         (print_target_ty ~max_level:4 t1)
@@ -74,9 +70,6 @@ let rec print_target_ty ?max_level ty ppf =
   | QualTy (c, tty) -> print "%t => %t" (print_ct_ty c) (print_target_ty tty)
   | QualDirt (c, tty) ->
       print "%t => %t" (print_ct_dirt c) (print_target_ty tty)
-  | TySchemeTy (p, sk, tty) ->
-      print "\\/(%t:%t). %t" (CoreTypes.TyParam.print p) (print_skeleton sk)
-        (print_target_ty tty)
   | TySchemeDirt (p, tty) ->
       print "\\/%t. %t" (CoreTypes.DirtParam.print p) (print_target_ty tty)
   | TySchemeSkel (p, tty) ->
@@ -164,7 +157,6 @@ let rec isMonoTy : target_ty -> bool = function
   | PrimTy _                  -> true
   | QualTy (_,_)              -> false (* no qualification *)
   | QualDirt (_,_)            -> false (* no qualification *)
-  | TySchemeTy (_,_,_)        -> false (* no quantification *)
   | TySchemeDirt (_,_)        -> false (* no quantification *)
   | TySchemeSkel (_,_)        -> false (* no quantification *)
 
@@ -180,7 +172,6 @@ let rec isClosedMonoTy : target_ty -> bool = function
   | PrimTy _            -> true
   | QualTy (_,_)        -> false (* no qualification *)
   | QualDirt (_,_)      -> false (* no qualification *)
-  | TySchemeTy (_,_,_)  -> false (* no quantification *)
   | TySchemeDirt (_,_)  -> false (* no quantification *)
   | TySchemeSkel (_,_)  -> false (* no quantification *)
 
@@ -220,7 +211,6 @@ let rec rnSkelVarInValTy (oldS : CoreTypes.SkelParam.t) (newS : CoreTypes.SkelPa
   | PrimTy ty           -> PrimTy ty
   | QualTy (ct,ty)      -> QualTy (rnSkelVarInTyCt oldS newS ct, rnSkelVarInValTy oldS newS ty)
   | QualDirt (ct,ty)    -> QualDirt (ct, rnSkelVarInValTy oldS newS ty) (* GEORGE: No skeletons in dirts! :) *)
-  | TySchemeTy (a,s,ty) -> TySchemeTy (a, rnSkelVarInSkel oldS newS s, rnSkelVarInValTy oldS newS ty)
   | TySchemeDirt (d,ty) -> TySchemeDirt (d, rnSkelVarInValTy oldS newS ty)
   | TySchemeSkel (v,ty) -> if v = oldS
                              then ( Print.debug "rnSkelVarInValTy: not fresh enough"
@@ -248,10 +238,6 @@ let rec rnTyVarInValTy (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t)
   | PrimTy ty           -> PrimTy ty
   | QualTy (ct, ty)     -> QualTy (rnTyVarInTyCt oldA newA ct, rnTyVarInValTy oldA newA ty)
   | QualDirt (ct, ty)   -> QualDirt (ct, rnTyVarInValTy oldA newA ty) (* GEORGE: No skeletonsin dirts! :) *)
-  | TySchemeTy (a,s,ty) -> if a = oldA
-                             then ( Print.debug "rnTyVarInValTy: not fresh enough"
-                                  ; failwith __LOC__ )
-                             else TySchemeTy (a,s,rnTyVarInValTy oldA newA ty)
   | TySchemeDirt (d,ty) -> TySchemeDirt (d, rnTyVarInValTy oldA newA ty)
   | TySchemeSkel (v,ty) -> TySchemeSkel (v, rnTyVarInValTy oldA newA ty)
 
@@ -276,7 +262,6 @@ let rec rnDirtVarInValTy (oldD : CoreTypes.DirtParam.t) (newD : CoreTypes.DirtPa
   | PrimTy ty           -> PrimTy ty
   | QualTy (ct,ty)      -> QualTy (rnDirtVarInTyCt oldD newD ct, rnDirtVarInValTy oldD newD ty)
   | QualDirt (ct,ty)    -> QualDirt (rnDirtVarInDirtCt oldD newD ct, rnDirtVarInValTy oldD newD ty)
-  | TySchemeTy (a,s,ty) -> TySchemeTy (a,s,rnDirtVarInValTy oldD newD ty)
   | TySchemeDirt (d,ty) -> if d = oldD
                              then ( Print.debug "rnDirtVarInValTy: not fresh enough"
                                   ; failwith __LOC__ )
@@ -320,12 +305,6 @@ let rec types_are_equal type1 type2 =
       ty_cts_are_equal ctty1 ctty2 && types_are_equal ty1 ty2
   | QualDirt (ctd1, ty1), QualDirt (ctd2, ty2) ->
       dirt_cts_are_equal ctd1 ctd2 && types_are_equal ty1 ty2
-  | TySchemeTy (tyvar1, sk1, ty1), TySchemeTy (tyvar2, sk2, ty2) ->
-      let tyvar = CoreTypes.TyParam.fresh () in (* Fresh type variable *)
-      let ty1new = rnTyVarInValTy tyvar1 tyvar ty1 in
-      let ty2new = rnTyVarInValTy tyvar2 tyvar ty2 in
-      sk1 = sk2 && (* The skeletons must be identical *)
-      types_are_equal ty1new ty2new
   | TySchemeDirt (dvar1, ty1), TySchemeDirt (dvar2, ty2) ->
       let dvar = CoreTypes.DirtParam.fresh () in (* Fresh dirt variable *)
       let ty1new = rnDirtVarInValTy dvar1 dvar ty1 in
@@ -410,7 +389,6 @@ let rec fdvsOfTargetValTy : target_ty -> DirtParamSet.t = function
   | Apply (_, vtys)        -> fdvsOfTargetValTys vtys
   | QualTy (ct, vty)       -> DirtParamSet.union (fdvsOfValTyCt ct) (fdvsOfTargetValTy vty)
   | QualDirt (ct, vty)     -> DirtParamSet.union (fdvsOfDirtCt  ct) (fdvsOfTargetValTy vty)
-  | TySchemeTy (_, _, vty) -> fdvsOfTargetValTy vty
   | TySchemeDirt (d, vty)  -> DirtParamSet.remove d (fdvsOfTargetValTy vty)
   | TySchemeSkel (_, vty)  -> fdvsOfTargetValTy vty
 
@@ -460,7 +438,6 @@ let rec ftvsOfTargetValTy : target_ty -> TyParamSet.t = function
   | Apply (_, vtys)        -> ftvsOfTargetValTys vtys
   | QualTy (ct, vty)       -> TyParamSet.union (ftvsOfValTyCt ct) (ftvsOfTargetValTy vty)
   | QualDirt (_, vty)      -> ftvsOfTargetValTy vty
-  | TySchemeTy (a, _, vty) -> TyParamSet.remove a (ftvsOfTargetValTy vty)
   | TySchemeDirt (_, vty)  -> ftvsOfTargetValTy vty
   | TySchemeSkel (_, vty)  -> ftvsOfTargetValTy vty
 
@@ -520,7 +497,6 @@ let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
   | PrimTy x -> ((ty_sbst, dirt_sbst), PrimTy x)
   | QualTy (_, a) -> failwith __LOC__
   | QualDirt (_, a) -> failwith __LOC__
-  | TySchemeTy (ty_param, _, a) -> failwith __LOC__
   | TySchemeDirt (dirt_param, a) -> failwith __LOC__
 
 

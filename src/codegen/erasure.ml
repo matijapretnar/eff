@@ -18,9 +18,6 @@ let rec typed_to_erasure_ty sub typed_ty =
   | Types.PrimTy p -> Types.PrimSkel p
   | Types.QualTy (_, tty) -> typed_to_erasure_ty sub tty
   | Types.QualDirt (_, tty) -> typed_to_erasure_ty sub tty
-  | Types.TySchemeTy (p, sk, tty) ->
-      let sub' = Assoc.update p sk sub in
-      typed_to_erasure_ty sub' tty
   | Types.TySchemeDirt (p, tty) -> typed_to_erasure_ty sub tty
   | Types.TySchemeSkel (p, tty) ->
       Types.ForallSkel (p, typed_to_erasure_ty sub tty)
@@ -49,13 +46,9 @@ let rec typed_to_erasure_exp sub tt =
       in
       let new_h = {effect_clauses= new_op_c; value_clause= new_vc} in
       SkelEff.EHandler new_h
-  | Typed.BigLambdaTy (tp, sk, e) ->
-      let sub1 = Assoc.concat sub (Assoc.update tp sk Assoc.empty) in
-      typed_to_erasure_exp sub1 e
   | BigLambdaDirt (_, e) -> typed_to_erasure_exp sub e
   | BigLambdaSkel (sk_p, e) -> SkelEff.EBigLambdaSkel (sk_p, typed_to_erasure_exp sub e)
   | CastExp (e, _) -> typed_to_erasure_exp sub e
-  | ApplyTyExp (e, _) -> typed_to_erasure_exp sub e
   | LambdaTyCoerVar (_, _, e) -> typed_to_erasure_exp sub e
   | LambdaDirtCoerVar (_, _, e) -> typed_to_erasure_exp sub e
   | ApplyDirtExp (e, _) -> typed_to_erasure_exp sub e

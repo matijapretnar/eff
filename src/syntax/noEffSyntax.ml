@@ -12,8 +12,6 @@ and n_term =
   | NTuple of n_term list
   | NFun of n_abstraction_with_type
   | NApplyTerm of n_term * n_term
-  | NBigLambdaTy of CoreTypes.TyParam.t * n_term
-  | NTyAppl of n_term * n_type
   | NBigLambdaCoer of CoreTypes.TyCoercionParam.t * n_coerty * n_term
   | NApplyCoer of n_term * n_coercion
   | NCast of n_term * n_coercion
@@ -44,8 +42,6 @@ and n_type =
   | NTyHandler of n_type * n_type
   | NTyQual of n_coerty * n_type
   | NTyComp of n_type
-  (* Might remove this later to drop all polymorphism *)
-  | NTyForall of CoreTypes.TyParam.t * n_type
   | NTyApply of CoreTypes.TyName.t * n_type list
   | NTyPrim of prim_ty
 
@@ -98,11 +94,6 @@ let rec print_term ?max_level t ppf =
   | NApplyTerm (t1, t2) -> print ~at_level:1 "((%t)@ (%t))"
         (print_term ~max_level:1 t1)
         (print_term ~max_level:0 t2)
-  | NBigLambdaTy (x, t) ->
-        print "/\\%t. %t " (CoreTypes.TyParam.print x) (print_term t)
-  | NTyAppl (t, ty) -> print ~at_level:1 "((%t)@ (%t))"
-        (print_term ~max_level:1 t)
-        (print_type ~max_level:0 ty)
   | NBigLambdaCoer (x, coerty, t) ->
         print "/\\%t : %t. %t " (CoreTypes.TyCoercionParam.print x)
           (print_coerty coerty)
@@ -187,7 +178,6 @@ and print_type ?max_level ty ppf =
   | NTyHandler (t1, t2) -> print "%t ==> %t" (print_type t1) (print_type t2)
   | NTyQual (coerty, t) -> print "%t => %t" (print_coerty coerty) (print_type t)
   | NTyComp t -> print "Comp %t" (print_type t)
-  | NTyForall (x, t) -> print "forall %t. %t" (CoreTypes.TyParam.print x) (print_type t)
   | NTyApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
   | NTyApply (t, [s]) ->
       print ~at_level:1 "%t %t" (print_type ~max_level:1 s) (CoreTypes.TyName.print t)

@@ -80,9 +80,6 @@ let rec checkWellFormedValTyTemp st = function
   | QualDirt (ct_ty1, tty1) ->
       checkWellFormedDirtCt st ct_ty1 ;
       checkWellFormedValTy st tty1
-  | TySchemeTy (ty_param, skel, tty1) ->
-      let st' = extend_ty_param_skeletons st ty_param skel in
-      checkWellFormedValTy st' tty1
   | TySchemeDirt (dirt_param, tty1) ->
       let st' = extend_dirt_params st dirt_param in
       checkWellFormedValTy st' tty1
@@ -142,19 +139,6 @@ let rec tcValTyCoTemp st = function
   | LeftArrow tc1 -> (
     match tcValTyCo st tc1 with
     | Types.Arrow (t1, _), Types.Arrow (t2, _) -> (t2, t1)
-    | _ -> assert false )
-  | ForallTy (ty_param, ty_coer1) ->
-      let new_st = extend_ty_params st ty_param in
-      let t1, t2 = tcValTyCo new_st ty_coer1 in
-      ( Types.TySchemeTy (ty_param, Types.PrimSkel Types.IntTy, t1)   (* WHY int SKEL???? *)
-      , Types.TySchemeTy (ty_param, Types.PrimSkel Types.IntTy, t2) ) (* WHY int SKEL???? *)
-  | ApplyTyCoer (ty_coer1, tty1) -> (
-    match tcValTyCo st ty_coer1 with
-    | Types.TySchemeTy (ty_param1, _, t1), Types.TySchemeTy (ty_param2, _, t2) ->
-        checkWellFormedValTy st tty1 ;
-        let sub = Substitution.add_type_substitution_e ty_param1 tty1 in
-        assert (ty_param1 = ty_param2) ;
-        (Substitution.apply_substitutions_to_type sub t1, Substitution.apply_substitutions_to_type sub t2)
     | _ -> assert false )
   | ForallDirt (dirt_param, ty_coer1) ->
       let new_st = extend_dirt_params st dirt_param in
@@ -324,10 +308,6 @@ let rec typeOfExpressionTemp st = function (*  (%t) (Typed.print_expression inpu
       Types.Arrow
         (eff_in, (eff_out, Types.closed_dirt (EffectSet.singleton eff)))
   | Handler h -> type_of_handler st h
-  | BigLambdaTy (ty_param, skel, e1) ->
-      let st' = extend_ty_param_skeletons st ty_param skel in
-      let e1_ty = typeOfExpression st' e1 in
-      TySchemeTy (ty_param, skel, e1_ty)
   | BigLambdaSkel (skel_param, e1) ->
       let st' = extend_skel_params st skel_param in
       let e1_ty = typeOfExpression st' e1 in
@@ -343,13 +323,6 @@ let rec typeOfExpressionTemp st = function (*  (%t) (Typed.print_expression inpu
       Print.debug "CastExp: after  tcValTyCo";
       assert (Types.types_are_equal tc1a e1_ty) ;
       tc1b
-  | ApplyTyExp (e1, tty) -> (
-    match typeOfExpression st e1 with
-    | Types.TySchemeTy (p_e1, skel, ty_e1) ->
-        checkWellFormedValTy st tty ;
-        let sub = Substitution.add_type_substitution_e p_e1 tty in
-        Substitution.apply_substitutions_to_type sub ty_e1
-    | _ -> assert false )
   | ApplySkelExp (e1, sk) -> (
     match typeOfExpression st e1 with
     | Types.TySchemeSkel (p_e1, ty_e1) ->

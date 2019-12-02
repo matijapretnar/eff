@@ -131,18 +131,16 @@ let subInDirtCt sub (d1,d2) = (subInDirt sub d1, subInDirt sub d2)
 (* ************************************************************************* *)
 
 (* Apply a term to all possible arguments *)
-let applyTerm skeletons types dirts tyCoercions dirtCoercions exp : Typed.expression =
+let applyTerm skeletons dirts tyCoercions dirtCoercions exp : Typed.expression =
   let foldLeft f xs x0 = List.fold_left f x0 xs in (* GEORGE: Just for convenience *)
   exp
   |> (* 1: Apply to the skeletons *)
      foldLeft (fun e s -> Typed.ApplySkelExp (e, s)) skeletons
-  |> (* 2: Apply to the types *)
-     foldLeft (fun e a -> Typed.ApplyTyExp (e, a)) types
-  |> (* 3: Apply to the dirts *)
+  |> (* 2: Apply to the dirts *)
      foldLeft (fun e d -> Typed.ApplyDirtExp (e, d)) dirts
-  |> (* 4: Apply to the type coercions *)
+  |> (* 3: Apply to the type coercions *)
      foldLeft (fun e c -> Typed.ApplyTyCoercion (e, c)) tyCoercions
-  |> (* 5: Apply to the dirt coercions *)
+  |> (* 4: Apply to the dirt coercions *)
      foldLeft (fun e c -> Typed.ApplyDirtCoercion (e, c)) dirtCoercions
 
 (* ************************************************************************* *)
@@ -157,7 +155,6 @@ let applyTerm skeletons types dirts tyCoercions dirtCoercions exp : Typed.expres
  * that exact form, [stripHindleyMilnerLikeTy] will return [None]. *)
 let stripHindleyMilnerLikeTy : Types.target_ty ->
     ( CoreTypes.SkelParam.t list                  (* Skeleton variables *)
-    * (CoreTypes.TyParam.t * Types.skeleton) list (* Skeleton-annotated type variables *)
     * CoreTypes.DirtParam.t list                  (* Dirt variables *)
     * Types.ct_ty list                            (* Type inequalities *)
     * Types.ct_dirt list                          (* Dirt inequalities *)
@@ -165,10 +162,6 @@ let stripHindleyMilnerLikeTy : Types.target_ty ->
   let rec stripSkelAbs = function
     | Types.TySchemeSkel (s,ty) ->
         let skels, rem = stripSkelAbs ty in (s :: skels, rem)
-    | other_type -> ([], other_type) in
-  let rec stripTyAbs = function
-    | Types.TySchemeTy (a,s,ty) ->
-        let alphaSkels, rem = stripTyAbs ty in ((a,s) :: alphaSkels, rem)
     | other_type -> ([], other_type) in
   let rec stripDirtAbs = function
     | Types.TySchemeDirt (d, ty) ->
@@ -184,12 +177,11 @@ let stripHindleyMilnerLikeTy : Types.target_ty ->
     | other_type -> ([], other_type) in
   function inTy ->
     let allSkelVars, ty1 = stripSkelAbs  inTy in  (* 1: Strip off the skeleton abstractions *)
-    let allTyVars  , ty2 = stripTyAbs    ty1  in  (* 2: Strip off the type abstractions *)
-    let allDirtVars, ty3 = stripDirtAbs  ty2  in  (* 3: Strip off the dirt abstractions *)
-    let allTyCs    , ty4 = stripTyQual   ty3  in  (* 4: Strip off the type inequality qualification *)
-    let allDirtCs  , ty5 = stripDirtQual ty4  in  (* 5: Strip off the dirt inequality qualification *)
-    if Types.isMonoTy ty5                         (* 6: Ensure the remainder is a monotype *)
-      then Some (allSkelVars,allTyVars,allDirtVars,allTyCs,allDirtCs,ty5)
+    let allDirtVars, ty2 = stripDirtAbs  ty1  in  (* 3: Strip off the dirt abstractions *)
+    let allTyCs    , ty3 = stripTyQual   ty2  in  (* 4: Strip off the type inequality qualification *)
+    let allDirtCs  , ty4 = stripDirtQual ty3  in  (* 5: Strip off the dirt inequality qualification *)
+    if Types.isMonoTy ty4                         (* 6: Ensure the remainder is a monotype *)
+      then Some (allSkelVars,allDirtVars,allTyCs,allDirtCs,ty4)
       else None
 
 (* ************************************************************************* *)
@@ -199,14 +191,13 @@ let stripHindleyMilnerLikeTy : Types.target_ty ->
 let instantiateVariable (x : variable) (scheme : Types.target_ty)
   : (Typed.expression * Types.target_ty * Typed.omega_ct list) =
   (* 1: Take the type signature apart *)
-  let skelVars, tyVarsWithSkels, dirtVars, tyCs, dirtCs, monotype =
+  let skelVars, dirtVars, tyCs, dirtCs, monotype =
     (match stripHindleyMilnerLikeTy scheme with
-     | Some (a,b,c,d,e,f) -> (a,b,c,d,e,f)
+     | Some (a,b,c,d,e) -> (a,b,c,d,e)
      | None -> failwith "instantiateVariable: Non-HM type in the environment!") in
 
   (* 2: Generate fresh skeleton, type, and dirt variables *)
   let newSkelVars = List.map (fun _ -> CoreTypes.SkelParam.fresh ()) skelVars in
-  let newTyVars   = List.map (fun _ -> CoreTypes.TyParam.fresh ()) tyVarsWithSkels in
   let newDirtVars = List.map (fun _ -> Types.fresh_dirt ()) dirtVars in
 
   (* 3: Generate the freshening substitution *)
@@ -218,12 +209,6 @@ let instantiateVariable (x : variable) (scheme : Types.target_ty)
                     let newS = Types.SkelParam newSkelVar in
                     sub |> Substitution.add_skel_param_substitution oldS newS)
                  (List.combine skelVars newSkelVars)
-            |> (* Substitute the old type variables for the fresh ones *)
-               foldLeft
-                 (fun sub (oldA, newTyVar) ->
-                    let newA = Types.TyParam newTyVar in
-                    sub |> Substitution.add_type_substitution oldA newA)
-                 (List.combine (List.map fst tyVarsWithSkels) newTyVars)
             |> (* Substitute the old dirt variables for the fresh ones *)
                foldLeft
                  (fun sub (oldD, newD) ->
@@ -232,9 +217,10 @@ let instantiateVariable (x : variable) (scheme : Types.target_ty)
   in
 
   (* 4: Generate the wanted skeleton constraints *)
-  let wantedSkelCs = List.map (* a' : sigma(tau) *)
+  (* STIEN: I guess this can go? *)
+  (* let wantedSkelCs = List.map (* a' : sigma(tau) *)
                        (fun (a,s) -> Typed.TyParamHasSkel (a, subInSkel sub s))
-                       (List.combine newTyVars (List.map snd tyVarsWithSkels)) in
+                       (List.combine newTyVars (List.map snd tyVarsWithSkels)) in *)
 
   (* 5: Generate the wanted type inequality constraints *)
   let tyOmegas, wantedTyCs =
@@ -249,7 +235,6 @@ let instantiateVariable (x : variable) (scheme : Types.target_ty)
   (* 6: Apply x to all its fresh arguments *)
   let targetX = applyTerm
                   (List.map (fun s -> Types.SkelParam s) newSkelVars)
-                  (List.map (fun a -> Types.TyParam a) newTyVars)
                   newDirtVars
                   tyOmegas
                   dirtOmegas
@@ -259,7 +244,7 @@ let instantiateVariable (x : variable) (scheme : Types.target_ty)
   (* 7: Combine the results *)
   ( targetX
   , subInValTy sub monotype
-  , wantedSkelCs @ wantedTyCs @ wantedDirtCs
+  , wantedTyCs @ wantedDirtCs
   )
 
 (* ************************************************************************* *)
@@ -315,7 +300,6 @@ let mkGenParts (cs : Typed.omega_ct list)
 (* Create a generalized type from parts (as delivered from "mkGenParts"). *)
 let mkGeneralizedType
     (freeSkelVars  : CoreTypes.SkelParam.t list)
-    (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
     (freeDirtVars  : CoreTypes.DirtParam.t list)
     (tyCs   : (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list)
     (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
@@ -334,11 +318,7 @@ let mkGeneralizedType
      List.fold_right
        (fun delta scheme -> Types.TySchemeDirt (delta, scheme))
        freeDirtVars
-  |> (* 4: Add the type variable abstractions *)
-     List.fold_right
-       (fun (a,s) scheme -> Types.TySchemeTy (a, s, scheme))
-       annFreeTyVars
-  |> (* 5: Add the skeleton abstractions *)
+  |> (* 4: Add the skeleton abstractions *)
      List.fold_right
        (fun skel scheme -> Types.TySchemeSkel (skel, scheme))
        freeSkelVars
@@ -349,7 +329,6 @@ let mkGeneralizedType
  * the elaborated expression and pass them in. *)
 let mkGeneralizedTerm
     (freeSkelVars  : CoreTypes.SkelParam.t list)
-    (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
     (freeDirtVars  : CoreTypes.DirtParam.t list)
     (tyCs   : (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list)
     (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
@@ -368,11 +347,7 @@ let mkGeneralizedTerm
      List.fold_right
        (fun delta e -> Typed.BigLambdaDirt (delta, e))
        freeDirtVars
-  |> (* 4: Add the type variable abstractions *)
-     List.fold_right
-       (fun (a,s) e -> Typed.BigLambdaTy (a, s, e))
-       annFreeTyVars
-  |> (* 5: Add the skeleton abstractions *)
+  |> (* 4: Add the skeleton abstractions *)
      List.fold_right
        (fun skel e -> Typed.BigLambdaSkel (skel, e))
        freeSkelVars

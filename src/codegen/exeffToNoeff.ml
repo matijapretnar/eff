@@ -81,10 +81,6 @@ let rec type_elab state (env : environment) (ty : ExEffTypes.target_ty) =
     let (type3, elab3) = type_elab state env ty in
     (type3, NoEff.NTyQual ((elab1, elab2), elab3))
   | ExEffTypes.QualDirt (_, ty) -> type_elab state env ty
-  | ExEffTypes.TySchemeTy (par, skel, ty) -> 
-    let env' = TypeCheck.extend_ty_param_skeletons env par skel in
-    let (t, elab) = type_elab state env' ty in
-    (t, NoEff.NTyForall (par, elab))
   | ExEffTypes.TySchemeDirt (par, ty) -> 
     let env' = TypeCheck.extend_dirt_params env par in
     type_elab state env' ty
@@ -191,10 +187,6 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
         )
       )
     )
-  | ExEff.BigLambdaTy (par, skel, value) -> 
-    let env' = TypeCheck.extend_ty_param_skeletons env par skel in
-    let (ty, elab) = value_elab state env' value in
-    (ExEffTypes.TySchemeTy (par, skel, ty), NoEff.NBigLambdaTy (par, elab))
   | ExEff.BigLambdaDirt (par, value) -> 
     let env' = TypeCheck.extend_dirt_params env par in
     let (ty, elab) = value_elab state env' value in
@@ -209,15 +201,6 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
     if (ty1 = ty2) 
     then (r, NoEff.NCast (elab1, elab2))
     else typefail "Ill-typed cast"
-  | ExEff.ApplyTyExp (value, ty) -> 
-    let (tyv, elabv) = (
-      match (value_elab state env value) with
-      | (ExEffTypes.TySchemeTy (p,t,v), elab) -> (ExEffTypes.TySchemeTy (p,t,v), elab)
-      | _ -> typefail "Ill-typed type application value"
-    ) in
-    let (skel, elabt) = type_elab state env ty in
-    let ExEffTypes.TySchemeTy (pat, s, bigt) = tyv in
-    ( subst_ty_param ty pat bigt,  NoEff.NTyAppl (elabv, elabt) )
   | ExEff.LambdaTyCoerVar (par, (ty1, ty2), value) ->
     let (_, elab1) = type_elab state env ty1 in
     let (_, elab2) = type_elab state env ty2 in
@@ -328,9 +311,6 @@ and coercion_elab_ty state env coer =
       let (_, elab) = coercion_elab_ty state env c in
       ( ty, NoEff.NCoerLeftArrow elab )
     | _ -> failwith "Ill-formed left arrow coercion"
-  | ExEff.ForallTy (par, c) ->
-    let ( ty, elab ) = coercion_elab_ty state env c in failwith "TODO" (* STIEN: Need the skeleton here, is fixed in Brecht's branch but not here yet *)
-  | ExEff.ApplyTyCoer (c, t) -> failwith "TODO" (* STIEN: Same skeleton-note as above + NB: becomes NCoerInst in elaboration *)
   | ExEff.ForallDirt (par, c) ->
     let ( (ty1, ty2), elab ) = coercion_elab_ty state env c in
     ( (ExEffTypes.TySchemeDirt (par, ty1), ExEffTypes.TySchemeDirt (par, ty2)), elab )
@@ -485,7 +465,6 @@ and subst_ty_param tysub par ty =
     ExEffTypes.QualTy ((subst_ty_param tysub par ty1, subst_ty_param tysub par ty2), 
         subst_ty_param tysub par ty3)
   | ExEffTypes.QualDirt (dirts, t) -> ExEffTypes.QualDirt (dirts, subst_ty_param tysub par t)
-  | ExEffTypes.TySchemeTy (p, skel, t) -> ExEffTypes.TySchemeTy (p, skel, subst_ty_param tysub par t)
   | ExEffTypes.TySchemeDirt (p, t) -> ExEffTypes.TySchemeDirt (p, subst_ty_param tysub par t)
   | ExEffTypes.TySchemeSkel (p, t) -> ExEffTypes.TySchemeSkel (p, subst_ty_param tysub par t)
  
