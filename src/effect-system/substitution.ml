@@ -83,7 +83,6 @@ let rec apply_sub_skel sub skeleton =
       SkelArrow (apply_sub_skel sub sk1, apply_sub_skel sub sk2)
   | SkelHandler (sk1, sk2) ->
       SkelHandler (apply_sub_skel sub sk1, apply_sub_skel sub sk2)
-  | ForallSkel (p, sk1) -> ForallSkel (p, apply_sub_skel sub sk1)
   (* Really consider other cases *)
   | SkelApply (t,l) -> SkelApply (t, List.map (apply_sub_skel sub) l)
   | SkelTuple skels -> SkelTuple (List.map (apply_sub_skel sub) skels )
@@ -106,7 +105,6 @@ let rec apply_sub_ty sub = function
       QualDirt (apply_sub_ct_dirt sub ct_drt1, apply_sub_ty sub tty1)
   | TySchemeDirt (dirt_param, tty1) ->
       TySchemeDirt (dirt_param, apply_sub_ty sub tty1)
-  | TySchemeSkel (skvar, ty) -> TySchemeSkel (skvar, apply_sub_ty sub ty)
 
 
 and apply_sub_dirty_ty sub (ty, drt) =
@@ -149,10 +147,6 @@ let rec apply_sub_tycoer sub ty_coer =
       ApplyDirtCoer (apply_sub_tycoer sub ty_coer1, apply_sub_dirt sub drt)
   | PureCoercion dirty_coer1 ->
       PureCoercion (apply_sub_dirtycoer sub dirty_coer1)
-  | ForallSkel (ty_param, ty_coer1) ->
-      ForallSkel (ty_param, apply_sub_tycoer sub ty_coer1)
-  | ApplySkelCoer (ty_coer1, sk1) ->
-      ApplySkelCoer (apply_sub_tycoer sub ty_coer1, apply_sub_skel sub sk1)
 
 
 and apply_sub_dirtcoer sub dirt_coer =
@@ -224,8 +218,6 @@ and apply_sub_exp sub expression =
   | Handler h -> Handler (apply_sub_handler sub h)
   | BigLambdaDirt (dirt_param, e1) ->
       BigLambdaDirt (dirt_param, apply_sub_exp sub e1)
-  | BigLambdaSkel (skel_param, e1) ->
-      BigLambdaSkel (skel_param, apply_sub_exp sub e1)
   | CastExp (e1, tc1) ->
       CastExp (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
   | LambdaTyCoerVar (tcp1, (ty1, ty2), e1) ->
@@ -244,8 +236,6 @@ and apply_sub_exp sub expression =
       ApplyTyCoercion (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
   | ApplyDirtCoercion (e1, dc1) ->
       ApplyDirtCoercion (apply_sub_exp sub e1, apply_sub_dirtcoer sub dc1)
-  | ApplySkelExp (e1, s1) ->
-      ApplySkelExp (apply_sub_exp sub e1, apply_sub_skel sub s1)
 
 
 and apply_sub_abs sub (p, c) = (p, apply_sub_comp sub c)

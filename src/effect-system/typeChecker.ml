@@ -52,9 +52,6 @@ let rec check_well_formed_skeleton st = function
   | SkelHandler (sk1, sk2) ->
       check_well_formed_skeleton st sk1 ;
       check_well_formed_skeleton st sk2
-  | ForallSkel (skp, sk1) ->
-      let st' = extend_skel_params st skp in
-      check_well_formed_skeleton st' sk1
   | _ -> failwith __LOC__
 
 let checkWellFormedDirt st = function
@@ -82,9 +79,6 @@ let rec checkWellFormedValTyTemp st = function
       checkWellFormedValTy st tty1
   | TySchemeDirt (dirt_param, tty1) ->
       let st' = extend_dirt_params st dirt_param in
-      checkWellFormedValTy st' tty1
-  | TySchemeSkel (skel_param, tty1) ->
-      let st' = extend_skel_params st skel_param in
       checkWellFormedValTy st' tty1
 
 and checkWellFormedValTy st ty =
@@ -308,10 +302,6 @@ let rec typeOfExpressionTemp st = function (*  (%t) (Typed.print_expression inpu
       Types.Arrow
         (eff_in, (eff_out, Types.closed_dirt (EffectSet.singleton eff)))
   | Handler h -> type_of_handler st h
-  | BigLambdaSkel (skel_param, e1) ->
-      let st' = extend_skel_params st skel_param in
-      let e1_ty = typeOfExpression st' e1 in
-      TySchemeSkel (skel_param, e1_ty)
   | BigLambdaDirt (dirt_param, e1) ->
       let st' = extend_dirt_params st dirt_param in
       let e1_ty = typeOfExpression st' e1 in
@@ -323,13 +313,6 @@ let rec typeOfExpressionTemp st = function (*  (%t) (Typed.print_expression inpu
       Print.debug "CastExp: after  tcValTyCo";
       assert (Types.types_are_equal tc1a e1_ty) ;
       tc1b
-  | ApplySkelExp (e1, sk) -> (
-    match typeOfExpression st e1 with
-    | Types.TySchemeSkel (p_e1, ty_e1) ->
-        check_well_formed_skeleton st sk ;
-        let sub = Substitution.add_skel_param_substitution_e p_e1 sk in
-        Substitution.apply_substitutions_to_type sub ty_e1
-    | _ -> assert false )
   | ApplyDirtExp (e1, d1) -> (
     match typeOfExpression st e1 with
     | Types.TySchemeDirt (p_e1, ty_e1) ->

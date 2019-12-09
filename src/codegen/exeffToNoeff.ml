@@ -84,9 +84,6 @@ let rec type_elab state (env : environment) (ty : ExEffTypes.target_ty) =
   | ExEffTypes.TySchemeDirt (par, ty) -> 
     let env' = TypeCheck.extend_dirt_params env par in
     type_elab state env' ty
-  | ExEffTypes.TySchemeSkel (par, ty) -> 
-    let (t, elab) = type_elab state env ty in
-    (ExEffTypes.ForallSkel (par, t), elab)
   | ExEffTypes.PrimTy ty -> (ExEffTypes.PrimSkel ty, prim_type_elab ty)
 
 and prim_type_elab ty = 
@@ -191,10 +188,6 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
     let env' = TypeCheck.extend_dirt_params env par in
     let (ty, elab) = value_elab state env' value in
     (ExEffTypes.TySchemeDirt (par, ty), elab)
-  | ExEff.BigLambdaSkel (par, value) -> 
-    let env' = TypeCheck.extend_skel_params env par in
-    let (ty, elab) = value_elab state env' value in
-    (ExEffTypes.TySchemeSkel (par, ty), elab)
   | ExEff.CastExp (value, coer) -> 
     let (ty1, elab1) = value_elab state env value in
     let ((ty2, r), elab2) = coercion_elab_ty state env coer in
@@ -213,13 +206,6 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
     let (typev, elabv) = value_elab state env' value
     in (ExEffTypes.QualDirt ((dirt1, dirt2), typev), elabv) 
   | ExEff.ApplyDirtExp (value, dirt) -> failwith "Dirt application should not happen"
-  | ExEff.ApplySkelExp (value, skel) -> 
-    let (tyv, elabv) = value_elab state env value in
-    ( match tyv with
-    | ExEffTypes.TySchemeSkel (s, t) -> 
-      let sub = Sub.add_skel_param_substitution_e s skel in
-      ( Sub.apply_substitutions_to_type sub t, elabv ) 
-    | _ -> typefail "Ill-typed skeleton application" )
   | ExEff.ApplyTyCoercion (value, coer) -> 
     let ((ty1, ty2), elabc) = coercion_elab_ty state env coer in
     let (ty, elabv) = value_elab state env value in
@@ -355,15 +341,6 @@ and coercion_elab_ty state env coer =
       then ( coercion_elab_ty state env ccd )
       else (failwith "Ill-typed coercion application")
     | _ -> failwith "Ill-typed coercion application" ) 
-  | ExEff.ForallSkel (par, c) ->
-    let ((ty1, ty2), elab) = coercion_elab_ty state env c in
-    ( (ExEffTypes.TySchemeSkel (par, ty1), ExEffTypes.TySchemeSkel (par, ty2)), elab )
-  | ExEff.ApplySkelCoer (c, skel) ->
-    ( match c with
-    | ExEff.ForallSkel (par, c) ->
-      let ( (ty1, ty2), elab ) = coercion_elab_ty state env c in
-      ( (ExEffTypes.TySchemeSkel (par, ty1), ExEffTypes.TySchemeSkel (par, ty2)), elab )
-    | _ -> failwith "Ill-typed skeleton coercion application" )
  
 and coer_elab_dirty state env (coer: ExEff.dirty_coercion) =
   match coer with
@@ -466,7 +443,6 @@ and subst_ty_param tysub par ty =
         subst_ty_param tysub par ty3)
   | ExEffTypes.QualDirt (dirts, t) -> ExEffTypes.QualDirt (dirts, subst_ty_param tysub par t)
   | ExEffTypes.TySchemeDirt (p, t) -> ExEffTypes.TySchemeDirt (p, subst_ty_param tysub par t)
-  | ExEffTypes.TySchemeSkel (p, t) -> ExEffTypes.TySchemeSkel (p, subst_ty_param tysub par t)
  
 and comp_elab state env c = 
   match c with 

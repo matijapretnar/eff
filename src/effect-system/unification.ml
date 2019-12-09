@@ -151,7 +151,6 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
       ( Substitution.add_type_substitution k v sub
       , []
       , Typed.add_to_constraints cons1 cons_subbed |> Typed.add_to_constraints cons2 )
-  | ForallSkel (p, sk1) -> failwith __LOC__
 
 
 and skel_eq_step sub paused cons rest_queue sk1 sk2 =

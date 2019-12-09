@@ -12,7 +12,6 @@ type skeleton =
   | SkelApply of CoreTypes.TyName.t * skeleton list
   | SkelHandler of skeleton * skeleton
   | SkelTuple of skeleton list
-  | ForallSkel of CoreTypes.SkelParam.t * skeleton
 
 and target_ty =
   | TyParam of CoreTypes.TyParam.t
@@ -24,7 +23,6 @@ and target_ty =
   | QualTy of ct_ty * target_ty
   | QualDirt of ct_dirt * target_ty
   | TySchemeDirt of CoreTypes.DirtParam.t * target_ty
-  | TySchemeSkel of CoreTypes.SkelParam.t * target_ty
 
 and target_dirty = (target_ty * dirt)
 
@@ -72,8 +70,6 @@ let rec print_target_ty ?max_level ty ppf =
       print "%t => %t" (print_ct_dirt c) (print_target_ty tty)
   | TySchemeDirt (p, tty) ->
       print "\\/%t. %t" (CoreTypes.DirtParam.print p) (print_target_ty tty)
-  | TySchemeSkel (p, tty) ->
-      print "\\/%t. %t" (CoreTypes.SkelParam.print p) (print_target_ty tty)
 
 
 and print_skeleton ?max_level sk ppf =
@@ -94,8 +90,6 @@ and print_skeleton ?max_level sk ppf =
         (Print.sequence (Symbols.times ()) (print_skeleton ~max_level:1) sks)
   | SkelHandler (sk1, sk2) ->
       print "%t =sk=> %t" (print_skeleton sk1) (print_skeleton sk2)
-  | ForallSkel (p, sk1) ->
-      print "ForallSkelSkel %t. %t" (CoreTypes.SkelParam.print p) (print_skeleton sk1)
 
 
 and print_target_dirt drt ppf =
@@ -158,7 +152,6 @@ let rec isMonoTy : target_ty -> bool = function
   | QualTy (_,_)              -> false (* no qualification *)
   | QualDirt (_,_)            -> false (* no qualification *)
   | TySchemeDirt (_,_)        -> false (* no quantification *)
-  | TySchemeSkel (_,_)        -> false (* no quantification *)
 
 (* Check if a target type is a closed monotype. That is, no type variables, no
  * universal quantification and no qualified constraints, at the top-level or
@@ -173,7 +166,6 @@ let rec isClosedMonoTy : target_ty -> bool = function
   | QualTy (_,_)        -> false (* no qualification *)
   | QualDirt (_,_)      -> false (* no qualification *)
   | TySchemeDirt (_,_)  -> false (* no quantification *)
-  | TySchemeSkel (_,_)  -> false (* no quantification *)
 
 (* Check if a dirt is closed. That is, no dirt variables in it. *)
 and isClosedDirt (d : dirt) : bool = match d.row with
@@ -196,10 +188,6 @@ let rec rnSkelVarInSkel (oldS : CoreTypes.SkelParam.t) (newS : CoreTypes.SkelPar
   | SkelApply (tc,ss)   -> SkelApply (tc, List.map (rnSkelVarInSkel oldS newS) ss)
   | SkelHandler (s1,s2) -> SkelHandler (rnSkelVarInSkel oldS newS s1, rnSkelVarInSkel oldS newS s2)
   | SkelTuple ss        -> SkelTuple (List.map (rnSkelVarInSkel oldS newS) ss)
-  | ForallSkel (v,s)    -> if v = oldS
-                             then ( Print.debug "rnSkelVarInSkel: not fresh enough"
-                                  ; failwith __LOC__ )
-                             else ForallSkel (v, rnSkelVarInSkel oldS newS s)
 
 let rec rnSkelVarInValTy (oldS : CoreTypes.SkelParam.t) (newS : CoreTypes.SkelParam.t)
   : target_ty -> target_ty = function
@@ -212,10 +200,6 @@ let rec rnSkelVarInValTy (oldS : CoreTypes.SkelParam.t) (newS : CoreTypes.SkelPa
   | QualTy (ct,ty)      -> QualTy (rnSkelVarInTyCt oldS newS ct, rnSkelVarInValTy oldS newS ty)
   | QualDirt (ct,ty)    -> QualDirt (ct, rnSkelVarInValTy oldS newS ty) (* GEORGE: No skeletons in dirts! :) *)
   | TySchemeDirt (d,ty) -> TySchemeDirt (d, rnSkelVarInValTy oldS newS ty)
-  | TySchemeSkel (v,ty) -> if v = oldS
-                             then ( Print.debug "rnSkelVarInValTy: not fresh enough"
-                                  ; failwith __LOC__ )
-                             else TySchemeSkel (v, rnSkelVarInValTy oldS newS ty)
 
 and rnSkelVarInCmpTy (oldS : CoreTypes.SkelParam.t) (newS : CoreTypes.SkelParam.t)
   : target_dirty -> target_dirty = function
@@ -239,7 +223,6 @@ let rec rnTyVarInValTy (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t)
   | QualTy (ct, ty)     -> QualTy (rnTyVarInTyCt oldA newA ct, rnTyVarInValTy oldA newA ty)
   | QualDirt (ct, ty)   -> QualDirt (ct, rnTyVarInValTy oldA newA ty) (* GEORGE: No skeletonsin dirts! :) *)
   | TySchemeDirt (d,ty) -> TySchemeDirt (d, rnTyVarInValTy oldA newA ty)
-  | TySchemeSkel (v,ty) -> TySchemeSkel (v, rnTyVarInValTy oldA newA ty)
 
 and rnTyVarInCmpTy (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t)
   : target_dirty -> target_dirty = function
@@ -266,7 +249,6 @@ let rec rnDirtVarInValTy (oldD : CoreTypes.DirtParam.t) (newD : CoreTypes.DirtPa
                              then ( Print.debug "rnDirtVarInValTy: not fresh enough"
                                   ; failwith __LOC__ )
                              else TySchemeDirt (d, rnDirtVarInValTy oldD newD ty)
-  | TySchemeSkel (v,ty) -> TySchemeSkel (v, rnDirtVarInValTy oldD newD ty)
 
 and rnDirtVarInCmpTy (oldD : CoreTypes.DirtParam.t) (newD : CoreTypes.DirtParam.t)
   : target_dirty -> target_dirty = function
@@ -309,11 +291,6 @@ let rec types_are_equal type1 type2 =
       let dvar = CoreTypes.DirtParam.fresh () in (* Fresh dirt variable *)
       let ty1new = rnDirtVarInValTy dvar1 dvar ty1 in
       let ty2new = rnDirtVarInValTy dvar2 dvar ty2 in
-      types_are_equal ty1new ty2new
-  | TySchemeSkel (skvar1, ty1), TySchemeSkel (skvar2, ty2) ->
-      let svar = CoreTypes.SkelParam.fresh () in (* Fresh skeleton variable *)
-      let ty1new = rnSkelVarInValTy skvar1 svar ty1 in
-      let ty2new = rnSkelVarInValTy skvar2 svar ty2 in
       types_are_equal ty1new ty2new
   | _ -> false
 
@@ -362,9 +339,6 @@ let rec free_skeleton sk =
     | SkelArrow (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
     | SkelHandler (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
     | SkelTuple sks -> List.concat (List.map free_skeleton sks)
-    | ForallSkel (p, sk1) ->
-        let free_a = free_skeleton sk1 in
-        List.filter (fun x -> not (List.mem x [p])) free_a
   in
   let rec nub = function
             | []  -> []
@@ -390,7 +364,6 @@ let rec fdvsOfTargetValTy : target_ty -> DirtParamSet.t = function
   | QualTy (ct, vty)       -> DirtParamSet.union (fdvsOfValTyCt ct) (fdvsOfTargetValTy vty)
   | QualDirt (ct, vty)     -> DirtParamSet.union (fdvsOfDirtCt  ct) (fdvsOfTargetValTy vty)
   | TySchemeDirt (d, vty)  -> DirtParamSet.remove d (fdvsOfTargetValTy vty)
-  | TySchemeSkel (_, vty)  -> fdvsOfTargetValTy vty
 
 (* Compute the free dirt variables of a list of target value types *)
 and fdvsOfTargetValTys : target_ty list -> DirtParamSet.t = function
@@ -439,7 +412,6 @@ let rec ftvsOfTargetValTy : target_ty -> TyParamSet.t = function
   | QualTy (ct, vty)       -> TyParamSet.union (ftvsOfValTyCt ct) (ftvsOfTargetValTy vty)
   | QualDirt (_, vty)      -> ftvsOfTargetValTy vty
   | TySchemeDirt (_, vty)  -> ftvsOfTargetValTy vty
-  | TySchemeSkel (_, vty)  -> ftvsOfTargetValTy vty
 
 (* Compute the free type variables of a list of target value types *)
 and ftvsOfTargetValTys : target_ty list -> TyParamSet.t = function

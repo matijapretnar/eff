@@ -61,15 +61,11 @@ and n_coercion =
   | NCoerHandler of n_coercion * n_coercion
   | NCoerHandToFun of n_coercion * n_coercion
   | NCoerFunToHand of n_coercion * n_coercion
-  (* Might remove this later to drop all polymorphism *)
-  | NCoerForall of CoreTypes.TyParam.t * n_coercion
   | NCoerQual of n_coerty * n_coercion
   | NCoerComp of n_coercion
   | NCoerReturn of n_coercion
   | NCoerUnsafe of n_coercion
   | NCoerApp of n_coercion * n_coercion
-  (* Might remove this later to drop all polymorphism *)
-  | NCoerInst of n_coercion * n_type
   | NCoerTrans of n_coercion * n_coercion
   (* STIEN: Might have to add more left-cases here later *)
   | NCoerLeftArrow of n_coercion
@@ -155,13 +151,11 @@ and print_coercion ?max_level coer ppf =
   | NCoerHandler (c1, c2) -> print "(%t ==> %t)" (print_coercion c1) (print_coercion c2)
   | NCoerHandToFun (c1, c2) -> print "(handToFun %t %t)" (print_coercion c1) (print_coercion c2)
   | NCoerFunToHand (c1, c2) -> print "(funToHand %t %t)" (print_coercion c1) (print_coercion c2)
-  | NCoerForall (x, c) -> print "(forall %t. %t)" (CoreTypes.TyParam.print x) (print_coercion c)
   | NCoerQual (ty, c) -> print "(%t => %t)" (print_coerty ty) (print_coercion c)
   | NCoerComp c -> print "(Comp %t)" (print_coercion c)
   | NCoerReturn c -> print "(return %t)" (print_coercion c)
   | NCoerUnsafe c -> print "(unsafe %t)" (print_coercion c)
   | NCoerApp (c1, c2) -> print "(%t @ %t)" (print_coercion c1) (print_coercion c2)
-  | NCoerInst (c, t) -> print "(%t [%t])" (print_coercion c) (print_type t)
   | NCoerTrans (c1, c2) -> print "(%t >> %t)" (print_coercion c1) (print_coercion c2)
   | NCoerLeftArrow c -> print "(leftA %t)" (print_coercion c)
   | NCoerRightArrow c -> print "(rightA %t)" (print_coercion c)

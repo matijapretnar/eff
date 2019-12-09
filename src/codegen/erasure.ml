@@ -19,8 +19,6 @@ let rec typed_to_erasure_ty sub typed_ty =
   | Types.QualTy (_, tty) -> typed_to_erasure_ty sub tty
   | Types.QualDirt (_, tty) -> typed_to_erasure_ty sub tty
   | Types.TySchemeDirt (p, tty) -> typed_to_erasure_ty sub tty
-  | Types.TySchemeSkel (p, tty) ->
-      Types.ForallSkel (p, typed_to_erasure_ty sub tty)
 
 and typed_to_erasure_cmp_ty sub (ty, _drt) =
   typed_to_erasure_ty sub ty
@@ -47,12 +45,10 @@ let rec typed_to_erasure_exp sub tt =
       let new_h = {effect_clauses= new_op_c; value_clause= new_vc} in
       SkelEff.EHandler new_h
   | BigLambdaDirt (_, e) -> typed_to_erasure_exp sub e
-  | BigLambdaSkel (sk_p, e) -> SkelEff.EBigLambdaSkel (sk_p, typed_to_erasure_exp sub e)
   | CastExp (e, _) -> typed_to_erasure_exp sub e
   | LambdaTyCoerVar (_, _, e) -> typed_to_erasure_exp sub e
   | LambdaDirtCoerVar (_, _, e) -> typed_to_erasure_exp sub e
   | ApplyDirtExp (e, _) -> typed_to_erasure_exp sub e
-  | ApplySkelExp (e, s) -> SkelEff.EApplySkelExp (typed_to_erasure_exp sub e, s)
   | ApplyTyCoercion (e, _) -> typed_to_erasure_exp sub e
   | ApplyDirtCoercion (e, _) -> typed_to_erasure_exp sub e
 
