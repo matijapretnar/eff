@@ -103,8 +103,6 @@ let rec apply_sub_ty sub = function
       QualTy (apply_sub_ct_ty sub ct_ty1, apply_sub_ty sub tty1)
   | QualDirt (ct_drt1, tty1) ->
       QualDirt (apply_sub_ct_dirt sub ct_drt1, apply_sub_ty sub tty1)
-  | TySchemeDirt (dirt_param, tty1) ->
-      TySchemeDirt (dirt_param, apply_sub_ty sub tty1)
 
 
 and apply_sub_dirty_ty sub (ty, drt) =
@@ -141,10 +139,6 @@ let rec apply_sub_tycoer sub ty_coer =
   | ApplyCoercion (ty_name, tcl) ->
       ApplyCoercion (ty_name, List.map (fun x -> apply_sub_tycoer sub x) tcl)
   | LeftArrow tc1 -> LeftArrow (apply_sub_tycoer sub tc1)
-  | ForallDirt (dirt_param, ty_coer1) ->
-      ForallDirt (dirt_param, apply_sub_tycoer sub ty_coer1)
-  | ApplyDirtCoer (ty_coer1, drt) ->
-      ApplyDirtCoer (apply_sub_tycoer sub ty_coer1, apply_sub_dirt sub drt)
   | PureCoercion dirty_coer1 ->
       PureCoercion (apply_sub_dirtycoer sub dirty_coer1)
 
@@ -216,8 +210,6 @@ and apply_sub_exp sub expression =
   | Lambda abs -> Lambda (apply_sub_abs_with_ty sub abs)
   | Effect eff -> Effect eff
   | Handler h -> Handler (apply_sub_handler sub h)
-  | BigLambdaDirt (dirt_param, e1) ->
-      BigLambdaDirt (dirt_param, apply_sub_exp sub e1)
   | CastExp (e1, tc1) ->
       CastExp (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
   | LambdaTyCoerVar (tcp1, (ty1, ty2), e1) ->
@@ -230,8 +222,6 @@ and apply_sub_exp sub expression =
         ( dcp1
         , (apply_sub_dirt sub d1, apply_sub_dirt sub d2)
         , apply_sub_exp sub e1 )
-  | ApplyDirtExp (e1, d1) ->
-      ApplyDirtExp (apply_sub_exp sub e1, apply_sub_dirt sub d1)
   | ApplyTyCoercion (e1, tc1) ->
       ApplyTyCoercion (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
   | ApplyDirtCoercion (e1, dc1) ->

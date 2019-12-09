@@ -41,8 +41,6 @@ type ty_coercion =
   | ApplyCoercion of CoreTypes.TyName.t * ty_coercion list
   | TupleCoercion of ty_coercion list
   | LeftArrow of ty_coercion
-  | ForallDirt of CoreTypes.DirtParam.t * ty_coercion
-  | ApplyDirtCoer of ty_coercion * dirt
   | PureCoercion of dirty_coercion
   | QualTyCoer of ct_ty * ty_coercion
   | QualDirtCoer of ct_dirt * ty_coercion
@@ -74,11 +72,9 @@ type expression =
   | Lambda of abstraction_with_ty
   | Effect of effect
   | Handler of handler
-  | BigLambdaDirt of CoreTypes.DirtParam.t * expression
   | CastExp of expression * ty_coercion
   | LambdaTyCoerVar of CoreTypes.TyCoercionParam.t * Types.ct_ty * expression
   | LambdaDirtCoerVar of CoreTypes.DirtCoercionParam.t * Types.ct_dirt * expression
-  | ApplyDirtExp of expression * Types.dirt
   | ApplyTyCoercion of expression * ty_coercion
   | ApplyDirtCoercion of expression * dirt_coercion
 
@@ -304,8 +300,6 @@ let rec print_expression ?max_level e ppf =
   | Effect eff -> print ~at_level:2 "effect %t" (print_effect eff)
   | CastExp (e1, tc) ->
       print "(%t) |> [%t]" (print_expression e1) (print_ty_coercion tc)
-  | BigLambdaDirt (p, e) ->
-      print "/\\%t. %t " (CoreTypes.DirtParam.print p) (print_expression e)
   | LambdaTyCoerVar (p, (tty1, tty2), e) ->
       print "/\\(%t:%t<=%t).( %t ) "
         (CoreTypes.TyCoercionParam.print p)
@@ -318,10 +312,6 @@ let rec print_expression ?max_level e ppf =
         (Types.print_target_dirt tty1)
         (Types.print_target_dirt tty2)
         (print_expression e)
-  | ApplyDirtExp (e, tty) ->
-      print ~at_level:1 "%t@ %t"
-        (print_expression ~max_level:1 e)
-        (Types.print_target_dirt tty)
   | ApplyTyCoercion (e, tty) ->
       print ~at_level:1 "%t@ %t"
         (print_expression ~max_level:1 e)
@@ -562,14 +552,10 @@ let rec refresh_expr sbst = function
   | Variant (lbl, e) -> Variant (lbl, refresh_expr sbst e)
   | CastExp (e1, tyco) -> CastExp (refresh_expr sbst e1, tyco)
   | (Const _ | Effect _) as e -> e
-  | BigLambdaDirt (dvar, e) ->
-      (* TODO: refresh dirt var *)
-      BigLambdaDirt (dvar, refresh_expr sbst e)
   | LambdaTyCoerVar (tycovar, ct, e) -> failwith __LOC__
   | LambdaDirtCoerVar (dcovar, ct, e) ->
       (* TODO: refresh dco var *)
       LambdaDirtCoerVar (dcovar, ct, refresh_expr sbst e)
-  | ApplyDirtExp (e, d) -> ApplyDirtExp (refresh_expr sbst e, d)
   | ApplyTyCoercion (e, tyco) -> ApplyTyCoercion (refresh_expr sbst e, tyco)
   | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (refresh_expr sbst e, dco)
 
@@ -632,12 +618,10 @@ let rec subst_expr sbst = function
   | Variant (lbl, e) -> Variant (lbl, subst_expr sbst e)
   | (Const _ | Effect _) as e -> e
   | CastExp (e, tyco) -> CastExp (subst_expr sbst e, tyco)
-  | BigLambdaDirt (dvar, e) -> BigLambdaDirt (dvar, subst_expr sbst e)
   | LambdaTyCoerVar (tycovar, ct, e) ->
       LambdaTyCoerVar (tycovar, ct, subst_expr sbst e)
   | LambdaDirtCoerVar (dcovar, ct, e) ->
       LambdaDirtCoerVar (dcovar, ct, subst_expr sbst e)
-  | ApplyDirtExp (e, d) -> ApplyDirtExp (subst_expr sbst e, d)
   | ApplyTyCoercion (e, tyco) -> ApplyTyCoercion (subst_expr sbst e, tyco)
   | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (subst_expr sbst e, dco)
 
@@ -730,8 +714,6 @@ let rec alphaeq_expr eqvars e e' =
   | Effect eff, Effect eff' -> eff = eff'
   | ApplyDirtCoercion (e, dco), ApplyDirtCoercion (e', dco') ->
       dco = dco' && alphaeq_expr eqvars e e'
-  | ApplyDirtExp (e, d), ApplyDirtExp (e', d') ->
-      dirts_are_equal d d' && alphaeq_expr eqvars e e'
   | _, _ -> false
 
 
@@ -863,10 +845,8 @@ and free_vars_expr e =
   | Variant (_, e) -> free_vars_expr e
   | CastExp (e', tyco) -> free_vars_expr e'
   | Effect _ | Const _ -> ([], [])
-  | BigLambdaDirt _ -> failwith __LOC__
   | LambdaTyCoerVar _ -> failwith __LOC__
   | LambdaDirtCoerVar _ -> failwith __LOC__
-  | ApplyDirtExp (e, d) -> free_vars_expr e
   | ApplyTyCoercion (e, tyco) -> free_vars_expr e
   | ApplyDirtCoercion (e, dco) -> free_vars_expr e
 
@@ -995,12 +975,6 @@ let rec free_dirt_vars_ty_coercion = function
           Types.DirtParamSet.union free (free_dirt_vars_ty_coercion tc) )
         Types.DirtParamSet.empty tcs
   | LeftArrow tc -> free_dirt_vars_ty_coercion tc
-  | ForallDirt (dp, tc) ->
-      Types.DirtParamSet.remove dp (free_dirt_vars_ty_coercion tc)
-  | ApplyDirtCoer (tc, d) ->
-      Types.DirtParamSet.union
-        (free_dirt_vars_ty_coercion tc)
-        (fdvsOfDirt d)
   | PureCoercion dc -> free_dirt_vars_dirty_coercion dc
   | QualTyCoer (ctty, tc) -> free_dirt_vars_ty_coercion tc
   | QualDirtCoer (ctd, tc) -> free_dirt_vars_ty_coercion tc
@@ -1052,18 +1026,12 @@ let rec free_dirt_vars_expression e =
   | Lambda abs -> free_dirt_vars_abstraction_with_ty abs
   | Effect _ -> DirtParamSet.empty
   | Handler h -> free_dirt_vars_abstraction_with_ty h.value_clause
-  | BigLambdaDirt (dp, e) ->
-      DirtParamSet.remove dp (free_dirt_vars_expression e)
   | CastExp (e, tc) ->
       Types.DirtParamSet.union
         (free_dirt_vars_expression e)
         (free_dirt_vars_ty_coercion tc)
   | LambdaTyCoerVar (tcp, ctty, e) -> free_dirt_vars_expression e
   | LambdaDirtCoerVar (dcp, ctd, e) -> free_dirt_vars_expression e
-  | ApplyDirtExp (e, d) ->
-      Types.DirtParamSet.union
-        (free_dirt_vars_expression e)
-        (fdvsOfDirt d)
   | ApplyTyCoercion (e, tc) ->
       Types.DirtParamSet.union
         (free_dirt_vars_expression e)

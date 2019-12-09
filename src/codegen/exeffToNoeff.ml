@@ -81,9 +81,6 @@ let rec type_elab state (env : environment) (ty : ExEffTypes.target_ty) =
     let (type3, elab3) = type_elab state env ty in
     (type3, NoEff.NTyQual ((elab1, elab2), elab3))
   | ExEffTypes.QualDirt (_, ty) -> type_elab state env ty
-  | ExEffTypes.TySchemeDirt (par, ty) -> 
-    let env' = TypeCheck.extend_dirt_params env par in
-    type_elab state env' ty
   | ExEffTypes.PrimTy ty -> (ExEffTypes.PrimSkel ty, prim_type_elab ty)
 
 and prim_type_elab ty = 
@@ -184,10 +181,6 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
         )
       )
     )
-  | ExEff.BigLambdaDirt (par, value) -> 
-    let env' = TypeCheck.extend_dirt_params env par in
-    let (ty, elab) = value_elab state env' value in
-    (ExEffTypes.TySchemeDirt (par, ty), elab)
   | ExEff.CastExp (value, coer) -> 
     let (ty1, elab1) = value_elab state env value in
     let ((ty2, r), elab2) = coercion_elab_ty state env coer in
@@ -205,7 +198,6 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
     let env' = TypeCheck.extend_dirt_coer_types env par (dirt1, dirt2) in
     let (typev, elabv) = value_elab state env' value
     in (ExEffTypes.QualDirt ((dirt1, dirt2), typev), elabv) 
-  | ExEff.ApplyDirtExp (value, dirt) -> failwith "Dirt application should not happen"
   | ExEff.ApplyTyCoercion (value, coer) -> 
     let ((ty1, ty2), elabc) = coercion_elab_ty state env coer in
     let (ty, elabv) = value_elab state env value in
@@ -297,22 +289,6 @@ and coercion_elab_ty state env coer =
       let (_, elab) = coercion_elab_ty state env c in
       ( ty, NoEff.NCoerLeftArrow elab )
     | _ -> failwith "Ill-formed left arrow coercion"
-  | ExEff.ForallDirt (par, c) ->
-    let ( (ty1, ty2), elab ) = coercion_elab_ty state env c in
-    ( (ExEffTypes.TySchemeDirt (par, ty1), ExEffTypes.TySchemeDirt (par, ty2)), elab )
-  | ExEff.ApplyDirtCoer (c, d) ->
-    let ( (ty1, ty2), elab ) = coercion_elab_ty state env c in
-    ( match ty1 with
-    | ExEffTypes.TySchemeDirt (par1, ty1) ->
-      ( match ty2 with
-      | ExEffTypes.TySchemeDirt (par2, ty2) -> 
-        let subs1 = Substitution.add_dirt_substitution_e par1 d in
-        let subs2 = Substitution.add_dirt_substitution_e par2 d in
-        let ty1' = Substitution.apply_substitutions_to_type subs1 ty1 in
-        let ty2' = Substitution.apply_substitutions_to_type subs2 ty2 in
-        ( (ty1', ty2'), elab )  (* STIEN: not 100% sure *)
-      | _ -> failwith "Ill-formed coercion dirt application" )
-    | _ -> failwith "Ill-formed coercion dirt application" )
   | ExEff.PureCoercion c ->
     let ( ((ty1,_), (ty2,_)), elabc ) = coer_elab_dirty state env c in
     ( (ty1, ty2), NoEff.NCoerPure elabc )
@@ -442,7 +418,6 @@ and subst_ty_param tysub par ty =
     ExEffTypes.QualTy ((subst_ty_param tysub par ty1, subst_ty_param tysub par ty2), 
         subst_ty_param tysub par ty3)
   | ExEffTypes.QualDirt (dirts, t) -> ExEffTypes.QualDirt (dirts, subst_ty_param tysub par t)
-  | ExEffTypes.TySchemeDirt (p, t) -> ExEffTypes.TySchemeDirt (p, subst_ty_param tysub par t)
  
 and comp_elab state env c = 
   match c with 

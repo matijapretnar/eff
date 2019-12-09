@@ -77,9 +77,6 @@ let rec checkWellFormedValTyTemp st = function
   | QualDirt (ct_ty1, tty1) ->
       checkWellFormedDirtCt st ct_ty1 ;
       checkWellFormedValTy st tty1
-  | TySchemeDirt (dirt_param, tty1) ->
-      let st' = extend_dirt_params st dirt_param in
-      checkWellFormedValTy st' tty1
 
 and checkWellFormedValTy st ty =
   Print.debug "checkWellFormedValTy (%t){" (Types.print_target_ty ty);
@@ -134,18 +131,6 @@ let rec tcValTyCoTemp st = function
     match tcValTyCo st tc1 with
     | Types.Arrow (t1, _), Types.Arrow (t2, _) -> (t2, t1)
     | _ -> assert false )
-  | ForallDirt (dirt_param, ty_coer1) ->
-      let new_st = extend_dirt_params st dirt_param in
-      let t1, t2 = tcValTyCo new_st ty_coer1 in
-      (Types.TySchemeDirt (dirt_param, t1), Types.TySchemeDirt (dirt_param, t2))
-  | ApplyDirtCoer (ty_coer1, drt) -> (
-    match tcValTyCo st ty_coer1 with
-    | Types.TySchemeDirt (drt_param1, t1), Types.TySchemeDirt (drt_param2, t2) ->
-        checkWellFormedDirt st drt ;
-        let sub = Substitution.add_dirt_substitution_e drt_param1 drt in
-        assert (drt_param1 = drt_param2) ;
-        (Substitution.apply_substitutions_to_type sub t1, Substitution.apply_substitutions_to_type sub t2)
-    | _ -> assert false )
   | PureCoercion dirty_coer1 ->
       let (t1, _), (t2, _) = tcCmpTyCo st dirty_coer1 in
       (t1, t2)
@@ -168,11 +153,11 @@ let rec tcValTyCoTemp st = function
       let dirt_coer_applied_cons =
         tcDirtCo st dirt_coer_applied
       in
-      match tcValTyCo st ty_coer1 with
+      ( match tcValTyCo st ty_coer1 with
       | QualDirt (cons1, t1), QualDirt (cons2, t2) ->
           assert (cons1 = cons2 && cons2 = dirt_coer_applied_cons) ;
           (t1, t2)
-      | _ -> assert false )
+      | _ -> assert false ) )
   | _ -> failwith __LOC__
 
 (* Typecheck a value-type coercion *)
@@ -302,10 +287,6 @@ let rec typeOfExpressionTemp st = function (*  (%t) (Typed.print_expression inpu
       Types.Arrow
         (eff_in, (eff_out, Types.closed_dirt (EffectSet.singleton eff)))
   | Handler h -> type_of_handler st h
-  | BigLambdaDirt (dirt_param, e1) ->
-      let st' = extend_dirt_params st dirt_param in
-      let e1_ty = typeOfExpression st' e1 in
-      TySchemeDirt (dirt_param, e1_ty)
   | CastExp (e1, tc1) ->
       let e1_ty = typeOfExpression st e1 in
       Print.debug "CastExp: before tcValTyCo";
@@ -313,28 +294,6 @@ let rec typeOfExpressionTemp st = function (*  (%t) (Typed.print_expression inpu
       Print.debug "CastExp: after  tcValTyCo";
       assert (Types.types_are_equal tc1a e1_ty) ;
       tc1b
-  | ApplyDirtExp (e1, d1) -> (
-    match typeOfExpression st e1 with
-    | Types.TySchemeDirt (p_e1, ty_e1) ->
-        Print.debug "ApplyDirtExp 1";
-        checkWellFormedDirt st d1 ;
-        Print.debug "ApplyDirtExp 2";
-        (* Avoid capture *)
-        let freshDVar   = CoreTypes.DirtParam.fresh () in
-        let renamedType = Types.rnDirtVarInValTy p_e1 freshDVar ty_e1 in
-        let sub = Substitution.add_dirt_substitution_e freshDVar d1 in
-(*
-        let sub = Substitution.add_dirt_substitution_e p_e1 d1 in
-*)
-        Print.debug "ApplyDirtExp 3";
-        Substitution.print_substitutions sub;
-        let res = Substitution.apply_substitutions_to_type sub renamedType in
-(*
-        let res = Substitution.apply_substitutions_to_type sub ty_e1 in
-*)
-        Print.debug "ApplyDirtExp 4";
-        res
-    | _ -> assert false )
   | LambdaTyCoerVar (tcp1, ct_ty1, e1) ->
       let st' = extend_ty_coer_types st tcp1 ct_ty1 in
       let e1_ty = typeOfExpression st' e1 in

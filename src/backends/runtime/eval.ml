@@ -123,11 +123,9 @@ and veval state e =
   | ExEff.Effect (eff, (_, _)) ->
       V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | ExEff.Handler h -> V.Handler (eval_handler state h)
-  | ExEff.BigLambdaDirt (_, e) -> veval state e
   | ExEff.CastExp (e, _) -> veval state e
   | ExEff.LambdaTyCoerVar (_, _, e) -> veval state e
   | ExEff.LambdaDirtCoerVar (_, _, e) -> veval state e
-  | ExEff.ApplyDirtExp (e, _) -> veval state e
   | ExEff.ApplyTyCoercion (e, _) -> veval state e
   | ExEff.ApplyDirtCoercion (e, _) -> veval state e
 
