@@ -127,12 +127,14 @@ module Make (Backend : BackendSignature.T) = struct
         let desugarer_state', tydefs' =
           Desugarer.desugar_tydefs state.desugarer_state tydefs
         in
-        Tctx.extend_tydefs ~loc tydefs' ;
+        let tydefs'' = Assoc.map (fun (params,type_def) -> {Tctx.params=params;type_def=type_def}) tydefs' in 
+        let type_system_state' = TypeSystem.extend_tydefs ~loc tydefs'' state.type_system_state in
         let backend_state' =
           Backend.process_tydef state.backend_state tydefs'
         in
-        { state with
-          desugarer_state= desugarer_state'; backend_state= backend_state' }
+        { desugarer_state= desugarer_state'
+        ; type_system_state= type_system_state'
+        ; backend_state= backend_state' }
 
   and exec_cmds state cmds = fold exec_cmd state cmds
 

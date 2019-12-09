@@ -1,20 +1,45 @@
 (** Type inference contexts *)
 module T = Type
-
 type tydef =
-  | Record of (CoreTypes.Field.t, Type.ty) Assoc.t
-  | Sum of (CoreTypes.Label.t, Type.ty option) Assoc.t
-  | Inline of Type.ty
+  | Record of (CoreTypes.Field.t, T.ty) Assoc.t
+  | Sum of (CoreTypes.Label.t, T.ty option) Assoc.t
+  | Inline of T.ty
 
-type tyctx = (CoreTypes.TyName.t, CoreTypes.TyParam.t list * tydef) Assoc.t
+type ty_data = 
+  { params: CoreTypes.TyParam.t list
+  ; type_def: tydef }
 
-let initial : tyctx =
+type type_context = (CoreTypes.TyName.t, ty_data) Assoc.t
+
+(*
+let initial_type_context2 = 
+  let add = TypeContextMap.add in
+  TypeContextMap.empty |>
+  add CoreTypes.bool_tyname {params= []; type_def= Inline T.bool_ty} |>
+  add CoreTypes.unit_tyname {params= []; type_def= Inline T.unit_ty} |>
+  add CoreTypes.int_tyname {params= []; type_def= Inline T.int_ty} |>
+  add CoreTypes.string_tyname {params= []; type_def= Inline T.string_ty} |>
+  add CoreTypes.float_tyname {params= []; type_def= Inline T.float_ty} |>
+  add CoreTypes.empty_tyname {params= []; type_def= Sum Assoc.empty} |>
+  (let a = T.fresh_ty_param () in
+        let list_nil = (CoreTypes.nil, None) in
+        let list_cons =
+          ( CoreTypes.cons
+          , Some
+              (T.Tuple
+                 [T.TyParam a; T.Apply (CoreTypes.list_tyname, [T.TyParam a])])
+          )
+        in
+  add CoreTypes.list_tyname {params= [a]; type_def= Sum (Assoc.of_list [list_nil; list_cons])} 
+  )
+*)
+let initial_type_context = 
   Assoc.of_list
-    [ (CoreTypes.bool_tyname, ([], Inline T.bool_ty))
-    ; (CoreTypes.unit_tyname, ([], Inline T.unit_ty))
-    ; (CoreTypes.int_tyname, ([], Inline T.int_ty))
-    ; (CoreTypes.string_tyname, ([], Inline T.string_ty))
-    ; (CoreTypes.float_tyname, ([], Inline T.float_ty))
+    [ (CoreTypes.bool_tyname, {params= []; type_def= Inline T.bool_ty})
+    ; (CoreTypes.unit_tyname, {params= []; type_def= Inline T.unit_ty})
+    ; (CoreTypes.int_tyname, {params= []; type_def= Inline T.int_ty})
+    ; (CoreTypes.string_tyname, {params= []; type_def= Inline T.string_ty})
+    ; (CoreTypes.float_tyname, {params= []; type_def= Inline T.float_ty})
     ; ( CoreTypes.list_tyname
       , let a = Type.fresh_ty_param () in
         let list_nil = (CoreTypes.nil, None) in
@@ -25,66 +50,65 @@ let initial : tyctx =
                  [T.TyParam a; T.Apply (CoreTypes.list_tyname, [T.TyParam a])])
           )
         in
-        ([a], Sum (Assoc.of_list [list_nil; list_cons])) )
-    ; (CoreTypes.empty_tyname, ([], Sum Assoc.empty)) ]
-
-let global = ref initial
+        {params=[a]; type_def= Sum (Assoc.of_list [list_nil; list_cons])} )
+    ; (CoreTypes.empty_tyname, {params= []; type_def= Sum Assoc.empty}) ]
 
 let subst_tydef sbst =
-  let subst = Type.subst_ty sbst in
+  let subst = T.subst_ty sbst in
   function
   | Record tys -> Record (Assoc.map subst tys)
   | Sum tys ->
       Sum (Assoc.map (function None -> None | Some x -> Some (subst x)) tys)
   | Inline ty -> Inline (subst ty)
 
-let lookup_tydef ~loc ty_name =
-  match Assoc.lookup ty_name !global with
+let lookup_tydef ~loc ty_name tctx =
+  match Assoc.lookup ty_name tctx with
   | None ->
       Error.typing ~loc "Unknown type %t" (CoreTypes.TyName.print ty_name)
-  | Some (params, tydef) -> (params, tydef)
+  | Some tdata -> tdata
 
-let fresh_tydef ~loc ty_name =
-  let params, tydef = lookup_tydef ~loc ty_name in
-  let params', sbst = Type.refreshing_subst params in
-  (params', subst_tydef sbst tydef)
+let fresh_tydef ~loc ty_name tctx =
+  let {params; type_def} = lookup_tydef ~loc ty_name tctx in
+  let params', sbst = T.refreshing_subst params in
+  (params', subst_tydef sbst type_def)
 
 (** [find_variant lbl] returns the information about the variant type that defines the
     label [lbl]. *)
-let find_variant lbl =
+let find_variant lbl (tctx: type_context) =
   let construct = function
-    | ty_name, (ps, Sum vs) -> (
+    | (ty_name, {params; type_def=Sum vs}) -> (
       match Assoc.lookup lbl vs with
-      | Some us -> Some (ty_name, ps, vs, us)
+      | Some us -> Some (ty_name, params, vs, us)
       | None -> None )
     | _ -> None
   in
-  match Assoc.find_if (fun x -> construct x <> None) !global with
+  match Assoc.find_if (fun x -> construct x <> None) tctx with
   | Some x -> construct x
   | None -> None
 
 (** [find_field fld] returns the information about the record type that defines the field
     [fld]. *)
 
-let find_field fld =
+let find_field fld (tctx:type_context) =
   let construct = function
-    | ty_name, (ps, Record flds) -> (
+    | (ty_name, {params; type_def=Record flds}) -> (
       match Assoc.lookup fld flds with
-      | Some _ -> Some (ty_name, ps, flds)
-      | None -> None )
+      | Some _ -> Some (ty_name, params, flds)
+      | None -> None 
+    )
     | _ -> None
   in
-  match Assoc.find_if (fun x -> construct x <> None) !global with
+  match Assoc.find_if (fun x -> construct x <> None) tctx with
   | Some x -> construct x
   | None -> None
 
-let apply_to_params t ps = Type.Apply (t, List.map (fun p -> Type.TyParam p) ps)
+let apply_to_params t ps = T.Apply (t, List.map (fun p -> T.TyParam p) ps)
 
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
     with refreshed type parameters and additional information needed for type
     inference. *)
-let infer_variant lbl =
-  match find_variant lbl with
+let infer_variant lbl tctx =
+  match find_variant lbl tctx with
   | None -> None
   | Some (ty_name, ps, _, u) ->
       let ps', fresh_subst = T.refreshing_subst ps in
@@ -95,35 +119,35 @@ let infer_variant lbl =
 
 (** [infer_field fld] finds a record type that defines the field [fld] and returns it with
     refreshed type parameters and additional information needed for type inference. *)
-let infer_field fld =
-  match find_field fld with
+let infer_field fld tctx =
+  match find_field fld tctx with
   | None -> None
   | Some (ty_name, ps, us) ->
       let ps', fresh_subst = T.refreshing_subst ps in
       let us' = Assoc.map (T.subst_ty fresh_subst) us in
       Some (apply_to_params ty_name ps', (ty_name, us'))
 
-let transparent ~loc ty_name =
-  let _, ty = lookup_tydef ~loc ty_name in
-  match ty with Sum _ | Record _ -> false | Inline _ -> true
+let transparent ~loc ty_name tctx =
+  let {type_def} = lookup_tydef ~loc ty_name tctx in
+  match type_def with Sum _ | Record _ -> false | Inline _ -> true
 
 (* [ty_apply pos t lst] applies the type constructor [t] to the given list of arguments. *)
-let ty_apply ~loc ty_name lst =
-  let xs, ty = lookup_tydef ~loc ty_name in
-  if List.length xs <> List.length lst then
+let ty_apply ~loc ty_name lst tctx =
+  let {params; type_def} = lookup_tydef ~loc ty_name tctx in
+  if List.length params <> List.length lst then
     Error.typing ~loc "Type constructors %t should be applied to %d arguments"
       (CoreTypes.TyName.print ty_name)
-      (List.length xs)
+      (List.length params)
   else
-    let combined = Assoc.of_list (List.combine xs lst) in
-    subst_tydef combined ty
+    let combined = Assoc.of_list (List.combine params lst) in
+    subst_tydef combined type_def
 
 (** [check_well_formed ~loc ty] checks that type [ty] is well-formed. *)
-let check_well_formed ~loc tydef =
+let check_well_formed ~loc tydef tctx =
   let rec check = function
     | T.Basic _ | T.TyParam _ -> ()
     | T.Apply (ty_name, tys) ->
-        let params, _ = lookup_tydef ~loc ty_name in
+        let {params} = lookup_tydef ~loc ty_name tctx in
         let n = List.length params in
         if List.length tys <> n then
           Error.typing ~loc "The type constructor %t expects %d arguments"
@@ -146,14 +170,14 @@ let check_well_formed ~loc tydef =
   | Inline ty -> check ty
 
 (** [check_well_formed ~loc ty] checks that the definition of type [ty] is non-cyclic. *)
-let check_noncyclic ~loc =
+let check_noncyclic ~loc (tctx: type_context) =
   let rec check forbidden = function
     | T.Basic _ | T.TyParam _ -> ()
     | T.Apply (t, lst) ->
         if List.mem t forbidden then
           Error.typing ~loc "Type definition %t is cyclic."
             (CoreTypes.TyName.print t)
-        else check_tydef (t :: forbidden) (ty_apply ~loc t lst)
+        else check_tydef (t :: forbidden) (ty_apply ~loc t lst tctx)
     | T.Arrow (ty1, ty2) -> check forbidden ty1 ; check forbidden ty2
     | T.Tuple tys -> List.iter (check forbidden) tys
     | T.Handler {T.value= ty1; T.finally= ty2} ->
@@ -162,6 +186,7 @@ let check_noncyclic ~loc =
     | Sum _ -> ()
     | Record fields -> Assoc.iter (fun (_, t) -> check forbidden t) fields
     | Inline ty -> check forbidden ty
+    
   in
   check_tydef []
 
@@ -171,10 +196,10 @@ let check_noncyclic ~loc =
     NB: In eff we _cannot_ allow shadowing because the interpreter uses the original
     field names and label, hence shadowing breaks type safety!
 *)
-let check_shadowing ~loc = function
+let check_shadowing ~loc (tctx: type_context) = function
   | Record lst ->
       let shadow_check_fld (f, _) =
-        match find_field f with
+        match find_field f tctx with
         | Some (u, _, _) ->
             Error.typing ~loc
               "Record field label %t is already used in type %t"
@@ -184,7 +209,7 @@ let check_shadowing ~loc = function
       Assoc.iter shadow_check_fld lst
   | Sum lst ->
       let shadow_check_sum (lbl, _) =
-        match find_variant lbl with
+        match find_variant lbl tctx with
         | Some (u, _, _, _) ->
             Error.typing ~loc "Constructor %t is already used in type %t"
               (CoreTypes.Label.print lbl)
@@ -196,23 +221,22 @@ let check_shadowing ~loc = function
 
 (** [extend_tydefs ~loc tydefs] checks that the simulatenous type definitions [tydefs] are
     well-formed and returns the extended context. *)
-let extend_tydefs ~loc tydefs =
+let extend_tydefs ~loc tydefs tctx =
   (* We wish we wrote this in eff, where we could have transactional memory. *)
-  let global_orig = !global in
-  let extend_tydef (name, (params, ty)) =
-    check_shadowing ~loc ty ;
-    match Assoc.lookup name !global with
-    | Some _ ->
+  let extend_tydef (tctx': type_context) (name, {params; type_def}) =
+    check_shadowing ~loc tctx' type_def;
+    match Assoc.lookup name tctx' with
+    | Some _ -> 
         Error.typing ~loc "Type %t already defined."
           (CoreTypes.TyName.print name)
-    | None -> global := Assoc.update name (params, ty) !global
+    | None -> Assoc.update name {params;type_def = type_def} tctx'
   in
   try
-    Assoc.iter extend_tydef tydefs ;
-    Assoc.iter (fun (_, (_, ty)) -> check_well_formed ~loc ty) tydefs ;
-    Assoc.iter (fun (_, (_, ty)) -> check_noncyclic ~loc ty) tydefs
+    let tctx = Assoc.fold_left extend_tydef tctx tydefs in
+    Assoc.iter (fun (_, {type_def}) -> check_well_formed ~loc type_def tctx) tydefs ;
+    Assoc.iter (fun (_, {type_def}) -> check_noncyclic ~loc tctx type_def) tydefs;
+    tctx
   with e ->
-    global := global_orig ;
     raise e
 
 (* reinstate the context on error *)

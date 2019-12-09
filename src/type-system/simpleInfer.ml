@@ -4,13 +4,15 @@ module Untyped = UntypedSyntax
 module Unify = SimpleUnify
 module EffectMap = Map.Make (CoreTypes.Effect)
 module VariableMap = Map.Make (CoreTypes.Variable)
+module TypeContextMap = Map.Make (CoreTypes.TyName)
 
 type ty_scheme = CoreTypes.TyParam.t list * Type.ty
 
 type state =
   { context: ty_scheme VariableMap.t
+  ; type_context: Tctx.type_context
   ; effects: (Type.ty * Type.ty) EffectMap.t
-  ; constraints: (T.ty * Tctx.T.ty * Location.t) list }
+  ; constraints: (T.ty * T.ty * Location.t) list }
 
 let warn_implicit_sequencing = ref false
 
@@ -21,7 +23,10 @@ let empty_ctx = VariableMap.empty
 let empty_effects = EffectMap.empty
 
 let initial_state =
-  {context= empty_ctx; effects= empty_effects; constraints= empty_constraints}
+  { context= empty_ctx
+  ; type_context = Tctx.initial_type_context
+  ; effects= empty_effects
+  ; constraints= empty_constraints}
 
 let replace_ctx st ctx = {st with context= ctx}
 
@@ -77,6 +82,15 @@ let add_effect st eff (ty1, ty2) =
   | Some _ ->
       Error.typing ~loc:Location.unknown "Effect %t already defined."
         (CoreTypes.Effect.print eff)
+
+let extend_tydefs ~loc tydefs st = {
+  st with type_context = Tctx.extend_tydefs ~loc tydefs st.type_context
+}
+
+
+let extend_tydefs_tuple ~loc tydefs st = {
+  st with type_context = Tctx.extend_tydefs ~loc (Assoc.map (fun (params,type_def) -> {Tctx.params=params;type_def=type_def}) tydefs) st.type_context
+}
 
 (* We perform type inference int the style of Standard ML 97, i.e.,
    Hindley-Milner polymorphism with value restriction. Throughout, we work with
@@ -142,7 +156,7 @@ let infer_pattern st pp =
       | None ->
           assert false
       | Some ((fld, _), _) -> (
-        match Tctx.infer_field fld with
+        match Tctx.infer_field fld st.type_context with
         | None ->
             Error.typing ~loc "Unbound record field label %t"
               (CoreTypes.Field.print fld)
@@ -163,7 +177,7 @@ let infer_pattern st pp =
             in
             (ty, st', vars) ) )
     | Untyped.PVariant (lbl, p) -> (
-      match Tctx.infer_variant lbl with
+      match Tctx.infer_variant lbl st.type_context with
       | None ->
           assert false
       | Some (ty, u) -> (
@@ -226,7 +240,7 @@ and infer_let st loc defs =
         Error.typing ~loc "Several definitions of %t."
           (CoreTypes.Variable.print x)
     | None ->
-        let sbst = Unify.solve st'.constraints in
+        let sbst = Unify.solve st'.constraints st.type_context in
         let ws = Assoc.map (T.subst_ty sbst) (Assoc.of_list ws) in
         let st' = subst_ctx st' sbst in
         let ws = Assoc.map (generalize st' (nonexpansive c.it)) ws in
@@ -239,7 +253,7 @@ and infer_let st loc defs =
         (List.rev ws @ vs, st')
   in
   let vars, st = List.fold_left infer_fold_fun ([], st) defs in
-  (vars, subst_ctx st (Unify.solve st.constraints))
+  (vars, subst_ctx st (Unify.solve st.constraints st.type_context))
 
 and infer_let_rec st loc defs =
   if not (no_duplicates (List.map fst defs)) then
@@ -274,7 +288,7 @@ and infer_let_rec st loc defs =
       st lst
   in
   let st = replace_ctx st old_ctx in
-  let sbst = Unify.solve st.constraints in
+  let sbst = Unify.solve st.constraints st.type_context in
   let vars = Assoc.map (T.subst_ty sbst) (Assoc.of_list vars) in
   let st = subst_ctx st sbst in
   let vars = Assoc.map (generalize st true) vars in
@@ -313,7 +327,7 @@ and infer_expr st {it= e; at= loc} =
         (* XXX *)
         (*       if not (Pattern.linear_record flds') then
           Error.typing ~loc "Fields in a record must be distinct." ;*)
-        match Tctx.infer_field fld with
+        match Tctx.infer_field fld st.type_context with
         | None ->
             Error.typing ~loc "Unbound record field label %t in a pattern"
               (CoreTypes.Field.print fld)
@@ -340,7 +354,7 @@ and infer_expr st {it= e; at= loc} =
               in
               (ty, Assoc.fold_left unify_record_arg st arg_types') ) )
     | Untyped.Variant (lbl, u) -> (
-      match Tctx.infer_variant lbl with
+      match Tctx.infer_variant lbl st.type_context with
       | None ->
           assert false
       | Some (ty, arg_type) -> (
@@ -441,8 +455,8 @@ and infer_comp st cp =
 let infer_top_comp st c =
   let st = clear_constraints st in
   let ty, st = infer_comp st c in
-  let sbst = Unify.solve st.constraints in
-  Exhaust.check_comp c ;
+  let sbst = Unify.solve st.constraints st.type_context in
+  Exhaust.check_comp st.type_context c ;
   let st = subst_ctx st sbst in
   let ty = Type.subst_ty sbst ty in
   (st, generalize st (nonexpansive c.it) ty)
@@ -450,14 +464,14 @@ let infer_top_comp st c =
 let infer_top_let ~loc st defs =
   let vars, st = infer_let (clear_constraints st) Location.unknown defs in
   List.iter
-    (fun (p, c) -> Exhaust.is_irrefutable p ; Exhaust.check_comp c)
+    (fun (p, c) -> Exhaust.is_irrefutable st.type_context p ; Exhaust.check_comp st.type_context c)
     defs ;
   (vars, st)
 
 let infer_top_let_rec ~loc st defs =
   let vars, st = infer_let_rec (clear_constraints st) Location.unknown defs in
   let exhaust_check (_, (p, c)) =
-    Exhaust.is_irrefutable p ; Exhaust.check_comp c
+    Exhaust.is_irrefutable st.type_context p ; Exhaust.check_comp st.type_context c
   in
   List.iter exhaust_check defs ;
   (vars, st)

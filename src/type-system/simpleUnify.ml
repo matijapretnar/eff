@@ -1,6 +1,6 @@
 (** [unify sbst loc t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)
-let solve cstr =
+let solve cstr tctx=
   let rec unify loc t1 t2 subst =
     let t1 = Type.subst_ty subst t1 in
     let t2 = Type.subst_ty subst t2 in
@@ -28,8 +28,8 @@ let solve cstr =
           subst lst1 lst2
     (* The following two cases cannot be merged into one, as the whole matching
        fails if both types are Apply, but only the second one is transparent. *)
-    | Type.Apply (t1, lst1), t2 when Tctx.transparent ~loc t1 -> (
-      match Tctx.ty_apply ~loc t1 lst1 with
+    | Type.Apply (t1, lst1), t2 when Tctx.transparent ~loc t1 tctx -> (
+      match Tctx.ty_apply ~loc t1 lst1 tctx with
       | Tctx.Inline t ->
           unify loc t2 t subst
       | Tctx.Sum _ | Tctx.Record _ ->
