@@ -49,7 +49,7 @@ let rec cons_of_pattern tctx {it= p; at= loc} =
     match Assoc.pop flds with
     | None -> assert false
     | Some ((lbl, _), _) -> (
-      match Tctx.find_field lbl tctx with
+      match TypeContext.find_field lbl tctx with
       | None ->
           Error.typing ~loc "Unbound record field label %t in a pattern"
             (CoreTypes.Field.print lbl)
@@ -112,7 +112,7 @@ let find_constructors tctx lst =
           find (first c)
       (* Check if all tags defined by this variant type are covered. *)
       | Variant (lbl, _) -> (
-        match Tctx.find_variant lbl tctx with
+        match TypeContext.find_variant lbl tctx with
         | None -> assert false (* We assume that everything is type-checked *)
         | Some (_, _, tags, _) ->
             let all =

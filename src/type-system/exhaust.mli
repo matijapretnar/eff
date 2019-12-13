@@ -5,8 +5,8 @@
    [1] http://pauillac.inria.fr/~maranget/papers/warn/index.html
 *)
 
-val is_irrefutable : Tctx.type_context -> UntypedSyntax.pattern -> unit
+val is_irrefutable : TypeContext.state -> UntypedSyntax.pattern -> unit
 (** Check that a pattern is irrefutable. *)
 
-val check_comp : Tctx.type_context -> UntypedSyntax.computation -> unit
+val check_comp : TypeContext.state -> UntypedSyntax.computation -> unit
 (** Check for refutable patterns in let statements and non-exhaustive match statements. *)

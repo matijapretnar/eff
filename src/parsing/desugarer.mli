@@ -29,4 +29,4 @@ val desugar_tydefs :
      state
   -> (string, SugaredSyntax.typaram list * SugaredSyntax.tydef) Assoc.t
   -> state
-     * (CoreTypes.TyName.t, CoreTypes.TyParam.t list * Tctx.tydef) Assoc.t
+     * (CoreTypes.TyName.t, CoreTypes.TyParam.t list * TypeContext.tydef) Assoc.t
