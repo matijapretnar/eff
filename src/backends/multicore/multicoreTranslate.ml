@@ -109,8 +109,8 @@ and of_type = function
       TyArrow (TyArrow (of_type Type.unit_ty, of_type value), of_type finally)
 
 and of_tydef = function
-  | Tctx.Record assoc -> TyDefRecord (Assoc.map of_type assoc)
-  | Tctx.Sum assoc ->
+  | TypeContext.Record assoc -> TyDefRecord (Assoc.map of_type assoc)
+  | TypeContext.Sum assoc ->
       let converter = function None -> None | Some ty -> Some (of_type ty) in
       TyDefSum (Assoc.map converter assoc)
-  | Tctx.Inline ty -> TyDefInline (of_type ty)
+  | TypeContext.Inline ty -> TyDefInline (of_type ty)

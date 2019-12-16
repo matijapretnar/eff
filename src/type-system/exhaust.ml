@@ -40,16 +40,16 @@ let rec remove_as {it= p} =
   | p -> p
 
 (* Reads constructor description from a pattern, discarding any [Untyped.PAs] layers. *)
-let rec cons_of_pattern {it= p; at= loc} =
+let rec cons_of_pattern tctx {it= p; at= loc} =
   match p with
-  | Untyped.PAs (p, _) -> cons_of_pattern p
-  | Untyped.PAnnotated (p, _) -> cons_of_pattern p
+  | Untyped.PAs (p, _) -> cons_of_pattern tctx p
+  | Untyped.PAnnotated (p, _) -> cons_of_pattern tctx p
   | Untyped.PTuple lst -> Tuple (List.length lst)
   | Untyped.PRecord flds -> (
     match Assoc.pop flds with
     | None -> assert false
     | Some ((lbl, _), _) -> (
-      match Tctx.find_field lbl with
+      match TypeContext.find_field lbl tctx with
       | None ->
           Error.typing ~loc "Unbound record field label %t in a pattern"
             (CoreTypes.Field.print lbl)
@@ -74,8 +74,8 @@ let pattern_of_cons ~loc c lst =
 
 (* Finds all distinct non-wildcard root pattern constructors in [lst], and at
    least one constructor of their type not present in [lst] if it exists. *)
-let find_constructors lst =
-  let cons_lst = List.map cons_of_pattern (unique_elements lst) in
+let find_constructors tctx lst =
+  let cons_lst = List.map (cons_of_pattern tctx) (unique_elements lst) in
   let present = List.filter (fun c -> c <> Wildcard) cons_lst in
   let missing =
     match present with
@@ -112,7 +112,7 @@ let find_constructors lst =
           find (first c)
       (* Check if all tags defined by this variant type are covered. *)
       | Variant (lbl, _) -> (
-        match Tctx.find_variant lbl with
+        match TypeContext.find_variant lbl tctx with
         | None -> assert false (* We assume that everything is type-checked *)
         | Some (_, _, tags, _) ->
             let all =
@@ -168,34 +168,34 @@ let rec default = function
     | _ -> default lst )
 
 (* Is the pattern vector [q] useful w.r.t. pattern matrix [p]? *)
-let rec useful ~loc p q =
+let rec useful tctx ~loc p q =
   match q with
   (* Base case. *)
   | [] -> p = []
   (* Induction on the number of columns of [p] and [q]. *)
   | q1 :: qs -> (
-      let cons = cons_of_pattern q1 in
+      let cons = cons_of_pattern tctx q1 in
       match cons with
       (* If the first pattern in [q] is constructed, check the matrix [p]
              specialized for that constructor. *)
       | Tuple _ | Record _ | Variant _ | Const _ -> (
         match specialize_vector ~loc cons q with
         | None -> assert false
-        | Some q' -> useful ~loc (specialize ~loc cons p) q' )
+        | Some q' -> useful tctx ~loc (specialize ~loc cons p) q' )
       (* Otherwise, check if pattern constructors in the first column of [p]
              form a complete type signature. If they do, check if [q] is useful
              for any specialization of [p] for that type; if not, only the
              default matrix of [p] must be checked. *)
       | Wildcard ->
-          let present, missing = find_constructors (List.map List.hd p) in
+          let present, missing = find_constructors tctx (List.map List.hd p) in
           if present <> [] && missing = [] then
             List.exists
               (fun x ->
                 match specialize_vector ~loc x q with
                 | None -> false
-                | Some q' -> useful ~loc (specialize ~loc x p) q' )
+                | Some q' -> useful tctx ~loc (specialize ~loc x p) q' )
               present
-          else useful ~loc (default p) qs )
+          else useful tctx ~loc (default p) qs )
 
 (* Specialized version of [useful] that checks if a pattern matrix [p] with [n]
    columns is exhaustive (equivalent to calling [useful] on [p] with a vector
@@ -209,15 +209,15 @@ let split_at n lst =
   in
   split_at' [] lst n
 
-let rec exhaustive ~loc p = function
+let rec exhaustive tctx ~loc p = function
   | 0 -> if p = [] then Some [] else None
   | n -> (
-      let present, missing = find_constructors (List.map List.hd p) in
+      let present, missing = find_constructors tctx (List.map List.hd p) in
       if present <> [] && missing = [] then
         let rec find = function
           | [] -> None
           | c :: cs -> (
-            match exhaustive ~loc (specialize ~loc c p) (arity c + n - 1) with
+            match exhaustive tctx ~loc (specialize ~loc c p) (arity c + n - 1) with
             | None -> find cs
             | Some lst ->
                 let ps, rest = split_at (arity c) lst in
@@ -225,7 +225,7 @@ let rec exhaustive ~loc p = function
         in
         find present
       else
-        match exhaustive ~loc (default p) (n - 1) with
+        match exhaustive tctx ~loc (default p) (n - 1) with
         | None -> None
         | Some lst ->
             let c = List.hd missing in
@@ -236,12 +236,12 @@ let rec exhaustive ~loc p = function
 
 (* Prints a warning if the list of patterns [pats] is not exhaustive or contains
    unused patterns. *)
-let check_patterns ~loc patts =
+let check_patterns tctx ~loc patts =
   (* [p] contains the patterns that have already been checked for usefulness. *)
   let rec check p patts =
     match patts with
     | [] -> (
-      match exhaustive ~loc p 1 with
+      match exhaustive tctx ~loc p 1 with
       | Some ps ->
           Print.warning ~loc
             "@[This pattern-matching is not exhaustive.@.\n                                    \
@@ -249,7 +249,7 @@ let check_patterns ~loc patts =
             (Untyped.print_pattern (List.hd ps))
       | None -> () )
     | patt :: patts ->
-        if not (useful ~loc p [patt]) then (
+        if not (useful tctx ~loc p [patt]) then (
           Print.warning ~loc "This match case is unused." ;
           check p patts )
         else check ([patt] :: p) patts
@@ -258,23 +258,23 @@ let check_patterns ~loc patts =
   check [] patts
 
 (* A pattern is irrefutable if it cannot fail during pattern matching. *)
-let is_irrefutable p = check_patterns ~loc:p.at [p]
+let is_irrefutable tctx p = check_patterns tctx ~loc:p.at [p]
 
 (* Check for refutable patterns in let statements and non-exhaustive match
    statements. *)
-let check_comp c =
+let check_comp tctx c =
   let rec check {it= c; at= loc} =
     match c with
     | Untyped.Value _ -> ()
     | Untyped.Let (lst, c) ->
-        List.iter (fun (p, c) -> is_irrefutable p ; check c) lst ;
+        List.iter (fun (p, c) -> is_irrefutable tctx p ; check c) lst ;
         check c
     | Untyped.LetRec (lst, c) ->
-        List.iter (fun (_, (p, c)) -> is_irrefutable p ; check c) lst
+        List.iter (fun (_, (p, c)) -> is_irrefutable tctx p ; check c) lst
     | Untyped.Match (_, []) ->
         () (* Skip empty match to avoid an unwanted warning. *)
     | Untyped.Match (_, lst) ->
-        check_patterns ~loc (List.map fst lst) ;
+        check_patterns tctx ~loc (List.map fst lst) ;
         List.iter (fun (_, c) -> check c) lst
     | Untyped.Apply _ -> ()
     | Untyped.Handle (_, c) -> check c

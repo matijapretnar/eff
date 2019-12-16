@@ -6,4 +6,4 @@ val of_pattern : CoreSyntax.pattern -> MulticoreSyntax.pattern
 
 val of_type : Type.ty -> MulticoreSyntax.ty
 
-val of_tydef : Tctx.tydef -> MulticoreSyntax.tydef
+val of_tydef : TypeContext.tydef -> MulticoreSyntax.tydef

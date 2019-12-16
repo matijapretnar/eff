@@ -123,7 +123,7 @@ let desugar_tydef state params def =
           (st'', (f', t'))
         in
         let state', flds' = Assoc.kfold_map field_desugar state flds in
-        (state', Tctx.Record flds')
+        (state', TypeContext.Record flds')
     | Sugared.TySum assoc ->
         let aux_desug st (lbl, cons) =
           let unsugared_lbl =
@@ -157,10 +157,10 @@ let desugar_tydef state params def =
         let state', assoc' =
           Assoc.kfold_map aux_desug {state with constructors} assoc
         in
-        (state', Tctx.Sum assoc')
+        (state', TypeContext.Sum assoc')
     | Sugared.TyInline t ->
         let state', t' = desugar_type ty_sbst state t in
-        (state', Tctx.Inline t')
+        (state', TypeContext.Inline t')
   in
   (state', (Assoc.values_of ty_sbst, def'))
 
