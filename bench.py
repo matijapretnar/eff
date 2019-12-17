@@ -7,7 +7,7 @@ counter = 0
 
 filename = sys.argv[1]
 
-resultfile = open("dummy_timing_100_runs.txt", "w+")
+resultfile = open("dummyfun_timing_100_runs.txt", "w+")
 
 while counter < RUNS:
     start = timer()
