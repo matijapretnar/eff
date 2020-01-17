@@ -24,6 +24,11 @@ type ('a, 'b) handler_clauses =
 
   }
 
+let rec (>>) (c : 'a computation) (f : 'a -> 'b computation) =
+  match c with
+  | Value x -> f x
+  | Call (eff, arg, k) -> Call (eff, arg, ((fun y  -> (k y) >> f)))
+
 let rec handler (h : ('a, 'b) handler_clauses) : 'a computation -> 'b =
   let rec handler =
     function
@@ -189,7 +194,7 @@ let rec pp_term noEff_term ppf =
         (pp_sequence "@, | " pp_abs cases)
     | Call (e, t, abs_ty) -> print ppf "@[<hov 2> call (%t) @,(%t) @,(%t)@]" (pp_effect e) (pp_term t) (pp_abs_with_ty abs_ty)
     | Op (e, t) -> print ppf "@[<hov 2> call (%t) @,(%t) @,(%s)@]" (pp_effect e) (pp_term t) "(fun x -> x)"
-    | Bind (t, abs) -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t) (pp_abs abs)
+    | Bind (t, abs) -> print ppf "@[<hov 2>((%t) >> (%t))@]" (pp_term t) (pp_abs abs)
     | Handle (NoEffSyntax.Call (e, t1, (pat, ty, t)), Cast (t2, FunToHand (c1, c2))) -> print ppf "%t"
         (pp_term (NoEffSyntax.Call (e, t1, (pat, ty, Handle (t, Cast (t2, FunToHand (c1, c2)))))))
     | Handle (Return t1, Cast (t2, FunToHand (c1, c2))) -> print ppf "%t" (pp_term (Cast (Apply (t2, Cast (t1, c1)), c2)))
