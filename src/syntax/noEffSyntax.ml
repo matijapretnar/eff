@@ -6,6 +6,15 @@ type variable = Variable.t
 
 type n_effect = CoreTypes.Effect.t * (n_type * n_type)
 
+(* and n_pattern =
+  | PNVar of variable
+  | PNAs of n_pattern * variable
+  | PNTuple of n_pattern list
+  | PNRecord of (CoreTypes.Field.t, n_pattern) Assoc.t
+  | PNVariant of Coretypes.Label.t * n_pattern
+  | PNConst of Const.t
+  | PNNonbinding *) 
+
 and n_term =
   | NVar of variable
   | NAs of n_term * variable
@@ -28,7 +37,7 @@ and n_term =
   | NMatch of n_term * n_type * n_abstraction list * Location.t
   | NOp of n_effect * n_term
   | NRecord of (CoreTypes.Field.t, n_term) Assoc.t
-  | NVariant of CoreTypes.Label.t * n_term
+  | NVariant of CoreTypes.Label.t * n_term option
 
 and n_handler =
   { effect_clauses: (n_effect, n_abstraction_2_args) Assoc.t

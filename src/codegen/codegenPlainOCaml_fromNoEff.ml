@@ -1,0 +1,104 @@
+module NoEff = NoEffSyntax
+
+let print_variable = NoEff.Variable.print ~safe:true
+
+let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
+
+(* STIEN: Add patterns to NoEff? 
+let rec print_pattern ?max_level p ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match p with
+  | Erasure.PEVar x -> print "%t" (print_variable x)
+  | Erasure.PEAs (p, x) ->
+      print "%t as %t" (print_pattern p) (print_variable x)
+  | Erasure.PEConst c -> Const.print c ppf
+  | Erasure.PETuple lst -> Print.tuple print_pattern lst ppf
+  | Erasure.PERecord lst -> Print.record print_pattern lst ppf
+  | Erasure.PEVariant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
+  | Erasure.PEVariant (lbl, None) -> print "%s" lbl
+  | Erasure.PEVariant ("(::)", Some Erasure.PETuple [p1; p2]) ->
+      print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
+  | Erasure.PEVariant (lbl, Some p) ->
+      print ~at_level:1 "(%s @[<hov>%t@])" lbl (print_pattern p)
+  | Erasure.PENonbinding -> print "_" *)
+
+
+let rec print_term ?max_level e ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match e with
+  | NoEff.NVar x -> print "%t" (print_variable x)
+  | NoEff.NConst c -> print "%t" (Const.print c)
+  | NoEff.NTuple lst -> Print.tuple print_term lst ppf
+  | NoEff.NRecord lst -> Print.record print_term lst ppf
+  | NoEff.NVariant (lbl, None) -> print "%s" lbl
+  | NoEff.NVariant (lbl, Some e) ->
+      print ~at_level:1 "(%s %t)" lbl (print_term e)
+  (* STIEN: Need to keep track of type? *)
+  | NoEff.NFun (x, _, c) ->
+      print "fun (%t) -> %t" (print_pattern x) (print_term c)
+  | NoEff.NEffect eff -> print ~at_level:2 "effect %t" (print_effect eff)
+  (* STIEN: TODO *)
+  | Erasure.EHandler h ->
+      print ~at_level:2
+        "fun c -> handler {@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->\n             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]} c"
+        (print_abstraction_with_ty h.Erasure.value_clause)
+        (print_effect_clauses (Assoc.to_list h.Erasure.effect_clauses))
+  | NoEff.NLetVal (p, e, c) ->
+      print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p)
+        (print_term e) (print_term c)
+  | NoEff.NApplyTerm (e1, e2) ->
+      print ~at_level:1 "%t@ %t"
+        (print_term ~max_level:1 e1)
+        (print_term ~max_level:0 e2)
+  (* STIEN: TODO *)
+  | Erasure.EHandle (e, c) ->
+      print ~at_level:1 "%t %t"
+        (print_expression ~max_level:0 e)
+        (print_computation ~max_level:0 c)
+  | NoEff.NCall (eff, e, a) ->
+      print ~at_level:1 "call %t %t (@[fun %t@])" (print_effect eff)
+        (print_term ~max_level:0 e)
+        (print_abstraction_with_ty a)
+  | NoEff.NBind (c1, a) ->
+      print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]"
+        (print_term ~max_level:0 c1)
+        (print_abstraction a)
+  | NoEff.NMatch (e, alist) ->
+      print ~at_level:1 "match %t with %t"
+        (print_term ~max_level:0 e)
+        (print_cases alist)
+  (* STIEN: Keep track of type? *)
+  | NoEff.NLetRec ([(var, _, e)], c) ->
+      print ~at_level:2 "let rec @[<hov>%t =@ %t@ in@]@ %t"
+        (print_variable var) (print_term e) (print_term c)
+  (* STIEN: NoEff.NOp: faalt in erasure exeff -> skeleff, wat hier doen? *)
+  (* STIEN: NoEff.NBigLambdaCoer - cf. coercions *)
+  (* STIEN: NoEff.NApplyCoer - cf. coercions*)
+  (* STIEN: NoEff.NCast - cf. coercions *)
+  (* STIEN: NoEff.NReturn - zou makkelijk moeten zijn, wel syntax checken *)
+  (* STIEN: NoEff.NNonBinding (hangt ook af van patterns) *)
+
+and print_effect_clauses eff_clauses ppf =
+  let print ?at_level = Print.print ?at_level ppf in
+  match eff_clauses with
+  | [] -> print "| eff' -> fun arg k -> Call (eff', arg, k)"
+  | (((eff_name, (t1, t2)) as eff), (p1, p2, c)) :: cases ->
+      print ~at_level:1
+        "| %t -> (fun (%t : %t) (%t : %t -> _ computation) -> %t) %t"
+        (print_effect eff) (print_pattern p1) (Types.print_target_ty t1)
+        (print_pattern p2) (Types.print_target_ty t2) (print_term c)
+        (print_effect_clauses cases)
+
+and print_cases cases ppf =
+  let print ?at_level = Print.print ?at_level ppf in
+  match cases with
+  | [] -> ()
+  | (p, c) :: cases ->
+      print ~at_level:1 "| %t -> %t %t" (print_pattern p) (print_term c)
+        (print_cases cases)
+
+and print_abstraction (p, c) ppf =
+  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_term c)
+
+and print_abstraction_with_ty (p, _, c) ppf =
+  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_term c)
