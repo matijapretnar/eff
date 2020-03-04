@@ -98,13 +98,13 @@ and dirty_elab state env (ty, dirt) =
 
 and pattern_elab p =
   match p with
-  | PVar x -> NVar x
-  | PAs (p, x) -> NAs (pattern_elab p, x)
-  | PTuple ps -> NTuple (List.map pattern_elab ps)
-  | PConst c -> NConst c
-  | PRecord recs -> NoEff.NRecord (Assoc.map pattern_elab recs)
-  | PVariant (l, p) -> NoEff.NVariant (l, pattern_elab p)
-  | PNonbinding -> NNonBinding
+  | PVar x -> PNVar x
+  | PAs (p, x) -> PNAs (pattern_elab p, x)
+  | PTuple ps -> PNTuple (List.map pattern_elab ps)
+  | PConst c -> PNConst c
+  | PRecord recs -> NoEff.PNRecord (Assoc.map pattern_elab recs)
+  | PVariant (l, p) -> NoEff.PNVariant (l, pattern_elab p)
+  | PNonbinding -> PNNonbinding
 
 and value_elab (state : ExplicitInfer.state) (env : environment) v =
   match v with
@@ -153,7 +153,7 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
           let env' = extend_pattern_type env p1 ty1 in
           let env'' = extend_pattern_type env' p2 (ExEffTypes.Arrow (ty2, (t, ExEffTypes.empty_dirt))) in
           let (_, elabcomp) = comp_elab state env'' comp in
-            ((eff, (elab1, elab2)), (pattern_elab p1, NoEff.NCast ((pattern_elab p2), 
+            ((eff, (elab1, elab2)), (pattern_elab p1, NoEff.PNCast ((pattern_elab p2), 
             (NoEff.NCoerArrow (NoEff.NCoerRefl (elab1),
              NoEff.NCoerUnsafe (NoEff.NCoerRefl (elab2))))), NoEff.NReturn elabcomp)) ) in
         let effectset = get_effectset (Assoc.to_list h.effect_clauses) in

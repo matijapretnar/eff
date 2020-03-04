@@ -6,18 +6,19 @@ type variable = Variable.t
 
 type n_effect = CoreTypes.Effect.t * (n_type * n_type)
 
-(* and n_pattern =
+and n_pattern =
   | PNVar of variable
   | PNAs of n_pattern * variable
   | PNTuple of n_pattern list
   | PNRecord of (CoreTypes.Field.t, n_pattern) Assoc.t
-  | PNVariant of Coretypes.Label.t * n_pattern
+  | PNVariant of CoreTypes.Label.t * n_pattern
   | PNConst of Const.t
-  | PNNonbinding *) 
+  (* STIEN: Nodig voor tweede handler elaboration case van exeff naar noeff, maar eigenlijk juister om daarvoor een substitutie te maken denk ik, en dan te pattern matchen op k als variabele? Niet zeker of dat wel mag *)
+  | PNCast of n_pattern * n_coercion
+  | PNNonbinding
 
 and n_term =
   | NVar of variable
-  | NAs of n_term * variable
   | NTuple of n_term list
   | NFun of n_abstraction_with_type
   | NApplyTerm of n_term * n_term
@@ -32,7 +33,6 @@ and n_term =
   | NHandle of n_term * n_term
   | NConst of Const.t
   | NEffect of n_effect
-  | NNonBinding
   | NLetRec of n_letrec_abstraction list * n_term
   | NMatch of n_term * n_type * n_abstraction list * Location.t
   | NOp of n_effect * n_term
@@ -56,9 +56,9 @@ and n_type =
 
 and prim_ty = NInt | NBool | NString | NFloat
 
-and n_abstraction = (n_term * n_term)
-and n_abstraction_with_type = (n_term * n_type * n_term)
-and n_abstraction_2_args = (n_term * n_term * n_term)
+and n_abstraction = (n_pattern * n_term)
+and n_abstraction_with_type = (n_pattern * n_type * n_term)
+and n_abstraction_2_args = (n_pattern * n_pattern * n_term)
 and n_letrec_abstraction = (variable * n_type * n_type * n_abstraction)
 
 and n_coerty = n_type * n_type
@@ -93,7 +93,6 @@ let rec print_term ?max_level t ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match t with
   | NVar x -> print "%t" (print_variable x)
-  | NAs (t, var) -> print "As %t = %t" (print_variable var) (print_term t)
   | NTuple ts -> Print.tuple print_term ts ppf
   | NFun abs -> print_abstraction_with_type abs ppf
   | NApplyTerm (t1, t2) -> print ~at_level:1 "((%t)@ (%t))"
@@ -115,7 +114,7 @@ let rec print_term ?max_level t ppf =
         (print_abstraction_with_type h.return_clause)
         (print_effect_clauses (Assoc.to_list h.effect_clauses))
   | NLet (t1, (t2, t3)) ->
-        print "let (%t = (%t)) in (%t)" (print_term t2) (print_term t1)
+        print "let (%t = (%t)) in (%t)" (print_pattern t2) (print_term t1)
         (print_term t3)
   | NCall (eff, t, abs) ->
         print ~at_level:1 "call (%t) (%t) ((@[fun %t@]))" (print_effect eff)
@@ -131,7 +130,6 @@ let rec print_term ?max_level t ppf =
         (print_term ~max_level:0 h) 
   | NConst c -> Const.print c ppf
   | NEffect (eff, (ty1, ty2)) -> print "Effect %t : %t %t" (CoreTypes.Effect.print eff) (print_type ty1) (print_type ty2)
-  | NNonBinding -> print "_"
   | NLetRec (lst, t) ->
         print ~at_level:2 "let rec @[<hov>%t@] in %t"
         (Print.sequence " and " print_let_rec_abstraction lst)
@@ -141,15 +139,27 @@ let rec print_term ?max_level t ppf =
         (Print.cases print_abstraction lst)
   | NOp (eff, t) -> print "Op %t %t" (print_effect eff) (print_term t)
   | NRecord recs -> Print.record CoreTypes.Field.print print_term recs ppf
-  | NVariant (l, t) -> 
+  | NVariant (l, Some t) -> 
         print "Variant %t %t" (CoreTypes.Label.print l) (print_term t)
+
+and print_pattern ?max_level p ppf = 
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match p with
+  | PNVar var -> print "%t" (print_variable var)
+  | PNAs (pat, var) -> print "As %t = %t" (print_variable var) (print_pattern p)
+  | PNTuple ps -> Print.tuple print_pattern ps ppf
+  | PNRecord recs -> Print.record CoreTypes.Field.print print_pattern recs ppf
+  | PNVariant (l, t) ->
+        print "Variant %t %t" (CoreTypes.Label.print l) (print_pattern t)
+  | PNConst c -> Const.print c ppf
+  | PNNonbinding -> print "_"
 
 and print_let_rec_abstraction (f, arg_ty, res_ty, abs) ppf =
   Format.fprintf ppf "(%t : %t) %t"
     (print_variable f) (print_type (NTyArrow (arg_ty,res_ty))) (print_let_abstraction abs)
 
 and print_let_abstraction (t1, t2) ppf =
-  Format.fprintf ppf "%t = %t" (print_term t1) (print_term t2)
+  Format.fprintf ppf "%t = %t" (print_pattern t1) (print_term t2)
 
 and print_coercion ?max_level coer ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -210,14 +220,14 @@ and print_effect (eff, _) ppf =
   Print.print ppf "Effect_%t" (CoreTypes.Effect.print eff)
 
 and print_abstraction (t1, t2) ppf =
-  Format.fprintf ppf "(fun %t -> %t)" (print_term t1)
+  Format.fprintf ppf "(fun %t -> %t)" (print_pattern t1)
     (print_term t2)
 
 and print_abstraction2 (t1, t2, t3) ppf =
-  Format.fprintf ppf "(fun %t %t -> %t)" (print_term t1) (print_term t2)
+  Format.fprintf ppf "(fun %t %t -> %t)" (print_pattern t1) (print_pattern t2)
     (print_term t3)
 
 and print_abstraction_with_type (t1, ty, t2) ppf =
-  Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_term t1)
+  Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern t1)
     (print_type ty)
     (print_term t2)
