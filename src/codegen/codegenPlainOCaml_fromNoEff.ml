@@ -1,9 +1,10 @@
 module NoEff = NoEffSyntax
+module OCamn = OcamlSyntax
 
 let print_variable = NoEff.Variable.print ~safe:true
 
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
- 
+
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p with
@@ -102,21 +103,45 @@ and print_abstraction_with_ty (p, _, c) ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_term c)
 
 (* ELABORATING COERCIONS AS FUNCTIONS *)
-
-and elab_coercion (coer: NoEff.n_coercion) = 
+and elab_coercion (coer: NoEff.n_coercion): OCaml.term =
   match coer with
-  | NoEff.NCoerVar x -> 
-  | NoEff.NCoerRefl t -> OCaml.Function (* identity *)
-  | NoEff.NCoerArrow (arg, res)
-  | NoEff.NCoerHandler (arg, res)
+  | NoEff.NCoerRefl t ->
+    let x = CoreTypes.Variable.new_fresh in
+    OCaml.Lambda (OCaml.PVar x, OCaml.Var x)
+  | NoEff.NCoerArrow (arg, res) ->
+    let f = elab_coercion arg in
+    let g = elab_coercion res in
+    match f with
+    | OCaml.Lambda (p_f, c_f) ->
+      match g with
+      | OCaml.Lambda (p_g, c_g) ->
+        let x1 = CoreTypes.Variable.new_fresh in
+        let x2 = CoreTypes.Variable.new_fresh in
+        OCaml.Lambda (OCaml.PVar x1,
+          OCaml.Lambda (OCaml.PVar x2,
+            OCaml.Apply (g, OCaml.Apply x1, OCaml.Apply (f, x2))))
+    | _ -> /* STIEN: fail here */
+  | NoEff.NCoerHandler (arg, res) ->
+    let f = elab_coercion arg in
+    let g = elab_coercion res in
+    match f with
+    | OCaml.Lambda (p_f, c_f) ->
+      match g with
+      | OCaml.Lambda (p_g, c_g) ->
+        let x1 = CoreTypes.Variable.new_fresh in
+        let x2 = CoreTypes.Variable.new_fresh in
+        OCaml.Lambda (OCaml.PVar x1,
+          OCaml.Lambda (OCaml.PVar x2,
+            // TODO
+    | _ -> /* STIEN: fail here */
   | NoEff.NCoerHandToFun (arg, res) ->
-    let arg_fun 
+    let arg_fun
   | NoEff.NCoerFunToHand (arg, res) ->
   | NoEff.NCoerQual
   | NoEff.NCoerReturn c ->
     let (pat, comp) = elab_coercion c in
     (pat, NoEff.NReturn comp)
-  | NoEff.NCoerComp c -> 
+  | NoEff.NCoerComp c ->
     fun m -> m >>= \x -> NoEff.NReturn (NoEff.NApplyTerm )
   | NoEff.NCoerUnsafe c ->
     fun x ->
@@ -125,5 +150,3 @@ and elab_coercion (coer: NoEff.n_coercion) =
       | _ -> error
   | NoEff.NCoerApp (c1, c2)
   | NoEff.NCoerTrans (c1, c2)
-
-
