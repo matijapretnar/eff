@@ -11,7 +11,7 @@ and n_pattern =
   | PNAs of n_pattern * variable
   | PNTuple of n_pattern list
   | PNRecord of (CoreTypes.Field.t, n_pattern) Assoc.t
-  | PNVariant of CoreTypes.Label.t * n_pattern
+  | PNVariant of CoreTypes.Label.t * n_pattern option
   | PNConst of Const.t
   (* STIEN: Nodig voor tweede handler elaboration case van exeff naar noeff, maar eigenlijk juister om daarvoor een substitutie te maken denk ik, en dan te pattern matchen op k als variabele? Niet zeker of dat wel mag *)
   | PNCast of n_pattern * n_coercion
@@ -149,7 +149,7 @@ and print_pattern ?max_level p ppf =
   | PNAs (pat, var) -> print "As %t = %t" (print_variable var) (print_pattern p)
   | PNTuple ps -> Print.tuple print_pattern ps ppf
   | PNRecord recs -> Print.record CoreTypes.Field.print print_pattern recs ppf
-  | PNVariant (l, t) ->
+  | PNVariant (l, Some t) ->
         print "Variant %t %t" (CoreTypes.Label.print l) (print_pattern t)
   | PNConst c -> Const.print c ppf
   | PNNonbinding -> print "_"

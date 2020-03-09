@@ -3,24 +3,23 @@ module NoEff = NoEffSyntax
 let print_variable = NoEff.Variable.print ~safe:true
 
 let print_effect (eff, _) ppf = Print.print ppf "Effect_%s" eff
-
-(* STIEN: Add patterns to NoEff? 
+ 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p with
-  | Erasure.PEVar x -> print "%t" (print_variable x)
-  | Erasure.PEAs (p, x) ->
+  | NoEff.PNVar x -> print "%t" (print_variable x)
+  | NoEff.PNAs (p, x) ->
       print "%t as %t" (print_pattern p) (print_variable x)
-  | Erasure.PEConst c -> Const.print c ppf
-  | Erasure.PETuple lst -> Print.tuple print_pattern lst ppf
-  | Erasure.PERecord lst -> Print.record print_pattern lst ppf
-  | Erasure.PEVariant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
-  | Erasure.PEVariant (lbl, None) -> print "%s" lbl
-  | Erasure.PEVariant ("(::)", Some Erasure.PETuple [p1; p2]) ->
+  | NoEff.PNConst c -> Const.print c ppf
+  | NoEff.PNTuple lst -> Print.tuple print_pattern lst ppf
+  | NoEff.PNRecord lst -> Print.record print_pattern lst ppf
+  | NoEff.PNVariant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
+  | NoEff.PNVariant (lbl, None) -> print "%s" lbl
+  | NoEff.PNVariant ("(::)", Some NoEff.PNTuple [p1; p2]) ->
       print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
-  | Erasure.PEVariant (lbl, Some p) ->
+  | NoEff.PNVariant (lbl, Some p) ->
       print ~at_level:1 "(%s @[<hov>%t@])" lbl (print_pattern p)
-  | Erasure.PENonbinding -> print "_" *)
+  | NoEff.PNNonbinding -> print "_"
 
 
 let rec print_term ?max_level e ppf =
@@ -76,7 +75,6 @@ let rec print_term ?max_level e ppf =
   (* STIEN: NoEff.NApplyCoer - cf. coercions*)
   (* STIEN: NoEff.NCast - cf. coercions *)
   (* STIEN: NoEff.NReturn - zou makkelijk moeten zijn, wel syntax checken *)
-  (* STIEN: NoEff.NNonBinding (hangt ook af van patterns) *)
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
@@ -102,3 +100,30 @@ and print_abstraction (p, c) ppf =
 
 and print_abstraction_with_ty (p, _, c) ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_term c)
+
+(* ELABORATING COERCIONS AS FUNCTIONS *)
+
+and elab_coercion (coer: NoEff.n_coercion) = 
+  match coer with
+  | NoEff.NCoerVar x -> 
+  | NoEff.NCoerRefl t -> OCaml.Function (* identity *)
+  | NoEff.NCoerArrow (arg, res)
+  | NoEff.NCoerHandler (arg, res)
+  | NoEff.NCoerHandToFun (arg, res) ->
+    let arg_fun 
+  | NoEff.NCoerFunToHand (arg, res) ->
+  | NoEff.NCoerQual
+  | NoEff.NCoerReturn c ->
+    let (pat, comp) = elab_coercion c in
+    (pat, NoEff.NReturn comp)
+  | NoEff.NCoerComp c -> 
+    fun m -> m >>= \x -> NoEff.NReturn (NoEff.NApplyTerm )
+  | NoEff.NCoerUnsafe c ->
+    fun x ->
+      match x with
+      | NoEff.NReturn y -> g y
+      | _ -> error
+  | NoEff.NCoerApp (c1, c2)
+  | NoEff.NCoerTrans (c1, c2)
+
+

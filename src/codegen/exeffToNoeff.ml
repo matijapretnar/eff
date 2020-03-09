@@ -103,7 +103,7 @@ and pattern_elab p =
   | PTuple ps -> PNTuple (List.map pattern_elab ps)
   | PConst c -> PNConst c
   | PRecord recs -> NoEff.PNRecord (Assoc.map pattern_elab recs)
-  | PVariant (l, p) -> NoEff.PNVariant (l, pattern_elab p)
+  | PVariant (l, p) -> NoEff.PNVariant (l, Some (pattern_elab p))
   | PNonbinding -> PNNonbinding
 
 and value_elab (state : ExplicitInfer.state) (env : environment) v =
