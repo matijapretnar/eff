@@ -1,7 +1,0 @@
-effect Decide : bool;;
-
-handle
-  let x = (if perform Decide then 10 else 20) in
-  x-1
-with
-| effect Decide k -> k true;;

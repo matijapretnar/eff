@@ -8,6 +8,7 @@ module TestB = UntypedToMulticore
 module TestC = SkelEffSyntax
 module TestD = NoEffSyntax
 module TestE = ExeffToNoeff
+module TestF = CodegenPlainOCaml_fromNoEff
 
 module type Shell = sig
   type state

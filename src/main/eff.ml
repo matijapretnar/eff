@@ -29,6 +29,9 @@ let options =
     ; ( "--compile-multicore-ocaml"
       , Arg.String (fun filename -> Config.backend := Multicore filename)
       , "<file> Compile the Eff code into a Multicore OCaml file <file>" )
+    ; ( "--compile-plain-ocaml"
+       , Arg.String (fun filename -> Config.backend := Ocaml filename)
+       , "<file> Compile the Eff code into a OCaml file <file>" )
     ; ("--ascii", Arg.Set Config.ascii, " Use ASCII output")
     ; ( "-v"
       , Arg.Unit
@@ -149,6 +152,10 @@ let main =
       | Config.Multicore output_file ->
           ( module MulticoreCompile.Backend (struct
             let output_file = output_file
+          end) )
+      | Config.Ocaml output_file ->
+          ( module OcamlCompile_viaNoEff.Backend (struct
+              let output_file = output_file
           end) )
     in
     let (module Shell) = (module Shell.Make (Backend) : Shell.Shell) in
