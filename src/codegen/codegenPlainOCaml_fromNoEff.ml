@@ -148,7 +148,18 @@ and elab_type t =
   | NoEff.NTyTuple ts -> OCaml.TyTuple (List.map elab_type ts)
   | NoEff.NTyArrow (ty1, ty2) -> OCaml.TyArrow (elab_type ty1, elab_type ty2)
   | NoEff.NTyHandler (ty1, ty2) -> OCaml.TyArrow (elab_type ty1, elab_type ty2)
-  | NTyApply (name, tys) -> OCaml.TyApply (name, List.map elab_type tys)
+  | NoEff.NTyApply (name, tys) -> OCaml.TyApply (name, List.map elab_type tys)
+  | NoEff.NTyQual (_, _) -> failwith "No ty qual supported"
+  | NoEff.NTyComp ty -> elab_type ty
+  | NoEff.NTyApply _ -> failwith "No ty apply supported"
+  | NoEff.NTyPrim ty -> OCaml.PrimTy (prim_to_ocaml ty)
+
+and prim_to_ocaml ty =
+  match ty with
+  | NInt -> "int"
+  | NBool -> "bool"
+  | NString -> "string"
+  | NFloat -> "float"
 
 and elab_abstraction (p, c) = (elab_pattern p, elab_term c)
 

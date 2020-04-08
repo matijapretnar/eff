@@ -18,6 +18,7 @@ type ty =
   | TyBasic of string
   | TyTuple of ty list
   | TyArrow of ty * ty
+  | PrimTy of string
 
 type tydef =
   | TyDefRecord of (field, ty) Assoc.t
@@ -138,6 +139,7 @@ and print_type ?max_level t ppf =
     print ~at_level:2 "@[<hov>%t@]"
       (Print.sequence (Symbols.times ()) (print_type ~max_level:1) tys)
   | TyArrow (ty1, ty2) -> print "%t -> %t" (print_type ty1) (print_type ty2)
+  | PrimTy s -> print "%s" s
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
