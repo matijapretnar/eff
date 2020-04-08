@@ -56,6 +56,12 @@ type term =
   | Handler of abstraction_with_type * effect_clause list
   | Bind of term * abstraction
 
+and cmd =
+  | Term of term
+  | DefEffect of effect * ty * ty
+  | External of (variable * ty * string)
+  | TyDef of (CoreTypes.Label.t * (CoreTypes.TyParam.t list * tydef)) list
+
 and match_case =
   | ValueClause of abstraction
   | EffectClause of effect * abstraction2
@@ -103,7 +109,7 @@ let rec print_expression ?max_level e ppf =
   | Variant (lbl, Some e) ->
       print ~at_level:1 "(%t %t)" (CoreTypes.Field.print lbl) (print_expression e)
   | Lambda (x, c) ->
-      print "fun (%t) -> %t" (print_pattern x) (print_term c)
+      print "fun (%t) -> %t" (print_pattern x) (print_expression c)
   | Effect (eff, _, _) -> print ~at_level:2 "effect %t" (CoreTypes.Effect.print eff)
   | Handler (value_clause, effect_clauses) ->
       print ~at_level:2
@@ -111,33 +117,27 @@ let rec print_expression ?max_level e ppf =
         (print_abstraction_with_ty value_clause)
         (print_effect_clauses effect_clauses)
 
-and print_term ?max_level t ppf =
+and print_command ?max_level cmd ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match cmd with
+  | Term t -> print ~at_level:2 "%t" (print_expression t)
+  | DefEffect (eff, ty1, ty2) -> print ~at_level:2 "Effect %t: %t -> %t" (CoreTypes.Effect.print eff)
+    (print_type ty1) (print_type ty2)
+  | External (v, t, s) -> print ~at_level:2 "%t: %t = %s" (print_variable v) (print_type t) s
+  | TyDef defs -> failwith "TODO"
+
+and print_type ?max_level t ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match t with
-  | Let ((p, t1), t2) ->
-      print ~at_level:2 "let @[<hov>%t =@ %t@ in@]@ %t" (print_pattern p)
-        (print_expression t1) (print_term t2)
-  | Apply (e1, e2) ->
-      print ~at_level:1 "%t@ %t"
-        (print_expression ~max_level:1 e1)
-        (print_expression ~max_level:0 e2)
-  | Call (eff, e, a) ->
-      print ~at_level:1 "call %t %t (@[fun %t@])" (CoreTypes.Effect.print eff)
-        (print_expression ~max_level:0 e)
-        (print_abstraction a)
-  | Bind (c1, a) ->
-      print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]"
-        (print_term ~max_level:0 c1)
-        (print_abstraction a)
-  | Match (e, alist) ->
-      print ~at_level:1 "match %t with %t"
-        (print_expression ~max_level:0 e)
-        (print_cases alist)
-  | LetRec ([(var, abs)], c) ->
-      print ~at_level:2 "let rec @[<hov>%t =@ %t@ in@]@ %t"
-        (print_variable var) (print_abstraction abs) (print_term c)
-
-and print_type t ppf = failwith "TODO"
+  | TyApply (name, tys) ->
+    print ~at_level:1 "(%t) %t" (Print.sequence ", " print_type tys) (CoreTypes.TyName.print name)
+  | TyParam p -> CoreTypes.TyParam.print p ppf
+  | TyBasic s -> print "%s" s
+  | TyTuple [] -> print "unit"
+  | TyTuple tys ->
+    print ~at_level:2 "@[<hov>%t@]"
+      (Print.sequence (Symbols.times ()) (print_type ~max_level:1) tys)
+  | TyArrow (ty1, ty2) -> print "%t -> %t" (print_type ty1) (print_type ty2)
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
@@ -147,7 +147,7 @@ and print_effect_clauses eff_clauses ppf =
       print ~at_level:1
         "| %t -> (fun (%t : %t) (%t : %t -> _ computation) -> %t) %t"
         (CoreTypes.Effect.print eff) (print_pattern p1) (print_type t1)
-        (print_pattern p2) (print_type t2) (print_term c)
+        (print_pattern p2) (print_type t2) (print_expression c)
         (print_effect_clauses cases)
 
 and print_cases cases ppf =
@@ -157,15 +157,15 @@ and print_cases cases ppf =
   | case :: cases ->
       ( match case with
       | ValueClause (p, c) ->
-        print ~at_level:1 "| %t -> %t %t" (print_pattern p) (print_term c)
+        print ~at_level:1 "| %t -> %t %t" (print_pattern p) (print_expression c)
           (print_cases cases)
       | EffectClause (eff, (p1, p2, c)) ->
         print ~at_level:1 "| Eff_%t %t %t -> %t %t" (CoreTypes.Effect.print eff)
-          (print_pattern p1) (print_pattern p2) (print_term c)
+          (print_pattern p1) (print_pattern p2) (print_expression c)
           (print_cases cases) )
 
 and print_abstraction (p, c) ppf =
-  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_term c)
+  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_expression c)
 
 and print_abstraction_with_ty (p, _, c) ppf =
-  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_term c)
+  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_expression c)
