@@ -47,7 +47,10 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     in
     update state (OcamlSyntax.External (x, process_type state ty, f)) typing_state'
 
-  let process_tydef state tydefs = failwith __LOC__ (* not implemented *)
+  let process_tydef state tydefs =
+    let converter (ty_params, tydef) = (ty_params, FromNoEff.elab_tydef (ExeffToNoeff.elab_tydef tydef)) in
+    let tydefs' = Assoc.map converter tydefs |> Assoc.to_list in
+    update state (OcamlSyntax.TyDef tydefs') state.typing
 
   let finalize state =
     let channel = open_out P.output_file in

@@ -152,14 +152,24 @@ and elab_type t =
   | NoEff.NTyQual (_, _) -> failwith "No ty qual supported"
   | NoEff.NTyComp ty -> elab_type ty
   | NoEff.NTyApply _ -> failwith "No ty apply supported"
-  | NoEff.NTyPrim ty -> OCaml.PrimTy (prim_to_ocaml ty)
+  | NoEff.NTyPrim ty -> OCaml.PrimTy (prim_to_string ty)
 
-and prim_to_ocaml ty =
+and elab_tydef = function
+  | NoEff.TyDefRecord assoc -> OCaml.TyDefRecord (Assoc.map elab_type assoc)
+  | NoEff.TyDefSum assoc -> OCaml.TyDefSum (Assoc.map help_sum assoc)
+  | NoEff.TyDefInline ty -> OCaml.TyDefInline (elab_type ty)
+
+and help_sum ty =
   match ty with
-  | NInt -> "int"
-  | NBool -> "bool"
-  | NString -> "string"
-  | NFloat -> "float"
+  | Some x -> Some (elab_type x)
+  | None -> None
+
+and prim_to_string ty =
+  match ty with
+  | NoEff.NInt -> "int"
+  | NoEff.NBool -> "bool"
+  | NoEff.NString -> "string"
+  | NoEff.NFloat -> "float"
 
 and elab_abstraction (p, c) = (elab_pattern p, elab_term c)
 

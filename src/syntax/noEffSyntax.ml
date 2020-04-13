@@ -53,8 +53,14 @@ and n_type =
   | NTyComp of n_type
   | NTyApply of CoreTypes.TyName.t * n_type list
   | NTyPrim of prim_ty
+  | NTyBasic of string
 
 and prim_ty = NInt | NBool | NString | NFloat
+
+and n_tydef =
+  | TyDefRecord of (CoreTypes.Field.t, n_type) Assoc.t
+  | TyDefSum of (CoreTypes.Label.t, n_type option) Assoc.t
+  | TyDefInline of n_type
 
 and n_abstraction = (n_pattern * n_term)
 and n_abstraction_with_type = (n_pattern * n_type * n_term)
@@ -127,7 +133,7 @@ let rec print_term ?max_level t ppf =
   | NHandle (t, h) ->
         print ~at_level:1 "handle %t %t"
         (print_term ~max_level:0 t)
-        (print_term ~max_level:0 h) 
+        (print_term ~max_level:0 h)
   | NConst c -> Const.print c ppf
   | NEffect (eff, (ty1, ty2)) -> print "Effect %t : %t %t" (CoreTypes.Effect.print eff) (print_type ty1) (print_type ty2)
   | NLetRec (lst, t) ->
@@ -139,10 +145,10 @@ let rec print_term ?max_level t ppf =
         (Print.cases print_abstraction lst)
   | NOp (eff, t) -> print "Op %t %t" (print_effect eff) (print_term t)
   | NRecord recs -> Print.record CoreTypes.Field.print print_term recs ppf
-  | NVariant (l, Some t) -> 
+  | NVariant (l, Some t) ->
         print "Variant %t %t" (CoreTypes.Label.print l) (print_term t)
 
-and print_pattern ?max_level p ppf = 
+and print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p with
   | PNVar var -> print "%t" (print_variable var)

@@ -61,7 +61,7 @@ and cmd =
   | Term of term
   | DefEffect of effect * ty * ty
   | External of (variable * ty * string)
-  | TyDef of (CoreTypes.Label.t * (CoreTypes.TyParam.t list * tydef)) list
+  | TyDef of (CoreTypes.TyName.t * (CoreTypes.TyParam.t list * tydef)) list
 
 and match_case =
   | ValueClause of abstraction

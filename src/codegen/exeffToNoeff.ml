@@ -47,7 +47,7 @@ let rec type_elab state (env : environment) (ty : ExEffTypes.target_ty) =
   | ExEffTypes.TyParam x -> (
     match (Assoc.lookup x env.ty_param_skeletons) with
     | Some xtype -> (xtype, NoEff.NTyParam x)
-    | None -> typefail "Variable out of scope" )
+    | None -> (Types.PrimSkel IntTy, NoEff.NTyParam x) )
   | ExEffTypes.Apply (name, lst) ->
     let get_skel x = ( let (s, _) = type_elab state env x in s ) in
     let get_elab x = ( let (_, e) = type_elab state env x in e ) in
@@ -523,5 +523,20 @@ and comp_elab state env c =
     if (cty = t1)
     then ( (t2, NoEff.NCast (coelab, elabc) ) )
     else failwith "Ill-typed casting"
+
+and elab_ty = function
+  | Type.Apply (name, ts) -> NoEff.NTyApply (name, (List.map elab_ty ts))
+  | Type.TyParam p -> NoEff.NTyParam p
+  | Basic s -> NoEff.NTyBasic s
+  | Tuple tys -> NoEff.NTyTuple (List.map elab_ty tys)
+  | Arrow (t1, t2) -> NoEff.NTyArrow (elab_ty t1, elab_ty t2)
+  | Handler h -> NoEff.NTyHandler (elab_ty h.value, elab_ty h.finally)
+
+and elab_tydef = function
+  | Tctx.Record assoc -> NoEff.TyDefRecord (Assoc.map elab_ty assoc)
+  | Tctx.Sum assoc ->
+      let converter = function None -> None | Some ty -> Some (elab_ty ty) in
+      NoEff.TyDefSum (Assoc.map converter assoc)
+  | Tctx.Inline ty -> NoEff.TyDefInline (elab_ty ty)
 
 and has_empty_dirt ( (ty, dirt): ExEffTypes.target_dirty ) = is_empty_dirt dirt
