@@ -24,8 +24,6 @@ let extendLclCtxt env x scheme = TypingEnv.update env x scheme
 let georgeTODO () = failwith __LOC__
 
 let warnAddConstraints s cs =
-  print_int (List.length cs);
-  print_string "\n";
   Print.debug "%s: Added %d constraints: " s (List.length cs);
   Unification.print_c_list cs
 

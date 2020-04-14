@@ -117,6 +117,8 @@ let rec print_expression ?max_level e ppf =
         "fun c -> handler {@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->\n             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]} c"
         (print_abstraction_with_ty value_clause)
         (print_effect_clauses effect_clauses)
+  | Let ((p, t1), t2) -> print "let %t = %t in %t" (print_pattern p) (print_expression t1) (print_expression t2)
+  | Apply (t1, t2) -> print "%t %t" (print_expression t1) (print_expression t2)
 
 and print_command ?max_level cmd ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -125,7 +127,30 @@ and print_command ?max_level cmd ppf =
   | DefEffect (eff, ty1, ty2) -> print ~at_level:2 "Effect %t: %t -> %t" (CoreTypes.Effect.print eff)
     (print_type ty1) (print_type ty2)
   | External (v, t, s) -> print ~at_level:2 "%t: %t = %s" (print_variable v) (print_type t) s
-  | TyDef defs -> failwith "TODO"
+  | TyDef defs -> print_tydefs defs ppf
+
+and print_tydefs ?max_level defs ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match defs with
+  | [] -> print " "
+  | def::rest -> print "%t; %t" (print_tydef def) (print_tydefs rest)
+
+and print_tydef ?max_level (name, (params, tydef)) ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match tydef with
+  | TyDefRecord assoc ->
+          print "%t" (Print.record CoreTypes.Field.print print_type assoc)
+  | TyDefSum assoc -> print_sums (Assoc.to_list assoc) ppf
+  | TyDefInline ty -> print "%t" (print_type ty)
+
+and print_sums ?max_level sums ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match sums with
+  | [] -> print ""
+  | (lbl, ty_opt)::rest ->
+  ( match ty_opt with
+    | None -> print "| %t %t" (CoreTypes.Label.print lbl) (print_sums rest)
+    | Some ty -> print "| %t of %t %t" (CoreTypes.Label.print lbl) (print_type ty) (print_sums rest) )
 
 and print_type ?max_level t ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
