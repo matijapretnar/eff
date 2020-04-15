@@ -119,6 +119,24 @@ let rec print_expression ?max_level e ppf =
         (print_effect_clauses effect_clauses)
   | Let ((p, t1), t2) -> print "let %t = %t in %t" (print_pattern p) (print_expression t1) (print_expression t2)
   | Apply (t1, t2) -> print "%t %t" (print_expression t1) (print_expression t2)
+  | Annotated (t, ty) -> print "%t: %t" (print_expression t) (print_type ty)
+  | Function ls -> failwith "Function print"
+  | LetRec (ls, t) -> failwith "Letrec print"
+  | Match (t, ls) -> print "match %t with %t" (print_expression t) (print_match_cases ls)
+  | Check t -> failwith "Check print"
+  | Return t -> print "return %t" (print_expression t)
+  | Bind (t, abs) -> failwith "Bind print"
+
+and print_match_cases ?max_level ls ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match ls with
+  | [] -> print ""
+  | m::rest ->
+  ( match m with
+    | ValueClause (p,c) -> print "| %t -> %t %t" (print_pattern p) (print_expression c) (print_match_cases rest)
+    | EffectClause (eff, (p1, p2, c)) ->
+      print "| %t %t %t -> %t %t" (CoreTypes.Effect.print eff) (print_pattern p1) (print_pattern p2)
+        (print_expression c) (print_match_cases rest) )
 
 and print_command ?max_level cmd ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

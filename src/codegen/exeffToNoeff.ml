@@ -153,9 +153,12 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
           let env' = extend_pattern_type env p1 ty1 in
           let env'' = extend_pattern_type env' p2 (ExEffTypes.Arrow (ty2, (t, ExEffTypes.empty_dirt))) in
           let (_, elabcomp) = comp_elab state env'' comp in
-            ((eff, (elab1, elab2)), (pattern_elab p1, NoEff.PNCast ((pattern_elab p2),
-            (NoEff.NCoerArrow (NoEff.NCoerRefl (elab1),
-             NoEff.NCoerUnsafe (NoEff.NCoerRefl (elab2))))), NoEff.NReturn elabcomp)) ) in
+          ( match p2 with
+            | PVar x ->
+              ((eff, (elab1, elab2)), (pattern_elab p1, pattern_elab p2,
+                NReturn (subs_var_in_term x (NCast (NVar x, NoEff.NCoerArrow (NoEff.NCoerRefl (elab1),
+                 NoEff.NCoerUnsafe (NoEff.NCoerRefl (elab2))))) elabcomp)))
+            | _ -> failwith "STIEN: wrong elab handler case 2" )) in
         let effectset = get_effectset (Assoc.to_list h.effect_clauses) in
         (  ExEffTypes.Handler ( (t, ExEffTypes.closed_dirt effectset), typec ),
            NoEff.NHandler
@@ -418,6 +421,32 @@ and subst_ty_param tysub par ty =
     ExEffTypes.QualTy ((subst_ty_param tysub par ty1, subst_ty_param tysub par ty2),
         subst_ty_param tysub par ty3)
   | ExEffTypes.QualDirt (dirts, t) -> ExEffTypes.QualDirt (dirts, subst_ty_param tysub par t)
+
+and subs_var_in_term par subs term =
+  match term with
+  | NVar v -> if (v = par) then subs else term
+  | NTuple ls -> NTuple (List.map (subs_var_in_term par subs) ls)
+  | NFun (p, t, c) -> NFun (p, t, subs_var_in_term par subs c)
+  | NApplyTerm (t1, t2) -> NApplyTerm (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
+  | NCast (t, c) -> NCast (subs_var_in_term par subs t, c)
+  | NReturn t -> NReturn (subs_var_in_term par subs t)
+  | NHandler h -> NHandler h
+  | NLet (t, (p, c)) -> NLet (subs_var_in_term par subs t, (p, subs_var_in_term par subs c))
+  | NCall (eff, t, (p, ty, c)) -> NCall (eff, subs_var_in_term par subs t, (p, ty, subs_var_in_term par subs c))
+  | NBind (t, (p, c)) -> NBind (subs_var_in_term par subs t, (p, subs_var_in_term par subs c))
+  | NHandle (t1, t2) -> NHandle (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
+  | NConst c -> NConst c
+  | NEffect e -> NEffect e
+  | NLetRec (abss, t) ->
+    let subs_letrec = fun (var, ty1, ty2, (p, c)) -> (var, ty1, ty2, (p, subs_var_in_term par subs c))
+    in (NoEff.NLetRec (List.map subs_letrec abss, subs_var_in_term par subs t))
+  | NMatch (t, ty, abss, loc) ->
+    let subs_abs = fun (p, c) -> (p, subs_var_in_term par subs c)
+    in (NoEff.NMatch (subs_var_in_term par subs t, ty, List.map subs_abs abss, loc))
+  | NOp (eff, t) -> NOp (eff, subs_var_in_term par subs t)
+  | NRecord a -> NRecord (Assoc.map (subs_var_in_term par subs) a)
+  | NVariant (lbl, None) -> NVariant (lbl, None)
+  | NVariant (lbl, Some t) -> NVariant (lbl, Some (subs_var_in_term par subs t))
 
 and comp_elab state env c =
   match c with
