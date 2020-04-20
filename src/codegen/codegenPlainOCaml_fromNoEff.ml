@@ -68,8 +68,8 @@ and elab_coercion (coer: NoEff.n_coercion): OCaml.term =
     | OCaml.Lambda (p_f, c_f) ->
       match g with
       | OCaml.Lambda (p_g, c_g) ->
-        let x1 = Variable.fresh "x1" in
-        let x2 = Variable.fresh "x2" in
+        let x1 = Variable.fresh "coer_x1" in
+        let x2 = Variable.fresh "coer_x2" in
         OCaml.Lambda (OCaml.PVar x1,
           OCaml.Lambda (OCaml.PVar x2,
             OCaml.Apply (g, OCaml.Apply (OCaml.Var x1, OCaml.Apply (f, OCaml.Var x2)))))

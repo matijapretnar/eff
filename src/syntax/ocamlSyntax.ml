@@ -110,15 +110,15 @@ let rec print_expression ?max_level e ppf =
   | Variant (lbl, Some e) ->
       print ~at_level:1 "(%t %t)" (CoreTypes.Field.print lbl) (print_expression e)
   | Lambda (x, c) ->
-      print "fun (%t) -> %t" (print_pattern x) (print_expression c)
+      print "fun (%t) -> (%t)" (print_pattern x) (print_expression c)
   | Effect (eff, _, _) -> print ~at_level:2 "effect %t" (CoreTypes.Effect.print eff)
   | Handler (value_clause, effect_clauses) ->
       print ~at_level:2
         "fun c -> handler {@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->\n             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]} c"
         (print_abstraction_with_ty value_clause)
         (print_effect_clauses effect_clauses)
-  | Let ((p, t1), t2) -> print "let %t = %t in %t" (print_pattern p) (print_expression t1) (print_expression t2)
-  | Apply (t1, t2) -> print "%t %t" (print_expression t1) (print_expression t2)
+  | Let ((p, t1), t2) -> print "let %t = %t\nin %t" (print_pattern p) (print_expression t1) (print_expression t2)
+  | Apply (t1, t2) -> print "(%t) (%t)" (print_expression t1) (print_expression t2)
   | Annotated (t, ty) -> print "%t: %t" (print_expression t) (print_type ty)
   | Function ls -> failwith "Function print"
   | LetRec (ls, t) -> failwith "Letrec print"

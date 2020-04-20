@@ -143,7 +143,7 @@ let main =
         | Config.Runtime -> Filename.concat Local.effdir "pervasives.eff"
         | Config.Multicore _ ->
             Filename.concat Local.effdir "multicorePervasives.eff"
-        | Config.Ocaml _ -> Filename.concat Local.effdir "multicorePervasives.eff"
+        | Config.Ocaml _ -> Filename.concat Local.effdir "ocamlPervasives.eff"
       in
       enqueue_file (Load f) ) ;
   try
