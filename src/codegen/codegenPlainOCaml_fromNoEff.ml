@@ -59,20 +59,21 @@ let rec elab_term (t_in : NoEff.n_term) : OCaml.term =
 and elab_coercion (coer: NoEff.n_coercion): OCaml.term =
   match coer with
   | NoEff.NCoerRefl t ->
-    let x = Variable.fresh "x" in
+    let x = Variable.fresh "coer_refl_x" in
     OCaml.Lambda (OCaml.PVar x, OCaml.Var x)
   | NoEff.NCoerArrow (arg, res) ->
     let f = elab_coercion arg in
     let g = elab_coercion res in
     ( match f with
     | OCaml.Lambda (p_f, c_f) ->
-      match g with
+      ( match g with
       | OCaml.Lambda (p_g, c_g) ->
-        let x1 = Variable.fresh "coer_x1" in
-        let x2 = Variable.fresh "coer_x2" in
-        OCaml.Lambda (OCaml.PVar x1,
-          OCaml.Lambda (OCaml.PVar x2,
-            OCaml.Apply (g, OCaml.Apply (OCaml.Var x1, OCaml.Apply (f, OCaml.Var x2)))))
+          let x1 = Variable.fresh "coer_x1" in
+          let x2 = Variable.fresh "coer_x2" in
+          OCaml.Lambda (OCaml.PVar x1,
+            OCaml.Lambda (OCaml.PVar x2,
+              OCaml.Apply (g, OCaml.Apply (OCaml.Var x1, OCaml.Apply (f, OCaml.Var x2)))))
+      | _ -> failwith "Wrong arrow coercion elaboration" )
     | _ -> failwith "Wrong arrow coercion elaboration" )
   | NoEff.NCoerHandler (arg, res) ->
     let f = elab_coercion arg in

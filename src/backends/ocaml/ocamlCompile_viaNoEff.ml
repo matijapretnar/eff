@@ -55,6 +55,14 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
   let finalize state =
     let channel = open_out P.output_file in
     let output_ppf = Format.formatter_of_out_channel channel in
+    let header_file =
+      Filename.concat (Filename.dirname Sys.argv.(0)) "backendHeaderPlainOCaml.ml"
+    in
+    let header_channel = open_in header_file in
+    let n = in_channel_length header_channel in
+    let header = really_input_string header_channel n in
+    close_in header_channel ;
+    Format.fprintf output_ppf "%s\n;;\n@." header ;
     List.iter (fun cmd -> OcamlSyntax.print_command cmd output_ppf) state.prog ;
     close_out channel
 end

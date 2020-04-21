@@ -142,7 +142,7 @@ and print_command ?max_level cmd ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match cmd with
   | Term t -> print ~at_level:2 "%t" (print_expression t)
-  | DefEffect (eff, ty1, ty2) -> print ~at_level:2 "Effect %t: %t -> %t" (CoreTypes.Effect.print eff)
+  | DefEffect (eff, ty1, ty2) -> print ~at_level:2 "let %t : effect %t ->@ %t@]@.\n\n" (CoreTypes.Effect.print eff)
     (print_type ty1) (print_type ty2)
   | External (v, t, s) -> print ~at_level:2 "%t: %t = %s" (print_variable v) (print_type t) s
   | TyDef defs -> print_tydefs defs ppf
