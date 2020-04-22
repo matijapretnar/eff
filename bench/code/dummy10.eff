@@ -5,10 +5,10 @@ let h9 = handler
         | x -> x
 in
 
-let h8 = handler 
+let h8 = handler
 	| effect (Dummy _) k -> with h9 handle 3
 	| x -> x
-in 
+in
 
 let h7 = handler
         | effect (Dummy _) k -> with h8 handle 3
@@ -44,4 +44,4 @@ let h1 = handler
         | effect (Dummy _) k -> with h2 handle 3
         | x -> x
 
-in (with h1 handle (perform (Dummy ()))) 
+in (with h1 handle (perform (Dummy ())))

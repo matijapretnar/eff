@@ -65,62 +65,24 @@ let lift_binary f = fun x -> value (fun y -> value (f x y))
 
 ;;
 
-let Dummy : effect unit ->
-int
+effect (unit, int) Dummy 
 
-
-let h9 = (fun (x1) -> (fun (x2) -> ((fun (x) -> (match x with | (return y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) )) ((x1) (return (fun (coer_refl_x) -> (coer_refl_x)) (x2)))))) (fun c -> handler {
- value_clause = (fun y ->
-                    return (fun (coer_refl_x) -> (coer_refl_x)) (let x = (fun (coer_refl_x) -> (coer_refl_x)) (y)
-in x));
-effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with | Dummy -> (fun (_ : unit) (l : int -> _ computation) -> return (fun (coer_refl_x) -> (coer_refl_x)) (3)) | eff' -> fun arg k -> Call (eff', arg, k)) : a -> (b -> _ computation) -> _ computation)) } c)
-in let h8 = (fun (x1) -> (fun (x2) -> ((fun (x) -> (match x with | (return y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) )) ((x1) (return (fun (coer_refl_x) -> (coer_refl_x)) (x2)))))) (fun c -> handler {
- value_clause = (fun y ->
-                    return (fun (coer_refl_x) -> (coer_refl_x)) (let x = (fun (coer_refl_x) -> (coer_refl_x)) (y)
-in x));
-effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with | Dummy -> (fun (_ : unit) (l : int -> _ computation) -> return (fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h9)) ((fun (coer_refl_x) -> (coer_refl_x)) (3)))) | eff' -> fun arg k -> Call (eff', arg, k)) : a -> (b -> _ computation) -> _ computation)) } c)
-in let h7 = (fun (x1) -> (fun (x2) -> ((fun (x) -> (match x with | (return y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) )) ((x1) (return (fun (coer_refl_x) -> (coer_refl_x)) (x2)))))) (fun c -> handler {
- value_clause = (fun y ->
-                    return (fun (coer_refl_x) -> (coer_refl_x)) (let x = (fun (coer_refl_x) -> (coer_refl_x)) (y)
-in x));
-effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with | Dummy -> (fun (_ : unit) (l : int -> _ computation) -> return (fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h8)) ((fun (coer_refl_x) -> (coer_refl_x)) (3)))) | eff' -> fun arg k -> Call (eff', arg, k)) : a -> (b -> _ computation) -> _ computation)) } c)
-in let h6 = (fun (x1) -> (fun (x2) -> ((fun (x) -> (match x with | (return y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) )) ((x1) (return (fun (coer_refl_x) -> (coer_refl_x)) (x2)))))) (fun c -> handler {
- value_clause = (fun y ->
-                    return (fun (coer_refl_x) -> (coer_refl_x)) (let x = (fun (coer_refl_x) -> (coer_refl_x)) (y)
-in x));
-effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with | Dummy -> (fun (_ : unit) (l : int -> _ computation) -> return (fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h7)) ((fun (coer_refl_x) -> (coer_refl_x)) (3)))) | eff' -> fun arg k -> Call (eff', arg, k)) : a -> (b -> _ computation) -> _ computation)) } c)
-in let h5 = (fun (x1) -> (fun (x2) -> ((fun (x) -> (match x with | (return y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) )) ((x1) (return (fun (coer_refl_x) -> (coer_refl_x)) (x2)))))) (fun c -> handler {
- value_clause = (fun y ->
-                    return (fun (coer_refl_x) -> (coer_refl_x)) (let x = (fun (coer_refl_x) -> (coer_refl_x)) (y)
-in x));
-effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with | Dummy -> (fun (_ : unit) (l : int -> _ computation) -> return (fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h6)) ((fun (coer_refl_x) -> (coer_refl_x)) (3)))) | eff' -> fun arg k -> Call (eff', arg, k)) : a -> (b -> _ computation) -> _ computation)) } c)
-in let h4 = (fun (x1) -> (fun (x2) -> ((fun (x) -> (match x with | (return y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) )) ((x1) (return (fun (coer_refl_x) -> (coer_refl_x)) (x2)))))) (fun c -> handler {
- value_clause = (fun y ->
-                    return (fun (coer_refl_x) -> (coer_refl_x)) (let x = (fun (coer_refl_x) -> (coer_refl_x)) (y)
-in x));
-effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with | Dummy -> (fun (_ : unit) (l : int -> _ computation) -> return (fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h5)) ((fun (coer_refl_x) -> (coer_refl_x)) (3)))) | eff' -> fun arg k -> Call (eff', arg, k)) : a -> (b -> _ computation) -> _ computation)) } c)
-in let h3 = (fun (x1) -> (fun (x2) -> ((fun (x) -> (match x with | (return y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) )) ((x1) (return (fun (coer_refl_x) -> (coer_refl_x)) (x2)))))) (fun c -> handler {
- value_clause = (fun y ->
-                    return (fun (coer_refl_x) -> (coer_refl_x)) (let x = (fun (coer_refl_x) -> (coer_refl_x)) (y)
-in x));
-effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with | Dummy -> (fun (_ : unit) (l : int -> _ computation) -> return (fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h4)) ((fun (coer_refl_x) -> (coer_refl_x)) (3)))) | eff' -> fun arg k -> Call (eff', arg, k)) : a -> (b -> _ computation) -> _ computation)) } c)
-in let h2 = (fun (x1) -> (fun (x2) -> ((fun (x) -> (match x with | (return y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) )) ((x1) (return (fun (coer_refl_x) -> (coer_refl_x)) (x2)))))) (fun c -> handler {
- value_clause = (fun y ->
-                    return (fun (coer_refl_x) -> (coer_refl_x)) (let x = (fun (coer_refl_x) -> (coer_refl_x)) (y)
-in x));
-effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with | Dummy -> (fun (_ : unit) (l : int -> _ computation) -> return (fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h3)) ((fun (coer_refl_x) -> (coer_refl_x)) (3)))) | eff' -> fun arg k -> Call (eff', arg, k)) : a -> (b -> _ computation) -> _ computation)) } c)
-in let h1 = (fun (x1) -> (fun (x2) -> ((fun (x) -> (match x with | (return y) -> return (fun (coer_refl_x) -> (coer_refl_x)) (y) )) ((x1) (return (fun (x) -> (match x with | (return y) -> return (fun (coer_refl_x) -> (coer_refl_x)) (y) )) (x2)))))) (fun c -> handler {
- value_clause = (fun y ->
-                    return (fun (coer_refl_x) -> (coer_refl_x)) (let x = (fun (coer_refl_x) -> (coer_refl_x)) (y)
-in x));
-effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with | Dummy -> (fun (_ : unit) (l : int -> _ computation) -> return (fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h2)) ((fun (coer_refl_x) -> (coer_refl_x)) (3)))) | eff' -> fun arg k -> Call (eff', arg, k)) : a -> (b -> _ computation) -> _ computation)) } c)
-in (fun (x) -> (match x with | (return y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) )) (((fun (x) -> (match x with | (return y) -> return (fun (coer_refl_x) -> (coer_refl_x)) (y) )) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (x) -> (match x with | (return y) -> return (fun (coer_refl_x) -> (coer_refl_x)) (y) )) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (effect Dummy)) (()))) ((fun (x1) -> (fun (x2) -> ((fun (x) -> (match x with | (return y) -> return (fun (coer_refl_x) -> (coer_refl_x)) (y) )) ((x1) (return (fun (x) -> (match x with | (return y) -> return (fun (coer_refl_x) -> (coer_refl_x)) (y) )) (x2)))))) (h1)))
+let (h9) = ((fun (x1) -> (fun (x2) -> ((fun (x) -> ((match (x) with | Value (y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) ))) ((x1) (Value ((fun (coer_refl_x) -> (coer_refl_x)) (x2))))))) (fun c -> ((handler {value_clause = (fun (y) -> (Value ((fun (coer_refl_x) -> (coer_refl_x)) (let (x) = ((fun (coer_refl_x) -> (coer_refl_x)) (y)) 
+in (x))))); effect_clauses = (fun (x : (a, b) effect) -> (match x with | Dummy -> (fun ((_ : unit), (l : int -> _ computation)) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (3))) | eff' -> (fun (arg, k) -> Call (eff', arg, k)))) }) c))) 
+in (let (h8) = ((fun (x1) -> (fun (x2) -> ((fun (x) -> ((match (x) with | Value (y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) ))) ((x1) (Value ((fun (coer_refl_x) -> (coer_refl_x)) (x2))))))) (fun c -> ((handler {value_clause = (fun (y) -> (Value ((fun (coer_refl_x) -> (coer_refl_x)) (let (x) = ((fun (coer_refl_x) -> (coer_refl_x)) (y)) 
+in (x))))); effect_clauses = (fun (x : (a, b) effect) -> (match x with | Dummy -> (fun ((_ : unit), (l : int -> _ computation)) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h9)) ((fun (coer_refl_x) -> (coer_refl_x)) (3))))) | eff' -> (fun (arg, k) -> Call (eff', arg, k)))) }) c))) 
+in (let (h7) = ((fun (x1) -> (fun (x2) -> ((fun (x) -> ((match (x) with | Value (y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) ))) ((x1) (Value ((fun (coer_refl_x) -> (coer_refl_x)) (x2))))))) (fun c -> ((handler {value_clause = (fun (y) -> (Value ((fun (coer_refl_x) -> (coer_refl_x)) (let (x) = ((fun (coer_refl_x) -> (coer_refl_x)) (y)) 
+in (x))))); effect_clauses = (fun (x : (a, b) effect) -> (match x with | Dummy -> (fun ((_ : unit), (l : int -> _ computation)) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h8)) ((fun (coer_refl_x) -> (coer_refl_x)) (3))))) | eff' -> (fun (arg, k) -> Call (eff', arg, k)))) }) c))) 
+in (let (h6) = ((fun (x1) -> (fun (x2) -> ((fun (x) -> ((match (x) with | Value (y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) ))) ((x1) (Value ((fun (coer_refl_x) -> (coer_refl_x)) (x2))))))) (fun c -> ((handler {value_clause = (fun (y) -> (Value ((fun (coer_refl_x) -> (coer_refl_x)) (let (x) = ((fun (coer_refl_x) -> (coer_refl_x)) (y)) 
+in (x))))); effect_clauses = (fun (x : (a, b) effect) -> (match x with | Dummy -> (fun ((_ : unit), (l : int -> _ computation)) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h7)) ((fun (coer_refl_x) -> (coer_refl_x)) (3))))) | eff' -> (fun (arg, k) -> Call (eff', arg, k)))) }) c))) 
+in (let (h5) = ((fun (x1) -> (fun (x2) -> ((fun (x) -> ((match (x) with | Value (y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) ))) ((x1) (Value ((fun (coer_refl_x) -> (coer_refl_x)) (x2))))))) (fun c -> ((handler {value_clause = (fun (y) -> (Value ((fun (coer_refl_x) -> (coer_refl_x)) (let (x) = ((fun (coer_refl_x) -> (coer_refl_x)) (y)) 
+in (x))))); effect_clauses = (fun (x : (a, b) effect) -> (match x with | Dummy -> (fun ((_ : unit), (l : int -> _ computation)) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h6)) ((fun (coer_refl_x) -> (coer_refl_x)) (3))))) | eff' -> (fun (arg, k) -> Call (eff', arg, k)))) }) c))) 
+in (let (h4) = ((fun (x1) -> (fun (x2) -> ((fun (x) -> ((match (x) with | Value (y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) ))) ((x1) (Value ((fun (coer_refl_x) -> (coer_refl_x)) (x2))))))) (fun c -> ((handler {value_clause = (fun (y) -> (Value ((fun (coer_refl_x) -> (coer_refl_x)) (let (x) = ((fun (coer_refl_x) -> (coer_refl_x)) (y)) 
+in (x))))); effect_clauses = (fun (x : (a, b) effect) -> (match x with | Dummy -> (fun ((_ : unit), (l : int -> _ computation)) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h5)) ((fun (coer_refl_x) -> (coer_refl_x)) (3))))) | eff' -> (fun (arg, k) -> Call (eff', arg, k)))) }) c))) 
+in (let (h3) = ((fun (x1) -> (fun (x2) -> ((fun (x) -> ((match (x) with | Value (y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) ))) ((x1) (Value ((fun (coer_refl_x) -> (coer_refl_x)) (x2))))))) (fun c -> ((handler {value_clause = (fun (y) -> (Value ((fun (coer_refl_x) -> (coer_refl_x)) (let (x) = ((fun (coer_refl_x) -> (coer_refl_x)) (y)) 
+in (x))))); effect_clauses = (fun (x : (a, b) effect) -> (match x with | Dummy -> (fun ((_ : unit), (l : int -> _ computation)) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h4)) ((fun (coer_refl_x) -> (coer_refl_x)) (3))))) | eff' -> (fun (arg, k) -> Call (eff', arg, k)))) }) c))) 
+in (let (h2) = ((fun (x1) -> (fun (x2) -> ((fun (x) -> ((match (x) with | Value (y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) ))) ((x1) (Value ((fun (coer_refl_x) -> (coer_refl_x)) (x2))))))) (fun c -> ((handler {value_clause = (fun (y) -> (Value ((fun (coer_refl_x) -> (coer_refl_x)) (let (x) = ((fun (coer_refl_x) -> (coer_refl_x)) (y)) 
+in (x))))); effect_clauses = (fun (x : (a, b) effect) -> (match x with | Dummy -> (fun ((_ : unit), (l : int -> _ computation)) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h3)) ((fun (coer_refl_x) -> (coer_refl_x)) (3))))) | eff' -> (fun (arg, k) -> Call (eff', arg, k)))) }) c))) 
+in (let (h1) = ((fun (x1) -> (fun (x2) -> ((fun (x) -> ((match (x) with | Value (y) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (y)) ))) ((x1) (Value ((fun (x) -> ((match (x) with | Value (y) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (y)) ))) (x2))))))) (fun c -> ((handler {value_clause = (fun (y) -> (Value ((fun (coer_refl_x) -> (coer_refl_x)) (let (x) = ((fun (coer_refl_x) -> (coer_refl_x)) (y)) 
+in (x))))); effect_clauses = (fun (x : (a, b) effect) -> (match x with | Dummy -> (fun ((_ : unit), (l : int -> _ computation)) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (coer_refl_x) -> (coer_refl_x)) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (h2)) ((fun (coer_refl_x) -> (coer_refl_x)) (3))))) | eff' -> (fun (arg, k) -> Call (eff', arg, k)))) }) c))) 
+in ((fun (x) -> ((match (x) with | Value (y) -> (fun (coer_refl_x) -> (coer_refl_x)) (y) ))) (((fun (x) -> ((match (x) with | Value (y) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (y)) ))) (((fun (coer_x1) -> (fun (coer_x2) -> ((fun (x) -> ((match (x) with | Value (y) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (y)) ))) ((coer_x1) ((fun (coer_refl_x) -> (coer_refl_x)) (coer_x2)))))) (effect Dummy)) (()))) ((fun (x1) -> (fun (x2) -> ((fun (x) -> ((match (x) with | Value (y) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (y)) ))) ((x1) (Value ((fun (x) -> ((match (x) with | Value (y) -> Value ((fun (coer_refl_x) -> (coer_refl_x)) (y)) ))) (x2))))))) (h1))))))))))))
