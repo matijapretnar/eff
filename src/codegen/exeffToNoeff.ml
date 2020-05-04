@@ -162,7 +162,7 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
         let effectset = get_effectset (Assoc.to_list h.effect_clauses) in
         (  ExEffTypes.Handler ( (t, ExEffTypes.closed_dirt effectset), typec ),
            NoEff.NHandler
-           {return_clause= (pattern_elab p, elabt, NoEff.NReturn elabc);
+           {return_clause= (pattern_elab p, elabt, elabc);
            effect_clauses= Assoc.map_of_list subst_cont_effect (Assoc.to_list h.effect_clauses)}
         )
       )

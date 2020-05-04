@@ -36,7 +36,7 @@ let rec elab_term (t_in : NoEff.n_term) : OCaml.term =
       OCaml.Let ((elab_pattern p, elab_term e), elab_term c)
   | NoEff.NApplyTerm (e1, e2) ->
       OCaml.Apply (elab_term e1, elab_term e2)
-  | NoEff.NHandle (e, c) ->
+  | NoEff.NHandle (c, e) ->
       OCaml.Apply (elab_term e, elab_term c)
   | NoEff.NCall (eff, e, (p, _, c)) ->
       OCaml.Call (fst eff, elab_term e, (elab_pattern p, elab_term c))

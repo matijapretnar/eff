@@ -1,0 +1,7 @@
+effect Dummy : unit -> int;;
+
+let h1 = handler
+        | effect (Dummy _) k -> 3
+        | x -> 0
+
+in (with h1 handle (perform (Dummy ())))
