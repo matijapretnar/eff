@@ -121,11 +121,8 @@ and elab_coercion (coer: NoEff.n_coercion): OCaml.term =
   | NoEff.NCoerComp c ->
     let f = elab_coercion c in
     let x = Variable.fresh "x" in
-    let y = Variable.fresh "y" in
-      OCaml.Lambda (PVar x,
-        OCaml.Match (OCaml.Var x,
-          [OCaml.ValueClause (OCaml.PReturn (OCaml.PVar y), OCaml.Return
-            (OCaml.Apply (f, (OCaml.Var y))))]))
+      OCaml.Lambda (PVar x, OCaml.Return
+            (OCaml.Apply (f, (OCaml.Var x))))
   | NoEff.NCoerUnsafe c ->
     let f = elab_coercion c in
     ( match f with
