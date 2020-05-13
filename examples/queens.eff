@@ -19,7 +19,7 @@ type intlist = IntNil | IntCons of int * intlist;;
 type inttuplist = IntTupNil | IntTupCons of inttuple * inttuplist;;
 type void = Void;;
 
-let test_queens n = 
+let test_queens n =
   let absurd void = (match void with)
   in
 
@@ -81,7 +81,7 @@ let test_queens n =
   let backtrack = handler
     | effect (Decide _) k ->
             (fun kf ->
-                  k true (fun _ -> k false kf) )  
+                  k true (fun _ -> k false kf) )
     | effect (Fail _) _k -> (fun kf -> kf ())
     | y -> (fun _ -> y)
   in

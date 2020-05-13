@@ -113,7 +113,7 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
     | Some ty -> (ty, NoEff.NVar x)
     | None -> ( match TypingEnv.lookup state.gblCtxt x with
                      | Some ty -> (ty, NoEff.NVar x)
-                     | None -> typefail "No type for variable found" ) )
+                     | None -> failwith "Found no type for variable" ) )
   | ExEff.Const c -> (ExEffTypes.type_const c, NoEff.NConst c)
   | ExEff.Tuple vs ->
     let type_elab_list = List.map (value_elab state env) vs in
@@ -274,7 +274,7 @@ and coercion_elab_ty state env coer =
     if (coer1ty2 = coer2ty1)
     then ( (coer1ty1, coer2ty2), NoEff.NCoerTrans (elab1, elab2) )
     else (failwith "Ill-typed coercion sequencing")
-  | ExEff.ApplyCoercion (name, coer_list) -> (* STIEN: What to elaborate to? Typing as in TypeChecker -> voeg applycoercion toe aan noeff *)
+  | ExEff.ApplyCoercion (name, coer_list) ->
     let type_list = List.map (fun x -> fst (coercion_elab_ty state env x)) coer_list in
     let ty1s = List.map fst type_list in
     let ty2s = List.map snd type_list in
