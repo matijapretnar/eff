@@ -139,6 +139,9 @@ and elab_coercion (coer: NoEff.n_coercion): OCaml.term =
     let x = Variable.fresh "x" in
     OCaml.Lambda (OCaml.PVar x,
       OCaml.Apply (f, OCaml.Apply (g, OCaml.Var x)))
+  | NoEff.NCoerTuple ls ->
+    let coer_elabs = List.map elab_coercion ls in
+    OCaml.LambdaList coer_elabs
 
 and elab_type t =
   match t with

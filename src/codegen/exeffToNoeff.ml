@@ -22,13 +22,15 @@ let rec extend_pattern_type env pat ty =
   | PTuple ps -> (
     match ty with
     | ExEffTypes.Tuple tys -> extend_multiple_pats env ps tys
-    | _ -> typefail "Ill-typed tuple" )
+    | _ -> failwith "ill-typed tuple" )
   | PConst c -> if (ExEffTypes.type_const c = ty) then env else (typefail "Ill-typed constant")
   | PRecord recs -> (
     match ty with
     | ExEffTypes.Tuple tys -> extend_multiple_pats env (Assoc.values_of recs) tys
-    | _ -> typefail "Ill-typed tuple" )
-  | PVariant (_, p) -> extend_pattern_type env p ty
+    | _ -> typefail "Ill-typed record" )
+  | PVariant (lbl, p) ->
+    let (ty_in, ty_out) = Types.constructor_signature lbl in
+    extend_pattern_type env p ty_in
   | PNonbinding -> env
 
 and extend_multiple_pats env ps tys =
@@ -151,7 +153,7 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
           ( let (_, elab1) = type_elab state env ty1 in
           let (_, elab2) = type_elab state env ty2 in
           let env' = extend_pattern_type env p1 ty1 in
-          let env'' = extend_pattern_type env' p2 (ExEffTypes.Arrow (ty2, (t, ExEffTypes.empty_dirt))) in
+          let env'' = extend_pattern_type env' p2 (ExEffTypes.Arrow (ty2, (ty, ExEffTypes.empty_dirt))) in
           let (_, elabcomp) = comp_elab state env'' comp in
           ( match p2 with
             | PVar x ->
@@ -172,10 +174,9 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
           let (_, elab1) = type_elab state env ty1 in
           let (_, elab2) = type_elab state env ty2 in
           let env' = extend_pattern_type env p1 ty1 in
-          let env'' = extend_pattern_type env' p2 (ExEffTypes.Arrow (ty2, (t, ExEffTypes.empty_dirt))) in
+          let env'' = extend_pattern_type env' p2 (ExEffTypes.Arrow (ty2, (ty, ExEffTypes.empty_dirt))) in
           let (_, elabcomp) = comp_elab state env'' comp in
           ((eff, (elab1, elab2)), (pattern_elab p1, pattern_elab p2, elabcomp)) in
-
         let effectset = get_effectset (Assoc.to_list h.effect_clauses) in
         (
           ExEffTypes.Handler ( (t, ExEffTypes.closed_dirt effectset), typec ),
@@ -187,7 +188,7 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
   | ExEff.CastExp (value, coer) ->
     let (ty1, elab1) = value_elab state env value in
     let ((ty2, r), elab2) = coercion_elab_ty state env coer in
-    if (ty1 = ty2)
+    if (Types.types_are_equal ty1 ty2)
     then (r, NoEff.NCast (elab1, elab2))
     else typefail "Ill-typed cast"
   | ExEff.LambdaTyCoerVar (par, (ty1, ty2), value) ->
@@ -222,6 +223,12 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
           else (typefail "Ill-typed coercion application")
         | _ -> failwith "Ill-typed coercion application"
     )
+  | ExEff.Variant (lbl, exp) ->
+    let (ty_in, ty_out) = Types.constructor_signature lbl in
+    let (ty_e, elab_e) = value_elab state env exp in
+    assert (Types.types_are_equal ty_e ty_in) ;
+    (ty_out, NoEff.NVariant (lbl, Some elab_e))
+  | ExEff.Record ass -> failwith "records not supported yet"
 
 and coercion_elab_ty state env coer =
   match coer with
@@ -469,7 +476,7 @@ and comp_elab state env c =
     let elab_letrec_abs ( (var, ty1, ty2, (p, compt)) ) =
             ( let (_, t1) = type_elab state env ty1 in
             let (_, t2) = dirty_elab state env ty2 in
-            let (_, elabc) = comp_elab state (extend_env env [(var, ty1, ty2, (p, compt))]) compt in
+            let (_, elabc) = comp_elab state (extend_env env abs_list) compt in
             ( (var, t1, t2, (pattern_elab p, elabc)) ) ) in
     let (tycomp, elabcomp) = comp_elab state (extend_env env abs_list) comp in
     ( tycomp, NoEff.NLetRec (List.map (elab_letrec_abs) abs_list, elabcomp) )
@@ -477,13 +484,14 @@ and comp_elab state env c =
     let (tyv, elabv) = value_elab state env value in
     let (tyskel, tyelab) = dirty_elab state env ty in
     let elab_abs vty cty (pat, comp) =
-            ( let env' = extend_pattern_type env pat vty in
+            ( let env' = extend_pattern_type env pat tyv in
               let (tyc, elabc) = comp_elab state env' comp in
-              if (tyc = cty) then (pattern_elab pat, elabc) else (typefail "Ill-typed match branch")) in
+              if (Types.types_are_equal (fst tyc) (fst cty)) then (pattern_elab pat, elabc) else (typefail "Ill-typed match branch")) in
     ( if ( (List.length abs_lst) = 0)
     then ( (ty, NoEff.NMatch (elabv, tyelab, [], loc)) )
     else ( let ((p1,c1) :: _ ) = abs_lst in
-           let (tyc, elabc) = comp_elab state env c1 in
+           let env' = extend_pattern_type env p1 tyv in
+           let (tyc, elabc) = comp_elab state env' c1 in
            (tyc, NoEff.NMatch (elabv, tyelab, List.map (elab_abs tyv tyc) abs_lst, loc)) ) )
   | ExEff.Apply (v1, v2) ->
     let (ty1, elab1) = value_elab state env v1 in
@@ -499,7 +507,7 @@ and comp_elab state env c =
     let ( vtype, velab ) = value_elab state env value in
     ( match vtype with
       | ExEffTypes.Handler ( (vty1, vdirt1), (vty2, vdirt2) ) ->
-        if (vty1 = ctype && vdirt1 = cdirt) then (
+        if (Types.types_are_equal vty1 ctype) then (
           if (Types.is_empty_dirt cdirt)
           (* Handle - Case 1 *)
           then ( (vty2, vdirt2), NoEff.NApplyTerm (velab, elabc))
@@ -544,14 +552,13 @@ and comp_elab state env c =
     then ( (ty2, dirt2), NoEff.NLet (elab1, (pattern_elab p, elab2)) )
     (* Bind - Case 2 *)
     else (
-      if (dirt1 = dirt2) then ( (ty2, dirt2), NoEff.NBind (elab1, (pattern_elab p, elab2)) )
-      else (typefail "Ill-typed bind") )
+      (ty2, dirt2), NoEff.NBind (elab1, (pattern_elab p, elab2)) )
   | ExEff.CastComp (comp, coer) ->
     let ( (t1, t2), elabc ) = coer_elab_dirty state env coer in
     let ( cty, coelab ) = comp_elab state env comp in
-    if (cty = t1)
+    if (Types.types_are_equal (fst cty) (fst t1))
     then ( (t2, NoEff.NCast (coelab, elabc) ) )
-    else failwith "Ill-typed casting"
+    else ( typefail "Ill-typed cast" )
 
 and elab_ty = function
   | Type.Apply (name, ts) -> NoEff.NTyApply (name, (List.map elab_ty ts))

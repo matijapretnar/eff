@@ -45,6 +45,7 @@ type term =
   | Record of (field, term) Assoc.t
   | Variant of label * term option
   | Lambda of abstraction
+  | LambdaList of term list
   | Effect of effect * ty * ty
   | Let of (pattern * term) * term
   | LetRec of (variable * abstraction) list * term
@@ -109,6 +110,8 @@ let rec print_expression ?max_level e ppf =
       print ~at_level:1 "(%t %t)" (CoreTypes.Field.print lbl) (print_expression e)
   | Lambda (x, c) ->
       print "fun (%t) -> (%t)" (print_pattern x) (print_expression c)
+  | LambdaList ls ->
+      print "fun lst -> (map ( (x,y) -> (x y) ) (zip [%t] lst))" (print_lambda_list ls)
   | Effect (eff, _, _) -> print ~at_level:2 "effect %t" (CoreTypes.Effect.print eff)
   | Handler (value_clause, effect_clauses) ->
       print ~at_level:2
@@ -124,6 +127,12 @@ let rec print_expression ?max_level e ppf =
   | Bind (t, (p, c)) -> print "%t >> (fun (%t) -> (%t))" (print_expression t) (print_pattern p) (print_expression c)
   | Call (eff, t , (p,c)) -> print "call %t (%t) (fun (%t) -> (%t))"
       (CoreTypes.Effect.print eff) (print_expression t) (print_pattern p) (print_expression c)
+
+and print_lambda_list ?max_level ls ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match ls with
+  | [] -> print ""
+  | l::rest -> print "(%t);" (print_expression l)
 
 and print_letrec_cases ?max_level ls ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

@@ -187,6 +187,7 @@ and print_coercion ?max_level coer ppf =
   | NCoerLeftHandler c -> print "(leftH %t)" (print_coercion c)
   | NCoerRightHandler c -> print "(rightH %t)" (print_coercion c)
   | NCoerPure c -> print "(pure %t)" (print_coercion c)
+  | NCoerTuple ls -> print "tuplecoer"
 
 and print_type ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
