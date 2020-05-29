@@ -4,15 +4,17 @@ Matija Pretnar. The paper is available [here](http://arxiv.org/abs/1203.1539).
 
 # Using Eff's NoEff backend
 
-**Limitations:** NoEff is an intermediary language in compilation from Eff to OCaml, that has
+NoEff is an intermediary language in compilation from Eff to OCaml, that has
 no native effects, and is introduced for optimising the performance of compiled OCaml programs. 
-A compiler backend branch that implements NoEff is included in this implementation, 
-yet excludes the following Eff features:
+A compiler backend branch that implements NoEff is included in this implementation, and follows
+the theory presented [here](https://arxiv.org/abs/2005.13814).
+
+**Limitations:** This compiler's NoEff backend excludes the following Eff features:
 - polymorphism
 - top-level LET and LET REC bindings
 
-**Supported examples:** As such, the following subset of examples in this directory is supported by the
-NoEff backend branch:
+**Supported examples:** Taking into account its limitations, the following subset of examples 
+in this directory is supported by the NoEff backend branch:
 - `queens.eff` = a monomorphic implementation of n-queens without top-level bindings
 - `loop.eff` = a recursive loop
 - `dummy.eff` = a handler indirection chain
