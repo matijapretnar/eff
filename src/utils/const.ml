@@ -36,7 +36,7 @@ let infer_ty = function
 
 let compare c1 c2 =
   let cmp x y =
-    let r = Pervasives.compare x y in
+    let r = Stdlib.compare x y in
     if r < 0 then CoreUtils.Less
     else if r > 0 then CoreUtils.Greater
     else CoreUtils.Equal

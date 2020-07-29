@@ -94,7 +94,7 @@ module Make (Backend : BackendSignature.T) = struct
           Desugarer.desugar_top_let state.desugarer_state defs
         in
         let vars, type_system_state' =
-          TypeSystem.infer_top_let ~loc state.type_system_state
+          TypeSystem.infer_top_let state.type_system_state
             state.type_context_state defs'
         in
         let backend_state' =
@@ -109,7 +109,7 @@ module Make (Backend : BackendSignature.T) = struct
           Desugarer.desugar_top_let_rec state.desugarer_state defs
         in
         let vars, type_system_state' =
-          TypeSystem.infer_top_let_rec ~loc state.type_system_state
+          TypeSystem.infer_top_let_rec state.type_system_state
             state.type_context_state defs'
         in
         let defs'' = Assoc.of_list defs' in

@@ -5,7 +5,7 @@ module CoreSyntax = UntypedSyntax
 (* ------------------------------------------------------------------------ *)
 (* Translations *)
 
-let abstraction_is_id (p, c) =
+let abstraction_is_id (p, _c) =
   (* Used to remove trivial finally clauses from handlers. *)
   match p with
   | PVar v -> CoreTypes.Variable.fold (fun desc _ -> desc = "$id_par") v
@@ -17,7 +17,7 @@ and of_abstraction2 (p1, p2, c) =
   (of_pattern p1, of_pattern p2, of_computation c)
 
 (** Conversion functions. *)
-and of_expression {it; at} =
+and of_expression {it; _} =
   match it with
   | CoreSyntax.Var v -> Var v
   | CoreSyntax.Const const -> Const const
@@ -31,7 +31,7 @@ and of_expression {it; at} =
   | CoreSyntax.Lambda abs -> (
     (* Transform back to [function] keyword if possible *)
     match abs with
-    | p, {it= CoreSyntax.Match (e, abs_lst)} -> (
+    | p, {it= CoreSyntax.Match (e, abs_lst); _} -> (
         let p' = of_pattern p in
         let e' = of_expression e in
         match (p', e') with
@@ -64,7 +64,7 @@ and of_expression {it; at} =
         Lambda
           (PVar ghost_bind, Apply (Lambda finally_clause_abs, match_handler))
 
-and of_computation {it; at} =
+and of_computation {it; _} =
   match it with
   | CoreSyntax.Value e -> of_expression e
   | CoreSyntax.Let (p_c_lst, c) ->
@@ -84,7 +84,7 @@ and of_computation {it; at} =
       let thunked_c = Lambda (PNonbinding, of_computation c) in
       Apply (modified_handler, thunked_c)
 
-and of_pattern {it; at} =
+and of_pattern {it; _} =
   match it with
   | CoreSyntax.PVar var -> PVar var
   | CoreSyntax.PAnnotated (p, ty) -> PAnnotated (of_pattern p, of_type ty)

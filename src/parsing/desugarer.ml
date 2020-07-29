@@ -7,6 +7,11 @@ module Untyped = UntypedSyntax
 
 type constructor_kind = Variant of bool | Effect of bool
 
+(* This is so OCaml doesn't complain about:
+    Error (warning 37): constructor Effect is never used to build values. *)
+
+let _ = Effect true
+
 type state =
   { context: (string, CoreTypes.Variable.t) Assoc.t
   ; effect_symbols: (string, CoreTypes.Effect.t) Assoc.t
@@ -97,7 +102,7 @@ let desugar_type type_sbst state =
 
 (** [free_type_params t] returns all free type params in [t]. *)
 let free_type_params t =
-  let rec ty_params {it= t; at= loc} =
+  let rec ty_params {it= t; at= _loc} =
     match t with
     | Sugared.TyApply (_, tys) -> List.map ty_params tys |> List.flatten
     | Sugared.TyParam s -> [s]
@@ -129,7 +134,7 @@ let desugar_tydef state params def =
           let unsugared_lbl =
             match Assoc.lookup lbl st.constructors with
             | None -> failwith "unreachable"
-            | Some (lbl', cons_kind) -> lbl'
+            | Some (lbl', _cons_kind) -> lbl'
           in
           match cons with
           | None -> (st, (unsugared_lbl, None))
@@ -208,7 +213,7 @@ let desugar_pattern state ?(initial_forbidden = []) p =
       | Sugared.PAnnotated (p, t) ->
           let bind bound_ps p =
             match Assoc.lookup p bound_ps with
-            | Some ty_param -> bound_ps
+            | Some _ty_param -> bound_ps
             | None -> Assoc.update p (Type.fresh_ty_param ()) bound_ps
           in
           let free_params = free_type_params t in
@@ -248,7 +253,7 @@ let desugar_pattern state ?(initial_forbidden = []) p =
           | false, Some _ ->
               Error.typing ~loc
                 "Constructor %s cannot be applied to an argument." lbl )
-        | Some (cons_lbl, Effect eff) ->
+        | Some (_cons_lbl, Effect _eff) ->
             Error.typing ~loc
               "Constructor %s should not be an effect constructor." lbl )
       | Sugared.PConst c -> (state, Untyped.PConst c)
@@ -272,7 +277,7 @@ let rec desugar_expression state {it= t; at= loc} =
     | Sugared.Annotated (t, ty) ->
         let bind bound_ps p =
           match Assoc.lookup p bound_ps with
-          | Some ty_param -> bound_ps
+          | Some _ty_param -> bound_ps
           | None -> Assoc.update p (Type.fresh_ty_param ()) bound_ps
         in
         let free_params = free_type_params ty in
@@ -320,7 +325,7 @@ let rec desugar_expression state {it= t; at= loc} =
         | false, Some _ ->
             Error.typing ~loc
               "Constructor %s cannot be applied to an argument." lbl )
-      | Some (cons_lbl, Effect eff) ->
+      | Some (_cons_lbl, Effect _eff) ->
           Error.typing ~loc
             "Constructor %s should not be an effect constructor." lbl )
     (* Terms that are desugared into computations. We list them explicitly in
@@ -344,7 +349,7 @@ and desugar_computation state {it= t; at= loc} =
   let state', w, c =
     match t with
     | Sugared.Apply
-        ( {it= Sugared.Apply ({it= Sugared.Var "&&"; at= loc1}, t1); at= loc2}
+        ( {it= Sugared.Apply ({it= Sugared.Var "&&"; at= _loc1}, t1); at= loc2}
         , t2 ) ->
         let state', w1, e1 = desugar_expression state t1 in
         let untyped_false loc = add_loc (Untyped.Const Const.of_false) loc in
@@ -352,7 +357,7 @@ and desugar_computation state {it= t; at= loc} =
         let c2 = add_loc (Untyped.Value (untyped_false loc2)) loc2 in
         (state'', w1, if_then_else e1 c1 c2)
     | Sugared.Apply
-        ( {it= Sugared.Apply ({it= Sugared.Var "||"; at= loc1}, t1); at= loc2}
+        ( {it= Sugared.Apply ({it= Sugared.Var "||"; at= _loc1}, t1); at= loc2}
         , t2 ) ->
         let state', w1, e1 = desugar_expression state t1 in
         let untyped_true loc = add_loc (Untyped.Const Const.of_true) loc in
@@ -482,12 +487,12 @@ and desugar_handler loc state
     ; Sugared.value_clause= val_cs
     ; Sugared.finally_clause= fin_cs } =
   (* Construct a desugared handler with match statements. *)
-  let rec group_eff_cs (eff, a2) assoc =
+  let group_eff_cs (eff, a2) assoc =
     match Assoc.lookup eff assoc with
     | None -> Assoc.update eff [a2] assoc
     | Some a2s -> Assoc.replace eff (a2 :: a2s) assoc
   in
-  let rec construct_eff_clause state (eff, eff_cs_lst) =
+  let construct_eff_clause state (eff, eff_cs_lst) =
     (* transform string name to CoreTypes.Effect.t *)
     let state', eff' = effect_to_symbol state eff in
     match eff_cs_lst with
@@ -621,7 +626,7 @@ let desugar_top_let_rec state defs =
 let desugar_external state (x, t, f) =
   let n = fresh_var (Some x) in
   let ts = syntax_to_core_params (free_type_params t) in
-  let state', t' = desugar_type ts state t in
+  let _state', t' = desugar_type ts state t in
   ({state with context= Assoc.update x n state.context}, (n, t', f))
 
 let desugar_def_effect state (eff, (ty1, ty2)) =

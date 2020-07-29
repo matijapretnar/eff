@@ -65,13 +65,13 @@ let rec print_pattern ?max_level p ppf =
   | PVar x -> print "%t" (CoreTypes.Variable.print x)
   | PAs (p, x) ->
       print "%t as %t" (print_pattern p) (CoreTypes.Variable.print x)
-  | PAnnotated (p, ty) -> print_pattern ?max_level p ppf
+  | PAnnotated (p, _ty) -> print_pattern ?max_level p ppf
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
   | PRecord assoc -> Print.record CoreTypes.Field.print print_pattern assoc ppf
   | PVariant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
   | PVariant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
-  | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = CoreTypes.cons ->
+  | PVariant (lbl, Some {it= PTuple [v1; v2]; _}) when lbl = CoreTypes.cons ->
       print "[@[<hov>@[%t@]%t@]]" (print_pattern v1) (pattern_list v2)
   | PVariant (lbl, Some p) ->
       print ~at_level:1 "%t @[<hov>%t@]"
@@ -82,7 +82,7 @@ let rec print_pattern ?max_level p ppf =
 and pattern_list ?(max_length = 299) p ppf =
   if max_length > 1 then
     match p.it with
-    | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = CoreTypes.cons ->
+    | PVariant (lbl, Some {it= PTuple [v1; v2]; _}) when lbl = CoreTypes.cons ->
         Format.fprintf ppf ",@ %t%t" (print_pattern v1)
           (pattern_list ~max_length:(max_length - 1) v2)
     | PVariant (lbl, None) when lbl = CoreTypes.nil -> ()
@@ -105,7 +105,7 @@ let rec print_computation ?max_level c ppf =
       print "let @[<hov>%t@] in %t"
         (Print.sequence " | " let_abstraction lst)
         (print_computation c)
-  | LetRec (lst, c) -> print "let rec ... in %t" (print_computation c)
+  | LetRec (_lst, c) -> print "let rec ... in %t" (print_computation c)
   | Check c -> print "check %t" (print_computation c)
 
 and print_expression ?max_level e ppf =
@@ -113,7 +113,7 @@ and print_expression ?max_level e ppf =
   match e.it with
   | Var x -> print "%t" (CoreTypes.Variable.print x)
   | Const c -> print "%t" (Const.print c)
-  | Annotated (t, ty) -> print_expression ?max_level t ppf
+  | Annotated (t, _ty) -> print_expression ?max_level t ppf
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record assoc -> Print.record CoreTypes.Field.print print_expression assoc ppf
   | Variant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)

@@ -18,7 +18,7 @@ exception PatternMatch of Location.t
 let rec extend_value p v state =
   match (p.it, v) with
   | Untyped.PVar x, v -> update x v state
-  | Untyped.PAnnotated (p, t), v -> extend_value p v state
+  | Untyped.PAnnotated (p, _t), v -> extend_value p v state
   | Untyped.PAs (p, x), v ->
       let state = extend_value p v state in
       update x v state
@@ -42,7 +42,7 @@ let rec extend_value p v state =
   | _, _ -> raise (PatternMatch p.at)
 
 let extend p v state =
-  try extend_value p v state with PatternMatch loc ->
+  try extend_value p v state with PatternMatch _loc ->
     Error.runtime "Pattern match failure."
 
 let rec sequence k = function
@@ -112,7 +112,7 @@ and veval state e =
     | None ->
         Error.runtime "Name %t is not defined." (CoreTypes.Variable.print x) )
   | Untyped.Const c -> V.Const c
-  | Untyped.Annotated (t, ty) -> veval state t
+  | Untyped.Annotated (t, _ty) -> veval state t
   | Untyped.Tuple es -> V.Tuple (List.map (veval state) es)
   | Untyped.Record es -> V.Record (Assoc.map (fun e -> veval state e) es)
   | Untyped.Variant (lbl, None) -> V.Variant (lbl, None)
@@ -146,15 +146,11 @@ and eval_closure state a v =
   let p, c = a in
   ceval (extend p v state) c
 
-and eval_closure2 state a2 v1 v2 =
-  let p1, p2, c = a2.it in
-  ceval (extend p2 v2 (extend p1 v1 state)) c
-
 let rec top_handle op =
   match op with
   | V.Value v -> v
   | V.Call (eff, v, k) -> (
-    match CoreTypes.Effect.fold (fun annot n -> annot) eff with
+    match CoreTypes.Effect.fold (fun annot _n -> annot) eff with
     | "Print" ->
         let str = V.to_str v in
         Format.pp_print_string !Config.output_formatter str ;
@@ -173,7 +169,7 @@ let rec top_handle op =
         let str = read_line () in
         let str_v = V.Const (Const.of_string str) in
         top_handle (k str_v)
-    | eff_annot ->
+    | _eff_annot ->
         Error.runtime "uncaught effect %t %t." (Value.print_effect eff)
           (Value.print_value v) )
 

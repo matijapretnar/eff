@@ -1,6 +1,4 @@
 (** Syntax of the core language. *)
-open CoreUtils
-
 type variable = CoreTypes.Variable.t
 
 type effect = CoreTypes.Effect.t
@@ -67,8 +65,6 @@ type cmd =
   | TopLetRec of (variable * abstraction) list
   | External of (variable * Type.ty * string)
   | TyDef of (label * (CoreTypes.TyParam.t list * tydef)) list
-
-let state_ppf = Format.str_formatter
 
 let print = Format.fprintf
 
@@ -141,7 +137,7 @@ let rec print_term t ppf =
         (print_term t2)
   | Apply (t1, t2) ->
       print ppf "@[<hov 2>(%t) @,(%t)@]" (print_term t1) (print_term t2)
-  | Check t ->
+  | Check _t ->
       Print.warning
         "[#check] commands are ignored when compiling to Multicore OCaml."
 
@@ -202,7 +198,7 @@ and print_tydef (name, (params, tydef)) ppf =
       print ppf "@[type %t = %t@]@."
         (MulticoreSymbol.print_tyname name)
         (print_def tydef)
-  | lst ->
+  | _lst ->
       print ppf "@[type (%t) %t = %t@]@."
         (print_sequence ", " MulticoreSymbol.print_typaram params)
         (MulticoreSymbol.print_tyname name)
@@ -304,7 +300,7 @@ let print_cmd cmd ppf =
   | TopLet defs -> print_top_let defs ppf
   | TopLetRec defs -> print_top_let_rec defs ppf
   | TyDef tydefs -> print_tydefs tydefs ppf
-  | External (x, ty, f) -> (
+  | External (x, _ty, f) -> (
     match Assoc.lookup f MulticoreExternal.values with
     | None -> Error.runtime "Unknown external symbol %s." f
     | Some (MulticoreExternal.Unknown as unknown) ->
@@ -313,5 +309,5 @@ let print_cmd cmd ppf =
           ^^ "with [failwith \"Unknown external symbol %s.\"]." )
           f f ;
         print_external x f unknown ppf
-    | Some (MulticoreExternal.Exists s as known) ->
+    | Some (MulticoreExternal.Exists _s as known) ->
         print_external x f known ppf )

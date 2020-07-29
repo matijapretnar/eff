@@ -10,17 +10,13 @@ module Anonymous : Annotation with type t = unit = struct
   let print _ _ n ppf = Format.pp_print_int ppf n
 end
 
-module type Parameter = sig
+module type PARAMETER = sig
   val ascii_symbol : string
 
   val utf8_symbol : string
 end
 
-module Parameter (Param : sig
-  val ascii_symbol : string
-
-  val utf8_symbol : string
-end) : Annotation with type t = unit = struct
+module Parameter (Param : PARAMETER) : Annotation with type t = unit = struct
   type t = unit
 
   let print _ _ n ppf =
@@ -45,7 +41,7 @@ end
 module Int : Annotation with type t = int = struct
   type t = int
 
-  let print safe desc n ppf = Format.fprintf ppf "%d" desc
+  let print _safe desc _n ppf = Format.fprintf ppf "%d" desc
 end
 
 module type S = sig
@@ -71,7 +67,7 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
 
   type t = int * annot
 
-  let compare (n1, _) (n2, _) = Pervasives.compare n1 n2
+  let compare (n1, _) (n2, _) = Stdlib.compare n1 n2
 
   let new_fresh () =
     let count = ref (-1) in

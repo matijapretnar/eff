@@ -35,7 +35,7 @@ let print_label lbl ppf = CoreTypes.Label.print lbl ppf
 let print_field fld ppf = CoreTypes.Field.print fld ppf
 
 let print_tyname tyname ppf =
-  let printer desc n =
+  let printer desc _n =
     if desc = "empty" then
       Print.warning
         "Warning: [empty] type encountered. Must be fixed by hand!@." ;
@@ -44,5 +44,5 @@ let print_tyname tyname ppf =
   CoreTypes.TyName.fold printer tyname
 
 let print_typaram typaram ppf =
-  let printer desc n = Format.fprintf ppf "'ty_%d" n in
+  let printer _desc n = Format.fprintf ppf "'ty_%d" n in
   CoreTypes.TyParam.fold printer typaram

@@ -1,9 +1,6 @@
 (* Evaluation of the intermediate language, big step. *)
-open CoreUtils
 module V = Value
 module Untyped = UntypedSyntax
-
-exception PatternMatch of Location.t
 
 module Backend : BackendSignature.T = struct
   module RuntimeEnv = Map.Make (CoreTypes.Variable)
@@ -21,12 +18,12 @@ module Backend : BackendSignature.T = struct
       (Type.print_beautiful ty) (Value.print_value v) ;
     state
 
-  let process_type_of state c ty =
+  let process_type_of state _c ty =
     Format.fprintf !Config.output_formatter "@[- : %t@]@."
       (Type.print_beautiful ty) ;
     state
 
-  let process_def_effect state (eff, (ty1, ty2)) = state
+  let process_def_effect state (_eff, (_ty1, _ty2)) = state
 
   let process_top_let state defs vars =
     let state' =
@@ -58,12 +55,12 @@ module Backend : BackendSignature.T = struct
       vars ;
     state'
 
-  let process_external state (x, ty, f) =
+  let process_external state (x, _ty, f) =
     match Assoc.lookup f External.values with
     | Some v -> Eval.update x v state
     | None -> Error.runtime "unknown external symbol %s." f
 
-  let process_tydef state tydefs = state
+  let process_tydef state _tydefs = state
 
-  let finalize state = ()
+  let finalize _state = ()
 end

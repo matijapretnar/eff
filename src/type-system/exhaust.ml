@@ -33,7 +33,7 @@ let arity = function
   | Variant (_, b) -> if b then 1 else 0
 
 (* Removes the top-most [As] pattern wrappers, if present (e.g. [2 as x] -> [2]). *)
-let rec remove_as {it= p} =
+let rec remove_as {it= p; _} =
   match p with
   | Untyped.PAs (p', _) -> remove_as p'
   | Untyped.PAnnotated (p', _) -> remove_as p'
@@ -63,7 +63,7 @@ let rec cons_of_pattern tctx {it= p; at= loc} =
 let pattern_of_cons ~loc c lst =
   let plain =
     match c with
-    | Tuple n -> Untyped.PTuple lst
+    | Tuple _n -> Untyped.PTuple lst
     | Record flds -> Untyped.PRecord (Assoc.of_list (List.combine flds lst))
     | Const const -> Untyped.PConst const
     | Variant (lbl, opt) ->
@@ -269,7 +269,7 @@ let check_comp tctx c =
     | Untyped.Let (lst, c) ->
         List.iter (fun (p, c) -> is_irrefutable tctx p ; check c) lst ;
         check c
-    | Untyped.LetRec (lst, c) ->
+    | Untyped.LetRec (lst, _c) ->
         List.iter (fun (_, (p, c)) -> is_irrefutable tctx p ; check c) lst
     | Untyped.Match (_, []) ->
         () (* Skip empty match to avoid an unwanted warning. *)

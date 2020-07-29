@@ -1,6 +1,4 @@
 (* Evaluation of the intermediate language, big step. *)
-open CoreUtils
-
 module type BackendParameters = sig
   val output_file : string
 end
@@ -20,11 +18,11 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
 
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
-  let process_computation state c ty =
+  let process_computation state c _ty =
     let t = MulticoreTranslate.of_computation c in
     update state (Term t)
 
-  let process_type_of state c ty =
+  let process_type_of state _c _ty =
     Print.warning
       "[#typeof] commands are ignored when compiling to Multicore OCaml." ;
     state
@@ -34,14 +32,14 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     let ty2' = MulticoreTranslate.of_type ty2 in
     update state (DefEffect (eff, (ty1', ty2')))
 
-  let process_top_let state defs vars =
+  let process_top_let state defs _vars =
     let converter (p, c) =
       (MulticoreTranslate.of_pattern p, MulticoreTranslate.of_computation c)
     in
     let defs' = List.map converter defs in
     update state (TopLet defs')
 
-  let process_top_let_rec state defs vars =
+  let process_top_let_rec state defs _vars =
     let converter (p, c) =
       (MulticoreTranslate.of_pattern p, MulticoreTranslate.of_computation c)
     in

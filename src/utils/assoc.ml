@@ -1,7 +1,7 @@
 (** Association lists *)
 type ('key, 'value) t = ('key * 'value) list
 
-let rec empty = []
+let empty = []
 
 (* Finding elements. *)
 let rec lookup x = function
@@ -27,7 +27,7 @@ let rec remove x = function
   | (k, v) :: tl -> if x = k then tl else (k, v) :: remove x tl
 
 (* Iters, maps, folds. *)
-let rec iter = List.iter
+let iter = List.iter
 
 let rec map f = function
   | [] -> []
@@ -73,9 +73,9 @@ let kfold_map f st xs =
 (* Other useful stuff. *)
 let length assoc = List.length assoc
 
-let rec values_of = function [] -> [] | (k, v) :: tl -> v :: values_of tl
+let rec values_of = function [] -> [] | (_k, v) :: tl -> v :: values_of tl
 
-let rec keys_of = function [] -> [] | (k, v) :: tl -> k :: keys_of tl
+let rec keys_of = function [] -> [] | (k, _v) :: tl -> k :: keys_of tl
 
 let rev = List.rev
 

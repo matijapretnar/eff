@@ -415,7 +415,7 @@ and infer_comp st type_context cp =
     | Untyped.Match (e, lst) ->
         let t_in, st' = infer_expr st' type_context e in
         let t_out = T.fresh_ty () in
-        let infer_case st'' ((p, e') as a) =
+        let infer_case st'' ((_p, e') as a) =
           let t_in', t_out', st'' = infer_abstraction st'' type_context a in
           add_ty_constraint e.at t_in t_in' st''
           |> add_ty_constraint e'.at t_out' t_out
@@ -449,7 +449,7 @@ let infer_top_comp st type_context c =
   let ty = Type.subst_ty sbst ty in
   (st, generalize st (nonexpansive c.it) ty)
 
-let infer_top_let ~loc st type_context defs =
+let infer_top_let st type_context defs =
   let vars, st =
     infer_let (clear_constraints st) type_context Location.unknown defs
   in
@@ -460,7 +460,7 @@ let infer_top_let ~loc st type_context defs =
     defs ;
   (vars, st)
 
-let infer_top_let_rec ~loc st type_context defs =
+let infer_top_let_rec st type_context defs =
   let vars, st =
     infer_let_rec (clear_constraints st) type_context Location.unknown defs
   in

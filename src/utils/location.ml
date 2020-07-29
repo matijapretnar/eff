@@ -12,7 +12,7 @@ and known =
 let print loc ppf =
   match loc with
   | Unknown -> Format.fprintf ppf "unknown location"
-  | Known {filename; start_line; start_column; end_line; end_column} ->
+  | Known {filename; start_line; start_column; _} ->
       if String.length filename != 0 then
         Format.fprintf ppf "file %S, line %d, char %d" filename start_line
           start_column

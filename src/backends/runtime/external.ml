@@ -67,7 +67,7 @@ let rec compare v1 v2 =
     | V.Closure _ | V.Handler _ -> Invalid
     | V.Const _ | V.Tuple _ | V.Record _ -> Greater
     | V.Variant (lbl', u') ->
-        let r = Pervasives.compare lbl lbl' in
+        let r = Stdlib.compare lbl lbl' in
         if r < 0 then Less else if r > 0 then Greater else compare_option u u'
     )
 
@@ -88,7 +88,7 @@ and compare_record lst1 lst2 =
   let rec comp = function
     | [], [] -> Equal
     | (fld1, v1) :: lst1, (fld2, v2) :: lst2 -> (
-        let r = Pervasives.compare fld1 fld2 in
+        let r = Stdlib.compare fld1 fld2 in
         if r < 0 then Less
         else if r > 0 then Greater
         else
@@ -103,8 +103,8 @@ and compare_record lst1 lst2 =
   let lst1' = Assoc.to_list lst1 in
   let lst2' = Assoc.to_list lst2 in
   comp
-    ( List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst1'
-    , List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst2'
+    ( List.sort (fun (fld1, _) (fld2, _) -> Stdlib.compare fld1 fld2) lst1'
+    , List.sort (fun (fld1, _) (fld2, _) -> Stdlib.compare fld1 fld2) lst2'
     )
 
 and compare_option o1 o2 =

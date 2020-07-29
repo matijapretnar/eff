@@ -46,11 +46,6 @@ let lookup_tydef ~loc ty_name st =
   | Some tdata ->
       tdata
 
-let fresh_tydef ~loc ty_name st =
-  let {params; type_def} = lookup_tydef ~loc ty_name st in
-  let params', sbst = T.refreshing_subst params in
-  (params', subst_tydef sbst type_def)
-
 (** [find_variant lbl] returns the information about the variant type that defines the
     label [lbl]. *)
 let find_variant lbl st =
@@ -118,7 +113,7 @@ let infer_field fld st =
       Some (apply_to_params ty_name ps', (ty_name, us'))
 
 let transparent ~loc ty_name st =
-  let {type_def} = lookup_tydef ~loc ty_name st in
+  let {type_def; _} = lookup_tydef ~loc ty_name st in
   match type_def with Sum _ | Record _ -> false | Inline _ -> true
 
 (* [ty_apply pos ty_name lst st] applies the type constructor [ty_name] to the given list of arguments. *)
@@ -138,7 +133,7 @@ let check_well_formed ~loc tydef st =
     | T.Basic _ | T.TyParam _ ->
         ()
     | T.Apply (ty_name, tys) ->
-        let {params} = lookup_tydef ~loc ty_name st in
+        let {params; _} = lookup_tydef ~loc ty_name st in
         let n = List.length params in
         if List.length tys <> n then
           Error.typing ~loc "The type constructor %t expects %d arguments"
@@ -241,10 +236,10 @@ let extend_type_definitions ~loc tydefs st =
   try
     let st = Assoc.fold_left extend_tydef st tydefs' in
     Assoc.iter
-      (fun (_, {type_def}) -> check_well_formed ~loc type_def st)
+      (fun (_, {type_def; _}) -> check_well_formed ~loc type_def st)
       tydefs' ;
     Assoc.iter
-      (fun (_, {type_def}) -> check_noncyclic ~loc st type_def)
+      (fun (_, {type_def; _}) -> check_noncyclic ~loc st type_def)
       tydefs' ;
     st
   with e -> raise e
