@@ -2,6 +2,7 @@
 (using menhir 2.1)
 (generate_opam_files true)
 
+(name eff)
 (version dev)
 (source (github matijapretnar/eff))
 (homepage "http://www.eff-lang.org/")
