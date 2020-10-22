@@ -79,16 +79,9 @@ To compile Eff manually, first clone the GitHub repository
 
 and run
 
-    ./configure
-
-If it complains you will have to install missing prerequisites. In case of
-problems, `make clean distclean` might help. The configuration script takes
-standard GNU Autoconf arguments, such as `--prefix` which determines where to
-install Eff. Type `./configure --help` for more information. Next, run
-
     make
 
-If all goes well, you should be able to run Eff in-place by typing `./eff`.
+If all goes well, you should be able to run Eff in-place by typing `./eff.exe`.
 
 You can also run a battery of tests with
 
@@ -96,7 +89,7 @@ You can also run a battery of tests with
 
 Finally, to install the command `eff`, run
 
-    sudo make install
+    make install
 
 See the file `etc/README.txt` for editor support.
 

@@ -1,0 +1,10 @@
+(library
+ (name shared)
+ (libraries unix))
+
+(ocamllex lexer)
+
+(menhir
+ (modules parser))
+
+(include_subdirs unqualified)
