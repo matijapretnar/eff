@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Eff Programming Language</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.0-beta.40/css/uikit.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.0-beta.40/js/uikit.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.0-beta.40/js/uikit-icons.min.js"></script>
+    <style>
+    em {
+        color: inherit !important;
+    }
+
+    body {
+        background: #f5f6fa;
+        color: #2f3640;
+    }
+
+    .uk-navbar-container {
+        background: #192a56 !important;
+    }
+
+    .uk-navbar-container, .uk-navbar-container a {
+        height: 40px !important;
+    }
+
+    .uk-navbar-container a, .uk-button-primary {
+        color: rgba(255, 255, 255, 0.8) !important;
+    }
+
+.uk-navbar-container .uk-active a, .uk-button-primary {
+        color: rgba(255, 255, 255, 1) !important;
+    }
+    
+    a {
+        color: #0097e6;
+    }
+
+    .uk-alert-danger {
+        background: #dcdde1;
+        color: #2f3640;
+    }
+
+    #try-out {
+        font-weight: bold;
+        font-size: 1.5em;
+    }
+
+    #install {
+        margin-top: -1.5em;
+        font-size: 0.9em;
+    }
+    </style>
+</head>
+
+<body>
+    <nav class="uk-navbar-container" uk-navbar>
+        <div class="uk-navbar-center">
+            <a href="/" class="uk-navbar-item uk-logo" style="height: 50px; color: white !important">
+                EFF
+            </a>
+            <ul class="uk-navbar-nav">
+                <li><a href="/try/">
+                    <span uk-icon="settings"></span>
+                    Try it out
+                </a></li>
+                <li><a href="/learn/">
+                    <span uk-icon="copy"></span>
+                    Learn more
+                </a></li>
+                <li><a href="https://github.com/matijapretnar/eff/">
+                    <span uk-icon="github"></span>
+                    Contribute
+                </a></li>
+            </ul>
+        </div>
+    </nav>
+    <div class="uk-section">
+        <div class="uk-container uk-container-small">
+            <p class="uk-text-lead">
+                <em>Eff</em> is a functional programming language based on <strong>algebraic effect handlers</strong>. This means that <em>Eff</em> provides handlers of not only exceptions, but of any computational effect, allowing you to <strong>redirect output</strong>, wrap state modifications in <strong>transactions</strong>, schedule <strong>asynchronous threads</strong>, and much much more…</strong>
+            </p>
+            <p class="uk-heading-line uk-text-center uk-text-uppercase" id="try-out">
+                <a href="/try/">Try it out in your browser!</a>
+            </p>
+            <p class="uk-text-center" id="install">
+                <a href="https://github.com/matijapretnar/eff/#installation--usage">or install it on your computer</a>
+            </p>
+            <div class="uk-grid-match uk-child-width-1-3@m" uk-grid>
+                <div>
+                    <p><strong>Algebraic effects</strong>, on which <em>Eff</em> is built, give rise to a uniform representation of all computational effects. Effects are thus first-class citizens of <em>Eff</em> and can be seamlessly combined. There is no need for the do notation, no need for monad transformers, and no need to reshuffle your whole program just to read a global flag.</p>
+                </div>
+                <div>
+                    <p>Just like exceptions are a particular instance of an effect, exception handlers are a particular instance of <strong>effect handlers</strong>. In <em>Eff</em>, you can silence standard output, redirect it to a different channel, or even rearrange it. Similarly, state modifications can be prevented or grouped in transactions.</p>
+                </div>
+                <div>
+                    <p>As handlers completely override the behaviour of effects, there is no need for a default behaviour to start with. <em>Eff</em> allows you to <strong>define your own effects</strong>. Just declare a choice operation and start writing your nondetermnistic programs. Later, you can write a handler that computes a single possible result, an optimal result, or a list of all results.</p>
+                </div>
+            </div>
+            <div class="uk-alert-danger" uk-alert>
+                <p>The purpose of <em>Eff</em> is to test new concepts in programming languages, in particular ones regarding computational effects. <strong>We discourage the use of <em>Eff</em> in production</strong>, as it has no library support, little documentation and is prone to change.</p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

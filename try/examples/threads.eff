@@ -1,0 +1,74 @@
+(** Multi-threading *)
+
+effect Yield : unit
+effect Spawn : (unit -> unit) -> unit
+
+(* We will need a queue to keep track of inactive threads. *)
+
+effect Get_next : (unit -> unit) option
+effect Add_to_queue : (unit -> unit) -> unit
+
+let queue initial = handler
+  | effect Get_next k ->
+    ( fun queue -> match queue with
+        | [] -> (continue k None) []
+        | hd::tl -> (continue k (Some hd)) tl )
+  | effect (Add_to_queue y) k -> ( fun queue -> (continue k ()) (queue @ [y]))
+  | x -> ( fun _ -> x)
+  | finally x -> x initial
+;;
+
+let round_robin =
+  let enqueue t =
+    perform (Add_to_queue t)
+  in
+  let dequeue () =
+    match perform Get_next with
+    | None -> ()
+    | Some t -> t ()
+  in
+  let rec rr_handler () = handler (*Needs to be defined recursively.*)
+    | effect Yield k -> enqueue k; dequeue ()
+    | effect (Spawn t) k -> enqueue k; with rr_handler () handle t ()
+    | () -> dequeue ()
+  in
+  rr_handler ()
+;;
+
+(* Because the round_robin handler uses our queue, we must nest the handlers. *)
+
+with queue [] handle
+with round_robin handle
+ perform (Spawn (fun _ ->
+  iter (fun x -> perform (Print x); perform Yield) ["a"; "b"; "c"; "d"; "e"]
+  ));
+ perform (Spawn (fun _ ->
+  iter (fun x -> perform (Print x); perform Yield) ["A"; "B"; "C"; "D"; "E"]
+  ))
+;;
+
+(* We can run an unbounded amount of threads. The following example enumerates all
+   reduced positive fractions less than 1 by spawning a thread for each denominator
+   between d and e. *)
+
+let rec fractions d e =
+ let rec find_fractions n =
+   (* If the fraction is reduced, print it and yield *)
+   if gcd n d = 1 then
+     perform (Print (to_string n ^ "/" ^ to_string d ^ ", ")); perform Yield
+   else ();
+   if d > n then
+     find_fractions (n+1)
+   else ()
+ in
+ (* Spawn a thread for the next denominator *)
+ (if d < e then
+    perform (Spawn (fun _ -> perform Yield; fractions (d + 1) e)) else ()) ;
+ (* List all the fractions with the current denominator *)
+ find_fractions 1
+;;
+
+with queue [] handle
+with round_robin handle
+  fractions 1 10
+;;

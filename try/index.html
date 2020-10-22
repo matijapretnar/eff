@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Eff Programming Language</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.0-beta.40/css/uikit.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.0-beta.40/js/uikit.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.0.0-beta.40/js/uikit-icons.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.33.0/codemirror.min.js" integrity="sha256-ag7KgA1S7cuuU2FCC2G7/L8IpaijDSPqzcLLLeJv5Iw=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.36.0/codemirror.min.css" integrity="sha256-I8NyGs4wjbMuBSUE40o55W6k6P7tu/7G28/JGUUYCIs=" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.36.0/theme/monokai.min.css" integrity="sha256-6ov3WWd9ybfZPeJBlXBgQuD/aLhTRCEp5kBhqD9ke0o=" crossorigin="anonymous" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.36.0/mode/mllike/mllike.min.js" integrity="sha256-BOCKMndg6/AI2iWczANGB1/QIky96Pzxaj9l2yKKfkY=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.36.0/addon/edit/matchbrackets.min.js" integrity="sha256-BzzUspurJPtHi1Ux5geUVUtDLQDqDeUu9SMkOrsShUY=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.36.0/addon/edit/closebrackets.min.js" integrity="sha256-ckZJSSEwRjAtCl8YzZuhIqHYq+Bt+Csy3keSLdp8uxA=" crossorigin="anonymous"></script>
+    <!-- Jquery Terminal -->
+    <script src="https://code.jquery.com/jquery-2.2.4.min.js" integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/css/jquery.terminal.min.css" integrity="sha256-NPnczI0KjCueVIbIZBIjffajQholjsUnhVe4sQgL80U=" crossorigin="anonymous" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/js/jquery.terminal.min.js" integrity="sha256-Qm1Nw4js01hUsHFCa8xirKnSZeRXR8uNgbAKwjhn9mA=" crossorigin="anonymous"></script>
+    <!-- suport for resizable CodeMirror editor -->
+    <script src="https://unpkg.com/cm-resize"></script>
+    <!-- CodeMirror editing mode for Eff (depends on mllike being loaded) -->
+    <script src="./effmode.js"></script>
+    <!-- local Javascript code -->
+    <script src="/try/jseff.bc.js"></script>
+    <style>
+    .CodeMirror {
+        height: 60vh;
+        border: 1px solid #ddd;
+        margin-bottom: 10px;
+    }
+
+    .CodeMirror pre {
+        padding-left: 7px;
+        line-height: 1.25;
+    }
+
+    em {
+        color: inherit !important;
+    }
+
+    body {
+        background: #f5f6fa;
+        color: #2f3640;
+    }
+
+    .uk-navbar-container {
+        background: #192a56 !important;
+    }
+
+    .uk-navbar-container, .uk-navbar-container a {
+        height: 40px !important;
+    }
+
+    .uk-navbar-container a,
+    .uk-button-primary {
+        color: rgba(255, 255, 255, 0.7) !important;
+    }
+
+.uk-navbar-container li.uk-active a {
+        color: rgba(255, 255, 255, 1) !important;
+    }
+
+    a {
+        color: #0097e6;
+    }
+
+    #load-file-button {
+        background: #0097e6;
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    #try-out {
+        font-weight: bold;
+        font-size: 1.5em;
+    }
+
+span.cm-number, span.cm-string { color: #c23616 !important; }
+span.cm-comment { color: #718093 !important; }
+span.cm-variable, span.cm-operator { color: #2f3640 !important; }
+span.cm-keyword { color: #192a56 !important; font-weight: bold;}
+
+.CodeMirror-activeline-background { background: #e8f2ff; }
+.CodeMirror-matchingbracket { outline:1px solid grey; color:black !important; }
+
+.terminal {
+    --background: #192a56;
+    --color: #f5f6fa;
+    }
+    </style>
+</head>
+
+<body>
+    <nav class="uk-navbar-container" uk-navbar>
+        <div class="uk-navbar-center">
+            <a href="/" class="uk-navbar-item uk-logo" style="height: 50px">
+                EFF
+            </a>
+            <ul class="uk-navbar-nav">
+                <li class="uk-active"><a href="/try/">
+                    <span uk-icon="settings"></span>
+                    Try it out
+                </a></li>
+                <li><a href="/learn/">
+                    <span uk-icon="copy"></span>
+                    Learn more
+                </a></li>
+                <li><a href="https://github.com/matijapretnar/eff/">
+                    <span uk-icon="github"></span>
+                    Contribute
+                </a></li>
+            </ul>
+        </div>
+    </nav>
+    <div class="uk-container uk-padding-small uk-container">
+        <div uk-height-viewport="offset-top: true" style="position: relative">
+        <ul class="uk-tab" uk-tab>
+<li><a id="syntaxLoad">Syntax</a></li>
+<li><a id="printingLoad">Printing</a></li>
+<li><a id="nondeterminismLoad">Non-determinism</a></li>
+<li><a id="probabilityLoad">Probability</a></li>
+<li><a id="stateLoad">State</a></li>
+<li><a id="threadsLoad">Threads</a></li>
+        </ul>
+            <textarea id="sourcecode"></textarea>
+
+            <script>
+            var editor = CodeMirror.fromTextArea(document.getElementById("sourcecode"), {
+                mode: "text/x-eff",
+                lineNumbers: true,
+                matchBrackets: true
+            });
+            cmResize(editor, {resizableWidth: false});
+            </script>
+            <!-- The terminal window -->
+            <div style="position: absolute; right: 0px">
+            <button style="position: relative; float: right; z-index:100000" id="load-file-button" class="uk-button uk-button-small uk-button-primary">LOAD FILE</button>
+            </div>
+            <div id="terminal" style="--size: 16px">
+            </div>
+            <!-- Code to setup the terminal and the buttons -->
+            <script>
+            var terminal =
+                $('#terminal').terminal(function(command, term) {
+                    if (command !== '') {
+                        state = jseff.executeSource()(state)(command);
+                    }
+                }, {
+                    greetings: '',
+                    name: 'repl_terminal',
+                    height: 'calc(30vh - 50px)',
+                    width: "auto",
+                    prompt: '# '
+                });
+
+            var state = jseff.initialize()(terminal.echo);
+            jQuery.get('/try/pervasives.eff', function(data) {
+                state = jseff.loadSource()(state)(data);
+            })
+
+            jQuery.get('/try/examples/syntax.eff', function(data) {
+                editor.setValue(data);
+            })
+
+            $('#load-file-button').click(function() {
+                state = jseff.executeSource()(state)(editor.getValue());
+            });
+
+            $('#syntaxLoad').click(function() {
+                jQuery.get('/try/examples/syntax.eff', function(data) {
+                    editor.setValue(data);
+                })
+            });
+
+            $('#printingLoad').click(function() {
+                jQuery.get('/try/examples/printing.eff', function(data) {
+                    editor.setValue(data);
+                })
+            });
+
+            $('#nondeterminismLoad').click(function() {
+                jQuery.get('/try/examples/nondeterminism.eff', function(data) {
+                    editor.setValue(data);
+                })
+            });
+
+            $('#probabilityLoad').click(function() {
+                jQuery.get('/try/examples/probability.eff', function(data) {
+                    editor.setValue(data);
+                })
+            });
+
+            $('#stateLoad').click(function() {
+                jQuery.get('/try/examples/state.eff', function(data) {
+                    editor.setValue(data);
+                })
+            });
+
+            $('#threadsLoad').click(function() {
+                jQuery.get('/try/examples/threads.eff', function(data) {
+                    editor.setValue(data);
+                })
+            });
+            </script>
+        </div>
+</body>
+
+</html>

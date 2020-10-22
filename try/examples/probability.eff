@@ -1,0 +1,69 @@
+(** Probability *)
+
+(* As seen in non-determinism examples, effects can be used to simulate choice.
+   In order to use randomness we also need to use effects, for instance
+   RandomInt and RandomFloat. We can also use handlers to compute some
+   properties, for instance the expected value of a discrete random variable. *)
+
+(* We define an operation Toss to use as a random coin toss. *)
+effect Toss : float -> bool
+
+(* Using the operation Toss we can define other distributions as well. *)
+let rec uniform = function
+  | [x] -> x
+  | x :: xs ->
+      let n = length xs + 1 in
+      let p = 1.0 /. float_of_int n in
+      if perform (Toss p) then x else uniform xs
+;;
+
+let random_value = handler
+  | v -> v
+  | effect (Toss p) k ->
+    let toss = perform (RandomFloat 1.) < p in
+    continue k toss
+;;
+
+let expectation = handler
+  | v -> v
+  | effect (Toss p) k ->
+  p *. (continue k true) +. (1.0 -. p) *. (continue k false)
+;;
+
+with expectation handle
+  let x = uniform [1.; 2.; 3.; 4.; 5.; 6.] in
+  let y = uniform [1.; 2.; 3.; 4.; 5.; 6.] in
+  x +. y
+;;
+
+(* We can also compute the distribution of outcomes for a probabilisitic
+   computation. *)
+
+(* We first write a function that combines two outcome distributions where
+   the first outcome distribution is chosen with the probability p and the second
+   with probability 1-p. *)
+
+let combine p dist1 dist2 =
+  let scale p dist = map (fun (x, q) -> (x, p *. q)) dist in
+  let rec add (x, p) = function
+    | [] -> [(x, p)]
+    | (y, q) :: dist ->
+      if x = y then (x, p +. q) :: dist else (y, q) :: add (x, p) dist
+  in
+  let dist1 = scale p dist1 in
+  let dist2 = scale (1.0 -. p) dist2 in
+  fold_right add dist1 dist2
+;;
+
+let distribution = handler
+    (* Distribution of only one value. *)
+  | v -> [(v, 1.0)]
+    (* Combine possible distributions. *)
+  | effect (Toss p) k -> combine p (continue k true) (continue k false)
+;;
+
+with distribution handle
+  let x = uniform [1; 2; 3; 4; 5; 6] in
+  let y = uniform [1; 2; 3; 4; 5; 6] in
+  x + y
+;;

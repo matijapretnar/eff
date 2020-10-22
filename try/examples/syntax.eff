@@ -1,0 +1,50 @@
+(** Overview of syntax *)
+
+(** If you are familiar with OCaml, you will find Eff easy to read
+    and you can jump straight to examples of effects by choosing one
+    of the above tabs.
+
+    Eff syntax is close to that of OCaml, which we review
+    quickly in this file. An online OCaml tutorial is available at
+    http://try.ocamlpro.com.
+*)
+
+(* You can define variables. *)
+let x = 10 + 10
+let y = x * 3
+
+(* You can define functions. *)
+let double x = 2 * x
+
+(* Functions can be recursive. *)
+let rec fact n =
+  if n = 0 then 1 else n * fact (n - 1)
+
+(* Or even mutually recursive. *)
+let rec even n =
+  match n with
+  | 0 -> true
+  | x -> odd (x-1)
+and odd n =
+  match n with
+  | 0 -> false
+  | x -> even (x-1)
+
+(* You can declare your own types. *)
+type shape =
+  | Circle of float
+  | Rectangle of float * float
+
+(* And you can use pattern matching to define functions on such types. *)
+let area shape =
+  match shape with
+  | Circle r -> 3.14159 *. r *. r
+  | Rectangle (w, h) -> w *. h
+
+(* You can write the above using the "function" shortcut. *)
+let perimeter = function
+  | Circle r -> 2.0 *. 3.14159 *. r
+  | Rectangle (w, h) -> 2.0 *. (w +. h)
+
+(* Like in OCaml, a double semicolon separates commands in a file. *)
+;;
