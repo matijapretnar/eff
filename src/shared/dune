@@ -8,3 +8,14 @@
  (modules parser))
 
 (include_subdirs unqualified)
+
+(rule
+ (with-stdout-to
+  stdlib_eff.ml
+  (progn
+   (echo "let stdlib = {|")
+   (cat stdlib.eff)
+   (echo "|}")
+   (echo "let multicoreStdlib = {|")
+   (cat backends/multicore/multicoreStdlib.eff)
+   (echo "|}"))))

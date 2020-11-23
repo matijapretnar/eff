@@ -2,9 +2,7 @@
 
 let version = "5.0"
 
-type pervasives = PervasivesNone | PervasivesDefault
-
-let pervasives_file = ref PervasivesDefault
+let use_stdlib = ref true
 
 type backend = Runtime | Multicore of string
 

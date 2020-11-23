@@ -1,43 +1,29 @@
-(* This is the equivalent of Haskell prelude or Ocaml pervasives,
+(* This is the equivalent of Haskell prelude or Ocaml stdlib,
    with some list handling functions thrown in. *)
-
-let continue x = x
 
 (* Top level effects. *)
 effect Print : string -> unit
 
 effect Read : string
 
-effect Raise : string -> empty
-
 effect RandomInt : int -> int
 
 effect RandomFloat: float -> float
+
+external _ocaml_tophandler : 'a => 'a = "_ocaml_tophandler"
 
 (* Integers and Floats *)
 external ( = ) : 'a -> 'a -> bool = "="
 
 external ( < ) : 'a -> 'a -> bool = "<"
 
+external failwith : string -> 'a = "failwith"
+
 external infinity : float = "infinity"
 
 external neg_infinity : float = "neg_infinity"
 
 external nan : float = "nan"
-
-let absurd void = match void with;;
-
-effect DivisionByZero : empty
-
-effect InvalidArgument : string -> empty
-
-effect Failure : string -> empty
-
-let failwith msg = absurd (perform (Failure msg)) ;;
-
-effect AssertionFault : empty
-
-let assert b = if b then () else absurd (perform AssertionFault) ;;
 
 external ( ~- ) : int -> int = "~-"
 
@@ -48,9 +34,6 @@ external ( * ) : int -> int -> int = "*"
 external ( - ) : int -> int -> int = "-"
 
 external ( mod ) : int -> int -> int = "mod"
-let (mod) m n = match n with
-  | 0 -> absurd (perform DivisionByZero)
-  | n -> m mod n
 
 external ( ~-. ) : float -> float = "~-."
 
@@ -66,7 +49,7 @@ external ( ** ) : int -> int -> int = "**"
 
 external ( / ) : int -> int -> int = "/"
 let ( / ) m n = match n with
-  | 0 -> absurd (perform DivisionByZero)
+  | 0 -> failwith "division by zero"
   | n -> (/) m n
 
 external exp : float -> float = "exp"
@@ -89,15 +72,20 @@ external asin : float -> float = "asin"
 
 external atan : float -> float = "atan"
 
-
+external sqrt : float -> float = "sqrt"
+                               
 (* Strings *)
 external float_of_int : int -> float = "float_of_int"
+
+external int_of_float : float -> int = "int_of_float"
 
 external ( ^ ) : string -> string -> string = "^"
 
 external string_length : string -> int = "string_length"
 
-external to_string : 'a -> string  = "to_string"
+external string_of_float : float -> string  = "string_of_float"
+
+external string_of_int : int -> string  = "string_of_int"
 
 (* Booleans *)
 let not x = if x then false else true
@@ -143,11 +131,11 @@ let rec map f = function
     y :: ys
 
 let hd = function
-  | [] ->  absurd (perform (InvalidArgument "head: empty list"))
+  | [] ->  failwith "head: empty list"
   | x :: _ -> x
 
 let tl = function
-  | [] ->  absurd (perform (InvalidArgument "tail: empty list"))
+  | [] ->  failwith "tail: empty list"
   | x :: xs -> xs
 
 let take f k =
@@ -193,7 +181,7 @@ let rec zip xs ys =
   match (xs, ys) with
   | ([], []) -> []
   | (x :: xs, y :: ys) -> (x, y) :: (zip xs ys)
-  | (_, _) -> absurd (perform (InvalidArgument "zip: length mismatch"))
+  | (_, _) -> failwith "zip: length mismatch"
 
 let rec unzip = function
   | [] -> ([], [])
@@ -241,24 +229,9 @@ let fst (x, _) = x
 
 let snd (_, y) = y
 
-let print v =
-  let s = to_string v in
-  perform (Print s)
-
 let print_string str =
   perform (Print str)
 
 let print_endline str =
   perform (Print (str ^ "\n"))
 
-(* Basic Handlers *)
-(*
-effect Lookup: int
-effect Update: int -> unit
-
-let state initial = handler
-  | y -> (fun _ -> y)
-  | effect Lookup k -> (fun s -> continue k s s)
-  | effect (Update s) k -> (fun _ -> continue k () s)
-  | finally f -> f initial;;
-*)

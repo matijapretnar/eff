@@ -1,4 +1,4 @@
-(* Check every thing in pervasives. *)
+(* Check every thing in the standard library. *)
 
 let less1 = (1 < 2);;
 

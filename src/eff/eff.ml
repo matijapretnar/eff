@@ -13,9 +13,9 @@ let enqueue_file filename = file_queue := filename :: !file_queue
 let options =
   Arg.align
     [
-      ( "--no-pervasives",
-        Arg.Unit (fun () -> Config.pervasives_file := Config.PervasivesNone),
-        " Do not load pervasives.eff" );
+      ( "--no-stdlib",
+        Arg.Clear Config.use_stdlib,
+        " Do not load the standard library" );
       ( "--wrapper",
         Arg.String (fun str -> Config.wrapper := Some [ str ]),
         "<program> Specify a command-line wrapper to be used (such as rlwrap \
@@ -128,16 +128,6 @@ let main =
           lst );
   (* Files were listed in the wrong order, so we reverse them *)
   file_queue := List.rev !file_queue;
-  (* Load the pervasives. *)
-  ( match !Config.pervasives_file with
-  | Config.PervasivesNone -> ()
-  | Config.PervasivesDefault ->
-      let f =
-        match !Config.backend with
-        | Config.Runtime -> Filename.concat "." "pervasives.eff"
-        | Config.Multicore _ -> Filename.concat "." "multicorePervasives.eff"
-      in
-      enqueue_file (Load f) );
   try
     let (module Backend : BackendSignature.T) =
       match !Config.backend with
@@ -154,6 +144,17 @@ let main =
       | Load filename -> Shell.load_file filename env
     in
     let state = Shell.initialize () in
+    let state =
+      (* Load the standard library. *)
+      if !Config.use_stdlib then
+        let stdlib =
+          match !Config.backend with
+          | Config.Runtime -> Stdlib_eff.stdlib
+          | Config.Multicore _ -> Stdlib_eff.multicoreStdlib
+        in
+        Shell.load_source stdlib state
+      else state
+    in
     let state = List.fold_left execute_file state !file_queue in
     let state =
       if !Config.interactive_shell then toplevel Shell.execute_source state

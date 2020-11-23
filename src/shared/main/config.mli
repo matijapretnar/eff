@@ -3,23 +3,8 @@
 val version : string
 (** Current version *)
 
-(** Possible locations of pervasives file
-
-    Unless specified otherwise, we look for pervasives.eff _first_ next to the
-    executable and _then_ in the relevant install directory. This makes it
-    easier to experiment with pervasives.eff because Eff will work straight
-    from the build directory. We are probably creating a security hole, but
-    we'll deal with that when Eff actually gets used by more than a dozen
-    people. *)
-type pervasives =
-  | PervasivesNone
-  (* do not use pervasives *)
-  | PervasivesDefault
-
-(* look in the default locations *)
-
-val pervasives_file : pervasives ref
-(** Location of the pervasives file *)
+val use_stdlib : bool ref
+(** Should we load the standard library? *)
 
 type backend = Runtime | Multicore of string
 
