@@ -1,7 +1,13 @@
 (executable
  (name eff)
  (public_name eff)
- (libraries shared)
+ (libraries eff_core)
+ (modules eff)
  (promote
   (until-clean)
   (into ../..)))
+
+(library
+ (name eff_core)
+ (libraries shared)
+ (modules eff_core))
