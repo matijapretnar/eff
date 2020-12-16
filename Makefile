@@ -11,7 +11,7 @@ clean:
 	dune clean
 
 test: default
-	echo "Does not work yet"
+	dune runtest
 
 test-validate: default
 	echo "Does not work yet"
