@@ -5,7 +5,7 @@
  (action
   (with-stdout-to
    %{targets}
-   (run ../generate_dune_rules.exe 0))))
+   (run ../../generate_dune_rules.exe 1))))
 
 (rule
  (alias runtest)

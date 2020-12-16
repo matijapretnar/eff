@@ -1,18 +1,13 @@
-(executables
- (names regression_test)
- (libraries eff_core)
- (modules regression_test)
-)
-
 (rule
  (deps
+ %{bin:eff}
   (source_tree .))
    (target lexer.eff.out)
     (action
      (with-outputs-to %{target}
       (with-accepted-exit-codes
        0
-       (run %{dep:regression_test.exe} ./lexer.eff)))))
+       (run eff ./lexer.eff)))))
 
 (rule
  (alias runtest)
@@ -21,13 +16,14 @@
 
 (rule
  (deps
+ %{bin:eff}
   (source_tree .))
    (target orelse_andalso.eff.out)
     (action
      (with-outputs-to %{target}
       (with-accepted-exit-codes
        0
-       (run %{dep:regression_test.exe} ./orelse_andalso.eff)))))
+       (run eff ./orelse_andalso.eff)))))
 
 (rule
  (alias runtest)
@@ -36,13 +32,14 @@
 
 (rule
  (deps
+ %{bin:eff}
   (source_tree .))
    (target patterns.eff.out)
     (action
      (with-outputs-to %{target}
       (with-accepted-exit-codes
        0
-       (run %{dep:regression_test.exe} ./patterns.eff)))))
+       (run eff ./patterns.eff)))))
 
 (rule
  (alias runtest)
@@ -51,13 +48,14 @@
 
 (rule
  (deps
+ %{bin:eff}
   (source_tree .))
    (target polymorphism.eff.out)
     (action
      (with-outputs-to %{target}
       (with-accepted-exit-codes
        0
-       (run %{dep:regression_test.exe} ./polymorphism.eff)))))
+       (run eff ./polymorphism.eff)))))
 
 (rule
  (alias runtest)
@@ -66,13 +64,14 @@
 
 (rule
  (deps
+ %{bin:eff}
   (source_tree .))
    (target semisemi.eff.out)
     (action
      (with-outputs-to %{target}
       (with-accepted-exit-codes
        0
-       (run %{dep:regression_test.exe} ./semisemi.eff)))))
+       (run eff ./semisemi.eff)))))
 
 (rule
  (alias runtest)
@@ -81,13 +80,14 @@
 
 (rule
  (deps
+ %{bin:eff}
   (source_tree .))
    (target state.eff.out)
     (action
      (with-outputs-to %{target}
       (with-accepted-exit-codes
        0
-       (run %{dep:regression_test.exe} ./state.eff)))))
+       (run eff ./state.eff)))))
 
 (rule
  (alias runtest)
@@ -96,13 +96,14 @@
 
 (rule
  (deps
+ %{bin:eff}
   (source_tree .))
    (target test_equality.eff.out)
     (action
      (with-outputs-to %{target}
       (with-accepted-exit-codes
        0
-       (run %{dep:regression_test.exe} ./test_equality.eff)))))
+       (run eff ./test_equality.eff)))))
 
 (rule
  (alias runtest)
@@ -111,13 +112,14 @@
 
 (rule
  (deps
+ %{bin:eff}
   (source_tree .))
    (target test_less_than.eff.out)
     (action
      (with-outputs-to %{target}
       (with-accepted-exit-codes
        0
-       (run %{dep:regression_test.exe} ./test_less_than.eff)))))
+       (run eff ./test_less_than.eff)))))
 
 (rule
  (alias runtest)
@@ -126,13 +128,14 @@
 
 (rule
  (deps
+ %{bin:eff}
   (source_tree .))
    (target test_stdlib.eff.out)
     (action
      (with-outputs-to %{target}
       (with-accepted-exit-codes
        0
-       (run %{dep:regression_test.exe} ./test_stdlib.eff)))))
+       (run eff ./test_stdlib.eff)))))
 
 (rule
  (alias runtest)
@@ -141,13 +144,14 @@
 
 (rule
  (deps
+ %{bin:eff}
   (source_tree .))
    (target tydef.eff.out)
     (action
      (with-outputs-to %{target}
       (with-accepted-exit-codes
        0
-       (run %{dep:regression_test.exe} ./tydef.eff)))))
+       (run eff ./tydef.eff)))))
 
 (rule
  (alias runtest)
@@ -156,13 +160,14 @@
 
 (rule
  (deps
+ %{bin:eff}
   (source_tree .))
    (target type_annotations.eff.out)
     (action
      (with-outputs-to %{target}
       (with-accepted-exit-codes
        0
-       (run %{dep:regression_test.exe} ./type_annotations.eff)))))
+       (run eff ./type_annotations.eff)))))
 
 (rule
  (alias runtest)
@@ -171,13 +176,14 @@
 
 (rule
  (deps
+ %{bin:eff}
   (source_tree .))
    (target typing.eff.out)
     (action
      (with-outputs-to %{target}
       (with-accepted-exit-codes
        0
-       (run %{dep:regression_test.exe} ./typing.eff)))))
+       (run eff ./typing.eff)))))
 
 (rule
  (alias runtest)
