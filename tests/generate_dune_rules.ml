@@ -17,18 +17,18 @@ let test_case_rule_stanza exit_code (_bare, full_name) =
   Printf.printf " (deps\n";
   Printf.printf " %%{bin:eff}\n";
   Printf.printf "  (source_tree .))\n";
-  Printf.printf "   (target %s.out)\n" full_name;
+  Printf.printf "   (target \"%s.out\")\n" full_name;
   Printf.printf "    (action\n";
-  Printf.printf "     (with-outputs-to %%{target}\n";
+  Printf.printf "     (with-outputs-to \"%%{target}\"\n";
   Printf.printf "      (with-accepted-exit-codes\n";
   Printf.printf "       %d\n" exit_code;
-  Printf.printf "       (run eff ./%s)))))\n\n" full_name
+  Printf.printf "       (run eff \"./%s\")))))\n\n" full_name
 
 let test_case_alias_stanza (_bare, full_name) =
   Printf.printf "(rule\n";
   Printf.printf " (alias runtest)\n";
   Printf.printf "  (action\n";
-  Printf.printf "   (diff %s.ref %s.out)))\n\n" full_name full_name
+  Printf.printf "   (diff \"%s.ref\" \"%s.out\")))\n\n" full_name full_name
 
 type config = { allowed_exit_code : int }
 
