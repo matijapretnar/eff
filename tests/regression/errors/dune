@@ -2,6 +2,8 @@
 
 (rule
  (targets dune.gen)
+ (deps
+  (source_tree .))
  (action
   (with-stdout-to
    %{targets}
