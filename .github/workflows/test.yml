@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup OCaml
+        uses: avsm/setup-ocaml@v1
+
+      - name: Install Opam packages
+        run: opam install menhir js_of_ocaml js_of_ocaml-ppx ocamlformat
+
+      - name: Format
+        run: make format
+
+      - name: Test
+        run: make test
