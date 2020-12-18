@@ -1,0 +1,2 @@
+Syntax error (file "./non_linear_pattern.eff", line 2, char 5):
+Variable a occurs more than once in a pattern

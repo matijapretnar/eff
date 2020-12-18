@@ -11,10 +11,7 @@ clean:
 	dune clean
 
 test: default
-	echo "Does not work yet"
-
-test-validate: default
-	echo "Does not work yet"
+	dune runtest
 
 install: release
 	dune install

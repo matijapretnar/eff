@@ -1,2 +1,0 @@
-Syntax error (file "./errors/duplicate_let_toplevel.eff", line 1, char 5):
-Several definitions of x
