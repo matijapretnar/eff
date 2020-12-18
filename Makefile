@@ -13,9 +13,6 @@ clean:
 test: default
 	dune runtest
 
-test-validate: default
-	echo "Does not work yet"
-
 install: release
 	dune install
 
