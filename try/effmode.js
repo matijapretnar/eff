@@ -35,7 +35,7 @@ CodeMirror.defineMIME('text/x-eff', {
     'type' : 'keyword',
     'with' : 'keyword',
 
-    // Pervasives
+    // Standard library
     'assert' : 'builtin',
     'option' : 'type'
   },

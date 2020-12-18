@@ -155,9 +155,6 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
                 });
 
             var state = jseff.initialize()(terminal.echo);
-            jQuery.get('/try/pervasives.eff', function(data) {
-                state = jseff.loadSource()(state)(data);
-            })
 
             jQuery.get('/try/examples/syntax.eff', function(data) {
                 editor.setValue(data);
