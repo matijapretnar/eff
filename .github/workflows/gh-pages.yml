@@ -18,7 +18,7 @@ jobs:
         run: opam install menhir js_of_ocaml js_of_ocaml-ppx ocamlformat
 
       - name: Build
-        run: opam exec -- make release
+        run: opam exec -- dune build --profile release
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
