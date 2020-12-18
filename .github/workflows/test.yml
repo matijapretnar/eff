@@ -17,7 +17,7 @@ jobs:
         run: opam install menhir js_of_ocaml js_of_ocaml-ppx ocamlformat
 
       - name: Format
-        run: make format
+        run: opam exec -- make format
 
       - name: Test
-        run: make test
+        run: opam exec -- make test
