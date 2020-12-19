@@ -153,7 +153,7 @@ let infer_pattern st type_context pp =
                 let st', vars =
                   Assoc.fold_left unify_record_pattern (st', vars) flds
                 in
-                (ty, st', vars) ) )
+                (ty, st', vars)))
     | Untyped.PVariant (lbl, p) -> (
         match TypeContext.infer_variant lbl type_context with
         | None -> assert false
@@ -164,7 +164,7 @@ let infer_pattern st type_context pp =
                 let t, st', vars = infer st' vars p in
                 (ty, add_ty_constraint loc t u st', vars)
             | None, Some _ -> assert false
-            | Some _, None -> assert false ) )
+            | Some _, None -> assert false))
   in
   let t, st, vars = infer st [] pp in
   (vars, t, st)
@@ -193,11 +193,10 @@ and infer_handler_case_abstraction st type_context (p, k, e) =
   (tk, t1, t2, replace_ctx st old_ctx)
 
 and infer_let st type_context loc defs =
-  ( if !warn_implicit_sequencing && List.length defs >= 2 then
-    let locations = List.map (fun (_, c) -> c.at) defs in
-    Print.warning ~loc
-      "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
-      (Print.sequence "," Location.print locations) );
+  (if !warn_implicit_sequencing && List.length defs >= 2 then
+   let locations = List.map (fun (_, c) -> c.at) defs in
+   Print.warning ~loc "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
+     (Print.sequence "," Location.print locations));
   let rec find_duplicate xs ys =
     match xs with
     | [] -> None
@@ -320,7 +319,7 @@ and infer_expr st type_context { it = e; at = loc } =
                           (CoreTypes.Field.print fld)
                     | Some u -> add_ty_constraint loc t u st'
                   in
-                  (ty, Assoc.fold_left unify_record_arg st arg_types') ) )
+                  (ty, Assoc.fold_left unify_record_arg st arg_types')))
     | Untyped.Variant (lbl, u) -> (
         match TypeContext.infer_variant lbl type_context with
         | None -> assert false
@@ -330,7 +329,7 @@ and infer_expr st type_context { it = e; at = loc } =
             | Some ty_, Some u ->
                 let ty', st = infer_expr st type_context u in
                 (ty, add_ty_constraint loc ty_ ty' st)
-            | _, _ -> assert false ) )
+            | _, _ -> assert false))
     | Untyped.Lambda a ->
         let t1, t2, st = infer_abstraction st type_context a in
         (T.Arrow (t1, t2), st)
@@ -338,7 +337,7 @@ and infer_expr st type_context { it = e; at = loc } =
         match infer_effect st op with
         | None ->
             Error.typing ~loc "Unbound operation %t" (CoreTypes.Effect.print op)
-        | Some (t1, t2) -> (T.Arrow (t1, t2), st) )
+        | Some (t1, t2) -> (T.Arrow (t1, t2), st))
     | Untyped.Handler
         {
           Untyped.effect_clauses = ops;

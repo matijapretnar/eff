@@ -31,16 +31,16 @@ val infer_field :
 val find_field :
   CoreTypes.Field.t ->
   state ->
-  ( CoreTypes.TyName.t
+  (CoreTypes.TyName.t
   * CoreTypes.TyParam.t list
-  * (CoreTypes.Field.t, Type.ty) Assoc.t )
+  * (CoreTypes.Field.t, Type.ty) Assoc.t)
   option
 
 val find_variant :
   CoreTypes.Label.t ->
   state ->
-  ( CoreTypes.TyName.t
+  (CoreTypes.TyName.t
   * CoreTypes.TyParam.t list
   * (CoreTypes.Label.t, Type.ty option) Assoc.t
-  * Type.ty option )
+  * Type.ty option)
   option

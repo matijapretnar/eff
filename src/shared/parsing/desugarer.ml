@@ -90,7 +90,7 @@ let desugar_type type_sbst state =
     | Sugared.TyParam t -> (
         match Assoc.lookup t type_sbst with
         | None -> Error.syntax ~loc "Unbound type parameter '%s" t
-        | Some p -> (state, T.TyParam p) )
+        | Some p -> (state, T.TyParam p))
     | Sugared.TyArrow (t1, t2) ->
         let state', t1' = desugar_type state t1 in
         let state'', t2' = desugar_type state' t2 in
@@ -257,10 +257,10 @@ let desugar_pattern state ?(initial_forbidden = []) p =
                     "Constructor %s should be applied to an argument." lbl
               | false, Some _ ->
                   Error.typing ~loc
-                    "Constructor %s cannot be applied to an argument." lbl )
+                    "Constructor %s cannot be applied to an argument." lbl)
           | Some (_cons_lbl, Effect _eff) ->
               Error.typing ~loc
-                "Constructor %s should not be an effect constructor." lbl )
+                "Constructor %s should not be an effect constructor." lbl)
       | Sugared.PConst c -> (state, Untyped.PConst c)
       | Sugared.PNonbinding -> (state, Untyped.PNonbinding)
     in
@@ -277,7 +277,7 @@ let rec desugar_expression state { it = t; at = loc } =
     | Sugared.Var x -> (
         match Assoc.lookup x state.context with
         | Some n -> (state, [], Untyped.Var n)
-        | None -> Error.typing ~loc "Unknown variable %s" x )
+        | None -> Error.typing ~loc "Unknown variable %s" x)
     | Sugared.Const k -> (state, [], Untyped.Const k)
     | Sugared.Annotated (t, ty) ->
         let bind bound_ps p =
@@ -329,10 +329,10 @@ let rec desugar_expression state { it = t; at = loc } =
                   "Constructor %s should be applied to an argument." lbl
             | false, Some _ ->
                 Error.typing ~loc
-                  "Constructor %s cannot be applied to an argument." lbl )
+                  "Constructor %s cannot be applied to an argument." lbl)
         | Some (_cons_lbl, Effect _eff) ->
             Error.typing ~loc
-              "Constructor %s should not be an effect constructor." lbl )
+              "Constructor %s should not be an effect constructor." lbl)
     (* Terms that are desugared into computations. We list them explicitly in
        order to catch any future constructs. *)
     | Sugared.Apply _ | Sugared.Match _ | Sugared.Let _ | Sugared.LetRec _
@@ -385,7 +385,7 @@ and desugar_computation state { it = t; at = loc } =
             let state', w, e = desugar_expression state t in
             let loc_eff = add_loc (Untyped.Effect eff') loc in
             (state', w, Untyped.Apply (loc_eff, e))
-        | None -> Error.typing ~loc "Unknown operation %s" eff )
+        | None -> Error.typing ~loc "Unknown operation %s" eff)
     | Sugared.Match (t, cs) -> match_constructor state loc t cs
     | Sugared.Handle (t1, t2) ->
         let state', w1, e1 = desugar_expression state t1 in

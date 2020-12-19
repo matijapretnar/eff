@@ -40,7 +40,7 @@ let rec subst_ty sbst ty =
   let rec subst = function
     | Apply (ty_name, tys) -> Apply (ty_name, List.map subst tys)
     | TyParam p as ty -> (
-        match Assoc.lookup p sbst with Some ty -> ty | None -> ty )
+        match Assoc.lookup p sbst with Some ty -> ty | None -> ty)
     | Basic _ as ty -> ty
     | Tuple tys -> Tuple (List.map subst tys)
     | Arrow (ty1, ty2) -> Arrow (subst ty1, subst_ty sbst ty2)

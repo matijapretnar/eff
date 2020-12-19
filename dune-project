@@ -16,4 +16,6 @@
  (depends
   menhir
   js_of_ocaml
-  js_of_ocaml-ppx))
+  js_of_ocaml-ppx
+  (ocaml (>= 4.06))
+  (ocamlformat (= 0.16.0))))

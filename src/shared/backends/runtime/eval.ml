@@ -31,7 +31,7 @@ let rec extend_value p v state =
         | Some v -> extend_value p v state
       in
       try Assoc.fold_left extender state ps
-      with Not_found -> raise (PatternMatch p.at) )
+      with Not_found -> raise (PatternMatch p.at))
   | Untyped.PVariant (lbl, None), Value.Variant (lbl', None) when lbl = lbl' ->
       state
   | Untyped.PVariant (lbl, Some p), Value.Variant (lbl', Some v) when lbl = lbl'
@@ -57,7 +57,7 @@ let rec ceval state c =
       let v1 = veval state e1 and v2 = veval state e2 in
       match v1 with
       | V.Closure f -> f v2
-      | _ -> Error.runtime "Only functions can be applied." )
+      | _ -> Error.runtime "Only functions can be applied.")
   | Untyped.Value e -> V.Value (veval state e)
   | Untyped.Match (e, cases) ->
       let v = veval state e in
@@ -66,7 +66,7 @@ let rec ceval state c =
         | a :: lst -> (
             let p, c = a in
             try ceval (extend_value p v state) c
-            with PatternMatch _ -> eval_case lst )
+            with PatternMatch _ -> eval_case lst)
       in
       eval_case cases
   | Untyped.Handle (e, c) ->
@@ -109,7 +109,7 @@ and veval state e =
       match lookup x state with
       | Some v -> v
       | None ->
-          Error.runtime "Name %t is not defined." (CoreTypes.Variable.print x) )
+          Error.runtime "Name %t is not defined." (CoreTypes.Variable.print x))
   | Untyped.Const c -> V.Const c
   | Untyped.Annotated (t, _ty) -> veval state t
   | Untyped.Tuple es -> V.Tuple (List.map (veval state) es)
@@ -139,7 +139,7 @@ and eval_handler state
         let k' u = h (k u) in
         match Assoc.lookup eff ops with
         | Some f -> f v k'
-        | None -> V.Call (eff, v, k') )
+        | None -> V.Call (eff, v, k'))
   in
   fun r -> sequence (eval_closure state fin) (h r)
 
@@ -172,6 +172,6 @@ let rec top_handle op =
           top_handle (k str_v)
       | _eff_annot ->
           Error.runtime "uncaught effect %t %t." (Value.print_effect eff)
-            (Value.print_value v) )
+            (Value.print_value v))
 
 let run state c = top_handle (ceval state c)

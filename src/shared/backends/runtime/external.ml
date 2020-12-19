@@ -49,19 +49,19 @@ let rec compare v1 v2 =
       match v2 with
       | V.Closure _ | V.Handler _ -> Invalid
       | V.Const c' -> Const.compare c c'
-      | V.Tuple _ | V.Record _ | V.Variant _ -> Less )
+      | V.Tuple _ | V.Record _ | V.Variant _ -> Less)
   | V.Tuple lst -> (
       match v2 with
       | V.Closure _ | V.Handler _ -> Invalid
       | V.Const _ -> Greater
       | V.Tuple lst' -> compare_list lst lst'
-      | V.Record _ | V.Variant _ -> Less )
+      | V.Record _ | V.Variant _ -> Less)
   | V.Record lst -> (
       match v2 with
       | V.Closure _ | V.Handler _ -> Invalid
       | V.Const _ | V.Tuple _ -> Greater
       | V.Record lst' -> compare_record lst lst'
-      | V.Variant _ -> Less )
+      | V.Variant _ -> Less)
   | V.Variant (lbl, u) -> (
       match v2 with
       | V.Closure _ | V.Handler _ -> Invalid
@@ -79,7 +79,7 @@ and compare_list lst1 lst2 =
       | Less -> Less
       | Equal -> compare_list lst1 lst2
       | Greater -> Greater
-      | Invalid -> Invalid )
+      | Invalid -> Invalid)
   | [], _ :: _ -> Less
   | _ :: _, [] -> Greater
 
@@ -96,7 +96,7 @@ and compare_record lst1 lst2 =
           | Less -> Less
           | Equal -> comp (lst1, lst2)
           | Greater -> Greater
-          | Invalid -> Invalid )
+          | Invalid -> Invalid)
     | [], _ :: _ -> Less
     | _ :: _, [] -> Greater
   in

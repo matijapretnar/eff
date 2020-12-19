@@ -55,7 +55,7 @@ let find_variant lbl st =
     | ty_name, { params; type_def = Sum vs } -> (
         match Assoc.lookup lbl vs with
         | Some us -> Some (ty_name, params, vs, us)
-        | None -> None )
+        | None -> None)
     | _ -> None
   in
   match Assoc.find_if (fun x -> construct x <> None) st with
@@ -70,7 +70,7 @@ let find_field fld (st : state) =
     | ty_name, { params; type_def = Record flds } -> (
         match Assoc.lookup fld flds with
         | Some _ -> Some (ty_name, params, flds)
-        | None -> None )
+        | None -> None)
     | _ -> None
   in
   match Assoc.find_if (fun x -> construct x <> None) st with

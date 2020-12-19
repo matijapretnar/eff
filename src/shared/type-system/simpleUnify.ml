@@ -32,7 +32,7 @@ let solve cstr type_context =
         match TypeContext.ty_apply ~loc t1 lst1 type_context with
         | TypeContext.Inline t -> unify loc t2 t subst
         | TypeContext.Sum _ | TypeContext.Record _ ->
-            assert false (* None of these are transparent *) )
+            assert false (* None of these are transparent *))
     | t1, (Type.Apply _ as t2) -> unify loc t2 t1 subst
     | Type.Handler h1, Type.Handler h2 ->
         subst
