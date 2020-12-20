@@ -27,7 +27,7 @@ and of_expression { it; _ } =
   | CoreSyntax.Variant (lbl, e_opt) -> (
       match e_opt with
       | None -> Variant (lbl, None)
-      | Some e -> Variant (lbl, Some (of_expression e)) )
+      | Some e -> Variant (lbl, Some (of_expression e)))
   | CoreSyntax.Lambda abs -> (
       (* Transform back to [function] keyword if possible *)
       match abs with
@@ -42,8 +42,8 @@ and of_expression { it; _ } =
                       v1 ->
               let converter abs = ValueClause (of_abstraction abs) in
               Function (List.map converter abs_lst)
-          | _ -> Lambda (of_abstraction abs) )
-      | _ -> Lambda (of_abstraction abs) )
+          | _ -> Lambda (of_abstraction abs))
+      | _ -> Lambda (of_abstraction abs))
   | CoreSyntax.Effect eff -> Effect eff
   | CoreSyntax.Handler { effect_clauses; value_clause; finally_clause } ->
       (* Non-trivial case *)
@@ -95,7 +95,7 @@ and of_pattern { it; _ } =
   | CoreSyntax.PVariant (lbl, p_opt) -> (
       match p_opt with
       | None -> PVariant (lbl, None)
-      | Some p -> PVariant (lbl, Some (of_pattern p)) )
+      | Some p -> PVariant (lbl, Some (of_pattern p)))
   | CoreSyntax.PConst const -> PConst const
   | CoreSyntax.PNonbinding -> PNonbinding
 

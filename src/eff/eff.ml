@@ -60,7 +60,7 @@ let read_toplevel () =
     let semisemi = ref false in
     let i = ref 0 in
     while !i < String.length str && not !semisemi do
-      ( match (str.[!i], !last_backslash, !in_quote, !last_semi) with
+      (match (str.[!i], !last_backslash, !in_quote, !last_semi) with
       | '\\', b, _, _ ->
           last_backslash := not b;
           last_semi := false
@@ -73,7 +73,7 @@ let read_toplevel () =
           last_semi := true
       | _, _, _, _ ->
           last_backslash := false;
-          last_semi := false );
+          last_semi := false);
       incr i
     done;
     if !semisemi then Some (String.sub str 0 !i) else None
@@ -117,15 +117,14 @@ let main =
   (* Parse the arguments. *)
   Arg.parse options anonymous usage;
   (* Attemp to wrap yourself with a line-editing wrapper. *)
-  ( if !Config.interactive_shell then
-    match !Config.wrapper with
-    | None -> ()
-    | Some lst ->
-        List.iter
-          (fun wrapper ->
-            try run_under_wrapper wrapper Sys.argv
-            with Unix.Unix_error _ -> ())
-          lst );
+  (if !Config.interactive_shell then
+   match !Config.wrapper with
+   | None -> ()
+   | Some lst ->
+       List.iter
+         (fun wrapper ->
+           try run_under_wrapper wrapper Sys.argv with Unix.Unix_error _ -> ())
+         lst);
   (* Files were listed in the wrong order, so we reverse them *)
   file_queue := List.rev !file_queue;
   try
@@ -133,9 +132,9 @@ let main =
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
       | Config.Multicore output_file ->
-          ( module MulticoreCompile.Backend (struct
+          (module MulticoreCompile.Backend (struct
             let output_file = output_file
-          end) )
+          end))
     in
     let (module Shell) = (module Shell.Make (Backend) : Shell.Shell) in
     (* Run and load all the specified files. *)

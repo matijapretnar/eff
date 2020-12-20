@@ -121,8 +121,8 @@ let rec print_term t ppf =
   | Match (t, []) ->
       (* Absurd case *)
       print ppf
-        ( "@[<hv>(match %t with | _ ->"
-        ^^ " failwith \"void successfully matched\")@]" )
+        ("@[<hv>(match %t with | _ ->"
+       ^^ " failwith \"void successfully matched\")@]")
         (print_term t)
   | Match (t, lst) ->
       print ppf "@[<hv>(match %t with@, | %t)@]" (print_term t)
@@ -284,8 +284,8 @@ and print_case case ppf =
           (print_pattern p1) (print_pattern p2) (print_term t)
       else
         print ppf
-          ( "@[<hv 2>effect (%t %t) %t ->@,"
-          ^^ "(let %t x = continue (Obj.clone_continuation %t) x in @,%t)@]" )
+          ("@[<hv 2>effect (%t %t) %t ->@,"
+         ^^ "(let %t x = continue (Obj.clone_continuation %t) x in @,%t)@]")
           (MulticoreSymbol.print_effect eff)
           (print_pattern p1) (print_pattern p2) (print_pattern p2)
           (print_pattern p2) (print_term t)
@@ -304,9 +304,9 @@ let print_cmd cmd ppf =
       | None -> Error.runtime "Unknown external symbol %s." f
       | Some (MulticoreExternal.Unknown as unknown) ->
           Print.warning
-            ( "External symbol %s cannot be compiled. It has been replaced "
-            ^^ "with [failwith \"Unknown external symbol %s.\"]." )
+            ("External symbol %s cannot be compiled. It has been replaced "
+           ^^ "with [failwith \"Unknown external symbol %s.\"].")
             f f;
           print_external x f unknown ppf
       | Some (MulticoreExternal.Exists _s as known) ->
-          print_external x f known ppf )
+          print_external x f known ppf)

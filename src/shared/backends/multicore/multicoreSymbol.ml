@@ -25,8 +25,8 @@ let print_variable var ppf =
           | "$id_par" -> Format.fprintf ppf "_id_%d" n
           | "$anon" -> Format.fprintf ppf "_anon_%d" n
           | "$bind" -> Format.fprintf ppf "_b_%d" n
-          | _ -> Format.fprintf ppf "_x_%d" n )
-      | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc )
+          | _ -> Format.fprintf ppf "_x_%d" n)
+      | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc)
   in
   CoreTypes.Variable.fold printer var
 

@@ -53,7 +53,7 @@ let rec cons_of_pattern tctx { it = p; at = loc } =
           | None ->
               Error.typing ~loc "Unbound record field label %t in a pattern"
                 (CoreTypes.Field.print lbl)
-          | Some (_, _, flds) -> Record (Assoc.keys_of flds) ) )
+          | Some (_, _, flds) -> Record (Assoc.keys_of flds)))
   | Untyped.PVariant (lbl, opt) -> Variant (lbl, opt <> None)
   | Untyped.PConst c -> Const c
   | Untyped.PVar _ | Untyped.PNonbinding -> Wildcard
@@ -121,9 +121,9 @@ let find_constructors tctx lst =
                     (fun (lbl, opt) -> Variant (lbl, opt <> None))
                     (Assoc.to_list tags)
                 in
-                list_diff all present )
+                list_diff all present)
         (* Only for completeness. *)
-        | Wildcard -> [] )
+        | Wildcard -> [])
   in
   (present, missing)
 
@@ -142,7 +142,7 @@ let specialize_vector ~loc con = function
           in
           Some (List.map (get_pattern def) all @ lst)
       | Variant (lbl, _), Untyped.PVariant (lbl', opt) when lbl = lbl' -> (
-          match opt with Some p -> Some (p :: lst) | None -> Some lst )
+          match opt with Some p -> Some (p :: lst) | None -> Some lst)
       | Const c, Untyped.PConst c' when Const.equal c c' -> Some lst
       | _, (Untyped.PNonbinding | Untyped.PVar _) ->
           let nonbinds =
@@ -150,7 +150,7 @@ let specialize_vector ~loc con = function
                 { it = Untyped.PNonbinding; at = loc })
           in
           Some (nonbinds @ lst)
-      | _, _ -> None )
+      | _, _ -> None)
 
 (* Specializes a pattern matrix for the pattern constructor [con]. *)
 let rec specialize ~loc con = function
@@ -158,7 +158,7 @@ let rec specialize ~loc con = function
   | row :: lst -> (
       match specialize_vector ~loc con row with
       | Some row' -> row' :: specialize ~loc con lst
-      | None -> specialize ~loc con lst )
+      | None -> specialize ~loc con lst)
 
 (* Creates a default matrix from the input pattern matrix. *)
 let rec default = function
@@ -167,7 +167,7 @@ let rec default = function
   | (p :: ps) :: lst -> (
       match remove_as p with
       | Untyped.PNonbinding | Untyped.PVar _ -> ps :: default lst
-      | _ -> default lst )
+      | _ -> default lst)
 
 (* Is the pattern vector [q] useful w.r.t. pattern matrix [p]? *)
 let rec useful tctx ~loc p q =
@@ -183,7 +183,7 @@ let rec useful tctx ~loc p q =
       | Tuple _ | Record _ | Variant _ | Const _ -> (
           match specialize_vector ~loc cons q with
           | None -> assert false
-          | Some q' -> useful tctx ~loc (specialize ~loc cons p) q' )
+          | Some q' -> useful tctx ~loc (specialize ~loc cons p) q')
       (* Otherwise, check if pattern constructors in the first column of [p]
              form a complete type signature. If they do, check if [q] is useful
              for any specialization of [p] for that type; if not, only the
@@ -197,7 +197,7 @@ let rec useful tctx ~loc p q =
                 | None -> false
                 | Some q' -> useful tctx ~loc (specialize ~loc x p) q')
               present
-          else useful tctx ~loc (default p) qs )
+          else useful tctx ~loc (default p) qs)
 
 (* Specialized version of [useful] that checks if a pattern matrix [p] with [n]
    columns is exhaustive (equivalent to calling [useful] on [p] with a vector
@@ -225,7 +225,7 @@ let rec exhaustive tctx ~loc p = function
               | None -> find cs
               | Some lst ->
                   let ps, rest = split_at (arity c) lst in
-                  Some (pattern_of_cons ~loc c ps :: rest) )
+                  Some (pattern_of_cons ~loc c ps :: rest))
         in
         find present
       else
@@ -237,7 +237,7 @@ let rec exhaustive tctx ~loc p = function
               List.init (arity c) (fun _ ->
                   { it = Untyped.PNonbinding; at = loc })
             in
-            Some (pattern_of_cons ~loc c nonbinds :: lst) )
+            Some (pattern_of_cons ~loc c nonbinds :: lst))
 
 (* Prints a warning if the list of patterns [pats] is not exhaustive or contains
    unused patterns. *)
@@ -253,11 +253,11 @@ let check_patterns tctx ~loc patts =
               \                                    Here is an example of a \
                value that is not matched:@.  @[%t@]"
               (Untyped.print_pattern (List.hd ps))
-        | None -> () )
+        | None -> ())
     | patt :: patts ->
         if not (useful tctx ~loc p [ patt ]) then (
           Print.warning ~loc "This match case is unused.";
-          check p patts )
+          check p patts)
         else check ([ patt ] :: p) patts
     (* Order of rows in [p] is not important. *)
   in
