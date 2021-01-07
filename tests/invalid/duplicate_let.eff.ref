@@ -1,0 +1,2 @@
+Syntax error (file "./duplicate_let.eff", line 1, char 5):
+Several definitions of x

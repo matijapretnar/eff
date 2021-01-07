@@ -1,0 +1,7 @@
+(executable
+ (name eff)
+ (public_name eff)
+ (libraries shared)
+ (promote
+  (until-clean)
+  (into ../..)))

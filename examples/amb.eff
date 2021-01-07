@@ -9,7 +9,7 @@ let amb = handler
   |  effect Select k ->
     (match k true with
     | Success y -> Success y
-    | Failure -> continue k false)
+    | Failure -> k false)
 ;;
 
 (* The 8 queens problem. *)
@@ -45,9 +45,9 @@ effect Add_to_queue : ((bool -> result)*bool) -> unit
 let queue initial = handler
   | effect Get_next k ->
     ( fun queue -> match queue with
-    | [] -> continue k None []
-    | hd::tl -> continue k (Some hd) tl )
-    | effect (Add_to_queue y) k -> ( fun queue -> (continue k ()) (queue @ [y]))
+    | [] -> k None []
+    | hd::tl -> k (Some hd) tl )
+  | effect (Add_to_queue y) k -> ( fun queue ->  k () (queue @ [y]))
   | x -> ( fun _ -> x)
   | finally x -> x initial
 ;;
@@ -58,7 +58,7 @@ let bfs =
   let run_next () =
     match perform Get_next with
     | None -> Failure
-    | Some (k,x) -> continue k x
+    | Some (k,x) -> k x
   in
   handler (* Handler definition. *)
 | effect Select k ->

@@ -15,15 +15,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.36.0/addon/edit/matchbrackets.min.js" integrity="sha256-BzzUspurJPtHi1Ux5geUVUtDLQDqDeUu9SMkOrsShUY=" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.36.0/addon/edit/closebrackets.min.js" integrity="sha256-ckZJSSEwRjAtCl8YzZuhIqHYq+Bt+Csy3keSLdp8uxA=" crossorigin="anonymous"></script>
     <!-- Jquery Terminal -->
-    <script src="https://code.jquery.com/jquery-2.2.4.min.js" integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/css/jquery.terminal.min.css" integrity="sha256-NPnczI0KjCueVIbIZBIjffajQholjsUnhVe4sQgL80U=" crossorigin="anonymous" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/js/jquery.terminal.min.js" integrity="sha256-Qm1Nw4js01hUsHFCa8xirKnSZeRXR8uNgbAKwjhn9mA=" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-latest.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/2.20.1/js/jquery.terminal.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/2.20.1/css/jquery.terminal.min.css" rel="stylesheet"/>
     <!-- suport for resizable CodeMirror editor -->
     <script src="https://unpkg.com/cm-resize"></script>
     <!-- CodeMirror editing mode for Eff (depends on mllike being loaded) -->
     <script src="./effmode.js"></script>
     <!-- local Javascript code -->
-    <script src="/try/jseff.js"></script>
+    <script src="/try/jseff.bc.js"></script>
     <style>
     .CodeMirror {
         height: 60vh;
@@ -66,12 +66,7 @@
         color: #0097e6;
     }
 
-    .uk-alert-danger, #resetButton {
-        background: #c23616;
-        color: rgba(255, 255, 255, 0.8);
-    }
-
-    #runButton {
+    #load-file-button {
         background: #0097e6;
         color: rgba(255, 255, 255, 0.8);
     }
@@ -138,15 +133,10 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
             });
             cmResize(editor, {resizableWidth: false});
             </script>
-<!--             <div class="uk-align-center" style="margin: 0 auto; width: 100%">
-                <button class="uk-button uk-button-primary uk-width-3-5" id="runButton">Run</button>
-                <button class="uk-button uk-button-danger uk-width-1-5" id="resetButton">Reset</button>
+            <!-- The terminal window -->
+            <div style="position: absolute; right: 0px">
+            <button style="position: relative; float: right; z-index:100000" id="load-file-button" class="uk-button uk-button-small uk-button-primary">LOAD FILE</button>
             </div>
- -->            <!-- The terminal window -->
-              <div style="position: absolute; right: 0px">
-                <button style="position: relative; float: right; z-index:100000" id="resetButton" class="uk-button uk-button-small uk-button-danger">RESET</button>
-                <button style="position: relative; float: right; z-index:100000" id="runButton" class="uk-button uk-button-small uk-button-primary">LOAD FILE</button>
-              </div>
             <div id="terminal" style="--size: 16px">
             </div>
             <!-- Code to setup the terminal and the buttons -->
@@ -154,7 +144,7 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
             var terminal =
                 $('#terminal').terminal(function(command, term) {
                     if (command !== '') {
-                        env = jseff.toplevel()(term.echo)(env)(command);
+                        state = jseff.executeSource()(state)(command);
                     }
                 }, {
                     greetings: '',
@@ -164,25 +154,14 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
                     prompt: '# '
                 });
 
-            var env = jseff.reset()(terminal.echo);
-            jQuery.get('/try/pervasives.eff', function(data) {
-                env = jseff.usefile()(function() {})(env)(data);
-            })
+            var state = jseff.initialize()(terminal.echo);
 
             jQuery.get('/try/examples/syntax.eff', function(data) {
                 editor.setValue(data);
             })
 
-            $('#runButton').click(function() {
-                env = jseff.usefile()(terminal.echo)(env)(editor.getValue());
-            });
-
-            $('#resetButton').click(function() {
-                terminal.clear();
-                env = jseff.reset()(terminal.echo);
-                jQuery.get('/try/pervasives.eff', function(data) {
-                    env = jseff.usefile()(function() {})(env)(data);
-                })
+            $('#load-file-button').click(function() {
+                state = jseff.executeSource()(state)(editor.getValue());
             });
 
             $('#syntaxLoad').click(function() {

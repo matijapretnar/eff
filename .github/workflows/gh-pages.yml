@@ -1,0 +1,30 @@
+name: github pages
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup OCaml
+        uses: avsm/setup-ocaml@v1
+
+      - name: Install Opam packages
+        run: opam install menhir js_of_ocaml js_of_ocaml-ppx ocamlformat
+
+      - name: Test
+        run: opam exec -- make test
+      
+      - name: Build
+        run: opam exec -- make release
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs

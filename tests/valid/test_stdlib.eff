@@ -1,0 +1,202 @@
+(* Check every thing in the standard library. *)
+
+let less1 = (1 < 2);;
+
+let less2 = (true < false);;
+
+let less3 = ((1,true) < (0,false));;
+
+(* More comprehensive checking of < can be found in test_less_than.eff *)
+
+let test_equal_int = (1 = 1);;
+
+let test_equal_float = (1.0 = 1.0);;
+
+(* More comprehensive checking of = can be found in test_equality.eff *)
+
+assert ("a" = "a");;
+
+assert (1.0 /. 0.0 = infinity);;
+
+assert (-. 1.0 /. 0.0 = neg_infinity);;
+
+assert (0.0 /. 0.0 = nan);;
+
+let tilda_minus = (~-1);;
+
+let tilda_minus_dot2 = (~-. 3.14159);;
+
+let tilda_minus_dot2 = (~-. 1.0);;
+
+let test_plus = (2 + 2);;
+
+let test_times = (2 * 2);;
+
+let test_power = (2 ** 3);;
+
+let test_minus = (42 - 23);;
+
+let test_minus_tilda_minus = (42 - ~-23);;
+
+let test_mod1 = (5 mod 3);;
+
+let test_mod2 = (0 mod 1);;
+
+check (0 mod 0);;
+
+check (1 mod 0);;
+
+let test_plus_dot = (3.14 +. 2.7);;
+
+let test_times_dot = (3.14 *. 2.7);;
+
+let test_minus_dot = (3.14 -. 2.7);;
+
+let test_div_dot = (3.14 /. 2.7);;
+
+let test_div_dot_zero = (1.0 /. 0.0);;
+
+let test_div = (100 / 3);;
+
+check (1 / 0);;
+
+let test_zero_div = (0 / 1);;
+
+check (0 / 0);;
+
+let test_carron = ("cherry" ^ "pie");;
+
+let test_string_of_float1 = (string_of_float 12.);;
+
+let test_string_of_float2 = (string_of_float 12.0);;
+
+let test_string_of_float3 = (string_of_float (-12.000009));;
+
+let test_string_of_int1 = (string_of_int 0);;
+
+let test_string_of_int2 = (string_of_int (-18));;
+
+let test_to_string1 = (to_string 13);;
+
+let test_to_string2 = (to_string [1,2,3]);;
+
+let test_to_string3 = (to_string (1,2,3));;
+
+let test_to_string4 = (to_string (fun x -> x));;
+
+let test_int_of_float1 = (int_of_float (-1.5));;
+
+let test_int_of_float2 = (int_of_float (12.0001));;
+
+let test_float_of_int = (float_of_int 42);;
+
+let test_none = None;;
+
+let test_some = (Some 3);;
+
+let test_ignore = (ignore (2 + 3));;
+
+let test_not = (not true);;
+
+let test_greater1 = (3 > 2);;
+
+let test_greater2 = ("foo" > "bar");;
+
+let test_leq = (1 <= 1);;
+
+let test_geq = (2 >= 1);;
+
+let test_neq = (2 <> 3);;
+
+let test_range = (range 4 9);;
+
+let test_map = (map (fun x -> x * x) [1;2;3;4;5]);;
+
+let test_take = (take (fun k -> 3 * k + 2) 20);;
+
+let test_fold_left = (fold_left (fun a y -> 2 * a + y) 1 [1;2;3;4;5]);;
+
+let test_fold_right = (fold_right (fun y a -> 2 * a + y) [1;2;3;4;5] 1);;
+
+let test_iter = (fun k -> check ("iter " ^ to_string k)) [1;2;3;4;5];;
+
+let test_forall = (forall (fun k -> k mod 3 = 2) [1;2;3;4;5]);;
+
+let test_exists = (exists (fun k -> k mod 3 = 2) [1;2;3;4;5]);;
+
+let test_mem = (mem "foo" ["bar"; "baz"]);;
+
+let test_filter = (filter (fun k -> k > 3) [1;2;3;4;5]);;
+
+let test_complement = (complement [1; 2; 3; 4; 5; 6] [2; 4; 8]);;
+
+let test_intersection = (intersection [1; 2; 3; 4; 5; 6] [2; 4; 8]);;
+
+let test_zip1 = (zip [1;2;3] ["a"; "b"; "c"]);;
+
+check (zip [1;2;3;4;5;6] ["a"; "b"; "c"]);;
+
+let test_unzip = (unzip [(1, "a"); (2, "b"); (3, "c")]);;
+
+let test_reverse = reverse [1;2;3;4;5];;
+
+let test_at = ([1;2;3] @ [4;5;6]);;
+
+let test_length = (length [1;2;3;4;5]);;
+
+let test_head = (hd [1;2;3;4]);;
+
+check (hd []);;
+
+let test_tail = (tl [1;2;3;4]);;
+
+check (tl []);;
+
+let test_abs = (abs 5, abs (~-5), abs(-5));;
+
+let test_min = (min 1 2);;
+
+let test_max = (max 1 2);;
+
+let test_gcd = (gcd 12 8);;
+
+let test_lcm = (lcm 12 8);;
+
+let test_odd = (odd 42);;
+
+let test_even = (even 42);;
+
+let test_id = (id 5);;
+
+let test_id_id = (id id);;
+
+let test_compose = (compose (fun k -> k * k) (fun j -> j +4) 10);;
+
+let test_rev_apply = 3 |> (fun x -> x) |> (+) 4;; 
+
+let test_fst = (fst ("foo", 4));;
+
+let test_snd = (snd ("foo", 4));;
+
+check (perform (Print "Does this work?"));;
+
+check (print "How about now?");;
+
+check (print 12);;
+
+check (perform Read);;
+
+(* check (failwith "The cows are home.");;
+
+check (rnd#int 42);;
+
+check (rnd#float 42.0);;
+
+let test_state =
+  (let r = new ref in 
+   with state r 10 handle
+     r := !r + 32;
+     !r);; 
+
+let test_ref = (let r = ref 5 in r := !r + 10; !r);;
+ *)

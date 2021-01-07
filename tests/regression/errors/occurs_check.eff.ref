@@ -1,2 +1,0 @@
-Typing error (file "./errors/occurs_check.eff", line 1, char 15):
-This expression has a forbidden cyclic type '_a = '_b -> '_a.

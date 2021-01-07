@@ -65,7 +65,7 @@ This is the easiest way to install Eff. Follow these steps:
 
 3. Run
 
-        opam pin add -k git eff git@github.com:matijapretnar/eff.git
+        opam pin add -k git eff https://github.com/matijapretnar/eff.git
 
    OPAM will download and build the necessary dependencies first, then download
    and build Eff itself.
@@ -74,21 +74,14 @@ This is the easiest way to install Eff. Follow these steps:
 
 To compile Eff manually, first clone the GitHub repository
 
-    git clone git@github.com:matijapretnar/eff.git
+    git clone https://github.com/matijapretnar/eff.git
     cd eff
 
 and run
 
-    ./configure
-
-If it complains you will have to install missing prerequisites. In case of
-problems, `make clean distclean` might help. The configuration script takes
-standard GNU Autoconf arguments, such as `--prefix` which determines where to
-install Eff. Type `./configure --help` for more information. Next, run
-
     make
 
-If all goes well, you should be able to run Eff in-place by typing `./eff`.
+If all goes well, you should be able to run Eff in-place by typing `./eff.exe`.
 
 You can also run a battery of tests with
 
@@ -96,7 +89,7 @@ You can also run a battery of tests with
 
 Finally, to install the command `eff`, run
 
-    sudo make install
+    make install
 
 See the file `etc/README.txt` for editor support.
 

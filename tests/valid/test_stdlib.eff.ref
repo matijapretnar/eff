@@ -1,0 +1,116 @@
+val less1 : bool = true
+val less2 : bool = false
+val less3 : bool = false
+val test_equal_int : bool = true
+val test_equal_float : bool = true
+- : unit = ()
+- : unit = ()
+- : unit = ()
+- : unit = ()
+val tilda_minus : int = -1
+val tilda_minus_dot2 : float = -3.14159
+val tilda_minus_dot2 : float = -1.
+val test_plus : int = 4
+val test_times : int = 4
+val test_power : int = 8
+val test_minus : int = 19
+val test_minus_tilda_minus : int = 65
+val test_mod1 : int = 2
+val test_mod2 : int = 0
+Check (file "./test_stdlib.eff", line 45, char 1):
+Call DivisionByZero ()
+- : unit = ()
+Check (file "./test_stdlib.eff", line 47, char 1):
+Call DivisionByZero ()
+- : unit = ()
+val test_plus_dot : float = 5.84
+val test_times_dot : float = 8.478
+val test_minus_dot : float = 0.44
+val test_div_dot : float = 1.16296296296
+val test_div_dot_zero : float = infinity
+val test_div : int = 33
+Check (file "./test_stdlib.eff", line 61, char 1):
+Call DivisionByZero ()
+- : unit = ()
+val test_zero_div : int = 0
+Check (file "./test_stdlib.eff", line 65, char 1):
+Call DivisionByZero ()
+- : unit = ()
+val test_carron : string = "cherrypie"
+val test_string_of_float1 : string = "12."
+val test_string_of_float2 : string = "12."
+val test_string_of_float3 : string = "-12.000009"
+val test_string_of_int1 : string = "0"
+val test_string_of_int2 : string = "-18"
+val test_to_string1 : string = "13"
+val test_to_string2 : string = "[(1, 2, 3)]"
+val test_to_string3 : string = "(1, 2, 3)"
+val test_to_string4 : string = "<fun>"
+val test_int_of_float1 : int = -1
+val test_int_of_float2 : int = 12
+val test_float_of_int : float = 42.
+val test_none : 'a option = None
+val test_some : int option = Some 3
+val test_ignore : unit = ()
+val test_not : bool = false
+val test_greater1 : bool = true
+val test_greater2 : bool = true
+val test_leq : bool = true
+val test_geq : bool = true
+val test_neq : bool = true
+val test_range : int list = [4; 5; 6; 7; 8; 9]
+val test_map : int list = [1; 4; 9; 16; 25]
+val test_take : int list = [2; 5; 8; 11; 14; 17; 20; 23; 26; 29; 32; 35; 38;
+                            41; 44; 47; 50; 53; 56; 59; 62]
+val test_fold_left : int = 89
+val test_fold_right : int = 161
+Check (file "./test_stdlib.eff", line 121, char 27):
+"iter [1; 2; 3; 4; 5]"
+val test_iter : unit = ()
+val test_forall : bool = false
+val test_exists : bool = true
+val test_mem : bool = false
+val test_filter : int list = [4; 5]
+val test_complement : int list = [1; 3; 5; 6]
+val test_intersection : int list = [2; 4]
+val test_zip1 : (int * string) list = [(1, "a"); (2, "b"); (3, "c")]
+Check (file "./test_stdlib.eff", line 137, char 1):
+Call InvalidArgument "zip: length mismatch"
+- : unit = ()
+val test_unzip : int list * string list = ([1; 2; 3], ["a"; "b"; "c"])
+val test_reverse : int list = [5; 4; 3; 2; 1]
+val test_at : int list = [1; 2; 3; 4; 5; 6]
+val test_length : int = 5
+val test_head : int = 1
+Check (file "./test_stdlib.eff", line 149, char 1):
+Call InvalidArgument "head: empty list"
+- : unit = ()
+val test_tail : int list = [2; 3; 4]
+Check (file "./test_stdlib.eff", line 153, char 1):
+Call InvalidArgument "tail: empty list"
+- : unit = ()
+val test_abs : int * int * int = (5, 5, 5)
+val test_min : int = 1
+val test_max : int = 2
+val test_gcd : int = 4
+val test_lcm : int = 24
+val test_odd : bool = false
+val test_even : bool = true
+val test_id : int = 5
+val test_id_id : '_a -> '_a = <fun>
+val test_compose : int = 196
+val test_rev_apply : int = 7
+val test_fst : string = "foo"
+val test_snd : int = 4
+Check (file "./test_stdlib.eff", line 181, char 1):
+Call Print "Does this work?"
+- : unit = ()
+Check (file "./test_stdlib.eff", line 183, char 1):
+Call Print "\"How about now?\""
+- : unit = ()
+Check (file "./test_stdlib.eff", line 185, char 1):
+Call Print "12"
+- : unit = ()
+Check (file "./test_stdlib.eff", line 187, char 1):
+Call Read ()
+- : unit = ()
