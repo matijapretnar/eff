@@ -47,20 +47,65 @@ module Make (Backend : BackendSignature.T) = struct
   let rec exec_cmd state {it= cmd; at= loc} =
     match cmd with
     | Commands.Term t ->
+        let t_start = Sys.time() in
+        (* Desugar to ImpEff *)
+        Print.debug "exec_cmd: before desugaring";
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
         let type_system_state', _ =
           TypeSystem.infer_top_comp state.type_system_state c
         in
+        Print.debug "exec_cmd: after desugaring";
+        (* Format.fprintf !Config.error_formatter "%t\n"
+         *   (UntypedSyntax.print_computation c); *)
+
+        (* Elaborate to ExEff *)
+        Print.debug "exec_cmd: before elaboration";
         let c', inferredExEffType =
           ExplicitInfer.tcTopLevelMono ~loc:c.at state.effect_system_state c
+        (* let c' = ExplicitInfer.tcTopLevel ~loc:c.at
+         *            state.effect_system_state c *)
         in
+        Print.debug "exec_cmd: after elaboration";
+        (* Format.fprintf !Config.error_formatter "%t\n"
+         *   (Typed.print_computation c'); *)
+
+        (* Typecheck ExEff *)
         Print.debug "exec_cmd: before backend typechecking";
         let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
         Print.debug "exec_cmd: after backend typechecking";
 
-        let backend_state' =
-          Backend.process_computation state.backend_state c' drty
+        (* Optimize ExEff *)
+        let c'' =
+          if !Config.disable_optimization
+          then c'
+          else (
+            Print.debug "exec_cmd: before optimization";
+            let c_opt = Optimize.optimize_main_comp state.type_checker_state c' in
+            Print.debug "exec_cmd: after optimization";
+            (* Format.fprintf !Config.error_formatter "%t\n"
+             *   (Typed.print_computation c_opt); *)
+              c_opt
+            )
         in
+
+        (* Erase ExEff back to ImpEff *)
+        Print.debug "exec_cmd: before erasure";
+        let c'''= ErasureUntyped.typed_to_untyped_comp (Assoc.empty) c'' in
+        Print.debug "exec_cmd: after erasure";
+        (* Format.fprintf !Config.error_formatter "%t\n"
+         *   (UntypedSyntax.print_computation c'''); *)
+
+        (* Compile / Interpret ImpEff *)
+        Print.debug "exec_cmd: begin processing by backend";
+        let t1 = Sys.time() in
+        let t_compile = t1 -. t_start in
+        let backend_state' =
+          Backend.process_computation state.backend_state c''' drty
+        in
+        let t2 = Sys.time() in
+        let t_process = t2 -. t1 in
+        if !Config.profiling then
+          print_profiling t_compile t_process;
         { state with
           type_system_state= type_system_state'
         ; backend_state= backend_state' }
@@ -205,4 +250,9 @@ module Make (Backend : BackendSignature.T) = struct
   and load_source str state = Lexer.read_string parse str |> load_cmds state
 
   and finalize state = Backend.finalize state.backend_state
+
+  and print_profiling t_comp t_process =
+    Format.fprintf !Config.output_formatter "Compile time: %f\n" t_comp;
+    Format.fprintf !Config.output_formatter "Process time: %f\n" t_process;
+      ()
 end

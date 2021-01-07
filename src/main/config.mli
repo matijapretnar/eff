@@ -31,6 +31,9 @@ val backend : backend ref
 val disable_optimization : bool ref
 (** Should compiled computations be optimized? *)
 
+val profiling : bool ref
+(** Should profiling be enabled? *)
+
 val optimization_fuel : int ref
 
 val ascii : bool ref

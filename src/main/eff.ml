@@ -19,6 +19,12 @@ let options =
     ; ( "--explicit-subtyping"
       , Arg.Set Config.explicit_subtyping
       , " Enable the experimental explicit subtyping inference engine" )
+    ; ( "--profile"
+      , Arg.Set Config.profiling
+      , " Print out profiling information" )
+    ; ( "--no-opts"
+      , Arg.Set Config.disable_optimization
+      , " Disable optmizations" )
     ; ( "--wrapper"
       , Arg.String (fun str -> Config.wrapper := Some [str])
       , "<program> Specify a command-line wrapper to be used (such as rlwrap \
