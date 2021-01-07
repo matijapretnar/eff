@@ -41,11 +41,10 @@ let rec print_value ?max_level v ppf =
   match v with
   | Const c -> Const.print c ppf
   | Tuple lst -> Print.tuple print_value lst ppf
-  | Record assoc ->
-      Print.record CoreTypes.Field.print print_value assoc ppf
+  | Record assoc -> Print.record CoreTypes.Field.print print_value assoc ppf
   | Variant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
   | Variant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
-  | Variant (lbl, Some (Tuple [v1; v2])) when lbl = CoreTypes.cons ->
+  | Variant (lbl, Some (Tuple [ v1; v2 ])) when lbl = CoreTypes.cons ->
       print "[@[<hov>@[%t@]%t@]]" (print_value v1) (list v2)
   | Variant (lbl, Some v) ->
       print ~at_level:1 "%t @[<hov>%t@]"
@@ -57,7 +56,7 @@ let rec print_value ?max_level v ppf =
 and list ?(max_length = 299) v ppf =
   if max_length > 1 then
     match v with
-    | Variant (lbl, Some (Tuple [v1; v2])) when lbl = CoreTypes.cons ->
+    | Variant (lbl, Some (Tuple [ v1; v2 ])) when lbl = CoreTypes.cons ->
         Format.fprintf ppf ";@ %t%t" (print_value v1)
           (list ~max_length:(max_length - 1) v2)
     | Variant (lbl, None) when lbl = CoreTypes.nil -> ()

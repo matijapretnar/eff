@@ -1,5 +1,5 @@
-(** Association lists *)
 type ('key, 'v) t
+(** Association lists *)
 
 val empty : ('k, 'v) t
 (** The empty association list. *)
@@ -58,10 +58,10 @@ val fold_map :
     at the same time. *)
 
 val kfold_map :
-     ('acc -> 'k * 'v -> 'acc * ('h * 'w))
-  -> 'acc
-  -> ('k, 'v) t
-  -> 'acc * ('h, 'w) t
+  ('acc -> 'k * 'v -> 'acc * ('h * 'w)) ->
+  'acc ->
+  ('k, 'v) t ->
+  'acc * ('h, 'w) t
 (** [kfold_map f state assoc] folds from left to right and also maps at the same time. *)
 
 val length : ('k, 'v) t -> int

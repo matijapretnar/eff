@@ -6,10 +6,7 @@ type pervasives = PervasivesNone | PervasivesDefault
 
 let pervasives_file = ref PervasivesDefault
 
-type backend =
-  | Runtime
-  | Ocaml of string
-  | Multicore of string
+type backend = Runtime | Ocaml of string | Multicore of string
 
 let backend = ref Runtime
 

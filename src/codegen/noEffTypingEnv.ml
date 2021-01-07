@@ -2,32 +2,31 @@
 
 (* Global state *)
 
-type state =
-  { gblCtxt: typingEnv                                            
-  ; effects: (NoEff.n_type * NoEff.n_type) Typed.EffectMap.t
-  }
+type state = {
+  gblCtxt : typingEnv;
+  effects : (NoEff.n_type * NoEff.n_type) Typed.EffectMap.t;
+}
 
-(* Local environment *) 
+(* Local environment *)
 
-type environment = 
-  { var_types: (NoEff.variable, NoEff.n_type) Assoc.t
-  ; ty_params: CoreTypes.TyParam.t list
-  ; ty_coer_types: (CoreTypes.TyCoercionParam.t, NoEff.n_type) Assoc.t }
+type environment = {
+  var_types : (NoEff.variable, NoEff.n_type) Assoc.t;
+  ty_params : CoreTypes.TyParam.t list;
+  ty_coer_types : (CoreTypes.TyCoercionParam.t, NoEff.n_type) Assoc.t;
+}
 
-let extend_ty_params st ty_var = {st with ty_params= ty_var :: st.ty_params}
+let extend_ty_params st ty_var = { st with ty_params = ty_var :: st.ty_params }
 
 let extend_var_types st t_var tty =
-  {st with var_types= Assoc.update t_var tty st.var_types}
+  { st with var_types = Assoc.update t_var tty st.var_types }
 
 let addExternal st x ty = extend_var_types st x ty
 
 let extend_ty_coer_types st tcp ctty =
-  {st with ty_coer_types= Assoc.update tcp ctty st.ty_coer_types}
+  { st with ty_coer_types = Assoc.update tcp ctty st.ty_coer_types }
 
 let initial_state =
-  { var_types= Assoc.empty
-  ; ty_params= []
-  ; ty_coer_types= Assoc.empty }
+  { var_types = Assoc.empty; ty_params = []; ty_coer_types = Assoc.empty }
 
 (* Typing env (global context) *)
 

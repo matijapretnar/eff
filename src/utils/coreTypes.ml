@@ -1,13 +1,13 @@
 (** Types shared by different modules *)
 
-(** variable symbols *)
 module Variable = Symbol.Make (Symbol.String)
+(** variable symbols *)
 
-(** effect symbols *)
 module Effect = Symbol.Make (Symbol.String)
+(** effect symbols *)
 
-(** variant labels *)
 module Label = Symbol.Make (Symbol.String)
+(** variant labels *)
 
 (** Variants for the built-in list type *)
 let nil_annot = "$0nil"
@@ -18,11 +18,11 @@ let cons_annot = "$1cons"
 
 let cons = Label.fresh cons_annot
 
-(** record fields *)
 module Field = Symbol.Make (Symbol.String)
+(** record fields *)
 
-(** type names *)
 module TyName = Symbol.Make (Symbol.String)
+(** type names *)
 
 let bool_tyname = TyName.fresh "bool"
 
@@ -52,7 +52,7 @@ module TyParam = struct
       (fun _ k ->
         if 0 <= k && k <= 25 then
           Format.fprintf ppf "%s%c" c (char_of_int (k + int_of_char 'a'))
-        else Format.fprintf ppf "%sty%i" c (k - 25) )
+        else Format.fprintf ppf "%sty%i" c (k - 25))
       k
 end
 

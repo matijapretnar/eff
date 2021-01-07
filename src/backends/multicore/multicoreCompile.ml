@@ -10,15 +10,15 @@ end
 module Backend (P : BackendParameters) : BackendSignature.T = struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
-  type state = {prog: string}
+  type state = { prog : string }
 
-  let initial_state = {prog= ""}
+  let initial_state = { prog = "" }
 
   (* Auxiliary functions *)
   let update state translation =
     let actual_translation = Format.flush_str_formatter () in
-    Format.fprintf !Config.output_formatter "%s@?" actual_translation ;
-    {prog= state.prog ^ actual_translation}
+    Format.fprintf !Config.output_formatter "%s@?" actual_translation;
+    { prog = state.prog ^ actual_translation }
 
   let state_ppf = Format.str_formatter
 
@@ -33,7 +33,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     let rec sequence sep (translator : a -> Format.formatter -> unit) vs ppf =
       match vs with
       | [] -> ()
-      | [v] -> translator v ppf
+      | [ v ] -> translator v ppf
       | v :: vs ->
           translate ppf
             ("%t" ^^ sep ^^ "%t")
@@ -73,7 +73,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
         translate ppf "[]"
     | Multicore.Variant (lbl, None) ->
         translate ppf "%t" (MulticoreSymbol.print_label lbl)
-    | Multicore.Variant (lbl, Some (Multicore.Tuple [hd; tl]))
+    | Multicore.Variant (lbl, Some (Multicore.Tuple [ hd; tl ]))
       when lbl = CoreTypes.cons ->
         translate ppf "@[<hov>(%t::%t)@]" (translate_term hd)
           (translate_term tl)
@@ -97,8 +97,8 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     | Multicore.Match (t, []) ->
         (* Absurd case *)
         translate ppf
-          ( "@[<hv>(match %t with | _ ->"
-          ^^ " failwith \"void successfully matched\")@]" )
+          ("@[<hv>(match %t with | _ ->"
+         ^^ " failwith \"void successfully matched\")@]")
           (translate_term t)
     | Multicore.Match (t, lst) ->
         translate ppf "@[<hv>(match %t with@, | %t)@]" (translate_term t)
@@ -135,7 +135,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
         translate ppf "[]"
     | Multicore.PVariant (lbl, None) ->
         translate ppf "%t" (MulticoreSymbol.print_label lbl)
-    | Multicore.PVariant (lbl, Some (Multicore.PTuple [hd; tl]))
+    | Multicore.PVariant (lbl, Some (Multicore.PTuple [ hd; tl ]))
       when lbl = CoreTypes.cons ->
         translate ppf "@[<hov>(%t::%t)@]" (translate_pattern hd)
           (translate_pattern tl)
@@ -264,7 +264,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     | Multicore.Lambda abs ->
         let p_list, t' = abs_to_multiarg_abs abs in
         (p :: p_list, t')
-    | _ -> ([p], t)
+    | _ -> ([ p ], t)
 
   and translate_case case ppf =
     match case with
@@ -277,12 +277,11 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
             (translate_pattern p1) (translate_pattern p2) (translate_term t)
         else
           translate ppf
-            ( "@[<hv 2>effect (%t %t) %t ->@,"
-            ^^ "(let %t x = continue (Obj.clone_continuation %t) x in @,%t)@]"
-            )
+            ("@[<hv 2>effect (%t %t) %t ->@,"
+           ^^ "(let %t x = continue (Obj.clone_continuation %t) x in @,%t)@]")
             (MulticoreSymbol.print_effect eff)
-            (translate_pattern p1) (translate_pattern p2)
-            (translate_pattern p2) (translate_pattern p2) (translate_term t)
+            (translate_pattern p1) (translate_pattern p2) (translate_pattern p2)
+            (translate_pattern p2) (translate_term t)
 
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
@@ -297,7 +296,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
 
   let process_type_of state c ty =
     Print.warning
-      "[#typeof] commands are ignored when compiling to Multicore OCaml." ;
+      "[#typeof] commands are ignored when compiling to Multicore OCaml.";
     state
 
   let process_def_effect state (eff, (ty1, ty2)) =
@@ -308,8 +307,9 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
 
   let process_top_let state defs vars =
     let converter (p, c) =
-      (FromSkelEff.of_pattern (Erasure.typed_to_erasure_pattern p),
-        FromSkelEff.of_computation (Erasure.typed_to_erasure_comp Assoc.empty c))
+      ( FromSkelEff.of_pattern (Erasure.typed_to_erasure_pattern p),
+        FromSkelEff.of_computation (Erasure.typed_to_erasure_comp Assoc.empty c)
+      )
     in
     let defs' = List.map converter defs in
     let translation = translate_top_let defs' state_ppf in
@@ -317,8 +317,9 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
 
   let process_top_let_rec state defs vars =
     let converter (p, c) =
-      (FromSkelEff.of_pattern (Erasure.typed_to_erasure_pattern p),
-        FromSkelEff.of_computation (Erasure.typed_to_erasure_comp Assoc.empty c))
+      ( FromSkelEff.of_pattern (Erasure.typed_to_erasure_pattern p),
+        FromSkelEff.of_computation (Erasure.typed_to_erasure_comp Assoc.empty c)
+      )
     in
     let defs' = Assoc.map converter defs |> Assoc.to_list in
     let translation = translate_top_let_rec defs' state_ppf in
@@ -329,9 +330,9 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     | None -> Error.runtime "Unknown external symbol %s." f
     | Some (MulticoreExternal.Unknown as unknown) ->
         Print.warning
-          ( "External symbol %s cannot be compiled. It has been replaced "
-          ^^ "with [failwith \"Unknown external symbol %s.\"]." )
-          f f ;
+          ("External symbol %s cannot be compiled. It has been replaced "
+         ^^ "with [failwith \"Unknown external symbol %s.\"].")
+          f f;
         let translation = translate_external x f unknown state_ppf in
         update state translation
     | Some (MulticoreExternal.Exists s as known) ->
@@ -339,7 +340,9 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
         update state translation
 
   let process_tydef state tydefs =
-    let converter (ty_params, tydef) = (ty_params, FromSkelEff.of_tydef tydef) in
+    let converter (ty_params, tydef) =
+      (ty_params, FromSkelEff.of_tydef tydef)
+    in
     let tydefs' = Assoc.map converter tydefs |> Assoc.to_list in
     let translation = translate_tydefs tydefs' state_ppf in
     update state translation
@@ -347,6 +350,6 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
   let finalize state =
     let channel = open_out P.output_file in
     let output_ppf = Format.formatter_of_out_channel channel in
-    Format.fprintf output_ppf "%s" state.prog ;
+    Format.fprintf output_ppf "%s" state.prog;
     close_out channel
 end

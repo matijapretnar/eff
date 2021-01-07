@@ -41,19 +41,21 @@ and e_computation =
   | EMatch of e_expression * Types.skeleton * e_abstraction list * Location.t
   | ELetRec of e_letrec_abstraction list * e_computation
 
+and e_handler = {
+  effect_clauses : (effect, e_abstraction2) Assoc.t;
+  value_clause : e_abstraction_with_ty;
+}
 (** Handler definitions *)
-and e_handler =
-  { effect_clauses: (effect, e_abstraction2) Assoc.t
-  ; value_clause: e_abstraction_with_ty }
 
+and e_letrec_abstraction =
+  variable * Types.skeleton * Types.skeleton * e_abstraction
 (** LetRec Abstractions: function name, argument type, result type, pattern,
     and right-hand side *)
-and e_letrec_abstraction = (variable * Types.skeleton * Types.skeleton * e_abstraction)
 
+and e_abstraction = e_pattern * e_computation
 (** Abstractions that take one argument. *)
-and e_abstraction = (e_pattern * e_computation)
 
-and e_abstraction_with_ty = (e_pattern * Types.skeleton * e_computation)
+and e_abstraction_with_ty = e_pattern * Types.skeleton * e_computation
 
+and e_abstraction2 = e_pattern * e_pattern * e_computation
 (** Abstractions that take two arguments. *)
-and e_abstraction2 = (e_pattern * e_pattern * e_computation)

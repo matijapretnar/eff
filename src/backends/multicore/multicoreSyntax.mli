@@ -1,5 +1,5 @@
-(** Syntax of the core language. *)
 open CoreUtils
+(** Syntax of the core language. *)
 
 type variable = CoreTypes.Variable.t
 
@@ -54,8 +54,8 @@ and match_case =
   | ValueClause of abstraction
   | EffectClause of effect * abstraction2
 
-(** Abstractions that take one argument. *)
 and abstraction = pattern * term
+(** Abstractions that take one argument. *)
 
-(** Abstractions that take two arguments. *)
 and abstraction2 = pattern * pattern * term
+(** Abstractions that take two arguments. *)

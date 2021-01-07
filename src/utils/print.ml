@@ -7,8 +7,7 @@ let message ~verbosity ?loc ~header fmt =
         Format.fprintf !Config.error_formatter
           ("%s (%t):@," ^^ fmt ^^ "@.")
           header (Location.print loc)
-    | _ ->
-        Format.fprintf !Config.error_formatter ("%s: " ^^ fmt ^^ "@.") header
+    | _ -> Format.fprintf !Config.error_formatter ("%s: " ^^ fmt ^^ "@.") header
   else Format.ifprintf !Config.error_formatter fmt
 
 let error ?loc err_kind fmt = message ~verbosity:1 ?loc ~header:err_kind fmt
@@ -26,16 +25,14 @@ let print ?(at_level = min_int) ?(max_level = max_int) ppf =
 let rec sequence sep pp vs ppf =
   match vs with
   | [] -> ()
-  | [v] -> pp v ppf
+  | [ v ] -> pp v ppf
   | v :: vs -> Format.fprintf ppf "%t%s@,%t" (pp v) sep (sequence sep pp vs)
-
 
 let rec cases pp vs ppf =
   match vs with
   | [] -> ()
-  | [v] -> pp v ppf
+  | [ v ] -> pp v ppf
   | v :: vs -> Format.fprintf ppf "%t@,| %t" (pp v) (cases pp vs)
-
 
 let field fpp vpp (f, v) ppf = print ppf "%t = %t" (fpp f) (vpp v)
 

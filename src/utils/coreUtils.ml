@@ -1,4 +1,4 @@
-type 'a located = {it: 'a; at: Location.t}
+type 'a located = { it : 'a; at : Location.t }
 
 type comparison = Less | Equal | Greater | Invalid
 

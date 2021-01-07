@@ -20,8 +20,8 @@ and plain_pattern =
   | PConst of Const.t
   | PNonbinding
 
-(** Pure expressions *)
 type expression = plain_expression CoreUtils.located
+(** Pure expressions *)
 
 and plain_expression =
   | Var of variable
@@ -34,8 +34,8 @@ and plain_expression =
   | Effect of effect
   | Handler of handler
 
-(** Impure computations *)
 and computation = plain_computation CoreUtils.located
+(** Impure computations *)
 
 and plain_computation =
   | Value of expression
@@ -46,17 +46,18 @@ and plain_computation =
   | Handle of expression * computation
   | Check of computation
 
+and handler = {
+  effect_clauses : (effect, abstraction2) Assoc.t;
+  value_clause : abstraction;
+  finally_clause : abstraction;
+}
 (** Handler definitions *)
-and handler =
-  { effect_clauses: (effect, abstraction2) Assoc.t
-  ; value_clause: abstraction
-  ; finally_clause: abstraction }
 
-(** Abstractions that take one argument. *)
 and abstraction = pattern * computation
+(** Abstractions that take one argument. *)
 
-(** Abstractions that take two arguments. *)
 and abstraction2 = pattern * pattern * computation
+(** Abstractions that take two arguments. *)
 
 val print_pattern : ?max_level:int -> pattern -> Format.formatter -> unit
 

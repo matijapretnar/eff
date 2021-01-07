@@ -1,11 +1,10 @@
 open SkelEffSyntax
-
 module SkelEff = SkelEffSyntax
 
 let rec typed_to_erasure_ty sub typed_ty =
   match typed_ty with
   | Types.TyParam p -> (
-    match Assoc.lookup p sub with Some x' -> x' | None -> assert false )
+      match Assoc.lookup p sub with Some x' -> x' | None -> assert false)
   | Types.Arrow (t1, (t2, drt)) ->
       let t1' = typed_to_erasure_ty sub t1 in
       let t2' = typed_to_erasure_ty sub t2 in
@@ -19,8 +18,7 @@ let rec typed_to_erasure_ty sub typed_ty =
   | Types.QualTy (_, tty) -> typed_to_erasure_ty sub tty
   | Types.QualDirt (_, tty) -> typed_to_erasure_ty sub tty
 
-and typed_to_erasure_cmp_ty sub (ty, _drt) =
-  typed_to_erasure_ty sub ty
+and typed_to_erasure_cmp_ty sub (ty, _drt) = typed_to_erasure_ty sub ty
 
 let rec typed_to_erasure_exp sub tt =
   match tt with
@@ -38,10 +36,10 @@ let rec typed_to_erasure_exp sub tt =
         Assoc.kmap
           (fun (eff, e_a2) ->
             let new_e_a2 = typed_to_erasure_abs_2 sub e_a2 in
-            (eff, new_e_a2) )
+            (eff, new_e_a2))
           op_c
       in
-      let new_h = {effect_clauses= new_op_c; value_clause= new_vc} in
+      let new_h = { effect_clauses = new_op_c; value_clause = new_vc } in
       SkelEff.EHandler new_h
   | CastExp (e, _) -> typed_to_erasure_exp sub e
   | LambdaTyCoerVar (_, _, e) -> typed_to_erasure_exp sub e
@@ -82,32 +80,36 @@ and typed_to_erasure_comp sub tt =
   | Typed.CastComp (c, _) -> typed_to_erasure_comp sub c
   | Typed.CastComp_ty (c, _) -> typed_to_erasure_comp sub c
   | Typed.CastComp_dirt (c, _) -> typed_to_erasure_comp sub c
-  | Typed.LetRec ([(var, argTy, resTy, abs)], c1) ->
+  | Typed.LetRec ([ (var, argTy, resTy, abs) ], c1) ->
       SkelEff.ELetRec
-        ( [( var
-           , typed_to_erasure_ty sub argTy
-           , typed_to_erasure_cmp_ty sub resTy
-           , typed_to_erasure_abs sub abs)]
-        , typed_to_erasure_comp sub c1 )
+        ( [
+            ( var,
+              typed_to_erasure_ty sub argTy,
+              typed_to_erasure_cmp_ty sub resTy,
+              typed_to_erasure_abs sub abs );
+          ],
+          typed_to_erasure_comp sub c1 )
 
 and typed_to_erasure_abs_with_ty sub (e_p, e_ty, e_c) =
-  ( typed_to_erasure_pattern e_p
-  , typed_to_erasure_ty sub e_ty
-  , typed_to_erasure_comp sub e_c )
+  ( typed_to_erasure_pattern e_p,
+    typed_to_erasure_ty sub e_ty,
+    typed_to_erasure_comp sub e_c )
 
 and typed_to_erasure_abs sub (e_p, e_c) =
   (typed_to_erasure_pattern e_p, typed_to_erasure_comp sub e_c)
 
 and typed_to_erasure_abs_2 sub (e_p1, e_p2, e_c) =
-  ( typed_to_erasure_pattern e_p1
-  , typed_to_erasure_pattern e_p2
-  , typed_to_erasure_comp sub e_c )
+  ( typed_to_erasure_pattern e_p1,
+    typed_to_erasure_pattern e_p2,
+    typed_to_erasure_comp sub e_c )
 
 and typed_to_erasure_pattern = function
   | Typed.PVar x -> SkelEff.PEVar x
   | Typed.PAs (p, x) -> SkelEff.PEAs (typed_to_erasure_pattern p, x)
   | Typed.PTuple ps -> SkelEff.PETuple (List.map typed_to_erasure_pattern ps)
-  | Typed.PRecord ass -> SkelEff.PERecord (Assoc.map typed_to_erasure_pattern ass)
-  | Typed.PVariant (lbl, p) -> SkelEff.PEVariant (lbl, typed_to_erasure_pattern p)
+  | Typed.PRecord ass ->
+      SkelEff.PERecord (Assoc.map typed_to_erasure_pattern ass)
+  | Typed.PVariant (lbl, p) ->
+      SkelEff.PEVariant (lbl, typed_to_erasure_pattern p)
   | Typed.PConst const -> SkelEff.PEConst const
   | Typed.PNonbinding -> SkelEff.PENonbinding

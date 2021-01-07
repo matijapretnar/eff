@@ -1,10 +1,10 @@
-(** Syntax of the core language. *)
 open CoreUtils
+(** Syntax of the core language. *)
+
 open Types
 module EffectMap = Map.Make (CoreTypes.Effect)
 
-let add_to_constraints con constraints =
-  con :: constraints
+let add_to_constraints con constraints = con :: constraints
 
 let add_list_to_constraints new_constraints old_constraints =
   new_constraints @ old_constraints
@@ -23,14 +23,13 @@ type pattern =
   | PNonbinding
 
 let rec pattern_vars = function
-  | PVar x -> [x]
+  | PVar x -> [ x ]
   | PAs (p, x) -> x :: pattern_vars p
   | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
   | PRecord lst -> Assoc.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
   | PVariant (_, p) -> pattern_vars p
   | PConst _ -> []
   | PNonbinding -> []
-
 
 type ty_coercion =
   | ReflTy of Types.target_ty
@@ -74,7 +73,8 @@ type expression =
   | Handler of handler
   | CastExp of expression * ty_coercion
   | LambdaTyCoerVar of CoreTypes.TyCoercionParam.t * Types.ct_ty * expression
-  | LambdaDirtCoerVar of CoreTypes.DirtCoercionParam.t * Types.ct_dirt * expression
+  | LambdaDirtCoerVar of
+      CoreTypes.DirtCoercionParam.t * Types.ct_dirt * expression
   | ApplyTyCoercion of expression * ty_coercion
   | ApplyDirtCoercion of expression * dirt_coercion
 
@@ -92,7 +92,7 @@ and computation =
      impossible in the general case.
   *)
   | Match of expression * Types.target_dirty * abstraction list
-    (* We need to keep the result type in the term, in case the match is empty *)
+  (* We need to keep the result type in the term, in case the match is empty *)
   | Apply of expression * expression
   | Handle of expression * computation
   | Call of effect * expression * abstraction_with_ty
@@ -102,22 +102,24 @@ and computation =
   | CastComp_ty of computation * ty_coercion
   | CastComp_dirt of computation * dirt_coercion
 
+and handler = {
+  effect_clauses : (effect, abstraction2) Assoc.t;
+  value_clause : abstraction_with_ty;
+}
 (** Handler definitions *)
-and handler =
-  { effect_clauses: (effect, abstraction2) Assoc.t
-  ; value_clause: abstraction_with_ty }
 
+and abstraction = pattern * computation
 (** Abstractions that take one argument. *)
-and abstraction = (pattern * computation)
 
-and abstraction_with_ty = (pattern * Types.target_ty * computation)
+and abstraction_with_ty = pattern * Types.target_ty * computation
 
+and letrec_abstraction =
+  variable * Types.target_ty * Types.target_dirty * abstraction
 (** LetRec Abstractions: function name, argument type, result type, pattern,
     and right-hand side *)
-and letrec_abstraction = (variable * Types.target_ty * Types.target_dirty * abstraction)
 
+and abstraction2 = pattern * pattern * computation
 (** Abstractions that take two arguments. *)
-and abstraction2 = (pattern * pattern * computation)
 
 let abstraction_with_ty_to_abstraction (p, _, c) = (p, c)
 
@@ -125,11 +127,12 @@ type omega_ct =
   | TyOmega of (CoreTypes.TyCoercionParam.t * Types.ct_ty)
   | DirtOmega of (CoreTypes.DirtCoercionParam.t * Types.ct_dirt)
   | DirtyOmega of
-      ((CoreTypes.TyCoercionParam.t * CoreTypes.DirtCoercionParam.t) * Types.ct_dirty)
+      ((CoreTypes.TyCoercionParam.t * CoreTypes.DirtCoercionParam.t)
+      * Types.ct_dirty)
   | SkelEq of skeleton * skeleton
   | TyParamHasSkel of (CoreTypes.TyParam.t * skeleton)
 
-type toplevel = (plain_toplevel * Location.t)
+type toplevel = plain_toplevel * Location.t
 
 and plain_toplevel =
   (* | Tydef of (CoreTypes.tyname, Params.t * Tctx.tydef) CoreTypes.assoc *)
@@ -143,16 +146,15 @@ and plain_toplevel =
   | Help
   | Quit
 
-
 (* ************************************************************************* *)
 (*                         COERCION VARIABLES OF                             *)
 (* ************************************************************************* *)
 
-module TyCoercionParamSet   = Set.Make (CoreTypes.TyCoercionParam)
+module TyCoercionParamSet = Set.Make (CoreTypes.TyCoercionParam)
 module DirtCoercionParamSet = Set.Make (CoreTypes.DirtCoercionParam)
 
 let rec tyCoVarsOfExpression : expression -> TyCoercionParamSet.t = function
-(*
+  (*
 type expression =
   | Var of variable
   | BuiltIn of string * int
@@ -175,10 +177,10 @@ type expression =
   | ApplyTyCoercion of expression * ty_coercion
   | ApplyDirtCoercion of expression * dirt_coercion
 *)
-  _ -> failwith __LOC__
+  | _ -> failwith __LOC__
 
 and dirtCoVarsOfExpression : expression -> DirtCoercionParamSet.t = function
-(*
+  (*
 type expression =
   | Var of variable
   | BuiltIn of string * int
@@ -201,10 +203,10 @@ type expression =
   | ApplyTyCoercion of expression * ty_coercion
   | ApplyDirtCoercion of expression * dirt_coercion
 *)
-  _ -> failwith __LOC__
+  | _ -> failwith __LOC__
 
 and tyCoVarsOfComputation : computation -> TyCoercionParamSet.t = function
-(*
+  (*
 and computation =
   | Value of expression
   | LetVal of expression * abstraction_with_ty
@@ -219,10 +221,10 @@ and computation =
   | CastComp_ty of computation * ty_coercion
   | CastComp_dirt of computation * dirt_coercion
 *)
-  _ -> failwith __LOC__
+  | _ -> failwith __LOC__
 
 and dirtCoVarsOfComputation : computation -> DirtCoercionParamSet.t = function
-(*
+  (*
 and computation =
   | Value of expression
   | LetVal of expression * abstraction_with_ty
@@ -237,9 +239,7 @@ and computation =
   | CastComp_ty of computation * ty_coercion
   | CastComp_dirt of computation * dirt_coercion
 *)
-  _ -> failwith __LOC__
-
-
+  | _ -> failwith __LOC__
 
 (*
 let rec state_free_dirt_vars st =
@@ -264,7 +264,8 @@ let abstraction_with_ty p ty c : abstraction_with_ty = (p, ty, c)
 
 let abstraction2 p1 p2 c : abstraction2 = (p1, p2, c)
 
-let print_effect (eff, _) ppf = Print.print ppf "Effect_%t" (CoreTypes.Effect.print eff)
+let print_effect (eff, _) ppf =
+  Print.print ppf "Effect_%t" (CoreTypes.Effect.print eff)
 
 let print_variable = CoreTypes.Variable.print ~safe:true
 
@@ -277,9 +278,10 @@ let rec print_pattern ?max_level p ppf =
   | PTuple lst -> Print.tuple print_pattern lst ppf
   | PRecord lst -> Print.record CoreTypes.Field.print print_pattern lst ppf
   | PVariant (lbl, p) ->
-      print ~at_level:1 "(%t @[<hov>%t@])" (CoreTypes.Label.print lbl) (print_pattern p)
+      print ~at_level:1 "(%t @[<hov>%t@])"
+        (CoreTypes.Label.print lbl)
+        (print_pattern p)
   | PNonbinding -> print "_"
-
 
 let rec print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -288,13 +290,17 @@ let rec print_expression ?max_level e ppf =
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record lst -> Print.record CoreTypes.Field.print print_expression lst ppf
-  | Variant (lbl, e) -> print ~at_level:1 "%t %t" (CoreTypes.Label.print lbl) (print_expression e)
+  | Variant (lbl, e) ->
+      print ~at_level:1 "%t %t" (CoreTypes.Label.print lbl) (print_expression e)
   | Lambda (x, t, c) ->
       print "fun (%t:%t) -> (%t)" (print_pattern x) (Types.print_target_ty t)
         (print_computation c)
   | Handler h ->
       print
-        "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->\n             ((match x with %t) : a -> (b -> _ computation) -> _ computation)) @]}"
+        "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) \
+         (type b) (x : (a, b) effect) ->\n\
+        \             ((match x with %t) : a -> (b -> _ computation) -> _ \
+         computation)) @]}"
         (print_abstraction_with_ty h.value_clause)
         (print_effect_clauses (Assoc.to_list h.effect_clauses))
   | Effect eff -> print ~at_level:2 "effect %t" (print_effect eff)
@@ -321,7 +327,6 @@ let rec print_expression ?max_level e ppf =
         (print_expression ~max_level:1 e)
         (print_dirt_coercion tty)
 
-
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with
@@ -331,8 +336,7 @@ and print_computation ?max_level c ppf =
         (print_expression ~max_level:0 e2)
   | Value e -> print ~at_level:1 "value (%t)" (print_expression ~max_level:0 e)
   | Match (e, _resTy, []) ->
-      print ~at_level:2 "(match %t with _ -> assert false)"
-        (print_expression e)
+      print ~at_level:2 "(match %t with _ -> assert false)" (print_expression e)
   | Match (e, _resTy, lst) ->
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e)
         (Print.cases print_abstraction lst)
@@ -365,7 +369,6 @@ and print_computation ?max_level c ppf =
       print "let (%t = (%t)) in (%t)" (print_pattern p) (print_expression e1)
         (print_computation c1)
 
-
 and print_ty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with
@@ -378,19 +381,22 @@ and print_ty_coercion ?max_level c ppf =
   | SequenceTyCoer (tc1, tc2) ->
       print "%t ; %t" (print_ty_coercion tc1) (print_ty_coercion tc2)
   | PureCoercion dtyco -> print "pure(%t)" (print_dirty_coercion dtyco)
-  | ApplyCoercion (t, [])  ->
-      print "%t" (CoreTypes.TyName.print t)
-  | ApplyCoercion (t, [c]) ->
-      print ~at_level:1 "%t %t" (print_ty_coercion ~max_level:1 c) (CoreTypes.TyName.print t)
-  | ApplyCoercion (t, cs)  ->
-      print ~at_level:1 "(%t) %t" (Print.sequence ", " print_ty_coercion cs) (CoreTypes.TyName.print t)
-  | TupleCoercion []  ->
-      print "unit"
+  | ApplyCoercion (t, []) -> print "%t" (CoreTypes.TyName.print t)
+  | ApplyCoercion (t, [ c ]) ->
+      print ~at_level:1 "%t %t"
+        (print_ty_coercion ~max_level:1 c)
+        (CoreTypes.TyName.print t)
+  | ApplyCoercion (t, cs) ->
+      print ~at_level:1 "(%t) %t"
+        (Print.sequence ", " print_ty_coercion cs)
+        (CoreTypes.TyName.print t)
+  | TupleCoercion [] -> print "unit"
   | TupleCoercion cos ->
       print ~at_level:2 "@[<hov>%t@]"
         (Print.sequence (Symbols.times ()) (print_ty_coercion ~max_level:1) cos)
-  | LeftArrow co            -> print "fst(%t)" (print_ty_coercion co)
+  | LeftArrow co -> print "fst(%t)" (print_ty_coercion co)
   | _ -> failwith "Not yet implemented __LOC__"
+
 (* THE FOLLOWING ARE UNEXPECTED. SOMETHING MUST BE WRONG TO GET THEM.
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   | ForallTy of CoreTypes.TyParam.t * ty_coercion
@@ -408,7 +414,6 @@ and print_ty_coercion ?max_level c ppf =
   | ForallSkel of CoreTypes.SkelParam.t * ty_coercion
   | ApplySkelCoer of ty_coercion * skeleton
 *)
-
 and print_dirty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with
@@ -419,7 +424,6 @@ and print_dirty_coercion ?max_level c ppf =
   | RightArrow tyco -> print "snd(%t)" (print_ty_coercion tyco)
   | SequenceDirtyCoer (c1, c2) ->
       print "(%t;%t)" (print_dirty_coercion c1) (print_dirty_coercion c2)
-
 
 and print_dirt_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -432,7 +436,6 @@ and print_dirt_coercion ?max_level c ppf =
   | DirtCoercion dtyco -> print "dirtOf(%t)" (print_dirty_coercion dtyco)
   | SequenceDirtCoer (dco1, dco2) ->
       print "(%t;%t)" (print_dirt_coercion dco1) (print_dirt_coercion dco2)
-
 
 and print_omega_ct ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -458,7 +461,6 @@ and print_omega_ct ?max_level c ppf =
   | TyParamHasSkel (tp, sk1) ->
       print "%t : %t" (CoreTypes.TyParam.print tp) (Types.print_skeleton sk1)
 
-
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match eff_clauses with
@@ -468,29 +470,23 @@ and print_effect_clauses eff_clauses ppf =
         (print_abstraction2 a2)
         (print_effect_clauses cases)
 
-
 and print_abstraction (p, c) ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
-
 
 and print_abstraction_with_ty (p, tty, c) ppf =
   Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern p)
     (Types.print_target_ty tty)
     (print_computation c)
 
-
 and print_abstraction2 (p1, p2, c) ppf =
   Format.fprintf ppf "(fun %t %t -> %t)" (print_pattern p1) (print_pattern p2)
     (print_computation c)
 
-
 and print_pure_abstraction (p, e) ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_expression e)
 
-
 and print_let_abstraction (p, c) ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)
-
 
 and print_top_let_abstraction (p, c) ppf =
   match c with
@@ -501,14 +497,13 @@ and print_top_let_abstraction (p, c) ppf =
       Format.fprintf ppf "%t = run %t" (print_pattern p)
         (print_computation ~max_level:0 c)
 
-
 and print_let_rec_abstraction (f, arg_ty, res_ty, abs) ppf =
-  Format.fprintf ppf "(%t : %t) %t"
-    (print_variable f) (print_target_ty (Types.Arrow (arg_ty,res_ty))) (print_let_abstraction abs)
+  Format.fprintf ppf "(%t : %t) %t" (print_variable f)
+    (print_target_ty (Types.Arrow (arg_ty, res_ty)))
+    (print_let_abstraction abs)
 
 let backup_location loc locs =
   match loc with None -> Location.union locs | Some loc -> loc
-
 
 let rec refresh_pattern sbst = function
   | PVar x ->
@@ -523,7 +518,7 @@ let rec refresh_pattern sbst = function
         List.fold_right
           (fun p (sbst, ps') ->
             let sbst, p' = refresh_pattern sbst p in
-            (sbst, p' :: ps') )
+            (sbst, p' :: ps'))
           ps (sbst, [])
       in
       (sbst, PTuple ps')
@@ -532,7 +527,7 @@ let rec refresh_pattern sbst = function
         Assoc.fold_right
           (fun (lbl, p) (sbst, flds') ->
             let sbst, p' = refresh_pattern sbst p in
-            (sbst, Assoc.update lbl p' flds') )
+            (sbst, Assoc.update lbl p' flds'))
           flds (sbst, Assoc.empty)
       in
       (sbst, PRecord flds')
@@ -541,10 +536,9 @@ let rec refresh_pattern sbst = function
       (sbst, PVariant (lbl, p'))
   | (PConst _ | PNonbinding) as p -> (sbst, p)
 
-
 let rec refresh_expr sbst = function
   | Var x as e -> (
-    match Assoc.lookup x sbst with Some x' -> Var x' | None -> e )
+      match Assoc.lookup x sbst with Some x' -> Var x' | None -> e)
   | Lambda abs -> Lambda (refresh_abs_with_ty sbst abs)
   | Handler h -> Handler (refresh_handler sbst h)
   | Tuple es -> Tuple (List.map (refresh_expr sbst) es)
@@ -559,7 +553,6 @@ let rec refresh_expr sbst = function
   | ApplyTyCoercion (e, tyco) -> ApplyTyCoercion (refresh_expr sbst e, tyco)
   | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (refresh_expr sbst e, dco)
 
-
 and refresh_comp sbst = function
   | Bind (c1, c2) -> Bind (refresh_comp sbst c1, refresh_abs sbst c2)
   | LetRec (li, c1) ->
@@ -567,18 +560,21 @@ and refresh_comp sbst = function
         List.fold_right
           (fun (x, _, _, _) (new_xs, sbst') ->
             let x' = CoreTypes.Variable.refresh x in
-            (x' :: new_xs, Assoc.update x x' sbst') )
+            (x' :: new_xs, Assoc.update x x' sbst'))
           li ([], sbst)
       in
       let li' =
         List.map
           (fun (x', (argTy, resTy, abs)) -> (x', argTy, resTy, abs))
           (List.combine new_xs
-             (List.map (fun (_, argTy, resTy, abs) -> (argTy, resTy, refresh_abs sbst' abs)) li))
+             (List.map
+                (fun (_, argTy, resTy, abs) ->
+                  (argTy, resTy, refresh_abs sbst' abs))
+                li))
       in
       LetRec (li', refresh_comp sbst' c1)
-
-  | Match (e, resTy, li) -> Match (refresh_expr sbst e, resTy, List.map (refresh_abs sbst) li)
+  | Match (e, resTy, li) ->
+      Match (refresh_expr sbst e, resTy, List.map (refresh_abs sbst) li)
   | Apply (e1, e2) -> Apply (refresh_expr sbst e1, refresh_expr sbst e2)
   | Handle (e, c) -> Handle (refresh_expr sbst e, refresh_comp sbst c)
   | Call (eff, e, a) ->
@@ -586,21 +582,19 @@ and refresh_comp sbst = function
   | Value e -> Value (refresh_expr sbst e)
   | CastComp (c, dtyco) -> CastComp (refresh_comp sbst c, dtyco)
 
-
 and refresh_handler sbst h =
-  { effect_clauses= Assoc.map (refresh_abs2 sbst) h.effect_clauses
-  ; value_clause= refresh_abs_with_ty sbst h.value_clause }
-
+  {
+    effect_clauses = Assoc.map (refresh_abs2 sbst) h.effect_clauses;
+    value_clause = refresh_abs_with_ty sbst h.value_clause;
+  }
 
 and refresh_abs sbst (p, c) =
   let sbst, p' = refresh_pattern sbst p in
   (p', refresh_comp sbst c)
 
-
 and refresh_abs_with_ty sbst (p, ty, c) =
   let sbst, p' = refresh_pattern sbst p in
   (p', ty, refresh_comp sbst c)
-
 
 and refresh_abs2 sbst (p1, p2, c) =
   let sbst, p1' = refresh_pattern sbst p1 in
@@ -608,10 +602,8 @@ and refresh_abs2 sbst (p1, p2, c) =
   let c' = refresh_comp sbst c in
   (p1', p2', c')
 
-
 let rec subst_expr sbst = function
-  | Var x as e -> (
-    match Assoc.lookup x sbst with Some e' -> e' | None -> e )
+  | Var x as e -> ( match Assoc.lookup x sbst with Some e' -> e' | None -> e)
   | Lambda abs -> Lambda (subst_abs_with_ty sbst abs)
   | Handler h -> Handler (subst_handler sbst h)
   | Tuple es -> Tuple (List.map (subst_expr sbst) es)
@@ -626,61 +618,59 @@ let rec subst_expr sbst = function
   | ApplyTyCoercion (e, tyco) -> ApplyTyCoercion (subst_expr sbst e, tyco)
   | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (subst_expr sbst e, dco)
 
-
 and subst_comp sbst = function
   | Bind (c1, c2) -> Bind (subst_comp sbst c1, subst_abs sbst c2)
-  | LetVal (e1, (x,ty,c1)) -> (* XXX Should we check that x does not appear in sbst? *)
-                              LetVal ( subst_expr sbst e1
-                                     , (x, ty, subst_comp sbst c1) )
+  | LetVal (e1, (x, ty, c1)) ->
+      (* XXX Should we check that x does not appear in sbst? *)
+      LetVal (subst_expr sbst e1, (x, ty, subst_comp sbst c1))
   | LetRec (li, c1) ->
       let li' =
         List.map
           (fun (x, argTy, resTy, abs) ->
             (* XXX Should we check that x does not appear in sbst? *)
-            (x, argTy, resTy, subst_abs sbst abs) )
+            (x, argTy, resTy, subst_abs sbst abs))
           li
       in
       LetRec (li', subst_comp sbst c1)
-  | Match (e, resTy, li) -> Match (subst_expr sbst e, resTy, List.map (subst_abs sbst) li)
+  | Match (e, resTy, li) ->
+      Match (subst_expr sbst e, resTy, List.map (subst_abs sbst) li)
   | Apply (e1, e2) -> Apply (subst_expr sbst e1, subst_expr sbst e2)
   | Handle (e, c) -> Handle (subst_expr sbst e, subst_comp sbst c)
   | Call (eff, e, a) -> Call (eff, subst_expr sbst e, subst_abs_with_ty sbst a)
   | Value e -> Value (subst_expr sbst e)
   | CastComp (c, dtyco) -> CastComp (subst_comp sbst c, dtyco)
-  | other -> ( Print.debug "About to fail (subst_comp): %t" (print_computation other)
-             ; failwith __LOC__ )
+  | other ->
+      Print.debug "About to fail (subst_comp): %t" (print_computation other);
+      failwith __LOC__
 
 and subst_handler sbst h =
-  { effect_clauses= Assoc.map (subst_abs2 sbst) h.effect_clauses
-  ; value_clause= subst_abs_with_ty sbst h.value_clause }
-
+  {
+    effect_clauses = Assoc.map (subst_abs2 sbst) h.effect_clauses;
+    value_clause = subst_abs_with_ty sbst h.value_clause;
+  }
 
 and subst_abs sbst (p, c) =
   (* XXX We should assert that p & sbst have disjoint variables *)
   (p, subst_comp sbst c)
 
-
 and subst_abs_with_ty sbst (p, ty, c) =
   (* XXX We should assert that p & sbst have disjoint variables *)
   (p, ty, subst_comp sbst c)
-
 
 and subst_abs2 sbst (p1, p2, c) =
   (* XXX We should assert that p1, p2 & sbst have disjoint variables *)
   (p1, p2, subst_comp sbst c)
 
-
 let assoc_equal eq flds flds' : bool =
   let rec equal_fields flds =
     match flds with
     | [] -> true
-    | (f, x) :: flds ->
-      match Assoc.lookup f flds' with
-      | Some x' when eq x x' -> equal_fields flds
-      | _ -> false
+    | (f, x) :: flds -> (
+        match Assoc.lookup f flds' with
+        | Some x' when eq x x' -> equal_fields flds
+        | _ -> false)
   in
   Assoc.length flds = Assoc.length flds' && equal_fields (Assoc.to_list flds)
-
 
 let rec make_equal_pattern eqvars p p' =
   match (p, p') with
@@ -691,16 +681,15 @@ let rec make_equal_pattern eqvars p p' =
         (make_equal_pattern eqvars p p')
   | PTuple ps, PTuple ps' ->
       List.fold_right2
-        (fun p p' ->
-          function
-            | Some eqvars' -> make_equal_pattern eqvars' p p' | None -> None )
+        (fun p p' -> function
+          | Some eqvars' -> make_equal_pattern eqvars' p p'
+          | None -> None)
         ps ps' (Some eqvars)
   | PConst cst, PConst cst' when Const.equal cst cst' -> Some eqvars
   | PNonbinding, PNonbinding -> Some eqvars
   | PVariant (lbl, p), PVariant (lbl', p') when lbl = lbl' ->
       make_equal_pattern eqvars p p'
   | _, _ -> None
-
 
 let rec alphaeq_expr eqvars e e' =
   match (e, e') with
@@ -717,25 +706,23 @@ let rec alphaeq_expr eqvars e e' =
       dco = dco' && alphaeq_expr eqvars e e'
   | _, _ -> false
 
-
 and alphaeq_comp eqvars c c' =
   match (c, c') with
   | Bind (c1, c2), Bind (c1', c2') ->
       alphaeq_comp eqvars c1 c1' && alphaeq_abs eqvars c2 c2'
-  | LetRec (li, c1), LetRec (li', c1') -> (* XXX Not yet implemented *)
-                                          false
+  | LetRec (li, c1), LetRec (li', c1') ->
+      (* XXX Not yet implemented *)
+      false
   | Match (e, _resTy1, li), Match (e', _resTy2, li') ->
       alphaeq_expr eqvars e e' && List.for_all2 (alphaeq_abs eqvars) li li'
   | Apply (e1, e2), Apply (e1', e2') ->
       alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2'
   | Handle (e, c), Handle (e', c') ->
       alphaeq_expr eqvars e e' && alphaeq_comp eqvars c c'
-  (*   | Call (eff, e, a), Call (eff', e', a') ->
-    eff = eff' && alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a' *)
-  | Value e, Value e' ->
-      alphaeq_expr eqvars e e'
+  (* | Call (eff, e, a), Call (eff', e', a') ->
+     eff = eff' && alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a' *)
+  | Value e, Value e' -> alphaeq_expr eqvars e e'
   | _, _ -> false
-
 
 and alphaeq_handler eqvars h h' =
   alphaeq_abs_with_ty eqvars h.value_clause h'.value_clause
@@ -744,9 +731,8 @@ and alphaeq_handler eqvars h h' =
        (fun (effect, abs2) ->
          match Assoc.lookup effect h'.effect_clauses with
          | Some abs2' -> alphaeq_abs2 eqvars abs2 abs2'
-         | None -> false )
+         | None -> false)
        (Assoc.to_list h.effect_clauses)
-
 
 (*   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
   alphaeq_abs eqvars h.value_clause h'.value_clause *)
@@ -755,32 +741,29 @@ and alphaeq_abs eqvars (p, c) (p', c') =
   | Some eqvars' -> alphaeq_comp eqvars' c c'
   | None -> false
 
-
 and alphaeq_abs_with_ty eqvars (p, ty, c) (p', ty', c') =
   match make_equal_pattern eqvars p p' with
   | Some eqvars' -> alphaeq_comp eqvars' c c'
   | None -> false
 
-
 and alphaeq_abs2 eqvars (p1, p2, c) (p1', p2', c') =
   (* alphaeq_abs eqvars (a22a a2) (a22a a2') *)
   match make_equal_pattern eqvars p1 p1' with
   | Some eqvars' -> (
-    match make_equal_pattern eqvars' p2 p2' with
-    | Some eqvars'' -> alphaeq_comp eqvars'' c c'
-    | None -> false )
+      match make_equal_pattern eqvars' p2 p2' with
+      | Some eqvars'' -> alphaeq_comp eqvars'' c c'
+      | None -> false)
   | None -> false
-
 
 let pattern_match p e =
   (* XXX The commented out part checked that p and e had matching types *)
-  (*   let _, ty_e, constraints_e = e.scheme
-  and _, ty_p, constraints_p = p.scheme in
-  let constraints =
-    Constraints.union constraints_e constraints_p |>
-    Constraints.add_ty_constraint ~loc:e.location ty_e ty_p
-  in
-  ignore constraints; *)
+  (* let _, ty_e, constraints_e = e.scheme
+     and _, ty_p, constraints_p = p.scheme in
+     let constraints =
+       Constraints.union constraints_e constraints_p |>
+       Constraints.add_ty_constraint ~loc:e.location ty_e ty_p
+     in
+     ignore constraints; *)
   let rec extend_subst p e sbst =
     match (p, e) with
     | PVar x, e -> Assoc.update x e sbst
@@ -805,15 +788,12 @@ let pattern_match p e =
   in
   extend_subst p e Assoc.empty
 
-
 let ( @@@ ) (inside1, outside1) (inside2, outside2) =
   (inside1 @ inside2, outside1 @ outside2)
-
 
 let ( --- ) (inside, outside) bound =
   let remove_bound xs = List.filter (fun x -> not (List.mem x bound)) xs in
   (remove_bound inside, remove_bound outside)
-
 
 let concat_vars vars = List.fold_right ( @@@ ) vars ([], [])
 
@@ -824,8 +804,10 @@ let rec free_vars_comp c =
   | LetRec (li, c1) ->
       let xs, vars =
         List.fold_right
-          (fun (x, argTy, resTy, abs) (xs, vars) -> (x :: xs, free_vars_abs abs @@@ vars))
-          li ([], free_vars_comp c1)
+          (fun (x, argTy, resTy, abs) (xs, vars) ->
+            (x :: xs, free_vars_abs abs @@@ vars))
+          li
+          ([], free_vars_comp c1)
       in
       vars --- xs
   | Match (e, _resTy, li) ->
@@ -833,20 +815,20 @@ let rec free_vars_comp c =
   | Apply (e1, e2) -> free_vars_expr e1 @@@ free_vars_expr e2
   | Handle (e, c1) -> free_vars_expr e @@@ free_vars_comp c1
   | Call (_, e1, a1) -> free_vars_expr e1 @@@ free_vars_abs_with_ty a1
-  | Op (_,e) -> free_vars_expr e
+  | Op (_, e) -> free_vars_expr e
   | Bind (c1, a1) -> free_vars_comp c1 @@@ free_vars_abs a1
   | CastComp (c1, dtyco) -> free_vars_comp c1
-  | CastComp_ty (c1,_) -> free_vars_comp c1
-  | CastComp_dirt (c1,_) -> free_vars_comp c1
-
+  | CastComp_ty (c1, _) -> free_vars_comp c1
+  | CastComp_dirt (c1, _) -> free_vars_comp c1
 
 and free_vars_expr e =
   match e with
-  | Var v -> ([], [v])
+  | Var v -> ([], [ v ])
   | Tuple es -> concat_vars (List.map free_vars_expr es)
   | Lambda a -> free_vars_abs_with_ty a
   | Handler h -> free_vars_handler h
-  | Record flds -> Assoc.values_of flds |> List.map free_vars_expr |> concat_vars
+  | Record flds ->
+      Assoc.values_of flds |> List.map free_vars_expr |> concat_vars
   | Variant (_, e) -> free_vars_expr e
   | CastExp (e', tyco) -> free_vars_expr e'
   | Effect _ | Const _ -> ([], [])
@@ -855,25 +837,21 @@ and free_vars_expr e =
   | ApplyTyCoercion (e, tyco) -> free_vars_expr e
   | ApplyDirtCoercion (e, dco) -> free_vars_expr e
 
-
 and free_vars_handler h =
   free_vars_abs_with_ty h.value_clause
-  @@@ (Assoc.values_of h.effect_clauses |> List.map free_vars_abs2 |> concat_vars)
-
+  @@@ (Assoc.values_of h.effect_clauses
+      |> List.map free_vars_abs2 |> concat_vars)
 
 and free_vars_finally_handler (h, finally_clause) =
   free_vars_handler h @@@ free_vars_abs finally_clause
-
 
 and free_vars_abs (p, c) =
   let inside, outside = free_vars_comp c --- pattern_vars p in
   (inside @ outside, [])
 
-
 and free_vars_abs_with_ty (p, _, c) =
   let inside, outside = free_vars_comp c --- pattern_vars p in
   (inside @ outside, [])
-
 
 and free_vars_abs2 (p1, p2, c) =
   let inside, outside =
@@ -881,41 +859,33 @@ and free_vars_abs2 (p1, p2, c) =
   in
   (inside @ outside, [])
 
-
 let occurrences x (inside, outside) =
   let count ys = List.length (List.filter (fun y -> x = y) ys) in
   (count inside, count outside)
-
 
 let fresh_dirt_coer cons =
   let param = CoreTypes.DirtCoercionParam.fresh () in
   (DirtCoercionVar param, DirtOmega (param, cons))
 
-
 let fresh_ty_with_skel skel =
   let ty_var = CoreTypes.TyParam.fresh () in
   (Types.TyParam ty_var, TyParamHasSkel (ty_var, skel))
-
 
 let fresh_dirty_with_skel skel =
   let ty, cons = fresh_ty_with_skel skel and drt = Types.fresh_dirt () in
   ((ty, drt), cons)
 
-
 let fresh_ty_with_fresh_skel () =
   let skel_var = CoreTypes.SkelParam.fresh () in
   fresh_ty_with_skel (Types.SkelParam skel_var)
-
 
 let fresh_dirty_with_fresh_skel () =
   let skel_var = CoreTypes.SkelParam.fresh () in
   fresh_dirty_with_skel (Types.SkelParam skel_var)
 
-
 let fresh_ty_coer cons =
   let param = CoreTypes.TyCoercionParam.fresh () in
   (TyCoercionVar param, TyOmega (param, cons))
-
 
 let fresh_dirty_coer cons =
   let ty_param = CoreTypes.TyCoercionParam.fresh () in
@@ -925,11 +895,9 @@ let fresh_dirty_coer cons =
   in
   (coer, DirtyOmega ((ty_param, dirt_param), cons))
 
-
 let cast_expression e ty1 ty2 =
   let omega, cons = fresh_ty_coer (ty1, ty2) in
   (CastExp (e, omega), cons)
-
 
 let cast_computation c dirty1 dirty2 =
   let omega, cons = fresh_dirty_coer (dirty1, dirty2) in
@@ -941,19 +909,23 @@ let cast_computation c dirty1 dirty2 =
 
 (* Compute the free type variables of a constraint *)
 let ftvsOfOmegaCt : omega_ct -> TyParamSet.t = function
-  | TyOmega (_, ct)        -> ftvsOfValTyCt ct
-  | DirtOmega (_, _)       -> TyParamSet.empty
-  | DirtyOmega ((_,_), ct) -> ftvsOfCmpTyCt ct (* GEORGE: Is anyone using "DirtyOmega"? *)
-  | SkelEq (_,_)           -> TyParamSet.empty
-  | TyParamHasSkel (a,_)   -> TyParamSet. singleton a (* GEORGE: This is up to debate *)
+  | TyOmega (_, ct) -> ftvsOfValTyCt ct
+  | DirtOmega (_, _) -> TyParamSet.empty
+  | DirtyOmega ((_, _), ct) ->
+      ftvsOfCmpTyCt ct (* GEORGE: Is anyone using "DirtyOmega"? *)
+  | SkelEq (_, _) -> TyParamSet.empty
+  | TyParamHasSkel (a, _) -> TyParamSet.singleton a
+
+(* GEORGE: This is up to debate *)
 
 (* Compute the free dirt variables of a constraint *)
 let fdvsOfOmegaCt : omega_ct -> DirtParamSet.t = function
-  | TyOmega (_, ct)        -> fdvsOfValTyCt ct
-  | DirtOmega (_, ct)      -> fdvsOfDirtCt  ct
-  | DirtyOmega ((_,_), ct) -> fdvsOfCmpTyCt ct (* GEORGE: Is anyone using "DirtyOmega"? *)
-  | SkelEq (_,_)           -> DirtParamSet.empty
-  | TyParamHasSkel (_,_)   -> DirtParamSet.empty
+  | TyOmega (_, ct) -> fdvsOfValTyCt ct
+  | DirtOmega (_, ct) -> fdvsOfDirtCt ct
+  | DirtyOmega ((_, _), ct) ->
+      fdvsOfCmpTyCt ct (* GEORGE: Is anyone using "DirtyOmega"? *)
+  | SkelEq (_, _) -> DirtParamSet.empty
+  | TyParamHasSkel (_, _) -> DirtParamSet.empty
 
 (* ************************************************************************* *)
 
@@ -977,7 +949,7 @@ let rec free_dirt_vars_ty_coercion = function
   | TupleCoercion tcs ->
       List.fold_left
         (fun free tc ->
-          Types.DirtParamSet.union free (free_dirt_vars_ty_coercion tc) )
+          Types.DirtParamSet.union free (free_dirt_vars_ty_coercion tc))
         Types.DirtParamSet.empty tcs
   | LeftArrow tc -> free_dirt_vars_ty_coercion tc
   | PureCoercion dc -> free_dirt_vars_dirty_coercion dc
@@ -1003,7 +975,6 @@ and free_dirt_vars_dirt_coercion = function
         (free_dirt_vars_dirt_coercion dc2)
   | DirtCoercion dc -> free_dirt_vars_dirty_coercion dc
 
-
 and free_dirt_vars_dirty_coercion = function
   | BangCoercion (tc, dc) ->
       Types.DirtParamSet.union
@@ -1016,7 +987,6 @@ and free_dirt_vars_dirty_coercion = function
       Types.DirtParamSet.union
         (free_dirt_vars_dirty_coercion dc1)
         (free_dirt_vars_dirty_coercion dc2)
-
 
 let rec free_dirt_vars_expression e =
   match e with
@@ -1046,7 +1016,6 @@ let rec free_dirt_vars_expression e =
         (free_dirt_vars_expression e)
         (free_dirt_vars_dirt_coercion dc)
 
-
 and free_dirt_vars_computation c =
   match c with
   | Value e -> free_dirt_vars_expression e
@@ -1054,20 +1023,19 @@ and free_dirt_vars_computation c =
       Types.DirtParamSet.union
         (free_dirt_vars_expression e)
         (free_dirt_vars_abstraction_with_ty abs)
-  | LetRec ([(f, argTy, resTy, abs)], c) ->
+  | LetRec ([ (f, argTy, resTy, abs) ], c) ->
       Types.DirtParamSet.union
-        (Types.DirtParamSet.union
-          (fdvsOfTargetValTy argTy)
-          (fdvsOfTargetCmpTy resTy))
+        (Types.DirtParamSet.union (fdvsOfTargetValTy argTy)
+           (fdvsOfTargetCmpTy resTy))
         (free_dirt_vars_abstraction abs)
       |> Types.DirtParamSet.union (free_dirt_vars_computation c)
   | Match (e, resTy, cases) ->
       List.fold_left
         (fun free case ->
-          DirtParamSet.union free (free_dirt_vars_abstraction case) )
+          DirtParamSet.union free (free_dirt_vars_abstraction case))
         (DirtParamSet.union
-          (free_dirt_vars_expression e)
-          (fdvsOfTargetCmpTy resTy))
+           (free_dirt_vars_expression e)
+           (fdvsOfTargetCmpTy resTy))
         cases
   | Apply (e1, e2) ->
       Types.DirtParamSet.union
@@ -1096,17 +1064,14 @@ and free_dirt_vars_computation c =
         (free_dirt_vars_computation c)
         (free_dirt_vars_dirt_coercion dc)
 
-
 and free_dirt_vars_abstraction (_, c) = free_dirt_vars_computation c
 
 and free_dirt_vars_abstraction_with_ty (_, ty, c) =
-  Types.DirtParamSet.union (fdvsOfTargetValTy ty)
-    (free_dirt_vars_computation c)
-
+  Types.DirtParamSet.union (fdvsOfTargetValTy ty) (free_dirt_vars_computation c)
 
 let rec get_skel_vars_from_constraints = function
   | [] -> []
-  | (TyParamHasSkel (_, Types.SkelParam sv)) :: xs ->
+  | TyParamHasSkel (_, Types.SkelParam sv) :: xs ->
       sv :: get_skel_vars_from_constraints xs
   | _ :: xs -> get_skel_vars_from_constraints xs
 
@@ -1126,25 +1091,24 @@ let rec getSkelAnnotationsFromCs = function
       (alpha, skeleton) :: getSkelAnnotationsFromCs cs
   | _ :: cs -> getSkelAnnotationsFromCs cs
 
-
 let rec apply_sub_to_type ty_subs dirt_subs ty =
   match ty with
   | Types.TyParam p -> (
-    match Assoc.lookup p ty_subs with
-    | Some p' -> Types.TyParam p'
-    | None -> ty )
+      match Assoc.lookup p ty_subs with
+      | Some p' -> Types.TyParam p'
+      | None -> ty)
   | Types.Arrow (a, (b, d)) ->
       Types.Arrow
-        ( apply_sub_to_type ty_subs dirt_subs a
-        , (apply_sub_to_type ty_subs dirt_subs b, apply_sub_to_dirt dirt_subs d)
+        ( apply_sub_to_type ty_subs dirt_subs a,
+          (apply_sub_to_type ty_subs dirt_subs b, apply_sub_to_dirt dirt_subs d)
         )
   | Types.Tuple ty_list ->
       Types.Tuple
         (List.map (fun x -> apply_sub_to_type ty_subs dirt_subs x) ty_list)
   | Types.Handler ((a, b), (c, d)) ->
       Types.Handler
-        ( (apply_sub_to_type ty_subs dirt_subs a, apply_sub_to_dirt dirt_subs b)
-        , (apply_sub_to_type ty_subs dirt_subs c, apply_sub_to_dirt dirt_subs d)
+        ( (apply_sub_to_type ty_subs dirt_subs a, apply_sub_to_dirt dirt_subs b),
+          (apply_sub_to_type ty_subs dirt_subs c, apply_sub_to_dirt dirt_subs d)
         )
   | Types.PrimTy _ -> ty
   | Types.Apply (ty_name, tys) ->
@@ -1154,7 +1118,7 @@ let rec apply_sub_to_type ty_subs dirt_subs ty =
 and apply_sub_to_dirt dirt_subs drt =
   match drt.row with
   | Types.ParamRow p -> (
-    match Assoc.lookup p dirt_subs with
-    | Some p' -> {drt with row= Types.ParamRow p'}
-    | None -> drt )
+      match Assoc.lookup p dirt_subs with
+      | Some p' -> { drt with row = Types.ParamRow p' }
+      | None -> drt)
   | Types.EmptyRow -> drt

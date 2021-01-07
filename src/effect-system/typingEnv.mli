@@ -5,8 +5,8 @@
     quantified type parameters.
 *)
 
-(** The type of contexts. *)
 type t = (Typed.variable, Types.target_ty) Assoc.t
+(** The type of contexts. *)
 
 val empty : t
 (** [empty] is the empty context. *)

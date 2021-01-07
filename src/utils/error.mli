@@ -8,14 +8,14 @@
     and a message in form of a format string, for example:
     [Error.runtime ~loc "Unhandled effect %t" (Effect.print eff)]. *)
 
-(** Type of errors. *)
 type t
+(** Type of errors. *)
 
 val print : t -> unit
 (** Print an error. *)
 
-(** Exception representing all possible Eff errors. *)
 exception Error of t
+(** Exception representing all possible Eff errors. *)
 
 val fatal : ?loc:Location.t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 (** Fatal errors are errors over which Eff has no control, for example when

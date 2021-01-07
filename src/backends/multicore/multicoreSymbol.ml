@@ -1,11 +1,13 @@
 let protected =
-  ["and"; "as"; "assert"; "asr"; "begin"; "class"; "constraint"; "do"; "done"]
-  @ ["downto"; "else"; "end"; "exception"; "external"; "false"; "for"; "fun"]
-  @ ["function"; "functor"; "if"; "in"; "include"; "inherit"; "initializer"]
-  @ ["land"; "lazy"; "let"; "lor"; "lsl"; "lsr"; "lxor"; "match"; "method"]
-  @ ["mod"; "module"; "mutable"; "new"; "nonrec"; "object"; "of"; "open"; "or"]
-  @ ["private"; "rec"; "sig"; "struct"; "then"; "to"; "true"; "try"; "type"]
-  @ ["val"; "virtual"; "when"; "while"; "with"; "continue"]
+  [ "and"; "as"; "assert"; "asr"; "begin"; "class"; "constraint"; "do"; "done" ]
+  @ [ "downto"; "else"; "end"; "exception"; "external"; "false"; "for"; "fun" ]
+  @ [ "function"; "functor"; "if"; "in"; "include"; "inherit"; "initializer" ]
+  @ [ "land"; "lazy"; "let"; "lor"; "lsl"; "lsr"; "lxor"; "match"; "method" ]
+  @ [
+      "mod"; "module"; "mutable"; "new"; "nonrec"; "object"; "of"; "open"; "or";
+    ]
+  @ [ "private"; "rec"; "sig"; "struct"; "then"; "to"; "true"; "try"; "type" ]
+  @ [ "val"; "virtual"; "when"; "while"; "with"; "continue" ]
 
 let print_variable var ppf =
   let printer desc n =
@@ -14,17 +16,17 @@ let print_variable var ppf =
     else (
       if List.mem desc protected then
         Print.warning
-          "Warning: Protected keyword [%s]. Must be fixed by hand!@." desc ;
+          "Warning: Protected keyword [%s]. Must be fixed by hand!@." desc;
       match desc.[0] with
       | 'a' .. 'z' | '_' -> Format.fprintf ppf "%s" desc
       | '$' -> (
-        match desc with
-        | "$c_thunk" -> Format.fprintf ppf "_comp_%d" n
-        | "$id_par" -> Format.fprintf ppf "_id_%d" n
-        | "$anon" -> Format.fprintf ppf "_anon_%d" n
-        | "$bind" -> Format.fprintf ppf "_b_%d" n
-        | _ -> Format.fprintf ppf "_x_%d" n )
-      | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc )
+          match desc with
+          | "$c_thunk" -> Format.fprintf ppf "_comp_%d" n
+          | "$id_par" -> Format.fprintf ppf "_id_%d" n
+          | "$anon" -> Format.fprintf ppf "_anon_%d" n
+          | "$bind" -> Format.fprintf ppf "_b_%d" n
+          | _ -> Format.fprintf ppf "_x_%d" n)
+      | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc)
   in
   CoreTypes.Variable.fold printer var
 
@@ -38,7 +40,7 @@ let print_tyname tyname ppf =
   let printer desc n =
     if desc = "empty" then
       Print.warning
-        "Warning: [empty] type encountered. Must be fixed by hand!@." ;
+        "Warning: [empty] type encountered. Must be fixed by hand!@.";
     Format.fprintf ppf "%s" desc
   in
   CoreTypes.TyName.fold printer tyname

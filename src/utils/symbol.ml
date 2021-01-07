@@ -75,7 +75,10 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
 
   let new_fresh () =
     let count = ref (-1) in
-    let fresh ann = incr count ; (!count, ann) in
+    let fresh ann =
+      incr count;
+      (!count, ann)
+    in
     fresh
 
   let fresh = new_fresh ()

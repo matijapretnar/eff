@@ -5,8 +5,8 @@
     quantified type parameters.
 *)
 
-(** The types of contexts and type schemes. *)
 type ty_scheme = CoreTypes.TyParam.t list * Type.ty
+(** The types of contexts and type schemes. *)
 
 type t
 

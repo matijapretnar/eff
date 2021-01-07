@@ -10,11 +10,11 @@ type ty =
   | Arrow of ty * ty
   | Handler of handler_ty
 
-and handler_ty =
-  { value: ty
-  ; (* the type of the _argument_ of value *)
-    finally: ty
-  (* the return type of finally *) }
+and handler_ty = {
+  value : ty;
+  (* the type of the _argument_ of value *)
+  finally : ty; (* the return type of finally *)
+}
 
 let int_ty = Basic "int"
 
@@ -35,12 +35,12 @@ let rec subst_ty sbst ty =
   let rec subst = function
     | Apply (ty_name, tys) -> Apply (ty_name, List.map subst tys)
     | TyParam p as ty -> (
-      match Assoc.lookup p sbst with Some ty -> ty | None -> ty )
+        match Assoc.lookup p sbst with Some ty -> ty | None -> ty)
     | Basic _ as ty -> ty
     | Tuple tys -> Tuple (List.map subst tys)
     | Arrow (ty1, ty2) -> Arrow (subst ty1, subst_ty sbst ty2)
-    | Handler {value= ty1; finally= ty2} ->
-        Handler {value= subst ty1; finally= subst ty2}
+    | Handler { value = ty1; finally = ty2 } ->
+        Handler { value = subst ty1; finally = subst ty2 }
   in
   subst ty
 
@@ -58,11 +58,11 @@ let compose_subst sbst1 sbst2 =
 let free_params ty =
   let rec free_ty = function
     | Apply (_, tys) -> concat_map free_ty tys
-    | TyParam p -> [p]
+    | TyParam p -> [ p ]
     | Basic _ -> []
     | Tuple tys -> concat_map free_ty tys
     | Arrow (ty1, ty2) -> free_ty ty1 @ free_ty ty2
-    | Handler {value= ty1; finally= ty2} -> free_ty ty1 @ free_ty ty2
+    | Handler { value = ty1; finally = ty2 } -> free_ty ty1 @ free_ty ty2
   in
   unique_elements (free_ty ty)
 
@@ -95,8 +95,8 @@ let beautify (ps, ty) =
   (List.map sub ps, subst_ty ty_sbst ty)
 
 let beautify2 ty1 ty2 =
-  match beautify ([], Tuple [ty1; ty2]) with
-  | ps, Tuple [ty1; ty2] -> ((ps, ty1), (ps, ty2))
+  match beautify ([], Tuple [ ty1; ty2 ]) with
+  | ps, Tuple [ ty1; ty2 ] -> ((ps, ty1), (ps, ty2))
   | _ -> assert false
 
 let print (ps, t) ppf =
@@ -107,9 +107,8 @@ let print (ps, t) ppf =
         print ~at_level:5 "@[<h>%t ->@ %t@]" (ty ~max_level:4 t1) (ty t2)
     | Basic b -> print "%s" b
     | Apply (t, []) -> print "%t" (CoreTypes.TyName.print t)
-    | Apply (t, [s]) ->
-        print ~at_level:1 "%t %t" (ty ~max_level:1 s)
-          (CoreTypes.TyName.print t)
+    | Apply (t, [ s ]) ->
+        print ~at_level:1 "%t %t" (ty ~max_level:1 s) (CoreTypes.TyName.print t)
     | Apply (t, ts) ->
         print ~at_level:1 "(%t) %t"
           (Print.sequence ", " ty ts)
@@ -119,7 +118,7 @@ let print (ps, t) ppf =
     | Tuple ts ->
         print ~at_level:2 "@[<hov>%t@]"
           (Print.sequence " * " (ty ~max_level:1) ts)
-    | Handler {value= t1; finally= t2} ->
+    | Handler { value = t1; finally = t2 } ->
         print ~at_level:4 "%t =>@ %t" (ty ~max_level:2 t1) (ty t2)
   in
   ty t ppf

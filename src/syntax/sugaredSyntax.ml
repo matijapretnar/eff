@@ -1,8 +1,8 @@
-(** Abstract syntax of eff terms, types, and toplevel commands. *)
 open CoreUtils
+(** Abstract syntax of eff terms, types, and toplevel commands. *)
 
-(** Terms *)
 type variable = string
+(** Terms *)
 
 type effect = string
 
@@ -73,11 +73,12 @@ and plain_term =
   | Handle of term * term  (** [with t1 handle t2] *)
   | Check of term  (** [check t] *)
 
-and handler =
-  { effect_clauses: (effect, abstraction2) Assoc.t
-        (** [t1#op1 p1 k1 -> t1' | ... | tn#opn pn kn -> tn'] *)
-  ; value_clause: abstraction list  (** [val p -> t] *)
-  ; finally_clause: abstraction list  (** [finally p -> t] *) }
+and handler = {
+  effect_clauses : (effect, abstraction2) Assoc.t;
+      (** [t1#op1 p1 k1 -> t1' | ... | tn#opn pn kn -> tn'] *)
+  value_clause : abstraction list;  (** [val p -> t] *)
+  finally_clause : abstraction list;  (** [finally p -> t] *)
+}
 
 and match_case =
   | Val_match of abstraction
