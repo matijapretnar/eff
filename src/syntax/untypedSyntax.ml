@@ -1,5 +1,5 @@
-(** Syntax of the core language. *)
 open CoreUtils
+(** Syntax of the core language. *)
 
 type variable = CoreTypes.Variable.t
 
@@ -21,8 +21,8 @@ and plain_pattern =
   | PConst of Const.t
   | PNonbinding
 
-(** Pure expressions *)
 type expression = plain_expression located
+(** Pure expressions *)
 
 and plain_expression =
   | Var of variable
@@ -35,8 +35,8 @@ and plain_expression =
   | Effect of effect
   | Handler of handler
 
-(** Impure computations *)
 and computation = plain_computation located
+(** Impure computations *)
 
 and plain_computation =
   | Value of expression
@@ -47,19 +47,20 @@ and plain_computation =
   | Handle of expression * computation
   | Check of computation
 
+and handler = {
+  effect_clauses : (effect, abstraction2) Assoc.t;
+  value_clause : abstraction;
+  finally_clause : abstraction;
+}
 (** Handler definitions *)
-and handler =
-  { effect_clauses: (effect, abstraction2) Assoc.t
-  ; value_clause: abstraction
-  ; finally_clause: abstraction }
 
-(** Abstractions that take one argument. *)
 and abstraction = pattern * computation
+(** Abstractions that take one argument. *)
 
-(** Abstractions that take two arguments. *)
 and abstraction2 = pattern * pattern * computation
+(** Abstractions that take two arguments. *)
 
-let rec contains_variable_expression var {it= e} =
+let rec contains_variable_expression var { it = e } =
   contains_variable_plain_expression var e
 
 and contains_variable_plain_expression var = function
@@ -78,7 +79,7 @@ and contains_variable_plain_expression var = function
 
 and contains_variable_abs var (pat, c) = contains_variable_comp var c
 
-and contains_variable_comp var {it= c} = contains_variable_plain_comp var c
+and contains_variable_comp var { it = c } = contains_variable_plain_comp var c
 
 and contains_variable_plain_comp var = function
   | Value e -> contains_variable_expression var e
@@ -92,15 +93,17 @@ and contains_variable_plain_comp var = function
       contains_variable_expression var e
       || List.exists (contains_variable_abs var) abs_list
   | Apply (e1, e2) ->
-      contains_variable_expression var e1
-      || contains_variable_expression var e2
+      contains_variable_expression var e1 || contains_variable_expression var e2
   | Handle (e, c) ->
       contains_variable_expression var e || contains_variable_comp var c
   | Check c -> contains_variable_comp var c
 
 and contains_variable_handler var
-    {effect_clauses= eff_abs2_assoc; value_clause= abs1; finally_clause= abs2}
-    =
+    {
+      effect_clauses = eff_abs2_assoc;
+      value_clause = abs1;
+      finally_clause = abs2;
+    } =
   List.exists (contains_variable_abs2 var) (Assoc.values_of eff_abs2_assoc)
   || contains_variable_abs var abs1
   || contains_variable_abs var abs2
@@ -119,7 +122,7 @@ let rec print_pattern ?max_level p ppf =
   | PRecord assoc -> Print.record CoreTypes.Field.print print_pattern assoc ppf
   | PVariant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
   | PVariant (lbl, None) -> print "%t" (CoreTypes.Label.print lbl)
-  | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = CoreTypes.cons ->
+  | PVariant (lbl, Some { it = PTuple [ v1; v2 ] }) when lbl = CoreTypes.cons ->
       print "[@[<hov>@[%t@]%t@]]" (print_pattern v1) (pattern_list v2)
   | PVariant (lbl, Some p) ->
       print ~at_level:1 "%t @[<hov>%t@]"
@@ -130,7 +133,8 @@ let rec print_pattern ?max_level p ppf =
 and pattern_list ?(max_length = 299) p ppf =
   if max_length > 1 then
     match p.it with
-    | PVariant (lbl, Some {it= PTuple [v1; v2]}) when lbl = CoreTypes.cons ->
+    | PVariant (lbl, Some { it = PTuple [ v1; v2 ] }) when lbl = CoreTypes.cons
+      ->
         Format.fprintf ppf ",@ %t%t" (print_pattern v1)
           (pattern_list ~max_length:(max_length - 1) v2)
     | PVariant (lbl, None) when lbl = CoreTypes.nil -> ()
@@ -186,9 +190,7 @@ and let_abstraction (p, c) ppf =
 and case a ppf = Format.fprintf ppf "%t" (abstraction a)
 
 and effect_clause (eff, a2) ppf =
-  Format.fprintf ppf "| %t -> %t"
-    (CoreTypes.Effect.print eff)
-    (abstraction2 a2)
+  Format.fprintf ppf "| %t -> %t" (CoreTypes.Effect.print eff) (abstraction2 a2)
 
 and abstraction2 (p1, p2, c) ppf =
   Format.fprintf ppf "%t %t -> %t" (print_pattern p1) (print_pattern p2)

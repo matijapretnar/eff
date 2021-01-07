@@ -1,5 +1,5 @@
-(** Syntax of the core language. *)
 open CoreUtils
+(** Syntax of the core language. *)
 
 type variable = CoreTypes.Variable.t
 
@@ -54,11 +54,11 @@ and match_case =
   | ValueClause of abstraction
   | EffectClause of effect * abstraction2
 
-(** Abstractions that take one argument. *)
 and abstraction = pattern * term
+(** Abstractions that take one argument. *)
 
-(** Abstractions that take two arguments. *)
 and abstraction2 = pattern * pattern * term
+(** Abstractions that take two arguments. *)
 
 type cmd =
   | Term of term
@@ -81,7 +81,7 @@ let print_sequence (type a) =
   let rec sequence sep (pp : a -> Format.formatter -> unit) vs ppf =
     match vs with
     | [] -> ()
-    | [v] -> pp v ppf
+    | [ v ] -> pp v ppf
     | v :: vs -> print ppf ("%t" ^^ sep ^^ "%t") (pp v) (sequence sep pp vs)
   in
   sequence
@@ -107,7 +107,7 @@ let rec print_term t ppf =
   | Record assoc -> print ppf "%t" (print_record print_term "=" assoc)
   | Variant (lbl, None) when lbl = CoreTypes.nil -> print ppf "[]"
   | Variant (lbl, None) -> print ppf "%t" (MulticoreSymbol.print_label lbl)
-  | Variant (lbl, Some (Tuple [hd; tl])) when lbl = CoreTypes.cons ->
+  | Variant (lbl, Some (Tuple [ hd; tl ])) when lbl = CoreTypes.cons ->
       print ppf "@[<hov>(%t::%t)@]" (print_term hd) (print_term tl)
   | Variant (lbl, Some t) ->
       print ppf "(%t @[<hov>%t@])"
@@ -125,8 +125,8 @@ let rec print_term t ppf =
   | Match (t, []) ->
       (* Absurd case *)
       print ppf
-        ( "@[<hv>(match %t with | _ ->"
-        ^^ " failwith \"void successfully matched\")@]" )
+        ("@[<hv>(match %t with | _ ->"
+       ^^ " failwith \"void successfully matched\")@]")
         (print_term t)
   | Match (t, lst) ->
       print ppf "@[<hv>(match %t with@, | %t)@]" (print_term t)
@@ -157,7 +157,7 @@ and print_pattern p ppf =
   | PRecord assoc -> print ppf "%t" (print_record print_pattern "=" assoc)
   | PVariant (lbl, None) when lbl = CoreTypes.nil -> print ppf "[]"
   | PVariant (lbl, None) -> print ppf "%t" (MulticoreSymbol.print_label lbl)
-  | PVariant (lbl, Some (PTuple [hd; tl])) when lbl = CoreTypes.cons ->
+  | PVariant (lbl, Some (PTuple [ hd; tl ])) when lbl = CoreTypes.cons ->
       print ppf "@[<hov>(%t::%t)@]" (print_pattern hd) (print_pattern tl)
   | PVariant (lbl, Some p) ->
       print ppf "(%t @[<hov>%t@])"
@@ -177,8 +177,7 @@ and print_type ty ppf =
         (MulticoreSymbol.print_tyname t)
   | TyParam p -> print ppf "%t" (MulticoreSymbol.print_typaram p)
   | TyTuple [] -> print ppf "unit"
-  | TyTuple ts ->
-      print ppf "@[<hov>(%t)@]" (Print.sequence " * " print_type ts)
+  | TyTuple ts -> print ppf "@[<hov>(%t)@]" (Print.sequence " * " print_type ts)
 
 and print_tydef (name, (params, tydef)) ppf =
   let print_def tydef ppf =
@@ -277,7 +276,7 @@ and abs_to_multiarg_abs (p, t) =
   | Lambda abs ->
       let p_list, t' = abs_to_multiarg_abs abs in
       (p :: p_list, t')
-  | _ -> ([p], t)
+  | _ -> ([ p ], t)
 
 and print_case case ppf =
   match case with
@@ -289,8 +288,8 @@ and print_case case ppf =
           (print_pattern p1) (print_pattern p2) (print_term t)
       else
         print ppf
-          ( "@[<hv 2>effect (%t %t) %t ->@,"
-          ^^ "(let %t x = continue (Obj.clone_continuation %t) x in @,%t)@]" )
+          ("@[<hv 2>effect (%t %t) %t ->@,"
+         ^^ "(let %t x = continue (Obj.clone_continuation %t) x in @,%t)@]")
           (MulticoreSymbol.print_effect eff)
           (print_pattern p1) (print_pattern p2) (print_pattern p2)
           (print_pattern p2) (print_term t)
@@ -305,13 +304,13 @@ let print_cmd cmd ppf =
   | TopLetRec defs -> print_top_let_rec defs ppf
   | TyDef tydefs -> print_tydefs tydefs ppf
   | External (x, ty, f) -> (
-    match Assoc.lookup f MulticoreExternal.values with
-    | None -> Error.runtime "Unknown external symbol %s." f
-    | Some (MulticoreExternal.Unknown as unknown) ->
-        Print.warning
-          ( "External symbol %s cannot be compiled. It has been replaced "
-          ^^ "with [failwith \"Unknown external symbol %s.\"]." )
-          f f ;
-        print_external x f unknown ppf
-    | Some (MulticoreExternal.Exists s as known) ->
-        print_external x f known ppf )
+      match Assoc.lookup f MulticoreExternal.values with
+      | None -> Error.runtime "Unknown external symbol %s." f
+      | Some (MulticoreExternal.Unknown as unknown) ->
+          Print.warning
+            ("External symbol %s cannot be compiled. It has been replaced "
+           ^^ "with [failwith \"Unknown external symbol %s.\"].")
+            f f;
+          print_external x f unknown ppf
+      | Some (MulticoreExternal.Exists s as known) ->
+          print_external x f known ppf)

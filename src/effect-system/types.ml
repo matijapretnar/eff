@@ -29,7 +29,7 @@ and target_ty =
 
 and target_dirty = target_ty * dirt
 
-and dirt = {effect_set: effect_set; row: row}
+and dirt = { effect_set : effect_set; row : row }
 
 and row = ParamRow of CoreTypes.DirtParam.t | EmptyRow
 
@@ -49,7 +49,7 @@ let rec print_target_ty ?max_level ty ppf =
         (print_target_dirt drt) (Symbols.short_arrow ())
         (print_target_ty ~max_level:5 t2)
   | Apply (t, []) -> print "%t" (CoreTypes.TyName.print t)
-  | Apply (t, [s]) ->
+  | Apply (t, [ s ]) ->
       print ~at_level:1 "%t %t"
         (print_target_ty ~max_level:1 s)
         (CoreTypes.TyName.print t)
@@ -95,7 +95,7 @@ and print_skeleton ?max_level sk ppf =
   | SkelArrow (sk1, sk2) ->
       print "%t -sk-> %t" (print_skeleton sk1) (print_skeleton sk2)
   | SkelApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
-  | SkelApply (t, [s]) ->
+  | SkelApply (t, [ s ]) ->
       print ~at_level:1 "%t %t"
         (print_skeleton ~max_level:1 s)
         (CoreTypes.TyName.print t)
@@ -174,25 +174,25 @@ and dirts_are_equal d1 d2 =
   EffectSet.equal d1.effect_set d2.effect_set && d1.row = d2.row
 
 let no_effect_dirt dirt_param =
-  {effect_set= EffectSet.empty; row= ParamRow dirt_param}
+  { effect_set = EffectSet.empty; row = ParamRow dirt_param }
 
 let fresh_dirt () = no_effect_dirt (CoreTypes.DirtParam.fresh ())
 
-let closed_dirt effect_set = {effect_set; row= EmptyRow}
+let closed_dirt effect_set = { effect_set; row = EmptyRow }
 
 let empty_dirt = closed_dirt EffectSet.empty
 
 let make_dirty ty = (ty, fresh_dirt ())
 
 let add_effects effect_set drt =
-  {drt with effect_set= EffectSet.union drt.effect_set effect_set}
+  { drt with effect_set = EffectSet.union drt.effect_set effect_set }
 
 let remove_effects effect_set drt =
-  {drt with effect_set= EffectSet.diff drt.effect_set effect_set}
+  { drt with effect_set = EffectSet.diff drt.effect_set effect_set }
 
 let rec free_skeleton sk =
   match sk with
-  | SkelParam p -> [p]
+  | SkelParam p -> [ p ]
   | PrimSkel _ -> []
   | SkelApply (_, sks) -> List.concat (List.map free_skeleton sks)
   | SkelArrow (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
@@ -200,11 +200,11 @@ let rec free_skeleton sk =
   | SkelTuple sks -> List.concat (List.map free_skeleton sks)
   | ForallSkel (p, sk1) ->
       let free_a = free_skeleton sk1 in
-      List.filter (fun x -> not (List.mem x [p])) free_a
+      List.filter (fun x -> not (List.mem x [ p ])) free_a
 
 let rec free_target_ty t =
   match t with
-  | TyParam x -> [x]
+  | TyParam x -> [ x ]
   | Arrow (a, c) -> free_target_ty a @ free_target_dirty c
   | Tuple tup -> List.flatten (List.map free_target_ty tup)
   | Handler (c1, c2) -> free_target_dirty c1 @ free_target_dirty c2
@@ -213,7 +213,7 @@ let rec free_target_ty t =
   | QualDirt (_, a) -> failwith __LOC__
   | TySchemeTy (ty_param, _, a) ->
       let free_a = free_target_ty a in
-      List.filter (fun x -> not (List.mem x [ty_param])) free_a
+      List.filter (fun x -> not (List.mem x [ ty_param ])) free_a
   | TySchemeDirt (dirt_param, a) -> free_target_ty a
 
 and free_target_dirty (a, d) = free_target_ty a
@@ -221,11 +221,11 @@ and free_target_dirty (a, d) = free_target_ty a
 let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
   match t with
   | TyParam x -> (
-    match Assoc.lookup x ty_sbst with
-    | Some x' -> ((ty_sbst, dirt_sbst), TyParam x')
-    | None ->
-        let y = CoreTypes.TyParam.fresh () in
-        ((Assoc.update x y ty_sbst, dirt_sbst), TyParam y) )
+      match Assoc.lookup x ty_sbst with
+      | Some x' -> ((ty_sbst, dirt_sbst), TyParam x')
+      | None ->
+          let y = CoreTypes.TyParam.fresh () in
+          ((Assoc.update x y ty_sbst, dirt_sbst), TyParam y))
   | Arrow (a, c) ->
       let (a_ty_sbst, a_dirt_sbst), a' =
         refresh_target_ty (ty_sbst, dirt_sbst) a
@@ -254,9 +254,7 @@ let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
   | TySchemeDirt (dirt_param, a) -> failwith __LOC__
 
 and refresh_target_dirty (ty_sbst, dirt_sbst) (t, d) =
-  let (t_ty_sbst, t_dirt_sbst), t' =
-    refresh_target_ty (ty_sbst, dirt_sbst) t
-  in
+  let (t_ty_sbst, t_dirt_sbst), t' = refresh_target_ty (ty_sbst, dirt_sbst) t in
   let temp_ty_sbst = Assoc.concat t_ty_sbst ty_sbst in
   let temp_dirt_sbst = Assoc.concat t_dirt_sbst dirt_sbst in
   let (d_ty_sbst, d_dirt_sbst), d' =
@@ -267,29 +265,29 @@ and refresh_target_dirty (ty_sbst, dirt_sbst) (t, d) =
 and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
   match drt.row with
   | ParamRow x -> (
-    match Assoc.lookup x dirt_sbst with
-    | Some x' -> ((ty_sbst, dirt_sbst), {drt with row= ParamRow x'})
-    | None ->
-        let y = CoreTypes.DirtParam.fresh () in
-        ((ty_sbst, Assoc.update x y dirt_sbst), {drt with row= ParamRow y}) )
+      match Assoc.lookup x dirt_sbst with
+      | Some x' -> ((ty_sbst, dirt_sbst), { drt with row = ParamRow x' })
+      | None ->
+          let y = CoreTypes.DirtParam.fresh () in
+          ((ty_sbst, Assoc.update x y dirt_sbst), { drt with row = ParamRow y })
+      )
   | EmptyRow -> ((ty_sbst, dirt_sbst), drt)
 
 let rec source_to_target ty =
   let loc = Location.unknown in
   match ty with
   | Type.Apply (ty_name, args) when Tctx.transparent ~loc ty_name -> (
-    match Tctx.lookup_tydef ~loc ty_name with
-    | [], Tctx.Inline ty -> source_to_target ty
-    | _, Tctx.Sum _ | _, Tctx.Record _ ->
-        assert false (* None of these are transparent *) )
-  | Type.Apply (ty_name, args) ->
-      Apply (ty_name, List.map source_to_target args)
+      match Tctx.lookup_tydef ~loc ty_name with
+      | [], Tctx.Inline ty -> source_to_target ty
+      | _, Tctx.Sum _ | _, Tctx.Record _ ->
+          assert false (* None of these are transparent *))
+  | Type.Apply (ty_name, args) -> Apply (ty_name, List.map source_to_target args)
   | Type.TyParam p -> TyParam p
   | Type.Basic b -> PrimTy b
   | Type.Tuple l -> Tuple (List.map source_to_target l)
   | Type.Arrow (ty, dirty) ->
       Arrow (source_to_target ty, source_to_target_dirty dirty)
-  | Type.Handler {value= dirty1; finally= dirty2} ->
+  | Type.Handler { value = dirty1; finally = dirty2 } ->
       Handler (source_to_target_dirty dirty1, source_to_target_dirty dirty2)
 
 and source_to_target_dirty ty = (source_to_target ty, empty_dirt)

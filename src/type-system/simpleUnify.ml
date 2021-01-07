@@ -15,7 +15,8 @@ let solve cstr =
             (Type.print t1) (Type.print t2)
         else sbst := Type.compose_subst (Assoc.update p t Assoc.empty) !sbst
     | Type.Arrow (u1, v1), Type.Arrow (u2, v2) ->
-        unify loc v1 v2 ; unify loc u2 u1
+        unify loc v1 v2;
+        unify loc u2 u1
     | Type.Tuple lst1, Type.Tuple lst2 when List.length lst1 = List.length lst2
       ->
         List.iter2 (unify loc) lst1 lst2
@@ -25,13 +26,13 @@ let solve cstr =
     (* The following two cases cannot be merged into one, as the whole matching
        fails if both types are Apply, but only the second one is transparent. *)
     | Type.Apply (t1, lst1), t2 when Tctx.transparent ~loc t1 -> (
-      match Tctx.ty_apply ~loc t1 lst1 with
-      | Tctx.Inline t -> unify loc t2 t
-      | Tctx.Sum _ | Tctx.Record _ ->
-          assert false (* None of these are transparent *) )
+        match Tctx.ty_apply ~loc t1 lst1 with
+        | Tctx.Inline t -> unify loc t2 t
+        | Tctx.Sum _ | Tctx.Record _ ->
+            assert false (* None of these are transparent *))
     | t1, (Type.Apply _ as t2) -> unify loc t2 t1
     | Type.Handler h1, Type.Handler h2 ->
-        unify loc h2.Type.value h1.Type.value ;
+        unify loc h2.Type.value h1.Type.value;
         unify loc h1.Type.finally h2.Type.finally
     | t1, t2 ->
         let t1, t2 = Type.beautify2 t1 t2 in
@@ -39,5 +40,5 @@ let solve cstr =
           "This expression has type %t but it should have type %t."
           (Type.print t1) (Type.print t2)
   in
-  List.iter (fun (t1, t2, loc) -> unify loc t1 t2) (List.rev cstr) ;
+  List.iter (fun (t1, t2, loc) -> unify loc t1 t2) (List.rev cstr);
   !sbst

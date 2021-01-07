@@ -9,7 +9,7 @@ module Backend : BackendSignature.T = struct
   module RuntimeEnv = Map.Make (CoreTypes.Variable)
 
   (* prints tells us wheter or not to print, while mute depth makes sure that
-  printing is muted in the case of nested #use *)
+     printing is muted in the case of nested #use *)
   type state = Eval.state
 
   let initial_state = Eval.initial_state
@@ -18,12 +18,13 @@ module Backend : BackendSignature.T = struct
   let process_computation state c drty =
     let v = Eval.run state c in
     Format.fprintf !Config.output_formatter "@[- : %t = %t@]@."
-      (Types.print_target_dirty drty) (Value.print_value v) ;
+      (Types.print_target_dirty drty)
+      (Value.print_value v);
     state
 
   let process_type_of state c drty =
     Format.fprintf !Config.output_formatter "@[- : %t@]@."
-      (Types.print_target_dirty drty) ;
+      (Types.print_target_dirty drty);
     state
 
   let process_def_effect state (eff, (ty1, ty2)) = state
@@ -33,7 +34,7 @@ module Backend : BackendSignature.T = struct
       List.fold_right
         (fun (p, c) st ->
           let v = Eval.run st c in
-          Eval.extend p v st )
+          Eval.extend p v st)
         defs state
     in
     List.iter
@@ -44,8 +45,8 @@ module Backend : BackendSignature.T = struct
             Format.fprintf !Config.output_formatter "@[val %t : %t = %t@]@."
               (CoreTypes.Variable.print x)
               (Type.print_beautiful tysch)
-              (Value.print_value v) )
-      vars ;
+              (Value.print_value v))
+      vars;
     state'
 
   let process_top_let_rec state defs vars =
@@ -54,8 +55,8 @@ module Backend : BackendSignature.T = struct
       (fun (x, tysch) ->
         Format.fprintf !Config.output_formatter "@[val %t : %t = <fun>@]@."
           (CoreTypes.Variable.print x)
-          (Type.print_beautiful tysch) )
-      vars ;
+          (Type.print_beautiful tysch))
+      vars;
     state'
 
   let process_external state (x, ty, f) =

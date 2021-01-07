@@ -46,40 +46,40 @@ let rec compare v1 v2 =
   match v1 with
   | V.Closure _ | V.Handler _ -> Invalid
   | V.Const c -> (
-    match v2 with
-    | V.Closure _ | V.Handler _ -> Invalid
-    | V.Const c' -> Const.compare c c'
-    | V.Tuple _ | V.Record _ | V.Variant _ -> Less )
+      match v2 with
+      | V.Closure _ | V.Handler _ -> Invalid
+      | V.Const c' -> Const.compare c c'
+      | V.Tuple _ | V.Record _ | V.Variant _ -> Less)
   | V.Tuple lst -> (
-    match v2 with
-    | V.Closure _ | V.Handler _ -> Invalid
-    | V.Const _ -> Greater
-    | V.Tuple lst' -> compare_list lst lst'
-    | V.Record _ | V.Variant _ -> Less )
+      match v2 with
+      | V.Closure _ | V.Handler _ -> Invalid
+      | V.Const _ -> Greater
+      | V.Tuple lst' -> compare_list lst lst'
+      | V.Record _ | V.Variant _ -> Less)
   | V.Record lst -> (
-    match v2 with
-    | V.Closure _ | V.Handler _ -> Invalid
-    | V.Const _ | V.Tuple _ -> Greater
-    | V.Record lst' -> compare_record lst lst'
-    | V.Variant _ -> Less )
+      match v2 with
+      | V.Closure _ | V.Handler _ -> Invalid
+      | V.Const _ | V.Tuple _ -> Greater
+      | V.Record lst' -> compare_record lst lst'
+      | V.Variant _ -> Less)
   | V.Variant (lbl, u) -> (
-    match v2 with
-    | V.Closure _ | V.Handler _ -> Invalid
-    | V.Const _ | V.Tuple _ | V.Record _ -> Greater
-    | V.Variant (lbl', u') ->
-        let r = Pervasives.compare lbl lbl' in
-        if r < 0 then Less else if r > 0 then Greater else compare_option u u'
-    )
+      match v2 with
+      | V.Closure _ | V.Handler _ -> Invalid
+      | V.Const _ | V.Tuple _ | V.Record _ -> Greater
+      | V.Variant (lbl', u') ->
+          let r = Pervasives.compare lbl lbl' in
+          if r < 0 then Less else if r > 0 then Greater else compare_option u u'
+      )
 
 and compare_list lst1 lst2 =
   match (lst1, lst2) with
   | [], [] -> Equal
   | u :: lst1, v :: lst2 -> (
-    match compare u v with
-    | Less -> Less
-    | Equal -> compare_list lst1 lst2
-    | Greater -> Greater
-    | Invalid -> Invalid )
+      match compare u v with
+      | Less -> Less
+      | Equal -> compare_list lst1 lst2
+      | Greater -> Greater
+      | Invalid -> Invalid)
   | [], _ :: _ -> Less
   | _ :: _, [] -> Greater
 
@@ -96,15 +96,15 @@ and compare_record lst1 lst2 =
           | Less -> Less
           | Equal -> comp (lst1, lst2)
           | Greater -> Greater
-          | Invalid -> Invalid )
+          | Invalid -> Invalid)
     | [], _ :: _ -> Less
     | _ :: _, [] -> Greater
   in
   let lst1' = Assoc.to_list lst1 in
   let lst2' = Assoc.to_list lst2 in
   comp
-    ( List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst1'
-    , List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst2'
+    ( List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst1',
+      List.sort (fun (fld1, _) (fld2, _) -> Pervasives.compare fld1 fld2) lst2'
     )
 
 and compare_option o1 o2 =
@@ -130,14 +130,18 @@ let less_than v1 v2 =
 
 let comparison_functions =
   Assoc.of_list
-    [ ("=", binary_closure (fun v1 v2 -> value_bool (equal v1 v2)))
-    ; ("<", binary_closure (fun v1 v2 -> value_bool (less_than v1 v2))) ]
+    [
+      ("=", binary_closure (fun v1 v2 -> value_bool (equal v1 v2)));
+      ("<", binary_closure (fun v1 v2 -> value_bool (less_than v1 v2)));
+    ]
 
 let constants =
   Assoc.of_list
-    [ ("infinity", from_float infinity)
-    ; ("neg_infinity", from_float neg_infinity)
-    ; ("nan", from_float nan) ]
+    [
+      ("infinity", from_float infinity);
+      ("neg_infinity", from_float neg_infinity);
+      ("nan", from_float nan);
+    ]
 
 let rec pow a = function
   | 0 -> 1
@@ -148,53 +152,59 @@ let rec pow a = function
 
 let arithmetic_operations =
   Assoc.of_list
-    [ ("~-", from_fun (fun v -> value_int (-V.to_int v)))
-    ; ("+", int_int_to_int ( + ))
-    ; ("-", int_int_to_int ( - ))
-    ; ("*", int_int_to_int ( * ))
-    ; ("/", int_int_to_int ( / ))
-    ; ("mod", int_int_to_int ( mod ))
-    ; ("**", int_int_to_int pow)
-    ; ("~-.", from_fun (fun v -> value_float ~-.(V.to_float v)))
-    ; ("+.", float_float_to_float ( +. ))
-    ; ("-.", float_float_to_float ( -. ))
-    ; ("*.", float_float_to_float ( *. ))
-    ; ("/.", float_float_to_float ( /. ))
-    ; ("exp", float_to_float exp)
-    ; ("expm1", float_to_float expm1)
-    ; ("log", float_to_float log)
-    ; ("log1p", float_to_float log1p)
-    ; ("cos", float_to_float cos)
-    ; ("sin", float_to_float sin)
-    ; ("tan", float_to_float tan)
-    ; ("acos", float_to_float acos)
-    ; ("asin", float_to_float asin)
-    ; ("atan", float_to_float atan)
-    ; ("sqrt", float_to_float sqrt) ]
+    [
+      ("~-", from_fun (fun v -> value_int (-V.to_int v)));
+      ("+", int_int_to_int ( + ));
+      ("-", int_int_to_int ( - ));
+      ("*", int_int_to_int ( * ));
+      ("/", int_int_to_int ( / ));
+      ("mod", int_int_to_int ( mod ));
+      ("**", int_int_to_int pow);
+      ("~-.", from_fun (fun v -> value_float ~-.(V.to_float v)));
+      ("+.", float_float_to_float ( +. ));
+      ("-.", float_float_to_float ( -. ));
+      ("*.", float_float_to_float ( *. ));
+      ("/.", float_float_to_float ( /. ));
+      ("exp", float_to_float exp);
+      ("expm1", float_to_float expm1);
+      ("log", float_to_float log);
+      ("log1p", float_to_float log1p);
+      ("cos", float_to_float cos);
+      ("sin", float_to_float sin);
+      ("tan", float_to_float tan);
+      ("acos", float_to_float acos);
+      ("asin", float_to_float asin);
+      ("atan", float_to_float atan);
+      ("sqrt", float_to_float sqrt);
+    ]
 
 let string_operations =
   Assoc.of_list
-    [ ("^", binary_closure (fun v1 v2 -> value_str (V.to_str v1 ^ V.to_str v2)))
-    ; ( "string_length"
-      , from_fun (fun v -> value_int (String.length (V.to_str v))) ) ]
+    [
+      ("^", binary_closure (fun v1 v2 -> value_str (V.to_str v1 ^ V.to_str v2)));
+      ( "string_length",
+        from_fun (fun v -> value_int (String.length (V.to_str v))) );
+    ]
 
 let conversion_functions =
   Assoc.of_list
-    [ ( "to_string"
-      , let to_string v =
-          Value.print_value v Format.str_formatter ;
+    [
+      ( "to_string",
+        let to_string v =
+          Value.print_value v Format.str_formatter;
           let s = Format.flush_str_formatter () in
           value_str s
         in
-        from_fun to_string )
-    ; ( "string_of_float"
-      , from_fun (fun v -> value_str (string_of_float (V.to_float v))) )
-    ; ( "string_of_int"
-      , from_fun (fun v -> value_str (string_of_int (V.to_int v))) )
-    ; ( "float_of_int"
-      , from_fun (fun v -> value_float (float_of_int (V.to_int v))) )
-    ; ( "int_of_float"
-      , from_fun (fun v -> value_int (int_of_float (V.to_float v))) ) ]
+        from_fun to_string );
+      ( "string_of_float",
+        from_fun (fun v -> value_str (string_of_float (V.to_float v))) );
+      ( "string_of_int",
+        from_fun (fun v -> value_str (string_of_int (V.to_int v))) );
+      ( "float_of_int",
+        from_fun (fun v -> value_float (float_of_int (V.to_int v))) );
+      ( "int_of_float",
+        from_fun (fun v -> value_int (int_of_float (V.to_float v))) );
+    ]
 
 (** [values] is an association list of external names and values, consisting of
     comparison functions, arithmetic operations, string operations, conversion

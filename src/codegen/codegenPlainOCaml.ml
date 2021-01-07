@@ -6,14 +6,13 @@ let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p with
   | Erasure.PEVar x -> print "%t" (print_variable x)
-  | Erasure.PEAs (p, x) ->
-      print "%t as %t" (print_pattern p) (print_variable x)
+  | Erasure.PEAs (p, x) -> print "%t as %t" (print_pattern p) (print_variable x)
   | Erasure.PEConst c -> Const.print c ppf
   | Erasure.PETuple lst -> Print.tuple print_pattern lst ppf
   | Erasure.PERecord lst -> Print.record print_pattern lst ppf
   | Erasure.PEVariant (lbl, None) when lbl = CoreTypes.nil -> print "[]"
   | Erasure.PEVariant (lbl, None) -> print "%s" lbl
-  | Erasure.PEVariant ("(::)", Some (Erasure.PETuple [p1; p2])) ->
+  | Erasure.PEVariant ("(::)", Some (Erasure.PETuple [ p1; p2 ])) ->
       print ~at_level:1 "((%t) :: (%t))" (print_pattern p1) (print_pattern p2)
   | Erasure.PEVariant (lbl, Some p) ->
       print ~at_level:1 "(%s @[<hov>%t@])" lbl (print_pattern p)
@@ -39,9 +38,9 @@ let rec print_expression ?max_level e ppf =
   | Erasure.EHandler h ->
       print ~at_level:2
         "fun c -> handler {@[<hov> value_clause = (@[fun %t@]);@ \
-         effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->\n             \
-         ((match x with %t) : a -> (b -> _ computation) -> _ computation)) \
-         @]} c"
+         effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->\n\
+        \             ((match x with %t) : a -> (b -> _ computation) -> _ \
+         computation)) @]} c"
         (print_abstraction_with_ty h.Erasure.value_clause)
         (print_effect_clauses (Assoc.to_list h.Erasure.effect_clauses))
   | EBigLambdaSkel (_, e) -> print "%t" (print_expression e)
@@ -75,9 +74,9 @@ and print_computation ?max_level c ppf =
       print ~at_level:1 "match %t with %t"
         (print_expression ~max_level:0 e)
         (print_cases alist)
-  | Erasure.ELetRec ([(var, _, e)], c) ->
-      print ~at_level:2 "let rec @[<hov>%t =@ %t@ in@]@ %t"
-        (print_variable var) (print_expression e) (print_computation c)
+  | Erasure.ELetRec ([ (var, _, e) ], c) ->
+      print ~at_level:2 "let rec @[<hov>%t =@ %t@ in@]@ %t" (print_variable var)
+        (print_expression e) (print_computation c)
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in

@@ -16,24 +16,24 @@ module type T = sig
     state -> CoreTypes.Effect.t * (Type.ty * Type.ty) -> state
 
   val process_top_let :
-       state
-    -> (CoreSyntax.pattern * CoreSyntax.computation) list
-    -> (CoreTypes.Variable.t * TypeSystem.Ctx.ty_scheme) list
-    -> state
+    state ->
+    (CoreSyntax.pattern * CoreSyntax.computation) list ->
+    (CoreTypes.Variable.t * TypeSystem.Ctx.ty_scheme) list ->
+    state
 
   val process_top_let_rec :
-       state
-    -> (CoreSyntax.variable, CoreSyntax.abstraction) Assoc.t
-    -> (CoreTypes.Variable.t * TypeSystem.Ctx.ty_scheme) list
-    -> state
+    state ->
+    (CoreSyntax.variable, CoreSyntax.abstraction) Assoc.t ->
+    (CoreTypes.Variable.t * TypeSystem.Ctx.ty_scheme) list ->
+    state
 
   val process_external :
     state -> CoreTypes.Variable.t * Type.ty * string -> state
 
   val process_tydef :
-       state
-    -> (CoreTypes.TyName.t, CoreTypes.TyParam.t list * Tctx.tydef) Assoc.t
-    -> state
+    state ->
+    (CoreTypes.TyName.t, CoreTypes.TyParam.t list * Tctx.tydef) Assoc.t ->
+    state
 
   val finalize : state -> unit
 end

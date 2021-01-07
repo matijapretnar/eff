@@ -9,14 +9,14 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 
-  type state = {prog: MulticoreSyntax.cmd list}
+  type state = { prog : MulticoreSyntax.cmd list }
 
-  let initial_state = {prog= []}
+  let initial_state = { prog = [] }
 
   (* Auxiliary functions *)
   let update state cmd =
-    Print.debug "%t@?" (MulticoreSyntax.print_cmd cmd) ;
-    {prog= state.prog @ [cmd]}
+    Print.debug "%t@?" (MulticoreSyntax.print_cmd cmd);
+    { prog = state.prog @ [ cmd ] }
 
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
@@ -26,7 +26,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
 
   let process_type_of state c ty =
     Print.warning
-      "[#typeof] commands are ignored when compiling to Multicore OCaml." ;
+      "[#typeof] commands are ignored when compiling to Multicore OCaml.";
     state
 
   let process_def_effect state (eff, (ty1, ty2)) =
@@ -60,6 +60,6 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
   let finalize state =
     let channel = open_out P.output_file in
     let output_ppf = Format.formatter_of_out_channel channel in
-    List.iter (fun cmd -> MulticoreSyntax.print_cmd cmd output_ppf) state.prog ;
+    List.iter (fun cmd -> MulticoreSyntax.print_cmd cmd output_ppf) state.prog;
     close_out channel
 end

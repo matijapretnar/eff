@@ -17,7 +17,7 @@ and of_abstraction2 (p1, p2, c) =
   (of_pattern p1, of_pattern p2, of_computation c)
 
 (** Conversion functions. *)
-and of_expression {it; at} =
+and of_expression { it; at } =
   match it with
   | CoreSyntax.Var v -> Var v
   | CoreSyntax.Const const -> Const const
@@ -25,26 +25,27 @@ and of_expression {it; at} =
   | CoreSyntax.Tuple es -> Tuple (List.map of_expression es)
   | CoreSyntax.Record assoc -> Record (Assoc.map of_expression assoc)
   | CoreSyntax.Variant (lbl, e_opt) -> (
-    match e_opt with
-    | None -> Variant (lbl, None)
-    | Some e -> Variant (lbl, Some (of_expression e)) )
+      match e_opt with
+      | None -> Variant (lbl, None)
+      | Some e -> Variant (lbl, Some (of_expression e)))
   | CoreSyntax.Lambda abs -> (
-    (* Transform back to [function] keyword if possible *)
-    match abs with
-    | p, {it= CoreSyntax.Match (e, abs_lst)} -> (
-        let p' = of_pattern p in
-        let e' = of_expression e in
-        match (p', e') with
-        | PVar v1, Var v2
-          when v1 = v2
-               && CoreTypes.Variable.fold (fun desc _ -> desc = "$function") v1
-          ->
-            let converter abs = ValueClause (of_abstraction abs) in
-            Function (List.map converter abs_lst)
-        | _ -> Lambda (of_abstraction abs) )
-    | _ -> Lambda (of_abstraction abs) )
+      (* Transform back to [function] keyword if possible *)
+      match abs with
+      | p, { it = CoreSyntax.Match (e, abs_lst) } -> (
+          let p' = of_pattern p in
+          let e' = of_expression e in
+          match (p', e') with
+          | PVar v1, Var v2
+            when v1 = v2
+                 && CoreTypes.Variable.fold
+                      (fun desc _ -> desc = "$function")
+                      v1 ->
+              let converter abs = ValueClause (of_abstraction abs) in
+              Function (List.map converter abs_lst)
+          | _ -> Lambda (of_abstraction abs))
+      | _ -> Lambda (of_abstraction abs))
   | CoreSyntax.Effect eff -> Effect eff
-  | CoreSyntax.Handler {effect_clauses; value_clause; finally_clause} ->
+  | CoreSyntax.Handler { effect_clauses; value_clause; finally_clause } ->
       (* Non-trivial case *)
       let effect_clauses' =
         List.map
@@ -64,7 +65,7 @@ and of_expression {it; at} =
         Lambda
           (PVar ghost_bind, Apply (Lambda finally_clause_abs, match_handler))
 
-and of_computation {it; at} =
+and of_computation { it; at } =
   match it with
   | CoreSyntax.Value e -> of_expression e
   | CoreSyntax.Let (p_c_lst, c) ->
@@ -84,7 +85,7 @@ and of_computation {it; at} =
       let thunked_c = Lambda (PNonbinding, of_computation c) in
       Apply (modified_handler, thunked_c)
 
-and of_pattern {it; at} =
+and of_pattern { it; at } =
   match it with
   | CoreSyntax.PVar var -> PVar var
   | CoreSyntax.PAnnotated (p, ty) -> PAnnotated (of_pattern p, of_type ty)
@@ -92,9 +93,9 @@ and of_pattern {it; at} =
   | CoreSyntax.PTuple ps -> PTuple (List.map of_pattern ps)
   | CoreSyntax.PRecord assoc -> PRecord (Assoc.map of_pattern assoc)
   | CoreSyntax.PVariant (lbl, p_opt) -> (
-    match p_opt with
-    | None -> PVariant (lbl, None)
-    | Some p -> PVariant (lbl, Some (of_pattern p)) )
+      match p_opt with
+      | None -> PVariant (lbl, None)
+      | Some p -> PVariant (lbl, Some (of_pattern p)))
   | CoreSyntax.PConst const -> PConst const
   | CoreSyntax.PNonbinding -> PNonbinding
 
@@ -104,7 +105,7 @@ and of_type = function
   | Type.Basic s -> TyBasic s
   | Type.Tuple tys -> TyTuple (List.map of_type tys)
   | Type.Arrow (ty1, ty2) -> TyArrow (of_type ty1, of_type ty2)
-  | Type.Handler {value; finally} ->
+  | Type.Handler { value; finally } ->
       (* Non-trivial case *)
       TyArrow (TyArrow (of_type Type.unit_ty, of_type value), of_type finally)
 

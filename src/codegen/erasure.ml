@@ -41,23 +41,24 @@ and e_computation =
   | EMatch of e_expression * e_abstraction list
   | ELetRec of (variable * Types.skeleton * e_expression) list * e_computation
 
+and e_handler = {
+  effect_clauses : (effect, e_abstraction2) Assoc.t;
+  value_clause : e_abstraction_with_ty;
+}
 (** Handler definitions *)
-and e_handler =
-  { effect_clauses: (effect, e_abstraction2) Assoc.t
-  ; value_clause: e_abstraction_with_ty }
 
-(** Abstractions that take one argument. *)
 and e_abstraction = e_pattern * e_computation
+(** Abstractions that take one argument. *)
 
 and e_abstraction_with_ty = e_pattern * Types.skeleton * e_computation
 
-(** Abstractions that take two arguments. *)
 and e_abstraction2 = e_pattern * e_pattern * e_computation
+(** Abstractions that take two arguments. *)
 
 let rec typed_to_erasure_ty sub typed_ty =
   match typed_ty with
   | Types.TyParam p -> (
-    match Assoc.lookup p sub with Some x' -> x' | None -> assert false )
+      match Assoc.lookup p sub with Some x' -> x' | None -> assert false)
   | Types.Arrow (t1, (t2, drt)) ->
       let t1' = typed_to_erasure_ty sub t1 in
       let t2' = typed_to_erasure_ty sub t2 in
@@ -94,10 +95,10 @@ let rec typed_to_erasure_exp sub tt =
         Assoc.kmap
           (fun (eff, e_a2) ->
             let new_e_a2 = typed_to_erasure_abs_2 sub e_a2 in
-            (eff, new_e_a2) )
+            (eff, new_e_a2))
           op_c
       in
-      let new_h = {value_clause= new_vc; effect_clauses= new_op_c} in
+      let new_h = { value_clause = new_vc; effect_clauses = new_op_c } in
       EHandler new_h
   | Typed.BigLambdaTy (tp, sk, e) ->
       let sub1 = Assoc.concat sub (Assoc.update tp sk Assoc.empty) in
@@ -145,23 +146,23 @@ and typed_to_erasure_comp sub tt =
   | Typed.CastComp (c, _) -> typed_to_erasure_comp sub c
   | Typed.CastComp_ty (c, _) -> typed_to_erasure_comp sub c
   | Typed.CastComp_dirt (c, _) -> typed_to_erasure_comp sub c
-  | Typed.LetRec ([(var, ty, e1)], c1) ->
+  | Typed.LetRec ([ (var, ty, e1) ], c1) ->
       ELetRec
-        ( [(var, typed_to_erasure_ty sub ty, typed_to_erasure_exp sub e1)]
-        , typed_to_erasure_comp sub c1 )
+        ( [ (var, typed_to_erasure_ty sub ty, typed_to_erasure_exp sub e1) ],
+          typed_to_erasure_comp sub c1 )
 
 and typed_to_erasure_abs_with_ty sub (e_p, e_ty, e_c) =
-  ( typed_to_erasure_pattern e_p
-  , typed_to_erasure_ty sub e_ty
-  , typed_to_erasure_comp sub e_c )
+  ( typed_to_erasure_pattern e_p,
+    typed_to_erasure_ty sub e_ty,
+    typed_to_erasure_comp sub e_c )
 
 and typed_to_erasure_abs sub (e_p, e_c) =
   (typed_to_erasure_pattern e_p, typed_to_erasure_comp sub e_c)
 
 and typed_to_erasure_abs_2 sub (e_p1, e_p2, e_c) =
-  ( typed_to_erasure_pattern e_p1
-  , typed_to_erasure_pattern e_p2
-  , typed_to_erasure_comp sub e_c )
+  ( typed_to_erasure_pattern e_p1,
+    typed_to_erasure_pattern e_p2,
+    typed_to_erasure_comp sub e_c )
 
 and typed_to_erasure_pattern = function
   | Typed.PVar x -> PEVar x

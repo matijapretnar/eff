@@ -1,46 +1,55 @@
 open Types
 open Typed
 
-type state =
-  { fuel: int ref
-  ; tc_state: TypeChecker.state
-  ; recursive_functions: (variable, Types.target_ty * expression) Assoc.t
-  ; knot_functions: (variable, expression * handler * variable) Assoc.t }
+type state = {
+  fuel : int ref;
+  tc_state : TypeChecker.state;
+  recursive_functions : (variable, Types.target_ty * expression) Assoc.t;
+  knot_functions : (variable, expression * handler * variable) Assoc.t;
+}
 
 let inititial_state =
-  { fuel= ref !Config.optimization_fuel
-  ; tc_state= TypeChecker.initial_state
-  ; recursive_functions= Assoc.empty
-  ; knot_functions= Assoc.empty }
+  {
+    fuel = ref !Config.optimization_fuel;
+    tc_state = TypeChecker.initial_state;
+    recursive_functions = Assoc.empty;
+    knot_functions = Assoc.empty;
+  }
 
 let extend_rec_fun st f ty e =
-  {st with recursive_functions= Assoc.update f (ty, e) st.recursive_functions}
+  {
+    st with
+    recursive_functions = Assoc.update f (ty, e) st.recursive_functions;
+  }
 
 let extend_var_type st t_var ty =
-  {st with tc_state= TypeChecker.extend_var_types st.tc_state t_var ty}
+  { st with tc_state = TypeChecker.extend_var_types st.tc_state t_var ty }
 
 let extend_ty_params st ty_var =
-  {st with tc_state= TypeChecker.extend_ty_params st.tc_state ty_var}
+  { st with tc_state = TypeChecker.extend_ty_params st.tc_state ty_var }
 
 let extend_dirt_params st t_var =
-  {st with tc_state= TypeChecker.extend_dirt_params st.tc_state t_var}
+  { st with tc_state = TypeChecker.extend_dirt_params st.tc_state t_var }
 
 let extend_skel_params st t_var =
-  {st with tc_state= TypeChecker.extend_skel_params st.tc_state t_var}
+  { st with tc_state = TypeChecker.extend_skel_params st.tc_state t_var }
 
 let extend_ty_coer_types st omega ct =
-  {st with tc_state= TypeChecker.extend_ty_coer_types st.tc_state omega ct}
+  { st with tc_state = TypeChecker.extend_ty_coer_types st.tc_state omega ct }
 
 let extend_dirt_coer_types st omega ct =
-  {st with tc_state= TypeChecker.extend_dirt_coer_types st.tc_state omega ct}
+  { st with tc_state = TypeChecker.extend_dirt_coer_types st.tc_state omega ct }
 
 let extend_ty_param_skeletons st omega ct =
-  {st with tc_state= TypeChecker.extend_ty_param_skeletons st.tc_state omega ct}
+  {
+    st with
+    tc_state = TypeChecker.extend_ty_param_skeletons st.tc_state omega ct;
+  }
 
 let refresh_expr e =
   let res = Typed.refresh_expr Assoc.empty e in
-  Print.debug "refresh_expr  : %t" (Typed.print_expression e) ;
-  Print.debug "refresh_expr'd: %t" (Typed.print_expression res) ;
+  Print.debug "refresh_expr  : %t" (Typed.print_expression e);
+  Print.debug "refresh_expr'd: %t" (Typed.print_expression res);
   res
 
 let refresh_abs a = Typed.refresh_abs Assoc.empty a
@@ -49,13 +58,13 @@ let refresh_abs_with_ty a = Typed.refresh_abs_with_ty Assoc.empty a
 
 let refresh_abs2 a2 =
   let res = Typed.refresh_abs2 Assoc.empty a2 in
-  Print.debug "refresh_abs2  : %t" (Typed.print_abstraction2 a2) ;
-  Print.debug "refresh_abs2'd: %t" (Typed.print_abstraction2 res) ;
+  Print.debug "refresh_abs2  : %t" (Typed.print_abstraction2 a2);
+  Print.debug "refresh_abs2'd: %t" (Typed.print_abstraction2 res);
   res
 
 let is_relatively_pure st c h =
   match TypeChecker.type_of_computation st.tc_state c with
-  | ty, {Types.effect_set= ops; Types.row= Types.EmptyRow} ->
+  | ty, { Types.effect_set = ops; Types.row = Types.EmptyRow } ->
       let handled_ops =
         EffectSet.of_list
           (List.map (fun ((eff, _), _) -> eff) (Assoc.to_list h.effect_clauses))
@@ -63,30 +72,32 @@ let is_relatively_pure st c h =
       Print.debug "is_relatively_pure: %t:  %t vs %t"
         (Typed.print_computation c)
         (Types.print_effect_set handled_ops)
-        (Types.print_effect_set ops) ;
+        (Types.print_effect_set ops);
       if EffectSet.is_empty (EffectSet.inter handled_ops ops) then
         let (Types.Handler (_, (_, output_dirt))) =
           TypeChecker.type_of_handler st.tc_state h
         in
         match output_dirt with
-        | {Types.effect_set= ops'; Types.row= Types.EmptyRow} ->
+        | { Types.effect_set = ops'; Types.row = Types.EmptyRow } ->
             Some
               (BangCoercion
-                 ( ReflTy ty
-                 , UnionDirt
+                 ( ReflTy ty,
+                   UnionDirt
                      (*( EffectSet.inter ops ops'*)
                      (ops, Empty (Types.closed_dirt (EffectSet.diff ops' ops)))
                  ))
-        | {Types.effect_set= ops'; Types.row= Types.ParamRow var} ->
+        | { Types.effect_set = ops'; Types.row = Types.ParamRow var } ->
             Some
               (BangCoercion
-                 ( ReflTy ty
-                 , UnionDirt
+                 ( ReflTy ty,
+                   UnionDirt
                      (*( EffectSet.inter ops ops'*)
-                     ( ops
-                     , Empty
-                         { Types.effect_set= EffectSet.diff ops' ops
-                         ; Types.row= Types.ParamRow var } ) ))
+                     ( ops,
+                       Empty
+                         {
+                           Types.effect_set = EffectSet.diff ops' ops;
+                           Types.row = Types.ParamRow var;
+                         } ) ))
       else None
   | _, _ -> None
 
@@ -111,7 +122,7 @@ let applicable_pattern p vars =
         else
           match check_variables xs with
           | NotPresent -> if outside_occ = 0 then NotPresent else Inlinable
-          | inlinability -> inlinability )
+          | inlinability -> inlinability)
   in
   check_variables (Typed.pattern_vars p)
 
@@ -178,33 +189,32 @@ and optimize_sub_dirt_coercion st p_ops dco =
   match dco with
   | ReflDirt d -> dco
   | DirtCoercionVar dcov -> dco
-  | Empty d ->
-      if dirts_are_equal d empty_dirt then ReflDirt empty_dirt else dco
+  | Empty d -> if dirts_are_equal d empty_dirt then ReflDirt empty_dirt else dco
   | UnionDirt (ops, dco1) ->
       UnionDirt
         (ops, optimize_dirt_coercion' st (EffectSet.union p_ops ops) dco1)
   | SequenceDirtCoer (dco1, dco2) ->
       SequenceDirtCoer
-        ( optimize_dirt_coercion' st p_ops dco1
-        , optimize_dirt_coercion' st p_ops dco2 )
+        ( optimize_dirt_coercion' st p_ops dco1,
+          optimize_dirt_coercion' st p_ops dco2 )
   | DirtCoercion dtyco -> DirtCoercion (optimize_dirty_coercion st dtyco)
 
 and reduce_ty_coercion st tyco =
-  Print.debug "reduce_ty_coercion: %t" (Typed.print_ty_coercion tyco) ;
+  Print.debug "reduce_ty_coercion: %t" (Typed.print_ty_coercion tyco);
   match tyco with
   | ReflTy ty -> tyco
   | ArrowCoercion (tyco1, dtyco2) -> (
-    match (tyco1, dtyco2) with
-    | ReflTy ty1, BangCoercion (ReflTy ty2, ReflDirt d) ->
-        ReflTy (Arrow (ty1, (ty2, d)))
-    | _ -> tyco )
+      match (tyco1, dtyco2) with
+      | ReflTy ty1, BangCoercion (ReflTy ty2, ReflDirt d) ->
+          ReflTy (Arrow (ty1, (ty2, d)))
+      | _ -> tyco)
   | HandlerCoercion (dtyco1, dtyco2) -> tyco
   | TyCoercionVar tycovar -> tyco
   | SequenceTyCoer (tyco1, tyco2) -> (
-    match (tyco1, tyco2) with
-    | ReflTy _, _ -> tyco2
-    | _, ReflTy _ -> tyco1
-    | _ -> tyco )
+      match (tyco1, tyco2) with
+      | ReflTy _, _ -> tyco2
+      | _, ReflTy _ -> tyco1
+      | _ -> tyco)
   | TupleCoercion tycos -> tyco
   | LeftArrow tyco1 -> tyco
   | ForallTy (tv, tyco1) -> tyco
@@ -220,26 +230,26 @@ and reduce_ty_coercion st tyco =
   | ApplySkelCoer (tyco1, sk) -> tyco
 
 and reduce_dirty_coercion st dtyco =
-  Print.debug "reduce_dirty_coercion: %t" (Typed.print_dirty_coercion dtyco) ;
+  Print.debug "reduce_dirty_coercion: %t" (Typed.print_dirty_coercion dtyco);
   match dtyco with
   | BangCoercion (tyco1, dco2) -> dtyco
   | RightArrow tyco1 -> (
-    match tyco1 with ArrowCoercion (tyco11, dtyco12) -> dtyco12 | _ -> dtyco )
+      match tyco1 with ArrowCoercion (tyco11, dtyco12) -> dtyco12 | _ -> dtyco)
   | RightHandler tyco1 -> (
-    match tyco1 with
-    | HandlerCoercion (dtyco11, dtyco12) -> dtyco12
-    | _ -> dtyco )
+      match tyco1 with
+      | HandlerCoercion (dtyco11, dtyco12) -> dtyco12
+      | _ -> dtyco)
   | LeftHandler tyco1 -> (
-    match tyco1 with
-    | HandlerCoercion (dtyco11, dtyco12) -> dtyco11
-    | _ -> dtyco )
+      match tyco1 with
+      | HandlerCoercion (dtyco11, dtyco12) -> dtyco11
+      | _ -> dtyco)
   | SequenceDirtyCoer (dtyco1, dtyco2) -> (
-    match (dtyco1, dtyco2) with
-    | BangCoercion (tyco1, dco1), BangCoercion (tyco2, dco2) ->
-        BangCoercion
-          ( reduce_ty_coercion st (SequenceTyCoer (tyco1, tyco2))
-          , optimize_dirt_coercion st (SequenceDirtCoer (dco1, dco2)) )
-    | _ -> dtyco )
+      match (dtyco1, dtyco2) with
+      | BangCoercion (tyco1, dco1), BangCoercion (tyco2, dco2) ->
+          BangCoercion
+            ( reduce_ty_coercion st (SequenceTyCoer (tyco1, tyco2)),
+              optimize_dirt_coercion st (SequenceDirtCoer (dco1, dco2)) )
+      | _ -> dtyco)
 
 and reduce_dirt_coercion st p_ops dco =
   match dco with
@@ -249,22 +259,22 @@ and reduce_dirt_coercion st p_ops dco =
       let d' = Types.remove_effects p_ops d in
       if dirts_are_equal d' empty_dirt then ReflDirt empty_dirt else Empty d'
   | UnionDirt (ops, dco1) -> (
-    match dco1 with
-    | ReflDirt d -> ReflDirt (add_effects ops d)
-    | _ ->
-        let d1, d2 = TypeChecker.type_of_dirt_coercion st.tc_state dco1 in
-        let ops' =
-          EffectSet.diff ops
-            (EffectSet.inter d1.Types.effect_set d2.Types.effect_set)
-        in
-        if EffectSet.is_empty ops' then dco1 else UnionDirt (ops', dco1) )
+      match dco1 with
+      | ReflDirt d -> ReflDirt (add_effects ops d)
+      | _ ->
+          let d1, d2 = TypeChecker.type_of_dirt_coercion st.tc_state dco1 in
+          let ops' =
+            EffectSet.diff ops
+              (EffectSet.inter d1.Types.effect_set d2.Types.effect_set)
+          in
+          if EffectSet.is_empty ops' then dco1 else UnionDirt (ops', dco1))
   | SequenceDirtCoer (dco1, dco2) -> (
-    match (dco1, dco2) with
-    | ReflDirt _, _ -> dco2
-    | _, ReflDirt _ -> dco1
-    | _ -> dco )
+      match (dco1, dco2) with
+      | ReflDirt _, _ -> dco2
+      | _, ReflDirt _ -> dco1
+      | _ -> dco)
   | DirtCoercion dtyco -> (
-    match dtyco with BangCoercion (_, dco1) -> dco1 | _ -> dco )
+      match dtyco with BangCoercion (_, dco1) -> dco1 | _ -> dco)
 
 let rec substitute_pattern_comp st c p exp =
   optimize_comp st (Typed.subst_comp (Typed.pattern_match p exp) c)
@@ -274,7 +284,7 @@ and beta_reduce st ((p, ty, c) as a) e =
   | Inlinable -> substitute_pattern_comp st c p e
   | NotPresent -> c
   | NotInlinable when is_atomic e ->
-      Print.debug "beta_reduce not-inlinable is_atomc" ;
+      Print.debug "beta_reduce not-inlinable is_atomc";
       substitute_pattern_comp st c p e
   | NotInlinable -> LetVal (e, a)
 
@@ -346,9 +356,9 @@ and optimize_sub_expr st e =
 and match_recursive_function st e =
   match e with
   | Var fvar -> (
-    match Assoc.lookup fvar st.recursive_functions with
-    | None -> None
-    | Some (fty, fbody) -> Some (fvar, fty, fbody) )
+      match Assoc.lookup fvar st.recursive_functions with
+      | None -> None
+      | Some (fty, fbody) -> Some (fvar, fty, fbody))
   | ApplyTyExp (e, ty) -> match_recursive_function st e
   | ApplyDirtExp (e, dirt) -> match_recursive_function st e
   | ApplySkelExp (e, sk) -> match_recursive_function st e
@@ -361,11 +371,11 @@ and match_knot_function st e h = match_knot_function' st e e h
 and match_knot_function' st e e' h =
   match e with
   | Var fvar -> (
-    match Assoc.lookup fvar st.knot_functions with
-    | None -> None
-    | Some (ef, hf, fvar') ->
-        if alphaeq_expr [] e' ef && alphaeq_handler [] hf h then Some fvar'
-        else None )
+      match Assoc.lookup fvar st.knot_functions with
+      | None -> None
+      | Some (ef, hf, fvar') ->
+          if alphaeq_expr [] e' ef && alphaeq_handler [] hf h then Some fvar'
+          else None)
   | ApplyTyExp (e, ty) -> match_knot_function' st e e' h
   | ApplyDirtExp (e, dirt) -> match_knot_function' st e e' h
   | ApplySkelExp (e, sk) -> match_knot_function' st e e' h
@@ -373,11 +383,11 @@ and match_knot_function' st e e' h =
   | ApplyTyCoercion (e, tyco) -> match_knot_function' st e e' h
   | _ -> None
 
-and optimize_sub_handler st {effect_clauses= ecs; value_clause= vc} =
+and optimize_sub_handler st { effect_clauses = ecs; value_clause = vc } =
   let vc' = optimize_abstraction_with_ty st vc in
   let _, dty = TypeChecker.type_of_abstraction_with_ty st.tc_state vc in
   let ecs' = Assoc.kmap (optimize_abstraction2 st dty) ecs in
-  {effect_clauses= ecs'; value_clause= vc'}
+  { effect_clauses = ecs'; value_clause = vc' }
 
 and optimize_abstraction_with_ty st a_w_ty =
   let plain_a_w_ty' = optimize_plain_abstraction_with_ty st a_w_ty in
@@ -404,49 +414,45 @@ and optimize_abstraction2 st dty (effect, a2) =
   let (Typed.PVar v1) = p1 in
   let (Typed.PVar v2) = p2 in
   let st =
-    extend_var_type
-      (extend_var_type st v1 in_op)
-      v2
-      (Types.Arrow (out_op, dty))
+    extend_var_type (extend_var_type st v1 in_op) v2 (Types.Arrow (out_op, dty))
   in
   (effect, (p1, p2, optimize_comp st c))
 
 and optimize_sub_comp st c =
-  Print.debug "optimize_sub_comp: %t" (Typed.print_computation c) ;
+  Print.debug "optimize_sub_comp: %t" (Typed.print_computation c);
   let plain_c' =
     match c with
     | Value e1 -> Value (optimize_expr st e1)
     | LetVal (e1, abs) ->
         LetVal (optimize_expr st e1, optimize_abstraction_with_ty st abs)
-    | LetRec ([(var, ty, e1)], c1) ->
+    | LetRec ([ (var, ty, e1) ], c1) ->
         let st' = extend_var_type st var ty in
         let st'' = extend_rec_fun st' var ty e1 in
-        LetRec ([(var, ty, optimize_expr st' e1)], optimize_comp st'' c1)
+        LetRec ([ (var, ty, optimize_expr st' e1) ], optimize_comp st'' c1)
     | Match (e1, abstractions) ->
         let ty = TypeChecker.type_of_expression st.tc_state e1 in
         Match
-          ( optimize_expr st e1
-          , List.map (optimize_abstraction st ty) abstractions )
+          ( optimize_expr st e1,
+            List.map (optimize_abstraction st ty) abstractions )
     | Apply (e1, e2) -> Apply (optimize_expr st e1, optimize_expr st e2)
     | Handle (e1, c1) -> Handle (optimize_expr st e1, optimize_comp st c1)
     | Call (op, e1, a_w_ty) ->
         Call (op, optimize_expr st e1, optimize_abstraction_with_ty st a_w_ty)
     | Op (op, e1) ->
-        Print.debug "optimize_sub_comp Op" ;
+        Print.debug "optimize_sub_comp Op";
         Op (op, optimize_expr st e1)
     | Bind (c1, abstraction) ->
         let ty, _ = TypeChecker.type_of_computation st.tc_state c1 in
         Bind (optimize_comp st c1, optimize_abs st ty abstraction)
     | CastComp (c1, dirty_coercion) ->
-        CastComp
-          (optimize_comp st c1, optimize_dirty_coercion st dirty_coercion)
+        CastComp (optimize_comp st c1, optimize_dirty_coercion st dirty_coercion)
     | CastComp_ty (c1, ty_coercion) -> failwith __LOC__
     | CastComp_dirt (c1, dirt_coercion) -> failwith __LOC__
   in
   plain_c'
 
 and reduce_expr st e =
-  Print.debug "reduce_exp: %t" (Typed.print_expression e) ;
+  Print.debug "reduce_exp: %t" (Typed.print_expression e);
   match e with
   (*
           | Var of variable
@@ -467,33 +473,33 @@ and reduce_expr st e =
           | ApplyTyCoercion (e1,ty_co) ->
           *)
   | ApplySkelExp (e1, sk) -> (
-    match e1 with
-    | BigLambdaSkel (skvar, e11) ->
-        Substitution.apply_substitutions_to_expression
-          (Substitution.add_skel_param_substitution_e skvar sk)
-          e11
-    | _ -> e )
+      match e1 with
+      | BigLambdaSkel (skvar, e11) ->
+          Substitution.apply_substitutions_to_expression
+            (Substitution.add_skel_param_substitution_e skvar sk)
+            e11
+      | _ -> e)
   | ApplyTyExp (e1, ty) -> (
-    match e1 with
-    | BigLambdaTy (tyvar, sk, e11) ->
-        Substitution.apply_substitutions_to_expression
-          (Substitution.add_type_substitution_e tyvar ty)
-          e11
-    | _ -> e )
+      match e1 with
+      | BigLambdaTy (tyvar, sk, e11) ->
+          Substitution.apply_substitutions_to_expression
+            (Substitution.add_type_substitution_e tyvar ty)
+            e11
+      | _ -> e)
   | ApplyDirtCoercion (e1, dco) -> (
-    match e1 with
-    | LambdaDirtCoerVar (dcovar, ctd, e11) ->
-        Substitution.apply_substitutions_to_expression
-          (Substitution.add_dirt_var_coercion_e dcovar dco)
-          e11
-    | _ -> e )
+      match e1 with
+      | LambdaDirtCoerVar (dcovar, ctd, e11) ->
+          Substitution.apply_substitutions_to_expression
+            (Substitution.add_dirt_var_coercion_e dcovar dco)
+            e11
+      | _ -> e)
   | ApplyDirtExp (e1, d) -> (
-    match e1 with
-    | BigLambdaDirt (dvar, e11) ->
-        Substitution.apply_substitutions_to_expression
-          (Substitution.add_dirt_substitution_e dvar d)
-          e11
-    | _ -> e )
+      match e1 with
+      | BigLambdaDirt (dvar, e11) ->
+          Substitution.apply_substitutions_to_expression
+            (Substitution.add_dirt_substitution_e dvar d)
+            e11
+      | _ -> e)
   | Effect op -> e
   | CastExp (e1, ty_co) ->
       let ty1, ty2 = TypeChecker.type_of_ty_coercion st.tc_state ty_co in
@@ -501,192 +507,196 @@ and reduce_expr st e =
   | plain_e -> e
 
 and reduce_comp st c =
-  Print.debug "reduce_comp: %t" (Typed.print_computation c) ;
+  Print.debug "reduce_comp: %t" (Typed.print_computation c);
   match c with
   | Value _ -> c
   | LetVal (e1, abs) -> beta_reduce st abs e1
   | LetRec (bindings, c1) -> c
   | Match (e1, abstractions) -> c
   | Apply (e1, e2) -> (
-    match e1 with
-    | Lambda abs -> beta_reduce st abs e2
-    | Effect op ->
-        Print.debug "Op -> Call" ;
-        let var = Typed.Variable.fresh "call_var" in
-        let eff, (ty_in, ty_out) = op in
-        let c_cont =
-          CastComp
-            ( Value (Var var)
-            , BangCoercion
-                ( ReflTy ty_out
-                , Empty (Types.closed_dirt (EffectSet.singleton eff)) ) )
-        in
-        let a_w_ty = (PVar var, ty_out, c_cont) in
-        Call (op, e2, a_w_ty)
-    | _ ->
-        Print.debug "e1 is not a lambda" ;
-        (* TODO: support case where it's a cast of a lambda *)
-        c )
-  | Handle (e1, c1) -> (
-    match e1 with
-    | CastExp (e11, tyco1) ->
-        let c1' = CastComp (c1, LeftHandler tyco1) in
-        let c' = Handle (e11, c1') in
-        optimize_comp st (CastComp (c', RightHandler tyco1))
-    | Handler h -> (
-      match c1 with
-      | Value e1 ->
-          (* special case that happens when the handler has no effect clauses *)
-          optimize_comp st (beta_reduce st h.value_clause e1)
-      | CastComp (c1', dtyco1) -> (
-        match is_relatively_pure st c1' h with
-        | Some dtyco ->
-            optimize_comp st
-              (Bind
-                 ( CastComp (c1', dtyco)
-                 , Typed.abstraction_with_ty_to_abstraction h.value_clause ))
-        | None -> c )
-      | Bind ((CastComp (c111, _) as c11), a1) -> (
-        (* TODO: Fix *)
-        match is_relatively_pure st c111 h with
-        | Some dtyco ->
-            let p12, c12 = a1 in
-            let (PVar var12) = p12 in
-            optimize_comp st
-              (Bind
-                 ( CastComp (c111, dtyco)
-                 , abstraction p12 (Handle (refresh_expr e1, c12)) ))
-        | None -> c )
-      | Call (eff, e11, k_abs) -> (
-          (* handle call(eff,e11,y:ty.c) with H@{eff xi ki -> ci}
-             >-->
-              ci [(fun y:ty -> handle c with H)/ki, e11 / xi]
-           *)
-          let ((k_pat, k_ty, k_c) as k_abs') = refresh_abs_with_ty k_abs in
-          let (PVar k_var) = k_pat in
-          let handled_k =
-            abstraction_with_ty k_pat k_ty
-              (reduce_comp
-                 (extend_var_type st k_var k_ty)
-                 (Handle (refresh_expr e1, k_c)))
+      match e1 with
+      | Lambda abs -> beta_reduce st abs e2
+      | Effect op ->
+          Print.debug "Op -> Call";
+          let var = Typed.Variable.fresh "call_var" in
+          let eff, (ty_in, ty_out) = op in
+          let c_cont =
+            CastComp
+              ( Value (Var var),
+                BangCoercion
+                  ( ReflTy ty_out,
+                    Empty (Types.closed_dirt (EffectSet.singleton eff)) ) )
           in
-          match Assoc.lookup eff h.effect_clauses with
-          | Some eff_clause ->
-              let p1, p2, c = refresh_abs2 eff_clause in
-              (* Shouldn't we check for inlinability of p1 and p2 here? *)
-              substitute_pattern_comp st
-                (Typed.subst_comp (Typed.pattern_match p1 e11) c)
-                p2 (Lambda handled_k)
-          | None ->
-              let k_abs'' = (k_pat, k_ty, Handle (e1, k_c)) in
-              let res = Call (eff, e11, k_abs'') in
-              reduce_comp st res )
-      | Apply (e11, e12) -> (
-          Print.debug "Looking for recursive function name" ;
-          match match_recursive_function st e11 with
-          | Some (fvar, fty, fbody) ->
-              (*
+          let a_w_ty = (PVar var, ty_out, c_cont) in
+          Call (op, e2, a_w_ty)
+      | _ ->
+          Print.debug "e1 is not a lambda";
+          (* TODO: support case where it's a cast of a lambda *)
+          c)
+  | Handle (e1, c1) -> (
+      match e1 with
+      | CastExp (e11, tyco1) ->
+          let c1' = CastComp (c1, LeftHandler tyco1) in
+          let c' = Handle (e11, c1') in
+          optimize_comp st (CastComp (c', RightHandler tyco1))
+      | Handler h -> (
+          match c1 with
+          | Value e1 ->
+              (* special case that happens when the handler has no effect clauses *)
+              optimize_comp st (beta_reduce st h.value_clause e1)
+          | CastComp (c1', dtyco1) -> (
+              match is_relatively_pure st c1' h with
+              | Some dtyco ->
+                  optimize_comp st
+                    (Bind
+                       ( CastComp (c1', dtyco),
+                         Typed.abstraction_with_ty_to_abstraction h.value_clause
+                       ))
+              | None -> c)
+          | Bind ((CastComp (c111, _) as c11), a1) -> (
+              (* TODO: Fix *)
+              match is_relatively_pure st c111 h with
+              | Some dtyco ->
+                  let p12, c12 = a1 in
+                  let (PVar var12) = p12 in
+                  optimize_comp st
+                    (Bind
+                       ( CastComp (c111, dtyco),
+                         abstraction p12 (Handle (refresh_expr e1, c12)) ))
+              | None -> c)
+          | Call (eff, e11, k_abs) -> (
+              (* handle call(eff,e11,y:ty.c) with H@{eff xi ki -> ci}
+                 >-->
+                  ci [(fun y:ty -> handle c with H)/ki, e11 / xi]
+              *)
+              let ((k_pat, k_ty, k_c) as k_abs') = refresh_abs_with_ty k_abs in
+              let (PVar k_var) = k_pat in
+              let handled_k =
+                abstraction_with_ty k_pat k_ty
+                  (reduce_comp
+                     (extend_var_type st k_var k_ty)
+                     (Handle (refresh_expr e1, k_c)))
+              in
+              match Assoc.lookup eff h.effect_clauses with
+              | Some eff_clause ->
+                  let p1, p2, c = refresh_abs2 eff_clause in
+                  (* Shouldn't we check for inlinability of p1 and p2 here? *)
+                  substitute_pattern_comp st
+                    (Typed.subst_comp (Typed.pattern_match p1 e11) c)
+                    p2 (Lambda handled_k)
+              | None ->
+                  let k_abs'' = (k_pat, k_ty, Handle (e1, k_c)) in
+                  let res = Call (eff, e11, k_abs'') in
+                  reduce_comp st res)
+          | Apply (e11, e12) -> (
+              Print.debug "Looking for recursive function name";
+              match match_recursive_function st e11 with
+              | Some (fvar, fty, fbody) ->
+                  (*
                    handle C[f] e12 with H
                    >->
                    let rec f' : ty_{e12} -> dty_{handle C[f] e12 with H}
                         = fun x : ty_{e12} -> handle C[fbody] x with H
                    in f' e12
                 *)
-              Print.debug "Found recursive function call" ;
-              let dty_c = TypeChecker.type_of_computation st.tc_state c in
-              let ty_e12 = TypeChecker.type_of_expression st.tc_state e12 in
-              let fvar' = Variable.refresh fvar in
-              let xvar = Variable.new_fresh () "__x_of_rec__" in
-              let fty' = Arrow (ty_e12, dty_c) in
-              let st' =
-                { st with
-                  recursive_functions= Assoc.remove fvar st.recursive_functions
-                ; knot_functions=
-                    Assoc.update fvar (e11, h, fvar') st.knot_functions }
-              in
-              let st'' = extend_var_type st' fvar' fty' in
-              let fbody' =
-                optimize_expr st''
-                  (Lambda
-                     (abstraction_with_ty (PVar xvar) ty_e12
-                        (Handle
-                           ( e1
-                           , Apply
-                               ( Typed.subst_expr
-                                   (Assoc.of_list [(fvar, refresh_expr fbody)])
-                                   e11
-                               , Var xvar ) ))))
-              in
-              LetRec ([(fvar', fty', fbody')], Apply (Var fvar', e12))
-          | None -> (
-            match match_knot_function st e11 h with
-            | Some fvar' -> Apply (Var fvar', e12)
-            | None -> c ) )
-      | Match (e, branches) ->
-          (*
+                  Print.debug "Found recursive function call";
+                  let dty_c = TypeChecker.type_of_computation st.tc_state c in
+                  let ty_e12 = TypeChecker.type_of_expression st.tc_state e12 in
+                  let fvar' = Variable.refresh fvar in
+                  let xvar = Variable.new_fresh () "__x_of_rec__" in
+                  let fty' = Arrow (ty_e12, dty_c) in
+                  let st' =
+                    {
+                      st with
+                      recursive_functions =
+                        Assoc.remove fvar st.recursive_functions;
+                      knot_functions =
+                        Assoc.update fvar (e11, h, fvar') st.knot_functions;
+                    }
+                  in
+                  let st'' = extend_var_type st' fvar' fty' in
+                  let fbody' =
+                    optimize_expr st''
+                      (Lambda
+                         (abstraction_with_ty (PVar xvar) ty_e12
+                            (Handle
+                               ( e1,
+                                 Apply
+                                   ( Typed.subst_expr
+                                       (Assoc.of_list
+                                          [ (fvar, refresh_expr fbody) ])
+                                       e11,
+                                     Var xvar ) ))))
+                  in
+                  LetRec ([ (fvar', fty', fbody') ], Apply (Var fvar', e12))
+              | None -> (
+                  match match_knot_function st e11 h with
+                  | Some fvar' -> Apply (Var fvar', e12)
+                  | None -> c))
+          | Match (e, branches) ->
+              (*
              handle (match e with {pi -> ci} ) with H
              >-->
              match e with {pi -> handle ci with H}
            *)
-          let ty_e = TypeChecker.type_of_expression st.tc_state e in
-          Match
-            ( e
-            , List.map
-                (fun (pi, ci) ->
-                  optimize_abs st ty_e (abstraction pi (Handle (e1, ci))) )
-                branches )
-      | _ -> c )
-    | _ -> c )
+              let ty_e = TypeChecker.type_of_expression st.tc_state e in
+              Match
+                ( e,
+                  List.map
+                    (fun (pi, ci) ->
+                      optimize_abs st ty_e (abstraction pi (Handle (e1, ci))))
+                    branches )
+          | _ -> c)
+      | _ -> c)
   | Call (op, e1, a_w_ty) -> c
   | Op (op, e1) -> failwith __LOC__
   | Bind (c1, a2) -> (
-    match c1 with
-    | Bind (c11, (p1, c12)) ->
-        let (PVar var1) = p1 in
-        let ty1, _ = TypeChecker.type_of_computation st.tc_state c11 in
-        let st' = extend_var_type st var1 ty1 in
-        let c2' = reduce_comp st' (Bind (c12, a2)) in
-        reduce_comp st (Bind (c11, (p1, c2')))
-    | Value e11 ->
-        let ty11 = TypeChecker.type_of_expression st.tc_state e11 in
-        let p2, c2 = a2 in
-        beta_reduce st (p2, ty11, c2) e11
-    | Call (op, e11, ((p12, ty12, c12) as a_w_ty)) ->
-        let (PVar var12) = p12 in
-        let st' = extend_var_type st var12 ty12 in
-        let c12' = reduce_comp st' (Bind (c12, a2)) in
-        Call (op, e11, (p12, ty12, c12'))
-    | CastComp (c11, dtyco) -> (
-      match c11 with
-      | Value e111 ->
-          let p_e111' = CastExp (e111, PureCoercion dtyco) in
-          let ty111 = TypeChecker.type_of_expression st.tc_state p_e111' in
+      match c1 with
+      | Bind (c11, (p1, c12)) ->
+          let (PVar var1) = p1 in
+          let ty1, _ = TypeChecker.type_of_computation st.tc_state c11 in
+          let st' = extend_var_type st var1 ty1 in
+          let c2' = reduce_comp st' (Bind (c12, a2)) in
+          reduce_comp st (Bind (c11, (p1, c2')))
+      | Value e11 ->
+          let ty11 = TypeChecker.type_of_expression st.tc_state e11 in
           let p2, c2 = a2 in
-          beta_reduce st (p2, ty111, c2) p_e111'
-      | Bind (c111, abs112) ->
-          let p112, c112 = abs112 in
-          let (PVar var112) = p112 in
-          let ty111, _ = TypeChecker.type_of_computation st.tc_state c111 in
-          let c112' = CastComp (c112, dtyco) in
-          let st' = extend_var_type st var112 ty111 in
-          let c2' = reduce_comp st' (Bind (c112', a2)) in
-          let dtyco' =
-            optimize_dirty_coercion st
-              (BangCoercion (ReflTy ty111, DirtCoercion dtyco))
-          in
-          let c111' = reduce_comp st (CastComp (c111, dtyco')) in
-          reduce_comp st (Bind (c111', (p112, c2')))
-      | _ -> c )
-    | _ -> c )
+          beta_reduce st (p2, ty11, c2) e11
+      | Call (op, e11, ((p12, ty12, c12) as a_w_ty)) ->
+          let (PVar var12) = p12 in
+          let st' = extend_var_type st var12 ty12 in
+          let c12' = reduce_comp st' (Bind (c12, a2)) in
+          Call (op, e11, (p12, ty12, c12'))
+      | CastComp (c11, dtyco) -> (
+          match c11 with
+          | Value e111 ->
+              let p_e111' = CastExp (e111, PureCoercion dtyco) in
+              let ty111 = TypeChecker.type_of_expression st.tc_state p_e111' in
+              let p2, c2 = a2 in
+              beta_reduce st (p2, ty111, c2) p_e111'
+          | Bind (c111, abs112) ->
+              let p112, c112 = abs112 in
+              let (PVar var112) = p112 in
+              let ty111, _ = TypeChecker.type_of_computation st.tc_state c111 in
+              let c112' = CastComp (c112, dtyco) in
+              let st' = extend_var_type st var112 ty111 in
+              let c2' = reduce_comp st' (Bind (c112', a2)) in
+              let dtyco' =
+                optimize_dirty_coercion st
+                  (BangCoercion (ReflTy ty111, DirtCoercion dtyco))
+              in
+              let c111' = reduce_comp st (CastComp (c111, dtyco')) in
+              reduce_comp st (Bind (c111', (p112, c2')))
+          | _ -> c)
+      | _ -> c)
   | CastComp (c1, dtyco) -> (
       let dty1, dty2 = TypeChecker.type_of_dirty_coercion st.tc_state dtyco in
       match c1 with
       | _ when Types.dirty_types_are_equal dty1 dty2 -> c1
       | CastComp (c11, dtyco12) ->
           CastComp
-            ( c11
-            , optimize_dirty_coercion st (SequenceDirtyCoer (dtyco12, dtyco))
-            )
+            ( c11,
+              optimize_dirty_coercion st (SequenceDirtyCoer (dtyco12, dtyco)) )
       | Call (op, e11, ((p12, ty12, c12) as a_w_ty)) ->
           let (PVar var12) = p12 in
           let st' = extend_var_type st var12 ty12 in
@@ -694,7 +704,7 @@ and reduce_comp st c =
           Call (op, e11, (p12, ty12, c12'))
       | _ -> c
       | CastComp_ty (c1, ty_coercion) -> c
-      | CastComp_dirt (c1, dirt_coercion) -> c )
+      | CastComp_dirt (c1, dirt_coercion) -> c)
 
 (*
   | _ when outOfFuel st -> c
@@ -969,7 +979,7 @@ and reduce_comp st c =
 *)
 
 let optimize_main_comp tc_state c =
-  optimize_comp {inititial_state with tc_state} c
+  optimize_comp { inititial_state with tc_state } c
 
 (*
  To Do list for optimization :
@@ -1777,4 +1787,4 @@ Print.debug "Handler Reductions %i"
   +  !(initial.optimization_handler_With_LetRec));
 Print.debug "Specialization %i" !(initial.optimization_function_specialization); *)
 List.rev cmds;
-*)
+ *)

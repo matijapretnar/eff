@@ -8,7 +8,7 @@ type ty =
   | Arrow of ty * ty
   | Handler of handler_ty
 
-and handler_ty = {value: ty; finally: ty}
+and handler_ty = { value : ty; finally : ty }
 
 val int_ty : ty
 

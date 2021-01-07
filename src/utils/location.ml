@@ -2,17 +2,18 @@
 
 type t = Unknown | Known of known
 
-and known =
-  { filename: string
-  ; start_line: int
-  ; start_column: int
-  ; end_line: int
-  ; end_column: int }
+and known = {
+  filename : string;
+  start_line : int;
+  start_column : int;
+  end_line : int;
+  end_column : int;
+}
 
 let print loc ppf =
   match loc with
   | Unknown -> Format.fprintf ppf "unknown location"
-  | Known {filename; start_line; start_column; end_line; end_column} ->
+  | Known { filename; start_line; start_column; end_line; end_column } ->
       if String.length filename != 0 then
         Format.fprintf ppf "file %S, line %d, char %d" filename start_line
           start_column
@@ -30,12 +31,17 @@ let dismantle lexing_position =
   (filename, line, column)
 
 let make start_lexing_position end_lexing_position =
-  let start_filename, start_line, start_column =
-    dismantle start_lexing_position
+  let start_filename, start_line, start_column = dismantle start_lexing_position
   and end_filename, end_line, end_column = dismantle end_lexing_position in
-  assert (start_filename = end_filename) ;
+  assert (start_filename = end_filename);
   Known
-    {filename= start_filename; start_line; start_column; end_line; end_column}
+    {
+      filename = start_filename;
+      start_line;
+      start_column;
+      end_line;
+      end_column;
+    }
 
 let merge loc1 loc2 =
   match (loc1, loc2) with
@@ -50,7 +56,7 @@ let merge loc1 loc2 =
         and end_line, end_column =
           max (loc1.end_line, loc1.end_column) (loc2.end_line, loc2.end_column)
         in
-        Known {loc1 with start_line; start_column; end_line; end_column}
+        Known { loc1 with start_line; start_column; end_line; end_column }
   | loc, Unknown | Unknown, loc -> loc
 
 let union locs = List.fold_right merge locs Unknown

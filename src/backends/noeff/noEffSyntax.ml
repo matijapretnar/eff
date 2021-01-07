@@ -1,4 +1,3 @@
-
 type ty =
   | TyVar of CoreTypes.TyParam.t
   | TyApply of CoreTypes.TyName.t * ty list
@@ -10,8 +9,7 @@ type ty =
   | TyQualification of ty_coercion * ty
   | TyComputation of ty
 
-and ty_coercion = 
-  | TyCoercion of ty * ty
+and ty_coercion = TyCoercion of ty * ty
 
 type effect = CoreTypes.Effect.t * (ty * ty)
 
@@ -26,7 +24,7 @@ type pattern =
   | PConst of Const.t
   | PNonbinding
 
-type term = 
+type term =
   | Var of variable
   | BuiltIn of string * int
   | Const of Const.t
@@ -51,19 +49,20 @@ type term =
   | Bind of term * abstraction
   | Handle of term * term
 
-and handler = 
-  { effect_clauses: (effect, abstraction2) Assoc.t
-  ; value_clause: abstraction_with_ty }
+and handler = {
+  effect_clauses : (effect, abstraction2) Assoc.t;
+  value_clause : abstraction_with_ty;
+}
 
 and abstraction_with_ty = pattern * ty * term
 
-(** Abstractions that take one argument. *)
 and abstraction = pattern * term
+(** Abstractions that take one argument. *)
 
+and abstraction2 = pattern * pattern * term
 (** Abstractions that take two arguments. *)
-and abstraction2 = (pattern * pattern * term)
 
-and coercion = 
+and coercion =
   | CoerVar of CoreTypes.TyCoercionParam.t
   | ReflTy of ty
   | ReflVar of CoreTypes.TyParam.t
@@ -88,7 +87,7 @@ type tydef =
   | TyDefSum of (CoreTypes.Label.t, ty option) Assoc.t
   | TyDefInline of ty
 
-type cmd = 
+type cmd =
   | Term of term
   | DefEffect of effect
   | TopLet of abstraction_with_ty list

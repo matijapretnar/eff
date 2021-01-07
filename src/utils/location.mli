@@ -5,8 +5,8 @@
     the file and starting and ending position in the file (i.e. line and column
     number). *)
 
-(** Type of locations. *)
 type t
+(** Type of locations. *)
 
 val print : t -> Format.formatter -> unit
 (** Print a location. *)
