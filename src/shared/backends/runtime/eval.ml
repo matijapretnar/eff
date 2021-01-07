@@ -172,8 +172,9 @@ let rec top_handle op =
           top_handle (k str_v)
       | "Write" -> (
           match v with
-          | V.Tuple vs ->
-              let (file_name :: str :: _) = List.map V.to_str vs in
+          | V.Tuple
+              [ V.Const (Const.String file_name); V.Const (Const.String str) ]
+            ->
               let file_handle =
                 open_out_gen
                   [ Open_wronly; Open_append; Open_creat; Open_text ]
@@ -181,7 +182,8 @@ let rec top_handle op =
               in
               Printf.fprintf file_handle "%s" str;
               close_out file_handle;
-              top_handle (k V.unit_value))
+              top_handle (k V.unit_value)
+          | _ -> Error.runtime "A pair of a file name and string expected")
       | _eff_annot ->
           Error.runtime "uncaught effect %t %t." (Value.print_effect eff)
             (Value.print_value v))
