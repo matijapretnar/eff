@@ -1,6 +1,6 @@
 (** Configuration parameters *)
 
-let version = "5.0"
+let version = "5.1"
 
 let use_stdlib = ref true
 
