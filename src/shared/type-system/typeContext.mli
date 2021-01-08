@@ -1,12 +1,6 @@
 open Utils
 open Language
-
-type tydef =
-  | Record of (CoreTypes.Field.t, Type.ty) Assoc.t
-  | Sum of (CoreTypes.Label.t, Type.ty option) Assoc.t
-  | Inline of Type.ty
-
-type type_data
+open Type
 
 type state = (CoreTypes.TyName.t, type_data) Assoc.t
 

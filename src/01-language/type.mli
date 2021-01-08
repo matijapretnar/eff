@@ -24,6 +24,13 @@ val unit_ty : ty
 
 val empty_ty : ty
 
+type tydef =
+  | Record of (CoreTypes.Field.t, ty) Assoc.t
+  | Sum of (CoreTypes.Label.t, ty option) Assoc.t
+  | Inline of ty
+
+type type_data = { params : CoreTypes.TyParam.t list; type_def : tydef }
+
 type substitution = (CoreTypes.TyParam.t, ty) Assoc.t
 
 val subst_ty : substitution -> ty -> ty

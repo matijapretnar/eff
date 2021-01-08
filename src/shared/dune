@@ -1,11 +1,6 @@
 (library
  (name shared)
- (libraries unix utils language))
-
-(ocamllex lexer)
-
-(menhir
- (modules parser))
+ (libraries unix utils language parser))
 
 (include_subdirs unqualified)
 

@@ -1,6 +1,7 @@
 open Utils
 open Language
 open CoreUtils
+open Parser
 module TypeSystem = SimpleInfer
 
 module type Shell = sig
@@ -178,8 +179,8 @@ module Make (Backend : BackendSignature.T) = struct
 
   (* Parser wrapper *)
   and parse lexbuf =
-    try Parser.commands Lexer.token lexbuf with
-    | Parser.Error ->
+    try Grammar.commands Lexer.token lexbuf with
+    | Grammar.Error ->
         Error.syntax ~loc:(Location.of_lexeme lexbuf) "parser error"
     | Failure failmsg when failmsg = "lexing: empty token" ->
         Error.syntax ~loc:(Location.of_lexeme lexbuf) "unrecognised symbol."

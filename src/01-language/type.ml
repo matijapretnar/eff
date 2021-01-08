@@ -28,6 +28,13 @@ let unit_ty = Tuple []
 
 let empty_ty = Apply (CoreTypes.empty_tyname, [])
 
+type tydef =
+  | Record of (CoreTypes.Field.t, ty) Assoc.t
+  | Sum of (CoreTypes.Label.t, ty option) Assoc.t
+  | Inline of ty
+
+type type_data = { params : CoreTypes.TyParam.t list; type_def : tydef }
+
 type substitution = (CoreTypes.TyParam.t, ty) Assoc.t
 
 (** [subst_ty sbst ty] replaces type parameters in [ty] according to [sbst]. *)
