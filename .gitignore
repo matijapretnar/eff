@@ -1,12 +1,4 @@
 _build
-eff
-
-# Backup files
-*~
-
-# Silly Mac OS X files
-.DS_Store
-
 # Compiler generated code - once compiler is fixed, this should be cleaned up
 _tmp
 _tmp_no_opt

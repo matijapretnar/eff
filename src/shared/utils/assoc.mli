@@ -6,7 +6,7 @@ val empty : ('k, 'v) t
 
 val is_empty : ('k, 'v) t -> bool
 
-val isCons : ('k, 'v) t -> (('k * 'v) * ('k, 'v) t) option
+val is_cons : ('k, 'v) t -> (('k * 'v) * ('k, 'v) t) option
 (** [isCons xs] returns [None] if the association list is empty and [Some
     ((k,v),ys)] otherwise *)
 

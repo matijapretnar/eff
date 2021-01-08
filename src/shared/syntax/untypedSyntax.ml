@@ -162,7 +162,6 @@ let rec print_computation ?max_level c ppf =
       print "let rec @[<hov>%t@] in %t"
         (Print.sequence " | " letrec_abstraction lst)
         (print_computation c)
-      (* print "let rec %t in %t" (print_computation c) *)
   | Check c -> print "check %t" (print_computation c)
 
 and print_expression ?max_level e ppf =

@@ -13,9 +13,9 @@ effect RandomFloat: float -> float
 external _ocaml_tophandler : 'a => 'a = "_ocaml_tophandler"
 
 (* Integers and Floats *)
-external ( = ) : int -> int -> bool = "="
+external ( = ) : 'a -> 'a -> bool = "="
 
-external ( < ) : int -> int -> bool = "<"
+external ( < ) : 'a -> 'a -> bool = "<"
 
 external failwith : string -> 'a = "failwith"
 
@@ -73,7 +73,7 @@ external asin : float -> float = "asin"
 external atan : float -> float = "atan"
 
 external sqrt : float -> float = "sqrt"
-
+                               
 (* Strings *)
 external float_of_int : int -> float = "float_of_int"
 

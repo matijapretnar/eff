@@ -19,8 +19,6 @@ let rec left_to_right_map f = function
       let ys = left_to_right_map f xs in
       y :: ys
 
-let concat_map f xs = List.concat (List.map f xs)
-
 let unique_elements lst =
   let rec unique_elements acc = function
     | [] -> List.rev acc
@@ -41,4 +39,3 @@ let list_diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
 
 let option_map f = function None -> None | Some x -> Some (f x)
 
-let map_default f default = function None -> default | Some x -> f x

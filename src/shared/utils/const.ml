@@ -1,5 +1,3 @@
-open CoreUtils
-
 type t = Integer of int | String of string | Boolean of bool | Float of float
 
 type ty = IntegerTy | StringTy | BooleanTy | FloatTy
@@ -50,4 +48,4 @@ let compare c1 c2 =
   | Float x1, Float x2 -> cmp x1 x2
   | _ -> Error.runtime "Incomparable constants %t and %t" (print c1) (print c2)
 
-let equal c1 c2 = compare c1 c2 = Equal
+let equal c1 c2 = compare c1 c2 = CoreUtils.Equal

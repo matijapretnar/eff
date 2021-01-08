@@ -1,0 +1,119 @@
+module TypeSystem = SimpleInfer
+module EffectSystem = ExplicitInfer
+
+(* GEORGE: IMPORT JUST TO FORCE COMPILATION *)
+module TestA = SkelEffToMulticore
+module TestB = UntypedToMulticore
+module TestC = SkelEffSyntax
+module TestD = NoEffSyntax
+module TestE = ExeffToNoeff
+module TestF = CodegenPlainOCaml_fromNoEff
+
+module type Shell = sig
+  type state
+  
+  let print_profiling t_comp t_process =
+    Format.fprintf !Config.output_formatter "Compile time: %f\n" t_comp;
+    Format.fprintf !Config.output_formatter "Process time: %f\n" t_process;
+    ()
+
+external:
+
+        let ty' = Types.source_to_target state.type_context_state ty in
+        let effect_system_state' =
+          EffectSystem.addExternal state.effect_system_state x ty'
+        in
+        let type_checker_state' =
+          TypeChecker.addExternal state.type_checker_state x ty'
+        in
+
+letrec
+
+    Print.debug "ignoring top let rec binding";
+    state
+
+toplet
+
+    Print.debug "ignoring top let binding";
+    state
+
+defeffect
+
+    let effect_system_state' =
+        ExplicitInfer.add_effect eff (ty1, ty2) state.effect_system_state
+    in
+
+type_of
+
+    let c', inferredExEffType =
+        ExplicitInfer.tcTopLevelMono ~loc:c.at state.effect_system_state c
+    in
+    let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
+
+typeOfComputation
+
+    let t_start = Sys.time () in
+    (* Desugar to ImpEff *)
+    Print.debug "exec_cmd: before desugaring";
+    let _, c = Desugarer.desugar_computation state.desugarer_state t in
+    let type_system_state', ty =
+        TypeSystem.infer_top_comp state.type_system_state
+        state.type_context_state c
+    in
+    Print.debug "exec_cmd: after desugaring";
+
+    (* Format.fprintf !Config.error_formatter "%t\n"
+        *   (UntypedSyntax.print_computation c); *)
+
+    (* Elaborate to ExEff *)
+    Print.debug "exec_cmd: before elaboration";
+    let c', inferredExEffType =
+        ExplicitInfer.tcTopLevelMono ~loc:c.at state.effect_system_state c
+        (* let c' = ExplicitInfer.tcTopLevel ~loc:c.at
+        *            state.effect_system_state c *)
+    in
+    Print.debug "exec_cmd: after elaboration";
+
+    (* Format.fprintf !Config.error_formatter "%t\n"
+        *   (Typed.print_computation c'); *)
+
+    (* Typecheck ExEff *)
+    Print.debug "exec_cmd: before backend typechecking";
+    let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
+    Print.debug "exec_cmd: after backend typechecking";
+
+    (* Optimize ExEff *)
+    let c'' =
+        if !Config.disable_optimization then c'
+        else (
+        Print.debug "exec_cmd: before optimization";
+        let c_opt =
+            c'
+            (* TODO: Optimize.optimize_main_comp state.type_checker_state c' *)
+        in
+        Print.debug "exec_cmd: after optimization";
+        (* Format.fprintf !Config.error_formatter "%t\n"
+            *   (Typed.print_computation c_opt); *)
+        c_opt)
+    in
+
+    (* Erase ExEff back to ImpEff *)
+    Print.debug "exec_cmd: before erasure";
+    (* TODO: let c''' = ErasureUntyped.typed_to_untyped_comp Assoc.empty c'' in *)
+    Print.debug "exec_cmd: after erasure";
+
+    (* Format.fprintf !Config.error_formatter "%t\n"
+        *   (UntypedSyntax.print_computation c'''); *)
+
+    (* Compile / Interpret ImpEff *)
+    Print.debug "exec_cmd: begin processing by backend";
+    let t1 = Sys.time () in
+    let t_compile = t1 -. t_start in
+    let backend_state' =
+        Backend.process_computation state.backend_state c ty
+        (* USe implicit type *)
+    in
+    let t2 = Sys.time () in
+    let t_process = t2 -. t1 in
+    if !Config.profiling then print_profiling t_compile t_process;
+    

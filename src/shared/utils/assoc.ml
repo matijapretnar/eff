@@ -1,5 +1,3 @@
-open CoreUtils
-
 type ('key, 'value) t = ('key * 'value) list
 (** Association lists *)
 
@@ -8,7 +6,7 @@ let empty = []
 let is_empty = function [] -> true | _ :: _ -> false
 
 (* View from the left *)
-let rec isCons (xs : ('key, 'value) t) :
+let rec is_cons (xs : ('key, 'value) t) :
     (('key * 'value) * ('key, 'value) t) option =
   match xs with [] -> None | x :: xs -> Some (x, xs)
 
@@ -35,10 +33,6 @@ let rec remove x = function
   | [] -> []
   | (k, v) :: tl -> if x = k then tl else (k, v) :: remove x tl
 
-let rec filter f = function
-  | [] -> []
-  | (k, v) :: tl -> if f k then (k, v) :: filter f tl else filter f tl
-
 (* Iters, maps, folds. *)
 let iter = List.iter
 
@@ -63,7 +57,7 @@ let rec map_of_list f = function
       let tl' = map_of_list f tl in
       (k, v) :: tl'
 
-let fold_left = fold
+let fold_left = CoreUtils.fold
 
 let fold_right = List.fold_right
 

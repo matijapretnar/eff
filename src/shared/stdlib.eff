@@ -17,9 +17,9 @@ effect RandomFloat: float -> float
 effect Write : (string*string) -> unit
                
 (* Integers and Floats *)
-external ( = ) : int -> int -> bool = "="
+external ( = ) : 'a -> 'a -> bool = "="
 
-external ( < ) : int -> int -> bool = "<"
+external ( < ) : 'a -> 'a -> bool = "<"
 
 external infinity : float = "infinity"
 
@@ -92,7 +92,7 @@ external asin : float -> float = "asin"
 external atan : float -> float = "atan"
 
 external sqrt : float -> float = "sqrt"
-
+                               
 (* Strings *)
 external float_of_int : int -> float = "float_of_int"
 

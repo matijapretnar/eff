@@ -1,5 +1,3 @@
-open CoreUtils
-
 let fresh_ty_param = CoreTypes.TyParam.fresh
 
 type ty =
@@ -57,14 +55,14 @@ let compose_subst sbst1 sbst2 =
     [ty] is displayed. *)
 let free_params ty =
   let rec free_ty = function
-    | Apply (_, tys) -> concat_map free_ty tys
+    | Apply (_, tys) -> List.concat_map free_ty tys
     | TyParam p -> [ p ]
     | Basic _ -> []
-    | Tuple tys -> concat_map free_ty tys
+    | Tuple tys -> List.concat_map free_ty tys
     | Arrow (ty1, ty2) -> free_ty ty1 @ free_ty ty2
     | Handler { value = ty1; finally = ty2 } -> free_ty ty1 @ free_ty ty2
   in
-  unique_elements (free_ty ty)
+  CoreUtils.unique_elements (free_ty ty)
 
 (** [occurs_in_ty p ty] checks if the type parameter [p] occurs in type [ty]. *)
 let occurs_in_ty p ty = List.mem p (free_params ty)

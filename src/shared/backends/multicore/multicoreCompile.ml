@@ -1,6 +1,4 @@
-(* Evaluation of ExEff, big step via SkelEff. *)
-open CoreUtils
-
+(* Evaluation of the intermediate language, big step. *)
 module type BackendParameters = sig
   val output_file : string
 end
@@ -24,15 +22,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     let t = MulticoreTranslate.of_computation c in
     update state (Term t)
 
-  (* Erasure ExEff -> SkelEff *)
-  (* let c' = Erasure.typed_to_erasure_comp Assoc.empty c in
-     let t = FromSkelEff.of_computation c' in
-     update state
-       (translate state_ppf
-          "let _ = @.@[<hv>(_ocaml_tophandler) (fun _ -> @,%t@,)@];;@."
-          (translate_term t)) *)
-
-  let process_type_of state _c ty =
+  let process_type_of state _c _ty =
     Print.warning
       "[#typeof] commands are ignored when compiling to Multicore OCaml.";
     state

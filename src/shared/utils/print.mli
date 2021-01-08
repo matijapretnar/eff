@@ -94,6 +94,6 @@ val record :
   ('f, 'v) Assoc.t ->
   Format.formatter ->
   unit
-(** [record fpp vpp lst ppf] prints a record given by an associative list of
-    elements [lst] using a pretty-printer [fpp] for fields and [vpp] for values
-    to the formatter [ppf]. *)
+(** [record fpp vpp lst ppf] prints a record given by an associative list of elements
+    [lst] using a pretty-printer [fpp] for fields and [vpp] for values to the formatter
+    [ppf]. *)

@@ -1,6 +1,3 @@
-open CoreUtils
-(** Syntax of the core language. *)
-
 type variable = CoreTypes.Variable.t
 
 type effect = CoreTypes.Effect.t

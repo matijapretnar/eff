@@ -311,7 +311,7 @@ let rec desugar_expression state { it = t; at = loc } =
         let state', w, es = desugar_expressions state ts in
         (state', w, Untyped.Tuple es)
     | Sugared.Record ts ->
-        if not (no_duplicates (Assoc.keys_of ts)) then
+        if not (CoreUtils.no_duplicates (Assoc.keys_of ts)) then
           Error.syntax ~loc "Fields in a record must be distinct";
         let state', w, es = desugar_record_fields state ts in
         (state', w, Untyped.Record es)
