@@ -3,7 +3,7 @@ type tydef =
   | Sum of (CoreTypes.Label.t, Type.ty option) Assoc.t
   | Inline of Type.ty
 
-type type_data
+type type_data = { params : CoreTypes.TyParam.t list; type_def : tydef }
 
 type state = (CoreTypes.TyName.t, type_data) Assoc.t
 
@@ -14,6 +14,8 @@ val extend_type_definitions :
   (CoreTypes.TyName.t, CoreTypes.TyParam.t list * tydef) Assoc.t ->
   state ->
   state
+
+val lookup_tydef : loc:Location.t -> CoreTypes.Variable.t -> state -> type_data
 
 val transparent : loc:Location.t -> CoreTypes.TyName.t -> state -> bool
 

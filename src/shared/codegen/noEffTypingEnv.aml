@@ -1,6 +1,8 @@
 (* Utils for NoEff type inference *)
+module NoEff = NoEffSyntax
 
 (* Global state *)
+type typingEnv = (NoEff.variable, NoEff.n_type) Assoc.t
 
 type state = {
   gblCtxt : typingEnv;
@@ -29,8 +31,6 @@ let initial_state =
   { var_types = Assoc.empty; ty_params = []; ty_coer_types = Assoc.empty }
 
 (* Typing env (global context) *)
-
-type typingEnv = (NoEff.variable, NoEff.n_type) Assoc.t
 
 let empty = Assoc.empty
 

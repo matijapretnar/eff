@@ -9,12 +9,9 @@ let rec not_attacked x' = function
 
 let available (number_of_queens, x, qs) =
   let rec loop (possible, y) =
-    if y < 1 then
-      possible
-    else if not_attacked (x, y) qs then
-      loop ((y :: possible), (y - 1))
-    else
-      loop (possible, (y - 1))
+    if y < 1 then possible
+    else if not_attacked (x, y) qs then loop (y :: possible, y - 1)
+    else loop (possible, y - 1)
   in
   loop ([], number_of_queens)
 
@@ -24,13 +21,11 @@ exception Fail
 
 let queens_one_exceptions number_of_queens =
   let rec place (x, qs) =
-    if x > number_of_queens then qs else
+    if x > number_of_queens then qs
+    else
       let rec choose = function
         | [] -> raise Fail
-        | y :: ys ->
-            begin try place ((x + 1), ((x, y) :: qs)) with
-            | Fail -> choose ys
-            end
+        | y :: ys -> ( try place (x + 1, (x, y) :: qs) with Fail -> choose ys)
       in
       choose (available (number_of_queens, x, qs))
   in
@@ -40,14 +35,14 @@ let queens_one_exceptions number_of_queens =
 
 let queens_one_option number_of_queens =
   let rec place (x, qs) =
-    if x > number_of_queens then Some qs else
+    if x > number_of_queens then Some qs
+    else
       let rec choose = function
         | [] -> None
-        | y :: ys ->
-          begin match place ((x + 1), ((x, y) :: qs)) with
+        | y :: ys -> (
+            match place (x + 1, (x, y) :: qs) with
             | Some qs -> Some qs
-            | None -> choose ys
-          end
+            | None -> choose ys)
       in
       choose (available (number_of_queens, x, qs))
   in
@@ -57,13 +52,15 @@ let queens_one_option number_of_queens =
 
 let queens_one_cps number_of_queens =
   let rec place (x, qs) =
-    if x > number_of_queens then (fun _ -> qs) else
+    if x > number_of_queens then fun _ -> qs
+    else
       let rec choose = function
-          | [] -> (fun k  -> k ())
-          | y::ys ->
-              (fun k  -> place ((x + 1), ((x, y) :: qs)) (fun ()  -> choose ys (fun ()  -> k ())))
+        | [] -> fun k -> k ()
+        | y :: ys ->
+            fun k ->
+              place (x + 1, (x, y) :: qs) (fun () -> choose ys (fun () -> k ()))
       in
-      (fun a -> (choose (available (number_of_queens,x, qs)) a))
+      fun a -> choose (available (number_of_queens, x, qs)) a
   in
   place (1, []) (fun () -> [])
 
@@ -71,11 +68,11 @@ let queens_one_cps number_of_queens =
 
 let queens_all number_of_queens =
   let rec place (x, qs) =
-    if x > number_of_queens then [qs] else
+    if x > number_of_queens then [ qs ]
+    else
       let rec choose = function
         | [] -> []
-        | y :: ys ->
-            place ((x + 1), ((x, y) :: qs)) @ choose ys
+        | y :: ys -> place (x + 1, (x, y) :: qs) @ choose ys
       in
       choose (available (number_of_queens, x, qs))
   in

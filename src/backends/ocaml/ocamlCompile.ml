@@ -2,6 +2,7 @@ let compile_file ppf filename st =
   let out_channel = open_out (filename ^ ".ml") in
   let out_ppf = Format.formatter_of_out_channel out_channel in
   (* look for header.ml next to the executable  *)
+  (* It would be nice to bake this into executable as a string *)
   let header_file_basename =
     match !Config.backend with
     | Config.MulticoreOCaml -> "backendHeaderMulticoreOCaml.ml"

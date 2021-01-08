@@ -19,3 +19,8 @@
    (echo "let multicoreStdlib = {|")
    (cat backends/multicore/multicoreStdlib.eff)
    (echo "|}"))))
+
+(env
+ (dev
+  (flags
+   (:standard -warn-error -A))))

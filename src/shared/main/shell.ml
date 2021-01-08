@@ -89,7 +89,8 @@ module Make (Backend : BackendSignature.T) = struct
           else (
             Print.debug "exec_cmd: before optimization";
             let c_opt =
-              Optimize.optimize_main_comp state.type_checker_state c'
+              c'
+              (* TODO: Optimize.optimize_main_comp state.type_checker_state c' *)
             in
             Print.debug "exec_cmd: after optimization";
             (* Format.fprintf !Config.error_formatter "%t\n"
@@ -110,7 +111,8 @@ module Make (Backend : BackendSignature.T) = struct
         let t1 = Sys.time () in
         let t_compile = t1 -. t_start in
         let backend_state' =
-          Backend.process_computation state.backend_state c''' drty
+          Backend.process_computation state.backend_state c''' ty
+          (* USe implicit type *)
         in
         let t2 = Sys.time () in
         let t_process = t2 -. t1 in
@@ -122,8 +124,9 @@ module Make (Backend : BackendSignature.T) = struct
         }
     | Commands.TypeOf t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
-        let type_system_state', _ =
-          TypeSystem.infer_top_comp state.type_system_state c
+        let type_system_state', ty =
+          TypeSystem.infer_top_comp state.type_system_state
+            state.type_context_state c
         in
         let c', inferredExEffType =
           ExplicitInfer.tcTopLevelMono ~loc:c.at state.effect_system_state c
@@ -131,7 +134,8 @@ module Make (Backend : BackendSignature.T) = struct
         let drty = TypeChecker.typeOfComputation state.type_checker_state c' in
 
         let backend_state' =
-          Backend.process_type_of state.backend_state c drty
+          Backend.process_type_of state.backend_state c ty
+          (* use implicit type  *)
         in
         {
           state with
@@ -227,6 +231,7 @@ module Make (Backend : BackendSignature.T) = struct
           Backend.process_external state.backend_state (x, ty, f)
         in
         {
+          state with
           desugarer_state = desugarer_state';
           type_system_state = type_system_state';
           effect_system_state = effect_system_state';

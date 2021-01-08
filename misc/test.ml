@@ -33,7 +33,7 @@ let rec handler (h : ('a, 'b) handler_clauses) : 'a computation -> 'b =
 
 let rec zip l1 l2 =
   match l1 with
-  | x::xs -> (match l2 with (y::ys) -> ((x, y)::(zip xs ys)))
+  | x::xs -> (match l2 with (y::ys) -> ((x, y)::(zip xs ys)))
 
 let value (x : 'a) : 'a computation = Value x
 

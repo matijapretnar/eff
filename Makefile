@@ -13,6 +13,9 @@ clean:
 test: default
 	dune runtest
 
+test_explicit: default
+	dune runtest tests/explicit-effect-subtyping
+
 install: release
 	dune install
 

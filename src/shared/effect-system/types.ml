@@ -491,13 +491,17 @@ and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
       )
   | EmptyRow -> ((ty_sbst, dirt_sbst), drt)
 
+let st = failwith "TODO NOW"
+
 let rec source_to_target ty =
   let loc = Location.unknown in
   match ty with
-  | Type.Apply (ty_name, args) when Tctx.transparent ~loc ty_name -> (
-      match Tctx.lookup_tydef ~loc ty_name with
-      | [], Tctx.Inline ty -> source_to_target ty
-      | _, Tctx.Sum _ | _, Tctx.Record _ ->
+  | Type.Apply (ty_name, args) when TypeContext.transparent ~loc ty_name st -> (
+      match TypeContext.lookup_tydef ~loc ty_name st with
+      | { params = []; type_def = TypeContext.Inline ty } -> source_to_target ty
+      | { type_def = TypeContext.Sum _; _ }
+      | { type_def = TypeContext.Record _; _ }
+      | { type_def = TypeContext.Inline _; _ } ->
           assert false (* None of these are transparent *))
   | Type.Apply (ty_name, args) -> Apply (ty_name, List.map source_to_target args)
   | Type.TyParam p -> TyParam p
@@ -511,7 +515,7 @@ let rec source_to_target ty =
 and source_to_target_dirty ty = (source_to_target ty, empty_dirt)
 
 let constructor_signature lbl =
-  match Tctx.infer_variant lbl with
+  match TypeContext.infer_variant lbl st with
   | None -> assert false
   | Some (ty_out, ty_in) ->
       let ty_in =

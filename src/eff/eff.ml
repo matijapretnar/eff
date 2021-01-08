@@ -1,4 +1,3 @@
-open Unification
 open Shared
 
 let usage = "Usage: eff [option] ... [file] ..."

@@ -615,10 +615,10 @@ and elab_ty = function
   | Handler h -> NoEff.NTyHandler (elab_ty h.value, elab_ty h.finally)
 
 and elab_tydef = function
-  | Tctx.Record assoc -> NoEff.TyDefRecord (Assoc.map elab_ty assoc)
-  | Tctx.Sum assoc ->
+  | TypeContext.Record assoc -> NoEff.TyDefRecord (Assoc.map elab_ty assoc)
+  | TypeContext.Sum assoc ->
       let converter = function None -> None | Some ty -> Some (elab_ty ty) in
       NoEff.TyDefSum (Assoc.map converter assoc)
-  | Tctx.Inline ty -> NoEff.TyDefInline (elab_ty ty)
+  | TypeContext.Inline ty -> NoEff.TyDefInline (elab_ty ty)
 
 and has_empty_dirt ((ty, dirt) : ExEffTypes.target_dirty) = is_empty_dirt dirt
