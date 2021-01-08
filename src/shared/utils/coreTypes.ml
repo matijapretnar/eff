@@ -55,6 +55,3 @@ module TyParam = struct
         else Format.fprintf ppf "%sty%i" c (k - 25))
       k
 end
-
-module DirtParam = Symbol.Make (Symbol.Int)
-(** dirt parameters *)

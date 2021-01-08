@@ -1,7 +1,3 @@
-(* We need three sorts of parameters, for types, dirt, and regions.
-   In order not to confuse them, we define separate types for them.
- *)
-
 let fresh_ty_param = CoreTypes.TyParam.fresh
 
 type ty =
@@ -18,9 +14,6 @@ and handler_ty = {
   finally : ty; (* the return type of finally *)
 }
 
-(* This type is used when type checking is turned off. Its name
-   is syntactically incorrect so that the programmer cannot accidentally
-   define it. *)
 let int_ty = Basic Const.IntegerTy
 
 let string_ty = Basic Const.StringTy
@@ -61,12 +54,11 @@ let compose_subst sbst1 sbst2 =
     Each parameter is listed only once and in order in which it occurs when
     [ty] is displayed. *)
 let free_params ty =
-  let flatten_map f lst = List.fold_left ( @ ) [] (List.map f lst) in
   let rec free_ty = function
-    | Apply (_, tys) -> flatten_map free_ty tys
+    | Apply (_, tys) -> List.concat_map free_ty tys
     | TyParam p -> [ p ]
     | Basic _ -> []
-    | Tuple tys -> flatten_map free_ty tys
+    | Tuple tys -> List.concat_map free_ty tys
     | Arrow (ty1, ty2) -> free_ty ty1 @ free_ty ty2
     | Handler { value = ty1; finally = ty2 } -> free_ty ty1 @ free_ty ty2
   in
