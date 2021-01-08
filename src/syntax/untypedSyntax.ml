@@ -152,12 +152,16 @@ let rec print_computation ?max_level c ppf =
       print "match %t with (@[<hov>%t@])" (print_expression e)
         (Print.sequence " | " case lst)
   | Handle (e, c) ->
-      print "handle %t with %t" (print_expression e) (print_computation c)
+      print "with %t handle %t" (print_expression e) (print_computation c)
   | Let (lst, c) ->
       print "let @[<hov>%t@] in %t"
         (Print.sequence " | " let_abstraction lst)
         (print_computation c)
-  | LetRec (lst, c) -> print "let rec ... in %t" (print_computation c)
+  | LetRec (lst, c) ->
+      print "let rec @[<hov>%t@] in %t"
+        (Print.sequence " | " letrec_abstraction lst)
+        (print_computation c)
+      (* print "let rec %t in %t" (print_computation c) *)
   | Check c -> print "check %t" (print_computation c)
 
 and print_expression ?max_level e ppf =
@@ -187,10 +191,15 @@ and abstraction (p, c) ppf =
 and let_abstraction (p, c) ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)
 
+and letrec_abstraction (v, (p, c)) ppf =
+  Format.fprintf ppf "%t %t = %t"
+    (CoreTypes.Variable.print v)
+    (print_pattern p) (print_computation c)
+
 and case a ppf = Format.fprintf ppf "%t" (abstraction a)
 
 and effect_clause (eff, a2) ppf =
-  Format.fprintf ppf "| %t -> %t" (CoreTypes.Effect.print eff) (abstraction2 a2)
+  Format.fprintf ppf "| %t %t" (CoreTypes.Effect.print eff) (abstraction2 a2)
 
 and abstraction2 (p1, p2, c) ppf =
   Format.fprintf ppf "%t %t -> %t" (print_pattern p1) (print_pattern p2)

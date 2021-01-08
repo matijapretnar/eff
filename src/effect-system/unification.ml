@@ -19,15 +19,20 @@ let rec print_var_list = function
       print_var_list l
 
 let rec get_skel_of_tyvar tyvar clist =
-  Print.debug "getting skeleton of tyvar from list";
-  Print.debug " TyParam : %t" (CoreTypes.TyParam.print tyvar);
-  Print.debug "Constraint list :";
-  print_c_list clist;
+  (*
+  Print.debug "getting skeleton of tyvar from list" ;
+  Print.debug " TyParam : %t" (CoreTypes.TyParam.print tyvar) ;
+  Print.debug "Constraint list :" ;
+  print_c_list clist ;
+*)
   get_skel_of_tyvar_ tyvar clist
 
 and get_skel_of_tyvar_ tyvar clist =
   match clist with
-  | [] -> assert false
+  | [] ->
+      Print.debug "get_skel_of_tyvar_: Failed to retrieve skeleton of %t"
+        (CoreTypes.TyParam.print tyvar);
+      failwith __LOC__
   | TyParamHasSkel (tv, skel) :: _ when tyvar = tv -> skel
   | _ :: xs -> get_skel_of_tyvar_ tyvar xs
 
@@ -45,14 +50,14 @@ let rec skeleton_of_target_ty tty conslist =
   | Handler ((a1, _), (a2, _)) ->
       SkelHandler
         (skeleton_of_target_ty a1 conslist, skeleton_of_target_ty a2 conslist)
-  | PrimTy pt -> PrimSkel pt
-  | Tuple t ->
-      SkelTuple (List.map (fun ty -> skeleton_of_target_ty ty conslist) t)
+  | TyBasic pt -> SkelBasic pt
 
 let rec fix_union_find fixpoint c_list =
-  Print.debug "--------------start list-------";
-  print_var_list fixpoint;
-  Print.debug "---------------end list-------";
+  (*
+  Print.debug "--------------start list-------" ;
+  print_var_list fixpoint ;
+  Print.debug "---------------end list-------" ;
+*)
   let mapper x =
     match x with
     | Typed.TyOmega (_, tycons) -> (
@@ -86,11 +91,11 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
   (* α : ς *)
   | SkelParam p -> (sub, Typed.add_to_constraints cons paused, rest_queue)
   (* α : int *)
-  | PrimSkel ps ->
+  | SkelBasic ps ->
       let k = tvar in
-      let v = Types.PrimTy ps in
+      let v = Types.TyBasic ps in
       let sub1 = Substitution.add_type_substitution_e k v in
-      ( Substitution.add_type_substitution tvar (Types.PrimTy ps) sub,
+      ( Substitution.add_type_substitution tvar (Types.TyBasic ps) sub,
         [],
         Substitution.apply_substitutions_to_constraints sub1
           (Typed.add_list_to_constraints paused rest_queue) )
@@ -165,11 +170,9 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
         [],
         Typed.add_to_constraints cons1 cons_subbed
         |> Typed.add_to_constraints cons2 )
-  | ForallSkel (p, sk1) -> failwith __LOC__
 
 and skel_eq_step sub paused cons rest_queue sk1 sk2 =
   match (sk1, sk2) with
-  | s1, s2 when s1 = s2 -> (sub, paused, rest_queue)
   (* ς = ς *)
   | SkelParam sp1, SkelParam sp2 when sp1 = sp2 -> (sub, paused, rest_queue)
   (* ς₁ = τ₂ / τ₁ = ς₂ *)
@@ -178,7 +181,7 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
   | sk2a, SkelParam sp1 when not (List.mem sp1 (free_skeleton sk2a)) ->
       process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a
   (* int = int *)
-  | PrimSkel ps1, PrimSkel ps2 when ps1 = ps2 -> (sub, paused, rest_queue)
+  | SkelBasic ps1, SkelBasic ps2 when ps1 = ps2 -> (sub, paused, rest_queue)
   (* τ₁₁ -> τ₁₂ = τ₂₁ -> τ₂₂ *)
   | SkelArrow (ska, skb), SkelArrow (skc, skd) ->
       ( sub,
@@ -200,15 +203,9 @@ and skel_eq_step sub paused cons rest_queue sk1 sk2 =
         add_list_to_constraints
           (List.map2 (fun sk1 sk2 -> Typed.SkelEq (sk1, sk2)) sks1 sks2)
           rest_queue )
-  | SkelTuple t1, SkelTuple t2 ->
-      let new_constraints =
-        List.map (fun (s1, s2) -> Typed.SkelEq (s1, s2)) (List.combine t1 t2)
-      in
-      (sub, paused, add_list_to_constraints new_constraints rest_queue)
-  | SkelTuple _, _ | _, SkelTuple _ -> failwith "Invalid constraint"
   | _ ->
-      Print.debug "%t" (Types.print_skeleton sk1);
-      Print.debug "%t" (Types.print_skeleton sk2);
+      Print.debug "skel_eq_step failure: (%t)"
+        (Typed.print_omega_ct (Typed.SkelEq (sk1, sk2)));
       failwith __LOC__
 
 and ty_omega_step sub paused cons rest_queue omega = function
@@ -383,13 +380,14 @@ let dirty_omega_step sub paused cons rest_queue (omega1, omega2) drtycons =
   dirt_omega_step sub' paused' dirt_cons rest_queue' omega2 (drt1, drt2)
 
 let rec unify (sub, paused, queue) =
-  Print.debug "=============Start loop============";
-  Print.debug "-----Subs-----";
-  Substitution.print_substitutions sub;
-  Print.debug "-----paused-----";
-  print_c_list paused;
-  Print.debug "-----queue-----";
-  print_c_list queue;
+  (* Print.debug "=============Start loop============" ;
+     Print.debug "-----Subs-----" ;
+     Substitution.print_substitutions sub;
+     Print.debug "-----paused-----" ;
+     print_c_list paused ;
+     Print.debug "-----queue-----" ;
+     print_c_list queue ;
+  *)
   match queue with
   | [] ->
       Print.debug "=============FINAL LOOP Result============";
@@ -413,5 +411,5 @@ let rec unify (sub, paused, queue) =
         | Typed.DirtyOmega (omega, drtycons) ->
             dirty_omega_step sub paused cons rest_queue omega drtycons
       in
-      Print.debug "=========End loop============";
+      (* Print.debug "=========End loop============" ; *)
       unify new_state

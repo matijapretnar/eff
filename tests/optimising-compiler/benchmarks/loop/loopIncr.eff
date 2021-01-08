@@ -1,0 +1,27 @@
+external ( = ) : int -> int -> bool = "="
+external ( < ) : int -> int -> bool = "<"
+external ( - ) : int -> int -> int = "-"
+external ( + ) : int -> int -> int = "+"
+
+(******************************************************************************)
+
+(* ERROR: Only functions can be applied *)
+
+effect Incr : unit -> unit;;
+
+let test_incr n =
+  let rec loop_incr n =
+      if n = 0
+      then ()
+      else (perform (Incr ());
+            loop_incr (n - 1)
+           )
+  in
+  let incr_handler =
+    handler
+    | effect (Incr _u) k -> (fun x -> (k ()) (x + 1))
+    | y -> (fun x -> x)
+  in
+    (with incr_handler
+    handle loop_incr n) 0
+in test_incr 10000

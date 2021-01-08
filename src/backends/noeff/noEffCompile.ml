@@ -15,7 +15,7 @@ let rec compile_type exeff_ty =
       if is_dirt_empty ty_dirt1 then
         NoEffSyntax.TyArrow (compile_type ty1, compile_type ty2)
       else NoEffSyntax.TyHandler (compile_type ty1, compile_type ty2)
-  | Types.PrimTy ty_const -> NoEffSyntax.TyBasic ty_const
+  | Types.TyBasic ty_const -> NoEffSyntax.TyBasic ty_const
   | Types.QualTy (pi, ty) ->
       NoEffSyntax.TyQualification (compile_coercion_type pi, compile_type ty)
   | Types.QualDirt (_, ty) -> compile_type ty
@@ -225,8 +225,8 @@ let rec value_coercion_from_impure_dirt dirt_param dirt ty =
               ( computation_coercion_to_impure_dirt dirt dirt_param (ty1, drt1),
                 computation_coercion_from_impure_dirt dirt_param dirt
                   (ty2, Types.fresh_dirt ()) ))
-  | Types.PrimTy ty_const ->
-      NoEffSyntax.ReflTy (compile_type (Types.PrimTy ty_const))
+  | Types.TyBasic ty_const ->
+      NoEffSyntax.ReflTy (compile_type (Types.TyBasic ty_const))
   | Types.QualTy ((Types.TyParam a1, Types.TyParam a2), ty2) ->
       NoEffSyntax.CoerQualification
         ( NoEffSyntax.TyCoercion (NoEffSyntax.TyVar a1, NoEffSyntax.TyVar a2),
@@ -309,8 +309,8 @@ and value_coercion_to_impure_dirt dirt dirt_param ty =
               ( computation_coercion_from_impure_dirt dirt_param dirt (ty1, drt1),
                 computation_coercion_to_impure_dirt dirt dirt_param
                   (ty2, Types.fresh_dirt ()) ))
-  | Types.PrimTy ty_const ->
-      NoEffSyntax.ReflTy (compile_type (Types.PrimTy ty_const))
+  | Types.TyBasic ty_const ->
+      NoEffSyntax.ReflTy (compile_type (Types.TyBasic ty_const))
   | Types.QualTy ((Types.TyParam a1, Types.TyParam a2), ty2) ->
       NoEffSyntax.CoerQualification
         ( NoEffSyntax.TyCoercion (NoEffSyntax.TyVar a1, NoEffSyntax.TyVar a2),

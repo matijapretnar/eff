@@ -1,0 +1,97 @@
+effect Dummy : unit -> int;;
+
+let h19 = handler
+        | effect (Dummy _) k -> 3
+        | x -> x
+in
+
+let h18 = handler
+        | effect (Dummy _) k -> with h19 handle 3
+        | x -> x
+in
+
+let h17 = handler
+        | effect (Dummy _) k -> with h18 handle 3
+        | x -> x
+in
+
+let h16 = handler 
+	| effect (Dummy _) k -> with h17 handle 3
+	| x -> x
+in 
+
+let h15 = handler
+        | effect (Dummy _) k -> with h16 handle 3
+        | x -> x
+in
+
+let h14 = handler
+        | effect (Dummy _) k -> with h15 handle 3
+        | x -> x
+in
+
+let h13 = handler
+        | effect (Dummy _) k -> with h14 handle 3
+        | x -> x
+in
+
+let h12 = handler
+        | effect (Dummy _) k -> with h13 handle 3
+        | x -> x
+in
+
+let h11 = handler
+        | effect (Dummy _) k -> with h12 handle 3
+        | x -> x
+in
+
+let h10 = handler
+        | effect (Dummy _) k -> with h11 handle 3
+        | x -> x
+in
+
+let h9 = handler
+        | effect (Dummy _) k -> with h10 handle 3
+        | x -> x
+in
+
+let h8 = handler 
+	| effect (Dummy _) k -> with h9 handle 3
+	| x -> x
+in 
+
+let h7 = handler
+        | effect (Dummy _) k -> with h8 handle 3
+        | x -> x
+in
+
+let h6 = handler
+        | effect (Dummy _) k -> with h7 handle 3
+        | x -> x
+in
+
+let h5 = handler
+        | effect (Dummy _) k -> with h6 handle 3
+        | x -> x
+in
+
+let h4 = handler
+        | effect (Dummy _) k -> with h5 handle 3
+        | x -> x
+in
+
+let h3 = handler
+        | effect (Dummy _) k -> with h4 handle 3
+        | x -> x
+in
+
+let h2 = handler
+        | effect (Dummy _) k -> with h3 handle 3
+        | x -> x
+in
+
+let h1 = handler
+        | effect (Dummy _) k -> with h2 handle 3
+        | x -> x
+
+in (with h1 handle (perform (Dummy ()))) 

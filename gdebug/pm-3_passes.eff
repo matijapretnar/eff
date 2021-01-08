@@ -1,0 +1,24 @@
+
+effect Decide : bool;;
+
+type intlist =
+  | IntNil
+  | IntCons of int * intlist;;
+
+(* This returns a list of four possibilities [10; 5; 20; 15] *)
+let rec concat xs = (
+  match xs with
+  | IntNil         -> fun ys -> ys
+  | IntCons (z,zs) -> fun ys -> IntCons (z, concat zs ys)
+) in
+  with
+    (* This handler collects all results that we can get by making different choices. *)
+    (handler
+     | effect Decide k -> concat (k true) (k false)
+     | x -> IntCons (x,IntNil)
+    )
+  handle (
+    let x = (if perform Decide then 10 else 20) in
+    let y = (if perform Decide then 0 else 5) in
+    x - y
+  )

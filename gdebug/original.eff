@@ -1,0 +1,14 @@
+
+let rec loop n =
+    if n = 0 then
+        0
+    else
+        loop (n - 1)
+in loop 10
+
+(* We fail with:
+
+     Fatal error:
+       exception File "src/effect-system/unification.ml", line 33, characters 10-16:
+         Assertion failed
+*)

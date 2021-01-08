@@ -1,0 +1,27 @@
+external ( = ) : int -> int -> bool = "="
+external ( < ) : int -> int -> bool = "<"
+external ( - ) : int -> int -> int = "-"
+external ( + ) : int -> int -> int = "+"
+
+(******************************************************************************)
+
+effect Get: unit -> int
+effect Put: int -> unit;;
+
+let test_state n =
+  let rec loop_state n =
+    if n = 0
+    then ()
+    else
+      (perform (Put ((perform (Get ())) + 1));
+       loop_state (n - 1)
+      )
+  in
+  let state_handler = handler
+  | y -> (fun x -> x)
+  | effect (Get _s) k -> (fun s -> k s s)
+  | effect (Put s') k -> (fun _s -> k () s')
+  in
+    (with state_handler
+     handle (loop_state n)) 0
+in test_state 10000

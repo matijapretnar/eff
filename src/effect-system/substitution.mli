@@ -1,5 +1,5 @@
-(** 
-Substitutions 
+(**
+Substitutions
 
 Holds substitutions
 *)
@@ -71,8 +71,14 @@ val apply_substitutions_to_dirt : t -> Types.dirt -> Types.dirt
 val apply_substitutions_to_skeleton : t -> Types.skeleton -> Types.skeleton
 (** [apply_substitutions_to_skeleton subs skeleton] Applies all substitutions from [subs] to [skeleton] *)
 
-val apply_substitutions_to_tycoer : t -> Typed.ty_coercion -> Typed.ty_coercion
-(** [apply_substitutions_to_tycoer sub ty_coer] Applies all substitutions from [subs] to [ty_coer] *)
+val apply_sub_tycoer : t -> Typed.ty_coercion -> Typed.ty_coercion
+(** [apply_sub_tycoer subs co] Applies all substitutions from [subs] to [co] *)
+
+val apply_sub_dirtcoer : t -> Typed.dirt_coercion -> Typed.dirt_coercion
+(** [apply_sub_dirtcoer subs co] Applies all substitutions from [subs] to [co] *)
+
+val apply_sub_dirtycoer : t -> Typed.dirty_coercion -> Typed.dirty_coercion
+(** [apply_sub_dirtycoer subs co] Applies all substitutions from [subs] to [co] *)
 
 (* Other type information *)
 

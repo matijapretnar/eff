@@ -1,4 +1,4 @@
-(* Evaluation of the intermediate language, big step. *)
+(* Evaluation of ExEff, big step via SkelEff. *)
 open CoreUtils
 
 module type BackendParameters = sig
@@ -23,6 +23,14 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
   let process_computation state c ty =
     let t = MulticoreTranslate.of_computation c in
     update state (Term t)
+
+  (* Erasure ExEff -> SkelEff *)
+  (* let c' = Erasure.typed_to_erasure_comp Assoc.empty c in
+     let t = FromSkelEff.of_computation c' in
+     update state
+       (translate state_ppf
+          "let _ = @.@[<hv>(_ocaml_tophandler) (fun _ -> @,%t@,)@];;@."
+          (translate_term t)) *)
 
   let process_type_of state c ty =
     Print.warning

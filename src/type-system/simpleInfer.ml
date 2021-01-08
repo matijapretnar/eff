@@ -37,6 +37,12 @@ let empty_constraint = []
 
 let add_ty_constraint cstr loc t1 t2 = cstr := (t1, t2, loc) :: !cstr
 
+let ty_of_const = function
+  | Const.Integer _ -> Type.int_ty
+  | Const.String _ -> Type.string_ty
+  | Const.Boolean _ -> Type.bool_ty
+  | Const.Float _ -> Type.float_ty
+
 (* [infer_pattern cstr pp] infers the type of pattern [pp]. It returns the list of
    pattern variables with their types, which are all guaranteed to be [Type.Meta]'s, together
    with the type of the pattern. *)
@@ -60,7 +66,7 @@ let infer_pattern cstr pp =
         vars := (x, t) :: !vars;
         t
     | Untyped.PNonbinding -> T.fresh_ty ()
-    | Untyped.PConst const -> T.Basic (Const.infer_ty const)
+    | Untyped.PConst const -> ty_of_const const
     | Untyped.PTuple ps -> T.Tuple (left_to_right_map infer ps)
     | Untyped.PRecord flds -> (
         match Assoc.pop flds with
@@ -204,7 +210,7 @@ and infer_let_rec ctx cstr loc defs =
 and infer_expr ctx cstr { it = e; at = loc } =
   match e with
   | Untyped.Var x -> Ctx.lookup ~loc ctx x
-  | Untyped.Const const -> T.Basic (Const.infer_ty const)
+  | Untyped.Const const -> ty_of_const const
   | Untyped.Annotated (t, ty) ->
       let ty' = infer_expr ctx cstr t in
       add_ty_constraint cstr loc ty ty';

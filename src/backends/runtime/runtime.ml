@@ -1,4 +1,4 @@
-(* Evaluation of the intermediate language, big step. *)
+(* Evaluation of ExEff, big step without intermediate SkelEff step. *)
 open CoreUtils
 module V = Value
 module Untyped = UntypedSyntax

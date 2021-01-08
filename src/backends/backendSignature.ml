@@ -1,5 +1,8 @@
-module CoreSyntax = UntypedSyntax
+module ExEff = Typed
 module TypeSystem = SimpleInfer
+
+(* STIEN: Supposed to eventually not use this anymore, now used for top let (rec) *)
+module CoreSyntax = UntypedSyntax
 
 module type T = sig
   type state

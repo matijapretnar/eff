@@ -1,6 +1,8 @@
 open CoreUtils
 (** Syntax of the core language. *)
 
+module CoreSyntax = UntypedSyntax
+
 type variable = CoreTypes.Variable.t
 
 type effect = CoreTypes.Effect.t

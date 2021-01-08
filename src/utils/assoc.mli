@@ -6,6 +6,10 @@ val empty : ('k, 'v) t
 
 val is_empty : ('k, 'v) t -> bool
 
+val isCons : ('k, 'v) t -> (('k * 'v) * ('k, 'v) t) option
+(** [isCons xs] returns [None] if the association list is empty and [Some
+    ((k,v),ys)] otherwise *)
+
 val lookup : 'k -> ('k, 'v) t -> 'v option
 (** [lookup k assoc] returns the most recent value associated with [k] in
     [assoc] if it exists. *)
@@ -28,6 +32,8 @@ val replace : 'k -> 'v -> ('k, 'v) t -> ('k, 'v) t
 
 val remove : 'k -> ('k, 'v) t -> ('k, 'v) t
 (** [remove k assoc] removes the most recent association with [k]. *)
+
+val filter : ('k -> bool) -> ('k, 'v) t -> ('k, 'v) t
 
 val iter : ('k * 'v -> unit) -> ('k, 'v) t -> unit
 (** [iter f assoc] iterates the function [f] over all elements of [assoc]. *)

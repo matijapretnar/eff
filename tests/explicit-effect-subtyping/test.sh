@@ -33,7 +33,7 @@ fi
 
 for FILE in $BASEDIR/*.eff
   do
-  "$EFF" --explicit-subtyping --no-pervasives --compile-ocaml "$FILE.out" "$FILE"
+  "$EFF" --explicit-subtyping --no-pervasives "$FILE" >"$FILE.out" 2>&1
   if [ -f $FILE.ref ]
       then
       RESULT=`"$DIFF" "$FILE.out" "$FILE.ref"`

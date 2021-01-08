@@ -892,10 +892,10 @@ let dispatch_default = MyOCamlbuildBase.dispatch_default conf package_default;;
 
 # 894 "myocamlbuild.ml"
 (* OASIS_STOP *)
-Ocamlbuild_plugin.dispatch
+(* Ocamlbuild_plugin.dispatch
  (fun hook ->
     dispatch_default hook;
     Ocamlbuild_js_of_ocaml.dispatcher
       ~oasis_executables:["src/jseff.byte"]
       hook;
- )
+ ) *)

@@ -6,11 +6,6 @@ let usage = "Usage: eff [option] ... [file] ..."
 
 type use_file = Run of string | Load of string | Compile of string
 
-module M = NoEffSyntax
-module Cmp = NoEffCompile
-module Prt = NoEffPrint
-module ExtNoEff = NoEffExternal
-
 let file_queue = ref []
 
 let enqueue_file filename = file_queue := filename :: !file_queue
@@ -25,6 +20,8 @@ let options =
       ( "--explicit-subtyping",
         Arg.Set Config.explicit_subtyping,
         " Enable the experimental explicit subtyping inference engine" );
+      ("--profile", Arg.Set Config.profiling, " Print out profiling information");
+      ("--no-opts", Arg.Set Config.disable_optimization, " Disable optmizations");
       ( "--wrapper",
         Arg.String (fun str -> Config.wrapper := Some [ str ]),
         "<program> Specify a command-line wrapper to be used (such as rlwrap \
@@ -35,7 +32,7 @@ let options =
       ( "--compile-multicore-ocaml",
         Arg.String (fun filename -> Config.backend := Multicore filename),
         "<file> Compile the Eff code into a Multicore OCaml file <file>" );
-      ( "--compile-ocaml",
+      ( "--compile-plain-ocaml",
         Arg.String (fun filename -> Config.backend := Ocaml filename),
         "<file> Compile the Eff code into a OCaml file <file>" );
       ("--ascii", Arg.Set Config.ascii, " Use ASCII output");
@@ -148,7 +145,7 @@ let main =
         | Config.Runtime -> Filename.concat Local.effdir "pervasives.eff"
         | Config.Multicore _ ->
             Filename.concat Local.effdir "multicorePervasives.eff"
-        | Config.Ocaml _ -> Filename.concat Local.effdir "noEffPervasives.eff"
+        | Config.Ocaml _ -> Filename.concat Local.effdir "ocamlPervasives.eff"
       in
       enqueue_file (Load f));
   try
@@ -159,10 +156,10 @@ let main =
           (module MulticoreCompile.Backend (struct
             let output_file = output_file
           end))
-      | Config.Ocaml output_file ->
-          (module NoEffBackend.Backend (struct
+      (* | Config.Ocaml output_file ->
+          (module OcamlCompile_viaNoEff.Backend (struct
             let output_file = output_file
-          end))
+          end)) *)
     in
     let (module Shell) = (module Shell.Make (Backend) : Shell.Shell) in
     (* Run and load all the specified files. *)

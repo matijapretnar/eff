@@ -7,6 +7,11 @@ let empty = []
 
 let is_empty = function [] -> true | _ :: _ -> false
 
+(* View from the left *)
+let rec isCons (xs : ('key, 'value) t) :
+    (('key * 'value) * ('key, 'value) t) option =
+  match xs with [] -> None | x :: xs -> Some (x, xs)
+
 (* Finding elements. *)
 let rec lookup x = function
   | [] -> None
@@ -29,6 +34,10 @@ let rec replace k v = function
 let rec remove x = function
   | [] -> []
   | (k, v) :: tl -> if x = k then tl else (k, v) :: remove x tl
+
+let rec filter f = function
+  | [] -> []
+  | (k, v) :: tl -> if f k then (k, v) :: filter f tl else filter f tl
 
 (* Iters, maps, folds. *)
 let rec iter = List.iter

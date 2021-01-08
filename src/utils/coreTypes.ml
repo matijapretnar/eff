@@ -74,12 +74,12 @@ end))
 module TyCoercionParam = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "tycoer"
 
-  let utf8_symbol = "\207\132ycoer"
+  let utf8_symbol = "\207\132co"
 end))
 
 (** dirt coercion parameters *)
 module DirtCoercionParam = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "dirtcoer"
 
-  let utf8_symbol = "dirtcoer"
+  let utf8_symbol = "\206\180co"
 end))

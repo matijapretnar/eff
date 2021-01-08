@@ -1,0 +1,11 @@
+let f5 = fun x -> x in
+
+let f4 = fun x -> (f5 x) in 
+
+let f3 = fun x -> (f4 x) in 
+
+let f2 = fun x -> (f3 x) in 
+
+let f1 = fun x -> (f2 x) in 
+
+(f1 3)

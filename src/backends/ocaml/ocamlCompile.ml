@@ -23,9 +23,7 @@ let compile_file ppf filename st =
           Desugarer.desugar_computation state.desugarer_state t
         in
         Print.debug "Compiling: %t" (UntypedSyntax.print_computation c);
-        let ct, effect_system_state =
-          ExplicitInfer.type_toplevel ~loc state.effect_system_state c
-        in
+        let ct = ExplicitInfer.tcTopLevel ~loc state.effect_system_state c in
         Print.debug
           "-- After Type Inference ----------------------------------------";
         Print.debug "%t" (Typed.print_computation ct);

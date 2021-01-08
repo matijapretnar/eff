@@ -23,4 +23,3 @@ _tmp
 _tmp_no_opt
 tests/code-generation/pure/*.ml
 tests/code-generation/pure/*.eff
-.vscode/tasks.json
