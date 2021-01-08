@@ -1,3 +1,5 @@
+open Utils
+open Language
 open CoreUtils
 module T = Type
 module Untyped = UntypedSyntax

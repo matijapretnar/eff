@@ -1,3 +1,5 @@
+open Utils
+
 let fresh_ty_param = CoreTypes.TyParam.fresh
 
 type ty =

@@ -1,3 +1,6 @@
+open Utils
+open Language
+
 type variable = CoreTypes.Variable.t
 
 type effect = CoreTypes.Effect.t

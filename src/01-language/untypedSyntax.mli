@@ -1,3 +1,4 @@
+open Utils
 (** Syntax of the core language. *)
 
 type variable = CoreTypes.Variable.t

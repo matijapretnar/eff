@@ -1,3 +1,4 @@
+open Language
 module CoreSyntax = UntypedSyntax
 
 val of_computation : CoreSyntax.computation -> MulticoreSyntax.term

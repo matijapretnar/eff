@@ -1,3 +1,6 @@
+open Utils
+open Language
+
 type variable = CoreTypes.Variable.t
 (** Syntax of the core language. *)
 

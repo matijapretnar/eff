@@ -1,4 +1,5 @@
 open Shared
+open Utils
 open Js_of_ocaml
 
 let js_formatter _format echo =

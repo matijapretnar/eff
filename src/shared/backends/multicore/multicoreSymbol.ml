@@ -1,3 +1,6 @@
+open Utils
+open Language
+
 let protected =
   [ "and"; "as"; "assert"; "asr"; "begin"; "class"; "constraint"; "do"; "done" ]
   @ [ "downto"; "else"; "end"; "exception"; "external"; "false"; "for"; "fun" ]

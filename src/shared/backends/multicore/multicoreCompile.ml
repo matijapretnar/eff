@@ -1,4 +1,7 @@
 (* Evaluation of the intermediate language, big step. *)
+
+open Utils
+
 module type BackendParameters = sig
   val output_file : string
 end

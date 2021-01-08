@@ -1,3 +1,4 @@
+open Utils
 (** Types shared by different modules *)
 
 module Variable = Symbol.Make (Symbol.String)

@@ -1,5 +1,7 @@
 (** Desugaring of syntax into the core language. *)
 
+open Utils
+open Language
 open CoreUtils
 module T = Type
 module Sugared = SugaredSyntax

@@ -10,5 +10,5 @@
     [external id : ty = "external_name"].
 *)
 
-val values : (string, Value.value) Assoc.t
+val values : (string, Value.value) Utils.Assoc.t
 (** [values] is an association list of external names and values. *)

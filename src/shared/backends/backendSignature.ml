@@ -1,3 +1,5 @@
+open Utils
+open Language
 module CoreSyntax = UntypedSyntax
 module TypeSystem = SimpleInfer
 

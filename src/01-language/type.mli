@@ -1,3 +1,5 @@
+open Utils
+
 val fresh_ty_param : unit -> CoreTypes.TyParam.t
 
 type ty =

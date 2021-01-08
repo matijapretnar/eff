@@ -1,3 +1,6 @@
+open Utils
+open Language
+
 type tydef =
   | Record of (CoreTypes.Field.t, Type.ty) Assoc.t
   | Sum of (CoreTypes.Label.t, Type.ty option) Assoc.t

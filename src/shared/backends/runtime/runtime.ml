@@ -1,4 +1,7 @@
 (* Evaluation of the intermediate language, big step. *)
+
+open Utils
+open Language
 module V = Value
 module Untyped = UntypedSyntax
 

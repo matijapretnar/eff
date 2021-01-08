@@ -1,6 +1,6 @@
 (library
  (name shared)
- (libraries unix))
+ (libraries unix utils language))
 
 (ocamllex lexer)
 

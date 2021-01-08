@@ -1,4 +1,5 @@
 open Shared
+open Utils
 
 let usage = "Usage: eff [option] ... [file] ..."
 

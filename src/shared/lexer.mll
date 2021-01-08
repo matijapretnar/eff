@@ -1,5 +1,6 @@
 {
   open Parser
+  open Utils
 
   let reserved = Assoc.of_list [
     ("and", AND);

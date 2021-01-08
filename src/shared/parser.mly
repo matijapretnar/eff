@@ -1,6 +1,8 @@
 %{
   open SugaredSyntax
+  open Utils
   open CoreUtils
+  open Language
 
   type handler_clause =
     | EffectClause of effect * abstraction2

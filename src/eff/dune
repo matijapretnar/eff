@@ -1,7 +1,7 @@
 (executable
  (name eff)
  (public_name eff)
- (libraries shared)
+ (libraries shared utils language)
  (promote
   (until-clean)
   (into ../..)))

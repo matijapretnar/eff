@@ -1,3 +1,6 @@
+open Utils
+open Language
+
 (** [unify sbst loc t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)
 let solve cstr type_context =

@@ -1,3 +1,5 @@
+open Utils
+
 open CoreUtils
 (** Syntax of the core language. *)
 

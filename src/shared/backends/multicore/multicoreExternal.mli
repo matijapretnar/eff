@@ -1,3 +1,5 @@
+open Utils
+
 (** External values.
 
     Here, we define values that cannot be defined in Eff itself.
