@@ -2,7 +2,8 @@ open Utils
 open Language
 open CoreUtils
 open Parser
-module TypeSystem = SimpleInfer
+module TypeSystem = Typechecker.SimpleInfer
+module TypeContext = Typechecker.TypeContext
 
 module type Shell = sig
   type state
