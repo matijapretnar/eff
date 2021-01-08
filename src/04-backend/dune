@@ -1,8 +1,6 @@
 (library
- (name shared)
- (libraries unix utils language parser typechecker))
-
-(include_subdirs unqualified)
+ (name backend)
+ (libraries language typechecker))
 
 (rule
  (with-stdout-to
@@ -12,5 +10,5 @@
    (cat stdlib.eff)
    (echo "|}")
    (echo "let multicoreStdlib = {|")
-   (cat backends/multicore/multicoreStdlib.eff)
+   (cat multicore/multicoreStdlib.eff)
    (echo "|}"))))

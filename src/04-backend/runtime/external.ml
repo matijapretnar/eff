@@ -1,7 +1,7 @@
 open Utils
 open Language
 open CoreUtils
-module V = Value
+module V = Backend.Value
 
 let from_bool b = V.Const (Const.of_boolean b)
 
@@ -200,7 +200,7 @@ let conversion_functions =
     [
       ( "to_string",
         let to_string v =
-          Value.print_value v Format.str_formatter;
+          V.print_value v Format.str_formatter;
           let s = Format.flush_str_formatter () in
           value_str s
         in

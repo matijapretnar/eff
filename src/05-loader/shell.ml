@@ -21,7 +21,7 @@ module type Shell = sig
   val finalize : state -> unit
 end
 
-module Make (Backend : BackendSignature.T) = struct
+module Make (Backend : Backend.BackendSignature.T) = struct
   type state = {
     desugarer_state : Desugarer.state;
     type_system_state : TypeSystem.state;

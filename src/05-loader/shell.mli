@@ -14,4 +14,4 @@ module type Shell = sig
   val finalize : state -> unit
 end
 
-module Make (Backend : BackendSignature.T) : Shell
+module Make (Backend : Backend.BackendSignature.T) : Shell

@@ -2,10 +2,10 @@
 
 open Utils
 open Language
-module V = Value
+module V = Backend.Value
 module Untyped = UntypedSyntax
 
-module Backend : BackendSignature.T = struct
+module Backend : Backend.BackendSignature.T = struct
   module RuntimeEnv = Map.Make (CoreTypes.Variable)
 
   (* prints tells us wheter or not to print, while mute depth makes sure that
@@ -18,7 +18,7 @@ module Backend : BackendSignature.T = struct
   let process_computation state c ty =
     let v = Eval.run state c in
     Format.fprintf !Config.output_formatter "@[- : %t = %t@]@."
-      (Type.print_beautiful ty) (Value.print_value v);
+      (Type.print_beautiful ty) (V.print_value v);
     state
 
   let process_type_of state _c ty =
@@ -44,7 +44,7 @@ module Backend : BackendSignature.T = struct
             Format.fprintf !Config.output_formatter "@[val %t : %t = %t@]@."
               (CoreTypes.Variable.print x)
               (Type.print_beautiful tysch)
-              (Value.print_value v))
+              (V.print_value v))
       vars;
     state'
 

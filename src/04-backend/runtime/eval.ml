@@ -2,11 +2,11 @@
 open Utils
 open Language
 open CoreUtils
-module V = Value
+module V = Backend.Value
 module Untyped = UntypedSyntax
 module RuntimeEnv = Map.Make (CoreTypes.Variable)
 
-type state = Value.value RuntimeEnv.t
+type state = V.value RuntimeEnv.t
 
 let initial_state = RuntimeEnv.empty
 
@@ -24,9 +24,8 @@ let rec extend_value p v state =
       let state = extend_value p v state in
       update x v state
   | Untyped.PNonbinding, _ -> state
-  | Untyped.PTuple ps, Value.Tuple vs ->
-      List.fold_right2 extend_value ps vs state
-  | Untyped.PRecord ps, Value.Record vs -> (
+  | Untyped.PTuple ps, V.Tuple vs -> List.fold_right2 extend_value ps vs state
+  | Untyped.PRecord ps, V.Record vs -> (
       let extender state (f, p) =
         match Assoc.lookup f vs with
         | None -> raise Not_found
@@ -34,12 +33,11 @@ let rec extend_value p v state =
       in
       try Assoc.fold_left extender state ps
       with Not_found -> raise (PatternMatch p.at))
-  | Untyped.PVariant (lbl, None), Value.Variant (lbl', None) when lbl = lbl' ->
+  | Untyped.PVariant (lbl, None), V.Variant (lbl', None) when lbl = lbl' ->
       state
-  | Untyped.PVariant (lbl, Some p), Value.Variant (lbl', Some v) when lbl = lbl'
-    ->
+  | Untyped.PVariant (lbl, Some p), V.Variant (lbl', Some v) when lbl = lbl' ->
       extend_value p v state
-  | Untyped.PConst c, Value.Const c' when Const.equal c c' -> state
+  | Untyped.PConst c, V.Const c' when Const.equal c c' -> state
   | _, _ -> raise (PatternMatch p.at)
 
 let extend p v state =
@@ -82,7 +80,7 @@ let rec ceval state c =
       ceval state c
   | Untyped.Check c ->
       let r = ceval state c in
-      Print.check ~loc "%t" (Value.print_result r);
+      Print.check ~loc "%t" (V.print_result r);
       V.unit_result
 
 and eval_let state lst c =
@@ -159,13 +157,13 @@ let rec top_handle op =
           Format.pp_print_string !Config.output_formatter str;
           Format.pp_print_flush !Config.output_formatter ();
           top_handle (k V.unit_value)
-      | "Raise" -> Error.runtime "%t" (Value.print_value v)
+      | "Raise" -> Error.runtime "%t" (V.print_value v)
       | "RandomInt" ->
-          let rnd_int = Random.int (Value.to_int v) in
+          let rnd_int = Random.int (V.to_int v) in
           let rnd_int_v = V.Const (Const.of_integer rnd_int) in
           top_handle (k rnd_int_v)
       | "RandomFloat" ->
-          let rnd_float = Random.float (Value.to_float v) in
+          let rnd_float = Random.float (V.to_float v) in
           let rnd_float_v = V.Const (Const.of_float rnd_float) in
           top_handle (k rnd_float_v)
       | "Read" ->
@@ -187,7 +185,7 @@ let rec top_handle op =
               top_handle (k V.unit_value)
           | _ -> Error.runtime "A pair of a file name and string expected")
       | _eff_annot ->
-          Error.runtime "uncaught effect %t %t." (Value.print_effect eff)
-            (Value.print_value v))
+          Error.runtime "uncaught effect %t %t." (V.print_effect eff)
+            (V.print_value v))
 
 let run state c = top_handle (ceval state c)

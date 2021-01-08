@@ -1,7 +1,7 @@
 (executable
  (name eff)
  (public_name eff)
- (libraries shared utils language)
+ (libraries utils language runtime backendMulticore shell)
  (promote
   (until-clean)
-  (into ../..)))
+  (into ../../)))
