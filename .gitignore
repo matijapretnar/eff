@@ -1,7 +1,23 @@
 _build
-.devcontainer
-.DS_Store
-.merlin
-.vscode
-eff.exe
+# Executable
+eff
 docs/try/jseff.bc.js
+
+# Backup files
+*~
+
+# Silly Mac OS X files
+.DS_Store
+
+# VSCode
+.vscode
+.devcontainer
+
+# Dune takes care of merlin
+.merlin
+
+# Compiler generated code - once compiler is fixed, this should be cleaned up
+_tmp
+_tmp_no_opt
+tests/code-generation/pure/*.ml
+tests/code-generation/pure/*.eff
