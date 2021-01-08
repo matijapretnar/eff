@@ -100,7 +100,7 @@ module Make (Backend : BackendSignature.T) = struct
 
         (* Erase ExEff back to ImpEff *)
         Print.debug "exec_cmd: before erasure";
-        let c''' = ErasureUntyped.typed_to_untyped_comp Assoc.empty c'' in
+        (* TODO: let c''' = ErasureUntyped.typed_to_untyped_comp Assoc.empty c'' in *)
         Print.debug "exec_cmd: after erasure";
 
         (* Format.fprintf !Config.error_formatter "%t\n"
@@ -111,7 +111,7 @@ module Make (Backend : BackendSignature.T) = struct
         let t1 = Sys.time () in
         let t_compile = t1 -. t_start in
         let backend_state' =
-          Backend.process_computation state.backend_state c''' ty
+          Backend.process_computation state.backend_state c ty
           (* USe implicit type *)
         in
         let t2 = Sys.time () in
@@ -220,7 +220,7 @@ module Make (Backend : BackendSignature.T) = struct
         let type_system_state' =
           TypeSystem.extend state.type_system_state x (Type.free_params ty, ty)
         in
-        let ty' = Types.source_to_target ty in
+        let ty' = Types.source_to_target state.type_context_state ty in
         let effect_system_state' =
           EffectSystem.addExternal state.effect_system_state x ty'
         in

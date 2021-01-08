@@ -10,6 +10,7 @@ type state = {
   ty_param_skeletons : (CoreTypes.TyParam.t, Types.skeleton) Assoc.t;
   ty_coer_types : (CoreTypes.TyCoercionParam.t, Types.ct_ty) Assoc.t;
   dirt_coer_types : (CoreTypes.DirtCoercionParam.t, Types.ct_dirt) Assoc.t;
+  tctx_st : TypeContext.state;
 }
 
 let extend_ty_params st ty_var = { st with ty_params = ty_var :: st.ty_params }
@@ -43,6 +44,7 @@ let initial_state =
     ty_param_skeletons = Assoc.empty;
     ty_coer_types = Assoc.empty;
     dirt_coer_types = Assoc.empty;
+    tctx_st = TypeContext.initial_state;
   }
 
 let rec check_well_formed_skeleton st = function
@@ -247,7 +249,7 @@ let rec extendPatternTypesTemp st p ty =
       assert (Types.types_are_equal ty_c ty);
       st
   | PVariant (lbl, p) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
+      let ty_in, ty_out = Types.constructor_signature st.tctx_st lbl in
       assert (Types.types_are_equal ty ty_out);
       extendPatternTypes st p ty_in
   | PTuple ps -> (
@@ -277,7 +279,7 @@ let rec typeOfExpressionTemp st = function
       Types.Arrow (ty1, c_ty)
   | Tuple es -> Types.Tuple (List.map (fun e -> typeOfExpression st e) es)
   | Variant (lbl, e) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
+      let ty_in, ty_out = Types.constructor_signature st.tctx_st lbl in
       let u' = typeOfExpression st e in
       assert (Types.types_are_equal u' ty_in);
       ty_out

@@ -2,5 +2,4 @@
  (name generate_dune_rules)
  (modules generate_dune_rules))
 
-(ignored_subdirs
- (code-generation valid invalid))
+(ignored_subdirs (code-generation))

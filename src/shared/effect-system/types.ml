@@ -491,34 +491,37 @@ and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
       )
   | EmptyRow -> ((ty_sbst, dirt_sbst), drt)
 
-let st = failwith "TODO NOW"
-
-let rec source_to_target ty =
+let rec source_to_target tctx_st ty =
   let loc = Location.unknown in
   match ty with
-  | Type.Apply (ty_name, args) when TypeContext.transparent ~loc ty_name st -> (
-      match TypeContext.lookup_tydef ~loc ty_name st with
-      | { params = []; type_def = TypeContext.Inline ty } -> source_to_target ty
+  | Type.Apply (ty_name, args) when TypeContext.transparent ~loc ty_name tctx_st
+    -> (
+      match TypeContext.lookup_tydef ~loc ty_name tctx_st with
+      | { params = []; type_def = TypeContext.Inline ty } ->
+          source_to_target tctx_st ty
       | { type_def = TypeContext.Sum _; _ }
       | { type_def = TypeContext.Record _; _ }
       | { type_def = TypeContext.Inline _; _ } ->
           assert false (* None of these are transparent *))
-  | Type.Apply (ty_name, args) -> Apply (ty_name, List.map source_to_target args)
+  | Type.Apply (ty_name, args) ->
+      Apply (ty_name, List.map (source_to_target tctx_st) args)
   | Type.TyParam p -> TyParam p
   | Type.Basic s -> TyBasic s
-  | Type.Tuple l -> Tuple (List.map source_to_target l)
+  | Type.Tuple l -> Tuple (List.map (source_to_target tctx_st) l)
   | Type.Arrow (ty, dirty) ->
-      Arrow (source_to_target ty, source_to_target_dirty dirty)
+      Arrow ((source_to_target tctx_st) ty, source_to_target_dirty tctx_st dirty)
   | Type.Handler { value = dirty1; finally = dirty2 } ->
-      Handler (source_to_target_dirty dirty1, source_to_target_dirty dirty2)
+      Handler
+        ( source_to_target_dirty tctx_st dirty1,
+          source_to_target_dirty tctx_st dirty2 )
 
-and source_to_target_dirty ty = (source_to_target ty, empty_dirt)
+and source_to_target_dirty tctx_st ty = (source_to_target tctx_st ty, empty_dirt)
 
-let constructor_signature lbl =
-  match TypeContext.infer_variant lbl st with
+let constructor_signature tctx_st lbl =
+  match TypeContext.infer_variant lbl tctx_st with
   | None -> assert false
   | Some (ty_out, ty_in) ->
       let ty_in =
         match ty_in with Some ty_in -> ty_in | None -> Type.Tuple []
       in
-      (source_to_target ty_in, source_to_target ty_out)
+      (source_to_target tctx_st ty_in, source_to_target tctx_st ty_out)

@@ -40,8 +40,9 @@ let extendGenSub acc sub = Substitution.merge acc sub
 type state = {
   gblCtxt : TypingEnv.t;
   (* Global Typing Environment *)
-  effects : (Types.target_ty * Types.target_ty) Typed.EffectMap.t;
-      (* Valid Effects             *)
+  effects : (Types.target_ty * Types.target_ty) EffectMap.t;
+  (* Valid Effects             *)
+  tctx_st : TypeContext.state;
 }
 
 (* A bag/list of constraints *)
@@ -74,7 +75,11 @@ type expression_typing_result = {
 
 (* Initial type inference state: everything is empty *)
 let initial_state : state =
-  { gblCtxt = TypingEnv.empty; effects = Typed.EffectMap.empty }
+  {
+    gblCtxt = TypingEnv.empty;
+    effects = Typed.EffectMap.empty;
+    tctx_st = TypeContext.initial_state;
+  }
 
 let print_env env =
   List.iter
@@ -84,8 +89,8 @@ let print_env env =
     env
 
 let add_effect eff (ty1, ty2) st =
-  let ty1 = Types.source_to_target ty1 in
-  let ty2 = Types.source_to_target ty2 in
+  let ty1 = Types.source_to_target st.tctx_st ty1 in
+  let ty2 = Types.source_to_target st.tctx_st ty2 in
   { st with effects = EffectMap.add eff (ty1, ty2) st.effects }
 
 (* ... *)
@@ -349,14 +354,15 @@ let rec tcMany (inState : state) (lclCtxt : TypingEnv.t) (xss : 'a list)
 
 (** CHECK the type of a (located) pattern. Return the extended typing
  * environment with the additional term bindings. *)
-let rec checkLocatedPatTy (lclCtxt : TypingEnv.t) (pat : Untyped.pattern)
+let rec checkLocatedPatTy st (lclCtxt : TypingEnv.t) (pat : Untyped.pattern)
     (patTy : Types.target_ty) : Typed.pattern * TypingEnv.t =
-  checkPatTy lclCtxt pat.it patTy
+  checkPatTy st lclCtxt pat.it patTy
 
 (** CHECK the type of a pattern. Return the extended typing environment with
  * the additional term bindings. *)
-and checkPatTy (lclCtxt : TypingEnv.t) (pat : Untyped.plain_pattern)
-    (patTy : Types.target_ty) : Typed.pattern * TypingEnv.t =
+and checkPatTy (st : state) (lclCtxt : TypingEnv.t)
+    (pat : Untyped.plain_pattern) (patTy : Types.target_ty) :
+    Typed.pattern * TypingEnv.t =
   match pat with
   (* Variable Case *)
   | Untyped.PVar x -> (Typed.PVar x, extendLclCtxt lclCtxt x patTy)
@@ -364,15 +370,15 @@ and checkPatTy (lclCtxt : TypingEnv.t) (pat : Untyped.plain_pattern)
   | Untyped.PNonbinding -> (Typed.PNonbinding, lclCtxt)
   (* Nullary Constructor Case *)
   | Untyped.PVariant (lbl, None) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
+      let ty_in, ty_out = Types.constructor_signature st.tctx_st lbl in
       if ty_in = Types.Tuple [] && patTy = ty_out then
         (Typed.PVariant (lbl, Typed.PTuple []), lclCtxt)
       else failwith "checkPatTy: PVariant(None)"
   (* Unary Constructor Case *)
   | Untyped.PVariant (lbl, Some p) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
+      let ty_in, ty_out = Types.constructor_signature st.tctx_st lbl in
       if patTy = ty_out then
-        let p', midCtxt = checkLocatedPatTy lclCtxt p ty_in in
+        let p', midCtxt = checkLocatedPatTy st lclCtxt p ty_in in
         (Typed.PVariant (lbl, p'), midCtxt)
       else failwith "checkPatTy: PVariant(Some)"
   (* Constant Case *)
@@ -383,7 +389,7 @@ and checkPatTy (lclCtxt : TypingEnv.t) (pat : Untyped.plain_pattern)
   | Untyped.PTuple pats -> (
       match patTy with
       | Types.Tuple tys ->
-          let outPats, outCtxt = checkLocatedPatTys lclCtxt pats tys in
+          let outPats, outCtxt = checkLocatedPatTys st lclCtxt pats tys in
           (Typed.PTuple outPats, outCtxt)
       | _ -> failwith "checkPatTy: PTuple")
   (* GEORGE: Not implemented yet cases *)
@@ -391,13 +397,13 @@ and checkPatTy (lclCtxt : TypingEnv.t) (pat : Untyped.plain_pattern)
   | Untyped.PRecord r -> failwith __LOC__
   | Untyped.PAnnotated (p, ty) -> failwith __LOC__
 
-and checkLocatedPatTys (lclCtxt : TypingEnv.t) (pats : Untyped.pattern list)
+and checkLocatedPatTys st (lclCtxt : TypingEnv.t) (pats : Untyped.pattern list)
     (patTys : Types.target_ty list) : Typed.pattern list * TypingEnv.t =
   match (pats, patTys) with
   | [], [] -> ([], lclCtxt)
   | pat :: pats, ty :: tys ->
-      let newPat, newCtxt = checkLocatedPatTy lclCtxt pat ty in
-      let newPats, outCtxt = checkLocatedPatTys newCtxt pats tys in
+      let newPat, newCtxt = checkLocatedPatTy st lclCtxt pat ty in
+      let newPats, outCtxt = checkLocatedPatTys st newCtxt pats tys in
       (newPat :: newPats, outCtxt)
   | _, _ -> failwith "checkLocatedPatTys: length mismatch"
 
@@ -420,26 +426,27 @@ let rec optionMapM (f : 'a -> 'b option) : 'a list -> 'b list option = function
           optionBind (optionMapM f xs) (fun ys -> Some (y :: ys)))
 
 (* Infer a ground monotype for a pattern, if possible. *)
-let rec inferClosedPatTy : Untyped.plain_pattern -> Types.target_ty option =
+let rec inferClosedPatTy st : Untyped.plain_pattern -> Types.target_ty option =
   function
   | Untyped.PVar _ -> None
   | Untyped.PNonbinding -> None
   | Untyped.PVariant (lbl, None) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
+      let ty_in, ty_out = Types.constructor_signature st.tctx_st lbl in
       if ty_in = Types.Tuple [] && Types.isClosedMonoTy ty_out then (
         assert (Types.isClosedMonoTy ty_out);
         Some ty_out)
       else failwith "inferClosedPatTy: PVariant(None)"
   | Untyped.PVariant (lbl, Some p) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
-      checkLocatedClosedPatTy p ty_in;
+      let ty_in, ty_out = Types.constructor_signature st.tctx_st lbl in
+      checkLocatedClosedPatTy st p ty_in;
       assert (Types.isClosedMonoTy ty_out);
       Some ty_out
   | Untyped.PConst c -> Some (Types.type_const c)
-  | Untyped.PAs (p, _) -> inferLocatedClosedPatTy p
+  | Untyped.PAs (p, _) -> inferLocatedClosedPatTy st p
   | Untyped.PTuple l ->
-      optionBind (optionMapM inferLocatedClosedPatTy l) (fun tys ->
-          Some (Types.Tuple tys))
+      optionBind
+        (optionMapM (inferLocatedClosedPatTy st) l)
+        (fun tys -> Some (Types.Tuple tys))
   | Untyped.PRecord r -> None (* TODO: Not implemented yet *)
   | Untyped.PAnnotated (p, ty) -> failwith __LOC__
 
@@ -449,62 +456,63 @@ let rec inferClosedPatTy : Untyped.plain_pattern -> Types.target_ty option =
  *  then checkClosedPatTy p ty
  *  else None
  *)
-and inferLocatedClosedPatTy (inpat : Untyped.pattern) : Types.target_ty option =
-  inferClosedPatTy inpat.it
+and inferLocatedClosedPatTy st (inpat : Untyped.pattern) :
+    Types.target_ty option =
+  inferClosedPatTy st inpat.it
 
-and checkLocatedClosedPatTy (inpat : Untyped.pattern) (patTy : Types.target_ty)
-    : unit =
-  checkClosedPatTy inpat.it patTy
+and checkLocatedClosedPatTy st (inpat : Untyped.pattern)
+    (patTy : Types.target_ty) : unit =
+  checkClosedPatTy st inpat.it patTy
 
 (* Check a pattern against a ground monotype. Fail if not possible. *)
-and checkClosedPatTy (inpat : Untyped.plain_pattern) (patTy : Types.target_ty) :
-    unit =
+and checkClosedPatTy st (inpat : Untyped.plain_pattern)
+    (patTy : Types.target_ty) : unit =
   match inpat with
   | Untyped.PVar _ -> () (* Always possible *)
   | Untyped.PNonbinding -> () (* Always possible *)
   | Untyped.PVariant (lbl, None) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
+      let ty_in, ty_out = Types.constructor_signature st.tctx_st lbl in
       if ty_in = Types.Tuple [] && patTy = ty_out then ()
       else failwith "checkClosedPatTy: PVariant(None)"
   | Untyped.PVariant (lbl, Some p) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
-      if patTy = ty_out then checkLocatedClosedPatTy p ty_in
+      let ty_in, ty_out = Types.constructor_signature st.tctx_st lbl in
+      if patTy = ty_out then checkLocatedClosedPatTy st p ty_in
       else failwith "checkClosedPatTy: PVariant(Some)"
   | Untyped.PConst c ->
       if patTy = Types.type_const c then ()
       else failwith "checkClosedPatTy: PConst"
-  | Untyped.PAs (p, v) -> checkLocatedClosedPatTy p patTy
+  | Untyped.PAs (p, v) -> checkLocatedClosedPatTy st p patTy
   | Untyped.PTuple pats -> (
       match patTy with
-      | Types.Tuple tys -> List.iter2 checkLocatedClosedPatTy pats tys
+      | Types.Tuple tys -> List.iter2 (checkLocatedClosedPatTy st) pats tys
       | _ -> failwith "checkClosedPatTy: PTuple")
   | Untyped.PRecord r -> failwith __LOC__ (* TODO: Not implemented yet *)
   | Untyped.PAnnotated (p, ty) -> failwith __LOC__
 
 (* TODO: Not implemented yet *)
 
-let rec inferCheckLocatedClosedPatTys (pats : Untyped.pattern list) :
+let rec inferCheckLocatedClosedPatTys st (pats : Untyped.pattern list) :
     Types.target_ty option =
-  inferCheckClosedPatTys (List.map (fun p -> p.it) pats)
+  inferCheckClosedPatTys st (List.map (fun p -> p.it) pats)
 
-and inferCheckClosedPatTys (pats : Untyped.plain_pattern list) :
+and inferCheckClosedPatTys st (pats : Untyped.plain_pattern list) :
     Types.target_ty option =
   let rec filterMap f = function
     | [] -> []
     | x :: xs -> (
         match f x with None -> filterMap f xs | Some y -> y :: filterMap f xs)
   in
-  match filterMap inferClosedPatTy pats with
+  match filterMap (inferClosedPatTy st) pats with
   (* Case 1: We cannot infer a ground type for any of the patterns *)
   | [] -> None
   (* Case 2: We can infer a type for at least a pattern. Verify that all
    * other patterns can be typed against this type and return it *)
   | ty :: _ ->
-      List.iter (fun p -> checkClosedPatTy p ty) pats;
+      List.iter (fun p -> checkClosedPatTy st p ty) pats;
       Some ty
 
-and inferCheckLocatedClosedPatAlts alts =
-  match inferCheckLocatedClosedPatTys (List.map fst alts) with
+and inferCheckLocatedClosedPatAlts st alts =
+  match inferCheckLocatedClosedPatTys st (List.map fst alts) with
   | None ->
       failwith
         "inferCheckLocatedClosedPatAlts: Could not infer the type of the \
@@ -626,7 +634,7 @@ and tcRecord (inState : state) (lclCtx : TypingEnv.t)
 (* Variants *)
 and tcVariant (inState : state) (lclCtx : TypingEnv.t)
     ((lbl, mbe) : label * Untyped.expression option) : tcValOutput =
-  let ty_in, ty_out = Types.constructor_signature lbl in
+  let ty_in, ty_out = Types.constructor_signature inState.tctx_st lbl in
   match mbe with
   | None -> ((Typed.Variant (lbl, Typed.Tuple []), ty_out), [])
   | Some e ->
@@ -1015,7 +1023,7 @@ and tcNonEmptyMatch (inState : state) (lclCtxt : TypingEnv.t)
   let deltaOut = Types.fresh_dirt () in
 
   (* 2: Infer a type for the patterns *)
-  let patTy = inferCheckLocatedClosedPatAlts alts in
+  let patTy = inferCheckLocatedClosedPatAlts inState alts in
 
   (* 4: Typecheck the scrutinee and the alternatives *)
   let (trgScr, scrTy), cs1 = tcLocatedVal inState lclCtxt scr in
@@ -1134,7 +1142,7 @@ and tcAlternative (inState : state) (lclCtx : TypingEnv.t)
   (* Expected output type *)
 
   (* Typecheck the pattern and the right-hand side *)
-  let trgPat, midCtxt = checkLocatedPatTy lclCtx pat patTy in
+  let trgPat, midCtxt = checkLocatedPatTy inState lclCtx pat patTy in
   let (trgCmp, (tyA, dirtD)), cs = tcLocatedCmp inState midCtxt cmp in
   (* Generate coercions to cast the RHS *)
   let omegaL, omegaCtL = Typed.fresh_ty_coer (tyA, tyAout) in
