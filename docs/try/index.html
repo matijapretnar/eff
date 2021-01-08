@@ -15,15 +15,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.36.0/addon/edit/matchbrackets.min.js" integrity="sha256-BzzUspurJPtHi1Ux5geUVUtDLQDqDeUu9SMkOrsShUY=" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.36.0/addon/edit/closebrackets.min.js" integrity="sha256-ckZJSSEwRjAtCl8YzZuhIqHYq+Bt+Csy3keSLdp8uxA=" crossorigin="anonymous"></script>
     <!-- Jquery Terminal -->
-    <script src="https://code.jquery.com/jquery-2.2.4.min.js" integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/css/jquery.terminal.min.css" integrity="sha256-NPnczI0KjCueVIbIZBIjffajQholjsUnhVe4sQgL80U=" crossorigin="anonymous" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/1.11.0/js/jquery.terminal.min.js" integrity="sha256-Qm1Nw4js01hUsHFCa8xirKnSZeRXR8uNgbAKwjhn9mA=" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-latest.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/2.20.1/js/jquery.terminal.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/jquery.terminal/2.20.1/css/jquery.terminal.min.css" rel="stylesheet"/>
     <!-- suport for resizable CodeMirror editor -->
     <script src="https://unpkg.com/cm-resize"></script>
     <!-- CodeMirror editing mode for Eff (depends on mllike being loaded) -->
     <script src="./effmode.js"></script>
     <!-- local Javascript code -->
-    <script src="/try/jseff.js"></script>
+    <script src="/try/jseff.bc.js"></script>
     <style>
     .CodeMirror {
         height: 60vh;
@@ -155,9 +155,6 @@ span.cm-keyword { color: #192a56 !important; font-weight: bold;}
                 });
 
             var state = jseff.initialize()(terminal.echo);
-            jQuery.get('/try/pervasives.eff', function(data) {
-                state = jseff.loadSource()(state)(data);
-            })
 
             jQuery.get('/try/examples/syntax.eff', function(data) {
                 editor.setValue(data);

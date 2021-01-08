@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup OCaml
+        uses: avsm/setup-ocaml@v1
+
+      - name: Install Opam packages
+        run: opam pin add -n .; opam install eff --deps-only
+
+      - name: Format
+        run: opam exec -- make format
+
+      - name: Test
+        run: opam exec -- make test

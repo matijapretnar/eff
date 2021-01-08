@@ -1,0 +1,2 @@
+Syntax error (file "./non_linear_record.eff", line 3, char 9):
+Fields in a record must be distinct

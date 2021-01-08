@@ -1,0 +1,2 @@
+Typing error (file "./duplicate_field_tydef_record.eff", line 2, char 1):
+Field labels in a record type must be distinct
