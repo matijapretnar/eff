@@ -3,7 +3,7 @@ open Language
 open CoreUtils
 open Parser
 module TypeSystem = Typechecker.SimpleInfer
-module TypeContext = Typechecker.TypeContext
+module TypeDefinitionContext = Typechecker.TypeDefinitionContext
 
 module type Shell = sig
   type state
@@ -26,7 +26,7 @@ module Make (Backend : Backend.BackendSignature.T) = struct
     desugarer_state : Desugarer.state;
     type_system_state : TypeSystem.state;
     backend_state : Backend.state;
-    type_context_state : TypeContext.state;
+    type_context_state : TypeDefinitionContext.state;
   }
 
   let initialize () =
@@ -35,7 +35,7 @@ module Make (Backend : Backend.BackendSignature.T) = struct
       desugarer_state = Desugarer.initial_state;
       type_system_state = TypeSystem.initial_state;
       backend_state = Backend.initial_state;
-      type_context_state = TypeContext.initial_state;
+      type_context_state = TypeDefinitionContext.initial_state;
     }
 
   (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
@@ -155,7 +155,7 @@ module Make (Backend : Backend.BackendSignature.T) = struct
           Desugarer.desugar_tydefs state.desugarer_state tydefs
         in
         let type_context_state' =
-          TypeContext.extend_type_definitions ~loc tydefs'
+          TypeDefinitionContext.extend_type_definitions ~loc tydefs'
             state.type_context_state
         in
         let backend_state' =

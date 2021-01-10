@@ -136,7 +136,7 @@ let infer_pattern st type_context pp =
         match Assoc.pop flds with
         | None -> assert false
         | Some ((fld, _), _) -> (
-            match TypeContext.infer_field fld type_context with
+            match TypeDefinitionContext.infer_field fld type_context with
             | None ->
                 Error.typing ~loc "Unbound record field label %t"
                   (CoreTypes.Field.print fld)
@@ -157,7 +157,7 @@ let infer_pattern st type_context pp =
                 in
                 (ty, st', vars)))
     | Untyped.PVariant (lbl, p) -> (
-        match TypeContext.infer_variant lbl type_context with
+        match TypeDefinitionContext.infer_variant lbl type_context with
         | None -> assert false
         | Some (ty, u) -> (
             match (p, u) with
@@ -297,7 +297,7 @@ and infer_expr st type_context { it = e; at = loc } =
             (* XXX *)
             (* if not (Pattern.linear_record flds') then
                Error.typing ~loc "Fields in a record must be distinct." ;*)
-            match TypeContext.infer_field fld type_context with
+            match TypeDefinitionContext.infer_field fld type_context with
             | None ->
                 Error.typing ~loc "Unbound record field label %t in a pattern"
                   (CoreTypes.Field.print fld)
@@ -323,7 +323,7 @@ and infer_expr st type_context { it = e; at = loc } =
                   in
                   (ty, Assoc.fold_left unify_record_arg st arg_types')))
     | Untyped.Variant (lbl, u) -> (
-        match TypeContext.infer_variant lbl type_context with
+        match TypeDefinitionContext.infer_variant lbl type_context with
         | None -> assert false
         | Some (ty, arg_type) -> (
             match (arg_type, u) with

@@ -31,8 +31,8 @@ let solve cstr type_context =
     (* The following two cases cannot be merged into one, as the whole matching
        fails if both types are Apply, but only the second one is transparent. *)
     | Type.Apply (t1, lst1), t2
-      when TypeContext.transparent ~loc t1 type_context -> (
-        match TypeContext.ty_apply ~loc t1 lst1 type_context with
+      when TypeDefinitionContext.transparent ~loc t1 type_context -> (
+        match TypeDefinitionContext.ty_apply ~loc t1 lst1 type_context with
         | Type.Inline t -> unify loc t2 t subst
         | Type.Sum _ | Type.Record _ ->
             assert false (* None of these are transparent *))
