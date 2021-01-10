@@ -13,6 +13,7 @@ type state = {
   context : ty_scheme VariableMap.t;
   effects : (Type.ty * Type.ty) EffectMap.t;
   constraints : (T.ty * T.ty * Location.t) list;
+  type_definition_context : TypeDefinitionContext.state;
 }
 
 let warn_implicit_sequencing = ref false
@@ -28,6 +29,7 @@ let initial_state =
     context = empty_ctx;
     effects = empty_effects;
     constraints = empty_constraints;
+    type_definition_context = TypeDefinitionContext.initial_state;
   }
 
 let replace_ctx st ctx = { st with context = ctx }
@@ -41,6 +43,14 @@ let extend st x ty_scheme =
   { st with context = VariableMap.add x ty_scheme st.context }
 
 let extend_ty st x ty = extend st x ([], ty)
+
+let add_type_definitions ~loc tydefs state =
+  {
+    state with
+    type_definition_context =
+      TypeDefinitionContext.extend_type_definitions ~loc tydefs
+        state.type_definition_context;
+  }
 
 let subst_ctx st sbst =
   let subst_ty_scheme (ps, ty) =
@@ -106,7 +116,7 @@ let nonexpansive = function
 (* [infer_pattern st pp] infers the type of pattern [pp]. It returns the list of
    pattern variables with their types, which are all guaranteed to be [Type.Meta]'s, together
    with the type of the pattern and updated state. *)
-let infer_pattern st type_context pp =
+let infer_pattern st pp =
   (* XXX *)
   (* if not (Pattern.linear_pattern pp) then
      Error.typing ~loc:(snd pp) "Variables in a pattern must be distinct." ; *)
@@ -136,7 +146,9 @@ let infer_pattern st type_context pp =
         match Assoc.pop flds with
         | None -> assert false
         | Some ((fld, _), _) -> (
-            match TypeDefinitionContext.infer_field fld type_context with
+            match
+              TypeDefinitionContext.infer_field fld st.type_definition_context
+            with
             | None ->
                 Error.typing ~loc "Unbound record field label %t"
                   (CoreTypes.Field.print fld)
@@ -157,7 +169,9 @@ let infer_pattern st type_context pp =
                 in
                 (ty, st', vars)))
     | Untyped.PVariant (lbl, p) -> (
-        match TypeDefinitionContext.infer_variant lbl type_context with
+        match
+          TypeDefinitionContext.infer_variant lbl st.type_definition_context
+        with
         | None -> assert false
         | Some (ty, u) -> (
             match (p, u) with
@@ -171,8 +185,8 @@ let infer_pattern st type_context pp =
   let t, st, vars = infer st [] pp in
   (vars, t, st)
 
-let extend_with_pattern ?(forbidden_vars = []) st type_context p =
-  let vars, t, st = infer_pattern st type_context p in
+let extend_with_pattern ?(forbidden_vars = []) st p =
+  let vars, t, st = infer_pattern st p in
   match List.find_opt (fun (x, _) -> List.mem_assoc x vars) forbidden_vars with
   | Some (x, _) ->
       Error.typing ~loc:p.at "Several definitions of %t."
@@ -181,20 +195,20 @@ let extend_with_pattern ?(forbidden_vars = []) st type_context p =
       let st = List.fold_right (fun (x, t) st' -> extend_ty st' x t) vars st in
       (vars, t, st)
 
-let rec infer_abstraction st type_context (p, c) =
+let rec infer_abstraction st (p, c) =
   let old_ctx = st.context in
-  let _, t1, st = extend_with_pattern st type_context p in
-  let t2, st = infer_comp st type_context c in
+  let _, t1, st = extend_with_pattern st p in
+  let t2, st = infer_comp st c in
   (t1, t2, replace_ctx st old_ctx)
 
-and infer_handler_case_abstraction st type_context (p, k, e) =
+and infer_handler_case_abstraction st (p, k, e) =
   let old_ctx = st.context in
-  let vs, t1, st = extend_with_pattern st type_context p in
-  let _, tk, st = extend_with_pattern ~forbidden_vars:vs st type_context k in
-  let t2, st = infer_comp st type_context e in
+  let vs, t1, st = extend_with_pattern st p in
+  let _, tk, st = extend_with_pattern ~forbidden_vars:vs st k in
+  let t2, st = infer_comp st e in
   (tk, t1, t2, replace_ctx st old_ctx)
 
-and infer_let st type_context loc defs =
+and infer_let st loc defs =
   (if !warn_implicit_sequencing && List.length defs >= 2 then
    let locations = List.map (fun (_, c) -> c.at) defs in
    Print.warning ~loc "Implicit sequencing between computations:@?@[<v 2>@,%t@]"
@@ -205,15 +219,15 @@ and infer_let st type_context loc defs =
     | x :: xs -> if List.mem x ys then Some x else find_duplicate xs ys
   in
   let infer_fold_fun (vs, st') (p, c) =
-    let tc, st' = infer_comp st' type_context c in
-    let ws, tp, st' = infer_pattern st' type_context p in
+    let tc, st' = infer_comp st' c in
+    let ws, tp, st' = infer_pattern st' p in
     let st' = add_ty_constraint c.at tc tp st' in
     match find_duplicate (List.map fst ws) (List.map fst vs) with
     | Some x ->
         Error.typing ~loc "Several definitions of %t."
           (CoreTypes.Variable.print x)
     | None ->
-        let sbst = Unify.solve st'.constraints type_context in
+        let sbst = Unify.solve st'.constraints st.type_definition_context in
         let ws = Assoc.map (T.subst_ty sbst) (Assoc.of_list ws) in
         let st' = subst_ctx st' sbst in
         let ws = Assoc.map (generalize st' (nonexpansive c.it)) ws in
@@ -226,9 +240,9 @@ and infer_let st type_context loc defs =
         (List.rev ws @ vs, st')
   in
   let vars, st = List.fold_left infer_fold_fun ([], st) defs in
-  (vars, subst_ctx st (Unify.solve st.constraints type_context))
+  (vars, subst_ctx st (Unify.solve st.constraints st.type_definition_context))
 
-and infer_let_rec st type_context loc defs =
+and infer_let_rec st loc defs =
   if not (no_duplicates (List.map fst defs)) then
     Error.typing ~loc "Multiply defined recursive value.";
   let lst =
@@ -254,14 +268,14 @@ and infer_let_rec st type_context loc defs =
     List.fold_left
       (fun st' (_, u1, u2, p, c) ->
         let old_ctx = st'.context in
-        let _, tp, st' = extend_with_pattern st' type_context p in
-        let tc, st' = infer_comp st' type_context c in
+        let _, tp, st' = extend_with_pattern st' p in
+        let tc, st' = infer_comp st' c in
         let st' = replace_ctx st' old_ctx in
         add_ty_constraint p.at u1 tp st' |> add_ty_constraint c.at u2 tc)
       st lst
   in
   let st = replace_ctx st old_ctx in
-  let sbst = Unify.solve st.constraints type_context in
+  let sbst = Unify.solve st.constraints st.type_definition_context in
   let vars = Assoc.map (T.subst_ty sbst) (Assoc.of_list vars) in
   let st = subst_ctx st sbst in
   let vars = Assoc.map (generalize st true) vars in
@@ -273,19 +287,19 @@ and infer_let_rec st type_context loc defs =
 
 (* [infer_expr st (e,loc)] infers the type of expression [e] in state
    [st]. It returns the inferred type of [e] and updated state. *)
-and infer_expr st type_context { it = e; at = loc } =
+and infer_expr st { it = e; at = loc } =
   let tty, st =
     match e with
     | Untyped.Var x -> (ctx_lookup ~loc st x, st)
     | Untyped.Const const -> (T.Basic (Const.infer_ty const), st)
     | Untyped.Annotated (t, ty) ->
-        let ty', st = infer_expr st type_context t in
+        let ty', st = infer_expr st t in
         (ty, add_ty_constraint loc ty ty' st)
     | Untyped.Tuple es ->
         let st, tys =
           fold_map
             (fun st' e ->
-              let t, st' = infer_expr st' type_context e in
+              let t, st' = infer_expr st' e in
               (st', t))
             st es
         in
@@ -297,7 +311,9 @@ and infer_expr st type_context { it = e; at = loc } =
             (* XXX *)
             (* if not (Pattern.linear_record flds') then
                Error.typing ~loc "Fields in a record must be distinct." ;*)
-            match TypeDefinitionContext.infer_field fld type_context with
+            match
+              TypeDefinitionContext.infer_field fld st.type_definition_context
+            with
             | None ->
                 Error.typing ~loc "Unbound record field label %t in a pattern"
                   (CoreTypes.Field.print fld)
@@ -309,7 +325,7 @@ and infer_expr st type_context { it = e; at = loc } =
                   let st, arg_types' =
                     Assoc.fold_map
                       (fun st' e ->
-                        let t, st' = infer_expr st' type_context e in
+                        let t, st' = infer_expr st' e in
                         (st', t))
                       st flds
                   in
@@ -323,17 +339,19 @@ and infer_expr st type_context { it = e; at = loc } =
                   in
                   (ty, Assoc.fold_left unify_record_arg st arg_types')))
     | Untyped.Variant (lbl, u) -> (
-        match TypeDefinitionContext.infer_variant lbl type_context with
+        match
+          TypeDefinitionContext.infer_variant lbl st.type_definition_context
+        with
         | None -> assert false
         | Some (ty, arg_type) -> (
             match (arg_type, u) with
             | None, None -> (ty, st)
             | Some ty_, Some u ->
-                let ty', st = infer_expr st type_context u in
+                let ty', st = infer_expr st u in
                 (ty, add_ty_constraint loc ty_ ty' st)
             | _, _ -> assert false))
     | Untyped.Lambda a ->
-        let t1, t2, st = infer_abstraction st type_context a in
+        let t1, t2, st = infer_abstraction st a in
         (T.Arrow (t1, t2), st)
     | Untyped.Effect op -> (
         match infer_effect st op with
@@ -355,9 +373,7 @@ and infer_expr st type_context { it = e; at = loc } =
               Error.typing ~loc "Unbound operation %t in a handler"
                 (CoreTypes.Effect.print op)
           | Some (t1, t2) ->
-              let tk, u1, u2, st' =
-                infer_handler_case_abstraction st' type_context a2
-              in
+              let tk, u1, u2, st' = infer_handler_case_abstraction st' a2 in
               let st' = add_ty_constraint loc t1 u1 st' in
               (* XXX maybe we need to change the direction of inequalities here,
                      or even require equalities. *)
@@ -365,8 +381,8 @@ and infer_expr st type_context { it = e; at = loc } =
               |> add_ty_constraint loc t_yield u2
         in
         let st = Assoc.fold_left unify_operation st ops in
-        let valt1, valt2, st = infer_abstraction st type_context a_val in
-        let fint1, fint2, st = infer_abstraction st type_context a_fin in
+        let valt1, valt2, st = infer_abstraction st a_val in
+        let fint1, fint2, st = infer_abstraction st a_fin in
         let st =
           add_ty_constraint loc valt1 t_value st
           |> add_ty_constraint loc valt2 t_yield
@@ -379,40 +395,40 @@ and infer_expr st type_context { it = e; at = loc } =
 
 (* [infer_comp st (c,loc)] infers the type of computation [c] in context of state [st].
    It returns the list of newly introduced meta-variables and the inferred type along with updated state. *)
-and infer_comp st type_context cp =
+and infer_comp st cp =
   let rec infer st' { it = c; at = loc } =
     match c with
     | Untyped.Apply (e1, e2) ->
-        let t1, st' = infer_expr st' type_context e1 in
-        let t2, st' = infer_expr st' type_context e2 in
+        let t1, st' = infer_expr st' e1 in
+        let t2, st' = infer_expr st' e2 in
         let t = T.fresh_ty () in
         (t, add_ty_constraint loc t1 (T.Arrow (t2, t)) st')
-    | Untyped.Value e -> infer_expr st' type_context e
+    | Untyped.Value e -> infer_expr st' e
     | Untyped.Match (e, []) ->
-        let t_in, st' = infer_expr st' type_context e in
+        let t_in, st' = infer_expr st' e in
         let t_out = T.fresh_ty () in
         (t_out, add_ty_constraint loc t_in T.empty_ty st')
     | Untyped.Match (e, lst) ->
-        let t_in, st' = infer_expr st' type_context e in
+        let t_in, st' = infer_expr st' e in
         let t_out = T.fresh_ty () in
         let infer_case st'' ((_p, e') as a) =
-          let t_in', t_out', st'' = infer_abstraction st'' type_context a in
+          let t_in', t_out', st'' = infer_abstraction st'' a in
           add_ty_constraint e.at t_in t_in' st''
           |> add_ty_constraint e'.at t_out' t_out
         in
         let st' = List.fold_left infer_case st' lst in
         (t_out, st')
     | Untyped.Handle (e1, c2) ->
-        let t1, st' = infer_expr st' type_context e1 in
+        let t1, st' = infer_expr st' e1 in
         let t2, st' = infer st' c2 in
         let t3 = T.fresh_ty () in
         let t1' = T.Handler { T.value = t2; T.finally = t3 } in
         (t3, add_ty_constraint loc t1' t1 st')
     | Untyped.Let (defs, c) ->
-        let _, st' = infer_let st' type_context loc defs in
+        let _, st' = infer_let st' loc defs in
         infer st' c
     | Untyped.LetRec (defs, c) ->
-        let _, st' = infer_let_rec st' type_context loc defs in
+        let _, st' = infer_let_rec st' loc defs in
         infer st' c
     | Untyped.Check c ->
         let _, st' = infer st' c in
@@ -420,33 +436,29 @@ and infer_comp st type_context cp =
   in
   infer st cp
 
-let infer_top_comp st type_context c =
+let infer_top_comp st c =
   let st = clear_constraints st in
-  let ty, st = infer_comp st type_context c in
-  let sbst = Unify.solve st.constraints type_context in
-  Exhaust.check_comp type_context c;
+  let ty, st = infer_comp st c in
+  let sbst = Unify.solve st.constraints st.type_definition_context in
+  Exhaust.check_comp st.type_definition_context c;
   let st = subst_ctx st sbst in
   let ty = Type.subst_ty sbst ty in
   (st, generalize st (nonexpansive c.it) ty)
 
-let infer_top_let st type_context defs =
-  let vars, st =
-    infer_let (clear_constraints st) type_context Location.unknown defs
-  in
+let infer_top_let st defs =
+  let vars, st = infer_let (clear_constraints st) Location.unknown defs in
   List.iter
     (fun (p, c) ->
-      Exhaust.is_irrefutable type_context p;
-      Exhaust.check_comp type_context c)
+      Exhaust.is_irrefutable st.type_definition_context p;
+      Exhaust.check_comp st.type_definition_context c)
     defs;
   (vars, st)
 
-let infer_top_let_rec st type_context defs =
-  let vars, st =
-    infer_let_rec (clear_constraints st) type_context Location.unknown defs
-  in
+let infer_top_let_rec st defs =
+  let vars, st = infer_let_rec (clear_constraints st) Location.unknown defs in
   let exhaust_check (_, (p, c)) =
-    Exhaust.is_irrefutable type_context p;
-    Exhaust.check_comp type_context c
+    Exhaust.is_irrefutable st.type_definition_context p;
+    Exhaust.check_comp st.type_definition_context c
   in
   List.iter exhaust_check defs;
   (vars, st)
