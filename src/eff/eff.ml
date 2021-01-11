@@ -132,7 +132,7 @@ let main =
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
       | Config.Multicore output_file ->
-          (module BackendMulticore.Compile.Backend (struct
+          (module Multicore.Backend (struct
             let output_file = output_file
           end))
     in
@@ -150,8 +150,8 @@ let main =
       if !Config.use_stdlib then
         let stdlib =
           match !Config.backend with
-          | Config.Runtime -> Loader.Stdlib_eff.stdlib
-          | Config.Multicore _ -> Loader.Stdlib_eff.multicoreStdlib
+          | Config.Runtime -> Loader.Stdlib_eff.source
+          | Config.Multicore _ -> Multicore.stdlib
         in
         Shell.load_source stdlib state
       else state

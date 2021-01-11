@@ -62,3 +62,5 @@ module Backend (P : BackendParameters) : Language.BackendSignature.T = struct
     List.iter (fun cmd -> Syntax.print_cmd cmd output_ppf) state.prog;
     close_out channel
 end
+
+let stdlib = Stdlib_eff.source

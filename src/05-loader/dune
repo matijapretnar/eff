@@ -6,9 +6,6 @@
  (with-stdout-to
   stdlib_eff.ml
   (progn
-   (echo "let stdlib = {|")
+   (echo "let source = {|")
    (cat stdlib.eff)
-   (echo "|}")
-   (echo "let multicoreStdlib = {|")
-   (cat ../04-backends/multicore/stdlib.eff)
    (echo "|}"))))

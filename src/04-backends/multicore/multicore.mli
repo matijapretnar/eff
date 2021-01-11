@@ -3,3 +3,5 @@ module type BackendParameters = sig
 end
 
 module Backend (P : BackendParameters) : Language.BackendSignature.T
+
+val stdlib : string
