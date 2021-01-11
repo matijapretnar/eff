@@ -28,7 +28,10 @@ let options =
         Arg.String (fun filename -> Config.backend := Multicore filename),
         "<file> Compile the Eff code into a Multicore OCaml file <file>" );
       ( "--compile-plain-ocaml",
-        Arg.String (fun filename -> Config.backend := Ocaml filename),
+        Arg.String
+          (fun filename ->
+            Config.backend :=
+              Ocaml (if String.length filename = 0 then None else Some filename)),
         "<file> Compile the Eff code into a OCaml file <file>" );
       ("--profile", Arg.Set Config.profiling, " Print out profiling information");
       ( "--no-opts",
