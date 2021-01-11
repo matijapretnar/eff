@@ -14,8 +14,8 @@
  (name eff)
  (synopsis "A functional programming language based on algebraic effect handlers")
  (depends
-  menhir
   js_of_ocaml
   js_of_ocaml-ppx
-  (ocaml (>= 4.06))
+  menhir
+  (ocaml (>= 4.08.1))
   (ocamlformat (= 0.16.0))))

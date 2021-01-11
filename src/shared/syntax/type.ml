@@ -55,10 +55,10 @@ let compose_subst sbst1 sbst2 =
     [ty] is displayed. *)
 let free_params ty =
   let rec free_ty = function
-    | Apply (_, tys) -> List.concat_map free_ty tys
+    | Apply (_, tys) -> CoreUtils.concat_map free_ty tys
     | TyParam p -> [ p ]
     | Basic _ -> []
-    | Tuple tys -> List.concat_map free_ty tys
+    | Tuple tys -> CoreUtils.concat_map free_ty tys
     | Arrow (ty1, ty2) -> free_ty ty1 @ free_ty ty2
     | Handler { value = ty1; finally = ty2 } -> free_ty ty1 @ free_ty ty2
   in

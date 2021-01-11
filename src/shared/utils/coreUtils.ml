@@ -36,3 +36,5 @@ let no_duplicates lst =
   check [] lst
 
 let list_diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
+
+let concat_map f lst = List.concat (List.map f lst)

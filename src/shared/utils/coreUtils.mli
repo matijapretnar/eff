@@ -18,3 +18,5 @@ val no_duplicates : 'a list -> bool
 
 val list_diff : 'a list -> 'a list -> 'a list
 (** Returns elements of the first list that or not present in the second. *)
+
+val concat_map : ('a -> 'b list) -> 'a list -> 'b list
