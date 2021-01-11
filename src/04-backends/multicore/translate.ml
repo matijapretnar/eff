@@ -1,7 +1,7 @@
 open Utils
 open Language
 open CoreUtils
-open MulticoreSyntax
+open Syntax
 module CoreSyntax = UntypedSyntax
 
 (* ------------------------------------------------------------------------ *)

@@ -10,5 +10,5 @@
    (cat stdlib.eff)
    (echo "|}")
    (echo "let multicoreStdlib = {|")
-   (cat ../04-backends/multicore/multicoreStdlib.eff)
+   (cat ../04-backends/multicore/stdlib.eff)
    (echo "|}"))))

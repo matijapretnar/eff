@@ -1,5 +1,6 @@
-open Utils
 open Language
+module Assoc = Utils.Assoc
+module Print = Utils.Print
 
 type variable = CoreTypes.Variable.t
 (** Syntax of the core language. *)
@@ -86,7 +87,7 @@ let print_sequence (type a) =
   sequence
 
 let print_field pp sep (f, v) ppf =
-  print ppf "%t %s %t" (MulticoreSymbol.print_field f) sep (pp v)
+  print ppf "%t %s %t" (Symbol.print_field f) sep (pp v)
 
 let print_tuple pp lst ppf =
   match lst with
@@ -99,24 +100,22 @@ let print_record pp sep assoc ppf =
 
 let rec print_term t ppf =
   match t with
-  | Var x -> print ppf "%t" (MulticoreSymbol.print_variable x)
+  | Var x -> print ppf "%t" (Symbol.print_variable x)
   | Const c -> print ppf "%t" (Const.print c)
   | Annotated (t, ty) -> print ppf "(%t : %t)" (print_term t) (print_type ty)
   | Tuple lst -> print ppf "%t" (print_tuple print_term lst)
   | Record assoc -> print ppf "%t" (print_record print_term "=" assoc)
   | Variant (lbl, None) when lbl = CoreTypes.nil -> print ppf "[]"
-  | Variant (lbl, None) -> print ppf "%t" (MulticoreSymbol.print_label lbl)
+  | Variant (lbl, None) -> print ppf "%t" (Symbol.print_label lbl)
   | Variant (lbl, Some (Tuple [ hd; tl ])) when lbl = CoreTypes.cons ->
       print ppf "@[<hov>(%t::%t)@]" (print_term hd) (print_term tl)
   | Variant (lbl, Some t) ->
-      print ppf "(%t @[<hov>%t@])"
-        (MulticoreSymbol.print_label lbl)
-        (print_term t)
+      print ppf "(%t @[<hov>%t@])" (Symbol.print_label lbl) (print_term t)
   | Lambda a -> print ppf "@[<hv 2>fun %t@]" (print_abstraction a)
   | Function lst ->
       print ppf "@[<hv>(function @, | %t)@]"
         (print_sequence "@, | " print_case lst)
-  | Effect eff -> print ppf "%t" (MulticoreSymbol.print_effect eff)
+  | Effect eff -> print ppf "%t" (Symbol.print_effect eff)
   | Let (lst, t) ->
       print ppf "@[<hv>@[<hv>%tin@] @,%t@]" (print_let lst) (print_term t)
   | LetRec (lst, t) ->
@@ -131,13 +130,9 @@ let rec print_term t ppf =
       print ppf "@[<hv>(match %t with@, | %t)@]" (print_term t)
         (print_sequence "@, | " print_case lst)
   | Apply (Effect eff, (Lambda _ as t2)) ->
-      print ppf "perform (%t (%t))"
-        (MulticoreSymbol.print_effect eff)
-        (print_term t2)
+      print ppf "perform (%t (%t))" (Symbol.print_effect eff) (print_term t2)
   | Apply (Effect eff, t2) ->
-      print ppf "perform (%t %t)"
-        (MulticoreSymbol.print_effect eff)
-        (print_term t2)
+      print ppf "perform (%t %t)" (Symbol.print_effect eff) (print_term t2)
   | Apply (t1, t2) ->
       print ppf "@[<hov 2>(%t) @,(%t)@]" (print_term t1) (print_term t2)
   | Check _t ->
@@ -146,22 +141,20 @@ let rec print_term t ppf =
 
 and print_pattern p ppf =
   match p with
-  | PVar x -> print ppf "%t" (MulticoreSymbol.print_variable x)
+  | PVar x -> print ppf "%t" (Symbol.print_variable x)
   | PAs (p, x) ->
-      print ppf "%t as %t" (print_pattern p) (MulticoreSymbol.print_variable x)
+      print ppf "%t as %t" (print_pattern p) (Symbol.print_variable x)
   | PAnnotated (p, ty) ->
       print ppf "(%t : %t)" (print_pattern p) (print_type ty)
   | PConst c -> print ppf "%t" (Const.print c)
   | PTuple lst -> print ppf "%t" (print_tuple print_pattern lst)
   | PRecord assoc -> print ppf "%t" (print_record print_pattern "=" assoc)
   | PVariant (lbl, None) when lbl = CoreTypes.nil -> print ppf "[]"
-  | PVariant (lbl, None) -> print ppf "%t" (MulticoreSymbol.print_label lbl)
+  | PVariant (lbl, None) -> print ppf "%t" (Symbol.print_label lbl)
   | PVariant (lbl, Some (PTuple [ hd; tl ])) when lbl = CoreTypes.cons ->
       print ppf "@[<hov>(%t::%t)@]" (print_pattern hd) (print_pattern tl)
   | PVariant (lbl, Some p) ->
-      print ppf "(%t @[<hov>%t@])"
-        (MulticoreSymbol.print_label lbl)
-        (print_pattern p)
+      print ppf "(%t @[<hov>%t@])" (Symbol.print_label lbl) (print_pattern p)
   | PNonbinding -> print ppf "_"
 
 and print_type ty ppf =
@@ -169,12 +162,12 @@ and print_type ty ppf =
   | TyArrow (t1, t2) ->
       print ppf "@[<h>(%t ->@ %t)@]" (print_type t1) (print_type t2)
   | TyBasic b -> print ppf "%t" (Const.print_ty b)
-  | TyApply (t, []) -> print ppf "%t" (MulticoreSymbol.print_tyname t)
+  | TyApply (t, []) -> print ppf "%t" (Symbol.print_tyname t)
   | TyApply (t, ts) ->
       print ppf "(%t) %t"
         (Print.sequence ", " print_type ts)
-        (MulticoreSymbol.print_tyname t)
-  | TyParam p -> print ppf "%t" (MulticoreSymbol.print_typaram p)
+        (Symbol.print_tyname t)
+  | TyParam p -> print ppf "%t" (Symbol.print_typaram p)
   | TyTuple [] -> print ppf "unit"
   | TyTuple ts -> print ppf "@[<hov>(%t)@]" (Print.sequence " * " print_type ts)
 
@@ -186,29 +179,24 @@ and print_tydef (name, (params, tydef)) ppf =
         let lst = Assoc.to_list assoc in
         let print_cons ty_opt ppf =
           match ty_opt with
-          | lbl, None -> print ppf "%t" (MulticoreSymbol.print_label lbl)
+          | lbl, None -> print ppf "%t" (Symbol.print_label lbl)
           | lbl, Some ty ->
-              print ppf "%t of %t"
-                (MulticoreSymbol.print_label lbl)
-                (print_type ty)
+              print ppf "%t of %t" (Symbol.print_label lbl) (print_type ty)
         in
         print ppf "@[<hov>%t@]" (print_sequence "@, | " print_cons lst)
     | TyDefInline ty -> print ppf "%t" (print_type ty)
   in
   match params with
   | [] ->
-      print ppf "@[type %t = %t@]@."
-        (MulticoreSymbol.print_tyname name)
+      print ppf "@[type %t = %t@]@." (Symbol.print_tyname name)
         (print_def tydef)
   | _lst ->
       print ppf "@[type (%t) %t = %t@]@."
-        (print_sequence ", " MulticoreSymbol.print_typaram params)
-        (MulticoreSymbol.print_tyname name)
-        (print_def tydef)
+        (print_sequence ", " Symbol.print_typaram params)
+        (Symbol.print_tyname name) (print_def tydef)
 
 and print_def_effect (eff, (ty1, ty2)) ppf =
-  print ppf "@[effect %t : %t ->@ %t@]@."
-    (MulticoreSymbol.print_effect eff)
+  print ppf "@[effect %t : %t ->@ %t@]@." (Symbol.print_effect eff)
     (print_type ty1) (print_type ty2)
 
 and print_top_let defs ppf = print ppf "@[<hv>%t@]@." (print_let defs)
@@ -217,12 +205,12 @@ and print_top_let_rec defs ppf = print ppf "@[<hv>%t@]@." (print_let_rec defs)
 
 and print_external name symbol_name translation ppf =
   match translation with
-  | MulticoreExternal.Unknown ->
+  | External.Unknown ->
       print ppf "let %t = failwith \"Unknown external symbol %s.\"@."
-        (MulticoreSymbol.print_variable name)
+        (Symbol.print_variable name)
         symbol_name
-  | MulticoreExternal.Exists t ->
-      print ppf "let %t = %s@." (MulticoreSymbol.print_variable name) t
+  | External.Exists t ->
+      print ppf "let %t = %s@." (Symbol.print_variable name) t
 
 and print_tydefs tydefs ppf =
   print ppf "%t@." (print_sequence "@, and " print_tydef tydefs)
@@ -256,7 +244,7 @@ and print_let_rec lst ppf =
     | (name, abs) :: tl ->
         let p_lst, t = abs_to_multiarg_abs abs in
         print ppf "@[<hv 2>and %t %t = @,%t@] @,%t"
-          (MulticoreSymbol.print_variable name)
+          (Symbol.print_variable name)
           (print_sequence " " print_pattern p_lst)
           (print_term t) (sequence tl)
   in
@@ -266,7 +254,7 @@ and print_let_rec lst ppf =
   | (name, abs) :: tl ->
       let p_lst, t = abs_to_multiarg_abs abs in
       print ppf "@[<hv 2>let rec %t %t = @,%t@] @,%t"
-        (MulticoreSymbol.print_variable name)
+        (Symbol.print_variable name)
         (print_sequence " " print_pattern p_lst)
         (print_term t) (sequence tl)
 
@@ -283,15 +271,14 @@ and print_case case ppf =
   | EffectClause (eff, (p1, p2, t)) ->
       if p2 = PNonbinding then
         print ppf "@[<hv 2>effect (%t %t) %t -> @,%t@]"
-          (MulticoreSymbol.print_effect eff)
-          (print_pattern p1) (print_pattern p2) (print_term t)
+          (Symbol.print_effect eff) (print_pattern p1) (print_pattern p2)
+          (print_term t)
       else
         print ppf
           ("@[<hv 2>effect (%t %t) %t ->@,"
          ^^ "(let %t x = continue (Obj.clone_continuation %t) x in @,%t)@]")
-          (MulticoreSymbol.print_effect eff)
-          (print_pattern p1) (print_pattern p2) (print_pattern p2)
-          (print_pattern p2) (print_term t)
+          (Symbol.print_effect eff) (print_pattern p1) (print_pattern p2)
+          (print_pattern p2) (print_pattern p2) (print_term t)
 
 let print_cmd cmd ppf =
   match cmd with
@@ -303,13 +290,12 @@ let print_cmd cmd ppf =
   | TopLetRec defs -> print_top_let_rec defs ppf
   | TyDef tydefs -> print_tydefs tydefs ppf
   | External (x, _ty, f) -> (
-      match Assoc.lookup f MulticoreExternal.values with
-      | None -> Error.runtime "Unknown external symbol %s." f
-      | Some (MulticoreExternal.Unknown as unknown) ->
+      match Assoc.lookup f External.values with
+      | None -> Utils.Error.runtime "Unknown external symbol %s." f
+      | Some (External.Unknown as unknown) ->
           Print.warning
             ("External symbol %s cannot be compiled. It has been replaced "
            ^^ "with [failwith \"Unknown external symbol %s.\"].")
             f f;
           print_external x f unknown ppf
-      | Some (MulticoreExternal.Exists _s as known) ->
-          print_external x f known ppf)
+      | Some (External.Exists _s as known) -> print_external x f known ppf)

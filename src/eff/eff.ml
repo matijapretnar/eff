@@ -132,7 +132,7 @@ let main =
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
       | Config.Multicore output_file ->
-          (module BackendMulticore.MulticoreCompile.Backend (struct
+          (module BackendMulticore.Compile.Backend (struct
             let output_file = output_file
           end))
     in
