@@ -11,7 +11,7 @@ module Backend (P : BackendParameters) : Language.BackendSignature.T = struct
 
   type state = { effect_system_state : ExplicitInfer.state }
 
-  let initial_state = { effect_system_state = ExplicitInfer.initial }
+  let initial_state = { effect_system_state = ExplicitInfer.initial_state }
 
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
@@ -19,7 +19,7 @@ module Backend (P : BackendParameters) : Language.BackendSignature.T = struct
 
   let process_type_of state _ _ = state
 
-  let process_def_effect state _ =
+  let process_def_effect state (eff, (ty1, ty2)) =
     let effect_system_state' =
       ExplicitInfer.add_effect eff (ty1, ty2) state.effect_system_state
     in
