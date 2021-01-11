@@ -1,12 +1,7 @@
 (executable
  (name eff)
  (public_name eff)
- (libraries shared)
+ (libraries utils language runtime multicore loader unix)
  (promote
   (until-clean)
-  (into ../..)))
-
-(env
- (dev
-  (flags
-   (:standard -warn-error -A))))
+  (into ../../)))
