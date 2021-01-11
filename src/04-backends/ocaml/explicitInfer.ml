@@ -45,7 +45,7 @@ type state = {
   (* Global Typing Environment *)
   effects : (Types.target_ty * Types.target_ty) Typed.EffectMap.t;
   (* Valid Effects             *)
-  tctx_st : TypeDefinitionContext.state;
+  tctx_st : TypeDefinitionContext.state; (* Type definition context *)
 }
 
 (* A bag/list of constraints *)
@@ -1388,4 +1388,16 @@ let tcTopLevelMono ~loc inState cmp =
 
 (* Add an external binding to the typing environment *)
 let addExternal ctx x ty =
-  { ctx with gblCtxt = TypingEnv.update ctx.gblCtxt x ty }
+  {
+    ctx with
+    gblCtxt =
+      TypingEnv.update ctx.gblCtxt x (Types.source_to_target ctx.tctx_st ty);
+  }
+
+let add_type_definitions state tydefs =
+  {
+    state with
+    tctx_st =
+      TypeDefinitionContext.extend_type_definitions ~loc:Location.unknown tydefs
+        state.tctx_st;
+  }
