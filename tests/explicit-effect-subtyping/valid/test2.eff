@@ -1,0 +1,3 @@
+effect Op : int -> int ;;
+#type perform (Op 1) ; perform (Op 2) ;;
+

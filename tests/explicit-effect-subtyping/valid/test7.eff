@@ -1,0 +1,5 @@
+effect Op : int -> int ;;
+
+handle perform (Op 1) with
+  | x -> x 
+  | effect (Op n) k -> 2 ;;

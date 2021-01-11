@@ -1,0 +1,6 @@
+type my_ty = Cons of my_ty
+
+;;
+
+function
+| Cons argmnt -> Cons argmnt
