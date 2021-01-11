@@ -10,7 +10,7 @@ let js_formatter _format echo =
   in
   Format.make_formatter out flush
 
-module Shell = Shell.Make (Runtime.Backend)
+module Shell = Loader.Shell.Make (Runtime.Backend)
 
 (* Export the interface to Javascript. *)
 let _ =
@@ -20,7 +20,7 @@ let _ =
          Config.output_formatter := js_formatter "[;#00a8ff;#192a56]" echo;
          Config.error_formatter := js_formatter "[b;#e84118;#192a56]" echo;
          let state = Shell.initialize () in
-         let state = Shell.load_source Backend.Stdlib_eff.stdlib state in
+         let state = Shell.load_source Loader.Stdlib_eff.stdlib state in
          Format.fprintf !Config.output_formatter "eff %s@." Config.version;
          Format.fprintf !Config.output_formatter "[Type #help for help.]@.";
          state

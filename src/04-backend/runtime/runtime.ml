@@ -2,10 +2,10 @@
 
 open Utils
 open Language
-module V = Backend.Value
+module V = Value
 module Untyped = UntypedSyntax
 
-module Backend : Backend.BackendSignature.T = struct
+module Backend : Language.BackendSignature.T = struct
   module RuntimeEnv = Map.Make (CoreTypes.Variable)
 
   type state = Eval.state

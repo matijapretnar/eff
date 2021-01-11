@@ -12,6 +12,8 @@ type ty =
 
 and handler_ty = { value : ty; finally : ty }
 
+type ty_scheme = CoreTypes.TyParam.t list * ty
+
 val int_ty : ty
 
 val string_ty : ty

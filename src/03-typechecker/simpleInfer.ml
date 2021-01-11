@@ -7,10 +7,8 @@ module Unify = SimpleUnify
 module EffectMap = Map.Make (CoreTypes.Effect)
 module VariableMap = Map.Make (CoreTypes.Variable)
 
-type ty_scheme = CoreTypes.TyParam.t list * Type.ty
-
 type state = {
-  context : ty_scheme VariableMap.t;
+  context : Type.ty_scheme VariableMap.t;
   effects : (Type.ty * Type.ty) EffectMap.t;
   constraints : (T.ty * T.ty * Location.t) list;
   type_definition_context : TypeDefinitionContext.state;

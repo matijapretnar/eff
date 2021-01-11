@@ -2,7 +2,7 @@
 open Utils
 open Language
 open CoreUtils
-module V = Backend.Value
+module V = Value
 module Untyped = UntypedSyntax
 module RuntimeEnv = Map.Make (CoreTypes.Variable)
 

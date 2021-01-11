@@ -1,7 +1,7 @@
 open Utils
 open Language
 open CoreUtils
-module V = Backend.Value
+module V = Value
 
 let from_bool b = V.Const (Const.of_boolean b)
 

@@ -1,7 +1,5 @@
 open Utils
-open Language
 module CoreSyntax = UntypedSyntax
-module TypeSystem = Typechecker.SimpleInfer
 
 module type T = sig
   type state
@@ -26,13 +24,13 @@ module type T = sig
   val process_top_let :
     state ->
     (CoreSyntax.pattern * CoreSyntax.computation) list ->
-    (CoreSyntax.variable * Typechecker.SimpleInfer.ty_scheme) list ->
+    (CoreSyntax.variable * Type.ty_scheme) list ->
     state
 
   val process_top_let_rec :
     state ->
     (CoreSyntax.variable, CoreSyntax.abstraction) Assoc.t ->
-    (CoreSyntax.variable * TypeSystem.ty_scheme) list ->
+    (CoreSyntax.variable * Type.ty_scheme) list ->
     state
 
   val process_external :

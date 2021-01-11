@@ -16,6 +16,8 @@ and handler_ty = {
   finally : ty; (* the return type of finally *)
 }
 
+type ty_scheme = CoreTypes.TyParam.t list * ty
+
 let int_ty = Basic Const.IntegerTy
 
 let string_ty = Basic Const.StringTy

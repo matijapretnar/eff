@@ -1,3 +1,14 @@
 (library
- (name shell)
- (libraries language typechecker parser backend))
+ (name loader)
+ (libraries language typechecker parser))
+
+(rule
+ (with-stdout-to
+  stdlib_eff.ml
+  (progn
+   (echo "let stdlib = {|")
+   (cat stdlib.eff)
+   (echo "|}")
+   (echo "let multicoreStdlib = {|")
+   (cat ../04-backend/multicore/multicoreStdlib.eff)
+   (echo "|}"))))

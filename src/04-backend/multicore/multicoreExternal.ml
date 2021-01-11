@@ -1,5 +1,4 @@
 open Utils
-module V = Backend.Value
 
 type translation = Exists of string | Unknown
 
