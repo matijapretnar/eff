@@ -8,8 +8,6 @@ module Untyped = UntypedSyntax
 module Backend : Backend.BackendSignature.T = struct
   module RuntimeEnv = Map.Make (CoreTypes.Variable)
 
-  (* prints tells us wheter or not to print, while mute depth makes sure that
-     printing is muted in the case of nested #use *)
   type state = Eval.state
 
   let initial_state = Eval.initial_state

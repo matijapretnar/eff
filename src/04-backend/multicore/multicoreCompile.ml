@@ -1,4 +1,4 @@
-(* Evaluation of the intermediate language, big step. *)
+(* Compilation to multicore ocaml *)
 
 open Utils
 
