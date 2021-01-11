@@ -32,8 +32,8 @@ The types are similar to those of OCaml and other variants of ML in the
 sense that they do not express any information about computational effects.
 
 For further information visit the [Eff page](http://www.eff-lang.org/)
-or contact the authors Andrej Bauer <Andrej.Bauer@andrej.com> and Matija
-Pretnar <matija@pretnar.info>.
+or contact the authors Andrej Bauer <Andrej.Bauer@andrej.com> and
+Matija Pretnar <matija@pretnar.info>.
 
 
 Installation & Usage
@@ -47,9 +47,14 @@ on Windows, we just have not tested it yet.
 
 To install Eff, you need a standard Unix-style build environment as well as
 
-1. [OCaml](https://ocaml.org/), version 4.02.3 or newer,
-2. [Menhir](http://gallium.inria.fr/~fpottier/menhir/) parser generator, and
-3. [js_of_ocaml](http://ocsigen.org/js_of_ocaml/) OCaml to Javascript compiler.
+1. [OCaml](https://ocaml.org/), version 4.08.1 or newer,
+2. [Js_of_ocaml](http://ocsigen.github.io/js_of_ocaml) compiler from OCaml bytecode to Javascript
+3. its syntax extension `js_of_ocaml-ppx`,
+4. [Menhir](http://gitlab.inria.fr/fpottier/menhir) LR(1) parser generator,
+5. [OCamlFormat](https://github.com/ocaml-ppx/ocamlformat) auto-formatter for OCaml code.
+
+The easiest way to install them is by running:
+
 
 We do not require, but recommend a command-line editing wrapper such as
 [rlwrap](http://freecode.com/projects/rlwrap) or
@@ -98,11 +103,8 @@ See the file `etc/README.txt` for editor support.
 There are examples of Eff in `examples` subdirectory that should get you started. The Eff
 syntax is very close to that of OCaml. You can find further material about Eff on the [Eff page](http://www.eff-lang.org/).
 
-Copyright and license
----------------------
-
-Copyright (c) 2015, Andrej Bauer and Matija Pretnar
-Copyright (c) 2012, Timotej Lazar
+License
+-------
 
 Eff is distributed under the abbreviated BSD License, see `LICENSE.txt` for
 licensing information.

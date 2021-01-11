@@ -39,3 +39,4 @@ let list_diff lst1 lst2 = List.filter (fun x -> not (List.mem x lst2)) lst1
 
 let option_map f = function None -> None | Some x -> Some (f x)
 
+let concat_map f lst = List.concat (List.map f lst)

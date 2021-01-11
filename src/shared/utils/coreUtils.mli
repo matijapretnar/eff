@@ -21,3 +21,5 @@ val list_diff : 'a list -> 'a list -> 'a list
 
 val option_map : ('a -> 'b) -> 'a option -> 'b option
 (** [option_map f] maps [None] to [None] and [Some x] to [Some (f x)]. *)
+
+val concat_map : ('a -> 'b list) -> 'a list -> 'b list

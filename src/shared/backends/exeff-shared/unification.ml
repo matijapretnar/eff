@@ -71,7 +71,7 @@ let rec fix_union_find fixpoint c_list =
         | _ -> [])
     | _ -> []
   in
-  let new_fixpoint = fixpoint @ List.concat_map mapper c_list in
+  let new_fixpoint = fixpoint @ CoreUtils.concat_map mapper c_list in
   let sort_new_fixpoint = List.sort compare new_fixpoint in
   if sort_new_fixpoint = fixpoint then sort_new_fixpoint
   else fix_union_find sort_new_fixpoint c_list
