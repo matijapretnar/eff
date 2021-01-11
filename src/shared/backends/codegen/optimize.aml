@@ -353,7 +353,7 @@ and specialize (fvar : Typed.variable) (fbody : Typed.expression)
         ApplyDirtExp (_var, dirt) ) ->
         assert (dirtparam = dirtparam');
         Print.debug "BigLambdaDirt: replacing %t by %t"
-          (CoreTypes.DirtParam.print dirtparam)
+          (Types.DirtParam.print dirtparam)
           (Types.print_target_dirt dirt);
         let sub = Substitution.add_dirt_substitution_e dirtparam dirt in
         (* v' = [D/d]v *)
@@ -366,7 +366,7 @@ and specialize (fvar : Typed.variable) (fbody : Typed.expression)
         ApplySkelExp (_var, sk) ) ->
         assert (skparam = skparam');
         Print.debug "BigLambdaSkel: replacing %t by %t"
-          (CoreTypes.SkelParam.print skparam)
+          (Types.SkelParam.print skparam)
           (Types.print_skeleton sk);
         let sub = Substitution.add_skel_param_substitution_e skparam sk in
         (* v' = [t/s]v *)
@@ -379,7 +379,7 @@ and specialize (fvar : Typed.variable) (fbody : Typed.expression)
         ApplyTyCoercion (_var, tyco) ) ->
         assert (_ct_ty = _ct_ty');
         Print.debug "LambdaTyCoerVar: replacing %t by %t"
-          (CoreTypes.TyCoercionParam.print coparam)
+          (Types.TyCoercionParam.print coparam)
           (Typed.print_ty_coercion tyco);
         let sub = Substitution.add_type_coercion_e coparam tyco in
         (* v' = [y/w]v *)
@@ -392,7 +392,7 @@ and specialize (fvar : Typed.variable) (fbody : Typed.expression)
         ApplyDirtCoercion (_var, dco) ) ->
         assert (_ct_dirt = _ct_dirt');
         Print.debug "LambdaDirtCoerVar: replacing %t by %t"
-          (CoreTypes.DirtCoercionParam.print coparam)
+          (Types.DirtCoercionParam.print coparam)
           (Typed.print_dirt_coercion dco);
         let sub = Substitution.add_dirt_var_coercion_e coparam dco in
         (* v' = [y/w]v *)
@@ -763,10 +763,10 @@ and reduce_expr st e =
           | Lambda of (pattern * Types.target_ty * computation)
           | Handler of handler
           | BigLambdaTy of CoreTypes.TyParam.t * skeleton * expression
-          | BigLambdaDirt of CoreTypes.DirtParam.t * expression
-          | BigLambdaSkel of CoreTypes.SkelParam.t * expression
-          | LambdaTyCoerVar of CoreTypes.TyCoercionParam.t * Types.ct_ty * expression
-          | LambdaDirtCoerVar of CoreTypes.DirtCoercionParam.t * Types.ct_dirt * expression
+          | BigLambdaDirt of Types.DirtParam.t * expression
+          | BigLambdaSkel of Types.SkelParam.t * expression
+          | LambdaTyCoerVar of Types.TyCoercionParam.t * Types.ct_ty * expression
+          | LambdaDirtCoerVar of Types.DirtCoercionParam.t * Types.ct_dirt * expression
           | ApplySkelExp of expression * Types.skeleton
           | ApplyTyCoercion of expression * ty_coercion
           | ApplyTyCoercion (e1,ty_co) ->

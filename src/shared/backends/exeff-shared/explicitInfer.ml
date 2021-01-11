@@ -238,9 +238,9 @@ let instantiateVariable (x : variable) (scheme : Types.target_ty) :
  * only a few kinds of constraints are expected after constraint solving. *)
 let partitionResidualCs :
     Typed.omega_ct list ->
-    (CoreTypes.TyParam.t * CoreTypes.SkelParam.t) list
-    * (CoreTypes.TyCoercionParam.t * Types.ct_ty) list
-    * (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list =
+    (CoreTypes.TyParam.t * Types.SkelParam.t) list
+    * (Types.TyCoercionParam.t * Types.ct_ty) list
+    * (Types.DirtCoercionParam.t * Types.ct_dirt) list =
   let rec aux = function
     | [] -> ([], [], [])
     | Typed.TyParamHasSkel (a, Types.SkelParam s) :: rest ->
@@ -262,11 +262,11 @@ let partitionResidualCs :
  * check whether this is the case and if it is compute the dirt variables from
  * the elaborated expression and pass them in. *)
 let mkGenParts (cs : Typed.omega_ct list) :
-    CoreTypes.SkelParam.t list
+    Types.SkelParam.t list
     * (CoreTypes.TyParam.t * Types.skeleton) list
-    * CoreTypes.DirtParam.t list
-    * (CoreTypes.TyCoercionParam.t * Types.ct_ty) list
-    * (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list =
+    * Types.DirtParam.t list
+    * (Types.TyCoercionParam.t * Types.ct_ty) list
+    * (Types.DirtCoercionParam.t * Types.ct_dirt) list =
   let alphasSkelVars, tyCs, dirtCs = partitionResidualCs cs in
   let skelVars =
     alphasSkelVars
@@ -289,8 +289,8 @@ let mkGenParts (cs : Typed.omega_ct list) :
   (skelVars, alphaSkels, dirtVars, tyCs, dirtCs)
 
 (* Create a generalized type from parts (as delivered from "mkGenParts"). *)
-let mkGeneralizedType (tyCs : (CoreTypes.TyCoercionParam.t * Types.ct_ty) list)
-    (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+let mkGeneralizedType (tyCs : (Types.TyCoercionParam.t * Types.ct_ty) list)
+    (dirtCs : (Types.DirtCoercionParam.t * Types.ct_dirt) list)
     (monotype : Types.target_ty) : Types.target_ty =
   (* expected to be a monotype! *)
   monotype
@@ -303,8 +303,8 @@ let mkGeneralizedType (tyCs : (CoreTypes.TyCoercionParam.t * Types.ct_ty) list)
 (* GEORGE NOTE: We might have "dangling" dirt variables at the end. In the end
  * check whether this is the case and if it is compute the dirt variables from
  * the elaborated expression and pass them in. *)
-let mkGeneralizedTerm (tyCs : (CoreTypes.TyCoercionParam.t * Types.ct_ty) list)
-    (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+let mkGeneralizedTerm (tyCs : (Types.TyCoercionParam.t * Types.ct_ty) list)
+    (dirtCs : (Types.DirtCoercionParam.t * Types.ct_dirt) list)
     (exp : Typed.expression) : Typed.expression =
   exp
   |> (* 1: Add the constraint abstractions (dirt) *)
@@ -1233,19 +1233,19 @@ let tcTopLetRec (inState : state) (var : Untyped.variable)
 let outExpr = Typed.LetRec ([(var, trgPatTy, (tyA1, dirtD1), (trgPat,c1''))], trgC2) in
 
 let mkGeneralizedType
-    (freeSkelVars  : CoreTypes.SkelParam.t list)
+    (freeSkelVars  : Types.SkelParam.t list)
     (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
-    (freeDirtVars  : CoreTypes.DirtParam.t list)
-    (tyCs   : (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list)
-    (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+    (freeDirtVars  : Types.DirtParam.t list)
+    (tyCs   : (Types.TyCoercionParam.t   * Types.ct_ty)   list)
+    (dirtCs : (Types.DirtCoercionParam.t * Types.ct_dirt) list)
     (monotype : Types.target_ty) (* expected to be a monotype! *)
   : Types.target_ty
 let mkGeneralizedTerm
-    (freeSkelVars  : CoreTypes.SkelParam.t list)
+    (freeSkelVars  : Types.SkelParam.t list)
     (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
-    (freeDirtVars  : CoreTypes.DirtParam.t list)
-    (tyCs   : (CoreTypes.TyCoercionParam.t   * Types.ct_ty)   list)
-    (dirtCs : (CoreTypes.DirtCoercionParam.t * Types.ct_dirt) list)
+    (freeDirtVars  : Types.DirtParam.t list)
+    (tyCs   : (Types.TyCoercionParam.t   * Types.ct_ty)   list)
+    (dirtCs : (Types.DirtCoercionParam.t * Types.ct_dirt) list)
     (exp : Typed.expression)
   : Typed.expression =
 *)

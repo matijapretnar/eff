@@ -288,7 +288,7 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
       { effect_set = s2; row = ParamRow v2 } ) ->
       if Types.EffectSet.is_empty s1 then (sub, cons :: paused, rest_queue)
       else
-        let omega' = CoreTypes.DirtCoercionParam.fresh () in
+        let omega' = Types.DirtCoercionParam.fresh () in
         let diff_set = Types.EffectSet.diff s1 s2 in
         let union_set = Types.EffectSet.union s1 s2 in
         let k0 = v2 in
@@ -296,7 +296,7 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
           let open Types in
           {
             effect_set = diff_set;
-            row = ParamRow (CoreTypes.DirtParam.fresh ());
+            row = ParamRow (Types.DirtParam.fresh ());
           }
         in
         let k1' = omega in
@@ -348,7 +348,7 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
   (* ω : O₁ <= O₂ ∪ δ₂ *)
   | { effect_set = s1; row = EmptyRow }, { effect_set = s2; row = ParamRow v2 }
     ->
-      let v2' = CoreTypes.DirtParam.fresh () in
+      let v2' = Types.DirtParam.fresh () in
       let k0 = omega in
       let v0 =
         Typed.UnionDirt

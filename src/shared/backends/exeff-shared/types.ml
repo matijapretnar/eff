@@ -1,12 +1,41 @@
+
+(** dirt parameters *)
+module DirtParam = Symbol.Make (Symbol.Parameter (struct
+  let ascii_symbol = "drt"
+
+  let utf8_symbol = "\206\180"
+end))
+
+(** skeleton parameters *)
+module SkelParam = Symbol.Make (Symbol.Parameter (struct
+  let ascii_symbol = "skl"
+
+  let utf8_symbol = "s"
+end))
+
+(** type coercion parameters *)
+module TyCoercionParam = Symbol.Make (Symbol.Parameter (struct
+  let ascii_symbol = "tycoer"
+
+  let utf8_symbol = "\207\132co"
+end))
+
+(** dirt coercion parameters *)
+module DirtCoercionParam = Symbol.Make (Symbol.Parameter (struct
+  let ascii_symbol = "dirtcoer"
+
+  let utf8_symbol = "\206\180co"
+end))
+
 module EffectSet = Set.Make (CoreTypes.Effect)
-module SkelParamSet = Set.Make (CoreTypes.SkelParam)
+module SkelParamSet = Set.Make (SkelParam)
 module TyParamSet = Set.Make (CoreTypes.TyParam)
-module DirtParamSet = Set.Make (CoreTypes.DirtParam)
+module DirtParamSet = Set.Make (DirtParam)
 
 type effect_set = EffectSet.t
 
 type skeleton =
-  | SkelParam of CoreTypes.SkelParam.t
+  | SkelParam of SkelParam.t
   | SkelBasic of Const.ty
   | SkelArrow of skeleton * skeleton
   | SkelApply of CoreTypes.TyName.t * skeleton list
@@ -27,7 +56,7 @@ and target_dirty = target_ty * dirt
 
 and dirt = { effect_set : effect_set; row : row }
 
-and row = ParamRow of CoreTypes.DirtParam.t | EmptyRow
+and row = ParamRow of DirtParam.t | EmptyRow
 
 and ct_ty = target_ty * target_ty
 
@@ -76,7 +105,7 @@ let rec print_target_ty ?max_level ty ppf =
 and print_skeleton ?max_level sk ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match sk with
-  | SkelParam p -> CoreTypes.SkelParam.print p ppf
+  | SkelParam p -> SkelParam.print p ppf
   | SkelBasic s -> print "prim_skel %t" (Const.print_ty s)
   | SkelArrow (sk1, sk2) ->
       print "%t -sk-> %t" (print_skeleton sk1) (print_skeleton sk2)
@@ -101,11 +130,11 @@ and print_target_dirt drt ppf =
   match (drt.effect_set, drt.row) with
   | effect_set, EmptyRow -> print "{%t}" (print_effect_set effect_set)
   | effect_set, ParamRow p when EffectSet.is_empty effect_set ->
-      print "%t" (CoreTypes.DirtParam.print p)
+      print "%t" (DirtParam.print p)
   | effect_set, ParamRow p ->
       print "{%t} U %t"
         (print_effect_set effect_set)
-        (CoreTypes.DirtParam.print p)
+        (DirtParam.print p)
 
 and print_effect_set effect_set =
   Print.sequence "," CoreTypes.Effect.print (EffectSet.elements effect_set)
@@ -167,8 +196,8 @@ and isClosedDirtyTy : target_dirty -> bool = function
 (* ************************************************************************* *)
 (*                             VARIABLE RENAMING                             *)
 (* ************************************************************************* *)
-let rec rnSkelVarInSkel (oldS : CoreTypes.SkelParam.t)
-    (newS : CoreTypes.SkelParam.t) : skeleton -> skeleton = function
+let rec rnSkelVarInSkel (oldS : SkelParam.t)
+    (newS : SkelParam.t) : skeleton -> skeleton = function
   | SkelParam v -> if v = oldS then SkelParam newS else SkelParam v
   | SkelBasic ty -> SkelBasic ty
   | SkelArrow (s1, s2) ->
@@ -178,8 +207,8 @@ let rec rnSkelVarInSkel (oldS : CoreTypes.SkelParam.t)
       SkelHandler (rnSkelVarInSkel oldS newS s1, rnSkelVarInSkel oldS newS s2)
   | SkelTuple ss -> SkelTuple (List.map (rnSkelVarInSkel oldS newS) ss)
 
-let rec rnSkelVarInValTy (oldS : CoreTypes.SkelParam.t)
-    (newS : CoreTypes.SkelParam.t) : target_ty -> target_ty = function
+let rec rnSkelVarInValTy (oldS : SkelParam.t)
+    (newS : SkelParam.t) : target_ty -> target_ty = function
   | TyParam x -> TyParam x
   | Apply (tc, tys) -> Apply (tc, List.map (rnSkelVarInValTy oldS newS) tys)
   | Arrow (tyA, tyB) ->
@@ -193,13 +222,13 @@ let rec rnSkelVarInValTy (oldS : CoreTypes.SkelParam.t)
   | QualDirt (ct, ty) -> QualDirt (ct, rnSkelVarInValTy oldS newS ty)
 
 (* GEORGE: No skeletons in dirts! :) *)
-and rnSkelVarInCmpTy (oldS : CoreTypes.SkelParam.t)
-    (newS : CoreTypes.SkelParam.t) : target_dirty -> target_dirty = function
+and rnSkelVarInCmpTy (oldS : SkelParam.t)
+    (newS : SkelParam.t) : target_dirty -> target_dirty = function
   | ty, drt -> (rnSkelVarInValTy oldS newS ty, drt)
 
 (* GEORGE: No skeletons in dirts! :) *)
-and rnSkelVarInTyCt (oldS : CoreTypes.SkelParam.t)
-    (newS : CoreTypes.SkelParam.t) : ct_ty -> ct_ty = function
+and rnSkelVarInTyCt (oldS : SkelParam.t)
+    (newS : SkelParam.t) : ct_ty -> ct_ty = function
   | ty1, ty2 -> (rnSkelVarInValTy oldS newS ty1, rnSkelVarInValTy oldS newS ty2)
 
 (* ************************************************************************* *)
@@ -232,8 +261,8 @@ and rnTyVarInTyCt (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t) :
 (* ************************************************************************* *)
 (*                             VARIABLE RENAMING                             *)
 (* ************************************************************************* *)
-let rec rnDirtVarInValTy (oldD : CoreTypes.DirtParam.t)
-    (newD : CoreTypes.DirtParam.t) : target_ty -> target_ty = function
+let rec rnDirtVarInValTy (oldD : DirtParam.t)
+    (newD : DirtParam.t) : target_ty -> target_ty = function
   | TyParam a -> TyParam a
   | Apply (tc, tys) -> Apply (tc, List.map (rnDirtVarInValTy oldD newD) tys)
   | Arrow (tyA, tyB) ->
@@ -247,23 +276,23 @@ let rec rnDirtVarInValTy (oldD : CoreTypes.DirtParam.t)
   | QualDirt (ct, ty) ->
       QualDirt (rnDirtVarInDirtCt oldD newD ct, rnDirtVarInValTy oldD newD ty)
 
-and rnDirtVarInCmpTy (oldD : CoreTypes.DirtParam.t)
-    (newD : CoreTypes.DirtParam.t) : target_dirty -> target_dirty = function
+and rnDirtVarInCmpTy (oldD : DirtParam.t)
+    (newD : DirtParam.t) : target_dirty -> target_dirty = function
   | ty, drt -> (rnDirtVarInValTy oldD newD ty, rnDirtVarInDirt oldD newD drt)
 
-and rnDirtVarInDirt (oldD : CoreTypes.DirtParam.t)
-    (newD : CoreTypes.DirtParam.t) : dirt -> dirt = function
+and rnDirtVarInDirt (oldD : DirtParam.t)
+    (newD : DirtParam.t) : dirt -> dirt = function
   | { effect_set = eff; row = EmptyRow } -> { effect_set = eff; row = EmptyRow }
   | { effect_set = eff; row = ParamRow d } ->
       if d = oldD then { effect_set = eff; row = ParamRow newD }
       else { effect_set = eff; row = ParamRow d }
 
-and rnDirtVarInTyCt (oldD : CoreTypes.DirtParam.t)
-    (newD : CoreTypes.DirtParam.t) : ct_ty -> ct_ty = function
+and rnDirtVarInTyCt (oldD : DirtParam.t)
+    (newD : DirtParam.t) : ct_ty -> ct_ty = function
   | ty1, ty2 -> (rnDirtVarInValTy oldD newD ty1, rnDirtVarInValTy oldD newD ty2)
 
-and rnDirtVarInDirtCt (oldD : CoreTypes.DirtParam.t)
-    (newD : CoreTypes.DirtParam.t) : ct_dirt -> ct_dirt = function
+and rnDirtVarInDirtCt (oldD : DirtParam.t)
+    (newD : DirtParam.t) : ct_dirt -> ct_dirt = function
   | d1, d2 -> (rnDirtVarInDirt oldD newD d1, rnDirtVarInDirt oldD newD d2)
 
 (* ************************************************************************* *)
@@ -304,7 +333,7 @@ and dirt_cts_are_equal (d1, d2) (d3, d4) =
 let no_effect_dirt dirt_param =
   { effect_set = EffectSet.empty; row = ParamRow dirt_param }
 
-let fresh_dirt () = no_effect_dirt (CoreTypes.DirtParam.fresh ())
+let fresh_dirt () = no_effect_dirt (DirtParam.fresh ())
 
 let closed_dirt effect_set = { effect_set; row = EmptyRow }
 
@@ -486,7 +515,7 @@ and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
       match Assoc.lookup x dirt_sbst with
       | Some x' -> ((ty_sbst, dirt_sbst), { drt with row = ParamRow x' })
       | None ->
-          let y = CoreTypes.DirtParam.fresh () in
+          let y = DirtParam.fresh () in
           ((ty_sbst, Assoc.update x y dirt_sbst), { drt with row = ParamRow y })
       )
   | EmptyRow -> ((ty_sbst, dirt_sbst), drt)
@@ -495,14 +524,12 @@ let rec source_to_target tctx_st ty =
   let loc = Location.unknown in
   match ty with
   | Type.Apply (ty_name, args) when TypeContext.transparent ~loc ty_name tctx_st
-    -> (
-      match TypeContext.lookup_tydef ~loc ty_name tctx_st with
-      | { params = []; type_def = TypeContext.Inline ty } ->
-          source_to_target tctx_st ty
-      | { type_def = TypeContext.Sum _; _ }
-      | { type_def = TypeContext.Record _; _ }
-      | { type_def = TypeContext.Inline _; _ } ->
-          assert false (* None of these are transparent *))
+    -> 
+      (match TypeContext.ty_apply ~loc ty_name [] tctx_st with
+      (* We currently support only inlined types with no arguments *)
+      | TypeContext.Inline ty -> source_to_target tctx_st ty
+      (* Other cases should not be transparent *)
+      | _ -> assert false)
   | Type.Apply (ty_name, args) ->
       Apply (ty_name, List.map (source_to_target tctx_st) args)
   | Type.TyParam p -> TyParam p

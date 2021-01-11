@@ -6,7 +6,7 @@ let empty = []
 let is_empty = function [] -> true | _ :: _ -> false
 
 (* View from the left *)
-let rec is_cons (xs : ('key, 'value) t) :
+let is_cons (xs : ('key, 'value) t) :
     (('key * 'value) * ('key, 'value) t) option =
   match xs with [] -> None | x :: xs -> Some (x, xs)
 

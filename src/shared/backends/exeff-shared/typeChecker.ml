@@ -5,11 +5,11 @@ open Unification
 type state = {
   var_types : (Typed.variable, Types.target_ty) Assoc.t;
   ty_params : CoreTypes.TyParam.t list;
-  dirt_params : CoreTypes.DirtParam.t list;
-  skel_params : CoreTypes.SkelParam.t list;
+  dirt_params : Types.DirtParam.t list;
+  skel_params : Types.SkelParam.t list;
   ty_param_skeletons : (CoreTypes.TyParam.t, Types.skeleton) Assoc.t;
-  ty_coer_types : (CoreTypes.TyCoercionParam.t, Types.ct_ty) Assoc.t;
-  dirt_coer_types : (CoreTypes.DirtCoercionParam.t, Types.ct_dirt) Assoc.t;
+  ty_coer_types : (Types.TyCoercionParam.t, Types.ct_ty) Assoc.t;
+  dirt_coer_types : (Types.DirtCoercionParam.t, Types.ct_dirt) Assoc.t;
   tctx_st : TypeContext.state;
 }
 

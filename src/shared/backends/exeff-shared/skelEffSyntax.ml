@@ -27,7 +27,7 @@ type e_expression =
   | ELambda of e_abstraction_with_ty
   | EEffect of effect
   | EHandler of e_handler
-  | EBigLambdaSkel of CoreTypes.SkelParam.t * e_expression
+  | EBigLambdaSkel of Types.SkelParam.t * e_expression
   | EApplySkelExp of e_expression * Types.skeleton
 
 (** Impure computations *)

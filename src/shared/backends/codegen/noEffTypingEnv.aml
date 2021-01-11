@@ -14,7 +14,7 @@ type state = {
 type environment = {
   var_types : (NoEff.variable, NoEff.n_type) Assoc.t;
   ty_params : CoreTypes.TyParam.t list;
-  ty_coer_types : (CoreTypes.TyCoercionParam.t, NoEff.n_type) Assoc.t;
+  ty_coer_types : (Types.TyCoercionParam.t, NoEff.n_type) Assoc.t;
 }
 
 let extend_ty_params st ty_var = { st with ty_params = ty_var :: st.ty_params }

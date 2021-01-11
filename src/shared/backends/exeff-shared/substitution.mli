@@ -12,10 +12,10 @@ val empty : t
 (* Adding and merging *)
 
 val add_type_coercion :
-  CoreTypes.TyCoercionParam.t -> Typed.ty_coercion -> t -> t
+  Types.TyCoercionParam.t -> Typed.ty_coercion -> t -> t
 (** [add_type_coercion parameter t_coercion sub] Add type [parameter] [t_coercion] to [sub]. *)
 
-val add_type_coercion_e : CoreTypes.TyCoercionParam.t -> Typed.ty_coercion -> t
+val add_type_coercion_e : Types.TyCoercionParam.t -> Typed.ty_coercion -> t
 (** [add_type_coercion_e parameter t_coercion] Add type [parameter] [t_coercion] to empty substitution. *)
 
 val add_type_substitution : CoreTypes.TyParam.t -> Types.target_ty -> t -> t
@@ -25,24 +25,24 @@ val add_type_substitution_e : CoreTypes.TyParam.t -> Types.target_ty -> t
 (** [add_type_substitution_e parameter target_type] Add type [parameter] to [target_type] substitution to empty substitution *)
 
 val add_dirt_var_coercion :
-  CoreTypes.DirtCoercionParam.t -> Typed.dirt_coercion -> t -> t
+  Types.DirtCoercionParam.t -> Typed.dirt_coercion -> t -> t
 (** [add_dirt_var_coercion dirt_var target_dc sub] Add [dirt_var] to target dirt coercion ([target_dc]) to [sub] *)
 
 val add_dirt_var_coercion_e :
-  CoreTypes.DirtCoercionParam.t -> Typed.dirt_coercion -> t
+  Types.DirtCoercionParam.t -> Typed.dirt_coercion -> t
 (** [add_dirt_var_coercion dirt_var target_dc] Add [dirt_var] to target dirt coercion ([target_dc]) to empty substitution *)
 
-val add_dirt_substitution : CoreTypes.DirtParam.t -> Types.dirt -> t -> t
+val add_dirt_substitution : Types.DirtParam.t -> Types.dirt -> t -> t
 (** [add_dirt_substitution var target_dirt sub] Add dirt variable ([dirt_var]) to [target_dirt] substitution to [sub] *)
 
-val add_dirt_substitution_e : CoreTypes.DirtParam.t -> Types.dirt -> t
+val add_dirt_substitution_e : Types.DirtParam.t -> Types.dirt -> t
 (** [add_dirt_substitution var target_dirt] Add dirt variable ([dirt_var]) to [target_dirt] substitution to empty substitution *)
 
 val add_skel_param_substitution :
-  CoreTypes.SkelParam.t -> Types.skeleton -> t -> t
+  Types.SkelParam.t -> Types.skeleton -> t -> t
 (** [add_type_substitution parameter target_skel sub] Add skeleton [parameter] to [target_skel] substitution to [sub] *)
 
-val add_skel_param_substitution_e : CoreTypes.SkelParam.t -> Types.skeleton -> t
+val add_skel_param_substitution_e : Types.SkelParam.t -> Types.skeleton -> t
 (** [add_type_substitution parameter target_skel sub] Add skeleton [parameter] to [target_skel] substitution to empty substitution *)
 
 val merge : t -> t -> t

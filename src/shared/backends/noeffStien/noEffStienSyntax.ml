@@ -22,7 +22,7 @@ and n_term =
   | NTuple of n_term list
   | NFun of n_abstraction_with_type
   | NApplyTerm of n_term * n_term
-  | NBigLambdaCoer of CoreTypes.TyCoercionParam.t * n_coerty * n_term
+  | NBigLambdaCoer of Types.TyCoercionParam.t * n_coerty * n_term
   | NApplyCoer of n_term * n_coercion
   | NCast of n_term * n_coercion
   | NReturn of n_term
@@ -71,7 +71,7 @@ and n_letrec_abstraction = variable * n_type * n_type * n_abstraction
 and n_coerty = n_type * n_type
 
 and n_coercion =
-  | NCoerVar of CoreTypes.TyCoercionParam.t
+  | NCoerVar of Types.TyCoercionParam.t
   | NCoerRefl of n_type
   | NCoerArrow of n_coercion * n_coercion
   | NCoerHandler of n_coercion * n_coercion
@@ -108,7 +108,7 @@ let rec print_term ?max_level t ppf =
         (print_term ~max_level:0 t2)
   | NBigLambdaCoer (x, coerty, t) ->
       print "/\\%t : %t. %t "
-        (CoreTypes.TyCoercionParam.print x)
+        (Types.TyCoercionParam.print x)
         (print_coerty coerty) (print_term t)
   | NApplyCoer (t, coer) ->
       print ~at_level:1 "((%t)@ (%t))"
@@ -179,7 +179,7 @@ and print_let_abstraction (t1, t2) ppf =
 and print_coercion ?max_level coer ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match coer with
-  | NCoerVar x -> CoreTypes.TyCoercionParam.print x ppf
+  | NCoerVar x -> Types.TyCoercionParam.print x ppf
   | NCoerRefl t -> print "(< %t >)" (print_type t)
   | NCoerArrow (c1, c2) ->
       print "(%t -> %t)" (print_coercion c1) (print_coercion c2)

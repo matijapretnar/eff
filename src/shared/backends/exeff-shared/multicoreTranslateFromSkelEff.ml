@@ -89,8 +89,8 @@ and of_type = function
 
 (* Type definitions *)
 and of_tydef = function
-  | Tctx.Record assoc -> Multicore.TyDefRecord (Assoc.map of_type assoc)
-  | Tctx.Sum assoc ->
+  | TypeContext.Record assoc -> Multicore.TyDefRecord (Assoc.map of_type assoc)
+  | TypeContext.Sum assoc ->
       let converter = function None -> None | Some ty -> Some (of_type ty) in
       Multicore.TyDefSum (Assoc.map converter assoc)
-  | Tctx.Inline ty -> Multicore.TyDefInline (of_type ty)
+  | TypeContext.Inline ty -> Multicore.TyDefInline (of_type ty)

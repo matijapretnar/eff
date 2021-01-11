@@ -55,31 +55,3 @@ module TyParam = struct
         else Format.fprintf ppf "%sty%i" c (k - 25))
       k
 end
-
-(** dirt parameters *)
-module DirtParam = Symbol.Make (Symbol.Parameter (struct
-  let ascii_symbol = "drt"
-
-  let utf8_symbol = "\206\180"
-end))
-
-(** skeleton parameters *)
-module SkelParam = Symbol.Make (Symbol.Parameter (struct
-  let ascii_symbol = "skl"
-
-  let utf8_symbol = "s"
-end))
-
-(** type coercion parameters *)
-module TyCoercionParam = Symbol.Make (Symbol.Parameter (struct
-  let ascii_symbol = "tycoer"
-
-  let utf8_symbol = "\207\132co"
-end))
-
-(** dirt coercion parameters *)
-module DirtCoercionParam = Symbol.Make (Symbol.Parameter (struct
-  let ascii_symbol = "dirtcoer"
-
-  let utf8_symbol = "\206\180co"
-end))
