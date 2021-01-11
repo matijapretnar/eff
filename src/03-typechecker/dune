@@ -1,0 +1,3 @@
+(library
+ (name typechecker)
+ (libraries language))

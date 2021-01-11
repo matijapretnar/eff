@@ -1,6 +1,6 @@
 (executable
  (name jseff)
- (libraries shared js_of_ocaml)
+ (libraries runtime js_of_ocaml utils loader)
  (preprocess
   (pps js_of_ocaml-ppx))
  (modes js)
