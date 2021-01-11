@@ -1,4 +1,6 @@
-open CoreUtils
+open Utils.CoreUtils
+
+open Utils
 (** Syntax of the core language. *)
 
 open Types
@@ -73,8 +75,7 @@ type expression =
   | Handler of handler
   | CastExp of expression * ty_coercion
   | LambdaTyCoerVar of Types.TyCoercionParam.t * Types.ct_ty * expression
-  | LambdaDirtCoerVar of
-      Types.DirtCoercionParam.t * Types.ct_dirt * expression
+  | LambdaDirtCoerVar of Types.DirtCoercionParam.t * Types.ct_dirt * expression
   | ApplyTyCoercion of expression * ty_coercion
   | ApplyDirtCoercion of expression * dirt_coercion
 
@@ -127,8 +128,7 @@ type omega_ct =
   | TyOmega of (Types.TyCoercionParam.t * Types.ct_ty)
   | DirtOmega of (Types.DirtCoercionParam.t * Types.ct_dirt)
   | DirtyOmega of
-      ((Types.TyCoercionParam.t * Types.DirtCoercionParam.t)
-      * Types.ct_dirty)
+      ((Types.TyCoercionParam.t * Types.DirtCoercionParam.t) * Types.ct_dirty)
   | SkelEq of skeleton * skeleton
   | TyParamHasSkel of (CoreTypes.TyParam.t * skeleton)
 

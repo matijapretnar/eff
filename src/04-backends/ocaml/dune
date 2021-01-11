@@ -1,6 +1,6 @@
 (library
  (name ocaml)
- (libraries language))
+ (libraries utils language typechecker))
 
 (env
  (dev

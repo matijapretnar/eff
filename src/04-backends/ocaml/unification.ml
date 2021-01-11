@@ -294,10 +294,7 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
         let k0 = v2 in
         let v0 =
           let open Types in
-          {
-            effect_set = diff_set;
-            row = ParamRow (Types.DirtParam.fresh ());
-          }
+          { effect_set = diff_set; row = ParamRow (Types.DirtParam.fresh ()) }
         in
         let k1' = omega in
         let v1' = Typed.UnionDirt (s1, DirtCoercionVar omega') in

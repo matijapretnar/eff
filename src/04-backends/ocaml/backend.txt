@@ -27,21 +27,8 @@ external:
           TypeChecker.addExternal state.type_checker_state x ty'
         in
 
-letrec
-
-    Print.debug "ignoring top let rec binding";
-    state
-
-toplet
-
-    Print.debug "ignoring top let binding";
-    state
-
 defeffect
 
-    let effect_system_state' =
-        ExplicitInfer.add_effect eff (ty1, ty2) state.effect_system_state
-    in
 
 type_of
 

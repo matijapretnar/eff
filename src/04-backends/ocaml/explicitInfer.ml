@@ -1,5 +1,6 @@
-open CoreUtils
+open Utils
 module Untyped = UntypedSyntax
+module CoreTypes = Language.CoreTypes
 open Typed
 
 (* GEORGE: TODO:

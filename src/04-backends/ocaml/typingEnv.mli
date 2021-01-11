@@ -5,6 +5,8 @@
     quantified type parameters.
 *)
 
+open Utils
+
 type t = (Typed.variable, Types.target_ty) Assoc.t
 (** The type of contexts. *)
 

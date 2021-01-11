@@ -1,5 +1,8 @@
 (** Substitution implementation *)
 
+open Utils
+module CoreTypes = Language.CoreTypes
+
 type t = {
   type_param_to_type_coercions :
     (Types.TyCoercionParam.t, Typed.ty_coercion) Assoc.t;
@@ -310,8 +313,7 @@ let print_type_param_to_type p t ppf =
 
 let print_dirt_var_sub p t ppf =
   Print.print ppf "substitution: ";
-  printy ppf "%t :-dirtvarToTargetdirt-> %t"
-    (Types.DirtParam.print p)
+  printy ppf "%t :-dirtvarToTargetdirt-> %t" (Types.DirtParam.print p)
     (Types.print_target_dirt t)
 
 let print_dirt_var_coercion p t ppf =
@@ -322,8 +324,7 @@ let print_dirt_var_coercion p t ppf =
 
 let print_skel_param_sub p t ppf =
   Print.print ppf "substitution: ";
-  printy ppf "%t :-skelvarToSkeleton-> %t"
-    (Types.SkelParam.print p)
+  printy ppf "%t :-skelvarToSkeleton-> %t" (Types.SkelParam.print p)
     (Types.print_skeleton t)
 
 let print_sub_list ?max_level subs =
