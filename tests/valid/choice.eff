@@ -1,42 +1,42 @@
-effect Decide : unit -> bool;;
+effect Decide: unit -> bool;;
 effect Decide2 : unit -> bool;;
 
 handle
-  let x = (if #Decide () then 10 else 20) in
-  let y = (if #Decide () then 0 else 5) in
+  let x = (if (perform (Decide ())) then 10 else 20) in
+  let y = (if (perform (Decide ())) then 0 else 5) in
     x - y
 with
-| #Decide () k -> k true;;
+| effect (Decide ()) k -> k true;;
 
 let choose_all = handler
-  | #Decide () k -> k true @ k false
-  | val x -> [x];;
+  | effect (Decide ()) k -> k true @ k false
+  | x -> [x];;
 
 with choose_all handle
-  let x = (if #Decide () then 10 else 20) in
-  let y = (if #Decide () then 0 else 5) in
+  let x = (if perform (Decide ()) then 10 else 20) in
+  let y = (if perform (Decide ()) then 0 else 5) in
     x - y;;
 
 let choose_all2 = handler
-  | #Decide2 () k -> k true @ k false
-  | val x -> [x];;
+  | effect (Decide2 ()) k -> k true @ k false
+  |  x -> [x];;
 
 with choose_all handle
 with choose_all2 handle
-  let x = (if #Decide () then 10 else 20) in
-  let y = (if #Decide2 () then 0 else 5) in
+  let x = (if perform (Decide ()) then 10 else 20) in
+  let y = (if perform (Decide2 ()) then 0 else 5) in
     x - y;;
 
 with choose_all2 handle
 with choose_all handle
-  let y = (if #Decide2 () then 0 else 5) in
-  let x = (if #Decide () then 10 else 20) in
+  let y = (if perform (Decide2 ()) then 0 else 5) in
+  let x = (if perform (Decide ()) then 10 else 20) in
     x - y;;
 
 with choose_all2 handle
 with choose_all handle
-  let x = (if #Decide () then 10 else 20) in
-  let y = (if #Decide2 () then 0 else 5) in
+  let x = (if perform (Decide ()) then 10 else 20) in
+  let y = (if perform (Decide2 ()) then 0 else 5) in
     x - y;;
 
 
@@ -44,8 +44,8 @@ effect Fail : unit -> empty;;
 
 let rec choose_int m n =
   if m > n then
-    absurd (#Fail ())
-  else if #Decide () then
+    absurd (perform (Fail ()))
+  else if perform (Decide ()) then
     m
   else
     choose_int (m + 1) n
@@ -67,18 +67,18 @@ let pythagorean m n =
   let a2b2 = a ** 2 + b ** 2 in
   match sqrt (a ** 2 + b ** 2) with
   | Some c -> (a, b, c)
-  | None -> absurd (#Fail ())
+  | None -> absurd (perform (Fail ()))
 
 let backtrack = handler
-| #Decide () k ->
+| effect (Decide ()) k ->
     handle k false with
-    | #Fail () _ -> k true
+    | effect (Fail ()) _ -> k true
 
 let choose_all =
     handler
-    | val x -> [x]
-    | #Decide () k -> (k true) @ (k false)
-    | #Fail _ _ -> []
+    |  x -> [x]
+    | effect (Decide ()) k -> (k true) @ (k false)
+    | effect (Fail _) _ -> []
 
 ;;
 

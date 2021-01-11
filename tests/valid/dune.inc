@@ -2,6 +2,22 @@
  (deps
  %{bin:eff}
   (source_tree .))
+   (target "choice.eff.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       0
+       (run eff "./choice.eff")))))
+
+(rule
+ (alias runtest)
+  (action
+   (diff "choice.eff.ref" "choice.eff.out")))
+
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
    (target "lexer.eff.out")
     (action
      (with-outputs-to "%{target}"
