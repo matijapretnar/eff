@@ -4,7 +4,7 @@ let version = "5.1"
 
 let use_stdlib = ref true
 
-type backend = Runtime | Ocaml of string | Multicore of string
+type backend = Runtime | Ocaml of string option | Multicore of string
 
 let backend = ref Runtime
 

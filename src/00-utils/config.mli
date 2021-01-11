@@ -6,7 +6,7 @@ val version : string
 val use_stdlib : bool ref
 (** Should we load the standard library? *)
 
-type backend = Runtime | Ocaml of string | Multicore of string
+type backend = Runtime | Ocaml of string option | Multicore of string
 
 val backend : backend ref
 
