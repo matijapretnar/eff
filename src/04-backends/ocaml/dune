@@ -1,0 +1,8 @@
+(library
+ (name ocaml)
+ (libraries language))
+
+(env
+ (dev
+  (flags
+   (:standard -warn-error -A))))

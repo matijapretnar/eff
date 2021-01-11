@@ -17,11 +17,6 @@ let options =
       ( "--no-stdlib",
         Arg.Clear Config.use_stdlib,
         " Do not load the standard library" );
-      ( "--explicit-subtyping",
-        Arg.Set Config.explicit_subtyping,
-        " Enable the experimental explicit subtyping inference engine" );
-      ("--profile", Arg.Set Config.profiling, " Print out profiling information");
-      ("--no-opts", Arg.Set Config.disable_optimization, " Disable optmizations");
       ( "--wrapper",
         Arg.String (fun str -> Config.wrapper := Some [ str ]),
         "<program> Specify a command-line wrapper to be used (such as rlwrap \
@@ -35,6 +30,10 @@ let options =
       ( "--compile-plain-ocaml",
         Arg.String (fun filename -> Config.backend := Ocaml filename),
         "<file> Compile the Eff code into a OCaml file <file>" );
+      ("--profile", Arg.Set Config.profiling, " Print out profiling information");
+      ( "--no-opts",
+        Arg.Set Config.disable_optimization,
+        " Disable optimizations" );
       ("--ascii", Arg.Set Config.ascii, " Use ASCII output");
       ( "-v",
         Arg.Unit
@@ -144,8 +143,12 @@ let main =
           (module Multicore.Backend (struct
             let output_file = output_file
           end))
-      | Config.Ocaml _output_file -> failwith "Not yet implemented"
+      | Config.Ocaml output_file ->
+          (module Ocaml.Backend (struct
+            let output_file = output_file
+          end))
     in
+
     let (module Shell) =
       (module Loader.Shell.Make (Backend) : Loader.Shell.Shell)
     in
