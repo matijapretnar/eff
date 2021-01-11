@@ -1,6 +1,4 @@
-type 'a located = { it : 'a; at : Location.t }
-
-type comparison = Less | Equal | Greater | Invalid
+include module type of Stdlib.List
 
 val fold : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a
 

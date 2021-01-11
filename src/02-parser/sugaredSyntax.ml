@@ -1,6 +1,5 @@
 open Utils
 open Language
-open CoreUtils
 
 (** Abstract syntax of eff terms, types, and toplevel commands. *)
 

@@ -1,6 +1,5 @@
 open Utils
 open Language
-open CoreUtils
 module T = Type
 module Untyped = UntypedSyntax
 module Unify = SimpleUnify
@@ -59,17 +58,13 @@ let subst_ctx st sbst =
 
 (** [free_params ctx] returns list of all free type parameters in [ctx]. *)
 let free_params ctx =
-  let binding_params (_, (ps, ty)) =
-    CoreUtils.list_diff (Type.free_params ty) ps
-  in
+  let binding_params (_, (ps, ty)) = List.list_diff (Type.free_params ty) ps in
   let xs = List.map binding_params (VariableMap.bindings ctx) |> List.flatten in
-  CoreUtils.unique_elements xs
+  List.unique_elements xs
 
 let generalize st poly ty =
   if poly then
-    let ps =
-      CoreUtils.list_diff (Type.free_params ty) (free_params st.context)
-    in
+    let ps = List.list_diff (Type.free_params ty) (free_params st.context) in
     (ps, ty)
   else ([], ty)
 
@@ -133,7 +128,7 @@ let infer_pattern st pp =
     | Untyped.PConst const -> (T.Basic (Const.infer_ty const), st', vars)
     | Untyped.PTuple ps ->
         let (st', vars), pst =
-          fold_map
+          List.fold_map
             (fun (st'', vars') pa ->
               let t, st'', vars' = infer st'' vars' pa in
               ((st'', vars'), t))
@@ -241,7 +236,7 @@ and infer_let st loc defs =
   (vars, subst_ctx st (Unify.solve st.constraints st.type_definition_context))
 
 and infer_let_rec st loc defs =
-  if not (no_duplicates (List.map fst defs)) then
+  if not (List.no_duplicates (List.map fst defs)) then
     Error.typing ~loc "Multiply defined recursive value.";
   let lst =
     List.map
@@ -295,7 +290,7 @@ and infer_expr st { it = e; at = loc } =
         (ty, add_ty_constraint loc ty ty' st)
     | Untyped.Tuple es ->
         let st, tys =
-          fold_map
+          List.fold_map
             (fun st' e ->
               let t, st' = infer_expr st' e in
               (st', t))

@@ -4,6 +4,8 @@ type t = Integer of int | String of string | Boolean of bool | Float of float
 
 type ty = IntegerTy | StringTy | BooleanTy | FloatTy
 
+type comparison = Less | Equal | Greater | Invalid
+
 let of_integer n = Integer n
 
 let of_string s = String s
@@ -39,9 +41,7 @@ let infer_ty = function
 let compare c1 c2 =
   let cmp x y =
     let r = Stdlib.compare x y in
-    if r < 0 then CoreUtils.Less
-    else if r > 0 then CoreUtils.Greater
-    else CoreUtils.Equal
+    if r < 0 then Less else if r > 0 then Greater else Equal
   in
   match (c1, c2) with
   | Integer n1, Integer n2 -> cmp n1 n2
@@ -50,4 +50,4 @@ let compare c1 c2 =
   | Float x1, Float x2 -> cmp x1 x2
   | _ -> Error.runtime "Incomparable constants %t and %t" (print c1) (print c2)
 
-let equal c1 c2 = compare c1 c2 = CoreUtils.Equal
+let equal c1 c2 = compare c1 c2 = Equal

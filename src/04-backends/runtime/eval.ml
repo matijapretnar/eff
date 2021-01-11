@@ -1,7 +1,6 @@
 (* Evaluation of the intermediate language, big step. *)
 open Utils
 open Language
-open CoreUtils
 module V = Value
 module Untyped = UntypedSyntax
 module RuntimeEnv = Map.Make (CoreTypes.Variable)
