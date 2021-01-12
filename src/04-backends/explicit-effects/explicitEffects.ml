@@ -1,22 +1,33 @@
 (* Compilation to multicore ocaml *)
 open Utils
+module V = Value
 
 module Evaluate : Language.BackendSignature.T = struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 
-  type state = { effect_system_state : ExplicitInfer.state; prog : string list }
+  type state = {
+    effect_system_state : ExplicitInfer.state;
+    evaluation_state : Eval.state;
+  }
 
   let initial_state =
-    { effect_system_state = ExplicitInfer.initial_state; prog = [] }
+    {
+      effect_system_state = ExplicitInfer.initial_state;
+      evaluation_state = Eval.initial_state;
+    }
 
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
-  let process_computation state c tysch =
-    let c', _ty' =
+  let process_computation state c _tysch =
+    let c', ty' =
       ExplicitInfer.tcTopLevelMono ~loc:Location.unknown
         state.effect_system_state c
     in
+    let v = Eval.run state.evaluation_state c' in
+    Format.fprintf !Config.output_formatter "@[- : %t = %t@]@."
+      (Types.print_target_dirty ty')
+      (V.print_value v);
     state
 
   let process_type_of state c _tysch =
@@ -25,7 +36,8 @@ module Evaluate : Language.BackendSignature.T = struct
         state.effect_system_state c
     in
     Format.fprintf Format.str_formatter "- : %t\n" (Types.print_target_dirty ty);
-    { state with prog = Format.flush_str_formatter () :: state.prog }
+    (* { state with prog = Format.flush_str_formatter () :: state.prog } *)
+    state
 
   let process_def_effect state (eff, (ty1, ty2)) =
     let effect_system_state' =
@@ -54,9 +66,10 @@ module Evaluate : Language.BackendSignature.T = struct
     { state with effect_system_state = effect_system_state' }
 
   let finalize state =
-    List.iter
-      (fun x -> Format.fprintf !Config.output_formatter "%s\n" x)
-      (List.rev state.prog)
+    (* List.iter
+       (fun x -> Format.fprintf !Config.output_formatter "%s\n" x)
+       (List.rev state.prog) *)
+    ()
 end
 
 module CompileToPlainOCaml : Language.BackendSignature.T = struct
