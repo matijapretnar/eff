@@ -54,11 +54,20 @@ module Evaluate : Language.BackendSignature.T = struct
     Print.debug "ignoring top let rec binding";
     state
 
-  let process_external state (x, ty, _name) =
+  let process_external state (x, ty, f) =
     let effect_system_state' =
       ExplicitInfer.addExternal state.effect_system_state x ty
     in
-    { state with effect_system_state = effect_system_state' }
+    let evaluation_state' =
+      match Assoc.lookup f External.values with
+      | Some v -> Eval.update x v state.evaluation_state
+      | None -> Error.runtime "unknown external symbol %s." f
+    in
+    {
+      state with
+      effect_system_state = effect_system_state';
+      evaluation_state = evaluation_state';
+    }
 
   let process_tydef state tydefs =
     let effect_system_state' =
