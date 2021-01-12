@@ -19,11 +19,11 @@ let rec compile_type exeff_ty =
   | Types.QualTy (pi, ty) ->
       NoEffSyntax.TyQualification (compile_coercion_type pi, compile_type ty)
   | Types.QualDirt (_, ty) -> compile_type ty
-  (* | Types.TySchemeTy (ty_param, _, ty) ->
-      NoEffSyntax.TyForAll (ty_param, compile_type ty) *)
-  (* | Types.TySchemeDirt (_, ty) -> compile_type ty *)
-  (* | Types.TySchemeSkel (_, ty) -> compile_type ty *)
 
+(* | Types.TySchemeTy (ty_param, _, ty) ->
+    NoEffSyntax.TyForAll (ty_param, compile_type ty) *)
+(* | Types.TySchemeDirt (_, ty) -> compile_type ty *)
+(* | Types.TySchemeSkel (_, ty) -> compile_type ty *)
 and compile_dirty_type (ty, dirt) =
   if is_dirt_empty dirt then compile_type ty
   else NoEffSyntax.TyComputation (compile_type ty)

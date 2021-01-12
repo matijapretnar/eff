@@ -1,3 +1,4 @@
+open Utils
 open Typed
 open Types
 open Unification

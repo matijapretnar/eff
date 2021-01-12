@@ -141,7 +141,8 @@ let main =
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
       | Config.Multicore -> (module Multicore.Backend)
-      | Config.Ocaml -> (module Ocaml.Backend)
+      | Config.Ocaml -> (module ExplicitEffects.CompileToPlainOCaml)
+      | Config.ExplicitEffects -> (module ExplicitEffects.Evaluate)
     in
 
     let (module Shell) =
@@ -158,9 +159,9 @@ let main =
       if !Config.use_stdlib then
         let stdlib =
           match !Config.backend with
-          | Config.Runtime -> Loader.Stdlib_eff.source
+          | Config.Runtime | Config.Ocaml | Config.ExplicitEffects ->
+              Loader.Stdlib_eff.source
           | Config.Multicore -> Multicore.stdlib
-          | Config.Ocaml -> Loader.Stdlib_eff.source
         in
         Shell.load_source stdlib state
       else state

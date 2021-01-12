@@ -6,7 +6,7 @@ val version : string
 val use_stdlib : bool ref
 (** Should we load the standard library? *)
 
-type backend = Runtime | Ocaml | Multicore
+type backend = Runtime | Ocaml | Multicore | ExplicitEffects
 
 val backend : backend ref
 
@@ -37,9 +37,6 @@ val verbosity : int ref
 
 val pure_print : bool ref
 (** Should we use pure printing for computations? *)
-
-val explicit_subtyping : bool ref
-(** Should we use the new explicit subtyping effect system? *)
 
 val output_formatter : Format.formatter ref
 

@@ -1,8 +1,10 @@
 (library
- (name ocaml)
+ (name explicitEffects)
  (libraries utils language typechecker))
 
 (env
  (dev
   (flags
    (:standard -warn-error -A))))
+
+(data_only_dirs old)

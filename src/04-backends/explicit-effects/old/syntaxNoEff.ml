@@ -13,8 +13,6 @@ and n_pattern =
   | PNRecord of (CoreTypes.Field.t, n_pattern) Assoc.t
   | PNVariant of CoreTypes.Label.t * n_pattern option
   | PNConst of Const.t
-  (* STIEN: Nodig voor tweede handler elaboration case van exeff naar noeff, maar eigenlijk juister om daarvoor een substitutie te maken denk ik, en dan te pattern matchen op k als variabele? Niet zeker of dat wel mag *)
-  | PNCast of n_pattern * n_coercion
   | PNNonbinding
 
 and n_term =

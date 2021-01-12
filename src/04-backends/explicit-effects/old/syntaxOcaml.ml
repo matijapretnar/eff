@@ -1,3 +1,4 @@
+open CoreUtils
 (** Syntax of the core language. *)
 
 module CoreSyntax = UntypedSyntax

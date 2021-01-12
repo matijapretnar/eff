@@ -4,7 +4,7 @@ let version = "5.1"
 
 let use_stdlib = ref true
 
-type backend = Runtime | Ocaml | Multicore
+type backend = Runtime | Ocaml | Multicore | ExplicitEffects
 
 let backend = ref Runtime
 
@@ -23,8 +23,6 @@ let wrapper = ref (Some [ "rlwrap"; "ledit" ])
 let verbosity = ref 3
 
 let pure_print = ref false
-
-let explicit_subtyping = ref false
 
 let output_formatter = ref Format.std_formatter
 
