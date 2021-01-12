@@ -131,11 +131,11 @@ let check_well_formed ~loc tydef st =
   in
   match tydef with
   | Record fields ->
-      if not (CoreUtils.no_duplicates (Assoc.keys_of fields)) then
+      if not (List.no_duplicates (Assoc.keys_of fields)) then
         Error.typing ~loc "Field labels in a record type must be distinct";
       Assoc.iter (fun (_, ty) -> check ty) fields
   | Sum constructors ->
-      if not (CoreUtils.no_duplicates (Assoc.keys_of constructors)) then
+      if not (List.no_duplicates (Assoc.keys_of constructors)) then
         Error.typing ~loc "Constructors of a sum type must be distinct";
       let checker = function _, None -> () | _, Some ty -> check ty in
       Assoc.iter checker constructors

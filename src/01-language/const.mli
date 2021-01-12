@@ -1,5 +1,3 @@
-open Utils
-
 type t = private
   | Integer of int
   | String of string
@@ -7,6 +5,8 @@ type t = private
   | Float of float
 
 type ty = IntegerTy | StringTy | BooleanTy | FloatTy
+
+type comparison = Less | Equal | Greater | Invalid
 
 val of_integer : int -> t
 
@@ -26,6 +26,6 @@ val print_ty : ty -> Format.formatter -> unit
 
 val infer_ty : t -> ty
 
-val compare : t -> t -> CoreUtils.comparison
+val compare : t -> t -> comparison
 
 val equal : t -> t -> bool

@@ -9,7 +9,7 @@ type label = CoreTypes.Label.t
 
 type field = CoreTypes.Field.t
 
-type pattern = plain_pattern CoreUtils.located
+type pattern = plain_pattern located
 
 and plain_pattern =
   | PVar of variable
@@ -21,7 +21,7 @@ and plain_pattern =
   | PConst of Const.t
   | PNonbinding
 
-type expression = plain_expression CoreUtils.located
+type expression = plain_expression located
 (** Pure expressions *)
 
 and plain_expression =
@@ -35,7 +35,7 @@ and plain_expression =
   | Effect of effect
   | Handler of handler
 
-and computation = plain_computation CoreUtils.located
+and computation = plain_computation located
 (** Impure computations *)
 
 and plain_computation =

@@ -1,6 +1,5 @@
 open Utils
 open Language
-open CoreUtils
 module Untyped = UntypedSyntax
 
 (* Pattern matching exhaustiveness checking as described by Maranget [1]. These
@@ -77,7 +76,7 @@ let pattern_of_cons ~loc c lst =
 (* Finds all distinct non-wildcard root pattern constructors in [lst], and at
    least one constructor of their type not present in [lst] if it exists. *)
 let find_constructors tctx lst =
-  let cons_lst = List.map (cons_of_pattern tctx) (unique_elements lst) in
+  let cons_lst = List.map (cons_of_pattern tctx) (List.unique_elements lst) in
   let present = List.filter (fun c -> c <> Wildcard) cons_lst in
   let missing =
     match present with
@@ -123,7 +122,7 @@ let find_constructors tctx lst =
                     (fun (lbl, opt) -> Variant (lbl, opt <> None))
                     (Assoc.to_list tags)
                 in
-                list_diff all present)
+                List.list_diff all present)
         (* Only for completeness. *)
         | Wildcard -> [])
   in

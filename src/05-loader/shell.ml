@@ -1,6 +1,5 @@
 open Utils
 open Language
-open CoreUtils
 open Parser
 module TypeSystem = Typechecker.SimpleInfer
 
@@ -155,7 +154,7 @@ module Make (Backend : Language.BackendSignature.T) = struct
           backend_state = backend_state';
         }
 
-  and exec_cmds state cmds = fold exec_cmd state cmds
+  and exec_cmds state cmds = List.fold exec_cmd state cmds
 
   and load_cmds state cmds =
     let old_output_formatter = !Config.output_formatter in

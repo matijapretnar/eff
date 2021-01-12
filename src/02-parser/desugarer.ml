@@ -2,7 +2,6 @@
 
 open Utils
 open Language
-open CoreUtils
 module T = Type
 module Sugared = SugaredSyntax
 module Untyped = UntypedSyntax
@@ -87,7 +86,7 @@ let desugar_type type_sbst state =
     match t with
     | Sugared.TyApply (t, tys) ->
         let state', t' = tyname_to_symbol state t in
-        let state'', tys' = fold_map desugar_type state' tys in
+        let state'', tys' = List.fold_map desugar_type state' tys in
         (state'', T.Apply (t', tys'))
     | Sugared.TyParam t -> (
         match Assoc.lookup t type_sbst with
@@ -98,7 +97,7 @@ let desugar_type type_sbst state =
         let state'', t2' = desugar_type state' t2 in
         (state'', T.Arrow (t1', t2'))
     | Sugared.TyTuple lst ->
-        let state', lst' = fold_map desugar_type state lst in
+        let state', lst' = List.fold_map desugar_type state lst in
         (state', T.Tuple lst')
     | Sugared.TyHandler (t1, t2) ->
         let state', t1' = desugar_type state t1 in
@@ -117,7 +116,7 @@ let free_type_params t =
     | Sugared.TyTuple lst -> List.map ty_params lst |> List.flatten
     | Sugared.TyHandler (t1, t2) -> ty_params t1 @ ty_params t2
   in
-  unique_elements (ty_params t)
+  List.unique_elements (ty_params t)
 
 let syntax_to_core_params ts =
   Assoc.map_of_list (fun p -> (p, Type.fresh_ty_param ())) ts
@@ -235,7 +234,7 @@ let desugar_pattern state ?(initial_forbidden = []) p =
           let state', p' = desugar_pattern state p in
           (state', Untyped.PAs (p', x))
       | Sugared.PTuple ps ->
-          let state', ps' = fold_map desugar_pattern state ps in
+          let state', ps' = List.fold_map desugar_pattern state ps in
           (state', Untyped.PTuple ps')
       | Sugared.PRecord flds ->
           let field_desugar st (f, p) =
@@ -299,7 +298,7 @@ let rec desugar_expression state { it = t; at = loc } =
         (state', [], Untyped.Lambda a')
     | Sugared.Function cs ->
         let x = fresh_var (Some "$function") in
-        let state', cs' = fold_map desugar_abstraction state cs in
+        let state', cs' = List.fold_map desugar_abstraction state cs in
         ( state',
           [],
           Untyped.Lambda
@@ -313,7 +312,7 @@ let rec desugar_expression state { it = t; at = loc } =
         let state', w, es = desugar_expressions state ts in
         (state', w, Untyped.Tuple es)
     | Sugared.Record ts ->
-        if not (CoreUtils.no_duplicates (Assoc.keys_of ts)) then
+        if not (List.no_duplicates (Assoc.keys_of ts)) then
           Error.syntax ~loc "Fields in a record must be distinct";
         let state', w, es = desugar_record_fields state ts in
         (state', w, Untyped.Record es)
@@ -474,7 +473,7 @@ and desugar_let_rec state { it = exp; at = loc } =
   | Sugared.Lambda a -> desugar_abstraction state a
   | Sugared.Function cs ->
       let x = fresh_var (Some "$let_rec_function") in
-      let state', cs = fold_map desugar_abstraction state cs in
+      let state', cs = List.fold_map desugar_abstraction state cs in
       let new_match = Untyped.Match (add_loc (Untyped.Var x) loc, cs) in
       (state', (add_loc (Untyped.PVar x) loc, add_loc new_match loc))
   | _ ->
@@ -529,7 +528,7 @@ and desugar_handler loc state
             let st', (p1', p2', t') = desugar_abstraction2 st a2 in
             (st', (add_loc (Untyped.PTuple [ p1'; p2' ]) loc, t'))
           in
-          let state', a2s' = fold_map aux state a2s in
+          let state', a2s' = List.fold_map aux state a2s in
           (state', add_loc (Untyped.Match (add_loc x_k_vars loc, a2s')) loc)
         in
         let p1, p2 = (Untyped.PVar x, Untyped.PVar k) in
@@ -550,7 +549,7 @@ and desugar_handler loc state
     | cs ->
         let v = fresh_var (Some "$val_param") in
         let v_var = add_loc (Untyped.Var v) loc in
-        let state'', cs = fold_map desugar_abstraction state' cs in
+        let state'', cs = List.fold_map desugar_abstraction state' cs in
         ( state'',
           (add_loc (Untyped.PVar v) loc, add_loc (Untyped.Match (v_var, cs)) loc)
         )
@@ -562,7 +561,7 @@ and desugar_handler loc state
     | cs ->
         let fin = fresh_var (Some "$fin_param") in
         let fin_var = add_loc (Untyped.Var fin) loc in
-        let state''', cs' = fold_map desugar_abstraction state cs in
+        let state''', cs' = List.fold_map desugar_abstraction state cs in
         ( state''',
           ( add_loc (Untyped.PVar fin) loc,
             add_loc (Untyped.Match (fin_var, cs')) loc ) )
@@ -580,7 +579,7 @@ and match_constructor state loc t cs =
   match eff_cs with
   | [] ->
       let state', w, e = desugar_expression state t in
-      let state'', val_cs' = fold_map desugar_abstraction state' val_cs in
+      let state'', val_cs' = List.fold_map desugar_abstraction state' val_cs in
       (state'', w, Untyped.Match (e, val_cs'))
   | _ ->
       let val_cs = List.map (fun cs -> Sugared.Val_match cs) val_cs in

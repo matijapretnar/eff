@@ -1,5 +1,4 @@
 open Utils
-open CoreUtils
 module Const = Language.Const
 module Untyped = Language.UntypedSyntax
 module CoreTypes = Language.CoreTypes

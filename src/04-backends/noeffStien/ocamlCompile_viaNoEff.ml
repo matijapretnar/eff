@@ -1,4 +1,3 @@
-open CoreUtils
 module FromNoEff = CodegenPlainOCaml_fromNoEff
 
 module type BackendParameters = sig

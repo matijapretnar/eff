@@ -17,8 +17,8 @@ let compile_file ppf filename st =
   close_in header_channel;
   Format.fprintf out_ppf "%s\n;;\n@." header;
   let compile_cmd state cmd =
-    let loc = cmd.CoreUtils.at in
-    match cmd.CoreUtils.it with
+    let loc = cmd.at in
+    match cmd.it with
     | Commands.Term t ->
         let desugarer_state', c =
           Desugarer.desugar_computation state.desugarer_state t

@@ -1,4 +1,3 @@
-open CoreUtils
 module SkelEff = SkelEffSyntax
 module Multicore = MulticoreSyntax
 

@@ -7,7 +7,7 @@
  (action
   (with-stdout-to
    %{targets}
-   (run ../../generate_dune_rules.exe 2 "--compile-plain-ocaml \"\""))))
+   (run ../../generate_dune_rules.exe 2 "--compile-plain-ocaml"))))
 
 (rule
  (alias runtest)

@@ -1,5 +1,3 @@
-open Utils.CoreUtils
-
 open Utils
 (** Syntax of the core language. *)
 
@@ -676,7 +674,7 @@ let rec make_equal_pattern eqvars p p' =
   match (p, p') with
   | PVar x, PVar x' -> Some ((x, x') :: eqvars)
   | PAs (p, x), PAs (p', x') ->
-      option_map
+      Option.map
         (fun eqvars -> (x, x') :: eqvars)
         (make_equal_pattern eqvars p p')
   | PTuple ps, PTuple ps' ->

@@ -25,14 +25,12 @@ let options =
         Arg.Unit (fun () -> Config.wrapper := None),
         " Do not use a command-line wrapper" );
       ( "--compile-multicore-ocaml",
-        Arg.String (fun filename -> Config.backend := Multicore filename),
-        "<file> Compile the Eff code into a Multicore OCaml file <file>" );
+        Arg.Unit (fun () -> Config.backend := Multicore),
+        " Compile the Eff code into a Multicore OCaml (sent to standard output)"
+      );
       ( "--compile-plain-ocaml",
-        Arg.String
-          (fun filename ->
-            Config.backend :=
-              Ocaml (if String.length filename = 0 then None else Some filename)),
-        "<file> Compile the Eff code into a OCaml file <file>" );
+        Arg.Unit (fun () -> Config.backend := Ocaml),
+        " Compile the Eff code into plain OCaml (sent to standard output)" );
       ("--profile", Arg.Set Config.profiling, " Print out profiling information");
       ( "--no-opts",
         Arg.Set Config.disable_optimization,
@@ -142,14 +140,8 @@ let main =
     let (module Backend : Language.BackendSignature.T) =
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
-      | Config.Multicore output_file ->
-          (module Multicore.Backend (struct
-            let output_file = output_file
-          end))
-      | Config.Ocaml output_file ->
-          (module Ocaml.Backend (struct
-            let output_file = output_file
-          end))
+      | Config.Multicore -> (module Multicore.Backend)
+      | Config.Ocaml -> (module Ocaml.Backend)
     in
 
     let (module Shell) =
@@ -167,8 +159,8 @@ let main =
         let stdlib =
           match !Config.backend with
           | Config.Runtime -> Loader.Stdlib_eff.source
-          | Config.Multicore _ -> Multicore.stdlib
-          | Config.Ocaml _ -> Loader.Stdlib_eff.source
+          | Config.Multicore -> Multicore.stdlib
+          | Config.Ocaml -> Loader.Stdlib_eff.source
         in
         Shell.load_source stdlib state
       else state

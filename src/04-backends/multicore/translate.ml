@@ -1,6 +1,5 @@
 open Utils
 open Language
-open CoreUtils
 open Syntax
 module CoreSyntax = UntypedSyntax
 

@@ -1,6 +1,4 @@
-type 'a located = { it : 'a; at : Location.t }
-
-type comparison = Less | Equal | Greater | Invalid
+include module type of Stdlib.List
 
 val fold : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a
 
@@ -18,8 +16,5 @@ val no_duplicates : 'a list -> bool
 
 val list_diff : 'a list -> 'a list -> 'a list
 (** Returns elements of the first list that or not present in the second. *)
-
-val option_map : ('a -> 'b) -> 'a option -> 'b option
-(** [option_map f] maps [None] to [None] and [Some x] to [Some (f x)]. *)
 
 val concat_map : ('a -> 'b list) -> 'a list -> 'b list

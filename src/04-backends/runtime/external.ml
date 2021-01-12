@@ -1,6 +1,5 @@
 open Utils
 open Language
-open CoreUtils
 module V = Value
 
 let from_bool b = V.Const (Const.of_boolean b)
@@ -51,7 +50,7 @@ let float_float_to_float f =
 (* Comparison of values is a trickier business than you might think. *)
 let rec compare v1 v2 =
   match v1 with
-  | V.Closure _ | V.Handler _ -> Invalid
+  | V.Closure _ | V.Handler _ -> Const.Invalid
   | V.Const c -> (
       match v2 with
       | V.Closure _ | V.Handler _ -> Invalid
@@ -93,7 +92,7 @@ and compare_list lst1 lst2 =
 and compare_record lst1 lst2 =
   (* Is is easiest to canonically sort the fields, then compare as lists. *)
   let rec comp = function
-    | [], [] -> Equal
+    | [], [] -> Const.Equal
     | (fld1, v1) :: lst1, (fld2, v2) :: lst2 -> (
         let r = Stdlib.compare fld1 fld2 in
         if r < 0 then Less
@@ -101,7 +100,7 @@ and compare_record lst1 lst2 =
         else
           match compare v1 v2 with
           | Less -> Less
-          | Equal -> comp (lst1, lst2)
+          | Const.Equal -> comp (lst1, lst2)
           | Greater -> Greater
           | Invalid -> Invalid)
     | [], _ :: _ -> Less
@@ -115,7 +114,7 @@ and compare_record lst1 lst2 =
 
 and compare_option o1 o2 =
   match (o1, o2) with
-  | None, None -> Equal
+  | None, None -> Const.Equal
   | Some v1, Some v2 -> compare v1 v2
   | None, Some _ -> Less
   | Some _, None -> Greater
@@ -124,7 +123,7 @@ and compare_option o1 o2 =
    can now easily add a builtin "compare". *)
 let equal v1 v2 =
   match compare v1 v2 with
-  | Equal -> true
+  | Const.Equal -> true
   | Less | Greater -> false
   | Invalid -> Error.runtime "invalid comparison with ="
 

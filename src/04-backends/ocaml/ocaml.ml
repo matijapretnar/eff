@@ -1,11 +1,7 @@
 (* Compilation to multicore ocaml *)
 open Utils
 
-module type BackendParameters = sig
-  val output_file : string option
-end
-
-module Backend (P : BackendParameters) : Language.BackendSignature.T = struct
+module Backend : Language.BackendSignature.T = struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 
@@ -58,15 +54,7 @@ module Backend (P : BackendParameters) : Language.BackendSignature.T = struct
     { state with effect_system_state = effect_system_state' }
 
   let finalize state =
-    let print output_ppf =
-      List.iter
-        (fun x -> Format.fprintf output_ppf "%s\n" x)
-        (List.rev state.prog)
-    in
-    match P.output_file with
-    | Some filename ->
-        let ch = open_out filename in
-        print (Format.formatter_of_out_channel ch);
-        close_out ch
-    | None -> print Format.std_formatter
+    List.iter
+      (fun x -> Format.fprintf !Config.output_formatter "%s\n" x)
+      (List.rev state.prog)
 end
