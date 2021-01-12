@@ -10,6 +10,6 @@
    (run ../../generate_dune_rules.exe 0 "--explicit-effects"))))
 
 (rule
- (alias runtest)
+ (alias depend)
  (action
   (diff dune.inc dune.gen)))

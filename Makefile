@@ -1,5 +1,5 @@
 default: format
-	dune build
+	dune build || true
 
 format:
 	dune build @fmt --auto-promote
@@ -10,8 +10,13 @@ release: format
 clean:
 	dune clean
 
-test: default
+.PHONY: test
+test: depend
 	dune runtest
+
+.PHONY: depend 
+depend: 
+	@ dune build @depend --auto-promote || true
 
 install: release
 	dune install
