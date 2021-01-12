@@ -1,6 +1,8 @@
-open CoreUtils
+open Utils
 (** Syntax of the core language. *)
 
+module CoreTypes = Language.CoreTypes
+module Const = Language.Const
 module CoreSyntax = UntypedSyntax
 
 type variable = CoreTypes.Variable.t

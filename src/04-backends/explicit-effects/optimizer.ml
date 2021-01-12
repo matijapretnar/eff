@@ -1,3 +1,4 @@
+open Utils
 open Types
 open Typed
 
@@ -8,7 +9,7 @@ type state = {
   knot_functions : (variable, expression * handler * variable) Assoc.t;
 }
 
-let inititial_state =
+let initial_state =
   {
     fuel = ref !Config.optimization_fuel;
     tc_state = TypeChecker.initial_state;
@@ -1304,7 +1305,7 @@ and reduce_comp st c =
 *)
 
 let optimize_main_comp tc_state c =
-  optimize_comp { inititial_state with tc_state } c
+  optimize_comp { initial_state with tc_state } c
 
 (*
  To Do list for optimization :

@@ -2,6 +2,14 @@
  (name explicitEffects)
  (libraries utils language typechecker))
 
+(rule
+ (with-stdout-to
+  ocamlHeader_ml.ml
+  (progn
+   (echo "let source = {|")
+   (cat ocamlHeader.ml)
+   (echo "|}"))))
+
 (env
  (dev
   (flags

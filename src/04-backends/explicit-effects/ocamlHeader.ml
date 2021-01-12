@@ -28,9 +28,6 @@ let rec handler (h : ('a, 'b) handler_clauses) : 'a computation -> 'b =
   in
   handler
 
-let rec zip l1 l2 =
-  match l1 with x :: xs -> ( match l2 with y :: ys -> (x, y) :: zip xs ys)
-
 let value (x : 'a) : 'a computation = Value x
 
 let call (eff : ('a, 'b) effect) (arg : 'a) (cont : 'b -> 'c computation) :
@@ -43,13 +40,11 @@ let rec lift (f : 'a -> 'b) : 'a computation -> 'b computation = function
 
 let effect eff arg = call eff arg value
 
-let run = function
-  | Value x -> x
-  | Call (eff, _, _) -> failwith "Uncaught effect"
+let run = function Value x -> x | Call (_, _, _) -> failwith "Uncaught effect"
 
 let ( ** ) =
   let rec pow a =
-    Pervasives.(
+    Stdlib.(
       function
       | 0 -> 1
       | 1 -> a

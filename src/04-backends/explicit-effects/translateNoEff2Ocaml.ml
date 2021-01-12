@@ -1,5 +1,6 @@
-module NoEff = NoEffSyntax
-module OCaml = OcamlSyntax
+open Utils
+module NoEff = SyntaxNoEff
+module OCaml = SyntaxOcaml
 module Variable = Symbol.Make (Symbol.String)
 
 type variable = Variable.t

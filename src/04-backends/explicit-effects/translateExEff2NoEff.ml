@@ -1,8 +1,9 @@
-open NoEffSyntax
+open Utils
+open SyntaxNoEff
 open Types
 open Typed
 module TypeCheck = TypeChecker
-module NoEff = NoEffSyntax
+module NoEff = SyntaxNoEff
 module ExEffTypes = Types
 module ExEff = Typed
 module EffectSet = Set.Make (CoreTypes.Effect)
@@ -33,7 +34,7 @@ let rec extend_pattern_type env pat ty =
           extend_multiple_pats env (Assoc.values_of recs) tys
       | _ -> typefail "Ill-typed record")
   | PVariant (lbl, p) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
+      let ty_in, ty_out = Types.constructor_signature env.tctx_st lbl in
       extend_pattern_type env p ty_in
   | PNonbinding -> env
 
@@ -232,7 +233,7 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
           else typefail "Ill-typed coercion application"
       | _ -> failwith "Ill-typed coercion application")
   | ExEff.Variant (lbl, exp) ->
-      let ty_in, ty_out = Types.constructor_signature lbl in
+      let ty_in, ty_out = Types.constructor_signature env.tctx_st lbl in
       let ty_e, elab_e = value_elab state env exp in
       assert (Types.types_are_equal ty_e ty_in);
       (ty_out, NoEff.NVariant (lbl, Some elab_e))
@@ -615,10 +616,10 @@ and elab_ty = function
   | Handler h -> NoEff.NTyHandler (elab_ty h.value, elab_ty h.finally)
 
 and elab_tydef = function
-  | TypeContext.Record assoc -> NoEff.TyDefRecord (Assoc.map elab_ty assoc)
-  | TypeContext.Sum assoc ->
+  | Language.Type.Record assoc -> NoEff.TyDefRecord (Assoc.map elab_ty assoc)
+  | Language.Type.Sum assoc ->
       let converter = function None -> None | Some ty -> Some (elab_ty ty) in
       NoEff.TyDefSum (Assoc.map converter assoc)
-  | TypeContext.Inline ty -> NoEff.TyDefInline (elab_ty ty)
+  | Language.Type.Inline ty -> NoEff.TyDefInline (elab_ty ty)
 
 and has_empty_dirt ((ty, dirt) : ExEffTypes.target_dirty) = is_empty_dirt dirt
