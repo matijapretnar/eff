@@ -1,9 +1,0 @@
-handle
-    match [4;5;6] with
-    | [] -> 1
-    | [x] -> x
-    | [_;y] -> y
-    | x :: _ -> x
-with
-| val x -> x + 10
-;;

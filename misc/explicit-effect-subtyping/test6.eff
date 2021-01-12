@@ -1,5 +1,0 @@
-effect Op : int -> int ;;
-
-handle 1 with
-  | x -> x 
-  | effect (Op n) k -> 2 ;;

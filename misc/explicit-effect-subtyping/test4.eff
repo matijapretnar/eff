@@ -1,2 +1,0 @@
-with (handler
-  | x -> x) handle 1 ;;

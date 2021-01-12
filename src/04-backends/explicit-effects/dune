@@ -14,5 +14,3 @@
  (dev
   (flags
    (:standard -warn-error -A))))
-
-(data_only_dirs old)
