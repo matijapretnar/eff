@@ -30,6 +30,9 @@ let options =
       ( "--compile-plain-ocaml",
         Arg.Unit (fun () -> Config.backend := Ocaml),
         " Compile the Eff code into plain OCaml (sent to standard output)" );
+      ( "--explicit-effects",
+        Arg.Unit (fun () -> Config.backend := ExplicitEffects),
+        " Compile the Eff code into plain OCaml (sent to standard output)" );
       ("--profile", Arg.Set Config.profiling, " Print out profiling information");
       ( "--no-opts",
         Arg.Set Config.disable_optimization,
