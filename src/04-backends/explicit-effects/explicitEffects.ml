@@ -35,7 +35,8 @@ module Evaluate : Language.BackendSignature.T = struct
       ExplicitInfer.tcTopLevelMono ~loc:Location.unknown
         state.effect_system_state c
     in
-    Format.fprintf Format.str_formatter "- : %t\n" (Types.print_target_dirty ty);
+    Format.fprintf !Config.output_formatter "- : %t\n"
+      (Types.print_target_dirty ty);
     (* { state with prog = Format.flush_str_formatter () :: state.prog } *)
     state
 
