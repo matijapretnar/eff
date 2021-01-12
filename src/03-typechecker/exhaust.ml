@@ -269,30 +269,50 @@ let is_irrefutable tctx p = check_patterns tctx ~loc:p.at [ p ]
 
 (* Check for refutable patterns in let statements and non-exhaustive match
    statements. *)
-let check_comp tctx c =
-  let rec check { it = c; at = loc } =
-    match c with
-    | Untyped.Value _ -> ()
-    | Untyped.Let (lst, c) ->
-        List.iter
-          (fun (p, c) ->
-            is_irrefutable tctx p;
-            check c)
-          lst;
-        check c
-    | Untyped.LetRec (lst, _c) ->
-        List.iter
-          (fun (_, (p, c)) ->
-            is_irrefutable tctx p;
-            check c)
-          lst
-    | Untyped.Match (_, []) ->
-        () (* Skip empty match to avoid an unwanted warning. *)
-    | Untyped.Match (_, lst) ->
-        check_patterns tctx ~loc (List.map fst lst);
-        List.iter (fun (_, c) -> check c) lst
-    | Untyped.Apply _ -> ()
-    | Untyped.Handle (_, c) -> check c
-    | Untyped.Check c -> check c
-  in
-  check c
+let rec check_computation tctx { it = c; at = loc } =
+  match c with
+  | Untyped.Value _ -> ()
+  | Untyped.Let (lst, c) ->
+      List.iter
+        (fun (p, c) ->
+          is_irrefutable tctx p;
+          check_computation tctx c)
+        lst;
+      check_computation tctx c
+  | Untyped.LetRec (lst, _c) ->
+      List.iter
+        (fun (_, (p, c)) ->
+          is_irrefutable tctx p;
+          check_computation tctx c)
+        lst
+  | Untyped.Match (_, []) ->
+      () (* Skip empty match to avoid an unwanted warning. *)
+  | Untyped.Match (_, lst) ->
+      check_patterns tctx ~loc (List.map fst lst);
+      List.iter (fun (_, c) -> check_computation tctx c) lst
+  | Untyped.Apply _ -> ()
+  | Untyped.Handle (_, c) -> check_computation tctx c
+  | Untyped.Check c -> check_computation tctx c
+
+and check_expression tctx { it = e; _ } =
+  match e with
+  | Untyped.Var _ | Untyped.Const _ | Untyped.Effect _ -> ()
+  | Untyped.Annotated (e, _) -> check_expression tctx e
+  | Untyped.Tuple es -> List.iter (check_expression tctx) es
+  | Untyped.Record flds ->
+      Assoc.iter (fun (_, e) -> check_expression tctx e) flds
+  | Untyped.Variant (_, e) -> Option.iter (check_expression tctx) e
+  | Untyped.Lambda a -> check_abstraction tctx a
+  | Untyped.Handler
+      {
+        Untyped.effect_clauses = ops;
+        Untyped.value_clause = a_val;
+        Untyped.finally_clause = a_fin;
+      } ->
+      check_abstraction tctx a_val;
+      check_abstraction tctx a_fin;
+      Assoc.iter (fun (_, a) -> check_abstraction2 tctx a) ops
+
+and check_abstraction tctx (_, c) = check_computation tctx c
+
+and check_abstraction2 tctx (_, _, c) = check_computation tctx c
