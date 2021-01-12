@@ -29,8 +29,8 @@ module Backend : Language.BackendSignature.T = struct
   let process_top_let state defs vars =
     let state' =
       List.fold_right
-        (fun (p, c) st ->
-          let v = Eval.run st c in
+        (fun (p, e) st ->
+          let v = Eval.eval st e in
           Eval.extend p v st)
         defs state
     in

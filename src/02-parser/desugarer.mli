@@ -21,7 +21,7 @@ val desugar_external :
 val desugar_top_let :
   state ->
   (SugaredSyntax.pattern * SugaredSyntax.term) list ->
-  state * (UntypedSyntax.pattern * UntypedSyntax.computation) list
+  state * (UntypedSyntax.pattern * UntypedSyntax.expression) list
 
 val desugar_top_let_rec :
   state ->

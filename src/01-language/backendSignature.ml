@@ -23,7 +23,7 @@ module type T = sig
 
   val process_top_let :
     state ->
-    (CoreSyntax.pattern * CoreSyntax.computation) list ->
+    (CoreSyntax.pattern * CoreSyntax.expression) list ->
     (CoreSyntax.variable * Type.ty_scheme) list ->
     state
 

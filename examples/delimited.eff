@@ -6,7 +6,7 @@ effect Shift : ((int -> int) -> int) -> int
    current version of eff. In version 3.0 it is possible to have a polymorphic
    version. *)
 
-let reset =
+let reset () =
   let rec reset_handler () = handler
     | effect (Shift f) k -> with reset_handler () handle (f k)
   in
@@ -15,7 +15,7 @@ let reset =
 
 (* An example from http://lamp.epfl.ch/~rompf/continuations-icfp09.pdf *)
 
-with reset handle
+with reset () handle
   perform (Shift (fun k -> k (k (k 7)))) * 2 + 1
 ;;
 
@@ -27,7 +27,7 @@ with reset handle
         eff --no-types delimited.eff*)
 
 (*
-with reset handle
+with reset () handle
 let yin = (fun k -> perform Print "@"; k) (perform Shift (fun k -> k k)) in
 let yang = (fun k -> perform Print "*"; k) (perform Shift (fun k -> k k)) in
 yin yang;;

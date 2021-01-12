@@ -32,8 +32,8 @@ module Backend : Language.BackendSignature.T = struct
     update state (DefEffect (eff, (ty1', ty2')))
 
   let process_top_let state defs _vars =
-    let converter (p, c) =
-      (Translate.of_pattern p, Translate.of_computation c)
+    let converter (p, e) =
+      (Translate.of_pattern p, Translate.of_expression e)
     in
     let defs' = List.map converter defs in
     update state (TopLet defs')

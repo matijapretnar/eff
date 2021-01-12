@@ -98,7 +98,7 @@ let thread_queue = handler
    run the next thread in the queue.
    The handler must be defined recursively so that we can handle threads
    that we run. *)
-let thread_handler =
+let thread_handler () =
   let rec thread_handler_rec () = handler
   | effect (Spawn t) k ->
     (perform (Enqueue t);  k ())
@@ -116,7 +116,7 @@ let thread_handler =
    is known, activates all the waiting threads and clears up a bit of the
    memory.
    Defined recursively for the same reason as the thread handler. *)
-let scheduler =
+let scheduler () =
   let rec continuation_tb k =
     (* Constructs a thread builder from a continuation. The thread builder
        passes the data value to the continuation and wraps it in the scheduler.
@@ -161,8 +161,8 @@ let update id v = perform (Update (id, v))
 let run_threads ts =
   let spawner t = (
     let handled_t () =
-      with thread_handler handle
-      with scheduler handle
+      with thread_handler () handle
+      with scheduler () handle
       t ()
     in
     perform (Spawn handled_t))
@@ -205,8 +205,8 @@ let multiply m1 m2 () =
 let test () =
   with mem_handler handle
   with thread_queue handle
-  with thread_handler handle
-  with scheduler handle
+  with thread_handler () handle
+  with scheduler () handle
   run_threads [
     set_matrix "A" (1, 2, 3, 4); set_matrix "B" (0, 1, 0, 1);
     set_matrix "C" (2, 2, 2, 2); set_matrix "D" (5, 0, -2, -1);

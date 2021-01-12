@@ -616,10 +616,14 @@ let desugar_top_let state defs =
     in
     let state', p_vars, p' = desugar_pattern state p in
     Assoc.iter check_forbidden p_vars;
-    let _, c' = desugar_computation state' c in
-    ( { state with context = Assoc.concat p_vars fold_state.context },
-      (p', c') :: defs,
-      Assoc.keys_of p_vars @ forbidden )
+    match desugar_expression state' c with
+    | _, [], e' ->
+        ( { state with context = Assoc.concat p_vars fold_state.context },
+          (p', e') :: defs,
+          Assoc.keys_of p_vars @ forbidden )
+    | _, _ :: _, _ ->
+        Error.syntax ~loc:c.at
+          "Only expressions are allowed on in top-let definitions"
   in
   let state', defs', _ = List.fold_right aux_desugar defs (state, [], []) in
   (state', defs')

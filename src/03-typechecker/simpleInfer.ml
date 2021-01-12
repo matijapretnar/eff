@@ -235,6 +235,36 @@ and infer_let st loc defs =
   let vars, st = List.fold_left infer_fold_fun ([], st) defs in
   (vars, subst_ctx st (Unify.solve st.constraints st.type_definition_context))
 
+and infer_val_let st loc defs =
+  let rec find_duplicate xs ys =
+    match xs with
+    | [] -> None
+    | x :: xs -> if List.mem x ys then Some x else find_duplicate xs ys
+  in
+  let infer_fold_fun (vs, st') (p, e) =
+    let tc, st' = infer_expr st' e in
+    let ws, tp, st' = infer_pattern st' p in
+    let st' = add_ty_constraint e.at tc tp st' in
+    match find_duplicate (List.map fst ws) (List.map fst vs) with
+    | Some x ->
+        Error.typing ~loc "Several definitions of %t."
+          (CoreTypes.Variable.print x)
+    | None ->
+        let sbst = Unify.solve st'.constraints st.type_definition_context in
+        let ws = Assoc.map (T.subst_ty sbst) (Assoc.of_list ws) in
+        let st' = subst_ctx st' sbst in
+        let ws = Assoc.map (generalize st' true) ws in
+        let ws = Assoc.to_list ws in
+        let st' =
+          List.fold_right
+            (fun (x, ty_scheme) st'' -> extend st'' x ty_scheme)
+            ws st'
+        in
+        (List.rev ws @ vs, st')
+  in
+  let vars, st = List.fold_left infer_fold_fun ([], st) defs in
+  (vars, subst_ctx st (Unify.solve st.constraints st.type_definition_context))
+
 and infer_let_rec st loc defs =
   if not (List.no_duplicates (List.map fst defs)) then
     Error.typing ~loc "Multiply defined recursive value.";
@@ -439,11 +469,11 @@ let infer_top_comp st c =
   (st, generalize st (nonexpansive c.it) ty)
 
 let infer_top_let st defs =
-  let vars, st = infer_let (clear_constraints st) Location.unknown defs in
+  let vars, st = infer_val_let (clear_constraints st) Location.unknown defs in
   List.iter
-    (fun (p, c) ->
+    (fun (p, e) ->
       Exhaust.is_irrefutable st.type_definition_context p;
-      Exhaust.check_computation st.type_definition_context c)
+      Exhaust.check_expression st.type_definition_context e)
     defs;
   (vars, st)
 

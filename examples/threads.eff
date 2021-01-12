@@ -20,7 +20,7 @@ let queue initial = handler
   | finally x -> x initial
 ;;
 
-let round_robin =
+let round_robin () =
   let enqueue t =
     perform (Add_to_queue t)
   in
@@ -41,7 +41,7 @@ let round_robin =
    the letter a and another one which has two sub-threads printing x and y. *)
 
 with queue [] handle
-with round_robin handle
+with round_robin () handle
  perform (Spawn (fun _ ->
   iter (fun x -> perform (Print x); perform Yield) ["a"; "b"; "c"; "d"; "e"]
   ));
@@ -73,6 +73,6 @@ let rec fractions d e =
 ;;
 
 with queue [] handle
-with round_robin handle
+with round_robin () handle
  fractions 1 10
 ;;

@@ -1,4 +1,3 @@
-val a : int * string = (5, "foo")
 - : int * string = (5, "foo")
 val g : 'a -> 'b -> 'a = <fun>
 - : int * string = (4, "foo")

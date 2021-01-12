@@ -1,6 +1,4 @@
-let a = (let f x = x in (f 5, f "foo"));;
-
-a;;
+(let f x = x in (f 5, f "foo"));;
 
 let g x y = (fun x y -> x) x y;;
 

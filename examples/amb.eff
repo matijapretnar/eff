@@ -53,7 +53,7 @@ let queue initial = handler
 ;;
 
 
-let bfs =
+let bfs () =
   (* Auxilary function that runs the next choice. *)
   let run_next () =
     match perform Get_next with
@@ -75,7 +75,7 @@ let bfs =
    than amb, which is not surprising. It still finds the same solution
    (which is what we would expect in this case). *)
 with queue [] handle
-with bfs handle
+with bfs () handle
   let rec place x qs =
     if x = 9 then Success qs else
       match select_from (available x qs) with

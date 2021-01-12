@@ -194,22 +194,6 @@
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "polymorphism_id_id.eff.out")
-    (action
-     (with-outputs-to "%{target}"
-      (with-accepted-exit-codes
-       1
-       (run eff "./polymorphism_id_id.eff")))))
-
-(rule
- (alias runtest)
-  (action
-   (diff "polymorphism_id_id.eff.ref" "polymorphism_id_id.eff.out")))
-
-(rule
- (deps
- %{bin:eff}
-  (source_tree .))
    (target "shadow_eff.eff.out")
     (action
      (with-outputs-to "%{target}"
@@ -269,6 +253,22 @@
  (alias runtest)
   (action
    (diff "shadow_type.eff.ref" "shadow_type.eff.out")))
+
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
+   (target "top_let_definitions.eff.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       1
+       (run eff "./top_let_definitions.eff")))))
+
+(rule
+ (alias runtest)
+  (action
+   (diff "top_let_definitions.eff.ref" "top_let_definitions.eff.out")))
 
 (rule
  (deps
