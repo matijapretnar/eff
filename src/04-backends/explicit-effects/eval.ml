@@ -77,13 +77,12 @@ let rec ceval state c =
       in
       let state = extend_let_rec state stripped in
       ceval state c
-  | Typed.Call (_, _, _)
-  | Typed.Op (_, _)
-  | Typed.Bind (_, _)
-  | Typed.CastComp (_, _)
-  | Typed.CastComp_ty (_, _)
-  | Typed.CastComp_dirt (_, _) ->
-      assert false
+  | Typed.Call (_, _, _) -> assert false
+  | Typed.Op (_, _) -> assert false
+  | Typed.Bind (_, _) -> assert false
+  | Typed.CastComp (c, _) | Typed.CastComp_ty (c, _) | Typed.CastComp_dirt (c, _)
+    ->
+      ceval state c
 
 and eval_let state lst c =
   match lst with
