@@ -433,7 +433,7 @@ let infer_top_comp st c =
   let st = clear_constraints st in
   let ty, st = infer_comp st c in
   let sbst = Unify.solve st.constraints st.type_definition_context in
-  Exhaust.check_comp st.type_definition_context c;
+  Exhaust.check_computation st.type_definition_context c;
   let st = subst_ctx st sbst in
   let ty = Type.subst_ty sbst ty in
   (st, generalize st (nonexpansive c.it) ty)
@@ -443,7 +443,7 @@ let infer_top_let st defs =
   List.iter
     (fun (p, c) ->
       Exhaust.is_irrefutable st.type_definition_context p;
-      Exhaust.check_comp st.type_definition_context c)
+      Exhaust.check_computation st.type_definition_context c)
     defs;
   (vars, st)
 
@@ -451,7 +451,7 @@ let infer_top_let_rec st defs =
   let vars, st = infer_let_rec (clear_constraints st) Location.unknown defs in
   let exhaust_check (_, (p, c)) =
     Exhaust.is_irrefutable st.type_definition_context p;
-    Exhaust.check_comp st.type_definition_context c
+    Exhaust.check_computation st.type_definition_context c
   in
   List.iter exhaust_check defs;
   (vars, st)
