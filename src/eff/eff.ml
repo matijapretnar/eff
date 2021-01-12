@@ -3,7 +3,6 @@ open Utils
 let usage = "Usage: eff [option] ... [file] ..."
 
 (* A list of files to be loaded and run. *)
-
 type use_file = Run of string | Load of string
 
 let file_queue = ref []
@@ -144,7 +143,6 @@ let main =
       | Config.Ocaml -> (module ExplicitEffects.CompileToPlainOCaml)
       | Config.ExplicitEffects -> (module ExplicitEffects.Evaluate)
     in
-
     let (module Shell) =
       (module Loader.Shell.Make (Backend) : Loader.Shell.Shell)
     in

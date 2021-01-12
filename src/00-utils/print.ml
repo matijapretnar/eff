@@ -28,12 +28,6 @@ let rec sequence sep pp vs ppf =
   | [ v ] -> pp v ppf
   | v :: vs -> Format.fprintf ppf "%t%s@,%t" (pp v) sep (sequence sep pp vs)
 
-let rec cases pp vs ppf =
-  match vs with
-  | [] -> ()
-  | [ v ] -> pp v ppf
-  | v :: vs -> Format.fprintf ppf "%t@,| %t" (pp v) (cases pp vs)
-
 let field fpp vpp (f, v) ppf = print ppf "%t = %t" (fpp f) (vpp v)
 
 let tuple pp lst ppf =

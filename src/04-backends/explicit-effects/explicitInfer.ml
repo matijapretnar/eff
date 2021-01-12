@@ -714,11 +714,11 @@ and tcOpCases (inState : state) (lclCtx : TypingEnv.t)
     (tyOut : Types.target_ty) (dirtOut : Types.dirt) :
     (Typed.effect, Typed.abstraction2) Assoc.t tcOutput =
   let rec go cs =
-    match Assoc.is_cons cs with
-    | None -> ([], [])
-    | Some (c, cs) ->
+    match Assoc.to_list cs with
+    | [] -> ([], [])
+    | c :: cs ->
         let y, cs1 = tcOpCase inState lclCtx c tyOut dirtOut in
-        let ys, cs2 = go cs in
+        let ys, cs2 = go (Assoc.of_list cs) in
         (y :: ys, cs1 @ cs2)
   in
   let allClauses, allCs = go eclauses in

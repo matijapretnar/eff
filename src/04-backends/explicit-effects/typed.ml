@@ -337,7 +337,7 @@ and print_computation ?max_level c ppf =
       print ~at_level:2 "(match %t with _ -> assert false)" (print_expression e)
   | Match (e, _resTy, lst) ->
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e)
-        (Print.cases print_abstraction lst)
+        (Print.sequence "@, | " print_abstraction lst)
   | Handle (e, c) ->
       print ~at_level:1 "handle %t %t"
         (print_expression ~max_level:0 e)

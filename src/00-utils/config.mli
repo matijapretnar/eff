@@ -6,17 +6,9 @@ val version : string
 val use_stdlib : bool ref
 (** Should we load the standard library? *)
 
-type backend = Runtime | Ocaml | Multicore | ExplicitEffects
+type backend = Runtime | Multicore | Ocaml | ExplicitEffects
 
 val backend : backend ref
-
-val disable_optimization : bool ref
-(** Should compiled computations be optimized? *)
-
-val profiling : bool ref
-(** Should profiling be enabled? *)
-
-val optimization_fuel : int ref
 
 val ascii : bool ref
 (** Should we use ASCII instead of Unicode for printing out types? *)
@@ -35,9 +27,17 @@ val verbosity : int ref
     - 3 errors, check, and warnings
     - 4 errors, check, warnings, and debug messages *)
 
-val pure_print : bool ref
-(** Should we use pure printing for computations? *)
-
 val output_formatter : Format.formatter ref
 
 val error_formatter : Format.formatter ref
+
+val disable_optimization : bool ref
+(** Should compiled computations be optimized? *)
+
+val profiling : bool ref
+(** Should profiling be enabled? *)
+
+val optimization_fuel : int ref
+
+val pure_print : bool ref
+(** Should we use pure printing for computations? *)

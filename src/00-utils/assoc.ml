@@ -3,13 +3,6 @@ type ('key, 'value) t = ('key * 'value) list
 
 let empty = []
 
-let is_empty = function [] -> true | _ :: _ -> false
-
-(* View from the left *)
-let is_cons (xs : ('key, 'value) t) :
-    (('key * 'value) * ('key, 'value) t) option =
-  match xs with [] -> None | x :: xs -> Some (x, xs)
-
 (* Finding elements. *)
 let rec lookup x = function
   | [] -> None

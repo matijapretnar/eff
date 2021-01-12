@@ -148,7 +148,7 @@ let rec print_term ?max_level t ppf =
         (print_term t)
   | NMatch (t, _, lst, _) ->
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_term t)
-        (Print.cases print_abstraction lst)
+        (Print.sequence "@, | "  print_abstraction lst)
   | NOp (eff, t) -> print "Op %t %t" (print_effect eff) (print_term t)
   | NRecord recs -> Print.record CoreTypes.Field.print print_term recs ppf
   | NVariant (l, Some t) ->
