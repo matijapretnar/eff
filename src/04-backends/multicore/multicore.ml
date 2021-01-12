@@ -2,11 +2,7 @@
 
 open Utils
 
-module type BackendParameters = sig
-  val output_file : string
-end
-
-module Backend (P : BackendParameters) : Language.BackendSignature.T = struct
+module Backend : Language.BackendSignature.T = struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 
@@ -57,10 +53,9 @@ module Backend (P : BackendParameters) : Language.BackendSignature.T = struct
     update state (TyDef tydefs')
 
   let finalize state =
-    let channel = open_out P.output_file in
-    let output_ppf = Format.formatter_of_out_channel channel in
-    List.iter (fun cmd -> Syntax.print_cmd cmd output_ppf) state.prog;
-    close_out channel
+    List.iter
+      (fun cmd -> Syntax.print_cmd cmd !Config.output_formatter)
+      state.prog
 end
 
 let stdlib = Stdlib_eff.source

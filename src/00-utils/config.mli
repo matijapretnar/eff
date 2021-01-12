@@ -6,7 +6,7 @@ val version : string
 val use_stdlib : bool ref
 (** Should we load the standard library? *)
 
-type backend = Runtime | Multicore of string
+type backend = Runtime | Multicore
 
 val backend : backend ref
 

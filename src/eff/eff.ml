@@ -24,8 +24,9 @@ let options =
         Arg.Unit (fun () -> Config.wrapper := None),
         " Do not use a command-line wrapper" );
       ( "--compile-multicore-ocaml",
-        Arg.String (fun filename -> Config.backend := Multicore filename),
-        "<file> Compile the Eff code into a Multicore OCaml file <file>" );
+        Arg.Unit (fun () -> Config.backend := Multicore),
+        " Compile the Eff code into a Multicore OCaml (sent to standard output)"
+      );
       ("--ascii", Arg.Set Config.ascii, " Use ASCII output");
       ( "-v",
         Arg.Unit
@@ -131,10 +132,7 @@ let main =
     let (module Backend : Language.BackendSignature.T) =
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
-      | Config.Multicore output_file ->
-          (module Multicore.Backend (struct
-            let output_file = output_file
-          end))
+      | Config.Multicore -> (module Multicore.Backend)
     in
     let (module Shell) =
       (module Loader.Shell.Make (Backend) : Loader.Shell.Shell)
@@ -151,7 +149,7 @@ let main =
         let stdlib =
           match !Config.backend with
           | Config.Runtime -> Loader.Stdlib_eff.source
-          | Config.Multicore _ -> Multicore.stdlib
+          | Config.Multicore -> Multicore.stdlib
         in
         Shell.load_source stdlib state
       else state
