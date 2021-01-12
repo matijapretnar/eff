@@ -79,7 +79,7 @@ let rec ceval state c =
       ceval state c
   | Typed.Call (_, _, _) -> assert false
   | Typed.Op (_, _) -> assert false
-  | Typed.Bind (_, _) -> assert false
+  | Typed.Bind (c1, (p, c2)) -> eval_let state [ (p, c1) ] c2
   | Typed.CastComp (c, _) | Typed.CastComp_ty (c, _) | Typed.CastComp_dirt (c, _)
     ->
       ceval state c
