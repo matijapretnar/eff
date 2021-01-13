@@ -77,7 +77,9 @@ let rec ceval state c =
       in
       let state = extend_let_rec state stripped in
       ceval state c
-  | Typed.Call (_, _, _) -> assert false
+  | Typed.Call ((eff, _), e, a) ->
+      let e' = veval state e in
+      V.Call (eff, e', eval_closure state a)
   | Typed.Op ((eff, _), e) ->
       let e' = veval state e in
       V.Call (eff, e', fun r -> V.Value r)
