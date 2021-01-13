@@ -7,7 +7,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./application_red.eff")))))
+       (run eff --no-stdlib --no-header --compile-plain-ocaml "./application_red.eff")))))
 
 (rule
  (alias runtest)
@@ -23,7 +23,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./handle_match.eff")))))
+       (run eff --no-stdlib --no-header --compile-plain-ocaml "./handle_match.eff")))))
 
 (rule
  (alias runtest)
@@ -39,7 +39,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./handle_rec.eff")))))
+       (run eff --no-stdlib --no-header --compile-plain-ocaml "./handle_rec.eff")))))
 
 (rule
  (alias runtest)
@@ -55,7 +55,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./handler_beta_reduction.eff")))))
+       (run eff --no-stdlib --no-header --compile-plain-ocaml "./handler_beta_reduction.eff")))))
 
 (rule
  (alias runtest)
@@ -71,7 +71,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./is_relatively_pure.eff")))))
+       (run eff --no-stdlib --no-header --compile-plain-ocaml "./is_relatively_pure.eff")))))
 
 (rule
  (alias runtest)
@@ -87,7 +87,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./let_list_to_bind.eff")))))
+       (run eff --no-stdlib --no-header --compile-plain-ocaml "./let_list_to_bind.eff")))))
 
 (rule
  (alias runtest)
@@ -103,7 +103,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./match_red.eff")))))
+       (run eff --no-stdlib --no-header --compile-plain-ocaml "./match_red.eff")))))
 
 (rule
  (alias runtest)
@@ -119,7 +119,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./not-found.eff")))))
+       (run eff --no-stdlib --no-header --compile-plain-ocaml "./not-found.eff")))))
 
 (rule
  (alias runtest)
@@ -135,7 +135,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./one_input.eff")))))
+       (run eff --no-stdlib --no-header --compile-plain-ocaml "./one_input.eff")))))
 
 (rule
  (alias runtest)
@@ -151,7 +151,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./substitution.eff")))))
+       (run eff --no-stdlib --no-header --compile-plain-ocaml "./substitution.eff")))))
 
 (rule
  (alias runtest)
@@ -167,7 +167,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./test-handle_effect_skip.eff")))))
+       (run eff --no-stdlib --no-header --compile-plain-ocaml "./test-handle_effect_skip.eff")))))
 
 (rule
  (alias runtest)
@@ -183,7 +183,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./two_inputs.eff")))))
+       (run eff --no-stdlib --no-header --compile-plain-ocaml "./two_inputs.eff")))))
 
 (rule
  (alias runtest)

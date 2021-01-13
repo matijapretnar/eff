@@ -173,7 +173,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = struct
     }
 
   let finalize state =
-    Format.fprintf !Config.output_formatter "%s" OcamlHeader_ml.source;
+    (if !Config.include_header then
+      Format.fprintf !Config.output_formatter "%s" OcamlHeader_ml.source);
     List.iter
       (fun cmd ->
         Format.fprintf !Config.output_formatter "%t\n"

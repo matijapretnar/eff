@@ -37,6 +37,9 @@ let options =
       ( "--no-opts",
         Arg.Set Config.disable_optimization,
         " Disable optimizations" );
+      ( "--no-header",
+        Arg.Clear Config.include_header,
+        " Do not include the header in generated files" );
       ("--ascii", Arg.Set Config.ascii, " Use ASCII output");
       ( "-v",
         Arg.Unit

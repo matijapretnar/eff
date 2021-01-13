@@ -7,7 +7,8 @@
  (action
   (with-stdout-to
    %{targets}
-   (run ../../generate_dune_rules.exe 0 "--no-stdlib --compile-plain-ocaml"))))
+   (run ../../generate_dune_rules.exe 0
+     "--no-stdlib --no-header --compile-plain-ocaml"))))
 
 (rule
  (alias generate_tests)
