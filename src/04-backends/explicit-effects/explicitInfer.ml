@@ -526,7 +526,7 @@ and inferCheckLocatedClosedPatAlts st alts =
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 (* ************************************************************************* *)
-let tcUntypedVarPat (lclCtxt : TypingEnv.t) :
+let rec tcUntypedVarPat (lclCtxt : TypingEnv.t) :
     Untyped.plain_pattern ->
     Typed.pattern * Types.target_ty * TypingEnv.t * constraints = function
   | Untyped.PVar x ->
@@ -536,7 +536,15 @@ let tcUntypedVarPat (lclCtxt : TypingEnv.t) :
       let alpha, alphaSkel = Typed.fresh_ty_with_fresh_skel () in
       (Typed.PNonbinding, alpha, lclCtxt, [ alphaSkel ])
   | Untyped.PConst c -> (Typed.PConst c, Types.type_const c, lclCtxt, [])
-  | Untyped.PTuple [] -> (Typed.PTuple [], Types.Tuple [], lclCtxt, [])
+  | Untyped.PTuple ps ->
+      let fold p (ps', tys, lclCtxt, cnstrs) =
+        let p', ty, lclCtxt', cnstrs' = tcUntypedVarPat lclCtxt p.it in
+        (p' :: ps', ty :: tys, lclCtxt', cnstrs' @ cnstrs)
+      in
+      let ps', tys', lclCtxt', cnstrs =
+        List.fold_right fold ps ([], [], lclCtxt, [])
+      in
+      (Typed.PTuple ps', Types.Tuple tys', lclCtxt', cnstrs)
   (* GEORGE: TODO: Unhandled cases *)
   | _other_pattern ->
       failwith
