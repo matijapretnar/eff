@@ -1261,8 +1261,13 @@ let mkGeneralizedTerm
     (exp : Typed.expression)
   : Typed.expression =
 *)
-  failwith __LOC__
+  (* Filip: Quick and dirty to make it work *)
+  let outExpr =
+    Typed.LetRec ([ (var, trgPatTy, (tyA1, dirtD1), (trgPat, c1'')) ], trgC1)
+  in
+  (outExpr, Types.Arrow (trgPatTy, (tyA1, dirtD1)))
 
+(* failwith __LOC__ *)
 (* GEORGE TODO: Decide what do we return *)
 
 (* ************************************************************************* *)
@@ -1400,6 +1405,8 @@ let addExternal ctx x ty =
     gblCtxt =
       TypingEnv.update ctx.gblCtxt x (Types.source_to_target ctx.tctx_st ty);
   }
+
+let add_type ctx x ty = { ctx with gblCtxt = TypingEnv.update ctx.gblCtxt x ty }
 
 let add_type_definitions state tydefs =
   {
