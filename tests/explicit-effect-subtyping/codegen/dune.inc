@@ -6,7 +6,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --no-stdlib --compile-plain-ocaml "./application_red.eff")))))
 
 (rule
@@ -22,7 +22,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --no-stdlib --compile-plain-ocaml "./handle_match.eff")))))
 
 (rule
@@ -38,7 +38,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --no-stdlib --compile-plain-ocaml "./handle_rec.eff")))))
 
 (rule
@@ -54,7 +54,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --no-stdlib --compile-plain-ocaml "./handler_beta_reduction.eff")))))
 
 (rule
@@ -70,7 +70,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --no-stdlib --compile-plain-ocaml "./is_relatively_pure.eff")))))
 
 (rule
@@ -86,7 +86,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --no-stdlib --compile-plain-ocaml "./let_list_to_bind.eff")))))
 
 (rule
@@ -102,7 +102,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --no-stdlib --compile-plain-ocaml "./match_red.eff")))))
 
 (rule
@@ -118,7 +118,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --no-stdlib --compile-plain-ocaml "./not-found.eff")))))
 
 (rule
@@ -134,7 +134,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --no-stdlib --compile-plain-ocaml "./one_input.eff")))))
 
 (rule
@@ -150,7 +150,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --no-stdlib --compile-plain-ocaml "./substitution.eff")))))
 
 (rule
@@ -166,7 +166,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --no-stdlib --compile-plain-ocaml "./test-handle_effect_skip.eff")))))
 
 (rule
@@ -182,7 +182,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --no-stdlib --compile-plain-ocaml "./two_inputs.eff")))))
 
 (rule

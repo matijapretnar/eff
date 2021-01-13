@@ -6,7 +6,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       2
+       (or 2 0 1 2)
        (run eff --explicit-effects "./test3.eff")))))
 
 (rule

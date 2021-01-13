@@ -6,7 +6,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test1.eff")))))
 
 (rule
@@ -22,7 +22,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test10.eff")))))
 
 (rule
@@ -38,7 +38,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test11.eff")))))
 
 (rule
@@ -54,7 +54,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test12.eff")))))
 
 (rule
@@ -70,7 +70,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test13.eff")))))
 
 (rule
@@ -86,7 +86,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test14.eff")))))
 
 (rule
@@ -102,7 +102,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test15.eff")))))
 
 (rule
@@ -118,7 +118,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test16.eff")))))
 
 (rule
@@ -134,7 +134,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test17.eff")))))
 
 (rule
@@ -150,7 +150,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test18.eff")))))
 
 (rule
@@ -166,7 +166,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test19.eff")))))
 
 (rule
@@ -182,7 +182,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test2.eff")))))
 
 (rule
@@ -198,7 +198,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test4.eff")))))
 
 (rule
@@ -214,7 +214,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test5.eff")))))
 
 (rule
@@ -230,7 +230,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test6.eff")))))
 
 (rule
@@ -246,7 +246,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test7.eff")))))
 
 (rule
@@ -262,7 +262,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test8.eff")))))
 
 (rule
@@ -278,7 +278,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff --explicit-effects "./test9.eff")))))
 
 (rule

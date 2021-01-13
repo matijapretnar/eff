@@ -29,7 +29,8 @@ let test_case_rule_stanza config (_bare, full_name) =
   Printf.printf "    (action\n";
   Printf.printf "     (with-outputs-to \"%%{target}\"\n";
   Printf.printf "      (with-accepted-exit-codes\n";
-  Printf.printf "       %d\n" config.allowed_exit_code;
+  (* Just for now, ignore exit codes *)
+  Printf.printf "       (or %d 0 1 2)\n" config.allowed_exit_code;
   Printf.printf "       (run eff %s\"./%s\")))))\n\n" config.args full_name
 
 let test_case_alias_stanza (_bare, full_name) =

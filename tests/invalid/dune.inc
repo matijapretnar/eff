@@ -6,7 +6,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./duplicate_field_tydef_record.eff")))))
 
 (rule
@@ -22,7 +22,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./duplicate_let.eff")))))
 
 (rule
@@ -38,7 +38,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./duplicate_let_toplevel.eff")))))
 
 (rule
@@ -54,7 +54,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./duplicate_operation_tydef_effect.eff")))))
 
 (rule
@@ -70,7 +70,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./duplicate_variant_tydef_sum.eff")))))
 
 (rule
@@ -86,7 +86,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./less_than_complex.eff")))))
 
 (rule
@@ -102,7 +102,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./less_than_function.eff")))))
 
 (rule
@@ -118,7 +118,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./less_than_handler.eff")))))
 
 (rule
@@ -134,7 +134,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./malformed_type_application.eff")))))
 
 (rule
@@ -150,7 +150,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./non_linear_pattern.eff")))))
 
 (rule
@@ -166,7 +166,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./non_linear_record.eff")))))
 
 (rule
@@ -182,7 +182,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./occurs_check.eff")))))
 
 (rule
@@ -198,7 +198,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./polymorphism_id_id.eff")))))
 
 (rule
@@ -214,7 +214,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./shadow_eff.eff")))))
 
 (rule
@@ -230,7 +230,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./shadow_field.eff")))))
 
 (rule
@@ -246,7 +246,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./shadow_label.eff")))))
 
 (rule
@@ -262,7 +262,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./shadow_type.eff")))))
 
 (rule
@@ -278,7 +278,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       1
+       (or 1 0 1 2)
        (run eff "./use_undefined_type.eff")))))
 
 (rule

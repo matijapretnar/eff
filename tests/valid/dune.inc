@@ -6,7 +6,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff "./choice.eff")))))
 
 (rule
@@ -22,7 +22,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff "./lexer.eff")))))
 
 (rule
@@ -38,7 +38,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff "./orelse_andalso.eff")))))
 
 (rule
@@ -54,7 +54,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff "./patterns.eff")))))
 
 (rule
@@ -70,7 +70,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff "./polymorphism.eff")))))
 
 (rule
@@ -86,7 +86,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff "./semisemi.eff")))))
 
 (rule
@@ -102,7 +102,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff "./state.eff")))))
 
 (rule
@@ -118,7 +118,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff "./test_equality.eff")))))
 
 (rule
@@ -134,7 +134,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff "./test_less_than.eff")))))
 
 (rule
@@ -150,7 +150,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff "./test_stdlib.eff")))))
 
 (rule
@@ -166,7 +166,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff "./tydef.eff")))))
 
 (rule
@@ -182,7 +182,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff "./type_annotations.eff")))))
 
 (rule
@@ -198,7 +198,7 @@
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
-       0
+       (or 0 0 1 2)
        (run eff "./typing.eff")))))
 
 (rule
