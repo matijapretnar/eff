@@ -1,6 +1,7 @@
 open Utils
 open Language
 module V = Value
+open Language.Const
 
 let from_bool b = V.Const (Const.of_boolean b)
 
@@ -128,7 +129,7 @@ let equal v1 v2 =
 
 let less_than v1 v2 =
   match compare v1 v2 with
-  | Less -> true
+  | Const.Less -> true
   | Greater | Equal -> false
   | Invalid -> Error.runtime "invalid comparison with <"
 

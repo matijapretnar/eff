@@ -1,7 +1,9 @@
 open Utils
+module CoreTypes = Language.CoreTypes
+
+module Const = Language.Const
 (** Syntax of the core language. *)
 
-open Types
 module EffectMap = Map.Make (CoreTypes.Effect)
 
 let add_to_constraints con constraints = con :: constraints
@@ -19,7 +21,7 @@ type pattern =
   | PTuple of pattern list
   | PRecord of (CoreTypes.Field.t, pattern) Assoc.t
   | PVariant of CoreTypes.Label.t * pattern
-  | PConst of Const.t
+  | PConst of Language.Const.t
   | PNonbinding
 
 let rec pattern_vars = function
@@ -41,15 +43,15 @@ type ty_coercion =
   | TupleCoercion of ty_coercion list
   | LeftArrow of ty_coercion
   | PureCoercion of dirty_coercion
-  | QualTyCoer of ct_ty * ty_coercion
-  | QualDirtCoer of ct_dirt * ty_coercion
+  | QualTyCoer of Types.ct_ty * ty_coercion
+  | QualDirtCoer of Types.ct_dirt * ty_coercion
   | ApplyQualTyCoer of ty_coercion * ty_coercion
   | ApplyQualDirtCoer of ty_coercion * dirt_coercion
 
 and dirt_coercion =
-  | ReflDirt of dirt
+  | ReflDirt of Types.dirt
   | DirtCoercionVar of Types.DirtCoercionParam.t
-  | Empty of dirt
+  | Empty of Types.dirt
   | UnionDirt of (Types.effect_set * dirt_coercion)
   | SequenceDirtCoer of dirt_coercion * dirt_coercion
   | DirtCoercion of dirty_coercion
@@ -64,7 +66,7 @@ and dirty_coercion =
 (** Pure expressions *)
 type expression =
   | Var of variable
-  | Const of Const.t
+  | Const of Language.Const.t
   | Tuple of expression list
   | Record of (CoreTypes.Field.t, expression) Assoc.t
   | Variant of CoreTypes.Label.t * expression
@@ -127,8 +129,8 @@ type omega_ct =
   | DirtOmega of (Types.DirtCoercionParam.t * Types.ct_dirt)
   | DirtyOmega of
       ((Types.TyCoercionParam.t * Types.DirtCoercionParam.t) * Types.ct_dirty)
-  | SkelEq of skeleton * skeleton
-  | TyParamHasSkel of (CoreTypes.TyParam.t * skeleton)
+  | SkelEq of Types.skeleton * Types.skeleton
+  | TyParamHasSkel of (CoreTypes.TyParam.t * Types.skeleton)
 
 type toplevel = plain_toplevel * Location.t
 
@@ -151,7 +153,7 @@ and plain_toplevel =
 module TyCoercionParamSet = Set.Make (Types.TyCoercionParam)
 module DirtCoercionParamSet = Set.Make (Types.DirtCoercionParam)
 
-let rec tyCoVarsOfExpression : expression -> TyCoercionParamSet.t = function
+let tyCoVarsOfExpression : expression -> TyCoercionParamSet.t = function
   (*
 type expression =
   | Var of variable
@@ -497,7 +499,7 @@ and print_top_let_abstraction (p, c) ppf =
 
 and print_let_rec_abstraction (f, arg_ty, res_ty, abs) ppf =
   Format.fprintf ppf "(%t : %t) %t" (print_variable f)
-    (print_target_ty (Types.Arrow (arg_ty, res_ty)))
+    (Types.print_target_ty (Types.Arrow (arg_ty, res_ty)))
     (print_let_abstraction abs)
 
 let backup_location loc locs =
@@ -906,31 +908,31 @@ let cast_computation c dirty1 dirty2 =
 (* ************************************************************************* *)
 
 (* Compute the free type variables of a constraint *)
-let ftvsOfOmegaCt : omega_ct -> TyParamSet.t = function
-  | TyOmega (_, ct) -> ftvsOfValTyCt ct
-  | DirtOmega (_, _) -> TyParamSet.empty
+let ftvsOfOmegaCt : omega_ct -> Types.TyParamSet.t = function
+  | TyOmega (_, ct) -> Types.ftvsOfValTyCt ct
+  | DirtOmega (_, _) -> Types.TyParamSet.empty
   | DirtyOmega ((_, _), ct) ->
-      ftvsOfCmpTyCt ct (* GEORGE: Is anyone using "DirtyOmega"? *)
-  | SkelEq (_, _) -> TyParamSet.empty
-  | TyParamHasSkel (a, _) -> TyParamSet.singleton a
+      Types.ftvsOfCmpTyCt ct (* GEORGE: Is anyone using "DirtyOmega"? *)
+  | SkelEq (_, _) -> Types.TyParamSet.empty
+  | TyParamHasSkel (a, _) -> Types.TyParamSet.singleton a
 
 (* GEORGE: This is up to debate *)
 
 (* Compute the free dirt variables of a constraint *)
-let fdvsOfOmegaCt : omega_ct -> DirtParamSet.t = function
-  | TyOmega (_, ct) -> fdvsOfValTyCt ct
-  | DirtOmega (_, ct) -> fdvsOfDirtCt ct
+let fdvsOfOmegaCt : omega_ct -> Types.DirtParamSet.t = function
+  | TyOmega (_, ct) -> Types.fdvsOfValTyCt ct
+  | DirtOmega (_, ct) -> Types.fdvsOfDirtCt ct
   | DirtyOmega ((_, _), ct) ->
-      fdvsOfCmpTyCt ct (* GEORGE: Is anyone using "DirtyOmega"? *)
-  | SkelEq (_, _) -> DirtParamSet.empty
-  | TyParamHasSkel (_, _) -> DirtParamSet.empty
+      Types.fdvsOfCmpTyCt ct (* GEORGE: Is anyone using "DirtyOmega"? *)
+  | SkelEq (_, _) -> Types.DirtParamSet.empty
+  | TyParamHasSkel (_, _) -> Types.DirtParamSet.empty
 
 (* ************************************************************************* *)
 
 (* free dirt variables in target terms *)
 
 let rec free_dirt_vars_ty_coercion = function
-  | ReflTy ty -> fdvsOfTargetValTy ty
+  | ReflTy ty -> Types.fdvsOfTargetValTy ty
   | ArrowCoercion (tc, dc) ->
       Types.DirtParamSet.union
         (free_dirt_vars_ty_coercion tc)
@@ -939,7 +941,7 @@ let rec free_dirt_vars_ty_coercion = function
       Types.DirtParamSet.union
         (free_dirt_vars_dirty_coercion dc1)
         (free_dirt_vars_dirty_coercion dc2)
-  | TyCoercionVar tcp -> DirtParamSet.empty
+  | TyCoercionVar tcp -> Types.DirtParamSet.empty
   | SequenceTyCoer (tc1, tc2) ->
       Types.DirtParamSet.union
         (free_dirt_vars_ty_coercion tc1)
@@ -963,9 +965,9 @@ let rec free_dirt_vars_ty_coercion = function
         (free_dirt_vars_dirt_coercion dc)
 
 and free_dirt_vars_dirt_coercion = function
-  | ReflDirt d -> fdvsOfDirt d
+  | ReflDirt d -> Types.fdvsOfDirt d
   | DirtCoercionVar dcv -> Types.DirtParamSet.empty
-  | Empty d -> fdvsOfDirt d
+  | Empty d -> Types.fdvsOfDirt d
   | UnionDirt (_, dc) -> free_dirt_vars_dirt_coercion dc
   | SequenceDirtCoer (dc1, dc2) ->
       Types.DirtParamSet.union
@@ -988,16 +990,17 @@ and free_dirt_vars_dirty_coercion = function
 
 let rec free_dirt_vars_expression e =
   match e with
-  | Var _ -> DirtParamSet.empty
-  | Const _ -> DirtParamSet.empty
+  | Var _ -> Types.DirtParamSet.empty
+  | Const _ -> Types.DirtParamSet.empty
   | Tuple es ->
       List.fold_left
-        (fun free e -> DirtParamSet.union free (free_dirt_vars_expression e))
-        DirtParamSet.empty es
+        (fun free e ->
+          Types.DirtParamSet.union free (free_dirt_vars_expression e))
+        Types.DirtParamSet.empty es
   | Record _ -> failwith __LOC__
   | Variant (_, e) -> free_dirt_vars_expression e
   | Lambda abs -> free_dirt_vars_abstraction_with_ty abs
-  | Effect _ -> DirtParamSet.empty
+  | Effect _ -> Types.DirtParamSet.empty
   | Handler h -> free_dirt_vars_abstraction_with_ty h.value_clause
   | CastExp (e, tc) ->
       Types.DirtParamSet.union
@@ -1023,17 +1026,18 @@ and free_dirt_vars_computation c =
         (free_dirt_vars_abstraction_with_ty abs)
   | LetRec ([ (f, argTy, resTy, abs) ], c) ->
       Types.DirtParamSet.union
-        (Types.DirtParamSet.union (fdvsOfTargetValTy argTy)
-           (fdvsOfTargetCmpTy resTy))
+        (Types.DirtParamSet.union
+           (Types.fdvsOfTargetValTy argTy)
+           (Types.fdvsOfTargetCmpTy resTy))
         (free_dirt_vars_abstraction abs)
       |> Types.DirtParamSet.union (free_dirt_vars_computation c)
   | Match (e, resTy, cases) ->
       List.fold_left
         (fun free case ->
-          DirtParamSet.union free (free_dirt_vars_abstraction case))
-        (DirtParamSet.union
+          Types.DirtParamSet.union free (free_dirt_vars_abstraction case))
+        (Types.DirtParamSet.union
            (free_dirt_vars_expression e)
-           (fdvsOfTargetCmpTy resTy))
+           (Types.fdvsOfTargetCmpTy resTy))
         cases
   | Apply (e1, e2) ->
       Types.DirtParamSet.union
@@ -1065,7 +1069,9 @@ and free_dirt_vars_computation c =
 and free_dirt_vars_abstraction (_, c) = free_dirt_vars_computation c
 
 and free_dirt_vars_abstraction_with_ty (_, ty, c) =
-  Types.DirtParamSet.union (fdvsOfTargetValTy ty) (free_dirt_vars_computation c)
+  Types.DirtParamSet.union
+    (Types.fdvsOfTargetValTy ty)
+    (free_dirt_vars_computation c)
 
 let rec get_skel_vars_from_constraints = function
   | [] -> []

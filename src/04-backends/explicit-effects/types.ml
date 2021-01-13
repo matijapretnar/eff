@@ -351,7 +351,7 @@ let remove_effects effect_set drt =
   { drt with effect_set = EffectSet.diff drt.effect_set effect_set }
 
 let rec free_skeleton sk =
-  let rec go = function
+  let go = function
     | SkelParam p -> [ p ]
     | SkelBasic _ -> []
     | SkelApply (_, sks) -> List.concat (List.map free_skeleton sks)
@@ -363,7 +363,7 @@ let rec free_skeleton sk =
     | [] -> []
     | [ x ] -> [ x ]
     | x :: xs ->
-        let rest = List.filter (fun y -> y <> x) xs in
+        let _rest = List.filter (fun y -> y <> x) xs in
         let others = nub xs in
         x :: others
   in
@@ -532,7 +532,7 @@ let rec source_to_target tctx_st ty =
       (* We currently support only inlined types with no arguments *)
       | Type.Inline ty -> source_to_target tctx_st ty
       (* Other cases should not be transparent *)
-      | _ -> assert false)
+      | Type.Record _ | Type.Sum _ -> assert false)
   | Type.Apply (ty_name, args) ->
       Apply (ty_name, List.map (source_to_target tctx_st) args)
   | Type.TyParam p -> TyParam p
@@ -540,7 +540,7 @@ let rec source_to_target tctx_st ty =
   | Type.Tuple l -> Tuple (List.map (source_to_target tctx_st) l)
   | Type.Arrow (ty, dirty) ->
       Arrow ((source_to_target tctx_st) ty, source_to_target_dirty tctx_st dirty)
-  | Type.Handler { value = dirty1; finally = dirty2 } ->
+  | Type.Handler { Type.value = dirty1; finally = dirty2 } ->
       Handler
         ( source_to_target_dirty tctx_st dirty1,
           source_to_target_dirty tctx_st dirty2 )

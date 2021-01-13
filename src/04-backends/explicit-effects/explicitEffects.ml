@@ -64,7 +64,6 @@ module Evaluate : Language.BackendSignature.T = struct
       | None -> Error.runtime "unknown external symbol %s." f
     in
     {
-      state with
       effect_system_state = effect_system_state';
       evaluation_state = evaluation_state';
     }

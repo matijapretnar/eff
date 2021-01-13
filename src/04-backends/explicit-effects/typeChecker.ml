@@ -1,7 +1,6 @@
 open Utils
 open Typed
 open Types
-open Unification
 
 type state = {
   var_types : (Typed.variable, Types.target_ty) Assoc.t;
@@ -60,8 +59,8 @@ let rec check_well_formed_skeleton st = function
   | _ -> failwith __LOC__
 
 let checkWellFormedDirt st = function
-  | { Types.row = Types.EmptyRow } -> ()
-  | { Types.row = Types.ParamRow v } -> assert (List.mem v st.dirt_params)
+  | { Types.row = Types.EmptyRow; _ } -> ()
+  | { Types.row = Types.ParamRow v; _ } -> assert (List.mem v st.dirt_params)
 
 let rec checkWellFormedValTyTemp st = function
   | TyParam typ ->
@@ -162,7 +161,6 @@ let rec tcValTyCoTemp st = function
           assert (cons1 = cons2 && cons2 = dirt_coer_applied_cons);
           (t1, t2)
       | _ -> assert false)
-  | _ -> failwith __LOC__
 
 (* Typecheck a value-type coercion *)
 and tcValTyCo st co =

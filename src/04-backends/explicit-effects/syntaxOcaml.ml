@@ -3,7 +3,7 @@ open Utils
 
 module CoreTypes = Language.CoreTypes
 module Const = Language.Const
-module CoreSyntax = UntypedSyntax
+module CoreSyntax = Language.UntypedSyntax
 
 type variable = CoreTypes.Variable.t
 

@@ -279,7 +279,7 @@ let apply_substitutions_to_dirt = apply_sub_dirt
 
 let apply_substitutions_to_skeleton = apply_sub_skel
 
-let rec apply_sub1 subs cons =
+let apply_sub1 subs cons =
   match cons with
   | Typed.TyOmega (coer_p, (ty1, ty2)) ->
       Typed.TyOmega (coer_p, (apply_sub_ty subs ty1, apply_sub_ty subs ty2))

@@ -97,12 +97,12 @@ let add_effect eff (ty1, ty2) st =
 
 (* ... *)
 
-let rec state_free_ty_vars st =
+let state_free_ty_vars st =
   List.fold_right
     (fun (_, ty) acc -> Types.TyParamSet.union (Types.ftvsOfTargetValTy ty) acc)
     st Types.TyParamSet.empty
 
-let rec state_free_dirt_vars st =
+let state_free_dirt_vars st =
   List.fold_right
     (fun (_, ty) acc ->
       Types.DirtParamSet.union (Types.fdvsOfTargetValTy ty) acc)

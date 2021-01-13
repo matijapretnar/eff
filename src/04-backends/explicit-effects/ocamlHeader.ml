@@ -19,7 +19,7 @@ let rec ( >> ) (c : 'a computation) (f : 'a -> 'b computation) =
   | Value x -> f x
   | Call (eff, arg, k) -> Call (eff, arg, fun y -> k y >> f)
 
-let rec handler (h : ('a, 'b) handler_clauses) : 'a computation -> 'b =
+let handler (h : ('a, 'b) handler_clauses) : 'a computation -> 'b =
   let rec handler = function
     | Value x -> h.value_clause x
     | Call (eff, arg, k) ->

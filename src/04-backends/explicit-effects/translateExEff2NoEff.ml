@@ -329,38 +329,38 @@ and coercion_elab_ty state env coer =
           let ty, _ = coercion_elab_ty state env c1 in
           let _, elab = coercion_elab_ty state env c in
           (ty, NoEff.NCoerLeftArrow elab)
-      | _ -> failwith "Ill-formed left arrow coercion"
-      | ExEff.PureCoercion c ->
-          let ((ty1, _), (ty2, _)), elabc = coer_elab_dirty state env c in
-          ((ty1, ty2), NoEff.NCoerPure elabc)
-      | ExEff.QualTyCoer ((ty1, ty2), c) ->
-          let (tyc1, tyc2), elabc = coercion_elab_ty state env c in
-          let _, ty1elab = type_elab state env ty1 in
-          let _, ty2elab = type_elab state env ty2 in
-          ( ( ExEffTypes.QualTy ((ty1, ty2), tyc1),
-              ExEffTypes.QualTy ((ty1, ty2), tyc2) ),
-            NoEff.NCoerQual ((ty1elab, ty2elab), elabc) )
-      | ExEff.QualDirtCoer (dirts, c) ->
-          let tyc, elabc = coercion_elab_ty state env c in
-          ( ( ExEffTypes.QualDirt (dirts, fst tyc),
-              ExEffTypes.QualDirt (dirts, snd tyc) ),
-            elabc )
-      | ExEff.ApplyQualTyCoer (c1, c2) -> (
-          let c2ty, c2elab = coercion_elab_ty state env c2 in
-          match c1 with
-          | ExEff.QualTyCoer (tys, ccty) ->
-              if c2ty = tys then
-                let (ty1, ty2), ccelab = coercion_elab_ty state env ccty in
-                ((ty1, ty2), NoEff.NCoerApp (ccelab, c2elab))
-              else failwith "Ill-typed coercion application"
-          | _ -> failwith "Ill-typed coercion application")
-      | ExEff.ApplyQualDirtCoer (c1, c2) -> (
-          match c1 with
-          | ExEff.QualDirtCoer (ds, ccd) ->
-              if coer_elab_dirt state env c2 = ds then
-                coercion_elab_ty state env ccd
-              else failwith "Ill-typed coercion application"
-          | _ -> failwith "Ill-typed coercion application"))
+      | _ -> failwith "Ill-formed left arrow coercion")
+  | ExEff.PureCoercion c ->
+      let ((ty1, _), (ty2, _)), elabc = coer_elab_dirty state env c in
+      ((ty1, ty2), NoEff.NCoerPure elabc)
+  | ExEff.QualTyCoer ((ty1, ty2), c) ->
+      let (tyc1, tyc2), elabc = coercion_elab_ty state env c in
+      let _, ty1elab = type_elab state env ty1 in
+      let _, ty2elab = type_elab state env ty2 in
+      ( ( ExEffTypes.QualTy ((ty1, ty2), tyc1),
+          ExEffTypes.QualTy ((ty1, ty2), tyc2) ),
+        NoEff.NCoerQual ((ty1elab, ty2elab), elabc) )
+  | ExEff.QualDirtCoer (dirts, c) ->
+      let tyc, elabc = coercion_elab_ty state env c in
+      ( ( ExEffTypes.QualDirt (dirts, fst tyc),
+          ExEffTypes.QualDirt (dirts, snd tyc) ),
+        elabc )
+  | ExEff.ApplyQualTyCoer (c1, c2) -> (
+      let c2ty, c2elab = coercion_elab_ty state env c2 in
+      match c1 with
+      | ExEff.QualTyCoer (tys, ccty) ->
+          if c2ty = tys then
+            let (ty1, ty2), ccelab = coercion_elab_ty state env ccty in
+            ((ty1, ty2), NoEff.NCoerApp (ccelab, c2elab))
+          else failwith "Ill-typed coercion application"
+      | _ -> failwith "Ill-typed coercion application")
+  | ExEff.ApplyQualDirtCoer (c1, c2) -> (
+      match c1 with
+      | ExEff.QualDirtCoer (ds, ccd) ->
+          if coer_elab_dirt state env c2 = ds then
+            coercion_elab_ty state env ccd
+          else failwith "Ill-typed coercion application"
+      | _ -> failwith "Ill-typed coercion application")
 
 and coer_elab_dirty state env (coer : ExEff.dirty_coercion) =
   match coer with
