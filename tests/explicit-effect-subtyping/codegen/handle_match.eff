@@ -5,5 +5,5 @@ handle
     | [_;y] -> y
     | x :: _ -> x
 with
-| val x -> x + 10
+| x -> x + 10
 ;;

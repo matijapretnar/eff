@@ -1,13 +1,13 @@
 effect Decide : unit -> bool
 
 let choose_all = handler
-  | #Decide () k -> k true @ k false
-  | val x -> [x]
+  | effect (Decide ()) k -> k true @ k false
+  | x -> [x]
 
 ;;
 
 let decide_func1 x y =
-    (if #Decide () then x else y) in
+    (if perform (Decide ()) then x else y) in
 with choose_all handle (decide_func1 10 20 )
 
 
