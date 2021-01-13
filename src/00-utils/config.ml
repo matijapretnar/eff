@@ -20,7 +20,7 @@ let output_formatter = ref Format.std_formatter
 
 let error_formatter = ref Format.err_formatter
 
-let disable_optimization = ref false
+let enable_optimization = ref true
 
 let profiling = ref false
 

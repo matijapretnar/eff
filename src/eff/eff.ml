@@ -35,7 +35,7 @@ let options =
         " Compile the Eff code into plain OCaml (sent to standard output)" );
       ("--profile", Arg.Set Config.profiling, " Print out profiling information");
       ( "--no-opts",
-        Arg.Set Config.disable_optimization,
+        Arg.Clear Config.enable_optimization,
         " Disable optimizations" );
       ( "--no-header",
         Arg.Clear Config.include_header,

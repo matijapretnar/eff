@@ -113,8 +113,9 @@ module CompileToPlainOCaml : Language.BackendSignature.T = struct
         state.effect_system_state c
     in
     let c'' =
-      if !Config.disable_optimization then c'
-      else Optimizer.optimize_main_comp state.typechecker_state c'
+      if !Config.enable_optimization then
+        Optimizer.optimize_main_comp state.typechecker_state c'
+      else c'
     in
     let _, c''' =
       TranslateExEff2NoEff.comp_elab state.effect_system_state
@@ -173,8 +174,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = struct
     }
 
   let finalize state =
-    (if !Config.include_header then
-      Format.fprintf !Config.output_formatter "%s" OcamlHeader_ml.source);
+    if !Config.include_header then
+      Format.fprintf !Config.output_formatter "%s" OcamlHeader_ml.source;
     List.iter
       (fun cmd ->
         Format.fprintf !Config.output_formatter "%t\n"

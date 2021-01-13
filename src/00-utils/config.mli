@@ -31,7 +31,7 @@ val output_formatter : Format.formatter ref
 
 val error_formatter : Format.formatter ref
 
-val disable_optimization : bool ref
+val enable_optimization : bool ref
 (** Should compiled computations be optimized? *)
 
 val profiling : bool ref
