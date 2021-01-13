@@ -1262,9 +1262,7 @@ let mkGeneralizedTerm
   : Typed.expression =
 *)
   (* Filip: Quick and dirty to make it work *)
-  let outExpr =
-    Typed.LetRec ([ (var, trgPatTy, (tyA1, dirtD1), (trgPat, c1'')) ], trgC1)
-  in
+  let outExpr = ([ (var, trgPatTy, (tyA1, dirtD1), (trgPat, c1'')) ], trgC1) in
   (outExpr, Types.Arrow (trgPatTy, (tyA1, dirtD1)))
 
 (* failwith __LOC__ *)
