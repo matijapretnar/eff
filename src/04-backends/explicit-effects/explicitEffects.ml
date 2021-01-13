@@ -50,9 +50,20 @@ module Evaluate : Language.BackendSignature.T = struct
     Print.debug "ignoring top let binding";
     state
 
-  let process_top_let_rec state _ _ =
-    Print.debug "ignoring top let rec binding";
-    state
+  let process_top_let_rec state defs _vars =
+    let [ (v, (p, c)) ] = Assoc.to_list defs in
+    let (Typed.LetRec ([ (v, _, _, a) ], cmp) as out_cmp), out_ty =
+      ExplicitInfer.tcTopLetRec state.effect_system_state v p c
+    in
+    let state' =
+      {
+        effect_system_state =
+          ExplicitInfer.add_type state.effect_system_state v out_ty;
+        evaluation_state =
+          Eval.extend_let_rec state.evaluation_state (Assoc.of_list [ (v, a) ]);
+      }
+    in
+    state'
 
   let process_external state (x, ty, f) =
     let effect_system_state' =

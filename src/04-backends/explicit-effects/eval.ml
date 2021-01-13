@@ -78,7 +78,9 @@ let rec ceval state c =
       let state = extend_let_rec state stripped in
       ceval state c
   | Typed.Call (_, _, _) -> assert false
-  | Typed.Op (_, _) -> assert false
+  | Typed.Op ((eff, _), e) ->
+      let e' = veval state e in
+      V.Call (eff, e', fun r -> V.Value r)
   | Typed.Bind (c1, (p, c2)) -> eval_let state [ (p, c1) ] c2
   | Typed.CastComp (c, _) | Typed.CastComp_ty (c, _) | Typed.CastComp_dirt (c, _)
     ->
@@ -121,11 +123,11 @@ and veval state e =
       V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | Typed.Handler h -> V.Handler (eval_handler state h)
   | Typed.CastExp (e, _coercion) -> veval state e
-  | Typed.LambdaTyCoerVar (_, _, _)
-  | Typed.LambdaDirtCoerVar (_, _, _)
-  | Typed.ApplyTyCoercion (_, _)
-  | Typed.ApplyDirtCoercion (_, _) ->
-      assert false
+  | Typed.LambdaTyCoerVar (_, _, e)
+  | Typed.LambdaDirtCoerVar (_, _, e)
+  | Typed.ApplyTyCoercion (e, _)
+  | Typed.ApplyDirtCoercion (e, _) ->
+      veval state e
 
 and eval_handler state
     { Typed.effect_clauses = ops; Typed.value_clause = value } =
