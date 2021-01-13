@@ -10,6 +10,6 @@
    (run ../generate_dune_rules.exe 1))))
 
 (rule
- (alias depend)
+ (alias generate_tests)
  (action
   (diff dune.inc dune.gen)))

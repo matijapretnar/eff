@@ -11,12 +11,12 @@ clean:
 	dune clean
 
 .PHONY: test
-test: depend
+test: generate_tests
 	dune runtest
 
-.PHONY: depend 
-depend: 
-	@ dune build @depend --auto-promote || true
+.PHONY: generate_tests 
+generate_tests: 
+	@ dune build @generate_tests --auto-promote || true
 
 install: release
 	dune install
