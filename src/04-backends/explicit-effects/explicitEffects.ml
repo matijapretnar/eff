@@ -151,9 +151,13 @@ module CompileToPlainOCaml : Language.BackendSignature.T = struct
     let effect_system_state' =
       ExplicitInfer.addExternal state.effect_system_state x ty
     in
+    let typechecker_state' =
+      TypeChecker.addExternal state.typechecker_state x
+        (Types.source_to_target effect_system_state'.tctx_st ty)
+    in
     {
-      state with
       effect_system_state = effect_system_state';
+      typechecker_state = typechecker_state';
       prog = SyntaxOcaml.External (x, process_type state ty, name) :: state.prog;
     }
 

@@ -1,4 +1,7 @@
 effect Eff : unit -> unit
+external ( - ) : int -> int -> int = "-"
+external ( * ) : int -> int -> int = "*"
+external ( = ) : int -> int -> bool = "="
 
 ;;
 
