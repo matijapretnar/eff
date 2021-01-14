@@ -148,15 +148,17 @@ and print_lambda_list ?max_level ls ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ls with
   | [] -> print ""
-  | l :: rest -> print "(%t);" (print_expression l)
+  | l :: rest ->
+      print "(%t);" (print_expression l);
+      print_lambda_list rest ppf
 
 and print_letrec_cases ?max_level ls ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ls with
   | [] -> print ""
   | (v, (p, c)) :: rest ->
-      print "let rec %t = %t in %t" (print_variable v) (print_expression c)
-        (print_letrec_cases rest)
+      print "let rec %t %t = %t in %t" (print_variable v) (print_pattern p)
+        (print_expression c) (print_letrec_cases rest)
 
 and print_match_cases ?max_level ls ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
