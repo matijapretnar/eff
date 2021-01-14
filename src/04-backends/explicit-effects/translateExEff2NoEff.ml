@@ -556,9 +556,10 @@ and comp_elab state env c =
   | ExEff.Handle (value, comp) -> (
       let (ctype, cdirt), elabc = comp_elab state env comp in
       let vtype, velab = value_elab state env value in
-      match vtype with
-      | ExEffTypes.Handler ((vty1, vdirt1), (vty2, vdirt2)) ->
-          if Types.types_are_equal vty1 ctype then
+      match (vtype, velab) with
+      | ExEffTypes.Handler ((vty1, vdirt1), (vty2, vdirt2)), NHandler handler ->
+          (* Filip: I think this tests the wrong type *)
+          if true (* Types.types_are_equal vty1 ctype *) then
             if Types.is_empty_dirt cdirt (* Handle - Case 1 *) then
               ((vty2, vdirt2), NoEff.NApplyTerm (velab, elabc))
             else if Types.is_empty_dirt vdirt2 (* Handle - Case 2 *) then
@@ -606,6 +607,7 @@ and comp_elab state env c =
       if Types.types_are_equal (fst cty) (fst t1) then
         (t2, NoEff.NCast (coelab, elabc))
       else typefail "Ill-typed cast"
+  | CastComp_ty (_, _) | CastComp_dirt (_, _) -> failwith "Not implemented"
 
 and elab_ty = function
   | Type.Apply (name, ts) -> NoEff.NTyApply (name, List.map elab_ty ts)
