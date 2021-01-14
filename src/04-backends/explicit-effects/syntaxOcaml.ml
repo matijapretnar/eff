@@ -182,7 +182,8 @@ and print_command ?max_level cmd ppf =
         (CoreTypes.Effect.print eff)
         (print_type ty1) (print_type ty2)
   | External (v, t, s) ->
-      print ~at_level:2 "%t: (%t) = %s" (print_variable v) (print_type t) s
+      print ~at_level:2 "let %t: (%t) = ( %s )" (print_variable v)
+        (print_type t) s
   | TyDef defs -> print_tydefs defs ppf
 
 and print_tydefs ?max_level defs ppf =
