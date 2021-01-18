@@ -1,0 +1,3 @@
+(library
+ (name benchmark_parser)
+ (libraries utils language typechecker))

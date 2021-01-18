@@ -18,6 +18,14 @@ test: generate_tests
 generate_tests: 
 	@ dune build @generate_tests --auto-promote || true
 
+.PHONY: generate_benchmark 
+generate_benchmarks: 
+	@ dune build @generate_benchmarks --auto-promote || true
+
+.PHONY: benchmark 
+benchmark: 
+	@ dune build @benchmark --auto-promote || true
+
 install: release
 	dune install
 

@@ -1,0 +1,13 @@
+effect Fetch : unit -> int;;
+external ( - ) : int -> int -> int = "-";;
+
+let rec range n =
+	match n with
+	| 0 -> []
+	| _ -> let n1 = n - 1 
+			in (perform (Fetch ())) :: range (n1)
+
+let test n = 
+	handle ( range n ) with
+| x -> x
+| effect (Fetch _) k -> k 42

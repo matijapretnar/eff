@@ -1,0 +1,3 @@
+(library
+ (name queens)
+ (libraries utils language typechecker))

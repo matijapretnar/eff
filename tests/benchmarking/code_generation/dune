@@ -1,0 +1,42 @@
+(executable
+ (name benchmark)
+ (modules benchmark)
+ (libraries core core_bench loop queens range interp))
+
+(executable
+ (modules generate_benchmark_rules)
+ (name generate_benchmark_rules))
+
+
+(env
+ (dev
+  (flags
+   (:standard -w -a))))
+
+(rule
+ (targets dune.gen)
+ (deps
+  (source_tree .))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run ./generate_benchmark_rules.exe))))
+
+(rule
+ (alias generate_benchmarks)
+ (action
+  (diff dune.inc dune.gen)))
+
+
+(rule
+ (deps
+  (source_tree .))
+ (action
+  (with-stdout-to
+   benchmark.output
+   (run ./benchmark.exe))))
+
+(rule
+ (alias benchmark)
+ (action
+  (diff benchmark.expected benchmark.output)))
