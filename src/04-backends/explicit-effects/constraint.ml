@@ -175,94 +175,80 @@ let fresh_dirty_coer cons =
   (coer, DirtyOmega ((ty_param, dirt_param), cons))
 
 (* ************************************************************************* *)
-(*                         FREE VARIABLE COMPUTATION                         *)
+(*                        FREE PARAMETER COMPUTATION                         *)
 (* ************************************************************************* *)
 
-(* Compute the free type variables of a constraint *)
-let ftvsOfOmegaCt : omega_ct -> Type.TyParamSet.t = function
-  | TyOmega (_, ct) -> Type.ftvsOfValTyCt ct
-  | DirtOmega (_, _) -> Type.TyParamSet.empty
+let free_params_constraint = function
+  | TyOmega (_, ct) -> Type.free_params_ct_ty ct
+  | DirtOmega (_, ct) -> Type.free_params_ct_dirt ct
   | DirtyOmega ((_, _), ct) ->
-      Type.ftvsOfCmpTyCt ct (* GEORGE: Is anyone using "DirtyOmega"? *)
-  | SkelEq (_, _) -> Type.TyParamSet.empty
-  | TyParamHasSkel (a, _) -> Type.TyParamSet.singleton a
-
-(* GEORGE: This is up to debate *)
-
-(* Compute the free dirt variables of a constraint *)
-let fdvsOfOmegaCt : omega_ct -> Type.DirtParamSet.t = function
-  | TyOmega (_, ct) -> Type.fdvsOfValTyCt ct
-  | DirtOmega (_, ct) -> Type.fdvsOfDirtCt ct
-  | DirtyOmega ((_, _), ct) ->
-      Type.fdvsOfCmpTyCt ct (* GEORGE: Is anyone using "DirtyOmega"? *)
-  | SkelEq (_, _) -> Type.DirtParamSet.empty
-  | TyParamHasSkel (_, _) -> Type.DirtParamSet.empty
+      Type.free_params_ct_dirty ct (* GEORGE: Is anyone using "DirtyOmega"? *)
+  | SkelEq (_, _) -> Type.FreeParams.empty
+  | TyParamHasSkel (_, _) -> Type.FreeParams.empty
 
 (* ************************************************************************* *)
 
-(* free dirt variables in target terms *)
+(* free variables in target terms *)
 
-let rec free_dirt_vars_ty_coercion = function
-  | ReflTy ty -> Type.fdvsOfTargetValTy ty
+let rec free_params_ty_coercion = function
+  | ReflTy ty -> Type.free_params_ty ty
   | ArrowCoercion (tc, dc) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_ty_coercion tc)
-        (free_dirt_vars_dirty_coercion dc)
+      Type.FreeParams.union
+        (free_params_ty_coercion tc)
+        (free_params_dirty_coercion dc)
   | HandlerCoercion (dc1, dc2) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_dirty_coercion dc1)
-        (free_dirt_vars_dirty_coercion dc2)
-  | TyCoercionVar _tcp -> Type.DirtParamSet.empty
+      Type.FreeParams.union
+        (free_params_dirty_coercion dc1)
+        (free_params_dirty_coercion dc2)
+  | TyCoercionVar _tcp -> Type.FreeParams.empty
   | SequenceTyCoer (tc1, tc2) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_ty_coercion tc1)
-        (free_dirt_vars_ty_coercion tc2)
+      Type.FreeParams.union
+        (free_params_ty_coercion tc1)
+        (free_params_ty_coercion tc2)
   | TupleCoercion tcs ->
       List.fold_left
-        (fun free tc ->
-          Type.DirtParamSet.union free (free_dirt_vars_ty_coercion tc))
-        Type.DirtParamSet.empty tcs
-  | LeftArrow tc -> free_dirt_vars_ty_coercion tc
-  | PureCoercion dc -> free_dirt_vars_dirty_coercion dc
-  | QualTyCoer (_ctty, tc) -> free_dirt_vars_ty_coercion tc
-  | QualDirtCoer (_ctd, tc) -> free_dirt_vars_ty_coercion tc
+        (fun free tc -> Type.FreeParams.union free (free_params_ty_coercion tc))
+        Type.FreeParams.empty tcs
+  | LeftArrow tc -> free_params_ty_coercion tc
+  | PureCoercion dc -> free_params_dirty_coercion dc
+  | QualTyCoer (_ctty, tc) -> free_params_ty_coercion tc
+  | QualDirtCoer (_ctd, tc) -> free_params_ty_coercion tc
   | ApplyQualTyCoer (tc1, tc2) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_ty_coercion tc1)
-        (free_dirt_vars_ty_coercion tc2)
+      Type.FreeParams.union
+        (free_params_ty_coercion tc1)
+        (free_params_ty_coercion tc2)
   | ApplyQualDirtCoer (tc, dc) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_ty_coercion tc)
-        (free_dirt_vars_dirt_coercion dc)
+      Type.FreeParams.union
+        (free_params_ty_coercion tc)
+        (free_params_dirt_coercion dc)
   | ApplyCoercion (_ty_name, tcs) ->
       List.fold_left
-        (fun free tc ->
-          Type.DirtParamSet.union free (free_dirt_vars_ty_coercion tc))
-        Type.DirtParamSet.empty tcs
+        (fun free tc -> Type.FreeParams.union free (free_params_ty_coercion tc))
+        Type.FreeParams.empty tcs
 
-and free_dirt_vars_dirt_coercion = function
-  | ReflDirt d -> Type.fdvsOfDirt d
-  | DirtCoercionVar _dcv -> Type.DirtParamSet.empty
-  | Empty d -> Type.fdvsOfDirt d
-  | UnionDirt (_, dc) -> free_dirt_vars_dirt_coercion dc
+and free_params_dirt_coercion = function
+  | ReflDirt d -> Type.free_params_dirt d
+  | DirtCoercionVar _dcv -> Type.FreeParams.empty
+  | Empty d -> Type.free_params_dirt d
+  | UnionDirt (_, dc) -> free_params_dirt_coercion dc
   | SequenceDirtCoer (dc1, dc2) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_dirt_coercion dc1)
-        (free_dirt_vars_dirt_coercion dc2)
-  | DirtCoercion dc -> free_dirt_vars_dirty_coercion dc
+      Type.FreeParams.union
+        (free_params_dirt_coercion dc1)
+        (free_params_dirt_coercion dc2)
+  | DirtCoercion dc -> free_params_dirty_coercion dc
 
-and free_dirt_vars_dirty_coercion = function
+and free_params_dirty_coercion = function
   | BangCoercion (tc, dc) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_ty_coercion tc)
-        (free_dirt_vars_dirt_coercion dc)
-  | RightArrow tc -> free_dirt_vars_ty_coercion tc
-  | RightHandler tc -> free_dirt_vars_ty_coercion tc
-  | LeftHandler tc -> free_dirt_vars_ty_coercion tc
+      Type.FreeParams.union
+        (free_params_ty_coercion tc)
+        (free_params_dirt_coercion dc)
+  | RightArrow tc -> free_params_ty_coercion tc
+  | RightHandler tc -> free_params_ty_coercion tc
+  | LeftHandler tc -> free_params_ty_coercion tc
   | SequenceDirtyCoer (dc1, dc2) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_dirty_coercion dc1)
-        (free_dirt_vars_dirty_coercion dc2)
+      Type.FreeParams.union
+        (free_params_dirty_coercion dc1)
+        (free_params_dirty_coercion dc2)
 
 let rec get_skel_vars_from_constraints = function
   | [] -> []

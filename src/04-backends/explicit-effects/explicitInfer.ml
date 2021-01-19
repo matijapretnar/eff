@@ -24,8 +24,6 @@ let initial_lcl_ty_env = TypingEnv.empty
 (* Add a single term binding to the local typing environment *)
 let extendLclCtxt env x scheme = TypingEnv.update env x scheme
 
-let georgeTODO () = failwith __LOC__
-
 let warnAddConstraints s cs =
   Print.debug "%s: Added %d constraints: " s (List.length cs);
   Unification.print_c_list cs
@@ -96,16 +94,6 @@ let add_effect eff (ty1, ty2) st =
   { st with effects = Term.EffectMap.add eff (ty1, ty2) st.effects }
 
 (* ... *)
-
-let state_free_ty_vars st =
-  List.fold_right
-    (fun (_, ty) acc -> Type.TyParamSet.union (Type.ftvsOfTargetValTy ty) acc)
-    st Type.TyParamSet.empty
-
-let state_free_dirt_vars st =
-  List.fold_right
-    (fun (_, ty) acc -> Type.DirtParamSet.union (Type.fdvsOfTargetValTy ty) acc)
-    st Type.DirtParamSet.empty
 
 (* ************************************************************************* *)
 (*                            SUBSTITUTIONS                                  *)
@@ -1144,10 +1132,9 @@ let mkGenParts (cs : Constraint.omega_ct list) :
     List.map (fun (a, s) -> (a, Type.SkelParam s)) alphasSkelVars
   in
   let dirtVars =
-    List.fold_right
-      (fun ct dvs -> Type.DirtParamSet.union (Constraint.fdvsOfOmegaCt ct) dvs)
-      cs Type.DirtParamSet.empty
-    |> Type.DirtParamSet.elements
+    Type.DirtParamSet.elements
+      (Type.FreeParams.union_map Constraint.free_params_constraint cs)
+        .dirt_params
   in
   (*let tyDirtVars  = Type.fdvsOfTargetValTy valTy in (* fv(A) *) *)
   (skelVars, alphaSkels, dirtVars, tyCs, dirtCs)
@@ -1302,7 +1289,7 @@ let mkCmpDirtGroundSubst cmp =
   List.fold_left
     (fun subs dp -> Substitution.add_dirt_substitution dp Type.empty_dirt subs)
     Substitution.empty
-    (Type.DirtParamSet.elements (Term.free_dirt_vars_computation cmp))
+    (Type.DirtParamSet.elements (Term.free_params_computation cmp).dirt_params)
 
 (* Typecheck a top-level expression *)
 let tcTopLevelMono inState cmp =

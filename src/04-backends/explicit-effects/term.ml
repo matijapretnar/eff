@@ -616,90 +616,81 @@ let cast_computation c dirty1 dirty2 =
 (* ************************************************************************* *)
 (*                         FREE VARIABLE COMPUTATION                         *)
 (* ************************************************************************* *)
-let rec free_dirt_vars_expression e =
+let rec free_params_expression e =
   match e with
-  | Var _ -> Type.DirtParamSet.empty
-  | Const _ -> Type.DirtParamSet.empty
+  | Var _ -> Type.FreeParams.empty
+  | Const _ -> Type.FreeParams.empty
   | Tuple es ->
       List.fold_left
-        (fun free e ->
-          Type.DirtParamSet.union free (free_dirt_vars_expression e))
-        Type.DirtParamSet.empty es
+        (fun free e -> Type.FreeParams.union free (free_params_expression e))
+        Type.FreeParams.empty es
   | Record _ -> failwith __LOC__
-  | Variant (_, e) -> free_dirt_vars_expression e
-  | Lambda abs -> free_dirt_vars_abstraction_with_ty abs
-  | Effect _ -> Type.DirtParamSet.empty
-  | Handler h -> free_dirt_vars_abstraction_with_ty h.value_clause
+  | Variant (_, e) -> free_params_expression e
+  | Lambda abs -> free_params_abstraction_with_ty abs
+  | Effect _ -> Type.FreeParams.empty
+  | Handler h -> free_params_abstraction_with_ty h.value_clause
   | CastExp (e, tc) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_expression e)
-        (Constraint.free_dirt_vars_ty_coercion tc)
-  | LambdaTyCoerVar (_tcp, _ctty, e) -> free_dirt_vars_expression e
-  | LambdaDirtCoerVar (_dcp, _ctd, e) -> free_dirt_vars_expression e
+      Type.FreeParams.union (free_params_expression e)
+        (Constraint.free_params_ty_coercion tc)
+  | LambdaTyCoerVar (_tcp, _ctty, e) -> free_params_expression e
+  | LambdaDirtCoerVar (_dcp, _ctd, e) -> free_params_expression e
   | ApplyTyCoercion (e, tc) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_expression e)
-        (Constraint.free_dirt_vars_ty_coercion tc)
+      Type.FreeParams.union (free_params_expression e)
+        (Constraint.free_params_ty_coercion tc)
   | ApplyDirtCoercion (e, dc) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_expression e)
-        (Constraint.free_dirt_vars_dirt_coercion dc)
+      Type.FreeParams.union (free_params_expression e)
+        (Constraint.free_params_dirt_coercion dc)
 
-and free_dirt_vars_computation c =
+and free_params_computation c =
   match c with
-  | Value e -> free_dirt_vars_expression e
+  | Value e -> free_params_expression e
   | LetVal (e, abs) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_expression e)
-        (free_dirt_vars_abstraction_with_ty abs)
+      Type.FreeParams.union (free_params_expression e)
+        (free_params_abstraction_with_ty abs)
   | LetRec (defs, c) -> (
       match defs with
       | [ (_f, argTy, resTy, abs) ] ->
-          Type.DirtParamSet.union
-            (Type.DirtParamSet.union
-               (Type.fdvsOfTargetValTy argTy)
-               (Type.fdvsOfTargetCmpTy resTy))
-            (free_dirt_vars_abstraction abs)
-          |> Type.DirtParamSet.union (free_dirt_vars_computation c)
+          Type.FreeParams.union
+            (Type.FreeParams.union
+               (Type.free_params_ty argTy)
+               (Type.free_params_dirty resTy))
+            (free_params_abstraction abs)
+          |> Type.FreeParams.union (free_params_computation c)
       | _ -> failwith __LOC__)
   | Match (e, resTy, cases) ->
       List.fold_left
         (fun free case ->
-          Type.DirtParamSet.union free (free_dirt_vars_abstraction case))
-        (Type.DirtParamSet.union
-           (free_dirt_vars_expression e)
-           (Type.fdvsOfTargetCmpTy resTy))
+          Type.FreeParams.union free (free_params_abstraction case))
+        (Type.FreeParams.union (free_params_expression e)
+           (Type.free_params_dirty resTy))
         cases
   | Apply (e1, e2) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_expression e1)
-        (free_dirt_vars_expression e2)
+      Type.FreeParams.union
+        (free_params_expression e1)
+        (free_params_expression e2)
   | Handle (e, c) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_expression e)
-        (free_dirt_vars_computation c)
+      Type.FreeParams.union (free_params_expression e)
+        (free_params_computation c)
   | Call (_, _e, _awty) -> failwith __LOC__
-  | Op (_, e) -> free_dirt_vars_expression e
+  | Op (_, e) -> free_params_expression e
   | Bind (c, a) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_computation c)
-        (free_dirt_vars_abstraction a)
+      Type.FreeParams.union
+        (free_params_computation c)
+        (free_params_abstraction a)
   | CastComp (c, dc) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_computation c)
-        (Constraint.free_dirt_vars_dirty_coercion dc)
+      Type.FreeParams.union
+        (free_params_computation c)
+        (Constraint.free_params_dirty_coercion dc)
   | CastComp_ty (c, tc) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_computation c)
-        (Constraint.free_dirt_vars_ty_coercion tc)
+      Type.FreeParams.union
+        (free_params_computation c)
+        (Constraint.free_params_ty_coercion tc)
   | CastComp_dirt (c, dc) ->
-      Type.DirtParamSet.union
-        (free_dirt_vars_computation c)
-        (Constraint.free_dirt_vars_dirt_coercion dc)
+      Type.FreeParams.union
+        (free_params_computation c)
+        (Constraint.free_params_dirt_coercion dc)
 
-and free_dirt_vars_abstraction (_, c) = free_dirt_vars_computation c
+and free_params_abstraction (_, c) = free_params_computation c
 
-and free_dirt_vars_abstraction_with_ty (_, ty, c) =
-  Type.DirtParamSet.union
-    (Type.fdvsOfTargetValTy ty)
-    (free_dirt_vars_computation c)
+and free_params_abstraction_with_ty (_, ty, c) =
+  Type.FreeParams.union (Type.free_params_ty ty) (free_params_computation c)

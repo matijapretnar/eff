@@ -370,103 +370,61 @@ let rec free_skeleton sk =
   nub (go sk)
 
 (* ************************************************************************* *)
-(*                      FREE DIRT VARIABLE COMPUTATION                       *)
+(*                         FREE VARIABLE COMPUTATION                         *)
 (* ************************************************************************* *)
 
-(* Compute the free dirt variables of a target value type *)
-let rec fdvsOfTargetValTy : target_ty -> DirtParamSet.t = function
-  | TyParam _ -> DirtParamSet.empty
-  | Arrow (vty, cty) ->
-      DirtParamSet.union (fdvsOfTargetValTy vty) (fdvsOfTargetCmpTy cty)
-  | Tuple vtys -> fdvsOfTargetValTys vtys
-  | Handler (cty1, cty2) ->
-      DirtParamSet.union (fdvsOfTargetCmpTy cty1) (fdvsOfTargetCmpTy cty2)
-  | TyBasic _prim_ty -> DirtParamSet.empty
-  | Apply (_, vtys) -> fdvsOfTargetValTys vtys
-  | QualTy (ct, vty) ->
-      DirtParamSet.union (fdvsOfValTyCt ct) (fdvsOfTargetValTy vty)
-  | QualDirt (ct, vty) ->
-      DirtParamSet.union (fdvsOfDirtCt ct) (fdvsOfTargetValTy vty)
+module FreeParams = struct
+  type t = { ty_params : TyParamSet.t; dirt_params : DirtParamSet.t }
 
-(* Compute the free dirt variables of a list of target value types *)
-and fdvsOfTargetValTys : target_ty list -> DirtParamSet.t = function
-  | [] -> DirtParamSet.empty
-  | vty :: vtys ->
-      DirtParamSet.union (fdvsOfTargetValTy vty) (fdvsOfTargetValTys vtys)
+  let empty = { ty_params = TyParamSet.empty; dirt_params = DirtParamSet.empty }
+
+  let union fp1 fp2 =
+    {
+      ty_params = TyParamSet.union fp1.ty_params fp2.ty_params;
+      dirt_params = DirtParamSet.union fp1.dirt_params fp2.dirt_params;
+    }
+
+  let union_map free_params =
+    List.fold_left (fun fp x -> union fp (free_params x)) empty
+end
+
+(* Compute the free variables of a target value type *)
+let rec free_params_ty = function
+  | TyParam p -> { FreeParams.empty with ty_params = TyParamSet.singleton p }
+  | Arrow (vty, cty) ->
+      FreeParams.union (free_params_ty vty) (free_params_dirty cty)
+  | Tuple vtys -> FreeParams.union_map free_params_ty vtys
+  | Handler (cty1, cty2) ->
+      FreeParams.union (free_params_dirty cty1) (free_params_dirty cty2)
+  | TyBasic _prim_ty -> FreeParams.empty
+  | Apply (_, vtys) -> FreeParams.union_map free_params_ty vtys
+  | QualTy (ct, vty) ->
+      FreeParams.union (free_params_ct_ty ct) (free_params_ty vty)
+  | QualDirt (ct, vty) ->
+      FreeParams.union (free_params_ct_dirt ct) (free_params_ty vty)
 
 (* Compute the free dirt variables of a target computation type *)
-and fdvsOfTargetCmpTy : target_dirty -> DirtParamSet.t = function
-  | vty, dirt -> DirtParamSet.union (fdvsOfTargetValTy vty) (fdvsOfDirt dirt)
-
-(* Compute the free dirt variables of a list of computation value types *)
-and fdvsOfTargetCmpTys : target_dirty list -> DirtParamSet.t = function
-  | [] -> DirtParamSet.empty
-  | cty :: ctys ->
-      DirtParamSet.union (fdvsOfTargetCmpTy cty) (fdvsOfTargetCmpTys ctys)
+and free_params_dirty (ty, dirt) =
+  FreeParams.union (free_params_ty ty) (free_params_dirt dirt)
 
 (* Compute the free dirt variables of a value type inequality *)
-and fdvsOfValTyCt : ct_ty -> DirtParamSet.t = function
-  | vty1, vty2 ->
-      DirtParamSet.union (fdvsOfTargetValTy vty1) (fdvsOfTargetValTy vty2)
+and free_params_ct_ty (vty1, vty2) =
+  FreeParams.union (free_params_ty vty1) (free_params_ty vty2)
 
 (* Compute the free dirt variables of a computation type inequality *)
-and fdvsOfCmpTyCt : ct_dirty -> DirtParamSet.t = function
-  | cty1, cty2 ->
-      DirtParamSet.union (fdvsOfTargetCmpTy cty1) (fdvsOfTargetCmpTy cty2)
+and free_params_ct_dirty (cty1, cty2) =
+  FreeParams.union (free_params_dirty cty1) (free_params_dirty cty2)
 
 (* Compute the free dirt variables of a dirt inequality *)
-and fdvsOfDirtCt : ct_dirt -> DirtParamSet.t = function
-  | dirt1, dirt2 -> DirtParamSet.union (fdvsOfDirt dirt1) (fdvsOfDirt dirt2)
+and free_params_ct_dirt (dirt1, dirt2) =
+  FreeParams.union (free_params_dirt dirt1) (free_params_dirt dirt2)
 
 (* Compute the free dirt variables of a dirt *)
-and fdvsOfDirt (dirt : dirt) : DirtParamSet.t =
+and free_params_dirt (dirt : dirt) =
   match dirt.row with
-  | ParamRow p -> DirtParamSet.singleton p
-  | EmptyRow -> DirtParamSet.empty
-
-(* ************************************************************************* *)
-(*                      FREE TYPE VARIABLE COMPUTATION                       *)
-(* ************************************************************************* *)
-
-(* Compute the free type variables of a target value type *)
-let rec ftvsOfTargetValTy : target_ty -> TyParamSet.t = function
-  | TyParam a -> TyParamSet.singleton a
-  | Arrow (vty, cty) ->
-      TyParamSet.union (ftvsOfTargetValTy vty) (ftvsOfTargetCmpTy cty)
-  | Tuple vtys -> ftvsOfTargetValTys vtys
-  | Handler (cty1, cty2) ->
-      TyParamSet.union (ftvsOfTargetCmpTy cty1) (ftvsOfTargetCmpTy cty2)
-  | TyBasic _prim_ty -> TyParamSet.empty
-  | Apply (_, vtys) -> ftvsOfTargetValTys vtys
-  | QualTy (ct, vty) ->
-      TyParamSet.union (ftvsOfValTyCt ct) (ftvsOfTargetValTy vty)
-  | QualDirt (_, vty) -> ftvsOfTargetValTy vty
-
-(* Compute the free type variables of a list of target value types *)
-and ftvsOfTargetValTys : target_ty list -> TyParamSet.t = function
-  | [] -> TyParamSet.empty
-  | vty :: vtys ->
-      TyParamSet.union (ftvsOfTargetValTy vty) (ftvsOfTargetValTys vtys)
-
-(* Compute the free type variables of a target computation type *)
-and ftvsOfTargetCmpTy : target_dirty -> TyParamSet.t = function
-  | ty, _dirt -> ftvsOfTargetValTy ty
-
-(* Compute the free type variables of a list of computation value types *)
-and ftvsOfTargetCmpTys : target_dirty list -> TyParamSet.t = function
-  | [] -> TyParamSet.empty
-  | cty :: ctys ->
-      TyParamSet.union (ftvsOfTargetCmpTy cty) (ftvsOfTargetCmpTys ctys)
-
-(* Compute the free type variables of a value type inequality *)
-and ftvsOfValTyCt : ct_ty -> TyParamSet.t = function
-  | vty1, vty2 ->
-      TyParamSet.union (ftvsOfTargetValTy vty1) (ftvsOfTargetValTy vty2)
-
-(* Compute the free type variables of a computation type inequality *)
-and ftvsOfCmpTyCt : ct_dirty -> TyParamSet.t = function
-  | cty1, cty2 ->
-      TyParamSet.union (ftvsOfTargetCmpTy cty1) (ftvsOfTargetCmpTy cty2)
+  | ParamRow p ->
+      { FreeParams.empty with dirt_params = DirtParamSet.singleton p }
+  | EmptyRow -> FreeParams.empty
 
 (* ************************************************************************* *)
 
