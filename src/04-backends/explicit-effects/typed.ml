@@ -132,20 +132,6 @@ type omega_ct =
   | SkelEq of Types.skeleton * Types.skeleton
   | TyParamHasSkel of (CoreTypes.TyParam.t * Types.skeleton)
 
-type toplevel = plain_toplevel * Location.t
-
-and plain_toplevel =
-  (* | Tydef of (CoreTypes.tyname, Params.t * Tctx.tydef) CoreTypes.assoc *)
-  (* | TopLet of (pattern * computation) list * (variable * Scheme.ty_scheme) list *)
-  (* | TopLetRec of (variable * abstraction) list * (variable * Scheme.ty_scheme) list *)
-  (* | External of variable * Type.ty * string *)
-  | DefEffect of effect
-  | Computation of computation
-  | Use of string
-  | Reset
-  | Help
-  | Quit
-
 (* ************************************************************************* *)
 (*                         COERCION VARIABLES OF                             *)
 (* ************************************************************************* *)
@@ -365,7 +351,7 @@ and print_computation ?max_level c ppf =
       print " ( (%t) |> [%t] )" (print_computation c1) (print_ty_coercion dc)
   | CastComp_dirt (c1, dc) ->
       print "( (%t) |> [%t])" (print_computation c1) (print_dirt_coercion dc)
-  | LetVal (e1, (p, ty, c1)) ->
+  | LetVal (e1, (p, _ty, c1)) ->
       print "let (%t = (%t)) in (%t)" (print_pattern p) (print_expression e1)
         (print_computation c1)
 
@@ -465,7 +451,7 @@ and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match eff_clauses with
   | [] -> print "| eff' -> fun arg k -> Call (eff', arg, k)"
-  | (((_, (t1, t2)) as eff), a2) :: cases ->
+  | (((_, (_t1, _t2)) as eff), a2) :: cases ->
       print ~at_level:1 "| %t -> %t %t" (print_effect eff)
         (print_abstraction2 a2)
         (print_effect_clauses cases)
@@ -546,7 +532,7 @@ let rec refresh_expr sbst = function
   | Variant (lbl, e) -> Variant (lbl, refresh_expr sbst e)
   | CastExp (e1, tyco) -> CastExp (refresh_expr sbst e1, tyco)
   | (Const _ | Effect _) as e -> e
-  | LambdaTyCoerVar (tycovar, ct, e) -> failwith __LOC__
+  | LambdaTyCoerVar (_tycovar, _ct, _e) -> failwith __LOC__
   | LambdaDirtCoerVar (dcovar, ct, e) ->
       (* TODO: refresh dco var *)
       LambdaDirtCoerVar (dcovar, ct, refresh_expr sbst e)
@@ -581,6 +567,7 @@ and refresh_comp sbst = function
       Call (eff, refresh_expr sbst e, refresh_abs_with_ty sbst a)
   | Value e -> Value (refresh_expr sbst e)
   | CastComp (c, dtyco) -> CastComp (refresh_comp sbst c, dtyco)
+  | _ -> failwith __LOC__
 
 and refresh_handler sbst h =
   {
@@ -710,7 +697,7 @@ and alphaeq_comp eqvars c c' =
   match (c, c') with
   | Bind (c1, c2), Bind (c1', c2') ->
       alphaeq_comp eqvars c1 c1' && alphaeq_abs eqvars c2 c2'
-  | LetRec (li, c1), LetRec (li', c1') ->
+  | LetRec _, LetRec _ ->
       (* XXX Not yet implemented *)
       false
   | Match (e, _resTy1, li), Match (e', _resTy2, li') ->
@@ -741,7 +728,7 @@ and alphaeq_abs eqvars (p, c) (p', c') =
   | Some eqvars' -> alphaeq_comp eqvars' c c'
   | None -> false
 
-and alphaeq_abs_with_ty eqvars (p, ty, c) (p', ty', c') =
+and alphaeq_abs_with_ty eqvars (p, _ty, c) (p', _ty', c') =
   match make_equal_pattern eqvars p p' with
   | Some eqvars' -> alphaeq_comp eqvars' c c'
   | None -> false
@@ -804,7 +791,7 @@ let rec free_vars_comp c =
   | LetRec (li, c1) ->
       let xs, vars =
         List.fold_right
-          (fun (x, argTy, resTy, abs) (xs, vars) ->
+          (fun (x, _argTy, _resTy, abs) (xs, vars) ->
             (x :: xs, free_vars_abs abs @@@ vars))
           li
           ([], free_vars_comp c1)
@@ -817,7 +804,7 @@ let rec free_vars_comp c =
   | Call (_, e1, a1) -> free_vars_expr e1 @@@ free_vars_abs_with_ty a1
   | Op (_, e) -> free_vars_expr e
   | Bind (c1, a1) -> free_vars_comp c1 @@@ free_vars_abs a1
-  | CastComp (c1, dtyco) -> free_vars_comp c1
+  | CastComp (c1, _dtyco) -> free_vars_comp c1
   | CastComp_ty (c1, _) -> free_vars_comp c1
   | CastComp_dirt (c1, _) -> free_vars_comp c1
 
@@ -830,12 +817,12 @@ and free_vars_expr e =
   | Record flds ->
       Assoc.values_of flds |> List.map free_vars_expr |> concat_vars
   | Variant (_, e) -> free_vars_expr e
-  | CastExp (e', tyco) -> free_vars_expr e'
+  | CastExp (e', _tyco) -> free_vars_expr e'
   | Effect _ | Const _ -> ([], [])
   | LambdaTyCoerVar _ -> failwith __LOC__
   | LambdaDirtCoerVar _ -> failwith __LOC__
-  | ApplyTyCoercion (e, tyco) -> free_vars_expr e
-  | ApplyDirtCoercion (e, dco) -> free_vars_expr e
+  | ApplyTyCoercion (e, _tyco) -> free_vars_expr e
+  | ApplyDirtCoercion (e, _dco) -> free_vars_expr e
 
 and free_vars_handler h =
   free_vars_abs_with_ty h.value_clause
@@ -941,7 +928,7 @@ let rec free_dirt_vars_ty_coercion = function
       Types.DirtParamSet.union
         (free_dirt_vars_dirty_coercion dc1)
         (free_dirt_vars_dirty_coercion dc2)
-  | TyCoercionVar tcp -> Types.DirtParamSet.empty
+  | TyCoercionVar _tcp -> Types.DirtParamSet.empty
   | SequenceTyCoer (tc1, tc2) ->
       Types.DirtParamSet.union
         (free_dirt_vars_ty_coercion tc1)
@@ -953,8 +940,8 @@ let rec free_dirt_vars_ty_coercion = function
         Types.DirtParamSet.empty tcs
   | LeftArrow tc -> free_dirt_vars_ty_coercion tc
   | PureCoercion dc -> free_dirt_vars_dirty_coercion dc
-  | QualTyCoer (ctty, tc) -> free_dirt_vars_ty_coercion tc
-  | QualDirtCoer (ctd, tc) -> free_dirt_vars_ty_coercion tc
+  | QualTyCoer (_ctty, tc) -> free_dirt_vars_ty_coercion tc
+  | QualDirtCoer (_ctd, tc) -> free_dirt_vars_ty_coercion tc
   | ApplyQualTyCoer (tc1, tc2) ->
       Types.DirtParamSet.union
         (free_dirt_vars_ty_coercion tc1)
@@ -963,10 +950,15 @@ let rec free_dirt_vars_ty_coercion = function
       Types.DirtParamSet.union
         (free_dirt_vars_ty_coercion tc)
         (free_dirt_vars_dirt_coercion dc)
+  | ApplyCoercion (_ty_name, tcs) ->
+      List.fold_left
+      (fun free tc ->
+        Types.DirtParamSet.union free (free_dirt_vars_ty_coercion tc))
+      Types.DirtParamSet.empty tcs
 
 and free_dirt_vars_dirt_coercion = function
   | ReflDirt d -> Types.fdvsOfDirt d
-  | DirtCoercionVar dcv -> Types.DirtParamSet.empty
+  | DirtCoercionVar _dcv -> Types.DirtParamSet.empty
   | Empty d -> Types.fdvsOfDirt d
   | UnionDirt (_, dc) -> free_dirt_vars_dirt_coercion dc
   | SequenceDirtCoer (dc1, dc2) ->
@@ -1006,8 +998,8 @@ let rec free_dirt_vars_expression e =
       Types.DirtParamSet.union
         (free_dirt_vars_expression e)
         (free_dirt_vars_ty_coercion tc)
-  | LambdaTyCoerVar (tcp, ctty, e) -> free_dirt_vars_expression e
-  | LambdaDirtCoerVar (dcp, ctd, e) -> free_dirt_vars_expression e
+  | LambdaTyCoerVar (_tcp, _ctty, e) -> free_dirt_vars_expression e
+  | LambdaDirtCoerVar (_dcp, _ctd, e) -> free_dirt_vars_expression e
   | ApplyTyCoercion (e, tc) ->
       Types.DirtParamSet.union
         (free_dirt_vars_expression e)
@@ -1024,13 +1016,17 @@ and free_dirt_vars_computation c =
       Types.DirtParamSet.union
         (free_dirt_vars_expression e)
         (free_dirt_vars_abstraction_with_ty abs)
-  | LetRec ([ (f, argTy, resTy, abs) ], c) ->
+  | LetRec (defs, c) ->
+      begin match defs with
+      | [ (_f, argTy, resTy, abs) ] ->
       Types.DirtParamSet.union
         (Types.DirtParamSet.union
            (Types.fdvsOfTargetValTy argTy)
            (Types.fdvsOfTargetCmpTy resTy))
         (free_dirt_vars_abstraction abs)
       |> Types.DirtParamSet.union (free_dirt_vars_computation c)
+      | _ -> failwith __LOC__
+      end
   | Match (e, resTy, cases) ->
       List.fold_left
         (fun free case ->
@@ -1047,7 +1043,7 @@ and free_dirt_vars_computation c =
       Types.DirtParamSet.union
         (free_dirt_vars_expression e)
         (free_dirt_vars_computation c)
-  | Call (_, e, awty) -> failwith __LOC__
+  | Call (_, _e, _awty) -> failwith __LOC__
   | Op (_, e) -> free_dirt_vars_expression e
   | Bind (c, a) ->
       Types.DirtParamSet.union
