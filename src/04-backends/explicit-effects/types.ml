@@ -162,7 +162,7 @@ and print_ct_dirt (ty1, ty2) ppf =
  * and no qualified constraints, at the top-level or in nested positions. *)
 let rec isMonoTy : target_ty -> bool = function
   | TyParam _ -> true
-  | Apply (tyCon, tys) -> List.for_all isMonoTy tys
+  | Apply (_, tys) -> List.for_all isMonoTy tys
   | Arrow (ty1, (ty2, _)) -> isMonoTy ty1 && isMonoTy ty2
   | Tuple tys -> List.for_all isMonoTy tys
   | Handler ((ty1, _), (ty2, _)) -> isMonoTy ty1 && isMonoTy ty2
@@ -177,7 +177,7 @@ let rec isMonoTy : target_ty -> bool = function
  * in nested positions. *)
 let rec isClosedMonoTy : target_ty -> bool = function
   | TyParam _ -> false
-  | Apply (tyCon, tys) -> List.for_all isClosedMonoTy tys
+  | Apply (_, tys) -> List.for_all isClosedMonoTy tys
   | Arrow (vty, cty) -> isClosedMonoTy vty && isClosedDirtyTy cty
   | Tuple tys -> List.for_all isClosedMonoTy tys
   | Handler (cty1, cty2) -> isClosedDirtyTy cty1 && isClosedDirtyTy cty2
@@ -375,7 +375,7 @@ let rec free_skeleton sk =
 
 (* Compute the free dirt variables of a target value type *)
 let rec fdvsOfTargetValTy : target_ty -> DirtParamSet.t = function
-  | TyParam a -> DirtParamSet.empty
+  | TyParam _ -> DirtParamSet.empty
   | Arrow (vty, cty) ->
       DirtParamSet.union (fdvsOfTargetValTy vty) (fdvsOfTargetCmpTy cty)
   | Tuple vtys -> fdvsOfTargetValTys vtys
@@ -488,7 +488,6 @@ let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
         refresh_target_dirty (temp_ty_sbst, temp_dirt_sbst) c
       in
       ((c_ty_sbst, c_dirt_sbst), Arrow (a', c'))
-  | Tuple tup -> ((ty_sbst, dirt_sbst), t)
   | Handler (c1, c2) ->
       let (c1_ty_sbst, c1_dirt_sbst), c1' =
         refresh_target_dirty (ty_sbst, dirt_sbst) c1
@@ -500,8 +499,10 @@ let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
       in
       ((c2_ty_sbst, c2_dirt_sbst), Handler (c1', c2'))
   | TyBasic x -> ((ty_sbst, dirt_sbst), TyBasic x)
-  | QualTy (_, a) -> failwith __LOC__
-  | QualDirt (_, a) -> failwith __LOC__
+  | QualTy _ -> failwith __LOC__
+  | QualDirt _ -> failwith __LOC__
+  | Apply _ -> failwith __LOC__
+  | Tuple _ -> failwith __LOC__
 
 and refresh_target_dirty (ty_sbst, dirt_sbst) (t, d) =
   let (t_ty_sbst, t_dirt_sbst), t' = refresh_target_ty (ty_sbst, dirt_sbst) t in
@@ -526,8 +527,8 @@ and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
 let rec source_to_target tctx_st ty =
   let loc = Location.unknown in
   match ty with
-  | Type.Apply (ty_name, args) when TypeContext.transparent ~loc ty_name tctx_st
-    -> (
+  | Type.Apply (ty_name, _args)
+    when TypeContext.transparent ~loc ty_name tctx_st -> (
       match TypeContext.ty_apply ~loc ty_name [] tctx_st with
       (* We currently support only inlined types with no arguments *)
       | Type.Inline ty -> source_to_target tctx_st ty
