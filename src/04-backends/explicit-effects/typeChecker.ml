@@ -60,7 +60,12 @@ let rec check_well_formed_skeleton st = function
 
 let checkWellFormedDirt st = function
   | { Type.row = Type.EmptyRow; _ } -> ()
-  | { Type.row = Type.ParamRow v; _ } -> assert (List.mem v st.dirt_params)
+  | { Type.row = Type.ParamRow v; _ } ->
+      ();
+      Print.debug "Param needed: %t" (DirtParam.print v);
+      assert (List.mem v st.dirt_params)
+
+(*assert (List.mem v st.dirt_params) *)
 
 let rec checkWellFormedValTyTemp st = function
   | TyParam typ ->
@@ -263,8 +268,8 @@ and extendPatternTypes st p ty =
   res
 
 let rec typeOfExpressionTemp st = function
-  (*  (%t) (Term.print_expression inputExpression); *)
   | Var v -> (
+      (* Print.debug "%t" (Types.print_expression (Var v)); *)
       (*Print.debug "right before the lookup"; *)
       match Assoc.lookup v st.var_types with
       | Some ty ->

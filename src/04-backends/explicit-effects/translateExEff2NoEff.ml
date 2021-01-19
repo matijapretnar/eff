@@ -556,8 +556,17 @@ and comp_elab state env c =
       let vtype, velab = value_elab state env value in
       match (vtype, velab) with
       | ExEffTypes.Handler ((vty1, vdirt1), (vty2, vdirt2)), NHandler handler ->
-          (* Filip: I think this tests the wrong type *)
-          if true (* Type.types_are_equal vty1 ctype *) then
+          (* Filip: I think this tests the wrong type, it is either strange,
+             or the computation is wrongly wrapped.
+          *)
+          (* Format.printf
+             "vty1: %t; vty2: %t;\n base_comp: %t \n;; comp: %t \n:: ctype %t\n"
+             (Type.print_target_ty vty1)
+             (Type.print_target_ty vty2)
+             (Typed.print_computation comp)
+             (SyntaxNoEff.print_term elabc)
+             (Types.print_target_ty ctype); *)
+          if true && Type.types_are_equal vty1 ctype then
             if Type.is_empty_dirt cdirt (* Handle - Case 1 *) then
               ((vty2, vdirt2), NoEff.NApplyTerm (velab, elabc))
             else if Type.is_empty_dirt vdirt2 (* Handle - Case 2 *) then

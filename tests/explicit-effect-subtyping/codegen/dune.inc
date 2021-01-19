@@ -98,6 +98,22 @@
  (deps
  %{bin:eff}
   (source_tree .))
+   (target "loop_example.eff.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       (or 0 0 1 2)
+       (run eff --no-stdlib --no-header --compile-plain-ocaml "./loop_example.eff")))))
+
+(rule
+ (alias runtest)
+  (action
+   (diff "loop_example.eff.ref" "loop_example.eff.out")))
+
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
    (target "match_red.eff.out")
     (action
      (with-outputs-to "%{target}"

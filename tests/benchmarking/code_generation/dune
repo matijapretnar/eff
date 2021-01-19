@@ -1,7 +1,8 @@
 (executable
  (name benchmark)
  (modules benchmark)
- (libraries core core_bench loop queens range interp))
+ (libraries bechamel bechamel-notty notty notty.unix unix loop queens range
+   interp))
 
 (executable
  (modules generate_benchmark_rules)
