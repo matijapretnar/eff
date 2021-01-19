@@ -209,8 +209,6 @@ let instantiateVariable (x : Typed.variable) (scheme : Types.target_ty) :
   in
 
   (* 2: Generate the freshening substitution *)
-  let foldLeft f xs x0 = List.fold_left f x0 xs in
-  (* GEORGE: Just for convenience *)
   let sub = Substitution.empty in
 
   (* 3: Generate the wanted type inequality constraints *)
@@ -256,7 +254,7 @@ let partitionResidualCs :
     | DirtOmega (o, ct) :: rest ->
         let alphaSkels, tyCs, dirtCs = aux rest in
         (alphaSkels, tyCs, (o, ct) :: dirtCs)
-    | cs -> failwith "partitionResidualCs: malformed"
+    | _cs -> failwith "partitionResidualCs: malformed"
   in
   aux
 
@@ -397,9 +395,9 @@ and checkPatTy (st : state) (lclCtxt : TypingEnv.t)
           (Typed.PTuple outPats, outCtxt)
       | _ -> failwith "checkPatTy: PTuple")
   (* GEORGE: Not implemented yet cases *)
-  | Untyped.PAs (p, v) -> failwith __LOC__
-  | Untyped.PRecord r -> failwith __LOC__
-  | Untyped.PAnnotated (p, ty) -> failwith __LOC__
+  | Untyped.PAs _ -> failwith __LOC__
+  | Untyped.PRecord _ -> failwith __LOC__
+  | Untyped.PAnnotated _ -> failwith __LOC__
 
 and checkLocatedPatTys st (lclCtxt : TypingEnv.t) (pats : Untyped.pattern list)
     (patTys : Types.target_ty list) : Typed.pattern list * TypingEnv.t =
@@ -451,8 +449,8 @@ let rec inferClosedPatTy st : Untyped.plain_pattern -> Types.target_ty option =
       optionBind
         (optionMapM (inferLocatedClosedPatTy st) l)
         (fun tys -> Some (Types.Tuple tys))
-  | Untyped.PRecord r -> None (* TODO: Not implemented yet *)
-  | Untyped.PAnnotated (p, ty) -> failwith __LOC__
+  | Untyped.PRecord _ -> None (* TODO: Not implemented yet *)
+  | Untyped.PAnnotated _ -> failwith __LOC__
 
 (* TODO: Not implemented yet *)
 
@@ -485,13 +483,13 @@ and checkClosedPatTy st (inpat : Untyped.plain_pattern)
   | Untyped.PConst c ->
       if patTy = Types.type_const c then ()
       else failwith "checkClosedPatTy: PConst"
-  | Untyped.PAs (p, v) -> checkLocatedClosedPatTy st p patTy
+  | Untyped.PAs (p, _v) -> checkLocatedClosedPatTy st p patTy
   | Untyped.PTuple pats -> (
       match patTy with
       | Types.Tuple tys -> List.iter2 (checkLocatedClosedPatTy st) pats tys
       | _ -> failwith "checkClosedPatTy: PTuple")
-  | Untyped.PRecord r -> failwith __LOC__ (* TODO: Not implemented yet *)
-  | Untyped.PAnnotated (p, ty) -> failwith __LOC__
+  | Untyped.PRecord _ -> failwith __LOC__ (* TODO: Not implemented yet *)
+  | Untyped.PAnnotated _ -> failwith __LOC__
 
 (* TODO: Not implemented yet *)
 
@@ -619,13 +617,13 @@ let rec tcVar (inState : state) (lclCtxt : TypingEnv.t) (x : Typed.variable) :
       assert false
 
 (* Constants *)
-and tcConst (inState : state) (lclCtxt : TypingEnv.t) (c : Const.t) :
+and tcConst (_inState : state) (_lclCtxt : TypingEnv.t) (c : Const.t) :
     tcValOutput =
   ((Typed.Const c, Types.type_const c), [])
 
 (* Type-annotated Expressions *)
-and tcAnnotated (inState : state) (lclCtxt : TypingEnv.t)
-    ((e, ty) : Untyped.expression * Language.Type.ty) : tcValOutput =
+and tcAnnotated (_inState : state) (_lclCtxt : TypingEnv.t)
+    ((_e, _ty) : Untyped.expression * Language.Type.ty) : tcValOutput =
   failwith __LOC__
 
 (* GEORGE: Planned TODO for the future I guess?? *)
@@ -637,8 +635,8 @@ and tcTuple (inState : state) (lclCtxt : TypingEnv.t)
   ((Typed.Tuple es, Types.Tuple tys), cs)
 
 (* Records *)
-and tcRecord (inState : state) (lclCtx : TypingEnv.t)
-    (lst : (field, Untyped.expression) Assoc.t) : tcValOutput =
+and tcRecord (_inState : state) (_lclCtx : TypingEnv.t)
+    (_lst : (field, Untyped.expression) Assoc.t) : tcValOutput =
   failwith __LOC__
 
 (* GEORGE: Planned TODO for the future I guess?? *)
@@ -666,7 +664,7 @@ and tcLambda (inState : state) (lclCtx : TypingEnv.t)
   ((outVal, outType), cs1 @ cs2)
 
 (* Effects (GEORGE: Isn't this supposed to be in computations? *)
-and tcEffect (inState : state) (lclCtx : TypingEnv.t) (eff : Untyped.effect) :
+and tcEffect (inState : state) (_lclCtx : TypingEnv.t) (eff : Untyped.effect) :
     tcValOutput =
   (* GEORGE: NOTE: This is verbatim copied from the previous implementation *)
   let in_ty, out_ty = Typed.EffectMap.find eff inState.effects in
@@ -1065,7 +1063,7 @@ and tcEmptyMatch (inState : state) (lclCtxt : TypingEnv.t)
   let deltaOut = Types.fresh_dirt () in
 
   (* 2: Typecheck the scrutinee *)
-  let (trgScr, scrTy), cs1 = tcLocatedVal inState lclCtxt scr in
+  let (trgScr, _scrTy), cs1 = tcLocatedVal inState lclCtxt scr in
 
   (* 3: Combine the results *)
   let outType = (alphaOut, deltaOut) in
@@ -1135,8 +1133,8 @@ and tcHandle (inState : state) (lclCtxt : TypingEnv.t)
   ((outExpr, outType), outCs)
 
 (* Typecheck a "Check" expression (GEORGE does not know what this means yet *)
-and tcCheck (inState : state) (lclCtxt : TypingEnv.t)
-    (cmp : Untyped.computation) : tcCmpOutput =
+and tcCheck (_inState : state) (_lclCtxt : TypingEnv.t)
+    (_cmp : Untyped.computation) : tcCmpOutput =
   failwith __LOC__
 
 (* GEORGE: Planned TODO for the future I guess?? *)
@@ -1235,7 +1233,7 @@ let tcTopLetRec (inState : state) (var : Untyped.variable)
   let trgC1 = subInCmp subst c1'' in
 
   (* 7: Partition the residual constraints and abstract over them *)
-  let freeSkelVars, annFreeTyVars, freeDirtVars, tyVs, dirtCs =
+  let _freeSkelVars, _annFreeTyVars, _freeDirtVars, _tyVs, _dirtCs =
     mkGenParts residuals
   in
 
@@ -1301,7 +1299,7 @@ let finalize_constraint sub ct =
         | Types.EmptyRow, Types.EmptyRow -> sub'
       in
       subs''
-  | Typed.SkelEq (sk1, sk2) -> failwith __LOC__
+  | Typed.SkelEq (_sk1, _sk2) -> failwith __LOC__
   | Typed.TyParamHasSkel (tp, sk) ->
       Error.typing ~loc:Location.unknown
         "Unsolved param-has-skel constraint in top-level computation: %t"
@@ -1323,7 +1321,7 @@ let mkCmpDirtGroundSubst cmp =
     (Types.DirtParamSet.elements (Typed.free_dirt_vars_computation cmp))
 
 (* Typecheck a top-level expression *)
-let tcTopLevelMono ~loc inState cmp =
+let tcTopLevelMono inState cmp =
   Print.debug "tcTopLevelMono [0]: %t" (Untyped.print_computation cmp);
   (* 1: Constraint generation *)
   let (trgCmp, (ttype, dirt)), generatedCs =
@@ -1345,7 +1343,7 @@ let tcTopLevelMono ~loc inState cmp =
     let skelGroundResiduals =
       List.map
         (function
-          | Typed.TyParamHasSkel (tyvar, Types.SkelParam s) ->
+          | Typed.TyParamHasSkel (tyvar, Types.SkelParam _s) ->
               Typed.TyParamHasSkel (tyvar, Types.SkelTuple [])
           | TyParamHasSkel (tyvar, skel) ->
               Error.typing ~loc:Location.unknown

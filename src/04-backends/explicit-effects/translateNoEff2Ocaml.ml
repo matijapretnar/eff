@@ -28,7 +28,6 @@ let rec elab_term (t_in : NoEff.n_term) : OCaml.term =
   | NoEff.NEffect (eff, (t1, t2)) ->
       OCaml.Effect (eff, elab_type t1, elab_type t2)
   | NoEff.NHandler h ->
-      let vcp, vct, vcc = h.return_clause in
       OCaml.Handler
         ( elab_abstraction_with_ty h.return_clause,
           List.map elab_effect_clause (Assoc.to_list h.effect_clauses) )
@@ -86,23 +85,20 @@ and elab_coercion (coer : NoEff.n_coercion) : OCaml.term =
   | NoEff.NCoerHandler (arg, res) -> (
       let f = elab_coercion arg in
       let g = elab_coercion res in
-      match f with
-      | OCaml.Lambda (p_f, c_f) -> (
-          match g with
-          | OCaml.Lambda (p_g, c_g) ->
-              let x1 = Variable.fresh "x1" in
-              let x2 = Variable.fresh "x2" in
+      match (f, g) with
+      | OCaml.Lambda (p_f, c_f), OCaml.Lambda (p_g, c_g) ->
+          let x1 = Variable.fresh "x1" in
+          let x2 = Variable.fresh "x2" in
+          OCaml.Lambda
+            ( OCaml.PVar x1,
               OCaml.Lambda
-                ( OCaml.PVar x1,
-                  OCaml.Lambda
-                    ( OCaml.PVar x2,
+                ( OCaml.PVar x2,
+                  OCaml.Apply
+                    ( g,
                       OCaml.Apply
-                        ( g,
-                          OCaml.Apply
-                            ( OCaml.Var x1,
-                              OCaml.Return (OCaml.Apply (f, OCaml.Var x2)) ) )
-                    ) )
-          | _ -> failwith "Wrong handler coercion elaboration"))
+                        ( OCaml.Var x1,
+                          OCaml.Return (OCaml.Apply (f, OCaml.Var x2)) ) ) ) )
+      | _, _ -> failwith "Wrong handler coercion elaboration")
   | NoEff.NCoerHandToFun (arg, res) ->
       let f = elab_coercion arg in
       let g = elab_coercion res in
@@ -164,7 +160,8 @@ and elab_coercion (coer : NoEff.n_coercion) : OCaml.term =
                     OCaml.ValueClause
                       ( OCaml.PReturn (OCaml.PVar y),
                         OCaml.Apply (f, OCaml.Var y) );
-                  ] ) ))
+                  ] ) )
+      | _ -> failwith __LOC__)
   | NoEff.NCoerApp (c1, c2) -> failwith "Dropped when dropping polymorphism"
   | NoEff.NCoerTrans (c1, c2) ->
       let f = elab_coercion c1 in
@@ -174,6 +171,7 @@ and elab_coercion (coer : NoEff.n_coercion) : OCaml.term =
   | NoEff.NCoerTuple ls ->
       let coer_elabs = List.map elab_coercion ls in
       OCaml.LambdaList coer_elabs
+  | _ -> failwith __LOC__
 
 and elab_type t =
   match t with

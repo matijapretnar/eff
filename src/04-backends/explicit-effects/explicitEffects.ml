@@ -92,8 +92,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
 
   let process_computation state c tysch =
     let c', ty' =
-      ExplicitInfer.tcTopLevelMono ~loc:Location.unknown
-        state.effect_system_state.type_system_state c
+      ExplicitInfer.tcTopLevelMono state.effect_system_state.type_system_state c
     in
     let backend_state' =
       ExBackend.process_computation state.backend_state
@@ -105,8 +104,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
 
   let process_type_of state c tysch =
     let c', ty' =
-      ExplicitInfer.tcTopLevelMono ~loc:Location.unknown
-        state.effect_system_state.type_system_state c
+      ExplicitInfer.tcTopLevelMono state.effect_system_state.type_system_state c
     in
     let backend_state' =
       ExBackend.process_type_of state.backend_state state.effect_system_state
@@ -136,26 +134,28 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
   let process_top_let _state _defs _vars =
     failwith "Top level bindings not supported"
 
-  let[@warning "-8"] process_top_let_rec state lst tys =
-    let [ (v, (p, c)) ] = Assoc.to_list lst in
-    let (((typed_abs, c), ty) as l_rec) =
-      ExplicitInfer.tcTopLetRec state.effect_system_state.type_system_state v p
-        c
-    in
-    let backend_state' =
-      ExBackend.process_top_let_rec state.backend_state
-        state.effect_system_state lst tys l_rec
-    in
-    let type_system_state =
-      List.fold_left
-        (fun st (v, p, c, _) ->
-          ExplicitInfer.add_gbl_def st v (Types.Arrow (p, c)))
-        state.effect_system_state.type_system_state typed_abs
-    in
-    let effect_system_state =
-      { state.effect_system_state with type_system_state }
-    in
-    { backend_state = backend_state'; effect_system_state }
+  let process_top_let_rec state lst tys =
+    match Assoc.to_list lst with
+    | [ (v, (p, c)) ] ->
+        let (((typed_abs, _c), _ty) as l_rec) =
+          ExplicitInfer.tcTopLetRec state.effect_system_state.type_system_state
+            v p c
+        in
+        let backend_state' =
+          ExBackend.process_top_let_rec state.backend_state
+            state.effect_system_state lst tys l_rec
+        in
+        let type_system_state =
+          List.fold_left
+            (fun st (v, p, c, _) ->
+              ExplicitInfer.add_gbl_def st v (Types.Arrow (p, c)))
+            state.effect_system_state.type_system_state typed_abs
+        in
+        let effect_system_state =
+          { state.effect_system_state with type_system_state }
+        in
+        { backend_state = backend_state'; effect_system_state }
+    | _ -> failwith __LOC__
 
   let process_external state (x, ty, name) =
     let type_system_state' =
@@ -229,14 +229,17 @@ module Evaluate : Language.BackendSignature.T = Make (struct
     state
 
   let process_top_let_rec state _ _defs _vars (defs, _ty) =
-    let [ (v, _, _, a) ], cmp = defs in
-    let state' =
-      {
-        evaluation_state =
-          Eval.extend_let_rec state.evaluation_state (Assoc.of_list [ (v, a) ]);
-      }
-    in
-    state'
+    match defs with
+    | [ (v, _, _, a) ], _cmp ->
+        let state' =
+          {
+            evaluation_state =
+              Eval.extend_let_rec state.evaluation_state
+                (Assoc.of_list [ (v, a) ]);
+          }
+        in
+        state'
+    | _ -> failwith __LOC__
 
   let process_external state _ (x, _ty, f) =
     let evaluation_state' =

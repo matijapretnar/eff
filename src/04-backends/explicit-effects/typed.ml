@@ -952,9 +952,9 @@ let rec free_dirt_vars_ty_coercion = function
         (free_dirt_vars_dirt_coercion dc)
   | ApplyCoercion (_ty_name, tcs) ->
       List.fold_left
-      (fun free tc ->
-        Types.DirtParamSet.union free (free_dirt_vars_ty_coercion tc))
-      Types.DirtParamSet.empty tcs
+        (fun free tc ->
+          Types.DirtParamSet.union free (free_dirt_vars_ty_coercion tc))
+        Types.DirtParamSet.empty tcs
 
 and free_dirt_vars_dirt_coercion = function
   | ReflDirt d -> Types.fdvsOfDirt d
@@ -1016,17 +1016,16 @@ and free_dirt_vars_computation c =
       Types.DirtParamSet.union
         (free_dirt_vars_expression e)
         (free_dirt_vars_abstraction_with_ty abs)
-  | LetRec (defs, c) ->
-      begin match defs with
+  | LetRec (defs, c) -> (
+      match defs with
       | [ (_f, argTy, resTy, abs) ] ->
-      Types.DirtParamSet.union
-        (Types.DirtParamSet.union
-           (Types.fdvsOfTargetValTy argTy)
-           (Types.fdvsOfTargetCmpTy resTy))
-        (free_dirt_vars_abstraction abs)
-      |> Types.DirtParamSet.union (free_dirt_vars_computation c)
-      | _ -> failwith __LOC__
-      end
+          Types.DirtParamSet.union
+            (Types.DirtParamSet.union
+               (Types.fdvsOfTargetValTy argTy)
+               (Types.fdvsOfTargetCmpTy resTy))
+            (free_dirt_vars_abstraction abs)
+          |> Types.DirtParamSet.union (free_dirt_vars_computation c)
+      | _ -> failwith __LOC__)
   | Match (e, resTy, cases) ->
       List.fold_left
         (fun free case ->

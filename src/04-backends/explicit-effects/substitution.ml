@@ -167,6 +167,7 @@ let rec apply_sub_tycoer sub ty_coer =
   | LeftArrow tc1 -> LeftArrow (apply_sub_tycoer sub tc1)
   | PureCoercion dirty_coer1 ->
       PureCoercion (apply_sub_dirtycoer sub dirty_coer1)
+  | _ -> failwith __LOC__
 
 and apply_sub_dirtcoer sub dirt_coer =
   match dirt_coer with
@@ -222,6 +223,7 @@ let rec apply_sub_comp sub computation =
       CastComp_ty (apply_sub_comp sub c1, apply_sub_tycoer sub tc1)
   | CastComp_dirt (c1, tc1) ->
       CastComp_dirt (apply_sub_comp sub c1, apply_sub_dirtcoer sub tc1)
+  | _ -> failwith __LOC__
 
 and apply_sub_exp sub expression =
   match expression with
@@ -247,6 +249,7 @@ and apply_sub_exp sub expression =
       ApplyTyCoercion (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
   | ApplyDirtCoercion (e1, dc1) ->
       ApplyDirtCoercion (apply_sub_exp sub e1, apply_sub_dirtcoer sub dc1)
+  | _ -> failwith __LOC__
 
 and apply_sub_abs sub (p, c) = (p, apply_sub_comp sub c)
 
@@ -327,7 +330,7 @@ let print_skel_param_sub p t ppf =
   printy ppf "%t :-skelvarToSkeleton-> %t" (Types.SkelParam.print p)
     (Types.print_skeleton t)
 
-let print_sub_list ?max_level subs =
+let print_sub_list subs =
   List.iter
     (fun (x, y) -> Print.debug "%t" (print_type_coercion x y))
     (Assoc.to_list subs.type_param_to_type_coercions);

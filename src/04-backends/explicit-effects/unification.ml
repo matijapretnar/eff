@@ -51,6 +51,8 @@ let rec skeleton_of_target_ty tty conslist =
       SkelHandler
         (skeleton_of_target_ty a1 conslist, skeleton_of_target_ty a2 conslist)
   | TyBasic pt -> SkelBasic pt
+  | QualTy (_, ty) -> skeleton_of_target_ty ty conslist
+  | QualDirt (_, ty) -> skeleton_of_target_ty ty conslist
 
 let rec fix_union_find fixpoint c_list =
   (*
@@ -89,7 +91,7 @@ let process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a =
 let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
   match skel with
   (* α : ς *)
-  | SkelParam p -> (sub, Typed.add_to_constraints cons paused, rest_queue)
+  | SkelParam _ -> (sub, Typed.add_to_constraints cons paused, rest_queue)
   (* α : int *)
   | SkelBasic ps ->
       let k = tvar in
@@ -171,7 +173,7 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
         Typed.add_to_constraints cons1 cons_subbed
         |> Typed.add_to_constraints cons2 )
 
-and skel_eq_step sub paused cons rest_queue sk1 sk2 =
+and skel_eq_step sub paused rest_queue sk1 sk2 =
   match (sk1, sk2) with
   (* ς = ς *)
   | SkelParam sp1, SkelParam sp2 when sp1 = sp2 -> (sub, paused, rest_queue)
@@ -367,7 +369,7 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
           (add_list_to_constraints paused rest_queue) )
   | _ -> (sub, cons :: paused, rest_queue)
 
-let dirty_omega_step sub paused cons rest_queue (omega1, omega2) drtycons =
+let dirty_omega_step sub paused rest_queue (omega1, omega2) drtycons =
   let (ty1, drt1), (ty2, drt2) = drtycons in
   let ty_cons = TyOmega (omega1, (ty1, ty2))
   and dirt_cons = DirtOmega (omega2, (drt1, drt2)) in
@@ -396,8 +398,7 @@ let rec unify (sub, paused, queue) =
         | Typed.TyParamHasSkel (tvar, skel) ->
             ty_param_has_skel_step sub paused cons rest_queue tvar skel
         (* τ₁ = τ₂ *)
-        | Typed.SkelEq (sk1, sk2) ->
-            skel_eq_step sub paused cons rest_queue sk1 sk2
+        | Typed.SkelEq (sk1, sk2) -> skel_eq_step sub paused rest_queue sk1 sk2
         (* ω : A <= B *)
         | Typed.TyOmega (omega, tycons) ->
             ty_omega_step sub paused cons rest_queue omega tycons
@@ -406,7 +407,7 @@ let rec unify (sub, paused, queue) =
             dirt_omega_step sub paused cons rest_queue omega dcons
         (* ω : A ! Δ₁ <= B ! Δ₂ *)
         | Typed.DirtyOmega (omega, drtycons) ->
-            dirty_omega_step sub paused cons rest_queue omega drtycons
+            dirty_omega_step sub paused rest_queue omega drtycons
       in
       (* Print.debug "=========End loop============" ; *)
       unify new_state

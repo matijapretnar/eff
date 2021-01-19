@@ -49,7 +49,7 @@ let initial_state =
 
 let rec check_well_formed_skeleton st = function
   | SkelParam skel_param -> assert (List.mem skel_param st.skel_params)
-  | SkelBasic p -> ()
+  | SkelBasic _ -> ()
   | SkelArrow (sk1, sk2) ->
       check_well_formed_skeleton st sk1;
       check_well_formed_skeleton st sk2
@@ -70,8 +70,7 @@ let rec checkWellFormedValTyTemp st = function
       checkWellFormedValTy st tty1;
       checkWellFormedCmpTy st tty2
   | Tuple ttyl -> List.iter (checkWellFormedValTy st) ttyl
-  | Apply (_, []) ->
-      () (* GEORGE: There is no need for this to be partial I think *)
+  | Apply (_, tys) -> List.iter (checkWellFormedValTy st) tys
   | Handler (tty1, tty2) ->
       checkWellFormedCmpTy st tty1;
       checkWellFormedCmpTy st tty2

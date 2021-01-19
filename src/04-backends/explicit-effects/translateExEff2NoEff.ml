@@ -39,14 +39,12 @@ let rec extend_pattern_type env pat ty =
   | PNonbinding -> env
 
 and extend_multiple_pats env ps tys =
-  match ps with
-  | [] -> if tys = [] then env else typefail "Ill-typed tuple"
-  | x :: xs ->
-      if tys = [] then typefail "Ill-typed tuple"
-      else
-        let (y :: ys) = tys in
-        let env' = extend_pattern_type env x y in
-        extend_multiple_pats env' xs ys
+  match (ps, tys) with
+  | [], [] -> env
+  | x :: xs, ty :: tys ->
+      let env' = extend_pattern_type env x ty in
+      extend_multiple_pats env' xs tys
+  | _, _ -> typefail "Ill-typed tuple"
 
 let rec type_elab state (env : environment) (ty : ExEffTypes.target_ty) =
   match ty with
@@ -493,6 +491,7 @@ and subs_var_in_term par subs term =
   | NRecord a -> NRecord (Assoc.map (subs_var_in_term par subs) a)
   | NVariant (lbl, None) -> NVariant (lbl, None)
   | NVariant (lbl, Some t) -> NVariant (lbl, Some (subs_var_in_term par subs t))
+  | _ -> failwith __LOC__
 
 and comp_elab state env c =
   match c with
@@ -523,7 +522,7 @@ and comp_elab state env c =
       in
       let tycomp, elabcomp = comp_elab state (extend_env env abs_list) comp in
       (tycomp, NoEff.NLetRec (List.map elab_letrec_abs abs_list, elabcomp))
-  | ExEff.Match (value, ty, abs_lst) ->
+  | ExEff.Match (value, ty, abs_lst) -> (
       let tyv, elabv = value_elab state env value in
       let tyskel, tyelab = dirty_elab state env ty in
       let elab_abs vty cty (pat, comp) =
@@ -533,18 +532,17 @@ and comp_elab state env c =
           (pattern_elab pat, elabc)
         else typefail "Ill-typed match branch"
       in
-      if List.length abs_lst = 0 then
-        (ty, NoEff.NMatch (elabv, tyelab, [], Location.unknown))
-      else
-        let ((p1, c1) :: _) = abs_lst in
-        let env' = extend_pattern_type env p1 tyv in
-        let tyc, elabc = comp_elab state env' c1 in
-        ( tyc,
-          NoEff.NMatch
-            ( elabv,
-              tyelab,
-              List.map (elab_abs tyv tyc) abs_lst,
-              Location.unknown ) )
+      match abs_lst with
+      | [] -> (ty, NoEff.NMatch (elabv, tyelab, [], Location.unknown))
+      | (p1, c1) :: _ ->
+          let env' = extend_pattern_type env p1 tyv in
+          let tyc, elabc = comp_elab state env' c1 in
+          ( tyc,
+            NoEff.NMatch
+              ( elabv,
+                tyelab,
+                List.map (elab_abs tyv tyc) abs_lst,
+                Location.unknown ) ))
   | ExEff.Apply (v1, v2) -> (
       let ty1, elab1 = value_elab state env v1 in
       match ty1 with

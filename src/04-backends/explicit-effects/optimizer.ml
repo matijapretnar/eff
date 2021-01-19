@@ -67,8 +67,12 @@ let refresh_abs2 a2 =
   res
 
 let is_relatively_pure st c h =
-  match TypeChecker.typeOfComputation st.tc_state c with
-  | ty, { Types.effect_set = ops; Types.row = Types.EmptyRow } ->
+  match
+    ( TypeChecker.typeOfComputation st.tc_state c,
+      TypeChecker.type_of_handler st.tc_state h )
+  with
+  | ( (ty, { Types.effect_set = ops; Types.row = Types.EmptyRow }),
+      Types.Handler (_, (_, output_dirt)) ) ->
       let handled_ops =
         EffectSet.of_list
           (List.map (fun ((eff, _), _) -> eff) (Assoc.to_list h.effect_clauses))
@@ -78,9 +82,6 @@ let is_relatively_pure st c h =
         (Types.print_effect_set handled_ops)
         (Types.print_effect_set ops);
       if EffectSet.is_empty (EffectSet.inter handled_ops ops) then
-        let (Types.Handler (_, (_, output_dirt))) =
-          TypeChecker.type_of_handler st.tc_state h
-        in
         match output_dirt with
         | { Types.effect_set = ops'; Types.row = Types.EmptyRow } ->
             Some
@@ -721,13 +722,16 @@ and optimize_sub_comp st c =
     | Value e1 -> Value (optimize_expr st e1)
     | LetVal (e1, abs) ->
         LetVal (optimize_expr st e1, optimize_abstraction_with_ty st abs)
-    | LetRec ([ (var, argTy, resTy, (p, rhs)) ], c) ->
-        let st' = extend_var_type st var (Types.Arrow (argTy, resTy)) in
-        let e1 = Lambda (p, argTy, rhs) in
-        let st'' = extend_rec_fun st' var (Types.Arrow (argTy, resTy)) e1 in
-        LetRec
-          ( [ (var, argTy, resTy, optimize_abstraction st' argTy (p, rhs)) ],
-            optimize_comp st'' c )
+    | LetRec (defs, c) -> (
+        match defs with
+        | [ (var, argTy, resTy, (p, rhs)) ] ->
+            let st' = extend_var_type st var (Types.Arrow (argTy, resTy)) in
+            let e1 = Lambda (p, argTy, rhs) in
+            let st'' = extend_rec_fun st' var (Types.Arrow (argTy, resTy)) e1 in
+            LetRec
+              ( [ (var, argTy, resTy, optimize_abstraction st' argTy (p, rhs)) ],
+                optimize_comp st'' c )
+        | _ -> failwith __LOC__)
     | Match (e1, resTy, abstractions) ->
         let ty = TypeChecker.typeOfExpression st.tc_state e1 in
         Match

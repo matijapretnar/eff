@@ -156,16 +156,19 @@ let rec print_term ?max_level t ppf =
   | NRecord recs -> Print.record CoreTypes.Field.print print_term recs ppf
   | NVariant (l, Some t) ->
       print "Variant %t %t" (CoreTypes.Label.print l) (print_term t)
+  | NVariant (l, None) -> print "Variant %t" (CoreTypes.Label.print l)
 
 and print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p with
   | PNVar var -> print "%t" (print_variable var)
-  | PNAs (pat, var) -> print "As %t = %t" (print_variable var) (print_pattern p)
+  | PNAs (_pat, var) ->
+      print "As %t = %t" (print_variable var) (print_pattern p)
   | PNTuple ps -> Print.tuple print_pattern ps ppf
   | PNRecord recs -> Print.record CoreTypes.Field.print print_pattern recs ppf
   | PNVariant (l, Some t) ->
       print "Variant %t %t" (CoreTypes.Label.print l) (print_pattern t)
+  | PNVariant (l, None) -> print "Variant %t" (CoreTypes.Label.print l)
   | PNConst c -> Const.print c ppf
   | PNNonbinding -> print "_"
 
@@ -203,7 +206,8 @@ and print_coercion ?max_level coer ppf =
   | NCoerLeftHandler c -> print "(leftH %t)" (print_coercion c)
   | NCoerRightHandler c -> print "(rightH %t)" (print_coercion c)
   | NCoerPure c -> print "(pure %t)" (print_coercion c)
-  | NCoerTuple ls -> print "tuplecoer"
+  | NCoerTuple _ls -> print "tuplecoer"
+  | NCoerApply (_ty_name, _cs) -> print "applycoer"
 
 and print_type ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
