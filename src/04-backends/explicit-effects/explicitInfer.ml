@@ -232,93 +232,6 @@ let instantiateVariable (x : Typed.variable) (scheme : Types.target_ty) :
   (targetX, subInValTy sub monotype, wantedTyCs @ wantedDirtCs)
 
 (* ************************************************************************* *)
-(*                     LET-GENERALIZATION UTILITIES                          *)
-(* ************************************************************************* *)
-
-(* GEORGE: Shall we use filter_map? That would bump the requirements for
- * installation (OCaml 4.08.0). Also, I would suggest adding more checks here;
- * only a few kinds of constraints are expected after constraint solving. *)
-let partitionResidualCs :
-    Typed.omega_ct list ->
-    (CoreTypes.TyParam.t * Types.SkelParam.t) list
-    * (Types.TyCoercionParam.t * Types.ct_ty) list
-    * (Types.DirtCoercionParam.t * Types.ct_dirt) list =
-  let rec aux = function
-    | [] -> ([], [], [])
-    | Typed.TyParamHasSkel (a, Types.SkelParam s) :: rest ->
-        let alphaSkels, tyCs, dirtCs = aux rest in
-        ((a, s) :: alphaSkels, tyCs, dirtCs)
-    | TyOmega (o, ct) :: rest ->
-        let alphaSkels, tyCs, dirtCs = aux rest in
-        (alphaSkels, (o, ct) :: tyCs, dirtCs)
-    | DirtOmega (o, ct) :: rest ->
-        let alphaSkels, tyCs, dirtCs = aux rest in
-        (alphaSkels, tyCs, (o, ct) :: dirtCs)
-    | _cs -> failwith "partitionResidualCs: malformed"
-  in
-  aux
-
-(* Detect the components to abstract over from the residual constraints. To be
- * used in let-generalization. *)
-(* GEORGE NOTE: We might have "dangling" dirt variables at the end. In the end
- * check whether this is the case and if it is compute the dirt variables from
- * the elaborated expression and pass them in. *)
-let mkGenParts (cs : Typed.omega_ct list) :
-    Types.SkelParam.t list
-    * (CoreTypes.TyParam.t * Types.skeleton) list
-    * Types.DirtParam.t list
-    * (Types.TyCoercionParam.t * Types.ct_ty) list
-    * (Types.DirtCoercionParam.t * Types.ct_dirt) list =
-  let alphasSkelVars, tyCs, dirtCs = partitionResidualCs cs in
-  let skelVars =
-    alphasSkelVars
-    |> List.map snd (* Keep only the skeleton variables *)
-    |> Types.SkelParamSet.of_list (* Convert to a set *)
-    |> Types.SkelParamSet.elements
-  in
-
-  (* Convert back to a list *)
-  let alphaSkels =
-    List.map (fun (a, s) -> (a, Types.SkelParam s)) alphasSkelVars
-  in
-  let dirtVars =
-    List.fold_right
-      (fun ct dvs -> Types.DirtParamSet.union (Typed.fdvsOfOmegaCt ct) dvs)
-      cs Types.DirtParamSet.empty
-    |> Types.DirtParamSet.elements
-  in
-  (*let tyDirtVars  = Types.fdvsOfTargetValTy valTy in (* fv(A) *) *)
-  (skelVars, alphaSkels, dirtVars, tyCs, dirtCs)
-
-(* Create a generalized type from parts (as delivered from "mkGenParts"). *)
-let mkGeneralizedType (tyCs : (Types.TyCoercionParam.t * Types.ct_ty) list)
-    (dirtCs : (Types.DirtCoercionParam.t * Types.ct_dirt) list)
-    (monotype : Types.target_ty) : Types.target_ty =
-  (* expected to be a monotype! *)
-  monotype
-  |> (* 1: Add the constraint abstractions (dirt) *)
-  List.fold_right (fun (_, pi) qual -> Types.QualDirt (pi, qual)) dirtCs
-  |> (* 2: Add the constraint abstractions (type) *)
-  List.fold_right (fun (_, pi) qual -> Types.QualTy (pi, qual)) tyCs
-
-(* Create a generalized term from parts (as delivered from "mkGenParts"). *)
-(* GEORGE NOTE: We might have "dangling" dirt variables at the end. In the end
- * check whether this is the case and if it is compute the dirt variables from
- * the elaborated expression and pass them in. *)
-let mkGeneralizedTerm (tyCs : (Types.TyCoercionParam.t * Types.ct_ty) list)
-    (dirtCs : (Types.DirtCoercionParam.t * Types.ct_dirt) list)
-    (exp : Typed.expression) : Typed.expression =
-  exp
-  |> (* 1: Add the constraint abstractions (dirt) *)
-  List.fold_right
-    (fun (omega, pi) qual -> Typed.LambdaDirtCoerVar (omega, pi, qual))
-    dirtCs
-  |> (* 2: Add the constraint abstractions (type) *)
-  List.fold_right
-    (fun (omega, pi) qual -> Typed.LambdaTyCoerVar (omega, pi, qual))
-    tyCs
-
-(* ************************************************************************* *)
 (*                           BASIC DEFINITIONS                               *)
 (* ************************************************************************* *)
 
@@ -1186,6 +1099,101 @@ and tcTypedAbstraction2 (inState : state) (lclCtx : TypingEnv.t)
   (((trgPat1, trgPat2, trgCmp), (patTy1, patTy2, cmpTy)), hack1 @ hack2 @ cs)
 
 (* ************************************************************************* *)
+(*                     LET-GENERALIZATION UTILITIES                          *)
+(* ************************************************************************* *)
+
+(* GEORGE: I would suggest adding more checks here;
+ * only a few kinds of constraints are expected after constraint solving. *)
+let rec partitionResidualCs = function
+  | [] -> ([], [], [])
+  | Typed.TyParamHasSkel (a, Types.SkelParam s) :: rest ->
+      let alphaSkels, tyCs, dirtCs = partitionResidualCs rest in
+      ((a, s) :: alphaSkels, tyCs, dirtCs)
+  | TyOmega (o, ct) :: rest ->
+      let alphaSkels, tyCs, dirtCs = partitionResidualCs rest in
+      (alphaSkels, (o, ct) :: tyCs, dirtCs)
+  | DirtOmega (o, ct) :: rest ->
+      let alphaSkels, tyCs, dirtCs = partitionResidualCs rest in
+      (alphaSkels, tyCs, (o, ct) :: dirtCs)
+  | _cs -> failwith "partitionResidualCs: malformed"
+
+(* Detect the components to abstract over from the residual constraints. To be
+ * used in let-generalization. *)
+(* GEORGE NOTE: We might have "dangling" dirt variables at the end. In the end
+ * check whether this is the case and if it is compute the dirt variables from
+ * the elaborated expression and pass them in. *)
+let mkGenParts (cs : Typed.omega_ct list) :
+    Types.SkelParam.t list
+    * (CoreTypes.TyParam.t * Types.skeleton) list
+    * Types.DirtParam.t list
+    * (Types.TyCoercionParam.t * Types.ct_ty) list
+    * (Types.DirtCoercionParam.t * Types.ct_dirt) list =
+  let alphasSkelVars, tyCs, dirtCs = partitionResidualCs cs in
+  let skelVars =
+    alphasSkelVars
+    |> List.map snd (* Keep only the skeleton variables *)
+    |> Types.SkelParamSet.of_list (* Convert to a set *)
+    |> Types.SkelParamSet.elements
+  in
+
+  (* Convert back to a list *)
+  let alphaSkels =
+    List.map (fun (a, s) -> (a, Types.SkelParam s)) alphasSkelVars
+  in
+  let dirtVars =
+    List.fold_right
+      (fun ct dvs -> Types.DirtParamSet.union (Typed.fdvsOfOmegaCt ct) dvs)
+      cs Types.DirtParamSet.empty
+    |> Types.DirtParamSet.elements
+  in
+  (*let tyDirtVars  = Types.fdvsOfTargetValTy valTy in (* fv(A) *) *)
+  (skelVars, alphaSkels, dirtVars, tyCs, dirtCs)
+
+(* Create a generalized type from parts (as delivered from "mkGenParts"). *)
+let mkGeneralizedType (_freeSkelVars : Types.SkelParam.t list)
+    (_annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
+    (_freeDirtVars : Types.DirtParam.t list)
+    (tyCs : (Types.TyCoercionParam.t * Types.ct_ty) list)
+    (dirtCs : (Types.DirtCoercionParam.t * Types.ct_dirt) list)
+    (monotype : Types.target_ty) : Types.target_ty =
+  (* expected to be a monotype! *)
+  monotype
+  |> (* 1: Add the constraint abstractions (dirt) *)
+  List.fold_right (fun (_, pi) qual -> Types.QualDirt (pi, qual)) dirtCs
+  |> (* 2: Add the constraint abstractions (type) *)
+  List.fold_right (fun (_, pi) qual -> Types.QualTy (pi, qual)) tyCs
+
+(* Create a generalized term from parts (as delivered from "mkGenParts"). *)
+(* GEORGE NOTE: We might have "dangling" dirt variables at the end. In the end
+ * check whether this is the case and if it is compute the dirt variables from
+ * the elaborated expression and pass them in. *)
+let mkGeneralizedExpression (_freeSkelVars : Types.SkelParam.t list)
+    (_annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
+    (_freeDirtVars : Types.DirtParam.t list)
+    (tyCs : (Types.TyCoercionParam.t * Types.ct_ty) list)
+    (dirtCs : (Types.DirtCoercionParam.t * Types.ct_dirt) list)
+    (exp : Typed.expression) : Typed.expression =
+  exp
+  |> (* 1: Add the constraint abstractions (dirt) *)
+  List.fold_right
+    (fun (omega, pi) qual -> Typed.LambdaDirtCoerVar (omega, pi, qual))
+    dirtCs
+  |> (* 2: Add the constraint abstractions (type) *)
+  List.fold_right
+    (fun (omega, pi) qual -> Typed.LambdaTyCoerVar (omega, pi, qual))
+    tyCs
+
+let generalize cs ty expr =
+  let freeSkelVars, annFreeTyVars, freeDirtVars, tyVs, dirtCs = mkGenParts cs in
+  let ty' =
+    mkGeneralizedType freeSkelVars annFreeTyVars freeDirtVars tyVs dirtCs ty
+  and expr' =
+    mkGeneralizedExpression freeSkelVars annFreeTyVars freeDirtVars tyVs dirtCs
+      expr
+  in
+  (ty', expr')
+
+(* ************************************************************************* *)
 (*                         LET-REC-GENERALIZATION                            *)
 (* ************************************************************************* *)
 
@@ -1233,85 +1241,61 @@ let tcTopLetRec (inState : state) (var : Untyped.variable)
   let trgC1 = subInCmp subst c1'' in
 
   (* 7: Partition the residual constraints and abstract over them *)
-  let _freeSkelVars, _annFreeTyVars, _freeDirtVars, _tyVs, _dirtCs =
-    mkGenParts residuals
-  in
-
-  (* GEORGE STOPPED HERE *)
-
-  (*
-let outExpr = Typed.LetRec ([(var, trgPatTy, (tyA1, dirtD1), (trgPat,c1''))], trgC2) in
-
-let mkGeneralizedType
-    (freeSkelVars  : Types.SkelParam.t list)
-    (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
-    (freeDirtVars  : Types.DirtParam.t list)
-    (tyCs   : (Types.TyCoercionParam.t   * Types.ct_ty)   list)
-    (dirtCs : (Types.DirtCoercionParam.t * Types.ct_dirt) list)
-    (monotype : Types.target_ty) (* expected to be a monotype! *)
-  : Types.target_ty
-let mkGeneralizedTerm
-    (freeSkelVars  : Types.SkelParam.t list)
-    (annFreeTyVars : (CoreTypes.TyParam.t * Types.skeleton) list)
-    (freeDirtVars  : Types.DirtParam.t list)
-    (tyCs   : (Types.TyCoercionParam.t   * Types.ct_ty)   list)
-    (dirtCs : (Types.DirtCoercionParam.t * Types.ct_dirt) list)
-    (exp : Typed.expression)
-  : Typed.expression =
-*)
-  (* Filip: Quick and dirty to make it work *)
-  let outExpr = ([ (var, trgPatTy, (tyA1, dirtD1), (trgPat, c1'')) ], trgC1) in
-  (outExpr, Types.Arrow (trgPatTy, (tyA1, dirtD1)))
-
-(* failwith __LOC__ *)
-(* GEORGE TODO: Decide what do we return *)
+  let outTy, _ =
+    generalize residuals
+      (Types.Arrow (trgPatTy, (tyA1, dirtD1)))
+      (Typed.Tuple [])
+  (* Matija: Make sure to generalize the expression as well *)
+  and outExpr = ([ (var, trgPatTy, (tyA1, dirtD1), (trgPat, c1'')) ], trgC1) in
+  (outExpr, outTy)
 
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 
 (* Finalize a list of constraints, setting all dirt variables to the empty set. *)
-let finalize_constraint sub ct =
-  match ct with
-  | Typed.TyOmega (tcp, ctty) ->
-      Error.typing ~loc:Location.unknown
-        "Unsolved type inequality in top-level computation: %t"
-        (Typed.print_omega_ct (Typed.TyOmega (tcp, ctty)))
-  | Typed.DirtOmega
+let finalize_constraints ct =
+  let check_skeleton_constraints = function
+    | [] -> ()
+    | (tp, sk) :: _ ->
+        Error.typing ~loc:Location.unknown
+          "Unsolved param-has-skel constraint in top-level computation: %t"
+          (Typed.print_omega_ct (Typed.TyParamHasSkel (tp, Types.SkelParam sk)))
+  in
+  let check_type_inequalities = function
+    | [] -> ()
+    | (tcp, ctty) :: _ ->
+        Error.typing ~loc:Location.unknown
+          "Unsolved type inequality in top-level computation: %t"
+          (Typed.print_omega_ct (Typed.TyOmega (tcp, ctty)))
+  in
+  let remove_dirt_variable sub
       ( dcp,
         ( { Types.effect_set = s1; Types.row = row1 },
-          { Types.effect_set = s2; Types.row = row2 } ) ) ->
-      assert (Types.EffectSet.subset s1 s2);
-      let sub' =
-        Substitution.add_dirt_var_coercion dcp
-          (Typed.UnionDirt
-             (s1, Typed.Empty (Types.closed_dirt (Types.EffectSet.diff s2 s1))))
-          sub
-      in
-      let subs'' =
-        match (row1, row2) with
-        | Types.EmptyRow, Types.ParamRow dv2 ->
-            Substitution.add_dirt_substitution dv2 Types.empty_dirt sub'
-        | Types.ParamRow dv1, Types.EmptyRow ->
-            Substitution.add_dirt_substitution dv1 Types.empty_dirt sub'
-        | Types.ParamRow dv1, Types.ParamRow dv2 ->
-            Substitution.add_dirt_substitution dv1 Types.empty_dirt sub'
-            |> Substitution.add_dirt_substitution dv2 Types.empty_dirt
-        | Types.EmptyRow, Types.EmptyRow -> sub'
-      in
-      subs''
-  | Typed.SkelEq (_sk1, _sk2) -> failwith __LOC__
-  | Typed.TyParamHasSkel (tp, sk) ->
-      Error.typing ~loc:Location.unknown
-        "Unsolved param-has-skel constraint in top-level computation: %t"
-        (Typed.print_omega_ct (Typed.TyParamHasSkel (tp, sk)))
-  | Typed.DirtyOmega ((_, _), _) -> failwith __LOC__
-
-(* GEORGE: I think this is unused *)
-
-let finalize_constraints c_list =
-  List.fold_left
-    (fun subs ct -> finalize_constraint subs ct)
-    Substitution.empty c_list
+          { Types.effect_set = s2; Types.row = row2 } ) ) =
+    assert (Types.EffectSet.subset s1 s2);
+    let sub' =
+      Substitution.add_dirt_var_coercion dcp
+        (Typed.UnionDirt
+           (s1, Typed.Empty (Types.closed_dirt (Types.EffectSet.diff s2 s1))))
+        sub
+    in
+    let subs'' =
+      match (row1, row2) with
+      | Types.EmptyRow, Types.ParamRow dv2 ->
+          Substitution.add_dirt_substitution dv2 Types.empty_dirt sub'
+      | Types.ParamRow dv1, Types.EmptyRow ->
+          Substitution.add_dirt_substitution dv1 Types.empty_dirt sub'
+      | Types.ParamRow dv1, Types.ParamRow dv2 ->
+          Substitution.add_dirt_substitution dv1 Types.empty_dirt sub'
+          |> Substitution.add_dirt_substitution dv2 Types.empty_dirt
+      | Types.EmptyRow, Types.EmptyRow -> sub'
+    in
+    subs''
+  in
+  let alphasSkelVars, tyCs, dirtCs = partitionResidualCs ct in
+  check_skeleton_constraints alphasSkelVars;
+  check_type_inequalities tyCs;
+  List.fold_left remove_dirt_variable Substitution.empty dirtCs
 
 (* GEORGE: Document *)
 let mkCmpDirtGroundSubst cmp =
