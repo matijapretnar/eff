@@ -1229,8 +1229,7 @@ let tcTopLetRec (inState : state) (var : Untyped.variable)
 
   (* 5: Solve (simplify, actually) the generated constraints *)
   let subst, residuals =
-    let cs = alphaSkel :: betaSkel :: omegaCt1 :: omegaCt2 :: cs in
-    Unification.unify (Substitution.empty, [], cs)
+    Unification.solve (alphaSkel :: betaSkel :: omegaCt1 :: omegaCt2 :: cs)
   in
 
   (* 6: Substitute back into everything *)
@@ -1320,9 +1319,7 @@ let tcTopLevelMono inState cmp =
   (* 2: Constraint solving *)
   let solverSigma, residualCs =
     (* A: Solve the constraints as they are *)
-    let initialSigma, initialResiduals =
-      Unification.unify (Substitution.empty, [], generatedCs)
-    in
+    let initialSigma, initialResiduals = Unification.solve generatedCs in
     (* B: Ground the free skeleton variables *)
     let skelGroundResiduals =
       List.map
@@ -1338,9 +1335,7 @@ let tcTopLevelMono inState cmp =
         initialResiduals
     in
     (* C: Solve again *)
-    let secondSigma, secondResiduals =
-      Unification.unify (Substitution.empty, [], skelGroundResiduals)
-    in
+    let secondSigma, secondResiduals = Unification.solve skelGroundResiduals in
     (* Combine the results *)
     (extendGenSub initialSigma secondSigma, secondResiduals)
   in

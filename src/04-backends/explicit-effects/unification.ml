@@ -1,10 +1,6 @@
 open Utils
 open Types
 open Typed
-module STyParams = Set.Make (CoreTypes.TyParam)
-
-let set_of_list =
-  List.fold_left (fun acc x -> STyParams.add x acc) STyParams.empty
 
 let rec print_c_list = function
   | [] -> Print.debug "---------------------"
@@ -411,3 +407,5 @@ let rec unify (sub, paused, queue) =
       in
       (* Print.debug "=========End loop============" ; *)
       unify new_state
+
+let solve constraints = unify (Substitution.empty, [], constraints)
