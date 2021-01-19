@@ -84,9 +84,7 @@ let rec ceval state c =
       let e' = veval state e in
       V.Call (eff, e', fun r -> V.Value r)
   | Term.Bind (c1, (p, c2)) -> eval_let state [ (p, c1) ] c2
-  | Term.CastComp (c, _) | Term.CastComp_ty (c, _) | Term.CastComp_dirt (c, _)
-    ->
-      ceval state c
+  | Term.CastComp (c, _) -> ceval state c
 
 and eval_let state lst c =
   match lst with

@@ -221,12 +221,6 @@ and specialize (fvar : Term.variable) (fbody : Term.expression)
     | CastComp (c1, dtyco) ->
         let c1' = specialize_comp c1 in
         CastComp (c1', dtyco)
-    | CastComp_ty (c1, tyco) ->
-        let c1' = specialize_comp c1 in
-        CastComp_ty (c1', tyco)
-    | CastComp_dirt (c1, dco) ->
-        let c1' = specialize_comp c1 in
-        CastComp_dirt (c1', dco)
   and specialize_expr (e : expression) : expression =
     match e with
     | Var _ -> e
@@ -751,8 +745,6 @@ and optimize_sub_comp st c =
         Bind (optimize_comp st c1, optimize_abs st ty abstraction)
     | CastComp (c1, dirty_coercion) ->
         CastComp (optimize_comp st c1, optimize_dirty_coercion st dirty_coercion)
-    | CastComp_ty (c1, ty_coercion) -> failwith __LOC__
-    | CastComp_dirt (c1, dirt_coercion) -> failwith __LOC__
   in
   plain_c'
 
@@ -1032,10 +1024,7 @@ and reduce_comp st c =
           let st' = extend_pat_type st p12 ty12 in
           let c12' = reduce_comp st' (CastComp (c12, dtyco)) in
           Call (op, e11, (p12, ty12, c12'))
-      | CastComp_ty (c1, ty_coercion) -> c
-      | CastComp_dirt (c1, dirt_coercion) -> c
       | _ -> c)
-  | _ -> c
 
 (*
   | _ when outOfFuel st -> c

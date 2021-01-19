@@ -39,8 +39,6 @@ and dirty_coercion =
 type omega_ct =
   | TyOmega of (Type.TyCoercionParam.t * Type.ct_ty)
   | DirtOmega of (Type.DirtCoercionParam.t * Type.ct_dirt)
-  | DirtyOmega of
-      ((Type.TyCoercionParam.t * Type.DirtCoercionParam.t) * Type.ct_dirty)
   | SkelEq of Type.skeleton * Type.skeleton
   | TyParamHasSkel of (CoreTypes.TyParam.t * Type.skeleton)
 
@@ -131,12 +129,6 @@ and print_omega_ct ?max_level c ppf =
         (Type.DirtCoercionParam.print p)
         (Type.print_target_dirt ty1)
         (Type.print_target_dirt ty2)
-  | DirtyOmega ((p1, p2), (dirty1, dirty2)) ->
-      print "%t ! %t: (%t =< %t)"
-        (Type.TyCoercionParam.print p1)
-        (Type.DirtCoercionParam.print p2)
-        (Type.print_target_dirty dirty1)
-        (Type.print_target_dirty dirty2)
   | SkelEq (sk1, sk2) ->
       print "%t ~ %t" (Type.print_skeleton sk1) (Type.print_skeleton sk2)
   | TyParamHasSkel (tp, sk1) ->
@@ -166,13 +158,13 @@ let fresh_ty_coer cons =
   let param = Type.TyCoercionParam.fresh () in
   (TyCoercionVar param, TyOmega (param, cons))
 
-let fresh_dirty_coer cons =
+let fresh_dirty_coer ((ty1, drt1), (ty2, drt2)) =
   let ty_param = Type.TyCoercionParam.fresh () in
   let dirt_param = Type.DirtCoercionParam.fresh () in
   let coer =
     BangCoercion (TyCoercionVar ty_param, DirtCoercionVar dirt_param)
   in
-  (coer, DirtyOmega ((ty_param, dirt_param), cons))
+  (coer, TyOmega (ty_param, (ty1, ty2)), DirtOmega (dirt_param, (drt1, drt2)))
 
 (* ************************************************************************* *)
 (*                        FREE PARAMETER COMPUTATION                         *)
@@ -181,8 +173,6 @@ let fresh_dirty_coer cons =
 let free_params_constraint = function
   | TyOmega (_, ct) -> Type.free_params_ct_ty ct
   | DirtOmega (_, ct) -> Type.free_params_ct_dirt ct
-  | DirtyOmega ((_, _), ct) ->
-      Type.free_params_ct_dirty ct (* GEORGE: Is anyone using "DirtyOmega"? *)
   | SkelEq (_, _) -> Type.FreeParams.empty
   | TyParamHasSkel (_, _) -> Type.FreeParams.empty
 

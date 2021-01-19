@@ -215,15 +215,18 @@ and ty_omega_step sub paused cons rest_queue omega = function
   (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
   | Type.Arrow (a1, dirty1), Type.Arrow (a2, dirty2) ->
       let new_ty_coercion_var_coer, ty_cons = fresh_ty_coer (a2, a1)
-      and dirty_coercion_c, dirty_cons = fresh_dirty_coer (dirty1, dirty2) in
+      and dirty_coercion_c, dirty_cons1, dirty_cons2 =
+        fresh_dirty_coer (dirty1, dirty2)
+      in
       let k = omega in
       let v =
         Constraint.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
       in
       ( Substitution.add_type_coercion k v sub,
         paused,
-        add_to_constraints ty_cons rest_queue |> add_to_constraints dirty_cons
-      )
+        add_to_constraints ty_cons rest_queue
+        |> add_to_constraints dirty_cons1
+        |> add_to_constraints dirty_cons2 )
   (* ω : A₁ x A₂ x ... <= B₁ x B₂ x ...  *)
   | Type.Tuple tys, Type.Tuple tys' when List.length tys = List.length tys' ->
       let coercions, conss =
@@ -256,14 +259,16 @@ and ty_omega_step sub paused cons rest_queue omega = function
         add_list_to_constraints conss rest_queue )
   (* ω : D₁ => C₁ <= D₂ => C₂ *)
   | Type.Handler (drty11, drty12), Type.Handler (drty21, drty22) ->
-      let drty_coer1, drty_cons1 = fresh_dirty_coer (drty21, drty11)
-      and drty_coer2, drty_cons2 = fresh_dirty_coer (drty12, drty22) in
+      let drty_coer1, ty_cons1, drt_cons1 = fresh_dirty_coer (drty21, drty11)
+      and drty_coer2, ty_cons2, drt_cons2 = fresh_dirty_coer (drty12, drty22) in
       let k = omega in
       let v = Constraint.HandlerCoercion (drty_coer1, drty_coer2) in
       ( Substitution.add_type_coercion k v sub,
         paused,
-        add_to_constraints drty_cons1 rest_queue
-        |> add_to_constraints drty_cons2 )
+        add_to_constraints ty_cons1 rest_queue
+        |> add_to_constraints ty_cons2
+        |> add_to_constraints drt_cons1
+        |> add_to_constraints drt_cons2 )
   (* ω : α <= A /  ω : A <= α *)
   | Type.TyParam tv, a | a, Type.TyParam tv ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
@@ -363,15 +368,6 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
           (add_list_to_constraints paused rest_queue) )
   | _ -> (sub, cons :: paused, rest_queue)
 
-let dirty_omega_step sub paused rest_queue (omega1, omega2) drtycons =
-  let (ty1, drt1), (ty2, drt2) = drtycons in
-  let ty_cons = TyOmega (omega1, (ty1, ty2))
-  and dirt_cons = DirtOmega (omega2, (drt1, drt2)) in
-  let sub', paused', rest_queue' =
-    ty_omega_step sub paused ty_cons rest_queue omega1 (ty1, ty2)
-  in
-  dirt_omega_step sub' paused' dirt_cons rest_queue' omega2 (drt1, drt2)
-
 let rec unify (sub, paused, queue) =
   (* Print.debug "=============Start loop============" ;
      Print.debug "-----Subs-----" ;
@@ -400,9 +396,6 @@ let rec unify (sub, paused, queue) =
         (* ω : Δ₁ <= Δ₂ *)
         | Constraint.DirtOmega (omega, dcons) ->
             dirt_omega_step sub paused cons rest_queue omega dcons
-        (* ω : A ! Δ₁ <= B ! Δ₂ *)
-        | Constraint.DirtyOmega (omega, drtycons) ->
-            dirty_omega_step sub paused rest_queue omega drtycons
       in
       (* Print.debug "=========End loop============" ; *)
       unify new_state

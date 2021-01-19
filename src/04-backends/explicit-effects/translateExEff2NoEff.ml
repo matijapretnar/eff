@@ -614,7 +614,6 @@ and comp_elab state env c =
       if Type.types_are_equal (fst cty) (fst t1) then
         (t2, NoEff.NCast (coelab, elabc))
       else typefail "Ill-typed cast"
-  | CastComp_ty (_, _) | CastComp_dirt (_, _) -> failwith "Not implemented"
 
 and elab_ty = function
   | Language.Type.Apply (name, ts) -> NoEff.NTyApply (name, List.map elab_ty ts)

@@ -219,10 +219,6 @@ let rec apply_sub_comp sub computation =
   | Bind (c1, a1) -> Bind (apply_sub_comp sub c1, apply_sub_abs sub a1)
   | CastComp (c1, dc1) ->
       CastComp (apply_sub_comp sub c1, apply_sub_dirtycoer sub dc1)
-  | CastComp_ty (c1, tc1) ->
-      CastComp_ty (apply_sub_comp sub c1, apply_sub_tycoer sub tc1)
-  | CastComp_dirt (c1, tc1) ->
-      CastComp_dirt (apply_sub_comp sub c1, apply_sub_dirtcoer sub tc1)
   | _ -> failwith __LOC__
 
 and apply_sub_exp sub expression =
