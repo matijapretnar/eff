@@ -7,7 +7,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test1.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test1.eff")))))
 
 (rule
  (alias runtest)
@@ -23,7 +23,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test10.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test10.eff")))))
 
 (rule
  (alias runtest)
@@ -39,7 +39,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test11.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test11.eff")))))
 
 (rule
  (alias runtest)
@@ -55,7 +55,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test12.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test12.eff")))))
 
 (rule
  (alias runtest)
@@ -71,7 +71,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test13.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test13.eff")))))
 
 (rule
  (alias runtest)
@@ -87,7 +87,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test14.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test14.eff")))))
 
 (rule
  (alias runtest)
@@ -103,7 +103,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test15.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test15.eff")))))
 
 (rule
  (alias runtest)
@@ -119,7 +119,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test16.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test16.eff")))))
 
 (rule
  (alias runtest)
@@ -135,7 +135,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test17.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test17.eff")))))
 
 (rule
  (alias runtest)
@@ -151,7 +151,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test18.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test18.eff")))))
 
 (rule
  (alias runtest)
@@ -167,7 +167,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test19.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test19.eff")))))
 
 (rule
  (alias runtest)
@@ -183,7 +183,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test2.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test2.eff")))))
 
 (rule
  (alias runtest)
@@ -199,7 +199,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test4.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test4.eff")))))
 
 (rule
  (alias runtest)
@@ -215,7 +215,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test5.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test5.eff")))))
 
 (rule
  (alias runtest)
@@ -231,7 +231,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test6.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test6.eff")))))
 
 (rule
  (alias runtest)
@@ -247,7 +247,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test7.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test7.eff")))))
 
 (rule
  (alias runtest)
@@ -263,7 +263,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test8.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test8.eff")))))
 
 (rule
  (alias runtest)
@@ -279,7 +279,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --explicit-effects "./test9.eff")))))
+       (run eff --no-stdlib --explicit-effects "./test9.eff")))))
 
 (rule
  (alias runtest)

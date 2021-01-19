@@ -7,7 +7,7 @@
  (action
   (with-stdout-to
    %{targets}
-   (run ../../generate_dune_rules.exe 0 "--explicit-effects"))))
+   (run ../../generate_dune_rules.exe 0 "--no-stdlib --explicit-effects"))))
 
 (rule
  (alias generate_tests)
