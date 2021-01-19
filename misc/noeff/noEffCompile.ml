@@ -1,29 +1,29 @@
-let is_dirt_empty (dirt : Types.dirt) =
+let is_dirt_empty (dirt : Type.dirt) =
   match dirt.row with
-  | Types.EmptyRow -> Types.EffectSet.is_empty dirt.effect_set
-  | Types.ParamRow _ -> false
+  | Type.EmptyRow -> Type.EffectSet.is_empty dirt.effect_set
+  | Type.ParamRow _ -> false
 
 let rec compile_type exeff_ty =
   match exeff_ty with
-  | Types.TyParam ty_param -> NoEffSyntax.TyVar ty_param
-  | Types.Apply (ty_name, tys) ->
+  | Type.TyParam ty_param -> NoEffSyntax.TyVar ty_param
+  | Type.Apply (ty_name, tys) ->
       NoEffSyntax.TyApply (ty_name, List.map compile_type tys)
-  | Types.Arrow (ty1, drty2) ->
+  | Type.Arrow (ty1, drty2) ->
       NoEffSyntax.TyArrow (compile_type ty1, compile_dirty_type drty2)
-  | Types.Tuple tys -> NoEffSyntax.TyTuple (List.map compile_type tys)
-  | Types.Handler ((ty1, ty_dirt1), (ty2, ty_dirt2)) ->
+  | Type.Tuple tys -> NoEffSyntax.TyTuple (List.map compile_type tys)
+  | Type.Handler ((ty1, ty_dirt1), (ty2, ty_dirt2)) ->
       if is_dirt_empty ty_dirt1 then
         NoEffSyntax.TyArrow (compile_type ty1, compile_type ty2)
       else NoEffSyntax.TyHandler (compile_type ty1, compile_type ty2)
-  | Types.TyBasic ty_const -> NoEffSyntax.TyBasic ty_const
-  | Types.QualTy (pi, ty) ->
+  | Type.TyBasic ty_const -> NoEffSyntax.TyBasic ty_const
+  | Type.QualTy (pi, ty) ->
       NoEffSyntax.TyQualification (compile_coercion_type pi, compile_type ty)
-  | Types.QualDirt (_, ty) -> compile_type ty
+  | Type.QualDirt (_, ty) -> compile_type ty
 
-(* | Types.TySchemeTy (ty_param, _, ty) ->
+(* | Type.TySchemeTy (ty_param, _, ty) ->
     NoEffSyntax.TyForAll (ty_param, compile_type ty) *)
-(* | Types.TySchemeDirt (_, ty) -> compile_type ty *)
-(* | Types.TySchemeSkel (_, ty) -> compile_type ty *)
+(* | Type.TySchemeDirt (_, ty) -> compile_type ty *)
+(* | Type.TySchemeSkel (_, ty) -> compile_type ty *)
 and compile_dirty_type (ty, dirt) =
   if is_dirt_empty dirt then compile_type ty
   else NoEffSyntax.TyComputation (compile_type ty)
@@ -33,33 +33,33 @@ and compile_coercion_type (ty1, ty2) =
 
 let rec compile_pattern exeff_pat =
   match exeff_pat with
-  | Typed.PVar v -> NoEffSyntax.PVar v
-  | Typed.PAs (pat, v) -> NoEffSyntax.PAs (compile_pattern pat, v)
-  | Typed.PTuple pats -> NoEffSyntax.PTuple (List.map compile_pattern pats)
-  | Typed.PRecord patr -> NoEffSyntax.PRecord (Assoc.map compile_pattern patr)
-  | Typed.PVariant (lab, pat) -> NoEffSyntax.PVariant (lab, compile_pattern pat)
-  | Typed.PConst c -> NoEffSyntax.PConst c
-  | Typed.PNonbinding -> NoEffSyntax.PNonbinding
+  | Term.PVar v -> NoEffSyntax.PVar v
+  | Term.PAs (pat, v) -> NoEffSyntax.PAs (compile_pattern pat, v)
+  | Term.PTuple pats -> NoEffSyntax.PTuple (List.map compile_pattern pats)
+  | Term.PRecord patr -> NoEffSyntax.PRecord (Assoc.map compile_pattern patr)
+  | Term.PVariant (lab, pat) -> NoEffSyntax.PVariant (lab, compile_pattern pat)
+  | Term.PConst c -> NoEffSyntax.PConst c
+  | Term.PNonbinding -> NoEffSyntax.PNonbinding
 
 let rec fun_apply_dirty_coercion bang_fun sequence_fun exeff_dirty_coer =
   match exeff_dirty_coer with
-  | Typed.BangCoercion (ty_coer, drt_coer) -> bang_fun ty_coer drt_coer
-  | Typed.RightArrow ty_coer -> (
+  | Term.BangCoercion (ty_coer, drt_coer) -> bang_fun ty_coer drt_coer
+  | Term.RightArrow ty_coer -> (
       match ty_coer with
-      | Typed.ArrowCoercion (_, dirty_coer1) ->
+      | Term.ArrowCoercion (_, dirty_coer1) ->
           fun_apply_dirty_coercion bang_fun sequence_fun dirty_coer1
       | _ -> assert false)
-  | Typed.RightHandler ty_coer -> (
+  | Term.RightHandler ty_coer -> (
       match ty_coer with
-      | Typed.HandlerCoercion (_, dirty_coer2) ->
+      | Term.HandlerCoercion (_, dirty_coer2) ->
           fun_apply_dirty_coercion bang_fun sequence_fun dirty_coer2
       | _ -> assert false)
-  | Typed.LeftHandler ty_coer -> (
+  | Term.LeftHandler ty_coer -> (
       match ty_coer with
-      | Typed.HandlerCoercion (dirty_coer1, _) ->
+      | Term.HandlerCoercion (dirty_coer1, _) ->
           fun_apply_dirty_coercion bang_fun sequence_fun dirty_coer1
       | _ -> assert false)
-  | Typed.SequenceDirtyCoer (drt_coer1, drt_coer2) ->
+  | Term.SequenceDirtyCoer (drt_coer1, drt_coer2) ->
       let t1, t2 =
         TypeChecker.type_of_dirty_coercion TypeChecker.initial_state drt_coer1
       in
@@ -73,11 +73,11 @@ let compile_effect (ef, (ty1, ty2)) = (ef, (compile_type ty1, compile_type ty2))
 
 let rec compile_coercion exeff_ty_coer =
   match exeff_ty_coer with
-  | Typed.ReflTy ty -> NoEffSyntax.ReflTy (compile_type ty)
-  | Typed.ArrowCoercion (ty_coer, drt_coer) ->
+  | Term.ReflTy ty -> NoEffSyntax.ReflTy (compile_type ty)
+  | Term.ArrowCoercion (ty_coer, drt_coer) ->
       NoEffSyntax.CoerArrow
         (compile_coercion ty_coer, compile_dirty_coercion drt_coer)
-  | Typed.HandlerCoercion (drt_coer1, drt_coer2) ->
+  | Term.HandlerCoercion (drt_coer1, drt_coer2) ->
       let (ty1_dc1, dr1_dc1), (ty2_dc1, dr2_dc1) =
         TypeChecker.type_of_dirty_coercion TypeChecker.initial_state drt_coer1
       in
@@ -107,48 +107,48 @@ let rec compile_coercion exeff_ty_coer =
             ( compile_dirty_coercion drt_coer1,
               NoEffSyntax.CoerComputation
                 (compile_ty_coer_from_dirty_coer drt_coer2) )
-  | Typed.TyCoercionVar ty_coer_param -> NoEffSyntax.CoerVar ty_coer_param
-  | Typed.SequenceTyCoer (ty_coer1, ty_coer2) ->
+  | Term.TyCoercionVar ty_coer_param -> NoEffSyntax.CoerVar ty_coer_param
+  | Term.SequenceTyCoer (ty_coer1, ty_coer2) ->
       NoEffSyntax.SequenceCoercion
         (compile_coercion ty_coer1, compile_coercion ty_coer2)
-  | Typed.ApplyCoercion (ty_name, ty_coers) ->
+  | Term.ApplyCoercion (ty_name, ty_coers) ->
       NoEffSyntax.ApplyCoercion
         (ty_name, List.map (fun coer -> compile_coercion coer) ty_coers)
-  | Typed.TupleCoercion ty_coers ->
+  | Term.TupleCoercion ty_coers ->
       NoEffSyntax.TupleCoercion
         (List.map (fun coer -> compile_coercion coer) ty_coers)
-  | Typed.LeftArrow ty_coer -> (
+  | Term.LeftArrow ty_coer -> (
       match ty_coer with
-      | Typed.ArrowCoercion (ty_coer1, _) -> compile_coercion ty_coer1
+      | Term.ArrowCoercion (ty_coer1, _) -> compile_coercion ty_coer1
       | _ -> assert false)
-  | Typed.ForallTy (ty_param, ty_coer) ->
+  | Term.ForallTy (ty_param, ty_coer) ->
       NoEffSyntax.Forall (ty_param, compile_coercion ty_coer)
-  | Typed.ApplyTyCoer (ty_coer, ty) ->
+  | Term.ApplyTyCoer (ty_coer, ty) ->
       NoEffSyntax.ApplyTyCoer (compile_coercion ty_coer, compile_type ty)
-  | Typed.ForallDirt (_, ty_coer) -> compile_coercion ty_coer
-  | Typed.ApplyDirCoer (ty_coer1, drt) -> (
+  | Term.ForallDirt (_, ty_coer) -> compile_coercion ty_coer
+  | Term.ApplyDirCoer (ty_coer1, drt) -> (
       match ty_coer1 with
-      | Typed.ForallDirt (p, ty_coer2) ->
+      | Term.ForallDirt (p, ty_coer2) ->
           compile_coercion
             (Substitution.apply_substitutions_to_tycoer
                (Substitution.add_dirt_substitution_e p drt)
                ty_coer2)
       | _ -> assert false)
-  | Typed.PureCoercion drt_coer -> compile_ty_coer_from_dirty_coer drt_coer
-  | Typed.QualTyCoer (ct_ty, ty_coer) ->
+  | Term.PureCoercion drt_coer -> compile_ty_coer_from_dirty_coer drt_coer
+  | Term.QualTyCoer (ct_ty, ty_coer) ->
       NoEffSyntax.CoerQualification
         (compile_coercion_type ct_ty, compile_coercion ty_coer)
-  | Typed.QualDirtCoer (ct_drt, ty_coer) -> compile_coercion ty_coer
-  | Typed.ApplyQualTyCoer (ty_coer1, ty_coer2) ->
+  | Term.QualDirtCoer (ct_drt, ty_coer) -> compile_coercion ty_coer
+  | Term.ApplyQualTyCoer (ty_coer1, ty_coer2) ->
       NoEffSyntax.ApplyQualTyCoer
         (compile_coercion ty_coer1, compile_coercion ty_coer2)
-  | Typed.ApplyQualDirtCoer (ty_coer, drt_coer) ->
+  | Term.ApplyQualDirtCoer (ty_coer, drt_coer) ->
       compile_coercion ty_coer
       (* Since QualDirtCoer ignores dirt, is this ok? *)
-  | Typed.ForallSkel (skel_param, ty_coer) -> compile_coercion ty_coer
-  | Typed.ApplySkelCoer (ty_coer1, skel) -> (
+  | Term.ForallSkel (skel_param, ty_coer) -> compile_coercion ty_coer
+  | Term.ApplySkelCoer (ty_coer1, skel) -> (
       match ty_coer1 with
-      | Typed.ForallSkel (s, ty_coer2) ->
+      | Term.ForallSkel (s, ty_coer2) ->
           compile_coercion
             (Substitution.apply_substitutions_to_tycoer
                (Substitution.add_skel_param_substitution_e s skel)
@@ -181,18 +181,18 @@ and compile_ty_coer_from_dirty_coer exeff_dirty_coer =
 
 let rec value_coercion_from_impure_dirt dirt_param dirt ty =
   match ty with
-  | Types.TyParam ty_param ->
-      NoEffSyntax.ReflTy (compile_type (Types.TyParam ty_param))
-  | Types.Apply (ty_name, tys) ->
-      NoEffSyntax.ReflTy (compile_type (Types.Apply (ty_name, tys)))
-  | Types.Arrow (ty1, drty2) ->
+  | Type.TyParam ty_param ->
+      NoEffSyntax.ReflTy (compile_type (Type.TyParam ty_param))
+  | Type.Apply (ty_name, tys) ->
+      NoEffSyntax.ReflTy (compile_type (Type.Apply (ty_name, tys)))
+  | Type.Arrow (ty1, drty2) ->
       NoEffSyntax.CoerArrow
         ( value_coercion_to_impure_dirt dirt dirt_param ty1,
           computation_coercion_from_impure_dirt dirt_param dirt drty2 )
-  | Types.Tuple tys ->
+  | Type.Tuple tys ->
       NoEffSyntax.TupleCoercion
         (List.map (value_coercion_from_impure_dirt dirt_param dirt) tys)
-  | Types.Handler ((ty1, drt1), (ty2, drt2)) -> (
+  | Type.Handler ((ty1, drt1), (ty2, drt2)) -> (
       if is_dirt_empty drt1 then
         NoEffSyntax.CoerArrow
           ( value_coercion_to_impure_dirt dirt dirt_param ty1,
@@ -202,7 +202,7 @@ let rec value_coercion_from_impure_dirt dirt_param dirt ty =
         | ParamRow d ->
             if
               d = dirt_param
-              && Types.EffectSet.is_empty drt1.effect_set
+              && Type.EffectSet.is_empty drt1.effect_set
               && is_dirt_empty dirt
             then
               let coer1 = value_coercion_to_impure_dirt dirt dirt_param ty1 in
@@ -219,27 +219,27 @@ let rec value_coercion_from_impure_dirt dirt_param dirt ty =
               NoEffSyntax.CoerHandler
                 ( computation_coercion_to_impure_dirt dirt dirt_param (ty1, drt1),
                   computation_coercion_from_impure_dirt dirt_param dirt
-                    (ty2, Types.fresh_dirt ()) )
+                    (ty2, Type.fresh_dirt ()) )
         | EmptyRow ->
             NoEffSyntax.CoerHandler
               ( computation_coercion_to_impure_dirt dirt dirt_param (ty1, drt1),
                 computation_coercion_from_impure_dirt dirt_param dirt
-                  (ty2, Types.fresh_dirt ()) ))
-  | Types.TyBasic ty_const ->
-      NoEffSyntax.ReflTy (compile_type (Types.TyBasic ty_const))
-  | Types.QualTy ((Types.TyParam a1, Types.TyParam a2), ty2) ->
+                  (ty2, Type.fresh_dirt ()) ))
+  | Type.TyBasic ty_const ->
+      NoEffSyntax.ReflTy (compile_type (Type.TyBasic ty_const))
+  | Type.QualTy ((Type.TyParam a1, Type.TyParam a2), ty2) ->
       NoEffSyntax.CoerQualification
         ( NoEffSyntax.TyCoercion (NoEffSyntax.TyVar a1, NoEffSyntax.TyVar a2),
           value_coercion_from_impure_dirt dirt_param dirt ty2 )
-  | Types.QualTy _ -> assert false (* not type parameters *)
-  | Types.QualDirt (_, ty2) ->
+  | Type.QualTy _ -> assert false (* not type parameters *)
+  | Type.QualDirt (_, ty2) ->
       value_coercion_from_impure_dirt dirt_param dirt ty2
-  | Types.TySchemeTy (ty_param, _, ty2) ->
+  | Type.TySchemeTy (ty_param, _, ty2) ->
       NoEffSyntax.Forall
         (ty_param, value_coercion_from_impure_dirt dirt_param dirt ty2)
-  | Types.TySchemeDirt (_, ty2) ->
+  | Type.TySchemeDirt (_, ty2) ->
       value_coercion_from_impure_dirt dirt_param dirt ty2
-  | Types.TySchemeSkel (_, ty2) ->
+  | Type.TySchemeSkel (_, ty2) ->
       value_coercion_from_impure_dirt dirt_param dirt ty2
 
 and computation_coercion_from_impure_dirt dirt_param dirt (ty1, d1) =
@@ -264,18 +264,18 @@ and computation_coercion_from_impure_dirt dirt_param dirt (ty1, d1) =
 
 and value_coercion_to_impure_dirt dirt dirt_param ty =
   match ty with
-  | Types.TyParam ty_param ->
-      NoEffSyntax.ReflTy (compile_type (Types.TyParam ty_param))
-  | Types.Apply (ty_name, tys) ->
-      NoEffSyntax.ReflTy (compile_type (Types.Apply (ty_name, tys)))
-  | Types.Arrow (ty1, drty2) ->
+  | Type.TyParam ty_param ->
+      NoEffSyntax.ReflTy (compile_type (Type.TyParam ty_param))
+  | Type.Apply (ty_name, tys) ->
+      NoEffSyntax.ReflTy (compile_type (Type.Apply (ty_name, tys)))
+  | Type.Arrow (ty1, drty2) ->
       NoEffSyntax.CoerArrow
         ( value_coercion_from_impure_dirt dirt_param dirt ty1,
           computation_coercion_to_impure_dirt dirt dirt_param drty2 )
-  | Types.Tuple tys ->
+  | Type.Tuple tys ->
       NoEffSyntax.TupleCoercion
         (List.map (value_coercion_to_impure_dirt dirt dirt_param) tys)
-  | Types.Handler ((ty1, drt1), (ty2, drt2)) -> (
+  | Type.Handler ((ty1, drt1), (ty2, drt2)) -> (
       if is_dirt_empty drt1 then
         NoEffSyntax.CoerArrow
           ( value_coercion_from_impure_dirt dirt_param dirt ty1,
@@ -285,7 +285,7 @@ and value_coercion_to_impure_dirt dirt dirt_param ty =
         | ParamRow d ->
             if
               d = dirt_param
-              && Types.EffectSet.is_empty drt1.effect_set
+              && Type.EffectSet.is_empty drt1.effect_set
               && is_dirt_empty dirt
             then
               let coer1 = value_coercion_from_impure_dirt dirt_param dirt ty1 in
@@ -303,26 +303,26 @@ and value_coercion_to_impure_dirt dirt dirt_param ty =
                 ( computation_coercion_from_impure_dirt dirt_param dirt
                     (ty1, drt1),
                   computation_coercion_to_impure_dirt dirt dirt_param
-                    (ty2, Types.fresh_dirt ()) )
+                    (ty2, Type.fresh_dirt ()) )
         | EmptyRow ->
             NoEffSyntax.CoerHandler
               ( computation_coercion_from_impure_dirt dirt_param dirt (ty1, drt1),
                 computation_coercion_to_impure_dirt dirt dirt_param
-                  (ty2, Types.fresh_dirt ()) ))
-  | Types.TyBasic ty_const ->
-      NoEffSyntax.ReflTy (compile_type (Types.TyBasic ty_const))
-  | Types.QualTy ((Types.TyParam a1, Types.TyParam a2), ty2) ->
+                  (ty2, Type.fresh_dirt ()) ))
+  | Type.TyBasic ty_const ->
+      NoEffSyntax.ReflTy (compile_type (Type.TyBasic ty_const))
+  | Type.QualTy ((Type.TyParam a1, Type.TyParam a2), ty2) ->
       NoEffSyntax.CoerQualification
         ( NoEffSyntax.TyCoercion (NoEffSyntax.TyVar a1, NoEffSyntax.TyVar a2),
           value_coercion_to_impure_dirt dirt dirt_param ty2 )
-  | Types.QualTy _ -> assert false (* not type parameters *)
-  | Types.QualDirt (_, ty2) -> value_coercion_to_impure_dirt dirt dirt_param ty2
-  | Types.TySchemeTy (ty_param, _, ty2) ->
+  | Type.QualTy _ -> assert false (* not type parameters *)
+  | Type.QualDirt (_, ty2) -> value_coercion_to_impure_dirt dirt dirt_param ty2
+  | Type.TySchemeTy (ty_param, _, ty2) ->
       NoEffSyntax.Forall
         (ty_param, value_coercion_to_impure_dirt dirt dirt_param ty2)
-  | Types.TySchemeDirt (_, ty2) ->
+  | Type.TySchemeDirt (_, ty2) ->
       value_coercion_to_impure_dirt dirt dirt_param ty2
-  | Types.TySchemeSkel (_, ty2) ->
+  | Type.TySchemeSkel (_, ty2) ->
       value_coercion_to_impure_dirt dirt dirt_param ty2
 
 and computation_coercion_to_impure_dirt dirt dirt_param (ty1, d1) =
@@ -347,48 +347,48 @@ and computation_coercion_to_impure_dirt dirt dirt_param (ty1, d1) =
 
 let rec compile_expr exeff_expr =
   match exeff_expr with
-  | Typed.Var v -> NoEffSyntax.Var v
-  | Typed.BuiltIn (s, i) -> NoEffSyntax.BuiltIn (s, i)
-  | Typed.Const ct -> NoEffSyntax.Const ct
-  | Typed.Tuple lst -> NoEffSyntax.Tuple (List.map compile_expr lst)
-  | Typed.Record rcd -> NoEffSyntax.Record (Assoc.map compile_expr rcd)
-  | Typed.Variant (label, expr) -> NoEffSyntax.Variant (label, compile_expr expr)
-  | Typed.Lambda abs_ty ->
+  | Term.Var v -> NoEffSyntax.Var v
+  | Term.BuiltIn (s, i) -> NoEffSyntax.BuiltIn (s, i)
+  | Term.Const ct -> NoEffSyntax.Const ct
+  | Term.Tuple lst -> NoEffSyntax.Tuple (List.map compile_expr lst)
+  | Term.Record rcd -> NoEffSyntax.Record (Assoc.map compile_expr rcd)
+  | Term.Variant (label, expr) -> NoEffSyntax.Variant (label, compile_expr expr)
+  | Term.Lambda abs_ty ->
       NoEffSyntax.Lambda (compile_abstraction_with_ty abs_ty)
-  | Typed.Effect (eff, (ty1, ty2)) ->
+  | Term.Effect (eff, (ty1, ty2)) ->
       NoEffSyntax.Effect (eff, (compile_type ty1, compile_type ty2))
-  | Typed.Handler handler ->
+  | Term.Handler handler ->
       if Assoc.is_empty handler.effect_clauses then
         NoEffSyntax.Lambda (compile_abstraction_with_ty handler.value_clause)
       else compile_handler_with_effects handler
-  | Typed.BigLambdaTy (ty_par, skel, expr) ->
+  | Term.BigLambdaTy (ty_par, skel, expr) ->
       NoEffSyntax.BigLambdaTy (ty_par, compile_expr expr)
-  | Typed.BigLambdaDirt (_, expr) -> compile_expr expr
-  | Typed.BigLambdaSkel (_, expr) -> compile_expr expr
-  | Typed.CastExp (expr, coer_ty) ->
+  | Term.BigLambdaDirt (_, expr) -> compile_expr expr
+  | Term.BigLambdaSkel (_, expr) -> compile_expr expr
+  | Term.CastExp (expr, coer_ty) ->
       NoEffSyntax.Cast (compile_expr expr, compile_coercion coer_ty)
-  | Typed.ApplyTyExp (expr, ty) ->
+  | Term.ApplyTyExp (expr, ty) ->
       NoEffSyntax.ApplyTy (compile_expr expr, compile_type ty)
-  | Typed.LambdaTyCoerVar (coer_param_ty, pi, expr) ->
+  | Term.LambdaTyCoerVar (coer_param_ty, pi, expr) ->
       NoEffSyntax.BigLambdaCoerVar
         (coer_param_ty, compile_coercion_type pi, compile_expr expr)
-  | Typed.LambdaDirtCoerVar (dirt_coer_param, ct_dirt, expr) ->
+  | Term.LambdaDirtCoerVar (dirt_coer_param, ct_dirt, expr) ->
       compile_expr expr
-  | Typed.ApplyDirtExp (expr, drt) -> (
+  | Term.ApplyDirtExp (expr, drt) -> (
       let exeff_ty =
         TypeChecker.type_of_expression TypeChecker.initial_state expr
       in
       match exeff_ty with
-      | Types.TySchemeDirt (drt_param, _) ->
+      | Type.TySchemeDirt (drt_param, _) ->
           NoEffSyntax.Cast
             ( compile_expr expr,
               value_coercion_from_impure_dirt drt_param drt exeff_ty )
       | _ -> assert false
       (* Fail if wrong type *))
-  | Typed.ApplySkelExp (expr, skel) -> compile_expr expr
-  | Typed.ApplyTyCoercion (expr, ty_coer) ->
+  | Term.ApplySkelExp (expr, skel) -> compile_expr expr
+  | Term.ApplyTyCoercion (expr, ty_coer) ->
       NoEffSyntax.ApplyTyCoercion (compile_expr expr, compile_coercion ty_coer)
-  | Typed.ApplyDirtCoercion (expr, drt_coer) -> compile_expr expr
+  | Term.ApplyDirtCoercion (expr, drt_coer) -> compile_expr expr
 
 and compile_handler_with_effects
     { effect_clauses = eff_cls; value_clause = valcl_pat, valcl_ty, valcl_comp }
@@ -400,7 +400,7 @@ and compile_handler_with_effects
         value_clause = (valcl_pat, valcl_ty, valcl_comp);
       }
   with
-  | Types.Handler (_, (ty, drt)) ->
+  | Type.Handler (_, (ty, drt)) ->
       if is_dirt_empty drt then
         NoEffSyntax.Handler
           {
@@ -431,7 +431,7 @@ and compile_effect_clauses_return eff_cls =
   Assoc.kmap
     (fun ((ef, (ty1, ty2)), (pat1, pat2, comp)) ->
       match pat2 with
-      | Typed.PVar var ->
+      | Term.PVar var ->
           let noEffTy1 = compile_type ty1 in
           let noEffTy2 = compile_type ty2 in
           ( (ef, (noEffTy1, noEffTy2)),
@@ -449,22 +449,22 @@ and compile_effect_clauses_return eff_cls =
 
 and compile_comp exeff_comp =
   match exeff_comp with
-  | Typed.Value expr -> compile_expr expr
-  | Typed.LetVal (expr, abs_ty) ->
+  | Term.Value expr -> compile_expr expr
+  | Term.LetVal (expr, abs_ty) ->
       NoEffSyntax.LetVal (compile_expr expr, compile_abstraction_with_ty abs_ty)
-  | Typed.LetRec (var_ty_expr_lst, comp) ->
+  | Term.LetRec (var_ty_expr_lst, comp) ->
       NoEffSyntax.LetRec
         ( List.map
             (fun (var, ty, expr) -> (var, compile_type ty, compile_expr expr))
             var_ty_expr_lst,
           compile_comp comp )
-  | Typed.Match (expr, abs_lst) ->
+  | Term.Match (expr, abs_lst) ->
       NoEffSyntax.Match (compile_expr expr, List.map compile_abstracion abs_lst)
-  | Typed.Apply (expr1, expr2) ->
+  | Term.Apply (expr1, expr2) ->
       NoEffSyntax.Apply (compile_expr expr1, compile_expr expr2)
-  | Typed.Handle (expr, comp) -> (
+  | Term.Handle (expr, comp) -> (
       match TypeChecker.type_of_expression TypeChecker.initial_state expr with
-      | Types.Handler ((ty1, drt1), (ty2, drt2)) ->
+      | Type.Handler ((ty1, drt1), (ty2, drt2)) ->
           if is_dirt_empty drt1 then
             NoEffSyntax.Apply (compile_expr expr, compile_comp comp)
           else
@@ -477,21 +477,21 @@ and compile_comp exeff_comp =
                   NoEffSyntax.Unsafe (NoEffSyntax.ReflTy (compile_type ty2)) )
             else compiled_handle
       | _ -> assert false)
-  | Typed.Call (eff, expr, abs_ty) ->
+  | Term.Call (eff, expr, abs_ty) ->
       NoEffSyntax.Call
         ( compile_effect eff,
           compile_expr expr,
           compile_abstraction_with_ty abs_ty )
-  | Typed.Op ((eff, (ty1, ty2)), expr) ->
+  | Term.Op ((eff, (ty1, ty2)), expr) ->
       NoEffSyntax.Op
         ((eff, (compile_type ty1, compile_type ty2)), compile_expr expr)
-  | Typed.Bind (comp1, abs) ->
+  | Term.Bind (comp1, abs) ->
       NoEffSyntax.Bind (compile_comp comp1, compile_abstracion abs)
-  | Typed.CastComp (comp, drty_coer) ->
+  | Term.CastComp (comp, drty_coer) ->
       NoEffSyntax.Cast (compile_comp comp, compile_dirty_coercion drty_coer)
-  | Typed.CastComp_ty (comp, ty_coer) ->
+  | Term.CastComp_ty (comp, ty_coer) ->
       NoEffSyntax.Cast (compile_comp comp, compile_coercion ty_coer)
-  | Typed.CastComp_dirt (comp, drt_coer) -> compile_comp comp
+  | Term.CastComp_dirt (comp, drt_coer) -> compile_comp comp
 
 (* Should this handle cases where drt_coer makes comp without effects or is this okay? *)
 and compile_abstraction_with_ty (pat, ty, comp) =

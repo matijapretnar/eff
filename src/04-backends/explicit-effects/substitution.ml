@@ -5,12 +5,12 @@ module CoreTypes = Language.CoreTypes
 
 type t = {
   type_param_to_type_coercions :
-    (Types.TyCoercionParam.t, Typed.ty_coercion) Assoc.t;
-  type_param_to_type_subs : (CoreTypes.TyParam.t, Types.target_ty) Assoc.t;
+    (Type.TyCoercionParam.t, Constraint.ty_coercion) Assoc.t;
+  type_param_to_type_subs : (CoreTypes.TyParam.t, Type.target_ty) Assoc.t;
   dirt_var_to_dirt_coercions :
-    (Types.DirtCoercionParam.t, Typed.dirt_coercion) Assoc.t;
-  dirt_var_to_dirt_subs : (Types.DirtParam.t, Types.dirt) Assoc.t;
-  skel_param_to_skel_subs : (Types.SkelParam.t, Types.skeleton) Assoc.t;
+    (Type.DirtCoercionParam.t, Constraint.dirt_coercion) Assoc.t;
+  dirt_var_to_dirt_subs : (Type.DirtParam.t, Type.dirt) Assoc.t;
+  skel_param_to_skel_subs : (Type.SkelParam.t, Type.skeleton) Assoc.t;
 }
 
 let empty =
@@ -91,14 +91,14 @@ let merge subs1 subs2 =
   }
 
 (* Substitution application *)
-open Types
-open Typed
+open Type
+open Term
 
 let rec apply_sub_dirt sub dirt =
   match dirt.row with
   | ParamRow p -> (
       match Assoc.lookup p sub.dirt_var_to_dirt_subs with
-      | Some drt2 -> apply_sub_dirt sub (Types.add_effects dirt.effect_set drt2)
+      | Some drt2 -> apply_sub_dirt sub (Type.add_effects dirt.effect_set drt2)
       | None -> dirt)
   | EmptyRow -> dirt
 
@@ -146,7 +146,7 @@ and apply_sub_ct_dirt sub (drt1, drt2) =
 
 let rec apply_sub_tycoer sub ty_coer =
   match ty_coer with
-  | ReflTy tty -> ReflTy (apply_sub_ty sub tty)
+  | Constraint.ReflTy tty -> Constraint.ReflTy (apply_sub_ty sub tty)
   | ArrowCoercion (tycoer1, dirtycoer) ->
       ArrowCoercion
         (apply_sub_tycoer sub tycoer1, apply_sub_dirtycoer sub dirtycoer)
@@ -171,7 +171,7 @@ let rec apply_sub_tycoer sub ty_coer =
 
 and apply_sub_dirtcoer sub dirt_coer =
   match dirt_coer with
-  | ReflDirt d -> ReflDirt (apply_sub_dirt sub d)
+  | Constraint.ReflDirt d -> Constraint.ReflDirt (apply_sub_dirt sub d)
   | DirtCoercionVar p -> (
       match Assoc.lookup p sub.dirt_var_to_dirt_coercions with
       | Some dc -> apply_sub_dirtcoer sub dc
@@ -185,8 +185,8 @@ and apply_sub_dirtcoer sub dirt_coer =
   | DirtCoercion dirty_coer1 ->
       DirtCoercion (apply_sub_dirtycoer sub dirty_coer1)
 
-and apply_sub_dirtycoer (sub : t) (dirty_coer : dirty_coercion) : dirty_coercion
-    =
+and apply_sub_dirtycoer (sub : t) (dirty_coer : Constraint.dirty_coercion) :
+    Constraint.dirty_coercion =
   match dirty_coer with
   | BangCoercion (ty_coer, dirt_coer) ->
       BangCoercion
@@ -284,13 +284,13 @@ let apply_substitutions_to_skeleton = apply_sub_skel
 
 let apply_sub1 subs cons =
   match cons with
-  | Typed.TyOmega (coer_p, (ty1, ty2)) ->
-      Typed.TyOmega (coer_p, (apply_sub_ty subs ty1, apply_sub_ty subs ty2))
-  | Typed.DirtOmega (coer_p, (drt1, drt2)) ->
-      Typed.DirtOmega
+  | Constraint.TyOmega (coer_p, (ty1, ty2)) ->
+      Constraint.TyOmega (coer_p, (apply_sub_ty subs ty1, apply_sub_ty subs ty2))
+  | Constraint.DirtOmega (coer_p, (drt1, drt2)) ->
+      Constraint.DirtOmega
         (coer_p, (apply_sub_dirt subs drt1, apply_sub_dirt subs drt2))
-  | Typed.TyParamHasSkel (tv, sp) ->
-      Typed.TyParamHasSkel (tv, apply_sub_skel subs sp)
+  | Constraint.TyParamHasSkel (tv, sp) ->
+      Constraint.TyParamHasSkel (tv, apply_sub_skel subs sp)
   | _ -> cons
 
 let apply_substitutions_to_constraints subs c_list =
@@ -305,30 +305,30 @@ let printy ?at_level ppf = Print.print ?at_level ppf
 let print_type_coercion p t ppf =
   Print.print ppf "substitution: ";
   printy ppf "%t :-coertyTotyCoer-> %t"
-    (Types.TyCoercionParam.print p)
-    (Typed.print_ty_coercion t)
+    (Type.TyCoercionParam.print p)
+    (Constraint.print_ty_coercion t)
 
 let print_type_param_to_type p t ppf =
   Print.print ppf "substitution: ";
   printy ppf "%t :-tyvarToTargetty-> %t"
     (CoreTypes.TyParam.print p)
-    (Types.print_target_ty t)
+    (Type.print_target_ty t)
 
 let print_dirt_var_sub p t ppf =
   Print.print ppf "substitution: ";
-  printy ppf "%t :-dirtvarToTargetdirt-> %t" (Types.DirtParam.print p)
-    (Types.print_target_dirt t)
+  printy ppf "%t :-dirtvarToTargetdirt-> %t" (Type.DirtParam.print p)
+    (Type.print_target_dirt t)
 
 let print_dirt_var_coercion p t ppf =
   Print.print ppf "substitution: ";
   printy ppf "%t :-coertyDirtoDirtCoer-> %t"
-    (Types.DirtCoercionParam.print p)
-    (Typed.print_dirt_coercion t)
+    (Type.DirtCoercionParam.print p)
+    (Constraint.print_dirt_coercion t)
 
 let print_skel_param_sub p t ppf =
   Print.print ppf "substitution: ";
-  printy ppf "%t :-skelvarToSkeleton-> %t" (Types.SkelParam.print p)
-    (Types.print_skeleton t)
+  printy ppf "%t :-skelvarToSkeleton-> %t" (Type.SkelParam.print p)
+    (Type.print_skeleton t)
 
 let print_sub_list subs =
   List.iter

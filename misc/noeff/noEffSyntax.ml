@@ -36,7 +36,7 @@ type term =
   | Apply of term * term
   | BigLambdaTy of CoreTypes.TyParam.t * term
   | ApplyTy of term * ty
-  | BigLambdaCoerVar of Types.TyCoercionParam.t * ty_coercion * term
+  | BigLambdaCoerVar of Type.TyCoercionParam.t * ty_coercion * term
   | ApplyTyCoercion of term * coercion
   | Cast of term * coercion
   | Return of term
@@ -63,7 +63,7 @@ and abstraction2 = pattern * pattern * term
 (** Abstractions that take two arguments. *)
 
 and coercion =
-  | CoerVar of Types.TyCoercionParam.t
+  | CoerVar of Type.TyCoercionParam.t
   | ReflTy of ty
   | ReflVar of CoreTypes.TyParam.t
   | CoerArrow of coercion * coercion

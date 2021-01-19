@@ -1,11 +1,12 @@
 open Utils
-open Types
-open Typed
+open Type
+open Constraint
+open Term
 
 type state = {
   fuel : int ref;
   tc_state : TypeChecker.state;
-  recursive_functions : (variable, Types.target_ty * expression) Assoc.t;
+  recursive_functions : (variable, Type.target_ty * expression) Assoc.t;
   knot_functions : (variable, expression * handler * variable) Assoc.t;
 }
 
@@ -51,19 +52,19 @@ let extend_ty_param_skeletons st omega ct =
   }
 
 let refresh_expr e =
-  let res = Typed.refresh_expr Assoc.empty e in
-  Print.debug "refresh_expr  : %t" (Typed.print_expression e);
-  Print.debug "refresh_expr'd: %t" (Typed.print_expression res);
+  let res = Term.refresh_expr Assoc.empty e in
+  Print.debug "refresh_expr  : %t" (Term.print_expression e);
+  Print.debug "refresh_expr'd: %t" (Term.print_expression res);
   res
 
-let refresh_abs a = Typed.refresh_abs Assoc.empty a
+let refresh_abs a = Term.refresh_abs Assoc.empty a
 
-let refresh_abs_with_ty a = Typed.refresh_abs_with_ty Assoc.empty a
+let refresh_abs_with_ty a = Term.refresh_abs_with_ty Assoc.empty a
 
 let refresh_abs2 a2 =
-  let res = Typed.refresh_abs2 Assoc.empty a2 in
-  Print.debug "refresh_abs2  : %t" (Typed.print_abstraction2 a2);
-  Print.debug "refresh_abs2'd: %t" (Typed.print_abstraction2 res);
+  let res = Term.refresh_abs2 Assoc.empty a2 in
+  Print.debug "refresh_abs2  : %t" (Term.print_abstraction2 a2);
+  Print.debug "refresh_abs2'd: %t" (Term.print_abstraction2 res);
   res
 
 let is_relatively_pure st c h =
@@ -71,27 +72,26 @@ let is_relatively_pure st c h =
     ( TypeChecker.typeOfComputation st.tc_state c,
       TypeChecker.type_of_handler st.tc_state h )
   with
-  | ( (ty, { Types.effect_set = ops; Types.row = Types.EmptyRow }),
-      Types.Handler (_, (_, output_dirt)) ) ->
+  | ( (ty, { Type.effect_set = ops; Type.row = Type.EmptyRow }),
+      Type.Handler (_, (_, output_dirt)) ) ->
       let handled_ops =
         EffectSet.of_list
           (List.map (fun ((eff, _), _) -> eff) (Assoc.to_list h.effect_clauses))
       in
-      Print.debug "is_relatively_pure: %t:  %t vs %t"
-        (Typed.print_computation c)
-        (Types.print_effect_set handled_ops)
-        (Types.print_effect_set ops);
+      Print.debug "is_relatively_pure: %t:  %t vs %t" (Term.print_computation c)
+        (Type.print_effect_set handled_ops)
+        (Type.print_effect_set ops);
       if EffectSet.is_empty (EffectSet.inter handled_ops ops) then
         match output_dirt with
-        | { Types.effect_set = ops'; Types.row = Types.EmptyRow } ->
+        | { Type.effect_set = ops'; Type.row = Type.EmptyRow } ->
             Some
               (BangCoercion
                  ( ReflTy ty,
                    UnionDirt
                      (*( EffectSet.inter ops ops'*)
-                     (ops, Empty (Types.closed_dirt (EffectSet.diff ops' ops)))
+                     (ops, Empty (Type.closed_dirt (EffectSet.diff ops' ops)))
                  ))
-        | { Types.effect_set = ops'; Types.row = Types.ParamRow var } ->
+        | { Type.effect_set = ops'; Type.row = Type.ParamRow var } ->
             Some
               (BangCoercion
                  ( ReflTy ty,
@@ -100,8 +100,8 @@ let is_relatively_pure st c h =
                      ( ops,
                        Empty
                          {
-                           Types.effect_set = EffectSet.diff ops' ops;
-                           Types.row = Types.ParamRow var;
+                           Type.effect_set = EffectSet.diff ops' ops;
+                           Type.row = Type.ParamRow var;
                          } ) ))
       else None
   | _, _ -> None
@@ -122,14 +122,14 @@ let applicable_pattern p vars =
   let rec check_variables = function
     | [] -> NotPresent
     | x :: xs -> (
-        let inside_occ, outside_occ = Typed.occurrences x vars in
+        let inside_occ, outside_occ = Term.occurrences x vars in
         if inside_occ > 0 || outside_occ > 1 then NotInlinable
         else
           match check_variables xs with
           | NotPresent -> if outside_occ = 0 then NotPresent else Inlinable
           | inlinability -> inlinability)
   in
-  check_variables (Typed.pattern_vars p)
+  check_variables (Term.pattern_vars p)
 
 (* Try to specialize a recursive function f with continuation cont.
  * If the body is an abstraction, substitute all applications f v of f in cont with
@@ -140,11 +140,11 @@ let applicable_pattern p vars =
  * The specialize_comp/expr/abs functions traverse the syntax tree, searching
  * for abstractions and applications. They create the specializations, add them
  * to the assoc and substitute a fresh variable. *)
-let rec specialize_letrec (cont : Typed.computation)
-    ( (fvar : Typed.variable),
-      (argty : Types.target_ty),
-      ((resty, resdt) : Types.target_dirty),
-      ((p, fbody_c) : Typed.abstraction) ) : Typed.computation =
+let rec specialize_letrec (cont : Term.computation)
+    ( (fvar : Term.variable),
+      (argty : Type.target_ty),
+      ((resty, resdt) : Type.target_dirty),
+      ((p, fbody_c) : Term.abstraction) ) : Term.computation =
   match fbody_c with
   | Value fbody -> (
       match (resty, fbody) with
@@ -160,12 +160,12 @@ let rec specialize_letrec (cont : Typed.computation)
       Print.debug "SPEC: letrec body is not a value";
       cont
 
-and specialize (fvar : Typed.variable) (fbody : Typed.expression)
-    (resty : Types.target_ty) (cont : Typed.computation) : Typed.computation =
+and specialize (fvar : Term.variable) (fbody : Term.expression)
+    (resty : Type.target_ty) (cont : Term.computation) : Term.computation =
   (* Define a referenced map that holds the substitutions. *)
   let assoc = ref Assoc.empty in
 
-  let specialize_app (e : Typed.expression) : Typed.variable =
+  let specialize_app (e : Term.expression) : Term.variable =
     (* check if the specialized version already exists *)
     match Assoc.lookup e !assoc with
     | Some f' -> f' (* already exists, substituting *)
@@ -333,8 +333,8 @@ and specialize (fvar : Typed.variable) (fbody : Typed.expression)
   (* End of the tree traversal functions *)
 
   (* This function prefixes the specializations in cont, and applies some necessary substitutions. *)
-  let subst_spec (cont : Typed.computation)
-      ((app : Typed.expression), (fvar' : Typed.variable)) : Typed.computation =
+  let subst_spec (cont : Term.computation)
+      ((app : Term.expression), (fvar' : Term.variable)) : Term.computation =
     match (fbody, resty, app) with
     (* | ( BigLambdaTy (typaram, _sk, v),
         TySchemeTy (typaram', _sk', ty1),
@@ -343,7 +343,7 @@ and specialize (fvar : Typed.variable) (fbody : Typed.expression)
         assert (_sk = _sk');
         Print.debug "BigLambdaTy: replacing %t by %t"
           (CoreTypes.TyParam.print typaram)
-          (Types.print_target_ty ty2);
+          (Type.print_target_ty ty2);
         let sub = Substitution.add_type_substitution_e typaram ty2 in
         (* v' = [T2/a]v *)
         let v' = Substitution.apply_substitutions_to_expression sub v in
@@ -355,8 +355,8 @@ and specialize (fvar : Typed.variable) (fbody : Typed.expression)
         ApplyDirtExp (_var, dirt) ) ->
         assert (dirtparam = dirtparam');
         Print.debug "BigLambdaDirt: replacing %t by %t"
-          (Types.DirtParam.print dirtparam)
-          (Types.print_target_dirt dirt);
+          (Type.DirtParam.print dirtparam)
+          (Type.print_target_dirt dirt);
         let sub = Substitution.add_dirt_substitution_e dirtparam dirt in
         (* v' = [D/d]v *)
         let v' = Substitution.apply_substitutions_to_expression sub v in
@@ -368,8 +368,8 @@ and specialize (fvar : Typed.variable) (fbody : Typed.expression)
         ApplySkelExp (_var, sk) ) ->
         assert (skparam = skparam');
         Print.debug "BigLambdaSkel: replacing %t by %t"
-          (Types.SkelParam.print skparam)
-          (Types.print_skeleton sk);
+          (Type.SkelParam.print skparam)
+          (Type.print_skeleton sk);
         let sub = Substitution.add_skel_param_substitution_e skparam sk in
         (* v' = [t/s]v *)
         let v' = Substitution.apply_substitutions_to_expression sub v in
@@ -381,8 +381,8 @@ and specialize (fvar : Typed.variable) (fbody : Typed.expression)
         ApplyTyCoercion (_var, tyco) ) ->
         assert (_ct_ty = _ct_ty');
         Print.debug "LambdaTyCoerVar: replacing %t by %t"
-          (Types.TyCoercionParam.print coparam)
-          (Typed.print_ty_coercion tyco);
+          (Type.TyCoercionParam.print coparam)
+          (Constraint.print_ty_coercion tyco);
         let sub = Substitution.add_type_coercion_e coparam tyco in
         (* v' = [y/w]v *)
         let v' = Substitution.apply_substitutions_to_expression sub v in
@@ -394,8 +394,8 @@ and specialize (fvar : Typed.variable) (fbody : Typed.expression)
         ApplyDirtCoercion (_var, dco) ) ->
         assert (_ct_dirt = _ct_dirt');
         Print.debug "LambdaDirtCoerVar: replacing %t by %t"
-          (Types.DirtCoercionParam.print coparam)
-          (Typed.print_dirt_coercion dco);
+          (Type.DirtCoercionParam.print coparam)
+          (Constraint.print_dirt_coercion dco);
         let sub = Substitution.add_dirt_var_coercion_e coparam dco in
         (* v' = [y/w]v *)
         let v' = Substitution.apply_substitutions_to_expression sub v in
@@ -417,7 +417,7 @@ let letrec_drop_unused_bindings (c : computation) : computation =
   match c with
   | LetRec (bindings, c1) -> (
       (* Get the free variables (function defs are the first part of the tuple)*)
-      let free_vars_c1, _ = Typed.free_vars_comp c1 in
+      let free_vars_c1, _ = Term.free_vars_comp c1 in
       let free_vars_bindings =
         List.map (fun (_, _, _, a) -> fst (free_vars_abs a)) bindings
       in
@@ -510,7 +510,7 @@ and optimize_sub_dirt_coercion st p_ops dco =
   | DirtCoercion dtyco -> DirtCoercion (optimize_dirty_coercion st dtyco)
 
 and reduce_ty_coercion st tyco =
-  Print.debug "reduce_ty_coercion: %t" (Typed.print_ty_coercion tyco);
+  Print.debug "reduce_ty_coercion: %t" (Constraint.print_ty_coercion tyco);
   match tyco with
   | ReflTy ty -> tyco
   | ArrowCoercion (tyco1, dtyco2) -> (
@@ -541,7 +541,8 @@ and reduce_ty_coercion st tyco =
   | _ -> tyco
 
 and reduce_dirty_coercion st dtyco =
-  Print.debug "reduce_dirty_coercion: %t" (Typed.print_dirty_coercion dtyco);
+  Print.debug "reduce_dirty_coercion: %t"
+    (Constraint.print_dirty_coercion dtyco);
   match dtyco with
   | BangCoercion (tyco1, dco2) -> dtyco
   | RightArrow tyco1 -> (
@@ -567,7 +568,7 @@ and reduce_dirt_coercion st p_ops dco =
   | ReflDirt d -> dco
   | DirtCoercionVar dcov -> dco
   | Empty d ->
-      let d' = Types.remove_effects p_ops d in
+      let d' = Type.remove_effects p_ops d in
       if dirts_are_equal d' empty_dirt then ReflDirt empty_dirt else Empty d'
   | UnionDirt (ops, dco1) -> (
       match dco1 with
@@ -576,7 +577,7 @@ and reduce_dirt_coercion st p_ops dco =
           let d1, d2 = TypeChecker.tcDirtCo st.tc_state dco1 in
           let ops' =
             EffectSet.diff ops
-              (EffectSet.inter d1.Types.effect_set d2.Types.effect_set)
+              (EffectSet.inter d1.Type.effect_set d2.Type.effect_set)
           in
           if EffectSet.is_empty ops' then dco1 else UnionDirt (ops', dco1))
   | SequenceDirtCoer (dco1, dco2) -> (
@@ -588,10 +589,10 @@ and reduce_dirt_coercion st p_ops dco =
       match dtyco with BangCoercion (_, dco1) -> dco1 | _ -> dco)
 
 let rec substitute_pattern_comp st c p exp =
-  optimize_comp st (Typed.subst_comp (Typed.pattern_match p exp) c)
+  optimize_comp st (Term.subst_comp (Term.pattern_match p exp) c)
 
 and beta_reduce st ((p, ty, c) as a) e =
-  match applicable_pattern p (Typed.free_vars_comp c) with
+  match applicable_pattern p (Term.free_vars_comp c) with
   | Inlinable -> substitute_pattern_comp st c p e
   | NotPresent -> c
   | NotInlinable when is_atomic e ->
@@ -602,7 +603,7 @@ and beta_reduce st ((p, ty, c) as a) e =
 (*
             let a =
               begin match p with
-                | {term = Typed.PVar x} ->
+                | {term = Term.PVar x} ->
                   let st = {st with stack = Common.update x e st.stack} in
                   abstraction p (optimize_comp st c)
                 | _ ->
@@ -712,11 +713,11 @@ and optimize_abstraction2 st (dty : target_dirty) (effect, a2) =
   let op, (op_ty_in, op_ty_out) = effect in
   let p1, p2, c = a2 in
   let st' = extend_pat_type st p1 op_ty_in in
-  let st'' = extend_pat_type st' p2 (Types.Arrow (op_ty_out, dty)) in
+  let st'' = extend_pat_type st' p2 (Type.Arrow (op_ty_out, dty)) in
   (effect, (p1, p2, optimize_comp st'' c))
 
 and optimize_sub_comp st c =
-  Print.debug "optimize_sub_comp: %t" (Typed.print_computation c);
+  Print.debug "optimize_sub_comp: %t" (Term.print_computation c);
   let plain_c' =
     match c with
     | Value e1 -> Value (optimize_expr st e1)
@@ -725,9 +726,9 @@ and optimize_sub_comp st c =
     | LetRec (defs, c) -> (
         match defs with
         | [ (var, argTy, resTy, (p, rhs)) ] ->
-            let st' = extend_var_type st var (Types.Arrow (argTy, resTy)) in
+            let st' = extend_var_type st var (Type.Arrow (argTy, resTy)) in
             let e1 = Lambda (p, argTy, rhs) in
-            let st'' = extend_rec_fun st' var (Types.Arrow (argTy, resTy)) e1 in
+            let st'' = extend_rec_fun st' var (Type.Arrow (argTy, resTy)) e1 in
             LetRec
               ( [ (var, argTy, resTy, optimize_abstraction st' argTy (p, rhs)) ],
                 optimize_comp st'' c )
@@ -756,7 +757,7 @@ and optimize_sub_comp st c =
   plain_c'
 
 and reduce_expr st e =
-  Print.debug "reduce_exp: %t" (Typed.print_expression e);
+  Print.debug "reduce_exp: %t" (Term.print_expression e);
   match e with
   (*
           | Var of variable
@@ -765,14 +766,14 @@ and reduce_expr st e =
           | Tuple of expression list
           | Record of (CoreTypes.field, expression) CoreTypes.assoc
           | Variant of CoreTypes.label * expression option
-          | Lambda of (pattern * Types.target_ty * computation)
+          | Lambda of (pattern * Type.target_ty * computation)
           | Handler of handler
           | BigLambdaTy of CoreTypes.TyParam.t * skeleton * expression
-          | BigLambdaDirt of Types.DirtParam.t * expression
-          | BigLambdaSkel of Types.SkelParam.t * expression
-          | LambdaTyCoerVar of Types.TyCoercionParam.t * Types.ct_ty * expression
-          | LambdaDirtCoerVar of Types.DirtCoercionParam.t * Types.ct_dirt * expression
-          | ApplySkelExp of expression * Types.skeleton
+          | BigLambdaDirt of Type.DirtParam.t * expression
+          | BigLambdaSkel of Type.SkelParam.t * expression
+          | LambdaTyCoerVar of Type.TyCoercionParam.t * Type.ct_ty * expression
+          | LambdaDirtCoerVar of Type.DirtCoercionParam.t * Type.ct_dirt * expression
+          | ApplySkelExp of expression * Type.skeleton
           | ApplyTyCoercion of expression * ty_coercion
           | ApplyTyCoercion (e1,ty_co) ->
           *)
@@ -809,13 +810,13 @@ and reduce_expr st e =
       let ty1, ty2 = TypeChecker.tcValTyCo st.tc_state ty_co in
       if
         Print.debug "HERE1";
-        Types.types_are_equal ty1 ty2
+        Type.types_are_equal ty1 ty2
       then e1
       else e
   | plain_e -> e
 
 and reduce_comp st c =
-  Print.debug "reduce_comp: %t" (Typed.print_computation c);
+  Print.debug "reduce_comp: %t" (Term.print_computation c);
   match c with
   | Value _ -> c
   | LetVal (e1, abs) -> beta_reduce st abs e1
@@ -839,7 +840,7 @@ and reduce_comp st c =
            *     ( Value (Var var)
            *     , BangCoercion
            *         ( ReflTy ty_out
-           *         , Empty (Types.closed_dirt (EffectSet.singleton eff)) ) )
+           *         , Empty (Type.closed_dirt (EffectSet.singleton eff)) ) )
            * in
            * let a_w_ty = (PVar var, ty_out, c_cont) in
            * Call (op, e2, a_w_ty) *)
@@ -864,7 +865,7 @@ and reduce_comp st c =
                   optimize_comp st
                     (Bind
                        ( CastComp (c1', dtyco),
-                         Typed.abstraction_with_ty_to_abstraction h.value_clause
+                         Term.abstraction_with_ty_to_abstraction h.value_clause
                        ))
               | None -> c)
           | Bind (c11, a1) -> (
@@ -882,7 +883,7 @@ and reduce_comp st c =
               | _ ->
                   let tv =
                     match TypeChecker.type_of_handler st.tc_state h with
-                    | Types.Handler ((x, _), _) -> x
+                    | Type.Handler ((x, _), _) -> x
                     | _ -> failwith __LOC__
                   in
                   let p12, c12 = a1 in
@@ -906,7 +907,7 @@ and reduce_comp st c =
                   let p1, p2, c = refresh_abs2 eff_clause in
                   (* Shouldn't we check for inlinability of p1 and p2 here? *)
                   substitute_pattern_comp st
-                    (Typed.subst_comp (Typed.pattern_match p1 e11) c)
+                    (Term.subst_comp (Term.pattern_match p1 e11) c)
                     p2 (Lambda handled_k)
               | None ->
                   let k_abs'' = (k_pat, k_ty, Handle (e1, k_c)) in
@@ -945,7 +946,7 @@ and reduce_comp st c =
                         Handle
                           ( e1,
                             Apply
-                              ( Typed.subst_expr
+                              ( Term.subst_expr
                                   (Assoc.of_list [ (fvar, refresh_expr fbody) ])
                                   e11,
                                 Var xvar ) ) )
@@ -1021,7 +1022,7 @@ and reduce_comp st c =
       match c1 with
       | _
         when Print.debug "HERE2";
-             Types.dirty_types_are_equal dty1 dty2 ->
+             Type.dirty_types_are_equal dty1 dty2 ->
           c1
       | CastComp (c11, dtyco12) ->
           CastComp
@@ -1145,9 +1146,9 @@ and reduce_comp st c =
                   st.optimization_function_specialization := !(st.optimization_function_specialization ) + 1;
                   st.optimization_total := !(st.optimization_total) + 1;
                   let (let_rec_p,let_rec_c) = abs in
-                  (* Print.debug "THE ABSTRACTION OF SAME HANDLER DIFF VALUE :- %t" (Typed.print_abstraction abs); *)
+                  (* Print.debug "THE ABSTRACTION OF SAME HANDLER DIFF VALUE :- %t" (Term.print_abstraction abs); *)
                   let Handler ha = e1 in
-                  (* Print.debug "THE VALUE CLAUSE :- %t" (Typed.print_abstraction ha.value_clause); *)
+                  (* Print.debug "THE VALUE CLAUSE :- %t" (Term.print_abstraction ha.value_clause); *)
                   let ctx_val, (tyin_val , (tyout_val,drt_val)), cnstrs_val = ha.value_clause.scheme in
                   let continuation_var_scheme = (ctx_val, Type.Arrow(tyin_val , Type.fresh_dirty ()), cnstrs_val) in
                   let k_var, k_pat = make_var "k_val"  continuation_var_scheme in
@@ -1181,7 +1182,7 @@ and reduce_comp st c =
                   let defs = [(newfvar, newf_body)] in
                   let orig_vc_lambda = optimize_expr st (lambda (hndlr.value_clause)) in
                   let res = let_rec' defs @@  apply newf_var  ( tuple [ae2; orig_vc_lambda] ) in
-                  (* Print.debug "THE resulting computation :-  %t" (Typed.print_computation res); *)
+                  (* Print.debug "THE resulting computation :-  %t" (Term.print_computation res); *)
                    optimize_comp st res
                 | _ -> c
                end
@@ -1237,7 +1238,7 @@ and reduce_comp st c =
                             optimize_comp st res
                        | _ ->
                         (* Print.debug "Its a none"; *)
-                                    (* Print.debug "The handle exp : %t" (Typed.print_expression ae1); *)
+                                    (* Print.debug "The handle exp : %t" (Term.print_expression ae1); *)
                                     c
                        end
                end
@@ -1264,7 +1265,7 @@ and reduce_comp st c =
       c
     *)
   | LetIn ({term = Lambda ({term = (p, {term = Value ({term = Lambda _ } as in_lambda)} )})}, ({term = ({term = PVar f} as f_pat,_)} as a) )->
-    Print.debug "We are now in the let in 4 for %t" (Typed.print_pattern f_pat);
+    Print.debug "We are now in the let in 4 for %t" (Term.print_pattern f_pat);
     let f1_var, f1_pat = make_var "f1" f_pat.scheme in
     let new_p_var, new_p_pat = make_var "new_p" p.scheme in
     let first_fun =
@@ -1289,10 +1290,10 @@ and reduce_comp st c =
   (* XXX simplify *)
   | LetRec (defs, co) ->
     useFuel st;
-    (*Print.debug "the letrec comp  %t" (Typed.print_computation co);*)
+    (*Print.debug "the letrec comp  %t" (Term.print_computation co);*)
     let st =
     List.fold_right (fun (var,abs) st ->
-            (*Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs);*)
+            (*Print.debug "ADDING %t and %t to letrec" (Term.print_variable var) (Term.print_abstraction abs);*)
             {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
     let_rec' defs (reduce_comp st co)
 
@@ -1303,8 +1304,8 @@ and reduce_comp st c =
   (*
   if c <> c' then
    Print.debug ~loc:c.Typedhh "%t : %t@.~~~>@.%t : %t@.\n"
-    (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme)
-    (Typed.print_computation c') (Scheme.print_dirty_scheme c'.Typed.scheme);*)
+    (Term.print_computation c) (Scheme.print_dirty_scheme c.Term.scheme)
+    (Term.print_computation c') (Scheme.print_dirty_scheme c'.Term.scheme);*)
   c'
 *)
 
@@ -1317,19 +1318,19 @@ let optimize_main_comp tc_state c =
   ==> Handlers inline.
 
 *)
-(* open Typed *)
+(* open Term *)
 (*
 
-let x = Types.TyBasic BoolTy;;
+let x = Type.TyBasic BoolTy;;
 
 type state = {
-  inlinable : (Typed.variable, unit -> Typed.expression) Common.assoc;
-  stack : (Typed.variable, Typed.expression) Common.assoc;
-  letrec_memory : (Typed.variable, Typed.abstraction) Common.assoc;
-  handlers_functions_mem : (Typed.expression * Typed.variable * Typed.expression) list;
-  handlers_functions_ref_mem : ((Typed.expression * Typed.variable * Typed.expression) list) ref;
-  handlers_functions_cont_mem : ((Typed.expression * Typed.variable * Typed.expression) list);
-  impure_wrappers : (Typed.variable, Typed.expression) Common.assoc;
+  inlinable : (Term.variable, unit -> Term.expression) Common.assoc;
+  stack : (Term.variable, Term.expression) Common.assoc;
+  letrec_memory : (Term.variable, Term.abstraction) Common.assoc;
+  handlers_functions_mem : (Term.expression * Term.variable * Term.expression) list;
+  handlers_functions_ref_mem : ((Term.expression * Term.variable * Term.expression) list) ref;
+  handlers_functions_cont_mem : ((Term.expression * Term.variable * Term.expression) list);
+  impure_wrappers : (Term.variable, Term.expression) Common.assoc;
   fuel : int ref;
   optimization_total : int ref;
   optimization_App_Fun : int ref;
@@ -1410,10 +1411,10 @@ let (Handler h't) = h' in
  assoc_equal (alphaeq_abs2 eqvars) ht.effect_clauses h't.effect_clauses
 
 let is_pure c = false
-(*   Scheme.is_surely_pure c.Typed.scheme *)
+(*   Scheme.is_surely_pure c.Term.scheme *)
 
 let is_pure_for_handler c clauses = false
-(*   Scheme.is_surely_pure_for_handler c.Typed.scheme (List.map (fun ((eff, _), _) -> eff) clauses) *)
+(*   Scheme.is_surely_pure_for_handler c.Term.scheme (List.map (fun ((eff, _), _) -> eff) clauses) *)
 
 let find_in_handlers_func_mem st f_name h_exp =
   let loc = h_exphh in
@@ -1441,13 +1442,13 @@ let find_in_handlers_func_mem st f_name h_exp =
             else begin
               if (alphaeq_handler_no_vc [] h h_exp)
               then begin
-                (* Print.debug ~loc:h_exp.Typedhh"ONLY VALUE CLAUSE IS DIFFERENT !! %t" (Typed.print_expression h_exp); *)
+                (* Print.debug ~loc:h_exp.Typedhh"ONLY VALUE CLAUSE IS DIFFERENT !! %t" (Term.print_expression h_exp); *)
                 let Handler hh = h in
                 (false,Some newf,Some hh.value_clause)
               end
               else
                 begin
-                (* Print.debug ~loc:h_exp.Typedhh"Conflicting specialization call on\n %t \n=====================================\n %t "  (Typed.print_expression h_exp) (Typed.print_expression h); *)
+                (* Print.debug ~loc:h_exp.Typedhh"Conflicting specialization call on\n %t \n=====================================\n %t "  (Term.print_expression h_exp) (Term.print_expression h); *)
                 (true,None,None)
                 end
             end
@@ -1480,8 +1481,8 @@ let different_branch_specialized defs st =
       (List.map (fun (var,abs) ->
             begin match findresinlocal var with
             | [] -> false
-            | (h,old_f,new_f) :: _ -> (* Print.debug "\n my old function :- %t \n" (Typed.print_variable old_f); *)
-                                      (* Print.debug "\n my new function :- %t \n" (Typed.print_expression new_f);  *)
+            | (h,old_f,new_f) :: _ -> (* Print.debug "\n my old function :- %t \n" (Term.print_variable old_f); *)
+                                      (* Print.debug "\n my new function :- %t \n" (Term.print_expression new_f);  *)
                                       true
             end) defs ) in
   let local_bool = List.fold_right (||) localboollist false in
@@ -1526,20 +1527,20 @@ let inlinable_definitions =
 
 
 let make_var ?(loc=Location.unknown) ann scheme =
-  let x = Typed.Variable.fresh ann in
+  let x = Term.Variable.fresh ann in
   let x_var = var ~loc x scheme
   and x_pat = {
-    term = Typed.PVar x;
+    term = Term.PVar x;
     location = loc;
     scheme = scheme
   } in
   x_var, x_pat
 
 let refresh_var ?(loc=Location.unknown) oldvar scheme =
-  let x = Typed.Variable.refresh oldvar in
+  let x = Term.Variable.refresh oldvar in
   let x_var = var ~loc x scheme
   and x_pat = {
-    term = Typed.PVar x;
+    term = Term.PVar x;
     location = loc;
     scheme = scheme
   } in
@@ -1554,7 +1555,7 @@ let applicable_pattern p vars =
   let rec check_variables = function
     | [] -> NotPresent
     | x :: xs ->
-      let inside_occ, outside_occ = Typed.occurrences x vars in
+      let inside_occ, outside_occ = Term.occurrences x vars in
       if inside_occ > 0 || outside_occ > 1 then
         NotInlinable
       else
@@ -1563,41 +1564,41 @@ let applicable_pattern p vars =
           | inlinability -> inlinability
         end
   in
-  check_variables (Typed.pattern_vars p)
+  check_variables (Term.pattern_vars p)
 
 let is_atomic e =
   match e with | Var _ -> true | Const _ -> true | _ -> false
 
 let unused x c =
-  let vars = Typed.free_vars_comp  c in
-  let inside_occ, outside_occ = Typed.occurrences x vars in
+  let vars = Term.free_vars_comp  c in
+  let inside_occ, outside_occ = Term.occurrences x vars in
   inside_occ == 0 && outside_occ == 0
 
-let refresh_comp c = Typed.refresh_comp [] c
-let refresh_handler h = Typed.refresh_handler [] h
+let refresh_comp c = Term.refresh_comp [] c
+let refresh_handler h = Term.refresh_handler [] h
 
-let substitute_var_comp comp vr exp = Typed.subst_comp [(vr, exp)] comp
+let substitute_var_comp comp vr exp = Term.subst_comp [(vr, exp)] comp
 
 let rec substitute_pattern_comp st c p exp =
-  optimize_comp st (Typed.subst_comp (Typed.pattern_match p exp) c)
+  optimize_comp st (Term.subst_comp (Term.pattern_match p exp) c)
 and substitute_pattern_expr st e p exp =
-  optimize_expr st (Typed.subst_expr (Typed.pattern_match p exp) e)
+  optimize_expr st (Term.subst_expr (Term.pattern_match p exp) e)
 
 and beta_reduce st ({term = (p, c)} as a) e =
-  (* Print.debug  "Inlining? %t[%t -> %t]" (Typed.print_computation c) (Typed.print_pattern p) (Typed.print_expression e) ; *)
-  match applicable_pattern p (Typed.free_vars_comp c) with
+  (* Print.debug  "Inlining? %t[%t -> %t]" (Term.print_computation c) (Term.print_pattern p) (Term.print_expression e) ; *)
+  match applicable_pattern p (Term.free_vars_comp c) with
   | NotInlinable when is_atomic e -> substitute_pattern_comp st c p e
   | Inlinable -> substitute_pattern_comp st c p e
   | NotPresent -> c
   | _ ->
     let a =
       begin match p with
-        | {term = Typed.PVar x} ->
-          (* Print.debug "Added to stack ==== %t" (Typed.print_variable x); *)
+        | {term = Term.PVar x} ->
+          (* Print.debug "Added to stack ==== %t" (Term.print_variable x); *)
           let st = {st with stack = Common.update x e st.stack} in
           abstraction p (optimize_comp st c)
         | _ ->
-          (* Print.debug "We are now in the let in 5 novar for %t" (Typed.print_pattern p); *)
+          (* Print.debug "We are now in the let in 5 novar for %t" (Term.print_pattern p); *)
           a
       end
     in
@@ -1697,8 +1698,8 @@ and reduce_expr st e =
   in
   (* if e <> e' then *)
 (*   Print.debug ~loc:e.Typedhh "%t : %t@.~~~>@.%t : %t@.\n"
-    (Typed.print_expression e) (Scheme.print_ty_scheme e.Typed.scheme)
-    (Typed.print_expression e') (Scheme.print_ty_scheme e'.Typed.scheme); *)
+    (Term.print_expression e) (Scheme.print_ty_scheme e.Term.scheme)
+    (Term.print_expression e') (Scheme.print_ty_scheme e'.Term.scheme); *)
   e'
 
 
@@ -1869,9 +1870,9 @@ and reduce_comp st c =
                   st.optimization_function_specialization := !(st.optimization_function_specialization ) + 1;
                   st.optimization_total := !(st.optimization_total) + 1;
                   let (let_rec_p,let_rec_c) = abs in
-                  (* Print.debug "THE ABSTRACTION OF SAME HANDLER DIFF VALUE :- %t" (Typed.print_abstraction abs); *)
+                  (* Print.debug "THE ABSTRACTION OF SAME HANDLER DIFF VALUE :- %t" (Term.print_abstraction abs); *)
                   let Handler ha = e1 in
-                  (* Print.debug "THE VALUE CLAUSE :- %t" (Typed.print_abstraction ha.value_clause); *)
+                  (* Print.debug "THE VALUE CLAUSE :- %t" (Term.print_abstraction ha.value_clause); *)
                   let ctx_val, (tyin_val , (tyout_val,drt_val)), cnstrs_val = ha.value_clause.scheme in
                   let continuation_var_scheme = (ctx_val, Type.Arrow(tyin_val , Type.fresh_dirty ()), cnstrs_val) in
                   let k_var, k_pat = make_var "k_val"  continuation_var_scheme in
@@ -1905,7 +1906,7 @@ and reduce_comp st c =
                   let defs = [(newfvar, newf_body)] in
                   let orig_vc_lambda = optimize_expr st (lambda (hndlr.value_clause)) in
                   let res = let_rec' defs @@  apply newf_var  ( tuple [ae2; orig_vc_lambda] ) in
-                  (* Print.debug "THE resulting computation :-  %t" (Typed.print_computation res); *)
+                  (* Print.debug "THE resulting computation :-  %t" (Term.print_computation res); *)
                    optimize_comp st res
                 | _ -> c
                end
@@ -1961,7 +1962,7 @@ and reduce_comp st c =
                             optimize_comp st res
                        | _ ->
                         (* Print.debug "Its a none"; *)
-                                    (* Print.debug "The handle exp : %t" (Typed.print_expression ae1); *)
+                                    (* Print.debug "The handle exp : %t" (Term.print_expression ae1); *)
                                     c
                        end
                end
@@ -2010,7 +2011,7 @@ and reduce_comp st c =
       c
     *)
   | LetIn ({term = Lambda ({term = (p, {term = Value ({term = Lambda _ } as in_lambda)} )})}, ({term = ({term = PVar f} as f_pat,_)} as a) )->
-    Print.debug "We are now in the let in 4 for %t" (Typed.print_pattern f_pat);
+    Print.debug "We are now in the let in 4 for %t" (Term.print_pattern f_pat);
     let f1_var, f1_pat = make_var "f1" f_pat.scheme in
     let new_p_var, new_p_pat = make_var "new_p" p.scheme in
     let first_fun =
@@ -2035,10 +2036,10 @@ and reduce_comp st c =
   (* XXX simplify *)
   | LetRec (defs, co) ->
     useFuel st;
-    (*Print.debug "the letrec comp  %t" (Typed.print_computation co);*)
+    (*Print.debug "the letrec comp  %t" (Term.print_computation co);*)
     let st =
     List.fold_right (fun (var,abs) st ->
-            (*Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs);*)
+            (*Print.debug "ADDING %t and %t to letrec" (Term.print_variable var) (Term.print_abstraction abs);*)
             {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
     let_rec' defs (reduce_comp st co)
 
@@ -2049,37 +2050,37 @@ and reduce_comp st c =
   (*
   if c <> c' then
    Print.debug ~loc:c.Typedhh "%t : %t@.~~~>@.%t : %t@.\n"
-    (Typed.print_computation c) (Scheme.print_dirty_scheme c.Typed.scheme)
-    (Typed.print_computation c') (Scheme.print_dirty_scheme c'.Typed.scheme);*)
+    (Term.print_computation c) (Scheme.print_dirty_scheme c.Term.scheme)
+    (Term.print_computation c') (Scheme.print_dirty_scheme c'.Term.scheme);*)
   c'
 
 
 let optimize_command st =
   refuel st;
   function
-  | Typed.Computation c ->
-    st, Typed.Computation (optimize_comp st c)
-  | Typed.TopLet (defs, vars) ->
+  | Term.Computation c ->
+    st, Term.Computation (optimize_comp st c)
+  | Term.TopLet (defs, vars) ->
     let defs' = Common.assoc_map (optimize_comp st) defs in
     let st' = begin match defs' with
       (* If we define a single simple handler, we inline it *)
-      | [({ term = Typed.PVar x}, { term = Value ({ term = Handler _ } as e)})] ->
+      | [({ term = Term.PVar x}, { term = Value ({ term = Handler _ } as e)})] ->
         {st with inlinable = Common.update x (fun () -> (optimize_expr st e)) st.inlinable}
-      | [({ term = Typed.PVar x}, ({ term = Value ({term = Lambda _ } as e )} ))] ->
+      | [({ term = Term.PVar x}, ({ term = Value ({term = Lambda _ } as e )} ))] ->
         {st with stack = Common.update x e st.stack}
       | _ -> st
     end
     in
-    st', Typed.TopLet (defs', vars)
-  | Typed.TopLetRec (defs, vars) ->
+    st', Term.TopLet (defs', vars)
+  | Term.TopLetRec (defs, vars) ->
     let defs' = Common.assoc_map (optimize_abs st) defs in
     let st' =
     List.fold_right (fun (var,abs) st ->
-            (* Print.debug "ADDING %t and %t to letrec" (Typed.print_variable var) (Typed.print_abstraction abs); *)
+            (* Print.debug "ADDING %t and %t to letrec" (Term.print_variable var) (Term.print_abstraction abs); *)
             {st with letrec_memory = (var,abs) :: st.letrec_memory}) defs st in
-    st', Typed.TopLetRec (defs', vars)
+    st', Term.TopLetRec (defs', vars)
 
-  | Typed.External (x, _, f) as cmd ->
+  | Term.External (x, _, f) as cmd ->
     let st' =
       begin match Common.lookup f inlinable_definitions with
         (* If the external function is one of the predefined inlinables, we inline it *)
@@ -2088,8 +2089,8 @@ let optimize_command st =
       end
     in
     st', cmd
-  | Typed.DefEffect _ | Typed.Reset | Typed.Quit | Typed.Use _
-  | Typed.Tydef _ | Typed.TypeOf _ | Typed.Help as cmd -> st, cmd
+  | Term.DefEffect _ | Term.Reset | Term.Quit | Term.Use _
+  | Term.Tydef _ | Term.TypeOf _ | Term.Help as cmd -> st, cmd
 
 let optimize_commands cmds =
   refuel initial;

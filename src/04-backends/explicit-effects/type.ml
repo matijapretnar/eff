@@ -1,7 +1,7 @@
 open Utils
 module Const = Language.Const
 module CoreTypes = Language.CoreTypes
-module Type = Language.Type
+module LangType = Language.Type
 module TypeContext = Typechecker.TypeDefinitionContext
 
 (** dirt parameters *)
@@ -527,21 +527,21 @@ and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
 let rec source_to_target tctx_st ty =
   let loc = Location.unknown in
   match ty with
-  | Type.Apply (ty_name, _args)
+  | LangType.Apply (ty_name, _args)
     when TypeContext.transparent ~loc ty_name tctx_st -> (
       match TypeContext.ty_apply ~loc ty_name [] tctx_st with
       (* We currently support only inlined types with no arguments *)
-      | Type.Inline ty -> source_to_target tctx_st ty
+      | LangType.Inline ty -> source_to_target tctx_st ty
       (* Other cases should not be transparent *)
-      | Type.Record _ | Type.Sum _ -> assert false)
-  | Type.Apply (ty_name, args) ->
+      | LangType.Record _ | LangType.Sum _ -> assert false)
+  | LangType.Apply (ty_name, args) ->
       Apply (ty_name, List.map (source_to_target tctx_st) args)
-  | Type.TyParam p -> TyParam p
-  | Type.Basic s -> TyBasic s
-  | Type.Tuple l -> Tuple (List.map (source_to_target tctx_st) l)
-  | Type.Arrow (ty, dirty) ->
+  | LangType.TyParam p -> TyParam p
+  | LangType.Basic s -> TyBasic s
+  | LangType.Tuple l -> Tuple (List.map (source_to_target tctx_st) l)
+  | LangType.Arrow (ty, dirty) ->
       Arrow ((source_to_target tctx_st) ty, source_to_target_dirty tctx_st dirty)
-  | Type.Handler { Type.value = dirty1; finally = dirty2 } ->
+  | LangType.Handler { LangType.value = dirty1; finally = dirty2 } ->
       Handler
         ( source_to_target_dirty tctx_st dirty1,
           source_to_target_dirty tctx_st dirty2 )
@@ -553,6 +553,35 @@ let constructor_signature tctx_st lbl =
   | None -> assert false
   | Some (ty_out, ty_in) ->
       let ty_in =
-        match ty_in with Some ty_in -> ty_in | None -> Type.Tuple []
+        match ty_in with Some ty_in -> ty_in | None -> LangType.Tuple []
       in
       (source_to_target tctx_st ty_in, source_to_target tctx_st ty_out)
+
+let rec apply_sub_to_type ty_subs dirt_subs ty =
+  match ty with
+  | TyParam p -> (
+      match Assoc.lookup p ty_subs with Some p' -> TyParam p' | None -> ty)
+  | Arrow (a, (b, d)) ->
+      Arrow
+        ( apply_sub_to_type ty_subs dirt_subs a,
+          (apply_sub_to_type ty_subs dirt_subs b, apply_sub_to_dirt dirt_subs d)
+        )
+  | Tuple ty_list ->
+      Tuple (List.map (fun x -> apply_sub_to_type ty_subs dirt_subs x) ty_list)
+  | Handler ((a, b), (c, d)) ->
+      Handler
+        ( (apply_sub_to_type ty_subs dirt_subs a, apply_sub_to_dirt dirt_subs b),
+          (apply_sub_to_type ty_subs dirt_subs c, apply_sub_to_dirt dirt_subs d)
+        )
+  | TyBasic _ -> ty
+  | Apply (ty_name, tys) ->
+      Apply (ty_name, List.map (apply_sub_to_type ty_subs dirt_subs) tys)
+  | _ -> failwith __LOC__
+
+and apply_sub_to_dirt dirt_subs drt =
+  match drt.row with
+  | ParamRow p -> (
+      match Assoc.lookup p dirt_subs with
+      | Some p' -> { drt with row = ParamRow p' }
+      | None -> drt)
+  | EmptyRow -> drt

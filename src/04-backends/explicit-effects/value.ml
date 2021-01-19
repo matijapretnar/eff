@@ -1,5 +1,6 @@
 open Utils
-open Language
+module Const = Language.Const
+module CoreTypes = Language.CoreTypes
 
 type value =
   | Const of Const.t
@@ -7,8 +8,8 @@ type value =
   | Record of (CoreTypes.Field.t, value) Assoc.t
   | Variant of CoreTypes.Label.t * value
   | Closure of closure
-  | TypeCoercionClosure of (Types.ct_ty -> value)
-  | DirtCoercionClosure of (Types.ct_dirt -> value)
+  | TypeCoercionClosure of (Type.ct_ty -> value)
+  | DirtCoercionClosure of (Type.ct_dirt -> value)
   | Handler of (result -> result)
 
 and result = Value of value | Call of CoreTypes.Effect.t * value * closure

@@ -15,7 +15,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
     Print.debug "%t@?" (NoEffPrint.pp_cmd cmd);
     { prog = state.prog @ [ cmd ]; typing = explicit_st }
 
-  let process_type ty = NoEffCompile.compile_type (Types.source_to_target ty)
+  let process_type ty = NoEffCompile.compile_type (Type.source_to_target ty)
 
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
@@ -39,7 +39,7 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
   (* not implemented *)
 
   let process_external state (x, ty, f) =
-    let ty' = Types.source_to_target ty in
+    let ty' = Type.source_to_target ty in
     let typing_state' = ExplicitInfer.add_external state.typing x ty' in
     update state (NoEffSyntax.External (x, process_type ty, f)) typing_state'
 

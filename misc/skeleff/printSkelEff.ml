@@ -85,8 +85,8 @@ and print_effect_clauses eff_clauses ppf =
   | (((eff_name, (t1, t2)) as eff), (p1, p2, c)) :: cases ->
       print ~at_level:1
         "| %t -> (fun (%t : %t) (%t : %t -> _ computation) -> %t) %t"
-        (print_effect eff) (print_pattern p1) (Types.print_target_ty t1)
-        (print_pattern p2) (Types.print_target_ty t2) (print_computation c)
+        (print_effect eff) (print_pattern p1) (Type.print_target_ty t1)
+        (print_pattern p2) (Type.print_target_ty t2) (print_computation c)
         (print_effect_clauses cases)
 
 and print_cases cases ppf =

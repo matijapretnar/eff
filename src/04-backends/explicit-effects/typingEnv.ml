@@ -1,6 +1,6 @@
 open Utils
 
-type t = (Typed.variable, Types.target_ty) Assoc.t
+type t = (Term.variable, Type.target_ty) Assoc.t
 
 let empty = Assoc.empty
 

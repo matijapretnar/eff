@@ -5,7 +5,7 @@ module EffectMap = Map.Make (String)
 
 type variable = Variable.t
 
-type effect = CoreTypes.Effect.t * (Types.target_ty * Types.target_ty)
+type effect = CoreTypes.Effect.t * (Type.target_ty * Type.target_ty)
 
 type e_pattern =
   | PEVar of variable
@@ -27,8 +27,8 @@ type e_expression =
   | ELambda of e_abstraction_with_ty
   | EEffect of effect
   | EHandler of e_handler
-  | EBigLambdaSkel of Types.SkelParam.t * e_expression
-  | EApplySkelExp of e_expression * Types.skeleton
+  | EBigLambdaSkel of Type.SkelParam.t * e_expression
+  | EApplySkelExp of e_expression * Type.skeleton
 
 (** Impure computations *)
 and e_computation =
@@ -38,7 +38,7 @@ and e_computation =
   | EHandle of e_expression * e_computation
   | ECall of effect * e_expression * e_abstraction_with_ty
   | EBind of e_computation * e_abstraction
-  | EMatch of e_expression * Types.skeleton * e_abstraction list * Location.t
+  | EMatch of e_expression * Type.skeleton * e_abstraction list * Location.t
   | ELetRec of e_letrec_abstraction list * e_computation
 
 and e_handler = {
@@ -48,14 +48,14 @@ and e_handler = {
 (** Handler definitions *)
 
 and e_letrec_abstraction =
-  variable * Types.skeleton * Types.skeleton * e_abstraction
+  variable * Type.skeleton * Type.skeleton * e_abstraction
 (** LetRec Abstractions: function name, argument type, result type, pattern,
     and right-hand side *)
 
 and e_abstraction = e_pattern * e_computation
 (** Abstractions that take one argument. *)
 
-and e_abstraction_with_ty = e_pattern * Types.skeleton * e_computation
+and e_abstraction_with_ty = e_pattern * Type.skeleton * e_computation
 
 and e_abstraction2 = e_pattern * e_pattern * e_computation
 (** Abstractions that take two arguments. *)

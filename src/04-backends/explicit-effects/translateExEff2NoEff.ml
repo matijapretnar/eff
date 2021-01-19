@@ -1,11 +1,11 @@
 open Utils
 open SyntaxNoEff
-open Types
-open Typed
+open Type
+open Term
 module TypeCheck = TypeChecker
 module NoEff = SyntaxNoEff
-module ExEffTypes = Types
-module ExEff = Typed
+module ExEffTypes = Type
+module ExEff = Term
 module EffectSet = Set.Make (CoreTypes.Effect)
 module Sub = Substitution
 
@@ -34,7 +34,7 @@ let rec extend_pattern_type env pat ty =
           extend_multiple_pats env (Assoc.values_of recs) tys
       | _ -> typefail "Ill-typed record")
   | PVariant (lbl, p) ->
-      let ty_in, ty_out = Types.constructor_signature env.tctx_st lbl in
+      let ty_in, ty_out = Type.constructor_signature env.tctx_st lbl in
       extend_pattern_type env p ty_in
   | PNonbinding -> env
 
@@ -51,7 +51,7 @@ let rec type_elab state (env : environment) (ty : ExEffTypes.target_ty) =
   | ExEffTypes.TyParam x -> (
       match Assoc.lookup x env.ty_param_skeletons with
       | Some xtype -> (xtype, NoEff.NTyParam x)
-      | None -> (Types.SkelBasic Const.IntegerTy, NoEff.NTyParam x))
+      | None -> (Type.SkelBasic Const.IntegerTy, NoEff.NTyParam x))
   | ExEffTypes.Apply (name, lst) ->
       let get_skel x =
         let s, _ = type_elab state env x in
@@ -201,7 +201,7 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
   | ExEff.CastExp (value, coer) ->
       let ty1, elab1 = value_elab state env value in
       let (ty2, r), elab2 = coercion_elab_ty state env coer in
-      if Types.types_are_equal ty1 ty2 then (r, NoEff.NCast (elab1, elab2))
+      if Type.types_are_equal ty1 ty2 then (r, NoEff.NCast (elab1, elab2))
       else typefail "Ill-typed cast"
   | ExEff.LambdaTyCoerVar (par, (ty1, ty2), value) ->
       let _, elab1 = type_elab state env ty1 in
@@ -231,23 +231,23 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
           else typefail "Ill-typed coercion application"
       | _ -> failwith "Ill-typed coercion application")
   | ExEff.Variant (lbl, exp) ->
-      let ty_in, ty_out = Types.constructor_signature env.tctx_st lbl in
+      let ty_in, ty_out = Type.constructor_signature env.tctx_st lbl in
       let ty_e, elab_e = value_elab state env exp in
-      assert (Types.types_are_equal ty_e ty_in);
+      assert (Type.types_are_equal ty_e ty_in);
       (ty_out, NoEff.NVariant (lbl, Some elab_e))
   | ExEff.Record ass -> failwith "records not supported yet"
 
 and coercion_elab_ty state env coer =
   match coer with
-  | ExEff.ReflTy ty ->
+  | Constraint.ReflTy ty ->
       let _, tyelab = type_elab state env ty in
       ((ty, ty), NoEff.NCoerRefl tyelab)
-  | ExEff.ArrowCoercion (tycoer, dirtycoer) ->
+  | Constraint.ArrowCoercion (tycoer, dirtycoer) ->
       let (tycoer2, tycoer1), tyelab = coercion_elab_ty state env tycoer in
       let (dcoer1, dcoer2), dirtyelab = coer_elab_dirty state env dirtycoer in
       ( (ExEffTypes.Arrow (tycoer1, dcoer1), ExEffTypes.Arrow (tycoer2, dcoer2)),
         NoEff.NCoerArrow (tyelab, dirtyelab) )
-  | ExEff.HandlerCoercion (coerA, coerB) -> (
+  | Constraint.HandlerCoercion (coerA, coerB) -> (
       let (coerA2, coerA1), elabA = coer_elab_dirty state env coerA in
       let (coerB1, coerB2), elabB = coer_elab_dirty state env coerB in
       if
@@ -259,7 +259,7 @@ and coercion_elab_ty state env coer =
           NoEff.NCoerArrow (elabA, elabB) )
       else
         match coerB with
-        | ExEff.BangCoercion (tycoer, dirtcoer) -> (
+        | Constraint.BangCoercion (tycoer, dirtcoer) -> (
             let (t1', t2'), elab2 = coercion_elab_ty state env tycoer in
             if
               (not (has_empty_dirt coerA2)) && not (has_empty_dirt coerA2)
@@ -270,7 +270,7 @@ and coercion_elab_ty state env coer =
                 NoEff.NCoerHandler (elabA, NoEff.NCoerComp elab2) )
             else
               match coerA with
-              | ExEff.BangCoercion (tycoerA, dirtcoerA) ->
+              | Constraint.BangCoercion (tycoerA, dirtcoerA) ->
                   let (t2, t1), elab1 = coercion_elab_ty state env tycoerA in
                   if
                     has_empty_dirt coerB1
@@ -293,17 +293,17 @@ and coercion_elab_ty state env coer =
                   else failwith "Ill-typed handler coercion"
               | _ -> failwith "Ill-typed handler coercion left side")
         | _ -> failwith "Ill-typed handler coercion right side")
-  | ExEff.TyCoercionVar par -> (
+  | Constraint.TyCoercionVar par -> (
       match Assoc.lookup par env.ty_coer_types with
       | Some xtype -> (xtype, NoEff.NCoerVar par)
       | None -> failwith "Coercion variable out of scope")
-  | ExEff.SequenceTyCoer (coer1, coer2) ->
+  | Constraint.SequenceTyCoer (coer1, coer2) ->
       let (coer1ty1, coer1ty2), elab1 = coercion_elab_ty state env coer1 in
       let (coer2ty1, coer2ty2), elab2 = coercion_elab_ty state env coer2 in
       if coer1ty2 = coer2ty1 then
         ((coer1ty1, coer2ty2), NoEff.NCoerTrans (elab1, elab2))
       else failwith "Ill-typed coercion sequencing"
-  | ExEff.ApplyCoercion (name, coer_list) ->
+  | Constraint.ApplyCoercion (name, coer_list) ->
       let type_list =
         List.map (fun x -> fst (coercion_elab_ty state env x)) coer_list
       in
@@ -314,55 +314,55 @@ and coercion_elab_ty state env coer =
       in
       ( (ExEffTypes.Tuple ty1s, ExEffTypes.Tuple ty2s),
         NoEff.NCoerApply (name, elab_list) )
-  | ExEff.TupleCoercion lst ->
+  | Constraint.TupleCoercion lst ->
       let elabs = List.map (coercion_elab_ty state env) lst in
       let tylist = List.map fst elabs in
       let elablist = List.map snd elabs in
       ( ( ExEffTypes.Tuple (List.map fst tylist),
           ExEffTypes.Tuple (List.map snd tylist) ),
         NoEff.NCoerTuple elablist )
-  | ExEff.LeftArrow c -> (
+  | Constraint.LeftArrow c -> (
       match c with
-      | ExEff.ArrowCoercion (c1, c2) ->
+      | Constraint.ArrowCoercion (c1, c2) ->
           let ty, _ = coercion_elab_ty state env c1 in
           let _, elab = coercion_elab_ty state env c in
           (ty, NoEff.NCoerLeftArrow elab)
       | _ -> failwith "Ill-formed left arrow coercion")
-  | ExEff.PureCoercion c ->
+  | Constraint.PureCoercion c ->
       let ((ty1, _), (ty2, _)), elabc = coer_elab_dirty state env c in
       ((ty1, ty2), NoEff.NCoerPure elabc)
-  | ExEff.QualTyCoer ((ty1, ty2), c) ->
+  | Constraint.QualTyCoer ((ty1, ty2), c) ->
       let (tyc1, tyc2), elabc = coercion_elab_ty state env c in
       let _, ty1elab = type_elab state env ty1 in
       let _, ty2elab = type_elab state env ty2 in
       ( ( ExEffTypes.QualTy ((ty1, ty2), tyc1),
           ExEffTypes.QualTy ((ty1, ty2), tyc2) ),
         NoEff.NCoerQual ((ty1elab, ty2elab), elabc) )
-  | ExEff.QualDirtCoer (dirts, c) ->
+  | Constraint.QualDirtCoer (dirts, c) ->
       let tyc, elabc = coercion_elab_ty state env c in
       ( ( ExEffTypes.QualDirt (dirts, fst tyc),
           ExEffTypes.QualDirt (dirts, snd tyc) ),
         elabc )
-  | ExEff.ApplyQualTyCoer (c1, c2) -> (
+  | Constraint.ApplyQualTyCoer (c1, c2) -> (
       let c2ty, c2elab = coercion_elab_ty state env c2 in
       match c1 with
-      | ExEff.QualTyCoer (tys, ccty) ->
+      | Constraint.QualTyCoer (tys, ccty) ->
           if c2ty = tys then
             let (ty1, ty2), ccelab = coercion_elab_ty state env ccty in
             ((ty1, ty2), NoEff.NCoerApp (ccelab, c2elab))
           else failwith "Ill-typed coercion application"
       | _ -> failwith "Ill-typed coercion application")
-  | ExEff.ApplyQualDirtCoer (c1, c2) -> (
+  | Constraint.ApplyQualDirtCoer (c1, c2) -> (
       match c1 with
-      | ExEff.QualDirtCoer (ds, ccd) ->
+      | Constraint.QualDirtCoer (ds, ccd) ->
           if coer_elab_dirt state env c2 = ds then
             coercion_elab_ty state env ccd
           else failwith "Ill-typed coercion application"
       | _ -> failwith "Ill-typed coercion application")
 
-and coer_elab_dirty state env (coer : ExEff.dirty_coercion) =
+and coer_elab_dirty state env (coer : Constraint.dirty_coercion) =
   match coer with
-  | ExEff.BangCoercion (tcoer, dcoer) ->
+  | Constraint.BangCoercion (tcoer, dcoer) ->
       let (ty1, ty2), tyelab = coercion_elab_ty state env tcoer in
       let d1, d2 = coer_elab_dirt state env dcoer in
       if is_empty_dirt d1 && is_empty_dirt d2 then
@@ -372,7 +372,7 @@ and coer_elab_dirty state env (coer : ExEff.dirty_coercion) =
       else if not (is_empty_dirt d2) then
         (((ty1, d1), (ty2, d2)), NoEff.NCoerComp tyelab)
       else failwith "Ill-typed bang coercion"
-  | ExEff.RightArrow tycoer -> (
+  | Constraint.RightArrow tycoer -> (
       let (ty1, ty2), tyelab = coercion_elab_ty state env tycoer in
       match ty1 with
       | ExEffTypes.Arrow (a, b) -> (
@@ -380,7 +380,7 @@ and coer_elab_dirty state env (coer : ExEff.dirty_coercion) =
           | ExEffTypes.Arrow (c, d) -> ((b, d), NoEff.NCoerRightArrow tyelab)
           | _ -> failwith "Ill-typed right arrow coercion")
       | _ -> failwith "Ill-typed right arrow coercion")
-  | ExEff.RightHandler tycoer -> (
+  | Constraint.RightHandler tycoer -> (
       let (ty1, ty2), tyelab = coercion_elab_ty state env tycoer in
       match ty1 with
       | ExEffTypes.Handler (a, b) -> (
@@ -388,7 +388,7 @@ and coer_elab_dirty state env (coer : ExEff.dirty_coercion) =
           | ExEffTypes.Handler (c, d) -> ((b, d), NoEff.NCoerRightHandler tyelab)
           | _ -> failwith "Ill-typed right handler coercion")
       | _ -> failwith "Ill-typed right handler coercion")
-  | ExEff.LeftHandler tycoer -> (
+  | Constraint.LeftHandler tycoer -> (
       let (ty1, ty2), tyelab = coercion_elab_ty state env tycoer in
       match ty1 with
       | ExEffTypes.Handler (a, b) -> (
@@ -396,7 +396,7 @@ and coer_elab_dirty state env (coer : ExEff.dirty_coercion) =
           | ExEffTypes.Handler (c, d) -> ((c, a), NoEff.NCoerLeftHandler tyelab)
           | _ -> failwith "Ill-typed left handler coercion")
       | _ -> failwith "Ill-typed left handler coercion")
-  | ExEff.SequenceDirtyCoer (c1, c2) ->
+  | Constraint.SequenceDirtyCoer (c1, c2) ->
       let (ty11, ty12), c1elab = coer_elab_dirty state env c1 in
       let (ty21, ty22), c2elab = coer_elab_dirty state env c2 in
       if ty12 = ty21 then ((ty11, ty22), NoEff.NCoerTrans (c1elab, c2elab))
@@ -404,13 +404,13 @@ and coer_elab_dirty state env (coer : ExEff.dirty_coercion) =
 
 and coer_elab_dirt state env dcoer =
   match dcoer with
-  | ExEff.ReflDirt dirt -> (dirt, dirt)
-  | ExEff.DirtCoercionVar par -> (
+  | Constraint.ReflDirt dirt -> (dirt, dirt)
+  | Constraint.DirtCoercionVar par -> (
       match Assoc.lookup par env.dirt_coer_types with
       | Some dirts -> dirts
       | None -> failwith "Dirt coercion variable out of scope")
-  | ExEff.Empty dirt -> (ExEffTypes.empty_dirt, dirt)
-  | ExEff.UnionDirt (set, dc) ->
+  | Constraint.Empty dirt -> (ExEffTypes.empty_dirt, dirt)
+  | Constraint.UnionDirt (set, dc) ->
       let d1, d2 = coer_elab_dirt state env dc in
       let d1' =
         { row = d1.row; effect_set = EffectSet.union set d1.effect_set }
@@ -419,12 +419,12 @@ and coer_elab_dirt state env dcoer =
         { row = d2.row; effect_set = EffectSet.union set d2.effect_set }
       in
       (d1', d2')
-  | ExEff.SequenceDirtCoer (d1, d2) ->
+  | Constraint.SequenceDirtCoer (d1, d2) ->
       let dirt11, dirt12 = coer_elab_dirt state env d1 in
       let dirt21, dirt22 = coer_elab_dirt state env d2 in
       if dirt12 = dirt21 then (dirt11, dirt22)
       else failwith "Ill-typed dirt coercion sequencing"
-  | ExEff.DirtCoercion dirty_coercion ->
+  | Constraint.DirtCoercion dirty_coercion ->
       let (dirtyA, dirtyB), _ = coer_elab_dirty state env dirty_coercion in
       let tyA, dA = dirtyA in
       let tyB, dB = dirtyB in
@@ -528,7 +528,7 @@ and comp_elab state env c =
       let elab_abs vty cty (pat, comp) =
         let env' = extend_pattern_type env pat tyv in
         let tyc, elabc = comp_elab state env' comp in
-        if Types.types_are_equal (fst tyc) (fst cty) then
+        if Type.types_are_equal (fst tyc) (fst cty) then
           (pattern_elab pat, elabc)
         else typefail "Ill-typed match branch"
       in
@@ -557,10 +557,10 @@ and comp_elab state env c =
       match (vtype, velab) with
       | ExEffTypes.Handler ((vty1, vdirt1), (vty2, vdirt2)), NHandler handler ->
           (* Filip: I think this tests the wrong type *)
-          if true (* Types.types_are_equal vty1 ctype *) then
-            if Types.is_empty_dirt cdirt (* Handle - Case 1 *) then
+          if true (* Type.types_are_equal vty1 ctype *) then
+            if Type.is_empty_dirt cdirt (* Handle - Case 1 *) then
               ((vty2, vdirt2), NoEff.NApplyTerm (velab, elabc))
-            else if Types.is_empty_dirt vdirt2 (* Handle - Case 2 *) then
+            else if Type.is_empty_dirt vdirt2 (* Handle - Case 2 *) then
               let _, telab = type_elab state env vty2 in
               ( (vty2, vdirt2),
                 NoEff.NCast
@@ -602,14 +602,14 @@ and comp_elab state env c =
   | ExEff.CastComp (comp, coer) ->
       let (t1, t2), elabc = coer_elab_dirty state env coer in
       let cty, coelab = comp_elab state env comp in
-      if Types.types_are_equal (fst cty) (fst t1) then
+      if Type.types_are_equal (fst cty) (fst t1) then
         (t2, NoEff.NCast (coelab, elabc))
       else typefail "Ill-typed cast"
   | CastComp_ty (_, _) | CastComp_dirt (_, _) -> failwith "Not implemented"
 
 and elab_ty = function
-  | Type.Apply (name, ts) -> NoEff.NTyApply (name, List.map elab_ty ts)
-  | Type.TyParam p -> NoEff.NTyParam p
+  | Language.Type.Apply (name, ts) -> NoEff.NTyApply (name, List.map elab_ty ts)
+  | TyParam p -> NoEff.NTyParam p
   | Basic s -> NoEff.NTyBasic s
   | Tuple tys -> NoEff.NTyTuple (List.map elab_ty tys)
   | Arrow (t1, t2) -> NoEff.NTyArrow (elab_ty t1, elab_ty t2)
@@ -617,9 +617,9 @@ and elab_ty = function
 
 and elab_tydef = function
   | Language.Type.Record assoc -> NoEff.TyDefRecord (Assoc.map elab_ty assoc)
-  | Language.Type.Sum assoc ->
+  | Sum assoc ->
       let converter = function None -> None | Some ty -> Some (elab_ty ty) in
       NoEff.TyDefSum (Assoc.map converter assoc)
-  | Language.Type.Inline ty -> NoEff.TyDefInline (elab_ty ty)
+  | Inline ty -> NoEff.TyDefInline (elab_ty ty)
 
 and has_empty_dirt ((ty, dirt) : ExEffTypes.target_dirty) = is_empty_dirt dirt

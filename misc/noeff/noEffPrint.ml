@@ -138,7 +138,7 @@ let pp_effect (e, (ty1, ty2)) ppf = CoreTypes.Effect.print e ppf
 let rec pp_coercion coer ppf =
   (* The cases not matched here should be handled in pp_term *)
   match coer with
-  | CoerVar v -> print ppf "CoerVar %t" (Types.TyCoercionParam.print v)
+  | CoerVar v -> print ppf "CoerVar %t" (Type.TyCoercionParam.print v)
   | ReflTy _ -> print ppf "coer_refl_ty"
   | ReflVar t -> print ppf "ReflVar"
   | CoerArrow (c1, c2) -> print ppf "CoerArrow"

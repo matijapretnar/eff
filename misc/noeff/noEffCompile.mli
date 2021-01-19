@@ -1,7 +1,7 @@
-val compile_type : Types.target_ty -> NoEffSyntax.ty
+val compile_type : Type.target_ty -> NoEffSyntax.ty
 
-val compile_expr : Typed.expression -> NoEffSyntax.term
+val compile_expr : Term.expression -> NoEffSyntax.term
 
-val compile_comp : Typed.computation -> NoEffSyntax.term
+val compile_comp : Term.computation -> NoEffSyntax.term
 
-val compile_pattern : Typed.pattern -> NoEffSyntax.pattern
+val compile_pattern : Term.pattern -> NoEffSyntax.pattern

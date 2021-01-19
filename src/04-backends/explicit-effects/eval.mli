@@ -4,13 +4,12 @@ type state
 
 val initial_state : state
 
-val extend : Typed.pattern -> Value.value -> state -> state
+val extend : Term.pattern -> Value.value -> state -> state
 
-val extend_let_rec :
-  state -> (Typed.variable, Typed.abstraction) Assoc.t -> state
+val extend_let_rec : state -> (Term.variable, Term.abstraction) Assoc.t -> state
 
-val run : state -> Typed.computation -> Value.value
+val run : state -> Term.computation -> Value.value
 
-val update : Typed.variable -> Value.value -> state -> state
+val update : Term.variable -> Value.value -> state -> state
 
-val lookup : Typed.variable -> state -> Value.value option
+val lookup : Term.variable -> state -> Value.value option

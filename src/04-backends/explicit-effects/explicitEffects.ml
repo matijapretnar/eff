@@ -13,8 +13,8 @@ type simple_comp = {
 }
 
 type explicit_comp = {
-  term : Typed.computation;
-  explicit_type : Types.target_ty * Types.dirt;
+  term : Term.computation;
+  explicit_type : Type.target_ty * Type.dirt;
 }
 
 module type ExplicitBackend = sig
@@ -49,12 +49,12 @@ module type ExplicitBackend = sig
     Assoc.t ->
     (Language.UntypedSyntax.variable * Language.Type.ty_scheme) list ->
     ((Language.UntypedSyntax.variable
-     * Types.target_ty
-     * (Types.target_ty * Types.dirt)
-     * (Typed.pattern * Typed.computation))
+     * Type.target_ty
+     * (Type.target_ty * Type.dirt)
+     * (Term.pattern * Term.computation))
      list
-    * Typed.computation)
-    * Types.target_ty ->
+    * Term.computation)
+    * Type.target_ty ->
     state
 
   val process_external :
@@ -148,7 +148,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
         let type_system_state =
           List.fold_left
             (fun st (v, p, c, _) ->
-              ExplicitInfer.add_gbl_def st v (Types.Arrow (p, c)))
+              ExplicitInfer.add_gbl_def st v (Type.Arrow (p, c)))
             state.effect_system_state.type_system_state typed_abs
         in
         let effect_system_state =
@@ -163,7 +163,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
     in
     let typechecker_state' =
       TypeChecker.addExternal state.effect_system_state.typechecker_state x
-        (Types.source_to_target type_system_state'.tctx_st ty)
+        (Type.source_to_target type_system_state'.tctx_st ty)
     in
     let effect_system_state' =
       {
@@ -213,13 +213,13 @@ module Evaluate : Language.BackendSignature.T = Make (struct
   let process_computation state _ _ { term = c'; explicit_type = ty' } =
     let v = Eval.run state.evaluation_state c' in
     Format.fprintf !Config.output_formatter "@[- : %t = %t@]@."
-      (Types.print_target_dirty ty')
+      (Type.print_target_dirty ty')
       (V.print_value v);
     state
 
   let process_type_of state _ _ { term = _; explicit_type = ty' } =
     Format.fprintf !Config.output_formatter "- : %t\n"
-      (Types.print_target_dirty ty');
+      (Type.print_target_dirty ty');
     state
 
   let process_def_effect state _ _ = state
@@ -267,8 +267,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
       (snd
          (TranslateExEff2NoEff.type_elab effect_system_state.type_system_state
             effect_system_state.typechecker_state
-            (Types.source_to_target
-               effect_system_state.type_system_state.tctx_st ty)))
+            (Type.source_to_target effect_system_state.type_system_state.tctx_st
+               ty)))
 
   let translate_computation state { type_system_state; typechecker_state } c' =
     let c'' =
@@ -310,7 +310,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     failwith "Top level bindings not supported"
 
   let process_top_let_rec state ts_state _defs _ ((lrecs, c), _ty) =
-    let comp = Typed.LetRec (lrecs, c) in
+    let comp = Term.LetRec (lrecs, c) in
     let state, _, c'''' = translate_computation state ts_state comp in
     { prog = SyntaxOcaml.Term c'''' :: state.prog }
 

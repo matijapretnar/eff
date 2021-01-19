@@ -1,11 +1,11 @@
 open Utils
-open Types
-open Typed
+open Type
+open Constraint
 
 let rec print_c_list = function
   | [] -> Print.debug "---------------------"
   | e :: l ->
-      Print.debug "%t" (Typed.print_omega_ct e);
+      Print.debug "%t" (Constraint.print_omega_ct e);
       print_c_list l
 
 let rec print_var_list = function
@@ -58,12 +58,12 @@ let rec fix_union_find fixpoint c_list =
 *)
   let mapper x =
     match x with
-    | Typed.TyOmega (_, tycons) -> (
+    | Constraint.TyOmega (_, tycons) -> (
         match tycons with
-        | Types.TyParam a, Types.TyParam b
+        | Type.TyParam a, Type.TyParam b
           when List.mem a fixpoint && not (List.mem b fixpoint) ->
             [ b ]
-        | Types.TyParam b, Types.TyParam a
+        | Type.TyParam b, Type.TyParam a
           when List.mem a fixpoint && not (List.mem b fixpoint) ->
             [ b ]
         | _ -> [])
@@ -87,43 +87,43 @@ let process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a =
 let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
   match skel with
   (* α : ς *)
-  | SkelParam _ -> (sub, Typed.add_to_constraints cons paused, rest_queue)
+  | SkelParam _ -> (sub, Constraint.add_to_constraints cons paused, rest_queue)
   (* α : int *)
   | SkelBasic ps ->
       let k = tvar in
-      let v = Types.TyBasic ps in
+      let v = Type.TyBasic ps in
       let sub1 = Substitution.add_type_substitution_e k v in
-      ( Substitution.add_type_substitution tvar (Types.TyBasic ps) sub,
+      ( Substitution.add_type_substitution tvar (Type.TyBasic ps) sub,
         [],
         Substitution.apply_substitutions_to_constraints sub1
-          (Typed.add_list_to_constraints paused rest_queue) )
+          (Constraint.add_list_to_constraints paused rest_queue) )
   (* α : τ₁ -> τ₂ *)
   | SkelArrow (sk1, sk2) ->
-      let tvar1, cons1 = Typed.fresh_ty_with_skel sk1
-      and tvar2, cons2 = Typed.fresh_ty_with_skel sk2
-      and dvar1 = Types.fresh_dirt () in
+      let tvar1, cons1 = Constraint.fresh_ty_with_skel sk1
+      and tvar2, cons2 = Constraint.fresh_ty_with_skel sk2
+      and dvar1 = Type.fresh_dirt () in
       let k = tvar in
-      let v = Types.Arrow (tvar1, (tvar2, dvar1)) in
+      let v = Type.Arrow (tvar1, (tvar2, dvar1)) in
       let sub1 = Substitution.add_type_substitution_e k v in
       let cons_subbed =
         Substitution.apply_substitutions_to_constraints sub1
-          (Typed.add_list_to_constraints paused rest_queue)
+          (Constraint.add_list_to_constraints paused rest_queue)
       in
       ( Substitution.add_type_substitution k v sub,
         [],
-        Typed.add_to_constraints cons1 cons_subbed
-        |> Typed.add_to_constraints cons2 )
+        Constraint.add_to_constraints cons1 cons_subbed
+        |> Constraint.add_to_constraints cons2 )
   (* α : τ₁ x τ₂ ... *)
   | SkelTuple sks ->
       let tvars, conss =
         List.fold_right
           (fun sk (tvars, conss) ->
-            let tvar, cons = Typed.fresh_ty_with_skel sk in
+            let tvar, cons = Constraint.fresh_ty_with_skel sk in
             (tvar :: tvars, cons :: conss))
           sks ([], [])
       in
       let k = tvar in
-      let v = Types.Tuple tvars in
+      let v = Type.Tuple tvars in
       let sub1 = Substitution.add_type_substitution_e k v in
       let cons_subbed =
         Substitution.apply_substitutions_to_constraints sub1
@@ -137,12 +137,12 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
       let tvars, conss =
         List.fold_right
           (fun sk (tvars, conss) ->
-            let tvar, cons = Typed.fresh_ty_with_skel sk in
+            let tvar, cons = Constraint.fresh_ty_with_skel sk in
             (tvar :: tvars, cons :: conss))
           sks ([], [])
       in
       let k = tvar in
-      let v = Types.Apply (ty_name, tvars) in
+      let v = Type.Apply (ty_name, tvars) in
       let sub1 = Substitution.add_type_substitution_e k v in
       let cons_subbed =
         Substitution.apply_substitutions_to_constraints sub1
@@ -153,21 +153,21 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
         add_list_to_constraints cons_subbed conss )
   (* α : τ₁ => τ₂ *)
   | SkelHandler (sk1, sk2) ->
-      let tvar1, cons1 = Typed.fresh_ty_with_skel sk1
-      and tvar2, cons2 = Typed.fresh_ty_with_skel sk2
-      and dvar1 = Types.fresh_dirt ()
-      and dvar2 = Types.fresh_dirt () in
+      let tvar1, cons1 = Constraint.fresh_ty_with_skel sk1
+      and tvar2, cons2 = Constraint.fresh_ty_with_skel sk2
+      and dvar1 = Type.fresh_dirt ()
+      and dvar2 = Type.fresh_dirt () in
       let k = tvar in
-      let v = Types.Handler ((tvar1, dvar1), (tvar2, dvar2)) in
+      let v = Type.Handler ((tvar1, dvar1), (tvar2, dvar2)) in
       let sub1 = Substitution.add_type_substitution_e k v in
       let cons_subbed =
         Substitution.apply_substitutions_to_constraints sub1
-          (Typed.add_list_to_constraints paused rest_queue)
+          (Constraint.add_list_to_constraints paused rest_queue)
       in
       ( Substitution.add_type_substitution k v sub,
         [],
-        Typed.add_to_constraints cons1 cons_subbed
-        |> Typed.add_to_constraints cons2 )
+        Constraint.add_to_constraints cons1 cons_subbed
+        |> Constraint.add_to_constraints cons2 )
 
 and skel_eq_step sub paused rest_queue sk1 sk2 =
   match (sk1, sk2) with
@@ -185,47 +185,47 @@ and skel_eq_step sub paused rest_queue sk1 sk2 =
       ( sub,
         paused,
         add_list_to_constraints
-          [ Typed.SkelEq (ska, skc); Typed.SkelEq (skb, skd) ]
+          [ Constraint.SkelEq (ska, skc); Constraint.SkelEq (skb, skd) ]
           rest_queue )
   (* τ₁₁ => τ₁₂ = τ₂₁ => τ₂₂ *)
   | SkelHandler (ska, skb), SkelHandler (skc, skd) ->
       ( sub,
         paused,
         add_list_to_constraints
-          [ Typed.SkelEq (ska, skc); Typed.SkelEq (skb, skd) ]
+          [ Constraint.SkelEq (ska, skc); Constraint.SkelEq (skb, skd) ]
           rest_queue )
   | SkelApply (ty_name1, sks1), SkelApply (ty_name2, sks2)
     when ty_name1 = ty_name2 && List.length sks1 = List.length sks2 ->
       ( sub,
         paused,
         add_list_to_constraints
-          (List.map2 (fun sk1 sk2 -> Typed.SkelEq (sk1, sk2)) sks1 sks2)
+          (List.map2 (fun sk1 sk2 -> Constraint.SkelEq (sk1, sk2)) sks1 sks2)
           rest_queue )
   | _ ->
       Print.debug "skel_eq_step failure: (%t)"
-        (Typed.print_omega_ct (Typed.SkelEq (sk1, sk2)));
+        (Constraint.print_omega_ct (Constraint.SkelEq (sk1, sk2)));
       failwith __LOC__
 
 and ty_omega_step sub paused cons rest_queue omega = function
   (* ω : A <= A *)
-  | x, y when Types.types_are_equal x y ->
+  | x, y when Type.types_are_equal x y ->
       let k = omega in
-      let v = Typed.ReflTy x in
+      let v = Constraint.ReflTy x in
       (Substitution.add_type_coercion k v sub, paused, rest_queue)
   (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
-  | Types.Arrow (a1, dirty1), Types.Arrow (a2, dirty2) ->
+  | Type.Arrow (a1, dirty1), Type.Arrow (a2, dirty2) ->
       let new_ty_coercion_var_coer, ty_cons = fresh_ty_coer (a2, a1)
       and dirty_coercion_c, dirty_cons = fresh_dirty_coer (dirty1, dirty2) in
       let k = omega in
       let v =
-        Typed.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
+        Constraint.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
       in
       ( Substitution.add_type_coercion k v sub,
         paused,
         add_to_constraints ty_cons rest_queue |> add_to_constraints dirty_cons
       )
   (* ω : A₁ x A₂ x ... <= B₁ x B₂ x ...  *)
-  | Types.Tuple tys, Types.Tuple tys' when List.length tys = List.length tys' ->
+  | Type.Tuple tys, Type.Tuple tys' when List.length tys = List.length tys' ->
       let coercions, conss =
         List.fold_right2
           (fun ty ty' (coercions, conss) ->
@@ -234,13 +234,13 @@ and ty_omega_step sub paused cons rest_queue omega = function
           tys tys' ([], [])
       in
       let k = omega in
-      let v = Typed.TupleCoercion coercions in
+      let v = Constraint.TupleCoercion coercions in
       ( Substitution.add_type_coercion k v sub,
         paused,
         add_list_to_constraints conss rest_queue )
   (* ω : ty (A₁,  A₂,  ...) <= ty (B₁,  B₂,  ...) *)
   (* we assume that all type parameters are positive *)
-  | Types.Apply (ty_name1, tys1), Types.Apply (ty_name2, tys2)
+  | Type.Apply (ty_name1, tys1), Type.Apply (ty_name2, tys2)
     when ty_name1 = ty_name2 && List.length tys1 = List.length tys2 ->
       let coercions, conss =
         List.fold_right2
@@ -250,22 +250,22 @@ and ty_omega_step sub paused cons rest_queue omega = function
           tys1 tys2 ([], [])
       in
       let k = omega in
-      let v = Typed.ApplyCoercion (ty_name1, coercions) in
+      let v = Constraint.ApplyCoercion (ty_name1, coercions) in
       ( Substitution.add_type_coercion k v sub,
         paused,
         add_list_to_constraints conss rest_queue )
   (* ω : D₁ => C₁ <= D₂ => C₂ *)
-  | Types.Handler (drty11, drty12), Types.Handler (drty21, drty22) ->
+  | Type.Handler (drty11, drty12), Type.Handler (drty21, drty22) ->
       let drty_coer1, drty_cons1 = fresh_dirty_coer (drty21, drty11)
       and drty_coer2, drty_cons2 = fresh_dirty_coer (drty12, drty22) in
       let k = omega in
-      let v = Typed.HandlerCoercion (drty_coer1, drty_coer2) in
+      let v = Constraint.HandlerCoercion (drty_coer1, drty_coer2) in
       ( Substitution.add_type_coercion k v sub,
         paused,
         add_to_constraints drty_cons1 rest_queue
         |> add_to_constraints drty_cons2 )
   (* ω : α <= A /  ω : A <= α *)
-  | Types.TyParam tv, a | a, Types.TyParam tv ->
+  | Type.TyParam tv, a | a, Type.TyParam tv ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
       let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in
       let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
@@ -284,27 +284,27 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
   (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
   | ( { effect_set = s1; row = ParamRow v1 },
       { effect_set = s2; row = ParamRow v2 } ) ->
-      if Types.EffectSet.is_empty s1 then (sub, cons :: paused, rest_queue)
+      if Type.EffectSet.is_empty s1 then (sub, cons :: paused, rest_queue)
       else
-        let omega' = Types.DirtCoercionParam.fresh () in
-        let diff_set = Types.EffectSet.diff s1 s2 in
-        let union_set = Types.EffectSet.union s1 s2 in
+        let omega' = Type.DirtCoercionParam.fresh () in
+        let diff_set = Type.EffectSet.diff s1 s2 in
+        let union_set = Type.EffectSet.union s1 s2 in
         let k0 = v2 in
         let v0 =
-          let open Types in
-          { effect_set = diff_set; row = ParamRow (Types.DirtParam.fresh ()) }
+          let open Type in
+          { effect_set = diff_set; row = ParamRow (Type.DirtParam.fresh ()) }
         in
         let k1' = omega in
-        let v1' = Typed.UnionDirt (s1, DirtCoercionVar omega') in
+        let v1' = Constraint.UnionDirt (s1, DirtCoercionVar omega') in
         let sub' =
           Substitution.add_dirt_substitution_e k0 v0
           |> Substitution.add_dirt_var_coercion k1' v1'
         in
         let new_cons =
-          Typed.DirtOmega
+          Constraint.DirtOmega
             ( omega',
-              ( Types.{ effect_set = Types.EffectSet.empty; row = ParamRow v1 },
-                Types.{ effect_set = union_set; row = ParamRow v2 } ) )
+              ( Type.{ effect_set = Type.EffectSet.empty; row = ParamRow v1 },
+                Type.{ effect_set = union_set; row = ParamRow v2 } ) )
         in
         ( Substitution.merge sub sub',
           [],
@@ -312,17 +312,17 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
             (add_list_to_constraints paused rest_queue
             |> add_to_constraints new_cons) )
   (* ω : Ø <= Δ₂ *)
-  | { effect_set = s1; row = EmptyRow }, d when Types.EffectSet.is_empty s1 ->
+  | { effect_set = s1; row = EmptyRow }, d when Type.EffectSet.is_empty s1 ->
       let k = omega in
-      let v = Typed.Empty d in
+      let v = Constraint.Empty d in
       (Substitution.add_dirt_var_coercion k v sub, paused, rest_queue)
   (* ω : δ₁ <= Ø *)
   | { effect_set = s1; row = ParamRow v1 }, { effect_set = s2; row = EmptyRow }
-    when Types.EffectSet.is_empty s1 && Types.EffectSet.is_empty s2 ->
+    when Type.EffectSet.is_empty s1 && Type.EffectSet.is_empty s2 ->
       let k0 = omega in
-      let v0 = Typed.Empty Types.empty_dirt in
+      let v0 = Constraint.Empty Type.empty_dirt in
       let k1' = v1 in
-      let v1' = Types.empty_dirt in
+      let v1' = Type.empty_dirt in
       let sub1 =
         Substitution.add_dirt_var_coercion_e k0 v0
         |> Substitution.add_dirt_substitution k1' v1'
@@ -333,28 +333,26 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
           (add_list_to_constraints paused rest_queue) )
   (* ω : O₁ <= O₂ *)
   | { effect_set = s1; row = EmptyRow }, { effect_set = s2; row = EmptyRow } ->
-      assert (Types.EffectSet.subset s1 s2);
+      assert (Type.EffectSet.subset s1 s2);
       let k = omega in
       let v =
-        Typed.UnionDirt
-          (s2, Typed.Empty (Types.closed_dirt (Types.EffectSet.diff s2 s1)))
+        Constraint.UnionDirt
+          (s2, Constraint.Empty (Type.closed_dirt (Type.EffectSet.diff s2 s1)))
       in
       (Substitution.add_dirt_var_coercion k v sub, paused, rest_queue)
   (* ω : O₁ <= O₂ ∪ δ₂ *)
   | { effect_set = s1; row = EmptyRow }, { effect_set = s2; row = ParamRow v2 }
     ->
-      let v2' = Types.DirtParam.fresh () in
+      let v2' = Type.DirtParam.fresh () in
       let k0 = omega in
       let v0 =
-        Typed.UnionDirt
+        Constraint.UnionDirt
           ( s1,
-            Typed.Empty
-              Types.{ effect_set = EffectSet.diff s2 s1; row = ParamRow v2' } )
+            Constraint.Empty
+              Type.{ effect_set = EffectSet.diff s2 s1; row = ParamRow v2' } )
       in
       let k1 = v2 in
-      let v1 =
-        Types.{ effect_set = EffectSet.diff s1 s2; row = ParamRow v2' }
-      in
+      let v1 = Type.{ effect_set = EffectSet.diff s1 s2; row = ParamRow v2' } in
       let sub1 =
         Substitution.add_dirt_var_coercion_e k0 v0
         |> Substitution.add_dirt_substitution k1 v1
@@ -391,18 +389,19 @@ let rec unify (sub, paused, queue) =
       let new_state =
         match cons with
         (* α : τ *)
-        | Typed.TyParamHasSkel (tvar, skel) ->
+        | Constraint.TyParamHasSkel (tvar, skel) ->
             ty_param_has_skel_step sub paused cons rest_queue tvar skel
         (* τ₁ = τ₂ *)
-        | Typed.SkelEq (sk1, sk2) -> skel_eq_step sub paused rest_queue sk1 sk2
+        | Constraint.SkelEq (sk1, sk2) ->
+            skel_eq_step sub paused rest_queue sk1 sk2
         (* ω : A <= B *)
-        | Typed.TyOmega (omega, tycons) ->
+        | Constraint.TyOmega (omega, tycons) ->
             ty_omega_step sub paused cons rest_queue omega tycons
         (* ω : Δ₁ <= Δ₂ *)
-        | Typed.DirtOmega (omega, dcons) ->
+        | Constraint.DirtOmega (omega, dcons) ->
             dirt_omega_step sub paused cons rest_queue omega dcons
         (* ω : A ! Δ₁ <= B ! Δ₂ *)
-        | Typed.DirtyOmega (omega, drtycons) ->
+        | Constraint.DirtyOmega (omega, drtycons) ->
             dirty_omega_step sub paused rest_queue omega drtycons
       in
       (* Print.debug "=========End loop============" ; *)
