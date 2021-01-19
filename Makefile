@@ -1,35 +1,39 @@
 default: format
-	dune build || true
+	dune build
+.PHONY: default
 
 format:
 	dune build @fmt --auto-promote
+.PHONY: format
 
 release: format
 	dune build --profile release
+.PHONY: release
 
 clean:
 	dune clean
+.PHONY: clean
 
-.PHONY: test
 test: generate_tests
 	dune runtest
+.PHONY: test
 
-.PHONY: generate_tests 
 generate_tests: 
-	@ dune build @generate_tests --auto-promote || true
+	dune build @generate_tests --auto-promote
+.PHONY: generate_tests 
 
-.PHONY: generate_benchmark 
 generate_benchmarks: 
-	@ dune build @generate_benchmarks --auto-promote || true
+	dune build @generate_benchmarks --auto-promote
+.PHONY: generate_benchmark 
 
-.PHONY: benchmark 
 benchmark: 
-	@ dune build @benchmark --auto-promote || true
+	dune build @benchmark --auto-promote
+.PHONY: benchmark 
 
 install: release
 	dune install
+.PHONY: install
 
 uninstall: release
 	dune uninstall
-
-.PHONY: default format release clean test test-validate install uninstall
+.PHONY: uninstall
