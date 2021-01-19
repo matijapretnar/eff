@@ -43,7 +43,7 @@ module type ExplicitBackend = sig
       *)
   val process_top_let_rec :
     state ->
-    effect_system_state -> 
+    effect_system_state ->
     ( Language.UntypedSyntax.variable,
       Language.UntypedSyntax.abstraction )
     Assoc.t ->
@@ -137,21 +137,25 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
     failwith "Top level bindings not supported"
 
   let[@warning "-8"] process_top_let_rec state lst tys =
-    let [(v, (p, c))] = Assoc.to_list lst in
-    let ((typed_abs, c), ty) as l_rec = ExplicitInfer.tcTopLetRec state.effect_system_state.type_system_state v p c in
-    let backend_state' = 
-      ExBackend.process_top_let_rec state.backend_state state.effect_system_state lst 
-      tys l_rec
+    let [ (v, (p, c)) ] = Assoc.to_list lst in
+    let (((typed_abs, c), ty) as l_rec) =
+      ExplicitInfer.tcTopLetRec state.effect_system_state.type_system_state v p
+        c
     in
-    let type_system_state = 
-      List.fold_left (fun st (v, p, c, _) -> 
-        ExplicitInfer.add_gbl_def st v (Types.Arrow  (p, c) ) ) 
-        state.effect_system_state.type_system_state 
-        typed_abs in
-    let effect_system_state = {
-      state.effect_system_state with type_system_state
-    } in
-    {backend_state = backend_state'; effect_system_state}
+    let backend_state' =
+      ExBackend.process_top_let_rec state.backend_state
+        state.effect_system_state lst tys l_rec
+    in
+    let type_system_state =
+      List.fold_left
+        (fun st (v, p, c, _) ->
+          ExplicitInfer.add_gbl_def st v (Types.Arrow (p, c)))
+        state.effect_system_state.type_system_state typed_abs
+    in
+    let effect_system_state =
+      { state.effect_system_state with type_system_state }
+    in
+    { backend_state = backend_state'; effect_system_state }
 
   let process_external state (x, ty, name) =
     let type_system_state' =
@@ -263,8 +267,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
             (Types.source_to_target
                effect_system_state.type_system_state.tctx_st ty)))
 
-let translate_computation state { type_system_state; typechecker_state } c' = 
-  let c'' =
+  let translate_computation state { type_system_state; typechecker_state } c' =
+    let c'' =
       if !Config.enable_optimization then
         Optimizer.optimize_main_comp typechecker_state c'
       else c'
@@ -273,14 +277,16 @@ let translate_computation state { type_system_state; typechecker_state } c' =
       TranslateExEff2NoEff.comp_elab type_system_state typechecker_state c''
     in
     let c'''' = TranslateNoEff2Ocaml.elab_term c''' in
-  (state, { type_system_state; typechecker_state },  c'''')
+    (state, { type_system_state; typechecker_state }, c'''')
 
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
-  
+
   let process_computation state { type_system_state; typechecker_state } _
       { term = c'; _ } =
-    let (state, _, c'''') = translate_computation state {type_system_state; typechecker_state} c' in
+    let state, _, c'''' =
+      translate_computation state { type_system_state; typechecker_state } c'
+    in
     { prog = SyntaxOcaml.Term c'''' :: state.prog }
 
   let process_type_of state _ _ _ =
@@ -302,7 +308,7 @@ let translate_computation state { type_system_state; typechecker_state } c' =
 
   let process_top_let_rec state ts_state _defs _ ((lrecs, c), _ty) =
     let comp = Typed.LetRec (lrecs, c) in
-    let (state, _, c'''') = translate_computation state ts_state comp in 
+    let state, _, c'''' = translate_computation state ts_state comp in
     { prog = SyntaxOcaml.Term c'''' :: state.prog }
 
   let process_external state effect_system_state (x, ty, name) =
