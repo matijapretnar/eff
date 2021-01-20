@@ -2,7 +2,7 @@
 
 let version = "5.1"
 
-let use_stdlib = ref true
+let use_stdlib = ref false
 
 type backend = Runtime | Multicore | Ocaml | ExplicitEffects
 
