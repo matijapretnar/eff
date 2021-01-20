@@ -1,13 +1,15 @@
 let names = [ "loop"; "queens"; "interp"; "range" ]
 
+let invalid = [] (*  ("loop", "NoOptImpure") ] *)
+
 let default_args = "--no-stdlib --compile-plain-ocaml"
 
 let modes =
   [
-    ("--pure", "OptPure");
-    ("--pure --no-opt", "NoOptPure");
+    ("--no-opts", "NoOptImpure");
+    ("--pure --no-opts", "NoOptPure");
     ("", "OptImpure");
-    ("--no-opt", "NoOptImpure");
+    ("--pure", "OptPure");
   ]
 
 let benchmark_case_stanza in_filename args out_filename =
@@ -24,22 +26,26 @@ let benchmark_case_stanza in_filename args out_filename =
   Printf.printf "       (run eff %s %s \"./%s\")))))\n\n" default_args args
     in_filename
 
-let benchmark_case_alias_stanza out_filename =
+let benchmark_case_alias_stanza out_filename out_filename_full =
   Printf.printf "(rule\n";
   Printf.printf " (alias generate_benchmarks)\n";
   Printf.printf "  (action\n";
-  Printf.printf "   (diff \"%s.ml\" \"%s.out\")))\n\n" out_filename out_filename
+  Printf.printf "   (diff \"%s.ml\" \"%s.out\")))\n\n" out_filename_full
+    out_filename
 
 let main () =
   List.iter
     (fun in_file_name ->
       List.iter
         (fun (args, name) ->
-          let out_filename = in_file_name ^ "/" ^ in_file_name ^ name in
-          benchmark_case_stanza
-            (in_file_name ^ "/" ^ in_file_name ^ ".eff")
-            args out_filename;
-          benchmark_case_alias_stanza out_filename)
+          if not (List.mem (in_file_name, name) invalid) then (
+            let out_filename = in_file_name ^ "/" ^ in_file_name ^ name in
+            let target_filename = in_file_name ^ name in
+            benchmark_case_stanza
+              (in_file_name ^ "/" ^ in_file_name ^ ".eff")
+              args target_filename;
+
+            benchmark_case_alias_stanza target_filename out_filename))
         modes)
     names
 

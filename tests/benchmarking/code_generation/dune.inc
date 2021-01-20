@@ -2,39 +2,39 @@
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "loop/loopOptPure.out")
+   (target "loopNoOptImpure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure "./loop/loop.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./loop/loop.eff")))))
 
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "loop/loopOptPure.ml" "loop/loopOptPure.out")))
+   (diff "loop/loopNoOptImpure.ml" "loopNoOptImpure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "loop/loopNoOptPure.out")
+   (target "loopNoOptPure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure --no-opt "./loop/loop.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --pure --no-opts "./loop/loop.eff")))))
 
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "loop/loopNoOptPure.ml" "loop/loopNoOptPure.out")))
+   (diff "loop/loopNoOptPure.ml" "loopNoOptPure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "loop/loopOptImpure.out")
+   (target "loopOptImpure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
@@ -44,61 +44,61 @@
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "loop/loopOptImpure.ml" "loop/loopOptImpure.out")))
+   (diff "loop/loopOptImpure.ml" "loopOptImpure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "loop/loopNoOptImpure.out")
+   (target "loopOptPure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opt "./loop/loop.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --pure "./loop/loop.eff")))))
 
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "loop/loopNoOptImpure.ml" "loop/loopNoOptImpure.out")))
+   (diff "loop/loopOptPure.ml" "loopOptPure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "queens/queensOptPure.out")
+   (target "queensNoOptImpure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure "./queens/queens.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./queens/queens.eff")))))
 
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "queens/queensOptPure.ml" "queens/queensOptPure.out")))
+   (diff "queens/queensNoOptImpure.ml" "queensNoOptImpure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "queens/queensNoOptPure.out")
+   (target "queensNoOptPure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure --no-opt "./queens/queens.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --pure --no-opts "./queens/queens.eff")))))
 
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "queens/queensNoOptPure.ml" "queens/queensNoOptPure.out")))
+   (diff "queens/queensNoOptPure.ml" "queensNoOptPure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "queens/queensOptImpure.out")
+   (target "queensOptImpure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
@@ -108,61 +108,61 @@
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "queens/queensOptImpure.ml" "queens/queensOptImpure.out")))
+   (diff "queens/queensOptImpure.ml" "queensOptImpure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "queens/queensNoOptImpure.out")
+   (target "queensOptPure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opt "./queens/queens.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --pure "./queens/queens.eff")))))
 
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "queens/queensNoOptImpure.ml" "queens/queensNoOptImpure.out")))
+   (diff "queens/queensOptPure.ml" "queensOptPure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "interp/interpOptPure.out")
+   (target "interpNoOptImpure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure "./interp/interp.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./interp/interp.eff")))))
 
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "interp/interpOptPure.ml" "interp/interpOptPure.out")))
+   (diff "interp/interpNoOptImpure.ml" "interpNoOptImpure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "interp/interpNoOptPure.out")
+   (target "interpNoOptPure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure --no-opt "./interp/interp.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --pure --no-opts "./interp/interp.eff")))))
 
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "interp/interpNoOptPure.ml" "interp/interpNoOptPure.out")))
+   (diff "interp/interpNoOptPure.ml" "interpNoOptPure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "interp/interpOptImpure.out")
+   (target "interpOptImpure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
@@ -172,61 +172,61 @@
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "interp/interpOptImpure.ml" "interp/interpOptImpure.out")))
+   (diff "interp/interpOptImpure.ml" "interpOptImpure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "interp/interpNoOptImpure.out")
+   (target "interpOptPure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opt "./interp/interp.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --pure "./interp/interp.eff")))))
 
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "interp/interpNoOptImpure.ml" "interp/interpNoOptImpure.out")))
+   (diff "interp/interpOptPure.ml" "interpOptPure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "range/rangeOptPure.out")
+   (target "rangeNoOptImpure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure "./range/range.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./range/range.eff")))))
 
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "range/rangeOptPure.ml" "range/rangeOptPure.out")))
+   (diff "range/rangeNoOptImpure.ml" "rangeNoOptImpure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "range/rangeNoOptPure.out")
+   (target "rangeNoOptPure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure --no-opt "./range/range.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --pure --no-opts "./range/range.eff")))))
 
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "range/rangeNoOptPure.ml" "range/rangeNoOptPure.out")))
+   (diff "range/rangeNoOptPure.ml" "rangeNoOptPure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "range/rangeOptImpure.out")
+   (target "rangeOptImpure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
@@ -236,21 +236,21 @@
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "range/rangeOptImpure.ml" "range/rangeOptImpure.out")))
+   (diff "range/rangeOptImpure.ml" "rangeOptImpure.out")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "range/rangeNoOptImpure.out")
+   (target "rangeOptPure.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opt "./range/range.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --pure "./range/range.eff")))))
 
 (rule
  (alias generate_benchmarks)
   (action
-   (diff "range/rangeNoOptImpure.ml" "range/rangeNoOptImpure.out")))
+   (diff "range/rangeOptPure.ml" "rangeOptPure.out")))
 
