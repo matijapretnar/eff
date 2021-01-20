@@ -1,5 +1,5 @@
 default: format
-	dune build
+	dune build src/eff
 .PHONY: default
 
 format:
