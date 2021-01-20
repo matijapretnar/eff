@@ -12,7 +12,7 @@ and number_of_queens = 8
 
 and number_of_range = 10
 
-let run_loop_pure = false
+let run_loop_pure = true
 
 and run_loop_latent = false
 
@@ -38,7 +38,7 @@ let benchmark test =
     Analyze.ols ~bootstrap:0 ~r_square:true ~predictors:Measure.[| run |]
   in
   let instances =
-    Instance.[ minor_allocated; major_allocated; monotonic_clock ]
+    Instance.[ minor_allocated; major_allocated; monotonic_clock; promoted ]
   in
   let cfg =
     Benchmark.cfg ~limit:2000 ~quota:(Time.second 0.5) ~kde:(Some 1000) ()
@@ -53,7 +53,7 @@ let benchmark test =
 let () =
   List.iter
     (fun v -> Bechamel_notty.Unit.add v (Measure.unit v))
-    Instance.[ minor_allocated; major_allocated; monotonic_clock ]
+    Instance.[ minor_allocated; major_allocated; monotonic_clock; promoted ]
 
 let img (window, results) =
   Bechamel_notty.Multiple.image_of_ols_results ~rect:window
@@ -77,11 +77,11 @@ let () =
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
            Test.make ~name:"Generated, impure, not optimized"
-             (st (fun () -> LoopNooptImpure._test_pure_11 number_of_loops));
+             (st (fun () -> LoopNoOptImpure._test_pure_11 number_of_loops));
            Test.make ~name:"Generated, impure, optimized"
              (st (fun () -> LoopOptImpure._test_pure_11 number_of_loops));
            Test.make ~name:"Generated, pure, not optimized"
-             (st (fun () -> LoopNooptPure._test_pure_11 number_of_loops));
+             (st (fun () -> LoopNoOptPure._test_pure_11 number_of_loops));
            Test.make ~name:"Generated, pure, optimized"
              (st (fun () -> LoopOptPure._test_pure_11 number_of_loops));
            Test.make ~name:"Hand written"
@@ -96,11 +96,11 @@ let () =
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
            Test.make ~name:"Generated, impure, not optimized"
-             (st (fun () -> LoopNooptImpure._test_latent_22 number_of_loops));
+             (st (fun () -> LoopNoOptImpure._test_latent_22 number_of_loops));
            Test.make ~name:"Generated, impure, optimized"
              (st (fun () -> LoopOptImpure._test_latent_22 number_of_loops));
            Test.make ~name:"Generated, pure, not optimized"
-             (st (fun () -> LoopNooptPure._test_latent_22 number_of_loops));
+             (st (fun () -> LoopNoOptPure._test_latent_22 number_of_loops));
            Test.make ~name:"Generated, pure, optimized"
              (st (fun () -> LoopOptPure._test_latent_22 number_of_loops));
            Test.make ~name:"Hand written"
@@ -115,11 +115,11 @@ let () =
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
            Test.make ~name:"Generated, impure, not optimized"
-             (st @@ fun () -> LoopNooptImpure._test_incr_38 number_of_loops);
+             (st @@ fun () -> LoopNoOptImpure._test_incr_38 number_of_loops);
            Test.make ~name:"Generated, impure, optimized"
              (st @@ fun () -> LoopOptImpure._test_incr_38 number_of_loops);
            Test.make ~name:"Generated, pure, not optimized"
-             (st @@ fun () -> LoopNooptPure._test_incr_38 number_of_loops);
+             (st @@ fun () -> LoopNoOptPure._test_incr_38 number_of_loops);
            Test.make ~name:"Generated, pure, optimized"
              (st @@ fun () -> LoopOptPure._test_incr_38 number_of_loops);
            Test.make ~name:"Hand written"
@@ -134,11 +134,11 @@ let () =
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
            Test.make ~name:"Generated, impure, not optimized"
-             (st @@ fun () -> LoopNooptImpure._test_incr'_47 100);
+             (st @@ fun () -> LoopNoOptImpure._test_incr'_47 100);
            Test.make ~name:"Generated, impure, optimized"
              (st @@ fun () -> LoopOptImpure._test_incr'_47 100);
            Test.make ~name:"Generated, pure, not optimized"
-             (st @@ fun () -> LoopNooptPure._test_incr'_47 100);
+             (st @@ fun () -> LoopNoOptPure._test_incr'_47 100);
            Test.make ~name:"Generated, pure, optimized"
              (st @@ fun () -> LoopOptPure._test_incr'_47 100);
            Test.make ~name:"Hand written"
@@ -152,11 +152,11 @@ let () =
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
            Test.make ~name:"Generated, impure, not optimized"
-             (st @@ fun () -> LoopNooptImpure._test_incr'_47 200);
+             (st @@ fun () -> LoopNoOptImpure._test_incr'_47 200);
            Test.make ~name:"Generated, impure, optimized"
              (st @@ fun () -> LoopOptImpure._test_incr'_47 200);
            Test.make ~name:"Generated, pure, not optimized"
-             (st @@ fun () -> LoopNooptPure._test_incr'_47 200);
+             (st @@ fun () -> LoopNoOptPure._test_incr'_47 200);
            Test.make ~name:"Generated, pure, optimized"
              (st @@ fun () -> LoopOptPure._test_incr'_47 200);
            Test.make ~name:"Hand written"
@@ -170,11 +170,11 @@ let () =
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
            Test.make ~name:"Generated, impure, not optimized"
-             (st @@ fun () -> LoopNooptImpure._test_state_68 number_of_loops);
+             (st @@ fun () -> LoopNoOptImpure._test_state_68 number_of_loops);
            Test.make ~name:"Generated, impure, optimized"
              (st @@ fun () -> LoopOptImpure._test_state_68 number_of_loops);
            Test.make ~name:"Generated, pure, not optimized"
-             (st @@ fun () -> LoopNooptPure._test_state_68 number_of_loops);
+             (st @@ fun () -> LoopNoOptPure._test_state_68 number_of_loops);
            Test.make ~name:"Generated, pure, optimized"
              (st @@ fun () -> LoopOptPure._test_state_68 number_of_loops);
            Test.make ~name:"Hand written"
@@ -276,11 +276,11 @@ let () =
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
            Test.make ~name:"Generated, impure, not optimized"
-             (st @@ fun () -> RangeNoPureNoOpt._test_222 number_of_range);
+             (st @@ fun () -> RangeNoOptImpure._test_222 number_of_range);
            Test.make ~name:"Generated, impure, optimized"
-             (st @@ fun () -> RangeOptNoPure._test_222 number_of_range);
+             (st @@ fun () -> RangeOptImpure._test_222 number_of_range);
            Test.make ~name:"Generated, pure, not optimized"
-             (st @@ fun () -> RangePureNoOpt._test_222 number_of_range);
+             (st @@ fun () -> RangeNoOptPure._test_222 number_of_range);
            Test.make ~name:"Generated, pure, optimized"
              (st @@ fun () -> RangeOptPure._test_222 number_of_range);
            (* Test.make ~name:"Native" (st @@ ((fun () -> FlatNative.bigTest ()))); *)
