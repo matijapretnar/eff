@@ -174,9 +174,11 @@ and skel_eq_step sub paused rest_queue sk1 sk2 =
   (* ς = ς *)
   | SkelParam sp1, SkelParam sp2 when sp1 = sp2 -> (sub, paused, rest_queue)
   (* ς₁ = τ₂ / τ₁ = ς₂ *)
-  | SkelParam sp1, sk2a when not (List.mem sp1 (free_skeleton sk2a)) ->
+  | SkelParam sp1, sk2a
+    when not (SkelParamSet.mem sp1 (free_params_skeleton sk2a).skel_params) ->
       process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a
-  | sk2a, SkelParam sp1 when not (List.mem sp1 (free_skeleton sk2a)) ->
+  | sk2a, SkelParam sp1
+    when not (SkelParamSet.mem sp1 (free_params_skeleton sk2a).skel_params) ->
       process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a
   (* int = int *)
   | SkelBasic ps1, SkelBasic ps2 when ps1 = ps2 -> (sub, paused, rest_queue)

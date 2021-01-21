@@ -348,47 +348,54 @@ let add_effects effect_set drt =
 let remove_effects effect_set drt =
   { drt with effect_set = EffectSet.diff drt.effect_set effect_set }
 
-let rec free_skeleton sk =
-  let go = function
-    | SkelParam p -> [ p ]
-    | SkelBasic _ -> []
-    | SkelApply (_, sks) -> List.concat (List.map free_skeleton sks)
-    | SkelArrow (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
-    | SkelHandler (sk1, sk2) -> free_skeleton sk1 @ free_skeleton sk2
-    | SkelTuple sks -> List.concat (List.map free_skeleton sks)
-  in
-  let rec nub = function
-    | [] -> []
-    | [ x ] -> [ x ]
-    | x :: xs ->
-        let _rest = List.filter (fun y -> y <> x) xs in
-        let others = nub xs in
-        x :: others
-  in
-  nub (go sk)
-
 (* ************************************************************************* *)
 (*                         FREE VARIABLE COMPUTATION                         *)
 (* ************************************************************************* *)
 
 module FreeParams = struct
-  type t = { ty_params : TyParamSet.t; dirt_params : DirtParamSet.t }
+  type t = {
+    ty_params : TyParamSet.t;
+    dirt_params : DirtParamSet.t;
+    skel_params : SkelParamSet.t;
+  }
 
-  let empty = { ty_params = TyParamSet.empty; dirt_params = DirtParamSet.empty }
+  let empty =
+    {
+      ty_params = TyParamSet.empty;
+      dirt_params = DirtParamSet.empty;
+      skel_params = SkelParamSet.empty;
+    }
+
+  let ty_singleton p = { empty with ty_params = TyParamSet.singleton p }
+
+  let dirt_singleton p = { empty with dirt_params = DirtParamSet.singleton p }
+
+  let skel_singleton p = { empty with skel_params = SkelParamSet.singleton p }
 
   let union fp1 fp2 =
     {
       ty_params = TyParamSet.union fp1.ty_params fp2.ty_params;
       dirt_params = DirtParamSet.union fp1.dirt_params fp2.dirt_params;
+      skel_params = SkelParamSet.union fp1.skel_params fp2.skel_params;
     }
 
   let union_map free_params =
     List.fold_left (fun fp x -> union fp (free_params x)) empty
 end
 
+let rec free_params_skeleton = function
+  | SkelParam p -> FreeParams.skel_singleton p
+  | SkelBasic _ -> FreeParams.empty
+  | SkelApply (_, sks) -> FreeParams.union_map free_params_skeleton sks
+  | SkelArrow (sk1, sk2) ->
+      FreeParams.union (free_params_skeleton sk1) (free_params_skeleton sk2)
+  | SkelHandler (sk1, sk2) ->
+      FreeParams.union (free_params_skeleton sk1) (free_params_skeleton sk2)
+  | SkelTuple sks -> FreeParams.union_map free_params_skeleton sks
+
 (* Compute the free variables of a target value type *)
 let rec free_params_ty = function
-  | TyParam p -> { FreeParams.empty with ty_params = TyParamSet.singleton p }
+  | TyParam p -> FreeParams.ty_singleton p
   | Arrow (vty, cty) ->
       FreeParams.union (free_params_ty vty) (free_params_dirty cty)
   | Tuple vtys -> FreeParams.union_map free_params_ty vtys
@@ -420,8 +427,7 @@ and free_params_ct_dirt (dirt1, dirt2) =
 (* Compute the free dirt variables of a dirt *)
 and free_params_dirt (dirt : dirt) =
   match dirt.row with
-  | ParamRow p ->
-      { FreeParams.empty with dirt_params = DirtParamSet.singleton p }
+  | ParamRow p -> FreeParams.dirt_singleton p
   | EmptyRow -> FreeParams.empty
 
 (* ************************************************************************* *)

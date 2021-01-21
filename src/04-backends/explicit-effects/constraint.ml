@@ -173,8 +173,14 @@ let fresh_dirty_coer ((ty1, drt1), (ty2, drt2)) =
 let free_params_constraint = function
   | TyOmega (_, ct) -> Type.free_params_ct_ty ct
   | DirtOmega (_, ct) -> Type.free_params_ct_dirt ct
-  | SkelEq (_, _) -> Type.FreeParams.empty
-  | TyParamHasSkel (_, _) -> Type.FreeParams.empty
+  | SkelEq (sk1, sk2) ->
+      Type.FreeParams.union
+        (Type.free_params_skeleton sk1)
+        (Type.free_params_skeleton sk2)
+  | TyParamHasSkel (t, sk) ->
+      Type.FreeParams.union
+        (Type.FreeParams.ty_singleton t)
+        (Type.free_params_skeleton sk)
 
 (* ************************************************************************* *)
 
