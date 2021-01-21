@@ -32,23 +32,19 @@ and get_skel_of_tyvar_ tyvar clist =
   | TyParamHasSkel (tv, skel) :: _ when tyvar = tv -> skel
   | _ :: xs -> get_skel_of_tyvar_ tyvar xs
 
-let rec skeleton_of_target_ty tty conslist =
+let rec skeleton_of_target_ty tty =
   match tty with
-  | TyParam x -> get_skel_of_tyvar x conslist
+  | TyParam (_, skel) -> skel
   | Arrow (a1, (a2, _)) ->
-      SkelArrow
-        (skeleton_of_target_ty a1 conslist, skeleton_of_target_ty a2 conslist)
+      SkelArrow (skeleton_of_target_ty a1, skeleton_of_target_ty a2)
   | Apply (ty_name, tys) ->
-      SkelApply
-        (ty_name, List.map (fun ty -> skeleton_of_target_ty ty conslist) tys)
-  | Tuple tup ->
-      SkelTuple (List.map (fun ty -> skeleton_of_target_ty ty conslist) tup)
+      SkelApply (ty_name, List.map (fun ty -> skeleton_of_target_ty ty) tys)
+  | Tuple tup -> SkelTuple (List.map (fun ty -> skeleton_of_target_ty ty) tup)
   | Handler ((a1, _), (a2, _)) ->
-      SkelHandler
-        (skeleton_of_target_ty a1 conslist, skeleton_of_target_ty a2 conslist)
+      SkelHandler (skeleton_of_target_ty a1, skeleton_of_target_ty a2)
   | TyBasic pt -> SkelBasic pt
-  | QualTy (_, ty) -> skeleton_of_target_ty ty conslist
-  | QualDirt (_, ty) -> skeleton_of_target_ty ty conslist
+  | QualTy (_, ty) -> skeleton_of_target_ty ty
+  | QualDirt (_, ty) -> skeleton_of_target_ty ty
 
 let rec fix_union_find fixpoint c_list =
   (*
@@ -60,10 +56,11 @@ let rec fix_union_find fixpoint c_list =
     match x with
     | Constraint.TyOmega (_, tycons) -> (
         match tycons with
-        | Type.TyParam a, Type.TyParam b
+        (* WHAT HAPPENS WITH SKELETONS? *)
+        | Type.TyParam (a, _), Type.TyParam (b, _)
           when List.mem a fixpoint && not (List.mem b fixpoint) ->
             [ b ]
-        | Type.TyParam b, Type.TyParam a
+        | Type.TyParam (b, _), Type.TyParam (a, _)
           when List.mem a fixpoint && not (List.mem b fixpoint) ->
             [ b ]
         | _ -> [])
@@ -272,10 +269,9 @@ and ty_omega_step sub paused cons rest_queue omega = function
         |> add_to_constraints drt_cons1
         |> add_to_constraints drt_cons2 )
   (* ω : α <= A /  ω : A <= α *)
-  | Type.TyParam tv, a | a, Type.TyParam tv ->
+  | Type.TyParam (_, skel_tv), a | a, Type.TyParam (_, skel_tv) ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
-      let skel_tv = get_skel_of_tyvar tv (paused @ rest_queue) in
-      let skel_a = skeleton_of_target_ty a (paused @ rest_queue) in
+      let skel_a = skeleton_of_target_ty a in
       if skel_tv = skel_a then (sub, cons :: paused, rest_queue)
       else
         ( sub,

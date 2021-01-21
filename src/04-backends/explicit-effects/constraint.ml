@@ -140,7 +140,7 @@ let fresh_dirt_coer cons =
 
 let fresh_ty_with_skel skel =
   let ty_var = CoreTypes.TyParam.fresh () in
-  (Type.TyParam ty_var, TyParamHasSkel (ty_var, skel))
+  (Type.TyParam (ty_var, skel), TyParamHasSkel (ty_var, skel))
 
 let fresh_dirty_with_skel skel =
   let ty, cons = fresh_ty_with_skel skel and drt = Type.fresh_dirt () in

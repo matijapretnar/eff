@@ -68,9 +68,10 @@ let checkWellFormedDirt st = function
 (*assert (List.mem v st.dirt_params) *)
 
 let rec checkWellFormedValTyTemp st = function
-  | TyParam typ ->
-      let ty_var_list = Assoc.keys_of st.ty_param_skeletons in
-      assert (List.mem typ ty_var_list)
+  | TyParam (typ, skel) -> (
+      match Assoc.lookup typ st.ty_param_skeletons with
+      | None -> assert false
+      | Some skel' -> assert (skel = skel'))
   | Arrow (tty1, tty2) ->
       checkWellFormedValTy st tty1;
       checkWellFormedCmpTy st tty2

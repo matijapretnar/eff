@@ -118,12 +118,12 @@ let rec apply_sub_skel sub skeleton =
   | SkelTuple skels -> SkelTuple (List.map (apply_sub_skel sub) skels)
 
 let rec apply_sub_ty sub = function
-  | TyParam typ1 -> (
+  | TyParam (typ1, skel) -> (
       match Assoc.lookup typ1 sub.type_param_to_type_subs with
       | Some ttype ->
           apply_sub_ty sub ttype
           (* We don't assume that substitutions are fully expanded *)
-      | None -> TyParam typ1)
+      | None -> TyParam (typ1, apply_sub_skel sub skel))
   | Arrow (tty1, tty2) ->
       Arrow (apply_sub_ty sub tty1, apply_sub_dirty_ty sub tty2)
   | Apply (ty_name, tys) -> Apply (ty_name, List.map (apply_sub_ty sub) tys)

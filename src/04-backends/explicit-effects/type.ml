@@ -48,7 +48,7 @@ type skeleton =
   | SkelTuple of skeleton list
 
 and target_ty =
-  | TyParam of CoreTypes.TyParam.t
+  | TyParam of CoreTypes.TyParam.t * skeleton
   | Apply of CoreTypes.TyName.t * target_ty list
   | Arrow of target_ty * target_dirty
   | Tuple of target_ty list
@@ -75,7 +75,7 @@ let is_empty_dirt dirt =
 let rec print_target_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
-  | TyParam p -> CoreTypes.TyParam.print p ppf
+  | TyParam (p, _) -> CoreTypes.TyParam.print p ppf
   | Arrow (t1, (t2, drt)) ->
       print ~at_level:5 "@[%t -%t%s@ %t@]"
         (print_target_ty ~max_level:4 t1)
@@ -210,7 +210,7 @@ let rec rnSkelVarInSkel (oldS : SkelParam.t) (newS : SkelParam.t) :
 
 let rec rnSkelVarInValTy (oldS : SkelParam.t) (newS : SkelParam.t) :
     target_ty -> target_ty = function
-  | TyParam x -> TyParam x
+  | TyParam (x, skel) -> TyParam (x, (rnSkelVarInSkel oldS newS) skel)
   | Apply (tc, tys) -> Apply (tc, List.map (rnSkelVarInValTy oldS newS) tys)
   | Arrow (tyA, tyB) ->
       Arrow (rnSkelVarInValTy oldS newS tyA, rnSkelVarInCmpTy oldS newS tyB)
@@ -237,7 +237,8 @@ and rnSkelVarInTyCt (oldS : SkelParam.t) (newS : SkelParam.t) : ct_ty -> ct_ty =
 (* ************************************************************************* *)
 let rec rnTyVarInValTy (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t)
     : target_ty -> target_ty = function
-  | TyParam a -> if a = oldA then TyParam newA else TyParam a
+  | TyParam (a, skel) ->
+      if a = oldA then TyParam (newA, skel) else TyParam (a, skel)
   | Apply (tc, tys) -> Apply (tc, List.map (rnTyVarInValTy oldA newA) tys)
   | Arrow (tyA, tyB) ->
       Arrow (rnTyVarInValTy oldA newA tyA, rnTyVarInCmpTy oldA newA tyB)
@@ -264,7 +265,7 @@ and rnTyVarInTyCt (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t) :
 (* ************************************************************************* *)
 let rec rnDirtVarInValTy (oldD : DirtParam.t) (newD : DirtParam.t) :
     target_ty -> target_ty = function
-  | TyParam a -> TyParam a
+  | TyParam (a, skel) -> TyParam (a, skel)
   | Apply (tc, tys) -> Apply (tc, List.map (rnDirtVarInValTy oldD newD) tys)
   | Arrow (tyA, tyB) ->
       Arrow (rnDirtVarInValTy oldD newD tyA, rnDirtVarInCmpTy oldD newD tyB)
@@ -300,7 +301,7 @@ and rnDirtVarInDirtCt (oldD : DirtParam.t) (newD : DirtParam.t) :
 
 let rec types_are_equal type1 type2 =
   match (type1, type2) with
-  | TyParam tv1, TyParam tv2 -> tv1 = tv2
+  | TyParam (tv1, _skel1), TyParam (tv2, _skel2) -> tv1 = tv2
   | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
       types_are_equal ttya1 ttyb1 && dirty_types_are_equal dirtya1 dirtyb1
   | Tuple tys1, Tuple tys2 -> List.for_all2 types_are_equal tys1 tys2
@@ -395,7 +396,8 @@ let rec free_params_skeleton = function
 
 (* Compute the free variables of a target value type *)
 let rec free_params_ty = function
-  | TyParam p -> FreeParams.ty_singleton p
+  | TyParam (p, skel) ->
+      FreeParams.union (FreeParams.ty_singleton p) (free_params_skeleton skel)
   | Arrow (vty, cty) ->
       FreeParams.union (free_params_ty vty) (free_params_dirty cty)
   | Tuple vtys -> FreeParams.union_map free_params_ty vtys
@@ -432,14 +434,17 @@ and free_params_dirt (dirt : dirt) =
 
 (* ************************************************************************* *)
 
+let refresh_skeleton _skel = failwith __LOC__
+
 let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
   match t with
-  | TyParam x -> (
+  | TyParam (x, skel) -> (
       match Assoc.lookup x ty_sbst with
-      | Some x' -> ((ty_sbst, dirt_sbst), TyParam x')
+      | Some x' -> ((ty_sbst, dirt_sbst), TyParam (x', refresh_skeleton skel))
       | None ->
           let y = CoreTypes.TyParam.fresh () in
-          ((Assoc.update x y ty_sbst, dirt_sbst), TyParam y))
+          ( (Assoc.update x y ty_sbst, dirt_sbst),
+            TyParam (y, refresh_skeleton skel) ))
   | Arrow (a, c) ->
       let (a_ty_sbst, a_dirt_sbst), a' =
         refresh_target_ty (ty_sbst, dirt_sbst) a
@@ -498,7 +503,7 @@ let rec source_to_target tctx_st ty =
       | LangType.Record _ | LangType.Sum _ -> assert false)
   | LangType.Apply (ty_name, args) ->
       Apply (ty_name, List.map (source_to_target tctx_st) args)
-  | LangType.TyParam p -> TyParam p
+  | LangType.TyParam p -> TyParam (p, SkelParam (SkelParam.fresh ()))
   | LangType.Basic s -> TyBasic s
   | LangType.Tuple l -> Tuple (List.map (source_to_target tctx_st) l)
   | LangType.Arrow (ty, dirty) ->
@@ -519,10 +524,14 @@ let constructor_signature tctx_st lbl =
       in
       (source_to_target tctx_st ty_in, source_to_target tctx_st ty_out)
 
+let apply_sub_to_skel _ _ _skel = failwith __LOC__
+
 let rec apply_sub_to_type ty_subs dirt_subs ty =
   match ty with
-  | TyParam p -> (
-      match Assoc.lookup p ty_subs with Some p' -> TyParam p' | None -> ty)
+  | TyParam (p, skel) -> (
+      match Assoc.lookup p ty_subs with
+      | Some p' -> TyParam (p', apply_sub_to_skel ty_subs dirt_subs skel)
+      | None -> ty)
   | Arrow (a, (b, d)) ->
       Arrow
         ( apply_sub_to_type ty_subs dirt_subs a,

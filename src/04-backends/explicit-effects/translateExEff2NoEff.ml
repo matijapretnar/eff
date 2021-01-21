@@ -48,10 +48,7 @@ and extend_multiple_pats env ps tys =
 
 let rec type_elab state (env : environment) (ty : ExEffTypes.target_ty) =
   match ty with
-  | ExEffTypes.TyParam x -> (
-      match Assoc.lookup x env.ty_param_skeletons with
-      | Some xtype -> (xtype, NoEff.NTyParam x)
-      | None -> (Type.SkelBasic Const.IntegerTy, NoEff.NTyParam x))
+  | ExEffTypes.TyParam (x, skel) -> (skel, NoEff.NTyParam x)
   | ExEffTypes.Apply (name, lst) ->
       let get_skel x =
         let s, _ = type_elab state env x in
@@ -439,7 +436,7 @@ and get_effectset_temp set effects =
 
 and subst_ty_param tysub par ty =
   match ty with
-  | ExEffTypes.TyParam x -> if x = par then tysub else ty
+  | ExEffTypes.TyParam (x, _skel) -> if x = par then tysub else ty
   | ExEffTypes.Apply (n, ls) ->
       ExEffTypes.Apply (n, List.map (subst_ty_param tysub par) ls)
   | ExEffTypes.Arrow (l, (rt, rd)) ->
