@@ -34,28 +34,27 @@ module type ExplicitBackend = sig
     Language.CoreTypes.Effect.t * (Language.Type.ty * Language.Type.ty) ->
     state
 
-  (*
   val process_top_let :
     state ->
-    (Language.UntypedSyntax.pattern * Language.UntypedSyntax.computation) list ->
-    (Language.UntypedSyntax.variable * Language.Type.ty_scheme) list ->
-    state
-      *)
-  val process_top_let_rec :
-    state ->
     effect_system_state ->
-    ( Language.UntypedSyntax.variable,
-      Language.UntypedSyntax.abstraction )
-    Assoc.t ->
-    (Language.UntypedSyntax.variable * Language.Type.ty_scheme) list ->
-    ((Language.UntypedSyntax.variable
-     * Type.target_ty
-     * (Type.target_ty * Type.dirt)
-     * (Term.pattern * Term.computation))
-     list
-    * Term.computation)
-    * Type.target_ty ->
+    Term.variable * Term.expression * Type.target_ty ->
     state
+
+  (* val process_top_let_rec :
+     state ->
+     effect_system_state ->
+     ( Language.UntypedSyntax.variable,
+       Language.UntypedSyntax.abstraction )
+     Assoc.t ->
+     (Language.UntypedSyntax.variable * Language.Type.ty_scheme) list ->
+     ((Language.UntypedSyntax.variable
+      * Type.target_ty
+      * (Type.target_ty * Type.dirt)
+      * (Term.pattern * Term.computation))
+      list
+     * Term.computation)
+     * Type.target_ty ->
+     state *)
 
   val process_external :
     state ->
@@ -131,31 +130,64 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
       effect_system_state = effect_system_state';
     }
 
-  let process_top_let _state _defs _vars =
-    failwith "Top level bindings not supported"
-
-  let process_top_let_rec state lst tys =
-    match Assoc.to_list lst with
-    | [ (v, (p, c)) ] ->
-        let (((typed_abs, _c), _ty) as l_rec) =
-          ExplicitInfer.tcTopLetRec state.effect_system_state.type_system_state
-            v p c
+  let process_top_let' state defs =
+    match defs with
+    | [] -> assert false
+    | [
+     ( { it = Language.UntypedSyntax.PVar x; _ },
+       { it = Language.UntypedSyntax.Value v; _ } );
+    ] ->
+        let ty', e' =
+          ExplicitInfer.tcTopLevelLet
+            state.effect_system_state.type_system_state v
         in
         let backend_state' =
-          ExBackend.process_top_let_rec state.backend_state
-            state.effect_system_state lst tys l_rec
+          ExBackend.process_top_let state.backend_state
+            state.effect_system_state (x, e', ty')
         in
-        let type_system_state =
-          List.fold_left
-            (fun st (v, p, c, _) ->
-              ExplicitInfer.add_gbl_def st v (Type.Arrow (p, c)))
-            state.effect_system_state.type_system_state typed_abs
-        in
-        let effect_system_state =
-          { state.effect_system_state with type_system_state }
-        in
-        { backend_state = backend_state'; effect_system_state }
+        { state with backend_state = backend_state' }
     | _ -> failwith __LOC__
+
+  let process_top_let state defs _vars = process_top_let' state defs
+
+  let process_top_let_rec state lst _tys =
+    let defs =
+      match Assoc.to_list lst with
+      | [] -> assert false
+      | [ (v, a) ] ->
+          [
+            Language.UntypedSyntax.
+              ( unlocated (PVar v),
+                unlocated
+                  (LetRec ([ (v, a) ], unlocated (Value (unlocated (Var v)))))
+              );
+          ]
+      | _ -> failwith __LOC__
+    in
+    process_top_let' state defs
+
+  (* process_top_let state lst
+     match Assoc.to_list lst with
+     | [ (v, (p, c)) ] ->
+         let (((typed_abs, _c), _ty) as l_rec) =
+           ExplicitInfer.tcTopLetRec state.effect_system_state.type_system_state
+             v p c
+         in
+         let backend_state' =
+           ExBackend.process_top_let_rec state.backend_state
+             state.effect_system_state lst tys l_rec
+         in
+         let type_system_state =
+           List.fold_left
+             (fun st (v, p, c, _) ->
+               ExplicitInfer.add_gbl_def st v (Type.Arrow (p, c)))
+             state.effect_system_state.type_system_state typed_abs
+         in
+         let effect_system_state =
+           { state.effect_system_state with type_system_state }
+         in
+         { backend_state = backend_state'; effect_system_state }
+     | _ -> failwith __LOC__ *)
 
   let process_external state (x, ty, name) =
     let type_system_state' =
@@ -224,22 +256,9 @@ module Evaluate : Language.BackendSignature.T = Make (struct
 
   let process_def_effect state _ _ = state
 
-  let _process_top_let state _defs _vars _ =
+  let process_top_let state _defs _vars =
     Print.debug "ignoring top let binding";
     state
-
-  let process_top_let_rec state _ _defs _vars (defs, _ty) =
-    match defs with
-    | [ (v, _, _, a) ], _cmp ->
-        let state' =
-          {
-            evaluation_state =
-              Eval.extend_let_rec state.evaluation_state
-                (Assoc.of_list [ (v, a) ]);
-          }
-        in
-        state'
-    | _ -> failwith __LOC__
 
   let process_external state _ (x, _ty, f) =
     let evaluation_state' =
@@ -306,13 +325,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
         :: state.prog;
     }
 
-  let _process_top_let _state _defs _vars _ =
+  let process_top_let _state _defs _vars =
     failwith "Top level bindings not supported"
-
-  let process_top_let_rec state ts_state _defs _ ((lrecs, c), _ty) =
-    let comp = Term.LetRec (lrecs, c) in
-    let state, _, c'''' = translate_computation state ts_state comp in
-    { prog = SyntaxOcaml.Term c'''' :: state.prog }
 
   let process_external state effect_system_state (x, ty, name) =
     {

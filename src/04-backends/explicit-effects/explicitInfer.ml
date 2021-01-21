@@ -1187,6 +1187,13 @@ let generalize cs ty expr =
 (*                         LET-REC-GENERALIZATION                            *)
 (* ************************************************************************* *)
 
+let tcTopLevelLet (inState : state) (exp : Untyped.expression) =
+  let (exp', ty'), outCs = tcLocatedVal inState TypingEnv.empty exp in
+  let sub, residuals = Unification.solve outCs in
+  let exp'' = subInExp sub exp' and ty'' = subInValTy sub ty' in
+  generalize residuals ty'' exp''
+
+(* This is currently unused, top lets are translated into local lets *)
 let tcTopLetRec (inState : state) (var : Untyped.variable)
     (pat : Untyped.pattern) (cmp : Untyped.computation) =
   (* 1: Generate fresh variables for everything *)

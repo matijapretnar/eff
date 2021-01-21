@@ -8,3 +8,5 @@ module Symbol = Symbol
 module Symbols = Symbols
 
 type 'a located = { it : 'a; at : Location.t }
+
+let unlocated x = { it = x; at = Location.unknown }
