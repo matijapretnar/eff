@@ -289,6 +289,18 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
             (Type.source_to_target effect_system_state.type_system_state.tctx_st
                ty)))
 
+  let translate_expression state { type_system_state; typechecker_state } e =
+    let e' =
+      if !Config.enable_optimization then
+        Optimizer.optimize_main_expr typechecker_state e
+      else e
+    in
+    let _, trm =
+      TranslateExEff2NoEff.value_elab type_system_state typechecker_state e'
+    in
+    let trm' = TranslateNoEff2Ocaml.elab_term trm in
+    (state, { type_system_state; typechecker_state }, trm')
+
   let translate_computation state { type_system_state; typechecker_state } c' =
     let c'' =
       if !Config.enable_optimization then
@@ -325,8 +337,12 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
         :: state.prog;
     }
 
-  let process_top_let _state _defs _vars =
-    failwith "Top level bindings not supported"
+  let process_top_let state { type_system_state; typechecker_state } (x, e, _ty)
+      =
+    let state, _, trm =
+      translate_expression state { type_system_state; typechecker_state } e
+    in
+    { prog = SyntaxOcaml.TopLet (x, trm) :: state.prog }
 
   let process_external state effect_system_state (x, ty, name) =
     {

@@ -1301,6 +1301,9 @@ and reduce_comp st c =
 let optimize_main_comp tc_state c =
   optimize_comp { initial_state with tc_state } c
 
+let optimize_main_expr tc_state e =
+  optimize_expr { initial_state with tc_state } e
+
 (*
  To Do list for optimization :
 
