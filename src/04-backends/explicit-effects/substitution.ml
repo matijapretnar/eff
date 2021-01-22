@@ -272,6 +272,8 @@ let apply_substitutions_to_computation = apply_sub_comp
 
 let apply_substitutions_to_expression = apply_sub_exp
 
+let apply_substitutions_to_typed_abstraction = apply_sub_abs_with_ty
+
 let apply_substitutions_to_type = apply_sub_ty
 
 let apply_substitutions_to_dirt = apply_sub_dirt

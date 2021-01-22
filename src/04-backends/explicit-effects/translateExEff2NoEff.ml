@@ -104,6 +104,12 @@ and pattern_elab p =
   | PVariant (l, p) -> NoEff.PNVariant (l, Some (pattern_elab p))
   | PNonbinding -> PNNonbinding
 
+and elab_abstraction state env (p, t, c) =
+  let _, type1 = type_elab state env t in
+  let env' = extend_pattern_type env p t in
+  let type2, elab2 = comp_elab state env' c in
+  ((pattern_elab p, elab2), (type1, type2))
+
 and value_elab (state : ExplicitInfer.state) (env : environment) v =
   match v with
   | ExEff.Var x -> (

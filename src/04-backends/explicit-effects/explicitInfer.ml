@@ -107,12 +107,18 @@ let subInCmp sub cmp = Substitution.apply_substitutions_to_computation sub cmp
 
 let subInExp sub exp = Substitution.apply_substitutions_to_expression sub exp
 
+let subInAbs sub abs =
+  Substitution.apply_substitutions_to_typed_abstraction sub abs
+
 (* Substitute in target value types, computation types, and dirts *)
 let subInValTy sub ty = Substitution.apply_substitutions_to_type sub ty
 
 let subInDirt sub dirt = Substitution.apply_substitutions_to_dirt sub dirt
 
 let subInCmpTy sub (ty, dirt) = (subInValTy sub ty, subInDirt sub dirt)
+
+let subInAbsTy sub (ty_in, drty_out) =
+  (subInValTy sub ty_in, subInCmpTy sub drty_out)
 
 (* Substitute in value, dirt, and computation coercions *)
 let subInValCo sub co = Substitution.apply_sub_tycoer sub co
@@ -1277,6 +1283,19 @@ let infer_expression state expr =
   let sub, residuals = Unification.solve cnstrs in
   ((subInExp sub expr', subInValTy sub ty), residuals)
 
+let infer_rec_abstraction state f abs =
+  match
+    tcLetRecNoGen state initial_lcl_ty_env f abs
+      (unlocated @@ Untyped.Value (unlocated @@ Untyped.Tuple []))
+  with
+  | ( (Term.LetRec ([ (_f, ty_in, drty_out, (p, c)) ], _ret_unit), _unit_drty),
+      cnstrs ) ->
+      let abs' = (p, ty_in, c)
+      and abs_ty' = (ty_in, drty_out)
+      and sub, residuals = Unification.solve cnstrs in
+      ((subInAbs sub abs', subInAbsTy sub abs_ty'), residuals)
+  | _ -> assert false
+
 (* Typecheck a top-level expression *)
 let top_level_computation state comp =
   let (comp, drty), residuals = infer_computation state comp in
@@ -1287,6 +1306,17 @@ let top_level_computation state comp =
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_computation mono_comp));
   (mono_comp, mono_drty)
+
+let top_level_rec_abstraction state x (abs : Untyped.abstraction) =
+  let (abs, abs_ty), residuals = infer_rec_abstraction state x abs in
+  let free_ty_params = Type.free_params_abstraction_ty abs_ty in
+  let mono_sub = monomorphize free_ty_params residuals in
+  let mono_abs = subInAbs mono_sub abs
+  and mono_abs_ty = subInAbsTy mono_sub abs_ty in
+  (* We assume that all free variables in the term already appeared in its type or constraints *)
+  assert (
+    Type.FreeParams.is_empty (Term.free_params_abstraction_with_ty mono_abs));
+  (mono_abs, mono_abs_ty)
 
 let top_level_expression state expr =
   let (expr, ty), residuals = infer_expression state expr in

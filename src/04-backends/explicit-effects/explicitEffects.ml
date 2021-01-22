@@ -40,21 +40,13 @@ module type ExplicitBackend = sig
     Term.variable * Term.expression * Type.target_ty ->
     state
 
-  (* val process_top_let_rec :
-     state ->
-     effect_system_state ->
-     ( Language.UntypedSyntax.variable,
-       Language.UntypedSyntax.abstraction )
-     Assoc.t ->
-     (Language.UntypedSyntax.variable * Language.Type.ty_scheme) list ->
-     ((Language.UntypedSyntax.variable
-      * Type.target_ty
-      * (Type.target_ty * Type.dirt)
-      * (Term.pattern * Term.computation))
-      list
-     * Term.computation)
-     * Type.target_ty ->
-     state *)
+  val process_top_let_rec :
+    state ->
+    effect_system_state ->
+    Language.UntypedSyntax.variable
+    * Term.abstraction_with_ty
+    * (Type.target_ty * Type.target_dirty) ->
+    state
 
   val process_external :
     state ->
@@ -132,7 +124,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
       effect_system_state = effect_system_state';
     }
 
-  let process_top_let' state defs =
+  let process_top_let state defs _vars =
     match defs with
     | [] -> assert false
     | [
@@ -150,23 +142,20 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
         { state with backend_state = backend_state' }
     | _ -> failwith __LOC__
 
-  let process_top_let state defs _vars = process_top_let' state defs
-
-  let process_top_let_rec state lst _tys =
-    let defs =
-      match Assoc.to_list lst with
-      | [] -> assert false
-      | [ (v, a) ] ->
-          [
-            Language.UntypedSyntax.
-              ( unlocated (PVar v),
-                unlocated
-                  (LetRec ([ (v, a) ], unlocated (Value (unlocated (Var v)))))
-              );
-          ]
-      | _ -> failwith __LOC__
-    in
-    process_top_let' state defs
+  let process_top_let_rec state defs _vars =
+    match Assoc.to_list defs with
+    | [] -> assert false
+    | [ (f, a) ] ->
+        let a', a_ty' =
+          ExplicitInfer.top_level_rec_abstraction
+            state.effect_system_state.type_system_state f a
+        in
+        let backend_state' =
+          ExBackend.process_top_let_rec state.backend_state
+            state.effect_system_state (f, a', a_ty')
+        in
+        { state with backend_state = backend_state' }
+    | _ -> failwith __LOC__
 
   (* process_top_let state lst
      match Assoc.to_list lst with
@@ -262,6 +251,10 @@ module Evaluate : Language.BackendSignature.T = Make (struct
     Print.debug "ignoring top let binding";
     state
 
+  let process_top_let_rec state _defs _vars =
+    Print.debug "ignoring top let rec binding";
+    state
+
   let process_external state _ (x, _ty, f) =
     let evaluation_state' =
       match Assoc.lookup f External.values with
@@ -315,6 +308,20 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     let c'''' = TranslateNoEff2Ocaml.elab_term c''' in
     (state, { type_system_state; typechecker_state }, c'''')
 
+  let translate_abstraction state { type_system_state; typechecker_state }
+      (p, ty, c') =
+    let c'' =
+      if !Config.enable_optimization then
+        Optimizer.optimize_main_comp typechecker_state c'
+      else c'
+    in
+    let a''', _ =
+      TranslateExEff2NoEff.elab_abstraction type_system_state typechecker_state
+        (p, ty, c'')
+    in
+    let a'''' = TranslateNoEff2Ocaml.elab_abstraction a''' in
+    (state, { type_system_state; typechecker_state }, a'''')
+
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
 
@@ -345,6 +352,13 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
       translate_expression state { type_system_state; typechecker_state } e
     in
     { prog = SyntaxOcaml.TopLet (x, trm) :: state.prog }
+
+  let process_top_let_rec state { type_system_state; typechecker_state }
+      (x, a, (_ty_in, _ty_out)) =
+    let state, _, a =
+      translate_abstraction state { type_system_state; typechecker_state } a
+    in
+    { prog = SyntaxOcaml.TopLetRec (x, a) :: state.prog }
 
   let process_external state effect_system_state (x, ty, name) =
     {

@@ -62,6 +62,10 @@ val apply_substitutions_to_computation :
 val apply_substitutions_to_expression : t -> Term.expression -> Term.expression
 (** [apply_substitutions_to_expression subs expression] Applies all substitutions from [subs] to [expression] *)
 
+val apply_substitutions_to_typed_abstraction :
+  t -> Term.abstraction_with_ty -> Term.abstraction_with_ty
+(** [apply_substitutions_to_expression subs expression] Applies all substitutions from [subs] to [expression] *)
+
 val apply_substitutions_to_type : t -> Type.target_ty -> Type.target_ty
 (** [apply_substitutions_to_type subs ty] Applies all substitutions from [subs] to [ty]pe *)
 

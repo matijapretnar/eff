@@ -60,6 +60,7 @@ type term =
 and cmd =
   | Term of term
   | TopLet of variable * term
+  | TopLetRec of variable * abstraction
   | DefEffect of effect * ty * ty
   | External of (variable * ty * string)
   | TyDef of (CoreTypes.TyName.t * (CoreTypes.TyParam.t list * tydef)) list
@@ -190,6 +191,9 @@ and print_command ?max_level cmd ppf =
   | TyDef defs -> print_tydefs defs ppf
   | TopLet (x, t) ->
       print ~at_level:2 "let %t = %t;;" (print_variable x) (print_expression t)
+  | TopLetRec (x, (p, c)) ->
+      print ~at_level:2 "let rec %t %t = %t;;" (print_variable x)
+        (print_pattern p) (print_expression c)
 
 and print_tydefs ?max_level defs ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

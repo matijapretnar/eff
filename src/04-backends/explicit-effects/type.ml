@@ -405,6 +405,10 @@ let rec free_params_ty = function
 and free_params_dirty (ty, dirt) =
   FreeParams.union (free_params_ty ty) (free_params_dirt dirt)
 
+(* Compute the free dirt variables of a target computation type *)
+and free_params_abstraction_ty (ty_in, drty_out) =
+  FreeParams.union (free_params_ty ty_in) (free_params_dirty drty_out)
+
 (* Compute the free dirt variables of a value type inequality *)
 and free_params_ct_ty (vty1, vty2) =
   FreeParams.union (free_params_ty vty1) (free_params_ty vty2)
