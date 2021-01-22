@@ -10,7 +10,8 @@
        (run eff --explicit-effects "./test3.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "test3.eff.ref" "test3.eff.out")))
+ (deps "test3.eff.out")
+  (alias runtest)
+   (action
+    (diff "test3.eff.ref" "test3.eff.out")))
 

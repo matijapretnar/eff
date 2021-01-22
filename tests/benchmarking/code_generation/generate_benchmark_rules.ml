@@ -26,11 +26,21 @@ let benchmark_case_stanza in_filename args out_filename =
   Printf.printf "       (run eff %s %s \"./%s\")))))\n\n" default_args args
     in_filename
 
+let format_stanza out_filename =
+  Printf.printf "(rule\n";
+  Printf.printf " (deps \"%s.out\")\n" out_filename;
+  Printf.printf "  (target \"%s.formatted\")\n" out_filename;
+  Printf.printf "   (action\n";
+  Printf.printf "    (with-outputs-to \"%s.formatted\"\n" out_filename;
+  Printf.printf "     (with-accepted-exit-codes (or 0 1 2)\n";
+  Printf.printf "      (run ocamlformat %s.out)))))\n\n" out_filename
+
 let benchmark_case_alias_stanza out_filename out_filename_full =
   Printf.printf "(rule\n";
-  Printf.printf " (alias generate_benchmarks)\n";
-  Printf.printf "  (action\n";
-  Printf.printf "   (diff \"%s.ml\" \"%s.out\")))\n\n" out_filename_full
+  Printf.printf " (deps %s.formatted)\n" out_filename;
+  Printf.printf "  (alias generate_benchmarks)\n";
+  Printf.printf "   (action\n";
+  Printf.printf "    (diff \"%s.ml\" \"%s.formatted\")))\n\n" out_filename_full
     out_filename
 
 let main () =
@@ -45,6 +55,7 @@ let main () =
               (in_file_name ^ "/" ^ in_file_name ^ ".eff")
               args target_filename;
 
+            format_stanza target_filename;
             benchmark_case_alias_stanza target_filename out_filename))
         modes)
     names

@@ -10,9 +10,10 @@
        (run eff "./duplicate_field_tydef_record.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "duplicate_field_tydef_record.eff.ref" "duplicate_field_tydef_record.eff.out")))
+ (deps "duplicate_field_tydef_record.eff.out")
+  (alias runtest)
+   (action
+    (diff "duplicate_field_tydef_record.eff.ref" "duplicate_field_tydef_record.eff.out")))
 
 (rule
  (deps
@@ -26,9 +27,10 @@
        (run eff "./duplicate_let.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "duplicate_let.eff.ref" "duplicate_let.eff.out")))
+ (deps "duplicate_let.eff.out")
+  (alias runtest)
+   (action
+    (diff "duplicate_let.eff.ref" "duplicate_let.eff.out")))
 
 (rule
  (deps
@@ -42,9 +44,10 @@
        (run eff "./duplicate_let_toplevel.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "duplicate_let_toplevel.eff.ref" "duplicate_let_toplevel.eff.out")))
+ (deps "duplicate_let_toplevel.eff.out")
+  (alias runtest)
+   (action
+    (diff "duplicate_let_toplevel.eff.ref" "duplicate_let_toplevel.eff.out")))
 
 (rule
  (deps
@@ -58,9 +61,10 @@
        (run eff "./duplicate_operation_tydef_effect.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "duplicate_operation_tydef_effect.eff.ref" "duplicate_operation_tydef_effect.eff.out")))
+ (deps "duplicate_operation_tydef_effect.eff.out")
+  (alias runtest)
+   (action
+    (diff "duplicate_operation_tydef_effect.eff.ref" "duplicate_operation_tydef_effect.eff.out")))
 
 (rule
  (deps
@@ -74,9 +78,10 @@
        (run eff "./duplicate_variant_tydef_sum.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "duplicate_variant_tydef_sum.eff.ref" "duplicate_variant_tydef_sum.eff.out")))
+ (deps "duplicate_variant_tydef_sum.eff.out")
+  (alias runtest)
+   (action
+    (diff "duplicate_variant_tydef_sum.eff.ref" "duplicate_variant_tydef_sum.eff.out")))
 
 (rule
  (deps
@@ -90,9 +95,10 @@
        (run eff "./less_than_complex.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "less_than_complex.eff.ref" "less_than_complex.eff.out")))
+ (deps "less_than_complex.eff.out")
+  (alias runtest)
+   (action
+    (diff "less_than_complex.eff.ref" "less_than_complex.eff.out")))
 
 (rule
  (deps
@@ -106,9 +112,10 @@
        (run eff "./less_than_function.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "less_than_function.eff.ref" "less_than_function.eff.out")))
+ (deps "less_than_function.eff.out")
+  (alias runtest)
+   (action
+    (diff "less_than_function.eff.ref" "less_than_function.eff.out")))
 
 (rule
  (deps
@@ -122,9 +129,10 @@
        (run eff "./less_than_handler.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "less_than_handler.eff.ref" "less_than_handler.eff.out")))
+ (deps "less_than_handler.eff.out")
+  (alias runtest)
+   (action
+    (diff "less_than_handler.eff.ref" "less_than_handler.eff.out")))
 
 (rule
  (deps
@@ -138,9 +146,10 @@
        (run eff "./malformed_type_application.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "malformed_type_application.eff.ref" "malformed_type_application.eff.out")))
+ (deps "malformed_type_application.eff.out")
+  (alias runtest)
+   (action
+    (diff "malformed_type_application.eff.ref" "malformed_type_application.eff.out")))
 
 (rule
  (deps
@@ -154,9 +163,10 @@
        (run eff "./non_linear_pattern.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "non_linear_pattern.eff.ref" "non_linear_pattern.eff.out")))
+ (deps "non_linear_pattern.eff.out")
+  (alias runtest)
+   (action
+    (diff "non_linear_pattern.eff.ref" "non_linear_pattern.eff.out")))
 
 (rule
  (deps
@@ -170,9 +180,10 @@
        (run eff "./non_linear_record.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "non_linear_record.eff.ref" "non_linear_record.eff.out")))
+ (deps "non_linear_record.eff.out")
+  (alias runtest)
+   (action
+    (diff "non_linear_record.eff.ref" "non_linear_record.eff.out")))
 
 (rule
  (deps
@@ -186,9 +197,10 @@
        (run eff "./occurs_check.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "occurs_check.eff.ref" "occurs_check.eff.out")))
+ (deps "occurs_check.eff.out")
+  (alias runtest)
+   (action
+    (diff "occurs_check.eff.ref" "occurs_check.eff.out")))
 
 (rule
  (deps
@@ -202,9 +214,10 @@
        (run eff "./polymorphism_id_id.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "polymorphism_id_id.eff.ref" "polymorphism_id_id.eff.out")))
+ (deps "polymorphism_id_id.eff.out")
+  (alias runtest)
+   (action
+    (diff "polymorphism_id_id.eff.ref" "polymorphism_id_id.eff.out")))
 
 (rule
  (deps
@@ -218,9 +231,10 @@
        (run eff "./shadow_eff.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "shadow_eff.eff.ref" "shadow_eff.eff.out")))
+ (deps "shadow_eff.eff.out")
+  (alias runtest)
+   (action
+    (diff "shadow_eff.eff.ref" "shadow_eff.eff.out")))
 
 (rule
  (deps
@@ -234,9 +248,10 @@
        (run eff "./shadow_field.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "shadow_field.eff.ref" "shadow_field.eff.out")))
+ (deps "shadow_field.eff.out")
+  (alias runtest)
+   (action
+    (diff "shadow_field.eff.ref" "shadow_field.eff.out")))
 
 (rule
  (deps
@@ -250,9 +265,10 @@
        (run eff "./shadow_label.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "shadow_label.eff.ref" "shadow_label.eff.out")))
+ (deps "shadow_label.eff.out")
+  (alias runtest)
+   (action
+    (diff "shadow_label.eff.ref" "shadow_label.eff.out")))
 
 (rule
  (deps
@@ -266,9 +282,10 @@
        (run eff "./shadow_type.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "shadow_type.eff.ref" "shadow_type.eff.out")))
+ (deps "shadow_type.eff.out")
+  (alias runtest)
+   (action
+    (diff "shadow_type.eff.ref" "shadow_type.eff.out")))
 
 (rule
  (deps
@@ -282,7 +299,8 @@
        (run eff "./use_undefined_type.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "use_undefined_type.eff.ref" "use_undefined_type.eff.out")))
+ (deps "use_undefined_type.eff.out")
+  (alias runtest)
+   (action
+    (diff "use_undefined_type.eff.ref" "use_undefined_type.eff.out")))
 

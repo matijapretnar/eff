@@ -10,9 +10,10 @@
        (run eff "./choice.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "choice.eff.ref" "choice.eff.out")))
+ (deps "choice.eff.out")
+  (alias runtest)
+   (action
+    (diff "choice.eff.ref" "choice.eff.out")))
 
 (rule
  (deps
@@ -26,9 +27,10 @@
        (run eff "./lexer.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "lexer.eff.ref" "lexer.eff.out")))
+ (deps "lexer.eff.out")
+  (alias runtest)
+   (action
+    (diff "lexer.eff.ref" "lexer.eff.out")))
 
 (rule
  (deps
@@ -42,9 +44,10 @@
        (run eff "./orelse_andalso.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "orelse_andalso.eff.ref" "orelse_andalso.eff.out")))
+ (deps "orelse_andalso.eff.out")
+  (alias runtest)
+   (action
+    (diff "orelse_andalso.eff.ref" "orelse_andalso.eff.out")))
 
 (rule
  (deps
@@ -58,9 +61,10 @@
        (run eff "./patterns.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "patterns.eff.ref" "patterns.eff.out")))
+ (deps "patterns.eff.out")
+  (alias runtest)
+   (action
+    (diff "patterns.eff.ref" "patterns.eff.out")))
 
 (rule
  (deps
@@ -74,9 +78,10 @@
        (run eff "./polymorphism.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "polymorphism.eff.ref" "polymorphism.eff.out")))
+ (deps "polymorphism.eff.out")
+  (alias runtest)
+   (action
+    (diff "polymorphism.eff.ref" "polymorphism.eff.out")))
 
 (rule
  (deps
@@ -90,9 +95,10 @@
        (run eff "./semisemi.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "semisemi.eff.ref" "semisemi.eff.out")))
+ (deps "semisemi.eff.out")
+  (alias runtest)
+   (action
+    (diff "semisemi.eff.ref" "semisemi.eff.out")))
 
 (rule
  (deps
@@ -106,9 +112,10 @@
        (run eff "./state.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "state.eff.ref" "state.eff.out")))
+ (deps "state.eff.out")
+  (alias runtest)
+   (action
+    (diff "state.eff.ref" "state.eff.out")))
 
 (rule
  (deps
@@ -122,9 +129,10 @@
        (run eff "./test_equality.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "test_equality.eff.ref" "test_equality.eff.out")))
+ (deps "test_equality.eff.out")
+  (alias runtest)
+   (action
+    (diff "test_equality.eff.ref" "test_equality.eff.out")))
 
 (rule
  (deps
@@ -138,9 +146,10 @@
        (run eff "./test_less_than.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "test_less_than.eff.ref" "test_less_than.eff.out")))
+ (deps "test_less_than.eff.out")
+  (alias runtest)
+   (action
+    (diff "test_less_than.eff.ref" "test_less_than.eff.out")))
 
 (rule
  (deps
@@ -154,9 +163,10 @@
        (run eff "./test_stdlib.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "test_stdlib.eff.ref" "test_stdlib.eff.out")))
+ (deps "test_stdlib.eff.out")
+  (alias runtest)
+   (action
+    (diff "test_stdlib.eff.ref" "test_stdlib.eff.out")))
 
 (rule
  (deps
@@ -170,9 +180,10 @@
        (run eff "./tydef.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "tydef.eff.ref" "tydef.eff.out")))
+ (deps "tydef.eff.out")
+  (alias runtest)
+   (action
+    (diff "tydef.eff.ref" "tydef.eff.out")))
 
 (rule
  (deps
@@ -186,9 +197,10 @@
        (run eff "./type_annotations.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "type_annotations.eff.ref" "type_annotations.eff.out")))
+ (deps "type_annotations.eff.out")
+  (alias runtest)
+   (action
+    (diff "type_annotations.eff.ref" "type_annotations.eff.out")))
 
 (rule
  (deps
@@ -202,7 +214,8 @@
        (run eff "./typing.eff")))))
 
 (rule
- (alias runtest)
-  (action
-   (diff "typing.eff.ref" "typing.eff.out")))
+ (deps "typing.eff.out")
+  (alias runtest)
+   (action
+    (diff "typing.eff.ref" "typing.eff.out")))
 
