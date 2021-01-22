@@ -91,7 +91,8 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
 
   let process_computation state c tysch =
     let c', ty' =
-      ExplicitInfer.tcTopLevelMono state.effect_system_state.type_system_state c
+      ExplicitInfer.top_level_computation
+        state.effect_system_state.type_system_state c
     in
     let backend_state' =
       ExBackend.process_computation state.backend_state
@@ -103,7 +104,8 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
 
   let process_type_of state c tysch =
     let c', ty' =
-      ExplicitInfer.tcTopLevelMono state.effect_system_state.type_system_state c
+      ExplicitInfer.top_level_computation
+        state.effect_system_state.type_system_state c
     in
     let backend_state' =
       ExBackend.process_type_of state.backend_state state.effect_system_state
@@ -137,8 +139,8 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
      ( { it = Language.UntypedSyntax.PVar x; _ },
        { it = Language.UntypedSyntax.Value v; _ } );
     ] ->
-        let ty', e' =
-          ExplicitInfer.tcTopLevelLet
+        let e', ty' =
+          ExplicitInfer.top_level_expression
             state.effect_system_state.type_system_state v
         in
         let backend_state' =

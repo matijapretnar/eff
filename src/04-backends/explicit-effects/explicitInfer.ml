@@ -1278,14 +1278,24 @@ let infer_expression state expr =
   ((subInExp sub expr', subInValTy sub ty), residuals)
 
 (* Typecheck a top-level expression *)
-let tcTopLevelMono inState cmp =
-  let (comp, drty), residuals = infer_computation inState cmp in
+let top_level_computation state comp =
+  let (comp, drty), residuals = infer_computation state comp in
   let free_ty_params = Type.free_params_dirty drty in
   let mono_sub = monomorphize free_ty_params residuals in
   let mono_comp = subInCmp mono_sub comp
   and mono_drty = subInCmpTy mono_sub drty in
+  (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_computation mono_comp));
   (mono_comp, mono_drty)
+
+let top_level_expression state expr =
+  let (expr, ty), residuals = infer_expression state expr in
+  let free_ty_params = Type.free_params_ty ty in
+  let mono_sub = monomorphize free_ty_params residuals in
+  let mono_expr = subInExp mono_sub expr and mono_ty = subInValTy mono_sub ty in
+  (* We assume that all free variables in the term already appeared in its type or constraints *)
+  assert (Type.FreeParams.is_empty (Term.free_params_expression mono_expr));
+  (mono_expr, mono_ty)
 
 (* Add an external binding to the typing environment *)
 let addExternal ctx x ty =
