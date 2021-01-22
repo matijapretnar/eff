@@ -199,7 +199,9 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
       let ty1, elab1 = value_elab state env value in
       let (ty2, r), elab2 = coercion_elab_ty state env coer in
       if Type.types_are_equal ty1 ty2 then (r, NoEff.NCast (elab1, elab2))
-      else typefail "Ill-typed cast"
+      else
+        Error.typing ~loc:Location.unknown "Ill-typed expression cast %t <= %t"
+          (Type.print_target_ty ty1) (Type.print_target_ty ty2)
   | ExEff.LambdaTyCoerVar (par, (ty1, ty2), value) ->
       let _, elab1 = type_elab state env ty1 in
       let _, elab2 = type_elab state env ty2 in
@@ -610,7 +612,10 @@ and comp_elab state env c =
       let cty, coelab = comp_elab state env comp in
       if Type.types_are_equal (fst cty) (fst t1) then
         (t2, NoEff.NCast (coelab, elabc))
-      else typefail "Ill-typed cast"
+      else
+        Error.typing ~loc:Location.unknown "Ill-typed computation cast %t <= %t"
+          (Type.print_target_ty (fst cty))
+          (Type.print_target_ty (fst t1))
 
 and elab_ty = function
   | Language.Type.Apply (name, ts) -> NoEff.NTyApply (name, List.map elab_ty ts)

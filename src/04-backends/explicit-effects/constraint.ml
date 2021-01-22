@@ -179,6 +179,8 @@ let free_params_constraint = function
         (Type.free_params_skeleton sk2)
   | TyParamHasSkel (_t, sk) -> Type.free_params_skeleton sk
 
+let free_params_constraints = Type.FreeParams.union_map free_params_constraint
+
 (* ************************************************************************* *)
 
 (* free variables in target terms *)

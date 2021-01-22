@@ -1245,129 +1245,47 @@ let tcTopLetRec (inState : state) (var : Untyped.variable)
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 
-(* Finalize a list of constraints, setting all dirt variables to the empty set. *)
-let finalize_constraints ct =
-  let check_skeleton_constraints = function
-    | [] -> ()
-    | (tp, sk) :: _ ->
-        Error.typing ~loc:Location.unknown
-          "Unsolved param-has-skel constraint in top-level computation: %t"
-          (Constraint.print_omega_ct
-             (Constraint.TyParamHasSkel (tp, Type.SkelParam sk)))
+let monomorphize free_ty_params cnstrs =
+  let free_cnstrs_params = Constraint.free_params_constraints cnstrs in
+  let free_params = Type.FreeParams.union free_ty_params free_cnstrs_params in
+  let monomorphize_skeletons =
+    List.map
+      (fun sk -> Constraint.SkelEq (Type.SkelParam sk, Type.SkelTuple []))
+      (Type.SkelParamSet.elements free_params.skel_params)
+  and monomorphize_dirts =
+    List.map
+      (fun d ->
+        Constraint.DirtOmega
+          ( Type.DirtCoercionParam.fresh (),
+            (Type.no_effect_dirt d, Type.empty_dirt) ))
+      (Type.DirtParamSet.elements free_params.dirt_params)
   in
-  let check_type_inequalities = function
-    | [] -> ()
-    | (tcp, ctty) :: _ ->
-        Error.typing ~loc:Location.unknown
-          "Unsolved type inequality in top-level computation: %t"
-          (Constraint.print_omega_ct (Constraint.TyOmega (tcp, ctty)))
+  let sub, residuals =
+    Unification.solve (monomorphize_skeletons @ monomorphize_dirts @ cnstrs)
   in
-  let remove_dirt_variable sub
-      ( dcp,
-        ( { Type.effect_set = s1; Type.row = row1 },
-          { Type.effect_set = s2; Type.row = row2 } ) ) =
-    assert (Type.EffectSet.subset s1 s2);
-    let sub' =
-      Substitution.add_dirt_var_coercion dcp
-        (Constraint.UnionDirt
-           (s1, Constraint.Empty (Type.closed_dirt (Type.EffectSet.diff s2 s1))))
-        sub
-    in
-    let subs'' =
-      match (row1, row2) with
-      | Type.EmptyRow, Type.ParamRow dv2 ->
-          Substitution.add_dirt_substitution dv2 Type.empty_dirt sub'
-      | Type.ParamRow dv1, Type.EmptyRow ->
-          Substitution.add_dirt_substitution dv1 Type.empty_dirt sub'
-      | Type.ParamRow dv1, Type.ParamRow dv2 ->
-          Substitution.add_dirt_substitution dv1 Type.empty_dirt sub'
-          |> Substitution.add_dirt_substitution dv2 Type.empty_dirt
-      | Type.EmptyRow, Type.EmptyRow -> sub'
-    in
-    subs''
-  in
-  let alphasSkelVars, tyCs, dirtCs = partitionResidualCs ct in
-  check_skeleton_constraints alphasSkelVars;
-  check_type_inequalities tyCs;
-  List.fold_left remove_dirt_variable Substitution.empty dirtCs
+  (* After zapping, there should be no more constraints left to solve. *)
+  assert (residuals = []);
+  sub
 
-(* GEORGE: Document *)
-let mkCmpDirtGroundSubst cmp =
-  List.fold_left
-    (fun subs dp -> Substitution.add_dirt_substitution dp Type.empty_dirt subs)
-    Substitution.empty
-    (Type.DirtParamSet.elements (Term.free_params_computation cmp).dirt_params)
+let infer_computation state comp =
+  let (comp', drty), cnstrs = tcLocatedCmp state initial_lcl_ty_env comp in
+  let sub, residuals = Unification.solve cnstrs in
+  ((subInCmp sub comp', subInCmpTy sub drty), residuals)
+
+let infer_expression state expr =
+  let (expr', ty), cnstrs = tcLocatedVal state initial_lcl_ty_env expr in
+  let sub, residuals = Unification.solve cnstrs in
+  ((subInExp sub expr', subInValTy sub ty), residuals)
 
 (* Typecheck a top-level expression *)
 let tcTopLevelMono inState cmp =
-  Print.debug "tcTopLevelMono [0]: %t" (Untyped.print_computation cmp);
-  (* 1: Constraint generation *)
-  let (trgCmp, (ttype, dirt)), generatedCs =
-    tcLocatedCmp inState initial_lcl_ty_env cmp
-  in
-
-  Print.debug "tcTopLevelMono [1]: INFERRED (BEFORE SUBST): %t"
-    (Type.print_target_dirty (ttype, dirt));
-  Print.debug "tcTopLevelMono [1]: ELABORATED COMP (BEFORE SUBST): %t"
-    (Term.print_computation trgCmp);
-
-  (* 2: Constraint solving *)
-  let solverSigma, residualCs =
-    (* A: Solve the constraints as they are *)
-    let initialSigma, initialResiduals = Unification.solve generatedCs in
-    (* B: Ground the free skeleton variables *)
-    let skelGroundResiduals =
-      List.map
-        (function
-          | Constraint.TyParamHasSkel (tyvar, Type.SkelParam _s) ->
-              Constraint.TyParamHasSkel (tyvar, Type.SkelTuple [])
-          | TyParamHasSkel (tyvar, skel) ->
-              Error.typing ~loc:Location.unknown
-                "[1] Unsolved param-has-skel constraint in top-level \
-                 computation: %t"
-                (Constraint.print_omega_ct
-                   (Constraint.TyParamHasSkel (tyvar, skel)))
-          | ct -> ct)
-        initialResiduals
-    in
-    (* C: Solve again *)
-    let secondSigma, secondResiduals = Unification.solve skelGroundResiduals in
-    (* Combine the results *)
-    (extendGenSub initialSigma secondSigma, secondResiduals)
-  in
-
-  Print.debug "tcTopLevelMono [2]: INFERRED (AFTER  SUBST): %t"
-    (Type.print_target_dirty (subInCmpTy solverSigma (ttype, dirt)));
-  Print.debug "tcTopLevelMono [2]: RESIDUAL CONSTRAINTS:";
-  Unification.print_c_list residualCs;
-
-  (* 4: Create the dirt-grounding substitution *)
-  let dirtZonker = mkCmpDirtGroundSubst (subInCmp solverSigma trgCmp) in
-
-  (* 5: Zonk and finalize the residual constraints *)
-  let sub3 =
-    Substitution.apply_substitutions_to_constraints dirtZonker residualCs
-    |> finalize_constraints
-  in
-
-  let targetComputation =
-    trgCmp
-    |> subInCmp solverSigma (* Solver's result *)
-    |> subInCmp dirtZonker (* Dirt-zonker's result *)
-    |> subInCmp sub3
-  in
-
-  (* georgeTODO *)
-  let targetType =
-    (ttype, dirt) |> subInCmpTy solverSigma |> subInCmpTy dirtZonker
-    |> subInCmpTy sub3
-  in
-
-  Print.debug "ELABORATED COMP (COMPLETE): %t"
-    (Term.print_computation targetComputation);
-
-  (* 6: Return the ExEff computation *)
-  (targetComputation, targetType)
+  let (comp, drty), residuals = infer_computation inState cmp in
+  let free_ty_params = Type.free_params_dirty drty in
+  let mono_sub = monomorphize free_ty_params residuals in
+  let mono_comp = subInCmp mono_sub comp
+  and mono_drty = subInCmpTy mono_sub drty in
+  assert (Type.FreeParams.is_empty (Term.free_params_computation mono_comp));
+  (mono_comp, mono_drty)
 
 (* Add an external binding to the typing environment *)
 let addExternal ctx x ty =

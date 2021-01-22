@@ -371,6 +371,9 @@ module FreeParams = struct
 
   let union_map free_params =
     List.fold_left (fun fp x -> union fp (free_params x)) empty
+
+  let is_empty fp =
+    DirtParamSet.is_empty fp.dirt_params && SkelParamSet.is_empty fp.skel_params
 end
 
 let rec free_params_skeleton = function
