@@ -177,10 +177,7 @@ let free_params_constraint = function
       Type.FreeParams.union
         (Type.free_params_skeleton sk1)
         (Type.free_params_skeleton sk2)
-  | TyParamHasSkel (t, sk) ->
-      Type.FreeParams.union
-        (Type.FreeParams.ty_singleton t)
-        (Type.free_params_skeleton sk)
+  | TyParamHasSkel (_t, sk) -> Type.free_params_skeleton sk
 
 (* ************************************************************************* *)
 

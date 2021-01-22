@@ -354,20 +354,10 @@ let remove_effects effect_set drt =
 (* ************************************************************************* *)
 
 module FreeParams = struct
-  type t = {
-    ty_params : TyParamSet.t;
-    dirt_params : DirtParamSet.t;
-    skel_params : SkelParamSet.t;
-  }
+  type t = { dirt_params : DirtParamSet.t; skel_params : SkelParamSet.t }
 
   let empty =
-    {
-      ty_params = TyParamSet.empty;
-      dirt_params = DirtParamSet.empty;
-      skel_params = SkelParamSet.empty;
-    }
-
-  let ty_singleton p = { empty with ty_params = TyParamSet.singleton p }
+    { dirt_params = DirtParamSet.empty; skel_params = SkelParamSet.empty }
 
   let dirt_singleton p = { empty with dirt_params = DirtParamSet.singleton p }
 
@@ -375,7 +365,6 @@ module FreeParams = struct
 
   let union fp1 fp2 =
     {
-      ty_params = TyParamSet.union fp1.ty_params fp2.ty_params;
       dirt_params = DirtParamSet.union fp1.dirt_params fp2.dirt_params;
       skel_params = SkelParamSet.union fp1.skel_params fp2.skel_params;
     }
@@ -396,8 +385,7 @@ let rec free_params_skeleton = function
 
 (* Compute the free variables of a target value type *)
 let rec free_params_ty = function
-  | TyParam (p, skel) ->
-      FreeParams.union (FreeParams.ty_singleton p) (free_params_skeleton skel)
+  | TyParam (_p, skel) -> free_params_skeleton skel
   | Arrow (vty, cty) ->
       FreeParams.union (free_params_ty vty) (free_params_dirty cty)
   | Tuple vtys -> FreeParams.union_map free_params_ty vtys
