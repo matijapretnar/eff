@@ -118,7 +118,9 @@ and value_elab (state : ExplicitInfer.state) (env : environment) v =
       | None -> (
           match TypingEnv.lookup state.gblCtxt x with
           | Some ty -> (ty, NoEff.NVar x)
-          | None -> failwith "Found no type for variable"))
+          | None ->
+              Error.runtime "Found no type for variable %t"
+                (CoreTypes.Variable.print x)))
   | ExEff.Const c -> (ExEffTypes.type_const c, NoEff.NConst c)
   | ExEff.Tuple vs ->
       let type_elab_list = List.map (value_elab state env) vs in

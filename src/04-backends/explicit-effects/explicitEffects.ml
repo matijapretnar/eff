@@ -135,11 +135,28 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
           ExplicitInfer.top_level_expression
             state.effect_system_state.type_system_state v
         in
-        let backend_state' =
-          ExBackend.process_top_let state.backend_state
-            state.effect_system_state (x, e', ty')
+        let type_system_state' =
+          ExplicitInfer.add_type state.effect_system_state.type_system_state x
+            ty'
+        and typechecker_state' =
+          TypeChecker.addExternal state.effect_system_state.typechecker_state x
+            ty'
         in
-        { state with backend_state = backend_state' }
+
+        let effect_system_state' =
+          {
+            type_system_state = type_system_state';
+            typechecker_state = typechecker_state';
+          }
+        in
+        let backend_state' =
+          ExBackend.process_top_let state.backend_state effect_system_state'
+            (x, e', ty')
+        in
+        {
+          effect_system_state = effect_system_state';
+          backend_state = backend_state';
+        }
     | _ -> failwith __LOC__
 
   let process_top_let_rec state defs _vars =
@@ -150,11 +167,30 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
           ExplicitInfer.top_level_rec_abstraction
             state.effect_system_state.type_system_state f a
         in
-        let backend_state' =
-          ExBackend.process_top_let_rec state.backend_state
-            state.effect_system_state (f, a', a_ty')
+        let ty_in, drty_out = a_ty' in
+        let fun_ty = Type.Arrow (ty_in, drty_out) in
+        let type_system_state' =
+          ExplicitInfer.add_type state.effect_system_state.type_system_state f
+            fun_ty
+        and typechecker_state' =
+          TypeChecker.addExternal state.effect_system_state.typechecker_state f
+            fun_ty
         in
-        { state with backend_state = backend_state' }
+
+        let effect_system_state' =
+          {
+            type_system_state = type_system_state';
+            typechecker_state = typechecker_state';
+          }
+        in
+        let backend_state' =
+          ExBackend.process_top_let_rec state.backend_state effect_system_state'
+            (f, a', a_ty')
+        in
+        {
+          effect_system_state = effect_system_state';
+          backend_state = backend_state';
+        }
     | _ -> failwith __LOC__
 
   (* process_top_let state lst
