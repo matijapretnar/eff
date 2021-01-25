@@ -2,7 +2,6 @@ open Utils
 open Type
 open Constraint
 open Term
-module TypeChecker = TranslateExEff2NoEff
 
 type state = {
   fuel : int ref;
@@ -66,11 +65,11 @@ let refresh_abs2 a2 =
 
 let is_relatively_pure st c h =
   match
-    ( TypeChecker.typeOfComputation st.tc_state c,
-      TypeChecker.type_of_handler st.tc_state h )
+    ( TypeChecker.check_computation st.tc_state c,
+      TypeChecker.check_handler st.tc_state h )
   with
   | ( (ty, { Type.effect_set = ops; Type.row = Type.EmptyRow }),
-      Type.Handler (_, (_, output_dirt)) ) ->
+      (_, (_, output_dirt)) ) ->
       let handled_ops =
         EffectSet.of_list
           (List.map (fun ((eff, _), _) -> eff) (Assoc.to_list h.effect_clauses))
@@ -565,7 +564,7 @@ and reduce_dirt_coercion st p_ops dco =
       match dco1 with
       | ReflDirt d -> ReflDirt (add_effects ops d)
       | _ ->
-          let d1, d2 = TypeChecker.tcDirtCo st.tc_state dco1 in
+          let d1, d2 = TypeChecker.check_dirt_coercion st.tc_state dco1 in
           let ops' =
             EffectSet.diff ops
               (EffectSet.inter d1.Type.effect_set d2.Type.effect_set)
@@ -683,7 +682,7 @@ and match_knot_function' st e e' h =
 
 and optimize_sub_handler st { effect_clauses = ecs; value_clause = vc } =
   let vc' = optimize_abstraction_with_ty st vc in
-  let dty = TypeChecker.type_of_abstraction_with_ty st.tc_state vc in
+  let dty = TypeChecker.check_abstraction st.tc_state vc in
   let ecs' = Assoc.kmap (optimize_abstraction2 st dty) ecs in
   { effect_clauses = ecs'; value_clause = vc' }
 
@@ -725,7 +724,7 @@ and optimize_sub_comp st c =
                 optimize_comp st'' c )
         | _ -> failwith __LOC__)
     | Match (e1, resTy, abstractions) ->
-        let ty = TypeChecker.typeOfExpression st.tc_state e1 in
+        let ty = TypeChecker.check_expression st.tc_state e1 in
         Match
           ( optimize_expr st e1,
             resTy,
@@ -738,7 +737,7 @@ and optimize_sub_comp st c =
         (* Print.debug "optimize_sub_comp Op"; *)
         Op (op, optimize_expr st e1)
     | Bind (c1, abstraction) ->
-        let ty, _ = TypeChecker.typeOfComputation st.tc_state c1 in
+        let ty, _ = TypeChecker.check_computation st.tc_state c1 in
         Bind (optimize_comp st c1, optimize_abs st ty abstraction)
     | CastComp (c1, dirty_coercion) ->
         CastComp (optimize_comp st c1, optimize_dirty_coercion st dirty_coercion)
@@ -796,7 +795,7 @@ and reduce_expr st e =
       | _ -> e) *)
   | Effect op -> e
   | CastExp (e1, ty_co) ->
-      let ty1, ty2 = TypeChecker.tcValTyCo st.tc_state ty_co in
+      let ty1, ty2 = TypeChecker.check_ty_coercion st.tc_state ty_co in
       if (* Print.debug "HERE1"; *)
          Type.types_are_equal ty1 ty2 then e1 else e
   | plain_e -> e
@@ -867,11 +866,7 @@ and reduce_comp st c =
                              abstraction p12 (Handle (refresh_expr e1, c12)) ))
                   | None -> c)
               | _ ->
-                  let tv =
-                    match TypeChecker.type_of_handler st.tc_state h with
-                    | Type.Handler ((x, _), _) -> x
-                    | _ -> failwith __LOC__
-                  in
+                  let (tv, _), _ = TypeChecker.check_handler st.tc_state h in
                   let p12, c12 = a1 in
                   let c_r' = (p12, tv, Handle (e1, c12)) in
                   let h' = { h with value_clause = c_r' } in
@@ -911,8 +906,8 @@ and reduce_comp st c =
                    in f' e12
                 *)
                   (* Print.debug "Found recursive function call"; *)
-                  let dty_c = TypeChecker.typeOfComputation st.tc_state c in
-                  let ty_e12 = TypeChecker.typeOfExpression st.tc_state e12 in
+                  let dty_c = TypeChecker.check_computation st.tc_state c in
+                  let ty_e12 = TypeChecker.check_expression st.tc_state e12 in
                   let fvar' = CoreTypes.Variable.refresh fvar in
                   let xvar = CoreTypes.Variable.new_fresh () "__x_of_rec__" in
                   let fty' = Arrow (ty_e12, dty_c) in
@@ -949,9 +944,9 @@ and reduce_comp st c =
              >-->
              match e with {pi -> handle ci with H}
            *)
-              let ty_e = TypeChecker.typeOfExpression st.tc_state e in
+              let ty_e = TypeChecker.check_expression st.tc_state e in
               let handResTy =
-                match TypeChecker.typeOfExpression st.tc_state e1 with
+                match TypeChecker.check_expression st.tc_state e1 with
                 | Handler (_, handResTy) -> handResTy
                 | _other -> failwith __LOC__
                 (* impossible *)
@@ -970,12 +965,12 @@ and reduce_comp st c =
   | Bind (c1, a2) -> (
       match c1 with
       | Bind (c11, (p1, c12)) ->
-          let ty1, _ = TypeChecker.typeOfComputation st.tc_state c11 in
+          let ty1, _ = TypeChecker.check_computation st.tc_state c11 in
           let st' = extend_pat_type st p1 ty1 in
           let c2' = reduce_comp st' (Bind (c12, a2)) in
           reduce_comp st (Bind (c11, (p1, c2')))
       | Value e11 ->
-          let ty11 = TypeChecker.typeOfExpression st.tc_state e11 in
+          let ty11 = TypeChecker.check_expression st.tc_state e11 in
           let p2, c2 = a2 in
           beta_reduce st (p2, ty11, c2) e11
       | Call (op, e11, (p12, ty12, c12)) ->
@@ -986,12 +981,12 @@ and reduce_comp st c =
           match c11 with
           | Value e111 ->
               let p_e111' = CastExp (e111, PureCoercion dtyco) in
-              let ty111 = TypeChecker.typeOfExpression st.tc_state p_e111' in
+              let ty111 = TypeChecker.check_expression st.tc_state p_e111' in
               let p2, c2 = a2 in
               beta_reduce st (p2, ty111, c2) p_e111'
           | Bind (c111, abs112) ->
               let p112, c112 = abs112 in
-              let ty111, _ = TypeChecker.typeOfComputation st.tc_state c111 in
+              let ty111, _ = TypeChecker.check_computation st.tc_state c111 in
               let c112' = CastComp (c112, dtyco) in
               let st' = extend_pat_type st p112 ty111 in
               let c2' = reduce_comp st' (Bind (c112', a2)) in
@@ -1004,7 +999,7 @@ and reduce_comp st c =
           | _ -> c)
       | _ -> c)
   | CastComp (c1, dtyco) -> (
-      let dty1, dty2 = TypeChecker.tcCmpTyCo st.tc_state dtyco in
+      let dty1, dty2 = TypeChecker.check_dirty_coercion st.tc_state dtyco in
       match c1 with
       | _ when Type.dirty_types_are_equal dty1 dty2 -> c1
       | CastComp (c11, dtyco12) ->

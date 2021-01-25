@@ -5,6 +5,41 @@ module CoreTypes = Language.CoreTypes
 module Const = Language.Const
 module Variable = Symbol.Make (Symbol.String)
 
+type n_type =
+  (* Might remove this later to drop all polymorphism *)
+  | NTyParam of CoreTypes.TyParam.t
+  | NTyTuple of n_type list
+  | NTyArrow of n_type * n_type
+  | NTyHandler of n_type * n_type
+  | NTyQual of n_coerty * n_type
+  | NTyComp of n_type
+  | NTyApply of CoreTypes.TyName.t * n_type list
+  | NTyBasic of Const.ty
+
+and n_coerty = n_type * n_type
+
+type n_coercion =
+  | NCoerVar of Type.TyCoercionParam.t
+  | NCoerRefl of n_type
+  | NCoerArrow of n_coercion * n_coercion
+  | NCoerHandler of n_coercion * n_coercion
+  | NCoerHandToFun of n_coercion * n_coercion
+  | NCoerFunToHand of n_coercion * n_coercion
+  | NCoerQual of n_coerty * n_coercion
+  | NCoerComp of n_coercion
+  | NCoerReturn of n_coercion
+  | NCoerUnsafe of n_coercion
+  | NCoerApp of n_coercion * n_coercion
+  | NCoerTrans of n_coercion * n_coercion
+  (* STIEN: Might have to add more left-cases here later *)
+  | NCoerLeftArrow of n_coercion
+  | NCoerLeftHandler of n_coercion
+  | NCoerRightArrow of n_coercion
+  | NCoerRightHandler of n_coercion
+  | NCoerPure of n_coercion
+  | NCoerApply of CoreTypes.TyName.t * n_coercion list
+  | NCoerTuple of n_coercion list
+
 type variable = Variable.t
 
 type n_effect = CoreTypes.Effect.t * (n_type * n_type)
@@ -45,17 +80,6 @@ and n_handler = {
   return_clause : n_abstraction_with_type;
 }
 
-and n_type =
-  (* Might remove this later to drop all polymorphism *)
-  | NTyParam of CoreTypes.TyParam.t
-  | NTyTuple of n_type list
-  | NTyArrow of n_type * n_type
-  | NTyHandler of n_type * n_type
-  | NTyQual of n_coerty * n_type
-  | NTyComp of n_type
-  | NTyApply of CoreTypes.TyName.t * n_type list
-  | NTyBasic of Const.ty
-
 and n_tydef =
   | TyDefRecord of (CoreTypes.Field.t, n_type) Assoc.t
   | TyDefSum of (CoreTypes.Label.t, n_type option) Assoc.t
@@ -69,33 +93,111 @@ and n_abstraction_2_args = n_pattern * n_pattern * n_term
 
 and n_letrec_abstraction = variable * n_type * n_type * n_abstraction
 
-and n_coerty = n_type * n_type
-
-and n_coercion =
-  | NCoerVar of Type.TyCoercionParam.t
-  | NCoerRefl of n_type
-  | NCoerArrow of n_coercion * n_coercion
-  | NCoerHandler of n_coercion * n_coercion
-  | NCoerHandToFun of n_coercion * n_coercion
-  | NCoerFunToHand of n_coercion * n_coercion
-  | NCoerQual of n_coerty * n_coercion
-  | NCoerComp of n_coercion
-  | NCoerReturn of n_coercion
-  | NCoerUnsafe of n_coercion
-  | NCoerApp of n_coercion * n_coercion
-  | NCoerTrans of n_coercion * n_coercion
-  (* STIEN: Might have to add more left-cases here later *)
-  | NCoerLeftArrow of n_coercion
-  | NCoerLeftHandler of n_coercion
-  | NCoerRightArrow of n_coercion
-  | NCoerRightHandler of n_coercion
-  | NCoerPure of n_coercion
-  | NCoerApply of CoreTypes.TyName.t * n_coercion list
-  | NCoerTuple of n_coercion list
+let rec subs_var_in_term par subs term =
+  match term with
+  | NVar v -> if v = par then subs else term
+  | NTuple ls -> NTuple (List.map (subs_var_in_term par subs) ls)
+  | NFun (p, t, c) -> NFun (p, t, subs_var_in_term par subs c)
+  | NApplyTerm (t1, t2) ->
+      NApplyTerm (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
+  | NCast (t, c) -> NCast (subs_var_in_term par subs t, c)
+  | NReturn t -> NReturn (subs_var_in_term par subs t)
+  | NHandler h -> NHandler h
+  | NLet (t, (p, c)) ->
+      NLet (subs_var_in_term par subs t, (p, subs_var_in_term par subs c))
+  | NCall (eff, t, (p, ty, c)) ->
+      NCall
+        (eff, subs_var_in_term par subs t, (p, ty, subs_var_in_term par subs c))
+  | NBind (t, (p, c)) ->
+      NBind (subs_var_in_term par subs t, (p, subs_var_in_term par subs c))
+  | NHandle (t1, t2) ->
+      NHandle (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
+  | NConst c -> NConst c
+  | NEffect e -> NEffect e
+  | NLetRec (abss, t) ->
+      let subs_letrec (var, ty1, ty2, (p, c)) =
+        (var, ty1, ty2, (p, subs_var_in_term par subs c))
+      in
+      NLetRec (List.map subs_letrec abss, subs_var_in_term par subs t)
+  | NMatch (t, ty, abss, loc) ->
+      let subs_abs (p, c) = (p, subs_var_in_term par subs c) in
+      NMatch (subs_var_in_term par subs t, ty, List.map subs_abs abss, loc)
+  | NOp (eff, t) -> NOp (eff, subs_var_in_term par subs t)
+  | NRecord a -> NRecord (Assoc.map (subs_var_in_term par subs) a)
+  | NVariant (lbl, None) -> NVariant (lbl, None)
+  | NVariant (lbl, Some t) -> NVariant (lbl, Some (subs_var_in_term par subs t))
+  | _ -> failwith __LOC__
 
 (********************** PRINT FUNCTIONS **********************)
 
+let rec print_type ?max_level ty ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match ty with
+  | NTyParam x -> CoreTypes.TyParam.print x ppf
+  | NTyTuple tys -> Print.tuple print_type tys ppf
+  | NTyArrow (t1, t2) -> print "%t -> %t" (print_type t1) (print_type t2)
+  | NTyHandler (t1, t2) -> print "%t ==> %t" (print_type t1) (print_type t2)
+  | NTyQual (coerty, t) -> print "%t => %t" (print_coerty coerty) (print_type t)
+  | NTyComp t -> print "Comp %t" (print_type t)
+  | NTyApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
+  | NTyApply (t, [ s ]) ->
+      print ~at_level:1 "%t %t"
+        (print_type ~max_level:1 s)
+        (CoreTypes.TyName.print t)
+  | NTyApply (t, ts) ->
+      print ~at_level:1 "(%t) %t"
+        (Print.sequence ", " print_type ts)
+        (CoreTypes.TyName.print t)
+  | NTyBasic t -> print "%t" (Const.print_ty t)
+
+and print_coerty ?max_level (t1, t2) ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  print "%t <= %t" (print_type t1) (print_type t2)
+
+let rec print_coercion ?max_level coer ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match coer with
+  | NCoerVar x -> Type.TyCoercionParam.print x ppf
+  | NCoerRefl t -> print "(< %t >)" (print_type t)
+  | NCoerArrow (c1, c2) ->
+      print "(%t -> %t)" (print_coercion c1) (print_coercion c2)
+  | NCoerHandler (c1, c2) ->
+      print "(%t ==> %t)" (print_coercion c1) (print_coercion c2)
+  | NCoerHandToFun (c1, c2) ->
+      print "(handToFun %t %t)" (print_coercion c1) (print_coercion c2)
+  | NCoerFunToHand (c1, c2) ->
+      print "(funToHand %t %t)" (print_coercion c1) (print_coercion c2)
+  | NCoerQual (ty, c) -> print "(%t => %t)" (print_coerty ty) (print_coercion c)
+  | NCoerComp c -> print "(Comp %t)" (print_coercion c)
+  | NCoerReturn c -> print "(return %t)" (print_coercion c)
+  | NCoerUnsafe c -> print "(unsafe %t)" (print_coercion c)
+  | NCoerApp (c1, c2) ->
+      print "(%t @ %t)" (print_coercion c1) (print_coercion c2)
+  | NCoerTrans (c1, c2) ->
+      print "(%t >> %t)" (print_coercion c1) (print_coercion c2)
+  | NCoerLeftArrow c -> print "(leftA %t)" (print_coercion c)
+  | NCoerRightArrow c -> print "(rightA %t)" (print_coercion c)
+  | NCoerLeftHandler c -> print "(leftH %t)" (print_coercion c)
+  | NCoerRightHandler c -> print "(rightH %t)" (print_coercion c)
+  | NCoerPure c -> print "(pure %t)" (print_coercion c)
+  | NCoerTuple _ls -> print "tuplecoer"
+  | NCoerApply (_ty_name, _cs) -> print "applycoer"
+
 let print_variable = CoreTypes.Variable.print ~safe:true
+
+let rec print_pattern ?max_level p ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match p with
+  | PNVar var -> print "%t" (print_variable var)
+  | PNAs (_pat, var) ->
+      print "As %t = %t" (print_variable var) (print_pattern p)
+  | PNTuple ps -> Print.tuple print_pattern ps ppf
+  | PNRecord recs -> Print.record CoreTypes.Field.print print_pattern recs ppf
+  | PNVariant (l, Some t) ->
+      print "Variant %t %t" (CoreTypes.Label.print l) (print_pattern t)
+  | PNVariant (l, None) -> print "Variant %t" (CoreTypes.Label.print l)
+  | PNConst c -> Const.print c ppf
+  | PNNonbinding -> print "_"
 
 let rec print_term ?max_level t ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -158,20 +260,6 @@ let rec print_term ?max_level t ppf =
       print "Variant %t %t" (CoreTypes.Label.print l) (print_term t)
   | NVariant (l, None) -> print "Variant %t" (CoreTypes.Label.print l)
 
-and print_pattern ?max_level p ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match p with
-  | PNVar var -> print "%t" (print_variable var)
-  | PNAs (_pat, var) ->
-      print "As %t = %t" (print_variable var) (print_pattern p)
-  | PNTuple ps -> Print.tuple print_pattern ps ppf
-  | PNRecord recs -> Print.record CoreTypes.Field.print print_pattern recs ppf
-  | PNVariant (l, Some t) ->
-      print "Variant %t %t" (CoreTypes.Label.print l) (print_pattern t)
-  | PNVariant (l, None) -> print "Variant %t" (CoreTypes.Label.print l)
-  | PNConst c -> Const.print c ppf
-  | PNNonbinding -> print "_"
-
 and print_let_rec_abstraction (f, arg_ty, res_ty, abs) ppf =
   Format.fprintf ppf "(%t : %t) %t" (print_variable f)
     (print_type (NTyArrow (arg_ty, res_ty)))
@@ -179,59 +267,6 @@ and print_let_rec_abstraction (f, arg_ty, res_ty, abs) ppf =
 
 and print_let_abstraction (t1, t2) ppf =
   Format.fprintf ppf "%t = %t" (print_pattern t1) (print_term t2)
-
-and print_coercion ?max_level coer ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match coer with
-  | NCoerVar x -> Type.TyCoercionParam.print x ppf
-  | NCoerRefl t -> print "(< %t >)" (print_type t)
-  | NCoerArrow (c1, c2) ->
-      print "(%t -> %t)" (print_coercion c1) (print_coercion c2)
-  | NCoerHandler (c1, c2) ->
-      print "(%t ==> %t)" (print_coercion c1) (print_coercion c2)
-  | NCoerHandToFun (c1, c2) ->
-      print "(handToFun %t %t)" (print_coercion c1) (print_coercion c2)
-  | NCoerFunToHand (c1, c2) ->
-      print "(funToHand %t %t)" (print_coercion c1) (print_coercion c2)
-  | NCoerQual (ty, c) -> print "(%t => %t)" (print_coerty ty) (print_coercion c)
-  | NCoerComp c -> print "(Comp %t)" (print_coercion c)
-  | NCoerReturn c -> print "(return %t)" (print_coercion c)
-  | NCoerUnsafe c -> print "(unsafe %t)" (print_coercion c)
-  | NCoerApp (c1, c2) ->
-      print "(%t @ %t)" (print_coercion c1) (print_coercion c2)
-  | NCoerTrans (c1, c2) ->
-      print "(%t >> %t)" (print_coercion c1) (print_coercion c2)
-  | NCoerLeftArrow c -> print "(leftA %t)" (print_coercion c)
-  | NCoerRightArrow c -> print "(rightA %t)" (print_coercion c)
-  | NCoerLeftHandler c -> print "(leftH %t)" (print_coercion c)
-  | NCoerRightHandler c -> print "(rightH %t)" (print_coercion c)
-  | NCoerPure c -> print "(pure %t)" (print_coercion c)
-  | NCoerTuple _ls -> print "tuplecoer"
-  | NCoerApply (_ty_name, _cs) -> print "applycoer"
-
-and print_type ?max_level ty ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match ty with
-  | NTyParam x -> CoreTypes.TyParam.print x ppf
-  | NTyTuple tys -> Print.tuple print_type tys ppf
-  | NTyArrow (t1, t2) -> print "%t -> %t" (print_type t1) (print_type t2)
-  | NTyHandler (t1, t2) -> print "%t ==> %t" (print_type t1) (print_type t2)
-  | NTyQual (coerty, t) -> print "%t => %t" (print_coerty coerty) (print_type t)
-  | NTyComp t -> print "Comp %t" (print_type t)
-  | NTyApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
-  | NTyApply (t, [ s ]) ->
-      print ~at_level:1 "%t %t"
-        (print_type ~max_level:1 s)
-        (CoreTypes.TyName.print t)
-  | NTyApply (t, ts) ->
-      print ~at_level:1 "(%t) %t"
-        (Print.sequence ", " print_type ts)
-        (CoreTypes.TyName.print t)
-  | NTyBasic t -> print "%t" (Const.print_ty t)
-
-and print_coerty ?max_level (t1, t2) ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  print "%t <= %t" (print_type t1) (print_type t2)
 
 and print_effect_clauses eff_clauses ppf =
   let print ?at_level = Print.print ?at_level ppf in

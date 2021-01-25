@@ -1,7 +1,6 @@
 (* Compilation to multicore ocaml *)
 open Utils
 module V = Value
-module TypeChecker = TranslateExEff2NoEff
 
 type effect_system_state = {
   type_system_state : ExplicitInfer.state;
@@ -312,7 +311,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   let process_type effect_system_state ty =
     TranslateNoEff2Ocaml.elab_type
       (snd
-         (TranslateExEff2NoEff.type_elab effect_system_state.typechecker_state
+         (TranslateExEff2NoEff.elab_ty effect_system_state.typechecker_state
             (Type.source_to_target effect_system_state.type_system_state.tctx_st
                ty)))
 
@@ -322,7 +321,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
         Optimizer.optimize_main_expr typechecker_state e
       else e
     in
-    let _, trm = TranslateExEff2NoEff.value_elab typechecker_state e' in
+    let _, trm = TranslateExEff2NoEff.elab_expression typechecker_state e' in
     let trm' = TranslateNoEff2Ocaml.elab_term trm in
     (state, { type_system_state; typechecker_state }, trm')
 
@@ -332,7 +331,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
         Optimizer.optimize_main_comp typechecker_state c'
       else c'
     in
-    let _, c''' = TranslateExEff2NoEff.comp_elab typechecker_state c'' in
+    let _, c''' = TranslateExEff2NoEff.elab_computation typechecker_state c'' in
     let c'''' = TranslateNoEff2Ocaml.elab_term c''' in
     (state, { type_system_state; typechecker_state }, c'''')
 
