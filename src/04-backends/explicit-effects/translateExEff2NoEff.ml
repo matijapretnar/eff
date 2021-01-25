@@ -538,30 +538,17 @@ and elab_computation state c =
       let (ctype, cdirt), elabc = elab_computation state comp in
       let vtype, velab = elab_expression state value in
       match vtype with
-      | ExEffTypes.Handler ((vty1, vdirt1), (vty2, vdirt2)) -> (
-          match velab with
-          | NHandler _ | NVar _ (* TODO: Check for correct resulting form *) ->
-              if
-                (* Filip: I think this tests the wrong type, it is either strange,
-                   or the computation is wrongly wrapped.
-                *)
-                Type.types_are_equal vty1 ctype
-              then
-                if Type.is_empty_dirt cdirt (* Handle - Case 1 *) then
-                  ((vty2, vdirt2), NoEff.NApplyTerm (velab, elabc))
-                else if Type.is_empty_dirt vdirt2 (* Handle - Case 2 *) then
-                  let _, telab = elab_ty state vty2 in
-                  ( (vty2, vdirt2),
-                    NoEff.NCast
-                      ( NoEff.NHandle (elabc, velab),
-                        NoEff.NCoerUnsafe (NoEff.NCoerRefl telab) ) )
-                  (* Handle - Case 3 *)
-                else ((vty2, vdirt2), NoEff.NHandle (elabc, velab))
-              else
-                failwith
-                  "Handler source type and handled computation type do not \
-                   match"
-          | _ -> failwith "Ill-typed handler")
+      | ExEffTypes.Handler ((vty1, vdirt1), (vty2, vdirt2)) when ctype = vty1 ->
+          if Type.is_empty_dirt cdirt (* Handle - Case 1 *) then
+            ((vty2, vdirt2), NoEff.NApplyTerm (velab, elabc))
+          else if Type.is_empty_dirt vdirt2 (* Handle - Case 2 *) then
+            let _, telab = elab_ty state vty2 in
+            ( (vty2, vdirt2),
+              NoEff.NCast
+                ( NoEff.NHandle (elabc, velab),
+                  NoEff.NCoerUnsafe (NoEff.NCoerRefl telab) ) )
+            (* Handle - Case 3 *)
+          else ((vty2, vdirt2), NoEff.NHandle (elabc, velab))
       | _ -> failwith "Ill-typed handler")
   | ExEff.Call ((eff, (ty1, ty2)), value, (p, ty, comp)) ->
       let _, t1 = elab_ty state ty1 in
