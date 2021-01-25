@@ -90,5 +90,5 @@ val apply_sub_dirtycoer :
 
 (* Printing and other debug helpers *)
 
-val print_substitutions : t -> unit
+val print_substitutions : t -> Format.formatter -> unit
 (** [print_substitutions subs] Prints [subs] *)

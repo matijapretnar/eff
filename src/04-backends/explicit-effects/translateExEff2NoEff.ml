@@ -585,10 +585,8 @@ and comp_elab state env c =
                 failwith
                   "Handler source type and handled computation type do not \
                    match"
-          | _ ->
-              failwith "Ill-typed handler")
-      | _ ->
-          failwith "Ill-typed handler")
+          | _ -> failwith "Ill-typed handler")
+      | _ -> failwith "Ill-typed handler")
   | ExEff.Call ((eff, (ty1, ty2)), value, (p, ty, comp)) ->
       let _, t1 = type_elab state env ty1 in
       let _, t2 = type_elab state env ty2 in

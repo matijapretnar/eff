@@ -373,9 +373,7 @@ and subst_comp sbst = function
   | Call (eff, e, a) -> Call (eff, subst_expr sbst e, subst_abs_with_ty sbst a)
   | Value e -> Value (subst_expr sbst e)
   | CastComp (c, dtyco) -> CastComp (subst_comp sbst c, dtyco)
-  | other ->
-      Print.debug "About to fail (subst_comp): %t" (print_computation other);
-      failwith __LOC__
+  | _ -> failwith __LOC__
 
 and subst_handler sbst h =
   {

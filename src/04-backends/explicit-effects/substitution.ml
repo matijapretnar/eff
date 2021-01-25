@@ -328,21 +328,21 @@ let print_skel_param_sub p t ppf =
   printy ppf "%t :-skelvarToSkeleton-> %t" (Type.SkelParam.print p)
     (Type.print_skeleton t)
 
-let print_sub_list subs =
+let print_sub_list subs ppf =
   List.iter
-    (fun (x, y) -> Print.debug "%t" (print_type_coercion x y))
+    (fun (x, y) -> Print.print ppf "%t" (print_type_coercion x y))
     (Assoc.to_list subs.type_param_to_type_coercions);
   List.iter
-    (fun (x, y) -> Print.debug "%t" (print_type_param_to_type x y))
+    (fun (x, y) -> Print.print ppf "%t" (print_type_param_to_type x y))
     (Assoc.to_list subs.type_param_to_type_subs);
   List.iter
-    (fun (x, y) -> Print.debug "%t" (print_dirt_var_sub x y))
+    (fun (x, y) -> Print.print ppf "%t" (print_dirt_var_sub x y))
     (Assoc.to_list subs.dirt_var_to_dirt_subs);
   List.iter
-    (fun (x, y) -> Print.debug "%t" (print_dirt_var_coercion x y))
+    (fun (x, y) -> Print.print ppf "%t" (print_dirt_var_coercion x y))
     (Assoc.to_list subs.dirt_var_to_dirt_coercions);
   List.iter
-    (fun (x, y) -> Print.debug "%t" (print_skel_param_sub x y))
+    (fun (x, y) -> Print.print ppf "%t" (print_skel_param_sub x y))
     (Assoc.to_list subs.skel_param_to_skel_subs)
 
-let print_substitutions subs = print_sub_list subs
+let print_substitutions subs ppf = print_sub_list subs ppf

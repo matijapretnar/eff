@@ -24,10 +24,6 @@ let initial_lcl_ty_env = TypingEnv.empty
 (* Add a single term binding to the local typing environment *)
 let extendLclCtxt env x scheme = TypingEnv.update env x scheme
 
-let warnAddConstraints s cs =
-  Print.debug "%s: Added %d constraints: " s (List.length cs);
-  Unification.print_c_list cs
-
 (* [WRITER] SUBSTITUTION *)
 
 (* Extend the generated substitution *)
@@ -80,13 +76,6 @@ let initial_state : state =
     effects = Term.EffectMap.empty;
     tctx_st = TypeDefinitionContext.initial_state;
   }
-
-let print_env env =
-  List.iter
-    (fun (x, ty_sch) ->
-      Print.debug "%t : %t" (Term.print_variable x)
-        (Type.print_target_ty ty_sch))
-    env
 
 let add_effect eff (ty1, ty2) st =
   let ty1 = Type.source_to_target st.tctx_st ty1 in
@@ -512,15 +501,9 @@ let rec tcVar (inState : state) (lclCtxt : TypingEnv.t) (x : Term.variable) :
     tcValOutput =
   match lookupTmVar inState lclCtxt x with
   | Some scheme ->
-      Print.debug "tcVar: Just found that variable %t has type %t, Yay!"
-        (Term.print_variable x)
-        (Type.print_target_ty scheme);
       let target_x, x_monotype, constraints = instantiateVariable x scheme in
-      warnAddConstraints "tcVar" constraints;
       ((target_x, x_monotype), constraints)
-  | None ->
-      Print.debug "Variable not found: %t" (Term.print_variable x);
-      assert false
+  | None -> assert false
 
 (* Constants *)
 and tcConst (_inState : state) (_lclCtxt : TypingEnv.t) (c : Const.t) :
@@ -557,7 +540,6 @@ and tcVariant (inState : state) (lclCtx : TypingEnv.t)
       let (e', ety), cs1 = tcLocatedVal inState lclCtx e in
       (* GEORGE: Investigate how cast_expression works *)
       let castExp, castCt = Term.cast_expression e' ety ty_in in
-      warnAddConstraints "tcVariant" [ castCt ];
       ((Term.Variant (lbl, castExp), ty_out), castCt :: cs1)
 
 (* Lambda Abstractions *)
@@ -694,9 +676,6 @@ and tcOpCase (inState : state) (lclCtx : TypingEnv.t)
 (* Handlers *)
 and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) :
     tcValOutput =
-  (* 0: Warn about the current state of the implementation *)
-  Print.debug "Ignoring the finally_clause";
-
   (* 1: Generate fresh variables for the input and output types *)
   let alphaIn, alphaInSkel = Constraint.fresh_ty_with_fresh_skel () in
   let deltaIn = Type.fresh_dirt () in
@@ -730,16 +709,12 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) :
       (deltaIn, Type.{ effect_set = allOps; row = ParamRow deltaOutVar })
   in
 
-  warnAddConstraints "tcHandler[7,in,out]"
-    [ omegaCt7; alphaInSkel; alphaOutSkel ];
-
   let handlerCo =
     Constraint.HandlerCoercion
       ( Constraint.BangCoercion (Constraint.ReflTy alphaIn, omega7),
         Constraint.BangCoercion
           (Constraint.ReflTy alphaOut, Constraint.ReflDirt deltaOut) )
   in
-  Print.debug "I am the HandlerCo : %t" (Constraint.print_ty_coercion handlerCo);
 
   let outExpr =
     Term.CastExp
@@ -866,7 +841,6 @@ and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.pattern)
   let outType = (tyA2, delta) in
   let outCs = hack @ (omegaCt1 :: omegaCt2 :: cs1) @ cs2 in
 
-  warnAddConstraints "tcLetCmp" [ omegaCt1; omegaCt2 ];
   ((outExpr, outType), outCs)
 
 (* Typecheck a non-recursive let *)
@@ -998,7 +972,6 @@ and tcApply (inState : state) (lclCtxt : TypingEnv.t)
   in
   let castVal1 = Term.CastExp (trgVal1, omega) in
 
-  warnAddConstraints "tcApply" [ alphaSkel; omegaCt ];
   let outExpr = Term.Apply (castVal1, trgVal2) in
   let outType = (alpha, delta) in
   let outCs = (alphaSkel :: omegaCt :: cs1) @ cs2 in

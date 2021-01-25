@@ -11,9 +11,7 @@ module Backend : Language.BackendSignature.T = struct
   let initial_state = { prog = [] }
 
   (* Auxiliary functions *)
-  let update state cmd =
-    Print.debug "%t@?" (Syntax.print_cmd cmd);
-    { prog = state.prog @ [ cmd ] }
+  let update state cmd = { prog = state.prog @ [ cmd ] }
 
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)

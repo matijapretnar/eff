@@ -2,33 +2,11 @@ open Utils
 open Type
 open Constraint
 
-let rec print_c_list = function
-  | [] -> Print.debug "---------------------"
-  | e :: l ->
-      Print.debug "%t" (Constraint.print_omega_ct e);
-      print_c_list l
-
-let rec print_var_list = function
-  | [] -> Print.debug "---------------------"
-  | e :: l ->
-      Print.debug "%t" (CoreTypes.TyParam.print e);
-      print_var_list l
-
-let rec get_skel_of_tyvar tyvar clist =
-  (*
-  Print.debug "getting skeleton of tyvar from list" ;
-  Print.debug " TyParam : %t" (CoreTypes.TyParam.print tyvar) ;
-  Print.debug "Constraint list :" ;
-  print_c_list clist ;
-*)
-  get_skel_of_tyvar_ tyvar clist
+let rec get_skel_of_tyvar tyvar clist = get_skel_of_tyvar_ tyvar clist
 
 and get_skel_of_tyvar_ tyvar clist =
   match clist with
-  | [] ->
-      Print.debug "get_skel_of_tyvar_: Failed to retrieve skeleton of %t"
-        (CoreTypes.TyParam.print tyvar);
-      failwith __LOC__
+  | [] -> failwith __LOC__
   | TyParamHasSkel (tv, skel) :: _ when tyvar = tv -> skel
   | _ :: xs -> get_skel_of_tyvar_ tyvar xs
 
@@ -47,11 +25,6 @@ let rec skeleton_of_target_ty tty =
   | QualDirt (_, ty) -> skeleton_of_target_ty ty
 
 let rec fix_union_find fixpoint c_list =
-  (*
-  Print.debug "--------------start list-------" ;
-  print_var_list fixpoint ;
-  Print.debug "---------------end list-------" ;
-*)
   let mapper x =
     match x with
     | Constraint.TyOmega (_, tycons) -> (
@@ -200,10 +173,7 @@ and skel_eq_step sub paused rest_queue sk1 sk2 =
         add_list_to_constraints
           (List.map2 (fun sk1 sk2 -> Constraint.SkelEq (sk1, sk2)) sks1 sks2)
           rest_queue )
-  | _ ->
-      Print.debug "skel_eq_step failure: (%t)"
-        (Constraint.print_omega_ct (Constraint.SkelEq (sk1, sk2)));
-      failwith __LOC__
+  | _ -> failwith __LOC__
 
 and ty_omega_step sub paused cons rest_queue omega = function
   (* ω : A <= A *)
@@ -277,10 +247,7 @@ and ty_omega_step sub paused cons rest_queue omega = function
         ( sub,
           add_to_constraints cons paused,
           add_to_constraints (SkelEq (skel_tv, skel_a)) rest_queue )
-  | a, b ->
-      Print.debug "can't solve subtyping for types: %t and %t"
-        (print_target_ty a) (print_target_ty b);
-      assert false
+  | a, b -> assert false
 
 and dirt_omega_step sub paused cons rest_queue omega dcons =
   match dcons with
@@ -367,18 +334,8 @@ and dirt_omega_step sub paused cons rest_queue omega dcons =
   | _ -> (sub, cons :: paused, rest_queue)
 
 let rec unify (sub, paused, queue) =
-  (* Print.debug "=============Start loop============" ;
-     Print.debug "-----Subs-----" ;
-     Substitution.print_substitutions sub;
-     Print.debug "-----paused-----" ;
-     print_c_list paused ;
-     Print.debug "-----queue-----" ;
-     print_c_list queue ;
-  *)
   match queue with
-  | [] ->
-      Print.debug "=============FINAL LOOP Result============";
-      (sub, paused)
+  | [] -> (sub, paused)
   | cons :: rest_queue ->
       let new_state =
         match cons with
@@ -395,7 +352,6 @@ let rec unify (sub, paused, queue) =
         | Constraint.DirtOmega (omega, dcons) ->
             dirt_omega_step sub paused cons rest_queue omega dcons
       in
-      (* Print.debug "=========End loop============" ; *)
       unify new_state
 
 let solve constraints = unify (Substitution.empty, [], constraints)

@@ -283,13 +283,9 @@ module Evaluate : Language.BackendSignature.T = Make (struct
 
   let process_def_effect state _ _ = state
 
-  let process_top_let state _defs _vars =
-    Print.debug "ignoring top let binding";
-    state
+  let process_top_let _state _defs _vars = failwith __LOC__
 
-  let process_top_let_rec state _defs _vars =
-    Print.debug "ignoring top let rec binding";
-    state
+  let process_top_let_rec _state _defs _vars = failwith __LOC__
 
   let process_external state _ (x, _ty, f) =
     let evaluation_state' =

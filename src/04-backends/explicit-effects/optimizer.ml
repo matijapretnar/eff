@@ -53,8 +53,6 @@ let extend_ty_param_skeletons st omega ct =
 
 let refresh_expr e =
   let res = Term.refresh_expr Assoc.empty e in
-  Print.debug "refresh_expr  : %t" (Term.print_expression e);
-  Print.debug "refresh_expr'd: %t" (Term.print_expression res);
   res
 
 let refresh_abs a = Term.refresh_abs Assoc.empty a
@@ -63,8 +61,6 @@ let refresh_abs_with_ty a = Term.refresh_abs_with_ty Assoc.empty a
 
 let refresh_abs2 a2 =
   let res = Term.refresh_abs2 Assoc.empty a2 in
-  Print.debug "refresh_abs2  : %t" (Term.print_abstraction2 a2);
-  Print.debug "refresh_abs2'd: %t" (Term.print_abstraction2 res);
   res
 
 let is_relatively_pure st c h =
@@ -78,9 +74,9 @@ let is_relatively_pure st c h =
         EffectSet.of_list
           (List.map (fun ((eff, _), _) -> eff) (Assoc.to_list h.effect_clauses))
       in
-      Print.debug "is_relatively_pure: %t:  %t vs %t" (Term.print_computation c)
-        (Type.print_effect_set handled_ops)
-        (Type.print_effect_set ops);
+      (* Print.debug "is_relatively_pure: %t:  %t vs %t" (Term.print_computation c)
+         (Type.print_effect_set handled_ops)
+         (Type.print_effect_set ops); *)
       if EffectSet.is_empty (EffectSet.inter handled_ops ops) then
         match output_dirt with
         | { Type.effect_set = ops'; Type.row = Type.EmptyRow } ->
@@ -154,10 +150,10 @@ let rec specialize_letrec (cont : Term.computation)
       | QualTy _, LambdaTyCoerVar _ -> specialize fvar fbody resty cont
       | QualDirt _, LambdaDirtCoerVar _ -> specialize fvar fbody resty cont
       | _ ->
-          Print.debug "SPEC: letrec body is not an abstraction";
+          (* Print.debug "SPEC: letrec body is not an abstraction"; *)
           cont)
   | _ ->
-      Print.debug "SPEC: letrec body is not a value";
+      (* Print.debug "SPEC: letrec body is not a value"; *)
       cont
 
 and specialize (fvar : Term.variable) (fbody : Term.expression)
@@ -374,9 +370,9 @@ and specialize (fvar : Term.variable) (fbody : Term.expression)
         QualTy (_ct_ty', ty),
         ApplyTyCoercion (_var, tyco) ) ->
         assert (_ct_ty = _ct_ty');
-        Print.debug "LambdaTyCoerVar: replacing %t by %t"
-          (Type.TyCoercionParam.print coparam)
-          (Constraint.print_ty_coercion tyco);
+        (* Print.debug "LambdaTyCoerVar: replacing %t by %t"
+           (Type.TyCoercionParam.print coparam)
+           (Constraint.print_ty_coercion tyco); *)
         let sub = Substitution.add_type_coercion_e coparam tyco in
         (* v' = [y/w]v *)
         let v' = Substitution.apply_substitutions_to_expression sub v in
@@ -387,9 +383,9 @@ and specialize (fvar : Term.variable) (fbody : Term.expression)
         QualDirt (_ct_dirt', ty),
         ApplyDirtCoercion (_var, dco) ) ->
         assert (_ct_dirt = _ct_dirt');
-        Print.debug "LambdaDirtCoerVar: replacing %t by %t"
-          (Type.DirtCoercionParam.print coparam)
-          (Constraint.print_dirt_coercion dco);
+        (* Print.debug "LambdaDirtCoerVar: replacing %t by %t"
+           (Type.DirtCoercionParam.print coparam)
+           (Constraint.print_dirt_coercion dco); *)
         let sub = Substitution.add_dirt_var_coercion_e coparam dco in
         (* v' = [y/w]v *)
         let v' = Substitution.apply_substitutions_to_expression sub v in
@@ -401,7 +397,7 @@ and specialize (fvar : Term.variable) (fbody : Term.expression)
         failwith __LOC__
   in
   (* Gather and substitute specializations *)
-  Print.debug "SPEC: specializing a letrec";
+  (* Print.debug "SPEC: specializing a letrec"; *)
   let cont' = specialize_comp cont in
   (* Prefix the new specializations as let-bindings for cont. *)
   Assoc.fold_left subst_spec cont' !assoc
@@ -422,11 +418,11 @@ let letrec_drop_unused_bindings (c : computation) : computation =
       (* if no bindings used, leave this LetRec out *)
       match used_bindings with
       | [] ->
-          Print.debug "Dropping letrec bindings";
+          (* Print.debug "Dropping letrec bindings"; *)
           c1
       | _ -> LetRec (used_bindings, c1))
   | _ ->
-      Print.debug "This function can only be applied on LetRecs";
+      (* Print.debug "This function can only be applied on LetRecs"; *)
       failwith __LOC__
 
 let rec optimize_ty_coercion st tyco =
@@ -504,7 +500,7 @@ and optimize_sub_dirt_coercion st p_ops dco =
   | DirtCoercion dtyco -> DirtCoercion (optimize_dirty_coercion st dtyco)
 
 and reduce_ty_coercion st tyco =
-  Print.debug "reduce_ty_coercion: %t" (Constraint.print_ty_coercion tyco);
+  (* Print.debug "reduce_ty_coercion: %t" (Constraint.print_ty_coercion tyco); *)
   match tyco with
   | ReflTy ty -> tyco
   | ArrowCoercion (tyco1, dtyco2) -> (
@@ -535,8 +531,8 @@ and reduce_ty_coercion st tyco =
   | _ -> tyco
 
 and reduce_dirty_coercion st dtyco =
-  Print.debug "reduce_dirty_coercion: %t"
-    (Constraint.print_dirty_coercion dtyco);
+  (* Print.debug "reduce_dirty_coercion: %t"
+     (Constraint.print_dirty_coercion dtyco); *)
   match dtyco with
   | BangCoercion (tyco1, dco2) -> dtyco
   | RightArrow tyco1 -> (
@@ -590,7 +586,7 @@ and beta_reduce st ((p, ty, c) as a) e =
   | Inlinable -> substitute_pattern_comp st c p e
   | NotPresent -> c
   | NotInlinable when is_atomic e ->
-      Print.debug "beta_reduce not-inlinable is_atomc";
+      (* Print.debug "beta_reduce not-inlinable is_atomc"; *)
       substitute_pattern_comp st c p e
   | NotInlinable -> LetVal (e, a)
 
@@ -711,7 +707,7 @@ and optimize_abstraction2 st (dty : target_dirty) (effect, a2) =
   (effect, (p1, p2, optimize_comp st'' c))
 
 and optimize_sub_comp st c =
-  Print.debug "optimize_sub_comp: %t" (Term.print_computation c);
+  (* Print.debug "optimize_sub_comp: %t" (Term.print_computation c); *)
   let plain_c' =
     match c with
     | Value e1 -> Value (optimize_expr st e1)
@@ -738,7 +734,7 @@ and optimize_sub_comp st c =
     | Call (op, e1, a_w_ty) ->
         Call (op, optimize_expr st e1, optimize_abstraction_with_ty st a_w_ty)
     | Op (op, e1) ->
-        Print.debug "optimize_sub_comp Op";
+        (* Print.debug "optimize_sub_comp Op"; *)
         Op (op, optimize_expr st e1)
     | Bind (c1, abstraction) ->
         let ty, _ = TypeChecker.typeOfComputation st.tc_state c1 in
@@ -749,7 +745,7 @@ and optimize_sub_comp st c =
   plain_c'
 
 and reduce_expr st e =
-  Print.debug "reduce_exp: %t" (Term.print_expression e);
+  (* Print.debug "reduce_exp: %t" (Term.print_expression e); *)
   match e with
   (*
           | Var of variable
@@ -800,15 +796,12 @@ and reduce_expr st e =
   | Effect op -> e
   | CastExp (e1, ty_co) ->
       let ty1, ty2 = TypeChecker.tcValTyCo st.tc_state ty_co in
-      if
-        Print.debug "HERE1";
-        Type.types_are_equal ty1 ty2
-      then e1
-      else e
+      if (* Print.debug "HERE1"; *)
+         Type.types_are_equal ty1 ty2 then e1 else e
   | plain_e -> e
 
 and reduce_comp st c =
-  Print.debug "reduce_comp: %t" (Term.print_computation c);
+  (* Print.debug "reduce_comp: %t" (Term.print_computation c); *)
   match c with
   | Value _ -> c
   | LetVal (e1, abs) -> beta_reduce st abs e1
@@ -837,7 +830,7 @@ and reduce_comp st c =
            * let a_w_ty = (PVar var, ty_out, c_cont) in
            * Call (op, e2, a_w_ty) *)
       | _ ->
-          Print.debug "e1 is not a lambda";
+          (* Print.debug "e1 is not a lambda"; *)
           (* TODO: support case where it's a cast of a lambda *)
           c)
   | Handle (e1, c1) -> (
@@ -906,7 +899,7 @@ and reduce_comp st c =
                   let res = Call (eff, e11, k_abs'') in
                   reduce_comp st res)
           | Apply (e11, e12) -> (
-              Print.debug "Looking for recursive function name";
+              (* Print.debug "Looking for recursive function name"; *)
               match match_recursive_function st e11 with
               | Some (fvar, fty, fbody) ->
                   (*
@@ -916,7 +909,7 @@ and reduce_comp st c =
                         = fun x : ty_{e12} -> handle C[fbody] x with H
                    in f' e12
                 *)
-                  Print.debug "Found recursive function call";
+                  (* Print.debug "Found recursive function call"; *)
                   let dty_c = TypeChecker.typeOfComputation st.tc_state c in
                   let ty_e12 = TypeChecker.typeOfExpression st.tc_state e12 in
                   let fvar' = CoreTypes.Variable.refresh fvar in
@@ -1012,10 +1005,7 @@ and reduce_comp st c =
   | CastComp (c1, dtyco) -> (
       let dty1, dty2 = TypeChecker.tcCmpTyCo st.tc_state dtyco in
       match c1 with
-      | _
-        when Print.debug "HERE2";
-             Type.dirty_types_are_equal dty1 dty2 ->
-          c1
+      | _ when Type.dirty_types_are_equal dty1 dty2 -> c1
       | CastComp (c11, dtyco12) ->
           CastComp
             ( c11,

@@ -61,8 +61,6 @@ let rec check_well_formed_skeleton st = function
 let checkWellFormedDirt st = function
   | { Type.row = Type.EmptyRow; _ } -> ()
   | { Type.row = Type.ParamRow v; _ } ->
-      ();
-      Print.debug "Param needed: %t" (DirtParam.print v);
       assert (List.mem v st.dirt_params)
 
 (*assert (List.mem v st.dirt_params) *)
@@ -292,9 +290,7 @@ let rec typeOfExpressionTemp st = function
   | Handler h -> type_of_handler st h
   | CastExp (e1, tc1) ->
       let e1_ty = typeOfExpression st e1 in
-      Print.debug "CastExp: before tcValTyCo";
       let tc1a, tc1b = tcValTyCo st tc1 in
-      Print.debug "CastExp: after  tcValTyCo";
       assert (Type.types_are_equal tc1a e1_ty);
       tc1b
   | LambdaTyCoerVar (tcp1, ct_ty1, e1) ->
@@ -374,20 +370,10 @@ and typeOfComputationTemp st = function
       (c2_ty, c2_drt)
   | CastComp (c1, dc) ->
       let c1_drty_ty = typeOfComputation st c1 in
-      Print.debug "CastComp: before tcCmpTyCo";
       let dc11, dc2 = tcCmpTyCo st dc in
-      Print.debug "CastComp: after  tcCmpTyCo";
       if Type.dirty_types_are_equal c1_drty_ty dc11 then dc2
-      else (
-        Print.debug "typeOfComputation(CastComp): %t ~/~ %t"
-          (Type.print_target_dirty c1_drty_ty)
-          (Type.print_target_dirty dc11);
-        Print.debug "typeOfComputation(CastComp): %t"
-          (Term.print_computation c1);
-        Print.debug "coercion(CastComp): %t"
-          (Constraint.print_dirty_coercion dc);
-        assert (Type.dirty_types_are_equal c1_drty_ty dc11);
-        failwith "canthappen")
+      else 
+        assert false
   | LetRec ([ (f, argTy, resTy, (pat, rhs)) ], c) ->
       checkWellFormedValTy st argTy;
       checkWellFormedCmpTy st resTy;

@@ -37,7 +37,7 @@ module Make (Backend : Language.BackendSignature.T) = struct
   (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
      It prints the result to [ppf] and returns the new state. *)
   let rec exec_cmd state { it = cmd; at = loc } =
-    Print.debug "Executing: %t" (Location.print loc);
+    Print.debug "Executing command: %t" (Location.print loc);
     match cmd with
     | Commands.Term t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in

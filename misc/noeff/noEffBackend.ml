@@ -12,7 +12,6 @@ module Backend (P : BackendParameters) : BackendSignature.T = struct
 
   (* Auxiliary functions *)
   let update state cmd explicit_st =
-    Print.debug "%t@?" (NoEffPrint.pp_cmd cmd);
     { prog = state.prog @ [ cmd ]; typing = explicit_st }
 
   let process_type ty = NoEffCompile.compile_type (Type.source_to_target ty)
