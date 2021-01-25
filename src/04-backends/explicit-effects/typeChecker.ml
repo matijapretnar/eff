@@ -60,8 +60,7 @@ let rec check_well_formed_skeleton st = function
 
 let checkWellFormedDirt st = function
   | { Type.row = Type.EmptyRow; _ } -> ()
-  | { Type.row = Type.ParamRow v; _ } ->
-      assert (List.mem v st.dirt_params)
+  | { Type.row = Type.ParamRow v; _ } -> assert (List.mem v st.dirt_params)
 
 (*assert (List.mem v st.dirt_params) *)
 
@@ -87,27 +86,28 @@ let rec checkWellFormedValTyTemp st = function
       checkWellFormedValTy st tty1
 
 and checkWellFormedValTy st ty =
-  Print.debug "checkWellFormedValTy (%t){" (Type.print_target_ty ty);
+  Print.open_scope "checkWellFormedValTy (%t)" (Type.print_target_ty ty);
   checkWellFormedValTyTemp st ty;
-  Print.debug "checkWellFormedValTy (%t)}" (Type.print_target_ty ty)
+  Print.close_scope ()
 
 and checkWellFormedCmpTy st (ty, drt) =
-  Print.debug "checkWellFormedCmpTy (%t){" (Type.print_target_dirty (ty, drt));
+  Print.open_scope "checkWellFormedCmpTy (%t)"
+    (Type.print_target_dirty (ty, drt));
   checkWellFormedValTy st ty;
   checkWellFormedDirt st drt;
-  Print.debug "checkWellFormedCmpTy (%t)}" (Type.print_target_dirty (ty, drt))
+  Print.close_scope ()
 
 and checkWellFormedTyCt (st : state) ((t1, t2) : Type.ct_ty) =
-  Print.debug "checkWellFormedTyCt (%t){" (Type.print_ct_ty (t1, t2));
+  Print.open_scope "checkWellFormedTyCt (%t)" (Type.print_ct_ty (t1, t2));
   checkWellFormedValTy st t1;
   checkWellFormedValTy st t2;
-  Print.debug "checkWellFormedTyCt (%t)}" (Type.print_ct_ty (t1, t2))
+  Print.close_scope ()
 
 and checkWellFormedDirtCt (st : state) ((d1, d2) : Type.ct_dirt) =
-  Print.debug "checkWellFormedDirtCt (%t){" (Type.print_ct_dirt (d1, d2));
+  Print.open_scope "checkWellFormedDirtCt (%t)" (Type.print_ct_dirt (d1, d2));
   checkWellFormedDirt st d1;
   checkWellFormedDirt st d2;
-  Print.debug "checkWellFormedDirtCt (%t)}" (Type.print_ct_dirt (d1, d2))
+  Print.close_scope ()
 
 (* Typecheck a value-type coercion *)
 let rec tcValTyCoTemp st = function
@@ -167,9 +167,9 @@ let rec tcValTyCoTemp st = function
 
 (* Typecheck a value-type coercion *)
 and tcValTyCo st co =
-  Print.debug "tcValTyCo (%t){" (Constraint.print_ty_coercion co);
+  Print.open_scope "tcValTyCo (%t)" (Constraint.print_ty_coercion co);
   let res = tcValTyCoTemp st co in
-  Print.debug "tcValTyCo (%t)}" (Constraint.print_ty_coercion co);
+  Print.close_scope ();
   res
 
 (* Typecheck a computation-type coercion *)
@@ -198,9 +198,9 @@ and tcCmpTyCoTemp st = function
 
 (* Typecheck a computation-type coercion *)
 and tcCmpTyCo st co =
-  Print.debug "tcCmpTyCo (%t){" (Constraint.print_dirty_coercion co);
+  Print.open_scope "tcCmpTyCo (%t)" (Constraint.print_dirty_coercion co);
   let res = tcCmpTyCoTemp st co in
-  Print.debug "tcCmpTyCo (%t)}" (Constraint.print_dirty_coercion co);
+  Print.close_scope ();
   res
 
 and tcManyValCo st coercions =
@@ -234,9 +234,9 @@ and tcDirtCoTemp st = function
 
 (* Typecheck a dirt coercion *)
 and tcDirtCo st co =
-  Print.debug "tcDirtCo (%t){" (Constraint.print_dirt_coercion co);
+  Print.open_scope "tcDirtCo (%t)" (Constraint.print_dirt_coercion co);
   let res = tcDirtCoTemp st co in
-  Print.debug "tcDirtCo (%t)}" (Constraint.print_dirt_coercion co);
+  Print.close_scope ();
   res
 
 let rec extendPatternTypesTemp st p ty =
@@ -261,9 +261,9 @@ let rec extendPatternTypesTemp st p ty =
   | _ -> failwith __LOC__
 
 and extendPatternTypes st p ty =
-  Print.debug "extendPatternTypes{";
+  Print.open_scope "extendPatternTypes";
   let res = extendPatternTypesTemp st p ty in
-  Print.debug "extendPatternTypes}";
+  Print.close_scope ();
   res
 
 let rec typeOfExpressionTemp st = function
@@ -320,9 +320,9 @@ let rec typeOfExpressionTemp st = function
   | _ -> failwith __LOC__
 
 and typeOfExpression st e =
-  Print.debug "typeOfExpression (%t){" (Term.print_expression e);
+  Print.open_scope "typeOfExpression (%t)" (Term.print_expression e);
   let res = typeOfExpressionTemp st e in
-  Print.debug "typeOfExpression (%t)}" (Term.print_expression e);
+  Print.close_scope ();
   res
 
 and typeOfComputationTemp st = function
@@ -371,9 +371,7 @@ and typeOfComputationTemp st = function
   | CastComp (c1, dc) ->
       let c1_drty_ty = typeOfComputation st c1 in
       let dc11, dc2 = tcCmpTyCo st dc in
-      if Type.dirty_types_are_equal c1_drty_ty dc11 then dc2
-      else 
-        assert false
+      if Type.dirty_types_are_equal c1_drty_ty dc11 then dc2 else assert false
   | LetRec ([ (f, argTy, resTy, (pat, rhs)) ], c) ->
       checkWellFormedValTy st argTy;
       checkWellFormedCmpTy st resTy;
@@ -386,13 +384,13 @@ and typeOfComputationTemp st = function
   | _ -> failwith __LOC__
 
 and typeOfComputation st c =
-  Print.debug "typeOfComputation (%t){" (Term.print_computation c);
+  Print.open_scope "typeOfComputation (%t)" (Term.print_computation c);
   let res = typeOfComputationTemp st c in
-  Print.debug "typeOfComputation (%t)}" (Term.print_computation c);
+  Print.close_scope ();
   res
 
 and type_of_handler st h =
-  Print.debug "type_of_handler{";
+  Print.open_scope "type_of_handler";
   let tv, type_cv = type_of_abstraction_with_ty st h.value_clause in
   let mapper (effe, abs2) =
     let eff, (in_op_ty, out_op_ty) = effe in
@@ -408,20 +406,20 @@ and type_of_handler st h =
   let _t_cv, d_cv = type_cv in
   let input_dirt = Type.add_effects handlers_ops_set d_cv in
   let res = Type.Handler ((tv, input_dirt), type_cv) in
-  Print.debug "type_of_handler}";
+  Print.close_scope ();
   res
 
 and type_of_abstraction st ty (pv, cv) =
-  Print.debug "type_of_abstraction{";
+  Print.open_scope "type_of_abstraction";
   let st' = extendPatternTypes st pv ty in
   let res = typeOfComputation st' cv in
-  Print.debug "type_of_abstraction}";
+  Print.close_scope ();
   res
 
 and type_of_abstraction_with_ty st (pv, tv, cv) =
-  Print.debug "type_of_abstraction_with_ty{";
+  Print.open_scope "type_of_abstraction_with_ty";
   checkWellFormedValTy st tv;
   let st' = extendPatternTypes st pv tv in
   let res = (tv, typeOfComputation st' cv) in
-  Print.debug "type_of_abstraction_with_ty}";
+  Print.close_scope ();
   res

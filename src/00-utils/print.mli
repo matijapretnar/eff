@@ -13,6 +13,10 @@ val warning : ?loc:Location.t -> ('a, Format.formatter, unit) format -> 'a
 val debug : ?loc:Location.t -> ('a, Format.formatter, unit) format -> 'a
 (** Print a debug message to the standard error channel. *)
 
+val open_scope : ('a, Format.formatter, unit) format -> 'a
+
+val close_scope : unit -> unit
+
 val print :
   ?at_level:int ->
   ?max_level:int ->
