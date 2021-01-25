@@ -2,6 +2,7 @@ open Utils
 open Type
 open Constraint
 open Term
+module TypeChecker = TranslateExEff2NoEff
 
 type state = {
   fuel : int ref;
@@ -28,7 +29,7 @@ let extend_var_type st t_var ty =
   { st with tc_state = TypeChecker.extend_var_types st.tc_state t_var ty }
 
 and extend_pat_type st p ty =
-  { st with tc_state = TypeChecker.extendPatternTypes st.tc_state p ty }
+  { st with tc_state = TypeChecker.extend_pattern_type st.tc_state p ty }
 
 let extend_ty_params st ty_var =
   { st with tc_state = TypeChecker.extend_ty_params st.tc_state ty_var }
@@ -682,7 +683,7 @@ and match_knot_function' st e e' h =
 
 and optimize_sub_handler st { effect_clauses = ecs; value_clause = vc } =
   let vc' = optimize_abstraction_with_ty st vc in
-  let _, dty = TypeChecker.type_of_abstraction_with_ty st.tc_state vc in
+  let dty = TypeChecker.type_of_abstraction_with_ty st.tc_state vc in
   let ecs' = Assoc.kmap (optimize_abstraction2 st dty) ecs in
   { effect_clauses = ecs'; value_clause = vc' }
 
