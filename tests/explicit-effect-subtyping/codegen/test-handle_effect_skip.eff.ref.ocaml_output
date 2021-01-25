@@ -1,0 +1,4 @@
+[1mFile "./test-handle_effect_skip.eff.formatted", line 1, characters 11-12[0m:
+1 | ocamlformat: ignoring "test-handle_effect_skip.eff.out" (syntax error)
+               [1;31m^[0m
+[1;31mError[0m: Syntax error

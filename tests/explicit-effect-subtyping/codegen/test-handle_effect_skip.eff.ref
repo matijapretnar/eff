@@ -1,7 +1,3 @@
-call Effect_Print "hello\n" (fun _call_var_2 ->
-                                (fun c -> handler { value_clause = (fun _fresh_var_0 ->
-                                                                     match _fresh_var_0 with | _ -> value 42 );
-                                                   effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with | eff' -> fun arg k -> Call (eff', arg, k)) : a -> (b -> _ computation) -> _ computation)) } c) (value _call_var_2))
-;;
- 
+ocamlformat: ignoring "test-handle_effect_skip.eff.out" (syntax error)
+File "test-handle_effect_skip.eff.out", line 1, characters 11-12:
+Error: Syntax error

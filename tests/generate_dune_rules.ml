@@ -9,6 +9,7 @@ type config = {
   allowed_exit_code : int;
   args : string;
   apply_ocamlformat : bool;
+  generate_ocaml_compile_rule : bool;
 }
 
 let parse_config =
@@ -18,7 +19,10 @@ let parse_config =
   let apply_ocamlformat =
     if l >= 4 then 1 = int_of_string Sys.argv.(3) else false
   in
-  { allowed_exit_code; args; apply_ocamlformat }
+  let generate_ocaml_compile_rule =
+    if l >= 5 then 1 = int_of_string Sys.argv.(4) else false
+  in
+  { allowed_exit_code; args; apply_ocamlformat; generate_ocaml_compile_rule }
 
 let skip = []
 
@@ -49,12 +53,29 @@ let format_stanza out_filename =
   Printf.printf "    (with-accepted-exit-codes (or 0 1 2)\n";
   Printf.printf "     (run ocamlformat %s.out)))))\n\n" out_filename
 
+let ocaml_compile_rule full_name out_filename =
+  Printf.printf "(rule\n";
+  Printf.printf " (deps \"%s\")\n" out_filename;
+  Printf.printf " (target \"%s.ocaml_output\")\n" out_filename;
+  Printf.printf "  (action\n";
+  Printf.printf "   (with-outputs-to \"%s.ocaml_output\"\n" out_filename;
+  Printf.printf "    (with-accepted-exit-codes (or 0 1 2)\n";
+  Printf.printf "     (run ocaml %s)))))\n\n" out_filename;
+
+  Printf.printf "(rule\n";
+  Printf.printf " (deps \"%s.ocaml_output\")\n" out_filename;
+  Printf.printf "  (alias runtest)\n";
+  Printf.printf "   (action\n";
+  Printf.printf "    (diff \"%s.ref.ocaml_output\" \"%s.ocaml_output\")))\n\n"
+    full_name out_filename
+
 let test_case_alias_stanza config (_bare, full_name) =
   let out_file_name =
     full_name ^ if config.apply_ocamlformat then ".formatted" else ".out"
   in
   if config.apply_ocamlformat then format_stanza full_name;
-
+  if config.generate_ocaml_compile_rule then
+    ocaml_compile_rule full_name out_file_name;
   Printf.printf "(rule\n";
   Printf.printf " (deps \"%s\")\n" out_file_name;
   Printf.printf "  (alias runtest)\n";

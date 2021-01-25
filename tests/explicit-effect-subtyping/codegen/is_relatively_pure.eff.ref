@@ -1,13 +1,3 @@
-type (_, _) effect += Effect_Op1 : (int, int) effect
-;;
- type (_, _) effect += Effect_Op2 : (int, int) effect
-;;
- call Effect_Op1 1 (
-fun _call_var_3 ->
-   (fun c -> handler { value_clause = (fun _fresh_var_0 ->
-                                          match _fresh_var_0 with | _x_271 -> value _x_271 );
-                      effect_clauses = (fun (type a) (type b) (x : (a, b) effect) ->
-             ((match x with | Effect_Op2 -> (fun (_n_268 : int) (_fresh_var_1 : unit -> _ computation) -> _fresh_var_1
-                      ()) | eff' -> fun arg k -> Call (eff', arg, k)) : a -> (b -> _ computation) -> _ computation)) } c) (value _call_var_3))
-;;
- 
+ocamlformat: ignoring "is_relatively_pure.eff.out" (syntax error)
+File "is_relatively_pure.eff.out", line 1, characters 12-13:
+Error: Syntax error

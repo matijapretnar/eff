@@ -1,28 +1,3 @@
-type (_,_) effect +=
-  | Effect_Decide: (unit,bool) effect
-let _choose_all_257 =
-  {
-    value_clause = (fun _x_263  -> value [_x_263]);
-    finally_clause = (fun _gen_id_par_262  -> value _gen_id_par_262);
-    effect_clauses = fun (type a) -> fun (type b) ->
-      fun (x : (a,b) effect)  ->
-        (match x with
-         | Effect_Decide  ->
-             (fun (() : unit)  ->
-                fun (_k_258 : bool -> _ computation)  ->
-                  (_k_258 true) >>
-                    (fun _gen_bind_260  ->
-                       (_var_165 _gen_bind_260) >>
-                         (fun _gen_bind_259  ->
-                            (_k_258 false) >>
-                              (fun _gen_bind_261  ->
-                                 _gen_bind_259 _gen_bind_261))))
-         | eff' -> (fun arg  -> fun k  -> Call (eff', arg, k)) : a ->
-                                                                   (b ->
-                                                                    _
-                                                                    computation)
-                                                                    ->
-                                                                    _
-                                                                    computation)
-  }
-let _ = (_var_165 [10]) >> (fun _gen_bind_95  -> _gen_bind_95 [20])
+ocamlformat: ignoring "two_inputs.eff.out" (syntax error)
+File "two_inputs.eff.out", line 1, characters 13-14:
+Error: Syntax error

@@ -1,0 +1,13 @@
+[1mFile "./not-found.eff.formatted", line 68, characters 10-68[0m:
+68 | (fun x -> match x with Value y -> (fun coer_refl_x -> coer_refl_x) y)
+               [1;35m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;35mWarning[0m 8: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+Call (_, _, _)
+[1mFile "./not-found.eff.formatted", lines 103-105, characters 41-79[0m:
+103 | .........................................match x with
+104 |                                          | Value y ->
+105 |                                              (fun coer_refl_x -> coer_refl_x) y.
+[1;35mWarning[0m 8: this pattern-matching is not exhaustive.
+Here is an example of a case that is not matched:
+Call (_, _, _)
