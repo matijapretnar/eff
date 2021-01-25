@@ -72,6 +72,21 @@ let type_const c = TyBasic (Const.infer_ty c)
 let is_empty_dirt dirt =
   EffectSet.is_empty dirt.effect_set && dirt.row = EmptyRow
 
+let rec skeleton_of_ty tty =
+  match tty with
+  | TyParam (_, skel) -> skel
+  | Arrow (ty1, drty2) -> SkelArrow (skeleton_of_ty ty1, skeleton_of_dirty drty2)
+  | Apply (ty_name, tys) ->
+      SkelApply (ty_name, List.map (fun ty -> skeleton_of_ty ty) tys)
+  | Tuple tup -> SkelTuple (List.map (fun ty -> skeleton_of_ty ty) tup)
+  | Handler (drty1, drty2) ->
+      SkelHandler (skeleton_of_dirty drty1, skeleton_of_dirty drty2)
+  | TyBasic pt -> SkelBasic pt
+  | QualTy (_, ty) -> skeleton_of_ty ty
+  | QualDirt (_, ty) -> skeleton_of_ty ty
+
+and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
+
 let rec print_target_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
