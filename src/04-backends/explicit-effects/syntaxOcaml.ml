@@ -180,7 +180,7 @@ and print_match_cases ?max_level ls ppf =
 and print_command ?max_level cmd ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match cmd with
-  | Term t -> print ~at_level:2 "%t" (print_expression t)
+  | Term t -> print ~at_level:2 "%t;;" (print_expression t)
   | DefEffect (eff, ty1, ty2) ->
       print ~at_level:2 "type (_, _) effect += %t : (%t, %t) effect;;\n\n"
         (CoreTypes.Effect.print eff)
