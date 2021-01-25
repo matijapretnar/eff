@@ -76,14 +76,10 @@ let () =
     run_and_show
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
-           Test.make ~name:"Generated, impure, not optimized"
-             (st (fun () -> LoopNoOptImpure._test_pure_11 number_of_loops));
-           Test.make ~name:"Generated, impure, optimized"
-             (st (fun () -> LoopOptImpure._test_pure_11 number_of_loops));
-           Test.make ~name:"Generated, pure, not optimized"
-             (st (fun () -> LoopNoOptPure._test_pure_11 number_of_loops));
-           Test.make ~name:"Generated, pure, optimized"
-             (st (fun () -> LoopOptPure._test_pure_11 number_of_loops));
+           Test.make ~name:"Generated, not optimized"
+             (st (fun () -> LoopNoOpt._test_pure_11 number_of_loops));
+           Test.make ~name:"Generated, optimized"
+             (st (fun () -> LoopOpt._test_pure_11 number_of_loops));
            Test.make ~name:"Hand written"
              (st (fun () -> LoopHandWritten.test_pure number_of_loops));
            Test.make ~name:"Native"
@@ -95,14 +91,10 @@ let () =
     run_and_show
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
-           Test.make ~name:"Generated, impure, not optimized"
-             (st (fun () -> LoopNoOptImpure._test_latent_22 number_of_loops));
-           Test.make ~name:"Generated, impure, optimized"
-             (st (fun () -> LoopOptImpure._test_latent_22 number_of_loops));
-           Test.make ~name:"Generated, pure, not optimized"
-             (st (fun () -> LoopNoOptPure._test_latent_22 number_of_loops));
-           Test.make ~name:"Generated, pure, optimized"
-             (st (fun () -> LoopOptPure._test_latent_22 number_of_loops));
+           Test.make ~name:"Generated, not optimized"
+             (st (fun () -> LoopNoOpt._test_latent_22 number_of_loops));
+           Test.make ~name:"Generated, optimized"
+             (st (fun () -> LoopOpt._test_latent_22 number_of_loops));
            Test.make ~name:"Hand written"
              (st (fun () -> LoopHandWritten.test_latent number_of_loops));
            Test.make ~name:"Native"
@@ -114,14 +106,10 @@ let () =
     run_and_show
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
-           Test.make ~name:"Generated, impure, not optimized"
-             (st @@ fun () -> LoopNoOptImpure._test_incr_38 number_of_loops);
-           Test.make ~name:"Generated, impure, optimized"
-             (st @@ fun () -> LoopOptImpure._test_incr_38 number_of_loops);
-           Test.make ~name:"Generated, pure, not optimized"
-             (st @@ fun () -> LoopNoOptPure._test_incr_38 number_of_loops);
-           Test.make ~name:"Generated, pure, optimized"
-             (st @@ fun () -> LoopOptPure._test_incr_38 number_of_loops);
+           Test.make ~name:"Generated, not optimized"
+             (st @@ fun () -> LoopNoOpt._test_incr_38 number_of_loops);
+           Test.make ~name:"Generated, optimized"
+             (st @@ fun () -> LoopOpt._test_incr_38 number_of_loops);
            Test.make ~name:"Hand written"
              (st @@ fun () -> LoopHandWritten.test_incr number_of_loops);
            Test.make ~name:"Native"
@@ -129,39 +117,33 @@ let () =
          ];
     Printf.printf "\n\n");
   if run_loop_incr' then (
-    Printf.printf "LOOP INCR' BENCHMARK (%d loops):\n" 100;
+    let n = 100 in
+    Printf.printf "LOOP INCR' BENCHMARK (%d loops):\n" n;
     run_and_show
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
-           Test.make ~name:"Generated, impure, not optimized"
-             (st @@ fun () -> LoopNoOptImpure._test_incr'_47 100);
-           Test.make ~name:"Generated, impure, optimized"
-             (st @@ fun () -> LoopOptImpure._test_incr'_47 100);
-           Test.make ~name:"Generated, pure, not optimized"
-             (st @@ fun () -> LoopNoOptPure._test_incr'_47 100);
-           Test.make ~name:"Generated, pure, optimized"
-             (st @@ fun () -> LoopOptPure._test_incr'_47 100);
+           Test.make ~name:"Generated, not optimized"
+             (st @@ fun () -> LoopNoOpt._test_incr'_47 n);
+           Test.make ~name:"Generated, optimized"
+             (st @@ fun () -> LoopOpt._test_incr'_47 n);
            Test.make ~name:"Hand written"
-             (st @@ fun () -> LoopHandWritten.test_incr' 100);
-           Test.make ~name:"Native" (st @@ fun () -> LoopNative.test_incr' 100);
+             (st @@ fun () -> LoopHandWritten.test_incr' n);
+           Test.make ~name:"Native" (st @@ fun () -> LoopNative.test_incr' n);
          ];
     Printf.printf "\n\n");
   if run_loop_incr' then (
-    Printf.printf "LOOP INCR' BENCHMARK (%d loops):\n" 200;
+    let n = 200 in
+    Printf.printf "LOOP INCR' BENCHMARK (%d loops):\n" n;
     run_and_show
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
-           Test.make ~name:"Generated, impure, not optimized"
-             (st @@ fun () -> LoopNoOptImpure._test_incr'_47 200);
-           Test.make ~name:"Generated, impure, optimized"
-             (st @@ fun () -> LoopOptImpure._test_incr'_47 200);
-           Test.make ~name:"Generated, pure, not optimized"
-             (st @@ fun () -> LoopNoOptPure._test_incr'_47 200);
-           Test.make ~name:"Generated, pure, optimized"
-             (st @@ fun () -> LoopOptPure._test_incr'_47 200);
+           Test.make ~name:"Generated, not optimized"
+             (st @@ fun () -> LoopNoOpt._test_incr'_47 n);
+           Test.make ~name:"Generated, optimized"
+             (st @@ fun () -> LoopOpt._test_incr'_47 n);
            Test.make ~name:"Hand written"
-             (st @@ fun () -> LoopHandWritten.test_incr' 200);
-           Test.make ~name:"Native" (st @@ fun () -> LoopNative.test_incr' 200);
+             (st @@ fun () -> LoopHandWritten.test_incr' n);
+           Test.make ~name:"Native" (st @@ fun () -> LoopNative.test_incr' n);
          ];
     Printf.printf "\n\n");
   if run_loop_state then (
@@ -169,14 +151,10 @@ let () =
     run_and_show
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
-           Test.make ~name:"Generated, impure, not optimized"
-             (st @@ fun () -> LoopNoOptImpure._test_state_68 number_of_loops);
-           Test.make ~name:"Generated, impure, optimized"
-             (st @@ fun () -> LoopOptImpure._test_state_68 number_of_loops);
-           Test.make ~name:"Generated, pure, not optimized"
-             (st @@ fun () -> LoopNoOptPure._test_state_68 number_of_loops);
-           Test.make ~name:"Generated, pure, optimized"
-             (st @@ fun () -> LoopOptPure._test_state_68 number_of_loops);
+           Test.make ~name:"Generated, not optimized"
+             (st @@ fun () -> LoopNoOpt._test_state_68 number_of_loops);
+           Test.make ~name:"Generated, optimized"
+             (st @@ fun () -> LoopOpt._test_state_68 number_of_loops);
            Test.make ~name:"Hand written"
              (st @@ fun () -> LoopHandWritten.test_state number_of_loops);
            Test.make ~name:"Native"
@@ -188,17 +166,10 @@ let () =
     run_and_show
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
-           Test.make ~name:"Generated, impure, not optimized"
-             ( st @@ fun () ->
-               QueensNoOptImpure._queens_one_cps_96 number_of_queens );
-           Test.make ~name:"Generated, impure, optimized"
-             ( st @@ fun () ->
-               QueensOptImpure._queens_one_cps_96 number_of_queens );
-           Test.make ~name:"Generated, pure, not optimized"
-             ( st @@ fun () ->
-               QueensNoOptPure._queens_one_cps_96 number_of_queens );
-           Test.make ~name:"Generated, pure, optimized"
-             (st @@ fun () -> QueensOptPure._queens_one_cps_96 number_of_queens);
+           Test.make ~name:"Generated, not optimized"
+             (st @@ fun () -> QueensNoOpt._queens_one_cps_96 number_of_queens);
+           Test.make ~name:"Generated, optimized"
+             (st @@ fun () -> QueensOpt._queens_one_cps_96 number_of_queens);
            Test.make ~name:"Hand written"
              (st @@ fun () -> QueensHandWritten.queens_one_cps number_of_queens);
            Test.make ~name:"Native - CPS"
@@ -213,18 +184,10 @@ let () =
     run_and_show
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
-           Test.make ~name:"Generated, impure, not optimized"
-             ( st @@ fun () ->
-               QueensNoOptImpure._queens_one_option_94 number_of_queens );
-           Test.make ~name:"Generated, impure, optimized"
-             ( st @@ fun () ->
-               QueensOptImpure._queens_one_option_94 number_of_queens );
-           Test.make ~name:"Generated, pure, not optimized"
-             ( st @@ fun () ->
-               QueensNoOptPure._queens_one_option_94 number_of_queens );
-           Test.make ~name:"Generated, pure, optimized"
-             ( st @@ fun () ->
-               QueensOptPure._queens_one_option_94 number_of_queens );
+           Test.make ~name:"Generated, not optimized"
+             (st @@ fun () -> QueensNoOpt._queens_one_option_94 number_of_queens);
+           Test.make ~name:"Generated, optimized"
+             (st @@ fun () -> QueensOpt._queens_one_option_94 number_of_queens);
            Test.make ~name:"Hand written"
              ( st @@ fun () ->
                QueensHandWritten.queens_one_option number_of_queens );
@@ -240,14 +203,10 @@ let () =
     run_and_show
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
-           Test.make ~name:"Generated, impure, not optimized"
-             (st @@ fun () -> QueensNoOptImpure._queens_all_100 number_of_queens);
-           Test.make ~name:"Generated, impure, optimized"
-             (st @@ fun () -> QueensOptImpure._queens_all_100 number_of_queens);
-           Test.make ~name:"Generated, pure, not optimized"
-             (st @@ fun () -> QueensNoOptPure._queens_all_100 number_of_queens);
-           Test.make ~name:"Generated, pure, optimized"
-             (st @@ fun () -> QueensOptPure._queens_all_100 number_of_queens);
+           Test.make ~name:"Generated, not optimized"
+             (st @@ fun () -> QueensNoOpt._queens_all_100 number_of_queens);
+           Test.make ~name:"Generated, optimized"
+             (st @@ fun () -> QueensOpt._queens_all_100 number_of_queens);
            Test.make ~name:"Hand written"
              (st @@ fun () -> QueensHandWritten.queens_all number_of_queens);
            Test.make ~name:"Native"
@@ -259,14 +218,10 @@ let () =
     run_and_show
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
-           Test.make ~name:"Generated, impure, not optimized"
-             (st @@ fun () -> InterpNoOptImpure._bigTest_38 ());
-           Test.make ~name:"Generated, impure, optimized"
-             (st @@ fun () -> InterpOptImpure._bigTest_38 ());
-           Test.make ~name:"Generated, pure, not optimized"
-             (st @@ fun () -> InterpNoOptPure._bigTest_38 ());
-           Test.make ~name:"Generated, pure, optimized"
-             (st @@ fun () -> InterpOptPure._bigTest_38 ());
+           Test.make ~name:"Generated, not optimized"
+             (st @@ fun () -> InterpNoOpt._bigTest_38 ());
+           Test.make ~name:"Generated, optimized"
+             (st @@ fun () -> InterpOpt._bigTest_38 ());
            Test.make ~name:"Native" (st @@ fun () -> InterpNative.bigTest ());
          ];
     Printf.printf "\n\n");
@@ -275,14 +230,10 @@ let () =
     run_and_show
     @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
          [
-           Test.make ~name:"Generated, impure, not optimized"
-             (st @@ fun () -> RangeNoOptImpure._test_222 number_of_range);
-           Test.make ~name:"Generated, impure, optimized"
-             (st @@ fun () -> RangeOptImpure._test_222 number_of_range);
-           Test.make ~name:"Generated, pure, not optimized"
-             (st @@ fun () -> RangeNoOptPure._test_222 number_of_range);
+           Test.make ~name:"Generated, not optimized"
+             (st @@ fun () -> RangeNoOpt._test_222 number_of_range);
            Test.make ~name:"Generated, pure, optimized"
-             (st @@ fun () -> RangeOptPure._test_222 number_of_range);
+             (st @@ fun () -> RangeOpt._test_222 number_of_range);
            (* Test.make ~name:"Native" (st @@ ((fun () -> FlatNative.bigTest ()))); *)
          ];
     Printf.printf "\n\n")

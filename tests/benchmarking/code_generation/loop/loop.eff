@@ -16,6 +16,7 @@ let test_pure n =
 
 (******************************************************************************)
 
+(*
 effect Fail : unit -> empty
 
 let rec loop_latent n =
@@ -75,3 +76,5 @@ let state_handler = handler
 
 let test_state n =
     (with state_handler handle loop_state n) 0
+
+    *)
