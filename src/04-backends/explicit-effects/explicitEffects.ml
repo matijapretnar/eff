@@ -414,7 +414,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
 
   let finalize state _ =
     if !Config.include_header then
-      Format.fprintf !Config.output_formatter "%s" OcamlHeader_ml.source;
+      Format.fprintf !Config.output_formatter "%s;;" OcamlHeader_ml.source;
     List.iter
       (fun cmd ->
         Format.fprintf !Config.output_formatter "%t\n"
