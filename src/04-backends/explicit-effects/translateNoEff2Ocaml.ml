@@ -204,7 +204,7 @@ and pp_effect_cls eff_cls ppf =
     (pp_sequence " " pp_effect_abs2 (Assoc.to_list eff_cls))
 
 let pp_def_effect (eff, (ty1, ty2)) ppf =
-  print ppf "@[effect %t : %t ->@ %t@]@."
+  print ppf "@[type(_, _) effect += %t : (%t, %t) effect @]@.;;"
     (CoreTypes.Effect.print eff)
     (pp_type ty1) (pp_type ty2)
 

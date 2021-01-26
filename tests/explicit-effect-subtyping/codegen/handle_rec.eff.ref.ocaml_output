@@ -1,4 +1,4 @@
-[1mFile "./handle_rec.eff.out", line 88, characters 11-12[0m:
-88 | effect Eff : unit -> unit
-                [1;31m^[0m
+[1mFile "./handle_rec.eff.out", line 97, characters 5-7[0m:
+97 |    x -> (((coer_return (coer_refl_ty)) 
+          [1;31m^^[0m
 [1;31mError[0m: Syntax error

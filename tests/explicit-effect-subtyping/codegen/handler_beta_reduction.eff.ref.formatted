@@ -1,3 +1,5 @@
 ocamlformat: ignoring "handler_beta_reduction.eff.out" (syntax error)
-File "handler_beta_reduction.eff.out", line 88, characters 11-12:
-Error: Syntax error
+File "handler_beta_reduction.eff.out", line 105, characters 27-29:
+Error: Syntax error: ')' expected
+File "handler_beta_reduction.eff.out", line 104, characters 80-81:
+  This '(' might be unmatched

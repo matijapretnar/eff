@@ -1,3 +1,5 @@
 ocamlformat: ignoring "not-found.eff.out" (syntax error)
-File "not-found.eff.out", line 88, characters 11-12:
-Error: Syntax error
+File "not-found.eff.out", line 98, characters 49-51:
+Error: Syntax error: '}' expected
+File "not-found.eff.out", line 98, characters 23-24:
+  This '{' might be unmatched

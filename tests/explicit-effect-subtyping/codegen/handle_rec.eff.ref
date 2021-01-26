@@ -85,8 +85,8 @@ let rec fun_to_hand coer1 coer2 f comp =
   | Call (eff, arg, k) ->
       Call (eff, arg, fun x -> fun_to_hand coer1 coer2 f (k x))
 ;;
-effect Eff : unit -> unit
-
+type(_, _) effect += Eff : (unit, unit) effect 
+;;
 let _op_0 (* - *) = ( - )
 
 let _op_1 (* * *) = ( * )

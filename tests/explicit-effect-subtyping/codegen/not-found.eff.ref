@@ -85,21 +85,21 @@ let rec fun_to_hand coer1 coer2 f comp =
   | Call (eff, arg, k) ->
       Call (eff, arg, fun x -> fun_to_hand coer1 coer2 f (k x))
 ;;
-effect Op1 : int -> int
-
+type(_, _) effect += Op1 : (int, int) effect 
+;;
 (coer_unsafe (coer_refl_ty)) 
-   ((coer_computation (coer_refl_ty)) 
-      ((coer_computation (coer_refl_ty)) 
-         (((coer_computation (coer_refl_ty)) 
-             ((coer_computation (coer_refl_ty)) 
-                ((coer_computation (coer_refl_ty)) 
-                   ((coer_computation (coer_refl_ty)) 
-                      ((Op1) ((coer_refl_ty) (5))))))) 
-            (handler {value_clause = (y : int) -> (coer_refl_ty) 
-                                                    (let x = (coer_refl_ty) 
-                                                               (y) in 
-                                                     x); effect_claueses = 
-                                                         (fun (type a) (type b) (eff : (a, b) effect) -> 
+     ((coer_computation (coer_refl_ty)) 
+        ((coer_computation (coer_refl_ty)) 
+           (((coer_computation (coer_refl_ty)) 
+               ((coer_computation (coer_refl_ty)) 
+                  ((coer_computation (coer_refl_ty)) 
+                     ((coer_computation (coer_refl_ty)) 
+                        ((Op1) ((coer_refl_ty) (5))))))) 
+              (handler {value_clause = (y : int) -> (coer_refl_ty) 
+                                                      (let x = (coer_refl_ty) 
+                                                                 (y) in 
+                                                       x); effect_claueses = 
+                                                           (fun (type a) (type b) (eff : (a, b) effect) -> 
   (match eff with
     | Op1 -> fun x l -> Value 
                                                                     (coer_refl_ty) 
