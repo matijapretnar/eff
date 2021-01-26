@@ -174,7 +174,8 @@ let rec pp_term noEff_term ppf =
       | _ -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2))
   | _ -> failwith __LOC__
 
-and pp_abs (p, t) ppf = print ppf "@[<h>%t ->@ %t@]" (pp_pattern p) (pp_term t)
+and pp_abs (p, t) ppf =
+  print ppf "@[<h>fun %t ->@ %t@]" (pp_pattern p) (pp_term t)
 
 and pp_abs_with_ty (p, ty, t) ppf =
   print ppf "@[<h>(%t : %t) ->@ %t@]" (pp_pattern p) (pp_type ty) (pp_term t)
