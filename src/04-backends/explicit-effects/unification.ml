@@ -296,6 +296,9 @@ let dirt_omega_step sub paused cons rest_queue omega dcons =
   | _ -> (sub, cons :: paused, rest_queue)
 
 let rec unify (sub, paused, queue) =
+  (* Print.debug "SUB: %t" (Substitution.print_substitutions sub);
+     Print.debug "PAUSED: %t" (Constraint.print_constraints paused);
+     Print.debug "QUEUE: %t" (Constraint.print_constraints queue); *)
   match queue with
   | [] -> (sub, paused)
   | cons :: rest_queue ->
@@ -316,4 +319,9 @@ let rec unify (sub, paused, queue) =
       in
       unify new_state
 
-let solve constraints = unify (Substitution.empty, [], constraints)
+let solve constraints =
+  Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints constraints);
+  let sub, solved = unify (Substitution.empty, [], constraints) in
+  Print.debug "SUB: %t" (Substitution.print_substitutions sub);
+  Print.debug "SOLVED: %t" (Constraint.print_constraints solved);
+  (sub, solved)

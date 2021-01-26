@@ -1278,9 +1278,14 @@ let top_level_rec_abstraction state x (abs : Untyped.abstraction) =
 
 let top_level_expression state expr =
   let (expr, ty), residuals = infer_expression state expr in
+  Print.debug "EXPR: %t" (Term.print_expression expr); 
+  Print.debug "TYPE: %t" (Type.print_target_ty ty); 
+  Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals);
   let free_ty_params = Type.free_params_ty ty in
   let mono_sub = monomorphize free_ty_params residuals in
   let mono_expr = subInExp mono_sub expr and mono_ty = subInValTy mono_sub ty in
+  Print.debug "MONO_EXPR: %t" (Term.print_expression mono_expr); 
+  Print.debug "MONO_TYPE: %t" (Type.print_target_ty mono_ty);
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_expression mono_expr));
   (mono_expr, mono_ty)

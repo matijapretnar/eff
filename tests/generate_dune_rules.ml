@@ -77,9 +77,7 @@ let ocaml_compile_rule full_name out_filename =
     full_name out_filename
 
 let test_case_alias_stanza config (_bare, full_name) =
-  let out_file_name =
-    full_name ^ ".out"
-  in
+  let out_file_name = full_name ^ ".out" in
   if config.apply_ocamlformat then format_stanza full_name;
   if config.generate_ocaml_compile_rule then
     ocaml_compile_rule full_name out_file_name;

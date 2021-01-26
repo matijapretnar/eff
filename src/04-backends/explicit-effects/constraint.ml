@@ -110,6 +110,8 @@ and print_omega_ct ?max_level c ppf =
   | TyParamHasSkel (tp, sk1) ->
       print "%t : %t" (CoreTypes.TyParam.print tp) (Type.print_skeleton sk1)
 
+let print_constraints cs = Print.sequence ";" print_omega_ct cs
+
 let fresh_dirt_coer cons =
   let param = Type.DirtCoercionParam.fresh () in
   (DirtCoercionVar param, DirtOmega (param, cons))
