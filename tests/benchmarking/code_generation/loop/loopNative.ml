@@ -21,7 +21,8 @@ let rec loop_incr counter n =
 
 let test_incr n =
   let counter = ref 0 in
-  loop_incr counter n
+  loop_incr counter n;
+  !counter
 
 (******************************************************************************)
 
@@ -33,7 +34,8 @@ let rec loop_incr' counter n =
 
 let test_incr' n =
   let counter = ref 0 in
-  loop_incr' counter n
+  loop_incr' counter n;
+  !counter
 
 (******************************************************************************)
 
@@ -45,4 +47,5 @@ let rec loop_state state n =
 
 let test_state n =
   let state = ref 0 in
-  loop_state state n
+  loop_state state n;
+  !state

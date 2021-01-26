@@ -6,7 +6,7 @@ open Queens
 open Interp
 open Range
 
-let number_of_loops = 10
+let number_of_loops = 100
 
 and number_of_queens = 8
 
@@ -14,13 +14,13 @@ and number_of_range = 10
 
 let run_loop_pure = true
 
-and run_loop_latent = false
+and run_loop_latent = true
 
-and run_loop_incr = false
+and run_loop_incr = true
 
-and run_loop_incr' = false
+and run_loop_incr' = true
 
-and run_loop_state = false
+and run_loop_state = true
 
 and run_queens_one = false
 
@@ -70,170 +70,277 @@ let run_and_show test =
 
 let st = Staged.stage
 
+type 'a benchmark_set = {
+  name : string;
+  benchmarks : (string * ('a -> unit) * ('a -> bool)) list;
+  param : 'a;
+}
+
+let forget_value f x =
+  let _ = f x in
+  ()
+
+let always_true f x =
+  let _ = f x in
+  true
+
+let loop_benchmarks =
+  {
+    name = "LOOP PURE BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, not optimized",
+          forget_value LoopNoOpt.test_pure,
+          fun n -> LoopNoOpt.test_pure n = () );
+        ( "Generated, optimized",
+          forget_value LoopOpt.test_pure,
+          fun n -> LoopOpt.test_pure n = () );
+        ( "Hand written",
+          forget_value LoopHandWritten.test_pure,
+          fun n -> LoopHandWritten.test_pure n = () );
+        ( "Native",
+          forget_value LoopNative.test_pure,
+          fun n -> LoopNative.test_pure n = () );
+      ];
+    param = number_of_loops;
+  }
+
+let loop_latent_benchmarks =
+  {
+    name = "LOOP LATENT BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, not optimized",
+          forget_value LoopNoOpt.test_latent,
+          always_true LoopNoOpt.test_latent );
+        ( "Generated, optimized",
+          forget_value LoopOpt.test_latent,
+          always_true LoopNoOpt.test_latent );
+        ( "Hand written",
+          forget_value LoopHandWritten.test_latent,
+          always_true LoopNoOpt.test_latent );
+        ( "Native",
+          forget_value LoopNative.test_latent,
+          always_true LoopNoOpt.test_latent );
+      ];
+    param = number_of_loops;
+  }
+
+let loop_incr_benchmark num =
+  {
+    name = "LOOP INCR BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, not optimized",
+          forget_value LoopNoOpt.test_incr,
+          fun n -> LoopNoOpt.test_incr n = num );
+        ( "Generated, optimized",
+          forget_value LoopOpt.test_incr,
+          fun n -> LoopOpt.test_incr n = num );
+        ( "Hand written",
+          forget_value LoopHandWritten.test_incr,
+          fun n -> LoopHandWritten.test_incr n = num );
+        ( "Native",
+          forget_value LoopNative.test_incr,
+          fun n -> LoopNative.test_incr n = num );
+      ];
+    param = num;
+  }
+
+let loop_incr'_benchmark num =
+  {
+    name = "LOOP INCR' BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, not optimized",
+          forget_value LoopNoOpt.test_incr',
+          fun n -> LoopNoOpt.test_incr' n = num );
+        ( "Generated, optimized",
+          forget_value LoopOpt.test_incr',
+          fun n -> LoopOpt.test_incr' n = num );
+        ( "Hand written",
+          forget_value LoopHandWritten.test_incr',
+          fun n -> LoopHandWritten.test_incr' n = num );
+        ( "Native",
+          forget_value LoopNative.test_incr',
+          fun n -> LoopNative.test_incr' n = num );
+      ];
+    param = num;
+  }
+
+let loop_state_benchmark num =
+  {
+    name = "LOOP STATE BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, not optimized",
+          forget_value LoopNoOpt.test_state,
+          fun n -> LoopNoOpt.test_state n = num );
+        ( "Generated, optimized",
+          forget_value LoopOpt.test_state,
+          fun n -> LoopNoOpt.test_state n = num );
+        ( "Hand written",
+          forget_value LoopHandWritten.test_state,
+          fun n -> LoopNoOpt.test_state n = num );
+        ( "Native",
+          forget_value LoopNative.test_state,
+          fun n -> LoopNoOpt.test_state n = num );
+      ];
+    param = num;
+  }
+
+let queens_one_cps_benchmark number_of_queens =
+  {
+    name = "QUEENS ONE CPS BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, not optimized",
+          forget_value QueensNoOpt.queens_one_cps,
+          always_true QueensNoOpt.queens_one_cps );
+        ( "Generated, optimized",
+          forget_value QueensOpt.queens_one_cps,
+          always_true QueensOpt.queens_one_cps );
+        ( "Hand written",
+          forget_value QueensHandWritten.queens_one_cps,
+          always_true QueensHandWritten.queens_one_cps );
+        ( "Native",
+          forget_value QueensNative.queens_one_cps,
+          always_true QueensNative.queens_one_cps );
+      ];
+    param = number_of_queens;
+  }
+
+let queens_one_benchmark number_of_queens =
+  {
+    name = "QUEENS ONE OPTION BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, not optimized",
+          forget_value QueensNoOpt.queens_one_option,
+          always_true QueensNoOpt.queens_one_option );
+        ( "Generated, optimized",
+          forget_value QueensOpt.queens_one_option,
+          always_true QueensOpt.queens_one_option );
+        ( "Hand written",
+          forget_value QueensHandWritten.queens_one_option,
+          always_true QueensHandWritten.queens_one_option );
+        ( "Native",
+          forget_value QueensNative.queens_one_option,
+          always_true QueensNative.queens_one_option );
+      ];
+    param = number_of_queens;
+  }
+
+let queens_all_benchmark number_of_queens =
+  {
+    name = "QUEENS ALL BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, not optimized",
+          forget_value QueensNoOpt.queens_all,
+          always_true QueensNoOpt.queens_all );
+        ( "Generated, optimized",
+          forget_value QueensOpt.queens_all,
+          always_true QueensOpt.queens_all );
+        ( "Hand written",
+          forget_value QueensHandWritten.queens_all,
+          always_true QueensHandWritten.queens_all );
+        ( "Native",
+          forget_value QueensNative.queens_all,
+          always_true QueensNative.queens_all );
+      ];
+    param = number_of_queens;
+  }
+
+let interpreter_benchmark =
+  {
+    name = "INTERPRETER BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, not optimized",
+          forget_value InterpNoOpt.bigTest,
+          always_true InterpNoOpt.bigTest );
+        ( "Generated, optimized",
+          forget_value InterpOpt.bigTest,
+          always_true InterpOpt.bigTest );
+      ];
+    param = ();
+  }
+
+let range_benchmarks number_of_range =
+  {
+    name = "RANGE BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, not optimized",
+          forget_value RangeNoOpt.test,
+          always_true RangeNoOpt.test );
+        ( "Generated, optimized",
+          forget_value RangeOpt.test,
+          always_true RangeOpt.test );
+      ];
+    param = number_of_range;
+  }
+
+let run_and_show_set benchmark_set =
+  List.iter
+    (fun (name, _, tester) ->
+      try
+        if not @@ tester benchmark_set.param then
+          Printf.printf "Test: %s was wrong\n" name
+      with e ->
+        Printf.printf "Test: %s failed at runtime with: %s \n" name
+          (Printexc.to_string e))
+    benchmark_set.benchmarks;
+  run_and_show
+  @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
+       (List.map
+          (fun (name, fn, _) ->
+            Test.make ~name (st (fun () -> fn benchmark_set.param)))
+          benchmark_set.benchmarks);
+  Printf.printf "\n\n"
+
 let () =
   if run_loop_pure then (
-    Printf.printf "LOOP PURE BENCHMARK (%d loops):\n" number_of_loops;
-    run_and_show
-    @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
-         [
-           Test.make ~name:"Generated, not optimized"
-             (st (fun () -> LoopNoOpt._test_pure_11 number_of_loops));
-           Test.make ~name:"Generated, optimized"
-             (st (fun () -> LoopOpt._test_pure_11 number_of_loops));
-           Test.make ~name:"Hand written"
-             (st (fun () -> LoopHandWritten.test_pure number_of_loops));
-           Test.make ~name:"Native"
-             (st (fun () -> LoopNative.test_pure number_of_loops));
-         ];
-    Printf.printf "\n\n");
+    let set = loop_benchmarks in
+    Printf.printf "%s (%d loops):\n" set.name set.param;
+    run_and_show_set set);
   if run_loop_latent then (
-    Printf.printf "LOOP LATENT BENCHMARK (%d loops):\n" number_of_loops;
-    run_and_show
-    @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
-         [
-           Test.make ~name:"Generated, not optimized"
-             (st (fun () -> LoopNoOpt._test_latent_22 number_of_loops));
-           Test.make ~name:"Generated, optimized"
-             (st (fun () -> LoopOpt._test_latent_22 number_of_loops));
-           Test.make ~name:"Hand written"
-             (st (fun () -> LoopHandWritten.test_latent number_of_loops));
-           Test.make ~name:"Native"
-             (st (fun () -> LoopNative.test_latent number_of_loops));
-         ];
-    Printf.printf "\n\n");
+    let set = loop_latent_benchmarks in
+    Printf.printf "%s (%d loops):\n" set.name set.param;
+    run_and_show_set loop_latent_benchmarks);
   if run_loop_incr then (
-    Printf.printf "LOOP INCR BENCHMARK (%d loops):\n" number_of_loops;
-    run_and_show
-    @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
-         [
-           Test.make ~name:"Generated, not optimized"
-             (st @@ fun () -> LoopNoOpt._test_incr_38 number_of_loops);
-           Test.make ~name:"Generated, optimized"
-             (st @@ fun () -> LoopOpt._test_incr_38 number_of_loops);
-           Test.make ~name:"Hand written"
-             (st @@ fun () -> LoopHandWritten.test_incr number_of_loops);
-           Test.make ~name:"Native"
-             (st @@ fun () -> LoopNative.test_incr number_of_loops);
-         ];
-    Printf.printf "\n\n");
-  if run_loop_incr' then (
-    let n = 100 in
-    Printf.printf "LOOP INCR' BENCHMARK (%d loops):\n" n;
-    run_and_show
-    @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
-         [
-           Test.make ~name:"Generated, not optimized"
-             (st @@ fun () -> LoopNoOpt._test_incr'_47 n);
-           Test.make ~name:"Generated, optimized"
-             (st @@ fun () -> LoopOpt._test_incr'_47 n);
-           Test.make ~name:"Hand written"
-             (st @@ fun () -> LoopHandWritten.test_incr' n);
-           Test.make ~name:"Native" (st @@ fun () -> LoopNative.test_incr' n);
-         ];
-    Printf.printf "\n\n");
-  if run_loop_incr' then (
-    let n = 200 in
-    Printf.printf "LOOP INCR' BENCHMARK (%d loops):\n" n;
-    run_and_show
-    @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
-         [
-           Test.make ~name:"Generated, not optimized"
-             (st @@ fun () -> LoopNoOpt._test_incr'_47 n);
-           Test.make ~name:"Generated, optimized"
-             (st @@ fun () -> LoopOpt._test_incr'_47 n);
-           Test.make ~name:"Hand written"
-             (st @@ fun () -> LoopHandWritten.test_incr' n);
-           Test.make ~name:"Native" (st @@ fun () -> LoopNative.test_incr' n);
-         ];
-    Printf.printf "\n\n");
+    let set = loop_incr_benchmark number_of_loops in
+    Printf.printf "%s (%d loops):\n" set.name set.param;
+    run_and_show_set set);
+  if run_loop_incr' then
+    List.iter
+      (fun n ->
+        let set = loop_incr'_benchmark n in
+        Printf.printf "%s (%d loops):\n" set.name set.param;
+        run_and_show_set set)
+      [ 100; 200 ];
   if run_loop_state then (
-    Printf.printf "LOOP STATE BENCHMARK (%d loops):\n" number_of_loops;
-    run_and_show
-    @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
-         [
-           Test.make ~name:"Generated, not optimized"
-             (st @@ fun () -> LoopNoOpt._test_state_68 number_of_loops);
-           Test.make ~name:"Generated, optimized"
-             (st @@ fun () -> LoopOpt._test_state_68 number_of_loops);
-           Test.make ~name:"Hand written"
-             (st @@ fun () -> LoopHandWritten.test_state number_of_loops);
-           Test.make ~name:"Native"
-             (st @@ fun () -> LoopNative.test_state number_of_loops);
-         ];
-    Printf.printf "\n\n");
+    let set = loop_incr_benchmark number_of_loops in
+    Printf.printf "%s (%d loops):\n" set.name set.param;
+    run_and_show_set set);
   if run_queens_one then (
-    Printf.printf "QUEENS ONE CPS BENCHMARK (%d queens):\n" number_of_queens;
-    run_and_show
-    @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
-         [
-           Test.make ~name:"Generated, not optimized"
-             (st @@ fun () -> QueensNoOpt._queens_one_cps_96 number_of_queens);
-           Test.make ~name:"Generated, optimized"
-             (st @@ fun () -> QueensOpt._queens_one_cps_96 number_of_queens);
-           Test.make ~name:"Hand written"
-             (st @@ fun () -> QueensHandWritten.queens_one_cps number_of_queens);
-           Test.make ~name:"Native - CPS"
-             (st @@ fun () -> QueensNative.queens_one_cps number_of_queens);
-           Test.make ~name:"Native - exceptions"
-             ( st @@ fun () ->
-               QueensNative.queens_one_exceptions number_of_queens );
-         ];
-    Printf.printf "\n\n");
+    let set = queens_one_cps_benchmark number_of_queens in
+    Printf.printf "%s (%d queens):\n" set.name set.param;
+    run_and_show_set set);
   if run_queens_one then (
-    Printf.printf "QUEENS ONE OPTION BENCHMARK (%d queens):\n" number_of_queens;
-    run_and_show
-    @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
-         [
-           Test.make ~name:"Generated, not optimized"
-             (st @@ fun () -> QueensNoOpt._queens_one_option_94 number_of_queens);
-           Test.make ~name:"Generated, optimized"
-             (st @@ fun () -> QueensOpt._queens_one_option_94 number_of_queens);
-           Test.make ~name:"Hand written"
-             ( st @@ fun () ->
-               QueensHandWritten.queens_one_option number_of_queens );
-           Test.make ~name:"Native - option"
-             (st @@ fun () -> QueensNative.queens_one_option number_of_queens);
-           Test.make ~name:"Native - exceptions"
-             ( st @@ fun () ->
-               QueensNative.queens_one_exceptions number_of_queens );
-         ];
-    Printf.printf "\n\n");
+    let set = queens_one_benchmark number_of_queens in
+    Printf.printf "%s (%d queens):\n" set.name set.param;
+    run_and_show_set set);
   if run_queens_all then (
-    Printf.printf "QUEENS ALL BENCHMARK (%d queens):\n" number_of_queens;
-    run_and_show
-    @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
-         [
-           Test.make ~name:"Generated, not optimized"
-             (st @@ fun () -> QueensNoOpt._queens_all_100 number_of_queens);
-           Test.make ~name:"Generated, optimized"
-             (st @@ fun () -> QueensOpt._queens_all_100 number_of_queens);
-           Test.make ~name:"Hand written"
-             (st @@ fun () -> QueensHandWritten.queens_all number_of_queens);
-           Test.make ~name:"Native"
-             (st @@ fun () -> QueensNative.queens_all number_of_queens);
-         ];
-    Printf.printf "\n\n");
+    let set = queens_all_benchmark number_of_queens in
+    Printf.printf "%s (%d queens):\n" set.name set.param;
+    run_and_show_set set);
   if run_interp then (
-    Printf.printf "INTERPRETER BENCHMARK:\n";
-    run_and_show
-    @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
-         [
-           Test.make ~name:"Generated, not optimized"
-             (st @@ fun () -> InterpNoOpt._bigTest_38 ());
-           Test.make ~name:"Generated, optimized"
-             (st @@ fun () -> InterpOpt._bigTest_38 ());
-           Test.make ~name:"Native" (st @@ fun () -> InterpNative.bigTest ());
-         ];
-    Printf.printf "\n\n");
+    let set = interpreter_benchmark in
+    Printf.printf "%s :\n" set.name;
+    run_and_show_set set);
   if run_range then (
-    Printf.printf "RANGE BENCHMARKS:\n";
-    run_and_show
-    @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
-         [
-           Test.make ~name:"Generated, not optimized"
-             (st @@ fun () -> RangeNoOpt._test_222 number_of_range);
-           Test.make ~name:"Generated, pure, optimized"
-             (st @@ fun () -> RangeOpt._test_222 number_of_range);
-           (* Test.make ~name:"Native" (st @@ ((fun () -> FlatNative.bigTest ()))); *)
-         ];
-    Printf.printf "\n\n")
+    let set = range_benchmarks number_of_range in
+    Printf.printf "%s :\n" set.name;
+    run_and_show_set set)
