@@ -265,8 +265,12 @@ and elab_pattern p =
   | PVariant (l, p) -> NoEff.PNVariant (l, Some (elab_pattern p))
   | PNonbinding -> PNNonbinding
 
-let rec elab_expression state v =
-  match v with
+let rec elab_expression state exp =
+  let ty, trm = elab_expression' state exp in
+  (ty, trm)
+
+and elab_expression' state exp =
+  match exp with
   | ExEff.Var x -> (
       match Assoc.lookup x state.var_types with
       | Some ty -> (ty, NoEff.NVar x)
@@ -329,7 +333,7 @@ let rec elab_expression state v =
           ( ExEffTypes.Handler ((t, ExEffTypes.closed_dirt effectset), typec),
             NoEff.NHandler
               {
-                return_clause = (elab_pattern p, elabt, elabc);
+                return_clause = (elab_pattern p, elabt, NoEff.NReturn elabc);
                 effect_clauses =
                   Assoc.map_of_list subst_cont_effect
                     (Assoc.to_list h.effect_clauses);
@@ -362,11 +366,11 @@ let rec elab_expression state v =
       else
         Error.typing ~loc:Location.unknown "Ill-typed expression cast %t <= %t"
           (Type.print_target_ty ty1) (Type.print_target_ty ty2)
-  | ExEff.LambdaTyCoerVar (par, (ty1, ty2), value) ->
+  | ExEff.LambdaTyCoerVar (par, (ty1, ty2), exp) ->
       let _, elab1 = elab_ty state ty1 in
       let _, elab2 = elab_ty state ty2 in
       let state' = extend_ty_coer_types state par (ty1, ty2) in
-      let typev, elabv = elab_expression state' v in
+      let typev, elabv = elab_expression state' exp in
       ( ExEffTypes.QualTy ((ty1, ty2), typev),
         NoEff.NBigLambdaCoer (par, (elab1, elab2), elabv) )
   | ExEff.LambdaDirtCoerVar (par, (dirt1, dirt2), value) ->
@@ -402,7 +406,11 @@ and elab_abstraction state (p, t, c) =
   let type2, elab2 = elab_computation state' c in
   ((elab_pattern p, elab2), (type1, type2))
 
-and elab_computation state c =
+and elab_computation state cmp =
+  let drty, trm = elab_computation' state cmp in
+  (drty, trm)
+
+and elab_computation' state c =
   match c with
   | ExEff.Value value ->
       let t, elab = elab_expression state value in

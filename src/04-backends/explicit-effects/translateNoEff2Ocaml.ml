@@ -104,8 +104,10 @@ let rec pp_coercion coer ppf =
       print ppf "coer_arrow (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
   | NCoerHandler (w1, w2) ->
       print ppf "coer_arrow (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
-  | NCoerHandToFun (w1, w2) -> print ppf "HandToFun"
-  | NCoerFunToHand (w1, w2) -> print ppf "FunToHand"
+  | NCoerHandToFun (w1, w2) ->
+      print ppf "coer_hand_to_fun (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
+  | NCoerFunToHand (w1, w2) ->
+      print ppf "coer_fun_to_hand (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
   | NCoerComp w -> print ppf "coer_computation (%t)" (pp_coercion w)
   | NCoerReturn w -> print ppf "coer_return (%t)" (pp_coercion w)
   | NCoerUnsafe w -> print ppf "coer_unsafe (%t)" (pp_coercion w)
@@ -125,21 +127,15 @@ let rec pp_term noEff_term ppf =
   | NVariant (l, Some t1) ->
       print ppf "(%t @[<hov>%t@])" (pp_label l) (pp_term t1)
   | NFun abs_ty -> print ppf "@[<hv 2>fun %t@]" (pp_abs_with_ty abs_ty)
-  | NEffect (et, _) -> CoreTypes.Effect.print et ppf
-  | NApplyTerm (t1, t2) -> (
-      match t1 with
-      | NCast (t, NCoerArrow (c1, c2)) ->
-          print ppf "%t" (pp_term (NCast (NApplyTerm (t, NCast (t2, c1)), c2)))
-      | NCast (t, NCoerHandToFun (c1, c2)) ->
-          print ppf "%t"
-            (pp_term (NCast (NHandle (NReturn (NCast (t2, c1)), t), c2)))
-      | _ -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2))
+  | NEffect (et, _) -> print ppf "(effect %t)" (CoreTypes.Effect.print et)
+  | NApplyTerm (t1, t2) ->
+      print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2)
   | NCast (t, c) ->
       print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_coercion c) (pp_term t)
-  | NReturn t -> print ppf "Value %t" (pp_term t)
+  | NReturn t -> print ppf "Value (%t)" (pp_term t)
   | NHandler { effect_clauses = eff_cls; return_clause = val_cl } ->
       print ppf
-        "handler {@[<hov>value_clause = (fun %t);@] @[<hov>effect_claueses = \
+        "handler {@[<hov>value_clause = (fun %t);@] @[<hov>effect_clauses = \
          %t;@] }"
         (pp_abs_with_ty val_cl) (pp_effect_cls eff_cls)
   | NLet (t1, (pat, t2)) ->
@@ -147,8 +143,10 @@ let rec pp_term noEff_term ppf =
         (pp_term t1) (pp_term t2)
   | NLetRec (defs, t2) ->
       print ppf "@[<hv>@[<hv>%tin@] @,%t@]" (pp_let_rec defs) (pp_term t2)
+  | NMatch (t, _, [], _) ->
+      print ppf "@[<hv>(match %t with@, _ -> assert false)@]" (pp_term t)
   | NMatch (t, _, cases, _) ->
-      print ppf "@[<hv>(match %t with@, | %t)@]" (pp_term t)
+      print ppf "@[<hv>(match %t with@, %t)@]" (pp_term t)
         (pp_sequence "@, | " pp_abs cases)
   | NCall (e, t, abs_ty) ->
       print ppf "@[<hov 2> call (%t) @,(%t) @,(fun %t)@]" (pp_effect e)
@@ -158,21 +156,8 @@ let rec pp_term noEff_term ppf =
         "(fun x -> x)"
   | NBind (t, abs) ->
       print ppf "@[<hov 2>((%t) >> (fun %t))@]" (pp_term t) (pp_abs abs)
-  | NHandle (NCall (e, t1, (pat, ty, t)), NCast (t2, NCoerFunToHand (c1, c2)))
-    ->
-      print ppf "%t"
-        (pp_term
-           (NCall
-              ( e,
-                t1,
-                (pat, ty, NHandle (t, NCast (t2, NCoerFunToHand (c1, c2)))) )))
-  | NHandle (NReturn t1, NCast (t2, NCoerFunToHand (c1, c2))) ->
-      print ppf "%t" (pp_term (NCast (NApplyTerm (t2, NCast (t1, c1)), c2)))
-  | NHandle (t1, t2) -> (
-      match t2 with
-      | NCast (t, NCoerHandler (c1, c2)) ->
-          print ppf "%t" (pp_term (NCast (NHandle (NCast (t1, c1), t), c2)))
-      | _ -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2))
+  | NHandle (t1, t2) ->
+      print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t2) (pp_term t1)
   | _ -> failwith __LOC__
 
 and pp_abs (p, t) ppf = print ppf "@[<h> %t ->@ %t@]" (pp_pattern p) (pp_term t)
@@ -198,10 +183,12 @@ and pp_effect_cls eff_cls ppf =
       (pp_pattern pat1) (pp_pattern pat2) (pp_term t)
   in
   print ppf
-    "@[<h>(fun (type a) (type b) (eff : (a, b) effect) -> \n\
+    "@[<h>(fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) \
+     -> \n\
     \  (match eff with\n\
     \    %t  \n\
-    \  ) @)@]"
+    \    | eff' -> (fun arg k -> Call (eff', arg, k))\n\
+    \      ))@]"
     (pp_sequence " " pp_effect_abs2 (Assoc.to_list eff_cls))
 
 let pp_def_effect (eff, (ty1, ty2)) ppf =

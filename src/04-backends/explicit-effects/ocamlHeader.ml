@@ -79,10 +79,10 @@ let coer_unsafe coer = function
 
 let coer_arrow coer1 coer2 f x = coer2 (f (coer1 x))
 
-let hand_to_fun coer1 coer2 h x = coer2 (h (Value (coer1 x)))
+let coer_hand_to_fun coer1 coer2 h x = coer2 (h (Value (coer1 x)))
 
-let rec fun_to_hand coer1 coer2 f comp =
+let rec coer_fun_to_hand coer1 coer2 f comp =
   match comp with
   | Value t -> coer2 (f (coer1 t))
   | Call (eff, arg, k) ->
-      Call (eff, arg, fun x -> fun_to_hand coer1 coer2 f (k x))
+      Call (eff, arg, fun x -> coer_fun_to_hand coer1 coer2 f (k x))
