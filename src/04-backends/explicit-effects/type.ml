@@ -92,14 +92,11 @@ let rec print_ty ?max_level ty ppf =
   match ty with
   | TyParam (p, _) -> CoreTypes.TyParam.print p ppf
   | Arrow (t1, (t2, drt)) ->
-      print ~at_level:5 "@[%t -%t%s@ %t@]"
-        (print_ty ~max_level:4 t1)
-        (print_dirt drt) (Symbols.short_arrow ())
-        (print_ty ~max_level:5 t2)
+      print ~at_level:5 "@[%t -%t%s@ %t@]" (print_ty ~max_level:4 t1)
+        (print_dirt drt) (Symbols.short_arrow ()) (print_ty ~max_level:5 t2)
   | Apply (t, []) -> print "%t" (CoreTypes.TyName.print t)
   | Apply (t, [ s ]) ->
-      print ~at_level:1 "%t %t"
-        (print_ty ~max_level:1 s)
+      print ~at_level:1 "%t %t" (print_ty ~max_level:1 s)
         (CoreTypes.TyName.print t)
   | Apply (t, ts) ->
       print ~at_level:1 "(%t) %t"
@@ -110,15 +107,12 @@ let rec print_ty ?max_level ty ppf =
       print ~at_level:2 "@[<hov>%t@]"
         (Print.sequence (Symbols.times ()) (print_ty ~max_level:1) tys)
   | Handler ((t1, drt1), (t2, drt2)) ->
-      print ~at_level:6 "%t ! %t %s@ %t ! %t"
-        (print_ty ~max_level:4 t1)
-        (print_dirt drt1) (Symbols.handler_arrow ())
-        (print_ty ~max_level:4 t2)
+      print ~at_level:6 "%t ! %t %s@ %t ! %t" (print_ty ~max_level:4 t1)
+        (print_dirt drt1) (Symbols.handler_arrow ()) (print_ty ~max_level:4 t2)
         (print_dirt drt2)
   | TyBasic p -> print "%t" (Const.print_ty p)
   | QualTy (c, tty) -> print "%t => %t" (print_ct_ty c) (print_ty tty)
-  | QualDirt (c, tty) ->
-      print "%t => %t" (print_ct_dirt c) (print_ty tty)
+  | QualDirt (c, tty) -> print "%t => %t" (print_ct_dirt c) (print_ty tty)
 
 and print_skeleton ?max_level sk ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -223,8 +217,8 @@ let rec rnSkelVarInSkel (oldS : SkelParam.t) (newS : SkelParam.t) :
       SkelHandler (rnSkelVarInSkel oldS newS s1, rnSkelVarInSkel oldS newS s2)
   | SkelTuple ss -> SkelTuple (List.map (rnSkelVarInSkel oldS newS) ss)
 
-let rec rnSkelVarInValTy (oldS : SkelParam.t) (newS : SkelParam.t) :
-    ty -> ty = function
+let rec rnSkelVarInValTy (oldS : SkelParam.t) (newS : SkelParam.t) : ty -> ty =
+  function
   | TyParam (x, skel) -> TyParam (x, (rnSkelVarInSkel oldS newS) skel)
   | Apply (tc, tys) -> Apply (tc, List.map (rnSkelVarInValTy oldS newS) tys)
   | Arrow (tyA, tyB) ->
@@ -238,8 +232,8 @@ let rec rnSkelVarInValTy (oldS : SkelParam.t) (newS : SkelParam.t) :
   | QualDirt (ct, ty) -> QualDirt (ct, rnSkelVarInValTy oldS newS ty)
 
 (* GEORGE: No skeletons in dirts! :) *)
-and rnSkelVarInCmpTy (oldS : SkelParam.t) (newS : SkelParam.t) :
-    dirty -> dirty = function
+and rnSkelVarInCmpTy (oldS : SkelParam.t) (newS : SkelParam.t) : dirty -> dirty
+    = function
   | ty, drt -> (rnSkelVarInValTy oldS newS ty, drt)
 
 (* GEORGE: No skeletons in dirts! :) *)
@@ -278,8 +272,8 @@ and rnTyVarInTyCt (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t) :
 (* ************************************************************************* *)
 (*                             VARIABLE RENAMING                             *)
 (* ************************************************************************* *)
-let rec rnDirtVarInValTy (oldD : DirtParam.t) (newD : DirtParam.t) :
-    ty -> ty = function
+let rec rnDirtVarInValTy (oldD : DirtParam.t) (newD : DirtParam.t) : ty -> ty =
+  function
   | TyParam (a, skel) -> TyParam (a, skel)
   | Apply (tc, tys) -> Apply (tc, List.map (rnDirtVarInValTy oldD newD) tys)
   | Arrow (tyA, tyB) ->
@@ -293,8 +287,8 @@ let rec rnDirtVarInValTy (oldD : DirtParam.t) (newD : DirtParam.t) :
   | QualDirt (ct, ty) ->
       QualDirt (rnDirtVarInDirtCt oldD newD ct, rnDirtVarInValTy oldD newD ty)
 
-and rnDirtVarInCmpTy (oldD : DirtParam.t) (newD : DirtParam.t) :
-    dirty -> dirty = function
+and rnDirtVarInCmpTy (oldD : DirtParam.t) (newD : DirtParam.t) : dirty -> dirty
+    = function
   | ty, drt -> (rnDirtVarInValTy oldD newD ty, rnDirtVarInDirt oldD newD drt)
 
 and rnDirtVarInDirt (oldD : DirtParam.t) (newD : DirtParam.t) : dirt -> dirt =
@@ -456,9 +450,7 @@ let rec refresh_ty (ty_sbst, dirt_sbst) t =
           ( (Assoc.update x y ty_sbst, dirt_sbst),
             TyParam (y, refresh_skeleton skel) ))
   | Arrow (a, c) ->
-      let (a_ty_sbst, a_dirt_sbst), a' =
-        refresh_ty (ty_sbst, dirt_sbst) a
-      in
+      let (a_ty_sbst, a_dirt_sbst), a' = refresh_ty (ty_sbst, dirt_sbst) a in
       let temp_ty_sbst = Assoc.concat a_ty_sbst ty_sbst in
       let temp_dirt_sbst = Assoc.concat a_dirt_sbst dirt_sbst in
       let (c_ty_sbst, c_dirt_sbst), c' =
@@ -519,9 +511,7 @@ let rec source_to_target tctx_st ty =
   | LangType.Arrow (ty, dirty) ->
       Arrow ((source_to_target tctx_st) ty, source_to_dirty tctx_st dirty)
   | LangType.Handler { LangType.value = dirty1; finally = dirty2 } ->
-      Handler
-        ( source_to_dirty tctx_st dirty1,
-          source_to_dirty tctx_st dirty2 )
+      Handler (source_to_dirty tctx_st dirty1, source_to_dirty tctx_st dirty2)
 
 and source_to_dirty tctx_st ty = (source_to_target tctx_st ty, empty_dirt)
 

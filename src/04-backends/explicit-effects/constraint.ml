@@ -103,8 +103,7 @@ and print_omega_ct ?max_level c ppf =
   | DirtOmega (p, (ty1, ty2)) ->
       print "%t: (%t =< %t)"
         (Type.DirtCoercionParam.print p)
-        (Type.print_dirt ty1)
-        (Type.print_dirt ty2)
+        (Type.print_dirt ty1) (Type.print_dirt ty2)
   | SkelEq (sk1, sk2) ->
       print "%t ~ %t" (Type.print_skeleton sk1) (Type.print_skeleton sk2)
   | TyParamHasSkel (tp, sk1) ->

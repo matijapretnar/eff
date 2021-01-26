@@ -248,8 +248,8 @@ let rec checkLocatedPatTy st (lclCtxt : TypingEnv.t) (pat : Untyped.pattern)
 (** CHECK the type of a pattern. Return the extended typing environment with
  * the additional term bindings. *)
 and checkPatTy (st : state) (lclCtxt : TypingEnv.t)
-    (pat : Untyped.plain_pattern) (patTy : Type.ty) :
-    Term.pattern * TypingEnv.t =
+    (pat : Untyped.plain_pattern) (patTy : Type.ty) : Term.pattern * TypingEnv.t
+    =
   match pat with
   (* Variable Case *)
   | Untyped.PVar x -> (Term.PVar x, extendLclCtxt lclCtxt x patTy)
@@ -307,8 +307,7 @@ let rec optionMapM (f : 'a -> 'b option) : 'a list -> 'b list option = function
           Option.bind (optionMapM f xs) (fun ys -> Some (y :: ys)))
 
 (* Infer a ground monotype for a pattern, if possible. *)
-let rec inferClosedPatTy st : Untyped.plain_pattern -> Type.ty option =
-  function
+let rec inferClosedPatTy st : Untyped.plain_pattern -> Type.ty option = function
   | Untyped.PVar _ -> None
   | Untyped.PNonbinding -> None
   | Untyped.PVariant (lbl, None) ->
@@ -337,17 +336,16 @@ let rec inferClosedPatTy st : Untyped.plain_pattern -> Type.ty option =
  *  then checkClosedPatTy p ty
  *  else None
  *)
-and inferLocatedClosedPatTy st (inpat : Untyped.pattern) : Type.ty option
-    =
+and inferLocatedClosedPatTy st (inpat : Untyped.pattern) : Type.ty option =
   inferClosedPatTy st inpat.it
 
-and checkLocatedClosedPatTy st (inpat : Untyped.pattern)
-    (patTy : Type.ty) : unit =
+and checkLocatedClosedPatTy st (inpat : Untyped.pattern) (patTy : Type.ty) :
+    unit =
   checkClosedPatTy st inpat.it patTy
 
 (* Check a pattern against a ground monotype. Fail if not possible. *)
-and checkClosedPatTy st (inpat : Untyped.plain_pattern) (patTy : Type.ty)
-    : unit =
+and checkClosedPatTy st (inpat : Untyped.plain_pattern) (patTy : Type.ty) : unit
+    =
   match inpat with
   | Untyped.PVar _ -> () (* Always possible *)
   | Untyped.PNonbinding -> () (* Always possible *)
@@ -404,8 +402,8 @@ and inferCheckLocatedClosedPatAlts st alts =
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 let rec tcUntypedVarPat (lclCtxt : TypingEnv.t) :
-    Untyped.plain_pattern ->
-    Term.pattern * Type.ty * TypingEnv.t * constraints = function
+    Untyped.plain_pattern -> Term.pattern * Type.ty * TypingEnv.t * constraints
+    = function
   | Untyped.PVar x ->
       let alpha, alphaSkel = Constraint.fresh_ty_with_fresh_skel () in
       (Term.PVar x, alpha, extendLclCtxt lclCtxt x alpha, [ alphaSkel ])
@@ -547,10 +545,10 @@ and tcEffect (inState : state) (_lclCtx : TypingEnv.t) (eff : Untyped.effect) :
 
 (* Handlers(Return Case) *)
 and tcReturnCase (inState : state) (lclCtx : TypingEnv.t)
-    ((pat, cmp) : Untyped.abstraction) (* Return clause *)
-    (tyIn : Type.ty) (* Expected input value type *)
-    (tyOut : Type.ty) (* Expected output value type *)
-    (dirtOut : Type.dirt) : Term.abstraction_with_ty tcOutput =
+    ((pat, cmp) : Untyped.abstraction) (* Return clause *) (tyIn : Type.ty)
+    (* Expected input value type *) (tyOut : Type.ty)
+    (* Expected output value type *) (dirtOut : Type.dirt) :
+    Term.abstraction_with_ty tcOutput =
   (* Expected output dirt *)
 
   (* 1: Typecheck the pattern and the body of the return clause *)
@@ -605,8 +603,8 @@ and tcOpCases (inState : state) (lclCtx : TypingEnv.t)
 (* Handlers(Op Case) *)
 and tcOpCase (inState : state) (lclCtx : TypingEnv.t)
     ((eff, abs2) : Untyped.effect * Untyped.abstraction2) (* Op clause *)
-    (tyOut : Type.ty) (* Expected output value type *)
-    (dirtOut : Type.dirt) : (Term.effect * Term.abstraction2) tcOutput =
+    (tyOut : Type.ty) (* Expected output value type *) (dirtOut : Type.dirt) :
+    (Term.effect * Term.abstraction2) tcOutput =
   (* Expected output dirt *)
 
   (* 1: Lookup the type of Opi *)

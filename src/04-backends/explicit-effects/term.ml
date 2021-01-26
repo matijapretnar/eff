@@ -77,8 +77,7 @@ and abstraction = pattern * computation
 
 and abstraction_with_ty = pattern * Type.ty * computation
 
-and letrec_abstraction =
-  variable * Type.ty * Type.dirty * abstraction
+and letrec_abstraction = variable * Type.ty * Type.dirty * abstraction
 (** LetRec Abstractions: function name, argument type, result type, pattern,
     and right-hand side *)
 
@@ -139,15 +138,11 @@ let rec print_expression ?max_level e ppf =
   | LambdaTyCoerVar (p, (tty1, tty2), e) ->
       print "/\\(%t:%t<=%t).( %t ) "
         (Type.TyCoercionParam.print p)
-        (Type.print_ty tty1)
-        (Type.print_ty tty2)
-        (print_expression e)
+        (Type.print_ty tty1) (Type.print_ty tty2) (print_expression e)
   | LambdaDirtCoerVar (p, (tty1, tty2), e) ->
       print "/\\(%t:%t<=%t).( %t )"
         (Type.DirtCoercionParam.print p)
-        (Type.print_dirt tty1)
-        (Type.print_dirt tty2)
-        (print_expression e)
+        (Type.print_dirt tty1) (Type.print_dirt tty2) (print_expression e)
   | ApplyTyCoercion (e, tty) ->
       print ~at_level:1 "%t@ %t"
         (print_expression ~max_level:1 e)
@@ -208,8 +203,8 @@ and print_abstraction (p, c) ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_computation c)
 
 and print_abstraction_with_ty (p, tty, c) ppf =
-  Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern p)
-    (Type.print_ty tty) (print_computation c)
+  Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern p) (Type.print_ty tty)
+    (print_computation c)
 
 and print_abstraction2 (p1, p2, c) ppf =
   Format.fprintf ppf "(fun %t %t -> %t)" (print_pattern p1) (print_pattern p2)
