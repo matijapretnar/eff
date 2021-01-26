@@ -98,21 +98,20 @@ let pp_effect (e, (ty1, ty2)) ppf = CoreTypes.Effect.print e ppf
 let rec pp_coercion coer ppf =
   (* The cases not matched here should be handled in pp_term *)
   match coer with
-  | NCoerVar v -> print ppf "CoerVar %t" (Type.TyCoercionParam.print v)
+  | NCoerVar v -> print ppf "%t" (Type.TyCoercionParam.print v)
   | NCoerRefl _ -> print ppf "coer_refl_ty"
-  (* | NReflVar t -> print ppf "ReflVar"
-     | NCoerArrow (c1, c2) -> print ppf "CoerArrow"
-     | NCoerHandler (c1, c2) -> print ppf "CoerHandler"
-     | NHandToFun (c1, c2) -> print ppf "HandToFun"
-     | NFunToHand (c1, c2) -> print ppf "FunToHand"
-     | NForall (t, c) -> print ppf "Forall"
-     | NCoerQualification (tyc, c) -> print ppf "CoerQualification" *)
-  | NCoerComp c -> print ppf "coer_computation (%t)" (pp_coercion c)
-  | NCoerReturn c -> print ppf "coer_return"
-  | NCoerUnsafe c -> print ppf "coer_unsafe"
+  | NCoerArrow (w1, w2) ->
+      print ppf "coer_arrow (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
+  | NCoerHandler (w1, w2) ->
+      print ppf "coer_arrow (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
+  | NCoerHandToFun (w1, w2) -> print ppf "HandToFun"
+  | NCoerFunToHand (w1, w2) -> print ppf "FunToHand"
+  | NCoerComp w -> print ppf "coer_computation (%t)" (pp_coercion w)
+  | NCoerReturn w -> print ppf "coer_return (%t)" (pp_coercion w)
+  | NCoerUnsafe w -> print ppf "coer_unsafe (%t)" (pp_coercion w)
   | NCoerTuple cs -> print ppf "TupleCoercion"
   | NCoerApply (t, cs) -> print ppf "ApplyCoercion"
-  | _ -> print ppf "xxx"
+  | NCoerQual (ct, c) -> print ppf "ApplyCoercion"
 
 let rec pp_term noEff_term ppf =
   match noEff_term with
