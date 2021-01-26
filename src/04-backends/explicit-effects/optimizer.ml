@@ -447,27 +447,16 @@ and optimize_sub_ty_coercion st tyco =
       HandlerCoercion
         (optimize_dirty_coercion st dtyco1, optimize_dirty_coercion st dtyco2)
   | TyCoercionVar tycovar -> TyCoercionVar tycovar
-  | SequenceTyCoer (tyco1, tyco2) ->
-      SequenceTyCoer
-        (optimize_ty_coercion st tyco1, optimize_ty_coercion st tyco2)
   | TupleCoercion tycos -> TupleCoercion tycos
-  | LeftArrow tyco1 -> LeftArrow (optimize_ty_coercion st tyco1)
   (* | ForallTy (tv, tyco1) ->
       ForallTy (tv, optimize_ty_coercion (extend_ty_params st tv) tyco1) *)
   (* | ApplyTyCoer (tyco1, ty) -> ApplyTyCoer (optimize_ty_coercion st tyco1, ty) *)
   (* | ForallDirt (dv, tyco1) -> ForallDirt (dv, optimize_ty_coercion st tyco1) *)
   (* | ApplyDirCoer (tyco1, d) -> ApplyDirCoer (optimize_ty_coercion st tyco1, d) *)
-  | PureCoercion dtyco1 -> PureCoercion (optimize_dirty_coercion st dtyco1)
   | QualTyCoer (ct_ty, tyco1) ->
       QualTyCoer (ct_ty, optimize_ty_coercion st tyco1)
   | QualDirtCoer (ct_dirt, tyco1) ->
       QualDirtCoer (ct_dirt, optimize_ty_coercion st tyco1)
-  | ApplyQualTyCoer (tyco1, tyco2) ->
-      ApplyQualTyCoer
-        (optimize_ty_coercion st tyco1, optimize_ty_coercion st tyco2)
-  | ApplyQualDirtCoer (tyco1, dco) ->
-      ApplyQualDirtCoer
-        (optimize_ty_coercion st tyco1, optimize_dirt_coercion st dco)
   (* | ForallSkel (sv, tyco1) -> ForallSkel (sv, optimize_ty_coercion st tyco1) *)
   (* | ApplySkelCoer (tyco1, sk) ->
       ApplySkelCoer (optimize_ty_coercion st tyco1, sk) *)
@@ -478,12 +467,6 @@ and optimize_sub_dirty_coercion st dtyco =
   | BangCoercion (tyco1, dco2) ->
       BangCoercion
         (optimize_ty_coercion st tyco1, optimize_dirt_coercion st dco2)
-  | RightArrow tyco1 -> RightArrow (optimize_ty_coercion st tyco1)
-  | RightHandler tyco1 -> RightHandler (optimize_ty_coercion st tyco1)
-  | LeftHandler tyco1 -> LeftHandler (optimize_ty_coercion st tyco1)
-  | SequenceDirtyCoer (dtyco1, dtyco2) ->
-      SequenceDirtyCoer
-        (optimize_dirty_coercion st dtyco1, optimize_dirty_coercion st dtyco2)
 
 and optimize_sub_dirt_coercion st p_ops dco =
   match dco with
@@ -493,11 +476,6 @@ and optimize_sub_dirt_coercion st p_ops dco =
   | UnionDirt (ops, dco1) ->
       UnionDirt
         (ops, optimize_dirt_coercion' st (EffectSet.union p_ops ops) dco1)
-  | SequenceDirtCoer (dco1, dco2) ->
-      SequenceDirtCoer
-        ( optimize_dirt_coercion' st p_ops dco1,
-          optimize_dirt_coercion' st p_ops dco2 )
-  | DirtCoercion dtyco -> DirtCoercion (optimize_dirty_coercion st dtyco)
 
 and reduce_ty_coercion st tyco =
   (* Print.debug "reduce_ty_coercion: %t" (Constraint.print_ty_coercion tyco); *)
@@ -510,22 +488,13 @@ and reduce_ty_coercion st tyco =
       | _ -> tyco)
   | HandlerCoercion (dtyco1, dtyco2) -> tyco
   | TyCoercionVar tycovar -> tyco
-  | SequenceTyCoer (tyco1, tyco2) -> (
-      match (tyco1, tyco2) with
-      | ReflTy _, _ -> tyco2
-      | _, ReflTy _ -> tyco1
-      | _ -> tyco)
   | TupleCoercion tycos -> tyco
-  | LeftArrow tyco1 -> tyco
   (* | ForallTy (tv, tyco1) -> tyco *)
   (* | ApplyTyCoer (tyco1, ty) -> tyco *)
   (* | ForallDirt (dv, tyco1) -> tyco *)
   (* | ApplyDirCoer (tyco1, d) -> tyco *)
-  | PureCoercion dtyco1 -> tyco
   | QualTyCoer (ct_ty, tyco1) -> tyco
   | QualDirtCoer (ct_dirt, tyco1) -> tyco
-  | ApplyQualTyCoer (tyco1, tyco2) -> tyco
-  | ApplyQualDirtCoer (tyco1, dco) -> tyco
   (* | ForallSkel (sv, tyco1) -> tyco *)
   (* | ApplySkelCoer (tyco1, sk) -> tyco *)
   | _ -> tyco
@@ -533,25 +502,7 @@ and reduce_ty_coercion st tyco =
 and reduce_dirty_coercion st dtyco =
   (* Print.debug "reduce_dirty_coercion: %t"
      (Constraint.print_dirty_coercion dtyco); *)
-  match dtyco with
-  | BangCoercion (tyco1, dco2) -> dtyco
-  | RightArrow tyco1 -> (
-      match tyco1 with ArrowCoercion (tyco11, dtyco12) -> dtyco12 | _ -> dtyco)
-  | RightHandler tyco1 -> (
-      match tyco1 with
-      | HandlerCoercion (dtyco11, dtyco12) -> dtyco12
-      | _ -> dtyco)
-  | LeftHandler tyco1 -> (
-      match tyco1 with
-      | HandlerCoercion (dtyco11, dtyco12) -> dtyco11
-      | _ -> dtyco)
-  | SequenceDirtyCoer (dtyco1, dtyco2) -> (
-      match (dtyco1, dtyco2) with
-      | BangCoercion (tyco1, dco1), BangCoercion (tyco2, dco2) ->
-          BangCoercion
-            ( reduce_ty_coercion st (SequenceTyCoer (tyco1, tyco2)),
-              optimize_dirt_coercion st (SequenceDirtCoer (dco1, dco2)) )
-      | _ -> dtyco)
+  match dtyco with BangCoercion (tyco1, dco2) -> dtyco
 
 and reduce_dirt_coercion st p_ops dco =
   match dco with
@@ -570,13 +521,6 @@ and reduce_dirt_coercion st p_ops dco =
               (EffectSet.inter d1.Type.effect_set d2.Type.effect_set)
           in
           if EffectSet.is_empty ops' then dco1 else UnionDirt (ops', dco1))
-  | SequenceDirtCoer (dco1, dco2) -> (
-      match (dco1, dco2) with
-      | ReflDirt _, _ -> dco2
-      | _, ReflDirt _ -> dco1
-      | _ -> dco)
-  | DirtCoercion dtyco -> (
-      match dtyco with BangCoercion (_, dco1) -> dco1 | _ -> dco)
 
 let rec substitute_pattern_comp st c p exp =
   optimize_comp st (Term.subst_comp (Term.pattern_match p exp) c)
@@ -835,10 +779,10 @@ and reduce_comp st c =
           c)
   | Handle (e1, c1) -> (
       match e1 with
-      | CastExp (e11, tyco1) ->
+      (* | CastExp (e11, tyco1) ->
           let c1' = CastComp (c1, LeftHandler tyco1) in
           let c' = Handle (e11, c1') in
-          optimize_comp st (CastComp (c', RightHandler tyco1))
+          optimize_comp st (CastComp (c', RightHandler tyco1)) *)
       | Handler h -> (
           match c1 with
           | Value e1 ->
@@ -979,12 +923,12 @@ and reduce_comp st c =
           Call (op, e11, (p12, ty12, c12'))
       | CastComp (c11, dtyco) -> (
           match c11 with
-          | Value e111 ->
+          (* | Value e111 ->
               let p_e111' = CastExp (e111, PureCoercion dtyco) in
               let ty111 = TypeChecker.check_expression st.tc_state p_e111' in
               let p2, c2 = a2 in
-              beta_reduce st (p2, ty111, c2) p_e111'
-          | Bind (c111, abs112) ->
+              beta_reduce st (p2, ty111, c2) p_e111' *)
+          (* | Bind (c111, abs112) ->
               let p112, c112 = abs112 in
               let ty111, _ = TypeChecker.check_computation st.tc_state c111 in
               let c112' = CastComp (c112, dtyco) in
@@ -995,17 +939,13 @@ and reduce_comp st c =
                   (BangCoercion (ReflTy ty111, DirtCoercion dtyco))
               in
               let c111' = reduce_comp st (CastComp (c111, dtyco')) in
-              reduce_comp st (Bind (c111', (p112, c2')))
+              reduce_comp st (Bind (c111', (p112, c2'))) *)
           | _ -> c)
       | _ -> c)
   | CastComp (c1, dtyco) -> (
       let dty1, dty2 = TypeChecker.check_dirty_coercion st.tc_state dtyco in
       match c1 with
       | _ when Type.dirty_types_are_equal dty1 dty2 -> c1
-      | CastComp (c11, dtyco12) ->
-          CastComp
-            ( c11,
-              optimize_dirty_coercion st (SequenceDirtyCoer (dtyco12, dtyco)) )
       | Call (op, e11, (p12, ty12, c12)) ->
           let st' = extend_pat_type st p12 ty12 in
           let c12' = reduce_comp st' (CastComp (c12, dtyco)) in

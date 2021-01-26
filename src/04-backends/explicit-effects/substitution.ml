@@ -157,16 +157,10 @@ let rec apply_sub_tycoer sub ty_coer =
       match Assoc.lookup p sub.type_param_to_type_coercions with
       | Some t_coer -> apply_sub_tycoer sub t_coer
       | None -> TyCoercionVar p)
-  | SequenceTyCoer (ty_coer1, ty_coer2) ->
-      SequenceTyCoer
-        (apply_sub_tycoer sub ty_coer1, apply_sub_tycoer sub ty_coer2)
   | TupleCoercion tcl ->
       TupleCoercion (List.map (fun x -> apply_sub_tycoer sub x) tcl)
   | ApplyCoercion (ty_name, tcl) ->
       ApplyCoercion (ty_name, List.map (fun x -> apply_sub_tycoer sub x) tcl)
-  | LeftArrow tc1 -> LeftArrow (apply_sub_tycoer sub tc1)
-  | PureCoercion dirty_coer1 ->
-      PureCoercion (apply_sub_dirtycoer sub dirty_coer1)
   | _ -> failwith __LOC__
 
 and apply_sub_dirtcoer sub dirt_coer =
@@ -179,11 +173,6 @@ and apply_sub_dirtcoer sub dirt_coer =
   | Empty d -> Empty (apply_sub_dirt sub d)
   | UnionDirt (es, dirt_coer1) ->
       UnionDirt (es, apply_sub_dirtcoer sub dirt_coer1)
-  | SequenceDirtCoer (dirt_coer1, dirt_coer2) ->
-      SequenceDirtCoer
-        (apply_sub_dirtcoer sub dirt_coer1, apply_sub_dirtcoer sub dirt_coer2)
-  | DirtCoercion dirty_coer1 ->
-      DirtCoercion (apply_sub_dirtycoer sub dirty_coer1)
 
 and apply_sub_dirtycoer (sub : t) (dirty_coer : Constraint.dirty_coercion) :
     Constraint.dirty_coercion =
@@ -191,13 +180,6 @@ and apply_sub_dirtycoer (sub : t) (dirty_coer : Constraint.dirty_coercion) :
   | BangCoercion (ty_coer, dirt_coer) ->
       BangCoercion
         (apply_sub_tycoer sub ty_coer, apply_sub_dirtcoer sub dirt_coer)
-  | RightArrow ty_coer1 -> RightArrow (apply_sub_tycoer sub ty_coer1)
-  | RightHandler ty_coer1 -> RightHandler (apply_sub_tycoer sub ty_coer1)
-  | LeftHandler ty_coer1 -> LeftHandler (apply_sub_tycoer sub ty_coer1)
-  | SequenceDirtyCoer (dirty_coer1, dirty_coer2) ->
-      SequenceDirtyCoer
-        ( apply_sub_dirtycoer sub dirty_coer1,
-          apply_sub_dirtycoer sub dirty_coer2 )
 
 let rec apply_sub_comp sub computation =
   match computation with

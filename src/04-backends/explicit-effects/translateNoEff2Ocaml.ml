@@ -110,7 +110,6 @@ let rec pp_coercion coer ppf =
   | NCoerComp c -> print ppf "coer_computation (%t)" (pp_coercion c)
   | NCoerReturn c -> print ppf "coer_return"
   | NCoerUnsafe c -> print ppf "coer_unsafe"
-  | NCoerTrans (c1, c2) -> print ppf "SequenceCoercion"
   | NCoerTuple cs -> print ppf "TupleCoercion"
   | NCoerApply (t, cs) -> print ppf "ApplyCoercion"
   | _ -> print ppf "xxx"

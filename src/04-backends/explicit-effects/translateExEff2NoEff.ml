@@ -167,19 +167,11 @@ let rec elab_ty_coercion state coer =
                     ( ( ExEffTypes.Handler (coerA1, coerB1),
                         ExEffTypes.Handler (coerA2, coerB2) ),
                       NoEff.NCoerHandToFun (elab1, elab2) )
-                  else failwith "Ill-typed handler coercion"
-              | _ -> failwith "Ill-typed handler coercion left side")
-        | _ -> failwith "Ill-typed handler coercion right side")
+                  else failwith "Ill-typed handler coercion"))
   | Constraint.TyCoercionVar par -> (
       match Assoc.lookup par state.ty_coer_types with
       | Some xtype -> (xtype, NoEff.NCoerVar par)
       | None -> failwith "Coercion variable out of scope")
-  | Constraint.SequenceTyCoer (coer1, coer2) ->
-      let (coer1ty1, coer1ty2), elab1 = elab_ty_coercion state coer1 in
-      let (coer2ty1, coer2ty2), elab2 = elab_ty_coercion state coer2 in
-      if coer1ty2 = coer2ty1 then
-        ((coer1ty1, coer2ty2), NoEff.NCoerTrans (elab1, elab2))
-      else failwith "Ill-typed coercion sequencing"
   | Constraint.ApplyCoercion (name, coer_list) ->
       let type_list =
         List.map (fun x -> fst (elab_ty_coercion state x)) coer_list
@@ -198,16 +190,6 @@ let rec elab_ty_coercion state coer =
       ( ( ExEffTypes.Tuple (List.map fst tylist),
           ExEffTypes.Tuple (List.map snd tylist) ),
         NoEff.NCoerTuple elablist )
-  | Constraint.LeftArrow c -> (
-      match c with
-      | Constraint.ArrowCoercion (c1, c2) ->
-          let ty, _ = elab_ty_coercion state c1 in
-          let _, elab = elab_ty_coercion state c in
-          (ty, NoEff.NCoerLeftArrow elab)
-      | _ -> failwith "Ill-formed left arrow coercion")
-  | Constraint.PureCoercion c ->
-      let ((ty1, _), (ty2, _)), elabc = elab_dirty_coercion state c in
-      ((ty1, ty2), NoEff.NCoerPure elabc)
   | Constraint.QualTyCoer ((ty1, ty2), c) ->
       let (tyc1, tyc2), elabc = elab_ty_coercion state c in
       let _, ty1elab = elab_ty state ty1 in
@@ -220,21 +202,6 @@ let rec elab_ty_coercion state coer =
       ( ( ExEffTypes.QualDirt (dirts, fst tyc),
           ExEffTypes.QualDirt (dirts, snd tyc) ),
         elabc )
-  | Constraint.ApplyQualTyCoer (c1, c2) -> (
-      let c2ty, c2elab = elab_ty_coercion state c2 in
-      match c1 with
-      | Constraint.QualTyCoer (tys, ccty) ->
-          if c2ty = tys then
-            let (ty1, ty2), ccelab = elab_ty_coercion state ccty in
-            ((ty1, ty2), NoEff.NCoerApp (ccelab, c2elab))
-          else failwith "Ill-typed coercion application"
-      | _ -> failwith "Ill-typed coercion application")
-  | Constraint.ApplyQualDirtCoer (c1, c2) -> (
-      match c1 with
-      | Constraint.QualDirtCoer (ds, ccd) ->
-          if elab_dirt_coercion state c2 = ds then elab_ty_coercion state ccd
-          else failwith "Ill-typed coercion application"
-      | _ -> failwith "Ill-typed coercion application")
 
 and elab_dirty_coercion state (coer : Constraint.dirty_coercion) =
   match coer with
@@ -248,35 +215,6 @@ and elab_dirty_coercion state (coer : Constraint.dirty_coercion) =
       else if not (is_empty_dirt d2) then
         (((ty1, d1), (ty2, d2)), NoEff.NCoerComp tyelab)
       else failwith "Ill-typed bang coercion"
-  | Constraint.RightArrow tycoer -> (
-      let (ty1, ty2), tyelab = elab_ty_coercion state tycoer in
-      match ty1 with
-      | ExEffTypes.Arrow (a, b) -> (
-          match ty2 with
-          | ExEffTypes.Arrow (c, d) -> ((b, d), NoEff.NCoerRightArrow tyelab)
-          | _ -> failwith "Ill-typed right arrow coercion")
-      | _ -> failwith "Ill-typed right arrow coercion")
-  | Constraint.RightHandler tycoer -> (
-      let (ty1, ty2), tyelab = elab_ty_coercion state tycoer in
-      match ty1 with
-      | ExEffTypes.Handler (a, b) -> (
-          match ty2 with
-          | ExEffTypes.Handler (c, d) -> ((b, d), NoEff.NCoerRightHandler tyelab)
-          | _ -> failwith "Ill-typed right handler coercion")
-      | _ -> failwith "Ill-typed right handler coercion")
-  | Constraint.LeftHandler tycoer -> (
-      let (ty1, ty2), tyelab = elab_ty_coercion state tycoer in
-      match ty1 with
-      | ExEffTypes.Handler (a, b) -> (
-          match ty2 with
-          | ExEffTypes.Handler (c, d) -> ((c, a), NoEff.NCoerLeftHandler tyelab)
-          | _ -> failwith "Ill-typed left handler coercion")
-      | _ -> failwith "Ill-typed left handler coercion")
-  | Constraint.SequenceDirtyCoer (c1, c2) ->
-      let (ty11, ty12), c1elab = elab_dirty_coercion state c1 in
-      let (ty21, ty22), c2elab = elab_dirty_coercion state c2 in
-      if ty12 = ty21 then ((ty11, ty22), NoEff.NCoerTrans (c1elab, c2elab))
-      else failwith "Ill-typed coercion sequence"
 
 and elab_dirt_coercion state dcoer =
   match dcoer with
@@ -295,16 +233,6 @@ and elab_dirt_coercion state dcoer =
         { row = d2.row; effect_set = EffectSet.union set d2.effect_set }
       in
       (d1', d2')
-  | Constraint.SequenceDirtCoer (d1, d2) ->
-      let dirt11, dirt12 = elab_dirt_coercion state d1 in
-      let dirt21, dirt22 = elab_dirt_coercion state d2 in
-      if dirt12 = dirt21 then (dirt11, dirt22)
-      else failwith "Ill-typed dirt coercion sequencing"
-  | Constraint.DirtCoercion dirty_coercion ->
-      let (dirtyA, dirtyB), _ = elab_dirty_coercion state dirty_coercion in
-      let tyA, dA = dirtyA in
-      let tyB, dB = dirtyB in
-      (dA, dB)
 
 let rec extend_pattern_type state pat ty =
   match (pat, ty) with
