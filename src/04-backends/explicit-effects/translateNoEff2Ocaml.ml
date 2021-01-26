@@ -82,9 +82,9 @@ let rec pp_pattern pat ppf =
   | PNAs (p, v) -> print ppf "%t as %t" (pp_pattern p) (pp_variable v)
   | PNTuple pats -> print ppf "%t" (pp_tuple pp_pattern pats)
   | PNRecord rcd -> print ppf "%t" (pp_record pp_pattern "=" rcd)
-  | PNVariant (l, None) -> print ppf "(%t)" (pp_label l)
+  | PNVariant (l, None) -> print ppf "%t" (pp_label l)
   | PNVariant (l, Some p) ->
-      print ppf "(%t @[<hov>%t@])" (pp_label l) (pp_pattern p)
+      print ppf "%t @[<hov>%t@]" (pp_label l) (pp_pattern p)
   | PNConst c -> print ppf "%t" (Const.print c)
   | PNNonbinding -> print ppf "_"
 
@@ -174,11 +174,10 @@ let rec pp_term noEff_term ppf =
       | _ -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2))
   | _ -> failwith __LOC__
 
-and pp_abs (p, t) ppf =
-  print ppf "@[<h>(%t ->@ %t)@]" (pp_pattern p) (pp_term t)
+and pp_abs (p, t) ppf = print ppf "@[<h>%t ->@ %t@]" (pp_pattern p) (pp_term t)
 
 and pp_abs_with_ty (p, ty, t) ppf =
-  print ppf "@[<h>((%t : %t) ->@ %t)@]" (pp_pattern p) (pp_type ty) (pp_term t)
+  print ppf "@[<h>(%t : %t) ->@ %t@]" (pp_pattern p) (pp_type ty) (pp_term t)
 
 and pp_let_rec lst ppf =
   let pp_var_ty_abs (v, ty, _, t) ppf =
@@ -222,7 +221,7 @@ let pp_lets lst ppf =
         (pp_sequence " " pp_one_let tl)
 
 let pp_external name symbol_name ppf =
-  print ppf "let %t = %s@." (pp_variable name) symbol_name
+  print ppf "let %t = ( %s )@." (pp_variable name) symbol_name
 
 let pp_tydef (name, (params, tydef)) ppf =
   let pp_def tydef ppf =
