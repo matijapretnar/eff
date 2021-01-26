@@ -47,23 +47,23 @@ type skeleton =
   | SkelHandler of skeleton * skeleton
   | SkelTuple of skeleton list
 
-and target_ty =
+and ty =
   | TyParam of CoreTypes.TyParam.t * skeleton
-  | Apply of CoreTypes.TyName.t * target_ty list
-  | Arrow of target_ty * target_dirty
-  | Tuple of target_ty list
-  | Handler of target_dirty * target_dirty
+  | Apply of CoreTypes.TyName.t * ty list
+  | Arrow of ty * dirty
+  | Tuple of ty list
+  | Handler of dirty * dirty
   | TyBasic of Const.ty
-  | QualTy of ct_ty * target_ty
-  | QualDirt of ct_dirt * target_ty
+  | QualTy of ct_ty * ty
+  | QualDirt of ct_dirt * ty
 
-and target_dirty = target_ty * dirt
+and dirty = ty * dirt
 
 and dirt = { effect_set : effect_set; row : row }
 
 and row = ParamRow of DirtParam.t | EmptyRow
 
-and ct_ty = target_ty * target_ty
+and ct_ty = ty * ty
 
 and ct_dirt = dirt * dirt
 
@@ -87,38 +87,38 @@ let rec skeleton_of_ty tty =
 
 and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
 
-let rec print_target_ty ?max_level ty ppf =
+let rec print_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
   | TyParam (p, _) -> CoreTypes.TyParam.print p ppf
   | Arrow (t1, (t2, drt)) ->
       print ~at_level:5 "@[%t -%t%s@ %t@]"
-        (print_target_ty ~max_level:4 t1)
-        (print_target_dirt drt) (Symbols.short_arrow ())
-        (print_target_ty ~max_level:5 t2)
+        (print_ty ~max_level:4 t1)
+        (print_dirt drt) (Symbols.short_arrow ())
+        (print_ty ~max_level:5 t2)
   | Apply (t, []) -> print "%t" (CoreTypes.TyName.print t)
   | Apply (t, [ s ]) ->
       print ~at_level:1 "%t %t"
-        (print_target_ty ~max_level:1 s)
+        (print_ty ~max_level:1 s)
         (CoreTypes.TyName.print t)
   | Apply (t, ts) ->
       print ~at_level:1 "(%t) %t"
-        (Print.sequence ", " print_target_ty ts)
+        (Print.sequence ", " print_ty ts)
         (CoreTypes.TyName.print t)
   | Tuple [] -> print "unit"
   | Tuple tys ->
       print ~at_level:2 "@[<hov>%t@]"
-        (Print.sequence (Symbols.times ()) (print_target_ty ~max_level:1) tys)
+        (Print.sequence (Symbols.times ()) (print_ty ~max_level:1) tys)
   | Handler ((t1, drt1), (t2, drt2)) ->
       print ~at_level:6 "%t ! %t %s@ %t ! %t"
-        (print_target_ty ~max_level:4 t1)
-        (print_target_dirt drt1) (Symbols.handler_arrow ())
-        (print_target_ty ~max_level:4 t2)
-        (print_target_dirt drt2)
+        (print_ty ~max_level:4 t1)
+        (print_dirt drt1) (Symbols.handler_arrow ())
+        (print_ty ~max_level:4 t2)
+        (print_dirt drt2)
   | TyBasic p -> print "%t" (Const.print_ty p)
-  | QualTy (c, tty) -> print "%t => %t" (print_ct_ty c) (print_target_ty tty)
+  | QualTy (c, tty) -> print "%t => %t" (print_ct_ty c) (print_ty tty)
   | QualDirt (c, tty) ->
-      print "%t => %t" (print_ct_dirt c) (print_target_ty tty)
+      print "%t => %t" (print_ct_dirt c) (print_ty tty)
 
 and print_skeleton ?max_level sk ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -143,7 +143,7 @@ and print_skeleton ?max_level sk ppf =
   | SkelHandler (sk1, sk2) ->
       print "%t =sk=> %t" (print_skeleton sk1) (print_skeleton sk2)
 
-and print_target_dirt drt ppf =
+and print_dirt drt ppf =
   let print ?at_level = Print.print ?at_level ppf in
   match (drt.effect_set, drt.row) with
   | effect_set, EmptyRow -> print "{%t}" (print_effect_set effect_set)
@@ -155,25 +155,25 @@ and print_target_dirt drt ppf =
 and print_effect_set effect_set =
   Print.sequence "," CoreTypes.Effect.print (EffectSet.elements effect_set)
 
-and print_target_dirty (t1, drt1) ppf =
+and print_dirty (t1, drt1) ppf =
   let print ?at_level = Print.print ?at_level ppf in
-  print "%t ! %t" (print_target_ty t1) (print_target_dirt drt1)
+  print "%t ! %t" (print_ty t1) (print_dirt drt1)
 
 and print_ct_ty (ty1, ty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
-  print "%t <= %t" (print_target_ty ty1) (print_target_ty ty2)
+  print "%t <= %t" (print_ty ty1) (print_ty ty2)
 
 and print_ct_dirt (ty1, ty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
-  print "%t <= %t" (print_target_dirt ty1) (print_target_dirt ty2)
+  print "%t <= %t" (print_dirt ty1) (print_dirt ty2)
 
 (* ************************************************************************* *)
-(*                       PREDICATES ON target_ty                             *)
+(*                       PREDICATES ON ty                             *)
 (* ************************************************************************* *)
 
 (* Check if a target type is a monotype. That is, no universal quantification
  * and no qualified constraints, at the top-level or in nested positions. *)
-let rec isMonoTy : target_ty -> bool = function
+let rec isMonoTy : ty -> bool = function
   | TyParam _ -> true
   | Apply (_, tys) -> List.for_all isMonoTy tys
   | Arrow (ty1, (ty2, _)) -> isMonoTy ty1 && isMonoTy ty2
@@ -188,7 +188,7 @@ let rec isMonoTy : target_ty -> bool = function
 (* Check if a target type is a closed monotype. That is, no type variables, no
  * universal quantification and no qualified constraints, at the top-level or
  * in nested positions. *)
-let rec isClosedMonoTy : target_ty -> bool = function
+let rec isClosedMonoTy : ty -> bool = function
   | TyParam _ -> false
   | Apply (_, tys) -> List.for_all isClosedMonoTy tys
   | Arrow (vty, cty) -> isClosedMonoTy vty && isClosedDirtyTy cty
@@ -206,7 +206,7 @@ and isClosedDirt (d : dirt) : bool =
 
 (* Check if a dirty type is closed. That is, if both the dirt and the value
  * type are closed. *)
-and isClosedDirtyTy : target_dirty -> bool = function
+and isClosedDirtyTy : dirty -> bool = function
   | ty, drt -> isClosedMonoTy ty && isClosedDirt drt
 
 (* ************************************************************************* *)
@@ -224,7 +224,7 @@ let rec rnSkelVarInSkel (oldS : SkelParam.t) (newS : SkelParam.t) :
   | SkelTuple ss -> SkelTuple (List.map (rnSkelVarInSkel oldS newS) ss)
 
 let rec rnSkelVarInValTy (oldS : SkelParam.t) (newS : SkelParam.t) :
-    target_ty -> target_ty = function
+    ty -> ty = function
   | TyParam (x, skel) -> TyParam (x, (rnSkelVarInSkel oldS newS) skel)
   | Apply (tc, tys) -> Apply (tc, List.map (rnSkelVarInValTy oldS newS) tys)
   | Arrow (tyA, tyB) ->
@@ -239,7 +239,7 @@ let rec rnSkelVarInValTy (oldS : SkelParam.t) (newS : SkelParam.t) :
 
 (* GEORGE: No skeletons in dirts! :) *)
 and rnSkelVarInCmpTy (oldS : SkelParam.t) (newS : SkelParam.t) :
-    target_dirty -> target_dirty = function
+    dirty -> dirty = function
   | ty, drt -> (rnSkelVarInValTy oldS newS ty, drt)
 
 (* GEORGE: No skeletons in dirts! :) *)
@@ -251,7 +251,7 @@ and rnSkelVarInTyCt (oldS : SkelParam.t) (newS : SkelParam.t) : ct_ty -> ct_ty =
 (*                             VARIABLE RENAMING                             *)
 (* ************************************************************************* *)
 let rec rnTyVarInValTy (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t)
-    : target_ty -> target_ty = function
+    : ty -> ty = function
   | TyParam (a, skel) ->
       if a = oldA then TyParam (newA, skel) else TyParam (a, skel)
   | Apply (tc, tys) -> Apply (tc, List.map (rnTyVarInValTy oldA newA) tys)
@@ -267,7 +267,7 @@ let rec rnTyVarInValTy (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t)
 
 (* GEORGE: No skeletonsin dirts! :) *)
 and rnTyVarInCmpTy (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t) :
-    target_dirty -> target_dirty = function
+    dirty -> dirty = function
   | ty, drt -> (rnTyVarInValTy oldA newA ty, drt)
 
 (* GEORGE: No skeletons in dirts! :) *)
@@ -279,7 +279,7 @@ and rnTyVarInTyCt (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t) :
 (*                             VARIABLE RENAMING                             *)
 (* ************************************************************************* *)
 let rec rnDirtVarInValTy (oldD : DirtParam.t) (newD : DirtParam.t) :
-    target_ty -> target_ty = function
+    ty -> ty = function
   | TyParam (a, skel) -> TyParam (a, skel)
   | Apply (tc, tys) -> Apply (tc, List.map (rnDirtVarInValTy oldD newD) tys)
   | Arrow (tyA, tyB) ->
@@ -294,7 +294,7 @@ let rec rnDirtVarInValTy (oldD : DirtParam.t) (newD : DirtParam.t) :
       QualDirt (rnDirtVarInDirtCt oldD newD ct, rnDirtVarInValTy oldD newD ty)
 
 and rnDirtVarInCmpTy (oldD : DirtParam.t) (newD : DirtParam.t) :
-    target_dirty -> target_dirty = function
+    dirty -> dirty = function
   | ty, drt -> (rnDirtVarInValTy oldD newD ty, rnDirtVarInDirt oldD newD drt)
 
 and rnDirtVarInDirt (oldD : DirtParam.t) (newD : DirtParam.t) : dirt -> dirt =
@@ -332,8 +332,8 @@ let rec types_are_equal type1 type2 =
       dirt_cts_are_equal ctd1 ctd2 && types_are_equal ty1 ty2
   | _ -> false
 
-(*       Error.typing ~loc:Location.unknown "%t <> %t" (print_target_ty ty1)
-        (print_target_ty ty2)
+(*       Error.typing ~loc:Location.unknown "%t <> %t" (print_ty ty1)
+        (print_ty ty2)
  *)
 and dirty_types_are_equal (ty1, d1) (ty2, d2) =
   types_are_equal ty1 ty2 && dirts_are_equal d1 d2
@@ -446,7 +446,7 @@ and free_params_dirt (dirt : dirt) =
 
 let refresh_skeleton _skel = failwith __LOC__
 
-let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
+let rec refresh_ty (ty_sbst, dirt_sbst) t =
   match t with
   | TyParam (x, skel) -> (
       match Assoc.lookup x ty_sbst with
@@ -457,22 +457,22 @@ let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
             TyParam (y, refresh_skeleton skel) ))
   | Arrow (a, c) ->
       let (a_ty_sbst, a_dirt_sbst), a' =
-        refresh_target_ty (ty_sbst, dirt_sbst) a
+        refresh_ty (ty_sbst, dirt_sbst) a
       in
       let temp_ty_sbst = Assoc.concat a_ty_sbst ty_sbst in
       let temp_dirt_sbst = Assoc.concat a_dirt_sbst dirt_sbst in
       let (c_ty_sbst, c_dirt_sbst), c' =
-        refresh_target_dirty (temp_ty_sbst, temp_dirt_sbst) c
+        refresh_dirty (temp_ty_sbst, temp_dirt_sbst) c
       in
       ((c_ty_sbst, c_dirt_sbst), Arrow (a', c'))
   | Handler (c1, c2) ->
       let (c1_ty_sbst, c1_dirt_sbst), c1' =
-        refresh_target_dirty (ty_sbst, dirt_sbst) c1
+        refresh_dirty (ty_sbst, dirt_sbst) c1
       in
       let temp_ty_sbst = Assoc.concat c1_ty_sbst ty_sbst in
       let temp_dirt_sbst = Assoc.concat c1_dirt_sbst dirt_sbst in
       let (c2_ty_sbst, c2_dirt_sbst), c2' =
-        refresh_target_dirty (temp_ty_sbst, temp_dirt_sbst) c2
+        refresh_dirty (temp_ty_sbst, temp_dirt_sbst) c2
       in
       ((c2_ty_sbst, c2_dirt_sbst), Handler (c1', c2'))
   | TyBasic x -> ((ty_sbst, dirt_sbst), TyBasic x)
@@ -481,16 +481,16 @@ let rec refresh_target_ty (ty_sbst, dirt_sbst) t =
   | Apply _ -> failwith __LOC__
   | Tuple _ -> failwith __LOC__
 
-and refresh_target_dirty (ty_sbst, dirt_sbst) (t, d) =
-  let (t_ty_sbst, t_dirt_sbst), t' = refresh_target_ty (ty_sbst, dirt_sbst) t in
+and refresh_dirty (ty_sbst, dirt_sbst) (t, d) =
+  let (t_ty_sbst, t_dirt_sbst), t' = refresh_ty (ty_sbst, dirt_sbst) t in
   let temp_ty_sbst = Assoc.concat t_ty_sbst ty_sbst in
   let temp_dirt_sbst = Assoc.concat t_dirt_sbst dirt_sbst in
   let (d_ty_sbst, d_dirt_sbst), d' =
-    refresh_target_dirt (temp_ty_sbst, temp_dirt_sbst) d
+    refresh_dirt (temp_ty_sbst, temp_dirt_sbst) d
   in
   ((d_ty_sbst, d_dirt_sbst), (t', d'))
 
-and refresh_target_dirt (ty_sbst, dirt_sbst) drt =
+and refresh_dirt (ty_sbst, dirt_sbst) drt =
   match drt.row with
   | ParamRow x -> (
       match Assoc.lookup x dirt_sbst with
@@ -517,13 +517,13 @@ let rec source_to_target tctx_st ty =
   | LangType.Basic s -> TyBasic s
   | LangType.Tuple l -> Tuple (List.map (source_to_target tctx_st) l)
   | LangType.Arrow (ty, dirty) ->
-      Arrow ((source_to_target tctx_st) ty, source_to_target_dirty tctx_st dirty)
+      Arrow ((source_to_target tctx_st) ty, source_to_dirty tctx_st dirty)
   | LangType.Handler { LangType.value = dirty1; finally = dirty2 } ->
       Handler
-        ( source_to_target_dirty tctx_st dirty1,
-          source_to_target_dirty tctx_st dirty2 )
+        ( source_to_dirty tctx_st dirty1,
+          source_to_dirty tctx_st dirty2 )
 
-and source_to_target_dirty tctx_st ty = (source_to_target tctx_st ty, empty_dirt)
+and source_to_dirty tctx_st ty = (source_to_target tctx_st ty, empty_dirt)
 
 let constructor_signature tctx_st lbl =
   match TypeContext.infer_variant lbl tctx_st with

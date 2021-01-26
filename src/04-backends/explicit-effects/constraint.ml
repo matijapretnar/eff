@@ -7,7 +7,7 @@ let add_list_to_constraints new_constraints old_constraints =
   new_constraints @ old_constraints
 
 type ty_coercion =
-  | ReflTy of Type.target_ty
+  | ReflTy of Type.ty
   | ArrowCoercion of ty_coercion * dirty_coercion
   | HandlerCoercion of dirty_coercion * dirty_coercion
   | TyCoercionVar of Type.TyCoercionParam.t
@@ -40,7 +40,7 @@ module DirtCoercionParamSet = Set.Make (Type.DirtCoercionParam)
 let rec print_ty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with
-  | ReflTy p -> print "<%t>" (Type.print_target_ty p)
+  | ReflTy p -> print "<%t>" (Type.print_ty p)
   | ArrowCoercion (tc, dc) ->
       print "%t -> %t" (print_ty_coercion tc) (print_dirty_coercion dc)
   | HandlerCoercion (dc1, dc2) ->
@@ -64,7 +64,7 @@ let rec print_ty_coercion ?max_level c ppf =
 (* THE FOLLOWING ARE UNEXPECTED. SOMETHING MUST BE WRONG TO GET THEM.
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   | ForallTy of CoreTypes.TyParam.t * ty_coercion
-  | ApplyTyCoer of ty_coercion * target_ty
+  | ApplyTyCoer of ty_coercion * ty
 
   | ForallDirt of Type.DirtParam.t * ty_coercion
   | ApplyDirCoer of ty_coercion * dirt
@@ -87,9 +87,9 @@ and print_dirty_coercion ?max_level c ppf =
 and print_dirt_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with
-  | ReflDirt p -> print "<%t>" (Type.print_target_dirt p)
+  | ReflDirt p -> print "<%t>" (Type.print_dirt p)
   | DirtCoercionVar tcp -> print "%t" (Type.DirtCoercionParam.print tcp)
-  | Empty d -> print "Empty__(%t)" (Type.print_target_dirt d)
+  | Empty d -> print "Empty__(%t)" (Type.print_dirt d)
   | UnionDirt (eset, dc) ->
       print "{%t} U %t" (Type.print_effect_set eset) (print_dirt_coercion dc)
 
@@ -99,12 +99,12 @@ and print_omega_ct ?max_level c ppf =
   | TyOmega (p, (ty1, ty2)) ->
       print "%t: (%t =< %t)"
         (Type.TyCoercionParam.print p)
-        (Type.print_target_ty ty1) (Type.print_target_ty ty2)
+        (Type.print_ty ty1) (Type.print_ty ty2)
   | DirtOmega (p, (ty1, ty2)) ->
       print "%t: (%t =< %t)"
         (Type.DirtCoercionParam.print p)
-        (Type.print_target_dirt ty1)
-        (Type.print_target_dirt ty2)
+        (Type.print_dirt ty1)
+        (Type.print_dirt ty2)
   | SkelEq (sk1, sk2) ->
       print "%t ~ %t" (Type.print_skeleton sk1) (Type.print_skeleton sk2)
   | TyParamHasSkel (tp, sk1) ->

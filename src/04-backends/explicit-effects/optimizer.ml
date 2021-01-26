@@ -6,7 +6,7 @@ open Term
 type state = {
   fuel : int ref;
   tc_state : TypeChecker.state;
-  recursive_functions : (variable, Type.target_ty * expression) Assoc.t;
+  recursive_functions : (variable, Type.ty * expression) Assoc.t;
   knot_functions : (variable, expression * handler * variable) Assoc.t;
 }
 
@@ -138,8 +138,8 @@ let applicable_pattern p vars =
  * to the assoc and substitute a fresh variable. *)
 let rec specialize_letrec (cont : Term.computation)
     ( (fvar : Term.variable),
-      (argty : Type.target_ty),
-      ((resty, resdt) : Type.target_dirty),
+      (argty : Type.ty),
+      ((resty, resdt) : Type.dirty),
       ((p, fbody_c) : Term.abstraction) ) : Term.computation =
   match fbody_c with
   | Value fbody -> (
@@ -157,7 +157,7 @@ let rec specialize_letrec (cont : Term.computation)
       cont
 
 and specialize (fvar : Term.variable) (fbody : Term.expression)
-    (resty : Type.target_ty) (cont : Term.computation) : Term.computation =
+    (resty : Type.ty) (cont : Term.computation) : Term.computation =
   (* Define a referenced map that holds the substitutions. *)
   let assoc = ref Assoc.empty in
 
@@ -333,7 +333,7 @@ and specialize (fvar : Term.variable) (fbody : Term.expression)
         assert (_sk = _sk');
         Print.debug "BigLambdaTy: replacing %t by %t"
           (CoreTypes.TyParam.print typaram)
-          (Type.print_target_ty ty2);
+          (Type.print_ty ty2);
         let sub = Substitution.add_type_substitution_e typaram ty2 in
         (* v' = [T2/a]v *)
         let v' = Substitution.apply_substitutions_to_expression sub v in
@@ -346,7 +346,7 @@ and specialize (fvar : Term.variable) (fbody : Term.expression)
         assert (dirtparam = dirtparam');
         Print.debug "BigLambdaDirt: replacing %t by %t"
           (Type.DirtParam.print dirtparam)
-          (Type.print_target_dirt dirt);
+          (Type.print_dirt dirt);
         let sub = Substitution.add_dirt_substitution_e dirtparam dirt in
         (* v' = [D/d]v *)
         let v' = Substitution.apply_substitutions_to_expression sub v in
@@ -643,7 +643,7 @@ and optimize_abstraction st ty a =
 
 and optimize_pattern st ty p = extend_pat_type st p ty
 
-and optimize_abstraction2 st (dty : target_dirty) (effect, a2) =
+and optimize_abstraction2 st (dty : dirty) (effect, a2) =
   let op, (op_ty_in, op_ty_out) = effect in
   let p1, p2, c = a2 in
   let st' = extend_pat_type st p1 op_ty_in in
@@ -698,7 +698,7 @@ and reduce_expr st e =
           | Tuple of expression list
           | Record of (CoreTypes.field, expression) CoreTypes.assoc
           | Variant of CoreTypes.label * expression option
-          | Lambda of (pattern * Type.target_ty * computation)
+          | Lambda of (pattern * Type.ty * computation)
           | Handler of handler
           | BigLambdaTy of CoreTypes.TyParam.t * skeleton * expression
           | BigLambdaDirt of Type.DirtParam.t * expression

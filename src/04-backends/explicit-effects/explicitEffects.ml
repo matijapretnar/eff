@@ -14,7 +14,7 @@ type simple_comp = {
 
 type explicit_comp = {
   term : Term.computation;
-  explicit_type : Type.target_ty * Type.dirt;
+  explicit_type : Type.ty * Type.dirt;
 }
 
 module type ExplicitBackend = sig
@@ -37,7 +37,7 @@ module type ExplicitBackend = sig
   val process_top_let :
     state ->
     effect_system_state ->
-    Term.variable * Term.expression * Type.target_ty ->
+    Term.variable * Term.expression * Type.ty ->
     state
 
   val process_top_let_rec :
@@ -45,7 +45,7 @@ module type ExplicitBackend = sig
     effect_system_state ->
     Language.UntypedSyntax.variable
     * Term.abstraction_with_ty
-    * (Type.target_ty * Type.target_dirty) ->
+    * (Type.ty * Type.dirty) ->
     state
 
   val process_external :
@@ -272,13 +272,13 @@ module Evaluate : Language.BackendSignature.T = Make (struct
   let process_computation state _ _ { term = c'; explicit_type = ty' } =
     let v = Eval.run state.evaluation_state c' in
     Format.fprintf !Config.output_formatter "@[- : %t = %t@]@."
-      (Type.print_target_dirty ty')
+      (Type.print_dirty ty')
       (V.print_value v);
     state
 
   let process_type_of state _ _ { term = _; explicit_type = ty' } =
     Format.fprintf !Config.output_formatter "- : %t\n"
-      (Type.print_target_dirty ty');
+      (Type.print_dirty ty');
     state
 
   let process_def_effect state _ _ = state

@@ -8,7 +8,7 @@ module EffectMap = Map.Make (CoreTypes.Effect)
 
 type variable = CoreTypes.Variable.t
 
-type effect = CoreTypes.Effect.t * (Type.target_ty * Type.target_ty)
+type effect = CoreTypes.Effect.t * (Type.ty * Type.ty)
 
 type pattern =
   | PVar of variable
@@ -51,13 +51,13 @@ and computation =
   | LetRec of letrec_abstraction list * computation
   (* Historical note: Previously LetRec looked like this:
 
-       LetRec of (variable * Type.target_ty * expression) list * computation
+       LetRec of (variable * Type.ty * expression) list * computation
 
      Unfortunately this shape forgets the source structure (where the
      abstraction is explicit) and thus makes translation to MulticoreOcaml
      impossible in the general case.
   *)
-  | Match of expression * Type.target_dirty * abstraction list
+  | Match of expression * Type.dirty * abstraction list
   (* We need to keep the result type in the term, in case the match is empty *)
   | Apply of expression * expression
   | Handle of expression * computation
@@ -75,10 +75,10 @@ and handler = {
 and abstraction = pattern * computation
 (** Abstractions that take one argument. *)
 
-and abstraction_with_ty = pattern * Type.target_ty * computation
+and abstraction_with_ty = pattern * Type.ty * computation
 
 and letrec_abstraction =
-  variable * Type.target_ty * Type.target_dirty * abstraction
+  variable * Type.ty * Type.dirty * abstraction
 (** LetRec Abstractions: function name, argument type, result type, pattern,
     and right-hand side *)
 
@@ -122,7 +122,7 @@ let rec print_expression ?max_level e ppf =
   | Variant (lbl, e) ->
       print ~at_level:1 "%t %t" (CoreTypes.Label.print lbl) (print_expression e)
   | Lambda (x, t, c) ->
-      print "fun (%t:%t) -> (%t)" (print_pattern x) (Type.print_target_ty t)
+      print "fun (%t:%t) -> (%t)" (print_pattern x) (Type.print_ty t)
         (print_computation c)
   | Handler h ->
       print
@@ -139,14 +139,14 @@ let rec print_expression ?max_level e ppf =
   | LambdaTyCoerVar (p, (tty1, tty2), e) ->
       print "/\\(%t:%t<=%t).( %t ) "
         (Type.TyCoercionParam.print p)
-        (Type.print_target_ty tty1)
-        (Type.print_target_ty tty2)
+        (Type.print_ty tty1)
+        (Type.print_ty tty2)
         (print_expression e)
   | LambdaDirtCoerVar (p, (tty1, tty2), e) ->
       print "/\\(%t:%t<=%t).( %t )"
         (Type.DirtCoercionParam.print p)
-        (Type.print_target_dirt tty1)
-        (Type.print_target_dirt tty2)
+        (Type.print_dirt tty1)
+        (Type.print_dirt tty2)
         (print_expression e)
   | ApplyTyCoercion (e, tty) ->
       print ~at_level:1 "%t@ %t"
@@ -209,7 +209,7 @@ and print_abstraction (p, c) ppf =
 
 and print_abstraction_with_ty (p, tty, c) ppf =
   Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern p)
-    (Type.print_target_ty tty) (print_computation c)
+    (Type.print_ty tty) (print_computation c)
 
 and print_abstraction2 (p1, p2, c) ppf =
   Format.fprintf ppf "(fun %t %t -> %t)" (print_pattern p1) (print_pattern p2)
@@ -232,7 +232,7 @@ and print_top_let_abstraction (p, c) ppf =
 
 and print_let_rec_abstraction (f, arg_ty, res_ty, abs) ppf =
   Format.fprintf ppf "(%t : %t) %t" (print_variable f)
-    (Type.print_target_ty (Type.Arrow (arg_ty, res_ty)))
+    (Type.print_ty (Type.Arrow (arg_ty, res_ty)))
     (print_let_abstraction abs)
 
 let backup_location loc locs =

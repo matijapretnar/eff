@@ -6,7 +6,7 @@ module CoreTypes = Language.CoreTypes
 type t = {
   type_param_to_type_coercions :
     (Type.TyCoercionParam.t, Constraint.ty_coercion) Assoc.t;
-  type_param_to_type_subs : (CoreTypes.TyParam.t, Type.target_ty) Assoc.t;
+  type_param_to_type_subs : (CoreTypes.TyParam.t, Type.ty) Assoc.t;
   dirt_var_to_dirt_coercions :
     (Type.DirtCoercionParam.t, Constraint.dirt_coercion) Assoc.t;
   dirt_var_to_dirt_subs : (Type.DirtParam.t, Type.dirt) Assoc.t;
@@ -34,25 +34,25 @@ let add_type_coercion parameter t_coercion sub =
 let add_type_coercion_e parameter t_coercion =
   add_to_empty add_type_coercion parameter t_coercion
 
-let add_type_substitution parameter target_type sub =
+let add_type_substitution parameter ty sub =
   {
     sub with
     type_param_to_type_subs =
-      Assoc.update parameter target_type sub.type_param_to_type_subs;
+      Assoc.update parameter ty sub.type_param_to_type_subs;
   }
 
-let add_type_substitution_e parameter target_type =
-  add_to_empty add_type_substitution parameter target_type
+let add_type_substitution_e parameter ty =
+  add_to_empty add_type_substitution parameter ty
 
-let add_dirt_var_coercion dirt_var target_dc sub =
+let add_dirt_var_coercion dirt_var dc sub =
   {
     sub with
     dirt_var_to_dirt_coercions =
-      Assoc.update dirt_var target_dc sub.dirt_var_to_dirt_coercions;
+      Assoc.update dirt_var dc sub.dirt_var_to_dirt_coercions;
   }
 
-let add_dirt_var_coercion_e dirt_var target_dc =
-  add_to_empty add_dirt_var_coercion dirt_var target_dc
+let add_dirt_var_coercion_e dirt_var dc =
+  add_to_empty add_dirt_var_coercion dirt_var dc
 
 let add_dirt_substitution dirt_var t_coercion sub =
   {
@@ -64,15 +64,15 @@ let add_dirt_substitution dirt_var t_coercion sub =
 let add_dirt_substitution_e dirt_var t_coercion =
   add_to_empty add_dirt_substitution dirt_var t_coercion
 
-let add_skel_param_substitution param target_skel sub =
+let add_skel_param_substitution param skel sub =
   {
     sub with
     skel_param_to_skel_subs =
-      Assoc.update param target_skel sub.skel_param_to_skel_subs;
+      Assoc.update param skel sub.skel_param_to_skel_subs;
   }
 
-let add_skel_param_substitution_e param target_skel =
-  add_to_empty add_skel_param_substitution param target_skel
+let add_skel_param_substitution_e param skel =
+  add_to_empty add_skel_param_substitution param skel
 
 let merge subs1 subs2 =
   {
@@ -292,12 +292,12 @@ let print_type_param_to_type p t ppf =
   Print.print ppf "substitution: ";
   printy ppf "%t :-tyvarToTargetty-> %t"
     (CoreTypes.TyParam.print p)
-    (Type.print_target_ty t)
+    (Type.print_ty t)
 
 let print_dirt_var_sub p t ppf =
   Print.print ppf "substitution: ";
   printy ppf "%t :-dirtvarToTargetdirt-> %t" (Type.DirtParam.print p)
-    (Type.print_target_dirt t)
+    (Type.print_dirt t)
 
 let print_dirt_var_coercion p t ppf =
   Print.print ppf "substitution: ";

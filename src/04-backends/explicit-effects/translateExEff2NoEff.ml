@@ -11,7 +11,7 @@ module Sub = Substitution
 type effect_set = EffectSet.t
 
 type state = {
-  var_types : (Term.variable, Type.target_ty) Assoc.t;
+  var_types : (Term.variable, Type.ty) Assoc.t;
   ty_params : CoreTypes.TyParam.t list;
   dirt_params : Type.DirtParam.t list;
   skel_params : Type.SkelParam.t list;
@@ -57,7 +57,7 @@ let typefail str =
   let message = "ExEff-to-NoEff: " ^ str in
   failwith message
 
-let rec elab_ty state (ty : ExEffTypes.target_ty) =
+let rec elab_ty state (ty : ExEffTypes.ty) =
   match ty with
   | ExEffTypes.TyParam (x, skel) -> (skel, NoEff.NTyParam x)
   | ExEffTypes.Apply (name, lst) ->
@@ -105,7 +105,7 @@ and elab_dirty state (ty, dirt) =
   if ExEffTypes.is_empty_dirt dirt then (skel, elab)
   else (skel, NoEff.NTyComp elab)
 
-let has_empty_dirt ((_ty, dirt) : ExEffTypes.target_dirty) = is_empty_dirt dirt
+let has_empty_dirt ((_ty, dirt) : ExEffTypes.dirty) = is_empty_dirt dirt
 
 let rec get_effectset_temp set effects =
   match effects with
@@ -365,7 +365,7 @@ and elab_expression' state exp =
       if Type.types_are_equal ty1 ty2 then (r, NoEff.NCast (elab1, elab2))
       else
         Error.typing ~loc:Location.unknown "Ill-typed expression cast %t <= %t"
-          (Type.print_target_ty ty1) (Type.print_target_ty ty2)
+          (Type.print_ty ty1) (Type.print_ty ty2)
   | ExEff.LambdaTyCoerVar (par, (ty1, ty2), exp) ->
       let _, elab1 = elab_ty state ty1 in
       let _, elab2 = elab_ty state ty2 in
@@ -520,8 +520,8 @@ and elab_computation' state c =
         (t2, NoEff.NCast (coelab, elabc))
       else
         Error.typing ~loc:Location.unknown "Ill-typed computation cast %t <= %t"
-          (Type.print_target_ty (fst cty))
-          (Type.print_target_ty (fst t1))
+          (Type.print_ty (fst cty))
+          (Type.print_ty (fst t1))
 
 let rec elab_source_ty = function
   | Language.Type.Apply (name, ts) ->
