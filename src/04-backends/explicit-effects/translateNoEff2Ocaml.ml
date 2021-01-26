@@ -139,7 +139,7 @@ let rec pp_term noEff_term ppf =
   | NReturn t -> print ppf "Value %t" (pp_term t)
   | NHandler { effect_clauses = eff_cls; return_clause = val_cl } ->
       print ppf
-        "handler {@[<hov>value_clause = %t;@] @[<hov>effect_claueses = %t;@] }"
+        "handler {@[<hov>value_clause = (fun %t);@] @[<hov>effect_claueses = %t;@] }"
         (pp_abs_with_ty val_cl) (pp_effect_cls eff_cls)
   | NLet (t1, (pat, t2)) ->
       print ppf "@[<hv>@[<hv>let %t = %t in@] @,%t@]" (pp_pattern pat)
@@ -150,13 +150,13 @@ let rec pp_term noEff_term ppf =
       print ppf "@[<hv>(match %t with@, | %t)@]" (pp_term t)
         (pp_sequence "@, | " pp_abs cases)
   | NCall (e, t, abs_ty) ->
-      print ppf "@[<hov 2> call (%t) @,(%t) @,(%t)@]" (pp_effect e) (pp_term t)
-        (pp_abs_with_ty abs_ty)
+      print ppf "@[<hov 2> call (%t) @,(%t) @,(fun %t)@]" (pp_effect e)
+        (pp_term t) (pp_abs_with_ty abs_ty)
   | NOp (e, t) ->
       print ppf "@[<hov 2> call (%t) @,(%t) @,(%s)@]" (pp_effect e) (pp_term t)
         "(fun x -> x)"
   | NBind (t, abs) ->
-      print ppf "@[<hov 2>((%t) >> (%t))@]" (pp_term t) (pp_abs abs)
+      print ppf "@[<hov 2>((%t) >> (fun %t))@]" (pp_term t) (pp_abs abs)
   | NHandle (NCall (e, t1, (pat, ty, t)), NCast (t2, NCoerFunToHand (c1, c2)))
     ->
       print ppf "%t"
@@ -174,8 +174,7 @@ let rec pp_term noEff_term ppf =
       | _ -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2))
   | _ -> failwith __LOC__
 
-and pp_abs (p, t) ppf =
-  print ppf "@[<h>fun %t ->@ %t@]" (pp_pattern p) (pp_term t)
+and pp_abs (p, t) ppf = print ppf "@[<h> %t ->@ %t@]" (pp_pattern p) (pp_term t)
 
 and pp_abs_with_ty (p, ty, t) ppf =
   print ppf "@[<h>(%t : %t) ->@ %t@]" (pp_pattern p) (pp_type ty) (pp_term t)
