@@ -16,7 +16,7 @@ let test_pure n =
 
 (******************************************************************************)
 
-(*
+
 effect Fail : unit -> empty
 
 let rec loop_latent n =
@@ -67,7 +67,7 @@ let rec loop_state n =
     if n = 0 then
         ()
     else
-        (oerform (Put ((perofmr (Get ())) + 1)); loop_state (n - 1))
+        (perform (Put ((perform (Get ())) + 1)); loop_state (n - 1))
 
 let state_handler = handler
 | y -> (fun x -> x)
@@ -76,5 +76,3 @@ let state_handler = handler
 
 let test_state n =
     (with state_handler handle loop_state n) 0
-
-    *)
