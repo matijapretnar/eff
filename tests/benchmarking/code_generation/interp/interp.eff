@@ -37,9 +37,6 @@ let rec interp = function
     | _ -> x / y
     end
 
-let arithmeticHandler = handler
-    | effect (DivByZero ()) k ->  -1
-
 (******************************************************************************)
 
 let addCase =
@@ -63,4 +60,7 @@ let rec createCase n =
 let finalCase = createCase 200
 
 let bigTest () =
+  let arithmeticHandler = handler
+    | effect (DivByZero ()) k ->  -1
+  in
   with arithmeticHandler handle interp (createCase 200)

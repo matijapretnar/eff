@@ -44,21 +44,6 @@ let rec choose = function
   | [] -> (match (perform (Fail ())) with)
   | x::xs -> if (perform (Decide ())) then x else choose xs
 
-let optionalize = handler
-  | y -> (Some y)
-  | effect (Decide _) k -> (match k true with Some x -> Some x | None -> k false)
-  | effect (Fail _) _ -> None
-
-let backtrack = handler
-  |  y -> (fun _ -> y)
-  | effect (Decide _) k -> (fun kf -> k true (fun () -> k false kf) )  
-  | effect (Fail _) _ -> (fun kf -> kf ())
-
-let choose_all = handler
-  |  x -> [x]
-  | effect (Decide _) k -> k true @ k false
-  | effect (Fail _) _ -> []
-
 (******************************************************************************)
 
 let queens number_of_queens =
@@ -70,10 +55,55 @@ let queens number_of_queens =
   place (1, [])
 
 let queens_one_option number_of_queens =
+  let optionalize = handler
+  | y -> (Some y)
+  | effect (Decide _) k -> (match k true with Some x -> Some x | None -> k false)
+  | effect (Fail _) _ -> None
+  in
+  let backtrack = handler
+    |  y -> (fun _ -> y)
+    | effect (Decide _) k -> (fun kf -> k true (fun () -> k false kf) )  
+    | effect (Fail _) _ -> (fun kf -> kf ())
+  in
+  let choose_all = handler
+    |  x -> [x]
+    | effect (Decide _) k -> k true @ k false
+    | effect (Fail _) _ -> []
+  in
   with optionalize handle queens number_of_queens
 
 let queens_one_cps number_of_queens =
+  let optionalize = handler
+  | y -> (Some y)
+  | effect (Decide _) k -> (match k true with Some x -> Some x | None -> k false)
+  | effect (Fail _) _ -> None
+  in
+  let backtrack = handler
+    |  y -> (fun _ -> y)
+    | effect (Decide _) k -> (fun kf -> k true (fun () -> k false kf) )  
+    | effect (Fail _) _ -> (fun kf -> kf ())
+  in
+  let choose_all = handler
+    |  x -> [x]
+    | effect (Decide _) k -> k true @ k false
+    | effect (Fail _) _ -> []
+  in
   (with backtrack handle queens number_of_queens) (fun () -> (absurd (perform (Fail ()))))
 
 let queens_all number_of_queens =
+  let optionalize = handler
+  | y -> (Some y)
+  | effect (Decide _) k -> (match k true with Some x -> Some x | None -> k false)
+  | effect (Fail _) _ -> None
+  in
+  let backtrack = handler
+    |  y -> (fun _ -> y)
+    | effect (Decide _) k -> (fun kf -> k true (fun () -> k false kf) )  
+    | effect (Fail _) _ -> (fun kf -> kf ())
+  in
+  let choose_all = handler
+    |  x -> [x]
+    | effect (Decide _) k -> k true @ k false
+    | effect (Fail _) _ -> []
+  in
   with choose_all handle queens number_of_queens

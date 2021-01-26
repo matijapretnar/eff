@@ -40,11 +40,11 @@ let rec loop_incr n =
     else
         (perform (Incr ()); loop_incr (n - 1))
 
-let incr_handler = handler
-| y -> (fun x -> x)
-| effect (Incr ()) k -> (fun x -> k () (x + 1))
-
 let test_incr n =
+    let incr_handler = handler
+    | y -> (fun x -> x)
+    | effect (Incr ()) k -> (fun x -> k () (x + 1))
+    in
     (with incr_handler handle loop_incr n) 0
 
 (******************************************************************************)
@@ -56,6 +56,10 @@ let rec loop_incr' n =
         (loop_incr' (n - 1); perform (Incr ()))
 
 let test_incr' n =
+    let incr_handler = handler
+    | y -> (fun x -> x)
+    | effect (Incr ()) k -> (fun x -> k () (x + 1))
+    in
     (with incr_handler handle loop_incr' n) 0
 
 (******************************************************************************)
@@ -69,10 +73,10 @@ let rec loop_state n =
     else
         (perform (Put ((perform (Get ())) + 1)); loop_state (n - 1))
 
-let state_handler = handler
-| y -> (fun x -> x)
-| effect (Get ()) k -> (fun s -> k s s)
-| effect (Put s') k -> (fun _ -> k () s')
-
 let test_state n =
+    let state_handler = handler
+    | y -> (fun x -> x)
+    | effect (Get ()) k -> (fun s -> k s s)
+    | effect (Put s') k -> (fun _ -> k () s')
+    in
     (with state_handler handle loop_state n) 0

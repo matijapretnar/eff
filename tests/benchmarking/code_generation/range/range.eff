@@ -9,5 +9,7 @@ let rec range n =
 
 let test n = 
 	handle ( range n ) with
-| x -> x
-| effect (Fetch _) k -> k 42
+	| x -> x
+	| effect (Fetch _) k -> k 42
+	in
+	test 20
