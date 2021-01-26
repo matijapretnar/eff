@@ -84,12 +84,8 @@ let rec fun_to_hand coer1 coer2 f comp =
   | Value t -> coer2 (f (coer1 t))
   | Call (eff, arg, k) ->
       Call (eff, arg, fun x -> fun_to_hand coer1 coer2 f (k x))
-;;let _op_0 (* + *) = ( + )
 
-let x = 2 in 
- let y = 1 in 
- let _b_3 = (coer_refl_ty) 
-              ((coer_arrow (coer_refl_ty) (coer_refl_ty)) 
-                 ((_op_0 (* + *)) ((coer_refl_ty) (x)))) in 
- (coer_refl_ty) ((coer_refl_ty) ((_b_3) ((coer_refl_ty) (y))))
-
+let decide_func (bl : bool) =
+  let x = 10 in
+  let y = 20 in
+  match coer_refl_ty bl with true -> coer_refl_ty x | false -> coer_refl_ty y

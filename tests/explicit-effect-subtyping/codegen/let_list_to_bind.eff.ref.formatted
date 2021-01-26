@@ -1,0 +1,3 @@
+ocamlformat: ignoring "let_list_to_bind.eff.out" (syntax error)
+File "let_list_to_bind.eff.out", line 89, characters 10-12:
+Error: Syntax error

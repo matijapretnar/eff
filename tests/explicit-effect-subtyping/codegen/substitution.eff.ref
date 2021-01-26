@@ -62,9 +62,32 @@ let lift_unary f x = value (f x)
 
 let lift_binary f x = value (fun y -> value (f x y))
 
-let decide_func bl =
-  let x = 10 in
-  let y = 20 in
-  match (fun coer_refl_x -> coer_refl_x) bl with
-  | true -> (fun coer_refl_x -> coer_refl_x) x
-  | false -> (fun coer_refl_x -> coer_refl_x) y
+let coer_refl_ty term = term
+
+let rec coer_computation coer comp =
+  match comp with
+  | Value t -> Value (coer t)
+  | Call (eff, arg, k) -> Call (eff, arg, fun x -> coer_computation coer (k x))
+
+let coer_return coer term = Value (coer term)
+
+let coer_unsafe coer = function
+  | Value v -> coer v
+  | Call (_eff, _arg, _k) -> failwith "Unsafe coercion"
+
+let coer_arrow coer1 coer2 f x = coer2 (f (coer1 x))
+
+let hand_to_fun coer1 coer2 h x = coer2 (h (Value (coer1 x)))
+
+let rec fun_to_hand coer1 coer2 f comp =
+  match comp with
+  | Value t -> coer2 (f (coer1 t))
+  | Call (eff, arg, k) ->
+      Call (eff, arg, fun x -> fun_to_hand coer1 coer2 f (k x))
+;;let decide_func = 
+fun (bl : bool) -> let x = 10 in 
+                   let y = 20 in 
+                   (match (coer_refl_ty) (bl) with
+                    | true -> (coer_refl_ty) (x)
+                    | false -> (coer_refl_ty) (y))
+

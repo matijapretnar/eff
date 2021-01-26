@@ -1,3 +1,1 @@
-ocamlformat: ignoring "is_relatively_pure.eff.out" (syntax error)
-File "is_relatively_pure.eff.out", line 1, characters 12-13:
-Error: Syntax error
+Typing error: Ill-typed expression cast unit -{}→ unit <= unit -{Op1}→ unit

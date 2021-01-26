@@ -1,3 +1,1 @@
-ocamlformat: ignoring "one_input.eff.out" (syntax error)
-File "one_input.eff.out", line 1, characters 11-12:
-Error: Syntax error
+Fatal error: exception File "src/04-backends/explicit-effects/unification.ml", line 268, characters 6-12: Assertion failed

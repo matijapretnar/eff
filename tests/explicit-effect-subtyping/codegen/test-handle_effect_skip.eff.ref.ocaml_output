@@ -1,4 +1,4 @@
-[1mFile "./test-handle_effect_skip.eff.formatted", line 1, characters 11-12[0m:
-1 | ocamlformat: ignoring "test-handle_effect_skip.eff.out" (syntax error)
+[1mFile "./test-handle_effect_skip.eff.out", line 1, characters 11-12[0m:
+1 | Fatal error: exception Failure("inferCheckLocatedClosedPatAlts: Could not infer the type of the patterns")
                [1;31m^[0m
 [1;31mError[0m: Syntax error

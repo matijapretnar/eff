@@ -1,29 +1,4 @@
-[1mFile "./handler_beta_reduction.eff.formatted", line 70, characters 10-68[0m:
-70 | (fun x -> match x with Value y -> (fun coer_refl_x -> coer_refl_x) y)
-               [1;35m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
-[1;35mWarning[0m 8: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-Call (_, _, _)
-[1mFile "./handler_beta_reduction.eff.formatted", lines 153-156, characters 44-51[0m:
-153 | ............................................match x with
-154 |                                             | Value y ->
-155 |                                                 (fun coer_refl_x -> coer_refl_x)
-156 |                                                   y.
-[1;35mWarning[0m 8: this pattern-matching is not exhaustive.
-Here is an example of a case that is not matched:
-Call (_, _, _)
-[1mFile "./handler_beta_reduction.eff.formatted", lines 78-163, characters 9-14[0m:
- 78 | .........(handler
- 79 |             {
- 80 |               value_clause =
- 81 |                 (fun y ->
- 82 |                   Value
-...
-160 |                                           l)))
-161 |                                    _var_3)))
-162 |                   | eff' -> fun arg k -> Call (eff', arg, k));
-163 |             })..
-[1;31mError[0m: This expression has type int computation -> int computation
-       but an expression was expected of type
-         'a computation computation -> 'b
-       Type int is not compatible with type 'a computation 
+[1mFile "./handler_beta_reduction.eff.out", line 88, characters 11-12[0m:
+88 | effect Eff : int -> int
+                [1;31m^[0m
+[1;31mError[0m: Syntax error

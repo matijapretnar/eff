@@ -51,7 +51,14 @@ let format_stanza out_filename =
   Printf.printf "  (action\n";
   Printf.printf "   (with-outputs-to \"%s.formatted\"\n" out_filename;
   Printf.printf "    (with-accepted-exit-codes (or 0 1 2)\n";
-  Printf.printf "     (run ocamlformat %s.out)))))\n\n" out_filename
+  Printf.printf "     (run ocamlformat %s.out)))))\n\n" out_filename;
+
+  Printf.printf "(rule\n";
+  Printf.printf " (deps \"%s.formatted\")\n" out_filename;
+  Printf.printf "  (alias runtest)\n";
+  Printf.printf "   (action\n";
+  Printf.printf "    (diff \"%s.ref.formatted\" \"%s.formatted\")))\n\n"
+    out_filename out_filename
 
 let ocaml_compile_rule full_name out_filename =
   Printf.printf "(rule\n";
@@ -71,7 +78,7 @@ let ocaml_compile_rule full_name out_filename =
 
 let test_case_alias_stanza config (_bare, full_name) =
   let out_file_name =
-    full_name ^ if config.apply_ocamlformat then ".formatted" else ".out"
+    full_name ^ ".out"
   in
   if config.apply_ocamlformat then format_stanza full_name;
   if config.generate_ocaml_compile_rule then

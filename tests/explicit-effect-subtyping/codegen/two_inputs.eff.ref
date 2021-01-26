@@ -1,3 +1,2 @@
-ocamlformat: ignoring "two_inputs.eff.out" (syntax error)
-File "two_inputs.eff.out", line 1, characters 13-14:
-Error: Syntax error
+Typing error (file "./two_inputs.eff", line 4, char 36):
+Unknown variable @

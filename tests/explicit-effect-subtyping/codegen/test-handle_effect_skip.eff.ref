@@ -1,3 +1,1 @@
-ocamlformat: ignoring "test-handle_effect_skip.eff.out" (syntax error)
-File "test-handle_effect_skip.eff.out", line 1, characters 11-12:
-Error: Syntax error
+Fatal error: exception Failure("inferCheckLocatedClosedPatAlts: Could not infer the type of the patterns")

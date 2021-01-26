@@ -1,4 +1,4 @@
-[1mFile "./handle_match.eff.formatted", line 1, characters 11-12[0m:
-1 | ocamlformat: ignoring "handle_match.eff.out" (syntax error)
+[1mFile "./handle_match.eff.out", line 1, characters 11-12[0m:
+1 | Fatal error: exception Failure("inferClosedPatTy: PVariant(None)")
                [1;31m^[0m
 [1;31mError[0m: Syntax error

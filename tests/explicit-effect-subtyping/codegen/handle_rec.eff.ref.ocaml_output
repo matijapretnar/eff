@@ -1,16 +1,4 @@
-[1mFile "./handle_rec.eff.formatted", lines 97-134, characters 8-32[0m:
- 97 | ........(fun x -> Value ((fun coer_refl_x -> coer_refl_x) x))
- 98 |           ( (fun x -> Value ((fun coer_refl_x -> coer_refl_x) x))
- 99 |               (((fun coer_x1 coer_x2 ->
-100 |                   (fun x -> Value ((fun coer_refl_x -> coer_refl_x) x))
-101 |                     (coer_x1 ((fun coer_refl_x -> coer_refl_x) coer_x2)))
-...
-131 |                          (fun x -> Value ((fun coer_refl_x -> coer_refl_x) x))
-132 |                            (coer_x1 ((fun coer_refl_x -> coer_refl_x) coer_x2)))
-133 |                          f))
-134 |                      _var_7) ) ).
-[1;31mError[0m: This expression has type
-         'a computation computation computation computation computation
-       but an expression was expected of type int computation
-       Type 'a computation computation computation computation
-       is not compatible with type int 
+[1mFile "./handle_rec.eff.out", line 88, characters 11-12[0m:
+88 | effect Eff : unit -> unit
+                [1;31m^[0m
+[1;31mError[0m: Syntax error
