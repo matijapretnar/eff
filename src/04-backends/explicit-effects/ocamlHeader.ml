@@ -1,3 +1,5 @@
+type empty
+
 type ('eff_arg, 'eff_res) effect = ..
 
 type 'a computation =
