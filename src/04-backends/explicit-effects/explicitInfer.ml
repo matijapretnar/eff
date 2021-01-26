@@ -723,8 +723,8 @@ and tcExpr' (inState : state) (lclCtx : TypingEnv.t) :
   | Untyped.Handler hand -> tcHandler inState lclCtx hand
 
 (* Type inference for a located value (expression) *)
-and tcExpr (inState : state) (lclCtx : TypingEnv.t)
-    (e : Untyped.expression) : tcExprOutput =
+and tcExpr (inState : state) (lclCtx : TypingEnv.t) (e : Untyped.expression) :
+    tcExprOutput =
   tcExpr' inState lclCtx e.it
 
 (* ************************************************************************* *)
@@ -758,8 +758,8 @@ and tcComp' (inState : state) (lclCtx : TypingEnv.t) :
   | Check cmp -> tcCheck inState lclCtx cmp
 
 (* Type inference for a located computation *)
-and tcComp (inState : state) (lclCtx : TypingEnv.t)
-    (c : Untyped.computation) : tcCompOutput =
+and tcComp (inState : state) (lclCtx : TypingEnv.t) (c : Untyped.computation) :
+    tcCompOutput =
   tcComp' inState lclCtx c.it
 
 (* Typecheck a value wrapped in a return *)
@@ -892,7 +892,8 @@ and tcMatch (inState : state) (lclCtxt : TypingEnv.t) (scr : Untyped.expression)
 
 (* Typecheck a non-empty case expression *)
 and tcNonEmptyMatch (inState : state) (lclCtxt : TypingEnv.t)
-    (scr : Untyped.expression) (alts : Untyped.abstraction list) : tcCompOutput =
+    (scr : Untyped.expression) (alts : Untyped.abstraction list) : tcCompOutput
+    =
   (* 0: Make sure that we have at least one alternative *)
   assert (List.length alts > 0);
 

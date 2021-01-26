@@ -61,3 +61,16 @@ let to_string _ = assert false
 let lift_unary f x = value (f x)
 
 let lift_binary f x = value (fun y -> value (f x y))
+
+let coer_refl_ty term = term
+
+let rec coer_computation coer comp =
+  match comp with
+  | Value t -> Value (coer t)
+  | Call (eff, arg, k) -> Call (eff, arg, fun x -> coer_computation coer (k x))
+
+let coer_return coer term = Value (coer term)
+
+let coer_unsafe coer = function
+  | Value v -> coer v
+  | Call (_eff, _arg, _k) -> failwith "Unsafe coercion"

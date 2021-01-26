@@ -1,203 +1,264 @@
 open Utils
-module NoEff = SyntaxNoEff
-module OCaml = SyntaxOcaml
-module Variable = Symbol.Make (Symbol.String)
+open SyntaxNoEff
 
-type variable = Variable.t
+let print = Format.fprintf
 
-let rec elab_pattern (in_p : NoEff.n_pattern) : OCaml.pattern =
-  match in_p with
-  | NoEff.PNVar x -> OCaml.PVar x
-  | NoEff.PNAs (p, x) -> OCaml.PAs (elab_pattern p, x)
-  | NoEff.PNConst c -> OCaml.PConst c
-  | NoEff.PNTuple lst -> OCaml.PTuple (List.map elab_pattern lst)
-  | NoEff.PNRecord lst -> OCaml.PRecord (Assoc.map elab_pattern lst)
-  | NoEff.PNVariant (lbl, None) -> OCaml.PVariant (lbl, None)
-  | NoEff.PNVariant (lbl, Some p) -> OCaml.PVariant (lbl, Some (elab_pattern p))
-  | NoEff.PNNonbinding -> OCaml.PNonbinding
+let rec pp_sequence sep pp xs ppf =
+  match xs with
+  | [] -> ()
+  | [ x ] -> pp x ppf
+  | x :: xs -> print ppf ("%t" ^^ sep ^^ "%t") (pp x) (pp_sequence sep pp xs)
 
-let rec elab_term (t_in : NoEff.n_term) : OCaml.term =
-  match t_in with
-  | NoEff.NVar x -> OCaml.Var x
-  | NoEff.NConst c -> OCaml.Const c
-  | NoEff.NTuple lst -> OCaml.Tuple (List.map elab_term lst)
-  | NoEff.NRecord lst -> OCaml.Record (Assoc.map elab_term lst)
-  | NoEff.NVariant (lbl, None) -> OCaml.Variant (lbl, None)
-  | NoEff.NVariant (lbl, Some t) -> OCaml.Variant (lbl, Some (elab_term t))
-  | NoEff.NFun (x, _, c) -> OCaml.Lambda (elab_pattern x, elab_term c)
-  | NoEff.NEffect (eff, (t1, t2)) ->
-      OCaml.Effect (eff, elab_type t1, elab_type t2)
-  | NoEff.NHandler h ->
-      OCaml.Handler
-        ( elab_abstraction_with_ty h.return_clause,
-          List.map elab_effect_clause (Assoc.to_list h.effect_clauses) )
-  | NoEff.NLet (e, (p, c)) ->
-      OCaml.Let ((elab_pattern p, elab_term e), elab_term c)
-  | NoEff.NApplyTerm (e1, e2) -> OCaml.Apply (elab_term e1, elab_term e2)
-  | NoEff.NHandle (c, e) -> OCaml.Apply (elab_term e, elab_term c)
-  | NoEff.NCall (eff, e, (p, _, c)) ->
-      OCaml.Call (fst eff, elab_term e, (elab_pattern p, elab_term c))
-  | NoEff.NBind (c1, a) -> OCaml.Bind (elab_term c1, elab_abstraction a)
-  | NoEff.NMatch (e, _, alist, _) ->
-      OCaml.Match
-        ( elab_term e,
-          List.map
-            (fun (p, c) -> OCaml.ValueClause (elab_pattern p, elab_term c))
-            alist )
-  | NoEff.NLetRec (alist, c) ->
-      let alist' =
-        List.map
-          (fun (v, _, _, (p, c)) -> (v, (elab_pattern p, elab_term c)))
-          alist
-      in
-      OCaml.LetRec (alist', elab_term c)
-  | NoEff.NOp (eff, t) -> failwith "No operations supposed to happen"
-  | NoEff.NBigLambdaCoer (p, c, t) ->
-      failwith "Not supported without polymorphism"
-  | NoEff.NApplyCoer (t, c) -> failwith "Not supported without polymorphism"
-  | NoEff.NCast (t, c) -> OCaml.Apply (elab_coercion c, elab_term t)
-  | NoEff.NReturn t -> OCaml.Return (elab_term t)
+let pp_tuple pp lst ppf =
+  match lst with
+  | [] -> print ppf "()"
+  | lst -> print ppf "(@[<hov>%t@])" (pp_sequence ", " pp lst)
 
-and elab_coercion (coer : NoEff.n_coercion) : OCaml.term =
+let pp_label label ppf = CoreTypes.Label.print label ppf
+
+let pp_tyname ty_name ppf = CoreTypes.TyName.print ty_name ppf
+
+let pp_typaram ty_param ppf =
+  print ppf "'ty%t" (CoreTypes.TyParam.print ~safe:true ty_param)
+
+let protected =
+  [ "and"; "as"; "assert"; "asr"; "begin"; "class"; "constraint"; "do"; "done" ]
+  @ [ "downto"; "else"; "end"; "exception"; "external"; "false"; "for"; "fun" ]
+  @ [ "function"; "functor"; "if"; "in"; "include"; "inherit"; "initializer" ]
+  @ [ "land"; "lazy"; "let"; "lor"; "lsl"; "lsr"; "lxor"; "match"; "method" ]
+  @ [
+      "mod"; "module"; "mutable"; "new"; "nonrec"; "object"; "of"; "open"; "or";
+    ]
+  @ [ "private"; "rec"; "sig"; "struct"; "then"; "to"; "true"; "try"; "type" ]
+  @ [ "val"; "virtual"; "when"; "while"; "with"; "continue" ]
+
+let pp_variable var ppf =
+  let printer desc n =
+    (* [mod] has privileges because otherwise it's stupid *)
+    if desc = "mod" then Format.fprintf ppf "_op_%d (* %s *)" n desc
+    else (
+      if List.mem desc protected then
+        Print.warning
+          "Warning: Protected keyword [%s]. Must be fixed by hand!@." desc;
+      match desc.[0] with
+      | 'a' .. 'z' | '_' -> Format.fprintf ppf "%s" desc
+      | '$' -> (
+          match desc with
+          | "$c_thunk" -> Format.fprintf ppf "_comp_%d" n
+          | "$id_par" -> Format.fprintf ppf "_id_%d" n
+          | "$anon" -> Format.fprintf ppf "_anon_%d" n
+          | "$bind" -> Format.fprintf ppf "_b_%d" n
+          | _ -> Format.fprintf ppf "_x_%d" n)
+      | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc)
+  in
+  CoreTypes.Variable.fold printer var
+
+let pp_field pp sep (field, value) ppf =
+  print ppf "%t %s %t" (CoreTypes.Field.print field) sep (pp value)
+
+let pp_record pp sep assoc ppf =
+  let lst = Assoc.to_list assoc in
+  print ppf "{@[<hov>%t@]}" (pp_sequence "; " (pp_field pp sep) lst)
+
+let rec pp_type noeff_ty ppf =
+  match noeff_ty with
+  | NTyParam p -> print ppf "%t" (pp_typaram p)
+  | NTyApply (tyName, []) -> print ppf "%t" (pp_tyname tyName)
+  | NTyApply (tyName, tys) ->
+      print ppf "(%t) %t" (Print.sequence ", " pp_type tys) (pp_tyname tyName)
+  | NTyTuple [] -> print ppf "unit"
+  | NTyTuple tys -> print ppf "@[<hov>(%t)@]" (Print.sequence " * " pp_type tys)
+  | NTyBasic t -> print ppf "%t" (Const.print_ty t)
+  | NTyArrow (ty1, ty2) ->
+      print ppf "@[<h>(%t ->@ %t)@]" (pp_type ty1) (pp_type ty2)
+  | NTyHandler (ty1, ty2) ->
+      print ppf "@[<h>(%t ->@ %t)@]" (pp_type ty1) (pp_type ty2)
+  | NTyQual (tyc, ty) -> pp_type ty ppf
+  | NTyComp ty -> print ppf "%t computation" (pp_type ty)
+
+let rec pp_pattern pat ppf =
+  match pat with
+  | PNVar v -> print ppf "%t" (pp_variable v)
+  | PNAs (p, v) -> print ppf "%t as %t" (pp_pattern p) (pp_variable v)
+  | PNTuple pats -> print ppf "%t" (pp_tuple pp_pattern pats)
+  | PNRecord rcd -> print ppf "%t" (pp_record pp_pattern "=" rcd)
+  | PNVariant (l, None) -> print ppf "(%t)" (pp_label l)
+  | PNVariant (l, Some p) ->
+      print ppf "(%t @[<hov>%t@])" (pp_label l) (pp_pattern p)
+  | PNConst c -> print ppf "%t" (Const.print c)
+  | PNNonbinding -> print ppf "_"
+
+let pp_tuple pp tpl ppf =
+  match tpl with
+  | [] -> print ppf "()"
+  | xs -> print ppf "(@[<hov>%t@])" (pp_sequence ", " pp xs)
+
+let pp_effect (e, (ty1, ty2)) ppf = CoreTypes.Effect.print e ppf
+
+let rec pp_coercion coer ppf =
+  (* The cases not matched here should be handled in pp_term *)
   match coer with
-  | NoEff.NCoerRefl t ->
-      let x = Variable.fresh "coer_refl_x" in
-      OCaml.Lambda (OCaml.PVar x, OCaml.Var x)
-  | NoEff.NCoerArrow (arg, res) -> (
-      let f = elab_coercion arg in
-      let g = elab_coercion res in
-      match f with
-      | OCaml.Lambda (p_f, c_f) -> (
-          match g with
-          | OCaml.Lambda (p_g, c_g) ->
-              let x1 = Variable.fresh "coer_x1" in
-              let x2 = Variable.fresh "coer_x2" in
-              OCaml.Lambda
-                ( OCaml.PVar x1,
-                  OCaml.Lambda
-                    ( OCaml.PVar x2,
-                      OCaml.Apply
-                        ( g,
-                          OCaml.Apply
-                            (OCaml.Var x1, OCaml.Apply (f, OCaml.Var x2)) ) ) )
-          | _ -> failwith "Wrong arrow coercion elaboration")
-      | _ -> failwith "Wrong arrow coercion elaboration")
-  | NoEff.NCoerHandler (arg, res) -> (
-      let f = elab_coercion arg in
-      let g = elab_coercion res in
-      match (f, g) with
-      | OCaml.Lambda (p_f, c_f), OCaml.Lambda (p_g, c_g) ->
-          let x1 = Variable.fresh "x1" in
-          let x2 = Variable.fresh "x2" in
-          OCaml.Lambda
-            ( OCaml.PVar x1,
-              OCaml.Lambda
-                ( OCaml.PVar x2,
-                  OCaml.Apply
-                    ( g,
-                      OCaml.Apply
-                        ( OCaml.Var x1,
-                          OCaml.Return (OCaml.Apply (f, OCaml.Var x2)) ) ) ) )
-      | _, _ -> failwith "Wrong handler coercion elaboration")
-  | NoEff.NCoerHandToFun (arg, res) ->
-      let f = elab_coercion arg in
-      let g = elab_coercion res in
-      let x1 = Variable.fresh "x1" in
-      let x2 = Variable.fresh "x2" in
-      OCaml.Lambda
-        ( OCaml.PVar x1,
-          OCaml.Lambda
-            ( OCaml.PVar x2,
-              OCaml.Apply
-                ( g,
-                  OCaml.Apply
-                    (OCaml.Var x1, OCaml.Return (OCaml.Apply (f, OCaml.Var x2)))
-                ) ) )
-  | NoEff.NCoerFunToHand (arg, res) ->
-      let f = elab_coercion arg in
-      let g = elab_coercion res in
-      let x1 = Variable.fresh "x1" in
-      let x2 = Variable.fresh "x2" in
-      let y = Variable.fresh "y" in
-      OCaml.Lambda
-        ( OCaml.PVar x1,
-          OCaml.Lambda
-            ( OCaml.PVar x2,
-              OCaml.Match
-                ( OCaml.Var x2,
-                  [
-                    OCaml.ValueClause
-                      ( OCaml.PReturn (OCaml.PVar y),
-                        OCaml.Apply
-                          ( g,
-                            OCaml.Apply
-                              (OCaml.Var x1, OCaml.Apply (f, OCaml.Var y)) ) );
-                  ] ) ) )
-  | NoEff.NCoerQual (x, y) -> failwith "Dropped when dropping polymorphism"
-  | NoEff.NCoerReturn c -> (
-      let f = elab_coercion c in
-      let x = Variable.fresh "x" in
-      match f with
-      | OCaml.Lambda (p_f, c_f) ->
-          OCaml.Lambda
-            (OCaml.PVar x, OCaml.Return (OCaml.Apply (f, OCaml.Var x)))
-      | _ -> failwith "Wrong return coercion elaboration")
-  | NoEff.NCoerComp c ->
-      let f = elab_coercion c in
-      let x = Variable.fresh "x" in
-      OCaml.Lambda (PVar x, OCaml.Return (OCaml.Apply (f, OCaml.Var x)))
-  | NoEff.NCoerUnsafe c -> (
-      let f = elab_coercion c in
-      match f with
-      | OCaml.Lambda (f_pat, f_comp) ->
-          let x = Variable.fresh "x" in
-          let y = Variable.fresh "y" in
-          OCaml.Lambda
-            ( OCaml.PVar x,
-              OCaml.Match
-                ( OCaml.Var x,
-                  [
-                    OCaml.ValueClause
-                      ( OCaml.PReturn (OCaml.PVar y),
-                        OCaml.Apply (f, OCaml.Var y) );
-                  ] ) )
-      | _ -> failwith __LOC__)
-  | NoEff.NCoerApp (c1, c2) -> failwith "Dropped when dropping polymorphism"
-  | NoEff.NCoerTrans (c1, c2) ->
-      let f = elab_coercion c1 in
-      let g = elab_coercion c2 in
-      let x = Variable.fresh "x" in
-      OCaml.Lambda (OCaml.PVar x, OCaml.Apply (f, OCaml.Apply (g, OCaml.Var x)))
-  | NoEff.NCoerTuple ls ->
-      let coer_elabs = List.map elab_coercion ls in
-      OCaml.LambdaList coer_elabs
+  | NCoerVar v -> print ppf "CoerVar %t" (Type.TyCoercionParam.print v)
+  | NCoerRefl _ -> print ppf "coer_refl_ty"
+  (* | NReflVar t -> print ppf "ReflVar"
+     | NCoerArrow (c1, c2) -> print ppf "CoerArrow"
+     | NCoerHandler (c1, c2) -> print ppf "CoerHandler"
+     | NHandToFun (c1, c2) -> print ppf "HandToFun"
+     | NFunToHand (c1, c2) -> print ppf "FunToHand"
+     | NForall (t, c) -> print ppf "Forall"
+     | NCoerQualification (tyc, c) -> print ppf "CoerQualification" *)
+  | NCoerComp c -> print ppf "coer_computation (%t)" (pp_coercion c)
+  | NCoerReturn c -> print ppf "coer_return"
+  | NCoerUnsafe c -> print ppf "coer_unsafe"
+  | NCoerTrans (c1, c2) -> print ppf "SequenceCoercion"
+  | NCoerTuple cs -> print ppf "TupleCoercion"
+  | NCoerApply (t, cs) -> print ppf "ApplyCoercion"
+  | _ -> print ppf "xxx"
+
+let rec pp_term noEff_term ppf =
+  match noEff_term with
+  | NVar v -> print ppf "%t" (pp_variable v)
+  | NConst c -> print ppf "%t" (Const.print c)
+  | NTuple ts -> print ppf "%t" (pp_tuple pp_term ts)
+  | NRecord rcd -> print ppf "%t" (pp_record pp_term "=" rcd)
+  | NVariant (l, Some (NTuple [ hd; tl ])) when l = CoreTypes.cons ->
+      print ppf "@[<hov>(%t::%t)@]" (pp_term hd) (pp_term tl)
+  | NVariant (l, None) -> print ppf "(%t)" (pp_label l)
+  | NVariant (l, Some t1) ->
+      print ppf "(%t @[<hov>%t@])" (pp_label l) (pp_term t1)
+  | NFun abs_ty -> print ppf "@[<hv 2>fun %t@]" (pp_abs_with_ty abs_ty)
+  | NEffect (et, _) -> CoreTypes.Effect.print et ppf
+  | NApplyTerm (t1, t2) -> (
+      match t1 with
+      | NCast (t, NCoerArrow (c1, c2)) ->
+          print ppf "%t" (pp_term (NCast (NApplyTerm (t, NCast (t2, c1)), c2)))
+      | NCast (t, NCoerHandToFun (c1, c2)) ->
+          print ppf "%t"
+            (pp_term (NCast (NHandle (NReturn (NCast (t2, c1)), t), c2)))
+      | _ -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2))
+  | NCast (t, c) ->
+      print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_coercion c) (pp_term t)
+  | NReturn t -> print ppf "Value %t" (pp_term t)
+  | NHandler { effect_clauses = eff_cls; return_clause = val_cl } ->
+      print ppf
+        "handler {@[<hov>value_clause = %t;@] @[<hov>effect_claueses = %t;@] }"
+        (pp_abs_with_ty val_cl) (pp_effect_cls eff_cls)
+  | NLet (t1, (pat, t2)) ->
+      print ppf "@[<hv>@[<hv>let %t = %t in@] @,%t@]" (pp_pattern pat)
+        (pp_term t1) (pp_term t2)
+  | NLetRec (defs, t2) ->
+      print ppf "@[<hv>@[<hv>%tin@] @,%t@]" (pp_let_rec defs) (pp_term t2)
+  | NMatch (t, _, cases, _) ->
+      print ppf "@[<hv>(match %t with@, | %t)@]" (pp_term t)
+        (pp_sequence "@, | " pp_abs cases)
+  | NCall (e, t, abs_ty) ->
+      print ppf "@[<hov 2> call (%t) @,(%t) @,(%t)@]" (pp_effect e) (pp_term t)
+        (pp_abs_with_ty abs_ty)
+  | NOp (e, t) ->
+      print ppf "@[<hov 2> call (%t) @,(%t) @,(%s)@]" (pp_effect e) (pp_term t)
+        "(fun x -> x)"
+  | NBind (t, abs) ->
+      print ppf "@[<hov 2>((%t) >> (%t))@]" (pp_term t) (pp_abs abs)
+  | NHandle (NCall (e, t1, (pat, ty, t)), NCast (t2, NCoerFunToHand (c1, c2)))
+    ->
+      print ppf "%t"
+        (pp_term
+           (NCall
+              ( e,
+                t1,
+                (pat, ty, NHandle (t, NCast (t2, NCoerFunToHand (c1, c2)))) )))
+  | NHandle (NReturn t1, NCast (t2, NCoerFunToHand (c1, c2))) ->
+      print ppf "%t" (pp_term (NCast (NApplyTerm (t2, NCast (t1, c1)), c2)))
+  | NHandle (t1, t2) -> (
+      match t2 with
+      | NCast (t, NCoerHandler (c1, c2)) ->
+          print ppf "%t" (pp_term (NCast (NHandle (NCast (t1, c1), t), c2)))
+      | _ -> print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2))
   | _ -> failwith __LOC__
 
-and elab_type t =
-  match t with
-  | NoEff.NTyParam t -> OCaml.TyParam t
-  | NoEff.NTyTuple ts -> OCaml.TyTuple (List.map elab_type ts)
-  | NoEff.NTyArrow (ty1, ty2) -> OCaml.TyArrow (elab_type ty1, elab_type ty2)
-  | NoEff.NTyHandler (ty1, ty2) -> OCaml.TyArrow (elab_type ty1, elab_type ty2)
-  | NoEff.NTyApply (name, tys) -> OCaml.TyApply (name, List.map elab_type tys)
-  | NoEff.NTyQual (_, _) -> failwith "No ty qual supported"
-  | NoEff.NTyComp ty -> elab_type ty
-  | NoEff.NTyBasic ty -> OCaml.TyBasic ty
+and pp_abs (p, t) ppf =
+  print ppf "@[<h>(%t ->@ %t)@]" (pp_pattern p) (pp_term t)
 
-and elab_tydef = function
-  | NoEff.TyDefRecord assoc -> OCaml.TyDefRecord (Assoc.map elab_type assoc)
-  | NoEff.TyDefSum assoc -> OCaml.TyDefSum (Assoc.map help_sum assoc)
-  | NoEff.TyDefInline ty -> OCaml.TyDefInline (elab_type ty)
+and pp_abs_with_ty (p, ty, t) ppf =
+  print ppf "@[<h>((%t : %t) ->@ %t)@]" (pp_pattern p) (pp_type ty) (pp_term t)
 
-and help_sum ty = match ty with Some x -> Some (elab_type x) | None -> None
+and pp_let_rec lst ppf =
+  let pp_var_ty_abs (v, ty, _, t) ppf =
+    print ppf "@[<hv 2>and (%t : %t) = @,%t@]" (pp_variable v) (pp_type ty)
+      (pp_abs t)
+  in
+  match lst with
+  | [] -> ()
+  | (v, ty, _, t) :: tl ->
+      print ppf "@[<hv 2>let rec (%t : %t) = @,%t@] @,%t" (pp_variable v)
+        (pp_type ty) (pp_abs t)
+        (pp_sequence " " pp_var_ty_abs tl)
 
-and elab_abstraction (p, c) = (elab_pattern p, elab_term c)
+and pp_effect_cls eff_cls ppf =
+  let pp_effect_abs2 (eff, (pat1, pat2, t)) ppf =
+    print ppf "@[<hv 2>| %t -> fun %t %t -> %t @]" (pp_effect eff)
+      (pp_pattern pat1) (pp_pattern pat2) (pp_term t)
+  in
+  print ppf
+    "@[<h>(fun (type a) (type b) (eff : (a, b) effect) -> \n\
+    \  (match eff with\n\
+    \    %t  \n\
+    \  ) @)@]"
+    (pp_sequence " " pp_effect_abs2 (Assoc.to_list eff_cls))
 
-and elab_abstraction_with_ty (p, t, c) =
-  (elab_pattern p, elab_type t, elab_term c)
+let pp_def_effect (eff, (ty1, ty2)) ppf =
+  print ppf "@[effect %t : %t ->@ %t@]@."
+    (CoreTypes.Effect.print eff)
+    (pp_type ty1) (pp_type ty2)
 
-and elab_abstraction_2 (p1, p2, c) =
-  (elab_pattern p1, elab_pattern p2, elab_term c)
+let pp_lets lst ppf =
+  let pp_one_let (p, ty, t) ppf =
+    print ppf "@[<hv 2>and (%t : %t) = @,%t@]" (pp_pattern p) (pp_type ty)
+      (pp_term t)
+  in
+  match lst with
+  | [] -> ()
+  | (p, ty, t) :: tl ->
+      print ppf "@[<hv 2>let rec (%t : %t) = @,%t@] @,%t" (pp_pattern p)
+        (pp_type ty) (pp_term t)
+        (pp_sequence " " pp_one_let tl)
 
-and elab_effect_clause ((eff, (t1, t2)), abs) =
-  ((eff, elab_type t1, elab_type t2), elab_abstraction_2 abs)
+let pp_external name symbol_name ppf =
+  print ppf "let %t = %s@." (pp_variable name) symbol_name
+
+let pp_tydef (name, (params, tydef)) ppf =
+  let pp_def tydef ppf =
+    match tydef with
+    | TyDefRecord assoc -> print ppf "%t" (pp_record pp_type ":" assoc)
+    | TyDefSum assoc ->
+        let lst = Assoc.to_list assoc in
+        let print_cons ty_opt ppf =
+          match ty_opt with
+          | lbl, None -> print ppf "%t" (CoreTypes.Label.print lbl)
+          | lbl, Some ty ->
+              print ppf "%t of %t" (CoreTypes.Label.print lbl) (pp_type ty)
+        in
+        print ppf "@[<hov>%t@]" (pp_sequence "@, | " print_cons lst)
+    | TyDefInline ty -> print ppf "%t" (pp_type ty)
+  in
+  match params with
+  | [] ->
+      print ppf "@[type %t = %t@]@."
+        (CoreTypes.TyName.print name)
+        (pp_def tydef)
+  | lst ->
+      print ppf "@[type (%t) %t = %t@]@."
+        (pp_sequence ", " CoreTypes.TyParam.print params)
+        (CoreTypes.TyName.print name)
+        (pp_def tydef)
+
+let pp_cmd cmd ppf =
+  match cmd with
+  | Term t -> print ppf "%t@." (pp_term t) (* TODO check if ok *)
+  | DefEffect e -> pp_def_effect e ppf
+  | TopLet (x, t) -> print ppf "let %t = %t@." (pp_variable x) (pp_term t)
+  | TopLetRec (x, (p, t)) ->
+      print ppf "let rec %t %t = %t@." (pp_variable x) (pp_pattern p)
+        (pp_term t)
+  | External (x, _ty, f) -> pp_external x f ppf
+  | TyDef defs -> print ppf "%t@." (pp_sequence "@, and " pp_tydef defs)

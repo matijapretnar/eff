@@ -93,6 +93,14 @@ and n_abstraction_2_args = n_pattern * n_pattern * n_term
 
 and n_letrec_abstraction = variable * n_type * n_type * n_abstraction
 
+type cmd =
+  | Term of n_term
+  | TopLet of variable * n_term
+  | TopLetRec of variable * n_abstraction
+  | DefEffect of n_effect
+  | External of (variable * n_type * string)
+  | TyDef of (CoreTypes.TyName.t * (CoreTypes.TyParam.t list * n_tydef)) list
+
 let rec subs_var_in_term par subs term =
   match term with
   | NVar v -> if v = par then subs else term
