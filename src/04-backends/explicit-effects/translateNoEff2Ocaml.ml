@@ -139,7 +139,8 @@ let rec pp_term noEff_term ppf =
   | NReturn t -> print ppf "Value %t" (pp_term t)
   | NHandler { effect_clauses = eff_cls; return_clause = val_cl } ->
       print ppf
-        "handler {@[<hov>value_clause = (fun %t);@] @[<hov>effect_claueses = %t;@] }"
+        "handler {@[<hov>value_clause = (fun %t);@] @[<hov>effect_claueses = \
+         %t;@] }"
         (pp_abs_with_ty val_cl) (pp_effect_cls eff_cls)
   | NLet (t1, (pat, t2)) ->
       print ppf "@[<hv>@[<hv>let %t = %t in@] @,%t@]" (pp_pattern pat)
