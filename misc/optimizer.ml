@@ -1,68 +1,3 @@
-open Utils
-open Type
-open Constraint
-open Term
-
-type state = {
-  fuel : int ref;
-  tc_state : TypeChecker.state;
-  recursive_functions : (variable, Type.ty * expression) Assoc.t;
-  knot_functions : (variable, expression * handler * variable) Assoc.t;
-}
-
-let initial_state =
-  {
-    fuel = ref !Config.optimization_fuel;
-    tc_state = TypeChecker.initial_state;
-    recursive_functions = Assoc.empty;
-    knot_functions = Assoc.empty;
-  }
-
-let extend_rec_fun st f ty e =
-  {
-    st with
-    recursive_functions = Assoc.update f (ty, e) st.recursive_functions;
-  }
-
-let extend_var_type st t_var ty =
-  { st with tc_state = TypeChecker.extend_var_types st.tc_state t_var ty }
-
-and extend_pat_type st p ty =
-  { st with tc_state = TypeChecker.extend_pattern_type st.tc_state p ty }
-
-let extend_ty_params st ty_var =
-  { st with tc_state = TypeChecker.extend_ty_params st.tc_state ty_var }
-
-let extend_dirt_params st t_var =
-  { st with tc_state = TypeChecker.extend_dirt_params st.tc_state t_var }
-
-let extend_skel_params st t_var =
-  { st with tc_state = TypeChecker.extend_skel_params st.tc_state t_var }
-
-let extend_ty_coer_types st omega ct =
-  { st with tc_state = TypeChecker.extend_ty_coer_types st.tc_state omega ct }
-
-let extend_dirt_coer_types st omega ct =
-  { st with tc_state = TypeChecker.extend_dirt_coer_types st.tc_state omega ct }
-
-let extend_ty_param_skeletons st omega ct =
-  {
-    st with
-    tc_state = TypeChecker.extend_ty_param_skeletons st.tc_state omega ct;
-  }
-
-let refresh_expr e =
-  let res = Term.refresh_expr Assoc.empty e in
-  res
-
-let refresh_abs a = Term.refresh_abs Assoc.empty a
-
-let refresh_abs_with_ty a = Term.refresh_abs_with_ty Assoc.empty a
-
-let refresh_abs2 a2 =
-  let res = Term.refresh_abs2 Assoc.empty a2 in
-  res
-
 let is_relatively_pure st c h =
   match
     ( TypeChecker.check_computation st.tc_state c,
@@ -425,85 +360,6 @@ let letrec_drop_unused_bindings (c : computation) : computation =
       (* Print.debug "This function can only be applied on LetRecs"; *)
       failwith __LOC__
 
-let rec optimize_ty_coercion st tyco =
-  reduce_ty_coercion st (optimize_sub_ty_coercion st tyco)
-
-and optimize_dirty_coercion st dtyco =
-  reduce_dirty_coercion st (optimize_sub_dirty_coercion st dtyco)
-
-and optimize_dirt_coercion st dco =
-  optimize_dirt_coercion' st EffectSet.empty dco
-
-and optimize_dirt_coercion' st ops dco =
-  reduce_dirt_coercion st ops (optimize_sub_dirt_coercion st ops dco)
-
-and optimize_sub_ty_coercion st tyco =
-  match tyco with
-  | ReflTy ty -> tyco
-  | ArrowCoercion (tyco1, dtyco2) ->
-      ArrowCoercion
-        (optimize_ty_coercion st tyco1, optimize_dirty_coercion st dtyco2)
-  | HandlerCoercion (dtyco1, dtyco2) ->
-      HandlerCoercion
-        (optimize_dirty_coercion st dtyco1, optimize_dirty_coercion st dtyco2)
-  | TyCoercionVar tycovar -> TyCoercionVar tycovar
-  | TupleCoercion tycos -> TupleCoercion tycos
-  (* | ForallTy (tv, tyco1) ->
-      ForallTy (tv, optimize_ty_coercion (extend_ty_params st tv) tyco1) *)
-  (* | ApplyTyCoer (tyco1, ty) -> ApplyTyCoer (optimize_ty_coercion st tyco1, ty) *)
-  (* | ForallDirt (dv, tyco1) -> ForallDirt (dv, optimize_ty_coercion st tyco1) *)
-  (* | ApplyDirCoer (tyco1, d) -> ApplyDirCoer (optimize_ty_coercion st tyco1, d) *)
-  | QualTyCoer (ct_ty, tyco1) ->
-      QualTyCoer (ct_ty, optimize_ty_coercion st tyco1)
-  | QualDirtCoer (ct_dirt, tyco1) ->
-      QualDirtCoer (ct_dirt, optimize_ty_coercion st tyco1)
-  (* | ForallSkel (sv, tyco1) -> ForallSkel (sv, optimize_ty_coercion st tyco1) *)
-  (* | ApplySkelCoer (tyco1, sk) ->
-      ApplySkelCoer (optimize_ty_coercion st tyco1, sk) *)
-  | _ -> tyco
-
-and optimize_sub_dirty_coercion st dtyco =
-  match dtyco with
-  | BangCoercion (tyco1, dco2) ->
-      BangCoercion
-        (optimize_ty_coercion st tyco1, optimize_dirt_coercion st dco2)
-
-and optimize_sub_dirt_coercion st p_ops dco =
-  match dco with
-  | ReflDirt d -> dco
-  | DirtCoercionVar dcov -> dco
-  | Empty d -> if dirts_are_equal d empty_dirt then ReflDirt empty_dirt else dco
-  | UnionDirt (ops, dco1) ->
-      UnionDirt
-        (ops, optimize_dirt_coercion' st (EffectSet.union p_ops ops) dco1)
-
-and reduce_ty_coercion st tyco =
-  (* Print.debug "reduce_ty_coercion: %t" (Constraint.print_ty_coercion tyco); *)
-  match tyco with
-  | ReflTy ty -> tyco
-  | ArrowCoercion (tyco1, dtyco2) -> (
-      match (tyco1, dtyco2) with
-      | ReflTy ty1, BangCoercion (ReflTy ty2, ReflDirt d) ->
-          ReflTy (Arrow (ty1, (ty2, d)))
-      | _ -> tyco)
-  | HandlerCoercion (dtyco1, dtyco2) -> tyco
-  | TyCoercionVar tycovar -> tyco
-  | TupleCoercion tycos -> tyco
-  (* | ForallTy (tv, tyco1) -> tyco *)
-  (* | ApplyTyCoer (tyco1, ty) -> tyco *)
-  (* | ForallDirt (dv, tyco1) -> tyco *)
-  (* | ApplyDirCoer (tyco1, d) -> tyco *)
-  | QualTyCoer (ct_ty, tyco1) -> tyco
-  | QualDirtCoer (ct_dirt, tyco1) -> tyco
-  (* | ForallSkel (sv, tyco1) -> tyco *)
-  (* | ApplySkelCoer (tyco1, sk) -> tyco *)
-  | _ -> tyco
-
-and reduce_dirty_coercion st dtyco =
-  (* Print.debug "reduce_dirty_coercion: %t"
-     (Constraint.print_dirty_coercion dtyco); *)
-  match dtyco with BangCoercion (tyco1, dco2) -> dtyco
-
 and reduce_dirt_coercion st p_ops dco =
   match dco with
   | ReflDirt d -> dco
@@ -554,45 +410,6 @@ and optimize_abs st ty (p, c) =
   let st' = optimize_pattern st ty p in
   (p, optimize_comp st' c)
 
-and optimize_sub_expr st e =
-  let plain_e' =
-    match e with
-    | Var v -> Var v
-    (* | BuiltIn (s, i) -> BuiltIn (s, i) *)
-    | Const c -> Const c
-    | Tuple es -> Tuple (List.map (optimize_expr st) es)
-    | Record _r -> failwith __LOC__
-    | Variant (l, e1) -> Variant (l, optimize_expr st e1)
-    | Lambda plain_a_w_ty ->
-        Lambda (optimize_abstraction_with_ty st plain_a_w_ty)
-    | Effect op -> Effect op
-    | Handler h -> Handler (optimize_sub_handler st h)
-    (* | BigLambdaTy (ty_var, sk, e) ->
-        let st' =
-          extend_ty_param_skeletons (extend_ty_params st ty_var) ty_var sk
-        in
-        BigLambdaTy (ty_var, sk, optimize_expr st' e) *)
-    (* | BigLambdaDirt (dirt_var, e) ->
-        let st' = extend_dirt_params st dirt_var in
-        BigLambdaDirt (dirt_var, optimize_expr st' e) *)
-    (* | BigLambdaSkel (sk_var, e) ->
-        let st' = extend_skel_params st sk_var in
-        BigLambdaSkel (sk_var, optimize_expr st' e) *)
-    | CastExp (e1, tyco1) ->
-        CastExp (optimize_expr st e1, optimize_ty_coercion st tyco1)
-    (* | ApplyTyExp (e, ty) -> ApplyTyExp (optimize_expr st e, ty) *)
-    | LambdaTyCoerVar (tyco_var, ct_ty, e) ->
-        let st' = extend_ty_coer_types st tyco_var ct_ty in
-        LambdaTyCoerVar (tyco_var, ct_ty, optimize_expr st' e)
-    | LambdaDirtCoerVar (dco_var, ct_dirt, e) ->
-        let st' = extend_dirt_coer_types st dco_var ct_dirt in
-        LambdaDirtCoerVar (dco_var, ct_dirt, optimize_expr st' e)
-    (* | ApplyDirtExp (e, dirt) -> ApplyDirtExp (optimize_expr st e, dirt) *)
-    (* | ApplySkelExp (e, sk) -> ApplySkelExp (optimize_expr st e, sk) *)
-    | ApplyTyCoercion (e, tyco) -> ApplyTyCoercion (optimize_expr st e, tyco)
-    | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (optimize_expr st e, dco)
-  in
-  plain_e'
 
 and match_recursive_function st e =
   match e with
@@ -623,70 +440,6 @@ and match_knot_function' st e e' h =
   | ApplyDirtCoercion (e, dco) -> match_knot_function' st e e' h
   | ApplyTyCoercion (e, tyco) -> match_knot_function' st e e' h
   | _ -> None
-
-and optimize_sub_handler st { effect_clauses = ecs; value_clause = vc } =
-  let vc' = optimize_abstraction_with_ty st vc in
-  let dty = TypeChecker.check_abstraction st.tc_state vc in
-  let ecs' = Assoc.kmap (optimize_abstraction2 st dty) ecs in
-  { effect_clauses = ecs'; value_clause = vc' }
-
-and optimize_abstraction_with_ty st a_w_ty =
-  optimize_plain_abstraction_with_ty st a_w_ty
-
-and optimize_plain_abstraction_with_ty st (p, ty, c) =
-  (p, ty, optimize_comp (extend_pat_type st p ty) c)
-
-and optimize_abstraction st ty a =
-  let p, c = a in
-  let st' = optimize_pattern st ty p in
-  (p, optimize_comp st' c)
-
-and optimize_pattern st ty p = extend_pat_type st p ty
-
-and optimize_abstraction2 st (dty : dirty) (effect, a2) =
-  let op, (op_ty_in, op_ty_out) = effect in
-  let p1, p2, c = a2 in
-  let st' = extend_pat_type st p1 op_ty_in in
-  let st'' = extend_pat_type st' p2 (Type.Arrow (op_ty_out, dty)) in
-  (effect, (p1, p2, optimize_comp st'' c))
-
-and optimize_sub_comp st c =
-  (* Print.debug "optimize_sub_comp: %t" (Term.print_computation c); *)
-  let plain_c' =
-    match c with
-    | Value e1 -> Value (optimize_expr st e1)
-    | LetVal (e1, abs) ->
-        LetVal (optimize_expr st e1, optimize_abstraction_with_ty st abs)
-    | LetRec (defs, c) -> (
-        match defs with
-        | [ (var, argTy, resTy, (p, rhs)) ] ->
-            let st' = extend_var_type st var (Type.Arrow (argTy, resTy)) in
-            let e1 = Lambda (p, argTy, rhs) in
-            let st'' = extend_rec_fun st' var (Type.Arrow (argTy, resTy)) e1 in
-            LetRec
-              ( [ (var, argTy, resTy, optimize_abstraction st' argTy (p, rhs)) ],
-                optimize_comp st'' c )
-        | _ -> failwith __LOC__)
-    | Match (e1, resTy, abstractions) ->
-        let ty = TypeChecker.check_expression st.tc_state e1 in
-        Match
-          ( optimize_expr st e1,
-            resTy,
-            List.map (optimize_abstraction st ty) abstractions )
-    | Apply (e1, e2) -> Apply (optimize_expr st e1, optimize_expr st e2)
-    | Handle (e1, c1) -> Handle (optimize_expr st e1, optimize_comp st c1)
-    | Call (op, e1, a_w_ty) ->
-        Call (op, optimize_expr st e1, optimize_abstraction_with_ty st a_w_ty)
-    | Op (op, e1) ->
-        (* Print.debug "optimize_sub_comp Op"; *)
-        Op (op, optimize_expr st e1)
-    | Bind (c1, abstraction) ->
-        let ty, _ = TypeChecker.check_computation st.tc_state c1 in
-        Bind (optimize_comp st c1, optimize_abs st ty abstraction)
-    | CastComp (c1, dirty_coercion) ->
-        CastComp (optimize_comp st c1, optimize_dirty_coercion st dirty_coercion)
-  in
-  plain_c'
 
 and reduce_expr st e =
   (* Print.debug "reduce_exp: %t" (Term.print_expression e); *)
@@ -1223,12 +976,6 @@ and reduce_comp st c =
     (Term.print_computation c') (Scheme.print_dirty_scheme c'.Term.scheme);*)
   c'
 *)
-
-let optimize_main_comp tc_state c =
-  optimize_comp { initial_state with tc_state } c
-
-let optimize_main_expr tc_state e =
-  optimize_expr { initial_state with tc_state } e
 
 (*
  To Do list for optimization :
