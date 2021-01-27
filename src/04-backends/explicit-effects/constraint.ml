@@ -6,7 +6,9 @@ let add_to_constraints con constraints = con :: constraints
 let add_list_to_constraints new_constraints old_constraints =
   new_constraints @ old_constraints
 
-type ty_coercion =
+type ty_coercion = (ty_coercion', Type.ct_ty) typed
+
+and ty_coercion' =
   | ReflTy of Type.ty
   | ArrowCoercion of ty_coercion * dirty_coercion
   | HandlerCoercion of dirty_coercion * dirty_coercion
@@ -16,7 +18,9 @@ type ty_coercion =
   | QualTyCoer of Type.ct_ty * ty_coercion
   | QualDirtCoer of Type.ct_dirt * ty_coercion
 
-and dirt_coercion =
+and dirt_coercion = (dirt_coercion', Type.ct_dirt) typed
+
+and dirt_coercion' =
   | ReflDirt of Type.dirt
   | DirtCoercionVar of Type.DirtCoercionParam.t
   | Empty of Type.dirt
@@ -30,6 +34,17 @@ type omega_ct =
   | SkelEq of Type.skeleton * Type.skeleton
   | TyParamHasSkel of (CoreTypes.TyParam.t * Type.skeleton)
 
+let reflTy ty = { term = ReflTy ty; ty = (ty, ty) }
+
+let arrowCoercion (tcoer1, (tcoer2, dcoer2)) =
+  let ty1, ty1' = tcoer1.ty
+  and ty2, ty2' = tcoer2.ty
+  and drt2, drt2' = dcoer2.ty in
+  {
+    term = ArrowCoercion (tcoer1, (tcoer2, dcoer2));
+    ty = (Type.Arrow (ty1', (ty2, drt2)), Type.Arrow (ty1, (ty2', drt2')));
+  }
+
 (* ************************************************************************* *)
 (*                         COERCION VARIABLES OF                             *)
 (* ************************************************************************* *)
@@ -39,7 +54,7 @@ module DirtCoercionParamSet = Set.Make (Type.DirtCoercionParam)
 
 let rec print_ty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c with
+  match c.term with
   | ReflTy p -> print "<%t>" (Type.print_ty p)
   | ArrowCoercion (tc, dc) ->
       print "%t -> %t" (print_ty_coercion tc) (print_dirty_coercion dc)
@@ -84,7 +99,7 @@ and print_dirty_coercion ?max_level (tc, dirtc) ppf =
 
 and print_dirt_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c with
+  match c.term with
   | ReflDirt p -> print "<%t>" (Type.print_dirt p)
   | DirtCoercionVar tcp -> print "%t" (Type.DirtCoercionParam.print tcp)
   | Empty d -> print "Empty__(%t)" (Type.print_dirt d)
@@ -109,10 +124,6 @@ and print_omega_ct ?max_level c ppf =
 
 let print_constraints cs = Print.sequence ";" print_omega_ct cs
 
-let fresh_dirt_coer cons =
-  let param = Type.DirtCoercionParam.fresh () in
-  (DirtCoercionVar param, DirtOmega (param, cons))
-
 let fresh_ty_with_skel skel =
   let ty_var = CoreTypes.TyParam.fresh () in
   (Type.TyParam (ty_var, skel), TyParamHasSkel (ty_var, skel))
@@ -131,13 +142,16 @@ let fresh_dirty_with_fresh_skel () =
 
 let fresh_ty_coer cons =
   let param = Type.TyCoercionParam.fresh () in
-  (TyCoercionVar param, TyOmega (param, cons))
+  ({ term = TyCoercionVar param; ty = cons }, TyOmega (param, cons))
+
+let fresh_dirt_coer cons =
+  let param = Type.DirtCoercionParam.fresh () in
+  ({ term = DirtCoercionVar param; ty = cons }, DirtOmega (param, cons))
 
 let fresh_dirty_coer ((ty1, drt1), (ty2, drt2)) =
-  let ty_param = Type.TyCoercionParam.fresh () in
-  let dirt_param = Type.DirtCoercionParam.fresh () in
-  let coer = (TyCoercionVar ty_param, DirtCoercionVar dirt_param) in
-  (coer, TyOmega (ty_param, (ty1, ty2)), DirtOmega (dirt_param, (drt1, drt2)))
+  let ty_coer, ty_cons = fresh_ty_coer (ty1, ty2)
+  and drt_coer, drt_cons = fresh_dirt_coer (drt1, drt2) in
+  ((ty_coer, drt_coer), ty_cons, drt_cons)
 
 (* ************************************************************************* *)
 (*                        FREE PARAMETER COMPUTATION                         *)
@@ -158,7 +172,8 @@ let free_params_constraints = Type.FreeParams.union_map free_params_constraint
 
 (* free variables in target terms *)
 
-let rec free_params_ty_coercion = function
+let rec free_params_ty_coercion coer =
+  match coer.term with
   | ReflTy ty -> Type.free_params_ty ty
   | ArrowCoercion (tc, dc) ->
       Type.FreeParams.union
@@ -180,7 +195,8 @@ let rec free_params_ty_coercion = function
         (fun free tc -> Type.FreeParams.union free (free_params_ty_coercion tc))
         Type.FreeParams.empty tcs
 
-and free_params_dirt_coercion = function
+and free_params_dirt_coercion coer =
+  match coer.term with
   | ReflDirt d -> Type.free_params_dirt d
   | DirtCoercionVar _dcv -> Type.FreeParams.empty
   | Empty d -> Type.free_params_dirt d

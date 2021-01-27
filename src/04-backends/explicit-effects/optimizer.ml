@@ -37,7 +37,7 @@ and optimize_dirty_coercion state (tcoer, dcoer) =
   (optimize_ty_coercion state tcoer, optimize_dirt_coercion state dcoer)
 
 and reduce_ty_coercion _state = function
-  | ArrowCoercion (ReflTy ty1, (ReflTy ty2, ReflDirt drt)) ->
+  | ArrowCoercion (ReflTy ty1, BangCoercion (ReflTy ty2, ReflDirt drt)) ->
       ReflTy (Type.Arrow (ty1, (ty2, drt)))
   | tcoer -> tcoer
 
@@ -121,6 +121,6 @@ and reduce_computation state = function
     when TypeChecker.is_trivial_dirty_coercion TypeChecker.initial_state dtcoer
     ->
       cmp
-  | Term.CastComp (Term.Value exp, (tcoer, _)) ->
+  | Term.CastComp (Term.Value exp, BangCoercion (tcoer, _)) ->
       Term.Value (reduce_expression state (Term.CastExp (exp, tcoer)))
   | cmp -> cmp

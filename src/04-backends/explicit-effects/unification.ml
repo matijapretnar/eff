@@ -136,7 +136,7 @@ let ty_omega_step sub paused cons rest_queue omega = function
   (* ω : A <= A *)
   | x, y when Type.types_are_equal x y ->
       let k = omega in
-      let v = Constraint.ReflTy x in
+      let v = Constraint.reflTy x in
       (Substitution.add_type_coercion k v sub, paused, rest_queue)
   (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
   | Type.Arrow (a1, dirty1), Type.Arrow (a2, dirty2) ->
@@ -146,7 +146,7 @@ let ty_omega_step sub paused cons rest_queue omega = function
       in
       let k = omega in
       let v =
-        Constraint.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
+        Constraint.arrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
       in
       ( Substitution.add_type_coercion k v sub,
         paused,
@@ -163,7 +163,7 @@ let ty_omega_step sub paused cons rest_queue omega = function
           tys tys' ([], [])
       in
       let k = omega in
-      let v = Constraint.TupleCoercion coercions in
+      let v = Constraint.tupleCoercion coercions in
       ( Substitution.add_type_coercion k v sub,
         paused,
         Constraint.add_list_to_constraints conss rest_queue )

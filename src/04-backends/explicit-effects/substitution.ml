@@ -145,6 +145,12 @@ and apply_sub_ct_dirt sub (drt1, drt2) =
   (apply_sub_dirt sub drt1, apply_sub_dirt sub drt2)
 
 let rec apply_sub_tycoer sub ty_coer =
+  {
+    term = apply_sub_tycoer' sub ty_coer.term;
+    ty = apply_sub_ct_ty sub ty_coer.ty;
+  }
+
+and apply_sub_tycoer' sub ty_coer =
   match ty_coer with
   | Constraint.ReflTy tty -> Constraint.ReflTy (apply_sub_ty sub tty)
   | ArrowCoercion (tycoer1, dirtycoer) ->
