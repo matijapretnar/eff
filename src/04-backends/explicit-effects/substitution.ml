@@ -145,13 +145,17 @@ and apply_sub_ct_dirt sub (drt1, drt2) =
   (apply_sub_dirt sub drt1, apply_sub_dirt sub drt2)
 
 let rec apply_sub_tycoer sub ty_coer =
-  {
-    term = apply_sub_tycoer' sub ty_coer.term;
-    ty = apply_sub_ct_ty sub ty_coer.ty;
-  }
+  let ty' = apply_sub_ct_ty sub ty_coer.ty in
+  match ty_coer.term with
+  | Constraint.TyCoercionVar p -> (
+      match Assoc.lookup p sub.type_param_to_type_coercions with
+      | Some t_coer -> apply_sub_tycoer sub t_coer
+      | None -> { ty_coer with ty = ty' })
+  | _ -> { term = apply_sub_tycoer' sub ty_coer.term; ty = ty' }
 
 and apply_sub_tycoer' sub ty_coer =
   match ty_coer with
+  | TyCoercionVar _ -> assert false
   | Constraint.ReflTy tty -> Constraint.ReflTy (apply_sub_ty sub tty)
   | ArrowCoercion (tycoer1, dirtycoer) ->
       ArrowCoercion
@@ -159,23 +163,25 @@ and apply_sub_tycoer' sub ty_coer =
   | HandlerCoercion (dirtycoer1, dirtycoer2) ->
       HandlerCoercion
         (apply_sub_dirtycoer sub dirtycoer1, apply_sub_dirtycoer sub dirtycoer2)
-  | TyCoercionVar p -> (
-      match Assoc.lookup p sub.type_param_to_type_coercions with
-      | Some t_coer -> apply_sub_tycoer sub t_coer
-      | None -> TyCoercionVar p)
   | TupleCoercion tcl ->
       TupleCoercion (List.map (fun x -> apply_sub_tycoer sub x) tcl)
   | ApplyCoercion (ty_name, tcl) ->
       ApplyCoercion (ty_name, List.map (fun x -> apply_sub_tycoer sub x) tcl)
   | _ -> failwith __LOC__
 
-and apply_sub_dirtcoer sub dirt_coer =
-  match dirt_coer with
-  | Constraint.ReflDirt d -> Constraint.ReflDirt (apply_sub_dirt sub d)
-  | DirtCoercionVar p -> (
+and apply_sub_dirtcoer sub drt_coer =
+  let drt' = apply_sub_ct_dirt sub drt_coer.ty in
+  match drt_coer.term with
+  | Constraint.DirtCoercionVar p -> (
       match Assoc.lookup p sub.dirt_var_to_dirt_coercions with
       | Some dc -> apply_sub_dirtcoer sub dc
-      | _ -> dirt_coer)
+      | None -> { drt_coer with ty = drt' })
+  | _ -> { term = apply_sub_dirtcoer' sub drt_coer.term; ty = drt' }
+
+and apply_sub_dirtcoer' sub ty_coer =
+  match ty_coer with
+  | Constraint.ReflDirt d -> Constraint.ReflDirt (apply_sub_dirt sub d)
+  | DirtCoercionVar _ -> assert false
   | Empty d -> Empty (apply_sub_dirt sub d)
   | UnionDirt (es, dirt_coer1) ->
       UnionDirt (es, apply_sub_dirtcoer sub dirt_coer1)
