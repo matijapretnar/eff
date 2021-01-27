@@ -2,7 +2,7 @@
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "loopNoOptImpure.out")
+   (target "loopNoOpt.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
@@ -10,49 +10,24 @@
        (run eff --no-stdlib --compile-plain-ocaml --no-opts "./loop/loop.eff")))))
 
 (rule
- (deps "loopNoOptImpure.out")
-  (target "loopNoOptImpure.formatted")
+ (deps "loopNoOpt.out")
+  (target "loopNoOpt.formatted")
    (action
-    (with-outputs-to "loopNoOptImpure.formatted"
+    (with-outputs-to "loopNoOpt.formatted"
      (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat loopNoOptImpure.out)))))
+      (run ocamlformat loopNoOpt.out)))))
 
 (rule
- (deps loopNoOptImpure.formatted)
+ (deps loopNoOpt.formatted)
   (alias generate_benchmarks)
    (action
-    (diff "loop/loopNoOptImpure.ml" "loopNoOptImpure.formatted")))
+    (diff "loop/loopNoOpt.ml" "loopNoOpt.formatted")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "loopNoOptPure.out")
-    (action
-     (with-outputs-to "%{target}"
-      (with-accepted-exit-codes
-       (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure --no-opts "./loop/loop.eff")))))
-
-(rule
- (deps "loopNoOptPure.out")
-  (target "loopNoOptPure.formatted")
-   (action
-    (with-outputs-to "loopNoOptPure.formatted"
-     (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat loopNoOptPure.out)))))
-
-(rule
- (deps loopNoOptPure.formatted)
-  (alias generate_benchmarks)
-   (action
-    (diff "loop/loopNoOptPure.ml" "loopNoOptPure.formatted")))
-
-(rule
- (deps
- %{bin:eff}
-  (source_tree .))
-   (target "loopOptImpure.out")
+   (target "loopOpt.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
@@ -60,49 +35,24 @@
        (run eff --no-stdlib --compile-plain-ocaml  "./loop/loop.eff")))))
 
 (rule
- (deps "loopOptImpure.out")
-  (target "loopOptImpure.formatted")
+ (deps "loopOpt.out")
+  (target "loopOpt.formatted")
    (action
-    (with-outputs-to "loopOptImpure.formatted"
+    (with-outputs-to "loopOpt.formatted"
      (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat loopOptImpure.out)))))
+      (run ocamlformat loopOpt.out)))))
 
 (rule
- (deps loopOptImpure.formatted)
+ (deps loopOpt.formatted)
   (alias generate_benchmarks)
    (action
-    (diff "loop/loopOptImpure.ml" "loopOptImpure.formatted")))
+    (diff "loop/loopOpt.ml" "loopOpt.formatted")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "loopOptPure.out")
-    (action
-     (with-outputs-to "%{target}"
-      (with-accepted-exit-codes
-       (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure "./loop/loop.eff")))))
-
-(rule
- (deps "loopOptPure.out")
-  (target "loopOptPure.formatted")
-   (action
-    (with-outputs-to "loopOptPure.formatted"
-     (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat loopOptPure.out)))))
-
-(rule
- (deps loopOptPure.formatted)
-  (alias generate_benchmarks)
-   (action
-    (diff "loop/loopOptPure.ml" "loopOptPure.formatted")))
-
-(rule
- (deps
- %{bin:eff}
-  (source_tree .))
-   (target "queensNoOptImpure.out")
+   (target "queensNoOpt.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
@@ -110,49 +60,24 @@
        (run eff --no-stdlib --compile-plain-ocaml --no-opts "./queens/queens.eff")))))
 
 (rule
- (deps "queensNoOptImpure.out")
-  (target "queensNoOptImpure.formatted")
+ (deps "queensNoOpt.out")
+  (target "queensNoOpt.formatted")
    (action
-    (with-outputs-to "queensNoOptImpure.formatted"
+    (with-outputs-to "queensNoOpt.formatted"
      (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat queensNoOptImpure.out)))))
+      (run ocamlformat queensNoOpt.out)))))
 
 (rule
- (deps queensNoOptImpure.formatted)
+ (deps queensNoOpt.formatted)
   (alias generate_benchmarks)
    (action
-    (diff "queens/queensNoOptImpure.ml" "queensNoOptImpure.formatted")))
+    (diff "queens/queensNoOpt.ml" "queensNoOpt.formatted")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "queensNoOptPure.out")
-    (action
-     (with-outputs-to "%{target}"
-      (with-accepted-exit-codes
-       (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure --no-opts "./queens/queens.eff")))))
-
-(rule
- (deps "queensNoOptPure.out")
-  (target "queensNoOptPure.formatted")
-   (action
-    (with-outputs-to "queensNoOptPure.formatted"
-     (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat queensNoOptPure.out)))))
-
-(rule
- (deps queensNoOptPure.formatted)
-  (alias generate_benchmarks)
-   (action
-    (diff "queens/queensNoOptPure.ml" "queensNoOptPure.formatted")))
-
-(rule
- (deps
- %{bin:eff}
-  (source_tree .))
-   (target "queensOptImpure.out")
+   (target "queensOpt.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
@@ -160,49 +85,24 @@
        (run eff --no-stdlib --compile-plain-ocaml  "./queens/queens.eff")))))
 
 (rule
- (deps "queensOptImpure.out")
-  (target "queensOptImpure.formatted")
+ (deps "queensOpt.out")
+  (target "queensOpt.formatted")
    (action
-    (with-outputs-to "queensOptImpure.formatted"
+    (with-outputs-to "queensOpt.formatted"
      (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat queensOptImpure.out)))))
+      (run ocamlformat queensOpt.out)))))
 
 (rule
- (deps queensOptImpure.formatted)
+ (deps queensOpt.formatted)
   (alias generate_benchmarks)
    (action
-    (diff "queens/queensOptImpure.ml" "queensOptImpure.formatted")))
+    (diff "queens/queensOpt.ml" "queensOpt.formatted")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "queensOptPure.out")
-    (action
-     (with-outputs-to "%{target}"
-      (with-accepted-exit-codes
-       (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure "./queens/queens.eff")))))
-
-(rule
- (deps "queensOptPure.out")
-  (target "queensOptPure.formatted")
-   (action
-    (with-outputs-to "queensOptPure.formatted"
-     (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat queensOptPure.out)))))
-
-(rule
- (deps queensOptPure.formatted)
-  (alias generate_benchmarks)
-   (action
-    (diff "queens/queensOptPure.ml" "queensOptPure.formatted")))
-
-(rule
- (deps
- %{bin:eff}
-  (source_tree .))
-   (target "interpNoOptImpure.out")
+   (target "interpNoOpt.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
@@ -210,49 +110,24 @@
        (run eff --no-stdlib --compile-plain-ocaml --no-opts "./interp/interp.eff")))))
 
 (rule
- (deps "interpNoOptImpure.out")
-  (target "interpNoOptImpure.formatted")
+ (deps "interpNoOpt.out")
+  (target "interpNoOpt.formatted")
    (action
-    (with-outputs-to "interpNoOptImpure.formatted"
+    (with-outputs-to "interpNoOpt.formatted"
      (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat interpNoOptImpure.out)))))
+      (run ocamlformat interpNoOpt.out)))))
 
 (rule
- (deps interpNoOptImpure.formatted)
+ (deps interpNoOpt.formatted)
   (alias generate_benchmarks)
    (action
-    (diff "interp/interpNoOptImpure.ml" "interpNoOptImpure.formatted")))
+    (diff "interp/interpNoOpt.ml" "interpNoOpt.formatted")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "interpNoOptPure.out")
-    (action
-     (with-outputs-to "%{target}"
-      (with-accepted-exit-codes
-       (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure --no-opts "./interp/interp.eff")))))
-
-(rule
- (deps "interpNoOptPure.out")
-  (target "interpNoOptPure.formatted")
-   (action
-    (with-outputs-to "interpNoOptPure.formatted"
-     (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat interpNoOptPure.out)))))
-
-(rule
- (deps interpNoOptPure.formatted)
-  (alias generate_benchmarks)
-   (action
-    (diff "interp/interpNoOptPure.ml" "interpNoOptPure.formatted")))
-
-(rule
- (deps
- %{bin:eff}
-  (source_tree .))
-   (target "interpOptImpure.out")
+   (target "interpOpt.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
@@ -260,49 +135,24 @@
        (run eff --no-stdlib --compile-plain-ocaml  "./interp/interp.eff")))))
 
 (rule
- (deps "interpOptImpure.out")
-  (target "interpOptImpure.formatted")
+ (deps "interpOpt.out")
+  (target "interpOpt.formatted")
    (action
-    (with-outputs-to "interpOptImpure.formatted"
+    (with-outputs-to "interpOpt.formatted"
      (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat interpOptImpure.out)))))
+      (run ocamlformat interpOpt.out)))))
 
 (rule
- (deps interpOptImpure.formatted)
+ (deps interpOpt.formatted)
   (alias generate_benchmarks)
    (action
-    (diff "interp/interpOptImpure.ml" "interpOptImpure.formatted")))
+    (diff "interp/interpOpt.ml" "interpOpt.formatted")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "interpOptPure.out")
-    (action
-     (with-outputs-to "%{target}"
-      (with-accepted-exit-codes
-       (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure "./interp/interp.eff")))))
-
-(rule
- (deps "interpOptPure.out")
-  (target "interpOptPure.formatted")
-   (action
-    (with-outputs-to "interpOptPure.formatted"
-     (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat interpOptPure.out)))))
-
-(rule
- (deps interpOptPure.formatted)
-  (alias generate_benchmarks)
-   (action
-    (diff "interp/interpOptPure.ml" "interpOptPure.formatted")))
-
-(rule
- (deps
- %{bin:eff}
-  (source_tree .))
-   (target "rangeNoOptImpure.out")
+   (target "rangeNoOpt.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
@@ -310,49 +160,24 @@
        (run eff --no-stdlib --compile-plain-ocaml --no-opts "./range/range.eff")))))
 
 (rule
- (deps "rangeNoOptImpure.out")
-  (target "rangeNoOptImpure.formatted")
+ (deps "rangeNoOpt.out")
+  (target "rangeNoOpt.formatted")
    (action
-    (with-outputs-to "rangeNoOptImpure.formatted"
+    (with-outputs-to "rangeNoOpt.formatted"
      (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat rangeNoOptImpure.out)))))
+      (run ocamlformat rangeNoOpt.out)))))
 
 (rule
- (deps rangeNoOptImpure.formatted)
+ (deps rangeNoOpt.formatted)
   (alias generate_benchmarks)
    (action
-    (diff "range/rangeNoOptImpure.ml" "rangeNoOptImpure.formatted")))
+    (diff "range/rangeNoOpt.ml" "rangeNoOpt.formatted")))
 
 (rule
  (deps
  %{bin:eff}
   (source_tree .))
-   (target "rangeNoOptPure.out")
-    (action
-     (with-outputs-to "%{target}"
-      (with-accepted-exit-codes
-       (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure --no-opts "./range/range.eff")))))
-
-(rule
- (deps "rangeNoOptPure.out")
-  (target "rangeNoOptPure.formatted")
-   (action
-    (with-outputs-to "rangeNoOptPure.formatted"
-     (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat rangeNoOptPure.out)))))
-
-(rule
- (deps rangeNoOptPure.formatted)
-  (alias generate_benchmarks)
-   (action
-    (diff "range/rangeNoOptPure.ml" "rangeNoOptPure.formatted")))
-
-(rule
- (deps
- %{bin:eff}
-  (source_tree .))
-   (target "rangeOptImpure.out")
+   (target "rangeOpt.out")
     (action
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
@@ -360,41 +185,16 @@
        (run eff --no-stdlib --compile-plain-ocaml  "./range/range.eff")))))
 
 (rule
- (deps "rangeOptImpure.out")
-  (target "rangeOptImpure.formatted")
+ (deps "rangeOpt.out")
+  (target "rangeOpt.formatted")
    (action
-    (with-outputs-to "rangeOptImpure.formatted"
+    (with-outputs-to "rangeOpt.formatted"
      (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat rangeOptImpure.out)))))
+      (run ocamlformat rangeOpt.out)))))
 
 (rule
- (deps rangeOptImpure.formatted)
+ (deps rangeOpt.formatted)
   (alias generate_benchmarks)
    (action
-    (diff "range/rangeOptImpure.ml" "rangeOptImpure.formatted")))
-
-(rule
- (deps
- %{bin:eff}
-  (source_tree .))
-   (target "rangeOptPure.out")
-    (action
-     (with-outputs-to "%{target}"
-      (with-accepted-exit-codes
-       (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --pure "./range/range.eff")))))
-
-(rule
- (deps "rangeOptPure.out")
-  (target "rangeOptPure.formatted")
-   (action
-    (with-outputs-to "rangeOptPure.formatted"
-     (with-accepted-exit-codes (or 0 1 2)
-      (run ocamlformat rangeOptPure.out)))))
-
-(rule
- (deps rangeOptPure.formatted)
-  (alias generate_benchmarks)
-   (action
-    (diff "range/rangeOptPure.ml" "rangeOptPure.formatted")))
+    (diff "range/rangeOpt.ml" "rangeOpt.formatted")))
 
