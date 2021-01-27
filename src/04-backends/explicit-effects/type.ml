@@ -440,61 +440,6 @@ and free_params_dirt (dirt : dirt) =
 
 (* ************************************************************************* *)
 
-let refresh_skeleton _skel = failwith __LOC__
-
-let rec refresh_ty (ty_sbst, dirt_sbst) t =
-  match t with
-  | TyParam (x, skel) -> (
-      match Assoc.lookup x ty_sbst with
-      | Some x' -> ((ty_sbst, dirt_sbst), TyParam (x', refresh_skeleton skel))
-      | None ->
-          let y = CoreTypes.TyParam.fresh () in
-          ( (Assoc.update x y ty_sbst, dirt_sbst),
-            TyParam (y, refresh_skeleton skel) ))
-  | Arrow (a, c) ->
-      let (a_ty_sbst, a_dirt_sbst), a' = refresh_ty (ty_sbst, dirt_sbst) a in
-      let temp_ty_sbst = Assoc.concat a_ty_sbst ty_sbst in
-      let temp_dirt_sbst = Assoc.concat a_dirt_sbst dirt_sbst in
-      let (c_ty_sbst, c_dirt_sbst), c' =
-        refresh_dirty (temp_ty_sbst, temp_dirt_sbst) c
-      in
-      ((c_ty_sbst, c_dirt_sbst), Arrow (a', c'))
-  | Handler (c1, c2) ->
-      let (c1_ty_sbst, c1_dirt_sbst), c1' =
-        refresh_dirty (ty_sbst, dirt_sbst) c1
-      in
-      let temp_ty_sbst = Assoc.concat c1_ty_sbst ty_sbst in
-      let temp_dirt_sbst = Assoc.concat c1_dirt_sbst dirt_sbst in
-      let (c2_ty_sbst, c2_dirt_sbst), c2' =
-        refresh_dirty (temp_ty_sbst, temp_dirt_sbst) c2
-      in
-      ((c2_ty_sbst, c2_dirt_sbst), Handler (c1', c2'))
-  | TyBasic x -> ((ty_sbst, dirt_sbst), TyBasic x)
-  | QualTy _ -> failwith __LOC__
-  | QualDirt _ -> failwith __LOC__
-  | Apply _ -> failwith __LOC__
-  | Tuple _ -> failwith __LOC__
-
-and refresh_dirty (ty_sbst, dirt_sbst) (t, d) =
-  let (t_ty_sbst, t_dirt_sbst), t' = refresh_ty (ty_sbst, dirt_sbst) t in
-  let temp_ty_sbst = Assoc.concat t_ty_sbst ty_sbst in
-  let temp_dirt_sbst = Assoc.concat t_dirt_sbst dirt_sbst in
-  let (d_ty_sbst, d_dirt_sbst), d' =
-    refresh_dirt (temp_ty_sbst, temp_dirt_sbst) d
-  in
-  ((d_ty_sbst, d_dirt_sbst), (t', d'))
-
-and refresh_dirt (ty_sbst, dirt_sbst) drt =
-  match drt.row with
-  | ParamRow x -> (
-      match Assoc.lookup x dirt_sbst with
-      | Some x' -> ((ty_sbst, dirt_sbst), { drt with row = ParamRow x' })
-      | None ->
-          let y = DirtParam.fresh () in
-          ((ty_sbst, Assoc.update x y dirt_sbst), { drt with row = ParamRow y })
-      )
-  | EmptyRow -> ((ty_sbst, dirt_sbst), drt)
-
 let rec source_to_target tctx_st ty =
   let loc = Location.unknown in
   match ty with
