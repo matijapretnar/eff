@@ -4,9 +4,31 @@ type state = unit
 
 let initial_state = ()
 
-let optimize_ty_coercion _state tcoer = tcoer
+let rec optimize_ty_coercion state (tcoer : Constraint.ty_coercion) =
+  match tcoer with
+  | ReflTy _ -> tcoer
+  | ArrowCoercion (tc, dc) ->
+      ArrowCoercion
+        (optimize_ty_coercion state tc, optimize_dirty_coercion state dc)
+  | HandlerCoercion (dc1, dc2) ->
+      HandlerCoercion
+        (optimize_dirty_coercion state dc1, optimize_dirty_coercion state dc2)
+  | TyCoercionVar _ -> tcoer
+  | ApplyCoercion (v, lst) ->
+      ApplyCoercion (v, List.map (optimize_ty_coercion state) lst)
+  | TupleCoercion lst ->
+      TupleCoercion (List.map (optimize_ty_coercion state) lst)
+  | QualTyCoer (ct_ty, tc) -> QualTyCoer (ct_ty, optimize_ty_coercion state tc)
+  | QualDirtCoer (ct_drt, tc) ->
+      QualDirtCoer (ct_drt, optimize_ty_coercion state tc)
 
-and optimize_dirt_coercion _state dcoer = dcoer
+and optimize_dirt_coercion state (dcoer : Constraint.dirt_coercion) =
+  match dcoer with
+  | ReflDirt _ -> dcoer 
+  | DirtCoercionVar _ -> dcoer
+  | Empty _ -> dcoer
+  | UnionDirt (s, dc) -> UnionDirt (s, optimize_dirt_coercion state dc)
+
 
 and optimize_dirty_coercion _state dtcoer = dtcoer
 
