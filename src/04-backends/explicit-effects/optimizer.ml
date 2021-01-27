@@ -59,54 +59,55 @@ and reduce_dirt_coercion' _state = function
   | dcoer -> dcoer
 
 let rec optimize_expression state exp =
-  let exp' = optimize_expression' state exp in
+  let exp' = { exp with term = optimize_expression' state exp.term } in
   reduce_expression state exp'
 
 and optimize_expression' state exp =
   match exp with
   | Term.Var _ | Term.Const _ -> exp
-  | Term.Tuple exps -> Tuple (List.map (optimize_expression state) exps)
-  | Term.Record flds -> Record (Assoc.map (optimize_expression state) flds)
-  | Term.Variant (lbl, exp) -> Variant (lbl, optimize_expression state exp)
-  | Term.Lambda abs -> Lambda (optimize_abstraction state abs)
+  | Term.Tuple exps -> Term.tuple (List.map (optimize_expression state) exps)
+  | Term.Record flds -> Term.record (Assoc.map (optimize_expression state) flds)
+  | Term.Variant (lbl, exp) -> Term.variant (lbl, optimize_expression state exp)
+  | Term.Lambda abs -> Term.lambda (optimize_abstraction state abs)
   | Term.Effect _ -> exp
-  | Term.Handler hnd -> Term.Handler (optimize_handler state hnd)
+  | Term.Handler hnd -> Term.handler (optimize_handler state hnd)
   | Term.CastExp (exp, coer) ->
-      CastExp (optimize_expression state exp, optimize_ty_coercion state coer)
+      Term.castExp
+        (optimize_expression state exp, optimize_ty_coercion state coer)
   | Term.LambdaTyCoerVar (w, coerty, exp) ->
-      LambdaTyCoerVar (w, coerty, optimize_expression state exp)
+      Term.lambdaTyCoerVar (w, coerty, optimize_expression state exp)
   | Term.LambdaDirtCoerVar (d, coerty, exp) ->
-      LambdaDirtCoerVar (d, coerty, optimize_expression state exp)
+      Term.lambdaDirtCoerVar (d, coerty, optimize_expression state exp)
   | Term.ApplyTyCoercion (exp, tcoer) ->
-      ApplyTyCoercion
+      Term.applyTyCoercion
         (optimize_expression state exp, optimize_ty_coercion state tcoer)
   | Term.ApplyDirtCoercion (exp, dcoer) ->
-      ApplyDirtCoercion
+      Term.applyDirtCoercion
         (optimize_expression state exp, optimize_dirt_coercion state dcoer)
 
 and optimize_computation state cmp =
-  let cmp' = optimize_computation' state cmp in
+  let cmp' = { cmp with term = optimize_computation' state cmp.term } in
   reduce_computation state cmp'
 
 and optimize_computation' state = function
-  | Term.Value exp -> Term.Value (optimize_expression state exp)
+  | Term.Value exp -> Term.value (optimize_expression state exp)
   | Term.LetVal (exp, abs) ->
-      Term.LetVal (optimize_expression state exp, optimize_abstraction state abs)
-  | Term.LetRec (defs, cmp) -> Term.LetRec (defs, optimize_computation state cmp)
+      Term.letVal (optimize_expression state exp, optimize_abstraction state abs)
+  | Term.LetRec (defs, cmp) -> Term.letRec (defs, optimize_computation state cmp)
   | Term.Match (exp, drty, cases) ->
-      Term.Match (optimize_expression state exp, drty, cases)
+      Term.match_ (optimize_expression state exp, drty, cases)
   | Term.Apply (exp1, exp2) ->
-      Term.Apply (optimize_expression state exp1, optimize_expression state exp2)
+      Term.apply (optimize_expression state exp1, optimize_expression state exp2)
   | Term.Handle (exp, cmp) ->
-      Term.Handle (optimize_expression state exp, optimize_computation state cmp)
+      Term.handle (optimize_expression state exp, optimize_computation state cmp)
   | Term.Call (eff, exp, abs) ->
-      Term.Call
+      Term.call
         (eff, optimize_expression state exp, optimize_abstraction state abs)
-  | Term.Op (eff, exp) -> Term.Op (eff, optimize_expression state exp)
+  | Term.Op (eff, exp) -> Term.op (eff, optimize_expression state exp)
   | Term.Bind (cmp, abs) ->
-      Term.Bind (optimize_computation state cmp, optimize_abstraction state abs)
+      Term.bind (optimize_computation state cmp, optimize_abstraction state abs)
   | Term.CastComp (cmp, dtcoer) ->
-      Term.CastComp
+      Term.castComp
         (optimize_computation state cmp, optimize_dirty_coercion state dtcoer)
 
 and optimize_handler state hnd =
@@ -116,21 +117,30 @@ and optimize_handler state hnd =
       Assoc.map (optimize_abstraction2 state) hnd.effect_clauses;
   }
 
-and optimize_abstraction state (pat, ty, cmp) =
+and optimize_abstraction state abs =
+  { abs with term = optimize_abstraction' state abs.term }
+
+and optimize_abstraction' state (pat, ty, cmp) =
   (pat, ty, optimize_computation state cmp)
 
 and optimize_abstraction2 state (pat1, pat2, cmp) =
   (pat1, pat2, optimize_computation state cmp)
 
-and reduce_expression _state = function
+and reduce_expression state expr =
+  { expr with term = reduce_expression' state expr.term }
+
+and reduce_expression' _state = function
   | Term.CastExp (exp, tcoer) when Constraint.is_trivial_ty_coercion tcoer ->
-      exp
+      exp.term
   | exp -> exp
 
-and reduce_computation state = function
+and reduce_computation state comp =
+  { comp with term = reduce_computation' state comp.term }
+
+and reduce_computation' state = function
   | Term.CastComp (cmp, dtcoer) when Constraint.is_trivial_dirty_coercion dtcoer
     ->
-      cmp
-  | Term.CastComp (Term.Value exp, { term = tcoer, _; _ }) ->
-      Term.Value (reduce_expression state (Term.CastExp (exp, tcoer)))
+      cmp.term
+  | Term.CastComp ({ term = Term.Value exp; _ }, { term = tcoer, _; _ }) ->
+      Term.Value (reduce_expression state (Term.castExp (exp, tcoer)))
   | cmp -> cmp

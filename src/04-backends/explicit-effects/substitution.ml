@@ -193,6 +193,9 @@ and apply_sub_dirtycoer (sub : t) { term = ty_coer, dirt_coer; _ } :
   Constraint.bangCoercion (ty_coer', dirt_coer')
 
 let rec apply_sub_comp sub computation =
+  { computation with term = apply_sub_comp' sub computation.term }
+
+and apply_sub_comp' sub computation =
   match computation with
   | Value e -> Value (apply_sub_exp sub e)
   | LetVal (e1, abs) -> LetVal (apply_sub_exp sub e1, apply_sub_abs sub abs)
@@ -214,6 +217,9 @@ let rec apply_sub_comp sub computation =
   | _ -> failwith __LOC__
 
 and apply_sub_exp sub expression =
+  { expression with term = apply_sub_exp' sub expression.term }
+
+and apply_sub_exp' sub expression =
   match expression with
   | Var v -> Var v
   | Const c -> Const c
@@ -239,7 +245,9 @@ and apply_sub_exp sub expression =
       ApplyDirtCoercion (apply_sub_exp sub e1, apply_sub_dirtcoer sub dc1)
   | _ -> failwith __LOC__
 
-and apply_sub_abs sub (p, t, c) = (p, apply_sub_ty sub t, apply_sub_comp sub c)
+and apply_sub_abs sub abs = { abs with term = apply_sub_abs' sub abs.term }
+
+and apply_sub_abs' sub (p, t, c) = (p, apply_sub_ty sub t, apply_sub_comp sub c)
 
 and apply_sub_letrec_abs sub (f, res_ty, abs) =
   (f, apply_sub_dirty_ty sub res_ty, apply_sub_abs sub abs)
