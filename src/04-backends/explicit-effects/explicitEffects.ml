@@ -302,9 +302,12 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 
-  type state = { prog : SyntaxNoEff.cmd list }
+  type state = {
+    prog : SyntaxNoEff.cmd list;
+    optimizer_state : Optimizer.state;
+  }
 
-  let initial_state = { prog = [] }
+  let initial_state = { prog = []; optimizer_state = Optimizer.initial_state }
 
   let process_type effect_system_state ty =
     snd
@@ -314,7 +317,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   let translate_expression state { type_system_state; typechecker_state } e =
     let e' =
       if !Config.enable_optimization then
-        Optimizer.optimize_main_expr typechecker_state e
+        Optimizer.optimize_expression state.optimizer_state e
       else e
     in
     let _, trm = TranslateExEff2NoEff.elab_expression typechecker_state e' in
@@ -323,7 +326,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   let translate_computation state { type_system_state; typechecker_state } c' =
     let c'' =
       if !Config.enable_optimization then
-        Optimizer.optimize_main_comp typechecker_state c'
+        Optimizer.optimize_computation state.optimizer_state c'
       else c'
     in
     let _, c''' = TranslateExEff2NoEff.elab_computation typechecker_state c'' in
@@ -333,7 +336,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
       (p, ty, c') =
     let c'' =
       if !Config.enable_optimization then
-        Optimizer.optimize_main_comp typechecker_state c'
+        Optimizer.optimize_computation state.optimizer_state c'
       else c'
     in
     let a''', _ =
@@ -349,7 +352,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     let state, _, c'''' =
       translate_computation state { type_system_state; typechecker_state } c'
     in
-    { prog = SyntaxNoEff.Term c'''' :: state.prog }
+    { state with prog = SyntaxNoEff.Term c'''' :: state.prog }
 
   let process_type_of state _ _ _ =
     Print.warning "[#typeof] commands are ignored when compiling to OCaml.";
@@ -357,6 +360,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
 
   let process_def_effect state effect_system_state (eff, (ty1, ty2)) =
     {
+      state with
       prog =
         SyntaxNoEff.DefEffect
           ( eff,
@@ -370,17 +374,18 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     let state, _, trm =
       translate_expression state { type_system_state; typechecker_state } e
     in
-    { prog = SyntaxNoEff.TopLet (x, trm) :: state.prog }
+    { state with prog = SyntaxNoEff.TopLet (x, trm) :: state.prog }
 
   let process_top_let_rec state { type_system_state; typechecker_state }
       (x, a, (_ty_in, _ty_out)) =
     let state, _, a =
       translate_abstraction state { type_system_state; typechecker_state } a
     in
-    { prog = SyntaxNoEff.TopLetRec (x, a) :: state.prog }
+    { state with prog = SyntaxNoEff.TopLetRec (x, a) :: state.prog }
 
   let process_external state effect_system_state (x, ty, name) =
     {
+      state with
       prog =
         SyntaxNoEff.External (x, process_type effect_system_state ty, name)
         :: state.prog;
@@ -391,7 +396,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
       (ty_params, TranslateExEff2NoEff.elab_tydef tydef)
     in
     let tydefs' = Assoc.map converter tydefs |> Assoc.to_list in
-    { prog = SyntaxNoEff.TyDef tydefs' :: state.prog }
+    { state with prog = SyntaxNoEff.TyDef tydefs' :: state.prog }
 
   let finalize state _ =
     if !Config.include_header then
