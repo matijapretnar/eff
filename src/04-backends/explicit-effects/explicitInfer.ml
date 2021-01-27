@@ -686,9 +686,9 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) :
   in
 
   let handlerCo =
-    Constraint.HandlerCoercion
-      ( (Constraint.ReflTy alphaIn, omega7),
-        (Constraint.ReflTy alphaOut, Constraint.ReflDirt deltaOut) )
+    Constraint.handlerCoercion
+      ( (Constraint.reflTy alphaIn, omega7),
+        (Constraint.reflTy alphaOut, Constraint.reflDirt deltaOut) )
   in
 
   let outExpr =
@@ -803,8 +803,8 @@ and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.pattern)
   let omega2, omegaCt2 = Constraint.fresh_dirt_coer (dirtD2, delta) in
 
   (*    D2  <= delta *)
-  let cresC1 = Term.CastComp (trgC1, (Constraint.ReflTy tyA1, omega1)) in
-  let cresC2 = Term.CastComp (trgC2, (Constraint.ReflTy tyA2, omega2)) in
+  let cresC1 = Term.CastComp (trgC1, (Constraint.reflTy tyA1, omega1)) in
+  let cresC2 = Term.CastComp (trgC2, (Constraint.reflTy tyA2, omega2)) in
 
   let outExpr = Term.Bind (cresC1, (trgPat, tyA1, cresC2)) in
   let outType = (tyA2, delta) in
@@ -849,7 +849,7 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
   (* 4: Create the (complicated) c1''. *)
   let c1'' =
     let f_coercion =
-      Constraint.ArrowCoercion (Constraint.ReflTy alpha, (omega1, omega2))
+      Constraint.arrowCoercion (Constraint.reflTy alpha, (omega1, omega2))
     in
     let subst_fn =
       Term.subst_comp
@@ -1159,7 +1159,7 @@ let tcTopLetRec (inState : state) (var : Untyped.variable)
   (* 4: Create the (complicated) c1''. *)
   let c1'' =
     let f_coercion =
-      Constraint.ArrowCoercion (Constraint.ReflTy alpha, (omega1, omega2))
+      Constraint.arrowCoercion (Constraint.reflTy alpha, (omega1, omega2))
     in
     Term.subst_comp
       (Assoc.of_list [ (var, Term.CastExp (Term.Var var, f_coercion)) ])

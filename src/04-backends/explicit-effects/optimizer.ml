@@ -5,7 +5,8 @@ type state = unit
 let initial_state = ()
 
 let rec optimize_ty_coercion state (tcoer : Constraint.ty_coercion) =
-  reduce_ty_coercion state (optimize_ty_coercion' state tcoer)
+  reduce_ty_coercion state
+    { tcoer with term = optimize_ty_coercion' state tcoer.term }
 
 and optimize_ty_coercion' state tcoer =
   match tcoer with
@@ -26,9 +27,10 @@ and optimize_ty_coercion' state tcoer =
       QualDirtCoer (ct_drt, optimize_ty_coercion state tc)
 
 and optimize_dirt_coercion state (dcoer : Constraint.dirt_coercion) =
-  reduce_dirt_coercion state (optimize_dirt_coercion' state dcoer)
+  reduce_dirt_coercion state
+    { dcoer with term = optimize_dirt_coercion' state dcoer.term }
 
-and optimize_dirt_coercion' state (dcoer : Constraint.dirt_coercion) =
+and optimize_dirt_coercion' state (dcoer : Constraint.dirt_coercion') =
   match dcoer with
   | ReflDirt _ | DirtCoercionVar _ | Empty _ -> dcoer
   | UnionDirt (s, dc) -> UnionDirt (s, optimize_dirt_coercion state dc)
@@ -36,14 +38,23 @@ and optimize_dirt_coercion' state (dcoer : Constraint.dirt_coercion) =
 and optimize_dirty_coercion state (tcoer, dcoer) =
   (optimize_ty_coercion state tcoer, optimize_dirt_coercion state dcoer)
 
-and reduce_ty_coercion _state = function
-  | ArrowCoercion (ReflTy ty1, BangCoercion (ReflTy ty2, ReflDirt drt)) ->
+and reduce_ty_coercion state ty_coer =
+  { ty_coer with term = reduce_ty_coercion' state ty_coer.term }
+
+and reduce_ty_coercion' _state = function
+  | ArrowCoercion
+      ( { term = ReflTy ty1; _ },
+        ({ term = ReflTy ty2; _ }, { term = ReflDirt drt; _ }) ) ->
       ReflTy (Type.Arrow (ty1, (ty2, drt)))
   | tcoer -> tcoer
 
-and reduce_dirt_coercion _state = function
+and reduce_dirt_coercion state drt_coer =
+  { drt_coer with term = reduce_dirt_coercion' state drt_coer.term }
+
+and reduce_dirt_coercion' _state = function
   | Empty drt when Type.is_empty_dirt drt -> ReflDirt drt
-  | UnionDirt (effects, ReflDirt drt) -> ReflDirt (Type.add_effects effects drt)
+  | UnionDirt (effects, { term = ReflDirt drt; _ }) ->
+      ReflDirt (Type.add_effects effects drt)
   | dcoer -> dcoer
 
 let rec optimize_expression state exp =
@@ -121,6 +132,6 @@ and reduce_computation state = function
     when TypeChecker.is_trivial_dirty_coercion TypeChecker.initial_state dtcoer
     ->
       cmp
-  | Term.CastComp (Term.Value exp, BangCoercion (tcoer, _)) ->
+  | Term.CastComp (Term.Value exp, (tcoer, _)) ->
       Term.Value (reduce_expression state (Term.CastExp (exp, tcoer)))
   | cmp -> cmp

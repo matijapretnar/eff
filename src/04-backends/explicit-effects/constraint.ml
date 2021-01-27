@@ -45,6 +45,35 @@ let arrowCoercion (tcoer1, (tcoer2, dcoer2)) =
     ty = (Type.Arrow (ty1', (ty2, drt2)), Type.Arrow (ty1, (ty2', drt2')));
   }
 
+let tupleCoercion tcoers =
+  let tys, tys' = tcoers |> List.map (fun tcoer -> tcoer.ty) |> List.split in
+  { term = TupleCoercion tcoers; ty = (Type.Tuple tys, Type.Tuple tys') }
+
+let applyCoercion (_tyname, _tcoers) = failwith __LOC__
+
+let handlerCoercion ((tcoer1, dcoer1), (tcoer2, dcoer2)) =
+  let ty1, ty1' = tcoer1.ty
+  and drt1, drt1' = dcoer1.ty
+  and ty2, ty2' = tcoer2.ty
+  and drt2, drt2' = dcoer2.ty in
+  {
+    term = HandlerCoercion ((tcoer1, dcoer1), (tcoer2, dcoer2));
+    ty =
+      ( Type.Handler ((ty1', drt1'), (ty2, drt2)),
+        Type.Handler ((ty1, drt1), (ty2', drt2')) );
+  }
+
+let reflDirt drt = { term = ReflDirt drt; ty = (drt, drt) }
+
+let empty drt = { term = Empty drt; ty = (Type.empty_dirt, drt) }
+
+let unionDirt (effs, dcoer) =
+  let drt, drt' = dcoer.ty in
+  {
+    term = UnionDirt (effs, dcoer);
+    ty = (Type.add_effects effs drt, Type.add_effects effs drt');
+  }
+
 (* ************************************************************************* *)
 (*                         COERCION VARIABLES OF                             *)
 (* ************************************************************************* *)

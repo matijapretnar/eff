@@ -115,7 +115,7 @@ let rec get_effectset_temp set effects =
 let get_effectset effects = get_effectset_temp EffectSet.empty effects
 
 let rec elab_ty_coercion state coer =
-  match coer with
+  match coer.term with
   | Constraint.ReflTy ty ->
       let _, tyelab = elab_ty state ty in
       ((ty, ty), NoEff.NCoerRefl tyelab)
@@ -214,7 +214,7 @@ and elab_dirty_coercion state (tcoer, dcoer) =
   else failwith "Ill-typed bang coercion"
 
 and elab_dirt_coercion state dcoer =
-  match dcoer with
+  match dcoer.term with
   | Constraint.ReflDirt dirt -> (dirt, dirt)
   | Constraint.DirtCoercionVar par -> (
       match Assoc.lookup par state.dirt_coer_types with
