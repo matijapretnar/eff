@@ -79,6 +79,13 @@ and optimize_abstraction_with_ty state (pat, ty, cmp) =
 and optimize_abstraction2 state (pat1, pat2, cmp) =
   (pat1, pat2, optimize_computation state cmp)
 
-and reduce_expression _state = function exp -> exp
+and reduce_expression _state = function
+  | Term.CastExp (exp, Constraint.ReflTy _) -> exp
+  | exp -> exp
 
-and reduce_computation _state = function cmp -> cmp
+and reduce_computation _state = function
+  | Term.CastComp
+      (cmp, Constraint.BangCoercion (Constraint.ReflTy _, Constraint.ReflDirt _))
+    ->
+      cmp
+  | cmp -> cmp
