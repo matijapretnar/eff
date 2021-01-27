@@ -26,7 +26,7 @@ and dirt_coercion' =
   | Empty of Type.dirt
   | UnionDirt of (Type.effect_set * dirt_coercion)
 
-and dirty_coercion = ty_coercion * dirt_coercion
+and dirty_coercion = (ty_coercion * dirt_coercion, Type.ct_dirty) typed
 
 type omega_ct =
   | TyOmega of (Type.TyCoercionParam.t * Type.ct_ty)
@@ -38,19 +38,17 @@ let is_trivial_ty_coercion omega =
   let ty1, ty2 = omega.ty in
   Type.types_are_equal ty1 ty2
 
-let is_trivial_dirty_coercion (ty_cons, drt_cons) =
-  let ty1, ty2 = ty_cons.ty and drt1, drt2 = drt_cons.ty in
-  Type.dirty_types_are_equal (ty1, drt1) (ty2, drt2)
+let is_trivial_dirty_coercion omega =
+  let drty1, drty2 = omega.ty in
+  Type.dirty_types_are_equal drty1 drty2
 
 let reflTy ty = { term = ReflTy ty; ty = (ty, ty) }
 
-let arrowCoercion (tcoer1, (tcoer2, dcoer2)) =
-  let ty1, ty1' = tcoer1.ty
-  and ty2, ty2' = tcoer2.ty
-  and drt2, drt2' = dcoer2.ty in
+let arrowCoercion (tcoer1, dtcoer2) =
+  let ty1, ty1' = tcoer1.ty and drty2, drty2' = dtcoer2.ty in
   {
-    term = ArrowCoercion (tcoer1, (tcoer2, dcoer2));
-    ty = (Type.Arrow (ty1', (ty2, drt2)), Type.Arrow (ty1, (ty2', drt2')));
+    term = ArrowCoercion (tcoer1, dtcoer2);
+    ty = (Type.Arrow (ty1', drty2), Type.Arrow (ty1, drty2'));
   }
 
 let tupleCoercion tcoers =
@@ -59,19 +57,20 @@ let tupleCoercion tcoers =
 
 let applyCoercion (_tyname, _tcoers) = failwith __LOC__
 
-let handlerCoercion ((tcoer1, dcoer1), (tcoer2, dcoer2)) =
-  let ty1, ty1' = tcoer1.ty
-  and drt1, drt1' = dcoer1.ty
-  and ty2, ty2' = tcoer2.ty
-  and drt2, drt2' = dcoer2.ty in
+let handlerCoercion (dtcoer1, dtcoer2) =
+  let drty1, drty1' = dtcoer1.ty and drty2, drty2' = dtcoer2.ty in
   {
-    term = HandlerCoercion ((tcoer1, dcoer1), (tcoer2, dcoer2));
-    ty =
-      ( Type.Handler ((ty1', drt1'), (ty2, drt2)),
-        Type.Handler ((ty1, drt1), (ty2', drt2')) );
+    term = HandlerCoercion (dtcoer1, dtcoer2);
+    ty = (Type.Handler (drty1', drty2), Type.Handler (drty1, drty2'));
   }
 
+let bangCoercion ((ty_coer : ty_coercion), (drt_coer : dirt_coercion)) =
+  let ty, ty' = ty_coer.ty and drt, drt' = drt_coer.ty in
+  { term = (ty_coer, drt_coer); ty = ((ty, drt), (ty', drt')) }
+
 let reflDirt drt = { term = ReflDirt drt; ty = (drt, drt) }
+
+let reflDirty (ty, drt) = bangCoercion (reflTy ty, reflDirt drt)
 
 let empty drt = { term = Empty drt; ty = (Type.empty_dirt, drt) }
 
@@ -130,7 +129,7 @@ let rec print_ty_coercion ?max_level c ppf =
   | ForallSkel of Type.SkelParam.t * ty_coercion
   | ApplySkelCoer of ty_coercion * skeleton
 *)
-and print_dirty_coercion ?max_level (tc, dirtc) ppf =
+and print_dirty_coercion ?max_level { term = tc, dirtc; _ } ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   print "%t ! %t" (print_ty_coercion tc) (print_dirt_coercion dirtc)
 
@@ -188,7 +187,7 @@ let fresh_dirt_coer cons =
 let fresh_dirty_coer ((ty1, drt1), (ty2, drt2)) =
   let ty_coer, ty_cons = fresh_ty_coer (ty1, ty2)
   and drt_coer, drt_cons = fresh_dirt_coer (drt1, drt2) in
-  ((ty_coer, drt_coer), ty_cons, drt_cons)
+  (bangCoercion (ty_coer, drt_coer), ty_cons, drt_cons)
 
 (* ************************************************************************* *)
 (*                        FREE PARAMETER COMPUTATION                         *)
@@ -239,7 +238,7 @@ and free_params_dirt_coercion coer =
   | Empty d -> Type.free_params_dirt d
   | UnionDirt (_, dc) -> free_params_dirt_coercion dc
 
-and free_params_dirty_coercion (tc, dc) =
+and free_params_dirty_coercion { term = tc, dc; _ } =
   Type.FreeParams.union
     (free_params_ty_coercion tc)
     (free_params_dirt_coercion dc)

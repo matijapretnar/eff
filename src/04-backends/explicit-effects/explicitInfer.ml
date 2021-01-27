@@ -563,8 +563,9 @@ and tcReturnCase (inState : state) (lclCtx : TypingEnv.t)
   in
 
   (* 3: Generate all wanted constraints *)
-  let omega1, omegaCt1 = Constraint.fresh_ty_coer (tyB, tyOut) in
-  let omega2, omegaCt2 = Constraint.fresh_dirt_coer (dirtD, dirtOut) in
+  let omega12, omegaCt1, omegaCt2 =
+    Constraint.fresh_dirty_coer ((tyB, dirtD), (tyOut, dirtOut))
+  in
   let omega6, omegaCt6 = Constraint.fresh_ty_coer (tyIn, patTy) in
 
   (* 4: Create the elaborated clause *)
@@ -572,9 +573,7 @@ and tcReturnCase (inState : state) (lclCtx : TypingEnv.t)
   let ysub =
     Term.subst_comp (Assoc.of_list [ (x, Term.CastExp (Var yvar, omega6)) ])
   in
-  let outExpr =
-    (Term.PVar yvar, patTy, Term.CastComp (ysub trgCmp, (omega1, omega2)))
-  in
+  let outExpr = (Term.PVar yvar, patTy, Term.CastComp (ysub trgCmp, omega12)) in
 
   (* 5: Combine the results *)
   (outExpr, (omegaCt1 :: omegaCt2 :: omegaCt6 :: cs1) @ cs2)
@@ -627,8 +626,9 @@ and tcOpCase (inState : state) (lclCtx : TypingEnv.t)
   in
 
   (* 5: Generate all the needed constraints *)
-  let omega3i, omegaCt3i = Constraint.fresh_ty_coer (tyBOpi, tyOut) in
-  let omega4i, omegaCt4i = Constraint.fresh_dirt_coer (dirtDOpi, dirtOut) in
+  let omega34i, omegaCt3i, omegaCt4i =
+    Constraint.fresh_dirty_coer ((tyBOpi, dirtDOpi), (tyOut, dirtOut))
+  in
   let omega5i, omegaCt5i =
     let leftty = Type.Arrow (tyBi, (tyOut, dirtOut)) in
     let rightty = Type.Arrow (tyBi, (alphai, deltai)) in
@@ -642,7 +642,7 @@ and tcOpCase (inState : state) (lclCtx : TypingEnv.t)
   in
   let outExpr =
     ( ((eff, (tyAi, tyBi)) : Term.effect) (* Opi *),
-      (xop, Term.PVar lvar, Term.CastComp (lsub trgCop, (omega3i, omega4i))) )
+      (xop, Term.PVar lvar, Term.CastComp (lsub trgCop, omega34i)) )
   in
 
   (* 7: Combine the results *)
@@ -687,8 +687,8 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) :
 
   let handlerCo =
     Constraint.handlerCoercion
-      ( (Constraint.reflTy alphaIn, omega7),
-        (Constraint.reflTy alphaOut, Constraint.reflDirt deltaOut) )
+      ( Constraint.bangCoercion (Constraint.reflTy alphaIn, omega7),
+        Constraint.reflDirty (alphaOut, deltaOut) )
   in
 
   let outExpr =
@@ -803,8 +803,14 @@ and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.pattern)
   let omega2, omegaCt2 = Constraint.fresh_dirt_coer (dirtD2, delta) in
 
   (*    D2  <= delta *)
-  let cresC1 = Term.CastComp (trgC1, (Constraint.reflTy tyA1, omega1)) in
-  let cresC2 = Term.CastComp (trgC2, (Constraint.reflTy tyA2, omega2)) in
+  let cresC1 =
+    Term.CastComp
+      (trgC1, Constraint.bangCoercion (Constraint.reflTy tyA1, omega1))
+  in
+  let cresC2 =
+    Term.CastComp
+      (trgC2, Constraint.bangCoercion (Constraint.reflTy tyA2, omega2))
+  in
 
   let outExpr = Term.Bind (cresC1, (trgPat, tyA1, cresC2)) in
   let outType = (tyA2, delta) in
@@ -843,13 +849,14 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
   in
 
   (* 3: The assumed type should be at least as general as the inferred one *)
-  let omega1, omegaCt1 = Constraint.fresh_ty_coer (tyA1, beta) in
-  let omega2, omegaCt2 = Constraint.fresh_dirt_coer (dirtD1, delta) in
+  let omega12, omegaCt1, omegaCt2 =
+    Constraint.fresh_dirty_coer ((tyA1, dirtD1), (beta, delta))
+  in
 
   (* 4: Create the (complicated) c1''. *)
   let c1'' =
     let f_coercion =
-      Constraint.arrowCoercion (Constraint.reflTy alpha, (omega1, omega2))
+      Constraint.arrowCoercion (Constraint.reflTy alpha, omega12)
     in
     let subst_fn =
       Term.subst_comp
@@ -967,13 +974,14 @@ and tcHandle (inState : state) (lclCtxt : TypingEnv.t)
     Constraint.fresh_ty_coer
       (tyA1, Type.Handler ((alpha1, delta1), (alpha2, delta2)))
   in
-  let omega2, omegaCt2 = Constraint.fresh_ty_coer (tyA2, alpha1) in
-  let omega3, omegaCt3 = Constraint.fresh_dirt_coer (dirtD2, delta1) in
+  let omega23, omegaCt2, omegaCt3 =
+    Constraint.fresh_dirty_coer ((tyA2, dirtD2), (alpha1, delta1))
+  in
 
   (* Combine all the outputs *)
   let outExpr =
     let castHand = Term.CastExp (trgHand, omega1) in
-    let castCmp = Term.CastComp (trgCmp, (omega2, omega3)) in
+    let castCmp = Term.CastComp (trgCmp, omega23) in
     Term.Handle (castHand, castCmp)
   in
   let outType = (alpha2, delta2) in
@@ -1005,10 +1013,11 @@ and tcAlternative (inState : state) (lclCtx : TypingEnv.t)
   let trgPat, midCtxt = checkLocatedPatTy inState lclCtx pat patTy in
   let (trgCmp, (tyA, dirtD)), cs = tcComp inState midCtxt cmp in
   (* Generate coercions to cast the RHS *)
-  let omegaL, omegaCtL = Constraint.fresh_ty_coer (tyA, tyAout) in
-  let omegaR, omegaCtR = Constraint.fresh_dirt_coer (dirtD, dirtDout) in
+  let omegaLR, omegaCtL, omegaCtR =
+    Constraint.fresh_dirty_coer ((tyA, dirtD), (tyAout, dirtDout))
+  in
   (* Combine the results *)
-  let outExpr = (trgPat, patTy, Term.CastComp (trgCmp, (omegaL, omegaR))) in
+  let outExpr = (trgPat, patTy, Term.CastComp (trgCmp, omegaLR)) in
   let outCs = omegaCtL :: omegaCtR :: cs in
   (outExpr, outCs)
 
@@ -1153,13 +1162,14 @@ let tcTopLetRec (inState : state) (var : Untyped.variable)
   in
 
   (* 3: The assumed type should be at least as general as the inferred one *)
-  let omega1, omegaCt1 = Constraint.fresh_ty_coer (tyA1, beta) in
-  let omega2, omegaCt2 = Constraint.fresh_dirt_coer (dirtD1, delta) in
+  let omega12, omegaCt1, omegaCt2 =
+    Constraint.fresh_dirty_coer ((tyA1, dirtD1), (beta, delta))
+  in
 
   (* 4: Create the (complicated) c1''. *)
   let c1'' =
     let f_coercion =
-      Constraint.arrowCoercion (Constraint.reflTy alpha, (omega1, omega2))
+      Constraint.arrowCoercion (Constraint.reflTy alpha, omega12)
     in
     Term.subst_comp
       (Assoc.of_list [ (var, Term.CastExp (Term.Var var, f_coercion)) ])

@@ -67,6 +67,8 @@ and ct_ty = ty * ty
 
 and ct_dirt = dirt * dirt
 
+and ct_dirty = dirty * dirty
+
 let type_const c = TyBasic (Const.infer_ty c)
 
 let is_empty_dirt dirt =

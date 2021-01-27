@@ -135,7 +135,7 @@ let rec elab_ty_coercion state coer =
             ExEffTypes.Handler (coerA2, coerB2) ),
           NoEff.NCoerArrow (elabA, elabB) )
       else
-        match coerB with
+        match coerB.term with
         | tycoer, dirtcoer -> (
             let (t1', t2'), elab2 = elab_ty_coercion state tycoer in
             if
@@ -146,7 +146,7 @@ let rec elab_ty_coercion state coer =
                   ExEffTypes.Handler (coerA2, coerB2) ),
                 NoEff.NCoerHandler (elabA, NoEff.NCoerComp elab2) )
             else
-              match coerA with
+              match coerA.term with
               | tycoerA, dirtcoerA ->
                   let (t2, t1), elab1 = elab_ty_coercion state tycoerA in
                   if
@@ -203,7 +203,7 @@ let rec elab_ty_coercion state coer =
           ExEffTypes.QualDirt (dirts, snd tyc) ),
         elabc )
 
-and elab_dirty_coercion state (tcoer, dcoer) =
+and elab_dirty_coercion state { term = tcoer, dcoer; _ } =
   let (ty1, ty2), tyelab = elab_ty_coercion state tcoer in
   let d1, d2 = elab_dirt_coercion state dcoer in
   if is_empty_dirt d1 && is_empty_dirt d2 then (((ty1, d1), (ty2, d2)), tyelab)

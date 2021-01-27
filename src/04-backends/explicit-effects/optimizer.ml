@@ -35,8 +35,9 @@ and optimize_dirt_coercion' state (dcoer : Constraint.dirt_coercion') =
   | ReflDirt _ | DirtCoercionVar _ | Empty _ -> dcoer
   | UnionDirt (s, dc) -> UnionDirt (s, optimize_dirt_coercion state dc)
 
-and optimize_dirty_coercion state (tcoer, dcoer) =
-  (optimize_ty_coercion state tcoer, optimize_dirt_coercion state dcoer)
+and optimize_dirty_coercion state { term = tcoer, dcoer; _ } =
+  Constraint.bangCoercion
+    (optimize_ty_coercion state tcoer, optimize_dirt_coercion state dcoer)
 
 and reduce_ty_coercion state ty_coer =
   { ty_coer with term = reduce_ty_coercion' state ty_coer.term }
@@ -44,7 +45,7 @@ and reduce_ty_coercion state ty_coer =
 and reduce_ty_coercion' _state = function
   | ArrowCoercion
       ( { term = ReflTy ty1; _ },
-        ({ term = ReflTy ty2; _ }, { term = ReflDirt drt; _ }) ) ->
+        { term = { term = ReflTy ty2; _ }, { term = ReflDirt drt; _ }; _ } ) ->
       ReflTy (Type.Arrow (ty1, (ty2, drt)))
   | tcoer -> tcoer
 
@@ -130,6 +131,6 @@ and reduce_computation state = function
   | Term.CastComp (cmp, dtcoer) when Constraint.is_trivial_dirty_coercion dtcoer
     ->
       cmp
-  | Term.CastComp (Term.Value exp, (tcoer, _)) ->
+  | Term.CastComp (Term.Value exp, { term = tcoer, _; _ }) ->
       Term.Value (reduce_expression state (Term.CastExp (exp, tcoer)))
   | cmp -> cmp
