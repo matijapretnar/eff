@@ -43,9 +43,7 @@ module type ExplicitBackend = sig
   val process_top_let_rec :
     state ->
     effect_system_state ->
-    Language.UntypedSyntax.variable
-    * Term.abstraction_with_ty
-    * (Type.ty * Type.dirty) ->
+    Language.UntypedSyntax.variable * Term.abstraction * (Type.ty * Type.dirty) ->
     state
 
   val process_external :
@@ -339,7 +337,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
         Optimizer.optimize_computation state.optimizer_state c'
       else c'
     in
-    let a''', _ =
+    let _, a''' =
       TranslateExEff2NoEff.elab_abstraction typechecker_state (p, ty, c'')
     in
     (state, { type_system_state; typechecker_state }, a''')
@@ -377,7 +375,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     { state with prog = SyntaxNoEff.TopLet (x, trm) :: state.prog }
 
   let process_top_let_rec state { type_system_state; typechecker_state }
-      (x, a, (_ty_in, _ty_out)) =
+      (x, a, _) =
     let state, _, a =
       translate_abstraction state { type_system_state; typechecker_state } a
     in

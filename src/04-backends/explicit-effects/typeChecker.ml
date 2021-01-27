@@ -15,8 +15,7 @@ let check_ty_coercion st omega =
 let check_dirty_coercion st omega =
   fst @@ TranslateExEff2NoEff.elab_dirty_coercion st omega
 
-let check_abstraction st a =
-  snd @@ snd @@ TranslateExEff2NoEff.elab_abstraction st a
+let check_abstraction st a = fst @@ TranslateExEff2NoEff.elab_abstraction st a
 
 let check_handler st h =
   match check_expression st (Term.Handler h) with

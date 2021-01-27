@@ -59,7 +59,7 @@ let rec ceval state c =
       let rec eval_case = function
         | [] -> Error.runtime "No branches succeeded in a pattern match."
         | a :: lst -> (
-            let p, c = a in
+            let p, _, c = a in
             try ceval (extend_value p v state) c
             with PatternMatch _ -> eval_case lst)
       in
@@ -73,7 +73,7 @@ let rec ceval state c =
   | Term.LetRec (defs, c) ->
       (* strip types *)
       let stripped =
-        List.map (fun (v, _, _, abs) -> (v, abs)) defs |> Assoc.of_list
+        List.map (fun (v, _, abs) -> (v, abs)) defs |> Assoc.of_list
       in
       let state = extend_let_rec state stripped in
       ceval state c
@@ -83,7 +83,7 @@ let rec ceval state c =
   | Term.Op ((eff, _), e) ->
       let e' = veval state e in
       V.Call (eff, e', fun r -> V.Value r)
-  | Term.Bind (c1, (p, c2)) -> eval_let state [ (p, c1) ] c2
+  | Term.Bind (c1, (p, _, c2)) -> eval_let state [ (p, c1) ] c2
   | Term.CastComp (c, _) -> ceval state c
 
 and eval_let state lst c =
@@ -98,7 +98,7 @@ and extend_let_rec state defs =
   let state =
     Assoc.fold_right
       (fun (f, a) state ->
-        let p, c = a in
+        let p, _, c = a in
         let g = V.Closure (fun v -> ceval (extend p v !state') c) in
         update f g state)
       defs state

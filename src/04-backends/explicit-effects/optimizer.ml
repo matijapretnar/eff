@@ -24,11 +24,10 @@ let rec optimize_ty_coercion state (tcoer : Constraint.ty_coercion) =
 
 and optimize_dirt_coercion state (dcoer : Constraint.dirt_coercion) =
   match dcoer with
-  | ReflDirt _ -> dcoer 
+  | ReflDirt _ -> dcoer
   | DirtCoercionVar _ -> dcoer
   | Empty _ -> dcoer
   | UnionDirt (s, dc) -> UnionDirt (s, optimize_dirt_coercion state dc)
-
 
 and optimize_dirty_coercion _state dtcoer = dtcoer
 
@@ -42,7 +41,7 @@ and optimize_expression' state exp =
   | Term.Tuple exps -> Tuple (List.map (optimize_expression state) exps)
   | Term.Record flds -> Record (Assoc.map (optimize_expression state) flds)
   | Term.Variant (lbl, exp) -> Variant (lbl, optimize_expression state exp)
-  | Term.Lambda abs -> Lambda (optimize_abstraction_with_ty state abs)
+  | Term.Lambda abs -> Lambda (optimize_abstraction state abs)
   | Term.Effect _ -> exp
   | Term.Handler hnd -> Term.Handler (optimize_handler state hnd)
   | Term.CastExp (exp, coer) ->
@@ -65,8 +64,7 @@ and optimize_computation state cmp =
 and optimize_computation' state = function
   | Term.Value exp -> Term.Value (optimize_expression state exp)
   | Term.LetVal (exp, abs) ->
-      Term.LetVal
-        (optimize_expression state exp, optimize_abstraction_with_ty state abs)
+      Term.LetVal (optimize_expression state exp, optimize_abstraction state abs)
   | Term.LetRec (defs, cmp) -> Term.LetRec (defs, optimize_computation state cmp)
   | Term.Match (exp, drty, cases) ->
       Term.Match (optimize_expression state exp, drty, cases)
@@ -76,9 +74,7 @@ and optimize_computation' state = function
       Term.Handle (optimize_expression state exp, optimize_computation state cmp)
   | Term.Call (eff, exp, abs) ->
       Term.Call
-        ( eff,
-          optimize_expression state exp,
-          optimize_abstraction_with_ty state abs )
+        (eff, optimize_expression state exp, optimize_abstraction state abs)
   | Term.Op (eff, exp) -> Term.Op (eff, optimize_expression state exp)
   | Term.Bind (cmp, abs) ->
       Term.Bind (optimize_computation state cmp, optimize_abstraction state abs)
@@ -88,14 +84,12 @@ and optimize_computation' state = function
 
 and optimize_handler state hnd =
   {
-    Term.value_clause = optimize_abstraction_with_ty state hnd.value_clause;
+    Term.value_clause = optimize_abstraction state hnd.value_clause;
     Term.effect_clauses =
       Assoc.map (optimize_abstraction2 state) hnd.effect_clauses;
   }
 
-and optimize_abstraction state (pat, cmp) = (pat, optimize_computation state cmp)
-
-and optimize_abstraction_with_ty state (pat, ty, cmp) =
+and optimize_abstraction state (pat, ty, cmp) =
   (pat, ty, optimize_computation state cmp)
 
 and optimize_abstraction2 state (pat1, pat2, cmp) =

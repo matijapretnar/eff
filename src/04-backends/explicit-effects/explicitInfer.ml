@@ -86,8 +86,7 @@ let subInCmp sub cmp = Substitution.apply_substitutions_to_computation sub cmp
 
 let subInExp sub exp = Substitution.apply_substitutions_to_expression sub exp
 
-let subInAbs sub abs =
-  Substitution.apply_substitutions_to_typed_abstraction sub abs
+let subInAbs sub abs = Substitution.apply_substitutions_to_abstraction sub abs
 
 (* Substitute in target value types, computation types, and dirts *)
 let subInValTy sub ty = Substitution.apply_substitutions_to_type sub ty
@@ -529,7 +528,7 @@ and tcLambda (inState : state) (lclCtx : TypingEnv.t)
     ((pat, cmp) : Untyped.abstraction) : tcExprOutput =
   let trgPat, patTy, midCtx, cs1 = tcLocatedUntypedVarPat lclCtx pat in
   let (trgCmp, cmpTy), cs2 = tcComp inState midCtx cmp in
-  let outVal = Term.Lambda (Term.abstraction_with_ty trgPat patTy trgCmp) in
+  let outVal = Term.Lambda (Term.abstraction trgPat patTy trgCmp) in
   let outType = Type.Arrow (patTy, cmpTy) in
   ((outVal, outType), cs1 @ cs2)
 
@@ -548,7 +547,7 @@ and tcReturnCase (inState : state) (lclCtx : TypingEnv.t)
     ((pat, cmp) : Untyped.abstraction) (* Return clause *) (tyIn : Type.ty)
     (* Expected input value type *) (tyOut : Type.ty)
     (* Expected output value type *) (dirtOut : Type.dirt) :
-    Term.abstraction_with_ty tcOutput =
+    Term.abstraction tcOutput =
   (* Expected output dirt *)
 
   (* 1: Typecheck the pattern and the body of the return clause *)
@@ -787,7 +786,7 @@ and tcLetValNoGen (inState : state) (lclCtxt : TypingEnv.t)
 
   (* 3: Combine the results *)
   let outExpr =
-    Term.LetVal (trgE1, Term.abstraction_with_ty (Term.PVar x) tyA1 trgC2)
+    Term.LetVal (trgE1, Term.abstraction (Term.PVar x) tyA1 trgC2)
   in
   let outType = (tyB2, dirtD2) in
   let outCs = cs1 @ cs2 in
@@ -819,7 +818,7 @@ and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.pattern)
       (trgC2, Constraint.BangCoercion (Constraint.ReflTy tyA2, omega2))
   in
 
-  let outExpr = Term.Bind (cresC1, (trgPat, cresC2)) in
+  let outExpr = Term.Bind (cresC1, (trgPat, tyA1, cresC2)) in
   let outType = (tyA2, delta) in
   let outCs = hack @ (omegaCt1 :: omegaCt2 :: cs1) @ cs2 in
 
@@ -875,7 +874,7 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
 
   (* 5: Combine the results *)
   let outExpr =
-    Term.LetRec ([ (var, trgPatTy, (tyA1, dirtD1), (trgPat, c1'')) ], trgC2)
+    Term.LetRec ([ (var, (tyA1, dirtD1), (trgPat, trgPatTy, c1'')) ], trgC2)
   in
 
   let outType = (tyA2, dirtD2) in
@@ -1025,7 +1024,9 @@ and tcAlternative (inState : state) (lclCtx : TypingEnv.t)
   let omegaR, omegaCtR = Constraint.fresh_dirt_coer (dirtD, dirtDout) in
   (* Combine the results *)
   let outExpr =
-    (trgPat, Term.CastComp (trgCmp, Constraint.BangCoercion (omegaL, omegaR)))
+    ( trgPat,
+      patTy,
+      Term.CastComp (trgCmp, Constraint.BangCoercion (omegaL, omegaR)) )
   in
   let outCs = omegaCtL :: omegaCtR :: cs in
   (outExpr, outCs)
@@ -1244,8 +1245,9 @@ let infer_rec_abstraction state f abs =
     tcLetRecNoGen state initial_lcl_ty_env f abs
       (unlocated @@ Untyped.Value (unlocated @@ Untyped.Tuple []))
   with
-  | ( (Term.LetRec ([ (_f, ty_in, drty_out, (p, c)) ], _ret_unit), _unit_drty),
+  | ( (Term.LetRec ([ (_f, drty_out, (p, ty_in, c)) ], _ret_unit), _unit_drty),
       cnstrs ) ->
+      (* These two are not necessarily equal, but should be unifiable *)
       let abs' = (p, ty_in, c)
       and abs_ty' = (ty_in, drty_out)
       and sub, residuals = Unification.solve cnstrs in
@@ -1270,8 +1272,7 @@ let top_level_rec_abstraction state x (abs : Untyped.abstraction) =
   let mono_abs = subInAbs mono_sub abs
   and mono_abs_ty = subInAbsTy mono_sub abs_ty in
   (* We assume that all free variables in the term already appeared in its type or constraints *)
-  assert (
-    Type.FreeParams.is_empty (Term.free_params_abstraction_with_ty mono_abs));
+  assert (Type.FreeParams.is_empty (Term.free_params_abstraction mono_abs));
   (mono_abs, mono_abs_ty)
 
 let top_level_expression state expr =

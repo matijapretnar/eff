@@ -184,8 +184,7 @@ and apply_sub_dirtycoer (sub : t) (dirty_coer : Constraint.dirty_coercion) :
 let rec apply_sub_comp sub computation =
   match computation with
   | Value e -> Value (apply_sub_exp sub e)
-  | LetVal (e1, abs) ->
-      LetVal (apply_sub_exp sub e1, apply_sub_abs_with_ty sub abs)
+  | LetVal (e1, abs) -> LetVal (apply_sub_exp sub e1, apply_sub_abs sub abs)
   | LetRec ([ letrec ], c1) ->
       LetRec ([ apply_sub_letrec_abs sub letrec ], apply_sub_comp sub c1)
   | Match (e, resTy, alist) ->
@@ -196,7 +195,7 @@ let rec apply_sub_comp sub computation =
   | Apply (e1, e2) -> Apply (apply_sub_exp sub e1, apply_sub_exp sub e2)
   | Handle (e1, c1) -> Handle (apply_sub_exp sub e1, apply_sub_comp sub c1)
   | Call (effect, e1, abs) ->
-      Call (effect, apply_sub_exp sub e1, apply_sub_abs_with_ty sub abs)
+      Call (effect, apply_sub_exp sub e1, apply_sub_abs sub abs)
   | Op (ef, e1) -> Op (ef, apply_sub_exp sub e1)
   | Bind (c1, a1) -> Bind (apply_sub_comp sub c1, apply_sub_abs sub a1)
   | CastComp (c1, dc1) ->
@@ -209,7 +208,7 @@ and apply_sub_exp sub expression =
   | Const c -> Const c
   | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
   | Variant (lbl, e1) -> Variant (lbl, apply_sub_exp sub e1)
-  | Lambda abs -> Lambda (apply_sub_abs_with_ty sub abs)
+  | Lambda abs -> Lambda (apply_sub_abs sub abs)
   | Effect eff -> Effect eff
   | Handler h -> Handler (apply_sub_handler sub h)
   | CastExp (e1, tc1) -> CastExp (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
@@ -229,22 +228,16 @@ and apply_sub_exp sub expression =
       ApplyDirtCoercion (apply_sub_exp sub e1, apply_sub_dirtcoer sub dc1)
   | _ -> failwith __LOC__
 
-and apply_sub_abs sub (p, c) = (p, apply_sub_comp sub c)
+and apply_sub_abs sub (p, t, c) = (p, apply_sub_ty sub t, apply_sub_comp sub c)
 
-and apply_sub_abs_with_ty sub (p, t, c) =
-  (p, apply_sub_ty sub t, apply_sub_comp sub c)
-
-and apply_sub_letrec_abs sub (f, arg_ty, res_ty, abs) =
-  ( f,
-    apply_sub_ty sub arg_ty,
-    apply_sub_dirty_ty sub res_ty,
-    apply_sub_abs sub abs )
+and apply_sub_letrec_abs sub (f, res_ty, abs) =
+  (f, apply_sub_dirty_ty sub res_ty, apply_sub_abs sub abs)
 
 and apply_sub_abs2 sub (p1, p2, c) = (p1, p2, apply_sub_comp sub c)
 
 and apply_sub_handler sub h =
   let eff_clauses = h.effect_clauses in
-  let new_value_clause = apply_sub_abs_with_ty sub h.value_clause in
+  let new_value_clause = apply_sub_abs sub h.value_clause in
   let new_eff_clauses =
     Assoc.map (fun abs2 -> apply_sub_abs2 sub abs2) eff_clauses
   in
@@ -254,7 +247,7 @@ let apply_substitutions_to_computation = apply_sub_comp
 
 let apply_substitutions_to_expression = apply_sub_exp
 
-let apply_substitutions_to_typed_abstraction = apply_sub_abs_with_ty
+let apply_substitutions_to_abstraction = apply_sub_abs
 
 let apply_substitutions_to_type = apply_sub_ty
 

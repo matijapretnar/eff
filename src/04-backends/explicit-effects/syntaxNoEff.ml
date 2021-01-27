@@ -48,7 +48,7 @@ and n_pattern =
 and n_term =
   | NVar of variable
   | NTuple of n_term list
-  | NFun of n_abstraction_with_type
+  | NFun of n_abstraction
   | NApplyTerm of n_term * n_term
   | NBigLambdaCoer of Type.TyCoercionParam.t * n_coerty * n_term
   | NApplyCoer of n_term * n_coercion
@@ -56,7 +56,7 @@ and n_term =
   | NReturn of n_term
   | NHandler of n_handler
   | NLet of n_term * n_abstraction
-  | NCall of n_effect * n_term * n_abstraction_with_type
+  | NCall of n_effect * n_term * n_abstraction
   | NBind of n_term * n_abstraction
   | NHandle of n_term * n_term
   | NConst of Const.t
@@ -69,7 +69,7 @@ and n_term =
 
 and n_handler = {
   effect_clauses : (n_effect, n_abstraction_2_args) Assoc.t;
-  return_clause : n_abstraction_with_type;
+  return_clause : n_abstraction;
 }
 
 and n_tydef =
@@ -77,13 +77,11 @@ and n_tydef =
   | TyDefSum of (CoreTypes.Label.t, n_type option) Assoc.t
   | TyDefInline of n_type
 
-and n_abstraction = n_pattern * n_term
-
-and n_abstraction_with_type = n_pattern * n_type * n_term
+and n_abstraction = n_pattern * n_type * n_term
 
 and n_abstraction_2_args = n_pattern * n_pattern * n_term
 
-and n_letrec_abstraction = variable * n_type * n_type * n_abstraction
+and n_letrec_abstraction = variable * n_type * n_abstraction
 
 type cmd =
   | Term of n_term
@@ -97,36 +95,40 @@ let rec subs_var_in_term par subs term =
   match term with
   | NVar v -> if v = par then subs else term
   | NTuple ls -> NTuple (List.map (subs_var_in_term par subs) ls)
-  | NFun (p, t, c) -> NFun (p, t, subs_var_in_term par subs c)
+  | NFun abs -> NFun (subs_var_in_abs par subs abs)
   | NApplyTerm (t1, t2) ->
       NApplyTerm (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
   | NCast (t, c) -> NCast (subs_var_in_term par subs t, c)
   | NReturn t -> NReturn (subs_var_in_term par subs t)
   | NHandler h -> NHandler h
-  | NLet (t, (p, c)) ->
-      NLet (subs_var_in_term par subs t, (p, subs_var_in_term par subs c))
-  | NCall (eff, t, (p, ty, c)) ->
-      NCall
-        (eff, subs_var_in_term par subs t, (p, ty, subs_var_in_term par subs c))
-  | NBind (t, (p, c)) ->
-      NBind (subs_var_in_term par subs t, (p, subs_var_in_term par subs c))
+  | NLet (t, abs) ->
+      NLet (subs_var_in_term par subs t, subs_var_in_abs par subs abs)
+  | NCall (eff, t, abs) ->
+      NCall (eff, subs_var_in_term par subs t, subs_var_in_abs par subs abs)
+  | NBind (t, abs) ->
+      NBind (subs_var_in_term par subs t, subs_var_in_abs par subs abs)
   | NHandle (t1, t2) ->
       NHandle (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
   | NConst c -> NConst c
   | NEffect e -> NEffect e
   | NLetRec (abss, t) ->
-      let subs_letrec (var, ty1, ty2, (p, c)) =
-        (var, ty1, ty2, (p, subs_var_in_term par subs c))
+      let subs_letrec (var, ty_out, abs) =
+        (var, ty_out, subs_var_in_abs par subs abs)
       in
       NLetRec (List.map subs_letrec abss, subs_var_in_term par subs t)
   | NMatch (t, ty, abss, loc) ->
-      let subs_abs (p, c) = (p, subs_var_in_term par subs c) in
-      NMatch (subs_var_in_term par subs t, ty, List.map subs_abs abss, loc)
+      NMatch
+        ( subs_var_in_term par subs t,
+          ty,
+          List.map (subs_var_in_abs par subs) abss,
+          loc )
   | NOp (eff, t) -> NOp (eff, subs_var_in_term par subs t)
   | NRecord a -> NRecord (Assoc.map (subs_var_in_term par subs) a)
   | NVariant (lbl, None) -> NVariant (lbl, None)
   | NVariant (lbl, Some t) -> NVariant (lbl, Some (subs_var_in_term par subs t))
   | _ -> failwith __LOC__
+
+and subs_var_in_abs par subs (p, ty, c) = (p, ty, subs_var_in_term par subs c)
 
 (********************** PRINT FUNCTIONS **********************)
 
@@ -195,7 +197,7 @@ let rec print_term ?max_level t ppf =
   match t with
   | NVar x -> print "%t" (print_variable x)
   | NTuple ts -> Print.tuple print_term ts ppf
-  | NFun abs -> print_abstraction_with_type abs ppf
+  | NFun abs -> print_abstraction abs ppf
   | NApplyTerm (t1, t2) ->
       print ~at_level:1 "((%t)@ (%t))"
         (print_term ~max_level:1 t1)
@@ -216,15 +218,15 @@ let rec print_term ?max_level t ppf =
          (type b) (x : (a, b) effect) ->\n\
         \             ((match x with %t) : a -> (b -> _ computation) -> _ \
          computation)) @]}"
-        (print_abstraction_with_type h.return_clause)
+        (print_abstraction h.return_clause)
         (print_effect_clauses (Assoc.to_list h.effect_clauses))
-  | NLet (t1, (t2, t3)) ->
+  | NLet (t1, (t2, _, t3)) ->
       print "let (%t = (%t)) in (%t)" (print_pattern t2) (print_term t1)
         (print_term t3)
   | NCall (eff, t, abs) ->
       print ~at_level:1 "call (%t) (%t) ((@[fun %t@]))" (print_effect eff)
         (print_term ~max_level:0 t)
-        (print_abstraction_with_type abs)
+        (print_abstraction abs)
   | NBind (t, abs) ->
       print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]"
         (print_term ~max_level:0 t)
@@ -251,12 +253,12 @@ let rec print_term ?max_level t ppf =
       print "Variant %t %t" (CoreTypes.Label.print l) (print_term t)
   | NVariant (l, None) -> print "Variant %t" (CoreTypes.Label.print l)
 
-and print_let_rec_abstraction (f, arg_ty, res_ty, abs) ppf =
+and print_let_rec_abstraction (f, res_ty, ((_, arg_ty, _) as abs)) ppf =
   Format.fprintf ppf "(%t : %t) %t" (print_variable f)
     (print_type (NTyArrow (arg_ty, res_ty)))
     (print_let_abstraction abs)
 
-and print_let_abstraction (t1, t2) ppf =
+and print_let_abstraction (t1, _ty, t2) ppf =
   Format.fprintf ppf "%t = %t" (print_pattern t1) (print_term t2)
 
 and print_effect_clauses eff_clauses ppf =
@@ -271,13 +273,10 @@ and print_effect_clauses eff_clauses ppf =
 and print_effect (eff, _) ppf =
   Print.print ppf "Effect_%t" (CoreTypes.Effect.print eff)
 
-and print_abstraction (t1, t2) ppf =
-  Format.fprintf ppf "(fun %t -> %t)" (print_pattern t1) (print_term t2)
+and print_abstraction (t1, ty, t2) ppf =
+  Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern t1) (print_type ty)
+    (print_term t2)
 
 and print_abstraction2 (t1, t2, t3) ppf =
   Format.fprintf ppf "(fun %t %t -> %t)" (print_pattern t1) (print_pattern t2)
     (print_term t3)
-
-and print_abstraction_with_type (t1, ty, t2) ppf =
-  Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern t1) (print_type ty)
-    (print_term t2)

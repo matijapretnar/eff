@@ -401,10 +401,10 @@ and elab_expression' state exp =
   | ExEff.Record ass -> failwith "records not supported yet"
 
 and elab_abstraction state (p, t, c) =
-  let _, type1 = elab_ty state t in
+  let _type1, ntype1 = elab_ty state t in
   let state' = extend_pattern_type state p t in
   let type2, elab2 = elab_computation state' c in
-  ((elab_pattern p, elab2), (type1, type2))
+  ((t, type2), (elab_pattern p, ntype1, elab2))
 
 and elab_computation state cmp =
   let drty, trm = elab_computation' state cmp in
@@ -415,27 +415,26 @@ and elab_computation' state c =
   | ExEff.Value value ->
       let t, elab = elab_expression state value in
       ((t, ExEffTypes.empty_dirt), elab)
-  | ExEff.LetVal (value, (pat, _, comp)) ->
+  | ExEff.LetVal (value, abs) ->
       let tyv, elabv = elab_expression state value in
-      let state' = extend_pattern_type state pat tyv in
-      let tyc, elabc = elab_computation state' comp in
-      (tyc, NoEff.NLet (elabv, (elab_pattern pat, elabc)))
+      let (_, tyc), elababs = elab_abstraction state abs in
+      (tyc, NoEff.NLet (elabv, elababs))
   | ExEff.LetRec (abs_list, comp) ->
       let rec extend_state state ls =
         match ls with
         | [] -> state
-        | (var, ty1, ty2, (p, comp)) :: rest ->
+        | (var, ty2, (p, ty1, comp)) :: rest ->
             let state' =
               extend_var_types state var (ExEffTypes.Arrow (ty1, ty2))
             in
             let state'' = extend_pattern_type state' p ty1 in
             extend_state state'' rest
       in
-      let elab_letrec_abs (var, ty1, ty2, (p, compt)) =
+      let elab_letrec_abs (var, ty2, (p, ty1, compt)) =
         let _, t1 = elab_ty state ty1 in
         let _, t2 = elab_dirty state ty2 in
         let _, elabc = elab_computation (extend_state state abs_list) compt in
-        (var, t1, t2, (elab_pattern p, elabc))
+        (var, t2, (elab_pattern p, t1, elabc))
       in
       let tycomp, elabcomp =
         elab_computation (extend_state state abs_list) comp
@@ -444,23 +443,15 @@ and elab_computation' state c =
   | ExEff.Match (value, ty, abs_lst) -> (
       let tyv, elabv = elab_expression state value in
       let tyskel, tyelab = elab_dirty state ty in
-      let elab_abs vty cty (pat, comp) =
-        let state' = extend_pattern_type state pat tyv in
-        let tyc, elabc = elab_computation state' comp in
-        if Type.types_are_equal (fst tyc) (fst cty) then
-          (elab_pattern pat, elabc)
-        else typefail "Ill-typed match branch"
-      in
       match abs_lst with
       | [] -> (ty, NoEff.NMatch (elabv, tyelab, [], Location.unknown))
-      | (p1, c1) :: _ ->
-          let state' = extend_pattern_type state p1 tyv in
-          let tyc, elabc = elab_computation state' c1 in
+      | abs :: _ ->
+          let (_, tyc), _ = elab_abstraction state abs in
           ( tyc,
             NoEff.NMatch
               ( elabv,
                 tyelab,
-                List.map (elab_abs tyv tyc) abs_lst,
+                List.map (fun abs -> snd @@ elab_abstraction state abs) abs_lst,
                 Location.unknown ) ))
   | ExEff.Apply (v1, v2) -> (
       let ty1, elab1 = elab_expression state v1 in
@@ -503,16 +494,15 @@ and elab_computation' state c =
       if vty = ty1 then
         ((ty2, ExEffTypes.empty_dirt), NoEff.NOp ((eff, (t1, t2)), velab))
       else typefail "Ill-typed operation"
-  | ExEff.Bind (c1, (p, c2)) ->
-      let (ty1, dirt1), elab1 = elab_computation state c1 in
-      let state' = extend_pattern_type state p ty1 in
-      let (ty2, dirt2), elab2 = elab_computation state' c2 in
+  | ExEff.Bind (c1, abs) ->
+      let (ty1, dirt1), elab1 = elab_computation state c1
+      and (ty1', (ty2, dirt2)), elababs = elab_abstraction state abs in
+      assert (ty1 = ty1');
       if
         ExEffTypes.is_empty_dirt dirt1 && ExEffTypes.is_empty_dirt dirt2
         (* Bind - Case 1 *)
-      then ((ty2, dirt2), NoEff.NLet (elab1, (elab_pattern p, elab2)))
-        (* Bind - Case 2 *)
-      else ((ty2, dirt2), NoEff.NBind (elab1, (elab_pattern p, elab2)))
+      then ((ty2, dirt2), NoEff.NLet (elab1, elababs)) (* Bind - Case 2 *)
+      else ((ty2, dirt2), NoEff.NBind (elab1, elababs))
   | ExEff.CastComp (comp, coer) ->
       let (t1, t2), elabc = elab_dirty_coercion state coer in
       let cty, coelab = elab_computation state comp in
