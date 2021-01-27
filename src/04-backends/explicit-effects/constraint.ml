@@ -34,6 +34,14 @@ type omega_ct =
   | SkelEq of Type.skeleton * Type.skeleton
   | TyParamHasSkel of (CoreTypes.TyParam.t * Type.skeleton)
 
+let is_trivial_ty_coercion omega =
+  let ty1, ty2 = omega.ty in
+  Type.types_are_equal ty1 ty2
+
+let is_trivial_dirty_coercion (ty_cons, drt_cons) =
+  let ty1, ty2 = ty_cons.ty and drt1, drt2 = drt_cons.ty in
+  Type.dirty_types_are_equal (ty1, drt1) (ty2, drt2)
+
 let reflTy ty = { term = ReflTy ty; ty = (ty, ty) }
 
 let arrowCoercion (tcoer1, (tcoer2, dcoer2)) =

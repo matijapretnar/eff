@@ -122,14 +122,12 @@ and optimize_abstraction2 state (pat1, pat2, cmp) =
   (pat1, pat2, optimize_computation state cmp)
 
 and reduce_expression _state = function
-  | Term.CastExp (exp, tcoer)
-    when TypeChecker.is_trivial_ty_coercion TypeChecker.initial_state tcoer ->
+  | Term.CastExp (exp, tcoer) when Constraint.is_trivial_ty_coercion tcoer ->
       exp
   | exp -> exp
 
 and reduce_computation state = function
-  | Term.CastComp (cmp, dtcoer)
-    when TypeChecker.is_trivial_dirty_coercion TypeChecker.initial_state dtcoer
+  | Term.CastComp (cmp, dtcoer) when Constraint.is_trivial_dirty_coercion dtcoer
     ->
       cmp
   | Term.CastComp (Term.Value exp, (tcoer, _)) ->
