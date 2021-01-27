@@ -15,6 +15,14 @@ let check_ty_coercion st omega =
 let check_dirty_coercion st omega =
   fst @@ TranslateExEff2NoEff.elab_dirty_coercion st omega
 
+let is_trivial_ty_coercion st omega =
+  let ty1, ty2 = check_ty_coercion st omega in
+  Type.types_are_equal ty1 ty2
+
+let is_trivial_dirty_coercion st omega =
+  let drty1, drty2 = check_dirty_coercion st omega in
+  Type.dirty_types_are_equal drty1 drty2
+
 let check_abstraction st a = fst @@ TranslateExEff2NoEff.elab_abstraction st a
 
 let check_handler st h =
