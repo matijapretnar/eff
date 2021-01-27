@@ -174,12 +174,9 @@ and apply_sub_dirtcoer sub dirt_coer =
   | UnionDirt (es, dirt_coer1) ->
       UnionDirt (es, apply_sub_dirtcoer sub dirt_coer1)
 
-and apply_sub_dirtycoer (sub : t) (dirty_coer : Constraint.dirty_coercion) :
+and apply_sub_dirtycoer (sub : t) (ty_coer, dirt_coer) :
     Constraint.dirty_coercion =
-  match dirty_coer with
-  | BangCoercion (ty_coer, dirt_coer) ->
-      BangCoercion
-        (apply_sub_tycoer sub ty_coer, apply_sub_dirtcoer sub dirt_coer)
+  (apply_sub_tycoer sub ty_coer, apply_sub_dirtcoer sub dirt_coer)
 
 let rec apply_sub_comp sub computation =
   match computation with

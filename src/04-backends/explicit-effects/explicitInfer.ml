@@ -573,9 +573,7 @@ and tcReturnCase (inState : state) (lclCtx : TypingEnv.t)
     Term.subst_comp (Assoc.of_list [ (x, Term.CastExp (Var yvar, omega6)) ])
   in
   let outExpr =
-    ( Term.PVar yvar,
-      patTy,
-      Term.CastComp (ysub trgCmp, Constraint.BangCoercion (omega1, omega2)) )
+    (Term.PVar yvar, patTy, Term.CastComp (ysub trgCmp, (omega1, omega2)))
   in
 
   (* 5: Combine the results *)
@@ -644,10 +642,7 @@ and tcOpCase (inState : state) (lclCtx : TypingEnv.t)
   in
   let outExpr =
     ( ((eff, (tyAi, tyBi)) : Term.effect) (* Opi *),
-      ( xop,
-        Term.PVar lvar,
-        Term.CastComp (lsub trgCop, Constraint.BangCoercion (omega3i, omega4i))
-      ) )
+      (xop, Term.PVar lvar, Term.CastComp (lsub trgCop, (omega3i, omega4i))) )
   in
 
   (* 7: Combine the results *)
@@ -692,9 +687,8 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) :
 
   let handlerCo =
     Constraint.HandlerCoercion
-      ( Constraint.BangCoercion (Constraint.ReflTy alphaIn, omega7),
-        Constraint.BangCoercion
-          (Constraint.ReflTy alphaOut, Constraint.ReflDirt deltaOut) )
+      ( (Constraint.ReflTy alphaIn, omega7),
+        (Constraint.ReflTy alphaOut, Constraint.ReflDirt deltaOut) )
   in
 
   let outExpr =
@@ -809,14 +803,8 @@ and tcLetCmp (inState : state) (lclCtxt : TypingEnv.t) (pat : Untyped.pattern)
   let omega2, omegaCt2 = Constraint.fresh_dirt_coer (dirtD2, delta) in
 
   (*    D2  <= delta *)
-  let cresC1 =
-    Term.CastComp
-      (trgC1, Constraint.BangCoercion (Constraint.ReflTy tyA1, omega1))
-  in
-  let cresC2 =
-    Term.CastComp
-      (trgC2, Constraint.BangCoercion (Constraint.ReflTy tyA2, omega2))
-  in
+  let cresC1 = Term.CastComp (trgC1, (Constraint.ReflTy tyA1, omega1)) in
+  let cresC2 = Term.CastComp (trgC2, (Constraint.ReflTy tyA2, omega2)) in
 
   let outExpr = Term.Bind (cresC1, (trgPat, tyA1, cresC2)) in
   let outType = (tyA2, delta) in
@@ -861,8 +849,7 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
   (* 4: Create the (complicated) c1''. *)
   let c1'' =
     let f_coercion =
-      Constraint.ArrowCoercion
-        (Constraint.ReflTy alpha, Constraint.BangCoercion (omega1, omega2))
+      Constraint.ArrowCoercion (Constraint.ReflTy alpha, (omega1, omega2))
     in
     let subst_fn =
       Term.subst_comp
@@ -986,9 +973,7 @@ and tcHandle (inState : state) (lclCtxt : TypingEnv.t)
   (* Combine all the outputs *)
   let outExpr =
     let castHand = Term.CastExp (trgHand, omega1) in
-    let castCmp =
-      Term.CastComp (trgCmp, Constraint.BangCoercion (omega2, omega3))
-    in
+    let castCmp = Term.CastComp (trgCmp, (omega2, omega3)) in
     Term.Handle (castHand, castCmp)
   in
   let outType = (alpha2, delta2) in
@@ -1023,11 +1008,7 @@ and tcAlternative (inState : state) (lclCtx : TypingEnv.t)
   let omegaL, omegaCtL = Constraint.fresh_ty_coer (tyA, tyAout) in
   let omegaR, omegaCtR = Constraint.fresh_dirt_coer (dirtD, dirtDout) in
   (* Combine the results *)
-  let outExpr =
-    ( trgPat,
-      patTy,
-      Term.CastComp (trgCmp, Constraint.BangCoercion (omegaL, omegaR)) )
-  in
+  let outExpr = (trgPat, patTy, Term.CastComp (trgCmp, (omegaL, omegaR))) in
   let outCs = omegaCtL :: omegaCtR :: cs in
   (outExpr, outCs)
 
@@ -1178,8 +1159,7 @@ let tcTopLetRec (inState : state) (var : Untyped.variable)
   (* 4: Create the (complicated) c1''. *)
   let c1'' =
     let f_coercion =
-      Constraint.ArrowCoercion
-        (Constraint.ReflTy alpha, Constraint.BangCoercion (omega1, omega2))
+      Constraint.ArrowCoercion (Constraint.ReflTy alpha, (omega1, omega2))
     in
     Term.subst_comp
       (Assoc.of_list [ (var, Term.CastExp (Term.Var var, f_coercion)) ])

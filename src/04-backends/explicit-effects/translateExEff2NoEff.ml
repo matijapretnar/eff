@@ -136,7 +136,7 @@ let rec elab_ty_coercion state coer =
           NoEff.NCoerArrow (elabA, elabB) )
       else
         match coerB with
-        | Constraint.BangCoercion (tycoer, dirtcoer) -> (
+        | tycoer, dirtcoer -> (
             let (t1', t2'), elab2 = elab_ty_coercion state tycoer in
             if
               (not (has_empty_dirt coerA2)) && not (has_empty_dirt coerA2)
@@ -147,7 +147,7 @@ let rec elab_ty_coercion state coer =
                 NoEff.NCoerHandler (elabA, NoEff.NCoerComp elab2) )
             else
               match coerA with
-              | Constraint.BangCoercion (tycoerA, dirtcoerA) ->
+              | tycoerA, dirtcoerA ->
                   let (t2, t1), elab1 = elab_ty_coercion state tycoerA in
                   if
                     has_empty_dirt coerB1
@@ -203,18 +203,15 @@ let rec elab_ty_coercion state coer =
           ExEffTypes.QualDirt (dirts, snd tyc) ),
         elabc )
 
-and elab_dirty_coercion state (coer : Constraint.dirty_coercion) =
-  match coer with
-  | Constraint.BangCoercion (tcoer, dcoer) ->
-      let (ty1, ty2), tyelab = elab_ty_coercion state tcoer in
-      let d1, d2 = elab_dirt_coercion state dcoer in
-      if is_empty_dirt d1 && is_empty_dirt d2 then
-        (((ty1, d1), (ty2, d2)), tyelab)
-      else if is_empty_dirt d1 then
-        (((ty1, d1), (ty2, d2)), NoEff.NCoerReturn tyelab)
-      else if not (is_empty_dirt d2) then
-        (((ty1, d1), (ty2, d2)), NoEff.NCoerComp tyelab)
-      else failwith "Ill-typed bang coercion"
+and elab_dirty_coercion state (tcoer, dcoer) =
+  let (ty1, ty2), tyelab = elab_ty_coercion state tcoer in
+  let d1, d2 = elab_dirt_coercion state dcoer in
+  if is_empty_dirt d1 && is_empty_dirt d2 then (((ty1, d1), (ty2, d2)), tyelab)
+  else if is_empty_dirt d1 then
+    (((ty1, d1), (ty2, d2)), NoEff.NCoerReturn tyelab)
+  else if not (is_empty_dirt d2) then
+    (((ty1, d1), (ty2, d2)), NoEff.NCoerComp tyelab)
+  else failwith "Ill-typed bang coercion"
 
 and elab_dirt_coercion state dcoer =
   match dcoer with

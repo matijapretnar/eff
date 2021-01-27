@@ -22,7 +22,7 @@ and dirt_coercion =
   | Empty of Type.dirt
   | UnionDirt of (Type.effect_set * dirt_coercion)
 
-and dirty_coercion = BangCoercion of ty_coercion * dirt_coercion
+and dirty_coercion = ty_coercion * dirt_coercion
 
 type omega_ct =
   | TyOmega of (Type.TyCoercionParam.t * Type.ct_ty)
@@ -78,11 +78,9 @@ let rec print_ty_coercion ?max_level c ppf =
   | ForallSkel of Type.SkelParam.t * ty_coercion
   | ApplySkelCoer of ty_coercion * skeleton
 *)
-and print_dirty_coercion ?max_level c ppf =
+and print_dirty_coercion ?max_level (tc, dirtc) ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c with
-  | BangCoercion (tc, dirtc) ->
-      print "%t ! %t" (print_ty_coercion tc) (print_dirt_coercion dirtc)
+  print "%t ! %t" (print_ty_coercion tc) (print_dirt_coercion dirtc)
 
 and print_dirt_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -138,9 +136,7 @@ let fresh_ty_coer cons =
 let fresh_dirty_coer ((ty1, drt1), (ty2, drt2)) =
   let ty_param = Type.TyCoercionParam.fresh () in
   let dirt_param = Type.DirtCoercionParam.fresh () in
-  let coer =
-    BangCoercion (TyCoercionVar ty_param, DirtCoercionVar dirt_param)
-  in
+  let coer = (TyCoercionVar ty_param, DirtCoercionVar dirt_param) in
   (coer, TyOmega (ty_param, (ty1, ty2)), DirtOmega (dirt_param, (drt1, drt2)))
 
 (* ************************************************************************* *)
@@ -190,11 +186,10 @@ and free_params_dirt_coercion = function
   | Empty d -> Type.free_params_dirt d
   | UnionDirt (_, dc) -> free_params_dirt_coercion dc
 
-and free_params_dirty_coercion = function
-  | BangCoercion (tc, dc) ->
-      Type.FreeParams.union
-        (free_params_ty_coercion tc)
-        (free_params_dirt_coercion dc)
+and free_params_dirty_coercion (tc, dc) =
+  Type.FreeParams.union
+    (free_params_ty_coercion tc)
+    (free_params_dirt_coercion dc)
 
 let rec get_skel_vars_from_constraints = function
   | [] -> []
