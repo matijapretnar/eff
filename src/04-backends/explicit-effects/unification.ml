@@ -218,24 +218,27 @@ let dirt_omega_step sub paused cons rest_queue omega dcons =
       { effect_set = s2; row = ParamRow v2 } ) ->
       if Type.EffectSet.is_empty s1 then (sub, cons :: paused, rest_queue)
       else
+        let omega' = Type.DirtCoercionParam.fresh () in
         let diff_set = Type.EffectSet.diff s1 s2 in
         let union_set = Type.EffectSet.union s1 s2 in
-        let omega', new_cons =
-          Constraint.fresh_dirt_coer
-            ( Type.{ effect_set = Type.EffectSet.empty; row = ParamRow v1 },
-              Type.{ effect_set = union_set; row = ParamRow v2 } )
-        in
         let k0 = v2 in
         let v0 =
           let open Type in
           { effect_set = diff_set; row = ParamRow (Type.DirtParam.fresh ()) }
         in
+        let omega_ty' =
+          ( Type.{ effect_set = Type.EffectSet.empty; row = ParamRow v1 },
+            Type.{ effect_set = union_set; row = ParamRow v2 } )
+        in
         let k1' = omega in
-        let v1' = Constraint.unionDirt (s1, omega') in
+        let v1' =
+          Constraint.unionDirt (s1, Constraint.dirtCoercionVar omega' omega_ty')
+        in
         let sub' =
           Substitution.add_dirt_substitution_e k0 v0
           |> Substitution.add_dirt_var_coercion k1' v1'
         in
+        let new_cons = Constraint.DirtOmega (omega', omega_ty') in
         ( Substitution.merge sub sub',
           [],
           Substitution.apply_substitutions_to_constraints sub'

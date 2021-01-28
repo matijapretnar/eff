@@ -44,6 +44,10 @@ let is_trivial_dirty_coercion omega =
 
 let reflTy ty = { term = ReflTy ty; ty = (ty, ty) }
 
+let tyCoercionVar omega ct = { term = TyCoercionVar omega; ty = ct }
+
+let dirtCoercionVar omega cd = { term = DirtCoercionVar omega; ty = cd }
+
 let arrowCoercion (tcoer1, dtcoer2) =
   let ty1, ty1' = tcoer1.ty and drty2, drty2' = dtcoer2.ty in
   {
