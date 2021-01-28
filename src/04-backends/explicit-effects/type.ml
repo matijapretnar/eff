@@ -360,6 +360,8 @@ let empty_dirt = closed_dirt EffectSet.empty
 
 let make_dirty ty = (ty, fresh_dirt ())
 
+let pure_ty ty = (ty, empty_dirt)
+
 let add_effects effect_set drt =
   { drt with effect_set = EffectSet.union drt.effect_set effect_set }
 

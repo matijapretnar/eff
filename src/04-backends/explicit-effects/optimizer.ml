@@ -59,14 +59,19 @@ and reduce_dirt_coercion' _state = function
   | dcoer -> dcoer
 
 let rec optimize_expression state exp =
-  reduce_expression state (optimize_expression' state exp)
+  let exp' = optimize_expression' state exp in
+  assert (Type.types_are_equal exp.ty exp'.ty);
+  let exp'' = reduce_expression state exp' in
+  assert (Type.types_are_equal exp'.ty exp''.ty);
+  exp''
 
 and optimize_expression' state exp =
   match exp.term with
   | Term.Var _ | Term.Const _ -> exp
   | Term.Tuple exps -> Term.tuple (List.map (optimize_expression state) exps)
   | Term.Record flds -> Term.record (Assoc.map (optimize_expression state) flds)
-  | Term.Variant (lbl, exp) -> Term.variant (lbl, optimize_expression state exp)
+  | Term.Variant (lbl, arg) ->
+      Term.variant (lbl, optimize_expression state arg) exp.ty
   | Term.Lambda abs -> Term.lambda (optimize_abstraction state abs)
   | Term.Effect _ -> exp
   | Term.Handler hnd -> Term.handler (optimize_handler state hnd)
@@ -85,7 +90,11 @@ and optimize_expression' state exp =
         (optimize_expression state exp, optimize_dirt_coercion state dcoer)
 
 and optimize_computation state cmp =
-  reduce_computation state (optimize_computation' state cmp)
+  let cmp' = optimize_computation' state cmp in
+  assert (Type.dirty_types_are_equal cmp.ty cmp'.ty);
+  let cmp'' = reduce_computation state cmp' in
+  assert (Type.dirty_types_are_equal cmp'.ty cmp''.ty);
+  cmp''
 
 and optimize_computation' state cmp =
   match cmp.term with

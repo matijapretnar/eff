@@ -106,7 +106,7 @@ let tuple es =
 let record (_ : (CoreTypes.Field.t, expression) Assoc.t) : expression =
   failwith __LOC__
 
-let variant (_ : CoreTypes.Label.t * expression) : expression = failwith __LOC__
+let variant (lbl, e) ty = { term = Variant (lbl, e); ty }
 
 let lambda abs = { term = Lambda abs; ty = Type.Arrow abs.ty }
 
@@ -134,15 +134,14 @@ let applyTyCoercion (_ : expression * Constraint.ty_coercion) : expression =
 let applyDirtCoercion (_ : expression * Constraint.dirt_coercion) : expression =
   failwith __LOC__
 
-let value exp = { term = Value exp; ty = Type.make_dirty exp.ty }
+let value exp = { term = Value exp; ty = Type.pure_ty exp.ty }
 
 let letVal (exp, abs) =
   let ty1, drty2 = abs.ty in
   assert (Type.types_are_equal exp.ty ty1);
   { term = LetVal (exp, abs); ty = drty2 }
 
-let letRec (_ : letrec_abstraction list * computation) : computation =
-  failwith __LOC__
+let letRec (defs, comp) = { term = LetRec (defs, comp); ty = comp.ty }
 
 let match_ (e, cases) drty = { term = Match (e, cases); ty = drty }
 
