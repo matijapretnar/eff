@@ -265,12 +265,16 @@ and apply_sub_letrec_abs sub (f, res_ty, abs) =
 and apply_sub_abs2 sub (p1, p2, c) = (p1, p2, apply_sub_comp sub c)
 
 and apply_sub_handler sub h =
-  let eff_clauses = h.effect_clauses in
-  let new_value_clause = apply_sub_abs sub h.value_clause in
+  let drty1, drty2 = h.ty in
+  let eff_clauses = h.term.effect_clauses in
+  let new_value_clause = apply_sub_abs sub h.term.value_clause in
   let new_eff_clauses =
     Assoc.map (fun abs2 -> apply_sub_abs2 sub abs2) eff_clauses
   in
-  { effect_clauses = new_eff_clauses; value_clause = new_value_clause }
+  {
+    term = { effect_clauses = new_eff_clauses; value_clause = new_value_clause };
+    ty = (apply_sub_dirty_ty sub drty1, apply_sub_dirty_ty sub drty2);
+  }
 
 let apply_substitutions_to_computation = apply_sub_comp
 

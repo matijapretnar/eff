@@ -50,7 +50,7 @@ type skeleton =
 and ty =
   | TyParam of CoreTypes.TyParam.t * skeleton
   | Apply of CoreTypes.TyName.t * ty list
-  | Arrow of ty * dirty
+  | Arrow of abs_ty
   | Tuple of ty list
   | Handler of dirty * dirty
   | TyBasic of Const.ty
@@ -60,6 +60,8 @@ and ty =
 and dirty = ty * dirt
 
 and dirt = { effect_set : effect_set; row : row }
+
+and abs_ty = ty * dirty
 
 and row = ParamRow of DirtParam.t | EmptyRow
 

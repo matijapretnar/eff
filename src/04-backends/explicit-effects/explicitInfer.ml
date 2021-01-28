@@ -692,18 +692,26 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) :
         Constraint.reflDirty (alphaOut, deltaOut) )
   in
   let handTy, _ = handlerCo.ty in
-  let outExpr =
-    Term.CastExp
-      ( {
-          term = Term.Handler { effect_clauses = trgCls; value_clause = trgRet };
-          ty = handTy;
-        },
-        handlerCo )
-  in
-  let outType = Type.Handler ((alphaIn, deltaIn), (alphaOut, deltaOut)) in
-  let outCs = (omegaCt7 :: alphaInSkel :: alphaOutSkel :: cs1) @ cs2 in
-  (* 7, ain : skelin, aout : skelout && 1, 2, 6 && 3i, 4i, 5i *)
-  ((outExpr, outType), outCs)
+  match handTy with
+  | Type.Handler (inTy, outTy) ->
+      let outExpr =
+        Term.CastExp
+          ( {
+              term =
+                Term.Handler
+                  {
+                    term = { effect_clauses = trgCls; value_clause = trgRet };
+                    ty = (inTy, outTy);
+                  };
+              ty = handTy;
+            },
+            handlerCo )
+      in
+      let outType = Type.Handler ((alphaIn, deltaIn), (alphaOut, deltaOut)) in
+      let outCs = (omegaCt7 :: alphaInSkel :: alphaOutSkel :: cs1) @ cs2 in
+      (* 7, ain : skelin, aout : skelout && 1, 2, 6 && 3i, 4i, 5i *)
+      ((outExpr, outType), outCs)
+  | _ -> assert false
 
 (* Dispatch: Type inference for a plain value (expression) *)
 and tcExpr' (inState : state) (lclCtx : TypingEnv.t) :
@@ -1213,9 +1221,9 @@ let tcTopLetRec (inState : state) (var : Untyped.variable)
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 
-let monomorphize free_params cnstrs =
+let monomorphize free_ty_params cnstrs =
   let free_cnstrs_params = Constraint.free_params_constraints cnstrs in
-  let free_params = Type.FreeParams.union free_params free_cnstrs_params in
+  let free_params = Type.FreeParams.union free_ty_params free_cnstrs_params in
   let monomorphize_skeletons =
     List.map
       (fun sk ->
@@ -1260,17 +1268,21 @@ let infer_rec_abstraction state f abs =
 (* Typecheck a top-level expression *)
 let top_level_computation state comp =
   let comp, residuals = infer_computation state comp in
-  let free_params = Term.free_params_computation comp in
-  let mono_sub = monomorphize free_params residuals in
+  Print.debug "TYPE: %t" (Type.print_dirty comp.ty);
+  Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals);
+  let free_ty_params = Type.free_params_dirty comp.ty in
+  let mono_sub = monomorphize free_ty_params residuals in
+  Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub);
   let mono_comp = subInCmp mono_sub comp in
+  Print.debug "MONO TYPE: %t" (Type.print_dirty mono_comp.ty);
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_computation mono_comp));
   mono_comp
 
 let top_level_rec_abstraction state x (abs : Untyped.abstraction) =
   let abs, residuals = infer_rec_abstraction state x abs in
-  let free_params = Term.free_params_abstraction abs in
-  let mono_sub = monomorphize free_params residuals in
+  let free_ty_params = Type.free_params_abstraction_ty abs.ty in
+  let mono_sub = monomorphize free_ty_params residuals in
   let mono_abs = subInAbs mono_sub abs in
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_abstraction mono_abs));
@@ -1279,14 +1291,14 @@ let top_level_rec_abstraction state x (abs : Untyped.abstraction) =
 let top_level_expression state expr =
   let expr, residuals = infer_expression state expr in
   (* Print.debug "TERM: %t" (Term.print_expression expr); *)
-  (* Print.debug "TYPE: %t" (Type.print_ty expr.ty); *)
-  (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
-  let free_params = Term.free_params_expression expr in
-  let mono_sub = monomorphize free_params residuals in
-  (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
+  Print.debug "TYPE: %t" (Type.print_ty expr.ty);
+  Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals);
+  let free_ty_params = Type.free_params_ty expr.ty in
+  let mono_sub = monomorphize free_ty_params residuals in
+  Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub);
   let mono_expr = subInExp mono_sub expr in
-  (* Print.debug "MONO TERM: %t" (Term.print_expression mono_expr); *)
-  (* Print.debug "MONO TYPE: %t" (Type.print_ty mono_expr.ty); *)
+  Print.debug "MONO TERM: %t" (Term.print_expression mono_expr);
+  Print.debug "MONO TYPE: %t" (Type.print_ty mono_expr.ty);
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_expression mono_expr));
   mono_expr

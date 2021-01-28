@@ -68,7 +68,7 @@ let rec elab_ty_coercion coer =
   | Constraint.HandlerCoercion (coerA, coerB) -> (
       let coerA2, coerA1 = coerA.ty
       and elabA = elab_dirty_coercion coerA
-      and coerB1, coerB2 = coerB.ty
+      and coerB1, _coerB2 = coerB.ty
       and elabB = elab_dirty_coercion coerB in
       if
         has_empty_dirt coerA1 && has_empty_dirt coerA2
@@ -76,7 +76,7 @@ let rec elab_ty_coercion coer =
       then NoEff.NCoerArrow (elabA, elabB)
       else
         match coerB.term with
-        | tycoer, dirtcoer -> (
+        | tycoer, _dirtcoer -> (
             let elab2 = elab_ty_coercion tycoer in
             if
               (not (has_empty_dirt coerA2)) && not (has_empty_dirt coerA2)
@@ -84,7 +84,7 @@ let rec elab_ty_coercion coer =
             then NoEff.NCoerHandler (elabA, NoEff.NCoerComp elab2)
             else
               match coerA.term with
-              | tycoerA, dirtcoerA ->
+              | tycoerA, _dirtcoerA ->
                   let elab1 = elab_ty_coercion tycoerA in
                   if
                     has_empty_dirt coerB1
@@ -110,7 +110,7 @@ let rec elab_ty_coercion coer =
       let ty1elab = elab_ty ty1 in
       let ty2elab = elab_ty ty2 in
       NoEff.NCoerQual ((ty1elab, ty2elab), elabc)
-  | Constraint.QualDirtCoer (dirts, c) ->
+  | Constraint.QualDirtCoer (_dirts, c) ->
       let elabc = elab_ty_coercion c in
       elabc
 
@@ -145,12 +145,12 @@ and elab_expression' exp =
       let elab2 = elab_ty t2 in
       NoEff.NEffect (e, (elab1, elab2))
   | ExEff.Handler h ->
-      let elabvc = elab_abstraction h.value_clause in
+      let elabvc = elab_abstraction h.term.value_clause in
 
-      if Assoc.length h.effect_clauses = 0 (* Handler - Case 1 *) then
+      if Assoc.length h.term.effect_clauses = 0 (* Handler - Case 1 *) then
         NoEff.NFun elabvc
       else
-        let _, (_ty, dirt) = h.value_clause.ty in
+        let _, (_ty, dirt) = h.term.value_clause.ty in
         if ExEffTypes.is_empty_dirt dirt (* Handler - Case 2 *) then
           let subst_cont_effect ((eff, (ty1, ty2)), (p1, p2, comp)) =
             let elab1 = elab_ty ty1 in
@@ -176,7 +176,7 @@ and elab_expression' exp =
               return_clause = elabvc;
               effect_clauses =
                 Assoc.map_of_list subst_cont_effect
-                  (Assoc.to_list h.effect_clauses);
+                  (Assoc.to_list h.term.effect_clauses);
             } (* Handler - Case 3 *)
         else
           let elab_effect_clause ((eff, (ty1, ty2)), (p1, p2, comp)) =
@@ -190,7 +190,7 @@ and elab_expression' exp =
               return_clause = elabvc;
               effect_clauses =
                 Assoc.map_of_list elab_effect_clause
-                  (Assoc.to_list h.effect_clauses);
+                  (Assoc.to_list h.term.effect_clauses);
             }
   | ExEff.CastExp (value, coer) ->
       let elab1 = elab_expression value in
@@ -201,20 +201,20 @@ and elab_expression' exp =
       let elab2 = elab_ty ty2 in
       let elabv = elab_expression exp in
       NoEff.NBigLambdaCoer (par, (elab1, elab2), elabv)
-  | ExEff.LambdaDirtCoerVar (par, (dirt1, dirt2), value) ->
+  | ExEff.LambdaDirtCoerVar (_par, (_dirt1, _dirt2), value) ->
       let elabv = elab_expression value in
       elabv
   | ExEff.ApplyTyCoercion (value, coer) ->
       let elabc = elab_ty_coercion coer in
       let elabv = elab_expression value in
       NoEff.NApplyCoer (elabv, elabc)
-  | ExEff.ApplyDirtCoercion (value, coer) ->
+  | ExEff.ApplyDirtCoercion (value, _coer) ->
       let elabv = elab_expression value in
       elabv
   | ExEff.Variant (lbl, exp) ->
       let elab_e = elab_expression exp in
       NoEff.NVariant (lbl, Some elab_e)
-  | ExEff.Record ass -> failwith "records not supported yet"
+  | ExEff.Record _ass -> failwith "records not supported yet"
 
 and elab_abstraction { term = p, t, c; _ } =
   let ntype1 = elab_ty t in

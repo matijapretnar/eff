@@ -70,7 +70,9 @@ and computation' =
   | Bind of computation * abstraction
   | CastComp of computation * Constraint.dirty_coercion
 
-and handler = {
+and handler = (handler', Type.dirty * Type.dirty) typed
+
+and handler' = {
   effect_clauses : (effect, abstraction2) Assoc.t;
   value_clause : abstraction;
 }
@@ -98,11 +100,14 @@ let record (_ : (CoreTypes.Field.t, expression) Assoc.t) : expression =
 
 let variant (_ : CoreTypes.Label.t * expression) : expression = failwith __LOC__
 
-let lambda (_ : abstraction) : expression = failwith __LOC__
+let lambda abs = { term = Lambda abs; ty = Type.Arrow abs.ty }
 
 let effect (_ : effect) : expression = failwith __LOC__
 
-let handler (_ : handler) : expression = failwith __LOC__
+let handler h =
+  let drty1, drty2 = h.ty in
+  (* Check that effect clauses have a correct type *)
+  { term = Handler h; ty = Type.Handler (drty1, drty2) }
 
 let castExp (exp, coer) =
   let ty1 = exp.ty and ty1', ty2 = coer.ty in
@@ -123,26 +128,42 @@ let applyTyCoercion (_ : expression * Constraint.ty_coercion) : expression =
 let applyDirtCoercion (_ : expression * Constraint.dirt_coercion) : expression =
   failwith __LOC__
 
-let value (_ : expression) : computation = failwith __LOC__
+let value exp = { term = Value exp; ty = Type.make_dirty exp.ty }
 
-let letVal (_ : expression * abstraction) : computation = failwith __LOC__
+let letVal (exp, abs) =
+  let ty1, drty2 = abs.ty in
+  assert (Type.types_are_equal exp.ty ty1);
+  { term = LetVal (exp, abs); ty = drty2 }
 
 let letRec (_ : letrec_abstraction list * computation) : computation =
   failwith __LOC__
 
-let match_ (_ : expression * Type.dirty * abstraction list) : computation =
-  failwith __LOC__
+let match_ (e, drty, cases) = { term = Match (e, drty, cases); ty = drty }
 
-let apply (_ : expression * expression) : computation = failwith __LOC__
+let apply (exp1, exp2) =
+  match exp1.ty with
+  | Type.Arrow (ty1, drty2) ->
+      assert (Type.types_are_equal exp2.ty ty1);
+      { term = Apply (exp1, exp2); ty = drty2 }
+  | _ -> assert false
 
-let handle (_ : expression * computation) : computation = failwith __LOC__
+let handle (exp, comp) =
+  match exp.ty with
+  | Type.Handler (drty1, drty2) ->
+      assert (Type.dirty_types_are_equal comp.ty drty1);
+      { term = Handle (exp, comp); ty = drty2 }
+  | _ -> assert false
 
 let call (_ : effect * expression * abstraction) : computation =
   failwith __LOC__
 
 let op (_ : effect * expression) : computation = failwith __LOC__
 
-let bind (_ : computation * abstraction) : computation = failwith __LOC__
+let bind (comp1, abs2) =
+  let ty1, drt1 = comp1.ty and ty2, ((_, drt2) as drty2) = abs2.ty in
+  assert (Type.types_are_equal ty1 ty2);
+  assert (Type.dirts_are_equal drt1 drt2);
+  { term = Bind (comp1, abs2); ty = drty2 }
 
 let castComp (cmp, coer) =
   let drty1 = cmp.ty and drty1', drty2 = coer.ty in
@@ -191,8 +212,8 @@ let rec print_expression ?max_level e ppf =
          (type b) (x : (a, b) effect) ->\n\
         \             ((match x with %t) : a -> (b -> _ computation) -> _ \
          computation)) @]}"
-        (print_abstraction h.value_clause)
-        (print_effect_clauses (Assoc.to_list h.effect_clauses))
+        (print_abstraction h.term.value_clause)
+        (print_effect_clauses (Assoc.to_list h.term.effect_clauses))
   | Effect eff -> print ~at_level:2 "effect %t" (print_effect eff)
   | CastExp (e1, tc) ->
       print "(%t) |> [%t]" (print_expression e1)
@@ -339,8 +360,12 @@ and subst_comp' sbst = function
 
 and subst_handler sbst h =
   {
-    effect_clauses = Assoc.map (subst_abs2 sbst) h.effect_clauses;
-    value_clause = subst_abs sbst h.value_clause;
+    h with
+    term =
+      {
+        effect_clauses = Assoc.map (subst_abs2 sbst) h.term.effect_clauses;
+        value_clause = subst_abs sbst h.term.value_clause;
+      };
   }
 
 and subst_abs sbst { term = p, ty, c; ty = absty } =
@@ -415,14 +440,14 @@ and alphaeq_comp eqvars c c' =
   | _, _ -> false
 
 and alphaeq_handler eqvars h h' =
-  alphaeq_abs eqvars h.value_clause h'.value_clause
-  && Assoc.length h.effect_clauses = Assoc.length h'.effect_clauses
+  alphaeq_abs eqvars h.term.value_clause h'.term.value_clause
+  && Assoc.length h.term.effect_clauses = Assoc.length h'.term.effect_clauses
   && List.for_all
        (fun (effect, abs2) ->
-         match Assoc.lookup effect h'.effect_clauses with
+         match Assoc.lookup effect h'.term.effect_clauses with
          | Some abs2' -> alphaeq_abs2 eqvars abs2 abs2'
          | None -> false)
-       (Assoc.to_list h.effect_clauses)
+       (Assoc.to_list h.term.effect_clauses)
 
 (*   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
   alphaeq_abs eqvars h.value_clause h'.value_clause *)
@@ -521,8 +546,8 @@ and free_vars_expr e =
   | ApplyDirtCoercion (e, _dco) -> free_vars_expr e
 
 and free_vars_handler h =
-  free_vars_abs h.value_clause
-  @@@ (Assoc.values_of h.effect_clauses
+  free_vars_abs h.term.value_clause
+  @@@ (Assoc.values_of h.term.effect_clauses
       |> List.map free_vars_abs2 |> concat_vars)
 
 and free_vars_finally_handler (h, finally_clause) =
@@ -570,7 +595,7 @@ and free_params_expression' e =
   | Variant (_, e) -> free_params_expression e
   | Lambda abs -> free_params_abstraction abs
   | Effect _ -> Type.FreeParams.empty
-  | Handler h -> free_params_abstraction h.value_clause
+  | Handler h -> free_params_abstraction h.term.value_clause
   | CastExp (e, tc) ->
       Type.FreeParams.union (free_params_expression e)
         (Constraint.free_params_ty_coercion tc)

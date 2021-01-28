@@ -130,8 +130,8 @@ and veval state e =
   | Term.ApplyDirtCoercion (e, _) ->
       veval state e
 
-and eval_handler state { Term.effect_clauses = ops; Term.value_clause = value }
-    =
+and eval_handler state
+    { term = { Term.effect_clauses = ops; Term.value_clause = value }; _ } =
   let eval_op ((eff, (_, to_ty)), a2) =
     let p, kvar, c = a2 in
     let f u k =
