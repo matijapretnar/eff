@@ -163,6 +163,10 @@ and print_ct_dirt (ty1, ty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
   print "%t <= %t" (print_dirt ty1) (print_dirt ty2)
 
+and print_abs_ty (ty1, drty2) ppf =
+  let print ?at_level = Print.print ?at_level ppf in
+  print "%t -> %t" (print_ty ty1) (print_dirty drty2)
+
 (* ************************************************************************* *)
 (*                       PREDICATES ON ty                             *)
 (* ************************************************************************* *)

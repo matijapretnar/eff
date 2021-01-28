@@ -195,7 +195,7 @@ let instantiateVariable (x : Term.variable) (scheme : Type.ty) :
   in
 
   (* 5: Apply x to all its fresh arguments *)
-  let targetX = applyTerm tyOmegas dirtOmegas (Term.var x) in
+  let targetX = applyTerm tyOmegas dirtOmegas (Term.var x scheme) in
 
   (* 6: Combine the results *)
   (targetX, subInValTy sub monotype, wantedTyCs @ wantedDirtCs)
@@ -571,7 +571,7 @@ and tcReturnCase (inState : state) (lclCtx : TypingEnv.t)
   let yvar = CoreTypes.Variable.fresh "y" in
   let ysub =
     Term.subst_comp
-      (Assoc.of_list [ (x, Term.CastExp (Term.var yvar, omega6)) ])
+      (Assoc.of_list [ (x, Term.CastExp (Term.var yvar tyIn, omega6)) ])
   in
   let outExpr =
     Term.abstraction
@@ -631,17 +631,15 @@ and tcOpCase (inState : state) (lclCtx : TypingEnv.t)
   let omega34i, omegaCt3i, omegaCt4i =
     Constraint.fresh_dirty_coer ((tyBOpi, dirtDOpi), (tyOut, dirtOut))
   in
-  let omega5i, omegaCt5i =
-    let leftty = Type.Arrow (tyBi, (tyOut, dirtOut)) in
-    let rightty = Type.Arrow (tyBi, (alphai, deltai)) in
-    Constraint.fresh_ty_coer (leftty, rightty)
-  in
+  let leftty = Type.Arrow (tyBi, (tyOut, dirtOut)) in
+  let rightty = Type.Arrow (tyBi, (alphai, deltai)) in
+  let omega5i, omegaCt5i = Constraint.fresh_ty_coer (leftty, rightty) in
 
   (* 6: Create the elaborated clause *)
   let lvar = CoreTypes.Variable.fresh "l" in
   let lsub =
     Term.subst_comp
-      (Assoc.of_list [ (k, Term.CastExp (Term.var lvar, omega5i)) ])
+      (Assoc.of_list [ (k, Term.CastExp (Term.var lvar leftty, omega5i)) ])
   in
   let outExpr =
     ( ((eff, (tyAi, tyBi)) : Term.effect) (* Opi *),
@@ -693,10 +691,13 @@ and tcHandler (inState : state) (lclCtx : TypingEnv.t) (h : Untyped.handler) :
       ( Constraint.bangCoercion (Constraint.reflTy alphaIn, omega7),
         Constraint.reflDirty (alphaOut, deltaOut) )
   in
-
+  let handTy, _ = handlerCo.ty in
   let outExpr =
     Term.CastExp
-      ( Term.handler { effect_clauses = trgCls; value_clause = trgRet },
+      ( {
+          term = Term.Handler { effect_clauses = trgCls; value_clause = trgRet };
+          ty = handTy;
+        },
         handlerCo )
   in
   let outType = Type.Handler ((alphaIn, deltaIn), (alphaOut, deltaOut)) in
@@ -870,7 +871,7 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
     in
     let subst_fn =
       Term.subst_comp
-        (Assoc.of_list [ (var, Term.CastExp (Term.var var, f_coercion)) ])
+        (Assoc.of_list [ (var, Term.CastExp (Term.var var alpha, f_coercion)) ])
     in
 
     subst_fn trgC1
@@ -1186,7 +1187,7 @@ let tcTopLetRec (inState : state) (var : Untyped.variable)
       Constraint.arrowCoercion (Constraint.reflTy alpha, omega12)
     in
     Term.subst_comp
-      (Assoc.of_list [ (var, Term.CastExp (Term.var var, f_coercion)) ])
+      (Assoc.of_list [ (var, Term.CastExp (Term.var var alpha, f_coercion)) ])
       trgC1
   in
 
@@ -1212,12 +1213,13 @@ let tcTopLetRec (inState : state) (var : Untyped.variable)
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 
-let monomorphize free_ty_params cnstrs =
+let monomorphize free_params cnstrs =
   let free_cnstrs_params = Constraint.free_params_constraints cnstrs in
-  let free_params = Type.FreeParams.union free_ty_params free_cnstrs_params in
+  let free_params = Type.FreeParams.union free_params free_cnstrs_params in
   let monomorphize_skeletons =
     List.map
-      (fun sk -> Constraint.SkelEq (Type.SkelParam sk, Type.SkelTuple []))
+      (fun sk ->
+        Constraint.SkelEq (Type.SkelParam sk, Type.SkelBasic Const.FloatTy))
       (Type.SkelParamSet.elements free_params.skel_params)
   and monomorphize_dirts =
     List.map
@@ -1234,9 +1236,15 @@ let monomorphize free_ty_params cnstrs =
   assert (residuals = []);
   sub
 
-let infer_computation state comp = tcComp state initial_lcl_ty_env comp
+let infer_computation state comp =
+  let (comp', _drty), cnstrs = tcComp state initial_lcl_ty_env comp in
+  let sub, residuals = Unification.solve cnstrs in
+  (subInCmp sub comp', residuals)
 
-let infer_expression state expr = tcExpr state initial_lcl_ty_env expr
+let infer_expression state expr =
+  let (expr', _ty), cnstrs = tcExpr state initial_lcl_ty_env expr in
+  let sub, residuals = Unification.solve cnstrs in
+  (subInExp sub expr', residuals)
 
 let infer_rec_abstraction state f abs =
   match
@@ -1246,33 +1254,39 @@ let infer_rec_abstraction state f abs =
   | (Term.LetRec ([ (_f, _drty_out, abs') ], _ret_unit), _unit_drty), cnstrs ->
       (* These two are not necessarily equal, but should be unifiable *)
       let sub, residuals = Unification.solve cnstrs in
-      ((subInAbs sub abs', subInAbsTy sub abs'.ty), residuals)
+      (subInAbs sub abs', residuals)
   | _ -> assert false
 
 (* Typecheck a top-level expression *)
 let top_level_computation state comp =
-  let (comp, _drty), residuals = infer_computation state comp in
-  let free_ty_params = Type.free_params_dirty comp.ty in
-  let mono_sub = monomorphize free_ty_params residuals in
+  let comp, residuals = infer_computation state comp in
+  let free_params = Term.free_params_computation comp in
+  let mono_sub = monomorphize free_params residuals in
   let mono_comp = subInCmp mono_sub comp in
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_computation mono_comp));
   mono_comp
 
 let top_level_rec_abstraction state x (abs : Untyped.abstraction) =
-  let (abs, _abs_ty), residuals = infer_rec_abstraction state x abs in
-  let free_ty_params = Type.free_params_abstraction_ty abs.ty in
-  let mono_sub = monomorphize free_ty_params residuals in
+  let abs, residuals = infer_rec_abstraction state x abs in
+  let free_params = Term.free_params_abstraction abs in
+  let mono_sub = monomorphize free_params residuals in
   let mono_abs = subInAbs mono_sub abs in
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_abstraction mono_abs));
   mono_abs
 
 let top_level_expression state expr =
-  let (expr, ty), residuals = infer_expression state expr in
-  let free_ty_params = Type.free_params_ty ty in
-  let mono_sub = monomorphize free_ty_params residuals in
+  let expr, residuals = infer_expression state expr in
+  (* Print.debug "TERM: %t" (Term.print_expression expr); *)
+  (* Print.debug "TYPE: %t" (Type.print_ty expr.ty); *)
+  (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
+  let free_params = Term.free_params_expression expr in
+  let mono_sub = monomorphize free_params residuals in
+  (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
   let mono_expr = subInExp mono_sub expr in
+  (* Print.debug "MONO TERM: %t" (Term.print_expression mono_expr); *)
+  (* Print.debug "MONO TYPE: %t" (Type.print_ty mono_expr.ty); *)
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_expression mono_expr));
   mono_expr

@@ -86,11 +86,12 @@ and letrec_abstraction = variable * Type.dirty * abstraction
 and abstraction2 = pattern * pattern * computation
 (** Abstractions that take two arguments. *)
 
-let var (_ : variable) : expression = failwith __LOC__
+let var x ty = { term = Var x; ty }
 
 let const (_ : Language.Const.t) : expression = failwith __LOC__
 
-let tuple (_ : expression list) : expression = failwith __LOC__
+let tuple es =
+  { term = Tuple es; ty = Type.Tuple (List.map (fun e -> e.ty) es) }
 
 let record (_ : (CoreTypes.Field.t, expression) Assoc.t) : expression =
   failwith __LOC__
@@ -103,8 +104,10 @@ let effect (_ : effect) : expression = failwith __LOC__
 
 let handler (_ : handler) : expression = failwith __LOC__
 
-let castExp (_ : expression * Constraint.ty_coercion) : expression =
-  failwith __LOC__
+let castExp (exp, coer) =
+  let ty1 = exp.ty and ty1', ty2 = coer.ty in
+  assert (Type.types_are_equal ty1 ty1');
+  { term = CastExp (exp, coer); ty = ty2 }
 
 let lambdaTyCoerVar (_ : Type.TyCoercionParam.t * Type.ct_ty * expression) :
     expression =
@@ -141,8 +144,10 @@ let op (_ : effect * expression) : computation = failwith __LOC__
 
 let bind (_ : computation * abstraction) : computation = failwith __LOC__
 
-let castComp (_ : computation * Constraint.dirty_coercion) : computation =
-  failwith __LOC__
+let castComp (cmp, coer) =
+  let drty1 = cmp.ty and drty1', drty2 = coer.ty in
+  assert (Type.dirty_types_are_equal drty1 drty1');
+  { term = CastComp (cmp, coer); ty = drty2 }
 
 let abstraction (p, ty, c) : abstraction =
   { term = (p, ty, c); ty = (ty, c.ty) }
@@ -549,7 +554,12 @@ let cast_computation c dirty1 dirty2 =
 (*                         FREE VARIABLE COMPUTATION                         *)
 (* ************************************************************************* *)
 let rec free_params_expression e =
-  match e.term with
+  Type.FreeParams.union
+    (free_params_expression' e.term)
+    (Type.free_params_ty e.ty)
+
+and free_params_expression' e =
+  match e with
   | Var _ -> Type.FreeParams.empty
   | Const _ -> Type.FreeParams.empty
   | Tuple es ->
@@ -574,7 +584,12 @@ let rec free_params_expression e =
         (Constraint.free_params_dirt_coercion dc)
 
 and free_params_computation c =
-  match c.term with
+  Type.FreeParams.union
+    (free_params_computation' c.term)
+    (Type.free_params_dirty c.ty)
+
+and free_params_computation' c =
+  match c with
   | Value e -> free_params_expression e
   | LetVal (e, abs) ->
       Type.FreeParams.union (free_params_expression e)
@@ -612,5 +627,9 @@ and free_params_computation c =
         (free_params_computation c)
         (Constraint.free_params_dirty_coercion dc)
 
-and free_params_abstraction { term = _, ty, c; _ } =
-  Type.FreeParams.union (Type.free_params_ty ty) (free_params_computation c)
+and free_params_abstraction abs =
+  Type.FreeParams.union
+    (Type.free_params_abstraction_ty abs.ty)
+    (free_params_abstraction' abs.term)
+
+and free_params_abstraction' (_, _, c) = free_params_computation c
