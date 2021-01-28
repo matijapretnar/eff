@@ -123,7 +123,7 @@ and elab_dirty_coercion { term = tcoer, dcoer; _ } =
   else failwith "Ill-typed bang coercion"
 
 let rec elab_pattern p =
-  match p with
+  match p.term with
   | PVar x -> PNVar x
   | PAs (p, x) -> PNAs (elab_pattern p, x)
   | PTuple ps -> PNTuple (List.map elab_pattern ps)
@@ -156,7 +156,7 @@ and elab_expression' exp =
             let elab1 = elab_ty ty1 in
             let elab2 = elab_ty ty2 in
             let elabcomp = elab_computation comp in
-            match p2 with
+            match p2.term with
             | PVar x ->
                 ( (eff, (elab1, elab2)),
                   ( elab_pattern p1,
@@ -216,8 +216,8 @@ and elab_expression' exp =
       NoEff.NVariant (lbl, Some elab_e)
   | ExEff.Record _ass -> failwith "records not supported yet"
 
-and elab_abstraction { term = p, t, c; _ } =
-  let ntype1 = elab_ty t in
+and elab_abstraction { term = p, c; _ } =
+  let ntype1 = elab_ty p.ty in
   let elab2 = elab_computation c in
   (elab_pattern p, ntype1, elab2)
 

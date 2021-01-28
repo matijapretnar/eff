@@ -15,7 +15,7 @@ let lookup x state = RuntimeEnv.find_opt x state
 exception PatternMatch of Location.t
 
 let rec extend_value p v state =
-  match (p, v) with
+  match (p.term, v) with
   | Term.PVar x, v -> update x v state
   (* | Term.PAnnotated (p, _t), v -> extend_value p v state *)
   | Term.PAs (p, x), v ->
@@ -59,7 +59,7 @@ let rec ceval state c =
       let rec eval_case = function
         | [] -> Error.runtime "No branches succeeded in a pattern match."
         | a :: lst -> (
-            let p, _, c = a.term in
+            let p, c = a.term in
             try ceval (extend_value p v state) c
             with PatternMatch _ -> eval_case lst)
       in
@@ -69,7 +69,7 @@ let rec ceval state c =
       let r = ceval state c in
       let h = V.to_handler v in
       h r
-  | Term.LetVal (e, { term = p, _ty, c; _ }) ->
+  | Term.LetVal (e, { term = p, c; _ }) ->
       eval_let state [ (p, Term.value e) ] c
   | Term.LetRec (defs, c) ->
       (* strip types *)
@@ -84,7 +84,7 @@ let rec ceval state c =
   | Term.Op ((eff, _), e) ->
       let e' = veval state e in
       V.Call (eff, e', fun r -> V.Value r)
-  | Term.Bind (c1, { term = p, _, c2; _ }) -> eval_let state [ (p, c1) ] c2
+  | Term.Bind (c1, { term = p, c2; _ }) -> eval_let state [ (p, c1) ] c2
   | Term.CastComp (c, _) -> ceval state c
 
 and eval_let state lst c =
@@ -99,7 +99,7 @@ and extend_let_rec state defs =
   let state =
     Assoc.fold_right
       (fun (f, a) state ->
-        let p, _, c = a.term in
+        let p, c = a.term in
         let g = V.Closure (fun v -> ceval (extend p v !state') c) in
         update f g state)
       defs state
@@ -132,11 +132,9 @@ and veval state e =
 
 and eval_handler state
     { term = { Term.effect_clauses = ops; Term.value_clause = value }; _ } =
-  let eval_op ((eff, (_, to_ty)), a2) =
+  let eval_op ((eff, _), a2) =
     let p, kvar, c = a2 in
-    let f u k =
-      eval_closure (extend kvar (V.Closure k) state) (p, to_ty, c) u
-    in
+    let f u k = eval_closure (extend kvar (V.Closure k) state) (p, c) u in
     (eff, f)
   in
   let ops = Assoc.kmap eval_op ops in
@@ -152,7 +150,7 @@ and eval_handler state
   h
 
 and eval_closure state a v =
-  let p, _, c = a in
+  let p, c = a in
   ceval (extend p v state) c
 
 let rec top_handle op =

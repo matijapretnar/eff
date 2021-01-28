@@ -257,7 +257,9 @@ and apply_sub_exp' sub expression =
 and apply_sub_abs sub abs =
   { term = apply_sub_abs' sub abs.term; ty = apply_sub_abs_ty sub abs.ty }
 
-and apply_sub_abs' sub (p, t, c) = (p, apply_sub_ty sub t, apply_sub_comp sub c)
+and apply_sub_abs' sub (p, c) = (apply_sub_pat sub p, apply_sub_comp sub c)
+
+and apply_sub_pat sub { term = p; ty } = { term = p; ty = apply_sub_ty sub ty }
 
 and apply_sub_letrec_abs sub (f, res_ty, abs) =
   (f, apply_sub_dirty_ty sub res_ty, apply_sub_abs sub abs)

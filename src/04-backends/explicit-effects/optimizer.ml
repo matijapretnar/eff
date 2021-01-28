@@ -126,8 +126,8 @@ and optimize_handler state hnd =
 and optimize_abstraction state abs =
   { abs with term = optimize_abstraction' state abs.term }
 
-and optimize_abstraction' state (pat, ty, cmp) =
-  (pat, ty, optimize_computation state cmp)
+and optimize_abstraction' state (pat, cmp) =
+  (pat, optimize_computation state cmp)
 
 and optimize_abstraction2 state (pat1, pat2, cmp) =
   (pat1, pat2, optimize_computation state cmp)

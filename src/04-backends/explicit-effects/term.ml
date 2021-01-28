@@ -10,7 +10,9 @@ type variable = CoreTypes.Variable.t
 
 type effect = CoreTypes.Effect.t * (Type.ty * Type.ty)
 
-type pattern =
+type pattern = (pattern', Type.ty) typed
+
+and pattern' =
   | PVar of variable
   | PAs of pattern * variable
   | PTuple of pattern list
@@ -19,7 +21,13 @@ type pattern =
   | PConst of Language.Const.t
   | PNonbinding
 
-let rec pattern_vars = function
+let pVar p ty = { term = PVar p; ty }
+
+let pTuple ps =
+  { term = PTuple ps; ty = Type.Tuple (List.map (fun x -> x.ty) ps) }
+
+let rec pattern_vars pat =
+  match pat.term with
   | PVar x -> [ x ]
   | PAs (p, x) -> x :: pattern_vars p
   | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
@@ -78,7 +86,7 @@ and handler' = {
 }
 (** Handler definitions *)
 
-and abstraction = (pattern * Type.ty * computation, Type.ty * Type.dirty) typed
+and abstraction = (pattern * computation, Type.ty * Type.dirty) typed
 (** Abstractions that take one argument. *)
 
 and letrec_abstraction = variable * Type.dirty * abstraction
@@ -170,8 +178,7 @@ let castComp (cmp, coer) =
   assert (Type.dirty_types_are_equal drty1 drty1');
   { term = CastComp (cmp, coer); ty = drty2 }
 
-let abstraction (p, ty, c) : abstraction =
-  { term = (p, ty, c); ty = (ty, c.ty) }
+let abstraction (p, c) : abstraction = { term = (p, c); ty = (p.ty, c.ty) }
 
 let abstraction2 p1 p2 c : abstraction2 = (p1, p2, c)
 
@@ -182,7 +189,7 @@ let print_variable = CoreTypes.Variable.print ~safe:true
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match p with
+  match p.term with
   | PVar x -> print "%t" (print_variable x)
   | PAs (p, x) -> print "%t as %t" (print_pattern p) (print_variable x)
   | PConst c -> Const.print c ppf
@@ -203,8 +210,8 @@ let rec print_expression ?max_level e ppf =
   | Record lst -> Print.record CoreTypes.Field.print print_expression lst ppf
   | Variant (lbl, e) ->
       print ~at_level:1 "%t %t" (CoreTypes.Label.print lbl) (print_expression e)
-  | Lambda { term = x, t, c; _ } ->
-      print "fun (%t:%t) -> (%t)" (print_pattern x) (Type.print_ty t)
+  | Lambda { term = x, c; _ } ->
+      print "fun (%t:%t) -> (%t)" (print_pattern x) (Type.print_ty x.ty)
         (print_computation c)
   | Handler h ->
       print
@@ -269,7 +276,7 @@ and print_computation ?max_level c ppf =
   | CastComp (c1, dc) ->
       print " ( (%t) |> [%t] ) " (print_computation c1)
         (Constraint.print_dirty_coercion dc)
-  | LetVal (e1, { term = p, _ty, c1; _ }) ->
+  | LetVal (e1, { term = p, c1; _ }) ->
       print "let (%t = (%t)) in (%t)" (print_pattern p) (print_expression e1)
         (print_computation c1)
 
@@ -282,8 +289,8 @@ and print_effect_clauses eff_clauses ppf =
         (print_abstraction2 a2)
         (print_effect_clauses cases)
 
-and print_abstraction { term = p, tty, c; _ } ppf =
-  Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern p) (Type.print_ty tty)
+and print_abstraction { term = p, c; _ } ppf =
+  Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern p) (Type.print_ty p.ty)
     (print_computation c)
 
 and print_abstraction2 (p1, p2, c) ppf =
@@ -293,7 +300,7 @@ and print_abstraction2 (p1, p2, c) ppf =
 and print_pure_abstraction (p, e) ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_expression e)
 
-and print_let_abstraction { term = p, _ty, c; _ } ppf =
+and print_let_abstraction { term = p, c; _ } ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)
 
 and print_top_let_abstraction (p, c) ppf =
@@ -305,10 +312,9 @@ and print_top_let_abstraction (p, c) ppf =
       Format.fprintf ppf "%t = run %t" (print_pattern p)
         (print_computation ~max_level:0 c)
 
-and print_let_rec_abstraction (f, res_ty, ({ term = _, arg_ty, _; _ } as abs))
-    ppf =
+and print_let_rec_abstraction (f, res_ty, ({ term = p, _; _ } as abs)) ppf =
   Format.fprintf ppf "(%t : %t) %t" (print_variable f)
-    (Type.print_ty (Type.Arrow (arg_ty, res_ty)))
+    (Type.print_ty (Type.Arrow (p.ty, res_ty)))
     (print_let_abstraction abs)
 
 let backup_location loc locs =
@@ -368,9 +374,9 @@ and subst_handler sbst h =
       };
   }
 
-and subst_abs sbst { term = p, ty, c; ty = absty } =
+and subst_abs sbst { term = p, c; ty = absty } =
   (* XXX We should assert that p & sbst have disjoint variables *)
-  { term = (p, ty, subst_comp sbst c); ty = absty }
+  { term = (p, subst_comp sbst c); ty = absty }
 
 and subst_abs2 sbst (p1, p2, c) =
   (* XXX We should assert that p1, p2 & sbst have disjoint variables *)
@@ -388,7 +394,7 @@ let assoc_equal eq flds flds' : bool =
   Assoc.length flds = Assoc.length flds' && equal_fields (Assoc.to_list flds)
 
 let rec make_equal_pattern eqvars p p' =
-  match (p, p') with
+  match (p.term, p'.term) with
   | PVar x, PVar x' -> Some ((x, x') :: eqvars)
   | PAs (p, x), PAs (p', x') ->
       Option.map
@@ -451,7 +457,7 @@ and alphaeq_handler eqvars h h' =
 
 (*   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
   alphaeq_abs eqvars h.value_clause h'.value_clause *)
-and alphaeq_abs eqvars { term = p, _ty, c; _ } { term = p', _ty', c'; _ } =
+and alphaeq_abs eqvars { term = p, c; _ } { term = p', c'; _ } =
   match make_equal_pattern eqvars p p' with
   | Some eqvars' -> alphaeq_comp eqvars' c c'
   | None -> false
@@ -475,7 +481,7 @@ let pattern_match p e =
      in
      ignore constraints; *)
   let rec extend_subst p e sbst =
-    match (p, e.term) with
+    match (p.term, e.term) with
     | PVar x, e -> Assoc.update x e sbst
     | PAs (p, x), e' ->
         let sbst = extend_subst p e sbst in
@@ -553,7 +559,7 @@ and free_vars_handler h =
 and free_vars_finally_handler (h, finally_clause) =
   free_vars_handler h @@@ free_vars_abs finally_clause
 
-and free_vars_abs { term = p, _, c; _ } =
+and free_vars_abs { term = p, c; _ } =
   let inside, outside = free_vars_comp c --- pattern_vars p in
   (inside @ outside, [])
 
@@ -657,4 +663,4 @@ and free_params_abstraction abs =
     (Type.free_params_abstraction_ty abs.ty)
     (free_params_abstraction' abs.term)
 
-and free_params_abstraction' (_, _, c) = free_params_computation c
+and free_params_abstraction' (_, c) = free_params_computation c
