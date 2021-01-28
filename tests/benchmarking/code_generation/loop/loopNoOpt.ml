@@ -79,6 +79,8 @@ let coer_unsafe coer = function
 
 let coer_arrow coer1 coer2 f x = coer2 (f (coer1 x))
 
+let coer_handler coer1 coer2 h x = coer2 (h (coer1 x))
+
 let coer_hand_to_fun coer1 coer2 h x = coer2 (h (Value (coer1 x)))
 
 let rec coer_fun_to_hand coer1 coer2 f comp =
@@ -234,7 +236,9 @@ let rec loop_incr n =
 
 let test_incr (n : int) =
   let incr_handler =
-    (coer_arrow (coer_computation coer_refl_ty) (coer_computation coer_refl_ty))
+    (coer_handler
+       (coer_computation coer_refl_ty)
+       (coer_computation coer_refl_ty))
       (handler
          {
            value_clause =
@@ -286,7 +290,7 @@ let test_incr (n : int) =
   let _b_41 =
     coer_refl_ty
       ((coer_unsafe coer_refl_ty)
-         (((coer_arrow
+         (((coer_handler
               (coer_computation coer_refl_ty)
               (coer_computation (coer_arrow coer_refl_ty coer_refl_ty)))
              incr_handler)
@@ -337,7 +341,9 @@ let rec loop_incr' n =
 
 let test_incr' (n : int) =
   let incr_handler =
-    (coer_arrow (coer_computation coer_refl_ty) (coer_computation coer_refl_ty))
+    (coer_handler
+       (coer_computation coer_refl_ty)
+       (coer_computation coer_refl_ty))
       (handler
          {
            value_clause =
@@ -389,7 +395,7 @@ let test_incr' (n : int) =
   let _b_62 =
     coer_refl_ty
       ((coer_unsafe coer_refl_ty)
-         (((coer_arrow
+         (((coer_handler
               (coer_computation coer_refl_ty)
               (coer_computation (coer_arrow coer_refl_ty coer_refl_ty)))
              incr_handler)
@@ -462,7 +468,9 @@ let rec loop_state n =
 
 let test_state (n : int) =
   let state_handler =
-    (coer_arrow (coer_computation coer_refl_ty) (coer_computation coer_refl_ty))
+    (coer_handler
+       (coer_computation coer_refl_ty)
+       (coer_computation coer_refl_ty))
       (handler
          {
            value_clause =
@@ -515,7 +523,7 @@ let test_state (n : int) =
   let _b_87 =
     coer_refl_ty
       ((coer_unsafe coer_refl_ty)
-         (((coer_arrow
+         (((coer_handler
               (coer_computation coer_refl_ty)
               (coer_computation (coer_arrow coer_refl_ty coer_refl_ty)))
              state_handler)
