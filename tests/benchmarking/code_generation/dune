@@ -2,6 +2,7 @@
 
 (executable
  (name benchmark)
+ (modes native)
  (modules benchmark)
  (libraries bechamel bechamel-notty notty notty.unix unix loop queens range
    interp))
