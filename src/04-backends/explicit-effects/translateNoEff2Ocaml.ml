@@ -73,7 +73,7 @@ let rec pp_type noeff_ty ppf =
       print ppf "@[<h>(%t ->@ %t)@]" (pp_type ty1) (pp_type ty2)
   | NTyHandler (ty1, ty2) ->
       print ppf "@[<h>(%t ->@ %t)@]" (pp_type ty1) (pp_type ty2)
-  | NTyQual (tyc, ty) -> pp_type ty ppf
+  | NTyQual (_tyc, ty) -> pp_type ty ppf
   | NTyComp ty -> print ppf "%t computation" (pp_type ty)
 
 let rec pp_pattern pat ppf =
@@ -93,7 +93,7 @@ let pp_tuple pp tpl ppf =
   | [] -> print ppf "()"
   | xs -> print ppf "(@[<hov>%t@])" (pp_sequence ", " pp xs)
 
-let pp_effect (e, (ty1, ty2)) ppf = CoreTypes.Effect.print e ppf
+let pp_effect (e, (_ty1, _ty2)) ppf = CoreTypes.Effect.print e ppf
 
 let rec pp_coercion coer ppf =
   (* The cases not matched here should be handled in pp_term *)
@@ -111,9 +111,9 @@ let rec pp_coercion coer ppf =
   | NCoerComp w -> print ppf "coer_computation (%t)" (pp_coercion w)
   | NCoerReturn w -> print ppf "coer_return (%t)" (pp_coercion w)
   | NCoerUnsafe w -> print ppf "coer_unsafe (%t)" (pp_coercion w)
-  | NCoerTuple cs -> print ppf "TupleCoercion"
-  | NCoerApply (t, cs) -> print ppf "ApplyCoercion"
-  | NCoerQual (ct, c) -> print ppf "ApplyCoercion"
+  | NCoerTuple _cs -> print ppf "TupleCoercion"
+  | NCoerApply (_t, _cs) -> print ppf "ApplyCoercion"
+  | NCoerQual (_ct, _c) -> print ppf "ApplyCoercion"
 
 let rec pp_term noEff_term ppf =
   match noEff_term with
@@ -232,7 +232,7 @@ let pp_tydef (name, (params, tydef)) ppf =
       print ppf "@[type %t = %t@]@."
         (CoreTypes.TyName.print name)
         (pp_def tydef)
-  | lst ->
+  | _lst ->
       print ppf "@[type (%t) %t = %t@]@."
         (pp_sequence ", " CoreTypes.TyParam.print params)
         (CoreTypes.TyName.print name)

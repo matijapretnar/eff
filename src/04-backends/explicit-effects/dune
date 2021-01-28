@@ -9,8 +9,3 @@
    (echo "let source = {|")
    (cat ocamlHeader.ml)
    (echo "|}"))))
-
-(env
- (dev
-  (flags
-   (:standard -warn-error +a-27))))

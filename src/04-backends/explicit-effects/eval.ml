@@ -47,7 +47,7 @@ let rec sequence k = function
       V.Call (op, v, k'')
 
 let rec ceval state c =
-  match c with
+  match c.term with
   | Term.Apply (e1, e2) -> (
       let v1 = veval state e1 and v2 = veval state e2 in
       match v1 with
@@ -59,7 +59,7 @@ let rec ceval state c =
       let rec eval_case = function
         | [] -> Error.runtime "No branches succeeded in a pattern match."
         | a :: lst -> (
-            let p, _, c = a in
+            let p, _, c = a.term in
             try ceval (extend_value p v state) c
             with PatternMatch _ -> eval_case lst)
       in
@@ -69,7 +69,8 @@ let rec ceval state c =
       let r = ceval state c in
       let h = V.to_handler v in
       h r
-  | Term.LetVal (e, (p, _ty, c)) -> eval_let state [ (p, Term.Value e) ] c
+  | Term.LetVal (e, { term = p, _ty, c; _ }) ->
+      eval_let state [ (p, Term.value e) ] c
   | Term.LetRec (defs, c) ->
       (* strip types *)
       let stripped =
@@ -79,11 +80,11 @@ let rec ceval state c =
       ceval state c
   | Term.Call ((eff, _), e, a) ->
       let e' = veval state e in
-      V.Call (eff, e', eval_closure state a)
+      V.Call (eff, e', eval_closure state a.term)
   | Term.Op ((eff, _), e) ->
       let e' = veval state e in
       V.Call (eff, e', fun r -> V.Value r)
-  | Term.Bind (c1, (p, _, c2)) -> eval_let state [ (p, c1) ] c2
+  | Term.Bind (c1, { term = p, _, c2; _ }) -> eval_let state [ (p, c1) ] c2
   | Term.CastComp (c, _) -> ceval state c
 
 and eval_let state lst c =
@@ -98,7 +99,7 @@ and extend_let_rec state defs =
   let state =
     Assoc.fold_right
       (fun (f, a) state ->
-        let p, _, c = a in
+        let p, _, c = a.term in
         let g = V.Closure (fun v -> ceval (extend p v !state') c) in
         update f g state)
       defs state
@@ -107,7 +108,7 @@ and extend_let_rec state defs =
   state
 
 and veval state e =
-  match e with
+  match e.term with
   | Term.Var x -> (
       match lookup x state with
       | Some v -> v
@@ -118,7 +119,7 @@ and veval state e =
   | Term.Tuple es -> V.Tuple (List.map (veval state) es)
   | Term.Record es -> V.Record (Assoc.map (fun e -> veval state e) es)
   | Term.Variant (lbl, e) -> V.Variant (lbl, veval state e)
-  | Term.Lambda a -> V.Closure (eval_closure state a)
+  | Term.Lambda a -> V.Closure (eval_closure state a.term)
   | Term.Effect (eff, _) ->
       V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | Term.Handler h -> V.Handler (eval_handler state h)
@@ -129,8 +130,8 @@ and veval state e =
   | Term.ApplyDirtCoercion (e, _) ->
       veval state e
 
-and eval_handler state { Term.effect_clauses = ops; Term.value_clause = value }
-    =
+and eval_handler state
+    { term = { Term.effect_clauses = ops; Term.value_clause = value }; _ } =
   let eval_op ((eff, (_, to_ty)), a2) =
     let p, kvar, c = a2 in
     let f u k =
@@ -140,7 +141,7 @@ and eval_handler state { Term.effect_clauses = ops; Term.value_clause = value }
   in
   let ops = Assoc.kmap eval_op ops in
   let rec h = function
-    | V.Value v -> eval_closure state value v
+    | V.Value v -> eval_closure state value.term v
     | V.Call (eff, v, k) -> (
         let k' u = h (k u) in
         match Assoc.lookup eff ops with

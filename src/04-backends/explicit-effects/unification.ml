@@ -136,7 +136,7 @@ let ty_omega_step sub paused cons rest_queue omega = function
   (* ω : A <= A *)
   | x, y when Type.types_are_equal x y ->
       let k = omega in
-      let v = Constraint.ReflTy x in
+      let v = Constraint.reflTy x in
       (Substitution.add_type_coercion k v sub, paused, rest_queue)
   (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
   | Type.Arrow (a1, dirty1), Type.Arrow (a2, dirty2) ->
@@ -146,7 +146,7 @@ let ty_omega_step sub paused cons rest_queue omega = function
       in
       let k = omega in
       let v =
-        Constraint.ArrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
+        Constraint.arrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
       in
       ( Substitution.add_type_coercion k v sub,
         paused,
@@ -163,7 +163,7 @@ let ty_omega_step sub paused cons rest_queue omega = function
           tys tys' ([], [])
       in
       let k = omega in
-      let v = Constraint.TupleCoercion coercions in
+      let v = Constraint.tupleCoercion coercions in
       ( Substitution.add_type_coercion k v sub,
         paused,
         Constraint.add_list_to_constraints conss rest_queue )
@@ -179,7 +179,7 @@ let ty_omega_step sub paused cons rest_queue omega = function
           tys1 tys2 ([], [])
       in
       let k = omega in
-      let v = Constraint.ApplyCoercion (ty_name1, coercions) in
+      let v = Constraint.applyCoercion (ty_name1, coercions) in
       ( Substitution.add_type_coercion k v sub,
         paused,
         Constraint.add_list_to_constraints conss rest_queue )
@@ -191,7 +191,7 @@ let ty_omega_step sub paused cons rest_queue omega = function
         Constraint.fresh_dirty_coer (drty12, drty22)
       in
       let k = omega in
-      let v = Constraint.HandlerCoercion (drty_coer1, drty_coer2) in
+      let v = Constraint.handlerCoercion (drty_coer1, drty_coer2) in
       ( Substitution.add_type_coercion k v sub,
         paused,
         Constraint.add_to_constraints ty_cons1 rest_queue
@@ -218,25 +218,23 @@ let dirt_omega_step sub paused cons rest_queue omega dcons =
       { effect_set = s2; row = ParamRow v2 } ) ->
       if Type.EffectSet.is_empty s1 then (sub, cons :: paused, rest_queue)
       else
-        let omega' = Type.DirtCoercionParam.fresh () in
         let diff_set = Type.EffectSet.diff s1 s2 in
         let union_set = Type.EffectSet.union s1 s2 in
+        let omega', new_cons =
+          Constraint.fresh_dirt_coer
+            ( Type.{ effect_set = Type.EffectSet.empty; row = ParamRow v1 },
+              Type.{ effect_set = union_set; row = ParamRow v2 } )
+        in
         let k0 = v2 in
         let v0 =
           let open Type in
           { effect_set = diff_set; row = ParamRow (Type.DirtParam.fresh ()) }
         in
         let k1' = omega in
-        let v1' = Constraint.UnionDirt (s1, DirtCoercionVar omega') in
+        let v1' = Constraint.unionDirt (s1, omega') in
         let sub' =
           Substitution.add_dirt_substitution_e k0 v0
           |> Substitution.add_dirt_var_coercion k1' v1'
-        in
-        let new_cons =
-          Constraint.DirtOmega
-            ( omega',
-              ( Type.{ effect_set = Type.EffectSet.empty; row = ParamRow v1 },
-                Type.{ effect_set = union_set; row = ParamRow v2 } ) )
         in
         ( Substitution.merge sub sub',
           [],
@@ -246,13 +244,13 @@ let dirt_omega_step sub paused cons rest_queue omega dcons =
   (* ω : Ø <= Δ₂ *)
   | { effect_set = s1; row = EmptyRow }, d when Type.EffectSet.is_empty s1 ->
       let k = omega in
-      let v = Constraint.Empty d in
+      let v = Constraint.empty d in
       (Substitution.add_dirt_var_coercion k v sub, paused, rest_queue)
   (* ω : δ₁ <= Ø *)
   | { effect_set = s1; row = ParamRow v1 }, { effect_set = s2; row = EmptyRow }
     when Type.EffectSet.is_empty s1 && Type.EffectSet.is_empty s2 ->
       let k0 = omega in
-      let v0 = Constraint.Empty Type.empty_dirt in
+      let v0 = Constraint.empty Type.empty_dirt in
       let k1' = v1 in
       let v1' = Type.empty_dirt in
       let sub1 =
@@ -268,8 +266,8 @@ let dirt_omega_step sub paused cons rest_queue omega dcons =
       assert (Type.EffectSet.subset s1 s2);
       let k = omega in
       let v =
-        Constraint.UnionDirt
-          (s2, Constraint.Empty (Type.closed_dirt (Type.EffectSet.diff s2 s1)))
+        Constraint.unionDirt
+          (s2, Constraint.empty (Type.closed_dirt (Type.EffectSet.diff s2 s1)))
       in
       (Substitution.add_dirt_var_coercion k v sub, paused, rest_queue)
   (* ω : O₁ <= O₂ ∪ δ₂ *)
@@ -278,9 +276,9 @@ let dirt_omega_step sub paused cons rest_queue omega dcons =
       let v2' = Type.DirtParam.fresh () in
       let k0 = omega in
       let v0 =
-        Constraint.UnionDirt
+        Constraint.unionDirt
           ( s1,
-            Constraint.Empty
+            Constraint.empty
               Type.{ effect_set = EffectSet.diff s2 s1; row = ParamRow v2' } )
       in
       let k1 = v2 in

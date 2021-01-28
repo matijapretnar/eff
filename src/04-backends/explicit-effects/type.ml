@@ -50,7 +50,7 @@ type skeleton =
 and ty =
   | TyParam of CoreTypes.TyParam.t * skeleton
   | Apply of CoreTypes.TyName.t * ty list
-  | Arrow of ty * dirty
+  | Arrow of abs_ty
   | Tuple of ty list
   | Handler of dirty * dirty
   | TyBasic of Const.ty
@@ -61,11 +61,15 @@ and dirty = ty * dirt
 
 and dirt = { effect_set : effect_set; row : row }
 
+and abs_ty = ty * dirty
+
 and row = ParamRow of DirtParam.t | EmptyRow
 
 and ct_ty = ty * ty
 
 and ct_dirt = dirt * dirt
+
+and ct_dirty = dirty * dirty
 
 let type_const c = TyBasic (Const.infer_ty c)
 
@@ -160,6 +164,10 @@ and print_ct_ty (ty1, ty2) ppf =
 and print_ct_dirt (ty1, ty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
   print "%t <= %t" (print_dirt ty1) (print_dirt ty2)
+
+and print_abs_ty (ty1, drty2) ppf =
+  let print ?at_level = Print.print ?at_level ppf in
+  print "%t -> %t" (print_ty ty1) (print_dirty drty2)
 
 (* ************************************************************************* *)
 (*                       PREDICATES ON ty                             *)
@@ -437,61 +445,6 @@ and free_params_dirt (dirt : dirt) =
   | EmptyRow -> FreeParams.empty
 
 (* ************************************************************************* *)
-
-let refresh_skeleton _skel = failwith __LOC__
-
-let rec refresh_ty (ty_sbst, dirt_sbst) t =
-  match t with
-  | TyParam (x, skel) -> (
-      match Assoc.lookup x ty_sbst with
-      | Some x' -> ((ty_sbst, dirt_sbst), TyParam (x', refresh_skeleton skel))
-      | None ->
-          let y = CoreTypes.TyParam.fresh () in
-          ( (Assoc.update x y ty_sbst, dirt_sbst),
-            TyParam (y, refresh_skeleton skel) ))
-  | Arrow (a, c) ->
-      let (a_ty_sbst, a_dirt_sbst), a' = refresh_ty (ty_sbst, dirt_sbst) a in
-      let temp_ty_sbst = Assoc.concat a_ty_sbst ty_sbst in
-      let temp_dirt_sbst = Assoc.concat a_dirt_sbst dirt_sbst in
-      let (c_ty_sbst, c_dirt_sbst), c' =
-        refresh_dirty (temp_ty_sbst, temp_dirt_sbst) c
-      in
-      ((c_ty_sbst, c_dirt_sbst), Arrow (a', c'))
-  | Handler (c1, c2) ->
-      let (c1_ty_sbst, c1_dirt_sbst), c1' =
-        refresh_dirty (ty_sbst, dirt_sbst) c1
-      in
-      let temp_ty_sbst = Assoc.concat c1_ty_sbst ty_sbst in
-      let temp_dirt_sbst = Assoc.concat c1_dirt_sbst dirt_sbst in
-      let (c2_ty_sbst, c2_dirt_sbst), c2' =
-        refresh_dirty (temp_ty_sbst, temp_dirt_sbst) c2
-      in
-      ((c2_ty_sbst, c2_dirt_sbst), Handler (c1', c2'))
-  | TyBasic x -> ((ty_sbst, dirt_sbst), TyBasic x)
-  | QualTy _ -> failwith __LOC__
-  | QualDirt _ -> failwith __LOC__
-  | Apply _ -> failwith __LOC__
-  | Tuple _ -> failwith __LOC__
-
-and refresh_dirty (ty_sbst, dirt_sbst) (t, d) =
-  let (t_ty_sbst, t_dirt_sbst), t' = refresh_ty (ty_sbst, dirt_sbst) t in
-  let temp_ty_sbst = Assoc.concat t_ty_sbst ty_sbst in
-  let temp_dirt_sbst = Assoc.concat t_dirt_sbst dirt_sbst in
-  let (d_ty_sbst, d_dirt_sbst), d' =
-    refresh_dirt (temp_ty_sbst, temp_dirt_sbst) d
-  in
-  ((d_ty_sbst, d_dirt_sbst), (t', d'))
-
-and refresh_dirt (ty_sbst, dirt_sbst) drt =
-  match drt.row with
-  | ParamRow x -> (
-      match Assoc.lookup x dirt_sbst with
-      | Some x' -> ((ty_sbst, dirt_sbst), { drt with row = ParamRow x' })
-      | None ->
-          let y = DirtParam.fresh () in
-          ((ty_sbst, Assoc.update x y dirt_sbst), { drt with row = ParamRow y })
-      )
-  | EmptyRow -> ((ty_sbst, dirt_sbst), drt)
 
 let rec source_to_target tctx_st ty =
   let loc = Location.unknown in

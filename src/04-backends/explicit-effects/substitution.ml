@@ -139,13 +139,26 @@ let rec apply_sub_ty sub = function
 and apply_sub_dirty_ty sub (ty, drt) =
   (apply_sub_ty sub ty, apply_sub_dirt sub drt)
 
+and apply_sub_abs_ty sub (ty, drty) =
+  (apply_sub_ty sub ty, apply_sub_dirty_ty sub drty)
+
 and apply_sub_ct_ty sub (ty1, ty2) = (apply_sub_ty sub ty1, apply_sub_ty sub ty2)
 
 and apply_sub_ct_dirt sub (drt1, drt2) =
   (apply_sub_dirt sub drt1, apply_sub_dirt sub drt2)
 
 let rec apply_sub_tycoer sub ty_coer =
+  let ty' = apply_sub_ct_ty sub ty_coer.ty in
+  match ty_coer.term with
+  | Constraint.TyCoercionVar p -> (
+      match Assoc.lookup p sub.type_param_to_type_coercions with
+      | Some t_coer -> apply_sub_tycoer sub t_coer
+      | None -> { ty_coer with ty = ty' })
+  | _ -> { term = apply_sub_tycoer' sub ty_coer.term; ty = ty' }
+
+and apply_sub_tycoer' sub ty_coer =
   match ty_coer with
+  | TyCoercionVar _ -> assert false
   | Constraint.ReflTy tty -> Constraint.ReflTy (apply_sub_ty sub tty)
   | ArrowCoercion (tycoer1, dirtycoer) ->
       ArrowCoercion
@@ -153,32 +166,42 @@ let rec apply_sub_tycoer sub ty_coer =
   | HandlerCoercion (dirtycoer1, dirtycoer2) ->
       HandlerCoercion
         (apply_sub_dirtycoer sub dirtycoer1, apply_sub_dirtycoer sub dirtycoer2)
-  | TyCoercionVar p -> (
-      match Assoc.lookup p sub.type_param_to_type_coercions with
-      | Some t_coer -> apply_sub_tycoer sub t_coer
-      | None -> TyCoercionVar p)
   | TupleCoercion tcl ->
       TupleCoercion (List.map (fun x -> apply_sub_tycoer sub x) tcl)
   | ApplyCoercion (ty_name, tcl) ->
       ApplyCoercion (ty_name, List.map (fun x -> apply_sub_tycoer sub x) tcl)
   | _ -> failwith __LOC__
 
-and apply_sub_dirtcoer sub dirt_coer =
-  match dirt_coer with
-  | Constraint.ReflDirt d -> Constraint.ReflDirt (apply_sub_dirt sub d)
-  | DirtCoercionVar p -> (
+and apply_sub_dirtcoer sub drt_coer =
+  let drt' = apply_sub_ct_dirt sub drt_coer.ty in
+  match drt_coer.term with
+  | Constraint.DirtCoercionVar p -> (
       match Assoc.lookup p sub.dirt_var_to_dirt_coercions with
       | Some dc -> apply_sub_dirtcoer sub dc
-      | _ -> dirt_coer)
+      | None -> { drt_coer with ty = drt' })
+  | _ -> { term = apply_sub_dirtcoer' sub drt_coer.term; ty = drt' }
+
+and apply_sub_dirtcoer' sub ty_coer =
+  match ty_coer with
+  | Constraint.ReflDirt d -> Constraint.ReflDirt (apply_sub_dirt sub d)
+  | DirtCoercionVar _ -> assert false
   | Empty d -> Empty (apply_sub_dirt sub d)
   | UnionDirt (es, dirt_coer1) ->
       UnionDirt (es, apply_sub_dirtcoer sub dirt_coer1)
 
-and apply_sub_dirtycoer (sub : t) (ty_coer, dirt_coer) :
+and apply_sub_dirtycoer (sub : t) { term = ty_coer, dirt_coer; _ } :
     Constraint.dirty_coercion =
-  (apply_sub_tycoer sub ty_coer, apply_sub_dirtcoer sub dirt_coer)
+  let ty_coer' = apply_sub_tycoer sub ty_coer
+  and dirt_coer' = apply_sub_dirtcoer sub dirt_coer in
+  Constraint.bangCoercion (ty_coer', dirt_coer')
 
 let rec apply_sub_comp sub computation =
+  {
+    term = apply_sub_comp' sub computation.term;
+    ty = apply_sub_dirty_ty sub computation.ty;
+  }
+
+and apply_sub_comp' sub computation =
   match computation with
   | Value e -> Value (apply_sub_exp sub e)
   | LetVal (e1, abs) -> LetVal (apply_sub_exp sub e1, apply_sub_abs sub abs)
@@ -200,6 +223,12 @@ let rec apply_sub_comp sub computation =
   | _ -> failwith __LOC__
 
 and apply_sub_exp sub expression =
+  {
+    term = apply_sub_exp' sub expression.term;
+    ty = apply_sub_ty sub expression.ty;
+  }
+
+and apply_sub_exp' sub expression =
   match expression with
   | Var v -> Var v
   | Const c -> Const c
@@ -225,7 +254,10 @@ and apply_sub_exp sub expression =
       ApplyDirtCoercion (apply_sub_exp sub e1, apply_sub_dirtcoer sub dc1)
   | _ -> failwith __LOC__
 
-and apply_sub_abs sub (p, t, c) = (p, apply_sub_ty sub t, apply_sub_comp sub c)
+and apply_sub_abs sub abs =
+  { term = apply_sub_abs' sub abs.term; ty = apply_sub_abs_ty sub abs.ty }
+
+and apply_sub_abs' sub (p, t, c) = (p, apply_sub_ty sub t, apply_sub_comp sub c)
 
 and apply_sub_letrec_abs sub (f, res_ty, abs) =
   (f, apply_sub_dirty_ty sub res_ty, apply_sub_abs sub abs)
@@ -233,12 +265,16 @@ and apply_sub_letrec_abs sub (f, res_ty, abs) =
 and apply_sub_abs2 sub (p1, p2, c) = (p1, p2, apply_sub_comp sub c)
 
 and apply_sub_handler sub h =
-  let eff_clauses = h.effect_clauses in
-  let new_value_clause = apply_sub_abs sub h.value_clause in
+  let drty1, drty2 = h.ty in
+  let eff_clauses = h.term.effect_clauses in
+  let new_value_clause = apply_sub_abs sub h.term.value_clause in
   let new_eff_clauses =
     Assoc.map (fun abs2 -> apply_sub_abs2 sub abs2) eff_clauses
   in
-  { effect_clauses = new_eff_clauses; value_clause = new_value_clause }
+  {
+    term = { effect_clauses = new_eff_clauses; value_clause = new_value_clause };
+    ty = (apply_sub_dirty_ty sub drty1, apply_sub_dirty_ty sub drty2);
+  }
 
 let apply_substitutions_to_computation = apply_sub_comp
 
