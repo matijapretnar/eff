@@ -139,13 +139,13 @@ and elab_expression' exp =
   | ExEff.Var x -> NoEff.NVar x
   | ExEff.Const c -> NoEff.NConst c
   | ExEff.Tuple vs -> NoEff.NTuple (List.map elab_expression vs)
-  | ExEff.Lambda abs -> NoEff.NFun (elab_abstraction abs)
+  | ExEff.Lambda abs -> NoEff.NFun (elab_abstraction_with_param_ty abs)
   | ExEff.Effect (e, (t1, t2)) ->
       let elab1 = elab_ty t1 in
       let elab2 = elab_ty t2 in
       NoEff.NEffect (e, (elab1, elab2))
   | ExEff.Handler h ->
-      let elabvc = elab_abstraction h.term.value_clause in
+      let elabvc = elab_abstraction_with_param_ty h.term.value_clause in
 
       if Assoc.length h.term.effect_clauses = 0 (* Handler - Case 1 *) then
         NoEff.NFun elabvc
@@ -171,10 +171,10 @@ and elab_expression' exp =
                          elabcomp) ) )
             | _ -> failwith "STIEN: wrong elab handler case 2"
           in
-          let p, c = elabvc in
+          let p, ty, c = elabvc in
           NoEff.NHandler
             {
-              return_clause = (p, NoEff.NReturn c);
+              return_clause = (p, ty, NoEff.NReturn c);
               effect_clauses =
                 Assoc.map_of_list subst_cont_effect
                   (Assoc.to_list h.term.effect_clauses);
@@ -187,10 +187,10 @@ and elab_expression' exp =
             let elabcomp = elab_computation comp in
             ((eff, (elab1, elab2)), (elab_pattern p1, elab_pattern p2, elabcomp))
           in
-          let p, c = elabvc in
+          let p, ty, c = elabvc in
           NoEff.NHandler
             {
-              return_clause = (p, c);
+              return_clause = (p, ty, c);
               (* Filip: Not sure if this needs NReturn *)
               effect_clauses =
                 Assoc.map_of_list elab_effect_clause
@@ -221,6 +221,10 @@ and elab_expression' exp =
 and elab_abstraction { term = p, c; _ } =
   let elab2 = elab_computation c in
   (elab_pattern p, elab2)
+
+and elab_abstraction_with_param_ty { term = p, c; ty = param_ty, _ } =
+  let elab2 = elab_computation c in
+  (elab_pattern p, elab_ty param_ty, elab2)
 
 and elab_computation cmp = elab_computation' cmp.term
 
@@ -273,7 +277,7 @@ and elab_computation' c =
       let t1 = elab_ty ty1 in
       let t2 = elab_ty ty2 in
       let velab = elab_expression value in
-      let aelab = elab_abstraction abs in
+      let aelab = elab_abstraction_with_param_ty abs in
       NoEff.NCall ((eff, (t1, t2)), velab, aelab)
   | ExEff.Op ((eff, (ty1, ty2)), value) ->
       let t1 = elab_ty ty1 in

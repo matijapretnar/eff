@@ -162,8 +162,8 @@ let rec pp_term noEff_term ppf =
 
 and pp_abs (p, t) ppf = print ppf "@[<h> %t ->@ %t@]" (pp_pattern p) (pp_term t)
 
-and pp_abs_with_ty (p, t) ppf =
-  print ppf "@[<h>%t ->@ %t@]" (pp_pattern p) (pp_term t)
+and pp_abs_with_ty (p, ty, t) ppf =
+  print ppf "@[<h>(%t: %t) ->@ %t@]" (pp_pattern p) (print_type ty) (pp_term t)
 
 and pp_let_rec lst ppf =
   let pp_var_ty_abs (v, t) ppf =
