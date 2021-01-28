@@ -62,7 +62,7 @@ and n_term =
   | NConst of Const.t
   | NEffect of n_effect
   | NLetRec of n_letrec_abstraction list * n_term
-  | NMatch of n_term * n_type * n_abstraction list * Location.t
+  | NMatch of n_term * n_abstraction list
   | NOp of n_effect * n_term
   | NRecord of (CoreTypes.Field.t, n_term) Assoc.t
   | NVariant of CoreTypes.Label.t * n_term option
@@ -77,11 +77,11 @@ and n_tydef =
   | TyDefSum of (CoreTypes.Label.t, n_type option) Assoc.t
   | TyDefInline of n_type
 
-and n_abstraction = n_pattern * n_type * n_term
+and n_abstraction = n_pattern * n_term
 
 and n_abstraction_2_args = n_pattern * n_pattern * n_term
 
-and n_letrec_abstraction = variable * n_type * n_abstraction
+and n_letrec_abstraction = variable * n_abstraction
 
 type cmd =
   | Term of n_term
@@ -112,23 +112,18 @@ let rec subs_var_in_term par subs term =
   | NConst c -> NConst c
   | NEffect e -> NEffect e
   | NLetRec (abss, t) ->
-      let subs_letrec (var, ty_out, abs) =
-        (var, ty_out, subs_var_in_abs par subs abs)
-      in
+      let subs_letrec (var, abs) = (var, subs_var_in_abs par subs abs) in
       NLetRec (List.map subs_letrec abss, subs_var_in_term par subs t)
-  | NMatch (t, ty, abss, loc) ->
+  | NMatch (t, abss) ->
       NMatch
-        ( subs_var_in_term par subs t,
-          ty,
-          List.map (subs_var_in_abs par subs) abss,
-          loc )
+        (subs_var_in_term par subs t, List.map (subs_var_in_abs par subs) abss)
   | NOp (eff, t) -> NOp (eff, subs_var_in_term par subs t)
   | NRecord a -> NRecord (Assoc.map (subs_var_in_term par subs) a)
   | NVariant (lbl, None) -> NVariant (lbl, None)
   | NVariant (lbl, Some t) -> NVariant (lbl, Some (subs_var_in_term par subs t))
   | _ -> failwith __LOC__
 
-and subs_var_in_abs par subs (p, ty, c) = (p, ty, subs_var_in_term par subs c)
+and subs_var_in_abs par subs (p, c) = (p, subs_var_in_term par subs c)
 
 (********************** PRINT FUNCTIONS **********************)
 
@@ -220,7 +215,7 @@ let rec print_term ?max_level t ppf =
          computation)) @]}"
         (print_abstraction h.return_clause)
         (print_effect_clauses (Assoc.to_list h.effect_clauses))
-  | NLet (t1, (t2, _, t3)) ->
+  | NLet (t1, (t2, t3)) ->
       print "let (%t = (%t)) in (%t)" (print_pattern t2) (print_term t1)
         (print_term t3)
   | NCall (eff, t, abs) ->
@@ -244,7 +239,7 @@ let rec print_term ?max_level t ppf =
       print ~at_level:2 "let rec @[<hov>%t@] in %t"
         (Print.sequence " and " print_let_rec_abstraction lst)
         (print_term t)
-  | NMatch (t, _, lst, _) ->
+  | NMatch (t, lst) ->
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_term t)
         (Print.sequence "@, | " print_abstraction lst)
   | NOp (eff, t) -> print "Op %t %t" (print_effect eff) (print_term t)
@@ -253,12 +248,10 @@ let rec print_term ?max_level t ppf =
       print "Variant %t %t" (CoreTypes.Label.print l) (print_term t)
   | NVariant (l, None) -> print "Variant %t" (CoreTypes.Label.print l)
 
-and print_let_rec_abstraction (f, res_ty, ((_, arg_ty, _) as abs)) ppf =
-  Format.fprintf ppf "(%t : %t) %t" (print_variable f)
-    (print_type (NTyArrow (arg_ty, res_ty)))
-    (print_let_abstraction abs)
+and print_let_rec_abstraction (f, abs) ppf =
+  Format.fprintf ppf "%t %t" (print_variable f) (print_let_abstraction abs)
 
-and print_let_abstraction (t1, _ty, t2) ppf =
+and print_let_abstraction (t1, t2) ppf =
   Format.fprintf ppf "%t = %t" (print_pattern t1) (print_term t2)
 
 and print_effect_clauses eff_clauses ppf =
@@ -273,9 +266,8 @@ and print_effect_clauses eff_clauses ppf =
 and print_effect (eff, _) ppf =
   Print.print ppf "Effect_%t" (CoreTypes.Effect.print eff)
 
-and print_abstraction (t1, ty, t2) ppf =
-  Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern t1) (print_type ty)
-    (print_term t2)
+and print_abstraction (t1, t2) ppf =
+  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern t1) (print_term t2)
 
 and print_abstraction2 (t1, t2, t3) ppf =
   Format.fprintf ppf "(fun %t %t -> %t)" (print_pattern t1) (print_pattern t2)

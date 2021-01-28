@@ -207,11 +207,8 @@ and apply_sub_comp' sub computation =
   | LetVal (e1, abs) -> LetVal (apply_sub_exp sub e1, apply_sub_abs sub abs)
   | LetRec ([ letrec ], c1) ->
       LetRec ([ apply_sub_letrec_abs sub letrec ], apply_sub_comp sub c1)
-  | Match (e, resTy, alist) ->
-      Match
-        ( apply_sub_exp sub e,
-          apply_sub_dirty_ty sub resTy,
-          List.map (apply_sub_abs sub) alist )
+  | Match (e, alist) ->
+      Match (apply_sub_exp sub e, List.map (apply_sub_abs sub) alist)
   | Apply (e1, e2) -> Apply (apply_sub_exp sub e1, apply_sub_exp sub e2)
   | Handle (e1, c1) -> Handle (apply_sub_exp sub e1, apply_sub_comp sub c1)
   | Call (effect, e1, abs) ->
@@ -261,8 +258,7 @@ and apply_sub_abs' sub (p, c) = (apply_sub_pat sub p, apply_sub_comp sub c)
 
 and apply_sub_pat sub { term = p; ty } = { term = p; ty = apply_sub_ty sub ty }
 
-and apply_sub_letrec_abs sub (f, res_ty, abs) =
-  (f, apply_sub_dirty_ty sub res_ty, apply_sub_abs sub abs)
+and apply_sub_letrec_abs sub (f, abs) = (f, apply_sub_abs sub abs)
 
 and apply_sub_abs2 sub (p1, p2, c) = (p1, p2, apply_sub_comp sub c)
 

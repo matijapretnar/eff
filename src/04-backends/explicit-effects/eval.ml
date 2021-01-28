@@ -54,7 +54,7 @@ let rec ceval state c =
       | V.Closure f -> f v2
       | _ -> Error.runtime "Only functions can be applied.")
   | Term.Value e -> V.Value (veval state e)
-  | Term.Match (e, _ty, cases) ->
+  | Term.Match (e, cases) ->
       let v = veval state e in
       let rec eval_case = function
         | [] -> Error.runtime "No branches succeeded in a pattern match."
@@ -74,7 +74,7 @@ let rec ceval state c =
   | Term.LetRec (defs, c) ->
       (* strip types *)
       let stripped =
-        List.map (fun (v, _, abs) -> (v, abs)) defs |> Assoc.of_list
+        List.map (fun (v, abs) -> (v, abs)) defs |> Assoc.of_list
       in
       let state = extend_let_rec state stripped in
       ceval state c

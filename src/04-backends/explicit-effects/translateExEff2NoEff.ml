@@ -217,9 +217,8 @@ and elab_expression' exp =
   | ExEff.Record _ass -> failwith "records not supported yet"
 
 and elab_abstraction { term = p, c; _ } =
-  let ntype1 = elab_ty p.ty in
   let elab2 = elab_computation c in
-  (elab_pattern p, ntype1, elab2)
+  (elab_pattern p, elab2)
 
 and elab_computation cmp = elab_computation' cmp.term
 
@@ -233,24 +232,19 @@ and elab_computation' c =
       let elababs = elab_abstraction abs in
       NoEff.NLet (elabv, elababs)
   | ExEff.LetRec (abs_list, comp) ->
-      let elab_letrec_abs (var, ty2, abs) =
-        let t2 = elab_dirty ty2 in
+      let elab_letrec_abs (var, abs) =
         let elaba = elab_abstraction abs in
-        (var, t2, elaba)
+        (var, elaba)
       in
       let elabcomp = elab_computation comp in
       NoEff.NLetRec (List.map elab_letrec_abs abs_list, elabcomp)
-  | ExEff.Match (value, ty, abs_lst) -> (
+  | ExEff.Match (value, abs_lst) -> (
       let elabv = elab_expression value in
-      let tyelab = elab_dirty ty in
       match abs_lst with
-      | [] -> NoEff.NMatch (elabv, tyelab, [], Location.unknown)
+      | [] -> NoEff.NMatch (elabv, [])
       | _ :: _ ->
           NoEff.NMatch
-            ( elabv,
-              tyelab,
-              List.map (fun abs -> elab_abstraction abs) abs_lst,
-              Location.unknown ))
+            (elabv, List.map (fun abs -> elab_abstraction abs) abs_lst))
   | ExEff.Apply (v1, v2) ->
       let telab1 = elab_expression v1 in
       let elab2 = elab_expression v2 in

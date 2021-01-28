@@ -93,11 +93,11 @@ and optimize_computation' state cmp =
   | Term.LetVal (exp, abs) ->
       Term.letVal (optimize_expression state exp, optimize_abstraction state abs)
   | Term.LetRec (defs, cmp) -> Term.letRec (defs, optimize_computation state cmp)
-  | Term.Match (exp, drty, cases) ->
+  | Term.Match (exp, cases) ->
       Term.match_
         ( optimize_expression state exp,
-          drty,
           List.map (optimize_abstraction state) cases )
+        cmp.ty
   | Term.Apply (exp1, exp2) ->
       Term.apply (optimize_expression state exp1, optimize_expression state exp2)
   | Term.Handle (exp, cmp) ->

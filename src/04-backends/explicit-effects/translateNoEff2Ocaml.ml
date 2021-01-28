@@ -138,14 +138,14 @@ let rec pp_term noEff_term ppf =
         "handler {@[<hov>value_clause = (fun %t);@] @[<hov>effect_clauses = \
          %t;@] }"
         (pp_abs_with_ty val_cl) (pp_effect_cls eff_cls)
-  | NLet (t1, (pat, _, t2)) ->
+  | NLet (t1, (pat, t2)) ->
       print ppf "@[<hv>@[<hv>let %t = %t in@] @,%t@]" (pp_pattern pat)
         (pp_term t1) (pp_term t2)
   | NLetRec (defs, t2) ->
       print ppf "@[<hv>@[<hv>%tin@] @,%t@]" (pp_let_rec defs) (pp_term t2)
-  | NMatch (t, _, [], _) ->
+  | NMatch (t, []) ->
       print ppf "@[<hv>(match %t with@, _ -> assert false)@]" (pp_term t)
-  | NMatch (t, _, cases, _) ->
+  | NMatch (t, cases) ->
       print ppf "@[<hv>(match %t with@, %t)@]" (pp_term t)
         (pp_sequence "@, | " pp_abs cases)
   | NCall (e, t, abs_ty) ->
@@ -160,22 +160,19 @@ let rec pp_term noEff_term ppf =
       print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t2) (pp_term t1)
   | _ -> failwith __LOC__
 
-and pp_abs (p, _, t) ppf =
-  print ppf "@[<h> %t ->@ %t@]" (pp_pattern p) (pp_term t)
+and pp_abs (p, t) ppf = print ppf "@[<h> %t ->@ %t@]" (pp_pattern p) (pp_term t)
 
-and pp_abs_with_ty (p, ty, t) ppf =
-  print ppf "@[<h>(%t : %t) ->@ %t@]" (pp_pattern p) (pp_type ty) (pp_term t)
+and pp_abs_with_ty (p, t) ppf =
+  print ppf "@[<h>%t ->@ %t@]" (pp_pattern p) (pp_term t)
 
 and pp_let_rec lst ppf =
-  let pp_var_ty_abs (v, _, ((_, ty, _) as t)) ppf =
-    print ppf "@[<hv 2>and (%t : %t) = @,%t@]" (pp_variable v) (pp_type ty)
-      (pp_abs t)
+  let pp_var_ty_abs (v, t) ppf =
+    print ppf "@[<hv 2>and %t = @,%t@]" (pp_variable v) (pp_abs t)
   in
   match lst with
   | [] -> ()
-  | (v, _, ((_, ty, _) as t)) :: tl ->
-      print ppf "@[<hv 2>let rec (%t : %t) = @,%t@] @,%t" (pp_variable v)
-        (pp_type ty) (pp_abs t)
+  | (v, t) :: tl ->
+      print ppf "@[<hv 2>let rec %t = @,%t@] @,%t" (pp_variable v) (pp_abs t)
         (pp_sequence " " pp_var_ty_abs tl)
 
 and pp_effect_cls eff_cls ppf =
@@ -243,7 +240,7 @@ let pp_cmd cmd ppf =
   | Term t -> print ppf "%t@." (pp_term t) (* TODO check if ok *)
   | DefEffect e -> pp_def_effect e ppf
   | TopLet (x, t) -> print ppf "let %t = %t@." (pp_variable x) (pp_term t)
-  | TopLetRec (x, (p, _, t)) ->
+  | TopLetRec (x, (p, t)) ->
       print ppf "let rec %t %t = %t@." (pp_variable x) (pp_pattern p)
         (pp_term t)
   | External (x, _ty, f) -> pp_external x f ppf

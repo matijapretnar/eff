@@ -898,8 +898,7 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
 
   (* 5: Combine the results *)
   let outExpr =
-    Term.LetRec
-      ([ (var, (tyA1, dirtD1), Term.abstraction (trgPat, c1'')) ], trgC2)
+    Term.LetRec ([ (var, Term.abstraction (trgPat, c1'')) ], trgC2)
   in
 
   let outCs = (alphaSkel :: betaSkel :: omegaCt1 :: omegaCt2 :: cs1) @ cs2 in
@@ -939,9 +938,7 @@ and tcNonEmptyMatch (inState : state) (lclCtxt : TypingEnv.t)
 
   (* 6: Combine the results *)
   let outType = (alphaOut, deltaOut) in
-  let outExpr =
-    Term.Match (Term.castExp (trgScr, omegaScr), outType, trgAlts)
-  in
+  let outExpr = Term.Match (Term.castExp (trgScr, omegaScr), trgAlts) in
   let outCs = (alphaOutSkel :: omegaCtScr :: cs1) @ cs2 in
   ((outExpr, outType), outCs)
 
@@ -957,7 +954,7 @@ and tcEmptyMatch (inState : state) (lclCtxt : TypingEnv.t)
 
   (* 3: Combine the results *)
   let outType = (alphaOut, deltaOut) in
-  let outExpr = Term.Match (trgScr, outType, []) in
+  let outExpr = Term.Match (trgScr, []) in
   let outCs = alphaOutSkel :: cs1 in
   ((outExpr, outType), outCs)
 
@@ -1268,7 +1265,7 @@ let infer_rec_abstraction state f abs =
     tcLetRecNoGen state initial_lcl_ty_env f abs
       (unlocated @@ Untyped.Value (unlocated @@ Untyped.Tuple []))
   with
-  | (Term.LetRec ([ (_f, _drty_out, abs') ], _ret_unit), _unit_drty), cnstrs ->
+  | (Term.LetRec ([ (_f, abs') ], _ret_unit), _unit_drty), cnstrs ->
       (* These two are not necessarily equal, but should be unifiable *)
       let sub, residuals = Unification.solve cnstrs in
       (subInAbs sub abs', residuals)

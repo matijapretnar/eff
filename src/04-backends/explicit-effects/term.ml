@@ -69,7 +69,7 @@ and computation' =
      abstraction is explicit) and thus makes translation to MulticoreOcaml
      impossible in the general case.
   *)
-  | Match of expression * Type.dirty * abstraction list
+  | Match of expression * abstraction list
   (* We need to keep the result type in the term, in case the match is empty *)
   | Apply of expression * expression
   | Handle of expression * computation
@@ -89,7 +89,7 @@ and handler' = {
 and abstraction = (pattern * computation, Type.ty * Type.dirty) typed
 (** Abstractions that take one argument. *)
 
-and letrec_abstraction = variable * Type.dirty * abstraction
+and letrec_abstraction = variable * abstraction
 (** LetRec Abstractions: function name, result type, pattern,
     and right-hand side *)
 
@@ -146,7 +146,7 @@ let letVal (exp, abs) =
 let letRec (_ : letrec_abstraction list * computation) : computation =
   failwith __LOC__
 
-let match_ (e, drty, cases) = { term = Match (e, drty, cases); ty = drty }
+let match_ (e, cases) drty = { term = Match (e, cases); ty = drty }
 
 let apply (exp1, exp2) =
   match exp1.ty with
@@ -250,9 +250,9 @@ and print_computation ?max_level c ppf =
         (print_expression ~max_level:1 e1)
         (print_expression ~max_level:0 e2)
   | Value e -> print ~at_level:1 "value (%t)" (print_expression ~max_level:0 e)
-  | Match (e, _resTy, []) ->
+  | Match (e, []) ->
       print ~at_level:2 "(match %t with _ -> assert false)" (print_expression e)
-  | Match (e, _resTy, lst) ->
+  | Match (e, lst) ->
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e)
         (Print.sequence "@, | " print_abstraction lst)
   | Handle (e, c) ->
@@ -312,9 +312,9 @@ and print_top_let_abstraction (p, c) ppf =
       Format.fprintf ppf "%t = run %t" (print_pattern p)
         (print_computation ~max_level:0 c)
 
-and print_let_rec_abstraction (f, res_ty, ({ term = p, _; _ } as abs)) ppf =
+and print_let_rec_abstraction (f, abs) ppf =
   Format.fprintf ppf "(%t : %t) %t" (print_variable f)
-    (Type.print_ty (Type.Arrow (p.ty, res_ty)))
+    (Type.print_ty (Type.Arrow abs.ty))
     (print_let_abstraction abs)
 
 let backup_location loc locs =
@@ -349,14 +349,13 @@ and subst_comp' sbst = function
   | LetRec (li, c1) ->
       let li' =
         List.map
-          (fun (x, resTy, abs) ->
+          (fun (x, abs) ->
             (* XXX Should we check that x does not appear in sbst? *)
-            (x, resTy, subst_abs sbst abs))
+            (x, subst_abs sbst abs))
           li
       in
       LetRec (li', subst_comp sbst c1)
-  | Match (e, resTy, li) ->
-      Match (subst_expr sbst e, resTy, List.map (subst_abs sbst) li)
+  | Match (e, li) -> Match (subst_expr sbst e, List.map (subst_abs sbst) li)
   | Apply (e1, e2) -> Apply (subst_expr sbst e1, subst_expr sbst e2)
   | Handle (e, c) -> Handle (subst_expr sbst e, subst_comp sbst c)
   | Call (eff, e, a) -> Call (eff, subst_expr sbst e, subst_abs sbst a)
@@ -434,7 +433,7 @@ and alphaeq_comp eqvars c c' =
   | LetRec _, LetRec _ ->
       (* XXX Not yet implemented *)
       false
-  | Match (e, _resTy1, li), Match (e', _resTy2, li') ->
+  | Match (e, li), Match (e', li') ->
       alphaeq_expr eqvars e e' && List.for_all2 (alphaeq_abs eqvars) li li'
   | Apply (e1, e2), Apply (e1', e2') ->
       alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2'
@@ -520,13 +519,12 @@ let rec free_vars_comp c =
   | LetRec (li, c1) ->
       let xs, vars =
         List.fold_right
-          (fun (x, _resTy, abs) (xs, vars) ->
-            (x :: xs, free_vars_abs abs @@@ vars))
+          (fun (x, abs) (xs, vars) -> (x :: xs, free_vars_abs abs @@@ vars))
           li
           ([], free_vars_comp c1)
       in
       vars --- xs
-  | Match (e, _resTy, li) ->
+  | Match (e, li) ->
       free_vars_expr e @@@ concat_vars (List.map free_vars_abs li)
   | Apply (e1, e2) -> free_vars_expr e1 @@@ free_vars_expr e2
   | Handle (e, c1) -> free_vars_expr e @@@ free_vars_comp c1
@@ -627,19 +625,15 @@ and free_params_computation' c =
         (free_params_abstraction abs)
   | LetRec (defs, c) -> (
       match defs with
-      | [ (_f, resTy, abs) ] ->
-          Type.FreeParams.union
-            (Type.free_params_dirty resTy)
-            (free_params_abstraction abs)
+      | [ (_f, abs) ] ->
+          free_params_abstraction abs
           |> Type.FreeParams.union (free_params_computation c)
       | _ -> failwith __LOC__)
-  | Match (e, resTy, cases) ->
+  | Match (e, cases) ->
       List.fold_left
         (fun free case ->
           Type.FreeParams.union free (free_params_abstraction case))
-        (Type.FreeParams.union (free_params_expression e)
-           (Type.free_params_dirty resTy))
-        cases
+        (free_params_expression e) cases
   | Apply (e1, e2) ->
       Type.FreeParams.union
         (free_params_expression e1)
