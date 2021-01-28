@@ -50,7 +50,7 @@ and n_term =
   | NTuple of n_term list
   | NFun of n_abstraction
   | NApplyTerm of n_term * n_term
-  | NBigLambdaCoer of Type.TyCoercionParam.t * n_coerty * n_term
+  | NBigLambdaCoer of Type.TyCoercionParam.t * n_term
   | NApplyCoer of n_term * n_coercion
   | NCast of n_term * n_coercion
   | NReturn of n_term
@@ -197,10 +197,8 @@ let rec print_term ?max_level t ppf =
       print ~at_level:1 "((%t)@ (%t))"
         (print_term ~max_level:1 t1)
         (print_term ~max_level:0 t2)
-  | NBigLambdaCoer (x, coerty, t) ->
-      print "/\\%t : %t. %t "
-        (Type.TyCoercionParam.print x)
-        (print_coerty coerty) (print_term t)
+  | NBigLambdaCoer (x, t) ->
+      print "/\\%t. %t " (Type.TyCoercionParam.print x) (print_term t)
   | NApplyCoer (t, coer) ->
       print ~at_level:1 "((%t)@ (%t))"
         (print_term ~max_level:1 t)

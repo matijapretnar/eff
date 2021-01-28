@@ -73,10 +73,10 @@ and optimize_expression' state exp =
   | Term.CastExp (exp, coer) ->
       Term.castExp
         (optimize_expression state exp, optimize_ty_coercion state coer)
-  | Term.LambdaTyCoerVar (w, coerty, exp) ->
-      Term.lambdaTyCoerVar (w, coerty, optimize_expression state exp)
-  | Term.LambdaDirtCoerVar (d, coerty, exp) ->
-      Term.lambdaDirtCoerVar (d, coerty, optimize_expression state exp)
+  | Term.LambdaTyCoerVar (w, exp) ->
+      Term.lambdaTyCoerVar (w, optimize_expression state exp)
+  | Term.LambdaDirtCoerVar (d, exp) ->
+      Term.lambdaDirtCoerVar (d, optimize_expression state exp)
   | Term.ApplyTyCoercion (exp, tcoer) ->
       Term.applyTyCoercion
         (optimize_expression state exp, optimize_ty_coercion state tcoer)

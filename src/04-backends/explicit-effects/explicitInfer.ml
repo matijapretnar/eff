@@ -1148,11 +1148,11 @@ let mkGeneralizedExpression (_freeSkelVars : Type.SkelParam.t list)
   exp
   |> (* 1: Add the constraint abstractions (dirt) *)
   List.fold_right
-    (fun (omega, pi) qual -> Term.lambdaDirtCoerVar (omega, pi, qual))
+    (fun (omega, _pi) qual -> Term.lambdaDirtCoerVar (omega, qual))
     dirtCs
   |> (* 2: Add the constraint abstractions (type) *)
   List.fold_right
-    (fun (omega, pi) qual -> Term.lambdaTyCoerVar (omega, pi, qual))
+    (fun (omega, _pi) qual -> Term.lambdaTyCoerVar (omega, qual))
     tyCs
 
 let generalize cs ty expr =

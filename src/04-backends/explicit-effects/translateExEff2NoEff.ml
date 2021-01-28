@@ -196,12 +196,10 @@ and elab_expression' exp =
       let elab1 = elab_expression value in
       let elab2 = elab_ty_coercion coer in
       NoEff.NCast (elab1, elab2)
-  | ExEff.LambdaTyCoerVar (par, (ty1, ty2), exp) ->
-      let elab1 = elab_ty ty1 in
-      let elab2 = elab_ty ty2 in
+  | ExEff.LambdaTyCoerVar (par, exp) ->
       let elabv = elab_expression exp in
-      NoEff.NBigLambdaCoer (par, (elab1, elab2), elabv)
-  | ExEff.LambdaDirtCoerVar (_par, (_dirt1, _dirt2), value) ->
+      NoEff.NBigLambdaCoer (par, elabv)
+  | ExEff.LambdaDirtCoerVar (_par, value) ->
       let elabv = elab_expression value in
       elabv
   | ExEff.ApplyTyCoercion (value, coer) ->

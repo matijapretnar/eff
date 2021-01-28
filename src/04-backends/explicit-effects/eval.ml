@@ -124,8 +124,8 @@ and veval state e =
       V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | Term.Handler h -> V.Handler (eval_handler state h)
   | Term.CastExp (e, _coercion) -> veval state e
-  | Term.LambdaTyCoerVar (_, _, e)
-  | Term.LambdaDirtCoerVar (_, _, e)
+  | Term.LambdaTyCoerVar (_, e)
+  | Term.LambdaDirtCoerVar (_, e)
   | Term.ApplyTyCoercion (e, _)
   | Term.ApplyDirtCoercion (e, _) ->
       veval state e

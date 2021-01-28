@@ -49,8 +49,8 @@ and expression' =
   | Effect of effect
   | Handler of handler
   | CastExp of expression * Constraint.ty_coercion
-  | LambdaTyCoerVar of Type.TyCoercionParam.t * Type.ct_ty * expression
-  | LambdaDirtCoerVar of Type.DirtCoercionParam.t * Type.ct_dirt * expression
+  | LambdaTyCoerVar of Type.TyCoercionParam.t * expression
+  | LambdaDirtCoerVar of Type.DirtCoercionParam.t * expression
   | ApplyTyCoercion of expression * Constraint.ty_coercion
   | ApplyDirtCoercion of expression * Constraint.dirt_coercion
 
@@ -122,12 +122,10 @@ let castExp (exp, coer) =
   assert (Type.types_are_equal ty1 ty1');
   { term = CastExp (exp, coer); ty = ty2 }
 
-let lambdaTyCoerVar (_ : Type.TyCoercionParam.t * Type.ct_ty * expression) :
-    expression =
+let lambdaTyCoerVar (_ : Type.TyCoercionParam.t * expression) : expression =
   failwith __LOC__
 
-let lambdaDirtCoerVar (_ : Type.DirtCoercionParam.t * Type.ct_dirt * expression)
-    : expression =
+let lambdaDirtCoerVar (_ : Type.DirtCoercionParam.t * expression) : expression =
   failwith __LOC__
 
 let applyTyCoercion (_ : expression * Constraint.ty_coercion) : expression =
@@ -225,14 +223,14 @@ let rec print_expression ?max_level e ppf =
   | CastExp (e1, tc) ->
       print "(%t) |> [%t]" (print_expression e1)
         (Constraint.print_ty_coercion tc)
-  | LambdaTyCoerVar (p, (tty1, tty2), e) ->
-      print "/\\(%t:%t<=%t).( %t ) "
+  | LambdaTyCoerVar (p, e) ->
+      print "/\\(%t).( %t ) "
         (Type.TyCoercionParam.print p)
-        (Type.print_ty tty1) (Type.print_ty tty2) (print_expression e)
-  | LambdaDirtCoerVar (p, (tty1, tty2), e) ->
-      print "/\\(%t:%t<=%t).( %t )"
+        (print_expression e)
+  | LambdaDirtCoerVar (p, e) ->
+      print "/\\(%t).( %t )"
         (Type.DirtCoercionParam.print p)
-        (Type.print_dirt tty1) (Type.print_dirt tty2) (print_expression e)
+        (print_expression e)
   | ApplyTyCoercion (e, tty) ->
       print ~at_level:1 "%t@ %t"
         (print_expression ~max_level:1 e)
@@ -332,10 +330,9 @@ and subst_expr' sbst = function
   | Variant (lbl, e) -> Variant (lbl, subst_expr sbst e)
   | (Const _ | Effect _) as e -> e
   | CastExp (e, tyco) -> CastExp (subst_expr sbst e, tyco)
-  | LambdaTyCoerVar (tycovar, ct, e) ->
-      LambdaTyCoerVar (tycovar, ct, subst_expr sbst e)
-  | LambdaDirtCoerVar (dcovar, ct, e) ->
-      LambdaDirtCoerVar (dcovar, ct, subst_expr sbst e)
+  | LambdaTyCoerVar (tycovar, e) -> LambdaTyCoerVar (tycovar, subst_expr sbst e)
+  | LambdaDirtCoerVar (dcovar, e) ->
+      LambdaDirtCoerVar (dcovar, subst_expr sbst e)
   | ApplyTyCoercion (e, tyco) -> ApplyTyCoercion (subst_expr sbst e, tyco)
   | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (subst_expr sbst e, dco)
 
@@ -603,8 +600,8 @@ and free_params_expression' e =
   | CastExp (e, tc) ->
       Type.FreeParams.union (free_params_expression e)
         (Constraint.free_params_ty_coercion tc)
-  | LambdaTyCoerVar (_tcp, _ctty, e) -> free_params_expression e
-  | LambdaDirtCoerVar (_dcp, _ctd, e) -> free_params_expression e
+  | LambdaTyCoerVar (_tcp, e) -> free_params_expression e
+  | LambdaDirtCoerVar (_dcp, e) -> free_params_expression e
   | ApplyTyCoercion (e, tc) ->
       Type.FreeParams.union (free_params_expression e)
         (Constraint.free_params_ty_coercion tc)

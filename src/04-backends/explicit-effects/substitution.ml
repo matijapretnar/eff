@@ -235,16 +235,9 @@ and apply_sub_exp' sub expression =
   | Effect eff -> Effect eff
   | Handler h -> Handler (apply_sub_handler sub h)
   | CastExp (e1, tc1) -> CastExp (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
-  | LambdaTyCoerVar (tcp1, (ty1, ty2), e1) ->
-      LambdaTyCoerVar
-        ( tcp1,
-          (apply_sub_ty sub ty1, apply_sub_ty sub ty2),
-          apply_sub_exp sub e1 )
-  | LambdaDirtCoerVar (dcp1, (d1, d2), e1) ->
-      LambdaDirtCoerVar
-        ( dcp1,
-          (apply_sub_dirt sub d1, apply_sub_dirt sub d2),
-          apply_sub_exp sub e1 )
+  | LambdaTyCoerVar (tcp1, e1) -> LambdaTyCoerVar (tcp1, apply_sub_exp sub e1)
+  | LambdaDirtCoerVar (dcp1, e1) ->
+      LambdaDirtCoerVar (dcp1, apply_sub_exp sub e1)
   | ApplyTyCoercion (e1, tc1) ->
       ApplyTyCoercion (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
   | ApplyDirtCoercion (e1, dc1) ->
