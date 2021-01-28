@@ -59,9 +59,16 @@ and reduce_dirt_coercion' _state = function
   | dcoer -> dcoer
 
 let rec optimize_expression state exp =
+  (* Print.debug "EXP: %t : %t" (Term.print_expression exp) (Type.print_ty exp.ty); *)
   let exp' = optimize_expression' state exp in
+  (* Print.debug "EXP': %t : %t"
+     (Term.print_expression exp')
+     (Type.print_ty exp'.ty); *)
   assert (Type.types_are_equal exp.ty exp'.ty);
   let exp'' = reduce_expression state exp' in
+  (* Print.debug "EXP'': %t : %t"
+     (Term.print_expression exp'')
+     (Type.print_ty exp''.ty); *)
   assert (Type.types_are_equal exp'.ty exp''.ty);
   exp''
 
@@ -90,6 +97,7 @@ and optimize_expression' state exp =
         (optimize_expression state exp, optimize_dirt_coercion state dcoer)
 
 and optimize_computation state cmp =
+  (* Print.debug "%t" (Term.print_computation cmp); *)
   let cmp' = optimize_computation' state cmp in
   assert (Type.dirty_types_are_equal cmp.ty cmp'.ty);
   let cmp'' = reduce_computation state cmp' in

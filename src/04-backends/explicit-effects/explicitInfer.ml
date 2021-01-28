@@ -583,7 +583,7 @@ and tcReturnCase (inState : state) (lclCtx : TypingEnv.t)
   let yvar = CoreTypes.Variable.fresh "y" in
   let ysub =
     Term.subst_comp
-      (Assoc.of_list [ (x, Term.CastExp (Term.var yvar tyIn, omega6)) ])
+      (Assoc.of_list [ (x, Term.castExp (Term.var yvar tyIn, omega6)) ])
   in
   let outExpr =
     Term.abstraction
@@ -651,7 +651,7 @@ and tcOpCase (inState : state) (lclCtx : TypingEnv.t)
   let lvar = CoreTypes.Variable.fresh "l" in
   let lsub =
     Term.subst_comp
-      (Assoc.of_list [ (k, Term.CastExp (Term.var lvar leftty, omega5i)) ])
+      (Assoc.of_list [ (k, Term.castExp (Term.var lvar leftty, omega5i)) ])
   in
   let outExpr =
     ( ((eff, (tyAi, tyBi)) : Term.effect) (* Opi *),
@@ -890,7 +890,13 @@ and tcLetRecNoGen (inState : state) (lclCtxt : TypingEnv.t)
     in
     let subst_fn =
       Term.subst_comp
-        (Assoc.of_list [ (var, Term.CastExp (Term.var var alpha, f_coercion)) ])
+        (Assoc.of_list
+           [
+             ( var,
+               Term.castExp
+                 (Term.var var (Type.Arrow (alpha, (tyA1, dirtD1))), f_coercion)
+             );
+           ])
     in
 
     subst_fn trgC1
@@ -1201,7 +1207,13 @@ let tcTopLetRec (inState : state) (var : Untyped.variable)
       Constraint.arrowCoercion (Constraint.reflTy alpha, omega12)
     in
     Term.subst_comp
-      (Assoc.of_list [ (var, Term.CastExp (Term.var var alpha, f_coercion)) ])
+      (Assoc.of_list
+         [
+           ( var,
+             Term.castExp
+               (Term.var var (Type.Arrow (alpha, (tyA1, dirtD1))), f_coercion)
+           );
+         ])
       trgC1
   in
 
@@ -1274,12 +1286,13 @@ let infer_rec_abstraction state f abs =
 (* Typecheck a top-level expression *)
 let top_level_computation state comp =
   let comp, residuals = infer_computation state comp in
-  Print.debug "TYPE: %t" (Type.print_dirty comp.ty);
-  Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals);
+  (* Print.debug "TYPE: %t" (Type.print_dirty comp.ty); *)
+  (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
   let free_ty_params = Type.free_params_dirty comp.ty in
   let mono_sub = monomorphize free_ty_params residuals in
-  Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub);
+  (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
   let mono_comp = subInCmp mono_sub comp in
+  Print.debug "MONO TERM: %t" (Term.print_computation mono_comp);
   Print.debug "MONO TYPE: %t" (Type.print_dirty mono_comp.ty);
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_computation mono_comp));
@@ -1297,11 +1310,11 @@ let top_level_rec_abstraction state x (abs : Untyped.abstraction) =
 let top_level_expression state expr =
   let expr, residuals = infer_expression state expr in
   (* Print.debug "TERM: %t" (Term.print_expression expr); *)
-  Print.debug "TYPE: %t" (Type.print_ty expr.ty);
-  Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals);
+  (* Print.debug "TYPE: %t" (Type.print_ty expr.ty); *)
+  (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
   let free_ty_params = Type.free_params_ty expr.ty in
   let mono_sub = monomorphize free_ty_params residuals in
-  Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub);
+  (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
   let mono_expr = subInExp mono_sub expr in
   Print.debug "MONO TERM: %t" (Term.print_expression mono_expr);
   Print.debug "MONO TYPE: %t" (Type.print_ty mono_expr.ty);

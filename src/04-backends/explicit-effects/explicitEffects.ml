@@ -88,8 +88,13 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
        { it = Language.UntypedSyntax.Value v; _ } );
     ] ->
         let e' = ExplicitInfer.top_level_expression state.type_system_state v in
+        let e'' =
+          if !Config.enable_optimization then
+            Optimizer.optimize_expression state.optimizer_state e'
+          else e'
+        in
         let type_system_state' =
-          ExplicitInfer.add_type state.type_system_state x e'.ty
+          ExplicitInfer.add_type state.type_system_state x e''.ty
         in
         let backend_state' =
           ExBackend.process_top_let state.backend_state (x, e')
@@ -108,14 +113,19 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
         let a' =
           ExplicitInfer.top_level_rec_abstraction state.type_system_state f a
         in
-        let ty_in, drty_out = a'.ty in
+        let a'' =
+          if !Config.enable_optimization then
+            Optimizer.optimize_abstraction state.optimizer_state a'
+          else a'
+        in
+        let ty_in, drty_out = a''.ty in
         let fun_ty = Type.Arrow (ty_in, drty_out) in
         let type_system_state' =
           ExplicitInfer.add_type state.type_system_state f fun_ty
         in
 
         let backend_state' =
-          ExBackend.process_top_let_rec state.backend_state (f, a')
+          ExBackend.process_top_let_rec state.backend_state (f, a'')
         in
         {
           state with

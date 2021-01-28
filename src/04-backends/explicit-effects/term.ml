@@ -321,7 +321,8 @@ let rec subst_expr sbst exp = { exp with term = subst_expr' sbst exp.term }
 
 and subst_expr' sbst = function
   (* We could afford to check that types of x and e match *)
-  | Var x as e -> ( match Assoc.lookup x sbst with Some e' -> e' | None -> e)
+  | Var x as e -> (
+      match Assoc.lookup x sbst with Some e' -> e'.term | None -> e)
   | Lambda abs -> Lambda (subst_abs sbst abs)
   | Handler h -> Handler (subst_handler sbst h)
   | Tuple es -> Tuple (List.map (subst_expr sbst) es)

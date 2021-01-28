@@ -103,7 +103,7 @@ let rec pp_coercion coer ppf =
   | NCoerArrow (w1, w2) ->
       print ppf "coer_arrow (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
   | NCoerHandler (w1, w2) ->
-      print ppf "coer_arrow (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
+      print ppf "coer_handler (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
   | NCoerHandToFun (w1, w2) ->
       print ppf "coer_hand_to_fun (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
   | NCoerFunToHand (w1, w2) ->
