@@ -171,27 +171,31 @@ and elab_expression' exp =
                          elabcomp) ) )
             | _ -> failwith "STIEN: wrong elab handler case 2"
           in
+          let p, c = elabvc in
           NoEff.NHandler
             {
-              return_clause = elabvc;
+              return_clause = (p, NoEff.NReturn c);
               effect_clauses =
                 Assoc.map_of_list subst_cont_effect
                   (Assoc.to_list h.term.effect_clauses);
             } (* Handler - Case 3 *)
-        else
+        else (
+          Print.debug "Case 3";
           let elab_effect_clause ((eff, (ty1, ty2)), (p1, p2, comp)) =
             let elab1 = elab_ty ty1 in
             let elab2 = elab_ty ty2 in
             let elabcomp = elab_computation comp in
             ((eff, (elab1, elab2)), (elab_pattern p1, elab_pattern p2, elabcomp))
           in
+          let p, c = elabvc in
           NoEff.NHandler
             {
-              return_clause = elabvc;
+              return_clause = (p, c);
+              (* Filip: Not sure if this needs NReturn *)
               effect_clauses =
                 Assoc.map_of_list elab_effect_clause
                   (Assoc.to_list h.term.effect_clauses);
-            }
+            })
   | ExEff.CastExp (value, coer) ->
       let elab1 = elab_expression value in
       let elab2 = elab_ty_coercion coer in
