@@ -101,24 +101,13 @@ let rec loop_pure n =
     _b_7 0
   in
   match _b_6 with
-  | true -> coer_refl_ty ()
+  | true -> ()
   | false ->
-      coer_refl_ty
-        (let _b_8 =
-           coer_refl_ty
-             (let _b_9 =
-                coer_refl_ty
-                  (((coer_arrow coer_refl_ty
-                       (coer_arrow coer_refl_ty coer_refl_ty))
-                      _op_2 (* - *))
-                     n)
-              in
-              coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_9) 1))
-         in
-         coer_refl_ty
-           (((coer_arrow coer_refl_ty coer_refl_ty)
-               ((coer_arrow coer_refl_ty coer_refl_ty) loop_pure))
-              _b_8))
+      let _b_8 =
+        let _b_9 = _op_2 (* - *) n in
+        _b_9 1
+      in
+      loop_pure _b_8
 
 let test_pure (n : int) = loop_pure n
 
@@ -131,50 +120,20 @@ let rec loop_latent n =
   >> fun _b_14 ->
   match _b_14 with
   | true -> (coer_return coer_refl_ty) ()
-  | false ->
-      (coer_computation coer_refl_ty)
-        ( (coer_return coer_refl_ty)
-            (let _b_17 =
-               coer_refl_ty
-                 (((coer_arrow coer_refl_ty
-                      (coer_arrow coer_refl_ty coer_refl_ty))
-                     _op_1 (* < *))
-                    n)
-             in
-             coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_17) 0))
-        >> fun _b_16 ->
-          (coer_computation coer_refl_ty)
-            (match coer_refl_ty _b_16 with
-            | true ->
-                (coer_computation coer_refl_ty)
-                  ( (coer_computation coer_refl_ty)
-                      (((coer_arrow coer_refl_ty
-                           (coer_computation coer_refl_ty))
-                          (effect Fail))
-                         ())
-                  >> fun _b_18 ->
-                    (coer_return coer_refl_ty)
-                      (match _b_18 with _ -> assert false) )
-            | false ->
-                (coer_computation coer_refl_ty)
-                  ( (coer_return coer_refl_ty)
-                      (let _b_20 =
-                         coer_refl_ty
-                           (((coer_arrow coer_refl_ty
-                                (coer_arrow coer_refl_ty coer_refl_ty))
-                               _op_2 (* - *))
-                              n)
-                       in
-                       coer_refl_ty
-                         (((coer_arrow coer_refl_ty coer_refl_ty) _b_20) 1))
-                  >> fun _b_19 ->
-                    (coer_computation coer_refl_ty)
-                      (((coer_arrow coer_refl_ty
-                           (coer_computation coer_refl_ty))
-                          ((coer_arrow coer_refl_ty
-                              (coer_computation coer_refl_ty))
-                             loop_latent))
-                         _b_19) )) )
+  | false -> (
+      (coer_return coer_refl_ty)
+        (let _b_17 = _op_1 (* < *) n in
+         _b_17 0)
+      >> fun _b_16 ->
+      match _b_16 with
+      | true ->
+          (effect Fail) () >> fun _b_18 ->
+          (coer_return coer_refl_ty) (match _b_18 with _ -> assert false)
+      | false ->
+          (coer_return coer_refl_ty)
+            (let _b_20 = _op_2 (* - *) n in
+             _b_20 1)
+          >> fun _b_19 -> loop_latent _b_19)
 
 let test_latent (n : int) = loop_latent n
 
@@ -188,28 +147,11 @@ let rec loop_incr n =
   match _b_25 with
   | true -> (coer_return coer_refl_ty) ()
   | false ->
-      (coer_computation coer_refl_ty)
-        ( (coer_computation coer_refl_ty)
-            (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                (effect Incr))
-               ())
-        >> fun _ ->
-          (coer_computation coer_refl_ty)
-            ( (coer_return coer_refl_ty)
-                (let _b_28 =
-                   coer_refl_ty
-                     (((coer_arrow coer_refl_ty
-                          (coer_arrow coer_refl_ty coer_refl_ty))
-                         _op_2 (* - *))
-                        n)
-                 in
-                 coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_28) 1))
-            >> fun _b_27 ->
-              (coer_computation coer_refl_ty)
-                (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                    ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                       loop_incr))
-                   _b_27) ) )
+      (effect Incr) () >> fun _ ->
+      (coer_return coer_refl_ty)
+        (let _b_28 = _op_2 (* - *) n in
+         _b_28 1)
+      >> fun _b_27 -> loop_incr _b_27
 
 let test_incr (n : int) =
   let incr_handler =
@@ -250,28 +192,11 @@ let rec loop_incr' n =
   match _b_46 with
   | true -> (coer_return coer_refl_ty) ()
   | false ->
-      (coer_computation coer_refl_ty)
-        ( (coer_computation coer_refl_ty)
-            ( (coer_return coer_refl_ty)
-                (let _b_49 =
-                   coer_refl_ty
-                     (((coer_arrow coer_refl_ty
-                          (coer_arrow coer_refl_ty coer_refl_ty))
-                         _op_2 (* - *))
-                        n)
-                 in
-                 coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_49) 1))
-            >> fun _b_48 ->
-              (coer_computation coer_refl_ty)
-                (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                    ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                       loop_incr'))
-                   _b_48) )
-        >> fun _ ->
-          (coer_computation coer_refl_ty)
-            (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                (effect Incr))
-               ()) )
+      ( (coer_return coer_refl_ty)
+          (let _b_49 = _op_2 (* - *) n in
+           _b_49 1)
+      >> fun _b_48 -> loop_incr' _b_48 )
+      >> fun _ -> (effect Incr) ()
 
 let test_incr' (n : int) =
   let incr_handler =
@@ -316,46 +241,16 @@ let rec loop_state n =
   match _b_67 with
   | true -> (coer_return coer_refl_ty) ()
   | false ->
-      (coer_computation coer_refl_ty)
-        ( (coer_computation coer_refl_ty)
-            ( (coer_computation coer_refl_ty)
-                ( (coer_computation coer_refl_ty)
-                    ( (coer_computation coer_refl_ty)
-                        (((coer_arrow coer_refl_ty
-                             (coer_computation coer_refl_ty))
-                            (effect Get))
-                           ())
-                    >> fun _b_71 ->
-                      (coer_return coer_refl_ty)
-                        (((coer_arrow coer_refl_ty
-                             (coer_arrow coer_refl_ty coer_refl_ty))
-                            _op_3 (* + *))
-                           _b_71) )
-                >> fun _b_70 ->
-                  (coer_return coer_refl_ty)
-                    (((coer_arrow coer_refl_ty coer_refl_ty) _b_70) 1) )
-            >> fun _b_69 ->
-              (coer_computation coer_refl_ty)
-                (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                    (effect Put))
-                   _b_69) )
-        >> fun _ ->
-          (coer_computation coer_refl_ty)
-            ( (coer_return coer_refl_ty)
-                (let _b_73 =
-                   coer_refl_ty
-                     (((coer_arrow coer_refl_ty
-                          (coer_arrow coer_refl_ty coer_refl_ty))
-                         _op_2 (* - *))
-                        n)
-                 in
-                 coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_73) 1))
-            >> fun _b_72 ->
-              (coer_computation coer_refl_ty)
-                (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                    ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                       loop_state))
-                   _b_72) ) )
+      ( (coer_computation coer_refl_ty)
+          ( ( (effect Get) () >> fun _b_71 ->
+              (coer_return coer_refl_ty) (_op_3 (* + *) _b_71) )
+          >> fun _b_70 -> (coer_return coer_refl_ty) (_b_70 1) )
+      >> fun _b_69 -> (coer_computation coer_refl_ty) ((effect Put) _b_69) )
+      >> fun _ ->
+      (coer_return coer_refl_ty)
+        (let _b_73 = _op_2 (* - *) n in
+         _b_73 1)
+      >> fun _b_72 -> loop_state _b_72
 
 let test_state (n : int) =
   let state_handler =

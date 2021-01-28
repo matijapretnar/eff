@@ -82,7 +82,10 @@ and optimize_computation' state = function
       Term.LetVal (optimize_expression state exp, optimize_abstraction state abs)
   | Term.LetRec (defs, cmp) -> Term.LetRec (defs, optimize_computation state cmp)
   | Term.Match (exp, drty, cases) ->
-      Term.Match (optimize_expression state exp, drty, cases)
+      Term.Match
+        ( optimize_expression state exp,
+          drty,
+          List.map (optimize_abstraction state) cases )
   | Term.Apply (exp1, exp2) ->
       Term.Apply (optimize_expression state exp1, optimize_expression state exp2)
   | Term.Handle (exp, cmp) ->
@@ -116,11 +119,9 @@ and reduce_expression _state = function
       exp
   | exp -> exp
 
-and reduce_computation state = function
+and reduce_computation _state = function
   | Term.CastComp (cmp, dtcoer)
     when TypeChecker.is_trivial_dirty_coercion TypeChecker.initial_state dtcoer
     ->
       cmp
-  | Term.CastComp (Term.Value exp, (tcoer, _)) ->
-      Term.Value (reduce_expression state (Term.CastExp (exp, tcoer)))
   | cmp -> cmp
