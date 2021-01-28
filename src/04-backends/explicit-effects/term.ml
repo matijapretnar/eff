@@ -86,57 +86,66 @@ and letrec_abstraction = variable * Type.dirty * abstraction
 and abstraction2 = pattern * pattern * computation
 (** Abstractions that take two arguments. *)
 
-let var (_ : variable) = failwith __LOC__
+let var (_ : variable) : expression = failwith __LOC__
 
-let const (_ : Language.Const.t) = failwith __LOC__
+let const (_ : Language.Const.t) : expression = failwith __LOC__
 
-let tuple (_ : expression list) = failwith __LOC__
+let tuple (_ : expression list) : expression = failwith __LOC__
 
-let record (_ : (CoreTypes.Field.t, expression) Assoc.t) = failwith __LOC__
+let record (_ : (CoreTypes.Field.t, expression) Assoc.t) : expression =
+  failwith __LOC__
 
-let variant (_ : CoreTypes.Label.t * expression) = failwith __LOC__
+let variant (_ : CoreTypes.Label.t * expression) : expression = failwith __LOC__
 
-let lambda (_ : abstraction) = failwith __LOC__
+let lambda (_ : abstraction) : expression = failwith __LOC__
 
-let effect (_ : effect) = failwith __LOC__
+let effect (_ : effect) : expression = failwith __LOC__
 
-let handler (_ : handler) = failwith __LOC__
+let handler (_ : handler) : expression = failwith __LOC__
 
-let castExp (_ : expression * Constraint.ty_coercion) = failwith __LOC__
+let castExp (_ : expression * Constraint.ty_coercion) : expression =
+  failwith __LOC__
 
-let lambdaTyCoerVar (_ : Type.TyCoercionParam.t * Type.ct_ty * expression) =
+let lambdaTyCoerVar (_ : Type.TyCoercionParam.t * Type.ct_ty * expression) :
+    expression =
   failwith __LOC__
 
 let lambdaDirtCoerVar (_ : Type.DirtCoercionParam.t * Type.ct_dirt * expression)
-    =
+    : expression =
   failwith __LOC__
 
-let applyTyCoercion (_ : expression * Constraint.ty_coercion) = failwith __LOC__
-
-let applyDirtCoercion (_ : expression * Constraint.dirt_coercion) =
+let applyTyCoercion (_ : expression * Constraint.ty_coercion) : expression =
   failwith __LOC__
 
-let value (_ : expression) = failwith __LOC__
+let applyDirtCoercion (_ : expression * Constraint.dirt_coercion) : expression =
+  failwith __LOC__
 
-let letVal (_ : expression * abstraction) = failwith __LOC__
+let value (_ : expression) : computation = failwith __LOC__
 
-let letRec (_ : letrec_abstraction list * computation) = failwith __LOC__
+let letVal (_ : expression * abstraction) : computation = failwith __LOC__
 
-let match_ (_ : expression * Type.dirty * abstraction list) = failwith __LOC__
+let letRec (_ : letrec_abstraction list * computation) : computation =
+  failwith __LOC__
 
-let apply (_ : expression * expression) = failwith __LOC__
+let match_ (_ : expression * Type.dirty * abstraction list) : computation =
+  failwith __LOC__
 
-let handle (_ : expression * computation) = failwith __LOC__
+let apply (_ : expression * expression) : computation = failwith __LOC__
 
-let call (_ : effect * expression * abstraction) = failwith __LOC__
+let handle (_ : expression * computation) : computation = failwith __LOC__
 
-let op (_ : effect * expression) = failwith __LOC__
+let call (_ : effect * expression * abstraction) : computation =
+  failwith __LOC__
 
-let bind (_ : computation * abstraction) = failwith __LOC__
+let op (_ : effect * expression) : computation = failwith __LOC__
 
-let castComp (_ : computation * Constraint.dirty_coercion) = failwith __LOC__
+let bind (_ : computation * abstraction) : computation = failwith __LOC__
 
-let abstraction p ty c : abstraction = { term = (p, ty, c); ty = (ty, c.ty) }
+let castComp (_ : computation * Constraint.dirty_coercion) : computation =
+  failwith __LOC__
+
+let abstraction (p, ty, c) : abstraction =
+  { term = (p, ty, c); ty = (ty, c.ty) }
 
 let abstraction2 p1 p2 c : abstraction2 = (p1, p2, c)
 
@@ -528,13 +537,13 @@ let occurrences x (inside, outside) =
   let count ys = List.length (List.filter (fun y -> x = y) ys) in
   (count inside, count outside)
 
-let cast_expression e ty1 ty2 =
-  let omega, cons = Constraint.fresh_ty_coer (ty1, ty2) in
-  (CastExp (e, omega), cons)
+let cast_expression e ty2 =
+  let omega, cons = Constraint.fresh_ty_coer (e.ty, ty2) in
+  (castExp (e, omega), cons)
 
 let cast_computation c dirty1 dirty2 =
   let omega, cons1, cons2 = Constraint.fresh_dirty_coer (dirty1, dirty2) in
-  (CastComp (c, omega), cons1, cons2)
+  (castComp (c, omega), cons1, cons2)
 
 (* ************************************************************************* *)
 (*                         FREE VARIABLE COMPUTATION                         *)

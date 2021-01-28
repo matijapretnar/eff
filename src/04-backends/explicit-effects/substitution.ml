@@ -139,6 +139,9 @@ let rec apply_sub_ty sub = function
 and apply_sub_dirty_ty sub (ty, drt) =
   (apply_sub_ty sub ty, apply_sub_dirt sub drt)
 
+and apply_sub_abs_ty sub (ty, drty) =
+  (apply_sub_ty sub ty, apply_sub_dirty_ty sub drty)
+
 and apply_sub_ct_ty sub (ty1, ty2) = (apply_sub_ty sub ty1, apply_sub_ty sub ty2)
 
 and apply_sub_ct_dirt sub (drt1, drt2) =
@@ -193,7 +196,10 @@ and apply_sub_dirtycoer (sub : t) { term = ty_coer, dirt_coer; _ } :
   Constraint.bangCoercion (ty_coer', dirt_coer')
 
 let rec apply_sub_comp sub computation =
-  { computation with term = apply_sub_comp' sub computation.term }
+  {
+    term = apply_sub_comp' sub computation.term;
+    ty = apply_sub_dirty_ty sub computation.ty;
+  }
 
 and apply_sub_comp' sub computation =
   match computation with
@@ -217,7 +223,10 @@ and apply_sub_comp' sub computation =
   | _ -> failwith __LOC__
 
 and apply_sub_exp sub expression =
-  { expression with term = apply_sub_exp' sub expression.term }
+  {
+    term = apply_sub_exp' sub expression.term;
+    ty = apply_sub_ty sub expression.ty;
+  }
 
 and apply_sub_exp' sub expression =
   match expression with
@@ -245,7 +254,8 @@ and apply_sub_exp' sub expression =
       ApplyDirtCoercion (apply_sub_exp sub e1, apply_sub_dirtcoer sub dc1)
   | _ -> failwith __LOC__
 
-and apply_sub_abs sub abs = { abs with term = apply_sub_abs' sub abs.term }
+and apply_sub_abs sub abs =
+  { term = apply_sub_abs' sub abs.term; ty = apply_sub_abs_ty sub abs.ty }
 
 and apply_sub_abs' sub (p, t, c) = (p, apply_sub_ty sub t, apply_sub_comp sub c)
 

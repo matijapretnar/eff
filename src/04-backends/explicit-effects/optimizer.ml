@@ -59,11 +59,10 @@ and reduce_dirt_coercion' _state = function
   | dcoer -> dcoer
 
 let rec optimize_expression state exp =
-  let exp' = { exp with term = optimize_expression' state exp.term } in
-  reduce_expression state exp'
+  reduce_expression state (optimize_expression' state exp)
 
 and optimize_expression' state exp =
-  match exp with
+  match exp.term with
   | Term.Var _ | Term.Const _ -> exp
   | Term.Tuple exps -> Term.tuple (List.map (optimize_expression state) exps)
   | Term.Record flds -> Term.record (Assoc.map (optimize_expression state) flds)
@@ -86,10 +85,10 @@ and optimize_expression' state exp =
         (optimize_expression state exp, optimize_dirt_coercion state dcoer)
 
 and optimize_computation state cmp =
-  let cmp' = { cmp with term = optimize_computation' state cmp.term } in
-  reduce_computation state cmp'
+  reduce_computation state (optimize_computation' state cmp)
 
-and optimize_computation' state = function
+and optimize_computation' state cmp =
+  match cmp.term with
   | Term.Value exp -> Term.value (optimize_expression state exp)
   | Term.LetVal (exp, abs) ->
       Term.letVal (optimize_expression state exp, optimize_abstraction state abs)
@@ -126,21 +125,17 @@ and optimize_abstraction' state (pat, ty, cmp) =
 and optimize_abstraction2 state (pat1, pat2, cmp) =
   (pat1, pat2, optimize_computation state cmp)
 
-and reduce_expression state expr =
-  { expr with term = reduce_expression' state expr.term }
-
-and reduce_expression' _state = function
+and reduce_expression _state expr =
+  match expr.term with
   | Term.CastExp (exp, tcoer) when Constraint.is_trivial_ty_coercion tcoer ->
-      exp.term
-  | exp -> exp
+      exp
+  | _ -> expr
 
 and reduce_computation state comp =
-  { comp with term = reduce_computation' state comp.term }
-
-and reduce_computation' state = function
+  match comp.term with
   | Term.CastComp (cmp, dtcoer) when Constraint.is_trivial_dirty_coercion dtcoer
     ->
-      cmp.term
+      cmp
   | Term.CastComp ({ term = Term.Value exp; _ }, { term = tcoer, _; _ }) ->
-      Term.Value (reduce_expression state (Term.castExp (exp, tcoer)))
-  | cmp -> cmp
+      Term.value (reduce_expression state (Term.castExp (exp, tcoer)))
+  | _ -> comp

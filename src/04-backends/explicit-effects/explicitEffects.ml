@@ -115,7 +115,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
         in
 
         let backend_state' =
-          ExBackend.process_top_let_rec state.backend_state a'
+          ExBackend.process_top_let_rec state.backend_state (f, a')
         in
         {
           state with
