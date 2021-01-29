@@ -568,13 +568,13 @@ let occurrences x (inside, outside) =
   let count ys = List.length (List.filter (fun y -> x = y) ys) in
   (count inside, count outside)
 
-let cast_expression e ty2 =
-  let omega, cons = Constraint.fresh_ty_coer (e.ty, ty2) in
+let cast_expression e ty =
+  let omega, cons = Constraint.fresh_ty_coer (e.ty, ty) in
   (castExp (e, omega), cons)
 
-let cast_computation c dirty1 dirty2 =
-  let omega, cons1, cons2 = Constraint.fresh_dirty_coer (dirty1, dirty2) in
-  (castComp (c, omega), cons1, cons2)
+let cast_computation c dirty =
+  let omega, cnstrs = Constraint.fresh_dirty_coer (c.ty, dirty) in
+  (castComp (c, omega), cnstrs)
 
 (* ************************************************************************* *)
 (*                         FREE VARIABLE COMPUTATION                         *)
