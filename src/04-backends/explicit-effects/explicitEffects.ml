@@ -66,8 +66,8 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
     { state with backend_state = backend_state' }
 
   let process_def_effect state (eff, (ty1, ty2)) =
-    let ty1 = Type.source_to_target state.type_system_state.tctx_st ty1 in
-    let ty2 = Type.source_to_target state.type_system_state.tctx_st ty2 in
+    let ty1 = Type.source_to_target state.type_system_state.tydefs ty1 in
+    let ty2 = Type.source_to_target state.type_system_state.tydefs ty2 in
     let type_system_state' =
       ExplicitInfer.add_effect eff (ty1, ty2) state.type_system_state
     in
@@ -94,7 +94,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
           else e'
         in
         let type_system_state' =
-          ExplicitInfer.add_type state.type_system_state x e''.ty
+          ExplicitInfer.extend_var state.type_system_state x e''.ty
         in
         let backend_state' =
           ExBackend.process_top_let state.backend_state (x, e'')
@@ -121,7 +121,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
         let ty_in, drty_out = a''.ty in
         let fun_ty = Type.Arrow (ty_in, drty_out) in
         let type_system_state' =
-          ExplicitInfer.add_type state.type_system_state f fun_ty
+          ExplicitInfer.extend_var state.type_system_state f fun_ty
         in
 
         let backend_state' =
@@ -158,9 +158,9 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
      | _ -> failwith __LOC__ *)
 
   let process_external state (x, ty, name) =
-    let ty = Type.source_to_target state.type_system_state.tctx_st ty in
+    let ty = Type.source_to_target state.type_system_state.tydefs ty in
     let type_system_state' =
-      ExplicitInfer.addExternal state.type_system_state x ty
+      ExplicitInfer.extend_var state.type_system_state x ty
     in
     let backend_state' =
       ExBackend.process_external state.backend_state (x, ty, name)
