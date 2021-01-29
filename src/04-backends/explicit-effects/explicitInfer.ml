@@ -1292,8 +1292,8 @@ let top_level_computation state comp =
   let mono_sub = monomorphize free_ty_params residuals in
   (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
   let mono_comp = subInCmp mono_sub comp in
-  Print.debug "MONO TERM: %t" (Term.print_computation mono_comp);
-  Print.debug "MONO TYPE: %t" (Type.print_dirty mono_comp.ty);
+  (* Print.debug "MONO TERM: %t" (Term.print_computation mono_comp); *)
+  (* Print.debug "MONO TYPE: %t" (Type.print_dirty mono_comp.ty); *)
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_computation mono_comp));
   mono_comp
@@ -1316,8 +1316,8 @@ let top_level_expression state expr =
   let mono_sub = monomorphize free_ty_params residuals in
   (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
   let mono_expr = subInExp mono_sub expr in
-  Print.debug "MONO TERM: %t" (Term.print_expression mono_expr);
-  Print.debug "MONO TYPE: %t" (Type.print_ty mono_expr.ty);
+  (* Print.debug "MONO TERM: %t" (Term.print_expression mono_expr); *)
+  (* Print.debug "MONO TYPE: %t" (Type.print_ty mono_expr.ty); *)
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_expression mono_expr));
   mono_expr

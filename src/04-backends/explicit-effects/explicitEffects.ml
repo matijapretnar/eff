@@ -97,7 +97,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
           ExplicitInfer.add_type state.type_system_state x e''.ty
         in
         let backend_state' =
-          ExBackend.process_top_let state.backend_state (x, e')
+          ExBackend.process_top_let state.backend_state (x, e'')
         in
         {
           state with

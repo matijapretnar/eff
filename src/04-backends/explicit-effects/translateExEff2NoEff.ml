@@ -179,8 +179,7 @@ and elab_expression' exp =
                 Assoc.map_of_list subst_cont_effect
                   (Assoc.to_list h.term.effect_clauses);
             } (* Handler - Case 3 *)
-        else (
-          Print.debug "Case 3";
+        else
           let elab_effect_clause ((eff, (ty1, ty2)), (p1, p2, comp)) =
             let elab1 = elab_ty ty1 in
             let elab2 = elab_ty ty2 in
@@ -195,7 +194,7 @@ and elab_expression' exp =
               effect_clauses =
                 Assoc.map_of_list elab_effect_clause
                   (Assoc.to_list h.term.effect_clauses);
-            })
+            }
   | ExEff.CastExp (value, coer) ->
       let elab1 = elab_expression value in
       let elab2 = elab_ty_coercion coer in

@@ -79,6 +79,8 @@ let coer_unsafe coer = function
 
 let coer_arrow coer1 coer2 f x = coer2 (f (coer1 x))
 
+let coer_handler coer1 coer2 h x = coer2 (h (coer1 x))
+
 let coer_hand_to_fun coer1 coer2 h x = coer2 (h (Value (coer1 x)))
 
 let rec coer_fun_to_hand coer1 coer2 f comp =
