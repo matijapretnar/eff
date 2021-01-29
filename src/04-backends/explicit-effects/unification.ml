@@ -17,10 +17,9 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
   (* α : τ₁ -> τ₂ *)
   | SkelArrow (sk1, sk2) ->
       let tvar1, cons1 = Constraint.fresh_ty_with_skel sk1
-      and tvar2, cons2 = Constraint.fresh_ty_with_skel sk2
-      and dvar1 = Type.fresh_dirt () in
+      and dtvar2, cons2 = Constraint.fresh_dirty_with_skel sk2 in
       let k = tvar in
-      let v = Type.Arrow (tvar1, (tvar2, dvar1)) in
+      let v = Type.Arrow (tvar1, dtvar2) in
       let sub1 = Substitution.add_type_substitution_e k v in
       let cons_subbed =
         Substitution.apply_substitutions_to_constraints sub1
@@ -70,12 +69,10 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
         Constraint.add_list_to_constraints cons_subbed conss )
   (* α : τ₁ => τ₂ *)
   | SkelHandler (sk1, sk2) ->
-      let tvar1, cons1 = Constraint.fresh_ty_with_skel sk1
-      and tvar2, cons2 = Constraint.fresh_ty_with_skel sk2
-      and dvar1 = Type.fresh_dirt ()
-      and dvar2 = Type.fresh_dirt () in
+      let dtvar1, cons1 = Constraint.fresh_dirty_with_skel sk1
+      and dtvar2, cons2 = Constraint.fresh_dirty_with_skel sk2 in
       let k = tvar in
-      let v = Type.Handler ((tvar1, dvar1), (tvar2, dvar2)) in
+      let v = Type.Handler (dtvar1, dtvar2) in
       let sub1 = Substitution.add_type_substitution_e k v in
       let cons_subbed =
         Substitution.apply_substitutions_to_constraints sub1
