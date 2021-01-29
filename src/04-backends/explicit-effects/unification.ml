@@ -17,10 +17,9 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
   (* α : τ₁ -> τ₂ *)
   | SkelArrow (sk1, sk2) ->
       let tvar1, cons1 = Constraint.fresh_ty_with_skel sk1
-      and tvar2, cons2 = Constraint.fresh_ty_with_skel sk2
-      and dvar1 = Type.fresh_dirt () in
+      and dtvar2, cons2 = Constraint.fresh_dirty_with_skel sk2 in
       let k = tvar in
-      let v = Type.Arrow (tvar1, (tvar2, dvar1)) in
+      let v = Type.Arrow (tvar1, dtvar2) in
       let sub1 = Substitution.add_type_substitution_e k v in
       let cons_subbed =
         Substitution.apply_substitutions_to_constraints sub1
@@ -70,12 +69,10 @@ let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
         Constraint.add_list_to_constraints cons_subbed conss )
   (* α : τ₁ => τ₂ *)
   | SkelHandler (sk1, sk2) ->
-      let tvar1, cons1 = Constraint.fresh_ty_with_skel sk1
-      and tvar2, cons2 = Constraint.fresh_ty_with_skel sk2
-      and dvar1 = Type.fresh_dirt ()
-      and dvar2 = Type.fresh_dirt () in
+      let dtvar1, cons1 = Constraint.fresh_dirty_with_skel sk1
+      and dtvar2, cons2 = Constraint.fresh_dirty_with_skel sk2 in
       let k = tvar in
-      let v = Type.Handler ((tvar1, dvar1), (tvar2, dvar2)) in
+      let v = Type.Handler (dtvar1, dtvar2) in
       let sub1 = Substitution.add_type_substitution_e k v in
       let cons_subbed =
         Substitution.apply_substitutions_to_constraints sub1
@@ -141,7 +138,7 @@ let ty_omega_step sub paused cons rest_queue omega = function
   (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
   | Type.Arrow (a1, dirty1), Type.Arrow (a2, dirty2) ->
       let new_ty_coercion_var_coer, ty_cons = Constraint.fresh_ty_coer (a2, a1)
-      and dirty_coercion_c, dirty_cons1, dirty_cons2 =
+      and dirty_coercion_c, dirty_cnstrs =
         Constraint.fresh_dirty_coer (dirty1, dirty2)
       in
       let k = omega in
@@ -150,9 +147,7 @@ let ty_omega_step sub paused cons rest_queue omega = function
       in
       ( Substitution.add_type_coercion k v sub,
         paused,
-        Constraint.add_to_constraints ty_cons rest_queue
-        |> Constraint.add_to_constraints dirty_cons1
-        |> Constraint.add_to_constraints dirty_cons2 )
+        Constraint.add_to_constraints ty_cons (rest_queue @ dirty_cnstrs) )
   (* ω : A₁ x A₂ x ... <= B₁ x B₂ x ...  *)
   | Type.Tuple tys, Type.Tuple tys' when List.length tys = List.length tys' ->
       let coercions, conss =
@@ -185,19 +180,15 @@ let ty_omega_step sub paused cons rest_queue omega = function
         Constraint.add_list_to_constraints conss rest_queue )
   (* ω : D₁ => C₁ <= D₂ => C₂ *)
   | Type.Handler (drty11, drty12), Type.Handler (drty21, drty22) ->
-      let drty_coer1, ty_cons1, drt_cons1 =
-        Constraint.fresh_dirty_coer (drty21, drty11)
-      and drty_coer2, ty_cons2, drt_cons2 =
+      let drty_coer1, dirty_cons1 = Constraint.fresh_dirty_coer (drty21, drty11)
+      and drty_coer2, dirty_cons2 =
         Constraint.fresh_dirty_coer (drty12, drty22)
       in
       let k = omega in
       let v = Constraint.handlerCoercion (drty_coer1, drty_coer2) in
       ( Substitution.add_type_coercion k v sub,
         paused,
-        Constraint.add_to_constraints ty_cons1 rest_queue
-        |> Constraint.add_to_constraints ty_cons2
-        |> Constraint.add_to_constraints drt_cons1
-        |> Constraint.add_to_constraints drt_cons2 )
+        dirty_cons1 @ dirty_cons2 @ rest_queue )
   (* ω : α <= A /  ω : A <= α *)
   | Type.TyParam (_, skel_tv), a | a, Type.TyParam (_, skel_tv) ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
