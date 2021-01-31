@@ -110,7 +110,8 @@ let rec pp_coercion coer ppf =
       print ppf "coer_fun_to_hand (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
   | NCoerComp w -> print ppf "coer_computation (%t)" (pp_coercion w)
   | NCoerReturn w -> print ppf "coer_return (%t)" (pp_coercion w)
-  | NCoerUnsafe w -> print ppf "coer_unsafe (%t)" (pp_coercion w)
+  | NCoerUnsafe w -> print ppf "coer_unsafe (*unsafe*)(%t)" (pp_coercion w)
+  | NCoerForceUnsafe -> print ppf "force_unsafe"
   | NCoerTuple _cs -> print ppf "TupleCoercion"
   | NCoerApply (_t, _cs) -> print ppf "ApplyCoercion"
   | NCoerQual (_ct, _c) -> print ppf "ApplyCoercion"
@@ -130,6 +131,8 @@ let rec pp_term noEff_term ppf =
   | NEffect (et, _) -> print ppf "(effect %t)" (CoreTypes.Effect.print et)
   | NApplyTerm (t1, t2) ->
       print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2)
+  (*| NCast (t, (NCoerReturn (NCoerRefl _) as _c)) ->
+      print ppf "Value (%t)" (pp_term t) *)
   | NCast (t, c) ->
       print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_coercion c) (pp_term t)
   | NReturn t -> print ppf "Value (%t)" (pp_term t)

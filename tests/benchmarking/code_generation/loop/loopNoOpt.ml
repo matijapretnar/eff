@@ -77,6 +77,10 @@ let coer_unsafe coer = function
   | Value v -> coer v
   | Call (_eff, _arg, _k) -> failwith "Unsafe coercion"
 
+let force_unsafe = function
+  | Value v -> v
+  | Call (_eff, _arg, _k) -> failwith "Unsafe coercion"
+
 let coer_arrow coer1 coer2 f x = coer2 (f (coer1 x))
 
 let coer_handler coer1 coer2 h x = coer2 (h (coer1 x))
@@ -261,7 +265,7 @@ let test_incr (n : int) =
                                     ((coer_arrow coer_refl_ty
                                         (coer_arrow coer_refl_ty coer_refl_ty))
                                        ((coer_arrow coer_refl_ty
-                                           (coer_unsafe coer_refl_ty))
+                                           (coer_unsafe (*unsafe*) coer_refl_ty))
                                           l)))
                                    ())
                             in
@@ -289,7 +293,7 @@ let test_incr (n : int) =
   in
   let _b_41 =
     coer_refl_ty
-      ((coer_unsafe coer_refl_ty)
+      ((coer_unsafe (*unsafe*) coer_refl_ty)
          (((coer_handler
               (coer_computation coer_refl_ty)
               (coer_computation (coer_arrow coer_refl_ty coer_refl_ty)))
@@ -366,7 +370,7 @@ let test_incr' (n : int) =
                                     ((coer_arrow coer_refl_ty
                                         (coer_arrow coer_refl_ty coer_refl_ty))
                                        ((coer_arrow coer_refl_ty
-                                           (coer_unsafe coer_refl_ty))
+                                           (coer_unsafe (*unsafe*) coer_refl_ty))
                                           l)))
                                    ())
                             in
@@ -394,7 +398,7 @@ let test_incr' (n : int) =
   in
   let _b_62 =
     coer_refl_ty
-      ((coer_unsafe coer_refl_ty)
+      ((coer_unsafe (*unsafe*) coer_refl_ty)
          (((coer_handler
               (coer_computation coer_refl_ty)
               (coer_computation (coer_arrow coer_refl_ty coer_refl_ty)))
@@ -493,7 +497,7 @@ let test_state (n : int) =
                                     ((coer_arrow coer_refl_ty
                                         (coer_arrow coer_refl_ty coer_refl_ty))
                                        ((coer_arrow coer_refl_ty
-                                           (coer_unsafe coer_refl_ty))
+                                           (coer_unsafe (*unsafe*) coer_refl_ty))
                                           l)))
                                    s)
                             in
@@ -510,7 +514,7 @@ let test_state (n : int) =
                                     ((coer_arrow coer_refl_ty
                                         (coer_arrow coer_refl_ty coer_refl_ty))
                                        ((coer_arrow coer_refl_ty
-                                           (coer_unsafe coer_refl_ty))
+                                           (coer_unsafe (*unsafe*) coer_refl_ty))
                                           l)))
                                    ())
                             in
@@ -522,7 +526,7 @@ let test_state (n : int) =
   in
   let _b_87 =
     coer_refl_ty
-      ((coer_unsafe coer_refl_ty)
+      ((coer_unsafe (*unsafe*) coer_refl_ty)
          (((coer_handler
               (coer_computation coer_refl_ty)
               (coer_computation (coer_arrow coer_refl_ty coer_refl_ty)))
