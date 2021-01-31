@@ -228,16 +228,37 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 
-  type state = { prog : SyntaxNoEff.cmd list }
+  type state = {
+    prog : SyntaxNoEff.cmd list;
+    no_eff_optimizer_state : NoEffOptimizer.state;
+  }
 
-  let initial_state = { prog = [] }
+  let initial_state =
+    { prog = []; no_eff_optimizer_state = NoEffOptimizer.initial_state }
 
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
 
+  let optimize_term state term =
+    let t' =
+      if !Config.enable_optimization then
+        NoEffOptimizer.optimize_term state.no_eff_optimizer_state term
+      else term
+    in
+    t'
+
+  let optimize_abstraction state abstraction =
+    let t' =
+      if !Config.enable_optimization then
+        NoEffOptimizer.optimize_abstraction state.no_eff_optimizer_state
+          abstraction
+      else abstraction
+    in
+    t'
+
   let process_computation state c =
     let c' = TranslateExEff2NoEff.elab_computation c in
-    { prog = SyntaxNoEff.Term c' :: state.prog }
+    { state with prog = SyntaxNoEff.Term c' :: state.prog }
 
   let process_type_of state _ =
     Print.warning "[#typeof] commands are ignored when compiling to OCaml.";
@@ -245,27 +266,25 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
 
   let process_def_effect state eff =
     {
+      state with
       prog =
         SyntaxNoEff.DefEffect (TranslateExEff2NoEff.elab_effect eff)
         :: state.prog;
     }
 
   let process_top_let state (x, e) =
-    {
-      prog =
-        SyntaxNoEff.TopLet (x, TranslateExEff2NoEff.elab_expression e)
-        :: state.prog;
-    }
+    let t = optimize_term state @@ TranslateExEff2NoEff.elab_expression e in
+    { state with prog = SyntaxNoEff.TopLet (x, t) :: state.prog }
 
   let process_top_let_rec state (x, a) =
-    {
-      prog =
-        SyntaxNoEff.TopLetRec (x, TranslateExEff2NoEff.elab_abstraction a)
-        :: state.prog;
-    }
+    let t =
+      optimize_abstraction state @@ TranslateExEff2NoEff.elab_abstraction a
+    in
+    { state with prog = SyntaxNoEff.TopLetRec (x, t) :: state.prog }
 
   let process_external state (x, ty, name) =
     {
+      state with
       prog =
         SyntaxNoEff.External (x, TranslateExEff2NoEff.elab_ty ty, name)
         :: state.prog;
@@ -276,7 +295,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
       (ty_params, TranslateExEff2NoEff.elab_tydef tydef)
     in
     let tydefs' = Assoc.map converter tydefs |> Assoc.to_list in
-    { prog = SyntaxNoEff.TyDef tydefs' :: state.prog }
+    { state with prog = SyntaxNoEff.TyDef tydefs' :: state.prog }
 
   let finalize state =
     if !Config.include_header then
