@@ -79,7 +79,7 @@ let coer_unsafe coer = function
 
 let force_unsafe = function
   | Value v -> v
-  | Call (_eff, _arg, _k) -> failwith "Unsafe coercion"
+  | Call (_eff, _arg, _k) -> failwith "Unsafe value force"
 
 let coer_arrow coer1 coer2 f x = coer2 (f (coer1 x))
 
@@ -176,7 +176,7 @@ let test_incr (n : int) =
                   Value
                     (fun (x : int) ->
                       let _b_34 =
-                        ((coer_arrow coer_refl_ty (force_unsafe)) l) ()
+                        ((coer_arrow coer_refl_ty force_unsafe) l) ()
                       in
                       let _b_35 =
                         let _b_36 = _op_3 (* + *) x in
@@ -245,10 +245,9 @@ let rec loop_state n =
   match _b_67 with
   | true -> Value ()
   | false ->
-      ( (coer_computation coer_refl_ty)
-          ( ((effect Get) () >> fun _b_71 -> Value (_op_3 (* + *) _b_71))
-          >> fun _b_70 -> Value (_b_70 1) )
-      >> fun _b_69 -> (coer_computation coer_refl_ty) ((effect Put) _b_69) )
+      ( ( ((effect Get) () >> fun _b_71 -> Value (_op_3 (* + *) _b_71))
+        >> fun _b_70 -> Value (_b_70 1) )
+      >> fun _b_69 -> (effect Put) _b_69 )
       >> fun _ ->
       Value
         (let _b_73 = _op_2 (* - *) n in

@@ -6,7 +6,7 @@ open Queens
 open Interp
 open Range
 
-let number_of_loops = 100
+let number_of_loops = 10000
 
 and number_of_queens = 8
 
@@ -14,13 +14,13 @@ and number_of_range = 10
 
 let run_loop_pure = true
 
-and run_loop_latent = true
+and run_loop_latent = false
 
-and run_loop_incr = true
+and run_loop_incr = false
 
-and run_loop_incr' = true
+and run_loop_incr' = false
 
-and run_loop_state = true
+and run_loop_state = false
 
 and run_queens_one = false
 
@@ -41,7 +41,7 @@ let benchmark test =
     Instance.[ minor_allocated; major_allocated; monotonic_clock; promoted ]
   in
   let cfg =
-    Benchmark.cfg ~limit:2000 ~quota:(Time.second 0.5) ~kde:(Some 1000) ()
+    Benchmark.cfg ~limit:2000 ~quota:(Time.second 2.0) ~kde:(Some 5000) ()
   in
   let raw_results = Benchmark.all cfg instances test in
   let results =
@@ -115,13 +115,13 @@ let loop_latent_benchmarks =
           always_true LoopNoOpt.test_latent );
         ( "Generated, optimized",
           forget_value LoopOpt.test_latent,
-          always_true LoopNoOpt.test_latent );
+          always_true LoopOpt.test_latent );
         ( "Hand written",
           forget_value LoopHandWritten.test_latent,
-          always_true LoopNoOpt.test_latent );
+          always_true LoopHandWritten.test_latent );
         ( "Native",
           forget_value LoopNative.test_latent,
-          always_true LoopNoOpt.test_latent );
+          always_true LoopNative.test_latent );
       ];
     param = number_of_loops;
   }
@@ -178,13 +178,13 @@ let loop_state_benchmark num =
           fun n -> LoopNoOpt.test_state n = num );
         ( "Generated, optimized",
           forget_value LoopOpt.test_state,
-          fun n -> LoopNoOpt.test_state n = num );
+          fun n -> LoopOpt.test_state n = num );
         ( "Hand written",
           forget_value LoopHandWritten.test_state,
-          fun n -> LoopNoOpt.test_state n = num );
+          fun n -> LoopHandWritten.test_state n = num );
         ( "Native",
           forget_value LoopNative.test_state,
-          fun n -> LoopNoOpt.test_state n = num );
+          fun n -> LoopNative.test_state n = num );
       ];
     param = num;
   }
@@ -319,7 +319,7 @@ let () =
         let set = loop_incr'_benchmark n in
         Printf.printf "%s (%d loops):\n" set.name set.param;
         run_and_show_set set)
-      [ 100; 200 ];
+      [ number_of_loops; 2 * number_of_loops ];
   if run_loop_state then (
     let set = loop_incr_benchmark number_of_loops in
     Printf.printf "%s (%d loops):\n" set.name set.param;

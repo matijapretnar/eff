@@ -79,7 +79,7 @@ let coer_unsafe coer = function
 
 let force_unsafe = function
   | Value v -> v
-  | Call (_eff, _arg, _k) -> failwith "Unsafe coercion"
+  | Call (_eff, _arg, _k) -> failwith "Unsafe value force"
 
 let coer_arrow coer1 coer2 f x = coer2 (f (coer1 x))
 

@@ -39,6 +39,7 @@ and reduce_ty_coercion' _state n_coer =
   | NoEff.NCoerHandler (NCoerRefl t1, NCoerRefl t2) ->
       NCoerRefl (NTyHandler (t1, t2))
   | NCoerUnsafe (NCoerRefl _) -> NCoerForceUnsafe
+  | NCoerComp (NCoerRefl t1) -> NCoerRefl t1
   | NoEff.NCoerTuple _ -> failwith ""
   | _ -> n_coer
 
@@ -112,4 +113,5 @@ and n_abstraction_2_args state ((pat1, pat2, term) : NoEff.n_abstraction_2_args)
 and reduce_term _state (n_term : NoEff.n_term) =
   match n_term with
   | NCast (t, (NCoerReturn (NCoerRefl _) as _c)) -> NReturn t
+  | NCast (t, NCoerRefl _) -> t
   | _ -> n_term
