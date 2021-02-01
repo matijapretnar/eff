@@ -32,8 +32,8 @@ let rec extend_value p v state =
       try Assoc.fold_left extender state ps
       with Not_found -> raise (PatternMatch Location.unknown))
   | Term.PVariant (lbl, None), V.Variant (lbl', None) when lbl = lbl' -> state
-  | Term.PVariant (lbl, Some x), V.Variant (lbl', Some v) when lbl = lbl' ->
-      update x v state
+  | Term.PVariant (lbl, Some p), V.Variant (lbl', Some v) when lbl = lbl' ->
+      extend_value p v state
   | Term.PConst c, V.Const c' when Const.equal c c' -> state
   | _, _ -> raise (PatternMatch Location.unknown)
 

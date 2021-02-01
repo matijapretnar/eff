@@ -225,10 +225,11 @@ let rec tcMany state (xss : 'a list) tc =
 (* ************************************************************************* *)
 
 let rec check_pattern state ty (pat : Untyped.pattern) : Term.pattern * state =
-  let pat', state' = check_pattern' state ty pat.it in
+  let pat', state' = check_pattern' state ty pat in
   ({ term = pat'; ty }, state')
 
-and check_pattern' state ty = function
+and check_pattern' state ty pat =
+  match pat.it with
   | Untyped.PVar x -> (Term.PVar x, extend_var state x ty)
   | Untyped.PAnnotated (p, ty') when Type.source_to_target state.tydefs ty' = ty
     ->
@@ -253,28 +254,21 @@ and check_pattern' state ty = function
       match (p, Type.constructor_signature state.tydefs lbl) with
       | None, (None, out_ty) when out_ty = ty ->
           (Term.PVariant (lbl, None), state)
-      | Some p, (Some in_ty, out_ty) when out_ty = ty -> (
-          match p.it with
-          | Untyped.PVar x ->
-              (Term.PVariant (lbl, Some x), extend_var state x in_ty)
-          | Untyped.PNonbinding -> (Term.PNonbinding, state)
-          | _ ->
-              failwith
-                "tcPattern: Only variables allowed in variant pattern matching")
-      | _ -> failwith "Invalid type")
-  (* GEORGE: TODO: Unhandled cases *)
-  | _other_pattern ->
-      failwith
-        "check_pattern: Please no pattern matching in lambda abstractions!"
+      | Some p, (Some in_ty, out_ty) when out_ty = ty ->
+          let p', state' = check_pattern state in_ty p in
+          (Term.PVariant (lbl, Some p'), state')
+      | _ -> assert false)
+  | _ ->
+      Error.typing ~loc:pat.at "check_pattern: Unsupported pattern %t"
+        (Untyped.print_pattern pat)
 
 let rec infer_pattern state (pat : Untyped.pattern) :
     Term.pattern * state * constraints =
-  let pat', ty, state', cnstrs = infer_pattern' state pat.it in
+  let pat', ty, state', cnstrs = infer_pattern' state pat in
   ({ term = pat'; ty }, state', cnstrs)
 
-and infer_pattern' state :
-    Untyped.plain_pattern -> Term.pattern' * Type.ty * state * constraints =
-  function
+and infer_pattern' state pat =
+  match pat.it with
   | Untyped.PVar x ->
       let alpha, alphaSkel = Constraint.fresh_ty_with_fresh_skel () in
       (Term.PVar x, alpha, extend_var state x alpha, [ alphaSkel ])
@@ -297,19 +291,13 @@ and infer_pattern' state :
   | Untyped.PVariant (lbl, p) -> (
       match (p, Type.constructor_signature state.tydefs lbl) with
       | None, (None, out_ty) -> (Term.PVariant (lbl, None), out_ty, state, [])
-      | Some p, (Some in_ty, out_ty) -> (
-          match p.it with
-          | Untyped.PVar x ->
-              (Term.PVariant (lbl, Some x), out_ty, extend_var state x in_ty, [])
-          | Untyped.PNonbinding -> (Term.PNonbinding, out_ty, state, [])
-          | _ ->
-              failwith
-                "tcPattern: Only variables allowed in variant pattern matching")
-      | _ -> failwith "Invalid type")
-  (* GEORGE: TODO: Unhandled cases *)
-  | _other_pattern ->
-      failwith
-        "infer_pattern: Please no pattern matching in lambda abstractions!"
+      | Some p, (Some in_ty, out_ty) ->
+          let p', state' = check_pattern state in_ty p in
+          (Term.PVariant (lbl, Some p'), out_ty, state', [])
+      | _ -> assert false)
+  | _ ->
+      Error.typing ~loc:pat.at "infer_pattern: Unsupported pattern %t"
+        (Untyped.print_pattern pat)
 
 let isLocatedVarPat (pat : Untyped.pattern) : bool =
   match pat.it with Untyped.PVar _ -> true | _other_pattern -> false

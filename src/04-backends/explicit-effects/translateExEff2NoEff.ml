@@ -130,7 +130,7 @@ let rec elab_pattern p =
   | PConst c -> PNConst c
   | PRecord recs -> NoEff.PNRecord (Assoc.map elab_pattern recs)
   | PVariant (l, None) -> NoEff.PNVariant (l, None)
-  | PVariant (l, Some x) -> NoEff.PNVariant (l, Some (PNVar x))
+  | PVariant (l, Some p) -> NoEff.PNVariant (l, Some (elab_pattern p))
   | PNonbinding -> PNNonbinding
 
 let rec elab_expression exp = elab_expression' exp.term

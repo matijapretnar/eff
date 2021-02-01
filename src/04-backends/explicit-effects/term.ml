@@ -17,7 +17,7 @@ and pattern' =
   | PAs of pattern * variable
   | PTuple of pattern list
   | PRecord of (CoreTypes.Field.t, pattern) Assoc.t
-  | PVariant of CoreTypes.Label.t * variable option
+  | PVariant of CoreTypes.Label.t * pattern option
   | PConst of Language.Const.t
   | PNonbinding
 
@@ -33,7 +33,7 @@ let rec pattern_vars pat =
   | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
   | PRecord lst -> Assoc.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
   | PVariant (_, None) -> []
-  | PVariant (_, Some x) -> [ x ]
+  | PVariant (_, Some p) -> pattern_vars p
   | PConst _ -> []
   | PNonbinding -> []
 
@@ -203,7 +203,7 @@ let rec print_pattern ?max_level p ppf =
   | PVariant (lbl, Some p) ->
       print ~at_level:1 "(%t @[<hov>%t@])"
         (CoreTypes.Label.print lbl)
-        (print_variable p)
+        (print_pattern p)
   | PNonbinding -> print "_"
 
 let rec print_expression ?max_level e ppf =
@@ -413,8 +413,8 @@ let rec make_equal_pattern eqvars p p' =
         ps ps' (Some eqvars)
   | PConst cst, PConst cst' when Const.equal cst cst' -> Some eqvars
   | PNonbinding, PNonbinding -> Some eqvars
-  | PVariant (lbl, Some x), PVariant (lbl', Some x') when lbl = lbl' ->
-      Some ((x, x') :: eqvars)
+  | PVariant (lbl, Some p), PVariant (lbl', Some p') when lbl = lbl' ->
+      make_equal_pattern eqvars p p'
   | _, _ -> None
 
 let rec alphaeq_expr eqvars e e' =
@@ -504,8 +504,8 @@ let pattern_match p e =
         in
         extend_record (Assoc.to_list ps) (Assoc.to_list es) sbst
     | PVariant (lbl, None), Variant (lbl', None) when lbl = lbl' -> sbst
-    | PVariant (lbl, Some x), Variant (lbl', Some e) when lbl = lbl' ->
-        Assoc.update x e.term sbst
+    | PVariant (lbl, Some p), Variant (lbl', Some e) when lbl = lbl' ->
+        extend_subst p e sbst
     | PConst c, Const c' when Const.equal c c' -> sbst
     | _, _ -> assert false
   in
