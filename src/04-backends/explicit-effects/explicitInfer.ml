@@ -508,39 +508,6 @@ and tcEffect state (eff : Untyped.effect) : tcExprOutput' =
   let outType = Type.Arrow (in_ty, (out_ty, Type.closed_dirt s)) in
   ((outVal, outType), [])
 
-(* Handlers(Return Case) *)
-and tcReturnCase state (abs : Untyped.abstraction)
-    (* Return clause *) (tyIn : Type.ty)
-    (* Expected input value type *) (drtyOut : Type.dirty) =
-  (* Expected output dirt *)
-
-  (* 1: Typecheck the pattern and the body of the return clause *)
-  let abs, cs1 = tcAbstraction state abs in
-
-  (* 2: Make sure that the pattern is a variable one.
-   *    We do not support anything else at the moment *)
-  let x, pat, cmp =
-    match abs.term with
-    | ({ term = PVar x; _ } as pat), cmp -> (x, pat, cmp)
-    | _ -> failwith "tcReturnCase: only varpats allowed"
-  in
-
-  (* 3: Generate all wanted constraints *)
-  let omega12, omegaCt12 = Constraint.fresh_dirty_coer (cmp.ty, drtyOut) in
-
-  (* 4: Create the elaborated clause *)
-  let yvar = CoreTypes.Variable.fresh "y" in
-  let castY, omegaCt6 = Term.cast_expression (Term.var yvar tyIn) pat.ty in
-  let ysub = Term.subst_comp (Assoc.of_list [ (x, castY) ]) in
-  let outExpr =
-    Term.abstraction (Term.pVar yvar pat.ty, Term.castComp (ysub cmp, omega12))
-  in
-
-  (* 5: Combine the results *)
-  (outExpr, omegaCt12 @ (omegaCt6 :: cs1))
-
-(* NOTE: (a_r : skel_r) \in cs1 *)
-
 (* Handlers(Op Cases) *)
 and tcOpCases state (eclauses : (Untyped.effect, Untyped.abstraction2) Assoc.t)
     (dirtyOut : Type.dirty) : (Term.effect, Term.abstraction2) Assoc.t tcOutput
@@ -605,18 +572,17 @@ and tcOpCase state
 (* Handlers *)
 and tcHandler state (h : Untyped.handler) : tcExprOutput' =
   (* 1: Generate fresh variables for the input and output types *)
-  let ((alphaIn, deltaIn) as dirtyIn), alphaInSkel =
-    Constraint.fresh_dirty_with_fresh_skel ()
-  in
+  let deltaIn = Type.fresh_dirt () in
   let ((_, deltaOut) as dirtyOut), alphaOutSkel =
     Constraint.fresh_dirty_with_fresh_skel ()
   in
 
   (* 2: Process the return and the operation clauses *)
-  let trgRet, cs1 = tcReturnCase state h.value_clause alphaIn dirtyOut in
+  let trgRet, cs1 = tcAbstraction state h.value_clause in
   let trgCls, cs2 = tcOpCases state h.effect_clauses dirtyOut in
 
   (* 3: Create the omega7 coercion (cast the whole handler) *)
+  let ty_ret_in, _ = trgRet.ty in
   let omega7, omegaCt7 =
     let allOps =
       trgCls |> Assoc.to_list
@@ -637,27 +603,28 @@ and tcHandler state (h : Untyped.handler) : tcExprOutput' =
 
   let handlerCo =
     Constraint.handlerCoercion
-      ( Constraint.bangCoercion (Constraint.reflTy alphaIn, omega7),
+      ( Constraint.bangCoercion (Constraint.reflTy ty_ret_in, omega7),
         Constraint.reflDirty dirtyOut )
   in
   let handTy, _ = handlerCo.ty in
   match handTy with
   | Type.Handler (inTy, outTy) ->
+      let trgRet', cnstr_ret = Term.cast_abstraction trgRet dirtyOut in
       let outExpr =
         Term.CastExp
           ( {
               term =
                 Term.Handler
                   {
-                    term = { effect_clauses = trgCls; value_clause = trgRet };
+                    term = { effect_clauses = trgCls; value_clause = trgRet' };
                     ty = (inTy, outTy);
                   };
               ty = handTy;
             },
             handlerCo )
       in
-      let outType = Type.Handler (dirtyIn, dirtyOut) in
-      let outCs = (omegaCt7 :: alphaInSkel :: alphaOutSkel :: cs1) @ cs2 in
+      let outType = Type.Handler ((ty_ret_in, deltaIn), dirtyOut) in
+      let outCs = ((omegaCt7 :: alphaOutSkel :: cnstr_ret) @ cs1) @ cs2 in
       (* 7, ain : skelin, aout : skelout && 1, 2, 6 && 3i, 4i, 5i *)
       ((outExpr, outType), outCs)
   | _ -> assert false

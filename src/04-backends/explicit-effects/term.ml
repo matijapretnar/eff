@@ -580,6 +580,10 @@ let cast_computation c dirty =
   let omega, cnstrs = Constraint.fresh_dirty_coer (c.ty, dirty) in
   (castComp (c, omega), cnstrs)
 
+let cast_abstraction { term = pat, cmp; _ } dirty =
+  let cmp', cnstrs = cast_computation cmp dirty in
+  (abstraction (pat, cmp'), cnstrs)
+
 (* ************************************************************************* *)
 (*                         FREE VARIABLE COMPUTATION                         *)
 (* ************************************************************************* *)
