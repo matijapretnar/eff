@@ -257,7 +257,10 @@ and check_pattern' state ty pat =
       | Some p, (Some in_ty, out_ty) when out_ty = ty ->
           let p', state' = check_pattern state in_ty p in
           (Term.PVariant (lbl, Some p'), state')
-      | _ -> assert false)
+      | _, (_, out_ty) ->
+          Error.typing ~loc:pat.at
+            "check_pattern: Variant output type %t does not match %t"
+            (Type.print_ty out_ty) (Type.print_ty ty))
   | _ ->
       Error.typing ~loc:pat.at "check_pattern: Unsupported pattern %t"
         (Untyped.print_pattern pat)
