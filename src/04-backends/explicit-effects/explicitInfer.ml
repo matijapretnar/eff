@@ -230,6 +230,10 @@ let rec check_pattern state ty (pat : Untyped.pattern) : Term.pattern * state =
 
 and check_pattern' state ty = function
   | Untyped.PVar x -> (Term.PVar x, extend_var state x ty)
+  | Untyped.PAnnotated (p, ty') when Type.source_to_target state.tydefs ty' = ty
+    ->
+      let p', state = check_pattern state ty p in
+      (p'.term, state)
   | Untyped.PNonbinding -> (Term.PNonbinding, state)
   | Untyped.PConst c when ty = Type.type_const c -> (Term.PConst c, state)
   | Untyped.PTuple ps -> (
@@ -254,7 +258,7 @@ and check_pattern' state ty = function
           | Untyped.PVar x ->
               (Term.PVariant (lbl, Some x), extend_var state x in_ty)
           | Untyped.PNonbinding -> (Term.PNonbinding, state)
-                        | _ ->
+          | _ ->
               failwith
                 "tcPattern: Only variables allowed in variant pattern matching")
       | _ -> failwith "Invalid type")
@@ -274,6 +278,10 @@ and infer_pattern' state :
   | Untyped.PVar x ->
       let alpha, alphaSkel = Constraint.fresh_ty_with_fresh_skel () in
       (Term.PVar x, alpha, extend_var state x alpha, [ alphaSkel ])
+  | Untyped.PAnnotated (p, ty) ->
+      let ty' = Type.source_to_target state.tydefs ty in
+      let p', state' = check_pattern state ty' p in
+      (p'.term, ty', state', [])
   | Untyped.PNonbinding ->
       let alpha, alphaSkel = Constraint.fresh_ty_with_fresh_skel () in
       (Term.PNonbinding, alpha, state, [ alphaSkel ])
@@ -294,7 +302,7 @@ and infer_pattern' state :
           | Untyped.PVar x ->
               (Term.PVariant (lbl, Some x), out_ty, extend_var state x in_ty, [])
           | Untyped.PNonbinding -> (Term.PNonbinding, out_ty, state, [])
-              | _ ->
+          | _ ->
               failwith
                 "tcPattern: Only variables allowed in variant pattern matching")
       | _ -> failwith "Invalid type")
