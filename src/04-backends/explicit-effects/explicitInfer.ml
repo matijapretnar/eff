@@ -420,6 +420,29 @@ and tcPattern' state :
       let ps', state', cnstrs = List.fold_right fold ps ([], state, []) in
       let p = Term.pTuple ps' in
       (p.term, p.ty, state', cnstrs)
+  | Untyped.PVariant (lbl, p) -> (
+      match TypeDefinitionContext.infer_variant lbl state.tydefs with
+      | None -> assert false
+      | Some variant -> (
+          match (p, variant) with
+          | None, (out_ty, None) ->
+              ( Term.PVariant (lbl, None),
+                Type.source_to_target state.tydefs out_ty,
+                state,
+                [] )
+          | Some p, (out_ty, Some v) -> (
+              match p.it with
+              | Untyped.PVar x ->
+                  ( Term.PVariant (lbl, Some x),
+                    Type.source_to_target state.tydefs out_ty,
+                    extend_var state x (Type.source_to_target state.tydefs v),
+                    [] )
+              | _ ->
+                  failwith
+                    "tcPattern: Only variables allowed in variant pattern \
+                     matching")
+          | _ -> failwith "Invalid type"))
+  
   (* GEORGE: TODO: Unhandled cases *)
   | _other_pattern ->
       failwith "tcPattern: Please no pattern matching in lambda abstractions!"
