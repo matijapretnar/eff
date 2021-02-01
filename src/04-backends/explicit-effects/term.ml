@@ -98,6 +98,10 @@ and abstraction2 = pattern * pattern * computation
 
 let var x ty = { term = Var x; ty }
 
+let fresh_variable x ty =
+  let x' = CoreTypes.Variable.fresh x in
+  (pVar x' ty, var x' ty)
+
 let const (_ : Language.Const.t) : expression = failwith __LOC__
 
 let tuple es =

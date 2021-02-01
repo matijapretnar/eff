@@ -151,15 +151,36 @@ and optimize_abstraction' state (pat, cmp) =
 and optimize_abstraction2 state (pat1, pat2, cmp) =
   (pat1, pat2, optimize_computation state cmp)
 
-and reduce_expression _state expr =
+and cast_expression state exp sub_exp coer =
+  match (sub_exp, coer.term) with
+  | _, _ when Constraint.is_trivial_ty_coercion coer -> exp
+  | exp, Constraint.ArrowCoercion (tcoer1, tcoer2) -> (
+      match exp.ty with
+      | Type.Arrow (ty1, _) ->
+          let pat_x, exp_x = Term.fresh_variable "x" ty1 in
+          let exp' =
+            Term.lambda
+              (Term.abstraction
+                 ( pat_x,
+                   Term.castComp
+                     (Term.apply (exp, Term.castExp (exp_x, tcoer1)), tcoer2) ))
+          in
+          optimize_expression state exp'
+      | _ -> assert false)
+  | _, _ -> exp
+
+and cast_computation _state cmp sub_cmp coer =
+  match (sub_cmp, coer.term) with
+  | _, _ when Constraint.is_trivial_dirty_coercion coer -> sub_cmp
+  | _, _ -> cmp
+
+and reduce_expression state expr =
   match expr.term with
-  | Term.CastExp (exp, tcoer) when Constraint.is_trivial_ty_coercion tcoer ->
-      exp
+  | Term.CastExp (sub_exp, tcoer) -> cast_expression state expr sub_exp tcoer
   | _ -> expr
 
-and reduce_computation _state comp =
+and reduce_computation state comp =
   match comp.term with
-  | Term.CastComp (cmp, dtcoer) when Constraint.is_trivial_dirty_coercion dtcoer
-    ->
-      cmp
+  | Term.CastComp (sub_cmp, dtcoer) ->
+      cast_computation state comp sub_cmp dtcoer
   | _ -> comp
