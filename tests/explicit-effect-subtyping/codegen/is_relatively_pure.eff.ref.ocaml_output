@@ -1,4 +1,0 @@
-[1mFile "./is_relatively_pure.eff.out", line 1, characters 11-17[0m:
-1 | type(_, _) effect += Op1 : (int, unit) effect 
-               [1;31m^^^^^^[0m
-[1;31mError[0m: Unbound type constructor effect

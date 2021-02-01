@@ -1,4 +1,0 @@
-[1mFile "./let_list_to_bind.eff.out", line 5, characters 16-28[0m:
-5 |    let _b_3 = ((coer_refl_ty) (_op_0 (* + *))) (x) in 
-                    [1;31m^^^^^^^^^^^^[0m
-[1;31mError[0m: Unbound value coer_refl_ty

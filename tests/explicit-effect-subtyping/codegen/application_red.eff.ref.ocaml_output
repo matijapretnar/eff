@@ -1,4 +1,0 @@
-[1mFile "./application_red.eff.out", line 3, characters 37-49[0m:
-3 | let x = fun (y: int) -> let _b_3 = ((coer_refl_ty) (_op_0 (* * *))) (y) in 
-                                         [1;31m^^^^^^^^^^^^[0m
-[1;31mError[0m: Unbound value coer_refl_ty

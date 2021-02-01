@@ -1,4 +1,0 @@
-[1mFile "./handler_beta_reduction.eff.out", line 1, characters 11-17[0m:
-1 | type(_, _) effect += Eff : (int, int) effect 
-               [1;31m^^^^^^[0m
-[1;31mError[0m: Unbound type constructor effect
