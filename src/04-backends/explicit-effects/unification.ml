@@ -131,7 +131,7 @@ let skel_eq_step sub paused rest_queue sk1 sk2 =
 
 let ty_omega_step sub paused cons rest_queue omega = function
   (* ω : A <= A *)
-  | x, y when Type.types_are_equal x y ->
+  | x, y when Type.equal_ty x y ->
       let k = omega in
       let v = Constraint.reflTy x in
       (Substitution.add_type_coercion k v sub, paused, rest_queue)

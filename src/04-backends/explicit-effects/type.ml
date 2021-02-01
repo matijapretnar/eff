@@ -185,169 +185,36 @@ let rec isMonoTy : ty -> bool = function
   | QualTy (_, _) -> false (* no qualification *)
   | QualDirt (_, _) -> false
 
-(* no qualification *)
-
-(* Check if a target type is a closed monotype. That is, no type variables, no
- * universal quantification and no qualified constraints, at the top-level or
- * in nested positions. *)
-let rec isClosedMonoTy : ty -> bool = function
-  | TyParam _ -> false
-  | Apply (_, tys) -> List.for_all isClosedMonoTy tys
-  | Arrow (vty, cty) -> isClosedMonoTy vty && isClosedDirtyTy cty
-  | Tuple tys -> List.for_all isClosedMonoTy tys
-  | Handler (cty1, cty2) -> isClosedDirtyTy cty1 && isClosedDirtyTy cty2
-  | TyBasic _ -> true
-  | QualTy (_, _) -> false (* no qualification *)
-  | QualDirt (_, _) -> false
-
-(* no qualification *)
-
-(* Check if a dirt is closed. That is, no dirt variables in it. *)
-and isClosedDirt (d : dirt) : bool =
-  match d.row with EmptyRow -> true | ParamRow _ -> false
-
-(* Check if a dirty type is closed. That is, if both the dirt and the value
- * type are closed. *)
-and isClosedDirtyTy : dirty -> bool = function
-  | ty, drt -> isClosedMonoTy ty && isClosedDirt drt
-
-(* ************************************************************************* *)
-(*                             VARIABLE RENAMING                             *)
-(* ************************************************************************* *)
-let rec rnSkelVarInSkel (oldS : SkelParam.t) (newS : SkelParam.t) :
-    skeleton -> skeleton = function
-  | SkelParam v -> if v = oldS then SkelParam newS else SkelParam v
-  | SkelBasic ty -> SkelBasic ty
-  | SkelArrow (s1, s2) ->
-      SkelArrow (rnSkelVarInSkel oldS newS s1, rnSkelVarInSkel oldS newS s2)
-  | SkelApply (tc, ss) -> SkelApply (tc, List.map (rnSkelVarInSkel oldS newS) ss)
-  | SkelHandler (s1, s2) ->
-      SkelHandler (rnSkelVarInSkel oldS newS s1, rnSkelVarInSkel oldS newS s2)
-  | SkelTuple ss -> SkelTuple (List.map (rnSkelVarInSkel oldS newS) ss)
-
-let rec rnSkelVarInValTy (oldS : SkelParam.t) (newS : SkelParam.t) : ty -> ty =
-  function
-  | TyParam (x, skel) -> TyParam (x, (rnSkelVarInSkel oldS newS) skel)
-  | Apply (tc, tys) -> Apply (tc, List.map (rnSkelVarInValTy oldS newS) tys)
-  | Arrow (tyA, tyB) ->
-      Arrow (rnSkelVarInValTy oldS newS tyA, rnSkelVarInCmpTy oldS newS tyB)
-  | Tuple tys -> Tuple (List.map (rnSkelVarInValTy oldS newS) tys)
-  | Handler (tyA, tyB) ->
-      Handler (rnSkelVarInCmpTy oldS newS tyA, rnSkelVarInCmpTy oldS newS tyB)
-  | TyBasic ty -> TyBasic ty
-  | QualTy (ct, ty) ->
-      QualTy (rnSkelVarInTyCt oldS newS ct, rnSkelVarInValTy oldS newS ty)
-  | QualDirt (ct, ty) -> QualDirt (ct, rnSkelVarInValTy oldS newS ty)
-
-(* GEORGE: No skeletons in dirts! :) *)
-and rnSkelVarInCmpTy (oldS : SkelParam.t) (newS : SkelParam.t) : dirty -> dirty
-    = function
-  | ty, drt -> (rnSkelVarInValTy oldS newS ty, drt)
-
-(* GEORGE: No skeletons in dirts! :) *)
-and rnSkelVarInTyCt (oldS : SkelParam.t) (newS : SkelParam.t) : ct_ty -> ct_ty =
-  function
-  | ty1, ty2 -> (rnSkelVarInValTy oldS newS ty1, rnSkelVarInValTy oldS newS ty2)
-
-(* ************************************************************************* *)
-(*                             VARIABLE RENAMING                             *)
-(* ************************************************************************* *)
-let rec rnTyVarInValTy (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t)
-    : ty -> ty = function
-  | TyParam (a, skel) ->
-      if a = oldA then TyParam (newA, skel) else TyParam (a, skel)
-  | Apply (tc, tys) -> Apply (tc, List.map (rnTyVarInValTy oldA newA) tys)
-  | Arrow (tyA, tyB) ->
-      Arrow (rnTyVarInValTy oldA newA tyA, rnTyVarInCmpTy oldA newA tyB)
-  | Tuple tys -> Tuple (List.map (rnTyVarInValTy oldA newA) tys)
-  | Handler (tyA, tyB) ->
-      Handler (rnTyVarInCmpTy oldA newA tyA, rnTyVarInCmpTy oldA newA tyB)
-  | TyBasic ty -> TyBasic ty
-  | QualTy (ct, ty) ->
-      QualTy (rnTyVarInTyCt oldA newA ct, rnTyVarInValTy oldA newA ty)
-  | QualDirt (ct, ty) -> QualDirt (ct, rnTyVarInValTy oldA newA ty)
-
-(* GEORGE: No skeletonsin dirts! :) *)
-and rnTyVarInCmpTy (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t) :
-    dirty -> dirty = function
-  | ty, drt -> (rnTyVarInValTy oldA newA ty, drt)
-
-(* GEORGE: No skeletons in dirts! :) *)
-and rnTyVarInTyCt (oldA : CoreTypes.TyParam.t) (newA : CoreTypes.TyParam.t) :
-    ct_ty -> ct_ty = function
-  | ty1, ty2 -> (rnTyVarInValTy oldA newA ty1, rnTyVarInValTy oldA newA ty2)
-
-(* ************************************************************************* *)
-(*                             VARIABLE RENAMING                             *)
-(* ************************************************************************* *)
-let rec rnDirtVarInValTy (oldD : DirtParam.t) (newD : DirtParam.t) : ty -> ty =
-  function
-  | TyParam (a, skel) -> TyParam (a, skel)
-  | Apply (tc, tys) -> Apply (tc, List.map (rnDirtVarInValTy oldD newD) tys)
-  | Arrow (tyA, tyB) ->
-      Arrow (rnDirtVarInValTy oldD newD tyA, rnDirtVarInCmpTy oldD newD tyB)
-  | Tuple tys -> Tuple (List.map (rnDirtVarInValTy oldD newD) tys)
-  | Handler (tyA, tyB) ->
-      Handler (rnDirtVarInCmpTy oldD newD tyA, rnDirtVarInCmpTy oldD newD tyB)
-  | TyBasic ty -> TyBasic ty
-  | QualTy (ct, ty) ->
-      QualTy (rnDirtVarInTyCt oldD newD ct, rnDirtVarInValTy oldD newD ty)
-  | QualDirt (ct, ty) ->
-      QualDirt (rnDirtVarInDirtCt oldD newD ct, rnDirtVarInValTy oldD newD ty)
-
-and rnDirtVarInCmpTy (oldD : DirtParam.t) (newD : DirtParam.t) : dirty -> dirty
-    = function
-  | ty, drt -> (rnDirtVarInValTy oldD newD ty, rnDirtVarInDirt oldD newD drt)
-
-and rnDirtVarInDirt (oldD : DirtParam.t) (newD : DirtParam.t) : dirt -> dirt =
-  function
-  | { effect_set = eff; row = EmptyRow } -> { effect_set = eff; row = EmptyRow }
-  | { effect_set = eff; row = ParamRow d } ->
-      if d = oldD then { effect_set = eff; row = ParamRow newD }
-      else { effect_set = eff; row = ParamRow d }
-
-and rnDirtVarInTyCt (oldD : DirtParam.t) (newD : DirtParam.t) : ct_ty -> ct_ty =
-  function
-  | ty1, ty2 -> (rnDirtVarInValTy oldD newD ty1, rnDirtVarInValTy oldD newD ty2)
-
-and rnDirtVarInDirtCt (oldD : DirtParam.t) (newD : DirtParam.t) :
-    ct_dirt -> ct_dirt = function
-  | d1, d2 -> (rnDirtVarInDirt oldD newD d1, rnDirtVarInDirt oldD newD d2)
-
-(* ************************************************************************* *)
-
-let rec types_are_equal type1 type2 =
+let rec equal_ty type1 type2 =
   match (type1, type2) with
   | TyParam (tv1, _skel1), TyParam (tv2, _skel2) -> tv1 = tv2
   | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
-      types_are_equal ttya1 ttyb1 && dirty_types_are_equal dirtya1 dirtyb1
-  | Tuple tys1, Tuple tys2 -> List.for_all2 types_are_equal tys1 tys2
+      equal_ty ttya1 ttyb1 && equal_dirty dirtya1 dirtyb1
+  | Tuple tys1, Tuple tys2 -> List.for_all2 equal_ty tys1 tys2
   | Apply (ty_name1, tys1), Apply (ty_name2, tys2) ->
-      ty_name1 = ty_name2 && List.for_all2 types_are_equal tys1 tys2
+      ty_name1 = ty_name2 && List.for_all2 equal_ty tys1 tys2
   | Handler (dirtya1, dirtya2), Handler (dirtyb1, dirtyb2) ->
-      dirty_types_are_equal dirtya1 dirtyb1
-      && dirty_types_are_equal dirtya2 dirtyb2
+      equal_dirty dirtya1 dirtyb1 && equal_dirty dirtya2 dirtyb2
   | TyBasic ptya, TyBasic ptyb -> ptya = ptyb
   | QualTy (ctty1, ty1), QualTy (ctty2, ty2) ->
-      ty_cts_are_equal ctty1 ctty2 && types_are_equal ty1 ty2
+      equal_ty_constraint ctty1 ctty2 && equal_ty ty1 ty2
   | QualDirt (ctd1, ty1), QualDirt (ctd2, ty2) ->
-      dirt_cts_are_equal ctd1 ctd2 && types_are_equal ty1 ty2
+      equal_dirt_constraint ctd1 ctd2 && equal_ty ty1 ty2
   | _ -> false
 
 (*       Error.typing ~loc:Location.unknown "%t <> %t" (print_ty ty1)
         (print_ty ty2)
  *)
-and dirty_types_are_equal (ty1, d1) (ty2, d2) =
-  types_are_equal ty1 ty2 && dirts_are_equal d1 d2
+and equal_dirty (ty1, d1) (ty2, d2) = equal_ty ty1 ty2 && equal_dirt d1 d2
 
-and dirts_are_equal d1 d2 =
+and equal_dirt d1 d2 =
   EffectSet.equal d1.effect_set d2.effect_set && d1.row = d2.row
 
-and ty_cts_are_equal (ty1, ty2) (ty3, ty4) =
-  types_are_equal ty1 ty3 && types_are_equal ty2 ty4
+and equal_ty_constraint (ty1, ty2) (ty3, ty4) =
+  equal_ty ty1 ty3 && equal_ty ty2 ty4
 
-and dirt_cts_are_equal (d1, d2) (d3, d4) =
-  dirts_are_equal d1 d3 && dirts_are_equal d2 d4
+and equal_dirt_constraint (d1, d2) (d3, d4) =
+  equal_dirt d1 d3 && equal_dirt d2 d4
 
 let no_effect_dirt dirt_param =
   { effect_set = EffectSet.empty; row = ParamRow dirt_param }
@@ -364,9 +231,6 @@ let pure_ty ty = (ty, empty_dirt)
 
 let add_effects effect_set drt =
   { drt with effect_set = EffectSet.union drt.effect_set effect_set }
-
-let remove_effects effect_set drt =
-  { drt with effect_set = EffectSet.diff drt.effect_set effect_set }
 
 (* ************************************************************************* *)
 (*                         FREE VARIABLE COMPUTATION                         *)
@@ -476,36 +340,3 @@ let constructor_signature tctx_st lbl =
   | Some (ty_out, ty_in) ->
       ( Option.map (source_to_target tctx_st) ty_in,
         source_to_target tctx_st ty_out )
-
-let apply_sub_to_skel _ _ _skel = failwith __LOC__
-
-let rec apply_sub_to_type ty_subs dirt_subs ty =
-  match ty with
-  | TyParam (p, skel) -> (
-      match Assoc.lookup p ty_subs with
-      | Some p' -> TyParam (p', apply_sub_to_skel ty_subs dirt_subs skel)
-      | None -> ty)
-  | Arrow (a, (b, d)) ->
-      Arrow
-        ( apply_sub_to_type ty_subs dirt_subs a,
-          (apply_sub_to_type ty_subs dirt_subs b, apply_sub_to_dirt dirt_subs d)
-        )
-  | Tuple ty_list ->
-      Tuple (List.map (fun x -> apply_sub_to_type ty_subs dirt_subs x) ty_list)
-  | Handler ((a, b), (c, d)) ->
-      Handler
-        ( (apply_sub_to_type ty_subs dirt_subs a, apply_sub_to_dirt dirt_subs b),
-          (apply_sub_to_type ty_subs dirt_subs c, apply_sub_to_dirt dirt_subs d)
-        )
-  | TyBasic _ -> ty
-  | Apply (ty_name, tys) ->
-      Apply (ty_name, List.map (apply_sub_to_type ty_subs dirt_subs) tys)
-  | _ -> failwith __LOC__
-
-and apply_sub_to_dirt dirt_subs drt =
-  match drt.row with
-  | ParamRow p -> (
-      match Assoc.lookup p dirt_subs with
-      | Some p' -> { drt with row = ParamRow p' }
-      | None -> drt)
-  | EmptyRow -> drt

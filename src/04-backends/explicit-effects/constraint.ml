@@ -36,11 +36,11 @@ type omega_ct =
 
 let is_trivial_ty_coercion omega =
   let ty1, ty2 = omega.ty in
-  Type.types_are_equal ty1 ty2
+  Type.equal_ty ty1 ty2
 
 let is_trivial_dirty_coercion omega =
   let drty1, drty2 = omega.ty in
-  Type.dirty_types_are_equal drty1 drty2
+  Type.equal_dirty drty1 drty2
 
 let reflTy ty = { term = ReflTy ty; ty = (ty, ty) }
 

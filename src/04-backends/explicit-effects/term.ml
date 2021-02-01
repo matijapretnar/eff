@@ -125,7 +125,7 @@ let handler h =
 
 let castExp (exp, coer) =
   let ty1 = exp.ty and ty1', ty2 = coer.ty in
-  assert (Type.types_are_equal ty1 ty1');
+  assert (Type.equal_ty ty1 ty1');
   { term = CastExp (exp, coer); ty = ty2 }
 
 let lambdaTyCoerVar (_ : Type.TyCoercionParam.t * expression) : expression =
@@ -144,7 +144,7 @@ let value exp = { term = Value exp; ty = Type.pure_ty exp.ty }
 
 let letVal (exp, abs) =
   let ty1, drty2 = abs.ty in
-  assert (Type.types_are_equal exp.ty ty1);
+  assert (Type.equal_ty exp.ty ty1);
   { term = LetVal (exp, abs); ty = drty2 }
 
 let letRec (defs, comp) = { term = LetRec (defs, comp); ty = comp.ty }
@@ -154,14 +154,14 @@ let match_ (e, cases) drty = { term = Match (e, cases); ty = drty }
 let apply (exp1, exp2) =
   match exp1.ty with
   | Type.Arrow (ty1, drty2) ->
-      assert (Type.types_are_equal exp2.ty ty1);
+      assert (Type.equal_ty exp2.ty ty1);
       { term = Apply (exp1, exp2); ty = drty2 }
   | _ -> assert false
 
 let handle (exp, comp) =
   match exp.ty with
   | Type.Handler (drty1, drty2) ->
-      assert (Type.dirty_types_are_equal comp.ty drty1);
+      assert (Type.equal_dirty comp.ty drty1);
       { term = Handle (exp, comp); ty = drty2 }
   | _ -> assert false
 
@@ -172,13 +172,13 @@ let op (_ : effect * expression) : computation = failwith __LOC__
 
 let bind (comp1, abs2) =
   let ty1, drt1 = comp1.ty and ty2, ((_, drt2) as drty2) = abs2.ty in
-  assert (Type.types_are_equal ty1 ty2);
-  assert (Type.dirts_are_equal drt1 drt2);
+  assert (Type.equal_ty ty1 ty2);
+  assert (Type.equal_dirt drt1 drt2);
   { term = Bind (comp1, abs2); ty = drty2 }
 
 let castComp (cmp, coer) =
   let drty1 = cmp.ty and drty1', drty2 = coer.ty in
-  assert (Type.dirty_types_are_equal drty1 drty1');
+  assert (Type.equal_dirty drty1 drty1');
   { term = CastComp (cmp, coer); ty = drty2 }
 
 let abstraction (p, c) : abstraction = { term = (p, c); ty = (p.ty, c.ty) }
