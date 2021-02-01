@@ -153,7 +153,8 @@ and elab_expression' exp =
       else
         let _, (_ty, dirt) = h.term.value_clause.ty in
         if ExEffTypes.is_empty_dirt dirt (* Handler - Case 2 *) then
-          let subst_cont_effect ((eff, (ty1, ty2)), (p1, p2, comp)) =
+          let subst_cont_effect ((eff, (ty1, ty2)), { term = p1, p2, comp; _ })
+              =
             let elab1 = elab_ty ty1 in
             let elab2 = elab_ty ty2 in
             let elabcomp = elab_computation comp in
@@ -181,7 +182,8 @@ and elab_expression' exp =
                   (Assoc.to_list h.term.effect_clauses);
             } (* Handler - Case 3 *)
         else
-          let elab_effect_clause ((eff, (ty1, ty2)), (p1, p2, comp)) =
+          let elab_effect_clause ((eff, (ty1, ty2)), { term = p1, p2, comp; _ })
+              =
             let elab1 = elab_ty ty1 in
             let elab2 = elab_ty ty2 in
             let elabcomp = elab_computation comp in

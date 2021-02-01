@@ -142,6 +142,9 @@ and apply_sub_dirty_ty sub (ty, drt) =
 and apply_sub_abs_ty sub (ty, drty) =
   (apply_sub_ty sub ty, apply_sub_dirty_ty sub drty)
 
+and apply_sub_abs2_ty sub (ty1, ty2, drty) =
+  (apply_sub_ty sub ty1, apply_sub_ty sub ty2, apply_sub_dirty_ty sub drty)
+
 and apply_sub_ct_ty sub (ty1, ty2) = (apply_sub_ty sub ty1, apply_sub_ty sub ty2)
 
 and apply_sub_ct_dirt sub (drt1, drt2) =
@@ -253,7 +256,10 @@ and apply_sub_pat sub { term = p; ty } = { term = p; ty = apply_sub_ty sub ty }
 
 and apply_sub_letrec_abs sub (f, abs) = (f, apply_sub_abs sub abs)
 
-and apply_sub_abs2 sub (p1, p2, c) = (p1, p2, apply_sub_comp sub c)
+and apply_sub_abs2 sub abs2 =
+  { term = apply_sub_abs2' sub abs2.term; ty = apply_sub_abs2_ty sub abs2.ty }
+
+and apply_sub_abs2' sub (p1, p2, c) = (p1, p2, apply_sub_comp sub c)
 
 and apply_sub_handler sub h =
   let drty1, drty2 = h.ty in

@@ -148,7 +148,10 @@ and optimize_abstraction state abs =
 and optimize_abstraction' state (pat, cmp) =
   (pat, optimize_computation state cmp)
 
-and optimize_abstraction2 state (pat1, pat2, cmp) =
+and optimize_abstraction2 state abs2 =
+  { abs2 with term = optimize_abstraction2' state abs2.term }
+
+and optimize_abstraction2' state (pat1, pat2, cmp) =
   (pat1, pat2, optimize_computation state cmp)
 
 and cast_expression state exp sub_exp coer =

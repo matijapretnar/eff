@@ -94,7 +94,8 @@ and letrec_abstraction = variable * abstraction
 (** LetRec Abstractions: function name, result type, pattern,
     and right-hand side *)
 
-and abstraction2 = pattern * pattern * computation
+and abstraction2 =
+  (pattern * pattern * computation, Type.ty * Type.ty * Type.dirty) typed
 (** Abstractions that take two arguments. *)
 
 let var x ty = { term = Var x; ty }
@@ -182,7 +183,8 @@ let castComp (cmp, coer) =
 
 let abstraction (p, c) : abstraction = { term = (p, c); ty = (p.ty, c.ty) }
 
-let abstraction2 p1 p2 c : abstraction2 = (p1, p2, c)
+let abstraction2 (p1, p2, c) : abstraction2 =
+  { term = (p1, p2, c); ty = (p1.ty, p2.ty, c.ty) }
 
 let print_effect (eff, _) ppf =
   Print.print ppf "Effect_%t" (CoreTypes.Effect.print eff)
@@ -297,7 +299,7 @@ and print_abstraction { term = p, c; _ } ppf =
   Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern p) (Type.print_ty p.ty)
     (print_computation c)
 
-and print_abstraction2 (p1, p2, c) ppf =
+and print_abstraction2 { term = p1, p2, c; _ } ppf =
   Format.fprintf ppf "(fun %t %t -> %t)" (print_pattern p1) (print_pattern p2)
     (print_computation c)
 
@@ -381,9 +383,9 @@ and subst_abs sbst { term = p, c; ty = absty } =
   (* XXX We should assert that p & sbst have disjoint variables *)
   { term = (p, subst_comp sbst c); ty = absty }
 
-and subst_abs2 sbst (p1, p2, c) =
+and subst_abs2 sbst { term = p1, p2, c; ty = absty } =
   (* XXX We should assert that p1, p2 & sbst have disjoint variables *)
-  (p1, p2, subst_comp sbst c)
+  { term = (p1, p2, subst_comp sbst c); ty = absty }
 
 let assoc_equal eq flds flds' : bool =
   let rec equal_fields flds =
@@ -466,7 +468,7 @@ and alphaeq_abs eqvars { term = p, c; _ } { term = p', c'; _ } =
   | Some eqvars' -> alphaeq_comp eqvars' c c'
   | None -> false
 
-and alphaeq_abs2 eqvars (p1, p2, c) (p1', p2', c') =
+and alphaeq_abs2 eqvars { term = p1, p2, c; _ } { term = p1', p2', c'; _ } =
   (* alphaeq_abs eqvars (a22a a2) (a22a a2') *)
   match make_equal_pattern eqvars p1 p1' with
   | Some eqvars' -> (
@@ -567,7 +569,7 @@ and free_vars_abs { term = p, c; _ } =
   let inside, outside = free_vars_comp c --- pattern_vars p in
   (inside @ outside, [])
 
-and free_vars_abs2 (p1, p2, c) =
+and free_vars_abs2 { term = p1, p2, c; _ } =
   let inside, outside =
     free_vars_comp c --- pattern_vars p2 --- pattern_vars p1
   in

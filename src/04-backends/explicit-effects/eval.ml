@@ -134,7 +134,7 @@ and veval state e =
 and eval_handler state
     { term = { Term.effect_clauses = ops; Term.value_clause = value }; _ } =
   let eval_op ((eff, _), a2) =
-    let p, kvar, c = a2 in
+    let p, kvar, c = a2.term in
     let f u k = eval_closure (extend kvar (V.Closure k) state) (p, c) u in
     (eff, f)
   in
