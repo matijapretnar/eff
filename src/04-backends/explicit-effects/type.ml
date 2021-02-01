@@ -474,10 +474,8 @@ let constructor_signature tctx_st lbl =
   match TypeContext.infer_variant lbl tctx_st with
   | None -> assert false
   | Some (ty_out, ty_in) ->
-      let ty_in =
-        match ty_in with Some ty_in -> ty_in | None -> LangType.Tuple []
-      in
-      (source_to_target tctx_st ty_in, source_to_target tctx_st ty_out)
+      ( Option.map (source_to_target tctx_st) ty_in,
+        source_to_target tctx_st ty_out )
 
 let apply_sub_to_skel _ _ _skel = failwith __LOC__
 

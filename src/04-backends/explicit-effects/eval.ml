@@ -31,8 +31,9 @@ let rec extend_value p v state =
       in
       try Assoc.fold_left extender state ps
       with Not_found -> raise (PatternMatch Location.unknown))
-  | Term.PVariant (lbl, p), V.Variant (lbl', v) when lbl = lbl' ->
-      extend_value p v state
+  | Term.PVariant (lbl, None), V.Variant (lbl', None) when lbl = lbl' -> state
+  | Term.PVariant (lbl, Some x), V.Variant (lbl', Some v) when lbl = lbl' ->
+      update x v state
   | Term.PConst c, V.Const c' when Const.equal c c' -> state
   | _, _ -> raise (PatternMatch Location.unknown)
 
@@ -118,7 +119,7 @@ and veval state e =
   (* | Term.Annotated (t, _ty) -> veval state t *)
   | Term.Tuple es -> V.Tuple (List.map (veval state) es)
   | Term.Record es -> V.Record (Assoc.map (fun e -> veval state e) es)
-  | Term.Variant (lbl, e) -> V.Variant (lbl, veval state e)
+  | Term.Variant (lbl, e) -> V.Variant (lbl, Option.map (veval state) e)
   | Term.Lambda a -> V.Closure (eval_closure state a.term)
   | Term.Effect (eff, _) ->
       V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))

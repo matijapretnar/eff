@@ -3,6 +3,7 @@ module Config = Config
 module Error = Error
 module List = List
 module Location = Location
+module Option = Option
 module Print = Print
 module Symbol = Symbol
 module Symbols = Symbols

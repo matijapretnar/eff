@@ -6,7 +6,7 @@ type value =
   | Const of Const.t
   | Tuple of value list
   | Record of (CoreTypes.Field.t, value) Assoc.t
-  | Variant of CoreTypes.Label.t * value
+  | Variant of CoreTypes.Label.t * value option
   | Closure of closure
   | TypeCoercionClosure of (Type.ct_ty -> value)
   | DirtCoercionClosure of (Type.ct_dirt -> value)
@@ -48,9 +48,8 @@ let rec print_value ?max_level v ppf =
   | Const c -> Const.print c ppf
   | Tuple lst -> Print.tuple print_value lst ppf
   | Record assoc -> Print.record CoreTypes.Field.print print_value assoc ppf
-  | Variant (lbl, Tuple [ v1; v2 ]) when lbl = CoreTypes.cons ->
-      print "[@[<hov>@[%t@]%t@]]" (print_value v1) (list v2)
-  | Variant (lbl, v) ->
+  | Variant (lbl, None) -> print ~at_level:1 "%t" (CoreTypes.Label.print lbl)
+  | Variant (lbl, Some v) ->
       print ~at_level:1 "%t @[<hov>%t@]"
         (CoreTypes.Label.print lbl)
         (print_value v)
@@ -58,15 +57,6 @@ let rec print_value ?max_level v ppf =
   | Handler _ -> print "<handler>"
   | TypeCoercionClosure _ -> print "<ty_coercion>"
   | DirtCoercionClosure _ -> print "<dir_coercion>"
-
-and list ?(max_length = 299) v ppf =
-  if max_length > 1 then
-    match v with
-    | Variant (lbl, Tuple [ v1; v2 ]) when lbl = CoreTypes.cons ->
-        Format.fprintf ppf ";@ %t%t" (print_value v1)
-          (list ~max_length:(max_length - 1) v2)
-    | _ -> assert false
-  else Format.fprintf ppf ";@ ..."
 
 let print_result r ppf =
   match r with

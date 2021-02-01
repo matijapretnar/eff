@@ -17,7 +17,7 @@ and pattern' =
   | PAs of pattern * variable
   | PTuple of pattern list
   | PRecord of (CoreTypes.Field.t, pattern) Assoc.t
-  | PVariant of CoreTypes.Label.t * pattern
+  | PVariant of CoreTypes.Label.t * variable option
   | PConst of Language.Const.t
   | PNonbinding
 
@@ -32,7 +32,8 @@ let rec pattern_vars pat =
   | PAs (p, x) -> x :: pattern_vars p
   | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
   | PRecord lst -> Assoc.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
-  | PVariant (_, p) -> pattern_vars p
+  | PVariant (_, None) -> []
+  | PVariant (_, Some x) -> [ x ]
   | PConst _ -> []
   | PNonbinding -> []
 
@@ -44,7 +45,7 @@ and expression' =
   | Const of Language.Const.t
   | Tuple of expression list
   | Record of (CoreTypes.Field.t, expression) Assoc.t
-  | Variant of CoreTypes.Label.t * expression
+  | Variant of CoreTypes.Label.t * expression option
   | Lambda of abstraction
   | Effect of effect
   | Handler of handler
@@ -196,10 +197,11 @@ let rec print_pattern ?max_level p ppf =
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
   | PRecord lst -> Print.record CoreTypes.Field.print print_pattern lst ppf
-  | PVariant (lbl, p) ->
+  | PVariant (lbl, None) -> print ~at_level:1 "(%t)" (CoreTypes.Label.print lbl)
+  | PVariant (lbl, Some p) ->
       print ~at_level:1 "(%t @[<hov>%t@])"
         (CoreTypes.Label.print lbl)
-        (print_pattern p)
+        (print_variable p)
   | PNonbinding -> print "_"
 
 let rec print_expression ?max_level e ppf =
@@ -209,7 +211,8 @@ let rec print_expression ?max_level e ppf =
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record lst -> Print.record CoreTypes.Field.print print_expression lst ppf
-  | Variant (lbl, e) ->
+  | Variant (lbl, None) -> print ~at_level:1 "%t" (CoreTypes.Label.print lbl)
+  | Variant (lbl, Some e) ->
       print ~at_level:1 "%t %t" (CoreTypes.Label.print lbl) (print_expression e)
   | Lambda { term = x, c; _ } ->
       print "fun (%t:%t) -> (%t)" (print_pattern x) (Type.print_ty x.ty)
@@ -331,7 +334,7 @@ and subst_expr' sbst = function
   | Handler h -> Handler (subst_handler sbst h)
   | Tuple es -> Tuple (List.map (subst_expr sbst) es)
   | Record flds -> Record (Assoc.map (subst_expr sbst) flds)
-  | Variant (lbl, e) -> Variant (lbl, subst_expr sbst e)
+  | Variant (lbl, e) -> Variant (lbl, Option.map (subst_expr sbst) e)
   | (Const _ | Effect _) as e -> e
   | CastExp (e, tyco) -> CastExp (subst_expr sbst e, tyco)
   | LambdaTyCoerVar (tycovar, e) -> LambdaTyCoerVar (tycovar, subst_expr sbst e)
@@ -408,8 +411,8 @@ let rec make_equal_pattern eqvars p p' =
         ps ps' (Some eqvars)
   | PConst cst, PConst cst' when Const.equal cst cst' -> Some eqvars
   | PNonbinding, PNonbinding -> Some eqvars
-  | PVariant (lbl, p), PVariant (lbl', p') when lbl = lbl' ->
-      make_equal_pattern eqvars p p'
+  | PVariant (lbl, Some x), PVariant (lbl', Some x') when lbl = lbl' ->
+      Some ((x, x') :: eqvars)
   | _, _ -> None
 
 let rec alphaeq_expr eqvars e e' =
@@ -419,7 +422,8 @@ let rec alphaeq_expr eqvars e e' =
   | Handler h, Handler h' -> alphaeq_handler eqvars h h'
   | Tuple es, Tuple es' -> List.for_all2 (alphaeq_expr eqvars) es es'
   | Record flds, Record flds' -> assoc_equal (alphaeq_expr eqvars) flds flds'
-  | Variant (lbl, e), Variant (lbl', e') ->
+  | Variant (lbl, None), Variant (lbl', None) -> lbl = lbl'
+  | Variant (lbl, Some e), Variant (lbl', Some e') ->
       lbl = lbl' && alphaeq_expr eqvars e e'
   | Const cst, Const cst' -> Const.equal cst cst'
   | Effect eff, Effect eff' -> eff = eff'
@@ -497,8 +501,9 @@ let pattern_match p e =
               extend_record ps es (extend_subst p e sbst)
         in
         extend_record (Assoc.to_list ps) (Assoc.to_list es) sbst
-    | PVariant (lbl, p), Variant (lbl', e) when lbl = lbl' ->
-        extend_subst p e sbst
+    | PVariant (lbl, None), Variant (lbl', None) when lbl = lbl' -> sbst
+    | PVariant (lbl, Some x), Variant (lbl', Some e) when lbl = lbl' ->
+        Assoc.update x e.term sbst
     | PConst c, Const c' when Const.equal c c' -> sbst
     | _, _ -> assert false
   in
@@ -542,7 +547,7 @@ and free_vars_expr e =
   | Handler h -> free_vars_handler h
   | Record flds ->
       Assoc.values_of flds |> List.map free_vars_expr |> concat_vars
-  | Variant (_, e) -> free_vars_expr e
+  | Variant (_, e) -> Option.default_map ([], []) free_vars_expr e
   | CastExp (e', _tyco) -> free_vars_expr e'
   | Effect _ | Const _ -> ([], [])
   | LambdaTyCoerVar _ -> failwith __LOC__
@@ -601,7 +606,8 @@ and free_params_expression' e =
         (fun free e -> Type.FreeParams.union free (free_params_expression e))
         Type.FreeParams.empty es
   | Record _ -> failwith __LOC__
-  | Variant (_, e) -> free_params_expression e
+  | Variant (_, e) ->
+      Option.default_map Type.FreeParams.empty free_params_expression e
   | Lambda abs -> free_params_abstraction abs
   | Effect _ -> Type.FreeParams.empty
   | Handler h -> free_params_abstraction h.term.value_clause

@@ -85,7 +85,8 @@ let rec compare v1 v2 =
       | V.Const _ | V.Tuple _ | V.Record _ -> Greater
       | V.Variant (lbl', u') ->
           let r = Stdlib.compare lbl lbl' in
-          if r < 0 then Less else if r > 0 then Greater else compare u u')
+          if r < 0 then Less else if r > 0 then Greater else compare_option u u'
+      )
 
 and compare_list lst1 lst2 =
   match (lst1, lst2) with

@@ -230,7 +230,7 @@ and apply_sub_exp' sub expression =
   | Var v -> Var v
   | Const c -> Const c
   | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
-  | Variant (lbl, e1) -> Variant (lbl, apply_sub_exp sub e1)
+  | Variant (lbl, e1) -> Variant (lbl, Option.map (apply_sub_exp sub) e1)
   | Lambda abs -> Lambda (apply_sub_abs sub abs)
   | Effect eff -> Effect eff
   | Handler h -> Handler (apply_sub_handler sub h)

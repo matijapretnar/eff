@@ -251,16 +251,17 @@ and checkPatTy' (state : state) (pat : Untyped.plain_pattern) (patTy : Type.ty)
   (* Nullary Constructor Case *)
   | Untyped.PVariant (lbl, None) ->
       let ty_in, ty_out = Type.constructor_signature state.tydefs lbl in
-      if ty_in = Type.Tuple [] && patTy = ty_out then
-        (Term.PVariant (lbl, Term.pTuple []), state)
+      if ty_in = None && patTy = ty_out then (Term.PVariant (lbl, None), state)
       else failwith "checkPatTy: PVariant(None)"
   (* Unary Constructor Case *)
-  | Untyped.PVariant (lbl, Some p) ->
-      let ty_in, ty_out = Type.constructor_signature state.tydefs lbl in
-      if patTy = ty_out then
-        let p', state' = checkLocatedPatTy state p ty_in in
-        (Term.PVariant (lbl, p'), state')
-      else failwith "checkPatTy: PVariant(Some)"
+  | Untyped.PVariant (lbl, Some p) -> (
+      match p.it with
+      | Untyped.PVar x -> (
+          match Type.constructor_signature state.tydefs lbl with
+          | Some ty_in, ty_out when ty_out = patTy ->
+              (Term.PVariant (lbl, Some x), extend_var state x ty_in)
+          | _ -> failwith "checkPatTy: PVariant(Some)")
+      | _ -> failwith "Only variables supported in variant patterns")
   (* Constant Case *)
   | Untyped.PConst c ->
       if patTy = Type.type_const c then (Term.PConst c, state)
@@ -304,17 +305,17 @@ let rec inferClosedPatTy state : Untyped.plain_pattern -> Type.ty option =
   function
   | Untyped.PVar _ -> None
   | Untyped.PNonbinding -> None
-  | Untyped.PVariant (lbl, None) ->
-      let ty_in, ty_out = Type.constructor_signature state.tydefs lbl in
-      if ty_in = Type.Tuple [] && Type.isClosedMonoTy ty_out then (
-        assert (Type.isClosedMonoTy ty_out);
-        Some ty_out)
-      else failwith "inferClosedPatTy: PVariant(None)"
-  | Untyped.PVariant (lbl, Some p) ->
-      let ty_in, ty_out = Type.constructor_signature state.tydefs lbl in
-      checkLocatedClosedPatTy state p ty_in;
-      assert (Type.isClosedMonoTy ty_out);
-      Some ty_out
+  | Untyped.PVariant (lbl, None) -> (
+      match Type.constructor_signature state.tydefs lbl with
+      | None, ty_out when Type.isClosedMonoTy ty_out -> Some ty_out
+      | _ -> failwith "inferClosedPatTy: PVariant(None)")
+  | Untyped.PVariant (lbl, Some p) -> (
+      match Type.constructor_signature state.tydefs lbl with
+      | Some ty_in, ty_out when Type.isClosedMonoTy ty_out ->
+          checkLocatedClosedPatTy state p ty_in;
+          assert (Type.isClosedMonoTy ty_out);
+          Some ty_out
+      | _ -> failwith "inferClosedPatTy: PVariant(None)")
   | Untyped.PConst c -> Some (Type.type_const c)
   | Untyped.PAs (p, _) -> inferLocatedClosedPatTy state p
   | Untyped.PTuple l ->
@@ -343,14 +344,15 @@ and checkClosedPatTy state (inpat : Untyped.plain_pattern) (patTy : Type.ty) :
   match inpat with
   | Untyped.PVar _ -> () (* Always possible *)
   | Untyped.PNonbinding -> () (* Always possible *)
-  | Untyped.PVariant (lbl, None) ->
-      let ty_in, ty_out = Type.constructor_signature state.tydefs lbl in
-      if ty_in = Type.Tuple [] && patTy = ty_out then ()
-      else failwith "checkClosedPatTy: PVariant(None)"
-  | Untyped.PVariant (lbl, Some p) ->
-      let ty_in, ty_out = Type.constructor_signature state.tydefs lbl in
-      if patTy = ty_out then checkLocatedClosedPatTy state p ty_in
-      else failwith "checkClosedPatTy: PVariant(Some)"
+  | Untyped.PVariant (lbl, None) -> (
+      match Type.constructor_signature state.tydefs lbl with
+      | None, ty_out when ty_out = patTy -> ()
+      | _ -> failwith "checkClosedPatTy: PVariant(None)")
+  | Untyped.PVariant (lbl, Some p) -> (
+      match Type.constructor_signature state.tydefs lbl with
+      | Some ty_in, ty_out when ty_out = patTy ->
+          checkLocatedClosedPatTy state p ty_in
+      | _ -> failwith "checkClosedPatTy: PVariant(Some)")
   | Untyped.PConst c ->
       if patTy = Type.type_const c then ()
       else failwith "checkClosedPatTy: PConst"
@@ -480,14 +482,14 @@ and tcRecord (_state : state) (_lst : (field, Untyped.expression) Assoc.t) :
 (* Variants *)
 and tcVariant state ((lbl, mbe) : label * Untyped.expression option) :
     tcExprOutput' =
-  let ty_in, ty_out = Type.constructor_signature state.tydefs lbl in
-  match mbe with
-  | None -> ((Term.Variant (lbl, Term.tuple []), ty_out), [])
-  | Some e ->
+  match (Type.constructor_signature state.tydefs lbl, mbe) with
+  | (None, ty_out), None -> ((Term.Variant (lbl, None), ty_out), [])
+  | (Some ty_in, ty_out), Some e ->
       let e', cs1 = tcExpr state e in
       (* GEORGE: Investigate how cast_expression works *)
       let castExp, castCt = Term.cast_expression e' ty_in in
-      ((Term.Variant (lbl, castExp), ty_out), castCt :: cs1)
+      ((Term.Variant (lbl, Some castExp), ty_out), castCt :: cs1)
+  | _, _ -> failwith "tcVariant"
 
 and tcAbstraction state (pat, cmp) =
   let pat', state', cnstrs1 = tcPattern state pat in
