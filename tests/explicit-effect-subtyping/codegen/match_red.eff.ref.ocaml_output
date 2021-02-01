@@ -1,0 +1,4 @@
+[1mFile "./match_red.eff.out", line 1, characters 24-36[0m:
+1 | let x = true in (match (coer_refl_ty) (x) with  true -> 1 |  _ -> 2)
+                            [1;31m^^^^^^^^^^^^[0m
+[1;31mError[0m: Unbound value coer_refl_ty

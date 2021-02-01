@@ -1,4 +1,4 @@
-[1mFile "./application_red.eff.out", line 94, characters 75-77[0m:
-94 |                             ((coer_refl_ty) ((_b_3) ((coer_refl_ty) (2)))) in 
-                                                                                [1;31m^^[0m
+[1mFile "./application_red.eff.out", line 4, characters 53-55[0m:
+4 |                          ((coer_refl_ty) (_b_3)) (2) in 
+                                                         [1;31m^^[0m
 [1;31mError[0m: Syntax error

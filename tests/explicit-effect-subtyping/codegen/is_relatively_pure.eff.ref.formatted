@@ -1,3 +1,29 @@
-ocamlformat: ignoring "is_relatively_pure.eff.out" (syntax error)
-File "is_relatively_pure.eff.out", line 1, characters 12-13:
-Error: Syntax error
+type (_, _) effect += Op1 : (int, unit) effect
+
+type (_, _) effect += Op2 : (int, unit) effect
+
+;;
+((coer_handler (coer_computation coer_refl_ty) (coer_computation coer_refl_ty))
+   ((coer_handler
+       (coer_computation coer_refl_ty)
+       (coer_computation coer_refl_ty))
+      (handler
+         {
+           value_clause =
+             (fun (_x_2 : unit) ->
+               (coer_return coer_refl_ty)
+                 (let x = _x_2 in
+                  x));
+           effect_clauses =
+             (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+               match eff with
+               | Op2 ->
+                   fun n l ->
+                     ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
+                        ((coer_arrow coer_refl_ty
+                            (coer_computation coer_refl_ty))
+                           l))
+                       ()
+               | eff' -> fun arg k -> Call (eff', arg, k));
+         })))
+  ((coer_refl_ty (effect Op1)) 1)

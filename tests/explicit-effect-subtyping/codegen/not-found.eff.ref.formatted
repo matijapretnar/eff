@@ -1,5 +1,32 @@
-ocamlformat: ignoring "not-found.eff.out" (syntax error)
-File "not-found.eff.out", line 98, characters 49-51:
-Error: Syntax error: '}' expected
-File "not-found.eff.out", line 98, characters 23-24:
-  This '{' might be unmatched
+type (_, _) effect += Op1 : (int, int) effect
+
+;;
+(coer_unsafe (*unsafe*) coer_refl_ty)
+  (((coer_handler
+       (coer_computation coer_refl_ty)
+       (coer_computation coer_refl_ty))
+      ((coer_handler
+          (coer_computation coer_refl_ty)
+          (coer_computation coer_refl_ty))
+         (handler
+            {
+              value_clause =
+                (fun (_x_2 : int) ->
+                  Value
+                    (let x = _x_2 in
+                     x));
+              effect_clauses =
+                (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+                  match eff with
+                  | Op1 ->
+                      fun x l ->
+                        Value
+                          ((coer_refl_ty
+                              (coer_refl_ty
+                                 ((coer_arrow coer_refl_ty
+                                     (coer_unsafe (*unsafe*) coer_refl_ty))
+                                    l)))
+                             11)
+                  | eff' -> fun arg k -> Call (eff', arg, k));
+            })))
+     ((coer_refl_ty (effect Op1)) 5))

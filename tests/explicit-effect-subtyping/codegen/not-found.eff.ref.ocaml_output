@@ -1,8 +1,4 @@
-[1mFile "./not-found.eff.out", line 98, characters 49-51[0m:
-98 |               (handler {value_clause = (y : int) -> (coer_refl_ty) 
-                                                      [1;31m^^[0m
-[1;31mError[0m: Syntax error: '}' expected
-[1mFile "./not-found.eff.out", line 98, characters 23-24[0m:
-98 |               (handler {value_clause = (y : int) -> (coer_refl_ty) 
-                            [1;31m^[0m
-  This '{' might be unmatched
+[1mFile "./not-found.eff.out", line 1, characters 11-17[0m:
+1 | type(_, _) effect += Op1 : (int, int) effect 
+               [1;31m^^^^^^[0m
+[1;31mError[0m: Unbound type constructor effect

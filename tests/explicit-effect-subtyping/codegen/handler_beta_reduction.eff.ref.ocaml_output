@@ -1,8 +1,4 @@
-[1mFile "./handler_beta_reduction.eff.out", line 105, characters 27-29[0m:
-105 |                       _b_9 -> (coer_computation (coer_refl_ty)) 
-                                 [1;31m^^[0m
-[1;31mError[0m: Syntax error: ')' expected
-[1mFile "./handler_beta_reduction.eff.out", line 104, characters 80-81[0m:
-104 |                            ((coer_refl_ty) ((_b_10) ((coer_refl_ty) (3)))))) >> (
-                                                                                      [1;31m^[0m
-  This '(' might be unmatched
+[1mFile "./handler_beta_reduction.eff.out", line 1, characters 11-17[0m:
+1 | type(_, _) effect += Eff : (int, int) effect 
+               [1;31m^^^^^^[0m
+[1;31mError[0m: Unbound type constructor effect

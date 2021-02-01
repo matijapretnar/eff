@@ -1,3 +1,9 @@
-ocamlformat: ignoring "test-handle_effect_skip.eff.out" (syntax error)
-File "test-handle_effect_skip.eff.out", line 1, characters 11-12:
-Error: Syntax error
+type (_, _) effect += Print : (string, unit) effect
+
+;;
+((coer_handler (coer_computation coer_refl_ty) (coer_computation coer_refl_ty))
+   ((coer_handler
+       (coer_computation coer_refl_ty)
+       (coer_computation coer_refl_ty)) (fun (_x_0 : unit) ->
+        (coer_return coer_refl_ty) (match coer_refl_ty _x_0 with _ -> 42))))
+  ((coer_refl_ty (effect Print)) "hello\n")

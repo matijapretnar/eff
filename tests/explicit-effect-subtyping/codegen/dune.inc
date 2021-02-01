@@ -7,7 +7,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./application_red.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./application_red.eff")))))
 
 (rule
  (deps "application_red.eff.out")
@@ -52,7 +52,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./handle_match.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./handle_match.eff")))))
 
 (rule
  (deps "handle_match.eff.out")
@@ -97,7 +97,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./handle_rec.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./handle_rec.eff")))))
 
 (rule
  (deps "handle_rec.eff.out")
@@ -142,7 +142,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./handler_beta_reduction.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./handler_beta_reduction.eff")))))
 
 (rule
  (deps "handler_beta_reduction.eff.out")
@@ -187,7 +187,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./is_relatively_pure.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./is_relatively_pure.eff")))))
 
 (rule
  (deps "is_relatively_pure.eff.out")
@@ -232,7 +232,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./let_list_to_bind.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./let_list_to_bind.eff")))))
 
 (rule
  (deps "let_list_to_bind.eff.out")
@@ -277,7 +277,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./match_red.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./match_red.eff")))))
 
 (rule
  (deps "match_red.eff.out")
@@ -322,7 +322,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./not-found.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./not-found.eff")))))
 
 (rule
  (deps "not-found.eff.out")
@@ -367,7 +367,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./one_input.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./one_input.eff")))))
 
 (rule
  (deps "one_input.eff.out")
@@ -412,7 +412,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./substitution.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./substitution.eff")))))
 
 (rule
  (deps "substitution.eff.out")
@@ -457,7 +457,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./test-handle_effect_skip.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./test-handle_effect_skip.eff")))))
 
 (rule
  (deps "test-handle_effect_skip.eff.out")
@@ -502,7 +502,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml --no-opts "./two_inputs.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./two_inputs.eff")))))
 
 (rule
  (deps "two_inputs.eff.out")

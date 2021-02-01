@@ -5,4 +5,4 @@ effect Print : string -> unit
 handle 
   perform (Print "hello\n")
 with 
-  | _ -> 42
+  | (_ : unit) -> 42

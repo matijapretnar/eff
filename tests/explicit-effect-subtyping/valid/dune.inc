@@ -206,6 +206,23 @@
  (deps
  %{bin:eff}
   (source_tree .))
+   (target "test3.eff.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       (or 0 0 1 2)
+       (run eff --no-stdlib --explicit-effects "./test3.eff")))))
+
+(rule
+ (deps "test3.eff.out")
+  (alias runtest)
+   (action
+    (diff "test3.eff.ref" "test3.eff.out")))
+
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
    (target "test4.eff.out")
     (action
      (with-outputs-to "%{target}"
