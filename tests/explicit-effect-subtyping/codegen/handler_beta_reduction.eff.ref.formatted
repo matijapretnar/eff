@@ -1,40 +1,42 @@
 type (_, _) effect += Eff : (int, int) effect
 
-let _op_0 (* + *) =
-  coer_unsafe (*unsafe*) coer_refl_ty
-  + ((coer_handler
-        (coer_computation coer_refl_ty)
-        (coer_computation coer_refl_ty))
-       ((coer_handler
-           (coer_computation coer_refl_ty)
-           (coer_computation coer_refl_ty))
-          (handler
-             {
-               value_clause =
-                 (fun (_x_5 : int) ->
-                   Value
-                     (let y = _x_5 in
-                      let _b_7 = (coer_refl_ty _op_0 (* + *)) y in
-                      (coer_refl_ty _b_7) 4));
-               effect_clauses =
-                 (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
-                   match eff with
-                   | Eff ->
-                       fun x l ->
-                         Value
-                           (let _b_3 =
-                              let _b_4 = (coer_refl_ty _op_0 (* + *)) x in
-                              (coer_refl_ty _b_4) 2
-                            in
-                            (coer_refl_ty
-                               (coer_refl_ty
-                                  ((coer_arrow coer_refl_ty
-                                      (coer_unsafe (*unsafe*) coer_refl_ty))
-                                     l)))
-                              _b_3)
-                   | eff' -> fun arg k -> Call (eff', arg, k));
-             })))
-      ( (coer_return coer_refl_ty)
-          (let _b_10 = (coer_refl_ty _op_0 (* + *)) 1 in
-           (coer_refl_ty _b_10) 3)
-      >> fun _b_9 -> (coer_refl_ty (effect Eff)) _b_9 )
+let _op_0 (* + *) = ( + )
+
+;;
+(coer_unsafe (*unsafe*) coer_refl_ty)
+  (((coer_handler
+       (coer_computation coer_refl_ty)
+       (coer_computation coer_refl_ty))
+      ((coer_handler
+          (coer_computation coer_refl_ty)
+          (coer_computation coer_refl_ty))
+         (handler
+            {
+              value_clause =
+                (fun (_x_5 : int) ->
+                  Value
+                    (let y = _x_5 in
+                     let _b_7 = (coer_refl_ty _op_0 (* + *)) y in
+                     (coer_refl_ty _b_7) 4));
+              effect_clauses =
+                (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+                  match eff with
+                  | Eff ->
+                      fun x l ->
+                        Value
+                          (let _b_3 =
+                             let _b_4 = (coer_refl_ty _op_0 (* + *)) x in
+                             (coer_refl_ty _b_4) 2
+                           in
+                           (coer_refl_ty
+                              (coer_refl_ty
+                                 ((coer_arrow coer_refl_ty
+                                     (coer_unsafe (*unsafe*) coer_refl_ty))
+                                    l)))
+                             _b_3)
+                  | eff' -> fun arg k -> Call (eff', arg, k));
+            })))
+     ( (coer_return coer_refl_ty)
+         (let _b_10 = (coer_refl_ty _op_0 (* + *)) 1 in
+          (coer_refl_ty _b_10) 3)
+     >> fun _b_9 -> (coer_refl_ty (effect Eff)) _b_9 ))

@@ -1,4 +1,4 @@
 let decide_func = fun (bl: bool) -> let x = 10 in 
                                     let y = 20 in 
                                     (match bl with  true -> x |  false -> y)
-
+;;

@@ -1,6 +1,6 @@
 let _op_0 (* * *) = ( * )
-
+;;
 let x = fun (y: int) -> let _b_3 = ((coer_refl_ty) (_op_0 (* * *))) (y) in 
-                         ((coer_refl_ty) (_b_3)) (2) in 
- ((coer_refl_ty) (x)) (3)
-
+                           ((coer_refl_ty) (_b_3)) (2) in 
+   ((coer_refl_ty) (x)) (3)
+;;

@@ -5,4 +5,4 @@ type(_, _) effect += Print : (string, unit) effect
          (fun (_x_0: unit) -> (coer_return (coer_refl_ty)) 
                                 ((match (coer_refl_ty) (_x_0) with  _ -> 42))))) 
      (((coer_refl_ty) ((effect Print))) ("hello\n"))
-
+;;

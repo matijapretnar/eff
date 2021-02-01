@@ -1,3 +1,8 @@
-ocamlformat: ignoring "application_red.eff.out" (syntax error)
-File "application_red.eff.out", line 4, characters 53-55:
-Error: Syntax error
+let _op_0 (* * *) = ( * )
+
+;;
+let x (y : int) =
+  let _b_3 = (coer_refl_ty _op_0 (* * *)) y in
+  (coer_refl_ty _b_3) 2
+in
+(coer_refl_ty x) 3

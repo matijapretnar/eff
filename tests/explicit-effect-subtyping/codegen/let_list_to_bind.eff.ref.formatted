@@ -1,3 +1,7 @@
-ocamlformat: ignoring "let_list_to_bind.eff.out" (syntax error)
-File "let_list_to_bind.eff.out", line 3, characters 10-12:
-Error: Syntax error
+let _op_0 (* + *) = ( + )
+
+;;
+let x = 2 in
+let y = 1 in
+let _b_3 = (coer_refl_ty _op_0 (* + *)) x in
+(coer_refl_ty _b_3) y

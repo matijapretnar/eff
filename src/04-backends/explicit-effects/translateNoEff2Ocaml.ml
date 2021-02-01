@@ -175,7 +175,8 @@ and pp_let_rec lst ppf =
   match lst with
   | [] -> ()
   | (v, t) :: tl ->
-      print ppf "@[<hv 2>let rec %t = @,%t@] @,%t" (pp_variable v) (pp_abs t)
+      print ppf "@[<hv 2>let rec %t = @,fun %t@] @,%t" (pp_variable v)
+        (pp_abs t)
         (pp_sequence " " pp_var_ty_abs tl)
 
 and pp_effect_cls eff_cls ppf =
@@ -210,7 +211,7 @@ let pp_lets lst ppf =
         (pp_sequence " " pp_one_let tl)
 
 let pp_external name symbol_name ppf =
-  print ppf "let %t = ( %s )@." (pp_variable name) symbol_name
+  print ppf "let %t = ( %s )@.;;" (pp_variable name) symbol_name
 
 let pp_tydef (name, (params, tydef)) ppf =
   let pp_def tydef ppf =
@@ -240,11 +241,11 @@ let pp_tydef (name, (params, tydef)) ppf =
 
 let pp_cmd cmd ppf =
   match cmd with
-  | Term t -> print ppf "%t@." (pp_term t) (* TODO check if ok *)
+  | Term t -> print ppf "%t@.;;" (pp_term t) (* TODO check if ok *)
   | DefEffect e -> pp_def_effect e ppf
-  | TopLet (x, t) -> print ppf "let %t = %t@." (pp_variable x) (pp_term t)
+  | TopLet (x, t) -> print ppf "let %t = %t@.;;" (pp_variable x) (pp_term t)
   | TopLetRec (x, (p, t)) ->
-      print ppf "let rec %t %t = %t@." (pp_variable x) (pp_pattern p)
+      print ppf "let rec %t %t = %t@.;;" (pp_variable x) (pp_pattern p)
         (pp_term t)
   | External (x, _ty, f) -> pp_external x f ppf
-  | TyDef defs -> print ppf "%t@." (pp_sequence "@, and " pp_tydef defs)
+  | TyDef defs -> print ppf "%t@.;;" (pp_sequence "@, and " pp_tydef defs)

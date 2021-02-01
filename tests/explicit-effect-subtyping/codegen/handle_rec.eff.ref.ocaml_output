@@ -1,4 +1,4 @@
-[1mFile "./handle_rec.eff.out", line 10, characters 6-8[0m:
-10 |     x -> (((coer_return (coer_refl_ty)) 
-           [1;31m^^[0m
-[1;31mError[0m: Syntax error
+[1mFile "./handle_rec.eff.out", line 1, characters 11-17[0m:
+1 | type(_, _) effect += Eff : (unit, unit) effect 
+               [1;31m^^^^^^[0m
+[1;31mError[0m: Unbound type constructor effect

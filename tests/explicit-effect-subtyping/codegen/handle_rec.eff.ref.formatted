@@ -1,3 +1,113 @@
-ocamlformat: ignoring "handle_rec.eff.out" (syntax error)
-File "handle_rec.eff.out", line 10, characters 6-8:
-Error: Syntax error
+type (_, _) effect += Eff : (unit, unit) effect
+
+let _op_0 (* - *) = ( - )
+
+let _op_1 (* * *) = ( * )
+
+let _op_2 (* = *) = ( = )
+
+;;
+let f (x : int) =
+  (coer_return coer_refl_ty)
+    (let _b_6 = (coer_refl_ty _op_2 (* = *)) x in
+     (coer_refl_ty _b_6) 0)
+  >> fun _b_5 ->
+  match coer_refl_ty _b_5 with
+  | true -> (coer_return coer_refl_ty) 1
+  | false ->
+      (coer_refl_ty (effect Eff)) () >> fun _ ->
+      (coer_return coer_refl_ty)
+        (let _b_7 = (coer_refl_ty _op_0 (* - *)) x in
+         (coer_refl_ty _b_7) 1)
+in
+(coer_unsafe (*unsafe*) coer_refl_ty)
+  (((coer_handler
+       (coer_computation coer_refl_ty)
+       (coer_computation coer_refl_ty))
+      ((coer_handler
+          (coer_computation coer_refl_ty)
+          (coer_computation coer_refl_ty))
+         (handler
+            {
+              value_clause = (fun (_id_11 : int) -> Value _id_11);
+              effect_clauses =
+                (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+                  match eff with
+                  | Eff ->
+                      fun () l ->
+                        Value
+                          (let _b_9 =
+                             let _b_10 =
+                               (coer_refl_ty
+                                  (coer_refl_ty
+                                     ((coer_arrow coer_refl_ty
+                                         (coer_unsafe (*unsafe*) coer_refl_ty))
+                                        l)))
+                                 ()
+                             in
+                             (coer_refl_ty _op_1 (* * *)) _b_10
+                           in
+                           (coer_refl_ty _b_9) 2)
+                  | eff' -> fun arg k -> Call (eff', arg, k));
+            })))
+     (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty)) f) 5))
+
+;;
+let rec g x =
+  let _b_16 =
+    coer_refl_ty
+      (let _b_17 =
+         coer_refl_ty
+           (((coer_arrow coer_refl_ty (coer_arrow coer_refl_ty coer_refl_ty))
+               _op_2 (* = *))
+              x)
+       in
+       coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_17) 0))
+  in
+  coer_refl_ty
+    (match coer_refl_ty _b_16 with
+    | true -> coer_refl_ty 1
+    | false ->
+        coer_refl_ty
+          (let _b_18 =
+             coer_refl_ty
+               (let _b_19 =
+                  coer_refl_ty
+                    (((coer_arrow coer_refl_ty
+                         (coer_arrow coer_refl_ty coer_refl_ty))
+                        _op_0 (* - *))
+                       x)
+                in
+                coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_19) 1))
+           in
+           coer_refl_ty
+             (((coer_arrow coer_refl_ty coer_refl_ty)
+                 ((coer_arrow coer_refl_ty coer_refl_ty) g))
+                _b_18)))
+in
+((coer_arrow coer_refl_ty coer_refl_ty)
+   ((coer_hand_to_fun coer_refl_ty (coer_unsafe (*unsafe*) coer_refl_ty))
+      (handler
+         {
+           value_clause = (fun (_id_23 : int) -> Value _id_23);
+           effect_clauses =
+             (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+               match eff with
+               | Eff ->
+                   fun () l ->
+                     Value
+                       (let _b_21 =
+                          let _b_22 =
+                            (coer_refl_ty
+                               (coer_refl_ty
+                                  ((coer_arrow coer_refl_ty
+                                      (coer_unsafe (*unsafe*) coer_refl_ty))
+                                     l)))
+                              ()
+                          in
+                          (coer_refl_ty _op_1 (* * *)) _b_22
+                        in
+                        (coer_refl_ty _b_21) 2)
+               | eff' -> fun arg k -> Call (eff', arg, k));
+         })))
+  ((coer_refl_ty g) 5)

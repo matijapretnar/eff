@@ -16,4 +16,4 @@ type(_, _) effect += Op2 : (int, unit) effect
     | eff' -> (fun arg k -> Call (eff', arg, k))
       )); }))) 
      (((coer_refl_ty) ((effect Op1))) (1))
-
+;;
