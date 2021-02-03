@@ -488,10 +488,10 @@ let pattern_match p e =
      ignore constraints; *)
   let rec extend_subst p e sbst =
     match (p.term, e.term) with
-    | PVar x, e -> Assoc.update x e sbst
-    | PAs (p, x), e' ->
+    | PVar x, _ -> Assoc.update x e sbst
+    | PAs (p, x), _ ->
         let sbst = extend_subst p e sbst in
-        Assoc.update x e' sbst
+        Assoc.update x e sbst
     | PNonbinding, _ -> sbst
     | PTuple ps, Tuple es -> List.fold_right2 extend_subst ps es sbst
     | PRecord ps, Record es ->

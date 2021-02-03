@@ -39,29 +39,6 @@ let is_relatively_pure st c h =
 
 (* var can be instantiated to anything *)
 
-let is_atomic e = match e with Var _ -> true | Const _ -> true | _ -> false
-
-type inlinability =
-  (* Pattern variables occur more than once or inside a binder *)
-  | NotInlinable
-  (* Pattern variables are not present in the body *)
-  | NotPresent
-  (* Pattern variables occur each at most once outside a binder *)
-  | Inlinable
-
-let applicable_pattern p vars =
-  let rec check_variables = function
-    | [] -> NotPresent
-    | x :: xs -> (
-        let inside_occ, outside_occ = Term.occurrences x vars in
-        if inside_occ > 0 || outside_occ > 1 then NotInlinable
-        else
-          match check_variables xs with
-          | NotPresent -> if outside_occ = 0 then NotPresent else Inlinable
-          | inlinability -> inlinability)
-  in
-  check_variables (Term.pattern_vars p)
-
 (* Try to specialize a recursive function f with continuation cont.
  * If the body is an abstraction, substitute all applications f v of f in cont with
  * a new variable f'. Then prefix let-bindings f' = f v to cont for all
@@ -378,9 +355,6 @@ and reduce_dirt_coercion st p_ops dco =
           in
           if EffectSet.is_empty ops' then dco1 else UnionDirt (ops', dco1))
 
-let rec substitute_pattern_comp st c p exp =
-  optimize_comp st (Term.subst_comp (Term.pattern_match p exp) c)
-
 and beta_reduce st ((p, ty, c) as a) e =
   match applicable_pattern p (Term.free_vars_comp c) with
   | Inlinable -> substitute_pattern_comp st c p e
@@ -538,9 +512,6 @@ and reduce_comp st c =
           optimize_comp st (CastComp (c', RightHandler tyco1)) *)
       | Handler h -> (
           match c1 with
-          | Value e1 ->
-              (* special case that happens when the handler has no effect clauses *)
-              optimize_comp st (beta_reduce st h.value_clause e1)
           | CastComp (c1', dtyco1) -> (
               match is_relatively_pure st c1' h with
               | Some dtyco ->
@@ -635,30 +606,7 @@ and reduce_comp st c =
                   match match_knot_function st e11 h with
                   | Some fvar' -> Apply (Var fvar', e12)
                   | None -> c))
-          | Match (e, _resTy, branches) ->
-              (*
-             handle (match e with {pi -> ci} ) with H
-             >-->
-             match e with {pi -> handle ci with H}
-           *)
-              let ty_e = TypeChecker.check_expression st.tc_state e in
-              let handResTy =
-                match TypeChecker.check_expression st.tc_state e1 with
-                | Handler (_, handResTy) -> handResTy
-                | _other -> failwith __LOC__
-                (* impossible *)
-              in
-              Match
-                ( e,
-                  handResTy,
-                  List.map
-                    (fun (pi, ci) ->
-                      optimize_abs st ty_e (abstraction pi (Handle (e1, ci))))
-                    branches )
-          | _ -> c)
       | _ -> c)
-  | Call (op, e1, a_w_ty) -> c
-  | Op (op, e1) -> failwith __LOC__
   | Bind (c1, a2) -> (
       match c1 with
       | Bind (c11, (p1, c12)) ->
@@ -666,10 +614,6 @@ and reduce_comp st c =
           let st' = extend_pat_type st p1 ty1 in
           let c2' = reduce_comp st' (Bind (c12, a2)) in
           reduce_comp st (Bind (c11, (p1, c2')))
-      | Value e11 ->
-          let ty11 = TypeChecker.check_expression st.tc_state e11 in
-          let p2, c2 = a2 in
-          beta_reduce st (p2, ty11, c2) e11
       | Call (op, e11, (p12, ty12, c12)) ->
           let st' = extend_pat_type st p12 ty12 in
           let c12' = reduce_comp st' (Bind (c12, a2)) in
@@ -695,15 +639,6 @@ and reduce_comp st c =
               reduce_comp st (Bind (c111', (p112, c2'))) *)
           | _ -> c)
       | _ -> c)
-  | CastComp (c1, dtyco) -> (
-      let dty1, dty2 = TypeChecker.check_dirty_coercion st.tc_state dtyco in
-      match c1 with
-      | _ when Type.dirty_types_are_equal dty1 dty2 -> c1
-      | Call (op, e11, (p12, ty12, c12)) ->
-          let st' = extend_pat_type st p12 ty12 in
-          let c12' = reduce_comp st' (CastComp (c12, dtyco)) in
-          Call (op, e11, (p12, ty12, c12'))
-      | _ -> c)
 
 (*
   | _ when outOfFuel st -> c
@@ -724,16 +659,6 @@ and reduce_comp st c =
     let bind_k_c = reduce_comp st (bind k_body c) in
     let res =
       call eff param (abstraction k_pat bind_k_c)
-    in
-    reduce_comp st res
-
-  | Handle (h, {term = LetRec (defs, co)}) ->
-    useFuel st;
-    st.optimization_handler_With_LetRec := !(st.optimization_handler_With_LetRec) + 1;
-    st.optimization_total := !(st.optimization_total) + 1;
-    let handle_h_c = reduce_comp st (handle h co) in
-    let res =
-      let_rec' defs handle_h_c
     in
     reduce_comp st res
 
@@ -913,16 +838,6 @@ and reduce_comp st c =
         end
       | _ -> c
     end
-
-| Handle (e1, {term = Match (e2, cases)}) ->
-    useFuel st;
-    let push_handler = fun {term = (p, c)} ->
-      abstraction p (reduce_comp st (handle (refresh_expr e1) c))
-    in
-    let res =
-      match' e2 (List.map push_handler cases)
-    in
-    res
 
 (*
     (*
@@ -1211,84 +1126,12 @@ let refresh_var ?(loc=Location.unknown) oldvar scheme =
   } in
   x_var, x_pat
 
-type inlinability =
-  | NotInlinable (* Pattern variables occur more than once or inside a binder *)
-  | NotPresent (* Pattern variables are not present in the body *)
-  | Inlinable (* Pattern variables occur each at most once outside a binder *)
-
-let applicable_pattern p vars =
-  let rec check_variables = function
-    | [] -> NotPresent
-    | x :: xs ->
-      let inside_occ, outside_occ = Term.occurrences x vars in
-      if inside_occ > 0 || outside_occ > 1 then
-        NotInlinable
-      else
-        begin match check_variables xs with
-          | NotPresent -> if outside_occ = 0 then NotPresent else Inlinable
-          | inlinability -> inlinability
-        end
-  in
-  check_variables (Term.pattern_vars p)
-
-let is_atomic e =
-  match e with | Var _ -> true | Const _ -> true | _ -> false
-
 let unused x c =
   let vars = Term.free_vars_comp  c in
   let inside_occ, outside_occ = Term.occurrences x vars in
   inside_occ == 0 && outside_occ == 0
 
-let refresh_comp c = Term.refresh_comp [] c
-let refresh_handler h = Term.refresh_handler [] h
 
-let substitute_var_comp comp vr exp = Term.subst_comp [(vr, exp)] comp
-
-let rec substitute_pattern_comp st c p exp =
-  optimize_comp st (Term.subst_comp (Term.pattern_match p exp) c)
-and substitute_pattern_expr st e p exp =
-  optimize_expr st (Term.subst_expr (Term.pattern_match p exp) e)
-
-and beta_reduce st ({term = (p, c)} as a) e =
-  (* Print.debug  "Inlining? %t[%t -> %t]" (Term.print_computation c) (Term.print_pattern p) (Term.print_expression e) ; *)
-  match applicable_pattern p (Term.free_vars_comp c) with
-  | NotInlinable when is_atomic e -> substitute_pattern_comp st c p e
-  | Inlinable -> substitute_pattern_comp st c p e
-  | NotPresent -> c
-  | _ ->
-    let a =
-      begin match p with
-        | {term = Term.PVar x} ->
-          (* Print.debug "Added to stack ==== %t" (Term.print_variable x); *)
-          let st = {st with stack = Common.update x e st.stack} in
-          abstraction p (optimize_comp st c)
-        | _ ->
-          (* Print.debug "We are now in the let in 5 novar for %t" (Term.print_pattern p); *)
-          a
-      end
-    in
-    let_in e a
-
-and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
-and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
-
-and optimize_sub_expr st e =
-  let loc = ehh in
-  match e with
-  | Record lst ->
-    record ~loc (Common.assoc_map (optimize_expr st) lst)
-  | Variant (lbl, e) ->
-    variant ~loc (lbl, (Common.option_map (optimize_expr st) e))
-  | Tuple lst ->
-    tuple ~loc (List.map (optimize_expr st) lst)
-  | Lambda a ->
-    lambda ~loc (optimize_abs st a)
-  | Handler h ->
-    handler ~loc {
-      effect_clauses = Common.assoc_map (optimize_abs2 st) h.effect_clauses;
-      value_clause = optimize_abs st h.value_clause;
-    }
-  | (Var _ | Const _ | BuiltIn _ | Effect _) -> e
 and optimize_sub_comp st c =
   let loc = chh in
   match c with
@@ -1331,15 +1174,9 @@ and optimize_sub_comp st c =
     call ~loc eff (optimize_expr st e1) (optimize_abs st a1)
   | Bind (c1, a1) ->
     bind ~loc (optimize_comp st c1) (optimize_abs st a1)
-and optimize_abs st {term = (p, c); location = loc} =
-  abstraction ~loc p (optimize_comp st c)
-and optimize_abs2 st a2 = a2a2 @@ optimize_abs st @@ a22a @@ a2
 
 and reduce_expr st e =
   let e' = match e with
-
-  | _ when outOfFuel st -> e
-
   | Var x ->
     begin match find_inlinable st x with
       | Some ({term = Handler _} as d) -> reduce_expr st (refresh_expr d)
@@ -1359,19 +1196,9 @@ and reduce_expr st e =
     (* Body is already reduced and it's a lambda *)
     res
 
-  | _ -> e
-  in
-  (* if e <> e' then *)
-(*   Print.debug ~loc:e.Typedhh "%t : %t@.~~~>@.%t : %t@.\n"
-    (Term.print_expression e) (Scheme.print_ty_scheme e.Term.scheme)
-    (Term.print_expression e') (Scheme.print_ty_scheme e'.Term.scheme); *)
-  e'
-
 
 and reduce_comp st c =
   let c' = match c with
-
-  | _ when outOfFuel st -> c
 
   | Match ({term = Const cst}, cases) ->
     let rec find_const_case = function

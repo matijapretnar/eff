@@ -2,31 +2,31 @@ open Utils
 
 type state = {
   (* Abstractions available for specializtions for specializations *)
-  abstraction_stack : (Term.variable, Term.abstraction) Assoc.t;
-  recursive_functions_stack : (Term.variable, Term.abstraction) Assoc.t;
+  functions : (Term.variable, Term.abstraction) Assoc.t;
+  recursive_functions : (Term.variable, Term.abstraction) Assoc.t;
   (* Rest of fuel for optimization *)
   fuel : int;
 }
 
 let initial_state =
   {
-    abstraction_stack = Assoc.empty;
-    recursive_functions_stack = Assoc.empty;
+    functions = Assoc.empty;
+    recursive_functions = Assoc.empty;
     fuel = !Config.optimization_fuel;
   }
 
-let use_fuel state = { state with fuel = state.fuel - 1 }
-
-let refuel state = { state with fuel = !Config.optimization_fuel }
+let reduce_if_fuel reduce_term state term =
+  if state.fuel > 0 then reduce_term { state with fuel = state.fuel - 1 } term
+  else term
 
 (* Updating stack and letrec *)
-let add_to_abstraction_stack st v e =
-  { st with abstraction_stack = Assoc.update v e st.abstraction_stack }
+let add_function state x abs =
+  { state with functions = Assoc.update x abs state.functions }
 
-let add_to_recursive_stack st v a =
+let add_recursive_function state x abs =
   {
-    st with
-    recursive_functions_stack = Assoc.update v a st.recursive_functions_stack;
+    state with
+    recursive_functions = Assoc.update x abs state.recursive_functions;
   }
 
 (* Optimization functions *)
@@ -224,10 +224,36 @@ and cast_expression state exp sub_exp coer =
       | _ -> assert false)
   | _, _ -> exp
 
-and cast_computation _state cmp sub_cmp coer =
-  match (sub_cmp, coer.term) with
-  | _, _ when Constraint.is_trivial_dirty_coercion coer -> sub_cmp
-  | _, _ -> cmp
+and cast_computation state comp coer =
+  match (comp.term, coer.term) with
+  | _, _ when Constraint.is_trivial_dirty_coercion coer -> comp
+  | Term.Call (eff, exp, { term = p, c; _ }), _ ->
+      let c' = cast_computation state c coer in
+      Term.call (eff, exp, Term.abstraction (p, c'))
+  | _, _ -> Term.castComp (comp, coer)
+
+and bind_computation state comp bind =
+  match comp.term with
+  | Term.Value exp -> beta_reduce state bind exp
+  | _ -> Term.bind (comp, bind)
+
+and handle_computation state hnd comp =
+  match comp.term with
+  | Term.Value exp -> beta_reduce state hnd.term.Term.value_clause exp
+  | Match (exp, cases) ->
+      let _, drty_out = hnd.ty in
+      Term.match_ (exp, List.map (handle_abstraction state hnd) cases) drty_out
+      |> optimize_computation state
+  | LetVal (exp, abs) ->
+      Term.letVal (exp, handle_abstraction state hnd abs)
+      |> optimize_computation state
+  | LetRec (defs, comp) ->
+      Term.letRec (defs, handle_computation state hnd comp)
+      |> optimize_computation state
+  | _ -> Term.handle (Term.handler hnd, comp)
+
+and handle_abstraction state hnd { term = p, c; _ } =
+  Term.abstraction (p, handle_computation state hnd c)
 
 and substitute_pattern_comp st c p exp =
   optimize_computation st (Term.subst_comp (Term.pattern_match p exp) c)
@@ -249,7 +275,7 @@ and beta_reduce state ({ term = p, c; _ } as a) e =
         else
           let state' =
             match (p.term, e.term) with
-            | Term.PVar x, Term.Lambda a -> add_to_abstraction_stack state x a
+            | Term.PVar x, Term.Lambda a -> add_function state x a
             | _ -> state
           in
           optimize_computation state' c
@@ -257,22 +283,29 @@ and beta_reduce state ({ term = p, c; _ } as a) e =
       let abs = Term.abstraction (p, c) in
       Term.letVal (e, abs)
 
-and reduce_expression state expr =
+and reduce_expression state expr = reduce_if_fuel reduce_expression' state expr
+
+and reduce_expression' state expr =
   match expr.term with
   | Term.CastExp (sub_exp, tcoer) -> cast_expression state expr sub_exp tcoer
   | _ -> expr
 
 and reduce_computation state comp =
+  reduce_if_fuel reduce_computation' state comp
+
+and reduce_computation' state comp =
   match comp.term with
-  | Term.CastComp (sub_cmp, dtcoer) ->
-      cast_computation state comp sub_cmp dtcoer
+  | Term.CastComp (cmp, dtcoer) -> cast_computation state cmp dtcoer
   | Term.LetVal (e, abs) -> beta_reduce state abs e
   | Term.Apply ({ term = Term.Lambda a; _ }, e) -> beta_reduce state a e
   | Term.LetRec (defs, c) ->
       let state' =
         List.fold_right
-          (fun (v, abs) state -> add_to_recursive_stack state v abs)
+          (fun (v, abs) state -> add_recursive_function state v abs)
           defs state
       in
       Term.letRec (defs, reduce_computation state' c)
+  | Term.Bind (cmp, abs) -> bind_computation state cmp abs
+  | Term.Handle ({ term = Term.Handler hnd; _ }, cmp) ->
+      handle_computation state hnd cmp
   | _ -> comp
