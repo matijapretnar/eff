@@ -132,7 +132,6 @@ and optimize_expression' state exp =
   | Term.Variant (lbl, arg) ->
       Term.variant (lbl, Option.map (optimize_expression state) arg) exp.ty
   | Term.Lambda abs -> Term.lambda (optimize_abstraction state abs)
-  | Term.Effect _ -> exp
   | Term.Handler hnd -> Term.handler (optimize_handler state hnd)
   | Term.CastExp (exp, coer) ->
       Term.castExp
@@ -176,7 +175,6 @@ and optimize_computation' state cmp =
   | Term.Call (eff, exp, abs) ->
       Term.call
         (eff, optimize_expression state exp, optimize_abstraction state abs)
-  | Term.Op (eff, exp) -> Term.op (eff, optimize_expression state exp)
   | Term.Bind (cmp, abs) ->
       Term.bind (optimize_computation state cmp, optimize_abstraction state abs)
   | Term.CastComp (cmp, dtcoer) ->

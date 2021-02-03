@@ -47,7 +47,6 @@ and expression' =
   | Record of (CoreTypes.Field.t, expression) Assoc.t
   | Variant of CoreTypes.Label.t * expression option
   | Lambda of abstraction
-  | Effect of effect
   | Handler of handler
   | CastExp of expression * Constraint.ty_coercion
   | LambdaTyCoerVar of Type.TyCoercionParam.t * expression
@@ -75,7 +74,6 @@ and computation' =
   | Apply of expression * expression
   | Handle of expression * computation
   | Call of effect * expression * abstraction
-  | Op of effect * expression
   | Bind of computation * abstraction
   | CastComp of computation * Constraint.dirty_coercion
 
@@ -227,7 +225,6 @@ let rec print_expression ?max_level e ppf =
          computation)) @]}"
         (print_abstraction h.term.value_clause)
         (print_effect_clauses (Assoc.to_list h.term.effect_clauses))
-  | Effect eff -> print ~at_level:2 "effect %t" (print_effect eff)
   | CastExp (e1, tc) ->
       print "(%t) |> [%t]" (print_expression e1)
         (Constraint.print_ty_coercion tc)
@@ -273,8 +270,6 @@ and print_computation ?max_level c ppf =
       print ~at_level:1 "call (%t) (%t) ((@[fun %t@]))" (print_effect eff)
         (print_expression ~max_level:0 e)
         (print_abstraction a)
-  | Op (eff, e) ->
-      print ~at_level:1 "(#%t %t)" (print_effect eff) (print_expression e)
   | Bind (c1, a) ->
       print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]"
         (print_computation ~max_level:0 c1)
@@ -337,7 +332,7 @@ and subst_expr' sbst = function
   | Tuple es -> Tuple (List.map (subst_expr sbst) es)
   | Record flds -> Record (Assoc.map (subst_expr sbst) flds)
   | Variant (lbl, e) -> Variant (lbl, Option.map (subst_expr sbst) e)
-  | (Const _ | Effect _) as e -> e
+  | Const _ as e -> e
   | CastExp (e, tyco) -> CastExp (subst_expr sbst e, tyco)
   | LambdaTyCoerVar (tycovar, e) -> LambdaTyCoerVar (tycovar, subst_expr sbst e)
   | LambdaDirtCoerVar (dcovar, e) ->
@@ -367,7 +362,6 @@ and subst_comp' sbst = function
   | Call (eff, e, a) -> Call (eff, subst_expr sbst e, subst_abs sbst a)
   | Value e -> Value (subst_expr sbst e)
   | CastComp (c, dtyco) -> CastComp (subst_comp sbst c, dtyco)
-  | _ -> failwith __LOC__
 
 and subst_handler sbst h =
   {
@@ -428,7 +422,6 @@ let rec alphaeq_expr eqvars e e' =
   | Variant (lbl, Some e), Variant (lbl', Some e') ->
       lbl = lbl' && alphaeq_expr eqvars e e'
   | Const cst, Const cst' -> Const.equal cst cst'
-  | Effect eff, Effect eff' -> eff = eff'
   | ApplyDirtCoercion (e, dco), ApplyDirtCoercion (e', dco') ->
       dco = dco' && alphaeq_expr eqvars e e'
   | _, _ -> false
@@ -537,7 +530,6 @@ let rec free_vars_comp c =
   | Apply (e1, e2) -> free_vars_expr e1 @@@ free_vars_expr e2
   | Handle (e, c1) -> free_vars_expr e @@@ free_vars_comp c1
   | Call (_, e1, a1) -> free_vars_expr e1 @@@ free_vars_abs a1
-  | Op (_, e) -> free_vars_expr e
   | Bind (c1, a1) -> free_vars_comp c1 @@@ free_vars_abs a1
   | CastComp (c1, _dtyco) -> free_vars_comp c1
 
@@ -551,7 +543,7 @@ and free_vars_expr e =
       Assoc.values_of flds |> List.map free_vars_expr |> concat_vars
   | Variant (_, e) -> Option.default_map ([], []) free_vars_expr e
   | CastExp (e', _tyco) -> free_vars_expr e'
-  | Effect _ | Const _ -> ([], [])
+  | Const _ -> ([], [])
   | LambdaTyCoerVar _ -> failwith __LOC__
   | LambdaDirtCoerVar _ -> failwith __LOC__
   | ApplyTyCoercion (e, _tyco) -> free_vars_expr e
@@ -611,7 +603,6 @@ and free_params_expression' e =
   | Variant (_, e) ->
       Option.default_map Type.FreeParams.empty free_params_expression e
   | Lambda abs -> free_params_abstraction abs
-  | Effect _ -> Type.FreeParams.empty
   | Handler h -> free_params_abstraction h.term.value_clause
   | CastExp (e, tc) ->
       Type.FreeParams.union (free_params_expression e)
@@ -654,8 +645,9 @@ and free_params_computation' c =
   | Handle (e, c) ->
       Type.FreeParams.union (free_params_expression e)
         (free_params_computation c)
-  | Call (_, _e, _awty) -> failwith __LOC__
-  | Op (_, e) -> free_params_expression e
+  | Call (_, e, abs) ->
+      Type.FreeParams.union (free_params_expression e)
+        (free_params_abstraction abs)
   | Bind (c, a) ->
       Type.FreeParams.union
         (free_params_computation c)

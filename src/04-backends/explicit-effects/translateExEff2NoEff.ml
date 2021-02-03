@@ -141,10 +141,6 @@ and elab_expression' exp =
   | ExEff.Const c -> NoEff.NConst c
   | ExEff.Tuple vs -> NoEff.NTuple (List.map elab_expression vs)
   | ExEff.Lambda abs -> NoEff.NFun (elab_abstraction_with_param_ty abs)
-  | ExEff.Effect (e, (t1, t2)) ->
-      let elab1 = elab_ty t1 in
-      let elab2 = elab_ty t2 in
-      NoEff.NEffect (e, (elab1, elab2))
   | ExEff.Handler h ->
       let elabvc = elab_abstraction_with_param_ty h.term.value_clause in
 
@@ -282,11 +278,6 @@ and elab_computation' c =
       let velab = elab_expression value in
       let aelab = elab_abstraction_with_param_ty abs in
       NoEff.NCall ((eff, (t1, t2)), velab, aelab)
-  | ExEff.Op ((eff, (ty1, ty2)), value) ->
-      let t1 = elab_ty ty1 in
-      let t2 = elab_ty ty2 in
-      let velab = elab_expression value in
-      NoEff.NOp ((eff, (t1, t2)), velab)
   | ExEff.Bind (c1, abs) ->
       let _ty1, dirt1 = c1.ty
       and elab1 = elab_computation c1

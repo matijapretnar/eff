@@ -216,7 +216,6 @@ and apply_sub_comp' sub computation =
   | Handle (e1, c1) -> Handle (apply_sub_exp sub e1, apply_sub_comp sub c1)
   | Call (effect, e1, abs) ->
       Call (effect, apply_sub_exp sub e1, apply_sub_abs sub abs)
-  | Op (ef, e1) -> Op (ef, apply_sub_exp sub e1)
   | Bind (c1, a1) -> Bind (apply_sub_comp sub c1, apply_sub_abs sub a1)
   | CastComp (c1, dc1) ->
       CastComp (apply_sub_comp sub c1, apply_sub_dirtycoer sub dc1)
@@ -235,7 +234,6 @@ and apply_sub_exp' sub expression =
   | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
   | Variant (lbl, e1) -> Variant (lbl, Option.map (apply_sub_exp sub) e1)
   | Lambda abs -> Lambda (apply_sub_abs sub abs)
-  | Effect eff -> Effect eff
   | Handler h -> Handler (apply_sub_handler sub h)
   | CastExp (e1, tc1) -> CastExp (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
   | LambdaTyCoerVar (tcp1, e1) -> LambdaTyCoerVar (tcp1, apply_sub_exp sub e1)

@@ -82,9 +82,6 @@ let rec ceval state c =
   | Term.Call ((eff, _), e, a) ->
       let e' = veval state e in
       V.Call (eff, e', eval_closure state a.term)
-  | Term.Op ((eff, _), e) ->
-      let e' = veval state e in
-      V.Call (eff, e', fun r -> V.Value r)
   | Term.Bind (c1, { term = p, c2; _ }) -> eval_let state [ (p, c1) ] c2
   | Term.CastComp (c, _) -> ceval state c
 
@@ -121,8 +118,6 @@ and veval state e =
   | Term.Record es -> V.Record (Assoc.map (fun e -> veval state e) es)
   | Term.Variant (lbl, e) -> V.Variant (lbl, Option.map (veval state) e)
   | Term.Lambda a -> V.Closure (eval_closure state a.term)
-  | Term.Effect (eff, _) ->
-      V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | Term.Handler h -> V.Handler (eval_handler state h)
   | Term.CastExp (e, _coercion) -> veval state e
   | Term.LambdaTyCoerVar (_, e)
