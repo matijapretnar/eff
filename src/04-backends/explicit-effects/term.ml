@@ -163,10 +163,15 @@ let handle (exp, comp) =
       { term = Handle (exp, comp); ty = drty2 }
   | _ -> assert false
 
-let call (_ : effect * expression * abstraction) : computation =
-  failwith __LOC__
-
-let op (_ : effect * expression) : computation = failwith __LOC__
+let call (eff, e, a) =
+  let eff_name, (in_ty, out_ty) = eff in
+  let p_ty, (r_ty, r_ty_dirt) = a.ty in
+  assert (Type.equal_ty in_ty e.ty);
+  assert (Type.equal_ty out_ty p_ty);
+  {
+    term = Call (eff, e, a);
+    ty = (r_ty, Type.add_effects (Type.EffectSet.singleton eff_name) r_ty_dirt);
+  }
 
 let bind (comp1, abs2) =
   let ty1, drt1 = comp1.ty and ty2, ((_, drt2) as drty2) = abs2.ty in
