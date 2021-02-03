@@ -1,8 +1,60 @@
 open Utils
 
-type state = unit
+type state = {
+  (* Abstractions available for specializtions for specializations *)
+  abstraction_stack : (Term.variable, Term.abstraction) Assoc.t;
+  recursive_functions_stack : (Term.variable, Term.abstraction) Assoc.t;
+  (* Rest of fuel for optimization *)
+  fuel : int;
+}
 
-let initial_state = ()
+let initial_state =
+  {
+    abstraction_stack = Assoc.empty;
+    recursive_functions_stack = Assoc.empty;
+    fuel = !Config.optimization_fuel;
+  }
+
+let use_fuel state = { state with fuel = state.fuel - 1 }
+
+let refuel state = { state with fuel = !Config.optimization_fuel }
+
+(* Updating stack and letrec *)
+let add_to_abstraction_stack st v e =
+  { st with abstraction_stack = Assoc.update v e st.abstraction_stack }
+
+let add_to_recursive_stack st v a =
+  {
+    st with
+    recursive_functions_stack = Assoc.update v a st.recursive_functions_stack;
+  }
+
+(* Optimization functions *)
+
+(* Reductions and inlining *)
+
+type inlinability =
+  (* Pattern does not occur in in an abstraction body *)
+  | NotPresent
+  (* Pattern occurs, and occurs at most once in an abstraction and there is no recursion *)
+  | Inlinable
+  (* Pattern occurs more than once in a body of abstraction or it occurs recursively *)
+  | NotInlinable
+
+let is_atomic = function Term.Var _ | Const _ -> true | _ -> false
+
+let applicable_pattern p vars =
+  let rec check_variables = function
+    | [] -> NotPresent
+    | x :: xs -> (
+        let inside_occ, outside_occ = Term.occurrences x vars in
+        if inside_occ > 0 || outside_occ > 1 then NotInlinable
+        else
+          match check_variables xs with
+          | NotPresent -> if outside_occ = 0 then NotPresent else Inlinable
+          | inlinability -> inlinability)
+  in
+  check_variables (Term.pattern_vars p)
 
 let rec optimize_ty_coercion state (tcoer : Constraint.ty_coercion) =
   reduce_ty_coercion state
@@ -59,16 +111,16 @@ and reduce_dirt_coercion' _state = function
   | dcoer -> dcoer
 
 let rec optimize_expression state exp =
-  Print.debug "EXP: %t : %t" (Term.print_expression exp) (Type.print_ty exp.ty);
+  (* Print.debug "EXP: %t : %t" (Term.print_expression exp) (Type.print_ty exp.ty); *)
   let exp' = optimize_expression' state exp in
-  Print.debug "EXP': %t : %t"
-    (Term.print_expression exp')
-    (Type.print_ty exp'.ty);
+  (* Print.debug "EXP': %t : %t"
+     (Term.print_expression exp')
+     (Type.print_ty exp'.ty); *)
   assert (Type.equal_ty exp.ty exp'.ty);
   let exp'' = reduce_expression state exp' in
-  Print.debug "EXP'': %t : %t"
-    (Term.print_expression exp'')
-    (Type.print_ty exp''.ty);
+  (* Print.debug "EXP'': %t : %t"
+     (Term.print_expression exp'')
+     (Type.print_ty exp''.ty); *)
   assert (Type.equal_ty exp'.ty exp''.ty);
   exp''
 
@@ -177,6 +229,34 @@ and cast_computation _state cmp sub_cmp coer =
   | _, _ when Constraint.is_trivial_dirty_coercion coer -> sub_cmp
   | _, _ -> cmp
 
+and substitute_pattern_comp st c p exp =
+  optimize_computation st (Term.subst_comp (Term.pattern_match p exp) c)
+
+and substitute_pattern_expr st e p exp =
+  optimize_expression st (Term.subst_expr (Term.pattern_match p exp) e)
+
+and beta_reduce state ({ term = p, c; _ } as a) e =
+  Print.debug "Beta reduce: %t; %t" (Term.print_abstraction a)
+    (Term.print_expression e);
+  match applicable_pattern p (Term.free_vars_comp c) with
+  | Inlinable -> substitute_pattern_comp state c p e
+  | NotPresent -> c
+  | NotInlinable ->
+      let c =
+        if is_atomic e.term then
+          (* Inline constants and variables anyway *)
+          substitute_pattern_comp state c p e
+        else
+          let state' =
+            match (p.term, e.term) with
+            | Term.PVar x, Term.Lambda a -> add_to_abstraction_stack state x a
+            | _ -> state
+          in
+          optimize_computation state' c
+      in
+      let abs = Term.abstraction (p, c) in
+      Term.letVal (e, abs)
+
 and reduce_expression state expr =
   match expr.term with
   | Term.CastExp (sub_exp, tcoer) -> cast_expression state expr sub_exp tcoer
@@ -186,4 +266,13 @@ and reduce_computation state comp =
   match comp.term with
   | Term.CastComp (sub_cmp, dtcoer) ->
       cast_computation state comp sub_cmp dtcoer
+  | Term.LetVal (e, abs) -> beta_reduce state abs e
+  | Term.Apply ({ term = Term.Lambda a; _ }, e) -> beta_reduce state a e
+  | Term.LetRec (defs, c) ->
+      let state' =
+        List.fold_right
+          (fun (v, abs) state -> add_to_recursive_stack state v abs)
+          defs state
+      in
+      Term.letRec (defs, reduce_computation state' c)
   | _ -> comp
