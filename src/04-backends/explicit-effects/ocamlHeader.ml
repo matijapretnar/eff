@@ -73,6 +73,19 @@ let force_unsafe = function
   | Value v -> v
   | Call (_eff, _arg, _k) -> failwith "Unsafe value force"
 
+(* Manual tuple coercions, one way to do this a bit better is to use GADT and map over them *)
+
+let coer_tuple_2 (c1, c2) (a1, a2) = (c1 a1, c2 a2)
+
+let coer_tuple_3 (c1, c2, c3) (a1, a2, a3) = (c1 a1, c2 a2, c3 a3)
+
+let coer_tuple_4 (c1, c2, c3, c4) (a1, a2, a3, a4) = (c1 a1, c2 a2, c3 a3, c4 a4)
+
+let coer_tuple_5 (c1, c2, c3, c4, c5) (a1, a2, a3, a4, a5) =
+  (c1 a1, c2 a2, c3 a3, c4 a4, c5 a5)
+
+(* This should be enough *)
+
 let coer_arrow coer1 coer2 f x = coer2 (f (coer1 x))
 
 let coer_handler coer1 coer2 h x = coer2 (h (coer1 x))

@@ -112,7 +112,9 @@ let rec pp_coercion coer ppf =
   | NCoerReturn w -> print ppf "coer_return (%t)" (pp_coercion w)
   | NCoerUnsafe w -> print ppf "coer_unsafe (*unsafe*)(%t)" (pp_coercion w)
   | NCoerForceUnsafe -> print ppf "force_unsafe"
-  | NCoerTuple _cs -> print ppf "TupleCoercion"
+  | NCoerTuple cs ->
+      print ppf "( (* tuple_coer *) coer_tuple_%d %t)" (List.length cs)
+        (pp_tuple pp_coercion cs)
   | NCoerApply (_t, _cs) -> print ppf "ApplyCoercion"
   | NCoerQual (_ct, _c) -> print ppf "ApplyCoercion"
 
