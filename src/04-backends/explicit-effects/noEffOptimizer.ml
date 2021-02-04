@@ -75,7 +75,6 @@ and optimize_term' state (n_term : NoEff.n_term) =
   | NBind (term, abs) ->
       NBind (optimize_term state term, optimize_abstraction state abs)
   | NHandle (t1, t2) -> NHandle (optimize_term state t1, optimize_term state t2)
-  | NEffect eff -> NEffect eff
   | NLetRec (abs_lst, term) ->
       NLetRec
         ( List.map (optimize_letrec_abstraction state) abs_lst,
@@ -84,7 +83,6 @@ and optimize_term' state (n_term : NoEff.n_term) =
       NMatch
         ( optimize_term state term,
           List.map (optimize_abstraction state) abs_list )
-  | NOp (eff, term) -> NOp (eff, optimize_term state term)
   | NRecord ass -> NRecord (Assoc.map (fun t -> optimize_term state t) ass)
   | NVariant (l, opt_term) ->
       NVariant (l, Option.map (optimize_term state) opt_term)

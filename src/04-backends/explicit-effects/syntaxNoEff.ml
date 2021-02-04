@@ -61,10 +61,8 @@ and n_term =
   | NBind of n_term * n_abstraction
   | NHandle of n_term * n_term
   | NConst of Const.t
-  | NEffect of n_effect
   | NLetRec of n_letrec_abstraction list * n_term
   | NMatch of n_term * n_abstraction list
-  | NOp of n_effect * n_term
   | NRecord of (CoreTypes.Field.t, n_term) Assoc.t
   | NVariant of CoreTypes.Label.t * n_term option
 
@@ -114,14 +112,12 @@ let rec subs_var_in_term par subs term =
   | NHandle (t1, t2) ->
       NHandle (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
   | NConst c -> NConst c
-  | NEffect e -> NEffect e
   | NLetRec (abss, t) ->
       let subs_letrec (var, abs) = (var, subs_var_in_abs par subs abs) in
       NLetRec (List.map subs_letrec abss, subs_var_in_term par subs t)
   | NMatch (t, abss) ->
       NMatch
         (subs_var_in_term par subs t, List.map (subs_var_in_abs par subs) abss)
-  | NOp (eff, t) -> NOp (eff, subs_var_in_term par subs t)
   | NRecord a -> NRecord (Assoc.map (subs_var_in_term par subs) a)
   | NVariant (lbl, None) -> NVariant (lbl, None)
   | NVariant (lbl, Some t) -> NVariant (lbl, Some (subs_var_in_term par subs t))
@@ -239,10 +235,6 @@ let rec print_term ?max_level t ppf =
         (print_term ~max_level:0 t)
         (print_term ~max_level:0 h)
   | NConst c -> Const.print c ppf
-  | NEffect (eff, (ty1, ty2)) ->
-      print "Effect %t : %t %t"
-        (CoreTypes.Effect.print eff)
-        (print_type ty1) (print_type ty2)
   | NLetRec (lst, t) ->
       print ~at_level:2 "let rec @[<hov>%t@] in %t"
         (Print.sequence " and " print_let_rec_abstraction lst)
@@ -250,7 +242,6 @@ let rec print_term ?max_level t ppf =
   | NMatch (t, lst) ->
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_term t)
         (Print.sequence "@, | " print_abstraction lst)
-  | NOp (eff, t) -> print "Op %t %t" (print_effect eff) (print_term t)
   | NRecord recs -> Print.record CoreTypes.Field.print print_term recs ppf
   | NVariant (l, Some t) ->
       print "Variant %t %t" (CoreTypes.Label.print l) (print_term t)

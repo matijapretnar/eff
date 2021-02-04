@@ -372,21 +372,21 @@ and tcLambda state abs =
 
 and tcEffect state (eff : Untyped.effect) : tcExprOutput' =
   (* GEORGE: NOTE: This is verbatim copied from the previous implementation *)
-  let in_ty, out_ty = Term.EffectMap.find eff state.effects in
+  let in_ty, out_ty = Term.EffectMap.find eff state.effects
+  and s = Type.EffectSet.singleton eff in
+  let out_drty = (out_ty, Type.closed_dirt s) in
   let x_pat, x_var = Term.fresh_variable "x" in_ty
   and y_pat, y_var = Term.fresh_variable "y" out_ty in
-  let s = Type.EffectSet.singleton eff in
+  let ret, cnstrs = Term.cast_computation (Term.value y_var) out_drty in
   let outVal =
     Term.Lambda
       (Term.abstraction
          ( x_pat,
            Term.call
-             ( (eff, (in_ty, out_ty)),
-               x_var,
-               Term.abstraction (y_pat, Term.value y_var) ) ))
+             ((eff, (in_ty, out_ty)), x_var, Term.abstraction (y_pat, ret)) ))
   in
-  let outType = Type.Arrow (in_ty, (out_ty, Type.closed_dirt s)) in
-  ((outVal, outType), [])
+  let outType = Type.Arrow (in_ty, out_drty) in
+  ((outVal, outType), cnstrs)
 
 (* Handlers(Op Cases) *)
 and tcOpCases state (eclauses : (Untyped.effect, Untyped.abstraction2) Assoc.t)

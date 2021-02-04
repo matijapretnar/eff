@@ -128,7 +128,6 @@ let rec pp_term noEff_term ppf =
   | NVariant (l, Some t1) ->
       print ppf "(%t @[<hov>%t@])" (pp_label l) (pp_term t1)
   | NFun abs_ty -> print ppf "@[<hv 2>fun %t@]" (pp_abs_with_ty abs_ty)
-  | NEffect (et, _) -> print ppf "(effect %t)" (CoreTypes.Effect.print et)
   | NApplyTerm (t1, t2) ->
       print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2)
   (*| NCast (t, (NCoerReturn (NCoerRefl _) as _c)) ->
@@ -152,11 +151,8 @@ let rec pp_term noEff_term ppf =
       print ppf "@[<hv>(match %t with@, %t)@]" (pp_term t)
         (pp_sequence "@, | " pp_abs cases)
   | NCall (e, t, abs_ty) ->
-      print ppf "@[<hov 2> call (%t) @,(%t) @,(fun %t)@]" (pp_effect e)
-        (pp_term t) (pp_abs_with_ty abs_ty)
-  | NOp (e, t) ->
-      print ppf "@[<hov 2> call (%t) @,(%t) @,(%s)@]" (pp_effect e) (pp_term t)
-        "(fun x -> x)"
+      print ppf "@[<hov 2> Call (%t, %t, (fun %t))@]" (pp_effect e) (pp_term t)
+        (pp_abs_with_ty abs_ty)
   | NBind (t, abs) ->
       print ppf "@[<hov 2>((%t) >> (fun %t))@]" (pp_term t) (pp_abs abs)
   | NHandle (t1, t2) ->
