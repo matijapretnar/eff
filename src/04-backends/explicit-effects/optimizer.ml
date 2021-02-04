@@ -56,6 +56,15 @@ let applicable_pattern p vars =
   in
   check_variables (Term.pattern_vars p)
 
+let keep_used_letrec_bindings defs cmp =
+  (* Do proper call graph analysis *)
+  let free_vars_cmp, _ = Term.free_vars_comp cmp in
+  let free_vars_defs =
+    List.map (fun (_, a) -> fst (Term.free_vars_abs a)) defs
+  in
+  let free_vars = List.flatten (free_vars_cmp :: free_vars_defs) in
+  List.filter (fun (x, _) -> List.mem x free_vars) defs
+
 let rec optimize_ty_coercion state (tcoer : Constraint.ty_coercion) =
   reduce_ty_coercion state
     { tcoer with term = optimize_ty_coercion' state tcoer.term }
@@ -228,8 +237,9 @@ and cast_computation state comp coer =
   | Term.Bind (cmp, abs), (_, dcoer) ->
       let ty1, _ = cmp.ty in
       let coer1 = Constraint.bangCoercion (Constraint.reflTy ty1, dcoer) in
-      Term.bind
-        (cast_computation state cmp coer1, cast_abstraction state abs coer)
+      bind_computation state
+        (cast_computation state cmp coer1)
+        (cast_abstraction state abs coer)
   | Term.Call (eff, exp, abs), _ ->
       Term.call (eff, exp, cast_abstraction state abs coer)
   | _, _ -> Term.castComp (comp, coer)
@@ -240,7 +250,8 @@ and cast_abstraction state { term = pat, cmp; _ } coer =
 and bind_computation state comp bind =
   match comp.term with
   | Term.Value exp -> beta_reduce state bind exp
-  | Term.Bind (comp, abs) -> Term.bind (comp, bind_abstraction state abs bind)
+  | Term.Bind (comp, abs) ->
+      bind_computation state comp (bind_abstraction state abs bind)
   | Term.Call (eff, exp, abs) ->
       Term.call (eff, exp, bind_abstraction state abs bind)
   | _ -> Term.bind (comp, bind)
@@ -309,13 +320,16 @@ and reduce_computation' state comp =
   | Term.CastComp (cmp, dtcoer) -> cast_computation state cmp dtcoer
   | Term.LetVal (e, abs) -> beta_reduce state abs e
   | Term.Apply ({ term = Term.Lambda a; _ }, e) -> beta_reduce state a e
-  | Term.LetRec (defs, c) ->
+  | Term.LetRec (defs, c) -> (
       let state' =
         List.fold_right
           (fun (v, abs) state -> add_recursive_function state v abs)
           defs state
       in
-      Term.letRec (defs, reduce_computation state' c)
+      let c' = reduce_computation state' c in
+      match keep_used_letrec_bindings defs c' with
+      | [] -> c'
+      | defs' -> Term.letRec (defs', c'))
   | Term.Bind (cmp, abs) -> bind_computation state cmp abs
   | Term.Handle ({ term = Term.Handler hnd; _ }, cmp) ->
       handle_computation state hnd cmp

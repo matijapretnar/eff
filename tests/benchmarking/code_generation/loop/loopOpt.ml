@@ -108,45 +108,37 @@ let test_pure (n : int) = loop_pure n
 type (_, _) effect += Fail : (unit, empty) effect
 
 let rec loop_latent n =
-  Value
-    (let _b_15 = _op_0 (* = *) n in
-     _b_15 0)
-  >> fun _b_14 ->
+  let _b_15 = _op_0 (* = *) n in
+  let _b_14 = _b_15 0 in
   match _b_14 with
   | true -> Value ()
   | false -> (
-      Value
-        (let _b_17 = _op_1 (* < *) n in
-         _b_17 0)
-      >> fun _b_16 ->
+      let _b_17 = _op_1 (* < *) n in
+      let _b_16 = _b_17 0 in
       match _b_16 with
       | true ->
           (fun (x : unit) -> Call (Fail, x, fun (y : empty) -> Value y)) ()
           >> fun _b_18 -> Value (match _b_18 with _ -> assert false)
       | false ->
-          Value
-            (let _b_20 = _op_2 (* - *) n in
-             _b_20 1)
-          >> fun _b_19 -> loop_latent _b_19)
+          let _b_20 = _op_2 (* - *) n in
+          let _b_19 = _b_20 1 in
+          loop_latent _b_19)
 
 let test_latent (n : int) = loop_latent n
 
 type (_, _) effect += Incr : (unit, unit) effect
 
 let rec loop_incr n =
-  Value
-    (let _b_28 = _op_0 (* = *) n in
-     _b_28 0)
-  >> fun _b_27 ->
+  let _b_28 = _op_0 (* = *) n in
+  let _b_27 = _b_28 0 in
   match _b_27 with
   | true -> Value ()
   | false ->
       (fun (x : unit) -> Call (Incr, x, fun (y : unit) -> Value y)) ()
       >> fun _ ->
-      Value
-        (let _b_30 = _op_2 (* - *) n in
-         _b_30 1)
-      >> fun _b_29 -> loop_incr _b_29
+      let _b_30 = _op_2 (* - *) n in
+      let _b_29 = _b_30 1 in
+      loop_incr _b_29
 
 let test_incr (n : int) =
   let _b_45 =
@@ -174,17 +166,13 @@ let test_incr (n : int) =
   _b_45 0
 
 let rec loop_incr' n =
-  Value
-    (let _b_50 = _op_0 (* = *) n in
-     _b_50 0)
-  >> fun _b_49 ->
+  let _b_50 = _op_0 (* = *) n in
+  let _b_49 = _b_50 0 in
   match _b_49 with
   | true -> Value ()
   | false ->
-      Value
-        (let _b_52 = _op_2 (* - *) n in
-         _b_52 1)
-      >> fun _b_51 ->
+      let _b_52 = _op_2 (* - *) n in
+      let _b_51 = _b_52 1 in
       loop_incr' _b_51 >> fun _ ->
       (fun (x : unit) -> Call (Incr, x, fun (y : unit) -> Value y)) ()
 
@@ -218,23 +206,20 @@ type (_, _) effect += Get : (unit, int) effect
 type (_, _) effect += Put : (int, unit) effect
 
 let rec loop_state n =
-  Value
-    (let _b_72 = _op_0 (* = *) n in
-     _b_72 0)
-  >> fun _b_71 ->
+  let _b_72 = _op_0 (* = *) n in
+  let _b_71 = _b_72 0 in
   match _b_71 with
   | true -> Value ()
   | false ->
-      ( (fun (x : unit) -> Call (Get, x, fun (y : int) -> Value y)) ()
+      (fun (x : unit) -> Call (Get, x, fun (y : int) -> Value y)) ()
       >> fun _b_75 ->
-        Value (_op_3 (* + *) _b_75) >> fun _b_74 -> Value (_b_74 1) )
-      >> fun _b_73 ->
+      let _b_74 = _op_3 (* + *) _b_75 in
+      let _b_73 = _b_74 1 in
       (fun (x : int) -> Call (Put, x, fun (y : unit) -> Value y)) _b_73
       >> fun _ ->
-      Value
-        (let _b_77 = _op_2 (* - *) n in
-         _b_77 1)
-      >> fun _b_76 -> loop_state _b_76
+      let _b_77 = _op_2 (* - *) n in
+      let _b_76 = _b_77 1 in
+      loop_state _b_76
 
 let test_state (n : int) =
   let _b_95 =
