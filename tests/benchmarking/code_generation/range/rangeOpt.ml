@@ -109,10 +109,9 @@ let test (n : int) =
     match n with
     | 0 -> Value Nil
     | _ ->
-        let n1 = (_op_0 (* - *) n) 1 in
         (fun (x : unit) -> Call (Fetch, x, fun (y : int) -> Value y)) ()
-        >> fun _b_7 ->
-        range n1 >> fun _b_8 -> Value (Cons (_b_7, _b_8))
+        >> fun _b_5 ->
+        range ((_op_0 (* - *) n) 1) >> fun _b_6 -> Value (Cons (_b_5, _b_6))
   in
   force_unsafe
     ((handler

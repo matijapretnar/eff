@@ -110,40 +110,39 @@ let test (n : int) =
     | 0 -> (coer_return coer_refl_ty) Nil
     | _ ->
         (coer_computation coer_refl_ty)
-          ( (coer_return coer_refl_ty)
-              (let _b_6 =
-                 coer_refl_ty
-                   (((coer_arrow coer_refl_ty
-                        (coer_arrow coer_refl_ty coer_refl_ty))
-                       _op_0 (* - *))
-                      n)
-               in
-               coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_6) 1))
-          >> fun n1 ->
+          ( (coer_computation coer_refl_ty)
+              (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
+                  (fun (x : unit) ->
+                    Call
+                      (Fetch, x, fun (y : int) -> (coer_return coer_refl_ty) y)))
+                 ())
+          >> fun _b_5 ->
             (coer_computation coer_refl_ty)
               ( (coer_computation coer_refl_ty)
-                  (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                      (fun (x : unit) ->
-                        Call
-                          ( Fetch,
-                            x,
-                            fun (y : int) -> (coer_return coer_refl_ty) y )))
-                     ())
-              >> fun _b_7 ->
-                (coer_computation coer_refl_ty)
-                  ( (coer_computation coer_refl_ty)
+                  ( (coer_return coer_refl_ty)
+                      (let _b_8 =
+                         coer_refl_ty
+                           (((coer_arrow coer_refl_ty
+                                (coer_arrow coer_refl_ty coer_refl_ty))
+                               _op_0 (* - *))
+                              n)
+                       in
+                       coer_refl_ty
+                         (((coer_arrow coer_refl_ty coer_refl_ty) _b_8) 1))
+                  >> fun _b_7 ->
+                    (coer_computation coer_refl_ty)
                       (((coer_arrow coer_refl_ty
                            (coer_computation coer_refl_ty))
                           ((coer_arrow coer_refl_ty
                               (coer_computation coer_refl_ty))
                              range))
-                         n1)
-                  >> fun _b_8 ->
-                    (coer_return coer_refl_ty)
-                      (Cons
-                         (((* tuple_coer *) coer_tuple_2
-                             (coer_refl_ty, coer_refl_ty))
-                            (_b_7, _b_8))) ) ) )
+                         _b_7) )
+              >> fun _b_6 ->
+                (coer_return coer_refl_ty)
+                  (Cons
+                     (((* tuple_coer *) coer_tuple_2
+                         (coer_refl_ty, coer_refl_ty))
+                        (_b_5, _b_6))) ) )
   in
   (coer_unsafe (*unsafe*) coer_refl_ty)
     (((coer_handler

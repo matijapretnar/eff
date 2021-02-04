@@ -8,7 +8,7 @@ let test n =
 		match n with
 		| 0 -> Nil
 		| _ ->
-			in Cons (perform (Fetch ()), range (n - 1))
+			Cons (perform (Fetch ()), range (n - 1))
 	in			
 	handle ( range n ) with
 	| x -> x
