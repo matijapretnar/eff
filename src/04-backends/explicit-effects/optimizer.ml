@@ -65,6 +65,15 @@ let keep_used_letrec_bindings defs cmp =
   let free_vars = List.flatten (free_vars_cmp :: free_vars_defs) in
   List.filter (fun (x, _) -> List.mem x free_vars) defs
 
+let rec extract_cast_value comp =
+  match comp.term with
+  | Term.Value exp -> Some exp
+  | Term.CastComp (comp, { term = tcoer, _; _ }) ->
+      Option.map
+        (fun exp -> Term.castExp (exp, tcoer))
+        (extract_cast_value comp)
+  | _ -> None
+
 let rec optimize_ty_coercion state (tcoer : Constraint.ty_coercion) =
   reduce_ty_coercion state
     { tcoer with term = optimize_ty_coercion' state tcoer.term }
@@ -104,6 +113,7 @@ and reduce_ty_coercion state ty_coer =
   { ty_coer with term = reduce_ty_coercion' state ty_coer.term }
 
 and reduce_ty_coercion' _state = function
+  (* TODO: Is it sufficient to just check if the input and output types match? *)
   | ArrowCoercion
       ( { term = ReflTy ty1; _ },
         { term = { term = ReflTy ty2; _ }, { term = ReflDirt drt; _ }; _ } ) ->
@@ -117,6 +127,7 @@ and reduce_dirt_coercion' _state = function
   | Empty drt when Type.is_empty_dirt drt -> ReflDirt drt
   | UnionDirt (effects, { term = ReflDirt drt; _ }) ->
       ReflDirt (Type.add_effects effects drt)
+  | UnionDirt (effects, {})
   | dcoer -> dcoer
 
 let rec optimize_expression state exp =
@@ -249,20 +260,21 @@ and cast_abstraction state { term = pat, cmp; _ } coer =
 
 and bind_computation state comp bind =
   match comp.term with
-  | Term.Value exp -> beta_reduce state bind exp
   | Term.Bind (comp, abs) ->
       bind_computation state comp (bind_abstraction state abs bind)
   | Term.Call (eff, exp, abs) ->
       Term.call (eff, exp, bind_abstraction state abs bind)
-  | _ -> Term.bind (comp, bind)
+  | _ -> (
+      match extract_cast_value comp with
+      | Some exp -> beta_reduce state bind exp
+      | None -> Term.bind (comp, bind))
 
 and bind_abstraction state { term = pat, cmp; _ } bind =
   Term.abstraction (pat, bind_computation state cmp bind)
 
 and handle_computation state hnd comp =
   match comp.term with
-  | Term.Value exp -> beta_reduce state hnd.term.Term.value_clause exp
-  | Match (exp, cases) ->
+  | Term.Match (exp, cases) ->
       let _, drty_out = hnd.ty in
       Term.match_ (exp, List.map (handle_abstraction state hnd) cases) drty_out
       |> optimize_computation state
@@ -272,7 +284,10 @@ and handle_computation state hnd comp =
   | LetRec (defs, comp) ->
       Term.letRec (defs, handle_computation state hnd comp)
       |> optimize_computation state
-  | _ -> Term.handle (Term.handler hnd, comp)
+  | _ -> (
+      match extract_cast_value comp with
+      | Some exp -> beta_reduce state hnd.term.Term.value_clause exp
+      | None -> Term.handle (Term.handler hnd, comp))
 
 and handle_abstraction state hnd { term = p, c; _ } =
   Term.abstraction (p, handle_computation state hnd c)
@@ -317,6 +332,7 @@ and reduce_computation state comp =
 
 and reduce_computation' state comp =
   match comp.term with
+  (* TODO: matches of a constant *)
   | Term.CastComp (cmp, dtcoer) -> cast_computation state cmp dtcoer
   | Term.LetVal (e, abs) -> beta_reduce state abs e
   | Term.Apply ({ term = Term.Lambda a; _ }, e) -> beta_reduce state a e
