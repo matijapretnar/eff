@@ -37,7 +37,7 @@ let rec optimize_ty_coercion state (n_coer : NoEff.n_coercion) =
 
 and optimize_ty_coercion' state (n_coer : NoEff.n_coercion) =
   match n_coer with
-  | NCoerVar _ | NCoerRefl _ -> n_coer
+  | NCoerVar _ | NCoerRefl -> n_coer
   | NCoerArrow (n1, n2) ->
       NCoerArrow (optimize_ty_coercion state n1, optimize_ty_coercion state n2)
   | NCoerHandler (n1, n2) ->
@@ -61,13 +61,13 @@ and reduce_ty_coercion state ty_coer = reduce_ty_coercion' state ty_coer
 
 and reduce_ty_coercion' _state n_coer =
   match n_coer with
-  | NoEff.NCoerArrow (NCoerRefl t1, NCoerRefl t2) ->
-      NCoerRefl (NTyArrow (t1, t2))
-  | NoEff.NCoerHandler (NCoerRefl t1, NCoerRefl t2) ->
-      NCoerRefl (NTyHandler (t1, t2))
-  | NCoerUnsafe (NCoerRefl _) -> NCoerForceUnsafe
-  | NCoerComp (NCoerRefl t1) -> NCoerRefl t1
-  | NoEff.NCoerTuple _ -> failwith ""
+  | NoEff.NCoerArrow (NCoerRefl, NCoerRefl) -> NCoerRefl
+  | NoEff.NCoerHandler (NCoerRefl, NCoerRefl) -> NCoerRefl
+  | NCoerUnsafe NCoerRefl -> NCoerForceUnsafe
+  | NCoerComp NCoerRefl -> NCoerRefl
+  | NoEff.NCoerTuple coers
+    when List.for_all (fun coer -> coer = NoEff.NCoerRefl) coers ->
+      NCoerRefl
   | _ -> n_coer
 
 and optimize_term state (n_term : NoEff.n_term) =
@@ -153,8 +153,8 @@ and beta_reduce state (p, c) e =
 and reduce_term' state (n_term : NoEff.n_term) =
   (* Print.debug "Reducing noeff term: %t" (NoEff.print_term n_term); *)
   match n_term with
-  | NCast (t, (NCoerReturn (NCoerRefl _) as _c)) -> NoEff.NReturn t
-  | NCast (t, NCoerRefl _) -> t
+  | NCast (t, (NCoerReturn NCoerRefl as _c)) -> NoEff.NReturn t
+  | NCast (t, NCoerRefl) -> t
   | NBind (NReturn t, c) -> beta_reduce state c t
   | NLet (e, a) -> beta_reduce state a e
   | _ -> n_term

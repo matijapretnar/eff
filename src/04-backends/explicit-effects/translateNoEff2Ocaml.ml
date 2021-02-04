@@ -84,7 +84,7 @@ let rec pp_pattern pat ppf =
   | PNRecord rcd -> print ppf "%t" (pp_record pp_pattern "=" rcd)
   | PNVariant (l, None) -> print ppf "%t" (pp_label l)
   | PNVariant (l, Some p) ->
-      print ppf "%t @[<hov>%t@]" (pp_label l) (pp_pattern p)
+      print ppf "%t (@[<hov>%t@])" (pp_label l) (pp_pattern p)
   | PNConst c -> print ppf "%t" (Const.print c)
   | PNNonbinding -> print ppf "_"
 
@@ -99,7 +99,7 @@ let rec pp_coercion coer ppf =
   (* The cases not matched here should be handled in pp_term *)
   match coer with
   | NCoerVar v -> print ppf "%t" (Type.TyCoercionParam.print v)
-  | NCoerRefl _ -> print ppf "coer_refl_ty"
+  | NCoerRefl -> print ppf "coer_refl_ty"
   | NCoerArrow (w1, w2) ->
       print ppf "coer_arrow (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
   | NCoerHandler (w1, w2) ->
@@ -126,7 +126,7 @@ let rec pp_term noEff_term ppf =
       print ppf "@[<hov>(%t::%t)@]" (pp_term hd) (pp_term tl)
   | NVariant (l, None) -> print ppf "(%t)" (pp_label l)
   | NVariant (l, Some t1) ->
-      print ppf "(%t @[<hov>%t@])" (pp_label l) (pp_term t1)
+      print ppf "(%t (@[<hov>%t@]))" (pp_label l) (pp_term t1)
   | NFun abs_ty -> print ppf "@[<hv 2>fun %t@]" (pp_abs_with_ty abs_ty)
   | NApplyTerm (t1, t2) ->
       print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2)
@@ -162,7 +162,7 @@ let rec pp_term noEff_term ppf =
 and pp_abs (p, t) ppf = print ppf "@[<h> %t ->@ %t@]" (pp_pattern p) (pp_term t)
 
 and pp_abs_with_ty (p, ty, t) ppf =
-  print ppf "@[<h>(%t: %t) ->@ %t@]" (pp_pattern p) (print_type ty) (pp_term t)
+  print ppf "@[<h>(%t: %t) ->@ %t@]" (pp_pattern p) (pp_type ty) (pp_term t)
 
 and pp_let_rec lst ppf =
   let pp_var_ty_abs (v, t) ppf =

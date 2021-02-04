@@ -20,7 +20,7 @@ and n_coerty = n_type * n_type
 
 type n_coercion =
   | NCoerVar of Type.TyCoercionParam.t
-  | NCoerRefl of n_type
+  | NCoerRefl
   | NCoerArrow of n_coercion * n_coercion
   | NCoerHandler of n_coercion * n_coercion
   | NCoerHandToFun of n_coercion * n_coercion
@@ -296,7 +296,7 @@ let rec print_coercion ?max_level coer ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match coer with
   | NCoerVar x -> Type.TyCoercionParam.print x ppf
-  | NCoerRefl t -> print "(< %t >)" (print_type t)
+  | NCoerRefl -> print "<>"
   | NCoerArrow (c1, c2) ->
       print "(%t -> %t)" (print_coercion c1) (print_coercion c2)
   | NCoerHandler (c1, c2) ->

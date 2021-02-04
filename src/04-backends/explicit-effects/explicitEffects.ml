@@ -257,7 +257,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     t'
 
   let process_computation state c =
-    let c' = TranslateExEff2NoEff.elab_computation c in
+    let c' = optimize_term state @@ TranslateExEff2NoEff.elab_computation c in
     { state with prog = SyntaxNoEff.Term c' :: state.prog }
 
   let process_type_of state _ =

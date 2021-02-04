@@ -58,9 +58,7 @@ let get_effectset effects = get_effectset_temp EffectSet.empty effects
 
 let rec elab_ty_coercion coer =
   match coer.term with
-  | Constraint.ReflTy ty ->
-      let tyelab = elab_ty ty in
-      NoEff.NCoerRefl tyelab
+  | Constraint.ReflTy _ -> NoEff.NCoerRefl
   | Constraint.ArrowCoercion (tycoer, dirtycoer) ->
       let tyelab = elab_ty_coercion tycoer in
       let dirtyelab = elab_dirty_coercion dirtycoer in
@@ -164,8 +162,8 @@ and elab_expression' exp =
                          (NCast
                             ( NVar x,
                               NoEff.NCoerArrow
-                                ( NoEff.NCoerRefl elab1,
-                                  NoEff.NCoerUnsafe (NoEff.NCoerRefl elab2) ) ))
+                                ( NoEff.NCoerRefl,
+                                  NoEff.NCoerUnsafe NoEff.NCoerRefl ) ))
                          elabcomp) ) )
             | _ -> failwith "STIEN: wrong elab handler case 2"
           in
@@ -260,15 +258,13 @@ and elab_computation' c =
       and vtype = value.ty
       and velab = elab_expression value in
       match vtype with
-      | ExEffTypes.Handler ((vty1, _vdirt1), (vty2, vdirt2)) when ctype = vty1
+      | ExEffTypes.Handler ((vty1, _vdirt1), (_vty2, vdirt2)) when ctype = vty1
         ->
           if Type.is_empty_dirt cdirt (* Handle - Case 1 *) then
             NoEff.NApplyTerm (velab, elabc)
           else if Type.is_empty_dirt vdirt2 (* Handle - Case 2 *) then
-            let telab = elab_ty vty2 in
             NoEff.NCast
-              ( NoEff.NHandle (elabc, velab),
-                NoEff.NCoerUnsafe (NoEff.NCoerRefl telab) )
+              (NoEff.NHandle (elabc, velab), NoEff.NCoerUnsafe NoEff.NCoerRefl)
             (* Handle - Case 3 *)
           else NoEff.NHandle (elabc, velab)
       | _ -> failwith "Ill-typed handler")
