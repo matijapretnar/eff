@@ -12,7 +12,7 @@ and number_of_queens = 8
 
 and number_of_range = 10
 
-let run_loop_pure = true
+let run_loop_pure = false
 
 and run_loop_latent = false
 
@@ -22,13 +22,13 @@ and run_loop_incr' = false
 
 and run_loop_state = false
 
-and run_queens_one = false
+and run_queens_one = true
 
 and run_queens_all = false
 
 and run_interp = false
 
-and run_range = false
+and run_range = true
 
 open Bechamel
 open Toolkit
@@ -194,12 +194,12 @@ let queens_one_cps_benchmark number_of_queens =
     name = "QUEENS ONE CPS BENCHMARK";
     benchmarks =
       [
-        ( "Generated, not optimized",
+        (* ( "Generated, not optimized",
           forget_value QueensNoOpt.queens_one_cps,
-          always_true QueensNoOpt.queens_one_cps );
+          always_true QueensNoOpt.queens_one_cps ); *)
         ( "Generated, optimized",
-          forget_value QueensOpt.queens_one_cps,
-          always_true QueensOpt.queens_one_cps );
+          forget_value QueensOpt.test_queens,
+          always_true QueensOpt.test_queens );
         ( "Hand written",
           forget_value QueensHandWritten.queens_one_cps,
           always_true QueensHandWritten.queens_one_cps );
@@ -210,7 +210,7 @@ let queens_one_cps_benchmark number_of_queens =
     param = number_of_queens;
   }
 
-let queens_one_benchmark number_of_queens =
+(* let queens_one_benchmark number_of_queens =
   {
     name = "QUEENS ONE OPTION BENCHMARK";
     benchmarks =
@@ -229,19 +229,19 @@ let queens_one_benchmark number_of_queens =
           always_true QueensNative.queens_one_option );
       ];
     param = number_of_queens;
-  }
+  } *)
 
-let queens_all_benchmark number_of_queens =
+(* let queens_all_benchmark number_of_queens =
   {
     name = "QUEENS ALL BENCHMARK";
     benchmarks =
       [
-        ( "Generated, not optimized",
-          forget_value QueensNoOpt.queens_all,
-          always_true QueensNoOpt.queens_all );
+        (* ( "Generated, not optimized",
+           forget_value QueensNoOpt.queens_all,
+           always_true QueensNoOpt.queens_all ); *)
         ( "Generated, optimized",
-          forget_value QueensOpt.queens_all,
-          always_true QueensOpt.queens_all );
+          forget_value QueensOpt.test_queens,
+          always_true QueensOpt.test_queens );
         ( "Hand written",
           forget_value QueensHandWritten.queens_all,
           always_true QueensHandWritten.queens_all );
@@ -250,7 +250,7 @@ let queens_all_benchmark number_of_queens =
           always_true QueensNative.queens_all );
       ];
     param = number_of_queens;
-  }
+  } *)
 
 let interpreter_benchmark =
   {
@@ -328,14 +328,14 @@ let () =
     let set = queens_one_cps_benchmark number_of_queens in
     Printf.printf "%s (%d queens):\n" set.name set.param;
     run_and_show_set set);
-  if run_queens_one then (
+  (* if run_queens_one then (
     let set = queens_one_benchmark number_of_queens in
     Printf.printf "%s (%d queens):\n" set.name set.param;
     run_and_show_set set);
   if run_queens_all then (
     let set = queens_all_benchmark number_of_queens in
     Printf.printf "%s (%d queens):\n" set.name set.param;
-    run_and_show_set set);
+    run_and_show_set set); *)
   if run_interp then (
     let set = interpreter_benchmark in
     Printf.printf "%s :\n" set.name;

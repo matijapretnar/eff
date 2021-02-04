@@ -107,8 +107,7 @@ type inttuplist = IntTupNil | IntTupCons of (inttuple * inttuplist)
 
 type void = Void
 
-;;
-(fun (n : int) ->
+let test_queens (n : int) =
   let absurd (void : empty) = match void with _ -> assert false in
   let _op_9 (* > *) (x : int) (y : int) = (_op_0 (* < *) y) x in
   let _op_13 (* <> *) (x : int) (y : int) =
@@ -197,5 +196,4 @@ type void = Void
     (force_unsafe (backtrack (queens number_of_queens))) (fun (() : unit) ->
         (fun (x : unit) -> Call (Fail, x, fun (y : empty) -> Value y)) ()
         >> fun _b_100 -> Value (absurd _b_100)))
-    n)
-  8
+    n

@@ -103,12 +103,9 @@ let test_queens n =
 
 (*  let queens_one_option number_of_queens = *)
 (*    with optionalize handle queens number_of_queens *)
-(*  in *)
   let queens_one_cps number_of_queens =
     (with backtrack handle queens number_of_queens) (fun () -> (absurd (perform (Fail ()))))
-  in
 (*  let queens_all number_of_queens = *)
 (*    with choose_all handle queens number_of_queens *)
-(*  in *)
+  in
   queens_one_cps n
-in test_queens 8
