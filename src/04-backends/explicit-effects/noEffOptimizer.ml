@@ -135,31 +135,30 @@ and n_abstraction_2_args state ((pat1, pat2, term) : NoEff.n_abstraction_2_args)
     =
   (pat1, pat2, optimize_term state term)
 
-(* and substitute_pattern st t p exp =
-  optimize_term st (NoEff.subst_comp (NoEff.pattern_match p exp) c) *)
+and substitute_pattern st t p exp =
+  optimize_term st (NoEff.substitute_term (NoEff.pattern_match p exp) t)
 
-(* and substitute_pattern_expr st e p exp =
-  optimize_expression st (NoEff.subst_expr (NoEff.pattern_match p exp) e) *)
-and beta_reduce _state abs e =
-  (* match applicable_pattern p (NoEff.free_vars_comp c) with
-     | Inlinable -> substitute_pattern_comp state c p e
-     | NotPresent -> c
-     | NotInlinable ->
-         let c =
-           if is_atomic e then
-             (* Inline constants and variables anyway *)
-             substitute_pattern_comp state c p e
-           else c
-         in
-         let abs = Term.abstraction (p, c) in *)
-  Term.letVal (e, abs)
+and beta_reduce state (p, c) e =
+  match applicable_pattern p (NoEff.free_vars c) with
+  | Inlinable -> substitute_pattern state c p e
+  | NotPresent -> c
+  | NotInlinable ->
+      let c =
+        if is_atomic e then
+          (* Inline constants and variables anyway *)
+          substitute_pattern state c p e
+        else c
+      in
+      let abs = (p, c) in
+      NoEff.NLet (e, abs)
 
-and reduce_term' _state (n_term : NoEff.n_term) =
+and reduce_term' state (n_term : NoEff.n_term) =
   (* Print.debug "Reducing noeff term: %t" (NoEff.print_term n_term); *)
   match n_term with
   | NCast (t, (NCoerReturn (NCoerRefl _) as _c)) -> NoEff.NReturn t
   | NCast (t, NCoerRefl _) -> t
   | NBind (NReturn t, c) -> NLet (t, c)
+  | NLet (e, a) -> beta_reduce state a e
   | _ -> n_term
 
 and reduce_term state n_term =

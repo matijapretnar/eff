@@ -145,6 +145,125 @@ let occurrences x (inside, outside) =
   let count ys = List.length (List.filter (fun y -> x = y) ys) in
   (count inside, count outside)
 
+let pattern_match p e =
+  let rec extend_subst p e sbst =
+    match (p, e) with
+    | PNVar x, _ -> Assoc.update x e sbst
+    | PNAs (p, x), _ ->
+        let sbst = extend_subst p e sbst in
+        Assoc.update x e sbst
+    | PNNonbinding, _ -> sbst
+    | PNTuple ps, NTuple es -> List.fold_right2 extend_subst ps es sbst
+    | PNRecord ps, NRecord es ->
+        let rec extend_record ps es sbst =
+          match ps with
+          | [] -> sbst
+          | (f, p) :: ps ->
+              let e = List.assoc f es in
+              extend_record ps es (extend_subst p e sbst)
+        in
+        extend_record (Assoc.to_list ps) (Assoc.to_list es) sbst
+    | PNVariant (lbl, None), NVariant (lbl', None) when lbl = lbl' -> sbst
+    | PNVariant (lbl, Some p), NVariant (lbl', Some e) when lbl = lbl' ->
+        extend_subst p e sbst
+    | PNConst c, NConst c' when Const.equal c c' -> sbst
+    | _, _ -> assert false
+  in
+  extend_subst p e Assoc.empty
+
+(* Substitutions *)
+
+let rec substitute_term sbst n_term =
+  match n_term with
+  | NVar x -> ( match Assoc.lookup x sbst with Some e' -> e' | None -> n_term)
+  | NTuple t -> NTuple (List.map (substitute_term sbst) t)
+  | NFun a -> NFun (substitute_abstraction_with_ty sbst a)
+  | NApplyTerm (t1, t2) ->
+      NApplyTerm ((substitute_term sbst) t1, (substitute_term sbst) t2)
+  | NBigLambdaCoer (c, t) -> NBigLambdaCoer (c, (substitute_term sbst) t)
+  | NApplyCoer (t, c) -> NApplyCoer ((substitute_term sbst) t, c)
+  | NCast (t, c) -> NCast ((substitute_term sbst) t, c)
+  | NReturn t -> NReturn ((substitute_term sbst) t)
+  | NHandler h -> NHandler (substitue_handler sbst h)
+  | NLet (t, a) -> NLet ((substitute_term sbst) t, substitute_abstraction sbst a)
+  | NCall (eff, t, a) ->
+      NCall
+        (eff, (substitute_term sbst) t, substitute_abstraction_with_ty sbst a)
+  | NBind (t, a) ->
+      NBind ((substitute_term sbst) t, substitute_abstraction sbst a)
+  | NHandle (t1, t2) ->
+      NHandle ((substitute_term sbst) t1, (substitute_term sbst) t2)
+  | NConst _ -> n_term
+  | NLetRec (lst, t) ->
+      NLetRec (List.map (substitute_letrec sbst) lst, (substitute_term sbst) t)
+  | NMatch (t, abs) ->
+      NMatch
+        ((substitute_term sbst) t, List.map (substitute_abstraction sbst) abs)
+  | NRecord recs -> NRecord (Assoc.map (substitute_term sbst) recs)
+  | NVariant (lbl, a) -> NVariant (lbl, Option.map (substitute_term sbst) a)
+
+and substitute_abstraction sbst (p, c) = (p, substitute_term sbst c)
+
+and substitute_letrec sbst (p, a) = (p, substitute_abstraction sbst a)
+
+and substitute_abstraction_with_ty sbst (p, ty, c) =
+  (p, ty, substitute_term sbst c)
+
+and substitute_abstraction2 sbst (p1, p2, c) = (p1, p2, (substitute_term sbst) c)
+
+and substitue_handler sbst { effect_clauses; return_clause } =
+  {
+    return_clause = substitute_abstraction_with_ty sbst return_clause;
+    effect_clauses = Assoc.map (substitute_abstraction2 sbst) effect_clauses;
+  }
+
+(* Free variables *)
+
+let ( @@@ ) (inside1, outside1) (inside2, outside2) =
+  (inside1 @ inside2, outside1 @ outside2)
+
+let ( --- ) (inside, outside) bound =
+  let remove_bound xs = List.filter (fun x -> not (List.mem x bound)) xs in
+  (remove_bound inside, remove_bound outside)
+
+let concat_vars vars = List.fold_right ( @@@ ) vars ([], [])
+
+let rec free_vars = function
+  | NVar v -> ([], [ v ])
+  | NTuple l -> concat_vars (List.map free_vars l)
+  | NFun _ -> failwith ""
+  | NHandle (t1, t2) | NApplyTerm (t1, t2) -> free_vars t1 @@@ free_vars t2
+  | NBigLambdaCoer (_, t) | NApplyCoer (t, _) | NCast (t, _) -> free_vars t
+  | NReturn t -> free_vars t
+  | NHandler h -> free_vars_handler h
+  | NLet (e, a) -> free_vars e @@@ free_vars_abs a
+  | NCall (_, e, a) -> free_vars e @@@ free_vars_abs_with_ty a
+  | NBind (e, a) -> free_vars e @@@ free_vars_abs a
+  | NConst _ -> ([], [])
+  | NLetRec (_, _) -> failwith ""
+  | NMatch (e, l) -> free_vars e @@@ concat_vars (List.map free_vars_abs l)
+  | NRecord r -> Assoc.values_of r |> List.map free_vars |> concat_vars
+  | NVariant (_, e) -> Option.default_map ([], []) free_vars e
+
+and free_vars_handler h =
+  free_vars_abs_with_ty h.return_clause
+  @@@ (Assoc.values_of h.effect_clauses
+      |> List.map free_vars_abs2 |> concat_vars)
+
+and free_vars_abs (p, c) =
+  let inside, outside = free_vars c --- pattern_vars p in
+  (inside @ outside, [])
+
+and free_vars_letrec (v, (p, c)) =
+  let inside, outside = free_vars c --- pattern_vars p --- [ v ] in
+  (inside @ outside, [])
+
+and free_vars_abs_with_ty (p, _ty, c) = free_vars_abs (p, c)
+
+and free_vars_abs2 (p1, p2, c) =
+  let inside, outside = free_vars c --- pattern_vars p2 --- pattern_vars p1 in
+  (inside @ outside, [])
+
 (********************** PRINT FUNCTIONS **********************)
 
 let rec print_type ?max_level ty ppf =
