@@ -225,9 +225,11 @@ and cast_expression state exp sub_exp coer =
 and cast_computation state comp coer =
   match (comp.term, coer.term) with
   | _, _ when Constraint.is_trivial_dirty_coercion coer -> comp
-  (* | Term.Bind (cmp, abs), _ ->
+  | Term.Bind (cmp, abs), (_, dcoer) ->
+      let ty1, _ = cmp.ty in
+      let coer1 = Constraint.bangCoercion (Constraint.reflTy ty1, dcoer) in
       Term.bind
-        (cast_computation state cmp coer, cast_abstraction state abs coer) *)
+        (cast_computation state cmp coer1, cast_abstraction state abs coer)
   | Term.Call (eff, exp, abs), _ ->
       Term.call (eff, exp, cast_abstraction state abs coer)
   | _, _ -> Term.castComp (comp, coer)
