@@ -240,7 +240,8 @@ let rec free_vars = function
   | NCall (_, e, a) -> free_vars e @@@ free_vars_abs_with_ty a
   | NBind (e, a) -> free_vars e @@@ free_vars_abs a
   | NConst _ -> ([], [])
-  | NLetRec (defs, c) ->( List.map free_vars_letrec defs |> concat_vars) @@@ free_vars c
+  | NLetRec (defs, c) ->
+      (List.map free_vars_letrec defs |> concat_vars) @@@ free_vars c
   | NMatch (e, l) -> free_vars e @@@ concat_vars (List.map free_vars_abs l)
   | NRecord r -> Assoc.values_of r |> List.map free_vars |> concat_vars
   | NVariant (_, e) -> Option.default_map ([], []) free_vars e

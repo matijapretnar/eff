@@ -116,9 +116,14 @@ let lambda abs = { term = Lambda abs; ty = Type.Arrow abs.ty }
 
 let effect (_ : effect) : expression = failwith __LOC__
 
+let handler_clauses value_clause effect_clauses drt_in =
+  (* TODO: Check that input dirt is either handled or covered in output dirt *)
+  (* TODO: Check that effect clauses have a correct type *)
+  let ty_in, drty_out = value_clause.ty in
+  { term = { value_clause; effect_clauses }; ty = ((ty_in, drt_in), drty_out) }
+
 let handler h =
   let drty1, drty2 = h.ty in
-  (* Check that effect clauses have a correct type *)
   { term = Handler h; ty = Type.Handler (drty1, drty2) }
 
 let castExp (exp, coer) =

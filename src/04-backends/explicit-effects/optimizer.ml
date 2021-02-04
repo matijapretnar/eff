@@ -74,6 +74,28 @@ let rec extract_cast_value comp =
         (extract_cast_value comp)
   | _ -> None
 
+let rec recast_computation handled_drt comp =
+  match (comp.term, comp.ty) with
+  | Term.CastComp (comp, { term = tcoer, _; _ }), _ ->
+      Option.map
+        (fun comp ->
+          let _, drt = comp.ty in
+          Term.castComp
+            (comp, Constraint.bangCoercion (tcoer, Constraint.reflDirt drt)))
+        (recast_computation handled_drt comp)
+  | _, (ty, { Type.effect_set = effs; Type.row = EmptyRow })
+    when Type.EffectSet.disjoint effs handled_drt.Type.effect_set ->
+      let drt_diff =
+        {
+          Type.effect_set = Type.EffectSet.diff handled_drt.Type.effect_set effs;
+          Type.row = handled_drt.Type.row;
+        }
+      in
+      let ty_coer = Constraint.reflTy ty
+      and drt_coer = Constraint.empty drt_diff in
+      Some (Term.castComp (comp, Constraint.bangCoercion (ty_coer, drt_coer)))
+  | _, _ -> None
+
 let rec optimize_ty_coercion state (tcoer : Constraint.ty_coercion) =
   reduce_ty_coercion state
     { tcoer with term = optimize_ty_coercion' state tcoer.term }
@@ -283,10 +305,39 @@ and handle_computation state hnd comp =
   | LetRec (defs, comp) ->
       Term.letRec (defs, handle_computation state hnd comp)
       |> optimize_computation state
+  | Call (eff, exp, abs) -> (
+      let handled_abs = handle_abstraction state hnd abs in
+      match Assoc.lookup eff hnd.term.Term.effect_clauses with
+      | Some { term = p1, p2, comp; _ } ->
+          (* TODO: Refresh abstraction? *)
+          let comp' =
+            beta_reduce state
+              (Term.abstraction (p2, comp))
+              (Term.lambda handled_abs)
+          in
+          beta_reduce state (Term.abstraction (p1, comp')) exp
+      | None -> Term.call (eff, exp, handled_abs))
+  | Bind (cmp, abs) -> (
+      let (_, drt_in), _ = hnd.ty in
+      match recast_computation drt_in cmp with
+      | Some comp' ->
+          bind_computation state comp' (handle_abstraction state hnd abs)
+      | None ->
+          let hnd' =
+            Term.handler_clauses
+              (handle_abstraction state hnd abs)
+              hnd.term.Term.effect_clauses drt_in
+          in
+          handle_computation state hnd' cmp)
   | _ -> (
       match extract_cast_value comp with
       | Some exp -> beta_reduce state hnd.term.Term.value_clause exp
-      | None -> Term.handle (Term.handler hnd, comp))
+      | None -> (
+          let (_, drt_in), _ = hnd.ty in
+          match recast_computation drt_in comp with
+          | Some comp' ->
+              bind_computation state comp' hnd.term.Term.value_clause
+          | None -> Term.handle (Term.handler hnd, comp)))
 
 and handle_abstraction state hnd { term = p, c; _ } =
   Term.abstraction (p, handle_computation state hnd c)
