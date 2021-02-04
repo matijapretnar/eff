@@ -37,7 +37,7 @@ type variable = Variable.t
 
 type n_effect = CoreTypes.Effect.t * (n_type * n_type)
 
-and n_pattern =
+type n_pattern =
   | PNVar of variable
   | PNAs of n_pattern * variable
   | PNTuple of n_pattern list
@@ -46,7 +46,19 @@ and n_pattern =
   | PNConst of Const.t
   | PNNonbinding
 
-and n_term =
+let rec pattern_vars pat =
+  match pat with
+  | PNVar x -> [ x ]
+  | PNAs (p, x) -> x :: pattern_vars p
+  | PNTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
+  | PNRecord lst ->
+      Assoc.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
+  | PNVariant (_, None) -> []
+  | PNVariant (_, Some p) -> pattern_vars p
+  | PNConst _ -> []
+  | PNNonbinding -> []
+
+type n_term =
   | NVar of variable
   | NTuple of n_term list
   | NFun of n_abstraction_with_param_ty
@@ -71,11 +83,6 @@ and n_handler = {
   return_clause : n_abstraction_with_param_ty;
 }
 
-and n_tydef =
-  | TyDefRecord of (CoreTypes.Field.t, n_type) Assoc.t
-  | TyDefSum of (CoreTypes.Label.t, n_type option) Assoc.t
-  | TyDefInline of n_type
-
 and n_abstraction = n_pattern * n_term
 
 and n_abstraction_with_param_ty = n_pattern * n_type * n_term
@@ -83,6 +90,11 @@ and n_abstraction_with_param_ty = n_pattern * n_type * n_term
 and n_abstraction_2_args = n_pattern * n_pattern * n_term
 
 and n_letrec_abstraction = variable * n_abstraction
+
+type n_tydef =
+  | TyDefRecord of (CoreTypes.Field.t, n_type) Assoc.t
+  | TyDefSum of (CoreTypes.Label.t, n_type option) Assoc.t
+  | TyDefInline of n_type
 
 type cmd =
   | Term of n_term
@@ -128,6 +140,10 @@ and subs_var_in_abs par subs (p, c) = (p, subs_var_in_term par subs c)
 and subs_var_in_abs_with_ty par subs (p, t, c) =
   let p, c = subs_var_in_abs par subs (p, c) in
   (p, t, c)
+
+let occurrences x (inside, outside) =
+  let count ys = List.length (List.filter (fun y -> x = y) ys) in
+  (count inside, count outside)
 
 (********************** PRINT FUNCTIONS **********************)
 

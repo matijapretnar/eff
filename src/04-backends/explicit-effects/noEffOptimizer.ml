@@ -1,9 +1,36 @@
 open Utils
 module NoEff = SyntaxNoEff
 
-type state = unit
+type state = { fuel : int }
 
-let initial_state = ()
+let initial_state = { fuel = !Config.optimization_fuel }
+
+(* Optimization functions *)
+
+(* Reductions and inlining *)
+
+type inlinability =
+  (* Pattern does not occur in in an abstraction body *)
+  | NotPresent
+  (* Pattern occurs, and occurs at most once in an abstraction and there is no recursion *)
+  | Inlinable
+  (* Pattern occurs more than once in a body of abstraction or it occurs recursively *)
+  | NotInlinable
+
+let is_atomic = function NoEff.NVar _ | NConst _ -> true | _ -> false
+
+let applicable_pattern p vars =
+  let rec check_variables = function
+    | [] -> NotPresent
+    | x :: xs -> (
+        let inside_occ, outside_occ = NoEff.occurrences x vars in
+        if inside_occ > 0 || outside_occ > 1 then NotInlinable
+        else
+          match check_variables xs with
+          | NotPresent -> if outside_occ = 0 then NotPresent else Inlinable
+          | inlinability -> inlinability)
+  in
+  check_variables (NoEff.pattern_vars p)
 
 let rec optimize_ty_coercion state (n_coer : NoEff.n_coercion) =
   reduce_ty_coercion state (optimize_ty_coercion' state n_coer)
@@ -108,8 +135,34 @@ and n_abstraction_2_args state ((pat1, pat2, term) : NoEff.n_abstraction_2_args)
     =
   (pat1, pat2, optimize_term state term)
 
-and reduce_term _state (n_term : NoEff.n_term) =
+and substitute_pattern st t p exp =
+  optimize_term st (NoEff.subst_comp (NoEff.pattern_match p exp) c)
+
+and substitute_pattern_expr st e p exp =
+  optimize_expression st (NoEff.subst_expr (NoEff.pattern_match p exp) e)
+
+and beta_reduce state (p, c) e =
+  match applicable_pattern p (NoEff.free_vars_comp c) with
+  | Inlinable -> substitute_pattern_comp state c p e
+  | NotPresent -> c
+  | NotInlinable ->
+      let c =
+        if is_atomic e then
+          (* Inline constants and variables anyway *)
+          substitute_pattern_comp state c p e
+        else c
+      in
+      let abs = Term.abstraction (p, c) in
+      Term.letVal (e, abs)
+
+and reduce_term' _state (n_term : NoEff.n_term) =
+  (* Print.debug "Reducing noeff term: %t" (NoEff.print_term n_term); *)
   match n_term with
-  | NCast (t, (NCoerReturn (NCoerRefl _) as _c)) -> NReturn t
+  | NCast (t, (NCoerReturn (NCoerRefl _) as _c)) -> NoEff.NReturn t
   | NCast (t, NCoerRefl _) -> t
   | _ -> n_term
+
+
+and reduce_term state n_term =
+  let n_term = reduce_term' state n_term in
+  n_term
