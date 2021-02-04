@@ -231,7 +231,7 @@ let concat_vars vars = List.fold_right ( @@@ ) vars ([], [])
 let rec free_vars = function
   | NVar v -> ([], [ v ])
   | NTuple l -> concat_vars (List.map free_vars l)
-  | NFun _ -> failwith ""
+  | NFun abs -> free_vars_abs_with_ty abs
   | NHandle (t1, t2) | NApplyTerm (t1, t2) -> free_vars t1 @@@ free_vars t2
   | NBigLambdaCoer (_, t) | NApplyCoer (t, _) | NCast (t, _) -> free_vars t
   | NReturn t -> free_vars t
@@ -240,7 +240,7 @@ let rec free_vars = function
   | NCall (_, e, a) -> free_vars e @@@ free_vars_abs_with_ty a
   | NBind (e, a) -> free_vars e @@@ free_vars_abs a
   | NConst _ -> ([], [])
-  | NLetRec (_, _) -> failwith ""
+  | NLetRec (defs, c) ->( List.map free_vars_letrec defs |> concat_vars) @@@ free_vars c
   | NMatch (e, l) -> free_vars e @@@ concat_vars (List.map free_vars_abs l)
   | NRecord r -> Assoc.values_of r |> List.map free_vars |> concat_vars
   | NVariant (_, e) -> Option.default_map ([], []) free_vars e

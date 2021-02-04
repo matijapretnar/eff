@@ -143,21 +143,19 @@ and beta_reduce state (p, c) e =
   | Inlinable -> substitute_pattern state c p e
   | NotPresent -> c
   | NotInlinable ->
-      let c =
-        if is_atomic e then
-          (* Inline constants and variables anyway *)
-          substitute_pattern state c p e
-        else c
-      in
-      let abs = (p, c) in
-      NoEff.NLet (e, abs)
+      if is_atomic e then
+        (* Inline constants and variables anyway *)
+        substitute_pattern state c p e
+      else
+        let abs = (p, c) in
+        NoEff.NLet (e, abs)
 
 and reduce_term' state (n_term : NoEff.n_term) =
   (* Print.debug "Reducing noeff term: %t" (NoEff.print_term n_term); *)
   match n_term with
   | NCast (t, (NCoerReturn (NCoerRefl _) as _c)) -> NoEff.NReturn t
   | NCast (t, NCoerRefl _) -> t
-  | NBind (NReturn t, c) -> NLet (t, c)
+  | NBind (NReturn t, c) -> beta_reduce state c t
   | NLet (e, a) -> beta_reduce state a e
   | _ -> n_term
 

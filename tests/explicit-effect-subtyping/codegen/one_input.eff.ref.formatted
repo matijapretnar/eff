@@ -30,17 +30,9 @@ let handler (h : ('a, 'b) handler_clauses) : 'a computation -> 'b =
   in
   handler
 
-let value (x : 'a) : 'a computation = Value x
-
-let call (eff : ('a, 'b) effect) (arg : 'a) (cont : 'b -> 'c computation) :
-    'c computation =
-  Call (eff, arg, cont)
-
 let rec lift (f : 'a -> 'b) : 'a computation -> 'b computation = function
   | Value x -> Value (f x)
   | Call (eff, arg, k) -> Call (eff, arg, fun y -> lift f (k y))
-
-let effect eff arg = call eff arg value
 
 let run = function Value x -> x | Call (_, _, _) -> failwith "Uncaught effect"
 
@@ -60,9 +52,9 @@ let string_length _ = assert false
 
 let to_string _ = assert false
 
-let lift_unary f x = value (f x)
+let lift_unary f x = Value (f x)
 
-let lift_binary f x = value (fun y -> value (f x y))
+let lift_binary f x = Value (fun y -> Value (f x y))
 
 let coer_refl_ty term = term
 
@@ -98,53 +90,48 @@ type (_, _) effect += Decide : (unit, bool) effect
 let _op_0 (* + *) = ( + )
 
 ;;
-let choose_sum =
-  (coer_handler (coer_computation coer_refl_ty) (coer_computation coer_refl_ty))
-    (handler
-       {
-         value_clause =
-           (fun (_x_6 : int) ->
-             Value
-               (let x = _x_6 in
-                x));
-         effect_clauses =
-           (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
-             match eff with
-             | Decide ->
-                 fun () l ->
-                   Value
-                     (let _b_3 =
-                        let _b_4 =
-                          (coer_refl_ty
-                             (coer_refl_ty
-                                ((coer_arrow coer_refl_ty
-                                    (coer_unsafe (*unsafe*) coer_refl_ty))
-                                   l)))
-                            true
-                        in
-                        (coer_refl_ty _op_0 (* + *)) _b_4
-                      in
-                      let _b_5 =
-                        (coer_refl_ty
-                           (coer_refl_ty
-                              ((coer_arrow coer_refl_ty
-                                  (coer_unsafe (*unsafe*) coer_refl_ty))
-                                 l)))
-                          false
-                      in
-                      (coer_refl_ty _b_3) _b_5)
-             | eff' -> fun arg k -> Call (eff', arg, k));
-       })
-in
-let decide_func1 (x : int) =
-  (coer_refl_ty (effect Decide)) () >> fun _b_11 ->
-  (coer_return coer_refl_ty)
-    (match coer_refl_ty _b_11 with true -> x | false -> 20)
-in
 (coer_unsafe (*unsafe*) coer_refl_ty)
   (((coer_handler
        (coer_computation coer_refl_ty)
        (coer_computation coer_refl_ty))
-      choose_sum)
-     (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty)) decide_func1)
+      ((coer_handler
+          (coer_computation coer_refl_ty)
+          (coer_computation coer_refl_ty))
+         (handler
+            {
+              value_clause = (fun (_x_6 : int) -> Value _x_6);
+              effect_clauses =
+                (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+                  match eff with
+                  | Decide ->
+                      fun () l ->
+                        Value
+                          (let _b_4 =
+                             (coer_refl_ty
+                                (coer_refl_ty
+                                   ((coer_arrow coer_refl_ty
+                                       (coer_unsafe (*unsafe*) coer_refl_ty))
+                                      l)))
+                               true
+                           in
+                           let _b_3 = (coer_refl_ty _op_0 (* + *)) _b_4 in
+                           let _b_5 =
+                             (coer_refl_ty
+                                (coer_refl_ty
+                                   ((coer_arrow coer_refl_ty
+                                       (coer_unsafe (*unsafe*) coer_refl_ty))
+                                      l)))
+                               false
+                           in
+                           (coer_refl_ty _b_3) _b_5)
+                  | eff' -> fun arg k -> Call (eff', arg, k));
+            })))
+     (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
+         (fun (x : int) ->
+           (coer_refl_ty (fun (x : unit) ->
+                Call (Decide, x, fun (y : bool) -> (coer_return coer_refl_ty) y)))
+             ()
+           >> fun _b_11 ->
+           (coer_return coer_refl_ty)
+             (match coer_refl_ty _b_11 with true -> x | false -> 20)))
         10))

@@ -30,17 +30,9 @@ let handler (h : ('a, 'b) handler_clauses) : 'a computation -> 'b =
   in
   handler
 
-let value (x : 'a) : 'a computation = Value x
-
-let call (eff : ('a, 'b) effect) (arg : 'a) (cont : 'b -> 'c computation) :
-    'c computation =
-  Call (eff, arg, cont)
-
 let rec lift (f : 'a -> 'b) : 'a computation -> 'b computation = function
   | Value x -> Value (f x)
   | Call (eff, arg, k) -> Call (eff, arg, fun y -> lift f (k y))
-
-let effect eff arg = call eff arg value
 
 let run = function Value x -> x | Call (_, _, _) -> failwith "Uncaught effect"
 
@@ -60,9 +52,9 @@ let string_length _ = assert false
 
 let to_string _ = assert false
 
-let lift_unary f x = value (f x)
+let lift_unary f x = Value (f x)
 
-let lift_binary f x = value (fun y -> value (f x y))
+let lift_binary f x = Value (fun y -> Value (f x y))
 
 let coer_refl_ty term = term
 
@@ -119,7 +111,8 @@ let rec f x =
         (coer_computation coer_refl_ty)
           ( (coer_computation coer_refl_ty)
               (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                  (effect Eff))
+                  (fun (x : unit) ->
+                    Call (Eff, x, fun (y : unit) -> (coer_return coer_refl_ty) y)))
                  ())
           >> fun _ ->
             (coer_computation coer_refl_ty)
@@ -156,17 +149,15 @@ in
                   | Eff ->
                       fun () l ->
                         Value
-                          (let _b_10 =
-                             let _b_11 =
-                               (coer_refl_ty
-                                  (coer_refl_ty
-                                     ((coer_arrow coer_refl_ty
-                                         (coer_unsafe (*unsafe*) coer_refl_ty))
-                                        l)))
-                                 ()
-                             in
-                             (coer_refl_ty _op_1 (* * *)) _b_11
+                          (let _b_11 =
+                             (coer_refl_ty
+                                (coer_refl_ty
+                                   ((coer_arrow coer_refl_ty
+                                       (coer_unsafe (*unsafe*) coer_refl_ty))
+                                      l)))
+                               ()
                            in
+                           let _b_10 = (coer_refl_ty _op_1 (* * *)) _b_11 in
                            (coer_refl_ty _b_10) 2)
                   | eff' -> fun arg k -> Call (eff', arg, k));
             })))
@@ -174,60 +165,58 @@ in
 
 ;;
 let rec g x =
-  let _b_17 =
+  let _b_19 =
     coer_refl_ty
-      (let _b_18 =
+      (let _b_20 =
          coer_refl_ty
            (((coer_arrow coer_refl_ty (coer_arrow coer_refl_ty coer_refl_ty))
                _op_2 (* = *))
               x)
        in
-       coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_18) 0))
+       coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_20) 0))
   in
   coer_refl_ty
-    (match coer_refl_ty _b_17 with
+    (match coer_refl_ty _b_19 with
     | true -> coer_refl_ty 1
     | false ->
         coer_refl_ty
-          (let _b_19 =
+          (let _b_21 =
              coer_refl_ty
-               (let _b_20 =
+               (let _b_22 =
                   coer_refl_ty
                     (((coer_arrow coer_refl_ty
                          (coer_arrow coer_refl_ty coer_refl_ty))
                         _op_0 (* - *))
                        x)
                 in
-                coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_20) 1))
+                coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_22) 1))
            in
            coer_refl_ty
              (((coer_arrow coer_refl_ty coer_refl_ty)
                  ((coer_arrow coer_refl_ty coer_refl_ty) g))
-                _b_19)))
+                _b_21)))
 in
 ((coer_arrow coer_refl_ty coer_refl_ty)
    ((coer_hand_to_fun coer_refl_ty (coer_unsafe (*unsafe*) coer_refl_ty))
       (handler
          {
-           value_clause = (fun (_id_24 : int) -> Value _id_24);
+           value_clause = (fun (_id_26 : int) -> Value _id_26);
            effect_clauses =
              (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
                match eff with
                | Eff ->
                    fun () l ->
                      Value
-                       (let _b_22 =
-                          let _b_23 =
-                            (coer_refl_ty
-                               (coer_refl_ty
-                                  ((coer_arrow coer_refl_ty
-                                      (coer_unsafe (*unsafe*) coer_refl_ty))
-                                     l)))
-                              ()
-                          in
-                          (coer_refl_ty _op_1 (* * *)) _b_23
+                       (let _b_25 =
+                          (coer_refl_ty
+                             (coer_refl_ty
+                                ((coer_arrow coer_refl_ty
+                                    (coer_unsafe (*unsafe*) coer_refl_ty))
+                                   l)))
+                            ()
                         in
-                        (coer_refl_ty _b_22) 2)
+                        let _b_24 = (coer_refl_ty _op_1 (* * *)) _b_25 in
+                        (coer_refl_ty _b_24) 2)
                | eff' -> fun arg k -> Call (eff', arg, k));
          })))
   ((coer_refl_ty g) 5)

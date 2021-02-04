@@ -127,7 +127,6 @@ and reduce_dirt_coercion' _state = function
   | Empty drt when Type.is_empty_dirt drt -> ReflDirt drt
   | UnionDirt (effects, { term = ReflDirt drt; _ }) ->
       ReflDirt (Type.add_effects effects drt)
-  | UnionDirt (effects, {})
   | dcoer -> dcoer
 
 let rec optimize_expression state exp =
@@ -305,20 +304,17 @@ and beta_reduce state ({ term = p, c; _ } as a) e =
   | Inlinable -> substitute_pattern_comp state c p e
   | NotPresent -> c
   | NotInlinable ->
-      let c =
-        if is_atomic e.term then
-          (* Inline constants and variables anyway *)
-          substitute_pattern_comp state c p e
-        else
-          let state' =
-            match (p.term, e.term) with
-            | Term.PVar x, Term.Lambda a -> add_function state x a
-            | _ -> state
-          in
-          optimize_computation state' c
-      in
-      let abs = Term.abstraction (p, c) in
-      Term.letVal (e, abs)
+      if is_atomic e.term then
+        (* Inline constants and variables anyway *)
+        substitute_pattern_comp state c p e
+      else
+        let state' =
+          match (p.term, e.term) with
+          | Term.PVar x, Term.Lambda a -> add_function state x a
+          | _ -> state
+        in
+        let a' = optimize_abstraction state' a in
+        Term.letVal (e, a')
 
 and reduce_expression state expr = reduce_if_fuel reduce_expression' state expr
 

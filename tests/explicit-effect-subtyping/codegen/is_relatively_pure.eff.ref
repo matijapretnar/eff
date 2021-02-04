@@ -30,17 +30,9 @@ let handler (h : ('a, 'b) handler_clauses) : 'a computation -> 'b =
   in
   handler
 
-let value (x : 'a) : 'a computation = Value x
-
-let call (eff : ('a, 'b) effect) (arg : 'a) (cont : 'b -> 'c computation) :
-    'c computation =
-  Call (eff, arg, cont)
-
 let rec lift (f : 'a -> 'b) : 'a computation -> 'b computation = function
   | Value x -> Value (f x)
   | Call (eff, arg, k) -> Call (eff, arg, fun y -> lift f (k y))
-
-let effect eff arg = call eff arg value
 
 let run = function Value x -> x | Call (_, _, _) -> failwith "Uncaught effect"
 
@@ -60,9 +52,9 @@ let string_length _ = assert false
 
 let to_string _ = assert false
 
-let lift_unary f x = value (f x)
+let lift_unary f x = Value (f x)
 
-let lift_binary f x = value (fun y -> value (f x y))
+let lift_binary f x = Value (fun y -> Value (f x y))
 
 let coer_refl_ty term = term
 
@@ -100,8 +92,8 @@ type(_, _) effect += Op2 : (int, unit) effect
 ((coer_handler (coer_computation (coer_refl_ty)) (coer_computation (coer_refl_ty))) 
       ((coer_handler (coer_computation (coer_refl_ty)) (coer_computation (coer_refl_ty))) 
          (handler {value_clause = (fun (_x_2: unit) -> (coer_return (coer_refl_ty)) 
-                                                         (let x = _x_2 in x)); 
-         effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
+                                                         (_x_2)); effect_clauses = 
+                                                                  (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
   (match eff with
     | Op2 -> fun n l -> 
                                                                     ((coer_arrow (coer_refl_ty) (coer_computation (coer_refl_ty))) 
@@ -110,5 +102,7 @@ type(_, _) effect += Op2 : (int, unit) effect
                                                                     (())   
     | eff' -> (fun arg k -> Call (eff', arg, k))
       )); }))) 
-     (((coer_refl_ty) ((effect Op1))) (1))
+     (((coer_refl_ty) 
+         (fun (x: int) ->  Call (Op1, x, (fun (y: unit) -> (coer_return (coer_refl_ty)) 
+                                                             (y))))) (1))
 ;;

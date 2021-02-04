@@ -94,160 +94,113 @@ let _op_2 (* - *) = ( - )
 let _op_3 (* + *) = ( + )
 
 let rec loop_pure n =
-  let _b_7 = _op_0 (* = *) n in
-  let _b_6 = _b_7 0 in
-  match _b_6 with
+  match (_op_0 (* = *) n) 0 with
   | true -> ()
-  | false ->
-      let _b_9 = _op_2 (* - *) n in
-      let _b_8 = _b_9 1 in
-      loop_pure _b_8
+  | false -> loop_pure ((_op_2 (* - *) n) 1)
 
 let test_pure (n : int) = loop_pure n
 
 type (_, _) effect += Fail : (unit, empty) effect
 
 let rec loop_latent n =
-  let _b_15 = _op_0 (* = *) n in
-  let _b_14 = _b_15 0 in
-  match _b_14 with
+  match (_op_0 (* = *) n) 0 with
   | true -> Value ()
   | false -> (
-      let _b_17 = _op_1 (* < *) n in
-      let _b_16 = _b_17 0 in
-      match _b_16 with
+      match (_op_1 (* < *) n) 0 with
       | true ->
           (fun (x : unit) -> Call (Fail, x, fun (y : empty) -> Value y)) ()
           >> fun _b_18 -> Value (match _b_18 with _ -> assert false)
-      | false ->
-          let _b_20 = _op_2 (* - *) n in
-          let _b_19 = _b_20 1 in
-          loop_latent _b_19)
+      | false -> loop_latent ((_op_2 (* - *) n) 1))
 
 let test_latent (n : int) = loop_latent n
 
 type (_, _) effect += Incr : (unit, unit) effect
 
 let rec loop_incr n =
-  let _b_28 = _op_0 (* = *) n in
-  let _b_27 = _b_28 0 in
-  match _b_27 with
+  match (_op_0 (* = *) n) 0 with
   | true -> Value ()
   | false ->
       (fun (x : unit) -> Call (Incr, x, fun (y : unit) -> Value y)) ()
-      >> fun _ ->
-      let _b_30 = _op_2 (* - *) n in
-      let _b_29 = _b_30 1 in
-      loop_incr _b_29
+      >> fun _ -> loop_incr ((_op_2 (* - *) n) 1)
 
 let test_incr (n : int) =
-  let _b_45 =
-    force_unsafe
-      ((handler
-          {
-            value_clause = (fun (_x_41 : unit) -> Value (fun (x : int) -> x));
-            effect_clauses =
-              (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
-                match eff with
-                | Incr ->
-                    fun () l ->
-                      Value
-                        (fun (x : int) ->
-                          let _b_38 =
-                            ((coer_arrow coer_refl_ty force_unsafe) l) ()
-                          in
-                          let _b_40 = _op_3 (* + *) x in
-                          let _b_39 = _b_40 1 in
-                          _b_38 _b_39)
-                | eff' -> fun arg k -> Call (eff', arg, k));
-          })
-         (loop_incr n))
-  in
-  _b_45 0
+  (force_unsafe
+     ((handler
+         {
+           value_clause = (fun (_x_41 : unit) -> Value (fun (x : int) -> x));
+           effect_clauses =
+             (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+               match eff with
+               | Incr ->
+                   fun () l ->
+                     Value
+                       (fun (x : int) ->
+                         (((coer_arrow coer_refl_ty force_unsafe) l) ())
+                           ((_op_3 (* + *) x) 1))
+               | eff' -> fun arg k -> Call (eff', arg, k));
+         })
+        (loop_incr n)))
+    0
 
 let rec loop_incr' n =
-  let _b_50 = _op_0 (* = *) n in
-  let _b_49 = _b_50 0 in
-  match _b_49 with
+  match (_op_0 (* = *) n) 0 with
   | true -> Value ()
   | false ->
-      let _b_52 = _op_2 (* - *) n in
-      let _b_51 = _b_52 1 in
-      loop_incr' _b_51 >> fun _ ->
+      loop_incr' ((_op_2 (* - *) n) 1) >> fun _ ->
       (fun (x : unit) -> Call (Incr, x, fun (y : unit) -> Value y)) ()
 
 let test_incr' (n : int) =
-  let _b_67 =
-    force_unsafe
-      ((handler
-          {
-            value_clause = (fun (_x_63 : unit) -> Value (fun (x : int) -> x));
-            effect_clauses =
-              (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
-                match eff with
-                | Incr ->
-                    fun () l ->
-                      Value
-                        (fun (x : int) ->
-                          let _b_60 =
-                            ((coer_arrow coer_refl_ty force_unsafe) l) ()
-                          in
-                          let _b_62 = _op_3 (* + *) x in
-                          let _b_61 = _b_62 1 in
-                          _b_60 _b_61)
-                | eff' -> fun arg k -> Call (eff', arg, k));
-          })
-         (loop_incr' n))
-  in
-  _b_67 0
+  (force_unsafe
+     ((handler
+         {
+           value_clause = (fun (_x_63 : unit) -> Value (fun (x : int) -> x));
+           effect_clauses =
+             (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+               match eff with
+               | Incr ->
+                   fun () l ->
+                     Value
+                       (fun (x : int) ->
+                         (((coer_arrow coer_refl_ty force_unsafe) l) ())
+                           ((_op_3 (* + *) x) 1))
+               | eff' -> fun arg k -> Call (eff', arg, k));
+         })
+        (loop_incr' n)))
+    0
 
 type (_, _) effect += Get : (unit, int) effect
 
 type (_, _) effect += Put : (int, unit) effect
 
 let rec loop_state n =
-  let _b_72 = _op_0 (* = *) n in
-  let _b_71 = _b_72 0 in
-  match _b_71 with
+  match (_op_0 (* = *) n) 0 with
   | true -> Value ()
   | false ->
       (fun (x : unit) -> Call (Get, x, fun (y : int) -> Value y)) ()
       >> fun _b_75 ->
-      let _b_74 = _op_3 (* + *) _b_75 in
-      let _b_73 = _b_74 1 in
-      (fun (x : int) -> Call (Put, x, fun (y : unit) -> Value y)) _b_73
-      >> fun _ ->
-      let _b_77 = _op_2 (* - *) n in
-      let _b_76 = _b_77 1 in
-      loop_state _b_76
+      (fun (x : int) -> Call (Put, x, fun (y : unit) -> Value y))
+        ((_op_3 (* + *) _b_75) 1)
+      >> fun _ -> loop_state ((_op_2 (* - *) n) 1)
 
 let test_state (n : int) =
-  let _b_95 =
-    force_unsafe
-      ((handler
-          {
-            value_clause = (fun (_x_91 : unit) -> Value (fun (x : int) -> x));
-            effect_clauses =
-              (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
-                match eff with
-                | Get ->
-                    fun () l ->
-                      Value
-                        (fun (s : int) ->
-                          let _b_87 =
-                            ((coer_arrow coer_refl_ty force_unsafe) l) s
-                          in
-                          _b_87 s)
-                | Put ->
-                    fun s' l ->
-                      Value
-                        (fun (_ : int) ->
-                          let _b_90 =
-                            ((coer_arrow coer_refl_ty force_unsafe) l) ()
-                          in
-                          _b_90 s')
-                | eff' -> fun arg k -> Call (eff', arg, k));
-          })
-         (loop_state n))
-  in
-  _b_95 0
+  (force_unsafe
+     ((handler
+         {
+           value_clause = (fun (_x_91 : unit) -> Value (fun (x : int) -> x));
+           effect_clauses =
+             (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+               match eff with
+               | Get ->
+                   fun () l ->
+                     Value
+                       (fun (s : int) ->
+                         (((coer_arrow coer_refl_ty force_unsafe) l) s) s)
+               | Put ->
+                   fun s' l ->
+                     Value
+                       (fun (_ : int) ->
+                         (((coer_arrow coer_refl_ty force_unsafe) l) ()) s')
+               | eff' -> fun arg k -> Call (eff', arg, k));
+         })
+        (loop_state n)))
+    0
