@@ -22,7 +22,7 @@ and run_loop_incr' = false
 
 and run_loop_state = false
 
-and run_queens_one = true
+and run_queens_one = false
 
 and run_queens_all = false
 
@@ -195,8 +195,8 @@ let queens_one_cps_benchmark number_of_queens =
     benchmarks =
       [
         (* ( "Generated, not optimized",
-          forget_value QueensNoOpt.queens_one_cps,
-          always_true QueensNoOpt.queens_one_cps ); *)
+           forget_value QueensNoOpt.queens_one_cps,
+           always_true QueensNoOpt.queens_one_cps ); *)
         ( "Generated, optimized",
           forget_value QueensOpt.test_queens,
           always_true QueensOpt.test_queens );
@@ -278,6 +278,7 @@ let range_benchmarks number_of_range =
         ( "Generated, optimized",
           forget_value RangeOpt.test,
           always_true RangeOpt.test );
+        ("Native", forget_value RangeNative.test, always_true RangeNative.test);
       ];
     param = number_of_range;
   }
@@ -329,13 +330,13 @@ let () =
     Printf.printf "%s (%d queens):\n" set.name set.param;
     run_and_show_set set);
   (* if run_queens_one then (
-    let set = queens_one_benchmark number_of_queens in
-    Printf.printf "%s (%d queens):\n" set.name set.param;
-    run_and_show_set set);
-  if run_queens_all then (
-    let set = queens_all_benchmark number_of_queens in
-    Printf.printf "%s (%d queens):\n" set.name set.param;
-    run_and_show_set set); *)
+       let set = queens_one_benchmark number_of_queens in
+       Printf.printf "%s (%d queens):\n" set.name set.param;
+       run_and_show_set set);
+     if run_queens_all then (
+       let set = queens_all_benchmark number_of_queens in
+       Printf.printf "%s (%d queens):\n" set.name set.param;
+       run_and_show_set set); *)
   if run_interp then (
     let set = interpreter_benchmark in
     Printf.printf "%s :\n" set.name;

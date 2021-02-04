@@ -73,6 +73,19 @@ let force_unsafe = function
   | Value v -> v
   | Call (_eff, _arg, _k) -> failwith "Unsafe value force"
 
+(* Manual tuple coercions, one way to do this a bit better is to use GADT and map over them *)
+
+let coer_tuple_2 (c1, c2) (a1, a2) = (c1 a1, c2 a2)
+
+let coer_tuple_3 (c1, c2, c3) (a1, a2, a3) = (c1 a1, c2 a2, c3 a3)
+
+let coer_tuple_4 (c1, c2, c3, c4) (a1, a2, a3, a4) = (c1 a1, c2 a2, c3 a3, c4 a4)
+
+let coer_tuple_5 (c1, c2, c3, c4, c5) (a1, a2, a3, a4, a5) =
+  (c1 a1, c2 a2, c3 a3, c4 a4, c5 a5)
+
+(* This should be enough *)
+
 let coer_arrow coer1 coer2 f x = coer2 (f (coer1 x))
 
 let coer_handler coer1 coer2 h x = coer2 (h (coer1 x))
@@ -107,7 +120,6 @@ type inttuplist = IntTupNil | IntTupCons of (inttuple * inttuplist)
 
 type void = Void
 
-;;
 let test_queens (n : int) =
   let absurd (void : empty) = match void with _ -> assert false in
   let _op_9 (* > *) (x : int) (y : int) =
@@ -318,7 +330,10 @@ let test_queens (n : int) =
                         (((coer_arrow coer_refl_ty
                              (coer_arrow coer_refl_ty coer_refl_ty))
                             not_attacked)
-                           (IntTuple ((TupleCoercion) (x, y))))
+                           (IntTuple
+                              (((* tuple_coer *) coer_tuple_2
+                                  (coer_refl_ty, coer_refl_ty))
+                                 (x, y))))
                     in
                     coer_refl_ty
                       (((coer_arrow coer_refl_ty coer_refl_ty) _b_58) qs))
@@ -584,8 +599,13 @@ let test_queens (n : int) =
                            (coer_computation coer_refl_ty))
                           _b_93)
                          (IntTupCons
-                            ((TupleCoercion)
-                               (IntTuple ((TupleCoercion) (x, y)), qs)))) ) ))
+                            (((* tuple_coer *) coer_tuple_2
+                                (coer_refl_ty, coer_refl_ty))
+                               ( IntTuple
+                                   (((* tuple_coer *) coer_tuple_2
+                                       (coer_refl_ty, coer_refl_ty))
+                                      (x, y)),
+                                 qs )))) ) ))
     in
     (coer_return coer_refl_ty)
       (((coer_arrow coer_refl_ty
@@ -628,5 +648,3 @@ let test_queens (n : int) =
              (((coer_arrow coer_refl_ty coer_refl_ty) absurd) _b_100)))
   in
   ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty)) queens_one_cps) n
-in
-((coer_arrow coer_refl_ty (coer_computation coer_refl_ty)) test_queens) 8

@@ -15,7 +15,10 @@ type term =
 
 effect DivByZero : unit -> int
 
-let rec interp = function
+(******************************************************************************)
+
+let bigTest () =
+  let rec interp = function
   | Num b -> b
   | Add (l, r) ->
     let x = interp l in
@@ -36,10 +39,8 @@ let rec interp = function
     | 0 -> perform (DivByZero ())
     | _ -> x / y
     end
-
-(******************************************************************************)
-
-let addCase =
+  in
+  let addCase =
     Add (
         Add (
             Add ((Num 20), (Num 2)),
@@ -49,17 +50,15 @@ let addCase =
             Add ((Num 2), (Num 2)),
             Div ((Num 1), (Num 10))
         )
-    );;
-
-let rec createCase n =
+    )
+  in
+  let rec createCase n =
     begin match n with
     | 1 -> (Div (Num 100, Num 0))
     | _ -> Add (addCase, (createCase (n - 1)))
     end
-
-let finalCase = createCase 200
-
-let bigTest () =
+  in
+  let finalCase = createCase 200 in
   let arithmeticHandler = handler
     | effect (DivByZero ()) k ->  -1
   in
