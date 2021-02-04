@@ -492,19 +492,10 @@ and tcHandler state (h : Untyped.handler) : tcExprOutput' =
   match handTy with
   | Type.Handler (inTy, outTy) ->
       let trgRet', cnstr_ret = Term.cast_abstraction trgRet dirtyOut in
-      let outExpr =
-        Term.CastExp
-          ( {
-              term =
-                Term.Handler
-                  {
-                    term = { effect_clauses = trgCls; value_clause = trgRet' };
-                    ty = (inTy, outTy);
-                  };
-              ty = handTy;
-            },
-            handlerCo )
+      let handler =
+        Term.Handler (Term.fresh_handler trgRet' trgCls (inTy, outTy))
       in
+      let outExpr = Term.CastExp ({ term = handler; ty = handTy }, handlerCo) in
       let outType = Type.Handler ((ty_ret_in, deltaIn), dirtyOut) in
       let outCs = ((omegaCt7 :: alphaOutSkel :: cnstr_ret) @ cs1) @ cs2 in
       (* 7, ain : skelin, aout : skelout && 1, 2, 6 && 3i, 4i, 5i *)

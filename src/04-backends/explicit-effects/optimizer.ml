@@ -229,7 +229,13 @@ and optimize_handler state hnd =
       {
         Term.value_clause = optimize_abstraction state hnd.term.value_clause;
         Term.effect_clauses =
-          Assoc.map (optimize_abstraction2 state) hnd.term.effect_clauses;
+          {
+            hnd.term.effect_clauses with
+            effect_part =
+              Assoc.map
+                (optimize_abstraction2 state)
+                hnd.term.effect_clauses.effect_part;
+          };
       };
   }
 
@@ -307,7 +313,7 @@ and handle_computation state hnd comp =
       |> optimize_computation state
   | Call (eff, exp, abs) -> (
       let handled_abs = handle_abstraction state hnd abs in
-      match Assoc.lookup eff hnd.term.Term.effect_clauses with
+      match Assoc.lookup eff hnd.term.Term.effect_clauses.effect_part with
       | Some { term = p1, p2, comp; _ } ->
           (* TODO: Refresh abstraction? *)
           let comp' =
@@ -326,7 +332,7 @@ and handle_computation state hnd comp =
           let hnd' =
             Term.handler_clauses
               (handle_abstraction state hnd abs)
-              hnd.term.Term.effect_clauses drt_in
+              hnd.term.Term.effect_clauses.effect_part drt_in
           in
           handle_computation state hnd' cmp)
   | _ -> (

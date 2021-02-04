@@ -264,10 +264,14 @@ and apply_sub_handler sub h =
   let eff_clauses = h.term.effect_clauses in
   let new_value_clause = apply_sub_abs sub h.term.value_clause in
   let new_eff_clauses =
-    Assoc.map (fun abs2 -> apply_sub_abs2 sub abs2) eff_clauses
+    Assoc.map (fun abs2 -> apply_sub_abs2 sub abs2) eff_clauses.effect_part
   in
   {
-    term = { effect_clauses = new_eff_clauses; value_clause = new_value_clause };
+    term =
+      {
+        effect_clauses = { eff_clauses with effect_part = new_eff_clauses };
+        value_clause = new_value_clause;
+      };
     ty = (apply_sub_dirty_ty sub drty1, apply_sub_dirty_ty sub drty2);
   }
 

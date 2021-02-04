@@ -142,8 +142,10 @@ and elab_expression' exp =
   | ExEff.Handler h ->
       let elabvc = elab_abstraction_with_param_ty h.term.value_clause in
 
-      if Assoc.length h.term.effect_clauses = 0 (* Handler - Case 1 *) then
-        NoEff.NFun elabvc
+      if
+        Assoc.length h.term.effect_clauses.effect_part = 0
+        (* Handler - Case 1 *)
+      then NoEff.NFun elabvc
       else
         let _, (_ty, dirt) = h.term.value_clause.ty in
         if ExEffTypes.is_empty_dirt dirt (* Handler - Case 2 *) then
@@ -173,7 +175,7 @@ and elab_expression' exp =
               return_clause = (p, ty, NoEff.NReturn c);
               effect_clauses =
                 Assoc.map_of_list subst_cont_effect
-                  (Assoc.to_list h.term.effect_clauses);
+                  (Assoc.to_list h.term.effect_clauses.effect_part);
             } (* Handler - Case 3 *)
         else
           let elab_effect_clause ((eff, (ty1, ty2)), { term = p1, p2, comp; _ })
@@ -190,7 +192,7 @@ and elab_expression' exp =
               (* Filip: Not sure if this needs NReturn *)
               effect_clauses =
                 Assoc.map_of_list elab_effect_clause
-                  (Assoc.to_list h.term.effect_clauses);
+                  (Assoc.to_list h.term.effect_clauses.effect_part);
             }
   | ExEff.CastExp (value, coer) ->
       let elab1 = elab_expression value in
