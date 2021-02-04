@@ -354,156 +354,12 @@ and reduce_dirt_coercion st p_ops dco =
               (EffectSet.inter d1.Type.effect_set d2.Type.effect_set)
           in
           if EffectSet.is_empty ops' then dco1 else UnionDirt (ops', dco1))
-
-and beta_reduce st ((p, ty, c) as a) e =
-  match applicable_pattern p (Term.free_vars_comp c) with
-  | Inlinable -> substitute_pattern_comp st c p e
-  | NotPresent -> c
-  | NotInlinable when is_atomic e ->
-      (* Print.debug "beta_reduce not-inlinable is_atomc"; *)
-      substitute_pattern_comp st c p e
-  | NotInlinable -> LetVal (e, a)
-
-(*
-            let a =
-              begin match p with
-                | {term = Term.PVar x} ->
-                  let st = {st with stack = Common.update x e st.stack} in
-                  abstraction p (optimize_comp st c)
-                | _ ->
-                  a
-              end
-            in
-            let_in e a
-             *)
-and optimize_comp st c = reduce_comp st (optimize_sub_comp st c)
-
-and optimize_expr st e = reduce_expr st (optimize_sub_expr st e)
-
-and optimize_abs st ty (p, c) =
-  let st' = optimize_pattern st ty p in
-  (p, optimize_comp st' c)
-
-
-and match_recursive_function st e =
-  match e with
-  | Var fvar -> (
-      match Assoc.lookup fvar st.recursive_functions with
-      | None -> None
-      | Some (fty, fbody) -> Some (fvar, fty, fbody))
-  (* | ApplyTyExp (e, ty) -> match_recursive_function st e *)
-  (* | ApplyDirtExp (e, dirt) -> match_recursive_function st e *)
-  (* | ApplySkelExp (e, sk) -> match_recursive_function st e *)
-  | ApplyDirtCoercion (e, dco) -> match_recursive_function st e
-  | ApplyTyCoercion (e, tyco) -> match_recursive_function st e
-  | _ -> None
-
-and match_knot_function st e h = match_knot_function' st e e h
-
-and match_knot_function' st e e' h =
-  match e with
-  | Var fvar -> (
-      match Assoc.lookup fvar st.knot_functions with
-      | None -> None
-      | Some (ef, hf, fvar') ->
-          if alphaeq_expr [] e' ef && alphaeq_handler [] hf h then Some fvar'
-          else None)
-  (* | ApplyTyExp (e, ty) -> match_knot_function' st e e' h *)
-  (* | ApplyDirtExp (e, dirt) -> match_knot_function' st e e' h *)
-  (* | ApplySkelExp (e, sk) -> match_knot_function' st e e' h *)
-  | ApplyDirtCoercion (e, dco) -> match_knot_function' st e e' h
-  | ApplyTyCoercion (e, tyco) -> match_knot_function' st e e' h
-  | _ -> None
-
-and reduce_expr st e =
-  (* Print.debug "reduce_exp: %t" (Term.print_expression e); *)
-  match e with
-  (*
-          | Var of variable
-          | BuiltIn of string * int
-          | Const of Const.t
-          | Tuple of expression list
-          | Record of (CoreTypes.field, expression) CoreTypes.assoc
-          | Variant of CoreTypes.label * expression option
-          | Lambda of (pattern * Type.ty * computation)
-          | Handler of handler
-          | BigLambdaTy of CoreTypes.TyParam.t * skeleton * expression
-          | BigLambdaDirt of Type.DirtParam.t * expression
-          | BigLambdaSkel of Type.SkelParam.t * expression
-          | LambdaTyCoerVar of Type.TyCoercionParam.t * Type.ct_ty * expression
-          | LambdaDirtCoerVar of Type.DirtCoercionParam.t * Type.ct_dirt * expression
-          | ApplySkelExp of expression * Type.skeleton
-          | ApplyTyCoercion of expression * ty_coercion
-          | ApplyTyCoercion (e1,ty_co) ->
-          *)
-  (* | ApplySkelExp (e1, sk) -> (
-      match e1 with
-      | BigLambdaSkel (skvar, e11) ->
-          Substitution.apply_substitutions_to_expression
-            (Substitution.add_skel_param_substitution_e skvar sk)
-            e11
-      | _ -> e) *)
-  (* | ApplyTyExp (e1, ty) -> (
-      match e1 with
-      | BigLambdaTy (tyvar, sk, e11) ->
-          Substitution.apply_substitutions_to_expression
-            (Substitution.add_type_substitution_e tyvar ty)
-            e11
-      | _ -> e) *)
-  | ApplyDirtCoercion (e1, dco) -> (
-      match e1 with
-      | LambdaDirtCoerVar (dcovar, ctd, e11) ->
-          Substitution.apply_substitutions_to_expression
-            (Substitution.add_dirt_var_coercion_e dcovar dco)
-            e11
-      | _ -> e)
-  (* | ApplyDirtExp (e1, d) -> (
-      match e1 with
-      | BigLambdaDirt (dvar, e11) ->
-          Substitution.apply_substitutions_to_expression
-            (Substitution.add_dirt_substitution_e dvar d)
-            e11
-      | _ -> e) *)
-  | Effect op -> e
-  | CastExp (e1, ty_co) ->
-      let ty1, ty2 = TypeChecker.check_ty_coercion st.tc_state ty_co in
-      if (* Print.debug "HERE1"; *)
-         Type.types_are_equal ty1 ty2 then e1 else e
-  | plain_e -> e
-
 and reduce_comp st c =
   (* Print.debug "reduce_comp: %t" (Term.print_computation c); *)
   match c with
-  | Value _ -> c
-  | LetVal (e1, abs) -> beta_reduce st abs e1
   | LetRec (bs, cont) ->
       let cont' = List.fold_left specialize_letrec cont bs in
       letrec_drop_unused_bindings (LetRec (bs, cont'))
-  | Match (e1, resTy, abstractions) -> c
-  | Apply (e1, e2) -> (
-      match e1 with
-      | Lambda abs -> beta_reduce st abs e2
-      | Effect op ->
-          c
-          (* BRECHT: Removing opts that create Calls for use with erasureUntyped
-           * as UntypedSyntax cannot represent them. Maybe they can be
-           * reintroduced with the SkelEff backend.
-           * Print.debug "Op -> Call" ;
-           * let var = CoreTypes.Variable.fresh "call_var" in
-           * let eff, (ty_in, ty_out) = op in
-           * let c_cont =
-           *   CastComp
-           *     ( Value (Var var)
-           *     , BangCoercion
-           *         ( ReflTy ty_out
-           *         , Empty (Type.closed_dirt (EffectSet.singleton eff)) ) )
-           * in
-           * let a_w_ty = (PVar var, ty_out, c_cont) in
-           * Call (op, e2, a_w_ty) *)
-      | _ ->
-          (* Print.debug "e1 is not a lambda"; *)
-          (* TODO: support case where it's a cast of a lambda *)
-          c)
   | Handle (e1, c1) -> (
       match e1 with
       (* | CastExp (e11, tyco1) ->
@@ -609,15 +465,6 @@ and reduce_comp st c =
       | _ -> c)
   | Bind (c1, a2) -> (
       match c1 with
-      | Bind (c11, (p1, c12)) ->
-          let ty1, _ = TypeChecker.check_computation st.tc_state c11 in
-          let st' = extend_pat_type st p1 ty1 in
-          let c2' = reduce_comp st' (Bind (c12, a2)) in
-          reduce_comp st (Bind (c11, (p1, c2')))
-      | Call (op, e11, (p12, ty12, c12)) ->
-          let st' = extend_pat_type st p12 ty12 in
-          let c12' = reduce_comp st' (Bind (c12, a2)) in
-          Call (op, e11, (p12, ty12, c12'))
       | CastComp (c11, dtyco) -> (
           match c11 with
           (* | Value e111 ->
