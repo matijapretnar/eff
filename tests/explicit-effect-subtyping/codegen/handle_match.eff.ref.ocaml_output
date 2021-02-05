@@ -1,4 +1,0 @@
-[1mFile "./handle_match.eff.out", line 1, characters 11-12[0m:
-1 | Fatal error: exception Failure("tcPattern: Only variables allowed in variant pattern matching")
-               [1;31m^[0m
-[1;31mError[0m: Syntax error

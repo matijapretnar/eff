@@ -1,4 +1,0 @@
-[1mFile "./test-handle_effect_skip.eff.out", line 1, characters 11-17[0m:
-1 | type(_, _) effect += Print : (string, unit) effect 
-               [1;31m^^^^^^[0m
-[1;31mError[0m: Unbound type constructor effect

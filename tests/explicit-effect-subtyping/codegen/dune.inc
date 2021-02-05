@@ -1,5 +1,15 @@
 (rule
  (deps
+  "../../../ocamlHeader/ocamlHeader.ml")
+   (target ocaml_header.tmp)
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       0
+       (run cat "../../../ocamlHeader/ocamlHeader.ml")))))
+
+(rule
+ (deps
  %{bin:eff}
   (source_tree .))
    (target "application_red.eff.out")
@@ -7,7 +17,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./application_red.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./application_red.eff")))))
 
 (rule
  (deps "application_red.eff.out")
@@ -24,12 +34,19 @@
     (diff "application_red.eff.ref.formatted" "application_red.eff.formatted")))
 
 (rule
- (deps "application_red.eff.out")
+ (deps "application_red.eff.out" ocaml_header.tmp)
+ (target "application_red.eff.out.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - application_red.eff.out)))))
+
+(rule
+ (deps "application_red.eff.out.ocaml_with_header")
  (target "application_red.eff.out.ocaml_output")
   (action
    (with-outputs-to "application_red.eff.out.ocaml_output"
     (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml application_red.eff.out)))))
+     (run ocaml "application_red.eff.out.ocaml_with_header")))))
 
 (rule
  (deps "application_red.eff.out.ocaml_output")
@@ -52,7 +69,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./handle_match.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./handle_match.eff")))))
 
 (rule
  (deps "handle_match.eff.out")
@@ -69,12 +86,19 @@
     (diff "handle_match.eff.ref.formatted" "handle_match.eff.formatted")))
 
 (rule
- (deps "handle_match.eff.out")
+ (deps "handle_match.eff.out" ocaml_header.tmp)
+ (target "handle_match.eff.out.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - handle_match.eff.out)))))
+
+(rule
+ (deps "handle_match.eff.out.ocaml_with_header")
  (target "handle_match.eff.out.ocaml_output")
   (action
    (with-outputs-to "handle_match.eff.out.ocaml_output"
     (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml handle_match.eff.out)))))
+     (run ocaml "handle_match.eff.out.ocaml_with_header")))))
 
 (rule
  (deps "handle_match.eff.out.ocaml_output")
@@ -97,7 +121,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./handle_rec.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./handle_rec.eff")))))
 
 (rule
  (deps "handle_rec.eff.out")
@@ -114,12 +138,19 @@
     (diff "handle_rec.eff.ref.formatted" "handle_rec.eff.formatted")))
 
 (rule
- (deps "handle_rec.eff.out")
+ (deps "handle_rec.eff.out" ocaml_header.tmp)
+ (target "handle_rec.eff.out.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - handle_rec.eff.out)))))
+
+(rule
+ (deps "handle_rec.eff.out.ocaml_with_header")
  (target "handle_rec.eff.out.ocaml_output")
   (action
    (with-outputs-to "handle_rec.eff.out.ocaml_output"
     (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml handle_rec.eff.out)))))
+     (run ocaml "handle_rec.eff.out.ocaml_with_header")))))
 
 (rule
  (deps "handle_rec.eff.out.ocaml_output")
@@ -142,7 +173,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./handler_beta_reduction.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./handler_beta_reduction.eff")))))
 
 (rule
  (deps "handler_beta_reduction.eff.out")
@@ -159,12 +190,19 @@
     (diff "handler_beta_reduction.eff.ref.formatted" "handler_beta_reduction.eff.formatted")))
 
 (rule
- (deps "handler_beta_reduction.eff.out")
+ (deps "handler_beta_reduction.eff.out" ocaml_header.tmp)
+ (target "handler_beta_reduction.eff.out.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - handler_beta_reduction.eff.out)))))
+
+(rule
+ (deps "handler_beta_reduction.eff.out.ocaml_with_header")
  (target "handler_beta_reduction.eff.out.ocaml_output")
   (action
    (with-outputs-to "handler_beta_reduction.eff.out.ocaml_output"
     (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml handler_beta_reduction.eff.out)))))
+     (run ocaml "handler_beta_reduction.eff.out.ocaml_with_header")))))
 
 (rule
  (deps "handler_beta_reduction.eff.out.ocaml_output")
@@ -187,7 +225,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./is_relatively_pure.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./is_relatively_pure.eff")))))
 
 (rule
  (deps "is_relatively_pure.eff.out")
@@ -204,12 +242,19 @@
     (diff "is_relatively_pure.eff.ref.formatted" "is_relatively_pure.eff.formatted")))
 
 (rule
- (deps "is_relatively_pure.eff.out")
+ (deps "is_relatively_pure.eff.out" ocaml_header.tmp)
+ (target "is_relatively_pure.eff.out.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - is_relatively_pure.eff.out)))))
+
+(rule
+ (deps "is_relatively_pure.eff.out.ocaml_with_header")
  (target "is_relatively_pure.eff.out.ocaml_output")
   (action
    (with-outputs-to "is_relatively_pure.eff.out.ocaml_output"
     (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml is_relatively_pure.eff.out)))))
+     (run ocaml "is_relatively_pure.eff.out.ocaml_with_header")))))
 
 (rule
  (deps "is_relatively_pure.eff.out.ocaml_output")
@@ -232,7 +277,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./let_list_to_bind.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./let_list_to_bind.eff")))))
 
 (rule
  (deps "let_list_to_bind.eff.out")
@@ -249,12 +294,19 @@
     (diff "let_list_to_bind.eff.ref.formatted" "let_list_to_bind.eff.formatted")))
 
 (rule
- (deps "let_list_to_bind.eff.out")
+ (deps "let_list_to_bind.eff.out" ocaml_header.tmp)
+ (target "let_list_to_bind.eff.out.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - let_list_to_bind.eff.out)))))
+
+(rule
+ (deps "let_list_to_bind.eff.out.ocaml_with_header")
  (target "let_list_to_bind.eff.out.ocaml_output")
   (action
    (with-outputs-to "let_list_to_bind.eff.out.ocaml_output"
     (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml let_list_to_bind.eff.out)))))
+     (run ocaml "let_list_to_bind.eff.out.ocaml_with_header")))))
 
 (rule
  (deps "let_list_to_bind.eff.out.ocaml_output")
@@ -277,7 +329,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./match_red.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./match_red.eff")))))
 
 (rule
  (deps "match_red.eff.out")
@@ -294,12 +346,19 @@
     (diff "match_red.eff.ref.formatted" "match_red.eff.formatted")))
 
 (rule
- (deps "match_red.eff.out")
+ (deps "match_red.eff.out" ocaml_header.tmp)
+ (target "match_red.eff.out.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - match_red.eff.out)))))
+
+(rule
+ (deps "match_red.eff.out.ocaml_with_header")
  (target "match_red.eff.out.ocaml_output")
   (action
    (with-outputs-to "match_red.eff.out.ocaml_output"
     (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml match_red.eff.out)))))
+     (run ocaml "match_red.eff.out.ocaml_with_header")))))
 
 (rule
  (deps "match_red.eff.out.ocaml_output")
@@ -322,7 +381,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./not-found.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./not-found.eff")))))
 
 (rule
  (deps "not-found.eff.out")
@@ -339,12 +398,19 @@
     (diff "not-found.eff.ref.formatted" "not-found.eff.formatted")))
 
 (rule
- (deps "not-found.eff.out")
+ (deps "not-found.eff.out" ocaml_header.tmp)
+ (target "not-found.eff.out.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - not-found.eff.out)))))
+
+(rule
+ (deps "not-found.eff.out.ocaml_with_header")
  (target "not-found.eff.out.ocaml_output")
   (action
    (with-outputs-to "not-found.eff.out.ocaml_output"
     (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml not-found.eff.out)))))
+     (run ocaml "not-found.eff.out.ocaml_with_header")))))
 
 (rule
  (deps "not-found.eff.out.ocaml_output")
@@ -367,7 +433,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./one_input.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./one_input.eff")))))
 
 (rule
  (deps "one_input.eff.out")
@@ -384,12 +450,19 @@
     (diff "one_input.eff.ref.formatted" "one_input.eff.formatted")))
 
 (rule
- (deps "one_input.eff.out")
+ (deps "one_input.eff.out" ocaml_header.tmp)
+ (target "one_input.eff.out.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - one_input.eff.out)))))
+
+(rule
+ (deps "one_input.eff.out.ocaml_with_header")
  (target "one_input.eff.out.ocaml_output")
   (action
    (with-outputs-to "one_input.eff.out.ocaml_output"
     (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml one_input.eff.out)))))
+     (run ocaml "one_input.eff.out.ocaml_with_header")))))
 
 (rule
  (deps "one_input.eff.out.ocaml_output")
@@ -412,7 +485,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./substitution.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./substitution.eff")))))
 
 (rule
  (deps "substitution.eff.out")
@@ -429,12 +502,19 @@
     (diff "substitution.eff.ref.formatted" "substitution.eff.formatted")))
 
 (rule
- (deps "substitution.eff.out")
+ (deps "substitution.eff.out" ocaml_header.tmp)
+ (target "substitution.eff.out.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - substitution.eff.out)))))
+
+(rule
+ (deps "substitution.eff.out.ocaml_with_header")
  (target "substitution.eff.out.ocaml_output")
   (action
    (with-outputs-to "substitution.eff.out.ocaml_output"
     (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml substitution.eff.out)))))
+     (run ocaml "substitution.eff.out.ocaml_with_header")))))
 
 (rule
  (deps "substitution.eff.out.ocaml_output")
@@ -457,7 +537,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./test-handle_effect_skip.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./test-handle_effect_skip.eff")))))
 
 (rule
  (deps "test-handle_effect_skip.eff.out")
@@ -474,12 +554,19 @@
     (diff "test-handle_effect_skip.eff.ref.formatted" "test-handle_effect_skip.eff.formatted")))
 
 (rule
- (deps "test-handle_effect_skip.eff.out")
+ (deps "test-handle_effect_skip.eff.out" ocaml_header.tmp)
+ (target "test-handle_effect_skip.eff.out.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - test-handle_effect_skip.eff.out)))))
+
+(rule
+ (deps "test-handle_effect_skip.eff.out.ocaml_with_header")
  (target "test-handle_effect_skip.eff.out.ocaml_output")
   (action
    (with-outputs-to "test-handle_effect_skip.eff.out.ocaml_output"
     (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml test-handle_effect_skip.eff.out)))))
+     (run ocaml "test-handle_effect_skip.eff.out.ocaml_with_header")))))
 
 (rule
  (deps "test-handle_effect_skip.eff.out.ocaml_output")
@@ -502,7 +589,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml "./two_inputs.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./two_inputs.eff")))))
 
 (rule
  (deps "two_inputs.eff.out")
@@ -519,12 +606,19 @@
     (diff "two_inputs.eff.ref.formatted" "two_inputs.eff.formatted")))
 
 (rule
- (deps "two_inputs.eff.out")
+ (deps "two_inputs.eff.out" ocaml_header.tmp)
+ (target "two_inputs.eff.out.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - two_inputs.eff.out)))))
+
+(rule
+ (deps "two_inputs.eff.out.ocaml_with_header")
  (target "two_inputs.eff.out.ocaml_output")
   (action
    (with-outputs-to "two_inputs.eff.out.ocaml_output"
     (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml two_inputs.eff.out)))))
+     (run ocaml "two_inputs.eff.out.ocaml_with_header")))))
 
 (rule
  (deps "two_inputs.eff.out.ocaml_output")

@@ -298,7 +298,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     { state with prog = SyntaxNoEff.TyDef tydefs' :: state.prog }
 
   let finalize state =
-    Format.fprintf !Config.output_formatter "open OcamlHeader;;";
+    if !Config.include_header_open then
+      Format.fprintf !Config.output_formatter "open OcamlHeader;;";
     List.iter
       (fun cmd ->
         Format.fprintf !Config.output_formatter "%t\n"

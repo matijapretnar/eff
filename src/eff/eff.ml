@@ -23,6 +23,9 @@ let options =
       ( "--no-wrapper",
         Arg.Unit (fun () -> Config.wrapper := None),
         " Do not use a command-line wrapper" );
+      ( "--no-header",
+        Arg.Clear Config.include_header_open,
+        " Do not include open OcamlHeader in generated files" );
       ( "--compile-multicore-ocaml",
         Arg.Unit (fun () -> Config.backend := Multicore),
         " Compile the Eff code into a Multicore OCaml (sent to standard output)"

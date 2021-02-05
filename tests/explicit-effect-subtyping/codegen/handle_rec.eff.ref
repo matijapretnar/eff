@@ -1,4 +1,4 @@
-open OcamlHeader;;type(_, _) effect += Eff : (unit, unit) effect 
+type(_, _) effect += Eff : (unit, unit) effect 
 ;;
 let _op_0 (* - *) = ( - )
 ;;

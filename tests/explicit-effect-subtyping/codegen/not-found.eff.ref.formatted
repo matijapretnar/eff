@@ -1,5 +1,3 @@
-open OcamlHeader
-
 type (_, _) effect += Op1 : (int, int) effect
 
 ;;

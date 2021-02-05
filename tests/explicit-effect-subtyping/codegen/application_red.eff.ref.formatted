@@ -1,5 +1,3 @@
-open OcamlHeader
-
 let _op_0 (* * *) = ( * )
 
 ;;

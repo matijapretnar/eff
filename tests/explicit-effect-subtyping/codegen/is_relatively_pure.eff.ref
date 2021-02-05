@@ -1,4 +1,4 @@
-open OcamlHeader;;type(_, _) effect += Op1 : (int, unit) effect 
+type(_, _) effect += Op1 : (int, unit) effect 
 ;;
 type(_, _) effect += Op2 : (int, unit) effect 
 ;;

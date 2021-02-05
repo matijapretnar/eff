@@ -14,6 +14,8 @@ let interactive_shell = ref true
 
 let wrapper = ref (Some [ "rlwrap"; "ledit" ])
 
+let include_header_open = ref true
+
 let verbosity = ref 3
 
 let output_formatter = ref Format.std_formatter

@@ -1,4 +1,4 @@
-open OcamlHeader;;let decide_func_0 = fun (bl_1: bool) -> (match bl_1 with
-                                                            true -> 10
-                                                           |  false -> 20)
+let decide_func_0 = fun (bl_1: bool) -> (match bl_1 with
+                                          true -> 10
+                                         |  false -> 20)
 ;;

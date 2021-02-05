@@ -28,8 +28,18 @@ let skip = []
 
 let generate_empty_ref = true
 
-(* Placeholder for future use *)
-let global_stanza _files = ()
+let global_stanza _files config =
+  if config.generate_ocaml_compile_rule then (
+    Printf.printf "(rule\n";
+    Printf.printf " (deps\n";
+    Printf.printf "  \"../../../ocamlHeader/ocamlHeader.ml\")\n";
+    Printf.printf "   (target ocaml_header.tmp)\n";
+    Printf.printf "    (action\n";
+    Printf.printf "     (with-outputs-to \"%%{target}\"\n";
+    Printf.printf "      (with-accepted-exit-codes\n";
+    Printf.printf "       0\n";
+    Printf.printf
+      "       (run cat \"../../../ocamlHeader/ocamlHeader.ml\")))))\n\n")
 
 let test_case_rule_stanza config (_bare, full_name) =
   Printf.printf "(rule\n";
@@ -61,13 +71,23 @@ let format_stanza out_filename =
     out_filename out_filename
 
 let ocaml_compile_rule full_name out_filename =
+  (* Combined file*)
   Printf.printf "(rule\n";
-  Printf.printf " (deps \"%s\")\n" out_filename;
+  Printf.printf " (deps \"%s\" ocaml_header.tmp)\n" out_filename;
+  Printf.printf " (target \"%s.ocaml_with_header\")\n" out_filename;
+  Printf.printf "  (action\n";
+  Printf.printf "   (with-outputs-to \"%%{target}\"\n";
+  Printf.printf
+    "    (pipe-outputs (run echo \";;\") (run cat ocaml_header.tmp - %s)))))\n\n"
+    out_filename;
+
+  Printf.printf "(rule\n";
+  Printf.printf " (deps \"%s.ocaml_with_header\")\n" out_filename;
   Printf.printf " (target \"%s.ocaml_output\")\n" out_filename;
   Printf.printf "  (action\n";
   Printf.printf "   (with-outputs-to \"%s.ocaml_output\"\n" out_filename;
   Printf.printf "    (with-accepted-exit-codes (or 0 1 2)\n";
-  Printf.printf "     (run ocaml %s)))))\n\n" out_filename;
+  Printf.printf "     (run ocaml \"%s.ocaml_with_header\")))))\n\n" out_filename;
 
   Printf.printf "(rule\n";
   Printf.printf " (deps \"%s.ocaml_output\")\n" out_filename;
@@ -98,7 +118,7 @@ let main () =
   |> function
   | [] -> () (* no tests to execute *)
   | tests ->
-      global_stanza tests;
+      global_stanza tests config;
       List.iter
         (fun test ->
           test_case_rule_stanza config test;

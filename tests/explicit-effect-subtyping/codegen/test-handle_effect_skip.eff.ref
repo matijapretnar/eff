@@ -1,4 +1,4 @@
-open OcamlHeader;;type(_, _) effect += Print : (string, unit) effect 
+type(_, _) effect += Print : (string, unit) effect 
 ;;
  Call (Print, "hello\n", (fun (y_3: unit) -> Value ((match y_3 with
                                                          _ -> 42))))

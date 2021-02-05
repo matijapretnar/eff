@@ -19,6 +19,9 @@ val interactive_shell : bool ref
 val wrapper : string list option ref
 (** The command-line wrappers that we look for *)
 
+val include_header_open : bool ref
+(** Should we include the open OcamlHeader in the generated files? *)
+
 val verbosity : int ref
 (** Select which messages should be printed:
     - 0 no messages
