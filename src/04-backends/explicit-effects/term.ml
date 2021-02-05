@@ -8,6 +8,10 @@ module EffectMap = Map.Make (CoreTypes.Effect)
 
 type variable = CoreTypes.Variable.t
 
+module EffectFingerprint = Symbol.Make (Symbol.Anonymous)
+
+type effect_fingerprint = EffectFingerprint.t
+
 type effect = CoreTypes.Effect.t * (Type.ty * Type.ty)
 
 type pattern = (pattern', Type.ty) typed
@@ -79,10 +83,12 @@ and computation' =
 
 and handler = (handler', Type.dirty * Type.dirty) typed
 
-and handler' = {
-  effect_clauses : (effect, abstraction2) Assoc.t;
-  value_clause : abstraction;
+and effect_clauses = {
+  effect_part : (effect, abstraction2) Assoc.t;
+  fingerprint : effect_fingerprint;
 }
+
+and handler' = { effect_clauses : effect_clauses; value_clause : abstraction }
 (** Handler definitions *)
 
 and abstraction = (pattern * computation, Type.ty * Type.dirty) typed
@@ -116,11 +122,15 @@ let lambda abs = { term = Lambda abs; ty = Type.Arrow abs.ty }
 
 let effect (_ : effect) : expression = failwith __LOC__
 
-let handler_clauses value_clause effect_clauses drt_in =
+let fresh_handler value_clause effect_part ty =
   (* TODO: Check that input dirt is either handled or covered in output dirt *)
   (* TODO: Check that effect clauses have a correct type *)
+  let fingerprint = EffectFingerprint.fresh () in
+  { term = { value_clause; effect_clauses = { fingerprint; effect_part } }; ty }
+
+let handler_clauses value_clause effect_part drt_in : handler =
   let ty_in, drty_out = value_clause.ty in
-  { term = { value_clause; effect_clauses }; ty = ((ty_in, drt_in), drty_out) }
+  fresh_handler value_clause effect_part ((ty_in, drt_in), drty_out)
 
 let handler h =
   let drty1, drty2 = h.ty in
@@ -234,7 +244,7 @@ let rec print_expression ?max_level e ppf =
         \             ((match x with %t) : a -> (b -> _ computation) -> _ \
          computation)) @]}"
         (print_abstraction h.term.value_clause)
-        (print_effect_clauses (Assoc.to_list h.term.effect_clauses))
+        (print_effect_clauses (Assoc.to_list h.term.effect_clauses.effect_part))
   | CastExp (e1, tc) ->
       print "(%t) |> [%t]" (print_expression e1)
         (Constraint.print_ty_coercion tc)
@@ -373,12 +383,19 @@ and subst_comp' sbst = function
   | Value e -> Value (subst_expr sbst e)
   | CastComp (c, dtyco) -> CastComp (subst_comp sbst c, dtyco)
 
+and substitute_effect_clauses sbst effect_clauses =
+  (* TODO: What happens with handler fingerprint on substitution? *)
+  {
+    effect_clauses with
+    effect_part = Assoc.map (subst_abs2 sbst) effect_clauses.effect_part;
+  }
+
 and subst_handler sbst h =
   {
     h with
     term =
       {
-        effect_clauses = Assoc.map (subst_abs2 sbst) h.term.effect_clauses;
+        effect_clauses = substitute_effect_clauses sbst h.term.effect_clauses;
         value_clause = subst_abs sbst h.term.value_clause;
       };
   }
@@ -421,6 +438,12 @@ let rec make_equal_pattern eqvars p p' =
       make_equal_pattern eqvars p p'
   | _, _ -> None
 
+(* Checks if the effect handling part of handlers is the same *)
+let effect_part_identical h1 h2 =
+  EffectFingerprint.compare h1.effect_clauses.fingerprint
+    h2.effect_clauses.fingerprint
+  = 0
+
 let rec alphaeq_expr eqvars e e' =
   match (e.term, e'.term) with
   | Var x, Var y -> List.mem (x, y) eqvars || CoreTypes.Variable.compare x y = 0
@@ -454,15 +477,17 @@ and alphaeq_comp eqvars c c' =
   | Value e, Value e' -> alphaeq_expr eqvars e e'
   | _, _ -> false
 
+(* This one seems out of use now that we got effect part fingerprint *)
 and alphaeq_handler eqvars h h' =
   alphaeq_abs eqvars h.term.value_clause h'.term.value_clause
-  && Assoc.length h.term.effect_clauses = Assoc.length h'.term.effect_clauses
+  && Assoc.length h.term.effect_clauses.effect_part
+     = Assoc.length h'.term.effect_clauses.effect_part
   && List.for_all
        (fun (effect, abs2) ->
-         match Assoc.lookup effect h'.term.effect_clauses with
+         match Assoc.lookup effect h'.term.effect_clauses.effect_part with
          | Some abs2' -> alphaeq_abs2 eqvars abs2 abs2'
          | None -> false)
-       (Assoc.to_list h.term.effect_clauses)
+       (Assoc.to_list h.term.effect_clauses.effect_part)
 
 (*   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
   alphaeq_abs eqvars h.value_clause h'.value_clause *)
@@ -561,7 +586,7 @@ and free_vars_expr e =
 
 and free_vars_handler h =
   free_vars_abs h.term.value_clause
-  @@@ (Assoc.values_of h.term.effect_clauses
+  @@@ (Assoc.values_of h.term.effect_clauses.effect_part
       |> List.map free_vars_abs2 |> concat_vars)
 
 and free_vars_finally_handler (h, finally_clause) =
