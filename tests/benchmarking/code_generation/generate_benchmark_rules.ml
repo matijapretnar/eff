@@ -4,7 +4,7 @@ let invalid = [] (*  ("loop", "NoOptImpure") ] *)
 
 let default_args = "--no-stdlib --compile-plain-ocaml"
 
-let modes = [ ("--no-opts", "NoOpt"); ("", "Opt") ]
+let modes = [ ("", "Opt") ]
 
 let benchmark_case_stanza in_filename args out_filename =
   Printf.printf "(rule\n";

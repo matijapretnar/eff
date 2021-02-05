@@ -6,27 +6,27 @@ open Queens
 open Interp
 open Range
 
-let number_of_loops = 10000
+let number_of_loops = 100
 
 and number_of_queens = 8
 
 and number_of_range = 10
 
-let run_loop_pure = false
+let run_loop_pure = true
 
-and run_loop_latent = false
+and run_loop_latent = true
 
-and run_loop_incr = false
+and run_loop_incr = true
 
-and run_loop_incr' = false
+and run_loop_incr' = true
 
-and run_loop_state = false
+and run_loop_state = true
 
-and run_queens_one = false
+and run_queens_one = true
 
-and run_queens_all = false
+and run_queens_all = true
 
-and run_interp = false
+and run_interp = true
 
 and run_range = true
 
@@ -41,7 +41,7 @@ let benchmark test =
     Instance.[ minor_allocated; major_allocated; monotonic_clock; promoted ]
   in
   let cfg =
-    Benchmark.cfg ~limit:2000 ~quota:(Time.second 2.0) ~kde:(Some 5000) ()
+    Benchmark.cfg ~limit:500 ~quota:(Time.second 0.5) ~kde:(Some 500) ()
   in
   let raw_results = Benchmark.all cfg instances test in
   let results =
@@ -89,12 +89,9 @@ let loop_benchmarks =
     name = "LOOP PURE BENCHMARK";
     benchmarks =
       [
-        ( "Generated, not optimized",
-          forget_value LoopNoOpt.test_pure,
-          fun n -> LoopNoOpt.test_pure n = () );
         ( "Generated, optimized",
-          forget_value LoopOpt.test_pure,
-          fun n -> LoopOpt.test_pure n = () );
+          forget_value LoopOpt.test_pure_10,
+          fun n -> LoopOpt.test_pure_10 n = () );
         ( "Hand written",
           forget_value LoopHandWritten.test_pure,
           fun n -> LoopHandWritten.test_pure n = () );
@@ -110,12 +107,9 @@ let loop_latent_benchmarks =
     name = "LOOP LATENT BENCHMARK";
     benchmarks =
       [
-        ( "Generated, not optimized",
-          forget_value LoopNoOpt.test_latent,
-          always_true LoopNoOpt.test_latent );
         ( "Generated, optimized",
-          forget_value LoopOpt.test_latent,
-          always_true LoopOpt.test_latent );
+          forget_value LoopOpt.test_latent_23,
+          always_true LoopOpt.test_latent_23 );
         ( "Hand written",
           forget_value LoopHandWritten.test_latent,
           always_true LoopHandWritten.test_latent );
@@ -131,12 +125,9 @@ let loop_incr_benchmark num =
     name = "LOOP INCR BENCHMARK";
     benchmarks =
       [
-        ( "Generated, not optimized",
-          forget_value LoopNoOpt.test_incr,
-          fun n -> LoopNoOpt.test_incr n = num );
         ( "Generated, optimized",
-          forget_value LoopOpt.test_incr,
-          fun n -> LoopOpt.test_incr n = num );
+          forget_value LoopOpt.test_incr_33,
+          fun n -> LoopOpt.test_incr_33 n = num );
         ( "Hand written",
           forget_value LoopHandWritten.test_incr,
           fun n -> LoopHandWritten.test_incr n = num );
@@ -152,12 +143,9 @@ let loop_incr'_benchmark num =
     name = "LOOP INCR' BENCHMARK";
     benchmarks =
       [
-        ( "Generated, not optimized",
-          forget_value LoopNoOpt.test_incr',
-          fun n -> LoopNoOpt.test_incr' n = num );
         ( "Generated, optimized",
-          forget_value LoopOpt.test_incr',
-          fun n -> LoopOpt.test_incr' n = num );
+          forget_value LoopOpt.test_incr'_55,
+          fun n -> LoopOpt.test_incr'_55 n = num );
         ( "Hand written",
           forget_value LoopHandWritten.test_incr',
           fun n -> LoopHandWritten.test_incr' n = num );
@@ -173,12 +161,9 @@ let loop_state_benchmark num =
     name = "LOOP STATE BENCHMARK";
     benchmarks =
       [
-        ( "Generated, not optimized",
-          forget_value LoopNoOpt.test_state,
-          fun n -> LoopNoOpt.test_state n = num );
         ( "Generated, optimized",
-          forget_value LoopOpt.test_state,
-          fun n -> LoopOpt.test_state n = num );
+          forget_value LoopOpt.test_state_82,
+          fun n -> LoopOpt.test_state_82 n = num );
         ( "Hand written",
           forget_value LoopHandWritten.test_state,
           fun n -> LoopHandWritten.test_state n = num );
@@ -194,12 +179,9 @@ let queens_one_cps_benchmark number_of_queens =
     name = "QUEENS ONE CPS BENCHMARK";
     benchmarks =
       [
-        (* ( "Generated, not optimized",
-           forget_value QueensNoOpt.queens_one_cps,
-           always_true QueensNoOpt.queens_one_cps ); *)
         ( "Generated, optimized",
-          forget_value QueensOpt.test_queens,
-          always_true QueensOpt.test_queens );
+          forget_value QueensOpt.test_queens_5,
+          always_true QueensOpt.test_queens_5 );
         ( "Hand written",
           forget_value QueensHandWritten.queens_one_cps,
           always_true QueensHandWritten.queens_one_cps );
@@ -215,9 +197,6 @@ let queens_one_cps_benchmark number_of_queens =
     name = "QUEENS ONE OPTION BENCHMARK";
     benchmarks =
       [
-        ( "Generated, not optimized",
-          forget_value QueensNoOpt.queens_one_option,
-          always_true QueensNoOpt.queens_one_option );
         ( "Generated, optimized",
           forget_value QueensOpt.queens_one_option,
           always_true QueensOpt.queens_one_option );
@@ -236,9 +215,6 @@ let queens_one_cps_benchmark number_of_queens =
     name = "QUEENS ALL BENCHMARK";
     benchmarks =
       [
-        (* ( "Generated, not optimized",
-           forget_value QueensNoOpt.queens_all,
-           always_true QueensNoOpt.queens_all ); *)
         ( "Generated, optimized",
           forget_value QueensOpt.test_queens,
           always_true QueensOpt.test_queens );
@@ -257,12 +233,9 @@ let interpreter_benchmark =
     name = "INTERPRETER BENCHMARK";
     benchmarks =
       [
-        ( "Generated, not optimized",
-          forget_value InterpNoOpt.bigTest,
-          always_true InterpNoOpt.bigTest );
         ( "Generated, optimized",
-          forget_value InterpOpt.bigTest,
-          always_true InterpOpt.bigTest );
+          forget_value InterpOpt.bigTest_5,
+          always_true InterpOpt.bigTest_5 );
       ];
     param = ();
   }
@@ -272,12 +245,9 @@ let range_benchmarks number_of_range =
     name = "RANGE BENCHMARK";
     benchmarks =
       [
-        ( "Generated, not optimized",
-          forget_value RangeNoOpt.test,
-          always_true RangeNoOpt.test );
         ( "Generated, optimized",
-          forget_value RangeOpt.test,
-          always_true RangeOpt.test );
+          forget_value RangeOpt.test_1,
+          always_true RangeOpt.test_1 );
         ("Native", forget_value RangeNative.test, always_true RangeNative.test);
       ];
     param = number_of_range;
