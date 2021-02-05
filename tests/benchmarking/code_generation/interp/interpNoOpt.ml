@@ -117,111 +117,112 @@ type term =
 
 type (_, _) effect += DivByZero : (unit, int) effect
 
-let bigTest (() : unit) =
-  let rec interp _x_7 =
+let bigTest_5 (() : unit) =
+  let rec interp_6 _x_7 =
     match coer_refl_ty _x_7 with
-    | Num b -> (coer_return coer_refl_ty) b
-    | Add (l, r) ->
+    | Num b_8 -> (coer_return coer_refl_ty) b_8
+    | Add (l_9, r_10) ->
         (coer_computation coer_refl_ty)
           ( (coer_computation coer_refl_ty)
               (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
                   ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                     interp))
-                 l)
-          >> fun x ->
+                     interp_6))
+                 l_9)
+          >> fun x_11 ->
             (coer_computation coer_refl_ty)
               ( (coer_computation coer_refl_ty)
                   (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
                       ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                         interp))
-                     r)
-              >> fun y ->
+                         interp_6))
+                     r_10)
+              >> fun y_12 ->
                 (coer_return coer_refl_ty)
                   (let _b_13 =
                      coer_refl_ty
                        (((coer_arrow coer_refl_ty
                             (coer_arrow coer_refl_ty coer_refl_ty))
                            _op_0 (* + *))
-                          x)
+                          x_11)
                    in
                    coer_refl_ty
-                     (((coer_arrow coer_refl_ty coer_refl_ty) _b_13) y)) ) )
-    | Mul (l, r) ->
+                     (((coer_arrow coer_refl_ty coer_refl_ty) _b_13) y_12)) ) )
+    | Mul (l_14, r_15) ->
         (coer_computation coer_refl_ty)
           ( (coer_computation coer_refl_ty)
               (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
                   ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                     interp))
-                 l)
-          >> fun x ->
+                     interp_6))
+                 l_14)
+          >> fun x_16 ->
             (coer_computation coer_refl_ty)
               ( (coer_computation coer_refl_ty)
                   (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
                       ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                         interp))
-                     r)
-              >> fun y ->
+                         interp_6))
+                     r_15)
+              >> fun y_17 ->
                 (coer_return coer_refl_ty)
                   (let _b_18 =
                      coer_refl_ty
                        (((coer_arrow coer_refl_ty
                             (coer_arrow coer_refl_ty coer_refl_ty))
                            _op_1 (* * *))
-                          x)
+                          x_16)
                    in
                    coer_refl_ty
-                     (((coer_arrow coer_refl_ty coer_refl_ty) _b_18) y)) ) )
-    | Sub (l, r) ->
+                     (((coer_arrow coer_refl_ty coer_refl_ty) _b_18) y_17)) ) )
+    | Sub (l_19, r_20) ->
         (coer_computation coer_refl_ty)
           ( (coer_computation coer_refl_ty)
               (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
                   ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                     interp))
-                 l)
-          >> fun x ->
+                     interp_6))
+                 l_19)
+          >> fun x_21 ->
             (coer_computation coer_refl_ty)
               ( (coer_computation coer_refl_ty)
                   (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
                       ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                         interp))
-                     r)
-              >> fun y ->
+                         interp_6))
+                     r_20)
+              >> fun y_22 ->
                 (coer_return coer_refl_ty)
                   (let _b_23 =
                      coer_refl_ty
                        (((coer_arrow coer_refl_ty
                             (coer_arrow coer_refl_ty coer_refl_ty))
                            _op_2 (* - *))
-                          x)
+                          x_21)
                    in
                    coer_refl_ty
-                     (((coer_arrow coer_refl_ty coer_refl_ty) _b_23) y)) ) )
-    | Div (l, r) ->
+                     (((coer_arrow coer_refl_ty coer_refl_ty) _b_23) y_22)) ) )
+    | Div (l_24, r_25) ->
         (coer_computation coer_refl_ty)
           ( (coer_computation coer_refl_ty)
               (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
                   ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                     interp))
-                 r)
-          >> fun y ->
+                     interp_6))
+                 r_25)
+          >> fun y_26 ->
             (coer_computation coer_refl_ty)
               ( (coer_computation coer_refl_ty)
                   (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
                       ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                         interp))
-                     l)
-              >> fun x ->
+                         interp_6))
+                     l_24)
+              >> fun x_27 ->
                 (coer_computation coer_refl_ty)
-                  (match coer_refl_ty y with
+                  (match coer_refl_ty y_26 with
                   | 0 ->
                       (coer_computation coer_refl_ty)
                         (((coer_arrow coer_refl_ty
-                             (coer_computation coer_refl_ty)) (fun (x : unit) ->
+                             (coer_computation coer_refl_ty))
+                            (fun (x_41 : unit) ->
                               Call
                                 ( DivByZero,
-                                  x,
-                                  fun (y : int) -> (coer_return coer_refl_ty) y
-                                )))
+                                  x_41,
+                                  fun (y_42 : int) ->
+                                    (coer_return coer_refl_ty) y_42 )))
                            ())
                   | _ ->
                       (coer_return coer_refl_ty)
@@ -230,13 +231,13 @@ let bigTest (() : unit) =
                              (((coer_arrow coer_refl_ty
                                   (coer_arrow coer_refl_ty coer_refl_ty))
                                  _op_4 (* / *))
-                                x)
+                                x_27)
                          in
                          coer_refl_ty
-                           (((coer_arrow coer_refl_ty coer_refl_ty) _b_28) y)))
+                           (((coer_arrow coer_refl_ty coer_refl_ty) _b_28) y_26)))
               ) )
   in
-  let addCase =
+  let addCase_29 =
     Add
       (coer_refl_ty
          ( Add
@@ -253,8 +254,8 @@ let bigTest (() : unit) =
                     (coer_refl_ty (Num (coer_refl_ty 1), Num (coer_refl_ty 10)))
                 )) ))
   in
-  let rec createCase n =
-    match coer_refl_ty n with
+  let rec createCase_30 n_31 =
+    match coer_refl_ty n_31 with
     | 1 ->
         coer_refl_ty
           (Div (coer_refl_ty (Num (coer_refl_ty 100), Num (coer_refl_ty 0))))
@@ -269,26 +270,26 @@ let bigTest (() : unit) =
                          (((coer_arrow coer_refl_ty
                               (coer_arrow coer_refl_ty coer_refl_ty))
                              _op_2 (* - *))
-                            n)
+                            n_31)
                      in
                      coer_refl_ty
                        (((coer_arrow coer_refl_ty coer_refl_ty) _b_34) 1))
                 in
                 coer_refl_ty
                   (((coer_arrow coer_refl_ty coer_refl_ty)
-                      ((coer_arrow coer_refl_ty coer_refl_ty) createCase))
+                      ((coer_arrow coer_refl_ty coer_refl_ty) createCase_30))
                      _b_33))
            in
            coer_refl_ty
              (Add
                 (((* tuple_coer *) coer_tuple_2 (coer_refl_ty, coer_refl_ty))
-                   (addCase, _b_32))))
+                   (addCase_29, _b_32))))
   in
-  let finalCase =
-    coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) createCase) 200)
+  let finalCase_35 =
+    coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) createCase_30) 200)
   in
   coer_refl_ty
-    (let arithmeticHandler =
+    (let arithmeticHandler_36 =
        (coer_handler
           (coer_computation coer_refl_ty)
           (coer_computation coer_refl_ty))
@@ -299,7 +300,7 @@ let bigTest (() : unit) =
                 (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
                   match eff with
                   | DivByZero ->
-                      fun () l ->
+                      fun () l_43 ->
                         Value
                           (coer_refl_ty
                              (((coer_arrow coer_refl_ty coer_refl_ty)
@@ -312,12 +313,12 @@ let bigTest (() : unit) =
        (((coer_handler
             (coer_computation coer_refl_ty)
             (coer_computation coer_refl_ty))
-           arithmeticHandler)
+           arithmeticHandler_36)
           ((coer_computation coer_refl_ty)
              ( (coer_return coer_refl_ty)
-                 (((coer_arrow coer_refl_ty coer_refl_ty) createCase) 200)
+                 (((coer_arrow coer_refl_ty coer_refl_ty) createCase_30) 200)
              >> fun _b_40 ->
                (coer_computation coer_refl_ty)
                  (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                     interp)
+                     interp_6)
                     _b_40) ))))

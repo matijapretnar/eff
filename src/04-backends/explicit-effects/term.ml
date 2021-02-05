@@ -387,7 +387,7 @@ and substitute_effect_clauses sbst effect_clauses =
   {
     effect_part = Assoc.map (subst_abs2 sbst) effect_clauses.effect_part;
     (* We refresh the fingerprint because the meaning of effect clauses changes *)
-    fingerprint = EffectFingerprint.refresh effect_clauses.fingerprint
+    fingerprint = EffectFingerprint.refresh effect_clauses.fingerprint;
   }
 
 and subst_handler sbst h =

@@ -116,7 +116,6 @@ let toplevel execute_source state =
   Format.fprintf !Config.output_formatter
     "[Type %s to exit or #help;; for help.]@." eof;
   let state = ref state in
-  Sys.catch_break true;
   try
     while true do
       let source = read_toplevel () in
@@ -131,6 +130,8 @@ let toplevel execute_source state =
 let main =
   (* Parse the arguments. *)
   Arg.parse options anonymous usage;
+  Printexc.record_backtrace true;
+  Sys.catch_break true;
   (* Attemp to wrap yourself with a line-editing wrapper. *)
   (if !Config.interactive_shell then
    match !Config.wrapper with

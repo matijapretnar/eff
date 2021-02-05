@@ -120,93 +120,100 @@ type inttuplist = IntTupNil | IntTupCons of (inttuple * inttuplist)
 
 type void = Void
 
-let test_queens (n : int) =
-  let absurd (void : empty) = match void with _ -> assert false in
-  let _op_9 (* > *) (x : int) (y : int) = (_op_0 (* < *) y) x in
-  let _op_13 (* <> *) (x : int) (y : int) =
-    match (_op_1 (* = *) y) x with true -> false | false -> true
+let test_queens_5 (n_6 : int) =
+  let absurd_7 (void_8 : empty) = match void_8 with _ -> assert false in
+  let _op_9 (* > *) (x_10 : int) (y_11 : int) = (_op_0 (* < *) y_11) x_10 in
+  let _op_13 (* <> *) (x_14 : int) (y_15 : int) =
+    match (_op_1 (* = *) y_15) x_14 with true -> false | false -> true
   in
-  let abs (x : int) =
-    match (_op_0 (* < *) x) 0 with true -> _op_4 (* ~- *) x | false -> x
+  let abs_18 (x_19 : int) =
+    match (_op_0 (* < *) x_19) 0 with
+    | true -> _op_4 (* ~- *) x_19
+    | false -> x_19
   in
-  let no_attack (q1 : inttuple) (q2 : inttuple) =
-    match q1 with
-    | IntTuple (x, y) -> (
-        match q2 with
-        | IntTuple (x', y') -> (
-            match (_op_13 (* <> *) x) x' with
+  let no_attack_22 (q1_23 : inttuple) (q2_24 : inttuple) =
+    match q1_23 with
+    | IntTuple (x_25, y_26) -> (
+        match q2_24 with
+        | IntTuple (x'_27, y'_28) -> (
+            match (_op_13 (* <> *) x_25) x'_27 with
             | true -> (
-                match (_op_13 (* <> *) y) y' with
+                match (_op_13 (* <> *) y_26) y'_28 with
                 | true ->
-                    (_op_13 (* <> *) (abs ((_op_2 (* - *) x) x')))
-                      (abs ((_op_2 (* - *) y) y'))
+                    (_op_13 (* <> *) (abs_18 ((_op_2 (* - *) x_25) x'_27)))
+                      (abs_18 ((_op_2 (* - *) y_26) y'_28))
                 | false -> false)
             | false -> false))
   in
-  let rec not_attacked x' (qs : inttuplist) =
-    match qs with
+  let rec not_attacked_40 x'_41 (qs_42 : inttuplist) =
+    match qs_42 with
     | IntTupNil -> true
-    | IntTupCons (x, xs) -> (
-        match (no_attack x') x with
-        | true -> (not_attacked x') xs
+    | IntTupCons (x_43, xs_44) -> (
+        match (no_attack_22 x'_41) x_43 with
+        | true -> (not_attacked_40 x'_41) xs_44
         | false -> false)
   in
-  let available (number_of_queens : int) (x : int) (qs : inttuplist) =
-    let rec loop possible (y : int) =
-      match (_op_0 (* < *) y) 1 with
-      | true -> possible
+  let available_48 (number_of_queens_49 : int) (x_50 : int) (qs_51 : inttuplist)
+      =
+    let rec loop_52 possible_53 (y_54 : int) =
+      match (_op_0 (* < *) y_54) 1 with
+      | true -> possible_53
       | false -> (
-          match (not_attacked (IntTuple (x, y))) qs with
-          | true -> (loop (IntCons (y, possible))) ((_op_2 (* - *) y) 1)
-          | false -> (loop possible) ((_op_2 (* - *) y) 1))
+          match (not_attacked_40 (IntTuple (x_50, y_54))) qs_51 with
+          | true ->
+              (loop_52 (IntCons (y_54, possible_53))) ((_op_2 (* - *) y_54) 1)
+          | false -> (loop_52 possible_53) ((_op_2 (* - *) y_54) 1))
     in
-    (loop IntNil) number_of_queens
+    (loop_52 IntNil) number_of_queens_49
   in
-  let rec choose xs =
-    match xs with
+  let rec choose_66 xs_67 =
+    match xs_67 with
     | IntNil ->
-        (fun (x : unit) -> Call (Fail, x, fun (y : empty) -> Value y)) ()
+        (fun (x_103 : unit) ->
+          Call (Fail, x_103, fun (y_104 : empty) -> Value y_104))
+          ()
         >> fun _b_68 -> Value (match _b_68 with _ -> assert false)
-    | IntCons (x, xs') -> (
-        (fun (x : unit) -> Call (Decide, x, fun (y : bool) -> Value y)) ()
-        >> fun _b_71 -> match _b_71 with true -> Value x | false -> choose xs')
+    | IntCons (x_69, xs'_70) -> (
+        (fun (x_101 : unit) ->
+          Call (Decide, x_101, fun (y_102 : bool) -> Value y_102))
+          ()
+        >> fun _b_71 ->
+        match _b_71 with true -> Value x_69 | false -> choose_66 xs'_70)
   in
-  let backtrack =
-    handler
-      {
-        value_clause =
-          (fun (_x_79 : inttuplist) ->
-            Value
-              ((coer_arrow coer_refl_ty (coer_return coer_refl_ty))
-                 (fun (_ : unit -> inttuplist computation) -> _x_79)));
-        effect_clauses =
-          (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
-            match eff with
-            | Decide ->
-                fun _ l ->
-                  Value
-                    (fun (kf : unit -> inttuplist computation) ->
-                      (((coer_arrow coer_refl_ty force_unsafe) l) true)
-                        (fun (_ : unit) ->
-                          (((coer_arrow coer_refl_ty force_unsafe) l) false) kf))
-            | Fail ->
-                fun _ l ->
-                  Value (fun (kf : unit -> inttuplist computation) -> kf ())
-            | eff' -> fun arg k -> Call (eff', arg, k));
-      }
-  in
-  let queens (number_of_queens : int) =
-    let rec place x (qs : inttuplist) =
-      match (_op_9 (* > *) x) number_of_queens with
-      | true -> Value qs
-      | false ->
-          choose (((available number_of_queens) x) qs) >> fun y ->
-          (place ((_op_3 (* + *) x) 1)) (IntTupCons (IntTuple (x, y), qs))
-    in
-    (place 1) IntTupNil
-  in
-  (fun (number_of_queens : int) ->
-    (force_unsafe (backtrack (queens number_of_queens))) (fun (() : unit) ->
-        (fun (x : unit) -> Call (Fail, x, fun (y : empty) -> Value y)) ()
-        >> fun _b_100 -> Value (absurd _b_100)))
-    n
+  (let rec place_84 x_85 (qs_86 : inttuplist) =
+     match (_op_9 (* > *) x_85) n_6 with
+     | true -> Value qs_86
+     | false ->
+         choose_66 (((available_48 n_6) x_85) qs_86) >> fun y_89 ->
+         (place_84 ((_op_3 (* + *) x_85) 1))
+           (IntTupCons (IntTuple (x_85, y_89), qs_86))
+   in
+   force_unsafe
+     ((handler
+         {
+           value_clause =
+             (fun (_x_79 : inttuplist) ->
+               Value
+                 ((coer_arrow coer_refl_ty (coer_return coer_refl_ty))
+                    (fun (_ : unit -> inttuplist computation) -> _x_79)));
+           effect_clauses =
+             (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+               match eff with
+               | Decide ->
+                   fun _ l_105 ->
+                     Value
+                       (fun (kf_74 : unit -> inttuplist computation) ->
+                         (((coer_arrow coer_refl_ty force_unsafe) l_105) true)
+                           (fun (_ : unit) ->
+                             (((coer_arrow coer_refl_ty force_unsafe) l_105)
+                                false)
+                               kf_74))
+               | Fail ->
+                   fun _ l_106 ->
+                     Value
+                       (fun (kf_78 : unit -> inttuplist computation) ->
+                         kf_78 ())
+               | eff' -> fun arg k -> Call (eff', arg, k));
+         })
+        ((place_84 1) IntTupNil))) (fun (() : unit) ->
+      Call (Fail, (), fun (y_108 : empty) -> Value (absurd_7 y_108)))

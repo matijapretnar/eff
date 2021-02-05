@@ -85,7 +85,7 @@ let rec extract_cast_value comp =
         (extract_cast_value comp)
   | _ -> None
 
-let rec recast_computation handled_drt comp =
+let rec recast_computation hnd comp =
   match (comp.term, comp.ty) with
   | Term.CastComp (comp, { term = tcoer, _; _ }), _ ->
       Option.map
@@ -93,18 +93,26 @@ let rec recast_computation handled_drt comp =
           let _, drt = comp.ty in
           Term.castComp
             (comp, Constraint.bangCoercion (tcoer, Constraint.reflDirt drt)))
-        (recast_computation handled_drt comp)
-  | _, (ty, { Type.effect_set = effs; Type.row = EmptyRow })
-    when Type.EffectSet.disjoint effs handled_drt.Type.effect_set ->
-      let drt_diff =
-        {
-          Type.effect_set = Type.EffectSet.diff handled_drt.Type.effect_set effs;
-          Type.row = handled_drt.Type.row;
-        }
+        (recast_computation hnd comp)
+  | _, (ty, { Type.effect_set = effs; Type.row = EmptyRow }) ->
+      let handled_effs =
+        Type.EffectSet.of_list
+          (List.map
+             (fun ((eff, _), _) -> eff)
+             (Assoc.to_list hnd.term.Term.effect_clauses.effect_part))
       in
-      let ty_coer = Constraint.reflTy ty
-      and drt_coer = Constraint.empty drt_diff in
-      Some (Term.castComp (comp, Constraint.bangCoercion (ty_coer, drt_coer)))
+      if Type.EffectSet.disjoint effs handled_effs then
+        let _, (_, drt_out) = hnd.ty in
+        let drt_diff =
+          {
+            Type.effect_set = Type.EffectSet.diff drt_out.Type.effect_set effs;
+            Type.row = drt_out.Type.row;
+          }
+        in
+        let ty_coer = Constraint.reflTy ty
+        and drt_coer = Constraint.empty drt_diff in
+        Some (Term.castComp (comp, Constraint.bangCoercion (ty_coer, drt_coer)))
+      else None
   | _, _ -> None
 
 let rec optimize_ty_coercion state (tcoer : Constraint.ty_coercion) =
@@ -262,23 +270,10 @@ and optimize_abstraction2 state abs2 =
 and optimize_abstraction2' state (pat1, pat2, cmp) =
   (pat1, pat2, optimize_computation state cmp)
 
-and cast_expression state exp sub_exp coer =
-  match (sub_exp, coer.term) with
+and cast_expression _state exp coer =
+  match (exp.term, coer.term) with
   | _, _ when Constraint.is_trivial_ty_coercion coer -> exp
-  | exp, Constraint.ArrowCoercion (tcoer1, tcoer2) -> (
-      match exp.ty with
-      | Type.Arrow (ty1, _) ->
-          let pat_x, exp_x = Term.fresh_variable "x" ty1 in
-          let exp' =
-            Term.lambda
-              (Term.abstraction
-                 ( pat_x,
-                   Term.castComp
-                     (Term.apply (exp, Term.castExp (exp_x, tcoer1)), tcoer2) ))
-          in
-          optimize_expression state exp'
-      | _ -> assert false)
-  | _, _ -> exp
+  | _, _ -> Term.castExp (exp, coer)
 
 and cast_computation state comp coer =
   match (comp.term, coer.term) with
@@ -334,46 +329,46 @@ and handle_computation state hnd comp =
           in
           beta_reduce state (Term.abstraction (p1, comp')) exp
       | None -> Term.call (eff, exp, handled_abs))
-  | Apply ({ term = Var f; _ }, exp)
-    when Option.is_some (Assoc.lookup f state.functions) -> (
-      let fingerprint = hnd.term.Term.effect_clauses.fingerprint in
-      match Assoc.lookup (fingerprint, f) state.specialized_functions with
-      | Some (f', ty) -> Term.apply (Term.var f' ty, exp)
-      | None -> (
-          match Assoc.lookup f state.functions with
-          | Some abs ->
-              let f' = Language.CoreTypes.Variable.refresh f in
-              let (ty_in, _), (_, drty_out) = (abs.ty, hnd.ty) in
-              let ty' = Type.Arrow (ty_in, drty_out) in
-              let abs' = handle_abstraction state hnd abs in
-              Term.letVal
-                ( Term.lambda abs',
-                  Term.abstraction
-                    (Term.pVar f' ty', Term.apply (Term.var f' ty', exp)) )
-          | None -> assert false))
-  | Apply ({ term = Var f; _ }, exp)
-    when Option.is_some (Assoc.lookup f state.recursive_functions) -> (
-      let fingerprint = hnd.term.Term.effect_clauses.fingerprint in
-      match Assoc.lookup (fingerprint, f) state.specialized_functions with
-      | Some (f', ty) -> Term.apply (Term.var f' ty, exp)
-      | None -> (
-          match Assoc.lookup f state.functions with
-          | Some abs ->
-              let f' = Language.CoreTypes.Variable.refresh f in
-              let (ty_in, _), (_, drty_out) = (abs.ty, hnd.ty) in
-              let ty' = Type.Arrow (ty_in, drty_out) in
-              let state' =
-                add_function_specialization state f fingerprint f' ty'
-              in
-              let abs' = handle_abstraction state' hnd abs in
-              Term.letRec ([ (f', abs') ], Term.apply (Term.var f' ty', exp))
-          | None -> assert false))
+  (* | Apply ({ term = Var f; _ }, exp)
+     when Option.is_some (Assoc.lookup f state.functions) -> (
+       let fingerprint = hnd.term.Term.effect_clauses.fingerprint in
+       match Assoc.lookup (fingerprint, f) state.specialized_functions with
+       | Some (f', ty) -> Term.apply (Term.var f' ty, exp)
+       | None -> (
+           match Assoc.lookup f state.functions with
+           | Some abs ->
+               let f' = Language.CoreTypes.Variable.refresh f in
+               let (ty_in, _), (_, drty_out) = (abs.ty, hnd.ty) in
+               let ty' = Type.Arrow (ty_in, drty_out) in
+               let abs' = handle_abstraction state hnd abs in
+               Term.letVal
+                 ( Term.lambda abs',
+                   Term.abstraction
+                     (Term.pVar f' ty', Term.apply (Term.var f' ty', exp)) )
+           | None -> assert false)) *)
+  (* | Apply ({ term = Var f; _ }, exp)
+     when Option.is_some (Assoc.lookup f state.recursive_functions) -> (
+       let fingerprint = hnd.term.Term.effect_clauses.fingerprint in
+       match Assoc.lookup (fingerprint, f) state.specialized_functions with
+       | Some (f', ty) -> Term.apply (Term.var f' ty, exp)
+       | None -> (
+           match Assoc.lookup f state.recursive_functions with
+           | Some abs ->
+               let f' = Language.CoreTypes.Variable.refresh f in
+               let (ty_in, _), (_, drty_out) = (abs.ty, hnd.ty) in
+               let ty' = Type.Arrow (ty_in, drty_out) in
+               let state' =
+                 add_function_specialization state f fingerprint f' ty'
+               in
+               let abs' = handle_abstraction state' hnd abs in
+               Term.letRec ([ (f', abs') ], Term.apply (Term.var f' ty', exp))
+           | None -> assert false)) *)
   | Bind (cmp, abs) -> (
-      let (_, drt_in), _ = hnd.ty in
-      match recast_computation drt_in cmp with
+      match recast_computation hnd cmp with
       | Some comp' ->
           bind_computation state comp' (handle_abstraction state hnd abs)
       | None ->
+          let (_, drt_in), _ = hnd.ty in
           let hnd' =
             Term.handler_clauses
               (handle_abstraction state hnd abs)
@@ -381,14 +376,9 @@ and handle_computation state hnd comp =
           in
           handle_computation state hnd' cmp)
   | _ -> (
-      match extract_cast_value comp with
-      | Some exp -> beta_reduce state hnd.term.Term.value_clause exp
-      | None -> (
-          let (_, drt_in), _ = hnd.ty in
-          match recast_computation drt_in comp with
-          | Some comp' ->
-              bind_computation state comp' hnd.term.Term.value_clause
-          | None -> Term.handle (Term.handler hnd, comp)))
+      match recast_computation hnd comp with
+      | Some comp' -> bind_computation state comp' hnd.term.Term.value_clause
+      | None -> Term.handle (Term.handler hnd, comp))
 
 and handle_abstraction state hnd { term = p, c; _ } =
   Term.abstraction (p, handle_computation state hnd c)
@@ -422,7 +412,7 @@ and reduce_expression state expr = reduce_if_fuel reduce_expression' state expr
 
 and reduce_expression' state expr =
   match expr.term with
-  | Term.CastExp (sub_exp, tcoer) -> cast_expression state expr sub_exp tcoer
+  | Term.CastExp (exp, tcoer) -> cast_expression state exp tcoer
   | _ -> expr
 
 and reduce_computation state comp =
@@ -434,6 +424,18 @@ and reduce_computation' state comp =
   | Term.CastComp (cmp, dtcoer) -> cast_computation state cmp dtcoer
   | Term.LetVal (e, abs) -> beta_reduce state abs e
   | Term.Apply ({ term = Term.Lambda a; _ }, e) -> beta_reduce state a e
+  | Term.Apply
+      ( {
+          term =
+            Term.CastExp
+              (exp, { term = Constraint.ArrowCoercion (ty_coer, drty_coer); _ });
+          _;
+        },
+        e ) ->
+      cast_computation state
+        (optimize_computation state
+           (Term.apply (exp, cast_expression state e ty_coer)))
+        drty_coer
   | Term.LetRec (defs, c) -> (
       let state' =
         List.fold_right
@@ -447,4 +449,20 @@ and reduce_computation' state comp =
   | Term.Bind (cmp, abs) -> bind_computation state cmp abs
   | Term.Handle ({ term = Term.Handler hnd; _ }, cmp) ->
       handle_computation state hnd cmp
+  | Term.Handle
+      ( {
+          term =
+            Term.CastExp
+              ( exp,
+                {
+                  term = Constraint.HandlerCoercion (drty_coer1, drty_coer2);
+                  _;
+                } );
+          _;
+        },
+        cmp ) ->
+      cast_computation state
+        (optimize_computation state
+           (Term.handle (exp, cast_computation state cmp drty_coer1)))
+        drty_coer2
   | _ -> comp

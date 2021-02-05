@@ -41,7 +41,7 @@ let pp_variable var ppf =
         Print.warning
           "Warning: Protected keyword [%s]. Must be fixed by hand!@." desc;
       match desc.[0] with
-      | 'a' .. 'z' | '_' -> Format.fprintf ppf "%s" desc
+      | 'a' .. 'z' | '_' -> Format.fprintf ppf "%s_%d" desc n
       | '$' -> (
           match desc with
           | "$c_thunk" -> Format.fprintf ppf "_comp_%d" n

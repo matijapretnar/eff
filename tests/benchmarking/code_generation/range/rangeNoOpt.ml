@@ -104,17 +104,19 @@ let _op_0 (* - *) = ( - )
 
 type int_list = Nil | Cons of (int * int_list)
 
-let test (n : int) =
-  let rec range n =
-    match coer_refl_ty n with
+let test_1 (n_2 : int) =
+  let rec range_3 n_4 =
+    match coer_refl_ty n_4 with
     | 0 -> (coer_return coer_refl_ty) Nil
     | _ ->
         (coer_computation coer_refl_ty)
           ( (coer_computation coer_refl_ty)
               (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                  (fun (x : unit) ->
+                  (fun (x_13 : unit) ->
                     Call
-                      (Fetch, x, fun (y : int) -> (coer_return coer_refl_ty) y)))
+                      ( Fetch,
+                        x_13,
+                        fun (y_14 : int) -> (coer_return coer_refl_ty) y_14 )))
                  ())
           >> fun _b_5 ->
             (coer_computation coer_refl_ty)
@@ -125,7 +127,7 @@ let test (n : int) =
                            (((coer_arrow coer_refl_ty
                                 (coer_arrow coer_refl_ty coer_refl_ty))
                                _op_0 (* - *))
-                              n)
+                              n_4)
                        in
                        coer_refl_ty
                          (((coer_arrow coer_refl_ty coer_refl_ty) _b_8) 1))
@@ -135,7 +137,7 @@ let test (n : int) =
                            (coer_computation coer_refl_ty))
                           ((coer_arrow coer_refl_ty
                               (coer_computation coer_refl_ty))
-                             range))
+                             range_3))
                          _b_7) )
               >> fun _b_6 ->
                 (coer_return coer_refl_ty)
@@ -157,22 +159,23 @@ let test (n : int) =
                   (fun (_x_10 : int_list) ->
                     Value
                       (coer_refl_ty
-                         (let x = _x_10 in
-                          x)));
+                         (let x_11 = _x_10 in
+                          x_11)));
                 effect_clauses =
                   (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
                     match eff with
                     | Fetch ->
-                        fun _ l ->
+                        fun _ l_15 ->
                           Value
                             (coer_refl_ty
                                (((coer_arrow coer_refl_ty coer_refl_ty)
                                    ((coer_arrow coer_refl_ty coer_refl_ty)
                                       ((coer_arrow coer_refl_ty
                                           (coer_unsafe (*unsafe*) coer_refl_ty))
-                                         l)))
+                                         l_15)))
                                   42))
                     | eff' -> fun arg k -> Call (eff', arg, k));
               })))
        ((coer_computation coer_refl_ty)
-          (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty)) range) n)))
+          (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty)) range_3)
+             n_2)))

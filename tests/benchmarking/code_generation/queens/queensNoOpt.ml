@@ -120,41 +120,41 @@ type inttuplist = IntTupNil | IntTupCons of (inttuple * inttuplist)
 
 type void = Void
 
-let test_queens (n : int) =
-  let absurd (void : empty) = match void with _ -> assert false in
-  let _op_9 (* > *) (x : int) (y : int) =
+let test_queens_5 (n_6 : int) =
+  let absurd_7 (void_8 : empty) = match void_8 with _ -> assert false in
+  let _op_9 (* > *) (x_10 : int) (y_11 : int) =
     let _b_12 =
       coer_refl_ty
         (((coer_arrow coer_refl_ty (coer_arrow coer_refl_ty coer_refl_ty))
             _op_0 (* < *))
-           y)
+           y_11)
     in
-    coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_12) x)
+    coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_12) x_10)
   in
-  let _op_13 (* <> *) (x : int) (y : int) =
+  let _op_13 (* <> *) (x_14 : int) (y_15 : int) =
     let _b_16 =
       coer_refl_ty
         (let _b_17 =
            coer_refl_ty
              (((coer_arrow coer_refl_ty (coer_arrow coer_refl_ty coer_refl_ty))
                  _op_1 (* = *))
-                y)
+                y_15)
          in
-         coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_17) x))
+         coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_17) x_14))
     in
     coer_refl_ty
       (match coer_refl_ty _b_16 with
       | true -> coer_refl_ty false
       | false -> coer_refl_ty true)
   in
-  let abs (x : int) =
+  let abs_18 (x_19 : int) =
     let _b_20 =
       coer_refl_ty
         (let _b_21 =
            coer_refl_ty
              (((coer_arrow coer_refl_ty (coer_arrow coer_refl_ty coer_refl_ty))
                  _op_0 (* < *))
-                x)
+                x_19)
          in
          coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_21) 0))
     in
@@ -162,15 +162,15 @@ let test_queens (n : int) =
       (match coer_refl_ty _b_20 with
       | true ->
           coer_refl_ty
-            (((coer_arrow coer_refl_ty coer_refl_ty) _op_4 (* ~- *)) x)
-      | false -> coer_refl_ty x)
+            (((coer_arrow coer_refl_ty coer_refl_ty) _op_4 (* ~- *)) x_19)
+      | false -> coer_refl_ty x_19)
   in
-  let no_attack (q1 : inttuple) (q2 : inttuple) =
-    match coer_refl_ty q1 with
-    | IntTuple (x, y) ->
+  let no_attack_22 (q1_23 : inttuple) (q2_24 : inttuple) =
+    match coer_refl_ty q1_23 with
+    | IntTuple (x_25, y_26) ->
         coer_refl_ty
-          (match coer_refl_ty q2 with
-          | IntTuple (x', y') ->
+          (match coer_refl_ty q2_24 with
+          | IntTuple (x'_27, y'_28) ->
               coer_refl_ty
                 (let _b_29 =
                    coer_refl_ty
@@ -179,10 +179,10 @@ let test_queens (n : int) =
                           (((coer_arrow coer_refl_ty
                                (coer_arrow coer_refl_ty coer_refl_ty))
                               _op_13 (* <> *))
-                             x)
+                             x_25)
                       in
                       coer_refl_ty
-                        (((coer_arrow coer_refl_ty coer_refl_ty) _b_30) x'))
+                        (((coer_arrow coer_refl_ty coer_refl_ty) _b_30) x'_27))
                  in
                  coer_refl_ty
                    (match coer_refl_ty _b_29 with
@@ -195,11 +195,11 @@ let test_queens (n : int) =
                                    (((coer_arrow coer_refl_ty
                                         (coer_arrow coer_refl_ty coer_refl_ty))
                                        _op_13 (* <> *))
-                                      y)
+                                      y_26)
                                in
                                coer_refl_ty
                                  (((coer_arrow coer_refl_ty coer_refl_ty) _b_32)
-                                    y'))
+                                    y'_28))
                           in
                           coer_refl_ty
                             (match coer_refl_ty _b_31 with
@@ -218,18 +218,18 @@ let test_queens (n : int) =
                                                               coer_refl_ty
                                                               coer_refl_ty))
                                                           _op_2 (* - *))
-                                                         x)
+                                                         x_25)
                                                   in
                                                   coer_refl_ty
                                                     (((coer_arrow coer_refl_ty
                                                          coer_refl_ty)
                                                         _b_36)
-                                                       x'))
+                                                       x'_27))
                                              in
                                              coer_refl_ty
                                                (((coer_arrow coer_refl_ty
                                                     coer_refl_ty)
-                                                   abs)
+                                                   abs_18)
                                                   _b_35))
                                         in
                                         coer_refl_ty
@@ -251,18 +251,18 @@ let test_queens (n : int) =
                                                             coer_refl_ty
                                                             coer_refl_ty))
                                                         _op_2 (* - *))
-                                                       y)
+                                                       y_26)
                                                 in
                                                 coer_refl_ty
                                                   (((coer_arrow coer_refl_ty
                                                        coer_refl_ty)
                                                       _b_39)
-                                                     y'))
+                                                     y'_28))
                                            in
                                            coer_refl_ty
                                              (((coer_arrow coer_refl_ty
                                                   coer_refl_ty)
-                                                 abs)
+                                                 abs_18)
                                                 _b_38))
                                       in
                                       coer_refl_ty
@@ -272,10 +272,10 @@ let test_queens (n : int) =
                             | false -> coer_refl_ty false))
                    | false -> coer_refl_ty false)))
   in
-  let rec not_attacked x' (qs : inttuplist) =
-    match coer_refl_ty qs with
+  let rec not_attacked_40 x'_41 (qs_42 : inttuplist) =
+    match coer_refl_ty qs_42 with
     | IntTupNil -> coer_refl_ty true
-    | IntTupCons (x, xs) ->
+    | IntTupCons (x_43, xs_44) ->
         coer_refl_ty
           (let _b_45 =
              coer_refl_ty
@@ -283,10 +283,11 @@ let test_queens (n : int) =
                   coer_refl_ty
                     (((coer_arrow coer_refl_ty
                          (coer_arrow coer_refl_ty coer_refl_ty))
-                        no_attack)
-                       x')
+                        no_attack_22)
+                       x'_41)
                 in
-                coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_46) x))
+                coer_refl_ty
+                  (((coer_arrow coer_refl_ty coer_refl_ty) _b_46) x_43))
            in
            coer_refl_ty
              (match coer_refl_ty _b_45 with
@@ -298,15 +299,16 @@ let test_queens (n : int) =
                              (coer_arrow coer_refl_ty coer_refl_ty))
                             ((coer_arrow coer_refl_ty
                                 (coer_arrow coer_refl_ty coer_refl_ty))
-                               not_attacked))
-                           x')
+                               not_attacked_40))
+                           x'_41)
                     in
                     coer_refl_ty
-                      (((coer_arrow coer_refl_ty coer_refl_ty) _b_47) xs))
+                      (((coer_arrow coer_refl_ty coer_refl_ty) _b_47) xs_44))
              | false -> coer_refl_ty false))
   in
-  let available (number_of_queens : int) (x : int) (qs : inttuplist) =
-    let rec loop possible (y : int) =
+  let available_48 (number_of_queens_49 : int) (x_50 : int) (qs_51 : inttuplist)
+      =
+    let rec loop_52 possible_53 (y_54 : int) =
       let _b_55 =
         coer_refl_ty
           (let _b_56 =
@@ -314,13 +316,13 @@ let test_queens (n : int) =
                (((coer_arrow coer_refl_ty
                     (coer_arrow coer_refl_ty coer_refl_ty))
                    _op_0 (* < *))
-                  y)
+                  y_54)
            in
            coer_refl_ty (((coer_arrow coer_refl_ty coer_refl_ty) _b_56) 1))
       in
       coer_refl_ty
         (match coer_refl_ty _b_55 with
-        | true -> coer_refl_ty possible
+        | true -> coer_refl_ty possible_53
         | false ->
             coer_refl_ty
               (let _b_57 =
@@ -329,14 +331,14 @@ let test_queens (n : int) =
                       coer_refl_ty
                         (((coer_arrow coer_refl_ty
                              (coer_arrow coer_refl_ty coer_refl_ty))
-                            not_attacked)
+                            not_attacked_40)
                            (IntTuple
                               (((* tuple_coer *) coer_tuple_2
                                   (coer_refl_ty, coer_refl_ty))
-                                 (x, y))))
+                                 (x_50, y_54))))
                     in
                     coer_refl_ty
-                      (((coer_arrow coer_refl_ty coer_refl_ty) _b_58) qs))
+                      (((coer_arrow coer_refl_ty coer_refl_ty) _b_58) qs_51))
                in
                coer_refl_ty
                  (match coer_refl_ty _b_57 with
@@ -348,8 +350,8 @@ let test_queens (n : int) =
                                  (coer_arrow coer_refl_ty coer_refl_ty))
                                 ((coer_arrow coer_refl_ty
                                     (coer_arrow coer_refl_ty coer_refl_ty))
-                                   loop))
-                               (IntCons (coer_refl_ty (y, possible))))
+                                   loop_52))
+                               (IntCons (coer_refl_ty (y_54, possible_53))))
                         in
                         coer_refl_ty
                           (let _b_60 =
@@ -359,7 +361,7 @@ let test_queens (n : int) =
                                     (((coer_arrow coer_refl_ty
                                          (coer_arrow coer_refl_ty coer_refl_ty))
                                         _op_2 (* - *))
-                                       y)
+                                       y_54)
                                 in
                                 coer_refl_ty
                                   (((coer_arrow coer_refl_ty coer_refl_ty)
@@ -377,8 +379,8 @@ let test_queens (n : int) =
                                  (coer_arrow coer_refl_ty coer_refl_ty))
                                 ((coer_arrow coer_refl_ty
                                     (coer_arrow coer_refl_ty coer_refl_ty))
-                                   loop))
-                               possible)
+                                   loop_52))
+                               possible_53)
                         in
                         coer_refl_ty
                           (let _b_63 =
@@ -388,7 +390,7 @@ let test_queens (n : int) =
                                     (((coer_arrow coer_refl_ty
                                          (coer_arrow coer_refl_ty coer_refl_ty))
                                         _op_2 (* - *))
-                                       y)
+                                       y_54)
                                 in
                                 coer_refl_ty
                                   (((coer_arrow coer_refl_ty coer_refl_ty)
@@ -401,45 +403,52 @@ let test_queens (n : int) =
     in
     let _b_65 =
       coer_refl_ty
-        (((coer_arrow coer_refl_ty (coer_arrow coer_refl_ty coer_refl_ty)) loop)
+        (((coer_arrow coer_refl_ty (coer_arrow coer_refl_ty coer_refl_ty))
+            loop_52)
            IntNil)
     in
     coer_refl_ty
-      (((coer_arrow coer_refl_ty coer_refl_ty) _b_65) number_of_queens)
+      (((coer_arrow coer_refl_ty coer_refl_ty) _b_65) number_of_queens_49)
   in
-  let rec choose xs =
-    match coer_refl_ty xs with
+  let rec choose_66 xs_67 =
+    match coer_refl_ty xs_67 with
     | IntNil ->
         (coer_computation coer_refl_ty)
           ( (coer_computation coer_refl_ty)
               (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                  (fun (x : unit) ->
+                  (fun (x_103 : unit) ->
                     Call
-                      (Fail, x, fun (y : empty) -> (coer_return coer_refl_ty) y)))
+                      ( Fail,
+                        x_103,
+                        fun (y_104 : empty) -> (coer_return coer_refl_ty) y_104
+                      )))
                  ())
           >> fun _b_68 ->
             (coer_return coer_refl_ty) (match _b_68 with _ -> assert false) )
-    | IntCons (x, xs') ->
+    | IntCons (x_69, xs'_70) ->
         (coer_computation coer_refl_ty)
           ( (coer_computation coer_refl_ty)
               (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                  (fun (x : unit) ->
+                  (fun (x_101 : unit) ->
                     Call
-                      (Decide, x, fun (y : bool) -> (coer_return coer_refl_ty) y)))
+                      ( Decide,
+                        x_101,
+                        fun (y_102 : bool) -> (coer_return coer_refl_ty) y_102
+                      )))
                  ())
           >> fun _b_71 ->
             (coer_computation coer_refl_ty)
               (match coer_refl_ty _b_71 with
-              | true -> (coer_return coer_refl_ty) x
+              | true -> (coer_return coer_refl_ty) x_69
               | false ->
                   (coer_computation coer_refl_ty)
                     (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
                         ((coer_arrow coer_refl_ty
                             (coer_computation coer_refl_ty))
-                           choose))
-                       xs')) )
+                           choose_66))
+                       xs'_70)) )
   in
-  let backtrack =
+  let backtrack_72 =
     (coer_handler
        (coer_computation coer_refl_ty)
        (coer_computation coer_refl_ty))
@@ -451,19 +460,19 @@ let test_queens (n : int) =
                  ((coer_arrow
                      (coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
                      (coer_return coer_refl_ty))
-                    (let y = _x_79 in
-                     fun (_ : unit -> inttuplist computation) -> y)));
+                    (let y_80 = _x_79 in
+                     fun (_ : unit -> inttuplist computation) -> y_80)));
            effect_clauses =
              (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
                match eff with
                | Decide ->
-                   fun _ l ->
+                   fun _ l_105 ->
                      Value
                        ((coer_arrow
                            (coer_arrow coer_refl_ty
                               (coer_computation coer_refl_ty))
                            (coer_computation coer_refl_ty))
-                          (fun (kf : unit -> inttuplist computation) ->
+                          (fun (kf_74 : unit -> inttuplist computation) ->
                             (coer_return coer_refl_ty)
                               (((coer_arrow coer_refl_ty
                                    (coer_arrow
@@ -477,7 +486,7 @@ let test_queens (n : int) =
                                          (coer_computation coer_refl_ty)))
                                      ((coer_arrow coer_refl_ty
                                          (coer_unsafe (*unsafe*) coer_refl_ty))
-                                        l)))
+                                        l_105)))
                                  true)
                             >> fun _b_75 ->
                             (coer_computation coer_refl_ty)
@@ -501,7 +510,7 @@ let test_queens (n : int) =
                                             ((coer_arrow coer_refl_ty
                                                 (coer_unsafe
                                                    (*unsafe*) coer_refl_ty))
-                                               l)))
+                                               l_105)))
                                         false)
                                    >> fun _b_76 ->
                                    (coer_computation coer_refl_ty)
@@ -510,37 +519,37 @@ let test_queens (n : int) =
                                              (coer_computation coer_refl_ty))
                                           (coer_computation coer_refl_ty))
                                          _b_76)
-                                        kf)))))
+                                        kf_74)))))
                | Fail ->
-                   fun _ l ->
+                   fun _ l_106 ->
                      Value
                        ((coer_arrow
                            (coer_arrow coer_refl_ty
                               (coer_computation coer_refl_ty))
                            (coer_computation coer_refl_ty))
-                          (fun (kf : unit -> inttuplist computation) ->
+                          (fun (kf_78 : unit -> inttuplist computation) ->
                             ((coer_arrow coer_refl_ty
                                 (coer_computation coer_refl_ty))
-                               kf)
+                               kf_78)
                               ()))
                | eff' -> fun arg k -> Call (eff', arg, k));
          })
   in
-  let queens (number_of_queens : int) =
-    let rec place x (qs : inttuplist) =
+  let queens_82 (number_of_queens_83 : int) =
+    let rec place_84 x_85 (qs_86 : inttuplist) =
       (coer_return coer_refl_ty)
         (let _b_88 =
            coer_refl_ty
              (((coer_arrow coer_refl_ty (coer_arrow coer_refl_ty coer_refl_ty))
                  _op_9 (* > *))
-                x)
+                x_85)
          in
          coer_refl_ty
-           (((coer_arrow coer_refl_ty coer_refl_ty) _b_88) number_of_queens))
+           (((coer_arrow coer_refl_ty coer_refl_ty) _b_88) number_of_queens_83))
       >> fun _b_87 ->
       (coer_computation coer_refl_ty)
         (match coer_refl_ty _b_87 with
-        | true -> (coer_return coer_refl_ty) qs
+        | true -> (coer_return coer_refl_ty) qs_86
         | false ->
             (coer_computation coer_refl_ty)
               ( (coer_computation coer_refl_ty)
@@ -552,24 +561,24 @@ let test_queens (n : int) =
                                 (((coer_arrow coer_refl_ty
                                      (coer_arrow coer_refl_ty
                                         (coer_arrow coer_refl_ty coer_refl_ty)))
-                                    available)
-                                   number_of_queens)
+                                    available_48)
+                                   number_of_queens_83)
                             in
                             coer_refl_ty
                               (((coer_arrow coer_refl_ty
                                    (coer_arrow coer_refl_ty coer_refl_ty))
                                   _b_92)
-                                 x))
+                                 x_85))
                        in
                        coer_refl_ty
-                         (((coer_arrow coer_refl_ty coer_refl_ty) _b_91) qs))
+                         (((coer_arrow coer_refl_ty coer_refl_ty) _b_91) qs_86))
                   >> fun _b_90 ->
                     (coer_computation coer_refl_ty)
                       (((coer_arrow coer_refl_ty
                            (coer_computation coer_refl_ty))
-                          choose)
+                          choose_66)
                          _b_90) )
-              >> fun y ->
+              >> fun y_89 ->
                 (coer_computation coer_refl_ty)
                   ( (coer_return coer_refl_ty)
                       (let _b_94 =
@@ -579,7 +588,7 @@ let test_queens (n : int) =
                                 (((coer_arrow coer_refl_ty
                                      (coer_arrow coer_refl_ty coer_refl_ty))
                                     _op_3 (* + *))
-                                   x)
+                                   x_85)
                             in
                             coer_refl_ty
                               (((coer_arrow coer_refl_ty coer_refl_ty) _b_95) 1))
@@ -591,7 +600,7 @@ let test_queens (n : int) =
                              ((coer_arrow coer_refl_ty
                                  (coer_arrow coer_refl_ty
                                     (coer_computation coer_refl_ty)))
-                                place))
+                                place_84))
                             _b_94))
                   >> fun _b_93 ->
                     (coer_computation coer_refl_ty)
@@ -604,20 +613,20 @@ let test_queens (n : int) =
                                ( IntTuple
                                    (((* tuple_coer *) coer_tuple_2
                                        (coer_refl_ty, coer_refl_ty))
-                                      (x, y)),
-                                 qs )))) ) ))
+                                      (x_85, y_89)),
+                                 qs_86 )))) ) ))
     in
     (coer_return coer_refl_ty)
       (((coer_arrow coer_refl_ty
            (coer_arrow coer_refl_ty (coer_computation coer_refl_ty)))
-          place)
+          place_84)
          1)
     >> fun _b_96 ->
     (coer_computation coer_refl_ty)
       (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty)) _b_96)
          IntTupNil)
   in
-  let queens_one_cps (number_of_queens : int) =
+  let queens_one_cps_97 (number_of_queens_98 : int) =
     (coer_return coer_refl_ty)
       ((coer_unsafe (*unsafe*) coer_refl_ty)
          (((coer_handler
@@ -626,11 +635,11 @@ let test_queens (n : int) =
                  (coer_arrow
                     (coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
                     (coer_computation coer_refl_ty))))
-             backtrack)
+             backtrack_72)
             ((coer_computation coer_refl_ty)
                (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                   queens)
-                  number_of_queens))))
+                   queens_82)
+                  number_of_queens_98))))
     >> fun _b_99 ->
     (coer_computation coer_refl_ty)
       (((coer_arrow
@@ -639,12 +648,16 @@ let test_queens (n : int) =
           _b_99) (fun (() : unit) ->
            (coer_computation coer_refl_ty)
              (((coer_arrow coer_refl_ty (coer_computation coer_refl_ty))
-                 (fun (x : unit) ->
+                 (fun (x_107 : unit) ->
                    Call
-                     (Fail, x, fun (y : empty) -> (coer_return coer_refl_ty) y)))
+                     ( Fail,
+                       x_107,
+                       fun (y_108 : empty) -> (coer_return coer_refl_ty) y_108
+                     )))
                 ())
            >> fun _b_100 ->
            (coer_return coer_refl_ty)
-             (((coer_arrow coer_refl_ty coer_refl_ty) absurd) _b_100)))
+             (((coer_arrow coer_refl_ty coer_refl_ty) absurd_7) _b_100)))
   in
-  ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty)) queens_one_cps) n
+  ((coer_arrow coer_refl_ty (coer_computation coer_refl_ty)) queens_one_cps_97)
+    n_6
