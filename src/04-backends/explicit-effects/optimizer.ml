@@ -1,7 +1,4 @@
 open Utils
-module VariableMap = Map.Make (Language.CoreTypes.Variable)
-module FingerPrintMap = Map.Make (Term.EffectFingerprint)
-module VariableSet = Set.Make (Language.CoreTypes.Variable)
 
 type state = {
   (* Abstractions available for specializtions for specializations *)
@@ -9,18 +6,9 @@ type state = {
   recursive_functions : (Term.variable, Term.abstraction) Assoc.t;
   (* Rest of fuel for optimization *)
   fuel : int;
-  (* Cahce of already specialized functions *)
-  specialized_functions_cache : Term.abstraction FingerPrintMap.t VariableMap.t;
-  (* private *)
-  (* for better performance:
-     For each handler, store the functions it has been specialized with
-     this way removing the handler [h] just means removing the handler
-     and all variables in the corresponding set
-
-     Invariant: each set has distinct elements only since we try to reuse
-     already specialized functions
-  *)
-  handler_function_specialization : VariableSet.t FingerPrintMap.t;
+  (* Cache of already specialized functions *)
+  specialized_functions :
+    (Term.EffectFingerprint.t * Term.variable, Term.variable * Type.ty) Assoc.t;
 }
 
 let initial_state =
@@ -28,8 +16,7 @@ let initial_state =
     functions = Assoc.empty;
     recursive_functions = Assoc.empty;
     fuel = !Config.optimization_fuel;
-    specialized_functions_cache = VariableMap.empty;
-    handler_function_specialization = FingerPrintMap.empty;
+    specialized_functions = Assoc.empty;
   }
 
 let reduce_if_fuel reduce_term state term =
@@ -46,74 +33,12 @@ let add_recursive_function state x abs =
     recursive_functions = Assoc.update x abs state.recursive_functions;
   }
 
-(* Updating and clearing specialization cache *)
-
-let remove_function_specialization state var =
-  (* Remove specialization information for handler *)
-  let handler_function_specialization =
-    match VariableMap.find_opt var state.specialized_functions_cache with
-    | None -> state.handler_function_specialization
-    | Some function_map ->
-        FingerPrintMap.fold
-          (fun f _ s ->
-            FingerPrintMap.update f
-              (function
-                | None -> None | Some set -> Some (VariableSet.remove var set))
-              s)
-          function_map state.handler_function_specialization
-  in
+let add_function_specialization state f fingerprint f' ty =
   {
     state with
-    specialized_functions_cache =
-      VariableMap.remove var state.specialized_functions_cache;
-    handler_function_specialization;
+    specialized_functions =
+      Assoc.update (fingerprint, f) (f', ty) state.specialized_functions;
   }
-
-let remove_handler_specialization state effect_clauses =
-  let fingerprint = effect_clauses.Term.fingerprint in
-  match
-    FingerPrintMap.find_opt fingerprint state.handler_function_specialization
-  with
-  | None -> state
-  | Some v_set ->
-      let handler_function_specialization =
-        FingerPrintMap.remove fingerprint state.handler_function_specialization
-      in
-      let specialized_functions_cache =
-        VariableSet.fold
-          (fun var s ->
-            VariableMap.update var
-              (function
-                | None -> None
-                | Some fm -> Some (FingerPrintMap.remove fingerprint fm))
-              s)
-          v_set state.specialized_functions_cache
-      in
-      {
-        state with
-        handler_function_specialization;
-        specialized_functions_cache;
-      }
-
-let add_function_specialization state var effect_clauses specialized =
-  let handler_function_specialization =
-    FingerPrintMap.update effect_clauses.Term.fingerprint
-      (function
-        | None -> Some (VariableSet.singleton var)
-        | Some s -> Some (VariableSet.add var s))
-      state.handler_function_specialization
-  in
-  let specialized_functions_cache =
-    VariableMap.update var
-      (function
-        | None ->
-            Some
-              (FingerPrintMap.singleton effect_clauses.fingerprint specialized)
-        | Some m ->
-            Some (FingerPrintMap.add effect_clauses.fingerprint specialized m))
-      state.specialized_functions_cache
-  in
-  { state with handler_function_specialization; specialized_functions_cache }
 
 (* Optimization functions *)
 
@@ -289,12 +214,7 @@ and optimize_computation' state cmp =
   | Term.Value exp -> Term.value (optimize_expression state exp)
   | Term.LetVal (exp, abs) ->
       Term.letVal (optimize_expression state exp, optimize_abstraction state abs)
-  | Term.LetRec (defs, cmp) ->
-      let c = Term.letRec (defs, optimize_computation state cmp) in
-      let _state =
-        List.fold remove_function_specialization state (List.map fst defs)
-      in
-      c
+  | Term.LetRec (defs, cmp) -> Term.letRec (defs, optimize_computation state cmp)
   | Term.Match (exp, cases) ->
       Term.match_
         ( optimize_expression state exp,
@@ -414,6 +334,40 @@ and handle_computation state hnd comp =
           in
           beta_reduce state (Term.abstraction (p1, comp')) exp
       | None -> Term.call (eff, exp, handled_abs))
+  | Apply ({ term = Var f; _ }, exp)
+    when Option.is_some (Assoc.lookup f state.functions) -> (
+      let fingerprint = hnd.term.Term.effect_clauses.fingerprint in
+      match Assoc.lookup (fingerprint, f) state.specialized_functions with
+      | Some (f', ty) -> Term.apply (Term.var f' ty, exp)
+      | None -> (
+          match Assoc.lookup f state.functions with
+          | Some abs ->
+              let f' = Language.CoreTypes.Variable.refresh f in
+              let (ty_in, _), (_, drty_out) = (abs.ty, hnd.ty) in
+              let ty' = Type.Arrow (ty_in, drty_out) in
+              let abs' = handle_abstraction state hnd abs in
+              Term.letVal
+                ( Term.lambda abs',
+                  Term.abstraction
+                    (Term.pVar f' ty', Term.apply (Term.var f' ty', exp)) )
+          | None -> assert false))
+  | Apply ({ term = Var f; _ }, exp)
+    when Option.is_some (Assoc.lookup f state.recursive_functions) -> (
+      let fingerprint = hnd.term.Term.effect_clauses.fingerprint in
+      match Assoc.lookup (fingerprint, f) state.specialized_functions with
+      | Some (f', ty) -> Term.apply (Term.var f' ty, exp)
+      | None -> (
+          match Assoc.lookup f state.functions with
+          | Some abs ->
+              let f' = Language.CoreTypes.Variable.refresh f in
+              let (ty_in, _), (_, drty_out) = (abs.ty, hnd.ty) in
+              let ty' = Type.Arrow (ty_in, drty_out) in
+              let state' =
+                add_function_specialization state f fingerprint f' ty'
+              in
+              let abs' = handle_abstraction state' hnd abs in
+              Term.letRec ([ (f', abs') ], Term.apply (Term.var f' ty', exp))
+          | None -> assert false))
   | Bind (cmp, abs) -> (
       let (_, drt_in), _ = hnd.ty in
       match recast_computation drt_in cmp with

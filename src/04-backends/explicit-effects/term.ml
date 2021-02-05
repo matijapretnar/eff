@@ -384,10 +384,10 @@ and subst_comp' sbst = function
   | CastComp (c, dtyco) -> CastComp (subst_comp sbst c, dtyco)
 
 and substitute_effect_clauses sbst effect_clauses =
-  (* TODO: What happens with handler fingerprint on substitution? *)
   {
-    effect_clauses with
     effect_part = Assoc.map (subst_abs2 sbst) effect_clauses.effect_part;
+    (* We refresh the fingerprint because the meaning of effect clauses changes *)
+    fingerprint = EffectFingerprint.refresh effect_clauses.fingerprint
   }
 
 and subst_handler sbst h =
