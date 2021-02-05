@@ -1,0 +1,35 @@
+type(_, _) effect += Decide : (unit, bool) effect 
+;;
+let two_0 = 2
+;;
+let three_1 = 3
+;;
+type intlist = IntNil | IntCons of (int * intlist)
+
+;;
+let rec concat_2 = 
+     fun  xs_3 -> (match xs_3 with
+                    IntNil -> fun (ys_4: intlist) -> ys_4
+                   |  IntCons ((z_5, zs_6)) -> fun (ys_7: intlist) -> (IntCons ((
+                                                                    z_5, 
+                                                                    ((concat_2) 
+                                                                    (zs_6)) 
+                                                                    (ys_7))))) 
+   in 
+   (force_unsafe) 
+     ((handler {value_clause = (fun (_x_14: int) -> Value ((IntCons ((
+                                                                    _x_14, (IntNil)))))); 
+        effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
+  (match eff with
+    | Decide -> fun () l_20 -> Value (
+                                                                    ((concat_2) 
+                                                                    (((coer_arrow (coer_refl_ty) (force_unsafe)) 
+                                                                    (l_20)) 
+                                                                    (true))) 
+                                                                    (((coer_arrow (coer_refl_ty) (force_unsafe)) 
+                                                                    (l_20)) 
+                                                                    (false)))   
+    | eff' -> (fun arg k -> Call (eff', arg, k))
+      )); }) 
+        ((f_17) (())))
+;;

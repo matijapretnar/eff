@@ -1,4 +1,0 @@
-[1mFile "./handler_beta_reduction.eff.out.ocaml_with_header", line 101, characters 11-12[0m:
-101 | Fatal error: exception File "src/04-backends/explicit-effects/term.ml", line 160, characters 2-8: Assertion failed
-                 [1;31m^[0m
-[1;31mError[0m: Syntax error

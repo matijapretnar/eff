@@ -32,14 +32,14 @@ let global_stanza _files config =
   if config.generate_ocaml_compile_rule then (
     Printf.printf "(rule\n";
     Printf.printf " (deps\n";
-    Printf.printf "  \"../../../ocamlHeader/ocamlHeader.ml\")\n";
+    Printf.printf "  \"../../ocamlHeader/ocamlHeader.ml\")\n";
     Printf.printf "   (target ocaml_header.tmp)\n";
     Printf.printf "    (action\n";
     Printf.printf "     (with-outputs-to \"%%{target}\"\n";
     Printf.printf "      (with-accepted-exit-codes\n";
     Printf.printf "       0\n";
     Printf.printf
-      "       (run cat \"../../../ocamlHeader/ocamlHeader.ml\")))))\n\n")
+      "       (run cat \"../../ocamlHeader/ocamlHeader.ml\")))))\n\n")
 
 let test_case_rule_stanza config (_bare, full_name) =
   Printf.printf "(rule\n";

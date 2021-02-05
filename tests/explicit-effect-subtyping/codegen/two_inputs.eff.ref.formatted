@@ -1,3 +1,0 @@
-ocamlformat: ignoring "two_inputs.eff.out" (syntax error)
-File "two_inputs.eff.out", line 1, characters 11-12:
-Error: Syntax error

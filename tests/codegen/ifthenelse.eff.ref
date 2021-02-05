@@ -1,0 +1,11 @@
+let _op_0 (* = *) = ( = )
+;;
+let _op_1 (* - *) = ( - )
+;;
+let rec _loop_2 = 
+     fun  n_3 -> (match ((_op_0 (* = *)) (n_3)) (0) with
+                   true -> 0
+                  |  false -> (_loop_2) (((_op_1 (* - *)) (n_3)) (1))) 
+   in 
+   ()
+;;

@@ -261,7 +261,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     { state with prog = SyntaxNoEff.Term c' :: state.prog }
 
   let process_type_of state _ =
-    Print.warning "[#typeof] commands are ignored when compiling to OCaml.";
+    (* Print.warning "[#typeof] commands are ignored when compiling to OCaml."; *)
     state
 
   let process_def_effect state eff =

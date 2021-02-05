@@ -1,0 +1,4 @@
+type(_, _) effect += Op : (int, int) effect 
+;;
+1
+;;

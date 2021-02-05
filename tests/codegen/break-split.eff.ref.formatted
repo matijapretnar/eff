@@ -1,0 +1,29 @@
+let _op_0 (* = *) = ( = )
+
+let _op_1 (* - *) = ( - )
+
+let _op_2 (* + *) = ( + )
+
+type (_, _) effect += Decide : (unit, bool) effect
+
+let two_3 = 2
+
+let three_4 = 3
+
+;;
+force_unsafe
+  ((handler
+      {
+        value_clause = (fun (_x_9 : int) -> Value _x_9);
+        effect_clauses =
+          (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+            match eff with
+            | Decide ->
+                fun () l_15 ->
+                  Value
+                    ((_op_2 (* + *)
+                        (((coer_arrow coer_refl_ty force_unsafe) l_15) true))
+                       (((coer_arrow coer_refl_ty force_unsafe) l_15) false))
+            | eff' -> fun arg k -> Call (eff', arg, k));
+      })
+     (f_12 ()))
