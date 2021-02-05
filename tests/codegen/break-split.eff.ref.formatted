@@ -11,6 +11,10 @@ let two_3 = 2
 let three_4 = 3
 
 ;;
+let rec f_12 x_13 =
+  (fun (x_16 : unit) -> Call (Decide, x_16, fun (y_17 : bool) -> Value y_17)) ()
+  >> fun _b_14 -> Value (match _b_14 with true -> 2 | false -> 3)
+in
 force_unsafe
   ((handler
       {

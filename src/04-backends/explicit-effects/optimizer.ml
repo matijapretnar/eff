@@ -69,11 +69,13 @@ let applicable_pattern p vars =
 
 let keep_used_letrec_bindings defs cmp =
   (* Do proper call graph analysis *)
-  let free_vars_cmp, _ = Term.free_vars_comp cmp in
+  let free_vars_cmp_in, free_vars_cmp_out = Term.free_vars_comp cmp in
   let free_vars_defs =
     List.map (fun (_, a) -> fst (Term.free_vars_abs a)) defs
   in
-  let free_vars = List.flatten (free_vars_cmp :: free_vars_defs) in
+  let free_vars =
+    List.flatten (free_vars_cmp_in :: free_vars_cmp_out :: free_vars_defs)
+  in
   List.filter (fun (x, _) -> List.mem x free_vars) defs
 
 let rec extract_cast_value comp =

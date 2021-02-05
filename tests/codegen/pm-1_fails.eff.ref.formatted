@@ -28,4 +28,10 @@ force_unsafe
                        (((coer_arrow coer_refl_ty force_unsafe) l_21) false))
             | eff' -> fun arg k -> Call (eff', arg, k));
       })
-     (f_18 ()))
+     (let rec f_18 x_19 =
+        (fun (x_22 : unit) ->
+          Call (Decide, x_22, fun (y_23 : bool) -> Value y_23))
+          ()
+        >> fun _b_20 -> Value (match _b_20 with true -> 2 | false -> 3)
+      in
+      f_18 ()))
