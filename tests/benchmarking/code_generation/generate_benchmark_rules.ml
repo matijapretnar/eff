@@ -43,11 +43,9 @@ let main () =
       List.iter
         (fun (args, name) ->
           if not (List.mem (in_file_name, name) invalid) then (
-            let out_filename = in_file_name ^ "/" ^ in_file_name ^ name in
+            let out_filename = in_file_name ^ name in
             let target_filename = in_file_name ^ name in
-            benchmark_case_stanza
-              (in_file_name ^ "/" ^ in_file_name ^ ".eff")
-              args target_filename;
+            benchmark_case_stanza (in_file_name ^ ".eff") args target_filename;
 
             format_stanza target_filename;
             benchmark_case_alias_stanza target_filename out_filename))

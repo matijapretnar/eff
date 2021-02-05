@@ -1,3 +1,0 @@
-(library
- (name interp)
- (libraries utils language typechecker))

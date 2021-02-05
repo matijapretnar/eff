@@ -4,8 +4,7 @@
  (name benchmark)
  (modes native)
  (modules benchmark)
- (libraries bechamel bechamel-notty notty notty.unix unix loop queens range
-   interp))
+ (libraries bechamel bechamel-notty notty notty.unix unix ocamlHeader))
 
 (executable
  (modules generate_benchmark_rules)

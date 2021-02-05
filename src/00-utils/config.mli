@@ -38,9 +38,3 @@ val profiling : bool ref
 (** Should profiling be enabled? *)
 
 val optimization_fuel : int ref
-
-val pure_print : bool ref
-(** Should we use pure printing for computations? *)
-
-val include_header : bool ref
-(** Should we include the header in the generated files? *)

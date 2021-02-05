@@ -7,7 +7,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml  "./loop/loop.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml  "./loop.eff")))))
 
 (rule
  (deps "loopOpt.out")
@@ -21,7 +21,7 @@
  (deps loopOpt.formatted)
   (alias generate_benchmarks)
    (action
-    (diff "loop/loopOpt.ml" "loopOpt.formatted")))
+    (diff "loopOpt.ml" "loopOpt.formatted")))
 
 (rule
  (deps
@@ -32,7 +32,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml  "./queens/queens.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml  "./queens.eff")))))
 
 (rule
  (deps "queensOpt.out")
@@ -46,7 +46,7 @@
  (deps queensOpt.formatted)
   (alias generate_benchmarks)
    (action
-    (diff "queens/queensOpt.ml" "queensOpt.formatted")))
+    (diff "queensOpt.ml" "queensOpt.formatted")))
 
 (rule
  (deps
@@ -57,7 +57,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml  "./interp/interp.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml  "./interp.eff")))))
 
 (rule
  (deps "interpOpt.out")
@@ -71,7 +71,7 @@
  (deps interpOpt.formatted)
   (alias generate_benchmarks)
    (action
-    (diff "interp/interpOpt.ml" "interpOpt.formatted")))
+    (diff "interpOpt.ml" "interpOpt.formatted")))
 
 (rule
  (deps
@@ -82,7 +82,7 @@
      (with-outputs-to "%{target}"
       (with-accepted-exit-codes
        (or 0 1 2)
-       (run eff --no-stdlib --compile-plain-ocaml  "./range/range.eff")))))
+       (run eff --no-stdlib --compile-plain-ocaml  "./range.eff")))))
 
 (rule
  (deps "rangeOpt.out")
@@ -96,5 +96,5 @@
  (deps rangeOpt.formatted)
   (alias generate_benchmarks)
    (action
-    (diff "range/rangeOpt.ml" "rangeOpt.formatted")))
+    (diff "rangeOpt.ml" "rangeOpt.formatted")))
 

@@ -37,10 +37,6 @@ let options =
       ( "--no-opts",
         Arg.Clear Config.enable_optimization,
         " Disable optimizations" );
-      ("--pure", Arg.Set Config.pure_print, " Optimize pure comps");
-      ( "--no-header",
-        Arg.Clear Config.include_header,
-        " Do not include the header in generated files" );
       ("--ascii", Arg.Set Config.ascii, " Use ASCII output");
       ( "-v",
         Arg.Unit

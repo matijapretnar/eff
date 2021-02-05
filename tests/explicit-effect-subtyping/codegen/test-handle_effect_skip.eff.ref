@@ -1,8 +1,5 @@
-type(_, _) effect += Print : (string, unit) effect 
+open OcamlHeader;;type(_, _) effect += Print : (string, unit) effect 
 ;;
-((coer_handler (coer_computation (coer_refl_ty)) (coer_computation (coer_refl_ty))) 
-      ((coer_handler (coer_computation (coer_refl_ty)) (coer_computation (coer_refl_ty))) 
-         (fun (_x_0: unit) -> (coer_return (coer_refl_ty)) 
-                                ((match (coer_refl_ty) (_x_0) with  _ -> 42))))) 
-     (((coer_refl_ty) ((effect Print))) ("hello\n"))
+ Call (Print, "hello\n", (fun (y_3: unit) -> Value ((match y_3 with
+                                                         _ -> 42))))
 ;;

@@ -1,5 +1,5 @@
-interp/*
-loop/*
-parser/*
-queens/*
-range/*
+interpOpt.ml
+loopOpt.ml
+parserOpt.ml
+queensOpt.ml
+rangeOpt.ml

@@ -25,7 +25,3 @@ let enable_optimization = ref true
 let profiling = ref false
 
 let optimization_fuel = ref 100
-
-let pure_print = ref false
-
-let include_header = ref true
