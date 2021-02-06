@@ -16,11 +16,12 @@ let rec f_10 =
                                                                (x_11)) (1))))) 
    in 
    let rec f_19 = 
-     fun  x_11 -> (force_unsafe) 
-                    ((handler {value_clause = (fun (_: unit) -> Value ((force_unsafe) 
+     fun  (x_11, k_21) -> (force_unsafe) 
+                            ((handler {value_clause = (fun (_: unit) -> Value ((force_unsafe) 
                                                                     ((handler {
                                                                     value_clause = (fun 
-                                                                    (_x_7: unit) -> Value (0)); 
+                                                                    (x_20: unit) -> Value ((k_21) 
+                                                                    (x_20))); 
                                                                     effect_clauses = 
                                                                     (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
   (match eff with
@@ -42,7 +43,7 @@ let rec f_10 =
                                                                     (((_op_2 (* - *)) 
                                                                     (x_11)) 
                                                                     (1))))))); 
-                       effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
+                               effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
   (match eff with
     | WriteInt -> fun n_3 l_16 -> Value (
                                                                     ((_op_1 (* + *)) 
@@ -52,9 +53,9 @@ let rec f_10 =
                                                                     (())))   
     | eff' -> (fun arg k -> Call (eff', arg, k))
       )); }) 
-                       ((fun (x_17: int) ->  Call (WriteInt, x_17, (fun 
-                                              (y_18: unit) -> Value (y_18)))) 
-                          (x_11))) 
+                               ((fun (x_17: int) ->  Call (WriteInt, x_17, (fun 
+                                                      (y_18: unit) -> Value (y_18)))) 
+                                  (x_11))) 
    in 
-   (f_19) (10)
+   (f_19) ((10, fun (_x_7: unit) -> 0))
 ;;

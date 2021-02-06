@@ -13,14 +13,13 @@ let rec concat_2 xs_3 =
   | IntCons (z_5, zs_6) ->
       fun (ys_7 : intlist) -> IntCons (z_5, (concat_2 zs_6) ys_7)
 in
-let rec f_23 x_18 =
+let rec f_23 (x_18, k_25) =
   force_unsafe
     ((handler
         {
           value_clause =
             (fun (_b_19 : bool) ->
-              Value
-                (IntCons ((match _b_19 with true -> 2 | false -> 3), IntNil)));
+              Value (k_25 (match _b_19 with true -> 2 | false -> 3)));
           effect_clauses =
             (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
               match eff with
@@ -36,4 +35,4 @@ let rec f_23 x_18 =
           Call (Decide, x_21, fun (y_22 : bool) -> Value y_22))
           ()))
 in
-f_23 ()
+f_23 ((), fun (_x_14 : int) -> IntCons (_x_14, IntNil))

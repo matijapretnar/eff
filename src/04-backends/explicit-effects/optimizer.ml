@@ -314,7 +314,10 @@ and handle_computation state specialized hnd comp =
   | Apply ({ term = Var f; _ }, exp)
     when Option.is_some (Assoc.lookup f specialized) -> (
       match Assoc.lookup f specialized with
-      | Some (f', ty') -> Term.apply (Term.var f' ty', exp)
+      | Some (f', ty') ->
+          Term.apply
+            ( Term.var f' ty',
+              Term.tuple [ exp; Term.lambda hnd.term.Term.value_clause ] )
       | None -> assert false)
   | Bind (cmp, abs) -> (
       match recast_computation hnd cmp with
@@ -399,17 +402,40 @@ and reduce_computation' state comp =
         state.recursive_functions
         |> Assoc.kmap (fun (f, abs) ->
                let f' = Language.CoreTypes.Variable.refresh f in
-               let (ty_in, _), (_, drty_out) = (abs.ty, hnd.ty) in
-               let ty' = Type.Arrow (ty_in, drty_out) in
+               let (ty_arg, _), ((ty_in, _), drty_out) = (abs.ty, hnd.ty) in
+               let ty' =
+                 Type.Arrow
+                   ( Type.Tuple [ ty_arg; Type.Arrow (ty_in, drty_out) ],
+                     drty_out )
+               in
                (f, (f', ty')))
       in
       let cmp' = handle_computation state specialized hnd cmp in
       let defs =
         Assoc.kmap
-          (fun (f, abs) ->
+          (fun (f, { term = pat, cmp; _ }) ->
             match Assoc.lookup f specialized with
-            | Some (f', _) -> (f', handle_abstraction state specialized hnd abs)
-            | None -> assert false)
+            | Some
+                ( f',
+                  Type.Arrow
+                    (Type.Tuple [ _; (Type.Arrow (ty_in, _) as ty_cont) ], _) )
+              ->
+                let x_pat, x_var = Term.fresh_variable "x" ty_in
+                and k_pat, k_var = Term.fresh_variable "k" ty_cont in
+                let hnd' =
+                  {
+                    hnd with
+                    term =
+                      {
+                        hnd.term with
+                        Term.value_clause =
+                          Term.abstraction (x_pat, Term.apply (k_var, x_var));
+                      };
+                  }
+                in
+                let abs' = Term.abstraction (Term.pTuple [ pat; k_pat ], cmp) in
+                (f', handle_abstraction state specialized hnd' abs')
+            | _ -> assert false)
           state.recursive_functions
       in
       match Assoc.to_list defs with

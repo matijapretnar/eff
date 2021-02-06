@@ -23,11 +23,11 @@ type (_, _) effect += Put : (int, unit) effect
        >> fun _ -> loop_4 ((_op_1 (* - *) n_5) 1)
    | false -> Value ()
  in
- let rec loop_29 n_5 =
+ let rec loop_29 (n_5, k_31) =
    force_unsafe
      ((handler
          {
-           value_clause = (fun (_x_19 : unit) -> Value (fun (_ : int) -> _x_19));
+           value_clause = (fun (x_30 : unit) -> Value (k_31 x_30));
            effect_clauses =
              (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
                match eff with
@@ -58,5 +58,5 @@ type (_, _) effect += Put : (int, unit) effect
             >> fun _ -> loop_4 ((_op_1 (* - *) n_5) 1)
         | false -> Value ()))
  in
- loop_29 10)
+ loop_29 (10, fun (_x_19 : unit) (_ : int) -> _x_19))
   0

@@ -17,14 +17,13 @@ let rec concat_2 =
                                                                     (ys_7))))) 
    in 
    let rec f_23 = 
-     fun  x_18 -> (force_unsafe) 
-                    ((handler {value_clause = (fun (_b_19: bool) -> Value ((IntCons ((
-                                                                    (match _b_19 with
-                                                                     
-                                                                     true -> 2
+     fun  (x_18, k_25) -> (force_unsafe) 
+                            ((handler {value_clause = (fun (_b_19: bool) -> Value ((k_25) 
+                                                                    ((match _b_19 with
+                                                                      true -> 2
                                                                      | 
-                                                                     false -> 3), (IntNil)))))); 
-                       effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
+                                                                     false -> 3)))); 
+                               effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
   (match eff with
     | Decide -> fun () l_20 -> Value (
                                                                     ((concat_2) 
@@ -36,9 +35,9 @@ let rec concat_2 =
                                                                     (false)))   
     | eff' -> (fun arg k -> Call (eff', arg, k))
       )); }) 
-                       ((fun (x_21: unit) ->  Call (Decide, x_21, (fun 
-                                               (y_22: bool) -> Value (y_22)))) 
-                          (()))) 
+                               ((fun (x_21: unit) ->  Call (Decide, x_21, (fun 
+                                                       (y_22: bool) -> Value (y_22)))) 
+                                  (()))) 
    in 
-   (f_23) (())
+   (f_23) (((), fun (_x_14: int) -> (IntCons ((_x_14, (IntNil))))))
 ;;

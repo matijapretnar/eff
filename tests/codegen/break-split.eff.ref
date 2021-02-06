@@ -11,11 +11,13 @@ let two_3 = 2
 let three_4 = 3
 ;;
 let rec f_18 = 
-     fun  x_13 -> (force_unsafe) 
-                    ((handler {value_clause = (fun (_b_14: bool) -> Value ((match _b_14 with
+     fun  (x_13, k_20) -> (force_unsafe) 
+                            ((handler {value_clause = (fun (_b_14: bool) -> Value ((k_20) 
+                                                                    ((match _b_14 with
                                                                       true -> 2
-                                                                     |  false -> 3))); 
-                       effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
+                                                                     | 
+                                                                     false -> 3)))); 
+                               effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
   (match eff with
     | Decide -> fun () l_15 -> Value (
                                                                     ((_op_2 (* + *)) 
@@ -27,9 +29,9 @@ let rec f_18 =
                                                                     (false)))   
     | eff' -> (fun arg k -> Call (eff', arg, k))
       )); }) 
-                       ((fun (x_16: unit) ->  Call (Decide, x_16, (fun 
-                                               (y_17: bool) -> Value (y_17)))) 
-                          (()))) 
+                               ((fun (x_16: unit) ->  Call (Decide, x_16, (fun 
+                                                       (y_17: bool) -> Value (y_17)))) 
+                                  (()))) 
    in 
-   (f_18) (())
+   (f_18) (((), fun (_x_9: int) -> _x_9))
 ;;
