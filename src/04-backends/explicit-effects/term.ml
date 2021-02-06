@@ -132,6 +132,14 @@ let handler_clauses value_clause effect_part drt_in : handler =
   let ty_in, drty_out = value_clause.ty in
   fresh_handler value_clause effect_part ((ty_in, drt_in), drty_out)
 
+let handler_with_new_value_clause hnd value_clause : handler =
+  let ty_in, drty_out = value_clause.ty in
+  let (_, drt_in), _ = hnd.ty in
+  {
+    term = { value_clause; effect_clauses = hnd.term.effect_clauses };
+    ty = ((ty_in, drt_in), drty_out);
+  }
+
 let handler h =
   let drty1, drty2 = h.ty in
   { term = Handler h; ty = Type.Handler (drty1, drty2) }

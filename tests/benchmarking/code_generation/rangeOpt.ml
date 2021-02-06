@@ -17,16 +17,12 @@ let test_1 (n_2 : int) =
         >> fun _b_5 ->
         range_3 ((_op_0 (* - *) n_4) 1) >> fun _b_6 -> Value (Cons (_b_5, _b_6))
   in
-  force_unsafe
-    ((handler
-        {
-          value_clause = (fun (_x_10 : int_list) -> Value _x_10);
-          effect_clauses =
-            (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
-              match eff with
-              | Fetch ->
-                  fun _ l_15 ->
-                    Value (((coer_arrow coer_refl_ty force_unsafe) l_15) 42)
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        })
-       (range_3 n_2))
+  let rec range_16 (n_4, k_18) =
+    match n_4 with
+    | 0 -> k_18 Nil
+    | _ ->
+        range_16
+          ( (_op_0 (* - *) n_4) 1,
+            fun (_b_6 : int_list) -> k_18 (Cons (42, _b_6)) )
+  in
+  range_16 (n_2, fun (_x_10 : int_list) -> _x_10)

@@ -2,11 +2,18 @@ open Utils
 
 type state = {
   recursive_functions : (Term.variable, Term.abstraction) Assoc.t;
-  fuel : int; (* Cache of already specialized functions *)
+  fuel : int;
+  (* Cache of already specialized functions *)
+  specialized_functions :
+    (Term.EffectFingerprint.t * Term.variable, Term.variable * Type.ty) Assoc.t;
 }
 
 let initial_state =
-  { recursive_functions = Assoc.empty; fuel = !Config.optimization_fuel }
+  {
+    recursive_functions = Assoc.empty;
+    fuel = !Config.optimization_fuel;
+    specialized_functions = Assoc.empty;
+  }
 
 let reduce_if_fuel reduce_term state term =
   if state.fuel > 0 then reduce_term { state with fuel = state.fuel - 1 } term
@@ -285,22 +292,20 @@ and bind_computation state comp bind =
 and bind_abstraction state { term = pat, cmp; _ } bind =
   Term.abstraction (pat, bind_computation state cmp bind)
 
-and handle_computation state specialized hnd comp =
+and handle_computation state hnd comp =
   match comp.term with
   | Term.Match (exp, cases) ->
       let _, drty_out = hnd.ty in
-      Term.match_
-        (exp, List.map (handle_abstraction state specialized hnd) cases)
-        drty_out
+      Term.match_ (exp, List.map (handle_abstraction state hnd) cases) drty_out
       |> optimize_computation state
   | LetVal (exp, abs) ->
-      Term.letVal (exp, handle_abstraction state specialized hnd abs)
+      Term.letVal (exp, handle_abstraction state hnd abs)
       |> optimize_computation state
   | LetRec (defs, comp) ->
-      Term.letRec (defs, handle_computation state specialized hnd comp)
+      Term.letRec (defs, handle_computation state hnd comp)
       |> optimize_computation state
   | Call (eff, exp, abs) -> (
-      let handled_abs = handle_abstraction state specialized hnd abs in
+      let handled_abs = handle_abstraction state hnd abs in
       match Assoc.lookup eff hnd.term.Term.effect_clauses.effect_part with
       | Some { term = p1, p2, comp; _ } ->
           (* TODO: Refresh abstraction? *)
@@ -312,8 +317,15 @@ and handle_computation state specialized hnd comp =
           beta_reduce state (Term.abstraction (p1, comp')) exp
       | None -> Term.call (eff, exp, handled_abs))
   | Apply ({ term = Var f; _ }, exp)
-    when Option.is_some (Assoc.lookup f specialized) -> (
-      match Assoc.lookup f specialized with
+    when Option.is_some
+           (Assoc.lookup
+              (hnd.term.Term.effect_clauses.fingerprint, f)
+              state.specialized_functions) -> (
+      match
+        Assoc.lookup
+          (hnd.term.Term.effect_clauses.fingerprint, f)
+          state.specialized_functions
+      with
       | Some (f', ty') ->
           Term.apply
             ( Term.var f' ty',
@@ -322,23 +334,20 @@ and handle_computation state specialized hnd comp =
   | Bind (cmp, abs) -> (
       match recast_computation hnd cmp with
       | Some comp' ->
-          bind_computation state comp'
-            (handle_abstraction state specialized hnd abs)
+          bind_computation state comp' (handle_abstraction state hnd abs)
       | None ->
-          let (_, drt_in), _ = hnd.ty in
           let hnd' =
-            Term.handler_clauses
-              (handle_abstraction state specialized hnd abs)
-              hnd.term.Term.effect_clauses.effect_part drt_in
+            Term.handler_with_new_value_clause hnd
+              (handle_abstraction state hnd abs)
           in
-          handle_computation state specialized hnd' cmp)
+          handle_computation state hnd' cmp)
   | _ -> (
       match recast_computation hnd comp with
       | Some comp' -> bind_computation state comp' hnd.term.Term.value_clause
       | None -> Term.handle (Term.handler hnd, comp))
 
-and handle_abstraction state specialized hnd { term = p, c; _ } =
-  Term.abstraction (p, handle_computation state specialized hnd c)
+and handle_abstraction state hnd { term = p, c; _ } =
+  Term.abstraction (p, handle_computation state hnd c)
 
 and substitute_pattern_comp st c p exp =
   optimize_computation st (Term.subst_comp (Term.pattern_match p exp) c)
@@ -398,23 +407,36 @@ and reduce_computation' state comp =
       | defs' -> Term.letRec (defs', c'))
   | Term.Bind (cmp, abs) -> bind_computation state cmp abs
   | Term.Handle ({ term = Term.Handler hnd; _ }, cmp) -> (
-      let specialized =
-        state.recursive_functions
-        |> Assoc.kmap (fun (f, abs) ->
-               let f' = Language.CoreTypes.Variable.refresh f in
-               let (ty_arg, _), ((ty_in, _), drty_out) = (abs.ty, hnd.ty) in
-               let ty' =
-                 Type.Arrow
-                   ( Type.Tuple [ ty_arg; Type.Arrow (ty_in, drty_out) ],
-                     drty_out )
-               in
-               (f, (f', ty')))
+      let fingerprint = hnd.term.effect_clauses.fingerprint in
+      let unspecialized_recursive_functions =
+        List.filter
+          (fun (f, _) ->
+            Option.is_none
+              (Assoc.lookup (fingerprint, f) state.specialized_functions))
+          (Assoc.to_list state.recursive_functions)
       in
-      let cmp' = handle_computation state specialized hnd cmp in
+      let add_specialized specialized (f, abs) =
+        let f' = Language.CoreTypes.Variable.refresh f in
+        let (ty_arg, _), ((ty_in, _), drty_out) = (abs.ty, hnd.ty) in
+        let ty' =
+          Type.Arrow
+            (Type.Tuple [ ty_arg; Type.Arrow (ty_in, drty_out) ], drty_out)
+        in
+        Assoc.update (fingerprint, f) (f', ty') specialized
+      in
+      let specialized_functions' =
+        List.fold_left add_specialized state.specialized_functions
+          unspecialized_recursive_functions
+      in
+      let cmp' =
+        handle_computation
+          { state with specialized_functions = specialized_functions' }
+          hnd cmp
+      in
       let defs =
-        Assoc.kmap
+        List.map
           (fun (f, { term = pat, cmp; _ }) ->
-            match Assoc.lookup f specialized with
+            match Assoc.lookup (fingerprint, f) specialized_functions' with
             | Some
                 ( f',
                   Type.Arrow
@@ -434,11 +456,17 @@ and reduce_computation' state comp =
                   }
                 in
                 let abs' = Term.abstraction (Term.pTuple [ pat; k_pat ], cmp) in
-                (f', handle_abstraction state specialized hnd' abs')
+                ( f',
+                  handle_abstraction
+                    {
+                      state with
+                      specialized_functions = specialized_functions';
+                    }
+                    hnd' abs' )
             | _ -> assert false)
-          state.recursive_functions
+          unspecialized_recursive_functions
       in
-      match Assoc.to_list defs with
+      match keep_used_letrec_bindings defs cmp' with
       | [] -> cmp'
       | defs' -> Term.letRec (defs', cmp'))
   | Term.Handle
