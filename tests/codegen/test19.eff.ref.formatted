@@ -6,3 +6,4 @@ fun ((w_1, k_2, num_3) : nat * nat * int) (_x_4 : nat * nat * int) ->
   | Zero, Zero, 0 -> (w_1, k_2, Zero, 0, 0)
   | Zero, z_5, n_6 -> (Zero, z_5, Zero, num_3, n_6)
   | x_7, Zero, n_8 -> (Zero, w_1, x_7, 1, n_8)
+  | _, _, _ -> (Zero, Zero, Zero, 0, 0)

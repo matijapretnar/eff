@@ -2,7 +2,7 @@ let _op_0 (* + *) = ( + )
 ;;
 type foo = A | B of bar
 
- and type bar = {x : foo}
+ and bar = {x : foo}
 
 ;;
 type(_, _) effect += Op1 : (int, bar) effect 

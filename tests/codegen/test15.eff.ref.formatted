@@ -1,0 +1,25 @@
+let _op_0 (* + *) = ( + )
+
+type foo = A | B of bar
+
+and bar = { x : foo }
+
+type (_, _) effect += Op1 : (int, bar) effect
+
+type (_, _) effect += Op2 : (bar, foo) effect
+
+type (_, _) effect += Op3 : (foo, int) effect
+
+;;
+fun (a_2 : int) ->
+  Call
+    ( Op1,
+      10,
+      fun (y_8 : bar) ->
+        Call
+          ( Op2,
+            y_8,
+            fun (y_10 : foo) ->
+              Call
+                (Op3, y_10, fun (y_12 : int) -> Value ((_op_0 (* + *) a_2) y_12))
+          ) )

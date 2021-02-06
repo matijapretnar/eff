@@ -227,12 +227,9 @@ let pp_tydef (name, (params, tydef)) ppf =
     | TyDefInline ty -> print ppf "%t" (pp_type ty)
   in
   match params with
-  | [] ->
-      print ppf "@[type %t = %t@]@."
-        (CoreTypes.TyName.print name)
-        (pp_def tydef)
+  | [] -> print ppf "@[%t = %t@]@." (CoreTypes.TyName.print name) (pp_def tydef)
   | _lst ->
-      print ppf "@[type (%t) %t = %t@]@."
+      print ppf "@[(%t) %t = %t@]@."
         (pp_sequence ", " CoreTypes.TyParam.print params)
         (CoreTypes.TyName.print name)
         (pp_def tydef)
@@ -246,4 +243,4 @@ let pp_cmd cmd ppf =
       print ppf "let rec %t %t = %t@.;;" (pp_variable x) (pp_pattern p)
         (pp_term t)
   | External (x, _ty, f) -> pp_external x f ppf
-  | TyDef defs -> print ppf "%t@.;;" (pp_sequence "@, and " pp_tydef defs)
+  | TyDef defs -> print ppf "type %t@.;;" (pp_sequence "@, and " pp_tydef defs)
