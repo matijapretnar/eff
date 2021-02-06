@@ -1,0 +1,14 @@
+type (_, _) effect += Decide : (unit, bool) effect
+
+type int_list = Nil | Cons of (int * int_list)
+
+;;
+let rec _op_0 (* @ *) xs_1 (ys_2 : int_list) =
+  match xs_1 with
+  | Nil -> ys_2
+  | Cons (x_3, xs_4) -> Cons (x_3, (_op_0 (* @ *) xs_4) ys_2)
+in
+let l_20 (y_22 : bool) =
+  Cons ((match y_22 with true -> 10 | false -> 20), Nil)
+in
+(_op_0 (* @ *) (l_20 true)) (l_20 false)

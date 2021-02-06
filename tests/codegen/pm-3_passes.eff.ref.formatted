@@ -1,0 +1,24 @@
+let _op_0 (* = *) = ( = )
+
+let _op_1 (* - *) = ( - )
+
+type (_, _) effect += Decide : (unit, bool) effect
+
+type intlist = IntNil | IntCons of (int * intlist)
+
+;;
+let rec concat_2 xs_3 =
+  match xs_3 with
+  | IntNil -> fun (ys_4 : intlist) -> ys_4
+  | IntCons (z_5, zs_6) ->
+      fun (ys_7 : intlist) -> IntCons (z_5, (concat_2 zs_6) ys_7)
+in
+let l_22 (y_24 : bool) =
+  let x_17 = match y_24 with true -> 10 | false -> 20 in
+  let l_22 (y_26 : bool) =
+    IntCons
+      ((_op_1 (* - *) x_17) (match y_26 with true -> 0 | false -> 5), IntNil)
+  in
+  (concat_2 (l_22 true)) (l_22 false)
+in
+(concat_2 (l_22 true)) (l_22 false)

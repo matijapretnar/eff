@@ -250,14 +250,26 @@ and apply_sub_abs sub abs =
 
 and apply_sub_abs' sub (p, c) = (apply_sub_pat sub p, apply_sub_comp sub c)
 
-and apply_sub_pat sub { term = p; ty } = { term = p; ty = apply_sub_ty sub ty }
+and apply_sub_pat sub pat =
+  { term = apply_sub_pat' sub pat.term; ty = apply_sub_ty sub pat.ty }
+
+and apply_sub_pat' sub pat =
+  match pat with
+  | PVar _ -> pat
+  | PAs (p, x) -> PAs (apply_sub_pat sub p, x)
+  | PTuple ps -> PTuple (List.map (apply_sub_pat sub) ps)
+  | PRecord flds -> PRecord (Assoc.map (apply_sub_pat sub) flds)
+  | PVariant (lbl, pat) -> PVariant (lbl, Option.map (apply_sub_pat sub) pat)
+  | PConst _ -> pat
+  | PNonbinding -> pat
 
 and apply_sub_letrec_abs sub (f, abs) = (f, apply_sub_abs sub abs)
 
 and apply_sub_abs2 sub abs2 =
   { term = apply_sub_abs2' sub abs2.term; ty = apply_sub_abs2_ty sub abs2.ty }
 
-and apply_sub_abs2' sub (p1, p2, c) = (p1, p2, apply_sub_comp sub c)
+and apply_sub_abs2' sub (p1, p2, c) =
+  (apply_sub_pat sub p1, apply_sub_pat sub p2, apply_sub_comp sub c)
 
 and apply_sub_handler sub h =
   let drty1, drty2 = h.ty in
