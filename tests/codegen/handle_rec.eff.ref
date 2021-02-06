@@ -15,9 +15,10 @@ let rec f_3 =
                                                         (((_op_0 (* - *)) 
                                                             (x_4)) (1))))) 
    in 
-   (force_unsafe) 
-     ((handler {value_clause = (fun (_id_12: int) -> Value (_id_12)); 
-        effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
+   let rec f_17 = 
+     fun  x_4 -> (force_unsafe) 
+                   ((handler {value_clause = (fun (_id_12: int) -> Value (_id_12)); 
+                      effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
   (match eff with
     | Eff -> fun () l_16 -> Value (
                                                                     ((_op_1 (* * *)) 
@@ -27,12 +28,20 @@ let rec f_3 =
                                                                     (2))   
     | eff' -> (fun arg k -> Call (eff', arg, k))
       )); }) 
-        ((f_3) (5)))
-;;
-let rec g_17 = 
-     fun  x_18 -> (match ((_op_2 (* = *)) (x_18)) (0) with
-                    true -> 1
-                   |  false -> (g_17) (((_op_0 (* - *)) (x_18)) (1))) 
+                      ((match ((_op_2 (* = *)) (x_4)) (0) with
+                         true -> Value (1)
+                        |  false -> (((fun (x_14: unit) ->  Call (Eff, x_14, (fun 
+                                                             (y_15: unit) -> Value (y_15)))) 
+                                        (())) >> (fun  _ -> (f_3) 
+                                                              (((_op_0 (* - *)) 
+                                                                  (x_4)) (1))))))) 
    in 
-   (g_17) (5)
+   (f_17) (5)
+;;
+let rec g_18 = 
+     fun  x_19 -> (match ((_op_2 (* = *)) (x_19)) (0) with
+                    true -> 1
+                   |  false -> (g_18) (((_op_0 (* - *)) (x_19)) (1))) 
+   in 
+   (g_18) (5)
 ;;

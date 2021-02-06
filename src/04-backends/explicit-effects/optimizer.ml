@@ -1,43 +1,21 @@
 open Utils
 
 type state = {
-  (* Abstractions available for specializtions for specializations *)
-  functions : (Term.variable, Term.abstraction) Assoc.t;
   recursive_functions : (Term.variable, Term.abstraction) Assoc.t;
-  (* Rest of fuel for optimization *)
-  fuel : int;
-  (* Cache of already specialized functions *)
-  specialized_functions :
-    (Term.EffectFingerprint.t * Term.variable, Term.variable * Type.ty) Assoc.t;
+  fuel : int; (* Cache of already specialized functions *)
 }
 
 let initial_state =
-  {
-    functions = Assoc.empty;
-    recursive_functions = Assoc.empty;
-    fuel = !Config.optimization_fuel;
-    specialized_functions = Assoc.empty;
-  }
+  { recursive_functions = Assoc.empty; fuel = !Config.optimization_fuel }
 
 let reduce_if_fuel reduce_term state term =
   if state.fuel > 0 then reduce_term { state with fuel = state.fuel - 1 } term
   else term
 
-(* Updating stack and letrec *)
-let add_function state x abs =
-  { state with functions = Assoc.update x abs state.functions }
-
 let add_recursive_function state x abs =
   {
     state with
     recursive_functions = Assoc.update x abs state.recursive_functions;
-  }
-
-let add_function_specialization state f fingerprint f' ty =
-  {
-    state with
-    specialized_functions =
-      Assoc.update (fingerprint, f) (f', ty) state.specialized_functions;
   }
 
 (* Optimization functions *)
@@ -307,20 +285,22 @@ and bind_computation state comp bind =
 and bind_abstraction state { term = pat, cmp; _ } bind =
   Term.abstraction (pat, bind_computation state cmp bind)
 
-and handle_computation state hnd comp =
+and handle_computation state specialized hnd comp =
   match comp.term with
   | Term.Match (exp, cases) ->
       let _, drty_out = hnd.ty in
-      Term.match_ (exp, List.map (handle_abstraction state hnd) cases) drty_out
+      Term.match_
+        (exp, List.map (handle_abstraction state specialized hnd) cases)
+        drty_out
       |> optimize_computation state
   | LetVal (exp, abs) ->
-      Term.letVal (exp, handle_abstraction state hnd abs)
+      Term.letVal (exp, handle_abstraction state specialized hnd abs)
       |> optimize_computation state
   | LetRec (defs, comp) ->
-      Term.letRec (defs, handle_computation state hnd comp)
+      Term.letRec (defs, handle_computation state specialized hnd comp)
       |> optimize_computation state
   | Call (eff, exp, abs) -> (
-      let handled_abs = handle_abstraction state hnd abs in
+      let handled_abs = handle_abstraction state specialized hnd abs in
       match Assoc.lookup eff hnd.term.Term.effect_clauses.effect_part with
       | Some { term = p1, p2, comp; _ } ->
           (* TODO: Refresh abstraction? *)
@@ -331,59 +311,31 @@ and handle_computation state hnd comp =
           in
           beta_reduce state (Term.abstraction (p1, comp')) exp
       | None -> Term.call (eff, exp, handled_abs))
-  (* | Apply ({ term = Var f; _ }, exp)
-     when Option.is_some (Assoc.lookup f state.functions) -> (
-       let fingerprint = hnd.term.Term.effect_clauses.fingerprint in
-       match Assoc.lookup (fingerprint, f) state.specialized_functions with
-       | Some (f', ty) -> Term.apply (Term.var f' ty, exp)
-       | None -> (
-           match Assoc.lookup f state.functions with
-           | Some abs ->
-               let f' = Language.CoreTypes.Variable.refresh f in
-               let (ty_in, _), (_, drty_out) = (abs.ty, hnd.ty) in
-               let ty' = Type.Arrow (ty_in, drty_out) in
-               let abs' = handle_abstraction state hnd abs in
-               Term.letVal
-                 ( Term.lambda abs',
-                   Term.abstraction
-                     (Term.pVar f' ty', Term.apply (Term.var f' ty', exp)) )
-           | None -> assert false)) *)
-  (* | Apply ({ term = Var f; _ }, exp)
-     when Option.is_some (Assoc.lookup f state.recursive_functions) -> (
-       let fingerprint = hnd.term.Term.effect_clauses.fingerprint in
-       match Assoc.lookup (fingerprint, f) state.specialized_functions with
-       | Some (f', ty) -> Term.apply (Term.var f' ty, exp)
-       | None -> (
-           match Assoc.lookup f state.recursive_functions with
-           | Some abs ->
-               let f' = Language.CoreTypes.Variable.refresh f in
-               let (ty_in, _), (_, drty_out) = (abs.ty, hnd.ty) in
-               let ty' = Type.Arrow (ty_in, drty_out) in
-               let state' =
-                 add_function_specialization state f fingerprint f' ty'
-               in
-               let abs' = handle_abstraction state' hnd abs in
-               Term.letRec ([ (f', abs') ], Term.apply (Term.var f' ty', exp))
-           | None -> assert false)) *)
+  | Apply ({ term = Var f; _ }, exp)
+    when Option.is_some (Assoc.lookup f specialized) -> (
+      match Assoc.lookup f specialized with
+      | Some (f', ty') -> Term.apply (Term.var f' ty', exp)
+      | None -> assert false)
   | Bind (cmp, abs) -> (
       match recast_computation hnd cmp with
       | Some comp' ->
-          bind_computation state comp' (handle_abstraction state hnd abs)
+          bind_computation state comp'
+            (handle_abstraction state specialized hnd abs)
       | None ->
           let (_, drt_in), _ = hnd.ty in
           let hnd' =
             Term.handler_clauses
-              (handle_abstraction state hnd abs)
+              (handle_abstraction state specialized hnd abs)
               hnd.term.Term.effect_clauses.effect_part drt_in
           in
-          handle_computation state hnd' cmp)
+          handle_computation state specialized hnd' cmp)
   | _ -> (
       match recast_computation hnd comp with
       | Some comp' -> bind_computation state comp' hnd.term.Term.value_clause
       | None -> Term.handle (Term.handler hnd, comp))
 
-and handle_abstraction state hnd { term = p, c; _ } =
-  Term.abstraction (p, handle_computation state hnd c)
+and handle_abstraction state specialized hnd { term = p, c; _ } =
+  Term.abstraction (p, handle_computation state specialized hnd c)
 
 and substitute_pattern_comp st c p exp =
   optimize_computation st (Term.subst_comp (Term.pattern_match p exp) c)
@@ -401,14 +353,7 @@ and beta_reduce state ({ term = p, c; _ } as a) e =
       if is_atomic e.term then
         (* Inline constants and variables anyway *)
         substitute_pattern_comp state c p e
-      else
-        let state' =
-          match (p.term, e.term) with
-          | Term.PVar x, Term.Lambda a -> add_function state x a
-          | _ -> state
-        in
-        let a' = optimize_abstraction state' a in
-        Term.letVal (e, a')
+      else Term.letVal (e, a)
 
 and reduce_expression state expr = reduce_if_fuel reduce_expression' state expr
 
@@ -449,8 +394,27 @@ and reduce_computation' state comp =
       | [] -> c'
       | defs' -> Term.letRec (defs', c'))
   | Term.Bind (cmp, abs) -> bind_computation state cmp abs
-  | Term.Handle ({ term = Term.Handler hnd; _ }, cmp) ->
-      handle_computation state hnd cmp
+  | Term.Handle ({ term = Term.Handler hnd; _ }, cmp) -> (
+      let specialized =
+        state.recursive_functions
+        |> Assoc.kmap (fun (f, abs) ->
+               let f' = Language.CoreTypes.Variable.refresh f in
+               let (ty_in, _), (_, drty_out) = (abs.ty, hnd.ty) in
+               let ty' = Type.Arrow (ty_in, drty_out) in
+               (f, (f', ty')))
+      in
+      let cmp' = handle_computation state specialized hnd cmp in
+      let defs =
+        Assoc.kmap
+          (fun (f, abs) ->
+            match Assoc.lookup f specialized with
+            | Some (f', _) -> (f', handle_abstraction state specialized hnd abs)
+            | None -> assert false)
+          state.recursive_functions
+      in
+      match Assoc.to_list defs with
+      | [] -> cmp'
+      | defs' -> Term.letRec (defs', cmp'))
   | Term.Handle
       ( {
           term =

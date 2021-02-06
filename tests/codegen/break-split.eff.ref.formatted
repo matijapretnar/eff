@@ -11,23 +11,26 @@ let two_3 = 2
 let three_4 = 3
 
 ;;
-let rec f_12 x_13 =
-  (fun (x_16 : unit) -> Call (Decide, x_16, fun (y_17 : bool) -> Value y_17)) ()
-  >> fun _b_14 -> Value (match _b_14 with true -> 2 | false -> 3)
+let rec f_18 x_13 =
+  force_unsafe
+    ((handler
+        {
+          value_clause =
+            (fun (_b_14 : bool) ->
+              Value (match _b_14 with true -> 2 | false -> 3));
+          effect_clauses =
+            (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+              match eff with
+              | Decide ->
+                  fun () l_15 ->
+                    Value
+                      ((_op_2 (* + *)
+                          (((coer_arrow coer_refl_ty force_unsafe) l_15) true))
+                         (((coer_arrow coer_refl_ty force_unsafe) l_15) false))
+              | eff' -> fun arg k -> Call (eff', arg, k));
+        })
+       ((fun (x_16 : unit) ->
+          Call (Decide, x_16, fun (y_17 : bool) -> Value y_17))
+          ()))
 in
-force_unsafe
-  ((handler
-      {
-        value_clause = (fun (_x_9 : int) -> Value _x_9);
-        effect_clauses =
-          (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
-            match eff with
-            | Decide ->
-                fun () l_15 ->
-                  Value
-                    ((_op_2 (* + *)
-                        (((coer_arrow coer_refl_ty force_unsafe) l_15) true))
-                       (((coer_arrow coer_refl_ty force_unsafe) l_15) false))
-            | eff' -> fun arg k -> Call (eff', arg, k));
-      })
-     (f_12 ()))
+f_18 ()

@@ -23,9 +23,11 @@ type(_, _) effect += Put : (int, unit) effect
                                                                     (1))))
                    |  false -> Value (())) 
     in 
-    (force_unsafe) 
-      ((handler {value_clause = (fun (_x_19: unit) -> Value (fun (_: int) -> _x_19)); 
-         effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
+    let rec loop_29 = 
+      fun  n_5 -> (force_unsafe) 
+                    ((handler {value_clause = (fun (_x_19: unit) -> Value (fun 
+                                                                    (_: int) -> _x_19)); 
+                       effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
   (match eff with
     | Get -> fun _ l_27 -> Value (
                                                                     fun 
@@ -40,5 +42,19 @@ type(_, _) effect += Put : (int, unit) effect
                                                                     (s_16))   
     | eff' -> (fun arg k -> Call (eff', arg, k))
       )); }) 
-         ((loop_4) (10)))) (0)
+                       ((match ((_op_0 (* < *)) (0)) (n_5) with
+                          true -> (((((((((fun (x_23: unit) ->  Call (Get, x_23, (fun 
+                                                                 (y_24: int) -> Value (y_24)))) 
+                                            (())) >> (fun  _b_10 -> Value ((_op_2 (* + *)) 
+                                                                    (_b_10))))) >> (fun 
+                                         _b_9 -> Value ((_b_9) (1))))) >> (fun 
+                                       _b_8 -> (fun (x_25: int) ->  Call (Put, x_25, (fun 
+                                                                    (y_26: unit) -> Value (y_26)))) 
+                                                 (_b_8)))) >> (fun  _ -> (loop_4) 
+                                                                    (((_op_1 (* - *)) 
+                                                                    (n_5)) 
+                                                                    (1))))
+                         |  false -> Value (())))) 
+    in 
+    (loop_29) (10)) (0)
 ;;

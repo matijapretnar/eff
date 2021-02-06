@@ -15,18 +15,45 @@ let rec f_10 x_11 =
   | true -> Value ()
   | false -> f_10 ((_op_2 (* - *) x_11) 1)
 in
-force_unsafe
-  ((handler
-      {
-        value_clause = (fun (_x_7 : unit) -> Value 0);
-        effect_clauses =
-          (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
-            match eff with
-            | WriteInt ->
-                fun n_3 l_16 ->
-                  Value
-                    ((_op_1 (* + *) n_3)
-                       (((coer_arrow coer_refl_ty force_unsafe) l_16) ()))
-            | eff' -> fun arg k -> Call (eff', arg, k));
-      })
-     (f_10 10))
+let rec f_19 x_11 =
+  force_unsafe
+    ((handler
+        {
+          value_clause =
+            (fun (_ : unit) ->
+              Value
+                (force_unsafe
+                   ((handler
+                       {
+                         value_clause = (fun (_x_7 : unit) -> Value 0);
+                         effect_clauses =
+                           (fun (type a b) (eff : (a, b) effect) :
+                                (a -> (b -> _) -> _) ->
+                             match eff with
+                             | WriteInt ->
+                                 fun n_3 l_16 ->
+                                   Value
+                                     ((_op_1 (* + *) n_3)
+                                        (((coer_arrow coer_refl_ty force_unsafe)
+                                            l_16)
+                                           ()))
+                             | eff' -> fun arg k -> Call (eff', arg, k));
+                       })
+                      (match (_op_0 (* = *) x_11) 0 with
+                      | true -> Value ()
+                      | false -> f_10 ((_op_2 (* - *) x_11) 1)))));
+          effect_clauses =
+            (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+              match eff with
+              | WriteInt ->
+                  fun n_3 l_16 ->
+                    Value
+                      ((_op_1 (* + *) n_3)
+                         (((coer_arrow coer_refl_ty force_unsafe) l_16) ()))
+              | eff' -> fun arg k -> Call (eff', arg, k));
+        })
+       ((fun (x_17 : int) ->
+          Call (WriteInt, x_17, fun (y_18 : unit) -> Value y_18))
+          x_11))
+in
+f_19 10
