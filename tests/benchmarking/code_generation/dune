@@ -3,7 +3,7 @@
 (executable
  (name benchmark)
  (modes native)
- (modules benchmark)
+ (modules (:standard \ generate_benchmark_rules))
  (libraries bechamel bechamel-notty notty notty.unix unix ocamlHeader))
 
 (executable

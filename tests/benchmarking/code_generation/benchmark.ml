@@ -1,10 +1,6 @@
 open Bechamel
 open Toolkit
 open Notty_unix
-open Loop
-open Queens
-open Interp
-open Range
 
 let number_of_loops = 100
 
