@@ -157,6 +157,7 @@ and reduce_term' state (n_term : NoEff.n_term) =
   | NCast (t, NCoerRefl) -> t
   | NBind (NReturn t, c) -> beta_reduce state c t
   | NLet (e, a) -> beta_reduce state a e
+  | NApplyTerm (NFun (p, _, c), t) -> beta_reduce state (p, c) t
   | _ -> n_term
 
 and reduce_term state n_term =

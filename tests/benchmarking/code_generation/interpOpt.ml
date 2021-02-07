@@ -36,10 +36,7 @@ let bigTest_5 (() : unit) =
         interp_6 r_25 >> fun y_26 ->
         interp_6 l_24 >> fun x_27 ->
         match y_26 with
-        | 0 ->
-            (fun (x_41 : unit) ->
-              Call (DivByZero, x_41, fun (y_42 : int) -> Value y_42))
-              ()
+        | 0 -> Call (DivByZero, (), fun (y_42 : int) -> Value y_42)
         | _ -> Value ((_op_4 (* / *) x_27) y_26))
   in
   let addCase_29 =

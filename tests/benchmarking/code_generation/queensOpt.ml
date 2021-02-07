@@ -71,15 +71,10 @@ let test_queens_5 (n_6 : int) =
   let rec choose_66 xs_67 =
     match xs_67 with
     | IntNil ->
-        (fun (x_103 : unit) ->
-          Call (Fail, x_103, fun (y_104 : empty) -> Value y_104))
-          ()
-        >> fun _b_68 -> Value (match _b_68 with _ -> assert false)
+        Call (Fail, (), fun (y_104 : empty) -> Value y_104) >> fun _b_68 ->
+        Value (match _b_68 with _ -> assert false)
     | IntCons (x_69, xs'_70) -> (
-        (fun (x_101 : unit) ->
-          Call (Decide, x_101, fun (y_102 : bool) -> Value y_102))
-          ()
-        >> fun _b_71 ->
+        Call (Decide, (), fun (y_102 : bool) -> Value y_102) >> fun _b_71 ->
         match _b_71 with true -> Value x_69 | false -> choose_66 xs'_70)
   in
   (let rec place_84 x_85 (qs_86 : inttuplist) =
