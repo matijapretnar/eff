@@ -59,8 +59,14 @@ let tupleCoercion tcoers =
   let tys, tys' = tcoers |> List.map (fun tcoer -> tcoer.ty) |> List.split in
   { term = TupleCoercion tcoers; ty = (Type.Tuple tys, Type.Tuple tys') }
 
-let applyCoercion (_tyname, _tcoers) = failwith __LOC__
 
+  let applyCoercion (tyname, tcoers) =
+    let tys, tys' = tcoers |> List.map (fun tcoer -> tcoer.ty) |> List.split in
+    {
+      term = ApplyCoercion (tyname, tcoers);
+      ty = (Type.Apply (tyname, tys), Type.Apply (tyname, tys'));
+    }
+  
 let handlerCoercion (dtcoer1, dtcoer2) =
   let drty1, drty1' = dtcoer1.ty and drty2, drty2' = dtcoer2.ty in
   {

@@ -35,9 +35,7 @@ let rec concat_2 =
                                                                     (false)))   
     | eff' -> (fun arg k -> Call (eff', arg, k))
       )); }) 
-                               ((fun (x_21: unit) ->  Call (Decide, x_21, (fun 
-                                                       (y_22: bool) -> Value (y_22)))) 
-                                  (()))) 
+                               ( Call (Decide, (), (fun (y_22: bool) -> Value (y_22))))) 
    in 
    (f_23) (((), fun (_x_14: int) -> (IntCons ((_x_14, (IntNil))))))
 ;;

@@ -108,7 +108,8 @@ let fresh_variable x ty =
   let x' = CoreTypes.Variable.fresh x in
   (pVar x' ty, var x' ty)
 
-let const (_ : Language.Const.t) : expression = failwith __LOC__
+let const (c : Language.Const.t) : expression = 
+  { term = Const c; ty = Type.TyBasic (Const.infer_ty c)}
 
 let tuple es =
   { term = Tuple es; ty = Type.Tuple (List.map (fun e -> e.ty) es) }
@@ -119,8 +120,6 @@ let record (_ : (CoreTypes.Field.t, expression) Assoc.t) : expression =
 let variant (lbl, e) ty = { term = Variant (lbl, e); ty }
 
 let lambda abs = { term = Lambda abs; ty = Type.Arrow abs.ty }
-
-let effect (_ : effect) : expression = failwith __LOC__
 
 let fresh_handler value_clause effect_part ty =
   (* TODO: Check that input dirt is either handled or covered in output dirt *)

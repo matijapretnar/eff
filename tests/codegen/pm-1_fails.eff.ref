@@ -32,11 +32,10 @@ type intlist = IntNil | IntCons of (int * intlist)
     | eff' -> (fun arg k -> Call (eff', arg, k))
       )); }) 
         (let rec f_18 = 
-           fun  x_19 -> (((fun (x_22: unit) ->  Call (Decide, x_22, (fun 
-                                                 (y_23: bool) -> Value (y_23)))) 
-                            (())) >> (fun  _b_20 -> Value ((match _b_20 with
-                                                             true -> 2
-                                                            |  false -> 3)))) 
+           fun  x_19 -> (( Call (Decide, (), (fun (y_23: bool) -> Value (y_23)))) >> (fun 
+                           _b_20 -> Value ((match _b_20 with
+                                             true -> 2
+                                            |  false -> 3)))) 
          in 
          (f_18) (())))
 ;;

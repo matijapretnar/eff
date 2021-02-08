@@ -11,9 +11,8 @@ let rec f_3 x_4 =
   match (_op_2 (* = *) x_4) 0 with
   | true -> Value 1
   | false ->
-      (fun (x_14 : unit) -> Call (Eff, x_14, fun (y_15 : unit) -> Value y_15))
-        ()
-      >> fun _ -> f_3 ((_op_0 (* - *) x_4) 1)
+      Call (Eff, (), fun (y_15 : unit) -> Value y_15) >> fun _ ->
+      f_3 ((_op_0 (* - *) x_4) 1)
 in
 let rec f_17 (x_4, k_19) =
   force_unsafe
@@ -34,10 +33,8 @@ let rec f_17 (x_4, k_19) =
        (match (_op_2 (* = *) x_4) 0 with
        | true -> Value 1
        | false ->
-           (fun (x_14 : unit) ->
-             Call (Eff, x_14, fun (y_15 : unit) -> Value y_15))
-             ()
-           >> fun _ -> f_3 ((_op_0 (* - *) x_4) 1)))
+           Call (Eff, (), fun (y_15 : unit) -> Value y_15) >> fun _ ->
+           f_3 ((_op_0 (* - *) x_4) 1)))
 in
 f_17 (5, fun (_id_12 : int) -> _id_12)
 

@@ -29,9 +29,7 @@ let rec f_18 =
                                                                     (false)))   
     | eff' -> (fun arg k -> Call (eff', arg, k))
       )); }) 
-                               ((fun (x_16: unit) ->  Call (Decide, x_16, (fun 
-                                                       (y_17: bool) -> Value (y_17)))) 
-                                  (()))) 
+                               ( Call (Decide, (), (fun (y_17: bool) -> Value (y_17))))) 
    in 
    (f_18) (((), fun (_x_9: int) -> _x_9))
 ;;

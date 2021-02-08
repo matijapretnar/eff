@@ -31,8 +31,6 @@ let rec f_23 (x_18, k_25) =
                          (((coer_arrow coer_refl_ty force_unsafe) l_20) false))
               | eff' -> fun arg k -> Call (eff', arg, k));
         })
-       ((fun (x_21 : unit) ->
-          Call (Decide, x_21, fun (y_22 : bool) -> Value y_22))
-          ()))
+       (Call (Decide, (), fun (y_22 : bool) -> Value y_22)))
 in
 f_23 ((), fun (_x_14 : int) -> IntCons (_x_14, IntNil))

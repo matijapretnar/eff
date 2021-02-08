@@ -10,17 +10,11 @@ type(_, _) effect += Put : (int, unit) effect
 ;;
 (let rec loop_4 = 
       fun  n_5 -> (match ((_op_0 (* < *)) (0)) (n_5) with
-                    true -> (((((((((fun (x_23: unit) ->  Call (Get, x_23, (fun 
-                                                           (y_24: int) -> Value (y_24)))) 
-                                      (())) >> (fun  _b_10 -> Value ((_op_2 (* + *)) 
-                                                                    (_b_10))))) >> (fun 
+                    true -> (((((((( Call (Get, (), (fun (y_24: int) -> Value (y_24)))) >> (fun 
+                                     _b_10 -> Value ((_op_2 (* + *)) (_b_10))))) >> (fun 
                                    _b_9 -> Value ((_b_9) (1))))) >> (fun 
-                                 _b_8 -> (fun (x_25: int) ->  Call (Put, x_25, (fun 
-                                                               (y_26: unit) -> Value (y_26)))) 
-                                           (_b_8)))) >> (fun  _ -> (loop_4) 
-                                                                    (((_op_1 (* - *)) 
-                                                                    (n_5)) 
-                                                                    (1))))
+                                 _b_8 ->  Call (Put, _b_8, (fun (y_26: unit) -> Value (y_26)))))) >> (fun 
+                               _ -> (loop_4) (((_op_1 (* - *)) (n_5)) (1))))
                    |  false -> Value (())) 
     in 
     let rec loop_29 = 
@@ -43,14 +37,13 @@ type(_, _) effect += Put : (int, unit) effect
     | eff' -> (fun arg k -> Call (eff', arg, k))
       )); }) 
                                ((match ((_op_0 (* < *)) (0)) (n_5) with
-                                  true -> (((((((((fun (x_23: unit) ->  Call (Get, x_23, (fun 
-                                                                    (y_24: int) -> Value (y_24)))) 
-                                                    (())) >> (fun  _b_10 -> Value ((_op_2 (* + *)) 
+                                  true -> (((((((( Call (Get, (), (fun 
+                                                    (y_24: int) -> Value (y_24)))) >> (fun 
+                                                   _b_10 -> Value ((_op_2 (* + *)) 
                                                                     (_b_10))))) >> (fun 
                                                  _b_9 -> Value ((_b_9) (1))))) >> (fun 
-                                               _b_8 -> (fun (x_25: int) ->  Call (Put, x_25, (fun 
-                                                                    (y_26: unit) -> Value (y_26)))) 
-                                                         (_b_8)))) >> (fun 
+                                               _b_8 ->  Call (Put, _b_8, (fun 
+                                                         (y_26: unit) -> Value (y_26)))))) >> (fun 
                                              _ -> (loop_4) 
                                                     (((_op_1 (* - *)) (n_5)) 
                                                        (1))))
