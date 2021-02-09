@@ -11,8 +11,12 @@ let test_1 (n_2 : int) =
     match n_4 with
     | 0 -> Value Nil
     | _ ->
-        Call (Fetch, (), fun (y_14 : int) -> Value y_14) >> fun _b_5 ->
-        range_3 ((_op_0 (* - *) n_4) 1) >> fun _b_6 -> Value (Cons (_b_5, _b_6))
+        Call
+          ( Fetch,
+            (),
+            fun (x_0 : int) ->
+              range_3 ((_op_0 (* - *) n_4) 1) >> fun _b_6 ->
+              Value (Cons (x_0, _b_6)) )
   in
   let rec range_16 (n_4, k_18) =
     match n_4 with

@@ -156,6 +156,11 @@ and reduce_term' state (n_term : NoEff.n_term) =
   | NCast (t, (NCoerReturn NCoerRefl as _c)) -> NoEff.NReturn t
   | NCast (t, NCoerRefl) -> t
   | NBind (NReturn t, c) -> beta_reduce state c t
+  | NBind (NCall (e, arg, ((_, ty, _) as k)), f) ->
+      let v = NoEff.Variable.fresh "x" in
+      let p' = NoEff.PNVar v in
+      let cont = NoEff.NApplyTerm (NoEff.NFun k, NoEff.NVar v) in
+      optimize_term state (NCall (e, arg, (p', ty, NoEff.NBind (cont, f))))
   | NLet (e, a) -> beta_reduce state a e
   | NApplyTerm (NFun (p, _, c), t) -> beta_reduce state (p, c) t
   | _ -> n_term
