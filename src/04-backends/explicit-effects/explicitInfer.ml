@@ -627,8 +627,7 @@ and tcLet state (pdef : Untyped.pattern) (c1 : Untyped.computation)
   | _other_computation -> tcLetCmp state pdef c1 c2
 
 (* Typecheck a (potentially) recursive let *)
-and tcLetRecNoGen state (var : Untyped.variable) (abs : Untyped.abstraction)
-    (c2 : Untyped.computation) : tcCompOutput' =
+and infer_let_rec state (var : Untyped.variable) (abs : Untyped.abstraction) =
   (* 1: Generate fresh variables for everything *)
   let alpha, alphaSkel = Constraint.fresh_ty_with_fresh_skel () in
   let betadelta, betaSkel = Constraint.fresh_dirty_with_fresh_skel () in
@@ -641,11 +640,6 @@ and tcLetRecNoGen state (var : Untyped.variable) (abs : Untyped.abstraction)
   in
 
   let (trgPat, trgC1), (_trgPatTy, dirty1) = (abs.term, abs.ty) in
-
-  (* 3: Typecheck c2 *)
-  let trgC2, cs2 =
-    tcComp (extend_var state var (Type.Arrow (alpha, dirty1))) c2
-  in
 
   (* 3: The assumed type should be at least as general as the inferred one *)
   let omega12, omegaCt12 = Constraint.fresh_dirty_coer (dirty1, betadelta) in
@@ -667,13 +661,21 @@ and tcLetRecNoGen state (var : Untyped.variable) (abs : Untyped.abstraction)
 
     subst_fn trgC1
   in
+  let outCs = (alphaSkel :: betaSkel :: omegaCt12) @ cs1 in
+
+  (Term.abstraction (trgPat, c1''), outCs)
+
+and tcLetRecNoGen state (var : Untyped.variable) (abs : Untyped.abstraction)
+    (c2 : Untyped.computation) : tcCompOutput' =
+  let abs, cs1 = infer_let_rec state var abs in
+
+  (* 3: Typecheck c2 *)
+  let trgC2, cs2 = tcComp (extend_var state var (Type.Arrow abs.ty)) c2 in
 
   (* 5: Combine the results *)
-  let outExpr =
-    Term.LetRec ([ (var, Term.abstraction (trgPat, c1'')) ], trgC2)
-  in
+  let outExpr = Term.LetRec ([ (var, abs) ], trgC2) in
 
-  let outCs = ((alphaSkel :: betaSkel :: omegaCt12) @ cs1) @ cs2 in
+  let outCs = cs1 @ cs2 in
   ((outExpr, trgC2.ty), outCs)
 
 (* Typecheck a case expression *)
@@ -914,58 +916,6 @@ let tcTopLevelLet state (exp : Untyped.expression) =
   let exp'' = subInExp sub exp' and ty'' = subInValTy sub exp'.ty in
   generalize residuals ty'' exp''
 
-(* This is currently unused, top lets are translated into local lets *)
-let tcTopLetRec state (var : Untyped.variable) (pat : Untyped.pattern)
-    (cmp : Untyped.computation) =
-  (* 1: Generate fresh variables for everything *)
-  let alpha, alphaSkel = Constraint.fresh_ty_with_fresh_skel () in
-  let betadelta, betaSkel = Constraint.fresh_dirty_with_fresh_skel () in
-
-  (* 2: Typecheck the abstraction *)
-  let abs, cs =
-    check_abstraction
-      (extend_var state var (Type.Arrow (alpha, betadelta)))
-      (pat, cmp) alpha
-  in
-
-  let (trgPat, trgC1), (trgPatTy, dirty1) = (abs.term, abs.ty) in
-
-  (* 3: The assumed type should be at least as general as the inferred one *)
-  let omega12, omegaCt12 = Constraint.fresh_dirty_coer (dirty1, betadelta) in
-
-  (* 4: Create the (complicated) c1''. *)
-  let c1'' =
-    let f_coercion =
-      Constraint.arrowCoercion (Constraint.reflTy alpha, omega12)
-    in
-    Term.subst_comp
-      (Assoc.of_list
-         [
-           ( var,
-             Term.castExp (Term.var var (Type.Arrow (alpha, dirty1)), f_coercion)
-           );
-         ])
-      trgC1
-  in
-
-  (* 5: Solve (simplify, actually) the generated constraints *)
-  let subst, residuals =
-    Unification.solve ((alphaSkel :: betaSkel :: omegaCt12) @ cs)
-  in
-
-  (* 6: Substitute back into everything *)
-  let trgPatTy = subInValTy subst trgPatTy in
-  let dirty1 = subInCmpTy subst dirty1 in
-  (* trgPat needs not a substitution *)
-  let trgC1 = subInCmp subst c1'' in
-
-  (* 7: Partition the residual constraints and abstract over them *)
-  let outTy, _ =
-    generalize residuals (Type.Arrow (trgPatTy, dirty1)) (Term.tuple [])
-  (* Matija: Make sure to generalize the expression as well *)
-  and outExpr = ([ (var, trgPatTy, dirty1, (trgPat, c1'')) ], trgC1) in
-  (outExpr, outTy)
-
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 
@@ -1003,15 +953,9 @@ let infer_expression state expr =
   (subInExp sub expr', residuals)
 
 let infer_rec_abstraction state f abs =
-  match
-    tcLetRecNoGen state f abs
-      (unlocated @@ Untyped.Value (unlocated @@ Untyped.Tuple []))
-  with
-  | (Term.LetRec ([ (_f, abs') ], _ret_unit), _unit_drty), cnstrs ->
-      (* These two are not necessarily equal, but should be unifiable *)
-      let sub, residuals = Unification.solve cnstrs in
-      (subInAbs sub abs', residuals)
-  | _ -> assert false
+  let abs', cnstrs = infer_let_rec state f abs in
+  let sub, residuals = Unification.solve cnstrs in
+  (subInAbs sub abs', residuals)
 
 (* Typecheck a top-level expression *)
 let top_level_computation state comp =
