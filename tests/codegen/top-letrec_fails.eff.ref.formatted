@@ -13,11 +13,11 @@ let rec concat_2 xs_3 =
       fun (ys_7 : intlist) -> IntCons (z_5, (concat_2 zs_6) ys_7)
 
 ;;
-let l_22 (y_24 : bool) =
-  let x_17 = match y_24 with true -> 10 | false -> 20 in
-  let l_22 (y_26 : bool) =
+let l_22 (y_31 : bool) =
+  let x_17 = match y_31 with true -> 10 | false -> 20 in
+  let l_22 (y_28 : bool) =
     IntCons
-      ((_op_1 (* - *) x_17) (match y_26 with true -> 0 | false -> 5), IntNil)
+      ((_op_1 (* - *) x_17) (match y_28 with true -> 0 | false -> 5), IntNil)
   in
   (concat_2 (l_22 true)) (l_22 false)
 in

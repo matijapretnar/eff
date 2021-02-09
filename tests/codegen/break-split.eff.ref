@@ -10,9 +10,9 @@ let two_3 = 2
 ;;
 let three_4 = 3
 ;;
-let rec f_18 = 
-     fun  (x_13, k_20) -> (force_unsafe) 
-                            ((handler {value_clause = (fun (_b_14: bool) -> Value ((k_20) 
+let rec f_19 = 
+     fun  (x_13, k_21) -> (force_unsafe) 
+                            ((handler {value_clause = (fun (_b_14: bool) -> Value ((k_21) 
                                                                     ((match _b_14 with
                                                                       true -> 2
                                                                      | 
@@ -31,5 +31,5 @@ let rec f_18 =
       )); }) 
                                ( Call (Decide, (), (fun (y_17: bool) -> Value (y_17))))) 
    in 
-   (f_18) (((), fun (_x_9: int) -> _x_9))
+   (f_19) (((), fun (_x_9: int) -> _x_9))
 ;;

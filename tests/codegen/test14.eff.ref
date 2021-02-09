@@ -5,6 +5,6 @@ type integer = int
 ;;
 type(_, _) effect += Op : (unit, int) effect 
 ;;
-fun (y_2: int) ->  Call (Op, (), (fun (y_6: int) -> Value (((_op_0 (* + *)) 
-                                                                 (y_6)) (y_2))))
+fun (y_2: int) ->  Call (Op, (), (fun (y_8: int) -> Value (((_op_0 (* + *)) 
+                                                                 (y_8)) (y_2))))
 ;;

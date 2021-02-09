@@ -15,13 +15,13 @@ let rec concat_2 xs_3 = (match xs_3 with
                                                                     (zs_6)) 
                                                                     (ys_7)))))
 ;;
-let l_22 = fun (y_24: bool) -> let x_17 = (match y_24 with
+let l_22 = fun (y_31: bool) -> let x_17 = (match y_31 with
                                                true -> 10
                                               |  false -> 20) in 
-                                  let l_22 = fun (y_26: bool) -> (IntCons ((
+                                  let l_22 = fun (y_28: bool) -> (IntCons ((
                                                                     ((_op_1 (* - *)) 
                                                                     (x_17)) 
-                                                                    ((match y_26 with
+                                                                    ((match y_28 with
                                                                       true -> 0
                                                                      | 
                                                                      false -> 5)), (IntNil)))) in 

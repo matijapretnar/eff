@@ -3,4 +3,4 @@ type (_, _) effect += Op1 : (int, unit) effect
 type (_, _) effect += Op2 : (int, unit) effect
 
 ;;
-Call (Op1, 1, fun (y_7 : unit) -> Value y_7)
+Call (Op1, 1, fun (y_9 : unit) -> Value y_9)
