@@ -37,9 +37,8 @@ type inlinability =
   (* Pattern occurs more than once in a body of abstraction or it occurs recursively *)
   | NotInlinable
 
-let is_atomic = function Term.Var _ | Const _ -> true | _ -> false
-
-let applicable_pattern p vars =
+let abstraction_inlinability { term = pat, cmp; _ } =
+  let vars = Term.free_vars_comp cmp in
   let rec check_variables = function
     | [] -> NotPresent
     | x :: xs -> (
@@ -50,7 +49,7 @@ let applicable_pattern p vars =
           | NotPresent -> if outside_occ = 0 then NotPresent else Inlinable
           | inlinability -> inlinability)
   in
-  check_variables (Term.pattern_vars p)
+  check_variables (Term.pattern_vars pat)
 
 let keep_used_letrec_bindings defs cmp =
   (* Do proper call graph analysis *)
@@ -308,7 +307,6 @@ and handle_computation state hnd comp =
       let handled_abs = handle_abstraction state hnd abs in
       match Assoc.lookup eff hnd.term.Term.effect_clauses.effect_part with
       | Some { term = p1, p2, comp; _ } ->
-          (* TODO: Refresh abstraction? *)
           let comp' =
             beta_reduce state
               (Term.abstraction (p2, comp))
@@ -349,23 +347,17 @@ and handle_computation state hnd comp =
 and handle_abstraction state hnd { term = p, c; _ } =
   Term.abstraction (p, handle_computation state hnd c)
 
-and substitute_pattern_comp st c p exp =
-  optimize_computation st (Term.subst_comp (Term.pattern_match p exp) c)
-
-and substitute_pattern_expr st e p exp =
-  optimize_expression st (Term.subst_expr (Term.pattern_match p exp) e)
-
-and beta_reduce state ({ term = p, c; _ } as a) e =
-  Print.debug "Beta reduce: %t; %t" (Term.print_abstraction a)
-    (Term.print_expression e);
-  match applicable_pattern p (Term.free_vars_comp c) with
-  | Inlinable -> substitute_pattern_comp state c p e
-  | NotPresent -> c
-  | NotInlinable ->
-      if is_atomic e.term then
-        (* Inline constants and variables anyway *)
-        substitute_pattern_comp state c p e
-      else Term.letVal (e, a)
+and beta_reduce state ({ term = _, cmp; _ } as abs) exp =
+  Print.debug "Beta reduce: %t; %t"
+    (Term.print_abstraction abs)
+    (Term.print_expression exp);
+  match (abstraction_inlinability abs, exp.term) with
+  | Inlinable, _
+  (* Inline constants and variables anyway *)
+  | NotInlinable, (Term.Var _ | Term.Const _) ->
+      Term.beta_reduce abs exp |> optimize_computation state
+  | NotPresent, _ -> cmp
+  | NotInlinable, _ -> Term.letVal (exp, abs)
 
 and reduce_expression state expr = reduce_if_fuel reduce_expression' state expr
 

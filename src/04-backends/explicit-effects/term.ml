@@ -108,8 +108,8 @@ let fresh_variable x ty =
   let x' = CoreTypes.Variable.fresh x in
   (pVar x' ty, var x' ty)
 
-let const (c : Language.Const.t) : expression = 
-  { term = Const c; ty = Type.TyBasic (Const.infer_ty c)}
+let const (c : Language.Const.t) : expression =
+  { term = Const c; ty = Type.TyBasic (Const.infer_ty c) }
 
 let tuple es =
   { term = Tuple es; ty = Type.Tuple (List.map (fun e -> e.ty) es) }
@@ -348,6 +348,122 @@ and print_let_rec_abstraction (f, abs) ppf =
 let backup_location loc locs =
   match loc with None -> Location.union locs | Some loc -> loc
 
+let rec refresh_pattern sbst pat =
+  let sbst', pat' = refresh_pattern' sbst pat.term in
+  (sbst', { pat with term = pat' })
+
+and refresh_pattern' sbst = function
+  | PVar x ->
+      let x' = CoreTypes.Variable.refresh x in
+      (Assoc.update x x' sbst, PVar x')
+  | PAs (p, x) ->
+      let x' = CoreTypes.Variable.refresh x in
+      let sbst, p' = refresh_pattern (Assoc.update x x' sbst) p in
+      (sbst, PAs (p', x'))
+  | PTuple ps ->
+      let sbst, ps' =
+        List.fold_right
+          (fun p (sbst, ps') ->
+            let sbst, p' = refresh_pattern sbst p in
+            (sbst, p' :: ps'))
+          ps (sbst, [])
+      in
+      (sbst, PTuple ps')
+  | PRecord flds ->
+      let sbst, flds' =
+        Assoc.fold_right
+          (fun (lbl, p) (sbst, flds') ->
+            let sbst, p' = refresh_pattern sbst p in
+            (sbst, Assoc.update lbl p' flds'))
+          flds (sbst, Assoc.empty)
+      in
+      (sbst, PRecord flds')
+  | PVariant (lbl, Some p) ->
+      let sbst, p' = refresh_pattern sbst p in
+      (sbst, PVariant (lbl, Some p'))
+  | (PConst _ | PNonbinding | PVariant (_, None)) as p -> (sbst, p)
+
+let rec refresh_expression sbst exp =
+  { exp with term = refresh_expression' sbst exp.term }
+
+and refresh_expression' sbst = function
+  | Var x as e -> (
+      match Assoc.lookup x sbst with Some x' -> Var x' | None -> e)
+  | Lambda abs -> Lambda (refresh_abstraction sbst abs)
+  | Handler h -> Handler (refresh_handler sbst h)
+  | Tuple es -> Tuple (List.map (refresh_expression sbst) es)
+  | Record flds -> Record (Assoc.map (refresh_expression sbst) flds)
+  | Variant (lbl, e) -> Variant (lbl, Option.map (refresh_expression sbst) e)
+  | CastExp (e1, tyco) -> CastExp (refresh_expression sbst e1, tyco)
+  | Const _ as e -> e
+  | LambdaTyCoerVar (_tycovar, _e) -> failwith __LOC__
+  | LambdaDirtCoerVar (dcovar, e) ->
+      (* TODO: refresh dco var *)
+      LambdaDirtCoerVar (dcovar, refresh_expression sbst e)
+  | ApplyTyCoercion (e, tyco) ->
+      ApplyTyCoercion (refresh_expression sbst e, tyco)
+  | ApplyDirtCoercion (e, dco) ->
+      ApplyDirtCoercion (refresh_expression sbst e, dco)
+
+and refresh_computation sbst cmp =
+  { cmp with term = refresh_computation' sbst cmp.term }
+
+and refresh_computation' sbst = function
+  | Bind (c1, c2) ->
+      Bind (refresh_computation sbst c1, refresh_abstraction sbst c2)
+  | LetRec (li, c1) ->
+      let new_xs, sbst' =
+        List.fold_right
+          (fun (x, _) (new_xs, sbst') ->
+            let x' = CoreTypes.Variable.refresh x in
+            (x' :: new_xs, Assoc.update x x' sbst'))
+          li ([], sbst)
+      in
+      let li' =
+        List.map
+          (fun (x', abs) -> (x', abs))
+          (List.combine new_xs
+             (List.map (fun (_, abs) -> refresh_abstraction sbst' abs) li))
+      in
+      LetRec (li', refresh_computation sbst' c1)
+  | Match (e, li) ->
+      Match (refresh_expression sbst e, List.map (refresh_abstraction sbst) li)
+  | Apply (e1, e2) ->
+      Apply (refresh_expression sbst e1, refresh_expression sbst e2)
+  | Handle (e, c) ->
+      Handle (refresh_expression sbst e, refresh_computation sbst c)
+  | Call (eff, e, a) ->
+      Call (eff, refresh_expression sbst e, refresh_abstraction sbst a)
+  | Value e -> Value (refresh_expression sbst e)
+  | CastComp (c, dtyco) -> CastComp (refresh_computation sbst c, dtyco)
+  | LetVal (exp, abs) ->
+      LetVal (refresh_expression sbst exp, refresh_abstraction sbst abs)
+
+and refresh_handler sbst { term = h; ty } =
+  {
+    term =
+      {
+        effect_clauses =
+          {
+            fingerprint = h.effect_clauses.fingerprint;
+            effect_part =
+              Assoc.map (refresh_abstraction2 sbst) h.effect_clauses.effect_part;
+          };
+        value_clause = refresh_abstraction sbst h.value_clause;
+      };
+    ty;
+  }
+
+and refresh_abstraction sbst { term = p, c; ty } =
+  let sbst, p' = refresh_pattern sbst p in
+  { term = (p', refresh_computation sbst c); ty }
+
+and refresh_abstraction2 sbst { term = p1, p2, c; ty } =
+  let sbst, p1' = refresh_pattern sbst p1 in
+  let sbst, p2' = refresh_pattern sbst p2 in
+  let c' = refresh_computation sbst c in
+  { term = (p1', p2', c'); ty }
+
 let rec subst_expr sbst exp = { exp with term = subst_expr' sbst exp.term }
 
 and subst_expr' sbst = function
@@ -545,6 +661,11 @@ let pattern_match p e =
     | _, _ -> assert false
   in
   extend_subst p e Assoc.empty
+
+let beta_reduce abs exp =
+  let { term = pat, cmp; _ } = refresh_abstraction Assoc.empty abs in
+  let sub = pattern_match pat exp in
+  subst_comp sub cmp
 
 let ( @@@ ) (inside1, outside1) (inside2, outside2) =
   (inside1 @ inside2, outside1 @ outside2)
