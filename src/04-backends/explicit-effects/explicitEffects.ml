@@ -134,29 +134,6 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
         }
     | _ -> failwith __LOC__
 
-  (* process_top_let state lst
-     match Assoc.to_list lst with
-     | [ (v, (p, c)) ] ->
-         let (((typed_abs, _c), _ty) as l_rec) =
-           ExplicitInfer.tcTopLetRec state.type_system_state
-             v p c
-         in
-         let backend_state' =
-           ExBackend.process_top_let_rec state.backend_state
-             state.effect_system_state lst tys l_rec
-         in
-         let type_system_state =
-           List.fold_left
-             (fun st (v, p, c, _) ->
-               ExplicitInfer.add_gbl_def st v (Type.Arrow (p, c)))
-             state.type_system_state typed_abs
-         in
-         let effect_system_state =
-           { state.effect_system_state with type_system_state }
-         in
-         { backend_state = backend_state'; effect_system_state }
-     | _ -> failwith __LOC__ *)
-
   let process_external state (x, ty, name) =
     let ty = Type.source_to_target state.type_system_state.tydefs ty in
     let type_system_state' =
@@ -207,9 +184,18 @@ module Evaluate : Language.BackendSignature.T = Make (struct
 
   let process_def_effect state _ = state
 
-  let process_top_let _state _ = failwith __LOC__
+  let process_top_let state (x, exp) =
+    let v = Eval.eval_expression state.evaluation_state exp in
+    Format.fprintf !Config.output_formatter "@[%t : %t = %t@]@."
+      (Language.CoreTypes.Variable.print x)
+      (Type.print_ty exp.ty) (V.print_value v);
+    { evaluation_state = Eval.update x v state.evaluation_state }
 
-  let process_top_let_rec _state _ = failwith __LOC__
+  let process_top_let_rec state (f, abs) =
+    {
+      evaluation_state =
+        Eval.extend_let_rec state.evaluation_state (Assoc.of_list [ (f, abs) ]);
+    }
 
   let process_external state (x, _ty, f) =
     let evaluation_state' =
