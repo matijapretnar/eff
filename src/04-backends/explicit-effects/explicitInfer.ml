@@ -634,36 +634,14 @@ and infer_let_rec state (var : Untyped.variable) (abs : Untyped.abstraction) =
 
   (* 2: Typecheck the abstraction *)
   let abs, cs1 =
-    infer_abstraction
-      (extend_var state var (Type.Arrow (alpha, betadelta)))
-      abs
+    infer_abstraction (extend_var state var (Type.Arrow (alpha, betadelta))) abs
   in
 
-  let (trgPat, trgC1), (_trgPatTy, dirty1) = (abs.term, abs.ty) in
+  let abs', cs2 = Term.full_cast_abstraction abs alpha betadelta in
 
-  (* 3: The assumed type should be at least as general as the inferred one *)
-  let omega12, omegaCt12 = Constraint.fresh_dirty_coer (dirty1, betadelta) in
+  let outCs = (alphaSkel :: betaSkel :: cs1) @ cs2 in
 
-  (* 4: Create the (complicated) c1''. *)
-  let c1'' =
-    let f_coercion =
-      Constraint.arrowCoercion (Constraint.reflTy alpha, omega12)
-    in
-    let subst_fn =
-      Term.subst_comp
-        (Assoc.of_list
-           [
-             ( var,
-               Term.castExp
-                 (Term.var var (Type.Arrow (alpha, dirty1)), f_coercion) );
-           ])
-    in
-
-    subst_fn trgC1
-  in
-  let outCs = (alphaSkel :: betaSkel :: omegaCt12) @ cs1 in
-
-  (Term.abstraction (trgPat, c1''), outCs)
+  (abs', outCs)
 
 and tcLetRecNoGen state (var : Untyped.variable) (abs : Untyped.abstraction)
     (c2 : Untyped.computation) : tcCompOutput' =

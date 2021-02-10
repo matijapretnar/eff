@@ -721,6 +721,13 @@ let cast_abstraction { term = pat, cmp; _ } dirty =
   let cmp', cnstrs = cast_computation cmp dirty in
   (abstraction (pat, cmp'), cnstrs)
 
+let full_cast_abstraction { term = pat, cmp; _ } ty_in dirty_out =
+  let x_pat, x_var = fresh_variable "x" ty_in in
+  let exp', cnstrs1 = cast_expression x_var pat.ty in
+  let cmp', cnstrs2 = cast_computation cmp dirty_out in
+  ( abstraction (x_pat, letVal (exp', abstraction (pat, cmp'))),
+    cnstrs1 :: cnstrs2 )
+
 (* ************************************************************************* *)
 (*                         FREE VARIABLE COMPUTATION                         *)
 (* ************************************************************************* *)
