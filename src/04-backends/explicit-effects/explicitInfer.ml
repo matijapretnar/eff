@@ -568,22 +568,14 @@ and tcLetValNoGen state (patIn : Untyped.pattern) (e1 : Untyped.expression)
   (* 1: Typecheck e1 *)
   let trgE1, cs1 = tcExpr state e1 in
 
-  (* (v',A, Qv, Sigma1) *)
-
-  (* 2: Typecheck c2 *)
-  let x =
-    match patIn.it with
-    | Untyped.PVar x -> x (* GEORGE: Support nothing else at the moment *)
-    | _ -> failwith "tcLetValNoGen: only varpats allowed"
-  in
-  let trgC2, cs2 = tcComp (extend_var state x trgE1.ty) c2 in
-
+  (* 2: Typecheck abstraction *)
+  let abs, cs2 = tcAbstraction state (patIn, c2) in
+  let ty_in, drty_out = abs.ty in
   (* 3: Combine the results *)
-  let outExpr =
-    Term.LetVal (trgE1, Term.abstraction (Term.pVar x trgE1.ty, trgC2))
-  in
-  let outCs = cs1 @ cs2 in
-  ((outExpr, trgC2.ty), outCs)
+  let exp', cnstr = Term.cast_expression trgE1 ty_in in
+  let outExpr = Term.LetVal (exp', abs) in
+  let outCs = (cnstr :: cs1) @ cs2 in
+  ((outExpr, drty_out), outCs)
 
 (* Typecheck a let when c1 is a computation (== do binding) *)
 and tcLetCmp state (pat : Untyped.pattern) (c1 : Untyped.computation)
