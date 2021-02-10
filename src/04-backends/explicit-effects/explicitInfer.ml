@@ -634,9 +634,9 @@ and infer_let_rec state (var : Untyped.variable) (abs : Untyped.abstraction) =
 
   (* 2: Typecheck the abstraction *)
   let abs, cs1 =
-    check_abstraction
+    infer_abstraction
       (extend_var state var (Type.Arrow (alpha, betadelta)))
-      abs alpha
+      abs
   in
 
   let (trgPat, trgC1), (_trgPatTy, dirty1) = (abs.term, abs.ty) in
@@ -795,6 +795,12 @@ and tcCheck (_state : state) (_cmp : Untyped.computation) : tcCompOutput' =
  * we mean that we have inferred "some" type (could be instantiated later).
  * Hence, we conservatively ask for the pattern to be a variable pattern (cf.
  * tcTypedVarPat) *)
+and infer_abstraction state (pat, cmp) :
+    Term.abstraction * Constraint.omega_ct list =
+  let trgPat, state', cs1 = infer_pattern state pat in
+  let trgCmp, cs2 = tcComp state' cmp in
+  (Term.abstraction (trgPat, trgCmp), cs1 @ cs2)
+
 and check_abstraction state (pat, cmp) patTy :
     Term.abstraction * Constraint.omega_ct list =
   let trgPat, state' = check_pattern state patTy pat in
