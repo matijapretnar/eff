@@ -231,7 +231,12 @@ let rec print_pattern ?max_level p ppf =
 
 let rec print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match e.term with
+  (* print "(%t : %t)" (print_expression' e.term) (Type.print_ty e.ty) *)
+  print "%t" (print_expression' e.term)
+
+and print_expression' ?max_level e ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match e with
   | Var x -> print "%t" (print_variable x)
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
@@ -266,7 +271,12 @@ let rec print_expression ?max_level e ppf =
 
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c.term with
+  (* print "(%t : %t)" (print_computation' c.term) (Type.print_dirty c.ty) *)
+  print "%t" (print_computation' c.term)
+
+and print_computation' ?max_level c ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match c with
   | Apply (e1, e2) ->
       print ~at_level:1 "%t %t"
         (print_expression ~max_level:1 e1)
@@ -604,14 +614,7 @@ and alphaeq_abs2 eqvars { term = p1, p2, c; _ } { term = p1', p2', c'; _ } =
   | None -> false
 
 let pattern_match p e =
-  (* XXX The commented out part checked that p and e had matching types *)
-  (* let _, ty_e, constraints_e = e.scheme
-     and _, ty_p, constraints_p = p.scheme in
-     let constraints =
-       Constraints.union constraints_e constraints_p |>
-       Constraints.add_ty_constraint ~loc:e.location ty_e ty_p
-     in
-     ignore constraints; *)
+  assert (Type.equal_ty p.ty e.ty);
   let rec extend_subst p e sbst =
     match (p.term, e.term) with
     | PVar x, _ -> Assoc.update x e sbst

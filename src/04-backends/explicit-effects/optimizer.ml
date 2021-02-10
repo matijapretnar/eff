@@ -157,16 +157,16 @@ and reduce_dirt_coercion' _state = function
   | dcoer -> dcoer
 
 let rec optimize_expression state exp =
-  (* Print.debug "EXP: %t : %t" (Term.print_expression exp) (Type.print_ty exp.ty); *)
   let exp' = optimize_expression' state exp in
+  (* Print.debug "EXP: %t : %t" (Term.print_expression exp) (Type.print_ty exp.ty); *)
   (* Print.debug "EXP': %t : %t"
-     (Term.print_expression exp')
-     (Type.print_ty exp'.ty); *)
+    (Term.print_expression exp')
+    (Type.print_ty exp'.ty); *)
   assert (Type.equal_ty exp.ty exp'.ty);
   let exp'' = reduce_expression state exp' in
   (* Print.debug "EXP'': %t : %t"
-     (Term.print_expression exp'')
-     (Type.print_ty exp''.ty); *)
+    (Term.print_expression exp'')
+    (Type.print_ty exp''.ty); *)
   assert (Type.equal_ty exp'.ty exp''.ty);
   exp''
 
@@ -400,11 +400,13 @@ and reduce_computation' state comp =
   | Term.Bind (cmp, abs) -> bind_computation state cmp abs
   | Term.Handle ({ term = Term.Handler hnd; _ }, cmp) -> (
       let fingerprint = hnd.term.effect_clauses.fingerprint in
+      let drty_in, _ = hnd.ty in
       let unspecialized_recursive_functions =
         List.filter
-          (fun (f, _) ->
-            Option.is_none
-              (Assoc.lookup (fingerprint, f) state.specialized_functions))
+          (fun (f, { ty = _, drty_out; _ }) ->
+            Type.equal_dirty drty_in drty_out
+            && Option.is_none
+                 (Assoc.lookup (fingerprint, f) state.specialized_functions))
           (Assoc.to_list state.recursive_functions)
       in
       let add_specialized specialized (f, abs) =
@@ -425,6 +427,7 @@ and reduce_computation' state comp =
           { state with specialized_functions = specialized_functions' }
           hnd cmp
       in
+      (* TODO: specialize only functions that are used, not just all with matching types *)
       let defs =
         List.map
           (fun (f, { term = pat, cmp; _ }) ->

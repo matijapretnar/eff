@@ -123,13 +123,15 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
         let type_system_state' =
           ExplicitInfer.extend_var state.type_system_state f fun_ty
         in
-
+        let optimizer_state' =
+          Optimizer.add_recursive_function state.optimizer_state f a''
+        in
         let backend_state' =
           ExBackend.process_top_let_rec state.backend_state (f, a'')
         in
         {
-          state with
           type_system_state = type_system_state';
+          optimizer_state = optimizer_state';
           backend_state = backend_state';
         }
     | _ -> failwith __LOC__
@@ -192,6 +194,9 @@ module Evaluate : Language.BackendSignature.T = Make (struct
     { evaluation_state = Eval.update x v state.evaluation_state }
 
   let process_top_let_rec state (f, abs) =
+    Format.fprintf !Config.output_formatter "@[%t : %t = <fun>@]@."
+      (Language.CoreTypes.Variable.print f)
+      (Type.print_ty (Type.Arrow abs.ty));
     {
       evaluation_state =
         Eval.extend_let_rec state.evaluation_state (Assoc.of_list [ (f, abs) ]);
