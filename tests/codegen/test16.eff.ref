@@ -8,46 +8,40 @@ type(_, _) effect += Get : (unit, int) effect
 ;;
 type(_, _) effect += Put : (int, unit) effect 
 ;;
-(let rec loop_4 = 
-      fun  n_5 -> (match ((_op_0 (* < *)) (0)) (n_5) with
-                    true -> (((((((( Call (Get, (), (fun (y_24: int) -> Value (y_24)))) >> (fun 
-                                     _b_10 -> Value ((_op_2 (* + *)) (_b_10))))) >> (fun 
-                                   _b_9 -> Value ((_b_9) (1))))) >> (fun 
-                                 _b_8 ->  Call (Put, _b_8, (fun (y_26: unit) -> Value (y_26)))))) >> (fun 
-                               _ -> (loop_4) (((_op_1 (* - *)) (n_5)) (1))))
-                   |  false -> Value (())) 
+(let rec _loop_4 = 
+      fun  _x_27 -> (match ((_op_0 (* < *)) (0)) (_x_27) with
+                      true ->  Call (Get, (), (fun (_x_3: int) ->  Call (Put, 
+                                                                    ((_op_2 (* + *)) 
+                                                                    (_x_3)) 
+                                                                    (1), (fun 
+                                                                    (_x_4: unit) -> (_loop_4) 
+                                                                    (((_op_1 (* - *)) 
+                                                                    (_x_27)) 
+                                                                    (1))))))
+                     |  false -> Value (())) 
     in 
-    let rec loop_31 = 
-      fun  (n_5, k_33) -> (force_unsafe) 
-                            ((handler {value_clause = (fun (x_32: unit) -> Value ((k_33) 
-                                                                    (x_32))); 
-                               effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
-  (match eff with
-    | Get -> fun _ l_27 -> Value (
+    let rec _loop_32 = 
+      fun  (_x_27, _k_34) -> (match ((_op_0 (* < *)) (0)) (_x_27) with
+                               true -> let _l_51 = fun (_y_54: int) -> let _b_56 = 
+                                                                    ((_op_2 (* + *)) 
+                                                                    (_y_54)) 
+                                                                    (1) in 
+                                                                    let _l_57 = 
                                                                     fun 
-                                                                    (s_14: int) -> (((coer_arrow (coer_refl_ty) (force_unsafe)) 
-                                                                    (l_27)) 
-                                                                    (s_14)) 
-                                                                    (s_14))  | Put -> fun s_16 l_28 -> Value (
+                                                                    (_y_59: unit) -> (_loop_32) 
+                                                                    ((((_op_1 (* - *)) 
+                                                                    (_x_27)) 
+                                                                    (1), 
                                                                     fun 
-                                                                    (_: int) -> (((coer_arrow (coer_refl_ty) (force_unsafe)) 
-                                                                    (l_28)) 
+                                                                    (_x_62: unit) -> (_k_34) 
+                                                                    (_x_62))) in 
+                                                                    fun 
+                                                                    (_: int) -> ((_l_57) 
                                                                     (())) 
-                                                                    (s_16))   
-    | eff' -> (fun arg k -> Call (eff', arg, k))
-      )); }) 
-                               ((match ((_op_0 (* < *)) (0)) (n_5) with
-                                  true -> (((((((( Call (Get, (), (fun 
-                                                    (y_24: int) -> Value (y_24)))) >> (fun 
-                                                   _b_10 -> Value ((_op_2 (* + *)) 
-                                                                    (_b_10))))) >> (fun 
-                                                 _b_9 -> Value ((_b_9) (1))))) >> (fun 
-                                               _b_8 ->  Call (Put, _b_8, (fun 
-                                                         (y_26: unit) -> Value (y_26)))))) >> (fun 
-                                             _ -> (loop_4) 
-                                                    (((_op_1 (* - *)) (n_5)) 
-                                                       (1))))
-                                 |  false -> Value (())))) 
+                                                                    (_b_56) in 
+                                       fun (_s_52: int) -> ((_l_51) (_s_52)) 
+                                                             (_s_52)
+                              |  false -> (_k_34) (())) 
     in 
-    (loop_31) ((10, fun (_x_19: unit) -> fun (_: int) -> _x_19))) (0)
+    (_loop_32) ((10, fun (_x_19: unit) -> fun (_: int) -> _x_19))) (0)
 ;;

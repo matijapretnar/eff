@@ -6,39 +6,30 @@ let _op_1 (* * *) = ( * )
 ;;
 let _op_2 (* = *) = ( = )
 ;;
-let rec f_3 = 
-     fun  x_4 -> (match ((_op_2 (* = *)) (x_4)) (0) with
-                   true -> Value (1)
-                  |  false -> (( Call (Eff, (), (fun (y_15: unit) -> Value (y_15)))) >> (fun 
-                                 _ -> (f_3) (((_op_0 (* - *)) (x_4)) (1))))) 
+let rec _f_3 = 
+     fun  _x_16 -> (match ((_op_2 (* = *)) (_x_16)) (0) with
+                     true -> Value (1)
+                    |  false ->  Call (Eff, (), (fun (_x_0: unit) -> (_f_3) 
+                                                                    (((_op_0 (* - *)) 
+                                                                    (_x_16)) 
+                                                                    (1))))) 
    in 
-   let rec f_17 = 
-     fun  (x_4, k_19) -> (force_unsafe) 
-                           ((handler {value_clause = (fun (x_18: int) -> Value ((k_19) 
-                                                                    (x_18))); 
-                              effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
-  (match eff with
-    | Eff -> fun () l_16 -> Value (
-                                                                    ((_op_1 (* * *)) 
-                                                                    (((coer_arrow (coer_refl_ty) (force_unsafe)) 
-                                                                    (l_16)) 
-                                                                    (()))) 
-                                                                    (2))   
-    | eff' -> (fun arg k -> Call (eff', arg, k))
-      )); }) 
-                              ((match ((_op_2 (* = *)) (x_4)) (0) with
-                                 true -> Value (1)
-                                |  false -> (( Call (Eff, (), (fun (y_15: unit) -> Value (y_15)))) >> (fun 
-                                               _ -> (f_3) 
-                                                      (((_op_0 (* - *)) (x_4)) 
-                                                         (1))))))) 
+   let rec _f_18 = 
+     fun  (_x_16, _k_20) -> (match ((_op_2 (* = *)) (_x_16)) (0) with
+                              true -> (_k_20) (1)
+                             |  false -> ((_op_1 (* * *)) 
+                                            ((_f_18) 
+                                               ((((_op_0 (* - *)) (_x_16)) 
+                                                   (1), fun (_x_34: int) -> (_k_20) 
+                                                                    (_x_34))))) 
+                                           (2)) 
    in 
-   (f_17) ((5, fun (_id_12: int) -> _id_12))
+   (_f_18) ((5, fun (_id_12: int) -> _id_12))
 ;;
-let rec g_20 = 
-     fun  x_21 -> (match ((_op_2 (* = *)) (x_21)) (0) with
-                    true -> 1
-                   |  false -> (g_20) (((_op_0 (* - *)) (x_21)) (1))) 
+let rec _g_35 = 
+     fun  _x_46 -> (match ((_op_2 (* = *)) (_x_46)) (0) with
+                     true -> 1
+                    |  false -> (_g_35) (((_op_0 (* - *)) (_x_46)) (1))) 
    in 
-   (g_20) (5)
+   (_g_35) (5)
 ;;

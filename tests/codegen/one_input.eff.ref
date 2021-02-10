@@ -2,8 +2,8 @@ type(_, _) effect += Decide : (unit, bool) effect
 ;;
 let _op_0 (* + *) = ( + )
 ;;
-let l_12 = fun (y_23: bool) -> (match y_23 with
-                                    true -> 10
-                                   |  false -> 20) in 
-   ((_op_0 (* + *)) ((l_12) (true))) ((l_12) (false))
+let _l_12 = fun (_y_23: bool) -> (match _y_23 with
+                                      true -> 10
+                                     |  false -> 20) in 
+   ((_op_0 (* + *)) ((_l_12) (true))) ((_l_12) (false))
 ;;

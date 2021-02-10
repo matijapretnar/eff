@@ -6,7 +6,7 @@ type(_, _) effect += Op2 : (int, int) effect
      (handler {value_clause = (fun (_x_4: int) -> Value (_x_4)); effect_clauses = 
                                                                  (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
   (match eff with
-    | Op1 -> fun n_0 l_7 -> Value (1)  | Op2 -> fun n_2 l_8 -> Value (2)   
+    | Op1 -> fun _n_0 _l_7 -> Value (1)  | Op2 -> fun _n_2 _l_8 -> Value (2)   
     | eff' -> (fun arg k -> Call (eff', arg, k))
       )); })
 ;;

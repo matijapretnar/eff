@@ -6,19 +6,11 @@ type (_, _) effect += Decide : (unit, bool) effect
 
 type intlist = IntNil | IntCons of (int * intlist)
 
-let rec concat_2 xs_3 =
-  match xs_3 with
-  | IntNil -> fun (ys_4 : intlist) -> ys_4
-  | IntCons (z_5, zs_6) ->
-      fun (ys_7 : intlist) -> IntCons (z_5, (concat_2 zs_6) ys_7)
+let rec _concat_2 _x_10 =
+  match _x_10 with
+  | IntNil -> fun (_ys_12 : intlist) -> _ys_12
+  | IntCons (_z_14, _zs_13) ->
+      fun (_ys_15 : intlist) -> IntCons (_z_14, (_concat_2 _zs_13) _ys_15)
 
 ;;
-let l_22 (y_31 : bool) =
-  let x_17 = match y_31 with true -> 10 | false -> 20 in
-  let l_22 (y_28 : bool) =
-    IntCons
-      ((_op_1 (* - *) x_17) (match y_28 with true -> 0 | false -> 5), IntNil)
-  in
-  (concat_2 (l_22 true)) (l_22 false)
-in
-(concat_2 (l_22 true)) (l_22 false)
+IntNil

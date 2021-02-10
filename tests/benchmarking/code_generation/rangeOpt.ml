@@ -6,24 +6,24 @@ let _op_0 (* - *) = ( - )
 
 type int_list = Nil | Cons of (int * int_list)
 
-let test_1 (n_2 : int) =
-  let rec range_3 n_4 =
-    match n_4 with
+let _test_1 (_n_2 : int) =
+  let rec _range_3 _x_15 =
+    match _x_15 with
     | 0 -> Value Nil
     | _ ->
         Call
           ( Fetch,
             (),
-            fun (x_0 : int) ->
-              range_3 ((_op_0 (* - *) n_4) 1) >> fun _b_6 ->
-              Value (Cons (x_0, _b_6)) )
+            fun (_x_0 : int) ->
+              _range_3 ((_op_0 (* - *) _x_15) 1) >> fun _b_6 ->
+              Value (Cons (_x_0, _b_6)) )
   in
-  let rec range_16 (n_4, k_18) =
-    match n_4 with
-    | 0 -> k_18 Nil
+  let rec _range_18 (_x_15, _k_20) =
+    match _x_15 with
+    | 0 -> _k_20 Nil
     | _ ->
-        range_16
-          ( (_op_0 (* - *) n_4) 1,
-            fun (_b_6 : int_list) -> k_18 (Cons (42, _b_6)) )
+        _range_18
+          ( (_op_0 (* - *) _x_15) 1,
+            fun (_b_37 : int_list) -> _k_20 (Cons (42, _b_37)) )
   in
-  range_16 (n_2, fun (_x_10 : int_list) -> _x_10)
+  _range_18 (_n_2, fun (_x_10 : int_list) -> _x_10)

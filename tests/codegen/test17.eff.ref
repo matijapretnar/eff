@@ -2,5 +2,5 @@ type my_ty = Cons of my_ty
 
 ;;
 fun (_x_0: my_ty) -> (match _x_0 with
-                          Cons (argmnt_1) -> (Cons (argmnt_1)))
+                          Cons (_argmnt_1) -> (Cons (_argmnt_1)))
 ;;

@@ -11,15 +11,16 @@ type (_, _) effect += Op2 : (bar, foo) effect
 type (_, _) effect += Op3 : (foo, int) effect
 
 ;;
-fun (a_2 : int) ->
+fun (_a_2 : int) ->
   Call
     ( Op1,
       10,
-      fun (y_24 : bar) ->
+      fun (_y_24 : bar) ->
         Call
           ( Op2,
-            y_24,
-            fun (y_26 : foo) ->
+            _y_24,
+            fun (_y_26 : foo) ->
               Call
-                (Op3, y_26, fun (y_27 : int) -> Value ((_op_0 (* + *) a_2) y_27))
-          ) )
+                ( Op3,
+                  _y_26,
+                  fun (_y_27 : int) -> Value ((_op_0 (* + *) _a_2) _y_27) ) ) )

@@ -6,51 +6,25 @@ let _op_2 (* - *) = ( - )
 ;;
 type(_, _) effect += WriteInt : (int, unit) effect 
 ;;
-let rec f_10 = 
-     fun  x_11 -> (( Call (WriteInt, x_11, (fun (y_18: unit) -> Value (y_18)))) >> (fun 
-                     _ -> (match ((_op_0 (* = *)) (x_11)) (0) with
-                            true -> Value (())
-                           |  false -> (f_10) (((_op_2 (* - *)) (x_11)) (1))))) 
-   in 
-   let rec f_19 = 
-     fun  (x_11, k_21) -> (force_unsafe) 
-                            ((handler {value_clause = (fun (_: unit) -> Value ((force_unsafe) 
-                                                                    ((handler {
-                                                                    value_clause = (fun 
-                                                                    (x_20: unit) -> Value ((k_21) 
-                                                                    (x_20))); 
-                                                                    effect_clauses = 
-                                                                    (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
-  (match eff with
-    | WriteInt -> fun n_3 l_16 -> Value (
-                                                                    ((_op_1 (* + *)) 
-                                                                    (n_3)) 
-                                                                    (((coer_arrow (coer_refl_ty) (force_unsafe)) 
-                                                                    (l_16)) 
-                                                                    (())))   
-    | eff' -> (fun arg k -> Call (eff', arg, k))
-      )); }) 
-                                                                    ((match 
-                                                                    ((_op_0 (* = *)) 
-                                                                    (x_11)) 
-                                                                    (0) with
-                                                                      true -> Value (())
-                                                                     | 
-                                                                     false -> (f_10) 
+let rec _f_10 = 
+     fun  _x_19 ->  Call (WriteInt, _x_19, (fun (_x_0: unit) -> (match 
+                                                                ((_op_0 (* = *)) 
+                                                                   (_x_19)) 
+                                                                  (0) with
+                                                                  true -> Value (())
+                                                                 |  false -> (_f_10) 
                                                                     (((_op_2 (* - *)) 
-                                                                    (x_11)) 
-                                                                    (1))))))); 
-                               effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
-  (match eff with
-    | WriteInt -> fun n_3 l_16 -> Value (
-                                                                    ((_op_1 (* + *)) 
-                                                                    (n_3)) 
-                                                                    (((coer_arrow (coer_refl_ty) (force_unsafe)) 
-                                                                    (l_16)) 
-                                                                    (())))   
-    | eff' -> (fun arg k -> Call (eff', arg, k))
-      )); }) 
-                               ( Call (WriteInt, x_11, (fun (y_18: unit) -> Value (y_18))))) 
+                                                                    (_x_19)) 
+                                                                    (1))))) 
    in 
-   (f_19) ((10, fun (_x_7: unit) -> 0))
+   let rec _f_20 = 
+     fun  (_x_19, _k_22) -> ((_op_1 (* + *)) (_x_19)) 
+                              ((match ((_op_0 (* = *)) (_x_19)) (0) with
+                                 true -> (_k_22) (())
+                                |  false -> (_f_20) 
+                                              ((((_op_2 (* - *)) (_x_19)) (1), 
+                                                fun (_x_45: unit) -> (_k_22) 
+                                                                    (_x_45))))) 
+   in 
+   (_f_20) ((10, fun (_x_7: unit) -> 0))
 ;;

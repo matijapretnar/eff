@@ -8,6 +8,6 @@ type (_, _) effect += Op : (int, int) effect
        effect_clauses =
          (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
            match eff with
-           | Op -> fun n_0 l_4 -> Value 2
+           | Op -> fun _n_0 _l_4 -> Value 2
            | eff' -> fun arg k -> Call (eff', arg, k));
      })

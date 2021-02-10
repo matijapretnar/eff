@@ -1,18 +1,18 @@
 type (_, _) effect += Decide : (unit, bool) effect
 
-let two_0 = 2
+let _two_0 = 2
 
-let three_1 = 3
+let _three_1 = 3
 
 type intlist = IntNil | IntCons of (int * intlist)
 
 ;;
 force_unsafe
-  ((let rec concat_3 xs_4 =
-      match xs_4 with
-      | IntNil -> fun (ys_5 : intlist) -> ys_5
-      | IntCons (z_6, zs_7) ->
-          fun (ys_8 : intlist) -> IntCons (z_6, (concat_3 zs_7) ys_8)
+  ((let rec _concat_3 _x_21 =
+      match _x_21 with
+      | IntNil -> fun (_ys_5 : intlist) -> _ys_5
+      | IntCons (_z_6, _zs_7) ->
+          fun (_ys_8 : intlist) -> IntCons (_z_6, (_concat_3 _zs_7) _ys_8)
     in
     handler
       {
@@ -21,15 +21,18 @@ force_unsafe
           (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
             match eff with
             | Decide ->
-                fun () l_21 ->
+                fun () _l_22 ->
                   Value
-                    ((concat_3
-                        (((coer_arrow coer_refl_ty force_unsafe) l_21) true))
-                       (((coer_arrow coer_refl_ty force_unsafe) l_21) false))
+                    ((_concat_3
+                        (((coer_arrow coer_refl_ty force_unsafe) _l_22) true))
+                       (((coer_arrow coer_refl_ty force_unsafe) _l_22) false))
             | eff' -> fun arg k -> Call (eff', arg, k));
       })
-     (let rec f_18 x_19 =
-        Call (Decide, (), fun (y_23 : bool) -> Value y_23) >> fun _b_20 ->
-        Value (match _b_20 with true -> 2 | false -> 3)
+     (let rec _f_18 _x_25 =
+        Call
+          ( Decide,
+            (),
+            fun (_x_0 : bool) ->
+              Value (match _x_0 with true -> 2 | false -> 3) )
       in
-      f_18 ()))
+      _f_18 ()))
