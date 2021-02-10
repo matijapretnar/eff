@@ -175,9 +175,9 @@ let queens_one_cps_benchmark number_of_queens =
     name = "QUEENS ONE CPS BENCHMARK";
     benchmarks =
       [
-        (* ( "Generated, optimized",
-           forget_value QueensOpt.queens_one_cps,
-           always_true QueensOpt._test_queens_5 ); *)
+        ( "Generated, optimized",
+          forget_value QueensOpt._queens_one_cps_214,
+          always_true QueensOpt._queens_one_cps_214 );
         ( "Hand written",
           forget_value QueensHandWritten.queens_one_cps,
           always_true QueensHandWritten.queens_one_cps );

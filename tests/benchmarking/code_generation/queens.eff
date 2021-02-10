@@ -88,6 +88,7 @@ let queens_all number_of_queens =
    with choose_all handle queens number_of_queens
 
 let queens_one_cps number_of_queens =
+  let absurd void = (match void with) in
   let backtrack = handler
     | effect (Decide _) k ->
       (fun kf -> k true (fun _ -> k false kf) )

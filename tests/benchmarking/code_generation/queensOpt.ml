@@ -198,3 +198,57 @@ let _queens_all_166 (_number_of_queens_167 : int) =
   _queens_181
     ( _number_of_queens_167,
       fun (_x_174 : solution) -> SolutionsCons (_x_174, SolutionsNil) )
+
+let _queens_one_cps_214 (_number_of_queens_215 : int) =
+  let _absurd_216 (_void_217 : empty) =
+    match _void_217 with _ -> assert false
+  in
+  (let rec _queens_241 (_number_of_queens_107, _k_243) =
+     let rec _place_108 _x_119 =
+       let _x_109, _qs_110 = _x_119 in
+       match _op_21 (* > *) _x_109 _number_of_queens_107 with
+       | true -> Value _qs_110
+       | false ->
+           _choose_84 (_available_68 _number_of_queens_107 _x_109 _qs_110)
+           >> fun _y_113 ->
+           _place_108
+             ( _op_3 (* + *) _x_109 1,
+               SolutionPlace (Queen (_x_109, _y_113), _qs_110) )
+     in
+     let rec _place_244 (_x_119, _k_246) =
+       let _x_109, _qs_110 = _x_119 in
+       match _op_21 (* > *) _x_109 _number_of_queens_107 with
+       | true -> _k_246 _qs_110
+       | false ->
+           let rec _choose_248 (_x_94, _k_250) =
+             match _x_94 with
+             | RowsEmpty ->
+                 fun (_kf_224 : unit -> solution computation) -> _kf_224 ()
+             | RowsCons (_x_104, _xs'_103) ->
+                 let _l_230 (_y_105 : bool) =
+                   match _y_105 with
+                   | true -> _k_250 _x_104
+                   | false ->
+                       _choose_248
+                         (_xs'_103, fun (_x_249 : int) -> _k_250 _x_249)
+                 in
+                 fun (_kf_220 : unit -> solution computation) ->
+                   _l_230 true (fun (_ : unit) -> _l_230 false _kf_220)
+           in
+           _choose_248
+             ( _available_68 _number_of_queens_107 _x_109 _qs_110,
+               fun (_y_113 : int) ->
+                 _place_244
+                   ( ( _op_3 (* + *) _x_109 1,
+                       SolutionPlace (Queen (_x_109, _y_113), _qs_110) ),
+                     fun (_x_245 : solution) -> _k_246 _x_245 ) )
+     in
+     _place_244 ((1, SolutionEmpty), fun (_x_242 : solution) -> _k_243 _x_242)
+   in
+   _queens_241
+     ( _number_of_queens_215,
+       fun (_x_225 : solution) ->
+         coer_arrow coer_refl_ty (coer_return coer_refl_ty)
+           (fun (_ : unit -> solution computation) -> _x_225) ))
+    (fun (() : unit) ->
+      Call (Fail, (), fun (_y_240 : empty) -> Value (_absurd_216 _y_240)))
