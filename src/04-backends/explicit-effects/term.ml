@@ -212,7 +212,7 @@ let abstraction2 (p1, p2, c) : abstraction2 =
   { term = (p1, p2, c); ty = (p1.ty, p2.ty, c.ty) }
 
 let print_effect (eff, _) ppf =
-  Print.print ppf "Effect_%t" (CoreTypes.Effect.print eff)
+  Print.print ppf "%t" (CoreTypes.Effect.print eff)
 
 let print_variable = CoreTypes.Variable.print ~safe:true
 
@@ -224,11 +224,9 @@ let rec print_pattern ?max_level p ppf =
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
   | PRecord lst -> Print.record CoreTypes.Field.print print_pattern lst ppf
-  | PVariant (lbl, None) -> print ~at_level:1 "(%t)" (CoreTypes.Label.print lbl)
+  | PVariant (lbl, None) -> print ~at_level:0 "%t" (CoreTypes.Label.print lbl)
   | PVariant (lbl, Some p) ->
-      print ~at_level:1 "(%t @[<hov>%t@])"
-        (CoreTypes.Label.print lbl)
-        (print_pattern p)
+      print ~at_level:1 "%t %t" (CoreTypes.Label.print lbl) (print_pattern p)
   | PNonbinding -> print "_"
 
 let rec print_expression ?max_level e ppf =
@@ -238,37 +236,31 @@ let rec print_expression ?max_level e ppf =
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record lst -> Print.record CoreTypes.Field.print print_expression lst ppf
-  | Variant (lbl, None) -> print ~at_level:1 "%t" (CoreTypes.Label.print lbl)
+  | Variant (lbl, None) -> print ~at_level:0 "%t" (CoreTypes.Label.print lbl)
   | Variant (lbl, Some e) ->
       print ~at_level:1 "%t %t" (CoreTypes.Label.print lbl) (print_expression e)
   | Lambda { term = x, c; _ } ->
-      print "fun (%t:%t) -> (%t)" (print_pattern x) (Type.print_ty x.ty)
+      print ~at_level:2 "λ(%t:%t). %t" (print_pattern x) (Type.print_ty x.ty)
         (print_computation c)
   | Handler h ->
-      print
-        "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) \
-         (type b) (x : (a, b) effect) ->\n\
-        \             ((match x with %t) : a -> (b -> _ computation) -> _ \
-         computation)) @]}"
+      print "{ret %t; %t}"
         (print_abstraction h.term.value_clause)
-        (print_effect_clauses (Assoc.to_list h.term.effect_clauses.effect_part))
+        (Print.sequence ";" print_effect_clause
+           (Assoc.to_list h.term.effect_clauses.effect_part))
   | CastExp (e1, tc) ->
-      print "(%t) |> [%t]" (print_expression e1)
-        (Constraint.print_ty_coercion tc)
+      print "%t ▷ %t"
+        (print_expression ~max_level:0 e1)
+        (Constraint.print_ty_coercion ~max_level:0 tc)
   | LambdaTyCoerVar (p, e) ->
-      print "/\\(%t).( %t ) "
-        (Type.TyCoercionParam.print p)
-        (print_expression e)
+      print "Λ%t. %t " (Type.TyCoercionParam.print p) (print_expression e)
   | LambdaDirtCoerVar (p, e) ->
-      print "/\\(%t).( %t )"
-        (Type.DirtCoercionParam.print p)
-        (print_expression e)
+      print "Λ%t. %t" (Type.DirtCoercionParam.print p) (print_expression e)
   | ApplyTyCoercion (e, tty) ->
-      print ~at_level:1 "%t@ %t"
+      print ~at_level:1 "%t %t"
         (print_expression ~max_level:1 e)
         (Constraint.print_ty_coercion tty)
   | ApplyDirtCoercion (e, tty) ->
-      print ~at_level:1 "%t@ %t"
+      print ~at_level:1 "%t %t"
         (print_expression ~max_level:1 e)
         (Constraint.print_dirt_coercion tty)
 
@@ -276,69 +268,52 @@ and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.term with
   | Apply (e1, e2) ->
-      print ~at_level:1 "((%t)@ (%t))"
+      print ~at_level:1 "%t %t"
         (print_expression ~max_level:1 e1)
         (print_expression ~max_level:0 e2)
-  | Value e -> print ~at_level:1 "value (%t)" (print_expression ~max_level:0 e)
-  | Match (e, []) ->
-      print ~at_level:2 "(match %t with _ -> assert false)" (print_expression e)
+  | Value e -> print ~at_level:1 "ret %t" (print_expression ~max_level:0 e)
+  | Match (e, []) -> print ~at_level:3 "match %t with /" (print_expression e)
   | Match (e, lst) ->
-      print ~at_level:2 "(match %t with @[<v>| %t@])" (print_expression e)
-        (Print.sequence "@, | " print_abstraction lst)
+      print ~at_level:3 "match %t with %t" (print_expression e)
+        (Print.sequence "|" print_abstraction lst)
   | Handle (e, c) ->
-      print ~at_level:1 "handle %t %t"
+      print ~at_level:3 "with %t handle %t"
         (print_expression ~max_level:0 e)
         (print_computation ~max_level:0 c)
   | LetRec (lst, c) ->
-      print ~at_level:2 "let rec @[<hov>%t@] in %t"
+      print ~at_level:3 "let rec %t in %t"
         (Print.sequence " and " print_let_rec_abstraction lst)
         (print_computation c)
   | Call (eff, e, a) ->
-      print ~at_level:1 "call (%t) (%t) ((@[fun %t@]))" (print_effect eff)
-        (print_expression ~max_level:0 e)
+      print ~at_level:2 "%t(%t; %t)" (print_effect eff)
+        (print_expression ~max_level:1 e)
         (print_abstraction a)
-  | Bind (c1, a) ->
-      print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]"
-        (print_computation ~max_level:0 c1)
-        (print_abstraction a)
-  | CastComp (c1, dc) ->
-      print " ( (%t) |> [%t] ) " (print_computation c1)
-        (Constraint.print_dirty_coercion dc)
-  | LetVal (e1, { term = p, c1; _ }) ->
-      print "let (%t = (%t)) in (%t)" (print_pattern p) (print_expression e1)
+  | Bind (c2, { term = p, c1; _ }) ->
+      print ~at_level:3 "do %t ← %t in %t" (print_pattern p)
         (print_computation c1)
+        (print_computation ~max_level:3 c2)
+  | CastComp (c1, dc) ->
+      print ~at_level:2 "%t ▷ %t"
+        (print_computation ~max_level:2 c1)
+        (Constraint.print_dirty_coercion ~max_level:0 dc)
+  | LetVal (e1, { term = p, c1; _ }) ->
+      print ~at_level:3 "let %t = %t in %t" (print_pattern p)
+        (print_expression e1) (print_computation c1)
 
-and print_effect_clauses eff_clauses ppf =
+and print_effect_clause (eff, a2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
-  match eff_clauses with
-  | [] -> print "| eff' -> fun arg k -> Call (eff', arg, k)"
-  | (((_, (_t1, _t2)) as eff), a2) :: cases ->
-      print ~at_level:1 "| %t -> %t %t" (print_effect eff)
-        (print_abstraction2 a2)
-        (print_effect_clauses cases)
+  print ~at_level:2 "%t %t" (print_effect eff) (print_abstraction2 a2)
 
 and print_abstraction { term = p, c; _ } ppf =
-  Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern p) (Type.print_ty p.ty)
+  Format.fprintf ppf "(%t:%t) ↦ %t" (print_pattern p) (Type.print_ty p.ty)
     (print_computation c)
 
 and print_abstraction2 { term = p1, p2, c; _ } ppf =
-  Format.fprintf ppf "(fun %t %t -> %t)" (print_pattern p1) (print_pattern p2)
+  Format.fprintf ppf "%t %t ↦ %t" (print_pattern p1) (print_pattern p2)
     (print_computation c)
-
-and print_pure_abstraction (p, e) ppf =
-  Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern p) (print_expression e)
 
 and print_let_abstraction { term = p, c; _ } ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)
-
-and print_top_let_abstraction (p, c) ppf =
-  match c.term with
-  | Value e ->
-      Format.fprintf ppf "%t = %t" (print_pattern p)
-        (print_expression ~max_level:0 e)
-  | _ ->
-      Format.fprintf ppf "%t = run %t" (print_pattern p)
-        (print_computation ~max_level:0 c)
 
 and print_let_rec_abstraction (f, abs) ppf =
   Format.fprintf ppf "(%t : %t) %t" (print_variable f)

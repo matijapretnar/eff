@@ -95,9 +95,12 @@ let rec print_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
   | TyParam (p, _) -> CoreTypes.TyParam.print p ppf
+  | Arrow (t1, (t2, drt)) when is_empty_dirt drt ->
+      print ~at_level:5 "%t → %t" (print_ty ~max_level:4 t1)
+        (print_ty ~max_level:5 t2)
   | Arrow (t1, (t2, drt)) ->
-      print ~at_level:5 "@[%t -%t%s@ %t@]" (print_ty ~max_level:4 t1)
-        (print_dirt drt) (Symbols.short_arrow ()) (print_ty ~max_level:5 t2)
+      print ~at_level:5 "%t -%t→ %t" (print_ty ~max_level:4 t1)
+        (print_dirt drt) (print_ty ~max_level:5 t2)
   | Apply (t, []) -> print "%t" (CoreTypes.TyName.print t)
   | Apply (t, [ s ]) ->
       print ~at_level:1 "%t %t" (print_ty ~max_level:1 s)
@@ -106,25 +109,22 @@ let rec print_ty ?max_level ty ppf =
       print ~at_level:1 "(%t) %t"
         (Print.sequence ", " print_ty ts)
         (CoreTypes.TyName.print t)
-  | Tuple [] -> print "unit"
+  | Tuple [] -> print "𝟙"
   | Tuple tys ->
-      print ~at_level:2 "@[<hov>%t@]"
-        (Print.sequence (Symbols.times ()) (print_ty ~max_level:1) tys)
-  | Handler ((t1, drt1), (t2, drt2)) ->
-      print ~at_level:6 "%t ! %t %s@ %t ! %t" (print_ty ~max_level:4 t1)
-        (print_dirt drt1) (Symbols.handler_arrow ()) (print_ty ~max_level:4 t2)
-        (print_dirt drt2)
+      print ~at_level:2 "%t" (Print.sequence "×" (print_ty ~max_level:1) tys)
+  | Handler (drty1, drty2) ->
+      print ~at_level:6 "%t ⇛ %t" (print_dirty drty1) (print_dirty drty2)
   | TyBasic p -> print "%t" (Const.print_ty p)
-  | QualTy (c, tty) -> print "%t => %t" (print_ct_ty c) (print_ty tty)
-  | QualDirt (c, tty) -> print "%t => %t" (print_ct_dirt c) (print_ty tty)
+  | QualTy (c, tty) -> print "%t ⇒ %t" (print_ct_ty c) (print_ty tty)
+  | QualDirt (c, tty) -> print "%t ⇒ %t" (print_ct_dirt c) (print_ty tty)
 
 and print_skeleton ?max_level sk ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match sk with
   | SkelParam p -> SkelParam.print p ppf
-  | SkelBasic s -> print "prim_skel %t" (Const.print_ty s)
+  | SkelBasic s -> print "%t" (Const.print_ty s)
   | SkelArrow (sk1, sk2) ->
-      print "%t -sk-> %t" (print_skeleton sk1) (print_skeleton sk2)
+      print "%t → %t" (print_skeleton sk1) (print_skeleton sk2)
   | SkelApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
   | SkelApply (t, [ s ]) ->
       print ~at_level:1 "%t %t"
@@ -134,40 +134,42 @@ and print_skeleton ?max_level sk ppf =
       print ~at_level:1 "(%t) %t"
         (Print.sequence ", " print_skeleton ts)
         (CoreTypes.TyName.print t)
-  | SkelTuple [] -> print "unit"
+  | SkelTuple [] -> print "𝟙"
   | SkelTuple sks ->
-      print ~at_level:2 "@[<hov>%t@]"
-        (Print.sequence (Symbols.times ()) (print_skeleton ~max_level:1) sks)
+      print ~at_level:2 "%t"
+        (Print.sequence "×" (print_skeleton ~max_level:1) sks)
   | SkelHandler (sk1, sk2) ->
-      print "%t =sk=> %t" (print_skeleton sk1) (print_skeleton sk2)
+      print "%t ⇛ %t" (print_skeleton sk1) (print_skeleton sk2)
 
-and print_dirt drt ppf =
-  let print ?at_level = Print.print ?at_level ppf in
+and print_dirt ?max_level drt ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
   match (drt.effect_set, drt.row) with
   | effect_set, EmptyRow -> print "{%t}" (print_effect_set effect_set)
   | effect_set, ParamRow p when EffectSet.is_empty effect_set ->
       print "%t" (DirtParam.print p)
   | effect_set, ParamRow p ->
-      print "{%t} U %t" (print_effect_set effect_set) (DirtParam.print p)
+      print ~at_level:1 "{%t}∪%t"
+        (print_effect_set effect_set)
+        (DirtParam.print p)
 
 and print_effect_set effect_set =
   Print.sequence "," CoreTypes.Effect.print (EffectSet.elements effect_set)
 
 and print_dirty (t1, drt1) ppf =
   let print ?at_level = Print.print ?at_level ppf in
-  print "%t ! %t" (print_ty t1) (print_dirt drt1)
+  print ~at_level:1 "%t!%t" (print_ty ~max_level:0 t1) (print_dirt drt1)
 
 and print_ct_ty (ty1, ty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
-  print "%t <= %t" (print_ty ty1) (print_ty ty2)
+  print "%t ≤ %t" (print_ty ty1) (print_ty ty2)
 
 and print_ct_dirt (ty1, ty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
-  print "%t <= %t" (print_dirt ty1) (print_dirt ty2)
+  print "%t ≤ %t" (print_dirt ty1) (print_dirt ty2)
 
 and print_abs_ty (ty1, drty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
-  print "%t -> %t" (print_ty ty1) (print_dirty drty2)
+  print "%t → %t" (print_ty ty1) (print_dirty drty2)
 
 (* ************************************************************************* *)
 (*                       PREDICATES ON ty                             *)

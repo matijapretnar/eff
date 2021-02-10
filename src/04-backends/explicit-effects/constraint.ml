@@ -100,12 +100,12 @@ module DirtCoercionParamSet = Set.Make (Type.DirtCoercionParam)
 let rec print_ty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.term with
-  | ReflTy p -> print "<%t>" (Type.print_ty p)
+  | ReflTy p -> print "⟨%t⟩" (Type.print_ty p)
   | ArrowCoercion (tc, dc) ->
-      print "%t -> %t" (print_ty_coercion tc) (print_dirty_coercion dc)
+      print "%t → %t" (print_ty_coercion tc) (print_dirty_coercion dc)
   | HandlerCoercion (dc1, dc2) ->
-      print "%t ==> %t" (print_dirty_coercion dc1) (print_dirty_coercion dc2)
-  | TyCoercionVar tcp -> print "%t " (Type.TyCoercionParam.print tcp)
+      print "%t ⇛ %t" (print_dirty_coercion dc1) (print_dirty_coercion dc2)
+  | TyCoercionVar tcp -> print "%t" (Type.TyCoercionParam.print tcp)
   | ApplyCoercion (t, []) -> print "%t" (CoreTypes.TyName.print t)
   | ApplyCoercion (t, [ c ]) ->
       print ~at_level:1 "%t %t"
@@ -115,10 +115,10 @@ let rec print_ty_coercion ?max_level c ppf =
       print ~at_level:1 "(%t) %t"
         (Print.sequence ", " print_ty_coercion cs)
         (CoreTypes.TyName.print t)
-  | TupleCoercion [] -> print "unit"
+  | TupleCoercion [] -> print "𝟙"
   | TupleCoercion cos ->
-      print ~at_level:2 "@[<hov>%t@]"
-        (Print.sequence (Symbols.times ()) (print_ty_coercion ~max_level:1) cos)
+      print ~at_level:2 "%t"
+        (Print.sequence "×" (print_ty_coercion ~max_level:1) cos)
   | _ -> failwith "Not yet implemented __LOC__"
 
 (* THE FOLLOWING ARE UNEXPECTED. SOMETHING MUST BE WRONG TO GET THEM.
@@ -140,26 +140,26 @@ let rec print_ty_coercion ?max_level c ppf =
 *)
 and print_dirty_coercion ?max_level { term = tc, dirtc; _ } ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  print "%t ! %t" (print_ty_coercion tc) (print_dirt_coercion dirtc)
+  print "%t!%t" (print_ty_coercion ~max_level:0 tc) (print_dirt_coercion dirtc)
 
 and print_dirt_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.term with
-  | ReflDirt p -> print "<%t>" (Type.print_dirt p)
+  | ReflDirt p -> print "⟨%t⟩" (Type.print_dirt p)
   | DirtCoercionVar tcp -> print "%t" (Type.DirtCoercionParam.print tcp)
-  | Empty d -> print "Empty__(%t)" (Type.print_dirt d)
+  | Empty d -> print "∅↪︎%t" (Type.print_dirt ~max_level:0 d)
   | UnionDirt (eset, dc) ->
-      print "{%t} U %t" (Type.print_effect_set eset) (print_dirt_coercion dc)
+      print "{%t}∪%t" (Type.print_effect_set eset) (print_dirt_coercion dc)
 
 and print_omega_ct ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with
   | TyOmega (p, (ty1, ty2)) ->
-      print "%t: (%t =< %t)"
+      print "%t: (%t ≤ %t)"
         (Type.TyCoercionParam.print p)
         (Type.print_ty ty1) (Type.print_ty ty2)
   | DirtOmega (p, (ty1, ty2)) ->
-      print "%t: (%t =< %t)"
+      print "%t: (%t ≤ %t)"
         (Type.DirtCoercionParam.print p)
         (Type.print_dirt ty1) (Type.print_dirt ty2)
   | SkelEq (sk1, sk2) ->
