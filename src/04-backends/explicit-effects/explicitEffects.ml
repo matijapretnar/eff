@@ -96,12 +96,18 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
         let type_system_state' =
           ExplicitInfer.extend_var state.type_system_state x e''.ty
         in
+        let optimizer_state' =
+          match e''.term with
+          | Term.Lambda abs ->
+              Optimizer.add_non_recursive_function state.optimizer_state x abs
+          | _ -> state.optimizer_state
+        in
         let backend_state' =
           ExBackend.process_top_let state.backend_state (x, e'')
         in
         {
-          state with
           type_system_state = type_system_state';
+          optimizer_state = optimizer_state';
           backend_state = backend_state';
         }
     | _ -> failwith __LOC__

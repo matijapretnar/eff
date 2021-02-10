@@ -2,6 +2,7 @@ open Utils
 
 type state = {
   recursive_functions : (Term.variable, Term.abstraction) Assoc.t;
+  non_recursive_functions : (Term.variable, Term.abstraction) Assoc.t;
   fuel : int;
   (* Cache of already specialized functions *)
   specialized_functions :
@@ -11,6 +12,7 @@ type state = {
 let initial_state =
   {
     recursive_functions = Assoc.empty;
+    non_recursive_functions = Assoc.empty;
     fuel = !Config.optimization_fuel;
     specialized_functions = Assoc.empty;
   }
@@ -23,6 +25,12 @@ let add_recursive_function state x abs =
   {
     state with
     recursive_functions = Assoc.update x abs state.recursive_functions;
+  }
+
+let add_non_recursive_function state x abs =
+  {
+    state with
+    non_recursive_functions = Assoc.update x abs state.non_recursive_functions;
   }
 
 (* Optimization functions *)
@@ -194,12 +202,12 @@ and optimize_expression' state exp =
         (optimize_expression state exp, optimize_dirt_coercion state dcoer)
 
 and optimize_computation state cmp =
-  Print.debug "CMP: %t" (Term.print_computation cmp);
+  (* Print.debug "CMP: %t" (Term.print_computation cmp); *)
   let cmp' = optimize_computation' state cmp in
-  Print.debug "CMP': %t" (Term.print_computation cmp');
+  (* Print.debug "CMP': %t" (Term.print_computation cmp'); *)
   assert (Type.equal_dirty cmp.ty cmp'.ty);
   let cmp'' = reduce_computation state cmp' in
-  Print.debug "CMP'': %t" (Term.print_computation cmp'');
+  (* Print.debug "CMP'': %t" (Term.print_computation cmp''); *)
   assert (Type.equal_dirty cmp'.ty cmp''.ty);
   cmp''
 
@@ -348,9 +356,9 @@ and handle_abstraction state hnd { term = p, c; _ } =
   Term.abstraction (p, handle_computation state hnd c)
 
 and beta_reduce state ({ term = _, cmp; _ } as abs) exp =
-  Print.debug "Beta reduce: %t; %t"
-    (Term.print_abstraction abs)
-    (Term.print_expression exp);
+  (* Print.debug "Beta reduce: %t; %t"
+     (Term.print_abstraction abs)
+     (Term.print_expression exp); *)
   match (abstraction_inlinability abs, exp.term) with
   | Inlinable, _
   (* Inline constants and variables anyway *)
@@ -411,6 +419,14 @@ and reduce_computation' state comp =
                  (Assoc.lookup (fingerprint, f) state.specialized_functions))
           (Assoc.to_list state.recursive_functions)
       in
+      let unspecialized_non_recursive_functions =
+        List.filter
+          (fun (f, { ty = _, drty_out; _ }) ->
+            Type.equal_dirty drty_in drty_out
+            && Option.is_none
+                 (Assoc.lookup (fingerprint, f) state.specialized_functions))
+          (Assoc.to_list state.non_recursive_functions)
+      in
       let add_specialized specialized (f, abs) =
         let f' = Language.CoreTypes.Variable.refresh f in
         let (ty_arg, _), ((ty_in, _), drty_out) = (abs.ty, hnd.ty) in
@@ -422,7 +438,8 @@ and reduce_computation' state comp =
       in
       let specialized_functions' =
         List.fold_left add_specialized state.specialized_functions
-          unspecialized_recursive_functions
+          (unspecialized_recursive_functions
+         @ unspecialized_non_recursive_functions)
       in
       let cmp' =
         handle_computation
@@ -430,7 +447,7 @@ and reduce_computation' state comp =
           hnd cmp
       in
       (* TODO: specialize only functions that are used, not just all with matching types *)
-      let defs =
+      let spec_defs =
         List.map
           (fun (f, { term = pat, cmp; _ }) ->
             match Assoc.lookup (fingerprint, f) specialized_functions' with
@@ -461,9 +478,10 @@ and reduce_computation' state comp =
                     }
                     hnd' abs' )
             | _ -> assert false)
-          unspecialized_recursive_functions
+          (unspecialized_recursive_functions
+         @ unspecialized_non_recursive_functions)
       in
-      match keep_used_letrec_bindings defs cmp' with
+      match keep_used_letrec_bindings spec_defs cmp' with
       | [] -> cmp'
       | defs' -> Term.letRec (defs', cmp'))
   | Term.Handle
