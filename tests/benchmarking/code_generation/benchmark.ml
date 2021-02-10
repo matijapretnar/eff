@@ -86,8 +86,8 @@ let loop_benchmarks =
     benchmarks =
       [
         ( "Generated, optimized",
-          forget_value LoopOpt.test_pure_10,
-          fun n -> LoopOpt.test_pure_10 n = () );
+          forget_value LoopOpt._test_pure_16,
+          fun n -> LoopOpt._test_pure_16 n = () );
         ( "Hand written",
           forget_value LoopHandWritten.test_pure,
           fun n -> LoopHandWritten.test_pure n = () );
@@ -104,8 +104,8 @@ let loop_latent_benchmarks =
     benchmarks =
       [
         ( "Generated, optimized",
-          forget_value LoopOpt.test_latent_23,
-          always_true LoopOpt.test_latent_23 );
+          forget_value LoopOpt._test_latent_41,
+          always_true LoopOpt._test_latent_41 );
         ( "Hand written",
           forget_value LoopHandWritten.test_latent,
           always_true LoopHandWritten.test_latent );
@@ -122,8 +122,8 @@ let loop_incr_benchmark num =
     benchmarks =
       [
         ( "Generated, optimized",
-          forget_value LoopOpt.test_incr_33,
-          fun n -> LoopOpt.test_incr_33 n = num );
+          forget_value LoopOpt._test_incr_60,
+          fun n -> LoopOpt._test_incr_60 n = num );
         ( "Hand written",
           forget_value LoopHandWritten.test_incr,
           fun n -> LoopHandWritten.test_incr n = num );
@@ -140,8 +140,8 @@ let loop_incr'_benchmark num =
     benchmarks =
       [
         ( "Generated, optimized",
-          forget_value LoopOpt.test_incr'_55,
-          fun n -> LoopOpt.test_incr'_55 n = num );
+          forget_value LoopOpt._test_incr'_97,
+          fun n -> LoopOpt._test_incr'_97 n = num );
         ( "Hand written",
           forget_value LoopHandWritten.test_incr',
           fun n -> LoopHandWritten.test_incr' n = num );
@@ -158,8 +158,8 @@ let loop_state_benchmark num =
     benchmarks =
       [
         ( "Generated, optimized",
-          forget_value LoopOpt.test_state_82,
-          fun n -> LoopOpt.test_state_82 n = num );
+          forget_value LoopOpt._test_state_150,
+          fun n -> LoopOpt._test_state_150 n = num );
         ( "Hand written",
           forget_value LoopHandWritten.test_state,
           fun n -> LoopHandWritten.test_state n = num );
@@ -176,8 +176,8 @@ let queens_one_cps_benchmark number_of_queens =
     benchmarks =
       [
         ( "Generated, optimized",
-          forget_value QueensOpt.test_queens_5,
-          always_true QueensOpt.test_queens_5 );
+          forget_value QueensOpt._test_queens_5,
+          always_true QueensOpt._test_queens_5 );
         ( "Hand written",
           forget_value QueensHandWritten.queens_one_cps,
           always_true QueensHandWritten.queens_one_cps );
@@ -230,8 +230,8 @@ let interpreter_benchmark =
     benchmarks =
       [
         ( "Generated, optimized",
-          forget_value InterpOpt.bigTest_5,
-          always_true InterpOpt.bigTest_5 );
+          forget_value InterpOpt._bigTest_5,
+          always_true InterpOpt._bigTest_5 );
       ];
     param = ();
   }
@@ -242,8 +242,8 @@ let range_benchmarks number_of_range =
     benchmarks =
       [
         ( "Generated, optimized",
-          forget_value RangeOpt.test_1,
-          always_true RangeOpt.test_1 );
+          forget_value RangeOpt._test_1,
+          always_true RangeOpt._test_1 );
         ("Native", forget_value RangeNative.test, always_true RangeNative.test);
       ];
     param = number_of_range;
