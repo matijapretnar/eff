@@ -17,9 +17,8 @@ type inlinability =
   (* Pattern occurs more than once in a body of abstraction or it occurs recursively *)
   | NotInlinable
 
-let is_atomic = function NoEff.NVar _ | NConst _ -> true | _ -> false
-
-let applicable_pattern p vars =
+let abstraction_inlinability (pat, cmp) =
+  let vars = NoEff.free_vars cmp in
   let rec check_variables = function
     | [] -> NotPresent
     | x :: xs -> (
@@ -30,7 +29,7 @@ let applicable_pattern p vars =
           | NotPresent -> if outside_occ = 0 then NotPresent else Inlinable
           | inlinability -> inlinability)
   in
-  check_variables (NoEff.pattern_vars p)
+  check_variables (NoEff.pattern_vars pat)
 
 let rec optimize_ty_coercion state (n_coer : NoEff.n_coercion) =
   reduce_ty_coercion state (optimize_ty_coercion' state n_coer)
@@ -135,20 +134,16 @@ and n_abstraction_2_args state ((pat1, pat2, term) : NoEff.n_abstraction_2_args)
     =
   (pat1, pat2, optimize_term state term)
 
-and substitute_pattern st t p exp =
-  optimize_term st (NoEff.substitute_term (NoEff.pattern_match p exp) t)
-
-and beta_reduce state (p, c) e =
-  match applicable_pattern p (NoEff.free_vars c) with
-  | Inlinable -> substitute_pattern state c p e
-  | NotPresent -> c
-  | NotInlinable ->
-      if is_atomic e then
-        (* Inline constants and variables anyway *)
-        substitute_pattern state c p e
-      else
-        let abs = (p, c) in
-        NoEff.NLet (e, abs)
+and beta_reduce state ((_, trm1) as abs) trm2 =
+  match (abstraction_inlinability abs, trm2) with
+  | Inlinable, _
+  (* Inline constants and variables anyway *)
+  | NotInlinable, (NoEff.NVar _ | NoEff.NConst _) -> (
+      match NoEff.beta_reduce abs trm2 with
+      | Some trm -> optimize_term state trm
+      | None -> NoEff.NLet (trm2, abs))
+  | NotPresent, _ -> trm1
+  | NotInlinable, _ -> NoEff.NLet (trm2, abs)
 
 and reduce_term' state (n_term : NoEff.n_term) =
   (* Print.debug "Reducing noeff term: %t" (NoEff.print_term n_term); *)

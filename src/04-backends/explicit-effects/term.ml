@@ -617,35 +617,39 @@ let pattern_match p e =
   assert (Type.equal_ty p.ty e.ty);
   let rec extend_subst p e sbst =
     match (p.term, e.term) with
-    | PVar x, _ -> Assoc.update x e sbst
+    | PVar x, _ -> Some (Assoc.update x e sbst)
     | PAs (p, x), _ ->
-        let sbst = extend_subst p e sbst in
-        Assoc.update x e sbst
-    | PNonbinding, _ -> sbst
-    | PTuple ps, Tuple es -> List.fold_right2 extend_subst ps es sbst
+        Option.bind (extend_subst p e sbst) (fun sbst ->
+            Some (Assoc.update x e sbst))
+    | PNonbinding, _ -> Some sbst
+    | PTuple ps, Tuple es ->
+        List.fold_right2
+          (fun p e sbst -> Option.bind sbst (fun sbst -> extend_subst p e sbst))
+          ps es (Some sbst)
     | PRecord ps, Record es ->
         let rec extend_record ps es sbst =
-          match ps with
-          | [] -> sbst
-          | (f, p) :: ps ->
+          match (sbst, ps) with
+          | None, _ -> None
+          | Some sbst, [] -> Some sbst
+          | Some sbst, (f, p) :: ps ->
               let e = List.assoc f es in
               extend_record ps es (extend_subst p e sbst)
         in
-        extend_record (Assoc.to_list ps) (Assoc.to_list es) sbst
-    | PVariant (lbl, None), Variant (lbl', None) when lbl = lbl' -> sbst
+        extend_record (Assoc.to_list ps) (Assoc.to_list es) (Some sbst)
+    | PVariant (lbl, None), Variant (lbl', None) when lbl = lbl' -> Some sbst
     | PVariant (lbl, Some p), Variant (lbl', Some e) when lbl = lbl' ->
         extend_subst p e sbst
-    | PConst c, Const c' when Const.equal c c' -> sbst
+    | PConst c, Const c' when Const.equal c c' -> Some sbst
     | _, _ ->
         Print.debug "%t = %t" (print_pattern p) (print_expression e);
-        assert false
+        None
   in
   extend_subst p e Assoc.empty
 
 let beta_reduce abs exp =
   let { term = pat, cmp; _ } = refresh_abstraction Assoc.empty abs in
   let sub = pattern_match pat exp in
-  subst_comp sub cmp
+  Option.map (fun sub -> subst_comp sub cmp) sub
 
 let ( @@@ ) (inside1, outside1) (inside2, outside2) =
   (inside1 @ inside2, outside1 @ outside2)

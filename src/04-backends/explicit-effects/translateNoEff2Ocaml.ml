@@ -168,7 +168,7 @@ and pp_abs_with_ty (p, ty, t) ppf =
 
 and pp_let_rec lst ppf =
   let pp_var_ty_abs (v, t) ppf =
-    print ppf "@[<hv 2>and %t = @,%t@]" (pp_variable v) (pp_abs t)
+    print ppf "@[<hv 2>and %t = @,fun %t@]" (pp_variable v) (pp_abs t)
   in
   match lst with
   | [] -> ()

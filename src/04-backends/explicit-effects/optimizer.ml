@@ -160,13 +160,13 @@ let rec optimize_expression state exp =
   let exp' = optimize_expression' state exp in
   (* Print.debug "EXP: %t : %t" (Term.print_expression exp) (Type.print_ty exp.ty); *)
   (* Print.debug "EXP': %t : %t"
-    (Term.print_expression exp')
-    (Type.print_ty exp'.ty); *)
+     (Term.print_expression exp')
+     (Type.print_ty exp'.ty); *)
   assert (Type.equal_ty exp.ty exp'.ty);
   let exp'' = reduce_expression state exp' in
   (* Print.debug "EXP'': %t : %t"
-    (Term.print_expression exp'')
-    (Type.print_ty exp''.ty); *)
+     (Term.print_expression exp'')
+     (Type.print_ty exp''.ty); *)
   assert (Type.equal_ty exp'.ty exp''.ty);
   exp''
 
@@ -354,8 +354,10 @@ and beta_reduce state ({ term = _, cmp; _ } as abs) exp =
   match (abstraction_inlinability abs, exp.term) with
   | Inlinable, _
   (* Inline constants and variables anyway *)
-  | NotInlinable, (Term.Var _ | Term.Const _) ->
-      Term.beta_reduce abs exp |> optimize_computation state
+  | NotInlinable, (Term.Var _ | Term.Const _) -> (
+      match Term.beta_reduce abs exp with
+      | Some comp -> optimize_computation state comp
+      | None -> Term.letVal (exp, abs))
   | NotPresent, _ -> cmp
   | NotInlinable, _ -> Term.letVal (exp, abs)
 

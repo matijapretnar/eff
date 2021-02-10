@@ -148,26 +148,30 @@ let occurrences x (inside, outside) =
 let pattern_match p e =
   let rec extend_subst p e sbst =
     match (p, e) with
-    | PNVar x, _ -> Assoc.update x e sbst
+    | PNVar x, _ -> Some (Assoc.update x e sbst)
     | PNAs (p, x), _ ->
-        let sbst = extend_subst p e sbst in
-        Assoc.update x e sbst
-    | PNNonbinding, _ -> sbst
-    | PNTuple ps, NTuple es -> List.fold_right2 extend_subst ps es sbst
+        Option.bind (extend_subst p e sbst) (fun sbst ->
+            Some (Assoc.update x e sbst))
+    | PNNonbinding, _ -> Some sbst
+    | PNTuple ps, NTuple es ->
+        List.fold_right2
+          (fun p e sbst -> Option.bind sbst (fun sbst -> extend_subst p e sbst))
+          ps es (Some sbst)
     | PNRecord ps, NRecord es ->
         let rec extend_record ps es sbst =
-          match ps with
-          | [] -> sbst
-          | (f, p) :: ps ->
+          match (sbst, ps) with
+          | None, _ -> None
+          | Some sbst, [] -> Some sbst
+          | Some sbst, (f, p) :: ps ->
               let e = List.assoc f es in
               extend_record ps es (extend_subst p e sbst)
         in
-        extend_record (Assoc.to_list ps) (Assoc.to_list es) sbst
-    | PNVariant (lbl, None), NVariant (lbl', None) when lbl = lbl' -> sbst
+        extend_record (Assoc.to_list ps) (Assoc.to_list es) (Some sbst)
+    | PNVariant (lbl, None), NVariant (lbl', None) when lbl = lbl' -> Some sbst
     | PNVariant (lbl, Some p), NVariant (lbl', Some e) when lbl = lbl' ->
         extend_subst p e sbst
-    | PNConst c, NConst c' when Const.equal c c' -> sbst
-    | _, _ -> assert false
+    | PNConst c, NConst c' when Const.equal c c' -> Some sbst
+    | _, _ -> None
   in
   extend_subst p e Assoc.empty
 
@@ -216,6 +220,11 @@ and substitue_handler sbst { effect_clauses; return_clause } =
     return_clause = substitute_abstraction_with_ty sbst return_clause;
     effect_clauses = Assoc.map (substitute_abstraction2 sbst) effect_clauses;
   }
+
+let beta_reduce (pat, trm2) trm1 =
+  (* let { term = pat, trm2; _ } = refresh_abstraction Assoc.empty abs in *)
+  let sub = pattern_match pat trm1 in
+  Option.map (fun sub -> substitute_term sub trm2) sub
 
 (* Free variables *)
 
