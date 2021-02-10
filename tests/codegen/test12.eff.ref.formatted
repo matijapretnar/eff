@@ -3,7 +3,7 @@ type (_, _) effect += Op1 : (int, int) effect
 type (_, _) effect += Op2 : (int, int) effect
 
 ;;
-(coer_hand_to_fun coer_refl_ty force_unsafe)
+coer_hand_to_fun coer_refl_ty force_unsafe
   (handler
      {
        value_clause = (fun (_x_4 : int) -> Value _x_4);

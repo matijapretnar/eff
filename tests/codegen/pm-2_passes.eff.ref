@@ -8,20 +8,20 @@ type intlist = IntNil | IntCons of (int * intlist)
 
 ;;
 let rec _concat_2 = 
-     fun  _x_20 -> (match _x_20 with
+     fun  _x_20 -> match _x_20 with
                      IntNil -> fun (_ys_4: intlist) -> _ys_4
-                    |  IntCons ((_z_5, _zs_6)) -> fun (_ys_7: intlist) -> (IntCons ((
+                    |  IntCons ((_z_5, _zs_6)) -> fun (_ys_7: intlist) -> IntCons (
                                                                     _z_5, 
-                                                                    ((_concat_2) 
-                                                                    (_zs_6)) 
-                                                                    (_ys_7))))) 
+                                                                    _concat_2 
+                                                                    _zs_6 
+                                                                    _ys_7) 
    in 
    let rec _f_26 = 
-     fun  (_x_24, _k_28) -> let _l_21 = fun (_y_30: bool) -> (_k_28) 
-                                                               ((match _y_30 with
+     fun  (_x_24, _k_28) -> let _l_21 = fun (_y_30: bool) -> _k_28 
+                                                               (match _y_30 with
                                                                   true -> 2
-                                                                 |  false -> 3)) in 
-                            ((_concat_2) ((_l_21) (true))) ((_l_21) (false)) 
+                                                                 |  false -> 3) in 
+                            _concat_2 (_l_21 true) (_l_21 false) 
    in 
-   (_f_26) (((), fun (_x_14: int) -> (IntCons ((_x_14, (IntNil))))))
+   _f_26 ((), (fun (_x_14: int) -> IntCons (_x_14, IntNil)))
 ;;

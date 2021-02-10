@@ -3,9 +3,9 @@ let _op_0 (* + *) = ( + )
 type int_list = Nil | Cons of (int * int_list)
 
 ;;
-(match (Cons ((4, (Cons ((5, (Cons ((6, (Nil)))))))))) with
-     Nil -> ((_op_0 (* + *)) (1)) (10)
-    |  Cons ((_x_5, Nil)) -> ((_op_0 (* + *)) (_x_5)) (10)
-    |  Cons ((_, Cons ((_y_6, Nil)))) -> ((_op_0 (* + *)) (_y_6)) (10)
-    |  Cons ((_x_7, _)) -> ((_op_0 (* + *)) (_x_7)) (10))
+match Cons (4, Cons (5, Cons (6, Nil))) with
+     Nil -> _op_0 (* + *) 1 10
+    |  Cons ((_x_5, Nil)) -> _op_0 (* + *) _x_5 10
+    |  Cons ((_, Cons ((_y_6, Nil)))) -> _op_0 (* + *) _y_6 10
+    |  Cons ((_x_7, _)) -> _op_0 (* + *) _x_7 10
 ;;

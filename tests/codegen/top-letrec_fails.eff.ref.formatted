@@ -10,7 +10,7 @@ let rec _concat_2 _x_10 =
   match _x_10 with
   | IntNil -> fun (_ys_12 : intlist) -> _ys_12
   | IntCons (_z_14, _zs_13) ->
-      fun (_ys_15 : intlist) -> IntCons (_z_14, (_concat_2 _zs_13) _ys_15)
+      fun (_ys_15 : intlist) -> IntCons (_z_14, _concat_2 _zs_13 _ys_15)
 
 ;;
 IntNil

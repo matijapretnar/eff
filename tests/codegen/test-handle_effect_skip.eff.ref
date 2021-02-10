@@ -1,5 +1,5 @@
 type(_, _) effect += Print : (string, unit) effect 
 ;;
- Call (Print, "hello\n", (fun (_y_5: unit) -> Value ((match _y_5 with
-                                                          _ -> 42))))
+ Call (Print, "hello\n", (fun (_y_5: unit) -> Value (match _y_5 with
+                                                          _ -> 42)))
 ;;

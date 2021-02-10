@@ -9,39 +9,33 @@ type(_, _) effect += Get : (unit, int) effect
 type(_, _) effect += Put : (int, unit) effect 
 ;;
 (let rec _loop_4 = 
-      fun  _x_27 -> (match ((_op_0 (* < *)) (0)) (_x_27) with
+      fun  _x_27 -> match _op_0 (* < *) 0 _x_27 with
                       true ->  Call (Get, (), (fun (_x_3: int) ->  Call (Put, 
-                                                                    ((_op_2 (* + *)) 
-                                                                    (_x_3)) 
-                                                                    (1), (fun 
-                                                                    (_x_4: unit) -> (_loop_4) 
-                                                                    (((_op_1 (* - *)) 
-                                                                    (_x_27)) 
-                                                                    (1))))))
-                     |  false -> Value (())) 
+                                                                    _op_2 (* + *) 
+                                                                    _x_3 1, (fun 
+                                                                    (_x_4: unit) -> _loop_4 
+                                                                    (_op_1 (* - *) 
+                                                                    _x_27 1)))))
+                     |  false -> Value () 
     in 
     let rec _loop_32 = 
-      fun  (_x_27, _k_34) -> (match ((_op_0 (* < *)) (0)) (_x_27) with
+      fun  (_x_27, _k_34) -> match _op_0 (* < *) 0 _x_27 with
                                true -> let _l_51 = fun (_y_54: int) -> let _b_56 = 
-                                                                    ((_op_2 (* + *)) 
-                                                                    (_y_54)) 
-                                                                    (1) in 
+                                                                    _op_2 (* + *) 
+                                                                    _y_54 1 in 
                                                                     let _l_57 = 
                                                                     fun 
-                                                                    (_y_59: unit) -> (_loop_32) 
-                                                                    ((((_op_1 (* - *)) 
-                                                                    (_x_27)) 
-                                                                    (1), 
+                                                                    (_y_59: unit) -> _loop_32 
+                                                                    (_op_1 (* - *) 
+                                                                    _x_27 1, (
                                                                     fun 
-                                                                    (_x_62: unit) -> (_k_34) 
-                                                                    (_x_62))) in 
+                                                                    (_x_62: unit) -> _k_34 
+                                                                    _x_62)) in 
                                                                     fun 
-                                                                    (_: int) -> ((_l_57) 
-                                                                    (())) 
-                                                                    (_b_56) in 
-                                       fun (_s_52: int) -> ((_l_51) (_s_52)) 
-                                                             (_s_52)
-                              |  false -> (_k_34) (())) 
+                                                                    (_: int) -> _l_57 
+                                                                    () _b_56 in 
+                                       fun (_s_52: int) -> _l_51 _s_52 _s_52
+                              |  false -> _k_34 () 
     in 
-    (_loop_32) ((10, fun (_x_19: unit) -> fun (_: int) -> _x_19))) (0)
+    _loop_32 (10, (fun (_x_19: unit) -> fun (_: int) -> _x_19))) 0
 ;;

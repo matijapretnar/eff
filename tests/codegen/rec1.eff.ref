@@ -1,2 +1,2 @@
-let rec _f_0 = fun  _x_2 -> () in (_f_0) (1)
+let rec _f_0 = fun  _x_2 -> () in _f_0 1
 ;;

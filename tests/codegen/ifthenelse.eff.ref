@@ -3,9 +3,9 @@ let _op_0 (* = *) = ( = )
 let _op_1 (* - *) = ( - )
 ;;
 let rec __loop_2 = 
-     fun  _x_8 -> (match ((_op_0 (* = *)) (_x_8)) (0) with
+     fun  _x_8 -> match _op_0 (* = *) _x_8 0 with
                     true -> 0
-                   |  false -> (__loop_2) (((_op_1 (* - *)) (_x_8)) (1))) 
+                   |  false -> __loop_2 (_op_1 (* - *) _x_8 1) 
    in 
    ()
 ;;

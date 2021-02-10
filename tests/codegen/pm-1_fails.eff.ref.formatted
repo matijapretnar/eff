@@ -12,7 +12,7 @@ force_unsafe
       match _x_21 with
       | IntNil -> fun (_ys_5 : intlist) -> _ys_5
       | IntCons (_z_6, _zs_7) ->
-          fun (_ys_8 : intlist) -> IntCons (_z_6, (_concat_3 _zs_7) _ys_8)
+          fun (_ys_8 : intlist) -> IntCons (_z_6, _concat_3 _zs_7 _ys_8)
     in
     handler
       {
@@ -23,9 +23,9 @@ force_unsafe
             | Decide ->
                 fun () _l_22 ->
                   Value
-                    ((_concat_3
-                        (((coer_arrow coer_refl_ty force_unsafe) _l_22) true))
-                       (((coer_arrow coer_refl_ty force_unsafe) _l_22) false))
+                    (_concat_3
+                       (coer_arrow coer_refl_ty force_unsafe _l_22 true)
+                       (coer_arrow coer_refl_ty force_unsafe _l_22 false))
             | eff' -> fun arg k -> Call (eff', arg, k));
       })
      (let rec _f_18 _x_25 =

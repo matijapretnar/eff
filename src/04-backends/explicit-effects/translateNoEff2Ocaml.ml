@@ -95,70 +95,90 @@ let pp_tuple pp tpl ppf =
 
 let pp_effect (e, (_ty1, _ty2)) ppf = CoreTypes.Effect.print e ppf
 
-let rec pp_coercion coer ppf =
+let rec pp_coercion ?max_level coer ppf =
   (* The cases not matched here should be handled in pp_term *)
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
   match coer with
-  | NCoerVar v -> print ppf "%t" (Type.TyCoercionParam.print v)
-  | NCoerRefl -> print ppf "coer_refl_ty"
+  | NCoerVar v -> print "%t" (Type.TyCoercionParam.print v)
+  | NCoerRefl -> print "coer_refl_ty"
   | NCoerArrow (w1, w2) ->
-      print ppf "coer_arrow (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
+      print ~at_level:1 "coer_arrow %t %t"
+        (pp_coercion ~max_level:0 w1)
+        (pp_coercion ~max_level:0 w2)
   | NCoerHandler (w1, w2) ->
-      print ppf "coer_handler (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
+      print ~at_level:1 "coer_handler %t %t"
+        (pp_coercion ~max_level:0 w1)
+        (pp_coercion ~max_level:0 w2)
   | NCoerHandToFun (w1, w2) ->
-      print ppf "coer_hand_to_fun (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
+      print ~at_level:1 "coer_hand_to_fun %t %t"
+        (pp_coercion ~max_level:0 w1)
+        (pp_coercion ~max_level:0 w2)
   | NCoerFunToHand (w1, w2) ->
-      print ppf "coer_fun_to_hand (%t) (%t)" (pp_coercion w1) (pp_coercion w2)
-  | NCoerComp w -> print ppf "coer_computation (%t)" (pp_coercion w)
-  | NCoerReturn w -> print ppf "coer_return (%t)" (pp_coercion w)
-  | NCoerUnsafe w -> print ppf "coer_unsafe (*unsafe*)(%t)" (pp_coercion w)
-  | NCoerForceUnsafe -> print ppf "force_unsafe"
+      print ~at_level:1 "coer_fun_to_hand %t %t"
+        (pp_coercion ~max_level:0 w1)
+        (pp_coercion ~max_level:0 w2)
+  | NCoerComp w ->
+      print ~at_level:1 "coer_computation %t" (pp_coercion ~max_level:0 w)
+  | NCoerReturn w ->
+      print ~at_level:1 "coer_return %t" (pp_coercion ~max_level:0 w)
+  | NCoerUnsafe w ->
+      print ~at_level:1 "coer_unsafe %t" (pp_coercion ~max_level:0 w)
+  | NCoerForceUnsafe -> print "force_unsafe"
   | NCoerTuple cs ->
-      print ppf "( (* tuple_coer *) coer_tuple_%d %t)" (List.length cs)
+      print ~at_level:1 "coer_tuple_%d %t" (List.length cs)
         (pp_tuple pp_coercion cs)
-  | NCoerApply (_t, _cs) -> print ppf "ApplyCoercion"
-  | NCoerQual (_ct, _c) -> print ppf "ApplyCoercion"
+  | NCoerApply (_t, _cs) -> print "ApplyCoercion"
+  | NCoerQual (_ct, _c) -> print "ApplyCoercion"
 
-let rec pp_term noEff_term ppf =
+let rec pp_term ?max_level noEff_term ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
   match noEff_term with
-  | NVar v -> print ppf "%t" (pp_variable v)
-  | NConst c -> print ppf "%t" (Const.print c)
-  | NTuple ts -> print ppf "%t" (pp_tuple pp_term ts)
-  | NRecord rcd -> print ppf "%t" (pp_record pp_term "=" rcd)
+  | NVar v -> print "%t" (pp_variable v)
+  | NConst c -> print "%t" (Const.print c)
+  | NTuple ts -> print "%t" (pp_tuple (pp_term ~max_level:1) ts)
+  | NRecord rcd -> print "%t" (pp_record pp_term "=" rcd)
   | NVariant (l, Some (NTuple [ hd; tl ])) when l = CoreTypes.cons ->
-      print ppf "@[<hov>(%t::%t)@]" (pp_term hd) (pp_term tl)
-  | NVariant (l, None) -> print ppf "(%t)" (pp_label l)
+      print ~at_level:1 "@[<hov>(%t::%t)@]" (pp_term hd)
+        (pp_term ~max_level:0 tl)
+  | NVariant (l, None) -> print "%t" (pp_label l)
   | NVariant (l, Some t1) ->
-      print ppf "(%t (@[<hov>%t@]))" (pp_label l) (pp_term t1)
-  | NFun abs_ty -> print ppf "@[<hv 2>fun %t@]" (pp_abs_with_ty abs_ty)
+      print ~at_level:1 "%t @[<hov>%t@]" (pp_label l) (pp_term ~max_level:0 t1)
+  | NFun abs_ty -> print ~at_level:2 "@[<hv 2>fun %t@]" (pp_abs_with_ty abs_ty)
   | NApplyTerm (t1, t2) ->
-      print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t1) (pp_term t2)
+      print ~at_level:1 "@[<hov 2>%t @,%t@]" (pp_term ~max_level:1 t1)
+        (pp_term ~max_level:0 t2)
   (*| NCast (t, (NCoerReturn (NCoerRefl _) as _c)) ->
-      print ppf "Value (%t)" (pp_term t) *)
+      print ~at_level:2 "Value (%t)" (pp_term t) *)
   | NCast (t, c) ->
-      print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_coercion c) (pp_term t)
-  | NReturn t -> print ppf "Value (%t)" (pp_term t)
+      print ~at_level:1 "@[<hov 2>%t @,%t@]"
+        (pp_coercion ~max_level:1 c)
+        (pp_term ~max_level:0 t)
+  | NReturn t -> print ~at_level:1 "Value %t" (pp_term ~max_level:0 t)
   | NHandler { effect_clauses = eff_cls; return_clause = val_cl } ->
-      print ppf
+      print ~at_level:2
         "handler {@[<hov>value_clause = (fun %t);@] @[<hov>effect_clauses = \
          %t;@] }"
         (pp_abs_with_ty val_cl) (pp_effect_cls eff_cls)
   | NLet (t1, (pat, t2)) ->
-      print ppf "@[<hv>@[<hv>let %t = %t in@] @,%t@]" (pp_pattern pat)
+      print ~at_level:2 "@[<hv>@[<hv>let %t = %t in@] @,%t@]" (pp_pattern pat)
         (pp_term t1) (pp_term t2)
   | NLetRec (defs, t2) ->
-      print ppf "@[<hv>@[<hv>%tin@] @,%t@]" (pp_let_rec defs) (pp_term t2)
+      print ~at_level:2 "@[<hv>@[<hv>%tin@] @,%t@]" (pp_let_rec defs)
+        (pp_term t2)
   | NMatch (t, []) ->
-      print ppf "@[<hv>(match %t with@, _ -> assert false)@]" (pp_term t)
+      print ~at_level:2 "@[<hv>match %t with@, _ -> assert false@]" (pp_term t)
   | NMatch (t, cases) ->
-      print ppf "@[<hv>(match %t with@, %t)@]" (pp_term t)
+      print ~at_level:2 "@[<hv>match %t with@, %t@]" (pp_term t)
         (pp_sequence "@, | " pp_abs cases)
   | NCall (e, t, abs_ty) ->
-      print ppf "@[<hov 2> Call (%t, %t, (fun %t))@]" (pp_effect e) (pp_term t)
-        (pp_abs_with_ty abs_ty)
+      print ~at_level:2 "@[<hov 2> Call (%t, %t, (fun %t))@]" (pp_effect e)
+        (pp_term t) (pp_abs_with_ty abs_ty)
   | NBind (t, abs) ->
-      print ppf "@[<hov 2>((%t) >> (fun %t))@]" (pp_term t) (pp_abs abs)
+      print ~at_level:2 "@[<hov 2>%t >> (fun %t)@]" (pp_term ~max_level:1 t)
+        (pp_abs abs)
   | NHandle (t1, t2) ->
-      print ppf "@[<hov 2>(%t) @,(%t)@]" (pp_term t2) (pp_term t1)
+      print ~at_level:1 "@[<hov 2>%t @,%t@]" (pp_term ~max_level:1 t2)
+        (pp_term ~max_level:0 t1)
   | _ -> failwith __LOC__
 
 and pp_abs (p, t) ppf = print ppf "@[<h> %t ->@ %t@]" (pp_pattern p) (pp_term t)

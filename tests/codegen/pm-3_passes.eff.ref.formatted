@@ -11,14 +11,14 @@ let rec _concat_2 _x_22 =
   match _x_22 with
   | IntNil -> fun (_ys_4 : intlist) -> _ys_4
   | IntCons (_z_5, _zs_6) ->
-      fun (_ys_7 : intlist) -> IntCons (_z_5, (_concat_2 _zs_6) _ys_7)
+      fun (_ys_7 : intlist) -> IntCons (_z_5, _concat_2 _zs_6 _ys_7)
 in
 let _l_23 (_y_32 : bool) =
   let _x_17 = match _y_32 with true -> 10 | false -> 20 in
   let _l_23 (_y_29 : bool) =
     IntCons
-      ((_op_1 (* - *) _x_17) (match _y_29 with true -> 0 | false -> 5), IntNil)
+      (_op_1 (* - *) _x_17 (match _y_29 with true -> 0 | false -> 5), IntNil)
   in
-  (_concat_2 (_l_23 true)) (_l_23 false)
+  _concat_2 (_l_23 true) (_l_23 false)
 in
-(_concat_2 (_l_23 true)) (_l_23 false)
+_concat_2 (_l_23 true) (_l_23 false)

@@ -8,24 +8,24 @@ let _op_2 (* = *) = ( = )
 
 ;;
 let rec _f_3 _x_16 =
-  match (_op_2 (* = *) _x_16) 0 with
+  match _op_2 (* = *) _x_16 0 with
   | true -> Value 1
-  | false -> Call (Eff, (), fun (_x_0 : unit) -> _f_3 ((_op_0 (* - *) _x_16) 1))
+  | false -> Call (Eff, (), fun (_x_0 : unit) -> _f_3 (_op_0 (* - *) _x_16 1))
 in
 let rec _f_18 (_x_16, _k_20) =
-  match (_op_2 (* = *) _x_16) 0 with
+  match _op_2 (* = *) _x_16 0 with
   | true -> _k_20 1
   | false ->
-      (_op_1 (* * *)
-         (_f_18 ((_op_0 (* - *) _x_16) 1, fun (_x_34 : int) -> _k_20 _x_34)))
+      _op_1 (* * *)
+        (_f_18 (_op_0 (* - *) _x_16 1, fun (_x_34 : int) -> _k_20 _x_34))
         2
 in
 _f_18 (5, fun (_id_12 : int) -> _id_12)
 
 ;;
 let rec _g_35 _x_46 =
-  match (_op_2 (* = *) _x_46) 0 with
+  match _op_2 (* = *) _x_46 0 with
   | true -> 1
-  | false -> _g_35 ((_op_0 (* - *) _x_46) 1)
+  | false -> _g_35 (_op_0 (* - *) _x_46 1)
 in
 _g_35 5

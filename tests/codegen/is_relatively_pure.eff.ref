@@ -2,5 +2,5 @@ type(_, _) effect += Op1 : (int, unit) effect
 ;;
 type(_, _) effect += Op2 : (int, unit) effect 
 ;;
- Call (Op1, 1, (fun (_y_9: unit) -> Value (_y_9)))
+ Call (Op1, 1, (fun (_y_9: unit) -> Value _y_9))
 ;;

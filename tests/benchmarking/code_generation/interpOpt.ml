@@ -25,19 +25,19 @@ let _bigTest_5 (() : unit) =
     | Num _b_8 -> Value _b_8
     | Add (_l_9, _r_10) ->
         _interp_6 _l_9 >> fun _x_11 ->
-        _interp_6 _r_10 >> fun _y_12 -> Value ((_op_0 (* + *) _x_11) _y_12)
+        _interp_6 _r_10 >> fun _y_12 -> Value (_op_0 (* + *) _x_11 _y_12)
     | Mul (_l_14, _r_15) ->
         _interp_6 _l_14 >> fun _x_16 ->
-        _interp_6 _r_15 >> fun _y_17 -> Value ((_op_1 (* * *) _x_16) _y_17)
+        _interp_6 _r_15 >> fun _y_17 -> Value (_op_1 (* * *) _x_16 _y_17)
     | Sub (_l_19, _r_20) ->
         _interp_6 _l_19 >> fun _x_21 ->
-        _interp_6 _r_20 >> fun _y_22 -> Value ((_op_2 (* - *) _x_21) _y_22)
+        _interp_6 _r_20 >> fun _y_22 -> Value (_op_2 (* - *) _x_21 _y_22)
     | Div (_l_24, _r_25) -> (
         _interp_6 _r_25 >> fun _y_26 ->
         _interp_6 _l_24 >> fun _x_27 ->
         match _y_26 with
         | 0 -> Call (DivByZero, (), fun (_y_42 : int) -> Value _y_42)
-        | _ -> Value ((_op_4 (* / *) _x_27) _y_26))
+        | _ -> Value (_op_4 (* / *) _x_27 _y_26))
   in
   let _addCase_29 =
     Add
@@ -47,7 +47,7 @@ let _bigTest_5 (() : unit) =
   let rec _createCase_30 _x_44 =
     match _x_44 with
     | 1 -> Div (Num 100, Num 0)
-    | _ -> Add (_addCase_29, _createCase_30 ((_op_2 (* - *) _x_44) 1))
+    | _ -> Add (_addCase_29, _createCase_30 (_op_2 (* - *) _x_44 1))
   in
   force_unsafe
     ((handler

@@ -7,34 +7,33 @@ let _three_1 = 3
 type intlist = IntNil | IntCons of (int * intlist)
 
 ;;
-(force_unsafe) 
+force_unsafe 
      ((let rec _concat_3 = 
-         fun  _x_21 -> (match _x_21 with
+         fun  _x_21 -> match _x_21 with
                          IntNil -> fun (_ys_5: intlist) -> _ys_5
-                        |  IntCons ((_z_6, _zs_7)) -> fun (_ys_8: intlist) -> (IntCons ((
+                        |  IntCons ((_z_6, _zs_7)) -> fun (_ys_8: intlist) -> IntCons (
                                                                     _z_6, 
-                                                                    ((_concat_3) 
-                                                                    (_zs_7)) 
-                                                                    (_ys_8))))) 
+                                                                    _concat_3 
+                                                                    _zs_7 
+                                                                    _ys_8) 
        in 
-       handler {value_clause = (fun (_x_15: int) -> Value ((IntCons ((
-                                                                    _x_15, (IntNil)))))); 
+       handler {value_clause = (fun (_x_15: int) -> Value (IntCons (_x_15, IntNil))); 
        effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
   (match eff with
     | Decide -> fun () _l_22 -> Value (
-                                                                    ((_concat_3) 
-                                                                    (((coer_arrow (coer_refl_ty) (force_unsafe)) 
-                                                                    (_l_22)) 
-                                                                    (true))) 
-                                                                    (((coer_arrow (coer_refl_ty) (force_unsafe)) 
-                                                                    (_l_22)) 
-                                                                    (false)))   
+                                                                    _concat_3 
+                                                                    (coer_arrow coer_refl_ty force_unsafe 
+                                                                    _l_22 
+                                                                    true) 
+                                                                    (coer_arrow coer_refl_ty force_unsafe 
+                                                                    _l_22 
+                                                                    false))   
     | eff' -> (fun arg k -> Call (eff', arg, k))
       )); }) 
         (let rec _f_18 = 
-           fun  _x_25 ->  Call (Decide, (), (fun (_x_0: bool) -> Value ((match _x_0 with
+           fun  _x_25 ->  Call (Decide, (), (fun (_x_0: bool) -> Value (match _x_0 with
                                                                       true -> 2
-                                                                     |  false -> 3)))) 
+                                                                     |  false -> 3))) 
          in 
-         (_f_18) (())))
+         _f_18 ()))
 ;;

@@ -23,4 +23,4 @@ fun (_a_2 : int) ->
               Call
                 ( Op3,
                   _y_26,
-                  fun (_y_27 : int) -> Value ((_op_0 (* + *) _a_2) _y_27) ) ) )
+                  fun (_y_27 : int) -> Value (_op_0 (* + *) _a_2 _y_27) ) ) )

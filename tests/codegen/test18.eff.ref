@@ -2,11 +2,10 @@ type nat = Zero | Succ of nat
 
 ;;
 let rec _add_0 = 
-     fun  _x_6 -> fun (_x_2: nat) -> (match _x_2 with
+     fun  _x_6 -> fun (_x_2: nat) -> match _x_2 with
                                        Zero -> _x_6
-                                      |  Succ (_n_3) -> (Succ (((_add_0) 
-                                                                  (_x_6)) 
-                                                                 (_n_3)))) 
+                                      |  Succ (_n_3) -> Succ (_add_0 _x_6 
+                                                                _n_3) 
    in 
    _add_0
 ;;
