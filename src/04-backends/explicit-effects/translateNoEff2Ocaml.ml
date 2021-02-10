@@ -138,7 +138,7 @@ let rec pp_term ?max_level noEff_term ppf =
   | NTuple ts -> print "%t" (pp_tuple (pp_term ~max_level:1) ts)
   | NRecord rcd -> print "%t" (pp_record pp_term "=" rcd)
   | NVariant (l, Some (NTuple [ hd; tl ])) when l = CoreTypes.cons ->
-      print ~at_level:1 "@[<hov>(%t::%t)@]" (pp_term hd)
+      print ~at_level:1 "@[<hov>(%t::%t)@]" (pp_term ~max_level:0 hd)
         (pp_term ~max_level:0 tl)
   | NVariant (l, None) -> print "%t" (pp_label l)
   | NVariant (l, Some t1) ->

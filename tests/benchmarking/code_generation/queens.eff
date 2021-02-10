@@ -14,98 +14,95 @@ effect Decide : unit -> bool
 effect Fail : unit -> empty
 
 (*type 'a option = None | Some of 'a;; *)
-type inttuple = IntTuple of int * int;;
-type intlist = IntNil | IntCons of int * intlist;;
-type inttuplist = IntTupNil | IntTupCons of inttuple * inttuplist;;
+type queen = Queen of int * int;;
+type rows = RowsEmpty | RowsCons of int * rows;;
+type solution = SolutionEmpty | SolutionPlace of queen * solution;;
+type solutions = SolutionsNil | SolutionsCons of solution * solutions;;
+type optional_solution = None | Some of solution
+
 type void = Void;;
 
-let test_queens n =
   let absurd void = (match void with)
-  in
 
-(*  let rec (@) xs ys = *)
-(*    match xs with *)
-(*    | [] -> ys *)
-(*    | x :: xs -> x :: (xs @ ys) *)
-(*  in *)
+ let rec (@) xs ys =
+   match xs with
+   | SolutionsNil -> ys
+   | SolutionsCons (x, xs) -> SolutionsCons (x, (xs @ ys))
 
   let (>) x y = y < x
-  in
+
   let (<>) x y = if (y = x) then false else true
-  in
+
   let abs x = if x < 0 then -x else x
-  in
 
   let no_attack q1 q2 = (
       match q1 with
-      | IntTuple (x, y) -> (
+      | Queen (x, y) -> (
           match q2 with
-          | IntTuple (x', y') ->
+          | Queen (x', y') ->
               x <> x' && y <> y' && abs (x - x') <> abs (y - y')
           )
       )
-  in
+
   let rec not_attacked x' qs =
     match qs with
-    | IntTupNil -> true
-    | IntTupCons (x, xs) -> if no_attack x' x then not_attacked x' xs else false
-  in
+    | SolutionEmpty -> true
+    | SolutionPlace (x, xs) -> if no_attack x' x then not_attacked x' xs else false
+
 
   let available number_of_queens x qs =
     let rec loop (possible, y) =
       if y < 1 then
         possible
-      else if not_attacked (IntTuple (x, y)) qs then
-        loop ((IntCons (y, possible)), (y - 1))
+      else if not_attacked (Queen (x, y)) qs then
+        loop ((RowsCons (y, possible)), (y - 1))
       else
         loop (possible, (y - 1))
     in
-    loop (IntNil, number_of_queens)
-  in
+    loop (RowsEmpty, number_of_queens)
 
   let rec choose xs = match xs with
-    | IntNil -> (match (perform (Fail ())) with)
-    | IntCons (x, xs') -> if perform (Decide ()) then x else choose xs'
-  in
-
-(*  let optionalize = handler *)
-(*    | effect (Decide _) k -> ( *)
-(*            match k true with *)
-(*                  | Some x -> Some x *)
-(*                  | None -> k false *)
-(*            ) *)
-(*    | effect (Fail _) _k -> None *)
-(*    | y -> (Some y) *)
-(*  in *)
-
-  let backtrack = handler
-    | effect (Decide _) k ->
-            (fun kf ->
-                  k true (fun _ -> k false kf) )
-    | effect (Fail _) _k -> (fun kf -> kf ())
-    | y -> (fun _ -> y)
-  in
-
-(*  let choose_all = handler *)
-(*    | effect (Decide _) k -> k true @ k false *)
-(*    | effect (Fail _) _k -> [] *)
-(*    | x -> [x] *)
-(*  in *)
+    | RowsEmpty -> (match (perform (Fail ())) with)
+    | RowsCons (x, xs') -> if perform (Decide ()) then x else choose xs'
 
   let queens number_of_queens =
     let rec place (x, qs) =
       if x > number_of_queens then qs else
         let y = choose (available number_of_queens x qs) in
-        place (x + 1, IntTupCons (IntTuple (x, y), qs))
+        place (x + 1, SolutionPlace (Queen (x, y), qs))
     in
-    place (1, IntTupNil)
-  in
+    place (1, SolutionEmpty)
 
-(*  let queens_one_option number_of_queens = *)
-(*    with optionalize handle queens number_of_queens *)
-  let queens_one_cps number_of_queens =
-    (with backtrack handle queens number_of_queens) (fun () -> (absurd (perform (Fail ()))))
-(*  let queens_all number_of_queens = *)
-(*    with choose_all handle queens number_of_queens *)
-  in
-  queens_one_cps n
+ let queens_one_option number_of_queens =
+  let optionalize = handler
+  | effect (Decide _) k -> (
+          match k true with
+                | Some x -> Some x
+                | None -> k false
+          )
+  | effect (Fail _) _k -> None
+  | y -> (Some y)
+in
+
+   with optionalize handle queens number_of_queens
+
+   
+  let queens_all number_of_queens =
+    let choose_all = handler
+    | effect (Decide _) k -> k true @ k false
+    | effect (Fail _) _k -> SolutionsNil
+    | x -> SolutionsCons (x, SolutionsNil)
+   in
+  with choose_all handle queens number_of_queens
+
+  
+  (* let queens_one_cps number_of_queens =
+    let backtrack = handler
+    | effect (Decide _) k ->
+            (fun kf ->
+                  k true (fun _ -> k false kf) )
+    | effect (Fail _) _k -> (fun kf -> kf ())
+    | y -> (fun _ -> y)
+            in
+    (with backtrack handle queens number_of_queens) (fun () -> (absurd (perform (Fail ())))) *)
+
