@@ -99,7 +99,7 @@ let rec recast_computation hnd comp =
         let _, (_, drt_out) = hnd.ty in
         let drt_diff =
           {
-            Type.effect_set = Type.EffectSet.diff drt_out.Type.effect_set effs;
+            Type.effect_set = Type.EffectSet.diff effs drt_out.Type.effect_set;
             Type.row = drt_out.Type.row;
           }
         in

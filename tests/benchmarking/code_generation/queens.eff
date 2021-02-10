@@ -87,8 +87,6 @@ let queens_all number_of_queens =
   in
    with choose_all handle queens number_of_queens
 
-
-(*
 let queens_one_cps number_of_queens =
   let backtrack = handler
     | effect (Decide _) k ->
@@ -97,5 +95,3 @@ let queens_one_cps number_of_queens =
     | y -> (fun _ -> y)
   in
   (with backtrack handle queens number_of_queens) (fun () -> (absurd (perform (Fail ()))))
-
-*)
