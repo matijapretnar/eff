@@ -67,7 +67,7 @@ type cmd =
   | DefEffect of effect * (ty * ty)
   | TopLet of (pattern * term) list
   | TopLetRec of (variable * abstraction) list
-  | External of (variable * Type.ty * string)
+  | RawSource of (variable * string)
   | TyDef of (label * (CoreTypes.TyParam.t list * tydef)) list
 
 let print = Format.fprintf
@@ -203,15 +203,6 @@ and print_top_let defs ppf = print ppf "@[<hv>%t@]@." (print_let defs)
 
 and print_top_let_rec defs ppf = print ppf "@[<hv>%t@]@." (print_let_rec defs)
 
-and print_external name symbol_name translation ppf =
-  match translation with
-  | External.Unknown ->
-      print ppf "let %t = failwith \"Unknown external symbol %s.\"@."
-        (Symbol.print_variable name)
-        symbol_name
-  | External.Exists t ->
-      print ppf "let %t = %s@." (Symbol.print_variable name) t
-
 and print_tydefs tydefs ppf =
   print ppf "%t@." (print_sequence "@, and " print_tydef tydefs)
 
@@ -289,13 +280,5 @@ let print_cmd cmd ppf =
   | TopLet defs -> print_top_let defs ppf
   | TopLetRec defs -> print_top_let_rec defs ppf
   | TyDef tydefs -> print_tydefs tydefs ppf
-  | External (x, _ty, f) -> (
-      match Assoc.lookup f External.values with
-      | None -> Utils.Error.runtime "Unknown external symbol %s." f
-      | Some (External.Unknown as unknown) ->
-          Print.warning
-            ("External symbol %s cannot be compiled. It has been replaced "
-           ^^ "with [failwith \"Unknown external symbol %s.\"].")
-            f f;
-          print_external x f unknown ppf
-      | Some (External.Exists _s as known) -> print_external x f known ppf)
+  | RawSource (x, source) ->
+      print ppf "let %t = %s@." (Symbol.print_variable x) source

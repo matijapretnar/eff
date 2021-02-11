@@ -37,7 +37,6 @@
 %token <SugaredSyntax.label> UNAME
 %token <SugaredSyntax.typaram> PARAM
 %token TYPE ARROW HARROW OF EFFECT PERFORM
-%token EXTERNAL
 %token MATCH WITH FUNCTION HASH
 %token LET REC AND IN
 %token FUN BAR BARBAR
@@ -107,8 +106,6 @@ plain_topdef:
     { Commands.TopLet defs }
   | LET REC defs = separated_nonempty_list(AND, let_rec_def)
     { Commands.TopLetRec defs }
-  | EXTERNAL x = ident COLON t = ty EQUAL n = STRING
-    { Commands.External (x, t, n) }
   | EFFECT eff = effect COLON t1 = prod_ty ARROW t2 = ty
     { Commands.DefEffect (eff, (t1, t2))}
   | EFFECT eff = effect COLON t = prod_ty

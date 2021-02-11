@@ -1,9 +1,10 @@
 (* Evaluation of the intermediate language, big step. *)
 
 open Utils
-open Language
 module V = Value
-module Untyped = UntypedSyntax
+module CoreTypes = Language.CoreTypes
+module Type = Language.Type
+module Untyped = Language.UntypedSyntax
 
 module Backend : Language.BackendSignature.T = struct
   module RuntimeEnv = Map.Make (CoreTypes.Variable)
@@ -11,6 +12,9 @@ module Backend : Language.BackendSignature.T = struct
   type state = Eval.state
 
   let initial_state = Eval.initial_state
+
+  let load_primitive state x prim =
+    Eval.update x (Primitives.primitive_value prim) state
 
   (* Processing functions *)
   let process_computation state c ty =
@@ -55,11 +59,6 @@ module Backend : Language.BackendSignature.T = struct
           (Type.print_beautiful tysch))
       vars;
     state'
-
-  let process_external state (x, _ty, f) =
-    match Assoc.lookup f External.values with
-    | Some v -> Eval.update x v state
-    | None -> Error.runtime "unknown external symbol %s." f
 
   let process_tydef state _tydefs = state
 

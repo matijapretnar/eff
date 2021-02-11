@@ -127,26 +127,19 @@ let equal v1 v2 =
   | Less | Greater -> false
   | Invalid -> Error.runtime "invalid comparison with ="
 
+let not_equal v1 v2 = not (equal v1 v2)
+
 let less_than v1 v2 =
   match compare v1 v2 with
   | Less -> true
   | Greater | Equal -> false
   | Invalid -> Error.runtime "invalid comparison with <"
 
-let comparison_functions =
-  Assoc.of_list
-    [
-      ("=", binary_closure (fun v1 v2 -> value_bool (equal v1 v2)));
-      ("<", binary_closure (fun v1 v2 -> value_bool (less_than v1 v2)));
-    ]
+let greater_than v1 v2 = less_than v2 v1
 
-let constants =
-  Assoc.of_list
-    [
-      ("infinity", from_float infinity);
-      ("neg_infinity", from_float neg_infinity);
-      ("nan", from_float nan);
-    ]
+let greater_than_or_equal v1 v2 = greater_than v1 v2 || equal v1 v2
+
+let less_than_or_equal v1 v2 = less_than v1 v2 || equal v1 v2
 
 let rec pow a = function
   | 0 -> 1
@@ -155,70 +148,64 @@ let rec pow a = function
       let b = pow a (n / 2) in
       if n mod 2 = 0 then b * b else b * b * a
 
-let arithmetic_operations =
-  Assoc.of_list
-    [
-      ("~-", from_fun (fun v -> value_int (-V.to_int v)));
-      ("+", int_int_to_int ( + ));
-      ("-", int_int_to_int ( - ));
-      ("*", int_int_to_int ( * ));
-      ("/", int_int_to_int ( / ));
-      ("mod", int_int_to_int ( mod ));
-      ("**", int_int_to_int pow);
-      ("~-.", from_fun (fun v -> value_float ~-.(V.to_float v)));
-      ("+.", float_float_to_float ( +. ));
-      ("-.", float_float_to_float ( -. ));
-      ("*.", float_float_to_float ( *. ));
-      ("/.", float_float_to_float ( /. ));
-      ("exp", float_to_float exp);
-      ("expm1", float_to_float expm1);
-      ("log", float_to_float log);
-      ("log1p", float_to_float log1p);
-      ("cos", float_to_float cos);
-      ("sin", float_to_float sin);
-      ("tan", float_to_float tan);
-      ("acos", float_to_float acos);
-      ("asin", float_to_float asin);
-      ("atan", float_to_float atan);
-      ("sqrt", float_to_float sqrt);
-    ]
-
-let string_operations =
-  Assoc.of_list
-    [
-      ("^", binary_closure (fun v1 v2 -> value_str (V.to_str v1 ^ V.to_str v2)));
-      ( "string_length",
-        from_fun (fun v -> value_int (String.length (V.to_str v))) );
-      ( "sub",
-        ternary_closure (fun v1 v2 v3 ->
-            value_str (String.sub (V.to_str v1) (V.to_int v2) (V.to_int v3))) );
-    ]
-
-let conversion_functions =
-  Assoc.of_list
-    [
-      ( "to_string",
-        let to_string v =
-          V.print_value v Format.str_formatter;
-          let s = Format.flush_str_formatter () in
-          value_str s
-        in
-        from_fun to_string );
-      ( "string_of_float",
-        from_fun (fun v -> value_str (string_of_float (V.to_float v))) );
-      ( "string_of_int",
-        from_fun (fun v -> value_str (string_of_int (V.to_int v))) );
-      ( "float_of_int",
-        from_fun (fun v -> value_float (float_of_int (V.to_int v))) );
-      ( "int_of_float",
-        from_fun (fun v -> value_int (int_of_float (V.to_float v))) );
-    ]
-
-(** [values] is an association list of external names and values, consisting of
-    comparison functions, arithmetic operations, string operations, conversion
-    functions, and effect instances. *)
-let values =
-  comparison_functions |> Assoc.concat constants
-  |> Assoc.concat arithmetic_operations
-  |> Assoc.concat string_operations
-  |> Assoc.concat conversion_functions
+let primitive_value = function
+  | Primitives.CompareEq ->
+      binary_closure (fun v1 v2 -> value_bool (equal v1 v2))
+  | Primitives.CompareGe ->
+      binary_closure (fun v1 v2 -> value_bool (greater_than_or_equal v1 v2))
+  | Primitives.CompareGt ->
+      binary_closure (fun v1 v2 -> value_bool (greater_than v1 v2))
+  | Primitives.CompareLe ->
+      binary_closure (fun v1 v2 -> value_bool (less_than_or_equal v1 v2))
+  | Primitives.CompareLt ->
+      binary_closure (fun v1 v2 -> value_bool (less_than v1 v2))
+  | Primitives.CompareNe ->
+      binary_closure (fun v1 v2 -> value_bool (not_equal v1 v2))
+  | Primitives.FloatAcos -> float_to_float acos
+  | Primitives.FloatAdd -> float_float_to_float ( +. )
+  | Primitives.FloatAsin -> float_to_float asin
+  | Primitives.FloatAtan -> float_to_float atan
+  | Primitives.FloatCos -> float_to_float cos
+  | Primitives.FloatDiv -> float_float_to_float ( /. )
+  | Primitives.FloatExp -> float_to_float exp
+  | Primitives.FloatExpm1 -> float_to_float expm1
+  | Primitives.FloatInfinity -> from_float infinity
+  | Primitives.FloatLog -> float_to_float log
+  | Primitives.FloatLog1p -> float_to_float log1p
+  | Primitives.FloatMul -> float_float_to_float ( *. )
+  | Primitives.FloatNaN -> from_float nan
+  | Primitives.FloatNeg -> from_fun (fun v -> value_float ~-.(V.to_float v))
+  | Primitives.FloatNegInfinity -> from_float neg_infinity
+  | Primitives.FloatOfInt ->
+      from_fun (fun v -> value_float (float_of_int (V.to_int v)))
+  | Primitives.FloatSin -> float_to_float sin
+  | Primitives.FloatSqrt -> float_to_float sqrt
+  | Primitives.FloatSub -> float_float_to_float ( -. )
+  | Primitives.FloatTan -> float_to_float tan
+  | Primitives.IntegerAdd -> int_int_to_int ( + )
+  | Primitives.IntegerDiv -> int_int_to_int ( / )
+  | Primitives.IntegerMod -> int_int_to_int ( mod )
+  | Primitives.IntegerMul -> int_int_to_int ( * )
+  | Primitives.IntegerNeg -> from_fun (fun v -> value_int (-V.to_int v))
+  | Primitives.IntegerPow -> int_int_to_int pow
+  | Primitives.IntegerSub -> int_int_to_int ( - )
+  | Primitives.IntOfFloat ->
+      from_fun (fun v -> value_int (int_of_float (V.to_float v)))
+  | Primitives.StringConcat ->
+      binary_closure (fun v1 v2 -> value_str (V.to_str v1 ^ V.to_str v2))
+  | Primitives.StringLength ->
+      from_fun (fun v -> value_int (String.length (V.to_str v)))
+  | Primitives.StringOfFloat ->
+      from_fun (fun v -> value_str (string_of_float (V.to_float v)))
+  | Primitives.StringOfInt ->
+      from_fun (fun v -> value_str (string_of_int (V.to_int v)))
+  | Primitives.StringSub ->
+      ternary_closure (fun v1 v2 v3 ->
+          value_str (String.sub (V.to_str v1) (V.to_int v2) (V.to_int v3)))
+  | Primitives.ToString ->
+      let to_string v =
+        V.print_value v Format.str_formatter;
+        let s = Format.flush_str_formatter () in
+        value_str s
+      in
+      from_fun to_string
