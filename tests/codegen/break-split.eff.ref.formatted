@@ -1,24 +1,18 @@
-let _op_0 (* = *) = ( = )
-
-let _op_1 (* - *) = ( - )
-
-let _op_2 (* + *) = ( + )
-
 type (_, _) effect += Decide : (unit, bool) effect
 
-let _two_3 = 2
+let _two_41 = 2
 
-let two = _two_3
+let two = _two_41
 
-let _three_4 = 3
+let _three_42 = 3
 
-let three = _three_4
+let three = _three_42
 
 ;;
-let rec _f_23 (_x_18, _k_25) =
-  let _l_15 (_y_20 : bool) =
-    _k_25 (match _y_20 with true -> 2 | false -> 3)
+let rec _f_61 (_x_56, _k_63) =
+  let _l_53 (_y_58 : bool) =
+    _k_63 (match _y_58 with true -> 2 | false -> 3)
   in
-  _op_2 (* + *) (_l_15 true) (_l_15 false)
+  _l_53 true + _l_53 false
 in
-_f_23 ((), fun (_x_9 : int) -> _x_9)
+_f_61 ((), fun (_x_47 : int) -> _x_47)

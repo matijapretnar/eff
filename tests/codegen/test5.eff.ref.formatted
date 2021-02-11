@@ -4,10 +4,10 @@ type (_, _) effect += Op : (int, int) effect
 coer_hand_to_fun coer_refl_ty force_unsafe
   (handler
      {
-       value_clause = (fun (_id_2 : int) -> Value _id_2);
+       value_clause = (fun (_id_43 : int) -> Value _id_43);
        effect_clauses =
          (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
            match eff with
-           | Op -> fun _n_0 _l_4 -> Value 2
+           | Op -> fun _n_41 _l_45 -> Value 2
            | eff' -> fun arg k -> Call (eff', arg, k));
      })

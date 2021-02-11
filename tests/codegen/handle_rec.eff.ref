@@ -1,33 +1,22 @@
 type(_, _) effect += Eff : (unit, unit) effect 
 ;;
-let _op_0 (* - *) = ( - )
-;;
-let _op_1 (* * *) = ( * )
-;;
-let _op_2 (* = *) = ( = )
-;;
-let rec _f_3 _x_16 = 
-      match _op_2 (* = *) _x_16 0 with
+let rec _f_41 _x_54 = 
+      match ( = ) _x_54 0 with
         true -> Value 1
-       |  false ->  Call (Eff, (), (fun (_y_23: unit) -> _f_3 
-                                                           (_op_0 (* - *) 
-                                                              _x_16 1))) 
+       |  false ->  Call (Eff, (), (fun (_y_61: unit) -> _f_41 
+                                                           (( - ) _x_54 1))) 
    in 
-   let rec _f_26 (_x_16, _k_28) = 
-      match _op_2 (* = *) _x_16 0 with
-        true -> _k_28 1
-       |  false -> _op_1 (* * *) 
-                     (_f_26 
-                        (_op_0 (* - *) _x_16 1, (fun (_x_27: int) -> _k_28 
-                                                                    _x_27))) 
-                     2 
+   let rec _f_64 (_x_54, _k_66) = 
+      match ( = ) _x_54 0 with
+        true -> _k_66 1
+       |  false -> ( * ) 
+                     (_f_64 
+                        (( - ) _x_54 1, (fun (_x_65: int) -> _k_66 _x_65))) 2 
    in 
-   _f_26 (5, (fun (_id_12: int) -> _id_12))
+   _f_64 (5, (fun (_id_50: int) -> _id_50))
 ;;
-let rec _g_33 _x_44 = 
-      match _op_2 (* = *) _x_44 0 with
-        true -> 1
-       |  false -> _g_33 (_op_0 (* - *) _x_44 1) 
+let rec _g_71 _x_82 = 
+      match ( = ) _x_82 0 with  true -> 1 |  false -> _g_71 (( - ) _x_82 1) 
    in 
-   _g_33 5
+   _g_71 5
 ;;

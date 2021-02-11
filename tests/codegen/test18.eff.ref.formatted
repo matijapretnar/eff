@@ -1,7 +1,7 @@
 type nat = Zero | Succ of nat
 
 ;;
-let rec _add_0 _x_6 (_x_8 : nat) =
-  match _x_8 with Zero -> _x_6 | Succ _n_9 -> Succ (_add_0 _x_6 _n_9)
+let rec _add_41 _x_47 (_x_49 : nat) =
+  match _x_49 with Zero -> _x_47 | Succ _n_50 -> Succ (_add_41 _x_47 _n_50)
 in
-_add_0
+_add_41

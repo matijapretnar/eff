@@ -1,22 +1,18 @@
-let _op_0 (* = *) = ( = )
-;;
-let _op_1 (* - *) = ( - )
-;;
 type(_, _) effect += Decide : (unit, bool) effect 
 ;;
 type intlist = IntNil | IntCons of (int * intlist)
 
 ;;
-let rec _concat_2 _x_10 = 
-      match _x_10 with
-        IntNil -> fun (_ys_12: intlist) -> _ys_12
-       |  IntCons ((_z_14, _zs_13)) -> fun (_ys_15: intlist) -> IntCons (
-                                                                    _z_14, 
-                                                                    _concat_2 
-                                                                    _zs_13 
-                                                                    _ys_15) 
+let rec _concat_41 _x_49 = 
+      match _x_49 with
+        IntNil -> fun (_ys_51: intlist) -> _ys_51
+       |  IntCons ((_z_53, _zs_52)) -> fun (_ys_54: intlist) -> IntCons (
+                                                                    _z_53, 
+                                                                    _concat_41 
+                                                                    _zs_52 
+                                                                    _ys_54) 
 
-;; let concat = _concat_2
+;; let concat = _concat_41
 ;;
 IntNil
 ;;

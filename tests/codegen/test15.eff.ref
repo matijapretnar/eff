@@ -1,5 +1,3 @@
-let _op_0 (* + *) = ( + )
-;;
 type foo = A | B of bar
 
  and bar = {x : foo}
@@ -11,9 +9,9 @@ type(_, _) effect += Op2 : (bar, foo) effect
 ;;
 type(_, _) effect += Op3 : (foo, int) effect 
 ;;
-fun (_a_2: int) ->  Call (Op1, 10, (fun (_y_24: bar) ->  Call (Op2, _y_24, (fun 
-                                                             (_y_26: foo) ->  Call (Op3, _y_26, (fun 
-                                                                    (_y_27: int) -> Value (_op_0 (* + *) 
-                                                                    _a_2 
-                                                                    _y_27)))))))
+fun (_a_42: int) ->  Call (Op1, 10, (fun (_y_64: bar) ->  Call (Op2, _y_64, (fun 
+                                                              (_y_66: foo) ->  Call (Op3, _y_66, (fun 
+                                                                    (_y_67: int) -> Value (( + ) 
+                                                                    _a_42 
+                                                                    _y_67)))))))
 ;;

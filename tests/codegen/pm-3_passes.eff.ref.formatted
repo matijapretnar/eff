@@ -1,24 +1,19 @@
-let _op_0 (* = *) = ( = )
-
-let _op_1 (* - *) = ( - )
-
 type (_, _) effect += Decide : (unit, bool) effect
 
 type intlist = IntNil | IntCons of (int * intlist)
 
 ;;
-let rec _concat_2 _x_22 =
-  match _x_22 with
-  | IntNil -> fun (_ys_36 : intlist) -> _ys_36
-  | IntCons (_z_38, _zs_37) ->
-      fun (_ys_39 : intlist) -> IntCons (_z_38, _concat_2 _zs_37 _ys_39)
+let rec _concat_41 _x_61 =
+  match _x_61 with
+  | IntNil -> fun (_ys_75 : intlist) -> _ys_75
+  | IntCons (_z_77, _zs_76) ->
+      fun (_ys_78 : intlist) -> IntCons (_z_77, _concat_41 _zs_76 _ys_78)
 in
-let _l_23 (_y_32 : bool) =
-  let _x_17 = match _y_32 with true -> 10 | false -> 20 in
-  let _l_23 (_y_29 : bool) =
-    IntCons
-      (_op_1 (* - *) _x_17 (match _y_29 with true -> 0 | false -> 5), IntNil)
+let _l_62 (_y_71 : bool) =
+  let _x_56 = match _y_71 with true -> 10 | false -> 20 in
+  let _l_62 (_y_68 : bool) =
+    IntCons ((_x_56 - match _y_68 with true -> 0 | false -> 5), IntNil)
   in
-  _concat_2 (_l_23 true) (_l_23 false)
+  _concat_41 (_l_62 true) (_l_62 false)
 in
-_concat_2 (_l_23 true) (_l_23 false)
+_concat_41 (_l_62 true) (_l_62 false)

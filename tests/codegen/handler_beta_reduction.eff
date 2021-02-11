@@ -1,5 +1,4 @@
 effect Eff : int -> int
-external ( + ) : int -> int -> int = "+"
 
 ;;
 

@@ -1,5 +1,5 @@
-let _decide_func_0 = fun (_bl_1: bool) -> match _bl_1 with
-                                            true -> 10
-                                           |  false -> 20
-;; let decide_func = _decide_func_0
+let _decide_func_41 = fun (_bl_42: bool) -> match _bl_42 with
+                                              true -> 10
+                                             |  false -> 20
+;; let decide_func = _decide_func_41
 ;;

@@ -1,8 +1,4 @@
 effect Eff : unit -> unit
-external ( - ) : int -> int -> int = "-"
-external ( * ) : int -> int -> int = "*"
-external ( = ) : int -> int -> bool = "="
-
 ;;
 
 let rec f x = if x = 0 then 1 else (perform (Eff ()); f (x - 1))

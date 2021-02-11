@@ -1,9 +1,9 @@
 type nat = Zero | Succ of nat
 
 ;;
-fun ((_w_1, _k_2, _num_3) : nat * nat * int) (_x_4 : nat * nat * int) ->
-  match _x_4 with
-  | Zero, Zero, 0 -> (_w_1, _k_2, Zero, 0, 0)
-  | Zero, _z_5, _n_6 -> (Zero, _z_5, Zero, _num_3, _n_6)
-  | _x_7, Zero, _n_8 -> (Zero, _w_1, _x_7, 1, _n_8)
+fun ((_w_42, _k_43, _num_44) : nat * nat * int) (_x_45 : nat * nat * int) ->
+  match _x_45 with
+  | Zero, Zero, 0 -> (_w_42, _k_43, Zero, 0, 0)
+  | Zero, _z_46, _n_47 -> (Zero, _z_46, Zero, _num_44, _n_47)
+  | _x_48, Zero, _n_49 -> (Zero, _w_42, _x_48, 1, _n_49)
   | _, _, _ -> (Zero, Zero, Zero, 0, 0)

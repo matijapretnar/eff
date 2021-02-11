@@ -1,7 +1,5 @@
 type (_, _) effect += Decide : (unit, bool) effect
 
-let _op_0 (* + *) = ( + )
-
 ;;
-let _l_12 (_y_23 : bool) = match _y_23 with true -> 10 | false -> 20 in
-_op_0 (* + *) (_l_12 true) (_l_12 false)
+let _l_52 (_y_63 : bool) = match _y_63 with true -> 10 | false -> 20 in
+_l_52 true + _l_52 false

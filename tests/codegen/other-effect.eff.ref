@@ -1,26 +1,18 @@
-let _op_0 (* = *) = ( = )
-;;
-let _op_1 (* + *) = ( + )
-;;
-let _op_2 (* - *) = ( - )
-;;
 type(_, _) effect += WriteInt : (int, unit) effect 
 ;;
-let rec _f_10 _x_19 = 
-       Call (WriteInt, _x_19, (fun (_y_23: unit) -> match _op_0 (* = *) _x_19 
-                                                            0 with
+let rec _f_48 _x_57 = 
+       Call (WriteInt, _x_57, (fun (_y_61: unit) -> match ( = ) _x_57 0 with
                                                       true -> Value ()
-                                                     |  false -> _f_10 
-                                                                   (_op_2 (* - *) 
-                                                                    _x_19 1))) 
+                                                     |  false -> _f_48 
+                                                                   (( - ) 
+                                                                    _x_57 1))) 
    in 
-   let rec _f_28 (_x_19, _k_30) = 
-      _op_1 (* + *) _x_19 
-        (match _op_0 (* = *) _x_19 0 with
-           true -> _k_30 ()
-          |  false -> _f_28 
-                        (_op_2 (* - *) _x_19 1, (fun (_x_41: unit) -> _k_30 
-                                                                    _x_41))) 
+   let rec _f_66 (_x_57, _k_68) = 
+      ( + ) _x_57 
+        (match ( = ) _x_57 0 with
+           true -> _k_68 ()
+          |  false -> _f_66 
+                        (( - ) _x_57 1, (fun (_x_79: unit) -> _k_68 _x_79))) 
    in 
-   _f_28 (10, (fun (_x_7: unit) -> 0))
+   _f_66 (10, (fun (_x_45: unit) -> 0))
 ;;

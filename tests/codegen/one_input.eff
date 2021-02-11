@@ -1,6 +1,4 @@
 effect Decide : unit -> bool
-external ( + ) : int -> int -> int = "+"
-
 ;;
 
 let choose_sum = handler

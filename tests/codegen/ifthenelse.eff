@@ -1,6 +1,3 @@
-external ( = ) : int -> int -> bool = "=";;
-external ( - ) : int -> int -> int = "-";;
-
 let rec _loop n =
     if n = 0 then
         0
