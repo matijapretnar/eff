@@ -58,7 +58,7 @@ let get_effectset effects = get_effectset_temp EffectSet.empty effects
 
 let rec elab_ty_coercion coer =
   match coer.term with
-  | Constraint.ReflTy _ -> NoEff.NCoerRefl
+  | Constraint.ReflTy -> NoEff.NCoerRefl
   | Constraint.ArrowCoercion (tycoer, dirtycoer) ->
       let tyelab = elab_ty_coercion tycoer in
       let dirtyelab = elab_dirty_coercion dirtycoer in
@@ -103,12 +103,10 @@ let rec elab_ty_coercion coer =
   | Constraint.TupleCoercion lst ->
       let elabs = List.map elab_ty_coercion lst in
       NoEff.NCoerTuple elabs
-  | Constraint.QualTyCoer ((ty1, ty2), c) ->
+  | Constraint.QualTyCoer c ->
       let elabc = elab_ty_coercion c in
-      let ty1elab = elab_ty ty1 in
-      let ty2elab = elab_ty ty2 in
-      NoEff.NCoerQual ((ty1elab, ty2elab), elabc)
-  | Constraint.QualDirtCoer (_dirts, c) ->
+      NoEff.NCoerQual elabc
+  | Constraint.QualDirtCoer c ->
       let elabc = elab_ty_coercion c in
       elabc
 

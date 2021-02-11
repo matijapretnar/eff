@@ -25,7 +25,7 @@ type n_coercion =
   | NCoerHandler of n_coercion * n_coercion
   | NCoerHandToFun of n_coercion * n_coercion
   | NCoerFunToHand of n_coercion * n_coercion
-  | NCoerQual of n_coerty * n_coercion
+  | NCoerQual of n_coercion
   | NCoerComp of n_coercion
   | NCoerReturn of n_coercion
   | NCoerUnsafe of n_coercion
@@ -314,7 +314,7 @@ let rec print_coercion ?max_level coer ppf =
       print "(handToFun %t %t)" (print_coercion c1) (print_coercion c2)
   | NCoerFunToHand (c1, c2) ->
       print "(funToHand %t %t)" (print_coercion c1) (print_coercion c2)
-  | NCoerQual (ty, c) -> print "(%t => %t)" (print_coerty ty) (print_coercion c)
+  | NCoerQual c -> print "(* => %t)" (print_coercion c)
   | NCoerComp c -> print "(Comp %t)" (print_coercion c)
   | NCoerReturn c -> print "(return %t)" (print_coercion c)
   | NCoerUnsafe c -> print "(unsafe %t)" (print_coercion c)

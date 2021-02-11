@@ -91,8 +91,7 @@ let ocaml_compile_rule out_filename =
 let test_case_alias_stanza config (_bare, full_name) =
   let out_file_name = full_name ^ ".out" in
   if config.apply_ocamlformat then format_stanza full_name;
-  if config.generate_ocaml_compile_rule then
-    ocaml_compile_rule out_file_name;
+  if config.generate_ocaml_compile_rule then ocaml_compile_rule out_file_name;
   Printf.printf "(rule\n";
   Printf.printf " (deps \"%s\")\n" out_file_name;
   Printf.printf "  (alias runtest)\n";

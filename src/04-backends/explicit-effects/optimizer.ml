@@ -126,7 +126,7 @@ let rec optimize_ty_coercion state (tcoer : Constraint.ty_coercion) =
 
 and optimize_ty_coercion' state tcoer =
   match tcoer with
-  | ReflTy _ -> tcoer
+  | ReflTy -> tcoer
   | ArrowCoercion (tc, dc) ->
       ArrowCoercion
         (optimize_ty_coercion state tc, optimize_dirty_coercion state dc)
@@ -138,9 +138,8 @@ and optimize_ty_coercion' state tcoer =
       ApplyCoercion (v, List.map (optimize_ty_coercion state) lst)
   | TupleCoercion lst ->
       TupleCoercion (List.map (optimize_ty_coercion state) lst)
-  | QualTyCoer (ct_ty, tc) -> QualTyCoer (ct_ty, optimize_ty_coercion state tc)
-  | QualDirtCoer (ct_drt, tc) ->
-      QualDirtCoer (ct_drt, optimize_ty_coercion state tc)
+  | QualTyCoer tc -> QualTyCoer (optimize_ty_coercion state tc)
+  | QualDirtCoer tc -> QualDirtCoer (optimize_ty_coercion state tc)
 
 and optimize_dirt_coercion state (dcoer : Constraint.dirt_coercion) =
   reduce_dirt_coercion state
@@ -148,7 +147,7 @@ and optimize_dirt_coercion state (dcoer : Constraint.dirt_coercion) =
 
 and optimize_dirt_coercion' state (dcoer : Constraint.dirt_coercion') =
   match dcoer with
-  | ReflDirt _ | DirtCoercionVar _ | Empty _ -> dcoer
+  | ReflDirt | DirtCoercionVar _ | Empty -> dcoer
   | UnionDirt (s, dc) -> UnionDirt (s, optimize_dirt_coercion state dc)
 
 and optimize_dirty_coercion state { term = tcoer, dcoer; _ } =
@@ -161,18 +160,18 @@ and reduce_ty_coercion state ty_coer =
 and reduce_ty_coercion' _state = function
   (* TODO: Is it sufficient to just check if the input and output types match? *)
   | ArrowCoercion
-      ( { term = ReflTy ty1; _ },
-        { term = { term = ReflTy ty2; _ }, { term = ReflDirt drt; _ }; _ } ) ->
-      ReflTy (Type.Arrow (ty1, (ty2, drt)))
+      ( { term = ReflTy; _ },
+        { term = { term = ReflTy; _ }, { term = ReflDirt; _ }; _ } ) ->
+      ReflTy
   | tcoer -> tcoer
 
 and reduce_dirt_coercion state drt_coer =
-  { drt_coer with term = reduce_dirt_coercion' state drt_coer.term }
+  { drt_coer with term = reduce_dirt_coercion' state drt_coer }
 
-and reduce_dirt_coercion' _state = function
-  | Empty drt when Type.is_empty_dirt drt -> ReflDirt drt
-  | UnionDirt (effects, { term = ReflDirt drt; _ }) ->
-      ReflDirt (Type.add_effects effects drt)
+and reduce_dirt_coercion' _state drt_coer =
+  match drt_coer.term with
+  | Empty when Type.is_empty_dirt (snd drt_coer.ty) -> ReflDirt
+  | UnionDirt (_, { term = ReflDirt; _ }) -> ReflDirt
   | dcoer -> dcoer
 
 let rec optimize_expression state exp =

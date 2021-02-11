@@ -130,7 +130,7 @@ let rec pp_coercion ?max_level coer ppf =
       print ~at_level:1 "coer_tuple_%d %t" (List.length cs)
         (pp_tuple pp_coercion cs)
   | NCoerApply (_t, _cs) -> print "ApplyCoercion"
-  | NCoerQual (_ct, _c) -> print "ApplyCoercion"
+  | NCoerQual _c -> print "ApplyCoercion"
 
 let rec pp_term ?max_level noEff_term ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

@@ -162,7 +162,7 @@ let rec apply_sub_tycoer sub ty_coer =
 and apply_sub_tycoer' sub ty_coer =
   match ty_coer with
   | TyCoercionVar _ -> assert false
-  | Constraint.ReflTy tty -> Constraint.ReflTy (apply_sub_ty sub tty)
+  | Constraint.ReflTy -> Constraint.ReflTy
   | ArrowCoercion (tycoer1, dirtycoer) ->
       ArrowCoercion
         (apply_sub_tycoer sub tycoer1, apply_sub_dirtycoer sub dirtycoer)
@@ -186,9 +186,9 @@ and apply_sub_dirtcoer sub drt_coer =
 
 and apply_sub_dirtcoer' sub ty_coer =
   match ty_coer with
-  | Constraint.ReflDirt d -> Constraint.ReflDirt (apply_sub_dirt sub d)
+  | Constraint.ReflDirt -> ty_coer
   | DirtCoercionVar _ -> assert false
-  | Empty d -> Empty (apply_sub_dirt sub d)
+  | Empty -> Empty
   | UnionDirt (es, dirt_coer1) ->
       UnionDirt (es, apply_sub_dirtcoer sub dirt_coer1)
 

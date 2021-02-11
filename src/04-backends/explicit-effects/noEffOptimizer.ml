@@ -47,7 +47,7 @@ and optimize_ty_coercion' state (n_coer : NoEff.n_coercion) =
   | NCoerFunToHand (n1, n2) ->
       NCoerFunToHand
         (optimize_ty_coercion state n1, optimize_ty_coercion state n2)
-  | NCoerQual (ct_ty, n2) -> NCoerQual (ct_ty, optimize_ty_coercion state n2)
+  | NCoerQual n2 -> NCoerQual (optimize_ty_coercion state n2)
   | NCoerComp n -> NCoerComp (optimize_ty_coercion state n)
   | NCoerReturn n -> NCoerReturn (optimize_ty_coercion state n)
   | NCoerUnsafe n -> NCoerUnsafe (optimize_ty_coercion state n)
