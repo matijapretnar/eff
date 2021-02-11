@@ -10,82 +10,9 @@ effect RandomInt : int -> int
 
 effect RandomFloat: float -> float
 
-external _ocaml_tophandler : 'a => 'a = "_ocaml_tophandler"
-
-(* Integers and Floats *)
-external ( = ) : 'a -> 'a -> bool = "="
-
-external ( < ) : 'a -> 'a -> bool = "<"
-
-external failwith : string -> 'a = "failwith"
-
-external infinity : float = "infinity"
-
-external neg_infinity : float = "neg_infinity"
-
-external nan : float = "nan"
-
-external ( ~- ) : int -> int = "~-"
-
-external ( + ) : int -> int -> int = "+"
-
-external ( * ) : int -> int -> int = "*"
-
-external ( - ) : int -> int -> int = "-"
-
-external ( mod ) : int -> int -> int = "mod"
-
-external ( ~-. ) : float -> float = "~-."
-
-external ( +. ) : float -> float -> float = "+."
-
-external ( *. ) : float -> float -> float = "*."
-
-external ( -. ) : float -> float -> float = "-."
-
-external ( /. ) : float -> float -> float = "/."
-
-external ( ** ) : int -> int -> int = "**"
-
-external ( / ) : int -> int -> int = "/"
 let ( / ) m n = match n with
   | 0 -> failwith "division by zero"
   | n -> (/) m n
-
-external exp : float -> float = "exp"
-
-external expm1 : float -> float = "expm1"
-
-external log : float -> float = "log"
-
-external log1p : float -> float = "log1p"
-
-external cos : float -> float = "cos"
-
-external sin : float -> float = "sin"
-
-external tan : float -> float = "tan"
-
-external acos : float -> float = "acos"
-
-external asin : float -> float = "asin"
-
-external atan : float -> float = "atan"
-
-external sqrt : float -> float = "sqrt"
-                               
-(* Strings *)
-external float_of_int : int -> float = "float_of_int"
-
-external int_of_float : float -> int = "int_of_float"
-
-external ( ^ ) : string -> string -> string = "^"
-
-external string_length : string -> int = "string_length"
-
-external string_of_float : float -> string  = "string_of_float"
-
-external string_of_int : int -> string  = "string_of_int"
 
 (* Booleans *)
 let not x = if x then false else true

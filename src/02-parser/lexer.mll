@@ -11,7 +11,6 @@
     ("effect", EFFECT);
     ("else", ELSE);
     ("end", END);
-    ("external", EXTERNAL);
     ("false", BOOL false);
     ("finally", FINALLY);
     ("fun", FUN);

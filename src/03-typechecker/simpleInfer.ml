@@ -1,8 +1,10 @@
 open Utils
-open Language
+module CoreTypes = Language.CoreTypes
+module Type = Language.Type
 module T = Type
-module Untyped = UntypedSyntax
+module Untyped = Language.UntypedSyntax
 module Unify = SimpleUnify
+module Const = Language.Const
 module EffectMap = Map.Make (CoreTypes.Effect)
 module VariableMap = Map.Make (CoreTypes.Variable)
 
@@ -455,3 +457,6 @@ let infer_top_let_rec st defs =
   in
   List.iter exhaust_check defs;
   (vars, st)
+
+let load_primitive st x prim =
+  extend st x (Primitives.primitive_type_scheme prim)

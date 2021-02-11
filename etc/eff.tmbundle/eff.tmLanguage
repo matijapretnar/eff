@@ -1462,7 +1462,7 @@
 						</dict>
 					</dict>
 					<key>end</key>
-					<string>(?=\b(type|val|external|class|module|end)\b)|^\s*$</string>
+					<string>(?=\b(type|val|class|module|end)\b)|^\s*$</string>
 					<key>name</key>
 					<string>meta.module.signature.val.eff</string>
 					<key>patterns</key>
@@ -1523,100 +1523,6 @@
 									<string>#definite_storagetypes</string>
 								</dict>
 							</array>
-						</dict>
-						<dict>
-							<key>include</key>
-							<string>#typedefs</string>
-						</dict>
-					</array>
-				</dict>
-				<dict>
-					<key>begin</key>
-					<string>(external)\s+([a-z_][a-zA-Z0-9_']*)\s*(:)</string>
-					<key>beginCaptures</key>
-					<dict>
-						<key>1</key>
-						<dict>
-							<key>name</key>
-							<string>keyword.other.eff</string>
-						</dict>
-						<key>2</key>
-						<dict>
-							<key>name</key>
-							<string>entity.name.type.external-signature.eff</string>
-						</dict>
-						<key>3</key>
-						<dict>
-							<key>name</key>
-							<string>punctuation.separator.type-constraint.eff</string>
-						</dict>
-					</dict>
-					<key>end</key>
-					<string>(?=\b(type|val|external|class|module|let|end)\b)|^\s*$</string>
-					<key>name</key>
-					<string>meta.module.signature.external.eff</string>
-					<key>patterns</key>
-					<array>
-						<dict>
-							<key>captures</key>
-							<dict>
-								<key>1</key>
-								<dict>
-									<key>name</key>
-									<string>punctuation.definition.optional-parameter.eff</string>
-								</dict>
-								<key>2</key>
-								<dict>
-									<key>name</key>
-									<string>entity.name.tag.label.optional.eff</string>
-								</dict>
-								<key>3</key>
-								<dict>
-									<key>name</key>
-									<string>punctuation.separator.optional-parameter.eff</string>
-								</dict>
-							</dict>
-							<key>match</key>
-							<string>(\?)([a-z][a-zA-Z0-9_]*)\s*(:)</string>
-							<key>name</key>
-							<string>variable.parameter.optional.eff</string>
-						</dict>
-						<dict>
-							<key>begin</key>
-							<string>(~)([a-z][a-zA-Z0-9'_]*)\s*(:)\s*</string>
-							<key>beginCaptures</key>
-							<dict>
-								<key>1</key>
-								<dict>
-									<key>name</key>
-									<string>punctuation.definition.labeled-parameter.eff</string>
-								</dict>
-								<key>2</key>
-								<dict>
-									<key>name</key>
-									<string>entity.name.tag.label.eff</string>
-								</dict>
-								<key>3</key>
-								<dict>
-									<key>name</key>
-									<string>punctuation.separator.label.eff</string>
-								</dict>
-							</dict>
-							<key>end</key>
-							<string>\s</string>
-							<key>name</key>
-							<string>variable.parameter.labeled.eff</string>
-							<key>patterns</key>
-							<array>
-								<dict>
-									<key>include</key>
-									<string>#variables</string>
-								</dict>
-							</array>
-						</dict>
-						<dict>
-							<key>include</key>
-							<string>#strings</string>
 						</dict>
 						<dict>
 							<key>include</key>
