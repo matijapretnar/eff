@@ -42,17 +42,10 @@
 
 (rule
  (deps "application_red.eff.out.ocaml_with_header")
- (target "application_red.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "application_red.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "application_red.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "application_red.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "application_red.eff.ref.ocaml_output" "application_red.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "application_red.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "application_red.eff.out")
@@ -94,17 +87,10 @@
 
 (rule
  (deps "break-split.eff.out.ocaml_with_header")
- (target "break-split.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "break-split.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "break-split.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "break-split.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "break-split.eff.ref.ocaml_output" "break-split.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "break-split.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "break-split.eff.out")
@@ -146,17 +132,10 @@
 
 (rule
  (deps "handle_match.eff.out.ocaml_with_header")
- (target "handle_match.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "handle_match.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "handle_match.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "handle_match.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "handle_match.eff.ref.ocaml_output" "handle_match.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "handle_match.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "handle_match.eff.out")
@@ -198,17 +177,10 @@
 
 (rule
  (deps "handle_rec.eff.out.ocaml_with_header")
- (target "handle_rec.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "handle_rec.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "handle_rec.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "handle_rec.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "handle_rec.eff.ref.ocaml_output" "handle_rec.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "handle_rec.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "handle_rec.eff.out")
@@ -250,17 +222,10 @@
 
 (rule
  (deps "handler_beta_reduction.eff.out.ocaml_with_header")
- (target "handler_beta_reduction.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "handler_beta_reduction.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "handler_beta_reduction.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "handler_beta_reduction.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "handler_beta_reduction.eff.ref.ocaml_output" "handler_beta_reduction.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "handler_beta_reduction.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "handler_beta_reduction.eff.out")
@@ -302,17 +267,10 @@
 
 (rule
  (deps "ifthenelse.eff.out.ocaml_with_header")
- (target "ifthenelse.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "ifthenelse.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "ifthenelse.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "ifthenelse.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "ifthenelse.eff.ref.ocaml_output" "ifthenelse.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "ifthenelse.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "ifthenelse.eff.out")
@@ -354,17 +312,10 @@
 
 (rule
  (deps "is_relatively_pure.eff.out.ocaml_with_header")
- (target "is_relatively_pure.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "is_relatively_pure.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "is_relatively_pure.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "is_relatively_pure.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "is_relatively_pure.eff.ref.ocaml_output" "is_relatively_pure.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "is_relatively_pure.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "is_relatively_pure.eff.out")
@@ -406,17 +357,10 @@
 
 (rule
  (deps "let_list_to_bind.eff.out.ocaml_with_header")
- (target "let_list_to_bind.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "let_list_to_bind.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "let_list_to_bind.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "let_list_to_bind.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "let_list_to_bind.eff.ref.ocaml_output" "let_list_to_bind.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "let_list_to_bind.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "let_list_to_bind.eff.out")
@@ -458,17 +402,10 @@
 
 (rule
  (deps "match_red.eff.out.ocaml_with_header")
- (target "match_red.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "match_red.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "match_red.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "match_red.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "match_red.eff.ref.ocaml_output" "match_red.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "match_red.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "match_red.eff.out")
@@ -510,17 +447,10 @@
 
 (rule
  (deps "norec.eff.out.ocaml_with_header")
- (target "norec.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "norec.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "norec.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "norec.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "norec.eff.ref.ocaml_output" "norec.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "norec.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "norec.eff.out")
@@ -562,17 +492,10 @@
 
 (rule
  (deps "not-found.eff.out.ocaml_with_header")
- (target "not-found.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "not-found.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "not-found.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "not-found.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "not-found.eff.ref.ocaml_output" "not-found.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "not-found.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "not-found.eff.out")
@@ -614,17 +537,10 @@
 
 (rule
  (deps "one_input.eff.out.ocaml_with_header")
- (target "one_input.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "one_input.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "one_input.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "one_input.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "one_input.eff.ref.ocaml_output" "one_input.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "one_input.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "one_input.eff.out")
@@ -666,17 +582,10 @@
 
 (rule
  (deps "original.eff.out.ocaml_with_header")
- (target "original.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "original.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "original.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "original.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "original.eff.ref.ocaml_output" "original.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "original.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "original.eff.out")
@@ -718,17 +627,10 @@
 
 (rule
  (deps "other-effect.eff.out.ocaml_with_header")
- (target "other-effect.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "other-effect.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "other-effect.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "other-effect.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "other-effect.eff.ref.ocaml_output" "other-effect.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "other-effect.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "other-effect.eff.out")
@@ -770,17 +672,10 @@
 
 (rule
  (deps "pm-1_fails.eff.out.ocaml_with_header")
- (target "pm-1_fails.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "pm-1_fails.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "pm-1_fails.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "pm-1_fails.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "pm-1_fails.eff.ref.ocaml_output" "pm-1_fails.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "pm-1_fails.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "pm-1_fails.eff.out")
@@ -822,17 +717,10 @@
 
 (rule
  (deps "pm-2_passes.eff.out.ocaml_with_header")
- (target "pm-2_passes.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "pm-2_passes.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "pm-2_passes.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "pm-2_passes.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "pm-2_passes.eff.ref.ocaml_output" "pm-2_passes.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "pm-2_passes.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "pm-2_passes.eff.out")
@@ -874,17 +762,10 @@
 
 (rule
  (deps "pm-3_passes.eff.out.ocaml_with_header")
- (target "pm-3_passes.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "pm-3_passes.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "pm-3_passes.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "pm-3_passes.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "pm-3_passes.eff.ref.ocaml_output" "pm-3_passes.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "pm-3_passes.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "pm-3_passes.eff.out")
@@ -926,17 +807,10 @@
 
 (rule
  (deps "rec1.eff.out.ocaml_with_header")
- (target "rec1.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "rec1.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "rec1.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "rec1.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "rec1.eff.ref.ocaml_output" "rec1.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "rec1.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "rec1.eff.out")
@@ -978,17 +852,10 @@
 
 (rule
  (deps "rec2.eff.out.ocaml_with_header")
- (target "rec2.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "rec2.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "rec2.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "rec2.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "rec2.eff.ref.ocaml_output" "rec2.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "rec2.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "rec2.eff.out")
@@ -1030,17 +897,10 @@
 
 (rule
  (deps "substitution.eff.out.ocaml_with_header")
- (target "substitution.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "substitution.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "substitution.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "substitution.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "substitution.eff.ref.ocaml_output" "substitution.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "substitution.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "substitution.eff.out")
@@ -1082,17 +942,10 @@
 
 (rule
  (deps "test-handle_effect_skip.eff.out.ocaml_with_header")
- (target "test-handle_effect_skip.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test-handle_effect_skip.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test-handle_effect_skip.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test-handle_effect_skip.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test-handle_effect_skip.eff.ref.ocaml_output" "test-handle_effect_skip.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test-handle_effect_skip.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test-handle_effect_skip.eff.out")
@@ -1134,17 +987,10 @@
 
 (rule
  (deps "test1.eff.out.ocaml_with_header")
- (target "test1.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test1.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test1.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test1.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test1.eff.ref.ocaml_output" "test1.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test1.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test1.eff.out")
@@ -1186,17 +1032,10 @@
 
 (rule
  (deps "test10.eff.out.ocaml_with_header")
- (target "test10.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test10.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test10.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test10.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test10.eff.ref.ocaml_output" "test10.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test10.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test10.eff.out")
@@ -1238,17 +1077,10 @@
 
 (rule
  (deps "test11.eff.out.ocaml_with_header")
- (target "test11.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test11.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test11.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test11.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test11.eff.ref.ocaml_output" "test11.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test11.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test11.eff.out")
@@ -1290,17 +1122,10 @@
 
 (rule
  (deps "test12.eff.out.ocaml_with_header")
- (target "test12.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test12.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test12.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test12.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test12.eff.ref.ocaml_output" "test12.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test12.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test12.eff.out")
@@ -1342,17 +1167,10 @@
 
 (rule
  (deps "test13.eff.out.ocaml_with_header")
- (target "test13.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test13.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test13.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test13.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test13.eff.ref.ocaml_output" "test13.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test13.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test13.eff.out")
@@ -1394,17 +1212,10 @@
 
 (rule
  (deps "test14.eff.out.ocaml_with_header")
- (target "test14.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test14.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test14.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test14.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test14.eff.ref.ocaml_output" "test14.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test14.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test14.eff.out")
@@ -1446,17 +1257,10 @@
 
 (rule
  (deps "test15.eff.out.ocaml_with_header")
- (target "test15.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test15.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test15.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test15.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test15.eff.ref.ocaml_output" "test15.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test15.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test15.eff.out")
@@ -1498,17 +1302,10 @@
 
 (rule
  (deps "test16.eff.out.ocaml_with_header")
- (target "test16.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test16.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test16.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test16.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test16.eff.ref.ocaml_output" "test16.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test16.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test16.eff.out")
@@ -1550,17 +1347,10 @@
 
 (rule
  (deps "test17.eff.out.ocaml_with_header")
- (target "test17.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test17.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test17.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test17.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test17.eff.ref.ocaml_output" "test17.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test17.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test17.eff.out")
@@ -1602,17 +1392,10 @@
 
 (rule
  (deps "test18.eff.out.ocaml_with_header")
- (target "test18.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test18.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test18.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test18.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test18.eff.ref.ocaml_output" "test18.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test18.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test18.eff.out")
@@ -1654,17 +1437,10 @@
 
 (rule
  (deps "test19.eff.out.ocaml_with_header")
- (target "test19.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test19.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test19.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test19.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test19.eff.ref.ocaml_output" "test19.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test19.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test19.eff.out")
@@ -1706,17 +1482,10 @@
 
 (rule
  (deps "test2.eff.out.ocaml_with_header")
- (target "test2.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test2.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test2.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test2.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test2.eff.ref.ocaml_output" "test2.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test2.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test2.eff.out")
@@ -1758,17 +1527,10 @@
 
 (rule
  (deps "test20.eff.out.ocaml_with_header")
- (target "test20.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test20.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test20.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test20.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test20.eff.ref.ocaml_output" "test20.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test20.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test20.eff.out")
@@ -1810,17 +1572,10 @@
 
 (rule
  (deps "test3.eff.out.ocaml_with_header")
- (target "test3.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test3.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test3.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test3.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test3.eff.ref.ocaml_output" "test3.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test3.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test3.eff.out")
@@ -1862,17 +1617,10 @@
 
 (rule
  (deps "test4.eff.out.ocaml_with_header")
- (target "test4.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test4.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test4.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test4.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test4.eff.ref.ocaml_output" "test4.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test4.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test4.eff.out")
@@ -1914,17 +1662,10 @@
 
 (rule
  (deps "test5.eff.out.ocaml_with_header")
- (target "test5.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test5.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test5.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test5.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test5.eff.ref.ocaml_output" "test5.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test5.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test5.eff.out")
@@ -1966,17 +1707,10 @@
 
 (rule
  (deps "test6.eff.out.ocaml_with_header")
- (target "test6.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test6.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test6.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test6.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test6.eff.ref.ocaml_output" "test6.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test6.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test6.eff.out")
@@ -2018,17 +1752,10 @@
 
 (rule
  (deps "test7.eff.out.ocaml_with_header")
- (target "test7.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test7.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test7.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test7.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test7.eff.ref.ocaml_output" "test7.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test7.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test7.eff.out")
@@ -2070,17 +1797,10 @@
 
 (rule
  (deps "test8.eff.out.ocaml_with_header")
- (target "test8.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test8.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test8.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test8.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test8.eff.ref.ocaml_output" "test8.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test8.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test8.eff.out")
@@ -2122,17 +1842,10 @@
 
 (rule
  (deps "test9.eff.out.ocaml_with_header")
- (target "test9.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "test9.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "test9.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "test9.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "test9.eff.ref.ocaml_output" "test9.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test9.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "test9.eff.out")
@@ -2174,17 +1887,10 @@
 
 (rule
  (deps "top-letrec_fails.eff.out.ocaml_with_header")
- (target "top-letrec_fails.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "top-letrec_fails.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "top-letrec_fails.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "top-letrec_fails.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "top-letrec_fails.eff.ref.ocaml_output" "top-letrec_fails.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "top-letrec_fails.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "top-letrec_fails.eff.out")
@@ -2226,17 +1932,10 @@
 
 (rule
  (deps "two_inputs.eff.out.ocaml_with_header")
- (target "two_inputs.eff.out.ocaml_output")
-  (action
-   (with-outputs-to "two_inputs.eff.out.ocaml_output"
-    (with-accepted-exit-codes (or 0 1 2)
-     (run ocaml "two_inputs.eff.out.ocaml_with_header")))))
-
-(rule
- (deps "two_inputs.eff.out.ocaml_output")
-  (alias runtest)
-   (action
-    (diff "two_inputs.eff.ref.ocaml_output" "two_inputs.eff.out.ocaml_output")))
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "two_inputs.eff.out.ocaml_with_header"))))
 
 (rule
  (deps "two_inputs.eff.out")
