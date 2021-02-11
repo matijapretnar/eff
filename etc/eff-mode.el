@@ -20,7 +20,6 @@
     "else"
     "end"
     "effect"
-    "external"
     "finally"
     "for"
     "fun"

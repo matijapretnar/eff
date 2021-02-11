@@ -3,7 +3,7 @@ open Language
 
 let protected =
   [ "and"; "as"; "assert"; "asr"; "begin"; "class"; "constraint"; "do"; "done" ]
-  @ [ "downto"; "else"; "end"; "exception"; "external"; "false"; "for"; "fun" ]
+  @ [ "downto"; "else"; "end"; "exception"; "false"; "for"; "fun" ]
   @ [ "function"; "functor"; "if"; "in"; "include"; "inherit"; "initializer" ]
   @ [ "land"; "lazy"; "let"; "lor"; "lsl"; "lsr"; "lxor"; "match"; "method" ]
   @ [

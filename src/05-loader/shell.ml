@@ -26,13 +26,26 @@ module Make (Backend : Language.BackendSignature.T) = struct
     backend_state : Backend.state;
   }
 
+  let add_primitive state prim =
+    let x =
+      Language.CoreTypes.Variable.fresh (Primitives.primitive_name prim)
+    in
+    {
+      desugarer_state = Desugarer.load_primitive state.desugarer_state x prim;
+      type_system_state =
+        TypeSystem.load_primitive state.type_system_state x prim;
+      backend_state = Backend.load_primitive state.backend_state x prim;
+    }
+
   let initialize () =
     Random.self_init ();
-    {
-      desugarer_state = Desugarer.initial_state;
-      type_system_state = TypeSystem.initial_state;
-      backend_state = Backend.initial_state;
-    }
+    List.fold_left add_primitive
+      {
+        desugarer_state = Desugarer.initial_state;
+        type_system_state = TypeSystem.initial_state;
+        backend_state = Backend.initial_state;
+      }
+      Primitives.primitives
 
   (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
      It prints the result to [ppf] and returns the new state. *)
@@ -117,21 +130,6 @@ module Make (Backend : Language.BackendSignature.T) = struct
         let defs'' = Assoc.of_list defs' in
         let backend_state' =
           Backend.process_top_let_rec state.backend_state defs'' vars
-        in
-        {
-          desugarer_state = desugarer_state';
-          type_system_state = type_system_state';
-          backend_state = backend_state';
-        }
-    | Commands.External ext_def ->
-        let desugarer_state', (x, ty, f) =
-          Desugarer.desugar_external state.desugarer_state ext_def
-        in
-        let type_system_state' =
-          TypeSystem.extend state.type_system_state x (Type.free_params ty, ty)
-        in
-        let backend_state' =
-          Backend.process_external state.backend_state (x, ty, f)
         in
         {
           desugarer_state = desugarer_state';

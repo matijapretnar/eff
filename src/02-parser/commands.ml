@@ -11,8 +11,6 @@ and plain_command =
       (** [let p1 = t1 and ... and pn = tn] *)
   | TopLetRec of (Sugared.variable * Sugared.term) list
       (** [let rec f1 p1 = t1 and ... and fn pn = tn] *)
-  | External of (Sugared.variable * Sugared.ty * Sugared.variable)
-      (** [external x : t = "ext_val_name"] *)
   | DefEffect of (Sugared.effect * (Sugared.ty * Sugared.ty))
       (** [effect Eff : ty1 -> t2] *)
   | Term of Sugared.term

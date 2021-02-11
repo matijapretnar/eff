@@ -65,7 +65,7 @@ type cmd =
   | DefEffect of effect * (ty * ty)
   | TopLet of (pattern * term) list
   | TopLetRec of (variable * abstraction) list
-  | External of (variable * Type.ty * string)
+  | RawSource of (variable * string)
   | TyDef of (label * (CoreTypes.TyParam.t list * tydef)) list
 
 val print_cmd : cmd -> Format.formatter -> unit
