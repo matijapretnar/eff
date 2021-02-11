@@ -88,9 +88,6 @@ let loop_benchmarks =
         ( "Generated, optimized",
           forget_value LoopOpt.test_pure,
           fun n -> LoopOpt.test_pure n = () );
-        ( "Hand written",
-          forget_value LoopHandWritten.test_pure,
-          fun n -> LoopHandWritten.test_pure n = () );
         ( "Native",
           forget_value LoopNative.test_pure,
           fun n -> LoopNative.test_pure n = () );
@@ -106,9 +103,6 @@ let loop_latent_benchmarks =
         ( "Generated, optimized",
           forget_value LoopOpt.test_latent,
           always_true LoopOpt.test_latent );
-        ( "Hand written",
-          forget_value LoopHandWritten.test_latent,
-          always_true LoopHandWritten.test_latent );
         ( "Native",
           forget_value LoopNative.test_latent,
           always_true LoopNative.test_latent );
@@ -124,9 +118,6 @@ let loop_incr_benchmark num =
         ( "Generated, optimized",
           forget_value LoopOpt.test_incr,
           fun n -> LoopOpt.test_incr n = num );
-        ( "Hand written",
-          forget_value LoopHandWritten.test_incr,
-          fun n -> LoopHandWritten.test_incr n = num );
         ( "Native",
           forget_value LoopNative.test_incr,
           fun n -> LoopNative.test_incr n = num );
@@ -142,9 +133,6 @@ let loop_incr'_benchmark num =
         ( "Generated, optimized",
           forget_value LoopOpt.test_incr',
           fun n -> LoopOpt.test_incr' n = num );
-        ( "Hand written",
-          forget_value LoopHandWritten.test_incr',
-          fun n -> LoopHandWritten.test_incr' n = num );
         ( "Native",
           forget_value LoopNative.test_incr',
           fun n -> LoopNative.test_incr' n = num );
@@ -160,9 +148,6 @@ let loop_state_benchmark num =
         ( "Generated, optimized",
           forget_value LoopOpt.test_state,
           fun n -> LoopOpt.test_state n = num );
-        ( "Hand written",
-          forget_value LoopHandWritten.test_state,
-          fun n -> LoopHandWritten.test_state n = num );
         ( "Native",
           forget_value LoopNative.test_state,
           fun n -> LoopNative.test_state n = num );
@@ -178,9 +163,6 @@ let queens_one_cps_benchmark number_of_queens =
         ( "Generated, optimized",
           forget_value QueensOpt.queens_one_cps,
           always_true QueensOpt.queens_one_cps );
-        ( "Hand written",
-          forget_value QueensHandWritten.queens_one_cps,
-          always_true QueensHandWritten.queens_one_cps );
         ( "Native",
           forget_value QueensNative.queens_one_cps,
           always_true QueensNative.queens_one_cps );
@@ -196,9 +178,6 @@ let queens_one_benchmark number_of_queens =
         ( "Generated, optimized",
           forget_value QueensOpt.queens_one_option,
           always_true QueensOpt.queens_one_option );
-        ( "Hand written",
-          forget_value QueensHandWritten.queens_one_option,
-          always_true QueensHandWritten.queens_one_option );
         ( "Native",
           forget_value QueensNative.queens_one_option,
           always_true QueensNative.queens_one_option );
@@ -214,9 +193,6 @@ let queens_all_benchmark number_of_queens =
         ( "Generated, optimized",
           forget_value QueensOpt.queens_all,
           always_true QueensOpt.queens_all );
-        ( "Hand written",
-          forget_value QueensHandWritten.queens_all,
-          always_true QueensHandWritten.queens_all );
         ( "Native",
           forget_value QueensNative.queens_all,
           always_true QueensNative.queens_all );
