@@ -176,8 +176,8 @@ let queens_one_cps_benchmark number_of_queens =
     benchmarks =
       [
         ( "Generated, optimized",
-          forget_value QueensOpt._queens_one_cps_214,
-          always_true QueensOpt._queens_one_cps_214 );
+          forget_value QueensOpt._queens_one_cps_210,
+          always_true QueensOpt._queens_one_cps_210 );
         ( "Hand written",
           forget_value QueensHandWritten.queens_one_cps,
           always_true QueensHandWritten.queens_one_cps );
@@ -212,8 +212,8 @@ let queens_all_benchmark number_of_queens =
     benchmarks =
       [
         ( "Generated, optimized",
-          forget_value QueensOpt._queens_all_166,
-          always_true QueensOpt._queens_all_166 );
+          forget_value QueensOpt._queens_all_164,
+          always_true QueensOpt._queens_all_164 );
         ( "Hand written",
           forget_value QueensHandWritten.queens_all,
           always_true QueensHandWritten.queens_all );

@@ -1,12 +1,16 @@
 open Utils
 
+type specialization = Recursive | NonRecursive
+
 type state = {
   recursive_functions : (Term.variable, Term.abstraction) Assoc.t;
   non_recursive_functions : (Term.variable, Term.abstraction) Assoc.t;
   fuel : int;
   (* Cache of already specialized functions *)
   specialized_functions :
-    (Term.EffectFingerprint.t * Term.variable, Term.variable * Type.ty) Assoc.t;
+    ( Term.EffectFingerprint.t * Term.variable,
+      Term.variable * Type.ty * specialization )
+    Assoc.t;
 }
 
 let initial_state =
@@ -59,7 +63,7 @@ let abstraction_inlinability { term = pat, cmp; _ } =
   in
   check_variables (Term.pattern_vars pat)
 
-let keep_used_letrec_bindings defs cmp =
+let keep_used_bindings defs cmp =
   (* Do proper call graph analysis *)
   let free_vars_cmp_in, free_vars_cmp_out = Term.free_vars_comp cmp in
   let free_vars_defs =
@@ -332,10 +336,11 @@ and handle_computation state hnd comp =
           (hnd.term.Term.effect_clauses.fingerprint, f)
           state.specialized_functions
       with
-      | Some (f', ty') ->
+      | Some (f', ty', Recursive) ->
           Term.apply
             ( Term.var f' ty',
               Term.tuple [ exp; Term.lambda hnd.term.Term.value_clause ] )
+      | Some (f', ty', NonRecursive) -> Term.apply (Term.var f' ty', exp)
       | None -> assert false)
   | Bind (cmp, abs) -> (
       match recast_computation hnd cmp with
@@ -404,7 +409,7 @@ and reduce_computation' state comp =
           defs state
       in
       let c' = reduce_computation state' c in
-      match keep_used_letrec_bindings defs c' with
+      match keep_used_bindings defs c' with
       | [] -> c'
       | defs' -> Term.letRec (defs', c'))
   | Term.Bind (cmp, abs) -> bind_computation state cmp abs
@@ -427,35 +432,43 @@ and reduce_computation' state comp =
                  (Assoc.lookup (fingerprint, f) state.specialized_functions))
           (Assoc.to_list state.non_recursive_functions)
       in
-      let add_specialized specialized (f, abs) =
+      let add_specialized_recursive specialized (f, abs) =
         let f' = Language.CoreTypes.Variable.refresh f in
         let (ty_arg, _), ((ty_in, _), drty_out) = (abs.ty, hnd.ty) in
         let ty' =
           Type.Arrow
             (Type.Tuple [ ty_arg; Type.Arrow (ty_in, drty_out) ], drty_out)
         in
-        Assoc.update (fingerprint, f) (f', ty') specialized
+        Assoc.update (fingerprint, f) (f', ty', Recursive) specialized
+      and add_specialized_non_recursive specialized (f, abs) =
+        let f' = Language.CoreTypes.Variable.refresh f in
+        let (ty_arg, _), (_, drty_out) = (abs.ty, hnd.ty) in
+        let ty' = Type.Arrow (ty_arg, drty_out) in
+        Assoc.update (fingerprint, f) (f', ty', NonRecursive) specialized
       in
       let specialized_functions' =
-        List.fold_left add_specialized state.specialized_functions
-          (unspecialized_recursive_functions
-         @ unspecialized_non_recursive_functions)
+        List.fold_left add_specialized_recursive state.specialized_functions
+          unspecialized_recursive_functions
+      in
+      let specialized_functions'' =
+        List.fold_left add_specialized_non_recursive specialized_functions'
+          unspecialized_non_recursive_functions
       in
       let cmp' =
         handle_computation
-          { state with specialized_functions = specialized_functions' }
+          { state with specialized_functions = specialized_functions'' }
           hnd cmp
       in
       (* TODO: specialize only functions that are used, not just all with matching types *)
-      let spec_defs =
+      let spec_rec_defs =
         List.map
-          (fun (f, { term = pat, cmp; _ }) ->
-            match Assoc.lookup (fingerprint, f) specialized_functions' with
+          (fun (f, ({ term = pat, cmp; _ } as abs)) ->
+            match Assoc.lookup (fingerprint, f) specialized_functions'' with
             | Some
                 ( f',
                   Type.Arrow
-                    (Type.Tuple [ _; (Type.Arrow (ty_in, _) as ty_cont) ], _) )
-              ->
+                    (Type.Tuple [ _; (Type.Arrow (ty_in, _) as ty_cont) ], _),
+                  Recursive ) ->
                 let x_pat, x_var = Term.fresh_variable "x" ty_in
                 and k_pat, k_var = Term.fresh_variable "k" ty_cont in
                 let hnd' =
@@ -474,14 +487,22 @@ and reduce_computation' state comp =
                   handle_abstraction
                     {
                       state with
-                      specialized_functions = specialized_functions';
+                      specialized_functions = specialized_functions'';
                     }
                     hnd' abs' )
+            | Some (f', _, NonRecursive) ->
+                ( f',
+                  handle_abstraction
+                    {
+                      state with
+                      specialized_functions = specialized_functions'';
+                    }
+                    hnd abs )
             | _ -> assert false)
           (unspecialized_recursive_functions
          @ unspecialized_non_recursive_functions)
       in
-      match keep_used_letrec_bindings spec_defs cmp' with
+      match keep_used_bindings spec_rec_defs cmp' with
       | [] -> cmp'
       | defs' -> Term.letRec (defs', cmp'))
   | Term.Handle
