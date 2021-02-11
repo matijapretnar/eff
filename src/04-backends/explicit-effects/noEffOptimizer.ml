@@ -102,9 +102,7 @@ and optimize_term' state (n_term : NoEff.n_term) =
       NBind (optimize_term state term, optimize_abstraction state abs)
   | NHandle (t1, t2) -> NHandle (optimize_term state t1, optimize_term state t2)
   | NLetRec (abs_lst, term) ->
-      NLetRec
-        ( List.map (optimize_letrec_abstraction state) abs_lst,
-          optimize_term state term )
+      NLetRec (optimize_rec_definitions state abs_lst, optimize_term state term)
   | NMatch (term, abs_list) ->
       NMatch
         ( optimize_term state term,
@@ -119,6 +117,9 @@ and optimize_handler state (hnd : NoEff.n_handler) =
     effect_clauses = Assoc.map (n_abstraction_2_args state) hnd.effect_clauses;
   }
 
+and optimize_rec_definitions state defs =
+  Assoc.map (optimize_abstraction state) defs
+
 and optimize_abstraction state ((pat, term) : NoEff.n_abstraction) =
   (pat, optimize_term state term)
 
@@ -126,9 +127,6 @@ and optimize_abstraction_with_ty state
     ((pat, ty, term) : NoEff.n_abstraction_with_param_ty) =
   let pat, term = optimize_abstraction state (pat, term) in
   (pat, ty, term)
-
-and optimize_letrec_abstraction state (v, abs) =
-  (v, optimize_abstraction state abs)
 
 and n_abstraction_2_args state ((pat1, pat2, term) : NoEff.n_abstraction_2_args)
     =

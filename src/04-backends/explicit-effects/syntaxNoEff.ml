@@ -73,7 +73,7 @@ type n_term =
   | NBind of n_term * n_abstraction
   | NHandle of n_term * n_term
   | NConst of Const.t
-  | NLetRec of n_letrec_abstraction list * n_term
+  | NLetRec of n_rec_definitions * n_term
   | NMatch of n_term * n_abstraction list
   | NRecord of (CoreTypes.Field.t, n_term) Assoc.t
   | NVariant of CoreTypes.Label.t * n_term option
@@ -89,7 +89,7 @@ and n_abstraction_with_param_ty = n_pattern * n_type * n_term
 
 and n_abstraction_2_args = n_pattern * n_pattern * n_term
 
-and n_letrec_abstraction = variable * n_abstraction
+and n_rec_definitions = (variable, n_abstraction) Assoc.t
 
 type n_tydef =
   | TyDefRecord of (CoreTypes.Field.t, n_type) Assoc.t
@@ -99,7 +99,7 @@ type n_tydef =
 type cmd =
   | Term of n_term
   | TopLet of variable * n_term
-  | TopLetRec of variable * n_abstraction
+  | TopLetRec of n_rec_definitions
   | DefEffect of n_effect
   | External of (variable * n_type * string)
   | TyDef of (CoreTypes.TyName.t * (CoreTypes.TyParam.t list * n_tydef)) list
@@ -125,8 +125,8 @@ let rec subs_var_in_term par subs term =
       NHandle (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
   | NConst c -> NConst c
   | NLetRec (abss, t) ->
-      let subs_letrec (var, abs) = (var, subs_var_in_abs par subs abs) in
-      NLetRec (List.map subs_letrec abss, subs_var_in_term par subs t)
+      NLetRec
+        (Assoc.map (subs_var_in_abs par subs) abss, subs_var_in_term par subs t)
   | NMatch (t, abss) ->
       NMatch
         (subs_var_in_term par subs t, List.map (subs_var_in_abs par subs) abss)
@@ -199,7 +199,8 @@ let rec substitute_term sbst n_term =
       NHandle ((substitute_term sbst) t1, (substitute_term sbst) t2)
   | NConst _ -> n_term
   | NLetRec (lst, t) ->
-      NLetRec (List.map (substitute_letrec sbst) lst, (substitute_term sbst) t)
+      NLetRec
+        (Assoc.map (substitute_abstraction sbst) lst, (substitute_term sbst) t)
   | NMatch (t, abs) ->
       NMatch
         ((substitute_term sbst) t, List.map (substitute_abstraction sbst) abs)
@@ -207,8 +208,6 @@ let rec substitute_term sbst n_term =
   | NVariant (lbl, a) -> NVariant (lbl, Option.map (substitute_term sbst) a)
 
 and substitute_abstraction sbst (p, c) = (p, substitute_term sbst c)
-
-and substitute_letrec sbst (p, a) = (p, substitute_abstraction sbst a)
 
 and substitute_abstraction_with_ty sbst (p, ty, c) =
   (p, ty, substitute_term sbst c)
@@ -250,7 +249,8 @@ let rec free_vars = function
   | NBind (e, a) -> free_vars e @@@ free_vars_abs a
   | NConst _ -> ([], [])
   | NLetRec (defs, c) ->
-      (List.map free_vars_letrec defs |> concat_vars) @@@ free_vars c
+      (List.map free_vars_letrec (Assoc.to_list defs) |> concat_vars)
+      @@@ free_vars c
   | NMatch (e, l) -> free_vars e @@@ concat_vars (List.map free_vars_abs l)
   | NRecord r -> Assoc.values_of r |> List.map free_vars |> concat_vars
   | NVariant (_, e) -> Option.default_map ([], []) free_vars e
@@ -382,7 +382,7 @@ let rec print_term ?max_level t ppf =
   | NConst c -> Const.print c ppf
   | NLetRec (lst, t) ->
       print ~at_level:2 "let rec @[<hov>%t@] in %t"
-        (Print.sequence " and " print_let_rec_abstraction lst)
+        (Print.sequence " and " print_let_rec_abstraction (Assoc.to_list lst))
         (print_term t)
   | NMatch (t, lst) ->
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_term t)

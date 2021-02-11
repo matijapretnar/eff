@@ -22,22 +22,22 @@ type (_, _) effect += DivByZero : (unit, int) effect
 let _bigTest_5 (() : unit) =
   let rec _interp_6 _x_43 =
     match _x_43 with
-    | Num _b_8 -> Value _b_8
-    | Add (_l_9, _r_10) ->
-        _interp_6 _l_9 >> fun _x_11 ->
-        _interp_6 _r_10 >> fun _y_12 -> Value (_op_0 (* + *) _x_11 _y_12)
-    | Mul (_l_14, _r_15) ->
-        _interp_6 _l_14 >> fun _x_16 ->
-        _interp_6 _r_15 >> fun _y_17 -> Value (_op_1 (* * *) _x_16 _y_17)
-    | Sub (_l_19, _r_20) ->
-        _interp_6 _l_19 >> fun _x_21 ->
-        _interp_6 _r_20 >> fun _y_22 -> Value (_op_2 (* - *) _x_21 _y_22)
-    | Div (_l_24, _r_25) -> (
-        _interp_6 _r_25 >> fun _y_26 ->
-        _interp_6 _l_24 >> fun _x_27 ->
-        match _y_26 with
-        | 0 -> Call (DivByZero, (), fun (_y_42 : int) -> Value _y_42)
-        | _ -> Value (_op_4 (* / *) _x_27 _y_26))
+    | Num _b_55 -> Value _b_55
+    | Add (_l_57, _r_56) ->
+        _interp_6 _l_57 >> fun _x_58 ->
+        _interp_6 _r_56 >> fun _y_59 -> Value (_op_0 (* + *) _x_58 _y_59)
+    | Mul (_l_62, _r_61) ->
+        _interp_6 _l_62 >> fun _x_63 ->
+        _interp_6 _r_61 >> fun _y_64 -> Value (_op_1 (* * *) _x_63 _y_64)
+    | Sub (_l_67, _r_66) ->
+        _interp_6 _l_67 >> fun _x_68 ->
+        _interp_6 _r_66 >> fun _y_69 -> Value (_op_2 (* - *) _x_68 _y_69)
+    | Div (_l_72, _r_71) -> (
+        _interp_6 _r_71 >> fun _y_73 ->
+        _interp_6 _l_72 >> fun _x_74 ->
+        match _y_73 with
+        | 0 -> Call (DivByZero, (), fun (_y_75 : int) -> Value _y_75)
+        | _ -> Value (_op_4 (* / *) _x_74 _y_73))
   in
   let _addCase_29 =
     Add

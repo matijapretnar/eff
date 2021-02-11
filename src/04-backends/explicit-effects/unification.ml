@@ -127,7 +127,15 @@ let skel_eq_step sub paused rest_queue sk1 sk2 =
         Constraint.add_list_to_constraints
           (List.map2 (fun sk1 sk2 -> Constraint.SkelEq (sk1, sk2)) sks1 sks2)
           rest_queue )
-  | _ -> failwith __LOC__
+  | SkelTuple sks1, SkelTuple sks2 when List.length sks1 = List.length sks2 ->
+      ( sub,
+        paused,
+        Constraint.add_list_to_constraints
+          (List.map2 (fun sk1 sk2 -> Constraint.SkelEq (sk1, sk2)) sks1 sks2)
+          rest_queue )
+  | _ ->
+      Print.debug "%t = %t" (Type.print_skeleton sk1) (Type.print_skeleton sk2);
+      assert false
 
 let ty_omega_step sub paused cons rest_queue omega = function
   (* ω : A <= A *)

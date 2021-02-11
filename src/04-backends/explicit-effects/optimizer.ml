@@ -67,12 +67,12 @@ let keep_used_bindings defs cmp =
   (* Do proper call graph analysis *)
   let free_vars_cmp_in, free_vars_cmp_out = Term.free_vars_comp cmp in
   let free_vars_defs =
-    List.map (fun (_, a) -> fst (Term.free_vars_abs a)) defs
+    List.map (fun (_, a) -> fst (Term.free_vars_abs a)) (Assoc.to_list defs)
   in
   let free_vars =
     List.flatten (free_vars_cmp_in :: free_vars_cmp_out :: free_vars_defs)
   in
-  List.filter (fun (x, _) -> List.mem x free_vars) defs
+  List.filter (fun (x, _) -> List.mem x free_vars) (Assoc.to_list defs)
 
 let rec extract_cast_value comp =
   match comp.term with
@@ -220,7 +220,9 @@ and optimize_computation' state cmp =
   | Term.Value exp -> Term.value (optimize_expression state exp)
   | Term.LetVal (exp, abs) ->
       Term.letVal (optimize_expression state exp, optimize_abstraction state abs)
-  | Term.LetRec (defs, cmp) -> Term.letRec (defs, optimize_computation state cmp)
+  | Term.LetRec (defs, cmp) ->
+      Term.letRec
+        (optimize_rec_definitions state defs, optimize_computation state cmp)
   | Term.Match (exp, cases) ->
       Term.match_
         ( optimize_expression state exp,
@@ -267,6 +269,9 @@ and optimize_abstraction2 state abs2 =
 
 and optimize_abstraction2' state (pat1, pat2, cmp) =
   (pat1, pat2, optimize_computation state cmp)
+
+and optimize_rec_definitions state defs =
+  Assoc.map (optimize_abstraction state) defs
 
 and cast_expression _state exp coer =
   match (exp.term, coer.term) with
@@ -404,14 +409,14 @@ and reduce_computation' state comp =
         drty_coer
   | Term.LetRec (defs, c) -> (
       let state' =
-        List.fold_right
+        Assoc.fold_right
           (fun (v, abs) state -> add_recursive_function state v abs)
           defs state
       in
       let c' = reduce_computation state' c in
       match keep_used_bindings defs c' with
       | [] -> c'
-      | defs' -> Term.letRec (defs', c'))
+      | defs' -> Term.letRec (Assoc.of_list defs', c'))
   | Term.Bind (cmp, abs) -> bind_computation state cmp abs
   | Term.Handle ({ term = Term.Handler hnd; _ }, cmp) -> (
       let fingerprint = hnd.term.effect_clauses.fingerprint in
@@ -474,9 +479,9 @@ and reduce_computation' state comp =
             | _ -> assert false)
           unspecialized_declared_functions
       in
-      match keep_used_bindings spec_rec_defs cmp' with
+      match keep_used_bindings (Assoc.of_list spec_rec_defs) cmp' with
       | [] -> cmp'
-      | defs' -> Term.letRec (defs', cmp'))
+      | defs' -> Term.letRec (Assoc.of_list defs', cmp'))
   | Term.Handle
       ( {
           term =

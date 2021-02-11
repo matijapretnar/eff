@@ -64,7 +64,7 @@ and computation = (computation', Type.dirty) typed
 and computation' =
   | Value of expression
   | LetVal of expression * abstraction
-  | LetRec of letrec_abstraction list * computation
+  | LetRec of rec_definitions * computation
   (* Historical note: Previously LetRec looked like this:
 
        LetRec of (variable * Type.ty * expression) list * computation
@@ -94,9 +94,7 @@ and handler' = { effect_clauses : effect_clauses; value_clause : abstraction }
 and abstraction = (pattern * computation, Type.ty * Type.dirty) typed
 (** Abstractions that take one argument. *)
 
-and letrec_abstraction = variable * abstraction
-(** LetRec Abstractions: function name, result type, pattern,
-    and right-hand side *)
+and rec_definitions = (variable, abstraction) Assoc.t
 
 and abstraction2 =
   (pattern * pattern * computation, Type.ty * Type.ty * Type.dirty) typed
@@ -292,7 +290,7 @@ and print_computation' ?max_level c ppf =
         (print_computation ~max_level:0 c)
   | LetRec (lst, c) ->
       print ~at_level:3 "let rec %t in %t"
-        (Print.sequence " and " print_let_rec_abstraction lst)
+        (Print.sequence " and " print_let_rec_abstraction (Assoc.to_list lst))
         (print_computation c)
   | Call (eff, e, a) ->
       print ~at_level:2 "%t(%t; %t)" (print_effect eff)
@@ -402,15 +400,17 @@ and refresh_computation' sbst = function
           (fun (x, _) (new_xs, sbst') ->
             let x' = CoreTypes.Variable.refresh x in
             (x' :: new_xs, Assoc.update x x' sbst'))
-          li ([], sbst)
+          (Assoc.to_list li) ([], sbst)
       in
       let li' =
         List.map
           (fun (x', abs) -> (x', abs))
           (List.combine new_xs
-             (List.map (fun (_, abs) -> refresh_abstraction sbst' abs) li))
+             (List.map
+                (fun (_, abs) -> refresh_abstraction sbst' abs)
+                (Assoc.to_list li)))
       in
-      LetRec (li', refresh_computation sbst' c1)
+      LetRec (Assoc.of_list li', refresh_computation sbst' c1)
   | Match (e, li) ->
       Match (refresh_expression sbst e, List.map (refresh_abstraction sbst) li)
   | Apply (e1, e2) ->
@@ -475,15 +475,7 @@ and subst_comp' sbst = function
   | LetVal (e1, abs) ->
       (* XXX Should we check that x does not appear in sbst? *)
       LetVal (subst_expr sbst e1, subst_abs sbst abs)
-  | LetRec (li, c1) ->
-      let li' =
-        List.map
-          (fun (x, abs) ->
-            (* XXX Should we check that x does not appear in sbst? *)
-            (x, subst_abs sbst abs))
-          li
-      in
-      LetRec (li', subst_comp sbst c1)
+  | LetRec (li, c1) -> LetRec (Assoc.map (subst_abs sbst) li, subst_comp sbst c1)
   | Match (e, li) -> Match (subst_expr sbst e, List.map (subst_abs sbst) li)
   | Apply (e1, e2) -> Apply (subst_expr sbst e1, subst_expr sbst e2)
   | Handle (e, c) -> Handle (subst_expr sbst e, subst_comp sbst c)
@@ -668,7 +660,7 @@ let rec free_vars_comp c =
       let xs, vars =
         List.fold_right
           (fun (x, abs) (xs, vars) -> (x :: xs, free_vars_abs abs @@@ vars))
-          li
+          (Assoc.to_list li)
           ([], free_vars_comp c1)
       in
       vars --- xs
@@ -781,12 +773,9 @@ and free_params_computation' c =
   | LetVal (e, abs) ->
       Type.FreeParams.union (free_params_expression e)
         (free_params_abstraction abs)
-  | LetRec (defs, c) -> (
-      match defs with
-      | [ (_f, abs) ] ->
-          free_params_abstraction abs
-          |> Type.FreeParams.union (free_params_computation c)
-      | _ -> failwith __LOC__)
+  | LetRec (defs, c) ->
+      free_params_definitions defs
+      |> Type.FreeParams.union (free_params_computation c)
   | Match (e, cases) ->
       List.fold_left
         (fun free case ->
@@ -817,3 +806,8 @@ and free_params_abstraction abs =
     (free_params_abstraction' abs.term)
 
 and free_params_abstraction' (_, c) = free_params_computation c
+
+and free_params_definitions defs =
+  Type.FreeParams.union_map
+    (fun (_, abs) -> free_params_abstraction abs)
+    (Assoc.to_list defs)

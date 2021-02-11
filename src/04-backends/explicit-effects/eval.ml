@@ -73,11 +73,7 @@ let rec ceval state c =
   | Term.LetVal (e, { term = p, c; _ }) ->
       eval_let state [ (p, Term.value e) ] c
   | Term.LetRec (defs, c) ->
-      (* strip types *)
-      let stripped =
-        List.map (fun (v, abs) -> (v, abs)) defs |> Assoc.of_list
-      in
-      let state = extend_let_rec state stripped in
+      let state = extend_let_rec state defs in
       ceval state c
   | Term.Call ((eff, _), e, a) ->
       let e' = veval state e in

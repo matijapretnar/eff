@@ -11,10 +11,10 @@ let _two_3 = 2
 let _three_4 = 3
 
 ;;
-let rec _f_20 (_x_18, _k_22) =
-  let _l_15 (_y_24 : bool) =
-    _k_22 (match _y_24 with true -> 2 | false -> 3)
+let rec _f_23 (_x_18, _k_25) =
+  let _l_15 (_y_20 : bool) =
+    _k_25 (match _y_20 with true -> 2 | false -> 3)
   in
   _op_2 (* + *) (_l_15 true) (_l_15 false)
 in
-_f_20 ((), fun (_x_9 : int) -> _x_9)
+_f_23 ((), fun (_x_9 : int) -> _x_9)

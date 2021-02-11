@@ -237,12 +237,8 @@ and elab_computation' c =
       let elababs = elab_abstraction abs in
       NoEff.NLet (elabv, elababs)
   | ExEff.LetRec (abs_list, comp) ->
-      let elab_letrec_abs (var, abs) =
-        let elaba = elab_abstraction abs in
-        (var, elaba)
-      in
       let elabcomp = elab_computation comp in
-      NoEff.NLetRec (List.map elab_letrec_abs abs_list, elabcomp)
+      NoEff.NLetRec (elab_rec_definitions abs_list, elabcomp)
   | ExEff.Match (value, abs_lst) -> (
       let elabv = elab_expression value in
       match abs_lst with
@@ -290,6 +286,8 @@ and elab_computation' c =
       let elabc = elab_dirty_coercion coer in
       let coelab = elab_computation comp in
       NoEff.NCast (coelab, elabc)
+
+and elab_rec_definitions defs = Assoc.map elab_abstraction defs
 
 let rec elab_source_ty = function
   | Language.Type.Apply (name, ts) ->

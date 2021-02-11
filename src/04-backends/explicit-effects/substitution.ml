@@ -208,8 +208,8 @@ and apply_sub_comp' sub computation =
   match computation with
   | Value e -> Value (apply_sub_exp sub e)
   | LetVal (e1, abs) -> LetVal (apply_sub_exp sub e1, apply_sub_abs sub abs)
-  | LetRec ([ letrec ], c1) ->
-      LetRec ([ apply_sub_letrec_abs sub letrec ], apply_sub_comp sub c1)
+  | LetRec (defs, c1) ->
+      LetRec (apply_sub_definitions sub defs, apply_sub_comp sub c1)
   | Match (e, alist) ->
       Match (apply_sub_exp sub e, List.map (apply_sub_abs sub) alist)
   | Apply (e1, e2) -> Apply (apply_sub_exp sub e1, apply_sub_exp sub e2)
@@ -219,7 +219,6 @@ and apply_sub_comp' sub computation =
   | Bind (c1, a1) -> Bind (apply_sub_comp sub c1, apply_sub_abs sub a1)
   | CastComp (c1, dc1) ->
       CastComp (apply_sub_comp sub c1, apply_sub_dirtycoer sub dc1)
-  | _ -> failwith __LOC__
 
 and apply_sub_exp sub expression =
   {
@@ -263,7 +262,7 @@ and apply_sub_pat' sub pat =
   | PConst _ -> pat
   | PNonbinding -> pat
 
-and apply_sub_letrec_abs sub (f, abs) = (f, apply_sub_abs sub abs)
+and apply_sub_definitions sub defs = Assoc.map (apply_sub_abs sub) defs
 
 and apply_sub_abs2 sub abs2 =
   { term = apply_sub_abs2' sub abs2.term; ty = apply_sub_abs2_ty sub abs2.ty }

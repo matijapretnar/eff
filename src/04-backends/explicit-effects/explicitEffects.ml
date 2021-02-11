@@ -15,7 +15,7 @@ module type ExplicitBackend = sig
 
   val process_top_let : state -> Term.variable * Term.expression -> state
 
-  val process_top_let_rec : state -> Term.variable * Term.abstraction -> state
+  val process_top_let_rec : state -> Term.rec_definitions -> state
 
   val process_external : state -> Term.variable * Type.ty * string -> state
 
@@ -113,34 +113,34 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
     | _ -> failwith __LOC__
 
   let process_top_let_rec state defs _vars =
-    match Assoc.to_list defs with
-    | [] -> assert false
-    | [ (f, a) ] ->
-        let a' =
-          ExplicitInfer.top_level_rec_abstraction state.type_system_state f a
-        in
-        let a'' =
-          if !Config.enable_optimization then
-            Optimizer.optimize_abstraction state.optimizer_state a'
-          else a'
-        in
-        let ty_in, drty_out = a''.ty in
-        let fun_ty = Type.Arrow (ty_in, drty_out) in
-        let type_system_state' =
-          ExplicitInfer.extend_var state.type_system_state f fun_ty
-        in
-        let optimizer_state' =
-          Optimizer.add_recursive_function state.optimizer_state f a''
-        in
-        let backend_state' =
-          ExBackend.process_top_let_rec state.backend_state (f, a'')
-        in
-        {
-          type_system_state = type_system_state';
-          optimizer_state = optimizer_state';
-          backend_state = backend_state';
-        }
-    | _ -> failwith __LOC__
+    let defs' =
+      ExplicitInfer.top_level_rec_abstraction state.type_system_state
+        (Assoc.to_list defs)
+    in
+    let defs'' =
+      if !Config.enable_optimization then
+        Optimizer.optimize_rec_definitions state.optimizer_state defs'
+      else defs'
+    in
+    let type_system_state' =
+      Assoc.fold_left
+        (fun state (f, abs) ->
+          ExplicitInfer.extend_var state f (Type.Arrow abs.ty))
+        state.type_system_state defs''
+    in
+    let optimizer_state' =
+      Assoc.fold_left
+        (fun state (f, abs) -> Optimizer.add_recursive_function state f abs)
+        state.optimizer_state defs''
+    in
+    let backend_state' =
+      ExBackend.process_top_let_rec state.backend_state defs''
+    in
+    {
+      type_system_state = type_system_state';
+      optimizer_state = optimizer_state';
+      backend_state = backend_state';
+    }
 
   let process_external state (x, ty, name) =
     let ty = Type.source_to_target state.type_system_state.tydefs ty in
@@ -199,14 +199,14 @@ module Evaluate : Language.BackendSignature.T = Make (struct
       (Type.print_ty exp.ty) (V.print_value v);
     { evaluation_state = Eval.update x v state.evaluation_state }
 
-  let process_top_let_rec state (f, abs) =
-    Format.fprintf !Config.output_formatter "@[%t : %t = <fun>@]@."
-      (Language.CoreTypes.Variable.print f)
-      (Type.print_ty (Type.Arrow abs.ty));
-    {
-      evaluation_state =
-        Eval.extend_let_rec state.evaluation_state (Assoc.of_list [ (f, abs) ]);
-    }
+  let process_top_let_rec state defs =
+    Assoc.iter
+      (fun (f, abs) ->
+        Format.fprintf !Config.output_formatter "@[%t : %t = <fun>@]@."
+          (Language.CoreTypes.Variable.print f)
+          (Type.print_ty (Type.Arrow abs.ty)))
+      defs;
+    { evaluation_state = Eval.extend_let_rec state.evaluation_state defs }
 
   let process_external state (x, _ty, f) =
     let evaluation_state' =
@@ -244,14 +244,14 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     in
     t'
 
-  let optimize_abstraction state abstraction =
-    let t' =
+  let optimize_rec_definitions state defs =
+    let defs' =
       if !Config.enable_optimization then
-        NoEffOptimizer.optimize_abstraction state.no_eff_optimizer_state
-          abstraction
-      else abstraction
+        NoEffOptimizer.optimize_rec_definitions state.no_eff_optimizer_state
+          defs
+      else defs
     in
-    t'
+    defs'
 
   let process_computation state c =
     let c' = optimize_term state @@ TranslateExEff2NoEff.elab_computation c in
@@ -273,11 +273,12 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     let t = optimize_term state @@ TranslateExEff2NoEff.elab_expression e in
     { state with prog = SyntaxNoEff.TopLet (x, t) :: state.prog }
 
-  let process_top_let_rec state (x, a) =
-    let t =
-      optimize_abstraction state @@ TranslateExEff2NoEff.elab_abstraction a
+  let process_top_let_rec state defs =
+    let defs' =
+      optimize_rec_definitions state
+      @@ TranslateExEff2NoEff.elab_rec_definitions defs
     in
-    { state with prog = SyntaxNoEff.TopLetRec (x, t) :: state.prog }
+    { state with prog = SyntaxNoEff.TopLetRec defs' :: state.prog }
 
   let process_external state (x, ty, name) =
     {

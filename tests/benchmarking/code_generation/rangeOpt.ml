@@ -14,16 +14,16 @@ let _test_1 (_n_2 : int) =
         Call
           ( Fetch,
             (),
-            fun (_x_0 : int) ->
-              _range_3 (_op_0 (* - *) _x_15 1) >> fun _b_6 ->
-              Value (Cons (_x_0, _b_6)) )
+            fun (_y_21 : int) ->
+              _range_3 (_op_0 (* - *) _x_15 1) >> fun _b_29 ->
+              Value (Cons (_y_21, _b_29)) )
   in
-  let rec _range_18 (_x_15, _k_20) =
+  let rec _range_30 (_x_15, _k_32) =
     match _x_15 with
-    | 0 -> _k_20 Nil
+    | 0 -> _k_32 Nil
     | _ ->
-        _range_18
+        _range_30
           ( _op_0 (* - *) _x_15 1,
-            fun (_b_37 : int_list) -> _k_20 (Cons (42, _b_37)) )
+            fun (_b_39 : int_list) -> _k_32 (Cons (42, _b_39)) )
   in
-  _range_18 (_n_2, fun (_x_10 : int_list) -> _x_10)
+  _range_30 (_n_2, fun (_x_10 : int_list) -> _x_10)

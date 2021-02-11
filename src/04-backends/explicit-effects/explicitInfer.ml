@@ -534,14 +534,7 @@ and tcComp' state : Untyped.plain_computation -> tcCompOutput' = function
   | Let ((pat, c1) :: rest, c2) ->
       let subCmp = { it = Untyped.Let (rest, c2); at = c2.at } in
       tcComp' state (Untyped.Let ([ (pat, c1) ], subCmp))
-  (* Nest a list of letrec-bindings; MUTUAL RECURSION NOT ALLOWED AT THE MOMENT *)
-  | LetRec ([], c2) ->
-      let c, cnstrs = tcComp state c2 in
-      ((c.term, c.ty), cnstrs)
-  | LetRec ([ (var, abs) ], c2) -> tcLetRecNoGen state var abs c2
-  | LetRec ((var, abs) :: rest, c2) ->
-      let subCmp = { it = Untyped.LetRec (rest, c2); at = c2.at } in
-      tcComp' state (Untyped.LetRec ([ (var, abs) ], subCmp))
+  | LetRec (defs, c2) -> tcLetRecNoGen state defs c2
   (* Pattern Matching: Special Case 2: Variable-binding *)
   | Match (scr, [ (p, c) ]) when isLocatedVarPat p ->
       tcComp' state
@@ -619,31 +612,44 @@ and tcLet state (pdef : Untyped.pattern) (c1 : Untyped.computation)
   | _other_computation -> tcLetCmp state pdef c1 c2
 
 (* Typecheck a (potentially) recursive let *)
-and infer_let_rec state (var : Untyped.variable) (abs : Untyped.abstraction) =
+and infer_let_rec state defs =
   (* 1: Generate fresh variables for everything *)
-  let alpha, alphaSkel = Constraint.fresh_ty_with_fresh_skel () in
-  let betadelta, betaSkel = Constraint.fresh_dirty_with_fresh_skel () in
-
-  (* 2: Typecheck the abstraction *)
-  let abs, cs1 =
-    infer_abstraction (extend_var state var (Type.Arrow (alpha, betadelta))) abs
+  let defs' =
+    List.map
+      (fun (x, abs) ->
+        let alpha, alphaSkel = Constraint.fresh_ty_with_fresh_skel () in
+        let betadelta, betaSkel = Constraint.fresh_dirty_with_fresh_skel () in
+        (x, abs, alpha, betadelta, [ alphaSkel; betaSkel ]))
+      defs
   in
+  let state' =
+    List.fold_left
+      (fun state (x, _, alpha, betadelta, _) ->
+        extend_var state x (Type.Arrow (alpha, betadelta)))
+      state defs'
+  in
+  let defs'', cnstrs =
+    List.fold_right
+      (fun (x, abs, alpha, betadelta, cs3) (defs, cnstrs) ->
+        let abs', cs1 = infer_abstraction state' abs in
+        let abs'', cs2 = Term.full_cast_abstraction abs' alpha betadelta in
+        ((x, abs'') :: defs, cs1 @ cs2 @ cs3 @ cnstrs))
+      defs' ([], [])
+  in
+  (Assoc.of_list defs'', cnstrs)
 
-  let abs', cs2 = Term.full_cast_abstraction abs alpha betadelta in
-
-  let outCs = (alphaSkel :: betaSkel :: cs1) @ cs2 in
-
-  (abs', outCs)
-
-and tcLetRecNoGen state (var : Untyped.variable) (abs : Untyped.abstraction)
-    (c2 : Untyped.computation) : tcCompOutput' =
-  let abs, cs1 = infer_let_rec state var abs in
-
+and tcLetRecNoGen state defs (c2 : Untyped.computation) : tcCompOutput' =
+  let defs', cs1 = infer_let_rec state defs in
+  let state' =
+    List.fold_left
+      (fun state (x, abs) -> extend_var state x (Type.Arrow abs.ty))
+      state (Assoc.to_list defs')
+  in
   (* 3: Typecheck c2 *)
-  let trgC2, cs2 = tcComp (extend_var state var (Type.Arrow abs.ty)) c2 in
+  let trgC2, cs2 = tcComp state' c2 in
 
   (* 5: Combine the results *)
-  let outExpr = Term.LetRec ([ (var, abs) ], trgC2) in
+  let outExpr = Term.LetRec (defs', trgC2) in
 
   let outCs = cs1 @ cs2 in
   ((outExpr, trgC2.ty), outCs)
@@ -765,7 +771,7 @@ and tcCheck (_state : state) (_cmp : Untyped.computation) : tcCompOutput' =
  * we mean that we have inferred "some" type (could be instantiated later).
  * Hence, we conservatively ask for the pattern to be a variable pattern (cf.
  * tcTypedVarPat) *)
-and infer_abstraction state (pat, cmp) :
+and infer_abstraction (state : state) (pat, cmp) :
     Term.abstraction * Constraint.omega_ct list =
   let trgPat, state', cs1 = infer_pattern state pat in
   let trgCmp, cs2 = tcComp state' cmp in
@@ -928,10 +934,10 @@ let infer_expression state expr =
   let sub, residuals = Unification.solve cnstrs in
   (subInExp sub expr', residuals)
 
-let infer_rec_abstraction state f abs =
-  let abs', cnstrs = infer_let_rec state f abs in
+let infer_rec_abstraction state defs =
+  let defs', cnstrs = infer_let_rec state defs in
   let sub, residuals = Unification.solve cnstrs in
-  (subInAbs sub abs', residuals)
+  (Substitution.apply_sub_definitions sub defs', residuals)
 
 (* Typecheck a top-level expression *)
 let top_level_computation state comp =
@@ -949,27 +955,27 @@ let top_level_computation state comp =
   assert (Type.FreeParams.is_empty (Term.free_params_computation mono_comp));
   mono_comp
 
-let top_level_rec_abstraction state x (abs : Untyped.abstraction) =
-  let abs, residuals = infer_rec_abstraction state x abs in
+let top_level_rec_abstraction state defs =
+  let defs, residuals = infer_rec_abstraction state defs in
   (* Print.debug "TERM: %t" (Term.print_abstraction abs); *)
   (* Print.debug "TYPE: %t" (Type.print_abs_ty abs.ty); *)
   (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
-  let free_ty_params = Type.free_params_abstraction_ty abs.ty in
-  let mono_sub = monomorphize free_ty_params residuals in
-  let mono_abs = subInAbs mono_sub abs in
+  let free_params = Term.free_params_definitions defs in
+  let mono_sub = monomorphize free_params residuals in
+  let mono_defs = Substitution.apply_sub_definitions mono_sub defs in
   (* Print.debug "MONO TERM: %t" (Term.print_abstraction mono_abs); *)
   (* Print.debug "MONO TYPE: %t" (Type.print_abs_ty abs.ty); *)
   (* We assume that all free variables in the term already appeared in its type or constraints *)
-  assert (Type.FreeParams.is_empty (Term.free_params_abstraction mono_abs));
-  mono_abs
+  (* assert (Type.FreeParams.is_empty (Term.free_params_abstraction mono_abs)); *)
+  mono_defs
 
 let top_level_expression state expr =
   let expr, residuals = infer_expression state expr in
   (* Print.debug "TERM: %t" (Term.print_expression expr); *)
   (* Print.debug "TYPE: %t" (Type.print_ty expr.ty); *)
   (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
-  let free_ty_params = Type.free_params_ty expr.ty in
-  let mono_sub = monomorphize free_ty_params residuals in
+  let free_params = Term.free_params_expression expr in
+  let mono_sub = monomorphize free_params residuals in
   (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
   let mono_expr = subInExp mono_sub expr in
   (* Print.debug "MONO TERM: %t" (Term.print_expression mono_expr); *)

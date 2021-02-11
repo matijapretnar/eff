@@ -3,14 +3,13 @@ type(_, _) effect += Decide : (unit, bool) effect
 type int_list = Nil | Cons of (int * int_list)
 
 ;;
-let rec _op_0 (* @ *) = 
-     fun  _x_20 -> fun (_ys_2: int_list) -> match _x_20 with
-                                              Nil -> _ys_2
-                                             |  Cons ((_x_3, _xs_4)) -> Cons (
-                                                                    _x_3, 
+let rec _op_0 (* @ *) _x_20 = 
+      fun (_ys_39: int_list) -> match _x_20 with
+                                  Nil -> _ys_39
+                                 |  Cons ((_x_41, _xs_40)) -> Cons (_x_41, 
                                                                     _op_0 (* @ *) 
-                                                                    _xs_4 
-                                                                    _ys_2) 
+                                                                    _xs_40 
+                                                                    _ys_39) 
    in 
    let _l_21 = fun (_y_37: bool) -> Cons ((match _y_37 with
                                              true -> 10

@@ -92,3 +92,5 @@ val apply_sub_dirtycoer :
 
 val print_substitutions : t -> Format.formatter -> unit
 (** [print_substitutions subs] Prints [subs] *)
+
+val apply_sub_definitions : t -> Term.rec_definitions -> Term.rec_definitions
