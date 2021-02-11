@@ -1,6 +1,6 @@
 open Utils
 
-type recursive = Recursive | NonRecursive
+type recursive = TailRecursive | Recursive | NonRecursive
 
 type state = {
   declared_functions : (Term.variable, Term.abstraction * recursive) Assoc.t;
@@ -24,10 +24,17 @@ let reduce_if_fuel reduce_term state term =
   else term
 
 let add_recursive_function state x abs =
+  let recursive =
+    Language.CoreTypes.Variable.fold
+      (fun x _ ->
+        if String.length x > 2 && String.sub x 0 2 = "tr" then TailRecursive
+        else Recursive)
+      x
+  in
   {
     state with
     declared_functions =
-      Assoc.update x (abs, Recursive) state.declared_functions;
+      Assoc.update x (abs, recursive) state.declared_functions;
   }
 
 let add_non_recursive_function state x abs =
@@ -346,6 +353,7 @@ and handle_computation state hnd comp =
             ( Term.var f' ty',
               Term.tuple [ exp; Term.lambda hnd.term.Term.value_clause ] )
       | Some (f', ty', NonRecursive) -> Term.apply (Term.var f' ty', exp)
+      | Some (f', ty', TailRecursive) -> Term.apply (Term.var f' ty', exp)
       | None -> assert false)
   | Bind (cmp, abs) -> (
       match recast_computation hnd cmp with
@@ -438,6 +446,7 @@ and reduce_computation' state comp =
               Type.Arrow
                 (Type.Tuple [ ty_arg; Type.Arrow (ty_in, drty_out) ], drty_out)
           | NonRecursive -> Type.Arrow (ty_arg, drty_out)
+          | TailRecursive -> Type.Arrow (ty_arg, drty_out)
         in
         Assoc.update (fingerprint, f) (f', ty', spec) specialized
       in
@@ -475,6 +484,8 @@ and reduce_computation' state comp =
                 let abs' = Term.abstraction (Term.pTuple [ pat; k_pat ], cmp) in
                 (f', handle_abstraction state' hnd' abs')
             | Some (f', _, NonRecursive) ->
+                (f', handle_abstraction state' hnd abs)
+            | Some (f', _, TailRecursive) ->
                 (f', handle_abstraction state' hnd abs)
             | _ -> assert false)
           unspecialized_declared_functions
