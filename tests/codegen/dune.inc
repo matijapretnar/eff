@@ -1728,6 +1728,58 @@
  (deps
  %{bin:eff}
   (source_tree .))
+   (target "test20.eff.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       (or 0 0 1 2)
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./test20.eff")))))
+
+(rule
+ (deps "test20.eff.out")
+ (target "test20.eff.formatted")
+  (action
+   (with-outputs-to "test20.eff.formatted"
+    (with-accepted-exit-codes (or 0 1 2)
+     (run ocamlformat test20.eff.out)))))
+
+(rule
+ (deps "test20.eff.formatted")
+  (alias runtest)
+   (action
+    (diff "test20.eff.ref.formatted" "test20.eff.formatted")))
+
+(rule
+ (deps "test20.eff.out" ocaml_header.tmp)
+ (target "test20.eff.out.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - test20.eff.out)))))
+
+(rule
+ (deps "test20.eff.out.ocaml_with_header")
+ (target "test20.eff.out.ocaml_output")
+  (action
+   (with-outputs-to "test20.eff.out.ocaml_output"
+    (with-accepted-exit-codes (or 0 1 2)
+     (run ocaml "test20.eff.out.ocaml_with_header")))))
+
+(rule
+ (deps "test20.eff.out.ocaml_output")
+  (alias runtest)
+   (action
+    (diff "test20.eff.ref.ocaml_output" "test20.eff.out.ocaml_output")))
+
+(rule
+ (deps "test20.eff.out")
+  (alias runtest)
+   (action
+    (diff "test20.eff.ref" "test20.eff.out")))
+
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
    (target "test3.eff.out")
     (action
      (with-outputs-to "%{target}"

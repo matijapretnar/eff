@@ -1,0 +1,13 @@
+let _op_0 (* - *) = ( - )
+
+let _op_1 (* = *) = ( = )
+
+let rec _even_3 _x_15 =
+  match _op_1 (* = *) _x_15 0 with
+  | true -> true
+  | false -> _odd_2 (_op_0 (* - *) _x_15 1)
+
+and _odd_2 _x_14 =
+  match _op_1 (* = *) _x_14 0 with
+  | true -> false
+  | false -> _even_3 (_op_0 (* - *) _x_14 1)
