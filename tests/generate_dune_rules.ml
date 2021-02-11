@@ -57,18 +57,11 @@ let test_case_rule_stanza config (_bare, full_name) =
 let format_stanza out_filename =
   Printf.printf "(rule\n";
   Printf.printf " (deps \"%s.out\")\n" out_filename;
-  Printf.printf " (target \"%s.formatted\")\n" out_filename;
+  Printf.printf " (target \"%s.out.formatted\")\n" out_filename;
   Printf.printf "  (action\n";
-  Printf.printf "   (with-outputs-to \"%s.formatted\"\n" out_filename;
+  Printf.printf "   (with-outputs-to \"%%{target}\"\n";
   Printf.printf "    (with-accepted-exit-codes (or 0 1 2)\n";
-  Printf.printf "     (run ocamlformat %s.out)))))\n\n" out_filename;
-
-  Printf.printf "(rule\n";
-  Printf.printf " (deps \"%s.formatted\")\n" out_filename;
-  Printf.printf "  (alias runtest)\n";
-  Printf.printf "   (action\n";
-  Printf.printf "    (diff \"%s.ref.formatted\" \"%s.formatted\")))\n\n"
-    out_filename out_filename
+  Printf.printf "     (run ocamlformat %s.out)))))\n\n" out_filename
 
 let ocaml_compile_rule out_filename =
   (* Combined file*)
@@ -89,7 +82,9 @@ let ocaml_compile_rule out_filename =
   Printf.printf "   (run ocaml \"%s.ocaml_with_header\"))))\n\n" out_filename
 
 let test_case_alias_stanza config (_bare, full_name) =
-  let out_file_name = full_name ^ ".out" in
+  let out_file_name =
+    full_name ^ ".out" ^ if config.apply_ocamlformat then ".formatted" else ""
+  in
   if config.apply_ocamlformat then format_stanza full_name;
   if config.generate_ocaml_compile_rule then ocaml_compile_rule out_file_name;
   Printf.printf "(rule\n";

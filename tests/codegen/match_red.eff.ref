@@ -1,2 +1,2 @@
-match true with  true -> 1 |  _ -> 2
 ;;
+match true with true -> 1 | _ -> 2

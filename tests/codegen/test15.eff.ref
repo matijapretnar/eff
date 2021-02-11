@@ -1,17 +1,21 @@
 type foo = A | B of bar
 
- and bar = {x : foo}
+and bar = { x : foo }
+
+type (_, _) effect += Op1 : (int, bar) effect
+
+type (_, _) effect += Op2 : (bar, foo) effect
+
+type (_, _) effect += Op3 : (foo, int) effect
 
 ;;
-type(_, _) effect += Op1 : (int, bar) effect 
-;;
-type(_, _) effect += Op2 : (bar, foo) effect 
-;;
-type(_, _) effect += Op3 : (foo, int) effect 
-;;
-fun (_a_42: int) ->  Call (Op1, 10, (fun (_y_64: bar) ->  Call (Op2, _y_64, (fun 
-                                                              (_y_66: foo) ->  Call (Op3, _y_66, (fun 
-                                                                    (_y_67: int) -> Value (( + ) 
-                                                                    _a_42 
-                                                                    _y_67)))))))
-;;
+fun (_a_42 : int) ->
+  Call
+    ( Op1,
+      10,
+      fun (_y_64 : bar) ->
+        Call
+          ( Op2,
+            _y_64,
+            fun (_y_66 : foo) ->
+              Call (Op3, _y_66, fun (_y_67 : int) -> Value (_a_42 + _y_67)) ) )

@@ -1,4 +1,0 @@
-type (_, _) effect += Print : (string, unit) effect
-
-;;
-Call (Print, "hello\n", fun (_y_46 : unit) -> Value (match _y_46 with _ -> 42))

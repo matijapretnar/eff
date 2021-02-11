@@ -1,9 +1,7 @@
-let rec _even_42 _x_54 = 
-   match ( = ) _x_54 0 with  true -> true |  false -> _odd_41 (( - ) _x_54 1) 
-and _odd_41 _x_53 = 
-   match ( = ) _x_53 0 with
-     true -> false
-    |  false -> _even_42 (( - ) _x_53 1)
-;; let even,odd = _even_42,
-_odd_41
-;;
+let rec _even_42 _x_54 =
+  match _x_54 = 0 with true -> true | false -> _odd_41 (_x_54 - 1)
+
+and _odd_41 _x_53 =
+  match _x_53 = 0 with true -> false | false -> _even_42 (_x_53 - 1)
+
+let even, odd = (_even_42, _odd_41)

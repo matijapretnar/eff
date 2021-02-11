@@ -1,4 +1,0 @@
-let _decide_func_41 (_bl_42 : bool) =
-  match _bl_42 with true -> 10 | false -> 20
-
-let decide_func = _decide_func_41

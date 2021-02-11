@@ -1,18 +1,18 @@
-type(_, _) effect += WriteInt : (int, unit) effect 
+type (_, _) effect += WriteInt : (int, unit) effect
+
 ;;
-let rec _f_48 _x_57 = 
-       Call (WriteInt, _x_57, (fun (_y_61: unit) -> match ( = ) _x_57 0 with
-                                                      true -> Value ()
-                                                     |  false -> _f_48 
-                                                                   (( - ) 
-                                                                    _x_57 1))) 
-   in 
-   let rec _f_66 (_x_57, _k_68) = 
-      ( + ) _x_57 
-        (match ( = ) _x_57 0 with
-           true -> _k_68 ()
-          |  false -> _f_66 
-                        (( - ) _x_57 1, (fun (_x_79: unit) -> _k_68 _x_79))) 
-   in 
-   _f_66 (10, (fun (_x_45: unit) -> 0))
-;;
+let rec _f_48 _x_57 =
+  Call
+    ( WriteInt,
+      _x_57,
+      fun (_y_61 : unit) ->
+        match _x_57 = 0 with true -> Value () | false -> _f_48 (_x_57 - 1) )
+in
+let rec _f_66 (_x_57, _k_68) =
+  _x_57
+  +
+  match _x_57 = 0 with
+  | true -> _k_68 ()
+  | false -> _f_66 (_x_57 - 1, fun (_x_79 : unit) -> _k_68 _x_79)
+in
+_f_66 (10, fun (_x_45 : unit) -> 0)

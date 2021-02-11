@@ -1,5 +1,5 @@
-let rec __loop_41 _x_47 = 
-   match ( = ) _x_47 0 with  true -> 0 |  false -> __loop_41 (( - ) _x_47 1) 
-in 
-()
 ;;
+let rec __loop_41 _x_47 =
+  match _x_47 = 0 with true -> 0 | false -> __loop_41 (_x_47 - 1)
+in
+()

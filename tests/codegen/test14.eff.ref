@@ -1,8 +1,6 @@
 type integer = int
 
+type (_, _) effect += Op : (unit, int) effect
+
 ;;
-type(_, _) effect += Op : (unit, int) effect 
-;;
-fun (_y_42: int) ->  Call (Op, (), (fun (_y_48: int) -> Value (( + ) _y_48 
-                                                                    _y_42)))
-;;
+fun (_y_42 : int) -> Call (Op, (), fun (_y_48 : int) -> Value (_y_48 + _y_42))

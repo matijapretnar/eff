@@ -1,17 +1,18 @@
-type(_, _) effect += Decide : (unit, bool) effect 
-;;
+type (_, _) effect += Decide : (unit, bool) effect
+
 let _two_41 = 2
-;; let two = _two_41
-;;
+
+let two = _two_41
+
 let _three_42 = 3
-;; let three = _three_42
+
+let three = _three_42
+
 ;;
-let rec _f_61 (_x_56, _k_63) = 
-      let _l_53 = fun (_y_58: bool) -> _k_63 
-                                         (match _y_58 with
-                                            true -> 2
-                                           |  false -> 3) in 
-      ( + ) (_l_53 true) (_l_53 false) 
-   in 
-   _f_61 ((), (fun (_x_47: int) -> _x_47))
-;;
+let rec _f_61 (_x_56, _k_63) =
+  let _l_53 (_y_58 : bool) =
+    _k_63 (match _y_58 with true -> 2 | false -> 3)
+  in
+  _l_53 true + _l_53 false
+in
+_f_61 ((), fun (_x_47 : int) -> _x_47)

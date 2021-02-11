@@ -1,27 +1,19 @@
-type(_, _) effect += Decide : (unit, bool) effect 
-;;
+type (_, _) effect += Decide : (unit, bool) effect
+
 type intlist = IntNil | IntCons of (int * intlist)
 
 ;;
-let rec _concat_41 _x_61 = 
-      match _x_61 with
-        IntNil -> fun (_ys_75: intlist) -> _ys_75
-       |  IntCons ((_z_77, _zs_76)) -> fun (_ys_78: intlist) -> IntCons (
-                                                                    _z_77, 
-                                                                    _concat_41 
-                                                                    _zs_76 
-                                                                    _ys_78) 
-   in 
-   let _l_62 = fun (_y_71: bool) -> let _x_56 = match _y_71 with
-                                                  true -> 10
-                                                 |  false -> 20 in 
-                                    let _l_62 = fun (_y_68: bool) -> IntCons (
-                                                                    ( - ) 
-                                                                    _x_56 
-                                                                    (match _y_68 with
-                                                                      true -> 0
-                                                                     | 
-                                                                     false -> 5), IntNil) in 
-                                    _concat_41 (_l_62 true) (_l_62 false) in 
-   _concat_41 (_l_62 true) (_l_62 false)
-;;
+let rec _concat_41 _x_61 =
+  match _x_61 with
+  | IntNil -> fun (_ys_75 : intlist) -> _ys_75
+  | IntCons (_z_77, _zs_76) ->
+      fun (_ys_78 : intlist) -> IntCons (_z_77, _concat_41 _zs_76 _ys_78)
+in
+let _l_62 (_y_71 : bool) =
+  let _x_56 = match _y_71 with true -> 10 | false -> 20 in
+  let _l_62 (_y_68 : bool) =
+    IntCons ((_x_56 - match _y_68 with true -> 0 | false -> 5), IntNil)
+  in
+  _concat_41 (_l_62 true) (_l_62 false)
+in
+_concat_41 (_l_62 true) (_l_62 false)

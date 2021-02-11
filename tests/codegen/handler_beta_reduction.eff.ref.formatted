@@ -1,4 +1,0 @@
-type (_, _) effect += Eff : (int, int) effect
-
-;;
-1 + 3 + 2 + 4

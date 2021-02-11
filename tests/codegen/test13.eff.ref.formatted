@@ -1,6 +1,0 @@
-type (_, _) effect += Op1 : (int, int) effect
-
-type (_, _) effect += Op2 : (int, int) effect
-
-;;
-1

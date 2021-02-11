@@ -1,29 +1,31 @@
-type(_, _) effect += Get : (unit, int) effect 
+type (_, _) effect += Get : (unit, int) effect
+
+type (_, _) effect += Put : (int, unit) effect
+
 ;;
-type(_, _) effect += Put : (int, unit) effect 
-;;
-(let rec _loop_42 _x_65 = 
-       match ( < ) 0 _x_65 with
-         true ->  Call (Get, (), (fun (_y_78: int) ->  Call (Put, ( + ) _y_78 
-                                                                    1, (fun 
-                                                        (_y_81: unit) -> _loop_42 
-                                                                    (( - ) 
-                                                                    _x_65 1)))))
-        |  false -> Value () 
-    in 
-    let rec _loop_84 (_x_65, _k_86) = 
-       match ( < ) 0 _x_65 with
-         true -> let _l_66 = fun (_y_78: int) -> let _b_80 = ( + ) _y_78 1 in 
-                                                 let _l_88 = fun (_y_90: unit) -> _loop_84 
-                                                                    (( - ) 
-                                                                    _x_65 1, (
-                                                                    fun 
-                                                                    (_x_93: unit) -> _k_86 
-                                                                    _x_93)) in 
-                                                 fun (_: int) -> _l_88 () 
-                                                                   _b_80 in 
-                 fun (_s_52: int) -> _l_66 _s_52 _s_52
-        |  false -> _k_86 () 
-    in 
-    _loop_84 (10, (fun (_x_57: unit) -> fun (_: int) -> _x_57))) 0
-;;
+(let rec _loop_42 _x_65 =
+   match 0 < _x_65 with
+   | true ->
+       Call
+         ( Get,
+           (),
+           fun (_y_78 : int) ->
+             Call (Put, _y_78 + 1, fun (_y_81 : unit) -> _loop_42 (_x_65 - 1))
+         )
+   | false -> Value ()
+ in
+ let rec _loop_84 (_x_65, _k_86) =
+   match 0 < _x_65 with
+   | true ->
+       let _l_66 (_y_78 : int) =
+         let _b_80 = _y_78 + 1 in
+         let _l_88 (_y_90 : unit) =
+           _loop_84 (_x_65 - 1, fun (_x_93 : unit) -> _k_86 _x_93)
+         in
+         fun (_ : int) -> _l_88 () _b_80
+       in
+       fun (_s_52 : int) -> _l_66 _s_52 _s_52
+   | false -> _k_86 ()
+ in
+ _loop_84 (10, fun (_x_57 : unit) (_ : int) -> _x_57))
+  0

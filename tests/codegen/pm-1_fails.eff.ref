@@ -1,41 +1,42 @@
-type(_, _) effect += Decide : (unit, bool) effect 
-;;
+type (_, _) effect += Decide : (unit, bool) effect
+
 let _two_41 = 2
-;; let two = _two_41
-;;
+
+let two = _two_41
+
 let _three_42 = 3
-;; let three = _three_42
-;;
+
+let three = _three_42
+
 type intlist = IntNil | IntCons of (int * intlist)
 
 ;;
-force_unsafe 
-     ((let rec _concat_44 _x_62 = 
-          match _x_62 with
-            IntNil -> fun (_ys_72: intlist) -> _ys_72
-           |  IntCons ((_z_74, _zs_73)) -> fun (_ys_75: intlist) -> IntCons (
-                                                                    _z_74, 
-                                                                    _concat_44 
-                                                                    _zs_73 
-                                                                    _ys_75) 
-       in 
-       handler {value_clause = (fun (_x_56: int) -> Value (IntCons (_x_56, IntNil))); 
-       effect_clauses = (fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) -> 
-  (match eff with
-    | Decide -> fun () _l_63 -> Value (
-                                                                    _concat_44 
-                                                                    (coer_arrow coer_refl_ty force_unsafe 
-                                                                    _l_63 
-                                                                    true) 
-                                                                    (coer_arrow coer_refl_ty force_unsafe 
-                                                                    _l_63 
-                                                                    false))   
-    | eff' -> (fun arg k -> Call (eff', arg, k))
-      )); }) 
-        (let rec _f_59 _x_66 = 
-             Call (Decide, (), (fun (_y_68: bool) -> Value (match _y_68 with
-                                                              true -> 2
-                                                             |  false -> 3))) 
-         in 
-         _f_59 ()))
-;;
+force_unsafe
+  ((let rec _concat_44 _x_62 =
+      match _x_62 with
+      | IntNil -> fun (_ys_72 : intlist) -> _ys_72
+      | IntCons (_z_74, _zs_73) ->
+          fun (_ys_75 : intlist) -> IntCons (_z_74, _concat_44 _zs_73 _ys_75)
+    in
+    handler
+      {
+        value_clause = (fun (_x_56 : int) -> Value (IntCons (_x_56, IntNil)));
+        effect_clauses =
+          (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+            match eff with
+            | Decide ->
+                fun () _l_63 ->
+                  Value
+                    (_concat_44
+                       (coer_arrow coer_refl_ty force_unsafe _l_63 true)
+                       (coer_arrow coer_refl_ty force_unsafe _l_63 false))
+            | eff' -> fun arg k -> Call (eff', arg, k));
+      })
+     (let rec _f_59 _x_66 =
+        Call
+          ( Decide,
+            (),
+            fun (_y_68 : bool) ->
+              Value (match _y_68 with true -> 2 | false -> 3) )
+      in
+      _f_59 ()))

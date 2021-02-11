@@ -1,2 +1,2 @@
-fun (_x_41: float) -> _x_41
 ;;
+fun (_x_41 : float) -> _x_41

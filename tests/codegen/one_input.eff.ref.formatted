@@ -1,5 +1,0 @@
-type (_, _) effect += Decide : (unit, bool) effect
-
-;;
-let _l_52 (_y_63 : bool) = match _y_63 with true -> 10 | false -> 20 in
-_l_52 true + _l_52 false
