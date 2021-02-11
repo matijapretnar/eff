@@ -1,22 +1,20 @@
 open Utils
 
-type specialization = Recursive | NonRecursive
+type recursive = Recursive | NonRecursive
 
 type state = {
-  recursive_functions : (Term.variable, Term.abstraction) Assoc.t;
-  non_recursive_functions : (Term.variable, Term.abstraction) Assoc.t;
+  declared_functions : (Term.variable, Term.abstraction * recursive) Assoc.t;
   fuel : int;
   (* Cache of already specialized functions *)
   specialized_functions :
     ( Term.EffectFingerprint.t * Term.variable,
-      Term.variable * Type.ty * specialization )
+      Term.variable * Type.ty * recursive )
     Assoc.t;
 }
 
 let initial_state =
   {
-    recursive_functions = Assoc.empty;
-    non_recursive_functions = Assoc.empty;
+    declared_functions = Assoc.empty;
     fuel = !Config.optimization_fuel;
     specialized_functions = Assoc.empty;
   }
@@ -28,13 +26,15 @@ let reduce_if_fuel reduce_term state term =
 let add_recursive_function state x abs =
   {
     state with
-    recursive_functions = Assoc.update x abs state.recursive_functions;
+    declared_functions =
+      Assoc.update x (abs, Recursive) state.declared_functions;
   }
 
 let add_non_recursive_function state x abs =
   {
     state with
-    non_recursive_functions = Assoc.update x abs state.non_recursive_functions;
+    declared_functions =
+      Assoc.update x (abs, NonRecursive) state.declared_functions;
   }
 
 (* Optimization functions *)
@@ -416,54 +416,39 @@ and reduce_computation' state comp =
   | Term.Handle ({ term = Term.Handler hnd; _ }, cmp) -> (
       let fingerprint = hnd.term.effect_clauses.fingerprint in
       let drty_in, _ = hnd.ty in
-      let unspecialized_recursive_functions =
+      let unspecialized_declared_functions =
         List.filter
-          (fun (f, { ty = _, drty_out; _ }) ->
+          (fun (f, ({ ty = _, drty_out; _ }, _)) ->
             Type.equal_dirty drty_in drty_out
             && Option.is_none
                  (Assoc.lookup (fingerprint, f) state.specialized_functions))
-          (Assoc.to_list state.recursive_functions)
+          (Assoc.to_list state.declared_functions)
       in
-      let unspecialized_non_recursive_functions =
-        List.filter
-          (fun (f, { ty = _, drty_out; _ }) ->
-            Type.equal_dirty drty_in drty_out
-            && Option.is_none
-                 (Assoc.lookup (fingerprint, f) state.specialized_functions))
-          (Assoc.to_list state.non_recursive_functions)
-      in
-      let add_specialized_recursive specialized (f, abs) =
+      let add_specialized specialized (f, (abs, spec)) =
         let f' = Language.CoreTypes.Variable.refresh f in
         let (ty_arg, _), ((ty_in, _), drty_out) = (abs.ty, hnd.ty) in
         let ty' =
-          Type.Arrow
-            (Type.Tuple [ ty_arg; Type.Arrow (ty_in, drty_out) ], drty_out)
+          match spec with
+          | Recursive ->
+              Type.Arrow
+                (Type.Tuple [ ty_arg; Type.Arrow (ty_in, drty_out) ], drty_out)
+          | NonRecursive -> Type.Arrow (ty_arg, drty_out)
         in
-        Assoc.update (fingerprint, f) (f', ty', Recursive) specialized
-      and add_specialized_non_recursive specialized (f, abs) =
-        let f' = Language.CoreTypes.Variable.refresh f in
-        let (ty_arg, _), (_, drty_out) = (abs.ty, hnd.ty) in
-        let ty' = Type.Arrow (ty_arg, drty_out) in
-        Assoc.update (fingerprint, f) (f', ty', NonRecursive) specialized
+        Assoc.update (fingerprint, f) (f', ty', spec) specialized
       in
       let specialized_functions' =
-        List.fold_left add_specialized_recursive state.specialized_functions
-          unspecialized_recursive_functions
+        List.fold_left add_specialized state.specialized_functions
+          unspecialized_declared_functions
       in
-      let specialized_functions'' =
-        List.fold_left add_specialized_non_recursive specialized_functions'
-          unspecialized_non_recursive_functions
+      let state' =
+        { state with specialized_functions = specialized_functions' }
       in
-      let cmp' =
-        handle_computation
-          { state with specialized_functions = specialized_functions'' }
-          hnd cmp
-      in
+      let cmp' = handle_computation state' hnd cmp in
       (* TODO: specialize only functions that are used, not just all with matching types *)
       let spec_rec_defs =
         List.map
-          (fun (f, ({ term = pat, cmp; _ } as abs)) ->
-            match Assoc.lookup (fingerprint, f) specialized_functions'' with
+          (fun (f, (({ term = pat, cmp; _ } as abs), _)) ->
+            match Assoc.lookup (fingerprint, f) specialized_functions' with
             | Some
                 ( f',
                   Type.Arrow
@@ -483,24 +468,11 @@ and reduce_computation' state comp =
                   }
                 in
                 let abs' = Term.abstraction (Term.pTuple [ pat; k_pat ], cmp) in
-                ( f',
-                  handle_abstraction
-                    {
-                      state with
-                      specialized_functions = specialized_functions'';
-                    }
-                    hnd' abs' )
+                (f', handle_abstraction state' hnd' abs')
             | Some (f', _, NonRecursive) ->
-                ( f',
-                  handle_abstraction
-                    {
-                      state with
-                      specialized_functions = specialized_functions'';
-                    }
-                    hnd abs )
+                (f', handle_abstraction state' hnd abs)
             | _ -> assert false)
-          (unspecialized_recursive_functions
-         @ unspecialized_non_recursive_functions)
+          unspecialized_declared_functions
       in
       match keep_used_bindings spec_rec_defs cmp' with
       | [] -> cmp'
