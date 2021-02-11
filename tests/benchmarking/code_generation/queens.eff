@@ -1,13 +1,5 @@
 (* A n-queens implementation without top-level bindings and no polymorphism *)
 
-(*external ( <> ) : int -> int -> bool = "<>"*)
-external ( < ) : int -> int -> bool = "<"
-external ( = ) : int -> int -> bool = "="
-(*external ( > ) : int -> int -> bool = ">"*)
-external ( - ) : int -> int -> int = "-"
-external ( + ) : int -> int -> int = "+"
-external ( ~- ) : int -> int = "~-"
-
 effect Decide : unit -> bool
 effect Fail : unit -> empty
 

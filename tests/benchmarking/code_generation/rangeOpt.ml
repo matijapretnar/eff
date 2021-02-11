@@ -2,30 +2,26 @@ open OcamlHeader
 
 type (_, _) effect += Fetch : (unit, int) effect
 
-let _op_0 (* - *) = ( - )
-
 type int_list = Nil | Cons of (int * int_list)
 
-let _test_1 (_n_2 : int) =
-  let rec _range_3 _x_15 =
-    match _x_15 with
+let _test_41 (_n_42 : int) =
+  let rec _range_43 _x_55 =
+    match _x_55 with
     | 0 -> Value Nil
     | _ ->
         Call
           ( Fetch,
             (),
-            fun (_y_21 : int) ->
-              _range_3 (_op_0 (* - *) _x_15 1) >> fun _b_29 ->
-              Value (Cons (_y_21, _b_29)) )
+            fun (_y_61 : int) ->
+              _range_43 (_x_55 - 1) >> fun _b_69 -> Value (Cons (_y_61, _b_69))
+          )
   in
-  let rec _range_30 (_x_15, _k_32) =
-    match _x_15 with
-    | 0 -> _k_32 Nil
+  let rec _range_70 (_x_55, _k_72) =
+    match _x_55 with
+    | 0 -> _k_72 Nil
     | _ ->
-        _range_30
-          ( _op_0 (* - *) _x_15 1,
-            fun (_b_39 : int_list) -> _k_32 (Cons (42, _b_39)) )
+        _range_70 (_x_55 - 1, fun (_b_79 : int_list) -> _k_72 (Cons (42, _b_79)))
   in
-  _range_30 (_n_2, fun (_x_10 : int_list) -> _x_10)
+  _range_70 (_n_42, fun (_x_50 : int_list) -> _x_50)
 
-let test = _test_1
+let test = _test_41

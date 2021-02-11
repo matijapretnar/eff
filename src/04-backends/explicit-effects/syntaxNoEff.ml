@@ -101,7 +101,6 @@ type cmd =
   | TopLet of variable * n_term
   | TopLetRec of n_rec_definitions
   | DefEffect of n_effect
-  | External of (variable * n_type * string)
   | TyDef of (CoreTypes.TyName.t * (CoreTypes.TyParam.t list * n_tydef)) list
 
 let rec subs_var_in_term par subs term =

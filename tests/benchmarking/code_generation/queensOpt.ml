@@ -1,15 +1,5 @@
 open OcamlHeader
 
-let _op_0 (* < *) = ( < )
-
-let _op_1 (* = *) = ( = )
-
-let _op_2 (* - *) = ( - )
-
-let _op_3 (* + *) = ( + )
-
-let _op_4 (* ~- *) = ( ~- )
-
 type (_, _) effect += Decide : (unit, bool) effect
 
 type (_, _) effect += Fail : (unit, empty) effect
@@ -26,237 +16,230 @@ type optional_solution = None | Some of solution
 
 type void = Void
 
-let _absurd_5 (_void_6 : float) = match _void_6 with _ -> assert false
+let _absurd_41 (_void_42 : float) = match _void_42 with _ -> assert false
 
-let absurd = _absurd_5
+let absurd = _absurd_41
 
-let rec _op_7 (* @ *) _x_14 (_ys_16 : solutions) =
-  match _x_14 with
-  | SolutionsNil -> _ys_16
-  | SolutionsCons (_x_18, _xs_17) ->
-      SolutionsCons (_x_18, _op_7 (* @ *) _xs_17 _ys_16)
+let rec _op_43 (* @ *) _x_50 (_ys_52 : solutions) =
+  match _x_50 with
+  | SolutionsNil -> _ys_52
+  | SolutionsCons (_x_54, _xs_53) ->
+      SolutionsCons (_x_54, _op_43 (* @ *) _xs_53 _ys_52)
 
-let _op_7 (* @ *) = _op_7 (* @ *)
+let _op_43 (* @ *) = _op_43 (* @ *)
 
-let _op_21 (* > *) (_x_22 : int) (_y_23 : int) = _op_0 (* < *) _y_23 _x_22
+let _op_57 (* > *) (_x_58 : int) (_y_59 : int) = _y_59 < _x_58
 
-let _op_21 (* > *) = _op_21 (* > *)
+let _op_57 (* > *) = _op_57 (* > *)
 
-let _op_25 (* <> *) (_x_26 : int) (_y_27 : int) =
-  match _op_1 (* = *) _y_27 _x_26 with true -> false | false -> true
+let _op_61 (* <> *) (_x_62 : int) (_y_63 : int) =
+  match _y_63 = _x_62 with true -> false | false -> true
 
-let _op_25 (* <> *) = _op_25 (* <> *)
+let _op_61 (* <> *) = _op_61 (* <> *)
 
-let _abs_30 (_x_31 : int) =
-  match _op_0 (* < *) _x_31 0 with
-  | true -> _op_4 (* ~- *) _x_31
-  | false -> _x_31
+let _abs_66 (_x_67 : int) =
+  match _x_67 < 0 with true -> ~-_x_67 | false -> _x_67
 
-let abs = _abs_30
+let abs = _abs_66
 
-let _no_attack_34 (_q1_35 : queen) (_q2_36 : queen) =
-  match _q1_35 with
-  | Queen (_x_37, _y_38) -> (
-      match _q2_36 with
-      | Queen (_x'_39, _y'_40) -> (
-          match _op_25 (* <> *) _x_37 _x'_39 with
+let _no_attack_70 (_q1_71 : queen) (_q2_72 : queen) =
+  match _q1_71 with
+  | Queen (_x_73, _y_74) -> (
+      match _q2_72 with
+      | Queen (_x'_75, _y'_76) -> (
+          match _op_61 (* <> *) _x_73 _x'_75 with
           | true -> (
-              match _op_25 (* <> *) _y_38 _y'_40 with
+              match _op_61 (* <> *) _y_74 _y'_76 with
               | true ->
-                  _op_25 (* <> *)
-                    (_abs_30 (_op_2 (* - *) _x_37 _x'_39))
-                    (_abs_30 (_op_2 (* - *) _y_38 _y'_40))
+                  _op_61 (* <> *)
+                    (_abs_66 (_x_73 - _x'_75))
+                    (_abs_66 (_y_74 - _y'_76))
               | false -> false
               | false -> false)))
 
-let no_attack = _no_attack_34
+let no_attack = _no_attack_70
 
-let rec _not_attacked_52 _x_60 (_qs_62 : solution) =
-  match _qs_62 with
+let rec _not_attacked_88 _x_96 (_qs_98 : solution) =
+  match _qs_98 with
   | SolutionEmpty -> true
-  | SolutionPlace (_x_64, _xs_63) -> (
-      match _no_attack_34 _x_60 _x_64 with
-      | true -> _not_attacked_52 _x_60 _xs_63
+  | SolutionPlace (_x_100, _xs_99) -> (
+      match _no_attack_70 _x_96 _x_100 with
+      | true -> _not_attacked_88 _x_96 _xs_99
       | false -> false)
 
-let not_attacked = _not_attacked_52
+let not_attacked = _not_attacked_88
 
-let _available_68 (_number_of_queens_69 : int) (_x_70 : int) (_qs_71 : solution)
-    =
-  let rec _loop_72 _x_83 =
-    let _possible_73, _y_74 = _x_83 in
-    match _op_0 (* < *) _y_74 1 with
-    | true -> _possible_73
+let _available_104 (_number_of_queens_105 : int) (_x_106 : int)
+    (_qs_107 : solution) =
+  let rec _loop_108 _x_119 =
+    let _possible_109, _y_110 = _x_119 in
+    match _y_110 < 1 with
+    | true -> _possible_109
     | false -> (
-        match _not_attacked_52 (Queen (_x_70, _y_74)) _qs_71 with
-        | true ->
-            _loop_72 (RowsCons (_y_74, _possible_73), _op_2 (* - *) _y_74 1)
-        | false -> _loop_72 (_possible_73, _op_2 (* - *) _y_74 1))
+        match _not_attacked_88 (Queen (_x_106, _y_110)) _qs_107 with
+        | true -> _loop_108 (RowsCons (_y_110, _possible_109), _y_110 - 1)
+        | false -> _loop_108 (_possible_109, _y_110 - 1))
   in
-  _loop_72 (RowsEmpty, _number_of_queens_69)
+  _loop_108 (RowsEmpty, _number_of_queens_105)
 
-let available = _available_68
+let available = _available_104
 
-let rec _tr_choose_94 _x_104 =
-  match _x_104 with
+let rec _tr_choose_130 _x_140 =
+  match _x_140 with
   | RowsEmpty ->
       Call
         ( Fail,
           (),
-          fun (_y_112 : empty) -> Value (match _y_112 with _ -> assert false) )
-  | RowsCons (_x_114, _xs'_113) ->
+          fun (_y_148 : empty) -> Value (match _y_148 with _ -> assert false) )
+  | RowsCons (_x_150, _xs'_149) ->
       Call
         ( Decide,
           (),
-          fun (_y_115 : bool) ->
-            match _y_115 with
-            | true -> Value _x_114
-            | false -> _tr_choose_94 _xs'_113 )
+          fun (_y_151 : bool) ->
+            match _y_151 with
+            | true -> Value _x_150
+            | false -> _tr_choose_130 _xs'_149 )
 
-let tr_choose = _tr_choose_94
+let tr_choose = _tr_choose_130
 
-let _queens_116 (_number_of_queens_117 : int) =
-  let rec _tr_place_118 _x_129 =
-    let _x_119, _qs_120 = _x_129 in
-    match _op_21 (* > *) _x_119 _number_of_queens_117 with
-    | true -> Value _qs_120
+let _queens_152 (_number_of_queens_153 : int) =
+  let rec _tr_place_154 _x_165 =
+    let _x_155, _qs_156 = _x_165 in
+    match _op_57 (* > *) _x_155 _number_of_queens_153 with
+    | true -> Value _qs_156
     | false ->
-        _tr_choose_94 (_available_68 _number_of_queens_117 _x_119 _qs_120)
-        >> fun _y_123 ->
-        _tr_place_118
-          ( _op_3 (* + *) _x_119 1,
-            SolutionPlace (Queen (_x_119, _y_123), _qs_120) )
+        _tr_choose_130 (_available_104 _number_of_queens_153 _x_155 _qs_156)
+        >> fun _y_159 ->
+        _tr_place_154
+          (_x_155 + 1, SolutionPlace (Queen (_x_155, _y_159), _qs_156))
   in
-  _tr_place_118 (1, SolutionEmpty)
+  _tr_place_154 (1, SolutionEmpty)
 
-let queens = _queens_116
+let queens = _queens_152
 
-let _queens_one_option_140 (_number_of_queens_141 : int) =
-  let rec _queens_154 _number_of_queens_117 =
-    let rec _tr_place_118 _x_129 =
-      let _x_119, _qs_120 = _x_129 in
-      match _op_21 (* > *) _x_119 _number_of_queens_117 with
-      | true -> Value _qs_120
+let _queens_one_option_176 (_number_of_queens_177 : int) =
+  let rec _queens_190 _number_of_queens_153 =
+    let rec _tr_place_154 _x_165 =
+      let _x_155, _qs_156 = _x_165 in
+      match _op_57 (* > *) _x_155 _number_of_queens_153 with
+      | true -> Value _qs_156
       | false ->
-          _tr_choose_94 (_available_68 _number_of_queens_117 _x_119 _qs_120)
-          >> fun _y_123 ->
-          _tr_place_118
-            ( _op_3 (* + *) _x_119 1,
-              SolutionPlace (Queen (_x_119, _y_123), _qs_120) )
+          _tr_choose_130 (_available_104 _number_of_queens_153 _x_155 _qs_156)
+          >> fun _y_159 ->
+          _tr_place_154
+            (_x_155 + 1, SolutionPlace (Queen (_x_155, _y_159), _qs_156))
     in
-    let rec _tr_place_165 _x_129 =
-      let _x_119, _qs_120 = _x_129 in
-      match _op_21 (* > *) _x_119 _number_of_queens_117 with
-      | true -> Some _qs_120
+    let rec _tr_place_201 _x_165 =
+      let _x_155, _qs_156 = _x_165 in
+      match _op_57 (* > *) _x_155 _number_of_queens_153 with
+      | true -> Some _qs_156
       | false ->
-          let rec _tr_choose_167 _x_104 =
-            match _x_104 with
+          let rec _tr_choose_203 _x_140 =
+            match _x_140 with
             | RowsEmpty -> None
-            | RowsCons (_x_114, _xs'_113) -> (
-                let _l_150 (_y_115 : bool) =
-                  match _y_115 with
+            | RowsCons (_x_150, _xs'_149) -> (
+                let _l_186 (_y_151 : bool) =
+                  match _y_151 with
                   | true ->
-                      _tr_place_165
-                        ( _op_3 (* + *) _x_119 1,
-                          SolutionPlace (Queen (_x_119, _x_114), _qs_120) )
-                  | false -> _tr_choose_167 _xs'_113
+                      _tr_place_201
+                        ( _x_155 + 1,
+                          SolutionPlace (Queen (_x_155, _x_150), _qs_156) )
+                  | false -> _tr_choose_203 _xs'_149
                 in
-                match _l_150 true with
-                | Some _x_145 -> Some _x_145
-                | None -> _l_150 false)
+                match _l_186 true with
+                | Some _x_181 -> Some _x_181
+                | None -> _l_186 false)
           in
-          _tr_choose_167 (_available_68 _number_of_queens_117 _x_119 _qs_120)
+          _tr_choose_203 (_available_104 _number_of_queens_153 _x_155 _qs_156)
     in
-    _tr_place_165 (1, SolutionEmpty)
+    _tr_place_201 (1, SolutionEmpty)
   in
-  _queens_154 _number_of_queens_141
+  _queens_190 _number_of_queens_177
 
-let queens_one_option = _queens_one_option_140
+let queens_one_option = _queens_one_option_176
 
-let _queens_all_188 (_number_of_queens_189 : int) =
-  let rec _queens_203 _number_of_queens_117 =
-    let rec _tr_place_118 _x_129 =
-      let _x_119, _qs_120 = _x_129 in
-      match _op_21 (* > *) _x_119 _number_of_queens_117 with
-      | true -> Value _qs_120
+let _queens_all_224 (_number_of_queens_225 : int) =
+  let rec _queens_239 _number_of_queens_153 =
+    let rec _tr_place_154 _x_165 =
+      let _x_155, _qs_156 = _x_165 in
+      match _op_57 (* > *) _x_155 _number_of_queens_153 with
+      | true -> Value _qs_156
       | false ->
-          _tr_choose_94 (_available_68 _number_of_queens_117 _x_119 _qs_120)
-          >> fun _y_123 ->
-          _tr_place_118
-            ( _op_3 (* + *) _x_119 1,
-              SolutionPlace (Queen (_x_119, _y_123), _qs_120) )
+          _tr_choose_130 (_available_104 _number_of_queens_153 _x_155 _qs_156)
+          >> fun _y_159 ->
+          _tr_place_154
+            (_x_155 + 1, SolutionPlace (Queen (_x_155, _y_159), _qs_156))
     in
-    let rec _tr_place_214 _x_129 =
-      let _x_119, _qs_120 = _x_129 in
-      match _op_21 (* > *) _x_119 _number_of_queens_117 with
-      | true -> SolutionsCons (_qs_120, SolutionsNil)
+    let rec _tr_place_250 _x_165 =
+      let _x_155, _qs_156 = _x_165 in
+      match _op_57 (* > *) _x_155 _number_of_queens_153 with
+      | true -> SolutionsCons (_qs_156, SolutionsNil)
       | false ->
-          let rec _tr_choose_216 _x_104 =
-            match _x_104 with
+          let rec _tr_choose_252 _x_140 =
+            match _x_140 with
             | RowsEmpty -> SolutionsNil
-            | RowsCons (_x_114, _xs'_113) ->
-                let _l_199 (_y_115 : bool) =
-                  match _y_115 with
+            | RowsCons (_x_150, _xs'_149) ->
+                let _l_235 (_y_151 : bool) =
+                  match _y_151 with
                   | true ->
-                      _tr_place_214
-                        ( _op_3 (* + *) _x_119 1,
-                          SolutionPlace (Queen (_x_119, _x_114), _qs_120) )
-                  | false -> _tr_choose_216 _xs'_113
+                      _tr_place_250
+                        ( _x_155 + 1,
+                          SolutionPlace (Queen (_x_155, _x_150), _qs_156) )
+                  | false -> _tr_choose_252 _xs'_149
                 in
-                _op_7 (* @ *) (_l_199 true) (_l_199 false)
+                _op_43 (* @ *) (_l_235 true) (_l_235 false)
           in
-          _tr_choose_216 (_available_68 _number_of_queens_117 _x_119 _qs_120)
+          _tr_choose_252 (_available_104 _number_of_queens_153 _x_155 _qs_156)
     in
-    _tr_place_214 (1, SolutionEmpty)
+    _tr_place_250 (1, SolutionEmpty)
   in
-  _queens_203 _number_of_queens_189
+  _queens_239 _number_of_queens_225
 
-let queens_all = _queens_all_188
+let queens_all = _queens_all_224
 
-let _queens_one_cps_238 (_number_of_queens_239 : int) =
-  let _absurd_240 (_void_241 : empty) =
-    match _void_241 with _ -> assert false
+let _queens_one_cps_274 (_number_of_queens_275 : int) =
+  let _absurd_276 (_void_277 : empty) =
+    match _void_277 with _ -> assert false
   in
-  (let rec _queens_265 _number_of_queens_117 =
-     let rec _tr_place_118 _x_129 =
-       let _x_119, _qs_120 = _x_129 in
-       match _op_21 (* > *) _x_119 _number_of_queens_117 with
-       | true -> Value _qs_120
+  (let rec _queens_301 _number_of_queens_153 =
+     let rec _tr_place_154 _x_165 =
+       let _x_155, _qs_156 = _x_165 in
+       match _op_57 (* > *) _x_155 _number_of_queens_153 with
+       | true -> Value _qs_156
        | false ->
-           _tr_choose_94 (_available_68 _number_of_queens_117 _x_119 _qs_120)
-           >> fun _y_123 ->
-           _tr_place_118
-             ( _op_3 (* + *) _x_119 1,
-               SolutionPlace (Queen (_x_119, _y_123), _qs_120) )
+           _tr_choose_130 (_available_104 _number_of_queens_153 _x_155 _qs_156)
+           >> fun _y_159 ->
+           _tr_place_154
+             (_x_155 + 1, SolutionPlace (Queen (_x_155, _y_159), _qs_156))
      in
-     let rec _tr_place_276 _x_129 =
-       let _x_119, _qs_120 = _x_129 in
-       match _op_21 (* > *) _x_119 _number_of_queens_117 with
+     let rec _tr_place_312 _x_165 =
+       let _x_155, _qs_156 = _x_165 in
+       match _op_57 (* > *) _x_155 _number_of_queens_153 with
        | true ->
            coer_arrow coer_refl_ty (coer_return coer_refl_ty)
-             (fun (_ : unit -> solution computation) -> _qs_120)
+             (fun (_ : unit -> solution computation) -> _qs_156)
        | false ->
-           let rec _tr_choose_278 _x_104 =
-             match _x_104 with
+           let rec _tr_choose_314 _x_140 =
+             match _x_140 with
              | RowsEmpty ->
-                 fun (_kf_248 : unit -> solution computation) -> _kf_248 ()
-             | RowsCons (_x_114, _xs'_113) ->
-                 let _l_254 (_y_115 : bool) =
-                   match _y_115 with
+                 fun (_kf_284 : unit -> solution computation) -> _kf_284 ()
+             | RowsCons (_x_150, _xs'_149) ->
+                 let _l_290 (_y_151 : bool) =
+                   match _y_151 with
                    | true ->
-                       _tr_place_276
-                         ( _op_3 (* + *) _x_119 1,
-                           SolutionPlace (Queen (_x_119, _x_114), _qs_120) )
-                   | false -> _tr_choose_278 _xs'_113
+                       _tr_place_312
+                         ( _x_155 + 1,
+                           SolutionPlace (Queen (_x_155, _x_150), _qs_156) )
+                   | false -> _tr_choose_314 _xs'_149
                  in
-                 fun (_kf_244 : unit -> solution computation) ->
-                   _l_254 true (fun (_ : unit) -> _l_254 false _kf_244)
+                 fun (_kf_280 : unit -> solution computation) ->
+                   _l_290 true (fun (_ : unit) -> _l_290 false _kf_280)
            in
-           _tr_choose_278 (_available_68 _number_of_queens_117 _x_119 _qs_120)
+           _tr_choose_314 (_available_104 _number_of_queens_153 _x_155 _qs_156)
      in
-     _tr_place_276 (1, SolutionEmpty)
+     _tr_place_312 (1, SolutionEmpty)
    in
-   _queens_265 _number_of_queens_239) (fun (() : unit) ->
-      Call (Fail, (), fun (_y_264 : empty) -> Value (_absurd_240 _y_264)))
+   _queens_301 _number_of_queens_275) (fun (() : unit) ->
+      Call (Fail, (), fun (_y_300 : empty) -> Value (_absurd_276 _y_300)))
 
-let queens_one_cps = _queens_one_cps_238
+let queens_one_cps = _queens_one_cps_274

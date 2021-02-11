@@ -17,7 +17,8 @@ module type ExplicitBackend = sig
 
   val process_top_let_rec : state -> Term.rec_definitions -> state
 
-  val process_external : state -> Term.variable * Type.ty * string -> state
+  val load_primitive :
+    state -> Term.variable * Type.ty * Language.Primitives.primitive -> state
 
   val process_tydef :
     state ->
@@ -142,13 +143,13 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
       backend_state = backend_state';
     }
 
-  let process_external state (x, ty, name) =
-    let ty = Type.source_to_target state.type_system_state.tydefs ty in
+  let load_primitive state x prim =
+    let ty = Primitives.primitive_type_scheme prim in
     let type_system_state' =
       ExplicitInfer.extend_var state.type_system_state x ty
     in
     let backend_state' =
-      ExBackend.process_external state.backend_state (x, ty, name)
+      ExBackend.load_primitive state.backend_state (x, ty, prim)
     in
     {
       state with
@@ -208,13 +209,7 @@ module Evaluate : Language.BackendSignature.T = Make (struct
       defs;
     { evaluation_state = Eval.extend_let_rec state.evaluation_state defs }
 
-  let process_external state (x, _ty, f) =
-    let evaluation_state' =
-      match Assoc.lookup f External.values with
-      | Some v -> Eval.update x v state.evaluation_state
-      | None -> Error.runtime "unknown external symbol %s." f
-    in
-    { evaluation_state = evaluation_state' }
+  let load_primitive _state (_x, _ty, _prim) = failwith "Not implemented"
 
   let process_tydef state _ = state
 
@@ -228,10 +223,16 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   type state = {
     prog : SyntaxNoEff.cmd list;
     no_eff_optimizer_state : NoEffOptimizer.state;
+    primitives :
+      (Language.CoreTypes.Variable.t, Language.Primitives.primitive) Assoc.t;
   }
 
   let initial_state =
-    { prog = []; no_eff_optimizer_state = NoEffOptimizer.initial_state }
+    {
+      prog = [];
+      no_eff_optimizer_state = NoEffOptimizer.initial_state;
+      primitives = Assoc.empty;
+    }
 
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
@@ -280,13 +281,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     in
     { state with prog = SyntaxNoEff.TopLetRec defs' :: state.prog }
 
-  let process_external state (x, ty, name) =
-    {
-      state with
-      prog =
-        SyntaxNoEff.External (x, TranslateExEff2NoEff.elab_ty ty, name)
-        :: state.prog;
-    }
+  let load_primitive state (x, _ty, prim) =
+    { state with primitives = Assoc.update x prim state.primitives }
 
   let process_tydef state tydefs =
     let converter (ty_params, tydef) =
@@ -301,6 +297,9 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     List.iter
       (fun cmd ->
         Format.fprintf !Config.output_formatter "%t\n"
-          (TranslateNoEff2Ocaml.pp_cmd cmd))
+          (TranslateNoEff2Ocaml.pp_cmd
+             (TranslateNoEff2Ocaml.add_primitives
+                TranslateNoEff2Ocaml.initial_state state.primitives)
+             cmd))
       (List.rev state.prog)
 end)

@@ -1,6 +1,16 @@
 open Utils
 open SyntaxNoEff
 
+type state = {
+  inlinable_primitives :
+    (Language.CoreTypes.Variable.t, Language.Primitives.primitive) Assoc.t;
+}
+
+let initial_state = { inlinable_primitives = Assoc.empty }
+
+let add_primitives state primitives =
+  { inlinable_primitives = Assoc.concat primitives state.inlinable_primitives }
+
 let print = Format.fprintf
 
 let rec pp_sequence sep pp xs ppf =
@@ -32,28 +42,31 @@ let protected =
   @ [ "private"; "rec"; "sig"; "struct"; "then"; "to"; "true"; "try"; "type" ]
   @ [ "val"; "virtual"; "when"; "while"; "with"; "continue" ]
 
-let pp_variable ?(safe = true) var ppf =
-  let printer desc n =
-    (* [mod] has privileges because otherwise it's stupid *)
-    if desc = "mod" then Format.fprintf ppf "_op_%d (* %s *)" n desc
-    else (
-      if List.mem desc protected then
-        Print.warning
-          "Warning: Protected keyword [%s]. Must be fixed by hand!@." desc;
-      match desc.[0] with
-      | 'a' .. 'z' | '_' ->
-          if safe then Format.fprintf ppf "_%s_%d" desc n
-          else Format.fprintf ppf "%s" desc
-      | '$' -> (
-          match desc with
-          | "$c_thunk" -> Format.fprintf ppf "_comp_%d" n
-          | "$id_par" -> Format.fprintf ppf "_id_%d" n
-          | "$anon" -> Format.fprintf ppf "_anon_%d" n
-          | "$bind" -> Format.fprintf ppf "_b_%d" n
-          | _ -> Format.fprintf ppf "_x_%d" n)
-      | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc)
-  in
-  CoreTypes.Variable.fold printer var
+let pp_variable ?(safe = true) state var ppf =
+  match Assoc.lookup var state.inlinable_primitives with
+  | Some s -> Format.fprintf ppf "%s" (OcamlPrimitives.primitive_source s)
+  | None ->
+      let printer desc n =
+        (* [mod] has privileges because otherwise it's stupid *)
+        if desc = "mod" then Format.fprintf ppf "_op_%d (* %s *)" n desc
+        else (
+          if List.mem desc protected then
+            Print.warning
+              "Warning: Protected keyword [%s]. Must be fixed by hand!@." desc;
+          match desc.[0] with
+          | 'a' .. 'z' | '_' ->
+              if safe then Format.fprintf ppf "_%s_%d" desc n
+              else Format.fprintf ppf "%s" desc
+          | '$' -> (
+              match desc with
+              | "$c_thunk" -> Format.fprintf ppf "_comp_%d" n
+              | "$id_par" -> Format.fprintf ppf "_id_%d" n
+              | "$anon" -> Format.fprintf ppf "_anon_%d" n
+              | "$bind" -> Format.fprintf ppf "_b_%d" n
+              | _ -> Format.fprintf ppf "_x_%d" n)
+          | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc)
+      in
+      CoreTypes.Variable.fold printer var
 
 let pp_field pp sep (field, value) ppf =
   print ppf "%t %s %t" (CoreTypes.Field.print field) sep (pp value)
@@ -78,15 +91,16 @@ let rec pp_type noeff_ty ppf =
   | NTyQual (_tyc, ty) -> pp_type ty ppf
   | NTyComp ty -> print ppf "%t computation" (pp_type ty)
 
-let rec pp_pattern pat ppf =
+let rec pp_pattern state pat ppf =
   match pat with
-  | PNVar v -> print ppf "%t" (pp_variable v)
-  | PNAs (p, v) -> print ppf "%t as %t" (pp_pattern p) (pp_variable v)
-  | PNTuple pats -> print ppf "%t" (pp_tuple pp_pattern pats)
-  | PNRecord rcd -> print ppf "%t" (pp_record pp_pattern "=" rcd)
+  | PNVar v -> print ppf "%t" (pp_variable state v)
+  | PNAs (p, v) ->
+      print ppf "%t as %t" (pp_pattern state p) (pp_variable state v)
+  | PNTuple pats -> print ppf "%t" (pp_tuple (pp_pattern state) pats)
+  | PNRecord rcd -> print ppf "%t" (pp_record (pp_pattern state) "=" rcd)
   | PNVariant (l, None) -> print ppf "%t" (pp_label l)
   | PNVariant (l, Some p) ->
-      print ppf "%t (@[<hov>%t@])" (pp_label l) (pp_pattern p)
+      print ppf "%t (@[<hov>%t@])" (pp_label l) (pp_pattern state p)
   | PNConst c -> print ppf "%t" (Const.print c)
   | PNNonbinding -> print ppf "_"
 
@@ -132,78 +146,89 @@ let rec pp_coercion ?max_level coer ppf =
   | NCoerApply (_t, _cs) -> print "ApplyCoercion"
   | NCoerQual _c -> print "ApplyCoercion"
 
-let rec pp_term ?max_level noEff_term ppf =
+let rec pp_term ?max_level state noEff_term ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match noEff_term with
-  | NVar v -> print "%t" (pp_variable v)
+  | NVar v -> print "%t" (pp_variable state v)
   | NConst c -> print "%t" (Const.print c)
-  | NTuple ts -> print "%t" (pp_tuple (pp_term ~max_level:1) ts)
-  | NRecord rcd -> print "%t" (pp_record pp_term "=" rcd)
+  | NTuple ts -> print "%t" (pp_tuple (pp_term state ~max_level:1) ts)
+  | NRecord rcd -> print "%t" (pp_record (pp_term state) "=" rcd)
   | NVariant (l, Some (NTuple [ hd; tl ])) when l = CoreTypes.cons ->
-      print ~at_level:1 "@[<hov>(%t::%t)@]" (pp_term ~max_level:0 hd)
-        (pp_term ~max_level:0 tl)
+      print ~at_level:1 "@[<hov>(%t::%t)@]"
+        (pp_term state ~max_level:0 hd)
+        (pp_term state ~max_level:0 tl)
   | NVariant (l, None) -> print "%t" (pp_label l)
   | NVariant (l, Some t1) ->
-      print ~at_level:1 "%t @[<hov>%t@]" (pp_label l) (pp_term ~max_level:0 t1)
-  | NFun abs_ty -> print ~at_level:2 "@[<hv 2>fun %t@]" (pp_abs_with_ty abs_ty)
+      print ~at_level:1 "%t @[<hov>%t@]" (pp_label l)
+        (pp_term state ~max_level:0 t1)
+  | NFun abs_ty ->
+      print ~at_level:2 "@[<hv 2>fun %t@]" (pp_abs_with_ty state abs_ty)
   | NApplyTerm (t1, t2) ->
-      print ~at_level:1 "@[<hov 2>%t @,%t@]" (pp_term ~max_level:1 t1)
-        (pp_term ~max_level:0 t2)
+      print ~at_level:1 "@[<hov 2>%t @,%t@]"
+        (pp_term state ~max_level:1 t1)
+        (pp_term state ~max_level:0 t2)
   (*| NCast (t, (NCoerReturn (NCoerRefl _) as _c)) ->
       print ~at_level:2 "Value (%t)" (pp_term t) *)
   | NCast (t, c) ->
       print ~at_level:1 "@[<hov 2>%t @,%t@]"
         (pp_coercion ~max_level:1 c)
-        (pp_term ~max_level:0 t)
-  | NReturn t -> print ~at_level:1 "Value %t" (pp_term ~max_level:0 t)
+        (pp_term state ~max_level:0 t)
+  | NReturn t -> print ~at_level:1 "Value %t" (pp_term state ~max_level:0 t)
   | NHandler { effect_clauses = eff_cls; return_clause = val_cl } ->
       print ~at_level:2
         "handler {@[<hov>value_clause = (fun %t);@] @[<hov>effect_clauses = \
          %t;@] }"
-        (pp_abs_with_ty val_cl) (pp_effect_cls eff_cls)
+        (pp_abs_with_ty state val_cl)
+        (pp_effect_cls state eff_cls)
   | NLet (t1, (pat, t2)) ->
-      print ~at_level:2 "@[<hv>@[<hv>let %t = %t in@] @,%t@]" (pp_pattern pat)
-        (pp_term t1) (pp_term t2)
+      print ~at_level:2 "@[<hv>@[<hv>let %t = %t in@] @,%t@]"
+        (pp_pattern state pat) (pp_term state t1) (pp_term state t2)
   | NLetRec (defs, t2) ->
-      print ~at_level:2 "@[<hv>@[<hv>%tin@] @,%t@]" (pp_let_rec defs)
-        (pp_term t2)
+      print ~at_level:2 "@[<hv>@[<hv>%tin@] @,%t@]" (pp_let_rec state defs)
+        (pp_term state t2)
   | NMatch (t, []) ->
-      print ~at_level:2 "@[<hv>match %t with@, _ -> assert false@]" (pp_term t)
+      print ~at_level:2 "@[<hv>match %t with@, _ -> assert false@]"
+        (pp_term state t)
   | NMatch (t, cases) ->
-      print ~at_level:2 "@[<hv>match %t with@, %t@]" (pp_term t)
-        (pp_sequence "@, | " pp_abs cases)
+      print ~at_level:2 "@[<hv>match %t with@, %t@]" (pp_term state t)
+        (pp_sequence "@, | " (pp_abs state) cases)
   | NCall (e, t, abs_ty) ->
       print ~at_level:2 "@[<hov 2> Call (%t, %t, (fun %t))@]" (pp_effect e)
-        (pp_term t) (pp_abs_with_ty abs_ty)
+        (pp_term state t)
+        (pp_abs_with_ty state abs_ty)
   | NBind (t, abs) ->
-      print ~at_level:2 "@[<hov 2>%t >> (fun %t)@]" (pp_term ~max_level:1 t)
-        (pp_abs abs)
+      print ~at_level:2 "@[<hov 2>%t >> (fun %t)@]"
+        (pp_term state ~max_level:1 t)
+        (pp_abs state abs)
   | NHandle (t1, t2) ->
-      print ~at_level:1 "@[<hov 2>%t @,%t@]" (pp_term ~max_level:1 t2)
-        (pp_term ~max_level:0 t1)
+      print ~at_level:1 "@[<hov 2>%t @,%t@]"
+        (pp_term state ~max_level:1 t2)
+        (pp_term state ~max_level:0 t1)
   | _ -> failwith __LOC__
 
-and pp_abs (p, t) ppf = print ppf "@[<h> %t ->@ %t@]" (pp_pattern p) (pp_term t)
+and pp_abs state (p, t) ppf =
+  print ppf "@[<h> %t ->@ %t@]" (pp_pattern state p) (pp_term state t)
 
-and pp_abs_with_ty (p, ty, t) ppf =
-  print ppf "@[<h>(%t: %t) ->@ %t@]" (pp_pattern p) (pp_type ty) (pp_term t)
+and pp_abs_with_ty state (p, ty, t) ppf =
+  print ppf "@[<h>(%t: %t) ->@ %t@]" (pp_pattern state p) (pp_type ty)
+    (pp_term state t)
 
-and pp_let_rec lst ppf =
+and pp_let_rec state lst ppf =
   let pp_var_ty_abs (v, (p, t)) ppf =
-    print ppf "@[<hv 2>and %t %t = @, %t@]" (pp_variable v) (pp_pattern p)
-      (pp_term t)
+    print ppf "@[<hv 2>and %t %t = @, %t@]" (pp_variable state v)
+      (pp_pattern state p) (pp_term state t)
   in
   match Assoc.to_list lst with
   | [] -> ()
   | (v, (p, t)) :: tl ->
-      print ppf "@[<hv 2>let rec %t %t = @, %t@] @,%t" (pp_variable v)
-        (pp_pattern p) (pp_term t)
+      print ppf "@[<hv 2>let rec %t %t = @, %t@] @,%t" (pp_variable state v)
+        (pp_pattern state p) (pp_term state t)
         (pp_sequence " " pp_var_ty_abs tl)
 
-and pp_effect_cls eff_cls ppf =
+and pp_effect_cls state eff_cls ppf =
   let pp_effect_abs2 (eff, (pat1, pat2, t)) ppf =
     print ppf "@[<hv 2>| %t -> fun %t %t -> %t @]" (pp_effect eff)
-      (pp_pattern pat1) (pp_pattern pat2) (pp_term t)
+      (pp_pattern state pat1) (pp_pattern state pat2) (pp_term state t)
   in
   print ppf
     "@[<h>(fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) \
@@ -219,20 +244,20 @@ let pp_def_effect (eff, (ty1, ty2)) ppf =
     (CoreTypes.Effect.print eff)
     (pp_type ty1) (pp_type ty2)
 
-let pp_lets lst ppf =
+let pp_lets state lst ppf =
   let pp_one_let (p, ty, t) ppf =
-    print ppf "@[<hv 2>and (%t : %t) = @,%t@]" (pp_pattern p) (pp_type ty)
-      (pp_term t)
+    print ppf "@[<hv 2>and (%t : %t) = @,%t@]" (pp_pattern state p) (pp_type ty)
+      (pp_term state t)
   in
   match lst with
   | [] -> ()
   | (p, ty, t) :: tl ->
-      print ppf "@[<hv 2>let rec (%t : %t) = @,%t@] @,%t" (pp_pattern p)
-        (pp_type ty) (pp_term t)
+      print ppf "@[<hv 2>let rec (%t : %t) = @,%t@] @,%t" (pp_pattern state p)
+        (pp_type ty) (pp_term state t)
         (pp_sequence " " pp_one_let tl)
 
-let pp_external name symbol_name ppf =
-  print ppf "let %t = ( %s )@.;;" (pp_variable name) symbol_name
+let pp_external state name symbol_name ppf =
+  print ppf "let %t = ( %s )@.;;" (pp_variable state name) symbol_name
 
 let pp_tydef (name, (params, tydef)) ppf =
   let pp_def tydef ppf =
@@ -257,19 +282,21 @@ let pp_tydef (name, (params, tydef)) ppf =
         (CoreTypes.TyName.print name)
         (pp_def tydef)
 
-let pp_cmd cmd ppf =
+let pp_cmd state cmd ppf =
   match cmd with
-  | Term t -> print ppf "%t@.;;" (pp_term t) (* TODO check if ok *)
+  | Term t -> print ppf "%t@.;;" (pp_term state t) (* TODO check if ok *)
   | DefEffect e -> pp_def_effect e ppf
   | TopLet (x, t) ->
-      print ppf "let %t = %t@.;; let %t = %t@.;;" (pp_variable x) (pp_term t)
-        (pp_variable ~safe:false x)
-        (pp_variable x)
+      print ppf "let %t = %t@.;; let %t = %t@.;;" (pp_variable state x)
+        (pp_term state t)
+        (pp_variable state ~safe:false x)
+        (pp_variable state x)
   | TopLetRec defs ->
-      print ppf "%t@.;; let %t = %t@.;;" (pp_let_rec defs)
+      print ppf "%t@.;; let %t = %t@.;;" (pp_let_rec state defs)
         (Print.sequence ","
-           (fun (f, _) -> pp_variable ~safe:false f)
+           (fun (f, _) -> pp_variable state ~safe:false f)
            (Assoc.to_list defs))
-        (Print.sequence "," (fun (f, _) -> pp_variable f) (Assoc.to_list defs))
-  | External (x, _ty, f) -> pp_external x f ppf
+        (Print.sequence ","
+           (fun (f, _) -> pp_variable state f)
+           (Assoc.to_list defs))
   | TyDef defs -> print ppf "type %t@.;;" (pp_sequence "@, and " pp_tydef defs)

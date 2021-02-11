@@ -1,5 +1,4 @@
 effect Fetch : unit -> int;;
-external ( - ) : int -> int -> int = "-";;
 
 type int_list = Nil | Cons of int * int_list
 ;;
