@@ -28,21 +28,31 @@ type void = Void
 
 let _absurd_5 (_void_6 : float) = match _void_6 with _ -> assert false
 
+let absurd = _absurd_5
+
 let rec _op_7 (* @ *) _x_14 (_ys_16 : solutions) =
   match _x_14 with
   | SolutionsNil -> _ys_16
   | SolutionsCons (_x_18, _xs_17) ->
       SolutionsCons (_x_18, _op_7 (* @ *) _xs_17 _ys_16)
 
+let _op_7 (* @ *) = _op_7 (* @ *)
+
 let _op_21 (* > *) (_x_22 : int) (_y_23 : int) = _op_0 (* < *) _y_23 _x_22
+
+let _op_21 (* > *) = _op_21 (* > *)
 
 let _op_25 (* <> *) (_x_26 : int) (_y_27 : int) =
   match _op_1 (* = *) _y_27 _x_26 with true -> false | false -> true
+
+let _op_25 (* <> *) = _op_25 (* <> *)
 
 let _abs_30 (_x_31 : int) =
   match _op_0 (* < *) _x_31 0 with
   | true -> _op_4 (* ~- *) _x_31
   | false -> _x_31
+
+let abs = _abs_30
 
 let _no_attack_34 (_q1_35 : queen) (_q2_36 : queen) =
   match _q1_35 with
@@ -59,6 +69,8 @@ let _no_attack_34 (_q1_35 : queen) (_q2_36 : queen) =
               | false -> false
               | false -> false)))
 
+let no_attack = _no_attack_34
+
 let rec _not_attacked_52 _x_60 (_qs_62 : solution) =
   match _qs_62 with
   | SolutionEmpty -> true
@@ -66,6 +78,8 @@ let rec _not_attacked_52 _x_60 (_qs_62 : solution) =
       match _no_attack_34 _x_60 _x_64 with
       | true -> _not_attacked_52 _x_60 _xs_63
       | false -> false)
+
+let not_attacked = _not_attacked_52
 
 let _available_68 (_number_of_queens_69 : int) (_x_70 : int) (_qs_71 : solution)
     =
@@ -80,6 +94,8 @@ let _available_68 (_number_of_queens_69 : int) (_x_70 : int) (_qs_71 : solution)
         | false -> _loop_72 (_possible_73, _op_2 (* - *) _y_74 1))
   in
   _loop_72 (RowsEmpty, _number_of_queens_69)
+
+let available = _available_68
 
 let rec _tr_choose_94 _x_104 =
   match _x_104 with
@@ -97,6 +113,8 @@ let rec _tr_choose_94 _x_104 =
             | true -> Value _x_114
             | false -> _tr_choose_94 _xs'_113 )
 
+let tr_choose = _tr_choose_94
+
 let _queens_116 (_number_of_queens_117 : int) =
   let rec _tr_place_118 _x_129 =
     let _x_119, _qs_120 = _x_129 in
@@ -110,6 +128,8 @@ let _queens_116 (_number_of_queens_117 : int) =
             SolutionPlace (Queen (_x_119, _y_123), _qs_120) )
   in
   _tr_place_118 (1, SolutionEmpty)
+
+let queens = _queens_116
 
 let _queens_one_option_140 (_number_of_queens_141 : int) =
   let rec _queens_154 _number_of_queens_117 =
@@ -151,6 +171,8 @@ let _queens_one_option_140 (_number_of_queens_141 : int) =
   in
   _queens_154 _number_of_queens_141
 
+let queens_one_option = _queens_one_option_140
+
 let _queens_all_188 (_number_of_queens_189 : int) =
   let rec _queens_203 _number_of_queens_117 =
     let rec _tr_place_118 _x_129 =
@@ -188,6 +210,8 @@ let _queens_all_188 (_number_of_queens_189 : int) =
     _tr_place_214 (1, SolutionEmpty)
   in
   _queens_203 _number_of_queens_189
+
+let queens_all = _queens_all_188
 
 let _queens_one_cps_238 (_number_of_queens_239 : int) =
   let _absurd_240 (_void_241 : empty) =
@@ -234,3 +258,5 @@ let _queens_one_cps_238 (_number_of_queens_239 : int) =
    in
    _queens_265 _number_of_queens_239) (fun (() : unit) ->
       Call (Fail, (), fun (_y_264 : empty) -> Value (_absurd_240 _y_264)))
+
+let queens_one_cps = _queens_one_cps_238

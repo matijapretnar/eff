@@ -27,3 +27,5 @@ let _test_1 (_n_2 : int) =
             fun (_b_39 : int_list) -> _k_32 (Cons (42, _b_39)) )
   in
   _range_30 (_n_2, fun (_x_10 : int_list) -> _x_10)
+
+let test = _test_1

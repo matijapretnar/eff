@@ -1,8 +1,10 @@
 type(_, _) effect += Decide : (unit, bool) effect 
 ;;
 let _two_0 = 2
+;; let two = _two_0
 ;;
 let _three_1 = 3
+;; let three = _three_1
 ;;
 type intlist = IntNil | IntCons of (int * intlist)
 

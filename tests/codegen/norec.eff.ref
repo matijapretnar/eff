@@ -1,2 +1,3 @@
 let _f_0 = fun (_x_1: float) -> ()
+;; let f = _f_0
 ;;

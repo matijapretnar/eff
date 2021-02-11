@@ -10,4 +10,6 @@ and _odd_2 _x_14 =
    match _op_1 (* = *) _x_14 0 with
      true -> false
     |  false -> _even_3 (_op_0 (* - *) _x_14 1)
+;; let even,odd = _even_3,
+_odd_2
 ;;

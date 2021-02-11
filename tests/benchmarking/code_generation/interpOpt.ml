@@ -60,3 +60,5 @@ let _bigTest_5 (() : unit) =
               | eff' -> fun arg k -> Call (eff', arg, k));
         })
        (_interp_6 (_createCase_30 200)))
+
+let bigTest = _bigTest_5

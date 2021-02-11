@@ -12,5 +12,7 @@ let rec _concat_2 _x_10 =
   | IntCons (_z_14, _zs_13) ->
       fun (_ys_15 : intlist) -> IntCons (_z_14, _concat_2 _zs_13 _ys_15)
 
+let concat = _concat_2
+
 ;;
 IntNil

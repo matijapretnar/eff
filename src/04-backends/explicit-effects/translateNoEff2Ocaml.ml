@@ -32,7 +32,7 @@ let protected =
   @ [ "private"; "rec"; "sig"; "struct"; "then"; "to"; "true"; "try"; "type" ]
   @ [ "val"; "virtual"; "when"; "while"; "with"; "continue" ]
 
-let pp_variable var ppf =
+let pp_variable ?(safe = true) var ppf =
   let printer desc n =
     (* [mod] has privileges because otherwise it's stupid *)
     if desc = "mod" then Format.fprintf ppf "_op_%d (* %s *)" n desc
@@ -41,7 +41,9 @@ let pp_variable var ppf =
         Print.warning
           "Warning: Protected keyword [%s]. Must be fixed by hand!@." desc;
       match desc.[0] with
-      | 'a' .. 'z' | '_' -> Format.fprintf ppf "_%s_%d" desc n
+      | 'a' .. 'z' | '_' ->
+          if safe then Format.fprintf ppf "_%s_%d" desc n
+          else Format.fprintf ppf "%s" desc
       | '$' -> (
           match desc with
           | "$c_thunk" -> Format.fprintf ppf "_comp_%d" n
@@ -259,7 +261,15 @@ let pp_cmd cmd ppf =
   match cmd with
   | Term t -> print ppf "%t@.;;" (pp_term t) (* TODO check if ok *)
   | DefEffect e -> pp_def_effect e ppf
-  | TopLet (x, t) -> print ppf "let %t = %t@.;;" (pp_variable x) (pp_term t)
-  | TopLetRec defs -> print ppf "%t@.;;" (pp_let_rec defs)
+  | TopLet (x, t) ->
+      print ppf "let %t = %t@.;; let %t = %t@.;;" (pp_variable x) (pp_term t)
+        (pp_variable ~safe:false x)
+        (pp_variable x)
+  | TopLetRec defs ->
+      print ppf "%t@.;; let %t = %t@.;;" (pp_let_rec defs)
+        (Print.sequence ","
+           (fun (f, _) -> pp_variable ~safe:false f)
+           (Assoc.to_list defs))
+        (Print.sequence "," (fun (f, _) -> pp_variable f) (Assoc.to_list defs))
   | External (x, _ty, f) -> pp_external x f ppf
   | TyDef defs -> print ppf "type %t@.;;" (pp_sequence "@, and " pp_tydef defs)

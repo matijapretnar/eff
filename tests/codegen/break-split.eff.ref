@@ -7,8 +7,10 @@ let _op_2 (* + *) = ( + )
 type(_, _) effect += Decide : (unit, bool) effect 
 ;;
 let _two_3 = 2
+;; let two = _two_3
 ;;
 let _three_4 = 3
+;; let three = _three_4
 ;;
 let rec _f_23 (_x_18, _k_25) = 
       let _l_15 = fun (_y_20: bool) -> _k_25 
