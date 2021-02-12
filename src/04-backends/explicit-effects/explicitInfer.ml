@@ -287,7 +287,7 @@ let lookupTmVar state x = TypingEnv.lookup state.variables x
 (* Term Variables *)
 let rec tcVar state (x : Untyped.variable) : tcExprOutput' =
   match lookupTmVar state x with
-  | Some scheme -> ((Term.Var (Term.variable x scheme), scheme), [])
+  | Some ty -> ((Term.Var { variable = Term.variable x ty }, ty), [])
   | None -> assert false
 
 (* Constants *)

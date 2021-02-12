@@ -277,7 +277,7 @@ and handle_computation state hnd comp =
           in
           beta_reduce state (Term.abstraction (p1, comp')) exp
       | None -> Term.call (eff, exp, handled_abs))
-  | Apply ({ term = Var f; _ }, exp)
+  | Apply ({ term = Var { variable = f }; _ }, exp)
     when Option.is_some
            (Assoc.lookup
               (hnd.term.Term.effect_clauses.fingerprint, f.term)
