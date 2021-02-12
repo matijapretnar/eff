@@ -9,6 +9,8 @@ module VariableMap = Map.Make (CoreTypes.Variable)
 
 type variable = (CoreTypes.Variable.t, Type.ty) typed
 
+type poly_variable = (CoreTypes.Variable.t, Type.ty_scheme) typed
+
 let variable x ty = { term = x; ty }
 
 module EffectFingerprint = Symbol.Make (Symbol.Anonymous)
