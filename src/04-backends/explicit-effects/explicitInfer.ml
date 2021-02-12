@@ -38,16 +38,8 @@ type state = {
 type constraints = Constraint.omega_ct list
 
 (* Add a single term binding to the global typing environment *)
-let extend_var env x ty_sch =
-  { env with variables = TypingEnv.update env.variables x ty_sch }
-
-(* Apply a substitution to the global typing environment *)
-let apply_sub_to_variables env sub =
-  { env with variables = TypingEnv.apply_sub env.variables sub }
-
-(* Extend the global typing environment with multiple term bindings *)
-let extend_env vars env =
-  List.fold_right (fun (x, ty_sch) env -> extend_var env x ty_sch) vars env
+let extend_var env x ty =
+  { env with variables = TypingEnv.update env.variables x (Type.monotype ty) }
 
 (* Initial type inference state: everything is empty *)
 let initial_state : state =
@@ -68,9 +60,6 @@ let process_def_effect eff (ty1, ty2) state =
 (* ************************************************************************* *)
 (*                            SUBSTITUTIONS                                  *)
 (* ************************************************************************* *)
-
-(* Substitute in typing environments *)
-let subInEnv sub env = TypingEnv.apply_sub env sub
 
 (* Substitute in target values and computations *)
 let subInCmp sub cmp = Substitution.apply_substitutions_to_computation sub cmp
@@ -287,14 +276,16 @@ let lookupTmVar state x = TypingEnv.lookup state.variables x
 (* Term Variables *)
 let rec tcVar state (x : Untyped.variable) : tcExprOutput' =
   match lookupTmVar state x with
-  | Some ty ->
+  | Some ty_scheme ->
+      assert (ty_scheme.ty_constraints = []);
+      assert (ty_scheme.dirt_constraints = []);
       ( ( Term.Var
             {
-              variable = Term.variable x ty;
+              variable = Term.variable x ty_scheme.monotype;
               ty_coercions = [];
               dirt_coercions = [];
             },
-          ty ),
+          ty_scheme.monotype ),
         [] )
   | None -> assert false
 
