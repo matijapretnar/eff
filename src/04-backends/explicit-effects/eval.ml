@@ -8,7 +8,7 @@ type state = V.value RuntimeEnv.t
 
 let initial_state = RuntimeEnv.empty
 
-let update x = RuntimeEnv.add x.term
+let update x = RuntimeEnv.add x
 
 let lookup x state = RuntimeEnv.find_opt x.term state
 
@@ -16,11 +16,11 @@ exception PatternMatch of Location.t
 
 let rec extend_value p v state =
   match (p.term, v) with
-  | Term.PVar x, v -> update x v state
+  | Term.PVar x, v -> update x.term v state
   (* | Term.PAnnotated (p, _t), v -> extend_value p v state *)
   | Term.PAs (p, x), v ->
       let state = extend_value p v state in
-      update x v state
+      update x.term v state
   | Term.PNonbinding, _ -> state
   | Term.PTuple ps, V.Tuple vs -> List.fold_right2 extend_value ps vs state
   | Term.PRecord ps, V.Record vs -> (
@@ -95,7 +95,7 @@ and extend_let_rec state defs =
       (fun (f, a) state ->
         let p, c = a.term in
         let g = V.Closure (fun v -> ceval (extend p v !state') c) in
-        update f g state)
+        update f.term g state)
       defs state
   in
   state' := state;

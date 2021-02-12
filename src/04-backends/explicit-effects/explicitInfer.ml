@@ -41,6 +41,9 @@ type constraints = Constraint.omega_ct list
 let extend_var env x ty =
   { env with variables = TypingEnv.update env.variables x (Type.monotype ty) }
 
+let extend_poly_var env x ty_scheme =
+  { env with variables = TypingEnv.update env.variables x ty_scheme }
+
 (* Initial type inference state: everything is empty *)
 let initial_state : state =
   {
@@ -269,25 +272,12 @@ let isLocatedVarPat (pat : Untyped.pattern) : bool =
 (*                             VALUE TYPING                                  *)
 (* ************************************************************************* *)
 
-(* Lookup the type of a term variable in the local and the global contexts
- * (local first, global after). *)
 let lookupTmVar state x = TypingEnv.lookup state.variables x
 
 (* Term Variables *)
 let rec tcVar state (x : Untyped.variable) : tcExprOutput' =
-  match lookupTmVar state x with
-  | Some ty_scheme ->
-      assert (ty_scheme.ty_constraints = []);
-      assert (ty_scheme.dirt_constraints = []);
-      ( ( Term.Var
-            {
-              variable = Term.variable x ty_scheme.monotype;
-              ty_coercions = [];
-              dirt_coercions = [];
-            },
-          ty_scheme.monotype ),
-        [] )
-  | None -> assert false
+  let var, cnstrs = TypingEnv.lookup state.variables x in
+  ((var.term, var.ty), cnstrs)
 
 (* Constants *)
 and tcConst (_state : state) (c : Const.t) : tcExprOutput' =
@@ -801,6 +791,11 @@ let monomorphize free_ty_params cnstrs =
   assert (Constraint.unresolve residuals = []);
   sub
 
+let generalize ty cnstrs =
+  let sub = monomorphize (Type.free_params_ty ty) cnstrs in
+  let ty' = Substitution.apply_substitutions_to_type sub ty in
+  Type.monotype ty'
+
 let infer_computation state comp =
   let comp', cnstrs = tcComp state comp in
   let sub, residuals = Unification.solve cnstrs in
@@ -835,26 +830,16 @@ let process_computation state comp =
 (* Typecheck a top-level expression *)
 let process_expression state expr =
   let expr, residuals = infer_expression state expr in
-  (* Print.debug "TERM: %t" (Term.print_expression expr); *)
-  (* Print.debug "TYPE: %t" (Type.print_dirty expr.ty); *)
-  (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
-  let free_params = Term.free_params_expression expr in
-  let mono_sub = monomorphize free_params residuals in
-  (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
-  let mono_expr = subInExp mono_sub expr in
-  (* Print.debug "MONO TERM: %t" (Term.print_expression mono_expr); *)
-  (* Print.debug "MONO TYPE: %t" (Type.print_dirty mono_expr.ty); *)
-  (* We assume that all free variables in the term already appeared in its type or constraints *)
-  assert (Type.FreeParams.is_empty (Term.free_params_expression mono_expr));
-  mono_expr
+  let ty_scheme = generalize expr.ty residuals in
+  (expr, ty_scheme)
 
 let process_top_let state defs =
   let fold (p, c) (state', defs) =
     match (p.it, c.it) with
     | Language.UntypedSyntax.PVar x, Language.UntypedSyntax.Value v ->
-        let e' = process_expression state v in
-        let x' = Term.variable x e'.ty in
-        let state'' = extend_var state' x e'.ty in
+        let e', ty_scheme = process_expression state v in
+        let x' = Term.variable x ty_scheme in
+        let state'' = extend_poly_var state' x ty_scheme in
         (state'', (x', e') :: defs)
     | _ -> failwith __LOC__
   in

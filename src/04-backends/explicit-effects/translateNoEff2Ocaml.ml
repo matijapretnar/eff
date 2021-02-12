@@ -36,7 +36,7 @@ let pp_label label ppf = CoreTypes.Label.print label ppf
 let pp_tyname ty_name ppf = CoreTypes.TyName.print ty_name ppf
 
 let pp_typaram ty_param ppf =
-  print ppf "'ty%t" (CoreTypes.TyParam.print ~safe:true ty_param)
+  print ppf "'ty%d" (CoreTypes.TyParam.fold (fun _ n -> n) ty_param)
 
 let protected =
   [ "and"; "as"; "assert"; "asr"; "begin"; "class"; "constraint"; "do"; "done" ]
@@ -312,7 +312,7 @@ let pp_tydef (name, (params, tydef)) ppf =
   | [] -> print ppf "@[%t = %t@]@." (CoreTypes.TyName.print name) (pp_def tydef)
   | _lst ->
       print ppf "@[(%t) %t = %t@]@."
-        (pp_sequence ", " CoreTypes.TyParam.print params)
+        (pp_sequence ", " pp_typaram params)
         (CoreTypes.TyName.print name)
         (pp_def tydef)
 

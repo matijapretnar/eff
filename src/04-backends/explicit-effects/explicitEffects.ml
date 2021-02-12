@@ -14,7 +14,7 @@ module type ExplicitBackend = sig
   val process_def_effect : state -> Term.effect -> state
 
   val process_top_let :
-    state -> (Term.variable, Term.expression) Assoc.t -> state
+    state -> (Term.poly_variable, Term.expression) Assoc.t -> state
 
   val process_top_let_rec : state -> Term.rec_definitions -> state
 
@@ -165,12 +165,12 @@ module Evaluate : Language.BackendSignature.T = Make (struct
   let process_top_let state defs =
     match Assoc.to_list defs with
     | [] -> state
-    | [ (x, exp) ] ->
+    | [ ((x : Term.poly_variable), exp) ] ->
         let v = Eval.eval_expression state.evaluation_state exp in
         Format.fprintf !Config.output_formatter "@[%t : %t = %t@]@."
           (Language.CoreTypes.Variable.print x.term)
           (Type.print_ty exp.ty) (V.print_value v);
-        { evaluation_state = Eval.update x v state.evaluation_state }
+        { evaluation_state = Eval.update x.term v state.evaluation_state }
     | _ -> failwith __LOC__
 
   let process_top_let_rec state defs =

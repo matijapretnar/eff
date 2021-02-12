@@ -13,7 +13,10 @@ type t = (Language.CoreTypes.Variable.t, Type.ty_scheme) Assoc.t
 val empty : t
 (** [empty] is the empty context. *)
 
-val lookup : t -> Language.CoreTypes.Variable.t -> Type.ty_scheme option
+val lookup :
+  t ->
+  Language.CoreTypes.Variable.t ->
+  Term.expression * Constraint.omega_ct list
 (** [lookup ctx x] returns a fresh instance of the type scheme assigned
     to the variable [x] in the context [ctx]. *)
 
