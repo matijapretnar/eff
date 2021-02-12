@@ -13,9 +13,9 @@ fun (_a_42 : int) ->
   Call
     ( Op1,
       10,
-      fun (_y_64 : bar) ->
+      fun (_y_63 : bar) ->
         Call
           ( Op2,
-            _y_64,
-            fun (_y_66 : foo) ->
-              Call (Op3, _y_66, fun (_y_67 : int) -> Value (_a_42 + _y_67)) ) )
+            _y_63,
+            fun (_y_65 : foo) ->
+              Call (Op3, _y_65, fun (_y_66 : int) -> Value (_a_42 + _y_66)) ) )

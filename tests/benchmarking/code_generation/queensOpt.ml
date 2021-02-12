@@ -198,48 +198,48 @@ let _queens_all_224 (_number_of_queens_225 : int) =
 let queens_all = _queens_all_224
 
 let _queens_one_cps_274 (_number_of_queens_275 : int) =
-  let _absurd_276 (_void_277 : empty) =
-    match _void_277 with _ -> assert false
-  in
-  (let rec _queens_301 _number_of_queens_153 =
-     let rec _tr_place_154 _x_165 =
-       let _x_155, _qs_156 = _x_165 in
-       match _op_57 (* > *) _x_155 _number_of_queens_153 with
-       | true -> Value _qs_156
+  (let rec _queens_340 _number_of_queens_341 =
+     let rec _tr_place_342 _x_343 =
+       let _x_345, _qs_344 = _x_343 in
+       match _op_57 (* > *) _x_345 _number_of_queens_341 with
+       | true -> Value _qs_344
        | false ->
-           _tr_choose_130 (_available_104 _number_of_queens_153 _x_155 _qs_156)
-           >> fun _y_159 ->
-           _tr_place_154
-             (_x_155 + 1, SolutionPlace (Queen (_x_155, _y_159), _qs_156))
+           _tr_choose_130 (_available_104 _number_of_queens_341 _x_345 _qs_344)
+           >> fun _y_351 ->
+           _tr_place_342
+             (_x_345 + 1, SolutionPlace (Queen (_x_345, _y_351), _qs_344))
      in
-     let rec _tr_place_312 _x_165 =
-       let _x_155, _qs_156 = _x_165 in
-       match _op_57 (* > *) _x_155 _number_of_queens_153 with
+     let rec _tr_place_354 _x_355 =
+       let _x_357, _qs_356 = _x_355 in
+       match _op_57 (* > *) _x_357 _number_of_queens_341 with
        | true ->
            coer_arrow coer_refl_ty (coer_return coer_refl_ty)
-             (fun (_ : unit -> solution computation) -> _qs_156)
+             (fun (_ : unit -> solution computation) -> _qs_356)
        | false ->
-           let rec _tr_choose_314 _x_140 =
-             match _x_140 with
+           let rec _tr_choose_363 _x_364 =
+             match _x_364 with
              | RowsEmpty ->
-                 fun (_kf_284 : unit -> solution computation) -> _kf_284 ()
-             | RowsCons (_x_150, _xs'_149) ->
-                 let _l_290 (_y_151 : bool) =
-                   match _y_151 with
+                 fun (_kf_365 : unit -> solution computation) -> _kf_365 ()
+             | RowsCons (_x_367, _xs'_366) ->
+                 let _l_368 (_y_372 : bool) =
+                   match _y_372 with
                    | true ->
-                       _tr_place_312
-                         ( _x_155 + 1,
-                           SolutionPlace (Queen (_x_155, _x_150), _qs_156) )
-                   | false -> _tr_choose_314 _xs'_149
+                       _tr_place_354
+                         ( _x_357 + 1,
+                           SolutionPlace (Queen (_x_357, _x_367), _qs_356) )
+                   | false -> _tr_choose_363 _xs'_366
                  in
-                 fun (_kf_280 : unit -> solution computation) ->
-                   _l_290 true (fun (_ : unit) -> _l_290 false _kf_280)
+                 fun (_kf_369 : unit -> solution computation) ->
+                   _l_368 true (fun (_ : unit) -> _l_368 false _kf_369)
            in
-           _tr_choose_314 (_available_104 _number_of_queens_153 _x_155 _qs_156)
+           _tr_choose_363 (_available_104 _number_of_queens_341 _x_357 _qs_356)
      in
-     _tr_place_312 (1, SolutionEmpty)
+     _tr_place_354 (1, SolutionEmpty)
    in
-   _queens_301 _number_of_queens_275) (fun (() : unit) ->
-      Call (Fail, (), fun (_y_300 : empty) -> Value (_absurd_276 _y_300)))
+   _queens_340 _number_of_queens_275) (fun (() : unit) ->
+      Call
+        ( Fail,
+          (),
+          fun (_y_339 : empty) -> Value (match _y_339 with _ -> assert false) ))
 
 let queens_one_cps = _queens_one_cps_274

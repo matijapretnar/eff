@@ -44,83 +44,76 @@ let _test_incr_97 (_n_98 : int) =
      match _x_88 = 0 with
      | true -> _k_115 ()
      | false ->
-         let _l_110 (_y_94 : unit) =
-           _loop_incr_113 (_x_88 - 1, fun (_x_114 : unit) -> _k_115 _x_114)
-         in
-         fun (_x_101 : int) -> _l_110 () (_x_101 + 1)
+         fun (_x_118 : int) ->
+           _loop_incr_113
+             (_x_88 - 1, fun (_x_114 : unit) -> _k_115 _x_114)
+             (_x_118 + 1)
    in
    _loop_incr_113 (_n_98, fun (_x_105 : unit) (_x_107 : int) -> _x_107))
     0
 
 let test_incr = _test_incr_97
 
-let rec _loop_incr'_117 _x_125 =
-  match _x_125 = 0 with
+let rec _loop_incr'_122 _x_130 =
+  match _x_130 = 0 with
   | true -> Value ()
   | false ->
-      _loop_incr'_117 (_x_125 - 1) >> fun _ ->
-      Call (Incr, (), fun (_y_133 : unit) -> Value _y_133)
+      _loop_incr'_122 (_x_130 - 1) >> fun _ ->
+      Call (Incr, (), fun (_y_138 : unit) -> Value _y_138)
 
-let loop_incr' = _loop_incr'_117
+let loop_incr' = _loop_incr'_122
 
-let _test_incr'_134 (_n_135 : int) =
-  (let rec _loop_incr'_150 (_x_125, _k_153) =
-     match _x_125 = 0 with
-     | true -> _k_153 ()
+let _test_incr'_139 (_n_140 : int) =
+  (let rec _loop_incr'_155 (_x_130, _k_158) =
+     match _x_130 = 0 with
+     | true -> _k_158 ()
      | false ->
-         _loop_incr'_150
-           ( _x_125 - 1,
-             fun (_ : unit) ->
-               let _l_147 (_y_133 : unit) = _k_153 _y_133 in
-               fun (_x_138 : int) -> _l_147 () (_x_138 + 1) )
-   and _loop_incr_151 (_x_88, _k_157) =
+         _loop_incr'_155
+           (_x_130 - 1, fun (_ : unit) (_x_162 : int) -> _k_158 () (_x_162 + 1))
+   and _loop_incr_156 (_x_88, _k_168) =
      match _x_88 = 0 with
-     | true -> _k_157 ()
+     | true -> _k_168 ()
      | false ->
-         let _l_147 (_y_94 : unit) =
-           _loop_incr_151 (_x_88 - 1, fun (_x_156 : unit) -> _k_157 _x_156)
-         in
-         fun (_x_138 : int) -> _l_147 () (_x_138 + 1)
+         fun (_x_171 : int) ->
+           _loop_incr_156
+             (_x_88 - 1, fun (_x_167 : unit) -> _k_168 _x_167)
+             (_x_171 + 1)
    in
-   _loop_incr'_150 (_n_135, fun (_x_142 : unit) (_x_144 : int) -> _x_144))
+   _loop_incr'_155 (_n_140, fun (_x_147 : unit) (_x_149 : int) -> _x_149))
     0
 
-let test_incr' = _test_incr'_134
+let test_incr' = _test_incr'_139
 
 type (_, _) effect += Get : (unit, int) effect
 
 type (_, _) effect += Put : (int, unit) effect
 
-let rec _loop_state_159 _x_172 =
-  match _x_172 = 0 with
+let rec _loop_state_175 _x_188 =
+  match _x_188 = 0 with
   | true -> Value ()
   | false ->
       Call
         ( Get,
           (),
-          fun (_y_181 : int) ->
+          fun (_y_197 : int) ->
             Call
               ( Put,
-                _y_181 + 1,
-                fun (_y_184 : unit) -> _loop_state_159 (_x_172 - 1) ) )
+                _y_197 + 1,
+                fun (_y_200 : unit) -> _loop_state_175 (_x_188 - 1) ) )
 
-let loop_state = _loop_state_159
+let loop_state = _loop_state_175
 
-let _test_state_187 (_n_188 : int) =
-  (let rec _loop_state_205 (_x_172, _k_207) =
-     match _x_172 = 0 with
-     | true -> _k_207 ()
+let _test_state_203 (_n_204 : int) =
+  (let rec _loop_state_221 (_x_188, _k_223) =
+     match _x_188 = 0 with
+     | true -> _k_223 ()
      | false ->
-         let _l_201 (_y_181 : int) =
-           let _b_183 = _y_181 + 1 in
-           let _l_210 (_y_212 : unit) =
-             _loop_state_205 (_x_172 - 1, fun (_x_215 : unit) -> _k_207 _x_215)
-           in
-           fun (_ : int) -> _l_210 () _b_183
-         in
-         fun (_s_191 : int) -> _l_201 _s_191 _s_191
+         fun (_s_233 : int) ->
+           _loop_state_221
+             (_x_188 - 1, fun (_x_241 : unit) -> _k_223 _x_241)
+             (_s_233 + 1)
    in
-   _loop_state_205 (_n_188, fun (_x_196 : unit) (_x_198 : int) -> _x_198))
+   _loop_state_221 (_n_204, fun (_x_212 : unit) (_x_214 : int) -> _x_214))
     0
 
-let test_state = _test_state_187
+let test_state = _test_state_203

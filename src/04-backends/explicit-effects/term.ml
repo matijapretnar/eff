@@ -5,6 +5,7 @@ module Const = Language.Const
 (** Syntax of the core language. *)
 
 module EffectMap = Map.Make (CoreTypes.Effect)
+module VariableMap = Map.Make (CoreTypes.Variable)
 
 type variable = CoreTypes.Variable.t
 
@@ -643,14 +644,16 @@ let beta_reduce abs exp =
   let sub = pattern_match pat exp in
   Option.map (fun sub -> subst_comp sub cmp) sub
 
-let ( @@@ ) (inside1, outside1) (inside2, outside2) =
-  (inside1 @ inside2, outside1 @ outside2)
+let ( @@@ ) occur1 occur2 =
+  VariableMap.merge
+    (fun _ oc1 oc2 ->
+      Some (Option.value ~default:0 oc1 + Option.value ~default:0 oc2))
+    occur1 occur2
 
-let ( --- ) (inside, outside) bound =
-  let remove_bound xs = List.filter (fun x -> not (List.mem x bound)) xs in
-  (remove_bound inside, remove_bound outside)
+let ( --- ) occur bound =
+  VariableMap.filter (fun x _ -> not (List.mem x bound)) occur
 
-let concat_vars vars = List.fold_right ( @@@ ) vars ([], [])
+let concat_vars vars = List.fold_right ( @@@ ) vars VariableMap.empty
 
 let rec free_vars_comp c =
   match c.term with
@@ -674,15 +677,15 @@ let rec free_vars_comp c =
 
 and free_vars_expr e =
   match e.term with
-  | Var v -> ([], [ v ])
+  | Var v -> VariableMap.singleton v 1
   | Tuple es -> concat_vars (List.map free_vars_expr es)
   | Lambda a -> free_vars_abs a
   | Handler h -> free_vars_handler h
   | Record flds ->
       Assoc.values_of flds |> List.map free_vars_expr |> concat_vars
-  | Variant (_, e) -> Option.default_map ([], []) free_vars_expr e
+  | Variant (_, e) -> Option.default_map VariableMap.empty free_vars_expr e
   | CastExp (e', _tyco) -> free_vars_expr e'
-  | Const _ -> ([], [])
+  | Const _ -> VariableMap.empty
   | LambdaTyCoerVar _ -> failwith __LOC__
   | LambdaDirtCoerVar _ -> failwith __LOC__
   | ApplyTyCoercion (e, _tyco) -> free_vars_expr e
@@ -696,19 +699,10 @@ and free_vars_handler h =
 and free_vars_finally_handler (h, finally_clause) =
   free_vars_handler h @@@ free_vars_abs finally_clause
 
-and free_vars_abs { term = p, c; _ } =
-  let inside, outside = free_vars_comp c --- pattern_vars p in
-  (inside @ outside, [])
+and free_vars_abs { term = p, c; _ } = free_vars_comp c --- pattern_vars p
 
 and free_vars_abs2 { term = p1, p2, c; _ } =
-  let inside, outside =
-    free_vars_comp c --- pattern_vars p2 --- pattern_vars p1
-  in
-  (inside @ outside, [])
-
-let occurrences x (inside, outside) =
-  let count ys = List.length (List.filter (fun y -> x = y) ys) in
-  (count inside, count outside)
+  free_vars_comp c --- pattern_vars p2 --- pattern_vars p1
 
 let cast_expression e ty =
   let omega, cons = Constraint.fresh_ty_coer (e.ty, ty) in

@@ -57,29 +57,34 @@ type inlinability =
   | NotInlinable
 
 let abstraction_inlinability { term = pat, cmp; _ } =
-  let vars = Term.free_vars_comp cmp in
+  let free_vars_cmp = Term.free_vars_comp cmp in
   let rec check_variables = function
     | [] -> NotPresent
     | x :: xs -> (
-        let inside_occ, outside_occ = Term.occurrences x vars in
-        if inside_occ > 0 || outside_occ > 1 then NotInlinable
+        let occ =
+          Term.VariableMap.find_opt x free_vars_cmp |> Option.value ~default:0
+        in
+        if occ > 1 then NotInlinable
         else
           match check_variables xs with
-          | NotPresent -> if outside_occ = 0 then NotPresent else Inlinable
+          | NotPresent -> if occ = 0 then NotPresent else Inlinable
           | inlinability -> inlinability)
   in
   check_variables (Term.pattern_vars pat)
 
 let keep_used_bindings defs cmp =
   (* Do proper call graph analysis *)
-  let free_vars_cmp_in, free_vars_cmp_out = Term.free_vars_comp cmp in
+  let free_vars_cmp = Term.free_vars_comp cmp in
   let free_vars_defs =
-    List.map (fun (_, a) -> fst (Term.free_vars_abs a)) (Assoc.to_list defs)
+    List.map (fun (_, a) -> Term.free_vars_abs a) (Assoc.to_list defs)
   in
-  let free_vars =
-    List.flatten (free_vars_cmp_in :: free_vars_cmp_out :: free_vars_defs)
-  in
-  List.filter (fun (x, _) -> List.mem x free_vars) (Assoc.to_list defs)
+  let free_vars = Term.concat_vars (free_vars_cmp :: free_vars_defs) in
+  List.filter
+    (fun (x, _) ->
+      match Term.VariableMap.find_opt x free_vars with
+      | None | Some 0 -> false
+      | Some _ -> true)
+    (Assoc.to_list defs)
 
 let rec extract_cast_value comp =
   match comp.term with
