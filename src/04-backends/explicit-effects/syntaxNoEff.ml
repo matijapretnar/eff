@@ -94,7 +94,7 @@ type n_tydef =
 
 type cmd =
   | Term of n_term
-  | TopLet of variable * n_term
+  | TopLet of (variable, n_term) Assoc.t
   | TopLetRec of n_rec_definitions
   | DefEffect of n_effect
   | TyDef of (CoreTypes.TyName.t * (CoreTypes.TyParam.t list * n_tydef)) list

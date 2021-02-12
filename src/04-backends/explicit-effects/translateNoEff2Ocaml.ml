@@ -245,15 +245,14 @@ let pp_def_effect (eff, (ty1, ty2)) ppf =
     (pp_type ty1) (pp_type ty2)
 
 let pp_lets state lst ppf =
-  let pp_one_let (p, ty, t) ppf =
-    print ppf "@[<hv 2>and (%t : %t) = @,%t@]" (pp_pattern state p) (pp_type ty)
-      (pp_term state t)
+  let pp_one_let (p, t) ppf =
+    print ppf "@[<hv 2>and %t = @,%t@]" (pp_variable state p) (pp_term state t)
   in
   match lst with
   | [] -> ()
-  | (p, ty, t) :: tl ->
-      print ppf "@[<hv 2>let rec (%t : %t) = @,%t@] @,%t" (pp_pattern state p)
-        (pp_type ty) (pp_term state t)
+  | (p, t) :: tl ->
+      print ppf "@[<hv 2>let %t = @,%t@] @,%t" (pp_variable state p)
+        (pp_term state t)
         (pp_sequence " " pp_one_let tl)
 
 let pp_external state name symbol_name ppf =
@@ -286,11 +285,15 @@ let pp_cmd state cmd ppf =
   match cmd with
   | Term t -> print ppf "%t@.;;" (pp_term state t) (* TODO check if ok *)
   | DefEffect e -> pp_def_effect e ppf
-  | TopLet (x, t) ->
-      print ppf "let %t = %t@.;; let %t = %t@.;;" (pp_variable state x)
-        (pp_term state t)
-        (pp_variable state ~safe:false x)
-        (pp_variable state x)
+  | TopLet defs ->
+      print ppf "%t@.;; let %t = %t@.;;"
+        (pp_lets state (Assoc.to_list defs))
+        (Print.sequence ","
+           (fun (f, _) -> pp_variable state ~safe:false f)
+           (Assoc.to_list defs))
+        (Print.sequence ","
+           (fun (f, _) -> pp_variable state f)
+           (Assoc.to_list defs))
   | TopLetRec defs ->
       print ppf "%t@.;; let %t = %t@.;;" (pp_let_rec state defs)
         (Print.sequence ","

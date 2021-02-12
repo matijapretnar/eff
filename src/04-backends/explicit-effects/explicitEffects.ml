@@ -13,7 +13,8 @@ module type ExplicitBackend = sig
 
   val process_def_effect : state -> Term.effect -> state
 
-  val process_top_let : state -> Term.variable * Term.expression -> state
+  val process_top_let :
+    state -> (Term.variable, Term.expression) Assoc.t -> state
 
   val process_top_let_rec : state -> Term.rec_definitions -> state
 
@@ -72,37 +73,18 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
     }
 
   let process_top_let state defs _vars =
-    match defs with
-    | [] -> assert false
-    | [
-     ( { it = Language.UntypedSyntax.PVar x; _ },
-       { it = Language.UntypedSyntax.Value v; _ } );
-    ] ->
-        let e' = ExplicitInfer.top_level_expression state.type_system_state v in
-        let x' = Term.variable x e'.ty in
-        let e'' =
-          if !Config.enable_optimization then
-            Optimizer.optimize_expression state.optimizer_state e'
-          else e'
-        in
-        let type_system_state' =
-          ExplicitInfer.extend_var state.type_system_state x e''.ty
-        in
-        let optimizer_state' =
-          match e''.term with
-          | Term.Lambda abs ->
-              Optimizer.add_non_recursive_function state.optimizer_state x abs
-          | _ -> state.optimizer_state
-        in
-        let backend_state' =
-          ExBackend.process_top_let state.backend_state (x', e'')
-        in
-        {
-          type_system_state = type_system_state';
-          optimizer_state = optimizer_state';
-          backend_state = backend_state';
-        }
-    | _ -> failwith __LOC__
+    let type_system_state', defs' =
+      ExplicitInfer.process_top_let state.type_system_state defs
+    in
+    let optimizer_state', defs'' =
+      Optimizer.process_top_let state.optimizer_state defs'
+    in
+    let backend_state' = ExBackend.process_top_let state.backend_state defs'' in
+    {
+      type_system_state = type_system_state';
+      optimizer_state = optimizer_state';
+      backend_state = backend_state';
+    }
 
   let process_top_let_rec state defs _vars =
     let type_system_state', defs' =
@@ -170,12 +152,16 @@ module Evaluate : Language.BackendSignature.T = Make (struct
 
   let process_def_effect state _ = state
 
-  let process_top_let state (x, exp) =
-    let v = Eval.eval_expression state.evaluation_state exp in
-    Format.fprintf !Config.output_formatter "@[%t : %t = %t@]@."
-      (Language.CoreTypes.Variable.print x.term)
-      (Type.print_ty exp.ty) (V.print_value v);
-    { evaluation_state = Eval.update x v state.evaluation_state }
+  let process_top_let state defs =
+    match Assoc.to_list defs with
+    | [] -> state
+    | [ (x, exp) ] ->
+        let v = Eval.eval_expression state.evaluation_state exp in
+        Format.fprintf !Config.output_formatter "@[%t : %t = %t@]@."
+          (Language.CoreTypes.Variable.print x.term)
+          (Type.print_ty exp.ty) (V.print_value v);
+        { evaluation_state = Eval.update x v state.evaluation_state }
+    | _ -> failwith __LOC__
 
   let process_top_let_rec state defs =
     Assoc.iter
@@ -247,9 +233,14 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
         :: state.prog;
     }
 
-  let process_top_let state (x, e) =
-    let t = optimize_term state @@ TranslateExEff2NoEff.elab_expression e in
-    { state with prog = SyntaxNoEff.TopLet (x.term, t) :: state.prog }
+  let process_top_let state defs =
+    let defs' =
+      Assoc.kmap
+        (fun (x, e) ->
+          (x.term, optimize_term state @@ TranslateExEff2NoEff.elab_expression e))
+        defs
+    in
+    { state with prog = SyntaxNoEff.TopLet defs' :: state.prog }
 
   let process_top_let_rec state defs =
     let defs' =

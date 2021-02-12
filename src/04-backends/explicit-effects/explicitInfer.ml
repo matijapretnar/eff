@@ -779,6 +779,35 @@ let process_computation state comp =
   assert (Type.FreeParams.is_empty (Term.free_params_computation mono_comp));
   mono_comp
 
+(* Typecheck a top-level expression *)
+let process_expression state expr =
+  let expr, residuals = infer_expression state expr in
+  (* Print.debug "TERM: %t" (Term.print_expression expr); *)
+  (* Print.debug "TYPE: %t" (Type.print_dirty expr.ty); *)
+  (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
+  let free_params = Term.free_params_expression expr in
+  let mono_sub = monomorphize free_params residuals in
+  (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
+  let mono_expr = subInExp mono_sub expr in
+  (* Print.debug "MONO TERM: %t" (Term.print_expression mono_expr); *)
+  (* Print.debug "MONO TYPE: %t" (Type.print_dirty mono_expr.ty); *)
+  (* We assume that all free variables in the term already appeared in its type or constraints *)
+  assert (Type.FreeParams.is_empty (Term.free_params_expression mono_expr));
+  mono_expr
+
+let process_top_let state defs =
+  let fold (p, c) (state', defs) =
+    match (p.it, c.it) with
+    | Language.UntypedSyntax.PVar x, Language.UntypedSyntax.Value v ->
+        let e' = process_expression state v in
+        let x' = Term.variable x e'.ty in
+        let state'' = extend_var state' x e'.ty in
+        (state'', (x', e') :: defs)
+    | _ -> failwith __LOC__
+  in
+  let state', defs' = List.fold_right fold defs (state, []) in
+  (state', Assoc.of_list defs')
+
 let process_top_let_rec state defs =
   let defs, residuals = infer_rec_abstraction state (Assoc.to_list defs) in
   (* Print.debug "TERM: %t" (Term.print_abstraction abs); *)
@@ -796,23 +825,7 @@ let process_top_let_rec state defs =
       (fun state (f, abs) -> extend_var state f.term (Type.Arrow abs.ty))
       state mono_defs
   in
-
   (state', mono_defs)
-
-let top_level_expression state expr =
-  let expr, residuals = infer_expression state expr in
-  (* Print.debug "TERM: %t" (Term.print_expression expr); *)
-  (* Print.debug "TYPE: %t" (Type.print_ty expr.ty); *)
-  (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
-  let free_params = Term.free_params_expression expr in
-  let mono_sub = monomorphize free_params residuals in
-  (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
-  let mono_expr = subInExp mono_sub expr in
-  (* Print.debug "MONO TERM: %t" (Term.print_expression mono_expr); *)
-  (* Print.debug "MONO TYPE: %t" (Type.print_ty mono_expr.ty); *)
-  (* We assume that all free variables in the term already appeared in its type or constraints *)
-  assert (Type.FreeParams.is_empty (Term.free_params_expression mono_expr));
-  mono_expr
 
 let add_type_definitions state tydefs =
   {
