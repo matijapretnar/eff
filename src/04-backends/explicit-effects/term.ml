@@ -48,7 +48,7 @@ type expression = (expression', Type.ty) typed
 (** Pure expressions *)
 
 and expression' =
-  | Var of variable
+  | Var of { variable : variable }
   | Const of Language.Const.t
   | Tuple of expression list
   | Record of (CoreTypes.Field.t, expression) Assoc.t
@@ -93,7 +93,7 @@ and abstraction2 =
   (pattern * pattern * computation, Type.ty * Type.ty * Type.dirty) typed
 (** Abstractions that take two arguments. *)
 
-let var x = { term = Var x; ty = x.ty }
+let var x = { term = Var { variable = x }; ty = x.ty }
 
 let fresh_variable x ty =
   let x' = { term = CoreTypes.Variable.fresh x; ty } in
@@ -238,7 +238,7 @@ let rec print_expression ?max_level e ppf =
 and print_expression' ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match e with
-  | Var x -> print "%t" (print_variable x)
+  | Var x -> print "%t" (print_variable x.variable)
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
   | Record lst -> Print.record CoreTypes.Field.print print_expression lst ppf
@@ -363,7 +363,9 @@ let rec refresh_expression sbst exp =
 
 and refresh_expression' sbst = function
   | Var x as e -> (
-      match Assoc.lookup x sbst with Some x' -> Var x' | None -> e)
+      match Assoc.lookup x.variable sbst with
+      | Some x' -> Var { variable = x' }
+      | None -> e)
   | Lambda abs -> Lambda (refresh_abstraction sbst abs)
   | Handler h -> Handler (refresh_handler sbst h)
   | Tuple es -> Tuple (List.map (refresh_expression sbst) es)
@@ -438,7 +440,7 @@ let rec subst_expr sbst exp = { exp with term = subst_expr' sbst exp.term }
 and subst_expr' sbst = function
   (* We could afford to check that types of x and e match *)
   | Var x as e -> (
-      match Assoc.lookup x sbst with Some e' -> e'.term | None -> e)
+      match Assoc.lookup x.variable sbst with Some e' -> e'.term | None -> e)
   | Lambda abs -> Lambda (subst_abs sbst abs)
   | Handler h -> Handler (subst_handler sbst h)
   | Tuple es -> Tuple (List.map (subst_expr sbst) es)
@@ -565,7 +567,7 @@ let rec free_vars_comp c =
 
 and free_vars_expr e =
   match e.term with
-  | Var v -> VariableMap.singleton v.term 1
+  | Var v -> VariableMap.singleton v.variable.term 1
   | Tuple es -> concat_vars (List.map free_vars_expr es)
   | Lambda a -> free_vars_abs a
   | Handler h -> free_vars_handler h

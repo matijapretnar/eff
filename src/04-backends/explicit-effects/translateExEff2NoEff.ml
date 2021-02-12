@@ -128,7 +128,7 @@ let rec elab_expression (state : state) exp = elab_expression' state exp.term
 
 and elab_expression' state exp =
   match exp with
-  | ExEff.Var x -> NoEff.NVar x.term
+  | ExEff.Var x -> NoEff.NVar x.variable.term
   | ExEff.Const c -> NoEff.NConst c
   | ExEff.Tuple vs -> NoEff.NTuple (List.map (elab_expression state) vs)
   | ExEff.Lambda abs -> NoEff.NFun (elab_abstraction_with_param_ty state abs)

@@ -104,11 +104,11 @@ and extend_let_rec state defs =
 and veval state e =
   match e.term with
   | Term.Var x -> (
-      match lookup x state with
+      match lookup x.variable state with
       | Some v -> v
       | None ->
           Error.runtime "Name %t is not defined."
-            (CoreTypes.Variable.print x.term))
+            (CoreTypes.Variable.print x.variable.term))
   | Term.Const c -> V.Const c
   (* | Term.Annotated (t, _ty) -> veval state t *)
   | Term.Tuple es -> V.Tuple (List.map (veval state) es)

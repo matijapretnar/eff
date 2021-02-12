@@ -208,8 +208,9 @@ and optimize_abstraction' state (pat, cmp) =
   let cmp' = optimize_computation state cmp in
   match (pat.term, cmp'.term) with
   | Term.PVar v, Term.Match ({ term = Var v'; _ }, [ abs ])
-  | Term.PVar v, Term.LetVal ({ term = Var v'; _ }, abs)
-    when v = v' && Term.does_not_occur v.term (Term.free_vars_abs abs) ->
+  | Term.PVar v, Term.LetVal ({ term = Term.Var v'; _ }, abs)
+    when v = v'.variable && Term.does_not_occur v.term (Term.free_vars_abs abs)
+    ->
       abs.term
   | _ -> (pat, cmp')
 
@@ -268,7 +269,7 @@ and bind_abstraction state { term = pat, cmp; _ } bind =
 
 and handle_computation state hnd comp =
   match comp.term with
-  | Term.Apply ({ term = Var f; _ }, exp)
+  | Term.Apply ({ term = Var { variable = f }; _ }, exp)
     when Option.is_some
            (Assoc.lookup
               (hnd.term.Term.effect_clauses.fingerprint, f.term)
