@@ -70,6 +70,25 @@ and ct_dirt = dirt * dirt
 
 and ct_dirty = dirty * dirty
 
+type ty_scheme = {
+  skeleton_params : SkelParam.t list;
+  dirt_params : DirtParam.t list;
+  ty_params : (CoreTypes.TyParam.t * skeleton) list;
+  ty_constraints : ct_ty list;
+  dirt_constraints : ct_dirt list;
+  monotype : ty;
+}
+
+let monotype ty =
+  {
+    skeleton_params = [];
+    dirt_params = [];
+    ty_params = [];
+    ty_constraints = [];
+    dirt_constraints = [];
+    monotype = ty;
+  }
+
 let type_const c = TyBasic (Const.infer_ty c)
 
 let is_empty_dirt dirt =
