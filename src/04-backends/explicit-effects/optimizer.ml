@@ -503,3 +503,17 @@ and reduce_computation' state comp =
            (Term.handle (exp, cast_computation state cmp drty_coer1)))
         drty_coer2
   | _ -> comp
+
+let process_computation state comp =
+  if !Config.enable_optimization then optimize_computation state comp else comp
+
+let process_top_let_rec state defs =
+  if !Config.enable_optimization then
+    let defs' = optimize_rec_definitions state defs in
+    let state' =
+      Assoc.fold_left
+        (fun state (f, abs) -> add_recursive_function state f abs)
+        state defs'
+    in
+    (state', defs')
+  else (state, defs)

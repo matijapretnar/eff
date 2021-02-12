@@ -57,8 +57,11 @@ let initial_state : state =
     tydefs = TypeDefinitionContext.initial_state;
   }
 
-let add_effect eff (ty1, ty2) state =
-  { state with effects = Term.EffectMap.add eff (ty1, ty2) state.effects }
+let process_def_effect eff (ty1, ty2) state =
+  let ty1 = Type.source_to_target state.tydefs ty1 in
+  let ty2 = Type.source_to_target state.tydefs ty2 in
+  ( { state with effects = Term.EffectMap.add eff (ty1, ty2) state.effects },
+    (ty1, ty2) )
 
 (* ... *)
 
@@ -761,7 +764,7 @@ let infer_rec_abstraction state defs =
   (Substitution.apply_sub_definitions sub defs', residuals)
 
 (* Typecheck a top-level expression *)
-let top_level_computation state comp =
+let process_computation state comp =
   let comp, residuals = infer_computation state comp in
   (* Print.debug "TERM: %t" (Term.print_computation comp); *)
   (* Print.debug "TYPE: %t" (Type.print_dirty comp.ty); *)
@@ -776,8 +779,8 @@ let top_level_computation state comp =
   assert (Type.FreeParams.is_empty (Term.free_params_computation mono_comp));
   mono_comp
 
-let top_level_rec_abstraction state defs =
-  let defs, residuals = infer_rec_abstraction state defs in
+let process_top_let_rec state defs =
+  let defs, residuals = infer_rec_abstraction state (Assoc.to_list defs) in
   (* Print.debug "TERM: %t" (Term.print_abstraction abs); *)
   (* Print.debug "TYPE: %t" (Type.print_abs_ty abs.ty); *)
   (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
@@ -788,7 +791,13 @@ let top_level_rec_abstraction state defs =
   (* Print.debug "MONO TYPE: %t" (Type.print_abs_ty abs.ty); *)
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   (* assert (Type.FreeParams.is_empty (Term.free_params_abstraction mono_abs)); *)
-  mono_defs
+  let state' =
+    Assoc.fold_left
+      (fun state (f, abs) -> extend_var state f.term (Type.Arrow abs.ty))
+      state mono_defs
+  in
+
+  (state', mono_defs)
 
 let top_level_expression state expr =
   let expr, residuals = infer_expression state expr in

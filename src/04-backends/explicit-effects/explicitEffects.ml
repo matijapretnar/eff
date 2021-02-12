@@ -45,32 +45,22 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
     }
 
   let process_computation state c _ =
-    let c' = ExplicitInfer.top_level_computation state.type_system_state c in
-    let c'' =
-      if !Config.enable_optimization then
-        Optimizer.optimize_computation state.optimizer_state c'
-      else c'
-    in
+    let c' = ExplicitInfer.process_computation state.type_system_state c in
+    let c'' = Optimizer.process_computation state.optimizer_state c' in
     let backend_state' =
       ExBackend.process_computation state.backend_state c''
     in
     { state with backend_state = backend_state' }
 
   let process_type_of state c _ =
-    let c' = ExplicitInfer.top_level_computation state.type_system_state c in
-    let c'' =
-      if !Config.enable_optimization then
-        Optimizer.optimize_computation state.optimizer_state c'
-      else c'
-    in
+    let c' = ExplicitInfer.process_computation state.type_system_state c in
+    let c'' = Optimizer.process_computation state.optimizer_state c' in
     let backend_state' = ExBackend.process_type_of state.backend_state c'' in
     { state with backend_state = backend_state' }
 
   let process_def_effect state (eff, (ty1, ty2)) =
-    let ty1 = Type.source_to_target state.type_system_state.tydefs ty1 in
-    let ty2 = Type.source_to_target state.type_system_state.tydefs ty2 in
-    let type_system_state' =
-      ExplicitInfer.add_effect eff (ty1, ty2) state.type_system_state
+    let type_system_state', (ty1, ty2) =
+      ExplicitInfer.process_def_effect eff (ty1, ty2) state.type_system_state
     in
     let backend_state' =
       ExBackend.process_def_effect state.backend_state (eff, (ty1, ty2))
@@ -115,25 +105,11 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
     | _ -> failwith __LOC__
 
   let process_top_let_rec state defs _vars =
-    let defs' =
-      ExplicitInfer.top_level_rec_abstraction state.type_system_state
-        (Assoc.to_list defs)
+    let type_system_state', defs' =
+      ExplicitInfer.process_top_let_rec state.type_system_state defs
     in
-    let defs'' =
-      if !Config.enable_optimization then
-        Optimizer.optimize_rec_definitions state.optimizer_state defs'
-      else defs'
-    in
-    let type_system_state' =
-      Assoc.fold_left
-        (fun state (f, abs) ->
-          ExplicitInfer.extend_var state f.term (Type.Arrow abs.ty))
-        state.type_system_state defs''
-    in
-    let optimizer_state' =
-      Assoc.fold_left
-        (fun state (f, abs) -> Optimizer.add_recursive_function state f abs)
-        state.optimizer_state defs''
+    let optimizer_state', defs'' =
+      Optimizer.process_top_let_rec state.optimizer_state defs'
     in
     let backend_state' =
       ExBackend.process_top_let_rec state.backend_state defs''
