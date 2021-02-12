@@ -1,6 +1,6 @@
 open OcamlHeader
 
-type (_, _) effect += Fetch : (unit, int) effect
+type (_, _) eff_internal_effect += Fetch : (unit, int) eff_internal_effect
 
 type int_list = Nil | Cons of (int * int_list)
 

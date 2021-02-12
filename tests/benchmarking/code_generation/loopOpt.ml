@@ -9,7 +9,7 @@ let _test_pure_53 (_n_54 : int) = _loop_pure_41 _n_54
 
 let test_pure = _test_pure_53
 
-type (_, _) effect += Fail : (unit, empty) effect
+type (_, _) eff_internal_effect += Fail : (unit, empty) eff_internal_effect
 
 let rec _loop_latent_55 _x_66 =
   match _x_66 = 0 with
@@ -30,7 +30,7 @@ let _test_latent_78 (_n_79 : int) = _loop_latent_55 _n_79
 
 let test_latent = _test_latent_78
 
-type (_, _) effect += Incr : (unit, unit) effect
+type (_, _) eff_internal_effect += Incr : (unit, unit) eff_internal_effect
 
 let rec _loop_incr_80 _x_88 =
   match _x_88 = 0 with
@@ -84,9 +84,9 @@ let _test_incr'_139 (_n_140 : int) =
 
 let test_incr' = _test_incr'_139
 
-type (_, _) effect += Get : (unit, int) effect
+type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
-type (_, _) effect += Put : (int, unit) effect
+type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
 
 let rec _loop_state_175 _x_188 =
   match _x_188 = 0 with

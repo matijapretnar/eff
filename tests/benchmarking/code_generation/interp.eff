@@ -11,7 +11,22 @@ effect DivByZero : unit -> int
 
 (******************************************************************************)
 
-let bigTest () =
+let addCase =
+  Add
+    ( Add (Add (Num 20, Num 2), Mul (Num 1, Num 2)),
+      Sub (Add (Num 2, Num 2), Div (Num 1, Num 10)) )
+
+let rec createZeroCase n =
+  match n with
+  | 0 -> Sub (addCase, addCase)
+  | n -> Sub (createZeroCase (n - 1), createZeroCase (n - 1))
+
+let rec createCase n =
+  match n with
+  | 1 -> Div (Num 100, createZeroCase 3)
+  | _ -> Add (addCase, createCase (n - 1))
+
+let bigTest num =
   let rec interp = function
   | Num b -> b
   | Add (l, r) ->
@@ -34,26 +49,8 @@ let bigTest () =
     | _ -> x / y
     end
   in
-  let addCase =
-    Add (
-        Add (
-            Add ((Num 20), (Num 2)),
-            Mul ((Num 1), (Num 2))
-        ),
-        Sub (
-            Add ((Num 2), (Num 2)),
-            Div ((Num 1), (Num 10))
-        )
-    )
-  in
-  let rec createCase n =
-    begin match n with
-    | 1 -> (Div (Num 100, Num 0))
-    | _ -> Add (addCase, (createCase (n - 1)))
-    end
-  in
-  let finalCase = createCase 200 in
+  let finalCase = createCase num in
   let arithmeticHandler = handler
     | effect (DivByZero ()) k ->  -1
   in
-  with arithmeticHandler handle interp (createCase 200)
+  with arithmeticHandler handle interp finalCase

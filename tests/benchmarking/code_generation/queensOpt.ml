@@ -1,8 +1,8 @@
 open OcamlHeader
 
-type (_, _) effect += Decide : (unit, bool) effect
+type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
 
-type (_, _) effect += Fail : (unit, empty) effect
+type (_, _) eff_internal_effect += Fail : (unit, empty) eff_internal_effect
 
 type queen = Queen of (int * int)
 
