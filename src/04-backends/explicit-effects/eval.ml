@@ -8,9 +8,9 @@ type state = V.value RuntimeEnv.t
 
 let initial_state = RuntimeEnv.empty
 
-let update x = RuntimeEnv.add x
+let update x = RuntimeEnv.add x.term
 
-let lookup x state = RuntimeEnv.find_opt x state
+let lookup x state = RuntimeEnv.find_opt x.term state
 
 exception PatternMatch of Location.t
 
@@ -107,7 +107,8 @@ and veval state e =
       match lookup x state with
       | Some v -> v
       | None ->
-          Error.runtime "Name %t is not defined." (CoreTypes.Variable.print x))
+          Error.runtime "Name %t is not defined."
+            (CoreTypes.Variable.print x.term))
   | Term.Const c -> V.Const c
   (* | Term.Annotated (t, _ty) -> veval state t *)
   | Term.Tuple es -> V.Tuple (List.map (veval state) es)

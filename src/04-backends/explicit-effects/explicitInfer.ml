@@ -114,14 +114,6 @@ let applyTerm tyCoercions dirtCoercions exp : Term.expression =
   foldLeft (fun e c -> Term.applyDirtCoercion (e, c)) dirtCoercions
 
 (* ************************************************************************* *)
-(*                       VARIABLE INSTANTIATION                              *)
-(* ************************************************************************* *)
-
-let instantiateVariable (x : Term.variable) (ty : Type.ty) :
-    Term.expression * Type.ty * Constraint.omega_ct list =
-  (Term.var x ty, ty, [])
-
-(* ************************************************************************* *)
 (*                           BASIC DEFINITIONS                               *)
 (* ************************************************************************* *)
 
@@ -161,7 +153,9 @@ let rec check_pattern state ty (pat : Untyped.pattern) : Term.pattern * state =
 
 and check_pattern' state ty pat =
   match pat.it with
-  | Untyped.PVar x -> (Term.PVar x, extend_var state x ty)
+  | Untyped.PVar x ->
+      let x' = { term = x; ty } in
+      (Term.PVar x', extend_var state x'.term ty)
   | Untyped.PAnnotated (p, ty') when Type.source_to_target state.tydefs ty' = ty
     ->
       let p', state = check_pattern state ty p in
@@ -205,7 +199,8 @@ and infer_pattern' state pat =
   match pat.it with
   | Untyped.PVar x ->
       let alpha, alphaSkel = Constraint.fresh_ty_with_fresh_skel () in
-      (Term.PVar x, alpha, extend_var state x alpha, [ alphaSkel ])
+      let x = Term.variable x alpha in
+      (Term.PVar x, alpha, extend_var state x.term alpha, [ alphaSkel ])
   | Untyped.PAnnotated (p, ty) ->
       let ty' = Type.source_to_target state.tydefs ty in
       let p', state' = check_pattern state ty' p in
@@ -249,11 +244,9 @@ let isLocatedVarPat (pat : Untyped.pattern) : bool =
 let lookupTmVar state x = TypingEnv.lookup state.variables x
 
 (* Term Variables *)
-let rec tcVar state (x : Term.variable) : tcExprOutput' =
+let rec tcVar state (x : Untyped.variable) : tcExprOutput' =
   match lookupTmVar state x with
-  | Some scheme ->
-      let x, x_monotype, constraints = instantiateVariable x scheme in
-      ((x.term, x_monotype), constraints)
+  | Some scheme -> ((Term.Var (Term.variable x scheme), scheme), [])
   | None -> assert false
 
 (* Constants *)
@@ -367,15 +360,12 @@ and tcOpCase state
   let rightty = Type.Arrow (tyBi, dirtyi) in
 
   (* 6: Create the elaborated clause *)
-  let lvar = CoreTypes.Variable.fresh "l" in
-  let castExp, omegaCt5i =
-    Term.cast_expression (Term.var lvar leftty) rightty
-  in
+  let l_pat, l_var = Term.fresh_variable "l" leftty in
+  let castExp, omegaCt5i = Term.cast_expression l_var rightty in
   let lsub = Term.subst_comp (Assoc.of_list [ (k, castExp) ]) in
   let outExpr =
     ( ((eff, (tyAi, tyBi)) : Term.effect) (* Opi *),
-      Term.abstraction2
-        (xop, Term.pVar lvar leftty, Term.castComp (lsub trgCop, omega34i)) )
+      Term.abstraction2 (xop, l_pat, Term.castComp (lsub trgCop, omega34i)) )
   in
 
   (* 7: Combine the results *)
@@ -550,13 +540,17 @@ and infer_let_rec state defs =
       (fun (x, abs) ->
         let alpha, alphaSkel = Constraint.fresh_ty_with_fresh_skel () in
         let betadelta, betaSkel = Constraint.fresh_dirty_with_fresh_skel () in
-        (x, abs, alpha, betadelta, [ alphaSkel; betaSkel ]))
+        ( Term.variable x (Type.Arrow (alpha, betadelta)),
+          abs,
+          alpha,
+          betadelta,
+          [ alphaSkel; betaSkel ] ))
       defs
   in
   let state' =
     List.fold_left
       (fun state (x, _, alpha, betadelta, _) ->
-        extend_var state x (Type.Arrow (alpha, betadelta)))
+        extend_var state x.term (Type.Arrow (alpha, betadelta)))
       state defs'
   in
   let defs'', cnstrs =
@@ -573,7 +567,7 @@ and tcLetRecNoGen state defs (c2 : Untyped.computation) : tcCompOutput' =
   let defs', cs1 = infer_let_rec state defs in
   let state' =
     List.fold_left
-      (fun state (x, abs) -> extend_var state x (Type.Arrow abs.ty))
+      (fun state (x, abs) -> extend_var state x.term (Type.Arrow abs.ty))
       state (Assoc.to_list defs')
   in
   (* 3: Typecheck c2 *)

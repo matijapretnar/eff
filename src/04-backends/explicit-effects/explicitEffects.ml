@@ -18,7 +18,7 @@ module type ExplicitBackend = sig
   val process_top_let_rec : state -> Term.rec_definitions -> state
 
   val load_primitive :
-    state -> Term.variable * Type.ty * Language.Primitives.primitive -> state
+    state -> Term.variable -> Language.Primitives.primitive -> state
 
   val process_tydef :
     state ->
@@ -89,6 +89,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
        { it = Language.UntypedSyntax.Value v; _ } );
     ] ->
         let e' = ExplicitInfer.top_level_expression state.type_system_state v in
+        let x' = Term.variable x e'.ty in
         let e'' =
           if !Config.enable_optimization then
             Optimizer.optimize_expression state.optimizer_state e'
@@ -104,7 +105,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
           | _ -> state.optimizer_state
         in
         let backend_state' =
-          ExBackend.process_top_let state.backend_state (x, e'')
+          ExBackend.process_top_let state.backend_state (x', e'')
         in
         {
           type_system_state = type_system_state';
@@ -126,7 +127,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
     let type_system_state' =
       Assoc.fold_left
         (fun state (f, abs) ->
-          ExplicitInfer.extend_var state f (Type.Arrow abs.ty))
+          ExplicitInfer.extend_var state f.term (Type.Arrow abs.ty))
         state.type_system_state defs''
     in
     let optimizer_state' =
@@ -149,7 +150,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
       ExplicitInfer.extend_var state.type_system_state x ty
     in
     let backend_state' =
-      ExBackend.load_primitive state.backend_state (x, ty, prim)
+      ExBackend.load_primitive state.backend_state (Term.variable x ty) prim
     in
     {
       state with
@@ -196,7 +197,7 @@ module Evaluate : Language.BackendSignature.T = Make (struct
   let process_top_let state (x, exp) =
     let v = Eval.eval_expression state.evaluation_state exp in
     Format.fprintf !Config.output_formatter "@[%t : %t = %t@]@."
-      (Language.CoreTypes.Variable.print x)
+      (Language.CoreTypes.Variable.print x.term)
       (Type.print_ty exp.ty) (V.print_value v);
     { evaluation_state = Eval.update x v state.evaluation_state }
 
@@ -204,12 +205,12 @@ module Evaluate : Language.BackendSignature.T = Make (struct
     Assoc.iter
       (fun (f, abs) ->
         Format.fprintf !Config.output_formatter "@[%t : %t = <fun>@]@."
-          (Language.CoreTypes.Variable.print f)
+          (Language.CoreTypes.Variable.print f.term)
           (Type.print_ty (Type.Arrow abs.ty)))
       defs;
     { evaluation_state = Eval.extend_let_rec state.evaluation_state defs }
 
-  let load_primitive _state (_x, _ty, _prim) = failwith "Not implemented"
+  let load_primitive _state _x _prim = failwith "Not implemented"
 
   let process_tydef state _ = state
 
@@ -272,7 +273,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
 
   let process_top_let state (x, e) =
     let t = optimize_term state @@ TranslateExEff2NoEff.elab_expression e in
-    { state with prog = SyntaxNoEff.TopLet (x, t) :: state.prog }
+    { state with prog = SyntaxNoEff.TopLet (x.term, t) :: state.prog }
 
   let process_top_let_rec state defs =
     let defs' =
@@ -281,8 +282,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     in
     { state with prog = SyntaxNoEff.TopLetRec defs' :: state.prog }
 
-  let load_primitive state (x, _ty, prim) =
-    { state with primitives = Assoc.update x prim state.primitives }
+  let load_primitive state x prim =
+    { state with primitives = Assoc.update x.term prim state.primitives }
 
   let process_tydef state tydefs =
     let converter (ty_params, tydef) =

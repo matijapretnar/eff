@@ -108,8 +108,8 @@ and elab_dirty_coercion { term = tcoer, dcoer; _ } =
 
 let rec elab_pattern p =
   match p.term with
-  | PVar x -> PNVar x
-  | PAs (p, x) -> PNAs (elab_pattern p, x)
+  | PVar x -> PNVar x.term
+  | PAs (p, x) -> PNAs (elab_pattern p, x.term)
   | PTuple ps -> PNTuple (List.map elab_pattern ps)
   | PConst c -> PNConst c
   | PRecord recs -> NoEff.PNRecord (Assoc.map elab_pattern recs)
@@ -121,7 +121,7 @@ let rec elab_expression exp = elab_expression' exp.term
 
 and elab_expression' exp =
   match exp with
-  | ExEff.Var x -> NoEff.NVar x
+  | ExEff.Var x -> NoEff.NVar x.term
   | ExEff.Const c -> NoEff.NConst c
   | ExEff.Tuple vs -> NoEff.NTuple (List.map elab_expression vs)
   | ExEff.Lambda abs -> NoEff.NFun (elab_abstraction_with_param_ty abs)
@@ -141,7 +141,7 @@ and elab_expression' exp =
             let elab2 = elab_ty ty2 in
             let elabcomp = elab_computation comp in
             match p2.term with
-            | PVar x ->
+            | PVar { term = x; _ } ->
                 ( (eff, (elab1, elab2)),
                   ( elab_pattern p1,
                     elab_pattern p2,
@@ -260,7 +260,8 @@ and elab_computation' c =
       let coelab = elab_computation comp in
       NoEff.NCast (coelab, elabc)
 
-and elab_rec_definitions defs = Assoc.map elab_abstraction defs
+and elab_rec_definitions defs =
+  Assoc.kmap (fun (x, abs) -> (x.term, elab_abstraction abs)) defs
 
 let rec elab_source_ty = function
   | Language.Type.Apply (name, ts) ->

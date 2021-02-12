@@ -3,12 +3,13 @@ open Utils
 type recursive = TailRecursive | Recursive | NonRecursive
 
 type state = {
-  declared_functions : (Term.variable, Term.abstraction * recursive) Assoc.t;
+  declared_functions :
+    (Language.CoreTypes.Variable.t, Term.abstraction * recursive) Assoc.t;
   fuel : int;
   (* Cache of already specialized functions *)
   specialized_functions :
-    ( Term.EffectFingerprint.t * Term.variable,
-      Term.variable * Type.ty * recursive )
+    ( Term.EffectFingerprint.t * Language.CoreTypes.Variable.t,
+      Term.variable * recursive )
     Assoc.t;
 }
 
@@ -29,12 +30,12 @@ let add_recursive_function state x abs =
       (fun x _ ->
         if String.length x > 2 && String.sub x 0 2 = "tr" then TailRecursive
         else Recursive)
-      x
+      x.term
   in
   {
     state with
     declared_functions =
-      Assoc.update x (abs, recursive) state.declared_functions;
+      Assoc.update x.term (abs, recursive) state.declared_functions;
   }
 
 let add_non_recursive_function state x abs =
@@ -81,7 +82,7 @@ let keep_used_bindings defs cmp =
   let free_vars = Term.concat_vars (free_vars_cmp :: free_vars_defs) in
   List.filter
     (fun (x, _) ->
-      match Term.VariableMap.find_opt x free_vars with
+      match Term.VariableMap.find_opt x.term free_vars with
       | None | Some 0 -> false
       | Some _ -> true)
     (Assoc.to_list defs)
@@ -333,19 +334,19 @@ and handle_computation state hnd comp =
   | Apply ({ term = Var f; _ }, exp)
     when Option.is_some
            (Assoc.lookup
-              (hnd.term.Term.effect_clauses.fingerprint, f)
+              (hnd.term.Term.effect_clauses.fingerprint, f.term)
               state.specialized_functions) -> (
       match
         Assoc.lookup
-          (hnd.term.Term.effect_clauses.fingerprint, f)
+          (hnd.term.Term.effect_clauses.fingerprint, f.term)
           state.specialized_functions
       with
-      | Some (f', ty', Recursive) ->
+      | Some (f', Recursive) ->
           Term.apply
-            ( Term.var f' ty',
+            ( Term.var f',
               Term.tuple [ exp; Term.lambda hnd.term.Term.value_clause ] )
-      | Some (f', ty', NonRecursive) -> Term.apply (Term.var f' ty', exp)
-      | Some (f', ty', TailRecursive) -> Term.apply (Term.var f' ty', exp)
+      | Some (f', NonRecursive) -> Term.apply (Term.var f', exp)
+      | Some (f', TailRecursive) -> Term.apply (Term.var f', exp)
       | None -> assert false)
   | Bind (cmp, abs) -> (
       match recast_computation hnd cmp with
@@ -440,7 +441,7 @@ and reduce_computation' state comp =
           | NonRecursive -> Type.Arrow (ty_arg, drty_out)
           | TailRecursive -> Type.Arrow (ty_arg, drty_out)
         in
-        Assoc.update (fingerprint, f) (f', ty', spec) specialized
+        Assoc.update (fingerprint, f) (Term.variable f' ty', spec) specialized
       in
       let specialized_functions' =
         List.fold_left add_specialized state.specialized_functions
@@ -455,30 +456,30 @@ and reduce_computation' state comp =
         List.map
           (fun (f, (({ term = pat, cmp; _ } as abs), _)) ->
             match Assoc.lookup (fingerprint, f) specialized_functions' with
-            | Some
-                ( f',
-                  Type.Arrow
-                    (Type.Tuple [ _; (Type.Arrow (ty_in, _) as ty_cont) ], _),
-                  Recursive ) ->
-                let x_pat, x_var = Term.fresh_variable "x" ty_in
-                and k_pat, k_var = Term.fresh_variable "k" ty_cont in
-                let hnd' =
-                  {
-                    hnd with
-                    term =
+            | Some (f', Recursive) -> (
+                match f'.ty with
+                | Type.Arrow
+                    (Type.Tuple [ _; (Type.Arrow (ty_in, _) as ty_cont) ], _) ->
+                    let x_pat, x_var = Term.fresh_variable "x" ty_in
+                    and k_pat, k_var = Term.fresh_variable "k" ty_cont in
+                    let hnd' =
                       {
-                        hnd.term with
-                        Term.value_clause =
-                          Term.abstraction (x_pat, Term.apply (k_var, x_var));
-                      };
-                  }
-                in
-                let abs' = Term.abstraction (Term.pTuple [ pat; k_pat ], cmp) in
-                (f', handle_abstraction state' hnd' abs')
-            | Some (f', _, NonRecursive) ->
-                (f', handle_abstraction state' hnd abs)
-            | Some (f', _, TailRecursive) ->
-                (f', handle_abstraction state' hnd abs)
+                        hnd with
+                        term =
+                          {
+                            hnd.term with
+                            Term.value_clause =
+                              Term.abstraction (x_pat, Term.apply (k_var, x_var));
+                          };
+                      }
+                    in
+                    let abs' =
+                      Term.abstraction (Term.pTuple [ pat; k_pat ], cmp)
+                    in
+                    (f', handle_abstraction state' hnd' abs')
+                | _ -> assert false)
+            | Some (f', NonRecursive) -> (f', handle_abstraction state' hnd abs)
+            | Some (f', TailRecursive) -> (f', handle_abstraction state' hnd abs)
             | _ -> assert false)
           unspecialized_declared_functions
       in

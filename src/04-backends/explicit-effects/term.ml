@@ -7,7 +7,9 @@ module Const = Language.Const
 module EffectMap = Map.Make (CoreTypes.Effect)
 module VariableMap = Map.Make (CoreTypes.Variable)
 
-type variable = CoreTypes.Variable.t
+type variable = (CoreTypes.Variable.t, Type.ty) typed
+
+let variable x ty = { term = x; ty }
 
 module EffectFingerprint = Symbol.Make (Symbol.Anonymous)
 
@@ -26,15 +28,15 @@ and pattern' =
   | PConst of Language.Const.t
   | PNonbinding
 
-let pVar p ty = { term = PVar p; ty }
+let pVar p = { term = PVar p; ty = p.ty }
 
 let pTuple ps =
   { term = PTuple ps; ty = Type.Tuple (List.map (fun x -> x.ty) ps) }
 
 let rec pattern_vars pat =
   match pat.term with
-  | PVar x -> [ x ]
-  | PAs (p, x) -> x :: pattern_vars p
+  | PVar x -> [ x.term ]
+  | PAs (p, x) -> x.term :: pattern_vars p
   | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
   | PRecord lst -> Assoc.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
   | PVariant (_, None) -> []
@@ -88,11 +90,11 @@ and abstraction2 =
   (pattern * pattern * computation, Type.ty * Type.ty * Type.dirty) typed
 (** Abstractions that take two arguments. *)
 
-let var x ty = { term = Var x; ty }
+let var x = { term = Var x; ty = x.ty }
 
 let fresh_variable x ty =
-  let x' = CoreTypes.Variable.fresh x in
-  (pVar x' ty, var x' ty)
+  let x' = { term = CoreTypes.Variable.fresh x; ty } in
+  (pVar x', var x')
 
 let const (c : Language.Const.t) : expression =
   { term = Const c; ty = Type.TyBasic (Const.infer_ty c) }
@@ -200,7 +202,7 @@ let abstraction2 (p1, p2, c) : abstraction2 =
 let print_effect (eff, _) ppf =
   Print.print ppf "%t" (CoreTypes.Effect.print eff)
 
-let print_variable = CoreTypes.Variable.print ~safe:true
+let print_variable x = CoreTypes.Variable.print ~safe:true x.term
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -304,8 +306,7 @@ and print_let_rec_abstraction (f, abs) ppf =
     (Type.print_ty (Type.Arrow abs.ty))
     (print_let_abstraction abs)
 
-let backup_location loc locs =
-  match loc with None -> Location.union locs | Some loc -> loc
+let refresh_variable x = { x with term = CoreTypes.Variable.refresh x.term }
 
 let rec refresh_pattern sbst pat =
   let sbst', pat' = refresh_pattern' sbst pat.term in
@@ -313,10 +314,10 @@ let rec refresh_pattern sbst pat =
 
 and refresh_pattern' sbst = function
   | PVar x ->
-      let x' = CoreTypes.Variable.refresh x in
+      let x' = refresh_variable x in
       (Assoc.update x x' sbst, PVar x')
   | PAs (p, x) ->
-      let x' = CoreTypes.Variable.refresh x in
+      let x' = refresh_variable x in
       let sbst, p' = refresh_pattern (Assoc.update x x' sbst) p in
       (sbst, PAs (p', x'))
   | PTuple ps ->
@@ -366,7 +367,7 @@ and refresh_computation' sbst = function
       let new_xs, sbst' =
         List.fold_right
           (fun (x, _) (new_xs, sbst') ->
-            let x' = CoreTypes.Variable.refresh x in
+            let x' = refresh_variable x in
             (x' :: new_xs, Assoc.update x x' sbst'))
           (Assoc.to_list li) ([], sbst)
       in
@@ -471,100 +472,11 @@ and subst_abs2 sbst { term = p1, p2, c; ty = absty } =
   (* XXX We should assert that p1, p2 & sbst have disjoint variables *)
   { term = (p1, p2, subst_comp sbst c); ty = absty }
 
-let assoc_equal eq flds flds' : bool =
-  let rec equal_fields flds =
-    match flds with
-    | [] -> true
-    | (f, x) :: flds -> (
-        match Assoc.lookup f flds' with
-        | Some x' when eq x x' -> equal_fields flds
-        | _ -> false)
-  in
-  Assoc.length flds = Assoc.length flds' && equal_fields (Assoc.to_list flds)
-
-let rec make_equal_pattern eqvars p p' =
-  match (p.term, p'.term) with
-  | PVar x, PVar x' -> Some ((x, x') :: eqvars)
-  | PAs (p, x), PAs (p', x') ->
-      Option.map
-        (fun eqvars -> (x, x') :: eqvars)
-        (make_equal_pattern eqvars p p')
-  | PTuple ps, PTuple ps' ->
-      List.fold_right2
-        (fun p p' -> function
-          | Some eqvars' -> make_equal_pattern eqvars' p p'
-          | None -> None)
-        ps ps' (Some eqvars)
-  | PConst cst, PConst cst' when Const.equal cst cst' -> Some eqvars
-  | PNonbinding, PNonbinding -> Some eqvars
-  | PVariant (lbl, Some p), PVariant (lbl', Some p') when lbl = lbl' ->
-      make_equal_pattern eqvars p p'
-  | _, _ -> None
-
 (* Checks if the effect handling part of handlers is the same *)
 let effect_part_identical h1 h2 =
   EffectFingerprint.compare h1.effect_clauses.fingerprint
     h2.effect_clauses.fingerprint
   = 0
-
-let rec alphaeq_expr eqvars e e' =
-  match (e.term, e'.term) with
-  | Var x, Var y -> List.mem (x, y) eqvars || CoreTypes.Variable.compare x y = 0
-  | Lambda a, Lambda a' -> alphaeq_abs eqvars a a'
-  | Handler h, Handler h' -> alphaeq_handler eqvars h h'
-  | Tuple es, Tuple es' -> List.for_all2 (alphaeq_expr eqvars) es es'
-  | Record flds, Record flds' -> assoc_equal (alphaeq_expr eqvars) flds flds'
-  | Variant (lbl, None), Variant (lbl', None) -> lbl = lbl'
-  | Variant (lbl, Some e), Variant (lbl', Some e') ->
-      lbl = lbl' && alphaeq_expr eqvars e e'
-  | Const cst, Const cst' -> Const.equal cst cst'
-  | _, _ -> false
-
-and alphaeq_comp eqvars c c' =
-  match (c.term, c'.term) with
-  | Bind (c1, c2), Bind (c1', c2') ->
-      alphaeq_comp eqvars c1 c1' && alphaeq_abs eqvars c2 c2'
-  | LetRec _, LetRec _ ->
-      (* XXX Not yet implemented *)
-      false
-  | Match (e, li), Match (e', li') ->
-      alphaeq_expr eqvars e e' && List.for_all2 (alphaeq_abs eqvars) li li'
-  | Apply (e1, e2), Apply (e1', e2') ->
-      alphaeq_expr eqvars e1 e1' && alphaeq_expr eqvars e2 e2'
-  | Handle (e, c), Handle (e', c') ->
-      alphaeq_expr eqvars e e' && alphaeq_comp eqvars c c'
-  (* | Call (eff, e, a), Call (eff', e', a') ->
-     eff = eff' && alphaeq_expr eqvars e e' && alphaeq_abs eqvars a a' *)
-  | Value e, Value e' -> alphaeq_expr eqvars e e'
-  | _, _ -> false
-
-(* This one seems out of use now that we got effect part fingerprint *)
-and alphaeq_handler eqvars h h' =
-  alphaeq_abs eqvars h.term.value_clause h'.term.value_clause
-  && Assoc.length h.term.effect_clauses.effect_part
-     = Assoc.length h'.term.effect_clauses.effect_part
-  && List.for_all
-       (fun (effect, abs2) ->
-         match Assoc.lookup effect h'.term.effect_clauses.effect_part with
-         | Some abs2' -> alphaeq_abs2 eqvars abs2 abs2'
-         | None -> false)
-       (Assoc.to_list h.term.effect_clauses.effect_part)
-
-(*   assoc_equal (alphaeq_abs2 eqvars) h.effect_clauses h'.effect_clauses &&
-  alphaeq_abs eqvars h.value_clause h'.value_clause *)
-and alphaeq_abs eqvars { term = p, c; _ } { term = p', c'; _ } =
-  match make_equal_pattern eqvars p p' with
-  | Some eqvars' -> alphaeq_comp eqvars' c c'
-  | None -> false
-
-and alphaeq_abs2 eqvars { term = p1, p2, c; _ } { term = p1', p2', c'; _ } =
-  (* alphaeq_abs eqvars (a22a a2) (a22a a2') *)
-  match make_equal_pattern eqvars p1 p1' with
-  | Some eqvars' -> (
-      match make_equal_pattern eqvars' p2 p2' with
-      | Some eqvars'' -> alphaeq_comp eqvars'' c c'
-      | None -> false)
-  | None -> false
 
 let pattern_match p e =
   assert (Type.equal_ty p.ty e.ty);
@@ -622,7 +534,8 @@ let rec free_vars_comp c =
   | LetRec (li, c1) ->
       let xs, vars =
         List.fold_right
-          (fun (x, abs) (xs, vars) -> (x :: xs, free_vars_abs abs @@@ vars))
+          (fun (x, abs) (xs, vars) ->
+            (x.term :: xs, free_vars_abs abs @@@ vars))
           (Assoc.to_list li)
           ([], free_vars_comp c1)
       in
@@ -637,7 +550,7 @@ let rec free_vars_comp c =
 
 and free_vars_expr e =
   match e.term with
-  | Var v -> VariableMap.singleton v 1
+  | Var v -> VariableMap.singleton v.term 1
   | Tuple es -> concat_vars (List.map free_vars_expr es)
   | Lambda a -> free_vars_abs a
   | Handler h -> free_vars_handler h
