@@ -1,11 +1,22 @@
 (include dune.inc)
 
-(executable
- (name benchmark)
+(executables
+ (names benchmark)
  (modes native)
  (modules
   (:standard \ generate_benchmark_rules))
- (libraries bechamel bechamel-notty notty notty.unix unix ocamlHeader))
+ (libraries
+  bechamel
+  bechamel-notty
+  notty
+  notty.unix
+  unix
+  ocamlHeader
+  (select
+   config.ml
+   from
+   (!nativeMulticore -> "config.plain.ml")
+   (nativeMulticore -> "config.multicore.ml"))))
 
 (executable
  (modules generate_benchmark_rules)
@@ -26,19 +37,28 @@
    (run ./generate_benchmark_rules.exe))))
 
 (rule
- (alias generate_benchmarks)
- (action
-  (diff dune.inc dune.gen)))
-
-(rule
  (deps
   (source_tree .))
+ (targets benchmark.output)
  (action
   (with-stdout-to
-   benchmark.output
+   %{targets}
    (run ./benchmark.exe))))
 
 (rule
- (alias benchmark)
+ (deps
+  (source_tree .)
+  benchmark.output)
+ (targets benchmark.output.version)
  (action
-  (diff benchmark.expected benchmark.output)))
+  (with-stdout-to
+   %{targets}
+   (pipe-outputs
+    (run echo "Ocaml Version: %{ocaml_version}\n")
+    (run cat - benchmark.output)))))
+
+(rule
+ (alias benchmark)
+ (deps benchmark.output.version)
+ (action
+  (diff benchmark.expected benchmark.output.version)))

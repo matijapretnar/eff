@@ -2,11 +2,15 @@ open Bechamel
 open Toolkit
 open Notty_unix
 
+let suite : Benchmark_config.test_suite = Config.test_suite
+
 let number_of_loops = 100
 
 and number_of_queens = 8
 
-and number_of_range = 10
+and number_of_range = 100
+
+and size_of_interp_expression = 200
 
 let run_loop_pure = false
 
@@ -18,16 +22,13 @@ and run_loop_incr' = false
 
 and run_loop_state = false
 
-and run_queens_one = true
+and run_queens_one = false
 
-and run_queens_all = true
+and run_queens_all = false
 
-and run_interp = false
+and run_interp = true
 
 and run_range = false
-
-open Bechamel
-open Toolkit
 
 let benchmark test =
   let ols =
@@ -66,12 +67,6 @@ let run_and_show test =
 
 let st = Staged.stage
 
-type 'a benchmark_set = {
-  name : string;
-  benchmarks : (string * ('a -> unit) * ('a -> bool)) list;
-  param : 'a;
-}
-
 let forget_value f x =
   let _ = f x in
   ()
@@ -80,152 +75,7 @@ let always_true f x =
   let _ = f x in
   true
 
-let loop_benchmarks =
-  {
-    name = "LOOP PURE BENCHMARK";
-    benchmarks =
-      [
-        ( "Generated, optimized",
-          forget_value LoopOpt.test_pure,
-          fun n -> LoopOpt.test_pure n = () );
-        ( "Native",
-          forget_value LoopNative.test_pure,
-          fun n -> LoopNative.test_pure n = () );
-      ];
-    param = number_of_loops;
-  }
-
-let loop_latent_benchmarks =
-  {
-    name = "LOOP LATENT BENCHMARK";
-    benchmarks =
-      [
-        ( "Generated, optimized",
-          forget_value LoopOpt.test_latent,
-          always_true LoopOpt.test_latent );
-        ( "Native",
-          forget_value LoopNative.test_latent,
-          always_true LoopNative.test_latent );
-      ];
-    param = number_of_loops;
-  }
-
-let loop_incr_benchmark num =
-  {
-    name = "LOOP INCR BENCHMARK";
-    benchmarks =
-      [
-        ( "Generated, optimized",
-          forget_value LoopOpt.test_incr,
-          fun n -> LoopOpt.test_incr n = num );
-        ( "Native",
-          forget_value LoopNative.test_incr,
-          fun n -> LoopNative.test_incr n = num );
-      ];
-    param = num;
-  }
-
-let loop_incr'_benchmark num =
-  {
-    name = "LOOP INCR' BENCHMARK";
-    benchmarks =
-      [
-        ( "Generated, optimized",
-          forget_value LoopOpt.test_incr',
-          fun n -> LoopOpt.test_incr' n = num );
-        ( "Native",
-          forget_value LoopNative.test_incr',
-          fun n -> LoopNative.test_incr' n = num );
-      ];
-    param = num;
-  }
-
-let loop_state_benchmark num =
-  {
-    name = "LOOP STATE BENCHMARK";
-    benchmarks =
-      [
-        ( "Generated, optimized",
-          forget_value LoopOpt.test_state,
-          fun n -> LoopOpt.test_state n = num );
-        ( "Native",
-          forget_value LoopNative.test_state,
-          fun n -> LoopNative.test_state n = num );
-      ];
-    param = num;
-  }
-
-let queens_one_cps_benchmark number_of_queens =
-  {
-    name = "QUEENS ONE CPS BENCHMARK";
-    benchmarks =
-      [
-        ( "Generated, optimized",
-          forget_value QueensOpt.queens_one_cps,
-          always_true QueensOpt.queens_one_cps );
-        ( "Native",
-          forget_value QueensNative.queens_one_cps,
-          always_true QueensNative.queens_one_cps );
-      ];
-    param = number_of_queens;
-  }
-
-let queens_one_benchmark number_of_queens =
-  {
-    name = "QUEENS ONE OPTION BENCHMARK";
-    benchmarks =
-      [
-        ( "Generated, optimized",
-          forget_value QueensOpt.queens_one_option,
-          always_true QueensOpt.queens_one_option );
-        ( "Native",
-          forget_value QueensNative.queens_one_option,
-          always_true QueensNative.queens_one_option );
-      ];
-    param = number_of_queens;
-  }
-
-let queens_all_benchmark number_of_queens =
-  {
-    name = "QUEENS ALL BENCHMARK";
-    benchmarks =
-      [
-        ( "Generated, optimized",
-          forget_value QueensOpt.queens_all,
-          always_true QueensOpt.queens_all );
-        ( "Native",
-          forget_value QueensNative.queens_all,
-          always_true QueensNative.queens_all );
-      ];
-    param = number_of_queens;
-  }
-
-let interpreter_benchmark =
-  {
-    name = "INTERPRETER BENCHMARK";
-    benchmarks =
-      [
-        ( "Generated, optimized",
-          forget_value InterpOpt.bigTest,
-          always_true InterpOpt.bigTest );
-      ];
-    param = ();
-  }
-
-let range_benchmarks number_of_range =
-  {
-    name = "RANGE BENCHMARK";
-    benchmarks =
-      [
-        ( "Generated, optimized",
-          forget_value RangeOpt.test,
-          always_true RangeOpt.test );
-        ("Native", forget_value RangeNative.test, always_true RangeNative.test);
-      ];
-    param = number_of_range;
-  }
-
-let run_and_show_set benchmark_set =
+let run_and_show_set (benchmark_set : 'a Benchmark_config.benchmark_set) =
   List.iter
     (fun (name, _, tester) ->
       try
@@ -245,45 +95,49 @@ let run_and_show_set benchmark_set =
 
 let () =
   if run_loop_pure then (
-    let set = loop_benchmarks in
+    let set = suite.loop_benchmarks number_of_loops in
     Printf.printf "%s (%d loops):\n" set.name set.param;
     run_and_show_set set);
   if run_loop_latent then (
-    let set = loop_latent_benchmarks in
+    let set = suite.loop_latent_benchmarks number_of_loops in
     Printf.printf "%s (%d loops):\n" set.name set.param;
-    run_and_show_set loop_latent_benchmarks);
+    run_and_show_set set);
   if run_loop_incr then (
-    let set = loop_incr_benchmark number_of_loops in
+    let set = suite.loop_incr_benchmark number_of_loops in
     Printf.printf "%s (%d loops):\n" set.name set.param;
     run_and_show_set set);
   if run_loop_incr' then
     List.iter
       (fun n ->
-        let set = loop_incr'_benchmark n in
+        let set = suite.loop_incr'_benchmark n in
         Printf.printf "%s (%d loops):\n" set.name set.param;
         run_and_show_set set)
       [ number_of_loops; 2 * number_of_loops ];
   if run_loop_state then (
-    let set = loop_incr_benchmark number_of_loops in
+    let set = suite.loop_incr_benchmark number_of_loops in
     Printf.printf "%s (%d loops):\n" set.name set.param;
     run_and_show_set set);
   if run_queens_one then (
-    let set = queens_one_cps_benchmark number_of_queens in
+    let set = suite.queens_one_cps_benchmark number_of_queens in
     Printf.printf "%s (%d queens):\n" set.name set.param;
     run_and_show_set set);
   if run_queens_one then (
-    let set = queens_one_benchmark number_of_queens in
+    let set = suite.queens_one_benchmark number_of_queens in
     Printf.printf "%s (%d queens):\n" set.name set.param;
     run_and_show_set set);
   if run_queens_all then (
-    let set = queens_all_benchmark number_of_queens in
+    let set = suite.queens_all_benchmark number_of_queens in
     Printf.printf "%s (%d queens):\n" set.name set.param;
     run_and_show_set set);
   if run_interp then (
-    let set = interpreter_benchmark in
-    Printf.printf "%s :\n" set.name;
+    let set = suite.interpreter_benchmark size_of_interp_expression in
+    Printf.printf "%s (size: %d):\n" set.name size_of_interp_expression;
+    run_and_show_set set);
+  if run_interp then (
+    let set = suite.interpreter_benchmark (size_of_interp_expression * 5) in
+    Printf.printf "%s (size: %d):\n" set.name size_of_interp_expression;
     run_and_show_set set);
   if run_range then (
-    let set = range_benchmarks number_of_range in
+    let set = suite.range_benchmarks number_of_range in
     Printf.printf "%s :\n" set.name;
     run_and_show_set set)
