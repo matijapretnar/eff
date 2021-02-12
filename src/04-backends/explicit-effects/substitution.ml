@@ -131,10 +131,6 @@ let rec apply_sub_ty sub = function
   | Handler (tydrty1, tydrty2) ->
       Handler (apply_sub_dirty_ty sub tydrty1, apply_sub_dirty_ty sub tydrty2)
   | TyBasic p -> TyBasic p
-  | QualTy (ct_ty1, tty1) ->
-      QualTy (apply_sub_ct_ty sub ct_ty1, apply_sub_ty sub tty1)
-  | QualDirt (ct_drt1, tty1) ->
-      QualDirt (apply_sub_ct_dirt sub ct_drt1, apply_sub_ty sub tty1)
 
 and apply_sub_dirty_ty sub (ty, drt) =
   (apply_sub_ty sub ty, apply_sub_dirt sub drt)
@@ -173,7 +169,6 @@ and apply_sub_tycoer' sub ty_coer =
       TupleCoercion (List.map (fun x -> apply_sub_tycoer sub x) tcl)
   | ApplyCoercion (ty_name, tcl) ->
       ApplyCoercion (ty_name, List.map (fun x -> apply_sub_tycoer sub x) tcl)
-  | _ -> failwith __LOC__
 
 and apply_sub_dirtcoer sub drt_coer =
   let drt' = apply_sub_ct_dirt sub drt_coer.ty in
@@ -235,13 +230,6 @@ and apply_sub_exp' sub expression =
   | Lambda abs -> Lambda (apply_sub_abs sub abs)
   | Handler h -> Handler (apply_sub_handler sub h)
   | CastExp (e1, tc1) -> CastExp (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
-  | LambdaTyCoerVar (tcp1, e1) -> LambdaTyCoerVar (tcp1, apply_sub_exp sub e1)
-  | LambdaDirtCoerVar (dcp1, e1) ->
-      LambdaDirtCoerVar (dcp1, apply_sub_exp sub e1)
-  | ApplyTyCoercion (e1, tc1) ->
-      ApplyTyCoercion (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
-  | ApplyDirtCoercion (e1, dc1) ->
-      ApplyDirtCoercion (apply_sub_exp sub e1, apply_sub_dirtcoer sub dc1)
   | _ -> failwith __LOC__
 
 and apply_sub_abs sub abs =

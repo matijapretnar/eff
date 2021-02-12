@@ -88,7 +88,6 @@ let rec pp_type noeff_ty ppf =
       print ppf "@[<h>(%t ->@ %t)@]" (pp_type ty1) (pp_type ty2)
   | NTyHandler (ty1, ty2) ->
       print ppf "@[<h>(%t ->@ %t)@]" (pp_type ty1) (pp_type ty2)
-  | NTyQual (_tyc, ty) -> pp_type ty ppf
   | NTyComp ty -> print ppf "%t computation" (pp_type ty)
 
 let rec pp_pattern state pat ppf =
@@ -144,7 +143,6 @@ let rec pp_coercion ?max_level coer ppf =
       print ~at_level:1 "coer_tuple_%d %t" (List.length cs)
         (pp_tuple pp_coercion cs)
   | NCoerApply (_t, _cs) -> print "ApplyCoercion"
-  | NCoerQual _c -> print "ApplyCoercion"
 
 let rec pp_term ?max_level state noEff_term ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -205,7 +203,6 @@ let rec pp_term ?max_level state noEff_term ppf =
       print ~at_level:1 "@[<hov 2>%t @,%t@]"
         (pp_term state ~max_level:1 t2)
         (pp_term state ~max_level:0 t1)
-  | _ -> failwith __LOC__
 
 and pp_abs state (p, t) ppf =
   print ppf "@[<h> %t ->@ %t@]" (pp_pattern state p) (pp_term state t)

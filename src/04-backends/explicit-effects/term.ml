@@ -54,10 +54,6 @@ and expression' =
   | Lambda of abstraction
   | Handler of handler
   | CastExp of expression * Constraint.ty_coercion
-  | LambdaTyCoerVar of Type.TyCoercionParam.t * expression
-  | LambdaDirtCoerVar of Type.DirtCoercionParam.t * expression
-  | ApplyTyCoercion of expression * Constraint.ty_coercion
-  | ApplyDirtCoercion of expression * Constraint.dirt_coercion
 
 and computation = (computation', Type.dirty) typed
 (** Impure computations *)
@@ -66,16 +62,7 @@ and computation' =
   | Value of expression
   | LetVal of expression * abstraction
   | LetRec of rec_definitions * computation
-  (* Historical note: Previously LetRec looked like this:
-
-       LetRec of (variable * Type.ty * expression) list * computation
-
-     Unfortunately this shape forgets the source structure (where the
-     abstraction is explicit) and thus makes translation to MulticoreOcaml
-     impossible in the general case.
-  *)
   | Match of expression * abstraction list
-  (* We need to keep the result type in the term, in case the match is empty *)
   | Apply of expression * expression
   | Handle of expression * computation
   | Call of effect * expression * abstraction
@@ -255,18 +242,6 @@ and print_expression' ?max_level e ppf =
       print "%t ▷ %t"
         (print_expression ~max_level:0 e1)
         (Constraint.print_ty_coercion ~max_level:0 tc)
-  | LambdaTyCoerVar (p, e) ->
-      print "Λ%t. %t " (Type.TyCoercionParam.print p) (print_expression e)
-  | LambdaDirtCoerVar (p, e) ->
-      print "Λ%t. %t" (Type.DirtCoercionParam.print p) (print_expression e)
-  | ApplyTyCoercion (e, tty) ->
-      print ~at_level:1 "%t %t"
-        (print_expression ~max_level:1 e)
-        (Constraint.print_ty_coercion tty)
-  | ApplyDirtCoercion (e, tty) ->
-      print ~at_level:1 "%t %t"
-        (print_expression ~max_level:1 e)
-        (Constraint.print_dirt_coercion tty)
 
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -380,14 +355,6 @@ and refresh_expression' sbst = function
   | Variant (lbl, e) -> Variant (lbl, Option.map (refresh_expression sbst) e)
   | CastExp (e1, tyco) -> CastExp (refresh_expression sbst e1, tyco)
   | Const _ as e -> e
-  | LambdaTyCoerVar (_tycovar, _e) -> failwith __LOC__
-  | LambdaDirtCoerVar (dcovar, e) ->
-      (* TODO: refresh dco var *)
-      LambdaDirtCoerVar (dcovar, refresh_expression sbst e)
-  | ApplyTyCoercion (e, tyco) ->
-      ApplyTyCoercion (refresh_expression sbst e, tyco)
-  | ApplyDirtCoercion (e, dco) ->
-      ApplyDirtCoercion (refresh_expression sbst e, dco)
 
 and refresh_computation sbst cmp =
   { cmp with term = refresh_computation' sbst cmp.term }
@@ -463,11 +430,6 @@ and subst_expr' sbst = function
   | Variant (lbl, e) -> Variant (lbl, Option.map (subst_expr sbst) e)
   | Const _ as e -> e
   | CastExp (e, tyco) -> CastExp (subst_expr sbst e, tyco)
-  | LambdaTyCoerVar (tycovar, e) -> LambdaTyCoerVar (tycovar, subst_expr sbst e)
-  | LambdaDirtCoerVar (dcovar, e) ->
-      LambdaDirtCoerVar (dcovar, subst_expr sbst e)
-  | ApplyTyCoercion (e, tyco) -> ApplyTyCoercion (subst_expr sbst e, tyco)
-  | ApplyDirtCoercion (e, dco) -> ApplyDirtCoercion (subst_expr sbst e, dco)
 
 and subst_comp sbst cmp = { cmp with term = subst_comp' sbst cmp.term }
 
@@ -556,8 +518,6 @@ let rec alphaeq_expr eqvars e e' =
   | Variant (lbl, Some e), Variant (lbl', Some e') ->
       lbl = lbl' && alphaeq_expr eqvars e e'
   | Const cst, Const cst' -> Const.equal cst cst'
-  | ApplyDirtCoercion (e, dco), ApplyDirtCoercion (e', dco') ->
-      dco = dco' && alphaeq_expr eqvars e e'
   | _, _ -> false
 
 and alphaeq_comp eqvars c c' =
@@ -686,10 +646,6 @@ and free_vars_expr e =
   | Variant (_, e) -> Option.default_map VariableMap.empty free_vars_expr e
   | CastExp (e', _tyco) -> free_vars_expr e'
   | Const _ -> VariableMap.empty
-  | LambdaTyCoerVar _ -> failwith __LOC__
-  | LambdaDirtCoerVar _ -> failwith __LOC__
-  | ApplyTyCoercion (e, _tyco) -> free_vars_expr e
-  | ApplyDirtCoercion (e, _dco) -> free_vars_expr e
 
 and free_vars_handler h =
   free_vars_abs h.term.value_clause
@@ -747,14 +703,6 @@ and free_params_expression' e =
   | CastExp (e, tc) ->
       Type.FreeParams.union (free_params_expression e)
         (Constraint.free_params_ty_coercion tc)
-  | LambdaTyCoerVar (_tcp, e) -> free_params_expression e
-  | LambdaDirtCoerVar (_dcp, e) -> free_params_expression e
-  | ApplyTyCoercion (e, tc) ->
-      Type.FreeParams.union (free_params_expression e)
-        (Constraint.free_params_ty_coercion tc)
-  | ApplyDirtCoercion (e, dc) ->
-      Type.FreeParams.union (free_params_expression e)
-        (Constraint.free_params_dirt_coercion dc)
 
 and free_params_computation c =
   Type.FreeParams.union

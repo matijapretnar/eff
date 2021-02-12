@@ -11,7 +11,6 @@ type n_type =
   | NTyTuple of n_type list
   | NTyArrow of n_type * n_type
   | NTyHandler of n_type * n_type
-  | NTyQual of n_coerty * n_type
   | NTyComp of n_type
   | NTyApply of CoreTypes.TyName.t * n_type list
   | NTyBasic of Const.ty
@@ -25,7 +24,6 @@ type n_coercion =
   | NCoerHandler of n_coercion * n_coercion
   | NCoerHandToFun of n_coercion * n_coercion
   | NCoerFunToHand of n_coercion * n_coercion
-  | NCoerQual of n_coercion
   | NCoerComp of n_coercion
   | NCoerReturn of n_coercion
   | NCoerUnsafe of n_coercion
@@ -63,8 +61,6 @@ type n_term =
   | NTuple of n_term list
   | NFun of n_abstraction_with_param_ty
   | NApplyTerm of n_term * n_term
-  | NBigLambdaCoer of Type.TyCoercionParam.t * n_term
-  | NApplyCoer of n_term * n_coercion
   | NCast of n_term * n_coercion
   | NReturn of n_term
   | NHandler of n_handler
@@ -132,7 +128,6 @@ let rec subs_var_in_term par subs term =
   | NRecord a -> NRecord (Assoc.map (subs_var_in_term par subs) a)
   | NVariant (lbl, None) -> NVariant (lbl, None)
   | NVariant (lbl, Some t) -> NVariant (lbl, Some (subs_var_in_term par subs t))
-  | _ -> failwith __LOC__
 
 and subs_var_in_abs par subs (p, c) = (p, subs_var_in_term par subs c)
 
@@ -183,8 +178,6 @@ let rec substitute_term sbst n_term =
   | NFun a -> NFun (substitute_abstraction_with_ty sbst a)
   | NApplyTerm (t1, t2) ->
       NApplyTerm ((substitute_term sbst) t1, (substitute_term sbst) t2)
-  | NBigLambdaCoer (c, t) -> NBigLambdaCoer (c, (substitute_term sbst) t)
-  | NApplyCoer (t, c) -> NApplyCoer ((substitute_term sbst) t, c)
   | NCast (t, c) -> NCast ((substitute_term sbst) t, c)
   | NReturn t -> NReturn ((substitute_term sbst) t)
   | NHandler h -> NHandler (substitue_handler sbst h)
@@ -240,7 +233,7 @@ let rec free_vars = function
   | NTuple l -> concat_vars (List.map free_vars l)
   | NFun abs -> free_vars_abs_with_ty abs
   | NHandle (t1, t2) | NApplyTerm (t1, t2) -> free_vars t1 @@@ free_vars t2
-  | NBigLambdaCoer (_, t) | NApplyCoer (t, _) | NCast (t, _) -> free_vars t
+  | NCast (t, _) -> free_vars t
   | NReturn t -> free_vars t
   | NHandler h -> free_vars_handler h
   | NLet (e, a) -> free_vars e @@@ free_vars_abs a
@@ -283,7 +276,6 @@ let rec print_type ?max_level ty ppf =
   | NTyTuple tys -> Print.tuple print_type tys ppf
   | NTyArrow (t1, t2) -> print "%t -> %t" (print_type t1) (print_type t2)
   | NTyHandler (t1, t2) -> print "%t ==> %t" (print_type t1) (print_type t2)
-  | NTyQual (coerty, t) -> print "%t => %t" (print_coerty coerty) (print_type t)
   | NTyComp t -> print "Comp %t" (print_type t)
   | NTyApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
   | NTyApply (t, [ s ]) ->
@@ -313,7 +305,6 @@ let rec print_coercion ?max_level coer ppf =
       print "(handToFun %t %t)" (print_coercion c1) (print_coercion c2)
   | NCoerFunToHand (c1, c2) ->
       print "(funToHand %t %t)" (print_coercion c1) (print_coercion c2)
-  | NCoerQual c -> print "(* => %t)" (print_coercion c)
   | NCoerComp c -> print "(Comp %t)" (print_coercion c)
   | NCoerReturn c -> print "(return %t)" (print_coercion c)
   | NCoerUnsafe c -> print "(unsafe %t)" (print_coercion c)
@@ -347,12 +338,6 @@ let rec print_term ?max_level t ppf =
       print ~at_level:1 "((%t)@ (%t))"
         (print_term ~max_level:1 t1)
         (print_term ~max_level:0 t2)
-  | NBigLambdaCoer (x, t) ->
-      print "/\\%t. %t " (Type.TyCoercionParam.print x) (print_term t)
-  | NApplyCoer (t, coer) ->
-      print ~at_level:1 "((%t)@ (%t))"
-        (print_term ~max_level:1 t)
-        (print_coercion ~max_level:0 coer)
   | NCast (t, coer) -> print "(%t) |> [%t]" (print_term t) (print_coercion coer)
   | NReturn t -> print "return %t" (print_term t)
   | NHandler h ->

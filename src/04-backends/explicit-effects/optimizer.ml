@@ -143,8 +143,6 @@ and optimize_ty_coercion' state tcoer =
       ApplyCoercion (v, List.map (optimize_ty_coercion state) lst)
   | TupleCoercion lst ->
       TupleCoercion (List.map (optimize_ty_coercion state) lst)
-  | QualTyCoer tc -> QualTyCoer (optimize_ty_coercion state tc)
-  | QualDirtCoer tc -> QualDirtCoer (optimize_ty_coercion state tc)
 
 and optimize_dirt_coercion state (dcoer : Constraint.dirt_coercion) =
   reduce_dirt_coercion state
@@ -205,16 +203,6 @@ and optimize_expression' state exp =
   | Term.CastExp (exp, coer) ->
       Term.castExp
         (optimize_expression state exp, optimize_ty_coercion state coer)
-  | Term.LambdaTyCoerVar (w, exp) ->
-      Term.lambdaTyCoerVar (w, optimize_expression state exp)
-  | Term.LambdaDirtCoerVar (d, exp) ->
-      Term.lambdaDirtCoerVar (d, optimize_expression state exp)
-  | Term.ApplyTyCoercion (exp, tcoer) ->
-      Term.applyTyCoercion
-        (optimize_expression state exp, optimize_ty_coercion state tcoer)
-  | Term.ApplyDirtCoercion (exp, dcoer) ->
-      Term.applyDirtCoercion
-        (optimize_expression state exp, optimize_dirt_coercion state dcoer)
 
 and optimize_computation state cmp =
   (* Print.debug "CMP: %t" (Term.print_computation cmp); *)

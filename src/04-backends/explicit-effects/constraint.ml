@@ -15,8 +15,6 @@ and ty_coercion' =
   | TyCoercionVar of Type.TyCoercionParam.t
   | ApplyCoercion of CoreTypes.TyName.t * ty_coercion list
   | TupleCoercion of ty_coercion list
-  | QualTyCoer of ty_coercion
-  | QualDirtCoer of ty_coercion
 
 and dirt_coercion = (dirt_coercion', Type.ct_dirt) typed
 
@@ -119,25 +117,7 @@ let rec print_ty_coercion ?max_level c ppf =
   | TupleCoercion cos ->
       print ~at_level:2 "%t"
         (Print.sequence "×" (print_ty_coercion ~max_level:1) cos)
-  | _ -> failwith "Not yet implemented __LOC__"
 
-(* THE FOLLOWING ARE UNEXPECTED. SOMETHING MUST BE WRONG TO GET THEM.
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  | ForallTy of CoreTypes.TyParam.t * ty_coercion
-  | ApplyTyCoer of ty_coercion * ty
-
-  | ForallDirt of Type.DirtParam.t * ty_coercion
-  | ApplyDirCoer of ty_coercion * dirt
-
-  | QualTyCoer of ct_ty * ty_coercion
-  | ApplyQualTyCoer of ty_coercion * ty_coercion
-
-  | QualDirtCoer of ct_dirt * ty_coercion
-  | ApplyQualDirtCoer of ty_coercion * dirt_coercion
-
-  | ForallSkel of Type.SkelParam.t * ty_coercion
-  | ApplySkelCoer of ty_coercion * skeleton
-*)
 and print_dirty_coercion ?max_level { term = tc, dirtc; _ } ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   print "%t!%t" (print_ty_coercion ~max_level:0 tc) (print_dirt_coercion dirtc)
@@ -237,8 +217,6 @@ and free_params_ty_coercion' = function
       List.fold_left
         (fun free tc -> Type.FreeParams.union free (free_params_ty_coercion tc))
         Type.FreeParams.empty tcs
-  | QualTyCoer tc -> free_params_ty_coercion tc
-  | QualDirtCoer tc -> free_params_ty_coercion tc
   | ApplyCoercion (_ty_name, tcs) ->
       List.fold_left
         (fun free tc -> Type.FreeParams.union free (free_params_ty_coercion tc))

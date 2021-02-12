@@ -54,8 +54,6 @@ and ty =
   | Tuple of ty list
   | Handler of dirty * dirty
   | TyBasic of Const.ty
-  | QualTy of ct_ty * ty
-  | QualDirt of ct_dirt * ty
 
 and dirty = ty * dirt
 
@@ -86,8 +84,6 @@ let rec skeleton_of_ty tty =
   | Handler (drty1, drty2) ->
       SkelHandler (skeleton_of_dirty drty1, skeleton_of_dirty drty2)
   | TyBasic pt -> SkelBasic pt
-  | QualTy (_, ty) -> skeleton_of_ty ty
-  | QualDirt (_, ty) -> skeleton_of_ty ty
 
 and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
 
@@ -115,8 +111,6 @@ let rec print_ty ?max_level ty ppf =
   | Handler (drty1, drty2) ->
       print ~at_level:6 "%t ⇛ %t" (print_dirty drty1) (print_dirty drty2)
   | TyBasic p -> print "%t" (Const.print_ty p)
-  | QualTy (c, tty) -> print "%t ⇒ %t" (print_ct_ty c) (print_ty tty)
-  | QualDirt (c, tty) -> print "%t ⇒ %t" (print_ct_dirt c) (print_ty tty)
 
 and print_skeleton ?max_level sk ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -184,8 +178,6 @@ let rec isMonoTy : ty -> bool = function
   | Tuple tys -> List.for_all isMonoTy tys
   | Handler ((ty1, _), (ty2, _)) -> isMonoTy ty1 && isMonoTy ty2
   | TyBasic _ -> true
-  | QualTy (_, _) -> false (* no qualification *)
-  | QualDirt (_, _) -> false
 
 let rec equal_ty type1 type2 =
   match (type1, type2) with
@@ -198,10 +190,6 @@ let rec equal_ty type1 type2 =
   | Handler (dirtya1, dirtya2), Handler (dirtyb1, dirtyb2) ->
       equal_dirty dirtya1 dirtyb1 && equal_dirty dirtya2 dirtyb2
   | TyBasic ptya, TyBasic ptyb -> ptya = ptyb
-  | QualTy (ctty1, ty1), QualTy (ctty2, ty2) ->
-      equal_ty_constraint ctty1 ctty2 && equal_ty ty1 ty2
-  | QualDirt (ctd1, ty1), QualDirt (ctd2, ty2) ->
-      equal_dirt_constraint ctd1 ctd2 && equal_ty ty1 ty2
   | _ -> false
 
 (*       Error.typing ~loc:Location.unknown "%t <> %t" (print_ty ty1)
@@ -281,10 +269,6 @@ let rec free_params_ty = function
       FreeParams.union (free_params_dirty cty1) (free_params_dirty cty2)
   | TyBasic _prim_ty -> FreeParams.empty
   | Apply (_, vtys) -> FreeParams.union_map free_params_ty vtys
-  | QualTy (ct, vty) ->
-      FreeParams.union (free_params_ct_ty ct) (free_params_ty vty)
-  | QualDirt (ct, vty) ->
-      FreeParams.union (free_params_ct_dirt ct) (free_params_ty vty)
 
 (* Compute the free dirt variables of a target computation type *)
 and free_params_dirty (ty, dirt) =

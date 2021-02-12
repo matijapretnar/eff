@@ -116,11 +116,6 @@ and veval state e =
   | Term.Lambda a -> V.Closure (eval_closure state a.term)
   | Term.Handler h -> V.Handler (eval_handler state h)
   | Term.CastExp (e, _coercion) -> veval state e
-  | Term.LambdaTyCoerVar (_, e)
-  | Term.LambdaDirtCoerVar (_, e)
-  | Term.ApplyTyCoercion (e, _)
-  | Term.ApplyDirtCoercion (e, _) ->
-      veval state e
 
 and eval_handler state
     {

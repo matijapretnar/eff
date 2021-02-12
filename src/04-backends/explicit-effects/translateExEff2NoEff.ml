@@ -35,12 +35,6 @@ let rec elab_ty (ty : ExEffTypes.ty) =
   | ExEffTypes.Tuple tys ->
       let ty_elab_list = List.map elab_ty tys in
       NoEff.NTyTuple ty_elab_list
-  | ExEffTypes.QualTy ((t1, t2), ty) ->
-      let elab1 = elab_ty t1 in
-      let elab2 = elab_ty t2 in
-      let elab3 = elab_ty ty in
-      NoEff.NTyQual ((elab1, elab2), elab3)
-  | ExEffTypes.QualDirt (_, ty) -> elab_ty ty
   | ExEffTypes.TyBasic ty -> NoEff.NTyBasic ty
 
 and elab_dirty (ty, dirt) =
@@ -103,12 +97,6 @@ let rec elab_ty_coercion coer =
   | Constraint.TupleCoercion lst ->
       let elabs = List.map elab_ty_coercion lst in
       NoEff.NCoerTuple elabs
-  | Constraint.QualTyCoer c ->
-      let elabc = elab_ty_coercion c in
-      NoEff.NCoerQual elabc
-  | Constraint.QualDirtCoer c ->
-      let elabc = elab_ty_coercion c in
-      elabc
 
 and elab_dirty_coercion { term = tcoer, dcoer; _ } =
   let tyelab = elab_ty_coercion tcoer in
@@ -196,19 +184,6 @@ and elab_expression' exp =
       let elab1 = elab_expression value in
       let elab2 = elab_ty_coercion coer in
       NoEff.NCast (elab1, elab2)
-  | ExEff.LambdaTyCoerVar (par, exp) ->
-      let elabv = elab_expression exp in
-      NoEff.NBigLambdaCoer (par, elabv)
-  | ExEff.LambdaDirtCoerVar (_par, value) ->
-      let elabv = elab_expression value in
-      elabv
-  | ExEff.ApplyTyCoercion (value, coer) ->
-      let elabc = elab_ty_coercion coer in
-      let elabv = elab_expression value in
-      NoEff.NApplyCoer (elabv, elabc)
-  | ExEff.ApplyDirtCoercion (value, _coer) ->
-      let elabv = elab_expression value in
-      elabv
   | ExEff.Variant (lbl, None) -> NoEff.NVariant (lbl, None)
   | ExEff.Variant (lbl, Some exp) ->
       let elab_e = elab_expression exp in
