@@ -50,7 +50,8 @@ let bigTest num =
     end
   in
   let finalCase = createCase num in
-  try 
+  match 
     interp finalCase
   with 
-    effect (DivByZero ()) k -> -1
+  | effect (DivByZero ()) k -> -1
+  | x -> x

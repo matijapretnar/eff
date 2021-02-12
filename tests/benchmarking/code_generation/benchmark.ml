@@ -12,23 +12,23 @@ and number_of_range = 100
 
 and size_of_interp_expression = 200
 
-let run_loop_pure = false
+let run_loop_pure = true
 
-and run_loop_latent = false
+and run_loop_latent = true
 
-and run_loop_incr = false
+and run_loop_incr = true
 
-and run_loop_incr' = false
+and run_loop_incr' = true
 
-and run_loop_state = false
+and run_loop_state = true
 
-and run_queens_one = false
+and run_queens_one = true
 
-and run_queens_all = false
+and run_queens_all = true
 
-and run_interp = true
+and run_interp = false
 
-and run_range = false
+and run_range = true
 
 let benchmark test =
   let ols =
