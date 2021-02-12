@@ -1,15 +1,17 @@
 type empty
 
-type ('eff_arg, 'eff_res) effect = ..
+type ('eff_arg, 'eff_res) eff_internal_effect = ..
 
 type 'a computation =
   | Value : 'a -> 'a computation
   | Call :
-      ('eff_arg, 'eff_res) effect * 'eff_arg * ('eff_res -> 'a computation)
+      ('eff_arg, 'eff_res) eff_internal_effect
+      * 'eff_arg
+      * ('eff_res -> 'a computation)
       -> 'a computation
 
 type ('eff_arg, 'eff_res, 'b) effect_clauses =
-  ('eff_arg, 'eff_res) effect -> 'eff_arg -> ('eff_res -> 'b) -> 'b
+  ('eff_arg, 'eff_res) eff_internal_effect -> 'eff_arg -> ('eff_res -> 'b) -> 'b
 
 type ('a, 'b) handler_clauses = {
   value_clause : 'a -> 'b;

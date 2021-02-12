@@ -231,8 +231,8 @@ and pp_effect_cls state eff_cls ppf =
       (pp_pattern state pat1) (pp_pattern state pat2) (pp_term state t)
   in
   print ppf
-    "@[<h>(fun (type a) (type b) (eff : (a, b) effect) : (a -> (b -> _) -> _) \
-     -> \n\
+    "@[<h>(fun (type a) (type b) (eff : (a, b) eff_internal_effect) : (a -> (b \
+     -> _) -> _) -> \n\
     \  (match eff with\n\
     \    %t  \n\
     \    | eff' -> (fun arg k -> Call (eff', arg, k))\n\
@@ -240,7 +240,9 @@ and pp_effect_cls state eff_cls ppf =
     (pp_sequence " " pp_effect_abs2 (Assoc.to_list eff_cls))
 
 let pp_def_effect (eff, (ty1, ty2)) ppf =
-  print ppf "@[type(_, _) effect += %t : (%t, %t) effect @]@.;;"
+  print ppf
+    "@[type(_, _) eff_internal_effect += %t : (%t, %t) eff_internal_effect \
+     @]@.;;"
     (CoreTypes.Effect.print eff)
     (pp_type ty1) (pp_type ty2)
 
