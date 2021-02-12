@@ -48,7 +48,11 @@ type expression = (expression', Type.ty) typed
 (** Pure expressions *)
 
 and expression' =
-  | Var of { variable : variable }
+  | Var of {
+      variable : variable;
+      ty_coercions : Constraint.ty_coercion list;
+      dirt_coercions : Constraint.dirt_coercion list;
+    }
   | Const of Language.Const.t
   | Tuple of expression list
   | Record of (CoreTypes.Field.t, expression) Assoc.t
@@ -93,11 +97,18 @@ and abstraction2 =
   (pattern * pattern * computation, Type.ty * Type.ty * Type.dirty) typed
 (** Abstractions that take two arguments. *)
 
-let var x = { term = Var { variable = x }; ty = x.ty }
+let mono_var x =
+  {
+    term = Var { variable = x; ty_coercions = []; dirt_coercions = [] };
+    ty = x.ty;
+  }
+
+let poly_var x ty_coercions dirt_coercions =
+  { term = Var { variable = x; ty_coercions; dirt_coercions }; ty = x.ty }
 
 let fresh_variable x ty =
   let x' = { term = CoreTypes.Variable.fresh x; ty } in
-  (pVar x', var x')
+  (pVar x', mono_var x')
 
 let const (c : Language.Const.t) : expression =
   { term = Const c; ty = Type.TyBasic (Const.infer_ty c) }
@@ -364,7 +375,8 @@ let rec refresh_expression sbst exp =
 and refresh_expression' sbst = function
   | Var x as e -> (
       match Assoc.lookup x.variable sbst with
-      | Some x' -> Var { variable = x' }
+      (* TODO: SHOULD COERCIONS BE REFRESHED? *)
+      | Some x' -> Var { x with variable = x' }
       | None -> e)
   | Lambda abs -> Lambda (refresh_abstraction sbst abs)
   | Handler h -> Handler (refresh_handler sbst h)

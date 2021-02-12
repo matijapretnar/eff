@@ -209,8 +209,8 @@ and optimize_abstraction' state (pat, cmp) =
   match (pat.term, cmp'.term) with
   | Term.PVar v, Term.Match ({ term = Var v'; _ }, [ abs ])
   | Term.PVar v, Term.LetVal ({ term = Term.Var v'; _ }, abs)
-    when v = v'.variable && Term.does_not_occur v.term (Term.free_vars_abs abs)
-    ->
+    when v.term = v'.variable.term
+         && Term.does_not_occur v.term (Term.free_vars_abs abs) ->
       abs.term
   | _ -> (pat, cmp')
 
@@ -269,24 +269,27 @@ and bind_abstraction state { term = pat, cmp; _ } bind =
 
 and handle_computation state hnd comp =
   match comp.term with
-  | Term.Apply ({ term = Var { variable = f }; _ }, exp)
+  | Term.Apply
+      ({ term = Var { variable = f; ty_coercions; dirt_coercions }; _ }, exp)
     when Option.is_some
            (Assoc.lookup
               (hnd.term.Term.effect_clauses.fingerprint, f.term)
               state.specialized_functions)
          && state.config.specialize_functions -> (
       let value_clause = hnd.term.Term.value_clause in
+      assert (ty_coercions = []);
+      assert (dirt_coercions = []);
       match
         Assoc.lookup
           (hnd.term.Term.effect_clauses.fingerprint, f.term)
           state.specialized_functions
       with
       | Some (f', FixedReturnClause value_clause') ->
-          if value_clause = value_clause' then Term.apply (Term.var f', exp)
+          if value_clause = value_clause' then Term.apply (Term.mono_var f', exp)
           else raise (ReturnClauseNotFixed f.term)
       | Some (f', VaryingReturnClause) ->
           Term.apply
-            ( Term.var f',
+            ( Term.mono_var f',
               Term.tuple [ exp; Term.lambda hnd.term.Term.value_clause ] )
       | None -> assert false)
   | _ when not state.config.handler_reductions ->
