@@ -82,6 +82,22 @@
  (deps
  %{bin:eff}
   (source_tree .))
+   (target "invalid_match_type.eff.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       1
+       (run eff "./invalid_match_type.eff")))))
+
+(rule
+ (alias runtest)
+  (action
+   (diff "invalid_match_type.eff.ref" "invalid_match_type.eff.out")))
+
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
    (target "less_than_complex.eff.out")
     (action
      (with-outputs-to "%{target}"
