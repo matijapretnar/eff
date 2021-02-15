@@ -49,8 +49,8 @@ let _no_attack_70 (Queen (_x_71, _y_72) : queen)
       match _op_61 (* <> *) _y_72 _y'_74 with
       | true ->
           _op_61 (* <> *) (_abs_66 (_x_71 - _x'_73)) (_abs_66 (_y_72 - _y'_74))
-      | false -> false
       | false -> false)
+  | false -> false
 
 let no_attack = _no_attack_70
 

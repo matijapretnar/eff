@@ -190,7 +190,8 @@ let rec pp_term ?max_level state noEff_term ppf =
       print ~at_level:2 "@[<hv>match %t with@, _ -> assert false@]"
         (pp_term state t)
   | NMatch (t, cases) ->
-      print ~at_level:2 "@[<hv>match %t with@, %t@]" (pp_term state t)
+      print ~at_level:2 "@[<hv>begin match %t with @, %t end @]"
+        (pp_term state t)
         (pp_sequence "@, | " (pp_abs state) cases)
   | NCall (e, t, abs_ty) ->
       print ~at_level:2 "@[<hov 2> Call (%t, %t, (fun %t))@]" (pp_effect e)
