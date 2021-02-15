@@ -60,12 +60,30 @@ let test_suite =
            forget_value LoopMulticore.test_state,
            fun n -> LoopMulticore.test_state n = n )
   in
+  let queens_one_benchmark = 
+    base_suite.queens_one_benchmark
+    |> add_benchmark
+         ( "Multicore translated",
+           forget_value QueensMulticoreTranslated.queens_one_option,
+           always_true QueensMulticoreTranslated.queens_one_option )
+  in
+  let queens_one_cps_benchmark = 
+    base_suite.queens_one_benchmark
+    |> add_benchmark
+         ( "Multicore translated",
+           forget_value QueensMulticoreTranslated.queens_one_cps,
+           always_true QueensMulticoreTranslated.queens_one_cps )
+  in
   let queens_all_benchmark =
     base_suite.queens_all_benchmark
     |> add_benchmark
          ( "Multicore",
            forget_value QueensMulticore.queens_all,
            always_true QueensMulticore.queens_all )
+    |> add_benchmark
+         ( "Multicore translated",
+           forget_value QueensMulticoreTranslated.queens_all,
+           always_true QueensMulticoreTranslated.queens_all )
   in
   {
     base_suite with
@@ -77,4 +95,6 @@ let test_suite =
     loop_incr'_benchmark;
     loop_state_benchmark;
     queens_all_benchmark;
+    queens_one_benchmark;
+    queens_one_cps_benchmark;
   }

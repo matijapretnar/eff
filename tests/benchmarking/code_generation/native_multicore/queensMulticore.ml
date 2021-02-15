@@ -1,4 +1,4 @@
-(* Taken varbatim from 
+(* Taken verbatim from 
 https://github.com/ocaml-multicore/effects-examples/blob/68f16120873f1ade4536ab3916ccce47fd424f9e/queens.ml 
 *)
 
