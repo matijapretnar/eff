@@ -23,7 +23,7 @@ let binary_float_op_ty = binary_op_ty float_ty float_ty float_ty
 let binary_string_op_ty = binary_op_ty string_ty string_ty string_ty
 
 (* TODO: I want to be polymorphic *)
-let comparison_ty = binary_op_ty int_ty int_ty bool_ty
+let comparison_ty = binary_op_ty string_ty string_ty bool_ty
 
 let primitive_type_scheme = function
   | Language.Primitives.CompareEq -> comparison_ty

@@ -208,7 +208,9 @@ let ty_omega_step sub paused cons rest_queue omega = function
           Constraint.add_to_constraints
             (Constraint.SkelEq (skel_tv, skel_a))
             rest_queue )
-  | _, _ -> assert false
+  | t1, t2 ->
+      Print.debug "%t != %t" (Type.print_ty t1) (Type.print_ty t2);
+      assert false
 
 let dirt_omega_step sub paused cons rest_queue omega dcons =
   match dcons with

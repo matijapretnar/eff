@@ -425,7 +425,11 @@ and tcOpCase state
   let k =
     match kop.term with
     | Term.PVar k -> k
-    | _ -> failwith "tcOpCase: only varpats allowed"
+    | Term.PNonbinding -> CoreTypes.Variable.fresh "k"
+    | _ ->
+        failwith
+          "tcOpCase: only variables and underscores allowed in continuation \
+           patterns"
   in
 
   (* 5: Generate all the needed constraints *)
@@ -971,15 +975,15 @@ let top_level_rec_abstraction state defs =
 
 let top_level_expression state expr =
   let expr, residuals = infer_expression state expr in
-  (* Print.debug "TERM: %t" (Term.print_expression expr); *)
-  (* Print.debug "TYPE: %t" (Type.print_ty expr.ty); *)
-  (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
+  Print.debug "TERM: %t" (Term.print_expression expr);
+  Print.debug "TYPE: %t" (Type.print_ty expr.ty);
+  Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals);
   let free_params = Term.free_params_expression expr in
   let mono_sub = monomorphize free_params residuals in
-  (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
+  Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub);
   let mono_expr = subInExp mono_sub expr in
-  (* Print.debug "MONO TERM: %t" (Term.print_expression mono_expr); *)
-  (* Print.debug "MONO TYPE: %t" (Type.print_ty mono_expr.ty); *)
+  Print.debug "MONO TERM: %t" (Term.print_expression mono_expr);
+  Print.debug "MONO TYPE: %t" (Type.print_ty mono_expr.ty);
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_expression mono_expr));
   mono_expr

@@ -1,9 +1,15 @@
-let absurd void = match void with;;
+type string_list = StrNil | StrCons of string * string_list
+type int_list = IntNil | IntCons of int * int_list
 
 let rec (@) xs ys =
   match xs with
-  | [] -> ys
-  | x :: xs -> x :: (xs @ ys)
+  | StrNil -> ys
+  | StrCons(x, xs) -> StrCons(x, (xs @ ys))
+
+let rec (@@) xs ys =
+  match xs with
+  | IntNil -> ys
+  | IntCons(x, xs) -> IntCons(x, (xs @@ ys))
 
 (***********************************
 *********** The Parser *************
@@ -14,40 +20,10 @@ let rec (@) xs ys =
 ********************************)
 
 effect Symbol : string -> string;;
-effect Fail : unit -> empty;;
+effect FailString : unit -> string;;
+effect FailInt : unit -> int;;
 effect Decide : unit -> bool
 
-(********************************
-* Handlers
-********************************)
-
-let parse = handler
-    | val y -> (fun s ->
-        begin match s with
-        | [] -> y
-        | _ -> (absurd (#Fail ()))
-        end
-    )
-    | #Symbol c k ->
-        fun s ->
-        (begin match s with
-            | [] -> (absurd (#Fail ()))
-            | (x :: xs) -> if (c = x) then k x xs else (absurd (#Fail ()))
-        end
-        )
-;;
-
-let allsols = handler
-  | val x -> [x]
-  | #Decide _ k -> k true @ k false
-  | #Fail _ _ -> []
-;;
-
-let backtrack = handler
-    | #Decide _ k ->
-        handle k true with
-            | #Fail _ _ -> k false
-;;
 (********************************
 * Parser :: string list to int
 ********************************)
@@ -56,8 +32,8 @@ let createNumber (prev, num) = prev * 10 + num;;
 
 let rec parseNum (l, v) =
     begin match l with
-    | [] -> v
-    | (x :: xs) ->
+    | StrNil -> v
+    | StrCons(x, xs) ->
         begin match x with
         | "0" -> parseNum (xs, (createNumber (v, 0)))
         | "1" -> parseNum (xs, (createNumber (v, 1)))
@@ -81,49 +57,49 @@ let rec toNum l = parseNum (l, 0);;
 
 let digit () =
 
-        let nums = ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"] in
+        let nums = StrCons ("0", StrCons ("1", StrNil)) in
         let rec checkNums n =
             begin match n with
-            | [] -> (absurd (#Fail ()))
-            | (x :: xs) ->
-                if (#Decide ()) then (#Symbol x) else (checkNums xs)
+            | StrNil -> perform (FailString ())
+            | StrCons(x, xs) ->
+                if (perform (Decide ())) then (perform (Symbol x)) else (checkNums xs)
             end in
         checkNums nums
 ;;
 
-let rec many m = if (#Decide ()) then (m ()) else ([]);;
 
 let rec many1 () =
-    let x = digit () in
+    let rec many m = if (perform (Decide ())) then (m ()) else (StrNil) in
+    let x = digit () in 
     let xs = many many1 in
-    [x] @ xs
+    StrCons (x, StrNil) @ xs
 ;;
 
 let rec expr () =
     let rec term () =
         let rec factor () =
-            if (#Decide ()) then (
+            if (perform (Decide ())) then (
                 let i = many1 () in
                 (toNum i)
             ) else (
-                let p = #Symbol "(" in
+                let p = perform (Symbol "(") in
                 let j = expr () in
-                let p = #Symbol ")" in
+                let p = perform (Symbol ")") in
                 j
             )
         in
-        if (#Decide ()) then (
+        if (perform (Decide ())) then (
             let i = factor () in
-            let p = #Symbol "*" in
+            let p = perform (Symbol "*") in
             let j = term () in
             i * j
         ) else (
             factor ()
         )
     in
-    if (#Decide ()) then (
+    if (perform (Decide ())) then (
         let i = term () in
-        let p = #Symbol "+" in
+        let p = perform (Symbol "+") in
         let j = expr () in
         i + j
     ) else (
@@ -136,9 +112,39 @@ let rec expr () =
 ********************************)
 
 let parseTest () =
+
+    let parse = handler
+        | y -> (fun s ->
+            begin match s with
+            | StrNil -> y
+            | _ -> perform (FailInt ())
+            end
+        )
+        | effect (Symbol c) k ->
+            fun s ->
+            (begin match s with
+                | StrNil -> perform (FailInt ())
+                | StrCons(x, xs) -> if (c = x) then k x xs else perform (FailInt ())
+            end
+            )
+    in
+
+    let allsols = handler
+    | x -> IntCons (x, IntNil)
+    | effect (Decide _) k -> k true @@ k false
+    | effect (FailString _) _ -> IntNil
+    | effect (FailInt _) _ -> IntNil
+    in
+
+    let backtrack = handler
+        | effect (Decide _) k ->
+            handle k true with
+                | effect (FailString _) _ -> k false
+                | effect (FailInt _) _ -> k false
+    in
     with allsols handle (with parse handle (
             expr ()
-        )) ["4"; "3"; "*"; "("; "3"; "+"; "3"; ")"]
+        )) (StrCons ("4", StrCons("3", StrCons("*", StrCons("(", StrCons("3", StrCons("+", StrCons("3", StrCons(")", StrNil)))))))))
 ;;
 
-let x = parseTest ()
+parseTest ()
