@@ -425,7 +425,7 @@ and reduce_computation' state comp =
           (fun (v, abs) state -> add_recursive_function state v abs)
           defs state
       in
-      let c' = reduce_computation state' c in
+      let c' = optimize_computation state' c in
       match keep_used_bindings defs c' with
       | [] -> c'
       | defs' -> Term.letRec (Assoc.of_list defs', c'))
