@@ -1,6 +1,6 @@
-type (_, _) effect += Op1 : (int, unit) effect
+type (_, _) eff_internal_effect += Op1 : (int, unit) eff_internal_effect
 
-type (_, _) effect += Op2 : (int, unit) effect
+type (_, _) eff_internal_effect += Op2 : (int, unit) eff_internal_effect
 
 ;;
 Call (Op1, 1, fun (_y_50 : unit) -> Value _y_50)

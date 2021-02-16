@@ -1,4 +1,4 @@
-type (_, _) effect += Op : (int, int) effect
+type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect
 
 ;;
 1

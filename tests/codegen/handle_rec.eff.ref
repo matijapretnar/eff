@@ -1,4 +1,4 @@
-type (_, _) effect += Eff : (unit, unit) effect
+type (_, _) eff_internal_effect += Eff : (unit, unit) eff_internal_effect
 
 ;;
 let rec _f_41 _x_54 =

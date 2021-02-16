@@ -1,4 +1,4 @@
-type (_, _) effect += Decide : (unit, bool) effect
+type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
 
 type intlist = IntNil | IntCons of (int * intlist)
 

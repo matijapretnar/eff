@@ -2,11 +2,11 @@ type foo = A | B of bar
 
 and bar = { x : foo }
 
-type (_, _) effect += Op1 : (int, bar) effect
+type (_, _) eff_internal_effect += Op1 : (int, bar) eff_internal_effect
 
-type (_, _) effect += Op2 : (bar, foo) effect
+type (_, _) eff_internal_effect += Op2 : (bar, foo) eff_internal_effect
 
-type (_, _) effect += Op3 : (foo, int) effect
+type (_, _) eff_internal_effect += Op3 : (foo, int) eff_internal_effect
 
 ;;
 fun (_a_42 : int) ->

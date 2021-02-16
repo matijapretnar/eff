@@ -1,4 +1,4 @@
-type (_, _) effect += Decide : (unit, bool) effect
+type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
 
 let _two_41 = 2
 
@@ -22,7 +22,8 @@ force_unsafe
       {
         value_clause = (fun (_x_56 : int) -> Value (IntCons (_x_56, IntNil)));
         effect_clauses =
-          (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+          (fun (type a b) (eff : (a, b) eff_internal_effect) :
+               (a -> (b -> _) -> _) ->
             match eff with
             | Decide ->
                 fun () _l_63 ->

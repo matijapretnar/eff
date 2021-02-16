@@ -1,6 +1,6 @@
-type (_, _) effect += Op1 : (int, int) effect
+type (_, _) eff_internal_effect += Op1 : (int, int) eff_internal_effect
 
-type (_, _) effect += Op2 : (int, int) effect
+type (_, _) eff_internal_effect += Op2 : (int, int) eff_internal_effect
 
 ;;
 coer_hand_to_fun coer_refl_ty force_unsafe
@@ -8,7 +8,8 @@ coer_hand_to_fun coer_refl_ty force_unsafe
      {
        value_clause = (fun (_x_45 : int) -> Value _x_45);
        effect_clauses =
-         (fun (type a b) (eff : (a, b) effect) : (a -> (b -> _) -> _) ->
+         (fun (type a b) (eff : (a, b) eff_internal_effect) :
+              (a -> (b -> _) -> _) ->
            match eff with
            | Op1 -> fun _n_41 _l_48 -> Value 1
            | Op2 -> fun _n_43 _l_49 -> Value 2

@@ -1,6 +1,6 @@
-type (_, _) effect += Get : (unit, int) effect
+type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
-type (_, _) effect += Put : (int, unit) effect
+type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
 
 ;;
 (let rec _loop_42 _x_65 =

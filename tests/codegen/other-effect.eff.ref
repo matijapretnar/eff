@@ -1,4 +1,4 @@
-type (_, _) effect += WriteInt : (int, unit) effect
+type (_, _) eff_internal_effect += WriteInt : (int, unit) eff_internal_effect
 
 ;;
 let rec _f_48 _x_57 =

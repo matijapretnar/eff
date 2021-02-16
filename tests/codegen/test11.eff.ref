@@ -1,3 +1,3 @@
-type (_, _) effect += Op1 : (int, int) effect
+type (_, _) eff_internal_effect += Op1 : (int, int) eff_internal_effect
 
-type (_, _) effect += Op2 : (int, int) effect
+type (_, _) eff_internal_effect += Op2 : (int, int) eff_internal_effect
