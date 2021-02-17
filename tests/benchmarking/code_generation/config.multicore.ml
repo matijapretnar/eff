@@ -68,7 +68,7 @@ let test_suite =
            always_true QueensMulticoreTranslated.queens_one_option )
   in
   let queens_one_cps_benchmark =
-    base_suite.queens_one_benchmark
+    base_suite.queens_one_cps_benchmark
     |> add_benchmark
          ( "Multicore translated",
            forget_value QueensMulticoreTranslated.queens_one_cps,
