@@ -26,7 +26,7 @@ and run_queens_one = true
 
 and run_queens_all = true
 
-and run_interp = false
+and run_interp = true
 
 and run_range = true
 
@@ -129,14 +129,13 @@ let () =
     let set = suite.queens_all_benchmark number_of_queens in
     Printf.printf "%s (%d queens):\n" set.name set.param;
     run_and_show_set set);
-  if run_interp then (
-    let set = suite.interpreter_benchmark size_of_interp_expression in
-    Printf.printf "%s (size: %d):\n" set.name size_of_interp_expression;
-    run_and_show_set set);
-  if run_interp then (
-    let set = suite.interpreter_benchmark (size_of_interp_expression * 5) in
-    Printf.printf "%s (size: %d):\n" set.name size_of_interp_expression;
-    run_and_show_set set);
+  if run_interp then
+    List.iter
+      (fun n ->
+        let set = suite.interpreter_benchmark n in
+        Printf.printf "%s (size: %d):\n" set.name set.param;
+        run_and_show_set set)
+      [ size_of_interp_expression; 5 * size_of_interp_expression ];
   if run_range then (
     let set = suite.range_benchmarks number_of_range in
     Printf.printf "%s :\n" set.name;
