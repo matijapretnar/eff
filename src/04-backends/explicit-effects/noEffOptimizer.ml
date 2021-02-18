@@ -128,6 +128,21 @@ and n_abstraction_2_args state ((pat1, pat2, term) : NoEff.n_abstraction_2_args)
     =
   (pat1, pat2, optimize_term state term)
 
+and reduce_letrec l t =
+  (* Is it worth it to remove unneeded let rec ? *)
+  let reduce_single (p, t) =
+    match (p, t) with
+    (* Let rec with pattern unwrap gets compiled to let rec with let unwrap case *)
+    | NoEff.PNVar v, NoEff.NMatch (NoEff.NVar v', [ (p', t') ])
+    | NoEff.PNVar v, NoEff.NLet (NoEff.NVar v', (p', t'))
+      when v = v' ->
+        let vars = NoEff.free_vars t' in
+        let inside, outside = NoEff.occurrences v' vars in
+        if inside = 0 && outside = 0 then (p', t') else (p, t)
+    | n -> n
+  in
+  NoEff.NLetRec (Assoc.map reduce_single l, t)
+
 and beta_reduce state ((_, trm1) as abs) trm2 =
   match (abstraction_inlinability abs, trm2) with
   | Inlinable, _
@@ -151,6 +166,8 @@ and reduce_term' state (n_term : NoEff.n_term) =
       let cont = NoEff.NApplyTerm (NoEff.NFun k, NoEff.NVar v) in
       optimize_term state (NCall (e, arg, (p', ty, NoEff.NBind (cont, f))))
   | NLet (e, a) -> beta_reduce state a e
+  | NLetRec (l, t) ->
+      reduce_letrec l t
   | NApplyTerm (NFun (p, _, c), t) -> beta_reduce state (p, c) t
   | _ -> n_term
 

@@ -480,6 +480,45 @@
  (deps
  %{bin:eff}
   (source_tree .))
+   (target "optimize_pattern_match.eff.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       (or 0 0 1 2)
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./optimize_pattern_match.eff")))))
+
+(rule
+ (deps "optimize_pattern_match.eff.out")
+ (target "optimize_pattern_match.eff.out.formatted")
+  (action
+   (with-outputs-to "%{target}"
+    (with-accepted-exit-codes (or 0 1 2)
+     (run ocamlformat optimize_pattern_match.eff.out)))))
+
+(rule
+ (deps "optimize_pattern_match.eff.out.formatted" ocaml_header.tmp)
+ (target "optimize_pattern_match.eff.out.formatted.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - optimize_pattern_match.eff.out.formatted)))))
+
+(rule
+ (deps "optimize_pattern_match.eff.out.formatted.ocaml_with_header")
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "optimize_pattern_match.eff.out.formatted.ocaml_with_header"))))
+
+(rule
+ (deps "optimize_pattern_match.eff.out.formatted")
+  (alias runtest)
+   (action
+    (diff "optimize_pattern_match.eff.ref" "optimize_pattern_match.eff.out.formatted")))
+
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
    (target "original.eff.out")
     (action
      (with-outputs-to "%{target}"
