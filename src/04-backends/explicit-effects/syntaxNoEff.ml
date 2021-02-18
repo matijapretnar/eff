@@ -203,8 +203,8 @@ and subs_var_in_abs_with_ty par subs { term = p, t, c; ty } =
   let p, c = (subs_var_in_abs par subs { term = (p, c); ty }).term in
   { term = (p, t, c); ty }
 
-let occurrences x (inside, outside) =
-  let count ys = List.length (List.filter (fun y -> x = y) ys) in
+let occurrences (x : variable) (inside, outside) =
+  let count ys = List.length (List.filter (fun y -> x.term = y.term) ys) in
   (count inside, count outside)
 
 let pattern_match p e =
@@ -291,7 +291,7 @@ and substitue_handler sbst h =
       };
   }
 
-let beta_reduce (pat, trm2) trm1 =
+let beta_reduce (pat, trm1) trm2 =
   (* let { term = pat, trm2; _ } = refresh_abstraction Assoc.empty abs in *)
   let sub = pattern_match pat trm1 in
   Option.map (fun sub -> substitute_term sub trm2) sub
