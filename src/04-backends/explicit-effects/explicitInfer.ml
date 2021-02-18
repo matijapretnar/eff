@@ -441,6 +441,11 @@ and tcExpr' state : Untyped.plain_expression -> tcExprOutput' = function
 (* Type inference for a located value (expression) *)
 and tcExpr state (e : Untyped.expression) : tcExprOutput =
   let (trm, ty), cnstrs = tcExpr' state e.it in
+  (* Print.debug "%t -> %t : %t / %t"
+     (Untyped.print_expression e)
+     (Term.print_expression' trm)
+     (Type.print_ty ty)
+     (Constraint.print_constraints cnstrs); *)
   ({ term = trm; ty }, cnstrs)
 
 (* ************************************************************************* *)
@@ -472,6 +477,11 @@ and tcComp' state : Untyped.plain_computation -> tcCompOutput' = function
 (* Type inference for a located computation *)
 and tcComp state (c : Untyped.computation) : tcCompOutput =
   let (trm, ty), cnstrs = tcComp' state c.it in
+  Print.debug "%t -> %t : %t / %t"
+    (Untyped.print_computation c)
+    (Term.print_computation' trm)
+    (Type.print_dirty ty)
+    (Constraint.print_constraints cnstrs);
   ({ term = trm; ty }, cnstrs)
 
 (* Typecheck a value wrapped in a return *)

@@ -8,28 +8,28 @@ module TypeContext = Typechecker.TypeDefinitionContext
 module DirtParam = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "drt"
 
-  let utf8_symbol = "\206\180"
+  let utf8_symbol = "δ"
 end))
 
 (** skeleton parameters *)
 module SkelParam = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "skl"
 
-  let utf8_symbol = "s"
+  let utf8_symbol = "ς"
 end))
 
 (** type coercion parameters *)
 module TyCoercionParam = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "tycoer"
 
-  let utf8_symbol = "\207\132co"
+  let utf8_symbol = "ω"
 end))
 
 (** dirt coercion parameters *)
 module DirtCoercionParam = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "dirtcoer"
 
-  let utf8_symbol = "\206\180co"
+  let utf8_symbol = "ϖ"
 end))
 
 module EffectSet = Set.Make (CoreTypes.Effect)
@@ -90,7 +90,10 @@ and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
 let rec print_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
-  | TyParam (p, _) -> CoreTypes.TyParam.print p ppf
+  | TyParam (p, skel) ->
+      print ~at_level:4 "%t:%t"
+        (CoreTypes.TyParam.print p)
+        (print_skeleton skel)
   | Arrow (t1, (t2, drt)) when is_empty_dirt drt ->
       print ~at_level:5 "%t → %t" (print_ty ~max_level:4 t1)
         (print_ty ~max_level:5 t2)

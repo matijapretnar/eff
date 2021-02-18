@@ -307,48 +307,39 @@ let apply_substitutions_to_constraints subs c_list =
 let printy ?at_level ppf = Print.print ?at_level ppf
 
 let print_type_coercion p t ppf =
-  Print.print ppf "substitution: ";
-  printy ppf "%t :-coertyTotyCoer-> %t"
+  printy ppf "%t ↦ %t"
     (Type.TyCoercionParam.print p)
     (Constraint.print_ty_coercion t)
 
 let print_type_param_to_type p t ppf =
-  Print.print ppf "substitution: ";
-  printy ppf "%t :-tyvarToTargetty-> %t"
-    (CoreTypes.TyParam.print p)
-    (Type.print_ty t)
+  printy ppf "%t ↦ %t" (CoreTypes.TyParam.print p) (Type.print_ty t)
 
 let print_dirt_var_sub p t ppf =
-  Print.print ppf "substitution: ";
-  printy ppf "%t :-dirtvarToTargetdirt-> %t" (Type.DirtParam.print p)
-    (Type.print_dirt t)
+  printy ppf "%t ↦ %t" (Type.DirtParam.print p) (Type.print_dirt t)
 
 let print_dirt_var_coercion p t ppf =
-  Print.print ppf "substitution: ";
-  printy ppf "%t :-coertyDirtoDirtCoer-> %t"
+  printy ppf "%t ↦ %t"
     (Type.DirtCoercionParam.print p)
     (Constraint.print_dirt_coercion t)
 
 let print_skel_param_sub p t ppf =
-  Print.print ppf "substitution: ";
-  printy ppf "%t :-skelvarToSkeleton-> %t" (Type.SkelParam.print p)
-    (Type.print_skeleton t)
+  printy ppf "%t ↦ %t" (Type.SkelParam.print p) (Type.print_skeleton t)
 
 let print_sub_list subs ppf =
-  List.iter
-    (fun (x, y) -> Print.print ppf "%t" (print_type_coercion x y))
-    (Assoc.to_list subs.type_param_to_type_coercions);
-  List.iter
-    (fun (x, y) -> Print.print ppf "%t" (print_type_param_to_type x y))
-    (Assoc.to_list subs.type_param_to_type_subs);
-  List.iter
-    (fun (x, y) -> Print.print ppf "%t" (print_dirt_var_sub x y))
-    (Assoc.to_list subs.dirt_var_to_dirt_subs);
-  List.iter
-    (fun (x, y) -> Print.print ppf "%t" (print_dirt_var_coercion x y))
-    (Assoc.to_list subs.dirt_var_to_dirt_coercions);
-  List.iter
-    (fun (x, y) -> Print.print ppf "%t" (print_skel_param_sub x y))
-    (Assoc.to_list subs.skel_param_to_skel_subs)
+  Assoc.iter
+    (fun (x, y) -> Print.print ppf "%t, " (print_type_coercion x y))
+    subs.type_param_to_type_coercions;
+  Assoc.iter
+    (fun (x, y) -> Print.print ppf "%t, " (print_type_param_to_type x y))
+    subs.type_param_to_type_subs;
+  Assoc.iter
+    (fun (x, y) -> Print.print ppf "%t, " (print_dirt_var_sub x y))
+    subs.dirt_var_to_dirt_subs;
+  Assoc.iter
+    (fun (x, y) -> Print.print ppf "%t, " (print_dirt_var_coercion x y))
+    subs.dirt_var_to_dirt_coercions;
+  Assoc.iter
+    (fun (x, y) -> Print.print ppf "%t, " (print_skel_param_sub x y))
+    subs.skel_param_to_skel_subs
 
 let print_substitutions subs ppf = print_sub_list subs ppf

@@ -231,7 +231,9 @@ and print_expression' ?max_level e ppf =
   | Record lst -> Print.record CoreTypes.Field.print print_expression lst ppf
   | Variant (lbl, None) -> print ~at_level:0 "%t" (CoreTypes.Label.print lbl)
   | Variant (lbl, Some e) ->
-      print ~at_level:1 "%t %t" (CoreTypes.Label.print lbl) (print_expression e)
+      print ~at_level:1 "%t %t"
+        (CoreTypes.Label.print lbl)
+        (print_expression ~max_level:0 e)
   | Lambda { term = x, c; _ } ->
       print ~at_level:2 "λ(%t:%t). %t" (print_pattern x) (Type.print_ty x.ty)
         (print_computation c)
@@ -241,7 +243,7 @@ and print_expression' ?max_level e ppf =
         (Print.sequence ";" print_effect_clause
            (Assoc.to_list h.term.effect_clauses.effect_part))
   | CastExp (e1, tc) ->
-      print "%t ▷ %t"
+      print ~at_level:2 "%t ▷ %t"
         (print_expression ~max_level:0 e1)
         (Constraint.print_ty_coercion ~max_level:0 tc)
 
