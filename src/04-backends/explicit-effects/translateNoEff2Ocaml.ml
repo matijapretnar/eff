@@ -43,7 +43,7 @@ let protected =
   @ [ "val"; "virtual"; "when"; "while"; "with"; "continue" ]
 
 let pp_variable ?(safe = true) state var ppf =
-  match Assoc.lookup var state.inlinable_primitives with
+  match Assoc.lookup var.term state.inlinable_primitives with
   | Some s -> Format.fprintf ppf "%s" (OcamlPrimitives.primitive_source s)
   | None ->
       let printer desc n =
@@ -66,7 +66,7 @@ let pp_variable ?(safe = true) state var ppf =
               | _ -> Format.fprintf ppf "_x_%d" n)
           | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc)
       in
-      CoreTypes.Variable.fold printer var
+      CoreTypes.Variable.fold printer var.term
 
 let pp_field pp sep (field, value) ppf =
   print ppf "%t %s %t" (CoreTypes.Field.print field) sep (pp value)
@@ -91,7 +91,7 @@ let rec pp_type noeff_ty ppf =
   | NTyComp ty -> print ppf "%t computation" (pp_type ty)
 
 let rec pp_pattern state pat ppf =
-  match pat with
+  match pat.term with
   | PNVar v -> print ppf "%t" (pp_variable state v)
   | PNAs (p, v) ->
       print ppf "%t as %t" (pp_pattern state p) (pp_variable state v)
@@ -146,12 +146,13 @@ let rec pp_coercion ?max_level coer ppf =
 
 let rec pp_term ?max_level state noEff_term ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match noEff_term with
+  match noEff_term.term with
   | NVar v -> print "%t" (pp_variable state v)
   | NConst c -> print "%t" (Const.print c)
   | NTuple ts -> print "%t" (pp_tuple (pp_term state ~max_level:1) ts)
   | NRecord rcd -> print "%t" (pp_record (pp_term state) "=" rcd)
-  | NVariant (l, Some (NTuple [ hd; tl ])) when l = CoreTypes.cons ->
+  | NVariant (l, Some { term = NTuple [ hd; tl ]; _ }) when l = CoreTypes.cons
+    ->
       print ~at_level:1 "@[<hov>(%t::%t)@]"
         (pp_term state ~max_level:0 hd)
         (pp_term state ~max_level:0 tl)
@@ -172,13 +173,14 @@ let rec pp_term ?max_level state noEff_term ppf =
         (pp_coercion ~max_level:1 c)
         (pp_term state ~max_level:0 t)
   | NReturn t -> print ~at_level:1 "Value %t" (pp_term state ~max_level:0 t)
-  | NHandler { effect_clauses = eff_cls; return_clause = val_cl } ->
+  | NHandler { term = { effect_clauses = eff_cls; return_clause = val_cl }; _ }
+    ->
       print ~at_level:2
         "handler {@[<hov>value_clause = (fun %t);@] @[<hov>effect_clauses = \
          %t;@] }"
         (pp_abs_with_ty state val_cl)
         (pp_effect_cls state eff_cls)
-  | NLet (t1, (pat, t2)) ->
+  | NLet (t1, { term = pat, t2; _ }) ->
       print ~at_level:2 "@[<hv>@[<hv>let %t = %t in@] @,%t@]"
         (pp_pattern state pat) (pp_term state t1) (pp_term state t2)
   | NLetRec (defs, t2) ->
@@ -204,27 +206,27 @@ let rec pp_term ?max_level state noEff_term ppf =
         (pp_term state ~max_level:1 t2)
         (pp_term state ~max_level:0 t1)
 
-and pp_abs state (p, t) ppf =
+and pp_abs state { term = p, t; _ } ppf =
   print ppf "@[<h> %t ->@ %t@]" (pp_pattern state p) (pp_term state t)
 
-and pp_abs_with_ty state (p, ty, t) ppf =
+and pp_abs_with_ty state { term = p, ty, t; _ } ppf =
   print ppf "@[<h>(%t: %t) ->@ %t@]" (pp_pattern state p) (pp_type ty)
     (pp_term state t)
 
 and pp_let_rec state lst ppf =
-  let pp_var_ty_abs (v, (p, t)) ppf =
+  let pp_var_ty_abs (v, { term = p, t; _ }) ppf =
     print ppf "@[<hv 2>and %t %t = @, %t@]" (pp_variable state v)
       (pp_pattern state p) (pp_term state t)
   in
   match Assoc.to_list lst with
   | [] -> ()
-  | (v, (p, t)) :: tl ->
+  | (v, { term = p, t; _ }) :: tl ->
       print ppf "@[<hv 2>let rec %t %t = @, %t@] @,%t" (pp_variable state v)
         (pp_pattern state p) (pp_term state t)
         (pp_sequence " " pp_var_ty_abs tl)
 
 and pp_effect_cls state eff_cls ppf =
-  let pp_effect_abs2 (eff, (pat1, pat2, t)) ppf =
+  let pp_effect_abs2 (eff, { term = pat1, pat2, t; _ }) ppf =
     print ppf "@[<hv 2>| %t -> fun %t %t -> %t @]" (pp_effect eff)
       (pp_pattern state pat1) (pp_pattern state pat2) (pp_term state t)
   in

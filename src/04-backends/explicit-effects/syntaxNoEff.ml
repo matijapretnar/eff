@@ -31,11 +31,15 @@ type n_coercion =
   | NCoerApply of CoreTypes.TyName.t * n_coercion list
   | NCoerTuple of n_coercion list
 
-type variable = Variable.t
+type variable = (Variable.t, n_type) typed
+
+let variable (x : Variable.t) (ty : n_type) = { term = x; ty }
 
 type n_effect = CoreTypes.Effect.t * (n_type * n_type)
 
-type n_pattern =
+type n_pattern = (n_pattern', n_type) typed
+
+and n_pattern' =
   | PNVar of variable
   | PNAs of n_pattern * variable
   | PNTuple of n_pattern list
@@ -45,7 +49,7 @@ type n_pattern =
   | PNNonbinding
 
 let rec pattern_vars pat =
-  match pat with
+  match pat.term with
   | PNVar x -> [ x ]
   | PNAs (p, x) -> x :: pattern_vars p
   | PNTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
@@ -56,7 +60,9 @@ let rec pattern_vars pat =
   | PNConst _ -> []
   | PNNonbinding -> []
 
-type n_term =
+type n_term = (n_term', n_type) typed
+
+and n_term' =
   | NVar of variable
   | NTuple of n_term list
   | NFun of n_abstraction_with_param_ty
@@ -74,18 +80,72 @@ type n_term =
   | NRecord of (CoreTypes.Field.t, n_term) Assoc.t
   | NVariant of CoreTypes.Label.t * n_term option
 
-and n_handler = {
+and n_handler = (n_handler', n_type * n_type) typed
+
+and n_handler' = {
   effect_clauses : (n_effect, n_abstraction_2_args) Assoc.t;
   return_clause : n_abstraction_with_param_ty;
 }
 
-and n_abstraction = n_pattern * n_term
+and n_abstraction = (n_pattern * n_term, n_type * n_type) typed
 
-and n_abstraction_with_param_ty = n_pattern * n_type * n_term
+and n_abstraction_with_param_ty =
+  (n_pattern * n_type * n_term, n_type * n_type) typed
 
-and n_abstraction_2_args = n_pattern * n_pattern * n_term
+and n_abstraction_2_args =
+  (n_pattern * n_pattern * n_term, n_type * n_type * n_type) typed
 
 and n_rec_definitions = (variable, n_abstraction) Assoc.t
+
+let var (x : variable) : n_term = { term = NVar x; ty = x.ty }
+
+let const c = { term = NConst c.term; ty = c.ty }
+
+let tuple t = { term = NTuple t; ty = NTyTuple (List.map (fun e -> e.ty) t) }
+
+let funct (p, ty, t) =
+  let typ = (ty, t.ty) in
+  { term = NFun { term = (p, ty, t); ty = typ }; ty = NTyArrow (ty, t.ty) }
+
+let apply_term (t1, t2) =
+  match t1.ty with
+  | NTyArrow (_ty1, ty2) -> { term = NApplyTerm (t1, t2); ty = ty2 }
+  | _ -> assert false
+
+let cast (t1, coer) = { term = NCast (t1, coer); ty = t1.ty }
+
+let return t = { term = NReturn t; ty = t.ty }
+
+let handler (h : n_handler) : n_term =
+  let t1, t2 = h.ty in
+  { term = NHandler h; ty = NTyHandler (t1, t2) }
+
+let n_let (t1, t2) : n_term =
+  let _ty1, ty2 = t2.ty in
+  { term = NLet (t1, t2); ty = ty2 }
+
+let call (eff, t, abs) : n_term =
+  let _, ty = abs.ty in
+  { term = NCall (eff, t, abs); ty }
+
+let bind (t, abs) : n_term =
+  let _, out = abs.ty in
+  { term = NBind (t, abs); ty = out }
+
+let handle (t1, t2) : n_term =
+  match t1.ty with
+  | NTyHandler (_ty1, ty2) -> { term = NHandle (t1, t2); ty = ty2 }
+  | _ -> assert false
+
+let letrec (l, t) : n_term = { term = NLetRec (l, t); ty = t.ty }
+
+let n_match (t, lst) ty : n_term = { term = NMatch (t, lst); ty }
+
+let record _ass : n_term = failwith "Not implemented"
+
+let variant (l, t) ty : n_term = { term = NVariant (l, t); ty }
+
+let abstraction (p, c) : n_abstraction = { term = (p, c); ty = (p.ty, c.ty) }
 
 type n_tydef =
   | TyDefRecord of (CoreTypes.Field.t, n_type) Assoc.t
@@ -99,41 +159,49 @@ type cmd =
   | DefEffect of n_effect
   | TyDef of (CoreTypes.TyName.t * (CoreTypes.TyParam.t list * n_tydef)) list
 
-let rec subs_var_in_term par subs term =
-  match term with
-  | NVar v -> if v = par then subs else term
-  | NTuple ls -> NTuple (List.map (subs_var_in_term par subs) ls)
-  | NFun abs -> NFun (subs_var_in_abs_with_ty par subs abs)
-  | NApplyTerm (t1, t2) ->
-      NApplyTerm (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
-  | NCast (t, c) -> NCast (subs_var_in_term par subs t, c)
-  | NReturn t -> NReturn (subs_var_in_term par subs t)
-  | NHandler h -> NHandler h
-  | NLet (t, abs) ->
-      NLet (subs_var_in_term par subs t, subs_var_in_abs par subs abs)
-  | NCall (eff, t, abs) ->
-      NCall
-        (eff, subs_var_in_term par subs t, subs_var_in_abs_with_ty par subs abs)
-  | NBind (t, abs) ->
-      NBind (subs_var_in_term par subs t, subs_var_in_abs par subs abs)
-  | NHandle (t1, t2) ->
-      NHandle (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
-  | NConst c -> NConst c
-  | NLetRec (abss, t) ->
-      NLetRec
-        (Assoc.map (subs_var_in_abs par subs) abss, subs_var_in_term par subs t)
-  | NMatch (t, abss) ->
-      NMatch
-        (subs_var_in_term par subs t, List.map (subs_var_in_abs par subs) abss)
-  | NRecord a -> NRecord (Assoc.map (subs_var_in_term par subs) a)
-  | NVariant (lbl, None) -> NVariant (lbl, None)
-  | NVariant (lbl, Some t) -> NVariant (lbl, Some (subs_var_in_term par subs t))
+let rec subs_var_in_term par subs { term; ty } =
+  let term' =
+    match term with
+    | NVar v -> if v = par then subs else term
+    | NTuple ls -> NTuple (List.map (subs_var_in_term par subs) ls)
+    | NFun abs -> NFun (subs_var_in_abs_with_ty par subs abs)
+    | NApplyTerm (t1, t2) ->
+        NApplyTerm (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
+    | NCast (t, c) -> NCast (subs_var_in_term par subs t, c)
+    | NReturn t -> NReturn (subs_var_in_term par subs t)
+    | NHandler h -> NHandler h
+    | NLet (t, abs) ->
+        NLet (subs_var_in_term par subs t, subs_var_in_abs par subs abs)
+    | NCall (eff, t, abs) ->
+        NCall
+          ( eff,
+            subs_var_in_term par subs t,
+            subs_var_in_abs_with_ty par subs abs )
+    | NBind (t, abs) ->
+        NBind (subs_var_in_term par subs t, subs_var_in_abs par subs abs)
+    | NHandle (t1, t2) ->
+        NHandle (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
+    | NConst c -> NConst c
+    | NLetRec (abss, t) ->
+        NLetRec
+          ( Assoc.map (subs_var_in_abs par subs) abss,
+            subs_var_in_term par subs t )
+    | NMatch (t, abss) ->
+        NMatch
+          (subs_var_in_term par subs t, List.map (subs_var_in_abs par subs) abss)
+    | NRecord a -> NRecord (Assoc.map (subs_var_in_term par subs) a)
+    | NVariant (lbl, None) -> NVariant (lbl, None)
+    | NVariant (lbl, Some t) ->
+        NVariant (lbl, Some (subs_var_in_term par subs t))
+  in
+  { term = term'; ty }
 
-and subs_var_in_abs par subs (p, c) = (p, subs_var_in_term par subs c)
+and subs_var_in_abs par subs { term = p, c; ty } =
+  { term = (p, subs_var_in_term par subs c); ty }
 
-and subs_var_in_abs_with_ty par subs (p, t, c) =
-  let p, c = subs_var_in_abs par subs (p, c) in
-  (p, t, c)
+and subs_var_in_abs_with_ty par subs { term = p, t, c; ty } =
+  let p, c = (subs_var_in_abs par subs { term = (p, c); ty }).term in
+  { term = (p, t, c); ty }
 
 let occurrences x (inside, outside) =
   let count ys = List.length (List.filter (fun y -> x = y) ys) in
@@ -141,7 +209,7 @@ let occurrences x (inside, outside) =
 
 let pattern_match p e =
   let rec extend_subst p e sbst =
-    match (p, e) with
+    match (p.term, e.term) with
     | PNVar x, _ -> Some (Assoc.update x e sbst)
     | PNAs (p, x), _ ->
         Option.bind (extend_subst p e sbst) (fun sbst ->
@@ -171,9 +239,13 @@ let pattern_match p e =
 
 (* Substitutions *)
 
-let rec substitute_term sbst n_term =
+let rec substitute_term sbst term =
+  { term with term = substitute_term' sbst term.term }
+
+and substitute_term' sbst n_term =
   match n_term with
-  | NVar x -> ( match Assoc.lookup x sbst with Some e' -> e' | None -> n_term)
+  | NVar x -> (
+      match Assoc.lookup x sbst with Some e' -> e'.term | None -> n_term)
   | NTuple t -> NTuple (List.map (substitute_term sbst) t)
   | NFun a -> NFun (substitute_abstraction_with_ty sbst a)
   | NApplyTerm (t1, t2) ->
@@ -199,17 +271,24 @@ let rec substitute_term sbst n_term =
   | NRecord recs -> NRecord (Assoc.map (substitute_term sbst) recs)
   | NVariant (lbl, a) -> NVariant (lbl, Option.map (substitute_term sbst) a)
 
-and substitute_abstraction sbst (p, c) = (p, substitute_term sbst c)
+and substitute_abstraction sbst { term = p, c; ty } =
+  { term = (p, substitute_term sbst c); ty }
 
-and substitute_abstraction_with_ty sbst (p, ty, c) =
-  (p, ty, substitute_term sbst c)
+and substitute_abstraction_with_ty sbst ({ term = p, ty, c; _ } as t) =
+  { t with term = (p, ty, substitute_term sbst c) }
 
-and substitute_abstraction2 sbst (p1, p2, c) = (p1, p2, (substitute_term sbst) c)
+and substitute_abstraction2 sbst ({ term = p1, p2, c; _ } as t) =
+  { t with term = (p1, p2, (substitute_term sbst) c) }
 
-and substitue_handler sbst { effect_clauses; return_clause } =
+and substitue_handler sbst h =
   {
-    return_clause = substitute_abstraction_with_ty sbst return_clause;
-    effect_clauses = Assoc.map (substitute_abstraction2 sbst) effect_clauses;
+    h with
+    term =
+      {
+        return_clause = substitute_abstraction_with_ty sbst h.term.return_clause;
+        effect_clauses =
+          Assoc.map (substitute_abstraction2 sbst) h.term.effect_clauses;
+      };
   }
 
 let beta_reduce (pat, trm2) trm1 =
@@ -228,7 +307,8 @@ let ( --- ) (inside, outside) bound =
 
 let concat_vars vars = List.fold_right ( @@@ ) vars ([], [])
 
-let rec free_vars = function
+let rec free_vars term =
+  match term.term with
   | NVar v -> ([], [ v ])
   | NTuple l -> concat_vars (List.map free_vars l)
   | NFun abs -> free_vars_abs_with_ty abs
@@ -248,21 +328,22 @@ let rec free_vars = function
   | NVariant (_, e) -> Option.default_map ([], []) free_vars e
 
 and free_vars_handler h =
-  free_vars_abs_with_ty h.return_clause
-  @@@ (Assoc.values_of h.effect_clauses
+  free_vars_abs_with_ty h.term.return_clause
+  @@@ (Assoc.values_of h.term.effect_clauses
       |> List.map free_vars_abs2 |> concat_vars)
 
-and free_vars_abs (p, c) =
+and free_vars_abs { term = p, c; _ } =
   let inside, outside = free_vars c --- pattern_vars p in
   (inside @ outside, [])
 
-and free_vars_letrec (v, (p, c)) =
+and free_vars_letrec (v, { term = p, c; _ }) =
   let inside, outside = free_vars c --- pattern_vars p --- [ v ] in
   (inside @ outside, [])
 
-and free_vars_abs_with_ty (p, _ty, c) = free_vars_abs (p, c)
+and free_vars_abs_with_ty { term = p, _ty, c; ty } =
+  free_vars_abs { term = (p, c); ty }
 
-and free_vars_abs2 (p1, p2, c) =
+and free_vars_abs2 { term = p1, p2, c; _ } =
   let inside, outside = free_vars c --- pattern_vars p2 --- pattern_vars p1 in
   (inside @ outside, [])
 
@@ -312,11 +393,11 @@ let rec print_coercion ?max_level coer ppf =
   | NCoerTuple _ls -> print "tuplecoer"
   | NCoerApply (_ty_name, _cs) -> print "applycoer"
 
-let print_variable = CoreTypes.Variable.print ~safe:true
+let print_variable x = CoreTypes.Variable.print ~safe:true x.term
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match p with
+  match p.term with
   | PNVar var -> print "%t" (print_variable var)
   | PNAs (_pat, var) ->
       print "As %t = %t" (print_variable var) (print_pattern p)
@@ -330,7 +411,7 @@ let rec print_pattern ?max_level p ppf =
 
 let rec print_term ?max_level t ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match t with
+  match t.term with
   | NVar x -> print "%t" (print_variable x)
   | NTuple ts -> Print.tuple print_term ts ppf
   | NFun abs -> print_abstraction_with_param_ty abs ppf
@@ -340,7 +421,7 @@ let rec print_term ?max_level t ppf =
         (print_term ~max_level:0 t2)
   | NCast (t, coer) -> print "(%t) |> [%t]" (print_term t) (print_coercion coer)
   | NReturn t -> print "return %t" (print_term t)
-  | NHandler h ->
+  | NHandler { term = h; _ } ->
       print
         "{@[<hov> value_clause = (@[fun %t@]);@ effect_clauses = (fun (type a) \
          (type b) (x : (a, b) effect) ->\n\
@@ -348,7 +429,7 @@ let rec print_term ?max_level t ppf =
          computation)) @]}"
         (print_abstraction_with_param_ty h.return_clause)
         (print_effect_clauses (Assoc.to_list h.effect_clauses))
-  | NLet (t1, (t2, t3)) ->
+  | NLet (t1, { term = t2, t3; _ }) ->
       print "let (%t = (%t)) in (%t)" (print_pattern t2) (print_term t1)
         (print_term t3)
   | NCall (eff, t, abs) ->
@@ -379,7 +460,7 @@ let rec print_term ?max_level t ppf =
 and print_let_rec_abstraction (f, abs) ppf =
   Format.fprintf ppf "%t %t" (print_variable f) (print_let_abstraction abs)
 
-and print_let_abstraction (t1, t2) ppf =
+and print_let_abstraction { term = t1, t2; _ } ppf =
   Format.fprintf ppf "%t = %t" (print_pattern t1) (print_term t2)
 
 and print_effect_clauses eff_clauses ppf =
@@ -394,13 +475,13 @@ and print_effect_clauses eff_clauses ppf =
 and print_effect (eff, _) ppf =
   Print.print ppf "Effect_%t" (CoreTypes.Effect.print eff)
 
-and print_abstraction (t1, t2) ppf =
+and print_abstraction { term = t1, t2; _ } ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern t1) (print_term t2)
 
-and print_abstraction_with_param_ty (t1, ty, t2) ppf =
+and print_abstraction_with_param_ty { term = t1, ty, t2; _ } ppf =
   Format.fprintf ppf "%t:%t ->@;<1 2> %t" (print_pattern t1) (print_type ty)
     (print_term t2)
 
-and print_abstraction2 (t1, t2, t3) ppf =
+and print_abstraction2 { term = t1, t2, t3; _ } ppf =
   Format.fprintf ppf "(fun %t %t -> %t)" (print_pattern t1) (print_pattern t2)
     (print_term t3)

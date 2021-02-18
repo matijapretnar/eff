@@ -77,98 +77,126 @@ and optimize_term state (n_term : NoEff.n_term) =
   n_term''
 
 and optimize_term' state (n_term : NoEff.n_term) =
-  match n_term with
+  match n_term.term with
   | NVar _ | NConst _ -> n_term
-  | NTuple ts -> NoEff.NTuple (List.map (optimize_term state) ts)
-  | NFun (p, ty, term) -> NFun (p, ty, optimize_term state term)
+  | NTuple ts -> NoEff.tuple (List.map (optimize_term state) ts)
+  | NFun { term = p, ty1, term; _ } ->
+      NoEff.funct (p, ty1, optimize_term state term)
   | NApplyTerm (t1, t2) ->
-      NApplyTerm (optimize_term state t1, optimize_term state t2)
+      NoEff.apply_term (optimize_term state t1, optimize_term state t2)
   | NCast (term, coercion) ->
-      NCast (optimize_term state term, optimize_ty_coercion state coercion)
-  | NReturn term -> NReturn (optimize_term state term)
-  | NHandler hnd -> NHandler (optimize_handler state hnd)
+      NoEff.cast (optimize_term state term, optimize_ty_coercion state coercion)
+  | NReturn term -> NoEff.return (optimize_term state term)
+  | NHandler hnd -> NoEff.handler (optimize_handler state hnd)
   | NLet (term, abs) ->
-      NLet (optimize_term state term, optimize_abstraction state abs)
+      NoEff.n_let (optimize_term state term, optimize_abstraction state abs)
   | NCall (eff, term, abs_with_ty) ->
-      NCall
+      NoEff.call
         ( eff,
           optimize_term state term,
           optimize_abstraction_with_ty state abs_with_ty )
   | NBind (term, abs) ->
-      NBind (optimize_term state term, optimize_abstraction state abs)
-  | NHandle (t1, t2) -> NHandle (optimize_term state t1, optimize_term state t2)
+      NoEff.bind (optimize_term state term, optimize_abstraction state abs)
+  | NHandle (t1, t2) ->
+      NoEff.handle (optimize_term state t1, optimize_term state t2)
   | NLetRec (abs_lst, term) ->
-      NLetRec (optimize_rec_definitions state abs_lst, optimize_term state term)
+      NoEff.letrec
+        (optimize_rec_definitions state abs_lst, optimize_term state term)
   | NMatch (term, abs_list) ->
-      NMatch
+      NoEff.n_match
         ( optimize_term state term,
           List.map (optimize_abstraction state) abs_list )
-  | NRecord ass -> NRecord (Assoc.map (fun t -> optimize_term state t) ass)
+        n_term.ty
+  | NRecord ass -> NoEff.record (Assoc.map (fun t -> optimize_term state t) ass)
   | NVariant (l, opt_term) ->
-      NVariant (l, Option.map (optimize_term state) opt_term)
+      NoEff.variant (l, Option.map (optimize_term state) opt_term) n_term.ty
 
-and optimize_handler state (hnd : NoEff.n_handler) =
+and optimize_handler state (hnd : NoEff.n_handler) : NoEff.n_handler =
   {
-    return_clause = optimize_abstraction_with_ty state hnd.return_clause;
-    effect_clauses = Assoc.map (n_abstraction_2_args state) hnd.effect_clauses;
+    hnd with
+    term =
+      {
+        return_clause =
+          optimize_abstraction_with_ty state hnd.term.return_clause;
+        effect_clauses =
+          Assoc.map (n_abstraction_2_args state) hnd.term.effect_clauses;
+      };
   }
 
 and optimize_rec_definitions state defs =
   Assoc.map (optimize_abstraction state) defs
 
-and optimize_abstraction state ((pat, term) : NoEff.n_abstraction) =
+and optimize_rec_definitions' state defs =
+  Assoc.map NoEff.abstraction (Assoc.map (optimize_abstraction' state) defs)
+
+and optimize_abstraction state { term = pat, term; ty } : NoEff.n_abstraction =
+  { term = (pat, optimize_term state term); ty }
+
+and optimize_abstraction' state ({ term = pat, term; _ } : NoEff.n_abstraction)
+    =
   (pat, optimize_term state term)
 
 and optimize_abstraction_with_ty state
-    ((pat, ty, term) : NoEff.n_abstraction_with_param_ty) =
-  let pat, term = optimize_abstraction state (pat, term) in
-  (pat, ty, term)
+    ({ term = pat, ty, term; ty = a_ty } : NoEff.n_abstraction_with_param_ty) =
+  { term = (pat, ty, optimize_term state term); ty = a_ty }
 
-and n_abstraction_2_args state ((pat1, pat2, term) : NoEff.n_abstraction_2_args)
-    =
-  (pat1, pat2, optimize_term state term)
+and n_abstraction_2_args state
+    ({ term = pat1, pat2, term; ty } : NoEff.n_abstraction_2_args) =
+  { term = (pat1, pat2, optimize_term state term); ty }
 
+and reduce_match t abs ty = NoEff.n_match (t, abs) ty
+
+(*   match abs with [(p1, t1); (p2, t2)] ->  *)
 and reduce_letrec l t =
   (* Is it worth it to remove unneeded let rec ? *)
-  let reduce_single (p, t) =
-    match (p, t) with
+  let reduce_single (({ term = p, t; ty } : NoEff.n_abstraction) as s) :
+      NoEff.n_abstraction =
+    match (p.term, t.term) with
     (* Let rec with pattern unwrap gets compiled to let rec with let unwrap case *)
-    | NoEff.PNVar v, NoEff.NMatch (NoEff.NVar v', [ (p', t') ])
-    | NoEff.PNVar v, NoEff.NLet (NoEff.NVar v', (p', t'))
+    | ( NoEff.PNVar v,
+        NoEff.NMatch ({ term = NoEff.NVar v'; _ }, [ { term = p', t'; _ } ]) )
+    | ( NoEff.PNVar v,
+        NoEff.NLet ({ term = NoEff.NVar v'; _ }, { term = p', t'; _ }) )
       when v = v' ->
         let vars = NoEff.free_vars t' in
         let inside, outside = NoEff.occurrences v' vars in
-        if inside = 0 && outside = 0 then (p', t') else (p, t)
-    | n -> n
+        if inside = 0 && outside = 0 then { term = (p', t'); ty }
+        else { term = (p, t); ty }
+    | _ -> s
   in
-  NoEff.NLetRec (Assoc.map reduce_single l, t)
+  NoEff.letrec (Assoc.map reduce_single l, t)
 
-and beta_reduce state ((_, trm1) as abs) trm2 =
-  match (abstraction_inlinability abs, trm2) with
+(* (Assoc.map reduce_single l, t) *)
+and beta_reduce state ({ term = p, cmp; _ } as abs) trm2 : NoEff.n_term =
+  match (abstraction_inlinability (p, cmp), trm2.term) with
   | Inlinable, _
   (* Inline constants and variables anyway *)
   | NotInlinable, (NoEff.NVar _ | NoEff.NConst _) -> (
-      match NoEff.beta_reduce abs trm2 with
+      match NoEff.beta_reduce abs.term trm2 with
       | Some trm -> optimize_term state trm
-      | None -> NoEff.NLet (trm2, abs))
-  | NotPresent, _ -> trm1
-  | NotInlinable, _ -> NoEff.NLet (trm2, abs)
+      | None -> NoEff.n_let (trm2, abs))
+  | NotPresent, _ -> cmp
+  | NotInlinable, _ -> NoEff.n_let (trm2, abs)
+
+and beta_reduce_with_ty state { term = p, _, cmp; ty } trm2 : NoEff.n_term =
+  beta_reduce state { term = (p, cmp); ty } trm2
 
 and reduce_term' state (n_term : NoEff.n_term) =
   (* Print.debug "Reducing noeff term: %t" (NoEff.print_term n_term); *)
-  match n_term with
-  | NCast (t, (NCoerReturn NCoerRefl as _c)) -> NoEff.NReturn t
+  match n_term.term with
+  | NCast (t, (NCoerReturn NCoerRefl as _c)) -> NoEff.return t
   | NCast (t, NCoerRefl) -> t
-  | NBind (NReturn t, c) -> beta_reduce state c t
-  | NBind (NCall (e, arg, ((_, ty, _) as k)), f) ->
-      let v = NoEff.Variable.fresh "x" in
+  | NBind ({ term = NReturn t; _ }, c) -> beta_reduce state c t
+  (* | NBind ({ term = NCall (e, arg, { term = (_, ty, _) as k; _ }); _ }, f) ->
+      let v = NoEff.Variable.fresh "xXx" in
       let p' = NoEff.PNVar v in
       let cont = NoEff.NApplyTerm (NoEff.NFun k, NoEff.NVar v) in
       optimize_term state (NCall (e, arg, (p', ty, NoEff.NBind (cont, f))))
+  *)
   | NLet (e, a) -> beta_reduce state a e
-  | NLetRec (l, t) ->
-      reduce_letrec l t
-  | NApplyTerm (NFun (p, _, c), t) -> beta_reduce state (p, c) t
+  | NLetRec (l, t) -> reduce_letrec l t
+  | NApplyTerm ({ term = NFun abs; _ }, t) -> beta_reduce_with_ty state abs t
+  | NMatch (t, abs) -> reduce_match t abs n_term.ty
   | _ -> n_term
 
 and reduce_term state n_term =

@@ -200,7 +200,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
 
-  let optimize_term state term =
+  let optimize_term state (term : SyntaxNoEff.n_term) : SyntaxNoEff.n_term =
     let t' =
       if !Config.enable_optimization then
         NoEffOptimizer.optimize_term state.no_eff_optimizer_state term
@@ -211,7 +211,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   let optimize_rec_definitions state defs =
     let defs' =
       if !Config.enable_optimization then
-        NoEffOptimizer.optimize_rec_definitions state.no_eff_optimizer_state
+        NoEffOptimizer.optimize_rec_definitions' state.no_eff_optimizer_state
           defs
       else defs
     in
@@ -233,11 +233,12 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
         :: state.prog;
     }
 
-  let process_top_let state defs =
+  let process_top_let state (defs : (Term.variable, Term.expression) Assoc.t) =
     let defs' =
       Assoc.kmap
         (fun (x, e) ->
-          (x.term, optimize_term state @@ TranslateExEff2NoEff.elab_expression e))
+          ( TranslateExEff2NoEff.elab_variable x,
+            optimize_term state @@ TranslateExEff2NoEff.elab_expression e ))
         defs
     in
     { state with prog = SyntaxNoEff.TopLet defs' :: state.prog }
